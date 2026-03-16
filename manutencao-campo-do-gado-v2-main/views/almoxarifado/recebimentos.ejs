@@ -1,0 +1,50 @@
+<% layout('layout') %>
+
+<div class="page-head">
+  <div>
+    <h1>Recebimentos de Compras</h1>
+    <p class="muted">Conferência de materiais comprados e entrada automática no estoque.</p>
+  </div>
+</div>
+
+<%- include('_tabs', { tab: 'recebimentos' }) %>
+
+<div class="subtabs" style="margin-top:0;">
+  <a class="subtab <%= !status || status === 'COMPRADA' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=COMPRADA">Para receber</a>
+  <a class="subtab <%= status === 'EM_RECEBIMENTO' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=EM_RECEBIMENTO">Em recebimento</a>
+  <a class="subtab <%= status === 'RECEBIDA_PARCIAL' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=RECEBIDA_PARCIAL">Parciais</a>
+  <a class="subtab <%= status === 'FECHADA' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=FECHADA">Fechadas</a>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Número</th><th>Solicitante</th><th>Status</th><th>Ações</th></tr></thead>
+      <tbody>
+        <% const filtrada = lista.filter((s) => !status || s.status === status); %>
+        <% if (!filtrada.length) { %>
+          <tr><td colspan="4" class="muted">Nenhuma solicitação nesta aba.</td></tr>
+        <% } %>
+        <% filtrada.forEach((s) => { %>
+          <tr>
+            <td><strong><%= s.numero || ('#' + s.id) %></strong></td>
+            <td><%= s.solicitante_nome %></td>
+            <td><span class="pill-tag pill-gray"><%= s.status %></span></td>
+            <td style="display:flex;gap:8px;flex-wrap:wrap;">
+              <% if (['COMPRADA', 'REABERTA'].includes(s.status)) { %>
+                <form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/iniciar-recebimento"><button class="btn btn-sm btn-green" type="submit">Iniciar</button></form>
+              <% } %>
+              <a class="btn btn-sm btn-ghost" href="/almoxarifado/solicitacoes/<%= s.id %>/conferir">Conferir</a>
+              <% if (['RECEBIDA_TOTAL', 'RECEBIDA_PARCIAL'].includes(s.status)) { %>
+                <form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/fechar"><button class="btn btn-sm" type="submit">Fechar</button></form>
+              <% } %>
+              <% if (['FECHADA', 'RECEBIDA_PARCIAL'].includes(s.status)) { %>
+                <form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/reabrir"><button class="btn btn-sm" type="submit">Reabrir</button></form>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

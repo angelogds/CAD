@@ -1,0 +1,19 @@
+<% layout('layout') %>
+<div class="page-head">
+  <div>
+    <h1>Novo item</h1>
+    <p class="muted">Cadastre item para controle de saldo e movimentações.</p>
+  </div>
+</div>
+<%- include('_tabs', { tab: 'itens' }) %>
+<div class="card" style="max-width:980px;">
+  <form method="POST" action="/estoque/itens" class="grid-3">
+    <div><div class="label">Código</div><input class="input" name="codigo" /></div>
+    <div><div class="label">Nome</div><input class="input" name="nome" required /></div>
+    <div><div class="label">Unidade</div><input class="input" name="unidade" value="UN" /></div>
+    <div><div class="label">Categoria</div><select class="input" name="categoria_id"><option value="">Selecione</option><% categorias.forEach(c=> { %><option value="<%= c.id %>"><%= c.nome %></option><% }) %></select></div>
+    <div><div class="label">Local</div><select class="input" name="local_id"><option value="">Selecione</option><% locais.forEach(l=> { %><option value="<%= l.id %>"><%= l.nome %></option><% }) %></select></div>
+    <div><div class="label">Saldo mínimo</div><input class="input" type="number" step="0.01" min="0" name="saldo_minimo" value="0" /></div>
+    <div style="grid-column:1/-1;display:flex;gap:8px;"><button class="btn btn-green">Salvar</button><a class="btn btn-ghost" href="/estoque/itens">Cancelar</a></div>
+  </form>
+</div>

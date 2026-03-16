@@ -1,0 +1,31 @@
+<% layout('layout') %>
+
+<div class="card">
+  <h1>Editar <%= equip.nome %></h1>
+  <form action="/equipamentos/<%= equip.id %>/editar" method="POST" enctype="multipart/form-data" class="form-grid">
+    <input class="input" name="codigo" value="<%= equip.codigo || '' %>" placeholder="Código interno / tag" />
+    <input class="input" name="nome" value="<%= equip.nome || '' %>" placeholder="Nome do equipamento" required />
+    <input class="input" name="setor" value="<%= equip.setor || '' %>" placeholder="Setor / área" />
+    <input class="input" name="tipo" value="<%= equip.tipo || '' %>" placeholder="Tipo" />
+    <input class="input" name="fabricante" value="<%= equip.fabricante || '' %>" placeholder="Fabricante" />
+    <input class="input" name="ano_fabricacao" type="number" value="<%= equip.ano_fabricacao || '' %>" placeholder="Ano fabricação" />
+    <input class="input" name="ano_instalacao" type="number" value="<%= equip.ano_instalacao || '' %>" placeholder="Ano instalação" />
+    <input class="input" name="capacidade" value="<%= equip.capacidade || '' %>" placeholder="Capacidade" />
+    <input class="input" name="pressao_trabalho" value="<%= equip.pressao_trabalho || '' %>" placeholder="Pressão de trabalho" />
+    <select class="input" name="criticidade"><option value="baixa" <%= equip.criticidade==='baixa'?'selected':'' %>>Baixa</option><option value="media" <%= (equip.criticidade||'media')==='media'?'selected':'' %>>Média</option><option value="alta" <%= equip.criticidade==='alta'?'selected':'' %>>Alta</option></select>
+    <select class="input" name="status_operacional"><option value="ATIVO" <%= (equip.status_operacional||'ATIVO')==='ATIVO'?'selected':'' %>>Ativo</option><option value="EM MANUTENCAO" <%= equip.status_operacional==='EM MANUTENCAO'?'selected':'' %>>Em manutenção</option><option value="PARADO" <%= equip.status_operacional==='PARADO'?'selected':'' %>>Parado</option></select>
+    <select class="input" name="ativo"><option value="1" <%= Number(equip.ativo)===1?'selected':'' %>>Ativo no cadastro</option><option value="0" <%= Number(equip.ativo)!==1?'selected':'' %>>Inativo no cadastro</option></select>
+    <div class="full">
+      <label>Foto atual</label>
+      <% if (equip.foto_url) { %>
+        <img src="<%= equip.foto_url %>" style="max-width:220px;border-radius:12px;display:block;margin-bottom:8px;"/>
+      <% } else { %>
+        <div style="padding:18px;background:#f3f4f6;border-radius:8px;">Sem foto cadastrada</div>
+      <% } %>
+      <input class="input" type="file" name="foto" accept="image/*" />
+      <label><input type="checkbox" name="remover_foto" value="1"/> Remover foto atual</label>
+    </div>
+    <textarea class="input full" name="observacao" placeholder="Observações"><%= equip.observacao || '' %></textarea>
+    <div class="full"><button class="btn btn-green">Salvar</button></div>
+  </form>
+</div>

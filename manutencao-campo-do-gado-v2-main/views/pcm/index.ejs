@@ -1,0 +1,97 @@
+<% layout('layout') %>
+<%- include('partials/internal-styles') %>
+
+<div class="page-head">
+  <div>
+    <h1>PCM – Planejamento e Controle da Manutenção</h1>
+    <p class="muted">Visão Geral do módulo PCM com acesso às novas telas internas.</p>
+  </div>
+</div>
+
+<div class="pcm-shell">
+  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
+
+  <div class="pcm-content">
+
+    <div class="card" id="pcm-alerta-card" style="border:2px solid #f59e0b; background:#fffbeb; margin-bottom:12px;">
+      <div class="label">IA • Alertas de Planejamento PCM</div>
+      <div id="pcm-alerta-texto" style="font-weight:800; margin-top:6px;">Nenhum alerta emergencial ativo no momento.</div>
+      <div class="pcm-actions" style="margin-top:8px;">
+        <button class="btn btn-outline" id="pcm-reconhecer-alerta" type="button">Reconhecer alerta</button>
+      </div>
+    </div>
+
+    <div class="pcm-actions" style="margin-bottom:10px;">
+      <a class="btn" href="/pcm/planejamento">Abrir tela de Planejamento</a>
+      <a class="btn btn-outline" href="/pcm/backlog">Abrir Backlog</a>
+      <form method="POST" action="/pcm/atualizar-indicadores" style="display:inline;"><button class="btn btn-outline" type="submit">Atualizar indicadores</button></form>
+    </div>
+
+    <div class="card">
+      <div class="label">Indicadores básicos</div>
+      <div class="pcm-kpi-grid" style="margin-top:10px;">
+        <div><div class="muted-xs">% Preventiva (mês)</div><div style="font-size:22px;font-weight:900;"><%= indicadores.preventiva_pct_mes %>%</div></div>
+        <div><div class="muted-xs">% Corretiva (mês)</div><div style="font-size:22px;font-weight:900;"><%= indicadores.corretiva_pct_mes %>%</div></div>
+        <div><div class="muted-xs">OS Atrasadas</div><div style="font-size:22px;font-weight:900;"><%= indicadores.os_atrasadas %></div></div>
+        <div><div class="muted-xs">MTBF (dias)</div><div style="font-size:22px;font-weight:900;"><%= indicadores.mtbf_medio_dias %></div></div>
+        <div><div class="muted-xs">MTTR (horas)</div><div style="font-size:22px;font-weight:900;"><%= indicadores.mttr_medio_horas %></div></div>
+        <div><div class="muted-xs">Custo do mês</div><div style="font-size:22px;font-weight:900;">R$ <%= Number(indicadores.custo_manutencao_mes || 0).toFixed(2) %></div></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="label">Top equipamentos com mais OS</div>
+      <div class="table-wrap"><table class="table compact" style="margin-top:8px; min-width:500px;">
+        <thead><tr><th>Equipamento</th><th>Total OS</th></tr></thead>
+        <tbody>
+          <% if (!ranking.length) { %><tr><td colspan="2" class="muted">Sem dados no período.</td></tr><% } %>
+          <% ranking.forEach(function(item){ %><tr><td><%= item.equipamento %></td><td><%= item.total_os %></td></tr><% }) %>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="label">Plano Mestre (resumo)</div>
+      <div class="table-wrap"><table class="table compact">
+        <thead><tr><th>Equipamento</th><th>Atividade</th><th>Tipo</th><th>Próxima data</th><th>Situação</th></tr></thead>
+        <tbody>
+          <% if (!planos.length) { %><tr><td colspan="5" class="muted">Sem planos cadastrados.</td></tr><% } %>
+          <% planos.slice(0, 8).forEach(function(p){ %><tr><td><%= p.equipamento_nome %></td><td><%= p.atividade_descricao %></td><td><%= p.tipo_manutencao %></td><td><%= p.proxima_data_prevista || '-' %></td><td><%= p.situacao %></td></tr><% }) %>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+(function(){
+  var box = document.getElementById('pcm-alerta-card');
+  var txt = document.getElementById('pcm-alerta-texto');
+  var btn = document.getElementById('pcm-reconhecer-alerta');
+  var alertaAtual = null;
+  var es = new EventSource('/dashboard/alertas/stream');
+  es.addEventListener('estado_inicial', function(e){
+    try {
+      var data = JSON.parse(e.data || '{}');
+      if (data.alertaAtivo) {
+        alertaAtual = { id_os: data.alertaAtivo.os_id };
+        txt.textContent = 'Alerta ativo: OS #' + data.alertaAtivo.os_id + ' • ' + (data.alertaAtivo.equipamento || '-');
+      }
+    } catch(_e){}
+  });
+  es.addEventListener('nova_os_emergencial', function(e){
+    try {
+      var data = JSON.parse(e.data || '{}');
+      alertaAtual = data;
+      txt.textContent = '⚠ Nova OS emergencial #' + data.id_os + ' • ' + (data.equipamento || '-') + ' • ' + (data.prioridade || '');
+    } catch(_e){}
+  });
+  btn?.addEventListener('click', function(){
+    if (!alertaAtual || !alertaAtual.id_os) return;
+    fetch('/dashboard/alertas/reconhecer', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ os_id: alertaAtual.id_os }) })
+      .then(function(){ txt.textContent='Alerta reconhecido. Nenhum alerta emergencial ativo no momento.'; alertaAtual=null; })
+      .catch(function(){});
+  });
+})();
+</script>

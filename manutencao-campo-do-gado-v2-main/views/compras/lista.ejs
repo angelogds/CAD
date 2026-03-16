@@ -1,0 +1,8 @@
+<% layout('layout') %>
+
+<h1>Compras - Solicitações</h1>
+<div><a href="?status=ABERTA">ABERTAS</a> | <a href="?status=EM_COTACAO">EM_COTACAO</a> | <a href="?status=COMPRADA">COMPRADAS</a></div>
+<table class="table"><tr><th>Número</th><th>Solicitante</th><th>Status</th><th>Ações</th></tr>
+<% lista.filter(s => !status || s.status===status).forEach(s=> { %>
+<tr><td><%= s.numero %></td><td><%= s.solicitante_nome %></td><td><%= s.status %></td><td><a href="/compras/solicitacoes/<%= s.id %>">Detalhe</a></td></tr>
+<% }) %></table>

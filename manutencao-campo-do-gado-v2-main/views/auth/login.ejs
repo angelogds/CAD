@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login • Campo do Gado</title>
+  <style>
+    :root {
+      /* parâmetros fáceis para próximo ajuste */
+      --bg-overlay: rgba(15, 23, 42, 0.32);
+      --card-bg: rgba(255, 255, 255, 0.62);
+      --card-radius: 22px;
+      --card-width: 410px;
+      --card-padding: 24px;
+      --title-size: 42px;
+      --subtitle-size: 16px;
+      --input-size: 16px;
+      --button-size: 18px;
+
+      --txt-strong: #0f172a;
+      --txt-soft: #475569;
+      --brand-green: #16a34a;
+      --brand-green-dark: #15803d;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        linear-gradient(var(--bg-overlay), var(--bg-overlay)),
+        url('/IMG/campo-do-bg-gado-login.svg.jpeg') center/cover no-repeat fixed;
+    }
+
+    .login-screen {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .login-card {
+      width: min(var(--card-width), 100%);
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      border-radius: var(--card-radius);
+      box-shadow: 0 18px 42px rgba(2, 6, 23, 0.28);
+      padding: var(--card-padding);
+      backdrop-filter: blur(8px);
+    }
+
+    .login-logo-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+
+    .login-logo {
+      width: min(250px, 100%);
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+
+    .login-subtitle {
+      margin: 0 0 18px;
+      color: var(--txt-soft);
+      font-size: var(--subtitle-size);
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .login-form { display: grid; gap: 12px; }
+    .field { display: grid; gap: 6px; }
+
+    .field label {
+      color: var(--txt-strong);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .field input {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 11px 12px;
+      font-size: var(--input-size);
+      color: var(--txt-strong);
+      background: #fff;
+    }
+
+    .field input:focus {
+      outline: none;
+      border-color: var(--brand-green);
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+    }
+
+    .btn-login {
+      margin-top: 4px;
+      width: 100%;
+      border: none;
+      border-radius: 12px;
+      padding: 12px;
+      background: var(--brand-green);
+      color: #fff;
+      font-size: var(--button-size);
+      font-weight: 800;
+      cursor: pointer;
+      transition: background .2s ease;
+    }
+
+    .btn-login:hover { background: var(--brand-green-dark); }
+
+    .alert {
+      margin: 0 0 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .alert-error { background: #fee2e2; color: #991b1b; }
+    .alert-success { background: #dcfce7; color: #166534; }
+    .alert-info { background: #e0f2fe; color: #075985; }
+
+    @media (max-width: 640px) {
+      :root {
+        --card-padding: 22px;
+        --title-size: 34px;
+        --subtitle-size: 15px;
+        --input-size: 15px;
+        --button-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <section class="login-screen">
+    <div class="login-card">
+      <div class="login-logo-wrap">
+        <img class="login-logo" src="/IMG/login_campo_do_gado.png.png.png" alt="Logo manutenção" />
+      </div>
+      <p class="login-subtitle">Acesse o Sistema de Manutenção Industrial</p>
+
+      <% if (flash && flash.error && flash.error.length) { %>
+        <div class="alert alert-error"><%= flash.error[0] %></div>
+      <% } %>
+
+      <% if (flash && flash.success && flash.success.length) { %>
+        <div class="alert alert-success"><%= flash.success[0] %></div>
+      <% } %>
+
+      <% if (lockout) { %>
+        <div class="alert alert-error">
+          Muitas tentativas. Aguarde <b><%= lockout.remainingSeconds %></b> segundos e tente novamente.
+        </div>
+      <% } %>
+
+      <% if (attemptsLeft !== null && attemptsLeft !== undefined) { %>
+        <div class="alert alert-info">
+          Tentativas restantes: <b><%= attemptsLeft %></b>
+        </div>
+      <% } %>
+
+      <form class="login-form" action="/auth/login" method="POST">
+        <input type="hidden" name="next" value="<%= next || '' %>" />
+
+        <div class="field">
+          <label for="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            name="email"
+            value="<%= rememberedEmail || '' %>"
+            required
+            autocomplete="email"
+            placeholder="seuemail@campodogado.local"
+          />
+        </div>
+
+        <div class="field">
+          <label for="password">Senha</label>
+          <input
+            id="password"
+            type="password"
+            name="password"
+            required
+            autocomplete="current-password"
+            placeholder="Digite sua senha"
+          />
+        </div>
+
+        <button class="btn-login" type="submit">Entrar no sistema</button>
+      </form>
+    </div>
+  </section>
+</body>
+</html>

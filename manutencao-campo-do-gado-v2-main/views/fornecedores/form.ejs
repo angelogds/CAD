@@ -1,0 +1,55 @@
+<% layout('layout') %>
+
+<div class="page-head">
+  <div>
+    <h1><%= fornecedor ? 'Editar fornecedor' : 'Novo fornecedor' %></h1>
+    <p class="muted">Mantenha os dados de contato e performance de entrega centralizados.</p>
+  </div>
+  <a class="btn btn-ghost" href="/fornecedores">← Voltar</a>
+</div>
+
+<div class="card" style="max-width: 900px;">
+  <form method="POST" action="<%= formAction %>">
+    <div class="grid-2">
+      <div>
+        <div class="label">Nome *</div>
+        <input class="input" name="nome" required value="<%= fornecedor?.nome || '' %>" />
+      </div>
+      <div>
+        <div class="label">CNPJ</div>
+        <input class="input" name="cnpj" value="<%= fornecedor?.cnpj || '' %>" />
+      </div>
+
+      <div>
+        <div class="label">Telefone</div>
+        <input class="input" name="telefone" value="<%= fornecedor?.telefone || '' %>" />
+      </div>
+      <div>
+        <div class="label">E-mail</div>
+        <input class="input" name="email" value="<%= fornecedor?.email || '' %>" />
+      </div>
+
+      <div>
+        <div class="label">Cidade</div>
+        <input class="input" name="cidade" value="<%= fornecedor?.cidade || '' %>" />
+      </div>
+      <div>
+        <div class="label">Situação</div>
+        <select class="input" name="ativo">
+          <option value="1" <%= Number(fornecedor?.ativo ?? 1) === 1 ? 'selected' : '' %>>Ativo</option>
+          <option value="0" <%= Number(fornecedor?.ativo ?? 1) === 0 ? 'selected' : '' %>>Inativo</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top: 12px;">
+      <div class="label">Observações</div>
+      <textarea class="input" style="min-height:120px;" name="observacoes"><%= fornecedor?.observacoes || '' %></textarea>
+    </div>
+
+    <div style="margin-top:14px; display:flex; gap:8px;">
+      <button class="btn btn-green" type="submit">Salvar</button>
+      <a class="btn btn-ghost" href="/fornecedores">Cancelar</a>
+    </div>
+  </form>
+</div>

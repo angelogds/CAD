@@ -1,0 +1,44 @@
+<% layout('layout') %>
+<div class="page-head"><div><h1>Demanda #<%= demanda.id %></h1><p class="muted"><%= demanda.titulo %></p></div></div>
+
+<div class="card" style="margin-bottom:12px;">
+  <div class="grid-3">
+    <div><div class="label">Status</div><strong><%= demanda.status %></strong></div>
+    <div><div class="label">Prioridade</div><strong><%= demanda.prioridade %></strong></div>
+    <div><div class="label">Responsável</div><strong><%= demanda.responsavel_nome || '-' %></strong></div>
+  </div>
+  <div style="margin-top:10px;"><div class="label">Descrição</div><div><%= demanda.descricao || '-' %></div></div>
+</div>
+
+<% if (String(user?.role || '').toUpperCase() === 'ADMIN') { %>
+  <div class="card" style="margin-bottom:12px;">
+    <div class="label">Ações do Admin</div>
+    <form method="POST" action="/demandas/<%= demanda.id %>/status" style="display:flex; gap:10px; align-items:end; flex-wrap:wrap; margin-top:10px;">
+      <div><div class="label">Status</div><select class="input" name="status"><% ['NOVA','EM_ANALISE','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %><option value="<%= st %>" <%= demanda.status===st?'selected':'' %>><%= st %></option><% }) %></select></div>
+      <div><div class="label">Responsável</div><select class="input" name="responsavel_user_id"><option value="">--</option><% (responsaveis||[]).forEach(u=>{ %><option value="<%= u.id %>" <%= Number(demanda.responsavel_user_id||0)===u.id?'selected':'' %>><%= u.name %></option><% }) %></select></div>
+      <button class="btn btn-green">Atualizar status</button>
+    </form>
+
+    <form method="POST" action="/demandas/<%= demanda.id %>/update" style="margin-top:10px;">
+      <div class="label">Nova atualização</div>
+      <textarea class="input" name="texto" required></textarea>
+      <div style="margin-top:8px;"><button class="btn">Salvar atualização</button></div>
+    </form>
+
+    <form method="POST" action="/demandas/<%= demanda.id %>/convert-to-os" style="margin-top:10px;">
+      <button class="btn btn-green" type="submit">Converter em OS</button>
+    </form>
+  </div>
+<% } %>
+
+<div class="card">
+  <div class="label">Histórico</div>
+  <div class="table-wrap" style="margin-top:10px;">
+    <table class="table"><thead><tr><th>Data</th><th>Usuário</th><th>Atualização</th></tr></thead><tbody>
+      <% if (!demanda.logs?.length) { %><tr><td colspan="3" style="text-align:center;color:#6b7280;">Sem atualizações.</td></tr><% } %>
+      <% (demanda.logs||[]).forEach(l => { %>
+        <tr><td><%= fmtBR(l.created_at) %></td><td><%= l.user_nome || '-' %></td><td><%= l.texto %></td></tr>
+      <% }) %>
+    </tbody></table>
+  </div>
+</div>

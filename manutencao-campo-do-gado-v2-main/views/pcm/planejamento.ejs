@@ -1,0 +1,46 @@
+<% layout('layout') %>
+<%- include('partials/internal-styles') %>
+<div class="page-head"><div><h1>PCM • Planejamento</h1><p class="muted">Plano Mestre e geração de OS preventivas.</p></div></div>
+<div class="pcm-shell">
+  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
+  <div class="pcm-content">
+    <div class="card">
+      <div class="pcm-actions" style="margin-bottom:8px;">
+        <button class="btn" type="button" onclick="document.getElementById('novo-plano').scrollIntoView({behavior:'smooth'})">Nova atividade / nova preventiva</button>
+        <button class="btn btn-outline" type="button">Exportar para PDF (em breve)</button>
+      </div>
+      <form method="GET" action="/pcm/planejamento" class="pcm-toolbar">
+        <select class="input" name="equipamento_id"><option value="">Equipamento...</option><% opcoes.equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>" <%= String(filtros.equipamento_id||'')===String(eq.id)?'selected':'' %>><%= eq.nome %></option><% }) %></select>
+        <select class="input" name="setor"><option value="">Setor...</option><% opcoes.setores.forEach(function(s){ %><option value="<%= s.setor %>" <%= filtros.setor===s.setor?'selected':'' %>><%= s.setor || 'Sem setor' %></option><% }) %></select>
+        <select class="input" name="tipo_manutencao"><option value="">Tipo...</option><% opcoes.tipos.forEach(function(t){ %><option value="<%= t %>" <%= filtros.tipo_manutencao===t?'selected':'' %>><%= t %></option><% }) %></select>
+        <input class="input" type="month" name="periodo" value="<%= filtros.periodo || '' %>">
+        <button class="btn" type="submit">Filtrar</button>
+      </form>
+    </div>
+
+    <div class="card" id="novo-plano" style="margin-top:12px;">
+      <div class="label">Novo plano mestre</div>
+      <form method="POST" action="/pcm/planos" class="grid-2" style="margin-top:10px; gap:10px;">
+        <select class="input" name="equipamento_id" required><option value="">Equipamento...</option><% opcoes.equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>"><%= eq.nome %></option><% }) %></select>
+        <select class="input" name="tipo_manutencao" required><% opcoes.tipos.forEach(function(t){ %><option value="<%= t %>"><%= t %></option><% }) %></select>
+        <input class="input" name="atividade_descricao" placeholder="Descrição da atividade" required>
+        <input class="input" type="date" name="proxima_data_prevista">
+        <input class="input" type="number" min="1" name="frequencia_dias" placeholder="Frequência (dias)">
+        <input class="input" type="number" min="1" name="frequencia_horas" placeholder="Frequência (horas)">
+        <textarea class="input" name="observacao" placeholder="Observações"></textarea>
+        <div class="pcm-actions"><button class="btn" type="submit">Salvar plano</button></div>
+      </form>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="label">Planos cadastrados</div>
+      <div class="table-wrap"><table class="table compact" style="margin-top:8px;">
+        <thead><tr><th>Equipamento</th><th>Atividade</th><th>Tipo</th><th>Próxima</th><th>Situação</th><th>Ações</th></tr></thead>
+        <tbody>
+          <% if (!planos.length) { %><tr><td colspan="6" class="muted">Sem registros.</td></tr><% } %>
+          <% planos.forEach(function(p){ %><tr><td><%= p.equipamento_nome %></td><td><%= p.atividade_descricao %></td><td><%= p.tipo_manutencao %></td><td><%= p.proxima_data_prevista || '-' %></td><td><%= p.situacao %></td><td><form method="POST" action="/pcm/planos/<%= p.id %>/gerar-os" style="display:inline;"><button class="btn btn-outline" type="submit">Gerar OS</button></form> <form method="POST" action="/pcm/planos/<%= p.id %>/registrar-execucao" style="display:inline;"><button class="btn btn-outline" type="submit">Registrar execução</button></form></td></tr><% }) %>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+</div>

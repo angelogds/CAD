@@ -1,0 +1,24 @@
+<% layout('layout') %>
+<%- include('partials/internal-styles') %>
+<div class="page-head"><div><h1>PCM • Peças Críticas em Estoque</h1><p class="muted">Visão das peças técnicas críticas vinculadas ao almoxarifado.</p></div></div>
+<div class="pcm-shell">
+  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
+  <div class="pcm-content">
+    <div class="card">
+      <form class="pcm-toolbar" method="GET" action="/pcm/pecas-criticas">
+        <input class="input" name="tipo" value="<%= filtros.tipo || '' %>" placeholder="Tipo de componente">
+        <label style="display:flex; align-items:center; gap:6px;"><input type="checkbox" name="abaixo_minimo" value="1" <%= filtros.abaixo_minimo ? 'checked' : '' %>>Abaixo do mínimo</label>
+        <input class="input" name="busca" value="<%= filtros.busca || '' %>" placeholder="Buscar código/modelo">
+        <button class="btn" type="submit">Filtrar</button>
+      </form>
+      <div class="pcm-actions" style="margin-bottom:8px;"><button class="btn btn-outline" type="button">Exportar para PDF (em breve)</button></div>
+      <div class="table-wrap"><table class="table compact" style="margin-top:10px;">
+        <thead><tr><th>Código interno</th><th>Descrição/Modelo</th><th>Tipo</th><th>Crítica</th><th>Estoque atual</th><th>Estoque mínimo</th><th>Qtd. equipamentos</th><th>Ação</th></tr></thead>
+        <tbody>
+          <% if (!pecas.length) { %><tr><td colspan="8" class="muted">Sem dados (TODO integração com BOM/estoque).</td></tr><% } %>
+          <% pecas.forEach(function(p){ %><tr><td><%= p.codigo_interno || '-' %></td><td><%= p.descricao_tecnica || p.modelo_comercial || '-' %></td><td><%= p.categoria || '-' %></td><td><%= p.peca_critica ? 'Sim' : 'Não' %></td><td><%= p.estoque_atual ?? '-' %></td><td><%= p.estoque_minimo ?? '-' %></td><td><%= p.qtd_equipamentos || 1 %></td><td><button class="btn btn-outline" type="button">Ver aplicações</button></td></tr><% }) %>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+</div>

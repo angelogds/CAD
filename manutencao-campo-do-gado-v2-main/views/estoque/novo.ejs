@@ -1,0 +1,63 @@
+<% layout('layout') %>
+
+<%- include("_tabs", { tab: "itens" }) %>
+<div class="page-head">
+  <div>
+    <h1>Novo item</h1>
+    <p class="muted">Cadastre um item para controlar saldo, mínimo e movimentações.</p>
+  </div>
+
+  <a class="btn btn-ghost" href="/estoque">Voltar</a>
+</div>
+
+<div class="card" style="max-width: 980px;">
+  <form action="/estoque" method="POST">
+
+    <div class="grid-2">
+      <div>
+        <div class="label">Código</div>
+        <input class="input" name="codigo" placeholder="Ex.: PAR-001 / ROL-6205" />
+      </div>
+
+      <div>
+        <div class="label">Nome *</div>
+        <input class="input" name="nome" required placeholder="Ex.: Rolamento 6205 / Parafuso 1/2" />
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="grid-2">
+      <div>
+        <div class="label">Unidade</div>
+        <select class="input" name="unidade">
+          <option value="un">un</option>
+          <option value="kg">kg</option>
+          <option value="l">l</option>
+          <option value="m">m</option>
+        </select>
+      </div>
+
+      <div>
+        <div class="label">Estoque mínimo</div>
+        <input class="input" name="estoque_min" type="number" step="0.01" placeholder="0" />
+      </div>
+    </div>
+
+    <div style="margin-top:14px;">
+      <div class="label">Custo unitário (opcional)</div>
+      <input class="input" name="custo_unit" type="number" step="0.01" placeholder="0" />
+      <div class="muted" style="margin-top:6px;">
+        Se não quiser controlar custo agora, pode deixar em branco.
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn btn-green" type="submit">Salvar</button>
+      <a class="btn btn-ghost" href="/estoque">Cancelar</a>
+    </div>
+
+  </form>
+</div>

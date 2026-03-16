@@ -1,0 +1,48 @@
+<% layout('layout') %>
+<h1>Histórico de traçagens</h1>
+
+<form method="GET" action="/tracagem/lista" class="card" style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
+  <select class="input" name="tipo">
+    <option value="">Todos os tipos</option>
+    <% Object.keys(labels).forEach((k) => { %>
+      <option value="<%= k %>" <%= filtros.tipo === k ? 'selected' : '' %>><%= labels[k] %></option>
+    <% }) %>
+  </select>
+  <select class="input" name="equipamento_id">
+    <option value="">Todos equipamentos</option>
+    <% equipamentos.forEach((equip) => { %>
+      <option value="<%= equip.id %>" <%= String(filtros.equipamento_id) === String(equip.id) ? 'selected' : '' %>><%= equip.nome %></option>
+    <% }) %>
+  </select>
+  <select class="input" name="os_id">
+    <option value="">Todas OS</option>
+    <% ordensServico.forEach((os) => { %>
+      <option value="<%= os.id %>" <%= String(filtros.os_id) === String(os.id) ? 'selected' : '' %>>OS #<%= os.id %></option>
+    <% }) %>
+  </select>
+  <input class="input" type="date" name="periodo_inicio" value="<%= filtros.periodo_inicio %>" />
+  <input class="input" type="date" name="periodo_fim" value="<%= filtros.periodo_fim %>" />
+  <button class="btn btn-green" type="submit">Filtrar</button>
+</form>
+
+<div class="card" style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;margin-top:10px;">
+  <table class="table" style="width:100%;">
+    <thead><tr><th>Tipo</th><th>Título</th><th>Equipamento</th><th>OS</th><th>Usuário</th><th>Data</th><th></th></tr></thead>
+    <tbody>
+      <% if (!tracagens.length) { %>
+        <tr><td colspan="7">Nenhum registro encontrado.</td></tr>
+      <% } %>
+      <% tracagens.forEach((item) => { %>
+        <tr>
+          <td><%= labels[item.tipo] || item.tipo %></td>
+          <td><%= item.titulo || '-' %></td>
+          <td><%= item.equipamento_nome || '-' %></td>
+          <td><%= item.os_codigo ? ('OS #' + item.os_codigo) : '-' %></td>
+          <td><%= item.usuario_nome || '-' %></td>
+          <td><%= fmtBR(item.created_at) %></td>
+          <td><a class="btn" href="/tracagem/<%= item.id %>">Abrir</a></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

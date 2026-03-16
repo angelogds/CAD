@@ -1,0 +1,29 @@
+<% layout('layout') %>
+<div class="page-head">
+  <div>
+    <h1>Itens de Estoque</h1>
+    <p class="muted">Lista detalhada dos itens ativos cadastrados.</p>
+  </div>
+  <div><a class="btn btn-green" href="/estoque/itens/novo">Novo item</a></div>
+</div>
+<%- include('_tabs', { tab: 'itens' }) %>
+<div class="card">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Código</th><th>Nome</th><th>Categoria</th><th>Local</th><th>Saldo</th><th>Mínimo</th></tr></thead>
+      <tbody>
+        <% if (!itens.length) { %><tr><td colspan="6" class="muted">Nenhum item cadastrado.</td></tr><% } %>
+        <% itens.forEach((i)=> { %>
+          <tr>
+            <td><%= i.codigo || '-' %></td>
+            <td><a href="/estoque/itens/<%= i.id %>"><strong><%= i.nome %></strong></a></td>
+            <td><%= i.categoria_nome || '-' %></td>
+            <td><%= i.local_nome || '-' %></td>
+            <td><%= i.saldo_atual %> <%= i.unidade %></td>
+            <td><%= i.saldo_minimo %> <%= i.unidade %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

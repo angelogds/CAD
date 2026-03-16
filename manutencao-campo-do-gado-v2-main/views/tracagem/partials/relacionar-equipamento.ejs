@@ -1,0 +1,117 @@
+<style>
+  .tr-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:60;padding:12px}
+  .modal-overlay.open{display:flex}
+  .modal-card{width:min(920px,96vw);max-height:88vh;overflow:auto;background:#fff;border-radius:16px;border:1px solid #dcfce7;padding:14px}
+  .equip-table{width:100%;border-collapse:collapse}
+  .equip-table th,.equip-table td{padding:8px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:.92rem}
+  .equip-row{cursor:pointer}
+  .equip-row.selected{background:#ecfdf5}
+</style>
+
+<div class="tr-actions">
+  <form method="POST" action="/tracagem/pdf-calculo" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;">
+    <input type="hidden" name="tipo" value="<%= tipo %>">
+    <input type="hidden" name="parametros_json" value='<%- JSON.stringify(calculo?.parametros || {}) %>'>
+    <input type="hidden" name="resultado_json" value='<%- JSON.stringify(calculo?.resultado || {}) %>'>
+    <button class="btn btn-green" type="submit">Gerar PDF</button>
+  </form>
+
+  <button class="btn btn-green" id="open-relacionar" type="button">Relacionar ao equipamento</button>
+</div>
+
+<div class="modal-overlay" id="modal-relacionar" aria-hidden="true">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <h3 style="margin:0;">Relacionar traçagem ao equipamento</h3>
+      <button class="btn" type="button" id="close-relacionar">Cancelar</button>
+    </div>
+
+    <div style="margin-top:10px;display:grid;gap:8px;">
+      <input class="input" id="equip-search" placeholder="Buscar por nome, código ou setor" />
+      <div style="overflow:auto;max-height:320px;border:1px solid #e2e8f0;border-radius:12px;">
+        <table class="equip-table">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Nome</th>
+              <th>Tipo</th>
+              <th>Setor</th>
+            </tr>
+          </thead>
+          <tbody id="equip-tbody">
+            <% (equipamentos || []).forEach((equip) => { %>
+              <tr class="equip-row" data-id="<%= equip.id %>" data-nome="<%= equip.nome %>" data-codigo="<%= equip.codigo || '' %>" data-setor="<%= equip.setor || '' %>">
+                <td><%= equip.codigo || '-' %></td>
+                <td><%= equip.nome %></td>
+                <td><%= equip.tipo || '-' %></td>
+                <td><%= equip.setor || '-' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <form method="POST" action="/tracagem/relacionar-equipamento" id="form-relacionar" style="display:grid;gap:8px;margin-top:12px;">
+      <input class="input" name="titulo" placeholder="Título da traçagem" required value="<%= tituloPadrao || 'Traçagem' %>">
+      <input type="hidden" name="tipo" value="<%= tipo %>">
+      <input type="hidden" name="parametros_json" value='<%- JSON.stringify(calculo?.parametros || {}) %>'>
+      <input type="hidden" name="resultado_json" value='<%- JSON.stringify(calculo?.resultado || {}) %>'>
+      <input type="hidden" name="equipamento_id" id="equipamento_id_selected" value="">
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button class="btn" type="button" id="cancel-relacionar">Cancelar</button>
+        <button class="btn btn-green" type="submit" id="confirm-relacionar">Confirmar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (() => {
+    const modal = document.getElementById('modal-relacionar');
+    const openBtn = document.getElementById('open-relacionar');
+    const closeBtn = document.getElementById('close-relacionar');
+    const cancelBtn = document.getElementById('cancel-relacionar');
+    const searchInput = document.getElementById('equip-search');
+    const tbody = document.getElementById('equip-tbody');
+    const hiddenSelected = document.getElementById('equipamento_id_selected');
+    const form = document.getElementById('form-relacionar');
+    const confirm = document.getElementById('confirm-relacionar');
+    let selectedRow = null;
+
+    function openModal() { modal.classList.add('open'); modal.setAttribute('aria-hidden', 'false'); }
+    function closeModal() { modal.classList.remove('open'); modal.setAttribute('aria-hidden', 'true'); }
+
+    openBtn?.addEventListener('click', openModal);
+    closeBtn?.addEventListener('click', closeModal);
+    cancelBtn?.addEventListener('click', closeModal);
+
+    tbody?.addEventListener('click', (event) => {
+      const row = event.target.closest('.equip-row');
+      if (!row) return;
+      if (selectedRow) selectedRow.classList.remove('selected');
+      row.classList.add('selected');
+      selectedRow = row;
+      hiddenSelected.value = row.dataset.id;
+    });
+
+    searchInput?.addEventListener('input', () => {
+      const q = searchInput.value.toLowerCase().trim();
+      [...tbody.querySelectorAll('.equip-row')].forEach((row) => {
+        const ok = [row.dataset.nome, row.dataset.codigo, row.dataset.setor].join(' ').toLowerCase().includes(q);
+        row.style.display = ok ? '' : 'none';
+      });
+    });
+
+    form?.addEventListener('submit', (e) => {
+      if (!hiddenSelected.value) {
+        e.preventDefault();
+        window.alert('Selecione um equipamento para continuar.');
+        return;
+      }
+      confirm.disabled = true;
+      confirm.textContent = 'Salvando...';
+    });
+  })();
+</script>

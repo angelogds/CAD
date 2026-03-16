@@ -1,0 +1,114 @@
+<% layout('layout') %>
+
+<div class="card">
+  <div class="page-head" style="margin-top:0;">
+    <div>
+      <h1 style="font-size:28px;">Nova Ordem de Serviço</h1>
+      <p class="muted">Informe o problema do solicitante e os dados técnicos para alimentar automaticamente a Inspeção PAC 01.</p>
+    </div>
+  </div>
+
+  <form method="POST" action="/os" enctype="multipart/form-data" id="os-form">
+    <div class="grid-2">
+      <div>
+        <label class="label">Equipamento (cadastro)</label>
+        <select name="equipamento_id" id="equipamento_id">
+          <option value="">Selecione...</option>
+          <% (equipamentos || []).forEach(e => { %>
+            <option value="<%= e.id %>" <%= String(prefillEquipamentoId||'')===String(e.id)?'selected':'' %>><%= e.codigo ? e.codigo + ' - ' : '' %><%= e.nome %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div>
+        <label class="label">Equipamento (manual)</label>
+        <input class="input" type="text" name="equipamento_manual" id="equipamento_manual" placeholder="Ex.: Digestor sem cadastro" />
+      </div>
+
+      <div>
+        <label class="label">Tipo da OS</label>
+        <select name="tipo" class="input" required>
+          <% (tipos || ['CORRETIVA','PREVENTIVA','ELETRICA','NRS','OUTROS']).forEach(t => { %>
+            <option value="<%= t %>"><%= t %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div>
+        <label class="label">Grau</label>
+        <select name="grau" class="input" required>
+          <% (graus || ['BAIXA','MEDIA','ALTA','CRITICA']).forEach(g => { %>
+            <option value="<%= g %>"><%= g %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div>
+        <label class="label">Data de início</label>
+        <input class="input" type="date" name="data_inicio" />
+      </div>
+
+      <div>
+        <label class="label">Data de fim (se já concluída)</label>
+        <input class="input" type="date" name="data_fim" />
+      </div>
+
+      <div style="grid-column:1 / -1;">
+        <label class="label">Descrição do problema (solicitante)</label>
+        <textarea name="descricao" class="input" required placeholder="Descreva o que está acontecendo no equipamento"></textarea>
+      </div>
+
+      <div>
+        <label class="label">Resumo técnico / Ação corretiva</label>
+        <textarea name="resumo_tecnico" class="input" placeholder="Relate o que foi feito na execução"></textarea>
+      </div>
+
+      <div>
+        <label class="label">Causa / Diagnóstico / Ação preventiva</label>
+        <textarea name="causa_diagnostico" class="input" placeholder="Explique a causa e como evitar recorrência"></textarea>
+      </div>
+
+      <div style="grid-column:1 / -1;">
+        <label class="label">Solicitante</label>
+        <input class="input" type="text" readonly value="<%= user?.name || '-' %>" />
+      </div>
+
+      <div style="grid-column:1 / -1;">
+        <label class="label">Fotos de abertura (opcional)</label>
+        <input id="abertura_fotos" type="file" name="abertura_fotos" accept="image/*" multiple style="display:none" />
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('abertura_fotos').click()">📷 Adicionar fotos</button>
+        <div class="muted" style="margin-top:8px;">Registro visual do estado inicial.</div>
+        <div id="preview-abertura" style="margin-top:6px;"></div>
+      </div>
+    </div>
+
+    <div class="row" style="justify-content:space-between; margin-top:16px;">
+      <a href="/os" class="btn btn-ghost">Cancelar</a>
+      <button type="submit" class="btn btn-primary">Salvar OS</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  const fileInput = document.getElementById('abertura_fotos');
+  const preview = document.getElementById('preview-abertura');
+  fileInput.addEventListener('change', function(){
+    preview.innerHTML = '';
+    Array.from(fileInput.files || []).forEach(f => {
+      const el = document.createElement('span');
+      el.className = 'pill-tag pill-gray';
+      el.style.marginRight = '6px';
+      el.textContent = f.name;
+      preview.appendChild(el);
+    });
+  });
+
+  document.getElementById('os-form').addEventListener('submit', function(e){
+    const id = document.getElementById('equipamento_id').value.trim();
+    const manual = document.getElementById('equipamento_manual').value.trim();
+    if (!id && !manual) {
+      e.preventDefault();
+      alert('Informe um equipamento cadastrado ou manual.');
+    }
+  });
+</script>

@@ -1,0 +1,35 @@
+<% layout('layout') %>
+<%- include('partials/internal-styles') %>
+<style>.week-grid{overflow:auto}.week-grid table{min-width:980px}.tag-mini{font-size:11px;background:#f1f5f9;padding:2px 6px;border-radius:999px;display:inline-block}</style>
+<div class="page-head"><div><h1>PCM • Programação Semanal</h1><p class="muted">Grade semanal por mecânico/equipe e atividades pendentes.</p></div></div>
+<div class="pcm-shell">
+  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
+  <div class="pcm-content">
+    <div class="card">
+      <div class="pcm-actions" style="margin-bottom:8px;"><a class="btn btn-outline" href="/pcm/programacao-semanal?mov=-1">Semana anterior</a><a class="btn btn-outline" href="/pcm/programacao-semanal?mov=1">Próxima semana</a></div>
+      <form class="pcm-toolbar" method="GET" action="/pcm/programacao-semanal">
+        <input class="input" name="semana" value="<%= filtros.semana || '' %>" placeholder="Semana (YYYY-Www)">
+        <input class="input" name="responsavel" value="<%= filtros.responsavel || '' %>" placeholder="Mecânico/Equipe">
+        <input class="input" name="tipo" value="<%= filtros.tipo || '' %>" placeholder="Tipo manutenção">
+        <input class="input" name="setor" value="<%= filtros.setor || '' %>" placeholder="Setor">
+        <input class="input" name="criticidade" value="<%= filtros.criticidade || '' %>" placeholder="Criticidade">
+        <button class="btn" type="submit">Filtrar</button>
+      </form>
+      <div class="week-grid">
+        <table class="table compact" style="margin-top:8px;"><thead><tr><th>Responsável/Equipe</th><th>Seg</th><th>Ter</th><th>Qua</th><th>Qui</th><th>Sex</th><th>Sáb</th><th>Dom</th></tr></thead><tbody>
+            <% semanaGrid.forEach(function(linha){ %><tr><td><strong><%= linha.responsavel %></strong></td><% linha.dias.forEach(function(dia){ %><td><% dia.itens.forEach(function(item){ %><div class="tag-mini">#<%= item.id %> <%= item.equipamento %> • <%= item.horas %>h • <%= item.criticidade || 'N/D' %></div><br><% }) %><% if (!dia.itens.length) { %><span class="muted-xs">-</span><% } %></td><% }) %></tr><% }) %>
+        </tbody></table>
+      </div>
+      <form method="POST" action="/pcm/programacao-semanal/salvar" style="margin-top:8px;"><button class="btn" type="submit">Salvar programação da semana</button></form>
+      <div class="muted-xs" style="margin-top:8px;">TODO: habilitar drag-and-drop para programar atividades no calendário.</div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="label">Atividades sem programação</div>
+      <div class="table-wrap"><table class="table compact" style="margin-top:8px;"><thead><tr><th>Nº</th><th>Equipamento</th><th>Tipo</th><th>Horas est.</th><th>Criticidade</th><th>Ação</th></tr></thead><tbody>
+          <% if (!atividadesSemProgramacao.length) { %><tr><td colspan="6" class="muted">Sem itens pendentes.</td></tr><% } %>
+          <% atividadesSemProgramacao.forEach(function(a){ %><tr><td>#<%= a.id %></td><td><%= a.equipamento %></td><td><%= a.tipo %></td><td><%= a.horas %></td><td><%= a.criticidade %></td><td><form method="POST" action="/pcm/backlog/<%= a.id %>/programar"><button class="btn btn-outline" type="submit">Programar</button></form></td></tr><% }) %>
+        </tbody></table></div>
+    </div>
+  </div>
+</div>

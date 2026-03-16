@@ -1,0 +1,17 @@
+<h1>OS #<%= os.id %></h1>
+
+<div class="card" style="padding:14px;">
+  <p><b>Título:</b> <%= os.titulo %></p>
+  <p><b>Setor:</b> <%= os.setor %></p>
+  <p><b>Prioridade:</b> <%= os.prioridade %></p>
+  <p><b>Status:</b> <%= os.status %></p>
+  <p><b>Data:</b> <%= os.created_at %></p>
+
+  <hr style="margin:12px 0;" />
+
+  <p style="white-space:pre-wrap;"><%= os.descricao %></p>
+</div>
+
+<div style="margin-top:12px;">
+  <a class="btn btn-ghost" href="/os">Voltar</a>
+</div>

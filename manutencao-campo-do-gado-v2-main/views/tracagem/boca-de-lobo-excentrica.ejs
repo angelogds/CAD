@@ -1,0 +1,16 @@
+<% layout('layout') %>
+<%- include('_calc_base', {
+  titulo: 'Boca de lobo excêntrica',
+  tipo,
+  action: '/tracagem/boca-lobo-excentrica/calcular',
+  desenho: '🐟 Boca de lobo excêntrica',
+  campos: [
+    { name: 'D1', label: 'D1 (diâmetro principal)', type: 'number', step: '0.01' },
+    { name: 'D2', label: 'D2 (diâmetro secundário)', type: 'number', step: '0.01' },
+    { name: 'X', label: 'X (deslocamento)', type: 'number', step: '0.01' },
+    { name: 'H', label: 'H (altura)', type: 'number', step: '0.01' },
+  ],
+  calculo,
+  equipamentos,
+  ordensServico
+}) %>

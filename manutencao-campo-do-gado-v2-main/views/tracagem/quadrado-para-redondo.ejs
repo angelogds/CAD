@@ -1,0 +1,49 @@
+<% layout('layout') %>
+<style>
+  .tr-page{display:grid;gap:14px}.tr-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px}
+  .tr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  @media(max-width:920px){.tr-grid{grid-template-columns:1fr}}
+</style>
+
+<div class="tr-page">
+  <div style="display:flex;justify-content:space-between;align-items:center;"><h1>Quadrado para redondo</h1><a class="btn" href="/tracagem">Voltar</a></div>
+
+  <div class="tr-card">
+    <form method="POST" action="/tracagem/quadrado-redondo/calcular" style="display:grid;gap:10px;">
+      <div class="tr-grid">
+        <div><label>A (lado do quadrado)</label><input class="input" name="A" type="number" step="0.01" min="0.01" required value="<%= calculo?.parametros?.A || '' %>"></div>
+        <div><label>B (lado do retângulo)</label><input class="input" name="B" type="number" step="0.01" min="0.01" required value="<%= calculo?.parametros?.B || '' %>"></div>
+        <div><label>D (diâmetro redondo)</label><input class="input" name="D" type="number" step="0.01" min="0.01" required value="<%= calculo?.parametros?.D || '' %>"></div>
+        <div><label>H (altura)</label><input class="input" name="H" type="number" step="0.01" min="0.01" required value="<%= calculo?.parametros?.H || '' %>"></div>
+        <div><label>E (espessura)</label><input class="input" name="E" type="number" step="0.01" min="0" value="<%= calculo?.parametros?.E || '' %>"></div>
+        <div><label>N (divisões)</label><input class="input" name="N" type="number" step="1" min="4" value="<%= calculo?.parametros?.N || 12 %>"></div>
+      </div>
+      <div><button class="btn btn-green" type="submit">CALCULAR</button></div>
+    </form>
+  </div>
+
+  <% if (calculo?.resultado) { const entrada = calculo.resultado.entrada; const resultado = calculo.resultado.resultado; const observacoes = calculo.resultado.observacoes || []; const planificacao = calculo.resultado.planificacao || {}; %>
+    <div class="tr-card"><%- include('partials/svg/retangulo-redondo-svg', { entrada, resultado, planificacao }) %></div>
+    <div class="tr-card">
+      <h3>Planificação</h3>
+      <p>AA = <b><%= Number(planificacao.labels?.AA || resultado.AA || entrada.A || 0).toFixed(2) %> mm</b></p>
+      <p>AB = <b><%= Number(planificacao.labels?.AB || resultado.AB || entrada.B || 0).toFixed(2) %> mm</b></p>
+      <p>C = <b><%= Number(planificacao.labels?.C || resultado.C || 0).toFixed(2) %> mm</b></p>
+    </div>
+    <div class="tr-card">
+      <h3>Resultados numéricos</h3>
+      <ul>
+        <li>Perímetro quadrado (A) = <%= Number(resultado.perimetroQuadrado || 0).toFixed(2) %> mm</li>
+        <li>Perímetro retângulo (A/B) = <%= Number(resultado.perimetroRetangulo || 0).toFixed(2) %> mm</li>
+        <li>Circunferência redondo = <%= Number(resultado.circunferenciaRedondo || 0).toFixed(2) %> mm</li>
+        <li>Geratriz aproximada = <%= Number(resultado.geratrizAproximada || 0).toFixed(2) %> mm</li>
+      </ul>
+      <h3>Observações técnicas</h3>
+      <ul><% observacoes.forEach((obs)=> { %><li><%= obs %></li><% }) %></ul>
+    </div>
+
+    <div class="tr-card">
+      <%- include('partials/relacionar-equipamento', { tipo: 'quadrado-para-redondo', calculo, equipamentos, tituloPadrao: 'Retângulo para redondo' }) %>
+    </div>
+  <% } %>
+</div>

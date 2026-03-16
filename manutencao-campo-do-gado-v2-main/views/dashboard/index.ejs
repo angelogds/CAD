@@ -1,0 +1,322 @@
+<% layout('layout') %>
+
+<style>
+  .tv-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+    grid-template-areas:
+      "os andamento"
+      "preventivas escala"
+      "mural quick"
+      "demandas quick";
+    gap: 10px;
+    align-items: start;
+  }
+
+  .dash-col {
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+    min-width:0;
+  }
+
+  .dash-col .dashboard-card {
+    height:auto;
+    min-height:unset;
+  }
+
+  .dashboard-card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:12px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+  .dashboard-title { font-size:13px; font-weight:900; letter-spacing:.04em; color:#475569; text-transform:uppercase; margin-bottom:10px; }
+
+  .kpi-grid { display:grid; grid-template-columns:repeat(3,minmax(120px,1fr)); gap:8px; margin-bottom:10px; }
+  .kpi-grid.two { grid-template-columns:repeat(2,minmax(120px,1fr)); margin-bottom:0; }
+  .kpi-box { border:1px solid #e5e7eb; border-radius:10px; padding:8px 10px; background:#fafafa; }
+  .kpi-label { font-size:12px; color:#64748b; }
+  .kpi-value { margin-top:2px; font-size:26px; font-weight:900; line-height:1.1; color:#0f172a; }
+
+  .table-wrap { overflow:auto; }
+  .table.compact th, .table.compact td { padding:8px; vertical-align:middle; font-size:13px; }
+  .table.compact thead th { background:#f8fafc; }
+  .muted-xs { font-size:12px; color:#64748b; }
+  .list-tight { margin:8px 0 0 16px; padding:0; }
+
+  .pagination { display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:8px; flex-wrap:wrap; }
+  .btn-outline { border:1px solid #d1d5db; border-radius:9px; padding:6px 10px; background:#fff; color:#0f172a; text-decoration:none; font-weight:700; font-size:12px; }
+  .btn-inline { border:none; border-radius:8px; padding:5px 9px; background:#16a34a; color:#fff; font-weight:800; cursor:pointer; font-size:12px; }
+  .aviso-item { border:1px solid #e5e7eb; border-radius:10px; padding:9px 10px; background:#fff; margin-top:8px; }
+  .quick-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+  .alerta-tv { border:2px solid #dc2626; border-radius:14px; background:#fff1f2; color:#7f1d1d; padding:14px; margin-bottom:10px; display:flex; gap:14px; align-items:center; justify-content:space-between; }
+  .alerta-tv.hidden { display:none; }
+  .alerta-tv__title { font-size:28px; font-weight:900; letter-spacing:.02em; }
+  .alerta-tv__meta { font-size:16px; font-weight:700; }
+  .alerta-tv.piscar { animation: alertaPulse 1s infinite; }
+  @keyframes alertaPulse { 0%{box-shadow:0 0 0 0 rgba(220,38,38,.45);} 70%{box-shadow:0 0 0 14px rgba(220,38,38,0);} 100%{box-shadow:0 0 0 0 rgba(220,38,38,0);} }
+  .pill-prioridade { padding:3px 8px; border-radius:999px; font-size:11px; font-weight:800; border:1px solid #d1d5db; }
+  .pill-status {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:114px;
+    min-height:30px;
+    text-align:center;
+    font-weight:800;
+    white-space:nowrap;
+  }
+  .pill-prioridade.emergencial { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
+  .pill-prioridade.alta { background:#ffedd5; color:#9a3412; border-color:#fdba74; }
+  .os-row-critico { background:#fef2f2; border-left:4px solid #dc2626; }
+  .os-row-medio { background:#fffbeb; border-left:4px solid #f59e0b; }
+  .os-row-leve { background:#f8fafc; }
+
+  @media (max-width: 1200px) {
+    .tv-grid { grid-template-columns: 1fr; grid-template-areas: "os" "andamento" "preventivas" "escala" "mural" "quick" "demandas"; }
+    .alerta-tv__title { font-size:22px; }
+  }
+
+  @media (max-width: 760px) {
+    .dash-grid { grid-template-columns: 1fr !important; }
+    .dash-col { gap: 16px; }
+    .kpi-grid, .kpi-grid.two, .quick-grid { grid-template-columns:1fr; }
+    .alerta-tv { flex-direction:column; align-items:flex-start; }
+    .alerta-tv__title { font-size:20px; }
+  }
+</style>
+
+<%
+  var safeDemandasResumo = demandasResumo || {};
+  var demandasEmTrabalho = safeDemandasResumo.em_trabalho || [];
+  var safeOSResumo = osResumo || {};
+  var safeOSPainel = osPainel || {};
+  var osItems = safeOSPainel.items || [];
+  var osAndamento = osEmAndamento || [];
+  var safeAvisos = avisos || [];
+  var safeEscala = escala || {};
+  var escalaDiurno = (safeEscala.diurno_mecanicos || []).map(function(p) { return p.nome; }).join(', ');
+  var escalaApoio = (safeEscala.apoio_operacional || []).map(function(p) { return p.nome; }).join(', ');
+  var escalaNoturno = (safeEscala.noturno || []).map(function(p) { return p.nome; }).join(', ');
+  var escalaFolgasAfastamentos = safeEscala.folgas_afastamentos || [];
+  var safeMotoresResumo = motoresResumo || {};
+  var alertaInicial = alertaAtivo || null;
+%>
+
+<div class="page-head">
+  <div>
+    <h1>Painel Operacional Reciclagem</h1>
+    <p class="muted">TV da manutenção • OS, mural, preventivas, escala e demandas em tempo real</p>
+    <p class="muted-xs" style="margin-top:6px; max-width:720px;">No iPhone (Safari, Edge e Chrome), os alertas push funcionam pelo app instalado na Tela de Início (abra no Safari → Compartilhar → Adicionar à Tela de Início).</p>
+  </div>
+  <button id="btn-ativar-push" class="btn-outline" type="button" onclick="enablePush()">Ativar alertas de OS neste dispositivo</button>
+</div>
+
+<section id="alerta-tv" class="alerta-tv <%= alertaInicial ? 'piscar' : 'hidden' %>">
+  <div>
+    <div class="alerta-tv__title">⚠ NOVA OS EMERGENCIAL</div>
+    <div class="alerta-tv__meta" id="alerta-tv-meta">
+      <% if (alertaInicial) { %>
+        Equipamento: <%= alertaInicial.equipamento || '-' %> • Setor: <%= alertaInicial.setor || '-' %> • Grau: <%= alertaInicial.grau || alertaInicial.prioridade || '-' %>
+      <% } else { %>
+        Nenhum alerta crítico no momento.
+      <% } %>
+    </div>
+  </div>
+  <div>
+    <button id="btn-reconhecer-alerta" class="btn-inline" style="background:#dc2626;">Reconhecer alerta</button>
+  </div>
+</section>
+
+
+<div class="dash-grid">
+  <div class="dash-col">
+<section class="dashboard-card area-os">
+    <div class="dashboard-title">Ordem de Serviço</div>
+    <div class="kpi-grid">
+      <div class="kpi-box"><div class="kpi-label">Abertas</div><div class="kpi-value"><%= safeOSResumo.abertas || 0 %></div></div>
+      <div class="kpi-box"><div class="kpi-label">Em andamento</div><div class="kpi-value"><%= safeOSResumo.andamento || 0 %></div></div>
+      <div class="kpi-box"><div class="kpi-label">Fechadas</div><div class="kpi-value"><%= safeOSResumo.fechadas || 0 %></div></div>
+    </div>
+    <div class="table-wrap">
+      <table class="table compact">
+        <thead><tr><th>#</th><th>Equipamento</th><th>Grau</th><th>Status</th><th>Abertura</th><th>Fechamento</th><th style="text-align:right;">Ações</th></tr></thead>
+        <tbody>
+          <% if (osItems.length === 0) { %><tr><td colspan="7" style="text-align:center; color:#6b7280;">Nenhuma OS aberta ou em andamento.</td></tr><% } %>
+          <% osItems.forEach(function(o) { var prio = String(o.grau || o.prioridade || 'MEDIA').toUpperCase(); var rowClass = (prio === 'CRITICO' || prio === 'CRÍTICO' || prio === 'ALTO' || prio === 'EMERGENCIAL') ? 'os-row-critico' : ((prio === 'MEDIO' || prio === 'MÉDIO' || prio === 'MEDIA') ? 'os-row-medio' : 'os-row-leve'); %>
+            <tr class="<%= rowClass %>">
+              <td><%= o.id %></td>
+              <td><strong><%= o.equipamento || '-' %></strong></td>
+              <td><span class="pill-prioridade <%= (prio === 'CRITICO' || prio === 'CRÍTICO' || prio === 'EMERGENCIAL') ? 'emergencial' : ((prio === 'ALTO' || prio === 'ALTA' || prio === 'MEDIO' || prio === 'MÉDIO' || prio === 'MEDIA') ? 'alta' : '') %>"><%= prio %></span></td>
+              <td>
+                <% var statusOs = String(o.status || '').toUpperCase(); %>
+                <% if (statusOs === 'ABERTA') { %><span class="pill-tag pill-amber pill-status">Aberta</span>
+                <% } else if (statusOs === 'ANDAMENTO' || statusOs === 'EM_ANDAMENTO') { %><span class="pill-tag pill-blue pill-status">Em andamento</span>
+                <% } else if (statusOs === 'PAUSADA') { %><span class="pill-tag pill-gray pill-status">Pausada</span>
+                <% } else if (statusOs === 'CONCLUIDA' || statusOs === 'FINALIZADA' || statusOs === 'FECHADA') { %><span class="pill-tag pill-green pill-status">Fechada</span>
+                <% } else if (statusOs === 'CANCELADA') { %><span class="pill-tag pill-gray pill-status">Cancelada</span>
+                <% } else { %><span class="pill-tag pill-gray pill-status"><%= statusOs || '-' %></span><% } %>
+              </td>
+              <td><%= o.opened_at ? fmtBR(o.opened_at) : '-' %></td>
+              <td><%= o.closed_at ? fmtBR(o.closed_at) : '-' %></td>
+              <td style="text-align:right;">
+                <% if (statusOs === 'ABERTA') { %>
+                  <form method="POST" action="/os/<%= o.id %>/status" style="display:inline;"><input type="hidden" name="status" value="ANDAMENTO"><button class="btn-inline" type="submit">Iniciar</button></form>
+                <% } else { %><a class="btn-outline" href="/os/<%= o.id %>">Ver</a><% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <div class="muted-xs">Mostrando <strong><%= osItems.length || 0 %></strong> OS ativas (limite de <strong><%= safeOSPainel.pageSize || 15 %></strong> no painel). Fechadas ficam apenas no histórico do equipamento.</div>
+    </div>
+  </section>
+
+<section class="dashboard-card area-preventivas">
+    <div class="dashboard-title">Preventivas Programadas</div>
+    <% if (!preventivas || preventivas.length === 0) { %><p class="muted" style="margin:0;">Nenhuma preventiva pendente.</p><% } else { %>
+      <div class="table-wrap"><table class="table compact"><thead><tr><th>Equipamento</th><th>Resp.</th><th>Data</th><th>Status</th><th>Obs</th></tr></thead><tbody>
+      <% preventivas.forEach(function(p) { %><tr><td><strong><%= p.equipamento_nome || '-' %></strong></td><td><%= p.responsavel || '-' %></td><td><%= p.data_prevista || '-' %></td><td><span class="pill-tag pill-gray"><%= p.status || '-' %></span></td><td><%= p.observacao || '-' %></td></tr><% }) %>
+      </tbody></table></div>
+    <% } %>
+  </section>
+
+<section class="dashboard-card area-demandas">
+    <div class="dashboard-title">Demandas</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+      <span class="pill-tag pill-blue">Novas: <%= safeDemandasResumo.novas || 0 %></span>
+      <span class="pill-tag pill-amber">Em andamento: <%= safeDemandasResumo.em_andamento || 0 %></span>
+      <span class="pill-tag pill-gray">Paradas: <%= safeDemandasResumo.paradas || 0 %></span>
+    </div>
+    <ul class="list-tight">
+      <% if (demandasEmTrabalho.length === 0) { %><li class="muted-xs">Nenhuma demanda em andamento.</li><% } %>
+      <% demandasEmTrabalho.slice(0, 4).forEach(function(d) { %><li><a href="/demandas/<%= d.id %>">#<%= d.id %> - <%= d.titulo %></a></li><% }) %>
+    </ul>
+  </section>
+  </div>
+
+  <div class="dash-col">
+<section class="dashboard-card area-andamento">
+    <div class="dashboard-title">OS em andamento (equipe)</div>
+    <div class="table-wrap"><table class="table compact">
+      <thead><tr><th>OS</th><th>Equipamento</th><th>Equipe</th><th>Status</th></tr></thead>
+      <tbody>
+        <% if (osAndamento.length === 0) { %><tr><td colspan="4" class="muted-xs">Nenhuma OS atribuída à equipe no momento.</td></tr><% } %>
+        <% osAndamento.forEach(function(o){ %>
+          <tr>
+            <td><a href="/os/<%= o.id %>">#<%= o.id %></a></td>
+            <td><%= o.equipamento || '-' %></td>
+            <td><%= o.equipe || '-' %></td>
+            <td>
+              <% if ((o.status || '').toUpperCase() === 'ABERTA') { %>
+                <span class="pill-tag pill-amber">ABERTA</span>
+              <% } else if ((o.status || '').toUpperCase() === 'ANDAMENTO' || (o.status || '').toUpperCase() === 'EM_ANDAMENTO') { %>
+                <span class="pill-tag pill-blue">ANDAMENTO</span>
+              <% } else { %>
+                <span class="pill-tag pill-gray"><%= o.status || '-' %></span>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table></div>
+  </section>
+
+<section class="dashboard-card area-escala">
+    <div class="dashboard-title">Escala da Semana</div>
+    <% if (escalaDiurno || escalaApoio || escalaNoturno || escalaFolgasAfastamentos.length) { %>
+      <div class="muted-xs" style="margin-bottom:8px;">Semana #<%= safeEscala.semana_numero || '-' %> • <%= safeEscala.data_inicio || '-' %> até <%= safeEscala.data_fim || '-' %></div>
+      <table class="table compact"><tbody>
+        <tr><td><strong>Dia (mecânicos)</strong></td><td><%= escalaDiurno || '-' %></td></tr>
+        <tr><td><strong>Apoio operacional</strong></td><td><%= escalaApoio || '-' %></td></tr>
+        <tr><td><strong>Noite (responsável)</strong></td><td><%= escalaNoturno || '-' %></td></tr>
+      </tbody></table>
+
+      <div class="dashboard-title" style="margin-top:10px; margin-bottom:6px; font-size:11px;">Folga / atestado</div>
+      <% if (escalaFolgasAfastamentos.length === 0) { %>
+        <p class="muted-xs" style="margin:0;">Sem mecânicos em folga/atestado nesta semana.</p>
+      <% } else { %>
+        <ul class="list-tight" style="margin-top:0;">
+          <% escalaFolgasAfastamentos.forEach(function(item) { %>
+            <li>
+              <strong><%= item.nome || '-' %></strong>
+              — <%= item.tipo || '-' %>
+              <% if (item.data_inicio || item.data_fim) { %>
+                (<%= item.data_inicio || '-' %> até <%= item.data_fim || '-' %>)
+              <% } %>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    <% } else { %><p class="muted" style="margin:0;">Escala não disponível.</p><% } %>
+  </section>
+
+<section class="area-quick">
+    <div class="dashboard-card"><div class="dashboard-title">Motores</div><div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;"><span class="pill-tag pill-green">Funcionando: <%= safeMotoresResumo.em_funcionamento || 0 %></span><span class="pill-tag pill-blue">Estoque: <%= safeMotoresResumo.em_estoque || 0 %></span><span class="pill-tag pill-amber">Conserto: <%= safeMotoresResumo.em_conserto || 0 %></span></div></div>
+  </section>
+  </div>
+</div>
+
+<script>
+(function(){
+  var eventSource = new EventSource('/dashboard/alertas/stream');
+  var box = document.getElementById('alerta-tv');
+  var meta = document.getElementById('alerta-tv-meta');
+  var btnReconhecer = document.getElementById('btn-reconhecer-alerta');
+  var alertaAtual = <%- JSON.stringify(alertaInicial || null) %>;
+
+  function renderAlerta(payload){
+    if (!payload || !payload.id_os) {
+      box.classList.add('hidden');
+      box.classList.remove('piscar');
+      meta.textContent = 'Nenhum alerta crítico no momento.';
+      return;
+    }
+    alertaAtual = payload;
+    box.classList.remove('hidden');
+    box.classList.add('piscar');
+    meta.textContent = 'Equipamento: ' + (payload.equipamento || '-') + ' • Setor: ' + (payload.setor || '-') + ' • Grau: ' + (payload.grau || payload.prioridade || '-') + ' • OS #' + payload.id_os;
+  }
+
+  eventSource.addEventListener('estado_inicial', function(e){
+    try {
+      var data = JSON.parse(e.data || '{}');
+      if (data.alertaAtivo) renderAlerta({
+        id_os: data.alertaAtivo.os_id,
+        equipamento: data.alertaAtivo.equipamento,
+        setor: data.alertaAtivo.setor,
+        prioridade: data.alertaAtivo.prioridade,
+        grau: data.alertaAtivo.grau,
+      });
+    } catch(_e){}
+  });
+
+  eventSource.addEventListener('os_criada', function(){
+    setTimeout(function(){ window.location.reload(); }, 900);
+  });
+
+  eventSource.addEventListener('nova_os_emergencial', function(e){
+    var data = JSON.parse(e.data || '{}');
+    renderAlerta(data);
+    setTimeout(function(){ window.location.reload(); }, 1800);
+  });
+
+  eventSource.addEventListener('os_status_alterado', function(){
+    setTimeout(function(){ window.location.reload(); }, 1200);
+  });
+
+
+
+  btnReconhecer?.addEventListener('click', function(){
+    if (!alertaAtual || !alertaAtual.id_os) return;
+    fetch('/dashboard/alertas/reconhecer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ os_id: alertaAtual.id_os })
+    }).then(function(){
+      box.classList.remove('piscar');
+      box.classList.add('hidden');
+      setTimeout(function(){ window.location.reload(); }, 500);
+    }).catch(function(){});
+  });
+})();
+</script>

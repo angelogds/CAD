@@ -1,0 +1,46 @@
+<%- layout('layout') -%>
+
+<h1>Editar Semana <%= semana.semana_numero %></h1>
+<p style="color:#64748b;font-weight:800;">Período: <%= semana.data_inicio %> até <%= semana.data_fim %></p>
+
+<div class="card" style="margin-top:12px;">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Colaborador</th>
+        <th style="width:160px;">Turno</th>
+        <th style="width:260px;">Ação</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!semana.alocacoes || semana.alocacoes.length === 0) { %>
+        <tr><td colspan="3" style="text-align:center;color:#64748b;">Sem alocações nessa semana.</td></tr>
+      <% } else { %>
+        <% semana.alocacoes.forEach(a => { %>
+          <tr>
+            <td style="font-weight:900;"><%= a.nome %></td>
+            <td><%= a.tipo_turno %></td>
+            <td>
+              <form method="POST" action="/escala/editar/<%= semana.id %>" style="display:flex;gap:8px;align-items:center;">
+                <input type="hidden" name="alocacaoId" value="<%= a.id %>">
+                <select class="input" name="novoTurno" style="height:36px;">
+                  <option value="diurno">Dia</option>
+                  <option value="noturno">Noite</option>
+                  <option value="apoio">Apoio</option>
+                  <option value="plantao">Plantão</option>
+                  <option value="folga">Folga</option>
+                </select>
+                <button class="btn btn-sm btn-primary" type="submit">Salvar</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<div style="margin-top:12px;display:flex;gap:10px;">
+  <a class="btn" href="/escala">Voltar</a>
+  <a class="btn btn-primary" href="/escala/pdf/semana/<%= semana.id %>">PDF da Semana</a>
+</div>

@@ -1,0 +1,78 @@
+<% layout('layout') %>
+
+<div class="page-head">
+  <div>
+    <h1>Usuários</h1>
+    <p class="muted">Cadastre perfis: Direção, RH, Compras e Manutenção.</p>
+  </div>
+
+  <a class="btn btn-green" href="/usuarios/novo">+ Novo Usuário</a>
+</div>
+
+<div class="card" style="max-width: 1100px;">
+  <form method="GET" action="/usuarios">
+    <div class="grid-2">
+      <div>
+        <div class="label">Buscar</div>
+        <input class="input" name="q" value="<%= q || '' %>" placeholder="Buscar por nome ou e-mail" />
+      </div>
+
+      <div>
+        <div class="label">Perfil</div>
+        <select class="input" name="role">
+          <option value="">Todos os perfis</option>
+          <% (ROLES || []).forEach(r => { %>
+            <option value="<%= r.key %>" <%= (role === r.key) ? "selected" : "" %>><%= r.label %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn btn-green btn-sm" type="submit">Filtrar</button>
+      <a class="btn btn-ghost btn-sm" href="/usuarios">Limpar</a>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="margin-top:12px;">
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th style="width:80px;">#</th>
+          <th>Nome</th>
+          <th>E-mail</th>
+          <th style="width:180px;">Perfil</th>
+          <th style="width:180px;">Criado</th>
+          <th style="width:140px; text-align:right;">Ações</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <% if (!lista || !lista.length) { %>
+          <tr>
+            <td colspan="6" class="muted" style="text-align:center; padding:18px;">
+              Nenhum usuário encontrado.
+            </td>
+          </tr>
+        <% } else { %>
+          <% (lista || []).forEach(u => { %>
+            <tr>
+              <td><%= u.id %></td>
+              <td><%= u.name %></td>
+              <td><%= u.email %></td>
+              <td>
+                <span class="pill-tag pill-gray"><%= (u.role || '').toUpperCase() %></span>
+              </td>
+              <td><%= u.created_at ? fmtBR(u.created_at) : '-' %></td>
+              <td style="text-align:right;">
+                <a class="btn btn-ghost btn-sm" href="/usuarios/<%= u.id %>/editar">Editar</a>
+              </td>
+            </tr>
+          <% }) %>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>

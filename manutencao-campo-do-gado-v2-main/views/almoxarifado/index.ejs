@@ -1,0 +1,60 @@
+<% layout('layout') %>
+
+<div class="page-head">
+  <div>
+    <h1>Almoxarifado</h1>
+    <p class="muted">Retirada com identificação do funcionário e baixa automática no estoque.</p>
+  </div>
+</div>
+
+<%- include('_tabs', { tab: 'retiradas' }) %>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="label">Registrar retirada</div>
+    <form method="POST" action="/almoxarifado/retiradas" class="grid-2" style="margin-top:10px;">
+      <select class="input" name="funcionario_id" required>
+        <option value="">Funcionário</option>
+        <% funcionarios.forEach((f) => { %><option value="<%= f.id %>"><%= f.codigo %> - <%= f.nome %></option><% }) %>
+      </select>
+      <select class="input" name="item_id" required>
+        <option value="">Item do estoque</option>
+        <% itens.forEach((i) => { %><option value="<%= i.id %>"><%= i.nome %> (saldo <%= i.saldo %> <%= i.unidade %>)</option><% }) %>
+      </select>
+      <input class="input" name="quantidade" type="number" step="0.01" min="0.01" placeholder="Quantidade" required />
+      <select class="input" name="solicitacao_id">
+        <option value="">Solicitação vinculada (opcional)</option>
+        <% solicitacoes.forEach((s) => { %><option value="<%= s.id %>"><%= s.numero || ('#' + s.id) %> - <%= s.status %></option><% }) %>
+      </select>
+      <input class="input" name="destino" placeholder="Destino/Setor" />
+      <input class="input" name="finalidade" placeholder="Finalidade" />
+      <button class="btn btn-green" style="grid-column:1/-1;">Registrar retirada</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="label">Últimas retiradas</div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr><th>#</th><th>Funcionário</th><th>Item</th><th>Qtd</th><th>Destino</th><th>Data</th></tr>
+        </thead>
+        <tbody>
+          <% if (!retiradas.length) { %>
+            <tr><td colspan="6" class="muted">Sem retiradas registradas.</td></tr>
+          <% } %>
+          <% retiradas.forEach((r) => { %>
+            <tr>
+              <td><%= r.id %></td>
+              <td><%= r.funcionario_codigo %> - <%= r.funcionario_nome %></td>
+              <td><%= r.item_nome %></td>
+              <td><%= r.quantidade %> <%= r.unidade %></td>
+              <td><%= r.destino || '-' %></td>
+              <td><%= fmtBR(r.created_at) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

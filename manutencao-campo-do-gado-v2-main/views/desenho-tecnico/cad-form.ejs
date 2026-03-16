@@ -1,0 +1,35 @@
+<% layout("layout") %>
+<section class="card" style="display:flex;justify-content:space-between;align-items:center;">
+  <h1>Novo Desenho CAD</h1>
+  <a class="btn" href="/desenho-tecnico">Voltar</a>
+</section>
+
+<form class="card cad-minimal-form" method="POST" action="/desenho-tecnico/cad">
+  <div>
+    <label>Código</label>
+    <input class="input" name="codigo" placeholder="Vazio = auto (CAD0001, CAD0002...)" value="<%= (desenho && desenho.codigo) || '' %>">
+    <small>Se informado, deve ser único.</small>
+  </div>
+  <div>
+    <label>Título *</label>
+    <input class="input" name="titulo" placeholder="Título do desenho" value="<%= (desenho && desenho.titulo) || '' %>" required>
+  </div>
+  <div>
+    <label>Material</label>
+    <input class="input" name="material" placeholder="Ex.: aço 1045, inox, alumínio..." value="<%= (desenho && desenho.material) || '' %>">
+  </div>
+  <div>
+    <label>Equipamento vinculado</label>
+    <select class="input" name="equipamento_id">
+      <option value="">Sem vínculo</option>
+      <% (equipamentos || []).forEach((e)=>{ %>
+        <option value="<%= e.id %>" <%= Number((desenho && desenho.equipamento_id) || 0)===Number(e.id)?'selected':'' %>><%= e.codigo || ('#'+e.id) %> - <%= e.nome %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div style="grid-column:1/-1;">
+    <label>Observações</label>
+    <textarea class="input" name="observacoes" placeholder="Informações opcionais"><%= (desenho && desenho.observacoes) || '' %></textarea>
+  </div>
+  <button class="btn btn-green" type="submit">Criar e abrir Editor CAD</button>
+</form>

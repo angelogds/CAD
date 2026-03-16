@@ -1,0 +1,134 @@
+<% layout('layout') %>
+
+<div class="page">
+
+  <div class="page-head">
+    <div>
+      <h1>Motores</h1>
+      <p class="muted">Controle de motores da planta</p>
+    </div>
+    <a class="btn btn-primary" href="/motores/new">
+      + Cadastrar Motor
+    </a>
+  </div>
+
+  <% if (rebobCount && rebobCount > 0) { %>
+    <div class="card" style="margin-bottom:16px; border-color:#fed7aa; background:#fff7ed;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:900;">
+            Atenção: <%= rebobCount %> motor(es) enviado(s) para rebobinamento
+            <span class="pill-tag pill-amber" style="margin-left:8px;">ENVIADO_REBOB</span>
+          </div>
+          <div class="muted" style="margin-top:4px;">
+            Verifique empresa e prazo de retorno.
+          </div>
+        </div>
+
+        <a class="btn btn-primary" href="/motores?status=ENVIADO_REBOB">
+          Ver enviados
+        </a>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- FILTROS -->
+  <div class="card" style="margin-bottom:16px;">
+    <form method="GET" action="/motores" class="grid-2">
+
+      <div>
+        <div class="label">Buscar</div>
+        <input class="input"
+               name="q"
+               placeholder="Buscar (código, descrição, local)"
+               value="<%= filtros.q %>">
+      </div>
+
+      <div>
+        <div class="label">Origem</div>
+        <select name="origem">
+          <option value="">Origem (todas)</option>
+          <option value="RECICLAGEM" <%= filtros.origem==='RECICLAGEM'?'selected':'' %>>RECICLAGEM</option>
+          <option value="FRIGORIFICO" <%= filtros.origem==='FRIGORIFICO'?'selected':'' %>>FRIGORÍFICO</option>
+        </select>
+      </div>
+
+      <div>
+        <div class="label">Status</div>
+        <select name="status">
+          <option value="">Status (todos)</option>
+          <option value="EM_USO">EM_USO</option>
+          <option value="ENVIADO_REBOB">ENVIADO_REBOB</option>
+          <option value="RETORNOU">RETORNOU</option>
+          <option value="RESERVA">RESERVA</option>
+        </select>
+      </div>
+
+      <div style="display:flex; align-items:end; gap:10px;">
+        <button class="btn btn-primary" type="submit">Filtrar</button>
+        <a class="btn btn-ghost" href="/motores">Limpar</a>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- LISTA -->
+  <div class="card">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Código</th>
+            <th>Descrição</th>
+            <th>Potência</th>
+            <th>RPM</th>
+            <th>Origem</th>
+            <th>Status</th>
+            <th style="text-align:right;">Ações</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <% if (!lista || !lista.length) { %>
+            <tr>
+              <td colspan="8" style="text-align:center; color:var(--muted);">
+                Nenhum motor encontrado.
+              </td>
+            </tr>
+          <% } %>
+
+          <% lista.forEach(m => { %>
+            <tr>
+              <td><%= m.id %></td>
+              <td><%= m.codigo || '-' %></td>
+              <td class="td-clip"><%= m.descricao %></td>
+              <td><%= m.potencia_cv ?? '-' %></td>
+              <td><%= m.rpm ?? '-' %></td>
+              <td><%= m.origem_unidade %></td>
+
+              <td>
+                <% if (m.status === 'EM_USO') { %>
+                  <span class="pill-tag pill-green">EM_USO</span>
+                <% } else if (m.status === 'ENVIADO_REBOB') { %>
+                  <span class="pill-tag pill-amber">ENVIADO_REBOB</span>
+                <% } else if (m.status === 'RETORNOU') { %>
+                  <span class="pill-tag pill-blue">RETORNOU</span>
+                <% } else { %>
+                  <span class="pill-tag pill-gray"><%= m.status %></span>
+                <% } %>
+              </td>
+
+              <td style="text-align:right;">
+                <a class="btn btn-sm btn-primary" href="/motores/<%= m.id %>">
+                  Ver
+                </a>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>

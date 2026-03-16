@@ -1,0 +1,164 @@
+<% layout('layout') %>
+
+<div class="page">
+
+  <div class="page-head">
+    <div>
+      <h1>Motor #<%= motor.id %></h1>
+      <p class="muted">Detalhes e movimentações</p>
+    </div>
+    <a class="btn btn-ghost" href="/motores">Voltar</a>
+  </div>
+
+  <!-- DADOS -->
+  <div class="card">
+
+    <div class="grid-2">
+
+      <div>
+        <div class="label">Código</div>
+        <div><%= motor.codigo || '-' %></div>
+      </div>
+
+      <div>
+        <div class="label">Descrição</div>
+        <div><%= motor.descricao %></div>
+      </div>
+
+      <div>
+        <div class="label">Potência (CV)</div>
+        <div><%= motor.potencia_cv ?? '-' %></div>
+      </div>
+
+      <div>
+        <div class="label">RPM</div>
+        <div><%= motor.rpm ?? '-' %></div>
+      </div>
+
+      <div>
+        <div class="label">Origem</div>
+        <div><%= motor.origem_unidade %></div>
+      </div>
+
+      <div>
+        <div class="label">Status</div>
+        <div>
+          <% if (motor.status === 'EM_USO') { %>
+            <span class="pill-tag pill-green">EM_USO</span>
+          <% } else if (motor.status === 'ENVIADO_REBOB') { %>
+            <span class="pill-tag pill-amber">ENVIADO_REBOB</span>
+          <% } else if (motor.status === 'RETORNOU') { %>
+            <span class="pill-tag pill-blue">RETORNOU</span>
+          <% } else { %>
+            <span class="pill-tag pill-gray"><%= motor.status %></span>
+          <% } %>
+        </div>
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <div class="label">Local de Instalação</div>
+        <div><%= motor.local_instalacao || '-' %></div>
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <div class="label">Observação</div>
+        <div><%= motor.observacao || '-' %></div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- AÇÕES -->
+  <div class="grid-2" style="margin-top:16px;">
+
+    <div class="card">
+      <h3>Enviar para Rebobinamento</h3>
+
+      <form method="POST" action="/motores/<%= motor.id %>/enviar" class="grid-2">
+
+        <div>
+          <div class="label">Empresa *</div>
+          <input class="input" name="empresa_rebob" required>
+        </div>
+
+        <div>
+          <div class="label">Motorista</div>
+          <input class="input" name="motorista_saida">
+        </div>
+
+        <div style="grid-column: 1 / -1;">
+          <div class="label">Observação</div>
+          <input class="input" name="observacao">
+        </div>
+
+        <div style="grid-column: 1 / -1; text-align:right;">
+          <button class="btn btn-primary" type="submit">Registrar Saída</button>
+        </div>
+
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Registrar Retorno</h3>
+
+      <form method="POST" action="/motores/<%= motor.id %>/retorno" class="grid-2">
+
+        <div>
+          <div class="label">Motorista</div>
+          <input class="input" name="motorista_retorno">
+        </div>
+
+        <div style="grid-column: 1 / -1;">
+          <div class="label">Observação</div>
+          <input class="input" name="observacao">
+        </div>
+
+        <div style="grid-column: 1 / -1; text-align:right;">
+          <button class="btn btn-primary" type="submit">Registrar Retorno</button>
+        </div>
+
+      </form>
+    </div>
+
+  </div>
+
+  <!-- HISTÓRICO -->
+  <div class="card" style="margin-top:16px;">
+    <h3>Histórico</h3>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Tipo</th>
+            <th>Data</th>
+            <th>Detalhes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!eventos || !eventos.length) { %>
+            <tr>
+              <td colspan="4" style="text-align:center; color:var(--muted);">
+                Sem histórico.
+              </td>
+            </tr>
+          <% } %>
+
+          <% eventos.forEach(e => { %>
+            <tr>
+              <td><%= e.id %></td>
+              <td><%= e.tipo %></td>
+              <td><%= e.created_at %></td>
+              <td class="td-clip">
+                <%= e.payloadObj ? JSON.stringify(e.payloadObj) : '-' %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>

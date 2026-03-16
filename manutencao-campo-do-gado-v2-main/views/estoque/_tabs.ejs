@@ -1,0 +1,10 @@
+<%
+  const currentTab = tab || estoqueTab || '';
+%>
+<div class="subtabs">
+  <a class="subtab <%= currentTab === 'itens' ? 'active' : '' %>" href="/estoque">Itens</a>
+  <a class="subtab <%= currentTab === 'categorias' ? 'active' : '' %>" href="/estoque/categorias">Categorias</a>
+  <a class="subtab <%= currentTab === 'locais' ? 'active' : '' %>" href="/estoque/locais">Locais</a>
+  <a class="subtab <%= currentTab === 'movimentos' ? 'active' : '' %>" href="/estoque/movimentos">Movimentos</a>
+  <a class="subtab <%= currentTab === 'saida' ? 'active' : '' %>" href="/estoque/saidas/nova">Registrar saída</a>
+</div>

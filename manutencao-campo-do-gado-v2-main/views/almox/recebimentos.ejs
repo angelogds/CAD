@@ -1,0 +1,9 @@
+<h1>Almoxarifado - Recebimentos</h1>
+<div><a href="?status=COMPRADA">PARA RECEBER</a> | <a href="?status=EM_RECEBIMENTO">EM RECEBIMENTO</a> | <a href="?status=RECEBIDA_PARCIAL">PARCIAIS</a> | <a href="?status=FECHADA">FECHADAS</a></div>
+<table class="table"><tr><th>Número</th><th>Status</th><th>Ações</th></tr>
+<% lista.filter(s=> !status || s.status===status).forEach(s=> { %><tr><td><%= s.numero %></td><td><%= s.status %></td><td>
+<form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/iniciar-recebimento" style="display:inline"><button>Iniciar</button></form>
+<a href="/almoxarifado/solicitacoes/<%= s.id %>/conferir">Conferir</a>
+<form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/fechar" style="display:inline"><button>Fechar</button></form>
+<form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/reabrir" style="display:inline"><button>Reabrir</button></form>
+</td></tr><% }) %></table>

@@ -1,0 +1,67 @@
+<% layout('layout') %>
+
+<style>
+  .card{ background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:14px; max-width:900px; }
+  .row{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
+  .field{ display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+  label{ font-size:12px; font-weight:900; color:#6b7280; letter-spacing:.04em; text-transform:uppercase; }
+  input, textarea, select{ border:1px solid #e5e7eb; border-radius:12px; padding:10px; font-size:14px; outline:none; }
+  .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+  .btn-mini{
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:10px 12px; border-radius:12px; border:1px solid #e5e7eb;
+    background:#fff; font-weight:900; font-size:13px; color:#111827;
+    text-decoration:none; transition: all .15s ease;
+  }
+  .btn-mini:hover{ background:#0f7a3a; border-color:#0f7a3a; color:#fff; transform: translateY(-1px); }
+</style>
+
+<h1>Novo Plano Preventivo</h1>
+<p style="color:#6b7280; margin-top:-6px;">Defina o plano e a frequência.</p>
+
+<div class="card">
+  <form method="POST" action="/preventivas/planos">
+    <div class="row">
+      <div class="field" style="grid-column: 1 / -1;">
+        <label>Título</label>
+        <input name="titulo" placeholder="Ex: Lubrificação Mancais / Inspeção semanal" required />
+      </div>
+
+      <div class="field">
+        <label>Equipamento (opcional)</label>
+        <select name="equipamento_id">
+          <option value="">-- sem vínculo --</option>
+          <% (equipamentos || []).forEach(e => { %>
+            <option value="<%= e.id %>"><%= (e.codigo ? e.codigo + " • " : "") + e.nome %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Frequência</label>
+        <select name="frequencia_tipo">
+          <option value="diario">diario</option>
+          <option value="semanal">semanal</option>
+          <option value="mensal" selected>mensal</option>
+          <option value="anual">anual</option>
+          <option value="horimetro">horimetro</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Valor da frequência</label>
+        <input name="frequencia_valor" placeholder="1" value="1" />
+      </div>
+
+      <div class="field" style="grid-column: 1 / -1;">
+        <label>Observação</label>
+        <textarea name="observacao" rows="3" placeholder="Detalhes do procedimento..."></textarea>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-mini" type="submit">Salvar plano</button>
+      <a class="btn-mini" href="/preventivas">Voltar</a>
+    </div>
+  </form>
+</div>

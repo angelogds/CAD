@@ -1,0 +1,11 @@
+<h1>Nova Solicitação de Material</h1>
+<form method="POST" action="/solicitacoes">
+  <input name="titulo" placeholder="Título" required />
+  <textarea name="descricao" placeholder="Descrição"></textarea>
+  <select name="setor_origem"><option>Manutenção</option><option>Produção</option></select>
+  <select name="prioridade"><option>BAIXA</option><option selected>MEDIA</option><option>ALTA</option><option>URGENTE</option></select>
+  <div id="itens">
+    <div><input name="item_nome" placeholder="Item" required/><input name="item_descricao" placeholder="Descrição"/><input name="qtd_solicitada" type="number" step="0.01" value="1"/><input name="unidade" value="UN"/><select name="estoque_item_id"><option value="">Sem vínculo</option><% estoqueItens.forEach(i=> { %><option value="<%= i.id %>"><%= i.nome %></option><% }) %></select></div>
+  </div>
+  <button class="btn" type="submit">Criar</button>
+</form>

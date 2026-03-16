@@ -1,0 +1,36 @@
+<% layout('layout') %>
+<style>
+  .tr-page{display:grid;gap:14px}.tr-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px}
+  .tr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .img-tecnica{width:100%;max-width:980px;display:block;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;background:#fff;object-fit:contain}
+  .img-planificacao{max-width:760px}
+  .resultado{display:grid;gap:6px;font-size:1rem}
+  @media(max-width:920px){.tr-grid{grid-template-columns:1fr}}
+</style>
+<div class="tr-page">
+  <div style="display:flex;justify-content:space-between;align-items:center;"><h1>Furação de flange</h1><a class="btn" href="/tracagem">Voltar</a></div>
+  <div class="tr-card">
+    <form method="POST" action="/tracagem/furacao-flange/calcular" style="display:grid;gap:10px;">
+      <div class="tr-grid">
+        <div><label>PCD (diâmetro do círculo dos furos)</label><input class="input" name="D" type="number" step="0.01" required value="<%= calculo?.parametros?.D || '' %>"></div>
+        <div><label>N (número de furos)</label><input class="input" name="N" type="number" step="1" required value="<%= calculo?.parametros?.N || calculo?.parametros?.furos || '' %>"></div>
+        <div><label>Unidade</label><select class="input" name="unidade"><option value="mm" <%= (calculo?.parametros?.unidade || "mm") === "mm" ? "selected" : "" %>>mm</option><option value="cm" <%= calculo?.parametros?.unidade === "cm" ? "selected" : "" %>>cm</option></select></div>
+      </div>
+      <img src="/img/tracagem/planificacoes/furacao-flange-peca.png" class="img-tecnica" alt="Furação de flange - peça">
+      <div><button class="btn btn-green" type="submit">CALCULAR</button></div>
+    </form>
+  </div>
+  <% if (calculo?.resultado) { const resultado = calculo.resultado.resultado; %>
+    <div class="tr-card"><h3>Planificação</h3><img src="/img/tracagem/planificacoes/furacao-flange-planificacao.png" class="img-tecnica img-planificacao" alt="Furação de flange - planificação"></div>
+    <div class="tr-card"><h3>Resultados</h3><div class="resultado">
+      <div>Raio = <%= resultado.raio.toFixed(2) %> mm</div>
+      <div>Ângulo entre furos = <%= resultado.anguloEntreFuros.toFixed(2) %>°</div>
+      <div>Corda = <%= resultado.corda.toFixed(2) %> mm</div>
+      <div>Lista de furos: <%= resultado.tabelaFuros?.length || 0 %> posições</div>
+    </div></div>
+
+    <div class="tr-card">
+      <%- include('partials/relacionar-equipamento', { tipo: 'furacao-flange', calculo, equipamentos, tituloPadrao: 'Furação de flange' }) %>
+    </div>
+  <% } %>
+</div>

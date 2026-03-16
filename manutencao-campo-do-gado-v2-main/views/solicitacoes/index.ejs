@@ -1,0 +1,8 @@
+<% layout('layout') %>
+<div class="page-head"><div><h1>Solicitações</h1><p class="muted">Histórico e acompanhamento das solicitações de material.</p></div><a class="btn btn-green" href="/solicitacoes/nova">+ Nova solicitação</a></div>
+<div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Solicitante</th><th>Origem</th><th>Equipamento/Destino</th><th>Status</th><th>Data</th><th></th></tr></thead><tbody>
+<% if (!lista?.length) { %><tr><td colspan="7" style="text-align:center;color:#6b7280;">Sem solicitações.</td></tr><% } %>
+<% (lista||[]).forEach(s => { %>
+<tr><td><%= s.id %></td><td><%= s.solicitante %></td><td><%= s.tipo_origem || 'AVULSA' %></td><td><%= s.equipamento_nome || s.destino_uso || '-' %></td><td><span class="pill-tag pill-blue"><%= String(s.status||'-').toUpperCase() %></span></td><td><%= fmtBR(s.created_at) %></td><td><a class="btn btn-sm" href="/solicitacoes/<%= s.id %>">Abrir</a></td></tr>
+<% }) %>
+</tbody></table></div></div>

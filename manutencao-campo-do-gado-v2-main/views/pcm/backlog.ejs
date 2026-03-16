@@ -1,0 +1,23 @@
+<% layout('layout') %>
+<%- include('partials/internal-styles') %>
+<div class="page-head"><div><h1>PCM • Backlog de Manutenção</h1><p class="muted">Fila consolidada de pendências para programação.</p></div></div>
+<div class="pcm-shell">
+  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
+  <div class="pcm-content">
+    <div class="card">
+      <form class="pcm-toolbar" method="GET" action="/pcm/backlog">
+        <input class="input" name="tipo" value="<%= filtros.tipo || '' %>" placeholder="Tipo">
+        <input class="input" name="setor" value="<%= filtros.setor || '' %>" placeholder="Setor">
+        <input class="input" name="criticidade" value="<%= filtros.criticidade || '' %>" placeholder="Criticidade">
+        <input class="input" name="prioridade" value="<%= filtros.prioridade || '' %>" placeholder="Prioridade">
+        <input class="input" name="dias_atraso" value="<%= filtros.dias_atraso || '' %>" placeholder="Dias de atraso">
+        <button class="btn" type="submit">Filtrar</button>
+      </form>
+      <div class="table-wrap"><table class="table compact" style="margin-top:10px;"><thead><tr><th>Tipo</th><th>Número</th><th>Equipamento</th><th>Criticidade</th><th>Prioridade</th><th>Data abertura/prevista</th><th>Dias atraso</th><th>Situação</th><th>Ações</th></tr></thead><tbody>
+          <% if (!backlog.length) { %><tr><td colspan="9" class="muted">Sem itens pendentes.</td></tr><% } %>
+          <% backlog.forEach(function(b){ %><tr><td><%= b.tipo %></td><td><%= b.numero %></td><td><%= b.equipamento %></td><td><%= b.criticidade %></td><td><%= b.prioridade %></td><td><%= b.data_ref %></td><td><%= b.atraso %></td><td><%= b.status %></td><td><a class="btn btn-outline" href="/os/<%= (b.numero || '').replace('OS-','') %>">Ver OS</a> <form method="POST" action="/pcm/backlog/<%= (b.numero || '').replace('OS-','') %>/programar" style="display:inline;"><button class="btn btn-outline" type="submit">Programar</button></form></td></tr><% }) %>
+        </tbody></table></div>
+      <div class="muted-xs" style="margin-top:8px;">TODO: incluir botão "Ver Demanda" quando origem for demanda aprovada.</div>
+    </div>
+  </div>
+</div>

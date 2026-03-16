@@ -1,0 +1,43 @@
+<% layout('layout') %>
+
+<h1>Preventivas</h1>
+<p style="color:#64748b; margin-top:-6px;">Planejamento e controle de manutenção preventiva.</p>
+
+<div style="margin:12px 0;">
+  <a class="btn btn-green" href="/preventivas/nova">+ Nova Preventiva</a>
+</div>
+
+<div class="card" style="border-radius:16px;">
+  <div style="overflow:auto;">
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="text-align:left; border-bottom:1px solid #e5e7eb;">
+          <th style="padding:12px;">#</th>
+          <th style="padding:12px;">Título</th>
+          <th style="padding:12px;">Equipamento</th>
+          <th style="padding:12px;">Frequência</th>
+          <th style="padding:12px;">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% (lista || []).forEach(p => { %>
+          <tr style="border-bottom:1px solid #f1f5f9;">
+            <td style="padding:12px;"><%= p.id %></td>
+            <td style="padding:12px; font-weight:900;"><%= p.titulo %></td>
+            <td style="padding:12px;"><%= p.equipamento_nome || '-' %></td>
+            <td style="padding:12px;"><%= (p.frequencia_tipo || '').toUpperCase() %> / <%= p.frequencia_valor %></td>
+            <td style="padding:12px;">
+              <a class="btn btn-ghost" href="/preventivas/<%= p.id %>">Abrir</a>
+            </td>
+          </tr>
+        <% }) %>
+
+        <% if (!lista || !lista.length) { %>
+          <tr>
+            <td colspan="5" style="padding:14px; color:#64748b;">Nenhuma preventiva cadastrada ainda.</td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>

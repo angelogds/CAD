@@ -1,0 +1,6 @@
+<h1>Conferir recebimento - <%= sol.numero %></h1>
+<table class="table"><tr><th>Item</th><th>Solicitado</th><th>Recebido</th><th>Pendente</th><th>Ação rápida</th></tr>
+<% sol.itens.forEach(i=> { %><tr><td><%= i.item_nome %></td><td><%= i.qtd_solicitada %></td><td><%= i.qtd_recebida_total %></td><td><%= i.pendente %></td><td>
+<form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/itens/<%= i.id %>/receber"><input type="number" name="qtd_recebida_agora" step="0.01" placeholder="qtd"/><input name="observacao_item" placeholder="obs"/><button>OK</button></form>
+</td></tr><% }) %></table>
+<form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/finalizar-recebimento"><button class="btn">Finalizar recebimento</button></form>

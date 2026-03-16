@@ -1,0 +1,38 @@
+<%
+  const furos = resultado?.furos || [];
+  const raio = Number(resultado?.raio || 0);
+  const corda = Number(resultado?.corda || 0);
+  const ang = Number(resultado?.anguloEntreFuros || 0);
+%>
+<svg viewBox="0 0 800 600" role="img" aria-label="Flange técnico com furos e corda" style="width:100%;max-width:960px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;">
+  <defs>
+    <marker id="arrFl" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#222"/>
+    </marker>
+  </defs>
+
+  <text x="30" y="35" fill="#222" font-size="20">Peça montada - Flange</text>
+  <circle cx="250" cy="220" r="150" stroke="#222" fill="none"/>
+  <circle cx="250" cy="220" r="40" stroke="#222" fill="none"/>
+  <circle cx="250" cy="220" r="110" stroke="#222" fill="none" stroke-dasharray="6 5"/>
+
+  <% furos.forEach((f) => { %>
+    <circle cx="<%= 250 + f.x * 0.95 %>" cy="<%= 220 + f.y * 0.95 %>" r="8" stroke="#222" fill="none"/>
+  <% }); %>
+
+  <% if (furos.length > 1) { %>
+    <line x1="<%= 250 + furos[0].x * 0.95 %>" y1="<%= 220 + furos[0].y * 0.95 %>" x2="<%= 250 + furos[1].x * 0.95 %>" y2="<%= 220 + furos[1].y * 0.95 %>" stroke="#222" stroke-width="2"/>
+  <% } %>
+
+  <text x="470" y="180" fill="#222" font-size="16">Corda = <%= corda.toFixed(2) %></text>
+  <text x="470" y="210" fill="#222" font-size="16">Raio = <%= raio.toFixed(2) %></text>
+  <text x="470" y="240" fill="#222" font-size="16">Δθ = <%= ang.toFixed(2) %>°</text>
+
+  <text x="30" y="360" fill="#222" font-size="20">Planificação / Posição angular dos furos</text>
+  <line x1="80" y1="420" x2="720" y2="420" stroke="#222"/>
+  <% furos.forEach((f, idx) => { const x = 80 + (idx * (640 / Math.max(furos.length - 1, 1))); %>
+    <line x1="<%= x %>" y1="410" x2="<%= x %>" y2="430" stroke="#222"/>
+    <text x="<%= x - 12 %>" y="455" fill="#222" font-size="14">F<%= idx + 1 %></text>
+    <text x="<%= x - 18 %>" y="475" fill="#222" font-size="12"><%= f.angulo.toFixed(0) %>°</text>
+  <% }); %>
+</svg>

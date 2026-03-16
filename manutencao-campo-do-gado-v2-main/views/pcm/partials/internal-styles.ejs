@@ -1,0 +1,53 @@
+<style>
+  .pcm-shell { display:grid; grid-template-columns: 1fr; gap:14px; align-items:start; }
+  .pcm-nav {
+    border:1px solid #e5e7eb;
+    border-radius:12px;
+    background:#fff;
+    padding:10px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    align-items:center;
+    overflow-x:auto;
+  }
+  .pcm-nav-title { font-size:12px; color:#64748b; text-transform:uppercase; font-weight:700; margin-right:6px; padding:0 4px; white-space:nowrap; }
+  .pcm-nav a { display:inline-block; padding:8px 10px; border-radius:999px; color:#1f2937; text-decoration:none; font-size:13px; border:1px solid #e5e7eb; background:#f8fafc; white-space:nowrap; }
+  .pcm-nav a:hover { background:#eef2ff; border-color:#c7d2fe; }
+  .pcm-nav a.active { background:#eff6ff; color:#1d4ed8; border-color:#93c5fd; font-weight:700; }
+  .pcm-content .card { margin-top:0; }
+  .pcm-toolbar { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:10px; }
+  .pcm-toolbar .input, .pcm-toolbar select { width:100%; }
+  .pcm-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .pcm-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .pcm-kpi-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+  .table-wrap { overflow-x:auto; width:100%; }
+  .table-wrap .table { min-width:860px; }
+  .status-dot { display:inline-flex; align-items:center; gap:6px; font-weight:600; }
+  .status-dot::before { content:""; width:8px; height:8px; border-radius:999px; background:#10b981; display:inline-block; }
+  .status-dot.warn::before { background:#f59e0b; }
+  .status-dot.danger::before { background:#ef4444; }
+
+  /* tablet */
+  @media (min-width: 768px) and (max-width: 1200px){
+    .pcm-grid-2 { grid-template-columns:1fr 1fr; }
+    .pcm-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .pcm-toolbar { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  }
+
+  /* mobile */
+  @media (max-width: 768px){
+    .pcm-grid-2,
+    .pcm-kpi-grid,
+    .pcm-toolbar { grid-template-columns:1fr; }
+    .pcm-nav { flex-wrap:nowrap; }
+    .pcm-nav-title { position:sticky; left:0; background:#fff; padding-right:8px; }
+    .pcm-actions .btn { width:100%; text-align:center; }
+    .table-wrap .table { min-width:700px; }
+  }
+
+  /* desktop grande */
+  @media (min-width: 1200px){
+    .pcm-kpi-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  }
+</style>

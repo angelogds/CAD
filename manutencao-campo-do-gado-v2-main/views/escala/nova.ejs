@@ -1,0 +1,66 @@
+<% layout('layout') %>
+
+<style>
+  .card{ background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:14px; max-width:900px; }
+  .row{ display:flex; gap:12px; flex-wrap:wrap; }
+  label{ font-weight:900; font-size:12px; color:#6b7280; letter-spacing:.04em; display:block; margin-bottom:6px; }
+  input, select{
+    width:100%; padding:10px 12px; border-radius:12px;
+    border:1px solid #e5e7eb; outline:none;
+  }
+  input:focus, select:focus{ border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.15); }
+  .btn-sm{ padding:10px 12px; border-radius:12px; font-weight:900; border:1px solid #e5e7eb; background:#fff; cursor:pointer; text-decoration:none; display:inline-block; }
+  .btn-sm:hover{ border-color:#10b981; color:#065f46; background:#ecfdf5; }
+  .muted{ color:#6b7280; }
+</style>
+
+<h1>Lançar escala</h1>
+<p class="muted" style="margin-top:-6px;">Registrar mecânicos do dia/noite e apoio operacional.</p>
+
+<div class="card">
+  <form action="/escala" method="POST">
+    <div class="row">
+      <div style="flex:1; min-width:200px;">
+        <label>Data</label>
+        <input name="data" value="<%= today %>" placeholder="YYYY-MM-DD" required />
+      </div>
+
+      <div style="flex:1; min-width:200px;">
+        <label>Turno</label>
+        <select name="turno">
+          <option value="dia">dia</option>
+          <option value="noite">noite</option>
+        </select>
+      </div>
+
+      <div style="flex:1; min-width:200px;">
+        <label>Categoria</label>
+        <select name="categoria">
+          <option value="mecanico">mecânico</option>
+          <option value="apoio">apoio operacional</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="height:10px"></div>
+
+    <div class="row">
+      <div style="flex:2; min-width:260px;">
+        <label>Nome</label>
+        <input name="nome" placeholder="Ex.: Salviano / Luiz / Emanuel" required />
+      </div>
+
+      <div style="flex:3; min-width:260px;">
+        <label>Observação (opcional)</label>
+        <input name="observacao" placeholder="Ex.: plantão / apoio / substituição..." />
+      </div>
+    </div>
+
+    <div style="height:14px"></div>
+
+    <div class="row">
+      <button class="btn-sm" type="submit">Salvar</button>
+      <a class="btn-sm" href="/escala">Cancelar</a>
+    </div>
+  </form>
+</div>

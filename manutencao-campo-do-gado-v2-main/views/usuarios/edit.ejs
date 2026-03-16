@@ -1,0 +1,86 @@
+<% layout('layout') %>
+
+<style>
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;margin-top:12px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .input{padding:10px;border-radius:12px;border:1px solid #e5e7eb;width:100%;}
+  .btn{padding:10px 12px;border-radius:12px;border:1px solid #e5e7eb;background:#fff;}
+  .btn:hover{border-color:#16a34a;color:#16a34a;}
+  .muted{color:#6b7280;}
+  @media(max-width:900px){.grid{grid-template-columns:1fr;}}
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+  <div>
+    <h1>Editar Usuário #<%= user.id %></h1>
+    <div class="muted"><%= user.email %></div>
+  </div>
+  <a class="btn" href="/usuarios">Voltar</a>
+</div>
+
+<div class="card">
+  <form method="POST" action="/usuarios/<%= user.id %>" enctype="multipart/form-data">
+    <div class="grid">
+      <div>
+        <label>Nome</label>
+        <input class="input" name="name" value="<%= user.name %>" required />
+      </div>
+
+      <div>
+        <label>E-mail</label>
+        <input class="input" name="email" type="email" value="<%= user.email %>" required />
+      </div>
+
+      <div>
+        <label>Perfil</label>
+        <select class="input" name="role" required>
+          <% ROLES.forEach(r => { %>
+            <option value="<%= r.key %>" <%= (String(user.role||'').toUpperCase() === r.key) ? "selected" : "" %>><%= r.label %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div>
+        <label>Criado em</label>
+        <input class="input" value="<%= user.created_at ? fmtBR(user.created_at) : '-' %>" disabled />
+      </div>
+
+      <div>
+        <label>Foto do rosto</label>
+        <input class="input" name="photo" type="file" accept="image/*" capture="user" />
+      </div>
+
+      <div>
+        <label>Foto atual</label>
+        <% if (user.photo_path) { %>
+          <img src="<%= user.photo_path %>" alt="Foto usuário" style="width:72px;height:72px;border-radius:999px;object-fit:cover;border:1px solid #e5e7eb;" />
+        <% } else { %>
+          <div class="muted">Sem foto cadastrada</div>
+        <% } %>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;gap:10px;">
+      <button class="btn" type="submit">Salvar alterações</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Resetar senha</h3>
+  <p class="muted">Defina uma nova senha para este usuário.</p>
+
+  <form method="POST" action="/usuarios/<%= user.id %>/reset-senha">
+    <div class="grid">
+      <div>
+        <label>Nova senha</label>
+        <input class="input" name="password" type="password" required />
+      </div>
+      <div></div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <button class="btn" type="submit">Resetar senha</button>
+    </div>
+  </form>
+</div>

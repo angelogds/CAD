@@ -1,0 +1,10 @@
+<%
+// uso: include("partials/permissions", { allow: ["ADMIN","COMPRAS"] })
+const allow = (locals.allow || []);
+const can = user && allow.includes(user.role);
+%>
+<% if (!can) { %>
+  <div class="alert alert-warn">
+    Você não tem permissão para esta ação.
+  </div>
+<% } %>

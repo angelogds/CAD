@@ -1,0 +1,27 @@
+<% layout('layout') %>
+
+<style>
+  .tr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .tr-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+  .tr-illu{height:130px;border:1px solid #e2e8f0;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#f8fafc;margin-bottom:10px;overflow:hidden}
+  .tr-illu img{width:100%;height:100%;object-fit:cover}
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+  <h1>Traçagem / Caldeiraria</h1>
+  <a class="btn" href="/tracagem/lista">Histórico</a>
+</div>
+
+<div class="tr-grid" style="margin-top:10px;">
+  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/rosca-helicoidal.png" alt="Rosca helicoidal"></div><h3>Rosca helicoidal</h3><a class="btn btn-green" href="/tracagem/rosca-helicoidal">Abrir</a></div>
+  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/furacao-flange.png" alt="Furação de flange"></div><h3>Furação de flange</h3><a class="btn btn-green" href="/tracagem/furacao-flange">Abrir</a></div>
+  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/cilindro.png" alt="Cilindro"></div><h3>Cilindro</h3><a class="btn btn-green" href="/tracagem/cilindro">Abrir</a></div>
+  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/curva-gomos.png" alt="Curva de gomos"></div><h3>Curva de gomos</h3><a class="btn btn-green" href="/tracagem/curva-gomos">Abrir</a></div>
+  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/quadrado-para-redondo.png" alt="Quadrado para redondo"></div><h3>Quadrado para redondo</h3><a class="btn btn-green" href="/tracagem/quadrado-para-redondo">Abrir</a></div>
+  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/reducao-concentrica.png" alt="Redução concêntrica"></div><h3>Redução concêntrica</h3><a class="btn btn-green" href="/tracagem/reducao-concentrica">Abrir</a></div>
+  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/semicilindro.png.png" alt="Semicílindro"></div><h3>Semicílindro</h3><a class="btn btn-green" href="/tracagem/semi-cilindro">Abrir</a></div>
+  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/boca-de-lobo-excentrica.png.png" alt="Boca de lobo excêntrica"></div><h3>Boca de lobo excêntrica</h3><a class="btn btn-green" href="/tracagem/boca-de-lobo-excentrica">Abrir</a></div>
+  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/boca-de-lobo-45.png.png" alt="Boca de lobo 45°"></div><h3>Boca de lobo 45°</h3><a class="btn btn-green" href="/tracagem/boca-de-lobo-45-graus">Abrir</a></div>
+  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/boca-de-lobo-90.png.png" alt="Boca de lobo 90°"></div><h3>Boca de lobo 90°</h3><a class="btn btn-green" href="/tracagem/boca-de-lobo-90-graus">Abrir</a></div>
+  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/mao-francesa.png.png" alt="Mão francesa"></div><h3>Mão francesa</h3><a class="btn btn-green" href="/tracagem/mao-francesa">Abrir</a></div>
+</div>

@@ -1,0 +1,27 @@
+<% layout('layout') %>
+<%- include('partials/internal-styles') %>
+<div class="page-head"><div><h1>PCM • Criticidade do Equipamento</h1><p class="muted">Classificação e índice de criticidade para priorização.</p></div></div>
+<div class="pcm-shell">
+  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
+  <div class="pcm-content">
+    <div class="card">
+      <form method="GET" action="/pcm/criticidade" class="pcm-toolbar" style="grid-template-columns:2fr 1fr;">
+        <select class="input" name="equipamento_id"><option value="">Escolher equipamento</option><% equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>" <%= String(filtros.equipamento_id||'')===String(eq.id)?'selected':'' %>><%= eq.nome %></option><% }) %></select>
+        <button class="btn" type="submit">Carregar</button>
+      </form>
+
+      <form class="grid-2" style="margin-top:8px; gap:10px;" method="POST" action="/pcm/criticidade">
+        <input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id || '' %>">
+        <label>Criticidade<select class="input" name="nivel_criticidade"><option>ALTA</option><option>MEDIA</option><option>BAIXA</option></select></label>
+        <label>Impacto produção (1 a 5)<input class="input" type="number" min="1" max="5" name="impacto_producao" value="3"></label>
+        <label>Impacto segurança (1 a 5)<input class="input" type="number" min="1" max="5" name="impacto_seguranca" value="3"></label>
+        <label>Impacto ambiental (1 a 5)<input class="input" type="number" min="1" max="5" name="impacto_ambiental" value="3"></label>
+        <label>Custo de parada (1 a 5)<input class="input" type="number" min="1" max="5" name="custo_parada" value="3"></label>
+        <label>Índice de criticidade (calculado)<input class="input" value="3.0" readonly></label>
+        <label style="grid-column:1 / -1;">Observações<textarea class="input" name="observacoes" placeholder="Observações técnicas"></textarea></label>
+        <div class="pcm-actions" style="grid-column:1 / -1;"><button class="btn" type="submit">Salvar criticidade</button><a class="btn btn-outline" href="/pcm/criticidade">Cancelar</a></div>
+      </form>
+      <div class="muted-xs" style="margin-top:8px;">TODO: integrar persistência em `pcm_equipamento_criticidade` e cálculo automático no backend.</div>
+    </div>
+  </div>
+</div>

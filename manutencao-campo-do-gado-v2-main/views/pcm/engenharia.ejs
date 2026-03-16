@@ -1,0 +1,41 @@
+<% layout('layout') %>
+<%- include('partials/internal-styles') %>
+<div class="page-head"><div><h1>PCM • Engenharia do Equipamento</h1><p class="muted">Lista técnica / BOM por equipamento.</p></div></div>
+<div class="pcm-shell">
+  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
+  <div class="pcm-content">
+    <div class="card">
+      <form class="pcm-toolbar" method="GET" action="/pcm/engenharia">
+        <select class="input" name="equipamento_id"><option value="">Selecionar equipamento</option><% equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>" <%= String(filtros.equipamento_id||'')===String(eq.id)?'selected':'' %>><%= eq.nome %></option><% }) %></select>
+        <input class="input" name="categoria" value="<%= filtros.categoria || '' %>" placeholder="Tipo (ROLAMENTO, CORREIA...)">
+        <input class="input" name="busca" value="<%= filtros.busca || '' %>" placeholder="Código interno / modelo">
+        <button class="btn" type="submit">Filtrar</button>
+      </form>
+      <div class="pcm-actions" style="margin-bottom:8px;">
+        <form method="POST" action="/pcm/engenharia/componentes" style="display:inline;"><input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id || '' %>"><button class="btn" type="submit">+ Adicionar componente à lista técnica</button></form>
+        <a class="btn btn-outline" href="/pcm/criticidade?equipamento_id=<%= encodeURIComponent(filtros.equipamento_id || '') %>">Ir para Criticidade do Equipamento selecionado</a>
+      </div>
+
+      <div class="pcm-grid-2" style="margin-top:8px;">
+        <div class="card" style="margin:0;">
+          <div class="label">Resumo do equipamento</div>
+          <ul style="margin:8px 0 0 16px; padding:0;">
+            <li>Tag/Código: <strong><%= equipamentoSelecionado?.tag || '-' %></strong></li>
+            <li>Nome: <strong><%= equipamentoSelecionado?.nome || 'Selecione um equipamento' %></strong></li>
+            <li>Setor: <strong><%= equipamentoSelecionado?.setor || '-' %></strong></li>
+            <li>Criticidade: <strong><%= equipamentoSelecionado?.criticidade || 'N/D' %></strong></li>
+          </ul>
+        </div>
+        <div class="card" style="margin:0;"><div class="label">Integrações</div><div class="muted" style="margin-top:8px;">TODO: conectar ações Ver/Editar ao CRUD real da BOM.</div></div>
+      </div>
+
+      <div class="table-wrap"><table class="table compact" style="margin-top:10px;">
+        <thead><tr><th>Tipo</th><th>Componente / Modelo</th><th>Código interno</th><th>Aplicação / Posição</th><th>Cód. almoxarifado</th><th>Peça crítica</th><th>Ações</th></tr></thead>
+        <tbody>
+          <% if (!bom.length) { %><tr><td colspan="7" class="muted">Sem componentes cadastrados para o filtro atual.</td></tr><% } %>
+          <% bom.forEach(function(item){ %><tr><td><%= item.categoria || '-' %></td><td><%= item.modelo_comercial || item.descricao_tecnica || '-' %></td><td><%= item.codigo_interno || '-' %></td><td><%= item.aplicacao_posicao || '-' %></td><td><%= item.estoque_item_id || '-' %></td><td><%= item.peca_critica ? 'Sim' : 'Não' %></td><td><button class="btn btn-outline">Ver</button> <button class="btn btn-outline">Editar</button></td></tr><% }) %>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+</div>

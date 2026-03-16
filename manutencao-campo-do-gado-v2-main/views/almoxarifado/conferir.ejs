@@ -1,0 +1,47 @@
+<% layout('layout') %>
+
+<div class="page-head">
+  <div>
+    <h1>Conferência de recebimento</h1>
+    <p class="muted"><strong><%= sol.numero || ('Solicitação #' + sol.id) %></strong> • status atual: <%= sol.status %>.</p>
+  </div>
+  <div><a class="btn btn-ghost" href="/almoxarifado/recebimentos">Voltar</a></div>
+</div>
+
+<%- include('_tabs', { tab: 'recebimentos' }) %>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Item</th><th>Solicitado</th><th>Recebido total</th><th>Pendente</th><th>Receber agora</th></tr></thead>
+      <tbody>
+        <% if (!sol.itens.length) { %>
+          <tr><td colspan="5" class="muted">Solicitação sem itens.</td></tr>
+        <% } %>
+        <% sol.itens.forEach((item) => { %>
+          <tr>
+            <td>
+              <strong><%= item.item_nome %></strong>
+              <div class="muted"><%= item.item_descricao || '-' %></div>
+            </td>
+            <td><%= item.qtd_solicitada %> <%= item.unidade %></td>
+            <td><%= item.qtd_recebida_total %> <%= item.unidade %></td>
+            <td><%= item.pendente %> <%= item.unidade %></td>
+            <td>
+              <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/itens/<%= item.id %>/receber" class="row">
+                <input class="input" type="number" min="0.01" step="0.01" name="qtd_recebida_agora" placeholder="Qtd" required />
+                <input class="input" name="observacao_item" placeholder="Observação" />
+                <button class="btn btn-sm btn-green" type="submit">OK</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/finalizar-recebimento" style="margin-top:12px;display:flex;gap:8px;">
+    <button class="btn btn-green" type="submit">Finalizar recebimento</button>
+    <a class="btn btn-ghost" href="/almoxarifado/recebimentos">Cancelar</a>
+  </form>
+</div>

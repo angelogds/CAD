@@ -1,0 +1,86 @@
+<% layout('layout') %>
+<%
+const activeStatus = filters?.status || 'ABERTA';
+const tabs = [
+  { key: 'ABERTA', label: 'Abertas' },
+  { key: 'EM_COTACAO', label: 'Em Cotação' },
+  { key: 'COMPRADA', label: 'Compradas' },
+];
+const statusConfig = {
+  ABERTA: { label: 'Aberta', className: 'is-open', icon: '📝' },
+  EM_COTACAO: { label: 'Em cotação', className: 'is-quote', icon: '💬' },
+  COMPRADA: { label: 'Comprada', className: 'is-bought', icon: '✅' },
+};
+%>
+
+<div class="page-head">
+  <div>
+    <h1>Compras • Solicitações</h1>
+    <p class="muted">Acompanhe cotações, anexos e evolução das solicitações.</p>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:12px;">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <% tabs.forEach((tab) => { %>
+      <a class="btn <%= activeStatus === tab.key ? 'btn-green' : 'btn-ghost' %>" href="/compras/solicitacoes?status=<%= tab.key %>">
+        <%= tab.label %> (<%= resumo?.[tab.key] || 0 %>)
+      </a>
+    <% }) %>
+  </div>
+</div>
+
+<div class="card">
+  <form method="GET" action="/compras/solicitacoes" class="grid-3">
+    <input type="hidden" name="status" value="<%= activeStatus %>" />
+    <div>
+      <label class="label">Pesquisar</label>
+      <input class="input" type="text" name="q" placeholder="Número, título ou fornecedor" value="<%= filters?.query || '' %>" />
+    </div>
+    <div>
+      <label class="label">De</label>
+      <input class="input" type="date" name="startDate" value="<%= filters?.startDate || '' %>" />
+    </div>
+    <div>
+      <label class="label">Até</label>
+      <input class="input" type="date" name="endDate" value="<%= filters?.endDate || '' %>" />
+    </div>
+    <div style="grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn" type="submit">Filtrar</button>
+      <a class="btn btn-ghost" href="/compras/solicitacoes?status=<%= activeStatus %>">Limpar</a>
+      <a class="btn btn-ghost" href="/compras/solicitacoes?status=<%= activeStatus %>&q=<%= encodeURIComponent(filters?.query || '') %>&startDate=<%= encodeURIComponent(filters?.startDate || '') %>&endDate=<%= encodeURIComponent(filters?.endDate || '') %>&export=excel">Excel</a>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="margin-top:12px;">
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Número</th>
+          <th>Título</th>
+          <th>Status</th>
+          <th>Fornecedor</th>
+          <th>Criada em</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!lista?.length) { %>
+          <tr><td colspan="6" class="muted" style="text-align:center;">Nenhuma solicitação encontrada.</td></tr>
+        <% } %>
+        <% (lista || []).forEach((s) => { const conf = statusConfig[s.status] || { label: s.status || '-', className: 'is-bought', icon: '📌' }; %>
+          <tr>
+            <td><strong><%= s.numero || ('#' + s.id) %></strong></td>
+            <td><%= s.titulo || '-' %></td>
+            <td><span class="sol-status <%= conf.className %>"><span><%= conf.icon %></span> <%= conf.label %></span></td>
+            <td><%= s.fornecedor_nome || s.fornecedor || '-' %></td>
+            <td><%= s.created_at ? fmtBR(s.created_at) : '-' %></td>
+            <td><a class="btn btn-sm btn-ghost" href="/compras/solicitacoes/<%= s.id %>">Detalhes</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

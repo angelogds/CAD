@@ -1,0 +1,42 @@
+<% layout('layout') %>
+
+<div class="page-head">
+  <div>
+    <h1>Categorias de Estoque</h1>
+    <p class="muted">Estruture grupos e subgrupos para classificação dos itens do almoxarifado.</p>
+  </div>
+</div>
+
+<%- include("_tabs", { tab: "categorias" }) %>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="label">Nova categoria</div>
+    <form method="POST" action="/estoque/categorias" style="margin-top:10px;">
+      <input class="input" name="nome" placeholder="Nome da categoria" required />
+      <button class="btn btn-green" style="margin-top:10px;">Criar categoria</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="label">Categorias ativas</div>
+    <div class="table-wrap" style="margin-top:10px;">
+      <table class="table">
+        <thead><tr><th>Nome</th><th>Subcategoria de</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody>
+          <% if (!categorias.length) { %>
+            <tr><td colspan="4" class="muted" style="text-align:center;">Nenhuma categoria cadastrada.</td></tr>
+          <% } %>
+          <% categorias.forEach((categoria) => { %>
+            <tr>
+              <td><strong><%= categoria.nome %></strong></td>
+              <td><%= categoria.parent_id ? ('#' + categoria.parent_id) : '-' %></td>
+              <td><span class="pill-tag pill-green"><%= categoria.ativo ? 'ATIVA' : 'INATIVA' %></span></td>
+              <td><span class="muted">Em breve</span></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

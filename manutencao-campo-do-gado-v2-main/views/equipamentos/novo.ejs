@@ -1,0 +1,22 @@
+<% layout('layout') %>
+
+<div class="card">
+  <h1>Novo Equipamento</h1>
+  <form action="/equipamentos" method="POST" enctype="multipart/form-data" class="form-grid">
+    <input class="input" name="codigo" placeholder="Código interno / tag" />
+    <input class="input" name="nome" placeholder="Nome do equipamento" required />
+    <input class="input" name="setor" placeholder="Setor / área" />
+    <input class="input" name="tipo" placeholder="Tipo (digestor, moinho...)" />
+    <input class="input" name="fabricante" placeholder="Fabricante" />
+    <input class="input" name="ano_fabricacao" type="number" placeholder="Ano fabricação" />
+    <input class="input" name="ano_instalacao" type="number" placeholder="Ano instalação" />
+    <input class="input" name="capacidade" placeholder="Capacidade" />
+    <input class="input" name="pressao_trabalho" placeholder="Pressão de trabalho" />
+    <select class="input" name="criticidade"><option value="baixa">Baixa</option><option value="media" selected>Média</option><option value="alta">Alta</option></select>
+    <select class="input" name="status_operacional"><option value="ATIVO">Ativo</option><option value="EM MANUTENCAO">Em manutenção</option><option value="PARADO">Parado</option></select>
+    <select class="input" name="ativo"><option value="1">Ativo no cadastro</option><option value="0">Inativo no cadastro</option></select>
+    <div class="full"><label>Foto</label><input class="input" type="file" name="foto" accept="image/*" /></div>
+    <textarea class="input full" name="observacao" placeholder="Observações"></textarea>
+    <div class="full"><button class="btn btn-green">Salvar</button></div>
+  </form>
+</div>

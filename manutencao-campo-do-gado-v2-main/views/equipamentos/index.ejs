@@ -1,0 +1,185 @@
+<% layout('layout') %>
+
+<style>
+  .page-head{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:14px;
+  }
+  .muted{ font-size:13px; color:#6b7280; margin-top:6px; }
+
+  .card{
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:16px;
+    padding:18px;
+  }
+
+  .actions{
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+
+  .btn-primary{
+    background:#16a34a;
+    color:#fff;
+    border:none;
+    padding:10px 16px;
+    border-radius:10px;
+    font-weight:700;
+    cursor:pointer;
+    text-decoration:none;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+  }
+  .btn-primary:hover{ background:#15803d; }
+
+  .btn-ghost{
+    background:#f3f4f6;
+    border:1px solid #d1d5db;
+    padding:10px 16px;
+    border-radius:10px;
+    font-weight:700;
+    cursor:pointer;
+    text-decoration:none;
+    color:#374151;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .table-wrap{ overflow:auto; }
+  table{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+    min-width:820px;
+  }
+  thead th{
+    text-align:left;
+    font-size:12px;
+    color:#64748b;
+    letter-spacing:.02em;
+    padding:12px 12px;
+    border-bottom:1px solid #e5e7eb;
+    background:#fff;
+    position:sticky;
+    top:0;
+    z-index:1;
+  }
+  tbody td{
+    padding:12px 12px;
+    border-bottom:1px solid #f1f5f9;
+    vertical-align:top;
+    font-size:14px;
+  }
+  tbody tr:hover td{ background:#f8fafc; }
+
+  .pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:4px 10px;
+    border-radius:999px;
+    font-weight:800;
+    font-size:12px;
+    border:1px solid #e5e7eb;
+    background:#f8fafc;
+    color:#0f172a;
+  }
+  .pill-on{ background:#ecfdf5; border-color:#bbf7d0; color:#14532d; }
+  .pill-off{ background:#fff1f2; border-color:#fecdd3; color:#9f1239; }
+
+  .link{
+    font-weight:800;
+    text-decoration:none;
+    color:#0f172a;
+  }
+  .link:hover{ text-decoration:underline; }
+
+  .btn-sm{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:8px 12px;
+    border-radius:10px;
+    border:1px solid #d1d5db;
+    background:#fff;
+    cursor:pointer;
+    text-decoration:none;
+    font-weight:800;
+    color:#0f172a;
+    white-space:nowrap;
+  }
+  .btn-sm:hover{
+    border-color: rgba(22,163,74,.45);
+    background:#ecfdf5;
+  }
+</style>
+
+<div class="page-head">
+  <div>
+    <h1>Equipamentos</h1>
+    <div class="muted">Cadastro geral da planta (ativos e inativos).</div>
+  </div>
+
+  <div class="actions">
+    <a class="btn-primary" href="/equipamentos/novo">+ Novo Equipamento</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:70px;">#</th>
+          <th style="width:150px;">Código</th>
+          <th>Nome</th>
+          <th style="width:180px;">Setor</th>
+          <th style="width:140px;">Tipo</th>
+          <th style="width:140px;">Criticidade</th>
+          <th style="width:110px;">Ativo</th>
+          <th style="width:140px; text-align:right;">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!lista || !lista.length) { %>
+          <tr>
+            <td colspan="8" style="padding:18px; color:#6b7280;">
+              Nenhum equipamento cadastrado ainda.
+            </td>
+          </tr>
+        <% } %>
+
+        <% (lista || []).forEach(e => { %>
+          <tr>
+            <td><%= e.id %></td>
+            <td><%= e.codigo || '-' %></td>
+            <td>
+              <a class="link" href="/equipamentos/<%= e.id %>"><%= e.nome %></a>
+            </td>
+            <td><%= e.setor || '-' %></td>
+            <td><%= e.tipo || '-' %></td>
+            <td><span class="pill"><%= (e.criticidade || 'media') %></span></td>
+            <td>
+              <% if (Number(e.ativo) === 1) { %>
+                <span class="pill pill-on">SIM</span>
+              <% } else { %>
+                <span class="pill pill-off">NÃO</span>
+              <% } %>
+            </td>
+            <td style="text-align:right;">
+              <a class="btn-sm" href="/equipamentos/<%= e.id %>">Abrir</a>
+              <a class="btn-sm" href="/equipamentos/<%= e.id %>/editar">Editar</a>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

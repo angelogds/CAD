@@ -1,0 +1,27 @@
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="brand brand-topbar">
+      <div>
+        <div class="brand-title">Manutenção Campo do Gado</div>
+        <div class="brand-subtitle">Sistema Industrial V2</div>
+      </div>
+      <div class="topbar-logos" aria-label="Logotipos institucionais">
+        <img src="/IMG/menu_campo_do_gado.png.png.png.png.png" alt="Símbolo Campo do Gado" class="topbar-logo topbar-logo-symbol" />
+        <img src="/IMG/login_campo_do_gado.png.png.png" alt="Manutenção Campo do Gado" class="topbar-logo" />
+        <img src="/IMG/logopdf_campo_do_gado.png.png" alt="Reciclagem Campo do Gado" class="topbar-logo" />
+      </div>
+    </div>
+  </div>
+
+  <div class="topbar-right">
+    <% if (user) { %>
+      <div class="user-pill">
+        <span class="user-name"><%= user.name %></span>
+        <span class="user-role"><%= user.role %></span>
+      </div>
+      <a class="btn btn-outline" href="/logout">Sair</a>
+    <% } else { %>
+      <a class="btn btn-outline" href="/login">Entrar</a>
+    <% } %>
+  </div>
+</header>

@@ -1,0 +1,24 @@
+<h1>Novo usuário</h1>
+
+<form method="POST" action="/admin/users" class="form">
+  <label>Nome</label>
+  <input name="name" required />
+
+  <label>Email</label>
+  <input name="email" type="email" required />
+
+  <label>Perfil</label>
+  <select name="role" required>
+    <% ROLES.forEach(r => { %>
+      <option value="<%= r %>"><%= r %></option>
+    <% }) %>
+  </select>
+
+  <label>Senha</label>
+  <input name="password" type="password" required />
+
+  <div style="margin-top: 12px;">
+    <button class="btn" type="submit">Criar</button>
+    <a class="btn btn-ghost" href="/admin/users">Cancelar</a>
+  </div>
+</form>

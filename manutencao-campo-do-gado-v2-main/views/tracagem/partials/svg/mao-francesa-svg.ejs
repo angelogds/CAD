@@ -1,0 +1,31 @@
+<%
+  const A = Number(entrada?.A || 0);
+  const h = Number(entrada?.h || 0);
+  const E = Number(entrada?.E || 0);
+  const C = Number(resultado?.C || 0);
+  const B = Number(resultado?.B || 0);
+  const D = Number(resultado?.D || 0);
+  const alpha = Number(resultado?.alpha || 0);
+%>
+<svg viewBox="0 0 800 600" role="img" aria-label="Mão francesa com cotas técnicas" style="width:100%;max-width:960px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;">
+  <defs><marker id="arrMao" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#222"/></marker></defs>
+  <text x="30" y="35" fill="#222" font-size="20">Peça montada</text>
+  <line x1="110" y1="280" x2="340" y2="280" stroke="#222"/>
+  <line x1="110" y1="280" x2="110" y2="100" stroke="#222"/>
+  <line x1="110" y1="280" x2="340" y2="100" stroke="#222" stroke-width="2"/>
+
+  <line x1="110" y1="310" x2="340" y2="310" stroke="#222" marker-start="url(#arrMao)" marker-end="url(#arrMao)"/>
+  <text x="190" y="332" fill="#222">A = <%= A.toFixed(2) %></text>
+  <line x1="80" y1="280" x2="80" y2="100" stroke="#222" marker-start="url(#arrMao)" marker-end="url(#arrMao)"/>
+  <text x="45" y="195" fill="#222">h = <%= h.toFixed(2) %></text>
+  <text x="230" y="185" fill="#222">C = <%= C.toFixed(2) %></text>
+  <text x="230" y="230" fill="#222">α = <%= alpha.toFixed(2) %>°</text>
+
+  <text x="30" y="370" fill="#222" font-size="20">Planificação da barra inclinada</text>
+  <rect x="100" y="410" width="520" height="36" stroke="#222" fill="none"/>
+  <line x1="100" y1="470" x2="620" y2="470" stroke="#222" marker-start="url(#arrMao)" marker-end="url(#arrMao)"/>
+  <text x="300" y="495" fill="#222">C = <%= C.toFixed(2) %></text>
+  <text x="640" y="425" fill="#222">E = <%= E.toFixed(2) %></text>
+  <text x="640" y="445" fill="#222">B = <%= B.toFixed(2) %></text>
+  <text x="640" y="465" fill="#222">D = <%= D.toFixed(2) %></text>
+</svg>

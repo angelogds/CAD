@@ -1,0 +1,58 @@
+<% layout('layout') %>
+
+<div class="page-head">
+  <div>
+    <h1>Solicitação <%= solicitacao.numero || ('#' + solicitacao.id) %></h1>
+    <p class="muted">Acompanhe os dados e itens da solicitação criada.</p>
+  </div>
+  <div><a class="btn btn-ghost" href="<%= backUrl %>">Voltar</a></div>
+</div>
+
+<div class="card" style="margin-bottom:14px;">
+  <div class="grid-3">
+    <div><div class="label">Solicitante</div><div><strong><%= solicitacao.solicitante_nome || '-' %></strong></div></div>
+    <div><div class="label">Setor</div><div><strong><%= solicitacao.setor_origem || '-' %></strong></div></div>
+    <div><div class="label">Prioridade</div><div><strong><%= solicitacao.prioridade || '-' %></strong></div></div>
+    <div><div class="label">Status</div><span class="pill-tag pill-gray"><%= solicitacao.status || '-' %></span></div>
+    <div><div class="label">Criado em</div><div><strong><%= solicitacao.created_at ? fmtBR(solicitacao.created_at) : '-' %></strong></div></div>
+    <div><div class="label">Título</div><div><strong><%= solicitacao.titulo || '-' %></strong></div></div>
+  </div>
+  <div style="margin-top:12px;">
+    <div class="label">Descrição</div>
+    <div class="note"><%= solicitacao.descricao || '-' %></div>
+  </div>
+</div>
+
+
+<div class="card" style="margin-bottom:14px;">
+  <div class="label">Timeline</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+    <span class="pill-tag pill-gray">Abertura: <%= solicitacao.created_at ? fmtBR(solicitacao.created_at) : '-' %></span>
+    <span class="pill-tag pill-gray">Início cotação: <%= solicitacao.cotacao_inicio_em ? fmtBR(solicitacao.cotacao_inicio_em) : '-' %></span>
+    <span class="pill-tag pill-gray">Comprada: <%= solicitacao.comprada_em ? fmtBR(solicitacao.comprada_em) : '-' %></span>
+    <span class="pill-tag pill-gray">Recebida: <%= solicitacao.recebida_em ? fmtBR(solicitacao.recebida_em) : '-' %></span>
+    <span class="pill-tag pill-gray">Fechada: <%= solicitacao.fechada_em ? fmtBR(solicitacao.fechada_em) : '-' %></span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="label">Itens da solicitação</div>
+  <div class="table-wrap" style="margin-top:10px;">
+    <table class="table">
+      <thead><tr><th>Item</th><th>Unidade</th><th>Qtde</th><th>Observação</th></tr></thead>
+      <tbody>
+        <% if (!itens.length) { %>
+          <tr><td colspan="4" class="muted" style="text-align:center;">Sem itens cadastrados.</td></tr>
+        <% } %>
+        <% itens.forEach((item) => { %>
+          <tr>
+            <td><strong><%= item.item_nome %></strong></td>
+            <td><%= item.unidade %></td>
+            <td><%= item.qtd_solicitada %></td>
+            <td><%= item.item_descricao || item.observacao_item || '-' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -1,0 +1,62 @@
+<% layout("layout") %>
+
+<style>
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;max-width:820px}
+  .muted{color:#6b7280}
+  .btn{display:inline-block;padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;font-weight:800;cursor:pointer}
+  .btn:hover{border-color:#16a34a;color:#16a34a}
+  .btn-primary{background:#16a34a;color:#fff;border-color:#16a34a}
+  .btn-primary:hover{filter:brightness(.95);color:#fff}
+  .field{margin-top:10px}
+  input,select,textarea{width:100%;height:40px;border-radius:10px;border:1px solid #e5e7eb;padding:0 10px}
+  textarea{height:90px;padding:10px}
+</style>
+
+<h1>Nova Preventiva</h1>
+<p class="muted" style="margin-top:-6px;">Cadastrar plano preventivo</p>
+
+<div class="card">
+  <form method="POST" action="/preventivas">
+    <div class="field">
+      <label class="muted" style="font-size:12px;font-weight:800;">Equipamento (opcional)</label>
+      <select name="equipamento_id">
+        <option value="">— Não vincular agora —</option>
+        <% (equipamentos || []).forEach(e => { %>
+          <option value="<%= e.id %>"><%= (e.codigo ? e.codigo + " • " : "") + e.nome %></option>
+        <% }) %>
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="muted" style="font-size:12px;font-weight:800;">Título</label>
+      <input name="titulo" placeholder="Ex: Lubrificação dos mancais do Digestor Laranja" />
+    </div>
+
+    <div class="field" style="display:flex;gap:10px;">
+      <div style="flex:1">
+        <label class="muted" style="font-size:12px;font-weight:800;">Frequência</label>
+        <select name="frequencia_tipo">
+          <option value="diario">Diário</option>
+          <option value="semanal">Semanal</option>
+          <option value="mensal" selected>Mensal</option>
+          <option value="anual">Anual</option>
+          <option value="horimetro">Horímetro</option>
+        </select>
+      </div>
+      <div style="flex:1">
+        <label class="muted" style="font-size:12px;font-weight:800;">Valor</label>
+        <input name="frequencia_valor" type="number" min="1" value="1" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="muted" style="font-size:12px;font-weight:800;">Observação</label>
+      <textarea name="observacao" placeholder="Ex: verificar folgas, reaperto, limpeza..." ></textarea>
+    </div>
+
+    <div class="field" style="display:flex;gap:10px;justify-content:flex-end;">
+      <a class="btn" href="/preventivas">Voltar</a>
+      <button class="btn btn-primary" type="submit">Salvar</button>
+    </div>
+  </form>
+</div>

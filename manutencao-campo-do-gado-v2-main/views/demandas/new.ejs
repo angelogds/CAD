@@ -1,0 +1,10 @@
+<% layout('layout') %>
+<div class="page-head"><div><h1>Nova Demanda</h1><p class="muted">Cadastro de demanda pela Direção.</p></div></div>
+<div class="card">
+  <form method="POST" action="/demandas">
+    <div><div class="label">Título</div><input class="input" name="titulo" required /></div>
+    <div style="margin-top:10px;"><div class="label">Prioridade</div><select class="input" name="prioridade"><option>BAIXA</option><option selected>NORMAL</option><option>ALTA</option><option>URGENTE</option></select></div>
+    <div style="margin-top:10px;"><div class="label">Descrição</div><textarea class="input" name="descricao" rows="5"></textarea></div>
+    <div style="margin-top:14px;"><button class="btn btn-green">Criar demanda</button></div>
+  </form>
+</div>

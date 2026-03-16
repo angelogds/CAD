@@ -1,0 +1,36 @@
+<% layout('layout') %>
+<style>
+  .tr-page{display:grid;gap:14px}.tr-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px}
+  .tr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .img-tecnica{width:100%;max-width:980px;display:block;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;background:#fff;object-fit:contain}
+  .img-planificacao{max-width:760px}.resultado{display:grid;gap:6px;font-size:1rem}
+  @media(max-width:920px){.tr-grid{grid-template-columns:1fr}}
+</style>
+<div class="tr-page">
+  <div style="display:flex;justify-content:space-between;align-items:center;"><h1>Boca de lobo 45°</h1><a class="btn" href="/tracagem">Voltar</a></div>
+  <div class="tr-card"><form method="POST" action="/tracagem/boca-de-lobo-45/calcular" style="display:grid;gap:10px;">
+    <div class="tr-grid">
+      <div><label>D (tubo principal)</label><input class="input" name="D" type="number" step="0.01" required value="<%= calculo?.parametros?.D || "" %>"></div>
+      <div><label>d (tubo derivação)</label><input class="input" name="d" type="number" step="0.01" required value="<%= calculo?.parametros?.d || "" %>"></div>
+      <div><label>α (ângulo)</label><input class="input" name="alpha" type="number" step="0.01" value="<%= calculo?.parametros?.alpha || 45 %>"></div>
+      <div><label>N (divisões)</label><input class="input" name="N" type="number" step="1" value="<%= calculo?.parametros?.N || 12 %>"></div>
+    </div>
+    <div class="tr-grid">
+      <div><label>Unidade</label><select class="input" name="unidade"><option value="mm" <%= (calculo?.parametros?.unidade || "mm") === "mm" ? "selected" : "" %>>mm</option><option value="cm" <%= calculo?.parametros?.unidade === "cm" ? "selected" : "" %>>cm</option></select></div>
+    </div>
+    <img src="/img/tracagem/planificacoes/boca-de-lobo-45-peca.png" class="img-tecnica" alt="Boca de lobo 45° - peça">
+    <div><button class="btn btn-green" type="submit">CALCULAR</button></div>
+  </form></div>
+  <% if (calculo?.resultado) { const resultado = calculo.resultado.resultado; %>
+    <div class="tr-card"><h3>Planificação</h3><img src="/img/tracagem/planificacoes/boca-de-lobo-45-planificacao.png" class="img-tecnica img-planificacao" alt="Boca de lobo 45° - planificação"></div>
+    <div class="tr-card"><h3>Resultados</h3><div class="resultado">
+      <div>Desenvolvimento = <%= resultado.desenvolvimento.toFixed(2) %> mm</div>
+      <div>Passe (A) = <%= (resultado.pontos?.[1]?.xPlano || 0).toFixed(2) %> mm</div>
+      <div>Pontos calculados = <%= resultado.pontos?.length || 0 %></div>
+    </div></div>
+
+    <div class="tr-card">
+      <%- include('partials/relacionar-equipamento', { tipo: 'boca-de-lobo-45', calculo, equipamentos, tituloPadrao: 'Boca de lobo 45 graus' }) %>
+    </div>
+  <% } %>
+</div>

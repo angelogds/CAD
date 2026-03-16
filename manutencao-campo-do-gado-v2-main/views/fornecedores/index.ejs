@@ -1,0 +1,80 @@
+<% layout('layout') %>
+
+<div class="page-head">
+  <div>
+    <h1>Fornecedores</h1>
+    <p class="muted">Cadastro e acompanhamento de parceiros de compra.</p>
+  </div>
+  <a class="btn btn-green" href="/fornecedores/novo">+ Novo fornecedor</a>
+</div>
+
+<div class="card" style="max-width: 1100px;">
+  <form method="GET" action="/fornecedores">
+    <div class="grid-2">
+      <div>
+        <div class="label">Buscar</div>
+        <input class="input" name="q" value="<%= filters?.q || '' %>" placeholder="Nome, CNPJ ou cidade" />
+      </div>
+      <div>
+        <div class="label">Situação</div>
+        <select class="input" name="ativo">
+          <option value="">Todos</option>
+          <option value="1" <%= filters?.ativo === '1' ? 'selected' : '' %>>Ativos</option>
+          <option value="0" <%= filters?.ativo === '0' ? 'selected' : '' %>>Inativos</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:12px; display:flex; gap:8px;">
+      <button class="btn btn-green btn-sm" type="submit">Filtrar</button>
+      <a class="btn btn-ghost btn-sm" href="/fornecedores">Limpar</a>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="margin-top: 12px;">
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Fornecedor</th>
+          <th>CNPJ</th>
+          <th>Cidade</th>
+          <th>Contato</th>
+          <th>Cotações</th>
+          <th style="text-align:right;">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!fornecedores?.length) { %>
+          <tr>
+            <td colspan="7" class="muted" style="text-align:center; padding: 14px;">Nenhum fornecedor encontrado.</td>
+          </tr>
+        <% } %>
+
+        <% (fornecedores || []).forEach((f) => { %>
+          <tr>
+            <td><%= f.id %></td>
+            <td>
+              <strong><%= f.nome %></strong>
+              <div class="muted"><%= Number(f.ativo) === 1 ? 'Ativo' : 'Inativo' %></div>
+            </td>
+            <td><%= f.cnpj || '-' %></td>
+            <td><%= f.cidade || '-' %></td>
+            <td>
+              <div><%= f.telefone || '-' %></div>
+              <div class="muted"><%= f.email || '-' %></div>
+            </td>
+            <td>
+              <div><%= f.total_cotacoes || 0 %> cotações</div>
+              <div class="muted">Prazo médio: <%= f.prazo_medio_cotado ?? '-' %> dias</div>
+            </td>
+            <td style="text-align:right;">
+              <a class="btn btn-ghost btn-sm" href="/fornecedores/<%= f.id %>/editar">Editar</a>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

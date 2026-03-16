@@ -1,0 +1,79 @@
+<% layout('layout') %>
+<style>
+  .tr-page{display:grid;gap:14px}.tr-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px}
+  .tr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .img-tecnica{width:100%;max-width:980px;display:block;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;background:#fff;object-fit:contain}
+  .img-planificacao{max-width:760px}.resultado{display:grid;gap:6px;font-size:1rem}
+  .planificacao-title{text-align:center;margin-bottom:10px}
+  .planificacao-info{margin-top:12px;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#f8fafc;display:grid;gap:8px}
+  .planificacao-info h4{margin:0;font-size:1rem}
+  .planificacao-info p{margin:0}
+  .tr-table{width:100%;border-collapse:collapse}
+  .tr-table th,.tr-table td{padding:10px;border-bottom:1px solid #e2e8f0;text-align:left}
+  .tr-table th{background:#f8fafc;font-weight:700}
+  @media(max-width:920px){.tr-grid{grid-template-columns:1fr}}
+</style>
+<div class="tr-page">
+  <div style="display:flex;justify-content:space-between;align-items:center;"><h1>Curva de gomos</h1><a class="btn" href="/tracagem">Voltar</a></div>
+  <div class="tr-card"><form method="POST" action="/tracagem/curva-gomos/calcular" style="display:grid;gap:10px;">
+    <div class="tr-grid">
+      <div><label>D (diâmetro)</label><input class="input" name="D" type="number" step="0.01" required value="<%= calculo?.parametros?.D || '' %>"></div>
+      <div><label>A (ângulo total)</label><input class="input" name="A" type="number" step="0.01" required value="<%= calculo?.parametros?.A || '' %>"></div>
+      <div><label>G (nº de gomos)</label><input class="input" name="G" type="number" step="1" required value="<%= calculo?.parametros?.G || '' %>"></div>
+      <div><label>R (raio da curva na linha de centro)</label><input class="input" name="R" type="number" step="0.01" required value="<%= calculo?.parametros?.R || '' %>"></div>
+      <div><label>E (espessura)</label><input class="input" name="E" type="number" step="0.01" value="<%= calculo?.parametros?.E || '' %>"></div>
+      <div><label>N (divisões)</label><input class="input" name="N" type="number" step="1" value="<%= calculo?.parametros?.N || 12 %>"></div>
+    </div>
+    <div class="tr-grid">
+      <div><label>Unidade</label><select class="input" name="unidade"><option value="mm" <%= (calculo?.parametros?.unidade || "mm") === "mm" ? "selected" : "" %>>mm</option><option value="cm" <%= calculo?.parametros?.unidade === "cm" ? "selected" : "" %>>cm</option></select></div>
+    </div>
+    <img src="/img/tracagem/planificacoes/curva-gomos-peca.png" class="img-tecnica" alt="Curva de gomos - peça">
+    <div><button class="btn btn-green" type="submit">CALCULAR</button></div>
+  </form></div>
+  <% if (calculo?.resultado) { const resultado = calculo.resultado.resultado; const entrada = calculo.resultado.entrada; const planificacao = calculo.resultado.planificacao || {}; const tabelaDivisoes = planificacao.divisoes || []; %>
+    <div class="tr-card">
+      <h3 class="planificacao-title">Planificação</h3>
+      <img src="/img/tracagem/planificacoes/curva-gomos-planificacao.png" class="img-tecnica img-planificacao" alt="Curva de gomos - planificação">
+      <div class="planificacao-info">
+        <h4>Informações principais</h4>
+        <p>P = <b><%= Number(planificacao.comprimentoTotal || resultado.comprimentoTotal || resultado.perimetro || 0).toFixed(2) %> mm</b></p>
+        <p>A = <b><%= Number(planificacao.larguraDivisao || resultado.larguraDivisao || resultado.passoDivisao || 0).toFixed(2) %> mm</b></p>
+        <p>Divisões = <b><%= planificacao.numeroDivisoes || entrada.N %></b></p>
+      </div>
+    </div>
+
+    <div class="tr-card">
+      <h3>Tabela de traçagem (peça pronta + medidas da planificação)</h3>
+      <p style="margin-top:0;color:#475569;">As medidas da planificação são calculadas dividindo a medida real por 2 (ex.: 100 → 50, 120 → 60).</p>
+      <table class="tr-table">
+        <thead>
+          <tr>
+            <th>Divisão</th>
+            <th>Medida real da peça (mm)</th>
+            <th>Medidas da planificação (÷ 2) (mm)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% tabelaDivisoes.forEach((item) => { %>
+            <% const medidaReal = Number(item.altura || item.valor || 0); %>
+            <tr>
+              <td><%= item.indice %></td>
+              <td><%= medidaReal.toFixed(2) %></td>
+              <td><%= (medidaReal / 2).toFixed(2) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tr-card"><h3>Resultados</h3><div class="resultado">
+      <div>Ângulo por gomo = <%= resultado.anguloPorGomo.toFixed(2) %>°</div><div>Ângulo de corte = <%= resultado.anguloMitra.toFixed(2) %>°</div>
+      <div>Passe = <%= Number(resultado.passe || 0).toFixed(2) %> mm</div><div>Comprimento aproximado = <%= Number(resultado.desenvolvimentoGomo || 0).toFixed(2) %> mm</div>
+      <div>A1..A7 = <%= [resultado.A1,resultado.A2,resultado.A3,resultado.A4,resultado.A5,resultado.A6,resultado.A7].map(v => Number(v||0).toFixed(2)).join(" | ") %></div>
+    </div></div>
+
+    <div class="tr-card">
+      <%- include('partials/relacionar-equipamento', { tipo: 'curva-gomos', calculo, equipamentos, tituloPadrao: 'Curva de gomos' }) %>
+    </div>
+  <% } %>
+</div>

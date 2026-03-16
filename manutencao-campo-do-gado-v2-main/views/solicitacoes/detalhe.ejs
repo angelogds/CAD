@@ -1,0 +1,42 @@
+<% layout('layout') %>
+
+<div class="page-head">
+  <div>
+    <h1><%= sol.numero || ('Solicitação #' + sol.id) %></h1>
+    <p class="muted"><%= sol.titulo %></p>
+  </div>
+  <div><a class="btn btn-ghost" href="/solicitacoes/minhas">Voltar</a></div>
+</div>
+
+<div class="card" style="margin-bottom:14px;">
+  <div class="grid-3">
+    <div><div class="label">Status</div><span class="pill-tag pill-gray"><%= sol.status %></span></div>
+    <div><div class="label">Setor de origem</div><div><%= sol.setor_origem %></div></div>
+    <div><div class="label">Prioridade</div><div><%= sol.prioridade %></div></div>
+  </div>
+  <div style="margin-top:12px;"><div class="label">Descrição</div><div class="note"><%= sol.descricao || '-' %></div></div>
+</div>
+
+<div class="card">
+  <div class="label">Itens solicitados</div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Item</th><th>Solicitado</th><th>Recebido</th><th>Pendente</th><th>Status item</th></tr></thead>
+      <tbody>
+        <% if (!sol.itens.length) { %><tr><td colspan="5" class="muted">Solicitação sem itens.</td></tr><% } %>
+        <% sol.itens.forEach((item) => { %>
+          <tr>
+            <td>
+              <strong><%= item.item_nome %></strong>
+              <div class="muted"><%= item.item_descricao || '-' %></div>
+            </td>
+            <td><%= item.qtd_solicitada %> <%= item.unidade %></td>
+            <td><%= item.qtd_recebida_total %> <%= item.unidade %></td>
+            <td><%= item.qtd_pendente %> <%= item.unidade %></td>
+            <td><span class="pill-tag pill-sky"><%= item.status_item %></span></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

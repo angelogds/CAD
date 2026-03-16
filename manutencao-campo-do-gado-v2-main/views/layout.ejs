@@ -1,0 +1,60 @@
+<%# views/layout.ejs %>
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title><%= title || "Manutenção Campo do Gado" %></title>
+  <link rel="stylesheet" href="/css/app.css" />
+  <script>window.__VAPID_PUBLIC_KEY__ = "<%= VAPID_PUBLIC_KEY || "" %>";</script>
+</head>
+<body>
+  <% const authFullscreen = !!(typeof locals !== 'undefined' && locals.authFullscreen); %>
+  <% if (authFullscreen) { %>
+    <%- body %>
+  <% } else { %>
+    <div class="app" id="appRoot">
+      <%- include("partials/sidebar") %>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Mostrar/ocultar menu">☰</button>
+            <div>
+              <div class="topbar-title">Manutenção Campo do Gado</div>
+              <div class="topbar-sub">Sistema Industrial V2</div>
+            </div>
+            <div class="topbar-logos" aria-label="Logos institucionais">
+              <img src="/IMG/menu_campo_do_gado.png.png.png.png.png" alt="Logo Campo do Gado" />
+              <img src="/IMG/login_campo_do_gado.png.png.png" alt="Logo Manutenção" />
+              <img src="/IMG/logopdf_campo_do_gado.png.png" alt="Logo Reciclagem" />
+            </div>
+          </div>
+
+          <div class="topbar-right">
+            <% if (user) { %>
+              <div class="pill">
+                <span class="pill-name"><%= user.name %></span>
+                <span class="pill-role"><%= String(user.role || '').toUpperCase() %></span>
+              </div>
+              <form action="/auth/logout" method="POST">
+                <button class="btn btn-ghost" type="submit">Sair</button>
+              </form>
+            <% } %>
+          </div>
+        </header>
+
+        <section class="flash"><%- include("partials/alerts") %></section>
+        <section class="content"><%- body %></section>
+        <footer class="footer">
+          <div>Manutenção Industrial • Campo do Gado</div>
+          <div>© <%= new Date().getFullYear() %> • Sistema V2</div>
+        </footer>
+      </main>
+    </div>
+
+    <script src="/js/app-layout.js" defer></script>
+    <script src="/js/push.js" defer></script>
+  <% } %>
+</body>
+</html>

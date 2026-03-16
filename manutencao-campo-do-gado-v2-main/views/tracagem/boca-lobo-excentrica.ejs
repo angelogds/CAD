@@ -1,0 +1,35 @@
+<% layout('layout') %>
+<style>
+  .tr-page{display:grid;gap:14px}.tr-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px}
+  .tr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .img-tecnica{width:100%;max-width:980px;display:block;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;background:#fff;object-fit:contain}
+  .img-planificacao{max-width:760px}.resultado{display:grid;gap:6px;font-size:1rem}
+  @media(max-width:920px){.tr-grid{grid-template-columns:1fr}}
+</style>
+<div class="tr-page">
+  <div style="display:flex;justify-content:space-between;align-items:center;"><h1>Boca de lobo excêntrica</h1><a class="btn" href="/tracagem">Voltar</a></div>
+  <div class="tr-card"><form method="POST" action="/tracagem/boca-lobo-excentrica/calcular" style="display:grid;gap:10px;">
+    <div class="tr-grid">
+      <div><label>D1 (diâmetro principal)</label><input class="input" name="D1" type="number" step="0.01" required value="<%= calculo?.parametros?.D1 || '' %>"></div>
+      <div><label>D2 (diâmetro secundário)</label><input class="input" name="D2" type="number" step="0.01" required value="<%= calculo?.parametros?.D2 || '' %>"></div>
+      <div><label>X (deslocamento)</label><input class="input" name="X" type="number" step="0.01" required value="<%= calculo?.parametros?.X || '' %>"></div>
+      <div><label>H (altura)</label><input class="input" name="H" type="number" step="0.01" required value="<%= calculo?.parametros?.H || '' %>"></div>
+    </div>
+    <div class="tr-grid">
+      <div><label>Unidade</label><select class="input" name="unidade"><option value="mm" <%= (calculo?.parametros?.unidade || "mm") === "mm" ? "selected" : "" %>>mm</option><option value="cm" <%= calculo?.parametros?.unidade === "cm" ? "selected" : "" %>>cm</option></select></div>
+    </div>
+    <img src="/img/tracagem/planificacoes/boca-de-lobo-excentrica-peca.png" class="img-tecnica" alt="Boca de lobo excêntrica - peça">
+    <div><button class="btn btn-green" type="submit">CALCULAR</button></div>
+  </form></div>
+  <% if (calculo?.resultado) { const resultado = calculo.resultado.resultado; %>
+    <div class="tr-card"><h3>Planificação</h3><img src="/img/tracagem/planificacoes/boca-de-lobo-excentrica-planificacao.png" class="img-tecnica img-planificacao" alt="Boca de lobo excêntrica - planificação"></div>
+    <div class="tr-card"><h3>Resultados</h3><div class="resultado">
+      <div>R1 = <%= resultado.R1.toFixed(2) %> mm</div><div>R2 = <%= resultado.R2.toFixed(2) %> mm</div>
+      <div>Deslocamento = <%= resultado.deslocamento.toFixed(2) %> mm</div><div>Geratriz aproximada = <%= resultado.geratrizAproximada.toFixed(2) %> mm</div>
+    </div></div>
+
+    <div class="tr-card">
+      <%- include('partials/relacionar-equipamento', { tipo: 'boca-de-lobo-excentrica', calculo, equipamentos, tituloPadrao: 'Boca de lobo excêntrica' }) %>
+    </div>
+  <% } %>
+</div>

@@ -1,0 +1,53 @@
+<% layout('layout') %>
+<div class="page-head">
+  <div>
+    <h1>Movimentos de Estoque</h1>
+    <p class="muted">Entradas e saídas com rastreabilidade.</p>
+  </div>
+</div>
+<%- include('_tabs', { tab: 'movimentos' }) %>
+
+<div class="card" style="margin-bottom:14px;">
+  <form method="GET" action="/estoque/movimentos" class="grid-3">
+    <div>
+      <div class="label">Tipo</div>
+      <select class="input" name="tipo">
+        <option value="">Todos</option>
+        <option value="ENTRADA_COMPRA" <%= filtros.tipo === 'ENTRADA_COMPRA' ? 'selected' : '' %>>Entrada compra</option>
+        <option value="SAIDA_REQUISICAO_INTERNA" <%= filtros.tipo === 'SAIDA_REQUISICAO_INTERNA' ? 'selected' : '' %>>Saída requisição</option>
+      </select>
+    </div>
+    <div>
+      <div class="label">Item</div>
+      <select class="input" name="item_id">
+        <option value="">Todos</option>
+        <% itens.forEach((item) => { %><option value="<%= item.id %>" <%= String(filtros.item_id) === String(item.id) ? 'selected' : '' %>><%= item.nome %></option><% }) %>
+      </select>
+    </div>
+    <div style="display:flex;align-items:end;gap:8px;">
+      <button class="btn btn-green">Filtrar</button>
+      <a class="btn btn-ghost" href="/estoque/movimentos">Limpar</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Data</th><th>Tipo</th><th>Item</th><th>Quantidade</th><th>Usuário</th><th>Observação</th></tr></thead>
+      <tbody>
+        <% if (!movimentos.length) { %><tr><td colspan="6" class="muted">Nenhum movimento encontrado.</td></tr><% } %>
+        <% movimentos.forEach((mov) => { %>
+          <tr>
+            <td><%= fmtBR(mov.data_mov) %></td>
+            <td><span class="pill-tag <%= mov.tipo === 'ENTRADA_COMPRA' ? 'pill-green' : 'pill-amber' %>"><%= mov.tipo %></span></td>
+            <td><%= mov.item_nome %></td>
+            <td><%= mov.quantidade %> <%= mov.item_unidade || '' %></td>
+            <td><%= mov.usuario_nome || '-' %></td>
+            <td><%= mov.observacao || '-' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

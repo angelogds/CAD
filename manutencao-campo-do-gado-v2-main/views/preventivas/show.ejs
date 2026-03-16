@@ -1,0 +1,136 @@
+<% layout("layout") %>
+
+<style>
+  .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px}
+  @media (max-width: 980px){.grid{grid-template-columns:1fr}}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px}
+  .muted{color:#6b7280}
+  .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#f3f4f6;font-weight:800;font-size:12px}
+  .btn{display:inline-block;padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;font-weight:800;cursor:pointer;text-decoration:none}
+  .btn:hover{border-color:#16a34a;color:#16a34a}
+  .btn-primary{background:#16a34a;color:#fff;border-color:#16a34a}
+  .btn-primary:hover{filter:brightness(.95);color:#fff}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px;border-bottom:1px solid #eef2f7;text-align:left;font-size:14px;vertical-align:top}
+  th{font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}
+  input,select,textarea{width:100%;height:40px;border-radius:10px;border:1px solid #e5e7eb;padding:0 10px}
+  textarea{height:80px;padding:10px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+</style>
+
+<h1>Preventiva #<%= plano.id %></h1>
+<p class="muted" style="margin-top:-6px;">
+  <strong><%= plano.titulo %></strong>
+  • <span class="pill"><%= (plano.frequencia_tipo || "").toUpperCase() %></span>
+  <span class="muted">x<%= plano.frequencia_valor || 1 %></span>
+</p>
+
+<div class="grid" style="margin-top:12px;">
+  <!-- COLUNA ESQUERDA -->
+  <div class="card">
+    <h3 style="margin:0 0 6px;">Detalhes do Plano</h3>
+
+    <div class="row" style="margin-top:8px;">
+      <div style="flex:1;min-width:220px;">
+        <div class="muted" style="font-size:12px;font-weight:900;">Equipamento</div>
+        <div style="font-weight:900;">
+          <%= plano.equipamento_nome ? ((plano.equipamento_codigo ? plano.equipamento_codigo + " • " : "") + plano.equipamento_nome) : "-" %>
+        </div>
+        <div class="muted" style="font-size:12px;">
+          <%= plano.equipamento_setor ? ("Setor: " + plano.equipamento_setor) : "" %>
+          <%= plano.equipamento_tipo ? (" • Tipo: " + plano.equipamento_tipo) : "" %>
+        </div>
+      </div>
+
+      <div style="min-width:200px;">
+        <div class="muted" style="font-size:12px;font-weight:900;">Ativa</div>
+        <div><span class="pill"><%= plano.ativo ? "ATIVA" : "INATIVA" %></span></div>
+      </div>
+    </div>
+
+    <% if (plano.observacao) { %>
+      <div style="margin-top:10px;">
+        <div class="muted" style="font-size:12px;font-weight:900;">Observação</div>
+        <div class="muted"><%= plano.observacao %></div>
+      </div>
+    <% } %>
+
+    <hr style="border:none;border-top:1px solid #eef2f7;margin:14px 0;"/>
+
+    <h3 style="margin:0 0 8px;">Execuções</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Prevista</th>
+          <th>Executada</th>
+          <th>Status</th>
+          <th>Responsável</th>
+          <th>Ação</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!execucoes?.length) { %>
+          <tr><td colspan="6" class="muted">Nenhuma execução registrada.</td></tr>
+        <% } %>
+
+        <% (execucoes || []).forEach(ex => { %>
+          <tr>
+            <td>#<%= ex.id %></td>
+            <td><%= ex.data_prevista || "-" %></td>
+            <td><%= ex.data_executada || "-" %></td>
+            <td><span class="pill"><%= (ex.status || "").toUpperCase() %></span></td>
+            <td class="muted"><%= ex.responsavel || "-" %></td>
+            <td>
+              <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/status" class="row" style="margin:0;">
+                <select name="status" style="width:160px">
+                  <option value="pendente" <%= ex.status === "pendente" ? "selected" : "" %>>pendente</option>
+                  <option value="executada" <%= ex.status === "executada" ? "selected" : "" %>>executada</option>
+                  <option value="atrasada" <%= ex.status === "atrasada" ? "selected" : "" %>>atrasada</option>
+                  <option value="cancelada" <%= ex.status === "cancelada" ? "selected" : "" %>>cancelada</option>
+                </select>
+                <input name="data_executada" type="date" value="<%= ex.data_executada || '' %>" style="width:170px" />
+                <button class="btn" type="submit" style="height:40px">Salvar</button>
+              </form>
+            </td>
+          </tr>
+          <% if (ex.observacao) { %>
+            <tr>
+              <td></td>
+              <td colspan="5" class="muted">Obs: <%= ex.observacao %></td>
+            </tr>
+          <% } %>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- COLUNA DIREITA -->
+  <div class="card">
+    <h3 style="margin:0 0 6px;">Adicionar Execução</h3>
+    <p class="muted" style="margin-top:-6px;">Cria uma execução pendente para este plano.</p>
+
+    <form method="POST" action="/preventivas/<%= plano.id %>/execucoes">
+      <div style="margin-top:10px;">
+        <div class="muted" style="font-size:12px;font-weight:900;">Data prevista</div>
+        <input name="data_prevista" type="date" />
+      </div>
+
+      <div style="margin-top:10px;">
+        <div class="muted" style="font-size:12px;font-weight:900;">Responsável</div>
+        <input name="responsavel" placeholder="Ex: Salviano / Luiz / Equipe C" />
+      </div>
+
+      <div style="margin-top:10px;">
+        <div class="muted" style="font-size:12px;font-weight:900;">Observação</div>
+        <textarea name="observacao" placeholder="Ex: lubrificar, reapertar, limpar, medir folga..."></textarea>
+      </div>
+
+      <div class="row" style="margin-top:12px;justify-content:space-between;">
+        <a class="btn" href="/preventivas">Voltar</a>
+        <button class="btn btn-primary" type="submit">Adicionar</button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,26 @@
+<% layout('layout') %>
+<%- include('partials/internal-styles') %>
+<div class="page-head"><div><h1>PCM • Relatórios e Indicadores Avançados</h1><p class="muted">Visões operacionais e executivas do PCM.</p></div></div>
+<div class="pcm-shell">
+  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
+  <div class="pcm-content">
+    <div class="card">
+      <form class="pcm-toolbar" method="GET" action="/pcm/relatorios-avancados">
+        <input class="input" type="month" name="periodo_inicio" value="<%= filtros?.periodo_inicio || '' %>">
+        <input class="input" type="month" name="periodo_fim" value="<%= filtros?.periodo_fim || '' %>">
+        <input class="input" name="setor" value="<%= filtros?.setor || '' %>" placeholder="Setor">
+        <button class="btn" type="submit">Atualizar</button>
+      </form>
+      <div class="pcm-actions" style="margin-bottom:8px;"><a class="btn btn-outline" href="#">Custo x Mês</a><a class="btn btn-outline" href="#">Falhas x Mês</a><a class="btn btn-outline" href="#">Ranking de Equipamentos</a><a class="btn btn-outline" href="#">Peças com maior custo</a><a class="btn btn-outline" href="#">Disponibilidade</a></div>
+      <div class="pcm-kpi-grid" style="gap:10px;"><div class="card" style="margin:0;"><div class="label">Custo total período</div><div style="font-size:24px;font-weight:900;">R$ <%= resumo.custo_total %></div></div><div class="card" style="margin:0;"><div class="label">Falhas período</div><div style="font-size:24px;font-weight:900;"><%= resumo.falhas %></div></div><div class="card" style="margin:0;"><div class="label">% Preventiva x Corretiva</div><div style="font-size:24px;font-weight:900;"><%= resumo.pct_preventiva %>% / <%= resumo.pct_corretiva %>%</div></div></div>
+      <div class="muted" style="margin-top:10px;">TODO: plugar gráficos (linha/barras) e consultas analíticas detalhadas do serviço PCM.</div>
+    </div>
+
+    <div class="card" style="margin-top:12px;"><div class="label">Ranking de equipamentos (placeholder)</div>
+      <div class="table-wrap"><table class="table compact" style="margin-top:8px;"><thead><tr><th>Equipamento</th><th>Setor</th><th>Criticidade</th><th>Falhas</th><th>Custo total</th><th>Horas paradas</th></tr></thead><tbody>
+          <% if (!ranking.length) { %><tr><td colspan="6" class="muted">Sem dados.</td></tr><% } %>
+          <% ranking.forEach(function(item){ %><tr><td><%= item.equipamento %></td><td><%= item.setor || '-' %></td><td><%= item.criticidade || '-' %></td><td><%= item.falhas || item.total_os %></td><td>R$ <%= Number(item.custo || 0).toFixed(2) %></td><td><%= item.horas_paradas || '-' %></td></tr><% }) %>
+        </tbody></table></div>
+    </div>
+  </div>
+</div>

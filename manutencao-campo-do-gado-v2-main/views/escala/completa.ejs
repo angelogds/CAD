@@ -1,0 +1,33 @@
+<%- layout('layout') -%>
+
+<h1>Escala Completa</h1>
+<p style="color:#64748b;font-weight:700;">(Use só quando precisar consultar o ano inteiro.)</p>
+
+<div class="card" style="margin-top:12px;">
+  <table class="table">
+    <thead>
+      <tr>
+        <th style="width:90px;">Semana</th>
+        <th style="width:220px;">Período</th>
+        <th>Noturno</th>
+        <th>Diurno</th>
+        <th>Apoio</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% semanas.forEach(s => { %>
+        <tr>
+          <td>#<%= s.semana_numero %></td>
+          <td><%= s.data_inicio %> → <%= s.data_fim %></td>
+          <td><%= (s.times.noturno || []).join(", ") %></td>
+          <td><%= (s.times.diurno || []).join(", ") %></td>
+          <td><%= (s.times.apoio || []).join(", ") %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<div style="margin-top:12px;">
+  <a class="btn" href="/escala">Voltar</a>
+</div>

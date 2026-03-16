@@ -1,0 +1,76 @@
+<% layout('layout') %>
+<style>
+  .tr-page{display:grid;gap:14px}.tr-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px}
+  .tr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .img-tecnica{width:100%;max-width:980px;display:block;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;background:#fff;object-fit:contain}
+  .img-planificacao{max-width:760px}.resultado{display:grid;gap:6px;font-size:1rem}
+  @media(max-width:920px){.tr-grid{grid-template-columns:1fr}}
+</style>
+<div class="tr-page">
+  <div style="display:flex;justify-content:space-between;align-items:center;"><h1>Quadrado para redondo</h1><a class="btn" href="/tracagem">Voltar</a></div>
+  <div class="tr-card"><form method="POST" action="/tracagem/quadrado-redondo/calcular" style="display:grid;gap:10px;">
+    <div class="tr-grid">
+      <div><label>A (lado do quadrado)</label><input class="input" name="A" type="number" step="0.01" min="0.01" required value="<%= calculo?.parametros?.A || "" %>"></div>
+      <div><label>D (diâmetro redondo)</label><input class="input" name="D" type="number" step="0.01" required value="<%= calculo?.parametros?.D || '' %>"></div>
+      <div><label>H (altura)</label><input class="input" name="H" type="number" step="0.01" min="0.01" required value="<%= calculo?.parametros?.H || calculo?.parametros?.h || "" %>"></div>
+      <div><label>B (lado do retângulo)</label><input class="input" name="B" type="number" step="0.01" min="0.01" required value="<%= calculo?.parametros?.B || calculo?.parametros?.A || "" %>"></div>
+      <div><label>E (espessura)</label><input class="input" name="E" type="number" step="0.01" value="<%= calculo?.parametros?.E || "" %>"></div>
+      <div><label>N (divisões)</label><input class="input" name="N" type="number" step="1" min="4" value="<%= calculo?.parametros?.N || 12 %>"></div>
+    </div>
+    <div class="tr-grid">
+      <div><label>Unidade</label><select class="input" name="unidade"><option value="mm" <%= (calculo?.parametros?.unidade || "mm") === "mm" ? "selected" : "" %>>mm</option><option value="cm" <%= calculo?.parametros?.unidade === "cm" ? "selected" : "" %>>cm</option></select></div>
+    </div>
+    <img src="/img/tracagem/planificacoes/quadrado-para-redondo-peca.png" class="img-tecnica" alt="Quadrado para redondo - peça">
+    <div><button class="btn btn-green" type="submit">CALCULAR</button></div>
+  </form></div>
+  <% if (calculo?.resultado) { const resultado = calculo.resultado.resultado; const planificacao = calculo.resultado.planificacao || {}; const divisoes = planificacao.divisoes || []; %>
+    <div class="tr-card"><h3>Planificação</h3><img src="/img/tracagem/planificacoes/quadrado-para-redondo-planificacao.png" class="img-tecnica img-planificacao" alt="Quadrado para redondo - planificação"></div>
+    <div class="tr-card"><h3>Resultados</h3><div class="resultado">
+      <div>Perímetro do quadrado = <%= resultado.perimetroQuadrado.toFixed(2) %> mm</div>
+      <div>Perímetro do retângulo = <%= resultado.perimetroRetangulo.toFixed(2) %> mm</div>
+      <div>Circunferência do redondo = <%= resultado.circunferenciaRedondo.toFixed(2) %> mm</div>
+      <div>Geratriz aproximada = <%= resultado.geratrizAproximada.toFixed(2) %> mm</div>
+      <div>AA = <%= Number(resultado.AA || 0).toFixed(2) %> mm</div>
+      <div>AB = <%= Number(resultado.AB || 0).toFixed(2) %> mm</div>
+      <div>A1 = <%= Number(resultado.A1 || 0).toFixed(2) %> mm</div>
+      <div>A2 = <%= Number(resultado.A2 || 0).toFixed(2) %> mm</div>
+      <div>A3 = <%= Number(resultado.A3 || 0).toFixed(2) %> mm</div>
+      <div>A4 = <%= Number(resultado.A4 || 0).toFixed(2) %> mm</div>
+      <div>C = <%= Number(resultado.C || 0).toFixed(2) %> mm</div>
+      <div>C (trecho 1-2) = <%= Number(resultado.C1 || 0).toFixed(2) %> mm</div>
+      <div>C (trecho 2-3) = <%= Number(resultado.C2 || 0).toFixed(2) %> mm</div>
+      <div>C (trecho 3-4) = <%= Number(resultado.C3 || 0).toFixed(2) %> mm</div>
+      <div>C (trecho 4-1) = <%= Number(resultado.C4 || 0).toFixed(2) %> mm</div>
+    </div></div>
+
+    <div class="tr-card">
+      <h3>Planificação por divisões</h3>
+      <div style="overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:.94rem;">
+          <thead>
+            <tr style="background:#f8fafc;">
+              <th style="text-align:left;padding:8px;border:1px solid #e2e8f0;">Divisão</th>
+              <th style="text-align:left;padding:8px;border:1px solid #e2e8f0;">Trecho</th>
+              <th style="text-align:left;padding:8px;border:1px solid #e2e8f0;">C (mm)</th>
+              <th style="text-align:left;padding:8px;border:1px solid #e2e8f0;">Geratriz (mm)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% divisoes.forEach((item) => { %>
+              <tr>
+                <td style="padding:8px;border:1px solid #e2e8f0;"><%= item.indice %></td>
+                <td style="padding:8px;border:1px solid #e2e8f0;"><%= item.trecho || '-' %></td>
+                <td style="padding:8px;border:1px solid #e2e8f0;"><%= Number(item.cTrecho || 0).toFixed(2) %></td>
+                <td style="padding:8px;border:1px solid #e2e8f0;"><%= Number(item.altura || 0).toFixed(2) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tr-card">
+      <%- include('partials/relacionar-equipamento', { tipo: 'quadrado-para-redondo', calculo, equipamentos, tituloPadrao: 'Quadrado para redondo' }) %>
+    </div>
+  <% } %>
+</div>

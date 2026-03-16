@@ -1,0 +1,20 @@
+<% layout('layout') %>
+<%- include('partials/internal-styles') %>
+<div class="page-head"><div><h1>PCM • Rotas de Inspeção</h1><p class="muted">Cadastro, checklist e execução de rotas.</p></div></div>
+<div class="pcm-shell">
+  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
+  <div class="pcm-content">
+    <div class="card">
+      <div class="pcm-actions"><form method="POST" action="/pcm/rotas-inspecao/nova"><button class="btn" type="submit">+ Nova rota de inspeção</button></form></div>
+      <div class="table-wrap"><table class="table compact" style="margin-top:8px;"><thead><tr><th>Nome da rota</th><th>Tipo</th><th>Frequência</th><th>Responsável</th><th>Qtd. equipamentos</th><th>Próxima execução</th><th>Ações</th></tr></thead><tbody>
+          <% if (!rotas.length) { %><tr><td colspan="7" class="muted">Sem rotas cadastradas.</td></tr><% } %>
+          <% rotas.forEach(function(r){ %><tr><td><%= r.nome %></td><td><%= r.tipo %></td><td><%= r.frequencia %></td><td><%= r.responsavel %></td><td><%= r.qtd_equipamentos %></td><td><%= r.proxima_execucao %></td><td><button class="btn btn-outline">Editar</button> <button class="btn btn-outline">Executar agora</button></td></tr><% }) %>
+        </tbody></table></div>
+    </div>
+
+    <div class="pcm-grid-2" style="margin-top:12px;">
+      <div class="card" style="margin:0;"><div class="label">Cadastro/Edição da rota</div><div class="muted" style="margin-top:8px;">TODO: formulário completo com equipamentos + itens de checklist.</div></div>
+      <div class="card" style="margin:0;"><div class="label">Execução de checklist</div><div class="pcm-actions" style="margin-top:8px;"><button class="btn btn-outline" type="button">Próximo equipamento</button><form method="POST" action="/pcm/rotas-inspecao/salvar-execucao" style="display:inline;"><button class="btn" type="submit">Salvar rota</button></form></div><div class="muted" style="margin-top:8px;">TODO: marcar Normal/Atenção/Crítico + observações + foto + geração de OS/Demanda.</div></div>
+    </div>
+  </div>
+</div>

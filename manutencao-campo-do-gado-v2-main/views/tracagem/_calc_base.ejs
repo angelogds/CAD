@@ -1,0 +1,77 @@
+<style>
+  .tr-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px}
+  .tr-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .tr-draw{height:140px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc;display:flex;align-items:center;justify-content:center;color:#334155;font-weight:700}
+  @media(max-width:900px){.tr-grid{grid-template-columns:1fr}}
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:center;">
+  <h1><%= titulo %></h1>
+  <a class="btn" href="/tracagem">Voltar</a>
+</div>
+
+<div class="tr-grid" style="margin-top:10px;">
+  <div class="tr-card">
+    <div class="tr-draw"><%= desenho %></div>
+    <form method="POST" action="<%= action %>" style="margin-top:10px;display:grid;gap:8px;">
+      <% campos.forEach((campo)=> { %>
+        <div>
+          <label><%= campo.label %></label>
+          <input class="input" name="<%= campo.name %>" type="<%= campo.type %>" step="<%= campo.step %>" value="<%= calculo?.parametros?.[campo.name] || '' %>" required />
+        </div>
+      <% }) %>
+      <button class="btn btn-green" type="submit">CALCULAR</button>
+    </form>
+  </div>
+
+  <div class="tr-card">
+    <h3>Resultado</h3>
+    <% if (!calculo) { %>
+      <div class="muted">Preencha os campos e clique em calcular.</div>
+    <% } else { %>
+      <div style="font-size:13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px;max-height:280px;overflow:auto;">
+        <pre style="margin:0;"><%= JSON.stringify(calculo.resultado, null, 2) %></pre>
+      </div>
+      <% if (calculo.resultado?.observacoes?.length || calculo.resultado?.observacao_tecnica) { %>
+        <div style="margin-top:8px;">
+          <b>Observações técnicas</b>
+          <ul>
+            <% (calculo.resultado.observacoes || [calculo.resultado.observacao_tecnica]).filter(Boolean).forEach((obs)=> { %>
+              <li><%= obs %></li>
+            <% }) %>
+          </ul>
+        </div>
+      <% } %>
+      <form method="POST" action="/tracagem/salvar" style="margin-top:10px;display:grid;gap:8px;">
+        <input class="input" name="titulo" placeholder="Título da traçagem" required />
+        <div>
+          <label>Vincular à OS</label>
+          <select class="input" name="os_id">
+            <option value="">Sem vínculo</option>
+            <% ordensServico.forEach((os) => { %>
+              <option value="<%= os.id %>">OS #<%= os.id %> - <%= os.status || '-' %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div>
+          <label>Vincular ao equipamento</label>
+          <select class="input" name="equipamento_id">
+            <option value="">Sem vínculo</option>
+            <% equipamentos.forEach((equip) => { %>
+              <option value="<%= equip.id %>"><%= equip.nome %></option>
+            <% }) %>
+          </select>
+        </div>
+        <input type="hidden" name="tipo" value="<%= tipo %>" />
+        <input type="hidden" name="parametros_json" value="<%= JSON.stringify(calculo.parametros) %>" />
+        <input type="hidden" name="resultado_json" value="<%= JSON.stringify(calculo.resultado) %>" />
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-green" type="submit">Salvar</button>
+        </div>
+      </form>
+      <div class="tr-card" style="margin-top:10px;">
+        <%- include('partials/relacionar-equipamento', { tipo, calculo, equipamentos, tituloPadrao: 'Traçagem técnica' }) %>
+      </div>
+    <% } %>
+  </div>
+</div>

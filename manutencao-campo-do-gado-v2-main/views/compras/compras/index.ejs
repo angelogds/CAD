@@ -1,0 +1,38 @@
+<% layout('layout') %>
+
+<div class="page-header">
+  <h2>Compras / Recebimento</h2>
+  <div class="actions">
+    <a class="btn" href="/compras/nova">+ Nova Compra</a>
+    <a class="btn" href="/solicitacoes">Solicitações</a>
+  </div>
+</div>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Fornecedor</th>
+      <th>Status</th>
+      <th>Compra</th>
+      <th>Receb.</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (!lista || !lista.length) { %>
+      <tr><td colspan="6">Nenhuma compra cadastrada.</td></tr>
+    <% } %>
+
+    <% (lista || []).forEach(c => { %>
+      <tr>
+        <td><%= c.id %></td>
+        <td><%= c.fornecedor || '-' %></td>
+        <td><%= c.status %></td>
+        <td><%= c.data_compra || '-' %></td>
+        <td><%= c.data_recebimento || '-' %></td>
+        <td><a class="btn btn-sm" href="/compras/<%= c.id %>">Abrir</a></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>

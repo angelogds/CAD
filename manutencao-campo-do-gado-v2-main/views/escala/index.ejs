@@ -1,0 +1,213 @@
+<%- layout('layout') -%>
+
+<% const pdfStartSafe = typeof pdfStart === 'string' ? pdfStart : ''; %>
+<% const pdfEndSafe = typeof pdfEnd === 'string' ? pdfEnd : ''; %>
+
+<div class="page-head" style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+  <div>
+    <h1 style="margin:0;">Escala</h1>
+    <p style="margin:6px 0 0;color:#64748b;font-weight:700;">
+      Gestão de escala, compensações e concessões de folgas/atestados/férias.
+    </p>
+  </div>
+
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+    <% if (semana) { %>
+      <a class="btn btn-primary" href="/escala/pdf/semana">Gerar PDF da Escala</a>
+    <% } %>
+    <form method="GET" action="/escala/pdf/periodo" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <input class="input" type="date" name="start" value="<%= pdfStartSafe %>" required style="height:38px;">
+      <input class="input" type="date" name="end" value="<%= pdfEndSafe %>" required style="height:38px;">
+      <button class="btn btn-green" type="submit">Gerar PDF de Folgas</button>
+    </form>
+    <a class="btn" href="/dashboard">Voltar</a>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px;">
+  <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+    <div>
+      <h3 style="margin:0;">Semana do Sistema</h3>
+      <% if (semana) { %>
+        <div style="margin-top:6px;color:#334155;font-weight:800;">
+          Período: <%= semana.data_inicio %> até <%= semana.data_fim %>
+        </div>
+      <% } else { %>
+        <div style="margin-top:6px;color:#b91c1c;font-weight:900;">
+          Sem semana cadastrada para esta data.
+        </div>
+      <% } %>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center;">
+      <form method="GET" action="/escala" style="display:flex;gap:8px;align-items:center;">
+        <input type="date" name="date" value="<%= alvo %>" class="input" style="height:38px;">
+        <button class="btn btn-sm" type="submit">Ir</button>
+        <a class="btn btn-sm" href="/escala?date=<%= (new Date()).toISOString().slice(0,10) %>">Hoje</a>
+      </form>
+    </div>
+  </div>
+
+  <div style="margin-top:12px;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th style="width:160px;">Data</th>
+          <th>Colaborador</th>
+          <th style="width:140px;">Turno</th>
+          <th style="width:160px;">Função</th>
+          <th style="width:240px;">Status</th>
+          <th style="width:120px;">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!semana || !semana.linhas || semana.linhas.length === 0) { %>
+          <tr>
+            <td colspan="6" style="text-align:center;color:#64748b;">Nenhum item cadastrado nesta semana.</td>
+          </tr>
+        <% } else { %>
+          <% semana.linhas.forEach(l => { %>
+            <tr>
+              <td><%= semana.data_inicio %> a <%= semana.data_fim %></td>
+              <td style="font-weight:900;"><%= l.nome %></td>
+              <td><%= l.turnoLabel %></td>
+              <td><%= l.funcaoLabel %></td>
+              <td><%= l.statusLabel %></td>
+              <td style="display:flex;gap:6px;align-items:center;">
+                <a class="btn btn-sm" href="/escala/editar/<%= semana.id %>" title="Editar" aria-label="Editar">✏️</a>
+                <form method="POST" action="/escala/alocacao/<%= l.alocacao_id %>/delete" onsubmit="return confirm('Deseja excluir este registro?');" style="margin:0;">
+                  <input type="hidden" name="date" value="<%= alvo %>">
+                  <button class="btn btn-sm" type="submit" title="Excluir" aria-label="Excluir">🗑️</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+
+  <hr style="margin:16px 0;border:0;border-top:1px solid #e5e7eb;">
+
+  <h4 style="margin:0 0 10px;">Adicionar rápido</h4>
+  <form method="POST" action="/escala/adicionar" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+    <input type="hidden" name="date" value="<%= alvo %>">
+    <div style="min-width:200px;">
+      <div class="label">DATA INÍCIO</div>
+      <input class="input" type="date" name="inicio" value="<%= alvo %>" required>
+    </div>
+    <div style="min-width:200px;">
+      <div class="label">DATA FIM</div>
+      <input class="input" type="date" name="fim" value="<%= alvo %>" required>
+    </div>
+    <div style="flex:1;min-width:220px;">
+      <div class="label">COLABORADOR</div>
+      <input class="input" name="nome" placeholder="Ex.: Emanuel" required>
+    </div>
+    <div style="min-width:180px;">
+      <div class="label">TURNO</div>
+      <select class="input" name="turno" required>
+        <option value="">Selecione</option>
+        <option value="Dia">Dia</option>
+        <option value="Noite">Noite</option>
+        <option value="Apoio">Apoio</option>
+      </select>
+    </div>
+    <div style="min-width:200px;">
+      <div class="label">FUNÇÃO</div>
+      <select class="input" name="funcao" required>
+        <option value="">Selecione</option>
+        <option value="Mecânico">Mecânico</option>
+        <option value="Auxiliar">Auxiliar</option>
+        <option value="Operacional">Operacional</option>
+      </select>
+    </div>
+
+    <button class="btn btn-primary" type="submit">Salvar</button>
+  </form>
+
+  <hr style="margin:16px 0;border:0;border-top:1px solid #e5e7eb;">
+
+  <h4 style="margin:0 0 10px;">Folga / Atestado / Férias por período</h4>
+  <form id="form-ausencia" method="POST" action="/escala/ausencia" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+    <input type="hidden" name="date" value="<%= alvo %>">
+    <div style="flex:1;min-width:220px;">
+      <div class="label">COLABORADOR</div>
+      <input class="input" name="nome" placeholder="Ex.: Diogo" required>
+    </div>
+    <div style="min-width:180px;">
+      <div class="label">FUNÇÃO</div>
+      <select class="input" name="funcao" required>
+        <option value="Mecânico">Mecânico</option>
+        <option value="Auxiliar">Auxiliar</option>
+        <option value="Operacional">Operacional</option>
+      </select>
+    </div>
+    <div style="min-width:180px;">
+      <div class="label">TIPO</div>
+      <select class="input" name="tipo" id="ausencia-tipo" required>
+        <option value="FOLGA">Folga</option>
+        <option value="ATESTADO">Atestado</option>
+        <option value="FERIAS">Férias</option>
+      </select>
+    </div>
+    <div style="min-width:200px;">
+      <div class="label">INÍCIO</div>
+      <input class="input" type="date" name="inicio" required>
+    </div>
+    <div style="min-width:200px;">
+      <div class="label">FIM</div>
+      <input class="input" type="date" name="fim" required>
+    </div>
+    <div style="flex:1;min-width:260px;">
+      <div class="label">MOTIVO</div>
+      <input class="input" id="motivo-input" name="motivo" placeholder="Opcional para Folga/Férias">
+    </div>
+
+    <div id="compensacao-fields" style="display:flex;gap:10px;flex-wrap:wrap;width:100%;">
+      <div style="min-width:200px;">
+        <div class="label">DATA DO SERVIÇO PRESTADO</div>
+        <input class="input" type="date" name="dataServico">
+      </div>
+      <div style="min-width:160px;">
+        <div class="label">HORA INÍCIO</div>
+        <input class="input" type="time" name="horaInicio">
+      </div>
+      <div style="min-width:160px;">
+        <div class="label">HORA FIM</div>
+        <input class="input" type="time" name="horaFim">
+      </div>
+      <div style="flex:1;min-width:220px;">
+        <div class="label">EQUIPAMENTO/SETOR</div>
+        <input class="input" name="equipamento" placeholder="Ex.: Transportador Correia 02">
+      </div>
+      <div style="flex:2;min-width:260px;">
+        <div class="label">DESCRIÇÃO DOS SERVIÇOS EXECUTADOS</div>
+        <input class="input" name="descricaoServico" placeholder="Ex.: troca de rolamento, alinhamento e teste final">
+      </div>
+    </div>
+
+    <button class="btn btn-primary" type="submit">Lançar</button>
+  </form>
+</div>
+
+<script>
+  (function () {
+    const tipoEl = document.getElementById('ausencia-tipo');
+    const compEl = document.getElementById('compensacao-fields');
+    const motivoEl = document.getElementById('motivo-input');
+
+    function syncFields() {
+      const tipo = (tipoEl.value || '').toUpperCase();
+      const folga = tipo === 'FOLGA';
+      compEl.style.display = folga ? 'flex' : 'none';
+      motivoEl.placeholder = tipo === 'ATESTADO'
+        ? 'Obrigatório para Atestado'
+        : 'Opcional para Folga/Férias';
+      motivoEl.required = tipo === 'ATESTADO';
+    }
+
+    tipoEl.addEventListener('change', syncFields);
+    syncFields();
+  })();
+</script>

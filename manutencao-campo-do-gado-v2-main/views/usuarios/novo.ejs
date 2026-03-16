@@ -1,0 +1,56 @@
+<% layout('layout') %>
+
+<div class="page-head">
+  <div>
+    <h1>Novo Usuário</h1>
+    <p class="muted">Use o e-mail pessoal/corporativo do colaborador.</p>
+  </div>
+</div>
+
+<div class="card" style="max-width:900px;">
+  <form method="POST" action="/usuarios" enctype="multipart/form-data">
+    
+    <div class="grid-2">
+      <div>
+        <div class="label">Nome</div>
+        <input class="input" name="name" required />
+      </div>
+
+      <div>
+        <div class="label">E-mail</div>
+        <input class="input" name="email" type="email" required />
+      </div>
+
+      <div>
+        <div class="label">Perfil</div>
+        <select class="input" name="role" required>
+          <option value="">Selecione</option>
+          <% (ROLES || []).forEach(r => { %>
+            <option value="<%= r.key %>"><%= r.label %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div>
+        <div class="label">Senha</div>
+        <input class="input" name="password" type="password" required />
+      </div>
+
+      <div>
+        <div class="label">Foto do rosto</div>
+        <input class="input" name="photo" type="file" accept="image/*" capture="user" />
+      </div>
+    </div>
+
+    <div style="margin-top:16px; display:flex; gap:10px;">
+      <button class="btn btn-green" type="submit">
+        Salvar Usuário
+      </button>
+
+      <a class="btn btn-ghost btn-sm" href="/usuarios">
+        Cancelar
+      </a>
+    </div>
+
+  </form>
+</div>

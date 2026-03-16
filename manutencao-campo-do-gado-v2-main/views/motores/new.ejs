@@ -1,0 +1,75 @@
+<% layout('layout') %>
+
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="page-header" style="display:flex; justify-content:space-between; align-items:center;">
+    <div>
+      <h2 style="margin:0;">Cadastrar Motor</h2>
+      <small style="color:#777;">Cadastre um motor da planta (uso, reserva ou rebobinamento)</small>
+    </div>
+    <a class="btn btn-secondary" href="/motores">Voltar</a>
+  </div>
+
+  <!-- FORM -->
+  <div class="card" style="margin-top:20px;">
+    <form method="POST" action="/motores" class="form-grid">
+
+      <div style="grid-column: 1 / -1;">
+        <label>Código / Patrimônio (opcional)</label>
+        <input name="codigo" placeholder="Ex: MTR-001">
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <label>Descrição *</label>
+        <input name="descricao" required placeholder="Ex: Motor 5CV 1700RPM">
+      </div>
+
+      <div>
+        <label>Potência (CV)</label>
+        <input name="potencia_cv" type="number" step="0.1" placeholder="5">
+      </div>
+
+      <div>
+        <label>RPM</label>
+        <input name="rpm" type="number" step="1" placeholder="1700">
+      </div>
+
+      <div>
+        <label>Origem</label>
+        <select name="origem_unidade">
+          <option value="RECICLAGEM">RECICLAGEM</option>
+          <option value="FRIGORIFICO">FRIGORÍFICO</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Status</label>
+        <select name="status">
+          <option value="EM_USO">EM_USO</option>
+          <option value="RESERVA">RESERVA</option>
+          <option value="RETORNOU">RETORNOU</option>
+          <option value="ENVIADO_REBOB">ENVIADO_REBOB</option>
+        </select>
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <label>Local de Instalação</label>
+        <input name="local_instalacao" placeholder="Ex: Rosca 02 / Caldeira / Digestor...">
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <label>Observação</label>
+        <textarea name="observacao" rows="4" placeholder="Detalhes adicionais..."></textarea>
+      </div>
+
+      <!-- AÇÕES -->
+      <div style="grid-column: 1 / -1; display:flex; gap:10px; justify-content:flex-end; margin-top:6px;">
+        <a class="btn btn-secondary" href="/motores">Cancelar</a>
+        <button class="btn btn-primary" type="submit">Salvar</button>
+      </div>
+
+    </form>
+  </div>
+
+</div>

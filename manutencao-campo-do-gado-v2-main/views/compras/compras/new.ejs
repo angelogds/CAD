@@ -1,0 +1,50 @@
+<% layout('layout') %>
+
+<style>
+  .card{ background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:14px; max-width:900px; }
+  .muted{ color:#6b7280; }
+  .row{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  input,select,textarea{ padding:10px 12px; border:1px solid #e5e7eb; border-radius:12px; font-size:14px; }
+  .btn{ display:inline-block; padding:10px 12px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; font-weight:800; cursor:pointer; }
+  .actions{ display:flex; gap:10px; margin-top:12px; }
+  @media (max-width: 760px){ .row{ grid-template-columns:1fr; } }
+</style>
+
+<h1>Nova Compra</h1>
+<p class="muted" style="margin-top:-6px;">Registre uma compra (vincular solicitação é opcional).</p>
+
+<div class="card">
+  <form method="post" action="/compras">
+    <div class="row">
+      <div class="field">
+        <label>Fornecedor</label>
+        <input name="fornecedor" placeholder="Ex: Casa do Rolamento" />
+      </div>
+      <div class="field">
+        <label>Solicitação (opcional)</label>
+        <input name="solicitacao_id" placeholder="ID da solicitação (ex: 12)" />
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <div class="field">
+        <label>Data da compra</label>
+        <input name="data_compra" placeholder="YYYY-MM-DD" />
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select name="status">
+          <option value="em_andamento">em_andamento</option>
+          <option value="recebida">recebida</option>
+          <option value="cancelada">cancelada</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" type="submit">Salvar</button>
+      <a class="btn" href="/compras">Voltar</a>
+    </div>
+  </form>
+</div>

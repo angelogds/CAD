@@ -1,0 +1,22 @@
+<% layout('layout') %>
+<div class="page-head">
+  <div>
+    <h1><%= item.nome %></h1>
+    <p class="muted">Código: <%= item.codigo || '-' %> • Unidade: <%= item.unidade %></p>
+  </div>
+  <div><a class="btn btn-ghost" href="/estoque/itens">Voltar</a></div>
+</div>
+<%- include('_tabs', { tab: 'itens' }) %>
+<div class="card" style="margin-bottom:14px;">
+  <div class="grid-3">
+    <div><div class="label">Saldo atual</div><div><strong><%= item.saldo_atual %> <%= item.unidade %></strong></div></div>
+    <div><div class="label">Movimentos</div><div><strong><%= movimentos.length %></strong></div></div>
+    <div><div class="label">Item ID</div><div><strong>#<%= item.id %></strong></div></div>
+  </div>
+</div>
+<div class="card">
+  <div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Tipo</th><th>Qtd</th><th>Obs</th></tr></thead><tbody>
+    <% if (!movimentos.length) { %><tr><td colspan="4" class="muted">Sem movimentações.</td></tr><% } %>
+    <% movimentos.forEach((m)=> { %><tr><td><%= fmtBR(m.data_mov || m.created_at) %></td><td><%= m.tipo %></td><td><%= m.quantidade %></td><td><%= m.observacao || '-' %></td></tr><% }) %>
+  </tbody></table></div>
+</div>

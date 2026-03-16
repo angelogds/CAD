@@ -1,0 +1,28 @@
+<% layout("layout") %>
+<section class="card" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+  <h1><%= (desenho && desenho.codigo) || 'Sem código' %> - <%= (desenho && desenho.titulo) || 'Sem título' %> <span class="badge badge-cad">CAD</span></h1>
+  <div style="display:flex;gap:8px;">
+    <a class="btn" href="/desenho-tecnico/cad/<%= (desenho && desenho.id) || '' %>/editor">Abrir Editor CAD</a>
+    <a class="btn" href="/desenho-tecnico/cad/<%= (desenho && desenho.id) || '' %>/pdf">Gerar PDF</a>
+  </div>
+</section>
+
+<section class="dt-editor">
+  <article class="card dt-col">
+    <h3>Dados CAD</h3>
+    <p><b>Tipo:</b> CAD Manual</p>
+    <p><b>Revisão:</b> R<%= (desenho && desenho.revisao) || 0 %></p>
+    <p><b>Equipamento:</b> <%= (desenho && desenho.equipamento_nome) || '-' %></p>
+    <p><b>Status:</b> <%= (desenho && desenho.status) || '-' %></p>
+    <p><b>Prévia 3D:</b> <%= (desenho && desenho.preview3d && desenho.preview3d.items && desenho.preview3d.items.length) ? 'Disponível' : 'Indisponível para geometria atual' %></p>
+  </article>
+  <article class="card dt-col"><h3>Vista 2D CAD</h3><div class="dt-svg-pane"><%- svgPreview || '' %></div></article>
+  <article class="card dt-col">
+    <h3>Revisões</h3>
+    <ul>
+      <% (revisoes || []).forEach((r)=>{ %>
+        <li><b><%= r.tipo_arquivo %></b> • R<%= r.revisao %></li>
+      <% }) %>
+    </ul>
+  </article>
+</section>

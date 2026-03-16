@@ -1,0 +1,44 @@
+<% layout('layout') %>
+<div class="page-head">
+  <div>
+    <h1>Demandas</h1>
+    <p class="muted">Demandas da Direção para acompanhamento e execução.</p>
+  </div>
+  <% if (String(user?.role || '').toUpperCase() === 'DIRECAO' || String(user?.role || '').toUpperCase() === 'DIRETORIA') { %>
+    <a class="btn btn-green" href="/demandas/new">+ Nova Demanda</a>
+  <% } %>
+</div>
+
+<div class="card">
+  <form method="GET" action="/demandas" style="display:flex; gap:10px; align-items:end; margin-bottom:12px;">
+    <div>
+      <div class="label">Filtrar status</div>
+      <select class="input" name="status">
+        <option value="">Todos</option>
+        <% ['NOVA','EM_ANALISE','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %>
+          <option value="<%= st %>" <%= status===st ? 'selected' : '' %>><%= st %></option>
+        <% }) %>
+      </select>
+    </div>
+    <button class="btn" type="submit">Aplicar</button>
+  </form>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>#</th><th>Título</th><th>Prioridade</th><th>Status</th><th>Criado por</th><th></th></tr></thead>
+      <tbody>
+      <% if (!lista?.length) { %><tr><td colspan="6" style="text-align:center;color:#6b7280;">Sem demandas.</td></tr><% } %>
+      <% (lista||[]).forEach(d => { %>
+        <tr>
+          <td><%= d.id %></td>
+          <td><strong><%= d.titulo %></strong></td>
+          <td><span class="pill-tag pill-amber"><%= d.prioridade %></span></td>
+          <td><span class="pill-tag pill-blue"><%= d.status %></span></td>
+          <td><%= d.created_by_nome || '-' %></td>
+          <td><a class="btn btn-sm" href="/demandas/<%= d.id %>">Abrir</a></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

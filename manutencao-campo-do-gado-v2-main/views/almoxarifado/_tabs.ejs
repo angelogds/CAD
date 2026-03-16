@@ -1,0 +1,7 @@
+<%
+  const currentTab = tab || almoxTab || '';
+%>
+<div class="subtabs">
+  <a class="subtab <%= currentTab === 'retiradas' ? 'active' : '' %>" href="/almoxarifado">Retiradas</a>
+  <a class="subtab <%= currentTab === 'recebimentos' ? 'active' : '' %>" href="/almoxarifado/recebimentos">Recebimentos</a>
+</div>

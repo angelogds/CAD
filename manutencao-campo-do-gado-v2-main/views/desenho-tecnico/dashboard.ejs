@@ -1,0 +1,37 @@
+<% layout("layout") %>
+<section class="dt-header card">
+  <h1>Desenho Técnico</h1>
+  <div style="display:flex;gap:8px;">
+    <a class="btn" href="/desenho-tecnico">Listar Desenhos</a>
+    <a class="btn btn-green" href="/desenho-tecnico/novo">Novo Desenho</a>
+    <a class="btn btn-dark" href="/desenho-tecnico/cad/novo">Novo Desenho CAD</a>
+  </div>
+</section>
+
+<section class="dt-grid dt-stats">
+  <article class="card"><h3>Total de desenhos</h3><p><%= stats.total %></p></article>
+  <article class="card"><h3>Modelos salvos</h3><p><%= stats.modelos %></p></article>
+  <article class="card"><h3>PDFs gerados</h3><p><%= stats.pdfs %></p></article>
+  <article class="card"><h3>Desenhos CAD</h3><p><%= stats.cad %></p></article>
+</section>
+
+<section class="dt-grid dt-cats">
+  <% categoryCards.forEach((c)=>{ %>
+    <article class="card"><h3><%= c.nome %></h3><p><%= c.total %> desenho(s)</p></article>
+  <% }) %>
+  <article class="card"><h3>Biblioteca Técnica</h3><a class="btn" href="/desenho-tecnico/biblioteca">Abrir</a></article>
+</section>
+
+<section class="card">
+  <h2>Últimos desenhos</h2>
+  <div class="table-wrap">
+    <table class="table"><thead><tr><th>Código</th><th>Título</th><th>Tipo</th><th>Categoria</th><th>Revisão</th><th>Ações</th></tr></thead>
+      <tbody>
+      <% if(!desenhosRecentes.length){ %><tr><td colspan="6">Nenhum desenho cadastrado.</td></tr><% } %>
+      <% desenhosRecentes.forEach((d)=>{ %>
+        <tr><td><%= d.codigo %></td><td><%= d.titulo %></td><td><span class="badge <%= d.tipo_origem==='cad'?'badge-cad':'badge-param' %>"><%= d.tipo_origem==='cad'?'CAD':'Paramétrico' %></span></td><td><%= d.categoria %></td><td>R<%= d.revisao %></td><td><a class="btn" href="<%= d.tipo_origem==='cad' ? ('/desenho-tecnico/cad/'+d.id) : ('/desenho-tecnico/'+d.id) %>">Visualizar</a></td></tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>

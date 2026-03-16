@@ -1,0 +1,31 @@
+<%
+  const A = Number(resultado?.A || 0);
+  const B = Number(resultado?.B || 0);
+  const E = Number(entrada?.E || 0);
+%>
+<svg viewBox="0 0 800 600" role="img" aria-label="Cilindro técnico com planificação" style="width:100%;max-width:960px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;">
+  <defs>
+    <marker id="arrCil" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#222"/>
+    </marker>
+  </defs>
+
+  <text x="30" y="35" fill="#222" font-size="20">Peça montada</text>
+  <ellipse cx="220" cy="130" rx="90" ry="25" stroke="#222" fill="none"/>
+  <line x1="130" y1="130" x2="130" y2="290" stroke="#222"/>
+  <line x1="310" y1="130" x2="310" y2="290" stroke="#222"/>
+  <ellipse cx="220" cy="290" rx="90" ry="25" stroke="#222" fill="none"/>
+
+  <line x1="340" y1="130" x2="340" y2="290" stroke="#222" marker-start="url(#arrCil)" marker-end="url(#arrCil)"/>
+  <text x="350" y="215" fill="#222" font-size="16">B = <%= B.toFixed(2) %></text>
+
+  <text x="30" y="350" fill="#222" font-size="20">Planificação</text>
+  <rect x="80" y="380" width="520" height="150" stroke="#222" fill="none"/>
+
+  <line x1="80" y1="550" x2="600" y2="550" stroke="#222" marker-start="url(#arrCil)" marker-end="url(#arrCil)"/>
+  <text x="280" y="575" fill="#222" font-size="16">A = <%= A.toFixed(2) %></text>
+
+  <line x1="620" y1="380" x2="620" y2="530" stroke="#222" marker-start="url(#arrCil)" marker-end="url(#arrCil)"/>
+  <text x="630" y="460" fill="#222" font-size="16">B = <%= B.toFixed(2) %></text>
+  <text x="630" y="490" fill="#222" font-size="16">E = <%= E.toFixed(2) %></text>
+</svg>

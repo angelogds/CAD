@@ -1,0 +1,25 @@
+<% layout('layout') %>
+<%- include('partials/internal-styles') %>
+<div class="page-head"><div><h1>PCM • Falhas</h1><p class="muted">Ponto de integração com o banco de falhas já existente.</p></div></div>
+<div class="pcm-shell">
+  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
+  <div class="pcm-content">
+    <div class="card">
+      <div class="pcm-actions" style="margin-bottom:8px;"><form method="POST" action="/pcm/falhas/registrar"><button class="btn" type="submit">Registrar falha / Nova OS de falha</button></form></div>
+      <form class="pcm-toolbar" method="GET" action="/pcm/falhas">
+        <input class="input" type="month" name="periodo" value="<%= filtros?.periodo || '' %>" placeholder="Período">
+        <input class="input" name="equipamento" value="<%= filtros?.equipamento || '' %>" placeholder="Equipamento">
+        <input class="input" name="tipo_falha" value="<%= filtros?.tipo_falha || '' %>" placeholder="Tipo de falha">
+        <button class="btn" type="submit">Filtrar</button>
+      </form>
+      <div class="table-wrap"><table class="table compact">
+        <thead><tr><th>OS</th><th>Equipamento</th><th>Tipo de falha</th><th>Data</th><th>Status</th><th>Ação</th></tr></thead>
+        <tbody>
+          <% if (!falhas.length) { %><tr><td colspan="6" class="muted">Sem dados carregados nesta tela base.</td></tr><% } %>
+          <% falhas.forEach(function(f){ %><tr><td>#<%= f.id %></td><td><%= f.equipamento || '-' %></td><td><%= f.tipo || '-' %></td><td><%= f.opened_at || '-' %></td><td><%= f.status || '-' %></td><td><a class="btn btn-outline" href="/os/<%= f.id %>">Ver OS</a></td></tr><% }) %>
+        </tbody>
+      </table></div>
+      <p class="muted" style="margin-top:8px;">TODO: integrar com endpoint consolidado de falhas e classificação por causa.</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,49 @@
+<% layout('layout') %>
+<style>
+  .tr-page{display:grid;gap:14px}.tr-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px}
+  .tr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .img-tecnica{width:100%;max-width:980px;display:block;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
+  .img-planificacao{max-width:760px}
+  .resultado{display:grid;gap:6px;font-size:1rem}
+  @media(max-width:920px){.tr-grid{grid-template-columns:1fr}}
+</style>
+
+<div class="tr-page">
+  <div style="display:flex;justify-content:space-between;align-items:center;"><h1>Rosca helicoidal</h1><a class="btn" href="/tracagem">Voltar</a></div>
+
+  <div class="tr-card">
+    <form method="POST" action="/tracagem/rosca-helicoidal/calcular" style="display:grid;gap:10px;">
+      <div class="tr-grid">
+        <div><label>D (Diâmetro maior)</label><input class="input" name="D" type="number" step="0.01" placeholder="Diâmetro maior" required value="<%= calculo?.parametros?.D || '' %>"></div>
+        <div><label>d (Diâmetro menor)</label><input class="input" name="d" type="number" step="0.01" placeholder="Diâmetro menor" required value="<%= calculo?.parametros?.d || '' %>"></div>
+        <div><label>P (Passo da rosca)</label><input class="input" name="P" type="number" step="0.01" placeholder="Passo da rosca" required value="<%= calculo?.parametros?.P || '' %>"></div>
+        <div><label>Unidade</label><select class="input" name="unidade"><option value="mm" <%= (calculo?.parametros?.unidade || "mm") === "mm" ? "selected" : "" %>>mm</option><option value="cm" <%= calculo?.parametros?.unidade === "cm" ? "selected" : "" %>>cm</option></select></div>
+      </div>
+
+      <img src="/img/tracagem/planificacoes/rosca-helicoidal-peca.png" class="img-tecnica" alt="Rosca helicoidal - peça">
+
+      <div><button class="btn btn-green" type="submit">CALCULAR</button></div>
+    </form>
+  </div>
+
+  <% if (calculo?.resultado) { const resultado = calculo.resultado.resultado; %>
+    <div class="tr-card">
+      <h3>Planificação</h3>
+      <img src="/img/tracagem/planificacoes/rosca-helicoidal-planificacao.png" class="img-tecnica img-planificacao" alt="Rosca helicoidal - planificação">
+    </div>
+    <div class="tr-card">
+      <h3>Resultados</h3>
+      <div class="resultado">
+        <div>R1 = <%= resultado.R1_dev.toFixed(2) %> mm</div>
+        <div>R2 = <%= resultado.R2_dev.toFixed(2) %> mm</div>
+        <div>C1 = <%= resultado.C1.toFixed(2) %> mm</div>
+        <div>T (largura) = <%= resultado.T.toFixed(2) %> mm</div>
+        <div>Ângulo = <%= resultado.angulo_dev.toFixed(2) %>°</div>
+      </div>
+    </div>
+
+    <div class="tr-card">
+      <%- include('partials/relacionar-equipamento', { tipo: 'rosca-helicoidal', calculo, equipamentos, tituloPadrao: 'Rosca helicoidal' }) %>
+    </div>
+  <% } %>
+</div>

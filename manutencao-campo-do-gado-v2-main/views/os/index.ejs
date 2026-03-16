@@ -1,0 +1,209 @@
+<% layout('layout') %>
+
+<style>
+  .page-head{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:14px;
+  }
+  .muted{ font-size:13px; color:#6b7280; margin-top:6px; }
+
+  .card{
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:16px;
+    padding:18px;
+  }
+
+  .actions{
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+
+  /* ✅ MESMO botão do Equipamentos (mesma cor + mesmo formato) */
+  .btn-primary{
+    background:#16a34a;
+    color:#fff;
+    border:none;
+    padding:10px 16px;
+    border-radius:10px;
+    font-weight:700;
+    cursor:pointer;
+    text-decoration:none;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+  }
+  .btn-primary:hover{ background:#15803d; }
+
+  .table-wrap{ overflow:auto; }
+  table{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+    min-width:900px;
+  }
+
+  /* ✅ Cabeçalho MAIS CLARO (igual Equipamentos) */
+  thead th{
+    text-align:left;
+    font-size:12px;
+    color:#64748b;
+    font-weight:700;           /* antes estava pesado */
+    letter-spacing:.02em;
+    padding:12px 12px;
+    border-bottom:1px solid #e5e7eb;
+    background:#fff;
+    position:sticky;
+    top:0;
+    z-index:1;
+  }
+
+  tbody td{
+    padding:12px 12px;
+    border-bottom:1px solid #f1f5f9;
+    vertical-align:top;
+    font-size:14px;
+    color:#0f172a;
+  }
+  tbody tr:hover td{ background:#f8fafc; }
+
+  .td-clip{
+    max-width:420px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  /* Pílulas (tipo/status) – mais leves e bonitas */
+  .pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:4px 10px;
+    border-radius:999px;
+    font-weight:800;
+    font-size:12px;
+    border:1px solid #e5e7eb;
+    background:#f8fafc;
+    color:#0f172a;
+    white-space:nowrap;
+  }
+  .pill-blue{  background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
+  .pill-amber{ background:#fff7ed; border-color:#fed7aa; color:#9a3412; }
+  .pill-sky{   background:#ecfeff; border-color:#a5f3fc; color:#155e75; }
+  .pill-gray{  background:#f1f5f9; border-color:#e2e8f0; color:#334155; }
+  .pill-green{ background:#ecfdf5; border-color:#bbf7d0; color:#14532d; }
+
+  /* Botão pequeno (ações) igual Equipamentos */
+  .btn-sm{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:8px 12px;
+    border-radius:10px;
+    border:1px solid #d1d5db;
+    background:#fff;
+    cursor:pointer;
+    text-decoration:none;
+    font-weight:800;
+    color:#0f172a;
+    white-space:nowrap;
+  }
+  .btn-sm:hover{
+    border-color: rgba(22,163,74,.45);
+    background:#ecfdf5;
+  }
+</style>
+
+<div class="page-head">
+  <div>
+    <h1>Ordens de Serviço</h1>
+    <div class="muted">Abertas, em andamento e finalizadas.</div>
+  </div>
+
+  <div class="actions">
+    <a class="btn-primary" href="/os/novo">+ Nova OS</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:70px;">#</th>
+          <th>Equipamento</th>
+          <th style="width:130px;">Tipo</th>
+          <th style="width:110px;">Grau</th>
+          <th style="width:140px;">Status</th>
+          <th style="width:180px;">Solicitante</th>
+          <th style="width:170px;">Abertura</th>
+          <th style="width:170px;">Fechamento</th>
+          <th style="width:240px;">Executores</th>
+          <th style="width:140px; text-align:right;">Ações</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <% if (!lista || !lista.length) { %>
+          <tr>
+            <td colspan="10" style="padding:18px; color:#6b7280; text-align:center;">
+              Nenhuma OS cadastrada.
+            </td>
+          </tr>
+        <% } %>
+
+        <% (lista || []).forEach(o => { %>
+          <tr>
+            <td><%= o.id %></td>
+
+            <td><%= o.equipamento || "-" %></td>
+
+            <td>
+              <span class="pill pill-blue"><%= (o.tipo || "-").toUpperCase() %></span>
+            </td>
+
+            <td><span class="pill pill-gray"><%= (o.grau || "-") %></span></td>
+
+            <td>
+              <% const st = (o.status || "").toUpperCase(); %>
+              <% if (st === "ABERTA") { %>
+                <span class="pill pill-amber">ABERTA</span>
+              <% } else if (st === "ANDAMENTO" || st === "EM_ANDAMENTO") { %>
+                <span class="pill pill-sky">ANDAMENTO</span>
+              <% } else if (st === "PAUSADA") { %>
+                <span class="pill pill-gray">PAUSADA</span>
+              <% } else if (st === "CONCLUIDA" || st === "FINALIZADA" || st === "FECHADA") { %>
+                <span class="pill pill-green">FINALIZADA</span>
+              <% } else if (st === "CANCELADA") { %>
+                <span class="pill pill-gray">CANCELADA</span>
+              <% } else { %>
+                <span class="pill pill-gray"><%= st || "-" %></span>
+              <% } %>
+            </td>
+
+            <td><%= o.solicitante || "-" %></td>
+
+            <td><%= o.opened_at ? fmtBR(o.opened_at) : "-" %></td>
+
+            <td><%= o.closed_at ? fmtBR(o.closed_at) : "-" %></td>
+
+            <td>
+              <% if (["FECHADA","FINALIZADA","CONCLUIDA","CONCLUÍDA"].includes((o.status||'').toUpperCase())) { %>
+                <%= (o.mecanico_nome || '-') %> + <%= (o.auxiliar_nome || '-') %>
+              <% } else { %>-<% } %>
+            </td>
+
+            <td style="text-align:right;">
+              <a class="btn-sm" href="/os/<%= o.id %>">Abrir</a>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

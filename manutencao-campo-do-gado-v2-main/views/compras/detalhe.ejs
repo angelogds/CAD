@@ -1,0 +1,14 @@
+<% layout('layout') %>
+
+<h1>Compras - <%= sol.numero %></h1>
+<p>Status: <%= sol.status %></p>
+<form method="POST" action="/compras/solicitacoes/<%= sol.id %>/assumir"><button class="btn" type="submit">Assumir (EM_COTACAO)</button></form>
+<form method="POST" action="/compras/solicitacoes/<%= sol.id %>/atualizar-dados">
+  <input name="fornecedor" value="<%= sol.fornecedor || '' %>" placeholder="Fornecedor" />
+  <input name="previsao_entrega" value="<%= sol.previsao_entrega || '' %>" placeholder="Previsão" />
+  <input name="valor_total" value="<%= sol.valor_total || '' %>" placeholder="Valor total" />
+  <textarea name="observacoes_compras"><%= sol.observacoes_compras || '' %></textarea>
+  <button class="btn" type="submit">Salvar dados</button>
+</form>
+<form method="POST" action="/compras/solicitacoes/<%= sol.id %>/marcar-comprada"><button class="btn" type="submit">Marcar COMPRADA</button></form>
+<a class="btn" href="/compras/solicitacoes/<%= sol.id %>/pdf">Baixar PDF</a>

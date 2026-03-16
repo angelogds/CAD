@@ -1,0 +1,26 @@
+<% layout('layout') %>
+<div style="display:flex;justify-content:space-between;align-items:center;">
+  <h1>Traçagem #<%= tracagem.id %></h1>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a class="btn" href="/tracagem/lista">Histórico</a>
+    <a class="btn btn-green" href="/tracagem/<%= tracagem.id %>/pdf">Gerar PDF</a>
+    <form method="POST" action="/desenho-tecnico/gerar-a-partir-da-tracagem/tracagem/<%= tracagem.id %>"><button class="btn" type="submit">Gerar desenho técnico</button></form>
+    <a class="btn" href="/desenho-tecnico/abrir-de-tracagem/tracagem/<%= tracagem.id %>">Abrir no desenho técnico</a>
+    <% if (desenhoVinculado) { %><a class="btn" href="/desenho-tecnico/<%= desenhoVinculado.id %>">Desenho vinculado #<%= desenhoVinculado.id %></a><% } %>
+  </div>
+</div>
+
+<div class="card" style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;margin-top:10px;">
+  <div><b>Título:</b> <%= tracagem.titulo || '-' %></div>
+  <div><b>Tipo:</b> <%= labels[tracagem.tipo] || tracagem.tipo %></div>
+  <div><b>Usuário:</b> <%= tracagem.usuario_nome || '-' %></div>
+  <div><b>OS:</b> <%= tracagem.os_id || '-' %></div>
+  <div><b>Equipamento:</b> <%= tracagem.equipamento_nome || '-' %></div>
+  <div><b>Data:</b> <%= fmtBR(tracagem.created_at) %></div>
+
+  <h3>Parâmetros</h3>
+  <pre><%= JSON.stringify(tracagem.parametros, null, 2) %></pre>
+
+  <h3>Resultados</h3>
+  <pre><%= JSON.stringify(tracagem.resultado, null, 2) %></pre>
+</div>

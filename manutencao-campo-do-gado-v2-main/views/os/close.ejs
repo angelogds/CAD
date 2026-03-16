@@ -1,0 +1,45 @@
+<% layout('layout') %>
+
+<div class="card">
+  <div class="page-head" style="margin-top:0;">
+    <div>
+      <h1 style="font-size:28px;">Concluir OS #<%= os.id %></h1>
+      <p class="muted">Etapa de fechamento (mecânico/manutenção).</p>
+    </div>
+  </div>
+
+  <div class="note" style="margin-bottom:12px;">
+    <b>Problema reportado:</b><br />
+    <%= os.descricao || '-' %>
+  </div>
+
+  <form method="POST" action="/os/<%= os.id %>/fechar" enctype="multipart/form-data" id="form-fechar-os">
+    <div class="grid-2">
+      <div>
+        <label class="label">Resumo técnico (Ação corretiva)</label>
+        <textarea class="input" name="resumo_tecnico" required placeholder="Descreva o que foi executado"></textarea>
+      </div>
+      <div>
+        <label class="label">Causa/Diagnóstico (Ação preventiva)</label>
+        <textarea class="input" name="causa_diagnostico" required placeholder="Causa raiz e prevenção"></textarea>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;">
+      <label style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" name="is_nao_conforme" value="1" checked />
+        Marcar como Não Conformidade (NC)
+      </label>
+    </div>
+
+    <div style="margin-top:10px;">
+      <label class="label">Fotos de fechamento (opcional)</label>
+      <input id="fechamento_fotos" type="file" name="fechamento_fotos" accept="image/*" multiple />
+    </div>
+
+    <div class="row" style="justify-content:space-between; margin-top:16px;">
+      <a class="btn btn-ghost" href="/os/<%= os.id %>">Voltar</a>
+      <button type="submit" class="btn btn-primary">Concluir OS</button>
+    </div>
+  </form>
+</div>

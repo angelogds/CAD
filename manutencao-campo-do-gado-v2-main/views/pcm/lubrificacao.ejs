@@ -1,0 +1,31 @@
+<% layout('layout') %>
+<%- include('partials/internal-styles') %>
+<div class="page-head"><div><h1>PCM • Plano de Lubrificação</h1><p class="muted">Pontos de lubrificação e integração com plano mestre.</p></div></div>
+<div class="pcm-shell">
+  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
+  <div class="pcm-content">
+    <div class="card">
+      <form method="GET" action="/pcm/lubrificacao" class="pcm-toolbar">
+        <select class="input" name="equipamento_id"><option value="">Equipamento</option><% equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>" <%= String(filtros.equipamento_id||'')===String(eq.id)?'selected':'' %>><%= eq.nome %></option><% }) %></select>
+        <input class="input" name="setor" placeholder="Setor" value="<%= filtros.setor || '' %>">
+        <button class="btn" type="submit">Filtrar</button>
+      </form>
+      <div class="pcm-actions" style="margin-bottom:8px;">
+        <form method="POST" action="/pcm/lubrificacao/pontos" style="display:inline;"><input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id || '' %>"><button class="btn" type="submit">+ Adicionar ponto de lubrificação</button></form>
+      </div>
+
+      <div class="card" style="margin:8px 0 0;"><div class="label">Resumo de lubrificação principal</div><div class="muted" style="margin-top:8px;">TODO: integrar resumo real do redutor/principal via `pcm_lubrificacao_planos`.</div></div>
+
+      <div class="table-wrap"><table class="table compact" style="margin-top:10px;">
+        <thead><tr><th>Ponto</th><th>Lubrificante</th><th>Frequência</th><th>Quantidade</th><th>Próxima data</th><th>Situação</th></tr></thead>
+        <tbody>
+          <% if (!lubrificacoes.length) { %><tr><td colspan="6" class="muted">Sem pontos cadastrados para os filtros informados.</td></tr><% } %>
+          <% lubrificacoes.forEach(function(p){ %><tr><td><%= p.ponto_lubrificacao %></td><td><%= p.tipo_lubrificante_texto || '-' %></td><td><%= p.frequencia_label || '-' %></td><td><%= p.quantidade || '-' %> <%= p.unidade || '' %></td><td><%= p.proxima_execucao_em || '-' %></td><td><span class="status-dot <%= p.situacao === 'ATRASADO' ? 'danger' : (p.situacao === 'EM_BREVE' ? 'warn' : '') %>"><%= p.situacao || '-' %></span></td></tr><% }) %>
+        </tbody>
+      </table></div>
+
+      <label style="display:block; margin-top:8px;"><input type="checkbox"> Gerar OS preventiva automaticamente conforme frequência</label>
+      <label style="display:block; margin-top:4px;"><input type="checkbox"> Vincular ao plano mestre de manutenção</label>
+    </div>
+  </div>
+</div>

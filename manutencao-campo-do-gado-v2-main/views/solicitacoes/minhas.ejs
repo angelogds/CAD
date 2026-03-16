@@ -1,0 +1,106 @@
+<% layout('layout') %>
+<%
+const statusMeta = {
+  ABERTA: { label: 'Aberta', icon: '○' },
+  EM_COTACAO: { label: 'Em Cotação', icon: '⌕' },
+  COMPRADA: { label: 'Comprada', icon: '•' },
+  EM_RECEBIMENTO: { label: 'Em Recebimento', icon: '⇄' },
+  RECEBIDA_PARCIAL: { label: 'Recebida Parcial', icon: '◐' },
+  RECEBIDA_TOTAL: { label: 'Recebida Total', icon: '✓' },
+  FECHADA: { label: 'Fechada', icon: '×' },
+  REABERTA: { label: 'Reaberta', icon: '↺' },
+};
+%>
+
+<style>
+  .ms-page { display: grid; gap: 14px; }
+  .ms-page .page-head { align-items: flex-start; gap: 12px; }
+  .ms-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .ms-indicator { border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px 10px; background: #fff; display: flex; justify-content: space-between; align-items: center; }
+  .ms-indicator .meta { display: inline-flex; align-items: center; gap: 6px; color: #4b5563; font-size: .86rem; }
+  .ms-indicator strong { font-size: .98rem; color: #111827; }
+  .ms-filters { display: grid; grid-template-columns: 1.2fr 1fr 1fr auto; gap: 10px; align-items: end; }
+  .ms-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ms-actions .btn-sm { padding: 4px 8px; font-size: .78rem; }
+
+  @media (max-width: 960px) {
+    .ms-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ms-filters { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 640px) {
+    .ms-page .page-head { flex-direction: column; }
+    .ms-summary, .ms-filters { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="ms-page">
+  <div class="page-head">
+    <div>
+      <h1>Minhas Solicitações</h1>
+      <p class="muted">Acompanhamento simples e prático das solicitações de materiais.</p>
+    </div>
+    <div><a class="btn btn-green" href="/solicitacoes/nova">+ Nova Solicitação</a></div>
+  </div>
+
+  <div class="ms-summary">
+    <% statuses.forEach((st) => { const meta = statusMeta[st] || { label: st, icon: '•' }; %>
+      <div class="ms-indicator">
+        <span class="meta"><span><%= meta.icon %></span><span><%= meta.label %></span></span>
+        <strong><%= counters?.[st] || 0 %></strong>
+      </div>
+    <% }) %>
+  </div>
+
+  <div class="card">
+    <form class="ms-filters" method="GET" action="/solicitacoes/minhas">
+      <div>
+        <label class="label">Buscar</label>
+        <input class="input" type="text" name="q" placeholder="Número ou título" value="<%= filters?.query || '' %>" />
+      </div>
+      <div>
+        <label class="label">Status</label>
+        <select class="input" name="status">
+          <option value="">Todos</option>
+          <% statuses.forEach((st) => { const meta = statusMeta[st] || { label: st }; %>
+            <option value="<%= st %>" <%= filters?.status === st ? 'selected' : '' %>><%= meta.label %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div>
+        <label class="label">Data</label>
+        <input class="input" type="date" name="date" value="<%= filters?.date || '' %>" />
+      </div>
+      <div>
+        <button class="btn" type="submit">Filtrar</button>
+        <a class="btn btn-ghost" href="/solicitacoes/minhas">Limpar</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Número</th><th>Título</th><th>Status</th><th>Criada em</th><th>Ações</th></tr></thead>
+        <tbody>
+          <% if (!lista.length) { %>
+            <tr><td colspan="5" class="muted">Você ainda não possui solicitações com os filtros informados.</td></tr>
+          <% } %>
+          <% lista.forEach((s) => { const meta = statusMeta[s.status] || { label: s.status || '-', icon: '•' }; %>
+            <tr>
+              <td><strong><%= s.numero || ('#' + s.id) %></strong></td>
+              <td><%= s.titulo || '-' %></td>
+              <td><span class="pill-tag pill-gray"><%= meta.icon %> <%= meta.label %></span></td>
+              <td><%= fmtBR(s.created_at) %></td>
+              <td>
+                <div class="ms-actions">
+                  <a class="btn btn-sm btn-ghost" href="/solicitacoes/<%= s.id %>">Detalhes</a>
+                  <a class="btn btn-sm" href="/solicitacoes/<%= s.id %>?mode=edit">Editar</a>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
