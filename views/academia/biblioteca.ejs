@@ -1,0 +1,16 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/academia.css" />
+
+<div class="page-head"><div><h1>Biblioteca técnica</h1><p class="muted">Materiais de apoio: manuais, procedimentos, vídeos e artigos.</p></div></div>
+
+<div class="academia-grid">
+  <% if (!itens.length) { %><p class="muted">Nenhum item disponível.</p><% } %>
+  <% itens.forEach(function(item){ %>
+    <div class="academia-card">
+      <div class="muted-xs"><strong><%= item.tipo %></strong></div>
+      <h3><%= item.titulo %></h3>
+      <p class="muted"><%= item.descricao || 'Sem descrição' %></p>
+      <a class="btn btn-outline" href="<%= item.arquivo_url %>" target="_blank" rel="noopener">Abrir material</a>
+    </div>
+  <% }) %>
+</div>

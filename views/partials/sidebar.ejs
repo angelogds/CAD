@@ -26,6 +26,7 @@
   const canInspecao = can('inspecao_view');
   const canTracagem = can('tracagem_view');
   const canDesenhoTecnico = can('desenho_tecnico_view');
+  const canAcademia = can('academia_view');
 
   const currentPcmSection = (typeof activePcmSection !== 'undefined' ? activePcmSection : '');
 
@@ -54,6 +55,7 @@
     <% if (canInspecao) { %><%- navItem('/inspecao', 'Inspeção', activeMenu === 'inspecao') %><% } %>
     <% if (canTracagem) { %><%- navItem('/tracagem', 'Traçagem', activeMenu === 'tracagem') %><% } %>
     <% if (canDesenhoTecnico) { %><%- navItem('/desenho-tecnico', 'Desenho Técnico', activeMenu === 'desenho-tecnico') %><% } %>
+    <% if (canAcademia) { %><%- navItem('/academia', 'Academia da Manutenção', activeMenu === 'academia') %><% } %>
 
     <% if (canPCM) { %>
       <%- navItem('/pcm', 'PCM – Planejamento', activeMenu === 'pcm') %>

@@ -1,0 +1,56 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/academia.css" />
+
+<div class="page-head"><div><h1>Academia da Manutenção</h1><p class="muted">Capacitação técnica contínua para manutenção e produção.</p></div></div>
+
+<div class="academia-grid" style="margin-bottom:12px;">
+  <div class="academia-kpi"><div class="muted-xs">Funcionários treinados</div><div class="valor"><%= indicadores.funcionarios_treinados || 0 %></div></div>
+  <div class="academia-kpi"><div class="muted-xs">Cursos concluídos</div><div class="valor"><%= indicadores.cursos_concluidos || 0 %></div></div>
+  <div class="academia-kpi"><div class="muted-xs">Horas de treinamento</div><div class="valor"><%= indicadores.horas_treinamento || 0 %></div></div>
+  <div class="academia-kpi"><div class="muted-xs">Cursos ativos</div><div class="valor"><%= indicadores.cursos_ativos || 0 %></div></div>
+</div>
+
+<div class="academia-grid" style="grid-template-columns:2fr 1fr;align-items:start;">
+  <div class="academia-card">
+    <div class="label">Trilhas de conhecimento</div>
+    <div class="academia-grid" style="margin-top:10px;">
+      <% trilhas.forEach(function(t){ %>
+        <a class="academia-row" href="/academia/cursos?trilha_id=<%= t.id %>"><strong><%= t.icone || '📘' %> <%= t.nome %></strong><span class="muted"><%= t.total_cursos %> cursos</span></a>
+      <% }) %>
+    </div>
+  </div>
+  <div class="academia-card">
+    <div class="label">Meu progresso</div>
+    <p style="margin:8px 0 0;">Em andamento: <strong><%= meuResumo.em_andamento %></strong></p>
+    <p>Concluídos: <strong><%= meuResumo.concluidos %></strong></p>
+    <p>Pontos: <strong><%= meuResumo.pontos %></strong></p>
+    <div class="academia-actions">
+      <a class="btn" href="/academia/minhas-aulas">Minhas aulas</a>
+      <a class="btn btn-outline" href="/academia/ranking">Ranking</a>
+    </div>
+  </div>
+</div>
+
+<div class="academia-grid" style="margin-top:12px; grid-template-columns:2fr 1fr;">
+  <div class="academia-card">
+    <div class="label">Cursos em destaque</div>
+    <div class="academia-grid" style="margin-top:10px;">
+      <% cursosDestaque.forEach(function(c){ %>
+        <div class="academia-card">
+          <h3><a href="/academia/curso/<%= c.id %>"><%= c.titulo %></a></h3>
+          <div class="muted-xs"><%= c.trilha_nome || 'Sem trilha' %> • <%= c.carga_horaria || 0 %>h • <%= c.pontos || 0 %> pts</div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+  <div class="academia-card">
+    <div class="label">Mais acessados</div>
+    <ul style="padding-left:16px; margin-top:8px;">
+      <% cursosMaisAcessados.forEach(function(c){ %>
+        <li><a href="/academia/curso/<%= c.id %>"><%= c.titulo %></a> (<%= c.total_acessos %>)</li>
+      <% }) %>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/academia.js"></script>
