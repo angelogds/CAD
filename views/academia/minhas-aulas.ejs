@@ -1,0 +1,21 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/academia.css" />
+
+<div class="page-head"><div><h1>Minhas aulas</h1><p class="muted">Acompanhe progresso, horas e certificados.</p></div></div>
+
+<div class="academia-grid">
+  <% if (!minhasAulas.length) { %>
+    <div class="card"><p class="muted">Você ainda não iniciou cursos.</p><a class="btn" href="/academia/cursos">Ir para cursos</a></div>
+  <% } %>
+  <% minhasAulas.forEach(function(a){ %>
+    <div class="academia-card">
+      <h3><a href="/academia/curso/<%= a.curso_id %>"><%= a.titulo %></a></h3>
+      <p class="muted-xs">Status: <span class="badge-status <%= a.status %>"><%= a.status %></span></p>
+      <p class="muted-xs">Horas concluídas: <strong><%= a.horas_concluidas || 0 %>h</strong> • Pontos: <strong><%= a.pontos || 0 %></strong></p>
+      <div class="academia-actions">
+        <% if (a.status !== 'CONCLUIDO') { %><form method="POST" action="/academia/concluir/<%= a.curso_id %>"><button class="btn" type="submit">Marcar como concluído</button></form><% } %>
+        <% if (a.link_curso && a.plataforma !== 'INTERNO') { %><a class="btn btn-outline" href="<%= a.link_curso %>" target="_blank" rel="noopener">Abrir plataforma</a><% } %>
+      </div>
+    </div>
+  <% }) %>
+</div>

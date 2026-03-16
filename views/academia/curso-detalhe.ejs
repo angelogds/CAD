@@ -1,0 +1,52 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/academia.css" />
+
+<div class="page-head"><div><h1><%= curso.titulo %></h1><p class="muted"><%= curso.descricao || 'Curso técnico da Academia da Manutenção.' %></p></div></div>
+
+<div class="academia-grid" style="grid-template-columns:2fr 1fr;align-items:start;">
+  <div class="academia-card">
+    <div class="muted-xs">Trilha: <strong><%= curso.trilha_nome || 'Sem trilha' %></strong> • Plataforma: <strong><%= curso.plataforma %></strong></div>
+    <p style="margin-top:10px;">Carga horária: <strong><%= curso.carga_horaria || 0 %>h</strong> • Pontos: <strong><%= curso.pontos || 0 %></strong></p>
+    <p>Status atual: <span class="badge-status <%= curso.meu_status %>"><%= curso.meu_status %></span></p>
+    <div class="academia-actions">
+      <form method="POST" action="/academia/iniciar/<%= curso.id %>"><button class="btn" type="submit">Iniciar curso</button></form>
+      <form method="POST" action="/academia/concluir/<%= curso.id %>"><button class="btn btn-outline" type="submit">Concluir curso</button></form>
+      <% if (curso.link_curso) { %><button class="btn btn-outline" type="button" data-open-external="<%= curso.link_curso %>">Abrir conteúdo externo</button><% } %>
+    </div>
+  </div>
+  <div class="academia-card">
+    <div class="label">Certificado</div>
+    <form method="POST" action="/academia/certificado" style="margin-top:8px;">
+      <input type="hidden" name="curso_id" value="<%= curso.id %>" />
+      <input name="certificado_url" placeholder="https://..." value="<%= curso.certificado_url || '' %>" required />
+      <button class="btn" style="margin-top:8px;" type="submit">Salvar certificado</button>
+    </form>
+  </div>
+</div>
+
+<div class="card" style="margin-top:12px;">
+  <div class="label">Videoaulas internas</div>
+  <div class="academia-grid" style="margin-top:8px;">
+    <% if (!curso.aulas.length) { %><p class="muted">Este curso ainda não possui aulas cadastradas.</p><% } %>
+    <% curso.aulas.forEach(function(a){ %>
+      <div class="academia-card">
+        <h3><%= a.ordem || '-' %>. <%= a.titulo %></h3>
+        <p class="muted"><%= a.descricao || 'Sem descrição' %></p>
+        <% if (a.video_url) { %><a class="btn btn-outline" href="<%= a.video_url %>" target="_blank" rel="noopener">Assistir aula</a><% } %>
+      </div>
+    <% }) %>
+  </div>
+
+  <% if (canAccessModule(normalizeRole(user?.role), 'academia_manage')) { %>
+    <form method="POST" action="/academia/aulas/criar" class="grid cols-4" style="margin-top:12px;">
+      <input type="hidden" name="curso_id" value="<%= curso.id %>" />
+      <input name="titulo" placeholder="Título da aula" required />
+      <input name="descricao" placeholder="Descrição" />
+      <input name="video_url" placeholder="URL do vídeo" />
+      <input type="number" name="ordem" value="1" min="1" />
+      <button class="btn" type="submit">Adicionar aula</button>
+    </form>
+  <% } %>
+</div>
+
+<script src="/js/academia.js"></script>
