@@ -6,6 +6,6 @@ const path = require('path');
 test('sidebar has fornecedores menu item', () => {
   const file = path.join(__dirname, '..', 'views', 'partials', 'sidebar.ejs');
   const html = fs.readFileSync(file, 'utf8');
-  assert.match(html, /href="\/fornecedores"/);
+  assert.match(html, /navItem\('\/fornecedores',\s*'Fornecedores'/);
   assert.match(html, /Fornecedores/);
 });
