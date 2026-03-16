@@ -238,6 +238,7 @@ function cadEditor(req, res) {
     return base(res, view, {
       title: `${desenho.codigo} • Editor CAD`,
       user: req.user || req.session?.user || null,
+      authFullscreen: true,
       desenho,
       layers: Array.isArray(service.CAD_LAYERS) ? service.CAD_LAYERS : [],
       cadData: payload,
