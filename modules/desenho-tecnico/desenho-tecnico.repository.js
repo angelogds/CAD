@@ -66,7 +66,23 @@ function getByCodigoExcludingId(codigo, id) {
 }
 
 function getLastCadCodeLike() {
-  return db.prepare("SELECT codigo FROM desenhos_tecnicos WHERE codigo LIKE 'CAD%' ORDER BY codigo DESC LIMIT 1").get();
+  // Ordenação numérica correta: extrai o número do código CAD e ordena por ele
+  return db.prepare(`
+    SELECT codigo FROM desenhos_tecnicos 
+    WHERE codigo GLOB 'CAD[0-9]*'
+    ORDER BY CAST(SUBSTR(codigo, 4) AS INTEGER) DESC 
+    LIMIT 1
+  `).get();
+}
+
+function getMaxCadNumber() {
+  // Retorna o maior número usado em códigos CAD
+  const row = db.prepare(`
+    SELECT MAX(CAST(SUBSTR(codigo, 4) AS INTEGER)) as max_num 
+    FROM desenhos_tecnicos 
+    WHERE codigo GLOB 'CAD[0-9]*'
+  `).get();
+  return row?.max_num || 0;
 }
 
 function create(data) {
