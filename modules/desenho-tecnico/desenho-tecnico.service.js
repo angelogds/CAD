@@ -20,8 +20,12 @@ const SQLITE_UNIQUE_CONSTRAINT = 'SQLITE_CONSTRAINT_UNIQUE';
 
 function isUniqueCodigoError(error) {
   if (!error) return false;
-  return String(error.code || '') === SQLITE_UNIQUE_CONSTRAINT
-    || String(error.message || '').toLowerCase().includes('desenhos_tecnicos.codigo');
+  const msg = String(error.message || '').toLowerCase();
+  const code = String(error.code || '');
+  return code === SQLITE_UNIQUE_CONSTRAINT
+    || code === 'SQLITE_CONSTRAINT'
+    || msg.includes('unique constraint')
+    || msg.includes('desenhos_tecnicos.codigo');
 }
 
 function parseCadCodeSequence(codigo = '') {
@@ -30,20 +34,28 @@ function parseCadCodeSequence(codigo = '') {
   return Number(match[1]);
 }
 
-function nextCadCodeFromLatest(latestCode = '') {
-  const current = parseCadCodeSequence(latestCode);
-  const next = Number.isFinite(current) ? (current + 1) : 1;
+function nextCadCodeFromNumber(num = 0) {
+  const next = Math.max(1, num + 1);
   return `CAD${String(next).padStart(4, '0')}`;
 }
 
 function generateUniqueCadCode() {
-  const latest = repo.getLastCadCodeLike();
-  let candidate = nextCadCodeFromLatest(latest?.codigo || '');
-  for (let i = 0; i < 1000; i += 1) {
-    if (!repo.getByCodigo(candidate)) return candidate;
-    candidate = nextCadCodeFromLatest(candidate);
+  // Usa função que retorna o maior número CAD existente
+  const maxNum = repo.getMaxCadNumber() || 0;
+  let candidate = nextCadCodeFromNumber(maxNum);
+  
+  // Verificação extra: garante que o código não existe
+  for (let i = 0; i < 100; i += 1) {
+    if (!repo.getByCodigo(candidate)) {
+      return candidate;
+    }
+    // Se já existe, incrementa
+    const currentNum = parseCadCodeSequence(candidate) || maxNum + i;
+    candidate = nextCadCodeFromNumber(currentNum);
   }
-  throw new Error('Não foi possível gerar um código CAD único automaticamente.');
+  
+  // Fallback: usa timestamp
+  return `CAD${Date.now()}`;
 }
 
 function parseParams(raw = {}) {
