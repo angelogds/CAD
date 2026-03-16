@@ -208,7 +208,7 @@ function showCad(req, res) {
 }
 
 function cadEditor(req, res) {
-  const view = 'desenho-tecnico/cad-editor';
+  const view = 'desenho-tecnico/cad-editor-v2';
   try {
     logCad('GET /desenho-tecnico/cad/:id/editor', 'entrada na rota', { params: req.params, id: req.params.id });
     const desenho = service.getById(req.params.id);
@@ -227,9 +227,10 @@ function cadEditor(req, res) {
       layers: cadData.layers || {},
       objects: Array.isArray(cadData.objects) ? cadData.objects : [],
       dimensions: Array.isArray(cadData.dimensions) ? cadData.dimensions : [],
+      shafts: Array.isArray(cadData.shafts) ? cadData.shafts : [],
       history: Array.isArray(cadData.history) ? cadData.history : [],
     });
-    logCad('GET /desenho-tecnico/cad/:id/editor', 'dados carregados para editor', {
+    logCad('GET /desenho-tecnico/cad/:id/editor', 'dados carregados para editor V2', {
       id: desenho.id,
       extra: { totalObjetos: payload.objects.length, hasLayers: Object.keys(payload.layers).length },
     });
