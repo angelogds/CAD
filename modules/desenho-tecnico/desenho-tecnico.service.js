@@ -282,9 +282,11 @@ function generateSvg(desenho, params) {
 
 async function generatePdf(desenho, params) {
   const svgMarkup = generateSvg(desenho, params);
+  const cadData = parseJson(desenho.json_cad, null);
   const pdfInfo = await pdf.generateTechnicalPdf(desenho, svgMarkup, {
     tipoOrigem: desenho.tipo_origem || 'parametrico',
     preview3d: parseJson(desenho.json_3d, null),
+    cadData: cadData
   });
   repo.saveArquivo(desenho.id, {
     tipo_arquivo: 'PDF',
