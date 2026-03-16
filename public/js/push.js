@@ -72,7 +72,12 @@
 
     const vapidPublicKey = window.__VAPID_PUBLIC_KEY__ || '';
     if (!vapidPublicKey) {
-      alert('VAPID_PUBLIC_KEY não configurada no servidor. Contate o suporte.');
+      alert('Push desativado: configure VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no servidor (ex.: variáveis do Railway) e recarregue a página.');
+      const button = document.getElementById('btn-ativar-push');
+      if (button) {
+        button.textContent = 'Push indisponível (configuração pendente)';
+        button.disabled = true;
+      }
       return;
     }
 
