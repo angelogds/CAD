@@ -1,4 +1,6 @@
 (function () {
+  const SOUND_URL = '/audio/notification.mp3';
+
   function base64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -6,6 +8,12 @@
     const outputArray = new Uint8Array(rawData.length);
     for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
     return outputArray;
+  }
+
+  function playNotificationSound(soundUrl) {
+    const audio = new Audio(soundUrl || SOUND_URL);
+    audio.volume = 1;
+    audio.play().catch(() => {});
   }
 
   function isIOS() {
@@ -87,15 +95,23 @@
       body: JSON.stringify({ subscription }),
     });
 
-    if (!response.ok) {
-      throw new Error('Falha ao registrar inscrição push.');
-    }
+    if (!response.ok) throw new Error('Falha ao registrar inscrição push.');
+
+    playNotificationSound(SOUND_URL);
 
     const button = document.getElementById('btn-ativar-push');
     if (button) {
       button.textContent = 'Alertas ativados neste dispositivo';
       button.disabled = true;
     }
+  }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data?.type === 'PUSH_NOTIFICATION_RECEIVED') {
+        playNotificationSound(event.data.sound || SOUND_URL);
+      }
+    });
   }
 
   window.enablePush = function () {
