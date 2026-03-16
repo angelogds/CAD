@@ -1,0 +1,271 @@
+<% layout("layout") %>
+<%# CAD Editor V2 - Estilo AutoCAD %>
+
+<link rel="stylesheet" href="/css/cad-autocad.css">
+
+<div class="cad-fullscreen">
+  <!-- TOOLBAR SUPERIOR -->
+  <div class="cad-toolbar">
+    <div class="cad-toolbar-row">
+      <div class="cad-toolbar-group">
+        <a class="cad-btn" href="/desenho-tecnico/cad/<%= desenho.id %>">
+          ← Voltar
+        </a>
+      </div>
+      
+      <div class="cad-toolbar-group">
+        <span class="cad-toolbar-group-label">Arquivo</span>
+        <button class="cad-btn cad-btn-success" id="cadSaveBtn" title="Salvar (Ctrl+S)">
+          💾 Salvar
+        </button>
+        <a class="cad-btn" href="/desenho-tecnico/cad/<%= desenho.id %>/pdf" title="Gerar PDF">
+          📄 PDF
+        </a>
+      </div>
+      
+      <div class="cad-toolbar-divider"></div>
+      
+      <div class="cad-toolbar-group">
+        <span class="cad-toolbar-group-label">Editar</span>
+        <button class="cad-btn" id="cadUndoBtn" title="Desfazer (Ctrl+Z)">↶</button>
+        <button class="cad-btn" id="cadRedoBtn" title="Refazer (Ctrl+Y)">↷</button>
+        <button class="cad-btn cad-btn-danger" id="cadDeleteBtn" title="Apagar seleção (Del)">🗑</button>
+      </div>
+      
+      <div class="cad-toolbar-divider"></div>
+      
+      <div class="cad-toolbar-group">
+        <span class="cad-toolbar-group-label">Ferramentas</span>
+        <button class="cad-btn" data-tool="select" title="Selecionar (V)">🔲 Selecionar</button>
+        <button class="cad-btn" data-tool="line" title="Linha (L)">／ Linha</button>
+        <button class="cad-btn" data-tool="polyline" title="Polilinha (P)">⎺ Polilinha</button>
+        <button class="cad-btn" data-tool="rect" title="Retângulo (R)">▭ Retângulo</button>
+        <button class="cad-btn" data-tool="circle" title="Círculo (C)">◯ Círculo</button>
+        <button class="cad-btn" data-tool="arc" title="Arco">◜ Arco</button>
+        <button class="cad-btn" data-tool="text" title="Texto (T)">T Texto</button>
+      </div>
+      
+      <div class="cad-toolbar-divider"></div>
+      
+      <div class="cad-toolbar-group">
+        <span class="cad-toolbar-group-label">Eixo</span>
+        <button class="cad-btn cad-btn-primary" data-tool="shaft" title="Eixo Paramétrico (X)">
+          ⚙ Eixo
+        </button>
+        <button class="cad-btn" data-tool="centerline" title="Linha de Centro">
+          ╍ Centro
+        </button>
+      </div>
+      
+      <div class="cad-toolbar-divider"></div>
+      
+      <div class="cad-toolbar-group">
+        <span class="cad-toolbar-group-label">Cotas</span>
+        <button class="cad-btn" data-tool="dim_linear" title="Cota Linear (D)">↔ Linear</button>
+        <button class="cad-btn" data-tool="dim_diameter" title="Cota Diâmetro">⌀ Diâmetro</button>
+      </div>
+    </div>
+    
+    <div class="cad-toolbar-row">
+      <div class="cad-toolbar-group">
+        <span class="cad-toolbar-group-label">Precisão</span>
+        <button class="cad-btn" id="cadGridToggle">🔲 Grid</button>
+        <button class="cad-btn" id="cadSnapToggle">⊕ Snap</button>
+        <button class="cad-btn" id="cadOrthoToggle">⊞ Ortho</button>
+      </div>
+      
+      <div class="cad-toolbar-group">
+        <span class="cad-toolbar-group-label">Zoom</span>
+        <button class="cad-btn" id="cadZoomExtentsBtn" title="Zoom Extents">🔎 Extents</button>
+      </div>
+      
+      <div class="cad-toolbar-group" style="margin-left:auto;">
+        <span style="color:#94a3b8;font-size:12px;">
+          <strong><%= desenho.codigo %></strong> - <%= desenho.titulo %>
+        </span>
+      </div>
+    </div>
+  </div>
+  
+  <!-- WORKSPACE -->
+  <div class="cad-workspace">
+    <!-- PAINEL ESQUERDO - FERRAMENTAS -->
+    <div class="cad-panel-left">
+      <div class="cad-panel-section">
+        <div class="cad-panel-header">Desenho</div>
+        <div class="cad-panel-content">
+          <button class="cad-tool-btn" data-tool="select">
+            <span class="cad-tool-icon">🔲</span>
+            <span>Selecionar</span>
+          </button>
+          <button class="cad-tool-btn" data-tool="line">
+            <span class="cad-tool-icon">／</span>
+            <span>Linha</span>
+          </button>
+          <button class="cad-tool-btn" data-tool="polyline">
+            <span class="cad-tool-icon">⎺</span>
+            <span>Polilinha</span>
+          </button>
+          <button class="cad-tool-btn" data-tool="rect">
+            <span class="cad-tool-icon">▭</span>
+            <span>Retângulo</span>
+          </button>
+          <button class="cad-tool-btn" data-tool="circle">
+            <span class="cad-tool-icon">◯</span>
+            <span>Círculo</span>
+          </button>
+          <button class="cad-tool-btn" data-tool="arc">
+            <span class="cad-tool-icon">◜</span>
+            <span>Arco</span>
+          </button>
+          <button class="cad-tool-btn" data-tool="text">
+            <span class="cad-tool-icon">T</span>
+            <span>Texto</span>
+          </button>
+        </div>
+      </div>
+      
+      <div class="cad-panel-section">
+        <div class="cad-panel-header">Eixo Mecânico</div>
+        <div class="cad-panel-content">
+          <button class="cad-tool-btn" data-tool="shaft">
+            <span class="cad-tool-icon">⚙</span>
+            <span>Eixo Paramétrico</span>
+          </button>
+          <button class="cad-tool-btn" data-tool="centerline">
+            <span class="cad-tool-icon">╍</span>
+            <span>Linha de Centro</span>
+          </button>
+        </div>
+      </div>
+      
+      <div class="cad-panel-section">
+        <div class="cad-panel-header">Cotas</div>
+        <div class="cad-panel-content">
+          <button class="cad-tool-btn" data-tool="dim_linear">
+            <span class="cad-tool-icon">↔</span>
+            <span>Cota Linear</span>
+          </button>
+          <button class="cad-tool-btn" data-tool="dim_diameter">
+            <span class="cad-tool-icon">⌀</span>
+            <span>Cota Diâmetro</span>
+          </button>
+        </div>
+      </div>
+      
+      <div class="cad-panel-section">
+        <div class="cad-panel-header">Modificar</div>
+        <div class="cad-panel-content">
+          <button class="cad-tool-btn" data-tool="erase">
+            <span class="cad-tool-icon">🗑</span>
+            <span>Apagar</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- CANVAS CENTRAL -->
+    <div class="cad-canvas-container">
+      <svg id="cadCanvas" viewBox="0 0 3000 2000" preserveAspectRatio="xMidYMid meet">
+      </svg>
+    </div>
+    
+    <!-- PAINEL DIREITO - PROPRIEDADES -->
+    <div class="cad-panel-right">
+      <div class="cad-panel-section">
+        <div class="cad-panel-header">Propriedades</div>
+        <div class="cad-panel-content" id="cadProperties">
+          <p style="color:#94a3b8;font-size:12px;">Selecione um objeto para editar suas propriedades.</p>
+        </div>
+      </div>
+      
+      <div class="cad-panel-section">
+        <div class="cad-panel-header">Camadas</div>
+        <div class="cad-panel-content">
+          <div style="margin-bottom:8px;">
+            <label class="cad-prop-label">Camada Ativa</label>
+            <select class="cad-select" id="cadLayerSelect">
+              <% Object.keys(cadData.layers || {}).forEach(layerName => { %>
+                <option value="<%= layerName %>" <%= cadData.activeLayer === layerName ? 'selected' : '' %>><%= layerName %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div id="cadLayersList"></div>
+        </div>
+      </div>
+      
+      <div class="cad-panel-section">
+        <div class="cad-panel-header">Metadados</div>
+        <div class="cad-panel-content">
+          <div class="cad-props-grid">
+            <div class="cad-prop-row">
+              <span class="cad-prop-label">Código</span>
+              <input class="cad-input" type="text" id="cadMetaCodigo" value="<%= desenho.codigo %>">
+            </div>
+            <div class="cad-prop-row">
+              <span class="cad-prop-label">Título</span>
+              <input class="cad-input" type="text" id="cadMetaTitulo" value="<%= desenho.titulo %>">
+            </div>
+            <div class="cad-prop-row">
+              <span class="cad-prop-label">Material</span>
+              <input class="cad-input" type="text" id="cadMetaMaterial" value="<%= desenho.material || '' %>">
+            </div>
+            <div class="cad-prop-row">
+              <span class="cad-prop-label">Equipamento</span>
+              <select class="cad-select" id="cadMetaEquipamento">
+                <option value="">-- Sem vínculo --</option>
+                <% (equipamentos || []).forEach(eq => { %>
+                  <option value="<%= eq.id %>" <%= Number(desenho.equipamento_id) === Number(eq.id) ? 'selected' : '' %>>
+                    <%= eq.codigo || '#' + eq.id %> - <%= eq.nome %>
+                  </option>
+                <% }) %>
+              </select>
+            </div>
+            <div style="grid-column:1/-1;margin-top:4px;">
+              <label class="cad-prop-label">Observações</label>
+              <textarea class="cad-input" id="cadMetaObservacoes" rows="3" style="min-height:60px;"><%= desenho.observacoes || '' %></textarea>
+            </div>
+            <button class="cad-btn cad-btn-lg" id="cadMetaSaveBtn" style="width:100%;margin-top:8px;">
+              💾 Salvar Metadados
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- STATUS BAR -->
+  <div class="cad-statusbar" id="cadStatusBar">
+    <div class="cad-status-left">
+      <div class="cad-status-item">
+        <span class="cad-status-label">X:</span>
+        <span class="cad-status-value">0</span>
+      </div>
+      <div class="cad-status-item">
+        <span class="cad-status-label">Y:</span>
+        <span class="cad-status-value">0</span>
+      </div>
+    </div>
+    <div class="cad-status-right">
+      <button class="cad-status-toggle active" data-toggle="grid">GRID</button>
+      <button class="cad-status-toggle active" data-toggle="snap">SNAP</button>
+      <button class="cad-status-toggle" data-toggle="ortho">ORTHO</button>
+    </div>
+  </div>
+</div>
+
+<script>
+window.CAD_INITIAL = {
+  desenhoId: <%= desenho.id %>,
+  canManage: <%= !!canManage %>,
+  data: <%- JSON.stringify(cadData || { objects: [], dimensions: [], layers: {}, activeLayer: 'geometria_principal' }) %>
+};
+</script>
+<script src="/js/cad-engine-v2.js"></script>
+
+<style>
+/* Override layout para fullscreen CAD */
+body { overflow: hidden; }
+.app { display: none !important; }
+.cad-fullscreen { display: grid !important; }
+</style>
