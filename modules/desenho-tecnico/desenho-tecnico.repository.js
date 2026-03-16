@@ -333,6 +333,7 @@ module.exports = {
   getByCodigo,
   getByCodigoExcludingId,
   getLastCadCodeLike,
+  getMaxCadNumber,
   create,
   update,
   updateCadMetadata,
