@@ -5,16 +5,16 @@
 
 :root {
   /* AutoCAD Classic Colors */
-  --cad-bg: #1d3557;
-  --cad-bg-dark: #14253d;
-  --cad-bg-darker: #0d1b2a;
+  --cad-bg: #111827;
+  --cad-bg-dark: #0f172a;
+  --cad-bg-darker: #020617;
   --cad-grid-major: rgba(100, 130, 170, 0.3);
   --cad-grid-minor: rgba(70, 100, 140, 0.15);
   --cad-crosshair: #ffffff;
   
   /* Toolbar Colors (AutoCAD ribbon style) */
-  --cad-toolbar-bg: #2d3748;
-  --cad-toolbar-border: #4a5568;
+  --cad-toolbar-bg: #0b1220;
+  --cad-toolbar-border: #1f2937;
   --cad-btn-bg: #3d4a5c;
   --cad-btn-hover: #4a5a6f;
   --cad-btn-active: #2563eb;
@@ -65,9 +65,10 @@
 .cad-toolbar {
   display: flex;
   flex-direction: column;
-  background: var(--cad-toolbar-bg);
-  border-bottom: 2px solid var(--cad-toolbar-border);
+  background: linear-gradient(180deg, #111827 0%, #0b1220 100%);
+  border-bottom: 1px solid var(--cad-toolbar-border);
   padding: 0;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.35);
 }
 
 .cad-toolbar-row {
@@ -86,11 +87,11 @@
 .cad-toolbar-group {
   display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 4px 8px;
-  background: rgba(0,0,0,0.15);
-  border-radius: 4px;
-  border: 1px solid rgba(255,255,255,0.08);
+  gap: 4px;
+  padding: 5px 9px;
+  background: rgba(15,23,42,0.7);
+  border-radius: 6px;
+  border: 1px solid rgba(148,163,184,0.2);
 }
 
 .cad-toolbar-group-label {
@@ -118,14 +119,14 @@
   justify-content: center;
   gap: 4px;
   min-width: 32px;
-  height: 28px;
-  padding: 0 8px;
-  background: var(--cad-btn-bg);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 3px;
+  height: 30px;
+  padding: 0 10px;
+  background: #1f2937;
+  border: 1px solid rgba(148,163,184,0.26);
+  border-radius: 6px;
   color: var(--cad-btn-text);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
@@ -180,7 +181,7 @@
 
 .cad-workspace {
   display: grid;
-  grid-template-columns: 180px 1fr 280px;
+  grid-template-columns: 200px 1fr 300px;
   gap: 0;
   overflow: hidden;
   background: var(--cad-bg-darker);
@@ -218,9 +219,9 @@
 }
 
 .cad-panel-content {
-  padding: 8px;
+  padding: 10px;
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .cad-tool-btn {
@@ -285,7 +286,7 @@
   flex: 1;
   width: 100%;
   height: 100%;
-  background: var(--cad-bg);
+  background: radial-gradient(circle at 50% 45%, #182742 0%, #0f1a30 45%, #0a1222 100%);
   cursor: crosshair;
 }
 
@@ -410,8 +411,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 12px;
-  background: var(--cad-status-bg);
+  padding: 6px 12px;
+  background: linear-gradient(180deg, #0b1220 0%, #0a0f1b 100%);
   border-top: 1px solid var(--cad-panel-border);
   font-family: 'Consolas', 'Monaco', monospace;
   font-size: 11px;

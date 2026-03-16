@@ -119,7 +119,7 @@
   // ELEMENTOS DOM
   // ==========================================================================
   
-  let svg, root, layerGrid, layerEntities, layerPreview, layerDimensions, layerSelection;
+  let svg, root, layerGrid, layerAxes, layerEntities, layerPreview, layerDimensions, layerSelection, layerOverlay;
   let statusBar, propsPanel, layersPanel, measurePreview;
 
   function setStatusMessage(message) {
@@ -146,6 +146,10 @@
     layerGrid = document.createElementNS(NS, 'g');
     layerGrid.setAttribute('id', 'layerGrid');
     
+    layerAxes = document.createElementNS(NS, 'g');
+    layerAxes.setAttribute('id', 'layerAxes');
+    layerAxes.setAttribute('pointer-events', 'none');
+
     layerEntities = document.createElementNS(NS, 'g');
     layerEntities.setAttribute('id', 'layerEntities');
     
@@ -157,8 +161,12 @@
     
     layerSelection = document.createElementNS(NS, 'g');
     layerSelection.setAttribute('id', 'layerSelection');
+
+    layerOverlay = document.createElementNS(NS, 'g');
+    layerOverlay.setAttribute('id', 'layerOverlay');
+    layerOverlay.setAttribute('pointer-events', 'none');
     
-    root.append(layerGrid, layerEntities, layerPreview, layerDimensions, layerSelection);
+    root.append(layerGrid, layerAxes, layerEntities, layerPreview, layerDimensions, layerSelection, layerOverlay);
     svg.innerHTML = '';
     svg.appendChild(root);
     
@@ -176,16 +184,34 @@
   // ==========================================================================
   
   function screenToWorld(clientX, clientY) {
-    const rect = svg.getBoundingClientRect();
-    const x = (clientX - rect.left - state.view.panX) / state.view.zoom;
-    const y = (clientY - rect.top - state.view.panY) / state.view.zoom;
-    return { x: round(x), y: round(y) };
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+
+    const point = svg.createSVGPoint();
+    point.x = clientX;
+    point.y = clientY;
+
+    const svgPoint = point.matrixTransform(ctm.inverse());
+    const worldX = (svgPoint.x - state.view.panX) / state.view.zoom;
+    const worldY = (svgPoint.y - state.view.panY) / state.view.zoom;
+
+    return { x: round(worldX), y: round(worldY) };
   }
   
   function worldToScreen(worldX, worldY) {
-    const x = worldX * state.view.zoom + state.view.panX;
-    const y = worldY * state.view.zoom + state.view.panY;
-    return { x, y };
+    const ctm = svg.getScreenCTM();
+    const rect = svg.getBoundingClientRect();
+    if (!ctm) return { x: 0, y: 0 };
+
+    const point = svg.createSVGPoint();
+    point.x = worldX * state.view.zoom + state.view.panX;
+    point.y = worldY * state.view.zoom + state.view.panY;
+
+    const screenPoint = point.matrixTransform(ctm);
+    return {
+      x: screenPoint.x - rect.left,
+      y: screenPoint.y - rect.top
+    };
   }
   
   // ==========================================================================
@@ -197,7 +223,7 @@
     
     let snapped = { ...point };
     let snapType = null;
-    let minDist = state.snap.grid ? CONFIG.gridStep / 2 : CONFIG.snapTolerance;
+    let minDist = state.snap.grid ? CONFIG.gridStep / 2 : CONFIG.snapTolerance / state.view.zoom;
     
     // Snap to grid
     if (state.snap.grid && state.grid.visible) {
@@ -375,24 +401,26 @@
   // ==========================================================================
   
   function hitTest(point, tolerance = 6) {
+    const worldTolerance = tolerance / state.view.zoom;
+
     for (let i = state.data.objects.length - 1; i >= 0; i--) {
       const obj = state.data.objects[i];
       
       if (obj.type === 'line' || obj.type === 'centerline') {
         const d = pointToLineDistance(point, { x: obj.x, y: obj.y }, { x: obj.x2, y: obj.y2 });
-        if (d <= tolerance) return obj;
+        if (d <= worldTolerance) return obj;
       }
       
       if (obj.type === 'rect') {
-        if (point.x >= obj.x - tolerance && point.x <= obj.x + obj.width + tolerance &&
-            point.y >= obj.y - tolerance && point.y <= obj.y + obj.height + tolerance) {
+        if (point.x >= obj.x - worldTolerance && point.x <= obj.x + obj.width + worldTolerance &&
+            point.y >= obj.y - worldTolerance && point.y <= obj.y + obj.height + worldTolerance) {
           return obj;
         }
       }
       
       if (obj.type === 'circle') {
         const d = Math.abs(distance(point, { x: obj.x, y: obj.y }) - obj.radius);
-        if (d <= tolerance) return obj;
+        if (d <= worldTolerance) return obj;
       }
       
       if (obj.type === 'text') {
@@ -402,8 +430,8 @@
       if (obj.type === 'shaft') {
         // Hit test simplificado para eixo
         const bounds = getShaftBounds(obj);
-        if (point.x >= bounds.minX - tolerance && point.x <= bounds.maxX + tolerance &&
-            point.y >= bounds.minY - tolerance && point.y <= bounds.maxY + tolerance) {
+        if (point.x >= bounds.minX - worldTolerance && point.x <= bounds.maxX + worldTolerance &&
+            point.y >= bounds.minY - worldTolerance && point.y <= bounds.maxY + worldTolerance) {
           return obj;
         }
       }
@@ -413,7 +441,7 @@
     for (let i = state.data.dimensions.length - 1; i >= 0; i--) {
       const dim = state.data.dimensions[i];
       const d = pointToLineDistance(point, { x: dim.x1, y: dim.y1 }, { x: dim.x2, y: dim.y2 });
-      if (d <= tolerance) return { ...dim, isDimension: true };
+      if (d <= worldTolerance) return { ...dim, isDimension: true };
     }
     
     return null;
@@ -588,10 +616,12 @@
     root.setAttribute('transform', `translate(${state.view.panX} ${state.view.panY}) scale(${state.view.zoom})`);
     
     renderGrid();
+    renderAxes();
     renderEntities();
     renderPreview();
     renderDimensions();
     renderSelection();
+    renderCursorOverlay();
     renderStatus();
     renderPropertiesPanel();
     renderLayersPanel();
@@ -635,6 +665,69 @@
     }
   }
   
+
+  function renderAxes() {
+    layerAxes.innerHTML = '';
+
+    const viewBox = svg.viewBox.baseVal;
+    const width = viewBox.width || 3000;
+    const height = viewBox.height || 2000;
+
+    const axisX = document.createElementNS(NS, 'line');
+    axisX.setAttribute('x1', 0);
+    axisX.setAttribute('y1', 0);
+    axisX.setAttribute('x2', width);
+    axisX.setAttribute('y2', 0);
+    axisX.setAttribute('stroke', 'rgba(90, 185, 255, 0.85)');
+    axisX.setAttribute('stroke-width', 1.2);
+    axisX.setAttribute('stroke-dasharray', '12,6');
+    layerAxes.appendChild(axisX);
+
+    const axisY = document.createElementNS(NS, 'line');
+    axisY.setAttribute('x1', 0);
+    axisY.setAttribute('y1', 0);
+    axisY.setAttribute('x2', 0);
+    axisY.setAttribute('y2', height);
+    axisY.setAttribute('stroke', 'rgba(255, 121, 121, 0.85)');
+    axisY.setAttribute('stroke-width', 1.2);
+    axisY.setAttribute('stroke-dasharray', '12,6');
+    layerAxes.appendChild(axisY);
+
+    const origin = document.createElementNS(NS, 'circle');
+    origin.setAttribute('cx', 0);
+    origin.setAttribute('cy', 0);
+    origin.setAttribute('r', 5);
+    origin.setAttribute('fill', '#f8fafc');
+    origin.setAttribute('stroke', '#0f172a');
+    origin.setAttribute('stroke-width', 1);
+    layerAxes.appendChild(origin);
+  }
+
+  function renderCursorOverlay() {
+    layerOverlay.innerHTML = '';
+
+    const p = state.worldPointer;
+    const size = 14 / state.view.zoom;
+
+    const hLine = document.createElementNS(NS, 'line');
+    hLine.setAttribute('x1', p.x - size);
+    hLine.setAttribute('y1', p.y);
+    hLine.setAttribute('x2', p.x + size);
+    hLine.setAttribute('y2', p.y);
+    hLine.setAttribute('stroke', '#e2e8f0');
+    hLine.setAttribute('stroke-width', 1 / state.view.zoom);
+    layerOverlay.appendChild(hLine);
+
+    const vLine = document.createElementNS(NS, 'line');
+    vLine.setAttribute('x1', p.x);
+    vLine.setAttribute('y1', p.y - size);
+    vLine.setAttribute('x2', p.x);
+    vLine.setAttribute('y2', p.y + size);
+    vLine.setAttribute('stroke', '#e2e8f0');
+    vLine.setAttribute('stroke-width', 1 / state.view.zoom);
+    layerOverlay.appendChild(vLine);
+  }
+
   // ==========================================================================
   // RENDERIZAR ENTIDADES
   // ==========================================================================
@@ -1980,6 +2073,7 @@
     }
     
     renderPreview();
+    renderCursorOverlay();
     renderStatus();
   }
   
