@@ -150,12 +150,17 @@ function createCadDrawing(payload = {}, userId = null) {
     return { ok: false, id: null, desenho: null, error: validation.errors.join(' ') };
   }
 
-  let codigo = validation.data.codigo || generateUniqueCadCode();
+  // Se código foi informado pelo usuário, usa ele; senão gera automático
+  const codigoInformado = Boolean(validation.data.codigo);
+  let codigo = codigoInformado ? validation.data.codigo : generateUniqueCadCode();
 
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  const maxAttempts = codigoInformado ? 1 : 10;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
       const data = { ...validation.data, codigo };
       const cadData = buildDefaultCadData(data);
+      
       const id = create({
         ...data,
         categoria: 'CAD',
@@ -167,22 +172,55 @@ function createCadDrawing(payload = {}, userId = null) {
         status: 'ATIVO',
         revisao: 0,
       });
+      
       const desenho = getById(id);
-      if (!desenho) throw new Error(`Desenho CAD criado com id ${id}, mas não foi encontrado em seguida.`);
+      if (!desenho) {
+        throw new Error(`Desenho CAD criado com id ${id}, mas não foi encontrado em seguida.`);
+      }
+      
+      console.log('[CAD] Desenho criado com sucesso:', { id, codigo });
       return { ok: true, id, desenho, error: null };
+      
     } catch (error) {
-      if (isUniqueCodigoError(error) && !validation.data.codigo) {
-        codigo = nextCadCodeFromLatest(codigo);
+      console.error('[CAD] Erro ao criar desenho:', { 
+        attempt, 
+        codigo, 
+        message: error?.message,
+        code: error?.code 
+      });
+      
+      if (isUniqueCodigoError(error)) {
+        if (codigoInformado) {
+          // Usuário informou código duplicado
+          return { 
+            ok: false, 
+            id: null, 
+            desenho: null, 
+            error: `O código "${codigo}" já existe. Informe outro código ou deixe em branco para gerar automaticamente.` 
+          };
+        }
+        // Código automático colidiu, tenta próximo
+        const currentNum = parseCadCodeSequence(codigo) || 0;
+        codigo = nextCadCodeFromNumber(currentNum);
         continue;
       }
-      if (isUniqueCodigoError(error) && validation.data.codigo) {
-        return { ok: false, id: null, desenho: null, error: 'Código já existe. Informe outro código ou deixe em branco para gerar automaticamente.' };
-      }
-      return { ok: false, id: null, desenho: null, error: error?.message || String(error) };
+      
+      // Outro tipo de erro
+      return { 
+        ok: false, 
+        id: null, 
+        desenho: null, 
+        error: `Erro ao criar desenho: ${error?.message || String(error)}` 
+      };
     }
   }
 
-  return { ok: false, id: null, desenho: null, error: 'Não foi possível criar o desenho CAD com um código único. Tente novamente.' };
+  return { 
+    ok: false, 
+    id: null, 
+    desenho: null, 
+    error: 'Não foi possível criar o desenho CAD após várias tentativas. Por favor, tente novamente.' 
+  };
 }
 
 function normalizeCadMetadata(payload = {}) {
