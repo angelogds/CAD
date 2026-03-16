@@ -25,8 +25,9 @@ test('controller includes CAD metadata update handler', () => {
 
 test('service handles CAD code generation and uniqueness fallback', () => {
   assert.equal(serviceContent.includes('function generateUniqueCadCode'), true);
-  assert.equal(serviceContent.includes('Código já existe'), true);
-  assert.equal(serviceContent.includes('nextCadCodeFromLatest'), true);
+  assert.equal(serviceContent.includes('function nextCadCodeFromNumber'), true);
+  assert.equal(serviceContent.includes('isUniqueCodigoError'), true);
+  assert.equal(serviceContent.includes('já existe. Informe outro código'), true);
 });
 
 test('cad service sanitizes editor payload', () => {
