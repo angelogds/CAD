@@ -1,4 +1,6 @@
 (function () {
+  const SOUND_URL = '/audio/notification.mp3';
+
   function base64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -6,6 +8,12 @@
     const outputArray = new Uint8Array(rawData.length);
     for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
     return outputArray;
+  }
+
+  function playNotificationSound(soundUrl) {
+    const audio = new Audio(soundUrl || SOUND_URL);
+    audio.volume = 1;
+    audio.play().catch(() => {});
   }
 
   function isIOS() {
@@ -64,7 +72,12 @@
 
     const vapidPublicKey = window.__VAPID_PUBLIC_KEY__ || '';
     if (!vapidPublicKey) {
-      alert('VAPID_PUBLIC_KEY não configurada no servidor. Contate o suporte.');
+      alert('Push desativado: configure VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no servidor (ex.: variáveis do Railway) e recarregue a página.');
+      const button = document.getElementById('btn-ativar-push');
+      if (button) {
+        button.textContent = 'Push indisponível (configuração pendente)';
+        button.disabled = true;
+      }
       return;
     }
 
@@ -87,9 +100,9 @@
       body: JSON.stringify({ subscription }),
     });
 
-    if (!response.ok) {
-      throw new Error('Falha ao registrar inscrição push.');
-    }
+    if (!response.ok) throw new Error('Falha ao registrar inscrição push.');
+
+    playNotificationSound(SOUND_URL);
 
     const button = document.getElementById('btn-ativar-push');
     if (button) {
@@ -97,6 +110,24 @@
       button.disabled = true;
     }
   }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data?.type === 'PUSH_NOTIFICATION_RECEIVED') {
+        playNotificationSound(event.data.sound || SOUND_URL);
+      }
+    });
+  }
+
+  (function initPushButtonState() {
+    const button = document.getElementById('btn-ativar-push');
+    if (!button) return;
+    if (!(window.__VAPID_PUBLIC_KEY__ || '').trim()) {
+      button.textContent = 'Push indisponível (configuração pendente)';
+      button.disabled = true;
+      button.title = 'Configure VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no servidor';
+    }
+  })();
 
   window.enablePush = function () {
     enablePush().catch(function (err) {

@@ -104,7 +104,7 @@
   <div>
     <h1>Painel Operacional Reciclagem</h1>
     <p class="muted">TV da manutenção • OS, mural, preventivas, escala e demandas em tempo real</p>
-    <p class="muted-xs" style="margin-top:6px; max-width:720px;">No iPhone (Safari, Edge e Chrome), os alertas push funcionam pelo app instalado na Tela de Início (abra no Safari → Compartilhar → Adicionar à Tela de Início).</p>
+    
   </div>
   <button id="btn-ativar-push" class="btn-outline" type="button" onclick="enablePush()">Ativar alertas de OS neste dispositivo</button>
 </div>
@@ -264,6 +264,14 @@
   var btnReconhecer = document.getElementById('btn-reconhecer-alerta');
   var alertaAtual = <%- JSON.stringify(alertaInicial || null) %>;
 
+  function tocarAlerta(){
+    try {
+      var audio = new Audio('/audio/notification.mp3');
+      audio.volume = 1;
+      audio.play().catch(function(){});
+    } catch(_e){}
+  }
+
   function renderAlerta(payload){
     if (!payload || !payload.id_os) {
       box.classList.add('hidden');
@@ -297,6 +305,7 @@
   eventSource.addEventListener('nova_os_emergencial', function(e){
     var data = JSON.parse(e.data || '{}');
     renderAlerta(data);
+    tocarAlerta();
     setTimeout(function(){ window.location.reload(); }, 1800);
   });
 

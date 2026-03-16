@@ -1,4 +1,3 @@
-<%# views/partials/sidebar.ejs %>
 <%
   const role = (typeof normalizeRole === 'function')
     ? normalizeRole(user?.role || '')
@@ -29,93 +28,48 @@
   const canDesenhoTecnico = can('desenho_tecnico_view');
 
   const currentPcmSection = (typeof activePcmSection !== 'undefined' ? activePcmSection : '');
+
+  const navItem = (href, label, isActive, extraClass = '') =>
+    `<a class="nav-item ${extraClass} ${isActive ? 'active' : ''}" href="${href}"><span class="nav-label">${label}</span></a>`;
 %>
 
 <aside class="sidebar">
   <div class="sidebar-title">Gestão Industrial</div>
 
   <nav class="nav">
-    <% if (canPainel) { %>
-      <a class="nav-item <%= activeMenu === 'dashboard' ? 'active' : '' %>" href="/dashboard">Painel Principal</a>
-    <% } %>
+    <% if (canPainel) { %><%- navItem('/dashboard', 'Painel Principal', activeMenu === 'dashboard') %><% } %>
+    <% if (canEquipamentos) { %><%- navItem('/equipamentos', 'Equipamentos', activeMenu === 'equipamentos') %><% } %>
+    <% if (canOS) { %><%- navItem('/os', 'Ordens de Serviço', activeMenu === 'os') %><% } %>
+    <% if (canPreventivas) { %><%- navItem('/preventivas', 'Preventivas', activeMenu === 'preventivas') %><% } %>
+    <% if (canDemandas) { %><%- navItem('/demandas', 'Demandas', activeMenu === 'demandas') %><% } %>
+    <% if (canSolicitacoes) { %><%- navItem('/solicitacoes/minhas', 'Solicitações', activeMenu === 'solicitacoes') %><% } %>
+    <% if (canCompras) { %><%- navItem('/compras/solicitacoes', 'Compras', activeMenu === 'compras') %><% } %>
+    <% if (canFornecedores) { %><a class="nav-item <%= activeMenu === 'fornecedores' ? 'active' : '' %>" href="/fornecedores"><span class="nav-label">Fornecedores</span></a><% } %>
+    <% if (canAlmoxarifado) { %><%- navItem('/almoxarifado/recebimentos', 'Almoxarifado', activeMenu === 'almoxarifado') %><% } %>
+    <% if (canEstoque) { %><%- navItem('/estoque', 'Estoque', activeMenu === 'estoque') %><% } %>
+    <% if (canMotores) { %><%- navItem('/motores', 'Motores', activeMenu === 'motores') %><% } %>
 
-    <% if (canEquipamentos) { %>
-      <a class="nav-item <%= activeMenu === 'equipamentos' ? 'active' : '' %>" href="/equipamentos">Equipamentos</a>
-    <% } %>
-
-    <% if (canOS) { %>
-      <a class="nav-item <%= activeMenu === 'os' ? 'active' : '' %>" href="/os">Ordens de Serviço</a>
-    <% } %>
-
-    <% if (canPreventivas) { %>
-      <a class="nav-item <%= activeMenu === 'preventivas' ? 'active' : '' %>" href="/preventivas">Preventivas</a>
-    <% } %>
-
-    <% if (canDemandas) { %>
-      <a class="nav-item <%= activeMenu === 'demandas' ? 'active' : '' %>" href="/demandas">Demandas</a>
-    <% } %>
-
-    <% if (canSolicitacoes) { %>
-      <a class="nav-item <%= activeMenu === 'solicitacoes' ? 'active' : '' %>" href="/solicitacoes/minhas">Solicitações</a>
-    <% } %>
-
-    <% if (canCompras) { %>
-      <a class="nav-item <%= activeMenu === 'compras' ? 'active' : '' %>" href="/compras/solicitacoes">Compras</a>
-    <% } %>
-
-    <% if (canFornecedores) { %>
-      <a class="nav-item <%= activeMenu === 'fornecedores' ? 'active' : '' %>" href="/fornecedores">Fornecedores</a>
-    <% } %>
-
-    <% if (canAlmoxarifado) { %>
-      <a class="nav-item <%= activeMenu === 'almoxarifado' ? 'active' : '' %>" href="/almoxarifado/recebimentos">Almoxarifado</a>
-    <% } %>
-
-    <% if (canEstoque) { %>
-      <a class="nav-item <%= activeMenu === 'estoque' ? 'active' : '' %>" href="/estoque">Estoque</a>
-    <% } %>
-
-    <% if (canMotores) { %>
-      <a class="nav-item <%= activeMenu === 'motores' ? 'active' : '' %>" href="/motores">Motores</a>
-    <% } %>
-
-    <% if (canEscala) { %>
-      <a class="nav-item <%= activeMenu === 'escala' ? 'active' : '' %>" href="/escala">Escala</a>
-    <% } %>
-
-    <% if (canInspecao) { %>
-      <a class="nav-item <%= activeMenu === 'inspecao' ? 'active' : '' %>" href="/inspecao">🛡️ Inspeção (PAC 01)</a>
-    <% } %>
-
-
-    <% if (canTracagem) { %>
-      <a class="nav-item <%= activeMenu === 'tracagem' ? 'active' : '' %>" href="/tracagem">Traçagem</a>
-    <% } %>
-
-    <% if (canDesenhoTecnico) { %>
-      <a class="nav-item <%= activeMenu === 'desenho-tecnico' ? 'active' : '' %>" href="/desenho-tecnico/dashboard">Desenho Técnico</a>
-    <% } %>
-
-    <% if (canAvisos) { %>
-      <a class="nav-item <%= activeMenu === 'avisos' ? 'active' : '' %>" href="/avisos">Avisos</a>
-    <% } %>
+    <% if (canAvisos) { %><%- navItem('/avisos', 'Avisos', activeMenu === 'avisos') %><% } %>
+    <% if (canEscala) { %><%- navItem('/escala', 'Escala', activeMenu === 'escala') %><% } %>
+    <% if (canInspecao) { %><%- navItem('/inspecao', 'Inspeção', activeMenu === 'inspecao') %><% } %>
+    <% if (canTracagem) { %><a class="nav-item <%= activeMenu === 'tracagem' ? 'active' : '' %>" href="/tracagem"><span class="nav-label">Traçagem</span></a><% } %>
+    <% if (canDesenhoTecnico) { %><%- navItem('/desenho-tecnico', 'Desenho Técnico', activeMenu === 'desenho-tecnico') %><% } %>
 
     <% if (canPCM) { %>
-      <a class="nav-item <%= activeMenu === 'pcm' ? 'active' : '' %>" href="/pcm">PCM – Planejamento</a>
-
+      <%- navItem('/pcm', 'PCM – Planejamento', activeMenu === 'pcm') %>
       <% if (activeMenu === 'pcm') { %>
         <div class="nav-submenu">
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'visao-geral' ? 'active' : '' %>" href="/pcm">• Visão Geral</a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'planejamento' ? 'active' : '' %>" href="/pcm/planejamento">• Planejamento</a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'falhas' ? 'active' : '' %>" href="/pcm/falhas">• Falhas</a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'engenharia' ? 'active' : '' %>" href="/pcm/engenharia">• Engenharia</a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'criticidade' ? 'active' : '' %>" href="/pcm/criticidade">• Criticidade</a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'lubrificacao' ? 'active' : '' %>" href="/pcm/lubrificacao">• Lubrificação</a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'pecas-criticas' ? 'active' : '' %>" href="/pcm/pecas-criticas">• Peças Críticas</a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'programacao-semanal' ? 'active' : '' %>" href="/pcm/programacao-semanal">• Programação Semanal</a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'backlog' ? 'active' : '' %>" href="/pcm/backlog">• Backlog</a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'rotas-inspecao' ? 'active' : '' %>" href="/pcm/rotas-inspecao">• Rotas de Inspeção</a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'relatorios-avancados' ? 'active' : '' %>" href="/pcm/relatorios-avancados">• Relatórios Avançados</a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'visao-geral' ? 'active' : '' %>" href="/pcm"><span class="nav-label">Visão Geral</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'planejamento' ? 'active' : '' %>" href="/pcm/planejamento"><span class="nav-label">Planejamento</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'falhas' ? 'active' : '' %>" href="/pcm/falhas"><span class="nav-label">Falhas</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'engenharia' ? 'active' : '' %>" href="/pcm/engenharia"><span class="nav-label">Engenharia</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'criticidade' ? 'active' : '' %>" href="/pcm/criticidade"><span class="nav-label">Criticidade</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'lubrificacao' ? 'active' : '' %>" href="/pcm/lubrificacao"><span class="nav-label">Lubrificação</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'pecas-criticas' ? 'active' : '' %>" href="/pcm/pecas-criticas"><span class="nav-label">Peças Críticas</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'programacao-semanal' ? 'active' : '' %>" href="/pcm/programacao-semanal"><span class="nav-label">Programação Semanal</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'backlog' ? 'active' : '' %>" href="/pcm/backlog"><span class="nav-label">Backlog</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'rotas-inspecao' ? 'active' : '' %>" href="/pcm/rotas-inspecao"><span class="nav-label">Rotas de Inspeção</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'relatorios-avancados' ? 'active' : '' %>" href="/pcm/relatorios-avancados"><span class="nav-label">Relatórios Avançados</span></a>
         </div>
       <% } %>
     <% } %>
@@ -124,7 +78,7 @@
 
     <% if (canUsuarios) { %>
       <div class="nav-section">ADMIN</div>
-      <a class="nav-item <%= activeMenu === 'usuarios' ? 'active' : '' %>" href="/usuarios">Gerenciar Usuários</a>
+      <%- navItem('/usuarios', 'Gerenciar Usuários', activeMenu === 'usuarios') %>
     <% } %>
   </nav>
 

@@ -4,9 +4,9 @@
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
     <a class="btn" href="/tracagem/lista">Histórico</a>
     <a class="btn btn-green" href="/tracagem/<%= tracagem.id %>/pdf">Gerar PDF</a>
-    <form method="POST" action="/desenho-tecnico/gerar-a-partir-da-tracagem/tracagem/<%= tracagem.id %>"><button class="btn" type="submit">Gerar desenho técnico</button></form>
-    <a class="btn" href="/desenho-tecnico/abrir-de-tracagem/tracagem/<%= tracagem.id %>">Abrir no desenho técnico</a>
-    <% if (desenhoVinculado) { %><a class="btn" href="/desenho-tecnico/<%= desenhoVinculado.id %>">Desenho vinculado #<%= desenhoVinculado.id %></a><% } %>
+    <a class="btn" href="/desenho-tecnico/cad/novo">Novo desenho CAD</a>
+    <a class="btn" href="/desenho-tecnico">Abrir lista de desenhos</a>
+    <% if (desenhoVinculado) { %><a class="btn" href="/desenho-tecnico/cad/<%= desenhoVinculado.id %>/editor">Desenho vinculado #<%= desenhoVinculado.id %></a><% } %>
   </div>
 </div>
 
