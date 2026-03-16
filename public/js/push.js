@@ -119,16 +119,6 @@
     });
   }
 
-  (function initPushButtonState() {
-    const button = document.getElementById('btn-ativar-push');
-    if (!button) return;
-    if (!(window.__VAPID_PUBLIC_KEY__ || '').trim()) {
-      button.textContent = 'Push indisponível (configuração pendente)';
-      button.disabled = true;
-      button.title = 'Configure VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no servidor';
-    }
-  })();
-
   window.enablePush = function () {
     enablePush().catch(function (err) {
       alert('Não foi possível ativar os alertas neste dispositivo.');
