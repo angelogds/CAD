@@ -22,6 +22,35 @@
   const distance = (p1, p2) => Math.hypot(p2.x - p1.x, p2.y - p1.y);
   const angle = (p1, p2) => rad2deg(Math.atan2(p2.y - p1.y, p2.x - p1.x));
   const midpoint = (p1, p2) => ({ x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 });
+  const normalizeAngle = (a) => {
+    let n = a % 360;
+    if (n < 0) n += 360;
+    return n;
+  };
+  const snapAngle = (a, snapStep = 15) => Math.round(a / snapStep) * snapStep;
+  const getLineAngle = (line) => normalizeAngle(angle({ x: line.x, y: line.y }, { x: line.x2, y: line.y2 }));
+  const getAngleBetweenLines = (lineA, lineB) => {
+    const a1 = getLineAngle(lineA);
+    const a2 = getLineAngle(lineB);
+    let diff = Math.abs(a2 - a1);
+    if (diff > 180) diff = 360 - diff;
+    return round(diff, 3);
+  };
+  const getLineIntersection = (lineA, lineB) => {
+    const x1 = lineA.x;
+    const y1 = lineA.y;
+    const x2 = lineA.x2;
+    const y2 = lineA.y2;
+    const x3 = lineB.x;
+    const y3 = lineB.y;
+    const x4 = lineB.x2;
+    const y4 = lineB.y2;
+    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (Math.abs(denom) < 0.000001) return null;
+    const px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom;
+    const py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom;
+    return { x: round(px, 3), y: round(py, 3) };
+  };
   const polarPoint = (origin, dist, angleDeg) => ({
     x: origin.x + dist * Math.cos(deg2rad(angleDeg)),
     y: origin.y + dist * Math.sin(deg2rad(angleDeg))
@@ -63,6 +92,8 @@
     selectedIds: [],
     drawStart: null,
     previewPoint: null,
+    command: null,
+    dimAngularSelection: [],
     pointer: { x: 0, y: 0 },
     worldPointer: { x: 0, y: 0 },
     history: [],
@@ -80,6 +111,7 @@
       endpoint: true,
       midpoint: true,
       center: true,
+      intersection: true,
       perpendicular: false
     },
     grid: {
@@ -274,10 +306,34 @@
         }
       }
     }
+
+    if (state.snap.intersection) {
+      const intersections = getAllLineIntersections();
+      for (const ip of intersections) {
+        const d = distance(point, ip);
+        if (d < minDist) {
+          snapped = { x: ip.x, y: ip.y };
+          snapType = 'intersection';
+          minDist = d;
+        }
+      }
+    }
     
     return { ...snapped, snapType };
   }
   
+  function getAllLineIntersections() {
+    const lines = state.data.objects.filter(o => o.type === 'line' || o.type === 'centerline');
+    const intersections = [];
+    for (let i = 0; i < lines.length; i++) {
+      for (let j = i + 1; j < lines.length; j++) {
+        const p = getLineIntersection(lines[i], lines[j]);
+        if (p) intersections.push(p);
+      }
+    }
+    return intersections;
+  }
+
   function getObjectEndpoints(obj) {
     const points = [];
     if (obj.type === 'line' || obj.type === 'centerline' || obj.type === 'arc') {
@@ -328,7 +384,7 @@
     if (!state.polar || !reference) return point;
     
     const dist = distance(reference, point);
-    const ang = angle(reference, point);
+    const ang = snapAngle(angle(reference, point), 45);
     
     // Encontrar ângulo polar mais próximo
     let closestAngle = state.polarAngles[0];
@@ -585,6 +641,84 @@
   // CRIAR EIXO PARAMÉTRICO
   // ==========================================================================
   
+  function createAngularDimension(lineA, lineB, radius = 40) {
+    const intersection = getLineIntersection(lineA, lineB);
+    if (!intersection) return null;
+
+    const a1 = getLineAngle(lineA);
+    const a2 = getLineAngle(lineB);
+    const rawDiff = normalizeAngle(a2 - a1);
+    const delta = rawDiff > 180 ? 360 - rawDiff : rawDiff;
+    const direction = rawDiff > 180 ? -1 : 1;
+    const mid = normalizeAngle(a1 + (delta / 2) * direction);
+    const textPoint = polarPoint(intersection, radius + 14, mid);
+
+    return {
+      id: uid(),
+      type: 'angular',
+      layer: 'cotas',
+      lineAId: lineA.id,
+      lineBId: lineB.id,
+      cx: intersection.x,
+      cy: intersection.y,
+      radius,
+      startAngle: a1,
+      endAngle: normalizeAngle(a1 + delta * direction),
+      value: round(delta, 2),
+      text: String(round(delta, 2)) + '°',
+      textX: round(textPoint.x, 2),
+      textY: round(textPoint.y, 2)
+    };
+  }
+
+  function getObjectById(id) {
+    return state.data.objects.find(o => o.id === id) || null;
+  }
+
+  function cloneObjectWithOffset(obj, dx, dy) {
+    const copy = JSON.parse(JSON.stringify(obj));
+    copy.id = uid();
+    if (copy.x != null) copy.x = round(copy.x + dx, 3);
+    if (copy.y != null) copy.y = round(copy.y + dy, 3);
+    if (copy.x2 != null) copy.x2 = round(copy.x2 + dx, 3);
+    if (copy.y2 != null) copy.y2 = round(copy.y2 + dy, 3);
+    if (copy.points) copy.points = copy.points.map(p => ({ x: round(p.x + dx, 3), y: round(p.y + dy, 3) }));
+    return copy;
+  }
+
+  function moveObjectByOffset(obj, dx, dy) {
+    if (obj.x != null) obj.x = round(obj.x + dx, 3);
+    if (obj.y != null) obj.y = round(obj.y + dy, 3);
+    if (obj.x2 != null) obj.x2 = round(obj.x2 + dx, 3);
+    if (obj.y2 != null) obj.y2 = round(obj.y2 + dy, 3);
+    if (obj.points) obj.points = obj.points.map(p => ({ x: round(p.x + dx, 3), y: round(p.y + dy, 3) }));
+  }
+
+  function mirrorPointByLine(point, m1, m2) {
+    const dx = m2.x - m1.x;
+    const dy = m2.y - m1.y;
+    const lenSq = dx * dx + dy * dy;
+    if (!lenSq) return { ...point };
+    const t = ((point.x - m1.x) * dx + (point.y - m1.y) * dy) / lenSq;
+    const proj = { x: m1.x + t * dx, y: m1.y + t * dy };
+    return { x: round(2 * proj.x - point.x, 3), y: round(2 * proj.y - point.y, 3) };
+  }
+
+  function mirrorObject(obj, m1, m2) {
+    const copy = JSON.parse(JSON.stringify(obj));
+    copy.id = uid();
+    if (copy.x != null && copy.y != null) {
+      const p = mirrorPointByLine({ x: copy.x, y: copy.y }, m1, m2);
+      copy.x = p.x; copy.y = p.y;
+    }
+    if (copy.x2 != null && copy.y2 != null) {
+      const p2 = mirrorPointByLine({ x: copy.x2, y: copy.y2 }, m1, m2);
+      copy.x2 = p2.x; copy.y2 = p2.y;
+    }
+    if (copy.points) copy.points = copy.points.map(p => mirrorPointByLine(p, m1, m2));
+    return copy;
+  }
+
   function createShaft(segments, options = {}) {
     const shaft = {
       id: uid(),
@@ -707,7 +841,7 @@
     layerOverlay.innerHTML = '';
 
     const p = state.worldPointer;
-    const size = 14 / state.view.zoom;
+    const size = 26 / state.view.zoom;
 
     const hLine = document.createElementNS(NS, 'line');
     hLine.setAttribute('x1', p.x - size);
@@ -726,6 +860,14 @@
     vLine.setAttribute('stroke', '#e2e8f0');
     vLine.setAttribute('stroke-width', 1 / state.view.zoom);
     layerOverlay.appendChild(vLine);
+
+
+    const dot = document.createElementNS(NS, 'circle');
+    dot.setAttribute('cx', p.x);
+    dot.setAttribute('cy', p.y);
+    dot.setAttribute('r', 2.5 / state.view.zoom);
+    dot.setAttribute('fill', '#38bdf8');
+    layerOverlay.appendChild(dot);
   }
 
   // ==========================================================================
@@ -1053,9 +1195,37 @@
     }
     
     if ((tool === 'dim_linear' || tool === 'dim_diameter') && state.drawStart) {
-      // Preview da cota
       const dim = createDimension(tool === 'dim_diameter' ? 'diameter' : 'linear', state.drawStart, state.previewPoint);
       renderDimensionSVG(dim, true);
+    }
+
+    if (tool === 'dim_angular' && state.dimAngularSelection.length && state.previewPoint) {
+      const lineA = getObjectById(state.dimAngularSelection[0]);
+      const helper = { id: 'preview_line', x: lineA ? lineA.x : state.previewPoint.x, y: lineA ? lineA.y : state.previewPoint.y, x2: state.previewPoint.x, y2: state.previewPoint.y };
+      if (lineA) {
+        const dimPreview = createAngularDimension(lineA, helper, 40);
+        if (dimPreview) renderDimensionSVG(dimPreview, true);
+      }
+    }
+
+    if ((tool === 'copy' || tool === 'move' || tool === 'mirror') && state.command && state.previewPoint) {
+      const selected = state.data.objects.filter(o => state.command.selectedIds.includes(o.id));
+      if (tool === 'copy' || tool === 'move') {
+        const dx = state.previewPoint.x - state.command.basePoint.x;
+        const dy = state.previewPoint.y - state.command.basePoint.y;
+        selected.forEach(obj => {
+          const ghost = cloneObjectWithOffset(obj, dx, dy);
+          const el = createSVGElement(ghost, true);
+          if (el) layerPreview.appendChild(el);
+        });
+      }
+      if (tool === 'mirror') {
+        selected.forEach(obj => {
+          const ghost = mirrorObject(obj, state.command.basePoint, state.previewPoint);
+          const el = createSVGElement(ghost, true);
+          if (el) layerPreview.appendChild(el);
+        });
+      }
     }
   }
   
@@ -1116,18 +1286,63 @@
   function renderDimensionSVG(dim, isPreview) {
     const color = isPreview ? CONFIG.previewColor : CONFIG.dimensionColor;
     const g = document.createElementNS(NS, 'g');
-    
+
+    if (dim.type === 'angular') {
+      const start = polarPoint({ x: dim.cx, y: dim.cy }, dim.radius, dim.startAngle);
+      const end = polarPoint({ x: dim.cx, y: dim.cy }, dim.radius, dim.endAngle);
+      const diff = normalizeAngle(dim.endAngle - dim.startAngle);
+      const largeArc = diff > 180 ? 1 : 0;
+      const sweep = diff >= 0 ? 1 : 0;
+
+      const ext1 = document.createElementNS(NS, 'line');
+      ext1.setAttribute('x1', dim.cx);
+      ext1.setAttribute('y1', dim.cy);
+      ext1.setAttribute('x2', start.x);
+      ext1.setAttribute('y2', start.y);
+      ext1.setAttribute('stroke', color);
+      ext1.setAttribute('stroke-width', 0.8);
+      g.appendChild(ext1);
+
+      const ext2 = document.createElementNS(NS, 'line');
+      ext2.setAttribute('x1', dim.cx);
+      ext2.setAttribute('y1', dim.cy);
+      ext2.setAttribute('x2', end.x);
+      ext2.setAttribute('y2', end.y);
+      ext2.setAttribute('stroke', color);
+      ext2.setAttribute('stroke-width', 0.8);
+      g.appendChild(ext2);
+
+      const arc = document.createElementNS(NS, 'path');
+      arc.setAttribute('d', 'M ' + start.x + ' ' + start.y + ' A ' + dim.radius + ' ' + dim.radius + ' 0 ' + largeArc + ' ' + sweep + ' ' + end.x + ' ' + end.y);
+      arc.setAttribute('fill', 'none');
+      arc.setAttribute('stroke', color);
+      arc.setAttribute('stroke-width', 1);
+      g.appendChild(arc);
+
+      g.appendChild(createArrow(start, dim.startAngle + 90, 6, color));
+      g.appendChild(createArrow(end, dim.endAngle - 90, 6, color));
+
+      const text = document.createElementNS(NS, 'text');
+      text.setAttribute('x', dim.textX);
+      text.setAttribute('y', dim.textY);
+      text.setAttribute('fill', '#ffffff');
+      text.setAttribute('font-size', 12);
+      text.setAttribute('font-family', 'Arial, sans-serif');
+      text.setAttribute('text-anchor', 'middle');
+      text.textContent = dim.text || (String(dim.value) + '°');
+      g.appendChild(text);
+
+      layerDimensions.appendChild(g);
+      return;
+    }
+
     const offset = 30;
     const textOffset = 5;
-    
-    // Calcular posição das linhas de cota
     const ang = angle({ x: dim.x1, y: dim.y1 }, { x: dim.x2, y: dim.y2 });
     const perpAng = ang + 90;
-    
     const offsetX = offset * Math.cos(deg2rad(perpAng));
     const offsetY = offset * Math.sin(deg2rad(perpAng));
-    
-    // Linhas de extensão
+
     const ext1 = document.createElementNS(NS, 'line');
     ext1.setAttribute('x1', dim.x1);
     ext1.setAttribute('y1', dim.y1);
@@ -1136,7 +1351,7 @@
     ext1.setAttribute('stroke', color);
     ext1.setAttribute('stroke-width', 0.8);
     g.appendChild(ext1);
-    
+
     const ext2 = document.createElementNS(NS, 'line');
     ext2.setAttribute('x1', dim.x2);
     ext2.setAttribute('y1', dim.y2);
@@ -1145,8 +1360,7 @@
     ext2.setAttribute('stroke', color);
     ext2.setAttribute('stroke-width', 0.8);
     g.appendChild(ext2);
-    
-    // Linha de cota principal
+
     const dimLine = document.createElementNS(NS, 'line');
     dimLine.setAttribute('x1', dim.x1 + offsetX);
     dimLine.setAttribute('y1', dim.y1 + offsetY);
@@ -1155,44 +1369,23 @@
     dimLine.setAttribute('stroke', color);
     dimLine.setAttribute('stroke-width', 1);
     g.appendChild(dimLine);
-    
-    // Setas (ou ticks)
-    const arrowSize = 8;
-    // Seta 1
-    const arrow1 = createArrow(
-      { x: dim.x1 + offsetX, y: dim.y1 + offsetY },
-      ang,
-      arrowSize,
-      color
-    );
-    g.appendChild(arrow1);
-    
-    // Seta 2
-    const arrow2 = createArrow(
-      { x: dim.x2 + offsetX, y: dim.y2 + offsetY },
-      ang + 180,
-      arrowSize,
-      color
-    );
-    g.appendChild(arrow2);
-    
-    // Texto da cota
-    const midX = (dim.x1 + dim.x2) / 2 + offsetX;
-    const midY = (dim.y1 + dim.y2) / 2 + offsetY;
-    
+
+    g.appendChild(createArrow({ x: dim.x1 + offsetX, y: dim.y1 + offsetY }, ang, 8, color));
+    g.appendChild(createArrow({ x: dim.x2 + offsetX, y: dim.y2 + offsetY }, ang + 180, 8, color));
+
     const text = document.createElementNS(NS, 'text');
-    text.setAttribute('x', midX);
-    text.setAttribute('y', midY - textOffset);
+    text.setAttribute('x', (dim.x1 + dim.x2) / 2 + offsetX);
+    text.setAttribute('y', (dim.y1 + dim.y2) / 2 + offsetY - textOffset);
     text.setAttribute('fill', '#ffffff');
     text.setAttribute('font-size', 12);
     text.setAttribute('font-family', 'Arial, sans-serif');
     text.setAttribute('text-anchor', 'middle');
-    text.textContent = dim.text || `${dim.value}`;
+    text.textContent = dim.text || String(dim.value);
     g.appendChild(text);
-    
+
     layerDimensions.appendChild(g);
   }
-  
+
   function createArrow(point, angleDeg, size, color) {
     const path = document.createElementNS(NS, 'path');
     const tip = point;
@@ -1408,6 +1601,10 @@
         <div class="cad-status-item">
           <span class="cad-status-label">Ângulo:</span>
           <span class="cad-status-value">${ang}°</span>
+        </div>
+        <div class="cad-status-item">
+          <span class="cad-status-label">Snap:</span>
+          <span class="cad-status-value">${p.snapType || 'livre'}</span>
         </div>
       </div>
       <div class="cad-status-right">
@@ -1896,7 +2093,16 @@
     state.drawStart = null;
     state.previewPoint = null;
     state.polylinePoints = [];
+    state.command = null;
+    state.dimAngularSelection = [];
     hideMeasurePreview();
+
+    if (toolName === 'dim_angular') setStatusMessage('Selecione a primeira linha para cota angular.');
+    else if (toolName === 'copy') setStatusMessage('COPY: selecione objetos e clique no ponto base.');
+    else if (toolName === 'move') setStatusMessage('MOVE: selecione objetos e clique no ponto base.');
+    else if (toolName === 'mirror') setStatusMessage('MIRROR: selecione objetos e defina a linha de espelho (2 pontos).');
+    else if (toolName === 'offset') setStatusMessage('OFFSET: selecione uma linha/círculo e clique no lado desejado.');
+    else if (toolName === 'measure') setStatusMessage('Medição: escolha o primeiro ponto e depois o segundo.');
     
     // Atualizar UI
     document.querySelectorAll('.cad-tool-btn, .cad-btn[data-tool]').forEach(btn => {
@@ -1925,6 +2131,76 @@
     render();
   }
   
+  function startCommand(name, point) {
+    state.command = { name, step: 1, basePoint: point, selectedIds: [...state.selectedIds] };
+  }
+
+  function applyCopyToPoint(targetPoint) {
+    if (!state.command || !state.command.basePoint) return;
+    const dx = targetPoint.x - state.command.basePoint.x;
+    const dy = targetPoint.y - state.command.basePoint.y;
+    const selected = state.data.objects.filter(o => state.command.selectedIds.includes(o.id));
+    if (!selected.length) return;
+    pushHistory();
+    const copies = selected.map(o => cloneObjectWithOffset(o, dx, dy));
+    state.data.objects.push(...copies);
+    state.selectedIds = copies.map(c => c.id);
+    state.command = null;
+    setStatusMessage('COPY concluído.');
+  }
+
+  function applyMoveToPoint(targetPoint) {
+    if (!state.command || !state.command.basePoint) return;
+    const dx = targetPoint.x - state.command.basePoint.x;
+    const dy = targetPoint.y - state.command.basePoint.y;
+    const selected = state.data.objects.filter(o => state.command.selectedIds.includes(o.id));
+    if (!selected.length) return;
+    pushHistory();
+    selected.forEach(o => moveObjectByOffset(o, dx, dy));
+    state.command = null;
+    setStatusMessage('MOVE concluído.');
+  }
+
+  function applyMirror(mirrorEnd) {
+    if (!state.command || !state.command.basePoint) return;
+    const selected = state.data.objects.filter(o => state.command.selectedIds.includes(o.id));
+    if (!selected.length) return;
+    pushHistory();
+    const mirrored = selected.map(o => mirrorObject(o, state.command.basePoint, mirrorEnd));
+    state.data.objects.push(...mirrored);
+    state.selectedIds = mirrored.map(o => o.id);
+    state.command = null;
+    setStatusMessage('MIRROR concluído.');
+  }
+
+  function applyOffset(hit, pickPoint) {
+    if (!hit) return;
+    pushHistory();
+    if (hit.type === 'line' || hit.type === 'centerline') {
+      const lineAng = angle({ x: hit.x, y: hit.y }, { x: hit.x2, y: hit.y2 });
+      const side = pointToLineDistance(pickPoint, { x: hit.x, y: hit.y }, { x: hit.x2, y: hit.y2 });
+      const off = Math.max(10, round(side));
+      const perp = lineAng + 90;
+      const candidateA = { x: hit.x + off * Math.cos(deg2rad(perp)), y: hit.y + off * Math.sin(deg2rad(perp)) };
+      const candidateB = { x: hit.x - off * Math.cos(deg2rad(perp)), y: hit.y - off * Math.sin(deg2rad(perp)) };
+      const chooseA = distance(candidateA, pickPoint) < distance(candidateB, pickPoint);
+      const sign = chooseA ? 1 : -1;
+      const dx = sign * off * Math.cos(deg2rad(perp));
+      const dy = sign * off * Math.sin(deg2rad(perp));
+      state.data.objects.push(cloneObjectWithOffset(hit, dx, dy));
+      setStatusMessage('OFFSET de linha criado.');
+    } else if (hit.type === 'circle') {
+      const center = { x: hit.x, y: hit.y };
+      const r = distance(center, pickPoint);
+      const newRadius = Math.max(1, round(r));
+      const copy = JSON.parse(JSON.stringify(hit));
+      copy.id = uid();
+      copy.radius = newRadius;
+      state.data.objects.push(copy);
+      setStatusMessage('OFFSET concêntrico criado.');
+    }
+  }
+
   function deleteSelected() {
     if (state.selectedIds.length === 0) return;
     
@@ -1941,33 +2217,22 @@
   
   function onMouseDown(evt) {
     if (evt.button === 1 || evt.button === 2 || evt.shiftKey) {
-      // Pan
       state.view.panning = true;
-      state.view.panOrigin = {
-        x: evt.clientX,
-        y: evt.clientY,
-        panX: state.view.panX,
-        panY: state.view.panY
-      };
+      state.view.panOrigin = { x: evt.clientX, y: evt.clientY, panX: state.view.panX, panY: state.view.panY };
       svg.style.cursor = 'grabbing';
       return;
     }
-    
+
     const point = getProcessedPoint(evt);
     state.worldPointer = point;
-    
-    // Seleção
+
     if (state.tool === 'select') {
       const hit = hitTest(point);
       if (hit) {
         if (evt.ctrlKey) {
-          // Toggle selection
           const idx = state.selectedIds.indexOf(hit.id);
-          if (idx >= 0) {
-            state.selectedIds.splice(idx, 1);
-          } else {
-            state.selectedIds.push(hit.id);
-          }
+          if (idx >= 0) state.selectedIds.splice(idx, 1);
+          else state.selectedIds.push(hit.id);
         } else {
           state.selectedIds = [hit.id];
         }
@@ -1977,8 +2242,7 @@
       render();
       return;
     }
-    
-    // Apagar
+
     if (state.tool === 'erase') {
       const hit = hitTest(point);
       if (hit) {
@@ -1989,14 +2253,119 @@
       }
       return;
     }
-    
-    // Eixo
+
+    if (state.tool === 'copy' || state.tool === 'move') {
+      if (!state.selectedIds.length) {
+        setStatusMessage('Selecione objetos antes de usar esta ferramenta.');
+        return;
+      }
+      if (!state.command) {
+        startCommand(state.tool, point);
+        setStatusMessage((state.tool === 'copy' ? 'COPY' : 'MOVE') + ': escolha o ponto destino.');
+      } else if (state.command.name === 'copy') {
+        applyCopyToPoint(point);
+      } else {
+        applyMoveToPoint(point);
+      }
+      render();
+      return;
+    }
+
+    if (state.tool === 'mirror') {
+      if (!state.selectedIds.length) {
+        setStatusMessage('Selecione objetos antes do MIRROR.');
+        return;
+      }
+      if (!state.command) {
+        startCommand('mirror', point);
+        setStatusMessage('MIRROR: selecione o segundo ponto da linha de espelho.');
+      } else {
+        applyMirror(point);
+      }
+      render();
+      return;
+    }
+
+    if (state.tool === 'offset') {
+      const hit = hitTest(point);
+      applyOffset(hit, point);
+      render();
+      return;
+    }
+
+    if (state.tool === 'trim') {
+      const hit = hitTest(point);
+      if (hit) {
+        pushHistory();
+        state.data.objects = state.data.objects.filter(o => o.id !== hit.id);
+        setStatusMessage('TRIM básico aplicado (remoção da entidade).');
+        render();
+      }
+      return;
+    }
+
+    if (state.tool === 'extend') {
+      const hit = hitTest(point);
+      if (hit && (hit.type === 'line' || hit.type === 'centerline')) {
+        pushHistory();
+        const ang = angle({ x: hit.x, y: hit.y }, { x: hit.x2, y: hit.y2 });
+        const end = polarPoint({ x: hit.x2, y: hit.y2 }, 40, ang);
+        hit.x2 = round(end.x, 2);
+        hit.y2 = round(end.y, 2);
+        setStatusMessage('EXTEND básico aplicado.');
+        render();
+      }
+      return;
+    }
+
+    if (state.tool === 'dim_angular') {
+      const hit = hitTest(point);
+      if (!hit || !['line', 'centerline'].includes(hit.type)) {
+        setStatusMessage('Cota angular: selecione uma linha válida.');
+        return;
+      }
+      if (!state.dimAngularSelection.length) {
+        state.dimAngularSelection = [hit.id];
+        setStatusMessage('Cota angular: selecione a segunda linha.');
+      } else {
+        const first = getObjectById(state.dimAngularSelection[0]);
+        const second = getObjectById(hit.id);
+        if (first && second && first.id !== second.id) {
+          const dim = createAngularDimension(first, second, 40);
+          if (dim) {
+            pushHistory();
+            state.data.dimensions = state.data.dimensions.filter(d => d.type !== 'angular_preview');
+            state.data.dimensions.push(dim);
+            setStatusMessage('Cota angular criada com sucesso.');
+          } else {
+            setStatusMessage('Linhas paralelas: não há interseção para cota angular.');
+          }
+        }
+        state.dimAngularSelection = [];
+      }
+      render();
+      return;
+    }
+
+    if (state.tool === 'measure') {
+      if (!state.drawStart) {
+        state.drawStart = point;
+        state.previewPoint = point;
+      } else {
+        setStatusMessage('Medição: ' + round(distance(state.drawStart, point), 2) + ' mm, ' + round(angle(state.drawStart, point), 2) + '°.');
+        state.drawStart = null;
+        state.previewPoint = null;
+        hideMeasurePreview();
+      }
+      render();
+      return;
+    }
+
     if (state.tool === 'shaft') {
       showShaftModal();
       return;
     }
-    
-    // Texto
+
     if (state.tool === 'text') {
       const text = prompt('Digite o texto:', 'Texto técnico');
       if (text) {
@@ -2007,21 +2376,15 @@
       }
       return;
     }
-    
-    // Desenho com dois pontos
+
     if (['line', 'centerline', 'rect', 'circle', 'arc', 'dim_linear', 'dim_diameter'].includes(state.tool)) {
       if (!state.drawStart) {
         state.drawStart = point;
         state.previewPoint = point;
       } else {
         pushHistory();
-        
         if (state.tool === 'dim_linear' || state.tool === 'dim_diameter') {
-          const dim = createDimension(
-            state.tool === 'dim_diameter' ? 'diameter' : 'linear',
-            state.drawStart,
-            point
-          );
+          const dim = createDimension(state.tool === 'dim_diameter' ? 'diameter' : 'linear', state.drawStart, point);
           state.data.dimensions.push(dim);
         } else {
           const obj = createObject(state.tool, state.drawStart, point);
@@ -2030,7 +2393,6 @@
             state.selectedIds = [obj.id];
           }
         }
-        
         state.drawStart = null;
         state.previewPoint = null;
         hideMeasurePreview();
@@ -2038,19 +2400,13 @@
       }
       return;
     }
-    
-    // Polilinha
+
     if (state.tool === 'polyline') {
-      if (state.polylinePoints.length === 0) {
-        state.polylinePoints.push(point);
-      } else {
-        state.polylinePoints.push(point);
-      }
+      state.polylinePoints.push(point);
       render();
-      return;
     }
   }
-  
+
   function onMouseMove(evt) {
     // Pan
     if (state.view.panning && state.view.panOrigin) {
@@ -2113,6 +2469,8 @@
       state.drawStart = null;
       state.previewPoint = null;
       state.polylinePoints = [];
+      state.command = null;
+      state.dimAngularSelection = [];
       hideMeasurePreview();
       render();
       return;
@@ -2155,6 +2513,12 @@
       'p': 'polyline',
       'e': 'erase',
       'd': 'dim_linear',
+      'a': 'dim_angular',
+      'm': 'move',
+      'o': 'offset',
+      'i': 'mirror',
+      'k': 'copy',
+      'q': 'measure',
       'x': 'shaft'
     };
     
