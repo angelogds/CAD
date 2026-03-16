@@ -238,6 +238,10 @@
   <div class="cad-statusbar" id="cadStatusBar">
     <div class="cad-status-left">
       <div class="cad-status-item">
+        <span class="cad-status-label">Status:</span>
+        <span class="cad-status-value" id="cadStatusMessage">Inicializando CAD...</span>
+      </div>
+      <div class="cad-status-item">
         <span class="cad-status-label">X:</span>
         <span class="cad-status-value">0</span>
       </div>
@@ -260,12 +264,15 @@ window.CAD_INITIAL = {
   canManage: <%= !!canManage %>,
   data: <%- JSON.stringify(cadData || { objects: [], dimensions: [], layers: {}, activeLayer: 'geometria_principal' }) %>
 };
+document.body.classList.add('cad-editor-mode');
+
+window.addEventListener('error', function () {
+  var status = document.getElementById('cadStatusMessage');
+  if (status) status.textContent = 'CAD carregado com limitações (ver console).';
+});
 </script>
-<script src="/js/cad-engine-v2.js"></script>
+<script src="/js/cad-engine-v2.js" onerror="(function(){var s=document.getElementById('cadStatusMessage'); if(s) s.textContent='Falha ao carregar o motor CAD.';})()"></script>
 
 <style>
-/* Override layout para fullscreen CAD */
-body { overflow: hidden; }
-.app { display: none !important; }
-.cad-fullscreen { display: grid !important; }
+body.cad-editor-mode { overflow: hidden; }
 </style>

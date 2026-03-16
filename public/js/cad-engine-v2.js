@@ -90,6 +90,7 @@
     polar: false,
     polarAngles: [0, 45, 90, 135, 180, 225, 270, 315],
     polylinePoints: [],
+    statusMessage: 'Inicializando CAD...',
     shaftModal: null,
     data: {
       activeLayer: 'geometria_principal',
@@ -120,6 +121,12 @@
   
   let svg, root, layerGrid, layerEntities, layerPreview, layerDimensions, layerSelection;
   let statusBar, propsPanel, layersPanel, measurePreview;
+
+  function setStatusMessage(message) {
+    state.statusMessage = String(message || '');
+    const statusText = document.getElementById('cadStatusMessage');
+    if (statusText) statusText.textContent = state.statusMessage;
+  }
   
   function initDOM() {
     svg = document.getElementById('cadCanvas');
@@ -130,7 +137,7 @@
     
     statusBar = document.getElementById('cadStatusBar');
     propsPanel = document.getElementById('cadProperties');
-    layersPanel = document.getElementById('cadLayers');
+    layersPanel = document.getElementById('cadLayersList') || document.getElementById('cadLayers');
     
     // Criar estrutura de layers no SVG
     root = document.createElementNS(NS, 'g');
@@ -1286,6 +1293,10 @@
     statusBar.innerHTML = `
       <div class="cad-status-left">
         <div class="cad-status-item">
+          <span class="cad-status-label">Status:</span>
+          <span class="cad-status-value" id="cadStatusMessage">${state.statusMessage || 'CAD carregado'}</span>
+        </div>
+        <div class="cad-status-item">
           <span class="cad-status-label">X:</span>
           <span class="cad-status-value">${round(p.x)}</span>
         </div>
@@ -2264,6 +2275,7 @@
     // Initial render
     render();
     
+    setStatusMessage('CAD carregado');
     console.log('[CAD] Engine V2 inicializado');
   }
   
@@ -2282,10 +2294,19 @@
   };
   
   // Inicializar quando DOM estiver pronto
+  function safeInit() {
+    try {
+      init();
+    } catch (err) {
+      console.error('[CAD] Falha na inicialização:', err);
+      setStatusMessage('CAD carregado com limitações (ver console).');
+    }
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', safeInit);
   } else {
-    init();
+    safeInit();
   }
   
 })();
