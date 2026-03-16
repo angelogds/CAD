@@ -1,31 +1,32 @@
 <% layout("layout") %>
 <section class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
   <h1>Desenho Técnico</h1>
-  <div style="display:flex;gap:8px;">
-    <a class="btn" href="/desenho-tecnico/dashboard">Dashboard</a>
-    <a class="btn btn-green" href="/desenho-tecnico/novo">Novo Desenho</a>
-    <a class="btn btn-dark" href="/desenho-tecnico/cad/novo">Novo Desenho CAD</a>
-  </div>
+  <a class="btn btn-dark" href="/desenho-tecnico/cad/novo">Novo Desenho CAD</a>
 </section>
 
-<form class="card" method="GET" action="/desenho-tecnico" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
-  <input class="input" type="text" name="q" placeholder="Buscar por código ou título" value="<%= filtros.q %>">
-  <input class="input" type="text" name="categoria" placeholder="Categoria" value="<%= filtros.categoria %>">
-  <input class="input" type="text" name="subtipo" placeholder="Subtipo" value="<%= filtros.subtipo %>">
-  <select class="input" name="tipo_origem"><option value="">Tipo</option><option value="parametrico" <%= filtros.tipo_origem==='parametrico'?'selected':'' %>>Paramétrico</option><option value="cad" <%= filtros.tipo_origem==='cad'?'selected':'' %>>CAD</option></select>
+<form class="card" method="GET" action="/desenho-tecnico" style="display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:10px;align-items:end;">
+  <div>
+    <label class="label" for="q">Buscar</label>
+    <input class="input" type="text" id="q" name="q" placeholder="Buscar por título" value="<%= filtros.q %>">
+  </div>
   <button class="btn" type="submit">Filtrar</button>
 </form>
 
 <section class="card">
+  <h2 style="margin-top:0;">Lista de Desenhos</h2>
   <div class="table-wrap">
     <table class="table">
-      <thead><tr><th>Código</th><th>Título</th><th>Tipo</th><th>Material</th><th>Equipamento</th><th>Rev.</th><th>Data</th><th>Ações</th></tr></thead>
+      <thead><tr><th>ID</th><th>Título</th><th>Equipamento vinculado</th><th>Data</th><th>Abrir editor</th><th>PDF</th></tr></thead>
       <tbody>
-      <% if(!lista.length){ %><tr><td colspan="8">Nenhum desenho encontrado.</td></tr><% } %>
+      <% if(!lista.length){ %><tr><td colspan="6">Nenhum desenho CAD encontrado.</td></tr><% } %>
       <% lista.forEach((d)=>{ %>
         <tr>
-          <td><%= d.codigo %></td><td><%= d.titulo %></td><td><span class="badge <%= d.tipo_origem==='cad'?'badge-cad':'badge-param' %>"><%= d.tipo_origem==='cad'?'CAD':'Paramétrico' %></span></td><td><%= d.material || '-' %></td><td><%= d.equipamento_nome || '-' %></td><td>R<%= d.revisao %></td><td><%= (d.atualizado_em || '').slice(0,10) %></td>
-          <td><a class="btn" href="<%= d.tipo_origem==='cad' ? ('/desenho-tecnico/cad/'+d.id+'/editor') : ('/desenho-tecnico/'+d.id) %>"><%= d.tipo_origem==='cad' ? 'Abrir Editor' : 'Abrir' %></a></td>
+          <td><%= d.id %></td>
+          <td><%= d.titulo %></td>
+          <td><%= d.equipamento_nome || '-' %></td>
+          <td><%= (d.atualizado_em || '').slice(0,10) %></td>
+          <td><a class="btn" href="/desenho-tecnico/cad/<%= d.id %>/editor">Abrir editor</a></td>
+          <td><a class="btn" href="/desenho-tecnico/cad/<%= d.id %>/pdf" target="_blank" rel="noopener">PDF</a></td>
         </tr>
       <% }) %>
       </tbody>
