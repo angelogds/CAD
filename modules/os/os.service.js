@@ -1,5 +1,6 @@
 const db = require("../../database/db");
 const { classifyOSPriority } = require("./os-priority.service");
+const osIAService = require("./os-ia.service");
 const alertsHub = require("../alerts/alerts.hub");
 const alertsService = require("../alerts/alerts.service");
 const pushService = require("../push/push.service");
@@ -644,6 +645,7 @@ function isColaboradorDisponivel(colaboradorId) {
 function persistirAlocacaoOS(osId, executor, auxiliar, turno, modo = "AUTO") {
   const cols = getOSColumns();
 
+
   db.transaction(() => {
     if (tableExists("os_execucoes")) {
       db.prepare(`UPDATE os_execucoes SET finalizado_em = datetime('now') WHERE os_id = ? AND finalizado_em IS NULL`).run(Number(osId));
@@ -915,7 +917,67 @@ function syncInspecaoFromOS(osId) {
   }
 }
 
-function createOS({
+function buscarHistoricoEquipamento(equipamentoId) {
+  if (!equipamentoId) return [];
+  return db
+    .prepare(
+      `SELECT id, descricao, status, tipo, opened_at, closed_at
+       FROM os
+       WHERE equipamento_id = ?
+       ORDER BY id DESC
+       LIMIT 8`
+    )
+    .all(Number(equipamentoId));
+}
+
+function buscarNaoConformidadesRelacionadas(equipamentoId, sintoma) {
+  if (!equipamentoId || !sintoma) return [];
+  const cols = getOSColumns();
+  if (!cols.includes("sintoma_principal")) return [];
+
+  return db
+    .prepare(
+      `SELECT id, sintoma_principal, severidade, descricao, opened_at
+       FROM os
+       WHERE equipamento_id = ?
+         AND UPPER(COALESCE(sintoma_principal,'')) = UPPER(?)
+       ORDER BY id DESC
+       LIMIT 8`
+    )
+    .all(Number(equipamentoId), String(sintoma));
+}
+
+function buscarOSRecentesSemelhantes(equipamentoId) {
+  if (!equipamentoId) return [];
+  return db
+    .prepare(
+      `SELECT id, descricao, resumo_tecnico, causa_diagnostico, status, opened_at
+       FROM os
+       WHERE equipamento_id = ?
+       ORDER BY id DESC
+       LIMIT 5`
+    )
+    .all(Number(equipamentoId));
+}
+
+function buscarPreventivasRelacionadas(equipamentoId) {
+  if (!equipamentoId) return [];
+  try {
+    return db
+      .prepare(
+        `SELECT id, descricao, status, data_programada
+         FROM preventivas
+         WHERE equipamento_id = ?
+         ORDER BY id DESC
+         LIMIT 5`
+      )
+      .all(Number(equipamentoId));
+  } catch (_e) {
+    return [];
+  }
+}
+
+async function createOS({
   equipamento_id,
   equipamento_manual,
   descricao,
@@ -926,6 +988,18 @@ function createOS({
   tipo,
   opened_by,
   grau,
+  setor_id,
+  sintoma_principal,
+  severidade,
+  observacao_curta,
+  equipamento_parado,
+  vazamento,
+  aquecimento,
+  ruido_anormal,
+  vibracao,
+  odor_anormal,
+  baixa_performance,
+  travamento,
 }) {
   const desc = String(descricao || "").trim();
   if (!desc) throw new Error("Descrição obrigatória.");
@@ -953,6 +1027,38 @@ function createOS({
   const grauOS = normalizeGrau(grau);
   const score = classifyOSPriority({ descricao: desc, tipo: tipoOS, equipamento_id: equipId });
 
+  const contexto = {
+    equipamento: equipId
+      ? db.prepare(`SELECT id, nome, codigo, tipo, categoria, setor_id FROM equipamentos WHERE id = ?`).get(equipId)
+      : null,
+    historico_equipamento: buscarHistoricoEquipamento(equipId),
+    nao_conformidades_relacionadas: buscarNaoConformidadesRelacionadas(equipId, sintoma_principal),
+    os_recentes_semelhantes: buscarOSRecentesSemelhantes(equipId),
+    preventivas_relacionadas: buscarPreventivasRelacionadas(equipId),
+  };
+
+  const aberturaIA = await osIAService.gerarAberturaAutomaticaDaOS({
+    usuario_id: openedBy,
+    nao_conformidade: {
+      equipamento_id: equipId,
+      setor_id: setor_id ? Number(setor_id) : null,
+      sintoma_principal: String(sintoma_principal || "").trim() || null,
+      severidade: normalizeGrau(severidade || grauOS),
+      observacao_curta: String(observacao_curta || "").trim() || null,
+      flags: {
+        equipamento_parado: !!equipamento_parado,
+        vazamento: !!vazamento,
+        aquecimento: !!aquecimento,
+        ruido_anormal: !!ruido_anormal,
+        vibracao: !!vibracao,
+        odor_anormal: !!odor_anormal,
+        baixa_performance: !!baixa_performance,
+        travamento: !!travamento,
+      },
+    },
+    contexto,
+  });
+
   const cols = getOSColumns();
   const fields = ["equipamento", "descricao", "tipo", "status", "opened_by"];
   const values = [equipamentoFinal, desc, tipoOS, "ABERTA", openedBy];
@@ -968,18 +1074,18 @@ function createOS({
 
   if (cols.includes("resumo_tecnico")) {
     fields.push("resumo_tecnico");
-    values.push(String(resumo_tecnico || "").trim() || null);
+    values.push(String(resumo_tecnico || aberturaIA.descricao_tecnica_os || "").trim() || null);
   } else if (cols.includes("acao_executada")) {
     fields.push("acao_executada");
-    values.push(String(resumo_tecnico || "").trim() || null);
+    values.push(String(resumo_tecnico || aberturaIA.descricao_tecnica_os || "").trim() || null);
   }
 
   if (cols.includes("causa_diagnostico")) {
     fields.push("causa_diagnostico");
-    values.push(String(causa_diagnostico || "").trim() || null);
+    values.push(String(causa_diagnostico || aberturaIA.causa_provavel || "").trim() || null);
   } else if (cols.includes("diagnostico")) {
     fields.push("diagnostico");
-    values.push(String(causa_diagnostico || "").trim() || null);
+    values.push(String(causa_diagnostico || aberturaIA.causa_provavel || "").trim() || null);
   }
 
   if (cols.includes("data_inicio")) {
@@ -999,7 +1105,7 @@ function createOS({
 
   if (cols.includes("prioridade")) {
     fields.push("prioridade");
-    values.push(score.prioridade || "MEDIA");
+    values.push(aberturaIA.prioridade_sugerida || score.prioridade || "MEDIA");
   }
   if (cols.includes("categoria_sugerida")) {
     fields.push("categoria_sugerida");
@@ -1009,6 +1115,33 @@ function createOS({
     fields.push("alertar_imediatamente");
     values.push(score.alertar_imediatamente ? 1 : 0);
   }
+  const mapCols = {
+    setor_id,
+    sintoma_principal,
+    severidade: normalizeGrau(severidade || grauOS),
+    nc_observacao_curta: observacao_curta,
+    equipamento_parado: equipamento_parado ? 1 : 0,
+    vazamento: vazamento ? 1 : 0,
+    aquecimento: aquecimento ? 1 : 0,
+    ruido_anormal: ruido_anormal ? 1 : 0,
+    vibracao: vibracao ? 1 : 0,
+    odor_anormal: odor_anormal ? 1 : 0,
+    baixa_performance: baixa_performance ? 1 : 0,
+    travamento: travamento ? 1 : 0,
+    ai_diagnostico_inicial: aberturaIA.diagnostico_inicial,
+    ai_causa_provavel: aberturaIA.causa_provavel,
+    ai_risco_operacional: aberturaIA.risco_operacional,
+    ai_servico_sugerido: aberturaIA.servico_sugerido,
+    ai_prioridade_sugerida: aberturaIA.prioridade_sugerida,
+    ai_observacao_seguranca: aberturaIA.observacao_seguranca,
+    ai_descricao_tecnica_os: aberturaIA.descricao_tecnica_os,
+  };
+
+  for (const [col, value] of Object.entries(mapCols)) {
+    if (!cols.includes(col)) continue;
+    fields.push(col);
+    values.push(value ?? null);
+  }
   const stmt = db.prepare(
     `INSERT INTO os (${fields.join(",")})
      VALUES (${fields.map(() => "?").join(",")})`
@@ -1016,6 +1149,21 @@ function createOS({
 
   const info = stmt.run(...values);
   const osId = Number(info.lastInsertRowid);
+
+  osIAService.registrarLogIA({
+    usuarioId: openedBy,
+    osId,
+    naoConformidadeId: osId,
+    tipo: "ABERTURA_NC",
+    entrada: {
+      equipamento_id: equipId,
+      sintoma_principal,
+      severidade,
+      observacao_curta,
+    },
+    resposta: aberturaIA,
+    status: "OK",
+  });
 
   setupPairsIfEmpty();
 
@@ -1131,7 +1279,7 @@ function pausarOS(id) {
   }
 }
 
-function concluirOS(id, { closedBy, diagnostico, acaoExecutada, pecas, dataFim }) {
+async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, pecas, dataFim, fechamentoPayload = {} }) {
   const os = getOSById(id);
   if (!os) throw new Error("OS não encontrada.");
   console.log("[OS_CLOSE] fechando OS:", {
@@ -1142,10 +1290,27 @@ function concluirOS(id, { closedBy, diagnostico, acaoExecutada, pecas, dataFim }
     data_fim_atual: os.data_fim || os.data_conclusao || os.closed_at || null,
   });
 
-  const diag = String(diagnostico || "").trim() || null;
-  const acao = String(acaoExecutada || "").trim() || null;
-
   const cols = getOSColumns();
+
+  const fechamentoIA = await osIAService.gerarFechamentoAutomaticoOS({
+    usuario_id: closedBy || null,
+    os_id: id,
+    nao_conformidade_id: id,
+    os_inicial: {
+      id: os.id,
+      descricao: os.descricao,
+      resumo_tecnico: os.resumo_tecnico || null,
+      causa_diagnostico: os.causa_diagnostico || null,
+      equipamento: os.equipamento,
+      equipamento_id: os.equipamento_id || null,
+      sintoma_principal: os.sintoma_principal || null,
+      severidade: os.severidade || null,
+    },
+    fechamento: fechamentoPayload,
+  });
+
+  const diag = String(diagnostico || fechamentoIA.acao_corretiva_realizada || "").trim() || null;
+  const acao = String(acaoExecutada || fechamentoIA.descricao_servico_executado || "").trim() || null;
 
   const tx = db.transaction(() => {
     const sets = ["status = 'FECHADA'", "closed_at = datetime('now')", "closed_by = ?"];
@@ -1171,6 +1336,26 @@ function concluirOS(id, { closedBy, diagnostico, acaoExecutada, pecas, dataFim }
     if (cols.includes("data_fim")) {
       sets.push("data_fim = COALESCE(?, data_fim)");
       args.push(String(dataFim || "").trim() || null);
+    }
+
+    const fechamentoCols = {
+      ai_descricao_servico_executado: fechamentoIA.descricao_servico_executado,
+      ai_acao_corretiva_realizada: fechamentoIA.acao_corretiva_realizada,
+      ai_recomendacao_reincidencia: fechamentoIA.recomendacao_para_evitar_reincidencia,
+      ai_observacao_final_tecnica: fechamentoIA.observacao_final_tecnica,
+      acoes_executadas_json: JSON.stringify(fechamentoPayload.acoes_executadas || []),
+      pecas_utilizadas_json: JSON.stringify((fechamentoPayload.pecas_utilizadas || []).filter((p) => p && p.peca_descricao)),
+      teste_operacional_realizado: fechamentoPayload.teste_operacional_realizado ? 1 : 0,
+      falha_eliminada: fechamentoPayload.falha_eliminada ? 1 : 0,
+      requer_monitoramento: fechamentoPayload.requer_monitoramento ? 1 : 0,
+      tipo_acao_fechamento: fechamentoPayload.tipo_acao || null,
+      observacao_curta_fechamento: fechamentoPayload.observacao_curta || null,
+    };
+
+    for (const [col, value] of Object.entries(fechamentoCols)) {
+      if (!cols.includes(col)) continue;
+      sets.push(`${col} = ?`);
+      args.push(value);
     }
 
     args.push(id);
@@ -1220,6 +1405,16 @@ function concluirOS(id, { closedBy, diagnostico, acaoExecutada, pecas, dataFim }
       console.error("[INSPECAO_SYNC][ERROR]", err);
     }
   }
+  osIAService.registrarLogIA({
+    usuarioId: closedBy || null,
+    osId: id,
+    naoConformidadeId: id,
+    tipo: "FECHAMENTO_OS",
+    entrada: fechamentoPayload,
+    resposta: fechamentoIA,
+    status: "OK",
+  });
+
   return syncResult;
 }
 

@@ -44,9 +44,21 @@ async function osCreate(req, res) {
       data_fim,
       tipo,
       grau,
+      setor_id,
+      sintoma_principal,
+      severidade,
+      observacao_curta,
+      equipamento_parado,
+      vazamento,
+      aquecimento,
+      ruido_anormal,
+      vibracao,
+      odor_anormal,
+      baixa_performance,
+      travamento,
     } = req.body;
 
-    const id = service.createOS({
+    const id = await service.createOS({
       equipamento_id: equipamento_id ? Number(equipamento_id) : null,
       equipamento_manual,
       descricao,
@@ -56,6 +68,18 @@ async function osCreate(req, res) {
       data_fim,
       tipo,
       grau,
+      setor_id,
+      sintoma_principal,
+      severidade,
+      observacao_curta,
+      equipamento_parado: equipamento_parado === "1",
+      vazamento: vazamento === "1",
+      aquecimento: aquecimento === "1",
+      ruido_anormal: ruido_anormal === "1",
+      vibracao: vibracao === "1",
+      odor_anormal: odor_anormal === "1",
+      baixa_performance: baixa_performance === "1",
+      travamento: travamento === "1",
       opened_by: req.session?.user?.id || null,
     });
 
@@ -166,6 +190,12 @@ function osPausar(req, res) {
   return res.redirect(`/os/${id}`);
 }
 
+function normalizeCheckboxValues(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter(Boolean);
+  return [String(value).trim()].filter(Boolean);
+}
+
 function normalizePecasBody(body) {
   const desc = Array.isArray(body.peca_descricao) ? body.peca_descricao : [body.peca_descricao];
   const qtd = Array.isArray(body.peca_quantidade) ? body.peca_quantidade : [body.peca_quantidade];
@@ -185,9 +215,6 @@ async function osClose(req, res) {
   });
 
   try {
-    if (!String(req.body.resumo_tecnico || "").trim() || !String(req.body.causa_diagnostico || "").trim()) {
-      throw new Error("Resumo técnico e causa/diagnóstico são obrigatórios para fechar a OS.");
-    }
 
     const fotosFechamento = mapFilesToPublic(req.files?.fechamento_fotos || []);
     service.addFotosAberturaFechamento({
@@ -197,12 +224,24 @@ async function osClose(req, res) {
       userId: req.session?.user?.id || null,
     });
 
-    const syncResult = service.concluirOS(id, {
+    const acoesExecutadas = normalizeCheckboxValues(req.body.acoes_executadas);
+    const pecas = normalizePecasBody(req.body);
+
+    const syncResult = await service.concluirOS(id, {
       closedBy: req.session?.user?.id || null,
       diagnostico: req.body.diagnostico || req.body.causa_diagnostico,
       acaoExecutada: req.body.acao_executada || req.body.resumo_tecnico,
-      pecas: normalizePecasBody(req.body),
+      pecas,
       dataFim: req.body.data_fim,
+      fechamentoPayload: {
+        acoes_executadas: acoesExecutadas,
+        pecas_utilizadas: pecas,
+        teste_operacional_realizado: req.body.teste_operacional_realizado === "1",
+        falha_eliminada: req.body.falha_eliminada === "1",
+        requer_monitoramento: req.body.requer_monitoramento === "1",
+        tipo_acao: req.body.tipo_acao || null,
+        observacao_curta: req.body.observacao_curta || null,
+      },
     });
 
     await pushService.sendPushToAll({
