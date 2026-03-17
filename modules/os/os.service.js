@@ -394,9 +394,13 @@ function getOSById(id) {
 
   const executorNome = os.executor_nome || os.executor_user_nome || null;
   const auxiliarNome = os.auxiliar_nome || os.auxiliar_user_nome || null;
+  const acaoCorretiva = os.causa_diagnostico || os.diagnostico || null;
+  const acaoPreventiva = os.resumo_tecnico || os.acao_executada || os.ai_recomendacao_reincidencia || null;
 
   return {
     ...os,
+    acao_corretiva: acaoCorretiva,
+    acao_preventiva: acaoPreventiva,
     executor_nome: executorNome,
     mecanico_nome: executorNome,
     auxiliar_nome: auxiliarNome,
@@ -1264,7 +1268,7 @@ function pausarOS(id) {
   }
 }
 
-async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, pecas, dataFim, fechamentoPayload = {} }) {
+async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, fechamentoPayload = {} }) {
   const os = getOSById(id);
   if (!os) throw new Error("OS não encontrada.");
   console.log("[OS_CLOSE] fechando OS:", {
@@ -1319,8 +1323,7 @@ async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, pecas, dat
       args.push(acao);
     }
     if (cols.includes("data_fim")) {
-      sets.push("data_fim = COALESCE(?, data_fim)");
-      args.push(String(dataFim || "").trim() || null);
+      sets.push("data_fim = COALESCE(data_fim, datetime('now'))");
     }
 
     const fechamentoCols = {
@@ -1349,18 +1352,6 @@ async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, pecas, dat
       db.prepare(`UPDATE os_execucoes SET finalizado_em = datetime('now') WHERE os_id = ? AND finalizado_em IS NULL`).run(id);
     }
 
-    if (Array.isArray(pecas) && pecas.length) {
-      const ins = db.prepare(
-        `INSERT INTO os_pecas_utilizadas (os_id, peca_descricao, quantidade, created_at)
-         VALUES (?, ?, ?, datetime('now'))`
-      );
-      for (const p of pecas) {
-        const d = String(p.peca_descricao || "").trim();
-        if (!d) continue;
-        const q = Number(p.quantidade || 1);
-        ins.run(id, d, q);
-      }
-    }
   });
 
   tx();

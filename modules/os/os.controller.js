@@ -166,33 +166,21 @@ function osPausar(req, res) {
   return res.redirect(`/os/${id}`);
 }
 
-function normalizeCheckboxValues(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter(Boolean);
-  return [String(value).trim()].filter(Boolean);
-}
-
-function normalizePecasBody(body) {
-  const desc = Array.isArray(body.peca_descricao) ? body.peca_descricao : [body.peca_descricao];
-  const qtd = Array.isArray(body.peca_quantidade) ? body.peca_quantidade : [body.peca_quantidade];
-
-  return desc.map((d, idx) => ({
-    peca_descricao: d,
-    quantidade: qtd[idx],
-  }));
-}
 
 async function osClose(req, res) {
   const id = Number(req.params.id);
   console.log("[OS_CLOSE] Iniciando fechamento", {
     osId: id,
     userId: req.session?.user?.id || null,
-    data_fim_payload: req.body?.data_fim || null,
   });
 
   try {
-
     const fotosFechamento = mapFilesToPublic(req.files?.fechamento_fotos || []);
+    if (!fotosFechamento.length) {
+      req.flash("error", "Adicione pelo menos uma foto de fechamento para concluir a OS.");
+      return res.redirect(`/os/${id}`);
+    }
+
     service.addFotosAberturaFechamento({
       osId: id,
       files: fotosFechamento,
@@ -200,24 +188,9 @@ async function osClose(req, res) {
       userId: req.session?.user?.id || null,
     });
 
-    const acoesExecutadas = normalizeCheckboxValues(req.body.acoes_executadas);
-    const pecas = normalizePecasBody(req.body);
-
     const syncResult = await service.concluirOS(id, {
       closedBy: req.session?.user?.id || null,
-      diagnostico: req.body.diagnostico || req.body.causa_diagnostico,
-      acaoExecutada: req.body.acao_executada || req.body.resumo_tecnico,
-      pecas,
-      dataFim: req.body.data_fim,
-      fechamentoPayload: {
-        acoes_executadas: acoesExecutadas,
-        pecas_utilizadas: pecas,
-        teste_operacional_realizado: req.body.teste_operacional_realizado === "1",
-        falha_eliminada: req.body.falha_eliminada === "1",
-        requer_monitoramento: req.body.requer_monitoramento === "1",
-        tipo_acao: req.body.tipo_acao || null,
-        observacao_curta: req.body.observacao_curta || null,
-      },
+      fechamentoPayload: {},
     });
 
     await pushService.sendPushToAll({
