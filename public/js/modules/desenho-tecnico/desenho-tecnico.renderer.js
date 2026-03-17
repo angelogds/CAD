@@ -2,6 +2,16 @@ import { Bounds2D } from './core/geometry.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 
+const SNAP_SHORT_LABELS = {
+  endpoint: 'END',
+  midpoint: 'MID',
+  'arc-midpoint': 'MID',
+  intersection: 'INT',
+  center: 'CTR',
+  nearest: 'NEAR',
+  grid: 'GRID',
+};
+
 function arcPath(viewport, geometry = {}) {
   const { cx = 0, cy = 0, radius = 0, startAngle = 0, endAngle = 0, ccw = true } = geometry;
   const p1w = { x: cx + Math.cos(startAngle) * radius, y: cy + Math.sin(startAngle) * radius };
@@ -189,9 +199,13 @@ export class DesenhoTecnicoRenderer {
       }
       if (p.type === 'snap') {
         const c = this.viewport.worldToScreen(p.point.x, p.point.y);
-        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='4.5' fill='rgba(15,118,110,0.12)' stroke='#0f766e' stroke-width='1.6'/>`);
-        g.insertAdjacentHTML('beforeend', `<line x1='${c.x - 8}' y1='${c.y}' x2='${c.x + 8}' y2='${c.y}' stroke='#0f766e' stroke-width='1'/>`);
-        g.insertAdjacentHTML('beforeend', `<line x1='${c.x}' y1='${c.y - 8}' x2='${c.x}' y2='${c.y + 8}' stroke='#0f766e' stroke-width='1'/>`);
+        const code = SNAP_SHORT_LABELS[p.kind] || String(p.kind || '').toUpperCase();
+        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='5' fill='rgba(16,185,129,0.18)' stroke='#059669' stroke-width='1.5'/>`);
+        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='2.2' fill='#10b981' stroke='#ffffff' stroke-width='0.8'/>`);
+        g.insertAdjacentHTML('beforeend', `<line x1='${c.x - 7}' y1='${c.y}' x2='${c.x + 7}' y2='${c.y}' stroke='#059669' stroke-width='1'/>`);
+        g.insertAdjacentHTML('beforeend', `<line x1='${c.x}' y1='${c.y - 7}' x2='${c.x}' y2='${c.y + 7}' stroke='#059669' stroke-width='1'/>`);
+        g.insertAdjacentHTML('beforeend', `<rect x='${c.x + 10}' y='${c.y - 18}' width='34' height='14' rx='3' fill='rgba(15,23,42,0.86)' stroke='#1f2937' stroke-width='0.8'/>`);
+        g.insertAdjacentHTML('beforeend', `<text x='${c.x + 27}' y='${c.y - 8}' text-anchor='middle' fill='#d1fae5' font-size='9' font-weight='700' font-family='Consolas, Monaco, monospace'>${code}</text>`);
       }
       if (p.type === 'ghost-entity' && p.entity) {
         const e = p.entity;
