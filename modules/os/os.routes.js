@@ -6,9 +6,7 @@ const router = express.Router();
 
 const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const ctrl = require("./os.controller");
-
-const OS_ACCESS = ["MANUTENCAO", "MECANICO", "PRODUCAO", "ENCARREGADO", "DIRECAO"];
-const OS_DETALHE_ACCESS = ["MANUTENCAO", "MECANICO", "AUXILIAR", "ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"];
+const { OS_ACCESS, OS_EXECUTION_ACCESS, OS_DETALHE_ACCESS } = require("./os.permissions");
 
 const uploadDir = path.join(__dirname, "../../public/uploads/os");
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -47,13 +45,13 @@ router.post(
 );
 
 router.get("/:id", requireLogin, requireRole(OS_DETALHE_ACCESS), wrap(ctrl.osShow, "osShow"));
-router.post("/:id/iniciar", requireLogin, requireRole(OS_DETALHE_ACCESS), wrap(ctrl.osIniciar, "osIniciar"));
-router.post("/:id/pausar", requireLogin, requireRole(OS_DETALHE_ACCESS), wrap(ctrl.osPausar, "osPausar"));
-router.get("/:id/fechar", requireLogin, requireRole(OS_DETALHE_ACCESS), wrap(ctrl.osCloseForm, "osCloseForm"));
+router.post("/:id/iniciar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osIniciar, "osIniciar"));
+router.post("/:id/pausar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osPausar, "osPausar"));
+router.get("/:id/fechar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osCloseForm, "osCloseForm"));
 router.post(
   "/:id/fechar",
   requireLogin,
-  requireRole(OS_DETALHE_ACCESS),
+  requireRole(OS_EXECUTION_ACCESS),
   upload.fields([{ name: "fechamento_fotos", maxCount: 10 }]),
   wrap(ctrl.osClose, "osClose")
 );
@@ -61,7 +59,7 @@ router.post(
 router.post(
   "/:id/concluir",
   requireLogin,
-  requireRole(OS_DETALHE_ACCESS),
+  requireRole(OS_EXECUTION_ACCESS),
   upload.fields([{ name: "fechamento_fotos", maxCount: 10 }]),
   wrap(ctrl.osClose, "osClose")
 );

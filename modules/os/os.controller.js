@@ -3,6 +3,7 @@ const pushService = require("../push/push.service");
 let tracagemService = null;
 try { tracagemService = require('../tracagem/tracagem.service'); } catch (_e) {}
 const { normalizeRole } = require("../../config/rbac");
+const { canViewOSDetails, postCloseRedirectPath } = require("./os.permissions");
 
 function mapFilesToPublic(files = []) {
   return (files || []).map((f) => ({
@@ -169,9 +170,12 @@ function osPausar(req, res) {
 
 async function osClose(req, res) {
   const id = Number(req.params.id);
+  const user = req.session?.user || null;
+  const redirectAfterClose = postCloseRedirectPath(user) || `/os/${id}`;
+
   console.log("[OS_CLOSE] Iniciando fechamento", {
     osId: id,
-    userId: req.session?.user?.id || null,
+    userId: user?.id || null,
   });
 
   try {
@@ -185,11 +189,11 @@ async function osClose(req, res) {
       osId: id,
       files: fotosFechamento,
       tipo: "FECHAMENTO",
-      userId: req.session?.user?.id || null,
+      userId: user?.id || null,
     });
 
     const syncResult = await service.concluirOS(id, {
-      closedBy: req.session?.user?.id || null,
+      closedBy: user?.id || null,
       fechamentoPayload: {},
     });
 
@@ -200,12 +204,14 @@ async function osClose(req, res) {
     }).catch(() => {});
 
     console.log("[OS_CLOSE] Fechamento concluído", { osId: id, syncResult });
-    req.flash("success", "OS concluída com sucesso.");
+    req.flash("success", canViewOSDetails(user) ? "OS concluída com sucesso." : "Serviço concluído com sucesso. Retornando ao painel.");
   } catch (err) {
     console.error("[OS_CLOSE][ERROR]", err);
     req.flash("error", err.message || "Não foi possível concluir a OS.");
+    return res.redirect(`/os/${id}`);
   }
-  return res.redirect(`/os/${id}`);
+
+  return res.redirect(redirectAfterClose);
 }
 
 async function osUpdateStatus(req, res) {
@@ -229,6 +235,12 @@ async function osUpdateStatus(req, res) {
         body: `OS #${id} foi finalizada.`,
         url: `/os/${id}`,
       }).catch(() => {});
+    }
+
+    const isCloseStatus = ['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA'].includes(st);
+    if (isCloseStatus && !canViewOSDetails(req.session?.user)) {
+      req.flash("success", "Status atualizado. Retornando ao painel.");
+      return res.redirect('/painel-operacional');
     }
 
     req.flash("success", "Status atualizado.");
