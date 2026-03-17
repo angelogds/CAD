@@ -199,7 +199,15 @@ export class DesenhoTecnicoRenderer {
       if (p.type === 'rect') {
         const a = this.viewport.worldToScreen(p.from.x, p.from.y);
         const b = this.viewport.worldToScreen(p.to.x, p.to.y);
-        g.insertAdjacentHTML('beforeend', `<rect x='${Math.min(a.x, b.x)}' y='${Math.min(a.y, b.y)}' width='${Math.abs(a.x - b.x)}' height='${Math.abs(a.y - b.y)}' fill='rgba(56,189,248,0.1)' stroke='#22d3ee' stroke-dasharray='6 4'/>`);
+        const rx = Math.min(a.x, b.x);
+        const ry = Math.min(a.y, b.y);
+        const rw = Math.abs(a.x - b.x);
+        const rh = Math.abs(a.y - b.y);
+        g.insertAdjacentHTML('beforeend', `<rect x='${rx}' y='${ry}' width='${rw}' height='${rh}' fill='rgba(56,189,248,0.1)' stroke='#22d3ee' stroke-dasharray='6 4'/>`);
+        if (p.showMeasures !== false) {
+          drawMeasureLabel(g, rx + (rw / 2), ry - 8, `L ${formatMm(Math.abs((p.to.x || 0) - (p.from.x || 0)))}`);
+          drawMeasureLabel(g, rx + rw + 10, ry + (rh / 2), `A ${formatMm(Math.abs((p.to.y || 0) - (p.from.y || 0)))}`);
+        }
       }
       if (p.type === 'circle') {
         const c = this.viewport.worldToScreen(p.center.x, p.center.y);
