@@ -138,7 +138,7 @@ function getPlantonistaNoite() {
 
 function listEquipamentosAtivos() {
   try {
-    return db.prepare(`SELECT id, nome FROM equipamentos WHERE ativo = 1 ORDER BY nome`).all();
+    return db.prepare(`SELECT id, codigo, nome FROM equipamentos WHERE ativo = 1 ORDER BY nome`).all();
   } catch (_e) {
     return [];
   }
@@ -980,6 +980,7 @@ function buscarPreventivasRelacionadas(equipamentoId) {
 async function createOS({
   equipamento_id,
   equipamento_manual,
+  nao_conformidade,
   descricao,
   resumo_tecnico,
   causa_diagnostico,
@@ -987,22 +988,17 @@ async function createOS({
   data_fim,
   tipo,
   opened_by,
+  criticidade,
   grau,
-  setor_id,
   sintoma_principal,
   severidade,
-  observacao_curta,
-  equipamento_parado,
-  vazamento,
-  aquecimento,
-  ruido_anormal,
-  vibracao,
-  odor_anormal,
-  baixa_performance,
-  travamento,
 }) {
-  const desc = String(descricao || "").trim();
-  if (!desc) throw new Error("Descrição obrigatória.");
+  const relatoNaoConformidade = String(nao_conformidade || descricao || "").trim();
+  if (!relatoNaoConformidade) throw new Error("Descreva a não conformidade do equipamento.");
+  if (relatoNaoConformidade.length < 10) throw new Error("A não conformidade deve ter pelo menos 10 caracteres.");
+
+  const sintoma = String(sintoma_principal || "").trim();
+  if (!sintoma) throw new Error("Selecione o sintoma principal.");
 
   const openedBy = Number(opened_by || 0);
   if (!openedBy) throw new Error("Usuário logado obrigatório para abrir OS.");
@@ -1023,16 +1019,22 @@ async function createOS({
 
   if (!equipamentoFinal) throw new Error("Informe um equipamento cadastrado ou manual.");
 
-  const tipoOS = normalizeTipoOS(tipo);
-  const grauOS = normalizeGrau(grau);
-  const score = classifyOSPriority({ descricao: desc, tipo: tipoOS, equipamento_id: equipId });
+  const tipoOS = normalizeTipoOS(tipo || "CORRETIVA");
+  const grauOS = normalizeGrau(criticidade || severidade || grau || "MEDIA");
+  const score = classifyOSPriority({ descricao: relatoNaoConformidade, tipo: tipoOS, equipamento_id: equipId });
+
+  const equipamentoCols = getTableColumns("equipamentos");
+  const equipamentoContextCols = ["id", "nome", "codigo", "tipo", "criticidade", "setor", "setor_id"]
+    .filter((col) => equipamentoCols.includes(col));
+  const equipamentoContext = (equipId && equipamentoContextCols.length)
+    ? db.prepare(`SELECT ${equipamentoContextCols.join(", ")} FROM equipamentos WHERE id = ?`).get(equipId)
+    : null;
+  const setorInferido = equipamentoContext?.setor_id || equipamentoContext?.setor || null;
 
   const contexto = {
-    equipamento: equipId
-      ? db.prepare(`SELECT id, nome, codigo, tipo, categoria, setor_id FROM equipamentos WHERE id = ?`).get(equipId)
-      : null,
+    equipamento: equipamentoContext,
     historico_equipamento: buscarHistoricoEquipamento(equipId),
-    nao_conformidades_relacionadas: buscarNaoConformidadesRelacionadas(equipId, sintoma_principal),
+    nao_conformidades_relacionadas: buscarNaoConformidadesRelacionadas(equipId, sintoma),
     os_recentes_semelhantes: buscarOSRecentesSemelhantes(equipId),
     preventivas_relacionadas: buscarPreventivasRelacionadas(equipId),
   };
@@ -1041,27 +1043,19 @@ async function createOS({
     usuario_id: openedBy,
     nao_conformidade: {
       equipamento_id: equipId,
-      setor_id: setor_id ? Number(setor_id) : null,
-      sintoma_principal: String(sintoma_principal || "").trim() || null,
-      severidade: normalizeGrau(severidade || grauOS),
-      observacao_curta: String(observacao_curta || "").trim() || null,
-      flags: {
-        equipamento_parado: !!equipamento_parado,
-        vazamento: !!vazamento,
-        aquecimento: !!aquecimento,
-        ruido_anormal: !!ruido_anormal,
-        vibracao: !!vibracao,
-        odor_anormal: !!odor_anormal,
-        baixa_performance: !!baixa_performance,
-        travamento: !!travamento,
-      },
+      equipamento_manual: equipManual,
+      setor: setorInferido,
+      sintoma_principal: sintoma,
+      severidade: grauOS,
+      nao_conformidade: relatoNaoConformidade,
+      observacao_curta: relatoNaoConformidade,
     },
     contexto,
   });
 
   const cols = getOSColumns();
   const fields = ["equipamento", "descricao", "tipo", "status", "opened_by"];
-  const values = [equipamentoFinal, desc, tipoOS, "ABERTA", openedBy];
+  const values = [equipamentoFinal, relatoNaoConformidade, tipoOS, "ABERTA", openedBy];
 
   if (cols.includes("equipamento_id")) {
     fields.push("equipamento_id");
@@ -1116,18 +1110,9 @@ async function createOS({
     values.push(score.alertar_imediatamente ? 1 : 0);
   }
   const mapCols = {
-    setor_id,
-    sintoma_principal,
-    severidade: normalizeGrau(severidade || grauOS),
-    nc_observacao_curta: observacao_curta,
-    equipamento_parado: equipamento_parado ? 1 : 0,
-    vazamento: vazamento ? 1 : 0,
-    aquecimento: aquecimento ? 1 : 0,
-    ruido_anormal: ruido_anormal ? 1 : 0,
-    vibracao: vibracao ? 1 : 0,
-    odor_anormal: odor_anormal ? 1 : 0,
-    baixa_performance: baixa_performance ? 1 : 0,
-    travamento: travamento ? 1 : 0,
+    sintoma_principal: sintoma,
+    severidade: grauOS,
+    nc_observacao_curta: relatoNaoConformidade,
     ai_diagnostico_inicial: aberturaIA.diagnostico_inicial,
     ai_causa_provavel: aberturaIA.causa_provavel,
     ai_risco_operacional: aberturaIA.risco_operacional,
@@ -1157,9 +1142,9 @@ async function createOS({
     tipo: "ABERTURA_NC",
     entrada: {
       equipamento_id: equipId,
-      sintoma_principal,
-      severidade,
-      observacao_curta,
+      sintoma_principal: sintoma,
+      severidade: grauOS,
+      nao_conformidade: relatoNaoConformidade,
     },
     resposta: aberturaIA,
     status: "OK",
