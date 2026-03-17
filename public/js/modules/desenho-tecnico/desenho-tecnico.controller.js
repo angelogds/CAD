@@ -94,9 +94,10 @@ export class DesenhoTecnicoController {
   loadInitial(initial) {
     this.state.activeLayer = initial.activeLayer || 'geometria_principal';
     this.state.layers = initial.layers || {};
+    this.ensureDefaultLayers();
     this.state.gridConfig.visible = initial.showGrid !== false;
     this.state.gridConfig.step = initial.gridStep || 20;
-    this.state.snappingConfig.enabled = initial.snapEnabled !== false;
+    this.state.snappingConfig = { ...this.state.snappingConfig, ...(initial.snappingConfig || {}), enabled: initial.snapEnabled !== false };
     this.state.orthoEnabled = Boolean(initial.orthoEnabled);
     this.state.metadata = {
       codigo: initial.codigo || '', titulo: initial.titulo || '', material: initial.material || '', equipamento_id: initial.equipamento_id || '', observacoes: initial.observacoes || '',
@@ -136,6 +137,7 @@ export class DesenhoTecnicoController {
       activeLayer: this.state.activeLayer,
       showGrid: this.state.gridConfig.visible,
       snapEnabled: this.state.snappingConfig.enabled,
+      snappingConfig: this.state.snappingConfig,
       orthoEnabled: this.state.orthoEnabled,
       gridStep: this.state.gridConfig.step,
       layers: this.state.layers,
@@ -151,7 +153,7 @@ export class DesenhoTecnicoController {
     this.redoStack = [];
   }
 
-  markDirty(msg = 'Editado') { this.state.statusMessage = msg; }
+  markDirty(msg = 'Editado') { this.state.statusMessage = msg; this.scheduleAutosave(); }
 
   applySerialized(raw) {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -160,7 +162,7 @@ export class DesenhoTecnicoController {
     this.render();
   }
 
-  addEntity(entity) { this.state.entities.push(entity); this.pushHistory(); this.eventBus.emit('entity:created', entity); this.render(); }
+  addEntity(entity) { this.state.entities.push(entity); this.pushHistory(); this.markDirty('Entidade criada'); this.eventBus.emit('entity:created', entity); this.render(); }
 
   getSnapCandidates() {
     const points = [];
@@ -202,6 +204,22 @@ export class DesenhoTecnicoController {
     return points;
   }
 
+  getNearestPointOnEntity(entity, point) {
+    const g = entity.geometry || {};
+    if (entity.type === 'line' || entity.type === 'centerline') {
+      const ax = g.x1; const ay = g.y1; const bx = g.x2; const by = g.y2;
+      const dx = bx - ax; const dy = by - ay;
+      const len2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((point.x - ax) * dx + (point.y - ay) * dy) / len2));
+      return { x: ax + t * dx, y: ay + t * dy, kind: 'nearest' };
+    }
+    if (entity.type === 'circle') {
+      const a = Math.atan2(point.y - g.cy, point.x - g.cx);
+      return { x: g.cx + Math.cos(a) * g.radius, y: g.cy + Math.sin(a) * g.radius, kind: 'nearest' };
+    }
+    return null;
+  }
+
   segmentIntersection(p1, p2, p3, p4) {
     const den = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
     if (Math.abs(den) < 1e-9) return null;
@@ -220,15 +238,29 @@ export class DesenhoTecnicoController {
     }
     if (!this.state.snappingConfig.enabled) return p;
     const tol = 10 / this.viewport.getViewState().zoom;
-    const priority = { endpoint: 1, center: 2, midpoint: 3, intersection: 4 };
-    const nearest = this.getSnapCandidates()
+    const cfg = this.state.snappingConfig || {};
+    const priority = { endpoint: 1, midpoint: 2, intersection: 3, center: 4, nearest: 5, grid: 6 };
+    const candidates = this.getSnapCandidates().filter((c) => cfg[c.kind] !== false);
+    if (cfg.nearest !== false) {
+      this.state.entities.forEach((e) => {
+        const n = this.getNearestPointOnEntity(e, p);
+        if (n) candidates.push(n);
+      });
+    }
+    if (cfg.grid !== false) {
+      const step = Math.max(0.1, this.state.gridConfig.step || 20);
+      candidates.push({ x: Math.round(p.x / step) * step, y: Math.round(p.y / step) * step, kind: 'grid' });
+    }
+    const nearest = candidates
       .map((c) => ({ ...c, d: Math.hypot(c.x - p.x, c.y - p.y) }))
       .filter((c) => c.d <= tol)
       .sort((a, b) => (priority[a.kind] || 99) - (priority[b.kind] || 99) || a.d - b.d)[0];
     if (nearest) {
+      this.state.snappingConfig.activeKind = nearest.kind;
       this.previewLayer.set([...this.previewLayer.items.filter((i) => i.type !== 'snap'), { type: 'snap', point: nearest, kind: nearest.kind }]);
       return { x: nearest.x, y: nearest.y };
     }
+    this.state.snappingConfig.activeKind = null;
     this.previewLayer.set(this.previewLayer.items.filter((i) => i.type !== 'snap'));
     return p;
   }
@@ -244,6 +276,7 @@ export class DesenhoTecnicoController {
     this.state.activeTool = this.toolManager.name;
     this.state.grips = this.toolManager.active?.getGrips?.() || [];
     this.renderer.render();
+    this.renderLayersPanel();
     this.updateStatus();
     this.syncToolbarState();
   }
@@ -255,7 +288,7 @@ export class DesenhoTecnicoController {
     set('cadStatusZoom', `Zoom: ${(zoom * 100).toFixed(0)}%`);
     if (cursor) { set('cadStatusX', `X: ${cursor.world.x.toFixed(2)}`); set('cadStatusY', `Y: ${cursor.world.y.toFixed(2)}`); }
     const first = this.state.entities.find((e) => this.selection.includes(e.id));
-    set('cadStatusSelected', `Selecionado: ${first?.type || '-'}`);
+    set('cadStatusSelected', `Selecionado: ${first?.type || '-'} • Layer: ${this.state.activeLayer} • Snap: ${this.state.snappingConfig.activeKind || (this.state.snappingConfig.enabled ? 'on' : 'off')} • Unidade: ${this.state.metadata?.unidade || 'mm'}`);
     this.renderProperties(first);
     set('cadStatusMessage', this.state.statusMessage || this.prompt.message || 'Pronto');
   }
@@ -333,6 +366,78 @@ export class DesenhoTecnicoController {
     document.querySelectorAll('.cad-status-toggle[data-toggle="ortho"],#cadOrthoToggle').forEach((b) => b.classList.toggle('active', this.state.orthoEnabled));
   }
 
+
+  ensureDefaultLayers() {
+    const defaults = {
+      contorno: { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' },
+      centro: { color: '#0f766e', visible: true, locked: false, lineType: 'center' },
+      cotas: { color: '#2563eb', visible: true, locked: false, lineType: 'continuous' },
+      eixos: { color: '#0e7490', visible: true, locked: false, lineType: 'center' },
+      furacao: { color: '#065f46', visible: true, locked: false, lineType: 'dashed' },
+      construcao: { color: '#6b7280', visible: true, locked: false, lineType: 'dashed' },
+      observacoes: { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' },
+      geometria_principal: { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' },
+    };
+    this.state.layers = { ...defaults, ...(this.state.layers || {}) };
+    if (!this.state.layers[this.state.activeLayer]) this.state.activeLayer = 'geometria_principal';
+  }
+
+  renderLayersPanel() {
+    const select = document.getElementById('cadLayerSelect');
+    const list = document.getElementById('cadLayersList');
+    const names = Object.keys(this.state.layers || {});
+    if (select) {
+      select.innerHTML = names.map((name) => `<option value="${name}" ${name === this.state.activeLayer ? 'selected' : ''}>${name}</option>`).join('');
+    }
+    if (!list) return;
+    list.innerHTML = names.map((name) => {
+      const cfg = this.state.layers[name] || {};
+      return `<div class='cad-layer-row'>
+        <div class='cad-layer-row-main'>
+          <button class='cad-layer-activate ${name === this.state.activeLayer ? 'active' : ''}' data-layer-activate='${name}' title='Definir ativa'>●</button>
+          <span>${name}</span>
+        </div>
+        <div class='cad-layer-row-controls'>
+          <input type='color' value='${cfg.color || '#1f2937'}' data-layer-color='${name}' title='Cor'>
+          <label><input type='checkbox' data-layer-visible='${name}' ${cfg.visible !== false ? 'checked' : ''}>V</label>
+          <label><input type='checkbox' data-layer-locked='${name}' ${cfg.locked ? 'checked' : ''}>L</label>
+        </div>
+      </div>`;
+    }).join('');
+
+    list.querySelectorAll('[data-layer-visible]').forEach((el) => el.addEventListener('change', (e) => {
+      const n = e.target.dataset.layerVisible;
+      this.state.layers[n].visible = e.target.checked;
+      this.render();
+    }));
+    list.querySelectorAll('[data-layer-locked]').forEach((el) => el.addEventListener('change', (e) => {
+      const n = e.target.dataset.layerLocked;
+      this.state.layers[n].locked = e.target.checked;
+      this.render();
+    }));
+    list.querySelectorAll('[data-layer-color]').forEach((el) => el.addEventListener('change', (e) => {
+      const n = e.target.dataset.layerColor;
+      this.state.layers[n].color = e.target.value;
+      this.render();
+    }));
+    list.querySelectorAll('[data-layer-activate]').forEach((el) => el.addEventListener('click', (e) => {
+      this.state.activeLayer = e.currentTarget.dataset.layerActivate;
+      this.render();
+    }));
+  }
+
+  scheduleAutosave() {
+    clearTimeout(this.autoSaveTimer);
+    this.autoSaveTimer = setTimeout(async () => {
+      try {
+        await this.saveDrawing();
+      } catch (err) {
+        this.state.statusMessage = `Auto-save falhou: ${err.message}`;
+      }
+      this.render();
+    }, 1200);
+  }
+
   async saveDrawing() {
     const id = window.CAD_INITIAL?.desenhoId;
     if (!id) return;
@@ -380,6 +485,15 @@ export class DesenhoTecnicoController {
     document.getElementById('cadOrthoToggle')?.addEventListener('click', () => { this.state.orthoEnabled = !this.state.orthoEnabled; this.render(); });
     document.querySelectorAll('.cad-status-toggle').forEach((btn) => btn.addEventListener('click', () => document.getElementById(`cad${btn.dataset.toggle[0].toUpperCase()}${btn.dataset.toggle.slice(1)}Toggle`)?.click()));
     document.getElementById('cadLayerSelect')?.addEventListener('change', (e) => { this.state.activeLayer = e.target.value; this.render(); });
+    document.getElementById('cadLayerAddBtn')?.addEventListener('click', () => {
+      const base = document.getElementById('cadLayerNewName')?.value?.trim();
+      if (!base) return;
+      const name = this.state.layers[base] ? `${base}_${Date.now().toString().slice(-4)}` : base;
+      this.state.layers[name] = { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' };
+      this.state.activeLayer = name;
+      this.markDirty('Layer criada');
+      this.render();
+    });
     document.getElementById('cadDeleteBtn')?.addEventListener('click', () => {
       this.state.entities = this.state.entities.filter((e) => !this.selection.includes(e.id));
       this.selection.clear();

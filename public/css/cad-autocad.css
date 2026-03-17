@@ -4,44 +4,24 @@
    ========================================================================== */
 
 :root {
-  /* AutoCAD Classic Colors */
-  --cad-bg: #0f172a;
-  --cad-bg-dark: #0b1220;
-  --cad-bg-darker: #030712;
-  --cad-grid-major: rgba(100, 130, 170, 0.3);
-  --cad-grid-minor: rgba(70, 100, 140, 0.15);
-  --cad-crosshair: #ffffff;
-  
-  /* Toolbar Colors (AutoCAD ribbon style) */
-  --cad-toolbar-bg: #0b1220;
-  --cad-toolbar-border: #1f2937;
-  --cad-btn-bg: #3d4a5c;
-  --cad-btn-hover: #4a5a6f;
-  --cad-btn-active: #3b82f6;
-  --cad-btn-text: #e2e8f0;
-  
-  /* Panel Colors */
-  --cad-panel-bg: #1a202c;
-  --cad-panel-border: #2d3748;
-  --cad-panel-header: #2d3748;
-  
-  /* Entity Colors - AutoCAD Style */
-  --cad-entity-white: #ffffff;
-  --cad-entity-red: #ff6b6b;
-  --cad-entity-yellow: #ffd93d;
-  --cad-entity-green: #6bcb77;
-  --cad-entity-cyan: #4ecdc4;
-  --cad-entity-blue: #74b9ff;
-  --cad-entity-magenta: #a29bfe;
-  
-  /* Dimension/Cota Colors */
-  --cad-dim-color: #4ecdc4;
-  --cad-dim-text: #ffffff;
-  
-  /* Status Bar */
-  --cad-status-bg: #1a202c;
-  --cad-status-text: #a0aec0;
-  --cad-status-active: #68d391;
+  --cad-bg: #ffffff;
+  --cad-bg-dark: #f8fafc;
+  --cad-bg-darker: #eef2f7;
+  --cad-grid-major: rgba(15, 118, 110, 0.18);
+  --cad-grid-minor: rgba(100, 116, 139, 0.14);
+  --cad-crosshair: #0f172a;
+  --cad-toolbar-bg: #f8fafc;
+  --cad-toolbar-border: #cbd5e1;
+  --cad-btn-bg: #ffffff;
+  --cad-btn-hover: #f1f5f9;
+  --cad-btn-active: #0f766e;
+  --cad-btn-text: #0f172a;
+  --cad-panel-bg: #f8fafc;
+  --cad-panel-border: #dbe3ec;
+  --cad-panel-header: #e2e8f0;
+  --cad-status-bg: #ecfdf5;
+  --cad-status-text: #334155;
+  --cad-status-active: #0f766e;
 }
 
 /* ==========================================================================
@@ -53,7 +33,7 @@
   inset: 0;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  background: var(--cad-bg-darker);
+  background: var(--cad-bg);
   z-index: 1000;
   overflow: hidden;
 }
@@ -65,7 +45,7 @@
 .cad-toolbar {
   display: flex;
   flex-direction: column;
-  background: #0b1220;
+  background: var(--cad-toolbar-bg);
   border-bottom: 1px solid var(--cad-toolbar-border);
   padding: 0;
   box-shadow: 0 8px 20px rgba(0,0,0,0.35);
@@ -80,7 +60,7 @@
 }
 
 .cad-toolbar-row:first-child {
-  background: #0f172a;
+  background: #f1f5f9;
   border-bottom: 1px solid var(--cad-toolbar-border);
 }
 
@@ -89,14 +69,14 @@
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  background: rgba(15,23,42,0.6);
+  background: #ffffff;
   border-radius: 6px;
-  border: 1px solid rgba(148,163,184,0.16);
+  border: 1px solid var(--cad-panel-border);
 }
 
 .cad-toolbar-group-label {
   font-size: 10px;
-  color: #94a3b8;
+  color: #475569;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-right: 4px;
@@ -121,8 +101,8 @@
   min-width: 30px;
   height: 24px;
   padding: 0 7px;
-  background: #1f2937;
-  border: 1px solid rgba(148,163,184,0.2);
+  background: var(--cad-btn-bg);
+  border: 1px solid #cbd5e1;
   border-radius: 6px;
   color: var(--cad-btn-text);
   font-size: 10px;
@@ -181,10 +161,10 @@
 
 .cad-workspace {
   display: grid;
-  grid-template-columns: 240px 1fr 280px;
+  grid-template-columns: 250px 1fr 300px;
   gap: 0;
   overflow: hidden;
-  background: var(--cad-bg-darker);
+  background: var(--cad-bg);
 }
 
 /* ==========================================================================
@@ -331,7 +311,7 @@
 
 .cad-prop-label {
   font-size: 10px;
-  color: #94a3b8;
+  color: #475569;
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -545,7 +525,7 @@
   justify-content: center;
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: #475569;
   cursor: pointer;
   font-size: 18px;
 }
@@ -586,7 +566,7 @@
 
 .cad-shaft-segments th {
   background: rgba(0,0,0,0.2);
-  color: #94a3b8;
+  color: #475569;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -674,3 +654,11 @@
 #cadProperties .cad-prop-row { border-bottom: 1px dashed rgba(148,163,184,0.12); padding-bottom: 4px; }
 #cadProperties .cad-prop-row:last-child { border-bottom: none; }
 #cadProperties .cad-prop-label { font-weight: 700; }
+
+
+.cad-layer-create { display:flex; gap:6px; margin-bottom:8px; }
+.cad-layer-row { display:flex; justify-content:space-between; align-items:center; border:1px solid #dbe3ec; border-radius:6px; padding:6px; background:#fff; margin-bottom:6px; }
+.cad-layer-row-main { display:flex; align-items:center; gap:6px; font-size:12px; color:#0f172a; }
+.cad-layer-row-controls { display:flex; align-items:center; gap:6px; font-size:11px; color:#334155; }
+.cad-layer-activate { border:1px solid #cbd5e1; background:#fff; border-radius:999px; width:20px; height:20px; cursor:pointer; color:#64748b; }
+.cad-layer-activate.active { background:#0f766e; color:white; border-color:#0f766e; }

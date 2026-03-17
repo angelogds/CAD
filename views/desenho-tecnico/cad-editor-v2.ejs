@@ -203,11 +203,11 @@
         <div class="cad-panel-content">
           <div style="margin-bottom:8px;">
             <label class="cad-prop-label">Camada Ativa</label>
-            <select class="cad-select" id="cadLayerSelect">
-              <% Object.keys(cadData.layers || {}).forEach(layerName => { %>
-                <option value="<%= layerName %>" <%= cadData.activeLayer === layerName ? 'selected' : '' %>><%= layerName %></option>
-              <% }) %>
-            </select>
+            <select class="cad-select" id="cadLayerSelect"></select>
+          </div>
+          <div class="cad-layer-create">
+            <input class="cad-input" id="cadLayerNewName" placeholder="Nova camada (ex.: furacao)">
+            <button class="cad-btn" id="cadLayerAddBtn">Adicionar</button>
           </div>
           <div id="cadLayersList"></div>
         </div>
