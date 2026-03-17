@@ -180,9 +180,9 @@ export class DesenhoTecnicoRenderer {
       }
       if (p.type === 'snap') {
         const c = this.viewport.worldToScreen(p.point.x, p.point.y);
-        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='6' fill='none' stroke='#f59e0b' stroke-width='2'/>`);
-        g.insertAdjacentHTML('beforeend', `<line x1='${c.x - 10}' y1='${c.y}' x2='${c.x + 10}' y2='${c.y}' stroke='#f59e0b' stroke-width='1'/>`);
-        g.insertAdjacentHTML('beforeend', `<line x1='${c.x}' y1='${c.y - 10}' x2='${c.x}' y2='${c.y + 10}' stroke='#f59e0b' stroke-width='1'/>`);
+        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='4.5' fill='rgba(245,158,11,0.12)' stroke='#f59e0b' stroke-width='1.6'/>`);
+        g.insertAdjacentHTML('beforeend', `<line x1='${c.x - 8}' y1='${c.y}' x2='${c.x + 8}' y2='${c.y}' stroke='#fbbf24' stroke-width='1'/>`);
+        g.insertAdjacentHTML('beforeend', `<line x1='${c.x}' y1='${c.y - 8}' x2='${c.x}' y2='${c.y + 8}' stroke='#fbbf24' stroke-width='1'/>`);
       }
       if (p.type === 'ghost-entity' && p.entity) {
         const e = p.entity;
@@ -208,9 +208,11 @@ export class DesenhoTecnicoRenderer {
   renderGrips() {
     const g = this.layers.overlay;
     g.innerHTML = '';
-    (this.state.grips || []).forEach((grip) => {
+    const selected = this.state.grips || [];
+    selected.forEach((grip) => {
       const p = this.viewport.worldToScreen(grip.x, grip.y);
-      g.insertAdjacentHTML('beforeend', `<rect x='${p.x - 4}' y='${p.y - 4}' width='8' height='8' fill='#0f172a' stroke='#22d3ee' stroke-width='1.2'/>`);
+      g.insertAdjacentHTML('beforeend', `<rect x='${p.x - 4}' y='${p.y - 4}' width='8' height='8' rx='1.5' fill='#0b1220' stroke='#38bdf8' stroke-width='1.2'/>`);
+      g.insertAdjacentHTML('beforeend', `<rect x='${p.x - 7}' y='${p.y - 7}' width='14' height='14' fill='transparent'/>`);
     });
   }
 

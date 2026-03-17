@@ -70,6 +70,7 @@ export class DesenhoTecnicoController {
       toolManager: this.toolManager,
       markDirty: (msg) => this.markDirty(msg),
       pushHistory: () => this.pushHistory(),
+      render: () => this.render(),
       get statusMessage() { return this.state.statusMessage; },
       set statusMessage(v) { this.state.statusMessage = v; },
       getPoint: (point, from = null) => this.getPoint(point, from),
@@ -163,22 +164,52 @@ export class DesenhoTecnicoController {
 
   getSnapCandidates() {
     const points = [];
+    const segments = [];
+    const asPoint = (x, y, kind) => points.push({ x, y, kind });
     this.state.entities.forEach((e) => {
       if (e.type === 'line' || e.type === 'centerline') {
-        points.push({ x: e.geometry.x1, y: e.geometry.y1, kind: 'endpoint' }, { x: e.geometry.x2, y: e.geometry.y2, kind: 'endpoint' });
-        points.push({ x: (e.geometry.x1 + e.geometry.x2) / 2, y: (e.geometry.y1 + e.geometry.y2) / 2, kind: 'midpoint' });
+        asPoint(e.geometry.x1, e.geometry.y1, 'endpoint');
+        asPoint(e.geometry.x2, e.geometry.y2, 'endpoint');
+        asPoint((e.geometry.x1 + e.geometry.x2) / 2, (e.geometry.y1 + e.geometry.y2) / 2, 'midpoint');
+        segments.push([{ x: e.geometry.x1, y: e.geometry.y1 }, { x: e.geometry.x2, y: e.geometry.y2 }]);
       }
       if (e.type === 'rect') {
-        points.push({ x: e.geometry.x, y: e.geometry.y, kind: 'endpoint' }, { x: e.geometry.x + e.geometry.width, y: e.geometry.y + e.geometry.height, kind: 'endpoint' });
+        asPoint(e.geometry.x, e.geometry.y, 'endpoint');
+        asPoint(e.geometry.x + e.geometry.width, e.geometry.y + e.geometry.height, 'endpoint');
       }
-      if (e.type === 'circle') points.push({ x: e.geometry.cx, y: e.geometry.cy, kind: 'center' });
-      if (e.type === 'arc') points.push({ x: e.geometry.cx, y: e.geometry.cy, kind: 'center' });
+      if (e.type === 'circle') asPoint(e.geometry.cx, e.geometry.cy, 'center');
+      if (e.type === 'arc') {
+        asPoint(e.geometry.cx, e.geometry.cy, 'center');
+        const a0 = e.geometry.startAngle || 0;
+        const a1 = e.geometry.endAngle || 0;
+        const mid = (a0 + a1) / 2;
+        asPoint(e.geometry.cx + Math.cos(mid) * e.geometry.radius, e.geometry.cy + Math.sin(mid) * e.geometry.radius, 'arc-midpoint');
+      }
       if (e.type === 'polyline') (e.geometry.points || []).forEach((pt, idx, arr) => {
-        points.push({ x: pt.x, y: pt.y, kind: 'endpoint' });
-        if (idx < arr.length - 1) points.push({ x: (pt.x + arr[idx + 1].x) / 2, y: (pt.y + arr[idx + 1].y) / 2, kind: 'midpoint' });
+        asPoint(pt.x, pt.y, 'endpoint');
+        if (idx < arr.length - 1) {
+          asPoint((pt.x + arr[idx + 1].x) / 2, (pt.y + arr[idx + 1].y) / 2, 'midpoint');
+          segments.push([pt, arr[idx + 1]]);
+        }
       });
     });
+    for (let i = 0; i < segments.length; i += 1) {
+      for (let j = i + 1; j < segments.length; j += 1) {
+        const hit = this.segmentIntersection(segments[i][0], segments[i][1], segments[j][0], segments[j][1]);
+        if (hit) asPoint(hit.x, hit.y, 'intersection');
+      }
+    }
     return points;
+  }
+
+  segmentIntersection(p1, p2, p3, p4) {
+    const den = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
+    if (Math.abs(den) < 1e-9) return null;
+    const x = ((p1.x * p2.y - p1.y * p2.x) * (p3.x - p4.x) - (p1.x - p2.x) * (p3.x * p4.y - p3.y * p4.x)) / den;
+    const y = ((p1.x * p2.y - p1.y * p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x * p4.y - p3.y * p4.x)) / den;
+    const inside = (p, a, b) => p >= Math.min(a, b) - 1e-6 && p <= Math.max(a, b) + 1e-6;
+    if (!inside(x, p1.x, p2.x) || !inside(y, p1.y, p2.y) || !inside(x, p3.x, p4.x) || !inside(y, p3.y, p4.y)) return null;
+    return { x, y };
   }
 
   getPoint(point, from = null) {
@@ -238,40 +269,62 @@ export class DesenhoTecnicoController {
     }
     const layer = entity.metadata?.layer || this.state.activeLayer;
     const geo = entity.geometry;
+    const input = (id, label, value, type = 'text') => `<div class='cad-prop-row'><span class='cad-prop-label'>${label}</span><input class='cad-input' data-prop='${id}' type='${type}' value='${value}'/></div>`;
+    const readOnly = (label, value) => `<div class='cad-prop-row'><span class='cad-prop-label'>${label}</span><span>${value}</span></div>`;
     let details = '';
-    if ('radius' in geo) details += `<div class='cad-prop-row'><span class='cad-prop-label'>Diâmetro</span><span>${(geo.radius * 2).toFixed(2)}</span></div>`;
-    if (entity.type === 'line' || entity.type === 'centerline') details += `<div class='cad-prop-row'><span class='cad-prop-label'>Comprimento</span><span>${Math.hypot((geo.x2 || 0) - (geo.x1 || 0), (geo.y2 || 0) - (geo.y1 || 0)).toFixed(2)}</span></div>`;
-    if (entity.type === 'shaft') details += `<div class='cad-prop-row'><span class='cad-prop-label'>Trechos</span><span>${(geo.segments || []).length}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>Comp. total</span><span>${(geo.segments || []).reduce((acc, s) => acc + Number(s.length || 0), 0).toFixed(2)}</span></div>`;
-    if (entity.type === 'text') details += `<div class='cad-prop-row'><span class='cad-prop-label'>Texto</span><input class='cad-input' id='propText' value='${String(geo.text || '').replace(/'/g, '&#39;')}'/></div>`;
-    if (entity.type === 'polyline' && entity.metadata?.shaft) {
-      const points = entity.geometry.points || [];
-      const lengths = points.slice(1).map((p, i) => Math.hypot(p.x - points[i].x, p.y - points[i].y));
-      const total = lengths.reduce((acc, v) => acc + v, 0);
-      details += `<div class='cad-prop-row'><span class='cad-prop-label'>Eixo paramétrico</span><span>${lengths.length} trechos</span></div>`;
-      details += `<div class='cad-prop-row'><span class='cad-prop-label'>Comprimento total</span><span>${total.toFixed(2)}</span></div>`;
-      details += `<div class='cad-prop-row'><button class='cad-btn' id='shaftAddSegment'>Adicionar trecho</button><button class='cad-btn' id='shaftRemoveSegment'>Remover último</button></div>`;
+    if (entity.type === 'line' || entity.type === 'centerline') {
+      details += input('x1', 'Início X', geo.x1, 'number') + input('y1', 'Início Y', geo.y1, 'number');
+      details += input('x2', 'Fim X', geo.x2, 'number') + input('y2', 'Fim Y', geo.y2, 'number');
+      details += readOnly('Comprimento', Math.hypot((geo.x2 || 0) - (geo.x1 || 0), (geo.y2 || 0) - (geo.y1 || 0)).toFixed(2));
+    } else if (entity.type === 'polyline') {
+      const points = geo.points || [];
+      const total = points.slice(1).reduce((acc, p, i) => acc + Math.hypot(p.x - points[i].x, p.y - points[i].y), 0);
+      details += readOnly('Vértices', points.length);
+      details += readOnly('Comprimento', total.toFixed(2));
+    } else if (entity.type === 'rect') {
+      details += input('x', 'Origem X', geo.x, 'number') + input('y', 'Origem Y', geo.y, 'number');
+      details += input('width', 'Largura', geo.width, 'number') + input('height', 'Altura', geo.height, 'number');
+    } else if (entity.type === 'circle') {
+      details += input('cx', 'Centro X', geo.cx, 'number') + input('cy', 'Centro Y', geo.cy, 'number');
+      details += input('radius', 'Raio', geo.radius, 'number');
+      details += readOnly('Diâmetro', ((geo.radius || 0) * 2).toFixed(2));
+    } else if (entity.type === 'arc') {
+      const sweep = ((geo.endAngle - geo.startAngle) * 180 / Math.PI + 360) % 360;
+      details += input('cx', 'Centro X', geo.cx, 'number') + input('cy', 'Centro Y', geo.cy, 'number');
+      details += input('radius', 'Raio', geo.radius, 'number');
+      details += readOnly('Ângulo inicial', ((geo.startAngle || 0) * 180 / Math.PI).toFixed(2));
+      details += readOnly('Ângulo final', ((geo.endAngle || 0) * 180 / Math.PI).toFixed(2));
+      details += readOnly('Abertura', sweep.toFixed(2));
+    } else if (entity.type === 'text') {
+      details += input('text', 'Conteúdo', String(geo.text || ''));
+      details += input('x', 'Posição X', geo.x, 'number') + input('y', 'Posição Y', geo.y, 'number');
+      details += input('size', 'Tamanho', geo.size || 14, 'number');
+    } else if (entity.type === 'shaft') {
+      const total = (geo.segments || []).reduce((acc, s) => acc + Number(s.length || 0), 0);
+      details += readOnly('Orientação', geo.orientation || 'horizontal');
+      details += readOnly('Trechos', (geo.segments || []).length);
+      details += readOnly('Comp. total', total.toFixed(2));
+      details += input('origin.x', 'Origem X', geo.origin?.x || 0, 'number') + input('origin.y', 'Origem Y', geo.origin?.y || 0, 'number');
+    } else if (entity.type === 'dimension' && geo.textPoint) {
+      details += input('textPoint.x', 'Texto X', geo.textPoint.x, 'number') + input('textPoint.y', 'Texto Y', geo.textPoint.y, 'number');
+      details += input('label', 'Texto', geo.label || '');
     }
-    props.innerHTML = `<div class='cad-prop-row'><span class='cad-prop-label'>Tipo</span><span>${entity.type}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>ID</span><span>${entity.id}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>Camada</span><select class='cad-select' id='propLayer'>${Object.keys(this.state.layers || {}).map((l) => `<option ${l === layer ? 'selected' : ''} value='${l}'>${l}</option>`).join('')}</select></div>${details}<pre style='font-size:11px;white-space:pre-wrap'>${JSON.stringify(geo, null, 2)}</pre>`;
+    props.innerHTML = `<div class='cad-prop-row'><span class='cad-prop-label'>Tipo</span><span>${entity.type}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>ID</span><span>${entity.id}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>Camada</span><select class='cad-select' id='propLayer'>${Object.keys(this.state.layers || {}).map((l) => `<option ${l === layer ? 'selected' : ''} value='${l}'>${l}</option>`).join('')}</select></div>${details}`;
     document.getElementById('propLayer')?.addEventListener('change', (e) => { entity.metadata = { ...(entity.metadata || {}), layer: e.target.value }; this.pushHistory(); this.render(); });
-    document.getElementById('propText')?.addEventListener('change', (e) => { entity.geometry.text = e.target.value; this.pushHistory(); this.render(); });
-    document.getElementById('shaftAddSegment')?.addEventListener('click', () => {
-      const points = entity.geometry.points || [];
-      if (!points.length) return;
-      const len = Number(window.prompt('Comprimento do novo trecho', '30') || 0);
-      if (!Number.isFinite(len) || len <= 0) return;
-      const last = points[points.length - 1];
-      points.push({ x: last.x + len, y: last.y });
+    props.querySelectorAll('[data-prop]').forEach((el) => el.addEventListener('change', (e) => {
+      const path = e.target.dataset.prop;
+      const value = e.target.type === 'number' ? Number(e.target.value) : e.target.value;
+      if (Number.isNaN(value)) return;
+      const keys = path.split('.');
+      let target = entity.geometry;
+      for (let i = 0; i < keys.length - 1; i += 1) {
+        target[keys[i]] = target[keys[i]] || {};
+        target = target[keys[i]];
+      }
+      target[keys[keys.length - 1]] = value;
       this.pushHistory();
       this.render();
-    });
-    document.getElementById('shaftRemoveSegment')?.addEventListener('click', () => {
-      const points = entity.geometry.points || [];
-      if (points.length <= 2) return;
-      points.pop();
-      this.pushHistory();
-      this.render();
-    });
-  }
+    }));
 
   syncToolbarState() {
     document.querySelectorAll('[data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === this.state.activeTool || (this.state.activeTool === 'dimension' && b.dataset.tool === `dim_${this.state.dimensionMode || 'linear'}`)));
