@@ -718,6 +718,8 @@ export class DesenhoTecnicoController {
     document.getElementById('cadLayerSelect')?.addEventListener('change', (e) => { this.state.activeLayer = e.target.value; this.render(); });
     this.setupLayoutControls();
     this.reflowWorkspace();
+    this.viewport.resize();
+    this.render();
     // eslint-disable-next-line no-console
     console.info('[CAD] Bind de eventos concluído');
     window.addEventListener('keydown', async (e) => {
