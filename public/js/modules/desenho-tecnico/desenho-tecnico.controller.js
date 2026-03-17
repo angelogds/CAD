@@ -349,8 +349,7 @@ export class DesenhoTecnicoController {
     overlay.style.display = 'flex';
     overlay.style.left = `${Math.max(8, cfg.x || 8)}px`;
     overlay.style.top = `${Math.max(8, cfg.y || 8)}px`;
-    const safeValue = String(cfg.value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/'/g, '&#39;');
-    overlay.innerHTML = `<button type='button' class='cad-dyn-value'>${safeValue || '0.00'}</button><input class='cad-dyn-input' type='text' inputmode='decimal' value='${safeValue}' style='display:none;'/>`;
+    overlay.innerHTML = `<button type='button' class='cad-dyn-value'>${cfg.value || '0.00'}</button><input class='cad-dyn-input' type='text' inputmode='decimal' value='${cfg.value || ''}' style='display:none;'/>`;
     const valueBtn = overlay.querySelector('.cad-dyn-value');
     const input = overlay.querySelector('.cad-dyn-input');
     const enterEdit = () => {
@@ -750,8 +749,7 @@ export class DesenhoTecnicoController {
     const rootRect = root.getBoundingClientRect();
     const toolbarRect = toolbar.getBoundingClientRect();
     const statusRect = status.getBoundingClientRect();
-    const reservedBottom = Math.max(4, Math.floor(statusRect.height * 0.25));
-    const available = Math.max(300, rootRect.height - toolbarRect.height - reservedBottom);
+    const available = Math.max(220, rootRect.height - toolbarRect.height - statusRect.height);
     workspace.style.height = `${Math.floor(available)}px`;
     workspace.style.minHeight = `${Math.floor(available)}px`;
   }
