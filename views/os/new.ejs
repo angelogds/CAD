@@ -1,85 +1,76 @@
 <% layout('layout') %>
 
-<div class="card">
+<div class="card" style="max-width:980px; margin:0 auto;">
   <div class="page-head" style="margin-top:0;">
     <div>
       <h1 style="font-size:28px;">Nova Não Conformidade / OS</h1>
-      <p class="muted">Fluxo rápido para operação em campo: poucos cliques e geração técnica automática.</p>
+      <p class="muted">Abertura rápida da ocorrência para geração automática da ordem de serviço.</p>
     </div>
   </div>
 
   <form method="POST" action="/os" enctype="multipart/form-data" id="os-form">
-    <div class="grid-2">
-      <div>
-        <label class="label">Equipamento</label>
-        <select name="equipamento_id" id="equipamento_id" required>
-          <option value="">Selecione...</option>
+    <div class="grid-2" style="gap:16px;">
+      <div style="grid-column:1 / -1;">
+        <label class="label" for="equipamento_id">EQUIPAMENTO</label>
+        <div class="muted" style="margin-bottom:8px;">Equipamento cadastrado / manual</div>
+        <select name="equipamento_id" id="equipamento_id" class="input">
+          <option value="">Selecionar equipamento cadastrado</option>
           <% (equipamentos || []).forEach(e => { %>
             <option value="<%= e.id %>" <%= String(prefillEquipamentoId||'')===String(e.id)?'selected':'' %>><%= e.codigo ? e.codigo + ' - ' : '' %><%= e.nome %></option>
           <% }) %>
         </select>
+        <div class="muted" style="margin:10px 0 6px;">Ou digitar equipamento manualmente</div>
+        <input class="input" type="text" name="equipamento_manual" id="equipamento_manual" placeholder="Ex.: Bomba de recirculação do setor de lavagem" />
       </div>
 
-      <div>
-        <label class="label">Setor (opcional)</label>
-        <input class="input" type="number" name="setor_id" placeholder="ID do setor" />
-      </div>
-
-      <div>
-        <label class="label">Sintoma principal</label>
-        <select name="sintoma_principal" class="input" required>
+      <div style="grid-column:1 / -1;">
+        <label class="label" for="sintoma_principal">SINTOMA PRINCIPAL *</label>
+        <select name="sintoma_principal" id="sintoma_principal" class="input" required>
           <option value="">Selecione...</option>
+          <option value="equipamento_parado">Equipamento parado</option>
           <option value="vazamento">Vazamento</option>
           <option value="aquecimento">Aquecimento</option>
           <option value="vibracao">Vibração</option>
           <option value="ruido_anormal">Ruído anormal</option>
           <option value="travamento">Travamento</option>
-          <option value="queda_de_desempenho">Queda de desempenho</option>
-          <option value="folga_mecanica">Folga mecânica</option>
-          <option value="desalinhamento">Desalinhamento</option>
-          <option value="material_acumulado">Material acumulado</option>
+          <option value="baixa_performance">Baixa performance</option>
           <option value="falha_eletrica">Falha elétrica</option>
-        </select>
-      </div>
-
-      <div>
-        <label class="label">Severidade</label>
-        <select name="severidade" class="input" required>
-          <% (graus || ['BAIXA','MEDIA','ALTA','CRITICA']).forEach(g => { %>
-            <option value="<%= g %>"><%= g %></option>
-          <% }) %>
+          <option value="desalinhamento">Desalinhamento</option>
+          <option value="folga_mecanica">Folga mecânica</option>
+          <option value="material_acumulado">Material acumulado</option>
+          <option value="outro">Outro</option>
         </select>
       </div>
 
       <div style="grid-column:1 / -1;">
-        <label class="label">Observação curta (opcional)</label>
-        <input class="input" type="text" name="observacao_curta" maxlength="180" placeholder="Detalhe curto" />
+        <label class="label" for="nao_conformidade">NÃO CONFORMIDADE DO EQUIPAMENTO *</label>
+        <div class="muted" style="margin-bottom:8px;">Descreva o que está acontecendo com o equipamento.</div>
+        <textarea
+          id="nao_conformidade"
+          name="nao_conformidade"
+          class="input"
+          style="min-height:150px;"
+          minlength="10"
+          required
+          placeholder="Ex.: Equipamento apresentando vibração forte, ruído e aquecimento durante operação."
+        ></textarea>
       </div>
 
       <div style="grid-column:1 / -1;">
-        <label class="label">Flags rápidas</label>
-        <div class="row" style="gap:14px; flex-wrap:wrap;">
-          <label><input type="checkbox" name="equipamento_parado" value="1"> Equipamento parado</label>
-          <label><input type="checkbox" name="vazamento" value="1"> Vazamento</label>
-          <label><input type="checkbox" name="aquecimento" value="1"> Aquecimento</label>
-          <label><input type="checkbox" name="ruido_anormal" value="1"> Ruído anormal</label>
-          <label><input type="checkbox" name="vibracao" value="1"> Vibração</label>
-          <label><input type="checkbox" name="odor_anormal" value="1"> Odor anormal</label>
-          <label><input type="checkbox" name="baixa_performance" value="1"> Baixa performance</label>
-          <label><input type="checkbox" name="travamento" value="1"> Travamento</label>
-        </div>
-      </div>
-
-      <input type="hidden" name="tipo" value="CORRETIVA" />
-      <input type="hidden" name="grau" value="MEDIA" />
-      <div style="display:none;">
-        <textarea name="descricao">Não conformidade aberta via fluxo rápido operacional.</textarea>
+        <label class="label" for="criticidade">CRITICIDADE *</label>
+        <select name="criticidade" id="criticidade" class="input" required>
+          <option value="BAIXA">BAIXA</option>
+          <option value="MEDIA" selected>MÉDIA</option>
+          <option value="ALTA">ALTA</option>
+          <option value="CRITICA">CRÍTICA</option>
+        </select>
       </div>
 
       <div style="grid-column:1 / -1;">
-        <label class="label">Fotos de abertura (opcional)</label>
+        <label class="label">FOTOS DE ABERTURA (OPCIONAL)</label>
         <input id="abertura_fotos" type="file" name="abertura_fotos" accept="image/*" multiple style="display:none" />
         <button type="button" class="btn btn-outline" onclick="document.getElementById('abertura_fotos').click()">📷 Adicionar fotos</button>
+        <div id="preview-abertura" style="margin-top:6px;"></div>
       </div>
     </div>
 
@@ -89,3 +80,46 @@
     </div>
   </form>
 </div>
+
+<script>
+  const fileInput = document.getElementById('abertura_fotos');
+  const preview = document.getElementById('preview-abertura');
+  fileInput.addEventListener('change', function(){
+    preview.innerHTML = '';
+    Array.from(fileInput.files || []).forEach(f => {
+      const el = document.createElement('span');
+      el.className = 'pill-tag pill-gray';
+      el.style.marginRight = '6px';
+      el.textContent = f.name;
+      preview.appendChild(el);
+    });
+  });
+
+  document.getElementById('os-form').addEventListener('submit', function(e){
+    const id = document.getElementById('equipamento_id').value.trim();
+    const manual = document.getElementById('equipamento_manual').value.trim();
+    const sintoma = document.getElementById('sintoma_principal').value.trim();
+    const naoConformidade = document.getElementById('nao_conformidade').value.trim();
+    const criticidade = document.getElementById('criticidade').value.trim();
+
+    if (!id && !manual) {
+      e.preventDefault();
+      alert('Selecione um equipamento cadastrado ou digite o equipamento manualmente.');
+      return;
+    }
+    if (!sintoma) {
+      e.preventDefault();
+      alert('Selecione o sintoma principal.');
+      return;
+    }
+    if (!naoConformidade || naoConformidade.length < 10) {
+      e.preventDefault();
+      alert('Descreva a não conformidade com pelo menos 10 caracteres.');
+      return;
+    }
+    if (!criticidade) {
+      e.preventDefault();
+      alert('Selecione a criticidade.');
+    }
+  });
+</script>

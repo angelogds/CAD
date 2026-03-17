@@ -37,49 +37,21 @@ async function osCreate(req, res) {
     const {
       equipamento_id,
       equipamento_manual,
-      descricao,
-      resumo_tecnico,
-      causa_diagnostico,
-      data_inicio,
-      data_fim,
-      tipo,
-      grau,
-      setor_id,
+      nao_conformidade,
       sintoma_principal,
-      severidade,
-      observacao_curta,
-      equipamento_parado,
-      vazamento,
-      aquecimento,
-      ruido_anormal,
-      vibracao,
-      odor_anormal,
-      baixa_performance,
-      travamento,
+      criticidade,
     } = req.body;
 
     const id = await service.createOS({
       equipamento_id: equipamento_id ? Number(equipamento_id) : null,
       equipamento_manual,
-      descricao,
-      resumo_tecnico,
-      causa_diagnostico,
-      data_inicio,
-      data_fim,
-      tipo,
-      grau,
-      setor_id,
+      nao_conformidade,
+      descricao: nao_conformidade,
+      tipo: "CORRETIVA",
       sintoma_principal,
-      severidade,
-      observacao_curta,
-      equipamento_parado: equipamento_parado === "1",
-      vazamento: vazamento === "1",
-      aquecimento: aquecimento === "1",
-      ruido_anormal: ruido_anormal === "1",
-      vibracao: vibracao === "1",
-      odor_anormal: odor_anormal === "1",
-      baixa_performance: baixa_performance === "1",
-      travamento: travamento === "1",
+      criticidade,
+      severidade: criticidade,
+      grau: criticidade,
       opened_by: req.session?.user?.id || null,
     });
 
@@ -112,7 +84,11 @@ async function osCreate(req, res) {
     return res.redirect(`/os/${id}`);
   } catch (err) {
     console.error("❌ osCreate:", err);
-    req.flash("error", err.message || "Erro ao salvar a OS.");
+    const rawMsg = String(err?.message || "");
+    const userMessage = /SQLITE|no such column|syntax error|constraint/i.test(rawMsg)
+      ? "Não foi possível salvar agora. Tente novamente e, se persistir, avise a manutenção do sistema."
+      : (rawMsg || "Erro ao salvar a OS.");
+    req.flash("error", userMessage);
     return res.redirect("/os/novo");
   }
 }
