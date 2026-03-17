@@ -35,15 +35,15 @@ function buildCSV({ equipamentos, matrix, ncList }) {
 
   lines.push("");
   lines.push("NAO_CONFORMIDADES");
-  lines.push("Item;Data;Nao Conformidade;Acao Corretiva;Acao Preventiva;Data Correcao;OS ID");
+  lines.push("Item;Data;Nao Conformidade;Acao Preventiva;Acao Corretiva;Data Correcao;OS ID");
 
   for (const nc of ncList) {
     lines.push([
       csvEscape(nc.item),
       csvEscape(nc.data_ocorrencia),
       csvEscape(nc.nao_conformidade),
-      csvEscape(nc.acao_corretiva),
-      csvEscape(nc.acao_preventiva),
+      csvEscape(nc.acao_preventiva_canonica || nc.acao_corretiva),
+      csvEscape(nc.acao_corretiva_canonica || nc.acao_preventiva),
       csvEscape(nc.data_correcao),
       csvEscape(nc.os_id),
     ].join(";"));
@@ -187,7 +187,7 @@ function drawNCBlock(doc, ncList) {
   const baseCols = [80, 55, 160, 120, 120, 70];
   const baseTotal = baseCols.reduce((a, b) => a + b, 0);
   const cols = baseCols.map((c) => (c / baseTotal) * usableW);
-  const headers = ["Item", "Data", "Não Conformidade", "Ação corretiva", "Ação preventiva", "Data da correção"];
+  const headers = ["Item", "Data", "Não Conformidade", "Ação preventiva", "Ação corretiva", "Data da correção"];
 
   let y = 118;
   doc.font("Helvetica-Bold").fontSize(10).fillColor(COLOR.greenPrimary).text("Não Conformidades", left, y);
@@ -229,8 +229,8 @@ function drawNCBlock(doc, ncList) {
       nc.item || "-",
       nc.data_ocorrencia || "-",
       nc.nao_conformidade || "-",
-      nc.acao_corretiva || "-",
-      nc.acao_preventiva || "-",
+      nc.acao_preventiva_canonica || nc.acao_corretiva || "-",
+      nc.acao_corretiva_canonica || nc.acao_preventiva || "-",
       nc.data_correcao || "-",
     ];
 

@@ -26,3 +26,17 @@ test('inspecao routes module loads', () => {
   assert.ok(routes);
   assert.equal(typeof routes.use, 'function');
 });
+
+
+test('inspecao service normaliza ações com compatibilidade legada', () => {
+  const service = require('../modules/inspecao/inspecao.service');
+  const result = service.normalizarAcoesInspecao({
+    acao_corretiva: 'troca de rolamento',
+    acao_preventiva: 'incluir inspeção semanal',
+  });
+
+  assert.equal(result.legado.acao_corretiva, 'troca de rolamento');
+  assert.equal(result.legado.acao_preventiva, 'incluir inspeção semanal');
+  assert.equal(result.canonico.acao_corretiva, 'incluir inspeção semanal');
+  assert.equal(result.canonico.acao_preventiva, 'troca de rolamento');
+});

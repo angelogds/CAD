@@ -19,3 +19,13 @@ test('inspecao stylesheet defines uniform action button layout', () => {
   assert.ok(css.includes('.action-btn'));
   assert.ok(css.includes('height:40px'));
 });
+
+
+test('inspecao NC section uses swapped preventive/corrective labels', () => {
+  const view = fs.readFileSync('views/inspecao/index.ejs', 'utf8');
+  assert.ok(view.includes('<th>Ação preventiva</th><th>Ação corretiva</th>'));
+  assert.ok(view.includes('name="acao_corretiva"'));
+  assert.ok(view.includes('placeholder="Ação preventiva"'));
+  assert.ok(view.includes('name="acao_preventiva"'));
+  assert.ok(view.includes('placeholder="Ação corretiva"'));
+});
