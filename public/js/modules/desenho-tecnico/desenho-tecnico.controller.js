@@ -718,6 +718,8 @@ export class DesenhoTecnicoController {
     document.getElementById('cadLayerSelect')?.addEventListener('change', (e) => { this.state.activeLayer = e.target.value; this.render(); });
     this.setupLayoutControls();
     this.reflowWorkspace();
+    this.viewport.resize();
+    this.render();
     // eslint-disable-next-line no-console
     console.info('[CAD] Bind de eventos concluído');
     window.addEventListener('keydown', async (e) => {
@@ -725,6 +727,25 @@ export class DesenhoTecnicoController {
       if (e.key === 'Delete') this.executeAction('delete-selection');
       if (e.ctrlKey && e.key.toLowerCase() === 'z') this.executeAction('undo');
       if (e.ctrlKey && e.key.toLowerCase() === 'y') this.executeAction('redo');
+      if (e.key === 'Escape') {
+        const activeEl = document.activeElement;
+        const isFormField = activeEl && (
+          activeEl.tagName === 'INPUT'
+          || activeEl.tagName === 'TEXTAREA'
+          || activeEl.tagName === 'SELECT'
+          || activeEl.isContentEditable
+        );
+        const isCadDynInput = activeEl?.classList?.contains('cad-dyn-input');
+        if (isFormField && !isCadDynInput) return;
+        e.preventDefault();
+        this.hideDynamicInput();
+        this.toolManager.active?.cancel?.();
+        if (this.toolManager.name !== 'select') {
+          this.toolManager.set('select');
+          this.eventBus.emit('tool:changed', this.toolManager.name);
+        }
+        this.render();
+      }
     });
   }
 
@@ -746,10 +767,14 @@ export class DesenhoTecnicoController {
     const toolbar = root?.querySelector('.cad-toolbar');
     const status = root?.querySelector('.cad-statusbar');
     if (!root || !workspace || !toolbar || !status) return;
+    const viewportHeight = window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || 0;
     const rootRect = root.getBoundingClientRect();
     const toolbarRect = toolbar.getBoundingClientRect();
     const statusRect = status.getBoundingClientRect();
-    const available = Math.max(220, rootRect.height - toolbarRect.height - statusRect.height);
+    const rootTop = Math.max(0, rootRect.top || 0);
+    const rootHeight = Math.max(rootRect.height || 0, viewportHeight - rootTop);
+    root.style.height = `${Math.floor(rootHeight)}px`;
+    const available = Math.max(220, rootHeight - toolbarRect.height - statusRect.height);
     workspace.style.height = `${Math.floor(available)}px`;
     workspace.style.minHeight = `${Math.floor(available)}px`;
   }
