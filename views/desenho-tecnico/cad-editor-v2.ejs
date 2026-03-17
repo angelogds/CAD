@@ -37,6 +37,7 @@
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Ferramentas</span>
         <button class="cad-btn" data-tool="select" title="Selecionar (V)">🔲 Selecionar</button>
+        <button class="cad-btn" data-tool="pan" title="Pan (M)">✋ Pan</button>
         <button class="cad-btn" data-tool="line" title="Linha (L)">／ Linha</button>
         <button class="cad-btn" data-tool="polyline" title="Polilinha (P)">⎺ Polilinha</button>
         <button class="cad-btn" data-tool="rect" title="Retângulo (R)">▭ Retângulo</button>
@@ -77,7 +78,9 @@
       
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Zoom</span>
+        <button class="cad-btn" data-tool="zoom-window" title="Zoom janela">▣ Janela</button>
         <button class="cad-btn" id="cadZoomExtentsBtn" title="Zoom Extents">🔎 Extents</button>
+        <button class="cad-btn" id="cadResetViewBtn" title="Resetar vista">↺ Resetar</button>
       </div>
       
       <div class="cad-toolbar-group" style="margin-left:auto;">
@@ -102,6 +105,10 @@
           <button class="cad-tool-btn" data-tool="line">
             <span class="cad-tool-icon">／</span>
             <span>Linha</span>
+          </button>
+          <button class="cad-tool-btn" data-tool="pan">
+            <span class="cad-tool-icon">✋</span>
+            <span>Pan</span>
           </button>
           <button class="cad-tool-btn" data-tool="polyline">
             <span class="cad-tool-icon">⎺</span>
@@ -254,12 +261,24 @@
         <span class="cad-status-value" id="cadStatusMessage">Inicializando CAD...</span>
       </div>
       <div class="cad-status-item">
+        <span class="cad-status-label">Ferramenta:</span>
+        <span class="cad-status-value" id="cadStatusTool">select</span>
+      </div>
+      <div class="cad-status-item">
         <span class="cad-status-label">X:</span>
-        <span class="cad-status-value">0</span>
+        <span class="cad-status-value" id="cadStatusX">0</span>
       </div>
       <div class="cad-status-item">
         <span class="cad-status-label">Y:</span>
-        <span class="cad-status-value">0</span>
+        <span class="cad-status-value" id="cadStatusY">0</span>
+      </div>
+      <div class="cad-status-item">
+        <span class="cad-status-label">Zoom:</span>
+        <span class="cad-status-value" id="cadStatusZoom">100%</span>
+      </div>
+      <div class="cad-status-item">
+        <span class="cad-status-label">Selecionado:</span>
+        <span class="cad-status-value" id="cadStatusSelected">-</span>
       </div>
     </div>
     <div class="cad-status-right">
@@ -283,7 +302,7 @@ window.addEventListener('error', function () {
   if (status) status.textContent = 'CAD carregado com limitações (ver console).';
 });
 </script>
-<script src="/js/cad-engine-v2.js" onerror="(function(){var s=document.getElementById('cadStatusMessage'); if(s) s.textContent='Falha ao carregar o motor CAD.';})()"></script>
+<script type="module" src="/js/cad-engine-v2.js" onerror="(function(){var s=document.getElementById('cadStatusMessage'); if(s) s.textContent='Falha ao carregar o motor CAD.';})()"></script>
 
 <style>
 body.cad-editor-mode { overflow: hidden; }
