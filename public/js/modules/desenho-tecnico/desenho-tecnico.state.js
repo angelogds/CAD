@@ -8,6 +8,7 @@ export function createDesenhoTecnicoState(initial = {}) {
     selection: [],
     hover: null,
     preview: [],
+    grips: [],
     snappingConfig: { enabled: true },
     gridConfig: { visible: true, step: 20 },
     orthoEnabled: false,

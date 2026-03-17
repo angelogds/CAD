@@ -20,6 +20,7 @@ export class DesenhoTecnicoRenderer {
     this.renderGrid();
     this.renderEntities();
     this.renderPreview();
+    this.renderGrips();
   }
 
   renderGrid() {
@@ -113,6 +114,33 @@ export class DesenhoTecnicoRenderer {
         const c = this.viewport.worldToScreen(p.point.x, p.point.y);
         g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='4' fill='none' stroke='#f59e0b' stroke-width='1.5'/>`);
       }
+      if (p.type === 'ghost-entity' && p.entity) {
+        const e = p.entity;
+        const stroke = '#22d3ee';
+        if (e.type === 'line' || e.type === 'centerline') {
+          const a = this.viewport.worldToScreen(e.geometry.x1, e.geometry.y1);
+          const b = this.viewport.worldToScreen(e.geometry.x2, e.geometry.y2);
+          g.insertAdjacentHTML('beforeend', `<line x1='${a.x}' y1='${a.y}' x2='${b.x}' y2='${b.y}' stroke='${stroke}' stroke-dasharray='6 4' stroke-width='1.5'/>`);
+        } else if (e.type === 'circle') {
+          const c = this.viewport.worldToScreen(e.geometry.cx, e.geometry.cy);
+          g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='${Math.abs(e.geometry.radius * this.viewport.getViewState().zoom)}' fill='none' stroke='${stroke}' stroke-dasharray='6 4'/>`);
+        } else if (e.type === 'rect') {
+          const p0 = this.viewport.worldToScreen(e.geometry.x, e.geometry.y);
+          g.insertAdjacentHTML('beforeend', `<rect x='${p0.x}' y='${p0.y}' width='${Math.abs(e.geometry.width * this.viewport.getViewState().zoom)}' height='${Math.abs(e.geometry.height * this.viewport.getViewState().zoom)}' fill='none' stroke='${stroke}' stroke-dasharray='6 4'/>`);
+        } else if (e.type === 'polyline') {
+          const points = (e.geometry.points || []).map((pp) => this.viewport.worldToScreen(pp.x, pp.y));
+          if (points.length > 1) g.insertAdjacentHTML('beforeend', `<polyline points='${points.map((pp) => `${pp.x},${pp.y}`).join(' ')}' fill='none' stroke='${stroke}' stroke-dasharray='6 4'/>`);
+        }
+      }
+    });
+  }
+
+  renderGrips() {
+    const g = this.layers.overlay;
+    g.innerHTML = '';
+    (this.state.grips || []).forEach((grip) => {
+      const p = this.viewport.worldToScreen(grip.x, grip.y);
+      g.insertAdjacentHTML('beforeend', `<rect x='${p.x - 4}' y='${p.y - 4}' width='8' height='8' fill='#0f172a' stroke='#22d3ee' stroke-width='1.2'/>`);
     });
   }
 
