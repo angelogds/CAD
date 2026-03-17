@@ -82,6 +82,24 @@ function getColumnValue(row, options = []) {
   return null;
 }
 
+function normalizarAcoesInspecao(data = {}) {
+  const acaoCorretiva = String(data.acao_corretiva || "").trim() || null;
+  const acaoPreventiva = String(data.acao_preventiva || "").trim() || null;
+
+  return {
+    // Compatibilidade legada da inspeção: colunas invertidas no histórico.
+    legado: {
+      acao_corretiva: acaoCorretiva,
+      acao_preventiva: acaoPreventiva,
+    },
+    // Mapeamento canônico alinhado com OS.
+    canonico: {
+      acao_corretiva: acaoPreventiva,
+      acao_preventiva: acaoCorretiva,
+    },
+  };
+}
+
 
 function isClosedStatus(value) {
   return normalizeStatus(value) === "FECHADA";
@@ -307,14 +325,19 @@ function recalculate(inspecaoId, mes, ano) {
         osByCell[`${eqId}-${day}`] = (osByCell[`${eqId}-${day}`] || []).concat(os.id);
       }
 
+      const acoes = normalizarAcoesInspecao({
+        acao_corretiva: String(os.acao_corretiva || "").trim() || null,
+        acao_preventiva: String(os.acao_preventiva || "").trim() || null,
+      });
+
       ncRows.push({
         equipamento_id: eqId,
         data_ocorrencia: formatDate(os.data_inicio),
         nao_conformidade: String(
           getColumnValue(os, ["descricao_problema", "descricao", "solicitacao", "relato", "texto_problema"]) || ""
         ).trim(),
-        acao_corretiva: String(os.acao_corretiva || "").trim() || null,
-        acao_preventiva: String(os.acao_preventiva || "").trim() || null,
+        acao_corretiva: acoes.legado.acao_corretiva,
+        acao_preventiva: acoes.legado.acao_preventiva,
         data_correcao: formatDate(os.data_fim) || null,
         os_id: os.id,
       });
@@ -433,18 +456,25 @@ function listNC(inspecaoId) {
     ORDER BY date(nc.data_ocorrencia) DESC, nc.id DESC
   `;
 
-  return db.prepare(sql).all(inspecaoId).map((row) => ({
-    ...row,
-    data_ocorrencia: formatDate(row.data_ocorrencia),
-    data_correcao: formatDate(row.data_correcao),
-    item: row.equipamento_codigo || row.equipamento_nome || `Eq #${row.equipamento_id || "-"}`,
-  }));
+  return db.prepare(sql).all(inspecaoId).map((row) => {
+    const acoes = normalizarAcoesInspecao(row);
+    return {
+      ...row,
+      data_ocorrencia: formatDate(row.data_ocorrencia),
+      data_correcao: formatDate(row.data_correcao),
+      item: row.equipamento_codigo || row.equipamento_nome || `Eq #${row.equipamento_id || "-"}`,
+      acao_corretiva_canonica: acoes.canonico.acao_corretiva,
+      acao_preventiva_canonica: acoes.canonico.acao_preventiva,
+    };
+  });
 }
 
 function saveNC(inspecaoId, data = {}) {
   const ncTable = resolveNCTable();
   const id = Number(data.id || 0);
   if (!id) return;
+
+  const acoes = normalizarAcoesInspecao(data);
 
   db.prepare(
     `UPDATE ${ncTable}
@@ -454,8 +484,8 @@ function saveNC(inspecaoId, data = {}) {
          updated_at = datetime('now')
      WHERE id = ? AND inspecao_id = ?`
   ).run(
-    String(data.acao_corretiva || "").trim() || null,
-    String(data.acao_preventiva || "").trim() || null,
+    acoes.legado.acao_corretiva,
+    acoes.legado.acao_preventiva,
     String(data.data_correcao || "").trim() || null,
     id,
     inspecaoId
@@ -499,8 +529,8 @@ function listOSDetailsByInspecao(inspecaoId, mes, ano) {
         id: os.id,
         status: os.status,
         nao_conformidade: getColumnValue(os, ["descricao_problema", "descricao", "solicitacao", "relato", "texto_problema"]),
-        resumo_tecnico: os.acao_corretiva,
-        causa_diagnostico: os.acao_preventiva,
+        resumo_tecnico: os.acao_preventiva,
+        causa_diagnostico: os.acao_corretiva,
         data_inicio: formatDate(os.data_inicio),
         data_fim: formatDate(os.data_fim),
       });
@@ -582,4 +612,5 @@ module.exports = {
   listOSDetailsByInspecao,
   syncFromClosedOS,
   syncFromOS,
+  normalizarAcoesInspecao,
 };

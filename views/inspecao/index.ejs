@@ -77,7 +77,7 @@
   <h3>Não Conformidades (automáticas via OS)</h3>
   <div class="table-wrap">
     <table class="table nc-table">
-      <thead><tr><th>Item</th><th>Data ocorrência</th><th>Não Conformidade</th><th>Ação corretiva</th><th>Ação preventiva</th><th>Data correção</th><th>OS ID</th></tr></thead>
+      <thead><tr><th>Item</th><th>Data ocorrência</th><th>Não Conformidade</th><th>Ação preventiva</th><th>Ação corretiva</th><th>Data correção</th><th>OS ID</th></tr></thead>
       <tbody>
         <% if (!ncList.length) { %><tr><td colspan="7">Nenhuma não conformidade detectada no mês.</td></tr><% } %>
         <% for (const nc of ncList) { %>
@@ -87,8 +87,8 @@
               <td colspan="3">
                 <form method="POST" class="nc-edit-form" action="/inspecao/<%= ano %>/<%= mes %>/nc/salvar">
                   <input type="hidden" name="id" value="<%= nc.id %>" />
-                  <input type="text" name="acao_corretiva" value="<%= nc.acao_corretiva || '' %>" placeholder="Ação corretiva" />
-                  <input type="text" name="acao_preventiva" value="<%= nc.acao_preventiva || '' %>" placeholder="Ação preventiva" />
+                  <input type="text" name="acao_corretiva" value="<%= nc.acao_corretiva || '' %>" placeholder="Ação preventiva" />
+                  <input type="text" name="acao_preventiva" value="<%= nc.acao_preventiva || '' %>" placeholder="Ação corretiva" />
                   <input type="date" name="data_correcao" value="<%= nc.data_correcao || '' %>" />
                   <button class="btn btn-primary" type="submit">Salvar</button>
                 </form>
@@ -126,7 +126,7 @@
       const rows = detailsByCell[key] || [];
       modalTitle.textContent = `Detalhes - ${btn.dataset.eq} (item ${btn.dataset.item}) dia ${btn.dataset.day}`;
       modalList.innerHTML = rows.length
-        ? rows.map((row) => `<li><strong>OS #${row.id}</strong> [${row.status || '-'}]<br>Não conformidade: ${row.nao_conformidade || row.problema || '-'}<br>Ação corretiva: ${row.resumo_tecnico || '-'}<br>Ação preventiva: ${row.causa_diagnostico || '-'}<br>Ocorrência: ${row.data_inicio || '-'} | Correção: ${row.data_fim || '-'}</li>`).join('')
+        ? rows.map((row) => `<li><strong>OS #${row.id}</strong> [${row.status || '-'}]<br>Não conformidade: ${row.nao_conformidade || row.problema || '-'}<br>Ação preventiva: ${row.causa_diagnostico || '-'}<br>Ação corretiva: ${row.resumo_tecnico || '-'}<br>Ocorrência: ${row.data_inicio || '-'} | Correção: ${row.data_fim || '-'}</li>`).join('')
         : '<li>Sem OS vinculada neste dia.</li>';
       modal.style.display = 'flex';
     });
