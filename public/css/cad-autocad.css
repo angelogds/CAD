@@ -88,10 +88,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 9px;
-  background: rgba(15,23,42,0.7);
+  padding: 4px 8px;
+  background: rgba(15,23,42,0.6);
   border-radius: 6px;
-  border: 1px solid rgba(148,163,184,0.2);
+  border: 1px solid rgba(148,163,184,0.16);
 }
 
 .cad-toolbar-group-label {
@@ -113,14 +113,14 @@
    BOTÕES CAD - ESTILO AUTOCAD
    ========================================================================== */
 
-.cad-btn {
+ .cad-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-width: 32px;
-  height: 26px;
-  padding: 0 8px;
+  min-width: 30px;
+  height: 24px;
+  padding: 0 7px;
   background: #1f2937;
   border: 1px solid rgba(148,163,184,0.2);
   border-radius: 6px;
@@ -669,3 +669,8 @@
     right: 0;
   }
 }
+
+
+#cadProperties .cad-prop-row { border-bottom: 1px dashed rgba(148,163,184,0.12); padding-bottom: 4px; }
+#cadProperties .cad-prop-row:last-child { border-bottom: none; }
+#cadProperties .cad-prop-label { font-weight: 700; }

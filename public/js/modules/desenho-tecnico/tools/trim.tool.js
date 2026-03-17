@@ -9,7 +9,7 @@ export class TrimTool extends BaseTool {
     if (!this.boundary) {
       if (!hit || !['line', 'centerline'].includes(hit.type)) return;
       this.boundary = hit;
-      this.ctx.prompt.set({ message: 'Selecione a entidade a ser cortada' });
+      this.ctx.prompt.set({ message: 'Selecione a entidade a ser cortada (lado pelo clique)' });
       return;
     }
     if (!hit || !['line', 'centerline', 'polyline'].includes(hit.type) || hit.id === this.boundary.id) return;
@@ -18,7 +18,18 @@ export class TrimTool extends BaseTool {
       this.ctx.markDirty('Trim aplicado');
       this.ctx.render();
     }
+    this.ctx.preview.clear();
     this.boundary = null;
+  }
+  onMouseMove(evt) {
+    if (!this.boundary) return;
+    const hit = this.ctx.findEntityAt(evt.world);
+    if (!hit || !['line', 'centerline', 'polyline'].includes(hit.type) || hit.id === this.boundary.id) {
+      this.ctx.preview.clear();
+      return;
+    }
+    const ghost = hit.clone();
+    if (this.trim(ghost, evt.world)) this.ctx.preview.set([{ type: 'ghost-entity', entity: ghost }]);
   }
   trim(entity, clickPoint) {
     const b1 = { x: this.boundary.geometry.x1, y: this.boundary.geometry.y1 };
@@ -46,5 +57,5 @@ export class TrimTool extends BaseTool {
     }
     return false;
   }
-  cancel() { this.boundary = null; }
+  cancel() { this.boundary = null; this.ctx.preview.clear(); }
 }
