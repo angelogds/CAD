@@ -113,6 +113,9 @@ export class DesenhoTecnicoController {
       get statusMessage() { return this.state.statusMessage; },
       set statusMessage(v) { this.state.statusMessage = v; },
       getPoint: (point, from = null) => this.getPoint(point, from),
+      getAssistGuides: (from, to) => this.getAssistGuides(from, to),
+      showDynamicInput: (cfg) => this.showDynamicInput(cfg),
+      hideDynamicInput: () => this.hideDynamicInput(),
     };
     [
       new SelectTool(this.ctx), new PanTool(this.ctx), new LineTool(this.ctx), new PolylineTool(this.ctx), new RectTool(this.ctx), new CircleTool(this.ctx), new ArcTool(this.ctx), new TextTool(this.ctx),
@@ -303,6 +306,82 @@ export class DesenhoTecnicoController {
     this.previewLayer.set(this.previewLayer.items.filter((i) => i.type !== 'snap'));
     return p;
   }
+
+  getAssistGuides(from, to) {
+    if (!from || !to) return [];
+    const guides = [];
+    const eps = 0.8 / Math.max(this.viewport.getViewState().zoom, 0.1);
+    if (Math.abs(to.x - from.x) <= eps) guides.push({ type: 'guide', kind: 'vertical', from: { x: from.x, y: from.y - 2000 }, to: { x: from.x, y: from.y + 2000 } });
+    if (Math.abs(to.y - from.y) <= eps) guides.push({ type: 'guide', kind: 'horizontal', from: { x: from.x - 2000, y: from.y }, to: { x: from.x + 2000, y: from.y } });
+
+    const segDx = to.x - from.x;
+    const segDy = to.y - from.y;
+    const segLen = Math.hypot(segDx, segDy) || 1;
+
+    this.state.entities.forEach((e) => {
+      if (e.type === 'line' || e.type === 'centerline') {
+        const dx = (e.geometry.x2 || 0) - (e.geometry.x1 || 0);
+        const dy = (e.geometry.y2 || 0) - (e.geometry.y1 || 0);
+        const len = Math.hypot(dx, dy) || 1;
+        const cross = Math.abs((segDx / segLen) * (dy / len) - (segDy / segLen) * (dx / len));
+        if (cross < 0.04) {
+          const anchor = { x: e.geometry.x1 || 0, y: e.geometry.y1 || 0 };
+          guides.push({ type: 'guide', kind: 'parallel', from: anchor, to: { x: anchor.x + (segDx / segLen) * 2000, y: anchor.y + (segDy / segLen) * 2000 } });
+        }
+      }
+      const pts = [];
+      if (e.type === 'line' || e.type === 'centerline') {
+        pts.push({ x: e.geometry.x1, y: e.geometry.y1 }, { x: e.geometry.x2, y: e.geometry.y2 }, { x: (e.geometry.x1 + e.geometry.x2) / 2, y: (e.geometry.y1 + e.geometry.y2) / 2 });
+      } else if (e.type === 'circle') {
+        pts.push({ x: e.geometry.cx, y: e.geometry.cy });
+      }
+      pts.forEach((pt) => {
+        if (Math.abs(to.x - pt.x) <= eps) guides.push({ type: 'guide', kind: 'vertical', from: { x: pt.x, y: pt.y - 1800 }, to: { x: pt.x, y: pt.y + 1800 } });
+        if (Math.abs(to.y - pt.y) <= eps) guides.push({ type: 'guide', kind: 'horizontal', from: { x: pt.x - 1800, y: pt.y }, to: { x: pt.x + 1800, y: pt.y } });
+      });
+    });
+    return guides.slice(0, 4);
+  }
+
+  showDynamicInput(cfg = {}) {
+    const overlay = document.getElementById('cadDynamicInput');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    overlay.style.left = `${Math.max(8, cfg.x || 8)}px`;
+    overlay.style.top = `${Math.max(8, cfg.y || 8)}px`;
+    const safeValue = String(cfg.value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/'/g, '&#39;');
+    overlay.innerHTML = `<button type='button' class='cad-dyn-value'>${safeValue || '0.00'}</button><input class='cad-dyn-input' type='text' inputmode='decimal' value='${safeValue}' style='display:none;'/>`;
+    const valueBtn = overlay.querySelector('.cad-dyn-value');
+    const input = overlay.querySelector('.cad-dyn-input');
+    const enterEdit = () => {
+      valueBtn.style.display = 'none';
+      input.style.display = 'inline-flex';
+      input.focus();
+      input.select();
+    };
+    valueBtn.addEventListener('click', enterEdit);
+    input.addEventListener('input', () => cfg.onChange?.(input.value.replace(',', '.')));
+    input.addEventListener('keydown', (evt) => {
+      if (evt.key === 'Enter') {
+        evt.preventDefault();
+        const ok = cfg.onConfirm?.(input.value.replace(',', '.'));
+        if (ok !== false) this.hideDynamicInput();
+      }
+      if (evt.key === 'Escape') {
+        evt.preventDefault();
+        cfg.onCancel?.();
+        this.hideDynamicInput();
+      }
+    });
+  }
+
+  hideDynamicInput() {
+    const overlay = document.getElementById('cadDynamicInput');
+    if (!overlay) return;
+    overlay.style.display = 'none';
+    overlay.innerHTML = '';
+  }
+
 
   findEntityAt(world) { return [...this.state.entities].reverse().find((e) => e.hitTest(world, 6 / this.viewport.getViewState().zoom)); }
 
@@ -668,9 +747,13 @@ export class DesenhoTecnicoController {
     const toolbar = root?.querySelector('.cad-toolbar');
     const status = root?.querySelector('.cad-statusbar');
     if (!root || !workspace || !toolbar || !status) return;
-    const viewportHeight = window.visualViewport?.height || window.innerHeight;
-    const available = Math.max(180, viewportHeight - toolbar.getBoundingClientRect().height - status.getBoundingClientRect().height);
+    const rootRect = root.getBoundingClientRect();
+    const toolbarRect = toolbar.getBoundingClientRect();
+    const statusRect = status.getBoundingClientRect();
+    const reservedBottom = Math.max(4, Math.floor(statusRect.height * 0.25));
+    const available = Math.max(300, rootRect.height - toolbarRect.height - reservedBottom);
     workspace.style.height = `${Math.floor(available)}px`;
+    workspace.style.minHeight = `${Math.floor(available)}px`;
   }
 
   setupLayoutControls() {
