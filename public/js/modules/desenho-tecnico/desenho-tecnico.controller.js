@@ -59,6 +59,7 @@ export class DesenhoTecnicoController {
     this.redoStack = [];
     this.initial = initial;
     this.toolManager = new ToolManager(this.state);
+    this.isUiBound = false;
     this.ctx = {
       state: this.state,
       viewport: this.viewport,
@@ -358,6 +359,7 @@ export class DesenhoTecnicoController {
       this.pushHistory();
       this.render();
     }));
+  }
 
   syncToolbarState() {
     document.querySelectorAll('[data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === this.state.activeTool || (this.state.activeTool === 'dimension' && b.dataset.tool === `dim_${this.state.dimensionMode || 'linear'}`)));
@@ -405,25 +407,72 @@ export class DesenhoTecnicoController {
       </div>`;
     }).join('');
 
-    list.querySelectorAll('[data-layer-visible]').forEach((el) => el.addEventListener('change', (e) => {
-      const n = e.target.dataset.layerVisible;
-      this.state.layers[n].visible = e.target.checked;
+  }
+
+  executeAction(action, source) {
+    if (!action) return;
+    if (action.startsWith('tool-')) {
+      const tool = source?.dataset?.tool || action.slice(5).replaceAll('-', '_');
+      const unsupported = ['copy', 'move', 'erase'];
+      if (unsupported.includes(tool)) {
+        this.state.statusMessage = `Ferramenta ${tool} em desenvolvimento`;
+        this.render();
+        return;
+      }
+      this.toolManager.set(tool);
+      this.eventBus.emit('tool:changed', this.toolManager.name);
+      this.state.statusMessage = `Ferramenta ativa: ${tool}`;
       this.render();
-    }));
-    list.querySelectorAll('[data-layer-locked]').forEach((el) => el.addEventListener('change', (e) => {
-      const n = e.target.dataset.layerLocked;
-      this.state.layers[n].locked = e.target.checked;
+      return;
+    }
+
+    const actions = {
+      'zoom-extents': () => this.viewport.zoomExtents(this.renderer.getGlobalBounds()),
+      'reset-view': () => { this.viewport.resetView(); this.fitInitial(); },
+      'toggle-grid': () => { this.state.gridConfig.visible = !this.state.gridConfig.visible; this.render(); },
+      'toggle-snap': () => { this.state.snappingConfig.enabled = !this.state.snappingConfig.enabled; this.render(); },
+      'toggle-ortho': () => { this.state.orthoEnabled = !this.state.orthoEnabled; this.render(); },
+      'add-layer': () => {
+        const base = document.getElementById('cadLayerNewName')?.value?.trim();
+        if (!base) return;
+        const name = this.state.layers[base] ? `${base}_${Date.now().toString().slice(-4)}` : base;
+        this.state.layers[name] = { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' };
+        this.state.activeLayer = name;
+        this.markDirty('Layer criada');
+        this.render();
+      },
+      'delete-selection': () => {
+        this.state.entities = this.state.entities.filter((e) => !this.selection.includes(e.id));
+        this.selection.clear();
+        this.pushHistory();
+        this.render();
+      },
+      undo: () => {
+        if (this.undoStack.length < 2) return;
+        const cur = this.undoStack.pop();
+        this.redoStack.push(cur);
+        this.applySerialized(this.undoStack[this.undoStack.length - 1]);
+      },
+      redo: () => {
+        if (!this.redoStack.length) return;
+        const state = this.redoStack.pop();
+        this.undoStack.push(state);
+        this.applySerialized(state);
+      },
+      save: async () => { await this.saveDrawing(); this.render(); },
+      'save-metadata': async () => { await this.saveMetadata(); },
+    };
+
+    const handler = actions[action];
+    if (!handler) {
+      // eslint-disable-next-line no-console
+      console.warn('[CAD] Ação não mapeada:', action);
+      return;
+    }
+    Promise.resolve(handler()).catch((e) => {
+      this.state.statusMessage = e.message;
       this.render();
-    }));
-    list.querySelectorAll('[data-layer-color]').forEach((el) => el.addEventListener('change', (e) => {
-      const n = e.target.dataset.layerColor;
-      this.state.layers[n].color = e.target.value;
-      this.render();
-    }));
-    list.querySelectorAll('[data-layer-activate]').forEach((el) => el.addEventListener('click', (e) => {
-      this.state.activeLayer = e.currentTarget.dataset.layerActivate;
-      this.render();
-    }));
+    });
   }
 
   scheduleAutosave() {
@@ -463,6 +512,10 @@ export class DesenhoTecnicoController {
   }
 
   bindUI() {
+    if (this.isUiBound) return;
+    this.isUiBound = true;
+    // eslint-disable-next-line no-console
+    console.info('[CAD] Editor inicializado, iniciando bind de eventos');
     window.addEventListener('resize', () => { this.viewport.resize(); this.render(); });
     this.eventBus.on('viewport:changed', () => this.render());
     this.eventBus.on('selection:changed', () => this.render());
@@ -471,54 +524,49 @@ export class DesenhoTecnicoController {
     this.eventBus.on('cursor:move', (c) => { this.updateStatus(c); this.render(); });
     document.querySelectorAll('[data-tool]').forEach((btn) => {
       const unsupported = ['copy', 'move', 'erase'];
-      if (unsupported.includes(btn.dataset.tool)) {
-        btn.disabled = true;
-        btn.title = 'Ferramenta em desenvolvimento';
+      if (!unsupported.includes(btn.dataset.tool)) return;
+      btn.disabled = true;
+      btn.title = 'Ferramenta em desenvolvimento';
+    });
+    const cadRoot = document.querySelector('.cad-fullscreen');
+    if (!cadRoot) {
+      // eslint-disable-next-line no-console
+      console.warn('[CAD] Container raiz não encontrado para bind da toolbar');
+      return;
+    }
+    // eslint-disable-next-line no-console
+    console.info('[CAD] Toolbar encontrada; registrando delegação de eventos');
+    cadRoot.addEventListener('click', (event) => {
+      const target = event.target.closest('[data-action],[data-layer-activate]');
+      if (!target) return;
+      if (target.dataset.layerActivate) {
+        this.state.activeLayer = target.dataset.layerActivate;
+        this.render();
         return;
       }
-      btn.addEventListener('click', () => { this.toolManager.set(btn.dataset.tool); this.eventBus.emit('tool:changed', this.toolManager.name); this.render(); });
+      this.executeAction(target.dataset.action, target);
     });
-    document.getElementById('cadZoomExtentsBtn')?.addEventListener('click', () => { this.viewport.zoomExtents(this.renderer.getGlobalBounds()); });
-    document.getElementById('cadResetViewBtn')?.addEventListener('click', () => { this.viewport.resetView(); this.fitInitial(); });
-    document.getElementById('cadGridToggle')?.addEventListener('click', () => { this.state.gridConfig.visible = !this.state.gridConfig.visible; this.render(); });
-    document.getElementById('cadSnapToggle')?.addEventListener('click', () => { this.state.snappingConfig.enabled = !this.state.snappingConfig.enabled; this.render(); });
-    document.getElementById('cadOrthoToggle')?.addEventListener('click', () => { this.state.orthoEnabled = !this.state.orthoEnabled; this.render(); });
-    document.querySelectorAll('.cad-status-toggle').forEach((btn) => btn.addEventListener('click', () => document.getElementById(`cad${btn.dataset.toggle[0].toUpperCase()}${btn.dataset.toggle.slice(1)}Toggle`)?.click()));
+    cadRoot.addEventListener('change', (event) => {
+      const target = event.target;
+      if (target.dataset.layerVisible) {
+        this.state.layers[target.dataset.layerVisible].visible = target.checked;
+        this.render();
+      } else if (target.dataset.layerLocked) {
+        this.state.layers[target.dataset.layerLocked].locked = target.checked;
+        this.render();
+      } else if (target.dataset.layerColor) {
+        this.state.layers[target.dataset.layerColor].color = target.value;
+        this.render();
+      }
+    });
     document.getElementById('cadLayerSelect')?.addEventListener('change', (e) => { this.state.activeLayer = e.target.value; this.render(); });
-    document.getElementById('cadLayerAddBtn')?.addEventListener('click', () => {
-      const base = document.getElementById('cadLayerNewName')?.value?.trim();
-      if (!base) return;
-      const name = this.state.layers[base] ? `${base}_${Date.now().toString().slice(-4)}` : base;
-      this.state.layers[name] = { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' };
-      this.state.activeLayer = name;
-      this.markDirty('Layer criada');
-      this.render();
-    });
-    document.getElementById('cadDeleteBtn')?.addEventListener('click', () => {
-      this.state.entities = this.state.entities.filter((e) => !this.selection.includes(e.id));
-      this.selection.clear();
-      this.pushHistory();
-      this.render();
-    });
-    document.getElementById('cadUndoBtn')?.addEventListener('click', () => {
-      if (this.undoStack.length < 2) return;
-      const cur = this.undoStack.pop();
-      this.redoStack.push(cur);
-      this.applySerialized(this.undoStack[this.undoStack.length - 1]);
-    });
-    document.getElementById('cadRedoBtn')?.addEventListener('click', () => {
-      if (!this.redoStack.length) return;
-      const state = this.redoStack.pop();
-      this.undoStack.push(state);
-      this.applySerialized(state);
-    });
-    document.getElementById('cadSaveBtn')?.addEventListener('click', async () => { try { await this.saveDrawing(); this.render(); } catch (e) { this.state.statusMessage = e.message; this.render(); } });
-    document.getElementById('cadMetaSaveBtn')?.addEventListener('click', async () => { try { await this.saveMetadata(); } catch (e) { this.state.statusMessage = e.message; this.render(); } });
+    // eslint-disable-next-line no-console
+    console.info('[CAD] Bind de eventos concluído');
     window.addEventListener('keydown', async (e) => {
-      if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); await this.saveDrawing(); this.render(); }
-      if (e.key === 'Delete') document.getElementById('cadDeleteBtn')?.click();
-      if (e.ctrlKey && e.key.toLowerCase() === 'z') document.getElementById('cadUndoBtn')?.click();
-      if (e.ctrlKey && e.key.toLowerCase() === 'y') document.getElementById('cadRedoBtn')?.click();
+      if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); this.executeAction('save'); }
+      if (e.key === 'Delete') this.executeAction('delete-selection');
+      if (e.ctrlKey && e.key.toLowerCase() === 'z') this.executeAction('undo');
+      if (e.ctrlKey && e.key.toLowerCase() === 'y') this.executeAction('redo');
     });
   }
 }

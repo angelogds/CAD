@@ -15,7 +15,7 @@
       
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Arquivo</span>
-        <button class="cad-btn cad-btn-success" id="cadSaveBtn" title="Salvar (Ctrl+S)">
+        <button class="cad-btn cad-btn-success" id="cadSaveBtn" data-action="save" type="button" title="Salvar (Ctrl+S)">
           Salvar
         </button>
         <a class="cad-btn" href="/desenho-tecnico/cad/<%= desenho.id %>/pdf" title="Gerar PDF">
@@ -27,33 +27,33 @@
       
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Editar</span>
-        <button class="cad-btn" id="cadUndoBtn" title="Desfazer (Ctrl+Z)">↶</button>
-        <button class="cad-btn" id="cadRedoBtn" title="Refazer (Ctrl+Y)">↷</button>
-        <button class="cad-btn cad-btn-danger" id="cadDeleteBtn" title="Apagar seleção (Del)">Del</button>
+        <button class="cad-btn" id="cadUndoBtn" data-action="undo" type="button" title="Desfazer (Ctrl+Z)">↶</button>
+        <button class="cad-btn" id="cadRedoBtn" data-action="redo" type="button" title="Refazer (Ctrl+Y)">↷</button>
+        <button class="cad-btn cad-btn-danger" id="cadDeleteBtn" data-action="delete-selection" type="button" title="Apagar seleção (Del)">Del</button>
       </div>
       
       <div class="cad-toolbar-divider"></div>
       
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Ferramentas</span>
-        <button class="cad-btn" data-tool="select" title="Selecionar (V)">Seleção</button>
-        <button class="cad-btn" data-tool="pan" title="Pan (M)">Pan</button>
-        <button class="cad-btn" data-tool="line" title="Linha (L)">Linha</button>
-        <button class="cad-btn" data-tool="polyline" title="Polilinha (P)">Polilinha</button>
-        <button class="cad-btn" data-tool="rect" title="Retângulo (R)">Retângulo</button>
-        <button class="cad-btn" data-tool="circle" title="Círculo (C)">Círculo</button>
-        <button class="cad-btn" data-tool="arc" title="Arco">Arco</button>
-        <button class="cad-btn" data-tool="text" title="Texto (T)">T Texto</button>
+        <button class="cad-btn" data-action="tool-select" data-tool="select" type="button" title="Selecionar (V)">Seleção</button>
+        <button class="cad-btn" data-action="tool-pan" data-tool="pan" type="button" title="Pan (M)">Pan</button>
+        <button class="cad-btn" data-action="tool-line" data-tool="line" type="button" title="Linha (L)">Linha</button>
+        <button class="cad-btn" data-action="tool-polyline" data-tool="polyline" type="button" title="Polilinha (P)">Polilinha</button>
+        <button class="cad-btn" data-action="tool-rect" data-tool="rect" type="button" title="Retângulo (R)">Retângulo</button>
+        <button class="cad-btn" data-action="tool-circle" data-tool="circle" type="button" title="Círculo (C)">Círculo</button>
+        <button class="cad-btn" data-action="tool-arc" data-tool="arc" type="button" title="Arco">Arco</button>
+        <button class="cad-btn" data-action="tool-text" data-tool="text" type="button" title="Texto (T)">T Texto</button>
       </div>
       
       <div class="cad-toolbar-divider"></div>
       
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Eixo</span>
-        <button class="cad-btn cad-btn-primary" data-tool="shaft" title="Eixo Paramétrico (X)">
+        <button class="cad-btn cad-btn-primary" data-action="tool-shaft" data-tool="shaft" type="button" title="Eixo Paramétrico (X)">
           Eixo
         </button>
-        <button class="cad-btn" data-tool="centerline" title="Linha de Centro">
+        <button class="cad-btn" data-action="tool-centerline" data-tool="centerline" type="button" title="Linha de Centro">
           Centro
         </button>
       </div>
@@ -62,25 +62,25 @@
       
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Cotas</span>
-        <button class="cad-btn" data-tool="dim_linear" title="Cota Linear (D)">Linear</button>
-        <button class="cad-btn" data-tool="dim_diameter" title="Cota Diâmetro">Diâmetro</button>
-        <button class="cad-btn" data-tool="dim_angular" title="Cota Angular">Angular</button>
+        <button class="cad-btn" data-action="tool-dim-linear" data-tool="dim_linear" type="button" title="Cota Linear (D)">Linear</button>
+        <button class="cad-btn" data-action="tool-dim-diameter" data-tool="dim_diameter" type="button" title="Cota Diâmetro">Diâmetro</button>
+        <button class="cad-btn" data-action="tool-dim-angular" data-tool="dim_angular" type="button" title="Cota Angular">Angular</button>
       </div>
     </div>
     
     <div class="cad-toolbar-row">
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Precisão</span>
-        <button class="cad-btn" id="cadGridToggle">Grid</button>
-        <button class="cad-btn" id="cadSnapToggle">Snap</button>
-        <button class="cad-btn" id="cadOrthoToggle">Ortho</button>
+        <button class="cad-btn" id="cadGridToggle" data-action="toggle-grid" type="button">Grid</button>
+        <button class="cad-btn" id="cadSnapToggle" data-action="toggle-snap" type="button">Snap</button>
+        <button class="cad-btn" id="cadOrthoToggle" data-action="toggle-ortho" type="button">Ortho</button>
       </div>
       
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Zoom</span>
-        <button class="cad-btn" data-tool="zoom-window" title="Zoom janela">Janela</button>
-        <button class="cad-btn" id="cadZoomExtentsBtn" title="Zoom Extents">Extents</button>
-        <button class="cad-btn" id="cadResetViewBtn" title="Resetar vista">Resetar</button>
+        <button class="cad-btn" data-action="tool-zoom-window" data-tool="zoom-window" type="button" title="Zoom janela">Janela</button>
+        <button class="cad-btn" id="cadZoomExtentsBtn" data-action="zoom-extents" type="button" title="Zoom Extents">Extents</button>
+        <button class="cad-btn" id="cadResetViewBtn" data-action="reset-view" type="button" title="Resetar vista">Resetar</button>
       </div>
       
       <div class="cad-toolbar-group" style="margin-left:auto;">
@@ -98,35 +98,35 @@
       <div class="cad-panel-section">
         <div class="cad-panel-header">Desenho</div>
         <div class="cad-panel-content">
-          <button class="cad-tool-btn" data-tool="select">
+          <button class="cad-tool-btn" data-action="tool-select" data-tool="select" type="button">
             <span class="cad-tool-icon">◻</span>
             <span>Selecionar</span>
           </button>
-          <button class="cad-tool-btn" data-tool="line">
+          <button class="cad-tool-btn" data-action="tool-line" data-tool="line" type="button">
             <span class="cad-tool-icon">／</span>
             <span>Linha</span>
           </button>
-          <button class="cad-tool-btn" data-tool="pan">
+          <button class="cad-tool-btn" data-action="tool-pan" data-tool="pan" type="button">
             <span class="cad-tool-icon">⟂</span>
             <span>Pan</span>
           </button>
-          <button class="cad-tool-btn" data-tool="polyline">
+          <button class="cad-tool-btn" data-action="tool-polyline" data-tool="polyline" type="button">
             <span class="cad-tool-icon">⎺</span>
             <span>Polilinha</span>
           </button>
-          <button class="cad-tool-btn" data-tool="rect">
+          <button class="cad-tool-btn" data-action="tool-rect" data-tool="rect" type="button">
             <span class="cad-tool-icon">▭</span>
             <span>Retângulo</span>
           </button>
-          <button class="cad-tool-btn" data-tool="circle">
+          <button class="cad-tool-btn" data-action="tool-circle" data-tool="circle" type="button">
             <span class="cad-tool-icon">◯</span>
             <span>Círculo</span>
           </button>
-          <button class="cad-tool-btn" data-tool="arc">
+          <button class="cad-tool-btn" data-action="tool-arc" data-tool="arc" type="button">
             <span class="cad-tool-icon">◜</span>
             <span>Arco</span>
           </button>
-          <button class="cad-tool-btn" data-tool="text">
+          <button class="cad-tool-btn" data-action="tool-text" data-tool="text" type="button">
             <span class="cad-tool-icon">T</span>
             <span>Texto</span>
           </button>
@@ -136,11 +136,11 @@
       <div class="cad-panel-section">
         <div class="cad-panel-header">Eixo Mecânico</div>
         <div class="cad-panel-content">
-          <button class="cad-tool-btn" data-tool="shaft">
+          <button class="cad-tool-btn" data-action="tool-shaft" data-tool="shaft" type="button">
             <span class="cad-tool-icon">◎</span>
             <span>Eixo Paramétrico</span>
           </button>
-          <button class="cad-tool-btn" data-tool="centerline">
+          <button class="cad-tool-btn" data-action="tool-centerline" data-tool="centerline" type="button">
             <span class="cad-tool-icon">╍</span>
             <span>Linha de Centro</span>
           </button>
@@ -150,15 +150,15 @@
       <div class="cad-panel-section">
         <div class="cad-panel-header">Cotas</div>
         <div class="cad-panel-content">
-          <button class="cad-tool-btn" data-tool="dim_linear">
+          <button class="cad-tool-btn" data-action="tool-dim-linear" data-tool="dim_linear" type="button">
             <span class="cad-tool-icon">↔</span>
             <span>Cota Linear</span>
           </button>
-          <button class="cad-tool-btn" data-tool="dim_diameter">
+          <button class="cad-tool-btn" data-action="tool-dim-diameter" data-tool="dim_diameter" type="button">
             <span class="cad-tool-icon">⌀</span>
             <span>Cota Diâmetro</span>
           </button>
-          <button class="cad-tool-btn" data-tool="dim_angular">
+          <button class="cad-tool-btn" data-action="tool-dim-angular" data-tool="dim_angular" type="button">
             <span class="cad-tool-icon">∠</span>
             <span>Cota Angular</span>
           </button>
@@ -168,14 +168,14 @@
       <div class="cad-panel-section">
         <div class="cad-panel-header">Modificar</div>
         <div class="cad-panel-content">
-          <button class="cad-tool-btn" data-tool="copy"><span class="cad-tool-icon">⎘</span><span>Copy</span></button>
-          <button class="cad-tool-btn" data-tool="move"><span class="cad-tool-icon">↕</span><span>Move</span></button>
-          <button class="cad-tool-btn" data-tool="mirror"><span class="cad-tool-icon">⇋</span><span>Mirror</span></button>
-          <button class="cad-tool-btn" data-tool="offset"><span class="cad-tool-icon">⧉</span><span>Offset</span></button>
-          <button class="cad-tool-btn" data-tool="trim"><span class="cad-tool-icon">✂</span><span>Trim</span></button>
-          <button class="cad-tool-btn" data-tool="extend"><span class="cad-tool-icon">⇢</span><span>Extend</span></button>
-          <button class="cad-tool-btn" data-tool="measure"><span class="cad-tool-icon">∣</span><span>Medição</span></button>
-          <button class="cad-tool-btn" data-tool="erase">
+          <button class="cad-tool-btn" data-action="tool-copy" data-tool="copy" type="button"><span class="cad-tool-icon">⎘</span><span>Copy</span></button>
+          <button class="cad-tool-btn" data-action="tool-move" data-tool="move" type="button"><span class="cad-tool-icon">↕</span><span>Move</span></button>
+          <button class="cad-tool-btn" data-action="tool-mirror" data-tool="mirror" type="button"><span class="cad-tool-icon">⇋</span><span>Mirror</span></button>
+          <button class="cad-tool-btn" data-action="tool-offset" data-tool="offset" type="button"><span class="cad-tool-icon">⧉</span><span>Offset</span></button>
+          <button class="cad-tool-btn" data-action="tool-trim" data-tool="trim" type="button"><span class="cad-tool-icon">✂</span><span>Trim</span></button>
+          <button class="cad-tool-btn" data-action="tool-extend" data-tool="extend" type="button"><span class="cad-tool-icon">⇢</span><span>Extend</span></button>
+          <button class="cad-tool-btn" data-action="tool-measure" data-tool="measure" type="button"><span class="cad-tool-icon">∣</span><span>Medição</span></button>
+          <button class="cad-tool-btn" data-action="tool-erase" data-tool="erase" type="button">
             <span class="cad-tool-icon">Del</span>
             <span>Apagar</span>
           </button>
@@ -207,7 +207,7 @@
           </div>
           <div class="cad-layer-create">
             <input class="cad-input" id="cadLayerNewName" placeholder="Nova camada (ex.: furacao)">
-            <button class="cad-btn" id="cadLayerAddBtn">Adicionar</button>
+            <button class="cad-btn" id="cadLayerAddBtn" data-action="add-layer" type="button">Adicionar</button>
           </div>
           <div id="cadLayersList"></div>
         </div>
@@ -244,7 +244,7 @@
               <label class="cad-prop-label">Observações</label>
               <textarea class="cad-input" id="cadMetaObservacoes" rows="3" style="min-height:60px;"><%= desenho.observacoes || '' %></textarea>
             </div>
-            <button class="cad-btn cad-btn-lg" id="cadMetaSaveBtn" style="width:100%;margin-top:8px;">
+            <button class="cad-btn cad-btn-lg" id="cadMetaSaveBtn" data-action="save-metadata" type="button" style="width:100%;margin-top:8px;">
               Salvar Metadados
             </button>
           </div>
@@ -276,9 +276,9 @@
       </div>
     </div>
     <div class="cad-status-right">
-      <button class="cad-status-toggle active" data-toggle="grid">GRID</button>
-      <button class="cad-status-toggle active" data-toggle="snap">SNAP</button>
-      <button class="cad-status-toggle" data-toggle="ortho">ORTHO</button>
+      <button class="cad-status-toggle active" data-toggle="grid" data-action="toggle-grid" type="button">GRID</button>
+      <button class="cad-status-toggle active" data-toggle="snap" data-action="toggle-snap" type="button">SNAP</button>
+      <button class="cad-status-toggle" data-toggle="ortho" data-action="toggle-ortho" type="button">ORTHO</button>
     </div>
   </div>
 </div>
