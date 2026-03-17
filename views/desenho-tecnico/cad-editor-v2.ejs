@@ -3,7 +3,7 @@
 
 <link rel="stylesheet" href="/css/cad-autocad.css">
 
-<div class="cad-fullscreen">
+<div class="cad-fullscreen cad-left-compact">
   <!-- TOOLBAR SUPERIOR -->
   <div class="cad-toolbar">
     <div class="cad-toolbar-row">
@@ -92,7 +92,7 @@
   </div>
   
   <!-- WORKSPACE -->
-  <div class="cad-workspace">
+  <div class="cad-workspace" id="cadWorkspace">
     <!-- PAINEL ESQUERDO - FERRAMENTAS -->
     <div class="cad-panel-left">
       <div class="cad-panel-section">
@@ -190,7 +190,7 @@
     </div>
     
     <!-- PAINEL DIREITO - PROPRIEDADES -->
-    <div class="cad-panel-right">
+    <div class="cad-panel-right" id="cadRightPanel">
       <div class="cad-panel-section">
         <div class="cad-panel-header">Propriedades</div>
         <div class="cad-panel-content" id="cadProperties">
@@ -251,6 +251,19 @@
         </div>
       </div>
     </div>
+
+    <button
+      class="cad-right-toggle"
+      id="cadRightToggle"
+      data-action="toggle-right-panel"
+      type="button"
+      aria-label="Recolher painel direito"
+      aria-expanded="true"
+      title="Recolher painel direito"
+    >
+      <span class="cad-right-toggle-icon">⟩</span>
+      <span class="cad-right-toggle-label">Painel</span>
+    </button>
   </div>
   
   <!-- STATUS BAR -->

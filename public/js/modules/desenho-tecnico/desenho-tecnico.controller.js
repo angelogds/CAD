@@ -432,6 +432,12 @@ export class DesenhoTecnicoController {
       'toggle-grid': () => { this.state.gridConfig.visible = !this.state.gridConfig.visible; this.render(); },
       'toggle-snap': () => { this.state.snappingConfig.enabled = !this.state.snappingConfig.enabled; this.render(); },
       'toggle-ortho': () => { this.state.orthoEnabled = !this.state.orthoEnabled; this.render(); },
+      'toggle-right-panel': () => {
+        const root = document.querySelector('.cad-fullscreen');
+        if (!root) return;
+        root.classList.toggle('cad-right-collapsed');
+        setTimeout(() => this.eventBus.emit('layout:changed'), 230);
+      },
       'add-layer': () => {
         const base = document.getElementById('cadLayerNewName')?.value?.trim();
         if (!base) return;
@@ -560,6 +566,7 @@ export class DesenhoTecnicoController {
       }
     });
     document.getElementById('cadLayerSelect')?.addEventListener('change', (e) => { this.state.activeLayer = e.target.value; this.render(); });
+    this.setupLayoutControls();
     // eslint-disable-next-line no-console
     console.info('[CAD] Bind de eventos concluído');
     window.addEventListener('keydown', async (e) => {
@@ -567,6 +574,26 @@ export class DesenhoTecnicoController {
       if (e.key === 'Delete') this.executeAction('delete-selection');
       if (e.ctrlKey && e.key.toLowerCase() === 'z') this.executeAction('undo');
       if (e.ctrlKey && e.key.toLowerCase() === 'y') this.executeAction('redo');
+    });
+  }
+
+  setupLayoutControls() {
+    const root = document.querySelector('.cad-fullscreen');
+    const rightToggle = document.getElementById('cadRightToggle');
+    if (!root || !rightToggle) return;
+
+    const syncToggle = () => {
+      const collapsed = root.classList.contains('cad-right-collapsed');
+      rightToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      rightToggle.setAttribute('aria-label', collapsed ? 'Expandir painel direito' : 'Recolher painel direito');
+      rightToggle.setAttribute('title', collapsed ? 'Expandir painel direito' : 'Recolher painel direito');
+    };
+
+    syncToggle();
+    this.eventBus.on('layout:changed', () => {
+      this.viewport.resize();
+      this.render();
+      syncToggle();
     });
   }
 }
