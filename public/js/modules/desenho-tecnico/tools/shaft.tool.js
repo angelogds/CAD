@@ -1,28 +1,69 @@
 import { BaseTool } from './base.tool.js';
-import { PolylineEntity } from '../entities/polyline.entity.js';
+import { ShaftEntity } from '../entities/shaft.entity.js';
 
 export class ShaftTool extends BaseTool {
-  constructor(ctx) { super(ctx); this.name = 'shaft'; this.base = null; this.segments = []; }
-  activate() { this.ctx.prompt.set({ message: 'Eixo: clique base inicial. Enter finaliza.' }); }
+  constructor(ctx) {
+    super(ctx);
+    this.name = 'shaft';
+    this.origin = null;
+    this.orientation = 'horizontal';
+    this.segments = [];
+    this.selectedSegment = -1;
+  }
+
+  activate() {
+    this.origin = null;
+    this.segments = [];
+    this.selectedSegment = -1;
+    this.ctx.prompt.set({ message: 'Eixo paramétrico: clique origem e adicione trechos (Enter finaliza).' });
+  }
+
   onMouseDown(evt) {
-    const p = this.ctx.getPoint(evt.world, this.base || null);
-    if (!this.base) { this.base = p; this.segments = [p]; return; }
+    const p = this.ctx.getPoint(evt.world, this.origin);
+    if (!this.origin) {
+      this.origin = p;
+      this.orientation = window.prompt('Orientação do eixo (h/v)', 'h')?.toLowerCase() === 'v' ? 'vertical' : 'horizontal';
+      this.ctx.prompt.set({ message: 'Trecho: informe comprimento e diâmetro no prompt.' });
+      return;
+    }
     const length = Number(window.prompt('Comprimento do trecho', '40') || 0);
     const diameter = Number(window.prompt('Diâmetro do trecho', '20') || 0);
-    if (!Number.isFinite(length) || length <= 0) return;
-    const next = { x: this.base.x + length, y: this.base.y };
-    this.segments.push(next);
-    this.base = next;
-    this.ctx.preview.set([{ type: 'polyline', points: this.segments }]);
-    this.ctx.state.statusMessage = `Trecho adicionado: L=${length}, Ø=${diameter}`;
+    if (!Number.isFinite(length) || !Number.isFinite(diameter) || length <= 0 || diameter <= 0) return;
+    this.segments.push({ length, diameter });
+    this.selectedSegment = this.segments.length - 1;
+    this.updatePreview(p);
+    this.ctx.statusMessage = `Eixo: ${this.segments.length} trecho(s), L=${this.segments.reduce((a, s) => a + s.length, 0).toFixed(2)}`;
   }
+
+  onMouseMove(evt) {
+    if (!this.origin || !this.segments.length) return;
+    this.updatePreview(this.ctx.getPoint(evt.world, this.origin));
+  }
+
+  updatePreview(cursorPoint) {
+    const geom = { origin: this.origin, orientation: this.orientation, segments: this.segments, selectedSegment: this.selectedSegment };
+    this.ctx.preview.set([{ type: 'shaft', geometry: geom, cursorPoint }]);
+  }
+
   commit() {
-    if (this.segments.length > 1) {
-      this.ctx.addEntity(new PolylineEntity({ geometry: { points: [...this.segments] }, metadata: { layer: 'geometria_principal', shaft: true } }));
+    if (this.origin && this.segments.length) {
+      this.ctx.addEntity(new ShaftEntity({
+        geometry: {
+          origin: { ...this.origin },
+          orientation: this.orientation,
+          segments: this.segments.map((s) => ({ ...s })),
+        },
+        metadata: { layer: this.ctx.state.activeLayer },
+      }));
     }
-    this.base = null;
+    this.cancel();
+    this.ctx.prompt.set({ message: 'Eixo paramétrico finalizado' });
+  }
+
+  cancel() {
+    this.origin = null;
     this.segments = [];
+    this.selectedSegment = -1;
     this.ctx.preview.clear();
   }
-  cancel() { this.base = null; this.segments = []; this.ctx.preview.clear(); }
 }

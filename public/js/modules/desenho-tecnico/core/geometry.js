@@ -36,6 +36,22 @@ export class Matrix3 {
 
 export const distance2D = (a, b) => Math.hypot((b.x - a.x), (b.y - a.y));
 export const angle2D = (a, b) => Math.atan2((b.y - a.y), (b.x - a.x));
+export const normalizeAngle = (a) => {
+  let n = a % (Math.PI * 2);
+  if (n < 0) n += Math.PI * 2;
+  return n;
+};
+export const isAngleBetween = (angle, start, end, ccw = true) => {
+  const a = normalizeAngle(angle);
+  const s = normalizeAngle(start);
+  const e = normalizeAngle(end);
+  if (ccw) {
+    if (s <= e) return a >= s && a <= e;
+    return a >= s || a <= e;
+  }
+  if (e <= s) return a <= s && a >= e;
+  return a <= s || a >= e;
+};
 export const rotatePoint = (p, angleRad, center = new Point2D()) => {
   const x = p.x - center.x; const y = p.y - center.y;
   return new Point2D(center.x + x * Math.cos(angleRad) - y * Math.sin(angleRad), center.y + x * Math.sin(angleRad) + y * Math.cos(angleRad));
