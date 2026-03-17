@@ -85,6 +85,7 @@ export class DesenhoTecnicoController {
     this.interaction.bind();
     this.toolManager.set(initial.activeTool || 'select');
     this.fitInitial();
+    if (initial.viewport) this.viewport.setView(initial.viewport);
     this.pushHistory();
     this.render();
   }
@@ -219,11 +220,11 @@ export class DesenhoTecnicoController {
   updateStatus(cursor = null) {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     const zoom = this.viewport.getViewState().zoom;
-    set('cadStatusTool', this.state.activeTool);
-    set('cadStatusZoom', `${(zoom * 100).toFixed(0)}%`);
-    if (cursor) { set('cadStatusX', cursor.world.x.toFixed(2)); set('cadStatusY', cursor.world.y.toFixed(2)); }
+    set('cadStatusTool', `Ferramenta: ${this.state.activeTool}`);
+    set('cadStatusZoom', `Zoom: ${(zoom * 100).toFixed(0)}%`);
+    if (cursor) { set('cadStatusX', `X: ${cursor.world.x.toFixed(2)}`); set('cadStatusY', `Y: ${cursor.world.y.toFixed(2)}`); }
     const first = this.state.entities.find((e) => this.selection.includes(e.id));
-    set('cadStatusSelected', first?.type || '-');
+    set('cadStatusSelected', `Selecionado: ${first?.type || '-'}`);
     this.renderProperties(first);
     set('cadStatusMessage', this.state.statusMessage || this.prompt.message || 'Pronto');
   }
