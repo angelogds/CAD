@@ -765,11 +765,7 @@ export class DesenhoTecnicoController {
     const toolbar = root?.querySelector('.cad-toolbar');
     const status = root?.querySelector('.cad-statusbar');
     if (!root || !workspace || !toolbar || !status) return;
-    const viewportHeight = Math.max(
-      window.innerHeight || 0,
-      document.documentElement?.clientHeight || 0,
-      window.visualViewport?.height || 0,
-    );
+    const viewportHeight = window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || 0;
     const rootRect = root.getBoundingClientRect();
     const toolbarRect = toolbar.getBoundingClientRect();
     const statusRect = status.getBoundingClientRect();
