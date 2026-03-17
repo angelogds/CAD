@@ -41,23 +41,36 @@ export class DesenhoTecnicoRenderer {
     const g = this.layers.grid;
     g.innerHTML = '';
     if (!this.state.gridConfig.visible) return;
-    const step = this.state.gridConfig.step;
+
     const v = this.viewport.getViewState();
+    const baseStep = Math.max(1, this.state.gridConfig.step || 20);
+    const targetPx = 36;
+    const zoom = Math.max(0.0001, v.zoom);
+    const scaled = baseStep * zoom;
+    const power = Math.pow(2, Math.round(Math.log2(targetPx / Math.max(1, scaled))));
+    const minorStep = Math.max(baseStep / 16, baseStep * power);
+    const majorEvery = 5;
+    const majorStep = minorStep * majorEvery;
+
     const min = this.viewport.screenToWorld(0, 0);
     const max = this.viewport.screenToWorld(v.width, v.height);
-    const startX = Math.floor(min.x / step) * step;
-    const endX = Math.ceil(max.x / step) * step;
-    const startY = Math.floor(min.y / step) * step;
-    const endY = Math.ceil(max.y / step) * step;
-    for (let x = startX; x <= endX; x += step) {
+    const startX = Math.floor(min.x / minorStep) * minorStep;
+    const endX = Math.ceil(max.x / minorStep) * minorStep;
+    const startY = Math.floor(min.y / minorStep) * minorStep;
+    const endY = Math.ceil(max.y / minorStep) * minorStep;
+
+    for (let x = startX; x <= endX + minorStep * 0.5; x += minorStep) {
       const p1 = this.viewport.worldToScreen(x, startY);
       const p2 = this.viewport.worldToScreen(x, endY);
-      g.insertAdjacentHTML('beforeend', `<line x1='${p1.x}' y1='${p1.y}' x2='${p2.x}' y2='${p2.y}' stroke='#1e293b' stroke-width='1'/>`);
+      const isMajor = Math.abs(Math.round(x / majorStep) - x / majorStep) < 1e-6;
+      g.insertAdjacentHTML('beforeend', `<line x1='${p1.x.toFixed(2)}' y1='${p1.y.toFixed(2)}' x2='${p2.x.toFixed(2)}' y2='${p2.y.toFixed(2)}' stroke='${isMajor ? '#334155' : '#1e293b'}' stroke-width='1'/>`);
     }
-    for (let y = startY; y <= endY; y += step) {
+
+    for (let y = startY; y <= endY + minorStep * 0.5; y += minorStep) {
       const p1 = this.viewport.worldToScreen(startX, y);
       const p2 = this.viewport.worldToScreen(endX, y);
-      g.insertAdjacentHTML('beforeend', `<line x1='${p1.x}' y1='${p1.y}' x2='${p2.x}' y2='${p2.y}' stroke='#1e293b' stroke-width='1'/>`);
+      const isMajor = Math.abs(Math.round(y / majorStep) - y / majorStep) < 1e-6;
+      g.insertAdjacentHTML('beforeend', `<line x1='${p1.x.toFixed(2)}' y1='${p1.y.toFixed(2)}' x2='${p2.x.toFixed(2)}' y2='${p2.y.toFixed(2)}' stroke='${isMajor ? '#334155' : '#1e293b'}' stroke-width='1'/>`);
     }
   }
 

@@ -16,10 +16,10 @@
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Arquivo</span>
         <button class="cad-btn cad-btn-success" id="cadSaveBtn" title="Salvar (Ctrl+S)">
-          💾 Salvar
+          Salvar
         </button>
         <a class="cad-btn" href="/desenho-tecnico/cad/<%= desenho.id %>/pdf" title="Gerar PDF">
-          📄 PDF
+          PDF
         </a>
       </div>
       
@@ -29,20 +29,20 @@
         <span class="cad-toolbar-group-label">Editar</span>
         <button class="cad-btn" id="cadUndoBtn" title="Desfazer (Ctrl+Z)">↶</button>
         <button class="cad-btn" id="cadRedoBtn" title="Refazer (Ctrl+Y)">↷</button>
-        <button class="cad-btn cad-btn-danger" id="cadDeleteBtn" title="Apagar seleção (Del)">🗑</button>
+        <button class="cad-btn cad-btn-danger" id="cadDeleteBtn" title="Apagar seleção (Del)">Del</button>
       </div>
       
       <div class="cad-toolbar-divider"></div>
       
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Ferramentas</span>
-        <button class="cad-btn" data-tool="select" title="Selecionar (V)">🔲 Selecionar</button>
-        <button class="cad-btn" data-tool="pan" title="Pan (M)">✋ Pan</button>
-        <button class="cad-btn" data-tool="line" title="Linha (L)">／ Linha</button>
-        <button class="cad-btn" data-tool="polyline" title="Polilinha (P)">⎺ Polilinha</button>
-        <button class="cad-btn" data-tool="rect" title="Retângulo (R)">▭ Retângulo</button>
-        <button class="cad-btn" data-tool="circle" title="Círculo (C)">◯ Círculo</button>
-        <button class="cad-btn" data-tool="arc" title="Arco">◜ Arco</button>
+        <button class="cad-btn" data-tool="select" title="Selecionar (V)">Seleção</button>
+        <button class="cad-btn" data-tool="pan" title="Pan (M)">Pan</button>
+        <button class="cad-btn" data-tool="line" title="Linha (L)">Linha</button>
+        <button class="cad-btn" data-tool="polyline" title="Polilinha (P)">Polilinha</button>
+        <button class="cad-btn" data-tool="rect" title="Retângulo (R)">Retângulo</button>
+        <button class="cad-btn" data-tool="circle" title="Círculo (C)">Círculo</button>
+        <button class="cad-btn" data-tool="arc" title="Arco">Arco</button>
         <button class="cad-btn" data-tool="text" title="Texto (T)">T Texto</button>
       </div>
       
@@ -51,10 +51,10 @@
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Eixo</span>
         <button class="cad-btn cad-btn-primary" data-tool="shaft" title="Eixo Paramétrico (X)">
-          ⚙ Eixo
+          Eixo
         </button>
         <button class="cad-btn" data-tool="centerline" title="Linha de Centro">
-          ╍ Centro
+          Centro
         </button>
       </div>
       
@@ -62,25 +62,25 @@
       
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Cotas</span>
-        <button class="cad-btn" data-tool="dim_linear" title="Cota Linear (D)">↔ Linear</button>
-        <button class="cad-btn" data-tool="dim_diameter" title="Cota Diâmetro">⌀ Diâmetro</button>
-        <button class="cad-btn" data-tool="dim_angular" title="Cota Angular">∠ Angular</button>
+        <button class="cad-btn" data-tool="dim_linear" title="Cota Linear (D)">Linear</button>
+        <button class="cad-btn" data-tool="dim_diameter" title="Cota Diâmetro">Diâmetro</button>
+        <button class="cad-btn" data-tool="dim_angular" title="Cota Angular">Angular</button>
       </div>
     </div>
     
     <div class="cad-toolbar-row">
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Precisão</span>
-        <button class="cad-btn" id="cadGridToggle">🔲 Grid</button>
-        <button class="cad-btn" id="cadSnapToggle">⊕ Snap</button>
-        <button class="cad-btn" id="cadOrthoToggle">⊞ Ortho</button>
+        <button class="cad-btn" id="cadGridToggle">Grid</button>
+        <button class="cad-btn" id="cadSnapToggle">Snap</button>
+        <button class="cad-btn" id="cadOrthoToggle">Ortho</button>
       </div>
       
       <div class="cad-toolbar-group">
         <span class="cad-toolbar-group-label">Zoom</span>
-        <button class="cad-btn" data-tool="zoom-window" title="Zoom janela">▣ Janela</button>
-        <button class="cad-btn" id="cadZoomExtentsBtn" title="Zoom Extents">🔎 Extents</button>
-        <button class="cad-btn" id="cadResetViewBtn" title="Resetar vista">↺ Resetar</button>
+        <button class="cad-btn" data-tool="zoom-window" title="Zoom janela">Janela</button>
+        <button class="cad-btn" id="cadZoomExtentsBtn" title="Zoom Extents">Extents</button>
+        <button class="cad-btn" id="cadResetViewBtn" title="Resetar vista">Resetar</button>
       </div>
       
       <div class="cad-toolbar-group" style="margin-left:auto;">
@@ -99,7 +99,7 @@
         <div class="cad-panel-header">Desenho</div>
         <div class="cad-panel-content">
           <button class="cad-tool-btn" data-tool="select">
-            <span class="cad-tool-icon">🔲</span>
+            <span class="cad-tool-icon">◻</span>
             <span>Selecionar</span>
           </button>
           <button class="cad-tool-btn" data-tool="line">
@@ -107,7 +107,7 @@
             <span>Linha</span>
           </button>
           <button class="cad-tool-btn" data-tool="pan">
-            <span class="cad-tool-icon">✋</span>
+            <span class="cad-tool-icon">⟂</span>
             <span>Pan</span>
           </button>
           <button class="cad-tool-btn" data-tool="polyline">
@@ -137,7 +137,7 @@
         <div class="cad-panel-header">Eixo Mecânico</div>
         <div class="cad-panel-content">
           <button class="cad-tool-btn" data-tool="shaft">
-            <span class="cad-tool-icon">⚙</span>
+            <span class="cad-tool-icon">◎</span>
             <span>Eixo Paramétrico</span>
           </button>
           <button class="cad-tool-btn" data-tool="centerline">
@@ -174,9 +174,9 @@
           <button class="cad-tool-btn" data-tool="offset"><span class="cad-tool-icon">⧉</span><span>Offset</span></button>
           <button class="cad-tool-btn" data-tool="trim"><span class="cad-tool-icon">✂</span><span>Trim</span></button>
           <button class="cad-tool-btn" data-tool="extend"><span class="cad-tool-icon">⇢</span><span>Extend</span></button>
-          <button class="cad-tool-btn" data-tool="measure"><span class="cad-tool-icon">📏</span><span>Medição</span></button>
+          <button class="cad-tool-btn" data-tool="measure"><span class="cad-tool-icon">∣</span><span>Medição</span></button>
           <button class="cad-tool-btn" data-tool="erase">
-            <span class="cad-tool-icon">🗑</span>
+            <span class="cad-tool-icon">Del</span>
             <span>Apagar</span>
           </button>
         </div>
@@ -185,7 +185,7 @@
     
     <!-- CANVAS CENTRAL -->
     <div class="cad-canvas-container">
-      <svg id="cadCanvas" viewBox="0 0 3000 2000" preserveAspectRatio="none">
+      <svg id="cadCanvas" aria-label="Área de desenho técnico">
       </svg>
     </div>
     
@@ -245,7 +245,7 @@
               <textarea class="cad-input" id="cadMetaObservacoes" rows="3" style="min-height:60px;"><%= desenho.observacoes || '' %></textarea>
             </div>
             <button class="cad-btn cad-btn-lg" id="cadMetaSaveBtn" style="width:100%;margin-top:8px;">
-              💾 Salvar Metadados
+              Salvar Metadados
             </button>
           </div>
         </div>
@@ -257,28 +257,22 @@
   <div class="cad-statusbar" id="cadStatusBar">
     <div class="cad-status-left">
       <div class="cad-status-item">
-        <span class="cad-status-label">Status:</span>
-        <span class="cad-status-value" id="cadStatusMessage">Inicializando CAD...</span>
+        <span class="cad-status-value" id="cadStatusMessage">Inicializando...</span>
       </div>
       <div class="cad-status-item">
-        <span class="cad-status-label">Ferramenta:</span>
-        <span class="cad-status-value" id="cadStatusTool">select</span>
+        <span class="cad-status-value" id="cadStatusTool">Tool: select</span>
       </div>
       <div class="cad-status-item">
-        <span class="cad-status-label">X:</span>
-        <span class="cad-status-value" id="cadStatusX">0</span>
+        <span class="cad-status-value" id="cadStatusX">X: 0.00</span>
       </div>
       <div class="cad-status-item">
-        <span class="cad-status-label">Y:</span>
-        <span class="cad-status-value" id="cadStatusY">0</span>
+        <span class="cad-status-value" id="cadStatusY">Y: 0.00</span>
       </div>
       <div class="cad-status-item">
-        <span class="cad-status-label">Zoom:</span>
-        <span class="cad-status-value" id="cadStatusZoom">100%</span>
+        <span class="cad-status-value" id="cadStatusZoom">Zoom: 100%</span>
       </div>
       <div class="cad-status-item">
-        <span class="cad-status-label">Selecionado:</span>
-        <span class="cad-status-value" id="cadStatusSelected">-</span>
+        <span class="cad-status-value" id="cadStatusSelected">Selecionado: -</span>
       </div>
     </div>
     <div class="cad-status-right">
