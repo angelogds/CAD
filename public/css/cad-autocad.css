@@ -1,28 +1,29 @@
 /* ==========================================================================
    CAD 2D - ESTILO AUTOCAD CLÁSSICO
-   Visual inspirado no AutoCAD: fundo escuro azulado, controles cinza
+   Visual CAD técnico claro com painéis compactos e foco no viewport
    ========================================================================== */
 
 :root {
   --cad-bg: #ffffff;
-  --cad-bg-dark: #f8fafc;
+  --cad-bg-soft: #f8fafc;
   --cad-bg-darker: #eef2f7;
-  --cad-grid-major: rgba(15, 118, 110, 0.18);
-  --cad-grid-minor: rgba(100, 116, 139, 0.14);
-  --cad-crosshair: #0f172a;
-  --cad-toolbar-bg: #f8fafc;
-  --cad-toolbar-border: #cbd5e1;
+  --cad-grid-major: #c5ced8;
+  --cad-grid-minor: #e7edf3;
+  --cad-crosshair: #111827;
+  --cad-toolbar-bg: #f3f6fb;
+  --cad-toolbar-border: #cfd8e3;
   --cad-btn-bg: #ffffff;
-  --cad-btn-hover: #f1f5f9;
+  --cad-btn-hover: #eff4fb;
   --cad-btn-active: #0f766e;
   --cad-btn-text: #0f172a;
-  --cad-panel-bg: #f8fafc;
-  --cad-panel-border: #dbe3ec;
-  --cad-panel-header: #e2e8f0;
-  --cad-status-bg: #ecfdf5;
+  --cad-panel-bg: #f7f9fc;
+  --cad-panel-border: #d6dee8;
+  --cad-panel-header: #e9eef5;
+  --cad-status-bg: #f4f7fb;
   --cad-status-text: #334155;
   --cad-status-active: #0f766e;
 }
+
 
 /* ==========================================================================
    LAYOUT PRINCIPAL - FULLSCREEN CAD
@@ -55,7 +56,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
+  padding: 3px 8px;
   flex-wrap: wrap;
 }
 
@@ -68,7 +69,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  padding: 3px 6px;
   background: #ffffff;
   border-radius: 6px;
   border: 1px solid var(--cad-panel-border);
@@ -99,7 +100,7 @@
   justify-content: center;
   gap: 4px;
   min-width: 30px;
-  height: 24px;
+  height: 22px;
   padding: 0 7px;
   background: var(--cad-btn-bg);
   border: 1px solid #cbd5e1;
@@ -161,7 +162,7 @@
 
 .cad-workspace {
   display: grid;
-  grid-template-columns: 250px 1fr 300px;
+  grid-template-columns: 76px 1fr minmax(290px, 320px);
   gap: 0;
   overflow: hidden;
   background: var(--cad-bg);
@@ -189,9 +190,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 6px 8px;
   background: var(--cad-panel-header);
-  color: #e2e8f0;
+  color: #475569;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -201,21 +202,21 @@
 }
 
 .cad-panel-content {
-  padding: 10px;
+  padding: 6px;
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .cad-tool-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 5px 6px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
-  color: #cbd5e1;
+  color: #1f2937;
   font-size: 12px;
   text-align: left;
   cursor: pointer;
@@ -223,8 +224,8 @@
 }
 
 .cad-tool-btn:hover {
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.1);
+  background: #eef4fb;
+  border-color: #d7e1ec;
 }
 
 .cad-tool-btn.active {
@@ -258,7 +259,7 @@
 .cad-canvas-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 6px 10px;
   background: var(--cad-toolbar-bg);
   border-bottom: 1px solid var(--cad-panel-border);
@@ -268,7 +269,7 @@
   flex: 1;
   width: 100%;
   height: 100%;
-  background: radial-gradient(circle at 50% 48%, #101b32 0%, #0c1426 55%, #090f1d 100%);
+  background: #ffffff;
   cursor: crosshair;
 }
 
@@ -299,13 +300,13 @@
 
 .cad-props-grid {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .cad-prop-row {
   display: grid;
   grid-template-columns: 80px 1fr;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 
@@ -319,10 +320,10 @@
 .cad-input {
   width: 100%;
   padding: 6px 8px;
-  background: #0d1b2a;
+  background: #ffffff;
   border: 1px solid var(--cad-panel-border);
   border-radius: 3px;
-  color: #e2e8f0;
+  color: #475569;
   font-size: 12px;
   font-family: 'Consolas', 'Monaco', monospace;
 }
@@ -336,10 +337,10 @@
 .cad-select {
   width: 100%;
   padding: 6px 8px;
-  background: #0d1b2a;
+  background: #ffffff;
   border: 1px solid var(--cad-panel-border);
   border-radius: 3px;
-  color: #e2e8f0;
+  color: #475569;
   font-size: 12px;
 }
 
@@ -347,10 +348,10 @@
 .cad-layer-item {
   display: grid;
   grid-template-columns: 24px 1fr auto auto;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
   padding: 6px 8px;
-  background: rgba(0,0,0,0.2);
+  background: #ffffff;
   border-radius: 4px;
   margin-bottom: 4px;
 }
@@ -359,12 +360,12 @@
   width: 16px;
   height: 16px;
   border-radius: 2px;
-  border: 1px solid rgba(255,255,255,0.2);
+  border: 1px solid #c7d2df;
 }
 
 .cad-layer-name {
   font-size: 10px;
-  color: #e2e8f0;
+  color: #475569;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -395,8 +396,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 10px;
-  background: linear-gradient(180deg, #0b1220 0%, #0a0f1b 100%);
+  padding: 3px 8px;
+  background: var(--cad-status-bg);
   border-top: 1px solid var(--cad-panel-border);
   font-family: 'Consolas', 'Monaco', monospace;
   font-size: 10px;
@@ -413,7 +414,7 @@
 .cad-status-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .cad-status-label {
@@ -421,13 +422,13 @@
 }
 
 .cad-status-value {
-  color: #e2e8f0;
+  color: #475569;
   min-width: 0;
 }
 
 .cad-status-toggle {
   padding: 2px 8px;
-  background: rgba(0,0,0,0.3);
+  background: #ffffff;
   border: 1px solid var(--cad-panel-border);
   border-radius: 3px;
   color: #64748b;
@@ -463,7 +464,7 @@
 .cad-measure-line {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .cad-measure-label {
@@ -512,7 +513,7 @@
 }
 
 .cad-modal-title {
-  color: #e2e8f0;
+  color: #475569;
   font-size: 14px;
   font-weight: 600;
 }
@@ -544,7 +545,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
   padding: 12px 16px;
   background: var(--cad-panel-header);
   border-top: 1px solid var(--cad-panel-border);
@@ -559,13 +560,13 @@
 
 .cad-shaft-segments th,
 .cad-shaft-segments td {
-  padding: 8px 10px;
+  padding: 5px 6px;
   text-align: left;
   border-bottom: 1px solid var(--cad-panel-border);
 }
 
 .cad-shaft-segments th {
-  background: rgba(0,0,0,0.2);
+  background: #ffffff;
   color: #475569;
   font-size: 10px;
   font-weight: 600;
@@ -573,7 +574,7 @@
 }
 
 .cad-shaft-segments td {
-  color: #e2e8f0;
+  color: #475569;
 }
 
 .cad-shaft-segments input {
@@ -583,7 +584,7 @@
 .cad-shaft-add {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 8px;
   background: rgba(37, 99, 235, 0.1);
   border: 1px dashed var(--cad-btn-active);
@@ -611,13 +612,99 @@
   height: 150px;
 }
 
+
+
+.cad-workspace {
+  position: relative;
+  transition: grid-template-columns 220ms ease;
+}
+
+.cad-fullscreen.cad-right-collapsed .cad-workspace {
+  grid-template-columns: 76px 1fr 0;
+}
+
+.cad-fullscreen.cad-left-compact .cad-panel-left {
+  width: 76px;
+}
+
+.cad-panel-left {
+  scrollbar-width: thin;
+}
+
+.cad-panel-content {
+  align-content: start;
+}
+
+.cad-tool-btn {
+  justify-content: center;
+  min-height: 28px;
+}
+
+.cad-tool-btn span:last-child {
+  display: none;
+}
+
+.cad-tool-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 12px;
+}
+
+.cad-panel-right {
+  min-width: 290px;
+  transition: transform 220ms ease, opacity 180ms ease;
+}
+
+.cad-fullscreen.cad-right-collapsed .cad-panel-right {
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cad-right-toggle {
+  position: absolute;
+  top: 14px;
+  right: 300px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: right 220ms ease, background-color 180ms ease;
+}
+
+.cad-right-toggle:hover {
+  background: #edf2f8;
+}
+
+.cad-right-toggle-icon {
+  font-size: 12px;
+  transition: transform 220ms ease;
+}
+
+.cad-fullscreen.cad-right-collapsed .cad-right-toggle {
+  right: 8px;
+}
+
+.cad-fullscreen.cad-right-collapsed .cad-right-toggle-icon {
+  transform: rotate(180deg);
+}
+
 /* ==========================================================================
    RESPONSIVE
    ========================================================================== */
 
 @media (max-width: 1200px) {
   .cad-workspace {
-    grid-template-columns: 160px 1fr 240px;
+    grid-template-columns: 76px 1fr 240px;
   }
 }
 

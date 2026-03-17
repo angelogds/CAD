@@ -69,14 +69,14 @@ export class DesenhoTecnicoRenderer {
       const p1 = this.viewport.worldToScreen(x, startY);
       const p2 = this.viewport.worldToScreen(x, endY);
       const isMajor = Math.abs(Math.round(x / majorStep) - x / majorStep) < 1e-6;
-      g.insertAdjacentHTML('beforeend', `<line x1='${p1.x.toFixed(2)}' y1='${p1.y.toFixed(2)}' x2='${p2.x.toFixed(2)}' y2='${p2.y.toFixed(2)}' stroke='${isMajor ? '#334155' : '#1e293b'}' stroke-width='1'/>`);
+      g.insertAdjacentHTML('beforeend', `<line x1='${p1.x.toFixed(2)}' y1='${p1.y.toFixed(2)}' x2='${p2.x.toFixed(2)}' y2='${p2.y.toFixed(2)}' stroke='${isMajor ? '#c5ced8' : '#e7edf3'}' stroke-width='1'/>`);
     }
 
     for (let y = startY; y <= endY + minorStep * 0.5; y += minorStep) {
       const p1 = this.viewport.worldToScreen(startX, y);
       const p2 = this.viewport.worldToScreen(endX, y);
       const isMajor = Math.abs(Math.round(y / majorStep) - y / majorStep) < 1e-6;
-      g.insertAdjacentHTML('beforeend', `<line x1='${p1.x.toFixed(2)}' y1='${p1.y.toFixed(2)}' x2='${p2.x.toFixed(2)}' y2='${p2.y.toFixed(2)}' stroke='${isMajor ? '#334155' : '#1e293b'}' stroke-width='1'/>`);
+      g.insertAdjacentHTML('beforeend', `<line x1='${p1.x.toFixed(2)}' y1='${p1.y.toFixed(2)}' x2='${p2.x.toFixed(2)}' y2='${p2.y.toFixed(2)}' stroke='${isMajor ? '#c5ced8' : '#e7edf3'}' stroke-width='1'/>`);
     }
   }
 
@@ -94,7 +94,7 @@ export class DesenhoTecnicoRenderer {
       if (orientation === 'horizontal') x += len; else y += len;
       const c1 = this.viewport.worldToScreen(orientation === 'horizontal' ? x - len : x, orientation === 'horizontal' ? origin.y : y - len);
       const c2 = this.viewport.worldToScreen(orientation === 'horizontal' ? x : origin.x, orientation === 'horizontal' ? origin.y : y);
-      g.insertAdjacentHTML('beforeend', `<line x1='${c1.x}' y1='${c1.y}' x2='${c2.x}' y2='${c2.y}' stroke='#93c5fd' stroke-width='1.2' stroke-dasharray='8 4 2 4'/>`);
+      g.insertAdjacentHTML('beforeend', `<line x1='${c1.x}' y1='${c1.y}' x2='${c2.x}' y2='${c2.y}' stroke='#0f766e' stroke-width='1.2' stroke-dasharray='8 4 2 4'/>`);
       if (idx < segments.length - 1) {
         const step = this.viewport.worldToScreen(x, y);
         g.insertAdjacentHTML('beforeend', `<line x1='${step.x}' y1='${step.y - 8}' x2='${step.x}' y2='${step.y + 8}' stroke='${stroke}' stroke-width='1'/>`);
@@ -138,17 +138,17 @@ export class DesenhoTecnicoRenderer {
       } else if (e.type === 'dimension') {
         if (e.geometry.mode === 'angular') {
           const v = this.viewport.worldToScreen(e.geometry.vertex.x, e.geometry.vertex.y);
-          g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, { cx: e.geometry.vertex.x, cy: e.geometry.vertex.y, radius: e.geometry.radius, startAngle: e.geometry.startAngle, endAngle: e.geometry.endAngle, ccw: true })}' fill='none' stroke='#a5b4fc' stroke-width='1.5'/>`);
+          g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, { cx: e.geometry.vertex.x, cy: e.geometry.vertex.y, radius: e.geometry.radius, startAngle: e.geometry.startAngle, endAngle: e.geometry.endAngle, ccw: true })}' fill='none' stroke='#1d4ed8' stroke-width='1.5'/>`);
           const mid = (e.geometry.startAngle + e.geometry.endAngle) / 2;
           const tp = this.viewport.worldToScreen(e.geometry.vertex.x + Math.cos(mid) * (e.geometry.radius + 10), e.geometry.vertex.y + Math.sin(mid) * (e.geometry.radius + 10));
-          g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='#a5b4fc' font-size='12' font-family='monospace'>${e.geometry.label || ''}</text>`);
-          g.insertAdjacentHTML('beforeend', `<circle cx='${v.x}' cy='${v.y}' r='2' fill='#a5b4fc'/>`);
+          g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='#1d4ed8' font-size='12' font-family='monospace'>${e.geometry.label || ''}</text>`);
+          g.insertAdjacentHTML('beforeend', `<circle cx='${v.x}' cy='${v.y}' r='2' fill='#1d4ed8'/>`);
         } else {
           const p1 = this.viewport.worldToScreen(e.geometry.p1.x, e.geometry.p1.y);
           const p2 = this.viewport.worldToScreen(e.geometry.p2.x, e.geometry.p2.y);
           const tp = this.viewport.worldToScreen(e.geometry.textPoint.x, e.geometry.textPoint.y);
-          g.insertAdjacentHTML('beforeend', `<line x1='${p1.x}' y1='${p1.y}' x2='${p2.x}' y2='${p2.y}' stroke='#a5b4fc' stroke-width='1.5'/>`);
-          g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='#a5b4fc' font-size='12' font-family='monospace'>${e.geometry.label || ''}</text>`);
+          g.insertAdjacentHTML('beforeend', `<line x1='${p1.x}' y1='${p1.y}' x2='${p2.x}' y2='${p2.y}' stroke='#1d4ed8' stroke-width='1.5'/>`);
+          g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='#1d4ed8' font-size='12' font-family='monospace'>${e.geometry.label || ''}</text>`);
         }
       }
     });
@@ -189,9 +189,9 @@ export class DesenhoTecnicoRenderer {
       }
       if (p.type === 'snap') {
         const c = this.viewport.worldToScreen(p.point.x, p.point.y);
-        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='4.5' fill='rgba(245,158,11,0.12)' stroke='#f59e0b' stroke-width='1.6'/>`);
-        g.insertAdjacentHTML('beforeend', `<line x1='${c.x - 8}' y1='${c.y}' x2='${c.x + 8}' y2='${c.y}' stroke='#fbbf24' stroke-width='1'/>`);
-        g.insertAdjacentHTML('beforeend', `<line x1='${c.x}' y1='${c.y - 8}' x2='${c.x}' y2='${c.y + 8}' stroke='#fbbf24' stroke-width='1'/>`);
+        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='4.5' fill='rgba(15,118,110,0.12)' stroke='#0f766e' stroke-width='1.6'/>`);
+        g.insertAdjacentHTML('beforeend', `<line x1='${c.x - 8}' y1='${c.y}' x2='${c.x + 8}' y2='${c.y}' stroke='#0f766e' stroke-width='1'/>`);
+        g.insertAdjacentHTML('beforeend', `<line x1='${c.x}' y1='${c.y - 8}' x2='${c.x}' y2='${c.y + 8}' stroke='#0f766e' stroke-width='1'/>`);
       }
       if (p.type === 'ghost-entity' && p.entity) {
         const e = p.entity;
