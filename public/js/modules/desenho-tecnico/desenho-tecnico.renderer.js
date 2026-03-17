@@ -12,6 +12,15 @@ const SNAP_SHORT_LABELS = {
   grid: 'GRID',
 };
 
+function formatMm(value, decimals = 2) {
+  return `${Number(value || 0).toFixed(decimals)} mm`;
+}
+
+function drawMeasureLabel(g, x, y, text) {
+  const safe = String(text || '').replace(/</g, '&lt;');
+  g.insertAdjacentHTML('beforeend', `<text x='${x.toFixed(2)}' y='${y.toFixed(2)}' class='cad-entity-measure'>${safe}</text>`);
+}
+
 function arcPath(viewport, geometry = {}) {
   const { cx = 0, cy = 0, radius = 0, startAngle = 0, endAngle = 0, ccw = true } = geometry;
   const p1w = { x: cx + Math.cos(startAngle) * radius, y: cy + Math.sin(startAngle) * radius };
@@ -127,6 +136,15 @@ export class DesenhoTecnicoRenderer {
         const a = this.viewport.worldToScreen(e.geometry.x1, e.geometry.y1);
         const b = this.viewport.worldToScreen(e.geometry.x2, e.geometry.y2);
         g.insertAdjacentHTML('beforeend', `<line x1='${a.x}' y1='${a.y}' x2='${b.x}' y2='${b.y}' stroke='${stroke}' stroke-width='2' ${e.type === 'centerline' ? "stroke-dasharray='10 4 2 4'" : ''}/>`);
+        const midX = (a.x + b.x) / 2;
+        const midY = (a.y + b.y) / 2;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len;
+        const ny = dx / len;
+        const label = formatMm(Math.hypot((e.geometry.x2 || 0) - (e.geometry.x1 || 0), (e.geometry.y2 || 0) - (e.geometry.y1 || 0)));
+        drawMeasureLabel(g, midX + nx * 14, midY + ny * 14, label);
       } else if (e.type === 'rect') {
         const x = e.geometry.width < 0 ? e.geometry.x + e.geometry.width : e.geometry.x;
         const y = e.geometry.height < 0 ? e.geometry.y + e.geometry.height : e.geometry.y;
@@ -134,7 +152,9 @@ export class DesenhoTecnicoRenderer {
         g.insertAdjacentHTML('beforeend', `<rect x='${p.x}' y='${p.y}' width='${Math.abs(e.geometry.width * this.viewport.getViewState().zoom)}' height='${Math.abs(e.geometry.height * this.viewport.getViewState().zoom)}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
       } else if (e.type === 'circle') {
         const c = this.viewport.worldToScreen(e.geometry.cx, e.geometry.cy);
-        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='${Math.abs(e.geometry.radius * this.viewport.getViewState().zoom)}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
+        const radiusScreen = Math.abs(e.geometry.radius * this.viewport.getViewState().zoom);
+        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='${radiusScreen}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
+        drawMeasureLabel(g, c.x + radiusScreen + 12, c.y - 8, `Ø ${formatMm((e.geometry.radius || 0) * 2)}`);
       } else if (e.type === 'arc') {
         g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, e.geometry)}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
       } else if (e.type === 'shaft') {
@@ -172,6 +192,9 @@ export class DesenhoTecnicoRenderer {
         const a = this.viewport.worldToScreen(p.from.x, p.from.y);
         const b = this.viewport.worldToScreen(p.to.x, p.to.y);
         g.insertAdjacentHTML('beforeend', `<line x1='${a.x}' y1='${a.y}' x2='${b.x}' y2='${b.y}' stroke='#22d3ee' stroke-dasharray='6 4' stroke-width='1.5'/>`);
+        const midX = (a.x + b.x) / 2;
+        const midY = (a.y + b.y) / 2;
+        drawMeasureLabel(g, midX + 8, midY - 8, formatMm(Math.hypot((p.to.x || 0) - (p.from.x || 0), (p.to.y || 0) - (p.from.y || 0))));
       }
       if (p.type === 'polyline') {
         const points = p.points.map((pp) => this.viewport.worldToScreen(pp.x, pp.y));
@@ -190,7 +213,9 @@ export class DesenhoTecnicoRenderer {
       }
       if (p.type === 'circle') {
         const c = this.viewport.worldToScreen(p.center.x, p.center.y);
-        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='${Math.abs(p.radius * this.viewport.getViewState().zoom)}' fill='none' stroke='#22d3ee' stroke-dasharray='6 4'/>`);
+        const radiusScreen = Math.abs(p.radius * this.viewport.getViewState().zoom);
+        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='${radiusScreen}' fill='none' stroke='#22d3ee' stroke-dasharray='6 4'/>`);
+        drawMeasureLabel(g, c.x + radiusScreen + 12, c.y - 8, `R ${formatMm(p.radius || 0)} | Ø ${formatMm((p.radius || 0) * 2)}`);
       }
       if (p.type === 'selection-box') {
         const a = this.viewport.worldToScreen(p.from.x, p.from.y);

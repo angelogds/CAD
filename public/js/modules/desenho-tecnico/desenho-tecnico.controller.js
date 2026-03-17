@@ -349,9 +349,14 @@ export class DesenhoTecnicoController {
     const readOnly = (label, value) => `<div class='cad-prop-row'><span class='cad-prop-label'>${label}</span><span>${value}</span></div>`;
     let details = '';
     if (entity.type === 'line' || entity.type === 'centerline') {
+      const dx = (geo.x2 || 0) - (geo.x1 || 0);
+      const dy = (geo.y2 || 0) - (geo.y1 || 0);
+      const len = Math.hypot(dx, dy);
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
       details += input('x1', 'Início X', geo.x1, 'number') + input('y1', 'Início Y', geo.y1, 'number');
       details += input('x2', 'Fim X', geo.x2, 'number') + input('y2', 'Fim Y', geo.y2, 'number');
-      details += readOnly('Comprimento', Math.hypot((geo.x2 || 0) - (geo.x1 || 0), (geo.y2 || 0) - (geo.y1 || 0)).toFixed(2));
+      details += input('length', 'Comprimento', len.toFixed(2), 'number');
+      details += input('angle', 'Ângulo (°)', angle.toFixed(2), 'number');
     } else if (entity.type === 'polyline') {
       const points = geo.points || [];
       const total = points.slice(1).reduce((acc, p, i) => acc + Math.hypot(p.x - points[i].x, p.y - points[i].y), 0);
@@ -363,7 +368,7 @@ export class DesenhoTecnicoController {
     } else if (entity.type === 'circle') {
       details += input('cx', 'Centro X', geo.cx, 'number') + input('cy', 'Centro Y', geo.cy, 'number');
       details += input('radius', 'Raio', geo.radius, 'number');
-      details += readOnly('Diâmetro', ((geo.radius || 0) * 2).toFixed(2));
+      details += input('diameter', 'Diâmetro', ((geo.radius || 0) * 2).toFixed(2), 'number');
     } else if (entity.type === 'arc') {
       const sweep = ((geo.endAngle - geo.startAngle) * 180 / Math.PI + 360) % 360;
       details += input('cx', 'Centro X', geo.cx, 'number') + input('cy', 'Centro Y', geo.cy, 'number');
@@ -391,6 +396,26 @@ export class DesenhoTecnicoController {
       const path = e.target.dataset.prop;
       const value = e.target.type === 'number' ? Number(e.target.value) : e.target.value;
       if (Number.isNaN(value)) return;
+      if ((entity.type === 'line' || entity.type === 'centerline') && (path === 'length' || path === 'angle')) {
+        const x1 = Number(entity.geometry.x1 || 0);
+        const y1 = Number(entity.geometry.y1 || 0);
+        const currDx = Number(entity.geometry.x2 || 0) - x1;
+        const currDy = Number(entity.geometry.y2 || 0) - y1;
+        const currAngle = Math.atan2(currDy, currDx);
+        const length = path === 'length' ? Number(value) : Math.hypot(currDx, currDy);
+        const angleRad = path === 'angle' ? (Number(value) * Math.PI / 180) : currAngle;
+        entity.geometry.x2 = x1 + Math.cos(angleRad) * length;
+        entity.geometry.y2 = y1 + Math.sin(angleRad) * length;
+        this.pushHistory();
+        this.render();
+        return;
+      }
+      if (entity.type === 'circle' && path === 'diameter') {
+        entity.geometry.radius = Number(value) / 2;
+        this.pushHistory();
+        this.render();
+        return;
+      }
       const keys = path.split('.');
       let target = entity.geometry;
       for (let i = 0; i < keys.length - 1; i += 1) {
