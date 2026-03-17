@@ -10,4 +10,13 @@ export class BaseTool {
   onKeyUp() {}
   cancel() {}
   commit() {}
+
+  setPreview(items = []) {
+    const persistent = (this.ctx.preview.items || []).filter((item) => item.type === 'snap');
+    this.ctx.preview.set([...items, ...persistent]);
+  }
+
+  clearPreview() {
+    this.ctx.preview.set((this.ctx.preview.items || []).filter((item) => item.type === 'snap'));
+  }
 }

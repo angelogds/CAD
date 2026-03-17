@@ -136,15 +136,6 @@ export class DesenhoTecnicoRenderer {
         const a = this.viewport.worldToScreen(e.geometry.x1, e.geometry.y1);
         const b = this.viewport.worldToScreen(e.geometry.x2, e.geometry.y2);
         g.insertAdjacentHTML('beforeend', `<line x1='${a.x}' y1='${a.y}' x2='${b.x}' y2='${b.y}' stroke='${stroke}' stroke-width='2' ${e.type === 'centerline' ? "stroke-dasharray='10 4 2 4'" : ''}/>`);
-        const midX = (a.x + b.x) / 2;
-        const midY = (a.y + b.y) / 2;
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const len = Math.hypot(dx, dy) || 1;
-        const nx = -dy / len;
-        const ny = dx / len;
-        const label = formatMm(Math.hypot((e.geometry.x2 || 0) - (e.geometry.x1 || 0), (e.geometry.y2 || 0) - (e.geometry.y1 || 0)));
-        drawMeasureLabel(g, midX + nx * 14, midY + ny * 14, label);
       } else if (e.type === 'rect') {
         const x = e.geometry.width < 0 ? e.geometry.x + e.geometry.width : e.geometry.x;
         const y = e.geometry.height < 0 ? e.geometry.y + e.geometry.height : e.geometry.y;
@@ -154,7 +145,6 @@ export class DesenhoTecnicoRenderer {
         const c = this.viewport.worldToScreen(e.geometry.cx, e.geometry.cy);
         const radiusScreen = Math.abs(e.geometry.radius * this.viewport.getViewState().zoom);
         g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='${radiusScreen}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
-        drawMeasureLabel(g, c.x + radiusScreen + 12, c.y - 8, `Ø ${formatMm((e.geometry.radius || 0) * 2)}`);
       } else if (e.type === 'arc') {
         g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, e.geometry)}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
       } else if (e.type === 'shaft') {
@@ -221,6 +211,11 @@ export class DesenhoTecnicoRenderer {
         const a = this.viewport.worldToScreen(p.from.x, p.from.y);
         const b = this.viewport.worldToScreen(p.to.x, p.to.y);
         g.insertAdjacentHTML('beforeend', `<rect x='${Math.min(a.x, b.x)}' y='${Math.min(a.y, b.y)}' width='${Math.abs(a.x - b.x)}' height='${Math.abs(a.y - b.y)}' fill='rgba(56,189,248,0.1)' stroke='#38bdf8' stroke-dasharray='4 3'/>`);
+      }
+      if (p.type === 'guide') {
+        const a = this.viewport.worldToScreen(p.from.x, p.from.y);
+        const b = this.viewport.worldToScreen(p.to.x, p.to.y);
+        g.insertAdjacentHTML('beforeend', `<line x1='${a.x}' y1='${a.y}' x2='${b.x}' y2='${b.y}' stroke='#16a34a' stroke-width='1.2' stroke-dasharray='8 5' opacity='0.9'/>`);
       }
       if (p.type === 'snap') {
         const c = this.viewport.worldToScreen(p.point.x, p.point.y);
