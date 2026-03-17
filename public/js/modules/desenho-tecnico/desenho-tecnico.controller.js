@@ -46,6 +46,44 @@ class ToolManager {
   }
 }
 
+const TOOL_LABELS = {
+  select: 'Selecionar',
+  pan: 'Pan',
+  line: 'Linha',
+  polyline: 'Polilinha',
+  rect: 'Retângulo',
+  circle: 'Círculo',
+  arc: 'Arco',
+  text: 'Texto',
+  shaft: 'Eixo Paramétrico',
+  centerline: 'Linha de Centro',
+  dim_linear: 'Cota Linear',
+  dim_diameter: 'Cota Diâmetro',
+  dim_angular: 'Cota Angular',
+  dimension: 'Cotas',
+  'zoom-window': 'Zoom Janela',
+  'zoom_window': 'Zoom Janela',
+  measure: 'Medição',
+  trim: 'Trim',
+  extend: 'Extend',
+  offset: 'Offset',
+  mirror: 'Mirror',
+  erase: 'Apagar',
+  copy: 'Copy',
+  move: 'Move',
+};
+
+const TOOL_HINTS = {
+  line: 'desenhar segmento',
+  polyline: 'desenhar sequência de segmentos',
+  circle: 'desenhar por centro e raio',
+  arc: 'desenhar arco técnico',
+  text: 'inserir anotação técnica',
+  shaft: 'gerar eixo mecânico paramétrico',
+  centerline: 'marcar eixo de simetria',
+  dim_linear: 'cotar distância linear',
+};
+
 export class DesenhoTecnicoController {
   constructor(svg, initial = {}) {
     this.state = createDesenhoTecnicoState();
@@ -270,6 +308,10 @@ export class DesenhoTecnicoController {
 
   fitInitial() { const b = this.renderer.getGlobalBounds(); if (b.isValid()) this.viewport.zoomExtents(b); }
 
+  getToolLabel(name) {
+    return TOOL_LABELS[name] || TOOL_LABELS[`dim_${name}`] || name;
+  }
+
   render() {
     this.state.preview = this.previewLayer.items;
     this.state.selection = Array.from(this.selection.ids);
@@ -285,7 +327,7 @@ export class DesenhoTecnicoController {
   updateStatus(cursor = null) {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     const zoom = this.viewport.getViewState().zoom;
-    set('cadStatusTool', `Ferramenta: ${this.state.activeTool}`);
+    set('cadStatusTool', `Ferramenta: ${this.getToolLabel(this.state.activeTool)}`);
     set('cadStatusZoom', `Zoom: ${(zoom * 100).toFixed(0)}%`);
     if (cursor) { set('cadStatusX', `X: ${cursor.world.x.toFixed(2)}`); set('cadStatusY', `Y: ${cursor.world.y.toFixed(2)}`); }
     const first = this.state.entities.find((e) => this.selection.includes(e.id));
@@ -415,13 +457,13 @@ export class DesenhoTecnicoController {
       const tool = source?.dataset?.tool || action.slice(5).replaceAll('-', '_');
       const unsupported = ['copy', 'move', 'erase'];
       if (unsupported.includes(tool)) {
-        this.state.statusMessage = `Ferramenta ${tool} em desenvolvimento`;
+        this.state.statusMessage = `Ferramenta ${this.getToolLabel(tool)} em desenvolvimento`;
         this.render();
         return;
       }
       this.toolManager.set(tool);
       this.eventBus.emit('tool:changed', this.toolManager.name);
-      this.state.statusMessage = `Ferramenta ativa: ${tool}`;
+      this.state.statusMessage = `Ferramenta ativa: ${this.getToolLabel(tool)}`;
       this.render();
       return;
     }
@@ -522,7 +564,11 @@ export class DesenhoTecnicoController {
     this.isUiBound = true;
     // eslint-disable-next-line no-console
     console.info('[CAD] Editor inicializado, iniciando bind de eventos');
-    window.addEventListener('resize', () => { this.viewport.resize(); this.render(); });
+    window.addEventListener('resize', () => {
+      this.reflowWorkspace();
+      this.viewport.resize();
+      this.render();
+    });
     this.eventBus.on('viewport:changed', () => this.render());
     this.eventBus.on('selection:changed', () => this.render());
     this.eventBus.on('entity:hovered', () => this.render());
@@ -534,6 +580,7 @@ export class DesenhoTecnicoController {
       btn.disabled = true;
       btn.title = 'Ferramenta em desenvolvimento';
     });
+    this.configureTooltips();
     const cadRoot = document.querySelector('.cad-fullscreen');
     if (!cadRoot) {
       // eslint-disable-next-line no-console
@@ -567,6 +614,7 @@ export class DesenhoTecnicoController {
     });
     document.getElementById('cadLayerSelect')?.addEventListener('change', (e) => { this.state.activeLayer = e.target.value; this.render(); });
     this.setupLayoutControls();
+    this.reflowWorkspace();
     // eslint-disable-next-line no-console
     console.info('[CAD] Bind de eventos concluído');
     window.addEventListener('keydown', async (e) => {
@@ -575,6 +623,29 @@ export class DesenhoTecnicoController {
       if (e.ctrlKey && e.key.toLowerCase() === 'z') this.executeAction('undo');
       if (e.ctrlKey && e.key.toLowerCase() === 'y') this.executeAction('redo');
     });
+  }
+
+  configureTooltips() {
+    document.querySelectorAll('.cad-panel-left .cad-tool-btn[data-tool]').forEach((btn) => {
+      const tool = btn.dataset.tool;
+      const label = this.getToolLabel(tool);
+      const hint = TOOL_HINTS[tool];
+      const tip = hint ? `${label} — ${hint}` : label;
+      btn.dataset.tooltip = tip;
+      btn.setAttribute('title', tip);
+      btn.setAttribute('aria-label', label);
+    });
+  }
+
+  reflowWorkspace() {
+    const root = document.querySelector('.cad-fullscreen');
+    const workspace = document.getElementById('cadWorkspace');
+    const toolbar = root?.querySelector('.cad-toolbar');
+    const status = root?.querySelector('.cad-statusbar');
+    if (!root || !workspace || !toolbar || !status) return;
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    const available = Math.max(180, viewportHeight - toolbar.getBoundingClientRect().height - status.getBoundingClientRect().height);
+    workspace.style.height = `${Math.floor(available)}px`;
   }
 
   setupLayoutControls() {
@@ -591,6 +662,7 @@ export class DesenhoTecnicoController {
 
     syncToggle();
     this.eventBus.on('layout:changed', () => {
+      this.reflowWorkspace();
       this.viewport.resize();
       this.render();
       syncToggle();
