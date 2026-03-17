@@ -25,6 +25,8 @@ import { CircleEntity } from './entities/circle.entity.js';
 import { PolylineEntity } from './entities/polyline.entity.js';
 import { TextEntity } from './entities/text.entity.js';
 import { DimensionEntity } from './entities/dimension.entity.js';
+import { ArcEntity } from './entities/arc.entity.js';
+import { ShaftEntity } from './entities/shaft.entity.js';
 
 class ToolManager {
   constructor(state) { this.tools = new Map(); this.active = null; this.name = 'select'; this.state = state; }
@@ -63,6 +65,7 @@ export class DesenhoTecnicoController {
       findEntityAt: (w) => this.findEntityAt(w),
       toolManager: this.toolManager,
       markDirty: (msg) => this.markDirty(msg),
+      pushHistory: () => this.pushHistory(),
       get statusMessage() { return this.state.statusMessage; },
       set statusMessage(v) { this.state.statusMessage = v; },
       getPoint: (point, from = null) => this.getPoint(point, from),
@@ -99,6 +102,8 @@ export class DesenhoTecnicoController {
       polyline: (o) => new PolylineEntity({ id: o.id, geometry: { points: o.points || [] }, metadata: { layer: o.layer } }),
       text: (o) => new TextEntity({ id: o.id, geometry: { x: o.x, y: o.y, text: o.text, size: o.size || 14 }, metadata: { layer: o.layer } }),
       dimension: (o) => new DimensionEntity({ id: o.id, geometry: o.geometry || {}, metadata: { layer: o.layer || 'cotas' } }),
+      arc: (o) => new ArcEntity({ id: o.id, geometry: o.geometry || { cx: o.cx, cy: o.cy, radius: o.radius, startAngle: o.startAngle, endAngle: o.endAngle, ccw: o.ccw !== false }, metadata: { layer: o.layer } }),
+      shaft: (o) => new ShaftEntity({ id: o.id, geometry: o.geometry || {}, metadata: { layer: o.layer } }),
     };
     (initial.objects || []).forEach((o) => { if (map[o.type]) this.state.entities.push(map[o.type](o)); });
     (initial.dimensions || []).forEach((d) => this.state.entities.push(new DimensionEntity({ ...d, metadata: { layer: 'cotas' } })));
@@ -113,6 +118,8 @@ export class DesenhoTecnicoController {
       if (e.type === 'polyline') return { id: e.id, type: 'polyline', points: e.geometry.points, layer };
       if (e.type === 'text') return { id: e.id, type: 'text', x: e.geometry.x, y: e.geometry.y, text: e.geometry.text, size: e.geometry.size, layer };
       if (e.type === 'dimension') return { id: e.id, type: 'dimension', geometry: e.geometry, layer };
+      if (e.type === 'arc') return { id: e.id, type: 'arc', geometry: e.geometry, layer };
+      if (e.type === 'shaft') return { id: e.id, type: 'shaft', geometry: e.geometry, layer };
       return { id: e.id, type: e.type, layer };
     });
     return {
@@ -150,10 +157,19 @@ export class DesenhoTecnicoController {
   getSnapCandidates() {
     const points = [];
     this.state.entities.forEach((e) => {
-      if (e.type === 'line' || e.type === 'centerline') points.push({ x: e.geometry.x1, y: e.geometry.y1 }, { x: e.geometry.x2, y: e.geometry.y2 });
-      if (e.type === 'rect') points.push({ x: e.geometry.x, y: e.geometry.y }, { x: e.geometry.x + e.geometry.width, y: e.geometry.y + e.geometry.height });
-      if (e.type === 'circle') points.push({ x: e.geometry.cx, y: e.geometry.cy });
-      if (e.type === 'polyline') points.push(...(e.geometry.points || []));
+      if (e.type === 'line' || e.type === 'centerline') {
+        points.push({ x: e.geometry.x1, y: e.geometry.y1, kind: 'endpoint' }, { x: e.geometry.x2, y: e.geometry.y2, kind: 'endpoint' });
+        points.push({ x: (e.geometry.x1 + e.geometry.x2) / 2, y: (e.geometry.y1 + e.geometry.y2) / 2, kind: 'midpoint' });
+      }
+      if (e.type === 'rect') {
+        points.push({ x: e.geometry.x, y: e.geometry.y, kind: 'endpoint' }, { x: e.geometry.x + e.geometry.width, y: e.geometry.y + e.geometry.height, kind: 'endpoint' });
+      }
+      if (e.type === 'circle') points.push({ x: e.geometry.cx, y: e.geometry.cy, kind: 'center' });
+      if (e.type === 'arc') points.push({ x: e.geometry.cx, y: e.geometry.cy, kind: 'center' });
+      if (e.type === 'polyline') (e.geometry.points || []).forEach((pt, idx, arr) => {
+        points.push({ x: pt.x, y: pt.y, kind: 'endpoint' });
+        if (idx < arr.length - 1) points.push({ x: (pt.x + arr[idx + 1].x) / 2, y: (pt.y + arr[idx + 1].y) / 2, kind: 'midpoint' });
+      });
     });
     return points;
   }
@@ -166,11 +182,16 @@ export class DesenhoTecnicoController {
     }
     if (!this.state.snappingConfig.enabled) return p;
     const tol = 10 / this.viewport.getViewState().zoom;
-    const nearest = this.getSnapCandidates().find((c) => Math.hypot(c.x - p.x, c.y - p.y) <= tol);
+    const priority = { endpoint: 1, center: 2, midpoint: 3, intersection: 4 };
+    const nearest = this.getSnapCandidates()
+      .map((c) => ({ ...c, d: Math.hypot(c.x - p.x, c.y - p.y) }))
+      .filter((c) => c.d <= tol)
+      .sort((a, b) => (priority[a.kind] || 99) - (priority[b.kind] || 99) || a.d - b.d)[0];
     if (nearest) {
-      this.previewLayer.set([...this.previewLayer.items.filter((i) => i.type !== 'snap'), { type: 'snap', point: nearest }]);
-      return nearest;
+      this.previewLayer.set([...this.previewLayer.items.filter((i) => i.type !== 'snap'), { type: 'snap', point: nearest, kind: nearest.kind }]);
+      return { x: nearest.x, y: nearest.y };
     }
+    this.previewLayer.set(this.previewLayer.items.filter((i) => i.type !== 'snap'));
     return p;
   }
 
@@ -211,6 +232,8 @@ export class DesenhoTecnicoController {
     const geo = entity.geometry;
     let details = '';
     if ('radius' in geo) details += `<div class='cad-prop-row'><span class='cad-prop-label'>Diâmetro</span><span>${(geo.radius * 2).toFixed(2)}</span></div>`;
+    if (entity.type === 'line' || entity.type === 'centerline') details += `<div class='cad-prop-row'><span class='cad-prop-label'>Comprimento</span><span>${Math.hypot((geo.x2 || 0) - (geo.x1 || 0), (geo.y2 || 0) - (geo.y1 || 0)).toFixed(2)}</span></div>`;
+    if (entity.type === 'shaft') details += `<div class='cad-prop-row'><span class='cad-prop-label'>Trechos</span><span>${(geo.segments || []).length}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>Comp. total</span><span>${(geo.segments || []).reduce((acc, s) => acc + Number(s.length || 0), 0).toFixed(2)}</span></div>`;
     if (entity.type === 'text') details += `<div class='cad-prop-row'><span class='cad-prop-label'>Texto</span><input class='cad-input' id='propText' value='${String(geo.text || '').replace(/'/g, '&#39;')}'/></div>`;
     props.innerHTML = `<div class='cad-prop-row'><span class='cad-prop-label'>Tipo</span><span>${entity.type}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>ID</span><span>${entity.id}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>Camada</span><select class='cad-select' id='propLayer'>${Object.keys(this.state.layers || {}).map((l) => `<option ${l === layer ? 'selected' : ''} value='${l}'>${l}</option>`).join('')}</select></div>${details}<pre style='font-size:11px;white-space:pre-wrap'>${JSON.stringify(geo, null, 2)}</pre>`;
     document.getElementById('propLayer')?.addEventListener('change', (e) => { entity.metadata = { ...(entity.metadata || {}), layer: e.target.value }; this.pushHistory(); this.render(); });

@@ -2,6 +2,20 @@ import { Bounds2D } from './core/geometry.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 
+function arcPath(viewport, geometry = {}) {
+  const { cx = 0, cy = 0, radius = 0, startAngle = 0, endAngle = 0, ccw = true } = geometry;
+  const p1w = { x: cx + Math.cos(startAngle) * radius, y: cy + Math.sin(startAngle) * radius };
+  const p2w = { x: cx + Math.cos(endAngle) * radius, y: cy + Math.sin(endAngle) * radius };
+  const p1 = viewport.worldToScreen(p1w.x, p1w.y);
+  const p2 = viewport.worldToScreen(p2w.x, p2w.y);
+  let delta = endAngle - startAngle;
+  while (delta < 0) delta += Math.PI * 2;
+  while (delta > Math.PI * 2) delta -= Math.PI * 2;
+  const sweep = ccw ? 1 : 0;
+  const large = delta > Math.PI ? 1 : 0;
+  return `M ${p1.x} ${p1.y} A ${Math.abs(radius * viewport.getViewState().zoom)} ${Math.abs(radius * viewport.getViewState().zoom)} 0 ${large} ${sweep} ${p2.x} ${p2.y}`;
+}
+
 export class DesenhoTecnicoRenderer {
   constructor(svg, state, viewport, selection) {
     this.svg = svg;
@@ -46,6 +60,28 @@ export class DesenhoTecnicoRenderer {
     }
   }
 
+  renderShaft(g, e, stroke) {
+    const { origin = { x: 0, y: 0 }, orientation = 'horizontal', segments = [] } = e.geometry;
+    let x = origin.x;
+    let y = origin.y;
+    segments.forEach((s, idx) => {
+      const len = Number(s.length || 0);
+      const r = Number(s.diameter || 0) / 2;
+      const sp = this.viewport.worldToScreen(x - (orientation === 'vertical' ? r : 0), y - (orientation === 'horizontal' ? r : 0));
+      const width = Math.abs((orientation === 'horizontal' ? len : s.diameter) * this.viewport.getViewState().zoom);
+      const height = Math.abs((orientation === 'horizontal' ? s.diameter : len) * this.viewport.getViewState().zoom);
+      g.insertAdjacentHTML('beforeend', `<rect x='${sp.x}' y='${sp.y}' width='${width}' height='${height}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
+      if (orientation === 'horizontal') x += len; else y += len;
+      const c1 = this.viewport.worldToScreen(orientation === 'horizontal' ? x - len : x, orientation === 'horizontal' ? origin.y : y - len);
+      const c2 = this.viewport.worldToScreen(orientation === 'horizontal' ? x : origin.x, orientation === 'horizontal' ? origin.y : y);
+      g.insertAdjacentHTML('beforeend', `<line x1='${c1.x}' y1='${c1.y}' x2='${c2.x}' y2='${c2.y}' stroke='#93c5fd' stroke-width='1.2' stroke-dasharray='8 4 2 4'/>`);
+      if (idx < segments.length - 1) {
+        const step = this.viewport.worldToScreen(x, y);
+        g.insertAdjacentHTML('beforeend', `<line x1='${step.x}' y1='${step.y - 8}' x2='${step.x}' y2='${step.y + 8}' stroke='${stroke}' stroke-width='1'/>`);
+      }
+    });
+  }
+
   renderEntities() {
     const g = this.layers.entities;
     g.innerHTML = '';
@@ -66,18 +102,31 @@ export class DesenhoTecnicoRenderer {
       } else if (e.type === 'circle') {
         const c = this.viewport.worldToScreen(e.geometry.cx, e.geometry.cy);
         g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='${Math.abs(e.geometry.radius * this.viewport.getViewState().zoom)}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
+      } else if (e.type === 'arc') {
+        g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, e.geometry)}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
+      } else if (e.type === 'shaft') {
+        this.renderShaft(g, e, stroke);
       } else if (e.type === 'polyline') {
         const points = (e.geometry.points || []).map((p) => this.viewport.worldToScreen(p.x, p.y));
         if (points.length > 1) g.insertAdjacentHTML('beforeend', `<polyline points='${points.map((p) => `${p.x},${p.y}`).join(' ')}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
       } else if (e.type === 'text') {
         const p = this.viewport.worldToScreen(e.geometry.x, e.geometry.y);
-        g.insertAdjacentHTML('beforeend', `<text x='${p.x}' y='${p.y}' fill='${stroke}' font-size='${(e.geometry.size || 14) * this.viewport.getViewState().zoom}' font-family='monospace'>${String(e.geometry.text || '').replace(/</g, '&lt;')}</text>`);
+        g.insertAdjacentHTML('beforeend', `<text x='${p.x}' y='${p.y}' fill='${stroke}' font-size='${Math.max(8, (e.geometry.size || 14) * this.viewport.getViewState().zoom)}' font-family='monospace'>${String(e.geometry.text || '').replace(/</g, '&lt;')}</text>`);
       } else if (e.type === 'dimension') {
-        const p1 = this.viewport.worldToScreen(e.geometry.p1.x, e.geometry.p1.y);
-        const p2 = this.viewport.worldToScreen(e.geometry.p2.x, e.geometry.p2.y);
-        const tp = this.viewport.worldToScreen(e.geometry.textPoint.x, e.geometry.textPoint.y);
-        g.insertAdjacentHTML('beforeend', `<line x1='${p1.x}' y1='${p1.y}' x2='${p2.x}' y2='${p2.y}' stroke='#a5b4fc' stroke-width='1.5'/>`);
-        g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='#a5b4fc' font-size='${12 * this.viewport.getViewState().zoom}' font-family='monospace'>${e.geometry.label || ''}</text>`);
+        if (e.geometry.mode === 'angular') {
+          const v = this.viewport.worldToScreen(e.geometry.vertex.x, e.geometry.vertex.y);
+          g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, { cx: e.geometry.vertex.x, cy: e.geometry.vertex.y, radius: e.geometry.radius, startAngle: e.geometry.startAngle, endAngle: e.geometry.endAngle, ccw: true })}' fill='none' stroke='#a5b4fc' stroke-width='1.5'/>`);
+          const mid = (e.geometry.startAngle + e.geometry.endAngle) / 2;
+          const tp = this.viewport.worldToScreen(e.geometry.vertex.x + Math.cos(mid) * (e.geometry.radius + 10), e.geometry.vertex.y + Math.sin(mid) * (e.geometry.radius + 10));
+          g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='#a5b4fc' font-size='${Math.max(10, 12 * this.viewport.getViewState().zoom)}' font-family='monospace'>${e.geometry.label || ''}</text>`);
+          g.insertAdjacentHTML('beforeend', `<circle cx='${v.x}' cy='${v.y}' r='2' fill='#a5b4fc'/>`);
+        } else {
+          const p1 = this.viewport.worldToScreen(e.geometry.p1.x, e.geometry.p1.y);
+          const p2 = this.viewport.worldToScreen(e.geometry.p2.x, e.geometry.p2.y);
+          const tp = this.viewport.worldToScreen(e.geometry.textPoint.x, e.geometry.textPoint.y);
+          g.insertAdjacentHTML('beforeend', `<line x1='${p1.x}' y1='${p1.y}' x2='${p2.x}' y2='${p2.y}' stroke='#a5b4fc' stroke-width='1.5'/>`);
+          g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='#a5b4fc' font-size='${Math.max(10, 12 * this.viewport.getViewState().zoom)}' font-family='monospace'>${e.geometry.label || ''}</text>`);
+        }
       }
     });
   }
@@ -95,6 +144,12 @@ export class DesenhoTecnicoRenderer {
         const points = p.points.map((pp) => this.viewport.worldToScreen(pp.x, pp.y));
         g.insertAdjacentHTML('beforeend', `<polyline points='${points.map((pp) => `${pp.x},${pp.y}`).join(' ')}' fill='none' stroke='#22d3ee' stroke-dasharray='6 4' stroke-width='1.5'/>`);
       }
+      if (p.type === 'arc') {
+        g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, p.geometry)}' fill='none' stroke='#22d3ee' stroke-dasharray='6 4' stroke-width='1.5'/>`);
+      }
+      if (p.type === 'shaft') {
+        this.renderShaft(g, { geometry: p.geometry }, '#22d3ee');
+      }
       if (p.type === 'rect') {
         const a = this.viewport.worldToScreen(p.from.x, p.from.y);
         const b = this.viewport.worldToScreen(p.to.x, p.to.y);
@@ -111,7 +166,9 @@ export class DesenhoTecnicoRenderer {
       }
       if (p.type === 'snap') {
         const c = this.viewport.worldToScreen(p.point.x, p.point.y);
-        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='4' fill='none' stroke='#f59e0b' stroke-width='1.5'/>`);
+        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='6' fill='none' stroke='#f59e0b' stroke-width='2'/>`);
+        g.insertAdjacentHTML('beforeend', `<line x1='${c.x - 10}' y1='${c.y}' x2='${c.x + 10}' y2='${c.y}' stroke='#f59e0b' stroke-width='1'/>`);
+        g.insertAdjacentHTML('beforeend', `<line x1='${c.x}' y1='${c.y - 10}' x2='${c.x}' y2='${c.y + 10}' stroke='#f59e0b' stroke-width='1'/>`);
       }
     });
   }

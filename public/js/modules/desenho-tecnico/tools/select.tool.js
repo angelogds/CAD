@@ -7,12 +7,14 @@ export class SelectTool extends BaseTool {
     this.name = 'select';
     this.boxStart = null;
     this.moveStart = null;
+    this.moved = false;
   }
   activate() { this.ctx.prompt.set({ message: 'Arraste para selecionar ou clique em uma entidade' }); }
   onMouseDown(evt) {
     const hit = this.ctx.findEntityAt(evt.world);
     if (hit && this.ctx.selection.includes(hit.id)) {
       this.moveStart = evt.world;
+      this.moved = false;
       return;
     }
     this.boxStart = evt.world;
@@ -25,13 +27,19 @@ export class SelectTool extends BaseTool {
       const dy = evt.world.y - this.moveStart.y;
       this.ctx.state.entities.filter((e) => this.ctx.selection.includes(e.id)).forEach((e) => e.move(dx, dy));
       this.moveStart = evt.world;
+      this.moved = true;
       this.ctx.markDirty('Mover seleção');
       return;
     }
     if (this.boxStart) this.ctx.preview.set([{ type: 'selection-box', from: this.boxStart, to: evt.world }]);
   }
   onMouseUp(evt) {
-    if (this.moveStart) { this.moveStart = null; return; }
+    if (this.moveStart) {
+      this.moveStart = null;
+      if (this.moved) this.ctx.pushHistory?.();
+      this.moved = false;
+      return;
+    }
     if (!this.boxStart) return;
     const startScreen = this.ctx.viewport.worldToScreen(this.boxStart.x, this.boxStart.y);
     const dragDist = Math.hypot(evt.screen.x - startScreen.x, evt.screen.y - startScreen.y);
@@ -50,5 +58,5 @@ export class SelectTool extends BaseTool {
     this.boxStart = null;
     this.ctx.preview.clear();
   }
-  cancel() { this.boxStart = null; this.moveStart = null; this.ctx.preview.clear(); }
+  cancel() { this.boxStart = null; this.moveStart = null; this.moved = false; this.ctx.preview.clear(); }
 }
