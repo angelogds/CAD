@@ -19,6 +19,10 @@ import { TextTool } from './tools/text.tool.js';
 import { CenterlineTool } from './tools/centerline.tool.js';
 import { ShaftTool } from './tools/shaft.tool.js';
 import { ArcTool } from './tools/arc.tool.js';
+import { TrimTool } from './tools/trim.tool.js';
+import { ExtendTool } from './tools/extend.tool.js';
+import { OffsetTool } from './tools/offset.tool.js';
+import { MirrorTool } from './tools/mirror.tool.js';
 import { LineEntity } from './entities/line.entity.js';
 import { RectEntity } from './entities/rect.entity.js';
 import { CircleEntity } from './entities/circle.entity.js';
@@ -73,6 +77,7 @@ export class DesenhoTecnicoController {
     [
       new SelectTool(this.ctx), new PanTool(this.ctx), new LineTool(this.ctx), new PolylineTool(this.ctx), new RectTool(this.ctx), new CircleTool(this.ctx), new ArcTool(this.ctx), new TextTool(this.ctx),
       new CenterlineTool(this.ctx), new ShaftTool(this.ctx), new DimensionTool(this.ctx), new MeasureTool(this.ctx), new ZoomWindowTool(this.ctx),
+      new TrimTool(this.ctx), new ExtendTool(this.ctx), new OffsetTool(this.ctx), new MirrorTool(this.ctx),
     ].forEach((t) => this.toolManager.register(t));
     this.interaction = new InteractionController(svg, this.toolManager, this.viewport, this.eventBus);
     this.loadInitial(initial);
@@ -99,7 +104,7 @@ export class DesenhoTecnicoController {
       centerline: (o) => new LineEntity({ id: o.id, type: 'centerline', geometry: { x1: o.x, y1: o.y, x2: o.x2, y2: o.y2 }, metadata: { layer: o.layer }, style: { stroke: '#93c5fd' } }),
       rect: (o) => new RectEntity({ id: o.id, geometry: { x: o.x, y: o.y, width: o.width, height: o.height }, metadata: { layer: o.layer } }),
       circle: (o) => new CircleEntity({ id: o.id, geometry: { cx: o.x, cy: o.y, radius: o.radius }, metadata: { layer: o.layer } }),
-      polyline: (o) => new PolylineEntity({ id: o.id, geometry: { points: o.points || [] }, metadata: { layer: o.layer } }),
+      polyline: (o) => new PolylineEntity({ id: o.id, geometry: { points: o.points || [] }, metadata: { layer: o.layer, ...(o.metadata || {}) } }),
       text: (o) => new TextEntity({ id: o.id, geometry: { x: o.x, y: o.y, text: o.text, size: o.size || 14 }, metadata: { layer: o.layer } }),
       dimension: (o) => new DimensionEntity({ id: o.id, geometry: o.geometry || {}, metadata: { layer: o.layer || 'cotas' } }),
       arc: (o) => new ArcEntity({ id: o.id, geometry: o.geometry || { cx: o.cx, cy: o.cy, radius: o.radius, startAngle: o.startAngle, endAngle: o.endAngle, ccw: o.ccw !== false }, metadata: { layer: o.layer } }),
@@ -115,7 +120,7 @@ export class DesenhoTecnicoController {
       if (e.type === 'line' || e.type === 'centerline') return { id: e.id, type: e.type, x: e.geometry.x1, y: e.geometry.y1, x2: e.geometry.x2, y2: e.geometry.y2, layer };
       if (e.type === 'rect') return { id: e.id, type: 'rect', x: e.geometry.x, y: e.geometry.y, width: e.geometry.width, height: e.geometry.height, layer };
       if (e.type === 'circle') return { id: e.id, type: 'circle', x: e.geometry.cx, y: e.geometry.cy, radius: e.geometry.radius, layer };
-      if (e.type === 'polyline') return { id: e.id, type: 'polyline', points: e.geometry.points, layer };
+      if (e.type === 'polyline') return { id: e.id, type: 'polyline', points: e.geometry.points, layer, metadata: e.metadata || {} };
       if (e.type === 'text') return { id: e.id, type: 'text', x: e.geometry.x, y: e.geometry.y, text: e.geometry.text, size: e.geometry.size, layer };
       if (e.type === 'dimension') return { id: e.id, type: 'dimension', geometry: e.geometry, layer };
       if (e.type === 'arc') return { id: e.id, type: 'arc', geometry: e.geometry, layer };
@@ -123,6 +128,7 @@ export class DesenhoTecnicoController {
       return { id: e.id, type: e.type, layer };
     });
     return {
+      schemaVersion: 2,
       ...this.state.metadata,
       activeTool: this.toolManager.name,
       activeLayer: this.state.activeLayer,
@@ -204,6 +210,7 @@ export class DesenhoTecnicoController {
     this.state.selection = Array.from(this.selection.ids);
     this.state.hover = this.selection.hoverId;
     this.state.activeTool = this.toolManager.name;
+    this.state.grips = this.toolManager.active?.getGrips?.() || [];
     this.renderer.render();
     this.updateStatus();
     this.syncToolbarState();
@@ -235,9 +242,34 @@ export class DesenhoTecnicoController {
     if (entity.type === 'line' || entity.type === 'centerline') details += `<div class='cad-prop-row'><span class='cad-prop-label'>Comprimento</span><span>${Math.hypot((geo.x2 || 0) - (geo.x1 || 0), (geo.y2 || 0) - (geo.y1 || 0)).toFixed(2)}</span></div>`;
     if (entity.type === 'shaft') details += `<div class='cad-prop-row'><span class='cad-prop-label'>Trechos</span><span>${(geo.segments || []).length}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>Comp. total</span><span>${(geo.segments || []).reduce((acc, s) => acc + Number(s.length || 0), 0).toFixed(2)}</span></div>`;
     if (entity.type === 'text') details += `<div class='cad-prop-row'><span class='cad-prop-label'>Texto</span><input class='cad-input' id='propText' value='${String(geo.text || '').replace(/'/g, '&#39;')}'/></div>`;
+    if (entity.type === 'polyline' && entity.metadata?.shaft) {
+      const points = entity.geometry.points || [];
+      const lengths = points.slice(1).map((p, i) => Math.hypot(p.x - points[i].x, p.y - points[i].y));
+      const total = lengths.reduce((acc, v) => acc + v, 0);
+      details += `<div class='cad-prop-row'><span class='cad-prop-label'>Eixo paramétrico</span><span>${lengths.length} trechos</span></div>`;
+      details += `<div class='cad-prop-row'><span class='cad-prop-label'>Comprimento total</span><span>${total.toFixed(2)}</span></div>`;
+      details += `<div class='cad-prop-row'><button class='cad-btn' id='shaftAddSegment'>Adicionar trecho</button><button class='cad-btn' id='shaftRemoveSegment'>Remover último</button></div>`;
+    }
     props.innerHTML = `<div class='cad-prop-row'><span class='cad-prop-label'>Tipo</span><span>${entity.type}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>ID</span><span>${entity.id}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>Camada</span><select class='cad-select' id='propLayer'>${Object.keys(this.state.layers || {}).map((l) => `<option ${l === layer ? 'selected' : ''} value='${l}'>${l}</option>`).join('')}</select></div>${details}<pre style='font-size:11px;white-space:pre-wrap'>${JSON.stringify(geo, null, 2)}</pre>`;
     document.getElementById('propLayer')?.addEventListener('change', (e) => { entity.metadata = { ...(entity.metadata || {}), layer: e.target.value }; this.pushHistory(); this.render(); });
     document.getElementById('propText')?.addEventListener('change', (e) => { entity.geometry.text = e.target.value; this.pushHistory(); this.render(); });
+    document.getElementById('shaftAddSegment')?.addEventListener('click', () => {
+      const points = entity.geometry.points || [];
+      if (!points.length) return;
+      const len = Number(window.prompt('Comprimento do novo trecho', '30') || 0);
+      if (!Number.isFinite(len) || len <= 0) return;
+      const last = points[points.length - 1];
+      points.push({ x: last.x + len, y: last.y });
+      this.pushHistory();
+      this.render();
+    });
+    document.getElementById('shaftRemoveSegment')?.addEventListener('click', () => {
+      const points = entity.geometry.points || [];
+      if (points.length <= 2) return;
+      points.pop();
+      this.pushHistory();
+      this.render();
+    });
   }
 
   syncToolbarState() {
@@ -279,7 +311,7 @@ export class DesenhoTecnicoController {
     this.eventBus.on('prompt:changed', () => this.render());
     this.eventBus.on('cursor:move', (c) => { this.updateStatus(c); this.render(); });
     document.querySelectorAll('[data-tool]').forEach((btn) => {
-      const unsupported = ['copy', 'move', 'mirror', 'offset', 'trim', 'extend', 'erase', 'measure'];
+      const unsupported = ['copy', 'move', 'erase'];
       if (unsupported.includes(btn.dataset.tool)) {
         btn.disabled = true;
         btn.title = 'Ferramenta em desenvolvimento';

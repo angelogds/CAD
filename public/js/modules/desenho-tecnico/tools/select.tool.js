@@ -11,6 +11,13 @@ export class SelectTool extends BaseTool {
   }
   activate() { this.ctx.prompt.set({ message: 'Arraste para selecionar ou clique em uma entidade' }); }
   onMouseDown(evt) {
+    const grip = this.getGrips().find((g) => Math.hypot(g.x - evt.world.x, g.y - evt.world.y) <= (10 / this.ctx.viewport.getViewState().zoom));
+    if (grip) {
+      this.gripDrag = grip;
+      const entity = this.ctx.state.entities.find((e) => e.id === grip.entityId);
+      this.beforeGrip = JSON.parse(JSON.stringify(entity?.geometry || {}));
+      return;
+    }
     const hit = this.ctx.findEntityAt(evt.world);
     if (hit && this.ctx.selection.includes(hit.id)) {
       this.moveStart = evt.world;
@@ -22,6 +29,13 @@ export class SelectTool extends BaseTool {
   onMouseMove(evt) {
     const hit = this.ctx.findEntityAt(evt.world);
     this.ctx.selection.setHover(hit?.id || null);
+    if (this.gripDrag) {
+      const entity = this.ctx.state.entities.find((e) => e.id === this.gripDrag.entityId);
+      if (!entity) return;
+      this.applyGrip(entity, this.gripDrag, evt.world);
+      this.ctx.markDirty('Edição por grip');
+      return;
+    }
     if (this.moveStart) {
       const dx = evt.world.x - this.moveStart.x;
       const dy = evt.world.y - this.moveStart.y;
