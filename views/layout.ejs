@@ -9,8 +9,8 @@
   <script>window.__VAPID_PUBLIC_KEY__ = "<%= VAPID_PUBLIC_KEY || "" %>";</script>
 </head>
 <body>
-  <% const authFullscreen = !!(typeof locals !== 'undefined' && locals.authFullscreen); %>
-  <% if (authFullscreen) { %>
+  <% const isAuthFullscreen = Boolean((typeof authFullscreen !== 'undefined' && authFullscreen) || (typeof locals !== 'undefined' && locals.authFullscreen)); %>
+  <% if (isAuthFullscreen) { %>
     <%- body %>
   <% } else { %>
     <div class="app" id="appRoot">
