@@ -1,7 +1,7 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/academia.css" />
 <div class="page-head"><div><h1>Ranking técnico</h1><p class="muted">Pontuação por cursos, avaliações, certificações e constância.</p></div></div>
-<%- include('academia/_menu') %>
+<%- include(incluir('academia/_menu')) %>
 
 <% if (minhaPosicao) { %><div class="card" style="margin-bottom:12px;">Sua posição atual: <strong><%= minhaPosicao.posicao %>º</strong> com <strong><%= minhaPosicao.pontos %> pontos</strong>.</div><% } %>
 <div class="card">
