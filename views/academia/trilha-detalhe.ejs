@@ -1,7 +1,7 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/academia.css" />
 <div class="page-head"><div><h1><%= trilha.icone || '📘' %> <%= trilha.nome %></h1><p class="muted"><%= trilha.descricao %></p></div></div>
-<%- include(incluir('academia/_menu')) %>
+<%- include(incluir('_menu')) %>
 <div class="card" style="margin-bottom:12px;"><p><strong><%= trilha.total_cursos %></strong> cursos • <strong><%= trilha.concluidos %></strong> concluídos • <strong><%= trilha.progresso_percentual %>%</strong> progresso</p></div>
 <div class="academia-grid">
   <% trilha.cursos.forEach(function(c){ %>
