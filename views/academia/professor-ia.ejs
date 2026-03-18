@@ -1,18 +1,35 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/academia.css" />
-<div class="page-head"><div><h1>Professor IA da Manutenção</h1><p class="muted">Assistente técnico para dúvidas, revisão e recomendações de estudo.</p></div></div>
+<div class="page-head"><div><h1>Professor IA da Manutenção</h1><p class="muted">Assistente técnico para dúvidas, revisão e recomendação de trilhas internas.</p></div></div>
 <%- include(incluir('_menu')) %>
 
 <div class="academia-grid academia-layout-2">
   <div class="academia-card">
     <h3>Pergunte ao Professor IA</h3>
+    <label class="muted-xs">Curso de contexto (opcional)</label>
+    <select id="iaCursoId" style="margin-bottom:8px;">
+      <option value="">Sem curso específico</option>
+      <% (cursos || []).forEach(function(c){ %>
+        <option value="<%= c.id %>"><%= c.titulo %></option>
+      <% }) %>
+    </select>
+
     <textarea id="iaPergunta" rows="5" placeholder="Ex.: Como inspecionar redutor e identificar falha de rolamento?"></textarea>
-    <button class="btn" type="button" id="iaPerguntar" style="margin-top:8px;">Enviar pergunta</button>
-    <p class="muted-xs" style="margin-top:8px;">* Em implantação: integração real será habilitada em fase futura.</p>
+
+    <div class="academia-actions" style="margin-top:8px;">
+      <button class="btn" type="button" data-ia-action="perguntar">Perguntar</button>
+      <button class="btn btn-outline" type="button" data-ia-action="resumir">Resumir conteúdo</button>
+      <button class="btn btn-outline" type="button" data-ia-action="gerar_perguntas">Gerar perguntas de fixação</button>
+      <button class="btn btn-outline" type="button" data-ia-action="iniciar_avaliacao">Iniciar avaliação com IA</button>
+      <button class="btn btn-outline" type="button" data-ia-action="recomendar_proximo">Recomendar próximo curso</button>
+    </div>
+
+    <p class="muted-xs" style="margin-top:8px;">* O Professor IA opera no backend com logs institucionais de interação.</p>
   </div>
   <div class="academia-card">
     <h3>Resposta</h3>
-    <div id="iaResposta" class="muted">Aguardando pergunta. O Professor IA responderá em linguagem simples, técnica e objetiva.</div>
+    <div id="iaResposta" class="muted">Aguardando interação.</div>
+    <p id="iaWarning" class="muted-xs" style="color:#b45309;"></p>
   </div>
 </div>
 <script src="/js/academia.js"></script>
