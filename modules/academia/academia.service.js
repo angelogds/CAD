@@ -5,6 +5,153 @@ function toInt(v, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function tableExists(name) {
+  const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name);
+  return !!row;
+}
+
+function columnExists(table, column) {
+  if (!tableExists(table)) return false;
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  return cols.some((c) => c.name === column);
+}
+
+function ensureAcademiaSchema() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS academia_cursos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trilha_id INTEGER,
+      titulo TEXT NOT NULL,
+      descricao TEXT,
+      tipo TEXT DEFAULT 'INTERNO',
+      plataforma TEXT DEFAULT 'INTERNO',
+      link_externo TEXT,
+      link_curso TEXT,
+      nivel TEXT DEFAULT 'BÁSICO',
+      carga_horaria INTEGER DEFAULT 0,
+      imagem TEXT,
+      ativo INTEGER DEFAULT 1,
+      criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS academia_aulas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      curso_id INTEGER,
+      titulo TEXT,
+      descricao TEXT,
+      tipo_conteudo TEXT DEFAULT 'VIDEO',
+      video_url TEXT,
+      arquivo_url TEXT,
+      ordem INTEGER,
+      ativo INTEGER DEFAULT 1
+    );
+    CREATE TABLE IF NOT EXISTS academia_biblioteca (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      titulo TEXT,
+      descricao TEXT,
+      categoria TEXT,
+      tipo TEXT,
+      arquivo_url TEXT,
+      equipamento_id INTEGER,
+      criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS academia_trilhas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL UNIQUE,
+      descricao TEXT,
+      icone TEXT,
+      nivel TEXT DEFAULT 'BÁSICO',
+      ativo INTEGER NOT NULL DEFAULT 1,
+      criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS academia_usuario_cursos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario_id INTEGER NOT NULL,
+      curso_id INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'NAO_INICIADO',
+      progresso_percentual INTEGER NOT NULL DEFAULT 0,
+      iniciado_em DATETIME,
+      concluido_em DATETIME,
+      UNIQUE (usuario_id, curso_id)
+    );
+    CREATE TABLE IF NOT EXISTS academia_avaliacoes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      curso_id INTEGER NOT NULL,
+      usuario_id INTEGER NOT NULL,
+      nota REAL,
+      percentual REAL,
+      status TEXT DEFAULT 'REVISAR',
+      feedback TEXT,
+      criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS academia_certificados (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario_id INTEGER NOT NULL,
+      curso_id INTEGER NOT NULL,
+      tipo TEXT NOT NULL DEFAULT 'INTERNO',
+      arquivo_url TEXT,
+      codigo_validacao TEXT,
+      emitido_em DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS academia_pontos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario_id INTEGER NOT NULL,
+      origem TEXT NOT NULL,
+      pontos INTEGER NOT NULL DEFAULT 0,
+      detalhe TEXT,
+      criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  if (tableExists('academia_cursos')) {
+    if (!columnExists('academia_cursos', 'tipo')) db.exec("ALTER TABLE academia_cursos ADD COLUMN tipo TEXT DEFAULT 'INTERNO'");
+    if (!columnExists('academia_cursos', 'link_externo')) db.exec("ALTER TABLE academia_cursos ADD COLUMN link_externo TEXT");
+    db.exec(`
+      UPDATE academia_cursos
+      SET tipo = CASE WHEN UPPER(COALESCE(plataforma,'')) IN ('CURSA','YOUTUBE','PDF','OUTRO') THEN 'EXTERNO' ELSE 'INTERNO' END
+      WHERE tipo IS NULL OR tipo='';
+
+      UPDATE academia_cursos
+      SET link_externo = COALESCE(link_externo, link_curso)
+      WHERE link_externo IS NULL;
+    `);
+  }
+
+  if (tableExists('academia_aulas')) {
+    if (!columnExists('academia_aulas', 'tipo_conteudo')) db.exec("ALTER TABLE academia_aulas ADD COLUMN tipo_conteudo TEXT DEFAULT 'VIDEO'");
+    if (!columnExists('academia_aulas', 'arquivo_url')) db.exec("ALTER TABLE academia_aulas ADD COLUMN arquivo_url TEXT");
+    if (!columnExists('academia_aulas', 'ativo')) db.exec("ALTER TABLE academia_aulas ADD COLUMN ativo INTEGER DEFAULT 1");
+  }
+
+  if (tableExists('academia_biblioteca')) {
+    if (!columnExists('academia_biblioteca', 'categoria')) db.exec("ALTER TABLE academia_biblioteca ADD COLUMN categoria TEXT");
+    if (!columnExists('academia_biblioteca', 'equipamento_id')) db.exec("ALTER TABLE academia_biblioteca ADD COLUMN equipamento_id INTEGER");
+  }
+
+  if (tableExists('trilhas_conhecimento')) {
+    db.exec(`
+      INSERT OR IGNORE INTO academia_trilhas (id, nome, descricao, icone, nivel, ativo, criado_em)
+      SELECT id, nome, descricao, icone, 'BÁSICO', 1, criado_em
+      FROM trilhas_conhecimento;
+    `);
+  }
+
+  if (tableExists('academia_progresso')) {
+    db.exec(`
+      INSERT OR IGNORE INTO academia_usuario_cursos (usuario_id, curso_id, status, progresso_percentual, iniciado_em, concluido_em)
+      SELECT
+        p.usuario_id,
+        p.curso_id,
+        COALESCE(p.status, 'NAO_INICIADO'),
+        CASE WHEN p.status='CONCLUIDO' THEN 100 WHEN p.status='EM_ANDAMENTO' THEN 50 ELSE 0 END,
+        p.data_inicio,
+        p.data_conclusao
+      FROM academia_progresso p;
+    `);
+  }
+}
+
+ensureAcademiaSchema();
+
 function getDashboardData(userId) {
   const indicadores = db.prepare(`
     SELECT
