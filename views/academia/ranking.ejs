@@ -1,14 +1,15 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/academia.css" />
+<div class="page-head"><div><h1>Ranking técnico</h1><p class="muted">Pontuação por cursos, avaliações, certificações e constância.</p></div></div>
+<%- include('academia/_menu') %>
 
-<div class="page-head"><div><h1>Ranking técnico</h1><p class="muted">Classificação por pontos de aprendizagem.</p></div></div>
-
+<% if (minhaPosicao) { %><div class="card" style="margin-bottom:12px;">Sua posição atual: <strong><%= minhaPosicao.posicao %>º</strong> com <strong><%= minhaPosicao.pontos %> pontos</strong>.</div><% } %>
 <div class="card">
   <% if (!ranking.length) { %><p class="muted">Ainda não há pontuações registradas.</p><% } %>
   <% ranking.forEach(function(r, idx){ %>
     <div class="academia-row" style="margin-bottom:8px;">
       <div style="display:flex;align-items:center;gap:10px;"><div class="ranking-pos"><%= idx + 1 %>°</div><div><strong><%= r.funcionario %></strong><div class="muted-xs"><%= r.role %></div></div></div>
-      <div class="muted-xs"><strong><%= r.pontos %></strong> pts • <%= r.cursos_concluidos %> cursos • <%= r.horas %>h</div>
+      <div class="muted-xs"><strong><%= r.pontos %></strong> pts • <%= r.cursos_concluidos %> cursos • <%= r.horas_estudadas %>h • <%= r.trilhas_concluidas %> trilhas • <%= r.certificados %> certificados</div>
     </div>
   <% }) %>
 </div>

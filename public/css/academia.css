@@ -1,13 +1,24 @@
 .academia-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.academia-layout-2{grid-template-columns:2fr 1fr;align-items:start}
+.academia-layout-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.academia-kpis{margin-bottom:12px}
 .academia-kpi{border:1px solid #e5e7eb;background:#fff;border-radius:12px;padding:14px}
-.academia-kpi .valor{font-size:28px;font-weight:800;color:#16A34A}
+.academia-kpi .valor{font-size:28px;font-weight:800;color:#15803d}
+.academia-kpi .valor-sm{font-size:18px;line-height:1.25}
 .academia-card{border:1px solid #e5e7eb;background:#fff;border-radius:12px;padding:14px}
 .academia-card h3{margin:0 0 6px}
 .academia-card img{width:100%;height:120px;object-fit:cover;border-radius:10px;background:#f3f4f6}
 .academia-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .badge-status{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
-.badge-status.NAO_INICIADO{background:#f3f4f6;color:#374151}
+.badge-status.NAO_INICIADO,.badge-status.PENDENTE{background:#f3f4f6;color:#374151}
 .badge-status.EM_ANDAMENTO{background:#dcfce7;color:#166534}
 .badge-status.CONCLUIDO{background:#bbf7d0;color:#14532d}
 .ranking-pos{font-size:22px;font-weight:900;color:#16A34A;min-width:42px}
-.academia-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
+.academia-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;margin-bottom:8px}
+.academia-menu{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.academia-menu a{padding:8px 12px;border-radius:999px;border:1px solid #d1d5db;color:#166534;text-decoration:none;font-weight:700;background:#fff}
+.academia-menu a.is-active{background:#166534;color:#fff;border-color:#166534}
+.progress{height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden}
+.progress span{display:block;height:100%;background:#16a34a}
+#iaPergunta{width:100%;border:1px solid #d1d5db;border-radius:10px;padding:10px;font-family:inherit}
+@media (max-width: 900px){.academia-layout-2,.academia-layout-3{grid-template-columns:1fr}}
