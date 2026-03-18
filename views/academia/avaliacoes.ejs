@@ -1,7 +1,7 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/academia.css" />
 <div class="page-head"><div><h1>Avaliações</h1><p class="muted">Resultados de quiz, perguntas objetivas e avaliações finais.</p></div></div>
-<%- include('_menu') %>
+<%- include(incluir('academia/_menu')) %>
 
 <div class="card">
   <% if (!avaliacoes.length) { %><p class="muted">Nenhuma avaliação registrada até o momento.</p><% } %>

@@ -1,7 +1,7 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/academia.css" />
 <div class="page-head"><div><h1>Certificados</h1><p class="muted">Certificados internos e externos com rastreabilidade.</p></div></div>
-<%- include('_menu') %>
+<%- include(incluir('academia/_menu')) %>
 
 <div class="academia-grid">
   <% if (!certificados.length) { %><p class="muted">Você ainda não possui certificados.</p><% } %>
