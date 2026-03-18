@@ -1,15 +1,16 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/academia.css" />
-
-<div class="page-head"><div><h1>Trilhas de conhecimento</h1><p class="muted">Escolha uma trilha para evoluir tecnicamente.</p></div></div>
-
+<div class="page-head"><div><h1>Trilhas de conhecimento</h1><p class="muted">Evolução técnica por trilhas e níveis.</p></div></div>
+<%- include('_menu') %>
 <div class="academia-grid">
   <% trilhas.forEach(function(t){ %>
     <div class="academia-card">
       <h3><%= t.icone || '📘' %> <%= t.nome %></h3>
       <p class="muted"><%= t.descricao || 'Sem descrição.' %></p>
-      <p class="muted-xs"><%= t.total_cursos %> cursos ativos</p>
-      <a class="btn" href="/academia/cursos?trilha_id=<%= t.id %>">Ver cursos</a>
+      <p class="muted-xs">Nível: <strong><%= t.nivel || 'BÁSICO' %></strong> • <%= t.total_cursos %> cursos</p>
+      <div class="progress"><span style="width:<%= t.progresso_percentual %>%"></span></div>
+      <p class="muted-xs"><%= t.progresso_percentual %>% concluído</p>
+      <a class="btn" href="/academia/trilha/<%= t.id %>">Ver trilha</a>
     </div>
   <% }) %>
 </div>

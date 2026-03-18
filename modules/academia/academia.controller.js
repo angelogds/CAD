@@ -1,16 +1,17 @@
 const service = require('./academia.service');
 
-function baseView() {
+function baseView(activeAcademiaSection = 'index') {
   return {
     title: 'Academia da Manutenção',
     activeMenu: 'academia',
+    activeAcademiaSection,
   };
 }
 
 function index(req, res) {
   const dados = service.getDashboardData(req.session?.user?.id);
   return res.render('academia/index', {
-    ...baseView(),
+    ...baseView('index'),
     ...dados,
   });
 }
@@ -23,9 +24,9 @@ function cursos(req, res) {
   };
 
   return res.render('academia/cursos', {
-    ...baseView(),
+    ...baseView('cursos'),
     cursos: service.listCursos(filtros, req.session?.user?.id),
-    trilhas: service.listTrilhas(),
+    trilhas: service.listTrilhas(req.session?.user?.id),
     filtros,
   });
 }
@@ -38,36 +39,77 @@ function cursoDetalhe(req, res) {
   }
 
   return res.render('academia/curso-detalhe', {
-    ...baseView(),
+    ...baseView('cursos'),
     curso,
+  });
+}
+
+function trilhaDetalhe(req, res) {
+  const trilha = service.getTrilhaDetalhe(Number(req.params.id), req.session?.user?.id);
+  if (!trilha) {
+    req.flash('error', 'Trilha não encontrada.');
+    return res.redirect('/academia/trilhas');
+  }
+
+  return res.render('academia/trilha-detalhe', {
+    ...baseView('trilhas'),
+    trilha,
   });
 }
 
 function minhasAulas(req, res) {
   return res.render('academia/minhas-aulas', {
-    ...baseView(),
+    ...baseView('minhas-aulas'),
     minhasAulas: service.getMinhasAulas(req.session?.user?.id),
+  });
+}
+
+function avaliacoes(req, res) {
+  return res.render('academia/avaliacoes', {
+    ...baseView('avaliacoes'),
+    avaliacoes: service.listAvaliacoes(req.session?.user?.id),
+  });
+}
+
+function certificados(req, res) {
+  return res.render('academia/certificados', {
+    ...baseView('certificados'),
+    certificados: service.listCertificados(req.session?.user?.id),
   });
 }
 
 function ranking(req, res) {
   return res.render('academia/ranking', {
-    ...baseView(),
+    ...baseView('ranking'),
     ranking: service.getRanking(),
+    minhaPosicao: service.getMinhaPosicaoRanking(req.session?.user?.id),
   });
 }
 
 function trilhas(req, res) {
   return res.render('academia/trilhas', {
-    ...baseView(),
-    trilhas: service.listTrilhas(),
+    ...baseView('trilhas'),
+    trilhas: service.listTrilhas(req.session?.user?.id),
   });
 }
 
 function biblioteca(req, res) {
+  const filtros = {
+    categoria: String(req.query.categoria || '').trim(),
+    busca: String(req.query.busca || '').trim(),
+  };
+
   return res.render('academia/biblioteca', {
-    ...baseView(),
-    itens: service.listBiblioteca(),
+    ...baseView('biblioteca'),
+    itens: service.listBiblioteca(filtros),
+    categorias: service.listBibliotecaCategorias(),
+    filtros,
+  });
+}
+
+function professorIA(req, res) {
+  return res.render('academia/professor-ia', {
+    ...baseView('professor-ia'),
   });
 }
 
@@ -135,10 +177,14 @@ module.exports = {
   index,
   cursos,
   cursoDetalhe,
+  trilhaDetalhe,
   minhasAulas,
+  avaliacoes,
+  certificados,
   ranking,
   trilhas,
   biblioteca,
+  professorIA,
   iniciarCurso,
   concluirCurso,
   certificado,
