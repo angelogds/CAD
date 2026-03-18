@@ -1,0 +1,17 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/academia.css" />
+<div class="page-head"><div><h1>Certificados</h1><p class="muted">Certificados internos e externos com rastreabilidade.</p></div></div>
+<%- include('academia/_menu') %>
+
+<div class="academia-grid">
+  <% if (!certificados.length) { %><p class="muted">Você ainda não possui certificados.</p><% } %>
+  <% certificados.forEach(function(c){ %>
+    <div class="academia-card">
+      <div class="muted-xs"><strong><%= c.tipo %></strong> • Emitido em <%= c.emitido_em %></div>
+      <h3><%= c.curso_titulo %></h3>
+      <p class="muted-xs">Carga horária: <%= c.carga_horaria %>h</p>
+      <p class="muted-xs">Código: <%= c.codigo_validacao %></p>
+      <a class="btn btn-outline" href="<%= c.arquivo_url %>" target="_blank" rel="noopener">Abrir certificado</a>
+    </div>
+  <% }) %>
+</div>
