@@ -1,7 +1,8 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/academia.css" />
 
-<div class="page-head"><div><h1>Cursos técnicos</h1><p class="muted">Cursos internos e externos por trilha de conhecimento.</p></div></div>
+<div class="page-head"><div><h1>Cursos técnicos</h1><p class="muted">Cursos internos e externos organizados por trilha.</p></div></div>
+<%- include('academia/_menu') %>
 
 <form class="card" method="GET" action="/academia/cursos" style="margin-bottom:12px;">
   <div class="grid cols-4">
@@ -22,8 +23,8 @@
       <div style="margin-top:6px;"><span class="badge-status <%= c.meu_status %>"><%= c.meu_status %></span></div>
       <div class="academia-actions">
         <form method="POST" action="/academia/iniciar/<%= c.id %>"><button class="btn" type="submit">INICIAR CURSO</button></form>
-        <% if (c.plataforma !== 'INTERNO' && c.link_curso) { %>
-          <button class="btn btn-outline" type="button" data-open-external="<%= c.link_curso %>">Abrir plataforma</button>
+        <% if (c.plataforma !== 'INTERNO' && c.link_externo) { %>
+          <button class="btn btn-outline" type="button" data-open-external="<%= c.link_externo %>">Abrir plataforma</button>
         <% } %>
       </div>
     </div>
@@ -37,8 +38,9 @@
       <input name="titulo" placeholder="Título" required />
       <input name="descricao" placeholder="Descrição" />
       <select name="trilha_id"><option value="">Sem trilha</option><% trilhas.forEach(function(t){ %><option value="<%= t.id %>"><%= t.nome %></option><% }) %></select>
-      <select name="plataforma"><option>INTERNO</option><option>CURSA</option><option>YOUTUBE</option><option>OUTRO</option></select>
-      <input name="link_curso" placeholder="Link externo" />
+      <select name="tipo"><option>INTERNO</option><option>EXTERNO</option></select>
+      <select name="plataforma"><option>INTERNO</option><option>CURSA</option><option>YOUTUBE</option><option>PDF</option><option>OUTRO</option></select>
+      <input name="link_externo" placeholder="Link externo" />
       <input name="imagem" placeholder="URL da imagem" />
       <input type="number" name="carga_horaria" placeholder="Carga horária" min="0" />
       <input type="number" name="pontos" placeholder="Pontos" min="0" value="10" />

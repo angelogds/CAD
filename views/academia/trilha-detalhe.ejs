@@ -1,0 +1,15 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/academia.css" />
+<div class="page-head"><div><h1><%= trilha.icone || '📘' %> <%= trilha.nome %></h1><p class="muted"><%= trilha.descricao %></p></div></div>
+<%- include('academia/_menu') %>
+<div class="card" style="margin-bottom:12px;"><p><strong><%= trilha.total_cursos %></strong> cursos • <strong><%= trilha.concluidos %></strong> concluídos • <strong><%= trilha.progresso_percentual %>%</strong> progresso</p></div>
+<div class="academia-grid">
+  <% trilha.cursos.forEach(function(c){ %>
+    <div class="academia-card">
+      <h3><a href="/academia/curso/<%= c.id %>"><%= c.titulo %></a></h3>
+      <p class="muted"><%= c.descricao %></p>
+      <p class="muted-xs"><%= c.nivel %> • <%= c.carga_horaria %>h • <%= c.plataforma %></p>
+      <span class="badge-status <%= c.meu_status %>"><%= c.meu_status %></span>
+    </div>
+  <% }) %>
+</div>

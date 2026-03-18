@@ -1,0 +1,15 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/academia.css" />
+<div class="page-head"><div><h1>Avaliações</h1><p class="muted">Resultados de quiz, perguntas objetivas e avaliações finais.</p></div></div>
+<%- include('academia/_menu') %>
+
+<div class="card">
+  <% if (!avaliacoes.length) { %><p class="muted">Nenhuma avaliação registrada até o momento.</p><% } %>
+  <% avaliacoes.forEach(function(a){ %>
+    <div class="academia-row" style="margin-bottom:8px;">
+      <div><strong><%= a.curso_titulo %></strong><div class="muted-xs"><%= a.curso_nivel %> • <%= a.curso_tipo %></div></div>
+      <div class="muted-xs">Nota: <strong><%= a.nota %></strong> • <%= a.percentual %>% • <span class="badge-status <%= a.status==='APROVADO'?'CONCLUIDO':'EM_ANDAMENTO' %>"><%= a.status %></span></div>
+    </div>
+    <% if (a.feedback) { %><p class="muted" style="margin:0 0 10px 0;"><%= a.feedback %></p><% } %>
+  <% }) %>
+</div>
