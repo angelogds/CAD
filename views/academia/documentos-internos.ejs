@@ -1,0 +1,21 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/academia.css" />
+<div class="page-head"><div><h1>Documentos Internos</h1><p class="muted">Registros institucionais de participação e conclusão da Academia da Manutenção.</p></div></div>
+<%- include(incluir('_menu')) %>
+
+<div class="card">
+  <p class="muted-xs">Atenção: estes documentos são institucionais internos e não representam diploma, certificação oficial ou curso técnico reconhecido.</p>
+  <% if (!documentos?.length) { %>
+    <p class="muted">Nenhum documento interno emitido até o momento.</p>
+  <% } %>
+  <% documentos.forEach(function(doc){ %>
+    <div class="academia-row">
+      <div>
+        <strong><%= doc.tipo_documento %></strong>
+        <div class="muted"><%= doc.curso_titulo %></div>
+        <div class="muted-xs">Código: <%= doc.codigo_validacao %> • Carga horária interna: <%= doc.carga_horaria_interna || 0 %>h • Emissão: <%= doc.emitido_em %></div>
+      </div>
+      <% if (doc.arquivo_url) { %><a class="btn btn-outline" href="<%= doc.arquivo_url %>">Abrir</a><% } %>
+    </div>
+  <% }) %>
+</div>

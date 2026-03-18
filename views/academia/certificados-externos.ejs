@@ -1,0 +1,33 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/academia.css" />
+<div class="page-head"><div><h1>Certificados Externos</h1><p class="muted">Envios e validações de etapas complementares externas (Cursa).</p></div></div>
+<%- include(incluir('_menu')) %>
+
+<div class="card">
+  <% if (!etapasExternas?.length) { %>
+    <p class="muted">Nenhum comprovante externo enviado.</p>
+  <% } %>
+
+  <% etapasExternas.forEach(function(etapa){ %>
+    <div class="academia-row">
+      <div>
+        <strong><%= etapa.curso_titulo %></strong>
+        <div class="muted">Plataforma: <%= etapa.plataforma %> • Status: <span class="badge-status"><%= etapa.status_validacao %></span></div>
+        <div class="muted-xs">Data conclusão externa: <%= etapa.data_conclusao || '-' %> • Enviado em: <%= etapa.criado_em %></div>
+      </div>
+      <div class="academia-actions">
+        <% if (etapa.certificado_url) { %><a class="btn btn-outline" href="<%= etapa.certificado_url %>" target="_blank" rel="noopener">Ver comprovante</a><% } %>
+        <% if (canAccessModule(normalizeRole(user?.role), 'academia_manage')) { %>
+          <form method="POST" action="/academia/etapas-externas/<%= etapa.id %>/validar">
+            <input type="hidden" name="status_validacao" value="VALIDADO" />
+            <button class="btn" type="submit">Validar</button>
+          </form>
+          <form method="POST" action="/academia/etapas-externas/<%= etapa.id %>/validar">
+            <input type="hidden" name="status_validacao" value="REPROVADO" />
+            <button class="btn btn-outline" type="submit">Reprovar</button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+  <% }) %>
+</div>

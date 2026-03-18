@@ -1,4 +1,6 @@
+const path = require('path');
 const service = require('./academia.service');
+const iaService = require('./academia-ia.service');
 
 function baseView(activeAcademiaSection = 'index') {
   return {
@@ -32,7 +34,8 @@ function cursos(req, res) {
 }
 
 function cursoDetalhe(req, res) {
-  const curso = service.getCursoDetalhe(Number(req.params.id), req.session?.user?.id);
+  const userId = req.session?.user?.id;
+  const curso = service.getCursoDetalhe(Number(req.params.id), userId);
   if (!curso) {
     req.flash('error', 'Curso não encontrado.');
     return res.redirect('/academia/cursos');
@@ -78,6 +81,20 @@ function certificados(req, res) {
   });
 }
 
+function documentosInternos(req, res) {
+  return res.render('academia/documentos-internos', {
+    ...baseView('documentos-internos'),
+    documentos: service.listDocumentosInternos(req.session?.user?.id),
+  });
+}
+
+function certificadosExternos(req, res) {
+  return res.render('academia/certificados-externos', {
+    ...baseView('certificados-externos'),
+    etapasExternas: service.listEtapasExternas(req.session?.user?.id),
+  });
+}
+
 function ranking(req, res) {
   return res.render('academia/ranking', {
     ...baseView('ranking'),
@@ -108,8 +125,10 @@ function biblioteca(req, res) {
 }
 
 function professorIA(req, res) {
+  const cursos = service.listCursos({}, req.session?.user?.id);
   return res.render('academia/professor-ia', {
     ...baseView('professor-ia'),
+    cursos,
   });
 }
 
@@ -132,11 +151,36 @@ function concluirCurso(req, res) {
       cursoId: Number(req.params.curso_id),
       userId: req.session?.user?.id,
     });
-    req.flash('success', 'Parabéns! Curso concluído e pontos computados.');
+    service.podeLiberarEtapaExterna({ cursoId: Number(req.params.curso_id), userId: req.session?.user?.id });
+    req.flash('success', 'Etapa interna concluída. Faça a avaliação para liberar a etapa complementar externa.');
   } catch (e) {
     req.flash('error', e.message || 'Não foi possível concluir o curso.');
   }
   return res.redirect(req.get('referer') || '/academia/minhas-aulas');
+}
+
+function enviarAvaliacao(req, res) {
+  try {
+    const result = service.registrarAvaliacaoInterna({
+      cursoId: Number(req.params.curso_id),
+      userId: req.session?.user?.id,
+      tipoAvaliacao: req.body.tipo_avaliacao,
+      nota: req.body.nota,
+      percentual: req.body.percentual,
+      feedback: req.body.feedback,
+      recomendacaoIA: req.body.recomendacao_ia,
+      respostas: req.body.respostas || null,
+    });
+
+    service.podeLiberarEtapaExterna({ cursoId: Number(req.params.curso_id), userId: req.session?.user?.id });
+
+    req.flash('success', result.status === 'APROVADO'
+      ? `Avaliação aprovada (nota mínima ${result.notaMinima}).`
+      : `Avaliação registrada. Nota mínima necessária: ${result.notaMinima}.`);
+  } catch (e) {
+    req.flash('error', e.message || 'Não foi possível registrar a avaliação.');
+  }
+  return res.redirect(req.get('referer') || '/academia/avaliacoes');
 }
 
 function certificado(req, res) {
@@ -146,11 +190,81 @@ function certificado(req, res) {
       userId: req.session?.user?.id,
       certificadoUrl: String(req.body.certificado_url || '').trim(),
     });
-    req.flash('success', 'Certificado vinculado ao curso com sucesso.');
+    req.flash('success', 'Comprovante externo enviado com sucesso. Aguarde validação da supervisão.');
   } catch (e) {
-    req.flash('error', e.message || 'Não foi possível salvar o certificado.');
+    req.flash('error', e.message || 'Não foi possível salvar o certificado externo.');
   }
-  return res.redirect(req.get('referer') || '/academia/minhas-aulas');
+  return res.redirect(req.get('referer') || '/academia/certificados-externos');
+}
+
+function certificadoUpload(req, res) {
+  try {
+    const file = req.file;
+    if (!file) throw new Error('Arquivo do comprovante não enviado.');
+
+    service.registrarEtapaExterna({
+      cursoId: Number(req.body.curso_id),
+      userId: req.session?.user?.id,
+      certificadoUrl: `/uploads/academia/certificados-externos/${file.filename}`,
+      dataConclusao: req.body.data_conclusao_externa || null,
+      plataforma: req.body.plataforma_externa || 'CURSA',
+      linkExterno: req.body.link_externo || null,
+      certificadoNomeArquivo: path.basename(file.originalname || file.filename),
+    });
+
+    req.flash('success', 'Arquivo de comprovante enviado para validação externa.');
+  } catch (e) {
+    req.flash('error', e.message || 'Não foi possível fazer upload do comprovante externo.');
+  }
+
+  return res.redirect(req.get('referer') || '/academia/certificados-externos');
+}
+
+function liberarEtapaExterna(req, res) {
+  try {
+    service.liberarEtapaExternaManual({
+      cursoId: Number(req.params.curso_id),
+      userId: Number(req.body.usuario_id || req.session?.user?.id),
+      adminId: req.session?.user?.id,
+    });
+    req.flash('success', 'Etapa complementar externa liberada manualmente.');
+  } catch (e) {
+    req.flash('error', e.message || 'Não foi possível liberar a etapa externa.');
+  }
+  return res.redirect(req.get('referer') || '/academia/cursos');
+}
+
+function validarEtapaExterna(req, res) {
+  try {
+    service.validarEtapaExterna({
+      etapaId: Number(req.params.id),
+      statusValidacao: req.body.status_validacao,
+      adminId: req.session?.user?.id,
+    });
+    req.flash('success', 'Validação da etapa externa atualizada.');
+  } catch (e) {
+    req.flash('error', e.message || 'Não foi possível validar etapa externa.');
+  }
+  return res.redirect(req.get('referer') || '/academia/certificados-externos');
+}
+
+async function professorIAPerguntar(req, res) {
+  try {
+    const action = String(req.body.action || 'perguntar').trim();
+    const pergunta = String(req.body.pergunta || '').trim();
+    const cursoId = req.body.curso_id ? Number(req.body.curso_id) : null;
+
+    const result = await iaService.responderProfessorIA({
+      usuarioId: req.session?.user?.id,
+      cursoId,
+      action,
+      pergunta,
+    });
+
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e.message || 'Falha no Professor IA.' });
+  }
 }
 
 function criarCurso(req, res) {
@@ -173,6 +287,26 @@ function criarAula(req, res) {
   return res.redirect(`/academia/curso/${req.body.curso_id || ''}`);
 }
 
+function criarBloco(req, res) {
+  try {
+    const id = service.criarBloco(req.body);
+    req.flash('success', `Bloco #${id} cadastrado com sucesso.`);
+  } catch (e) {
+    req.flash('error', e.message || 'Erro ao criar bloco.');
+  }
+  return res.redirect(`/academia/curso/${req.body.curso_id || ''}`);
+}
+
+function criarEbook(req, res) {
+  try {
+    const id = service.criarEbook(req.body);
+    req.flash('success', `E-book #${id} cadastrado com sucesso.`);
+  } catch (e) {
+    req.flash('error', e.message || 'Erro ao criar e-book.');
+  }
+  return res.redirect(`/academia/curso/${req.body.curso_id || ''}`);
+}
+
 module.exports = {
   index,
   cursos,
@@ -181,13 +315,22 @@ module.exports = {
   minhasAulas,
   avaliacoes,
   certificados,
+  documentosInternos,
+  certificadosExternos,
   ranking,
   trilhas,
   biblioteca,
   professorIA,
+  professorIAPerguntar,
   iniciarCurso,
   concluirCurso,
+  enviarAvaliacao,
   certificado,
+  certificadoUpload,
+  liberarEtapaExterna,
+  validarEtapaExterna,
   criarCurso,
   criarAula,
+  criarBloco,
+  criarEbook,
 };

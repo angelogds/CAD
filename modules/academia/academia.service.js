@@ -1,6 +1,14 @@
+const crypto = require('crypto');
 const db = require('../../database/db');
 
+const NOTA_MINIMA_PADRAO = Number(process.env.ACADEMIA_NOTA_MINIMA || 70);
+
 function toInt(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function toFloat(v, fallback = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
@@ -29,6 +37,7 @@ function ensureAcademiaSchema() {
       link_curso TEXT,
       nivel TEXT DEFAULT 'BÁSICO',
       carga_horaria INTEGER DEFAULT 0,
+      nota_minima REAL DEFAULT 70,
       imagem TEXT,
       ativo INTEGER DEFAULT 1,
       criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -43,6 +52,31 @@ function ensureAcademiaSchema() {
       arquivo_url TEXT,
       ordem INTEGER,
       ativo INTEGER DEFAULT 1
+    );
+    CREATE TABLE IF NOT EXISTS academia_blocos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      curso_id INTEGER NOT NULL,
+      titulo TEXT NOT NULL,
+      descricao TEXT,
+      conteudo_texto TEXT,
+      checklist_json TEXT,
+      imagem_url TEXT,
+      resumo TEXT,
+      ordem INTEGER DEFAULT 1,
+      ativo INTEGER DEFAULT 1,
+      criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS academia_ebooks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      curso_id INTEGER NOT NULL,
+      bloco_id INTEGER,
+      titulo TEXT NOT NULL,
+      resumo TEXT,
+      conteudo_html TEXT,
+      arquivo_url TEXT,
+      versao TEXT,
+      publicado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+      criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS academia_biblioteca (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,16 +105,21 @@ function ensureAcademiaSchema() {
       progresso_percentual INTEGER NOT NULL DEFAULT 0,
       iniciado_em DATETIME,
       concluido_em DATETIME,
+      etapa_externa_liberada_em DATETIME,
+      etapa_externa_liberada_por INTEGER,
       UNIQUE (usuario_id, curso_id)
     );
     CREATE TABLE IF NOT EXISTS academia_avaliacoes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       curso_id INTEGER NOT NULL,
       usuario_id INTEGER NOT NULL,
+      tipo_avaliacao TEXT DEFAULT 'OBJETIVA',
       nota REAL,
       percentual REAL,
       status TEXT DEFAULT 'REVISAR',
       feedback TEXT,
+      recomendacao_ia TEXT,
+      respostas_json TEXT,
       criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS academia_certificados (
@@ -92,6 +131,40 @@ function ensureAcademiaSchema() {
       codigo_validacao TEXT,
       emitido_em DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS academia_documentos_internos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario_id INTEGER NOT NULL,
+      curso_id INTEGER NOT NULL,
+      tipo_documento TEXT NOT NULL,
+      codigo_validacao TEXT NOT NULL,
+      observacao_institucional TEXT,
+      carga_horaria_interna INTEGER DEFAULT 0,
+      arquivo_url TEXT,
+      emitido_em DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS academia_etapas_externas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario_id INTEGER NOT NULL,
+      curso_id INTEGER NOT NULL,
+      plataforma TEXT NOT NULL DEFAULT 'CURSA',
+      link_externo TEXT,
+      certificado_url TEXT,
+      certificado_nome_arquivo TEXT,
+      data_conclusao DATETIME,
+      status_validacao TEXT DEFAULT 'PENDENTE',
+      validado_por INTEGER,
+      validado_em DATETIME,
+      criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS academia_interacoes_ia (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario_id INTEGER,
+      curso_id INTEGER,
+      tipo_interacao TEXT,
+      pergunta TEXT,
+      resposta TEXT,
+      criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
     CREATE TABLE IF NOT EXISTS academia_pontos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       usuario_id INTEGER NOT NULL,
@@ -102,30 +175,13 @@ function ensureAcademiaSchema() {
     );
   `);
 
-  if (tableExists('academia_cursos')) {
-    if (!columnExists('academia_cursos', 'tipo')) db.exec("ALTER TABLE academia_cursos ADD COLUMN tipo TEXT DEFAULT 'INTERNO'");
-    if (!columnExists('academia_cursos', 'link_externo')) db.exec("ALTER TABLE academia_cursos ADD COLUMN link_externo TEXT");
-    db.exec(`
-      UPDATE academia_cursos
-      SET tipo = CASE WHEN UPPER(COALESCE(plataforma,'')) IN ('CURSA','YOUTUBE','PDF','OUTRO') THEN 'EXTERNO' ELSE 'INTERNO' END
-      WHERE tipo IS NULL OR tipo='';
+  if (!columnExists('academia_cursos', 'nota_minima')) db.exec("ALTER TABLE academia_cursos ADD COLUMN nota_minima REAL DEFAULT 70");
+  if (!columnExists('academia_usuario_cursos', 'etapa_externa_liberada_em')) db.exec("ALTER TABLE academia_usuario_cursos ADD COLUMN etapa_externa_liberada_em DATETIME");
+  if (!columnExists('academia_usuario_cursos', 'etapa_externa_liberada_por')) db.exec("ALTER TABLE academia_usuario_cursos ADD COLUMN etapa_externa_liberada_por INTEGER");
 
-      UPDATE academia_cursos
-      SET link_externo = COALESCE(link_externo, link_curso)
-      WHERE link_externo IS NULL;
-    `);
-  }
-
-  if (tableExists('academia_aulas')) {
-    if (!columnExists('academia_aulas', 'tipo_conteudo')) db.exec("ALTER TABLE academia_aulas ADD COLUMN tipo_conteudo TEXT DEFAULT 'VIDEO'");
-    if (!columnExists('academia_aulas', 'arquivo_url')) db.exec("ALTER TABLE academia_aulas ADD COLUMN arquivo_url TEXT");
-    if (!columnExists('academia_aulas', 'ativo')) db.exec("ALTER TABLE academia_aulas ADD COLUMN ativo INTEGER DEFAULT 1");
-  }
-
-  if (tableExists('academia_biblioteca')) {
-    if (!columnExists('academia_biblioteca', 'categoria')) db.exec("ALTER TABLE academia_biblioteca ADD COLUMN categoria TEXT");
-    if (!columnExists('academia_biblioteca', 'equipamento_id')) db.exec("ALTER TABLE academia_biblioteca ADD COLUMN equipamento_id INTEGER");
-  }
+  if (!columnExists('academia_avaliacoes', 'tipo_avaliacao')) db.exec("ALTER TABLE academia_avaliacoes ADD COLUMN tipo_avaliacao TEXT DEFAULT 'OBJETIVA'");
+  if (!columnExists('academia_avaliacoes', 'recomendacao_ia')) db.exec("ALTER TABLE academia_avaliacoes ADD COLUMN recomendacao_ia TEXT");
+  if (!columnExists('academia_avaliacoes', 'respostas_json')) db.exec("ALTER TABLE academia_avaliacoes ADD COLUMN respostas_json TEXT");
 
   if (tableExists('trilhas_conhecimento')) {
     db.exec(`
@@ -157,7 +213,8 @@ function getDashboardData(userId) {
     SELECT
       (SELECT COUNT(*) FROM academia_usuario_cursos WHERE status='EM_ANDAMENTO' AND usuario_id=@user_id) AS cursos_em_andamento,
       (SELECT COUNT(*) FROM academia_usuario_cursos WHERE status='CONCLUIDO' AND usuario_id=@user_id) AS cursos_concluidos,
-      (SELECT COUNT(*) FROM academia_certificados WHERE usuario_id=@user_id) AS certificados,
+      (SELECT COUNT(*) FROM academia_documentos_internos WHERE usuario_id=@user_id) AS documentos_internos,
+      (SELECT COUNT(*) FROM academia_etapas_externas WHERE usuario_id=@user_id AND status_validacao='VALIDADO') AS etapas_externas_validadas,
       (SELECT COALESCE(SUM(c.carga_horaria),0)
         FROM academia_usuario_cursos uc
         JOIN academia_cursos c ON c.id=uc.curso_id
@@ -246,8 +303,8 @@ function getCursosDestaque() {
 
 function getAvisosAcademia() {
   return [
-    { titulo: 'Atualização de trilhas', descricao: 'Novos cursos de Segurança NR-12 e Lubrificação disponíveis nesta semana.' },
-    { titulo: 'Campanha de certificação', descricao: 'Conclua 2 cursos no mês para ganhar bônus no ranking técnico.' },
+    { titulo: 'Capacitação institucional', descricao: 'Documentos emitidos pela Academia são internos e não configuram formação técnica oficial.' },
+    { titulo: 'Etapa complementar externa', descricao: 'Após aprovação interna, o sistema libera o curso complementar no Cursa para validação externa.' },
   ];
 }
 
@@ -266,7 +323,7 @@ function getRecomendacaoIA(userId) {
     return 'Comece pela trilha “Conhecimento da Fábrica” para acelerar sua adaptação operacional.';
   }
 
-  return `Com base no seu último curso (${ultimoCurso.titulo}), revise a trilha ${ultimoCurso.trilha_nome || 'principal'} e avance para um curso intermediário.`;
+  return `Com base no seu último curso (${ultimoCurso.titulo}), revise a trilha ${ultimoCurso.trilha_nome || 'principal'} e avance para um bloco prático com checklist.`;
 }
 
 function listTrilhas(userId = null) {
@@ -301,7 +358,11 @@ function listCursos(filters = {}, userId = null) {
       COALESCE(uc.status, 'NAO_INICIADO') AS meu_status,
       COALESCE(uc.progresso_percentual, 0) AS progresso_percentual,
       uc.concluido_em,
-      uc.iniciado_em
+      uc.iniciado_em,
+      CASE
+        WHEN uc.etapa_externa_liberada_em IS NOT NULL THEN 1
+        ELSE 0
+      END AS etapa_externa_liberada
     FROM academia_cursos c
     LEFT JOIN academia_trilhas t ON t.id=c.trilha_id
     LEFT JOIN academia_usuario_cursos uc ON uc.curso_id=c.id AND uc.usuario_id=@usuario_id
@@ -348,6 +409,29 @@ function getTrilhaDetalhe(trilhaId, userId = null) {
   };
 }
 
+function listBlocos(cursoId) {
+  return db.prepare(`
+    SELECT id, curso_id, titulo, descricao, conteudo_texto, checklist_json, imagem_url, resumo, ordem, ativo
+    FROM academia_blocos
+    WHERE curso_id=? AND ativo=1
+    ORDER BY ordem ASC, id ASC
+  `).all(cursoId).map((b) => ({
+    ...b,
+    checklist: (() => {
+      try { return b.checklist_json ? JSON.parse(b.checklist_json) : []; } catch (_e) { return []; }
+    })(),
+  }));
+}
+
+function listEbooks(cursoId) {
+  return db.prepare(`
+    SELECT id, curso_id, bloco_id, titulo, resumo, conteudo_html, arquivo_url, versao, publicado_em
+    FROM academia_ebooks
+    WHERE curso_id=?
+    ORDER BY datetime(publicado_em) DESC, id DESC
+  `).all(cursoId);
+}
+
 function getCursoDetalhe(cursoId, userId = null) {
   const curso = db.prepare(`
     SELECT
@@ -356,7 +440,9 @@ function getCursoDetalhe(cursoId, userId = null) {
       COALESCE(uc.status, 'NAO_INICIADO') AS meu_status,
       COALESCE(uc.progresso_percentual, 0) AS progresso_percentual,
       uc.iniciado_em,
-      uc.concluido_em
+      uc.concluido_em,
+      uc.etapa_externa_liberada_em,
+      uc.etapa_externa_liberada_por
     FROM academia_cursos c
     LEFT JOIN academia_trilhas t ON t.id=c.trilha_id
     LEFT JOIN academia_usuario_cursos uc ON uc.curso_id=c.id AND uc.usuario_id=?
@@ -372,17 +458,28 @@ function getCursoDetalhe(cursoId, userId = null) {
     ORDER BY ordem ASC, id ASC
   `).all(cursoId);
 
+  const blocos = listBlocos(cursoId);
+  const ebooks = listEbooks(cursoId);
+
   const avaliacao = db.prepare(`
-    SELECT nota, percentual, status, feedback, criado_em
+    SELECT id, nota, percentual, status, feedback, recomendacao_ia, tipo_avaliacao, criado_em
     FROM academia_avaliacoes
     WHERE curso_id=? AND usuario_id=?
     ORDER BY criado_em DESC
     LIMIT 1
   `).get(cursoId, userId || 0);
 
-  const certificado = db.prepare(`
-    SELECT tipo, arquivo_url, emitido_em, codigo_validacao
-    FROM academia_certificados
+  const etapaExterna = db.prepare(`
+    SELECT *
+    FROM academia_etapas_externas
+    WHERE curso_id=? AND usuario_id=?
+    ORDER BY criado_em DESC
+    LIMIT 1
+  `).get(cursoId, userId || 0);
+
+  const documentoInterno = db.prepare(`
+    SELECT *
+    FROM academia_documentos_internos
     WHERE curso_id=? AND usuario_id=?
     ORDER BY emitido_em DESC
     LIMIT 1
@@ -391,8 +488,12 @@ function getCursoDetalhe(cursoId, userId = null) {
   return {
     ...curso,
     aulas,
+    blocos,
+    ebooks,
     avaliacao,
-    certificado,
+    etapaExterna,
+    documentoInterno,
+    podeLiberarEtapaExterna: podeLiberarEtapaExterna({ cursoId, userId, forceCheckOnly: true }),
   };
 }
 
@@ -473,6 +574,26 @@ function listCertificados(userId, limit = null) {
   return db.prepare(sql).all(userId || 0);
 }
 
+function listDocumentosInternos(userId) {
+  return db.prepare(`
+    SELECT d.*, c.titulo AS curso_titulo
+    FROM academia_documentos_internos d
+    JOIN academia_cursos c ON c.id=d.curso_id
+    WHERE d.usuario_id=?
+    ORDER BY d.emitido_em DESC
+  `).all(userId || 0);
+}
+
+function listEtapasExternas(userId) {
+  return db.prepare(`
+    SELECT e.*, c.titulo AS curso_titulo
+    FROM academia_etapas_externas e
+    JOIN academia_cursos c ON c.id=e.curso_id
+    WHERE e.usuario_id=?
+    ORDER BY e.criado_em DESC
+  `).all(userId || 0);
+}
+
 function getRanking() {
   return db.prepare(`
     WITH pontos AS (
@@ -493,23 +614,6 @@ function getRanking() {
       SELECT usuario_id, COUNT(*) AS certificados
       FROM academia_certificados
       GROUP BY usuario_id
-    ),
-    trilhas AS (
-      SELECT
-        base.usuario_id,
-        COUNT(CASE WHEN base.total > 0 AND base.concluidos = base.total THEN 1 END) AS trilhas_concluidas
-      FROM (
-        SELECT
-          uc.usuario_id,
-          c.trilha_id,
-          COUNT(*) AS total,
-          SUM(CASE WHEN uc.status='CONCLUIDO' THEN 1 ELSE 0 END) AS concluidos
-        FROM academia_usuario_cursos uc
-        JOIN academia_cursos c ON c.id=uc.curso_id
-        WHERE c.trilha_id IS NOT NULL
-        GROUP BY uc.usuario_id, c.trilha_id
-      ) base
-      GROUP BY base.usuario_id
     )
     SELECT
       u.id AS usuario_id,
@@ -518,13 +622,11 @@ function getRanking() {
       COALESCE(p.pontos, 0) AS pontos,
       COALESCE(c.cursos_concluidos, 0) AS cursos_concluidos,
       COALESCE(c.horas_estudadas, 0) AS horas_estudadas,
-      COALESCE(cert.certificados, 0) AS certificados,
-      COALESCE(t.trilhas_concluidas, 0) AS trilhas_concluidas
+      COALESCE(cert.certificados, 0) AS certificados
     FROM users u
     LEFT JOIN pontos p ON p.usuario_id=u.id
     LEFT JOIN cursos c ON c.usuario_id=u.id
     LEFT JOIN certs cert ON cert.usuario_id=u.id
-    LEFT JOIN trilhas t ON t.usuario_id=u.id
     WHERE COALESCE(p.pontos, 0) > 0 OR COALESCE(c.cursos_concluidos, 0) > 0 OR COALESCE(cert.certificados, 0) > 0
     ORDER BY pontos DESC, cursos_concluidos DESC, horas_estudadas DESC, funcionario ASC
     LIMIT 50
@@ -598,6 +700,32 @@ function iniciarCurso({ cursoId, userId }) {
   `).run(existente.id);
 }
 
+function registrarPontuacao(userId, origem, pontos, detalhe = null) {
+  db.prepare(`
+    INSERT INTO academia_pontos (usuario_id, origem, pontos, detalhe, criado_em)
+    VALUES (?, ?, ?, ?, datetime('now'))
+  `).run(userId, origem, toInt(pontos, 0), detalhe);
+}
+
+function emitirDocumentoInterno({ userId, cursoId, tipoDocumento = 'Declaração Interna de Conclusão de Capacitação' }) {
+  const curso = db.prepare('SELECT id, titulo, carga_horaria FROM academia_cursos WHERE id=?').get(cursoId);
+  if (!curso) throw new Error('Curso inválido para emissão de documento interno.');
+
+  const codigo = `DOC-${cursoId}-${userId}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+  db.prepare(`
+    INSERT INTO academia_documentos_internos (usuario_id, curso_id, tipo_documento, codigo_validacao, observacao_institucional, carga_horaria_interna, arquivo_url, emitido_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `).run(
+    userId,
+    cursoId,
+    tipoDocumento,
+    codigo,
+    'Documento institucional interno. Não representa formação técnica oficial nem certificação reconhecida por órgão educacional externo.',
+    toInt(curso.carga_horaria, 0),
+    `/academia/documentos-internos?codigo=${codigo}`
+  );
+}
+
 function concluirCurso({ cursoId, userId }) {
   const curso = db.prepare('SELECT id, carga_horaria, tipo FROM academia_cursos WHERE id=?').get(cursoId);
   if (!curso) throw new Error('Curso não encontrado.');
@@ -619,7 +747,10 @@ function concluirCurso({ cursoId, userId }) {
     `).run(existente.id);
   }
 
-  registrarPontuacao(userId, 'CONCLUSAO_CURSO', 100, `Curso #${cursoId} concluído`);
+  registrarPontuacao(userId, 'CONCLUSAO_CURSO_INTERNO', 20, `Curso interno #${cursoId} concluído`);
+
+  emitirDocumentoInterno({ userId, cursoId, tipoDocumento: 'Declaração Interna de Conclusão de Capacitação' });
+  emitirDocumentoInterno({ userId, cursoId, tipoDocumento: 'Registro Interno de Treinamento' });
 
   const jaTemCertificado = db.prepare(`
     SELECT id FROM academia_certificados
@@ -632,38 +763,149 @@ function concluirCurso({ cursoId, userId }) {
       INSERT INTO academia_certificados (usuario_id, curso_id, tipo, arquivo_url, codigo_validacao, emitido_em)
       VALUES (?, ?, 'INTERNO', ?, ?, datetime('now'))
     `).run(userId, cursoId, `/academia/certificados?codigo=${codigo}`, codigo);
-
-    registrarPontuacao(userId, 'CERTIFICADO_INTERNO', 30, `Certificado interno do curso #${cursoId}`);
   }
 }
 
-function salvarCertificado({ cursoId, userId, certificadoUrl }) {
-  if (!certificadoUrl) throw new Error('Informe o link do certificado.');
+function registrarAvaliacaoInterna({ cursoId, userId, tipoAvaliacao, nota, percentual, feedback, recomendacaoIA, respostas }) {
+  const curso = db.prepare('SELECT id, nota_minima FROM academia_cursos WHERE id=?').get(cursoId);
+  if (!curso) throw new Error('Curso não encontrado para avaliação.');
 
-  const curso = db.prepare('SELECT id FROM academia_cursos WHERE id=?').get(cursoId);
-  if (!curso) throw new Error('Curso inválido.');
+  const score = toFloat(nota, 0);
+  const perc = toFloat(percentual, score);
+  const notaMinima = toFloat(curso.nota_minima, NOTA_MINIMA_PADRAO);
+  const status = score >= notaMinima ? 'APROVADO' : 'REVISAR';
 
-  const progress = db.prepare('SELECT id FROM academia_usuario_cursos WHERE usuario_id=? AND curso_id=?').get(userId, cursoId);
-  if (!progress) {
+  db.prepare(`
+    INSERT INTO academia_avaliacoes (curso_id, usuario_id, tipo_avaliacao, nota, percentual, status, feedback, recomendacao_ia, respostas_json, criado_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `).run(
+    cursoId,
+    userId,
+    String(tipoAvaliacao || 'OBJETIVA').toUpperCase(),
+    score,
+    perc,
+    status,
+    feedback || null,
+    recomendacaoIA || null,
+    respostas ? JSON.stringify(respostas) : null
+  );
+
+  if (status === 'APROVADO') registrarPontuacao(userId, 'AVALIACAO_INTERNA_APROVADA', 20, `Avaliação aprovada do curso #${cursoId}`);
+
+  return { status, nota: score, notaMinima };
+}
+
+function podeLiberarEtapaExterna({ cursoId, userId, forceCheckOnly = false }) {
+  const progresso = db.prepare(`
+    SELECT status, progresso_percentual
+    FROM academia_usuario_cursos
+    WHERE curso_id=? AND usuario_id=?
+  `).get(cursoId, userId || 0);
+
+  const curso = db.prepare('SELECT nota_minima, link_externo FROM academia_cursos WHERE id=?').get(cursoId);
+  if (!curso) return false;
+
+  const avaliacao = db.prepare(`
+    SELECT nota, status
+    FROM academia_avaliacoes
+    WHERE curso_id=? AND usuario_id=?
+    ORDER BY criado_em DESC
+    LIMIT 1
+  `).get(cursoId, userId || 0);
+
+  const notaMinima = toFloat(curso.nota_minima, NOTA_MINIMA_PADRAO);
+  const regraAutomatica = !!progresso
+    && (progresso.status === 'CONCLUIDO' || toInt(progresso.progresso_percentual, 0) >= 100)
+    && !!avaliacao
+    && (avaliacao.status === 'APROVADO' || toFloat(avaliacao.nota, 0) >= notaMinima)
+    && !!curso.link_externo;
+
+  if (forceCheckOnly) return regraAutomatica;
+
+  if (regraAutomatica) {
+    db.prepare(`
+      UPDATE academia_usuario_cursos
+      SET etapa_externa_liberada_em=COALESCE(etapa_externa_liberada_em, datetime('now'))
+      WHERE usuario_id=? AND curso_id=?
+    `).run(userId, cursoId);
+  }
+
+  return regraAutomatica;
+}
+
+function liberarEtapaExternaManual({ cursoId, userId, adminId }) {
+  const progresso = db.prepare('SELECT id FROM academia_usuario_cursos WHERE usuario_id=? AND curso_id=?').get(userId, cursoId);
+  if (!progresso) {
     db.prepare(`
       INSERT INTO academia_usuario_cursos (usuario_id, curso_id, status, progresso_percentual, iniciado_em)
-      VALUES (?, ?, 'EM_ANDAMENTO', 20, datetime('now'))
+      VALUES (?, ?, 'EM_ANDAMENTO', 60, datetime('now'))
     `).run(userId, cursoId);
   }
 
   db.prepare(`
-    INSERT INTO academia_certificados (usuario_id, curso_id, tipo, arquivo_url, codigo_validacao, emitido_em)
-    VALUES (?, ?, 'EXTERNO', ?, ?, datetime('now'))
-  `).run(userId, cursoId, certificadoUrl, `EXT-${cursoId}-${userId}-${Date.now()}`);
-
-  registrarPontuacao(userId, 'CERTIFICADO_EXTERNO', 20, `Certificado externo do curso #${cursoId}`);
+    UPDATE academia_usuario_cursos
+    SET etapa_externa_liberada_em=datetime('now'),
+        etapa_externa_liberada_por=?
+    WHERE usuario_id=? AND curso_id=?
+  `).run(adminId || null, userId, cursoId);
 }
 
-function registrarPontuacao(userId, origem, pontos, detalhe = null) {
+function registrarEtapaExterna({ cursoId, userId, certificadoUrl, dataConclusao, plataforma = 'CURSA', linkExterno, certificadoNomeArquivo = null }) {
+  const curso = db.prepare('SELECT id, link_externo FROM academia_cursos WHERE id=?').get(cursoId);
+  if (!curso) throw new Error('Curso inválido.');
+
+  const etapaLiberada = db.prepare(`
+    SELECT etapa_externa_liberada_em
+    FROM academia_usuario_cursos
+    WHERE usuario_id=? AND curso_id=?
+  `).get(userId, cursoId);
+
+  if (!etapaLiberada?.etapa_externa_liberada_em) {
+    const automatico = podeLiberarEtapaExterna({ cursoId, userId });
+    if (!automatico) {
+      throw new Error('Etapa externa ainda não liberada. Conclua o interno e atinja a nota mínima, ou solicite liberação ao administrador.');
+    }
+  }
+
+  const url = String(certificadoUrl || '').trim();
+  if (!url) throw new Error('Informe o link ou upload do comprovante externo.');
+
   db.prepare(`
-    INSERT INTO academia_pontos (usuario_id, origem, pontos, detalhe, criado_em)
-    VALUES (?, ?, ?, ?, datetime('now'))
-  `).run(userId, origem, toInt(pontos, 0), detalhe);
+    INSERT INTO academia_etapas_externas (usuario_id, curso_id, plataforma, link_externo, certificado_url, certificado_nome_arquivo, data_conclusao, status_validacao, criado_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDENTE', datetime('now'))
+  `).run(
+    userId,
+    cursoId,
+    String(plataforma || 'CURSA').toUpperCase(),
+    linkExterno || curso.link_externo || null,
+    url,
+    certificadoNomeArquivo,
+    dataConclusao || null
+  );
+
+  registrarPontuacao(userId, 'ENVIO_CERTIFICADO_EXTERNO', 10, `Certificado externo enviado para o curso #${cursoId}`);
+}
+
+function validarEtapaExterna({ etapaId, statusValidacao, adminId }) {
+  const etapa = db.prepare('SELECT id, usuario_id, curso_id, status_validacao FROM academia_etapas_externas WHERE id=?').get(etapaId);
+  if (!etapa) throw new Error('Registro de etapa externa não encontrado.');
+
+  const status = String(statusValidacao || '').toUpperCase() === 'VALIDADO' ? 'VALIDADO' : 'REPROVADO';
+
+  db.prepare(`
+    UPDATE academia_etapas_externas
+    SET status_validacao=?, validado_por=?, validado_em=datetime('now')
+    WHERE id=?
+  `).run(status, adminId || null, etapaId);
+
+  if (status === 'VALIDADO') {
+    registrarPontuacao(etapa.usuario_id, 'ETAPA_EXTERNA_VALIDADA', 50, `Etapa externa validada no curso #${etapa.curso_id}`);
+    emitirDocumentoInterno({ userId: etapa.usuario_id, cursoId: etapa.curso_id, tipoDocumento: 'Comprovante Institucional de Participação' });
+  }
+}
+
+function salvarCertificado({ cursoId, userId, certificadoUrl }) {
+  registrarEtapaExterna({ cursoId, userId, certificadoUrl });
 }
 
 function criarCurso(payload = {}) {
@@ -671,8 +913,8 @@ function criarCurso(payload = {}) {
   if (!titulo) throw new Error('Título do curso é obrigatório.');
 
   const info = db.prepare(`
-    INSERT INTO academia_cursos (trilha_id, titulo, descricao, tipo, plataforma, link_externo, nivel, carga_horaria, imagem, ativo, criado_em)
-    VALUES (@trilha_id, @titulo, @descricao, @tipo, @plataforma, @link_externo, @nivel, @carga_horaria, @imagem, 1, datetime('now'))
+    INSERT INTO academia_cursos (trilha_id, titulo, descricao, tipo, plataforma, link_externo, nivel, carga_horaria, nota_minima, imagem, ativo, criado_em)
+    VALUES (@trilha_id, @titulo, @descricao, @tipo, @plataforma, @link_externo, @nivel, @carga_horaria, @nota_minima, @imagem, 1, datetime('now'))
   `).run({
     trilha_id: payload.trilha_id ? Number(payload.trilha_id) : null,
     titulo,
@@ -682,6 +924,7 @@ function criarCurso(payload = {}) {
     link_externo: payload.link_curso || payload.link_externo || null,
     nivel: payload.nivel || 'BÁSICO',
     carga_horaria: toInt(payload.carga_horaria, 0),
+    nota_minima: toFloat(payload.nota_minima, NOTA_MINIMA_PADRAO),
     imagem: payload.imagem || null,
   });
 
@@ -713,6 +956,57 @@ function criarAula(payload = {}) {
   return Number(info.lastInsertRowid);
 }
 
+function criarBloco(payload = {}) {
+  const cursoId = Number(payload.curso_id);
+  if (!cursoId) throw new Error('Curso inválido para bloco.');
+  const titulo = String(payload.titulo || '').trim();
+  if (!titulo) throw new Error('Título do bloco é obrigatório.');
+
+  const checklist = Array.isArray(payload.checklist)
+    ? payload.checklist
+    : String(payload.checklist || '').split('\n').map((l) => l.trim()).filter(Boolean);
+
+  const info = db.prepare(`
+    INSERT INTO academia_blocos (curso_id, titulo, descricao, conteudo_texto, checklist_json, imagem_url, resumo, ordem, ativo, criado_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+  `).run(
+    cursoId,
+    titulo,
+    payload.descricao || null,
+    payload.conteudo_texto || null,
+    JSON.stringify(checklist),
+    payload.imagem_url || null,
+    payload.resumo || null,
+    toInt(payload.ordem, 1)
+  );
+
+  return Number(info.lastInsertRowid);
+}
+
+function criarEbook(payload = {}) {
+  const cursoId = Number(payload.curso_id);
+  if (!cursoId) throw new Error('Curso inválido para e-book.');
+
+  const titulo = String(payload.titulo || '').trim();
+  if (!titulo) throw new Error('Título do e-book é obrigatório.');
+
+  const info = db.prepare(`
+    INSERT INTO academia_ebooks (curso_id, bloco_id, titulo, resumo, conteudo_html, arquivo_url, versao, publicado_em, criado_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now'))
+  `).run(
+    cursoId,
+    payload.bloco_id ? Number(payload.bloco_id) : null,
+    titulo,
+    payload.resumo || null,
+    payload.conteudo_html || null,
+    payload.arquivo_url || null,
+    payload.versao || '1.0',
+    payload.publicado_em || null
+  );
+
+  return Number(info.lastInsertRowid);
+}
+
 module.exports = {
   getDashboardData,
   listTrilhas,
@@ -722,6 +1016,8 @@ module.exports = {
   getMinhasAulas,
   listAvaliacoes,
   listCertificados,
+  listDocumentosInternos,
+  listEtapasExternas,
   getRanking,
   getMinhaPosicaoRanking,
   listBiblioteca,
@@ -729,6 +1025,14 @@ module.exports = {
   iniciarCurso,
   concluirCurso,
   salvarCertificado,
+  registrarAvaliacaoInterna,
+  podeLiberarEtapaExterna,
+  liberarEtapaExternaManual,
+  registrarEtapaExterna,
+  validarEtapaExterna,
   criarCurso,
   criarAula,
+  criarBloco,
+  criarEbook,
+  registrarPontuacao,
 };
