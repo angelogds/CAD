@@ -3,10 +3,10 @@ const db = require('../../database/db');
 
 const NOTA_MINIMA_PADRAO = Number(process.env.ACADEMIA_NOTA_MINIMA || 70);
 const CURSO_BLOCOS_PADRAO = [
-  { ordem: 1, titulo: 'Bloco 1 — Conceitos básicos', descricao: 'Fundamentos essenciais, termos técnicos e contexto operacional do curso.' },
-  { ordem: 2, titulo: 'Bloco 2 — Aplicação na fábrica', descricao: 'Aplicação prática no ambiente fabril, rotinas e padrões institucionais.' },
-  { ordem: 3, titulo: 'Bloco 3 — Falhas comuns e cuidados', descricao: 'Principais falhas, riscos operacionais, prevenção e controles de segurança.' },
-  { ordem: 4, titulo: 'Bloco 4 — Checklist e boas práticas', descricao: 'Checklists de execução, validação final e melhoria contínua.' },
+  { ordem: 1, titulo: 'Conceitos básicos', descricao: 'Fundamentos essenciais, termos técnicos e contexto operacional do curso.' },
+  { ordem: 2, titulo: 'Aplicação na fábrica', descricao: 'Aplicação prática no ambiente fabril, rotinas e padrões institucionais.' },
+  { ordem: 3, titulo: 'Falhas comuns', descricao: 'Principais falhas, riscos operacionais, prevenção e controles de segurança.' },
+  { ordem: 4, titulo: 'Boas práticas', descricao: 'Prevenção, padronização operacional e melhoria contínua na rotina.' },
 ];
 
 function toInt(v, fallback = 0) {
@@ -241,16 +241,6 @@ function sanitizeCursoPalavraChave(titulo) {
   return String(titulo || 'curso técnico').toLowerCase();
 }
 
-function isEmptyText(value) {
-  return !String(value || '').trim();
-}
-
-function isLegacyAutoBlock(bloco, cursoTitulo) {
-  const expectedConteudo = `${cursoTitulo}: ${bloco.descricao}`;
-  return String(bloco.conteudo_texto || '').trim() === expectedConteudo
-    || String(bloco.resumo || '').trim() === `Resumo institucional do ${bloco.titulo.toLowerCase()}.`;
-}
-
 function getChecklistPadrao(cursoTitulo) {
   return [
     'Validar liberação da área e condição segura para intervenção.',
@@ -311,12 +301,9 @@ function getAvaliacaoModeloPadrao(curso, proximoCursoTitulo) {
       `Na prática de ${termo}, qual ação reduz falha recorrente em equipamento crítico?`,
       'Qual registro é obrigatório após uma intervenção corretiva?',
       'Antes de liberar o equipamento, qual validação deve ser executada?',
-      'Qual evidência demonstra aplicação correta do checklist do bloco?',
     ],
     curtas: [
-      `Descreva como aplicar ${termo} na área de graxaria sem gerar risco operacional.`,
-      'Liste três erros comuns observados na manutenção e como prevenir cada um.',
-      `Qual próximo curso você faria (${proximoCursoTitulo}) e por quê?`,
+      `Descreva uma aplicação prática de ${termo} no seu setor e os principais cuidados operacionais.`,
     ],
   };
 }
@@ -331,13 +318,13 @@ function getEbookInstitucional(curso, proximoCursoTitulo) {
 <p>Desenvolver capacidade operacional para executar, inspecionar e registrar intervenções com segurança, qualidade e rastreabilidade.</p>
 <h2>Aplicação na fábrica</h2>
 <p>Conteúdo voltado para equipamentos de processo térmico, transporte mecânico, prensagem, utilidades e apoio operacional da planta.</p>
-<h2>Bloco 1 — Conceitos básicos</h2>
+<h2>Conceitos básicos</h2>
 <p>Fundamentos técnicos, parâmetros de operação e critérios mínimos de inspeção.</p>
-<h2>Bloco 2 — Aplicação prática</h2>
+<h2>Aplicação prática</h2>
 <p>Roteiro de execução em campo: preparação, intervenção, teste funcional e liberação.</p>
-<h2>Bloco 3 — Falhas comuns</h2>
+<h2>Falhas comuns</h2>
 <p>Principais anomalias da rotina de manutenção em graxaria, com foco em prevenção de recorrência.</p>
-<h2>Bloco 4 — Boas práticas</h2>
+<h2>Boas práticas</h2>
 <p>Padronização de checklists, registros e melhoria contínua da confiabilidade.</p>
 <h2>Checklist prático do curso</h2>
 <ol>${checklist.map((item) => `<li>${item}</li>`).join('')}</ol>
@@ -348,10 +335,87 @@ function getEbookInstitucional(curso, proximoCursoTitulo) {
   <li>Ignorar causa raiz e tratar apenas o sintoma.</li>
 </ul>
 <h2>Avaliação</h2>
-<p>Modelo institucional: 5 objetivas + 3 perguntas curtas + checklist prático de execução assistida.</p>
+<p>Modelo institucional: 4 perguntas objetivas + 1 pergunta aberta (nota mínima 70).</p>
 <h2>Recomendação de próximo curso</h2>
 <p>Próximo passo da trilha: <strong>${proximoCursoTitulo}</strong>.</p>
   `.trim();
+}
+
+function getProximoCursoDaTrilha(cursoId, trilhaId) {
+  const cursosDaTrilha = db.prepare(`
+    SELECT id, titulo
+    FROM academia_cursos
+    WHERE trilha_id IS ? AND ativo=1
+    ORDER BY titulo
+  `).all(trilhaId);
+  const posicao = cursosDaTrilha.findIndex((c) => Number(c.id) === Number(cursoId));
+  return (posicao >= 0 && cursosDaTrilha[posicao + 1])
+    ? cursosDaTrilha[posicao + 1]
+    : (cursosDaTrilha[0] || { titulo: 'Revisão de Segurança em Intervenção Mecânica' });
+}
+
+function seedConteudoCursos() {
+  const cursosPendentes = db.prepare(`
+    SELECT
+      c.id,
+      c.titulo,
+      c.trilha_id,
+      (SELECT COUNT(*) FROM academia_blocos b WHERE b.curso_id=c.id) AS total_blocos,
+      (SELECT COUNT(*) FROM academia_ebooks e WHERE e.curso_id=c.id) AS total_ebooks,
+      (SELECT COUNT(*) FROM academia_avaliacoes_modelo m WHERE m.curso_id=c.id) AS total_avaliacoes
+    FROM academia_cursos c
+    WHERE c.ativo=1
+      AND (
+        (SELECT COUNT(*) FROM academia_blocos b WHERE b.curso_id=c.id) = 0
+        OR (SELECT COUNT(*) FROM academia_ebooks e WHERE e.curso_id=c.id) = 0
+      )
+    ORDER BY c.titulo ASC
+  `).all();
+
+  const resumoExecucao = {
+    cursosAnalisados: cursosPendentes.length,
+    blocosCriados: 0,
+    ebooksCriados: 0,
+    avaliacoesCriadas: 0,
+  };
+
+  for (const curso of cursosPendentes) {
+    const proximoCurso = getProximoCursoDaTrilha(curso.id, curso.trilha_id);
+
+    if (Number(curso.total_blocos) === 0) {
+      CURSO_BLOCOS_PADRAO.forEach((blocoPadrao) => {
+        const conteudoPadrao = getConteudoBlocoPadrao(curso, blocoPadrao, proximoCurso.titulo);
+        const checklistPadrao = JSON.stringify(getChecklistPadrao(curso.titulo));
+        const resumoPadrao = `Aplicação prática de ${curso.titulo} com foco em ${blocoPadrao.titulo.toLowerCase()}.`;
+        db.prepare(`
+          INSERT INTO academia_blocos (curso_id, titulo, descricao, conteudo_texto, checklist_json, resumo, ordem, ativo, criado_em)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+        `).run(curso.id, blocoPadrao.titulo, blocoPadrao.descricao, conteudoPadrao, checklistPadrao, resumoPadrao, blocoPadrao.ordem);
+        resumoExecucao.blocosCriados += 1;
+      });
+    }
+
+    if (Number(curso.total_ebooks) === 0) {
+      const ebookResumoPadrao = `Guia didático completo de ${curso.titulo} com foco em manutenção industrial na graxaria.`;
+      const ebookConteudoPadrao = getEbookInstitucional(curso, proximoCurso.titulo);
+      db.prepare(`
+        INSERT INTO academia_ebooks (curso_id, titulo, resumo, conteudo_html, versao, publicado_em, criado_em)
+        VALUES (?, ?, ?, ?, '2.0', datetime('now'), datetime('now'))
+      `).run(curso.id, `E-book Institucional — ${curso.titulo}`, ebookResumoPadrao, ebookConteudoPadrao);
+      resumoExecucao.ebooksCriados += 1;
+    }
+
+    if (Number(curso.total_avaliacoes) === 0) {
+      const avaliacaoPadrao = getAvaliacaoModeloPadrao(curso, proximoCurso.titulo);
+      db.prepare(`
+        INSERT INTO academia_avaliacoes_modelo (curso_id, perguntas_objetivas_json, perguntas_curtas_json, nota_minima, criado_em)
+        VALUES (?, ?, ?, ?, datetime('now'))
+      `).run(curso.id, JSON.stringify(avaliacaoPadrao.objetivas), JSON.stringify(avaliacaoPadrao.curtas), NOTA_MINIMA_PADRAO);
+      resumoExecucao.avaliacoesCriadas += 1;
+    }
+  }
+
+  return resumoExecucao;
 }
 
 function seedAcademiaInicial() {
@@ -447,127 +511,9 @@ function seedAcademiaInicial() {
       `).run(trilhaId, descricao, linkExterno, cargaHoraria, NOTA_MINIMA_PADRAO, cursoId);
     }
 
-    const cursosDaTrilha = db.prepare(`
-      SELECT id, titulo
-      FROM academia_cursos
-      WHERE trilha_id IS ? AND ativo=1
-      ORDER BY titulo
-    `).all(trilhaId);
-    const posicao = cursosDaTrilha.findIndex((c) => Number(c.id) === Number(cursoId));
-    const proximoCurso = (posicao >= 0 && cursosDaTrilha[posicao + 1])
-      ? cursosDaTrilha[posicao + 1]
-      : (cursosDaTrilha[0] || { titulo: 'Revisão de Segurança em Intervenção Mecânica' });
-
-    const blocosExistentes = db.prepare(`
-      SELECT id, titulo, descricao, conteudo_texto, checklist_json, resumo, ordem
-      FROM academia_blocos
-      WHERE curso_id=?
-      ORDER BY ordem ASC, id ASC
-    `).all(cursoId);
-    const blocoPorOrdem = new Map(blocosExistentes.map((b) => [Number(b.ordem), b]));
-
-    CURSO_BLOCOS_PADRAO.forEach((blocoPadrao) => {
-      const blocoExistente = blocoPorOrdem.get(blocoPadrao.ordem);
-      const conteudoPadrao = getConteudoBlocoPadrao({ titulo }, blocoPadrao, proximoCurso.titulo);
-      const checklistPadrao = JSON.stringify(getChecklistPadrao(titulo));
-      const resumoPadrao = `Aplicação prática de ${titulo} com foco em ${blocoPadrao.titulo.toLowerCase()}.`;
-
-      if (!blocoExistente) {
-        db.prepare(`
-          INSERT INTO academia_blocos (curso_id, titulo, descricao, conteudo_texto, checklist_json, resumo, ordem, ativo, criado_em)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
-        `).run(cursoId, blocoPadrao.titulo, blocoPadrao.descricao, conteudoPadrao, checklistPadrao, resumoPadrao, blocoPadrao.ordem);
-        return;
-      }
-
-      const deveAtualizarConteudo = isEmptyText(blocoExistente.conteudo_texto) || isLegacyAutoBlock(blocoExistente, titulo);
-      const deveAtualizarChecklist = isEmptyText(blocoExistente.checklist_json)
-        || String(blocoExistente.checklist_json || '').includes('Executar procedimento padrão');
-      const deveAtualizarResumo = isEmptyText(blocoExistente.resumo)
-        || String(blocoExistente.resumo || '').startsWith('Resumo institucional do');
-
-      db.prepare(`
-        UPDATE academia_blocos
-        SET
-          titulo=COALESCE(NULLIF(titulo,''), ?),
-          descricao=COALESCE(NULLIF(descricao,''), ?),
-          conteudo_texto=CASE WHEN ? THEN ? ELSE conteudo_texto END,
-          checklist_json=CASE WHEN ? THEN ? ELSE checklist_json END,
-          resumo=CASE WHEN ? THEN ? ELSE resumo END,
-          ativo=1
-        WHERE id=?
-      `).run(
-        blocoPadrao.titulo,
-        blocoPadrao.descricao,
-        deveAtualizarConteudo ? 1 : 0,
-        conteudoPadrao,
-        deveAtualizarChecklist ? 1 : 0,
-        checklistPadrao,
-        deveAtualizarResumo ? 1 : 0,
-        resumoPadrao,
-        blocoExistente.id
-      );
-    });
-
-    const ebookExistente = db.prepare('SELECT id, resumo, conteudo_html FROM academia_ebooks WHERE curso_id=? ORDER BY id ASC LIMIT 1').get(cursoId);
-    const ebookResumoPadrao = `Guia didático completo de ${titulo} com foco em manutenção industrial na graxaria.`;
-    const ebookConteudoPadrao = getEbookInstitucional({ titulo }, proximoCurso.titulo);
-    if (!ebookExistente) {
-      db.prepare(`
-        INSERT INTO academia_ebooks (curso_id, titulo, resumo, conteudo_html, versao, publicado_em, criado_em)
-        VALUES (?, ?, ?, ?, '2.0', datetime('now'), datetime('now'))
-      `).run(cursoId, `E-book Institucional — ${titulo}`, ebookResumoPadrao, ebookConteudoPadrao);
-    } else {
-      const deveAtualizarResumo = isEmptyText(ebookExistente.resumo) || String(ebookExistente.resumo || '').startsWith('Material institucional de referência');
-      const deveAtualizarConteudo = isEmptyText(ebookExistente.conteudo_html) || String(ebookExistente.conteudo_html || '').includes('<h2>Checklist final</h2>');
-      db.prepare(`
-        UPDATE academia_ebooks
-        SET
-          titulo=COALESCE(NULLIF(titulo,''), ?),
-          resumo=CASE WHEN ? THEN ? ELSE resumo END,
-          conteudo_html=CASE WHEN ? THEN ? ELSE conteudo_html END,
-          versao=CASE WHEN ? THEN '2.0' ELSE versao END
-        WHERE id=?
-      `).run(
-        `E-book Institucional — ${titulo}`,
-        deveAtualizarResumo ? 1 : 0,
-        ebookResumoPadrao,
-        deveAtualizarConteudo ? 1 : 0,
-        ebookConteudoPadrao,
-        deveAtualizarConteudo ? 1 : 0,
-        ebookExistente.id
-      );
-    }
-
-    const modeloExistente = db.prepare('SELECT id, perguntas_objetivas_json, perguntas_curtas_json FROM academia_avaliacoes_modelo WHERE curso_id=? LIMIT 1').get(cursoId);
-    const avaliacaoPadrao = getAvaliacaoModeloPadrao({ titulo }, proximoCurso.titulo);
-    if (!modeloExistente) {
-      db.prepare(`
-        INSERT INTO academia_avaliacoes_modelo (curso_id, perguntas_objetivas_json, perguntas_curtas_json, nota_minima, criado_em)
-        VALUES (?, ?, ?, ?, datetime('now'))
-      `).run(cursoId, JSON.stringify(avaliacaoPadrao.objetivas), JSON.stringify(avaliacaoPadrao.curtas), NOTA_MINIMA_PADRAO);
-    } else {
-      const deveAtualizarObjetivas = isEmptyText(modeloExistente.perguntas_objetivas_json)
-        || String(modeloExistente.perguntas_objetivas_json || '').includes('Qual o principal objetivo operacional');
-      const deveAtualizarCurtas = isEmptyText(modeloExistente.perguntas_curtas_json)
-        || String(modeloExistente.perguntas_curtas_json || '').includes('Descreva um cuidado crítico');
-      db.prepare(`
-        UPDATE academia_avaliacoes_modelo
-        SET
-          perguntas_objetivas_json=CASE WHEN ? THEN ? ELSE perguntas_objetivas_json END,
-          perguntas_curtas_json=CASE WHEN ? THEN ? ELSE perguntas_curtas_json END,
-          nota_minima=COALESCE(nota_minima, ?)
-        WHERE id=?
-      `).run(
-        deveAtualizarObjetivas ? 1 : 0,
-        JSON.stringify(avaliacaoPadrao.objetivas),
-        deveAtualizarCurtas ? 1 : 0,
-        JSON.stringify(avaliacaoPadrao.curtas),
-        NOTA_MINIMA_PADRAO,
-        modeloExistente.id
-      );
-    }
   }
+
+  seedConteudoCursos();
 }
 
 function bootstrapAcademia() {
@@ -1484,5 +1430,6 @@ module.exports = {
   criarAula,
   criarBloco,
   criarEbook,
+  seedConteudoCursos,
   registrarPontuacao,
 };

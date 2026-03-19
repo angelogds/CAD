@@ -62,5 +62,6 @@ router.post('/cursos/criar', requireLogin, requireRole(ACCESS.academia_manage), 
 router.post('/aulas/criar', requireLogin, requireRole(ACCESS.academia_manage), ctrl.criarAula);
 router.post('/blocos/criar', requireLogin, requireRole(ACCESS.academia_manage), ctrl.criarBloco);
 router.post('/ebooks/criar', requireLogin, requireRole(ACCESS.academia_manage), ctrl.criarEbook);
+router.post('/admin/seed-conteudo-cursos', requireLogin, requireRole(ACCESS.academia_manage), ctrl.executarSeedConteudoCursos);
 
 module.exports = router;
