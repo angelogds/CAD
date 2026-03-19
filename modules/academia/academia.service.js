@@ -2,6 +2,12 @@ const crypto = require('crypto');
 const db = require('../../database/db');
 
 const NOTA_MINIMA_PADRAO = Number(process.env.ACADEMIA_NOTA_MINIMA || 70);
+const CURSO_BLOCOS_PADRAO = [
+  { ordem: 1, titulo: 'Bloco 1 — Conceitos básicos', descricao: 'Fundamentos essenciais, termos técnicos e contexto operacional do curso.' },
+  { ordem: 2, titulo: 'Bloco 2 — Aplicação na fábrica', descricao: 'Aplicação prática no ambiente fabril, rotinas e padrões institucionais.' },
+  { ordem: 3, titulo: 'Bloco 3 — Falhas comuns e cuidados', descricao: 'Principais falhas, riscos operacionais, prevenção e controles de segurança.' },
+  { ordem: 4, titulo: 'Bloco 4 — Checklist e boas práticas', descricao: 'Checklists de execução, validação final e melhoria contínua.' },
+];
 
 function toInt(v, fallback = 0) {
   const n = Number(v);
@@ -109,6 +115,14 @@ function ensureAcademiaSchema() {
       etapa_externa_liberada_por INTEGER,
       UNIQUE (usuario_id, curso_id)
     );
+    CREATE TABLE IF NOT EXISTS academia_usuario_blocos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario_id INTEGER NOT NULL,
+      curso_id INTEGER NOT NULL,
+      bloco_id INTEGER NOT NULL,
+      concluido_em DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (usuario_id, bloco_id)
+    );
     CREATE TABLE IF NOT EXISTS academia_avaliacoes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       curso_id INTEGER NOT NULL,
@@ -120,6 +134,14 @@ function ensureAcademiaSchema() {
       feedback TEXT,
       recomendacao_ia TEXT,
       respostas_json TEXT,
+      criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS academia_avaliacoes_modelo (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      curso_id INTEGER NOT NULL UNIQUE,
+      perguntas_objetivas_json TEXT,
+      perguntas_curtas_json TEXT,
+      nota_minima REAL DEFAULT 70,
       criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS academia_certificados (
@@ -206,7 +228,192 @@ function ensureAcademiaSchema() {
   }
 }
 
+function toSlug(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '');
+}
+
+function getEbookInstitucional(curso) {
+  return `
+<h2>Introdução</h2>
+<p>${curso.titulo} integra a Academia da Manutenção com foco institucional em desempenho operacional, segurança e padronização de rotina.</p>
+<h2>Objetivos</h2>
+<ul>
+  <li>Consolidar fundamentos técnicos aplicáveis ao posto de trabalho.</li>
+  <li>Padronizar inspeções, intervenções e registros internos.</li>
+  <li>Reduzir falhas recorrentes e riscos operacionais.</li>
+</ul>
+<h2>Aplicação prática</h2>
+<p>Aplicar os conceitos durante inspeções de turno, paradas programadas e intervenções corretivas, com registro de evidências no padrão interno da fábrica.</p>
+<h2>Cuidados</h2>
+<ul>
+  <li>Seguir bloqueio e etiquetagem quando aplicável.</li>
+  <li>Usar EPI adequado e checklist pré-serviço.</li>
+  <li>Comunicar não conformidades imediatamente ao responsável.</li>
+</ul>
+<h2>Erros comuns</h2>
+<ul>
+  <li>Executar atividade sem validar condição segura do equipamento.</li>
+  <li>Não registrar medições e evidências da intervenção.</li>
+  <li>Pular checklist de retorno à operação.</li>
+</ul>
+<h2>Checklist final</h2>
+<ol>
+  <li>Condição segura confirmada.</li>
+  <li>Atividade executada conforme procedimento.</li>
+  <li>Registros e evidências lançados.</li>
+  <li>Liberação final comunicada para operação.</li>
+</ol>
+  `.trim();
+}
+
+function seedAcademiaInicial() {
+  const trilhas = [
+    ['Fundamentos da Manutenção', 'Base institucional de manutenção industrial e segurança operacional.'],
+    ['Mecânica Industrial', 'Mecânica aplicada à confiabilidade e intervenções industriais.'],
+    ['Lubrificação', 'Gestão de lubrificação, inspeção e prevenção de desgaste prematuro.'],
+    ['Caldeiraria e Fabricação', 'Traçagem, caldeiraria e fabricação de componentes industriais.'],
+    ['Soldagem', 'Processos de soldagem aplicados à manutenção e fabricação.'],
+    ['Elétrica e Utilidades', 'Conceitos elétricos e utilidades industriais para manutenção.'],
+    ['Conhecimento da Fábrica', 'Trilha institucional focada em graxaria e reciclagem animal.'],
+  ];
+
+  const cursos = [
+    ['Fundamentos da Manutenção Industrial', 'Fundamentos da Manutenção', 8],
+    ['Inspeção e Identificação de Não Conformidades', 'Fundamentos da Manutenção', 6],
+    ['Operação Segura de Equipamentos', 'Fundamentos da Manutenção', 6],
+    ['Segurança em Intervenção Mecânica', 'Fundamentos da Manutenção', 6],
+    ['NR-12 Aplicada à Manutenção', 'Fundamentos da Manutenção', 6],
+    ['Mecânica Industrial Básica', 'Mecânica Industrial', 8],
+    ['Rolamentos Industriais', 'Mecânica Industrial', 8],
+    ['Manutenção de Redutores', 'Mecânica Industrial', 8],
+    ['Alinhamento de Eixos', 'Mecânica Industrial', 8],
+    ['Metrologia Industrial', 'Mecânica Industrial', 6],
+    ['Lubrificação Industrial', 'Lubrificação', 6],
+    ['Leitura e Interpretação de Desenho Técnico', 'Caldeiraria e Fabricação', 8],
+    ['Caldeiraria Industrial e Traçagem', 'Caldeiraria e Fabricação', 8],
+    ['Tubulações Industriais: Água, Vapor e Condensado', 'Caldeiraria e Fabricação', 8],
+    ['Soldagem MIG', 'Soldagem', 8],
+    ['Soldagem TIG', 'Soldagem', 8],
+    ['Soldagem com Eletrodo Revestido', 'Soldagem', 8],
+    ['Elétrica Industrial Básica para Manutenção', 'Elétrica e Utilidades', 8],
+    ['Caldeiras: Operação, Segurança e Manutenção', 'Elétrica e Utilidades', 8],
+    ['NR-13 Aplicada a Caldeiras e Tubulações', 'Elétrica e Utilidades', 8],
+    ['Introdução à Reciclagem Animal / Graxaria', 'Conhecimento da Fábrica', 6],
+    ['Operação e Manutenção de Digestores', 'Conhecimento da Fábrica', 8],
+    ['Operação e Manutenção de Prensas', 'Conhecimento da Fábrica', 8],
+    ['Operação e Manutenção de Roscas Transportadoras', 'Conhecimento da Fábrica', 8],
+    ['Fluxo de Processo da Reciclagem Animal', 'Conhecimento da Fábrica', 6],
+  ];
+
+  const insertTrilha = db.prepare(`
+    INSERT OR IGNORE INTO academia_trilhas (nome, descricao, icone, nivel, ativo, criado_em)
+    VALUES (?, ?, 'school', 'BÁSICO', 1, datetime('now'))
+  `);
+  trilhas.forEach(([nome, descricao]) => insertTrilha.run(nome, descricao));
+
+  const trilhaIdByNome = db.prepare('SELECT id FROM academia_trilhas WHERE nome=? LIMIT 1');
+  const cursoPorSlug = new Map();
+  const todosCursos = db.prepare('SELECT id, titulo FROM academia_cursos').all();
+  for (const c of todosCursos) {
+    const slug = toSlug(c.titulo);
+    if (!cursoPorSlug.has(slug)) cursoPorSlug.set(slug, []);
+    cursoPorSlug.get(slug).push(c.id);
+  }
+
+  for (const ids of cursoPorSlug.values()) {
+    if (ids.length <= 1) continue;
+    const [manter, ...remover] = ids.sort((a, b) => a - b);
+    remover.forEach((id) => {
+      db.prepare('DELETE FROM academia_usuario_cursos WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_usuario_blocos WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_aulas WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_blocos WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_ebooks WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_avaliacoes WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_avaliacoes_modelo WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_certificados WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_documentos_internos WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_etapas_externas WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_cursos WHERE id=?').run(id);
+    });
+    db.prepare('UPDATE academia_cursos SET ativo=1 WHERE id=?').run(manter);
+  }
+
+  const insertCurso = db.prepare(`
+    INSERT INTO academia_cursos (trilha_id, titulo, descricao, tipo, plataforma, link_externo, nivel, carga_horaria, nota_minima, imagem, ativo, criado_em)
+    VALUES (?, ?, ?, 'INTERNO', 'INTERNO', ?, 'BÁSICO', ?, ?, '/IMG/menu_campo_do_gado.png.png.png.png.png', 1, datetime('now'))
+  `);
+
+  for (const [titulo, trilhaNome, cargaHoraria] of cursos) {
+    const trilhaId = trilhaIdByNome.get(trilhaNome)?.id || null;
+    const linkExterno = `https://cursa.app/curso-complementar/${toSlug(titulo)}`;
+    const existente = db.prepare('SELECT id FROM academia_cursos WHERE lower(titulo)=lower(?) LIMIT 1').get(titulo);
+    const descricao = `Capacitação interna institucional sobre ${titulo.toLowerCase()} com foco em segurança, padrão operacional e melhoria contínua.`;
+    const cursoId = existente?.id || Number(insertCurso.run(trilhaId, titulo, descricao, linkExterno, cargaHoraria, NOTA_MINIMA_PADRAO).lastInsertRowid);
+    if (existente) {
+      db.prepare(`
+        UPDATE academia_cursos
+        SET trilha_id=?, descricao=?, tipo='INTERNO', plataforma='INTERNO', link_externo=COALESCE(NULLIF(link_externo,''), ?),
+            carga_horaria=?, nota_minima=?, ativo=1
+        WHERE id=?
+      `).run(trilhaId, descricao, linkExterno, cargaHoraria, NOTA_MINIMA_PADRAO, cursoId);
+    }
+
+    const totalBlocos = db.prepare('SELECT COUNT(*) AS total FROM academia_blocos WHERE curso_id=? AND ativo=1').get(cursoId)?.total || 0;
+    if (totalBlocos < 4) {
+      db.prepare('DELETE FROM academia_blocos WHERE curso_id=?').run(cursoId);
+      CURSO_BLOCOS_PADRAO.forEach((bloco) => {
+        db.prepare(`
+          INSERT INTO academia_blocos (curso_id, titulo, descricao, conteudo_texto, checklist_json, resumo, ordem, ativo, criado_em)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+        `).run(
+          cursoId,
+          bloco.titulo,
+          bloco.descricao,
+          `${titulo}: ${bloco.descricao}`,
+          JSON.stringify(['Executar procedimento padrão', 'Registrar evidências', 'Validar segurança e liberação']),
+          `Resumo institucional do ${bloco.titulo.toLowerCase()}.`,
+          bloco.ordem
+        );
+      });
+    }
+
+    const ebookExiste = db.prepare('SELECT id FROM academia_ebooks WHERE curso_id=? LIMIT 1').get(cursoId);
+    if (!ebookExiste) {
+      db.prepare(`
+        INSERT INTO academia_ebooks (curso_id, titulo, resumo, conteudo_html, versao, publicado_em, criado_em)
+        VALUES (?, ?, ?, ?, '1.0', datetime('now'), datetime('now'))
+      `).run(cursoId, `E-book Institucional — ${titulo}`, `Material institucional de referência para ${titulo}.`, getEbookInstitucional({ titulo }));
+    }
+
+    const modeloExiste = db.prepare('SELECT id FROM academia_avaliacoes_modelo WHERE curso_id=? LIMIT 1').get(cursoId);
+    if (!modeloExiste) {
+      const objetivas = [
+        `Qual o principal objetivo operacional de ${titulo}?`,
+        'Qual prática reduz maior risco de falhas recorrentes?',
+        'Qual evidência deve ser registrada após intervenção?',
+        'Qual etapa de segurança é obrigatória antes da execução?',
+        'Qual ação garante padronização entre turnos?',
+      ];
+      const curtas = [
+        `Descreva um cuidado crítico na aplicação de ${titulo} na fábrica.`,
+        'Liste duas verificações finais do checklist institucional.',
+      ];
+      db.prepare(`
+        INSERT INTO academia_avaliacoes_modelo (curso_id, perguntas_objetivas_json, perguntas_curtas_json, nota_minima, criado_em)
+        VALUES (?, ?, ?, ?, datetime('now'))
+      `).run(cursoId, JSON.stringify(objetivas), JSON.stringify(curtas), NOTA_MINIMA_PADRAO);
+    }
+  }
+}
+
 ensureAcademiaSchema();
+seedAcademiaInicial();
 
 function getDashboardData(userId) {
   const indicadores = db.prepare(`
@@ -409,7 +616,11 @@ function getTrilhaDetalhe(trilhaId, userId = null) {
   };
 }
 
-function listBlocos(cursoId) {
+function listBlocos(cursoId, userId = null) {
+  const concluidos = userId
+    ? db.prepare('SELECT bloco_id FROM academia_usuario_blocos WHERE usuario_id=? AND curso_id=?').all(userId, cursoId).map((r) => Number(r.bloco_id))
+    : [];
+  const concluidosSet = new Set(concluidos);
   return db.prepare(`
     SELECT id, curso_id, titulo, descricao, conteudo_texto, checklist_json, imagem_url, resumo, ordem, ativo
     FROM academia_blocos
@@ -417,6 +628,7 @@ function listBlocos(cursoId) {
     ORDER BY ordem ASC, id ASC
   `).all(cursoId).map((b) => ({
     ...b,
+    concluido: concluidosSet.has(Number(b.id)),
     checklist: (() => {
       try { return b.checklist_json ? JSON.parse(b.checklist_json) : []; } catch (_e) { return []; }
     })(),
@@ -458,8 +670,13 @@ function getCursoDetalhe(cursoId, userId = null) {
     ORDER BY ordem ASC, id ASC
   `).all(cursoId);
 
-  const blocos = listBlocos(cursoId);
+  const blocos = listBlocos(cursoId, userId);
   const ebooks = listEbooks(cursoId);
+  const avaliacaoModelo = db.prepare(`
+    SELECT perguntas_objetivas_json, perguntas_curtas_json, nota_minima
+    FROM academia_avaliacoes_modelo
+    WHERE curso_id=?
+  `).get(cursoId);
 
   const avaliacao = db.prepare(`
     SELECT id, nota, percentual, status, feedback, recomendacao_ia, tipo_avaliacao, criado_em
@@ -490,6 +707,11 @@ function getCursoDetalhe(cursoId, userId = null) {
     aulas,
     blocos,
     ebooks,
+    avaliacaoModelo: avaliacaoModelo ? {
+      ...avaliacaoModelo,
+      perguntas_objetivas: JSON.parse(avaliacaoModelo.perguntas_objetivas_json || '[]'),
+      perguntas_curtas: JSON.parse(avaliacaoModelo.perguntas_curtas_json || '[]'),
+    } : null,
     avaliacao,
     etapaExterna,
     documentoInterno,
@@ -698,6 +920,60 @@ function iniciarCurso({ cursoId, userId }) {
         iniciado_em=COALESCE(iniciado_em, datetime('now'))
     WHERE id=?
   `).run(existente.id);
+}
+
+function getPrimeiroBloco(cursoId) {
+  return db.prepare(`
+    SELECT id, ordem
+    FROM academia_blocos
+    WHERE curso_id=? AND ativo=1
+    ORDER BY ordem ASC, id ASC
+    LIMIT 1
+  `).get(cursoId);
+}
+
+function getProximoBlocoPendente({ cursoId, userId }) {
+  return db.prepare(`
+    SELECT b.id, b.ordem
+    FROM academia_blocos b
+    LEFT JOIN academia_usuario_blocos ub ON ub.bloco_id=b.id AND ub.usuario_id=@usuario_id
+    WHERE b.curso_id=@curso_id AND b.ativo=1 AND ub.id IS NULL
+    ORDER BY b.ordem ASC, b.id ASC
+    LIMIT 1
+  `).get({ usuario_id: userId || 0, curso_id: cursoId });
+}
+
+function concluirBloco({ cursoId, blocoId, userId }) {
+  const bloco = db.prepare('SELECT id FROM academia_blocos WHERE id=? AND curso_id=? AND ativo=1').get(blocoId, cursoId);
+  if (!bloco) throw new Error('Bloco não encontrado.');
+
+  iniciarCurso({ cursoId, userId });
+  db.prepare(`
+    INSERT OR IGNORE INTO academia_usuario_blocos (usuario_id, curso_id, bloco_id, concluido_em)
+    VALUES (?, ?, ?, datetime('now'))
+  `).run(userId, cursoId, blocoId);
+
+  const totals = db.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM academia_blocos WHERE curso_id=? AND ativo=1) AS total,
+      (SELECT COUNT(*) FROM academia_usuario_blocos WHERE usuario_id=? AND curso_id=?) AS concluidos
+  `).get(cursoId, userId, cursoId);
+  const total = Math.max(1, toInt(totals?.total, 1));
+  const concluidos = toInt(totals?.concluidos, 0);
+  const percentual = Math.min(100, Math.round((concluidos * 100) / total));
+
+  db.prepare(`
+    UPDATE academia_usuario_cursos
+    SET progresso_percentual=?,
+        status=CASE WHEN ? >= 100 THEN 'CONCLUIDO' ELSE 'EM_ANDAMENTO' END,
+        concluido_em=CASE WHEN ? >= 100 THEN datetime('now') ELSE concluido_em END
+    WHERE usuario_id=? AND curso_id=?
+  `).run(percentual, percentual, percentual, userId, cursoId);
+
+  return {
+    percentual,
+    proximoBloco: getProximoBlocoPendente({ cursoId, userId }),
+  };
 }
 
 function registrarPontuacao(userId, origem, pontos, detalhe = null) {
@@ -1023,6 +1299,9 @@ module.exports = {
   listBiblioteca,
   listBibliotecaCategorias,
   iniciarCurso,
+  getPrimeiroBloco,
+  getProximoBlocoPendente,
+  concluirBloco,
   concluirCurso,
   salvarCertificado,
   registrarAvaliacaoInterna,

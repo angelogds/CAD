@@ -14,7 +14,13 @@
       <p>Avaliação mais recente: <strong><%= curso.avaliacao.nota %></strong> (<%= curso.avaliacao.status %>)</p>
     <% } %>
     <div class="academia-actions">
-      <form method="POST" action="/academia/iniciar/<%= curso.id %>"><button class="btn" type="submit">Iniciar curso</button></form>
+      <% if (curso.meu_status === 'EM_ANDAMENTO') { %>
+        <form method="POST" action="/academia/continuar/<%= curso.id %>"><button class="btn" type="submit">Continuar curso</button></form>
+      <% } else { %>
+        <form method="POST" action="/academia/iniciar/<%= curso.id %>"><button class="btn" type="submit">Iniciar curso</button></form>
+      <% } %>
+      <a class="btn btn-outline" href="#ebooks">Ver e-book</a>
+      <a class="btn btn-outline" href="#avaliacao">Fazer avaliação</a>
       <form method="POST" action="/academia/concluir/<%= curso.id %>"><button class="btn btn-outline" type="submit">Concluir etapa interna</button></form>
       <% if (curso.podeLiberarEtapaExterna && curso.link_externo) { %>
         <button class="btn btn-outline" type="button" data-open-external="<%= curso.link_externo %>">Curso complementar externo (Cursa)</button>
@@ -30,7 +36,7 @@
     <p class="muted-xs" style="margin-top:10px;">* A Academia é uma plataforma de capacitação interna. Não se trata de curso técnico reconhecido.</p>
   </div>
 
-  <div class="academia-card">
+  <div class="academia-card" id="avaliacao">
     <div class="label">Avaliação interna</div>
     <form method="POST" action="/academia/avaliacoes/<%= curso.id %>/enviar" style="margin-top:8px;" class="academia-form-stack">
       <select name="tipo_avaliacao">
@@ -45,6 +51,15 @@
       <textarea name="recomendacao_ia" rows="2" placeholder="Recomendação da IA (opcional)"></textarea>
       <button class="btn" type="submit">Registrar avaliação</button>
     </form>
+    <% if (curso.avaliacaoModelo) { %>
+      <div class="muted-xs" style="margin-top:10px;">Modelo institucional (nota mínima <strong><%= curso.avaliacaoModelo.nota_minima %></strong>)</div>
+      <ol>
+        <% (curso.avaliacaoModelo.perguntas_objetivas || []).forEach(function(p){ %><li><%= p %></li><% }) %>
+      </ol>
+      <ul>
+        <% (curso.avaliacaoModelo.perguntas_curtas || []).forEach(function(p){ %><li><%= p %></li><% }) %>
+      </ul>
+    <% } %>
   </div>
 </div>
 
@@ -53,15 +68,22 @@
   <div class="academia-grid" style="margin-top:8px;">
     <% if (!curso.blocos?.length) { %><p class="muted">Este curso ainda não possui blocos cadastrados.</p><% } %>
     <% curso.blocos.forEach(function(b){ %>
-      <div class="academia-card">
+      <div class="academia-card" id="bloco-<%= b.id %>">
         <h3><%= b.ordem || '-' %>. <%= b.titulo %></h3>
         <p class="muted"><%= b.descricao || 'Sem descrição' %></p>
+        <p class="muted-xs">Status do bloco: <strong><%= b.concluido ? 'CONCLUÍDO' : 'PENDENTE' %></strong></p>
         <% if (b.resumo) { %><p><strong>Resumo:</strong> <%= b.resumo %></p><% } %>
+        <% if (b.conteudo_texto) { %><p><%= b.conteudo_texto %></p><% } %>
         <% if (b.checklist?.length) { %>
           <div class="muted-xs">Checklist técnico:</div>
           <ul>
             <% b.checklist.forEach(function(item){ %><li><%= item %></li><% }) %>
           </ul>
+        <% } %>
+        <% if (!b.concluido) { %>
+          <form method="POST" action="/academia/curso/<%= curso.id %>/bloco/<%= b.id %>/concluir">
+            <button class="btn btn-outline" type="submit">Concluir bloco</button>
+          </form>
         <% } %>
       </div>
     <% }) %>
@@ -81,7 +103,7 @@
   <% } %>
 </div>
 
-<div class="card" style="margin-top:12px;">
+<div class="card" style="margin-top:12px;" id="ebooks">
   <div class="label">E-books internos</div>
   <div class="academia-grid" style="margin-top:8px;">
     <% if (!curso.ebooks?.length) { %><p class="muted">Ainda não há e-books internos neste curso.</p><% } %>
@@ -111,6 +133,7 @@
 <div class="card" style="margin-top:12px;">
   <div class="label">Etapa complementar externa (Cursa)</div>
   <p class="muted">Fluxo: concluir etapa interna + aprovação na avaliação → liberar curso complementar externo → enviar comprovante para validação.</p>
+  <% if (curso.podeLiberarEtapaExterna) { %>
   <div class="academia-grid academia-layout-2">
     <div class="academia-card">
       <% if (curso.link_externo) { %>
@@ -139,6 +162,9 @@
       <% } %>
     </div>
   </div>
+  <% } else { %>
+    <p class="muted">A etapa externa complementar ficará disponível após conclusão da etapa interna e aprovação na avaliação.</p>
+  <% } %>
 </div>
 
 <script src="/js/academia.js"></script>
