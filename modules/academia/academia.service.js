@@ -237,37 +237,120 @@ function toSlug(value) {
     .replace(/(^-|-$)+/g, '');
 }
 
-function getEbookInstitucional(curso) {
+function sanitizeCursoPalavraChave(titulo) {
+  return String(titulo || 'curso técnico').toLowerCase();
+}
+
+function isEmptyText(value) {
+  return !String(value || '').trim();
+}
+
+function isLegacyAutoBlock(bloco, cursoTitulo) {
+  const expectedConteudo = `${cursoTitulo}: ${bloco.descricao}`;
+  return String(bloco.conteudo_texto || '').trim() === expectedConteudo
+    || String(bloco.resumo || '').trim() === `Resumo institucional do ${bloco.titulo.toLowerCase()}.`;
+}
+
+function getChecklistPadrao(cursoTitulo) {
+  return [
+    'Validar liberação da área e condição segura para intervenção.',
+    `Conferir ponto crítico do equipamento relacionado a ${sanitizeCursoPalavraChave(cursoTitulo)}.`,
+    'Registrar anomalias, medições e ação executada no padrão da manutenção.',
+    'Confirmar teste funcional antes de liberar para operação.',
+  ];
+}
+
+function getConteudoBlocoPadrao(curso, bloco, proximoCursoTitulo) {
+  const termo = sanitizeCursoPalavraChave(curso.titulo);
+  const mapa = {
+    1: `
+Introdução: ${curso.titulo} padroniza fundamentos técnicos para manutenção industrial na graxaria.
+Objetivo: criar base comum de termos, parâmetros e critérios de inspeção.
+Aplicação na fábrica: usar no início do turno para leitura de condição de digestores, prensas, roscas e utilidades.
+Conceitos básicos: pontos de falha, modos de operação e limites de processo.
+Checklist: confirmar EPIs, permissões, bloqueios aplicáveis e instrumento de medição calibrado.
+Erros comuns: iniciar intervenção sem diagnóstico mínimo e sem histórico de falha.
+Avaliação: identificar 3 sinais de perda de desempenho e o risco associado.
+Próximo curso recomendado: ${proximoCursoTitulo}.`.trim(),
+    2: `
+Introdução: bloco prático para aplicar ${termo} em rotina real de manutenção.
+Objetivo: executar procedimento técnico com segurança e rastreabilidade.
+Aplicação na fábrica: realizar inspeção funcional, ajuste, reaperto e validação operacional em linha de reciclagem animal.
+Aplicação prática: sequência padrão de preparação, execução, teste e liberação.
+Checklist: evidência fotográfica, medições antes/depois e registro no sistema.
+Erros comuns: pular etapa de teste com carga e não comunicar desvios ao líder.
+Avaliação: estudo de caso curto sobre falha recorrente no equipamento do setor.
+Próximo curso recomendado: ${proximoCursoTitulo}.`.trim(),
+    3: `
+Introdução: prevenção de falhas recorrentes em equipamentos críticos da manutenção.
+Objetivo: reconhecer causa raiz provável e agir antes da quebra.
+Aplicação na fábrica: analisar vibração, temperatura, ruído, vazamento e perda de rendimento.
+Falhas comuns: desalinhamento, lubrificação inadequada, contaminação e ajuste fora do padrão.
+Checklist: classificar criticidade, abrir plano de ação e definir responsável com prazo.
+Erros comuns: trocar componente sem investigar a origem da falha.
+Avaliação: listar duas causas mecânicas e duas causas operacionais para a mesma anomalia.
+Próximo curso recomendado: ${proximoCursoTitulo}.`.trim(),
+    4: `
+Introdução: consolidação final do curso com foco em desempenho estável.
+Objetivo: fechar padrão de execução com segurança, qualidade e produtividade.
+Aplicação na fábrica: aplicar boas práticas em parada programada, retorno de linha e inspeção de rotina.
+Boas práticas: padronizar checklist, lição aprendida e reunião rápida de turno.
+Checklist: validar torque/aperto, limpeza técnica, condição de guarda e teste final.
+Erros comuns: não atualizar histórico e repetir intervenção sem plano preventivo.
+Avaliação: checklist prático com validação do instrutor interno.
+Próximo curso recomendado: ${proximoCursoTitulo}.`.trim(),
+  };
+  return mapa[bloco.ordem] || mapa[1];
+}
+
+function getAvaliacaoModeloPadrao(curso, proximoCursoTitulo) {
+  const termo = sanitizeCursoPalavraChave(curso.titulo);
+  return {
+    objetivas: [
+      `Qual é o objetivo técnico principal do curso ${curso.titulo}?`,
+      `Na prática de ${termo}, qual ação reduz falha recorrente em equipamento crítico?`,
+      'Qual registro é obrigatório após uma intervenção corretiva?',
+      'Antes de liberar o equipamento, qual validação deve ser executada?',
+      'Qual evidência demonstra aplicação correta do checklist do bloco?',
+    ],
+    curtas: [
+      `Descreva como aplicar ${termo} na área de graxaria sem gerar risco operacional.`,
+      'Liste três erros comuns observados na manutenção e como prevenir cada um.',
+      `Qual próximo curso você faria (${proximoCursoTitulo}) e por quê?`,
+    ],
+  };
+}
+
+function getEbookInstitucional(curso, proximoCursoTitulo) {
+  const checklist = getChecklistPadrao(curso.titulo);
   return `
+<!-- AUTO_DIDATICO_V2 -->
 <h2>Introdução</h2>
-<p>${curso.titulo} integra a Academia da Manutenção com foco institucional em desempenho operacional, segurança e padronização de rotina.</p>
-<h2>Objetivos</h2>
-<ul>
-  <li>Consolidar fundamentos técnicos aplicáveis ao posto de trabalho.</li>
-  <li>Padronizar inspeções, intervenções e registros internos.</li>
-  <li>Reduzir falhas recorrentes e riscos operacionais.</li>
-</ul>
-<h2>Aplicação prática</h2>
-<p>Aplicar os conceitos durante inspeções de turno, paradas programadas e intervenções corretivas, com registro de evidências no padrão interno da fábrica.</p>
-<h2>Cuidados</h2>
-<ul>
-  <li>Seguir bloqueio e etiquetagem quando aplicável.</li>
-  <li>Usar EPI adequado e checklist pré-serviço.</li>
-  <li>Comunicar não conformidades imediatamente ao responsável.</li>
-</ul>
+<p>O curso <strong>${curso.titulo}</strong> foi estruturado para manutenção industrial aplicada à reciclagem animal (graxaria), com linguagem técnica e direta.</p>
+<h2>Objetivo</h2>
+<p>Desenvolver capacidade operacional para executar, inspecionar e registrar intervenções com segurança, qualidade e rastreabilidade.</p>
+<h2>Aplicação na fábrica</h2>
+<p>Conteúdo voltado para equipamentos de processo térmico, transporte mecânico, prensagem, utilidades e apoio operacional da planta.</p>
+<h2>Bloco 1 — Conceitos básicos</h2>
+<p>Fundamentos técnicos, parâmetros de operação e critérios mínimos de inspeção.</p>
+<h2>Bloco 2 — Aplicação prática</h2>
+<p>Roteiro de execução em campo: preparação, intervenção, teste funcional e liberação.</p>
+<h2>Bloco 3 — Falhas comuns</h2>
+<p>Principais anomalias da rotina de manutenção em graxaria, com foco em prevenção de recorrência.</p>
+<h2>Bloco 4 — Boas práticas</h2>
+<p>Padronização de checklists, registros e melhoria contínua da confiabilidade.</p>
+<h2>Checklist prático do curso</h2>
+<ol>${checklist.map((item) => `<li>${item}</li>`).join('')}</ol>
 <h2>Erros comuns</h2>
 <ul>
-  <li>Executar atividade sem validar condição segura do equipamento.</li>
-  <li>Não registrar medições e evidências da intervenção.</li>
-  <li>Pular checklist de retorno à operação.</li>
+  <li>Executar atividade sem condição segura validada.</li>
+  <li>Não registrar evidências técnicas e medições.</li>
+  <li>Ignorar causa raiz e tratar apenas o sintoma.</li>
 </ul>
-<h2>Checklist final</h2>
-<ol>
-  <li>Condição segura confirmada.</li>
-  <li>Atividade executada conforme procedimento.</li>
-  <li>Registros e evidências lançados.</li>
-  <li>Liberação final comunicada para operação.</li>
-</ol>
+<h2>Avaliação</h2>
+<p>Modelo institucional: 5 objetivas + 3 perguntas curtas + checklist prático de execução assistida.</p>
+<h2>Recomendação de próximo curso</h2>
+<p>Próximo passo da trilha: <strong>${proximoCursoTitulo}</strong>.</p>
   `.trim();
 }
 
@@ -364,50 +447,125 @@ function seedAcademiaInicial() {
       `).run(trilhaId, descricao, linkExterno, cargaHoraria, NOTA_MINIMA_PADRAO, cursoId);
     }
 
-    const totalBlocos = db.prepare('SELECT COUNT(*) AS total FROM academia_blocos WHERE curso_id=? AND ativo=1').get(cursoId)?.total || 0;
-    if (totalBlocos < 4) {
-      db.prepare('DELETE FROM academia_blocos WHERE curso_id=?').run(cursoId);
-      CURSO_BLOCOS_PADRAO.forEach((bloco) => {
+    const cursosDaTrilha = db.prepare(`
+      SELECT id, titulo
+      FROM academia_cursos
+      WHERE trilha_id IS ? AND ativo=1
+      ORDER BY titulo
+    `).all(trilhaId);
+    const posicao = cursosDaTrilha.findIndex((c) => Number(c.id) === Number(cursoId));
+    const proximoCurso = (posicao >= 0 && cursosDaTrilha[posicao + 1])
+      ? cursosDaTrilha[posicao + 1]
+      : (cursosDaTrilha[0] || { titulo: 'Revisão de Segurança em Intervenção Mecânica' });
+
+    const blocosExistentes = db.prepare(`
+      SELECT id, titulo, descricao, conteudo_texto, checklist_json, resumo, ordem
+      FROM academia_blocos
+      WHERE curso_id=?
+      ORDER BY ordem ASC, id ASC
+    `).all(cursoId);
+    const blocoPorOrdem = new Map(blocosExistentes.map((b) => [Number(b.ordem), b]));
+
+    CURSO_BLOCOS_PADRAO.forEach((blocoPadrao) => {
+      const blocoExistente = blocoPorOrdem.get(blocoPadrao.ordem);
+      const conteudoPadrao = getConteudoBlocoPadrao({ titulo }, blocoPadrao, proximoCurso.titulo);
+      const checklistPadrao = JSON.stringify(getChecklistPadrao(titulo));
+      const resumoPadrao = `Aplicação prática de ${titulo} com foco em ${blocoPadrao.titulo.toLowerCase()}.`;
+
+      if (!blocoExistente) {
         db.prepare(`
           INSERT INTO academia_blocos (curso_id, titulo, descricao, conteudo_texto, checklist_json, resumo, ordem, ativo, criado_em)
           VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
-        `).run(
-          cursoId,
-          bloco.titulo,
-          bloco.descricao,
-          `${titulo}: ${bloco.descricao}`,
-          JSON.stringify(['Executar procedimento padrão', 'Registrar evidências', 'Validar segurança e liberação']),
-          `Resumo institucional do ${bloco.titulo.toLowerCase()}.`,
-          bloco.ordem
-        );
-      });
-    }
+        `).run(cursoId, blocoPadrao.titulo, blocoPadrao.descricao, conteudoPadrao, checklistPadrao, resumoPadrao, blocoPadrao.ordem);
+        return;
+      }
 
-    const ebookExiste = db.prepare('SELECT id FROM academia_ebooks WHERE curso_id=? LIMIT 1').get(cursoId);
-    if (!ebookExiste) {
+      const deveAtualizarConteudo = isEmptyText(blocoExistente.conteudo_texto) || isLegacyAutoBlock(blocoExistente, titulo);
+      const deveAtualizarChecklist = isEmptyText(blocoExistente.checklist_json)
+        || String(blocoExistente.checklist_json || '').includes('Executar procedimento padrão');
+      const deveAtualizarResumo = isEmptyText(blocoExistente.resumo)
+        || String(blocoExistente.resumo || '').startsWith('Resumo institucional do');
+
+      db.prepare(`
+        UPDATE academia_blocos
+        SET
+          titulo=COALESCE(NULLIF(titulo,''), ?),
+          descricao=COALESCE(NULLIF(descricao,''), ?),
+          conteudo_texto=CASE WHEN ? THEN ? ELSE conteudo_texto END,
+          checklist_json=CASE WHEN ? THEN ? ELSE checklist_json END,
+          resumo=CASE WHEN ? THEN ? ELSE resumo END,
+          ativo=1
+        WHERE id=?
+      `).run(
+        blocoPadrao.titulo,
+        blocoPadrao.descricao,
+        deveAtualizarConteudo ? 1 : 0,
+        conteudoPadrao,
+        deveAtualizarChecklist ? 1 : 0,
+        checklistPadrao,
+        deveAtualizarResumo ? 1 : 0,
+        resumoPadrao,
+        blocoExistente.id
+      );
+    });
+
+    const ebookExistente = db.prepare('SELECT id, resumo, conteudo_html FROM academia_ebooks WHERE curso_id=? ORDER BY id ASC LIMIT 1').get(cursoId);
+    const ebookResumoPadrao = `Guia didático completo de ${titulo} com foco em manutenção industrial na graxaria.`;
+    const ebookConteudoPadrao = getEbookInstitucional({ titulo }, proximoCurso.titulo);
+    if (!ebookExistente) {
       db.prepare(`
         INSERT INTO academia_ebooks (curso_id, titulo, resumo, conteudo_html, versao, publicado_em, criado_em)
-        VALUES (?, ?, ?, ?, '1.0', datetime('now'), datetime('now'))
-      `).run(cursoId, `E-book Institucional — ${titulo}`, `Material institucional de referência para ${titulo}.`, getEbookInstitucional({ titulo }));
+        VALUES (?, ?, ?, ?, '2.0', datetime('now'), datetime('now'))
+      `).run(cursoId, `E-book Institucional — ${titulo}`, ebookResumoPadrao, ebookConteudoPadrao);
+    } else {
+      const deveAtualizarResumo = isEmptyText(ebookExistente.resumo) || String(ebookExistente.resumo || '').startsWith('Material institucional de referência');
+      const deveAtualizarConteudo = isEmptyText(ebookExistente.conteudo_html) || String(ebookExistente.conteudo_html || '').includes('<h2>Checklist final</h2>');
+      db.prepare(`
+        UPDATE academia_ebooks
+        SET
+          titulo=COALESCE(NULLIF(titulo,''), ?),
+          resumo=CASE WHEN ? THEN ? ELSE resumo END,
+          conteudo_html=CASE WHEN ? THEN ? ELSE conteudo_html END,
+          versao=CASE WHEN ? THEN '2.0' ELSE versao END
+        WHERE id=?
+      `).run(
+        `E-book Institucional — ${titulo}`,
+        deveAtualizarResumo ? 1 : 0,
+        ebookResumoPadrao,
+        deveAtualizarConteudo ? 1 : 0,
+        ebookConteudoPadrao,
+        deveAtualizarConteudo ? 1 : 0,
+        ebookExistente.id
+      );
     }
 
-    const modeloExiste = db.prepare('SELECT id FROM academia_avaliacoes_modelo WHERE curso_id=? LIMIT 1').get(cursoId);
-    if (!modeloExiste) {
-      const objetivas = [
-        `Qual o principal objetivo operacional de ${titulo}?`,
-        'Qual prática reduz maior risco de falhas recorrentes?',
-        'Qual evidência deve ser registrada após intervenção?',
-        'Qual etapa de segurança é obrigatória antes da execução?',
-        'Qual ação garante padronização entre turnos?',
-      ];
-      const curtas = [
-        `Descreva um cuidado crítico na aplicação de ${titulo} na fábrica.`,
-        'Liste duas verificações finais do checklist institucional.',
-      ];
+    const modeloExistente = db.prepare('SELECT id, perguntas_objetivas_json, perguntas_curtas_json FROM academia_avaliacoes_modelo WHERE curso_id=? LIMIT 1').get(cursoId);
+    const avaliacaoPadrao = getAvaliacaoModeloPadrao({ titulo }, proximoCurso.titulo);
+    if (!modeloExistente) {
       db.prepare(`
         INSERT INTO academia_avaliacoes_modelo (curso_id, perguntas_objetivas_json, perguntas_curtas_json, nota_minima, criado_em)
         VALUES (?, ?, ?, ?, datetime('now'))
-      `).run(cursoId, JSON.stringify(objetivas), JSON.stringify(curtas), NOTA_MINIMA_PADRAO);
+      `).run(cursoId, JSON.stringify(avaliacaoPadrao.objetivas), JSON.stringify(avaliacaoPadrao.curtas), NOTA_MINIMA_PADRAO);
+    } else {
+      const deveAtualizarObjetivas = isEmptyText(modeloExistente.perguntas_objetivas_json)
+        || String(modeloExistente.perguntas_objetivas_json || '').includes('Qual o principal objetivo operacional');
+      const deveAtualizarCurtas = isEmptyText(modeloExistente.perguntas_curtas_json)
+        || String(modeloExistente.perguntas_curtas_json || '').includes('Descreva um cuidado crítico');
+      db.prepare(`
+        UPDATE academia_avaliacoes_modelo
+        SET
+          perguntas_objetivas_json=CASE WHEN ? THEN ? ELSE perguntas_objetivas_json END,
+          perguntas_curtas_json=CASE WHEN ? THEN ? ELSE perguntas_curtas_json END,
+          nota_minima=COALESCE(nota_minima, ?)
+        WHERE id=?
+      `).run(
+        deveAtualizarObjetivas ? 1 : 0,
+        JSON.stringify(avaliacaoPadrao.objetivas),
+        deveAtualizarCurtas ? 1 : 0,
+        JSON.stringify(avaliacaoPadrao.curtas),
+        NOTA_MINIMA_PADRAO,
+        modeloExistente.id
+      );
     }
   }
 }
