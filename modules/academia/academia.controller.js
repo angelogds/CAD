@@ -341,6 +341,19 @@ function criarEbook(req, res) {
   return res.redirect(`/academia/curso/${req.body.curso_id || ''}`);
 }
 
+function executarSeedConteudoCursos(req, res) {
+  try {
+    const resultado = service.seedConteudoCursos();
+    req.flash(
+      'success',
+      `Gerador executado: ${resultado.cursosAnalisados} cursos analisados, ${resultado.blocosCriados} blocos criados, ${resultado.ebooksCriados} e-books criados e ${resultado.avaliacoesCriadas} avaliações criadas.`
+    );
+  } catch (e) {
+    req.flash('error', e.message || 'Erro ao executar gerador automático de conteúdo.');
+  }
+  return res.redirect(req.get('referer') || '/academia/cursos');
+}
+
 module.exports = {
   index,
   cursos,
@@ -369,4 +382,5 @@ module.exports = {
   criarAula,
   criarBloco,
   criarEbook,
+  executarSeedConteudoCursos,
 };
