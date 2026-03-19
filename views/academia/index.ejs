@@ -24,8 +24,8 @@
 </div>
 
 <div class="academia-grid academia-layout-3" style="margin-top:12px;">
-  <section class="academia-card"><h3>Cursos em destaque</h3><% cursosDestaque.forEach(function(c){ %><a class="academia-row" href="/academia/curso/<%= c.id %>"><span><%= c.titulo %></span><span class="muted-xs"><%= c.carga_horaria %>h</span></a><% }) %></section>
-  <section class="academia-card"><h3>Trilhas disponíveis</h3><% trilhas.slice(0,5).forEach(function(t){ %><a class="academia-row" href="/academia/trilha/<%= t.id %>"><span><%= t.nome %></span><span class="muted-xs"><%= t.progresso_percentual %>%</span></a><% }) %></section>
+  <section class="academia-card"><h3>Cursos em destaque</h3><% cursosDestaque.forEach(function(c){ %><a class="academia-row" href="/academia/curso/<%= c.id %>"><span><%= c.titulo %><div class="muted-xs"><%= c.trilha_nome || 'Sem trilha' %></div></span><span class="muted-xs"><%= c.carga_horaria %>h</span></a><% }) %></section>
+  <section class="academia-card"><h3>Trilhas disponíveis</h3><% trilhas.slice(0,7).forEach(function(t){ %><a class="academia-row" href="/academia/trilha/<%= t.id %>"><span><%= t.nome %><div class="muted-xs"><%= t.total_cursos %> cursos</div></span><span class="muted-xs"><%= t.progresso_percentual %>%</span></a><% }) %></section>
   <section class="academia-card"><h3>Últimos certificados</h3><% if (!ultimosCertificados.length) { %><p class="muted">Sem certificados ainda.</p><% } %><% ultimosCertificados.forEach(function(c){ %><a class="academia-row" href="/academia/certificados"><span><%= c.curso_titulo %></span><span class="muted-xs"><%= c.tipo %></span></a><% }) %></section>
 </div>
 

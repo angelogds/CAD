@@ -133,16 +133,50 @@ function professorIA(req, res) {
 }
 
 function iniciarCurso(req, res) {
+  const cursoId = Number(req.params.curso_id);
   try {
     service.iniciarCurso({
-      cursoId: Number(req.params.curso_id),
+      cursoId,
       userId: req.session?.user?.id,
     });
+    const primeiroBloco = service.getPrimeiroBloco(cursoId);
     req.flash('success', 'Curso iniciado com sucesso.');
+    if (primeiroBloco) return res.redirect(`/academia/curso/${cursoId}?bloco=${primeiroBloco.id}#bloco-${primeiroBloco.id}`);
   } catch (e) {
     req.flash('error', e.message || 'Não foi possível iniciar o curso.');
   }
   return res.redirect(req.get('referer') || '/academia/cursos');
+}
+
+function continuarCurso(req, res) {
+  const cursoId = Number(req.params.curso_id);
+  const userId = req.session?.user?.id;
+  try {
+    service.iniciarCurso({ cursoId, userId });
+    const pendente = service.getProximoBlocoPendente({ cursoId, userId }) || service.getPrimeiroBloco(cursoId);
+    if (pendente) return res.redirect(`/academia/curso/${cursoId}?bloco=${pendente.id}#bloco-${pendente.id}`);
+    req.flash('success', 'Todos os blocos já foram concluídos. Você pode seguir para avaliação.');
+  } catch (e) {
+    req.flash('error', e.message || 'Não foi possível continuar o curso.');
+  }
+  return res.redirect(`/academia/curso/${cursoId}`);
+}
+
+function concluirBloco(req, res) {
+  const cursoId = Number(req.params.curso_id);
+  const blocoId = Number(req.params.bloco_id);
+  const userId = req.session?.user?.id;
+  try {
+    const resultado = service.concluirBloco({ cursoId, blocoId, userId });
+    if (resultado.proximoBloco?.id) {
+      req.flash('success', `Bloco concluído. Progresso atual: ${resultado.percentual}%.`);
+      return res.redirect(`/academia/curso/${cursoId}?bloco=${resultado.proximoBloco.id}#bloco-${resultado.proximoBloco.id}`);
+    }
+    req.flash('success', 'Todos os blocos internos concluídos. Faça a avaliação para seguir para etapa externa.');
+  } catch (e) {
+    req.flash('error', e.message || 'Não foi possível concluir o bloco.');
+  }
+  return res.redirect(`/academia/curso/${cursoId}`);
 }
 
 function concluirCurso(req, res) {
@@ -323,6 +357,8 @@ module.exports = {
   professorIA,
   professorIAPerguntar,
   iniciarCurso,
+  continuarCurso,
+  concluirBloco,
   concluirCurso,
   enviarAvaliacao,
   certificado,

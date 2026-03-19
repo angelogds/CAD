@@ -36,6 +36,8 @@ router.get('/biblioteca', requireLogin, requireRole(ACCESS.academia_view), ctrl.
 router.get('/professor-ia', requireLogin, requireRole(ACCESS.academia_view), ctrl.professorIA);
 
 router.post('/iniciar/:curso_id', requireLogin, requireRole(ACCESS.academia_view), ctrl.iniciarCurso);
+router.post('/continuar/:curso_id', requireLogin, requireRole(ACCESS.academia_view), ctrl.continuarCurso);
+router.post('/curso/:curso_id/bloco/:bloco_id/concluir', requireLogin, requireRole(ACCESS.academia_view), ctrl.concluirBloco);
 router.post('/concluir/:curso_id', requireLogin, requireRole(ACCESS.academia_view), ctrl.concluirCurso);
 router.post('/avaliacoes/:curso_id/enviar', requireLogin, requireRole(ACCESS.academia_view), ctrl.enviarAvaliacao);
 router.post('/certificado', requireLogin, requireRole(ACCESS.academia_view), ctrl.certificado);

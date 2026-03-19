@@ -22,7 +22,11 @@
       <div class="muted-xs"><%= c.trilha_nome || 'Sem trilha' %> • <%= c.carga_horaria || 0 %>h • <%= c.pontos || 0 %> pts • <%= c.plataforma %></div>
       <div style="margin-top:6px;"><span class="badge-status <%= c.meu_status %>"><%= c.meu_status %></span></div>
       <div class="academia-actions">
-        <form method="POST" action="/academia/iniciar/<%= c.id %>"><button class="btn" type="submit">INICIAR CURSO</button></form>
+        <% if (c.meu_status === 'EM_ANDAMENTO') { %>
+          <form method="POST" action="/academia/continuar/<%= c.id %>"><button class="btn" type="submit">CONTINUAR CURSO</button></form>
+        <% } else { %>
+          <form method="POST" action="/academia/iniciar/<%= c.id %>"><button class="btn" type="submit">INICIAR CURSO</button></form>
+        <% } %>
         <% if (c.plataforma !== 'INTERNO' && c.link_externo) { %>
           <button class="btn btn-outline" type="button" data-open-external="<%= c.link_externo %>">Abrir plataforma</button>
         <% } %>
