@@ -329,47 +329,17 @@ function seedAcademiaInicial() {
     if (ids.length <= 1) continue;
     const [manter, ...remover] = ids.sort((a, b) => a - b);
     remover.forEach((id) => {
-      db.prepare(`
-        DELETE FROM academia_usuario_cursos
-        WHERE curso_id=? AND EXISTS (
-          SELECT 1 FROM academia_usuario_cursos uc2
-          WHERE uc2.usuario_id=academia_usuario_cursos.usuario_id
-            AND uc2.curso_id=?
-        )
-      `).run(id, manter);
-      db.prepare(`
-        UPDATE academia_usuario_cursos
-        SET curso_id=?
-        WHERE curso_id=?
-      `).run(manter, id);
-      db.prepare(`
-        UPDATE academia_avaliacoes
-        SET curso_id=?
-        WHERE curso_id=?
-      `).run(manter, id);
-      db.prepare(`
-        UPDATE academia_certificados
-        SET curso_id=?
-        WHERE curso_id=?
-      `).run(manter, id);
-      db.prepare(`
-        UPDATE academia_documentos_internos
-        SET curso_id=?
-        WHERE curso_id=?
-      `).run(manter, id);
-      db.prepare(`
-        UPDATE academia_etapas_externas
-        SET curso_id=?
-        WHERE curso_id=?
-      `).run(manter, id);
-      if (tableExists('academia_progresso')) {
-        db.prepare(`
-          UPDATE academia_progresso
-          SET curso_id=?
-          WHERE curso_id=?
-        `).run(manter, id);
-      }
-      db.prepare('UPDATE academia_cursos SET ativo=0 WHERE id=?').run(id);
+      db.prepare('DELETE FROM academia_usuario_cursos WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_usuario_blocos WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_aulas WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_blocos WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_ebooks WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_avaliacoes WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_avaliacoes_modelo WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_certificados WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_documentos_internos WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_etapas_externas WHERE curso_id=?').run(id);
+      db.prepare('DELETE FROM academia_cursos WHERE id=?').run(id);
     });
     db.prepare('UPDATE academia_cursos SET ativo=1 WHERE id=?').run(manter);
   }
