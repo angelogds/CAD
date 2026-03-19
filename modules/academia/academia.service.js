@@ -412,8 +412,21 @@ function seedAcademiaInicial() {
   }
 }
 
-ensureAcademiaSchema();
-seedAcademiaInicial();
+function bootstrapAcademia() {
+  try {
+    ensureAcademiaSchema();
+  } catch (err) {
+    console.error('[academia] Falha ao garantir schema:', err && (err.stack || err.message || err));
+  }
+
+  try {
+    seedAcademiaInicial();
+  } catch (err) {
+    console.error('[academia] Falha ao executar seed inicial:', err && (err.stack || err.message || err));
+  }
+}
+
+bootstrapAcademia();
 
 function getDashboardData(userId) {
   const indicadores = db.prepare(`

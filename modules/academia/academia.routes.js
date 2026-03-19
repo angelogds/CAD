@@ -9,17 +9,29 @@ const ctrl = require('./academia.controller');
 const router = express.Router();
 
 const certUploadDir = path.join(__dirname, '../../public/uploads/academia/certificados-externos');
-fs.mkdirSync(certUploadDir, { recursive: true });
+let certUploadReady = false;
+try {
+  fs.mkdirSync(certUploadDir, { recursive: true });
+  certUploadReady = true;
+} catch (err) {
+  console.warn('[academia] Falha ao preparar diretório de upload de certificados externos:', err.message || err);
+}
 
 const certUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, certUploadDir),
-    filename: (_req, file, cb) => {
-      const clean = String(file.originalname || 'certificado').replace(/[^a-zA-Z0-9_.-]+/g, '-');
-      cb(null, `${Date.now()}-${clean}`);
-    },
-  }),
+  storage: certUploadReady
+    ? multer.diskStorage({
+      destination: (_req, _file, cb) => cb(null, certUploadDir),
+      filename: (_req, file, cb) => {
+        const clean = String(file.originalname || 'certificado').replace(/[^a-zA-Z0-9_.-]+/g, '-');
+        cb(null, `${Date.now()}-${clean}`);
+      },
+    })
+    : multer.memoryStorage(),
 });
+const requireCertUploadStorage = (_req, res, next) => {
+  if (certUploadReady) return next();
+  return res.status(503).send('Upload de certificado externo indisponível no momento.');
+};
 
 router.get('/', requireLogin, requireRole(ACCESS.academia_view), ctrl.index);
 router.get('/cursos', requireLogin, requireRole(ACCESS.academia_view), ctrl.cursos);
@@ -41,7 +53,7 @@ router.post('/curso/:curso_id/bloco/:bloco_id/concluir', requireLogin, requireRo
 router.post('/concluir/:curso_id', requireLogin, requireRole(ACCESS.academia_view), ctrl.concluirCurso);
 router.post('/avaliacoes/:curso_id/enviar', requireLogin, requireRole(ACCESS.academia_view), ctrl.enviarAvaliacao);
 router.post('/certificado', requireLogin, requireRole(ACCESS.academia_view), ctrl.certificado);
-router.post('/certificado/upload', requireLogin, requireRole(ACCESS.academia_view), certUpload.single('certificado_externo'), ctrl.certificadoUpload);
+router.post('/certificado/upload', requireLogin, requireRole(ACCESS.academia_view), requireCertUploadStorage, certUpload.single('certificado_externo'), ctrl.certificadoUpload);
 router.post('/professor-ia/perguntar', requireLogin, requireRole(ACCESS.academia_view), ctrl.professorIAPerguntar);
 
 router.post('/cursos/:curso_id/liberar-etapa-externa', requireLogin, requireRole(ACCESS.academia_manage), ctrl.liberarEtapaExterna);
