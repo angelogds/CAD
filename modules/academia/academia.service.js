@@ -570,7 +570,126 @@ function seedAcademiaInicial() {
       `).run(trilhaId, descricao, linkExterno, cargaHoraria, NOTA_MINIMA_PADRAO, cursoId);
     }
 
-    upsertConteudoDidaticoCurso({ cursoId, titulo, trilhaId });
+    const cursosDaTrilha = db.prepare(`
+      SELECT id, titulo
+      FROM academia_cursos
+      WHERE trilha_id IS ? AND ativo=1
+      ORDER BY titulo
+    `).all(trilhaId);
+    const posicao = cursosDaTrilha.findIndex((c) => Number(c.id) === Number(cursoId));
+    const proximoCurso = (posicao >= 0 && cursosDaTrilha[posicao + 1])
+      ? cursosDaTrilha[posicao + 1]
+      : (cursosDaTrilha[0] || { titulo: 'Revisão de Segurança em Intervenção Mecânica' });
+
+    const blocosExistentes = db.prepare(`
+      SELECT id, titulo, descricao, conteudo_texto, checklist_json, resumo, ordem
+      FROM academia_blocos
+      WHERE curso_id=?
+      ORDER BY ordem ASC, id ASC
+    `).all(cursoId);
+    const blocoPorOrdem = new Map(blocosExistentes.map((b) => [Number(b.ordem), b]));
+
+    CURSO_BLOCOS_PADRAO.forEach((blocoPadrao) => {
+      const blocoExistente = blocoPorOrdem.get(blocoPadrao.ordem);
+      const conteudoPadrao = getConteudoBlocoPadrao({ titulo }, blocoPadrao, proximoCurso.titulo);
+      const checklistPadrao = JSON.stringify(getChecklistPadrao(titulo));
+      const resumoPadrao = `Aplicação prática de ${titulo} com foco em ${blocoPadrao.titulo.toLowerCase()}.`;
+
+      if (!blocoExistente) {
+        db.prepare(`
+          INSERT INTO academia_blocos (curso_id, titulo, descricao, conteudo_texto, checklist_json, resumo, ordem, ativo, criado_em)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+        `).run(cursoId, blocoPadrao.titulo, blocoPadrao.descricao, conteudoPadrao, checklistPadrao, resumoPadrao, blocoPadrao.ordem);
+        return;
+      }
+
+      const deveAtualizarConteudo = isEmptyText(blocoExistente.conteudo_texto) || isLegacyAutoBlock(blocoExistente, titulo);
+      const deveAtualizarChecklist = isEmptyText(blocoExistente.checklist_json)
+        || String(blocoExistente.checklist_json || '').includes('Executar procedimento padrão');
+      const deveAtualizarResumo = isEmptyText(blocoExistente.resumo)
+        || String(blocoExistente.resumo || '').startsWith('Resumo institucional do');
+
+      db.prepare(`
+        UPDATE academia_blocos
+        SET
+          titulo=COALESCE(NULLIF(titulo,''), ?),
+          descricao=COALESCE(NULLIF(descricao,''), ?),
+          conteudo_texto=CASE WHEN ? THEN ? ELSE conteudo_texto END,
+          checklist_json=CASE WHEN ? THEN ? ELSE checklist_json END,
+          resumo=CASE WHEN ? THEN ? ELSE resumo END,
+          ativo=1
+        WHERE id=?
+      `).run(
+        blocoPadrao.titulo,
+        blocoPadrao.descricao,
+        deveAtualizarConteudo ? 1 : 0,
+        conteudoPadrao,
+        deveAtualizarChecklist ? 1 : 0,
+        checklistPadrao,
+        deveAtualizarResumo ? 1 : 0,
+        resumoPadrao,
+        blocoExistente.id
+      );
+    });
+
+    const ebookExistente = db.prepare('SELECT id, resumo, conteudo_html FROM academia_ebooks WHERE curso_id=? ORDER BY id ASC LIMIT 1').get(cursoId);
+    const ebookResumoPadrao = `Guia didático completo de ${titulo} com foco em manutenção industrial na graxaria.`;
+    const ebookConteudoPadrao = getEbookInstitucional({ titulo }, proximoCurso.titulo);
+    if (!ebookExistente) {
+      db.prepare(`
+        INSERT INTO academia_ebooks (curso_id, titulo, resumo, conteudo_html, versao, publicado_em, criado_em)
+        VALUES (?, ?, ?, ?, '2.0', datetime('now'), datetime('now'))
+      `).run(cursoId, `E-book Institucional — ${titulo}`, ebookResumoPadrao, ebookConteudoPadrao);
+    } else {
+      const deveAtualizarResumo = isEmptyText(ebookExistente.resumo) || String(ebookExistente.resumo || '').startsWith('Material institucional de referência');
+      const deveAtualizarConteudo = isEmptyText(ebookExistente.conteudo_html) || String(ebookExistente.conteudo_html || '').includes('<h2>Checklist final</h2>');
+      db.prepare(`
+        UPDATE academia_ebooks
+        SET
+          titulo=COALESCE(NULLIF(titulo,''), ?),
+          resumo=CASE WHEN ? THEN ? ELSE resumo END,
+          conteudo_html=CASE WHEN ? THEN ? ELSE conteudo_html END,
+          versao=CASE WHEN ? THEN '2.0' ELSE versao END
+        WHERE id=?
+      `).run(
+        `E-book Institucional — ${titulo}`,
+        deveAtualizarResumo ? 1 : 0,
+        ebookResumoPadrao,
+        deveAtualizarConteudo ? 1 : 0,
+        ebookConteudoPadrao,
+        deveAtualizarConteudo ? 1 : 0,
+        ebookExistente.id
+      );
+    }
+
+    const modeloExistente = db.prepare('SELECT id, perguntas_objetivas_json, perguntas_curtas_json FROM academia_avaliacoes_modelo WHERE curso_id=? LIMIT 1').get(cursoId);
+    const avaliacaoPadrao = getAvaliacaoModeloPadrao({ titulo }, proximoCurso.titulo);
+    if (!modeloExistente) {
+      db.prepare(`
+        INSERT INTO academia_avaliacoes_modelo (curso_id, perguntas_objetivas_json, perguntas_curtas_json, nota_minima, criado_em)
+        VALUES (?, ?, ?, ?, datetime('now'))
+      `).run(cursoId, JSON.stringify(avaliacaoPadrao.objetivas), JSON.stringify(avaliacaoPadrao.curtas), NOTA_MINIMA_PADRAO);
+    } else {
+      const deveAtualizarObjetivas = isEmptyText(modeloExistente.perguntas_objetivas_json)
+        || String(modeloExistente.perguntas_objetivas_json || '').includes('Qual o principal objetivo operacional');
+      const deveAtualizarCurtas = isEmptyText(modeloExistente.perguntas_curtas_json)
+        || String(modeloExistente.perguntas_curtas_json || '').includes('Descreva um cuidado crítico');
+      db.prepare(`
+        UPDATE academia_avaliacoes_modelo
+        SET
+          perguntas_objetivas_json=CASE WHEN ? THEN ? ELSE perguntas_objetivas_json END,
+          perguntas_curtas_json=CASE WHEN ? THEN ? ELSE perguntas_curtas_json END,
+          nota_minima=COALESCE(nota_minima, ?)
+        WHERE id=?
+      `).run(
+        deveAtualizarObjetivas ? 1 : 0,
+        JSON.stringify(avaliacaoPadrao.objetivas),
+        deveAtualizarCurtas ? 1 : 0,
+        JSON.stringify(avaliacaoPadrao.curtas),
+        NOTA_MINIMA_PADRAO,
+        modeloExistente.id
+      );
+    }
   }
 
   const cursosExistentes = db.prepare(`
