@@ -50,11 +50,17 @@ router.get('/professor-ia', requireLogin, requireRole(ACCESS.academia_view), ctr
 router.post('/iniciar/:curso_id', requireLogin, requireRole(ACCESS.academia_view), ctrl.iniciarCurso);
 router.post('/continuar/:curso_id', requireLogin, requireRole(ACCESS.academia_view), ctrl.continuarCurso);
 router.post('/curso/:curso_id/bloco/:bloco_id/concluir', requireLogin, requireRole(ACCESS.academia_view), ctrl.concluirBloco);
+router.post('/curso/:curso_id/bloco/:bloco_id/avaliar', requireLogin, requireRole(ACCESS.academia_view), ctrl.enviarAvaliacaoBloco);
 router.post('/concluir/:curso_id', requireLogin, requireRole(ACCESS.academia_view), ctrl.concluirCurso);
 router.post('/avaliacoes/:curso_id/enviar', requireLogin, requireRole(ACCESS.academia_view), ctrl.enviarAvaliacao);
+router.post('/avaliacoes/:curso_id/final', requireLogin, requireRole(ACCESS.academia_view), ctrl.enviarAvaliacaoFinal);
 router.post('/certificado', requireLogin, requireRole(ACCESS.academia_view), ctrl.certificado);
 router.post('/certificado/upload', requireLogin, requireRole(ACCESS.academia_view), requireCertUploadStorage, certUpload.single('certificado_externo'), ctrl.certificadoUpload);
 router.post('/professor-ia/perguntar', requireLogin, requireRole(ACCESS.academia_view), ctrl.professorIAPerguntar);
+router.post('/ia/perguntar', requireLogin, requireRole(ACCESS.academia_view), ctrl.professorIAPerguntar);
+router.post('/ia/resumir-bloco', requireLogin, requireRole(ACCESS.academia_view), ctrl.professorIAResumirBloco);
+router.post('/ia/gerar-perguntas-bloco', requireLogin, requireRole(ACCESS.academia_view), ctrl.professorIAGerarPerguntasBloco);
+router.post('/ia/recomendar-proximo', requireLogin, requireRole(ACCESS.academia_view), ctrl.professorIARecomendarProximo);
 
 router.post('/cursos/:curso_id/liberar-etapa-externa', requireLogin, requireRole(ACCESS.academia_manage), ctrl.liberarEtapaExterna);
 router.post('/etapas-externas/:id/validar', requireLogin, requireRole(ACCESS.academia_manage), ctrl.validarEtapaExterna);

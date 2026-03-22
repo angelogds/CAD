@@ -129,6 +129,7 @@ function professorIA(req, res) {
   return res.render('academia/professor-ia', {
     ...baseView('professor-ia'),
     cursos,
+    iaConfigured: !!process.env.OPENAI_API_KEY && String(process.env.AI_ENABLED || 'true').toLowerCase() === 'true',
   });
 }
 
@@ -168,13 +169,32 @@ function concluirBloco(req, res) {
   const userId = req.session?.user?.id;
   try {
     const resultado = service.concluirBloco({ cursoId, blocoId, userId });
-    if (resultado.proximoBloco?.id) {
-      req.flash('success', `Bloco concluído. Progresso atual: ${resultado.percentual}%.`);
-      return res.redirect(`/academia/curso/${cursoId}?bloco=${resultado.proximoBloco.id}#bloco-${resultado.proximoBloco.id}`);
-    }
-    req.flash('success', 'Todos os blocos internos concluídos. Faça a avaliação para seguir para etapa externa.');
+    req.flash('success', `Leitura do bloco registrada. Progresso atual: ${resultado.percentual}%. Responda a avaliação do bloco para liberar o próximo.`);
   } catch (e) {
     req.flash('error', e.message || 'Não foi possível concluir o bloco.');
+  }
+  return res.redirect(`/academia/curso/${cursoId}?bloco=${blocoId}#bloco-${blocoId}`);
+}
+
+function enviarAvaliacaoBloco(req, res) {
+  const cursoId = Number(req.params.curso_id);
+  const blocoId = Number(req.params.bloco_id);
+  const respostas = Object.keys(req.body || {})
+    .filter((k) => k.startsWith('resposta_'))
+    .map((k) => ({ pergunta_id: Number(k.replace('resposta_', '')), resposta: req.body[k] }));
+
+  try {
+    const result = service.avaliarBloco({
+      cursoId,
+      blocoId,
+      userId: req.session?.user?.id,
+      respostas,
+    });
+    req.flash(result.aprovado
+      ? `Bloco aprovado com ${result.percentual}% de acerto.`
+      : `Bloco em revisão: ${result.percentual}% de acerto (mínimo 50%).`);
+  } catch (e) {
+    req.flash('error', e.message || 'Não foi possível registrar a avaliação do bloco.');
   }
   return res.redirect(`/academia/curso/${cursoId}`);
 }
@@ -213,6 +233,24 @@ function enviarAvaliacao(req, res) {
       : `Avaliação registrada. Nota mínima necessária: ${result.notaMinima}.`);
   } catch (e) {
     req.flash('error', e.message || 'Não foi possível registrar a avaliação.');
+  }
+  return res.redirect(req.get('referer') || '/academia/avaliacoes');
+}
+
+function enviarAvaliacaoFinal(req, res) {
+  try {
+    const result = service.registrarAvaliacaoFinal({
+      cursoId: Number(req.params.curso_id),
+      userId: req.session?.user?.id,
+      nota: req.body.nota,
+      percentual: req.body.percentual,
+      respostas: req.body.respostas || null,
+    });
+    req.flash(result.status === 'APROVADO'
+      ? `Avaliação final aprovada com ${result.percentual}%. Etapa interna concluída.`
+      : `Avaliação final em revisão (${result.percentual}%). Nota mínima final: 70%.`);
+  } catch (e) {
+    req.flash('error', e.message || 'Não foi possível registrar a avaliação final.');
   }
   return res.redirect(req.get('referer') || '/academia/avaliacoes');
 }
@@ -301,6 +339,21 @@ async function professorIAPerguntar(req, res) {
   }
 }
 
+async function professorIAResumirBloco(req, res) {
+  req.body.action = 'resumir';
+  return professorIAPerguntar(req, res);
+}
+
+async function professorIAGerarPerguntasBloco(req, res) {
+  req.body.action = 'gerar_perguntas';
+  return professorIAPerguntar(req, res);
+}
+
+async function professorIARecomendarProximo(req, res) {
+  req.body.action = 'recomendar_proximo';
+  return professorIAPerguntar(req, res);
+}
+
 function criarCurso(req, res) {
   try {
     const id = service.criarCurso(req.body);
@@ -369,11 +422,16 @@ module.exports = {
   biblioteca,
   professorIA,
   professorIAPerguntar,
+  professorIAResumirBloco,
+  professorIAGerarPerguntasBloco,
+  professorIARecomendarProximo,
   iniciarCurso,
   continuarCurso,
   concluirBloco,
+  enviarAvaliacaoBloco,
   concluirCurso,
   enviarAvaliacao,
+  enviarAvaliacaoFinal,
   certificado,
   certificadoUpload,
   liberarEtapaExterna,

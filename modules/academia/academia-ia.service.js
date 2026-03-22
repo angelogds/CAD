@@ -2,7 +2,7 @@ const db = require('../../database/db');
 const academiaService = require('./academia.service');
 
 const AI_ENABLED = String(process.env.AI_ENABLED || 'true').toLowerCase() === 'true';
-const DEFAULT_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS || 20000);
+const DEFAULT_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS || process.env.AI_TIMEOUT_MS || 20000);
 
 const BASE_SYSTEM_PROMPT = `Você é o Professor IA da Academia da Manutenção da empresa Campo do Gado.
 Atue em português do Brasil com linguagem institucional prática de manutenção.
@@ -80,7 +80,7 @@ function fallbackByAction(action, curso) {
 async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
   const curso = cursoId ? academiaService.getCursoDetalhe(cursoId, usuarioId) : null;
   const model = action === 'iniciar_avaliacao'
-    ? process.env.OPENAI_MODEL_AVALIACAO
+    ? (process.env.OPENAI_MODEL_AVALIACAO || process.env.OPENAI_MODEL_ACADEMIA)
     : process.env.OPENAI_MODEL_ACADEMIA;
 
   const actionPromptMap = {
@@ -120,10 +120,13 @@ async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
   } catch (err) {
     const fallback = fallbackByAction(action, curso);
     logInteracao({ usuarioId, cursoId, tipo: action, pergunta, resposta: `${fallback}\n[erro=${err.message}]` });
+    const warning = String(err.message || '').includes('OPENAI_API_KEY')
+      ? 'IA ainda não ativada. Configure OPENAI_API_KEY para habilitar o Professor IA.'
+      : 'Professor IA em modo contingência no momento. Tente novamente em instantes.';
     return {
       ok: true,
       resposta: fallback,
-      warning: 'Professor IA em modo contingência no momento. Tente novamente em instantes.',
+      warning,
     };
   }
 }
