@@ -346,7 +346,7 @@ function executarSeedConteudoCursos(req, res) {
     const resultado = service.seedConteudoCursos();
     req.flash(
       'success',
-      `Gerador executado: ${resultado.cursosAnalisados} cursos analisados, ${resultado.blocosCriados} blocos criados, ${resultado.ebooksCriados} e-books criados e ${resultado.avaliacoesCriadas} avaliações criadas.`
+      `Gerador executado: ${resultado.cursosAnalisados} cursos analisados, ${resultado.blocosCriados} blocos criados, ${resultado.ebooksCriados} e-books criados, ${resultado.ebooksImportados || 0} e-books importados da pasta e ${resultado.avaliacoesCriadas} avaliações criadas.`
     );
   } catch (e) {
     req.flash('error', e.message || 'Erro ao executar gerador automático de conteúdo.');

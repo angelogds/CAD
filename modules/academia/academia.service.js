@@ -1,7 +1,10 @@
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const db = require('../../database/db');
 
 const NOTA_MINIMA_PADRAO = Number(process.env.ACADEMIA_NOTA_MINIMA || 70);
+const ACADEMIA_EBOOKS_DIR = path.resolve(__dirname, '../../academia_ebooks');
 const CURSO_BLOCOS_PADRAO = [
   { ordem: 1, titulo: 'Conceitos básicos', descricao: 'Fundamentos essenciais, termos técnicos e contexto operacional do curso.' },
   { ordem: 2, titulo: 'Aplicação na fábrica', descricao: 'Aplicação prática no ambiente fabril, rotinas e padrões institucionais.' },
@@ -247,6 +250,62 @@ function sanitizeCursoPalavraChave(titulo) {
   return String(titulo || 'curso técnico').toLowerCase();
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function markdownToSafeHtml(markdown) {
+  return `<pre>${escapeHtml(markdown)}</pre>`;
+}
+
+function getResumoFromMarkdown(markdown, fallback = 'E-book técnico institucional para aplicação direta na rotina da fábrica.') {
+  const lines = String(markdown || '').split('\n').map((line) => line.trim());
+  const candidate = lines.find((line) => line && !line.startsWith('#'));
+  return candidate || fallback;
+}
+
+function getTituloFromMarkdown(markdown, cursoTitulo) {
+  const firstLine = String(markdown || '').split('\n')[0] || '';
+  const heading = firstLine.replace(/^#\s+/, '').trim();
+  if (heading) return heading;
+  return `E-book Institucional — ${cursoTitulo}`;
+}
+
+function syncEbooksFromDirectory() {
+  if (!tableExists('academia_cursos') || !tableExists('academia_ebooks')) return 0;
+  if (!fs.existsSync(ACADEMIA_EBOOKS_DIR)) return 0;
+
+  const cursos = db.prepare('SELECT id, titulo FROM academia_cursos WHERE ativo=1').all();
+  const cursoBySlug = new Map(cursos.map((curso) => [toSlug(curso.titulo), curso]));
+  const arquivos = fs.readdirSync(ACADEMIA_EBOOKS_DIR).filter((nome) => nome.toLowerCase().endsWith('.md'));
+  let importados = 0;
+
+  for (const arquivo of arquivos) {
+    const slugArquivo = toSlug(path.basename(arquivo, '.md'));
+    const curso = cursoBySlug.get(slugArquivo);
+    if (!curso) continue;
+
+    const markdown = fs.readFileSync(path.join(ACADEMIA_EBOOKS_DIR, arquivo), 'utf8');
+    const titulo = getTituloFromMarkdown(markdown, curso.titulo);
+    const resumo = getResumoFromMarkdown(markdown);
+    const existe = db.prepare('SELECT id FROM academia_ebooks WHERE curso_id=? AND lower(titulo)=lower(?) LIMIT 1').get(curso.id, titulo);
+    if (existe) continue;
+
+    db.prepare(`
+      INSERT INTO academia_ebooks (curso_id, titulo, resumo, conteudo_html, versao, publicado_em, criado_em)
+      VALUES (?, ?, ?, ?, '3.0', datetime('now'), datetime('now'))
+    `).run(curso.id, titulo, resumo, markdownToSafeHtml(markdown));
+    importados += 1;
+  }
+
+  return importados;
+}
+
 function getChecklistPadrao(cursoTitulo) {
   return [
     'Validar liberação da área e condição segura para intervenção.',
@@ -361,6 +420,7 @@ function getProximoCursoDaTrilha(cursoId, trilhaId) {
 }
 
 function seedConteudoCursos() {
+  const ebooksImportados = syncEbooksFromDirectory();
   const cursosPendentes = db.prepare(`
     SELECT
       c.id,
@@ -382,6 +442,7 @@ function seedConteudoCursos() {
     cursosAnalisados: cursosPendentes.length,
     blocosCriados: 0,
     ebooksCriados: 0,
+    ebooksImportados,
     avaliacoesCriadas: 0,
   };
 
