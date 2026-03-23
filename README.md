@@ -94,3 +94,11 @@ A Fase 2 do módulo **Desenho Técnico** adiciona uma base de mini CAD industria
 
 - Mantida compatibilidade com execução padrão no Railway (Node + SQLite).
 - Migrations incrementais aplicadas automaticamente no boot (`database/migrate.js`).
+
+## Configuração de IA (compatibilidade)
+
+- A chave da OpenAI deve ser configurada preferencialmente em `OPENAI_API_KEY`.
+- Por compatibilidade, o backend também reconhece `OPENAI_APIKEY` e `OPENAI_KEY`.
+- Existe um fallback temporário para `.env` malformado com linha única contendo apenas `sk-...`.
+- A chave continua com uso **somente no backend** (requisições para Responses API), sem exposição para frontend.
+- Segurança: se alguma chave tiver sido exposta em texto puro, considere comprometida e faça rotação imediata.
