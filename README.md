@@ -101,5 +101,6 @@ A Fase 2 do módulo **Desenho Técnico** adiciona uma base de mini CAD industria
 - Por compatibilidade, o backend também reconhece `OPENAI_APIKEY` e `OPENAI_KEY`.
 - Existe um fallback temporário para `.env` malformado com linha única contendo apenas `sk-...`.
 - Modelo padrão da Academia: `OPENAI_MODEL_ACADEMIA` → `OPENAI_MODEL` → `OPENAI_DEFAULT_MODEL` → `gpt-4o-mini`.
+- Modelo padrão do módulo de OS com IA: `OPENAI_MODEL_OS_AUTOMATICA`/`OPENAI_MODEL_FECHAMENTO_OS` → `OPENAI_MODEL` → `OPENAI_DEFAULT_MODEL` → `gpt-4o-mini`.
 - A chave continua com uso **somente no backend** (requisições para Responses API), sem exposição para frontend.
 - Segurança: se alguma chave tiver sido exposta em texto puro, considere comprometida e faça rotação imediata.

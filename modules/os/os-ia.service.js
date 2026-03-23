@@ -1,7 +1,13 @@
 const db = require("../../database/db");
+const {
+  getAIConfig,
+  resolveAIModel,
+  createAIError,
+  createAIKeyMissingError,
+  createOpenAIHTTPError,
+} = require("../ai.service");
 
 const DEFAULT_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS || 20000);
-const AI_ENABLED = String(process.env.AI_ENABLED || "true").toLowerCase() === "true";
 
 const PROMPT_ABERTURA = "Você é um assistente técnico de manutenção industrial da empresa Campo do Gado. Receberá dados estruturados de uma não conformidade aberta por um operador, junto com contexto do equipamento e histórico recente. Gere uma análise técnica inicial objetiva e realista, sem inventar medições ou detalhes não informados. Use português do Brasil, foco em manutenção industrial, segurança e praticidade de chão de fábrica. Retorne somente JSON válido com os campos: diagnostico_inicial, causa_provavel, risco_operacional, servico_sugerido, prioridade_sugerida, observacao_seguranca, descricao_tecnica_os.";
 
@@ -39,9 +45,10 @@ function normalizePrioridade(value) {
 }
 
 async function callOpenAIJSON({ model, systemPrompt, payload }) {
-  if (!AI_ENABLED) throw new Error("AI desabilitada por configuração.");
-  if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não configurada.");
-  if (!model) throw new Error("Model de IA não configurado.");
+  const aiConfig = getAIConfig();
+  if (!aiConfig.enabled) throw new Error("AI desabilitada por configuração.");
+  if (!aiConfig.hasApiKey) throw createAIKeyMissingError("AI_KEY_MISSING");
+  if (!model) throw createAIError("AI_MODEL_MISSING");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
@@ -51,7 +58,7 @@ async function callOpenAIJSON({ model, systemPrompt, payload }) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${aiConfig.apiKey}`,
       },
       body: JSON.stringify({
         model,
@@ -66,7 +73,7 @@ async function callOpenAIJSON({ model, systemPrompt, payload }) {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`Erro OpenAI ${response.status}: ${body.slice(0, 400)}`);
+      throw createOpenAIHTTPError(response.status, String(body || "").slice(0, 400));
     }
 
     const data = await response.json();
@@ -101,7 +108,11 @@ function registrarLogIA({ usuarioId, osId, naoConformidadeId, tipo, entrada, res
 
 async function gerarAberturaAutomaticaDaOS(payload) {
   const tipo = "GERACAO_OS_AUTOMATICA";
-  const model = process.env.OPENAI_MODEL_OS_AUTOMATICA;
+  const model = resolveAIModel(
+    process.env.OPENAI_MODEL_OS_AUTOMATICA,
+    process.env.OPENAI_MODEL,
+    process.env.OPENAI_DEFAULT_MODEL,
+  );
 
   try {
     const ai = await callOpenAIJSON({ model, systemPrompt: PROMPT_ABERTURA, payload });
@@ -153,7 +164,11 @@ async function gerarAberturaAutomaticaDaOS(payload) {
 
 async function gerarFechamentoAutomaticoOS(payload) {
   const tipo = "FECHAMENTO_OS";
-  const model = process.env.OPENAI_MODEL_FECHAMENTO_OS;
+  const model = resolveAIModel(
+    process.env.OPENAI_MODEL_FECHAMENTO_OS,
+    process.env.OPENAI_MODEL,
+    process.env.OPENAI_DEFAULT_MODEL,
+  );
 
   try {
     const ai = await callOpenAIJSON({ model, systemPrompt: PROMPT_FECHAMENTO, payload });
