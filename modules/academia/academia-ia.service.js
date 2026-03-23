@@ -3,6 +3,7 @@ const academiaService = require('./academia.service');
 const { getAIConfig, createAIKeyMissingError } = require('../ai.service');
 
 const DEFAULT_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS || process.env.AI_TIMEOUT_MS || 20000);
+const DEFAULT_OPENAI_MODEL = process.env.OPENAI_DEFAULT_MODEL || process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 const BASE_SYSTEM_PROMPT = `Você é o Professor IA da Academia da Manutenção da empresa Campo do Gado.
 Atue em português do Brasil com linguagem institucional prática de manutenção.
@@ -32,7 +33,11 @@ async function callOpenAI({ model, prompt, payload }) {
   const aiConfig = getAIConfig();
   if (!aiConfig.enabled) throw new Error('Professor IA desabilitado por configuração.');
   if (!aiConfig.hasApiKey) throw createAIKeyMissingError('AI_KEY_MISSING');
-  if (!model) throw new Error('Modelo de IA não configurado.');
+  if (!model) {
+    const modelErr = new Error('AI_MODEL_MISSING');
+    modelErr.code = 'AI_MODEL_MISSING';
+    throw modelErr;
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
@@ -57,7 +62,11 @@ async function callOpenAI({ model, prompt, payload }) {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`Erro OpenAI ${response.status}: ${body.slice(0, 300)}`);
+      const apiErr = new Error(`Erro OpenAI ${response.status}: ${body.slice(0, 300)}`);
+      if (response.status === 401 || response.status === 403) apiErr.code = 'OPENAI_AUTH_ERROR';
+      else if (response.status === 429) apiErr.code = 'OPENAI_RATE_LIMIT';
+      else if (response.status >= 500) apiErr.code = 'OPENAI_UNAVAILABLE';
+      throw apiErr;
     }
 
     const data = await response.json();
@@ -80,9 +89,10 @@ function fallbackByAction(action, curso) {
 
 async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
   const curso = cursoId ? academiaService.getCursoDetalhe(cursoId, usuarioId) : null;
+  const modelAcademia = process.env.OPENAI_MODEL_ACADEMIA || DEFAULT_OPENAI_MODEL;
   const model = action === 'iniciar_avaliacao'
-    ? (process.env.OPENAI_MODEL_AVALIACAO || process.env.OPENAI_MODEL_ACADEMIA)
-    : process.env.OPENAI_MODEL_ACADEMIA;
+    ? (process.env.OPENAI_MODEL_AVALIACAO || modelAcademia)
+    : modelAcademia;
 
   const actionPromptMap = {
     perguntar: 'Responda a dúvida técnica do colaborador com passo a passo objetivo e cautelas de segurança.',
@@ -121,9 +131,16 @@ async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
   } catch (err) {
     const fallback = fallbackByAction(action, curso);
     logInteracao({ usuarioId, cursoId, tipo: action, pergunta, resposta: `${fallback}\n[erro=${err.message}]` });
-    const warning = err?.code === 'AI_KEY_MISSING'
-      ? 'IA ainda não ativada. Configure OPENAI_API_KEY (ou variável legada compatível) para habilitar o Professor IA.'
-      : 'Professor IA em modo contingência no momento. Tente novamente em instantes.';
+    let warning = 'Professor IA em modo contingência no momento. Tente novamente em instantes.';
+    if (err?.code === 'AI_KEY_MISSING') {
+      warning = 'IA ainda não ativada. Configure OPENAI_API_KEY (ou variável legada compatível) para habilitar o Professor IA.';
+    } else if (err?.code === 'AI_MODEL_MISSING') {
+      warning = 'Modelo de IA não configurado. Defina OPENAI_MODEL_ACADEMIA (ou OPENAI_MODEL) para habilitar o Professor IA.';
+    } else if (err?.code === 'OPENAI_AUTH_ERROR') {
+      warning = 'Falha de autenticação da IA. Revise a chave OpenAI configurada no backend.';
+    } else if (err?.code === 'OPENAI_RATE_LIMIT') {
+      warning = 'Limite temporário da IA atingido. Tente novamente em instantes.';
+    }
     return {
       ok: true,
       resposta: fallback,
