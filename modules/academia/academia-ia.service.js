@@ -1,8 +1,8 @@
 const db = require('../../database/db');
 const academiaService = require('./academia.service');
 
-const AI_ENABLED = String(process.env.AI_ENABLED || 'true').toLowerCase() === 'true';
-const DEFAULT_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS || process.env.AI_TIMEOUT_MS || 20000);
+const aiCore = require('../ai/ai.service');
+const aiPrompts = require('../ai/ai.prompts');
 
 const BASE_SYSTEM_PROMPT = `Você é o Professor IA da Academia da Manutenção da empresa Campo do Gado.
 Atue em português do Brasil com linguagem institucional prática de manutenção.
@@ -28,44 +28,14 @@ function logInteracao({ usuarioId, cursoId, tipo, pergunta, resposta }) {
   }
 }
 
-async function callOpenAI({ model, prompt, payload }) {
-  if (!AI_ENABLED) throw new Error('Professor IA desabilitado por configuração.');
-  if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY não configurada.');
-  if (!model) throw new Error('Modelo de IA não configurado.');
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
-
-  try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model,
-        input: [
-          { role: 'system', content: [{ type: 'input_text', text: `${BASE_SYSTEM_PROMPT}\n${prompt}` }] },
-          { role: 'user', content: [{ type: 'input_text', text: safeJSONStringify(payload) }] },
-        ],
-        temperature: 0.3,
-      }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`Erro OpenAI ${response.status}: ${body.slice(0, 300)}`);
-    }
-
-    const data = await response.json();
-    return data.output_text
-      || data?.output?.[0]?.content?.find((item) => item.type === 'output_text')?.text
-      || '';
-  } finally {
-    clearTimeout(timeout);
-  }
+async function callOpenAI({ model, prompt, payload, action }) {
+  const result = await aiCore.askText({
+    model,
+    systemPrompt: `${aiPrompts.buildProfessorPrompt(action)}\n${prompt || ''}`.trim(),
+    userPayload: payload,
+    temperature: 0.3,
+  });
+  return result.text;
 }
 
 function fallbackByAction(action, curso) {
@@ -80,8 +50,8 @@ function fallbackByAction(action, curso) {
 async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
   const curso = cursoId ? academiaService.getCursoDetalhe(cursoId, usuarioId) : null;
   const model = action === 'iniciar_avaliacao'
-    ? (process.env.OPENAI_MODEL_AVALIACAO || process.env.OPENAI_MODEL_ACADEMIA)
-    : process.env.OPENAI_MODEL_ACADEMIA;
+    ? (process.env.OPENAI_MODEL_AVALIACAO || process.env.OPENAI_MODEL_ACADEMIA || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini')
+    : (process.env.OPENAI_MODEL_ACADEMIA || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini');
 
   const actionPromptMap = {
     perguntar: 'Responda a dúvida técnica do colaborador com passo a passo objetivo e cautelas de segurança.',
@@ -110,6 +80,7 @@ async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
       model,
       prompt: actionPromptMap[action] || actionPromptMap.perguntar,
       payload,
+      action,
     });
 
     const texto = String(resposta || '').trim() || fallbackByAction(action, curso);

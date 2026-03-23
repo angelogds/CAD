@@ -134,3 +134,20 @@
     </form>
   </div>
 </div>
+
+<div class="card" style="margin-top:12px;">
+  <h3 style="margin:0 0 6px;">Apoio de IA para Preventiva</h3>
+  <p class="muted" style="margin-top:-4px;">Use IA para checklist, criticidade e orientação de inspeção.</p>
+
+  <div class="row" style="margin-top:8px;">
+    <button class="btn" type="button" data-prev-ai-action="checklist" data-prev-id="<%= plano.id %>">Gerar checklist com IA</button>
+    <button class="btn" type="button" data-prev-ai-action="criticidade" data-prev-id="<%= plano.id %>">Analisar criticidade</button>
+    <button class="btn" type="button" data-prev-ai-action="orientacao" data-prev-id="<%= plano.id %>">Orientar inspeção</button>
+    <button class="btn" type="button" data-prev-ai-action="recomendacao" data-prev-id="<%= plano.id %>">Gerar recomendação preventiva</button>
+  </div>
+
+  <div id="preventivaAiStatus" class="muted" style="margin-top:8px;"></div>
+  <pre id="preventivaAiResposta" style="white-space:pre-wrap;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:10px;min-height:90px;margin-top:8px;">Sem análise ainda.</pre>
+</div>
+
+<script src="/js/preventiva-ai.js"></script>
