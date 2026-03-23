@@ -1,0 +1,77 @@
+<section class="page-head">
+  <div>
+    <h1>Colaboradores</h1>
+    <p class="muted">Gestão integrada de perfil, ferramental, EPI, materiais, certificados, escala e custos.</p>
+  </div>
+  <a class="btn btn-outline" href="/colaboradores/instalacao">Instalação</a>
+</section>
+
+<link rel="stylesheet" href="/css/colaboradores.css" />
+
+<div class="card">
+  <form method="GET" class="grid-3">
+    <div>
+      <div class="label">Busca</div>
+      <input class="input" type="text" name="search" value="<%= filtros.search %>" placeholder="Nome, função ou apelido" />
+    </div>
+    <div>
+      <div class="label">Setor</div>
+      <input class="input" type="text" name="setor" value="<%= filtros.setor %>" placeholder="MANUTENCAO" />
+    </div>
+    <div>
+      <div class="label">Status</div>
+      <select name="status">
+        <option value="">Todos</option>
+        <option value="ATIVO" <%= filtros.status==='ATIVO' ? 'selected' : '' %>>ATIVO</option>
+        <option value="INATIVO" <%= filtros.status==='INATIVO' ? 'selected' : '' %>>INATIVO</option>
+      </select>
+    </div>
+    <div><button class="btn btn-primary" type="submit">Filtrar</button></div>
+  </form>
+</div>
+
+<% if (canManageProfiles) { %>
+<div class="card" style="margin-top:14px;">
+  <h3 style="margin-top:0">Novo colaborador</h3>
+  <form action="/colaboradores" method="POST" enctype="multipart/form-data" class="grid-3">
+    <input class="input" name="nome" placeholder="Nome completo" required />
+    <input class="input" name="apelido" placeholder="Apelido" />
+    <input class="input" name="funcao" placeholder="Função" required />
+    <input class="input" name="setor" placeholder="Setor" value="MANUTENCAO" />
+    <input class="input" type="date" name="data_admissao" />
+    <select name="status"><option>ATIVO</option><option>INATIVO</option></select>
+    <input class="input" name="telefone" placeholder="Telefone" />
+    <input class="input" name="user_id" placeholder="ID do usuário (opcional)" type="number" />
+    <input class="input" type="file" name="foto" accept="image/*" />
+    <button class="btn btn-primary" type="submit">Cadastrar</button>
+  </form>
+</div>
+<% } %>
+
+<div class="card" style="margin-top:14px;">
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Nome</th><th>Função</th><th>Setor</th><th>Status</th><th>EPIs Ativos</th><th>Ferramentas</th><th>Ação</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!lista.length) { %>
+          <tr><td colspan="7">Nenhum colaborador encontrado.</td></tr>
+        <% } %>
+        <% lista.forEach((c) => { %>
+          <tr>
+            <td><strong><%= c.nome %></strong><br/><small><%= c.apelido || '-' %></small></td>
+            <td><%= c.funcao || '-' %></td>
+            <td><%= c.setor || '-' %></td>
+            <td><span class="pill-tag <%= c.status==='ATIVO' ? 'pill-green':'pill-gray' %>"><%= c.status || '-' %></span></td>
+            <td><%= c.epis_ativos || 0 %></td>
+            <td><%= c.ferramentas_ativas || 0 %></td>
+            <td><a class="btn btn-sm btn-outline" href="/colaboradores/<%= c.id %>">Abrir</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

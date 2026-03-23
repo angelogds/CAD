@@ -1,0 +1,306 @@
+<link rel="stylesheet" href="/css/colaboradores.css" />
+<%
+function tempoEmpresa(dataAdmissao) {
+  if (!dataAdmissao) return '-';
+  const start = new Date(dataAdmissao);
+  const diff = Date.now() - start.getTime();
+  const years = Math.floor(diff / (1000*60*60*24*365.25));
+  const months = Math.floor((diff % (1000*60*60*24*365.25)) / (1000*60*60*24*30));
+  return `${years}a ${months}m`;
+}
+%>
+
+<section class="colab-top card">
+  <img src="<%= colaborador.foto_url || '/IMG/logo_menu.png.png' %>" alt="Foto" class="colab-avatar" />
+  <div>
+    <h1 style="margin:0"><%= colaborador.nome %></h1>
+    <p class="muted" style="margin:6px 0 0"><%= colaborador.funcao || '-' %> • <%= colaborador.setor || '-' %> • Tempo de empresa: <strong><%= tempoEmpresa(colaborador.data_admissao) %></strong></p>
+  </div>
+  <span class="pill-tag <%= colaborador.status==='ATIVO' ? 'pill-green':'pill-gray' %>"><%= colaborador.status || 'ATIVO' %></span>
+</section>
+
+<section class="cards-kpi">
+  <article class="card"><h4>EPIs ativos</h4><p><%= dashboard.episAtivos %></p></article>
+  <article class="card"><h4>Ferramentas ativas</h4><p><%= dashboard.ferramentasAtivas %></p></article>
+  <article class="card"><h4>Materiais no mês</h4><p><%= dashboard.materiaisMes %></p></article>
+  <article class="card"><h4>Pendências</h4><p><%= dashboard.pendencias %></p></article>
+  <article class="card"><h4>Cursos concluídos</h4><p><%= dashboard.cursosConcluidos %></p></article>
+</section>
+
+<div class="subtabs">
+  <a class="subtab <%= activeTab==='dados' ? 'active' : '' %>" href="?tab=dados">Dados Gerais</a>
+  <a class="subtab <%= activeTab==='ferramental' ? 'active' : '' %>" href="?tab=ferramental">Ferramental</a>
+  <a class="subtab <%= activeTab==='epis' ? 'active' : '' %>" href="?tab=epis">EPIs</a>
+  <a class="subtab <%= activeTab==='materiais' ? 'active' : '' %>" href="?tab=materiais">Materiais</a>
+  <a class="subtab <%= activeTab==='escala' ? 'active' : '' %>" href="?tab=escala">Escala</a>
+  <a class="subtab <%= activeTab==='cursos-internos' ? 'active' : '' %>" href="?tab=cursos-internos">Cursos Internos</a>
+  <a class="subtab <%= activeTab==='certificados-externos' ? 'active' : '' %>" href="?tab=certificados-externos">Certificados Externos</a>
+  <a class="subtab <%= activeTab==='documentos' ? 'active' : '' %>" href="?tab=documentos">Documentos</a>
+  <a class="subtab <%= activeTab==='historico' ? 'active' : '' %>" href="?tab=historico">Histórico</a>
+</div>
+
+<% if (canGenerateReports) { %>
+<div class="card" style="margin-bottom:14px">
+  <div class="row" style="align-items:center;justify-content:space-between;">
+    <strong>Relatórios (PDF)</strong>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a class="btn btn-sm btn-outline" href="/colaboradores/<%= colaborador.id %>/relatorios/individual">Individual</a>
+      <a class="btn btn-sm btn-outline" href="/colaboradores/<%= colaborador.id %>/relatorios/ferramentas">Ferramentas</a>
+      <a class="btn btn-sm btn-outline" href="/colaboradores/<%= colaborador.id %>/relatorios/epis">EPIs</a>
+      <a class="btn btn-sm btn-outline" href="/colaboradores/<%= colaborador.id %>/relatorios/materiais">Materiais</a>
+      <a class="btn btn-sm btn-outline" href="/colaboradores/<%= colaborador.id %>/relatorios/custos">Custo total</a>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<% if (activeTab==='dados') { %>
+  <div class="card">
+    <h3 style="margin-top:0">Dados gerais e restrições</h3>
+    <% if (canManageProfiles) { %>
+    <form action="/colaboradores/<%= colaborador.id %>/perfil" method="POST" enctype="multipart/form-data" class="grid-3">
+      <input class="input" name="nome" value="<%= colaborador.nome %>" required />
+      <input class="input" name="apelido" value="<%= colaborador.apelido || '' %>" />
+      <input class="input" name="funcao" value="<%= colaborador.funcao || '' %>" />
+      <input class="input" name="setor" value="<%= colaborador.setor || '' %>" />
+      <input class="input" type="date" name="data_admissao" value="<%= colaborador.data_admissao || '' %>" />
+      <select name="status"><option <%= colaborador.status==='ATIVO'?'selected':'' %>>ATIVO</option><option <%= colaborador.status==='INATIVO'?'selected':'' %>>INATIVO</option></select>
+      <input class="input" name="telefone" value="<%= colaborador.telefone || '' %>" />
+      <input class="input" type="number" name="lider_id" value="<%= colaborador.lider_id || '' %>" placeholder="ID Líder" />
+      <input class="input" type="number" name="user_id" value="<%= colaborador.user_id || '' %>" placeholder="ID Usuário" />
+      <input class="input" type="file" name="foto" accept="image/*" />
+      <input class="input" name="tipo_sanguineo" value="<%= colaborador.tipo_sanguineo || '' %>" placeholder="Tipo sanguíneo" />
+      <input class="input" name="contato_emergencia" value="<%= colaborador.contato_emergencia || '' %>" placeholder="Contato de emergência" />
+      <textarea name="restricao_operacional" placeholder="Restrição operacional"><%= colaborador.restricao_operacional || '' %></textarea>
+      <textarea name="observacoes" placeholder="Observações"><%= colaborador.observacoes || '' %></textarea>
+      <button class="btn btn-primary" type="submit">Salvar</button>
+    </form>
+    <% } else { %>
+      <p><strong>Tipo sanguíneo:</strong> <%= colaborador.tipo_sanguineo || '-' %></p>
+      <p><strong>Contato emergência:</strong> <%= colaborador.contato_emergencia || '-' %></p>
+      <p><strong>Restrição operacional:</strong> <%= colaborador.restricao_operacional || '-' %></p>
+      <p><strong>Observações:</strong> <%= colaborador.observacoes || '-' %></p>
+    <% } %>
+  </div>
+<% } %>
+
+<% if (activeTab==='ferramental') { %>
+<div class="card">
+  <% if (canManageFerramental) { %>
+  <form action="/colaboradores/<%= colaborador.id %>/ferramental" method="POST" class="grid-3">
+    <input class="input" name="nome" placeholder="Ferramenta" required />
+    <input class="input" name="codigo_patrimonio" placeholder="Patrimônio" required />
+    <input class="input" name="categoria" placeholder="Categoria" />
+    <input class="input" type="number" step="0.01" name="valor" placeholder="Valor" />
+    <select name="tipo"><option value="entrega">Entrega</option><option value="transferencia">Transferência</option><option value="devolucao">Devolução</option><option value="extravio">Extravio</option></select>
+    <input class="input" name="observacao" placeholder="Observação" />
+    <button class="btn btn-primary" type="submit">Adicionar</button>
+  </form>
+  <% } %>
+
+  <div class="table-wrap" style="margin-top:14px;">
+    <table class="table"><thead><tr><th>Ferramenta</th><th>Patrimônio</th><th>Data entrega</th><th>Status</th><th>Observação</th><th>Ações</th></tr></thead><tbody>
+      <% tabs.ferramental.forEach((row)=> { %>
+        <tr>
+          <td><%= row.ferramenta_nome %></td>
+          <td><%= row.codigo_patrimonio %></td>
+          <td><%= row.data %></td>
+          <td><span class="pill-tag pill-gray"><%= row.status %></span></td>
+          <td><%= row.observacao || '-' %></td>
+          <td>
+            <% if (canManageFerramental) { %>
+            <form action="/colaboradores/<%= colaborador.id %>/ferramental/<%= row.id %>/acao" method="POST" style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn btn-sm" name="acao" value="transferir">Transferir</button>
+              <button class="btn btn-sm" name="acao" value="devolver">Devolver</button>
+              <button class="btn btn-sm" name="acao" value="extravio">Extravio</button>
+            </form>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody></table>
+  </div>
+</div>
+<% } %>
+
+<% if (activeTab==='epis') { %>
+<div class="card">
+  <% if (canManageEPIAndMateriais) { %>
+  <form action="/colaboradores/<%= colaborador.id %>/epis" method="POST" class="grid-3">
+    <input class="input" name="nome" placeholder="Tipo EPI" required />
+    <input class="input" name="ca" placeholder="CA" />
+    <input class="input" type="date" name="validade" />
+    <input class="input" type="number" step="0.01" name="quantidade" value="1" />
+    <input class="input" type="date" name="data_entrega" value="<%= today %>" />
+    <input class="input" name="categoria" placeholder="Categoria" />
+    <button class="btn btn-primary" type="submit">Lançar EPI</button>
+  </form>
+  <% } %>
+
+  <div class="table-wrap" style="margin-top:14px;">
+    <table class="table"><thead><tr><th>Tipo</th><th>CA</th><th>Validade</th><th>Qtd</th><th>Entrega</th><th>Status</th><th>Ações</th></tr></thead><tbody>
+      <% tabs.epis.forEach((row)=> { const vencendo = row.validade && row.validade <= today; %>
+        <tr>
+          <td><%= row.epi_nome %></td>
+          <td><%= row.ca || '-' %></td>
+          <td><%= row.validade || '-' %> <% if (vencendo) { %><span class="pill-tag pill-amber">Vencido</span><% } %></td>
+          <td><%= row.quantidade %></td>
+          <td><%= row.data_entrega %></td>
+          <td><span class="pill-tag pill-gray"><%= row.status %></span></td>
+          <td>
+            <% if (canManageEPIAndMateriais) { %>
+            <form action="/colaboradores/<%= colaborador.id %>/epis/<%= row.id %>/acao" method="POST" style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn btn-sm" name="acao" value="troca">Troca</button>
+              <button class="btn btn-sm" name="acao" value="devolucao">Devolução</button>
+              <button class="btn btn-sm" name="acao" value="vencer">Marcar vencido</button>
+            </form>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody></table>
+  </div>
+</div>
+<% } %>
+
+<% if (activeTab==='materiais') { %>
+<div class="card">
+  <% if (canManageEPIAndMateriais) { %>
+  <form action="/colaboradores/<%= colaborador.id %>/materiais" method="POST" class="grid-3">
+    <input class="input" name="nome" placeholder="Material" required />
+    <input class="input" name="unidade" placeholder="Unidade" value="UN" />
+    <input class="input" type="number" step="0.01" name="quantidade" value="1" />
+    <input class="input" name="destino" placeholder="Destino (obrigatório)" required />
+    <input class="input" name="equipamento" placeholder="Equipamento" />
+    <input class="input" name="os_id" placeholder="OS" type="number" />
+    <input class="input" name="autorizado_por" placeholder="Autorizado por" />
+    <input class="input" name="entregue_por" placeholder="Entregue por" />
+    <button class="btn btn-primary" type="submit">Registrar retirada</button>
+  </form>
+  <% } %>
+
+  <div class="table-wrap" style="margin-top:14px;">
+    <table class="table"><thead><tr><th>Material</th><th>Qtd</th><th>Data</th><th>Destino</th><th>Equipamento</th><th>OS</th><th>Autorizado por</th></tr></thead><tbody>
+      <% tabs.materiais.forEach((row)=> { %>
+        <tr>
+          <td><%= row.material_nome %></td><td><%= row.quantidade %> <%= row.unidade %></td><td><%= row.data %></td><td><%= row.destino %></td><td><%= row.equipamento || '-' %></td><td><%= row.os_id || '-' %></td><td><%= row.autorizado_por || '-' %></td>
+        </tr>
+      <% }) %>
+    </tbody></table>
+  </div>
+</div>
+<% } %>
+
+<% if (activeTab==='escala') { %>
+<div class="card">
+  <div class="table-wrap">
+    <table class="table"><thead><tr><th>Semana</th><th>Período</th><th>Turno</th><th>Horário</th><th>Observação</th></tr></thead><tbody>
+      <% tabs.escala.forEach((row) => { %>
+        <tr><td><%= row.semana_numero %></td><td><%= row.data_inicio %> a <%= row.data_fim %></td><td><%= row.tipo_turno %></td><td><%= row.horario_inicio || '-' %> - <%= row.horario_fim || '-' %></td><td><%= row.observacao || '-' %></td></tr>
+      <% }) %>
+    </tbody></table>
+  </div>
+</div>
+<% } %>
+
+<% if (activeTab==='cursos-internos' || activeTab==='certificados-externos') { %>
+<div class="card">
+  <% if (!isColaboradorOnly) { %>
+  <form action="/colaboradores/<%= colaborador.id %>/certificados" method="POST" enctype="multipart/form-data" class="grid-3">
+    <select name="tipo"><option value="interno" <%= activeTab==='cursos-internos'?'selected':'' %>>Interno</option><option value="externo" <%= activeTab==='certificados-externos'?'selected':'' %>>Externo</option></select>
+    <input class="input" name="titulo" placeholder="Título" required />
+    <input class="input" name="instituicao" placeholder="Instituição" />
+    <input class="input" name="carga_horaria" type="number" step="0.5" placeholder="Carga horária" />
+    <input class="input" type="date" name="data_emissao" />
+    <input class="input" type="date" name="validade" />
+    <input class="input" type="file" name="arquivo" accept="application/pdf" />
+    <button class="btn btn-primary" type="submit">Registrar certificado</button>
+  </form>
+  <% } %>
+
+  <% const rows = activeTab==='cursos-internos' ? tabs.cursosInternos : tabs.certificadosExternos; %>
+  <div class="table-wrap" style="margin-top:14px;">
+    <table class="table"><thead><tr><th>Título</th><th>Instituição</th><th>Emissão</th><th>Validade</th><th>Status</th><th>Arquivo</th><th>Validação</th></tr></thead><tbody>
+      <% rows.forEach((row) => { %>
+        <tr>
+          <td><%= row.titulo %></td>
+          <td><%= row.instituicao || '-' %></td>
+          <td><%= row.data_emissao || '-' %></td>
+          <td><%= row.validade || '-' %></td>
+          <td><span class="pill-tag pill-gray"><%= row.status_validacao %></span></td>
+          <td><% if (row.arquivo_url) { %><a href="<%= row.arquivo_url %>" target="_blank">Abrir</a><% } else { %>-<% } %></td>
+          <td>
+            <% if (canValidateCertificados) { %>
+            <form action="/colaboradores/<%= colaborador.id %>/certificados/<%= row.id %>/validar" method="POST" style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn btn-sm" name="status_validacao" value="aprovado">Aprovar</button>
+              <button class="btn btn-sm" name="status_validacao" value="reprovado">Reprovar</button>
+              <button class="btn btn-sm" name="status_validacao" value="vencido">Vencido</button>
+            </form>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody></table>
+  </div>
+</div>
+<% } %>
+
+<% if (activeTab==='documentos') { %>
+<div class="card">
+  <% if (!isColaboradorOnly) { %>
+  <form action="/colaboradores/<%= colaborador.id %>/documentos" method="POST" enctype="multipart/form-data" class="grid-2">
+    <input class="input" name="tipo" placeholder="Tipo (termo, contrato, etc.)" required />
+    <input class="input" type="file" name="arquivo" required />
+    <button class="btn btn-primary" type="submit">Upload</button>
+  </form>
+  <% } %>
+  <div class="table-wrap" style="margin-top:14px;">
+    <table class="table"><thead><tr><th>Tipo</th><th>Arquivo</th><th>Data</th><th>Ciência</th></tr></thead><tbody>
+      <% tabs.documentos.forEach((row) => { %>
+      <tr>
+        <td><%= row.tipo %></td>
+        <td><a href="<%= row.arquivo_url %>" target="_blank">Abrir</a></td>
+        <td><%= row.data %></td>
+        <td>
+          <%= row.confirmado_em ? `Confirmado em ${row.confirmado_em}` : 'Pendente' %>
+          <% if (!row.confirmado_em) { %>
+          <form action="/colaboradores/<%= colaborador.id %>/confirmar-ciencia" method="POST" style="display:inline;">
+            <input type="hidden" name="entidade" value="documentos_colaborador" />
+            <input type="hidden" name="entidade_id" value="<%= row.id %>" />
+            <input type="hidden" name="tab" value="documentos" />
+            <button class="btn btn-sm btn-outline" type="submit">Confirmar</button>
+          </form>
+          <% } %>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody></table>
+  </div>
+</div>
+<% } %>
+
+<% if (activeTab==='historico') { %>
+<div class="card">
+  <div class="table-wrap">
+    <table class="table"><thead><tr><th>Data</th><th>Entidade</th><th>Ação</th><th>Responsável</th><th>Confirmação Digital</th></tr></thead><tbody>
+      <% historico.forEach((row)=> { %>
+        <tr>
+          <td><%= row.created_at %></td><td><%= row.entidade %>#<%= row.entidade_id || '-' %></td><td><%= row.acao %></td><td><%= row.responsavel_nome || '-' %></td>
+          <td>
+            <% if (['movimentacoes_ferramentas','entregas_epi'].includes(row.entidade) && row.acao==='create') { %>
+              <form action="/colaboradores/<%= colaborador.id %>/confirmar-ciencia" method="POST">
+                <input type="hidden" name="entidade" value="<%= row.entidade %>" />
+                <input type="hidden" name="entidade_id" value="<%= row.entidade_id %>" />
+                <input type="hidden" name="tab" value="historico" />
+                <button class="btn btn-sm btn-outline" type="submit">Confirmar ciência</button>
+              </form>
+            <% } else { %>
+              -
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody></table>
+  </div>
+</div>
+<% } %>
