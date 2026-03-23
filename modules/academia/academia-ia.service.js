@@ -1,7 +1,7 @@
 const db = require('../../database/db');
 const academiaService = require('./academia.service');
+const { getAIConfig, createAIKeyMissingError } = require('../ai.service');
 
-const AI_ENABLED = String(process.env.AI_ENABLED || 'true').toLowerCase() === 'true';
 const DEFAULT_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS || process.env.AI_TIMEOUT_MS || 20000);
 
 const BASE_SYSTEM_PROMPT = `Você é o Professor IA da Academia da Manutenção da empresa Campo do Gado.
@@ -29,8 +29,9 @@ function logInteracao({ usuarioId, cursoId, tipo, pergunta, resposta }) {
 }
 
 async function callOpenAI({ model, prompt, payload }) {
-  if (!AI_ENABLED) throw new Error('Professor IA desabilitado por configuração.');
-  if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY não configurada.');
+  const aiConfig = getAIConfig();
+  if (!aiConfig.enabled) throw new Error('Professor IA desabilitado por configuração.');
+  if (!aiConfig.hasApiKey) throw createAIKeyMissingError('AI_KEY_MISSING');
   if (!model) throw new Error('Modelo de IA não configurado.');
 
   const controller = new AbortController();
@@ -41,7 +42,7 @@ async function callOpenAI({ model, prompt, payload }) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${aiConfig.apiKey}`,
       },
       body: JSON.stringify({
         model,
@@ -120,8 +121,8 @@ async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
   } catch (err) {
     const fallback = fallbackByAction(action, curso);
     logInteracao({ usuarioId, cursoId, tipo: action, pergunta, resposta: `${fallback}\n[erro=${err.message}]` });
-    const warning = String(err.message || '').includes('OPENAI_API_KEY')
-      ? 'IA ainda não ativada. Configure OPENAI_API_KEY para habilitar o Professor IA.'
+    const warning = err?.code === 'AI_KEY_MISSING'
+      ? 'IA ainda não ativada. Configure OPENAI_API_KEY (ou variável legada compatível) para habilitar o Professor IA.'
       : 'Professor IA em modo contingência no momento. Tente novamente em instantes.';
     return {
       ok: true,
