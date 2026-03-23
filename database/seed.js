@@ -1,6 +1,7 @@
 // database/seed.js
 const bcrypt = require("bcryptjs");
 const db = require("./db");
+const { ensureColaboradorSeed } = require('./seeds/colaboradores.seed');
 
 // ✅ Ajuste de senha controlado por ENV
 // ADMIN_PASSWORD=admin123
@@ -202,6 +203,7 @@ function runSeeds() {
   ensureAdmin();
   seedEscala2026();
   seedDesenhoTecnicoBlocos();
+  ensureColaboradorSeed();
 }
 
-module.exports = { runSeeds, ensureAdmin, seedEscala2026, seedDesenhoTecnicoBlocos };
+module.exports = { runSeeds, ensureAdmin, seedEscala2026, seedDesenhoTecnicoBlocos, ensureColaboradorSeed };

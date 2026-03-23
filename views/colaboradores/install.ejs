@@ -1,0 +1,18 @@
+<link rel="stylesheet" href="/css/colaboradores.css" />
+<section class="page-head">
+  <div>
+    <h1>Instalação do Módulo de Colaboradores</h1>
+    <p class="muted">Checklist para produção (Node.js + Express + EJS + SQLite better-sqlite3).</p>
+  </div>
+</section>
+
+<div class="card">
+  <ol>
+    <li>Rodar migrations: <code>npm run migrate</code>.</li>
+    <li>Rodar seeds: <code>npm run seed</code>.</li>
+    <li>Garantir diretórios de upload: <code>uploads/colaboradores/fotos</code> e <code>uploads/colaboradores/documentos</code>.</li>
+    <li>Acessar módulo: <a href="/colaboradores">/colaboradores</a>.</li>
+    <li>Testar perfis RBAC: ADMIN, RH, ENCARREGADO_MANUTENCAO e COLABORADOR.</li>
+    <li>Validar relatórios PDF em <code>/colaboradores/:id/relatorios/:tipo</code>.</li>
+  </ol>
+</div>
