@@ -1,6 +1,7 @@
 const path = require('path');
 const service = require('./academia.service');
 const iaService = require('./academia-ia.service');
+const { getAIConfig } = require('../ai.service');
 
 function baseView(activeAcademiaSection = 'index') {
   return {
@@ -126,10 +127,11 @@ function biblioteca(req, res) {
 
 function professorIA(req, res) {
   const cursos = service.listCursos({}, req.session?.user?.id);
+  const aiConfig = getAIConfig();
   return res.render('academia/professor-ia', {
     ...baseView('professor-ia'),
     cursos,
-    iaConfigured: !!process.env.OPENAI_API_KEY && String(process.env.AI_ENABLED || 'true').toLowerCase() === 'true',
+    iaConfigured: aiConfig.isConfigured,
   });
 }
 
