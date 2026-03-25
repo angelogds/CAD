@@ -116,7 +116,8 @@ async function analyzeOS(req, res) {
 
 async function analyzePreventiva(req, res) {
   const planoId = Number(req.params.id);
-  const action = String(req.body?.action || 'checklist').trim();
+  const action = String(req.body?.action || 'perguntar').trim();
+  const pergunta = String(req.body?.pergunta || '').trim();
   const plano = getPreventivaContext(planoId);
   if (!plano) return res.status(404).json({ ok: false, error: 'Plano preventivo não encontrado.' });
 
@@ -125,6 +126,7 @@ async function analyzePreventiva(req, res) {
       systemPrompt: prompts.buildPreventivaPrompt(action),
       userPayload: {
         action,
+        pergunta: pergunta || null,
         preventiva: plano,
         historico_basico: getPreventivaHistory(planoId, 6),
       },

@@ -32,6 +32,7 @@ function buildOSPrompt(action = 'analisar') {
 
 function buildPreventivaPrompt(action = 'checklist') {
   const mapa = {
+    perguntar: 'Responda como especialista em preventiva com orientação por tópicos e próximos passos de execução.',
     checklist: 'Gere checklist preventivo objetivo com passos de inspeção e aceite.',
     criticidade: 'Analise criticidade operacional e risco da preventiva.',
     orientacao: 'Oriente a inspeção com sequência prática de execução.',

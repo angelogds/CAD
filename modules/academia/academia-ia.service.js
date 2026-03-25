@@ -88,14 +88,24 @@ function logProfessorIAError({ err, model }) {
   });
 }
 
-async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
+async function responderProfessorIA({ usuarioId, cursoId, action, pergunta, modo = 'curso' }) {
   const curso = cursoId ? academiaService.getCursoDetalhe(cursoId, usuarioId) : null;
   const model = action === 'iniciar_avaliacao'
     ? (process.env.OPENAI_MODEL_AVALIACAO || process.env.OPENAI_MODEL_ACADEMIA || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini')
     : (process.env.OPENAI_MODEL_ACADEMIA || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini');
 
+  const normalizedModo = ['curso', 'ef', 'preventiva'].includes(String(modo || '').toLowerCase())
+    ? String(modo || '').toLowerCase()
+    : 'curso';
+
+  const modoPromptMap = {
+    curso: 'A resposta deve atuar como professora do curso atual, ensinando por tópicos curtos e claros.',
+    ef: 'A resposta deve preparar para EF (teste final), com foco em revisão aplicada, critérios de acerto e erros comuns.',
+    preventiva: 'A resposta deve ligar o conteúdo à manutenção preventiva, com itens de inspeção, periodicidade e evidências de execução.',
+  };
+
   const actionPromptMap = {
-    perguntar: 'Responda a dúvida técnica do colaborador com passo a passo objetivo e cautelas de segurança.',
+    perguntar: 'Responda a dúvida técnica do colaborador com passo a passo objetivo, linguagem de professor e cautelas de segurança. Sempre estruture em tópicos com títulos curtos.',
     resumir: 'Resuma o conteúdo recebido em tópicos curtos, com foco em aplicação prática de fábrica.',
     gerar_perguntas: 'Crie perguntas de fixação (objetiva, discursiva curta, estudo de caso e checklist de compreensão).',
     iniciar_avaliacao: 'Monte uma avaliação institucional interna (sem linguagem de certificação oficial) com gabarito sucinto.',
@@ -104,6 +114,7 @@ async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
 
   const payload = {
     action,
+    modo: normalizedModo,
     pergunta: pergunta || null,
     curso: curso ? {
       id: curso.id,
@@ -119,7 +130,7 @@ async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
   try {
     const resposta = await callOpenAI({
       model,
-      prompt: actionPromptMap[action] || actionPromptMap.perguntar,
+      prompt: `${actionPromptMap[action] || actionPromptMap.perguntar} ${modoPromptMap[normalizedModo]}`.trim(),
       payload,
       action,
     });
