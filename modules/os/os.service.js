@@ -394,8 +394,8 @@ function getOSById(id) {
 
   const executorNome = os.executor_nome || os.executor_user_nome || null;
   const auxiliarNome = os.auxiliar_nome || os.auxiliar_user_nome || null;
-  const acaoCorretiva = os.causa_diagnostico || os.diagnostico || null;
-  const acaoPreventiva = os.resumo_tecnico || os.acao_executada || os.ai_recomendacao_reincidencia || null;
+  const acaoCorretiva = os.ai_acao_corretiva_sugerida || os.causa_diagnostico || os.diagnostico || null;
+  const acaoPreventiva = os.ai_acao_preventiva_sugerida || os.resumo_tecnico || os.acao_executada || os.ai_recomendacao_reincidencia || null;
 
   return {
     ...os,
@@ -749,10 +749,8 @@ function autoAlocarOS(osId, { force = false } = {}) {
   const mecanicosDisponiveis = getMecanicosDiurno().filter((c) => isColaboradorDisponivel(c.id));
 
   if (grau === "BAIXA") {
-    const executor = apoioDisponivel[0]
-      || mecanicosDisponiveis[0]
-      || null;
-    if (!executor) return marcarAguardandoEquipe(Number(osId), "DIA", "Sem executor disponível no turno: OS aguardando alocação.");
+    const executor = mecanicosDisponiveis[0] || null;
+    if (!executor) return marcarAguardandoEquipe(Number(osId), "DIA", "Sem mecânico disponível no turno: OS aguardando alocação.");
     persistirAlocacaoOS(Number(osId), executor, null, "DIA", "AUTO");
     return { aguardando: false, turno: "DIA", executor, auxiliar: null };
   }
@@ -921,7 +919,7 @@ function syncInspecaoFromOS(osId) {
   }
 }
 
-function buscarHistoricoEquipamento(equipamentoId) {
+function getHistoricoEquipamento(equipamentoId) {
   if (!equipamentoId) return [];
   return db
     .prepare(
@@ -1024,7 +1022,7 @@ async function createOS({
   if (!equipamentoFinal) throw new Error("Informe um equipamento cadastrado ou manual.");
 
   const tipoOS = normalizeTipoOS(tipo || "CORRETIVA");
-  const grauOS = normalizeGrau(criticidade || severidade || grau || "MEDIA");
+  const criticidadeEntrada = normalizeGrau(criticidade || severidade || grau || "MEDIA");
   const score = classifyOSPriority({ descricao: relatoNaoConformidade, tipo: tipoOS, equipamento_id: equipId });
 
   const equipamentoCols = getTableColumns("equipamentos");
@@ -1037,7 +1035,7 @@ async function createOS({
 
   const contexto = {
     equipamento: equipamentoContext,
-    historico_equipamento: buscarHistoricoEquipamento(equipId),
+    historico_equipamento: getHistoricoEquipamento(equipId),
     nao_conformidades_relacionadas: buscarNaoConformidadesRelacionadas(equipId, sintoma),
     os_recentes_semelhantes: buscarOSRecentesSemelhantes(equipId),
     preventivas_relacionadas: buscarPreventivasRelacionadas(equipId),
@@ -1050,12 +1048,13 @@ async function createOS({
       equipamento_manual: equipManual,
       setor: setorInferido,
       sintoma_principal: sintoma,
-      severidade: grauOS,
+      severidade: criticidadeEntrada,
       nao_conformidade: relatoNaoConformidade,
       observacao_curta: relatoNaoConformidade,
     },
     contexto,
   });
+  const grauOS = normalizeGrau(aberturaIA.criticidade_sugerida || aberturaIA.prioridade_sugerida || score.prioridade || criticidadeEntrada);
 
   const cols = getOSColumns();
   const fields = ["equipamento", "descricao", "tipo", "status", "opened_by"];
@@ -1072,7 +1071,7 @@ async function createOS({
 
   if (cols.includes("resumo_tecnico")) {
     fields.push("resumo_tecnico");
-    values.push(String(resumo_tecnico || aberturaIA.descricao_tecnica_os || "").trim() || null);
+    values.push(String(resumo_tecnico || aberturaIA.acao_preventiva || aberturaIA.descricao_tecnica_os || "").trim() || null);
   } else if (cols.includes("acao_executada")) {
     fields.push("acao_executada");
     values.push(String(resumo_tecnico || aberturaIA.descricao_tecnica_os || "").trim() || null);
@@ -1080,10 +1079,10 @@ async function createOS({
 
   if (cols.includes("causa_diagnostico")) {
     fields.push("causa_diagnostico");
-    values.push(String(causa_diagnostico || aberturaIA.causa_provavel || "").trim() || null);
+    values.push(String(causa_diagnostico || aberturaIA.acao_corretiva || aberturaIA.causa_provavel || "").trim() || null);
   } else if (cols.includes("diagnostico")) {
     fields.push("diagnostico");
-    values.push(String(causa_diagnostico || aberturaIA.causa_provavel || "").trim() || null);
+    values.push(String(causa_diagnostico || aberturaIA.acao_corretiva || aberturaIA.causa_provavel || "").trim() || null);
   }
 
   if (cols.includes("data_inicio")) {
@@ -1103,7 +1102,7 @@ async function createOS({
 
   if (cols.includes("prioridade")) {
     fields.push("prioridade");
-    values.push(aberturaIA.prioridade_sugerida || score.prioridade || "MEDIA");
+    values.push(grauOS);
   }
   if (cols.includes("categoria_sugerida")) {
     fields.push("categoria_sugerida");
@@ -1115,13 +1114,18 @@ async function createOS({
   }
   const mapCols = {
     sintoma_principal: sintoma,
-    severidade: grauOS,
+    severidade: criticidadeEntrada,
     nc_observacao_curta: relatoNaoConformidade,
     ai_diagnostico_inicial: aberturaIA.diagnostico_inicial,
     ai_causa_provavel: aberturaIA.causa_provavel,
     ai_risco_operacional: aberturaIA.risco_operacional,
     ai_servico_sugerido: aberturaIA.servico_sugerido,
     ai_prioridade_sugerida: aberturaIA.prioridade_sugerida,
+    ai_criticidade_sugerida: aberturaIA.criticidade_sugerida,
+    ai_acao_corretiva_sugerida: aberturaIA.acao_corretiva,
+    ai_acao_preventiva_sugerida: aberturaIA.acao_preventiva,
+    ai_sugestao_equipe_json: JSON.stringify(aberturaIA.sugestao_equipe || {}),
+    ai_justificativa_criticidade: aberturaIA.justificativa_interna,
     ai_observacao_seguranca: aberturaIA.observacao_seguranca,
     ai_descricao_tecnica_os: aberturaIA.descricao_tecnica_os,
   };
@@ -1147,8 +1151,10 @@ async function createOS({
     entrada: {
       equipamento_id: equipId,
       sintoma_principal: sintoma,
-      severidade: grauOS,
+      severidade: criticidadeEntrada,
       nao_conformidade: relatoNaoConformidade,
+      criticidade_entrada: criticidadeEntrada,
+      criticidade_final: grauOS,
     },
     resposta: aberturaIA,
     status: "OK",
@@ -1471,4 +1477,5 @@ module.exports = {
   getExecucaoAtiva,
   setupPairsIfEmpty,
   liberarEquipeQuandoFechar,
+  getHistoricoEquipamento,
 };

@@ -55,17 +55,6 @@
           placeholder="Ex.: Equipamento apresentando vibração forte, ruído e aquecimento durante operação."
         ></textarea>
       </div>
-
-      <div style="grid-column:1 / -1;">
-        <label class="label" for="criticidade">CRITICIDADE *</label>
-        <select name="criticidade" id="criticidade" class="input" required>
-          <option value="BAIXA">BAIXA</option>
-          <option value="MEDIA" selected>MÉDIA</option>
-          <option value="ALTA">ALTA</option>
-          <option value="CRITICA">CRÍTICA</option>
-        </select>
-      </div>
-
       <div style="grid-column:1 / -1;">
         <label class="label">FOTOS DE ABERTURA (OPCIONAL)</label>
         <input id="abertura_fotos" type="file" name="abertura_fotos" accept="image/*" multiple style="display:none" />
@@ -100,7 +89,6 @@
     const manual = document.getElementById('equipamento_manual').value.trim();
     const sintoma = document.getElementById('sintoma_principal').value.trim();
     const naoConformidade = document.getElementById('nao_conformidade').value.trim();
-    const criticidade = document.getElementById('criticidade').value.trim();
 
     if (!id && !manual) {
       e.preventDefault();
@@ -116,10 +104,6 @@
       e.preventDefault();
       alert('Descreva a não conformidade com pelo menos 10 caracteres.');
       return;
-    }
-    if (!criticidade) {
-      e.preventDefault();
-      alert('Selecione a criticidade.');
     }
   });
 </script>

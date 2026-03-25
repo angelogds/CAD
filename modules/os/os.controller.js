@@ -21,12 +21,10 @@ function osIndex(req, res) {
 function osNewForm(req, res) {
   res.locals.activeMenu = "os";
   const equipamentos = service.listEquipamentosAtivos();
-  const graus = service.listGrauOptions();
   const tipos = service.listTipoOptions();
   return res.render("os/new", {
     title: "Nova OS",
     equipamentos,
-    graus,
     tipos,
     user: req.session?.user || null,
     prefillEquipamentoId: req.query.equipamento_id || "",
@@ -40,7 +38,6 @@ async function osCreate(req, res) {
       equipamento_manual,
       nao_conformidade,
       sintoma_principal,
-      criticidade,
     } = req.body;
 
     const id = await service.createOS({
@@ -50,9 +47,8 @@ async function osCreate(req, res) {
       descricao: nao_conformidade,
       tipo: "CORRETIVA",
       sintoma_principal,
-      criticidade,
-      severidade: criticidade,
-      grau: criticidade,
+      severidade: null,
+      grau: null,
       opened_by: req.session?.user?.id || null,
     });
 

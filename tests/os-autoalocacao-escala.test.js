@@ -97,10 +97,10 @@ function addOS(grau = 'MEDIA') {
   return Number(info.lastInsertRowid);
 }
 
-test('Teste 1: DIA + BAIXA usa apoio disponível como executor', () => {
+test('Teste 1: DIA + BAIXA usa 1 mecânico como executor', () => {
   resetSchema();
-  const apoio = addColaborador({ nome: 'Junior', funcao: 'operacional', tipo_turno: 'apoio' });
-  addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
+  addColaborador({ nome: 'Junior', funcao: 'operacional', tipo_turno: 'apoio' });
+  const mecanico = addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
   const osId = addOS('BAIXA');
 
   withMockedSaoPauloTime(7, 32, () => {
@@ -109,7 +109,7 @@ test('Teste 1: DIA + BAIXA usa apoio disponível como executor', () => {
   });
 
   const osAlocada = osService.getOSById(osId);
-  assert.equal(osAlocada.executor_colaborador_id, apoio.id);
+  assert.equal(osAlocada.executor_colaborador_id, mecanico.id);
   assert.equal(osAlocada.auxiliar_colaborador_id, null);
   assert.equal(osAlocada.turno_alocado, 'DIA');
   assert.equal(osAlocada.alocacao_modo, 'AUTO');
