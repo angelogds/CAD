@@ -1,0 +1,59 @@
+<% layout('layout') %>
+
+<style>
+  .ai-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .ai-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px}
+  .ai-muted{color:#6b7280;font-size:13px}
+  .ai-row{display:flex;gap:8px;flex-wrap:wrap}
+  .ai-btn{border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:10px;padding:10px 12px;cursor:pointer;font-weight:700}
+  .ai-btn.ghost{background:#fff;color:#16a34a}
+  .ai-history{max-height:420px;overflow:auto;border:1px solid #e5e7eb;border-radius:12px;padding:10px;background:#f8fafc}
+  .ai-bubble{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin-bottom:8px;white-space:pre-wrap}
+  .ai-bubble.user{border-color:#bbf7d0;background:#f0fdf4}
+  textarea,select{width:100%;border:1px solid #d1d5db;border-radius:10px;padding:10px}
+  textarea{min-height:120px}
+  @media(max-width:900px){.ai-wrap{grid-template-columns:1fr}}
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+  <div>
+    <h1>Assistente IA</h1>
+    <p class="ai-muted">Chat técnico para OS, preventiva, equipamentos e academia.</p>
+  </div>
+  <a href="/dashboard" class="btn btn-ghost">Voltar</a>
+</div>
+
+<% if (!aiEnabled) { %>
+  <div class="ai-card" style="margin-top:10px;color:#b45309;">IA desativada por configuração (AI_ENABLED=false).</div>
+<% } else if (!aiConfigured) { %>
+  <div class="ai-card" style="margin-top:10px;color:#b45309;">IA ainda não configurada no servidor (OPENAI_API_KEY ausente).</div>
+<% } %>
+
+<div class="ai-wrap" style="margin-top:12px;">
+  <div class="ai-card">
+    <label class="ai-muted">Contexto</label>
+    <select id="aiContexto">
+      <option value="geral">Geral</option>
+      <option value="os">OS</option>
+      <option value="equipamento">Equipamento</option>
+      <option value="preventiva">Preventiva</option>
+      <option value="academia">Academia</option>
+    </select>
+
+    <label class="ai-muted" style="display:block;margin-top:10px;">Pergunta</label>
+    <textarea id="aiPergunta" placeholder="Ex.: motor com aquecimento acima do normal e ruído de rolamento, por onde começo?"></textarea>
+
+    <div class="ai-row" style="margin-top:10px;">
+      <button class="ai-btn" id="aiEnviar" type="button">Enviar</button>
+      <button class="ai-btn ghost" id="aiLimpar" type="button">Limpar histórico</button>
+    </div>
+    <div id="aiStatus" class="ai-muted" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="ai-card">
+    <h3 style="margin-top:0;">Histórico local</h3>
+    <div class="ai-history" id="aiHistory"></div>
+  </div>
+</div>
+
+<script src="/js/ai-chat.js"></script>

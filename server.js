@@ -182,7 +182,7 @@ mount("/tracagem", "./modules/tracagem/tracagem.routes");
 mount("/tracagens", "./modules/tracagem/tracagens.routes");
 mount("/desenho-tecnico", "./modules/desenho-tecnico/desenho-tecnico.routes");
 mount("/academia", "./modules/academia/academia.routes");
-mount("/colaboradores", "./modules/colaboradores/colaboradores.routes");
+mount("/ai", "./modules/ai/ai.routes");
 
 try {
   const osService = require("./modules/os/os.service");

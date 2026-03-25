@@ -95,10 +95,34 @@ A Fase 2 do módulo **Desenho Técnico** adiciona uma base de mini CAD industria
 - Mantida compatibilidade com execução padrão no Railway (Node + SQLite).
 - Migrations incrementais aplicadas automaticamente no boot (`database/migrate.js`).
 
-## Configuração de IA (compatibilidade)
+## IA no Backend (Responses API)
 
-- A chave da OpenAI deve ser configurada preferencialmente em `OPENAI_API_KEY`.
-- Por compatibilidade, o backend também reconhece `OPENAI_APIKEY` e `OPENAI_KEY`.
-- Existe um fallback temporário para `.env` malformado com linha única contendo apenas `sk-...`.
-- A chave continua com uso **somente no backend** (requisições para Responses API), sem exposição para frontend.
-- Segurança: se alguma chave tiver sido exposta em texto puro, considere comprometida e faça rotação imediata.
+### Segurança
+- A chave `OPENAI_API_KEY` fica **somente** no backend via variável de ambiente.
+- Nunca publique chave em frontend, HTML/EJS, logs, seed/migration ou README.
+
+### Variáveis de ambiente
+Copie `.env.example` para `.env` no servidor e preencha:
+
+```bash
+AI_ENABLED=true
+OPENAI_API_KEY=
+OPENAI_MODEL_TEXT=gpt-4o-mini
+OPENAI_MAX_OUTPUT_TOKENS=300
+OPENAI_TIMEOUT_MS=20000
+```
+
+### Funcionalidades IA entregues
+- **Assistente IA geral**: `/ai/chat` (contextos: geral, OS, equipamento, preventiva, academia).
+- **IA na OS**: ações na tela de OS (`/os/:id`) para análise, causa, inspeções, materiais, execução segura e resumo técnico.
+- **IA na Preventiva**: ações na tela da preventiva (`/preventivas/:id`) para checklist, criticidade, orientação e recomendação.
+- **Professor IA (Academia)**: mantém fluxo existente e fallback amigável quando IA não está disponível.
+
+### Teste manual rápido
+1. Suba o sistema com `AI_ENABLED=false` e valide mensagem amigável.
+2. Suba com `AI_ENABLED=true` e sem `OPENAI_API_KEY`, valide fallback e aviso.
+3. Configure `OPENAI_API_KEY` e valide respostas em:
+   - `/ai/chat`
+   - `/os/:id` (botões de IA)
+   - `/preventivas/:id` (botões de IA)
+   - `/academia/professor-ia`
