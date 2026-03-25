@@ -2,7 +2,7 @@ const db = require("../../database/db");
 
 const aiCore = require('../ai/ai.service');
 
-const PROMPT_ABERTURA = "Você é um planejador de manutenção industrial com foco operacional. Ao receber dados de abertura de OS, gere decisão técnica automática para execução em chão de fábrica. Responda somente JSON válido com os campos: criticidade_sugerida, diagnostico_inicial, causa_provavel, risco_operacional, acao_corretiva, acao_preventiva, servico_sugerido, prioridade_sugerida, sugestao_equipe, descricao_tecnica_os, justificativa_interna. Regras obrigatórias: (1) criticidade_sugerida deve ser BAIXA, MEDIA, ALTA ou CRITICA; (2) seguir lógica de criticidade: vazamento leve -> BAIXA/MEDIA, vazamento crítico -> ALTA/CRITICA, equipamento essencial parado -> CRITICA, risco de segurança -> CRITICA, falha intermitente -> MEDIA, ruído -> BAIXA/MEDIA, aquecimento -> MEDIA/ALTA; (3) sugestao_equipe deve trazer quantidade_recomendada, perfil_minimo e racional, obedecendo: BAIXA=1 mecânico, MEDIA=2 mecânicos, ALTA=2 mecânicos, CRITICA=3+ equipe/grupo; (4) ação corretiva e preventiva devem ser técnicas, objetivas e aplicáveis; (5) justificativa_interna deve explicar a escolha da criticidade com base nos dados recebidos. Não invente medições.";
+const PROMPT_ABERTURA = "Você é um planejador de manutenção industrial com foco operacional. Ao receber dados de abertura de OS, gere decisão técnica automática para execução em chão de fábrica. Responda somente JSON válido com os campos: criticidade_sugerida, diagnostico_inicial, causa_provavel, risco_operacional, risco_seguranca, acao_corretiva, acao_preventiva, servico_sugerido, prioridade_sugerida, sugestao_equipe, descricao_tecnica_os, justificativa_interna. Regras obrigatórias: (1) criticidade_sugerida deve ser BAIXA, MEDIA, ALTA ou CRITICA; (2) seguir lógica de criticidade: vazamento leve -> BAIXA/MEDIA, vazamento crítico -> ALTA/CRITICA, equipamento essencial parado -> CRITICA, risco de segurança -> CRITICA, falha intermitente -> MEDIA, ruído -> BAIXA/MEDIA, aquecimento -> MEDIA/ALTA; (3) sugestao_equipe deve trazer quantidade_recomendada, perfil_minimo e racional, obedecendo: BAIXA=1 mecânico, MEDIA=2 mecânicos, ALTA=2 mecânicos, CRITICA=3+ equipe/grupo; (4) ação corretiva e preventiva devem ser técnicas, objetivas e aplicáveis; (5) justificativa_interna deve explicar a escolha da criticidade com base nos dados recebidos. Não invente medições.";
 
 const PROMPT_FECHAMENTO = "Você é um assistente técnico de encerramento de ordens de serviço da empresa Campo do Gado. Receberá dados estruturados do serviço executado, incluindo não conformidade original, descrição inicial da OS, ações realizadas, peças trocadas e resultado do teste. Gere um texto técnico claro, objetivo e padronizado para histórico de manutenção. Responda em português do Brasil. Não invente detalhes não informados. Retorne somente JSON válido com os campos: descricao_servico_executado, acao_corretiva_realizada, recomendacao_para_evitar_reincidencia, observacao_final_tecnica.";
 
@@ -102,7 +102,8 @@ async function gerarAberturaAutomaticaDaOS(payload) {
       acao_preventiva: String(ai.acao_preventiva || "").trim(),
       sugestao_equipe: buildTeamSuggestion(ai.criticidade_sugerida || ai.prioridade_sugerida, ai.sugestao_equipe),
       justificativa_interna: String(ai.justificativa_interna || "").trim(),
-      observacao_seguranca: String(ai.observacao_seguranca || "").trim(),
+      risco_seguranca: String(ai.risco_seguranca || ai.observacao_seguranca || "").trim(),
+      observacao_seguranca: String(ai.observacao_seguranca || ai.risco_seguranca || "").trim(),
       descricao_tecnica_os: String(ai.descricao_tecnica_os || "").trim(),
     };
 
@@ -129,6 +130,7 @@ async function gerarAberturaAutomaticaDaOS(payload) {
       acao_preventiva: "Padronizar inspeção de rotina e reaperto/lubrificação conforme condição encontrada.",
       sugestao_equipe: buildTeamSuggestion(payload?.nao_conformidade?.severidade, null),
       justificativa_interna: "Fallback aplicado por indisponibilidade de resposta da IA.",
+      risco_seguranca: "Aplicar bloqueio e etiquetagem (LOTO) e avaliar exposição dos operadores.",
       observacao_seguranca: "Aplicar bloqueio e etiquetagem (LOTO) antes da intervenção.",
       descricao_tecnica_os: "OS gerada automaticamente a partir de não conformidade. Validar condições do equipamento e executar intervenção segura.",
     };

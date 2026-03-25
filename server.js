@@ -135,12 +135,35 @@ app.use((req, res, next) => {
   res.locals.activeMenu = res.locals.activeMenu || "";
   res.locals.activePcmSection = res.locals.activePcmSection || "";
 
-  // compatibilidade com layouts antigos que esperam resumoOS
-  res.locals.resumoOS = res.locals.resumoOS || {
-    abertas: 0,
-    andamento: 0,
-    fechadas: 0,
-  };
+  // contadores operacionais globais (menu/alertas inteligentes)
+  try {
+    const osAbertas = db.prepare(`
+      SELECT COUNT(*) AS total
+      FROM os
+      WHERE UPPER(COALESCE(status,'')) IN ('ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA')
+    `).get()?.total || 0;
+
+    const osCriticas = db.prepare(`
+      SELECT COUNT(*) AS total
+      FROM os
+      WHERE UPPER(COALESCE(status,'')) IN ('ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA')
+        AND UPPER(COALESCE(prioridade, 'MEDIA')) IN ('CRITICA','CRÍTICA','EMERGENCIAL','ALTA')
+    `).get()?.total || 0;
+
+    const preventivasHoje = db.prepare(`
+      SELECT COUNT(*) AS total
+      FROM preventiva_execucoes
+      WHERE status IN ('pendente','atrasada') AND date(COALESCE(data_prevista,'')) = date('now','localtime')
+    `).get()?.total || 0;
+
+    res.locals.operationalCounters = {
+      osAbertas: Number(osAbertas || 0),
+      osCriticas: Number(osCriticas || 0),
+      preventivasHoje: Number(preventivasHoje || 0),
+    };
+  } catch (_e) {
+    res.locals.operationalCounters = { osAbertas: 0, osCriticas: 0, preventivasHoje: 0 };
+  }
 
   next();
 });

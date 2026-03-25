@@ -923,13 +923,69 @@ function getHistoricoEquipamento(equipamentoId) {
   if (!equipamentoId) return [];
   return db
     .prepare(
-      `SELECT id, descricao, status, tipo, opened_at, closed_at
+      `SELECT id, descricao, status, tipo, opened_at, closed_at,
+              COALESCE(tempo_parada_min, 0) AS tempo_parada_min,
+              COALESCE(sintoma_principal,'') AS sintoma_principal,
+              COALESCE(causa_diagnostico,'') AS causa_diagnostico,
+              COALESCE(resumo_tecnico,'') AS resumo_tecnico
        FROM os
        WHERE equipamento_id = ?
        ORDER BY id DESC
-       LIMIT 8`
+       LIMIT 20`
     )
     .all(Number(equipamentoId));
+}
+
+function getPecasHistoricoEquipamento(equipamentoId) {
+  if (!equipamentoId || !tableExists('os_pecas_utilizadas')) return [];
+  try {
+    return db.prepare(`
+      SELECT p.peca_descricao, SUM(COALESCE(p.quantidade,1)) AS qtd_total
+      FROM os_pecas_utilizadas p
+      JOIN os o ON o.id = p.os_id
+      WHERE o.equipamento_id = ?
+      GROUP BY p.peca_descricao
+      ORDER BY qtd_total DESC
+      LIMIT 12
+    `).all(Number(equipamentoId));
+  } catch (_e) {
+    return [];
+  }
+}
+
+function buildAprendizadoPlantaContext(equipamentoId, sintoma) {
+  const historico = getHistoricoEquipamento(equipamentoId);
+  const pecas = getPecasHistoricoEquipamento(equipamentoId);
+
+  const recorrenciaSintoma = sintoma
+    ? historico.filter((h) => String(h.sintoma_principal || '').toUpperCase() === String(sintoma).toUpperCase()).length
+    : 0;
+
+  const acoesCorretivasResolvidas = historico
+    .filter((h) => ['CONCLUIDA', 'CONCLUÍDA', 'FECHADA', 'FINALIZADA'].includes(String(h.status || '').toUpperCase()))
+    .map((h) => String(h.causa_diagnostico || '').trim())
+    .filter(Boolean)
+    .slice(0, 8);
+
+  const temposParada = historico.map((h) => Number(h.tempo_parada_min || 0)).filter((n) => n > 0);
+  const tempoParadaMedioMin = temposParada.length
+    ? Math.round(temposParada.reduce((acc, n) => acc + n, 0) / temposParada.length)
+    : 0;
+
+  const falhas30Dias = historico.filter((h) => {
+    if (!h.opened_at) return false;
+    const diff = Date.now() - new Date(h.opened_at).getTime();
+    return Number.isFinite(diff) && diff >= 0 && diff <= 30 * 24 * 60 * 60 * 1000;
+  }).length;
+
+  return {
+    total_os_historico: historico.length,
+    frequencia_falhas_30_dias: falhas30Dias,
+    recorrencia_sintoma: recorrenciaSintoma,
+    tempo_parada_medio_min: tempoParadaMedioMin,
+    acoes_que_ja_resolveram: acoesCorretivasResolvidas,
+    pecas_mais_utilizadas: pecas,
+  };
 }
 
 function buscarNaoConformidadesRelacionadas(equipamentoId, sintoma) {
@@ -1039,6 +1095,7 @@ async function createOS({
     nao_conformidades_relacionadas: buscarNaoConformidadesRelacionadas(equipId, sintoma),
     os_recentes_semelhantes: buscarOSRecentesSemelhantes(equipId),
     preventivas_relacionadas: buscarPreventivasRelacionadas(equipId),
+    aprendizado_planta: buildAprendizadoPlantaContext(equipId, sintoma),
   };
 
   const aberturaIA = await osIAService.gerarAberturaAutomaticaDaOS({
@@ -1119,6 +1176,7 @@ async function createOS({
     ai_diagnostico_inicial: aberturaIA.diagnostico_inicial,
     ai_causa_provavel: aberturaIA.causa_provavel,
     ai_risco_operacional: aberturaIA.risco_operacional,
+    ai_risco_seguranca: aberturaIA.risco_seguranca || aberturaIA.observacao_seguranca,
     ai_servico_sugerido: aberturaIA.servico_sugerido,
     ai_prioridade_sugerida: aberturaIA.prioridade_sugerida,
     ai_criticidade_sugerida: aberturaIA.criticidade_sugerida,
@@ -1126,7 +1184,7 @@ async function createOS({
     ai_acao_preventiva_sugerida: aberturaIA.acao_preventiva,
     ai_sugestao_equipe_json: JSON.stringify(aberturaIA.sugestao_equipe || {}),
     ai_justificativa_criticidade: aberturaIA.justificativa_interna,
-    ai_observacao_seguranca: aberturaIA.observacao_seguranca,
+    ai_observacao_seguranca: aberturaIA.risco_seguranca || aberturaIA.observacao_seguranca,
     ai_descricao_tecnica_os: aberturaIA.descricao_tecnica_os,
   };
 
