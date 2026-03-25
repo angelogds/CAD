@@ -199,19 +199,3 @@
 </div>
 
 
-<div class="card" style="margin-top:12px;">
-  <h3 style="margin:0;">Apoio de IA para esta OS</h3>
-  <div class="muted">Análise técnica com base na descrição, equipamento, setor e histórico básico.</div>
-  <div class="actions" style="margin-top:10px;">
-    <button class="btn" type="button" data-os-ai-action="analisar" data-os-id="<%= os.id %>">Analisar com IA</button>
-    <button class="btn" type="button" data-os-ai-action="causa" data-os-id="<%= os.id %>">Sugerir causa provável</button>
-    <button class="btn" type="button" data-os-ai-action="inspecoes" data-os-id="<%= os.id %>">Sugerir inspeções</button>
-    <button class="btn" type="button" data-os-ai-action="materiais" data-os-id="<%= os.id %>">Sugerir materiais prováveis</button>
-    <button class="btn" type="button" data-os-ai-action="execucao_segura" data-os-id="<%= os.id %>">Sugerir execução segura</button>
-    <button class="btn" type="button" data-os-ai-action="resumo" data-os-id="<%= os.id %>">Gerar resumo técnico</button>
-  </div>
-  <div id="osAiStatus" class="muted" style="margin-top:8px;"></div>
-  <pre id="osAiResposta" style="white-space:pre-wrap;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:10px;min-height:80px;margin-top:8px;">Sem análise ainda.</pre>
-</div>
-
-<script src="/js/os-ai.js"></script>

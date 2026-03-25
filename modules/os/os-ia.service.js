@@ -2,7 +2,7 @@ const db = require("../../database/db");
 
 const aiCore = require('../ai/ai.service');
 
-const PROMPT_ABERTURA = "Você é um assistente técnico de manutenção industrial da empresa Campo do Gado. Receberá dados estruturados de uma não conformidade aberta por um operador, junto com contexto do equipamento e histórico recente. Gere uma análise técnica inicial objetiva e realista, sem inventar medições ou detalhes não informados. Use português do Brasil, foco em manutenção industrial, segurança e praticidade de chão de fábrica. Retorne somente JSON válido com os campos: diagnostico_inicial, causa_provavel, risco_operacional, servico_sugerido, prioridade_sugerida, observacao_seguranca, descricao_tecnica_os.";
+const PROMPT_ABERTURA = "Você é um planejador de manutenção industrial com foco operacional. Ao receber dados de abertura de OS, gere decisão técnica automática para execução em chão de fábrica. Responda somente JSON válido com os campos: criticidade_sugerida, diagnostico_inicial, causa_provavel, risco_operacional, acao_corretiva, acao_preventiva, servico_sugerido, prioridade_sugerida, sugestao_equipe, descricao_tecnica_os, justificativa_interna. Regras obrigatórias: (1) criticidade_sugerida deve ser BAIXA, MEDIA, ALTA ou CRITICA; (2) seguir lógica de criticidade: vazamento leve -> BAIXA/MEDIA, vazamento crítico -> ALTA/CRITICA, equipamento essencial parado -> CRITICA, risco de segurança -> CRITICA, falha intermitente -> MEDIA, ruído -> BAIXA/MEDIA, aquecimento -> MEDIA/ALTA; (3) sugestao_equipe deve trazer quantidade_recomendada, perfil_minimo e racional, obedecendo: BAIXA=1 mecânico, MEDIA=2 mecânicos, ALTA=2 mecânicos, CRITICA=3+ equipe/grupo; (4) ação corretiva e preventiva devem ser técnicas, objetivas e aplicáveis; (5) justificativa_interna deve explicar a escolha da criticidade com base nos dados recebidos. Não invente medições.";
 
 const PROMPT_FECHAMENTO = "Você é um assistente técnico de encerramento de ordens de serviço da empresa Campo do Gado. Receberá dados estruturados do serviço executado, incluindo não conformidade original, descrição inicial da OS, ações realizadas, peças trocadas e resultado do teste. Gere um texto técnico claro, objetivo e padronizado para histórico de manutenção. Responda em português do Brasil. Não invente detalhes não informados. Retorne somente JSON válido com os campos: descricao_servico_executado, acao_corretiva_realizada, recomendacao_para_evitar_reincidencia, observacao_final_tecnica.";
 
@@ -29,12 +29,30 @@ function parseAIJSON(rawText) {
   }
 }
 
-function normalizePrioridade(value) {
+function normalizeCriticidade(value) {
   const p = String(value || "").toUpperCase().trim();
   if (["BAIXA", "MEDIA", "ALTA", "CRITICA"].includes(p)) return p;
   if (p === "MÉDIA") return "MEDIA";
   if (p === "CRÍTICA") return "CRITICA";
   return "MEDIA";
+}
+
+function buildTeamSuggestion(criticidade, sugestaoEquipe) {
+  const crit = normalizeCriticidade(criticidade);
+  const regra = {
+    BAIXA: { quantidade_recomendada: 1, perfil_minimo: "1 MECANICO" },
+    MEDIA: { quantidade_recomendada: 2, perfil_minimo: "2 MECANICOS" },
+    ALTA: { quantidade_recomendada: 2, perfil_minimo: "2 MECANICOS" },
+    CRITICA: { quantidade_recomendada: 3, perfil_minimo: "EQUIPE 3+ MECANICOS" },
+  }[crit];
+
+  const suggested = typeof sugestaoEquipe === "object" && sugestaoEquipe ? sugestaoEquipe : {};
+  return {
+    criticidade: crit,
+    quantidade_recomendada: Number(suggested.quantidade_recomendada || regra.quantidade_recomendada),
+    perfil_minimo: String(suggested.perfil_minimo || regra.perfil_minimo),
+    racional: String(suggested.racional || "Dimensionamento definido por regra operacional da criticidade.").trim(),
+  };
 }
 
 async function callOpenAIJSON({ model, systemPrompt, payload }) {
@@ -78,7 +96,12 @@ async function gerarAberturaAutomaticaDaOS(payload) {
       causa_provavel: String(ai.causa_provavel || "").trim(),
       risco_operacional: String(ai.risco_operacional || "").trim(),
       servico_sugerido: String(ai.servico_sugerido || "").trim(),
-      prioridade_sugerida: normalizePrioridade(ai.prioridade_sugerida),
+      criticidade_sugerida: normalizeCriticidade(ai.criticidade_sugerida || ai.prioridade_sugerida),
+      prioridade_sugerida: normalizeCriticidade(ai.prioridade_sugerida || ai.criticidade_sugerida),
+      acao_corretiva: String(ai.acao_corretiva || ai.servico_sugerido || "").trim(),
+      acao_preventiva: String(ai.acao_preventiva || "").trim(),
+      sugestao_equipe: buildTeamSuggestion(ai.criticidade_sugerida || ai.prioridade_sugerida, ai.sugestao_equipe),
+      justificativa_interna: String(ai.justificativa_interna || "").trim(),
       observacao_seguranca: String(ai.observacao_seguranca || "").trim(),
       descricao_tecnica_os: String(ai.descricao_tecnica_os || "").trim(),
     };
@@ -100,7 +123,12 @@ async function gerarAberturaAutomaticaDaOS(payload) {
       causa_provavel: "Verificar componentes relacionados ao sintoma informado.",
       risco_operacional: "Avaliar risco conforme severidade registrada pelo operador.",
       servico_sugerido: "Realizar inspeção técnica inicial e correção conforme diagnóstico em campo.",
-      prioridade_sugerida: normalizePrioridade(payload?.nao_conformidade?.severidade),
+      criticidade_sugerida: normalizeCriticidade(payload?.nao_conformidade?.severidade),
+      prioridade_sugerida: normalizeCriticidade(payload?.nao_conformidade?.severidade),
+      acao_corretiva: "Executar inspeção direcionada no componente afetado e corrigir falha identificada.",
+      acao_preventiva: "Padronizar inspeção de rotina e reaperto/lubrificação conforme condição encontrada.",
+      sugestao_equipe: buildTeamSuggestion(payload?.nao_conformidade?.severidade, null),
+      justificativa_interna: "Fallback aplicado por indisponibilidade de resposta da IA.",
       observacao_seguranca: "Aplicar bloqueio e etiquetagem (LOTO) antes da intervenção.",
       descricao_tecnica_os: "OS gerada automaticamente a partir de não conformidade. Validar condições do equipamento e executar intervenção segura.",
     };
