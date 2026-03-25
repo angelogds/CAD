@@ -2,8 +2,8 @@ function isAIEnabled() {
   return String(process.env.AI_ENABLED || 'true').toLowerCase() === 'true';
 }
 
-const API_KEY_CANDIDATES = ['OPENAI_API_KEY', 'OPENAI_APIKEY', 'OPENAI_KEY'];
 const REQUIRED_ENV_VARS = [
+  'OPENAI_API_KEY',
   'AI_ENABLED',
   'OPENAI_MODEL_ACADEMIA',
   'OPENAI_MODEL_AVALIACAO',
@@ -17,67 +17,25 @@ function redactValue(value) {
 }
 
 function validateAIEnvironment() {
-  const apiKey = resolveApiKey();
   const missing = REQUIRED_ENV_VARS.filter((name) => {
     const value = process.env[name];
     return typeof value === 'undefined' || String(value).trim() === '';
   });
-  if (!apiKey.value) missing.unshift('OPENAI_API_KEY (ou OPENAI_APIKEY/OPENAI_KEY)');
 
   if (missing.length) {
     console.error('[AI] Variáveis de ambiente ausentes:', missing.join(', '));
     console.error('ENV NÃO CARREGADO:', {
-      OPENAI_API_KEY: redactValue(apiKey.value),
-      OPENAI_API_KEY_SOURCE: apiKey.source,
+      OPENAI_API_KEY: redactValue(process.env.OPENAI_API_KEY),
       AI_ENABLED: process.env.AI_ENABLED,
       OPENAI_MODEL_ACADEMIA: process.env.OPENAI_MODEL_ACADEMIA,
       OPENAI_MODEL_AVALIACAO: process.env.OPENAI_MODEL_AVALIACAO,
     });
   }
-  validateDotenvFormat();
 
   return {
     ok: missing.length === 0,
     missing,
   };
-}
-
-function resolveApiKey() {
-  for (const name of API_KEY_CANDIDATES) {
-    const value = String(process.env[name] || '').trim();
-    if (value) return { value, source: name };
-  }
-  return { value: '', source: 'none' };
-}
-
-function validateDotenvFormat() {
-  const fs = require('fs');
-  const path = require('path');
-  const envPath = path.join(process.cwd(), '.env');
-  if (!fs.existsSync(envPath)) return;
-
-  const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
-  const invalidLines = [];
-  lines.forEach((line, idx) => {
-    const raw = String(line || '');
-    const trimmed = raw.trim();
-    if (!trimmed || trimmed.startsWith('#')) return;
-    if (!raw.includes('=')) {
-      invalidLines.push(`${idx + 1}: sem "="`);
-      return;
-    }
-    const [keyPart, ...valueParts] = raw.split('=');
-    const valuePart = valueParts.join('=');
-    if (!/^[A-Z0-9_]+$/.test(keyPart.trim())) invalidLines.push(`${idx + 1}: chave inválida "${keyPart.trim()}"`);
-    if (keyPart !== keyPart.trim()) invalidLines.push(`${idx + 1}: espaço na chave`);
-    if ((valuePart.match(/"/g) || []).length % 2 !== 0 || (valuePart.match(/'/g) || []).length % 2 !== 0) {
-      invalidLines.push(`${idx + 1}: aspas não fechadas`);
-    }
-  });
-
-  if (invalidLines.length) {
-    console.error('[AI] Formato do .env pode estar incorreto:', invalidLines.join(' | '));
-  }
 }
 
 function getAIConfig() {
