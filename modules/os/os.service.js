@@ -922,18 +922,29 @@ function syncInspecaoFromOS(osId) {
 function getHistoricoEquipamento(equipamentoId) {
   if (!equipamentoId) return [];
   const cols = getOSColumns();
+  if (!cols.includes("equipamento_id")) return [];
   const hasTempoParada = cols.includes("tempo_parada_min");
   const hasSintoma = cols.includes("sintoma_principal");
   const hasCausa = cols.includes("causa_diagnostico");
   const hasResumo = cols.includes("resumo_tecnico");
+  const openedExpr = cols.includes("opened_at")
+    ? "opened_at"
+    : (cols.includes("created_at") ? "created_at" : "NULL");
+  const closedExpr = cols.includes("closed_at")
+    ? "closed_at"
+    : (cols.includes("data_conclusao") ? "data_conclusao" : "NULL");
+  const tempoExpr = hasTempoParada ? "COALESCE(tempo_parada_min, 0)" : "0";
+  const sintomaExpr = hasSintoma ? "COALESCE(sintoma_principal,'')" : "''";
+  const causaExpr = hasCausa ? "COALESCE(causa_diagnostico,'')" : "''";
+  const resumoExpr = hasResumo ? "COALESCE(resumo_tecnico,'')" : "''";
 
   return db
     .prepare(
-      `SELECT id, descricao, status, tipo, opened_at, closed_at,
-              COALESCE(tempo_parada_min, 0) AS tempo_parada_min,
-              COALESCE(sintoma_principal,'') AS sintoma_principal,
-              COALESCE(causa_diagnostico,'') AS causa_diagnostico,
-              COALESCE(resumo_tecnico,'') AS resumo_tecnico
+      `SELECT id, descricao, status, tipo, ${openedExpr} AS opened_at, ${closedExpr} AS closed_at,
+              ${tempoExpr} AS tempo_parada_min,
+              ${sintomaExpr} AS sintoma_principal,
+              ${causaExpr} AS causa_diagnostico,
+              ${resumoExpr} AS resumo_tecnico
        FROM os
        WHERE equipamento_id = ?
        ORDER BY id DESC
