@@ -1,7 +1,5 @@
 const db = require('../../database/db');
 const academiaService = require('./academia.service');
-const { getAIConfig, createAIKeyMissingError } = require('../ai.service');
-
 const aiCore = require('../ai/ai.service');
 const aiPrompts = require('../ai/ai.prompts');
 
@@ -90,6 +88,7 @@ async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
 
     return { ok: true, resposta: texto };
   } catch (err) {
+    console.error('ERRO IA DETALHADO:', err?.response?.data || err?.technical || err?.message || err);
     const fallback = fallbackByAction(action, curso);
     logInteracao({ usuarioId, cursoId, tipo: action, pergunta, resposta: `${fallback}\n[erro=${err.message}]` });
     const warning = err?.code === 'AI_KEY_MISSING'
