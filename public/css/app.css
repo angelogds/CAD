@@ -478,18 +478,6 @@ html { font-size: 13px; }
   .topbar-right .btn-ghost {
     width: 100%;
   }
-  .pill {
-    padding: 7px 9px;
-    gap: 8px;
-  }
-  .pill-avatar {
-    width: 26px;
-    height: 26px;
-  }
-  .pill-role {
-    font-size: 11px;
-    padding: 3px 7px;
-  }
   .footer {
     flex-direction: column;
     gap: 6px;
