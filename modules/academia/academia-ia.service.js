@@ -1,5 +1,6 @@
 const db = require('../../database/db');
 const academiaService = require('./academia.service');
+const { getAIConfig, createAIKeyMissingError } = require('../ai.service');
 
 const aiCore = require('../ai/ai.service');
 const aiPrompts = require('../ai/ai.prompts');
@@ -91,8 +92,8 @@ async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
   } catch (err) {
     const fallback = fallbackByAction(action, curso);
     logInteracao({ usuarioId, cursoId, tipo: action, pergunta, resposta: `${fallback}\n[erro=${err.message}]` });
-    const warning = String(err.message || '').includes('OPENAI_API_KEY')
-      ? 'IA ainda não ativada. Configure OPENAI_API_KEY para habilitar o Professor IA.'
+    const warning = err?.code === 'AI_KEY_MISSING'
+      ? 'IA ainda não ativada. Configure OPENAI_API_KEY (ou variável legada compatível) para habilitar o Professor IA.'
       : 'Professor IA em modo contingência no momento. Tente novamente em instantes.';
     return {
       ok: true,
