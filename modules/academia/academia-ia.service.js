@@ -1,7 +1,5 @@
 const db = require('../../database/db');
 const academiaService = require('./academia.service');
-const { getAIConfig, createAIKeyMissingError } = require('../ai.service');
-
 const aiCore = require('../ai/ai.service');
 const aiPrompts = require('../ai/ai.prompts');
 
@@ -90,11 +88,19 @@ async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
 
     return { ok: true, resposta: texto };
   } catch (err) {
+    console.error('ERRO IA DETALHADO:', err?.response?.data || err?.technical || err?.message || err);
     const fallback = fallbackByAction(action, curso);
     logInteracao({ usuarioId, cursoId, tipo: action, pergunta, resposta: `${fallback}\n[erro=${err.message}]` });
-    const warning = err?.code === 'AI_KEY_MISSING'
-      ? 'IA ainda não ativada. Configure OPENAI_API_KEY (ou use OPENAI_APIKEY/OPENAI_KEY) para habilitar o Professor IA.'
-      : 'Professor IA em modo contingência no momento. Tente novamente em instantes.';
+    let warning = 'Professor IA em modo contingência no momento. Tente novamente em instantes.';
+    if (err?.code === 'AI_KEY_MISSING') {
+      warning = 'IA ainda não ativada. Configure OPENAI_API_KEY (ou use OPENAI_APIKEY/OPENAI_KEY) para habilitar o Professor IA.';
+    } else if (err?.code === 'AI_DISABLED') {
+      warning = 'Professor IA desativado no ambiente. Solicite ativação ao administrador.';
+    } else if (err?.code === 'AI_MODEL_MISSING') {
+      warning = 'Modelo da IA não configurado. Verifique OPENAI_MODEL_ACADEMIA/OPENAI_MODEL_AVALIACAO.';
+    } else if (err?.code === 'AI_TIMEOUT') {
+      warning = 'Professor IA demorou para responder. Tente novamente em instantes.';
+    }
     return {
       ok: true,
       resposta: fallback,

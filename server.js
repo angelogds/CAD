@@ -21,6 +21,7 @@ let webPush = null;
 try { webPush = require("web-push"); } catch (_e) { webPush = null; }
 
 const dateUtil = require("./utils/date");
+const aiService = require("./modules/ai/ai.service");
 const fmtBR =
   typeof dateUtil.fmtBR === "function" ? dateUtil.fmtBR : (v) => String(v ?? "-");
 const TZ = dateUtil.TZ || "America/Sao_Paulo";
@@ -38,6 +39,13 @@ try {
 
 const app = express();
 app.set("trust proxy", 1);
+
+aiService.validateAIEnvironment();
+setTimeout(() => {
+  aiService.testOpenAIConnection().catch((err) => {
+    console.error("ERRO REAL IA:", err?.message || err);
+  });
+}, 0);
 
 if (webPush && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   try {
