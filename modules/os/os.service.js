@@ -921,6 +921,12 @@ function syncInspecaoFromOS(osId) {
 
 function getHistoricoEquipamento(equipamentoId) {
   if (!equipamentoId) return [];
+  const cols = getOSColumns();
+  const hasTempoParada = cols.includes("tempo_parada_min");
+  const hasSintoma = cols.includes("sintoma_principal");
+  const hasCausa = cols.includes("causa_diagnostico");
+  const hasResumo = cols.includes("resumo_tecnico");
+
   return db
     .prepare(
       `SELECT id, descricao, status, tipo, opened_at, closed_at,
