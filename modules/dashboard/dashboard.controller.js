@@ -5,9 +5,10 @@ const alertsService = require('../alerts/alerts.service');
 const webPushService = require('../notifications/webpush.service');
 
 function index(req, res) {
+  const tvMode = ['1', 'true', 'tv'].includes(String(req.query.tv || '').toLowerCase());
   const cards = service.getCards();
   const osResumo = service.getOSResumoStatus();
-  const osPainel = service.getOSPainel(15);
+  const osPainel = service.getOSPainel(tvMode ? 30 : 15);
   const osEmAndamento = service.getOSEmAndamento();
   const historicoEquipamentos = service.getHistoricoEquipamentos(10);
   const motoresResumo = service.getMotoresResumoDashboard();
@@ -35,6 +36,7 @@ function index(req, res) {
     escala,
     avisos,
     alertaAtivo,
+    tvMode,
   });
 }
 

@@ -31,8 +31,12 @@
 
   const currentPcmSection = (typeof activePcmSection !== 'undefined' ? activePcmSection : '');
 
-  const navItem = (href, label, isActive, extraClass = '') =>
-    `<a class="nav-item ${extraClass} ${isActive ? 'active' : ''}" href="${href}"><span class="nav-label">${label}</span></a>`;
+  const counters = operationalCounters || { osAbertas: 0, osCriticas: 0, preventivasHoje: 0 };
+  const badge = (value, kind = 'gray') => value > 0
+    ? `<span class="pill-tag pill-${kind}" style="margin-left:auto; font-size:10px; padding:2px 7px;">${value}</span>`
+    : '';
+  const navItem = (href, label, isActive, extraClass = '', suffix = '') =>
+    `<a class="nav-item ${extraClass} ${isActive ? 'active' : ''}" href="${href}"><span class="nav-label">${label}</span>${suffix}</a>`;
 %>
 
 <aside class="sidebar">
@@ -41,8 +45,8 @@
   <nav class="nav">
     <% if (canPainel) { %><%- navItem('/dashboard', 'Painel Principal', activeMenu === 'dashboard') %><% } %>
     <% if (canEquipamentos) { %><%- navItem('/equipamentos', 'Equipamentos', activeMenu === 'equipamentos') %><% } %>
-    <% if (canOS) { %><%- navItem('/os', 'Ordens de Serviço', activeMenu === 'os') %><% } %>
-    <% if (canPreventivas) { %><%- navItem('/preventivas', 'Preventivas', activeMenu === 'preventivas') %><% } %>
+    <% if (canOS) { %><%- navItem('/os', 'Ordens de Serviço', activeMenu === 'os', '', badge(counters.osAbertas, counters.osCriticas > 0 ? 'amber' : 'gray')) %><% } %>
+    <% if (canPreventivas) { %><%- navItem('/preventivas', 'Preventivas', activeMenu === 'preventivas', '', badge(counters.preventivasHoje, 'blue')) %><% } %>
     <% if (canDemandas) { %><%- navItem('/demandas', 'Demandas', activeMenu === 'demandas') %><% } %>
     <% if (canSolicitacoes) { %><%- navItem('/solicitacoes/minhas', 'Solicitações', activeMenu === 'solicitacoes') %><% } %>
     <% if (canCompras) { %><%- navItem('/compras/solicitacoes', 'Compras', activeMenu === 'compras') %><% } %>

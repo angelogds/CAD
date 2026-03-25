@@ -46,6 +46,9 @@
   .aviso-item { border:1px solid #e5e7eb; border-radius:10px; padding:9px 10px; background:#fff; margin-top:8px; }
   .quick-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 
+   .op-toast{position:fixed;right:16px;bottom:16px;z-index:9999;background:#0f172a;color:#fff;padding:10px 12px;border-radius:10px;font-weight:700;box-shadow:0 10px 20px rgba(0,0,0,.2);display:none;max-width:340px;}
+  .op-toast.show{display:block;}
+  .boasvindas{border:1px solid #e2e8f0; background:#f8fafc; border-radius:12px; padding:10px 12px; margin-bottom:10px;}
   .alerta-tv { border:2px solid #dc2626; border-radius:14px; background:#fff1f2; color:#7f1d1d; padding:14px; margin-bottom:10px; display:flex; gap:14px; align-items:center; justify-content:space-between; }
   .alerta-tv.hidden { display:none; }
   .alerta-tv__title { font-size:28px; font-weight:900; letter-spacing:.02em; }
@@ -98,6 +101,8 @@
   var escalaFolgasAfastamentos = safeEscala.folgas_afastamentos || [];
   var safeMotoresResumo = motoresResumo || {};
   var alertaInicial = alertaAtivo || null;
+  var counters = operationalCounters || { osAbertas: 0, osCriticas: 0, preventivasHoje: 0 };
+  var saudacao = (new Date().getHours() < 12) ? "Bom dia" : (new Date().getHours() < 18 ? "Boa tarde" : "Boa noite");
 %>
 
 <div class="page-head">
@@ -106,7 +111,10 @@
     <p class="muted">TV da manutenção • OS, mural, preventivas, escala e demandas em tempo real</p>
     
   </div>
-  <button id="btn-ativar-push" class="btn-outline" type="button" onclick="enablePush()">Ativar alertas de OS neste dispositivo</button>
+  <div style="display:flex; gap:8px;">
+    <a class="btn-outline" href="/dashboard?tv=1">Modo TV</a>
+    <button id="btn-ativar-push" class="btn-outline" type="button" onclick="enablePush()">Ativar alertas de OS neste dispositivo</button>
+  </div>
 </div>
 
 <section id="alerta-tv" class="alerta-tv <%= alertaInicial ? 'piscar' : 'hidden' %>">
@@ -125,6 +133,14 @@
   </div>
 </section>
 
+<section class="boasvindas">
+  <strong><%= saudacao %>, <%= user?.name || "Equipe" %>.</strong>
+  Você tem <strong><%= counters.osAbertas %></strong> ordens de serviço abertas
+  <% if (counters.osCriticas > 0) { %>• <strong><%= counters.osCriticas %></strong> crítica(s) aguardando atendimento<% } %>
+  <% if (counters.preventivasHoje > 0) { %>• <strong><%= counters.preventivasHoje %></strong> preventiva(s) pendente(s) hoje<% } %>.
+</section>
+
+<div id="op-toast" class="op-toast"></div>
 
 <div class="dash-grid">
   <div class="dash-col">
@@ -264,12 +280,21 @@
   var btnReconhecer = document.getElementById('btn-reconhecer-alerta');
   var alertaAtual = <%- JSON.stringify(alertaInicial || null) %>;
 
-  function tocarAlerta(){
+  function tocarAlerta(tipo){
     try {
-      var audio = new Audio('/audio/notification.mp3');
+      var src = tipo === 'critica' ? '/audio/os-critica.mp3' : '/audio/os-nova.mp3';
+      var audio = new Audio(src);
       audio.volume = 1;
       audio.play().catch(function(){});
     } catch(_e){}
+  }
+
+  function toast(msg){
+    var el = document.getElementById('op-toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(function(){ el.classList.remove('show'); }, 4000);
   }
 
   function renderAlerta(payload){
@@ -298,14 +323,18 @@
     } catch(_e){}
   });
 
-  eventSource.addEventListener('os_criada', function(){
-    setTimeout(function(){ window.location.reload(); }, 900);
+  eventSource.addEventListener('os_criada', function(e){
+    var data = {};
+    try { data = JSON.parse(e.data || '{}'); } catch(_e) {}
+    toast('Nova OS #' + (data.id_os || '-') + ' aberta para ' + (data.equipamento || 'equipamento') + '.');
+    tocarAlerta('normal');
+    setTimeout(function(){ window.location.reload(); }, 1200);
   });
 
   eventSource.addEventListener('nova_os_emergencial', function(e){
     var data = JSON.parse(e.data || '{}');
     renderAlerta(data);
-    tocarAlerta();
+    tocarAlerta('critica');
     setTimeout(function(){ window.location.reload(); }, 1800);
   });
 
@@ -314,6 +343,14 @@
   });
 
 
+
+  var isTVMode = <%- JSON.stringify(Boolean(tvMode)) %>;
+  if (isTVMode) {
+    setInterval(function(){ window.location.reload(); }, 30000);
+    if (document.documentElement && document.documentElement.requestFullscreen) {
+      setTimeout(function(){ document.documentElement.requestFullscreen().catch(function(){}); }, 800);
+    }
+  }
 
   btnReconhecer?.addEventListener('click', function(){
     if (!alertaAtual || !alertaAtual.id_os) return;
