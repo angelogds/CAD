@@ -84,7 +84,19 @@
     .kpi-grid, .kpi-grid.two, .quick-grid { grid-template-columns:1fr; }
     .alerta-tv { flex-direction:column; align-items:flex-start; }
     .alerta-tv__title { font-size:20px; }
-    .dashboard-actions > * { width:100%; text-align:center; justify-content:center; }
+    .dashboard-actions { gap:6px; }
+    .dashboard-actions > * {
+      width:auto;
+      min-height:34px;
+      padding:5px 9px;
+      font-size:11px;
+      text-align:center;
+      justify-content:center;
+    }
+    .boasvindas { font-size:14px; }
+    .kpi-value { font-size:clamp(22px, 7vw, 28px); }
+    .table.compact th, .table.compact td { font-size:12px; padding:6px; }
+    .area-escala .table td, .area-escala .table th { white-space:normal; }
   }
 </style>
 

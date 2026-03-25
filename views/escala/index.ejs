@@ -3,6 +3,15 @@
 <% const pdfStartSafe = typeof pdfStart === 'string' ? pdfStart : ''; %>
 <% const pdfEndSafe = typeof pdfEnd === 'string' ? pdfEnd : ''; %>
 
+<style>
+  .escala-table-wrap { width:100%; overflow:auto; -webkit-overflow-scrolling:touch; }
+  @media (max-width: 760px) {
+    .escala-table-wrap .table { min-width: 720px; }
+    .escala-table-wrap .table th,
+    .escala-table-wrap .table td { font-size:12px; padding:8px; }
+  }
+</style>
+
 <div class="page-head" style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
   <div>
     <h1 style="margin:0;">Escala</h1>
@@ -48,7 +57,7 @@
     </div>
   </div>
 
-  <div style="margin-top:12px;">
+  <div class="escala-table-wrap" style="margin-top:12px;">
     <table class="table">
       <thead>
         <tr>

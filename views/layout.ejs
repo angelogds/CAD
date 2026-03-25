@@ -34,6 +34,11 @@
           <div class="topbar-right">
             <% if (user) { %>
               <div class="pill">
+                <% if (user.photo_path) { %>
+                  <img class="pill-avatar" src="<%= user.photo_path %>" alt="Foto de <%= user.name %>" />
+                <% } else { %>
+                  <span class="pill-avatar pill-avatar-fallback" aria-hidden="true"><%= String(user.name || 'U').trim().charAt(0).toUpperCase() %></span>
+                <% } %>
                 <span class="pill-name"><%= user.name %></span>
                 <span class="pill-role"><%= String(user.role || '').toUpperCase() %></span>
               </div>
