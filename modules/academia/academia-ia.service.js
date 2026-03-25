@@ -93,7 +93,7 @@ async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
     const fallback = fallbackByAction(action, curso);
     logInteracao({ usuarioId, cursoId, tipo: action, pergunta, resposta: `${fallback}\n[erro=${err.message}]` });
     const warning = err?.code === 'AI_KEY_MISSING'
-      ? 'IA ainda não ativada. Configure OPENAI_API_KEY (ou variável legada compatível) para habilitar o Professor IA.'
+      ? 'IA ainda não ativada. Configure OPENAI_API_KEY (ou use OPENAI_APIKEY/OPENAI_KEY) para habilitar o Professor IA.'
       : 'Professor IA em modo contingência no momento. Tente novamente em instantes.';
     return {
       ok: true,
