@@ -1,5 +1,16 @@
 const db = require("../../database/db");
 
+function tableExists(name) {
+  try {
+    const row = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name = ?`)
+      .get(String(name || ""));
+    return !!row;
+  } catch (_e) {
+    return false;
+  }
+}
+
 function listPlanos() {
   return db.prepare(`
     SELECT p.*,
@@ -151,24 +162,34 @@ function inferirPadraoPreventivo(equipamento = {}, historico = []) {
   const tituloBase = String(equipamento.nome || "equipamento").trim();
   const falhas = historico.length;
   const criticidadeEq = String(equipamento.criticidade || "").toUpperCase();
+  const recorrencias = historico.filter((h) => {
+    const txt = `${h.descricao || ''} ${h.causa_diagnostico || ''}`.toLowerCase();
+    return /(vaz|trav|ru[ií]do|vibra|desgaste|folga)/.test(txt);
+  }).length;
 
   const map = [
     {
       match: /(caldeira|boiler)/,
-      checklist: ["Limpeza geral semanal", "Verificar válvulas", "Inspecionar visor de nível", "Verificar bomba e vedação"],
+      checklist: ["Limpeza geral semanal", "Verificar válvulas", "Inspecionar visor de nível", "Verificar bomba", "Checar vedação e purga"],
       frequencia_tipo: "semanal",
       frequencia_valor: 1,
     },
     {
       match: /(digestor)/,
-      checklist: ["Inspecionar rosca", "Checar vedação", "Inspecionar pontos de vazamento"],
+      checklist: ["Inspecionar rosca", "Checar vedação", "Inspecionar pontos de vazamento", "Revisar mancais e redutor"],
       frequencia_tipo: "semanal",
       frequencia_valor: 1,
     },
     {
       match: /(triturador)/,
-      checklist: ["Inspecionar dentes", "Medir desgaste", "Verificar alinhamento"],
+      checklist: ["Inspecionar dentes", "Medir desgaste", "Verificar alinhamento", "Avaliar vibração em carga"],
       frequencia_tipo: "semanal",
+      frequencia_valor: 1,
+    },
+    {
+      match: /(valvula rotativa|válvula rotativa|redutor|transportador|bomba)/,
+      checklist: ["Inspeção de folgas e vedação", "Conferir lubrificação", "Verificar acoplamentos/alinhamento", "Testar vibração e ruído"],
+      frequencia_tipo: "quinzenal",
       frequencia_valor: 1,
     },
   ];
@@ -179,22 +200,37 @@ function inferirPadraoPreventivo(equipamento = {}, historico = []) {
     frequencia_valor: 1,
   };
 
-  const prioridade = criticidadeEq === "CRITICA" || falhas >= 6
-    ? "ALTA"
-    : falhas >= 3
-      ? "MEDIA"
-      : "BAIXA";
+  const impacto = criticidadeEq === 'CRITICA' ? 3 : criticidadeEq === 'ALTA' ? 2 : 1;
+  const score = impacto + (falhas >= 8 ? 3 : falhas >= 5 ? 2 : falhas >= 3 ? 1 : 0) + (recorrencias >= 4 ? 2 : recorrencias >= 2 ? 1 : 0);
 
-  const tipoPlano = prioridade === "ALTA" && falhas >= 8 ? "reforma" : "preventiva";
-  const observacao = `Plano IA com base no histórico real (${falhas} OS) e criticidade do equipamento.`;
+  const classificacao = score >= 7
+    ? 'reforma_total'
+    : score >= 5
+      ? 'reforma_parcial'
+      : score >= 3
+        ? 'preventiva_reforcada'
+        : 'preventiva_simples';
+
+  const prioridade = score >= 5 ? 'ALTA' : score >= 3 ? 'MEDIA' : 'BAIXA';
+  const tipoPlano = classificacao.startsWith('reforma') ? 'reforma' : 'preventiva';
+
+  const label = {
+    preventiva_simples: 'Preventiva Simples',
+    preventiva_reforcada: 'Preventiva Reforçada',
+    reforma_parcial: 'Reforma Parcial',
+    reforma_total: 'Reforma Total',
+  }[classificacao];
+
+  const observacao = `Plano IA com histórico da planta (${falhas} OS, ${recorrencias} recorrências). Classificação: ${label}.`;
 
   return {
-    titulo: `${tipoPlano === "reforma" ? "Reforma" : "Preventiva"} - ${tituloBase}`,
+    titulo: `${label} - ${tituloBase}`,
     checklist: padrao.checklist,
     frequencia_tipo: padrao.frequencia_tipo,
     frequencia_valor: padrao.frequencia_valor,
     prioridade,
     tipo_plano: tipoPlano,
+    classificacao,
     observacao,
   };
 }
@@ -258,8 +294,14 @@ function gerarCronogramaSemanalInteligente(refDate = new Date()) {
   `).all();
 
   let criadas = 0;
+  const weekNumber = Math.floor((monday.getTime() - Date.UTC(monday.getUTCFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000));
+  const alternanciaPorTipo = new Map();
+
   planos.forEach((plano, idx) => {
-    const prevista = formatDateISO(addDays(monday, idx % 7));
+    const tipoKey = String(plano.equipamento_nome || plano.equipamento_criticidade || "geral").toLowerCase();
+    const offsetTipo = alternanciaPorTipo.get(tipoKey) || 0;
+    alternanciaPorTipo.set(tipoKey, offsetTipo + 1);
+    const prevista = formatDateISO(addDays(monday, (idx + weekNumber + offsetTipo) % 7));
     const jaExiste = db.prepare(`
       SELECT id FROM preventiva_execucoes
       WHERE plano_id = ? AND data_prevista BETWEEN ? AND ?
@@ -280,6 +322,34 @@ function gerarCronogramaSemanalInteligente(refDate = new Date()) {
   return { criadas, semanaInicio: formatDateISO(monday), semanaFim: formatDateISO(sunday) };
 }
 
+function getConfig(chave) {
+  if (!tableExists("config_sistema")) return null;
+  const row = db.prepare(`SELECT valor FROM config_sistema WHERE chave = ?`).get(String(chave || ""));
+  return row?.valor || null;
+}
+
+function setConfig(chave, valor) {
+  if (!tableExists("config_sistema")) return;
+  db.prepare(`
+    INSERT INTO config_sistema (chave, valor)
+    VALUES (?, ?)
+    ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor
+  `).run(String(chave || ""), valor == null ? null : String(valor));
+}
+
+function executarCicloAutonomo(refDate = new Date()) {
+  const hoje = formatDateISO(refDate);
+  const ultimaExecucao = getConfig("preventiva_ia_ciclo_data");
+  if (ultimaExecucao === hoje) {
+    return { skipped: true, reason: "already_ran_today", data: hoje };
+  }
+
+  const autoPlanos = gerarPreventivasAutomaticas();
+  const autoCronograma = gerarCronogramaSemanalInteligente(refDate);
+  setConfig("preventiva_ia_ciclo_data", hoje);
+  return { skipped: false, data: hoje, autoPlanos, autoCronograma };
+}
+
 module.exports = {
   listPlanos,
   listEquipamentosAtivos,
@@ -292,4 +362,5 @@ module.exports = {
   inferirPadraoPreventivo,
   gerarPreventivasAutomaticas,
   gerarCronogramaSemanalInteligente,
+  executarCicloAutonomo,
 };

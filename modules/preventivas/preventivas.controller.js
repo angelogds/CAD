@@ -1,9 +1,8 @@
 const service = require("./preventivas.service");
 
 function index(req, res) {
-  const autoPlanos = service.gerarPreventivasAutomaticas();
-  const autoCronograma = service.gerarCronogramaSemanalInteligente(new Date());
-  console.log("[PREVENTIVA_IA] atualização automática", { autoPlanos, autoCronograma });
+  const ciclo = service.executarCicloAutonomo(new Date());
+  console.log("[PREVENTIVA_IA] ciclo autônomo", ciclo);
 
   const lista = service.listPlanos();
   return res.render("preventivas/index", {
