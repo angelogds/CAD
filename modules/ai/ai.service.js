@@ -2,6 +2,42 @@ function isAIEnabled() {
   return String(process.env.AI_ENABLED || 'true').toLowerCase() === 'true';
 }
 
+const REQUIRED_ENV_VARS = [
+  'OPENAI_API_KEY',
+  'AI_ENABLED',
+  'OPENAI_MODEL_ACADEMIA',
+  'OPENAI_MODEL_AVALIACAO',
+];
+
+function redactValue(value) {
+  const text = String(value || '');
+  if (!text) return '(vazio)';
+  if (text.length <= 8) return '***';
+  return `${text.slice(0, 4)}...${text.slice(-4)}`;
+}
+
+function validateAIEnvironment() {
+  const missing = REQUIRED_ENV_VARS.filter((name) => {
+    const value = process.env[name];
+    return typeof value === 'undefined' || String(value).trim() === '';
+  });
+
+  if (missing.length) {
+    console.error('[AI] Variáveis de ambiente ausentes:', missing.join(', '));
+    console.error('ENV NÃO CARREGADO:', {
+      OPENAI_API_KEY: redactValue(process.env.OPENAI_API_KEY),
+      AI_ENABLED: process.env.AI_ENABLED,
+      OPENAI_MODEL_ACADEMIA: process.env.OPENAI_MODEL_ACADEMIA,
+      OPENAI_MODEL_AVALIACAO: process.env.OPENAI_MODEL_AVALIACAO,
+    });
+  }
+
+  return {
+    ok: missing.length === 0,
+    missing,
+  };
+}
+
 function getAIConfig() {
   return {
     enabled: isAIEnabled(),
@@ -81,7 +117,36 @@ async function askText({ systemPrompt, userPayload, model, maxOutputTokens, temp
   }
 }
 
+async function testOpenAIConnection() {
+  const cfg = getAIConfig();
+  if (!cfg.enabled) {
+    console.warn('[AI] Teste de conexão ignorado: AI_ENABLED=false.');
+    return { ok: false, skipped: true, reason: 'AI_DISABLED' };
+  }
+  if (!cfg.apiKey) {
+    console.warn('[AI] Teste de conexão ignorado: OPENAI_API_KEY ausente.');
+    return { ok: false, skipped: true, reason: 'AI_KEY_MISSING' };
+  }
+
+  try {
+    const result = await askText({
+      model: process.env.OPENAI_MODEL_ACADEMIA || cfg.modelText || 'gpt-4o-mini',
+      systemPrompt: 'Responda de forma curta e objetiva.',
+      userPayload: { input: 'Teste simples: responda OK' },
+      maxOutputTokens: 20,
+      temperature: 0,
+    });
+    console.log('IA OK:', result.text);
+    return { ok: true, text: result.text };
+  } catch (err) {
+    console.error('ERRO REAL IA:', err.technical || err.message);
+    return { ok: false, error: err };
+  }
+}
+
 module.exports = {
   getAIConfig,
   askText,
+  validateAIEnvironment,
+  testOpenAIConnection,
 };
