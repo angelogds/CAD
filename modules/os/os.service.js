@@ -930,10 +930,10 @@ function getHistoricoEquipamento(equipamentoId) {
   return db
     .prepare(
       `SELECT id, descricao, status, tipo, opened_at, closed_at,
-              ${hasTempoParada ? "COALESCE(tempo_parada_min, 0)" : "0"} AS tempo_parada_min,
-              ${hasSintoma ? "COALESCE(sintoma_principal,'')" : "''"} AS sintoma_principal,
-              ${hasCausa ? "COALESCE(causa_diagnostico,'')" : "''"} AS causa_diagnostico,
-              ${hasResumo ? "COALESCE(resumo_tecnico,'')" : "''"} AS resumo_tecnico
+              COALESCE(tempo_parada_min, 0) AS tempo_parada_min,
+              COALESCE(sintoma_principal,'') AS sintoma_principal,
+              COALESCE(causa_diagnostico,'') AS causa_diagnostico,
+              COALESCE(resumo_tecnico,'') AS resumo_tecnico
        FROM os
        WHERE equipamento_id = ?
        ORDER BY id DESC
