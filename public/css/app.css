@@ -128,6 +128,23 @@ a{ color:inherit; }
   padding:8px 10px;
   max-width:100%;
 }
+.pill-avatar{
+  width:30px;
+  height:30px;
+  border-radius:999px;
+  object-fit:cover;
+  border:1px solid #d1d5db;
+  background:#f8fafc;
+  flex:0 0 auto;
+}
+.pill-avatar-fallback{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:12px;
+  font-weight:900;
+  color:#334155;
+}
 .pill-name{ font-weight:800; }
 .pill-role{
   font-size:12px;
@@ -299,6 +316,7 @@ textarea{ min-height:110px; resize:vertical; }
     padding:8px 10px;
   }
   .pill-name{
+    font-size:13px;
     min-width:0;
     overflow:hidden;
     text-overflow:ellipsis;
@@ -435,4 +453,51 @@ html { font-size: 13px; }
 
 @media (max-width: 980px) {
   .sidebar { width: 260px; max-width: 86vw; overflow-y: auto; }
+}
+
+/* Ajustes finais de responsividade mobile (mantidos ao final para vencer overrides) */
+@media (max-width: 980px) {
+  .app { grid-template-columns: 1fr !important; }
+  .main { width: 100%; min-width: 0; }
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .topbar-left,
+  .topbar-right {
+    width: 100%;
+    min-width: 0;
+  }
+  .topbar-logos {
+    margin-left: 0;
+  }
+  .topbar-right form,
+  .topbar-right .btn,
+  .topbar-right .btn-outline,
+  .topbar-right .btn-ghost {
+    width: 100%;
+  }
+  .pill {
+    padding: 7px 9px;
+    gap: 8px;
+  }
+  .pill-avatar {
+    width: 26px;
+    height: 26px;
+  }
+  .pill-role {
+    font-size: 11px;
+    padding: 3px 7px;
+  }
+  .footer {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar-title { font-size: 16px; }
+  .topbar-sub { font-size: 11px; }
+  .topbar-logos img { height: 20px; }
 }
