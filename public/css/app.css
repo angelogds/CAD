@@ -436,3 +436,38 @@ html { font-size: 13px; }
 @media (max-width: 980px) {
   .sidebar { width: 260px; max-width: 86vw; overflow-y: auto; }
 }
+
+/* Ajustes finais de responsividade mobile (mantidos ao final para vencer overrides) */
+@media (max-width: 980px) {
+  .app { grid-template-columns: 1fr !important; }
+  .main { width: 100%; min-width: 0; }
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .topbar-left,
+  .topbar-right {
+    width: 100%;
+    min-width: 0;
+  }
+  .topbar-logos {
+    margin-left: 0;
+  }
+  .topbar-right form,
+  .topbar-right .btn,
+  .topbar-right .btn-outline,
+  .topbar-right .btn-ghost {
+    width: 100%;
+  }
+  .footer {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar-title { font-size: 16px; }
+  .topbar-sub { font-size: 11px; }
+  .topbar-logos img { height: 20px; }
+}
