@@ -147,7 +147,6 @@ async function askText({ systemPrompt, userPayload, model, maxOutputTokens, temp
       const byStatus = {
         400: 'AI_BAD_REQUEST',
         401: 'AI_UNAUTHORIZED',
-        402: 'AI_RATE_LIMIT',
         404: 'AI_MODEL_NOT_FOUND',
         408: 'AI_TIMEOUT',
         429: 'AI_RATE_LIMIT',

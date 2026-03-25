@@ -53,13 +53,7 @@ function resolveWarning(err) {
   if (err?.code === 'AI_KEY_PLACEHOLDER' || err?.code === 'AI_UNAUTHORIZED') {
     return 'Configuração da IA inválida. Revise a chave da API.';
   }
-  const bodySummary = String(err?.providerBodySummary || '').toLowerCase();
-  if (
-    err?.code === 'AI_RATE_LIMIT'
-    || bodySummary.includes('insufficient_quota')
-    || bodySummary.includes('billing')
-    || bodySummary.includes('quota')
-  ) {
+  if (err?.code === 'AI_RATE_LIMIT') {
     return 'IA indisponível por limite ou cobrança da API.';
   }
   if (err?.code === 'AI_DISABLED') {
