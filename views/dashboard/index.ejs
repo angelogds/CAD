@@ -31,8 +31,8 @@
   .kpi-grid { display:grid; grid-template-columns:repeat(3,minmax(120px,1fr)); gap:8px; margin-bottom:10px; }
   .kpi-grid.two { grid-template-columns:repeat(2,minmax(120px,1fr)); margin-bottom:0; }
   .kpi-box { border:1px solid #e5e7eb; border-radius:10px; padding:8px 10px; background:#fafafa; }
-  .kpi-label { font-size:12px; color:#64748b; }
-  .kpi-value { margin-top:2px; font-size:26px; font-weight:900; line-height:1.1; color:#0f172a; }
+  .kpi-label { font-size:clamp(12px, .9vw, 14px); color:#64748b; }
+  .kpi-value { margin-top:2px; font-size:clamp(24px, 2.2vw, 36px); font-weight:900; line-height:1.1; color:#0f172a; }
 
   .table-wrap { overflow:auto; }
   .table.compact th, .table.compact td { padding:8px; vertical-align:middle; font-size:13px; }
@@ -45,6 +45,7 @@
   .btn-inline { border:none; border-radius:8px; padding:5px 9px; background:#16a34a; color:#fff; font-weight:800; cursor:pointer; font-size:12px; }
   .aviso-item { border:1px solid #e5e7eb; border-radius:10px; padding:9px 10px; background:#fff; margin-top:8px; }
   .quick-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .dashboard-actions { display:flex; gap:8px; flex-wrap:wrap; }
 
    .op-toast{position:fixed;right:16px;bottom:16px;z-index:9999;background:#0f172a;color:#fff;padding:10px 12px;border-radius:10px;font-weight:700;box-shadow:0 10px 20px rgba(0,0,0,.2);display:none;max-width:340px;}
   .op-toast.show{display:block;}
@@ -83,6 +84,7 @@
     .kpi-grid, .kpi-grid.two, .quick-grid { grid-template-columns:1fr; }
     .alerta-tv { flex-direction:column; align-items:flex-start; }
     .alerta-tv__title { font-size:20px; }
+    .dashboard-actions > * { width:100%; text-align:center; justify-content:center; }
   }
 </style>
 
@@ -111,7 +113,7 @@
     <p class="muted">TV da manutenção • OS, mural, preventivas, escala e demandas em tempo real</p>
     
   </div>
-  <div style="display:flex; gap:8px;">
+  <div class="dashboard-actions">
     <a class="btn-outline" href="/dashboard?tv=1">Modo TV</a>
     <button id="btn-ativar-push" class="btn-outline" type="button" onclick="enablePush()">Ativar alertas de OS neste dispositivo</button>
   </div>
