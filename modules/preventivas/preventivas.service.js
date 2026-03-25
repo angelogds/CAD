@@ -162,24 +162,34 @@ function inferirPadraoPreventivo(equipamento = {}, historico = []) {
   const tituloBase = String(equipamento.nome || "equipamento").trim();
   const falhas = historico.length;
   const criticidadeEq = String(equipamento.criticidade || "").toUpperCase();
+  const recorrencias = historico.filter((h) => {
+    const txt = `${h.descricao || ''} ${h.causa_diagnostico || ''}`.toLowerCase();
+    return /(vaz|trav|ru[ií]do|vibra|desgaste|folga)/.test(txt);
+  }).length;
 
   const map = [
     {
       match: /(caldeira|boiler)/,
-      checklist: ["Limpeza geral semanal", "Verificar válvulas", "Inspecionar visor de nível", "Verificar bomba e vedação"],
+      checklist: ["Limpeza geral semanal", "Verificar válvulas", "Inspecionar visor de nível", "Verificar bomba", "Checar vedação e purga"],
       frequencia_tipo: "semanal",
       frequencia_valor: 1,
     },
     {
       match: /(digestor)/,
-      checklist: ["Inspecionar rosca", "Checar vedação", "Inspecionar pontos de vazamento"],
+      checklist: ["Inspecionar rosca", "Checar vedação", "Inspecionar pontos de vazamento", "Revisar mancais e redutor"],
       frequencia_tipo: "semanal",
       frequencia_valor: 1,
     },
     {
       match: /(triturador)/,
-      checklist: ["Inspecionar dentes", "Medir desgaste", "Verificar alinhamento"],
+      checklist: ["Inspecionar dentes", "Medir desgaste", "Verificar alinhamento", "Avaliar vibração em carga"],
       frequencia_tipo: "semanal",
+      frequencia_valor: 1,
+    },
+    {
+      match: /(valvula rotativa|válvula rotativa|redutor|transportador|bomba)/,
+      checklist: ["Inspeção de folgas e vedação", "Conferir lubrificação", "Verificar acoplamentos/alinhamento", "Testar vibração e ruído"],
+      frequencia_tipo: "quinzenal",
       frequencia_valor: 1,
     },
   ];
@@ -190,22 +200,37 @@ function inferirPadraoPreventivo(equipamento = {}, historico = []) {
     frequencia_valor: 1,
   };
 
-  const prioridade = criticidadeEq === "CRITICA" || falhas >= 6
-    ? "ALTA"
-    : falhas >= 3
-      ? "MEDIA"
-      : "BAIXA";
+  const impacto = criticidadeEq === 'CRITICA' ? 3 : criticidadeEq === 'ALTA' ? 2 : 1;
+  const score = impacto + (falhas >= 8 ? 3 : falhas >= 5 ? 2 : falhas >= 3 ? 1 : 0) + (recorrencias >= 4 ? 2 : recorrencias >= 2 ? 1 : 0);
 
-  const tipoPlano = prioridade === "ALTA" && falhas >= 8 ? "reforma" : "preventiva";
-  const observacao = `Plano IA com base no histórico real (${falhas} OS) e criticidade do equipamento.`;
+  const classificacao = score >= 7
+    ? 'reforma_total'
+    : score >= 5
+      ? 'reforma_parcial'
+      : score >= 3
+        ? 'preventiva_reforcada'
+        : 'preventiva_simples';
+
+  const prioridade = score >= 5 ? 'ALTA' : score >= 3 ? 'MEDIA' : 'BAIXA';
+  const tipoPlano = classificacao.startsWith('reforma') ? 'reforma' : 'preventiva';
+
+  const label = {
+    preventiva_simples: 'Preventiva Simples',
+    preventiva_reforcada: 'Preventiva Reforçada',
+    reforma_parcial: 'Reforma Parcial',
+    reforma_total: 'Reforma Total',
+  }[classificacao];
+
+  const observacao = `Plano IA com histórico da planta (${falhas} OS, ${recorrencias} recorrências). Classificação: ${label}.`;
 
   return {
-    titulo: `${tipoPlano === "reforma" ? "Reforma" : "Preventiva"} - ${tituloBase}`,
+    titulo: `${label} - ${tituloBase}`,
     checklist: padrao.checklist,
     frequencia_tipo: padrao.frequencia_tipo,
     frequencia_valor: padrao.frequencia_valor,
     prioridade,
     tipo_plano: tipoPlano,
+    classificacao,
     observacao,
   };
 }
