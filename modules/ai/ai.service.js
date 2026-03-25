@@ -39,9 +39,11 @@ function validateAIEnvironment() {
 }
 
 function getAIConfig() {
+  const resolved = resolveApiKey();
   return {
     enabled: isAIEnabled(),
-    apiKey: String(process.env.OPENAI_API_KEY || '').trim(),
+    apiKey: resolved.value,
+    apiKeySource: resolved.source,
     modelText: String(process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini').trim(),
     timeoutMs: Number(process.env.OPENAI_TIMEOUT_MS || 20000),
     maxOutputTokens: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 300),
