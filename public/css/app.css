@@ -24,6 +24,9 @@ html,body{
   font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
   color:var(--text);
   background:var(--bg);
+  width:100%;
+  max-width:100%;
+  overflow-x:hidden;
 }
 
 a{ color:inherit; }
@@ -123,6 +126,7 @@ a{ color:inherit; }
   background:#fff;
   border-radius:999px;
   padding:8px 10px;
+  max-width:100%;
 }
 .pill-name{ font-weight:800; }
 .pill-role{
@@ -275,13 +279,35 @@ textarea{ min-height:110px; resize:vertical; }
   }
   .app.mobile-sidebar-open .sidebar{ transform:translateX(0); }
   .topbar{ padding:12px 14px; }
-  .topbar-left{ flex-wrap:wrap; }
-  .topbar-right{ gap:6px; }
+  .topbar-left{ flex-wrap:wrap; min-width:0; }
+  .topbar-right{
+    gap:6px;
+    width:100%;
+    justify-content:flex-start;
+    flex-wrap:wrap;
+  }
   .topbar-logos{
     gap:8px;
     margin-left:8px;
+    max-width:100%;
   }
   .topbar-logos img{ height:24px; }
+  .pill{
+    width:100%;
+    justify-content:space-between;
+    border-radius:14px;
+    padding:8px 10px;
+  }
+  .pill-name{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .btn, .btn-outline, .btn-ghost{
+    min-height:40px;
+    font-size:13px;
+  }
   .content{ padding:14px; }
   .flash{ padding:8px 14px 0; }
   .footer{ padding:10px 14px; }
