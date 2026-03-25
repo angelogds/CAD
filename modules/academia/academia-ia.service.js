@@ -30,7 +30,7 @@ function logInteracao({ usuarioId, cursoId, tipo, pergunta, resposta }) {
 async function callOpenAI({ model, prompt, payload, action }) {
   const result = await aiCore.askText({
     model,
-    systemPrompt: `${aiPrompts.buildProfessorPrompt(action)}\n${prompt || ''}`.trim(),
+    systemPrompt: `${BASE_SYSTEM_PROMPT}\n${aiPrompts.buildProfessorPrompt(action)}\n${prompt || ''}`.trim(),
     userPayload: payload,
     temperature: 0.3,
   });
@@ -44,6 +44,54 @@ function fallbackByAction(action, curso) {
   if (action === 'iniciar_avaliacao') return 'Avaliação sugerida: 5 questões objetivas + 1 estudo de caso curto + checklist de compreensão aplicado ao equipamento que você atende.';
   if (action === 'recomendar_proximo') return academiaService.getDashboardData(null).recomendacaoIA || 'Recomendo avançar para um bloco prático de aplicação na fábrica.';
   return 'Professor IA temporariamente indisponível. Revise o bloco atual, o e-book interno e finalize a avaliação para liberar a etapa complementar externa.';
+}
+
+function resolveWarning(err) {
+  if (err?.code === 'AI_KEY_MISSING') {
+    return 'IA ainda não ativada. Configure OPENAI_API_KEY.';
+  }
+  if (err?.code === 'AI_KEY_PLACEHOLDER' || err?.code === 'AI_UNAUTHORIZED') {
+    return 'Configuração da IA inválida. Revise a chave da API.';
+  }
+  const bodySummary = String(err?.providerBodySummary || '').toLowerCase();
+  if (
+    err?.code === 'AI_RATE_LIMIT'
+    || bodySummary.includes('insufficient_quota')
+    || bodySummary.includes('billing')
+    || bodySummary.includes('quota')
+  ) {
+    return 'IA indisponível por limite ou cobrança da API.';
+  }
+  if (err?.code === 'AI_DISABLED') {
+    return 'Professor IA desativado no ambiente. Solicite ativação ao administrador.';
+  }
+  if (err?.code === 'AI_MODEL_MISSING' || err?.code === 'AI_MODEL_NOT_FOUND' || err?.providerStatus === 404) {
+    return 'Modelo da IA inválido ou indisponível. Revise OPENAI_MODEL_ACADEMIA/OPENAI_MODEL_AVALIACAO.';
+  }
+  if (err?.code === 'AI_BAD_REQUEST' || err?.providerStatus === 400) {
+    return 'Falha de configuração da IA. Revise modelo e parâmetros da requisição.';
+  }
+  if (err?.code === 'AI_TIMEOUT') {
+    return 'Professor IA indisponível no momento. Tente novamente em instantes.';
+  }
+
+  return 'Professor IA indisponível no momento. Tente novamente em instantes.';
+}
+
+function logProfessorIAError({ err, model }) {
+  const cfg = aiCore.getAIConfig();
+  console.error('[ProfessorIA] Erro ao consultar OpenAI:', {
+    code: err?.code,
+    message: err?.message,
+    technical: err?.technical,
+    providerStatus: err?.providerStatus,
+    providerBodySummary: err?.providerBodySummary,
+    providerModel: err?.providerModel || model,
+    aiEnabled: cfg.enabled,
+    hasApiKey: cfg.hasApiKey,
+    apiKeyLooksPlaceholder: cfg.apiKeyLooksPlaceholder,
+    apiKeyMasked: cfg.hasApiKey ? `****${String(cfg.apiKey).slice(-4)}` : '(ausente)',
+  });
 }
 
 async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
@@ -88,23 +136,20 @@ async function responderProfessorIA({ usuarioId, cursoId, action, pergunta }) {
 
     return { ok: true, resposta: texto };
   } catch (err) {
-    console.error('ERRO IA DETALHADO:', err?.response?.data || err?.technical || err?.message || err);
+    logProfessorIAError({ err, model });
     const fallback = fallbackByAction(action, curso);
-    logInteracao({ usuarioId, cursoId, tipo: action, pergunta, resposta: `${fallback}\n[erro=${err.message}]` });
-    let warning = 'Professor IA em modo contingência no momento. Tente novamente em instantes.';
-    if (err?.code === 'AI_KEY_MISSING') {
-      warning = 'IA ainda não ativada. Configure OPENAI_API_KEY (ou use OPENAI_APIKEY/OPENAI_KEY) para habilitar o Professor IA.';
-    } else if (err?.code === 'AI_DISABLED') {
-      warning = 'Professor IA desativado no ambiente. Solicite ativação ao administrador.';
-    } else if (err?.code === 'AI_MODEL_MISSING') {
-      warning = 'Modelo da IA não configurado. Verifique OPENAI_MODEL_ACADEMIA/OPENAI_MODEL_AVALIACAO.';
-    } else if (err?.code === 'AI_TIMEOUT') {
-      warning = 'Professor IA demorou para responder. Tente novamente em instantes.';
-    }
+    logInteracao({
+      usuarioId,
+      cursoId,
+      tipo: action,
+      pergunta,
+      resposta: `${fallback}\n[erro=${safeJSONStringify({ code: err?.code, message: err?.message, status: err?.providerStatus })}]`,
+    });
+
     return {
       ok: true,
       resposta: fallback,
-      warning,
+      warning: resolveWarning(err),
     };
   }
 }
