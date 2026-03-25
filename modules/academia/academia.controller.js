@@ -327,12 +327,14 @@ async function professorIAPerguntar(req, res) {
     const action = String(req.body.action || 'perguntar').trim();
     const pergunta = String(req.body.pergunta || '').trim();
     const cursoId = req.body.curso_id ? Number(req.body.curso_id) : null;
+    const modo = String(req.body.modo || 'curso').trim().toLowerCase();
 
     const result = await iaService.responderProfessorIA({
       usuarioId: req.session?.user?.id,
       cursoId,
       action,
       pergunta,
+      modo,
     });
 
     return res.json(result);
