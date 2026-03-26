@@ -534,6 +534,15 @@ function createAviso({ titulo, mensagem, colaborador_nome, data_referencia, crea
    PREVENTIVAS ATIVAS (DASHBOARD)
    tabelas corretas: preventiva_planos / preventiva_execucoes
 =================================*/
+
+function parseResponsavelTextoLimitado(responsavel, limit = 2) {
+  const nomes = String(responsavel || "")
+    .split(",")
+    .map((nome) => nome.trim())
+    .filter(Boolean);
+  return nomes.slice(0, Math.max(1, Number(limit) || 2));
+}
+
 function getPreventivasDashboard() {
   return safeGet(() => {
     const cols = tableExists("preventiva_execucoes")
@@ -546,7 +555,7 @@ function getPreventivasDashboard() {
       ? "UPPER(COALESCE(pe.criticidade, e.criticidade, 'MEDIA'))"
       : "UPPER(COALESCE(e.criticidade, 'MEDIA'))";
 
-    const rows = db
+    const fetchRows = () => db
       .prepare(
         `
       SELECT
@@ -579,6 +588,26 @@ function getPreventivasDashboard() {
       )
       .all();
 
+    let rows = fetchRows();
+
+    if (typeof preventivasService?.alocarEquipeExecucaoPreventiva === "function") {
+      const idsParaReprocessar = rows
+        .filter((item) => {
+          const nomes = parseResponsavelTextoLimitado(item.responsavel, 10);
+          const semIds = !Number(item.responsavel_1_id || 0) && !Number(item.responsavel_2_id || 0);
+          return semIds || nomes.length > 2;
+        })
+        .map((item) => Number(item.id))
+        .filter(Boolean);
+
+      if (idsParaReprocessar.length) {
+        idsParaReprocessar.forEach((id) => {
+          preventivasService.alocarEquipeExecucaoPreventiva(id);
+        });
+        rows = fetchRows();
+      }
+    }
+
     const userIds = Array.from(new Set(rows.flatMap((item) => [item.responsavel_1_id, item.responsavel_2_id]).map((x) => Number(x)).filter(Boolean)));
     const usersMap = new Map();
     if (userIds.length) {
@@ -592,10 +621,8 @@ function getPreventivasDashboard() {
         .map((x) => String(x || "").trim())
         .filter(Boolean)
         .slice(0, 2);
-      const responsavelTexto = String(item.responsavel || "").trim();
-      const responsaveis = responsavelTexto
-        ? responsavelTexto.split(",").map((nome) => nome.trim()).filter(Boolean)
-        : responsaveisIds;
+      const responsavelTexto = parseResponsavelTextoLimitado(item.responsavel, 2);
+      const responsaveis = responsaveisIds.length ? responsaveisIds : responsavelTexto;
       return {
         ...item,
         responsaveis,
@@ -749,7 +776,7 @@ function getPreventivasEmAndamentoEquipe(limit = 10) {
       LIMIT ?
     `).all(Number(limit) || 10).map((r) => ({
       ...r,
-      equipe: [r.resp1, r.resp2].filter(Boolean).join(" • ") || r.responsavel || "-",
+      equipe: [r.resp1, r.resp2].filter(Boolean).join(" • ") || parseResponsavelTextoLimitado(r.responsavel, 2).join(" • ") || "-",
     }));
   }, []);
 }
