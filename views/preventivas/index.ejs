@@ -132,10 +132,27 @@
   </div>
 
   <div class="actions">
+    <% if (canAdminPreventivas && !tvMode) { %>
     <a class="btn-primary" href="/preventivas/nova">+ Nova Preventiva</a>
+    <form method="POST" action="/preventivas/reprocessar" style="display:inline;" onsubmit="return confirm('Reprocessar módulo de preventivas agora?');">
+      <button class="btn-sm" type="submit">↻ Reprocessar / Reboot Preventivas</button>
+    </form>
+    <% } %>
   </div>
 </div>
 
+
+<% if (diagnosticoLeitura) { %>
+<div class="card" style="margin-bottom:12px;">
+  <div class="muted" style="font-weight:800;">Auditoria de leitura de equipamentos</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+    <span class="pill pill-blue">Elegíveis: <%= diagnosticoLeitura.equipamentosElegiveis || 0 %></span>
+    <span class="pill">Sem plano: <%= diagnosticoLeitura.equipamentosSemPlano || 0 %></span>
+    <span class="pill">Planos ativos: <%= diagnosticoLeitura.planosAtivos || 0 %></span>
+    <span class="pill">Pendentes/andamento: <%= diagnosticoLeitura.execucoesPendentes || 0 %></span>
+  </div>
+</div>
+<% } %>
 <div class="card">
   <div class="table-wrap">
     <table>

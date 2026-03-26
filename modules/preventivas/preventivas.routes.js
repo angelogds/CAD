@@ -61,6 +61,15 @@ router.post(
   safe(ctrl.create, "create")
 );
 
+
+// POST /preventivas/reprocessar
+router.post(
+  "/reprocessar",
+  requireLogin,
+  requireRole(ACCESS.preventivas_manage),
+  safe(ctrl.reprocessarModulo, "reprocessarModulo")
+);
+
 // GET  /preventivas/:id
 router.get(
   "/:id",
@@ -83,6 +92,15 @@ router.post(
   requireLogin,
   requireRole(ACCESS.preventivas_manage),
   safe(ctrl.execUpdateStatus, "execUpdateStatus")
+);
+
+
+// POST /preventivas/:id/execucoes/:execId/apagar
+router.post(
+  "/:id/execucoes/:execId/apagar",
+  requireLogin,
+  requireRole(ACCESS.preventivas_manage),
+  safe(ctrl.apagarExecucao, "apagarExecucao")
 );
 
 module.exports = router;
