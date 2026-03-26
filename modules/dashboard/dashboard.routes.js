@@ -29,5 +29,6 @@ router.post('/avisos', requireLogin, wrap(ctrl.createAviso, 'createAviso'));
 router.get('/alertas/stream', requireLogin, wrap(ctrl.sse, 'sse'));
 router.post('/alertas/reconhecer', requireLogin, wrap(ctrl.reconhecerAlerta, 'reconhecerAlerta'));
 router.post('/push/subscribe', requireLogin, wrap(ctrl.subscribePush, 'subscribePush'));
+router.post('/preventivas/:execucaoId/iniciar', requireLogin, wrap(ctrl.iniciarPreventiva, 'iniciarPreventiva'));
 
 module.exports = router;

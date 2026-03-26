@@ -862,7 +862,7 @@ function listOS() {
   return db
     .prepare(
       `SELECT o.id,
-              o.equipamento,
+              COALESCE(e.nome, o.equipamento_manual, o.equipamento, '-') AS equipamento,
               o.tipo,
               o.status,
               ${grauExpr} AS grau,
@@ -873,6 +873,7 @@ function listOS() {
               m.name AS mecanico_nome,
               a.name AS auxiliar_nome
        FROM os o
+       LEFT JOIN equipamentos e ON e.id = o.equipamento_id
        LEFT JOIN users u ON u.id = o.opened_by
        LEFT JOIN users m ON m.id = o.mecanico_user_id
        LEFT JOIN users a ON a.id = o.auxiliar_user_id

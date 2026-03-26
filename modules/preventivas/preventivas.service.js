@@ -98,19 +98,36 @@ function listExecucoes(planoId) {
 }
 
 function createExecucao(planoId, data) {
-  const stmt = db.prepare(`
-    INSERT INTO preventiva_execucoes (
-      plano_id, data_prevista, status, responsavel, observacao
-    ) VALUES (?, ?, ?, ?, ?)
-  `);
-
-  const r = stmt.run(
+  const cols = getPreventivaExecColumns();
+  const fields = ["plano_id", "data_prevista", "status", "responsavel", "observacao"];
+  const values = [
     Number(planoId),
     (data.data_prevista || "").trim() || null,
-    String(data.status || "pendente").trim(),
+    normalizePreventivaStatus(data.status || "PENDENTE"),
     String(data.responsavel || "").trim(),
-    String(data.observacao || "").trim()
-  );
+    String(data.observacao || "").trim(),
+  ];
+
+  const extras = {
+    criticidade: data.criticidade || null,
+    responsavel_1_id: data.responsavel_1_id || null,
+    responsavel_2_id: data.responsavel_2_id || null,
+    iniciada_em: data.iniciada_em || null,
+    finalizada_em: data.finalizada_em || null,
+    iniciada_por_user_id: data.iniciada_por_user_id || null,
+  };
+
+  for (const [field, value] of Object.entries(extras)) {
+    if (!cols.includes(field)) continue;
+    fields.push(field);
+    values.push(value);
+  }
+
+  const stmt = db.prepare(`
+    INSERT INTO preventiva_execucoes (${fields.join(", ")})
+    VALUES (${fields.map(() => "?").join(", ")})
+  `);
+  const r = stmt.run(...values);
 
   return Number(r.lastInsertRowid);
 }
@@ -123,14 +140,27 @@ function updateExecucaoStatus(planoId, execId, status, dataExecutada) {
 
   if (!exec) return false;
 
+  const cols = getPreventivaExecColumns();
+  const statusNorm = normalizePreventivaStatus(status);
+  const updates = ["status = ?", "data_executada = ?"];
+  const args = [
+    statusNorm,
+    (dataExecutada || "").trim() || null,
+  ];
+
+  if (cols.includes("iniciada_em") && statusNorm === "EM_ANDAMENTO") {
+    updates.push("iniciada_em = COALESCE(iniciada_em, datetime('now'))");
+  }
+  if (cols.includes("finalizada_em") && ["CONCLUIDA", "EXECUTADA", "FINALIZADA"].includes(statusNorm)) {
+    updates.push("finalizada_em = COALESCE(finalizada_em, datetime('now'))");
+  }
+
   db.prepare(`
     UPDATE preventiva_execucoes
-    SET status = ?,
-        data_executada = ?
+    SET ${updates.join(", ")}
     WHERE id = ? AND plano_id = ?
   `).run(
-    String(status || "").trim(),
-    (dataExecutada || "").trim() || null,
+    ...args,
     Number(execId),
     Number(planoId)
   );
@@ -155,6 +185,24 @@ function getHistoricoEquipamento(equipamentoId) {
     ORDER BY id DESC
     LIMIT 20
   `).all(Number(equipamentoId));
+}
+
+function getPreventivaExecColumns() {
+  try {
+    return db.prepare(`PRAGMA table_info(preventiva_execucoes)`).all().map((c) => c.name);
+  } catch (_e) {
+    return [];
+  }
+}
+
+function normalizePreventivaStatus(status) {
+  const raw = String(status || "").trim().toUpperCase();
+  if (["PENDENTE", "EM_ANDAMENTO", "CONCLUIDA", "EXECUTADA", "FINALIZADA", "CANCELADA", "ATRASADA"].includes(raw)) return raw;
+  if (raw === "ANDAMENTO") return "EM_ANDAMENTO";
+  if (raw === "PENDENTE") return "PENDENTE";
+  if (raw === "EXECUTADA") return "EXECUTADA";
+  if (raw === "FINALIZADA") return "FINALIZADA";
+  return "PENDENTE";
 }
 
 function inferirPadraoPreventivo(equipamento = {}, historico = []) {
@@ -268,6 +316,63 @@ function formatDateISO(date) {
   return date.toISOString().slice(0, 10);
 }
 
+function gerarObservacaoPreventiva(equipamento = {}, historico = []) {
+  const nome = String(equipamento.nome || "equipamento").trim();
+  const tipo = String(equipamento.tipo || "").toLowerCase();
+  const setor = String(equipamento.setor || "").toLowerCase();
+  const recorrenciaVibracao = historico.some((h) => /vibra|ru[ií]do|folga/i.test(`${h?.descricao || ""} ${h?.causa_diagnostico || ""}`));
+  const recorrenciaVazamento = historico.some((h) => /vaza|veda|selagem/i.test(`${h?.descricao || ""} ${h?.causa_diagnostico || ""}`));
+
+  if (/(bomba|pressuriza)/.test(tipo) || /(bomba)/.test(nome.toLowerCase())) {
+    return "Inspecionar vibração, vazamentos e condições gerais da bomba. Verificar fixações, acoplamento e sinais de aquecimento.";
+  }
+  if (/(redutor|mancal|eixo|rolamento)/.test(tipo)) {
+    return "Inspecionar lubrificação, integridade do eixo, rolamentos e possíveis folgas operacionais.";
+  }
+  if (/(triturador|prensa|digestor|transportador|rosca)/.test(tipo) || /(graxaria|reciclagem)/.test(setor)) {
+    return "Executar limpeza técnica, conferência de ruído anormal, reaperto e verificação de funcionamento do conjunto.";
+  }
+
+  if (recorrenciaVibracao || recorrenciaVazamento) {
+    return `Executar inspeção técnica em ${nome}: conferir ${recorrenciaVibracao ? "vibração e ruído" : "fixações e alinhamento"}, ${recorrenciaVazamento ? "pontos de vazamento e vedação" : "condições gerais e lubrificação"} e registrar anomalias.`;
+  }
+  return `Inspecionar ${nome}: limpeza técnica, reaperto de fixações, verificação de lubrificação e teste funcional em condição operacional.`;
+}
+
+function getEscalaSemanaAtual() {
+  if (!tableExists("escala_semanas") || !tableExists("escala_alocacoes") || !tableExists("colaboradores")) return [];
+  const semana = db.prepare(`
+    SELECT id, data_inicio, data_fim
+    FROM escala_semanas
+    WHERE date('now', 'localtime') BETWEEN data_inicio AND data_fim
+    ORDER BY id DESC
+    LIMIT 1
+  `).get();
+  if (!semana) return [];
+
+  return db.prepare(`
+    SELECT c.id AS colaborador_id, c.nome, c.funcao, c.user_id, a.tipo_turno
+    FROM escala_alocacoes a
+    JOIN colaboradores c ON c.id = a.colaborador_id
+    WHERE a.semana_id = ? AND IFNULL(c.ativo,1)=1
+    ORDER BY
+      CASE a.tipo_turno WHEN 'diurno' THEN 0 WHEN 'apoio' THEN 1 WHEN 'noturno' THEN 2 ELSE 3 END,
+      c.nome ASC
+  `).all(Number(semana.id));
+}
+
+function escalarResponsaveisPreventiva(preventiva, escalaSemana = []) {
+  const criticidade = String(preventiva?.criticidade || preventiva?.equipamento_criticidade || "MEDIA").toUpperCase();
+  const quantidade = criticidade === "BAIXA" ? 1 : 2;
+  const candidatos = [...(escalaSemana || [])];
+  const escolhidos = candidatos.slice(0, Math.min(quantidade, 2));
+  return {
+    responsavel_1_id: escolhidos[0]?.user_id || null,
+    responsavel_2_id: quantidade > 1 ? (escolhidos[1]?.user_id || null) : null,
+    responsavelTexto: escolhidos.map((p) => p.nome).filter(Boolean).join(" • ") || "Equipe manutenção",
+  };
+}
+
 function addDays(date, days) {
   const d = new Date(date);
   d.setUTCDate(d.getUTCDate() + days);
@@ -281,7 +386,7 @@ function gerarCronogramaSemanalInteligente(refDate = new Date()) {
   const sunday = addDays(monday, 6);
 
   const planos = db.prepare(`
-    SELECT p.*, e.nome AS equipamento_nome, e.criticidade AS equipamento_criticidade
+    SELECT p.*, e.nome AS equipamento_nome, e.tipo AS equipamento_tipo, e.setor AS equipamento_setor, e.criticidade AS equipamento_criticidade
     FROM preventiva_planos p
     LEFT JOIN equipamentos e ON e.id = p.equipamento_id
     WHERE p.ativo = 1
@@ -297,6 +402,7 @@ function gerarCronogramaSemanalInteligente(refDate = new Date()) {
   const weekNumber = Math.floor((monday.getTime() - Date.UTC(monday.getUTCFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000));
   const alternanciaPorTipo = new Map();
 
+  const escalaSemana = getEscalaSemanaAtual();
   planos.forEach((plano, idx) => {
     const tipoKey = String(plano.equipamento_nome || plano.equipamento_criticidade || "geral").toLowerCase();
     const offsetTipo = alternanciaPorTipo.get(tipoKey) || 0;
@@ -310,11 +416,23 @@ function gerarCronogramaSemanalInteligente(refDate = new Date()) {
 
     if (jaExiste) return;
 
+    const historico = getHistoricoEquipamento(plano.equipamento_id);
+    const observacao = gerarObservacaoPreventiva(
+      { nome: plano.equipamento_nome, tipo: plano.equipamento_tipo, setor: plano.equipamento_setor },
+      historico
+    );
+    const responsaveis = escalarResponsaveisPreventiva(
+      { criticidade: plano.equipamento_criticidade },
+      escalaSemana
+    );
     createExecucao(plano.id, {
       data_prevista: prevista,
-      status: "pendente",
-      responsavel: "Equipe manutenção",
-      observacao: "Gerado automaticamente pelo cronograma inteligente semanal.",
+      status: "PENDENTE",
+      criticidade: plano.equipamento_criticidade || "MEDIA",
+      responsavel: responsaveis.responsavelTexto,
+      responsavel_1_id: responsaveis.responsavel_1_id,
+      responsavel_2_id: responsaveis.responsavel_2_id,
+      observacao,
     });
     criadas += 1;
   });
@@ -360,6 +478,9 @@ module.exports = {
   updateExecucaoStatus,
   getHistoricoEquipamento,
   inferirPadraoPreventivo,
+  normalizePreventivaStatus,
+  gerarObservacaoPreventiva,
+  escalarResponsaveisPreventiva,
   gerarPreventivasAutomaticas,
   gerarCronogramaSemanalInteligente,
   executarCicloAutonomo,
