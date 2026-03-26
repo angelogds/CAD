@@ -656,6 +656,9 @@ function podeIniciarPreventiva(user, preventiva) {
 
 function iniciarPreventiva(execucaoId, user) {
   return safeGet(() => {
+    if (typeof preventivasService?.alocarEquipeExecucaoPreventiva === "function") {
+      preventivasService.alocarEquipeExecucaoPreventiva(Number(execucaoId));
+    }
     const cols = tableExists("preventiva_execucoes")
       ? db.prepare("PRAGMA table_info(preventiva_execucoes)").all().map((c) => c.name)
       : [];

@@ -779,6 +779,59 @@ function reprocessarPreventivasComNovaEscala() {
   return reorganizarPreventivasPendentesPorEscala();
 }
 
+function alocarEquipeExecucaoPreventiva(execucaoId) {
+  if (!tableExists("preventiva_execucoes") || !tableExists("preventiva_planos")) {
+    return { ok: false, reason: "tables_missing" };
+  }
+
+  const cols = getPreventivaExecColumns();
+  const hasResp1 = cols.includes("responsavel_1_id");
+  const hasResp2 = cols.includes("responsavel_2_id");
+  const hasCriticidade = cols.includes("criticidade");
+  const hasResponsavelTxt = cols.includes("responsavel");
+  if (!hasResponsavelTxt) return { ok: false, reason: "column_missing" };
+
+  const row = db.prepare(`
+    SELECT pe.id,
+           COALESCE(pe.criticidade, e.criticidade, 'MEDIA') AS criticidade,
+           COALESCE(e.nome, pp.titulo, '-') AS equipamento_nome,
+           COALESCE(e.tipo, pp.titulo, '-') AS equipamento_tipo
+    FROM preventiva_execucoes pe
+    JOIN preventiva_planos pp ON pp.id = pe.plano_id
+    LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
+    WHERE pe.id = ?
+    LIMIT 1
+  `).get(Number(execucaoId));
+  if (!row) return { ok: false, reason: "not_found" };
+
+  const escalaSemana = getEscalaSemanaAtual();
+  const disponibilidade = getDisponibilidadeEscala();
+  const criticidade = calcularCriticidade({
+    nome: row.equipamento_nome,
+    tipo: row.equipamento_tipo,
+    criticidade: row.criticidade,
+  });
+  const aloc = montarEquipePreventiva({ criticidade }, escalaSemana, disponibilidade);
+
+  const updates = ["responsavel = ?"];
+  const args = [aloc.responsavelTexto];
+  if (hasCriticidade) {
+    updates.push("criticidade = ?");
+    args.push(criticidade);
+  }
+  if (hasResp1) {
+    updates.push("responsavel_1_id = ?");
+    args.push(aloc.responsavel_1_id);
+  }
+  if (hasResp2) {
+    updates.push("responsavel_2_id = ?");
+    args.push(aloc.responsavel_2_id);
+  }
+  args.push(Number(execucaoId));
+  db.prepare(`UPDATE preventiva_execucoes SET ${updates.join(", ")} WHERE id = ?`).run(...args);
+  return { ok: true, ...aloc };
+}
+
 function revisarCriticidadePreventivasFuturas() {
   if (!tableExists("preventiva_execucoes") || !tableExists("preventiva_planos")) return { revisadas: 0 };
   const cols = getPreventivaExecColumns();
@@ -847,6 +900,7 @@ module.exports = {
   calcularCriticidadePreventiva,
   calcularCriticidade,
   reorganizarPreventivasPendentesPorEscala,
+  alocarEquipeExecucaoPreventiva,
   reprocessarPreventivasComNovaEscala,
   revisarCriticidadePreventivasFuturas,
   contarPreventivasPorCriticidade,
