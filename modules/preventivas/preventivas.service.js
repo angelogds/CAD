@@ -27,7 +27,7 @@ function listEquipamentosAtivos() {
   return db.prepare(`
     SELECT id, codigo, nome, tipo, criticidade
     FROM equipamentos
-    WHERE ativo = 1
+    WHERE IFNULL(ativo,1) = 1
     ORDER BY nome
   `).all();
 }
@@ -49,6 +49,7 @@ function createPlano(data) {
     tipo_plano: data.tipo_plano || null,
     checklist_json: data.checklist_json ? JSON.stringify(data.checklist_json) : null,
     gerado_ia: typeof data.gerado_ia === "number" ? data.gerado_ia : null,
+    origem: data.origem || null,
   };
 
   for (const [col, value] of Object.entries(optional)) {
@@ -93,11 +94,15 @@ function listExecucoes(planoId) {
     ${hasResp2 ? "LEFT JOIN users u2 ON u2.id = pe.responsavel_2_id" : ""}
     WHERE pe.plano_id = ?
     ORDER BY
-      CASE pe.status
-        WHEN 'atrasada' THEN 1
-        WHEN 'pendente' THEN 2
-        WHEN 'executada' THEN 3
-        WHEN 'cancelada' THEN 4
+      CASE UPPER(COALESCE(pe.status,''))
+        WHEN 'ATRASADA' THEN 1
+        WHEN 'PENDENTE' THEN 2
+        WHEN 'EM_ANDAMENTO' THEN 3
+        WHEN 'ANDAMENTO' THEN 3
+        WHEN 'EXECUTADA' THEN 4
+        WHEN 'FINALIZADA' THEN 5
+        WHEN 'CONCLUIDA' THEN 5
+        WHEN 'CANCELADA' THEN 6
         ELSE 9
       END,
       COALESCE(pe.data_prevista,'9999-12-31') ASC,
@@ -132,6 +137,7 @@ function createExecucao(planoId, data) {
     iniciada_por_user_id: data.iniciada_por_user_id || null,
     finalizada_por_user_id: data.finalizada_por_user_id || null,
     duracao_minutos: data.duracao_minutos || null,
+    origem: data.origem || null,
   };
 
   for (const [field, value] of Object.entries(extras)) {
@@ -333,6 +339,7 @@ function gerarPreventivasAutomaticas() {
       tipo_plano: plano.tipo_plano,
       checklist_json: plano.checklist,
       gerado_ia: 1,
+      origem: "AUTOMATICA",
     });
     criados += 1;
   }
@@ -739,6 +746,7 @@ function gerarCronogramaSemanalInteligente(refDate = new Date()) {
       responsavel_1_id: responsaveis.responsavel_1_id,
       responsavel_2_id: responsaveis.responsavel_2_id,
       observacao,
+      origem: "AUTOMATICA",
     });
     criadas += 1;
   });
@@ -965,6 +973,158 @@ function contarPreventivasPorCriticidade(lista = []) {
   return total;
 }
 
+
+function sanitizeDateISO(value) {
+  const txt = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(txt) ? txt : null;
+}
+
+function registrarLogPreventiva({ acao, preventiva_execucao_id = null, preventiva_plano_id = null, user = null, detalhes = null }) {
+  if (!tableExists("preventiva_logs")) return;
+  try {
+    db.prepare(`
+      INSERT INTO preventiva_logs (preventiva_execucao_id, preventiva_plano_id, acao, usuario_id, usuario_nome, detalhes_json)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      preventiva_execucao_id ? Number(preventiva_execucao_id) : null,
+      preventiva_plano_id ? Number(preventiva_plano_id) : null,
+      String(acao || "ACAO_DESCONHECIDA").trim().toUpperCase(),
+      Number(user?.id || 0) || null,
+      String(user?.name || "").trim() || null,
+      detalhes ? JSON.stringify(detalhes) : null
+    );
+  } catch (_e) {}
+}
+
+function criarPreventivaManual(data = {}) {
+  const equipamentoId = Number(data.equipamento_id || 0);
+  if (!equipamentoId) throw new Error("Equipamento obrigatório para preventiva manual.");
+
+  const equipamento = db.prepare(`SELECT id, nome, tipo, criticidade FROM equipamentos WHERE id = ? AND IFNULL(ativo,1)=1 LIMIT 1`).get(equipamentoId);
+  if (!equipamento) throw new Error("Equipamento inválido/inativo para preventiva manual.");
+
+  const dataPrevista = sanitizeDateISO(data.data_prevista);
+  if (!dataPrevista) throw new Error("Data prevista inválida.");
+
+  const tipoPlano = String(data.tipo_preventiva || "preventiva").trim().toLowerCase();
+  const criticidade = normalizeCriticidade(data.criticidade || equipamento.criticidade || "MEDIA");
+  const planoId = createPlano({
+    equipamento_id: equipamentoId,
+    titulo: String(data.titulo || "").trim(),
+    frequencia_tipo: String(data.frequencia_tipo || "mensal").trim().toLowerCase(),
+    frequencia_valor: Number(data.frequencia_valor || 1),
+    ativo: true,
+    observacao: String(data.observacao || "").trim(),
+    prioridade: criticidade,
+    tipo_plano: tipoPlano,
+    origem: "MANUAL",
+    gerado_ia: 0,
+  });
+
+  const execucaoId = createExecucao(planoId, {
+    data_prevista: dataPrevista,
+    status: "PENDENTE",
+    criticidade,
+    responsavel: "",
+    observacao: String(data.observacao || "").trim(),
+    origem: "MANUAL",
+  });
+
+  alocarEquipeExecucaoPreventiva(execucaoId);
+  registrarLogPreventiva({
+    acao: "PREVENTIVA_MANUAL_CRIADA",
+    preventiva_execucao_id: execucaoId,
+    preventiva_plano_id: planoId,
+    user: data.user || null,
+    detalhes: { equipamento_id: equipamentoId, criticidade, data_prevista: dataPrevista, tipo_plano: tipoPlano },
+  });
+
+  return { planoId, execucaoId };
+}
+
+function auditarLeituraEquipamentosPreventivas() {
+  const base = {
+    equipamentosElegiveis: 0,
+    equipamentosInativos: 0,
+    equipamentosSemPlano: 0,
+    planosAtivos: 0,
+    planosSemEquipamento: 0,
+    execucoesPendentes: 0,
+  };
+  if (!tableExists("equipamentos") || !tableExists("preventiva_planos") || !tableExists("preventiva_execucoes")) return base;
+
+  const equipamentos = db.prepare(`SELECT id, IFNULL(ativo,1) AS ativo FROM equipamentos`).all();
+  const ativos = equipamentos.filter((e) => Number(e.ativo || 0) === 1);
+  base.equipamentosElegiveis = ativos.length;
+  base.equipamentosInativos = equipamentos.length - ativos.length;
+
+  const planos = db.prepare(`SELECT id, equipamento_id, IFNULL(ativo,1) AS ativo FROM preventiva_planos`).all();
+  const planosAtivos = planos.filter((p) => Number(p.ativo || 0) === 1);
+  base.planosAtivos = planosAtivos.length;
+  base.planosSemEquipamento = planosAtivos.filter((p) => !Number(p.equipamento_id || 0)).length;
+
+  const planoPorEquip = new Set(planosAtivos.map((p) => Number(p.equipamento_id || 0)).filter(Boolean));
+  base.equipamentosSemPlano = ativos.filter((e) => !planoPorEquip.has(Number(e.id))).length;
+
+  const pend = db.prepare(`
+    SELECT COUNT(*) AS total
+    FROM preventiva_execucoes
+    WHERE UPPER(COALESCE(status,'')) IN ('PENDENTE','ATRASADA','EM_ANDAMENTO','ANDAMENTO')
+  `).get();
+  base.execucoesPendentes = Number(pend?.total || 0);
+
+  return base;
+}
+
+function reprocessarModuloPreventivas({ user = null } = {}) {
+  const auditoria = auditarLeituraEquipamentosPreventivas();
+  const autoPlanos = gerarPreventivasAutomaticas();
+  const autoCronograma = gerarCronogramaSemanalInteligente(new Date());
+  const reorganizacao = reorganizarPreventivasPendentesPorEscala();
+  const revisaoCriticidade = revisarCriticidadePreventivasFuturas();
+
+  registrarLogPreventiva({
+    acao: "PREVENTIVAS_REPROCESSADAS",
+    user,
+    detalhes: { auditoria, autoPlanos, autoCronograma, reorganizacao, revisaoCriticidade },
+  });
+
+  return { auditoria, autoPlanos, autoCronograma, reorganizacao, revisaoCriticidade };
+}
+
+function apagarPreventivaExecucao({ planoId, execucaoId, user = null, forcar = false }) {
+  if (!tableExists("preventiva_execucoes")) return { ok: false, message: "Tabela de preventivas não encontrada." };
+  const row = db.prepare(`
+    SELECT id, plano_id, status, origem
+    FROM preventiva_execucoes
+    WHERE id = ? AND plano_id = ?
+    LIMIT 1
+  `).get(Number(execucaoId), Number(planoId));
+  if (!row) return { ok: false, message: "Preventiva não encontrada para este plano." };
+
+  const status = normalizePreventivaStatus(row.status);
+  const role = String(user?.role || "").toUpperCase();
+  const isAdmin = role === "ADMIN";
+
+  if (["FINALIZADA", "EXECUTADA", "CONCLUIDA"].includes(status) && !isAdmin) {
+    return { ok: false, message: "Preventiva finalizada só pode ser apagada por ADMIN." };
+  }
+  if (["EM_ANDAMENTO", "ANDAMENTO"].includes(status) && !forcar) {
+    return { ok: false, message: "Preventiva em andamento exige confirmação reforçada para exclusão." };
+  }
+
+  db.prepare(`DELETE FROM preventiva_execucoes WHERE id = ? AND plano_id = ?`).run(Number(execucaoId), Number(planoId));
+  registrarLogPreventiva({
+    acao: "PREVENTIVA_EXCLUIDA",
+    preventiva_execucao_id: Number(execucaoId),
+    preventiva_plano_id: Number(planoId),
+    user,
+    detalhes: { status, origem: row.origem || null, forcar: Boolean(forcar) },
+  });
+  return { ok: true };
+}
+
+
 module.exports = {
   listPlanos,
   listEquipamentosAtivos,
@@ -993,4 +1153,9 @@ module.exports = {
   gerarPreventivasAutomaticas,
   gerarCronogramaSemanalInteligente,
   executarCicloAutonomo,
+  criarPreventivaManual,
+  auditarLeituraEquipamentosPreventivas,
+  reprocessarModuloPreventivas,
+  apagarPreventivaExecucao,
+  registrarLogPreventiva,
 };

@@ -1,15 +1,24 @@
 const service = require("./preventivas.service");
 
+function isAdminOrEncarregado(user = null) {
+  const role = String(user?.role || "").toUpperCase();
+  return ["ADMIN", "MANUTENCAO_SUPERVISOR", "SUPERVISOR_MANUTENCAO", "ENCARREGADO_MANUTENCAO"].includes(role);
+}
+
 function index(req, res) {
   const ciclo = service.executarCicloAutonomo(new Date());
   console.log("[PREVENTIVA_IA] ciclo autônomo", ciclo);
 
   const lista = service.listPlanos();
+  const diagnosticoLeitura = service.auditarLeituraEquipamentosPreventivas();
   return res.render("preventivas/index", {
     layout: "layout",
     title: "Preventivas",
     activeMenu: "preventivas",
-    lista
+    lista,
+    diagnosticoLeitura,
+    tvMode: ["1", "true", "tv"].includes(String(req.query.tv || "").toLowerCase()),
+    canAdminPreventivas: isAdminOrEncarregado(req.session?.user || null),
   });
 }
 
@@ -19,29 +28,49 @@ function newForm(req, res) {
     layout: "layout",
     title: "Nova Preventiva",
     activeMenu: "preventivas",
-    equipamentos
+    equipamentos,
   });
 }
 
 function create(req, res) {
-  const { equipamento_id, titulo, frequencia_tipo, frequencia_valor, observacao } = req.body;
+  const {
+    equipamento_id,
+    titulo,
+    tipo_preventiva,
+    criticidade,
+    data_prevista,
+    frequencia_tipo,
+    frequencia_valor,
+    observacao,
+  } = req.body;
 
+  if (!equipamento_id || !Number(equipamento_id)) {
+    req.flash("error", "Selecione o equipamento da preventiva manual.");
+    return res.redirect("/preventivas/nova");
+  }
   if (!titulo || !titulo.trim()) {
     req.flash("error", "Informe o título da preventiva.");
     return res.redirect("/preventivas/nova");
   }
+  if (!data_prevista || !String(data_prevista).trim()) {
+    req.flash("error", "Informe a data prevista da preventiva.");
+    return res.redirect("/preventivas/nova");
+  }
 
-  const id = service.createPlano({
-    equipamento_id: equipamento_id ? Number(equipamento_id) : null,
+  const result = service.criarPreventivaManual({
+    equipamento_id: Number(equipamento_id),
     titulo: titulo.trim(),
+    tipo_preventiva: String(tipo_preventiva || "preventiva").trim(),
+    criticidade: String(criticidade || "MEDIA").trim(),
+    data_prevista: String(data_prevista || "").trim(),
     frequencia_tipo: (frequencia_tipo || "mensal").trim(),
     frequencia_valor: frequencia_valor ? Number(String(frequencia_valor).replace(",", ".")) : 1,
-    ativo: true,
-    observacao: (observacao || "").trim()
+    observacao: (observacao || "").trim(),
+    user: req.session?.user || null,
   });
 
-  req.flash("success", "Preventiva criada com sucesso.");
-  return res.redirect(`/preventivas/${id}`);
+  req.flash("success", `Preventiva manual criada com sucesso (execução #${result.execucaoId}).`);
+  return res.redirect(`/preventivas/${result.planoId}`);
 }
 
 function show(req, res) {
@@ -59,7 +88,8 @@ function show(req, res) {
     title: `Preventiva #${id}`,
     activeMenu: "preventivas",
     plano,
-    execucoes
+    execucoes,
+    canAdminPreventivas: isAdminOrEncarregado(req.session?.user || null),
   });
 }
 
@@ -69,11 +99,19 @@ function execCreate(req, res) {
 
   const execId = service.createExecucao(planoId, {
     data_prevista: (data_prevista || "").trim(),
-    status: "pendente",
+    status: "PENDENTE",
+    origem: "MANUAL",
     responsavel: "",
-    observacao: (observacao || "").trim()
+    observacao: (observacao || "").trim(),
   });
   service.alocarEquipeExecucaoPreventiva(execId);
+  service.registrarLogPreventiva({
+    acao: "PREVENTIVA_MANUAL_EXECUCAO_ADICIONADA",
+    preventiva_execucao_id: execId,
+    preventiva_plano_id: planoId,
+    user: req.session?.user || null,
+    detalhes: { data_prevista: (data_prevista || "").trim() || null },
+  });
 
   req.flash("success", "Execução adicionada.");
   return res.redirect(`/preventivas/${planoId}`);
@@ -100,4 +138,47 @@ function execUpdateStatus(req, res) {
   return res.redirect(`/preventivas/${planoId}`);
 }
 
-module.exports = { index, newForm, create, show, execCreate, execUpdateStatus };
+function reprocessarModulo(req, res) {
+  const user = req.session?.user || null;
+  if (!isAdminOrEncarregado(user)) {
+    req.flash("error", "Sem permissão para reprocessar preventivas.");
+    return res.redirect("/preventivas");
+  }
+
+  const result = service.reprocessarModuloPreventivas({ user });
+  req.flash(
+    "success",
+    `Preventivas reprocessadas. Equipamentos elegíveis: ${result.auditoria?.equipamentosElegiveis || 0}, ` +
+      `planos ativos: ${result.auditoria?.planosAtivos || 0}, execuções sincronizadas: ${result.reorganizacao?.atualizadas || 0}.`
+  );
+  return res.redirect("/preventivas");
+}
+
+function apagarExecucao(req, res) {
+  const user = req.session?.user || null;
+  if (!isAdminOrEncarregado(user)) {
+    req.flash("error", "Sem permissão para apagar preventiva.");
+    return res.redirect("/preventivas");
+  }
+
+  const planoId = Number(req.params.id);
+  const execId = Number(req.params.execId);
+  const forcar = ["1", "true", "sim"].includes(String(req.body.force_delete || "").toLowerCase());
+
+  const result = service.apagarPreventivaExecucao({
+    planoId,
+    execucaoId: execId,
+    user,
+    forcar,
+  });
+
+  if (!result.ok) {
+    req.flash("error", result.message || "Não foi possível apagar a preventiva.");
+    return res.redirect(`/preventivas/${planoId}`);
+  }
+
+  req.flash("success", `Preventiva #${execId} apagada com sucesso.`);
+  return res.redirect(`/preventivas/${planoId}`);
+}
+
+module.exports = { index, newForm, create, show, execCreate, execUpdateStatus, reprocessarModulo, apagarExecucao };

@@ -76,13 +76,14 @@
           <th>Prevista</th>
           <th>Executada</th>
           <th>Status</th>
+          <th>Origem</th>
           <th>Responsável</th>
           <th>Ação</th>
         </tr>
       </thead>
       <tbody>
         <% if (!execucoes?.length) { %>
-          <tr><td colspan="6" class="muted">Nenhuma execução registrada.</td></tr>
+          <tr><td colspan="7" class="muted">Nenhuma execução registrada.</td></tr>
         <% } %>
 
         <% (execucoes || []).forEach(ex => { %>
@@ -91,24 +92,33 @@
             <td><%= ex.data_prevista || "-" %></td>
             <td><%= ex.data_executada || "-" %></td>
             <td><span class="pill"><%= (ex.status || "").toUpperCase() %></span></td>
+            <td><span class="pill"><%= (ex.origem || "AUTOMATICA").toUpperCase() %></span></td>
             <td class="muted"><%= ex.responsavel_exibicao || ex.responsavel || "-" %></td>
             <td>
               <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/status" class="row" style="margin:0;">
                 <select name="status" style="width:160px">
-                  <option value="pendente" <%= ex.status === "pendente" ? "selected" : "" %>>pendente</option>
-                  <option value="executada" <%= ex.status === "executada" ? "selected" : "" %>>executada</option>
-                  <option value="atrasada" <%= ex.status === "atrasada" ? "selected" : "" %>>atrasada</option>
-                  <option value="cancelada" <%= ex.status === "cancelada" ? "selected" : "" %>>cancelada</option>
+                  <option value="pendente" <%= String(ex.status||"").toUpperCase() === "PENDENTE" ? "selected" : "" %>>pendente</option>
+                  <option value="executada" <%= String(ex.status||"").toUpperCase() === "EXECUTADA" ? "selected" : "" %>>executada</option>
+                  <option value="atrasada" <%= String(ex.status||"").toUpperCase() === "ATRASADA" ? "selected" : "" %>>atrasada</option>
+                  <option value="cancelada" <%= String(ex.status||"").toUpperCase() === "CANCELADA" ? "selected" : "" %>>cancelada</option>
                 </select>
                 <input name="data_executada" type="date" value="<%= ex.data_executada || '' %>" style="width:170px" />
                 <button class="btn" type="submit" style="height:40px">Salvar</button>
               </form>
+              <% if (canAdminPreventivas) { const stat = String(ex.status||'').toUpperCase(); const reforco = stat === 'EM_ANDAMENTO' ? '\nEsta preventiva está EM_ANDAMENTO e exigirá confirmação reforçada.' : ''; %>
+                <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/apagar" style="display:inline;" onsubmit="return confirm('Confirmar exclusão da preventiva #<%= ex.id %>?'+ '<%- reforco %>');">
+                  <% if (stat === 'EM_ANDAMENTO' || stat === 'ANDAMENTO' || stat === 'FINALIZADA' || stat === 'EXECUTADA' || stat === 'CONCLUIDA') { %>
+                    <input type="hidden" name="force_delete" value="1" />
+                  <% } %>
+                  <button class="btn" type="submit" style="height:40px;border-color:#fecaca;color:#b91c1c;">Apagar</button>
+                </form>
+              <% } %>
             </td>
           </tr>
           <% if (ex.observacao) { %>
             <tr>
               <td></td>
-              <td colspan="5" class="muted">Obs: <%= ex.observacao %></td>
+              <td colspan="6" class="muted">Obs: <%= ex.observacao %></td>
             </tr>
           <% } %>
         <% }) %>
