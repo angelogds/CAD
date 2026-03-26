@@ -386,6 +386,11 @@ function isMecanico(funcao) {
   return normalizeTxt(funcao).includes("mecan");
 }
 
+function isAuxiliarOuApoio(funcao) {
+  const n = normalizeTxt(funcao);
+  return n.includes("auxiliar") || n.includes("apoio");
+}
+
 function getTurnoAtual() {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo",
@@ -397,7 +402,55 @@ function getTurnoAtual() {
   const hora = Number(data.hour || 0);
   const minuto = Number(data.minute || 0);
   const mins = (hora * 60) + minuto;
-  return mins >= (18 * 60) || mins < (6 * 60) ? "NOITE" : "DIA";
+  return mins >= (19 * 60) || mins < (6 * 60) ? "NOITE" : "DIA";
+}
+
+function getHojeBrasilISO() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${map.year}-${map.month}-${map.day}`;
+}
+
+function parseResponsaveisConfig(valor) {
+  const ids = String(valor || "")
+    .split(",")
+    .map((v) => Number(v.trim()))
+    .filter(Boolean);
+  return { responsavel_1_id: ids[0] || null, responsavel_2_id: ids[1] || null };
+}
+
+function escolherPorRotacao(lista = [], configKeyUltimo = "") {
+  const candidatos = [...(lista || [])]
+    .filter((c) => Number(c?.user_id || 0))
+    .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+  if (!candidatos.length) return null;
+  const ultimoId = Number(getConfig(configKeyUltimo) || 0) || null;
+  const idx = ultimoId ? candidatos.findIndex((c) => Number(c.user_id) === ultimoId) : -1;
+  const escolhido = idx >= 0 ? (candidatos[idx + 1] || candidatos[0]) : candidatos[0];
+  setConfig(configKeyUltimo, Number(escolhido.user_id));
+  return escolhido;
+}
+
+function montarResponsaveisRetorno(escalaSemana = [], responsavel_1_id = null, responsavel_2_id = null) {
+  const mapaNomes = new Map(
+    (escalaSemana || [])
+      .filter((p) => Number(p?.user_id || 0))
+      .map((p) => [Number(p.user_id), String(p.nome || "").trim()])
+  );
+  const ids = [Number(responsavel_1_id || 0), Number(responsavel_2_id || 0)].filter(Boolean);
+  const nomes = ids.map((id) => mapaNomes.get(id)).filter(Boolean);
+  return {
+    responsavel_1_id: ids[0] || null,
+    responsavel_2_id: ids[1] || null,
+    responsavelTexto: nomes.join(", ") || "-",
+    responsavelIds: ids,
+    responsavelNomes: nomes,
+  };
 }
 
 
@@ -512,31 +565,41 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
     if (!userKey) return true;
     return !indisponiveis.has(userKey);
   });
-  const mecanico = elegiveis.find((p) => p.tipo_turno === "diurno" && isMecanico(p.funcao)) || null;
-  const apoio = elegiveis.find((p) => p.tipo_turno === "apoio" && Number(p.user_id || 0) !== Number(mecanico?.user_id || 0)) || null;
-  const escolhidos = [mecanico, apoio].filter(Boolean).slice(0, 2);
+  const turnoAtual = getTurnoAtual();
+  const hoje = getHojeBrasilISO();
+  const cacheKey = `preventiva_equipe_${turnoAtual}_${hoje}`;
 
-  const ids = [];
-  const nomes = [];
-  escolhidos.forEach((p) => {
-    if (!p) return;
-    const nome = String(p.nome || "").trim();
-    if (nome && !nomes.includes(nome)) nomes.push(nome);
-    const userId = Number(p.user_id || 0);
-    if (userId && !ids.includes(userId)) ids.push(userId);
-  });
-
-  if (ids.length) {
+  const salvaEquipe = (resp1 = null, resp2 = null) => {
+    const ids = [Number(resp1 || 0), Number(resp2 || 0)].filter(Boolean);
     setConfig(cacheKey, ids.join(","));
+    return montarResponsaveisRetorno(elegiveis, ids[0] || null, ids[1] || null);
+  };
+
+  const cacheExistente = parseResponsaveisConfig(getConfig(cacheKey));
+  if (cacheExistente.responsavel_1_id) {
+    const idsEscalados = new Set(elegiveis.map((p) => Number(p.user_id || 0)).filter(Boolean));
+    const resp1Ok = idsEscalados.has(Number(cacheExistente.responsavel_1_id));
+    const resp2Ok = cacheExistente.responsavel_2_id ? idsEscalados.has(Number(cacheExistente.responsavel_2_id)) : true;
+    if (resp1Ok && resp2Ok) {
+      return montarResponsaveisRetorno(elegiveis, cacheExistente.responsavel_1_id, cacheExistente.responsavel_2_id);
+    }
   }
 
-  return {
-    responsavel_1_id: ids[0] || null,
-    responsavel_2_id: ids[1] || null,
-    responsavelTexto: nomes.join(", ") || "-",
-    responsavelIds: ids,
-    responsavelNomes: nomes,
-  };
+  if (turnoAtual === "NOITE") {
+    const mecanicoNoite = elegiveis.find((p) =>
+      ["plantao", "noturno"].includes(normalizeTxt(p.tipo_turno)) && isMecanico(p.funcao)
+    ) || null;
+    return salvaEquipe(mecanicoNoite?.user_id || null, null);
+  }
+
+  const mecanicosDia = elegiveis.filter((p) => normalizeTxt(p.tipo_turno) === "diurno" && isMecanico(p.funcao));
+  const auxiliaresDia = elegiveis.filter((p) => normalizeTxt(p.tipo_turno) === "apoio" && isAuxiliarOuApoio(p.funcao));
+  const mecanico = escolherPorRotacao(mecanicosDia, "preventiva_dia_ultimo_mecanico_user_id");
+  const auxiliar = escolherPorRotacao(
+    auxiliaresDia.filter((p) => Number(p.user_id || 0) !== Number(mecanico?.user_id || 0)),
+    "preventiva_dia_ultimo_auxiliar_user_id"
+  );
+  return salvaEquipe(mecanico?.user_id || null, auxiliar?.user_id || null);
 }
 
 function escalarResponsaveisPreventiva(preventiva, escalaSemana = []) {
