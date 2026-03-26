@@ -118,7 +118,6 @@
   var preventivasItems = safePreventivas.items || [];
   var preventivasResumo = safePreventivas.resumo || {};
   var preventivasCrit = safePreventivas.criticidade || {};
-  var preventivasEmAndamentoLista = preventivasEmAndamento || [];
   var alertaInicial = alertaAtivo || null;
   var counters = operationalCounters || { osAbertas: 0, osCriticas: 0, preventivasHoje: 0 };
   var saudacao = (new Date().getHours() < 12) ? "Bom dia" : (new Date().getHours() < 18 ? "Boa tarde" : "Boa noite");
@@ -220,7 +219,7 @@
       <span class="pill-tag pill-red">Crítica: <%= preventivasCrit.CRITICA || 0 %></span>
     </div>
     <% if (preventivasItems.length === 0) { %><p class="muted" style="margin:0;">Nenhuma preventiva ativa.</p><% } else { %>
-      <div class="table-wrap"><table class="table compact"><thead><tr><th>#</th><th>Equipamento</th><th>Responsável(is)</th><th>Data prevista</th><th>Criticidade</th><th>Status</th><th>Observação</th><th style="text-align:right;">Ações</th></tr></thead><tbody>
+      <div class="table-wrap"><table class="table compact"><thead><tr><th>#</th><th>Equipamento</th><th>Responsável(is)</th><th>Data prevista</th><th>Criticidade</th><th>Status</th><th style="text-align:right;">Ações</th></tr></thead><tbody>
       <% preventivasItems.forEach(function(p) { var critic = String(p.criticidade || 'MEDIA').toUpperCase(); var stat = String(p.status || '').toUpperCase(); %>
         <tr class="<%= critic === 'CRITICA' ? 'os-row-critico' : (critic === 'ALTA' ? 'os-row-medio' : 'os-row-leve') %>">
           <td>#<%= p.id %></td>
@@ -229,7 +228,6 @@
           <td><%= p.data_prevista || '-' %></td>
           <td><span class="pill-tag <%= critic === 'CRITICA' ? 'pill-red' : (critic === 'ALTA' ? 'pill-amber' : (critic === 'MEDIA' ? 'pill-blue' : 'pill-green')) %>"><%= critic %></span></td>
           <td><span class="pill-tag <%= stat === 'EM_ANDAMENTO' ? 'pill-blue' : (stat === 'PENDENTE' ? 'pill-amber' : 'pill-gray') %>"><%= stat %></span></td>
-          <td style="max-width:360px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="<%= p.observacao || '-' %>"><%= p.observacao || '-' %></td>
           <td style="text-align:right;">
             <% var roleNorm = String(user?.role || '').toUpperCase(); var podeIniciar = roleNorm === 'ADMIN' || roleNorm === 'MANUTENCAO_SUPERVISOR' || roleNorm === 'SUPERVISOR_MANUTENCAO' || roleNorm === 'ENCARREGADO_MANUTENCAO' || Number(p.responsavel_1_id || 0) === Number(user?.id || 0) || Number(p.responsavel_2_id || 0) === Number(user?.id || 0); %>
             <% if (stat === 'PENDENTE' && podeIniciar) { %>
@@ -282,24 +280,6 @@
                 <span class="pill-tag pill-gray"><%= o.status || '-' %></span>
               <% } %>
             </td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table></div>
-  </section>
-
-  <section class="dashboard-card area-andamento-prev">
-    <div class="dashboard-title">Preventivas em andamento (equipe)</div>
-    <div class="table-wrap"><table class="table compact">
-      <thead><tr><th>Preventiva</th><th>Equipamento</th><th>Equipe</th><th>Status</th></tr></thead>
-      <tbody>
-        <% if (preventivasEmAndamentoLista.length === 0) { %><tr><td colspan="4" class="muted-xs">Nenhuma preventiva em andamento no momento.</td></tr><% } %>
-        <% preventivasEmAndamentoLista.forEach(function(p){ %>
-          <tr>
-            <td>#<%= p.id %></td>
-            <td><%= p.equipamento || '-' %></td>
-            <td><%= p.equipe || '-' %></td>
-            <td><span class="pill-tag pill-blue"><%= (p.status || 'EM_ANDAMENTO').toUpperCase() %></span></td>
           </tr>
         <% }) %>
       </tbody>

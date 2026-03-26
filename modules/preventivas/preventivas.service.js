@@ -361,15 +361,87 @@ function getEscalaSemanaAtual() {
   `).all(Number(semana.id));
 }
 
+function normalizeTxt(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function isMecanico(funcao) {
+  return normalizeTxt(funcao).includes("mecan");
+}
+
+function calcularCriticidade(equipamento = {}) {
+  const tipo = String(equipamento.tipo || equipamento.nome || "").trim();
+  if (!tipo) return "MEDIA";
+
+  const tipoNorm = normalizeTxt(tipo);
+  const quantidadeAtivosMesmoTipo = Number(
+    db
+      .prepare(
+        `
+      SELECT COUNT(*) AS total
+      FROM equipamentos
+      WHERE IFNULL(ativo,1)=1
+        AND lower(trim(COALESCE(tipo, nome, ''))) = lower(trim(?))
+    `
+      )
+      .get(tipo)?.total || 0
+  );
+
+  if (quantidadeAtivosMesmoTipo <= 1) {
+    const criticoProcesso =
+      tipoNorm.includes("digestor") ||
+      tipoNorm.includes("caldeira") ||
+      tipoNorm.includes("processo critico") ||
+      normalizeTxt(equipamento.criticidade).includes("critica");
+    return criticoProcesso ? "CRITICA" : "ALTA";
+  }
+  if (quantidadeAtivosMesmoTipo <= 3) return "MEDIA";
+  return "BAIXA";
+}
+
 function escalarResponsaveisPreventiva(preventiva, escalaSemana = []) {
-  const criticidade = String(preventiva?.criticidade || preventiva?.equipamento_criticidade || "MEDIA").toUpperCase();
-  const quantidade = criticidade === "BAIXA" ? 1 : 2;
-  const candidatos = [...(escalaSemana || [])];
-  const escolhidos = candidatos.slice(0, Math.min(quantidade, 2));
+  const criticidade = String(preventiva?.criticidade || preventiva?.equipamento_criticidade || "MEDIA")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+
+  const diurnoMecanicos = (escalaSemana || []).filter((p) => p.tipo_turno === "diurno" && isMecanico(p.funcao));
+  const apoioOperacional = (escalaSemana || []).filter((p) => p.tipo_turno === "apoio");
+  const responsavelNoite =
+    (escalaSemana || []).find((p) => p.tipo_turno === "plantao" && isMecanico(p.funcao)) ||
+    (escalaSemana || []).find((p) => p.tipo_turno === "noturno" && isMecanico(p.funcao)) ||
+    (escalaSemana || []).find((p) => p.tipo_turno === "noturno") ||
+    null;
+
+  let escolhidos = [];
+  if (criticidade === "BAIXA") {
+    escolhidos = diurnoMecanicos.slice(0, 1);
+  } else if (criticidade === "MEDIA") {
+    escolhidos = diurnoMecanicos.slice(0, 2);
+  } else if (criticidade === "ALTA") {
+    escolhidos = [diurnoMecanicos[0], apoioOperacional[0]].filter(Boolean);
+  } else if (criticidade === "CRITICA") {
+    escolhidos = [responsavelNoite, diurnoMecanicos[0]].filter(Boolean);
+  }
+
+  if (!escolhidos.length) escolhidos = [...(escalaSemana || [])].slice(0, 2);
+
+  const nomes = [];
+  const ids = [];
+  escolhidos.forEach((p) => {
+    if (!p) return;
+    if (p.nome) nomes.push(String(p.nome).trim());
+    if (p.user_id && !ids.includes(Number(p.user_id))) ids.push(Number(p.user_id));
+  });
+
   return {
-    responsavel_1_id: escolhidos[0]?.user_id || null,
-    responsavel_2_id: quantidade > 1 ? (escolhidos[1]?.user_id || null) : null,
-    responsavelTexto: escolhidos.map((p) => p.nome).filter(Boolean).join(" • ") || "Equipe manutenção",
+    responsavel_1_id: ids[0] || null,
+    responsavel_2_id: ids[1] || null,
+    responsavelTexto: nomes.slice(0, 2).join(", ") || "-",
   };
 }
 
@@ -421,14 +493,16 @@ function gerarCronogramaSemanalInteligente(refDate = new Date()) {
       { nome: plano.equipamento_nome, tipo: plano.equipamento_tipo, setor: plano.equipamento_setor },
       historico
     );
-    const responsaveis = escalarResponsaveisPreventiva(
-      { criticidade: plano.equipamento_criticidade },
-      escalaSemana
-    );
+    const criticidadeCalculada = calcularCriticidade({
+      tipo: plano.equipamento_tipo,
+      nome: plano.equipamento_nome,
+      criticidade: plano.equipamento_criticidade,
+    });
+    const responsaveis = escalarResponsaveisPreventiva({ criticidade: criticidadeCalculada }, escalaSemana);
     createExecucao(plano.id, {
       data_prevista: prevista,
       status: "PENDENTE",
-      criticidade: plano.equipamento_criticidade || "MEDIA",
+      criticidade: criticidadeCalculada,
       responsavel: responsaveis.responsavelTexto,
       responsavel_1_id: responsaveis.responsavel_1_id,
       responsavel_2_id: responsaveis.responsavel_2_id,
@@ -480,7 +554,9 @@ module.exports = {
   inferirPadraoPreventivo,
   normalizePreventivaStatus,
   gerarObservacaoPreventiva,
+  getEscalaSemanaAtual,
   escalarResponsaveisPreventiva,
+  calcularCriticidade,
   gerarPreventivasAutomaticas,
   gerarCronogramaSemanalInteligente,
   executarCicloAutonomo,
