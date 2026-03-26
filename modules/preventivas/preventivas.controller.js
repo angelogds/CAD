@@ -147,13 +147,23 @@ async function reprocessarModulo(req, res) {
 
   try {
     const result = await service.reprocessarModuloPreventivas({ user });
+    const pre = result.prevalidacao || {};
+    const alertas = Array.isArray(pre.alertas) ? pre.alertas : [];
+    const prefixo = alertas.length
+      ? `Reprocesso concluído com alertas de pré-validação (${alertas.length}). `
+      : "Preventivas reprocessadas e equipes atualizadas com sucesso. ";
     req.flash(
       "success",
-      `Preventivas reprocessadas e equipes atualizadas com sucesso. ` +
+      prefixo +
+        `Semana ativa: ${pre.semanaAtiva ? "SIM" : "NÃO"}, ` +
+        `turnos (D/A/N): ${pre.colaboradoresTurno?.diurno || 0}/${pre.colaboradoresTurno?.apoio || 0}/${pre.colaboradoresTurno?.noturnoPlantao || 0}, ` +
         `Equipamentos elegíveis: ${result.auditoria?.equipamentosElegiveis || 0}, ` +
         `planos ativos: ${result.auditoria?.planosAtivos || 0}, ` +
-        `execuções sincronizadas: ${result.reorganizacao?.atualizadas || 0}.`
+        `execuções sincronizadas/atualizadas: ${result.reorganizacao?.atualizadas || 0}.`
     );
+    if (alertas.length) {
+      req.flash("error", `Pré-validação: ${alertas.join(" | ")}`);
+    }
   } catch (err) {
     console.error("[PREVENTIVAS][REPROCESSAR] erro ao reprocessar módulo:", err?.stack || err);
     req.flash("error", "Erro ao reprocessar preventivas. Verifique os logs.");

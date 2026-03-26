@@ -844,6 +844,9 @@ function reorganizarPreventivasPendentesPorEscala() {
   const rows = db.prepare(`
     SELECT pe.id,
            pe.status,
+           COALESCE(pe.responsavel, '') AS responsavel,
+           ${hasResp1 ? "pe.responsavel_1_id" : "NULL"} AS responsavel_1_id,
+           ${hasResp2 ? "pe.responsavel_2_id" : "NULL"} AS responsavel_2_id,
            COALESCE(e.nome, pp.titulo, '-') AS equipamento_nome,
            COALESCE(e.tipo, pp.titulo, '-') AS equipamento_tipo,
            COALESCE(pe.criticidade, e.criticidade, 'MEDIA') AS criticidade,
@@ -853,12 +856,21 @@ function reorganizarPreventivasPendentesPorEscala() {
     FROM preventiva_execucoes pe
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
-    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE')
+    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA','EM_ANDAMENTO','ANDAMENTO')
   `).all();
   const disponibilidade = getDisponibilidadeEscala();
 
   let atualizadas = 0;
   for (const item of rows) {
+    const statusAtual = normalizePreventivaStatus(item.status);
+    const possuiResponsavel =
+      Boolean(String(item.responsavel || "").trim()) ||
+      Number(item.responsavel_1_id || 0) > 0 ||
+      Number(item.responsavel_2_id || 0) > 0;
+    if (["EM_ANDAMENTO", "ANDAMENTO"].includes(statusAtual) && possuiResponsavel) {
+      continue;
+    }
+
     const criticidade = calcularCriticidade({ nome: item.equipamento_nome, tipo: item.equipamento_tipo, criticidade: item.criticidade });
     const aloc = montarEquipePreventiva({
       criticidade,
@@ -1103,14 +1115,93 @@ function auditarLeituraEquipamentosPreventivas() {
   return base;
 }
 
+function prevalidarReprocessamentoPreventivas() {
+  const base = {
+    semanaAtiva: false,
+    semanaId: null,
+    colaboradoresTurno: {
+      diurno: 0,
+      apoio: 0,
+      noturnoPlantao: 0,
+    },
+    execucoesPendentes: {
+      pendente: 0,
+      atrasada: 0,
+      emAndamento: 0,
+      total: 0,
+    },
+    prontoParaReprocesso: false,
+    alertas: [],
+  };
+
+  if (tableExists("escala_semanas")) {
+    const semana = db.prepare(`
+      SELECT id
+      FROM escala_semanas
+      WHERE date('now', 'localtime') BETWEEN data_inicio AND data_fim
+      ORDER BY id DESC
+      LIMIT 1
+    `).get();
+    base.semanaAtiva = !!semana;
+    base.semanaId = semana ? Number(semana.id) : null;
+  }
+
+  if (base.semanaId && tableExists("escala_alocacoes") && tableExists("colaboradores")) {
+    const alocacoes = db.prepare(`
+      SELECT lower(COALESCE(a.tipo_turno,'')) AS tipo_turno
+      FROM escala_alocacoes a
+      JOIN colaboradores c ON c.id = a.colaborador_id
+      WHERE a.semana_id = ?
+        AND IFNULL(c.ativo,1)=1
+    `).all(base.semanaId);
+
+    alocacoes.forEach((row) => {
+      const turno = String(row.tipo_turno || "").trim();
+      if (turno === "diurno") base.colaboradoresTurno.diurno += 1;
+      if (turno === "apoio") base.colaboradoresTurno.apoio += 1;
+      if (turno === "noturno" || turno === "plantao") base.colaboradoresTurno.noturnoPlantao += 1;
+    });
+  }
+
+  if (tableExists("preventiva_execucoes")) {
+    const rows = db.prepare(`
+      SELECT UPPER(COALESCE(status,'')) AS status, COUNT(*) AS total
+      FROM preventiva_execucoes
+      WHERE UPPER(COALESCE(status,'')) IN ('PENDENTE','ATRASADA','EM_ANDAMENTO','ANDAMENTO')
+      GROUP BY UPPER(COALESCE(status,''))
+    `).all();
+    rows.forEach((row) => {
+      const status = String(row.status || "");
+      const total = Number(row.total || 0);
+      if (status === "PENDENTE") base.execucoesPendentes.pendente += total;
+      if (status === "ATRASADA") base.execucoesPendentes.atrasada += total;
+      if (status === "EM_ANDAMENTO" || status === "ANDAMENTO") base.execucoesPendentes.emAndamento += total;
+    });
+    base.execucoesPendentes.total =
+      base.execucoesPendentes.pendente +
+      base.execucoesPendentes.atrasada +
+      base.execucoesPendentes.emAndamento;
+  }
+
+  if (!base.semanaAtiva) base.alertas.push("Sem semana ativa na escala atual.");
+  if (base.colaboradoresTurno.diurno <= 0) base.alertas.push("Sem colaboradores ativos no turno diurno.");
+  if (base.colaboradoresTurno.apoio <= 0) base.alertas.push("Sem colaboradores ativos no turno de apoio.");
+  if (base.colaboradoresTurno.noturnoPlantao <= 0) base.alertas.push("Sem colaboradores ativos no turno noturno/plantão.");
+  if (base.execucoesPendentes.total <= 0) base.alertas.push("Não há preventivas pendentes/atrasadas/em andamento para sincronizar.");
+
+  base.prontoParaReprocesso = base.alertas.length === 0;
+  return base;
+}
+
 function reprocessarModuloPreventivas({ user = null } = {}) {
   const executar = db.transaction(() => {
+    const prevalidacao = prevalidarReprocessamentoPreventivas();
     const auditoria = auditarLeituraEquipamentosPreventivas();
     const autoPlanos = gerarPreventivasAutomaticas();
     const autoCronograma = gerarCronogramaSemanalInteligente(new Date());
     const reorganizacao = reorganizarPreventivasPendentesPorEscala();
     const revisaoCriticidade = revisarCriticidadePreventivasFuturas();
-    return { auditoria, autoPlanos, autoCronograma, reorganizacao, revisaoCriticidade };
+    return { prevalidacao, auditoria, autoPlanos, autoCronograma, reorganizacao, revisaoCriticidade };
   });
 
   try {
@@ -1194,6 +1285,7 @@ module.exports = {
   executarCicloAutonomo,
   criarPreventivaManual,
   auditarLeituraEquipamentosPreventivas,
+  prevalidarReprocessamentoPreventivas,
   reprocessarModuloPreventivas,
   apagarPreventivaExecucao,
   registrarLogPreventiva,
