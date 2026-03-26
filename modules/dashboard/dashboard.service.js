@@ -546,6 +546,10 @@ function getPreventivasDashboard() {
       ? "UPPER(COALESCE(pe.criticidade, e.criticidade, 'MEDIA'))"
       : "UPPER(COALESCE(e.criticidade, 'MEDIA'))";
 
+    if (typeof preventivasService?.reprocessarPreventivasComNovaEscala === "function") {
+      preventivasService.reprocessarPreventivasComNovaEscala();
+    }
+
     const rows = db
       .prepare(
         `
@@ -579,40 +583,6 @@ function getPreventivasDashboard() {
       )
       .all();
 
-    const escalaSemana = typeof preventivasService?.getEscalaSemanaAtual === "function"
-      ? preventivasService.getEscalaSemanaAtual()
-      : [];
-
-    const shouldReassign = (item) => {
-      const r1 = Number(item.responsavel_1_id || 0);
-      const r2 = Number(item.responsavel_2_id || 0);
-      const responsavelTxt = String(item.responsavel || "").trim().toLowerCase();
-      return (!r1 && !r2) || responsavelTxt === "equipe manutenção" || responsavelTxt === "equipe manutencao";
-    };
-
-    rows.forEach((item) => {
-      if (!hasResp1 || !hasResp2 || !shouldReassign(item) || !preventivasService) return;
-      const criticidadeAuto = typeof preventivasService.calcularCriticidade === "function"
-        ? preventivasService.calcularCriticidade({ tipo: item.equipamento_tipo, nome: item.equipamento_nome, criticidade: item.criticidade })
-        : item.criticidade;
-      const aloc = typeof preventivasService.escalarResponsaveisPreventiva === "function"
-        ? preventivasService.escalarResponsaveisPreventiva({ criticidade: criticidadeAuto }, escalaSemana)
-        : null;
-      if (!aloc) return;
-      db.prepare(`
-        UPDATE preventiva_execucoes
-        SET responsavel = ?,
-            responsavel_1_id = ?,
-            responsavel_2_id = ?,
-            criticidade = COALESCE(criticidade, ?)
-        WHERE id = ?
-      `).run(aloc.responsavelTexto || "-", aloc.responsavel_1_id || null, aloc.responsavel_2_id || null, criticidadeAuto || "MEDIA", Number(item.id));
-      item.responsavel = aloc.responsavelTexto || item.responsavel;
-      item.responsavel_1_id = aloc.responsavel_1_id || null;
-      item.responsavel_2_id = aloc.responsavel_2_id || null;
-      item.criticidade = criticidadeAuto || item.criticidade;
-    });
-
     const userIds = Array.from(new Set(rows.flatMap((item) => [item.responsavel_1_id, item.responsavel_2_id]).map((x) => Number(x)).filter(Boolean)));
     const usersMap = new Map();
     if (userIds.length) {
@@ -622,14 +592,18 @@ function getPreventivasDashboard() {
     }
 
     const items = rows.map((item) => {
-      const responsaveis = [usersMap.get(Number(item.responsavel_1_id)), usersMap.get(Number(item.responsavel_2_id))]
+      const responsaveisIds = [usersMap.get(Number(item.responsavel_1_id)), usersMap.get(Number(item.responsavel_2_id))]
         .map((x) => String(x || "").trim())
         .filter(Boolean)
         .slice(0, 2);
+      const responsavelTexto = String(item.responsavel || "").trim();
+      const responsaveis = responsavelTexto
+        ? responsavelTexto.split(",").map((nome) => nome.trim()).filter(Boolean)
+        : responsaveisIds;
       return {
         ...item,
         responsaveis,
-        responsavel_exibicao: responsaveis.length ? responsaveis.join(", ") : (item.responsavel || "-"),
+        responsavel_exibicao: responsaveis.length ? responsaveis.join(", ") : "-",
       };
     });
 
@@ -647,19 +621,23 @@ function getPreventivasDashboard() {
       else if (["EXECUTADA", "CONCLUIDA", "FINALIZADA", "CANCELADA"].includes(st)) resumo.fechadas += t;
     });
 
-    const criticidadeRows = db.prepare(`
-      SELECT ${criticidadeExpr} AS criticidade, COUNT(*) AS total
+    const criticidadeLista = db.prepare(`
+      SELECT UPPER(COALESCE(pe.status,'PENDENTE')) AS status,
+             ${criticidadeExpr} AS criticidade
       FROM preventiva_execucoes pe
       JOIN preventiva_planos pp ON pp.id = pe.plano_id
       LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
       WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA','ANDAMENTO','EM_ANDAMENTO')
-      GROUP BY ${criticidadeExpr}
     `).all();
-    const criticidade = { BAIXA: 0, MEDIA: 0, ALTA: 0, CRITICA: 0 };
-    criticidadeRows.forEach((r) => {
-      const key = String(r.criticidade || "MEDIA").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      if (criticidade[key] != null) criticidade[key] = Number(r.total || 0);
-    });
+    const criticidadeContagem = typeof preventivasService?.contarPreventivasPorCriticidade === "function"
+      ? preventivasService.contarPreventivasPorCriticidade(criticidadeLista)
+      : { baixa: 0, media: 0, alta: 0, critica: 0 };
+    const criticidade = {
+      BAIXA: Number(criticidadeContagem.baixa || 0),
+      MEDIA: Number(criticidadeContagem.media || 0),
+      ALTA: Number(criticidadeContagem.alta || 0),
+      CRITICA: Number(criticidadeContagem.critica || 0),
+    };
 
     return {
       items,
