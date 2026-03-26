@@ -70,6 +70,14 @@ router.post(
   safe(ctrl.reprocessarModulo, "reprocessarModulo")
 );
 
+// GET /preventivas/reprocessar
+router.get(
+  "/reprocessar",
+  requireLogin,
+  requireRole(ACCESS.preventivas_manage),
+  safe(ctrl.reprocessarModulo, "reprocessarModulo")
+);
+
 // GET  /preventivas/:id
 router.get(
   "/:id",

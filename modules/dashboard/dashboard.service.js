@@ -539,7 +539,14 @@ function parseResponsavelTextoLimitado(responsavel, limit = 2) {
   const nomes = String(responsavel || "")
     .split(",")
     .map((nome) => nome.trim())
-    .filter(Boolean);
+    .filter((nome) => {
+      if (!nome) return false;
+      const normalizado = nome
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+      return !["-", "equipe manutencao", "equipe de manutencao", "manutencao"].includes(normalizado);
+    });
   return nomes.slice(0, Math.max(1, Number(limit) || 2));
 }
 

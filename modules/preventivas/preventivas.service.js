@@ -600,78 +600,92 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
       .filter(([, info]) => !info?.disponivel || info?.noite_pesada)
       .map(([id]) => String(id))
   );
-
-  const elegiveis = (escalaSemana || []).filter((p) => {
-    const userKey = String(p?.user_id || "");
-    if (!userKey) return true;
-    return !indisponiveis.has(userKey);
-  }).filter((p) => {
-    if (!Number(p?.id || p?.colaborador_id || 0)) return true;
-    if (typeof osService.isColaboradorDisponivel !== "function") return true;
-    return osService.isColaboradorDisponivel(Number(p.id || p.colaborador_id));
-  });
   const turnoAtual = typeof osService.getTurnoAgora === "function" ? osService.getTurnoAgora() : getTurnoAtual();
-  const hoje = getHojeBrasilISO();
-  const cacheKey = `preventiva_equipe_${turnoAtual}_${hoje}`;
 
-  const salvaEquipe = (resp1 = null, resp2 = null) => {
-    const ids = [Number(resp1 || 0), Number(resp2 || 0)].filter(Boolean);
-    setConfig(cacheKey, ids.join(","));
-    return montarResponsaveisRetorno(elegiveis, ids[0] || null, ids[1] || null);
+  const elegivel = (pessoa) => {
+    const userId = Number(pessoa?.user_id || 0);
+    if (!userId) return false;
+    if (indisponiveis.has(String(userId))) return false;
+    const colaboradorId = Number(pessoa?.id || pessoa?.colaborador_id || 0);
+    if (!colaboradorId) return false;
+    if (typeof osService.isColaboradorDisponivel === "function" && !osService.isColaboradorDisponivel(colaboradorId)) return false;
+    return true;
   };
 
-  const cacheExistente = parseResponsaveisConfig(getConfig(cacheKey));
-  if (cacheExistente.responsavel_1_id) {
-    const idsEscalados = new Set(elegiveis.map((p) => Number(p.user_id || 0)).filter(Boolean));
-    const resp1Ok = idsEscalados.has(Number(cacheExistente.responsavel_1_id));
-    const resp2Ok = cacheExistente.responsavel_2_id ? idsEscalados.has(Number(cacheExistente.responsavel_2_id)) : true;
-    if (resp1Ok && resp2Ok) {
-      return montarResponsaveisRetorno(elegiveis, cacheExistente.responsavel_1_id, cacheExistente.responsavel_2_id);
-    }
+  const ordenarPorCarga = (lista, configPrefixo) => {
+    const ids = (lista || []).map((p) => Number(p.user_id || 0)).filter(Boolean);
+    return [...(lista || [])].sort((a, b) => {
+      const aId = Number(a.user_id || 0);
+      const bId = Number(b.user_id || 0);
+      const cargaA = Number(getConfig(`${configPrefixo}_${aId}`) || 0);
+      const cargaB = Number(getConfig(`${configPrefixo}_${bId}`) || 0);
+      if (cargaA !== cargaB) return cargaA - cargaB;
+      const idxA = ids.indexOf(aId);
+      const idxB = ids.indexOf(bId);
+      return idxA - idxB;
+    });
+  };
+
+  const registrarCarga = (resp1 = null, resp2 = null) => {
+    [resp1, resp2].filter(Boolean).forEach((userId) => {
+      const chave = `preventiva_carga_${getHojeBrasilISO()}_${Number(userId)}`;
+      const atual = Number(getConfig(chave) || 0);
+      setConfig(chave, atual + 1);
+    });
+  };
+
+  let baseEscala = (escalaSemana || []).filter((p) => Number(p?.user_id || 0));
+  if (typeof osService.getColaboradoresTurnoAtual === "function") {
+    const turnoColabs = osService.getColaboradoresTurnoAtual(turnoAtual);
+    if (Array.isArray(turnoColabs) && turnoColabs.length) baseEscala = turnoColabs;
+  }
+  const elegiveis = baseEscala.filter(elegivel);
+
+  if (!elegiveis.length) {
+    return { responsavel_1_id: null, responsavel_2_id: null, responsavelTexto: "-", responsavelIds: [], responsavelNomes: [] };
   }
 
   if (turnoAtual === "NOITE") {
-    const mecanicoNoite = elegiveis.find((p) =>
-      ["plantao", "noturno"].includes(normalizeTxt(p.tipo_turno)) && isMecanico(p.funcao)
-    ) || null;
-    return salvaEquipe(mecanicoNoite?.user_id || null, null);
+    const plantonista = typeof osService.getPlantonistaNoite === "function"
+      ? osService.getPlantonistaNoite()
+      : elegiveis.find((p) => ["plantao", "noturno"].includes(normalizeTxt(p.tipo_turno)) && isMecanico(p.funcao));
+    const resp1 = elegivel(plantonista) ? Number(plantonista.user_id) : Number(elegiveis[0].user_id || 0);
+    const retorno = montarResponsaveisRetorno(elegiveis, resp1 || null, null);
+    registrarCarga(retorno.responsavel_1_id, retorno.responsavel_2_id);
+    return retorno;
   }
 
-  const mecanicosDia = elegiveis.filter((p) => normalizeTxt(p.tipo_turno) === "diurno" && isMecanico(p.funcao));
-  const auxiliaresDia = elegiveis.filter((p) => normalizeTxt(p.tipo_turno) === "apoio" && isAuxiliarOuApoio(p.funcao));
-  const mecanico = escolherPorRotacao(mecanicosDia, "preventiva_dia_ultimo_mecanico_user_id");
-  const auxiliar = equipeCfg.exigirApoio
-    ? escolherPorRotacao(
-      auxiliaresDia.filter((p) => Number(p.user_id || 0) !== Number(mecanico?.user_id || 0)),
-      "preventiva_dia_ultimo_auxiliar_user_id"
-    )
-    : null;
-  return salvaEquipe(mecanico?.user_id || null, auxiliar?.user_id || null);
+  const mecanicosDiaRaw = typeof osService.getMecanicosDiurno === "function" ? osService.getMecanicosDiurno() : [];
+  const apoioDiaRaw = typeof osService.getApoioDiurno === "function" ? osService.getApoioDiurno() : [];
+  const mecanicosDia = ordenarPorCarga(mecanicosDiaRaw.filter(elegivel), `preventiva_carga_${getHojeBrasilISO()}`);
+  const apoioDia = ordenarPorCarga(apoioDiaRaw.filter(elegivel), `preventiva_carga_${getHojeBrasilISO()}`);
+  const poolGeral = ordenarPorCarga(elegiveis, `preventiva_carga_${getHojeBrasilISO()}`);
+
+  let resp1 = null;
+  let resp2 = null;
+
+  if (equipeCfg.quantidade === 1) {
+    const unico = mecanicosDia[0] || apoioDia[0] || poolGeral[0] || null;
+    resp1 = Number(unico?.user_id || 0) || null;
+  } else {
+    const executor = mecanicosDia[0] || poolGeral[0] || null;
+    const auxiliar = apoioDia.find((p) => Number(p.user_id) !== Number(executor?.user_id || 0))
+      || mecanicosDia.find((p) => Number(p.user_id) !== Number(executor?.user_id || 0))
+      || poolGeral.find((p) => Number(p.user_id) !== Number(executor?.user_id || 0))
+      || null;
+    resp1 = Number(executor?.user_id || 0) || null;
+    resp2 = Number(auxiliar?.user_id || 0) || null;
+  }
+
+  const retorno = montarResponsaveisRetorno(elegiveis, resp1, resp2);
+  registrarCarga(retorno.responsavel_1_id, retorno.responsavel_2_id);
+  return retorno;
 }
 
 function getEquipeConfigPreventiva(preventiva = {}) {
-  const tipoPlano = normalizeTxt(preventiva.tipo_plano || preventiva.tipo || "");
-  const classificacao = normalizeTxt(preventiva.classificacao || "");
-  const titulo = normalizeTxt(preventiva.titulo || "");
   const criticidade = normalizeCriticidade(preventiva.criticidade || preventiva.prioridade || "MEDIA");
-  let checklistLen = 0;
-  if (Array.isArray(preventiva.checklist_json)) {
-    checklistLen = preventiva.checklist_json.length;
-  } else {
-    try {
-      const parsed = JSON.parse(String(preventiva.checklist_json || "[]"));
-      checklistLen = Array.isArray(parsed) ? parsed.length : 0;
-    } catch (_e) {
-      checklistLen = String(preventiva.checklist_json || "").split(",").map((x) => x.trim()).filter(Boolean).length;
-    }
-  }
-
-  const reforma = tipoPlano.includes("reforma") || classificacao.includes("reforma") || titulo.includes("reforma");
-  const avancada = tipoPlano.includes("avanc") || classificacao.includes("reforc") || titulo.includes("avanc") || checklistLen >= 6;
-
-  if (reforma) return { tipoEquipe: "REFORMA", exigirApoio: true };
-  if (avancada || ["ALTA", "CRITICA"].includes(criticidade)) return { tipoEquipe: "AVANCADA", exigirApoio: true };
-  return { tipoEquipe: "SIMPLES", exigirApoio: false };
+  const quantidade = criticidade === "BAIXA" ? 1 : 2;
+  return { criticidade, quantidade };
 }
 
 function escalarResponsaveisPreventiva(preventiva, escalaSemana = []) {
@@ -826,7 +840,7 @@ function reorganizarPreventivasPendentesPorEscala() {
     FROM preventiva_execucoes pe
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
-    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA')
+    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE')
   `).all();
   const disponibilidade = getDisponibilidadeEscala();
 
@@ -941,7 +955,7 @@ function revisarCriticidadePreventivasFuturas() {
     FROM preventiva_execucoes pe
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
-    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA')
+    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE')
   `).all();
 
   let revisadas = 0;
@@ -1077,19 +1091,31 @@ function auditarLeituraEquipamentosPreventivas() {
 }
 
 function reprocessarModuloPreventivas({ user = null } = {}) {
-  const auditoria = auditarLeituraEquipamentosPreventivas();
-  const autoPlanos = gerarPreventivasAutomaticas();
-  const autoCronograma = gerarCronogramaSemanalInteligente(new Date());
-  const reorganizacao = reorganizarPreventivasPendentesPorEscala();
-  const revisaoCriticidade = revisarCriticidadePreventivasFuturas();
-
-  registrarLogPreventiva({
-    acao: "PREVENTIVAS_REPROCESSADAS",
-    user,
-    detalhes: { auditoria, autoPlanos, autoCronograma, reorganizacao, revisaoCriticidade },
+  const executar = db.transaction(() => {
+    const auditoria = auditarLeituraEquipamentosPreventivas();
+    const autoPlanos = gerarPreventivasAutomaticas();
+    const autoCronograma = gerarCronogramaSemanalInteligente(new Date());
+    const reorganizacao = reorganizarPreventivasPendentesPorEscala();
+    const revisaoCriticidade = revisarCriticidadePreventivasFuturas();
+    return { auditoria, autoPlanos, autoCronograma, reorganizacao, revisaoCriticidade };
   });
 
-  return { auditoria, autoPlanos, autoCronograma, reorganizacao, revisaoCriticidade };
+  try {
+    const result = executar();
+    registrarLogPreventiva({
+      acao: "PREVENTIVAS_REPROCESSADAS",
+      user,
+      detalhes: result,
+    });
+    return result;
+  } catch (err) {
+    registrarLogPreventiva({
+      acao: "PREVENTIVAS_REPROCESSAMENTO_ERRO",
+      user,
+      detalhes: { erro: err?.message || String(err) },
+    });
+    throw err;
+  }
 }
 
 function apagarPreventivaExecucao({ planoId, execucaoId, user = null, forcar = false }) {
