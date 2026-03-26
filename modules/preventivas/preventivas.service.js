@@ -386,6 +386,20 @@ function isMecanico(funcao) {
   return normalizeTxt(funcao).includes("mecan");
 }
 
+function getTurnoAtual() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const data = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  const hora = Number(data.hour || 0);
+  const minuto = Number(data.minute || 0);
+  const mins = (hora * 60) + minuto;
+  return mins >= (18 * 60) || mins < (6 * 60) ? "NOITE" : "DIA";
+}
+
 
 function obterNomeBaseEquipamento(nome) {
   return String(nome || "")
@@ -511,6 +525,10 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
     const userId = Number(p.user_id || 0);
     if (userId && !ids.includes(userId)) ids.push(userId);
   });
+
+  if (ids.length) {
+    setConfig(cacheKey, ids.join(","));
+  }
 
   return {
     responsavel_1_id: ids[0] || null,
