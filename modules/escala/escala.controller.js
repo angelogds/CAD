@@ -1,5 +1,11 @@
 const service = require("./escala.service");
 const generator = require("./escala.pdf");
+let preventivasService = null;
+try {
+  preventivasService = require("../preventivas/preventivas.service");
+} catch (_e) {
+  preventivasService = null;
+}
 
 function isoToday() {
   return new Date().toISOString().slice(0, 10);
@@ -24,6 +30,12 @@ function getCurrentMonthRangeISO() {
 
 function isValidDateISO(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function reprocessarPreventivasComNovaEscala() {
+  if (typeof preventivasService?.reprocessarPreventivasComNovaEscala === "function") {
+    preventivasService.reprocessarPreventivasComNovaEscala();
+  }
 }
 
 exports.index = (req, res, next) => {
@@ -99,6 +111,7 @@ exports.adicionarRapido = (req, res, next) => {
       tipo_turno: turno,
       funcao,
     });
+    reprocessarPreventivasComNovaEscala();
 
     let msg = `Período salvo com sucesso (${resultado.semanasAfetadas} semana(s): ${resultado.inserted} inserção(ões), ${resultado.updated} atualização(ões), ${resultado.ignored} sem alterações).`;
     if (resultado.diasSemSemana > 0) {
@@ -168,6 +181,7 @@ exports.lancarAusencia = (req, res, next) => {
       descricaoServico,
       funcao,
     });
+    reprocessarPreventivasComNovaEscala();
 
     req.flash("success", "Concessão lançada com sucesso.");
     return res.redirect(`/escala?date=${date}`);
@@ -193,6 +207,7 @@ exports.removerAlocacao = (req, res, next) => {
       req.flash("error", "Registro não encontrado para exclusão.");
       return res.redirect(`/escala?date=${date}`);
     }
+    reprocessarPreventivasComNovaEscala();
 
     req.flash("success", "Registro removido com sucesso.");
     return res.redirect(`/escala?date=${date}`);
@@ -234,6 +249,7 @@ exports.salvarEdicao = (req, res, next) => {
     }
 
     service.atualizarTurno(alocacaoId, tipo_turno);
+    reprocessarPreventivasComNovaEscala();
 
     req.flash("success", "Turno atualizado.");
     return res.redirect(`/escala/editar/${semanaId}`);

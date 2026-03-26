@@ -373,40 +373,46 @@ function isMecanico(funcao) {
   return normalizeTxt(funcao).includes("mecan");
 }
 
-function calcularCriticidade(equipamento = {}) {
-  const tipo = String(equipamento.tipo || equipamento.nome || "").trim();
-  if (!tipo) return "MEDIA";
 
-  const tipoNorm = normalizeTxt(tipo);
-  const quantidadeAtivosMesmoTipo = Number(
-    db
-      .prepare(
-        `
-      SELECT COUNT(*) AS total
-      FROM equipamentos
-      WHERE IFNULL(ativo,1)=1
-        AND lower(trim(COALESCE(tipo, nome, ''))) = lower(trim(?))
-    `
-      )
-      .get(tipo)?.total || 0
-  );
-
-  if (quantidadeAtivosMesmoTipo <= 1) {
-    const criticoProcesso =
-      tipoNorm.includes("digestor") ||
-      tipoNorm.includes("caldeira") ||
-      tipoNorm.includes("processo critico") ||
-      normalizeTxt(equipamento.criticidade).includes("critica");
-    return criticoProcesso ? "CRITICA" : "ALTA";
-  }
-  if (quantidadeAtivosMesmoTipo <= 3) return "MEDIA";
-  return "BAIXA";
+function obterNomeBaseEquipamento(nome) {
+  return String(nome || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/(?:\s*[-_/]?\s*\d+)\s*$/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
 }
 
-function escalarResponsaveisPreventiva(preventiva, escalaSemana = []) {
-  const criticidade = String(preventiva?.criticidade || preventiva?.equipamento_criticidade || "MEDIA")
+function calcularCriticidadePorQuantidade(equipamentoBase) {
+  const base = obterNomeBaseEquipamento(equipamentoBase);
+  if (!base) return "MEDIA";
+
+  const rows = db.prepare(`
+    SELECT nome
+    FROM equipamentos
+    WHERE IFNULL(ativo,1)=1
+  `).all();
+
+  const quantidadeMesmoTipo = rows.filter((row) => obterNomeBaseEquipamento(row?.nome) === base).length;
+
+  if (quantidadeMesmoTipo <= 1) return "CRITICA";
+  if (quantidadeMesmoTipo === 2) return "BAIXA";
+  return "MEDIA";
+}
+
+function calcularCriticidade(equipamento = {}) {
+  const base = obterNomeBaseEquipamento(equipamento.nome || equipamento.tipo);
+  const criticidadeAuto = calcularCriticidadePorQuantidade(base);
+  return criticidadeAuto || "MEDIA";
+}
+
+function distribuirEquipePreventiva(preventiva, escalaSemana = []) {
+  const criticidade = String(preventiva?.criticidade || "MEDIA")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toUpperCase();
 
   const diurnoMecanicos = (escalaSemana || []).filter((p) => p.tipo_turno === "diurno" && isMecanico(p.funcao));
@@ -417,32 +423,30 @@ function escalarResponsaveisPreventiva(preventiva, escalaSemana = []) {
     (escalaSemana || []).find((p) => p.tipo_turno === "noturno") ||
     null;
 
-  let escolhidos = [];
-  if (criticidade === "BAIXA") {
-    escolhidos = diurnoMecanicos.slice(0, 1);
-  } else if (criticidade === "MEDIA") {
-    escolhidos = diurnoMecanicos.slice(0, 2);
-  } else if (criticidade === "ALTA") {
-    escolhidos = [diurnoMecanicos[0], apoioOperacional[0]].filter(Boolean);
-  } else if (criticidade === "CRITICA") {
-    escolhidos = [responsavelNoite, diurnoMecanicos[0]].filter(Boolean);
-  }
+  const escolhidos = [...diurnoMecanicos, ...apoioOperacional];
+  if ((criticidade === "CRITICA" || !escolhidos.length) && responsavelNoite) escolhidos.push(responsavelNoite);
 
-  if (!escolhidos.length) escolhidos = [...(escalaSemana || [])].slice(0, 2);
-
-  const nomes = [];
   const ids = [];
+  const nomes = [];
   escolhidos.forEach((p) => {
     if (!p) return;
-    if (p.nome) nomes.push(String(p.nome).trim());
-    if (p.user_id && !ids.includes(Number(p.user_id))) ids.push(Number(p.user_id));
+    const nome = String(p.nome || "").trim();
+    if (nome && !nomes.includes(nome)) nomes.push(nome);
+    const userId = Number(p.user_id || 0);
+    if (userId && !ids.includes(userId)) ids.push(userId);
   });
 
   return {
     responsavel_1_id: ids[0] || null,
     responsavel_2_id: ids[1] || null,
-    responsavelTexto: nomes.slice(0, 2).join(", ") || "-",
+    responsavelTexto: nomes.join(", ") || "-",
+    responsavelIds: ids,
+    responsavelNomes: nomes,
   };
+}
+
+function escalarResponsaveisPreventiva(preventiva, escalaSemana = []) {
+  return distribuirEquipePreventiva(preventiva, escalaSemana);
 }
 
 function addDays(date, days) {
@@ -542,6 +546,69 @@ function executarCicloAutonomo(refDate = new Date()) {
   return { skipped: false, data: hoje, autoPlanos, autoCronograma };
 }
 
+
+function reprocessarPreventivasComNovaEscala() {
+  if (!tableExists("preventiva_execucoes") || !tableExists("preventiva_planos")) {
+    return { atualizadas: 0, totalAtivas: 0 };
+  }
+
+  const escalaSemana = getEscalaSemanaAtual();
+  const cols = getPreventivaExecColumns();
+  const hasCriticidade = cols.includes("criticidade");
+  const hasResp1 = cols.includes("responsavel_1_id");
+  const hasResp2 = cols.includes("responsavel_2_id");
+  const rows = db.prepare(`
+    SELECT pe.id,
+           pe.status,
+           COALESCE(e.nome, pp.titulo, '-') AS equipamento_nome,
+           COALESCE(e.tipo, pp.titulo, '-') AS equipamento_tipo,
+           COALESCE(pe.criticidade, e.criticidade, 'MEDIA') AS criticidade
+    FROM preventiva_execucoes pe
+    JOIN preventiva_planos pp ON pp.id = pe.plano_id
+    LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
+    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA','ANDAMENTO','EM_ANDAMENTO')
+  `).all();
+
+  let atualizadas = 0;
+  for (const item of rows) {
+    const criticidade = calcularCriticidade({ nome: item.equipamento_nome, tipo: item.equipamento_tipo, criticidade: item.criticidade });
+    const aloc = distribuirEquipePreventiva({ criticidade }, escalaSemana);
+    const updates = ["responsavel = ?"];
+    const args = [aloc.responsavelTexto];
+    if (hasCriticidade) {
+      updates.push("criticidade = ?");
+      args.push(criticidade);
+    }
+    if (hasResp1) {
+      updates.push("responsavel_1_id = ?");
+      args.push(aloc.responsavel_1_id);
+    }
+    if (hasResp2) {
+      updates.push("responsavel_2_id = ?");
+      args.push(aloc.responsavel_2_id);
+    }
+    args.push(Number(item.id));
+    db.prepare(`UPDATE preventiva_execucoes SET ${updates.join(", ")} WHERE id = ?`).run(...args);
+    atualizadas += 1;
+  }
+
+  return { atualizadas, totalAtivas: rows.length };
+}
+
+function contarPreventivasPorCriticidade(lista = []) {
+  const total = { baixa: 0, media: 0, alta: 0, critica: 0 };
+  (lista || []).forEach((item) => {
+    const status = String(item?.status || "").toUpperCase();
+    if (!["PENDENTE", "ANDAMENTO", "EM_ANDAMENTO", "ATRASADA"].includes(status)) return;
+    const criticidade = String(item?.criticidade || "MEDIA")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase();
+    if (total[criticidade] != null) total[criticidade] += 1;
+  });
+  return total;
+}
+
 module.exports = {
   listPlanos,
   listEquipamentosAtivos,
@@ -556,7 +623,12 @@ module.exports = {
   gerarObservacaoPreventiva,
   getEscalaSemanaAtual,
   escalarResponsaveisPreventiva,
+  distribuirEquipePreventiva,
+  obterNomeBaseEquipamento,
+  calcularCriticidadePorQuantidade,
   calcularCriticidade,
+  reprocessarPreventivasComNovaEscala,
+  contarPreventivasPorCriticidade,
   gerarPreventivasAutomaticas,
   gerarCronogramaSemanalInteligente,
   executarCicloAutonomo,

@@ -26,6 +26,7 @@ function getById(id) {
 }
 
 function create(data) {
+  const nomePadronizado = padronizarNomeComSequencial(data?.nome);
   const stmt = db.prepare(`
     INSERT INTO equipamentos (
       codigo, nome, setor, tipo, criticidade, ativo, status_operacional,
@@ -39,11 +40,12 @@ function create(data) {
     )
   `);
 
-  const info = stmt.run(normalizeEquipData(data));
+  const info = stmt.run(normalizeEquipData({ ...data, nome: nomePadronizado }));
   return info.lastInsertRowid;
 }
 
 function update(id, data) {
+  const nomePadronizado = padronizarNomeComSequencial(data?.nome, Number(id));
   const stmt = db.prepare(`
     UPDATE equipamentos
     SET
@@ -65,7 +67,45 @@ function update(id, data) {
     WHERE id = @id
   `);
 
-  stmt.run({ id: Number(id), ...normalizeEquipData(data) });
+  stmt.run({ id: Number(id), ...normalizeEquipData({ ...data, nome: nomePadronizado }) });
+}
+
+function obterNomeBaseEquipamento(nome) {
+  return String(nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/(?:\s*[-_/]?\s*\d+)\s*$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function padronizarNomeComSequencial(nome, equipamentoId = null) {
+  const base = obterNomeBaseEquipamento(nome);
+  if (!base) return String(nome || "").trim();
+
+  const rows = db.prepare(`
+    SELECT id, nome
+    FROM equipamentos
+    WHERE (? IS NULL OR id <> ?)
+    ORDER BY id ASC
+  `).all(equipamentoId, equipamentoId);
+
+  const indices = rows
+    .map((row) => {
+      const nomeAtual = String(row?.nome || "").trim();
+      const baseAtual = obterNomeBaseEquipamento(nomeAtual);
+      if (baseAtual.toUpperCase() !== base.toUpperCase()) return null;
+      const match = nomeAtual.match(/(\d+)\s*$/);
+      return match ? Number(match[1]) : 1;
+    })
+    .filter((n) => Number.isFinite(n) && n > 0);
+
+  if (!indices.length) return base;
+  let proximo = 1;
+  while (indices.includes(proximo)) proximo += 1;
+  return `${base} ${proximo}`;
 }
 
 function normalizeEquipData(data) {
