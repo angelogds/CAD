@@ -145,13 +145,20 @@ function reprocessarModulo(req, res) {
     return res.redirect("/preventivas");
   }
 
-  const result = service.reprocessarModuloPreventivas({ user });
-  req.flash(
-    "success",
-    `Preventivas reprocessadas. Equipamentos elegíveis: ${result.auditoria?.equipamentosElegiveis || 0}, ` +
-      `planos ativos: ${result.auditoria?.planosAtivos || 0}, execuções sincronizadas: ${result.reorganizacao?.atualizadas || 0}.`
-  );
-  return res.redirect("/preventivas");
+  try {
+    const result = service.reprocessarModuloPreventivas({ user });
+    req.flash(
+      "success",
+      `Preventivas reprocessadas e equipes atualizadas com sucesso. ` +
+        `Equipamentos elegíveis: ${result.auditoria?.equipamentosElegiveis || 0}, ` +
+        `planos ativos: ${result.auditoria?.planosAtivos || 0}, ` +
+        `execuções sincronizadas: ${result.reorganizacao?.atualizadas || 0}.`
+    );
+  } catch (err) {
+    console.error("[PREVENTIVAS][REPROCESSAR] erro ao reprocessar módulo:", err);
+    req.flash("error", "Erro ao reprocessar preventivas. Verifique os logs.");
+  }
+  return res.redirect("/dashboard");
 }
 
 function apagarExecucao(req, res) {
