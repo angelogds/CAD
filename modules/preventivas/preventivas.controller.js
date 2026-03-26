@@ -83,7 +83,7 @@ function execUpdateStatus(req, res) {
   const execId = Number(req.params.execId);
   const { status, data_executada } = req.body;
 
-  const ok = service.updateExecucaoStatus(planoId, execId, status, data_executada);
+  const ok = service.updateExecucaoStatus(planoId, execId, status, data_executada, req.session?.user?.id || null);
 
   if (!ok) {
     req.flash("error", "Execução não encontrada para este plano.");

@@ -546,10 +546,6 @@ function getPreventivasDashboard() {
       ? "UPPER(COALESCE(pe.criticidade, e.criticidade, 'MEDIA'))"
       : "UPPER(COALESCE(e.criticidade, 'MEDIA'))";
 
-    if (typeof preventivasService?.reprocessarPreventivasComNovaEscala === "function") {
-      preventivasService.reprocessarPreventivasComNovaEscala();
-    }
-
     const rows = db
       .prepare(
         `
@@ -573,7 +569,7 @@ function getPreventivasDashboard() {
       LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
       ${hasResp1 ? "LEFT JOIN users u1 ON u1.id = pe.responsavel_1_id" : ""}
       ${hasResp2 ? "LEFT JOIN users u2 ON u2.id = pe.responsavel_2_id" : ""}
-      WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA','ANDAMENTO','EM_ANDAMENTO')
+      WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ANDAMENTO','EM_ANDAMENTO')
       ORDER BY
         CASE WHEN pe.data_prevista IS NULL THEN 1 ELSE 0 END,
         pe.data_prevista ASC,
@@ -616,7 +612,7 @@ function getPreventivasDashboard() {
     resumoRows.forEach((r) => {
       const st = String(r.status || "");
       const t = Number(r.total || 0);
-      if (["PENDENTE", "ATRASADA"].includes(st)) resumo.abertas += t;
+      if (["PENDENTE"].includes(st)) resumo.abertas += t;
       else if (["EM_ANDAMENTO", "ANDAMENTO"].includes(st)) resumo.andamento += t;
       else if (["EXECUTADA", "CONCLUIDA", "FINALIZADA", "CANCELADA"].includes(st)) resumo.fechadas += t;
     });
@@ -627,7 +623,7 @@ function getPreventivasDashboard() {
       FROM preventiva_execucoes pe
       JOIN preventiva_planos pp ON pp.id = pe.plano_id
       LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
-      WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA','ANDAMENTO','EM_ANDAMENTO')
+      WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ANDAMENTO','EM_ANDAMENTO')
     `).all();
     const criticidadeContagem = typeof preventivasService?.contarPreventivasPorCriticidade === "function"
       ? preventivasService.contarPreventivasPorCriticidade(criticidadeLista)
@@ -682,6 +678,44 @@ function iniciarPreventiva(execucaoId, user) {
     if (hasIniciadaPor) updates.push("iniciada_por_user_id = ?");
     const args = [];
     if (hasIniciadaPor) args.push(Number(user.id));
+    args.push(Number(execucaoId));
+    db.prepare(`UPDATE preventiva_execucoes SET ${updates.join(", ")} WHERE id = ?`).run(...args);
+    return { ok: true };
+  }, { ok: false, reason: "error" });
+}
+
+function finalizarPreventiva(execucaoId, user) {
+  return safeGet(() => {
+    const cols = tableExists("preventiva_execucoes")
+      ? db.prepare("PRAGMA table_info(preventiva_execucoes)").all().map((c) => c.name)
+      : [];
+    const hasResp1 = cols.includes("responsavel_1_id");
+    const hasResp2 = cols.includes("responsavel_2_id");
+    const hasFinalizadaEm = cols.includes("finalizada_em");
+    const hasFinalizadaPor = cols.includes("finalizada_por_user_id");
+    const hasDuracao = cols.includes("duracao_minutos");
+    const preventiva = db.prepare(`
+      SELECT id, status, iniciada_em,
+             ${hasResp1 ? "responsavel_1_id" : "NULL AS responsavel_1_id"},
+             ${hasResp2 ? "responsavel_2_id" : "NULL AS responsavel_2_id"}
+      FROM preventiva_execucoes
+      WHERE id = ?
+      LIMIT 1
+    `).get(Number(execucaoId));
+    if (!preventiva) return { ok: false, reason: "not_found" };
+    if (!["EM_ANDAMENTO", "ANDAMENTO"].includes(String(preventiva.status || "").toUpperCase())) return { ok: false, reason: "invalid_status" };
+    if (!podeIniciarPreventiva(user, preventiva)) return { ok: false, reason: "forbidden" };
+
+    const updates = ["status = 'FINALIZADA'", "data_executada = date('now')"];
+    const args = [];
+    if (hasFinalizadaEm) updates.push("finalizada_em = COALESCE(finalizada_em, datetime('now'))");
+    if (hasFinalizadaPor) {
+      updates.push("finalizada_por_user_id = ?");
+      args.push(Number(user.id));
+    }
+    if (hasDuracao) {
+      updates.push("duracao_minutos = CASE WHEN iniciada_em IS NULL THEN duracao_minutos ELSE CAST((julianday(datetime('now')) - julianday(iniciada_em)) * 24 * 60 AS INTEGER) END");
+    }
     args.push(Number(execucaoId));
     db.prepare(`UPDATE preventiva_execucoes SET ${updates.join(", ")} WHERE id = ?`).run(...args);
     return { ok: true };
@@ -815,5 +849,6 @@ module.exports = {
   getEscalaSemana,
   getEscalaPainelSemana,
   iniciarPreventiva,
+  finalizarPreventiva,
   getPreventivasEmAndamentoEquipe,
 };
