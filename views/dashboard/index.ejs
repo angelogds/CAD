@@ -69,7 +69,7 @@
   }
   .pill-prioridade.emergencial { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
   .pill-prioridade.alta { background:#ffedd5; color:#9a3412; border-color:#fdba74; }
-  .os-row-critico { background:#fef2f2; border-left:4px solid #dc2626; }
+  .os-row-critico { background:#f3f4f6; border-left:4px solid #9ca3af; }
   .os-row-medio { background:#fffbeb; border-left:4px solid #f59e0b; }
   .os-row-leve { background:#f8fafc; }
 
@@ -216,7 +216,7 @@
       <span class="pill-tag pill-green">Baixa: <%= preventivasCrit.BAIXA || 0 %></span>
       <span class="pill-tag pill-blue">Média: <%= preventivasCrit.MEDIA || 0 %></span>
       <span class="pill-tag pill-amber">Alta: <%= preventivasCrit.ALTA || 0 %></span>
-      <span class="pill-tag pill-red">Crítica: <%= preventivasCrit.CRITICA || 0 %></span>
+      <span class="pill-tag pill-gray">Crítica: <%= preventivasCrit.CRITICA || 0 %></span>
     </div>
     <% if (preventivasItems.length === 0) { %><p class="muted" style="margin:0;">Nenhuma preventiva ativa.</p><% } else { %>
       <div class="table-wrap"><table class="table compact"><thead><tr><th>#</th><th>Equipamento</th><th>Responsável(is)</th><th>Data prevista</th><th>Criticidade</th><th>Status</th><th style="text-align:right;">Ações</th></tr></thead><tbody>
@@ -226,13 +226,17 @@
           <td><strong><%= p.equipamento_nome || '-' %></strong></td>
           <td><%= p.responsavel_exibicao || '-' %></td>
           <td><%= p.data_prevista || '-' %></td>
-          <td><span class="pill-tag <%= critic === 'CRITICA' ? 'pill-red' : (critic === 'ALTA' ? 'pill-amber' : (critic === 'MEDIA' ? 'pill-blue' : 'pill-green')) %>"><%= critic %></span></td>
+          <td><span class="pill-tag <%= critic === 'CRITICA' ? 'pill-gray' : (critic === 'ALTA' ? 'pill-amber' : (critic === 'MEDIA' ? 'pill-blue' : 'pill-green')) %>"><%= critic %></span></td>
           <td><span class="pill-tag <%= stat === 'EM_ANDAMENTO' ? 'pill-blue' : (stat === 'PENDENTE' ? 'pill-amber' : 'pill-gray') %>"><%= stat %></span></td>
           <td style="text-align:right;">
             <% var roleNorm = String(user?.role || '').toUpperCase(); var podeIniciar = roleNorm === 'ADMIN' || roleNorm === 'MANUTENCAO_SUPERVISOR' || roleNorm === 'SUPERVISOR_MANUTENCAO' || roleNorm === 'ENCARREGADO_MANUTENCAO' || Number(p.responsavel_1_id || 0) === Number(user?.id || 0) || Number(p.responsavel_2_id || 0) === Number(user?.id || 0); %>
             <% if (stat === 'PENDENTE' && podeIniciar) { %>
               <form method="POST" action="/dashboard/preventivas/<%= p.id %>/iniciar" style="display:inline;">
                 <button class="btn-inline" type="submit">Iniciar</button>
+              </form>
+            <% } else if ((stat === 'EM_ANDAMENTO' || stat === 'ANDAMENTO') && podeIniciar) { %>
+              <form method="POST" action="/dashboard/preventivas/<%= p.id %>/finalizar" style="display:inline;">
+                <button class="btn-inline" type="submit" style="background:#2563eb;">Finalizar</button>
               </form>
             <% } else { %>
               <span class="muted-xs">—</span>

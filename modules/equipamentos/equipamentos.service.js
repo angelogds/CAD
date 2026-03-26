@@ -207,12 +207,19 @@ function listHistoricoPreventivas(equipamentoId, filtros = {}) {
   return db.prepare(`
     SELECT pe.id,
            p.titulo AS atividade,
-           COALESCE(pe.data_executada, pe.data_prevista) AS data_execucao,
+           pe.data_prevista,
+           pe.iniciada_em,
+           pe.finalizada_em,
+           COALESCE(pe.duracao_minutos, CASE WHEN pe.iniciada_em IS NOT NULL AND pe.finalizada_em IS NOT NULL THEN CAST((julianday(pe.finalizada_em) - julianday(pe.iniciada_em)) * 24 * 60 AS INTEGER) END) AS duracao_minutos,
            pe.responsavel,
+           u1.name AS responsavel_1_nome,
+           u2.name AS responsavel_2_nome,
            pe.observacao,
            pe.status
     FROM preventiva_execucoes pe
     INNER JOIN preventiva_planos p ON p.id = pe.plano_id
+    LEFT JOIN users u1 ON u1.id = pe.responsavel_1_id
+    LEFT JOIN users u2 ON u2.id = pe.responsavel_2_id
     WHERE ${where.join(" AND ")}
     ORDER BY date(COALESCE(pe.data_executada, pe.data_prevista)) DESC, pe.id DESC
     LIMIT 300

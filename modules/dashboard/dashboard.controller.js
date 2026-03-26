@@ -56,6 +56,22 @@ function iniciarPreventiva(req, res) {
   return res.redirect("/dashboard");
 }
 
+function finalizarPreventiva(req, res) {
+  const execucaoId = Number(req.params.execucaoId);
+  const result = service.finalizarPreventiva(execucaoId, req.session?.user || null);
+  if (!result?.ok) {
+    const msg = result?.reason === "forbidden"
+      ? "Sem permissão para finalizar esta preventiva."
+      : result?.reason === "invalid_status"
+        ? "A preventiva precisa estar EM_ANDAMENTO para finalizar."
+        : "Não foi possível finalizar a preventiva.";
+    req.flash("error", msg);
+    return res.redirect("/dashboard");
+  }
+  req.flash("success", `Preventiva #${execucaoId} finalizada com sucesso.`);
+  return res.redirect("/dashboard");
+}
+
 function sse(req, res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -322,4 +338,4 @@ function createAviso(req, res) {
   return res.redirect("/avisos");
 }
 
-module.exports = { index, createAviso, sse, reconhecerAlerta, subscribePush, iniciarPreventiva };
+module.exports = { index, createAviso, sse, reconhecerAlerta, subscribePush, iniciarPreventiva, finalizarPreventiva };
