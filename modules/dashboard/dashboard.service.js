@@ -39,6 +39,18 @@ function tableExists(name) {
   }
 }
 
+function getUsersNameColumn() {
+  try {
+    if (!tableExists("users")) return null;
+    const cols = db.prepare("PRAGMA table_info(users)").all().map((c) => String(c.name || ""));
+    if (cols.includes("name")) return "name";
+    if (cols.includes("nome")) return "nome";
+    return null;
+  } catch (_e) {
+    return null;
+  }
+}
+
 
 function resolveOSGrauExpression() {
   const cols = safeGet(() => db.prepare('PRAGMA table_info(os)').all(), []);
@@ -557,6 +569,8 @@ function getPreventivasDashboard() {
       : [];
     const hasResp1 = cols.includes("responsavel_1_id");
     const hasResp2 = cols.includes("responsavel_2_id");
+    const usersNameCol = getUsersNameColumn();
+    const hasUsers = !!usersNameCol;
     const hasIniciadaEm = cols.includes("iniciada_em");
     const criticidadeExpr = cols.includes("criticidade")
       ? "UPPER(COALESCE(pe.criticidade, e.criticidade, 'MEDIA'))"
@@ -578,13 +592,13 @@ function getPreventivasDashboard() {
         ${criticidadeExpr} AS criticidade,
         ${hasResp1 ? "pe.responsavel_1_id" : "NULL"} AS responsavel_1_id,
         ${hasResp2 ? "pe.responsavel_2_id" : "NULL"} AS responsavel_2_id,
-        ${hasResp1 ? "u1.name" : "NULL"} AS responsavel_1_nome,
-        ${hasResp2 ? "u2.name" : "NULL"} AS responsavel_2_nome
+        ${hasResp1 && hasUsers ? `u1.${usersNameCol}` : "NULL"} AS responsavel_1_nome,
+        ${hasResp2 && hasUsers ? `u2.${usersNameCol}` : "NULL"} AS responsavel_2_nome
       FROM preventiva_execucoes pe
       JOIN preventiva_planos pp ON pp.id = pe.plano_id
       LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
-      ${hasResp1 ? "LEFT JOIN users u1 ON u1.id = pe.responsavel_1_id" : ""}
-      ${hasResp2 ? "LEFT JOIN users u2 ON u2.id = pe.responsavel_2_id" : ""}
+      ${hasResp1 && hasUsers ? "LEFT JOIN users u1 ON u1.id = pe.responsavel_1_id" : ""}
+      ${hasResp2 && hasUsers ? "LEFT JOIN users u2 ON u2.id = pe.responsavel_2_id" : ""}
       WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ANDAMENTO','EM_ANDAMENTO')
       ORDER BY
         CASE WHEN pe.data_prevista IS NULL THEN 1 ELSE 0 END,
@@ -617,10 +631,10 @@ function getPreventivasDashboard() {
 
     const userIds = Array.from(new Set(rows.flatMap((item) => [item.responsavel_1_id, item.responsavel_2_id]).map((x) => Number(x)).filter(Boolean)));
     const usersMap = new Map();
-    if (userIds.length) {
+    if (userIds.length && usersNameCol) {
       const placeholders = userIds.map(() => "?").join(",");
-      const users = db.prepare(`SELECT id, name FROM users WHERE id IN (${placeholders})`).all(...userIds);
-      users.forEach((u) => usersMap.set(Number(u.id), String(u.name || "").trim()));
+      const users = db.prepare(`SELECT id, ${usersNameCol} AS nome FROM users WHERE id IN (${placeholders})`).all(...userIds);
+      users.forEach((u) => usersMap.set(Number(u.id), String(u.nome || "").trim()));
     }
 
     const items = rows.map((item) => {
