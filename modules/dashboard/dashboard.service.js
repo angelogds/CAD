@@ -3,10 +3,16 @@ const db = require("../../database/db");
 const { normalizeRole } = require("../../config/rbac");
 
 let escalaService = null;
+let preventivasService = null;
 try {
   escalaService = require("../escala/escala.service");
 } catch (e) {
   console.warn("⚠️ escala.service não carregou:", e.message);
+}
+try {
+  preventivasService = require("../preventivas/preventivas.service");
+} catch (e) {
+  console.warn("⚠️ preventivas.service não carregou:", e.message);
 }
 
 // não derruba o dashboard se faltar tabela
@@ -540,13 +546,15 @@ function getPreventivasDashboard() {
       ? "UPPER(COALESCE(pe.criticidade, e.criticidade, 'MEDIA'))"
       : "UPPER(COALESCE(e.criticidade, 'MEDIA'))";
 
-    const items = db
+    const rows = db
       .prepare(
         `
       SELECT
         pe.id,
         pe.plano_id,
+        pp.equipamento_id,
         COALESCE(e.nome, pp.titulo, '-') AS equipamento_nome,
+        COALESCE(e.tipo, pp.titulo, '-') AS equipamento_tipo,
         pe.data_prevista,
         UPPER(COALESCE(pe.status, 'PENDENTE')) AS status,
         pe.responsavel,
@@ -569,17 +577,61 @@ function getPreventivasDashboard() {
       LIMIT 10
     `
       )
-      .all()
-      .map((item) => {
-        const responsaveis = [item.responsavel_1_nome, item.responsavel_2_nome]
-          .map((x) => String(x || "").trim())
-          .filter(Boolean);
-        return {
-          ...item,
-          responsaveis,
-          responsavel_exibicao: responsaveis.length ? responsaveis.join(" • ") : (item.responsavel || "-"),
-        };
-      });
+      .all();
+
+    const escalaSemana = typeof preventivasService?.getEscalaSemanaAtual === "function"
+      ? preventivasService.getEscalaSemanaAtual()
+      : [];
+
+    const shouldReassign = (item) => {
+      const r1 = Number(item.responsavel_1_id || 0);
+      const r2 = Number(item.responsavel_2_id || 0);
+      const responsavelTxt = String(item.responsavel || "").trim().toLowerCase();
+      return (!r1 && !r2) || responsavelTxt === "equipe manutenção" || responsavelTxt === "equipe manutencao";
+    };
+
+    rows.forEach((item) => {
+      if (!hasResp1 || !hasResp2 || !shouldReassign(item) || !preventivasService) return;
+      const criticidadeAuto = typeof preventivasService.calcularCriticidade === "function"
+        ? preventivasService.calcularCriticidade({ tipo: item.equipamento_tipo, nome: item.equipamento_nome, criticidade: item.criticidade })
+        : item.criticidade;
+      const aloc = typeof preventivasService.escalarResponsaveisPreventiva === "function"
+        ? preventivasService.escalarResponsaveisPreventiva({ criticidade: criticidadeAuto }, escalaSemana)
+        : null;
+      if (!aloc) return;
+      db.prepare(`
+        UPDATE preventiva_execucoes
+        SET responsavel = ?,
+            responsavel_1_id = ?,
+            responsavel_2_id = ?,
+            criticidade = COALESCE(criticidade, ?)
+        WHERE id = ?
+      `).run(aloc.responsavelTexto || "-", aloc.responsavel_1_id || null, aloc.responsavel_2_id || null, criticidadeAuto || "MEDIA", Number(item.id));
+      item.responsavel = aloc.responsavelTexto || item.responsavel;
+      item.responsavel_1_id = aloc.responsavel_1_id || null;
+      item.responsavel_2_id = aloc.responsavel_2_id || null;
+      item.criticidade = criticidadeAuto || item.criticidade;
+    });
+
+    const userIds = Array.from(new Set(rows.flatMap((item) => [item.responsavel_1_id, item.responsavel_2_id]).map((x) => Number(x)).filter(Boolean)));
+    const usersMap = new Map();
+    if (userIds.length) {
+      const placeholders = userIds.map(() => "?").join(",");
+      const users = db.prepare(`SELECT id, name FROM users WHERE id IN (${placeholders})`).all(...userIds);
+      users.forEach((u) => usersMap.set(Number(u.id), String(u.name || "").trim()));
+    }
+
+    const items = rows.map((item) => {
+      const responsaveis = [usersMap.get(Number(item.responsavel_1_id)), usersMap.get(Number(item.responsavel_2_id))]
+        .map((x) => String(x || "").trim())
+        .filter(Boolean)
+        .slice(0, 2);
+      return {
+        ...item,
+        responsaveis,
+        responsavel_exibicao: responsaveis.length ? responsaveis.join(", ") : (item.responsavel || "-"),
+      };
+    });
 
     const resumoRows = db.prepare(`
       SELECT UPPER(COALESCE(status, 'PENDENTE')) AS status, COUNT(*) AS total

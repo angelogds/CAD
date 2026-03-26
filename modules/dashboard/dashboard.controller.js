@@ -10,7 +10,6 @@ function index(req, res) {
   const osResumo = service.getOSResumoStatus();
   const osPainel = service.getOSPainel(tvMode ? 30 : 15);
   const osEmAndamento = service.getOSEmAndamento();
-  const preventivasEmAndamento = service.getPreventivasEmAndamentoEquipe();
   const historicoEquipamentos = service.getHistoricoEquipamentos(10);
   const motoresResumo = service.getMotoresResumoDashboard();
   const comprasResumo = service.getComprasResumoDashboard();
@@ -28,7 +27,6 @@ function index(req, res) {
     osResumo,
     osPainel,
     osEmAndamento,
-    preventivasEmAndamento,
     historicoEquipamentos,
     motoresResumo,
     comprasResumo,
