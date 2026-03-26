@@ -98,14 +98,19 @@ function listExecucoes(planoId) {
   const hasResp1 = cols.includes("responsavel_1_id");
   const hasResp2 = cols.includes("responsavel_2_id");
   const usersNameCol = getUsersNameColumn();
+  const colaboradoresNameCol = tableExists("colaboradores") ? "nome" : null;
   const hasUsers = tableExists("users") && !!usersNameCol;
   const rows = db.prepare(`
     SELECT pe.*,
            ${hasResp1 && hasUsers ? `u1.${usersNameCol}` : "NULL"} AS responsavel_1_nome,
-           ${hasResp2 && hasUsers ? `u2.${usersNameCol}` : "NULL"} AS responsavel_2_nome
+           ${hasResp2 && hasUsers ? `u2.${usersNameCol}` : "NULL"} AS responsavel_2_nome,
+           ${hasResp1 && colaboradoresNameCol ? "c1.nome" : "NULL"} AS responsavel_1_colaborador_nome,
+           ${hasResp2 && colaboradoresNameCol ? "c2.nome" : "NULL"} AS responsavel_2_colaborador_nome
     FROM preventiva_execucoes pe
     ${hasResp1 && hasUsers ? "LEFT JOIN users u1 ON u1.id = pe.responsavel_1_id" : ""}
     ${hasResp2 && hasUsers ? "LEFT JOIN users u2 ON u2.id = pe.responsavel_2_id" : ""}
+    ${hasResp1 && colaboradoresNameCol ? "LEFT JOIN colaboradores c1 ON c1.id = pe.responsavel_1_id" : ""}
+    ${hasResp2 && colaboradoresNameCol ? "LEFT JOIN colaboradores c2 ON c2.id = pe.responsavel_2_id" : ""}
     WHERE pe.plano_id = ?
     ORDER BY
       CASE UPPER(COALESCE(pe.status,''))
@@ -123,7 +128,10 @@ function listExecucoes(planoId) {
       pe.id DESC
   `).all(Number(planoId));
   return rows.map((row) => {
-    const nomes = [row.responsavel_1_nome, row.responsavel_2_nome].map((n) => String(n || "").trim()).filter(Boolean);
+    const nomes = [
+      row.responsavel_1_nome || row.responsavel_1_colaborador_nome,
+      row.responsavel_2_nome || row.responsavel_2_colaborador_nome,
+    ].map((n) => String(n || "").trim()).filter(Boolean);
     return {
       ...row,
       responsavel_exibicao: nomes.join(", ") || String(row.responsavel || "").trim() || "-",
@@ -501,6 +509,10 @@ function montarResponsaveisRetorno(escalaSemana = [], responsavel_1_id = null, r
       .map((u) => [Number(u.id), String(u.nome || "").trim()])
     : [];
   nomesUsers.forEach(([id, nome]) => mapaNomes.set(id, nome));
+  if (ids.length && tableExists("colaboradores")) {
+    const nomesColaboradores = db.prepare(`SELECT id, nome FROM colaboradores WHERE id IN (${ids.map(() => "?").join(",")})`).all(...ids);
+    nomesColaboradores.forEach((c) => mapaNomes.set(Number(c.id), String(c.nome || "").trim()));
+  }
   const nomes = ids.map((id) => mapaNomes.get(id)).filter(Boolean);
   return {
     responsavel_1_id: ids[0] || null,
@@ -638,7 +650,7 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
     });
   };
 
-  let baseEscala = (escalaSemana || []).filter((p) => Number(p?.user_id || 0));
+  let baseEscala = [...(escalaSemana || [])];
   if (typeof osService.getColaboradoresTurnoAtual === "function") {
     const turnoColabs = osService.getColaboradoresTurnoAtual(turnoAtual);
     if (Array.isArray(turnoColabs) && turnoColabs.length) baseEscala = turnoColabs;
