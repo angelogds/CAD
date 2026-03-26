@@ -436,6 +436,17 @@ function getEscalaSemanaAtual() {
   }));
 }
 
+function getTiposTurnoPorPeriodo(turno = "DIA") {
+  return String(turno || "").toUpperCase() === "NOITE"
+    ? ["plantao", "noturno"]
+    : ["diurno", "apoio"];
+}
+
+function filtrarEscalaVigentePorTurno(escalaSemana = [], turno = "DIA") {
+  const tiposPermitidos = new Set(getTiposTurnoPorPeriodo(turno));
+  return [...(escalaSemana || [])].filter((pessoa) => tiposPermitidos.has(normalizeTxt(pessoa?.tipo_turno)));
+}
+
 function normalizeTxt(value) {
   return String(value || "")
     .normalize("NFD")
@@ -644,7 +655,6 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
 
   const elegivel = (pessoa) => {
     const userId = Number(pessoa?.user_id || 0);
-    if (!userId) return false;
     if (indisponiveis.has(String(userId))) return false;
     const colaboradorId = Number(pessoa?.id || pessoa?.colaborador_id || 0);
     if (!colaboradorId) return false;
@@ -660,10 +670,12 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
     });
   };
 
-  let baseEscala = [...(escalaSemana || [])];
+  let baseEscala = filtrarEscalaVigentePorTurno(escalaSemana, turnoAtual);
   if (typeof osService.getColaboradoresTurnoAtual === "function") {
     const turnoColabs = osService.getColaboradoresTurnoAtual(turnoAtual);
-    if (Array.isArray(turnoColabs) && turnoColabs.length) baseEscala = turnoColabs;
+    if (Array.isArray(turnoColabs) && turnoColabs.length) {
+      baseEscala = filtrarEscalaVigentePorTurno(turnoColabs, turnoAtual);
+    }
   }
   const elegiveis = baseEscala.filter(elegivel);
 
@@ -691,10 +703,10 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
     : null;
 
   const fallbackExecutor = elegiveis[0] || null;
-  const fallbackAuxiliar = elegiveis.find((p) => Number(p.user_id || 0) !== Number(fallbackExecutor?.user_id || 0)) || null;
-  const resp1 = Number(equipeOS?.executor?.user_id || equipeOS?.executor?.id || fallbackExecutor?.user_id || fallbackExecutor?.id || 0) || null;
+  const fallbackAuxiliar = elegiveis.find((p) => Number(p.id || p.colaborador_id || 0) !== Number(fallbackExecutor?.id || fallbackExecutor?.colaborador_id || 0)) || null;
+  const resp1 = Number(equipeOS?.executor?.id || equipeOS?.executor?.colaborador_id || fallbackExecutor?.id || fallbackExecutor?.colaborador_id || 0) || null;
   const resp2 = equipeCfg.quantidade === 2
-    ? Number(equipeOS?.auxiliar?.user_id || equipeOS?.auxiliar?.id || fallbackAuxiliar?.user_id || fallbackAuxiliar?.id || 0) || null
+    ? Number(equipeOS?.auxiliar?.id || equipeOS?.auxiliar?.colaborador_id || fallbackAuxiliar?.id || fallbackAuxiliar?.colaborador_id || 0) || null
     : null;
 
   const retorno = montarResponsaveisRetorno(elegiveis, resp1, resp2);
