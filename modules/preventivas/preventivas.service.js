@@ -1,4 +1,5 @@
 const db = require("../../database/db");
+const osService = require("../os/os.service");
 
 function tableExists(name) {
   try {
@@ -80,21 +81,35 @@ function getPlanoById(id) {
 }
 
 function listExecucoes(planoId) {
-  return db.prepare(`
-    SELECT *
-    FROM preventiva_execucoes
-    WHERE plano_id = ?
+  const cols = getPreventivaExecColumns();
+  const hasResp1 = cols.includes("responsavel_1_id");
+  const hasResp2 = cols.includes("responsavel_2_id");
+  const rows = db.prepare(`
+    SELECT pe.*,
+           ${hasResp1 ? "u1.name" : "NULL"} AS responsavel_1_nome,
+           ${hasResp2 ? "u2.name" : "NULL"} AS responsavel_2_nome
+    FROM preventiva_execucoes pe
+    ${hasResp1 ? "LEFT JOIN users u1 ON u1.id = pe.responsavel_1_id" : ""}
+    ${hasResp2 ? "LEFT JOIN users u2 ON u2.id = pe.responsavel_2_id" : ""}
+    WHERE pe.plano_id = ?
     ORDER BY
-      CASE status
+      CASE pe.status
         WHEN 'atrasada' THEN 1
         WHEN 'pendente' THEN 2
         WHEN 'executada' THEN 3
         WHEN 'cancelada' THEN 4
         ELSE 9
       END,
-      COALESCE(data_prevista,'9999-12-31') ASC,
-      id DESC
+      COALESCE(pe.data_prevista,'9999-12-31') ASC,
+      pe.id DESC
   `).all(Number(planoId));
+  return rows.map((row) => {
+    const nomes = [row.responsavel_1_nome, row.responsavel_2_nome].map((n) => String(n || "").trim()).filter(Boolean);
+    return {
+      ...row,
+      responsavel_exibicao: nomes.join(", ") || String(row.responsavel || "").trim() || "-",
+    };
+  });
 }
 
 function createExecucao(planoId, data) {
@@ -353,9 +368,16 @@ function gerarObservacaoPreventiva(equipamento = {}, historico = []) {
 }
 
 function getEscalaSemanaAtual() {
+  try {
+    const dia = typeof osService.getColaboradoresTurnoAtual === "function" ? osService.getColaboradoresTurnoAtual("DIA") : [];
+    const noite = typeof osService.getColaboradoresTurnoAtual === "function" ? osService.getColaboradoresTurnoAtual("NOITE") : [];
+    const merged = [...dia, ...noite];
+    if (merged.length) return merged;
+  } catch (_e) {}
+
   if (!tableExists("escala_semanas") || !tableExists("escala_alocacoes") || !tableExists("colaboradores")) return [];
   const semana = db.prepare(`
-    SELECT id, data_inicio, data_fim
+    SELECT id
     FROM escala_semanas
     WHERE date('now', 'localtime') BETWEEN data_inicio AND data_fim
     ORDER BY id DESC
@@ -364,14 +386,15 @@ function getEscalaSemanaAtual() {
   if (!semana) return [];
 
   return db.prepare(`
-    SELECT c.id AS colaborador_id, c.nome, c.funcao, c.user_id, a.tipo_turno
+    SELECT c.id AS colaborador_id, c.nome, c.funcao, c.user_id, a.tipo_turno, a.id AS alocacao_id
     FROM escala_alocacoes a
     JOIN colaboradores c ON c.id = a.colaborador_id
     WHERE a.semana_id = ? AND IFNULL(c.ativo,1)=1
-    ORDER BY
-      CASE a.tipo_turno WHEN 'diurno' THEN 0 WHEN 'apoio' THEN 1 WHEN 'noturno' THEN 2 ELSE 3 END,
-      c.nome ASC
-  `).all(Number(semana.id));
+    ORDER BY a.id ASC
+  `).all(Number(semana.id)).map((row) => ({
+    ...row,
+    id: Number(row.colaborador_id),
+  }));
 }
 
 function normalizeTxt(value) {
@@ -439,10 +462,20 @@ function escolherPorRotacao(lista = [], configKeyUltimo = "") {
 function montarResponsaveisRetorno(escalaSemana = [], responsavel_1_id = null, responsavel_2_id = null) {
   const mapaNomes = new Map(
     (escalaSemana || [])
-      .filter((p) => Number(p?.user_id || 0))
-      .map((p) => [Number(p.user_id), String(p.nome || "").trim()])
+      .flatMap((p) => {
+        const nome = String(p.nome || "").trim();
+        const pares = [];
+        if (Number(p?.user_id || 0)) pares.push([Number(p.user_id), nome]);
+        if (Number(p?.id || p?.colaborador_id || 0)) pares.push([Number(p.id || p.colaborador_id), nome]);
+        return pares;
+      })
   );
   const ids = [Number(responsavel_1_id || 0), Number(responsavel_2_id || 0)].filter(Boolean);
+  const nomesUsers = ids.length
+    ? db.prepare(`SELECT id, name FROM users WHERE id IN (${ids.map(() => "?").join(",")})`).all(...ids)
+      .map((u) => [Number(u.id), String(u.name || "").trim()])
+    : [];
+  nomesUsers.forEach(([id, nome]) => mapaNomes.set(id, nome));
   const nomes = ids.map((id) => mapaNomes.get(id)).filter(Boolean);
   return {
     responsavel_1_id: ids[0] || null,
@@ -554,6 +587,7 @@ function calcularCriticidade(equipamento = {}, contextoOperacional = {}) {
 }
 
 function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade = {}) {
+  const equipeCfg = getEquipeConfigPreventiva(preventiva);
   const indisponiveis = new Set(
     Object.entries(disponibilidade || {})
       .filter(([, info]) => !info?.disponivel || info?.noite_pesada)
@@ -564,8 +598,12 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
     const userKey = String(p?.user_id || "");
     if (!userKey) return true;
     return !indisponiveis.has(userKey);
+  }).filter((p) => {
+    if (!Number(p?.id || p?.colaborador_id || 0)) return true;
+    if (typeof osService.isColaboradorDisponivel !== "function") return true;
+    return osService.isColaboradorDisponivel(Number(p.id || p.colaborador_id));
   });
-  const turnoAtual = getTurnoAtual();
+  const turnoAtual = typeof osService.getTurnoAgora === "function" ? osService.getTurnoAgora() : getTurnoAtual();
   const hoje = getHojeBrasilISO();
   const cacheKey = `preventiva_equipe_${turnoAtual}_${hoje}`;
 
@@ -595,11 +633,38 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
   const mecanicosDia = elegiveis.filter((p) => normalizeTxt(p.tipo_turno) === "diurno" && isMecanico(p.funcao));
   const auxiliaresDia = elegiveis.filter((p) => normalizeTxt(p.tipo_turno) === "apoio" && isAuxiliarOuApoio(p.funcao));
   const mecanico = escolherPorRotacao(mecanicosDia, "preventiva_dia_ultimo_mecanico_user_id");
-  const auxiliar = escolherPorRotacao(
-    auxiliaresDia.filter((p) => Number(p.user_id || 0) !== Number(mecanico?.user_id || 0)),
-    "preventiva_dia_ultimo_auxiliar_user_id"
-  );
+  const auxiliar = equipeCfg.exigirApoio
+    ? escolherPorRotacao(
+      auxiliaresDia.filter((p) => Number(p.user_id || 0) !== Number(mecanico?.user_id || 0)),
+      "preventiva_dia_ultimo_auxiliar_user_id"
+    )
+    : null;
   return salvaEquipe(mecanico?.user_id || null, auxiliar?.user_id || null);
+}
+
+function getEquipeConfigPreventiva(preventiva = {}) {
+  const tipoPlano = normalizeTxt(preventiva.tipo_plano || preventiva.tipo || "");
+  const classificacao = normalizeTxt(preventiva.classificacao || "");
+  const titulo = normalizeTxt(preventiva.titulo || "");
+  const criticidade = normalizeCriticidade(preventiva.criticidade || preventiva.prioridade || "MEDIA");
+  let checklistLen = 0;
+  if (Array.isArray(preventiva.checklist_json)) {
+    checklistLen = preventiva.checklist_json.length;
+  } else {
+    try {
+      const parsed = JSON.parse(String(preventiva.checklist_json || "[]"));
+      checklistLen = Array.isArray(parsed) ? parsed.length : 0;
+    } catch (_e) {
+      checklistLen = String(preventiva.checklist_json || "").split(",").map((x) => x.trim()).filter(Boolean).length;
+    }
+  }
+
+  const reforma = tipoPlano.includes("reforma") || classificacao.includes("reforma") || titulo.includes("reforma");
+  const avancada = tipoPlano.includes("avanc") || classificacao.includes("reforc") || titulo.includes("avanc") || checklistLen >= 6;
+
+  if (reforma) return { tipoEquipe: "REFORMA", exigirApoio: true };
+  if (avancada || ["ALTA", "CRITICA"].includes(criticidade)) return { tipoEquipe: "AVANCADA", exigirApoio: true };
+  return { tipoEquipe: "SIMPLES", exigirApoio: false };
 }
 
 function escalarResponsaveisPreventiva(preventiva, escalaSemana = []) {
@@ -660,7 +725,12 @@ function gerarCronogramaSemanalInteligente(refDate = new Date()) {
       nome: plano.equipamento_nome,
       criticidade: plano.equipamento_criticidade,
     });
-    const responsaveis = montarEquipePreventiva({ criticidade: criticidadeCalculada }, escalaSemana, disponibilidade);
+    const responsaveis = montarEquipePreventiva({
+      criticidade: criticidadeCalculada,
+      tipo_plano: plano.tipo_plano,
+      titulo: plano.titulo,
+      checklist_json: plano.checklist_json,
+    }, escalaSemana, disponibilidade);
     createExecucao(plano.id, {
       data_prevista: prevista,
       status: "PENDENTE",
@@ -741,7 +811,10 @@ function reorganizarPreventivasPendentesPorEscala() {
            pe.status,
            COALESCE(e.nome, pp.titulo, '-') AS equipamento_nome,
            COALESCE(e.tipo, pp.titulo, '-') AS equipamento_tipo,
-           COALESCE(pe.criticidade, e.criticidade, 'MEDIA') AS criticidade
+           COALESCE(pe.criticidade, e.criticidade, 'MEDIA') AS criticidade,
+           pp.tipo_plano,
+           pp.titulo,
+           pp.checklist_json
     FROM preventiva_execucoes pe
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
@@ -752,7 +825,12 @@ function reorganizarPreventivasPendentesPorEscala() {
   let atualizadas = 0;
   for (const item of rows) {
     const criticidade = calcularCriticidade({ nome: item.equipamento_nome, tipo: item.equipamento_tipo, criticidade: item.criticidade });
-    const aloc = montarEquipePreventiva({ criticidade }, escalaSemana, disponibilidade);
+    const aloc = montarEquipePreventiva({
+      criticidade,
+      tipo_plano: item.tipo_plano,
+      titulo: item.titulo,
+      checklist_json: item.checklist_json,
+    }, escalaSemana, disponibilidade);
     const updates = ["responsavel = ?"];
     const args = [aloc.responsavelTexto];
     if (hasCriticidade) {
@@ -795,7 +873,10 @@ function alocarEquipeExecucaoPreventiva(execucaoId) {
     SELECT pe.id,
            COALESCE(pe.criticidade, e.criticidade, 'MEDIA') AS criticidade,
            COALESCE(e.nome, pp.titulo, '-') AS equipamento_nome,
-           COALESCE(e.tipo, pp.titulo, '-') AS equipamento_tipo
+           COALESCE(e.tipo, pp.titulo, '-') AS equipamento_tipo,
+           pp.tipo_plano,
+           pp.titulo,
+           pp.checklist_json
     FROM preventiva_execucoes pe
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
@@ -811,7 +892,12 @@ function alocarEquipeExecucaoPreventiva(execucaoId) {
     tipo: row.equipamento_tipo,
     criticidade: row.criticidade,
   });
-  const aloc = montarEquipePreventiva({ criticidade }, escalaSemana, disponibilidade);
+  const aloc = montarEquipePreventiva({
+    criticidade,
+    tipo_plano: row.tipo_plano,
+    titulo: row.titulo,
+    checklist_json: row.checklist_json,
+  }, escalaSemana, disponibilidade);
 
   const updates = ["responsavel = ?"];
   const args = [aloc.responsavelTexto];
