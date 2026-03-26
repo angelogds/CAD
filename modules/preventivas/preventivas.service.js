@@ -512,34 +512,9 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
     if (!userKey) return true;
     return !indisponiveis.has(userKey);
   });
-  const turno = String(preventiva?.turno || getTurnoAtual()).toUpperCase();
-  const hojeKey = formatDateISO(new Date());
-  const cacheKey = `preventiva_equipe_${hojeKey}_${turno}`;
-  const cached = getConfig(cacheKey);
-  const cachedIds = String(cached || "").split(",").map((id) => Number(id)).filter(Boolean);
-
-  const noturnos = elegiveis.filter((p) => ["noturno", "plantao"].includes(String(p.tipo_turno || "").toLowerCase()) && isMecanico(p.funcao));
-  const diurnosMecanicos = elegiveis.filter((p) => String(p.tipo_turno || "").toLowerCase() === "diurno" && isMecanico(p.funcao));
-  const apoios = elegiveis.filter((p) => String(p.tipo_turno || "").toLowerCase() === "apoio");
-
-  let escolhidos = [];
-  if (cachedIds.length) {
-    escolhidos = cachedIds
-      .map((id) => elegiveis.find((p) => Number(p.user_id || 0) === id))
-      .filter(Boolean)
-      .slice(0, turno === "NOITE" ? 1 : 2);
-  }
-
-  if (!escolhidos.length) {
-    if (turno === "NOITE") {
-      const plantonista = noturnos[0] || null;
-      escolhidos = [plantonista].filter(Boolean);
-    } else {
-      const mecanico = diurnosMecanicos[0] || null;
-      const apoio = apoios.find((p) => Number(p.user_id || 0) !== Number(mecanico?.user_id || 0)) || null;
-      escolhidos = [mecanico, apoio].filter(Boolean).slice(0, 2);
-    }
-  }
+  const mecanico = elegiveis.find((p) => p.tipo_turno === "diurno" && isMecanico(p.funcao)) || null;
+  const apoio = elegiveis.find((p) => p.tipo_turno === "apoio" && Number(p.user_id || 0) !== Number(mecanico?.user_id || 0)) || null;
+  const escolhidos = [mecanico, apoio].filter(Boolean).slice(0, 2);
 
   const ids = [];
   const nomes = [];
@@ -707,7 +682,7 @@ function reorganizarPreventivasPendentesPorEscala() {
     FROM preventiva_execucoes pe
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
-    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE')
+    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA')
   `).all();
   const disponibilidade = getDisponibilidadeEscala();
 
@@ -756,7 +731,7 @@ function revisarCriticidadePreventivasFuturas() {
     FROM preventiva_execucoes pe
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
-    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE')
+    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA')
   `).all();
 
   let revisadas = 0;

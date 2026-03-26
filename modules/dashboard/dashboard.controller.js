@@ -59,6 +59,161 @@ function finalizarPreventiva(req, res) {
   return res.redirect("/dashboard");
 }
 
+function sse(req, res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  alertsHub.subscribe('dashboard', res);
+
+  const atual = alertsService.getAlertaAtivo();
+  res.write(`event: estado_inicial\ndata: ${JSON.stringify({ alertaAtivo: atual })}\n\n`);
+
+  const ping = setInterval(() => {
+    try { res.write(`event: ping\ndata: ${JSON.stringify({ ts: Date.now() })}\n\n`); } catch (_e) {}
+  }, 20000);
+
+  req.on('close', () => {
+    clearInterval(ping);
+    alertsHub.unsubscribe('dashboard', res);
+  });
+
+  req.flash("success", "Aviso publicado no mural.");
+  return res.redirect("/dashboard");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+function sse(req, res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  alertsHub.subscribe('dashboard', res);
+
+  const atual = alertsService.getAlertaAtivo();
+  res.write(`event: estado_inicial\ndata: ${JSON.stringify({ alertaAtivo: atual })}\n\n`);
+
+  const ping = setInterval(() => {
+    try { res.write(`event: ping\ndata: ${JSON.stringify({ ts: Date.now() })}\n\n`); } catch (_e) {}
+  }, 20000);
+
+  req.on('close', () => {
+    clearInterval(ping);
+    alertsHub.unsubscribe('dashboard', res);
+  });
+}
+
+function reconhecerAlerta(req, res) {
+  try {
+    const result = alertsService.reconhecerAlerta({
+      os_id: req.body.os_id,
+      user_id: req.session?.user?.id || null,
+      observacao: req.body.observacao || null,
+    });
+    alertsHub.publish('alerta_reconhecido', { os_id: result.os_id, reconhecido_por: req.session?.user?.id || null });
+    return res.json({ ok: true, ...result });
+  } catch (e) {
+    return res.status(400).json({ ok: false, error: e.message || 'Erro ao reconhecer alerta.' });
+  }
+}
+
+
+function subscribePush(req, res) {
+  try {
+    const result = webPushService.saveSubscription({
+      userId: req.session?.user?.id,
+      subscription: req.body?.subscription,
+      userAgent: req.headers['user-agent'] || null,
+    });
+    return res.json({ ok: true, ...result });
+  } catch (e) {
+    return res.status(400).json({ ok: false, error: e.message || 'Falha ao registrar push.' });
+  }
+  req.flash("success", `Preventiva #${execucaoId} finalizada com sucesso.`);
+  return res.redirect("/dashboard");
+}
+
 function createAviso(req, res) {
   req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
   return res.redirect("/avisos");
@@ -119,12 +274,9 @@ function subscribePush(req, res) {
   }
 }
 
-module.exports = {
-  index,
-  createAviso,
-  sse,
-  reconhecerAlerta,
-  subscribePush,
-  iniciarPreventiva,
-  finalizarPreventiva,
-};
+function createAviso(req, res) {
+  req.flash("success", "Cadastro de avisos foi movido para o módulo Avisos.");
+  return res.redirect("/avisos");
+}
+
+module.exports = { index, createAviso, sse, reconhecerAlerta, subscribePush, iniciarPreventiva, finalizarPreventiva };
