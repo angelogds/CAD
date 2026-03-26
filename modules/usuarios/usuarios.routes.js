@@ -3,6 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
 const router = express.Router();
+const storagePaths = require("../../config/storage");
 
 const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
@@ -15,7 +16,7 @@ try {
   console.error("❌ [usuarios] Falha ao carregar usuarios.controller:", e.message);
 }
 
-const uploadDir = path.join(__dirname, "../../public/uploads/users");
+const uploadDir = path.join(storagePaths.IMAGE_DIR, "users");
 fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({

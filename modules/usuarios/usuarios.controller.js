@@ -2,6 +2,7 @@
 const path = require("path");
 const fs = require("fs");
 const service = require("./usuarios.service");
+const storagePaths = require("../../config/storage");
 
 const ROLES = [
   { key: "ADMIN", label: "admin" },
@@ -16,7 +17,7 @@ const ROLES = [
 ];
 
 function ensureUploadDir() {
-  const dir = path.join(__dirname, "../../public/uploads/users");
+  const dir = path.join(storagePaths.IMAGE_DIR, "users");
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -24,7 +25,7 @@ function ensureUploadDir() {
 function normalizePhotoPath(file) {
   if (!file) return null;
   ensureUploadDir();
-  return `/uploads/users/${file.filename}`;
+  return `/imagens/users/${file.filename}`;
 }
 
 function list(req, res) {

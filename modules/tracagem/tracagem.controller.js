@@ -2,9 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const service = require('./tracagem.service');
 const desenhoTecnicoService = require('../desenho-tecnico/desenho-tecnico.service');
+const storagePaths = require('../../config/storage');
 
 
-const PDF_STORAGE_DIR = path.join(process.env.UPLOADS_DIR || (fs.existsSync('/data') ? '/data/uploads' : path.join(process.cwd(), 'uploads')), 'tracagem-pdfs');
+const PDF_STORAGE_DIR = path.join(storagePaths.PDF_DIR, 'tracagem');
 
 function ensurePdfStorageDir() {
   if (!fs.existsSync(PDF_STORAGE_DIR)) fs.mkdirSync(PDF_STORAGE_DIR, { recursive: true });
@@ -723,7 +724,7 @@ function relacionarEquipamento(req, res) {
       parametros,
       resultado,
       pdf_filename: filename,
-      pdf_path: `/uploads/tracagem-pdfs/${path.basename(storedPath)}`,
+      pdf_path: `/pdfs/tracagem/${path.basename(storedPath)}`,
     });
 
     req.flash('success', 'Traçagem vinculada ao equipamento com sucesso.');
@@ -738,7 +739,10 @@ function baixarPdfVinculado(req, res) {
   const tracagem = service.getById(req.params.id);
   if (!tracagem) return res.status(404).render('errors/404', { title: 'Não encontrado' });
 
-  const pdfPath = tracagem.pdf_path ? path.join(process.cwd(), tracagem.pdf_path.replace(/^\//, '')) : null;
+  const fromPdfDir = tracagem.pdf_path ? path.join(storagePaths.PDF_DIR, tracagem.pdf_path.replace(/^\/pdfs\/?/, "")) : null;
+  const fromUploadsDir = tracagem.pdf_path ? path.join(storagePaths.UPLOAD_DIR, tracagem.pdf_path.replace(/^\/uploads\/?/, "")) : null;
+  const pdfPath = fromPdfDir && fs.existsSync(fromPdfDir) ? fromPdfDir : fromUploadsDir;
+
   if (pdfPath && fs.existsSync(pdfPath)) {
     const filename = tracagem.pdf_filename || path.basename(pdfPath);
     return res.download(pdfPath, filename);

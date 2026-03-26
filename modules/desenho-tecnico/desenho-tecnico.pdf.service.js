@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
+const storagePaths = require('../../config/storage');
 
-const PDF_DIR = path.join(process.env.UPLOADS_DIR || (fs.existsSync('/data') ? '/data/uploads' : path.join(process.cwd(), 'uploads')), 'desenho-tecnico-pdf');
+const PDF_DIR = path.join(storagePaths.PDF_DIR, 'desenho-tecnico');
 if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
 
 /**
@@ -11,7 +12,7 @@ if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
 function generateTechnicalPdf(desenho, svgMarkup, options = {}) {
   const filename = `${String(desenho.codigo || 'desenho').replace(/[^a-zA-Z0-9_-]+/g, '-')}-rev${desenho.revisao || 0}-${Date.now()}.pdf`;
   const fullPath = path.join(PDF_DIR, filename);
-  const relPath = `/uploads/desenho-tecnico-pdf/${filename}`;
+  const relPath = `/pdfs/desenho-tecnico/${filename}`;
 
   // Usar formato landscape para desenhos técnicos
   const doc = new PDFDocument({ 

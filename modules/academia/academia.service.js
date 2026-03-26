@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
+const storagePaths = require('../../config/storage');
 const db = require('../../database/db');
 
 const NOTA_MINIMA_PADRAO = Number(process.env.ACADEMIA_NOTA_MINIMA || 70);
@@ -1407,7 +1408,7 @@ function emitirDocumentoInterno({ userId, cursoId, tipoDocumento = 'Declaração
   `).get(userId, cursoId);
 
   const codigo = `DOC-${cursoId}-${userId}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-  const outputDir = path.resolve(__dirname, '../../public/uploads/academia/documentos-internos');
+  const outputDir = path.join(storagePaths.PDF_DIR, 'academia', 'documentos-internos');
   fs.mkdirSync(outputDir, { recursive: true });
   const filename = `${codigo}.pdf`;
   const absolutePath = path.join(outputDir, filename);
@@ -1427,7 +1428,7 @@ function emitirDocumentoInterno({ userId, cursoId, tipoDocumento = 'Declaração
   pdf.text('Documento interno de capacitação institucional. Não se trata de curso técnico reconhecido.');
   pdf.end();
 
-  const arquivoUrl = `/uploads/academia/documentos-internos/${filename}`;
+  const arquivoUrl = `/pdfs/academia/documentos-internos/${filename}`;
   db.prepare(`
     INSERT INTO academia_documentos_internos (usuario_id, curso_id, tipo_documento, codigo_validacao, observacao_institucional, carga_horaria_interna, arquivo_url, emitido_em)
     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))

@@ -5,10 +5,11 @@ const multer = require('multer');
 const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const { ACCESS } = require('../../config/rbac');
 const ctrl = require('./academia.controller');
+const storagePaths = require('../../config/storage');
 
 const router = express.Router();
 
-const certUploadDir = path.join(__dirname, '../../public/uploads/academia/certificados-externos');
+const certUploadDir = path.join(storagePaths.UPLOAD_DIR, 'academia', 'certificados-externos');
 let certUploadReady = false;
 try {
   fs.mkdirSync(certUploadDir, { recursive: true });

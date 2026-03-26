@@ -7,7 +7,7 @@ try { desenhoTecnicoService = require('../desenho-tecnico/desenho-tecnico.servic
 
 function resolveFoto(file) {
   if (!file) return null;
-  return `/uploads/equipamentos/fotos/${file.filename}`;
+  return `/imagens/equipamentos/fotos/${file.filename}`;
 }
 
 function calcIdade(anoInstalacao) {

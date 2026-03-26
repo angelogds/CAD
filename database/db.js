@@ -2,10 +2,9 @@
 const path = require("path");
 const fs = require("fs");
 const Database = require("better-sqlite3");
+const storage = require("../config/storage");
 
-// Railway: use DB_PATH=/data/app.db (com volume montado em /data)
-const defaultDevPath = path.join(__dirname, "db.sqlite");
-const dbPath = process.env.DB_PATH || defaultDevPath;
+const dbPath = storage.DB_PATH;
 
 // garante pasta existente
 const dir = path.dirname(dbPath);

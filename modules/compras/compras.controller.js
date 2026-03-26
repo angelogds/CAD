@@ -2,8 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const service = require('./compras.service');
 const { applyMigrations } = require('../../database/migrate');
+const storagePaths = require('../../config/storage');
 
-const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
+const UPLOADS_DIR = storagePaths.UPLOAD_DIR;
 
 function isSchemaError(error) {
   const msg = String(error?.message || error || '').toLowerCase();

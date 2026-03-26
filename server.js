@@ -16,6 +16,7 @@ const flash = require("connect-flash");
 const SQLiteStoreFactory = require("better-sqlite3-session-store")(session);
 const db = require("./database/db");
 const engine = require("ejs-mate");
+const storage = require("./config/storage");
 
 let webPush = null;
 try { webPush = require("web-push"); } catch (_e) { webPush = null; }
@@ -39,6 +40,13 @@ try {
 
 const app = express();
 app.set("trust proxy", 1);
+
+try {
+  storage.ensurePersistentDirs();
+  console.log(`✅ Storage pronto: DATA_DIR=${storage.DATA_DIR}`);
+} catch (err) {
+  console.error("❌ Erro ao preparar diretórios persistentes:", err.message || err);
+}
 
 aiService.validateAIEnvironment();
 setTimeout(() => {
@@ -81,9 +89,9 @@ app.locals.incluir = function (p) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, "public")));
-const UPLOADS_DIR = process.env.UPLOADS_DIR || (fs.existsSync('/data') ? '/data/uploads' : path.join(process.cwd(), "uploads"));
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-app.use("/uploads", express.static(UPLOADS_DIR));
+app.use("/uploads", express.static(storage.UPLOAD_DIR));
+app.use("/pdfs", express.static(storage.PDF_DIR));
+app.use("/imagens", express.static(storage.IMAGE_DIR));
 
 // ===== Session + Flash =====
 app.use(
