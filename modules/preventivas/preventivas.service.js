@@ -33,15 +33,22 @@ function listEquipamentosAtivos() {
   `).all();
 }
 
-function getUsersNameColumn() {
-  try {
-    const cols = db.prepare(`PRAGMA table_info(users)`).all().map((c) => String(c.name || ""));
-    if (cols.includes("name")) return "name";
-    if (cols.includes("nome")) return "nome";
-    return null;
-  } catch (_e) {
-    return null;
+function resolveUsuariosSource() {
+  const candidates = ["users", "usuarios"];
+  for (const table of candidates) {
+    if (!tableExists(table)) continue;
+    try {
+      const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => String(c.name || ""));
+      const idCol = cols.includes("id") ? "id" : null;
+      const nameCol = cols.includes("name") ? "name" : (cols.includes("nome") ? "nome" : null);
+      if (idCol && nameCol) return { table, idCol, nameCol };
+    } catch (_e) {}
   }
+  return null;
+}
+
+function getUsersNameColumn() {
+  return resolveUsuariosSource()?.nameCol || null;
 }
 
 function createPlano(data) {
@@ -97,18 +104,18 @@ function listExecucoes(planoId) {
   const cols = getPreventivaExecColumns();
   const hasResp1 = cols.includes("responsavel_1_id");
   const hasResp2 = cols.includes("responsavel_2_id");
-  const usersNameCol = getUsersNameColumn();
+  const usuariosSource = resolveUsuariosSource();
   const colaboradoresNameCol = tableExists("colaboradores") ? "nome" : null;
-  const hasUsers = tableExists("users") && !!usersNameCol;
+  const hasUsers = !!usuariosSource;
   const rows = db.prepare(`
     SELECT pe.*,
-           ${hasResp1 && hasUsers ? `u1.${usersNameCol}` : "NULL"} AS responsavel_1_nome,
-           ${hasResp2 && hasUsers ? `u2.${usersNameCol}` : "NULL"} AS responsavel_2_nome,
+           ${hasResp1 && hasUsers ? `u1.${usuariosSource.nameCol}` : "NULL"} AS responsavel_1_nome,
+           ${hasResp2 && hasUsers ? `u2.${usuariosSource.nameCol}` : "NULL"} AS responsavel_2_nome,
            ${hasResp1 && colaboradoresNameCol ? "c1.nome" : "NULL"} AS responsavel_1_colaborador_nome,
            ${hasResp2 && colaboradoresNameCol ? "c2.nome" : "NULL"} AS responsavel_2_colaborador_nome
     FROM preventiva_execucoes pe
-    ${hasResp1 && hasUsers ? "LEFT JOIN users u1 ON u1.id = pe.responsavel_1_id" : ""}
-    ${hasResp2 && hasUsers ? "LEFT JOIN users u2 ON u2.id = pe.responsavel_2_id" : ""}
+    ${hasResp1 && hasUsers ? `LEFT JOIN ${usuariosSource.table} u1 ON u1.${usuariosSource.idCol} = pe.responsavel_1_id` : ""}
+    ${hasResp2 && hasUsers ? `LEFT JOIN ${usuariosSource.table} u2 ON u2.${usuariosSource.idCol} = pe.responsavel_2_id` : ""}
     ${hasResp1 && colaboradoresNameCol ? "LEFT JOIN colaboradores c1 ON c1.id = pe.responsavel_1_id" : ""}
     ${hasResp2 && colaboradoresNameCol ? "LEFT JOIN colaboradores c2 ON c2.id = pe.responsavel_2_id" : ""}
     WHERE pe.plano_id = ?
@@ -503,10 +510,13 @@ function montarResponsaveisRetorno(escalaSemana = [], responsavel_1_id = null, r
       })
   );
   const ids = [Number(responsavel_1_id || 0), Number(responsavel_2_id || 0)].filter(Boolean);
-  const usersNameCol = getUsersNameColumn();
-  const nomesUsers = ids.length && usersNameCol
-    ? db.prepare(`SELECT id, ${usersNameCol} AS nome FROM users WHERE id IN (${ids.map(() => "?").join(",")})`).all(...ids)
-      .map((u) => [Number(u.id), String(u.nome || "").trim()])
+  const usuariosSource = resolveUsuariosSource();
+  const nomesUsers = ids.length && usuariosSource
+    ? db.prepare(`
+      SELECT ${usuariosSource.idCol} AS id, ${usuariosSource.nameCol} AS nome
+      FROM ${usuariosSource.table}
+      WHERE ${usuariosSource.idCol} IN (${ids.map(() => "?").join(",")})
+    `).all(...ids).map((u) => [Number(u.id), String(u.nome || "").trim()])
     : [];
   nomesUsers.forEach(([id, nome]) => mapaNomes.set(id, nome));
   if (ids.length && tableExists("colaboradores")) {
@@ -1194,13 +1204,21 @@ function prevalidarReprocessamentoPreventivas() {
 }
 
 function reprocessarModuloPreventivas({ user = null } = {}) {
+  let etapaAtual = "inicializacao";
   const executar = db.transaction(() => {
+    etapaAtual = "prevalidacao";
     const prevalidacao = prevalidarReprocessamentoPreventivas();
+    etapaAtual = "auditoria";
     const auditoria = auditarLeituraEquipamentosPreventivas();
+    etapaAtual = "geracao_planos_automaticos";
     const autoPlanos = gerarPreventivasAutomaticas();
+    etapaAtual = "cronograma_semanal";
     const autoCronograma = gerarCronogramaSemanalInteligente(new Date());
+    etapaAtual = "reorganizacao_pendentes";
     const reorganizacao = reorganizarPreventivasPendentesPorEscala();
+    etapaAtual = "revisao_criticidade";
     const revisaoCriticidade = revisarCriticidadePreventivasFuturas();
+    etapaAtual = "concluido";
     return { prevalidacao, auditoria, autoPlanos, autoCronograma, reorganizacao, revisaoCriticidade };
   });
 
@@ -1213,10 +1231,16 @@ function reprocessarModuloPreventivas({ user = null } = {}) {
     });
     return result;
   } catch (err) {
+    const erroDetalhado = {
+      etapa: etapaAtual,
+      mensagem: err?.message || String(err),
+      stack: err?.stack || null,
+    };
+    console.error("[PREVENTIVAS][REPROCESSAR][ERRO]", erroDetalhado);
     registrarLogPreventiva({
       acao: "PREVENTIVAS_REPROCESSAMENTO_ERRO",
       user,
-      detalhes: { erro: err?.message || String(err) },
+      detalhes: erroDetalhado,
     });
     throw err;
   }
