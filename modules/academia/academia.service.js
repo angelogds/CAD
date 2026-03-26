@@ -425,7 +425,6 @@ Próximo curso recomendado: ${proximoCursoTitulo}.`.trim(),
 
 function getAvaliacaoModeloPadrao(curso, proximoCursoTitulo) {
   const termo = sanitizeCursoPalavraChave(curso.titulo);
-  const blocoAtual = blocos.find((b) => b.status !== BLOCO_STATUS.CONCLUIDO) || null;
   return {
     objetivas: [
       `Qual é o objetivo técnico principal do curso ${curso.titulo}?`,
