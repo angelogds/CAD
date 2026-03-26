@@ -3,12 +3,13 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const router = express.Router();
+const storagePaths = require("../../config/storage");
 
 const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const ctrl = require("./os.controller");
 const { OS_ACCESS, OS_EXECUTION_ACCESS, OS_DETALHE_ACCESS } = require("./os.permissions");
 
-const uploadDir = path.join(__dirname, "../../public/uploads/os");
+const uploadDir = path.join(storagePaths.UPLOAD_DIR, "os");
 fs.mkdirSync(uploadDir, { recursive: true });
 
 const upload = multer({

@@ -4,11 +4,12 @@ const path = require('path');
 const fs = require('fs');
 const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const ctrl = require('./colaboradores.controller');
+const storagePaths = require('../../config/storage');
 
 const router = express.Router();
 
-const fotosDir = path.join(process.cwd(), 'uploads/colaboradores/fotos');
-const docsDir = path.join(process.cwd(), 'uploads/colaboradores/documentos');
+const fotosDir = path.join(storagePaths.IMAGE_DIR, 'colaboradores', 'fotos');
+const docsDir = path.join(storagePaths.UPLOAD_DIR, 'colaboradores', 'documentos');
 fs.mkdirSync(fotosDir, { recursive: true });
 fs.mkdirSync(docsDir, { recursive: true });
 

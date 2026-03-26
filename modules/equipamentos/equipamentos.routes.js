@@ -3,12 +3,13 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const router = express.Router();
+const storagePaths = require("../../config/storage");
 
 const { requireLogin } = require("../auth/auth.middleware");
 const ctrl = require("./equipamentos.controller");
 
-const fotoDir = path.join(__dirname, "../../public/uploads/equipamentos/fotos");
-const docsDir = path.join(__dirname, "../../public/uploads/equipamentos/documentos");
+const fotoDir = path.join(storagePaths.IMAGE_DIR, "equipamentos", "fotos");
+const docsDir = path.join(storagePaths.UPLOAD_DIR, "equipamentos", "documentos");
 fs.mkdirSync(fotoDir, { recursive: true });
 fs.mkdirSync(docsDir, { recursive: true });
 

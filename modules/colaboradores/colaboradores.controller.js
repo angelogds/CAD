@@ -88,7 +88,7 @@ function savePerfil(req, res) {
 
   const id = parseId(req.params.id);
   const payload = { ...req.body, id };
-  const foto = req.file ? `/uploads/colaboradores/fotos/${req.file.filename}` : null;
+  const foto = req.file ? `/imagens/colaboradores/fotos/${req.file.filename}` : null;
   if (foto) payload.foto_url = foto;
 
   service.createOrUpdateColaborador(payload, actor(req));
@@ -104,7 +104,7 @@ function create(req, res) {
     return res.redirect('/colaboradores');
   }
 
-  const foto = req.file ? `/uploads/colaboradores/fotos/${req.file.filename}` : null;
+  const foto = req.file ? `/imagens/colaboradores/fotos/${req.file.filename}` : null;
   const id = service.createOrUpdateColaborador({ ...req.body, foto_url: foto }, actor(req));
   service.upsertDetalhes(id, req.body, actor(req));
 

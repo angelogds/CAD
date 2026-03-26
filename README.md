@@ -55,14 +55,26 @@ npm run dev
 - `GET /desenho-tecnico/:id/revisoes` — histórico de revisões
 - `GET /desenho-tecnico/biblioteca` — biblioteca técnica
 
-### Railway (deploy)
-1. Configurar `DB_PATH=/data/app.db` no serviço.
-2. Garantir volume persistente montado em `/data`.
-3. Start command recomendado:
+### Railway (deploy com 1 Volume persistente)
+1. Criar **1 Volume** no projeto Railway.
+2. Anexar o Volume ao serviço **CAD**.
+3. Definir o mount path do Volume como **`/data`**.
+4. Configurar variáveis de ambiente no serviço:
+   - `DATA_DIR=/data`
+   - `UPLOAD_DIR=/data/uploads`
+   - `PDF_DIR=/data/pdfs`
+   - `IMAGE_DIR=/data/imagens`
+   - `TEMP_DIR=/data/temp`
+   - `SQLITE_DIR=/data/sqlite`
+   - `DB_PATH=/data/sqlite/app.db`
+5. Start command recomendado:
    ```bash
    npm ci && npm run migrate && npm start
    ```
-4. O módulo gera PDFs em `/data/uploads/desenho-tecnico-pdf` automaticamente quando o volume está configurado.
+6. Validar persistência:
+   - enviar arquivo em upload;
+   - gerar PDF;
+   - reiniciar/redeploy e confirmar que os arquivos continuam acessíveis.
 
 ## Desenho Técnico – Fase 2
 
