@@ -1,5 +1,6 @@
 // modules/dashboard/dashboard.service.js
 const db = require("../../database/db");
+const { normalizeRole } = require("../../config/rbac");
 
 let escalaService = null;
 try {
@@ -529,27 +530,160 @@ function createAviso({ titulo, mensagem, colaborador_nome, data_referencia, crea
 =================================*/
 function getPreventivasDashboard() {
   return safeGet(() => {
-    return db
+    const cols = tableExists("preventiva_execucoes")
+      ? db.prepare("PRAGMA table_info(preventiva_execucoes)").all().map((c) => c.name)
+      : [];
+    const hasResp1 = cols.includes("responsavel_1_id");
+    const hasResp2 = cols.includes("responsavel_2_id");
+    const hasIniciadaEm = cols.includes("iniciada_em");
+    const criticidadeExpr = cols.includes("criticidade")
+      ? "UPPER(COALESCE(pe.criticidade, e.criticidade, 'MEDIA'))"
+      : "UPPER(COALESCE(e.criticidade, 'MEDIA'))";
+
+    const items = db
       .prepare(
         `
       SELECT
         pe.id,
+        pe.plano_id,
         COALESCE(e.nome, pp.titulo, '-') AS equipamento_nome,
         pe.data_prevista,
-        pe.status,
+        UPPER(COALESCE(pe.status, 'PENDENTE')) AS status,
         pe.responsavel,
-        pe.observacao
+        pe.observacao,
+        ${criticidadeExpr} AS criticidade,
+        ${hasResp1 ? "pe.responsavel_1_id" : "NULL"} AS responsavel_1_id,
+        ${hasResp2 ? "pe.responsavel_2_id" : "NULL"} AS responsavel_2_id,
+        ${hasResp1 ? "u1.name" : "NULL"} AS responsavel_1_nome,
+        ${hasResp2 ? "u2.name" : "NULL"} AS responsavel_2_nome
       FROM preventiva_execucoes pe
       JOIN preventiva_planos pp ON pp.id = pe.plano_id
       LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
-      WHERE pe.status IN ('pendente','atrasada','andamento','em_andamento')
+      ${hasResp1 ? "LEFT JOIN users u1 ON u1.id = pe.responsavel_1_id" : ""}
+      ${hasResp2 ? "LEFT JOIN users u2 ON u2.id = pe.responsavel_2_id" : ""}
+      WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA','ANDAMENTO','EM_ANDAMENTO')
       ORDER BY
         CASE WHEN pe.data_prevista IS NULL THEN 1 ELSE 0 END,
-        pe.data_prevista ASC
-      LIMIT 50
+        pe.data_prevista ASC,
+        pe.id ASC
+      LIMIT 10
     `
       )
-      .all();
+      .all()
+      .map((item) => {
+        const responsaveis = [item.responsavel_1_nome, item.responsavel_2_nome]
+          .map((x) => String(x || "").trim())
+          .filter(Boolean);
+        return {
+          ...item,
+          responsaveis,
+          responsavel_exibicao: responsaveis.length ? responsaveis.join(" • ") : (item.responsavel || "-"),
+        };
+      });
+
+    const resumoRows = db.prepare(`
+      SELECT UPPER(COALESCE(status, 'PENDENTE')) AS status, COUNT(*) AS total
+      FROM preventiva_execucoes
+      GROUP BY UPPER(COALESCE(status, 'PENDENTE'))
+    `).all();
+    const resumo = { abertas: 0, andamento: 0, fechadas: 0 };
+    resumoRows.forEach((r) => {
+      const st = String(r.status || "");
+      const t = Number(r.total || 0);
+      if (["PENDENTE", "ATRASADA"].includes(st)) resumo.abertas += t;
+      else if (["EM_ANDAMENTO", "ANDAMENTO"].includes(st)) resumo.andamento += t;
+      else if (["EXECUTADA", "CONCLUIDA", "FINALIZADA", "CANCELADA"].includes(st)) resumo.fechadas += t;
+    });
+
+    const criticidadeRows = db.prepare(`
+      SELECT ${criticidadeExpr} AS criticidade, COUNT(*) AS total
+      FROM preventiva_execucoes pe
+      JOIN preventiva_planos pp ON pp.id = pe.plano_id
+      LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
+      WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA','ANDAMENTO','EM_ANDAMENTO')
+      GROUP BY ${criticidadeExpr}
+    `).all();
+    const criticidade = { BAIXA: 0, MEDIA: 0, ALTA: 0, CRITICA: 0 };
+    criticidadeRows.forEach((r) => {
+      const key = String(r.criticidade || "MEDIA").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (criticidade[key] != null) criticidade[key] = Number(r.total || 0);
+    });
+
+    return {
+      items,
+      resumo,
+      criticidade,
+      limite: 10,
+      totalAtivas: items.length,
+      hasIniciadaEm,
+    };
+  }, { items: [], resumo: { abertas: 0, andamento: 0, fechadas: 0 }, criticidade: { BAIXA: 0, MEDIA: 0, ALTA: 0, CRITICA: 0 }, limite: 10, totalAtivas: 0, hasIniciadaEm: false });
+}
+
+function podeIniciarPreventiva(user, preventiva) {
+  const role = normalizeRole(user?.role);
+  if (!user?.id) return false;
+  if (role === "ADMIN" || role === "MANUTENCAO_SUPERVISOR" || role === "SUPERVISOR_MANUTENCAO" || role === "ENCARREGADO_MANUTENCAO") return true;
+  const ids = [preventiva?.responsavel_1_id, preventiva?.responsavel_2_id].map((x) => Number(x)).filter(Boolean);
+  return ids.includes(Number(user.id));
+}
+
+function iniciarPreventiva(execucaoId, user) {
+  return safeGet(() => {
+    const cols = tableExists("preventiva_execucoes")
+      ? db.prepare("PRAGMA table_info(preventiva_execucoes)").all().map((c) => c.name)
+      : [];
+    const hasIniciadaEm = cols.includes("iniciada_em");
+    const hasIniciadaPor = cols.includes("iniciada_por_user_id");
+    const hasResp1 = cols.includes("responsavel_1_id");
+    const hasResp2 = cols.includes("responsavel_2_id");
+    const preventiva = db.prepare(`
+      SELECT id, status, ${hasResp1 ? "responsavel_1_id" : "NULL AS responsavel_1_id"}, ${hasResp2 ? "responsavel_2_id" : "NULL AS responsavel_2_id"}
+      FROM preventiva_execucoes
+      WHERE id = ?
+      LIMIT 1
+    `).get(Number(execucaoId));
+    if (!preventiva) return { ok: false, reason: "not_found" };
+    if (String(preventiva.status || "").toUpperCase() !== "PENDENTE") return { ok: false, reason: "invalid_status" };
+    if (!podeIniciarPreventiva(user, preventiva)) return { ok: false, reason: "forbidden" };
+
+    const updates = ["status = 'EM_ANDAMENTO'"];
+    if (hasIniciadaEm) updates.push("iniciada_em = COALESCE(iniciada_em, datetime('now'))");
+    if (hasIniciadaPor) updates.push("iniciada_por_user_id = ?");
+    const args = [];
+    if (hasIniciadaPor) args.push(Number(user.id));
+    args.push(Number(execucaoId));
+    db.prepare(`UPDATE preventiva_execucoes SET ${updates.join(", ")} WHERE id = ?`).run(...args);
+    return { ok: true };
+  }, { ok: false, reason: "error" });
+}
+
+function getPreventivasEmAndamentoEquipe(limit = 10) {
+  return safeGet(() => {
+    const cols = tableExists("preventiva_execucoes")
+      ? db.prepare("PRAGMA table_info(preventiva_execucoes)").all().map((c) => c.name)
+      : [];
+    const hasResp1 = cols.includes("responsavel_1_id");
+    const hasResp2 = cols.includes("responsavel_2_id");
+    return db.prepare(`
+      SELECT pe.id,
+             COALESCE(e.nome, pp.titulo, '-') AS equipamento,
+             pe.status,
+             pe.responsavel,
+             ${hasResp1 ? "u1.name" : "NULL"} AS resp1,
+             ${hasResp2 ? "u2.name" : "NULL"} AS resp2
+      FROM preventiva_execucoes pe
+      JOIN preventiva_planos pp ON pp.id = pe.plano_id
+      LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
+      ${hasResp1 ? "LEFT JOIN users u1 ON u1.id = pe.responsavel_1_id" : ""}
+      ${hasResp2 ? "LEFT JOIN users u2 ON u2.id = pe.responsavel_2_id" : ""}
+      WHERE UPPER(COALESCE(pe.status,'')) IN ('EM_ANDAMENTO','ANDAMENTO')
+      ORDER BY COALESCE(pe.iniciada_em, pe.created_at) DESC, pe.id DESC
+      LIMIT ?
+    `).all(Number(limit) || 10).map((r) => ({
+      ...r,
+      equipe: [r.resp1, r.resp2].filter(Boolean).join(" • ") || r.responsavel || "-",
+    }));
   }, []);
 }
 
@@ -650,4 +784,6 @@ module.exports = {
   getPreventivasDashboard,
   getEscalaSemana,
   getEscalaPainelSemana,
+  iniciarPreventiva,
+  getPreventivasEmAndamentoEquipe,
 };

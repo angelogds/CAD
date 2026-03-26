@@ -161,7 +161,7 @@ app.use((req, res, next) => {
     const preventivasHoje = db.prepare(`
       SELECT COUNT(*) AS total
       FROM preventiva_execucoes
-      WHERE status IN ('pendente','atrasada') AND date(COALESCE(data_prevista,'')) = date('now','localtime')
+      WHERE UPPER(COALESCE(status,'')) IN ('PENDENTE','ATRASADA') AND date(COALESCE(data_prevista,'')) = date('now','localtime')
     `).get()?.total || 0;
 
     res.locals.operationalCounters = {

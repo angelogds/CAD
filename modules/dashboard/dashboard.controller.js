@@ -10,6 +10,7 @@ function index(req, res) {
   const osResumo = service.getOSResumoStatus();
   const osPainel = service.getOSPainel(tvMode ? 30 : 15);
   const osEmAndamento = service.getOSEmAndamento();
+  const preventivasEmAndamento = service.getPreventivasEmAndamentoEquipe();
   const historicoEquipamentos = service.getHistoricoEquipamentos(10);
   const motoresResumo = service.getMotoresResumoDashboard();
   const comprasResumo = service.getComprasResumoDashboard();
@@ -27,6 +28,7 @@ function index(req, res) {
     osResumo,
     osPainel,
     osEmAndamento,
+    preventivasEmAndamento,
     historicoEquipamentos,
     motoresResumo,
     comprasResumo,
@@ -38,6 +40,22 @@ function index(req, res) {
     alertaAtivo,
     tvMode,
   });
+}
+
+function iniciarPreventiva(req, res) {
+  const execucaoId = Number(req.params.execucaoId);
+  const result = service.iniciarPreventiva(execucaoId, req.session?.user || null);
+  if (!result?.ok) {
+    const msg = result?.reason === "forbidden"
+      ? "Sem permissão para iniciar esta preventiva."
+      : result?.reason === "invalid_status"
+        ? "A preventiva precisa estar PENDENTE para iniciar."
+        : "Não foi possível iniciar a preventiva.";
+    req.flash("error", msg);
+    return res.redirect("/dashboard");
+  }
+  req.flash("success", `Preventiva #${execucaoId} iniciada com sucesso.`);
+  return res.redirect("/dashboard");
 }
 
 function sse(req, res) {
@@ -306,4 +324,4 @@ function createAviso(req, res) {
   return res.redirect("/avisos");
 }
 
-module.exports = { index, createAviso, sse, reconhecerAlerta, subscribePush };
+module.exports = { index, createAviso, sse, reconhecerAlerta, subscribePush, iniciarPreventiva };
