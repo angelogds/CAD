@@ -65,14 +65,15 @@ function show(req, res) {
 
 function execCreate(req, res) {
   const planoId = Number(req.params.id);
-  const { data_prevista, responsavel, observacao } = req.body;
+  const { data_prevista, observacao } = req.body;
 
-  service.createExecucao(planoId, {
+  const execId = service.createExecucao(planoId, {
     data_prevista: (data_prevista || "").trim(),
     status: "pendente",
-    responsavel: (responsavel || "").trim(),
+    responsavel: "",
     observacao: (observacao || "").trim()
   });
+  service.alocarEquipeExecucaoPreventiva(execId);
 
   req.flash("success", "Execução adicionada.");
   return res.redirect(`/preventivas/${planoId}`);
@@ -82,8 +83,13 @@ function execUpdateStatus(req, res) {
   const planoId = Number(req.params.id);
   const execId = Number(req.params.execId);
   const { status, data_executada } = req.body;
+  const statusNorm = service.normalizePreventivaStatus(status);
 
-  const ok = service.updateExecucaoStatus(planoId, execId, status, data_executada, req.session?.user?.id || null);
+  if (["PENDENTE", "ATRASADA", "EM_ANDAMENTO", "ANDAMENTO"].includes(statusNorm)) {
+    service.alocarEquipeExecucaoPreventiva(execId);
+  }
+
+  const ok = service.updateExecucaoStatus(planoId, execId, statusNorm, data_executada, req.session?.user?.id || null);
 
   if (!ok) {
     req.flash("error", "Execução não encontrada para este plano.");
