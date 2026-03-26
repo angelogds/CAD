@@ -17,12 +17,10 @@ try {
 const safe = (fn, name) =>
   typeof fn === "function"
     ? (req, res, next) => {
-        try {
-          res.locals.activeMenu = "preventivas";
-          return fn(req, res, next);
-        } catch (err) {
-          return next(err);
-        }
+        res.locals.activeMenu = "preventivas";
+        Promise.resolve()
+          .then(() => fn(req, res, next))
+          .catch(next);
       }
     : (_req, res) => {
         console.error(`❌ [preventivas] Handler ${name} indefinido (export errado).`);

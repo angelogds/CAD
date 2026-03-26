@@ -138,15 +138,15 @@ function execUpdateStatus(req, res) {
   return res.redirect(`/preventivas/${planoId}`);
 }
 
-function reprocessarModulo(req, res) {
+async function reprocessarModulo(req, res) {
   const user = req.session?.user || null;
   if (!isAdminOrEncarregado(user)) {
     req.flash("error", "Sem permissão para reprocessar preventivas.");
-    return res.redirect("/preventivas");
+    return res.redirect("/dashboard");
   }
 
   try {
-    const result = service.reprocessarModuloPreventivas({ user });
+    const result = await service.reprocessarModuloPreventivas({ user });
     req.flash(
       "success",
       `Preventivas reprocessadas e equipes atualizadas com sucesso. ` +
@@ -155,7 +155,7 @@ function reprocessarModulo(req, res) {
         `execuções sincronizadas: ${result.reorganizacao?.atualizadas || 0}.`
     );
   } catch (err) {
-    console.error("[PREVENTIVAS][REPROCESSAR] erro ao reprocessar módulo:", err);
+    console.error("[PREVENTIVAS][REPROCESSAR] erro ao reprocessar módulo:", err?.stack || err);
     req.flash("error", "Erro ao reprocessar preventivas. Verifique os logs.");
   }
   return res.redirect("/dashboard");

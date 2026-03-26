@@ -24,12 +24,24 @@ function listPlanos() {
 }
 
 function listEquipamentosAtivos() {
+  if (!tableExists("equipamentos")) return [];
   return db.prepare(`
     SELECT id, codigo, nome, tipo, criticidade
     FROM equipamentos
     WHERE IFNULL(ativo,1) = 1
     ORDER BY nome
   `).all();
+}
+
+function getUsersNameColumn() {
+  try {
+    const cols = db.prepare(`PRAGMA table_info(users)`).all().map((c) => String(c.name || ""));
+    if (cols.includes("name")) return "name";
+    if (cols.includes("nome")) return "nome";
+    return null;
+  } catch (_e) {
+    return null;
+  }
 }
 
 function createPlano(data) {
@@ -85,13 +97,15 @@ function listExecucoes(planoId) {
   const cols = getPreventivaExecColumns();
   const hasResp1 = cols.includes("responsavel_1_id");
   const hasResp2 = cols.includes("responsavel_2_id");
+  const usersNameCol = getUsersNameColumn();
+  const hasUsers = tableExists("users") && !!usersNameCol;
   const rows = db.prepare(`
     SELECT pe.*,
-           ${hasResp1 ? "u1.name" : "NULL"} AS responsavel_1_nome,
-           ${hasResp2 ? "u2.name" : "NULL"} AS responsavel_2_nome
+           ${hasResp1 && hasUsers ? `u1.${usersNameCol}` : "NULL"} AS responsavel_1_nome,
+           ${hasResp2 && hasUsers ? `u2.${usersNameCol}` : "NULL"} AS responsavel_2_nome
     FROM preventiva_execucoes pe
-    ${hasResp1 ? "LEFT JOIN users u1 ON u1.id = pe.responsavel_1_id" : ""}
-    ${hasResp2 ? "LEFT JOIN users u2 ON u2.id = pe.responsavel_2_id" : ""}
+    ${hasResp1 && hasUsers ? "LEFT JOIN users u1 ON u1.id = pe.responsavel_1_id" : ""}
+    ${hasResp2 && hasUsers ? "LEFT JOIN users u2 ON u2.id = pe.responsavel_2_id" : ""}
     WHERE pe.plano_id = ?
     ORDER BY
       CASE UPPER(COALESCE(pe.status,''))
@@ -318,6 +332,9 @@ function inferirPadraoPreventivo(equipamento = {}, historico = []) {
 }
 
 function gerarPreventivasAutomaticas() {
+  if (!tableExists("preventiva_planos") || !tableExists("equipamentos")) {
+    return { criados: 0, totalEquipamentos: 0 };
+  }
   const equipamentos = listEquipamentosAtivos();
   let criados = 0;
 
@@ -478,9 +495,10 @@ function montarResponsaveisRetorno(escalaSemana = [], responsavel_1_id = null, r
       })
   );
   const ids = [Number(responsavel_1_id || 0), Number(responsavel_2_id || 0)].filter(Boolean);
-  const nomesUsers = ids.length
-    ? db.prepare(`SELECT id, name FROM users WHERE id IN (${ids.map(() => "?").join(",")})`).all(...ids)
-      .map((u) => [Number(u.id), String(u.name || "").trim()])
+  const usersNameCol = getUsersNameColumn();
+  const nomesUsers = ids.length && usersNameCol
+    ? db.prepare(`SELECT id, ${usersNameCol} AS nome FROM users WHERE id IN (${ids.map(() => "?").join(",")})`).all(...ids)
+      .map((u) => [Number(u.id), String(u.nome || "").trim()])
     : [];
   nomesUsers.forEach(([id, nome]) => mapaNomes.set(id, nome));
   const nomes = ids.map((id) => mapaNomes.get(id)).filter(Boolean);
@@ -612,20 +630,6 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
     return true;
   };
 
-  const ordenarPorCarga = (lista, configPrefixo) => {
-    const ids = (lista || []).map((p) => Number(p.user_id || 0)).filter(Boolean);
-    return [...(lista || [])].sort((a, b) => {
-      const aId = Number(a.user_id || 0);
-      const bId = Number(b.user_id || 0);
-      const cargaA = Number(getConfig(`${configPrefixo}_${aId}`) || 0);
-      const cargaB = Number(getConfig(`${configPrefixo}_${bId}`) || 0);
-      if (cargaA !== cargaB) return cargaA - cargaB;
-      const idxA = ids.indexOf(aId);
-      const idxB = ids.indexOf(bId);
-      return idxA - idxB;
-    });
-  };
-
   const registrarCarga = (resp1 = null, resp2 = null) => {
     [resp1, resp2].filter(Boolean).forEach((userId) => {
       const chave = `preventiva_carga_${getHojeBrasilISO()}_${Number(userId)}`;
@@ -645,37 +649,31 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
     return { responsavel_1_id: null, responsavel_2_id: null, responsavelTexto: "-", responsavelIds: [], responsavelNomes: [] };
   }
 
-  if (turnoAtual === "NOITE") {
-    const plantonista = typeof osService.getPlantonistaNoite === "function"
-      ? osService.getPlantonistaNoite()
-      : elegiveis.find((p) => ["plantao", "noturno"].includes(normalizeTxt(p.tipo_turno)) && isMecanico(p.funcao));
-    const resp1 = elegivel(plantonista) ? Number(plantonista.user_id) : Number(elegiveis[0].user_id || 0);
-    const retorno = montarResponsaveisRetorno(elegiveis, resp1 || null, null);
-    registrarCarga(retorno.responsavel_1_id, retorno.responsavel_2_id);
-    return retorno;
-  }
+  const mecanicosDia = elegiveis
+    .filter((p) => normalizeTxt(p.tipo_turno) === "diurno" && isMecanico(p.funcao))
+    .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+  const apoioDia = elegiveis
+    .filter((p) => normalizeTxt(p.tipo_turno) === "apoio" && isAuxiliarOuApoio(p.funcao))
+    .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+  const plantonistaNoite = elegiveis.find((p) => ["plantao", "noturno"].includes(normalizeTxt(p.tipo_turno)) && isMecanico(p.funcao)) || null;
 
-  const mecanicosDiaRaw = typeof osService.getMecanicosDiurno === "function" ? osService.getMecanicosDiurno() : [];
-  const apoioDiaRaw = typeof osService.getApoioDiurno === "function" ? osService.getApoioDiurno() : [];
-  const mecanicosDia = ordenarPorCarga(mecanicosDiaRaw.filter(elegivel), `preventiva_carga_${getHojeBrasilISO()}`);
-  const apoioDia = ordenarPorCarga(apoioDiaRaw.filter(elegivel), `preventiva_carga_${getHojeBrasilISO()}`);
-  const poolGeral = ordenarPorCarga(elegiveis, `preventiva_carga_${getHojeBrasilISO()}`);
+  const equipeOS = typeof osService.resolverEquipePorCriticidade === "function"
+    ? osService.resolverEquipePorCriticidade({
+      grau: equipeCfg.criticidade,
+      turno: turnoAtual,
+      mecanicos: mecanicosDia,
+      apoios: apoioDia,
+      plantonista: plantonistaNoite,
+      predicateDisponivel: (colab) => elegivel(colab),
+    })
+    : null;
 
-  let resp1 = null;
-  let resp2 = null;
-
-  if (equipeCfg.quantidade === 1) {
-    const unico = mecanicosDia[0] || apoioDia[0] || poolGeral[0] || null;
-    resp1 = Number(unico?.user_id || 0) || null;
-  } else {
-    const executor = mecanicosDia[0] || poolGeral[0] || null;
-    const auxiliar = apoioDia.find((p) => Number(p.user_id) !== Number(executor?.user_id || 0))
-      || mecanicosDia.find((p) => Number(p.user_id) !== Number(executor?.user_id || 0))
-      || poolGeral.find((p) => Number(p.user_id) !== Number(executor?.user_id || 0))
-      || null;
-    resp1 = Number(executor?.user_id || 0) || null;
-    resp2 = Number(auxiliar?.user_id || 0) || null;
-  }
+  const fallbackExecutor = elegiveis[0] || null;
+  const fallbackAuxiliar = elegiveis.find((p) => Number(p.user_id || 0) !== Number(fallbackExecutor?.user_id || 0)) || null;
+  const resp1 = Number(equipeOS?.executor?.user_id || equipeOS?.executor?.id || fallbackExecutor?.user_id || fallbackExecutor?.id || 0) || null;
+  const resp2 = equipeCfg.quantidade === 2
+    ? Number(equipeOS?.auxiliar?.user_id || equipeOS?.auxiliar?.id || fallbackAuxiliar?.user_id || fallbackAuxiliar?.id || 0) || null
+    : null;
 
   const retorno = montarResponsaveisRetorno(elegiveis, resp1, resp2);
   registrarCarga(retorno.responsavel_1_id, retorno.responsavel_2_id);
@@ -699,6 +697,9 @@ function addDays(date, days) {
 }
 
 function gerarCronogramaSemanalInteligente(refDate = new Date()) {
+  if (!tableExists("preventiva_planos") || !tableExists("preventiva_execucoes")) {
+    return { criadas: 0, semanaInicio: null, semanaFim: null };
+  }
   const start = new Date(Date.UTC(refDate.getUTCFullYear(), refDate.getUTCMonth(), refDate.getUTCDate()));
   const day = start.getUTCDay();
   const monday = addDays(start, day === 0 ? -6 : 1 - day);

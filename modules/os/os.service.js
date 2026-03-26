@@ -713,6 +713,32 @@ function marcarAguardandoEquipe(osId, turno, aviso) {
   return { aguardando: true, aviso, turno };
 }
 
+function resolverEquipePorCriticidade({
+  grau = "MEDIA",
+  turno = getTurnoAtual(),
+  mecanicos = null,
+  apoios = null,
+  plantonista = null,
+  predicateDisponivel = null,
+} = {}) {
+  const disponivel = typeof predicateDisponivel === "function"
+    ? predicateDisponivel
+    : (colab) => isColaboradorDisponivel(Number(colab?.id || 0));
+
+  if (turno === "NOITE") {
+    const escolhidoNoite = plantonista || getPlantonistaNoite();
+    return { turno: "NOITE", executor: disponivel(escolhidoNoite) ? escolhidoNoite : null, auxiliar: null };
+  }
+
+  const grauNorm = normalizeGrau(grau);
+  const apoioDisponivel = (apoios || getApoioDiurno()).filter((c) => disponivel(c));
+  const mecanicosDisponiveis = (mecanicos || getMecanicosDiurno()).filter((c) => disponivel(c));
+  const executor = mecanicosDisponiveis[0] || null;
+  if (!executor) return { turno: "DIA", executor: null, auxiliar: null };
+  if (grauNorm === "BAIXA") return { turno: "DIA", executor, auxiliar: null };
+  return { turno: "DIA", executor, auxiliar: apoioDisponivel[0] || null };
+}
+
 function autoAlocarOS(osId, { force = false } = {}) {
   const cols = getOSColumns();
   const os = db.prepare(`
@@ -736,29 +762,18 @@ function autoAlocarOS(osId, { force = false } = {}) {
   const turno = getTurnoAtual();
 
   if (turno === "NOITE") {
-    const plantonista = getPlantonistaNoite();
-    if (plantonista?.id && isColaboradorDisponivel(plantonista.id)) {
-      persistirAlocacaoOS(Number(osId), plantonista, null, "NOITE", "AUTO");
-      return { aguardando: false, turno: "NOITE", executor: plantonista, auxiliar: null };
+    const equipeNoite = resolverEquipePorCriticidade({ grau: os.grau, turno: "NOITE" });
+    if (equipeNoite.executor?.id) {
+      persistirAlocacaoOS(Number(osId), equipeNoite.executor, null, "NOITE", "AUTO");
+      return { aguardando: false, turno: "NOITE", executor: equipeNoite.executor, auxiliar: null };
     }
     return marcarAguardandoEquipe(Number(osId), "NOITE", "Sem executor disponível no turno: OS aguardando alocação.");
   }
 
-  const grau = normalizeGrau(os.grau);
-  const apoioDisponivel = getApoioDiurno().filter((c) => isColaboradorDisponivel(c.id));
-  const mecanicosDisponiveis = getMecanicosDiurno().filter((c) => isColaboradorDisponivel(c.id));
-
-  if (grau === "BAIXA") {
-    const executor = mecanicosDisponiveis[0] || null;
-    if (!executor) return marcarAguardandoEquipe(Number(osId), "DIA", "Sem mecânico disponível no turno: OS aguardando alocação.");
-    persistirAlocacaoOS(Number(osId), executor, null, "DIA", "AUTO");
-    return { aguardando: false, turno: "DIA", executor, auxiliar: null };
-  }
-
-  const executor = mecanicosDisponiveis[0] || null;
+  const equipe = resolverEquipePorCriticidade({ grau: os.grau, turno: "DIA" });
+  const executor = equipe.executor || null;
   if (!executor) return marcarAguardandoEquipe(Number(osId), "DIA", "Sem executor disponível no turno: OS aguardando alocação.");
-
-  const auxiliar = apoioDisponivel[0] || null;
+  const auxiliar = equipe.auxiliar || null;
   persistirAlocacaoOS(Number(osId), executor, auxiliar, "DIA", "AUTO");
   return { aguardando: false, turno: "DIA", executor, auxiliar };
 }
@@ -1544,6 +1559,7 @@ module.exports = {
   getMecanicosDiurno,
   getApoioDiurno,
   getPlantonista,
+  resolverEquipePorCriticidade,
   listarOcupados,
   autoAlocarOS,
   autoAssignOS,
