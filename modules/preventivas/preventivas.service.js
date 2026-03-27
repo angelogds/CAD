@@ -476,7 +476,7 @@ function getEscalaSemanaAtual() {
   `).all(Number(semana.id)).map((row) => ({
     ...row,
     id: Number(row.colaborador_id),
-    user_id: Number(row.user_id || 0) || findUserIdByName(row.nome),
+    user_id: Number(row.user_id || 0) || null,
   }));
 }
 
@@ -569,6 +569,27 @@ function escolherPorRotacao(lista = [], configKeyUltimo = "") {
   const idx = ultimoId ? candidatos.findIndex((c) => Number(c.user_id) === ultimoId) : -1;
   const escolhido = idx >= 0 ? (candidatos[idx + 1] || candidatos[0]) : candidatos[0];
   setConfig(configKeyUltimo, Number(escolhido.user_id));
+  return escolhido;
+}
+
+function escolherPorRotacaoDeterministica(lista = [], configKeyUltimo = "", { excluirUserIds = [] } = {}) {
+  const bloqueados = new Set((excluirUserIds || []).map((id) => Number(id || 0)).filter(Boolean));
+  const candidatos = [...(lista || [])]
+    .filter((c) => Number(c?.user_id || 0))
+    .filter((c) => !bloqueados.has(Number(c.user_id)))
+    .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+
+  if (!candidatos.length) return null;
+
+  const ultimoId = Number(getConfig(configKeyUltimo) || 0) || null;
+  const idxAtual = ultimoId ? candidatos.findIndex((c) => Number(c.user_id) === ultimoId) : -1;
+  const proximoIdx = idxAtual >= 0 ? (idxAtual + 1) % candidatos.length : 0;
+  const escolhido = candidatos[proximoIdx] || null;
+
+  if (escolhido?.user_id) {
+    setConfig(configKeyUltimo, Number(escolhido.user_id));
+  }
+
   return escolhido;
 }
 
@@ -714,6 +735,7 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
 
   const elegivel = (pessoa) => {
     const userId = Number(pessoa?.user_id || 0);
+    if (!userId) return false;
     if (indisponiveis.has(String(userId))) return false;
     const colaboradorId = Number(pessoa?.id || pessoa?.colaborador_id || 0);
     if (!colaboradorId) return false;
@@ -736,37 +758,40 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
       baseEscala = filtrarEscalaVigentePorTurno(turnoColabs, turnoAtual);
     }
   }
-  const elegiveis = baseEscala.filter(elegivel);
+  const elegiveis = baseEscala
+    .filter(elegivel)
+    .filter((pessoa) => Number(pessoa?.user_id || 0));
 
   if (!elegiveis.length) {
     return { responsavel_1_id: null, responsavel_2_id: null, responsavelTexto: "-", responsavelIds: [], responsavelNomes: [] };
   }
 
-  const mecanicosDia = elegiveis
-    .filter((p) => normalizeTxt(p.tipo_turno) === "diurno" && isMecanico(p.funcao))
+  const turnoNorm = normalizeTxt(turnoAtual);
+  const mecanicosTurno = elegiveis
+    .filter((p) => ["diurno", "noturno", "plantao"].includes(normalizeTxt(p.tipo_turno)) && isMecanico(p.funcao))
     .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
-  const apoioDia = elegiveis
+  const apoioTurno = elegiveis
     .filter((p) => normalizeTxt(p.tipo_turno) === "apoio" && isAuxiliarOuApoio(p.funcao))
     .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
-  const plantonistaNoite = elegiveis.find((p) => ["plantao", "noturno"].includes(normalizeTxt(p.tipo_turno)) && isMecanico(p.funcao)) || null;
-
-  const equipeOS = typeof osService.resolverEquipePorCriticidade === "function"
-    ? osService.resolverEquipePorCriticidade({
-      grau: equipeCfg.criticidade,
-      turno: turnoAtual,
-      mecanicos: mecanicosDia,
-      apoios: apoioDia,
-      plantonista: plantonistaNoite,
-      predicateDisponivel: (colab) => elegivel(colab),
-    })
+  const candidatosExecutor = turnoNorm === "noite"
+    ? mecanicosTurno
+    : (mecanicosTurno.length ? mecanicosTurno : elegiveis);
+  const executor = escolherPorRotacaoDeterministica(
+    candidatosExecutor,
+    `preventiva_rr_executor_${turnoNorm || "dia"}`
+  );
+  const candidatosAuxiliar = apoioTurno.length
+    ? apoioTurno
+    : elegiveis;
+  const auxiliar = equipeCfg.quantidade === 2
+    ? escolherPorRotacaoDeterministica(
+      candidatosAuxiliar,
+      `preventiva_rr_auxiliar_${turnoNorm || "dia"}`,
+      { excluirUserIds: [executor?.user_id] }
+    )
     : null;
-
-  const fallbackExecutor = elegiveis[0] || null;
-  const fallbackAuxiliar = elegiveis.find((p) => Number(p.id || p.colaborador_id || 0) !== Number(fallbackExecutor?.id || fallbackExecutor?.colaborador_id || 0)) || null;
-  const resp1 = Number(equipeOS?.executor?.user_id || fallbackExecutor?.user_id || findUserIdByName(equipeOS?.executor?.nome || fallbackExecutor?.nome) || 0) || null;
-  const resp2 = equipeCfg.quantidade === 2
-    ? Number(equipeOS?.auxiliar?.user_id || fallbackAuxiliar?.user_id || findUserIdByName(equipeOS?.auxiliar?.nome || fallbackAuxiliar?.nome) || 0) || null
-    : null;
+  const resp1 = Number(executor?.user_id || 0) || null;
+  const resp2 = equipeCfg.quantidade === 2 ? (Number(auxiliar?.user_id || 0) || null) : null;
 
   const retorno = montarResponsaveisRetorno(elegiveis, resp1, resp2);
   registrarCarga(retorno.responsavel_1_id, retorno.responsavel_2_id);
@@ -920,12 +945,8 @@ function reorganizarPreventivasPendentesPorEscala() {
     return { atualizadas: 0, totalAtivas: 0 };
   }
 
-  const escala = obterEscalaAtual();
-  const mecanicosDia = escala.mecanicos_dia || [];
-  const apoio = escala.apoio_operacional || [];
-  const noite = escala.noite || [];
-  const equipeDisponivel = [...mecanicosDia, ...apoio];
-  const equipeFallback = equipeDisponivel.length ? equipeDisponivel : [...noite];
+  const escalaSemana = getEscalaSemanaAtual();
+  const disponibilidade = getDisponibilidadeEscala();
   const cols = getPreventivaExecColumns();
   const hasCriticidade = cols.includes("criticidade");
   const hasResp1 = cols.includes("responsavel_1_id");
@@ -956,15 +977,14 @@ function reorganizarPreventivasPendentesPorEscala() {
       criticidade: item.criticidade,
     });
     const criticidadeNormalizada = normalizeCriticidade(criticidade);
-    const responsaveis = criticidadeNormalizada === "BAIXA"
-      ? [equipeFallback[0]].filter(Boolean)
-      : [equipeFallback[0], equipeFallback[1]].filter(Boolean);
-    const responsavelTexto = responsaveis
-      .map((p) => String(p?.nome || "").trim())
-      .filter(Boolean)
-      .join(", ") || "-";
-    const responsavel_1_id = Number(responsaveis[0]?.user_id || findUserIdByName(responsaveis[0]?.nome) || 0) || null;
-    const responsavel_2_id = Number(responsaveis[1]?.user_id || findUserIdByName(responsaveis[1]?.nome) || 0) || null;
+    const aloc = montarEquipePreventiva(
+      { criticidade: criticidadeNormalizada, tipo_plano: item.tipo_plano, titulo: item.titulo, checklist_json: item.checklist_json },
+      escalaSemana,
+      disponibilidade
+    );
+    const responsavelTexto = aloc.responsavelTexto;
+    const responsavel_1_id = Number(aloc.responsavel_1_id || 0) || null;
+    const responsavel_2_id = Number(aloc.responsavel_2_id || 0) || null;
 
     const updates = ["responsavel = ?"];
     const args = [responsavelTexto];
