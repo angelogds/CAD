@@ -717,7 +717,6 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
     if (indisponiveis.has(String(userId))) return false;
     const colaboradorId = Number(pessoa?.id || pessoa?.colaborador_id || 0);
     if (!colaboradorId) return false;
-    if (typeof osService.isColaboradorDisponivel === "function" && !osService.isColaboradorDisponivel(colaboradorId)) return false;
     return true;
   };
 
