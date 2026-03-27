@@ -12,11 +12,20 @@ function tableExists(name) {
   }
 }
 
+function getEquipamentosColumns() {
+  try {
+    return db.prepare(`PRAGMA table_info(equipamentos)`).all().map((c) => String(c.name || ""));
+  } catch (_e) {
+    return [];
+  }
+}
+
 function listPlanos() {
+  const hasCodigo = getEquipamentosColumns().includes("codigo");
   return db.prepare(`
     SELECT p.*,
            e.nome AS equipamento_nome,
-           e.codigo AS equipamento_codigo
+           ${hasCodigo ? "e.codigo" : "NULL"} AS equipamento_codigo
     FROM preventiva_planos p
     LEFT JOIN equipamentos e ON e.id = p.equipamento_id
     ORDER BY p.ativo DESC, p.id DESC
@@ -25,8 +34,9 @@ function listPlanos() {
 
 function listEquipamentosAtivos() {
   if (!tableExists("equipamentos")) return [];
+  const hasCodigo = getEquipamentosColumns().includes("codigo");
   return db.prepare(`
-    SELECT id, codigo, nome, tipo, criticidade
+    SELECT id, ${hasCodigo ? "codigo" : "NULL AS codigo"}, nome, tipo, criticidade
     FROM equipamentos
     WHERE IFNULL(ativo,1) = 1
     ORDER BY nome
@@ -80,12 +90,17 @@ function createPlano(data) {
 }
 
 function getPlanoById(id) {
+  const equipCols = getEquipamentosColumns();
+  const hasCodigo = equipCols.includes("codigo");
+  const hasSetor = equipCols.includes("setor");
+  const hasCriticidade = equipCols.includes("criticidade");
   return db.prepare(`
     SELECT p.*,
            e.nome AS equipamento_nome,
-           e.codigo AS equipamento_codigo,
-           e.setor AS equipamento_setor,
-           e.tipo AS equipamento_tipo
+           ${hasCodigo ? "e.codigo" : "NULL"} AS equipamento_codigo,
+           ${hasSetor ? "e.setor" : "NULL"} AS equipamento_setor,
+           e.tipo AS equipamento_tipo,
+           ${hasCriticidade ? "e.criticidade" : "NULL"} AS equipamento_criticidade
     FROM preventiva_planos p
     LEFT JOIN equipamentos e ON e.id = p.equipamento_id
     WHERE p.id = ?
@@ -498,7 +513,6 @@ function montarResponsaveisRetorno(escalaSemana = [], responsavel_1_id = null, r
         const nome = String(p.nome || "").trim();
         const pares = [];
         if (Number(p?.user_id || 0)) pares.push([Number(p.user_id), nome]);
-        if (Number(p?.id || p?.colaborador_id || 0)) pares.push([Number(p.id || p.colaborador_id), nome]);
         return pares;
       })
   );
@@ -509,10 +523,6 @@ function montarResponsaveisRetorno(escalaSemana = [], responsavel_1_id = null, r
       .map((u) => [Number(u.id), String(u.nome || "").trim()])
     : [];
   nomesUsers.forEach(([id, nome]) => mapaNomes.set(id, nome));
-  if (ids.length && tableExists("colaboradores")) {
-    const nomesColaboradores = db.prepare(`SELECT id, nome FROM colaboradores WHERE id IN (${ids.map(() => "?").join(",")})`).all(...ids);
-    nomesColaboradores.forEach((c) => mapaNomes.set(Number(c.id), String(c.nome || "").trim()));
-  }
   const nomes = ids.map((id) => mapaNomes.get(id)).filter(Boolean);
   return {
     responsavel_1_id: ids[0] || null,
@@ -682,9 +692,17 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
 
   const fallbackExecutor = elegiveis[0] || null;
   const fallbackAuxiliar = elegiveis.find((p) => Number(p.user_id || 0) !== Number(fallbackExecutor?.user_id || 0)) || null;
-  const resp1 = Number(equipeOS?.executor?.user_id || equipeOS?.executor?.id || fallbackExecutor?.user_id || fallbackExecutor?.id || 0) || null;
+  const resolveUserId = (pessoa) => {
+    const userId = Number(pessoa?.user_id || 0);
+    if (userId) return userId;
+    const colaboradorId = Number(pessoa?.colaborador_id || pessoa?.id || 0);
+    if (!colaboradorId || !tableExists("colaboradores")) return null;
+    const row = db.prepare(`SELECT user_id FROM colaboradores WHERE id = ? LIMIT 1`).get(colaboradorId);
+    return Number(row?.user_id || 0) || null;
+  };
+  const resp1 = resolveUserId(equipeOS?.executor) || resolveUserId(fallbackExecutor) || null;
   const resp2 = equipeCfg.quantidade === 2
-    ? Number(equipeOS?.auxiliar?.user_id || equipeOS?.auxiliar?.id || fallbackAuxiliar?.user_id || fallbackAuxiliar?.id || 0) || null
+    ? resolveUserId(equipeOS?.auxiliar) || resolveUserId(fallbackAuxiliar) || null
     : null;
 
   const retorno = montarResponsaveisRetorno(elegiveis, resp1, resp2);
@@ -717,12 +735,15 @@ function gerarCronogramaSemanalInteligente(refDate = new Date()) {
   const monday = addDays(start, day === 0 ? -6 : 1 - day);
   const sunday = addDays(monday, 6);
 
+  const equipCols = getEquipamentosColumns();
+  const hasSetor = equipCols.includes("setor");
+  const hasCriticidadeEq = equipCols.includes("criticidade");
   const planos = db.prepare(`
-    SELECT p.*, e.nome AS equipamento_nome, e.tipo AS equipamento_tipo, e.setor AS equipamento_setor, e.criticidade AS equipamento_criticidade
+    SELECT p.*, e.nome AS equipamento_nome, e.tipo AS equipamento_tipo, ${hasSetor ? "e.setor" : "NULL"} AS equipamento_setor, ${hasCriticidadeEq ? "e.criticidade" : "'MEDIA'"} AS equipamento_criticidade
     FROM preventiva_planos p
     LEFT JOIN equipamentos e ON e.id = p.equipamento_id
     WHERE p.ativo = 1
-    ORDER BY CASE UPPER(COALESCE(e.criticidade,''))
+    ORDER BY CASE UPPER(COALESCE(${hasCriticidadeEq ? "e.criticidade" : "'MEDIA'"},'MEDIA'))
       WHEN 'CRITICA' THEN 0
       WHEN 'ALTA' THEN 1
       WHEN 'MEDIA' THEN 2
@@ -841,6 +862,10 @@ function reorganizarPreventivasPendentesPorEscala() {
   const hasCriticidade = cols.includes("criticidade");
   const hasResp1 = cols.includes("responsavel_1_id");
   const hasResp2 = cols.includes("responsavel_2_id");
+  const planoCols = getPlanoColumns();
+  const hasTipoPlano = planoCols.includes("tipo_plano");
+  const hasChecklistJson = planoCols.includes("checklist_json");
+  const hasEquipCriticidade = getEquipamentosColumns().includes("criticidade");
   const rows = db.prepare(`
     SELECT pe.id,
            pe.status,
@@ -849,10 +874,10 @@ function reorganizarPreventivasPendentesPorEscala() {
            ${hasResp2 ? "pe.responsavel_2_id" : "NULL"} AS responsavel_2_id,
            COALESCE(e.nome, pp.titulo, '-') AS equipamento_nome,
            COALESCE(e.tipo, pp.titulo, '-') AS equipamento_tipo,
-           COALESCE(pe.criticidade, e.criticidade, 'MEDIA') AS criticidade,
-           pp.tipo_plano,
+           COALESCE(pe.criticidade, ${hasEquipCriticidade ? "e.criticidade" : "'MEDIA'"}, 'MEDIA') AS criticidade,
+           ${hasTipoPlano ? "pp.tipo_plano" : "NULL"} AS tipo_plano,
            pp.titulo,
-           pp.checklist_json
+           ${hasChecklistJson ? "pp.checklist_json" : "NULL"} AS checklist_json
     FROM preventiva_execucoes pe
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
@@ -914,16 +939,20 @@ function alocarEquipeExecucaoPreventiva(execucaoId) {
   const hasResp2 = cols.includes("responsavel_2_id");
   const hasCriticidade = cols.includes("criticidade");
   const hasResponsavelTxt = cols.includes("responsavel");
+  const planoCols = getPlanoColumns();
+  const hasTipoPlano = planoCols.includes("tipo_plano");
+  const hasChecklistJson = planoCols.includes("checklist_json");
+  const hasEquipCriticidade = getEquipamentosColumns().includes("criticidade");
   if (!hasResponsavelTxt) return { ok: false, reason: "column_missing" };
 
   const row = db.prepare(`
     SELECT pe.id,
-           COALESCE(pe.criticidade, e.criticidade, 'MEDIA') AS criticidade,
+           COALESCE(pe.criticidade, ${hasEquipCriticidade ? "e.criticidade" : "'MEDIA'"}, 'MEDIA') AS criticidade,
            COALESCE(e.nome, pp.titulo, '-') AS equipamento_nome,
            COALESCE(e.tipo, pp.titulo, '-') AS equipamento_tipo,
-           pp.tipo_plano,
+           ${hasTipoPlano ? "pp.tipo_plano" : "NULL"} AS tipo_plano,
            pp.titulo,
-           pp.checklist_json
+           ${hasChecklistJson ? "pp.checklist_json" : "NULL"} AS checklist_json
     FROM preventiva_execucoes pe
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
@@ -969,14 +998,17 @@ function revisarCriticidadePreventivasFuturas() {
   if (!tableExists("preventiva_execucoes") || !tableExists("preventiva_planos")) return { revisadas: 0 };
   const cols = getPreventivaExecColumns();
   if (!cols.includes("criticidade")) return { revisadas: 0 };
+  const equipCols = getEquipamentosColumns();
+  const hasSetor = equipCols.includes("setor");
+  const hasCriticidadeEq = equipCols.includes("criticidade");
 
   const rows = db.prepare(`
     SELECT pe.id,
            pp.equipamento_id,
            e.nome AS equipamento_nome,
            e.tipo AS equipamento_tipo,
-           e.setor AS equipamento_setor,
-           e.criticidade AS equipamento_criticidade
+           ${hasSetor ? "e.setor" : "NULL"} AS equipamento_setor,
+           ${hasCriticidadeEq ? "e.criticidade" : "'MEDIA'"} AS equipamento_criticidade
     FROM preventiva_execucoes pe
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
