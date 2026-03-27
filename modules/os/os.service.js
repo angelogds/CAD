@@ -74,6 +74,31 @@ function normalizeColaboradorFuncao(funcao) {
   return "APOIO";
 }
 
+function resolveUserIdPorNome(nome = "") {
+  const nomeLimpo = String(nome || "").trim();
+  if (!nomeLimpo || !tableExists("users")) return null;
+  try {
+    const exato = db.prepare(`
+      SELECT id
+      FROM users
+      WHERE lower(name) = lower(?)
+      ORDER BY id ASC
+      LIMIT 1
+    `).get(nomeLimpo);
+    if (exato?.id) return Number(exato.id);
+    const aproximado = db.prepare(`
+      SELECT id
+      FROM users
+      WHERE lower(name) LIKE lower(?)
+      ORDER BY id ASC
+      LIMIT 1
+    `).get(`%${nomeLimpo}%`);
+    return aproximado?.id ? Number(aproximado.id) : null;
+  } catch (_e) {
+    return null;
+  }
+}
+
 function getTurnoAtual() {
   return getTurnoAgora();
 }
@@ -95,7 +120,7 @@ function getPessoasDoTurnoAtual() {
   const usersJoin = tableExists("users");
   const rows = db.prepare(`
     SELECT c.user_id,
-           ${usersJoin ? "u.name" : "c.nome"} AS nome,
+           ${usersJoin ? "COALESCE(u.name, c.nome)" : "c.nome"} AS nome,
            c.funcao,
            a.tipo_turno
     FROM escala_alocacoes a
@@ -103,19 +128,18 @@ function getPessoasDoTurnoAtual() {
     ${usersJoin ? "LEFT JOIN users u ON u.id = c.user_id" : ""}
     WHERE a.semana_id = ?
       AND a.tipo_turno IN (${placeholders})
-      AND c.user_id IS NOT NULL
       AND IFNULL(c.ativo,1) = 1
     ORDER BY nome ASC
   `).all(semanaAtual.id, ...turnosPermitidos);
 
   return rows
     .map((row) => ({
-      user_id: Number(row.user_id),
-      nome: row.nome,
+      user_id: Number(row.user_id || 0) || resolveUserIdPorNome(row.nome) || null,
+      nome: String(row.nome || "").trim(),
       funcao: normalizeColaboradorFuncao(row.funcao),
       tipo_turno: String(row.tipo_turno || "").toUpperCase(),
     }))
-    .filter((row) => row.user_id && row.nome);
+    .filter((row) => row.nome);
 }
 
 function isUserOcupado(userId) {
@@ -528,7 +552,7 @@ function getColaboradoresTurnoAtual(turno) {
   `).all(Number(semana.id), ...tipos).map((row) => ({
     colaborador_id: Number(row.colaborador_id),
     id: Number(row.colaborador_id),
-    user_id: row.user_id ? Number(row.user_id) : null,
+    user_id: row.user_id ? Number(row.user_id) : (resolveUserIdPorNome(row.nome) || null),
     nome: row.nome,
     funcao: normalizeColaboradorFuncao(row.funcao),
     tipo_turno: String(row.tipo_turno || "").toLowerCase(),
