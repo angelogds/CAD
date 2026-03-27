@@ -57,6 +57,32 @@ function resolveUsuariosSource() {
   return null;
 }
 
+function findUserIdByName(nome = "") {
+  const usuariosSource = resolveUsuariosSource();
+  const nomeLimpo = String(nome || "").trim();
+  if (!usuariosSource || !nomeLimpo) return null;
+  try {
+    const row = db.prepare(`
+      SELECT ${usuariosSource.idCol} AS id
+      FROM ${usuariosSource.table}
+      WHERE lower(${usuariosSource.nameCol}) = lower(?)
+      LIMIT 1
+    `).get(nomeLimpo);
+    if (row?.id) return Number(row.id);
+
+    const likeRow = db.prepare(`
+      SELECT ${usuariosSource.idCol} AS id
+      FROM ${usuariosSource.table}
+      WHERE lower(${usuariosSource.nameCol}) LIKE lower(?)
+      ORDER BY ${usuariosSource.idCol} ASC
+      LIMIT 1
+    `).get(`%${nomeLimpo}%`);
+    return likeRow?.id ? Number(likeRow.id) : null;
+  } catch (_e) {
+    return null;
+  }
+}
+
 function getUsersNameColumn() {
   return resolveUsuariosSource()?.nameCol || null;
 }
@@ -450,23 +476,21 @@ function getEscalaSemanaAtual() {
   `).all(Number(semana.id)).map((row) => ({
     ...row,
     id: Number(row.colaborador_id),
+    user_id: Number(row.user_id || 0) || findUserIdByName(row.nome),
   }));
 }
 
 function obterEscalaAtual() {
   const escalaSemana = getEscalaSemanaAtual();
   const elegiveis = (escalaSemana || [])
-    .map((pessoa) => {
-      const userId = Number(pessoa?.user_id || 0);
-      if (!userId) return null;
-      return {
-        id: userId,
-        nome: String(pessoa?.nome || "").trim(),
-        tipo_turno: normalizeTxt(pessoa?.tipo_turno),
-        funcao: String(pessoa?.funcao || ""),
-      };
-    })
-    .filter(Boolean);
+    .map((pessoa) => ({
+      id: Number(pessoa?.id || pessoa?.colaborador_id || 0) || null,
+      user_id: Number(pessoa?.user_id || 0) || findUserIdByName(pessoa?.nome),
+      nome: String(pessoa?.nome || "").trim(),
+      tipo_turno: normalizeTxt(pessoa?.tipo_turno),
+      funcao: String(pessoa?.funcao || ""),
+    }))
+    .filter((pessoa) => !!pessoa.id);
 
   return {
     mecanicos_dia: elegiveis.filter((p) => p.tipo_turno === "diurno" && isMecanico(p.funcao)),
@@ -555,6 +579,7 @@ function montarResponsaveisRetorno(escalaSemana = [], responsavel_1_id = null, r
         const nome = String(p.nome || "").trim();
         const pares = [];
         if (Number(p?.user_id || 0)) pares.push([Number(p.user_id), nome]);
+        if (Number(p?.id || p?.colaborador_id || 0)) pares.push([Number(p.id || p.colaborador_id), nome]);
         return pares;
       })
   );
@@ -738,9 +763,9 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
 
   const fallbackExecutor = elegiveis[0] || null;
   const fallbackAuxiliar = elegiveis.find((p) => Number(p.id || p.colaborador_id || 0) !== Number(fallbackExecutor?.id || fallbackExecutor?.colaborador_id || 0)) || null;
-  const resp1 = Number(equipeOS?.executor?.id || equipeOS?.executor?.colaborador_id || fallbackExecutor?.id || fallbackExecutor?.colaborador_id || 0) || null;
+  const resp1 = Number(equipeOS?.executor?.user_id || fallbackExecutor?.user_id || findUserIdByName(equipeOS?.executor?.nome || fallbackExecutor?.nome) || 0) || null;
   const resp2 = equipeCfg.quantidade === 2
-    ? Number(equipeOS?.auxiliar?.id || equipeOS?.auxiliar?.colaborador_id || fallbackAuxiliar?.id || fallbackAuxiliar?.colaborador_id || 0) || null
+    ? Number(equipeOS?.auxiliar?.user_id || fallbackAuxiliar?.user_id || findUserIdByName(equipeOS?.auxiliar?.nome || fallbackAuxiliar?.nome) || 0) || null
     : null;
 
   const retorno = montarResponsaveisRetorno(elegiveis, resp1, resp2);
@@ -938,8 +963,8 @@ function reorganizarPreventivasPendentesPorEscala() {
       .map((p) => String(p?.nome || "").trim())
       .filter(Boolean)
       .join(", ") || "-";
-    const responsavel_1_id = Number(responsaveis[0]?.id || 0) || null;
-    const responsavel_2_id = Number(responsaveis[1]?.id || 0) || null;
+    const responsavel_1_id = Number(responsaveis[0]?.user_id || findUserIdByName(responsaveis[0]?.nome) || 0) || null;
+    const responsavel_2_id = Number(responsaveis[1]?.user_id || findUserIdByName(responsaveis[1]?.nome) || 0) || null;
 
     const updates = ["responsavel = ?"];
     const args = [responsavelTexto];
