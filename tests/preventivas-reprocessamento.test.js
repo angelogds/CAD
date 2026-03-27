@@ -335,3 +335,55 @@ test('turno noturno atribui preventivas pendentes somente ao plantonista', () =>
   });
   assert.notEqual(diogo.userId, rodolfo.userId);
 });
+
+test('reprocesso redistribui responsáveis com variação de nomes para criticidade alta', () => {
+  resetSchema();
+  const diogo = addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
+  const emanuel = addColaborador({ nome: 'Emanuel', funcao: 'apoio', tipo_turno: 'apoio' });
+  const salviano = addColaborador({ nome: 'Salviano', funcao: 'mecanico', tipo_turno: 'diurno' });
+  const junior = addColaborador({ nome: 'Junior', funcao: 'apoio', tipo_turno: 'apoio' });
+  addColaborador({ nome: 'Rodolfo', funcao: 'mecanico', tipo_turno: 'plantao' });
+
+  const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Linha de Bombas', 'bomba', 'ALTA', 1)`).run().lastInsertRowid);
+  const planoId = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano distribuição', 'semanal', 1, 1)`).run(eqId).lastInsertRowid);
+
+  for (let i = 0; i < 4; i += 1) {
+    db.prepare(`
+      INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade)
+      VALUES (?, date('now', ?), 'PENDENTE', '', 'ALTA')
+    `).run(planoId, `+${i} day`);
+  }
+
+  service.reorganizarPreventivasPendentesPorEscala();
+  const rows = db.prepare(`SELECT responsavel_1_id, responsavel_2_id FROM preventiva_execucoes ORDER BY id ASC`).all();
+
+  const pares = rows.map((r) => [Number(r.responsavel_1_id || 0), Number(r.responsavel_2_id || 0)].sort((a, b) => a - b).join('-'));
+  assert.ok(new Set(pares).size >= 2, 'deve variar pares atribuídos e evitar repetição fixa');
+
+  const idsEscala = new Set([diogo.userId, emanuel.userId, salviano.userId, junior.userId]);
+  rows.forEach((r) => {
+    assert.ok(idsEscala.has(Number(r.responsavel_1_id || 0)));
+    assert.ok(idsEscala.has(Number(r.responsavel_2_id || 0)));
+  });
+});
+
+test('reprocesso corrige datas pendentes para hoje em diante de forma sequencial', () => {
+  resetSchema();
+  addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
+  addColaborador({ nome: 'Emanuel', funcao: 'apoio', tipo_turno: 'apoio' });
+  addColaborador({ nome: 'Rodolfo', funcao: 'mecanico', tipo_turno: 'plantao' });
+
+  const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Bomba 02', 'bomba', 'MEDIA', 1)`).run().lastInsertRowid);
+  const planoId = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano datas', 'semanal', 1, 1)`).run(eqId).lastInsertRowid);
+  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now','-3 day'), 'PENDENTE', '', 'MEDIA')`).run(planoId);
+  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now','-1 day'), 'PENDENTE', '', 'MEDIA')`).run(planoId);
+  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now','+1 day'), 'PENDENTE', '', 'MEDIA')`).run(planoId);
+
+  service.reorganizarPreventivasPendentesPorEscala();
+
+  const rows = db.prepare(`SELECT data_prevista FROM preventiva_execucoes ORDER BY id ASC`).all();
+  const hoje = new Date().toISOString().slice(0, 10);
+  rows.forEach((row) => assert.ok(row.data_prevista >= hoje));
+  assert.ok(rows[1].data_prevista >= rows[0].data_prevista);
+  assert.ok(rows[2].data_prevista >= rows[1].data_prevista);
+});
