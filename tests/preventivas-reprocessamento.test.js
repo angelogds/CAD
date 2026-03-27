@@ -286,14 +286,16 @@ test('reprocesso usa apenas equipe vigente da escala sem puxar usuário fora da 
   const userForaEscala = Number(db.prepare(`INSERT INTO users (name, ativo) VALUES ('Mecanico Fora Escala', 1)`).run().lastInsertRowid);
   db.prepare(`INSERT INTO colaboradores (nome, funcao, user_id, ativo) VALUES ('Mecanico Fora Escala', 'mecanico', ?, 1)`).run(userForaEscala);
 
-  const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Exaustor A', 'exaustor', 'BAIXA', 1)`).run().lastInsertRowid);
-  const planoId = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano EXA', 'semanal', 1, 1)`).run(eqId).lastInsertRowid);
+  const eqA = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Exaustor A', 'exaustor', 'BAIXA', 1)`).run().lastInsertRowid);
+  const eqB = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Bomba B', 'bomba', 'BAIXA', 1)`).run().lastInsertRowid);
+  const planoA = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano EXA', 'semanal', 1, 1)`).run(eqA).lastInsertRowid);
+  const planoB = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano BOM', 'semanal', 1, 1)`).run(eqB).lastInsertRowid);
 
   for (let i = 0; i < 6; i += 1) {
     db.prepare(`
       INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade)
       VALUES (?, date('now', ?), 'PENDENTE', '', 'BAIXA')
-    `).run(planoId, `+${i} day`);
+    `).run(i % 2 === 0 ? planoA : planoB, `+${i} day`);
   }
 
   withMockedSaoPauloTime(10, 0, () => {
@@ -305,12 +307,31 @@ test('reprocesso usa apenas equipe vigente da escala sem puxar usuário fora da 
   const rows = db.prepare(`
     SELECT responsavel, responsavel_1_id
     FROM preventiva_execucoes
-    WHERE plano_id = ?
     ORDER BY id ASC
-  `).all(planoId);
+  `).all();
   const idsAtribuidos = rows.map((r) => Number(r.responsavel_1_id || 0));
   const universoEscala = new Set([a.userId, b.userId, c.userId, rodolfo.userId]);
   idsAtribuidos.forEach((id) => assert.ok(universoEscala.has(id)));
-  idsAtribuidos.forEach((id) => assert.equal(id, a.userId));
+  assert.ok(new Set(idsAtribuidos).size >= 2);
   assert.ok(!idsAtribuidos.includes(userForaEscala));
+});
+
+test('turno noturno atribui preventivas pendentes somente ao plantonista', () => {
+  resetSchema();
+  const diogo = addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
+  addColaborador({ nome: 'Emanuel', funcao: 'apoio', tipo_turno: 'apoio' });
+  const rodolfo = addColaborador({ nome: 'Rodolfo', funcao: 'mecanico', tipo_turno: 'plantao' });
+
+  const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Caldeira Exaustor 01', 'exaustor', 'CRITICA', 1)`).run().lastInsertRowid);
+  const planoId = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano noturno', 'semanal', 1, 1)`).run(eqId).lastInsertRowid);
+  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now'), 'PENDENTE', '', 'CRITICA')`).run(planoId);
+  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now'), 'PENDENTE', '', 'BAIXA')`).run(planoId);
+
+  withMockedSaoPauloTime(2, 30, () => service.reorganizarPreventivasPendentesPorEscala());
+  const rows = db.prepare(`SELECT responsavel_1_id, responsavel_2_id FROM preventiva_execucoes ORDER BY id ASC`).all();
+  rows.forEach((row) => {
+    assert.equal(Number(row.responsavel_1_id), rodolfo.userId);
+    assert.equal(Number(row.responsavel_2_id || 0), 0);
+  });
+  assert.notEqual(diogo.userId, rodolfo.userId);
 });
