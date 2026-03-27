@@ -93,7 +93,7 @@
             <td><%= ex.data_executada || "-" %></td>
             <td><span class="pill"><%= (ex.status || "").toUpperCase() %></span></td>
             <td><span class="pill"><%= (ex.origem || "AUTOMATICA").toUpperCase() %></span></td>
-            <td class="muted"><%= ex.responsavel_exibicao || ex.responsavel || "-" %></td>
+            <td class="muted"><%= ex.responsaveis || ex.responsavel_exibicao || ex.responsavel || "-" %></td>
             <td>
               <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/status" class="row" style="margin:0;">
                 <select name="status" style="width:160px">
