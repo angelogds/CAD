@@ -154,9 +154,11 @@ function listExecucoes(planoId) {
       row.responsavel_1_nome || row.responsavel_1_colaborador_nome,
       row.responsavel_2_nome || row.responsavel_2_colaborador_nome,
     ].map((n) => String(n || "").trim()).filter(Boolean);
+    const responsaveis = nomes.join(", ");
     return {
       ...row,
-      responsavel_exibicao: nomes.join(", ") || String(row.responsavel || "").trim() || "-",
+      responsaveis: responsaveis || String(row.responsavel || "").trim() || "-",
+      responsavel_exibicao: responsaveis || String(row.responsavel || "").trim() || "-",
     };
   });
 }
@@ -449,6 +451,28 @@ function getEscalaSemanaAtual() {
     ...row,
     id: Number(row.colaborador_id),
   }));
+}
+
+function obterEscalaAtual() {
+  const escalaSemana = getEscalaSemanaAtual();
+  const elegiveis = (escalaSemana || [])
+    .map((pessoa) => {
+      const userId = Number(pessoa?.user_id || 0);
+      if (!userId) return null;
+      return {
+        id: userId,
+        nome: String(pessoa?.nome || "").trim(),
+        tipo_turno: normalizeTxt(pessoa?.tipo_turno),
+        funcao: String(pessoa?.funcao || ""),
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    mecanicos_dia: elegiveis.filter((p) => p.tipo_turno === "diurno" && isMecanico(p.funcao)),
+    apoio_operacional: elegiveis.filter((p) => p.tipo_turno === "apoio"),
+    noite: elegiveis.filter((p) => ["plantao", "noturno"].includes(p.tipo_turno)),
+  };
 }
 
 function getTiposTurnoPorPeriodo(turno = "DIA") {
@@ -871,7 +895,12 @@ function reorganizarPreventivasPendentesPorEscala() {
     return { atualizadas: 0, totalAtivas: 0 };
   }
 
-  const escalaSemana = getEscalaSemanaAtual();
+  const escala = obterEscalaAtual();
+  const mecanicosDia = escala.mecanicos_dia || [];
+  const apoio = escala.apoio_operacional || [];
+  const noite = escala.noite || [];
+  const equipeDisponivel = [...mecanicosDia, ...apoio];
+  const equipeFallback = equipeDisponivel.length ? equipeDisponivel : [...noite];
   const cols = getPreventivaExecColumns();
   const hasCriticidade = cols.includes("criticidade");
   const hasResp1 = cols.includes("responsavel_1_id");
@@ -882,10 +911,6 @@ function reorganizarPreventivasPendentesPorEscala() {
   const hasEquipCriticidade = getEquipamentosColumns().includes("criticidade");
   const rows = db.prepare(`
     SELECT pe.id,
-           pe.status,
-           COALESCE(pe.responsavel, '') AS responsavel,
-           ${hasResp1 ? "pe.responsavel_1_id" : "NULL"} AS responsavel_1_id,
-           ${hasResp2 ? "pe.responsavel_2_id" : "NULL"} AS responsavel_2_id,
            COALESCE(e.nome, pp.titulo, '-') AS equipamento_nome,
            COALESCE(e.tipo, pp.titulo, '-') AS equipamento_tipo,
            COALESCE(pe.criticidade, ${hasEquipCriticidade ? "e.criticidade" : "'MEDIA'"}, 'MEDIA') AS criticidade,
@@ -895,41 +920,40 @@ function reorganizarPreventivasPendentesPorEscala() {
     FROM preventiva_execucoes pe
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
-    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA','EM_ANDAMENTO','ANDAMENTO')
+    WHERE UPPER(COALESCE(pe.status,'')) = 'PENDENTE'
   `).all();
-  const disponibilidade = getDisponibilidadeEscala();
 
   let atualizadas = 0;
   for (const item of rows) {
-    const statusAtual = normalizePreventivaStatus(item.status);
-    const possuiResponsavel =
-      Boolean(String(item.responsavel || "").trim()) ||
-      Number(item.responsavel_1_id || 0) > 0 ||
-      Number(item.responsavel_2_id || 0) > 0;
-    if (["EM_ANDAMENTO", "ANDAMENTO"].includes(statusAtual) && possuiResponsavel) {
-      continue;
-    }
+    const criticidade = calcularCriticidade({
+      nome: item.equipamento_nome,
+      tipo: item.equipamento_tipo,
+      criticidade: item.criticidade,
+    });
+    const criticidadeNormalizada = normalizeCriticidade(criticidade);
+    const responsaveis = criticidadeNormalizada === "BAIXA"
+      ? [equipeFallback[0]].filter(Boolean)
+      : [equipeFallback[0], equipeFallback[1]].filter(Boolean);
+    const responsavelTexto = responsaveis
+      .map((p) => String(p?.nome || "").trim())
+      .filter(Boolean)
+      .join(", ") || "-";
+    const responsavel_1_id = Number(responsaveis[0]?.id || 0) || null;
+    const responsavel_2_id = Number(responsaveis[1]?.id || 0) || null;
 
-    const criticidade = calcularCriticidade({ nome: item.equipamento_nome, tipo: item.equipamento_tipo, criticidade: item.criticidade });
-    const aloc = montarEquipePreventiva({
-      criticidade,
-      tipo_plano: item.tipo_plano,
-      titulo: item.titulo,
-      checklist_json: item.checklist_json,
-    }, escalaSemana, disponibilidade);
     const updates = ["responsavel = ?"];
-    const args = [aloc.responsavelTexto];
+    const args = [responsavelTexto];
     if (hasCriticidade) {
       updates.push("criticidade = ?");
-      args.push(criticidade);
+      args.push(criticidadeNormalizada);
     }
     if (hasResp1) {
       updates.push("responsavel_1_id = ?");
-      args.push(aloc.responsavel_1_id);
+      args.push(responsavel_1_id);
     }
     if (hasResp2) {
       updates.push("responsavel_2_id = ?");
-      args.push(aloc.responsavel_2_id);
+      args.push(responsavel_2_id);
     }
     args.push(Number(item.id));
     db.prepare(`UPDATE preventiva_execucoes SET ${updates.join(", ")} WHERE id = ?`).run(...args);

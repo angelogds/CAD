@@ -138,7 +138,7 @@ test('pré-validação confirma semana ativa, turnos e pendências elegíveis', 
   assert.equal(pre.alertas.length, 0);
 });
 
-test('reprocesso atualiza atrasada e pendente, mas preserva em andamento já alocada', () => {
+test('reprocesso atualiza apenas pendente e preserva atrasada/em andamento', () => {
   resetSchema();
   const dia = addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
   addColaborador({ nome: 'Junior', funcao: 'operacional', tipo_turno: 'apoio' });
@@ -153,8 +153,8 @@ test('reprocesso atualiza atrasada e pendente, mas preserva em andamento já alo
 
   withMockedSaoPauloTime(9, 15, () => {
     const result = service.reorganizarPreventivasPendentesPorEscala();
-    assert.equal(result.totalAtivas, 3);
-    assert.equal(result.atualizadas, 2);
+    assert.equal(result.totalAtivas, 1);
+    assert.equal(result.atualizadas, 1);
   });
 
   const pendente = db.prepare(`SELECT responsavel, responsavel_1_id FROM preventiva_execucoes WHERE id = ?`).get(pendenteId);
@@ -162,9 +162,9 @@ test('reprocesso atualiza atrasada e pendente, mas preserva em andamento já alo
   const andamento = db.prepare(`SELECT responsavel, responsavel_1_id FROM preventiva_execucoes WHERE id = ?`).get(andamentoId);
 
   assert.notEqual(String(pendente.responsavel || '').trim(), '');
-  assert.notEqual(String(atrasada.responsavel || '').trim(), '');
   assert.ok(Number(pendente.responsavel_1_id || 0) > 0);
-  assert.ok(Number(atrasada.responsavel_1_id || 0) > 0);
+  assert.equal(String(atrasada.responsavel || '').trim(), '');
+  assert.equal(Number(atrasada.responsavel_1_id || 0), 0);
 
   assert.equal(andamento.responsavel, 'Equipe Legada');
   assert.equal(Number(andamento.responsavel_1_id), dia.userId);
