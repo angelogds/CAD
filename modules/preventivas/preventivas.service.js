@@ -921,9 +921,10 @@ function reorganizarPreventivasPendentesPorEscala() {
   }
 
   const escala = obterEscalaAtual();
-  const mecanicosDia = escala.mecanicos_dia || [];
-  const apoio = escala.apoio_operacional || [];
-  const noite = escala.noite || [];
+  const mecanicosDia = (escala.mecanicos_dia || []).sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+  const apoio = (escala.apoio_operacional || []).sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+  const noite = (escala.noite || []).filter((p) => isMecanico(p.funcao))
+    .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
   const equipeDisponivel = [...mecanicosDia, ...apoio];
   const equipeFallback = equipeDisponivel.length ? equipeDisponivel : [...noite];
   const cols = getPreventivaExecColumns();
@@ -946,19 +947,46 @@ function reorganizarPreventivasPendentesPorEscala() {
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
     WHERE UPPER(COALESCE(pe.status,'')) = 'PENDENTE'
+    ORDER BY COALESCE(pe.data_prevista,'9999-12-31') ASC, pe.id ASC
   `).all();
 
+  const escolherRotativo = (candidatos = [], chave = "", usados = new Set()) => {
+    const validos = [...(candidatos || [])]
+      .filter((p) => Number(p?.user_id || 0))
+      .filter((p) => !usados.has(Number(p.user_id)));
+    if (!validos.length) return null;
+    const ultimoId = Number(getConfig(chave) || 0) || 0;
+    const idxAtual = ultimoId ? validos.findIndex((p) => Number(p.user_id) === ultimoId) : -1;
+    const escolhido = idxAtual >= 0 ? (validos[idxAtual + 1] || validos[0]) : validos[0];
+    setConfig(chave, Number(escolhido.user_id));
+    return escolhido;
+  };
+
   let atualizadas = 0;
-  for (const item of rows) {
+  rows.forEach((item, index) => {
+    const turnoPlanejado = index % 2 === 0 ? "DIA" : "NOITE";
     const criticidade = calcularCriticidade({
       nome: item.equipamento_nome,
       tipo: item.equipamento_tipo,
       criticidade: item.criticidade,
     });
     const criticidadeNormalizada = normalizeCriticidade(criticidade);
-    const responsaveis = criticidadeNormalizada === "BAIXA"
-      ? [equipeFallback[0]].filter(Boolean)
-      : [equipeFallback[0], equipeFallback[1]].filter(Boolean);
+    const usados = new Set();
+    const poolPrimario = turnoPlanejado === "NOITE" && noite.length ? noite : equipeFallback;
+    const executor = escolherRotativo(poolPrimario, `preventiva_reproc_executor_${turnoPlanejado}`, usados) || null;
+    if (executor?.user_id) usados.add(Number(executor.user_id));
+
+    let auxiliar = null;
+    if (criticidadeNormalizada !== "BAIXA") {
+      const poolAuxiliar = turnoPlanejado === "NOITE"
+        ? equipeFallback
+        : (apoio.length ? apoio : equipeFallback);
+      auxiliar = escolherRotativo(poolAuxiliar, `preventiva_reproc_auxiliar_${turnoPlanejado}`, usados) || null;
+      if (!auxiliar && turnoPlanejado === "NOITE") {
+        auxiliar = escolherRotativo(equipeFallback, "preventiva_reproc_auxiliar_DIA", usados) || null;
+      }
+    }
+    const responsaveis = [executor, auxiliar].filter(Boolean);
     const responsavelTexto = responsaveis
       .map((p) => String(p?.nome || "").trim())
       .filter(Boolean)
@@ -983,7 +1011,7 @@ function reorganizarPreventivasPendentesPorEscala() {
     args.push(Number(item.id));
     db.prepare(`UPDATE preventiva_execucoes SET ${updates.join(", ")} WHERE id = ?`).run(...args);
     atualizadas += 1;
-  }
+  });
 
   return { atualizadas, totalAtivas: rows.length };
 }
