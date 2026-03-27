@@ -276,7 +276,7 @@ test('alocação salva IDs de usuário mesmo quando OS retorna colaborador.id', 
   }
 });
 
-test('reprocesso distribui pendentes em rodízio sem puxar mecânico fora da escala', () => {
+test('reprocesso usa apenas equipe vigente da escala sem puxar usuário fora da escala', () => {
   resetSchema();
   const a = addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
   const b = addColaborador({ nome: 'Salviano', funcao: 'mecanico', tipo_turno: 'diurno' });
@@ -311,7 +311,6 @@ test('reprocesso distribui pendentes em rodízio sem puxar mecânico fora da esc
   const idsAtribuidos = rows.map((r) => Number(r.responsavel_1_id || 0));
   const universoEscala = new Set([a.userId, b.userId, c.userId, rodolfo.userId]);
   idsAtribuidos.forEach((id) => assert.ok(universoEscala.has(id)));
-  assert.ok(new Set(idsAtribuidos).size >= 2);
-  assert.ok(idsAtribuidos.some((id) => [a.userId, b.userId, c.userId].includes(id)));
+  idsAtribuidos.forEach((id) => assert.equal(id, a.userId));
   assert.ok(!idsAtribuidos.includes(userForaEscala));
 });
