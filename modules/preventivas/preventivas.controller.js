@@ -6,11 +6,23 @@ function isAdminOrEncarregado(user = null) {
 }
 
 function index(req, res) {
-  const ciclo = service.executarCicloAutonomo(new Date());
+  let ciclo = { skipped: true, reason: "erro_ciclo" };
+  let lista = [];
+  let diagnosticoLeitura = null;
+  try {
+    ciclo = service.executarCicloAutonomo(new Date());
+    lista = service.listPlanos();
+    diagnosticoLeitura = service.auditarLeituraEquipamentosPreventivas();
+  } catch (err) {
+    console.error("[PREVENTIVAS][INDEX] erro ao carregar módulo:", err?.stack || err);
+    req.flash("error", "Preventivas carregadas com alertas. Verifique o vínculo da escala com usuários.");
+    try {
+      lista = service.listPlanos();
+      diagnosticoLeitura = service.auditarLeituraEquipamentosPreventivas();
+    } catch (_e) {}
+  }
   console.log("[PREVENTIVA_IA] ciclo autônomo", ciclo);
 
-  const lista = service.listPlanos();
-  const diagnosticoLeitura = service.auditarLeituraEquipamentosPreventivas();
   return res.render("preventivas/index", {
     layout: "layout",
     title: "Preventivas",
