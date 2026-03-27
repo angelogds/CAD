@@ -441,6 +441,18 @@ function formatDateISO(date) {
   return date.toISOString().slice(0, 10);
 }
 
+function parseISODate(value) {
+  const txt = sanitizeDateISO(value);
+  if (!txt) return null;
+  return new Date(`${txt}T00:00:00.000Z`);
+}
+
+function somarDiasISO(dateISO, days = 0) {
+  const base = parseISODate(dateISO);
+  if (!base) return null;
+  return formatDateISO(addDays(base, Number(days || 0)));
+}
+
 function gerarObservacaoPreventiva(equipamento = {}, historico = []) {
   const nome = String(equipamento.nome || "equipamento").trim();
   const tipo = String(equipamento.tipo || "").toLowerCase();
@@ -764,25 +776,11 @@ function distribuirPreventivasPorAreaECarga(preventivas = [], equipeDia = {}) {
 
   const cargaAtual = { ...(equipeDia.cargaAtual || {}) };
   todos.forEach((p) => { if (cargaAtual[p.user_id] == null) cargaAtual[p.user_id] = 0; });
-  const areaOwner = new Map();
   const rotacao = {};
   todos.forEach((p, idx) => { rotacao[p.user_id] = idx; });
   let sequencia = todos.length + 1;
 
-  const preferirPorArea = (preventiva, candidatosBase = todos) => {
-    const chaveArea = obterChaveAreaPreventiva(preventiva);
-    const donoId = Number(areaOwner.get(chaveArea) || 0);
-    if (donoId) {
-      const dono = candidatosBase.find((p) => Number(p.user_id) === donoId);
-      if (dono) return dono;
-    }
-    return ordenarPorCargaERotacao(candidatosBase, cargaAtual, rotacao)[0] || null;
-  };
-
   const separarPorPrioridade = [...(preventivas || [])].sort((a, b) => {
-    const areaA = obterChaveAreaPreventiva(a);
-    const areaB = obterChaveAreaPreventiva(b);
-    if (areaA !== areaB) return areaA.localeCompare(areaB, "pt-BR");
     const dataA = String(a?.data_prevista || "9999-12-31");
     const dataB = String(b?.data_prevista || "9999-12-31");
     if (dataA !== dataB) return dataA.localeCompare(dataB);
@@ -791,8 +789,7 @@ function distribuirPreventivasPorAreaECarga(preventivas = [], equipeDia = {}) {
 
   separarPorPrioridade.forEach((item) => {
     const cfg = getEquipeConfigPreventiva(item);
-    const chaveArea = obterChaveAreaPreventiva(item);
-    const primario = preferirPorArea(item, todos);
+    const primario = ordenarPorCargaERotacao(todos, cargaAtual, rotacao)[0] || null;
     if (!primario) return;
 
     let secundaria = null;
@@ -809,7 +806,6 @@ function distribuirPreventivasPorAreaECarga(preventivas = [], equipeDia = {}) {
 
     const ids = [Number(primario.user_id || 0), Number(secundaria?.user_id || 0)].filter(Boolean);
     resultado.set(Number(item.id), ids);
-    if (ids[0]) areaOwner.set(chaveArea, ids[0]);
     ids.forEach((id) => {
       cargaAtual[id] = Number(cargaAtual[id] || 0) + 1;
       rotacao[id] = sequencia;
@@ -873,11 +869,47 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
   }
 
   const todosDia = deduplicarEquipePorUsuario([...mecanicosDia, ...apoioDia]);
-  const ordenados = ordenarPorCargaERotacao(todosDia, {}, {});
+  const cargaAtual = {};
+  const idsEquipe = todosDia.map((p) => Number(p.user_id || 0)).filter(Boolean);
+  idsEquipe.forEach((id) => { cargaAtual[id] = Number(cargaAtual[id] || 0); });
+  if (idsEquipe.length && tableExists("preventiva_execucoes") && getPreventivaExecColumns().includes("responsavel_1_id")) {
+    const placeholders = idsEquipe.map(() => "?").join(", ");
+    const hoje = getHojeBrasilISO();
+    db.prepare(`
+      SELECT user_id, SUM(total) AS total
+      FROM (
+        SELECT responsavel_1_id AS user_id, COUNT(*) AS total
+        FROM preventiva_execucoes
+        WHERE UPPER(COALESCE(status,'')) IN ('PENDENTE','EM_ANDAMENTO','ANDAMENTO')
+          AND responsavel_1_id IN (${placeholders})
+          AND COALESCE(data_prevista, ?) >= ?
+        GROUP BY responsavel_1_id
+        UNION ALL
+        SELECT responsavel_2_id AS user_id, COUNT(*) AS total
+        FROM preventiva_execucoes
+        WHERE UPPER(COALESCE(status,'')) IN ('PENDENTE','EM_ANDAMENTO','ANDAMENTO')
+          AND responsavel_2_id IN (${placeholders})
+          AND COALESCE(data_prevista, ?) >= ?
+        GROUP BY responsavel_2_id
+      ) t
+      GROUP BY user_id
+    `).all(...idsEquipe, hoje, hoje, ...idsEquipe, hoje, hoje).forEach((row) => {
+      const userId = Number(row.user_id || 0);
+      if (!userId) return;
+      cargaAtual[userId] = Number(row.total || 0);
+    });
+  }
+  const rotacao = {};
+  todosDia.forEach((p, idx) => { rotacao[Number(p.user_id || 0)] = idx; });
+  const ordenados = ordenarPorCargaERotacao(todosDia, cargaAtual, rotacao);
   const executor = ordenados[0] || null;
   let auxiliar = null;
   if (equipeCfg.quantidade === 2) {
-    auxiliar = (apoioDia.find((p) => Number(p.user_id) !== Number(executor?.user_id || 0)))
+    auxiliar = ordenarPorCargaERotacao(
+      (apoioDia.length ? apoioDia : todosDia).filter((p) => Number(p.user_id) !== Number(executor?.user_id || 0)),
+      cargaAtual,
+      rotacao
+    )[0]
       || ordenados.find((p) => Number(p.user_id) !== Number(executor?.user_id || 0))
       || null;
   }
@@ -932,6 +964,7 @@ function gerarCronogramaSemanalInteligente(refDate = new Date()) {
   `).all();
 
   let criadas = 0;
+  const hojeBrasilISO = getHojeBrasilISO();
   const weekNumber = Math.floor((monday.getTime() - Date.UTC(monday.getUTCFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000));
   const alternanciaPorTipo = new Map();
 
@@ -941,7 +974,8 @@ function gerarCronogramaSemanalInteligente(refDate = new Date()) {
     const tipoKey = String(plano.equipamento_nome || plano.equipamento_criticidade || "geral").toLowerCase();
     const offsetTipo = alternanciaPorTipo.get(tipoKey) || 0;
     alternanciaPorTipo.set(tipoKey, offsetTipo + 1);
-    const prevista = formatDateISO(addDays(monday, (idx + weekNumber + offsetTipo) % 7));
+    const previstaBase = formatDateISO(addDays(monday, (idx + weekNumber + offsetTipo) % 7));
+    const prevista = previstaBase < hojeBrasilISO ? somarDiasISO(hojeBrasilISO, criadas) : previstaBase;
     const jaExiste = db.prepare(`
       SELECT id FROM preventiva_execucoes
       WHERE plano_id = ? AND data_prevista BETWEEN ? AND ?
@@ -1053,6 +1087,7 @@ function reorganizarPreventivasPendentesPorEscala() {
   const hasSetor = getEquipamentosColumns().includes("setor");
   const rows = db.prepare(`
     SELECT pe.id,
+           pe.data_prevista,
            COALESCE(e.nome, pp.titulo, '-') AS equipamento_nome,
            COALESCE(e.tipo, pp.titulo, '-') AS equipamento_tipo,
            ${hasSetor ? "e.setor" : "NULL"} AS equipamento_setor,
@@ -1087,6 +1122,8 @@ function reorganizarPreventivasPendentesPorEscala() {
     cargaAtual,
   });
   const plantonista = noite[0] || null;
+  const hojeBrasilISO = getHojeBrasilISO();
+  let cursorData = hojeBrasilISO;
   rows.forEach((item) => {
     const criticidade = calcularCriticidade({
       nome: item.equipamento_nome,
@@ -1108,8 +1145,15 @@ function reorganizarPreventivasPendentesPorEscala() {
     const responsavel_1_id = nomes.responsavel_1_id;
     const responsavel_2_id = turnoAtual === "NOITE" ? null : nomes.responsavel_2_id;
 
-    const updates = ["responsavel = ?"];
-    const args = [responsavelTexto];
+    const dataOriginal = sanitizeDateISO(item.data_prevista);
+    let dataPrevistaAtualizada = dataOriginal;
+    if (!dataPrevistaAtualizada || dataPrevistaAtualizada < cursorData) {
+      dataPrevistaAtualizada = cursorData;
+    }
+    cursorData = somarDiasISO(dataPrevistaAtualizada, 1) || cursorData;
+
+    const updates = ["responsavel = ?", "data_prevista = ?"];
+    const args = [responsavelTexto, dataPrevistaAtualizada];
     if (hasCriticidade) {
       updates.push("criticidade = ?");
       args.push(criticidadeNormalizada);
