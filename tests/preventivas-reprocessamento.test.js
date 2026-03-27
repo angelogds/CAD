@@ -169,3 +169,109 @@ test('reprocesso atualiza atrasada e pendente, mas preserva em andamento já alo
   assert.equal(andamento.responsavel, 'Equipe Legada');
   assert.equal(Number(andamento.responsavel_1_id), dia.userId);
 });
+
+test('reprocesso não quebra em schema legado sem equipamentos.codigo/checklist_json', () => {
+  db.exec(`
+    DROP TABLE IF EXISTS preventiva_execucoes;
+    DROP TABLE IF EXISTS preventiva_planos;
+    DROP TABLE IF EXISTS equipamentos;
+    DROP TABLE IF EXISTS escala_alocacoes;
+    DROP TABLE IF EXISTS escala_semanas;
+    DROP TABLE IF EXISTS colaboradores;
+    DROP TABLE IF EXISTS users;
+
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT,
+      ativo INTEGER DEFAULT 1
+    );
+
+    CREATE TABLE colaboradores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT,
+      funcao TEXT,
+      user_id INTEGER,
+      ativo INTEGER DEFAULT 1
+    );
+
+    CREATE TABLE escala_semanas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      semana_numero INTEGER,
+      data_inicio TEXT,
+      data_fim TEXT
+    );
+
+    CREATE TABLE escala_alocacoes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      semana_id INTEGER,
+      colaborador_id INTEGER,
+      tipo_turno TEXT
+    );
+
+    CREATE TABLE equipamentos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT,
+      tipo TEXT,
+      criticidade TEXT,
+      ativo INTEGER DEFAULT 1
+    );
+
+    CREATE TABLE preventiva_planos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipamento_id INTEGER,
+      titulo TEXT,
+      frequencia_tipo TEXT,
+      frequencia_valor INTEGER,
+      ativo INTEGER DEFAULT 1,
+      observacao TEXT
+    );
+
+    CREATE TABLE preventiva_execucoes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plano_id INTEGER,
+      data_prevista TEXT,
+      status TEXT,
+      responsavel TEXT,
+      criticidade TEXT,
+      responsavel_1_id INTEGER,
+      responsavel_2_id INTEGER
+    );
+  `);
+
+  db.prepare(`INSERT INTO escala_semanas (semana_numero, data_inicio, data_fim) VALUES (1, '2000-01-01', '2999-12-31')`).run();
+  const userId = Number(db.prepare(`INSERT INTO users (name, ativo) VALUES ('Diogo', 1)`).run().lastInsertRowid);
+  const colabId = Number(db.prepare(`INSERT INTO colaboradores (nome, funcao, user_id, ativo) VALUES ('Diogo', 'mecanico', ?, 1)`).run(userId).lastInsertRowid);
+  db.prepare(`INSERT INTO escala_alocacoes (semana_id, colaborador_id, tipo_turno) VALUES (1, ?, 'diurno')`).run(colabId);
+
+  const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Bomba 01', 'bomba', 'ALTA', 1)`).run().lastInsertRowid);
+  const planoId = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo, observacao) VALUES (?, 'Plano legado', 'semanal', 1, 1, '')`).run(eqId).lastInsertRowid);
+  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now'), 'PENDENTE', '', 'ALTA')`).run(planoId);
+
+  assert.doesNotThrow(() => service.reprocessarModuloPreventivas({ user: { id: 999, name: 'Teste' } }));
+});
+
+test('alocação salva IDs de usuário mesmo quando OS retorna colaborador.id', () => {
+  resetSchema();
+  const executor = addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
+  const auxiliar = addColaborador({ nome: 'Junior', funcao: 'apoio', tipo_turno: 'apoio' });
+
+  const osService = require('../modules/os/os.service');
+  const original = osService.resolverEquipePorCriticidade;
+  osService.resolverEquipePorCriticidade = () => ({
+    executor: { id: executor.colabId, nome: 'Diogo' },
+    auxiliar: { id: auxiliar.colabId, nome: 'Junior' },
+  });
+
+  try {
+    const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Bomba 01', 'bomba', 'ALTA', 1)`).run().lastInsertRowid);
+    const planoId = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano B1', 'semanal', 1, 1)`).run(eqId).lastInsertRowid);
+    const execId = Number(db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now'), 'PENDENTE', '', 'ALTA')`).run(planoId).lastInsertRowid);
+
+    withMockedSaoPauloTime(9, 15, () => service.alocarEquipeExecucaoPreventiva(execId));
+    const row = db.prepare(`SELECT responsavel_1_id, responsavel_2_id FROM preventiva_execucoes WHERE id = ?`).get(execId);
+    assert.equal(Number(row.responsavel_1_id), executor.userId);
+    assert.equal(Number(row.responsavel_2_id), auxiliar.userId);
+  } finally {
+    osService.resolverEquipePorCriticidade = original;
+  }
+});
