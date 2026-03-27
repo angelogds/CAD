@@ -924,10 +924,8 @@ function reorganizarPreventivasPendentesPorEscala() {
   const apoio = (escala.apoio_operacional || []).sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
   const noite = (escala.noite || []).filter((p) => isMecanico(p.funcao))
     .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
-  const turnoAtual = typeof osService.getTurnoAgora === "function" ? osService.getTurnoAgora() : getTurnoAtual();
-  const equipePrincipal = turnoAtual === "NOITE"
-    ? (noite.length ? [...noite] : [...mecanicosDia, ...apoio])
-    : ([...mecanicosDia, ...apoio].length ? [...mecanicosDia, ...apoio] : [...noite]);
+  const equipeDisponivel = [...mecanicosDia, ...apoio];
+  const equipeFallback = equipeDisponivel.length ? equipeDisponivel : [...noite];
   const cols = getPreventivaExecColumns();
   const hasCriticidade = cols.includes("criticidade");
   const hasResp1 = cols.includes("responsavel_1_id");
@@ -951,23 +949,21 @@ function reorganizarPreventivasPendentesPorEscala() {
     ORDER BY COALESCE(pe.data_prevista,'9999-12-31') ASC, pe.id ASC
   `).all();
 
-  const estadoRotacao = new Map();
   const escolherRotativo = (candidatos = [], chave = "", usados = new Set()) => {
     const validos = [...(candidatos || [])]
       .filter((p) => Number(p?.user_id || 0))
       .filter((p) => !usados.has(Number(p.user_id)));
     if (!validos.length) return null;
-    const ultimoPersistido = Number(getConfig(chave) || 0) || 0;
-    const ultimoId = ultimoPersistido || Number(estadoRotacao.get(chave) || 0) || 0;
+    const ultimoId = Number(getConfig(chave) || 0) || 0;
     const idxAtual = ultimoId ? validos.findIndex((p) => Number(p.user_id) === ultimoId) : -1;
     const escolhido = idxAtual >= 0 ? (validos[idxAtual + 1] || validos[0]) : validos[0];
     setConfig(chave, Number(escolhido.user_id));
-    estadoRotacao.set(chave, Number(escolhido.user_id));
     return escolhido;
   };
 
   let atualizadas = 0;
-  rows.forEach((item) => {
+  rows.forEach((item, index) => {
+    const turnoPlanejado = index % 2 === 0 ? "DIA" : "NOITE";
     const criticidade = calcularCriticidade({
       nome: item.equipamento_nome,
       tipo: item.equipamento_tipo,
@@ -975,15 +971,18 @@ function reorganizarPreventivasPendentesPorEscala() {
     });
     const criticidadeNormalizada = normalizeCriticidade(criticidade);
     const usados = new Set();
-    const executor = escolherRotativo(equipePrincipal, "preventiva_reproc_executor", usados) || null;
+    const poolPrimario = turnoPlanejado === "NOITE" && noite.length ? noite : equipeFallback;
+    const executor = escolherRotativo(poolPrimario, `preventiva_reproc_executor_${turnoPlanejado}`, usados) || null;
     if (executor?.user_id) usados.add(Number(executor.user_id));
 
     let auxiliar = null;
     if (criticidadeNormalizada !== "BAIXA") {
-      const poolAuxiliar = apoio.length ? apoio : equipePrincipal;
-      auxiliar = escolherRotativo(poolAuxiliar, "preventiva_reproc_auxiliar", usados) || null;
-      if (!auxiliar) {
-        auxiliar = escolherRotativo(equipePrincipal, "preventiva_reproc_auxiliar_fallback", usados) || null;
+      const poolAuxiliar = turnoPlanejado === "NOITE"
+        ? equipeFallback
+        : (apoio.length ? apoio : equipeFallback);
+      auxiliar = escolherRotativo(poolAuxiliar, `preventiva_reproc_auxiliar_${turnoPlanejado}`, usados) || null;
+      if (!auxiliar && turnoPlanejado === "NOITE") {
+        auxiliar = escolherRotativo(equipeFallback, "preventiva_reproc_auxiliar_DIA", usados) || null;
       }
     }
     const responsaveis = [executor, auxiliar].filter(Boolean);
