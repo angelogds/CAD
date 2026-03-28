@@ -11,11 +11,12 @@ function index(req, res) {
   let diagnosticoLeitura = null;
   try {
     ciclo = service.executarCicloAutonomo(new Date());
+    service.sincronizarPreventivasComEscala({ origem: "preventivas.index" });
     lista = service.listPlanos();
     diagnosticoLeitura = service.auditarLeituraEquipamentosPreventivas();
   } catch (err) {
     console.error("[PREVENTIVAS][INDEX] erro ao carregar módulo:", err?.stack || err);
-    req.flash("error", "Preventivas carregadas com alertas. Verifique o vínculo da escala com usuários.");
+    req.flash("error", "Preventivas carregadas com alertas. Escala da semana não encontrada ou sem equipe elegível.");
     try {
       lista = service.listPlanos();
       diagnosticoLeitura = service.auditarLeituraEquipamentosPreventivas();
@@ -137,6 +138,9 @@ function execUpdateStatus(req, res) {
 
   if (["PENDENTE", "ATRASADA", "EM_ANDAMENTO", "ANDAMENTO"].includes(statusNorm)) {
     service.alocarEquipeExecucaoPreventiva(execId);
+  }
+  if (["EM_ANDAMENTO", "ANDAMENTO", "FINALIZADA", "EXECUTADA", "CONCLUIDA"].includes(statusNorm)) {
+    service.sincronizarPreventivasComEscala({ origem: "preventivas.execUpdateStatus" });
   }
 
   const ok = service.updateExecucaoStatus(planoId, execId, statusNorm, data_executada, req.session?.user?.id || null);

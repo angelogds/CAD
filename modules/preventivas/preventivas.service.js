@@ -1,5 +1,6 @@
 const db = require("../../database/db");
 const osService = require("../os/os.service");
+const { getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
 
 function tableExists(name) {
   try {
@@ -528,9 +529,7 @@ function obterEscalaAtual() {
 }
 
 function getTiposTurnoPorPeriodo(turno = "DIA") {
-  return String(turno || "").toUpperCase() === "NOITE"
-    ? ["plantao", "noturno"]
-    : ["diurno", "apoio"];
+  return getTiposTurnoEscala(turno);
 }
 
 function filtrarEscalaVigentePorTurno(escalaSemana = [], turno = "DIA") {
@@ -556,19 +555,7 @@ function isAuxiliarOuApoio(funcao) {
 }
 
 function getTurnoAtual() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date());
-  const data = Object.fromEntries(parts.map((p) => [p.type, p.value]));
-  const hora = Number(data.hour || 0);
-  const minuto = Number(data.minute || 0);
-  const mins = (hora * 60) + minuto;
-  if (mins >= (19 * 60) || mins < (5 * 60)) return "NOITE";
-  if (mins >= (7 * 60) && mins < (17 * 60)) return "DIA";
-  return "DIA";
+  return getTurnoOperacionalAgora();
 }
 
 function getHojeBrasilISO() {
@@ -602,7 +589,21 @@ function escolherPorRotacao(lista = [], configKeyUltimo = "") {
   return escolhido;
 }
 
-function montarResponsaveisRetorno(escalaSemana = [], responsavel_1_id = null, responsavel_2_id = null) {
+function montarResponsaveisRetorno(escalaSemana = [], responsavel1 = null, responsavel2 = null) {
+  const normalizarResponsavel = (responsavel) => {
+    if (!responsavel) return null;
+    if (typeof responsavel === "object") {
+      const user_id = Number(responsavel.user_id || 0) || findUserIdByName(responsavel.nome);
+      const colaborador_id = Number(responsavel.id || responsavel.colaborador_id || 0) || null;
+      const nome = String(responsavel.nome || "").trim();
+      return { user_id: user_id || null, colaborador_id, nome };
+    }
+    const id = Number(responsavel || 0) || null;
+    if (!id) return null;
+    return { user_id: id, colaborador_id: null, nome: "" };
+  };
+  const base1 = normalizarResponsavel(responsavel1);
+  const base2 = normalizarResponsavel(responsavel2);
   const mapaNomes = new Map(
     (escalaSemana || [])
       .flatMap((p) => {
@@ -613,7 +614,7 @@ function montarResponsaveisRetorno(escalaSemana = [], responsavel_1_id = null, r
         return pares;
       })
   );
-  const ids = [Number(responsavel_1_id || 0), Number(responsavel_2_id || 0)].filter(Boolean);
+  const ids = [base1?.user_id, base2?.user_id].map((v) => Number(v || 0)).filter(Boolean);
   const usuariosSource = resolveUsuariosSource();
   const nomesUsers = ids.length && usuariosSource
     ? db.prepare(`
@@ -623,11 +624,16 @@ function montarResponsaveisRetorno(escalaSemana = [], responsavel_1_id = null, r
     `).all(...ids).map((u) => [Number(u.id), String(u.nome || "").trim()])
     : [];
   nomesUsers.forEach(([id, nome]) => mapaNomes.set(id, nome));
-  const nomes = ids.map((id) => mapaNomes.get(id)).filter(Boolean);
+  const nomes = [
+    base1?.nome || mapaNomes.get(base1?.user_id) || mapaNomes.get(base1?.colaborador_id),
+    base2?.nome || mapaNomes.get(base2?.user_id) || mapaNomes.get(base2?.colaborador_id),
+  ].filter(Boolean);
+  const responsavel_1_id = base1?.user_id || null;
+  const responsavel_2_id = base2?.user_id || null;
   return {
-    responsavel_1_id: ids[0] || null,
-    responsavel_2_id: ids[1] || null,
-    responsavelTexto: nomes.join(", ") || "-",
+    responsavel_1_id,
+    responsavel_2_id,
+    responsavelTexto: nomes.join(", "),
     responsavelIds: ids,
     responsavelNomes: nomes,
   };
@@ -733,14 +739,25 @@ function calcularCriticidade(equipamento = {}, contextoOperacional = {}) {
   return calcularCriticidadePreventiva(equipamento, contextoOperacional);
 }
 
+function getPessoaChave(pessoa = {}) {
+  const userId = Number(pessoa?.user_id || 0);
+  if (userId) return `u:${userId}`;
+  const colaboradorId = Number(pessoa?.id || pessoa?.colaborador_id || 0);
+  if (colaboradorId) return `c:${colaboradorId}`;
+  const nome = normalizeTxt(pessoa?.nome);
+  if (nome) return `n:${nome}`;
+  return null;
+}
+
 function deduplicarEquipePorUsuario(lista = []) {
   const mapa = new Map();
   (lista || []).forEach((pessoa) => {
     const userId = Number(pessoa?.user_id || 0) || findUserIdByName(pessoa?.nome);
-    if (!userId || mapa.has(userId)) return;
-    mapa.set(userId, {
+    const chave = getPessoaChave({ ...pessoa, user_id: userId || null });
+    if (!chave || mapa.has(chave)) return;
+    mapa.set(chave, {
       ...pessoa,
-      user_id: userId,
+      user_id: userId || null,
       nome: String(pessoa?.nome || "").trim(),
     });
   });
@@ -779,6 +796,7 @@ function distribuirPreventivasPorAreaECarga(preventivas = [], equipeDia = {}) {
   const rotacao = {};
   todos.forEach((p, idx) => { rotacao[p.user_id] = idx; });
   let sequencia = todos.length + 1;
+  const responsavelPorArea = new Map();
 
   const separarPorPrioridade = [...(preventivas || [])].sort((a, b) => {
     const dataA = String(a?.data_prevista || "9999-12-31");
@@ -789,7 +807,12 @@ function distribuirPreventivasPorAreaECarga(preventivas = [], equipeDia = {}) {
 
   separarPorPrioridade.forEach((item) => {
     const cfg = getEquipeConfigPreventiva(item);
-    const primario = ordenarPorCargaERotacao(todos, cargaAtual, rotacao)[0] || null;
+    const areaKey = obterChaveAreaPreventiva(item);
+    const responsavelArea = responsavelPorArea.get(areaKey);
+    const ordenados = ordenarPorCargaERotacao(todos, cargaAtual, rotacao);
+    const primario = cfg.quantidade === 1 && responsavelArea
+      ? (ordenados.find((p) => Number(p.user_id || 0) === Number(responsavelArea)) || ordenados[0] || null)
+      : (ordenados[0] || null);
     if (!primario) return;
 
     let secundaria = null;
@@ -806,6 +829,7 @@ function distribuirPreventivasPorAreaECarga(preventivas = [], equipeDia = {}) {
 
     const ids = [Number(primario.user_id || 0), Number(secundaria?.user_id || 0)].filter(Boolean);
     resultado.set(Number(item.id), ids);
+    if (cfg.quantidade === 1 && areaKey && ids[0]) responsavelPorArea.set(areaKey, ids[0]);
     ids.forEach((id) => {
       cargaAtual[id] = Number(cargaAtual[id] || 0) + 1;
       rotacao[id] = sequencia;
@@ -826,10 +850,10 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
 
   const elegivel = (pessoa) => {
     const userId = Number(pessoa?.user_id || 0);
-    if (indisponiveis.has(String(userId))) return false;
-    const colaboradorId = Number(pessoa?.id || pessoa?.colaborador_id || 0);
-    if (!colaboradorId) return false;
-    return true;
+    const colabId = Number(pessoa?.id || pessoa?.colaborador_id || 0);
+    if (userId && indisponiveis.has(String(userId))) return false;
+    if (colabId && indisponiveis.has(`colab:${colabId}`)) return false;
+    return !!(colabId || String(pessoa?.nome || "").trim());
   };
 
   const registrarCarga = (resp1 = null, resp2 = null) => {
@@ -840,17 +864,11 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
     });
   };
 
-  let baseEscala = filtrarEscalaVigentePorTurno(escalaSemana, turnoAtual);
-  if (typeof osService.getColaboradoresTurnoAtual === "function") {
-    const turnoColabs = osService.getColaboradoresTurnoAtual(turnoAtual);
-    if (Array.isArray(turnoColabs) && turnoColabs.length) {
-      baseEscala = filtrarEscalaVigentePorTurno(turnoColabs, turnoAtual);
-    }
-  }
+  const baseEscala = filtrarEscalaVigentePorTurno(escalaSemana, turnoAtual);
   const elegiveis = baseEscala.filter(elegivel);
 
   if (!elegiveis.length) {
-    return { responsavel_1_id: null, responsavel_2_id: null, responsavelTexto: "-", responsavelIds: [], responsavelNomes: [] };
+    return { responsavel_1_id: null, responsavel_2_id: null, responsavelTexto: "", responsavelIds: [], responsavelNomes: [] };
   }
 
   const mecanicosDia = deduplicarEquipePorUsuario(elegiveis
@@ -859,11 +877,13 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
   const apoioDia = deduplicarEquipePorUsuario(elegiveis
     .filter((p) => normalizeTxt(p.tipo_turno) === "apoio" && (isAuxiliarOuApoio(p.funcao) || !isMecanico(p.funcao))))
     .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
-  const plantonistaNoite = elegiveis.find((p) => ["plantao", "noturno"].includes(normalizeTxt(p.tipo_turno)) && isMecanico(p.funcao)) || null;
+  const equipeNoiteOrdenada = deduplicarEquipePorUsuario(elegiveis
+    .filter((p) => ["plantao", "noturno"].includes(normalizeTxt(p.tipo_turno))))
+    .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+  const plantonistaNoite = equipeNoiteOrdenada.find((p) => isMecanico(p.funcao)) || equipeNoiteOrdenada[0] || null;
   const equipeCfg = getEquipeConfigPreventiva(preventiva);
   if (turnoAtual === "NOITE") {
-    const respNoite = Number(plantonistaNoite?.user_id || findUserIdByName(plantonistaNoite?.nome) || 0) || null;
-    const retornoNoite = montarResponsaveisRetorno(elegiveis, respNoite, null);
+    const retornoNoite = montarResponsaveisRetorno(elegiveis, plantonistaNoite, null);
     registrarCarga(retornoNoite.responsavel_1_id, null);
     return retornoNoite;
   }
@@ -914,10 +934,7 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
       || null;
   }
 
-  const resp1 = Number(executor?.user_id || findUserIdByName(executor?.nome) || 0) || null;
-  const resp2 = Number(auxiliar?.user_id || findUserIdByName(auxiliar?.nome) || 0) || null;
-
-  const retorno = montarResponsaveisRetorno(elegiveis, resp1, resp2);
+  const retorno = montarResponsaveisRetorno(elegiveis, executor, auxiliar);
   registrarCarga(retorno.responsavel_1_id, retorno.responsavel_2_id);
   return retorno;
 }
@@ -1052,16 +1069,19 @@ function getDisponibilidadeEscala() {
 
   const hoje = formatDateISO(new Date());
   const ausencias = db.prepare(`
-    SELECT c.user_id, UPPER(COALESCE(a.tipo,'')) AS tipo
+    SELECT c.user_id, c.id AS colaborador_id, UPPER(COALESCE(a.tipo,'')) AS tipo
     FROM escala_ausencias a
     JOIN colaboradores c ON c.id = a.colaborador_id
     WHERE ? BETWEEN a.data_inicio AND a.data_fim
   `).all(hoje);
 
   for (const item of ausencias) {
-    const key = String(item.user_id || "");
-    if (!key) continue;
-    disponibilidade[key] = { disponivel: false, noite_pesada: false, motivo: item.tipo || "AUSENTE" };
+    const tipo = String(item.tipo || "").trim();
+    if (!["FOLGA", "ATESTADO", "AUSENCIA", "AUSÊNCIA"].includes(tipo)) continue;
+    const keyUser = String(item.user_id || "").trim();
+    const keyColab = Number(item.colaborador_id || 0) || null;
+    if (keyUser) disponibilidade[keyUser] = { disponivel: false, noite_pesada: false, motivo: tipo || "AUSENTE" };
+    if (keyColab) disponibilidade[`colab:${keyColab}`] = { disponivel: false, noite_pesada: false, motivo: tipo || "AUSENTE" };
   }
   return disponibilidade;
 }
@@ -1098,7 +1118,7 @@ function reorganizarPreventivasPendentesPorEscala() {
     FROM preventiva_execucoes pe
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
-    WHERE UPPER(COALESCE(pe.status,'')) = 'PENDENTE'
+    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA')
     ORDER BY COALESCE(pe.data_prevista,'9999-12-31') ASC, pe.id ASC
   `).all();
 
@@ -1189,6 +1209,21 @@ async function reprocessarPreventivasPorTurnoAtual() {
     turnoAtual,
     turnoAnterior: turnoAnterior || null,
     houveTrocaTurno,
+  };
+}
+
+function sincronizarPreventivasComEscala({ origem = "manual" } = {}) {
+  const turnoAtual = getTurnoAtual();
+  const turnoAnterior = getConfig("preventiva_turno_reprocessado");
+  const houveTrocaTurno = String(turnoAnterior || "") !== String(turnoAtual || "");
+  const reorganizacao = reorganizarPreventivasPendentesPorEscala();
+  setConfig("preventiva_turno_reprocessado", turnoAtual);
+  return {
+    origem,
+    turnoAtual,
+    turnoAnterior: turnoAnterior || null,
+    houveTrocaTurno,
+    ...reorganizacao,
   };
 }
 
@@ -1478,10 +1513,9 @@ function prevalidarReprocessamentoPreventivas() {
       base.execucoesPendentes.emAndamento;
   }
 
-  if (!base.semanaAtiva) base.alertas.push("Sem semana ativa na escala atual.");
-  if (base.colaboradoresTurno.diurno <= 0) base.alertas.push("Sem colaboradores ativos no turno diurno.");
-  if (base.colaboradoresTurno.apoio <= 0) base.alertas.push("Sem colaboradores ativos no turno de apoio.");
-  if (base.colaboradoresTurno.noturnoPlantao <= 0) base.alertas.push("Sem colaboradores ativos no turno noturno/plantão.");
+  if (!base.semanaAtiva) base.alertas.push("Escala da semana não encontrada.");
+  if (base.colaboradoresTurno.diurno + base.colaboradoresTurno.apoio <= 0) base.alertas.push("Sem colaboradores ativos no turno DIA.");
+  if (base.colaboradoresTurno.noturnoPlantao <= 0) base.alertas.push("Sem colaboradores ativos no turno NOITE.");
   if (base.execucoesPendentes.total <= 0) base.alertas.push("Não há preventivas pendentes/atrasadas/em andamento para sincronizar.");
 
   base.prontoParaReprocesso = base.alertas.length === 0;
@@ -1590,6 +1624,7 @@ module.exports = {
   alocarEquipeExecucaoPreventiva,
   reprocessarPreventivasComNovaEscala,
   reprocessarPreventivasPorTurnoAtual,
+  sincronizarPreventivasComEscala,
   revisarCriticidadePreventivasFuturas,
   contarPreventivasPorCriticidade,
   gerarPreventivasAutomaticas,

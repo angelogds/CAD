@@ -5,6 +5,7 @@ const alertsHub = require("../alerts/alerts.hub");
 const alertsService = require("../alerts/alerts.service");
 const pushService = require("../push/push.service");
 const escalaService = require("../escala/escala.service");
+const { getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
 let inspecaoService = null;
 try {
   inspecaoService = require("../inspecao/inspecao.service");
@@ -112,9 +113,7 @@ function getPessoasDoTurnoAtual() {
   if (!semanaAtual?.id || !tableExists("escala_alocacoes") || !tableExists("colaboradores")) return [];
 
   const turnoAtual = getTurnoAtual();
-  const turnosPermitidos = turnoAtual === "NOITE"
-    ? ["plantao", "noturno"]
-    : ["diurno", "apoio"];
+  const turnosPermitidos = getTiposTurnoEscala(turnoAtual);
 
   const placeholders = turnosPermitidos.map(() => "?").join(",");
   const usersJoin = tableExists("users");
@@ -508,17 +507,7 @@ function getSemanaAtual() {
 }
 
 function getTurnoAgora() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date());
-  const partMap = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  const h = Number(partMap.hour || 0);
-  const m = Number(partMap.minute || 0);
-  const min = (h * 60) + m;
-  return (min >= (19 * 60) || min < (6 * 60)) ? "NOITE" : "DIA";
+  return getTurnoOperacionalAgora();
 }
 
 function getColaboradoresTurnoAtual(turno) {
@@ -526,7 +515,7 @@ function getColaboradoresTurnoAtual(turno) {
   if (!semana?.id || !tableExists("escala_alocacoes") || !tableExists("colaboradores")) return [];
 
   const turnoNormalizado = String(turno || "").toUpperCase() === "NOITE" ? "NOITE" : "DIA";
-  const tipos = turnoNormalizado === "NOITE" ? ["plantao", "noturno"] : ["diurno", "apoio"];
+  const tipos = getTiposTurnoEscala(turnoNormalizado);
   const placeholders = tipos.map(() => "?").join(",");
 
   return db.prepare(`

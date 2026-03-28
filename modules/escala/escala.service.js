@@ -1,4 +1,5 @@
 const db = require("../../database/db");
+const { getAgoraSaoPauloParts, getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
 
 
 function tableExists(tableName) {
@@ -11,21 +12,11 @@ function tableExists(tableName) {
 }
 
 function getNowSaoPauloParts() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date());
-
-  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  const now = getAgoraSaoPauloParts();
   return {
-    dateISO: `${map.year}-${map.month}-${map.day}`,
-    hour: Number(map.hour || 0),
-    minute: Number(map.minute || 0),
+    dateISO: now.dateISO,
+    hour: now.hour,
+    minute: now.minute,
   };
 }
 
@@ -67,9 +58,7 @@ function roleToFuncao(role) {
 }
 
 function currentTurno() {
-  const now = getNowSaoPauloParts();
-  const mins = (now.hour * 60) + now.minute;
-  return mins >= (18 * 60) || mins < (6 * 60) ? "noturno" : "diurno";
+  return getTurnoOperacionalAgora() === "NOITE" ? "noturno" : "diurno";
 }
 
 function getTurnoAtual() {
@@ -641,8 +630,7 @@ function getUsersDoTurnoAtual({ prefer = "auto" } = {}) {
 
   if (!semana?.id) return [];
 
-  const now = getNowSaoPauloParts();
-  const turnoAuto = now.hour >= 18 ? "noturno" : "diurno";
+  const turnoAuto = getTurnoOperacionalAgora() === "NOITE" ? "noturno" : "diurno";
   const pref = String(prefer || "auto").toLowerCase();
   const turno = pref === "auto" ? turnoAuto : normalizeTurno(pref);
 
@@ -660,8 +648,8 @@ function getUsersDoTurnoAtual({ prefer = "auto" } = {}) {
 
   const turnoPermitido = new Set(
     turno === "noturno"
-      ? ["noturno", "plantao"]
-      : ["diurno", "apoio", "plantao"]
+      ? getTiposTurnoEscala("NOITE")
+      : [...getTiposTurnoEscala("DIA"), "plantao"]
   );
 
   return rows
