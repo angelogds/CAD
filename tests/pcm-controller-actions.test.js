@@ -10,6 +10,8 @@ service.getIndicadores = () => ({ preventiva_pct_mes: 0, corretiva_pct_mes: 0, o
 service.getRankingEquipamentos = () => [];
 service.listPlanos = () => [];
 service.listBacklogSimples = () => [];
+service.getCriticidadeByEquipamentoId = () => null;
+service.saveCriticidade = () => ({ nivel_criticidade: 'MEDIA', indice_criticidade: 3.0 });
 
 function mockRes() {
   return {
@@ -76,4 +78,28 @@ test('placeholder POST actions redirect to expected pages', () => {
     '/pcm/programacao-semanal',
     '/pcm/programacao-semanal',
   ]);
+});
+
+test('criticidade GET carrega dados atuais e POST persiste com redirect', () => {
+  let persisted = null;
+  service.getCriticidadeByEquipamentoId = (id) => ({ equipamento_id: Number(id), nivel_criticidade: 'ALTA', indice_criticidade: 4.5 });
+  service.saveCriticidade = (payload) => {
+    persisted = payload;
+    return { nivel_criticidade: 'ALTA', indice_criticidade: 4.5 };
+  };
+
+  const reqGet = mockReq({ query: { equipamento_id: '9' } });
+  const resGet = mockRes();
+  ctrl.criticidade(reqGet, resGet);
+  assert.equal(resGet.rendered, 'pcm/criticidade');
+  assert.equal(resGet.payload.criticidadeAtual.nivel_criticidade, 'ALTA');
+
+  const reqPost = mockReq({
+    body: { equipamento_id: '9', nivel_criticidade: 'ALTA' },
+    flash: () => {},
+  });
+  const resPost = mockRes();
+  ctrl.salvarCriticidade(reqPost, resPost);
+  assert.equal(String(persisted.equipamento_id), '9');
+  assert.equal(resPost.redirected, '/pcm/criticidade?equipamento_id=9');
 });

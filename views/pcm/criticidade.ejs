@@ -12,16 +12,21 @@
 
       <form class="grid-2" style="margin-top:8px; gap:10px;" method="POST" action="/pcm/criticidade">
         <input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id || '' %>">
-        <label>Criticidade<select class="input" name="nivel_criticidade"><option>ALTA</option><option>MEDIA</option><option>BAIXA</option></select></label>
-        <label>Impacto produção (1 a 5)<input class="input" type="number" min="1" max="5" name="impacto_producao" value="3"></label>
-        <label>Impacto segurança (1 a 5)<input class="input" type="number" min="1" max="5" name="impacto_seguranca" value="3"></label>
-        <label>Impacto ambiental (1 a 5)<input class="input" type="number" min="1" max="5" name="impacto_ambiental" value="3"></label>
-        <label>Custo de parada (1 a 5)<input class="input" type="number" min="1" max="5" name="custo_parada" value="3"></label>
-        <label>Índice de criticidade (calculado)<input class="input" value="3.0" readonly></label>
-        <label style="grid-column:1 / -1;">Observações<textarea class="input" name="observacoes" placeholder="Observações técnicas"></textarea></label>
+        <label>Criticidade<select class="input" name="nivel_criticidade">
+          <% const nivelAtual = String(criticidadeAtual?.nivel_criticidade || 'MEDIA').toUpperCase(); %>
+          <option value="ALTA" <%= nivelAtual==='ALTA'?'selected':'' %>>ALTA</option>
+          <option value="MEDIA" <%= nivelAtual==='MEDIA'?'selected':'' %>>MEDIA</option>
+          <option value="BAIXA" <%= nivelAtual==='BAIXA'?'selected':'' %>>BAIXA</option>
+        </select></label>
+        <label>Impacto produção (1 a 5)<input class="input" type="number" min="1" max="5" name="impacto_producao" value="<%= criticidadeAtual?.impacto_producao || 3 %>"></label>
+        <label>Impacto segurança (1 a 5)<input class="input" type="number" min="1" max="5" name="impacto_seguranca" value="<%= criticidadeAtual?.impacto_seguranca || 3 %>"></label>
+        <label>Impacto ambiental (1 a 5)<input class="input" type="number" min="1" max="5" name="impacto_ambiental" value="<%= criticidadeAtual?.impacto_ambiental || 3 %>"></label>
+        <label>Custo de parada (1 a 5)<input class="input" type="number" min="1" max="5" name="custo_parada" value="<%= criticidadeAtual?.custo_parada || 3 %>"></label>
+        <label>Índice de criticidade (calculado)<input class="input" value="<%= Number(criticidadeAtual?.indice_criticidade || 3).toFixed(1) %>" readonly></label>
+        <label style="grid-column:1 / -1;">Observações<textarea class="input" name="observacoes" placeholder="Observações técnicas"><%= criticidadeAtual?.observacoes || '' %></textarea></label>
         <div class="pcm-actions" style="grid-column:1 / -1;"><button class="btn" type="submit">Salvar criticidade</button><a class="btn btn-outline" href="/pcm/criticidade">Cancelar</a></div>
       </form>
-      <div class="muted-xs" style="margin-top:8px;">TODO: integrar persistência em `pcm_equipamento_criticidade` e cálculo automático no backend.</div>
+      <div class="muted-xs" style="margin-top:8px;">Persistência ativa com cálculo automático do índice técnico (média dos impactos).</div>
     </div>
   </div>
 </div>

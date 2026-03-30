@@ -73,17 +73,26 @@ function criticidade(req, res) {
   const filtros = {
     equipamento_id: req.query.equipamento_id || "",
   };
+  const criticidadeAtual = service.getCriticidadeByEquipamentoId(filtros.equipamento_id);
   return res.render("pcm/criticidade", {
     ...baseView(req),
     activePcmSection: "criticidade",
     filtros,
     equipamentos: service.getEquipamentos(),
+    criticidadeAtual,
   });
 }
 
 function salvarCriticidade(req, res) {
-  // TODO: plugar persistência real em pcm_equipamento_criticidade
-  req.flash("success", "Configuração de criticidade recebida (integração pendente do endpoint de persistência).");
+  try {
+    const data = service.saveCriticidade(req.body, req.session?.user?.id || null);
+    req.flash(
+      "success",
+      `Criticidade do equipamento atualizada para ${data.nivel_criticidade} (índice ${data.indice_criticidade.toFixed(1)}).`
+    );
+  } catch (e) {
+    req.flash("error", e.message || "Falha ao salvar criticidade do equipamento.");
+  }
   return res.redirect(`/pcm/criticidade?equipamento_id=${encodeURIComponent(req.body.equipamento_id || "")}`);
 }
 
