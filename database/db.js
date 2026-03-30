@@ -1,7 +1,6 @@
 // database/db.js
 const path = require("path");
 const fs = require("fs");
-const Database = require("better-sqlite3");
 const storage = require("../config/storage");
 
 const dbPath = storage.DB_PATH;
@@ -10,7 +9,66 @@ const dbPath = storage.DB_PATH;
 const dir = path.dirname(dbPath);
 if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-const db = new Database(dbPath);
+function createNodeSqliteCompat(databasePath) {
+  // fallback nativo do Node.js para ambientes sem binário do better-sqlite3
+  const { DatabaseSync } = require("node:sqlite");
+  const nativeDb = new DatabaseSync(databasePath);
+
+  const normalizeResult = (result) => ({
+    changes: Number(result?.changes || 0),
+    lastInsertRowid: Number(result?.lastInsertRowid || 0),
+  });
+
+  return {
+    exec(sql) {
+      return nativeDb.exec(sql);
+    },
+    pragma(statement) {
+      return nativeDb.exec(`PRAGMA ${statement}`);
+    },
+    prepare(sql) {
+      const stmt = nativeDb.prepare(sql);
+      return {
+        run(...args) {
+          return normalizeResult(stmt.run(...args));
+        },
+        get(...args) {
+          return stmt.get(...args);
+        },
+        all(...args) {
+          return stmt.all(...args);
+        },
+      };
+    },
+    transaction(fn) {
+      return (...args) => {
+        nativeDb.exec("BEGIN");
+        try {
+          const result = fn(...args);
+          nativeDb.exec("COMMIT");
+          return result;
+        } catch (error) {
+          nativeDb.exec("ROLLBACK");
+          throw error;
+        }
+      };
+    },
+  };
+}
+
+function createDatabase(databasePath) {
+  try {
+    const BetterSqlite3 = require("better-sqlite3");
+    return new BetterSqlite3(databasePath);
+  } catch (error) {
+    const isBindingError = /Could not locate the bindings file/i.test(String(error?.message || ""));
+    if (!isBindingError) throw error;
+    console.warn("⚠️ [db] better-sqlite3 indisponível. Usando fallback node:sqlite.");
+    return createNodeSqliteCompat(databasePath);
+  }
+}
+
+const db = createDatabase(dbPath);
 
 // pragmas base
 db.pragma("journal_mode = WAL");
