@@ -201,6 +201,7 @@ function osPausar(req, res) {
 async function osClose(req, res) {
   const id = Number(req.params.id);
   const user = req.session?.user || null;
+  const descricaoAssistida = String(req.body?.descricao_assistida || "").trim();
   const redirectAfterClose = postCloseRedirectPath(user) || `/os/${id}`;
 
   console.log("[OS_CLOSE] Iniciando fechamento", {
@@ -256,16 +257,9 @@ async function osClose(req, res) {
 
     const syncResult = await service.concluirOS(id, {
       closedBy: user?.id || null,
-      diagnostico: versaoFinalAprovada || textoDigitado,
-      acaoExecutada: versaoFinalAprovada || versaoTecnicaSugerida || textoDigitado,
-      fechamentoPayload: {
-        fonte_descricao: fonteDescricao,
-        texto_digitado: textoDigitado,
-        transcricao_audio: transcricaoAudio,
-        versao_tecnica_sugerida: versaoTecnicaSugerida,
-        versao_final_aprovada: versaoFinalAprovada,
-        fotos_metadados: fotosMetadados,
-      },
+      diagnostico: descricaoAssistida || undefined,
+      acaoExecutada: descricaoAssistida || undefined,
+      fechamentoPayload: {},
     });
 
     await pushService.sendPushToAll({
