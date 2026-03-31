@@ -32,7 +32,11 @@ function registrarLogIA({ usuarioId, osId, naoConformidadeId, tipo, entrada, res
   }
 }
 
-function buscarHistoricoSemelhante({ equipamentoId, sintoma, descricao, limit = 8 }) {
+function buscarHistoricoSemelhante(params = {}) {
+  const equipamentoId = params.equipamentoId ?? params.equipamento_id ?? null;
+  const sintoma = params.sintoma ?? params.sintoma_principal ?? '';
+  const descricao = params.descricao ?? params.texto_base ?? '';
+  const limit = params.limit ?? params.limite ?? 8;
   const hasOS = tableExists("os");
   if (!hasOS || !equipamentoId) return [];
 

@@ -226,7 +226,7 @@ async function osClose(req, res) {
     const textoDigitado = normalizeText(req.body?.texto_digitado);
     const transcricaoAudio = normalizeText(req.body?.transcricao_audio);
     const versaoTecnicaSugerida = normalizeText(req.body?.versao_tecnica_sugerida);
-    const versaoFinalAprovada = normalizeText(req.body?.versao_final_aprovada) || versaoTecnicaSugerida || textoDigitado;
+    const versaoFinalAprovada = normalizeText(req.body?.versao_final_aprovada) || versaoTecnicaSugerida || transcricaoAudio || textoDigitado;
     const fonteDescricao = normalizeText(req.body?.fonte_descricao) || "texto";
     const fotosMetadadosBody = normalizeText(req.body?.fotos_metadados_json);
     let fotosMetadados = [];
@@ -255,11 +255,27 @@ async function osClose(req, res) {
       userId: user?.id || null,
     });
 
+    const fechamentoPayload = {
+      fonte_descricao: fonteDescricao,
+      texto_digitado: textoDigitado,
+      transcricao_audio: transcricaoAudio,
+      descricao_aprovada: versaoFinalAprovada,
+      versao_tecnica_sugerida: versaoTecnicaSugerida,
+      fotos_metadados: fotosMetadados,
+      fotos_fechamento: fotosFechamento.map((f) => f.pathPublic || f.path).filter(Boolean),
+      observacao_curta: normalizeText(req.body?.observacao_curta_fechamento) || null,
+      tipo_acao: normalizeText(req.body?.tipo_acao_fechamento) || null,
+      falha_eliminada: true,
+      teste_operacional_realizado: true,
+    };
+
+    const descricaoFinal = versaoFinalAprovada || descricaoAssistida || textoDigitado || transcricaoAudio || "";
+
     const syncResult = await service.concluirOS(id, {
       closedBy: user?.id || null,
-      diagnostico: descricaoAssistida || undefined,
-      acaoExecutada: descricaoAssistida || undefined,
-      fechamentoPayload: {},
+      diagnostico: descricaoFinal || undefined,
+      acaoExecutada: descricaoFinal || undefined,
+      fechamentoPayload,
     });
 
     await pushService.sendPushToAll({

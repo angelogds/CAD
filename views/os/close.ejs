@@ -68,3 +68,74 @@
   </form>
 </div>
 <script src="/js/os-audio-transcription.js"></script>
+<script>
+  (function(){
+    const form = document.getElementById('form-fechar-os');
+    const fotosInput = document.getElementById('fechamento_fotos');
+    const fotosMetaInput = document.getElementById('fotos_metadados_json');
+    const descricaoInput = document.getElementById('descricao_assistida');
+    const previewInput = document.getElementById('preview_tecnica');
+    const fonteInput = document.getElementById('fonte_descricao');
+    const versaoSugeridaInput = document.getElementById('versao_tecnica_sugerida');
+    const fonteIndicador = document.getElementById('fonte-indicador');
+    const statusGeracao = document.getElementById('status-geracao');
+    const btnGerar = document.getElementById('btn-gerar-descricao');
+
+    function syncFotosMetadados() {
+      const payload = Array.from(fotosInput?.files || []).map((f) => ({
+        nome_arquivo: f.name,
+        tipo_mime: f.type || null,
+        tamanho_bytes: f.size || null,
+      }));
+      fotosMetaInput.value = JSON.stringify(payload);
+      return payload;
+    }
+
+    fotosInput?.addEventListener('change', syncFotosMetadados);
+    syncFotosMetadados();
+
+    btnGerar?.addEventListener('click', async function(){
+      const textoDigitado = (descricaoInput?.value || '').trim();
+      const fotosMetadados = syncFotosMetadados();
+      const fonte = textoDigitado ? 'texto' : (fotosMetadados.length ? 'foto' : 'texto');
+
+      statusGeracao.textContent = 'Gerando descrição técnica...';
+      btnGerar.disabled = true;
+
+      try {
+        const resp = await fetch('/os/<%= os.id %>/gerar-descricao-tecnica', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            texto_digitado: textoDigitado,
+            transcricao_audio: textoDigitado,
+            fotos_metadados: fotosMetadados,
+            fonte,
+          }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data?.ok) throw new Error(data?.error || 'Falha ao gerar descrição técnica.');
+
+        const textoFinal = (data?.descricaoTecnica || '').trim();
+        if (textoFinal) {
+          previewInput.value = textoFinal;
+          versaoSugeridaInput.value = textoFinal;
+        }
+        const fonteDetectada = data?.fonte || fonte;
+        fonteInput.value = fonteDetectada;
+        fonteIndicador.textContent = fonteDetectada;
+        statusGeracao.textContent = textoFinal ? 'Descrição técnica pronta para edição.' : 'Sem conteúdo da IA. Continue manualmente.';
+      } catch (err) {
+        statusGeracao.textContent = err?.message || 'Falha da IA. Continue manualmente.';
+      } finally {
+        btnGerar.disabled = false;
+      }
+    });
+
+    form?.addEventListener('submit', function(){
+      syncFotosMetadados();
+      const preview = (previewInput?.value || '').trim();
+      if (!preview) previewInput.value = (descricaoInput?.value || '').trim();
+    });
+  })();
+</script>
