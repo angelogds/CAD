@@ -1140,6 +1140,18 @@ function buscarPreventivasRelacionadas(equipamentoId) {
   }
 }
 
+function normalizeFallbackNarrative(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return "Relato operacional informado sem detalhes técnicos suficientes.";
+  const collapsed = raw.replace(/\s+/g, " ").trim();
+  const compact = collapsed.replace(/\s+/g, "");
+  const hasLongRepeatedChar = /(.)\1{9,}/.test(compact);
+  if (hasLongRepeatedChar || compact.length < 8) {
+    return "Relato operacional informado sem detalhes técnicos suficientes.";
+  }
+  return collapsed;
+}
+
 async function createOS({
   equipamento_id,
   equipamento_manual,
@@ -1208,7 +1220,9 @@ async function createOS({
     }),
   };
 
-  const aberturaIA = await osIAService.gerarAberturaAutomaticaDaOS({
+  let aberturaIA;
+  let aberturaIAError = null;
+  const aberturaPayload = {
     usuario_id: openedBy,
     nao_conformidade: {
       equipamento_id: equipId,
@@ -1220,7 +1234,47 @@ async function createOS({
       observacao_curta: relatoNaoConformidade,
     },
     contexto,
-  });
+  };
+
+  try {
+    aberturaIA = await osIAService.gerarAberturaAutomaticaDaOS(aberturaPayload);
+  } catch (err) {
+    aberturaIAError = err;
+    console.error("[OS_CREATE][IA_RETRY] Primeira tentativa falhou. Tentando novamente.", {
+      osEquipamentoId: equipId,
+      errorCode: err?.code || null,
+      message: err?.message || String(err),
+    });
+    try {
+      aberturaIA = await osIAService.gerarAberturaAutomaticaDaOS(aberturaPayload);
+    } catch (retryErr) {
+      aberturaIAError = retryErr;
+    }
+  }
+
+  if (!aberturaIA) {
+    const relatoFallback = normalizeFallbackNarrative(relatoNaoConformidade);
+    console.error("[OS_CREATE][IA_WARN] Falha na IA de abertura. Seguindo com fallback manual.", {
+      osEquipamentoId: equipId,
+      errorCode: aberturaIAError?.code || null,
+      message: aberturaIAError?.message || String(aberturaIAError || ""),
+      technical: aberturaIAError?.technical || null,
+    });
+    aberturaIA = {
+      criticidade_sugerida: criticidadeEntrada,
+      prioridade_sugerida: criticidadeEntrada,
+      diagnostico_inicial: relatoFallback,
+      causa_provavel: "Diagnóstico técnico pendente de avaliação presencial da manutenção.",
+      risco_operacional: "Avaliação pendente (fallback sem IA).",
+      risco_seguranca: "Avaliação pendente (fallback sem IA).",
+      acao_corretiva: "Executar inspeção técnica inicial, identificar causa raiz e corrigir falha encontrada.",
+      acao_preventiva: "Após correção, registrar causa raiz e definir rotina de inspeção preventiva para evitar reincidência.",
+      servico_sugerido: `Inspeção e correção corretiva no equipamento ${equipamentoFinal || "informado"}.`,
+      sugestao_equipe: { quantidade_recomendada: 1, perfil_minimo: "Mecânico", racional: "Fallback sem IA" },
+      descricao_tecnica_os: relatoFallback,
+      justificativa_interna: "Abertura concluída sem IA por indisponibilidade temporária.",
+    };
+  }
   const grauOS = normalizeGrau(aberturaIA.criticidade_sugerida || aberturaIA.prioridade_sugerida || score.prioridade || criticidadeEntrada);
 
   const cols = getOSColumns();

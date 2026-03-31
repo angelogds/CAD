@@ -105,11 +105,38 @@ function buildError(code, message, technical, extra = {}) {
 }
 
 function extractOutputText(data) {
-  return String(
-    data?.output_text
-    || data?.output?.flatMap((i) => i?.content || []).find((c) => c?.type === 'output_text')?.text
-    || ''
-  ).trim();
+  const directText = String(data?.output_text || '').trim();
+  if (directText) return directText;
+
+  const parsedText = data?.output_parsed;
+  if (parsedText && typeof parsedText === 'object') {
+    try {
+      return JSON.stringify(parsedText);
+    } catch (_e) {}
+  }
+
+  const content = Array.isArray(data?.output)
+    ? data.output.flatMap((item) => (Array.isArray(item?.content) ? item.content : []))
+    : [];
+
+  const outputText = content.find((c) => c?.type === 'output_text' && typeof c?.text === 'string')?.text;
+  if (String(outputText || '').trim()) return String(outputText).trim();
+
+  const outputJson = content.find((c) => c?.type === 'output_json');
+  if (outputJson && typeof outputJson?.json === 'object') {
+    try {
+      return JSON.stringify(outputJson.json);
+    } catch (_e) {}
+  }
+
+  const outputAnyJson = content.find((c) => c && typeof c === 'object' && c?.json && typeof c.json === 'object');
+  if (outputAnyJson) {
+    try {
+      return JSON.stringify(outputAnyJson.json);
+    } catch (_e) {}
+  }
+
+  return '';
 }
 
 function parseJSONObject(rawText) {
