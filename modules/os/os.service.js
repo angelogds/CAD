@@ -1221,7 +1221,6 @@ async function createOS({
   };
 
   let aberturaIA;
-  let aberturaIAError = null;
   const aberturaPayload = {
     usuario_id: openedBy,
     nao_conformidade: {
@@ -1239,39 +1238,24 @@ async function createOS({
   try {
     aberturaIA = await osIAService.gerarAberturaAutomaticaDaOS(aberturaPayload);
   } catch (err) {
-    aberturaIAError = err;
-    console.error("[OS_CREATE][IA_RETRY] Primeira tentativa falhou. Tentando novamente.", {
+    console.error("[OS_CREATE][IA_WARN] Falha na IA de abertura. Seguindo com fallback manual.", {
       osEquipamentoId: equipId,
       errorCode: err?.code || null,
       message: err?.message || String(err),
-    });
-    try {
-      aberturaIA = await osIAService.gerarAberturaAutomaticaDaOS(aberturaPayload);
-    } catch (retryErr) {
-      aberturaIAError = retryErr;
-    }
-  }
-
-  if (!aberturaIA) {
-    const relatoFallback = normalizeFallbackNarrative(relatoNaoConformidade);
-    console.error("[OS_CREATE][IA_WARN] Falha na IA de abertura. Seguindo com fallback manual.", {
-      osEquipamentoId: equipId,
-      errorCode: aberturaIAError?.code || null,
-      message: aberturaIAError?.message || String(aberturaIAError || ""),
-      technical: aberturaIAError?.technical || null,
+      technical: err?.technical || null,
     });
     aberturaIA = {
       criticidade_sugerida: criticidadeEntrada,
       prioridade_sugerida: criticidadeEntrada,
-      diagnostico_inicial: relatoFallback,
-      causa_provavel: "Diagnóstico técnico pendente de avaliação presencial da manutenção.",
+      diagnostico_inicial: relatoNaoConformidade,
+      causa_provavel: relatoNaoConformidade,
       risco_operacional: "Avaliação pendente (fallback sem IA).",
       risco_seguranca: "Avaliação pendente (fallback sem IA).",
-      acao_corretiva: "Executar inspeção técnica inicial, identificar causa raiz e corrigir falha encontrada.",
-      acao_preventiva: "Após correção, registrar causa raiz e definir rotina de inspeção preventiva para evitar reincidência.",
-      servico_sugerido: `Inspeção e correção corretiva no equipamento ${equipamentoFinal || "informado"}.`,
+      acao_corretiva: relatoNaoConformidade,
+      acao_preventiva: relatoNaoConformidade,
+      servico_sugerido: relatoNaoConformidade,
       sugestao_equipe: { quantidade_recomendada: 1, perfil_minimo: "Mecânico", racional: "Fallback sem IA" },
-      descricao_tecnica_os: relatoFallback,
+      descricao_tecnica_os: relatoNaoConformidade,
       justificativa_interna: "Abertura concluída sem IA por indisponibilidade temporária.",
     };
   }
