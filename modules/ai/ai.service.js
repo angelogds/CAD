@@ -1,3 +1,7 @@
+const fs = require('fs');
+const path = require('path');
+const storagePaths = require('../../config/storage');
+
 const ENV_KEY_CANDIDATES = ['OPENAI_API_KEY', 'OPENAI_APIKEY', 'OPENAI_KEY'];
 
 function isAIEnabled() {
