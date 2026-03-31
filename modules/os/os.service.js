@@ -1140,6 +1140,18 @@ function buscarPreventivasRelacionadas(equipamentoId) {
   }
 }
 
+function normalizeFallbackNarrative(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return "Relato operacional informado sem detalhes técnicos suficientes.";
+  const collapsed = raw.replace(/\s+/g, " ").trim();
+  const compact = collapsed.replace(/\s+/g, "");
+  const hasLongRepeatedChar = /(.)\1{9,}/.test(compact);
+  if (hasLongRepeatedChar || compact.length < 8) {
+    return "Relato operacional informado sem detalhes técnicos suficientes.";
+  }
+  return collapsed;
+}
+
 async function createOS({
   equipamento_id,
   equipamento_manual,
