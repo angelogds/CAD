@@ -90,7 +90,21 @@ async function gerarAberturaAutomaticaDaOS(payload) {
   const model = process.env.OPENAI_MODEL_OS_AUTOMATICA || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini';
 
   try {
-    const ai = await callOpenAIJSON({ model, systemPrompt: PROMPT_ABERTURA, payload });
+    const contextoCompacto = Array.isArray(payload?.contexto?.historico_semelhante_compacto)
+      ? payload.contexto.historico_semelhante_compacto.slice(0, 5)
+      : [];
+    const payloadPrompt = {
+      ...payload,
+      contexto_compacto_relevante: {
+        historico_semelhante_top5: contextoCompacto,
+      },
+    };
+
+    const ai = await callOpenAIJSON({
+      model,
+      systemPrompt: `${PROMPT_ABERTURA} Use o contexto_compacto_relevante para reduzir respostas genéricas e priorizar ações já eficazes em casos semelhantes.`,
+      payload: payloadPrompt,
+    });
     const result = {
       diagnostico_inicial: String(ai.diagnostico_inicial || "").trim(),
       causa_provavel: String(ai.causa_provavel || "").trim(),
