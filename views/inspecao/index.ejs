@@ -83,19 +83,9 @@
         <% for (const nc of ncList) { %>
           <tr>
             <td><%= nc.item %></td><td><%= nc.data_ocorrencia %></td><td><%= nc.nao_conformidade %></td>
-            <% if (canEdit) { %>
-              <td colspan="3">
-                <form method="POST" class="nc-edit-form" action="/inspecao/<%= ano %>/<%= mes %>/nc/salvar">
-                  <input type="hidden" name="id" value="<%= nc.id %>" />
-                  <input type="text" name="acao_corretiva" value="<%= nc.acao_corretiva || '' %>" placeholder="Ação preventiva" />
-                  <input type="text" name="acao_preventiva" value="<%= nc.acao_preventiva || '' %>" placeholder="Ação corretiva" />
-                  <input type="date" name="data_correcao" value="<%= nc.data_correcao || '' %>" />
-                  <button class="btn btn-primary" type="submit">Salvar</button>
-                </form>
-              </td>
-            <% } else { %>
-              <td><%= nc.acao_corretiva || '-' %></td><td><%= nc.acao_preventiva || '-' %></td><td><%= nc.data_correcao || '-' %></td>
-            <% } %>
+            <td><%= nc.acao_preventiva || '-' %></td>
+            <td><%= nc.acao_corretiva || '-' %></td>
+            <td><%= nc.data_correcao || '-' %></td>
             <td><% if (nc.os_id) { %><a class="btn btn-outline btn-sm" href="/os/<%= nc.os_id %>">OS #<%= nc.os_id %></a><% } else { %>-<% } %></td>
           </tr>
         <% } %>

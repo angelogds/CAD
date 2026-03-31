@@ -34,7 +34,6 @@ router.post("/recalcular", requireLogin, requireRole(EDIT_ACCESS), wrap(ctrl.rec
 router.post("/atualizar", requireLogin, requireRole(EDIT_ACCESS), wrap(ctrl.recalculateCurrent));
 
 router.post("/:ano/:mes/recalcular", requireLogin, requireRole(EDIT_ACCESS), wrap(ctrl.recalculate));
-router.post("/:ano/:mes/nc/salvar", requireLogin, requireRole(EDIT_ACCESS), wrap(ctrl.saveNC));
 router.post("/:ano/:mes/observacao/salvar", requireLogin, requireRole(EDIT_ACCESS), wrap(ctrl.saveObservation));
 
 router.get("/:ano/:mes/pdf", requireLogin, requireRole(VIEW_ACCESS), wrap(ctrl.exportPDF));
