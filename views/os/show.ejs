@@ -14,6 +14,9 @@
   .foto-card img{display:block;width:100%;height:140px;object-fit:cover;background:#e5e7eb}
   .foto-card span{display:block;padding:6px 8px;font-size:12px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .resumo-exec{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .tabela-compacta{width:100%;border-collapse:collapse;margin-top:10px}
+  .tabela-compacta th,.tabela-compacta td{border:1px solid #e2e8f0;padding:8px 10px;font-size:13px;text-align:left}
+  .tabela-compacta th{background:#f8fafc;font-weight:700}
 
   .badge-funcao{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
   .func-mec{background:#fee2e2;color:#991b1b}.func-mon{background:#dbeafe;color:#1e3a8a}.func-aux{background:#dcfce7;color:#166534}
@@ -81,6 +84,77 @@
       <a class="btn btn-green" href="/tracagem?os_id=<%= os.id %>">Abrir Traçagem</a>
     </div>
     <div class="muted">Cálculos de caldeiraria relacionados a esta OS.</div>
+    <table class="tabela-compacta">
+      <thead>
+        <tr>
+          <th>Equipe</th>
+          <th>Executor</th>
+          <th>Auxiliar</th>
+          <th>Turno</th>
+          <th>Modo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><%= (os.executor_nome || os.execucao_ativa?.executor_nome) && (os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome) ? 'Equipe alocada' : '-' %></td>
+          <td><%= os.executor_nome || os.execucao_ativa?.executor_nome || '-' %></td>
+          <td><%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></td>
+          <td><%= os.turno_alocado || os.execucao_ativa?.turno_alocacao || '-' %></td>
+          <td><%= os.alocacao_modo || '-' %></td>
+        </tr>
+      </tbody>
+    </table>
+    <% if (canAutoAssign) { %>
+      <div style="margin-top:8px;display:flex;justify-content:flex-end;">
+        <form method="POST" action="/os/<%= os.id %>/auto-alocar">
+          <button class="btn btn-primary" type="submit">Reatribuir automaticamente</button>
+        </form>
+      </div>
+    <% } %>
+    <% if (canManualEditEquipe) { %>
+      <% const mecanicosTurno = (equipeUsuarios || []).filter(u => String(u.funcao || '').toLowerCase() === 'mecanico'); %>
+      <% const auxiliaresTurno = (equipeUsuarios || []).filter(u => ['auxiliar','apoio'].includes(String(u.funcao || '').toLowerCase())); %>
+      <% const grauManual = String(os.grau || '').toUpperCase(); %>
+      <% const exigirMecanico = ['MEDIA','ALTA','CRITICA'].includes(grauManual); %>
+      <form method="POST" action="/os/<%= os.id %>/equipe" style="margin-top:10px;">
+        <div class="grid2">
+          <div>
+            <label>Executor</label>
+            <select class="input" name="executor_colaborador_id" required>
+              <option value="">Selecione</option>
+              <% if (mecanicosTurno.length) { %>
+                <optgroup label="Mecânicos">
+                  <% mecanicosTurno.forEach(function(u){ %>
+                    <option value="<%= u.id %>" <%= Number(os.executor_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
+                  <% }) %>
+                </optgroup>
+              <% } %>
+              <% if (!exigirMecanico && auxiliaresTurno.length) { %>
+                <optgroup label="Apoio/Auxiliares">
+                  <% auxiliaresTurno.forEach(function(u){ %>
+                    <option value="<%= u.id %>" <%= Number(os.executor_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
+                  <% }) %>
+                </optgroup>
+              <% } %>
+            </select>
+          </div>
+          <div>
+            <label>Auxiliar</label>
+            <select class="input" name="auxiliar_colaborador_id">
+              <option value="">Sem auxiliar</option>
+              <% if (auxiliaresTurno.length) { %>
+                <optgroup label="Auxiliares">
+                  <% auxiliaresTurno.forEach(function(u){ %>
+                    <option value="<%= u.id %>" <%= Number(os.auxiliar_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
+                  <% }) %>
+                </optgroup>
+              <% } %>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:8px;"><button class="btn" type="submit">Salvar equipe</button></div>
+      </form>
+    <% } %>
     <ul style="margin-top:8px;">
       <% if (!(tracagens||[]).length) { %>
         <li class="muted">Nenhuma traçagem vinculada.</li>
@@ -90,69 +164,6 @@
       <% }) %>
     </ul>
   </div>
-</div>
-
-
-
-<div class="card" style="margin-top:12px;">
-  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-    <h3 style="margin:0;">Equipe</h3>
-    <% if (canAutoAssign) { %>
-      <form method="POST" action="/os/<%= os.id %>/auto-alocar">
-        <button class="btn btn-primary" type="submit">Reatribuir automaticamente</button>
-      </form>
-    <% } %>
-  </div>
-
-  <div class="muted" style="margin-top:6px;">Executor: <strong><%= os.executor_nome || os.execucao_ativa?.executor_nome || '-' %></strong></div>
-  <div class="muted">Auxiliar: <strong><%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></strong></div>
-  <div class="muted">Turno: <strong><%= os.turno_alocado || os.execucao_ativa?.turno_alocacao || '-' %></strong></div>
-  <div class="muted">Modo: <strong><%= os.alocacao_modo || '-' %></strong></div>
-
-  <% if (canManualEditEquipe) { %>
-    <% const mecanicosTurno = (equipeUsuarios || []).filter(u => String(u.funcao || '').toLowerCase() === 'mecanico'); %>
-    <% const auxiliaresTurno = (equipeUsuarios || []).filter(u => ['auxiliar','apoio'].includes(String(u.funcao || '').toLowerCase())); %>
-    <% const grauManual = String(os.grau || '').toUpperCase(); %>
-    <% const exigirMecanico = ['MEDIA','ALTA','CRITICA'].includes(grauManual); %>
-    <form method="POST" action="/os/<%= os.id %>/equipe" style="margin-top:10px;">
-      <div class="grid2">
-        <div>
-          <label>Executor</label>
-          <select class="input" name="executor_colaborador_id" required>
-            <option value="">Selecione</option>
-            <% if (mecanicosTurno.length) { %>
-              <optgroup label="Mecânicos">
-                <% mecanicosTurno.forEach(function(u){ %>
-                  <option value="<%= u.id %>" <%= Number(os.executor_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
-                <% }) %>
-              </optgroup>
-            <% } %>
-            <% if (!exigirMecanico && auxiliaresTurno.length) { %>
-              <optgroup label="Apoio/Auxiliares">
-                <% auxiliaresTurno.forEach(function(u){ %>
-                  <option value="<%= u.id %>" <%= Number(os.executor_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
-                <% }) %>
-              </optgroup>
-            <% } %>
-          </select>
-        </div>
-        <div>
-          <label>Auxiliar</label>
-          <select class="input" name="auxiliar_colaborador_id">
-            <option value="">Sem auxiliar</option>
-            <% if (auxiliaresTurno.length) { %>
-              <optgroup label="Auxiliares">
-                <% auxiliaresTurno.forEach(function(u){ %>
-                  <option value="<%= u.id %>" <%= Number(os.auxiliar_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
-                <% }) %>
-              </optgroup>
-            <% } %>
-          </select>
-        </div>
-      </div>
-      <div style="margin-top:8px;"><button class="btn" type="submit">Salvar equipe</button></div>
-    </form>
-  <% } %>
 </div>
 
 
@@ -197,5 +208,3 @@
     <% }) %>
   </div>
 </div>
-
-

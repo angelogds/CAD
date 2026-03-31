@@ -401,11 +401,13 @@ function getOSById(id) {
 
   const os = db.prepare(`
     SELECT o.*,
+           e.nome AS equipamento_nome,
            ce.nome AS executor_nome,
            ca.nome AS auxiliar_nome,
            ue.name AS executor_user_nome,
            ua.name AS auxiliar_user_nome
     FROM os o
+    LEFT JOIN equipamentos e ON e.id = o.equipamento_id
     LEFT JOIN colaboradores ce ON ce.id = ${hasExecColab ? "o.executor_colaborador_id" : "NULL"}
     LEFT JOIN colaboradores ca ON ca.id = ${hasAuxColab ? "o.auxiliar_colaborador_id" : "NULL"}
     LEFT JOIN users ue ON ue.id = o.mecanico_user_id
@@ -422,6 +424,7 @@ function getOSById(id) {
 
   return {
     ...os,
+    equipamento_resolvido: os.equipamento_nome || os.equipamento_manual || os.equipamento || "-",
     acao_corretiva: acaoCorretiva,
     acao_preventiva: acaoPreventiva,
     executor_nome: executorNome,
