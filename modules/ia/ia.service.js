@@ -1,133 +1,138 @@
-const aiCore = require('../ai/ai.service');
-const { IA_RESULT_JSON_SCHEMA, IA_RESULT_REQUIRED_FIELDS } = require('./ia.schema');
+const { getAIConfig } = require('../ai/ai.service');
 
-const IA_SYSTEM_PROMPT = [
-  'Você é um assistente técnico de manutenção industrial.',
-  'Responda SEMPRE em português do Brasil.',
-  'Retorne apenas dados técnicos coerentes com os dados informados.',
-  'Não invente medições, códigos de peças ou materiais não citados.',
-].join(' ');
+const MIME_TO_FORMAT = {
+  'audio/webm': 'webm',
+  'audio/ogg': 'ogg',
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/mp4': 'mp4',
+  'audio/x-m4a': 'm4a',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/flac': 'flac',
+};
 
-function normalizeString(value) {
-  return String(value || '').trim();
+function buildError(code, message, technical, extra = {}) {
+  const err = new Error(message);
+  err.code = code;
+  err.technical = technical || message;
+  Object.assign(err, extra);
+  return err;
 }
 
-function normalizeMateriais(value) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => normalizeString(item))
-    .filter(Boolean);
+function resolveAudioTimeoutMs(overrideMs) {
+  const fromEnv = Number(process.env.OPENAI_AUDIO_TIMEOUT_MS || process.env.OPENAI_TIMEOUT_MS || 25000);
+  const fromInput = Number(overrideMs || 0);
+  if (Number.isFinite(fromInput) && fromInput > 0) return fromInput;
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
+  return 25000;
 }
 
-function normalizeConfianca(value) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return 0;
-  return Math.min(100, Math.max(0, Math.round(parsed)));
+function pickAudioFormat(mimeType) {
+  return MIME_TO_FORMAT[String(mimeType || '').toLowerCase()] || 'webm';
 }
 
-function buildFallback(reason) {
-  return {
-    resumo_usuario: 'Análise automática indisponível no momento.',
-    descricao_tecnica: 'Não foi possível consolidar análise técnica automática com segurança.',
-    acao_corretiva: 'Executar inspeção em campo e corrigir a causa raiz identificada.',
-    acao_preventiva: 'Reforçar rotina de inspeção preventiva e registrar evidências de reincidência.',
-    materiais_citados: [],
-    tipo_intervencao: 'INSPECAO',
-    confianca: 15,
-    observacao_ia: `Fallback aplicado: ${normalizeString(reason) || 'resposta inválida da IA.'}`,
-  };
+function pickAudioModel() {
+  return String(process.env.OPENAI_MODEL_AUDIO || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini-transcribe').trim();
 }
 
-function validateIAResultShape(payload) {
-  const errors = [];
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return { valid: false, errors: ['Payload deve ser um objeto JSON.'] };
+async function transcreverAudioBase({ buffer, mimeType, prompt = '', timeoutMs }) {
+  const cfg = getAIConfig();
+  if (!cfg.enabled) throw buildError('AI_DISABLED', 'IA desativada no ambiente.', 'AI_ENABLED=false');
+  if (!cfg.hasApiKey) throw buildError('AI_KEY_MISSING', 'IA ainda não ativada. Configure OPENAI_API_KEY.', 'OPENAI_API_KEY ausente');
+  if (cfg.apiKeyLooksPlaceholder) {
+    throw buildError('AI_KEY_PLACEHOLDER', 'Configuração da IA inválida. Revise a chave da API.', 'OPENAI_API_KEY parece placeholder');
+  }
+  if (!buffer || !Buffer.isBuffer(buffer) || !buffer.length) {
+    throw buildError('AUDIO_EMPTY', 'Arquivo de áudio inválido.', 'Buffer vazio');
   }
 
-  for (const field of IA_RESULT_REQUIRED_FIELDS) {
-    if (!(field in payload)) errors.push(`Campo obrigatório ausente: ${field}`);
-  }
-
-  const known = new Set(IA_RESULT_REQUIRED_FIELDS);
-  for (const key of Object.keys(payload)) {
-    if (!known.has(key)) errors.push(`Campo não permitido: ${key}`);
-  }
-
-  if (typeof payload.resumo_usuario !== 'string') errors.push('resumo_usuario deve ser string');
-  if (typeof payload.descricao_tecnica !== 'string') errors.push('descricao_tecnica deve ser string');
-  if (typeof payload.acao_corretiva !== 'string') errors.push('acao_corretiva deve ser string');
-  if (typeof payload.acao_preventiva !== 'string') errors.push('acao_preventiva deve ser string');
-  if (!Array.isArray(payload.materiais_citados)) errors.push('materiais_citados deve ser array');
-  if (Array.isArray(payload.materiais_citados) && payload.materiais_citados.some((v) => typeof v !== 'string')) {
-    errors.push('materiais_citados deve conter apenas strings');
-  }
-  if (typeof payload.tipo_intervencao !== 'string') errors.push('tipo_intervencao deve ser string');
-
-  const conf = Number(payload.confianca);
-  if (!Number.isFinite(conf) || conf < 0 || conf > 100) errors.push('confianca deve estar entre 0 e 100');
-
-  if (typeof payload.observacao_ia !== 'string') errors.push('observacao_ia deve ser string');
-
-  return { valid: errors.length === 0, errors };
-}
-
-function sanitizeIAResult(payload) {
-  return {
-    resumo_usuario: normalizeString(payload?.resumo_usuario),
-    descricao_tecnica: normalizeString(payload?.descricao_tecnica),
-    acao_corretiva: normalizeString(payload?.acao_corretiva),
-    acao_preventiva: normalizeString(payload?.acao_preventiva),
-    materiais_citados: normalizeMateriais(payload?.materiais_citados),
-    tipo_intervencao: normalizeString(payload?.tipo_intervencao).toUpperCase() || 'INSPECAO',
-    confianca: normalizeConfianca(payload?.confianca),
-    observacao_ia: normalizeString(payload?.observacao_ia),
-  };
-}
-
-async function gerarAnalisePadronizada(payload, options = {}) {
-  const model = options.model || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini';
+  const chosenModel = pickAudioModel();
+  const controller = new AbortController();
+  const finalTimeoutMs = resolveAudioTimeoutMs(timeoutMs);
+  const timeout = setTimeout(() => controller.abort(), finalTimeoutMs);
 
   try {
-    const json = await aiCore.askJSONSchemaStrict({
-      model,
-      systemPrompt: options.systemPrompt || IA_SYSTEM_PROMPT,
-      userPayload: payload,
-      schemaName: 'analise_intervencao',
-      schema: IA_RESULT_JSON_SCHEMA,
-      temperature: 0.1,
-      maxOutputTokens: options.maxOutputTokens,
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cfg.apiKey}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: chosenModel,
+        input: [
+          {
+            role: 'system',
+            content: [{ type: 'input_text', text: 'Transcreva o áudio em português-BR, retornando apenas texto plano.' }],
+          },
+          {
+            role: 'user',
+            content: [
+              ...(prompt ? [{ type: 'input_text', text: String(prompt) }] : []),
+              {
+                type: 'input_audio',
+                input_audio: {
+                  data: buffer.toString('base64'),
+                  format: pickAudioFormat(mimeType),
+                },
+              },
+            ],
+          },
+        ],
+      }),
     });
 
-    const validation = validateIAResultShape(json);
-    if (!validation.valid) {
-      return {
-        data: buildFallback(validation.errors.join('; ')),
-        valid: false,
-        errors: validation.errors,
-        fallbackApplied: true,
-      };
+    if (!response.ok) {
+      const body = await response.text();
+      throw buildError(
+        'AI_PROVIDER_ERROR',
+        'Falha ao transcrever áudio no momento.',
+        `OpenAI ${response.status}: ${body.slice(0, 500)}`,
+        { providerStatus: response.status, providerBodySummary: body.slice(0, 500), providerModel: chosenModel }
+      );
     }
 
-    return {
-      data: sanitizeIAResult(json),
-      valid: true,
-      errors: [],
-      fallbackApplied: false,
-    };
-  } catch (err) {
-    return {
-      data: buildFallback(err?.message || 'erro na chamada da IA'),
-      valid: false,
-      errors: [err?.message || 'erro desconhecido na IA'],
-      fallbackApplied: true,
-    };
+    const data = await response.json();
+    const text = String(
+      data?.output_text
+      || data?.output?.flatMap((i) => i?.content || []).find((c) => c?.type === 'output_text')?.text
+      || ''
+    ).trim();
+
+    if (!text) throw buildError('AI_EMPTY_RESPONSE', 'A IA não retornou transcrição.', 'Resposta vazia da Responses API');
+    return { text, model: chosenModel };
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw buildError('AI_TIMEOUT', 'Tempo limite da transcrição atingido.', `Timeout de ${finalTimeoutMs}ms`);
+    }
+    if (error?.code) throw error;
+    throw buildError('AI_NETWORK_ERROR', 'Falha de rede na transcrição.', error?.message || 'Erro de rede desconhecido');
+  } finally {
+    clearTimeout(timeout);
   }
+}
+
+async function transcreverAudioOS({ buffer, mimeType, timeoutMs }) {
+  return transcreverAudioBase({
+    buffer,
+    mimeType,
+    timeoutMs,
+    prompt: 'Contexto: abertura de OS. Seja fiel à fala e mantenha detalhes técnicos.',
+  });
+}
+
+async function transcreverAudioFechamento({ buffer, mimeType, timeoutMs }) {
+  return transcreverAudioBase({
+    buffer,
+    mimeType,
+    timeoutMs,
+    prompt: 'Contexto: fechamento de OS. Preserve ações executadas, peças, testes e resultado final.',
+  });
 }
 
 module.exports = {
-  IA_SYSTEM_PROMPT,
-  validateIAResultShape,
-  sanitizeIAResult,
-  buildFallback,
-  gerarAnalisePadronizada,
+  transcreverAudioOS,
+  transcreverAudioFechamento,
 };

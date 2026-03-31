@@ -45,6 +45,19 @@
       <div style="grid-column:1 / -1;">
         <label class="label" for="nao_conformidade">NÃO CONFORMIDADE DO EQUIPAMENTO *</label>
         <div class="muted" style="margin-bottom:8px;">Descreva o que está acontecendo com o equipamento.</div>
+        <div class="row" style="justify-content:flex-start; gap:8px; margin-bottom:8px;">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            data-audio-transcriber
+            data-endpoint="/ia/transcrever/abertura"
+            data-target="#nao_conformidade"
+            data-status="#status-transcricao-abertura"
+            title="Gravar áudio para transcrever"
+            aria-label="Gravar áudio para transcrever"
+          >🎤</button>
+          <span id="status-transcricao-abertura" class="muted">Pronto para gravar</span>
+        </div>
         <textarea
           id="nao_conformidade"
           name="nao_conformidade"
@@ -107,3 +120,4 @@
     }
   });
 </script>
+<script src="/js/os-audio-transcription.js"></script>

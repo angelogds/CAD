@@ -14,6 +14,30 @@
   </div>
 
   <form method="POST" action="/os/<%= os.id %>/fechar" enctype="multipart/form-data" id="form-fechar-os">
+    <div style="margin-bottom:12px;">
+      <label class="label" for="descricao_assistida">Descrição assistida (editável)</label>
+      <div class="row" style="justify-content:flex-start; gap:8px; margin-bottom:8px;">
+        <button
+          type="button"
+          class="btn btn-ghost"
+          data-audio-transcriber
+          data-endpoint="/ia/transcrever/fechamento"
+          data-target="#descricao_assistida"
+          data-status="#status-transcricao-fechamento"
+          title="Gravar áudio para transcrever"
+          aria-label="Gravar áudio para transcrever"
+        >🎤</button>
+        <span id="status-transcricao-fechamento" class="muted">Pronto para gravar</span>
+      </div>
+      <textarea
+        id="descricao_assistida"
+        name="descricao_assistida"
+        class="input"
+        style="min-height:120px;"
+        placeholder="Descreva o serviço executado (você pode editar antes de concluir)."
+      ></textarea>
+    </div>
+
     <div>
       <label class="label">Fotos de fechamento *</label>
       <input id="fechamento_fotos" class="input" type="file" name="fechamento_fotos" accept="image/*" multiple required />
@@ -26,3 +50,4 @@
     </div>
   </form>
 </div>
+<script src="/js/os-audio-transcription.js"></script>
