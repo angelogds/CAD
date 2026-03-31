@@ -41,6 +41,27 @@ function resolveAnexosTable() {
   return null;
 }
 
+function listFechamentoMidias(osId) {
+  if (!tableExists("os_fechamento_midias")) return [];
+  try {
+    return db
+      .prepare(
+        `SELECT id,
+                os_id,
+                caminho_arquivo AS path,
+                legenda,
+                origem,
+                created_at
+         FROM os_fechamento_midias
+         WHERE os_id = ?
+         ORDER BY id DESC`
+      )
+      .all(osId);
+  } catch (_e) {
+    return [];
+  }
+}
+
 function resolveGrauColumn(columns) {
   if (columns.includes("grau")) return "grau";
   if (columns.includes("grau_dificuldade")) return "grau_dificuldade";
@@ -177,11 +198,21 @@ function listGrauOptions() {
 }
 
 function listAnexos(osId, tipo) {
+  const t = String(tipo || "").toUpperCase();
+
+  if (t === "FECHAMENTO") {
+    const midias = listFechamentoMidias(osId);
+    if (midias.length) {
+      return midias.map((row) => ({
+        ...row,
+        tipo: "FECHAMENTO",
+      }));
+    }
+  }
+
   try {
     const table = resolveAnexosTable();
     if (!table) return [];
-
-    const t = String(tipo || "").toUpperCase();
 
     if (table === "os_anexos") {
       return db
@@ -1377,9 +1408,25 @@ function addFotosAberturaFechamento({ osId, files = [], tipo, userId }) {
   if (!["ABERTURA", "FECHAMENTO"].includes(t)) return;
 
   const table = resolveAnexosTable();
-  if (!table) return;
+  const hasFechamentoMidias = t === "FECHAMENTO" && tableExists("os_fechamento_midias");
+  if (!table && !hasFechamentoMidias) return;
 
   const tx = db.transaction(() => {
+    if (hasFechamentoMidias) {
+      const insertFechamentoMidia = db.prepare(
+        `INSERT INTO os_fechamento_midias (os_id, caminho_arquivo, legenda, origem, user_id, created_at, updated_at)
+         VALUES (?, ?, ?, 'foto', ?, datetime('now'), datetime('now'))`
+      );
+
+      for (const f of files || []) {
+        const pathPublic = f.pathPublic || f.path || null;
+        if (!pathPublic) continue;
+        insertFechamentoMidia.run(osId, pathPublic, f.originalname || null, userId || null);
+      }
+    }
+
+    if (!table) return;
+
     if (table === "os_anexos") {
       const insert = db.prepare(
         `INSERT INTO os_anexos (os_id, tipo, path, legenda, created_by, created_at)
