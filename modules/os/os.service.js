@@ -1568,13 +1568,23 @@ function persistirRascunhoFechamento(
 async function gerarDescricaoTecnicaFechamento(id, { textoDigitado, transcricaoAudio, fotosMetadados, fonte, userId }) {
   const os = getOSById(id);
   if (!os) throw new Error("OS não encontrada.");
-
-  const fechamentoComMidias = {
-    ...fechamentoPayload,
-    fotos_fechamento: Array.isArray(fechamentoPayload?.fotos_fechamento) && fechamentoPayload.fotos_fechamento.length
-      ? fechamentoPayload.fotos_fechamento
-      : (Array.isArray(os?.fotos_fechamento) ? os.fotos_fechamento.map((f) => f.path) : []),
-  };
+  const fotosLista = Array.isArray(fotosMetadados) ? fotosMetadados : [];
+  let analiseFotos = { observacao_ia: null, confianca: 0, evidencias_visuais: [] };
+  if (fotosLista.length) {
+    try {
+      analiseFotos = await osIAService.analisarFotosFechamento({
+        fotos: fotosLista,
+        audioTranscricao: transcricaoAudio || null,
+        contexto: {
+          os_id: os.id,
+          equipamento_id: os.equipamento_id || null,
+          sintoma_principal: os.sintoma_principal || null,
+        },
+      });
+    } catch (_e) {
+      analiseFotos = { observacao_ia: null, confianca: 0, evidencias_visuais: [] };
+    }
+  }
 
   const fechamentoIA = await osIAService.gerarFechamentoAutomaticoOS({
     usuario_id: userId || null,
@@ -1594,7 +1604,8 @@ async function gerarDescricaoTecnicaFechamento(id, { textoDigitado, transcricaoA
       fonte_descricao: fonte || null,
       texto_digitado: textoDigitado || null,
       transcricao_audio: transcricaoAudio || null,
-      fotos_metadados: Array.isArray(fotosMetadados) ? fotosMetadados : [],
+      fotos_metadados: fotosLista,
+      analise_visual: analiseFotos,
     },
   });
 
