@@ -31,6 +31,13 @@
     let stream = null;
     let chunks = [];
     let isRecording = false;
+    let recordingMimeType = 'audio/webm';
+
+    function pickSupportedMimeType() {
+      const candidates = ['audio/webm', 'audio/ogg', 'audio/mp4'];
+      if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') return '';
+      return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
+    }
 
     async function stopRecordingAndSend() {
       if (!mediaRecorder || !isRecording) return;
@@ -43,10 +50,12 @@
       btn.textContent = '🎤';
       setStatus(statusEl, 'uploading');
 
-      const blob = new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' });
+      const blobType = chunks[0]?.type || recordingMimeType || 'audio/webm';
+      const blob = new Blob(chunks, { type: blobType });
       chunks = [];
       const form = new FormData();
-      form.append('audio', blob, `gravacao-${Date.now()}.webm`);
+      const extension = blobType.includes('ogg') ? 'ogg' : blobType.includes('mp4') || blobType.includes('m4a') ? 'm4a' : 'webm';
+      form.append('audio', blob, `gravacao-${Date.now()}.${extension}`);
 
       try {
         setStatus(statusEl, 'transcribing');
@@ -60,9 +69,9 @@
           setStatus(statusEl, 'done');
           return;
         }
-        setStatus(statusEl, 'error', payload?.erro || 'Sem transcrição automática. Continue manualmente.');
+        setStatus(statusEl, 'error', payload?.erro || 'Sem transcrição automática no momento. Continue com preenchimento manual sem bloqueio.');
       } catch (err) {
-        setStatus(statusEl, 'error', err?.message || 'Falha de transcrição. Continue manualmente.');
+        setStatus(statusEl, 'error', err?.message || 'Falha de transcrição no momento. Continue com preenchimento manual sem bloqueio.');
       }
     }
 
@@ -73,7 +82,8 @@
           return;
         }
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
+        recordingMimeType = pickSupportedMimeType() || 'audio/webm';
+        mediaRecorder = recordingMimeType ? new MediaRecorder(stream, { mimeType: recordingMimeType }) : new MediaRecorder(stream);
         chunks = [];
         mediaRecorder.addEventListener('dataavailable', (evt) => {
           if (evt.data && evt.data.size > 0) chunks.push(evt.data);

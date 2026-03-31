@@ -17,7 +17,8 @@ const MAX_AUDIO_BYTES = Number(process.env.OPENAI_AUDIO_MAX_BYTES || 12 * 1024 *
 function validateAudioFile(file) {
   if (!file) return 'Envie um arquivo de áudio.';
   const mimeType = String(file.mimetype || '').toLowerCase();
-  if (!ALLOWED_MIME.has(mimeType)) return 'Formato de áudio inválido. Use webm, ogg, mp3, m4a ou wav.';
+  const normalizedMime = mimeType.split(';')[0].trim();
+  if (!ALLOWED_MIME.has(normalizedMime)) return 'Formato de áudio inválido. Use webm, ogg, mp3, m4a ou wav.';
   if (!Number.isFinite(file.size) || file.size <= 0) return 'Arquivo de áudio inválido.';
   if (file.size > MAX_AUDIO_BYTES) return `Áudio excede o limite de ${Math.floor(MAX_AUDIO_BYTES / (1024 * 1024))}MB.`;
   return null;
@@ -25,11 +26,11 @@ function validateAudioFile(file) {
 
 function friendlyTranscriptionError(err) {
   const code = String(err?.code || 'AI_ERROR');
-  if (code === 'AI_TIMEOUT') return 'Demorou para transcrever. Você pode preencher manualmente e seguir normalmente.';
+  if (code === 'AI_TIMEOUT') return 'A transcrição demorou além do esperado. Continue com preenchimento manual sem bloqueio.';
   if (code === 'AI_DISABLED' || code === 'AI_KEY_MISSING' || code === 'AI_KEY_PLACEHOLDER') {
-    return 'Transcrição por áudio indisponível no momento. Preencha manualmente para continuar.';
+    return 'Transcrição por áudio indisponível no momento (configuração da IA). Continue com preenchimento manual sem bloqueio.';
   }
-  return 'Não foi possível transcrever agora. Continue com preenchimento manual sem bloqueio.';
+  return 'Não foi possível transcrever agora (falha temporária). Continue com preenchimento manual sem bloqueio.';
 }
 
 async function transcreverAbertura(req, res) {
