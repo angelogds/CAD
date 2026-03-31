@@ -1,6 +1,7 @@
 const db = require("../../database/db");
 const { classifyOSPriority } = require("./os-priority.service");
 const osIAService = require("./os-ia.service");
+const iaRepository = require("../ia/ia.repository");
 const alertsHub = require("../alerts/alerts.hub");
 const alertsService = require("../alerts/alerts.service");
 const pushService = require("../push/push.service");
@@ -1068,6 +1069,29 @@ function buscarOSRecentesSemelhantes(equipamentoId) {
     .all(Number(equipamentoId));
 }
 
+function buildHistoricoSemelhanteCompacto({ equipamentoId, sintomaPrincipal, descricao }) {
+  const casos = iaRepository.buscarHistoricoSemelhante({
+    equipamento_id: equipamentoId,
+    sintoma_principal: sintomaPrincipal,
+    texto_base: descricao,
+    limite: 5,
+  });
+
+  return casos.map((item) => ({
+    os_id: item.id,
+    score_similaridade: Number(item.score_similaridade || 0),
+    sintoma_principal: item.sintoma_principal || "",
+    status: item.status || "",
+    descricao: String(item.descricao || "").slice(0, 180),
+    resumo_tecnico: String(item.resumo_tecnico || "").slice(0, 180),
+    causa_diagnostico: String(item.causa_diagnostico || "").slice(0, 140),
+    ai_diagnostico_inicial: String(item.ai_diagnostico_inicial || "").slice(0, 140),
+    ai_causa_provavel: String(item.ai_causa_provavel || "").slice(0, 140),
+    ai_servico_sugerido: String(item.ai_servico_sugerido || "").slice(0, 140),
+    opened_at: item.opened_at || null,
+  }));
+}
+
 function buscarPreventivasRelacionadas(equipamentoId) {
   if (!equipamentoId) return [];
   try {
@@ -1146,6 +1170,11 @@ async function createOS({
     os_recentes_semelhantes: buscarOSRecentesSemelhantes(equipId),
     preventivas_relacionadas: buscarPreventivasRelacionadas(equipId),
     aprendizado_planta: buildAprendizadoPlantaContext(equipId, sintoma),
+    historico_semelhante_compacto: buildHistoricoSemelhanteCompacto({
+      equipamentoId: equipId,
+      sintomaPrincipal: sintoma,
+      descricao: relatoNaoConformidade,
+    }),
   };
 
   const aberturaIA = await osIAService.gerarAberturaAutomaticaDaOS({
