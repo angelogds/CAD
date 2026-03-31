@@ -1208,7 +1208,8 @@ async function createOS({
     }),
   };
 
-  const aberturaIA = await osIAService.gerarAberturaAutomaticaDaOS({
+  let aberturaIA;
+  const aberturaPayload = {
     usuario_id: openedBy,
     nao_conformidade: {
       equipamento_id: equipId,
@@ -1220,7 +1221,32 @@ async function createOS({
       observacao_curta: relatoNaoConformidade,
     },
     contexto,
-  });
+  };
+
+  try {
+    aberturaIA = await osIAService.gerarAberturaAutomaticaDaOS(aberturaPayload);
+  } catch (err) {
+    console.error("[OS_CREATE][IA_WARN] Falha na IA de abertura. Seguindo com fallback manual.", {
+      osEquipamentoId: equipId,
+      errorCode: err?.code || null,
+      message: err?.message || String(err),
+      technical: err?.technical || null,
+    });
+    aberturaIA = {
+      criticidade_sugerida: criticidadeEntrada,
+      prioridade_sugerida: criticidadeEntrada,
+      diagnostico_inicial: relatoNaoConformidade,
+      causa_provavel: relatoNaoConformidade,
+      risco_operacional: "Avaliação pendente (fallback sem IA).",
+      risco_seguranca: "Avaliação pendente (fallback sem IA).",
+      acao_corretiva: relatoNaoConformidade,
+      acao_preventiva: relatoNaoConformidade,
+      servico_sugerido: relatoNaoConformidade,
+      sugestao_equipe: { quantidade_recomendada: 1, perfil_minimo: "Mecânico", racional: "Fallback sem IA" },
+      descricao_tecnica_os: relatoNaoConformidade,
+      justificativa_interna: "Abertura concluída sem IA por indisponibilidade temporária.",
+    };
+  }
   const grauOS = normalizeGrau(aberturaIA.criticidade_sugerida || aberturaIA.prioridade_sugerida || score.prioridade || criticidadeEntrada);
 
   const cols = getOSColumns();
