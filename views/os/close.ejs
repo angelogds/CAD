@@ -14,10 +14,37 @@
   </div>
 
   <form method="POST" action="/os/<%= os.id %>/fechar" enctype="multipart/form-data" id="form-fechar-os">
+    <div style="margin-bottom:12px;">
+      <label class="label" for="texto_digitado">Relato técnico (texto)</label>
+      <textarea id="texto_digitado" name="texto_digitado" class="input" rows="4" placeholder="Descreva o serviço executado..."></textarea>
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label class="label" for="transcricao_audio">Transcrição de áudio</label>
+      <textarea id="transcricao_audio" name="transcricao_audio" class="input" rows="3" placeholder="Cole aqui a transcrição, se houver áudio..."></textarea>
+    </div>
+
     <div>
       <label class="label">Fotos de fechamento *</label>
       <input id="fechamento_fotos" class="input" type="file" name="fechamento_fotos" accept="image/*" multiple required />
       <div class="muted" style="margin-top:6px;">Adicione evidências visuais do serviço executado.</div>
+    </div>
+
+    <input type="hidden" name="fotos_metadados_json" id="fotos_metadados_json" value="[]" />
+    <input type="hidden" name="versao_tecnica_sugerida" id="versao_tecnica_sugerida" value="" />
+    <input type="hidden" name="fonte_descricao" id="fonte_descricao" value="texto" />
+
+    <div style="margin-top:14px;">
+      <button type="button" class="btn btn-outline" id="btn-gerar-descricao">Gerar descrição técnica</button>
+      <span class="muted" id="status-geracao" style="margin-left:8px;"></span>
+    </div>
+
+    <div style="margin-top:10px;">
+      <div class="muted">
+        Fonte detectada: <strong id="fonte-indicador">texto</strong>
+      </div>
+      <label class="label" for="preview_tecnica" style="margin-top:6px;">Pré-visualização editável (versão final aprovada)</label>
+      <textarea id="preview_tecnica" name="versao_final_aprovada" class="input" rows="5" placeholder="A versão final aprovada aparecerá aqui..."></textarea>
     </div>
 
     <div class="row" style="justify-content:space-between; margin-top:16px;">
@@ -26,3 +53,87 @@
     </div>
   </form>
 </div>
+
+<script>
+  (function () {
+    const form = document.getElementById('form-fechar-os');
+    const fotosInput = document.getElementById('fechamento_fotos');
+    const fotosMetadadosInput = document.getElementById('fotos_metadados_json');
+    const textoInput = document.getElementById('texto_digitado');
+    const audioInput = document.getElementById('transcricao_audio');
+    const previewInput = document.getElementById('preview_tecnica');
+    const sugeridaInput = document.getElementById('versao_tecnica_sugerida');
+    const fonteInput = document.getElementById('fonte_descricao');
+    const fonteIndicador = document.getElementById('fonte-indicador');
+    const statusEl = document.getElementById('status-geracao');
+    const btnGerar = document.getElementById('btn-gerar-descricao');
+
+    function getFotosMetadados() {
+      const files = Array.from(fotosInput.files || []);
+      return files.map((file) => ({
+        nome_arquivo: file.name,
+        tipo_mime: file.type || null,
+        tamanho_bytes: file.size || null,
+        ultima_modificacao: file.lastModified || null
+      }));
+    }
+
+    function detectarFonte(payload) {
+      if (payload.transcricao_audio && payload.fotos_metadados.length) return 'áudio+foto';
+      if (payload.transcricao_audio) return 'áudio';
+      if (payload.fotos_metadados.length) return 'foto';
+      return 'texto';
+    }
+
+    function montarPayload() {
+      const payload = {
+        texto_digitado: (textoInput.value || '').trim(),
+        transcricao_audio: (audioInput.value || '').trim(),
+        fotos_metadados: getFotosMetadados(),
+      };
+      payload.fonte = detectarFonte(payload);
+      return payload;
+    }
+
+    fotosInput.addEventListener('change', function () {
+      fotosMetadadosInput.value = JSON.stringify(getFotosMetadados());
+    });
+
+    btnGerar.addEventListener('click', async function () {
+      const payload = montarPayload();
+      fotosMetadadosInput.value = JSON.stringify(payload.fotos_metadados);
+      fonteInput.value = payload.fonte;
+      fonteIndicador.textContent = payload.fonte;
+      statusEl.textContent = 'Gerando...';
+
+      try {
+        const response = await fetch('/os/<%= os.id %>/gerar-descricao-tecnica', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok || !data?.ok) throw new Error(data?.error || 'Falha ao gerar descrição técnica.');
+
+        const descricao = (data.descricaoTecnica || '').trim();
+        previewInput.value = descricao;
+        sugeridaInput.value = descricao;
+        fonteInput.value = data.fonte || payload.fonte;
+        fonteIndicador.textContent = data.fonte || payload.fonte;
+        statusEl.textContent = 'Descrição técnica sugerida com sucesso.';
+      } catch (err) {
+        statusEl.textContent = err.message || 'Não foi possível gerar agora.';
+      }
+    });
+
+    form.addEventListener('submit', function () {
+      const payload = montarPayload();
+      fotosMetadadosInput.value = JSON.stringify(payload.fotos_metadados);
+      fonteInput.value = payload.fonte;
+      fonteIndicador.textContent = payload.fonte;
+      if (!sugeridaInput.value.trim()) {
+        sugeridaInput.value = previewInput.value.trim() || payload.texto_digitado || payload.transcricao_audio || '';
+      }
+    });
+  })();
+</script>

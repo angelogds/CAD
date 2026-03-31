@@ -136,6 +136,40 @@ function osCloseForm(req, res) {
   });
 }
 
+function normalizeText(value) {
+  const text = String(value || "").trim();
+  return text || null;
+}
+
+async function osGerarDescricaoTecnica(req, res) {
+  const id = Number(req.params.id);
+  const os = service.getOSById(id);
+  if (!os) return res.status(404).json({ ok: false, error: "OS não encontrada." });
+
+  const textoDigitado = normalizeText(req.body?.texto_digitado);
+  const transcricaoAudio = normalizeText(req.body?.transcricao_audio);
+  const fotosMetadados = Array.isArray(req.body?.fotos_metadados) ? req.body.fotos_metadados : [];
+
+  let fonte = "texto";
+  if (transcricaoAudio && fotosMetadados.length) fonte = "áudio+foto";
+  else if (transcricaoAudio) fonte = "áudio";
+  else if (fotosMetadados.length) fonte = "foto";
+
+  try {
+    const descricaoTecnica = await service.gerarDescricaoTecnicaFechamento(id, {
+      textoDigitado,
+      transcricaoAudio,
+      fotosMetadados,
+      fonte,
+      userId: req.session?.user?.id || null,
+    });
+    return res.json({ ok: true, descricaoTecnica, fonte });
+  } catch (err) {
+    console.error("[OS_GERAR_DESCRICAO_TECNICA][ERROR]", err);
+    return res.status(503).json({ ok: false, error: "Não foi possível gerar a descrição técnica agora." });
+  }
+}
+
 async function osIniciar(req, res) {
   const id = Number(req.params.id);
   try {
@@ -188,9 +222,50 @@ async function osClose(req, res) {
       userId: user?.id || null,
     });
 
+    const textoDigitado = normalizeText(req.body?.texto_digitado);
+    const transcricaoAudio = normalizeText(req.body?.transcricao_audio);
+    const versaoTecnicaSugerida = normalizeText(req.body?.versao_tecnica_sugerida);
+    const versaoFinalAprovada = normalizeText(req.body?.versao_final_aprovada) || versaoTecnicaSugerida || textoDigitado;
+    const fonteDescricao = normalizeText(req.body?.fonte_descricao) || "texto";
+    const fotosMetadadosBody = normalizeText(req.body?.fotos_metadados_json);
+    let fotosMetadados = [];
+    if (fotosMetadadosBody) {
+      try {
+        fotosMetadados = JSON.parse(fotosMetadadosBody);
+      } catch (_e) {
+        fotosMetadados = [];
+      }
+    }
+    if (!Array.isArray(fotosMetadados) || !fotosMetadados.length) {
+      fotosMetadados = fotosFechamento.map((f) => ({
+        nome_arquivo: f.originalname || f.filename,
+        tipo_mime: f.mimetype || null,
+        tamanho_bytes: Number(f.size || 0) || null,
+      }));
+    }
+
+    service.persistirRascunhoFechamento(id, {
+      transcricaoBruta: transcricaoAudio,
+      versaoTecnicaSugerida,
+      versaoFinalAprovada,
+      fonteDescricao,
+      textoDigitado,
+      fotosMetadados,
+      userId: user?.id || null,
+    });
+
     const syncResult = await service.concluirOS(id, {
       closedBy: user?.id || null,
-      fechamentoPayload: {},
+      diagnostico: versaoFinalAprovada || textoDigitado,
+      acaoExecutada: versaoFinalAprovada || versaoTecnicaSugerida || textoDigitado,
+      fechamentoPayload: {
+        fonte_descricao: fonteDescricao,
+        texto_digitado: textoDigitado,
+        transcricao_audio: transcricaoAudio,
+        versao_tecnica_sugerida: versaoTecnicaSugerida,
+        versao_final_aprovada: versaoFinalAprovada,
+        fotos_metadados: fotosMetadados,
+      },
     });
 
     await pushService.sendPushToAll({
@@ -290,6 +365,7 @@ module.exports = {
   osIniciar,
   osPausar,
   osClose,
+  osGerarDescricaoTecnica,
   osUpdateStatus,
   osAutoAssign,
   osSetEquipe,
