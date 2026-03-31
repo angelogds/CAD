@@ -6,6 +6,13 @@ const BASE_STYLE = `Regras de resposta:
 - Priorize segurança (LOTO, EPC, EPI, bloqueio de energia, teste seguro).
 - Evite texto longo e custo alto de tokens.`;
 
+const BASE_STYLE_FECHAMENTO_MULTIMODAL = `Regras obrigatórias para análise multimodal de fechamento:
+- Nunca afirmar com certeza quando a imagem for ambígua ou insuficiente.
+- Prefira termos probabilísticos: "sugere", "há indícios", "aparenta".
+- O áudio/transcrição tem prioridade semântica; use a foto apenas como complemento.
+- Se houver conflito entre áudio e foto, priorize o áudio e registre a divergência.
+- Não invente defeitos, medições ou conclusões além da evidência visual/auditiva.`;
+
 function buildAssistentePrompt(contexto = 'geral') {
   const mapa = {
     geral: 'Atue como assistente técnico geral de manutenção industrial.',
@@ -52,9 +59,14 @@ function buildProfessorPrompt(action = 'perguntar') {
   return `${mapa[action] || mapa.perguntar}\n${BASE_STYLE}`;
 }
 
+function buildFechamentoFotoPrompt() {
+  return `Atue como assistente técnico de manutenção para validação de fechamento de OS por múltiplas fotos.\n${BASE_STYLE}\n${BASE_STYLE_FECHAMENTO_MULTIMODAL}`;
+}
+
 module.exports = {
   buildAssistentePrompt,
   buildOSPrompt,
   buildPreventivaPrompt,
   buildProfessorPrompt,
+  buildFechamentoFotoPrompt,
 };

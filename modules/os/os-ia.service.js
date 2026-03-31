@@ -1,10 +1,12 @@
 const db = require("../../database/db");
 
 const aiCore = require('../ai/ai.service');
+const aiPrompts = require('../ai/ai.prompts');
 
 const PROMPT_ABERTURA = "Você é um planejador de manutenção industrial com foco operacional. Ao receber dados de abertura de OS, gere decisão técnica automática para execução em chão de fábrica. Responda somente JSON válido com os campos: criticidade_sugerida, diagnostico_inicial, causa_provavel, risco_operacional, risco_seguranca, acao_corretiva, acao_preventiva, servico_sugerido, prioridade_sugerida, sugestao_equipe, descricao_tecnica_os, justificativa_interna. Regras obrigatórias: (1) criticidade_sugerida deve ser BAIXA, MEDIA, ALTA ou CRITICA; (2) seguir lógica de criticidade: vazamento leve -> BAIXA/MEDIA, vazamento crítico -> ALTA/CRITICA, equipamento essencial parado -> CRITICA, risco de segurança -> CRITICA, falha intermitente -> MEDIA, ruído -> BAIXA/MEDIA, aquecimento -> MEDIA/ALTA; (3) sugestao_equipe deve trazer quantidade_recomendada, perfil_minimo e racional, obedecendo: BAIXA=1 mecânico, MEDIA=2 mecânicos, ALTA=2 mecânicos, CRITICA=3+ equipe/grupo; (4) ação corretiva e preventiva devem ser técnicas, objetivas e aplicáveis; (5) justificativa_interna deve explicar a escolha da criticidade com base nos dados recebidos. Não invente medições.";
 
 const PROMPT_FECHAMENTO = "Você é um assistente técnico de encerramento de ordens de serviço da empresa Campo do Gado. Receberá dados estruturados do serviço executado, incluindo não conformidade original, descrição inicial da OS, ações realizadas, peças trocadas e resultado do teste. Gere um texto técnico claro, objetivo e padronizado para histórico de manutenção. Responda em português do Brasil. Não invente detalhes não informados. Retorne somente JSON válido com os campos: descricao_servico_executado, acao_corretiva_realizada, recomendacao_para_evitar_reincidencia, observacao_final_tecnica.";
+const PROMPT_ANALISE_FOTOS_FECHAMENTO = `${aiPrompts.buildFechamentoFotoPrompt()} Retorne somente JSON válido com os campos: observacao_ia, confianca, evidencias_visuais. "confianca" deve ser número de 0 a 100 baseado apenas na evidência visual (baixa visibilidade/ambiguidade reduz confiança).`;
 
 function safeJSONStringify(value) {
   try {
@@ -154,12 +156,24 @@ async function gerarFechamentoAutomaticoOS(payload) {
   const model = process.env.OPENAI_MODEL_FECHAMENTO_OS || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini';
 
   try {
+    const fotos = Array.isArray(payload?.fechamento?.fotos_fechamento) ? payload.fechamento.fotos_fechamento : [];
+    const analiseFotos = await analisarFotosFechamento({
+      fotos,
+      audioTranscricao: payload?.fechamento?.audio_transcricao || payload?.fechamento?.transcricao_audio || payload?.fechamento?.observacao_audio || null,
+      contexto: {
+        os_id: payload?.os_id,
+        descricao_os: payload?.os_inicial?.descricao || null,
+      },
+    });
+
     const ai = await callOpenAIJSON({ model, systemPrompt: PROMPT_FECHAMENTO, payload });
     const result = {
       descricao_servico_executado: String(ai.descricao_servico_executado || "").trim(),
       acao_corretiva_realizada: String(ai.acao_corretiva_realizada || "").trim(),
       recomendacao_para_evitar_reincidencia: String(ai.recomendacao_para_evitar_reincidencia || "").trim(),
       observacao_final_tecnica: String(ai.observacao_final_tecnica || "").trim(),
+      observacao_ia: analiseFotos.observacao_ia,
+      confianca: analiseFotos.confianca,
     };
 
     registrarLogIA({
@@ -179,6 +193,8 @@ async function gerarFechamentoAutomaticoOS(payload) {
       acao_corretiva_realizada: "Ação corretiva registrada conforme checklist de execução.",
       recomendacao_para_evitar_reincidencia: "Manter monitoramento do equipamento e reforçar rotina preventiva.",
       observacao_final_tecnica: "Validar em campo a estabilidade operacional após a intervenção.",
+      observacao_ia: "Sem análise visual conclusiva. Há indícios limitados pelas imagens disponíveis.",
+      confianca: 0,
     };
 
     registrarLogIA({
@@ -195,8 +211,52 @@ async function gerarFechamentoAutomaticoOS(payload) {
   }
 }
 
+async function analisarFotosFechamento({ fotos = [], audioTranscricao = null, contexto = {} }) {
+  const imagens = Array.isArray(fotos) ? fotos.filter(Boolean) : [];
+  if (!imagens.length) {
+    return {
+      observacao_ia: "Sem imagens de fechamento para análise visual.",
+      confianca: 0,
+      evidencias_visuais: [],
+    };
+  }
+
+  const model = process.env.OPENAI_MODEL_FECHAMENTO_OS || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini';
+  const userText = JSON.stringify({
+    instrucao: "Analise múltiplas fotos de fechamento e retorne avaliação visual cautelosa.",
+    regra_prioridade_multimodal: "áudio tem prioridade semântica; foto somente complementa",
+    audio_transcricao: audioTranscricao ? String(audioTranscricao) : null,
+    contexto,
+  });
+
+  try {
+    const response = await aiCore.askMultimodal({
+      model,
+      systemPrompt: PROMPT_ANALISE_FOTOS_FECHAMENTO,
+      userText,
+      images: imagens,
+      temperature: 0.1,
+      maxOutputTokens: 300,
+    });
+    const parsed = parseAIJSON(response.text);
+    const confiancaRaw = Number(parsed?.confianca);
+    return {
+      observacao_ia: String(parsed?.observacao_ia || "Há indícios visuais de execução, porém a evidência aparenta ser parcial.").trim(),
+      confianca: Number.isFinite(confiancaRaw) ? Math.max(0, Math.min(100, Math.round(confiancaRaw))) : 0,
+      evidencias_visuais: Array.isArray(parsed?.evidencias_visuais) ? parsed.evidencias_visuais : [],
+    };
+  } catch (_err) {
+    return {
+      observacao_ia: "Análise visual indisponível no momento; há indícios limitados pelas fotos anexadas.",
+      confianca: 0,
+      evidencias_visuais: [],
+    };
+  }
+}
+
 module.exports = {
   gerarAberturaAutomaticaDaOS,
   gerarFechamentoAutomaticoOS,
+  analisarFotosFechamento,
   registrarLogIA,
 };

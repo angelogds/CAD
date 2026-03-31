@@ -1453,6 +1453,13 @@ async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, fechamento
 
   const cols = getOSColumns();
 
+  const fechamentoComMidias = {
+    ...fechamentoPayload,
+    fotos_fechamento: Array.isArray(fechamentoPayload?.fotos_fechamento) && fechamentoPayload.fotos_fechamento.length
+      ? fechamentoPayload.fotos_fechamento
+      : (Array.isArray(os?.fotos_fechamento) ? os.fotos_fechamento.map((f) => f.path) : []),
+  };
+
   const fechamentoIA = await osIAService.gerarFechamentoAutomaticoOS({
     usuario_id: closedBy || null,
     os_id: id,
@@ -1467,7 +1474,7 @@ async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, fechamento
       sintoma_principal: os.sintoma_principal || null,
       severidade: os.severidade || null,
     },
-    fechamento: fechamentoPayload,
+    fechamento: fechamentoComMidias,
   });
 
   const diag = String(diagnostico || fechamentoIA.acao_corretiva_realizada || "").trim() || null;
@@ -1511,6 +1518,8 @@ async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, fechamento
       requer_monitoramento: fechamentoPayload.requer_monitoramento ? 1 : 0,
       tipo_acao_fechamento: fechamentoPayload.tipo_acao || null,
       observacao_curta_fechamento: fechamentoPayload.observacao_curta || null,
+      observacao_ia: fechamentoIA.observacao_ia || null,
+      confianca: Number.isFinite(Number(fechamentoIA.confianca)) ? Number(fechamentoIA.confianca) : null,
     };
 
     for (const [col, value] of Object.entries(fechamentoCols)) {

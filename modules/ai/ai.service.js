@@ -1,3 +1,7 @@
+const fs = require('fs');
+const path = require('path');
+const storagePaths = require('../../config/storage');
+
 const ENV_KEY_CANDIDATES = ['OPENAI_API_KEY', 'OPENAI_APIKEY', 'OPENAI_KEY'];
 
 function isAIEnabled() {
@@ -189,6 +193,109 @@ async function askText({ systemPrompt, userPayload, model, maxOutputTokens, temp
   }
 }
 
+function normalizeImageToInputImage(image) {
+  const value = String(image || '').trim();
+  if (!value) return null;
+
+  if (/^https?:\/\//i.test(value) || /^data:image\//i.test(value)) {
+    return { type: 'input_image', image_url: value };
+  }
+
+  let absolute = value;
+  if (value.startsWith('/uploads/')) {
+    absolute = path.join(storagePaths.UPLOAD_DIR, value.replace('/uploads/', ''));
+  } else if (value.startsWith('/imagens/')) {
+    absolute = path.join(storagePaths.IMAGE_DIR, value.replace('/imagens/', ''));
+  } else if (value.startsWith('/pdfs/')) {
+    absolute = path.join(storagePaths.PDF_DIR, value.replace('/pdfs/', ''));
+  } else if (!path.isAbsolute(value)) {
+    absolute = path.join(process.cwd(), value.replace(/^\/+/, ''));
+  }
+  if (!fs.existsSync(absolute)) return null;
+
+  const ext = path.extname(absolute).toLowerCase();
+  const mimeByExt = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+  };
+  const mime = mimeByExt[ext] || 'image/jpeg';
+  const buffer = fs.readFileSync(absolute);
+  const dataUrl = `data:${mime};base64,${buffer.toString('base64')}`;
+  return { type: 'input_image', image_url: dataUrl };
+}
+
+async function askMultimodal({ systemPrompt, userText, images = [], model, maxOutputTokens, temperature = 0.1 }) {
+  const cfg = getAIConfig();
+
+  if (!cfg.enabled) throw buildError('AI_DISABLED', 'IA desativada no ambiente.', 'AI_ENABLED=false');
+  if (!cfg.hasApiKey) throw buildError('AI_KEY_MISSING', 'IA ainda não ativada. Configure OPENAI_API_KEY.', 'OPENAI_API_KEY ausente');
+  if (cfg.apiKeyLooksPlaceholder) {
+    throw buildError('AI_KEY_PLACEHOLDER', 'Configuração da IA inválida. Revise a chave da API.', 'OPENAI_API_KEY parece placeholder');
+  }
+
+  const chosenModel = String(model || cfg.modelText || '').trim() || 'gpt-4o-mini';
+  const normalizedImages = (images || []).map(normalizeImageToInputImage).filter(Boolean);
+
+  const userContent = [{ type: 'input_text', text: String(userText || '') }];
+  for (const image of normalizedImages) userContent.push(image);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), cfg.timeoutMs);
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cfg.apiKey}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: chosenModel,
+        max_output_tokens: Number(maxOutputTokens || cfg.maxOutputTokens),
+        temperature,
+        input: [
+          { role: 'system', content: [{ type: 'input_text', text: String(systemPrompt || '') }] },
+          { role: 'user', content: userContent },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      const summary = body.slice(0, 500);
+      throw buildError('AI_PROVIDER_ERROR', 'Falha ao consultar IA no momento.', `OpenAI ${response.status}: ${summary}`, {
+        providerStatus: response.status,
+        providerBodySummary: summary,
+        providerModel: chosenModel,
+      });
+    }
+
+    const data = await response.json();
+    const text = extractOutputText(data);
+    if (!text) {
+      throw buildError('AI_EMPTY_RESPONSE', 'IA sem conteúdo de resposta.', 'Resposta vazia da Responses API', {
+        providerModel: chosenModel,
+      });
+    }
+    return { text, model: chosenModel, usedImages: normalizedImages.length };
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw buildError('AI_TIMEOUT', 'Tempo de resposta da IA excedido.', `Timeout de ${cfg.timeoutMs}ms`, {
+        providerModel: chosenModel,
+      });
+    }
+    if (error?.code) throw error;
+    throw buildError('AI_NETWORK_ERROR', 'Erro de conexão ao consultar IA.', error?.message || 'Falha de rede desconhecida', {
+      providerModel: chosenModel,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function testOpenAIConnection() {
   const cfg = getAIConfig();
   if (!cfg.enabled) {
@@ -232,6 +339,7 @@ async function testOpenAIConnection() {
 module.exports = {
   getAIConfig,
   askText,
+  askMultimodal,
   validateAIEnvironment,
   testOpenAIConnection,
   looksLikePlaceholderKey,
