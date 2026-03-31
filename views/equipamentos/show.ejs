@@ -24,6 +24,8 @@
         <div><b>Idade:</b> <%= idadeEquipamento ?? '-' %> anos</div>
         <div><b>Status:</b> <%= equip.status_operacional || 'ATIVO' %></div>
         <div><b>Criticidade:</b> <span class="badge crit-<%= (equip.criticidade||'media') %>"><%= equip.criticidade || 'media' %></span></div>
+        <div><b>Score risco falha:</b> <%= riscoFalha ? riscoFalha.score_risco : '-' %> / 100</div>
+        <div><b>Classificação risco:</b> <%= riscoFalha ? riscoFalha.classificacao_risco : '-' %></div>
       </div>
       <form method="POST" action="/equipamentos/<%= equip.id %>/qrcode" style="margin-top:10px;"><button class="btn btn-green">Gerar/Regerar QR Code</button></form>
     </div>

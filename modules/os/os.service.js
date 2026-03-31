@@ -398,16 +398,17 @@ function getOSById(id) {
   const osCols = getOSColumns();
   const hasExecColab = osCols.includes("executor_colaborador_id");
   const hasAuxColab = osCols.includes("auxiliar_colaborador_id");
+  const hasEquipamentos = tableExists("equipamentos");
 
   const os = db.prepare(`
     SELECT o.*,
-           e.nome AS equipamento_nome,
+           ${hasEquipamentos ? "e.nome" : "NULL"} AS equipamento_nome,
            ce.nome AS executor_nome,
            ca.nome AS auxiliar_nome,
            ue.name AS executor_user_nome,
            ua.name AS auxiliar_user_nome
     FROM os o
-    LEFT JOIN equipamentos e ON e.id = o.equipamento_id
+    ${hasEquipamentos ? "LEFT JOIN equipamentos e ON e.id = o.equipamento_id" : ""}
     LEFT JOIN colaboradores ce ON ce.id = ${hasExecColab ? "o.executor_colaborador_id" : "NULL"}
     LEFT JOIN colaboradores ca ON ca.id = ${hasAuxColab ? "o.auxiliar_colaborador_id" : "NULL"}
     LEFT JOIN users ue ON ue.id = o.mecanico_user_id
@@ -1283,6 +1284,64 @@ async function createOS({
   return osId;
 }
 
+function createOSAutomatica({
+  equipamento_id,
+  descricao,
+  tipo = "PREVENTIVA",
+  prioridade = "MEDIA",
+  opened_by = null,
+  origem = "AUTOMACAO",
+  regra_geradora_id = null,
+  preventiva_execucao_id = null,
+  metadata = null,
+}) {
+  const equipId = Number(equipamento_id || 0) || null;
+  if (!equipId) throw new Error("Equipamento obrigatório para OS automática.");
+  const eq = db.prepare(`SELECT id, nome FROM equipamentos WHERE id = ?`).get(equipId);
+  if (!eq) throw new Error("Equipamento não encontrado para OS automática.");
+
+  const cols = getOSColumns();
+  const fields = ["equipamento", "descricao", "tipo", "status", "opened_by"];
+  const values = [
+    String(eq.nome || `Equipamento ${equipId}`),
+    String(descricao || "").trim() || "OS automática gerada por regra de automação.",
+    normalizeTipoOS(tipo),
+    "ABERTA",
+    opened_by ? Number(opened_by) : null,
+  ];
+
+  if (cols.includes("equipamento_id")) {
+    fields.push("equipamento_id");
+    values.push(equipId);
+  }
+  if (cols.includes("origem")) {
+    fields.push("origem");
+    values.push(String(origem || "AUTOMACAO").toUpperCase());
+  }
+  if (cols.includes("regra_geradora_id")) {
+    fields.push("regra_geradora_id");
+    values.push(regra_geradora_id ? Number(regra_geradora_id) : null);
+  }
+  if (cols.includes("preventiva_execucao_id")) {
+    fields.push("preventiva_execucao_id");
+    values.push(preventiva_execucao_id ? Number(preventiva_execucao_id) : null);
+  }
+  if (cols.includes("metadata_automacao_json")) {
+    fields.push("metadata_automacao_json");
+    values.push(metadata ? JSON.stringify(metadata) : null);
+  }
+  if (cols.includes("prioridade")) {
+    fields.push("prioridade");
+    values.push(normalizeGrau(prioridade));
+  }
+
+  const stmt = db.prepare(`INSERT INTO os (${fields.join(",")}) VALUES (${fields.map(() => "?").join(",")})`);
+  const info = stmt.run(...values);
+  const osId = Number(info.lastInsertRowid);
+  emitOSEvents(osId, "create");
+  return osId;
+}
+
 function addFotosAberturaFechamento({ osId, files = [], tipo, userId }) {
   if (!osId) return;
   const t = String(tipo || "").toUpperCase();
@@ -1555,6 +1614,7 @@ module.exports = {
   listGrauOptions,
   listUsuariosEquipe,
   createOS,
+  createOSAutomatica,
   addFotosAberturaFechamento,
   getOSById,
   iniciarOS,
