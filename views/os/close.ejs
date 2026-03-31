@@ -44,6 +44,23 @@
       <div class="muted" style="margin-top:6px;">Adicione evidências visuais do serviço executado.</div>
     </div>
 
+    <input type="hidden" name="fotos_metadados_json" id="fotos_metadados_json" value="[]" />
+    <input type="hidden" name="versao_tecnica_sugerida" id="versao_tecnica_sugerida" value="" />
+    <input type="hidden" name="fonte_descricao" id="fonte_descricao" value="texto" />
+
+    <div style="margin-top:14px;">
+      <button type="button" class="btn btn-outline" id="btn-gerar-descricao">Gerar descrição técnica</button>
+      <span class="muted" id="status-geracao" style="margin-left:8px;"></span>
+    </div>
+
+    <div style="margin-top:10px;">
+      <div class="muted">
+        Fonte detectada: <strong id="fonte-indicador">texto</strong>
+      </div>
+      <label class="label" for="preview_tecnica" style="margin-top:6px;">Pré-visualização editável (versão final aprovada)</label>
+      <textarea id="preview_tecnica" name="versao_final_aprovada" class="input" rows="5" placeholder="A versão final aprovada aparecerá aqui..."></textarea>
+    </div>
+
     <div class="row" style="justify-content:space-between; margin-top:16px;">
       <a class="btn btn-ghost" href="/os/<%= os.id %>">Voltar</a>
       <button type="submit" class="btn btn-primary">Concluir OS</button>
