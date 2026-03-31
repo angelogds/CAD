@@ -50,6 +50,12 @@ router.post("/:id/iniciar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap
 router.post("/:id/pausar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osPausar, "osPausar"));
 router.get("/:id/fechar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osCloseForm, "osCloseForm"));
 router.post(
+  "/:id/gerar-descricao-tecnica",
+  requireLogin,
+  requireRole(OS_EXECUTION_ACCESS),
+  wrap(ctrl.osGerarDescricaoTecnica, "osGerarDescricaoTecnica")
+);
+router.post(
   "/:id/fechar",
   requireLogin,
   requireRole(OS_EXECUTION_ACCESS),

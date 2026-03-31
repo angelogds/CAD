@@ -1440,6 +1440,97 @@ function pausarOS(id) {
   }
 }
 
+function pickFirstAvailableColumn(cols, options = []) {
+  return options.find((name) => cols.includes(name)) || null;
+}
+
+function persistirRascunhoFechamento(
+  id,
+  { transcricaoBruta, versaoTecnicaSugerida, versaoFinalAprovada, fonteDescricao, textoDigitado, fotosMetadados, userId }
+) {
+  const os = getOSById(id);
+  if (!os) throw new Error("OS não encontrada.");
+  const cols = getOSColumns();
+
+  const sets = [];
+  const args = [];
+  const byField = [
+    { value: transcricaoBruta, options: ["transcricao_bruta", "fechamento_transcricao_bruta", "audio_transcricao_bruta"] },
+    { value: versaoTecnicaSugerida, options: ["versao_tecnica_sugerida", "descricao_tecnica_sugerida_fechamento"] },
+    { value: versaoFinalAprovada, options: ["versao_final_aprovada", "descricao_final_aprovada_fechamento"] },
+    { value: fonteDescricao, options: ["fonte_descricao_fechamento", "fonte_descricao"] },
+    { value: textoDigitado, options: ["texto_digitado_fechamento", "descricao_digitada_fechamento"] },
+    {
+      value: JSON.stringify(Array.isArray(fotosMetadados) ? fotosMetadados : []),
+      options: ["fotos_fechamento_metadados_json", "fechamento_fotos_metadados_json"],
+    },
+  ];
+
+  for (const field of byField) {
+    const col = pickFirstAvailableColumn(cols, field.options);
+    if (!col) continue;
+    sets.push(`${col} = ?`);
+    args.push(field.value || null);
+  }
+
+  if (sets.length) {
+    args.push(id);
+    db.prepare(`UPDATE os SET ${sets.join(", ")} WHERE id = ?`).run(...args);
+  }
+
+  osIAService.registrarLogIA({
+    usuarioId: userId || null,
+    osId: id,
+    naoConformidadeId: id,
+    tipo: "FECHAMENTO_RASCUNHO",
+    entrada: { transcricaoBruta, fonteDescricao, textoDigitado, fotosMetadados },
+    resposta: { versaoTecnicaSugerida, versaoFinalAprovada },
+    status: "DRAFT",
+  });
+}
+
+async function gerarDescricaoTecnicaFechamento(id, { textoDigitado, transcricaoAudio, fotosMetadados, fonte, userId }) {
+  const os = getOSById(id);
+  if (!os) throw new Error("OS não encontrada.");
+
+  const fechamentoComMidias = {
+    ...fechamentoPayload,
+    fotos_fechamento: Array.isArray(fechamentoPayload?.fotos_fechamento) && fechamentoPayload.fotos_fechamento.length
+      ? fechamentoPayload.fotos_fechamento
+      : (Array.isArray(os?.fotos_fechamento) ? os.fotos_fechamento.map((f) => f.path) : []),
+  };
+
+  const fechamentoIA = await osIAService.gerarFechamentoAutomaticoOS({
+    usuario_id: userId || null,
+    os_id: id,
+    nao_conformidade_id: id,
+    os_inicial: {
+      id: os.id,
+      descricao: os.descricao,
+      resumo_tecnico: os.resumo_tecnico || null,
+      causa_diagnostico: os.causa_diagnostico || null,
+      equipamento: os.equipamento,
+      equipamento_id: os.equipamento_id || null,
+      sintoma_principal: os.sintoma_principal || null,
+      severidade: os.severidade || null,
+    },
+    fechamento: {
+      fonte_descricao: fonte || null,
+      texto_digitado: textoDigitado || null,
+      transcricao_audio: transcricaoAudio || null,
+      fotos_metadados: Array.isArray(fotosMetadados) ? fotosMetadados : [],
+    },
+  });
+
+  return String(
+    fechamentoIA.descricao_servico_executado
+      || fechamentoIA.observacao_final_tecnica
+      || textoDigitado
+      || transcricaoAudio
+      || ""
+  ).trim();
+}
+
 async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, fechamentoPayload = {} }) {
   const os = getOSById(id);
   if (!os) throw new Error("OS não encontrada.");
@@ -1453,29 +1544,33 @@ async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, fechamento
 
   const cols = getOSColumns();
 
-  const fechamentoComMidias = {
-    ...fechamentoPayload,
-    fotos_fechamento: Array.isArray(fechamentoPayload?.fotos_fechamento) && fechamentoPayload.fotos_fechamento.length
-      ? fechamentoPayload.fotos_fechamento
-      : (Array.isArray(os?.fotos_fechamento) ? os.fotos_fechamento.map((f) => f.path) : []),
-  };
-
-  const fechamentoIA = await osIAService.gerarFechamentoAutomaticoOS({
-    usuario_id: closedBy || null,
-    os_id: id,
-    nao_conformidade_id: id,
-    os_inicial: {
-      id: os.id,
-      descricao: os.descricao,
-      resumo_tecnico: os.resumo_tecnico || null,
-      causa_diagnostico: os.causa_diagnostico || null,
-      equipamento: os.equipamento,
-      equipamento_id: os.equipamento_id || null,
-      sintoma_principal: os.sintoma_principal || null,
-      severidade: os.severidade || null,
-    },
-    fechamento: fechamentoComMidias,
-  });
+  let fechamentoIA = null;
+  try {
+    fechamentoIA = await osIAService.gerarFechamentoAutomaticoOS({
+      usuario_id: closedBy || null,
+      os_id: id,
+      nao_conformidade_id: id,
+      os_inicial: {
+        id: os.id,
+        descricao: os.descricao,
+        resumo_tecnico: os.resumo_tecnico || null,
+        causa_diagnostico: os.causa_diagnostico || null,
+        equipamento: os.equipamento,
+        equipamento_id: os.equipamento_id || null,
+        sintoma_principal: os.sintoma_principal || null,
+        severidade: os.severidade || null,
+      },
+      fechamento: fechamentoPayload,
+    });
+  } catch (err) {
+    console.error("[OS_CLOSE][IA_WARN] Falha ao gerar fechamento via IA, seguindo sem bloquear:", err?.message || err);
+    fechamentoIA = {
+      descricao_servico_executado: "",
+      acao_corretiva_realizada: "",
+      recomendacao_para_evitar_reincidencia: "",
+      observacao_final_tecnica: "",
+    };
+  }
 
   const diag = String(diagnostico || fechamentoIA.acao_corretiva_realizada || "").trim() || null;
   const acao = String(acaoExecutada || fechamentoIA.descricao_servico_executado || "").trim() || null;
@@ -1629,6 +1724,8 @@ module.exports = {
   iniciarOS,
   pausarOS,
   concluirOS,
+  persistirRascunhoFechamento,
+  gerarDescricaoTecnicaFechamento,
   updateStatus,
   getTurnoAtual,
   getTurnoAgora,

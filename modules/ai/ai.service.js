@@ -112,6 +112,25 @@ function extractOutputText(data) {
   ).trim();
 }
 
+function parseJSONObject(rawText) {
+  const text = String(rawText || '').trim();
+  if (!text) throw buildError('AI_EMPTY_RESPONSE', 'IA sem conteúdo de resposta.', 'Resposta JSON vazia da Responses API');
+
+  try {
+    return JSON.parse(text);
+  } catch (_e) {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(text.slice(start, end + 1));
+      } catch (_ignored) {}
+    }
+  }
+
+  throw buildError('AI_INVALID_JSON', 'IA retornou JSON inválido.', 'Falha ao parsear JSON da Responses API');
+}
+
 async function askText({ systemPrompt, userPayload, model, maxOutputTokens, temperature = 0.2 }) {
   const cfg = getAIConfig();
 
@@ -193,40 +212,15 @@ async function askText({ systemPrompt, userPayload, model, maxOutputTokens, temp
   }
 }
 
-function normalizeImageToInputImage(image) {
-  const value = String(image || '').trim();
-  if (!value) return null;
-
-  if (/^https?:\/\//i.test(value) || /^data:image\//i.test(value)) {
-    return { type: 'input_image', image_url: value };
-  }
-
-  let absolute = value;
-  if (value.startsWith('/uploads/')) {
-    absolute = path.join(storagePaths.UPLOAD_DIR, value.replace('/uploads/', ''));
-  } else if (value.startsWith('/imagens/')) {
-    absolute = path.join(storagePaths.IMAGE_DIR, value.replace('/imagens/', ''));
-  } else if (value.startsWith('/pdfs/')) {
-    absolute = path.join(storagePaths.PDF_DIR, value.replace('/pdfs/', ''));
-  } else if (!path.isAbsolute(value)) {
-    absolute = path.join(process.cwd(), value.replace(/^\/+/, ''));
-  }
-  if (!fs.existsSync(absolute)) return null;
-
-  const ext = path.extname(absolute).toLowerCase();
-  const mimeByExt = {
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png': 'image/png',
-    '.webp': 'image/webp',
-  };
-  const mime = mimeByExt[ext] || 'image/jpeg';
-  const buffer = fs.readFileSync(absolute);
-  const dataUrl = `data:${mime};base64,${buffer.toString('base64')}`;
-  return { type: 'input_image', image_url: dataUrl };
-}
-
-async function askMultimodal({ systemPrompt, userText, images = [], model, maxOutputTokens, temperature = 0.1 }) {
+async function askJSONSchemaStrict({
+  systemPrompt,
+  userPayload,
+  model,
+  schemaName,
+  schema,
+  maxOutputTokens,
+  temperature = 0.2,
+}) {
   const cfg = getAIConfig();
 
   if (!cfg.enabled) throw buildError('AI_DISABLED', 'IA desativada no ambiente.', 'AI_ENABLED=false');
@@ -234,12 +228,12 @@ async function askMultimodal({ systemPrompt, userText, images = [], model, maxOu
   if (cfg.apiKeyLooksPlaceholder) {
     throw buildError('AI_KEY_PLACEHOLDER', 'Configuração da IA inválida. Revise a chave da API.', 'OPENAI_API_KEY parece placeholder');
   }
+  if (!schema || typeof schema !== 'object') {
+    throw buildError('AI_SCHEMA_INVALID', 'Schema JSON ausente para chamada estruturada.', 'Parâmetro schema inválido');
+  }
 
   const chosenModel = String(model || cfg.modelText || '').trim() || 'gpt-4o-mini';
-  const normalizedImages = (images || []).map(normalizeImageToInputImage).filter(Boolean);
-
-  const userContent = [{ type: 'input_text', text: String(userText || '') }];
-  for (const image of normalizedImages) userContent.push(image);
+  const chosenSchemaName = String(schemaName || 'structured_output').trim() || 'structured_output';
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), cfg.timeoutMs);
@@ -258,29 +252,44 @@ async function askMultimodal({ systemPrompt, userText, images = [], model, maxOu
         temperature,
         input: [
           { role: 'system', content: [{ type: 'input_text', text: String(systemPrompt || '') }] },
-          { role: 'user', content: userContent },
+          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify(userPayload || {}) }] },
         ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: chosenSchemaName,
+            schema,
+            strict: true,
+          },
+        },
       }),
     });
 
     if (!response.ok) {
       const body = await response.text();
       const summary = body.slice(0, 500);
-      throw buildError('AI_PROVIDER_ERROR', 'Falha ao consultar IA no momento.', `OpenAI ${response.status}: ${summary}`, {
-        providerStatus: response.status,
-        providerBodySummary: summary,
-        providerModel: chosenModel,
-      });
+      const byStatus = {
+        400: 'AI_BAD_REQUEST',
+        401: 'AI_UNAUTHORIZED',
+        404: 'AI_MODEL_NOT_FOUND',
+        408: 'AI_TIMEOUT',
+        429: 'AI_RATE_LIMIT',
+      };
+      throw buildError(
+        byStatus[response.status] || 'AI_PROVIDER_ERROR',
+        'Falha ao consultar IA no momento.',
+        `OpenAI ${response.status}: ${summary}`,
+        {
+          providerStatus: response.status,
+          providerBodySummary: summary,
+          providerModel: chosenModel,
+        }
+      );
     }
 
     const data = await response.json();
     const text = extractOutputText(data);
-    if (!text) {
-      throw buildError('AI_EMPTY_RESPONSE', 'IA sem conteúdo de resposta.', 'Resposta vazia da Responses API', {
-        providerModel: chosenModel,
-      });
-    }
-    return { text, model: chosenModel, usedImages: normalizedImages.length };
+    return parseJSONObject(text);
   } catch (error) {
     if (error?.name === 'AbortError') {
       throw buildError('AI_TIMEOUT', 'Tempo de resposta da IA excedido.', `Timeout de ${cfg.timeoutMs}ms`, {
@@ -339,7 +348,7 @@ async function testOpenAIConnection() {
 module.exports = {
   getAIConfig,
   askText,
-  askMultimodal,
+  askJSONSchemaStrict,
   validateAIEnvironment,
   testOpenAIConnection,
   looksLikePlaceholderKey,
