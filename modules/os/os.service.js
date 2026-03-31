@@ -1,10 +1,12 @@
 const db = require("../../database/db");
 const { classifyOSPriority } = require("./os-priority.service");
 const osIAService = require("./os-ia.service");
+const iaRepository = require("../ia/ia.repository");
 const alertsHub = require("../alerts/alerts.hub");
 const alertsService = require("../alerts/alerts.service");
 const pushService = require("../push/push.service");
 const escalaService = require("../escala/escala.service");
+const { getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
 let inspecaoService = null;
 try {
   inspecaoService = require("../inspecao/inspecao.service");
@@ -37,6 +39,27 @@ function resolveAnexosTable() {
   if (tableExists("os_anexos")) return "os_anexos";
   if (tableExists("anexos")) return "anexos";
   return null;
+}
+
+function listFechamentoMidias(osId) {
+  if (!tableExists("os_fechamento_midias")) return [];
+  try {
+    return db
+      .prepare(
+        `SELECT id,
+                os_id,
+                caminho_arquivo AS path,
+                legenda,
+                origem,
+                created_at
+         FROM os_fechamento_midias
+         WHERE os_id = ?
+         ORDER BY id DESC`
+      )
+      .all(osId);
+  } catch (_e) {
+    return [];
+  }
 }
 
 function resolveGrauColumn(columns) {
@@ -112,9 +135,7 @@ function getPessoasDoTurnoAtual() {
   if (!semanaAtual?.id || !tableExists("escala_alocacoes") || !tableExists("colaboradores")) return [];
 
   const turnoAtual = getTurnoAtual();
-  const turnosPermitidos = turnoAtual === "NOITE"
-    ? ["plantao", "noturno"]
-    : ["diurno", "apoio"];
+  const turnosPermitidos = getTiposTurnoEscala(turnoAtual);
 
   const placeholders = turnosPermitidos.map(() => "?").join(",");
   const usersJoin = tableExists("users");
@@ -177,11 +198,21 @@ function listGrauOptions() {
 }
 
 function listAnexos(osId, tipo) {
+  const t = String(tipo || "").toUpperCase();
+
+  if (t === "FECHAMENTO") {
+    const midias = listFechamentoMidias(osId);
+    if (midias.length) {
+      return midias.map((row) => ({
+        ...row,
+        tipo: "FECHAMENTO",
+      }));
+    }
+  }
+
   try {
     const table = resolveAnexosTable();
     if (!table) return [];
-
-    const t = String(tipo || "").toUpperCase();
 
     if (table === "os_anexos") {
       return db
@@ -399,14 +430,17 @@ function getOSById(id) {
   const osCols = getOSColumns();
   const hasExecColab = osCols.includes("executor_colaborador_id");
   const hasAuxColab = osCols.includes("auxiliar_colaborador_id");
+  const hasEquipamentos = tableExists("equipamentos");
 
   const os = db.prepare(`
     SELECT o.*,
+           ${hasEquipamentos ? "e.nome" : "NULL"} AS equipamento_nome,
            ce.nome AS executor_nome,
            ca.nome AS auxiliar_nome,
            ue.name AS executor_user_nome,
            ua.name AS auxiliar_user_nome
     FROM os o
+    ${hasEquipamentos ? "LEFT JOIN equipamentos e ON e.id = o.equipamento_id" : ""}
     LEFT JOIN colaboradores ce ON ce.id = ${hasExecColab ? "o.executor_colaborador_id" : "NULL"}
     LEFT JOIN colaboradores ca ON ca.id = ${hasAuxColab ? "o.auxiliar_colaborador_id" : "NULL"}
     LEFT JOIN users ue ON ue.id = o.mecanico_user_id
@@ -423,6 +457,7 @@ function getOSById(id) {
 
   return {
     ...os,
+    equipamento_resolvido: os.equipamento_nome || os.equipamento_manual || os.equipamento || "-",
     acao_corretiva: acaoCorretiva,
     acao_preventiva: acaoPreventiva,
     executor_nome: executorNome,
@@ -508,17 +543,7 @@ function getSemanaAtual() {
 }
 
 function getTurnoAgora() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date());
-  const partMap = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  const h = Number(partMap.hour || 0);
-  const m = Number(partMap.minute || 0);
-  const min = (h * 60) + m;
-  return (min >= (19 * 60) || min < (6 * 60)) ? "NOITE" : "DIA";
+  return getTurnoOperacionalAgora();
 }
 
 function getColaboradoresTurnoAtual(turno) {
@@ -526,7 +551,7 @@ function getColaboradoresTurnoAtual(turno) {
   if (!semana?.id || !tableExists("escala_alocacoes") || !tableExists("colaboradores")) return [];
 
   const turnoNormalizado = String(turno || "").toUpperCase() === "NOITE" ? "NOITE" : "DIA";
-  const tipos = turnoNormalizado === "NOITE" ? ["plantao", "noturno"] : ["diurno", "apoio"];
+  const tipos = getTiposTurnoEscala(turnoNormalizado);
   const placeholders = tipos.map(() => "?").join(",");
 
   return db.prepare(`
@@ -1075,6 +1100,29 @@ function buscarOSRecentesSemelhantes(equipamentoId) {
     .all(Number(equipamentoId));
 }
 
+function buildHistoricoSemelhanteCompacto({ equipamentoId, sintomaPrincipal, descricao }) {
+  const casos = iaRepository.buscarHistoricoSemelhante({
+    equipamento_id: equipamentoId,
+    sintoma_principal: sintomaPrincipal,
+    texto_base: descricao,
+    limite: 5,
+  });
+
+  return casos.map((item) => ({
+    os_id: item.id,
+    score_similaridade: Number(item.score_similaridade || 0),
+    sintoma_principal: item.sintoma_principal || "",
+    status: item.status || "",
+    descricao: String(item.descricao || "").slice(0, 180),
+    resumo_tecnico: String(item.resumo_tecnico || "").slice(0, 180),
+    causa_diagnostico: String(item.causa_diagnostico || "").slice(0, 140),
+    ai_diagnostico_inicial: String(item.ai_diagnostico_inicial || "").slice(0, 140),
+    ai_causa_provavel: String(item.ai_causa_provavel || "").slice(0, 140),
+    ai_servico_sugerido: String(item.ai_servico_sugerido || "").slice(0, 140),
+    opened_at: item.opened_at || null,
+  }));
+}
+
 function buscarPreventivasRelacionadas(equipamentoId) {
   if (!equipamentoId) return [];
   try {
@@ -1090,6 +1138,18 @@ function buscarPreventivasRelacionadas(equipamentoId) {
   } catch (_e) {
     return [];
   }
+}
+
+function normalizeFallbackNarrative(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return "Relato operacional informado sem detalhes técnicos suficientes.";
+  const collapsed = raw.replace(/\s+/g, " ").trim();
+  const compact = collapsed.replace(/\s+/g, "");
+  const hasLongRepeatedChar = /(.)\1{9,}/.test(compact);
+  if (hasLongRepeatedChar || compact.length < 8) {
+    return "Relato operacional informado sem detalhes técnicos suficientes.";
+  }
+  return collapsed;
 }
 
 async function createOS({
@@ -1153,9 +1213,15 @@ async function createOS({
     os_recentes_semelhantes: buscarOSRecentesSemelhantes(equipId),
     preventivas_relacionadas: buscarPreventivasRelacionadas(equipId),
     aprendizado_planta: buildAprendizadoPlantaContext(equipId, sintoma),
+    historico_semelhante_compacto: buildHistoricoSemelhanteCompacto({
+      equipamentoId: equipId,
+      sintomaPrincipal: sintoma,
+      descricao: relatoNaoConformidade,
+    }),
   };
 
-  const aberturaIA = await osIAService.gerarAberturaAutomaticaDaOS({
+  let aberturaIA;
+  const aberturaPayload = {
     usuario_id: openedBy,
     nao_conformidade: {
       equipamento_id: equipId,
@@ -1167,7 +1233,32 @@ async function createOS({
       observacao_curta: relatoNaoConformidade,
     },
     contexto,
-  });
+  };
+
+  try {
+    aberturaIA = await osIAService.gerarAberturaAutomaticaDaOS(aberturaPayload);
+  } catch (err) {
+    console.error("[OS_CREATE][IA_WARN] Falha na IA de abertura. Seguindo com fallback manual.", {
+      osEquipamentoId: equipId,
+      errorCode: err?.code || null,
+      message: err?.message || String(err),
+      technical: err?.technical || null,
+    });
+    aberturaIA = {
+      criticidade_sugerida: criticidadeEntrada,
+      prioridade_sugerida: criticidadeEntrada,
+      diagnostico_inicial: relatoNaoConformidade,
+      causa_provavel: relatoNaoConformidade,
+      risco_operacional: "Avaliação pendente (fallback sem IA).",
+      risco_seguranca: "Avaliação pendente (fallback sem IA).",
+      acao_corretiva: relatoNaoConformidade,
+      acao_preventiva: relatoNaoConformidade,
+      servico_sugerido: relatoNaoConformidade,
+      sugestao_equipe: { quantidade_recomendada: 1, perfil_minimo: "Mecânico", racional: "Fallback sem IA" },
+      descricao_tecnica_os: relatoNaoConformidade,
+      justificativa_interna: "Abertura concluída sem IA por indisponibilidade temporária.",
+    };
+  }
   const grauOS = normalizeGrau(aberturaIA.criticidade_sugerida || aberturaIA.prioridade_sugerida || score.prioridade || criticidadeEntrada);
 
   const cols = getOSColumns();
@@ -1291,15 +1382,89 @@ async function createOS({
   return osId;
 }
 
+function createOSAutomatica({
+  equipamento_id,
+  descricao,
+  tipo = "PREVENTIVA",
+  prioridade = "MEDIA",
+  opened_by = null,
+  origem = "AUTOMACAO",
+  regra_geradora_id = null,
+  preventiva_execucao_id = null,
+  metadata = null,
+}) {
+  const equipId = Number(equipamento_id || 0) || null;
+  if (!equipId) throw new Error("Equipamento obrigatório para OS automática.");
+  const eq = db.prepare(`SELECT id, nome FROM equipamentos WHERE id = ?`).get(equipId);
+  if (!eq) throw new Error("Equipamento não encontrado para OS automática.");
+
+  const cols = getOSColumns();
+  const fields = ["equipamento", "descricao", "tipo", "status", "opened_by"];
+  const values = [
+    String(eq.nome || `Equipamento ${equipId}`),
+    String(descricao || "").trim() || "OS automática gerada por regra de automação.",
+    normalizeTipoOS(tipo),
+    "ABERTA",
+    opened_by ? Number(opened_by) : null,
+  ];
+
+  if (cols.includes("equipamento_id")) {
+    fields.push("equipamento_id");
+    values.push(equipId);
+  }
+  if (cols.includes("origem")) {
+    fields.push("origem");
+    values.push(String(origem || "AUTOMACAO").toUpperCase());
+  }
+  if (cols.includes("regra_geradora_id")) {
+    fields.push("regra_geradora_id");
+    values.push(regra_geradora_id ? Number(regra_geradora_id) : null);
+  }
+  if (cols.includes("preventiva_execucao_id")) {
+    fields.push("preventiva_execucao_id");
+    values.push(preventiva_execucao_id ? Number(preventiva_execucao_id) : null);
+  }
+  if (cols.includes("metadata_automacao_json")) {
+    fields.push("metadata_automacao_json");
+    values.push(metadata ? JSON.stringify(metadata) : null);
+  }
+  if (cols.includes("prioridade")) {
+    fields.push("prioridade");
+    values.push(normalizeGrau(prioridade));
+  }
+
+  const stmt = db.prepare(`INSERT INTO os (${fields.join(",")}) VALUES (${fields.map(() => "?").join(",")})`);
+  const info = stmt.run(...values);
+  const osId = Number(info.lastInsertRowid);
+  emitOSEvents(osId, "create");
+  return osId;
+}
+
 function addFotosAberturaFechamento({ osId, files = [], tipo, userId }) {
   if (!osId) return;
   const t = String(tipo || "").toUpperCase();
   if (!["ABERTURA", "FECHAMENTO"].includes(t)) return;
 
   const table = resolveAnexosTable();
-  if (!table) return;
+  const hasFechamentoMidias = t === "FECHAMENTO" && tableExists("os_fechamento_midias");
+  if (!table && !hasFechamentoMidias) return;
 
   const tx = db.transaction(() => {
+    if (hasFechamentoMidias) {
+      const insertFechamentoMidia = db.prepare(
+        `INSERT INTO os_fechamento_midias (os_id, caminho_arquivo, legenda, origem, user_id, created_at, updated_at)
+         VALUES (?, ?, ?, 'foto', ?, datetime('now'), datetime('now'))`
+      );
+
+      for (const f of files || []) {
+        const pathPublic = f.pathPublic || f.path || null;
+        if (!pathPublic) continue;
+        insertFechamentoMidia.run(osId, pathPublic, f.originalname || null, userId || null);
+      }
+    }
+
+    if (!table) return;
+
     if (table === "os_anexos") {
       const insert = db.prepare(
         `INSERT INTO os_anexos (os_id, tipo, path, legenda, created_by, created_at)
@@ -1389,6 +1554,108 @@ function pausarOS(id) {
   }
 }
 
+function pickFirstAvailableColumn(cols, options = []) {
+  return options.find((name) => cols.includes(name)) || null;
+}
+
+function persistirRascunhoFechamento(
+  id,
+  { transcricaoBruta, versaoTecnicaSugerida, versaoFinalAprovada, fonteDescricao, textoDigitado, fotosMetadados, userId }
+) {
+  const os = getOSById(id);
+  if (!os) throw new Error("OS não encontrada.");
+  const cols = getOSColumns();
+
+  const sets = [];
+  const args = [];
+  const byField = [
+    { value: transcricaoBruta, options: ["transcricao_bruta", "fechamento_transcricao_bruta", "audio_transcricao_bruta"] },
+    { value: versaoTecnicaSugerida, options: ["versao_tecnica_sugerida", "descricao_tecnica_sugerida_fechamento"] },
+    { value: versaoFinalAprovada, options: ["versao_final_aprovada", "descricao_final_aprovada_fechamento"] },
+    { value: fonteDescricao, options: ["fonte_descricao_fechamento", "fonte_descricao"] },
+    { value: textoDigitado, options: ["texto_digitado_fechamento", "descricao_digitada_fechamento"] },
+    {
+      value: JSON.stringify(Array.isArray(fotosMetadados) ? fotosMetadados : []),
+      options: ["fotos_fechamento_metadados_json", "fechamento_fotos_metadados_json"],
+    },
+  ];
+
+  for (const field of byField) {
+    const col = pickFirstAvailableColumn(cols, field.options);
+    if (!col) continue;
+    sets.push(`${col} = ?`);
+    args.push(field.value || null);
+  }
+
+  if (sets.length) {
+    args.push(id);
+    db.prepare(`UPDATE os SET ${sets.join(", ")} WHERE id = ?`).run(...args);
+  }
+
+  osIAService.registrarLogIA({
+    usuarioId: userId || null,
+    osId: id,
+    naoConformidadeId: id,
+    tipo: "FECHAMENTO_RASCUNHO",
+    entrada: { transcricaoBruta, fonteDescricao, textoDigitado, fotosMetadados },
+    resposta: { versaoTecnicaSugerida, versaoFinalAprovada },
+    status: "DRAFT",
+  });
+}
+
+async function gerarDescricaoTecnicaFechamento(id, { textoDigitado, transcricaoAudio, fotosMetadados, fonte, userId }) {
+  const os = getOSById(id);
+  if (!os) throw new Error("OS não encontrada.");
+  const fotosLista = Array.isArray(fotosMetadados) ? fotosMetadados : [];
+  let analiseFotos = { observacao_ia: null, confianca: 0, evidencias_visuais: [] };
+  if (fotosLista.length) {
+    try {
+      analiseFotos = await osIAService.analisarFotosFechamento({
+        fotos: fotosLista,
+        audioTranscricao: transcricaoAudio || null,
+        contexto: {
+          os_id: os.id,
+          equipamento_id: os.equipamento_id || null,
+          sintoma_principal: os.sintoma_principal || null,
+        },
+      });
+    } catch (_e) {
+      analiseFotos = { observacao_ia: null, confianca: 0, evidencias_visuais: [] };
+    }
+  }
+
+  const fechamentoIA = await osIAService.gerarFechamentoAutomaticoOS({
+    usuario_id: userId || null,
+    os_id: id,
+    nao_conformidade_id: id,
+    os_inicial: {
+      id: os.id,
+      descricao: os.descricao,
+      resumo_tecnico: os.resumo_tecnico || null,
+      causa_diagnostico: os.causa_diagnostico || null,
+      equipamento: os.equipamento,
+      equipamento_id: os.equipamento_id || null,
+      sintoma_principal: os.sintoma_principal || null,
+      severidade: os.severidade || null,
+    },
+    fechamento: {
+      fonte_descricao: fonte || null,
+      texto_digitado: textoDigitado || null,
+      transcricao_audio: transcricaoAudio || null,
+      fotos_metadados: fotosLista,
+      analise_visual: analiseFotos,
+    },
+  });
+
+  return String(
+    fechamentoIA.descricao_servico_executado
+      || fechamentoIA.observacao_final_tecnica
+      || textoDigitado
+      || transcricaoAudio
+      || ""
+  ).trim();
+}
+
 async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, fechamentoPayload = {} }) {
   const os = getOSById(id);
   if (!os) throw new Error("OS não encontrada.");
@@ -1402,22 +1669,33 @@ async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, fechamento
 
   const cols = getOSColumns();
 
-  const fechamentoIA = await osIAService.gerarFechamentoAutomaticoOS({
-    usuario_id: closedBy || null,
-    os_id: id,
-    nao_conformidade_id: id,
-    os_inicial: {
-      id: os.id,
-      descricao: os.descricao,
-      resumo_tecnico: os.resumo_tecnico || null,
-      causa_diagnostico: os.causa_diagnostico || null,
-      equipamento: os.equipamento,
-      equipamento_id: os.equipamento_id || null,
-      sintoma_principal: os.sintoma_principal || null,
-      severidade: os.severidade || null,
-    },
-    fechamento: fechamentoPayload,
-  });
+  let fechamentoIA = null;
+  try {
+    fechamentoIA = await osIAService.gerarFechamentoAutomaticoOS({
+      usuario_id: closedBy || null,
+      os_id: id,
+      nao_conformidade_id: id,
+      os_inicial: {
+        id: os.id,
+        descricao: os.descricao,
+        resumo_tecnico: os.resumo_tecnico || null,
+        causa_diagnostico: os.causa_diagnostico || null,
+        equipamento: os.equipamento,
+        equipamento_id: os.equipamento_id || null,
+        sintoma_principal: os.sintoma_principal || null,
+        severidade: os.severidade || null,
+      },
+      fechamento: fechamentoPayload,
+    });
+  } catch (err) {
+    console.error("[OS_CLOSE][IA_WARN] Falha ao gerar fechamento via IA, seguindo sem bloquear:", err?.message || err);
+    fechamentoIA = {
+      descricao_servico_executado: "",
+      acao_corretiva_realizada: "",
+      recomendacao_para_evitar_reincidencia: "",
+      observacao_final_tecnica: "",
+    };
+  }
 
   const diag = String(diagnostico || fechamentoIA.acao_corretiva_realizada || "").trim() || null;
   const acao = String(acaoExecutada || fechamentoIA.descricao_servico_executado || "").trim() || null;
@@ -1460,6 +1738,8 @@ async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, fechamento
       requer_monitoramento: fechamentoPayload.requer_monitoramento ? 1 : 0,
       tipo_acao_fechamento: fechamentoPayload.tipo_acao || null,
       observacao_curta_fechamento: fechamentoPayload.observacao_curta || null,
+      observacao_ia: fechamentoIA.observacao_ia || null,
+      confianca: Number.isFinite(Number(fechamentoIA.confianca)) ? Number(fechamentoIA.confianca) : null,
     };
 
     for (const [col, value] of Object.entries(fechamentoCols)) {
@@ -1563,11 +1843,14 @@ module.exports = {
   listGrauOptions,
   listUsuariosEquipe,
   createOS,
+  createOSAutomatica,
   addFotosAberturaFechamento,
   getOSById,
   iniciarOS,
   pausarOS,
   concluirOS,
+  persistirRascunhoFechamento,
+  gerarDescricaoTecnicaFechamento,
   updateStatus,
   getTurnoAtual,
   getTurnoAgora,

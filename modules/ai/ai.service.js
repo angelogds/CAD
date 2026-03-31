@@ -1,3 +1,7 @@
+const fs = require('fs');
+const path = require('path');
+const storagePaths = require('../../config/storage');
+
 const ENV_KEY_CANDIDATES = ['OPENAI_API_KEY', 'OPENAI_APIKEY', 'OPENAI_KEY'];
 
 function isAIEnabled() {
@@ -101,11 +105,57 @@ function buildError(code, message, technical, extra = {}) {
 }
 
 function extractOutputText(data) {
-  return String(
-    data?.output_text
-    || data?.output?.flatMap((i) => i?.content || []).find((c) => c?.type === 'output_text')?.text
-    || ''
-  ).trim();
+  const directText = String(data?.output_text || '').trim();
+  if (directText) return directText;
+
+  const parsedText = data?.output_parsed;
+  if (parsedText && typeof parsedText === 'object') {
+    try {
+      return JSON.stringify(parsedText);
+    } catch (_e) {}
+  }
+
+  const content = Array.isArray(data?.output)
+    ? data.output.flatMap((item) => (Array.isArray(item?.content) ? item.content : []))
+    : [];
+
+  const outputText = content.find((c) => c?.type === 'output_text' && typeof c?.text === 'string')?.text;
+  if (String(outputText || '').trim()) return String(outputText).trim();
+
+  const outputJson = content.find((c) => c?.type === 'output_json');
+  if (outputJson && typeof outputJson?.json === 'object') {
+    try {
+      return JSON.stringify(outputJson.json);
+    } catch (_e) {}
+  }
+
+  const outputAnyJson = content.find((c) => c && typeof c === 'object' && c?.json && typeof c.json === 'object');
+  if (outputAnyJson) {
+    try {
+      return JSON.stringify(outputAnyJson.json);
+    } catch (_e) {}
+  }
+
+  return '';
+}
+
+function parseJSONObject(rawText) {
+  const text = String(rawText || '').trim();
+  if (!text) throw buildError('AI_EMPTY_RESPONSE', 'IA sem conteúdo de resposta.', 'Resposta JSON vazia da Responses API');
+
+  try {
+    return JSON.parse(text);
+  } catch (_e) {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(text.slice(start, end + 1));
+      } catch (_ignored) {}
+    }
+  }
+
+  throw buildError('AI_INVALID_JSON', 'IA retornou JSON inválido.', 'Falha ao parsear JSON da Responses API');
 }
 
 async function askText({ systemPrompt, userPayload, model, maxOutputTokens, temperature = 0.2 }) {
@@ -189,6 +239,99 @@ async function askText({ systemPrompt, userPayload, model, maxOutputTokens, temp
   }
 }
 
+async function askJSONSchemaStrict({
+  systemPrompt,
+  userPayload,
+  model,
+  schemaName,
+  schema,
+  maxOutputTokens,
+  temperature = 0.2,
+}) {
+  const cfg = getAIConfig();
+
+  if (!cfg.enabled) throw buildError('AI_DISABLED', 'IA desativada no ambiente.', 'AI_ENABLED=false');
+  if (!cfg.hasApiKey) throw buildError('AI_KEY_MISSING', 'IA ainda não ativada. Configure OPENAI_API_KEY.', 'OPENAI_API_KEY ausente');
+  if (cfg.apiKeyLooksPlaceholder) {
+    throw buildError('AI_KEY_PLACEHOLDER', 'Configuração da IA inválida. Revise a chave da API.', 'OPENAI_API_KEY parece placeholder');
+  }
+  if (!schema || typeof schema !== 'object') {
+    throw buildError('AI_SCHEMA_INVALID', 'Schema JSON ausente para chamada estruturada.', 'Parâmetro schema inválido');
+  }
+
+  const chosenModel = String(model || cfg.modelText || '').trim() || 'gpt-4o-mini';
+  const chosenSchemaName = String(schemaName || 'structured_output').trim() || 'structured_output';
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), cfg.timeoutMs);
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cfg.apiKey}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: chosenModel,
+        max_output_tokens: Number(maxOutputTokens || cfg.maxOutputTokens),
+        temperature,
+        input: [
+          { role: 'system', content: [{ type: 'input_text', text: String(systemPrompt || '') }] },
+          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify(userPayload || {}) }] },
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: chosenSchemaName,
+            schema,
+            strict: true,
+          },
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      const summary = body.slice(0, 500);
+      const byStatus = {
+        400: 'AI_BAD_REQUEST',
+        401: 'AI_UNAUTHORIZED',
+        404: 'AI_MODEL_NOT_FOUND',
+        408: 'AI_TIMEOUT',
+        429: 'AI_RATE_LIMIT',
+      };
+      throw buildError(
+        byStatus[response.status] || 'AI_PROVIDER_ERROR',
+        'Falha ao consultar IA no momento.',
+        `OpenAI ${response.status}: ${summary}`,
+        {
+          providerStatus: response.status,
+          providerBodySummary: summary,
+          providerModel: chosenModel,
+        }
+      );
+    }
+
+    const data = await response.json();
+    const text = extractOutputText(data);
+    return parseJSONObject(text);
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw buildError('AI_TIMEOUT', 'Tempo de resposta da IA excedido.', `Timeout de ${cfg.timeoutMs}ms`, {
+        providerModel: chosenModel,
+      });
+    }
+    if (error?.code) throw error;
+    throw buildError('AI_NETWORK_ERROR', 'Erro de conexão ao consultar IA.', error?.message || 'Falha de rede desconhecida', {
+      providerModel: chosenModel,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function testOpenAIConnection() {
   const cfg = getAIConfig();
   if (!cfg.enabled) {
@@ -232,6 +375,7 @@ async function testOpenAIConnection() {
 module.exports = {
   getAIConfig,
   askText,
+  askJSONSchemaStrict,
   validateAIEnvironment,
   testOpenAIConnection,
   looksLikePlaceholderKey,

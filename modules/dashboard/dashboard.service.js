@@ -570,6 +570,9 @@ function parseResponsavelTextoLimitado(responsavel, limit = 2) {
 
 function getPreventivasDashboard() {
   return safeGet(() => {
+    if (typeof preventivasService?.sincronizarPreventivasComEscala === "function") {
+      preventivasService.sincronizarPreventivasComEscala({ origem: "dashboard.getPreventivasDashboard" });
+    }
     const cols = tableExists("preventiva_execucoes")
       ? db.prepare("PRAGMA table_info(preventiva_execucoes)").all().map((c) => c.name)
       : [];
@@ -728,6 +731,9 @@ function podeIniciarPreventiva(user, preventiva) {
 
 function iniciarPreventiva(execucaoId, user) {
   return safeGet(() => {
+    if (typeof preventivasService?.sincronizarPreventivasComEscala === "function") {
+      preventivasService.sincronizarPreventivasComEscala({ origem: "dashboard.iniciarPreventiva" });
+    }
     if (typeof preventivasService?.alocarEquipeExecucaoPreventiva === "function") {
       preventivasService.alocarEquipeExecucaoPreventiva(Number(execucaoId));
     }
@@ -761,6 +767,9 @@ function iniciarPreventiva(execucaoId, user) {
 
 function finalizarPreventiva(execucaoId, user) {
   return safeGet(() => {
+    if (typeof preventivasService?.sincronizarPreventivasComEscala === "function") {
+      preventivasService.sincronizarPreventivasComEscala({ origem: "dashboard.finalizarPreventiva" });
+    }
     const cols = tableExists("preventiva_execucoes")
       ? db.prepare("PRAGMA table_info(preventiva_execucoes)").all().map((c) => c.name)
       : [];

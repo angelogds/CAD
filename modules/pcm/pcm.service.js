@@ -1,4 +1,5 @@
 const db = require("../../database/db");
+const intelligenceService = require("./pcm.intelligence.service");
 
 function toNum(v, d = 0) {
   const n = Number(v);
@@ -9,11 +10,11 @@ function getIndicadores() {
   const row = db
     .prepare(`
       SELECT
-        SUM(CASE WHEN UPPER(tipo)='PREVENTIVA' AND strftime('%Y-%m', opened_at)=strftime('%Y-%m','now') THEN 1 ELSE 0 END) AS prev_mes,
-        SUM(CASE WHEN UPPER(tipo)='CORRETIVA' AND strftime('%Y-%m', opened_at)=strftime('%Y-%m','now') THEN 1 ELSE 0 END) AS corr_mes,
-        SUM(CASE WHEN status IN ('ABERTA','ANDAMENTO','PAUSADA') AND datetime(opened_at) < datetime('now','-7 day') THEN 1 ELSE 0 END) AS os_atrasadas,
-        SUM(CASE WHEN strftime('%Y-%m', opened_at)=strftime('%Y-%m','now') THEN COALESCE(custo_total,0) ELSE 0 END) AS custo_mes,
-        SUM(CASE WHEN UPPER(tipo)='CORRETIVA' AND strftime('%Y-%m', opened_at)=strftime('%Y-%m','now')
+        SUM(CASE WHEN UPPER(tipo)='PREVENTIVA' AND strftime('%Y-%m', opened_at, 'localtime')=strftime('%Y-%m','now', 'localtime') THEN 1 ELSE 0 END) AS prev_mes,
+        SUM(CASE WHEN UPPER(tipo)='CORRETIVA' AND strftime('%Y-%m', opened_at, 'localtime')=strftime('%Y-%m','now', 'localtime') THEN 1 ELSE 0 END) AS corr_mes,
+        SUM(CASE WHEN UPPER(COALESCE(status,'')) IN ('ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA') AND datetime(opened_at) < datetime('now','-7 day') THEN 1 ELSE 0 END) AS os_atrasadas,
+        SUM(CASE WHEN strftime('%Y-%m', opened_at, 'localtime')=strftime('%Y-%m','now', 'localtime') THEN COALESCE(custo_total,0) ELSE 0 END) AS custo_mes,
+        SUM(CASE WHEN UPPER(tipo)='CORRETIVA' AND strftime('%Y-%m', opened_at, 'localtime')=strftime('%Y-%m','now', 'localtime')
                  AND (LOWER(descricao) LIKE '%emerg%' OR LOWER(descricao) LIKE '%parada%') THEN 1 ELSE 0 END) AS paradas_np
       FROM os
     `)
@@ -25,10 +26,10 @@ function getIndicadores() {
 
   const mttr = db
     .prepare(`
-      SELECT AVG((julianday(closed_at) - julianday(opened_at)) * 24.0) AS mttr_horas
+      SELECT AVG((julianday(COALESCE(closed_at, data_fim)) - julianday(opened_at)) * 24.0) AS mttr_horas
       FROM os
-      WHERE closed_at IS NOT NULL
-        AND status IN ('CONCLUIDA','FINALIZADA')
+      WHERE COALESCE(closed_at, data_fim) IS NOT NULL
+        AND UPPER(COALESCE(status,'')) IN ('CONCLUIDA','FINALIZADA')
         AND datetime(opened_at) >= datetime('now','-180 day')
     `)
     .get();
@@ -261,6 +262,127 @@ function getEquipamentoById(id) {
   }
 }
 
+function getCriticidadeByEquipamentoId(equipamentoId) {
+  const id = Number(equipamentoId);
+  if (!id) return null;
+
+  let criticidade = null;
+  try {
+    criticidade = db.prepare(`
+      SELECT
+        equipamento_id,
+        UPPER(COALESCE(nivel_criticidade, 'MEDIA')) AS nivel_criticidade,
+        COALESCE(impacto_producao, 3) AS impacto_producao,
+        COALESCE(impacto_seguranca, 3) AS impacto_seguranca,
+        COALESCE(impacto_ambiental, 3) AS impacto_ambiental,
+        COALESCE(custo_parada, 3) AS custo_parada,
+        COALESCE(indice_criticidade, 3) AS indice_criticidade,
+        COALESCE(observacoes, '') AS observacoes
+      FROM pcm_equipamento_criticidade
+      WHERE equipamento_id = ?
+    `).get(id);
+  } catch (_e) {
+    criticidade = null;
+  }
+
+  if (criticidade) return criticidade;
+
+  const equipamento = db.prepare(`
+    SELECT id, UPPER(COALESCE(criticidade, 'MEDIA')) AS criticidade
+    FROM equipamentos
+    WHERE id = ?
+  `).get(id);
+
+  if (!equipamento) return null;
+
+  return {
+    equipamento_id: id,
+    nivel_criticidade: equipamento.criticidade,
+    impacto_producao: 3,
+    impacto_seguranca: 3,
+    impacto_ambiental: 3,
+    custo_parada: 3,
+    indice_criticidade: 3,
+    observacoes: "",
+  };
+}
+
+function saveCriticidade(payload = {}, userId = null) {
+  const equipamentoId = Number(payload.equipamento_id);
+  if (!equipamentoId) throw new Error("Equipamento obrigatório para salvar criticidade.");
+
+  const nivel = String(payload.nivel_criticidade || "MEDIA").trim().toUpperCase();
+  if (!["BAIXA", "MEDIA", "ALTA"].includes(nivel)) {
+    throw new Error("Nível de criticidade inválido. Use BAIXA, MEDIA ou ALTA.");
+  }
+
+  const sanitizeImpact = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 3;
+    return Math.max(1, Math.min(5, Math.round(n)));
+  };
+
+  const impactoProducao = sanitizeImpact(payload.impacto_producao);
+  const impactoSeguranca = sanitizeImpact(payload.impacto_seguranca);
+  const impactoAmbiental = sanitizeImpact(payload.impacto_ambiental);
+  const custoParada = sanitizeImpact(payload.custo_parada);
+  const indice = Math.round((((impactoProducao + impactoSeguranca + impactoAmbiental + custoParada) / 4) * 10)) / 10;
+  const observacoes = String(payload.observacoes || "").trim();
+
+  const tx = db.transaction(() => {
+    db.prepare(`
+      UPDATE equipamentos
+      SET criticidade = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(nivel.toLowerCase(), equipamentoId);
+
+    try {
+      db.prepare(`
+        INSERT INTO pcm_equipamento_criticidade (
+          equipamento_id, nivel_criticidade, impacto_producao, impacto_seguranca,
+          impacto_ambiental, custo_parada, indice_criticidade, observacoes,
+          updated_by, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(equipamento_id) DO UPDATE SET
+          nivel_criticidade=excluded.nivel_criticidade,
+          impacto_producao=excluded.impacto_producao,
+          impacto_seguranca=excluded.impacto_seguranca,
+          impacto_ambiental=excluded.impacto_ambiental,
+          custo_parada=excluded.custo_parada,
+          indice_criticidade=excluded.indice_criticidade,
+          observacoes=excluded.observacoes,
+          updated_by=excluded.updated_by,
+          updated_at=datetime('now')
+      `).run(
+        equipamentoId,
+        nivel,
+        impactoProducao,
+        impactoSeguranca,
+        impactoAmbiental,
+        custoParada,
+        indice,
+        observacoes || null,
+        userId || null
+      );
+    } catch (_e) {
+      // Banco legado sem tabela dedicada: mantém atualização no cadastro base.
+    }
+  });
+
+  tx();
+
+  return {
+    equipamento_id: equipamentoId,
+    nivel_criticidade: nivel,
+    impacto_producao: impactoProducao,
+    impacto_seguranca: impactoSeguranca,
+    impacto_ambiental: impactoAmbiental,
+    custo_parada: custoParada,
+    indice_criticidade: indice,
+  };
+}
+
 function listBom({ equipamento_id, categoria, busca } = {}) {
   let where = '1=1';
   const params = {};
@@ -364,9 +486,15 @@ module.exports = {
   registrarExecucao,
   getEquipamentos,
   getEquipamentoById,
+  getCriticidadeByEquipamentoId,
+  saveCriticidade,
   listBom,
   listLubrificacao,
   listPecasCriticas,
   listBacklogSimples,
   listOSFalhasPreview,
+  atualizarScoresRiscoEquipamentos: intelligenceService.atualizarScoresRiscoEquipamentos,
+  getRankingTecnicos: intelligenceService.getRankingTecnicos,
+  listarAlertasOperacionais: intelligenceService.listarAlertas,
+  processarAutomacaoOS: intelligenceService.processarAutomacaoOS,
 };

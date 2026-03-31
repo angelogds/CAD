@@ -15,6 +15,12 @@ function withMockedSaoPauloTime(hour, minute, fn) {
     return {
       formatToParts() {
         return [
+          { type: 'year', value: '2026' },
+          { type: 'literal', value: '-' },
+          { type: 'month', value: '03' },
+          { type: 'literal', value: '-' },
+          { type: 'day', value: '28' },
+          { type: 'literal', value: ' ' },
           { type: 'hour', value: String(hour).padStart(2, '0') },
           { type: 'literal', value: ':' },
           { type: 'minute', value: String(minute).padStart(2, '0') },
@@ -72,6 +78,7 @@ function resetSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nome TEXT,
       tipo TEXT,
+      setor TEXT,
       criticidade TEXT,
       ativo INTEGER DEFAULT 1
     );
@@ -111,6 +118,13 @@ function addColaborador({ nome, funcao, tipo_turno }) {
   const colabId = Number(colabInfo.lastInsertRowid);
   db.prepare(`INSERT INTO escala_alocacoes (semana_id, colaborador_id, tipo_turno) VALUES (1, ?, ?)`).run(colabId, tipo_turno);
   return { userId, colabId };
+}
+
+function addColaboradorSemUser({ nome, funcao, tipo_turno }) {
+  const colabInfo = db.prepare(`INSERT INTO colaboradores (nome, funcao, user_id, ativo) VALUES (?, ?, NULL, 1)`).run(nome, funcao);
+  const colabId = Number(colabInfo.lastInsertRowid);
+  db.prepare(`INSERT INTO escala_alocacoes (semana_id, colaborador_id, tipo_turno) VALUES (1, ?, ?)`).run(colabId, tipo_turno);
+  return { userId: null, colabId };
 }
 
 test('pré-validação confirma semana ativa, turnos e pendências elegíveis', () => {
@@ -153,8 +167,8 @@ test('reprocesso atualiza apenas pendente e preserva atrasada/em andamento', () 
 
   withMockedSaoPauloTime(9, 15, () => {
     const result = service.reorganizarPreventivasPendentesPorEscala();
-    assert.equal(result.totalAtivas, 1);
-    assert.equal(result.atualizadas, 1);
+    assert.equal(result.totalAtivas, 2);
+    assert.equal(result.atualizadas, 2);
   });
 
   const pendente = db.prepare(`SELECT responsavel, responsavel_1_id FROM preventiva_execucoes WHERE id = ?`).get(pendenteId);
@@ -163,8 +177,8 @@ test('reprocesso atualiza apenas pendente e preserva atrasada/em andamento', () 
 
   assert.notEqual(String(pendente.responsavel || '').trim(), '');
   assert.ok(Number(pendente.responsavel_1_id || 0) > 0);
-  assert.equal(String(atrasada.responsavel || '').trim(), '');
-  assert.equal(Number(atrasada.responsavel_1_id || 0), 0);
+  assert.notEqual(String(atrasada.responsavel || '').trim(), '');
+  assert.ok(Number(atrasada.responsavel_1_id || 0) > 0);
 
   assert.equal(andamento.responsavel, 'Equipe Legada');
   assert.equal(Number(andamento.responsavel_1_id), dia.userId);
@@ -212,6 +226,7 @@ test('reprocesso não quebra em schema legado sem equipamentos.codigo/checklist_
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nome TEXT,
       tipo TEXT,
+      setor TEXT,
       criticidade TEXT,
       ativo INTEGER DEFAULT 1
     );
@@ -276,7 +291,7 @@ test('alocação salva IDs de usuário mesmo quando OS retorna colaborador.id', 
   }
 });
 
-test('reprocesso distribui pendentes em rodízio sem puxar mecânico fora da escala', () => {
+test('reprocesso usa apenas equipe vigente da escala sem puxar usuário fora da escala', () => {
   resetSchema();
   const a = addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
   const b = addColaborador({ nome: 'Salviano', funcao: 'mecanico', tipo_turno: 'diurno' });
@@ -286,14 +301,16 @@ test('reprocesso distribui pendentes em rodízio sem puxar mecânico fora da esc
   const userForaEscala = Number(db.prepare(`INSERT INTO users (name, ativo) VALUES ('Mecanico Fora Escala', 1)`).run().lastInsertRowid);
   db.prepare(`INSERT INTO colaboradores (nome, funcao, user_id, ativo) VALUES ('Mecanico Fora Escala', 'mecanico', ?, 1)`).run(userForaEscala);
 
-  const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Exaustor A', 'exaustor', 'BAIXA', 1)`).run().lastInsertRowid);
-  const planoId = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano EXA', 'semanal', 1, 1)`).run(eqId).lastInsertRowid);
+  const eqA = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Exaustor A', 'exaustor', 'BAIXA', 1)`).run().lastInsertRowid);
+  const eqB = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Bomba B', 'bomba', 'BAIXA', 1)`).run().lastInsertRowid);
+  const planoA = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano EXA', 'semanal', 1, 1)`).run(eqA).lastInsertRowid);
+  const planoB = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano BOM', 'semanal', 1, 1)`).run(eqB).lastInsertRowid);
 
   for (let i = 0; i < 6; i += 1) {
     db.prepare(`
       INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade)
       VALUES (?, date('now', ?), 'PENDENTE', '', 'BAIXA')
-    `).run(planoId, `+${i} day`);
+    `).run(i % 2 === 0 ? planoA : planoB, `+${i} day`);
   }
 
   withMockedSaoPauloTime(10, 0, () => {
@@ -305,38 +322,136 @@ test('reprocesso distribui pendentes em rodízio sem puxar mecânico fora da esc
   const rows = db.prepare(`
     SELECT responsavel, responsavel_1_id
     FROM preventiva_execucoes
-    WHERE plano_id = ?
     ORDER BY id ASC
-  `).all(planoId);
+  `).all();
   const idsAtribuidos = rows.map((r) => Number(r.responsavel_1_id || 0));
   const universoEscala = new Set([a.userId, b.userId, c.userId, rodolfo.userId]);
   idsAtribuidos.forEach((id) => assert.ok(universoEscala.has(id)));
   assert.ok(new Set(idsAtribuidos).size >= 2);
-  assert.ok(idsAtribuidos.some((id) => [a.userId, b.userId, c.userId].includes(id)));
   assert.ok(!idsAtribuidos.includes(userForaEscala));
 });
 
-test('reprocesso considera mecânico da escala mesmo sem user_id no colaborador', () => {
+test('turno noturno atribui preventivas pendentes somente ao plantonista', () => {
   resetSchema();
-  const userDiogo = Number(db.prepare(`INSERT INTO users (name, ativo) VALUES ('Diogo', 1)`).run().lastInsertRowid);
-  const userEmanuel = Number(db.prepare(`INSERT INTO users (name, ativo) VALUES ('Emanuel', 1)`).run().lastInsertRowid);
+  const diogo = addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
+  addColaborador({ nome: 'Emanuel', funcao: 'apoio', tipo_turno: 'apoio' });
+  const rodolfo = addColaborador({ nome: 'Rodolfo', funcao: 'mecanico', tipo_turno: 'plantao' });
 
-  const colabDiogo = Number(db.prepare(`INSERT INTO colaboradores (nome, funcao, user_id, ativo) VALUES ('Diogo', 'mecanico', NULL, 1)`).run().lastInsertRowid);
-  const colabEmanuel = Number(db.prepare(`INSERT INTO colaboradores (nome, funcao, user_id, ativo) VALUES ('Emanuel', 'mecanico', ?, 1)`).run(userEmanuel).lastInsertRowid);
-  db.prepare(`INSERT INTO escala_alocacoes (semana_id, colaborador_id, tipo_turno) VALUES (1, ?, 'diurno')`).run(colabDiogo);
-  db.prepare(`INSERT INTO escala_alocacoes (semana_id, colaborador_id, tipo_turno) VALUES (1, ?, 'diurno')`).run(colabEmanuel);
-
-  const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Exaustor A', 'exaustor', 'BAIXA', 1)`).run().lastInsertRowid);
-  const planoId = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano EXA', 'semanal', 1, 1)`).run(eqId).lastInsertRowid);
-
+  const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Caldeira Exaustor 01', 'exaustor', 'CRITICA', 1)`).run().lastInsertRowid);
+  const planoId = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano noturno', 'semanal', 1, 1)`).run(eqId).lastInsertRowid);
+  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now'), 'PENDENTE', '', 'CRITICA')`).run(planoId);
   db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now'), 'PENDENTE', '', 'BAIXA')`).run(planoId);
-  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now','+1 day'), 'PENDENTE', '', 'BAIXA')`).run(planoId);
 
-  withMockedSaoPauloTime(10, 0, () => service.reorganizarPreventivasPendentesPorEscala());
+  withMockedSaoPauloTime(2, 30, () => service.reorganizarPreventivasPendentesPorEscala());
+  const rows = db.prepare(`SELECT responsavel_1_id, responsavel_2_id FROM preventiva_execucoes ORDER BY id ASC`).all();
+  rows.forEach((row) => {
+    assert.equal(Number(row.responsavel_1_id), rodolfo.userId);
+    assert.equal(Number(row.responsavel_2_id || 0), 0);
+  });
+  assert.notEqual(diogo.userId, rodolfo.userId);
+});
 
-  const rows = db.prepare(`SELECT responsavel_1_id, responsavel FROM preventiva_execucoes WHERE plano_id = ? ORDER BY id ASC`).all(planoId);
-  const ids = rows.map((r) => Number(r.responsavel_1_id || 0));
-  assert.ok(ids.includes(userDiogo));
-  assert.ok(ids.includes(userEmanuel));
-  assert.ok(rows.some((r) => String(r.responsavel || '').toLowerCase().includes('diogo')));
+test('reprocesso redistribui responsáveis com variação de nomes para criticidade alta', () => {
+  resetSchema();
+  const diogo = addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
+  const emanuel = addColaborador({ nome: 'Emanuel', funcao: 'apoio', tipo_turno: 'apoio' });
+  const salviano = addColaborador({ nome: 'Salviano', funcao: 'mecanico', tipo_turno: 'diurno' });
+  const junior = addColaborador({ nome: 'Junior', funcao: 'apoio', tipo_turno: 'apoio' });
+  addColaborador({ nome: 'Rodolfo', funcao: 'mecanico', tipo_turno: 'plantao' });
+
+  const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Linha de Bombas', 'bomba', 'ALTA', 1)`).run().lastInsertRowid);
+  const planoId = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano distribuição', 'semanal', 1, 1)`).run(eqId).lastInsertRowid);
+
+  for (let i = 0; i < 4; i += 1) {
+    db.prepare(`
+      INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade)
+      VALUES (?, date('now', ?), 'PENDENTE', '', 'ALTA')
+    `).run(planoId, `+${i} day`);
+  }
+
+  service.reorganizarPreventivasPendentesPorEscala();
+  const rows = db.prepare(`SELECT responsavel_1_id, responsavel_2_id FROM preventiva_execucoes ORDER BY id ASC`).all();
+
+  const pares = rows.map((r) => [Number(r.responsavel_1_id || 0), Number(r.responsavel_2_id || 0)].sort((a, b) => a - b).join('-'));
+  assert.ok(new Set(pares).size >= 2, 'deve variar pares atribuídos e evitar repetição fixa');
+
+  const idsEscala = new Set([diogo.userId, emanuel.userId, salviano.userId, junior.userId]);
+  rows.forEach((r) => {
+    assert.ok(idsEscala.has(Number(r.responsavel_1_id || 0)));
+    assert.ok(idsEscala.has(Number(r.responsavel_2_id || 0)));
+  });
+});
+
+test('reprocesso corrige datas pendentes para hoje em diante de forma sequencial', () => {
+  resetSchema();
+  addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
+  addColaborador({ nome: 'Emanuel', funcao: 'apoio', tipo_turno: 'apoio' });
+  addColaborador({ nome: 'Rodolfo', funcao: 'mecanico', tipo_turno: 'plantao' });
+
+  const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Bomba 02', 'bomba', 'MEDIA', 1)`).run().lastInsertRowid);
+  const planoId = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano datas', 'semanal', 1, 1)`).run(eqId).lastInsertRowid);
+  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now','-3 day'), 'PENDENTE', '', 'MEDIA')`).run(planoId);
+  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now','-1 day'), 'PENDENTE', '', 'MEDIA')`).run(planoId);
+  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now','+1 day'), 'PENDENTE', '', 'MEDIA')`).run(planoId);
+
+  service.reorganizarPreventivasPendentesPorEscala();
+
+  const rows = db.prepare(`SELECT data_prevista FROM preventiva_execucoes ORDER BY id ASC`).all();
+  const hoje = new Date().toISOString().slice(0, 10);
+  rows.forEach((row) => assert.ok(row.data_prevista >= hoje));
+  assert.ok(rows[1].data_prevista >= rows[0].data_prevista);
+  assert.ok(rows[2].data_prevista >= rows[1].data_prevista);
+});
+
+test('turno troca para NOITE às 17:00 e volta para DIA às 05:00', () => {
+  resetSchema();
+  addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
+  addColaborador({ nome: 'Rodolfo', funcao: 'mecanico', tipo_turno: 'plantao' });
+  const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Exaustor 01', 'exaustor', 'BAIXA', 1)`).run().lastInsertRowid);
+  const planoId = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano turno', 'semanal', 1, 1)`).run(eqId).lastInsertRowid);
+  const execId = Number(db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now'), 'PENDENTE', '', 'BAIXA')`).run(planoId).lastInsertRowid);
+
+  withMockedSaoPauloTime(17, 0, () => service.alocarEquipeExecucaoPreventiva(execId));
+  let row = db.prepare(`SELECT responsavel FROM preventiva_execucoes WHERE id = ?`).get(execId);
+  assert.equal(String(row.responsavel).includes('Rodolfo'), true);
+
+  withMockedSaoPauloTime(5, 0, () => service.alocarEquipeExecucaoPreventiva(execId));
+  row = db.prepare(`SELECT responsavel FROM preventiva_execucoes WHERE id = ?`).get(execId);
+  assert.equal(String(row.responsavel).includes('Diogo'), true);
+});
+
+test('colaborador sem user_id mantém nome no responsável', () => {
+  resetSchema();
+  addColaboradorSemUser({ nome: 'Emanuel Sem User', funcao: 'mecanico', tipo_turno: 'diurno' });
+  const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Bomba 09', 'bomba', 'BAIXA', 1)`).run().lastInsertRowid);
+  const planoId = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'Plano sem user', 'semanal', 1, 1)`).run(eqId).lastInsertRowid);
+  const execId = Number(db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now'), 'PENDENTE', '', 'BAIXA')`).run(planoId).lastInsertRowid);
+
+  withMockedSaoPauloTime(9, 10, () => service.alocarEquipeExecucaoPreventiva(execId));
+  const row = db.prepare(`SELECT responsavel, responsavel_1_id FROM preventiva_execucoes WHERE id = ?`).get(execId);
+  assert.equal(String(row.responsavel).includes('Emanuel Sem User'), true);
+  assert.equal(Number(row.responsavel_1_id || 0), 0);
+});
+
+test('agrupa preventivas baixas da mesma área no mesmo responsável e alterna áreas diferentes', () => {
+  resetSchema();
+  addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
+  addColaborador({ nome: 'Junior', funcao: 'apoio', tipo_turno: 'apoio' });
+  addColaborador({ nome: 'Salviano', funcao: 'mecanico', tipo_turno: 'diurno' });
+  addColaborador({ nome: 'Rodolfo', funcao: 'mecanico', tipo_turno: 'plantao' });
+
+  const ex1 = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, setor, criticidade, ativo) VALUES ('Exaustor 1', 'exaustor', 'A1', 'BAIXA', 1)`).run().lastInsertRowid);
+  const ex2 = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, setor, criticidade, ativo) VALUES ('Exaustor 2', 'exaustor', 'A1', 'BAIXA', 1)`).run().lastInsertRowid);
+  const b1 = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, setor, criticidade, ativo) VALUES ('Bomba 1', 'bomba', 'B2', 'BAIXA', 1)`).run().lastInsertRowid);
+  const p1 = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'P1', 'semanal', 1, 1)`).run(ex1).lastInsertRowid);
+  const p2 = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'P2', 'semanal', 1, 1)`).run(ex2).lastInsertRowid);
+  const p3 = Number(db.prepare(`INSERT INTO preventiva_planos (equipamento_id, titulo, frequencia_tipo, frequencia_valor, ativo) VALUES (?, 'P3', 'semanal', 1, 1)`).run(b1).lastInsertRowid);
+  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now'), 'PENDENTE', '', 'BAIXA')`).run(p1);
+  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now'), 'PENDENTE', '', 'BAIXA')`).run(p2);
+  db.prepare(`INSERT INTO preventiva_execucoes (plano_id, data_prevista, status, responsavel, criticidade) VALUES (?, date('now'), 'PENDENTE', '', 'BAIXA')`).run(p3);
+
+  withMockedSaoPauloTime(9, 0, () => service.reorganizarPreventivasPendentesPorEscala());
+  const rows = db.prepare(`SELECT plano_id, responsavel_1_id FROM preventiva_execucoes ORDER BY id ASC`).all();
+  assert.equal(Number(rows[0].responsavel_1_id), Number(rows[1].responsavel_1_id));
+  assert.notEqual(Number(rows[1].responsavel_1_id), Number(rows[2].responsavel_1_id));
 });

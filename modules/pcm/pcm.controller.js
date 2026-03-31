@@ -9,6 +9,15 @@ function baseView(req) {
 }
 
 function index(req, res) {
+  let automacaoResumo = { geradas: 0, riscosAltos: 0 };
+  try {
+    automacaoResumo = service.processarAutomacaoOS({ userId: req.session?.user?.id || null });
+  } catch (_e) {}
+
+  const riscos = service.atualizarScoresRiscoEquipamentos().slice(0, 8);
+  const rankingTecnicos = service.getRankingTecnicos({ dias: Number(req.query.dias || 90), setor: req.query.setor || "" }).slice(0, 10);
+  const alertasOperacionais = service.listarAlertasOperacionais({ limit: 8 });
+
   const filtros = {
     equipamento_id: req.query.equipamento_id || "",
     setor: req.query.setor || "",
@@ -20,6 +29,10 @@ function index(req, res) {
     activePcmSection: "visao-geral",
     indicadores: service.getIndicadores(),
     ranking: service.getRankingEquipamentos(5, Number(req.query.meses || 6)),
+    rankingTecnicos,
+    riscos,
+    alertasOperacionais,
+    automacaoResumo,
     planos: service.listPlanos(filtros),
     filtros,
   });
@@ -73,17 +86,26 @@ function criticidade(req, res) {
   const filtros = {
     equipamento_id: req.query.equipamento_id || "",
   };
+  const criticidadeAtual = service.getCriticidadeByEquipamentoId(filtros.equipamento_id);
   return res.render("pcm/criticidade", {
     ...baseView(req),
     activePcmSection: "criticidade",
     filtros,
     equipamentos: service.getEquipamentos(),
+    criticidadeAtual,
   });
 }
 
 function salvarCriticidade(req, res) {
-  // TODO: plugar persistência real em pcm_equipamento_criticidade
-  req.flash("success", "Configuração de criticidade recebida (integração pendente do endpoint de persistência).");
+  try {
+    const data = service.saveCriticidade(req.body, req.session?.user?.id || null);
+    req.flash(
+      "success",
+      `Criticidade do equipamento atualizada para ${data.nivel_criticidade} (índice ${data.indice_criticidade.toFixed(1)}).`
+    );
+  } catch (e) {
+    req.flash("error", e.message || "Falha ao salvar criticidade do equipamento.");
+  }
   return res.redirect(`/pcm/criticidade?equipamento_id=${encodeURIComponent(req.body.equipamento_id || "")}`);
 }
 
