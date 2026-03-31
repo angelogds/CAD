@@ -717,7 +717,6 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
     if (indisponiveis.has(String(userId))) return false;
     const colaboradorId = Number(pessoa?.id || pessoa?.colaborador_id || 0);
     if (!colaboradorId) return false;
-    if (typeof osService.isColaboradorDisponivel === "function" && !osService.isColaboradorDisponivel(colaboradorId)) return false;
     return true;
   };
 
@@ -921,11 +920,14 @@ function reorganizarPreventivasPendentesPorEscala() {
   }
 
   const escala = obterEscalaAtual();
-  const mecanicosDia = escala.mecanicos_dia || [];
-  const apoio = escala.apoio_operacional || [];
-  const noite = escala.noite || [];
-  const equipeDisponivel = [...mecanicosDia, ...apoio];
-  const equipeFallback = equipeDisponivel.length ? equipeDisponivel : [...noite];
+  const mecanicosDia = (escala.mecanicos_dia || []).sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+  const apoio = (escala.apoio_operacional || []).sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+  const noite = (escala.noite || []).filter((p) => isMecanico(p.funcao))
+    .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+  const turnoAtual = typeof osService.getTurnoAgora === "function" ? osService.getTurnoAgora() : getTurnoAtual();
+  const equipePrincipal = turnoAtual === "NOITE"
+    ? (noite.length ? [...noite] : [...mecanicosDia, ...apoio])
+    : ([...mecanicosDia, ...apoio].length ? [...mecanicosDia, ...apoio] : [...noite]);
   const cols = getPreventivaExecColumns();
   const hasCriticidade = cols.includes("criticidade");
   const hasResp1 = cols.includes("responsavel_1_id");
@@ -946,25 +948,55 @@ function reorganizarPreventivasPendentesPorEscala() {
     JOIN preventiva_planos pp ON pp.id = pe.plano_id
     LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
     WHERE UPPER(COALESCE(pe.status,'')) = 'PENDENTE'
+    ORDER BY COALESCE(pe.data_prevista,'9999-12-31') ASC, pe.id ASC
   `).all();
 
+  const estadoRotacao = new Map();
+  const escolherRotativo = (candidatos = [], chave = "", usados = new Set()) => {
+    const validos = [...(candidatos || [])]
+      .map((p) => ({
+        ...p,
+        user_id_resolvido: Number(p?.user_id || findUserIdByName(p?.nome) || 0) || null,
+      }))
+      .filter((p) => Number(p?.user_id_resolvido || 0))
+      .filter((p) => !usados.has(Number(p.user_id_resolvido)));
+    if (!validos.length) return null;
+    const ultimoPersistido = Number(getConfig(chave) || 0) || 0;
+    const ultimoId = ultimoPersistido || Number(estadoRotacao.get(chave) || 0) || 0;
+    const idxAtual = ultimoId ? validos.findIndex((p) => Number(p.user_id_resolvido) === ultimoId) : -1;
+    const escolhido = idxAtual >= 0 ? (validos[idxAtual + 1] || validos[0]) : validos[0];
+    setConfig(chave, Number(escolhido.user_id_resolvido));
+    estadoRotacao.set(chave, Number(escolhido.user_id_resolvido));
+    return escolhido;
+  };
+
   let atualizadas = 0;
-  for (const item of rows) {
+  rows.forEach((item) => {
     const criticidade = calcularCriticidade({
       nome: item.equipamento_nome,
       tipo: item.equipamento_tipo,
       criticidade: item.criticidade,
     });
     const criticidadeNormalizada = normalizeCriticidade(criticidade);
-    const responsaveis = criticidadeNormalizada === "BAIXA"
-      ? [equipeFallback[0]].filter(Boolean)
-      : [equipeFallback[0], equipeFallback[1]].filter(Boolean);
+    const usados = new Set();
+    const executor = escolherRotativo(equipePrincipal, "preventiva_reproc_executor", usados) || null;
+    if (executor?.user_id_resolvido) usados.add(Number(executor.user_id_resolvido));
+
+    let auxiliar = null;
+    if (criticidadeNormalizada !== "BAIXA") {
+      const poolAuxiliar = apoio.length ? apoio : equipePrincipal;
+      auxiliar = escolherRotativo(poolAuxiliar, "preventiva_reproc_auxiliar", usados) || null;
+      if (!auxiliar) {
+        auxiliar = escolherRotativo(equipePrincipal, "preventiva_reproc_auxiliar_fallback", usados) || null;
+      }
+    }
+    const responsaveis = [executor, auxiliar].filter(Boolean);
     const responsavelTexto = responsaveis
       .map((p) => String(p?.nome || "").trim())
       .filter(Boolean)
       .join(", ") || "-";
-    const responsavel_1_id = Number(responsaveis[0]?.user_id || findUserIdByName(responsaveis[0]?.nome) || 0) || null;
-    const responsavel_2_id = Number(responsaveis[1]?.user_id || findUserIdByName(responsaveis[1]?.nome) || 0) || null;
+    const responsavel_1_id = Number(responsaveis[0]?.user_id_resolvido || responsaveis[0]?.user_id || findUserIdByName(responsaveis[0]?.nome) || 0) || null;
+    const responsavel_2_id = Number(responsaveis[1]?.user_id_resolvido || responsaveis[1]?.user_id || findUserIdByName(responsaveis[1]?.nome) || 0) || null;
 
     const updates = ["responsavel = ?"];
     const args = [responsavelTexto];
@@ -983,7 +1015,7 @@ function reorganizarPreventivasPendentesPorEscala() {
     args.push(Number(item.id));
     db.prepare(`UPDATE preventiva_execucoes SET ${updates.join(", ")} WHERE id = ?`).run(...args);
     atualizadas += 1;
-  }
+  });
 
   return { atualizadas, totalAtivas: rows.length };
 }
