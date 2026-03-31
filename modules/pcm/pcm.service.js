@@ -1,4 +1,5 @@
 const db = require("../../database/db");
+const intelligenceService = require("./pcm.intelligence.service");
 
 function toNum(v, d = 0) {
   const n = Number(v);
@@ -492,4 +493,8 @@ module.exports = {
   listPecasCriticas,
   listBacklogSimples,
   listOSFalhasPreview,
+  atualizarScoresRiscoEquipamentos: intelligenceService.atualizarScoresRiscoEquipamentos,
+  getRankingTecnicos: intelligenceService.getRankingTecnicos,
+  listarAlertasOperacionais: intelligenceService.listarAlertas,
+  processarAutomacaoOS: intelligenceService.processarAutomacaoOS,
 };

@@ -40,6 +40,14 @@
     </div>
 
     <div class="card" style="margin-top:12px;">
+      <div class="label">Automação (ciclo atual)</div>
+      <div class="pcm-kpi-grid" style="margin-top:10px;">
+        <div><div class="muted-xs">OS automáticas geradas</div><div style="font-size:22px;font-weight:900;"><%= automacaoResumo?.geradas || 0 %></div></div>
+        <div><div class="muted-xs">Equipamentos em risco alto</div><div style="font-size:22px;font-weight:900;"><%= automacaoResumo?.riscosAltos || 0 %></div></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
       <div class="label">Top equipamentos com mais OS</div>
       <div class="table-wrap"><table class="table compact" style="margin-top:8px; min-width:500px;">
         <thead><tr><th>Equipamento</th><th>Total OS</th></tr></thead>
@@ -57,6 +65,39 @@
         <tbody>
           <% if (!planos.length) { %><tr><td colspan="5" class="muted">Sem planos cadastrados.</td></tr><% } %>
           <% planos.slice(0, 8).forEach(function(p){ %><tr><td><%= p.equipamento_nome %></td><td><%= p.atividade_descricao %></td><td><%= p.tipo_manutencao %></td><td><%= p.proxima_data_prevista || '-' %></td><td><%= p.situacao %></td></tr><% }) %>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="label">Score de risco por equipamento (0-100)</div>
+      <div class="table-wrap"><table class="table compact" style="margin-top:8px; min-width:720px;">
+        <thead><tr><th>Equipamento</th><th>Score</th><th>Classe</th><th>Falhas 180d</th><th>Reincidência</th><th>Preventivas atrasadas</th></tr></thead>
+        <tbody>
+          <% if (!riscos.length) { %><tr><td colspan="6" class="muted">Sem dados para score de risco.</td></tr><% } %>
+          <% riscos.forEach(function(item){ %><tr><td><%= item.equipamento_nome %></td><td><%= item.score_risco %></td><td><%= item.classificacao_risco %></td><td><%= item.falhas_180d %></td><td><%= item.reincidencia %></td><td><%= item.preventivas_atrasadas %></td></tr><% }) %>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="label">Ranking de técnicos (score explicável)</div>
+      <div class="table-wrap"><table class="table compact" style="margin-top:8px; min-width:760px;">
+        <thead><tr><th>Técnico</th><th>Score</th><th>OS concluídas</th><th>% prazo</th><th>Preventivas</th><th>Tempo médio (min)</th><th>Reincidência</th></tr></thead>
+        <tbody>
+          <% if (!rankingTecnicos.length) { %><tr><td colspan="7" class="muted">Sem dados de execução técnica no período.</td></tr><% } %>
+          <% rankingTecnicos.forEach(function(item){ %><tr><td><%= item.tecnico %></td><td><%= item.score %></td><td><%= item.os_concluidas %></td><td><%= item.prazo_rate %>%</td><td><%= item.preventivas_executadas %></td><td><%= item.tempo_medio_min %></td><td><%= item.reincidencia %></td></tr><% }) %>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="label">Alertas operacionais inteligentes</div>
+      <div class="table-wrap"><table class="table compact" style="margin-top:8px; min-width:760px;">
+        <thead><tr><th>Data</th><th>Tipo</th><th>Severidade</th><th>Mensagem</th><th>Status</th></tr></thead>
+        <tbody>
+          <% if (!alertasOperacionais.length) { %><tr><td colspan="5" class="muted">Sem alertas ativos.</td></tr><% } %>
+          <% alertasOperacionais.forEach(function(item){ %><tr><td><%= item.created_at || '-' %></td><td><%= item.tipo %></td><td><%= item.severidade %></td><td><%= item.mensagem %></td><td><%= item.status %></td></tr><% }) %>
         </tbody>
       </table></div>
     </div>

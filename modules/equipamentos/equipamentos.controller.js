@@ -2,8 +2,10 @@ const QRCode = require("qrcode");
 const service = require("./equipamentos.service");
 let tracagemService = null;
 let desenhoTecnicoService = null;
+let pcmIntelligenceService = null;
 try { tracagemService = require('../tracagem/tracagem.service'); } catch (_e) {}
 try { desenhoTecnicoService = require('../desenho-tecnico/desenho-tecnico.service'); } catch (_e) {}
+try { pcmIntelligenceService = require('../pcm/pcm.intelligence.service'); } catch (_e) {}
 
 function resolveFoto(file) {
   if (!file) return null;
@@ -65,6 +67,7 @@ async function equipShow(req, res) {
   const qrImage = qrUrl ? await QRCode.toDataURL(qrUrl) : "";
   const tracagens = tracagemService ? tracagemService.listByEquipamento(id) : [];
   const desenhosTecnicos = desenhoTecnicoService ? desenhoTecnicoService.listByEquipamento(id) : [];
+  const riscoFalha = pcmIntelligenceService ? pcmIntelligenceService.calcularScoreRiscoEquipamento(id) : null;
 
   return res.render("equipamentos/show", {
     title: equip.nome,
@@ -83,6 +86,7 @@ async function equipShow(req, res) {
     qrImage,
     tracagens,
     desenhosTecnicos,
+    riscoFalha,
   });
 }
 
