@@ -21,11 +21,14 @@ test('inspecao stylesheet defines uniform action button layout', () => {
 });
 
 
-test('inspecao NC section uses swapped preventive/corrective labels', () => {
+test('inspecao NC section renders OS actions as read-only fields', () => {
   const view = fs.readFileSync('views/inspecao/index.ejs', 'utf8');
   assert.ok(view.includes('<th>Ação preventiva</th><th>Ação corretiva</th>'));
-  assert.ok(view.includes('name="acao_corretiva"'));
-  assert.ok(view.includes('placeholder="Ação preventiva"'));
-  assert.ok(view.includes('name="acao_preventiva"'));
-  assert.ok(view.includes('placeholder="Ação corretiva"'));
+  assert.ok(!view.includes('class="nc-edit-form"'));
+  assert.ok(!view.includes('name="acao_corretiva"'));
+  assert.ok(!view.includes('name="acao_preventiva"'));
+  assert.ok(!view.includes('name="data_correcao"'));
+  assert.ok(!view.includes('/nc/salvar'));
+  assert.ok(view.includes('<td><%= nc.acao_preventiva || \'-\' %></td>'));
+  assert.ok(view.includes('<td><%= nc.acao_corretiva || \'-\' %></td>'));
 });
