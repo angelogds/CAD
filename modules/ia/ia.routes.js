@@ -1,14 +1,25 @@
-const express = require("express");
-const { requireLogin } = require("../auth/auth.middleware");
-const ctrl = require("./ia.controller");
+const express = require('express');
+const multer = require('multer');
+const { requireLogin, requireRole } = require('../auth/auth.middleware');
+const { ACCESS } = require('../../config/rbac');
+const ctrl = require('./ia.controller');
 
 const router = express.Router();
 
-router.post("/transcricao/os", requireLogin, ctrl.transcreverAudioOS);
-router.post("/transcricao/fechamento", requireLogin, ctrl.transcreverAudioFechamento);
-router.post("/fechamento/resumo", requireLogin, ctrl.gerarResumoTecnicoFechamento);
-router.post("/fechamento/fotos", requireLogin, ctrl.analisarFotosFechamento);
-router.get("/historico/semelhante", requireLogin, ctrl.buscarHistoricoSemelhante);
-router.post("/acoes-inteligentes", requireLogin, ctrl.gerarAcoesInteligentes);
+const IA_TRANSCRICAO_ACCESS = Array.from(new Set([
+  ...(ACCESS.os_view || []),
+  ...(ACCESS.preventivas_view || []),
+]));
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: Number(process.env.OPENAI_AUDIO_MAX_BYTES || 12 * 1024 * 1024),
+    files: 1,
+  },
+});
+
+router.post('/transcrever/abertura', requireLogin, requireRole(IA_TRANSCRICAO_ACCESS), upload.single('audio'), ctrl.transcreverAbertura);
+router.post('/transcrever/fechamento', requireLogin, requireRole(IA_TRANSCRICAO_ACCESS), upload.single('audio'), ctrl.transcreverFechamento);
 
 module.exports = router;
