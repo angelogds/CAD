@@ -1122,6 +1122,25 @@ function reorganizarPreventivasPendentesPorEscala() {
     ORDER BY COALESCE(pe.data_prevista,'9999-12-31') ASC, pe.id ASC
   `).all();
 
+  const estadoRotacao = new Map();
+  const escolherRotativo = (candidatos = [], chave = "", usados = new Set()) => {
+    const validos = [...(candidatos || [])]
+      .map((p) => ({
+        ...p,
+        user_id_resolvido: Number(p?.user_id || findUserIdByName(p?.nome) || 0) || null,
+      }))
+      .filter((p) => Number(p?.user_id_resolvido || 0))
+      .filter((p) => !usados.has(Number(p.user_id_resolvido)));
+    if (!validos.length) return null;
+    const ultimoPersistido = Number(getConfig(chave) || 0) || 0;
+    const ultimoId = ultimoPersistido || Number(estadoRotacao.get(chave) || 0) || 0;
+    const idxAtual = ultimoId ? validos.findIndex((p) => Number(p.user_id_resolvido) === ultimoId) : -1;
+    const escolhido = idxAtual >= 0 ? (validos[idxAtual + 1] || validos[0]) : validos[0];
+    setConfig(chave, Number(escolhido.user_id_resolvido));
+    estadoRotacao.set(chave, Number(escolhido.user_id_resolvido));
+    return escolhido;
+  };
+
   let atualizadas = 0;
   const cargaAtual = {};
   if (hasResp1) {
