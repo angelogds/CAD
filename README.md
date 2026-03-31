@@ -26,6 +26,7 @@ Este repositório segue um padrão rígido para acelerar evolução sem retrabal
 ### 1) Instalar dependências
 ```bash
 npm install
+```
 
 ### 2) Rodar migrations e seed
 ```bash
@@ -43,17 +44,14 @@ npm run dev
 ### Rotas principais
 - `GET /desenho-tecnico` — lista de desenhos
 - `GET /desenho-tecnico/dashboard` — visão geral do módulo
-- `GET /desenho-tecnico/novo` — criação de novo desenho
-- `POST /desenho-tecnico` — salvar desenho
-- `GET /desenho-tecnico/:id` — visualizar desenho
-- `GET /desenho-tecnico/:id/editar` — editar desenho
-- `POST /desenho-tecnico/:id` — atualizar desenho
-- `POST /desenho-tecnico/:id/duplicar` — duplicar desenho
-- `GET /desenho-tecnico/:id/svg` — gerar SVG técnico
-- `POST /desenho-tecnico/:id/pdf` — gerar PDF técnico
-- `POST /desenho-tecnico/:id/vincular` — vincular desenho em equipamento
-- `GET /desenho-tecnico/:id/revisoes` — histórico de revisões
-- `GET /desenho-tecnico/biblioteca` — biblioteca técnica
+- `GET /desenho-tecnico/cad/novo` — criação de novo desenho CAD
+- `POST /desenho-tecnico/cad` — salvar desenho CAD inicial
+- `GET /desenho-tecnico/cad/:id` — visualizar desenho
+- `GET /desenho-tecnico/cad/:id/editor` — editar desenho
+- `POST /desenho-tecnico/cad/:id` — atualizar CAD (JSON)
+- `POST /desenho-tecnico/cad/:id/metadata` — atualizar metadados
+- `POST /desenho-tecnico/cad/:id/render-3d` — gerar preview técnico 3D
+- `GET /desenho-tecnico/cad/:id/pdf` — gerar PDF técnico
 
 ### Railway (deploy com 1 Volume persistente)
 1. Criar **1 Volume** no projeto Railway.
@@ -76,65 +74,177 @@ npm run dev
    - gerar PDF;
    - reiniciar/redeploy e confirmar que os arquivos continuam acessíveis.
 
-## Desenho Técnico – Fase 2
-
-A Fase 2 do módulo **Desenho Técnico** adiciona uma base de mini CAD industrial com:
-
-- Camadas técnicas (`geometria_principal`, `linhas_de_centro`, `cotas`, `textos`, `furos`, `construcao`, `solda`, `observacoes`, `planificacao`).
-- Biblioteca de **Blocos Técnicos** com duplicação e inserção por instância.
-- Cotas avançadas: cadeia, baseline, angular, raio, diâmetro, entre centros e padrão de furação.
-- Integração direta com Traçagem para gerar/abrir desenho técnico automaticamente.
-
-### Novas rotas
-
-- `POST /desenho-tecnico/integrar/tracagem`
-- `POST /desenho-tecnico/gerar-a-partir-da-tracagem/:origem/:id`
-- `GET /desenho-tecnico/abrir-de-tracagem/:origem/:id`
-- `POST /desenho-tecnico/:id/camadas`
-- `POST /desenho-tecnico/:id/camadas/:camadaId`
-- `POST /desenho-tecnico/:id/blocos/inserir`
-- `POST /desenho-tecnico/:id/cotas`
-
-### Teste local rápido
-
-1. Suba a aplicação normalmente (`npm start`).
-2. Crie/abra um desenho e valide os painéis de Camadas, Blocos e Cotas.
-3. Em Traçagem, abra uma peça suportada e use **Gerar desenho técnico**.
-4. Gere PDF técnico e confirme renderização de camadas visíveis e cotas.
-
-### Railway
-
-- Mantida compatibilidade com execução padrão no Railway (Node + SQLite).
-- Migrations incrementais aplicadas automaticamente no boot (`database/migrate.js`).
-
 ## IA no Backend (Responses API)
 
 ### Segurança
 - A chave `OPENAI_API_KEY` fica **somente** no backend via variável de ambiente.
 - Nunca publique chave em frontend, HTML/EJS, logs, seed/migration ou README.
 
-### Variáveis de ambiente
+### Variáveis de ambiente (`.env`)
 Copie `.env.example` para `.env` no servidor e preencha:
 
 ```bash
 AI_ENABLED=true
-OPENAI_API_KEY=
+OPENAI_API_KEY=sk-...
 OPENAI_MODEL_TEXT=gpt-4o-mini
-OPENAI_MAX_OUTPUT_TOKENS=300
 OPENAI_TIMEOUT_MS=20000
+OPENAI_MAX_OUTPUT_TOKENS=300
+
+# opcionais usados por outros fluxos
+OPENAI_MODEL_ACADEMIA=gpt-4o-mini
+OPENAI_MODEL_AVALIACAO=gpt-4o-mini
 ```
 
-### Funcionalidades IA entregues
-- **Assistente IA geral**: `/ai/chat` (contextos: geral, OS, equipamento, preventiva, academia).
-- **IA na OS**: ações na tela de OS (`/os/:id`) para análise, causa, inspeções, materiais, execução segura e resumo técnico.
-- **IA na Preventiva**: ações na tela da preventiva (`/preventivas/:id`) para checklist, criticidade, orientação e recomendação.
-- **Professor IA (Academia)**: mantém fluxo existente e fallback amigável quando IA não está disponível.
+### Endpoints IA / áudio / geração técnica
 
-### Teste manual rápido
-1. Suba o sistema com `AI_ENABLED=false` e valide mensagem amigável.
-2. Suba com `AI_ENABLED=true` e sem `OPENAI_API_KEY`, valide fallback e aviso.
-3. Configure `OPENAI_API_KEY` e valide respostas em:
-   - `/ai/chat`
-   - `/os/:id` (botões de IA)
-   - `/preventivas/:id` (botões de IA)
-   - `/academia/professor-ia`
+#### Assistente IA (texto)
+- `POST /ai/ask`
+- `POST /ai/os/:id/analyze`
+- `POST /ai/preventivas/:id/analyze`
+
+#### Fluxo OS assistido por IA
+- `POST /os` → abertura da OS com enriquecimento técnico automático (criticidade, diagnóstico, causa provável, equipe sugerida etc.)
+- `POST /os/:id/fechar` (ou `POST /os/:id/concluir`) → fechamento da OS com geração técnica automática de descrição de serviço, ação corretiva e recomendação
+
+#### Geração técnica de desenho
+- `POST /desenho-tecnico/cad/:id/render-3d` → gera preview técnico 3D a partir do CAD
+- `GET /desenho-tecnico/cad/:id/pdf` → gera PDF técnico
+
+#### Áudio / transcrição
+- Áudio de notificação é servido como arquivo estático em `/audio/*.mp3` (ex.: dashboard e push).
+- **Não existe endpoint HTTP público de transcrição de áudio neste branch.**
+
+### Fluxo de abertura e fechamento assistidos
+
+#### 1) Abertura assistida (`POST /os`)
+1. Operador envia não conformidade + sintoma principal.
+2. Backend monta contexto (equipamento, histórico, OS parecidas, preventivas).
+3. IA retorna JSON técnico estruturado.
+4. Sistema persiste os campos IA (`ai_diagnostico_inicial`, `ai_criticidade_sugerida`, `ai_sugestao_equipe_json`, etc.) e abre a OS.
+
+#### 2) Fechamento assistido (`POST /os/:id/fechar`)
+1. Operador anexa pelo menos uma foto de fechamento.
+2. Backend solicita à IA texto técnico de encerramento.
+3. Sistema grava saída estruturada (`ai_descricao_servico_executado`, `ai_acao_corretiva_realizada`, `ai_observacao_final_tecnica` etc.) e conclui OS.
+
+### Fallback quando IA estiver indisponível
+- `AI_ENABLED=false` → backend retorna mensagem amigável de IA desativada.
+- Sem `OPENAI_API_KEY` (ou chave inválida) → backend retorna erro de configuração controlado.
+- Timeout/provedor indisponível/rate limit → backend responde erro amigável (`503`) sem quebrar renderização de tela.
+- Em fluxos internos de OS (abertura/fechamento), o sistema usa fallback técnico padrão para manter continuidade operacional.
+
+## Exemplos de payload e resposta JSON estruturada
+
+### 1) Assistente geral (`POST /ai/ask`)
+
+**Payload**
+```json
+{
+  "contexto": "geral",
+  "pergunta": "Quais inspeções iniciais devo fazer em uma bomba centrífuga com aquecimento?"
+}
+```
+
+**Resposta (sucesso)**
+```json
+{
+  "ok": true,
+  "resposta": "1) Verifique vibração..."
+}
+```
+
+**Resposta (fallback IA indisponível)**
+```json
+{
+  "ok": false,
+  "error": "A IA demorou para responder. Tente novamente.",
+  "code": "AI_TIMEOUT"
+}
+```
+
+### 2) Análise de OS (`POST /ai/os/:id/analyze`)
+
+**Payload**
+```json
+{
+  "action": "analisar"
+}
+```
+
+**Resposta (sucesso)**
+```json
+{
+  "ok": true,
+  "resposta": "Diagnóstico técnico recomendado..."
+}
+```
+
+### 3) Salvar CAD (`POST /desenho-tecnico/cad/:id`)
+
+**Payload (resumido)**
+```json
+{
+  "objects": [
+    { "id": "L1", "type": "line", "x1": 10, "y1": 10, "x2": 120, "y2": 10 }
+  ],
+  "layers": {
+    "geometria_principal": { "visible": true, "locked": false }
+  }
+}
+```
+
+**Resposta (sucesso)**
+```json
+{
+  "ok": true,
+  "cad": {
+    "objects": [
+      { "id": "L1", "type": "line" }
+    ]
+  },
+  "preview3d": null,
+  "compatible3d": false
+}
+```
+
+### 4) Render 3D (`POST /desenho-tecnico/cad/:id/render-3d`)
+
+**Resposta (sucesso)**
+```json
+{
+  "ok": true,
+  "preview3d": {
+    "items": [
+      { "type": "extrude", "depth": 10 }
+    ]
+  }
+}
+```
+
+**Resposta (sem geometria compatível)**
+```json
+{
+  "ok": false,
+  "error": "Desenho CAD sem geometria compatível com extrusão simples."
+}
+```
+
+## Checklist manual (mobile + regressão do fluxo OS)
+
+### Mobile (responsividade e usabilidade)
+- [ ] Abrir `/os/novo` em viewport mobile (320px–430px).
+- [ ] Validar botão de anexar fotos de abertura (captura por câmera/galeria).
+- [ ] Validar preview das miniaturas antes de salvar.
+- [ ] Abrir `/os/:id` e validar leitura dos cards sem overflow horizontal.
+- [ ] Executar fechamento no mobile com upload de foto obrigatória.
+- [ ] Validar feedback visual de sucesso/erro (flash messages).
+
+### Regressão do fluxo OS (abertura → execução → fechamento)
+- [ ] Criar OS corretiva com sintoma e não conformidade válidos.
+- [ ] Confirmar atribuição automática de equipe (quando disponível).
+- [ ] Iniciar OS (`/os/:id/iniciar`) e validar status `ANDAMENTO`.
+- [ ] Pausar OS (`/os/:id/pausar`) e validar status `PAUSADA`.
+- [ ] Fechar OS sem foto e confirmar bloqueio com mensagem amigável.
+- [ ] Fechar OS com foto e confirmar status final `FECHADA`.
+- [ ] Confirmar campos técnicos IA persistidos na OS (quando IA ativa).
+- [ ] Repetir cenário com IA desligada e confirmar fallback operacional sem quebra de fluxo.
