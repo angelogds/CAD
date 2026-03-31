@@ -1,8 +1,9 @@
 const db = require("../../database/db");
 
 const aiCore = require('../ai/ai.service');
+const iaService = require('../ia/ia.service');
 
-const PROMPT_ABERTURA = "Você é um planejador de manutenção industrial com foco operacional. Ao receber dados de abertura de OS, gere decisão técnica automática para execução em chão de fábrica. Responda somente JSON válido com os campos: criticidade_sugerida, diagnostico_inicial, causa_provavel, risco_operacional, risco_seguranca, acao_corretiva, acao_preventiva, servico_sugerido, prioridade_sugerida, sugestao_equipe, descricao_tecnica_os, justificativa_interna. Regras obrigatórias: (1) criticidade_sugerida deve ser BAIXA, MEDIA, ALTA ou CRITICA; (2) seguir lógica de criticidade: vazamento leve -> BAIXA/MEDIA, vazamento crítico -> ALTA/CRITICA, equipamento essencial parado -> CRITICA, risco de segurança -> CRITICA, falha intermitente -> MEDIA, ruído -> BAIXA/MEDIA, aquecimento -> MEDIA/ALTA; (3) sugestao_equipe deve trazer quantidade_recomendada, perfil_minimo e racional, obedecendo: BAIXA=1 mecânico, MEDIA=2 mecânicos, ALTA=2 mecânicos, CRITICA=3+ equipe/grupo; (4) ação corretiva e preventiva devem ser técnicas, objetivas e aplicáveis; (5) justificativa_interna deve explicar a escolha da criticidade com base nos dados recebidos. Não invente medições.";
+const PROMPT_ABERTURA = "Você é um planejador de manutenção industrial com foco operacional. Ao receber dados de abertura de OS, gere decisão técnica automática para execução em chão de fábrica. Responda somente JSON válido com os campos: resumo_usuario, descricao_tecnica, acao_corretiva, acao_preventiva, materiais_citados, tipo_intervencao, confianca, observacao_ia. Regras obrigatórias: (1) resumo_usuario deve ser claro para operação; (2) descricao_tecnica deve usar linguagem técnica objetiva; (3) acao_corretiva e acao_preventiva devem ser aplicáveis em campo; (4) materiais_citados deve listar apenas materiais explicitamente citados/inferíveis com segurança; (5) tipo_intervencao deve sugerir categoria prática como INSPECAO, REPARO, SUBSTITUICAO ou AJUSTE; (6) confianca entre 0 e 100 conforme qualidade dos dados; (7) observacao_ia deve justificar limitações e hipóteses. Não invente medições.";
 
 const PROMPT_FECHAMENTO = "Você é um assistente técnico de encerramento de ordens de serviço da empresa Campo do Gado. Receberá dados estruturados do serviço executado, incluindo não conformidade original, descrição inicial da OS, ações realizadas, peças trocadas e resultado do teste. Gere um texto técnico claro, objetivo e padronizado para histórico de manutenção. Responda em português do Brasil. Não invente detalhes não informados. Retorne somente JSON válido com os campos: descricao_servico_executado, acao_corretiva_realizada, recomendacao_para_evitar_reincidencia, observacao_final_tecnica.";
 
@@ -90,21 +91,43 @@ async function gerarAberturaAutomaticaDaOS(payload) {
   const model = process.env.OPENAI_MODEL_OS_AUTOMATICA || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini';
 
   try {
-    const ai = await callOpenAIJSON({ model, systemPrompt: PROMPT_ABERTURA, payload });
+    const analisePadronizada = await iaService.gerarAnalisePadronizada(payload, {
+      model,
+      systemPrompt: PROMPT_ABERTURA,
+    });
+    const ai = analisePadronizada.data;
+    const confidenciaBaixa = !analisePadronizada.valid || Number(ai.confianca) < 40;
+    const criticidadeInferida = confidenciaBaixa
+      ? normalizeCriticidade(payload?.nao_conformidade?.severidade)
+      : normalizeCriticidade(payload?.nao_conformidade?.severidade || "MEDIA");
+
     const result = {
-      diagnostico_inicial: String(ai.diagnostico_inicial || "").trim(),
-      causa_provavel: String(ai.causa_provavel || "").trim(),
-      risco_operacional: String(ai.risco_operacional || "").trim(),
-      servico_sugerido: String(ai.servico_sugerido || "").trim(),
-      criticidade_sugerida: normalizeCriticidade(ai.criticidade_sugerida || ai.prioridade_sugerida),
-      prioridade_sugerida: normalizeCriticidade(ai.prioridade_sugerida || ai.criticidade_sugerida),
-      acao_corretiva: String(ai.acao_corretiva || ai.servico_sugerido || "").trim(),
+      diagnostico_inicial: String(ai.resumo_usuario || "").trim(),
+      causa_provavel: String(ai.observacao_ia || "").trim(),
+      risco_operacional: confidenciaBaixa
+        ? "Classificação operacional com baixa confiança automática. Validar em campo."
+        : "Risco operacional inferido automaticamente conforme padrão do histórico.",
+      servico_sugerido: String(ai.tipo_intervencao || "").trim(),
+      criticidade_sugerida: criticidadeInferida,
+      prioridade_sugerida: criticidadeInferida,
+      acao_corretiva: String(ai.acao_corretiva || "").trim(),
       acao_preventiva: String(ai.acao_preventiva || "").trim(),
-      sugestao_equipe: buildTeamSuggestion(ai.criticidade_sugerida || ai.prioridade_sugerida, ai.sugestao_equipe),
-      justificativa_interna: String(ai.justificativa_interna || "").trim(),
-      risco_seguranca: String(ai.risco_seguranca || ai.observacao_seguranca || "").trim(),
-      observacao_seguranca: String(ai.observacao_seguranca || ai.risco_seguranca || "").trim(),
-      descricao_tecnica_os: String(ai.descricao_tecnica_os || "").trim(),
+      sugestao_equipe: buildTeamSuggestion(criticidadeInferida, null),
+      justificativa_interna: confidenciaBaixa
+        ? "IA retornou payload inválido ou com baixa confiança. Fallback de criticidade aplicado."
+        : String(ai.observacao_ia || "").trim(),
+      risco_seguranca: confidenciaBaixa
+        ? "Executar intervenção sob APR e LOTO por baixa confiança da análise automática."
+        : "Risco de segurança a confirmar em inspeção inicial.",
+      observacao_seguranca: confidenciaBaixa
+        ? "Baixa confiança da IA: revisão humana obrigatória antes da execução."
+        : "Revisão técnica recomendada antes da execução.",
+      descricao_tecnica_os: String(ai.descricao_tecnica || "").trim(),
+      observacao_ia: String(ai.observacao_ia || "").trim(),
+      materiais_citados: Array.isArray(ai.materiais_citados) ? ai.materiais_citados : [],
+      tipo_intervencao: String(ai.tipo_intervencao || "").trim(),
+      confianca_ia: Number(ai.confianca || 0),
+      payload_ia_valido: analisePadronizada.valid ? 1 : 0,
     };
 
     registrarLogIA({
@@ -113,8 +136,12 @@ async function gerarAberturaAutomaticaDaOS(payload) {
       naoConformidadeId: payload?.nao_conformidade_id,
       tipo,
       entrada: payload,
-      resposta: result,
-      status: "OK",
+      resposta: {
+        ...result,
+        erros_validacao: analisePadronizada.errors || [],
+        fallback_aplicado: analisePadronizada.fallbackApplied ? 1 : 0,
+      },
+      status: analisePadronizada.valid ? "OK" : "FALLBACK",
     });
 
     return result;
