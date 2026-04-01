@@ -831,7 +831,7 @@ function distribuirPreventivasPorAreaECarga(preventivas = [], equipeDia = {}) {
     const areaKey = obterChaveAreaPreventiva(item);
     const responsavelArea = responsavelPorArea.get(areaKey);
     const ordenados = ordenarPorCargaERotacao(todos, cargaAtual, rotacao);
-    const primario = cfg.quantidade === 1 && responsavelArea
+    const primario = responsavelArea
       ? (ordenados.find((p) => getPessoaChave(p) === responsavelArea) || ordenados[0] || null)
       : (ordenados[0] || null);
     if (!primario) return;
@@ -851,7 +851,7 @@ function distribuirPreventivasPorAreaECarga(preventivas = [], equipeDia = {}) {
     const equipeSelecionada = [primario, secundaria].filter(Boolean);
     resultado.set(Number(item.id), equipeSelecionada);
     const chavePrimario = getPessoaChave(primario);
-    if (cfg.quantidade === 1 && areaKey && chavePrimario) responsavelPorArea.set(areaKey, chavePrimario);
+    if (areaKey && chavePrimario) responsavelPorArea.set(areaKey, chavePrimario);
     equipeSelecionada.forEach((pessoa) => {
       const chave = getPessoaChave(pessoa);
       if (!chave) return;
