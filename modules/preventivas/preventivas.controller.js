@@ -16,7 +16,17 @@ function index(req, res) {
     diagnosticoLeitura = service.auditarLeituraEquipamentosPreventivas();
   } catch (err) {
     console.error("[PREVENTIVAS][INDEX] erro ao carregar módulo:", err?.stack || err);
-    req.flash("error", "Preventivas carregadas com alertas. Escala da semana não encontrada ou sem equipe elegível.");
+    let mensagemAlerta = "Preventivas carregadas com alertas. Não foi possível sincronizar automaticamente com a escala.";
+    try {
+      const prevalidacao = service.prevalidarReprocessamentoPreventivas();
+      const alertasEscala = (prevalidacao?.alertas || [])
+        .filter((alerta) => /^Escala da semana não encontrada|^Sem colaboradores ativos no turno/i.test(String(alerta || "")))
+        .slice(0, 2);
+      if (alertasEscala.length) {
+        mensagemAlerta = `Preventivas carregadas com alertas. ${alertasEscala.join(" ")}`;
+      }
+    } catch (_e) {}
+    req.flash("error", mensagemAlerta);
     try {
       lista = service.listPlanos();
       diagnosticoLeitura = service.auditarLeituraEquipamentosPreventivas();

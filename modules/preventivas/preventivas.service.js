@@ -771,14 +771,28 @@ function obterChaveAreaPreventiva(preventiva = {}) {
 }
 
 function ordenarPorCargaERotacao(candidatos = [], cargaAtual = {}, rotacao = {}) {
+  const getCarga = (pessoa = {}) => {
+    const chave = getPessoaChave(pessoa);
+    const userId = Number(pessoa?.user_id || 0);
+    if (chave && cargaAtual[chave] != null) return Number(cargaAtual[chave] || 0);
+    if (userId && cargaAtual[`u:${userId}`] != null) return Number(cargaAtual[`u:${userId}`] || 0);
+    if (userId && cargaAtual[userId] != null) return Number(cargaAtual[userId] || 0);
+    return 0;
+  };
+  const getRotacao = (pessoa = {}) => {
+    const chave = getPessoaChave(pessoa);
+    const userId = Number(pessoa?.user_id || 0);
+    if (chave && rotacao[chave] != null) return Number(rotacao[chave] || 0);
+    if (userId && rotacao[`u:${userId}`] != null) return Number(rotacao[`u:${userId}`] || 0);
+    if (userId && rotacao[userId] != null) return Number(rotacao[userId] || 0);
+    return 0;
+  };
   return [...(candidatos || [])].sort((a, b) => {
-    const idA = Number(a.user_id || 0);
-    const idB = Number(b.user_id || 0);
-    const cargaA = Number(cargaAtual[idA] || 0);
-    const cargaB = Number(cargaAtual[idB] || 0);
+    const cargaA = getCarga(a);
+    const cargaB = getCarga(b);
     if (cargaA !== cargaB) return cargaA - cargaB;
-    const posA = Number(rotacao[idA] || 0);
-    const posB = Number(rotacao[idB] || 0);
+    const posA = getRotacao(a);
+    const posB = getRotacao(b);
     if (posA !== posB) return posA - posB;
     return String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR");
   });
@@ -792,9 +806,16 @@ function distribuirPreventivasPorAreaECarga(preventivas = [], equipeDia = {}) {
   if (!todos.length) return resultado;
 
   const cargaAtual = { ...(equipeDia.cargaAtual || {}) };
-  todos.forEach((p) => { if (cargaAtual[p.user_id] == null) cargaAtual[p.user_id] = 0; });
+  todos.forEach((p) => {
+    const chave = getPessoaChave(p);
+    if (!chave) return;
+    if (cargaAtual[chave] == null) cargaAtual[chave] = Number(cargaAtual[Number(p.user_id || 0)] || 0);
+  });
   const rotacao = {};
-  todos.forEach((p, idx) => { rotacao[p.user_id] = idx; });
+  todos.forEach((p, idx) => {
+    const chave = getPessoaChave(p);
+    if (chave) rotacao[chave] = idx;
+  });
   let sequencia = todos.length + 1;
   const responsavelPorArea = new Map();
 
@@ -811,7 +832,7 @@ function distribuirPreventivasPorAreaECarga(preventivas = [], equipeDia = {}) {
     const responsavelArea = responsavelPorArea.get(areaKey);
     const ordenados = ordenarPorCargaERotacao(todos, cargaAtual, rotacao);
     const primario = cfg.quantidade === 1 && responsavelArea
-      ? (ordenados.find((p) => Number(p.user_id || 0) === Number(responsavelArea)) || ordenados[0] || null)
+      ? (ordenados.find((p) => getPessoaChave(p) === responsavelArea) || ordenados[0] || null)
       : (ordenados[0] || null);
     if (!primario) return;
 
@@ -827,12 +848,15 @@ function distribuirPreventivasPorAreaECarga(preventivas = [], equipeDia = {}) {
       )[0] || null;
     }
 
-    const ids = [Number(primario.user_id || 0), Number(secundaria?.user_id || 0)].filter(Boolean);
-    resultado.set(Number(item.id), ids);
-    if (cfg.quantidade === 1 && areaKey && ids[0]) responsavelPorArea.set(areaKey, ids[0]);
-    ids.forEach((id) => {
-      cargaAtual[id] = Number(cargaAtual[id] || 0) + 1;
-      rotacao[id] = sequencia;
+    const equipeSelecionada = [primario, secundaria].filter(Boolean);
+    resultado.set(Number(item.id), equipeSelecionada);
+    const chavePrimario = getPessoaChave(primario);
+    if (cfg.quantidade === 1 && areaKey && chavePrimario) responsavelPorArea.set(areaKey, chavePrimario);
+    equipeSelecionada.forEach((pessoa) => {
+      const chave = getPessoaChave(pessoa);
+      if (!chave) return;
+      cargaAtual[chave] = Number(cargaAtual[chave] || 0) + 1;
+      rotacao[chave] = sequencia;
       sequencia += 1;
     });
   });
@@ -891,7 +915,10 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
   const todosDia = deduplicarEquipePorUsuario([...mecanicosDia, ...apoioDia]);
   const cargaAtual = {};
   const idsEquipe = todosDia.map((p) => Number(p.user_id || 0)).filter(Boolean);
-  idsEquipe.forEach((id) => { cargaAtual[id] = Number(cargaAtual[id] || 0); });
+  todosDia.forEach((p) => {
+    const chave = getPessoaChave(p);
+    if (chave) cargaAtual[chave] = Number(cargaAtual[chave] || 0);
+  });
   if (idsEquipe.length && tableExists("preventiva_execucoes") && getPreventivaExecColumns().includes("responsavel_1_id")) {
     const placeholders = idsEquipe.map(() => "?").join(", ");
     const hoje = getHojeBrasilISO();
@@ -916,11 +943,16 @@ function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade =
     `).all(...idsEquipe, hoje, hoje, ...idsEquipe, hoje, hoje).forEach((row) => {
       const userId = Number(row.user_id || 0);
       if (!userId) return;
+      cargaAtual[`u:${userId}`] = Number(row.total || 0);
       cargaAtual[userId] = Number(row.total || 0);
     });
   }
   const rotacao = {};
-  todosDia.forEach((p, idx) => { rotacao[Number(p.user_id || 0)] = idx; });
+  todosDia.forEach((p, idx) => {
+    const chave = getPessoaChave(p);
+    if (chave) rotacao[chave] = idx;
+    if (Number(p.user_id || 0)) rotacao[`u:${Number(p.user_id)}`] = idx;
+  });
   const ordenados = ordenarPorCargaERotacao(todosDia, cargaAtual, rotacao);
   const executor = ordenados[0] || null;
   let auxiliar = null;
