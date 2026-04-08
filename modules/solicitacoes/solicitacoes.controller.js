@@ -1,4 +1,5 @@
 const service = require("./solicitacoes.service");
+const comprasService = require("../compras/compras.service");
 
 function minhas(req, res) {
   const userId = req.session.user.id;
@@ -105,4 +106,20 @@ function detalhe(req, res) {
   }
 }
 
-module.exports = { minhas, nova, criar, detalhe };
+function pdf(req, res) {
+  try {
+    const solicitacao = service.getSolicitacaoById(Number(req.params.id));
+    if (!solicitacao) return res.status(404).send("Solicitação não encontrada");
+
+    if (req.session.user.role !== "ADMIN" && solicitacao.solicitante_user_id !== req.session.user.id) {
+      req.flash("error", "Sem permissão para esta solicitação.");
+      return res.redirect("/solicitacoes/minhas");
+    }
+
+    return comprasService.gerarPdf(solicitacao, res);
+  } catch (error) {
+    return res.status(500).send(error.message || "Falha ao gerar PDF da solicitação.");
+  }
+}
+
+module.exports = { minhas, nova, criar, detalhe, pdf };

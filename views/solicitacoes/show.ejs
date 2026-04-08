@@ -5,7 +5,10 @@
     <h1>Solicitação <%= solicitacao.numero || ('#' + solicitacao.id) %></h1>
     <p class="muted">Acompanhe os dados e itens da solicitação criada.</p>
   </div>
-  <div><a class="btn btn-ghost" href="<%= backUrl %>">Voltar</a></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a class="btn btn-ghost" href="/solicitacoes/<%= solicitacao.id %>/pdf" target="_blank" rel="noopener">PDF</a>
+    <a class="btn btn-ghost" href="<%= backUrl %>">Voltar</a>
+  </div>
 </div>
 
 <div class="card" style="margin-bottom:14px;">

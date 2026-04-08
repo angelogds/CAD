@@ -77,7 +77,10 @@ const statusConfig = {
             <td><span class="sol-status <%= conf.className %>"><span><%= conf.icon %></span> <%= conf.label %></span></td>
             <td><%= s.fornecedor_nome || s.fornecedor || '-' %></td>
             <td><%= s.created_at ? fmtBR(s.created_at) : '-' %></td>
-            <td><a class="btn btn-sm btn-ghost" href="/compras/solicitacoes/<%= s.id %>">Detalhes</a></td>
+            <td style="display:flex;gap:6px;flex-wrap:wrap;">
+              <a class="btn btn-sm btn-ghost" href="/compras/solicitacoes/<%= s.id %>">Detalhes</a>
+              <a class="btn btn-sm btn-ghost" href="/compras/solicitacoes/<%= s.id %>/pdf" target="_blank" rel="noopener">PDF</a>
+            </td>
           </tr>
         <% }) %>
       </tbody>
