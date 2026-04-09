@@ -10,4 +10,5 @@ module.exports = {
   analisarFotosFechamento: iaService.analisarFotosFechamento,
   buscarHistoricoSemelhante: iaService.buscarHistoricoSemelhante,
   gerarAcoesInteligentes: iaService.gerarAcoesInteligentes,
+  analisarOSGraxaria: iaService.analisarOSGraxaria,
 };

@@ -291,6 +291,61 @@ async function gerarAcoesInteligentes({ contexto = {}, historico = [] }) {
   };
 }
 
+async function analisarOSGraxaria(payload = {}) {
+  const equipamentoNome = safeString(payload?.equipamento_nome || payload?.equipamento?.nome || 'Equipamento não informado');
+  const setor = safeString(payload?.setor || payload?.equipamento?.setor || 'Setor não informado');
+  const problemaRelatado = safeString(payload?.descricao || payload?.problema || payload?.nao_conformidade || '');
+
+  const result = await askJSONSchemaStrict({
+    systemPrompt: [
+      'Você é um especialista em manutenção industrial de graxaria.',
+      'Responda estritamente no schema JSON solicitado, sem texto adicional.',
+      'Se faltar contexto, use hipótese técnica conservadora e prática.',
+    ].join('\n'),
+    model: process.env.OPENAI_MODEL_ANALISE_OS || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini',
+    schemaName: 'os_analise_graxaria',
+    schema: {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'criticidade',
+        'diagnostico',
+        'causa_provavel',
+        'acoes_recomendadas',
+        'tempo_estimado',
+        'equipe_sugerida',
+      ],
+      properties: {
+        criticidade: { type: 'string', enum: ['BAIXA', 'MEDIA', 'ALTA', 'CRITICA'] },
+        diagnostico: { type: 'string' },
+        causa_provavel: { type: 'string' },
+        acoes_recomendadas: { type: 'string' },
+        tempo_estimado: { type: 'integer', minimum: 5, maximum: 1440 },
+        equipe_sugerida: { type: 'string' },
+      },
+    },
+    userPayload: {
+      contexto: 'Análise de Ordem de Serviço da graxaria',
+      equipamento: `${equipamentoNome} - Setor: ${setor}`,
+      problema_relatado: problemaRelatado,
+      os_id: payload?.os_id || null,
+      equipamento_id: payload?.equipamento_id || null,
+    },
+    maxOutputTokens: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 350),
+    temperature: 0.1,
+  });
+
+  const criticidade = safeString(result?.criticidade || 'MEDIA').toUpperCase();
+  return {
+    criticidade: ['BAIXA', 'MEDIA', 'ALTA', 'CRITICA'].includes(criticidade) ? criticidade : 'MEDIA',
+    diagnostico: safeString(result?.diagnostico),
+    causa_provavel: safeString(result?.causa_provavel),
+    acoes_recomendadas: safeString(result?.acoes_recomendadas),
+    tempo_estimado: Number.isFinite(Number(result?.tempo_estimado)) ? Number(result.tempo_estimado) : 60,
+    equipe_sugerida: safeString(result?.equipe_sugerida) || 'Mecânicos',
+  };
+}
+
 function buscarHistoricoSemelhante(payload = {}) {
   return iaRepository.buscarHistoricoSemelhante(payload);
 }
@@ -346,4 +401,5 @@ module.exports = {
   analisarFotosFechamento,
   buscarHistoricoSemelhante,
   gerarAcoesInteligentes,
+  analisarOSGraxaria,
 };
