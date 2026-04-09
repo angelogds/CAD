@@ -57,13 +57,13 @@
         <label class="label">Descrição do problema (solicitante)</label>
         <textarea name="descricao" class="input" required placeholder="Descreva o que está acontecendo no equipamento"></textarea>
         <div style="margin:12px 0 0;">
-          <button type="button" id="btn-analisar-ia" class="btn btn-blue" style="padding:10px 18px;font-weight:600;">
-            🤖 Analisar com IA
+          <button type="button" id="btn-analisar-tecnico" class="btn btn-blue" style="padding:11px 20px; font-weight:600;">
+            👷 Analisar com o Técnico
           </button>
         </div>
-        <div id="loading-ia" style="display:none;align-items:center;gap:8px;margin:12px 0;color:#666;">
-          <div class="spinner-ia" style="width:18px;height:18px;border:3px solid #ddd;border-top:3px solid #3b82f6;border-radius:50%;animation:spin-ia 1s linear infinite;"></div>
-          <span id="loading-text">A IA está analisando a ordem de serviço...</span>
+        <div id="loading-tecnico" style="display:none; align-items:center; gap:10px; margin:12px 0; color:#444;">
+          <div class="spinner-tecnico" style="width:20px;height:20px;border:4px solid #ddd;border-top:4px solid #16a34a;border-radius:50%;animation:spin-tecnico 1s linear infinite;"></div>
+          <span id="loading-text-tecnico">O Técnico está analisando a OS...</span>
         </div>
       </div>
 
@@ -99,7 +99,7 @@
 </div>
 
 <style>
-  @keyframes spin-ia {
+  @keyframes spin-tecnico {
     to { transform: rotate(360deg); }
   }
 </style>
@@ -127,24 +127,24 @@
     }
   });
 
-  document.getElementById('btn-analisar-ia').addEventListener('click', async () => {
+  document.getElementById('btn-analisar-tecnico').addEventListener('click', async () => {
     const equipamento = document.querySelector('[name="equipamento_id"]')?.value || '';
     const descricaoField = document.querySelector('[name="descricao"]');
     const descricao = String(descricaoField?.value || '').trim();
-    const btn = document.getElementById('btn-analisar-ia');
-    const loading = document.getElementById('loading-ia');
-    const loadingText = document.getElementById('loading-text');
+    const btn = document.getElementById('btn-analisar-tecnico');
+    const loading = document.getElementById('loading-tecnico');
+    const loadingText = document.getElementById('loading-text-tecnico');
 
     if (!descricao) {
-      alert('Preencha a descrição do problema antes de analisar.');
+      alert('❌ Descreva o problema antes de chamar o Técnico.');
       return;
     }
 
     btn.disabled = true;
     btn.style.opacity = '0.6';
     loading.style.display = 'flex';
-    loadingText.textContent = 'A IA está analisando a ordem de serviço...';
-    loadingText.style.color = '#666';
+    loadingText.textContent = 'O Técnico está analisando a OS...';
+    loadingText.style.color = '#444';
 
     try {
       const res = await fetch('/ia/os/analisar-abertura', {
@@ -163,18 +163,18 @@
         const diagnosticoField = document.querySelector('[name="causa_diagnostico"]');
         const acaoInicialField = document.querySelector('[name="resumo_tecnico"]');
 
-        if (criticidadeField) criticidadeField.value = data.resultado?.criticidade_sugerida || criticidadeField.value;
-        if (diagnosticoField) diagnosticoField.value = data.resultado?.diagnostico_inicial || '';
+        if (criticidadeField) criticidadeField.value = data.resultado?.criticidade_sugerida || data.resultado?.criticidade || criticidadeField.value;
+        if (diagnosticoField) diagnosticoField.value = data.resultado?.diagnostico_inicial || data.resultado?.causa_mais_provavel || '';
         if (acaoInicialField) acaoInicialField.value = data.resultado?.acoes_iniciais || '';
-        loadingText.textContent = '✅ Análise concluída!';
-        setTimeout(() => { loading.style.display = 'none'; }, 1500);
+        loadingText.textContent = '✅ Análise do Técnico concluída!';
+        setTimeout(() => { loading.style.display = 'none'; }, 1800);
       } else {
-        throw new Error(data.error || 'Não foi possível analisar.');
+        throw new Error(data.error || 'Não foi possível completar a análise');
       }
     } catch (e) {
-      loadingText.textContent = `❌ ${e.message || 'Erro de conexão com a IA'}`;
-      loadingText.style.color = '#ef4444';
-      setTimeout(() => { loading.style.display = 'none'; }, 3000);
+      loadingText.textContent = `❌ ${e.message || 'Erro de conexão com o Técnico'}`;
+      loadingText.style.color = '#dc2626';
+      setTimeout(() => { loading.style.display = 'none'; }, 3500);
     } finally {
       btn.disabled = false;
       btn.style.opacity = '1';
