@@ -56,10 +56,14 @@
       <div style="grid-column:1 / -1;">
         <label class="label">Descrição do problema (solicitante)</label>
         <textarea name="descricao" class="input" required placeholder="Descreva o que está acontecendo no equipamento"></textarea>
-        <div style="margin-top:12px;">
-          <button type="button" id="btn-analisar-ia" class="btn btn-blue">
+        <div style="margin:12px 0 0;">
+          <button type="button" id="btn-analisar-ia" class="btn btn-blue" style="padding:10px 18px;font-weight:600;">
             🤖 Analisar com IA
           </button>
+        </div>
+        <div id="loading-ia" style="display:none;align-items:center;gap:8px;margin:12px 0;color:#666;">
+          <div class="spinner-ia" style="width:18px;height:18px;border:3px solid #ddd;border-top:3px solid #3b82f6;border-radius:50%;animation:spin-ia 1s linear infinite;"></div>
+          <span id="loading-text">A IA está analisando a ordem de serviço...</span>
         </div>
       </div>
 
@@ -94,6 +98,12 @@
   </form>
 </div>
 
+<style>
+  @keyframes spin-ia {
+    to { transform: rotate(360deg); }
+  }
+</style>
+
 <script>
   const fileInput = document.getElementById('abertura_fotos');
   const preview = document.getElementById('preview-abertura');
@@ -121,16 +131,20 @@
     const equipamento = document.querySelector('[name="equipamento_id"]')?.value || '';
     const descricaoField = document.querySelector('[name="descricao"]');
     const descricao = String(descricaoField?.value || '').trim();
+    const btn = document.getElementById('btn-analisar-ia');
+    const loading = document.getElementById('loading-ia');
+    const loadingText = document.getElementById('loading-text');
 
     if (!descricao) {
       alert('Preencha a descrição do problema antes de analisar.');
       return;
     }
 
-    const btn = document.getElementById('btn-analisar-ia');
-    const textoOriginal = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Analisando...';
+    btn.style.opacity = '0.6';
+    loading.style.display = 'flex';
+    loadingText.textContent = 'A IA está analisando a ordem de serviço...';
+    loadingText.style.color = '#666';
 
     try {
       const res = await fetch('/ia/os/analisar-abertura', {
@@ -152,16 +166,18 @@
         if (criticidadeField) criticidadeField.value = data.resultado?.criticidade_sugerida || criticidadeField.value;
         if (diagnosticoField) diagnosticoField.value = data.resultado?.diagnostico_inicial || '';
         if (acaoInicialField) acaoInicialField.value = data.resultado?.acoes_iniciais || '';
-
-        alert('✅ Análise da IA concluída!');
+        loadingText.textContent = '✅ Análise concluída!';
+        setTimeout(() => { loading.style.display = 'none'; }, 1500);
       } else {
-        alert(`Erro: ${data.error || 'Não foi possível analisar.'}`);
+        throw new Error(data.error || 'Não foi possível analisar.');
       }
-    } catch (_e) {
-      alert('Erro de conexão com a IA');
+    } catch (e) {
+      loadingText.textContent = `❌ ${e.message || 'Erro de conexão com a IA'}`;
+      loadingText.style.color = '#ef4444';
+      setTimeout(() => { loading.style.display = 'none'; }, 3000);
     } finally {
       btn.disabled = false;
-      btn.textContent = textoOriginal;
+      btn.style.opacity = '1';
     }
   });
 </script>
