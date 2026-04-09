@@ -71,6 +71,33 @@
     <div class="muted">Descrição do problema (solicitante)</div>
     <div><%= os.descricao || '-' %></div>
 
+    <% const diagnosticoInicialOS = os.ai_diagnostico_inicial || os.diagnostico || os.causa_diagnostico || '-'; %>
+    <% const causaProvavelOS = os.ai_causa_provavel || os.causa_diagnostico || '-'; %>
+    <% const acoesIniciaisOS = os.ai_servico_sugerido || os.resumo_tecnico || os.acao_executada || '-'; %>
+    <% const materiaisSugeridosOS = os.ai_sugestao_materiais || os.ai_servico_sugerido || '-'; %>
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0"/>
+    <div class="muted" style="font-weight:700;">Diagnóstico inicial para execução</div>
+    <table class="tabela-compacta">
+      <tbody>
+        <tr>
+          <th style="width:220px;">Diagnóstico inicial</th>
+          <td><%= diagnosticoInicialOS %></td>
+        </tr>
+        <tr>
+          <th>Causa mais provável</th>
+          <td><%= causaProvavelOS %></td>
+        </tr>
+        <tr>
+          <th>Ações iniciais sugeridas</th>
+          <td><%= acoesIniciaisOS %></td>
+        </tr>
+        <tr>
+          <th>Materiais / recursos sugeridos</th>
+          <td><%= materiaisSugeridosOS %></td>
+        </tr>
+      </tbody>
+    </table>
+
     <% if (os.acao_corretiva || os.acao_preventiva) { %>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0"/>
       <div><b>Ação corretiva:</b><br/><%= os.acao_corretiva || '-' %></div>

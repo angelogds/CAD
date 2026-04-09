@@ -471,6 +471,59 @@ function getOSById(id) {
   };
 }
 
+function findRecentDuplicateOS({
+  opened_by,
+  equipamento_id = null,
+  equipamento_manual = null,
+  nao_conformidade,
+  sintoma_principal = null,
+  windowSeconds = 45,
+} = {}) {
+  const userId = Number(opened_by || 0) || null;
+  const equipId = Number(equipamento_id || 0) || null;
+  const equipManual = String(equipamento_manual || "").trim().toLowerCase();
+  const relato = String(nao_conformidade || "").trim();
+  const sintoma = String(sintoma_principal || "").trim().toLowerCase();
+  const janela = Math.max(10, Number(windowSeconds || 45));
+
+  if (!userId || (!equipId && !equipManual) || !relato) return null;
+
+  let candidato = [];
+  if (equipId) {
+    candidato = db.prepare(`
+    SELECT id, descricao, sintoma_principal, opened_at, status
+    FROM os
+    WHERE opened_by = ?
+      AND IFNULL(equipamento_id, 0) = ?
+      AND datetime(opened_at) >= datetime('now', ?)
+    ORDER BY id DESC
+    LIMIT 5
+  `).all(userId, equipId, `-${janela} seconds`);
+  } else {
+    candidato = db.prepare(`
+      SELECT id, descricao, sintoma_principal, opened_at, status, equipamento_manual
+      FROM os
+      WHERE opened_by = ?
+        AND IFNULL(equipamento_id, 0) = 0
+        AND datetime(opened_at) >= datetime('now', ?)
+      ORDER BY id DESC
+      LIMIT 10
+    `).all(userId, `-${janela} seconds`)
+      .filter((row) => String(row.equipamento_manual || "").trim().toLowerCase() === equipManual);
+  }
+
+  const relatoNormalizado = relato.toLowerCase();
+  for (const row of candidato) {
+    const descricaoAtual = String(row.descricao || "").trim().toLowerCase();
+    const sintomaAtual = String(row.sintoma_principal || "").trim().toLowerCase();
+    if (!descricaoAtual) continue;
+    if (descricaoAtual !== relatoNormalizado) continue;
+    if (sintoma && sintomaAtual && sintomaAtual !== sintoma) continue;
+    return row;
+  }
+  return null;
+}
+
 function getConfig(chave) {
   if (!tableExists("config_sistema")) return null;
   return db.prepare(`SELECT valor FROM config_sistema WHERE chave = ?`).get(chave)?.valor || null;
@@ -1846,6 +1899,7 @@ module.exports = {
   createOSAutomatica,
   addFotosAberturaFechamento,
   getOSById,
+  findRecentDuplicateOS,
   iniciarOS,
   pausarOS,
   concluirOS,

@@ -50,14 +50,34 @@ async function osCreate(req, res) {
       tipo,
     } = req.body;
 
+    const equipamentoIdNum = equipamento_id ? Number(equipamento_id) : null;
     const relatoAbertura = String(nao_conformidade || descricao || '').trim();
     const diagnosticoInicial = String(ai_diagnostico_inicial || diagnostico_inicial || '').trim();
     const causaProvavel = String(ai_causa || causa_mais_provavel || '').trim();
     const acoesIniciais = String(ai_acoes_iniciais || acoes_iniciais || '').trim();
 
+    const equipamentoManualTxt = String(equipamento_manual || "").trim();
+    if (!equipamentoIdNum && !equipamentoManualTxt) {
+      req.flash("error", "Selecione um equipamento cadastrado ou digite o equipamento manual.");
+      return res.redirect("/os/novo");
+    }
+
+    const duplicada = service.findRecentDuplicateOS({
+      opened_by: req.session?.user?.id || null,
+      equipamento_id: equipamentoIdNum,
+      equipamento_manual: equipamentoManualTxt,
+      nao_conformidade: relatoAbertura,
+      sintoma_principal,
+      windowSeconds: 45,
+    });
+    if (duplicada?.id) {
+      req.flash("success", `OS #${duplicada.id} já foi aberta há instantes. Evitamos uma abertura duplicada.`);
+      return res.redirect(`/os/${duplicada.id}`);
+    }
+
     const id = await service.createOS({
-      equipamento_id: equipamento_id ? Number(equipamento_id) : null,
-      equipamento_manual,
+      equipamento_id: equipamentoIdNum,
+      equipamento_manual: equipamentoManualTxt || null,
       nao_conformidade: relatoAbertura,
       descricao: relatoAbertura,
       tipo: String(tipo || "CORRETIVA").trim() || "CORRETIVA",
@@ -87,7 +107,7 @@ async function osCreate(req, res) {
 
     await pushService.sendPushToAll({
       title: "Nova Ordem de Serviço",
-      body: `OS #${id} - ${equipamento_manual || (equipamento_id ? `Equipamento #${equipamento_id}` : 'Equipamento')}`,
+      body: `OS #${id} criada automaticamente.`,
       url: `/os/${id}`,
     }).catch(() => {});
 
@@ -228,6 +248,16 @@ async function osClose(req, res) {
   });
 
   try {
+    const osAtual = service.getOSById(id);
+    if (!osAtual) {
+      req.flash("error", "OS não encontrada.");
+      return res.redirect("/os");
+    }
+    if (String(osAtual.status || "").toUpperCase() === "FECHADA") {
+      req.flash("success", "Essa OS já estava concluída.");
+      return res.redirect(redirectAfterClose);
+    }
+
     const fotosFechamento = mapFilesToPublic(req.files?.fechamento_fotos || []);
     if (!fotosFechamento.length) {
       req.flash("error", "Adicione pelo menos uma foto de fechamento para concluir a OS.");
