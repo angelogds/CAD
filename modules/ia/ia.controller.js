@@ -1,4 +1,5 @@
-const { transcreverAudioOS, transcreverAudioFechamento } = require('./ia.service');
+const db = require('../../database/db');
+const { transcreverAudioOS, transcreverAudioFechamento, analisarOSGraxaria } = require('./ia.service');
 
 const ALLOWED_MIME = new Set([
   'audio/webm',
@@ -63,7 +64,65 @@ async function transcreverFechamento(req, res) {
   }
 }
 
+async function analisarOS(req, res) {
+  const equipamentoId = Number(req.body?.equipamento_id) || null;
+  const descricao = String(req.body?.descricao || '').trim();
+
+  if (!descricao) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Informe a descrição do problema para análise.',
+      code: 'VALIDATION_ERROR',
+    });
+  }
+
+  try {
+    let equipamentoNome = '';
+    let setor = '';
+
+    if (equipamentoId) {
+      const equipamento = db.prepare(`
+        SELECT nome, setor
+        FROM equipamentos
+        WHERE id = ?
+        LIMIT 1
+      `).get(equipamentoId);
+      if (equipamento) {
+        equipamentoNome = String(equipamento.nome || '').trim();
+        setor = String(equipamento.setor || '').trim();
+      }
+    }
+
+    const resultado = await analisarOSGraxaria({
+      equipamento_id: equipamentoId,
+      equipamento_nome: equipamentoNome || 'Não informado',
+      setor: setor || 'Não informado',
+      descricao,
+    });
+
+    return res.json({
+      ok: true,
+      resultado: {
+        criticidade: resultado.criticidade,
+        diagnostico_inicial: resultado.diagnostico,
+        causa_mais_provavel: resultado.causa_provavel,
+        acoes_iniciais: resultado.acoes_recomendadas,
+        tempo_estimado_minutos: resultado.tempo_estimado,
+        equipe_sugerida: resultado.equipe_sugerida,
+      },
+    });
+  } catch (err) {
+    console.warn('[ia.analisarOS]', { code: err?.code, technical: err?.technical || err?.message });
+    return res.status(503).json({
+      ok: false,
+      error: 'Não consegui analisar com a IA. Tente novamente.',
+      code: err?.code || 'AI_ERROR',
+    });
+  }
+}
+
 module.exports = {
   transcreverAbertura,
   transcreverFechamento,
+  analisarOS,
 };
