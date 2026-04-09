@@ -1297,18 +1297,19 @@ async function createOS({
       message: err?.message || String(err),
       technical: err?.technical || null,
     });
+    const fallbackNarrative = normalizeFallbackNarrative(relatoNaoConformidade);
     aberturaIA = {
       criticidade_sugerida: criticidadeEntrada,
       prioridade_sugerida: criticidadeEntrada,
-      diagnostico_inicial: relatoNaoConformidade,
-      causa_provavel: relatoNaoConformidade,
+      diagnostico_inicial: fallbackNarrative,
+      causa_provavel: "Causa provável pendente de inspeção técnica em campo.",
       risco_operacional: "Avaliação pendente (fallback sem IA).",
       risco_seguranca: "Avaliação pendente (fallback sem IA).",
-      acao_corretiva: relatoNaoConformidade,
-      acao_preventiva: relatoNaoConformidade,
-      servico_sugerido: relatoNaoConformidade,
+      acao_corretiva: "Isolar a falha, inspecionar componentes críticos e corrigir após diagnóstico local.",
+      acao_preventiva: "Registrar causa raiz após execução e incluir inspeção preventiva do ponto com falha.",
+      servico_sugerido: "Executar inspeção técnica inicial, registrar evidências e definir plano de correção.",
       sugestao_equipe: { quantidade_recomendada: 1, perfil_minimo: "Mecânico", racional: "Fallback sem IA" },
-      descricao_tecnica_os: relatoNaoConformidade,
+      descricao_tecnica_os: fallbackNarrative,
       justificativa_interna: "Abertura concluída sem IA por indisponibilidade temporária.",
     };
   }
