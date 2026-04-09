@@ -189,8 +189,16 @@
   });
 
   let mediaRecorder;
+  let mediaStream;
   let audioChunks = [];
   let isRecording = false;
+
+  function setBotoesAnaliseDisabled(disabled) {
+    const btnMic = document.getElementById('btn-tecnico-mic');
+    const btnManual = document.getElementById('btn-analisar-tecnico');
+    if (btnMic) btnMic.disabled = disabled;
+    if (btnManual) btnManual.disabled = disabled;
+  }
 
   document.getElementById('btn-tecnico-mic').addEventListener('click', async () => {
     const btn = document.getElementById('btn-tecnico-mic');
@@ -199,8 +207,13 @@
 
     if (!isRecording) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
+        if (typeof MediaRecorder === 'undefined') {
+          alert('❌ Seu navegador não suporta gravação de áudio.');
+          return;
+        }
+
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(mediaStream);
         audioChunks = [];
 
         mediaRecorder.ondataavailable = (event) => audioChunks.push(event.data);
@@ -219,7 +232,6 @@
       }
     } else {
       mediaRecorder.stop();
-      mediaRecorder.stream.getTracks().forEach((track) => track.stop());
       isRecording = false;
     }
   });
@@ -228,7 +240,7 @@
     const btn = document.getElementById('btn-tecnico-mic');
     const statusText = document.getElementById('status-text');
 
-    btn.disabled = true;
+    setBotoesAnaliseDisabled(true);
     statusText.textContent = 'Transcrevendo e analisando com o Técnico...';
 
     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
@@ -247,6 +259,9 @@
       }
 
       const transcricao = transData.transcricao_bruta || '';
+      if (!transcricao.trim()) {
+        throw new Error('A transcrição retornou vazia');
+      }
       document.querySelector('textarea[name="descricao"]').value = transcricao;
 
       const analiseRes = await fetch('/ia/os/analisar-abertura', {
@@ -274,9 +289,14 @@
       statusText.textContent = `❌ Erro: ${err.message}`;
       statusText.style.color = '#dc2626';
     } finally {
-      btn.disabled = false;
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+        mediaStream = null;
+      }
+      setBotoesAnaliseDisabled(false);
       btn.textContent = '🎤 Analisar com o Técnico (Gravar Áudio)';
       btn.style.background = '';
+      isRecording = false;
       setTimeout(() => {
         document.getElementById('status-tecnico').style.display = 'none';
       }, 4000);
