@@ -1,5 +1,4 @@
-const db = require('../../database/db');
-const { transcreverAudioOS, transcreverAudioFechamento, analisarOSGraxaria } = require('./ia.service');
+const { transcreverAudioOS, transcreverAudioFechamento, gerarAberturaAutomaticaDaOS } = require('./ia.service');
 
 const ALLOWED_MIME = new Set([
   'audio/webm',
@@ -64,59 +63,49 @@ async function transcreverFechamento(req, res) {
   }
 }
 
-async function analisarOS(req, res) {
-  const equipamentoId = Number(req.body?.equipamento_id) || null;
+async function analisarAberturaOS(req, res) {
   const descricao = String(req.body?.descricao || '').trim();
+  const equipamentoIdRaw = req.body?.equipamento_id;
+  const equipamentoId = Number(equipamentoIdRaw || 0) || null;
 
-  if (!descricao) {
+  if (!descricao || descricao.length < 10) {
     return res.status(400).json({
       ok: false,
-      error: 'Informe a descrição do problema para análise.',
-      code: 'VALIDATION_ERROR',
+      error: 'Descreva o problema com pelo menos 10 caracteres para a análise da IA.',
     });
   }
 
-  try {
-    let equipamentoNome = '';
-    let setor = '';
-
-    if (equipamentoId) {
-      const equipamento = db.prepare(`
-        SELECT nome, setor
-        FROM equipamentos
-        WHERE id = ?
-        LIMIT 1
-      `).get(equipamentoId);
-      if (equipamento) {
-        equipamentoNome = String(equipamento.nome || '').trim();
-        setor = String(equipamento.setor || '').trim();
-      }
-    }
-
-    const resultado = await analisarOSGraxaria({
+  const payload = {
+    usuario_id: req.session?.user?.id || null,
+    nao_conformidade: {
       equipamento_id: equipamentoId,
-      equipamento_nome: equipamentoNome || 'Não informado',
-      setor: setor || 'Não informado',
-      descricao,
-    });
+      sintoma_principal: 'outro',
+      severidade: 'MEDIA',
+      nao_conformidade: descricao,
+      observacao_curta: descricao,
+    },
+    contexto: {},
+  };
 
+  try {
+    const resultado = await gerarAberturaAutomaticaDaOS(payload);
     return res.json({
       ok: true,
       resultado: {
-        criticidade: resultado.criticidade,
-        diagnostico_inicial: resultado.diagnostico,
-        causa_mais_provavel: resultado.causa_provavel,
-        acoes_iniciais: resultado.acoes_recomendadas,
-        tempo_estimado_minutos: resultado.tempo_estimado,
-        equipe_sugerida: resultado.equipe_sugerida,
+        criticidade_sugerida: resultado?.criticidade_sugerida || 'MEDIA',
+        diagnostico_inicial: resultado?.diagnostico_inicial || '',
+        causa_mais_provavel: resultado?.causa_provavel || '',
+        acoes_iniciais: resultado?.acao_preventiva || '',
       },
     });
   } catch (err) {
-    console.warn('[ia.analisarOS]', { code: err?.code, technical: err?.technical || err?.message });
-    return res.status(503).json({
+    console.warn('[ia.analisarAberturaOS]', {
+      code: err?.code || null,
+      technical: err?.technical || err?.message || String(err),
+    });
+    return res.status(200).json({
       ok: false,
-      error: 'Não consegui analisar com a IA. Tente novamente.',
-      code: err?.code || 'AI_ERROR',
+      error: friendlyTranscriptionError(err),
     });
   }
 }
@@ -124,5 +113,5 @@ async function analisarOS(req, res) {
 module.exports = {
   transcreverAbertura,
   transcreverFechamento,
-  analisarOS,
+  analisarAberturaOS,
 };

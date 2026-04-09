@@ -21,6 +21,6 @@ const upload = multer({
 
 router.post('/transcrever/abertura', requireLogin, requireRole(IA_TRANSCRICAO_ACCESS), upload.single('audio'), ctrl.transcreverAbertura);
 router.post('/transcrever/fechamento', requireLogin, requireRole(IA_TRANSCRICAO_ACCESS), upload.single('audio'), ctrl.transcreverFechamento);
-router.post('/os/analisar', requireLogin, requireRole(ACCESS.os_view), ctrl.analisarOS);
+router.post('/os/analisar-abertura', requireLogin, requireRole(IA_TRANSCRICAO_ACCESS), ctrl.analisarAberturaOS);
 
 module.exports = router;
