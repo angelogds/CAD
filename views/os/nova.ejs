@@ -56,21 +56,16 @@
       <div style="grid-column:1 / -1;">
         <label class="label">Descrição do problema (solicitante)</label>
         <textarea name="descricao" class="input" required placeholder="Descreva o que está acontecendo no equipamento"></textarea>
-        <div style="margin:12px 0 0;">
-          <button type="button" id="btn-tecnico-mic" class="btn btn-ghost" style="padding:11px 20px; font-weight:600; margin-right:8px;">
+        <div style="margin: 20px 0 15px;">
+          <button type="button" id="btn-tecnico-mic" class="btn btn-green" style="padding: 12px 24px; font-size: 1.05rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
             🎤 Analisar com o Técnico (Gravar Áudio)
           </button>
-          <button type="button" id="btn-analisar-tecnico" class="btn btn-blue" style="padding:11px 20px; font-weight:600;">
-            👷 Analisar com o Técnico
-          </button>
         </div>
-        <div id="status-tecnico" style="display:none; align-items:center; gap:10px; margin:12px 0; color:#444;">
-          <div class="spinner-tecnico" style="width:20px;height:20px;border:4px solid #ddd;border-top:4px solid #16a34a;border-radius:50%;animation:spin-tecnico 1s linear infinite;"></div>
-          <span id="status-text">Pronto para gravar</span>
-        </div>
-        <div id="loading-tecnico" style="display:none; align-items:center; gap:10px; margin:12px 0; color:#444;">
-          <div class="spinner-tecnico" style="width:20px;height:20px;border:4px solid #ddd;border-top:4px solid #16a34a;border-radius:50%;animation:spin-tecnico 1s linear infinite;"></div>
-          <span id="loading-text-tecnico">O Técnico está analisando a OS...</span>
+        <div id="status-tecnico" style="display: none; margin: 12px 0; padding: 12px; border-radius: 12px; background: #f0fdf4; border: 1px solid #86efac;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div id="mic-spinner" class="spinner" style="width:22px;height:22px;border:4px solid #86efac;border-top:4px solid #16a34a;border-radius:50%;animation:spin 1s linear infinite;"></div>
+            <span id="status-text" style="font-weight: 500; color: #166534;">Gravando áudio... Fale o problema agora.</span>
+          </div>
         </div>
       </div>
 
@@ -106,7 +101,7 @@
 </div>
 
 <style>
-  @keyframes spin-tecnico {
+  @keyframes spin {
     to { transform: rotate(360deg); }
   }
 </style>
@@ -134,13 +129,13 @@
     }
   });
 
-  document.getElementById('btn-analisar-tecnico').addEventListener('click', async () => {
+  document.getElementById('btn-tecnico-mic').addEventListener('click', async () => {
     const equipamento = document.querySelector('[name="equipamento_id"]')?.value || '';
     const descricaoField = document.querySelector('[name="descricao"]');
     const descricao = String(descricaoField?.value || '').trim();
-    const btn = document.getElementById('btn-analisar-tecnico');
-    const loading = document.getElementById('loading-tecnico');
-    const loadingText = document.getElementById('loading-text-tecnico');
+    const btn = document.getElementById('btn-tecnico-mic');
+    const statusBox = document.getElementById('status-tecnico');
+    const statusText = document.getElementById('status-text');
 
     if (!descricao) {
       alert('❌ Descreva o problema antes de chamar o Técnico.');
@@ -149,12 +144,12 @@
 
     btn.disabled = true;
     btn.style.opacity = '0.6';
-    loading.style.display = 'flex';
-    loadingText.textContent = 'O Técnico está analisando a OS...';
-    loadingText.style.color = '#444';
+    statusBox.style.display = 'block';
+    statusText.textContent = 'O Técnico está analisando a OS...';
+    statusText.style.color = '#166534';
 
     try {
-      const res = await fetch('/ia/os/analisar-abertura', {
+      const res = await fetch('/ai/os/analisar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -173,15 +168,15 @@
         if (criticidadeField) criticidadeField.value = data.resultado?.criticidade_sugerida || data.resultado?.criticidade || criticidadeField.value;
         if (diagnosticoField) diagnosticoField.value = data.resultado?.diagnostico_inicial || data.resultado?.causa_mais_provavel || '';
         if (acaoInicialField) acaoInicialField.value = data.resultado?.acoes_iniciais || '';
-        loadingText.textContent = '✅ Análise do Técnico concluída!';
-        setTimeout(() => { loading.style.display = 'none'; }, 1800);
+        statusText.textContent = '✅ Análise do Técnico concluída!';
+        setTimeout(() => { statusBox.style.display = 'none'; }, 1800);
       } else {
         throw new Error(data.error || 'Não foi possível completar a análise');
       }
     } catch (e) {
-      loadingText.textContent = `❌ ${e.message || 'Erro de conexão com o Técnico'}`;
-      loadingText.style.color = '#dc2626';
-      setTimeout(() => { loading.style.display = 'none'; }, 3500);
+      statusText.textContent = `❌ ${e.message || 'Erro de conexão com o Técnico'}`;
+      statusText.style.color = '#dc2626';
+      setTimeout(() => { statusBox.style.display = 'none'; }, 3500);
     } finally {
       btn.disabled = false;
       btn.style.opacity = '1';

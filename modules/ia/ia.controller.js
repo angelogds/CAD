@@ -1,3 +1,5 @@
+const db = require('../../database/db');
+const { getAIConfig } = require('../ai/ai.service');
 const { transcreverAudioOS, transcreverAudioFechamento, gerarAberturaAutomaticaDaOS } = require('./ia.service');
 
 const ALLOWED_MIME = new Set([
@@ -75,6 +77,7 @@ async function analisarAberturaOS(req, res) {
     });
   }
 
+  const equipamentoInfo = resolveEquipamentoInfo(equipamentoId);
   const payload = {
     usuario_id: req.session?.user?.id || null,
     nao_conformidade: {
@@ -84,8 +87,20 @@ async function analisarAberturaOS(req, res) {
       nao_conformidade: descricao,
       observacao_curta: descricao,
     },
-    contexto: {},
+    contexto: {
+      equipamento_info: equipamentoInfo,
+    },
   };
+
+  const aiConfig = getAIConfig();
+  if (!aiConfig.enabled || !aiConfig.hasApiKey || aiConfig.apiKeyLooksPlaceholder) {
+    console.log('[IA] IA desativada/configuração inválida → usando fallback manual');
+    return res.json({
+      ok: true,
+      resultado: getFallbackAnalise(descricao),
+      fonte: 'fallback_manual',
+    });
+  }
 
   try {
     const resultado = await gerarAberturaAutomaticaDaOS(payload);
@@ -96,18 +111,45 @@ async function analisarAberturaOS(req, res) {
         diagnostico_inicial: resultado?.diagnostico_inicial || '',
         causa_mais_provavel: resultado?.causa_provavel || '',
         acoes_iniciais: resultado?.acao_preventiva || '',
+        tempo_estimado_minutos: Number.isFinite(Number(resultado?.tempo_estimado)) ? Number(resultado.tempo_estimado) : 30,
       },
+      fonte: 'ia',
     });
   } catch (err) {
-    console.warn('[ia.analisarAberturaOS]', {
-      code: err?.code || null,
+    console.warn('[OS_CREATE][IA_WARN] Falha na IA de abertura. Seguindo com fallback manual.', {
+      errorCode: err?.code || err?.message || null,
       technical: err?.technical || err?.message || String(err),
     });
     return res.status(200).json({
-      ok: false,
-      error: friendlyTranscriptionError(err),
+      ok: true,
+      resultado: getFallbackAnalise(descricao),
+      fonte: 'fallback_manual',
     });
   }
+}
+
+function resolveEquipamentoInfo(equipamentoId) {
+  if (!equipamentoId) return 'Não informado';
+  try {
+    const eq = db.prepare('SELECT nome, setor FROM equipamentos WHERE id = ?').get(equipamentoId);
+    if (!eq) return 'Não informado';
+    const nome = String(eq.nome || '').trim();
+    const setor = String(eq.setor || '').trim();
+    return `${nome || 'Equipamento sem nome'}${setor ? ` (${setor})` : ''}`;
+  } catch (_error) {
+    return 'Não informado';
+  }
+}
+
+function getFallbackAnalise(descricao) {
+  const resumo = String(descricao || '').trim();
+  return {
+    criticidade_sugerida: 'MEDIA',
+    diagnostico_inicial: `Problema relatado: ${resumo.slice(0, 80)}${resumo.length > 80 ? '...' : ''}`,
+    causa_mais_provavel: 'Necessita análise técnica no local',
+    acoes_iniciais: 'Verificar equipamento, tirar fotos e registrar sintomas',
+    tempo_estimado_minutos: 30,
+  };
 }
 
 module.exports = {
