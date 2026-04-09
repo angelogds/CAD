@@ -37,18 +37,36 @@ async function osCreate(req, res) {
       equipamento_id,
       equipamento_manual,
       nao_conformidade,
+      descricao,
       sintoma_principal,
+      criticidade,
+      grau,
+      ai_diagnostico_inicial,
+      diagnostico_inicial,
+      ai_causa,
+      causa_mais_provavel,
+      ai_acoes_iniciais,
+      acoes_iniciais,
+      tipo,
     } = req.body;
+
+    const relatoAbertura = String(nao_conformidade || descricao || '').trim();
+    const diagnosticoInicial = String(ai_diagnostico_inicial || diagnostico_inicial || '').trim();
+    const causaProvavel = String(ai_causa || causa_mais_provavel || '').trim();
+    const acoesIniciais = String(ai_acoes_iniciais || acoes_iniciais || '').trim();
 
     const id = await service.createOS({
       equipamento_id: equipamento_id ? Number(equipamento_id) : null,
       equipamento_manual,
-      nao_conformidade,
-      descricao: nao_conformidade,
-      tipo: "CORRETIVA",
+      nao_conformidade: relatoAbertura,
+      descricao: relatoAbertura,
+      tipo: String(tipo || "CORRETIVA").trim() || "CORRETIVA",
       sintoma_principal,
-      severidade: null,
-      grau: null,
+      severidade: criticidade || null,
+      criticidade: criticidade || grau || null,
+      grau: grau || criticidade || null,
+      resumo_tecnico: acoesIniciais || diagnosticoInicial || null,
+      causa_diagnostico: causaProvavel || diagnosticoInicial || null,
       opened_by: req.session?.user?.id || null,
     });
 

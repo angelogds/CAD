@@ -44,30 +44,62 @@
 
       <div style="grid-column:1 / -1;">
         <label class="label" for="nao_conformidade">NÃO CONFORMIDADE DO EQUIPAMENTO *</label>
-        <div class="muted" style="margin-bottom:8px;">Descreva o que está acontecendo com o equipamento.</div>
-        <div class="row" style="justify-content:flex-start; gap:8px; margin-bottom:8px;">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            data-audio-transcriber
-            data-endpoint="/ai/os/transcrever-abertura"
-            data-target="#nao_conformidade"
-            data-status="#status-transcricao-abertura"
-            title="Gravar áudio para transcrever"
-            aria-label="Gravar áudio para transcrever"
-          >🎤</button>
-          <span id="status-transcricao-abertura" class="muted">Pronto para gravar</span>
-        </div>
+        <div class="muted" style="margin-bottom:10px;">Fale o problema e deixe a IA preencher a descrição e os campos técnicos automaticamente.</div>
+
+        <button type="button" id="btn-converse-mecanico" class="btn-converse-mecanico" aria-label="Converse com o Mecânico">
+          <span class="emoji">🎤</span>
+          <span id="btn-converse-label">Converse com o Mecânico</span>
+        </button>
+
+        <div id="status-converse" class="status-converse" role="status" aria-live="polite">Pronto para gravar.</div>
+
         <textarea
           id="nao_conformidade"
           name="nao_conformidade"
           class="input"
-          style="min-height:150px;"
+          style="min-height:150px; margin-top:10px;"
           minlength="10"
           required
           placeholder="Ex.: Equipamento apresentando vibração forte, ruído e aquecimento durante operação."
         ></textarea>
       </div>
+
+      <div style="grid-column:1 / -1;" class="ai-box">
+        <div class="label" style="margin-bottom:8px;">PREENCHIMENTO DA IA (EDITÁVEL)</div>
+        <div class="grid-2" style="gap:12px;">
+          <div>
+            <label class="label" for="criticidade">Criticidade</label>
+            <select name="criticidade" id="criticidade" class="input">
+              <option value="BAIXA">BAIXA</option>
+              <option value="MEDIA" selected>MEDIA</option>
+              <option value="ALTA">ALTA</option>
+              <option value="CRITICA">CRITICA</option>
+            </select>
+          </div>
+          <div>
+            <label class="label" for="ai_tempo_estimado">Tempo estimado (min)</label>
+            <input type="number" min="0" step="1" name="ai_tempo_estimado" id="ai_tempo_estimado" class="input" placeholder="Ex.: 30" />
+          </div>
+          <div style="grid-column:1 / -1;">
+            <label class="label" for="ai_diagnostico_inicial">Diagnóstico inicial</label>
+            <textarea id="ai_diagnostico_inicial" name="ai_diagnostico_inicial" class="input" rows="3"></textarea>
+          </div>
+          <div style="grid-column:1 / -1;">
+            <label class="label" for="ai_causa">Causa mais provável</label>
+            <textarea id="ai_causa" name="ai_causa" class="input" rows="3"></textarea>
+          </div>
+          <div style="grid-column:1 / -1;">
+            <label class="label" for="ai_acoes_iniciais">Ações iniciais</label>
+            <textarea id="ai_acoes_iniciais" name="ai_acoes_iniciais" class="input" rows="3"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <input type="hidden" name="descricao" id="descricao_hidden" value="" />
+      <input type="hidden" name="diagnostico_inicial" id="diagnostico_inicial_hidden" value="" />
+      <input type="hidden" name="causa_mais_provavel" id="causa_mais_provavel_hidden" value="" />
+      <input type="hidden" name="acoes_iniciais" id="acoes_iniciais_hidden" value="" />
+
       <div style="grid-column:1 / -1;">
         <label class="label">FOTOS DE ABERTURA (OPCIONAL)</label>
         <input id="abertura_fotos" type="file" name="abertura_fotos" accept="image/*" multiple style="display:none" />
@@ -83,41 +115,311 @@
   </form>
 </div>
 
+<style>
+  .btn-converse-mecanico {
+    width: 100%;
+    border: none;
+    border-radius: 14px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .2s ease, filter .2s ease;
+    box-shadow: 0 6px 16px rgba(37, 99, 235, .25);
+  }
+  .btn-converse-mecanico:hover { filter: brightness(1.03); transform: translateY(-1px); }
+  .btn-converse-mecanico.is-recording {
+    background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+    box-shadow: 0 6px 16px rgba(185, 28, 28, .25);
+  }
+  .btn-converse-mecanico[disabled] { opacity: .7; cursor: wait; transform: none; }
+  .status-converse {
+    margin-top: 10px;
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: .92rem;
+  }
+  .status-converse.error {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b;
+  }
+  .status-converse.success {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+    color: #166534;
+  }
+  .ai-box {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px;
+    background: #fafafa;
+  }
+  @media (max-width: 768px) {
+    .btn-converse-mecanico { font-size: .96rem; padding: 12px; }
+  }
+</style>
+
 <script>
-  const fileInput = document.getElementById('abertura_fotos');
-  const preview = document.getElementById('preview-abertura');
-  fileInput.addEventListener('change', function(){
-    preview.innerHTML = '';
-    Array.from(fileInput.files || []).forEach(f => {
-      const el = document.createElement('span');
-      el.className = 'pill-tag pill-gray';
-      el.style.marginRight = '6px';
-      el.textContent = f.name;
-      preview.appendChild(el);
+  (function () {
+    const fileInput = document.getElementById('abertura_fotos');
+    const preview = document.getElementById('preview-abertura');
+
+    fileInput.addEventListener('change', function(){
+      preview.innerHTML = '';
+      Array.from(fileInput.files || []).forEach(function (f) {
+        const el = document.createElement('span');
+        el.className = 'pill-tag pill-gray';
+        el.style.marginRight = '6px';
+        el.textContent = f.name;
+        preview.appendChild(el);
+      });
     });
-  });
 
-  document.getElementById('os-form').addEventListener('submit', function(e){
-    const id = document.getElementById('equipamento_id').value.trim();
-    const manual = document.getElementById('equipamento_manual').value.trim();
-    const sintoma = document.getElementById('sintoma_principal').value.trim();
-    const naoConformidade = document.getElementById('nao_conformidade').value.trim();
+    const form = document.getElementById('os-form');
+    const btn = document.getElementById('btn-converse-mecanico');
+    const btnLabel = document.getElementById('btn-converse-label');
+    const statusEl = document.getElementById('status-converse');
 
-    if (!id && !manual) {
-      e.preventDefault();
-      alert('Selecione um equipamento cadastrado ou digite o equipamento manualmente.');
-      return;
+    const naoConformidadeEl = document.getElementById('nao_conformidade');
+    const descricaoHiddenEl = document.getElementById('descricao_hidden');
+    const criticidadeEl = document.getElementById('criticidade');
+    const diagnosticoEl = document.getElementById('ai_diagnostico_inicial');
+    const causaEl = document.getElementById('ai_causa');
+    const acoesEl = document.getElementById('ai_acoes_iniciais');
+    const tempoEl = document.getElementById('ai_tempo_estimado');
+
+    const diagnosticoHiddenEl = document.getElementById('diagnostico_inicial_hidden');
+    const causaHiddenEl = document.getElementById('causa_mais_provavel_hidden');
+    const acoesHiddenEl = document.getElementById('acoes_iniciais_hidden');
+
+    let mediaRecorder = null;
+    let mediaStream = null;
+    let chunks = [];
+    let isRecording = false;
+    let recordingMimeType = 'audio/webm';
+
+    function setStatus(message, tone) {
+      statusEl.textContent = message;
+      statusEl.classList.remove('error', 'success');
+      if (tone) statusEl.classList.add(tone);
     }
-    if (!sintoma) {
-      e.preventDefault();
-      alert('Selecione o sintoma principal.');
-      return;
+
+    function setButtonState(state) {
+      if (state === 'recording') {
+        btn.classList.add('is-recording');
+        btnLabel.textContent = 'Parar gravação';
+      } else {
+        btn.classList.remove('is-recording');
+        btnLabel.textContent = 'Converse com o Mecânico';
+      }
     }
-    if (!naoConformidade || naoConformidade.length < 10) {
-      e.preventDefault();
-      alert('Descreva a não conformidade com pelo menos 10 caracteres.');
-      return;
+
+    function stopTracks() {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(function (track) { track.stop(); });
+        mediaStream = null;
+      }
     }
-  });
+
+    function pickSupportedMimeType() {
+      if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+        return '';
+      }
+      const candidates = [
+        'audio/mp4',
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+      ];
+      return candidates.find(function (type) { return MediaRecorder.isTypeSupported(type); }) || '';
+    }
+
+    async function parseJsonSafe(response) {
+      const contentType = response.headers.get('content-type') || '';
+      const raw = await response.text();
+      if (!contentType.includes('application/json')) {
+        throw new Error('Resposta inválida do servidor (não retornou JSON).');
+      }
+      try {
+        return JSON.parse(raw);
+      } catch (_error) {
+        throw new Error('JSON inválido retornado pelo servidor.');
+      }
+    }
+
+    async function enviarParaTranscricao(audioBlob, extension) {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'abertura-os-' + Date.now() + '.' + extension);
+
+      const response = await fetch('/ai/os/transcrever-abertura', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const payload = await parseJsonSafe(response);
+      if (!response.ok || payload.status === 'erro_validacao') {
+        throw new Error(payload.erro || 'Falha ao transcrever áudio.');
+      }
+
+      const transcricao = String(payload.transcricao_bruta || payload.transcricao || '').trim();
+      if (!transcricao) {
+        throw new Error(payload.erro || 'A transcrição retornou vazia.');
+      }
+      return transcricao;
+    }
+
+    async function enviarParaAnalise(transcricao) {
+      const body = {
+        descricao: transcricao,
+        equipamento_id: document.getElementById('equipamento_id').value || null,
+      };
+
+      const response = await fetch('/ai/os/analisar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const payload = await parseJsonSafe(response);
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || 'Falha ao analisar descrição com IA.');
+      }
+      return payload.resultado || {};
+    }
+
+    function preencherCampos(transcricao, analise) {
+      naoConformidadeEl.value = transcricao;
+      descricaoHiddenEl.value = transcricao;
+
+      const criticidade = String(analise.criticidade_sugerida || analise.criticidade || '').toUpperCase();
+      if (criticidade && criticidadeEl.querySelector('option[value="' + criticidade + '"]')) {
+        criticidadeEl.value = criticidade;
+      }
+
+      const diagnostico = String(analise.ai_diagnostico_inicial || analise.diagnostico_inicial || '').trim();
+      const causa = String(analise.ai_causa || analise.causa_mais_provavel || '').trim();
+      const acoes = String(analise.ai_acoes_iniciais || analise.acoes_iniciais || '').trim();
+      const tempo = Number(analise.ai_tempo_estimado || analise.tempo_estimado_minutos || 0);
+
+      diagnosticoEl.value = diagnostico;
+      causaEl.value = causa;
+      acoesEl.value = acoes;
+      if (tempo > 0) tempoEl.value = String(tempo);
+
+      diagnosticoHiddenEl.value = diagnostico;
+      causaHiddenEl.value = causa;
+      acoesHiddenEl.value = acoes;
+    }
+
+    btn.addEventListener('click', async function () {
+      if (btn.disabled) return;
+
+      if (isRecording && mediaRecorder) {
+        btn.disabled = true;
+        setStatus('Parando gravação e enviando áudio...', null);
+        await new Promise(function (resolve) {
+          mediaRecorder.addEventListener('stop', resolve, { once: true });
+          mediaRecorder.stop();
+        });
+        return;
+      }
+
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        setStatus('Seu navegador não permite acesso ao microfone neste contexto.', 'error');
+        return;
+      }
+      if (typeof MediaRecorder === 'undefined') {
+        setStatus('Seu navegador não suporta gravação de áudio (MediaRecorder).', 'error');
+        return;
+      }
+
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recordingMimeType = pickSupportedMimeType() || 'audio/webm';
+        mediaRecorder = recordingMimeType
+          ? new MediaRecorder(mediaStream, { mimeType: recordingMimeType })
+          : new MediaRecorder(mediaStream);
+
+        chunks = [];
+        mediaRecorder.addEventListener('dataavailable', function (evt) {
+          if (evt.data && evt.data.size > 0) chunks.push(evt.data);
+        });
+
+        mediaRecorder.addEventListener('stop', async function () {
+          try {
+            setButtonState('idle');
+            isRecording = false;
+            setStatus('Transcrevendo áudio...', null);
+
+            const blobType = chunks[0] && chunks[0].type ? chunks[0].type : (recordingMimeType || 'audio/webm');
+            const extension = blobType.includes('ogg') ? 'ogg' : blobType.includes('mp4') || blobType.includes('m4a') ? 'm4a' : 'webm';
+            const audioBlob = new Blob(chunks, { type: blobType });
+            chunks = [];
+
+            const transcricao = await enviarParaTranscricao(audioBlob, extension);
+            setStatus('Analisando descrição com o Técnico IA...', null);
+            const analise = await enviarParaAnalise(transcricao);
+            preencherCampos(transcricao, analise);
+            setStatus('✅ Pronto! OS pré-preenchida com a análise do Técnico IA.', 'success');
+          } catch (err) {
+            setStatus('❌ ' + (err && err.message ? err.message : 'Erro ao processar áudio.'), 'error');
+          } finally {
+            stopTracks();
+            btn.disabled = false;
+          }
+        });
+
+        mediaRecorder.start();
+        isRecording = true;
+        setButtonState('recording');
+        setStatus('Gravando... fale o problema e toque novamente para parar.', null);
+      } catch (_error) {
+        stopTracks();
+        btn.disabled = false;
+        setButtonState('idle');
+        isRecording = false;
+        setStatus('Não foi possível acessar o microfone. Verifique a permissão do navegador.', 'error');
+      }
+    });
+
+    form.addEventListener('submit', function(e){
+      const id = document.getElementById('equipamento_id').value.trim();
+      const manual = document.getElementById('equipamento_manual').value.trim();
+      const sintoma = document.getElementById('sintoma_principal').value.trim();
+      const naoConformidade = naoConformidadeEl.value.trim();
+
+      descricaoHiddenEl.value = naoConformidade;
+      diagnosticoHiddenEl.value = diagnosticoEl.value.trim();
+      causaHiddenEl.value = causaEl.value.trim();
+      acoesHiddenEl.value = acoesEl.value.trim();
+
+      if (!id && !manual) {
+        e.preventDefault();
+        alert('Selecione um equipamento cadastrado ou digite o equipamento manualmente.');
+        return;
+      }
+      if (!sintoma) {
+        e.preventDefault();
+        alert('Selecione o sintoma principal.');
+        return;
+      }
+      if (!naoConformidade || naoConformidade.length < 10) {
+        e.preventDefault();
+        alert('Descreva a não conformidade com pelo menos 10 caracteres.');
+      }
+    });
+
+    window.addEventListener('beforeunload', stopTracks);
+  })();
 </script>
-<script src="/js/os-audio-transcription.js"></script>
