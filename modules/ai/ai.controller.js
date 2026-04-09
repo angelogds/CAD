@@ -2,6 +2,12 @@ const db = require('../../database/db');
 const { askText, getAIConfig } = require('./ai.service');
 const prompts = require('./ai.prompts');
 
+const GRAXARIA_SYSTEM_PROMPT = `Você é o Técnico IA da Manutenção do Campo do Gado, especialista em reciclagem animal (graxaria).
+Fale de forma direta, prática e técnica, como um encarregado de manutenção experiente.
+Use linguagem simples, evite enrolação e sempre foque em segurança, qualidade e redução de parada.
+
+Sempre responda em português do Brasil.`;
+
 function normalizeContext(value) {
   const allowed = ['geral', 'os', 'equipamento', 'preventiva', 'academia'];
   const ctx = String(value || 'geral').toLowerCase();
@@ -60,6 +66,32 @@ function getPreventivaHistory(planoId, limit = 6) {
   `).all(Number(planoId), Number(limit));
 }
 
+function getEquipamentoContext(equipamentoId) {
+  if (!equipamentoId) return null;
+  return db.prepare(`
+    SELECT id, nome, setor, tipo
+    FROM equipamentos
+    WHERE id = ?
+    LIMIT 1
+  `).get(Number(equipamentoId));
+}
+
+function buildGeneralContext({ equipamentoId, osId }) {
+  let contextoExtra = '';
+
+  const equipamento = getEquipamentoContext(equipamentoId);
+  if (equipamento) {
+    contextoExtra += `Equipamento: ${equipamento.nome} (${equipamento.setor} - ${equipamento.tipo})\n`;
+  }
+
+  const os = getOSContext(osId);
+  if (os) {
+    contextoExtra += `OS #${os.id}: ${os.descricao || 'Sem descrição'} (${os.status || 'sem status'})\n`;
+  }
+
+  return contextoExtra.trim();
+}
+
 function renderChat(req, res) {
   const cfg = getAIConfig();
   return res.render('ai/chat', {
@@ -74,13 +106,24 @@ function renderChat(req, res) {
 async function askGeneral(req, res) {
   const pergunta = String(req.body?.pergunta || '').trim();
   const contexto = normalizeContext(req.body?.contexto);
+  const equipamentoId = Number(req.body?.equipamento_id) || null;
+  const osId = Number(req.body?.os_id) || null;
 
   if (!pergunta) return res.status(400).json({ ok: false, error: 'Informe uma pergunta.' });
 
   try {
+    const contextoExtra = buildGeneralContext({
+      equipamentoId,
+      osId,
+    });
+
     const result = await askText({
-      systemPrompt: prompts.buildAssistentePrompt(contexto),
-      userPayload: { pergunta, contexto },
+      systemPrompt: `${GRAXARIA_SYSTEM_PROMPT}\n\n${prompts.buildAssistentePrompt(contexto)}`,
+      userPayload: {
+        pergunta,
+        contexto,
+        contexto_extra: contextoExtra || null,
+      },
     });
 
     return res.json({ ok: true, resposta: result.text });
