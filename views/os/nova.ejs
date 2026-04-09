@@ -57,9 +57,16 @@
         <label class="label">Descrição do problema (solicitante)</label>
         <textarea name="descricao" class="input" required placeholder="Descreva o que está acontecendo no equipamento"></textarea>
         <div style="margin:12px 0 0;">
+          <button type="button" id="btn-tecnico-mic" class="btn btn-ghost" style="padding:11px 20px; font-weight:600; margin-right:8px;">
+            🎤 Analisar com o Técnico (Gravar Áudio)
+          </button>
           <button type="button" id="btn-analisar-tecnico" class="btn btn-blue" style="padding:11px 20px; font-weight:600;">
             👷 Analisar com o Técnico
           </button>
+        </div>
+        <div id="status-tecnico" style="display:none; align-items:center; gap:10px; margin:12px 0; color:#444;">
+          <div class="spinner-tecnico" style="width:20px;height:20px;border:4px solid #ddd;border-top:4px solid #16a34a;border-radius:50%;animation:spin-tecnico 1s linear infinite;"></div>
+          <span id="status-text">Pronto para gravar</span>
         </div>
         <div id="loading-tecnico" style="display:none; align-items:center; gap:10px; margin:12px 0; color:#444;">
           <div class="spinner-tecnico" style="width:20px;height:20px;border:4px solid #ddd;border-top:4px solid #16a34a;border-radius:50%;animation:spin-tecnico 1s linear infinite;"></div>
@@ -180,4 +187,99 @@
       btn.style.opacity = '1';
     }
   });
+
+  let mediaRecorder;
+  let audioChunks = [];
+  let isRecording = false;
+
+  document.getElementById('btn-tecnico-mic').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-tecnico-mic');
+    const statusDiv = document.getElementById('status-tecnico');
+    const statusText = document.getElementById('status-text');
+
+    if (!isRecording) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (event) => audioChunks.push(event.data);
+        mediaRecorder.onstop = () => processarAudio();
+
+        mediaRecorder.start();
+        isRecording = true;
+
+        btn.textContent = '⏹️ Parar Gravação';
+        btn.style.background = '#ef4444';
+        statusDiv.style.display = 'flex';
+        statusText.textContent = 'Gravando... Fale o problema claramente.';
+        statusText.style.color = '#444';
+      } catch (err) {
+        alert('❌ Não foi possível acessar o microfone. Verifique as permissões.');
+      }
+    } else {
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+      isRecording = false;
+    }
+  });
+
+  async function processarAudio() {
+    const btn = document.getElementById('btn-tecnico-mic');
+    const statusText = document.getElementById('status-text');
+
+    btn.disabled = true;
+    statusText.textContent = 'Transcrevendo e analisando com o Técnico...';
+
+    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'os_audio.webm');
+
+    try {
+      const transRes = await fetch('/ia/transcrever/abertura', {
+        method: 'POST',
+        body: formData,
+      });
+      const transData = await transRes.json();
+
+      if (!transRes.ok || transData.status !== 'concluido') {
+        throw new Error(transData.erro || 'Falha na transcrição');
+      }
+
+      const transcricao = transData.transcricao_bruta || '';
+      document.querySelector('textarea[name="descricao"]').value = transcricao;
+
+      const analiseRes = await fetch('/ia/os/analisar-abertura', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          descricao: transcricao,
+          equipamento_id: document.querySelector('select[name="equipamento_id"]').value || null,
+        }),
+      });
+      const analiseData = await analiseRes.json();
+
+      if (analiseRes.ok && analiseData.ok && analiseData.resultado) {
+        document.querySelector('select[name="grau"]').value = analiseData.resultado.criticidade_sugerida || analiseData.resultado.criticidade || 'MEDIA';
+        document.querySelector('textarea[name="causa_diagnostico"]').value = analiseData.resultado.diagnostico_inicial || analiseData.resultado.causa_mais_provavel || '';
+        document.querySelector('textarea[name="resumo_tecnico"]').value = analiseData.resultado.acoes_iniciais || '';
+
+        statusText.textContent = '✅ Pronto! Áudio transcrito e analisado pelo Técnico.';
+        statusText.style.color = '#166534';
+      } else {
+        statusText.textContent = '✅ Áudio transcrito, mas análise falhou.';
+      }
+    } catch (err) {
+      console.error(err);
+      statusText.textContent = `❌ Erro: ${err.message}`;
+      statusText.style.color = '#dc2626';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🎤 Analisar com o Técnico (Gravar Áudio)';
+      btn.style.background = '';
+      setTimeout(() => {
+        document.getElementById('status-tecnico').style.display = 'none';
+      }, 4000);
+    }
+  }
 </script>
