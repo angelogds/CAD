@@ -129,60 +129,6 @@
     }
   });
 
-  document.getElementById('btn-tecnico-mic').addEventListener('click', async () => {
-    const equipamento = document.querySelector('[name="equipamento_id"]')?.value || '';
-    const descricaoField = document.querySelector('[name="descricao"]');
-    const descricao = String(descricaoField?.value || '').trim();
-    const btn = document.getElementById('btn-tecnico-mic');
-    const statusBox = document.getElementById('status-tecnico');
-    const statusText = document.getElementById('status-text');
-
-    if (!descricao) {
-      alert('❌ Descreva o problema antes de chamar o Técnico.');
-      return;
-    }
-
-    btn.disabled = true;
-    btn.style.opacity = '0.6';
-    statusBox.style.display = 'block';
-    statusText.textContent = 'O Técnico está analisando a OS...';
-    statusText.style.color = '#166534';
-
-    try {
-      const res = await fetch('/ai/os/analisar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          equipamento_id: equipamento,
-          descricao,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.ok) {
-        const criticidadeField = document.querySelector('[name="grau"]');
-        const diagnosticoField = document.querySelector('[name="causa_diagnostico"]');
-        const acaoInicialField = document.querySelector('[name="resumo_tecnico"]');
-
-        if (criticidadeField) criticidadeField.value = data.resultado?.criticidade_sugerida || data.resultado?.criticidade || criticidadeField.value;
-        if (diagnosticoField) diagnosticoField.value = data.resultado?.diagnostico_inicial || data.resultado?.causa_mais_provavel || '';
-        if (acaoInicialField) acaoInicialField.value = data.resultado?.acoes_iniciais || '';
-        statusText.textContent = '✅ Análise do Técnico concluída!';
-        setTimeout(() => { statusBox.style.display = 'none'; }, 1800);
-      } else {
-        throw new Error(data.error || 'Não foi possível completar a análise');
-      }
-    } catch (e) {
-      statusText.textContent = `❌ ${e.message || 'Erro de conexão com o Técnico'}`;
-      statusText.style.color = '#dc2626';
-      setTimeout(() => { statusBox.style.display = 'none'; }, 3500);
-    } finally {
-      btn.disabled = false;
-      btn.style.opacity = '1';
-    }
-  });
-
   let mediaRecorder;
   let mediaStream;
   let audioChunks = [];
@@ -243,23 +189,23 @@
     formData.append('audio', audioBlob, 'os_audio.webm');
 
     try {
-      const transRes = await fetch('/ia/transcrever/abertura', {
+      const transRes = await fetch('/ai/os/transcrever-abertura', {
         method: 'POST',
         body: formData,
       });
       const transData = await transRes.json();
 
-      if (!transRes.ok || transData.status !== 'concluido') {
-        throw new Error(transData.erro || 'Falha na transcrição');
+      if (!transData.ok) {
+        throw new Error('Falha na transcrição');
       }
 
-      const transcricao = transData.transcricao_bruta || '';
+      const transcricao = transData.transcricao || '';
       if (!transcricao.trim()) {
         throw new Error('A transcrição retornou vazia');
       }
       document.querySelector('textarea[name="descricao"]').value = transcricao;
 
-      const analiseRes = await fetch('/ia/os/analisar-abertura', {
+      const analiseRes = await fetch('/ai/os/analisar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
