@@ -152,6 +152,10 @@
           alert('❌ Seu navegador não suporta gravação de áudio.');
           return;
         }
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+          alert('❌ O navegador não permite acesso ao microfone neste contexto.');
+          return;
+        }
 
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(mediaStream);
