@@ -12,7 +12,7 @@
     <div class="grid-2" style="gap:16px;">
       <div style="grid-column:1 / -1;">
         <label class="label" for="equipamento_id">EQUIPAMENTO</label>
-        <div class="muted" style="margin-bottom:8px;">Equipamento cadastrado / manual</div>
+        <div class="muted" style="margin-bottom:8px;">Selecione o equipamento cadastrado ou informe manualmente.</div>
         <select name="equipamento_id" id="equipamento_id" class="input">
           <option value="">Selecionar equipamento cadastrado</option>
           <% (equipamentos || []).forEach(e => { %>
@@ -64,36 +64,11 @@
         ></textarea>
       </div>
 
-      <div style="grid-column:1 / -1;" class="ai-box">
-        <div class="label" style="margin-bottom:8px;">PREENCHIMENTO DA IA (EDITÁVEL)</div>
-        <div class="grid-2" style="gap:12px;">
-          <div>
-            <label class="label" for="criticidade">Criticidade</label>
-            <select name="criticidade" id="criticidade" class="input">
-              <option value="BAIXA">BAIXA</option>
-              <option value="MEDIA" selected>MEDIA</option>
-              <option value="ALTA">ALTA</option>
-              <option value="CRITICA">CRITICA</option>
-            </select>
-          </div>
-          <div>
-            <label class="label" for="ai_tempo_estimado">Tempo estimado (min)</label>
-            <input type="number" min="0" step="1" name="ai_tempo_estimado" id="ai_tempo_estimado" class="input" placeholder="Ex.: 30" />
-          </div>
-          <div style="grid-column:1 / -1;">
-            <label class="label" for="ai_diagnostico_inicial">Diagnóstico inicial</label>
-            <textarea id="ai_diagnostico_inicial" name="ai_diagnostico_inicial" class="input" rows="3"></textarea>
-          </div>
-          <div style="grid-column:1 / -1;">
-            <label class="label" for="ai_causa">Causa mais provável</label>
-            <textarea id="ai_causa" name="ai_causa" class="input" rows="3"></textarea>
-          </div>
-          <div style="grid-column:1 / -1;">
-            <label class="label" for="ai_acoes_iniciais">Ações iniciais</label>
-            <textarea id="ai_acoes_iniciais" name="ai_acoes_iniciais" class="input" rows="3"></textarea>
-          </div>
-        </div>
-      </div>
+      <input type="hidden" name="criticidade" id="criticidade" value="MEDIA" />
+      <input type="hidden" name="ai_tempo_estimado" id="ai_tempo_estimado" value="" />
+      <input type="hidden" name="ai_diagnostico_inicial" id="ai_diagnostico_inicial" value="" />
+      <input type="hidden" name="ai_causa" id="ai_causa" value="" />
+      <input type="hidden" name="ai_acoes_iniciais" id="ai_acoes_iniciais" value="" />
 
       <input type="hidden" name="descricao" id="descricao_hidden" value="" />
       <input type="hidden" name="diagnostico_inicial" id="diagnostico_inicial_hidden" value="" />
@@ -110,7 +85,7 @@
 
     <div class="row" style="justify-content:space-between; margin-top:16px;">
       <a href="/os" class="btn btn-ghost">Cancelar</a>
-      <button type="submit" class="btn btn-primary">Salvar e gerar OS automática</button>
+      <button type="submit" class="btn btn-primary" id="btn-salvar-os">Salvar e gerar OS automática</button>
     </div>
   </form>
 </div>
@@ -163,12 +138,6 @@
     background: #fffbeb;
     color: #92400e;
   }
-  .ai-box {
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 12px;
-    background: #fafafa;
-  }
   @media (max-width: 768px) {
     .btn-converse-mecanico { font-size: .96rem; padding: 12px; }
   }
@@ -191,6 +160,7 @@
     });
 
     const form = document.getElementById('os-form');
+    const submitBtn = document.getElementById('btn-salvar-os');
     const btn = document.getElementById('btn-converse-mecanico');
     const btnLabel = document.getElementById('btn-converse-label');
     const statusEl = document.getElementById('status-converse');
@@ -389,9 +359,7 @@
       descricaoHiddenEl.value = transcricao;
 
       const criticidade = String(analise.criticidade_sugerida || analise.criticidade || '').toUpperCase();
-      if (criticidade && criticidadeEl.querySelector('option[value="' + criticidade + '"]')) {
-        criticidadeEl.value = criticidade;
-      }
+      if (criticidade) criticidadeEl.value = criticidade;
 
       const diagnostico = String(analise.ai_diagnostico_inicial || analise.diagnostico_inicial || '').trim();
       const causa = String(analise.ai_causa || analise.causa_mais_provavel || '').trim();
@@ -531,7 +499,15 @@
       if (!naoConformidade || naoConformidade.length < 10) {
         e.preventDefault();
         alert('Descreva a não conformidade com pelo menos 10 caracteres.');
+        return;
       }
+
+      if (submitBtn?.disabled) {
+        e.preventDefault();
+        return;
+      }
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Salvando...';
     });
 
     window.addEventListener('beforeunload', stopTracks);

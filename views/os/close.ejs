@@ -63,7 +63,7 @@
 
     <div class="row" style="justify-content:space-between; margin-top:16px;">
       <a class="btn btn-ghost" href="/os/<%= os.id %>">Voltar</a>
-      <button type="submit" class="btn btn-primary">Concluir OS</button>
+      <button type="submit" class="btn btn-primary" id="btn-concluir-os">Concluir OS</button>
     </div>
   </form>
 </div>
@@ -77,6 +77,7 @@
     const previewInput = document.getElementById('preview_tecnica');
     const fonteInput = document.getElementById('fonte_descricao');
     const versaoSugeridaInput = document.getElementById('versao_tecnica_sugerida');
+    const btnConcluir = document.getElementById('btn-concluir-os');
     const fonteIndicador = document.getElementById('fonte-indicador');
     const statusGeracao = document.getElementById('status-geracao');
     const btnGerar = document.getElementById('btn-gerar-descricao');
@@ -133,9 +134,14 @@
     });
 
     form?.addEventListener('submit', function(){
+      if (btnConcluir?.disabled) return;
       syncFotosMetadados();
       const preview = (previewInput?.value || '').trim();
       if (!preview) previewInput.value = (descricaoInput?.value || '').trim();
+      if (btnConcluir) {
+        btnConcluir.disabled = true;
+        btnConcluir.textContent = 'Concluindo...';
+      }
     });
   })();
 </script>
