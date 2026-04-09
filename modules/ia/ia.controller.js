@@ -1,4 +1,4 @@
-const { transcreverAudioOS, transcreverAudioFechamento } = require('./ia.service');
+const { transcreverAudioOS, transcreverAudioFechamento, gerarAberturaAutomaticaDaOS } = require('./ia.service');
 
 const ALLOWED_MIME = new Set([
   'audio/webm',
@@ -63,7 +63,55 @@ async function transcreverFechamento(req, res) {
   }
 }
 
+async function analisarAberturaOS(req, res) {
+  const descricao = String(req.body?.descricao || '').trim();
+  const equipamentoIdRaw = req.body?.equipamento_id;
+  const equipamentoId = Number(equipamentoIdRaw || 0) || null;
+
+  if (!descricao || descricao.length < 10) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Descreva o problema com pelo menos 10 caracteres para a análise da IA.',
+    });
+  }
+
+  const payload = {
+    usuario_id: req.session?.user?.id || null,
+    nao_conformidade: {
+      equipamento_id: equipamentoId,
+      sintoma_principal: 'outro',
+      severidade: 'MEDIA',
+      nao_conformidade: descricao,
+      observacao_curta: descricao,
+    },
+    contexto: {},
+  };
+
+  try {
+    const resultado = await gerarAberturaAutomaticaDaOS(payload);
+    return res.json({
+      ok: true,
+      resultado: {
+        criticidade_sugerida: resultado?.criticidade_sugerida || 'MEDIA',
+        diagnostico_inicial: resultado?.diagnostico_inicial || '',
+        causa_mais_provavel: resultado?.causa_provavel || '',
+        acoes_iniciais: resultado?.acao_preventiva || '',
+      },
+    });
+  } catch (err) {
+    console.warn('[ia.analisarAberturaOS]', {
+      code: err?.code || null,
+      technical: err?.technical || err?.message || String(err),
+    });
+    return res.status(200).json({
+      ok: false,
+      error: friendlyTranscriptionError(err),
+    });
+  }
+}
+
 module.exports = {
   transcreverAbertura,
   transcreverFechamento,
+  analisarAberturaOS,
 };

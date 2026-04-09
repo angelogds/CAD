@@ -56,6 +56,11 @@
       <div style="grid-column:1 / -1;">
         <label class="label">Descrição do problema (solicitante)</label>
         <textarea name="descricao" class="input" required placeholder="Descreva o que está acontecendo no equipamento"></textarea>
+        <div style="margin-top:12px;">
+          <button type="button" id="btn-analisar-ia" class="btn btn-blue">
+            🤖 Analisar com IA
+          </button>
+        </div>
       </div>
 
       <div>
@@ -109,6 +114,54 @@
     if (!id && !manual) {
       e.preventDefault();
       alert('Informe um equipamento cadastrado ou manual.');
+    }
+  });
+
+  document.getElementById('btn-analisar-ia').addEventListener('click', async () => {
+    const equipamento = document.querySelector('[name="equipamento_id"]')?.value || '';
+    const descricaoField = document.querySelector('[name="descricao"]');
+    const descricao = String(descricaoField?.value || '').trim();
+
+    if (!descricao) {
+      alert('Preencha a descrição do problema antes de analisar.');
+      return;
+    }
+
+    const btn = document.getElementById('btn-analisar-ia');
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Analisando...';
+
+    try {
+      const res = await fetch('/ia/os/analisar-abertura', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          equipamento_id: equipamento,
+          descricao,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.ok) {
+        const criticidadeField = document.querySelector('[name="grau"]');
+        const diagnosticoField = document.querySelector('[name="causa_diagnostico"]');
+        const acaoInicialField = document.querySelector('[name="resumo_tecnico"]');
+
+        if (criticidadeField) criticidadeField.value = data.resultado?.criticidade_sugerida || criticidadeField.value;
+        if (diagnosticoField) diagnosticoField.value = data.resultado?.diagnostico_inicial || '';
+        if (acaoInicialField) acaoInicialField.value = data.resultado?.acoes_iniciais || '';
+
+        alert('✅ Análise da IA concluída!');
+      } else {
+        alert(`Erro: ${data.error || 'Não foi possível analisar.'}`);
+      }
+    } catch (_e) {
+      alert('Erro de conexão com a IA');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
     }
   });
 </script>
