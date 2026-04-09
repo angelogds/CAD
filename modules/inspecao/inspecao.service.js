@@ -581,8 +581,9 @@ function syncFromClosedOS(osId) {
 function syncFromOS(osId) {
   const osTable = resolveOSTable();
   const cols = tableColumns(osTable);
-  const dataInicioCol = cols.includes("data_inicio") ? "data_inicio" : (cols.includes("opened_at") ? "opened_at" : "NULL");
-  const os = db.prepare(`SELECT id, ${dataInicioCol} AS data_inicio FROM ${osTable} WHERE id = ?`).get(osId);
+  const startCols = ["data_inicio", "opened_at", "created_at"].filter((c) => cols.includes(c));
+  const dataInicioExpr = startCols.length ? `COALESCE(${startCols.join(", ")})` : "NULL";
+  const os = db.prepare(`SELECT id, ${dataInicioExpr} AS data_inicio FROM ${osTable} WHERE id = ?`).get(osId);
   if (!os || !normalizeDate(os.data_inicio)) return { synced: false, reason: "os_or_data_missing" };
 
   const dt = parseDate(os.data_inicio);

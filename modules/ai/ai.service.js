@@ -143,14 +143,58 @@ function parseJSONObject(rawText) {
   const text = String(rawText || '').trim();
   if (!text) throw buildError('AI_EMPTY_RESPONSE', 'IA sem conteúdo de resposta.', 'Resposta JSON vazia da Responses API');
 
+  const unwrapFencedJson = (value) => {
+    const match = String(value || '').match(/```(?:json)?\s*([\s\S]*?)```/i);
+    return match ? match[1].trim() : String(value || '').trim();
+  };
+
+  const findFirstJSONObject = (value) => {
+    const source = String(value || '');
+    let depth = 0;
+    let start = -1;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = 0; i < source.length; i += 1) {
+      const ch = source[i];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (ch === '\\') {
+          escaped = true;
+          continue;
+        }
+        if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+      if (ch === '{') {
+        if (depth === 0) start = i;
+        depth += 1;
+        continue;
+      }
+      if (ch === '}') {
+        if (depth > 0) depth -= 1;
+        if (depth === 0 && start >= 0) return source.slice(start, i + 1);
+      }
+    }
+    return '';
+  };
+
+  const normalized = unwrapFencedJson(text);
+
   try {
-    return JSON.parse(text);
+    return JSON.parse(normalized);
   } catch (_e) {
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
-    if (start >= 0 && end > start) {
+    const extracted = findFirstJSONObject(normalized);
+    if (extracted) {
       try {
-        return JSON.parse(text.slice(start, end + 1));
+        return JSON.parse(extracted);
       } catch (_ignored) {}
     }
   }
