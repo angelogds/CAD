@@ -38,15 +38,42 @@ function friendlyTranscriptionError(err) {
 async function transcreverAbertura(req, res) {
   const file = req.file;
   const fileError = validateAudioFile(file);
-  if (fileError) return res.status(400).json({ transcricao_bruta: '', status: 'erro_validacao', fonte: 'audio', erro: fileError });
+  if (fileError) {
+    return res.status(400).json({
+      ok: false,
+      transcricao: '',
+      transcricao_bruta: '',
+      status: 'erro_validacao',
+      fonte: 'audio',
+      erro: fileError,
+      pode_tentar_novamente: false,
+    });
+  }
 
   try {
     const result = await transcreverAudioOS({ buffer: file.buffer, mimeType: file.mimetype });
-    return res.json({ transcricao_bruta: result.text, status: 'concluido', fonte: 'audio' });
+    const texto = String(result?.text || '').trim();
+    return res.json({
+      ok: true,
+      transcricao: texto,
+      transcricao_bruta: texto,
+      status: texto ? 'concluido' : 'vazio',
+      fonte: 'audio',
+      erro: texto ? null : 'Áudio recebido, mas a transcrição retornou vazia. Continue com preenchimento manual sem bloqueio.',
+      pode_tentar_novamente: !texto,
+    });
   } catch (err) {
     const erroAmigavel = friendlyTranscriptionError(err);
     console.warn('[ia.transcreverAbertura]', { code: err?.code, technical: err?.technical || err?.message });
-    return res.status(200).json({ transcricao_bruta: '', status: 'erro', fonte: 'audio', erro: erroAmigavel });
+    return res.status(200).json({
+      ok: false,
+      transcricao: '',
+      transcricao_bruta: '',
+      status: 'erro',
+      fonte: 'audio',
+      erro: erroAmigavel,
+      pode_tentar_novamente: true,
+    });
   }
 }
 
@@ -99,6 +126,7 @@ async function analisarAberturaOS(req, res) {
       ok: true,
       resultado: getFallbackAnalise(descricao),
       fonte: 'fallback_manual',
+      aviso: 'IA indisponível no momento. Campos sugeridos preenchidos com fallback local; revise antes de salvar.',
     });
   }
 
@@ -124,6 +152,7 @@ async function analisarAberturaOS(req, res) {
       ok: true,
       resultado: getFallbackAnalise(descricao),
       fonte: 'fallback_manual',
+      aviso: 'Falha temporária da IA. Continue manualmente sem bloquear o salvamento da OS.',
     });
   }
 }
