@@ -6,21 +6,17 @@
   <title>Login • Campo do Gado</title>
   <style>
     :root {
-      /* parâmetros fáceis para próximo ajuste */
-      --bg-overlay: rgba(15, 23, 42, 0.32);
-      --card-bg: rgba(255, 255, 255, 0.62);
-      --card-radius: 22px;
-      --card-width: 410px;
-      --card-padding: 24px;
-      --title-size: 42px;
-      --subtitle-size: 16px;
-      --input-size: 16px;
-      --button-size: 18px;
-
-      --txt-strong: #0f172a;
-      --txt-soft: #475569;
-      --brand-green: #16a34a;
-      --brand-green-dark: #15803d;
+      --card-bg: rgba(7, 14, 20, 0.5);
+      --card-radius: 20px;
+      --card-width: 360px;
+      --card-padding: 20px;
+      --subtitle-size: 13px;
+      --input-size: 15px;
+      --button-size: 15px;
+      --txt-strong: #f8fafc;
+      --txt-soft: rgba(248, 250, 252, 0.72);
+      --brand-green: #2d5a3d;
+      --brand-green-dark: #4a8b5f;
     }
 
     * { box-sizing: border-box; }
@@ -28,27 +24,102 @@
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: Arial, Helvetica, sans-serif;
-      background:
-        linear-gradient(var(--bg-overlay), var(--bg-overlay)),
-        url('/IMG/campo-do-bg-gado-login.svg.jpeg') center/cover no-repeat fixed;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+      background: #0a0a0a;
+    }
+
+    .hero-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    .scene {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transform: scale(1.08);
+      transition: all 1.8s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+    }
+
+    .scene.active {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .scene img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: brightness(0.7) contrast(1.08) saturate(0.92);
+    }
+
+    .scene.active img {
+      animation: slowZoom 20s ease-in-out infinite alternate;
+    }
+
+    @keyframes slowZoom {
+      0% { transform: scale(1) translate(0, 0); }
+      100% { transform: scale(1.08) translate(-1%, -1%); }
+    }
+
+    .industrial-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        135deg,
+        rgba(10, 15, 20, 0.85) 0%,
+        rgba(20, 30, 40, 0.62) 40%,
+        rgba(10, 20, 30, 0.42) 60%,
+        rgba(5, 10, 15, 0.9) 100%
+      );
+      z-index: 2;
+    }
+
+    .vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.45) 100%);
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .tech-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(74, 139, 95, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(74, 139, 95, 0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+      z-index: 4;
+      pointer-events: none;
     }
 
     .login-screen {
       min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px;
+      position: relative;
+      z-index: 20;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 24px 9% 24px 24px;
     }
 
     .login-card {
       width: min(var(--card-width), 100%);
       background: var(--card-bg);
-      border: 1px solid rgba(255, 255, 255, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: var(--card-radius);
-      box-shadow: 0 18px 42px rgba(2, 6, 23, 0.28);
+      box-shadow:
+        0 25px 50px -12px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
       padding: var(--card-padding);
-      backdrop-filter: blur(8px);
+      backdrop-filter: blur(18px);
     }
 
     .login-logo-wrap {
@@ -58,17 +129,28 @@
     }
 
     .login-logo {
-      width: min(250px, 100%);
+      width: min(108px, 100%);
       height: auto;
       object-fit: contain;
       display: block;
     }
 
+    .company-name {
+      margin: 0 0 6px;
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+
     .login-subtitle {
-      margin: 0 0 18px;
+      margin: 0 0 16px;
       color: var(--txt-soft);
       font-size: var(--subtitle-size);
-      font-weight: 600;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 2px;
       text-align: center;
     }
 
@@ -83,18 +165,18 @@
 
     .field input {
       width: 100%;
-      border: 1px solid #cbd5e1;
+      border: 1px solid rgba(255, 255, 255, 0.13);
       border-radius: 12px;
       padding: 11px 12px;
       font-size: var(--input-size);
       color: var(--txt-strong);
-      background: #fff;
+      background: rgba(0, 0, 0, 0.28);
     }
 
     .field input:focus {
       outline: none;
       border-color: var(--brand-green);
-      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+      box-shadow: 0 0 0 3px rgba(74, 139, 95, 0.18);
     }
 
     .btn-login {
@@ -103,15 +185,18 @@
       border: none;
       border-radius: 12px;
       padding: 12px;
-      background: var(--brand-green);
+      background: linear-gradient(135deg, var(--brand-green) 0%, var(--brand-green-dark) 100%);
       color: #fff;
       font-size: var(--button-size);
       font-weight: 800;
       cursor: pointer;
-      transition: background .2s ease;
+      transition: all .25s ease;
     }
 
-    .btn-login:hover { background: var(--brand-green-dark); }
+    .btn-login:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(45, 90, 61, 0.35);
+    }
 
     .alert {
       margin: 0 0 10px;
@@ -127,21 +212,58 @@
 
     @media (max-width: 640px) {
       :root {
-        --card-padding: 22px;
-        --title-size: 34px;
-        --subtitle-size: 15px;
-        --input-size: 15px;
-        --button-size: 16px;
+        --card-width: 335px;
+        --card-padding: 18px;
+        --subtitle-size: 12px;
+        --input-size: 14px;
+        --button-size: 14px;
+      }
+
+      .login-screen {
+        justify-content: center;
+        padding: 16px;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .login-screen {
+        justify-content: center;
+        padding: 20px;
       }
     }
   </style>
 </head>
 <body>
+  <div class="hero-container">
+    <div class="scene active" data-stage="1">
+      <img src="https://kimi-web-img.moonshot.cn/img/c8.alamy.com/6deda514d0f13e01bd965c3db7684dd2f3639149.jpg" alt="Base da fábrica" />
+    </div>
+    <div class="scene" data-stage="2">
+      <img src="https://kimi-web-img.moonshot.cn/img/commercecon.pl/86d1114da7ce5560c553d23c507b7c0e4cc3c83f.jpg" alt="Estrutura metálica" />
+    </div>
+    <div class="scene" data-stage="3">
+      <img src="https://kimi-web-img.moonshot.cn/img/kianhuatmetal.com/8bb09527000020f8de7ae53a8ae78ed00ae3f206.jpg" alt="Solda industrial" />
+    </div>
+    <div class="scene" data-stage="4">
+      <img src="https://kimi-web-img.moonshot.cn/img/ptifabrication.com/d89635c333ff32d33441d3a7b827fc6dbe98022b.webp" alt="Instalação de equipamentos" />
+    </div>
+    <div class="scene" data-stage="5">
+      <img src="https://kimi-web-img.moonshot.cn/img/alltracon.com/2ef92bd7fe716aee29ce65533a6c346e90bf2bf9.jpg" alt="Manutenção industrial" />
+    </div>
+    <div class="scene" data-stage="6">
+      <img src="https://kimi-web-img.moonshot.cn/img/media.istockphoto.com/a18c867133f1c8cfbf18ecdcccecdc8cc17ecba2.jpg" alt="Fábrica moderna" />
+    </div>
+    <div class="industrial-overlay"></div>
+    <div class="vignette"></div>
+    <div class="tech-grid"></div>
+  </div>
+
   <section class="login-screen">
     <div class="login-card">
       <div class="login-logo-wrap">
         <img class="login-logo" src="/IMG/login_campo_do_gado.png.png.png" alt="Logo manutenção" />
       </div>
+      <h1 class="company-name">CAMPO DO GADO</h1>
       <p class="login-subtitle">Acesse o Sistema de Manutenção Industrial</p>
 
       <% if (flash && flash.error && flash.error.length) { %>
@@ -196,5 +318,21 @@
       </form>
     </div>
   </section>
+  <script>
+    const scenes = document.querySelectorAll('.scene');
+    let currentStage = 0;
+    const stageDuration = 5000;
+
+    function updateStage(nextIndex) {
+      scenes.forEach((scene, index) => {
+        scene.classList.toggle('active', index === nextIndex);
+      });
+    }
+
+    setInterval(() => {
+      currentStage = (currentStage + 1) % scenes.length;
+      updateStage(currentStage);
+    }, stageDuration);
+  </script>
 </body>
 </html>
