@@ -1,5 +1,7 @@
 const db = require('../../database/db');
-const { askText, getAIConfig } = require('./ai.service');
+const { askText, getAIConfig, gerarDiagnosticoOS, melhorarDescricaoOperador, sugerirPecasPorFalha, normalizeStructuredAIResponse } = require('./ai.service');
+const embeddingsService = require('./ai.embeddings.service');
+const visionService = require('./ai.vision.service');
 const prompts = require('./ai.prompts');
 
 const GRAXARIA_SYSTEM_PROMPT = `Você é o Técnico IA da Manutenção do Campo do Gado, especialista em reciclagem animal (graxaria).
@@ -182,9 +184,68 @@ async function analyzePreventiva(req, res) {
   }
 }
 
+
+
+async function diagnosticarOS(req, res) {
+  try {
+    const payload = req.body || {};
+    const diagnostico = await gerarDiagnosticoOS(payload);
+    const similares = embeddingsService.buscarOSSimilares({
+      equipamentoId: Number(payload.equipamento_id || 0) || null,
+      texto: [payload.descricao, payload.sintoma_principal].filter(Boolean).join(' '),
+      limit: 5,
+    });
+    const pecas = await sugerirPecasPorFalha({ ...payload, diagnostico, similares });
+    return res.json({ ok: true, ...diagnostico, pecas_sugeridas: pecas, os_similares: similares });
+  } catch (err) {
+    const friendly = toFriendlyError(err);
+    return res.status(503).json({ ok: false, error: friendly.message, code: friendly.code });
+  }
+}
+
+async function melhorarDescricaoOS(req, res) {
+  try {
+    const texto = String(req.body?.texto || req.body?.descricao || '').trim();
+    if (texto.length < 5) return res.status(400).json({ ok: false, error: 'Texto insuficiente para melhoria.' });
+    const result = await melhorarDescricaoOperador(texto, req.body?.contexto || {});
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    const friendly = toFriendlyError(err);
+    return res.status(503).json({ ok: false, error: friendly.message, code: friendly.code });
+  }
+}
+
+async function analisarImagemOS(req, res) {
+  const file = req.file;
+  if (!file) return res.status(400).json({ ok: false, error: 'Envie uma imagem.' });
+  const result = await visionService.analisarImagemFalha({
+    fileBuffer: file.buffer,
+    mimeType: file.mimetype,
+    fileName: file.originalname,
+  });
+  return res.json({ ok: true, ...result });
+}
+
+function rankingFalhas(req, res) {
+  const dias = Number(req.query?.dias || 90);
+  const ranking = embeddingsService.rankingFalhasEquipamentos({ dias, limit: Number(req.query?.limit || 15) });
+  const alertas = embeddingsService.preverFalhasEAlertas({ dias: Math.max(15, Math.min(dias, 60)) });
+  return res.json({ ok: true, ranking, alertas });
+}
+
+async function diagnosticoEstruturado(req, res) {
+  const dados = normalizeStructuredAIResponse(req.body || {});
+  return res.json({ ok: true, ...dados });
+}
+
 module.exports = {
   renderChat,
   askGeneral,
   analyzeOS,
   analyzePreventiva,
+  diagnosticarOS,
+  melhorarDescricaoOS,
+  analisarImagemOS,
+  rankingFalhas,
+  diagnosticoEstruturado,
 };

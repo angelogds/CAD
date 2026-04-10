@@ -26,6 +26,12 @@ const upload = multer({
   },
 });
 
+
+const uploadImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: Number(process.env.OPENAI_IMAGE_MAX_BYTES || 8 * 1024 * 1024), files: 1 },
+});
+
 router.get('/chat', requireLogin, requireRole(AI_ACCESS), ctrl.renderChat);
 router.post('/ask', requireLogin, requireRole(AI_ACCESS), ctrl.askGeneral);
 router.post('/os/:id/analyze', requireLogin, requireRole(ACCESS.os_view), ctrl.analyzeOS);
@@ -33,5 +39,12 @@ router.post('/preventivas/:id/analyze', requireLogin, requireRole(ACCESS.prevent
 router.post('/os/transcrever-abertura', requireLogin, requireRole(AI_TRANSCRICAO_ACCESS), upload.single('audio'), iaCtrl.transcreverAbertura);
 router.post('/os/transcrever-fechamento', requireLogin, requireRole(AI_TRANSCRICAO_ACCESS), upload.single('audio'), iaCtrl.transcreverFechamento);
 router.post('/os/analisar', requireLogin, requireRole(AI_TRANSCRICAO_ACCESS), iaCtrl.analisarAberturaOS);
+
+router.post('/os/diagnosticar', requireLogin, requireRole(ACCESS.os_view), ctrl.diagnosticarOS);
+router.post('/os/melhorar-descricao', requireLogin, requireRole(ACCESS.os_view), ctrl.melhorarDescricaoOS);
+router.post('/os/analisar-imagem', requireLogin, requireRole(ACCESS.os_view), uploadImage.single('imagem'), ctrl.analisarImagemOS);
+router.get('/os/ranking-falhas', requireLogin, requireRole(ACCESS.os_view), ctrl.rankingFalhas);
+router.post('/os/diagnostico-estruturado', requireLogin, requireRole(ACCESS.os_view), ctrl.diagnosticoEstruturado);
+
 
 module.exports = router;

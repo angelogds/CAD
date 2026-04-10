@@ -376,6 +376,65 @@ async function askJSONSchemaStrict({
   }
 }
 
+
+
+function normalizeCriticidade(value) {
+  const raw = String(value || 'media').toLowerCase();
+  if (raw.includes('crit')) return 'critica';
+  if (raw.includes('alt')) return 'alta';
+  if (raw.includes('baix')) return 'baixa';
+  return 'media';
+}
+
+function normalizeStructuredAIResponse(data = {}) {
+  return {
+    diagnostico: String(data.diagnostico || data.diagnostico_inicial || '').trim() || 'Diagnóstico inicial pendente de validação em campo.',
+    causa_provavel: String(data.causa_provavel || '').trim() || 'Causa provável ainda não definida.',
+    acao_recomendada: String(data.acao_recomendada || data.acao_corretiva || '').trim() || 'Executar inspeção técnica segura e definir plano corretivo.',
+    criticidade: normalizeCriticidade(data.criticidade || data.criticidade_sugerida),
+  };
+}
+
+async function gerarDiagnosticoOS(payload = {}) {
+  const result = await askText({
+    systemPrompt: 'Você é especialista em manutenção industrial. Responda somente JSON com: diagnostico, causa_provavel, acao_recomendada, criticidade.',
+    userPayload: payload,
+    maxOutputTokens: 260,
+    temperature: 0.1,
+  });
+  let parsed = {};
+  try { parsed = JSON.parse(String(result?.text || '{}')); } catch (_e) {}
+  return normalizeStructuredAIResponse(parsed);
+}
+
+async function melhorarDescricaoOperador(texto = '', contexto = {}) {
+  const result = await askText({
+    systemPrompt: 'Transforme relato operacional em texto técnico estruturado. Responda JSON com diagnostico, causa_provavel, acao_recomendada, criticidade.',
+    userPayload: { relato: String(texto || ''), contexto },
+    maxOutputTokens: 260,
+    temperature: 0.1,
+  });
+  let parsed = {};
+  try { parsed = JSON.parse(String(result?.text || '{}')); } catch (_e) {}
+  return normalizeStructuredAIResponse(parsed);
+}
+
+async function sugerirPecasPorFalha(payload = {}) {
+  const result = await askText({
+    systemPrompt: 'Retorne JSON com campo itens (array) contendo peças e ferramentas prováveis para manutenção.',
+    userPayload: payload,
+    maxOutputTokens: 220,
+    temperature: 0.2,
+  });
+  try {
+    const parsed = JSON.parse(String(result?.text || '{}'));
+    const itens = Array.isArray(parsed.itens) ? parsed.itens : [];
+    return itens.map((i) => String(i || '').trim()).filter(Boolean).slice(0, 12);
+  } catch (_e) {
+    return [];
+  }
+}
+
 async function testOpenAIConnection() {
   const cfg = getAIConfig();
   if (!cfg.enabled) {
@@ -423,4 +482,8 @@ module.exports = {
   validateAIEnvironment,
   testOpenAIConnection,
   looksLikePlaceholderKey,
+  gerarDiagnosticoOS,
+  melhorarDescricaoOperador,
+  sugerirPecasPorFalha,
+  normalizeStructuredAIResponse,
 };

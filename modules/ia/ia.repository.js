@@ -1,5 +1,6 @@
 const db = require("../../database/db");
 const { safeJSONStringify } = require("./ia.schema");
+const aiEmbeddingsService = require("../ai/ai.embeddings.service");
 
 function tableExists(name) {
   try {
@@ -39,6 +40,15 @@ function buscarHistoricoSemelhante(params = {}) {
   const limit = params.limit ?? params.limite ?? 8;
   const hasOS = tableExists("os");
   if (!hasOS || !equipamentoId) return [];
+
+  try {
+    const semelhantes = aiEmbeddingsService.buscarOSSimilares({
+      equipamentoId: Number(equipamentoId),
+      texto: [sintoma, descricao].filter(Boolean).join(' '),
+      limit: Number(limit),
+    });
+    if (semelhantes.length) return semelhantes;
+  } catch (_e) {}
 
   const sintomaSafe = String(sintoma || "").trim();
   const descSafe = String(descricao || "").trim();
