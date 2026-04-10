@@ -234,25 +234,22 @@
   </style>
 </head>
 <body>
+  <% const fallbackSlideshowImages = [
+    "https://kimi-web-img.moonshot.cn/img/c8.alamy.com/6deda514d0f13e01bd965c3db7684dd2f3639149.jpg",
+    "https://kimi-web-img.moonshot.cn/img/commercecon.pl/86d1114da7ce5560c553d23c507b7c0e4cc3c83f.jpg",
+    "https://kimi-web-img.moonshot.cn/img/kianhuatmetal.com/8bb09527000020f8de7ae53a8ae78ed00ae3f206.jpg",
+    "https://kimi-web-img.moonshot.cn/img/ptifabrication.com/d89635c333ff32d33441d3a7b827fc6dbe98022b.webp",
+    "https://kimi-web-img.moonshot.cn/img/alltracon.com/2ef92bd7fe716aee29ce65533a6c346e90bf2bf9.jpg",
+    "https://kimi-web-img.moonshot.cn/img/media.istockphoto.com/a18c867133f1c8cfbf18ecdcccecdc8cc17ecba2.jpg"
+  ]; %>
+  <% const heroImages = Array.isArray(slideshowImages) && slideshowImages.length ? slideshowImages : fallbackSlideshowImages; %>
+
   <div class="hero-container">
-    <div class="scene active" data-stage="1">
-      <img src="https://kimi-web-img.moonshot.cn/img/c8.alamy.com/6deda514d0f13e01bd965c3db7684dd2f3639149.jpg" alt="Base da fábrica" />
-    </div>
-    <div class="scene" data-stage="2">
-      <img src="https://kimi-web-img.moonshot.cn/img/commercecon.pl/86d1114da7ce5560c553d23c507b7c0e4cc3c83f.jpg" alt="Estrutura metálica" />
-    </div>
-    <div class="scene" data-stage="3">
-      <img src="https://kimi-web-img.moonshot.cn/img/kianhuatmetal.com/8bb09527000020f8de7ae53a8ae78ed00ae3f206.jpg" alt="Solda industrial" />
-    </div>
-    <div class="scene" data-stage="4">
-      <img src="https://kimi-web-img.moonshot.cn/img/ptifabrication.com/d89635c333ff32d33441d3a7b827fc6dbe98022b.webp" alt="Instalação de equipamentos" />
-    </div>
-    <div class="scene" data-stage="5">
-      <img src="https://kimi-web-img.moonshot.cn/img/alltracon.com/2ef92bd7fe716aee29ce65533a6c346e90bf2bf9.jpg" alt="Manutenção industrial" />
-    </div>
-    <div class="scene" data-stage="6">
-      <img src="https://kimi-web-img.moonshot.cn/img/media.istockphoto.com/a18c867133f1c8cfbf18ecdcccecdc8cc17ecba2.jpg" alt="Fábrica moderna" />
-    </div>
+    <% heroImages.forEach((imageSrc, index) => { %>
+      <div class="scene <%= index === 0 ? 'active' : '' %>" data-stage="<%= index + 1 %>">
+        <img src="<%= imageSrc %>" alt="Imagem de destaque do login <%= index + 1 %>" />
+      </div>
+    <% }); %>
     <div class="industrial-overlay"></div>
     <div class="vignette"></div>
     <div class="tech-grid"></div>

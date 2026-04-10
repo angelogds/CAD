@@ -1,6 +1,30 @@
 // modules/auth/auth.controller.js
+const fs = require("fs");
+const path = require("path");
 const bcrypt = require("bcryptjs");
 const authService = require("./auth.service");
+
+const LOGIN_SLIDESHOW_DIR = path.join(process.cwd(), "public", "img", "login", "slideshow");
+const LOGIN_SLIDESHOW_WEB_BASE = "/img/login/slideshow";
+const LOGIN_SLIDESHOW_ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".svg"]);
+
+function getLoginSlideshowImages() {
+  try {
+    if (!fs.existsSync(LOGIN_SLIDESHOW_DIR)) return [];
+
+    const imageFiles = fs
+      .readdirSync(LOGIN_SLIDESHOW_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name)
+      .filter((fileName) => LOGIN_SLIDESHOW_ALLOWED_EXTENSIONS.has(path.extname(fileName).toLowerCase()))
+      .sort((a, b) => a.localeCompare(b, "pt-BR", { sensitivity: "base", numeric: true }));
+
+    return imageFiles.map((fileName) => `${LOGIN_SLIDESHOW_WEB_BASE}/${encodeURIComponent(fileName)}`);
+  } catch (error) {
+    console.error("❌ Erro ao carregar imagens do slideshow de login:", error);
+    return [];
+  }
+}
 
 exports.showLogin = (req, res) => {
   if (req.session?.user) return res.redirect("/dashboard");
@@ -13,6 +37,7 @@ exports.showLogin = (req, res) => {
     attemptsLeft: null,
     rememberedEmail: "",
     next: String(req.query?.next || "").trim(),
+    slideshowImages: getLoginSlideshowImages(),
   });
 };
 
