@@ -46,5 +46,17 @@ router.post('/os/analisar-imagem', requireLogin, requireRole(ACCESS.os_view), up
 router.get('/os/ranking-falhas', requireLogin, requireRole(ACCESS.os_view), ctrl.rankingFalhas);
 router.post('/os/diagnostico-estruturado', requireLogin, requireRole(ACCESS.os_view), ctrl.diagnosticoEstruturado);
 
+router.get('/status', requireLogin, requireRole(AI_ACCESS), ctrl.status);
+router.post('/test-connection', requireLogin, requireRole(AI_ACCESS), ctrl.testConnection);
+router.post('/cache/clear', requireLogin, requireRole(AI_ACCESS), ctrl.clearAICache);
+router.post('/chatbot/message', requireLogin, requireRole(AI_ACCESS), ctrl.chatbotMessage);
+router.post('/chatbot/stream', requireLogin, requireRole(AI_ACCESS), ctrl.chatbotStream);
+router.post('/search/semantic', requireLogin, requireRole(AI_ACCESS), ctrl.semanticSearchHandler);
+router.post('/report/executive', requireLogin, requireRole(AI_ACCESS), ctrl.executiveReport);
+router.post('/equipamentos/:id/recommendations', requireLogin, requireRole(ACCESS.os_view), ctrl.equipamentoRecommendations);
+router.get('/equipamentos/:id/health', requireLogin, requireRole(ACCESS.os_view), ctrl.equipamentoHealth);
+router.post('/analyze-image', requireLogin, requireRole(ACCESS.os_view), ctrl.analyzeImage);
+router.get('/dashboard', requireLogin, requireRole(AI_ACCESS), ctrl.dashboard);
+router.post('/webhook/os-created', requireLogin, requireRole(ACCESS.os_view), ctrl.webhookOSCreated);
 
 module.exports = router;

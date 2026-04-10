@@ -1,5 +1,20 @@
 const db = require('../../database/db');
-const { askText, getAIConfig, gerarDiagnosticoOS, melhorarDescricaoOperador, sugerirPecasPorFalha, normalizeStructuredAIResponse } = require('./ai.service');
+const {
+  askText,
+  getAIConfig,
+  gerarDiagnosticoOS,
+  melhorarDescricaoOperador,
+  sugerirPecasPorFalha,
+  normalizeStructuredAIResponse,
+  semanticSearch,
+  chatbotContextual,
+  generateExecutiveReport,
+  getEquipmentRecommendations,
+  getEquipmentHealth,
+  testOpenAIConnection,
+  getStatus,
+  clearCache,
+} = require('./ai.service');
 const embeddingsService = require('./ai.embeddings.service');
 const visionService = require('./ai.vision.service');
 const prompts = require('./ai.prompts');
@@ -9,6 +24,14 @@ Fale de forma direta, prática e técnica, como um encarregado de manutenção e
 Use linguagem simples, evite enrolação e sempre foque em segurança, qualidade e redução de parada.
 
 Sempre responda em português do Brasil.`;
+
+function tableExists(name) {
+  try {
+    return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(String(name || ''));
+  } catch (_e) {
+    return false;
+  }
+}
 
 function normalizeContext(value) {
   const allowed = ['geral', 'os', 'equipamento', 'preventiva', 'academia'];
@@ -190,7 +213,7 @@ async function diagnosticarOS(req, res) {
   try {
     const payload = req.body || {};
     const diagnostico = await gerarDiagnosticoOS(payload);
-    const similares = embeddingsService.buscarOSSimilares({
+    const similares = await embeddingsService.buscarOSSimilares({
       equipamentoId: Number(payload.equipamento_id || 0) || null,
       texto: [payload.descricao, payload.sintoma_principal].filter(Boolean).join(' '),
       limit: 5,
@@ -226,6 +249,121 @@ async function analisarImagemOS(req, res) {
   return res.json({ ok: true, ...result });
 }
 
+async function status(req, res) {
+  return res.json({ ok: true, status: getStatus() });
+}
+
+async function testConnection(req, res) {
+  const result = await testOpenAIConnection();
+  if (!result.ok && !result.skipped) return res.status(503).json({ ok: false, ...result });
+  return res.json({ ok: true, ...result });
+}
+
+async function clearAICache(req, res) {
+  return res.json(clearCache());
+}
+
+async function chatbotMessage(req, res) {
+  const message = String(req.body?.message || req.body?.mensagem || '').trim();
+  if (!message) return res.status(400).json({ ok: false, error: 'Informe a mensagem.' });
+  try {
+    const data = await chatbotContextual({
+      message,
+      context: req.body?.context || {},
+      conversationId: req.body?.conversation_id || null,
+      userId: req.session?.user?.id || null,
+    });
+    return res.json({ ok: true, ...data });
+  } catch (err) {
+    const friendly = toFriendlyError(err);
+    return res.status(503).json({ ok: false, error: friendly.message, code: friendly.code });
+  }
+}
+
+async function chatbotStream(req, res) {
+  return chatbotMessage(req, res);
+}
+
+async function semanticSearchHandler(req, res) {
+  const query = String(req.body?.query || '').trim();
+  if (!query) return res.status(400).json({ ok: false, error: 'Informe query.' });
+  const data = await semanticSearch({
+    query,
+    equipamentoId: Number(req.body?.equipamento_id || 0) || null,
+    limit: Number(req.body?.limit || 6),
+  });
+  return res.json({ ok: true, resultados: data });
+}
+
+async function executiveReport(req, res) {
+  const data = await generateExecutiveReport({ periodDays: Number(req.body?.period_days || 7) });
+  return res.json({ ok: true, report: data });
+}
+
+async function equipamentoRecommendations(req, res) {
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ ok: false, error: 'ID de equipamento inválido.' });
+  const data = await getEquipmentRecommendations(id);
+  if (!data) return res.status(404).json({ ok: false, error: 'Equipamento não encontrado.' });
+  return res.json({ ok: true, ...data });
+}
+
+async function equipamentoHealth(req, res) {
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ ok: false, error: 'ID de equipamento inválido.' });
+  const data = await getEquipmentHealth(id);
+  if (!data) return res.status(404).json({ ok: false, error: 'Equipamento não encontrado.' });
+  return res.json({ ok: true, ...data });
+}
+
+async function analyzeImage(req, res) {
+  const imageBase64 = String(req.body?.image_base64 || '').trim();
+  if (!imageBase64) return res.status(400).json({ ok: false, error: 'Informe image_base64.' });
+  const osId = Number(req.body?.os_id || 0) || null;
+  const equipamentoId = Number(req.body?.equipamento_id || 0) || null;
+  if (osId) {
+    const analysis = await visionService.analyzeOSImage(osId, imageBase64, req.body?.context || {});
+    return res.json({ ok: true, analysis });
+  }
+  const analysis = await visionService.analyzeEquipmentImage(imageBase64, { equipamentoId, context: req.body?.context || {} });
+  return res.json({ ok: true, analysis });
+}
+
+function dashboard(req, res) {
+  const statusData = getStatus();
+  const total = tableExists('os') ? (db.prepare(`SELECT COUNT(*) AS total FROM os`).get()?.total || 0) : 0;
+  const comIA = tableExists('os') ? (db.prepare(`SELECT COUNT(*) AS total FROM os WHERE ai_diagnostico IS NOT NULL OR ai_analise_completa IS NOT NULL`).get()?.total || 0) : 0;
+  const uso7 = tableExists('ai_usage_logs') ? (db.prepare(`SELECT COUNT(*) AS total FROM ai_usage_logs WHERE datetime(criado_em) >= datetime('now','-7 days')`).get()?.total || 0) : 0;
+  const topCausas = tableExists('os') ? db.prepare(`
+    SELECT COALESCE(causa_diagnostico, ai_diagnostico, 'Sem causa') AS causa, COUNT(*) AS total
+    FROM os
+    GROUP BY causa
+    ORDER BY total DESC
+    LIMIT 5
+  `).all() : [];
+  return res.json({
+    ok: true,
+    total_os_com_analise_ia: Number(comIA || 0),
+    uso_ultimos_7_dias: Number(uso7 || 0),
+    top_causas_provaveis: topCausas,
+    taxa_adocao: Number(total ? ((Number(comIA || 0) / Number(total)) * 100).toFixed(2) : 0),
+    cache_hits: statusData.cache.hits,
+    erros_recentes: statusData.errors_recentes,
+    status_geral_ia: statusData.ok ? 'operacional' : 'degradado',
+  });
+}
+
+async function webhookOSCreated(req, res) {
+  const osId = Number(req.body?.os_id || req.body?.id || 0);
+  if (!osId) return res.status(400).json({ ok: false, error: 'os_id obrigatório.' });
+  try {
+    await embeddingsService.indexOS(osId);
+    return res.json({ ok: true, message: 'OS indexada para busca semântica.' });
+  } catch (_e) {
+    return res.status(202).json({ ok: true, warning: 'Falha ao indexar imediatamente, operação não bloqueante.' });
+  }
+}
+
 function rankingFalhas(req, res) {
   const dias = Number(req.query?.dias || 90);
   const ranking = embeddingsService.rankingFalhasEquipamentos({ dias, limit: Number(req.query?.limit || 15) });
@@ -248,4 +386,16 @@ module.exports = {
   analisarImagemOS,
   rankingFalhas,
   diagnosticoEstruturado,
+  status,
+  testConnection,
+  clearAICache,
+  chatbotMessage,
+  chatbotStream,
+  semanticSearchHandler,
+  executiveReport,
+  equipamentoRecommendations,
+  equipamentoHealth,
+  analyzeImage,
+  dashboard,
+  webhookOSCreated,
 };

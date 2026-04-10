@@ -1,11 +1,20 @@
 const fs = require('fs');
 const path = require('path');
 const storagePaths = require('../../config/storage');
+const db = require('../../database/db');
 
 const ENV_KEY_CANDIDATES = ['OPENAI_API_KEY', 'OPENAI_APIKEY', 'OPENAI_KEY'];
 
 function isAIEnabled() {
   return String(process.env.AI_ENABLED || 'true').toLowerCase() === 'true';
+}
+
+function tableExists(name) {
+  try {
+    return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(String(name || ''));
+  } catch (_e) {
+    return false;
+  }
 }
 
 const REQUIRED_ENV_VARS = [
@@ -14,6 +23,12 @@ const REQUIRED_ENV_VARS = [
   'OPENAI_MODEL_ACADEMIA',
   'OPENAI_MODEL_AVALIACAO',
 ];
+const aiRuntimeCache = new Map();
+const aiRuntimeStats = {
+  cacheHits: 0,
+  cacheMisses: 0,
+  lastErrors: [],
+};
 
 function redactValue(value) {
   const text = String(value || '').trim();
@@ -102,6 +117,31 @@ function buildError(code, message, technical, extra = {}) {
   err.technical = technical || message;
   Object.assign(err, extra);
   return err;
+}
+
+function registerAIError(err, context = null) {
+  aiRuntimeStats.lastErrors.unshift({
+    code: String(err?.code || 'AI_ERROR'),
+    message: String(err?.message || 'Erro de IA'),
+    context,
+    at: new Date().toISOString(),
+  });
+  if (aiRuntimeStats.lastErrors.length > 15) aiRuntimeStats.lastErrors = aiRuntimeStats.lastErrors.slice(0, 15);
+}
+
+function logUsage({ tipo, status = 'ok', payload = null, erro = null }) {
+  if (!tableExists('ai_usage_logs')) return;
+  try {
+    db.prepare(`
+      INSERT INTO ai_usage_logs (tipo, payload_json, status, erro_tecnico, criado_em)
+      VALUES (?, ?, ?, ?, datetime('now'))
+    `).run(
+      String(tipo || 'generic'),
+      JSON.stringify(payload || {}),
+      String(status || 'ok'),
+      erro ? String(erro).slice(0, 600) : null
+    );
+  } catch (_e) {}
 }
 
 function extractOutputText(data) {
@@ -217,6 +257,18 @@ async function askText({ systemPrompt, userPayload, model, maxOutputTokens, temp
   const timeout = setTimeout(() => controller.abort(), cfg.timeoutMs);
 
   try {
+    const cacheEnabled = String(process.env.AI_CACHE_ENABLED || 'true').toLowerCase() === 'true';
+    const cacheTtlMs = Number(process.env.AI_CACHE_TTL_MS || 60_000);
+    const cacheKey = cacheEnabled
+      ? JSON.stringify({ m: chosenModel, s: String(systemPrompt || ''), p: userPayload || {}, t: Number(temperature || 0.2), o: Number(maxOutputTokens || cfg.maxOutputTokens) })
+      : null;
+    const cached = cacheKey ? aiRuntimeCache.get(cacheKey) : null;
+    if (cached && cached.exp > Date.now()) {
+      aiRuntimeStats.cacheHits += 1;
+      return cached.value;
+    }
+    if (cacheEnabled && cacheKey) aiRuntimeStats.cacheMisses += 1;
+
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
@@ -265,7 +317,10 @@ async function askText({ systemPrompt, userPayload, model, maxOutputTokens, temp
       });
     }
 
-    return { text, model: chosenModel };
+    const payload = { text, model: chosenModel };
+    if (cacheEnabled && cacheKey) aiRuntimeCache.set(cacheKey, { exp: Date.now() + cacheTtlMs, value: payload });
+    logUsage({ tipo: 'ask_text', payload: { model: chosenModel } });
+    return payload;
   } catch (error) {
     if (error?.name === 'AbortError') {
       throw buildError('AI_TIMEOUT', 'Tempo de resposta da IA excedido.', `Timeout de ${cfg.timeoutMs}ms`, {
@@ -273,11 +328,18 @@ async function askText({ systemPrompt, userPayload, model, maxOutputTokens, temp
       });
     }
 
-    if (error?.code) throw error;
+    if (error?.code) {
+      registerAIError(error, 'askText');
+      logUsage({ tipo: 'ask_text', status: 'erro', payload: { model: chosenModel }, erro: error.technical || error.message });
+      throw error;
+    }
 
-    throw buildError('AI_NETWORK_ERROR', 'Erro de conexão ao consultar IA.', error?.message || 'Falha de rede desconhecida', {
+    const wrapped = buildError('AI_NETWORK_ERROR', 'Erro de conexão ao consultar IA.', error?.message || 'Falha de rede desconhecida', {
       providerModel: chosenModel,
     });
+    registerAIError(wrapped, 'askText');
+    logUsage({ tipo: 'ask_text', status: 'erro', payload: { model: chosenModel }, erro: wrapped.technical || wrapped.message });
+    throw wrapped;
   } finally {
     clearTimeout(timeout);
   }
@@ -360,17 +422,26 @@ async function askJSONSchemaStrict({
 
     const data = await response.json();
     const text = extractOutputText(data);
-    return parseJSONObject(text);
+    const parsed = parseJSONObject(text);
+    logUsage({ tipo: 'ask_json_schema', payload: { model: chosenModel, schema: chosenSchemaName } });
+    return parsed;
   } catch (error) {
     if (error?.name === 'AbortError') {
       throw buildError('AI_TIMEOUT', 'Tempo de resposta da IA excedido.', `Timeout de ${cfg.timeoutMs}ms`, {
         providerModel: chosenModel,
       });
     }
-    if (error?.code) throw error;
-    throw buildError('AI_NETWORK_ERROR', 'Erro de conexão ao consultar IA.', error?.message || 'Falha de rede desconhecida', {
+    if (error?.code) {
+      registerAIError(error, 'askJSONSchemaStrict');
+      logUsage({ tipo: 'ask_json_schema', status: 'erro', payload: { model: chosenModel, schema: chosenSchemaName }, erro: error.technical || error.message });
+      throw error;
+    }
+    const wrapped = buildError('AI_NETWORK_ERROR', 'Erro de conexão ao consultar IA.', error?.message || 'Falha de rede desconhecida', {
       providerModel: chosenModel,
     });
+    registerAIError(wrapped, 'askJSONSchemaStrict');
+    logUsage({ tipo: 'ask_json_schema', status: 'erro', payload: { model: chosenModel, schema: chosenSchemaName }, erro: wrapped.technical || wrapped.message });
+    throw wrapped;
   } finally {
     clearTimeout(timeout);
   }
@@ -475,12 +546,141 @@ async function testOpenAIConnection() {
   }
 }
 
+function clearCache() {
+  const before = aiRuntimeCache.size;
+  aiRuntimeCache.clear();
+  return { ok: true, cleared: before };
+}
+
+function getStatus() {
+  const cfg = getAIConfig();
+  return {
+    ok: cfg.enabled && cfg.hasApiKey && !cfg.apiKeyLooksPlaceholder,
+    enabled: cfg.enabled,
+    hasApiKey: cfg.hasApiKey,
+    apiKeySource: cfg.apiKeySource,
+    cache: {
+      enabled: String(process.env.AI_CACHE_ENABLED || 'true').toLowerCase() === 'true',
+      size: aiRuntimeCache.size,
+      hits: aiRuntimeStats.cacheHits,
+      misses: aiRuntimeStats.cacheMisses,
+    },
+    errors_recentes: aiRuntimeStats.lastErrors.slice(0, 10),
+    model_text: cfg.modelText,
+    timeout_ms: cfg.timeoutMs,
+  };
+}
+
+async function semanticSearch({ query, equipamentoId = null, limit = 5 } = {}) {
+  const embeddingsService = require('./ai.embeddings.service');
+  const texto = String(query || '').trim();
+  if (!texto) return [];
+  return embeddingsService.searchSimilarOS(texto, { equipamentoId, limit });
+}
+
+async function chatbotContextual({ message, context = {}, conversationId = null, userId = null }) {
+  const db = require('../../database/db');
+  const embeddingsService = require('./ai.embeddings.service');
+  const texto = String(message || '').trim();
+  if (!texto) return { resposta: 'Pergunta vazia.', conversation_id: conversationId };
+
+  const similares = await embeddingsService.searchSimilarOS(texto, {
+    equipamentoId: Number(context?.equipamento_id || 0) || null,
+    limit: 4,
+    minScore: 0.4,
+  });
+  const result = await askText({
+    systemPrompt: 'Você é assistente técnico de manutenção industrial. Responda em português-BR, com foco em segurança operacional.',
+    userPayload: { mensagem: texto, contexto: context || {}, os_similares: similares },
+    maxOutputTokens: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 320),
+    temperature: 0.2,
+  });
+
+  if (tableExists('ai_conversations')) {
+    try {
+      db.prepare(`
+        INSERT INTO ai_conversations (conversation_id, user_id, context_json, message, response, model, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+      `).run(
+        String(conversationId || `conv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
+        userId ? Number(userId) : null,
+        JSON.stringify(context || {}),
+        texto,
+        String(result.text || ''),
+        String(result.model || '')
+      );
+    } catch (_e) {}
+  }
+
+  return {
+    resposta: result.text,
+    os_similares: similares,
+    conversation_id: conversationId || null,
+    model: result.model,
+  };
+}
+
+async function generateExecutiveReport({ periodDays = 7 } = {}) {
+  const db = require('../../database/db');
+  const usage = tableExists('ai_usage_logs')
+    ? db.prepare(`SELECT tipo, COUNT(*) AS total FROM ai_usage_logs WHERE datetime(criado_em) >= datetime('now', ?) GROUP BY tipo ORDER BY total DESC`).all(`-${Number(periodDays || 7)} days`)
+    : [];
+  const osStats = tableExists('os')
+    ? db.prepare(`SELECT COUNT(*) AS total, SUM(CASE WHEN ai_diagnostico IS NOT NULL OR ai_analise_completa IS NOT NULL THEN 1 ELSE 0 END) AS com_ia FROM os`).get()
+    : { total: 0, com_ia: 0 };
+
+  return {
+    periodo_dias: Number(periodDays || 7),
+    total_os: Number(osStats.total || 0),
+    os_com_ia: Number(osStats.com_ia || 0),
+    taxa_adocao: Number(osStats.total ? ((Number(osStats.com_ia || 0) / Number(osStats.total)) * 100).toFixed(2) : 0),
+    uso_por_tipo: usage,
+  };
+}
+
+async function getEquipmentHealth(equipamentoId) {
+  const db = require('../../database/db');
+  if (!tableExists('equipamentos')) return null;
+  const eq = db.prepare('SELECT * FROM equipamentos WHERE id = ? LIMIT 1').get(Number(equipamentoId));
+  if (!eq) return null;
+  const osRows = tableExists('os')
+    ? db.prepare(`SELECT prioridade, grau, status FROM os WHERE equipamento_id = ? ORDER BY id DESC LIMIT 60`).all(Number(equipamentoId))
+    : [];
+  const total = osRows.length;
+  const criticas = osRows.filter((r) => ['ALTA', 'CRITICA', 'CRÍTICA'].includes(String(r.prioridade || r.grau || '').toUpperCase())).length;
+  const abertas = osRows.filter((r) => ['ABERTA', 'ANDAMENTO', 'EM_ANDAMENTO'].includes(String(r.status || '').toUpperCase())).length;
+  const score = Math.max(0, 100 - (criticas * 8) - (abertas * 4));
+  const saude = score >= 80 ? 'boa' : score >= 55 ? 'atencao' : 'critica';
+  return { equipamento_id: Number(equipamentoId), score, saude, total_os_recentes: total, os_criticas: criticas, os_abertas: abertas };
+}
+
+async function getEquipmentRecommendations(equipamentoId) {
+  const health = await getEquipmentHealth(equipamentoId);
+  if (!health) return null;
+  const recomendacoes = [];
+  if (health.saude === 'critica') recomendacoes.push('Programar intervenção corretiva imediata e inspeção de segurança.');
+  if (health.os_abertas >= 3) recomendacoes.push('Priorizar fechamento das OS abertas com checklist técnico.');
+  if (!recomendacoes.length) recomendacoes.push('Manter rotina preventiva e inspeções de condição.');
+  return {
+    ...health,
+    recomendacoes_imediatas: recomendacoes,
+    recomendacoes_medio_prazo: ['Atualizar plano preventivo com foco em reincidências.', 'Revisar estoque mínimo de peças críticas.'],
+  };
+}
+
 module.exports = {
   getAIConfig,
   askText,
   askJSONSchemaStrict,
   validateAIEnvironment,
   testOpenAIConnection,
+  getStatus,
+  clearCache,
+  semanticSearch,
+  chatbotContextual,
+  generateExecutiveReport,
+  getEquipmentRecommendations,
+  getEquipmentHealth,
   looksLikePlaceholderKey,
   gerarDiagnosticoOS,
   melhorarDescricaoOperador,
