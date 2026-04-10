@@ -4,6 +4,9 @@ let tracagemService = null;
 try { tracagemService = require('../tracagem/tracagem.service'); } catch (_e) {}
 const { normalizeRole } = require("../../config/rbac");
 const { canViewOSDetails, postCloseRedirectPath } = require("./os.permissions");
+const aiService = require("../ai/ai.service");
+const embeddingsService = require("../ai/ai.embeddings.service");
+const visionService = require("../ai/ai.vision.service");
 
 function mapFilesToPublic(files = []) {
   return (files || []).map((f) => ({
@@ -52,11 +55,25 @@ async function osCreate(req, res) {
 
     const equipamentoIdNum = equipamento_id ? Number(equipamento_id) : null;
     const relatoAbertura = String(nao_conformidade || descricao || '').trim();
-    const diagnosticoInicial = String(ai_diagnostico_inicial || diagnostico_inicial || '').trim();
-    const causaProvavel = String(ai_causa || causa_mais_provavel || '').trim();
-    const acoesIniciais = String(ai_acoes_iniciais || acoes_iniciais || '').trim();
+    let diagnosticoInicial = String(ai_diagnostico_inicial || diagnostico_inicial || '').trim();
+    let causaProvavel = String(ai_causa || causa_mais_provavel || '').trim();
+    let acoesIniciais = String(ai_acoes_iniciais || acoes_iniciais || '').trim();
 
     const equipamentoManualTxt = String(equipamento_manual || "").trim();
+
+    if (!diagnosticoInicial || !causaProvavel || !acoesIniciais) {
+      try {
+        const iaEstruturada = await aiService.melhorarDescricaoOperador(relatoAbertura, {
+          sintoma_principal,
+          criticidade,
+          equipamento_id: equipamentoIdNum,
+          equipamento_manual: equipamentoManualTxt || null,
+        });
+        diagnosticoInicial = diagnosticoInicial || iaEstruturada.diagnostico;
+        causaProvavel = causaProvavel || iaEstruturada.causa_provavel;
+        acoesIniciais = acoesIniciais || iaEstruturada.acao_recomendada;
+      } catch (_e) {}
+    }
     if (!equipamentoIdNum && !equipamentoManualTxt) {
       req.flash("error", "Selecione um equipamento cadastrado ou digite o equipamento manual.");
       return res.redirect("/os/novo");
@@ -104,6 +121,26 @@ async function osCreate(req, res) {
       tipo: "ABERTURA",
       userId: req.session?.user?.id || null,
     });
+
+    if (fotosAbertura.length) {
+      try {
+        const primeira = req.files?.abertura_fotos?.[0];
+        if (primeira?.buffer || primeira?.path) {
+          const analiseVisual = await visionService.analisarImagemFalha({
+            fileBuffer: primeira.buffer || null,
+            filePath: primeira.path || null,
+            mimeType: primeira.mimetype,
+            fileName: primeira.originalname,
+          });
+          await service.patchAIFields(id, {
+            ai_criticidade: analiseVisual.criticidade,
+            ai_sugestao: analiseVisual.recomendacao,
+          });
+        }
+      } catch (_e) {}
+    }
+
+    embeddingsService.updateOSEmbedding(id);
 
     await pushService.sendPushToAll({
       title: "Nova Ordem de Serviço",

@@ -1,6 +1,7 @@
 const db = require("../../database/db");
 const osService = require("../os/os.service");
 const { getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
+const aiEmbeddingsService = require("../ai/ai.embeddings.service");
 
 function tableExists(name) {
   try {
@@ -135,6 +136,7 @@ function createPlano(data) {
   `);
 
   const r = stmt.run(...values);
+  try { aiEmbeddingsService.updatePreventivaEmbedding(r.lastInsertRowid); } catch (_e) {}
   return Number(r.lastInsertRowid);
 }
 

@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const db = require("../../database/db");
+const aiEmbeddingsService = require("../ai/ai.embeddings.service");
 
 function list() {
   return db
@@ -41,6 +42,7 @@ function create(data) {
   `);
 
   const info = stmt.run(normalizeEquipData({ ...data, nome: nomePadronizado }));
+  try { aiEmbeddingsService.updateEquipamentoEmbedding(info.lastInsertRowid); } catch (_e) {}
   return info.lastInsertRowid;
 }
 
@@ -68,6 +70,7 @@ function update(id, data) {
   `);
 
   stmt.run({ id: Number(id), ...normalizeEquipData({ ...data, nome: nomePadronizado }) });
+  try { aiEmbeddingsService.updateEquipamentoEmbedding(id); } catch (_e) {}
 }
 
 function obterNomeBaseEquipamento(nome) {

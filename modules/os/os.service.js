@@ -2,6 +2,7 @@ const db = require("../../database/db");
 const { classifyOSPriority } = require("./os-priority.service");
 const osIAService = require("./os-ia.service");
 const iaRepository = require("../ia/ia.repository");
+const aiEmbeddingsService = require("../ai/ai.embeddings.service");
 const alertsHub = require("../alerts/alerts.hub");
 const alertsService = require("../alerts/alerts.service");
 const pushService = require("../push/push.service");
@@ -1388,6 +1389,9 @@ async function createOS({
     ai_justificativa_criticidade: aberturaIA.justificativa_interna,
     ai_observacao_seguranca: aberturaIA.risco_seguranca || aberturaIA.observacao_seguranca,
     ai_descricao_tecnica_os: aberturaIA.descricao_tecnica_os,
+    ai_diagnostico: aberturaIA.diagnostico_inicial,
+    ai_sugestao: aberturaIA.acao_corretiva || aberturaIA.servico_sugerido,
+    ai_criticidade: aberturaIA.criticidade_sugerida,
   };
 
   for (const [col, value] of Object.entries(mapCols)) {
@@ -1402,6 +1406,10 @@ async function createOS({
 
   const info = stmt.run(...values);
   const osId = Number(info.lastInsertRowid);
+
+  try {
+    aiEmbeddingsService.updateOSEmbedding(osId);
+  } catch (_e) {}
 
   osIAService.registrarLogIA({
     usuarioId: openedBy,
@@ -1490,6 +1498,10 @@ function createOSAutomatica({
   const stmt = db.prepare(`INSERT INTO os (${fields.join(",")}) VALUES (${fields.map(() => "?").join(",")})`);
   const info = stmt.run(...values);
   const osId = Number(info.lastInsertRowid);
+
+  try {
+    aiEmbeddingsService.updateOSEmbedding(osId);
+  } catch (_e) {}
   emitOSEvents(osId, "create");
   return osId;
 }
@@ -1890,6 +1902,20 @@ function updateStatus(id, status) {
   }
 }
 
+function patchAIFields(osId, payload = {}) {
+  const cols = getOSColumns();
+  const allowed = ['ai_diagnostico', 'ai_sugestao', 'ai_criticidade', 'ai_embedding'];
+  const entries = Object.entries(payload || {}).filter(([k, v]) => allowed.includes(k) && cols.includes(k) && v !== undefined);
+  if (!entries.length) return;
+  const sets = entries.map(([k]) => `${k} = ?`).join(', ');
+  const values = entries.map(([, v]) => v);
+  db.prepare(`UPDATE os SET ${sets} WHERE id = ?`).run(...values, Number(osId));
+  if (entries.some(([k]) => k !== 'ai_embedding')) {
+    try { aiEmbeddingsService.updateOSEmbedding(osId); } catch (_e) {}
+  }
+}
+
+
 module.exports = {
   listOS,
   listEquipamentosAtivos,
@@ -1933,4 +1959,5 @@ module.exports = {
   setupPairsIfEmpty,
   liberarEquipeQuandoFechar,
   getHistoricoEquipamento,
+  patchAIFields,
 };
