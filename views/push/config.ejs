@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="vapid-public-key" content="<%= VAPID_PUBLIC_KEY %>" />
+  <title><%= title %> - Campo do Gado</title>
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>🔔 Configurações de Notificações</h1>
+
+    <div class="card" id="push-status-card">
+      <h3>Status das Notificações</h3>
+      <p id="push-support-status">Verificando suporte...</p>
+      <button id="push-toggle-btn" class="btn btn-outline" data-push-toggle>Verificando...</button>
+    </div>
+
+    <div class="card" id="preferences-card" style="display:none;">
+      <h3>Preferências de Notificação</h3>
+      <form id="preferences-form">
+        <div class="form-group">
+          <h4>Ordens de Serviço</h4>
+          <label><input type="checkbox" name="os_critica" value="1" /> Crítica/Emergencial</label>
+          <label><input type="checkbox" name="os_alta" value="1" /> Alta Prioridade</label>
+          <label><input type="checkbox" name="os_media" value="1" /> Média Prioridade</label>
+          <label><input type="checkbox" name="os_baixa" value="1" /> Baixa Prioridade</label>
+        </div>
+
+        <div class="form-group">
+          <h4>Preventivas</h4>
+          <label><input type="checkbox" name="preventivas_atrasadas" value="1" /> Atrasadas</label>
+          <label><input type="checkbox" name="preventivas_hoje" value="1" /> Programadas para hoje</label>
+        </div>
+
+        <div class="form-group">
+          <h4>Outros</h4>
+          <label><input type="checkbox" name="mudanca_status_os" value="1" /> Mudança de status das minhas OS</label>
+          <label><input type="checkbox" name="lembretes_compliance" value="1" /> Lembretes de compliance</label>
+          <label><input type="checkbox" name="alertas_emergencia" value="1" /> Alertas de emergência</label>
+        </div>
+
+        <div class="form-group">
+          <h4>Horário de Silêncio</h4>
+          <label>
+            Das <input type="time" name="quiet_hours_start" value="22:00" />
+            às <input type="time" name="quiet_hours_end" value="07:00" />
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Salvar Preferências</button>
+      </form>
+    </div>
+
+    <div class="card" id="stats-card" style="display:none;">
+      <h3>Estatísticas</h3>
+      <div id="stats-content">Carregando...</div>
+    </div>
+  </div>
+
+  <script src="/js/push-client.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const support = PushNotificationClient.checkSupport();
+      const statusEl = document.getElementById('push-support-status');
+      const toggleBtn = document.getElementById('push-toggle-btn');
+
+      if (!support.supported) {
+        statusEl.textContent = '❌ Seu navegador não suporta notificações push';
+        toggleBtn.style.display = 'none';
+        return;
+      }
+
+      statusEl.textContent = `✅ Suportado (Permissão: ${support.permission})`;
+
+      await loadPreferences();
+      await loadStats();
+
+      toggleBtn.addEventListener('click', async () => {
+        try {
+          toggleBtn.disabled = true;
+          const result = await window.pushClient.toggle();
+          alert(result.message);
+          location.reload();
+        } catch (err) {
+          alert(`Erro: ${err.message}`);
+        } finally {
+          toggleBtn.disabled = false;
+        }
+      });
+
+      document.getElementById('preferences-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(e.target);
+        const prefs = {};
+        [
+          'os_critica', 'os_alta', 'os_media', 'os_baixa',
+          'preventivas_atrasadas', 'preventivas_hoje',
+          'mudanca_status_os', 'lembretes_compliance', 'alertas_emergencia',
+        ].forEach((field) => {
+          prefs[field] = formData.get(field) === '1' ? 1 : 0;
+        });
+
+        prefs.quiet_hours_start = formData.get('quiet_hours_start');
+        prefs.quiet_hours_end = formData.get('quiet_hours_end');
+
+        const response = await fetch('/push/preferences', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(prefs),
+        });
+
+        const data = await response.json();
+        alert(data.ok ? 'Preferências salvas!' : `Erro: ${data.error}`);
+      });
+    });
+
+    async function loadPreferences() {
+      const res = await fetch('/push/preferences');
+      const data = await res.json();
+
+      if (!data.ok) return;
+
+      const form = document.getElementById('preferences-form');
+      Object.keys(data.data).forEach((key) => {
+        const input = form.querySelector(`[name="${key}"]`);
+        if (!input) return;
+
+        if (input.type === 'checkbox') input.checked = data.data[key] === 1;
+        else input.value = data.data[key] || '';
+      });
+
+      document.getElementById('preferences-card').style.display = 'block';
+    }
+
+    async function loadStats() {
+      const res = await fetch('/push/stats');
+      const data = await res.json();
+
+      if (!data.ok) return;
+
+      const html = data.data.map((item) => `<li>${item.status}: ${item.count}</li>`).join('');
+      document.getElementById('stats-content').innerHTML = `<ul>${html}</ul>`;
+      document.getElementById('stats-card').style.display = 'block';
+    }
+  </script>
+</body>
+</html>
