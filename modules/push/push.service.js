@@ -1,96 +1,219 @@
-const db = require('../../database/db');
+const webPush = require('web-push');
+const pushRepository = require('./push.repository');
 
-let webPush = null;
-try {
-  webPush = require('web-push');
-} catch (_e) {
-  webPush = null;
-}
+class PushService {
+  constructor() {
+    this.vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
+    this.vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
+    this.vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@campodogado.local';
 
-function vapidConfig() {
-  const publicKey = process.env.VAPID_PUBLIC_KEY || '';
-  const privateKey = process.env.VAPID_PRIVATE_KEY || '';
-  const subject = process.env.VAPID_SUBJECT || 'mailto:admin@campodogado.local';
-  return { publicKey, privateKey, subject };
-}
-
-function hasVapidConfig() {
-  const { publicKey, privateKey } = vapidConfig();
-  return Boolean(publicKey && privateKey);
-}
-
-function configureWebPush() {
-  if (!webPush || !hasVapidConfig()) return false;
-  const { publicKey, privateKey, subject } = vapidConfig();
-  webPush.setVapidDetails(subject, publicKey, privateKey);
-  return true;
-}
-
-function saveSubscription({ userId, subscription }) {
-  const endpoint = subscription?.endpoint;
-  const p256dh = subscription?.keys?.p256dh;
-  const auth = subscription?.keys?.auth;
-
-  if (!endpoint || !p256dh || !auth) {
-    throw new Error('Subscription inválida.');
-  }
-
-  db.prepare(`
-    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(endpoint) DO UPDATE SET
-      user_id = excluded.user_id,
-      p256dh = excluded.p256dh,
-      auth = excluded.auth
-  `).run(userId ? Number(userId) : null, endpoint, p256dh, auth);
-
-  return { ok: true };
-}
-
-function listSubscriptions() {
-  return db.prepare(`
-    SELECT id, endpoint, p256dh, auth
-    FROM push_subscriptions
-    ORDER BY id ASC
-  `).all();
-}
-
-function removeSubscriptionById(id) {
-  db.prepare('DELETE FROM push_subscriptions WHERE id = ?').run(Number(id));
-}
-
-async function sendPushToAll(payload) {
-  if (!configureWebPush()) {
-    return { sent: 0, skipped: 0, reason: 'webpush_nao_configurado' };
-  }
-
-  const items = listSubscriptions();
-  if (!items.length) return { sent: 0, skipped: 0 };
-
-  let sent = 0;
-  let skipped = 0;
-
-  for (const sub of items) {
-    try {
-      await webPush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        JSON.stringify(payload)
-      );
-      sent += 1;
-    } catch (err) {
-      const code = Number(err?.statusCode || 0);
-      if (code === 404 || code === 410) {
-        removeSubscriptionById(sub.id);
+    if (this.vapidPublicKey && this.vapidPrivateKey) {
+      try {
+        webPush.setVapidDetails(this.vapidSubject, this.vapidPublicKey, this.vapidPrivateKey);
+        console.log('✅ WebPush configurado com sucesso');
+      } catch (err) {
+        console.error('❌ Erro ao configurar WebPush:', err.message);
       }
-      skipped += 1;
+    } else {
+      console.warn('⚠️ WebPush não configurado: VAPID keys não encontradas');
     }
   }
 
-  return { sent, skipped };
+  getVapidPublicKey() {
+    return this.vapidPublicKey;
+  }
+
+  isConfigured() {
+    return !!(this.vapidPublicKey && this.vapidPrivateKey);
+  }
+
+  async subscribe(userId, subscription, userAgent) {
+    const result = pushRepository.createSubscription(userId, subscription, userAgent);
+
+    await this.sendNotification(subscription, {
+      title: '🔔 Notificações Ativadas',
+      body: 'Você receberá alertas de OS críticas e preventivas.',
+      type: 'WELCOME',
+      requireInteraction: false,
+    });
+
+    return { success: true, id: result.lastInsertRowid };
+  }
+
+  async unsubscribe(endpoint) {
+    pushRepository.deactivateSubscription(endpoint);
+    return { success: true };
+  }
+
+  async sendNotification(subscription, payload) {
+    if (!this.isConfigured()) throw new Error('WebPush não configurado');
+
+    const pushPayload = JSON.stringify({
+      title: payload.title,
+      body: payload.body,
+      icon: payload.icon || '/images/notification-icon.png',
+      badge: payload.badge || '/images/badge.png',
+      tag: payload.tag || `notif-${Date.now()}`,
+      requireInteraction: payload.requireInteraction || false,
+      actions: payload.actions || [],
+      data: payload.data || {},
+      url: payload.url || '/dashboard',
+      type: payload.type || 'GENERIC',
+    });
+
+    try {
+      await webPush.sendNotification(subscription, pushPayload);
+      return { success: true };
+    } catch (err) {
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        pushRepository.deactivateSubscription(subscription.endpoint);
+      }
+      throw err;
+    }
+  }
+
+  async sendToUser(userId, payload) {
+    if (!pushRepository.shouldNotify(userId, payload.type)) {
+      return { skipped: true, reason: 'user_preferences' };
+    }
+
+    const subscriptions = pushRepository.getSubscriptionsByUser(userId);
+    if (!subscriptions.length) return { skipped: true, reason: 'no_subscriptions' };
+
+    const results = [];
+
+    for (const sub of subscriptions) {
+      const subscription = {
+        endpoint: sub.endpoint,
+        keys: { p256dh: sub.p256dh, auth: sub.auth },
+      };
+
+      const logId = pushRepository.createLog({
+        subscriptionId: sub.id,
+        userId,
+        type: payload.type,
+        title: payload.title,
+        body: payload.body,
+        payload: payload.data,
+        status: 'pending',
+      }).lastInsertRowid;
+
+      try {
+        await this.sendNotification(subscription, payload);
+        pushRepository.updateLogStatus(logId, 'sent');
+        results.push({ endpoint: sub.endpoint, status: 'sent' });
+      } catch (err) {
+        pushRepository.updateLogStatus(logId, 'failed', err.message);
+        results.push({ endpoint: sub.endpoint, status: 'failed', error: err.message });
+      }
+    }
+
+    return { success: true, results };
+  }
+
+  async sendToAll(payload, filterFn = null) {
+    const subscriptions = pushRepository.getAllActiveSubscriptions();
+    const results = [];
+
+    for (const sub of subscriptions) {
+      if (filterFn && !filterFn(sub)) continue;
+      if (!pushRepository.shouldNotify(sub.user_id, payload.type)) continue;
+
+      const subscription = {
+        endpoint: sub.endpoint,
+        keys: { p256dh: sub.p256dh, auth: sub.auth },
+      };
+
+      try {
+        await this.sendNotification(subscription, payload);
+        results.push({ userId: sub.user_id, status: 'sent' });
+      } catch (err) {
+        results.push({ userId: sub.user_id, status: 'failed', error: err.message });
+      }
+    }
+
+    return {
+      success: true,
+      sent: results.filter((result) => result.status === 'sent').length,
+      failed: results.filter((result) => result.status === 'failed').length,
+    };
+  }
+
+  async notifyNewOS(osData) {
+    const priority = osData.prioridade?.toUpperCase() || 'MEDIA';
+
+    const payload = {
+      title: `🚨 Nova OS ${priority}`,
+      body: `OS #${osData.id}: ${osData.equipamento} - ${osData.descricao?.substring(0, 50)}...`,
+      type: `OS_${priority}`,
+      requireInteraction: ['CRITICA', 'EMERGENCIAL', 'ALTA'].includes(priority),
+      tag: `os-${osData.id}`,
+      url: `/os/${osData.id}`,
+      data: { osId: osData.id, type: 'NEW_OS', priority },
+    };
+
+    if (osData.tecnico_id) {
+      return this.sendToUser(osData.tecnico_id, payload);
+    }
+
+    return this.sendToAll(payload, () => true);
+  }
+
+  async notifyOSStatusChange(osData, oldStatus, newStatus) {
+    const payload = {
+      title: `📋 OS #${osData.id} - ${newStatus}`,
+      body: `${osData.equipamento}: Status alterado de ${oldStatus} para ${newStatus}`,
+      type: 'MUDANCA_STATUS',
+      tag: `os-status-${osData.id}`,
+      url: `/os/${osData.id}`,
+      data: { osId: osData.id, oldStatus, newStatus, type: 'STATUS_CHANGE' },
+    };
+
+    if (osData.tecnico_id) await this.sendToUser(osData.tecnico_id, payload);
+    if (osData.solicitante_id && osData.solicitante_id !== osData.tecnico_id) {
+      await this.sendToUser(osData.solicitante_id, payload);
+    }
+  }
+
+  async notifyPreventivaAtrasada(preventiva) {
+    const payload = {
+      title: '⚠️ Preventiva Atrasada',
+      body: `${preventiva.equipamento}: ${preventiva.tipo} - Prevista para ${preventiva.data_prevista}`,
+      type: 'PREVENTIVA_ATRASADA',
+      requireInteraction: true,
+      tag: `preventiva-${preventiva.id}`,
+      url: `/preventivas/${preventiva.id}`,
+      data: { preventivaId: preventiva.id, type: 'PREVENTIVA_ATRASADA' },
+    };
+
+    if (preventiva.responsavel_id) {
+      await this.sendToUser(preventiva.responsavel_id, payload);
+    }
+  }
+
+  async notifyEmergency(message, url = '/dashboard') {
+    return this.sendToAll({
+      title: '🆘 ALERTA DE EMERGÊNCIA',
+      body: message,
+      type: 'EMERGENCIA',
+      requireInteraction: true,
+      tag: `emergency-${Date.now()}`,
+      url,
+      data: { type: 'EMERGENCY', timestamp: Date.now() },
+    });
+  }
+
+  getStats(userId = null) {
+    return pushRepository.getStats(userId);
+  }
+
+  getPreferences(userId) {
+    return pushRepository.getPreferences(userId);
+  }
+
+  updatePreferences(userId, preferences) {
+    return pushRepository.updatePreferences(userId, preferences);
+  }
 }
 
-module.exports = {
-  saveSubscription,
-  sendPushToAll,
-  configureWebPush,
-};
+module.exports = new PushService();
