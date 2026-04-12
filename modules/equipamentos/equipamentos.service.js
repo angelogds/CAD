@@ -73,6 +73,22 @@ function update(id, data) {
   try { aiEmbeddingsService.updateEquipamentoEmbedding(id); } catch (_e) {}
 }
 
+function remove(id) {
+  const equipamentoId = Number(id);
+  try {
+    const tx = db.transaction(() => {
+      db.prepare(`DELETE FROM equipamento_pecas WHERE equipamento_id = ?`).run(equipamentoId);
+      db.prepare(`DELETE FROM documentos_equipamento WHERE equipamento_id = ?`).run(equipamentoId);
+      db.prepare(`DELETE FROM equipamento_qrcode WHERE equipamento_id = ?`).run(equipamentoId);
+      db.prepare(`DELETE FROM equipamentos WHERE id = ?`).run(equipamentoId);
+    });
+    tx();
+    return true;
+  } catch (_err) {
+    return false;
+  }
+}
+
 function obterNomeBaseEquipamento(nome) {
   return String(nome || "")
     .normalize("NFD")
@@ -369,6 +385,7 @@ module.exports = {
   getById,
   create,
   update,
+  remove,
   listHistoricoOS,
   listHistoricoPreventivas,
   listPecasCatalogo,
