@@ -10,7 +10,12 @@
       <div class="foto-box">
         <% if (equip.foto_url) { %><img src="<%= equip.foto_url %>" alt="Foto de <%= equip.nome %>"/><% } else { %><div>Sem foto cadastrada</div><% } %>
       </div>
-      <a href="/equipamentos/<%= equip.id %>/editar" class="btn" style="margin-top:10px;">Editar ficha</a>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+        <a href="/equipamentos/<%= equip.id %>/editar" class="btn">Editar ficha</a>
+        <form method="POST" action="/equipamentos/<%= equip.id %>/excluir" onsubmit="return confirm('Excluir este equipamento permanentemente?');" style="margin:0;">
+          <button type="submit" class="btn btn-red">Excluir equipamento</button>
+        </form>
+      </div>
     </div>
   </div>
 

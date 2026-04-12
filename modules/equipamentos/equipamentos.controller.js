@@ -126,6 +126,21 @@ function equipUpdate(req, res) {
   return res.redirect(`/equipamentos/${id}`);
 }
 
+function equipDelete(req, res) {
+  const id = Number(req.params.id);
+  const equip = service.getById(id);
+  if (!equip) return res.status(404).render("errors/404", { title: "Não encontrado" });
+
+  const removido = service.remove(id);
+  if (!removido) {
+    req.flash("error", "Não foi possível excluir o equipamento porque ele possui vínculos no sistema.");
+    return res.redirect(`/equipamentos/${id}`);
+  }
+
+  req.flash("success", "Equipamento excluído com sucesso.");
+  return res.redirect("/equipamentos");
+}
+
 function addPeca(req, res) {
   const id = Number(req.params.id);
   service.addPecaToEquipamento(id, req.body);
@@ -226,6 +241,7 @@ module.exports = {
   equipShow,
   equipEditForm,
   equipUpdate,
+  equipDelete,
   addPeca,
   updatePeca,
   removePeca,

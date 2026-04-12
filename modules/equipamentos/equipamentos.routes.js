@@ -45,6 +45,7 @@ router.post("/", requireLogin, fotoUpload.single("foto"), safe(ctrl.equipCreate)
 router.get("/:id", requireLogin, safe(ctrl.equipShow));
 router.get("/:id/editar", requireLogin, safe(ctrl.equipEditForm));
 router.post("/:id/editar", requireLogin, fotoUpload.single("foto"), safe(ctrl.equipUpdate));
+router.post("/:id/excluir", requireLogin, safe(ctrl.equipDelete));
 
 router.post("/:id/pecas", requireLogin, safe(ctrl.addPeca));
 router.post("/:id/pecas/:associacaoId", requireLogin, safe(ctrl.updatePeca));

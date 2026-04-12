@@ -119,6 +119,21 @@
     border-color: rgba(22,163,74,.45);
     background:#ecfdf5;
   }
+  .btn-sm.btn-danger{
+    border-color:#fecaca;
+    color:#991b1b;
+    background:#fff1f2;
+  }
+  .btn-sm.btn-danger:hover{
+    border-color:#fca5a5;
+    background:#ffe4e6;
+  }
+  .acoes-col{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  .acoes-col form{ display:inline-flex; margin:0; }
 </style>
 
 <div class="page-head">
@@ -174,8 +189,12 @@
               <% } %>
             </td>
             <td style="text-align:right;">
-              <a class="btn-sm" href="/equipamentos/<%= e.id %>">Abrir</a>
-              <a class="btn-sm" href="/equipamentos/<%= e.id %>/editar">Editar</a>
+              <span class="acoes-col">
+                <a class="btn-sm" href="/equipamentos/<%= e.id %>">Abrir</a>
+                <form method="POST" action="/equipamentos/<%= e.id %>/excluir" onsubmit="return confirm('Excluir este equipamento permanentemente?');">
+                  <button type="submit" class="btn-sm btn-danger">Apagar</button>
+                </form>
+              </span>
             </td>
           </tr>
         <% }) %>
