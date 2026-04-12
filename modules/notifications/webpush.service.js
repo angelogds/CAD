@@ -7,14 +7,36 @@ try {
   webPush = null;
 }
 
+function decodeBase64Url(value) {
+  if (!value) return Buffer.alloc(0);
+  const normalized = String(value).replace(/-/g, '+').replace(/_/g, '/');
+  const padLength = (4 - (normalized.length % 4)) % 4;
+  return Buffer.from(normalized + '='.repeat(padLength), 'base64');
+}
+
+function hasValidVapidKeyLength(publicKey, privateKey) {
+  try {
+    const publicKeyBytes = decodeBase64Url(publicKey);
+    const privateKeyBytes = decodeBase64Url(privateKey);
+    return publicKeyBytes.length === 65 && privateKeyBytes.length === 32;
+  } catch (_err) {
+    return false;
+  }
+}
+
 function configureWebPush() {
   if (!webPush) return false;
   const publicKey = process.env.VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   const subject = process.env.VAPID_SUBJECT || 'mailto:admin@campodogado.local';
   if (!publicKey || !privateKey) return false;
-  webPush.setVapidDetails(subject, publicKey, privateKey);
-  return true;
+  if (!hasValidVapidKeyLength(publicKey, privateKey)) return false;
+  try {
+    webPush.setVapidDetails(subject, publicKey, privateKey);
+    return true;
+  } catch (_e) {
+    return false;
+  }
 }
 
 function saveSubscription({ userId, subscription, userAgent }) {

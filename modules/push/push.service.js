@@ -1,6 +1,23 @@
 const webPush = require('web-push');
 const pushRepository = require('./push.repository');
 
+function decodeBase64Url(value) {
+  if (!value) return Buffer.alloc(0);
+  const normalized = String(value).replace(/-/g, '+').replace(/_/g, '/');
+  const padLength = (4 - (normalized.length % 4)) % 4;
+  return Buffer.from(normalized + '='.repeat(padLength), 'base64');
+}
+
+function hasValidVapidKeyLength(publicKey, privateKey) {
+  try {
+    const publicKeyBytes = decodeBase64Url(publicKey);
+    const privateKeyBytes = decodeBase64Url(privateKey);
+    return publicKeyBytes.length === 65 && privateKeyBytes.length === 32;
+  } catch (_err) {
+    return false;
+  }
+}
+
 class PushService {
   constructor() {
     this.vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
@@ -8,11 +25,17 @@ class PushService {
     this.vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@campodogado.local';
 
     if (this.vapidPublicKey && this.vapidPrivateKey) {
-      try {
-        webPush.setVapidDetails(this.vapidSubject, this.vapidPublicKey, this.vapidPrivateKey);
-        console.log('✅ WebPush configurado com sucesso');
-      } catch (err) {
-        console.error('❌ Erro ao configurar WebPush:', err.message);
+      if (!hasValidVapidKeyLength(this.vapidPublicKey, this.vapidPrivateKey)) {
+        console.warn('⚠️ WebPush não configurado: VAPID keys inválidas (esperado: public=65 bytes, private=32 bytes)');
+        this.vapidPublicKey = '';
+        this.vapidPrivateKey = '';
+      } else {
+        try {
+          webPush.setVapidDetails(this.vapidSubject, this.vapidPublicKey, this.vapidPrivateKey);
+          console.log('✅ WebPush configurado com sucesso');
+        } catch (err) {
+          console.error('❌ Erro ao configurar WebPush:', err.message);
+        }
       }
     } else {
       console.warn('⚠️ WebPush não configurado: VAPID keys não encontradas');
