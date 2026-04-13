@@ -39,10 +39,12 @@ const safe = (fn) => (req, res, next) => {
 router.get("/qrcode/:token", safe(ctrl.qrPublicPage));
 
 router.get("/", requireLogin, safe(ctrl.equipIndex));
+router.get("/pdf/lista", requireLogin, safe(ctrl.exportListaPdf));
 router.get("/novo", requireLogin, safe(ctrl.equipNewForm));
 router.post("/", requireLogin, fotoUpload.single("foto"), safe(ctrl.equipCreate));
 
 router.get("/:id", requireLogin, safe(ctrl.equipShow));
+router.get("/:id/pdf", requireLogin, safe(ctrl.exportEquipamentoPdf));
 router.get("/:id/editar", requireLogin, safe(ctrl.equipEditForm));
 router.post("/:id/editar", requireLogin, fotoUpload.single("foto"), safe(ctrl.equipUpdate));
 router.post("/:id/excluir", requireLogin, safe(ctrl.equipDelete));

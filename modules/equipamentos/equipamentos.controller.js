@@ -1,4 +1,5 @@
 const QRCode = require("qrcode");
+const PDFDocument = require("pdfkit");
 const service = require("./equipamentos.service");
 let tracagemService = null;
 let desenhoTecnicoService = null;
@@ -20,6 +21,49 @@ function calcIdade(anoInstalacao) {
 function equipIndex(req, res) {
   const lista = service.list();
   return res.render("equipamentos/index", { title: "Equipamentos", lista });
+}
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString("pt-BR");
+}
+
+function drawSimpleTable(doc, headers, rows, widths) {
+  const startX = doc.page.margins.left;
+  const startY = doc.y;
+  const rowHeight = 22;
+  const tableWidth = widths.reduce((acc, n) => acc + n, 0);
+  const bottomLimit = doc.page.height - doc.page.margins.bottom - rowHeight;
+
+  doc.rect(startX, startY, tableWidth, rowHeight).fill("#f3f4f6");
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(9);
+  let cursorX = startX + 6;
+  headers.forEach((header, idx) => {
+    doc.text(header, cursorX, startY + 7, { width: widths[idx] - 10, ellipsis: true });
+    cursorX += widths[idx];
+  });
+
+  doc.font("Helvetica").fontSize(8.5);
+  let currentY = startY + rowHeight;
+  rows.forEach((row, rowIndex) => {
+    if (currentY > bottomLimit) {
+      doc.addPage();
+      currentY = doc.page.margins.top;
+    }
+    if (rowIndex % 2 === 1) {
+      doc.rect(startX, currentY, tableWidth, rowHeight).fill("#fafafa");
+    }
+    doc.fillColor("#111827");
+    let colX = startX + 6;
+    row.forEach((value, idx) => {
+      doc.text(String(value ?? "-"), colX, currentY + 7, { width: widths[idx] - 10, ellipsis: true });
+      colX += widths[idx];
+    });
+    currentY += rowHeight;
+  });
+  doc.moveDown(1);
 }
 
 function equipNewForm(req, res) {
@@ -95,6 +139,123 @@ function equipEditForm(req, res) {
   const equip = service.getById(id);
   if (!equip) return res.status(404).render("errors/404", { title: "Não encontrado" });
   return res.render("equipamentos/editar", { title: `Editar ${equip.nome}`, equip });
+}
+
+function exportListaPdf(req, res) {
+  const lista = service.list();
+  const fileName = `lista-equipamentos-${new Date().toISOString().slice(0, 10)}.pdf`;
+
+  const doc = new PDFDocument({ margin: 36, size: "A4" });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+  doc.pipe(res);
+
+  doc.fontSize(16).font("Helvetica-Bold").text("Lista Geral de Equipamentos");
+  doc.moveDown(0.3);
+  doc.fontSize(10).font("Helvetica").text(`Gerado em ${new Date().toLocaleString("pt-BR")}`);
+  doc.moveDown(0.8);
+
+  drawSimpleTable(
+    doc,
+    ["Código", "Equipamento", "Setor", "Tempo (anos)", "Criticidade", "Status"],
+    lista.map((eq) => [
+      eq.codigo || "-",
+      eq.nome || "-",
+      eq.setor || "-",
+      calcIdade(eq.ano_instalacao) ?? "-",
+      (eq.criticidade || "media").toUpperCase(),
+      Number(eq.ativo) === 1 ? "ATIVO" : "INATIVO",
+    ]),
+    [75, 160, 95, 70, 80, 75]
+  );
+
+  doc.end();
+}
+
+function exportEquipamentoPdf(req, res) {
+  const id = Number(req.params.id);
+  const equip = service.getById(id);
+  if (!equip) return res.status(404).send("Equipamento não encontrado.");
+
+  const historicoOS = service.listHistoricoOS(id, {});
+  const historicoPreventivas = service.listHistoricoPreventivas(id, {});
+  const pecas = service.listPecasByEquipamento(id);
+  const documentos = service.listDocumentos(id);
+  const qr = service.getQrByEquipamento(id);
+  const tracagens = tracagemService ? tracagemService.listByEquipamento(id) : [];
+  const desenhosTecnicos = desenhoTecnicoService ? desenhoTecnicoService.listByEquipamento(id) : [];
+  const riscoFalha = pcmIntelligenceService ? pcmIntelligenceService.calcularScoreRiscoEquipamento(id) : null;
+  const fileName = `equipamento-${id}-${(equip.nome || "detalhes").replace(/\s+/g, "-").toLowerCase()}.pdf`;
+
+  const doc = new PDFDocument({ margin: 36, size: "A4" });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+  doc.pipe(res);
+
+  doc.fontSize(17).font("Helvetica-Bold").text(`Relatório Técnico - ${equip.nome}`);
+  doc.fontSize(10).font("Helvetica").text(`Gerado em ${new Date().toLocaleString("pt-BR")}`);
+  doc.moveDown(0.8);
+
+  doc.fontSize(12).font("Helvetica-Bold").text("Dados gerais");
+  doc.moveDown(0.3);
+  const gerais = [
+    ["Código", equip.codigo || "-"],
+    ["Setor", equip.setor || "-"],
+    ["Tipo", equip.tipo || "-"],
+    ["Criticidade", (equip.criticidade || "media").toUpperCase()],
+    ["Status operacional", equip.status_operacional || "ATIVO"],
+    ["Tempo de uso (anos)", calcIdade(equip.ano_instalacao) ?? "-"],
+    ["Fabricante", equip.fabricante || "-"],
+    ["Ano fabricação / instalação", `${equip.ano_fabricacao || "-"} / ${equip.ano_instalacao || "-"}`],
+    ["Capacidade", equip.capacidade || "-"],
+    ["Pressão de trabalho", equip.pressao_trabalho || "-"],
+    ["Score de risco PCM", riscoFalha ? `${riscoFalha.score_risco}/100 (${riscoFalha.classificacao_risco})` : "-"],
+    ["QR Code ativo", qr ? "Sim" : "Não"],
+    ["Observação", equip.observacao || "-"],
+  ];
+  gerais.forEach(([k, v]) => doc.font("Helvetica-Bold").text(`${k}: `, { continued: true }).font("Helvetica").text(String(v)));
+  doc.moveDown(0.8);
+
+  doc.fontSize(12).font("Helvetica-Bold").text("Peças associadas");
+  drawSimpleTable(doc, ["Descrição", "Medida", "Unidade", "Qtde"], (pecas.length ? pecas : [{ descricao_item: "-", modelo_descricao: "-", unidade_medida: "-", quantidade: "-" }]).map((p) => [
+    p.descricao_item || "-",
+    p.modelo_descricao || "-",
+    p.unidade_medida || "-",
+    p.quantidade || "-",
+  ]), [250, 120, 100, 60]);
+
+  doc.fontSize(12).font("Helvetica-Bold").text("Documentos");
+  drawSimpleTable(doc, ["Tipo", "Descrição", "Emissão", "Validade"], (documentos.length ? documentos : [{ tipo_documento: "-", descricao: "-", data_emissao: "-", validade: "-" }]).map((d) => [
+    d.tipo_documento || "-",
+    d.descricao || "-",
+    d.data_emissao || "-",
+    d.validade || "-",
+  ]), [90, 220, 90, 90]);
+
+  doc.addPage();
+  doc.fontSize(12).font("Helvetica-Bold").text("Histórico de Ordens de Serviço");
+  drawSimpleTable(doc, ["OS", "Abertura", "Fechamento", "Tipo", "Parada(h)"], (historicoOS.length ? historicoOS : [{ id: "-", opened_at: "-", closed_at: "-", tipo: "-", tempo_parada_horas: "-" }]).map((o) => [
+    o.id,
+    formatDateTime(o.opened_at),
+    formatDateTime(o.closed_at),
+    o.tipo || "-",
+    o.tempo_parada_horas || "-",
+  ]), [60, 130, 130, 100, 90]);
+
+  doc.fontSize(12).font("Helvetica-Bold").text("Preventivas executadas");
+  drawSimpleTable(doc, ["Atividade", "Prevista", "Status", "Duração"], (historicoPreventivas.length ? historicoPreventivas : [{ atividade: "-", data_prevista: "-", status: "-", duracao_minutos: "-" }]).map((p) => [
+    p.atividade || "-",
+    p.data_prevista || "-",
+    p.status || "-",
+    p.duracao_minutos ? `${p.duracao_minutos} min` : "-",
+  ]), [250, 100, 100, 60]);
+
+  doc.fontSize(12).font("Helvetica-Bold").text("Traçagens e desenhos técnicos");
+  doc.font("Helvetica").fontSize(10).text(`Traçagens vinculadas: ${tracagens.length}`);
+  doc.text(`Desenhos técnicos vinculados: ${desenhosTecnicos.length}`);
+  doc.text("Este PDF consolida a vida do equipamento para consulta técnica e PCM.");
+
+  doc.end();
 }
 
 function equipUpdate(req, res) {
@@ -218,7 +379,6 @@ async function qrPublicPage(req, res) {
     title: `QR ${equip.nome}`,
     equip,
     qrImage,
-    tracagens,
     detalhesUrl: req.session?.user ? `/equipamentos/${equip.id}` : `/auth/login?next=${encodeURIComponent(`/equipamentos/${equip.id}`)}`,
     abrirOsUrl: req.session?.user ? `/os/nova?equipamento_id=${equip.id}` : `/auth/login?next=${encodeURIComponent(`/os/nova?equipamento_id=${equip.id}`)}`,
   });
@@ -242,6 +402,8 @@ module.exports = {
   equipEditForm,
   equipUpdate,
   equipDelete,
+  exportListaPdf,
+  exportEquipamentoPdf,
   addPeca,
   updatePeca,
   removePeca,
