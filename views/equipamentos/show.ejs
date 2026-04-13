@@ -32,7 +32,12 @@
         <div><b>Score risco falha:</b> <%= riscoFalha ? riscoFalha.score_risco : '-' %> / 100</div>
         <div><b>Classificação risco:</b> <%= riscoFalha ? riscoFalha.classificacao_risco : '-' %></div>
       </div>
-      <form method="POST" action="/equipamentos/<%= equip.id %>/qrcode" style="margin-top:10px;"><button class="btn btn-green">Gerar/Regerar QR Code</button></form>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <form method="POST" action="/equipamentos/<%= equip.id %>/qrcode" style="margin:0;">
+          <button class="btn btn-green">Gerar/Regerar QR Code</button>
+        </form>
+        <a class="btn" href="/equipamentos/<%= equip.id %>/pdf" target="_blank" rel="noopener">PDF completo do equipamento</a>
+      </div>
     </div>
 
     <div class="tabs">
