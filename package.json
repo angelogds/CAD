@@ -10,7 +10,8 @@
     "migrate": "node database/migrate.js",
     "seed": "node database/seed.js",
     "test": "node --test tests/*.test.js",
-    "test:openai": "node scripts/test-openai-responses.js"
+    "test:openai": "node scripts/test-openai-responses.js",
+    "generate:vapid": "node scripts/generate-vapid-keys.js"
   },
   "engines": {
     "node": ">=18"
