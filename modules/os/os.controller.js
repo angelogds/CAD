@@ -142,7 +142,7 @@ async function osCreate(req, res) {
 
     embeddingsService.updateOSEmbedding(id);
 
-    await pushService.sendPushToAll({
+    await pushService.sendToAll({
       title: "Nova Ordem de Serviço",
       body: `OS #${id} criada automaticamente.`,
       url: `/os/${id}`,
@@ -249,7 +249,7 @@ async function osIniciar(req, res) {
   const id = Number(req.params.id);
   try {
     service.iniciarOS(id, req.session?.user?.id || null);
-    await pushService.sendPushToAll({
+    await pushService.sendToAll({
       title: "OS em andamento",
       body: `OS #${id} entrou em andamento.`,
       url: `/os/${id}`,
@@ -363,7 +363,7 @@ async function osClose(req, res) {
       fechamentoPayload,
     });
 
-    await pushService.sendPushToAll({
+    await pushService.sendToAll({
       title: "OS finalizada",
       body: `OS #${id} foi finalizada.`,
       url: `/os/${id}`,
@@ -389,14 +389,14 @@ async function osUpdateStatus(req, res) {
 
     const st = String(status || '').toUpperCase();
     if (st === 'ANDAMENTO' || st === 'EM_ANDAMENTO') {
-      await pushService.sendPushToAll({
+      await pushService.sendToAll({
         title: "OS em andamento",
         body: `OS #${id} entrou em andamento.`,
         url: `/os/${id}`,
       }).catch(() => {});
     }
     if (['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA'].includes(st)) {
-      await pushService.sendPushToAll({
+      await pushService.sendToAll({
         title: "OS finalizada",
         body: `OS #${id} foi finalizada.`,
         url: `/os/${id}`,
