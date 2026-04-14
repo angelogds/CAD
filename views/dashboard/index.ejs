@@ -127,7 +127,8 @@
   var roleNorm = (typeof normalizeRole === 'function') ? normalizeRole(user?.role || '') : String(user?.role || '').toUpperCase();
   var isMecanico = roleNorm === 'MECANICO';
   var isProducao = roleNorm === 'PRODUCAO' || roleNorm === 'ENCARREGADO_PRODUCAO';
-  var showPreventivasCard = isMecanico || isProducao;
+  var isAdminPainel = roleNorm === 'ADMIN' || roleNorm === 'DIRETORIA' || roleNorm === 'RH' || roleNorm === 'MANUTENCAO_SUPERVISOR' || roleNorm === 'SUPERVISOR_MANUTENCAO' || roleNorm === 'ENCARREGADO_MANUTENCAO';
+  var showPreventivasCard = isMecanico || isProducao || isAdminPainel;
 %>
 
 <div class="page-head">
