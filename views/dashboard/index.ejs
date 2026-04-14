@@ -126,6 +126,8 @@
   var saudacao = (horaPainel < 12) ? "Bom dia" : (horaPainel < 18 ? "Boa tarde" : "Boa noite");
   var roleNorm = (typeof normalizeRole === 'function') ? normalizeRole(user?.role || '') : String(user?.role || '').toUpperCase();
   var isMecanico = roleNorm === 'MECANICO';
+  var isProducao = roleNorm === 'PRODUCAO' || roleNorm === 'ENCARREGADO_PRODUCAO';
+  var showPreventivasCard = isMecanico || isProducao;
 %>
 
 <div class="page-head">
@@ -214,7 +216,7 @@
     </div>
   </section>
 
-<% if (isMecanico) { %>
+<% if (showPreventivasCard) { %>
 <section class="dashboard-card area-preventivas">
     <div class="dashboard-title">Preventivas Programadas</div>
     <div class="kpi-grid">
@@ -328,6 +330,24 @@
         </ul>
       <% } %>
     <% } else { %><p class="muted" style="margin:0;">Escala não disponível.</p><% } %>
+  </section>
+
+<section class="dashboard-card area-avisos">
+    <div class="dashboard-title">Avisos</div>
+    <% if (safeAvisos.length === 0) { %>
+      <p class="muted" style="margin:0;">Nenhum aviso ativo no momento.</p>
+    <% } else { %>
+      <% safeAvisos.slice(0, 5).forEach(function(aviso) { %>
+        <article class="aviso-item">
+          <strong><%= aviso.titulo || 'Aviso' %></strong>
+          <div class="muted-xs" style="margin-top:4px;"><%= aviso.mensagem || '-' %></div>
+          <div class="muted-xs" style="margin-top:6px;">
+            <% if (aviso.publicado_em) { %>Publicado em <%= fmtBR(aviso.publicado_em) %><% } %>
+            <% if (aviso.autor_nome) { %> • por <%= aviso.autor_nome %><% } %>
+          </div>
+        </article>
+      <% }) %>
+    <% } %>
   </section>
 
 <section class="area-quick">
