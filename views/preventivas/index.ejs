@@ -134,9 +134,7 @@
   <div class="actions">
     <% if (canAdminPreventivas && !tvMode) { %>
     <a class="btn-primary" href="/preventivas/nova">+ Nova Preventiva</a>
-    <form method="POST" action="/preventivas/reprocessar" style="display:inline;" onsubmit="return confirm('Reprocessar módulo de preventivas agora?');">
-      <button class="btn-sm" type="submit">↻ Reprocessar / Reboot Preventivas</button>
-    </form>
+    <a class="btn-sm" href="/preventivas/programadas">Preventivas programadas</a>
     <% } %>
   </div>
 </div>

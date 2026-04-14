@@ -60,20 +60,20 @@ router.post(
 );
 
 
-// POST /preventivas/reprocessar
-router.post(
-  "/reprocessar",
+// GET /preventivas/programadas
+router.get(
+  "/programadas",
   requireLogin,
   requireRole(ACCESS.preventivas_manage),
-  safe(ctrl.reprocessarModulo, "reprocessarModulo")
+  safe(ctrl.programadasIndex, "programadasIndex")
 );
 
-// GET /preventivas/reprocessar
-router.get(
-  "/reprocessar",
+// POST /preventivas/programadas/gerar
+router.post(
+  "/programadas/gerar",
   requireLogin,
   requireRole(ACCESS.preventivas_manage),
-  safe(ctrl.reprocessarModulo, "reprocessarModulo")
+  safe(ctrl.gerarProgramadas, "gerarProgramadas")
 );
 
 // GET  /preventivas/:id

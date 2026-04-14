@@ -1,0 +1,76 @@
+<% layout('layout') %>
+
+<div class="page-head" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;">
+  <div>
+    <h1>Preventivas Programadas</h1>
+    <p class="muted" style="margin-top:6px;">Geração semanal para iniciar manutenção na segunda-feira.</p>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <% if (canAdminPreventivas) { %>
+      <form method="POST" action="/preventivas/programadas/gerar" onsubmit="return confirm('Gerar preventivas programadas para a próxima segunda-feira?');">
+        <button class="btn btn-primary" type="submit">Gerar preventivas programadas</button>
+      </form>
+    <% } %>
+    <a class="btn" href="/preventivas">Voltar</a>
+  </div>
+</div>
+
+<div class="card" style="margin-top:12px;">
+  <div class="label">Resumo</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+    <span class="pill">Próxima segunda: <strong><%= resumo?.proximaSegunda || '-' %></strong></span>
+    <span class="pill">Templates: <strong><%= resumo?.totalTemplates || 0 %></strong></span>
+    <span class="pill">Planos programados: <strong><%= resumo?.totalPlanos || 0 %></strong></span>
+    <span class="pill">Execuções pendentes (próxima segunda): <strong><%= resumo?.totalExecucoesProxima || 0 %></strong></span>
+  </div>
+</div>
+
+<div class="card" style="margin-top:12px;">
+  <div class="label">Templates padrão</div>
+  <div class="table-wrap" style="margin-top:8px;">
+    <table class="table">
+      <thead><tr><th>Template</th><th>Frequência</th><th>Checklist base</th></tr></thead>
+      <tbody>
+        <% if (!resumo?.templates?.length) { %>
+          <tr><td colspan="3">Nenhum template configurado.</td></tr>
+        <% } %>
+        <% (resumo?.templates || []).forEach(function(t){ %>
+          <tr>
+            <td><strong><%= t.titulo %></strong></td>
+            <td><%= (t.frequencia_tipo || '-').toUpperCase() %> x<%= t.frequencia_valor || 1 %></td>
+            <td>
+              <ul style="margin:0;padding-left:16px;">
+                <% (t.checklist || []).forEach(function(item){ %>
+                  <li><%= item %></li>
+                <% }) %>
+              </ul>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card" style="margin-top:12px;">
+  <div class="label">Planos já criados</div>
+  <div class="table-wrap" style="margin-top:8px;">
+    <table class="table">
+      <thead><tr><th>ID</th><th>Título</th><th>Equipamento</th><th>Frequência</th><th>Ação</th></tr></thead>
+      <tbody>
+        <% if (!resumo?.planos?.length) { %>
+          <tr><td colspan="5">Nenhuma preventiva programada criada ainda.</td></tr>
+        <% } %>
+        <% (resumo?.planos || []).forEach(function(p){ %>
+          <tr>
+            <td>#<%= p.id %></td>
+            <td><%= p.titulo %></td>
+            <td><%= p.equipamento_nome || '-' %> <span class="muted"><%= p.equipamento_tipo || '' %></span></td>
+            <td><%= (p.frequencia_tipo || '-').toUpperCase() %> x<%= p.frequencia_valor || 1 %></td>
+            <td><a class="btn btn-outline" href="/preventivas/<%= p.id %>">Abrir</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

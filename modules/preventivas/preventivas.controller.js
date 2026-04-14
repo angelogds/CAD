@@ -10,7 +10,7 @@ function index(req, res) {
   let lista = [];
   let diagnosticoLeitura = null;
   try {
-    ciclo = service.executarCicloAutonomo(new Date());
+    ciclo = service.executarCicloProgramadoSemanal(new Date());
     service.sincronizarPreventivasComEscala({ origem: "preventivas.index" });
     lista = service.listPlanos();
     diagnosticoLeitura = service.auditarLeituraEquipamentosPreventivas();
@@ -164,39 +164,43 @@ function execUpdateStatus(req, res) {
   return res.redirect(`/preventivas/${planoId}`);
 }
 
-async function reprocessarModulo(req, res) {
+function programadasIndex(req, res) {
   const user = req.session?.user || null;
   if (!isAdminOrEncarregado(user)) {
-    req.flash("error", "Sem permissão para reprocessar preventivas.");
-    return res.redirect("/dashboard");
+    req.flash("error", "Sem permissão para acessar preventivas programadas.");
+    return res.redirect("/preventivas");
+  }
+
+  const resumo = service.listarResumoPreventivasProgramadas();
+  return res.render("preventivas/programadas", {
+    layout: "layout",
+    title: "Preventivas Programadas",
+    activeMenu: "preventivas",
+    resumo,
+    canAdminPreventivas: isAdminOrEncarregado(user),
+  });
+}
+
+function gerarProgramadas(req, res) {
+  const user = req.session?.user || null;
+  if (!isAdminOrEncarregado(user)) {
+    req.flash("error", "Sem permissão para gerar preventivas programadas.");
+    return res.redirect("/preventivas");
   }
 
   try {
-    const result = await service.reprocessarModuloPreventivas({ user });
-    const pre = result.prevalidacao || {};
-    const alertas = Array.isArray(pre.alertas) ? pre.alertas : [];
-    const prefixo = alertas.length
-      ? `Reprocesso concluído com alertas de pré-validação (${alertas.length}). `
-      : "Preventivas reprocessadas e equipes atualizadas com sucesso. ";
+    const result = service.gerarPreventivasProgramadasSemanais({ user, refDate: new Date() });
     req.flash(
       "success",
-      prefixo +
-        `Semana ativa: ${pre.semanaAtiva ? "SIM" : "NÃO"}, ` +
-        `turnos (D/A/N): ${pre.colaboradoresTurno?.diurno || 0}/${pre.colaboradoresTurno?.apoio || 0}/${pre.colaboradoresTurno?.noturnoPlantao || 0}, ` +
-        `Equipamentos elegíveis: ${result.auditoria?.equipamentosElegiveis || 0}, ` +
-        `planos ativos: ${result.auditoria?.planosAtivos || 0}, ` +
-        `execuções sincronizadas/atualizadas: ${result.reorganizacao?.atualizadas || 0}.`
+      `Preventivas programadas processadas. Planos novos: ${result.planosCriados || 0}, execuções criadas: ${result.execucoesCriadas || 0}, próxima segunda: ${result.proximaSegunda || "-"}.`
     );
-    if (alertas.length) {
-      req.flash("error", `Pré-validação: ${alertas.join(" | ")}`);
-    }
   } catch (err) {
-    console.error("[PREVENTIVAS][REPROCESSAR] erro ao reprocessar módulo:", err?.stack || err);
-    req.flash("error", "Erro ao reprocessar preventivas. Verifique os logs.");
+    console.error("[PREVENTIVAS][PROGRAMADAS] erro ao gerar preventivas programadas:", err?.stack || err);
+    req.flash("error", "Erro ao gerar preventivas programadas.");
   }
-  return res.redirect("/dashboard");
-}
 
+  return res.redirect("/preventivas/programadas");
+}
 function apagarExecucao(req, res) {
   const user = req.session?.user || null;
   if (!isAdminOrEncarregado(user)) {
@@ -224,4 +228,4 @@ function apagarExecucao(req, res) {
   return res.redirect(`/preventivas/${planoId}`);
 }
 
-module.exports = { index, newForm, create, show, execCreate, execUpdateStatus, reprocessarModulo, apagarExecucao };
+module.exports = { index, newForm, create, show, programadasIndex, gerarProgramadas, execCreate, execUpdateStatus , apagarExecucao };

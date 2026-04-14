@@ -1097,6 +1097,277 @@ function executarCicloAutonomo(refDate = new Date()) {
 }
 
 
+
+
+function obterInicioSemanaDomingoISO(refDate = new Date()) {
+  const base = new Date(Date.UTC(refDate.getUTCFullYear(), refDate.getUTCMonth(), refDate.getUTCDate()));
+  const sunday = addDays(base, -base.getUTCDay());
+  return formatDateISO(sunday);
+}
+
+function executarCicloProgramadoSemanal(refDate = new Date()) {
+  const hoje = formatDateISO(refDate);
+  const diaSemana = refDate.getUTCDay();
+  if (diaSemana !== 0) {
+    return { skipped: true, reason: "not_sunday", data: hoje };
+  }
+
+  const semanaDomingo = obterInicioSemanaDomingoISO(refDate);
+  const semanaExecutada = getConfig("preventiva_ia_ciclo_semana");
+  if (semanaExecutada === semanaDomingo) {
+    return { skipped: true, reason: "already_ran_this_week", data: hoje, semanaDomingo };
+  }
+
+  const autoPlanos = gerarPreventivasAutomaticas();
+  const autoCronograma = gerarCronogramaSemanalInteligente(addDays(refDate, 1));
+  const revisaoCriticidade = revisarCriticidadePreventivasFuturas();
+  setConfig("preventiva_ia_ciclo_semana", semanaDomingo);
+  setConfig("preventiva_ia_ciclo_data", hoje);
+  return { skipped: false, data: hoje, semanaDomingo, autoPlanos, autoCronograma, revisaoCriticidade };
+}
+
+const PREVENTIVAS_PROGRAMADAS_TEMPLATE = [
+  {
+    chave: "abertura-prensa",
+    titulo: "Preventiva Programada • Abertura de Prensa",
+    keywords: ["prensa"],
+    frequencia_tipo: "semanal",
+    frequencia_valor: 1,
+    checklist: ["Abrir prensa e inspecionar pontos críticos.", "Verificar folgas, ruídos e vibração.", "Validar reapertos e estado geral da estrutura."],
+  },
+  {
+    chave: "perculadora",
+    titulo: "Preventiva Programada • Verificação da Perculadora",
+    keywords: ["perculadora"],
+    frequencia_tipo: "semanal",
+    frequencia_valor: 1,
+    checklist: ["Inspecionar funcionamento geral e vedação.", "Verificar alinhamento e condição dos componentes.", "Registrar anomalias e correções necessárias."],
+  },
+  {
+    chave: "triturador",
+    titulo: "Preventiva Programada • Verificação do Triturador",
+    keywords: ["triturador"],
+    frequencia_tipo: "semanal",
+    frequencia_valor: 1,
+    checklist: ["Inspecionar desgaste e integridade dos conjuntos.", "Verificar vibração, ruído e fixações.", "Executar limpeza técnica e reaperto."],
+  },
+  {
+    chave: "digestor-pugadores",
+    titulo: "Preventiva Programada • Digestor (Pugadores)",
+    keywords: ["digestor", "pugador"],
+    frequencia_tipo: "semanal",
+    frequencia_valor: 1,
+    checklist: ["Verificar pugadores e possíveis trincas/desgastes.", "Inspecionar roscas, vazamentos e vedação.", "Executar limpeza e teste operacional."],
+  },
+  {
+    chave: "decanter",
+    titulo: "Preventiva Programada • Decanter (Óleo + Higienização)",
+    keywords: ["decanter", "decante"],
+    frequencia_tipo: "semanal",
+    frequencia_valor: 1,
+    checklist: ["Completar óleo conforme padrão do fabricante.", "Abrir decanter para higienização total semanal.", "Inspecionar tubulações e condições de vedação."],
+  },
+  {
+    chave: "moinho-martelos",
+    titulo: "Preventiva Programada • Viragem de Martelos do Moinho",
+    keywords: ["moinho", "martelo"],
+    frequencia_tipo: "semanal",
+    frequencia_valor: 1,
+    checklist: ["Executar viragem dos martelos conforme padrão.", "Inspecionar trincas e desgaste nos conjuntos.", "Registrar condição e necessidade de troca."],
+  },
+  {
+    chave: "roscas-geral",
+    titulo: "Preventiva Programada • Verificação de Roscas",
+    keywords: ["rosca"],
+    frequencia_tipo: "semanal",
+    frequencia_valor: 1,
+    checklist: ["Verificar se há roscas trincadas.", "Inspecionar alinhamento e aperto.", "Planejar correção imediata quando necessário."],
+  },
+  {
+    chave: "caldeira-1",
+    titulo: "Preventiva Programada • Caldeira 1 (Escovação Semanal)",
+    keywords: ["caldeira", "1"],
+    frequencia_tipo: "semanal",
+    frequencia_valor: 1,
+    checklist: ["Abrir caldeira 1 para escovação de tubos e remoção de cinzas.", "Inspecionar obstruções/vazamentos de tubulação.", "Verificar exaustor, aperto de motor/mancal e vedação com troca de graxeta."],
+  },
+  {
+    chave: "caldeira-2",
+    titulo: "Preventiva Programada • Caldeira 2 (Escovação Quinzenal)",
+    keywords: ["caldeira", "2"],
+    frequencia_tipo: "quinzenal",
+    frequencia_valor: 1,
+    checklist: ["Abrir caldeira 2 para escovação quinzenal.", "Verificar acúmulo de cinzas e condição de tubos.", "Inspecionar vazamentos/obstruções e necessidade de solda/correção."],
+  },
+];
+
+function getProximaSegundaISO(refDate = new Date()) {
+  const base = new Date(Date.UTC(refDate.getUTCFullYear(), refDate.getUTCMonth(), refDate.getUTCDate()));
+  const day = base.getUTCDay();
+  const offset = day === 1 ? 0 : day === 0 ? 1 : 8 - day;
+  return formatDateISO(addDays(base, offset));
+}
+
+function listarEquipamentosAtivosDetalhado() {
+  if (!tableExists("equipamentos")) return [];
+  const hasSetor = getEquipamentosColumns().includes("setor");
+  const hasCriticidade = getEquipamentosColumns().includes("criticidade");
+  return db.prepare(`
+    SELECT id, nome, tipo, ${hasSetor ? "setor" : "NULL AS setor"}, ${hasCriticidade ? "criticidade" : "'MEDIA' AS criticidade"}
+    FROM equipamentos
+    WHERE IFNULL(ativo,1)=1
+    ORDER BY nome ASC
+  `).all();
+}
+
+function localizarEquipamentosPorKeywords(equipamentos = [], keywords = []) {
+  const chaves = (keywords || []).map((k) => normalizeTxt(k)).filter(Boolean);
+  if (!chaves.length) return [];
+  return (equipamentos || []).filter((eq) => {
+    const texto = normalizeTxt(`${eq?.nome || ""} ${eq?.tipo || ""} ${eq?.setor || ""}`);
+    return chaves.every((k) => texto.includes(k));
+  });
+}
+
+function montarChecklistProgramada(template = {}, equipamento = {}) {
+  const lista = Array.isArray(template.checklist) ? template.checklist : [];
+  const nomeEq = String(equipamento?.nome || "equipamento").trim();
+  return `Preventiva programada para ${nomeEq}. ${lista.join(" ")}`.trim();
+}
+
+function gerarPreventivasProgramadasSemanais({ user = null, refDate = new Date() } = {}) {
+  if (!tableExists("preventiva_planos") || !tableExists("preventiva_execucoes") || !tableExists("equipamentos")) {
+    return { planosCriados: 0, execucoesCriadas: 0, proximaSegunda: getProximaSegundaISO(refDate), equipamentosCobertos: 0 };
+  }
+
+  const executar = db.transaction(() => {
+    const equipamentos = listarEquipamentosAtivosDetalhado();
+    const proximaSegunda = getProximaSegundaISO(refDate);
+    const escalaSemana = getEscalaSemanaAtual();
+    const disponibilidade = getDisponibilidadeEscala();
+    let planosCriados = 0;
+    let execucoesCriadas = 0;
+    let equipamentosCobertos = 0;
+
+    PREVENTIVAS_PROGRAMADAS_TEMPLATE.forEach((template) => {
+      const encontrados = localizarEquipamentosPorKeywords(equipamentos, template.keywords);
+      encontrados.forEach((eq) => {
+        equipamentosCobertos += 1;
+        const tituloPlano = `${template.titulo} • ${eq.nome}`;
+        let plano = db.prepare(`
+          SELECT id, titulo, checklist_json, tipo_plano
+          FROM preventiva_planos
+          WHERE equipamento_id = ?
+            AND titulo = ?
+          LIMIT 1
+        `).get(Number(eq.id), tituloPlano);
+
+        if (!plano) {
+          const planoId = createPlano({
+            equipamento_id: Number(eq.id),
+            titulo: tituloPlano,
+            frequencia_tipo: template.frequencia_tipo,
+            frequencia_valor: template.frequencia_valor,
+            ativo: true,
+            observacao: `[PROGRAMADA_SEMANAL:${template.chave}] ${montarChecklistProgramada(template, eq)}`,
+            prioridade: normalizeCriticidade(eq.criticidade || "MEDIA"),
+            tipo_plano: "preventiva",
+            checklist_json: template.checklist,
+            gerado_ia: 1,
+            origem: "PROGRAMADA_SEMANAL",
+          });
+          plano = { id: planoId, titulo: tituloPlano, checklist_json: JSON.stringify(template.checklist), tipo_plano: "preventiva" };
+          planosCriados += 1;
+        }
+
+        const existeExecucao = db.prepare(`
+          SELECT id
+          FROM preventiva_execucoes
+          WHERE plano_id = ?
+            AND data_prevista = ?
+            AND UPPER(COALESCE(status,'')) IN ('PENDENTE','ATRASADA','EM_ANDAMENTO','ANDAMENTO')
+          LIMIT 1
+        `).get(Number(plano.id), proximaSegunda);
+
+        if (existeExecucao) return;
+
+        const criticidade = calcularCriticidade({
+          id: eq.id,
+          nome: eq.nome,
+          tipo: eq.tipo,
+          setor: eq.setor,
+          criticidade: eq.criticidade,
+        });
+        const equipe = montarEquipePreventiva({
+          criticidade,
+          tipo_plano: plano.tipo_plano,
+          titulo: plano.titulo,
+          checklist_json: plano.checklist_json,
+        }, escalaSemana, disponibilidade);
+
+        createExecucao(plano.id, {
+          data_prevista: proximaSegunda,
+          status: "PENDENTE",
+          criticidade,
+          responsavel: equipe.responsavelTexto,
+          responsavel_1_id: equipe.responsavel_1_id,
+          responsavel_2_id: equipe.responsavel_2_id,
+          observacao: montarChecklistProgramada(template, eq),
+          origem: "PROGRAMADA_SEMANAL",
+        });
+        execucoesCriadas += 1;
+      });
+    });
+
+    return { planosCriados, execucoesCriadas, proximaSegunda, equipamentosCobertos };
+  });
+
+  const result = executar();
+  registrarLogPreventiva({
+    acao: "PREVENTIVAS_PROGRAMADAS_GERADAS",
+    user,
+    detalhes: result,
+  });
+  return result;
+}
+
+function listarResumoPreventivasProgramadas(refDate = new Date()) {
+  const proximaSegunda = getProximaSegundaISO(refDate);
+  if (!tableExists("preventiva_planos")) {
+    return { proximaSegunda, totalPlanos: 0, totalExecucoesProxima: 0, totalTemplates: PREVENTIVAS_PROGRAMADAS_TEMPLATE.length, planos: [] };
+  }
+
+  const planos = db.prepare(`
+    SELECT p.id, p.titulo, p.frequencia_tipo, p.frequencia_valor,
+           e.nome AS equipamento_nome,
+           e.tipo AS equipamento_tipo
+    FROM preventiva_planos p
+    LEFT JOIN equipamentos e ON e.id = p.equipamento_id
+    WHERE UPPER(COALESCE(p.origem,'')) = 'PROGRAMADA_SEMANAL'
+    ORDER BY p.id DESC
+  `).all();
+
+  const totalExecucoesProxima = tableExists("preventiva_execucoes")
+    ? Number(db.prepare(`
+        SELECT COUNT(*) AS total
+        FROM preventiva_execucoes pe
+        JOIN preventiva_planos pp ON pp.id = pe.plano_id
+        WHERE UPPER(COALESCE(pp.origem,''))='PROGRAMADA_SEMANAL'
+          AND pe.data_prevista = ?
+          AND UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA','EM_ANDAMENTO','ANDAMENTO')
+      `).get(proximaSegunda)?.total || 0)
+    : 0;
+
+  return {
+    proximaSegunda,
+    totalPlanos: planos.length,
+    totalExecucoesProxima,
+    totalTemplates: PREVENTIVAS_PROGRAMADAS_TEMPLATE.length,
+    templates: PREVENTIVAS_PROGRAMADAS_TEMPLATE,
+    planos,
+  };
+}
+
 function getDisponibilidadeEscala() {
   const disponibilidade = {};
   if (!tableExists("escala_ausencias") || !tableExists("colaboradores")) return disponibilidade;
@@ -1683,10 +1954,13 @@ module.exports = {
   gerarPreventivasAutomaticas,
   gerarCronogramaSemanalInteligente,
   executarCicloAutonomo,
+  executarCicloProgramadoSemanal,
   criarPreventivaManual,
   auditarLeituraEquipamentosPreventivas,
   prevalidarReprocessamentoPreventivas,
   reprocessarModuloPreventivas,
+  gerarPreventivasProgramadasSemanais,
+  listarResumoPreventivasProgramadas,
   apagarPreventivaExecucao,
   registrarLogPreventiva,
 };
