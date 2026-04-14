@@ -1,6 +1,6 @@
 const { normalizeRole } = require('../../config/rbac');
 
-const OS_ACCESS = ['MANUTENCAO', 'MECANICO', 'PRODUCAO', 'ENCARREGADO', 'DIRECAO'];
+const OS_ACCESS = ['MANUTENCAO', 'MECANICO', 'PRODUCAO', 'ENCARREGADO', 'ENCARREGADO_PRODUCAO', 'DIRECAO'];
 
 // Perfis que podem executar ciclo operacional da OS.
 const OS_EXECUTION_ACCESS = [

@@ -120,7 +120,12 @@
   var preventivasCrit = safePreventivas.criticidade || {};
   var alertaInicial = alertaAtivo || null;
   var counters = operationalCounters || { osAbertas: 0, osCriticas: 0, preventivasHoje: 0 };
-  var saudacao = (new Date().getHours() < 12) ? "Bom dia" : (new Date().getHours() < 18 ? "Boa tarde" : "Boa noite");
+  var timezonePainel = TZ || 'America/Sao_Paulo';
+  var horaPainel = Number(new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', hour12: false, timeZone: timezonePainel }).format(new Date()));
+  var horaAtualFmt = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: timezonePainel }).format(new Date());
+  var saudacao = (horaPainel < 12) ? "Bom dia" : (horaPainel < 18 ? "Boa tarde" : "Boa noite");
+  var roleNorm = (typeof normalizeRole === 'function') ? normalizeRole(user?.role || '') : String(user?.role || '').toUpperCase();
+  var isMecanico = roleNorm === 'MECANICO';
 %>
 
 <div class="page-head">
@@ -152,10 +157,14 @@
 </section>
 
 <section class="boasvindas">
-  <strong><%= saudacao %>, <%= user?.name || "Equipe" %>.</strong>
-  Você tem <strong><%= counters.osAbertas %></strong> ordens de serviço abertas
-  <% if (counters.osCriticas > 0) { %>• <strong><%= counters.osCriticas %></strong> crítica(s) aguardando atendimento<% } %>
-  <% if (counters.preventivasHoje > 0) { %>• <strong><%= counters.preventivasHoje %></strong> preventiva(s) pendente(s) hoje<% } %>.
+  <strong><%= saudacao %>, senhor <%= user?.name || "Equipe" %>.</strong>
+  Bem-vindo ao sistema de manutenção Campo do Gado.
+  <% if (isMecanico) { %>
+    Você tem <strong><%= counters.osAbertas %></strong> ordens de serviço abertas
+    <% if (counters.osCriticas > 0) { %>• <strong><%= counters.osCriticas %></strong> crítica(s) aguardando atendimento<% } %>
+    <% if (counters.preventivasHoje > 0) { %>• <strong><%= counters.preventivasHoje %></strong> preventiva(s) pendente(s) hoje<% } %>.
+  <% } %>
+  <span class="muted-xs" style="display:block; margin-top:6px;">Horário de Brasília: <strong><%= horaAtualFmt %></strong></span>
 </section>
 
 <div id="op-toast" class="op-toast"></div>
@@ -205,6 +214,7 @@
     </div>
   </section>
 
+<% if (isMecanico) { %>
 <section class="dashboard-card area-preventivas">
     <div class="dashboard-title">Preventivas Programadas</div>
     <div class="kpi-grid">
@@ -229,7 +239,7 @@
           <td><span class="pill-tag <%= critic === 'CRITICA' ? 'pill-gray' : (critic === 'ALTA' ? 'pill-amber' : (critic === 'MEDIA' ? 'pill-blue' : 'pill-green')) %>"><%= critic %></span></td>
           <td><span class="pill-tag <%= stat === 'EM_ANDAMENTO' ? 'pill-blue' : (stat === 'PENDENTE' ? 'pill-amber' : 'pill-gray') %>"><%= stat %></span></td>
           <td style="text-align:right;">
-            <% var roleNorm = String(user?.role || '').toUpperCase(); var podeIniciar = roleNorm === 'ADMIN' || roleNorm === 'MANUTENCAO_SUPERVISOR' || roleNorm === 'SUPERVISOR_MANUTENCAO' || roleNorm === 'ENCARREGADO_MANUTENCAO' || Number(p.responsavel_1_id || 0) === Number(user?.id || 0) || Number(p.responsavel_2_id || 0) === Number(user?.id || 0); %>
+            <% var podeIniciar = roleNorm === 'ADMIN' || roleNorm === 'MANUTENCAO_SUPERVISOR' || roleNorm === 'SUPERVISOR_MANUTENCAO' || roleNorm === 'ENCARREGADO_MANUTENCAO' || Number(p.responsavel_1_id || 0) === Number(user?.id || 0) || Number(p.responsavel_2_id || 0) === Number(user?.id || 0); %>
             <% if (stat === 'PENDENTE' && podeIniciar) { %>
               <form method="POST" action="/dashboard/preventivas/<%= p.id %>/iniciar" style="display:inline;">
                 <button class="btn-inline" type="submit">Iniciar</button>
@@ -248,6 +258,7 @@
     <% } %>
     <div class="pagination"><div class="muted-xs">Mostrando 10 preventivas ativas no painel. Finalizadas ficam apenas no histórico do equipamento.</div></div>
   </section>
+<% } %>
 
 <section class="dashboard-card area-demandas">
     <div class="dashboard-title">Demandas</div>
