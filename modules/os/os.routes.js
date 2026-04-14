@@ -6,8 +6,9 @@ const router = express.Router();
 const storagePaths = require("../../config/storage");
 
 const { requireLogin, requireRole } = require("../auth/auth.middleware");
+const { ACCESS } = require("../../config/rbac");
 const ctrl = require("./os.controller");
-const { OS_ACCESS, OS_EXECUTION_ACCESS, OS_DETALHE_ACCESS } = require("./os.permissions");
+const { OS_EXECUTION_ACCESS, OS_DETALHE_ACCESS } = require("./os.permissions");
 
 const uploadDir = path.join(storagePaths.UPLOAD_DIR, "os");
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -34,13 +35,13 @@ const wrap = (fn, name) =>
         return res.status(500).send(`Erro interno: handler ${name} indefinido.`);
       };
 
-router.get("/", requireLogin, requireRole(OS_ACCESS), wrap(ctrl.osIndex, "osIndex"));
-router.get("/novo", requireLogin, requireRole(OS_ACCESS), wrap(ctrl.osNewForm, "osNewForm"));
-router.get("/nova", requireLogin, requireRole(OS_ACCESS), wrap(ctrl.osNewForm, "osNewForm"));
+router.get("/", requireLogin, requireRole(ACCESS.os_view), wrap(ctrl.osIndex, "osIndex"));
+router.get("/novo", requireLogin, requireRole(ACCESS.os_open), wrap(ctrl.osNewForm, "osNewForm"));
+router.get("/nova", requireLogin, requireRole(ACCESS.os_open), wrap(ctrl.osNewForm, "osNewForm"));
 router.post(
   "/",
   requireLogin,
-  requireRole(OS_ACCESS),
+  requireRole(ACCESS.os_open),
   upload.fields([{ name: "abertura_fotos", maxCount: 10 }]),
   wrap(ctrl.osCreate, "osCreate")
 );
