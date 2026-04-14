@@ -25,6 +25,7 @@ router.post("/falhas/registrar", requireLogin, requireRole(PCM_ACCESS), ctrl.reg
 router.post("/engenharia/componentes", requireLogin, requireRole(PCM_ACCESS), ctrl.adicionarComponente);
 router.post("/lubrificacao/pontos", requireLogin, requireRole(PCM_ACCESS), ctrl.adicionarLubrificacao);
 router.post("/lubrificacao/sugerir-ia", requireLogin, requireRole(PCM_ACCESS), ctrl.sugerirPlanoLubrificacaoIA);
+router.post("/lubrificacao/aplicar-sugestao-ia", requireLogin, requireRole(PCM_ACCESS), ctrl.aplicarSugestaoLubrificacaoIA);
 router.post("/programacao-semanal/salvar", requireLogin, requireRole(PCM_ACCESS), ctrl.salvarProgramacao);
 router.post("/backlog/:id/programar", requireLogin, requireRole(PCM_ACCESS), ctrl.programarBacklog);
 router.post("/rotas-inspecao/nova", requireLogin, requireRole(PCM_ACCESS), ctrl.novaRota);

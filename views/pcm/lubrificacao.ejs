@@ -6,15 +6,15 @@
   <div class="pcm-content">
     <div class="card">
       <form method="GET" action="/pcm/lubrificacao" class="pcm-toolbar">
-        <select class="input" name="equipamento_id"><option value="">Equipamento</option><% equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>" <%= String(filtros.equipamento_id||'')===String(eq.id)?'selected':'' %>><%= eq.nome %></option><% }) %></select>
-        <input class="input" name="setor" placeholder="Setor" value="<%= filtros.setor || '' %>">
+        <select class="input" id="equipamento-filtro" name="equipamento_id"><option value="">Equipamento</option><% equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>" data-setor="<%= eq.setor || '' %>" <%= String(filtros.equipamento_id||'')===String(eq.id)?'selected':'' %>><%= eq.nome %></option><% }) %></select>
+        <input class="input" id="setor-filtro" name="setor" placeholder="Setor" value="<%= filtros.setor || '' %>" readonly>
         <button class="btn" type="submit">Filtrar</button>
       </form>
       <div class="pcm-actions" style="margin-bottom:8px;">
         <form method="POST" action="/pcm/lubrificacao/pontos" class="grid-4" style="width:100%; gap:8px; align-items:end;">
           <input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id || '' %>">
           <input class="input" name="ponto_lubrificacao" placeholder="Ponto de lubrificação" required>
-          <input class="input" name="tipo_lubrificante_texto" placeholder="Lubrificante (ex: Graxa EP2)">
+          <input class="input" name="tipo_lubrificante_texto" placeholder="Lubrificante (ex: Graxa EP2)" value="Graxa EP2">
           <input class="input" type="number" step="0.1" min="0" name="quantidade" placeholder="Quantidade">
           <input class="input" name="unidade" placeholder="Unidade (g, L, ml)">
           <input class="input" type="number" min="1" name="frequencia_dias" placeholder="Frequência (dias)">
@@ -30,12 +30,16 @@
       <div class="card" style="margin:8px 0 0;">
         <div class="label">Resumo de lubrificação principal</div>
         <% if (sugestaoIA && sugestaoIA.plano && sugestaoIA.plano.length) { %>
-          <div class="muted" style="margin-top:8px;">Sugestão IA para <strong><%= sugestaoIA.equipamento_nome %></strong> (criticidade <%= sugestaoIA.criticidade %>):</div>
+          <div class="muted" style="margin-top:8px;">Sugestão IA para <strong><%= sugestaoIA.equipamento_nome %></strong> (setor <strong><%= sugestaoIA.setor || '-' %></strong>, criticidade <%= sugestaoIA.criticidade %>):</div>
           <ul style="margin:8px 0 0 18px;">
             <% sugestaoIA.plano.forEach(function(p){ %>
               <li><strong><%= p.ponto_lubrificacao %></strong> — <%= p.tipo_lubrificante_texto %> • a cada <%= p.frequencia_dias %> dias • <%= p.quantidade %> <%= p.unidade %></li>
             <% }) %>
           </ul>
+          <form method="POST" action="/pcm/lubrificacao/aplicar-sugestao-ia" style="margin-top:10px;">
+            <input type="hidden" name="equipamento_id" value="<%= sugestaoIA.equipamento_id || filtros.equipamento_id || '' %>">
+            <button class="btn" type="submit">Aplicar sugestão IA e gerar pontos automaticamente</button>
+          </form>
         <% } else { %>
           <div class="muted" style="margin-top:8px;">Use “Gerar sugestão IA” para criar um plano inicial baseado na criticidade do equipamento.</div>
         <% } %>
@@ -54,3 +58,16 @@
     </div>
   </div>
 </div>
+<script>
+  (function() {
+    var equipamento = document.getElementById('equipamento-filtro');
+    var setor = document.getElementById('setor-filtro');
+    if (!equipamento || !setor) return;
+    function syncSetor() {
+      var selected = equipamento.options[equipamento.selectedIndex];
+      setor.value = (selected && selected.dataset && selected.dataset.setor) ? selected.dataset.setor : '';
+    }
+    equipamento.addEventListener('change', syncSetor);
+    syncSetor();
+  })();
+</script>

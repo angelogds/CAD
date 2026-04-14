@@ -976,6 +976,10 @@ function listOS() {
   const closedExpr = cols.includes("closed_at")
     ? "closed_at"
     : (cols.includes("data_conclusao") ? "data_conclusao" : "NULL");
+  const hasExecutorColab = cols.includes("executor_colaborador_id");
+  const hasAuxiliarColab = cols.includes("auxiliar_colaborador_id");
+  const executorColabJoin = hasExecutorColab ? "LEFT JOIN colaboradores ce ON ce.id = o.executor_colaborador_id" : "LEFT JOIN colaboradores ce ON 1=0";
+  const auxiliarColabJoin = hasAuxiliarColab ? "LEFT JOIN colaboradores ca ON ca.id = o.auxiliar_colaborador_id" : "LEFT JOIN colaboradores ca ON 1=0";
 
   return db
     .prepare(
@@ -988,17 +992,28 @@ function listOS() {
               ${startedExpr} AS started_at,
               ${closedExpr} AS closed_at,
               COALESCE(u.name, u.email, '-') AS solicitante,
-              m.name AS mecanico_nome,
-              a.name AS auxiliar_nome
+              COALESCE(ce.nome, m.name) AS mecanico_nome,
+              COALESCE(ca.nome, a.name) AS auxiliar_nome
        FROM os o
        LEFT JOIN equipamentos e ON e.id = o.equipamento_id
        LEFT JOIN users u ON u.id = o.opened_by
        LEFT JOIN users m ON m.id = o.mecanico_user_id
        LEFT JOIN users a ON a.id = o.auxiliar_user_id
+       ${executorColabJoin}
+       ${auxiliarColabJoin}
        ORDER BY o.id DESC
        LIMIT 300`
     )
     .all();
+}
+
+function deleteOS(osId) {
+  const id = Number(osId);
+  if (!id) throw new Error("OS inválida para exclusão.");
+  const exists = db.prepare(`SELECT id FROM os WHERE id = ?`).get(id);
+  if (!exists?.id) throw new Error("OS não encontrada.");
+  db.prepare(`DELETE FROM os WHERE id = ?`).run(id);
+  return true;
 }
 
 function emitOSEvents(osId, eventHint) {
@@ -1918,6 +1933,7 @@ function patchAIFields(osId, payload = {}) {
 
 module.exports = {
   listOS,
+  deleteOS,
   listEquipamentosAtivos,
   listTipoOptions,
   listGrauOptions,

@@ -89,6 +89,7 @@ function getRankingEquipamentos(limit = 5, meses = 6) {
 }
 
 function listPlanos({ equipamento_id, setor, tipo_manutencao } = {}) {
+  const hasSetor = hasColumn("equipamentos", "setor");
   let where = "p.ativo = 1";
   const params = {};
 
@@ -96,7 +97,7 @@ function listPlanos({ equipamento_id, setor, tipo_manutencao } = {}) {
     where += " AND p.equipamento_id = @equipamento_id";
     params.equipamento_id = Number(equipamento_id);
   }
-  if (setor) {
+  if (setor && hasSetor) {
     where += " AND e.setor = @setor";
     params.setor = String(setor);
   }
@@ -105,9 +106,10 @@ function listPlanos({ equipamento_id, setor, tipo_manutencao } = {}) {
     params.tipo = String(tipo_manutencao).toUpperCase();
   }
 
+  const setorExpr = hasSetor ? "e.setor" : "''";
   const rows = db
     .prepare(`
-      SELECT p.*, e.nome AS equipamento_nome, e.setor AS equipamento_setor
+      SELECT p.*, e.nome AS equipamento_nome, ${setorExpr} AS equipamento_setor
       FROM pcm_planos p
       JOIN equipamentos e ON e.id = p.equipamento_id
       WHERE ${where}
@@ -327,9 +329,16 @@ function ensurePcmTables() {
 }
 
 function queryEquipamentosAtivos() {
+  const hasTag = hasColumn("equipamentos", "tag");
+  const hasCodigo = hasColumn("equipamentos", "codigo");
+  const hasSetor = hasColumn("equipamentos", "setor");
+  const hasCriticidade = hasColumn("equipamentos", "criticidade");
+  const tagExpr = hasTag ? "tag" : (hasCodigo ? "codigo" : "''");
+  const setorExpr = hasSetor ? "setor" : "''";
+  const criticidadeExpr = hasCriticidade ? "criticidade" : "'media'";
   const filtroAtivo = hasColumn("equipamentos", "ativo") ? "COALESCE(ativo,1)=1 AND" : "";
   const query = `
-    SELECT id, COALESCE(tag, codigo, '') AS tag, nome, COALESCE(setor,'') AS setor, COALESCE(criticidade,'media') AS criticidade
+    SELECT id, COALESCE(${tagExpr}, '') AS tag, nome, COALESCE(${setorExpr},'') AS setor, COALESCE(${criticidadeExpr},'media') AS criticidade
     FROM equipamentos
     WHERE ${filtroAtivo} COALESCE(nome,'') <> ''
     ORDER BY nome
@@ -562,10 +571,15 @@ function listBacklogSimples() {
 
 function listOSFalhasPreview() {
   return safeAll(`
-    SELECT id, equipamento, tipo, status, opened_at
-    FROM os
+    SELECT o.id,
+           COALESCE(e.nome, o.equipamento_manual, o.equipamento, '-') AS equipamento,
+           o.tipo,
+           o.status,
+           o.opened_at
+    FROM os o
+    LEFT JOIN equipamentos e ON e.id = o.equipamento_id
     WHERE UPPER(COALESCE(tipo,''))='CORRETIVA'
-    ORDER BY datetime(opened_at) DESC
+    ORDER BY datetime(o.opened_at) DESC
     LIMIT 20
   `);
 }
@@ -668,14 +682,16 @@ function gerarSugestaoPlanoLubrificacao(equipamentoId) {
   if (!eq) throw new Error("Equipamento não encontrado para sugestão de lubrificação.");
   const critic = String(eq.criticidade || "MEDIA").toUpperCase();
   const diasBase = critic === "CRITICA" ? 7 : critic === "ALTA" ? 14 : critic === "BAIXA" ? 45 : 30;
+  const lubrificantePadrao = "Graxa EP2";
   return {
     equipamento_id: Number(eq.id),
     equipamento_nome: eq.nome,
+    setor: eq.setor || "",
     criticidade: critic,
     plano: [
       {
         ponto_lubrificacao: "Mancal principal",
-        tipo_lubrificante_texto: "Graxa EP2",
+        tipo_lubrificante_texto: lubrificantePadrao,
         frequencia_dias: diasBase,
         quantidade: 60,
         unidade: "g",
@@ -683,14 +699,33 @@ function gerarSugestaoPlanoLubrificacao(equipamentoId) {
       },
       {
         ponto_lubrificacao: "Rolamento de apoio",
-        tipo_lubrificante_texto: "Óleo ISO VG 220",
+        tipo_lubrificante_texto: lubrificantePadrao,
         frequencia_dias: diasBase * 2,
-        quantidade: 0.3,
-        unidade: "L",
-        observacao: "Verificar aquecimento e presença de limalha.",
+        quantidade: 40,
+        unidade: "g",
+        observacao: "Aplicação complementar e inspeção visual de vedação.",
       },
     ],
   };
+}
+
+function aplicarSugestaoPlanoLubrificacao(sugestao, userId) {
+  if (!sugestao?.equipamento_id || !Array.isArray(sugestao?.plano) || !sugestao.plano.length) {
+    throw new Error("Gere uma sugestão IA antes de aplicar automaticamente.");
+  }
+  const ids = [];
+  sugestao.plano.forEach((ponto) => {
+    ids.push(addPontoLubrificacao({
+      equipamento_id: sugestao.equipamento_id,
+      ponto_lubrificacao: ponto.ponto_lubrificacao,
+      tipo_lubrificante_texto: ponto.tipo_lubrificante_texto || "Graxa EP2",
+      quantidade: ponto.quantidade,
+      unidade: ponto.unidade || "g",
+      frequencia_dias: ponto.frequencia_dias,
+      observacao: ponto.observacao,
+    }, userId));
+  });
+  return ids;
 }
 
 function listRotasInspecao() {
@@ -785,6 +820,7 @@ module.exports = {
   addComponenteBOM,
   addPontoLubrificacao,
   gerarSugestaoPlanoLubrificacao,
+  aplicarSugestaoPlanoLubrificacao,
   listRotasInspecao,
   createRotaInspecaoRapida,
   registrarExecucaoRota,

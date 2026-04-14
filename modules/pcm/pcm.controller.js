@@ -329,6 +329,19 @@ function sugerirPlanoLubrificacaoIA(req, res) {
   return res.redirect(`/pcm/lubrificacao?equipamento_id=${eid}`);
 }
 
+function aplicarSugestaoLubrificacaoIA(req, res) {
+  try {
+    const sugestao = req.session?.pcmLubrificacaoSugestao || null;
+    const ids = service.aplicarSugestaoPlanoLubrificacao(sugestao, req.session?.user?.id || null);
+    req.flash("success", `IA aplicou ${ids.length} ponto(s) de lubrificação automaticamente. Você pode editar/corrigir na sequência.`);
+    if (req.session) req.session.pcmLubrificacaoSugestao = null;
+  } catch (e) {
+    req.flash("error", e.message || "Falha ao aplicar sugestão automática de lubrificação.");
+  }
+  const eid = encodeURIComponent(req.body.equipamento_id || "");
+  return res.redirect(`/pcm/lubrificacao?equipamento_id=${eid}`);
+}
+
 function salvarProgramacao(req, res) {
   // TODO: persistir programação semanal em pcm_programacao_semana/itens
   req.flash('success', 'Programação da semana salva (integração pendente).');
@@ -384,6 +397,7 @@ module.exports = {
   adicionarComponente,
   adicionarLubrificacao,
   sugerirPlanoLubrificacaoIA,
+  aplicarSugestaoLubrificacaoIA,
   salvarProgramacao,
   programarBacklog,
   novaRota,
