@@ -14,9 +14,12 @@ function index(req, res) {
     automacaoResumo = service.processarAutomacaoOS({ userId: req.session?.user?.id || null });
   } catch (_e) {}
 
-  const riscos = service.atualizarScoresRiscoEquipamentos().slice(0, 8);
-  const rankingTecnicos = service.getRankingTecnicos({ dias: Number(req.query.dias || 90), setor: req.query.setor || "" }).slice(0, 10);
-  const alertasOperacionais = service.listarAlertasOperacionais({ limit: 8 });
+  let riscos = [];
+  let rankingTecnicos = [];
+  let alertasOperacionais = [];
+  try { riscos = service.atualizarScoresRiscoEquipamentos().slice(0, 8); } catch (_e) {}
+  try { rankingTecnicos = service.getRankingTecnicos({ dias: Number(req.query.dias || 90), setor: req.query.setor || "" }).slice(0, 10); } catch (_e) {}
+  try { alertasOperacionais = service.listarAlertasOperacionais({ limit: 8 }); } catch (_e) {}
 
   const filtros = {
     equipamento_id: req.query.equipamento_id || "",
@@ -63,6 +66,7 @@ function falhas(req, res) {
     activePcmSection: "falhas",
     filtros,
     falhas: service.listOSFalhasPreview(),
+    equipamentos: service.getEquipamentos(),
   });
 }
 
@@ -114,12 +118,15 @@ function lubrificacao(req, res) {
     equipamento_id: req.query.equipamento_id || "",
     setor: req.query.setor || "",
   };
+  const sugestaoIA = req.session?.pcmLubrificacaoSugestao || null;
+  if (req.session) req.session.pcmLubrificacaoSugestao = null;
   return res.render("pcm/lubrificacao", {
     ...baseView(req),
     activePcmSection: "lubrificacao",
     filtros,
     equipamentos: service.getEquipamentos(),
     lubrificacoes: service.listLubrificacao(filtros),
+    sugestaoIA,
   });
 }
 
@@ -208,7 +215,8 @@ function rotasInspecao(req, res) {
   return res.render("pcm/rotas-inspecao", {
     ...baseView(req),
     activePcmSection: "rotas-inspecao",
-    rotas: [],
+    rotas: service.listRotasInspecao(),
+    equipamentos: service.getEquipamentos(),
   });
 }
 
@@ -278,22 +286,46 @@ function atualizarIndicadores(_req, res) {
 }
 
 function registrarFalha(req, res) {
-  // TODO: integrar com criação de OS de falha / banco de falhas existente
-  req.flash('success', 'Ação de registro de falha recebida (integração pendente).');
+  try {
+    const osId = service.createFalhaOS(req.body, req.session?.user?.id || null);
+    req.flash('success', `Falha registrada e OS corretiva #${osId} aberta com sucesso.`);
+  } catch (e) {
+    req.flash('error', e.message || 'Falha ao registrar ocorrência.');
+  }
   return res.redirect('/pcm/falhas');
 }
 
 function adicionarComponente(req, res) {
-  // TODO: integrar com CRUD da lista técnica (BOM)
-  req.flash('success', 'Componente enviado para cadastro (integração pendente).');
+  try {
+    const itemId = service.addComponenteBOM(req.body, req.session?.user?.id || null);
+    req.flash('success', `Componente adicionado à engenharia/BOM (item #${itemId}).`);
+  } catch (e) {
+    req.flash('error', e.message || 'Falha ao adicionar componente.');
+  }
   const eid = encodeURIComponent(req.body.equipamento_id || '');
   return res.redirect(`/pcm/engenharia?equipamento_id=${eid}`);
 }
 
 function adicionarLubrificacao(req, res) {
-  // TODO: integrar com criação de pontos de lubrificação
-  req.flash('success', 'Ponto de lubrificação enviado (integração pendente).');
+  try {
+    const id = service.addPontoLubrificacao(req.body, req.session?.user?.id || null);
+    req.flash('success', `Ponto de lubrificação #${id} cadastrado com sucesso.`);
+  } catch (e) {
+    req.flash('error', e.message || 'Falha ao cadastrar ponto de lubrificação.');
+  }
   const eid = encodeURIComponent(req.body.equipamento_id || '');
+  return res.redirect(`/pcm/lubrificacao?equipamento_id=${eid}`);
+}
+
+function sugerirPlanoLubrificacaoIA(req, res) {
+  try {
+    const sugestao = service.gerarSugestaoPlanoLubrificacao(req.body.equipamento_id || req.query.equipamento_id);
+    if (req.session) req.session.pcmLubrificacaoSugestao = sugestao;
+    req.flash("success", `Sugestão de IA gerada para ${sugestao.equipamento_nome}.`);
+  } catch (e) {
+    req.flash("error", e.message || "Falha ao gerar sugestão de lubrificação.");
+  }
+  const eid = encodeURIComponent(req.body.equipamento_id || req.query.equipamento_id || "");
   return res.redirect(`/pcm/lubrificacao?equipamento_id=${eid}`);
 }
 
@@ -310,14 +342,26 @@ function programarBacklog(req, res) {
 }
 
 function novaRota(req, res) {
-  // TODO: integrar cadastro de rota de inspeção
-  req.flash('success', 'Cadastro de nova rota recebido (integração pendente).');
+  try {
+    const id = service.createRotaInspecaoRapida(req.body, req.session?.user?.id || null);
+    req.flash('success', `Rota de inspeção #${id} criada com sucesso.`);
+  } catch (e) {
+    req.flash('error', e.message || 'Falha ao criar rota.');
+  }
   return res.redirect('/pcm/rotas-inspecao');
 }
 
 function salvarExecucaoRota(req, res) {
-  // TODO: integrar execução de checklist / geração de OS ou demanda
-  req.flash('success', 'Execução da rota salva (integração pendente).');
+  try {
+    const out = service.registrarExecucaoRota(req.body, req.session?.user?.id || null);
+    if (out.osId) {
+      req.flash('success', `Execução da rota "${out.rota}" salva e OS #${out.osId} gerada.`);
+    } else {
+      req.flash('success', `Execução da rota "${out.rota}" salva com sucesso.`);
+    }
+  } catch (e) {
+    req.flash('error', e.message || 'Falha ao salvar execução da rota.');
+  }
   return res.redirect('/pcm/rotas-inspecao');
 }
 
@@ -339,6 +383,7 @@ module.exports = {
   registrarFalha,
   adicionarComponente,
   adicionarLubrificacao,
+  sugerirPlanoLubrificacaoIA,
   salvarProgramacao,
   programarBacklog,
   novaRota,

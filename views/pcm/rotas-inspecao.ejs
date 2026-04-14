@@ -5,7 +5,20 @@
   <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
   <div class="pcm-content">
     <div class="card">
-      <div class="pcm-actions"><form method="POST" action="/pcm/rotas-inspecao/nova"><button class="btn" type="submit">+ Nova rota de inspeção</button></form></div>
+      <div class="pcm-actions">
+        <form method="POST" action="/pcm/rotas-inspecao/nova" class="grid-4" style="width:100%;gap:8px;align-items:end;">
+          <input class="input" name="nome" placeholder="Nome da rota" required>
+          <select class="input" name="tipo"><option value="INSPECAO">Inspeção</option><option value="PREDITIVA">Preditiva</option><option value="LUBRIFICACAO">Lubrificação</option></select>
+          <input class="input" type="number" min="1" name="frequencia_dias" placeholder="Frequência (dias)">
+          <input class="input" name="responsavel" placeholder="Responsável">
+          <select class="input" name="equipamentos" multiple>
+            <% (equipamentos || []).forEach(function(eq){ %>
+              <option value="<%= eq.id %>"><%= eq.nome %></option>
+            <% }) %>
+          </select>
+          <button class="btn" type="submit">+ Nova rota de inspeção</button>
+        </form>
+      </div>
       <div class="table-wrap"><table class="table compact" style="margin-top:8px;"><thead><tr><th>Nome da rota</th><th>Tipo</th><th>Frequência</th><th>Responsável</th><th>Qtd. equipamentos</th><th>Próxima execução</th><th>Ações</th></tr></thead><tbody>
           <% if (!rotas.length) { %><tr><td colspan="7" class="muted">Sem rotas cadastradas.</td></tr><% } %>
           <% rotas.forEach(function(r){ %><tr><td><%= r.nome %></td><td><%= r.tipo %></td><td><%= r.frequencia %></td><td><%= r.responsavel %></td><td><%= r.qtd_equipamentos %></td><td><%= r.proxima_execucao %></td><td><button class="btn btn-outline">Editar</button> <button class="btn btn-outline">Executar agora</button></td></tr><% }) %>
@@ -14,7 +27,7 @@
 
     <div class="pcm-grid-2" style="margin-top:12px;">
       <div class="card" style="margin:0;"><div class="label">Cadastro/Edição da rota</div><div class="muted" style="margin-top:8px;">TODO: formulário completo com equipamentos + itens de checklist.</div></div>
-      <div class="card" style="margin:0;"><div class="label">Execução de checklist</div><div class="pcm-actions" style="margin-top:8px;"><button class="btn btn-outline" type="button">Próximo equipamento</button><form method="POST" action="/pcm/rotas-inspecao/salvar-execucao" style="display:inline;"><button class="btn" type="submit">Salvar rota</button></form></div><div class="muted" style="margin-top:8px;">TODO: marcar Normal/Atenção/Crítico + observações + foto + geração de OS/Demanda.</div></div>
+      <div class="card" style="margin:0;"><div class="label">Execução de checklist</div><div class="pcm-actions" style="margin-top:8px;"><form method="POST" action="/pcm/rotas-inspecao/salvar-execucao" class="grid-2" style="gap:8px;width:100%;"><select class="input" name="rota_id" required><option value="">Rota executada...</option><% (rotas || []).forEach(function(r){ %><option value="<%= r.id %>"><%= r.nome %></option><% }) %></select><input class="input" name="observacao" placeholder="Resumo da execução"><label><input type="checkbox" name="gerar_os" value="1"> Gerar OS automática</label><button class="btn" type="submit">Salvar rota</button></form></div><div class="muted" style="margin-top:8px;">Execução salva com histórico e, se necessário, abre OS corretiva para o primeiro equipamento da rota.</div></div>
     </div>
   </div>
 </div>
