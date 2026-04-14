@@ -18,6 +18,7 @@
       <div id="pcm-alerta-texto" style="font-weight:800; margin-top:6px;">Nenhum alerta emergencial ativo no momento.</div>
       <div class="pcm-actions" style="margin-top:8px;">
         <button class="btn btn-outline" id="pcm-reconhecer-alerta" type="button">Reconhecer alerta</button>
+        <a class="btn btn-outline" id="pcm-abrir-alerta" href="/pcm/backlog">Abrir alerta</a>
       </div>
     </div>
 
@@ -110,6 +111,7 @@
   var box = document.getElementById('pcm-alerta-card');
   var txt = document.getElementById('pcm-alerta-texto');
   var btn = document.getElementById('pcm-reconhecer-alerta');
+  var btnAbrir = document.getElementById('pcm-abrir-alerta');
   var alertaAtual = null;
   var es = new EventSource('/dashboard/alertas/stream');
   es.addEventListener('estado_inicial', function(e){
@@ -118,6 +120,7 @@
       if (data.alertaAtivo) {
         alertaAtual = { id_os: data.alertaAtivo.os_id };
         txt.textContent = 'Alerta ativo: OS #' + data.alertaAtivo.os_id + ' • ' + (data.alertaAtivo.equipamento || '-');
+        if (btnAbrir) btnAbrir.href = '/os/' + data.alertaAtivo.os_id;
       }
     } catch(_e){}
   });
@@ -126,12 +129,13 @@
       var data = JSON.parse(e.data || '{}');
       alertaAtual = data;
       txt.textContent = '⚠ Nova OS emergencial #' + data.id_os + ' • ' + (data.equipamento || '-') + ' • ' + (data.prioridade || '');
+      if (btnAbrir && data.id_os) btnAbrir.href = '/os/' + data.id_os;
     } catch(_e){}
   });
   btn?.addEventListener('click', function(){
     if (!alertaAtual || !alertaAtual.id_os) return;
     fetch('/dashboard/alertas/reconhecer', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ os_id: alertaAtual.id_os }) })
-      .then(function(){ txt.textContent='Alerta reconhecido. Nenhum alerta emergencial ativo no momento.'; alertaAtual=null; })
+      .then(function(){ txt.textContent='Alerta reconhecido. Nenhum alerta emergencial ativo no momento.'; alertaAtual=null; if (btnAbrir) btnAbrir.href = '/pcm/backlog'; })
       .catch(function(){});
   });
 })();

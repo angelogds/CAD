@@ -329,9 +329,9 @@
             : (st === 'CONCLUIDA' || st === 'FINALIZADA' || st === 'FECHADA') ? 'pill-green'
             : (st === 'CANCELADA') ? 'pill-red'
             : 'pill-gray';
-          const executores = ['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA'].includes(st)
-            ? `${o.mecanico_nome || '-'} + ${o.auxiliar_nome || '-'}`
-            : '-';
+          const principal = o.mecanico_nome || '-';
+          const apoio = o.auxiliar_nome || '';
+          const executores = apoio ? `${principal} + ${apoio}` : principal;
         %>
           <tr>
             <td><%= o.id %></td>
@@ -343,7 +343,14 @@
             <td><%= o.opened_at ? fmtBR(o.opened_at) : '-' %></td>
             <td><%= o.closed_at ? fmtBR(o.closed_at) : '-' %></td>
             <td class="td-clip"><%= executores %></td>
-            <td style="text-align:right;"><a class="btn-sm" href="/os/<%= o.id %>">Abrir</a></td>
+            <td style="text-align:right;">
+              <a class="btn-sm" href="/os/<%= o.id %>">Abrir</a>
+              <% if (canDeleteOS) { %>
+                <form method="POST" action="/os/<%= o.id %>/excluir" style="display:inline;" onsubmit="return confirm('Confirma excluir a OS #<%= o.id %>?');">
+                  <button class="btn-sm" type="submit" style="background:#7f1d1d;">Excluir</button>
+                </form>
+              <% } %>
+            </td>
           </tr>
         <% }) %>
       </tbody>
@@ -363,9 +370,9 @@
         : (st === 'CONCLUIDA' || st === 'FINALIZADA' || st === 'FECHADA') ? 'pill-green'
         : (st === 'CANCELADA') ? 'pill-red'
         : 'pill-gray';
-      const executores = ['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA'].includes(st)
-        ? `${o.mecanico_nome || '-'} + ${o.auxiliar_nome || '-'}`
-        : '-';
+      const principal = o.mecanico_nome || '-';
+      const apoio = o.auxiliar_nome || '';
+      const executores = apoio ? `${principal} + ${apoio}` : principal;
     %>
       <a class="os-card" href="/os/<%= o.id %>">
         <div class="os-card-head">

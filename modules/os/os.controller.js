@@ -18,7 +18,8 @@ function mapFilesToPublic(files = []) {
 function osIndex(req, res) {
   res.locals.activeMenu = "os";
   const lista = service.listOS();
-  return res.render("os/index", { title: "Ordens de Serviço", lista });
+  const role = normalizeRole(req.session?.user?.role || "");
+  return res.render("os/index", { title: "Ordens de Serviço", lista, canDeleteOS: role === "ADMIN" });
 }
 
 function osNewForm(req, res) {
@@ -261,6 +262,21 @@ async function osIniciar(req, res) {
   return res.redirect(`/os/${id}`);
 }
 
+function osDelete(req, res) {
+  const role = normalizeRole(req.session?.user?.role || "");
+  if (role !== "ADMIN") {
+    req.flash("error", "Somente administradores podem excluir ordens de serviço.");
+    return res.redirect("/os");
+  }
+  try {
+    service.deleteOS(req.params.id);
+    req.flash("success", `OS #${req.params.id} excluída com sucesso.`);
+  } catch (err) {
+    req.flash("error", err.message || "Não foi possível excluir a OS.");
+  }
+  return res.redirect("/os");
+}
+
 function osPausar(req, res) {
   const id = Number(req.params.id);
   try {
@@ -461,6 +477,7 @@ module.exports = {
   osPausar,
   osClose,
   osGerarDescricaoTecnica,
+  osDelete,
   osUpdateStatus,
   osAutoAssign,
   osSetEquipe,
