@@ -11,10 +11,35 @@
         <button class="btn" type="submit">Filtrar</button>
       </form>
       <div class="pcm-actions" style="margin-bottom:8px;">
-        <form method="POST" action="/pcm/lubrificacao/pontos" style="display:inline;"><input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id || '' %>"><button class="btn" type="submit">+ Adicionar ponto de lubrificação</button></form>
+        <form method="POST" action="/pcm/lubrificacao/pontos" class="grid-4" style="width:100%; gap:8px; align-items:end;">
+          <input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id || '' %>">
+          <input class="input" name="ponto_lubrificacao" placeholder="Ponto de lubrificação" required>
+          <input class="input" name="tipo_lubrificante_texto" placeholder="Lubrificante (ex: Graxa EP2)">
+          <input class="input" type="number" step="0.1" min="0" name="quantidade" placeholder="Quantidade">
+          <input class="input" name="unidade" placeholder="Unidade (g, L, ml)">
+          <input class="input" type="number" min="1" name="frequencia_dias" placeholder="Frequência (dias)">
+          <input class="input" name="observacao" placeholder="Observações">
+          <button class="btn" type="submit">+ Adicionar ponto de lubrificação</button>
+        </form>
+        <form method="POST" action="/pcm/lubrificacao/sugerir-ia" style="display:inline;">
+          <input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id || '' %>">
+          <button class="btn btn-outline" type="submit">Gerar sugestão IA</button>
+        </form>
       </div>
 
-      <div class="card" style="margin:8px 0 0;"><div class="label">Resumo de lubrificação principal</div><div class="muted" style="margin-top:8px;">TODO: integrar resumo real do redutor/principal via `pcm_lubrificacao_planos`.</div></div>
+      <div class="card" style="margin:8px 0 0;">
+        <div class="label">Resumo de lubrificação principal</div>
+        <% if (sugestaoIA && sugestaoIA.plano && sugestaoIA.plano.length) { %>
+          <div class="muted" style="margin-top:8px;">Sugestão IA para <strong><%= sugestaoIA.equipamento_nome %></strong> (criticidade <%= sugestaoIA.criticidade %>):</div>
+          <ul style="margin:8px 0 0 18px;">
+            <% sugestaoIA.plano.forEach(function(p){ %>
+              <li><strong><%= p.ponto_lubrificacao %></strong> — <%= p.tipo_lubrificante_texto %> • a cada <%= p.frequencia_dias %> dias • <%= p.quantidade %> <%= p.unidade %></li>
+            <% }) %>
+          </ul>
+        <% } else { %>
+          <div class="muted" style="margin-top:8px;">Use “Gerar sugestão IA” para criar um plano inicial baseado na criticidade do equipamento.</div>
+        <% } %>
+      </div>
 
       <div class="table-wrap"><table class="table compact" style="margin-top:10px;">
         <thead><tr><th>Ponto</th><th>Lubrificante</th><th>Frequência</th><th>Quantidade</th><th>Próxima data</th><th>Situação</th></tr></thead>

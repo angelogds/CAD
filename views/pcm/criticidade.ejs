@@ -14,6 +14,7 @@
         <input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id || '' %>">
         <label>Criticidade<select class="input" name="nivel_criticidade">
           <% const nivelAtual = String(criticidadeAtual?.nivel_criticidade || 'MEDIA').toUpperCase(); %>
+          <option value="CRITICA" <%= nivelAtual==='CRITICA'?'selected':'' %>>CRITICA</option>
           <option value="ALTA" <%= nivelAtual==='ALTA'?'selected':'' %>>ALTA</option>
           <option value="MEDIA" <%= nivelAtual==='MEDIA'?'selected':'' %>>MEDIA</option>
           <option value="BAIXA" <%= nivelAtual==='BAIXA'?'selected':'' %>>BAIXA</option>

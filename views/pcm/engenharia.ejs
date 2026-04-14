@@ -11,8 +11,18 @@
         <input class="input" name="busca" value="<%= filtros.busca || '' %>" placeholder="Código interno / modelo">
         <button class="btn" type="submit">Filtrar</button>
       </form>
-      <div class="pcm-actions" style="margin-bottom:8px;">
-        <form method="POST" action="/pcm/engenharia/componentes" style="display:inline;"><input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id || '' %>"><button class="btn" type="submit">+ Adicionar componente à lista técnica</button></form>
+      <div class="pcm-actions" style="margin-bottom:8px; flex-direction:column; align-items:stretch;">
+        <form method="POST" action="/pcm/engenharia/componentes" class="grid-4" style="gap:8px;">
+          <input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id || '' %>">
+          <input class="input" name="categoria" placeholder="Categoria (ROLAMENTO, CORREIA...)">
+          <input class="input" name="modelo_comercial" placeholder="Modelo/Componente" required>
+          <input class="input" name="descricao_tecnica" placeholder="Descrição técnica">
+          <input class="input" name="codigo_interno" placeholder="Código interno">
+          <input class="input" name="aplicacao_posicao" placeholder="Aplicação/posição">
+          <input class="input" name="estoque_item_id" placeholder="ID item almoxarifado">
+          <label><input type="checkbox" name="peca_critica" value="1"> Peça crítica</label>
+          <button class="btn" type="submit">+ Adicionar componente à lista técnica</button>
+        </form>
         <a class="btn btn-outline" href="/pcm/criticidade?equipamento_id=<%= encodeURIComponent(filtros.equipamento_id || '') %>">Ir para Criticidade do Equipamento selecionado</a>
       </div>
 
@@ -26,7 +36,7 @@
             <li>Criticidade: <strong><%= equipamentoSelecionado?.criticidade || 'N/D' %></strong></li>
           </ul>
         </div>
-        <div class="card" style="margin:0;"><div class="label">Integrações</div><div class="muted" style="margin-top:8px;">TODO: conectar ações Ver/Editar ao CRUD real da BOM.</div></div>
+        <div class="card" style="margin:0;"><div class="label">Integrações</div><div class="muted" style="margin-top:8px;">Componentes adicionados aqui já alimentam o módulo de peças críticas em estoque.</div></div>
       </div>
 
       <div class="table-wrap"><table class="table compact" style="margin-top:10px;">

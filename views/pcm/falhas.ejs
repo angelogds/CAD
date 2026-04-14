@@ -5,7 +5,23 @@
   <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
   <div class="pcm-content">
     <div class="card">
-      <div class="pcm-actions" style="margin-bottom:8px;"><form method="POST" action="/pcm/falhas/registrar"><button class="btn" type="submit">Registrar falha / Nova OS de falha</button></form></div>
+      <div class="pcm-actions" style="margin-bottom:8px;">
+        <form method="POST" action="/pcm/falhas/registrar" class="grid-4" style="width:100%; gap:8px; align-items:end;">
+          <select class="input" name="equipamento_id" required>
+            <option value="">Equipamento...</option>
+            <% (equipamentos || []).forEach(function(eq){ %>
+              <option value="<%= eq.id %>"><%= eq.nome %></option>
+            <% }) %>
+          </select>
+          <input class="input" name="descricao" placeholder="Descrição da falha" required>
+          <input class="input" type="number" min="1" max="5" name="impacto_producao" placeholder="Impacto produção (1-5)">
+          <input class="input" type="number" min="1" max="5" name="impacto_seguranca" placeholder="Impacto segurança (1-5)">
+          <input class="input" type="number" min="1" max="5" name="impacto_ambiental" placeholder="Impacto ambiental (1-5)">
+          <input class="input" type="number" min="1" max="5" name="custo_parada" placeholder="Custo parada (1-5)">
+          <input class="input" name="observacao" placeholder="Observações">
+          <button class="btn" type="submit">Registrar falha / Nova OS</button>
+        </form>
+      </div>
       <form class="pcm-toolbar" method="GET" action="/pcm/falhas">
         <input class="input" type="month" name="periodo" value="<%= filtros?.periodo || '' %>" placeholder="Período">
         <input class="input" name="equipamento" value="<%= filtros?.equipamento || '' %>" placeholder="Equipamento">

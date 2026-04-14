@@ -129,9 +129,11 @@ function listPlanos({ equipamento_id, setor, tipo_manutencao } = {}) {
 }
 
 function listFiltros() {
+  const equipamentos = queryEquipamentosAtivos();
+  const setores = [...new Set(equipamentos.map((e) => e.setor || "").sort())].map((setor) => ({ setor }));
   return {
-    equipamentos: db.prepare(`SELECT id, nome, setor FROM equipamentos WHERE ativo=1 ORDER BY nome`).all(),
-    setores: db.prepare(`SELECT DISTINCT COALESCE(setor,'') AS setor FROM equipamentos WHERE ativo=1 ORDER BY setor`).all(),
+    equipamentos: equipamentos.map((e) => ({ id: e.id, nome: e.nome, setor: e.setor })),
+    setores,
     tipos: ["PREVENTIVA", "INSPECAO", "LUBRIFICACAO", "PREDITIVA"],
   };
 }
@@ -243,8 +245,100 @@ function safeAll(sql, params) {
   }
 }
 
+function hasColumn(table, column) {
+  try {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+    return cols.includes(column);
+  } catch (_e) {
+    return false;
+  }
+}
+
+function ensurePcmTables() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pcm_bom_itens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipamento_id INTEGER NOT NULL,
+      categoria TEXT,
+      modelo_comercial TEXT,
+      descricao_tecnica TEXT,
+      codigo_interno TEXT,
+      aplicacao_posicao TEXT,
+      estoque_item_id INTEGER,
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(equipamento_id) REFERENCES equipamentos(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS pcm_bom_estoque_config (
+      bom_item_id INTEGER PRIMARY KEY,
+      peca_critica INTEGER NOT NULL DEFAULT 0,
+      estoque_item_id INTEGER,
+      estoque_minimo_pcm REAL,
+      updated_by INTEGER,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(bom_item_id) REFERENCES pcm_bom_itens(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS pcm_lubrificacao_planos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipamento_id INTEGER NOT NULL,
+      ponto_lubrificacao TEXT NOT NULL,
+      tipo_lubrificante_texto TEXT,
+      quantidade REAL,
+      unidade TEXT,
+      frequencia_dias INTEGER,
+      frequencia_semanas INTEGER,
+      frequencia_meses INTEGER,
+      frequencia_horas_operacao INTEGER,
+      observacao TEXT,
+      proxima_execucao_em TEXT,
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(equipamento_id) REFERENCES equipamentos(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS pcm_rotas_inspecao (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL,
+      tipo TEXT NOT NULL DEFAULT 'INSPECAO',
+      frequencia_dias INTEGER,
+      responsavel TEXT,
+      equipamentos_json TEXT,
+      ativo INTEGER NOT NULL DEFAULT 1,
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS pcm_rotas_execucoes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      rota_id INTEGER NOT NULL,
+      observacao TEXT,
+      gerou_os_id INTEGER,
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(rota_id) REFERENCES pcm_rotas_inspecao(id) ON DELETE CASCADE,
+      FOREIGN KEY(gerou_os_id) REFERENCES os(id)
+    );
+  `);
+}
+
+function queryEquipamentosAtivos() {
+  const filtroAtivo = hasColumn("equipamentos", "ativo") ? "COALESCE(ativo,1)=1 AND" : "";
+  const query = `
+    SELECT id, COALESCE(tag, codigo, '') AS tag, nome, COALESCE(setor,'') AS setor, COALESCE(criticidade,'media') AS criticidade
+    FROM equipamentos
+    WHERE ${filtroAtivo} COALESCE(nome,'') <> ''
+    ORDER BY nome
+  `;
+  return safeAll(query);
+}
+
 function getEquipamentos() {
-  return safeAll(`SELECT id, COALESCE(tag, codigo, '') AS tag, nome, COALESCE(setor,'') AS setor FROM equipamentos WHERE ativo=1 ORDER BY nome`);
+  return queryEquipamentosAtivos();
 }
 
 function getEquipamentoById(id) {
@@ -312,8 +406,8 @@ function saveCriticidade(payload = {}, userId = null) {
   if (!equipamentoId) throw new Error("Equipamento obrigatório para salvar criticidade.");
 
   const nivel = String(payload.nivel_criticidade || "MEDIA").trim().toUpperCase();
-  if (!["BAIXA", "MEDIA", "ALTA"].includes(nivel)) {
-    throw new Error("Nível de criticidade inválido. Use BAIXA, MEDIA ou ALTA.");
+  if (!["BAIXA", "MEDIA", "ALTA", "CRITICA"].includes(nivel)) {
+    throw new Error("Nível de criticidade inválido. Use BAIXA, MEDIA, ALTA ou CRITICA.");
   }
 
   const sanitizeImpact = (value) => {
@@ -476,6 +570,200 @@ function listOSFalhasPreview() {
   `);
 }
 
+function createFalhaOS({ equipamento_id, descricao, impacto_producao, impacto_seguranca, impacto_ambiental, custo_parada, observacao }, userId) {
+  const equipamentoId = Number(equipamento_id);
+  if (!equipamentoId) throw new Error("Selecione um equipamento para registrar a falha.");
+  const eq = getEquipamentoById(equipamentoId);
+  if (!eq) throw new Error("Equipamento não encontrado.");
+
+  const calc = [impacto_producao, impacto_seguranca, impacto_ambiental, custo_parada]
+    .map((v) => Math.max(1, Math.min(5, Number(v) || 3)));
+  const indice = Math.round(((calc[0] + calc[1] + calc[2] + calc[3]) / 4) * 10) / 10;
+
+  let grau = "MEDIA";
+  if (indice >= 4.5) grau = "CRITICA";
+  else if (indice >= 3.5) grau = "ALTA";
+  else if (indice < 2) grau = "BAIXA";
+
+  const payload = [
+    `[PCM-FALHA] ${String(descricao || "Falha registrada via PCM").trim()}`,
+    `Impacto produção: ${calc[0]}/5`,
+    `Impacto segurança: ${calc[1]}/5`,
+    `Impacto ambiental: ${calc[2]}/5`,
+    `Custo de parada: ${calc[3]}/5`,
+    `Índice calculado: ${indice}`,
+    observacao ? `Observações: ${String(observacao).trim()}` : null,
+  ].filter(Boolean).join("\n");
+
+  const info = db.prepare(`
+    INSERT INTO os (equipamento, equipamento_id, descricao, tipo, status, prioridade, grau, opened_by, opened_at)
+    VALUES (?, ?, ?, 'CORRETIVA', 'ABERTA', ?, ?, ?, datetime('now'))
+  `).run(eq.nome, equipamentoId, payload, grau, grau, userId || null);
+
+  return Number(info.lastInsertRowid);
+}
+
+function addComponenteBOM({ equipamento_id, categoria, modelo_comercial, descricao_tecnica, codigo_interno, aplicacao_posicao, estoque_item_id, peca_critica }, userId) {
+  ensurePcmTables();
+  const equipamentoId = Number(equipamento_id);
+  if (!equipamentoId) throw new Error("Selecione um equipamento para adicionar o componente.");
+  const info = db.prepare(`
+    INSERT INTO pcm_bom_itens (equipamento_id, categoria, modelo_comercial, descricao_tecnica, codigo_interno, aplicacao_posicao, estoque_item_id, created_by, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+  `).run(
+    equipamentoId,
+    (categoria || "").trim() || null,
+    (modelo_comercial || "").trim() || null,
+    (descricao_tecnica || "").trim() || null,
+    (codigo_interno || "").trim() || null,
+    (aplicacao_posicao || "").trim() || null,
+    estoque_item_id ? Number(estoque_item_id) : null,
+    userId || null
+  );
+  const bomId = Number(info.lastInsertRowid);
+  db.prepare(`
+    INSERT INTO pcm_bom_estoque_config (bom_item_id, peca_critica, estoque_item_id, updated_by, updated_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(bom_item_id) DO UPDATE SET
+      peca_critica=excluded.peca_critica,
+      estoque_item_id=excluded.estoque_item_id,
+      updated_by=excluded.updated_by,
+      updated_at=datetime('now')
+  `).run(bomId, peca_critica ? 1 : 0, estoque_item_id ? Number(estoque_item_id) : null, userId || null);
+  return bomId;
+}
+
+function addPontoLubrificacao({ equipamento_id, ponto_lubrificacao, tipo_lubrificante_texto, quantidade, unidade, frequencia_dias, observacao }, userId) {
+  ensurePcmTables();
+  const equipamentoId = Number(equipamento_id);
+  if (!equipamentoId) throw new Error("Selecione um equipamento para adicionar um ponto de lubrificação.");
+  if (!String(ponto_lubrificacao || "").trim()) throw new Error("Informe o ponto de lubrificação.");
+
+  const dias = Math.max(1, Number(frequencia_dias) || 30);
+  const prox = db.prepare(`SELECT datetime('now', '+' || ? || ' day') AS dt`).get(dias)?.dt || null;
+
+  const info = db.prepare(`
+    INSERT INTO pcm_lubrificacao_planos (
+      equipamento_id, ponto_lubrificacao, tipo_lubrificante_texto, quantidade, unidade,
+      frequencia_dias, observacao, proxima_execucao_em, created_by, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+  `).run(
+    equipamentoId,
+    String(ponto_lubrificacao).trim(),
+    (tipo_lubrificante_texto || "").trim() || null,
+    quantidade ? Number(quantidade) : null,
+    (unidade || "").trim() || null,
+    dias,
+    (observacao || "").trim() || null,
+    prox,
+    userId || null
+  );
+
+  return Number(info.lastInsertRowid);
+}
+
+function gerarSugestaoPlanoLubrificacao(equipamentoId) {
+  const eq = getEquipamentoById(equipamentoId);
+  if (!eq) throw new Error("Equipamento não encontrado para sugestão de lubrificação.");
+  const critic = String(eq.criticidade || "MEDIA").toUpperCase();
+  const diasBase = critic === "CRITICA" ? 7 : critic === "ALTA" ? 14 : critic === "BAIXA" ? 45 : 30;
+  return {
+    equipamento_id: Number(eq.id),
+    equipamento_nome: eq.nome,
+    criticidade: critic,
+    plano: [
+      {
+        ponto_lubrificacao: "Mancal principal",
+        tipo_lubrificante_texto: "Graxa EP2",
+        frequencia_dias: diasBase,
+        quantidade: 60,
+        unidade: "g",
+        observacao: "Aplicar com equipamento parado e limpar excesso.",
+      },
+      {
+        ponto_lubrificacao: "Rolamento de apoio",
+        tipo_lubrificante_texto: "Óleo ISO VG 220",
+        frequencia_dias: diasBase * 2,
+        quantidade: 0.3,
+        unidade: "L",
+        observacao: "Verificar aquecimento e presença de limalha.",
+      },
+    ],
+  };
+}
+
+function listRotasInspecao() {
+  ensurePcmTables();
+  const rows = safeAll(`
+    SELECT *
+    FROM pcm_rotas_inspecao
+    WHERE COALESCE(ativo,1)=1
+    ORDER BY datetime(updated_at) DESC, id DESC
+    LIMIT 100
+  `);
+  return rows.map((r) => {
+    let equipamentos = [];
+    try { equipamentos = JSON.parse(r.equipamentos_json || "[]"); } catch (_e) {}
+    const freq = Number(r.frequencia_dias || 0) > 0 ? `${r.frequencia_dias} dia(s)` : "-";
+    return {
+      ...r,
+      frequencia: freq,
+      qtd_equipamentos: equipamentos.length,
+      proxima_execucao: r.frequencia_dias ? db.prepare(`SELECT date('now', '+' || ? || ' day') AS dt`).get(Number(r.frequencia_dias))?.dt : "-",
+    };
+  });
+}
+
+function createRotaInspecaoRapida({ nome, tipo, frequencia_dias, responsavel, equipamentos }, userId) {
+  ensurePcmTables();
+  const nomeRota = String(nome || "").trim();
+  if (!nomeRota) throw new Error("Informe o nome da rota.");
+  const equipamentoIds = Array.isArray(equipamentos)
+    ? equipamentos.map(Number).filter(Boolean)
+    : String(equipamentos || "").split(",").map((x) => Number(x.trim())).filter(Boolean);
+  const info = db.prepare(`
+    INSERT INTO pcm_rotas_inspecao (nome, tipo, frequencia_dias, responsavel, equipamentos_json, created_by, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+  `).run(
+    nomeRota,
+    String(tipo || "INSPECAO").toUpperCase(),
+    frequencia_dias ? Number(frequencia_dias) : null,
+    (responsavel || "").trim() || null,
+    JSON.stringify(equipamentoIds),
+    userId || null
+  );
+  return Number(info.lastInsertRowid);
+}
+
+function registrarExecucaoRota({ rota_id, observacao, gerar_os }, userId) {
+  ensurePcmTables();
+  const rotaId = Number(rota_id);
+  if (!rotaId) throw new Error("Selecione a rota executada.");
+  const rota = db.prepare(`SELECT * FROM pcm_rotas_inspecao WHERE id=?`).get(rotaId);
+  if (!rota) throw new Error("Rota não encontrada.");
+  let osId = null;
+  if (gerar_os) {
+    let equipamentos = [];
+    try { equipamentos = JSON.parse(rota.equipamentos_json || "[]"); } catch (_e) {}
+    const equipamentoId = Number(equipamentos[0] || 0);
+    if (equipamentoId) {
+      osId = createFalhaOS({
+        equipamento_id: equipamentoId,
+        descricao: `Rota de inspeção "${rota.nome}" apontou necessidade de intervenção.`,
+        observacao,
+      }, userId);
+    }
+  }
+  db.prepare(`
+    INSERT INTO pcm_rotas_execucoes (rota_id, observacao, gerou_os_id, created_by, created_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
+  `).run(rotaId, (observacao || "").trim() || null, osId, userId || null);
+  return { rota: rota.nome, osId };
+}
+
+ensurePcmTables();
+
 module.exports = {
   getIndicadores,
   getRankingEquipamentos,
@@ -493,6 +781,13 @@ module.exports = {
   listPecasCriticas,
   listBacklogSimples,
   listOSFalhasPreview,
+  createFalhaOS,
+  addComponenteBOM,
+  addPontoLubrificacao,
+  gerarSugestaoPlanoLubrificacao,
+  listRotasInspecao,
+  createRotaInspecaoRapida,
+  registrarExecucaoRota,
   atualizarScoresRiscoEquipamentos: intelligenceService.atualizarScoresRiscoEquipamentos,
   getRankingTecnicos: intelligenceService.getRankingTecnicos,
   listarAlertasOperacionais: intelligenceService.listarAlertas,
