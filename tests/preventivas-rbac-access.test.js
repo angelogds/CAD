@@ -1,8 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { ACCESS } = require('../config/rbac');
+const { ACCESS, ROLE } = require('../config/rbac');
 
-test('preventivas_view replica perfis com acesso ao painel_operacional', () => {
-  assert.deepEqual(ACCESS.preventivas_view, ACCESS.painel_operacional);
+test('preventivas_view não inclui perfis de produção e mantém acesso operacional via painel', () => {
+  assert.ok(!ACCESS.preventivas_view.includes(ROLE.PRODUCAO));
+  assert.ok(!ACCESS.preventivas_view.includes(ROLE.ENCARREGADO_PRODUCAO));
+  assert.ok(ACCESS.painel_operacional.includes(ROLE.PRODUCAO));
+  assert.ok(ACCESS.painel_operacional.includes(ROLE.ENCARREGADO_PRODUCAO));
 });
