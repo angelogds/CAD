@@ -423,7 +423,15 @@
     setTimeout(function(){ window.location.reload(); }, 1800);
   });
 
-  eventSource.addEventListener('os_status_alterado', function(){
+  eventSource.addEventListener('os_status_alterado', function(e){
+    var data = {};
+    try { data = JSON.parse(e.data || '{}'); } catch(_e) {}
+    var statusAtual = String(data.status || '').toUpperCase();
+    var finalizada = ['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA'].indexOf(statusAtual) >= 0;
+    toast(finalizada
+      ? 'OS #' + (data.id_os || '-') + ' finalizada.'
+      : 'OS #' + (data.id_os || '-') + ' mudou de status para ' + (data.status || '-') + '.');
+    tocarAlerta(finalizada ? 'critica' : 'normal');
     setTimeout(function(){ window.location.reload(); }, 1200);
   });
 

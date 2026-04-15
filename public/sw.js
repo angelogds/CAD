@@ -4,11 +4,21 @@ self.addEventListener('push', (event) => {
 
   const title = data.title || 'Novo alerta';
   const body = data.body || 'Você recebeu um novo alerta de manutenção.';
-  const url = data.data?.url || '/dashboard';
+  const url = data.url || data.data?.url || '/dashboard';
+
+  function soundByType(type) {
+    const normalizedType = String(type || '').toUpperCase();
+    if (normalizedType === 'NEW_OS') return '/audio/os-nova.mp3';
+    if (normalizedType === 'STATUS_CHANGE') return '/audio/os-status.mp3';
+    if (normalizedType === 'OS_FINALIZADA') return '/audio/os-finalizada.mp3';
+    return '/audio/notification.mp3';
+  }
+
+  const sound = data.sound || data.data?.sound || soundByType(data.data?.type || data.type);
 
   const payload = {
     body,
-    data: { url, sound: '/audio/notification.mp3' },
+    data: { url, sound },
     tag: data.tag || `alerta-${Date.now()}`,
     renotify: true,
     vibrate: [200, 120, 200],

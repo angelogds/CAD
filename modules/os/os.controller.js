@@ -146,7 +146,10 @@ async function osCreate(req, res) {
     await pushService.sendToAll({
       title: "Nova Ordem de Serviço",
       body: `OS #${id} criada automaticamente.`,
+      type: "OS_MEDIA",
       url: `/os/${id}`,
+      sound: "/audio/os-nova.mp3",
+      data: { osId: id, type: "NEW_OS" },
     }).catch(() => {});
 
     if (autoResult?.aguardando) {
@@ -253,7 +256,10 @@ async function osIniciar(req, res) {
     await pushService.sendToAll({
       title: "OS em andamento",
       body: `OS #${id} entrou em andamento.`,
+      type: "MUDANCA_STATUS",
       url: `/os/${id}`,
+      sound: "/audio/os-status.mp3",
+      data: { osId: id, type: "STATUS_CHANGE", newStatus: "ANDAMENTO" },
     }).catch(() => {});
     req.flash("success", "OS iniciada e enviada para andamento.");
   } catch (err) {
@@ -382,7 +388,10 @@ async function osClose(req, res) {
     await pushService.sendToAll({
       title: "OS finalizada",
       body: `OS #${id} foi finalizada.`,
+      type: "MUDANCA_STATUS",
       url: `/os/${id}`,
+      sound: "/audio/os-finalizada.mp3",
+      data: { osId: id, type: "OS_FINALIZADA", newStatus: "FINALIZADA" },
     }).catch(() => {});
 
     console.log("[OS_CLOSE] Fechamento concluído", { osId: id, syncResult });
@@ -408,14 +417,20 @@ async function osUpdateStatus(req, res) {
       await pushService.sendToAll({
         title: "OS em andamento",
         body: `OS #${id} entrou em andamento.`,
+        type: "MUDANCA_STATUS",
         url: `/os/${id}`,
+        sound: "/audio/os-status.mp3",
+        data: { osId: id, type: "STATUS_CHANGE", newStatus: st },
       }).catch(() => {});
     }
     if (['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA'].includes(st)) {
       await pushService.sendToAll({
         title: "OS finalizada",
         body: `OS #${id} foi finalizada.`,
+        type: "MUDANCA_STATUS",
         url: `/os/${id}`,
+        sound: "/audio/os-finalizada.mp3",
+        data: { osId: id, type: "OS_FINALIZADA", newStatus: st },
       }).catch(() => {});
     }
 
