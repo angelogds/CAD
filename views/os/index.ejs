@@ -166,6 +166,32 @@
     background: #ecfdf5;
   }
 
+  .os-actions {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+  }
+
+  .os-action-btn {
+    justify-content: center;
+    min-width: 74px;
+    padding: 5px 10px;
+    line-height: 1.1;
+    transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
+  }
+
+  .os-action-open:hover {
+    border-color: rgba(22, 163, 74, .5);
+    background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+  }
+
+  .os-action-delete:hover {
+    border-color: rgba(185, 28, 28, .5);
+    color: #7f1d1d;
+    background: linear-gradient(180deg, #fee2e2 0%, #fecaca 100%);
+  }
+
   /* ─── CARDS MOBILE (escondidos no desktop) ─── */
   .os-cards {
     display: none;
@@ -344,12 +370,14 @@
             <td><%= o.closed_at ? fmtBR(o.closed_at) : '-' %></td>
             <td class="td-clip"><%= executores %></td>
             <td style="text-align:right;">
-              <a class="btn-sm" href="/os/<%= o.id %>">Abrir</a>
-              <% if (canDeleteOS) { %>
-                <form method="POST" action="/os/<%= o.id %>/excluir" style="display:inline;" onsubmit="return confirm('Confirma excluir a OS #<%= o.id %>?');">
-                  <button class="btn-sm" type="submit" style="background:#7f1d1d;">Excluir</button>
-                </form>
-              <% } %>
+              <div class="os-actions">
+                <a class="btn-sm os-action-btn os-action-open" href="/os/<%= o.id %>">Abrir</a>
+                <% if (canDeleteOS) { %>
+                  <form method="POST" action="/os/<%= o.id %>/excluir" style="display:inline;" onsubmit="return confirm('Confirma excluir a OS #<%= o.id %>?');">
+                    <button class="btn-sm os-action-btn os-action-delete" type="submit">Excluir</button>
+                  </form>
+                <% } %>
+              </div>
             </td>
           </tr>
         <% }) %>
