@@ -1,13 +1,15 @@
 <% layout('layout') %>
 
 <style>
-  .page-head{
+  .prev-page-head{
     display:flex;
     align-items:flex-end;
     justify-content:space-between;
     gap:12px;
     margin-bottom:14px;
+    flex-wrap:wrap;
   }
+
   .muted{ font-size:13px; color:#6b7280; margin-top:6px; }
 
   .card{
@@ -21,9 +23,9 @@
     display:flex;
     gap:10px;
     align-items:center;
+    flex-wrap:wrap;
   }
 
-  /* ✅ MESMO botão do Equipamentos (mesma cor + mesmo formato) */
   .btn-primary{
     background:#16a34a;
     color:#fff;
@@ -36,10 +38,11 @@
     display:inline-flex;
     align-items:center;
     gap:8px;
+    white-space:nowrap;
   }
   .btn-primary:hover{ background:#15803d; }
 
-  .table-wrap{ overflow:auto; }
+  .table-wrap{ overflow:auto; -webkit-overflow-scrolling:touch; }
   table{
     width:100%;
     border-collapse:separate;
@@ -47,7 +50,6 @@
     min-width:980px;
   }
 
-  /* ✅ Cabeçalho mais claro (igual Equipamentos) */
   thead th{
     text-align:left;
     font-size:12px;
@@ -78,7 +80,6 @@
   }
   .link:hover{ text-decoration:underline; }
 
-  /* Pílulas (mais leves e bonitas) */
   .pill{
     display:inline-flex;
     align-items:center;
@@ -104,7 +105,6 @@
   }
   .freq .muted-inline{ color:#6b7280; font-size:13px; }
 
-  /* Botão pequeno (Ações) igual Equipamentos */
   .btn-sm{
     display:inline-flex;
     align-items:center;
@@ -123,9 +123,105 @@
     border-color: rgba(22,163,74,.45);
     background:#ecfdf5;
   }
+
+  .prev-cards{
+    display:none;
+    gap:10px;
+    flex-direction:column;
+  }
+
+  .prev-card{
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:14px;
+    padding:14px;
+    display:grid;
+    gap:8px;
+    text-decoration:none;
+    color:inherit;
+    transition:box-shadow .15s ease;
+  }
+
+  .prev-card:hover{ box-shadow:0 4px 12px rgba(0,0,0,.08); }
+
+  .prev-card-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+  }
+
+  .prev-card-id{
+    font-weight:900;
+    font-size:13px;
+    color:#64748b;
+  }
+
+  .prev-card-title{
+    font-weight:800;
+    font-size:15px;
+    color:#0f172a;
+    line-height:1.35;
+  }
+
+  .prev-card-equip{
+    font-size:13px;
+    color:#475569;
+    line-height:1.4;
+  }
+
+  .prev-card-footer{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    flex-wrap:wrap;
+    padding-top:8px;
+    border-top:1px solid #f1f5f9;
+  }
+
+  .prev-card-pills{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+
+  .prev-card-open{
+    font-size:12px;
+    color:#334155;
+    font-weight:700;
+  }
+
+  .empty-state{
+    text-align:center;
+    padding:40px 20px;
+    color:#94a3b8;
+    font-size:14px;
+  }
+
+  @media (max-width:760px){
+    .card{
+      padding:0;
+      border:none;
+      background:transparent;
+    }
+
+    .table-wrap{ display:none; }
+    .prev-cards{ display:flex; }
+  }
+
+  @media (max-width:400px){
+    .btn-primary,
+    .btn-sm{
+      width:100%;
+      justify-content:center;
+    }
+
+    .actions{ width:100%; }
+  }
 </style>
 
-<div class="page-head">
+<div class="prev-page-head">
   <div>
     <h1>Preventivas</h1>
     <div class="muted">Planos de manutenção preventiva.</div>
@@ -214,5 +310,44 @@
         <% }) %>
       </tbody>
     </table>
+  </div>
+
+  <div class="prev-cards">
+    <% if (!lista || !lista.length) { %>
+      <div class="empty-state">Nenhuma preventiva cadastrada.</div>
+    <% } %>
+
+    <% (lista || []).forEach(p => {
+      const equipamento = p.equipamento_nome
+        ? (p.equipamento_codigo
+            ? (p.equipamento_codigo + ' • ' + p.equipamento_nome)
+            : p.equipamento_nome)
+        : '-';
+      const ativa = Number(p.ativo) === 1 || p.ativo === true;
+    %>
+      <a class="prev-card" href="/preventivas/<%= p.id %>">
+        <div class="prev-card-head">
+          <div>
+            <div class="prev-card-id">PREV #<%= p.id %></div>
+            <div class="prev-card-title"><%= p.titulo || '-' %></div>
+          </div>
+          <% if (ativa) { %>
+            <span class="pill pill-green">ATIVA</span>
+          <% } else { %>
+            <span class="pill pill-gray">INATIVA</span>
+          <% } %>
+        </div>
+
+        <div class="prev-card-equip"><strong>Equipamento:</strong> <%= equipamento %></div>
+
+        <div class="prev-card-footer">
+          <div class="prev-card-open">Toque para abrir detalhes</div>
+          <div class="prev-card-pills">
+            <span class="pill pill-blue"><%= (p.frequencia_tipo || '-').toUpperCase() %></span>
+            <span class="pill">x<%= p.frequencia_valor || 1 %></span>
+          </div>
+        </div>
+      </a>
+    <% }) %>
   </div>
 </div>
