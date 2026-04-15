@@ -363,14 +363,30 @@ function pickNextMecanicoRoundRobin(listaMecanicosDisponiveis) {
 
 function createExecucao(osId, executorUserId, auxiliarUserId, alocadoPorUserId, observacao = null, turnoAlocacao = null) {
   const cols = tableExists("os_execucoes") ? getTableColumns("os_execucoes") : [];
-  const executorCol = cols.includes("executor_user_id") ? "executor_user_id" : "mecanico_user_id";
+  const hasExecutorCol = cols.includes("executor_user_id");
+  const hasMecanicoCol = cols.includes("mecanico_user_id");
   const hasAux = cols.includes("auxiliar_user_id");
   const hasAlocadoPor = cols.includes("alocado_por");
   const hasObs = cols.includes("observacao");
   const hasTurno = cols.includes("turno_alocacao");
-  const fields = ["os_id", executorCol, "iniciado_em"];
-  const placeholders = ["?", "?", "datetime('now')"];
-  const args = [Number(osId), Number(executorUserId)];
+  const executorId = Number(executorUserId || 0);
+  if (!executorId) return;
+
+  const fields = ["os_id", "iniciado_em"];
+  const placeholders = ["?", "datetime('now')"];
+  const args = [Number(osId)];
+
+  if (hasExecutorCol) {
+    fields.push("executor_user_id");
+    placeholders.push("?");
+    args.push(executorId);
+  }
+  if (hasMecanicoCol) {
+    fields.push("mecanico_user_id");
+    placeholders.push("?");
+    args.push(executorId);
+  }
+  if (!hasExecutorCol && !hasMecanicoCol) return;
 
   if (hasAux) {
     fields.push("auxiliar_user_id");
