@@ -1012,7 +1012,38 @@ function deleteOS(osId) {
   if (!id) throw new Error("OS inválida para exclusão.");
   const exists = db.prepare(`SELECT id FROM os WHERE id = ?`).get(id);
   if (!exists?.id) throw new Error("OS não encontrada.");
-  db.prepare(`DELETE FROM os WHERE id = ?`).run(id);
+
+  const quoteIdent = (value) => `"${String(value || "").replace(/"/g, "\"\"")}"`;
+  const detachReferences = (table, column) => {
+    if (!tableExists(table)) return;
+    const columns = db.prepare(`PRAGMA table_info(${quoteIdent(table)})`).all();
+    const col = columns.find((item) => item?.name === column);
+    if (!col) return;
+    const tableSql = quoteIdent(table);
+    const columnSql = quoteIdent(column);
+    if (Number(col.notnull || 0) === 1) {
+      db.prepare(`DELETE FROM ${tableSql} WHERE ${columnSql} = ?`).run(id);
+      return;
+    }
+    db.prepare(`UPDATE ${tableSql} SET ${columnSql} = NULL WHERE ${columnSql} = ?`).run(id);
+  };
+
+  db.transaction(() => {
+    const tables = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> 'os'`)
+      .all()
+      .map((row) => row.name)
+      .filter(Boolean);
+
+    for (const table of tables) {
+      detachReferences(table, "os_id");
+      detachReferences(table, "id_os");
+      detachReferences(table, "gerou_os_id");
+    }
+
+    db.prepare(`DELETE FROM os WHERE id = ?`).run(id);
+  })();
+
   return true;
 }
 
