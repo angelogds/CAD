@@ -118,6 +118,43 @@ app.use(flash());
 app.locals.TZ = TZ;
 app.locals.fmtBR = fmtBR;
 
+function listOnlineUsers() {
+  try {
+    const nowMs = Date.now();
+    const sessions = db.prepare("SELECT sess, expired FROM sessions WHERE expired >= ?").all(nowMs);
+    const byUserId = new Map();
+
+    for (const row of sessions) {
+      if (!row?.sess) continue;
+
+      let payload = null;
+      try {
+        payload = JSON.parse(row.sess);
+      } catch (_e) {
+        continue;
+      }
+
+      const sessionUser = payload?.user;
+      const userId = Number(sessionUser?.id || 0);
+      if (!userId || !sessionUser?.name) continue;
+
+      if (!byUserId.has(userId)) {
+        byUserId.set(userId, {
+          id: userId,
+          name: sessionUser.name,
+          photo_path: sessionUser.photo_path || null,
+        });
+      }
+    }
+
+    return Array.from(byUserId.values())
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR", { sensitivity: "base" }))
+      .slice(0, 12);
+  } catch (_e) {
+    return [];
+  }
+}
+
 app.use((req, res, next) => {
   res.locals.user = req.session?.user || null;
 
@@ -172,6 +209,8 @@ app.use((req, res, next) => {
   } catch (_e) {
     res.locals.operationalCounters = { osAbertas: 0, osCriticas: 0, preventivasHoje: 0 };
   }
+
+  res.locals.onlineUsers = listOnlineUsers();
 
   next();
 });

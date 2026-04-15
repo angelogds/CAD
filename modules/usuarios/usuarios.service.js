@@ -81,4 +81,15 @@ function resetPassword(id, password) {
   db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(password_hash, id);
 }
 
-module.exports = { list, getById, create, update, resetPassword };
+function remove(id, actorUserId = null) {
+  const user = db.prepare("SELECT id, name FROM users WHERE id = ?").get(id);
+  if (!user) throw new Error("Usuário não encontrado.");
+
+  if (Number(actorUserId || 0) === Number(id)) {
+    throw new Error("Você não pode apagar o próprio usuário logado.");
+  }
+
+  db.prepare("DELETE FROM users WHERE id = ?").run(id);
+}
+
+module.exports = { list, getById, create, update, resetPassword, remove };

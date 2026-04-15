@@ -131,4 +131,17 @@ function resetPassword(req, res) {
   }
 }
 
-module.exports = { list, newForm, create, editForm, update, resetPassword };
+function remove(req, res) {
+  const id = Number(req.params.id);
+
+  try {
+    service.remove(id, req.session?.user?.id || null);
+    req.flash("success", "Usuário apagado com sucesso.");
+    return res.redirect("/usuarios");
+  } catch (e) {
+    req.flash("error", e.message || "Erro ao apagar usuário.");
+    return res.redirect("/usuarios");
+  }
+}
+
+module.exports = { list, newForm, create, editForm, update, resetPassword, remove };
