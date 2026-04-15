@@ -47,8 +47,28 @@
   .quick-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .dashboard-actions { display:flex; gap:8px; flex-wrap:wrap; }
 
-   .op-toast{position:fixed;right:16px;bottom:16px;z-index:9999;background:#0f172a;color:#fff;padding:10px 12px;border-radius:10px;font-weight:700;box-shadow:0 10px 20px rgba(0,0,0,.2);display:none;max-width:340px;}
+  .op-toast{position:fixed;right:16px;bottom:16px;z-index:9999;background:#0f172a;color:#fff;padding:10px 12px;border-radius:10px;font-weight:700;box-shadow:0 10px 20px rgba(0,0,0,.2);display:none;max-width:340px;}
   .op-toast.show{display:block;}
+  .op-toast-grande{
+    position:fixed;
+    top:20px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:10000;
+    min-width:min(860px, calc(100vw - 24px));
+    max-width:min(920px, calc(100vw - 24px));
+    border:3px solid #dc2626;
+    border-radius:16px;
+    background:#7f1d1d;
+    color:#fff;
+    padding:18px 20px;
+    box-shadow:0 20px 40px rgba(0,0,0,.35);
+    display:none;
+    animation: alertaPulse 1s infinite;
+  }
+  .op-toast-grande.show{display:block;}
+  .op-toast-grande__titulo{font-size:30px;font-weight:900;letter-spacing:.02em;}
+  .op-toast-grande__meta{font-size:20px;font-weight:800;margin-top:6px;}
   .boasvindas{border:1px solid #e2e8f0; background:#f8fafc; border-radius:12px; padding:10px 12px; margin-bottom:10px;}
   .alerta-tv { border:2px solid #dc2626; border-radius:14px; background:#fff1f2; color:#7f1d1d; padding:14px; margin-bottom:10px; display:flex; gap:14px; align-items:center; justify-content:space-between; }
   .alerta-tv.hidden { display:none; }
@@ -84,6 +104,9 @@
     .kpi-grid, .kpi-grid.two, .quick-grid { grid-template-columns:1fr; }
     .alerta-tv { flex-direction:column; align-items:flex-start; }
     .alerta-tv__title { font-size:20px; }
+    .op-toast-grande{top:12px;padding:12px;min-width:calc(100vw - 16px);}
+    .op-toast-grande__titulo{font-size:20px;}
+    .op-toast-grande__meta{font-size:15px;}
     .dashboard-actions { gap:6px; }
     .dashboard-actions > * {
       width:auto;
@@ -139,7 +162,6 @@
   </div>
   <div class="dashboard-actions">
     <a class="btn-outline" href="/dashboard?tv=1">Modo TV</a>
-    <button id="btn-ativar-push" class="btn-outline" type="button" onclick="enablePush()">Ativar alertas de OS neste dispositivo</button>
   </div>
 </div>
 
@@ -171,6 +193,10 @@
 </section>
 
 <div id="op-toast" class="op-toast"></div>
+<div id="op-toast-grande" class="op-toast-grande" role="alert" aria-live="assertive">
+  <div class="op-toast-grande__titulo">🚨 NOVA ORDEM DE SERVIÇO</div>
+  <div id="op-toast-grande-meta" class="op-toast-grande__meta">Aguardando evento...</div>
+</div>
 
 <div class="dash-grid">
   <div class="dash-col">
@@ -382,6 +408,17 @@
     setTimeout(function(){ el.classList.remove('show'); }, 4000);
   }
 
+  function toastGrande(titulo, msg){
+    var boxGrande = document.getElementById('op-toast-grande');
+    var metaGrande = document.getElementById('op-toast-grande-meta');
+    if (!boxGrande || !metaGrande) return;
+    var tituloEl = boxGrande.querySelector('.op-toast-grande__titulo');
+    if (tituloEl && titulo) tituloEl.textContent = titulo;
+    metaGrande.textContent = msg || '';
+    boxGrande.classList.add('show');
+    setTimeout(function(){ boxGrande.classList.remove('show'); }, 9000);
+  }
+
   function renderAlerta(payload){
     if (!payload || !payload.id_os) {
       box.classList.add('hidden');
@@ -411,7 +448,9 @@
   eventSource.addEventListener('os_criada', function(e){
     var data = {};
     try { data = JSON.parse(e.data || '{}'); } catch(_e) {}
+    var mensagem = 'OS #' + (data.id_os || '-') + ' • Equipamento: ' + (data.equipamento || '-') + ' • Setor: ' + (data.setor || '-') + ' • Prioridade: ' + (data.prioridade || '-');
     toast('Nova OS #' + (data.id_os || '-') + ' aberta para ' + (data.equipamento || 'equipamento') + '.');
+    toastGrande('🚨 NOVA ORDEM DE SERVIÇO', mensagem);
     tocarAlerta('normal');
     setTimeout(function(){ window.location.reload(); }, 1200);
   });

@@ -59,26 +59,32 @@
     return 'Push não suportado neste navegador.';
   }
 
-  async function enablePush() {
+  async function enablePush(options) {
+    const opts = options || {};
+    const requestPermission = opts.requestPermission !== false;
+
     if (!window.isSecureContext) {
-      alert('Notificações push exigem HTTPS.');
+      if (requestPermission) alert('Notificações push exigem HTTPS.');
       return;
     }
 
     if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-      alert(unsupportedMessage());
+      if (requestPermission) alert(unsupportedMessage());
       return;
     }
 
     const vapidPublicKey = window.__VAPID_PUBLIC_KEY__ || '';
     if (!vapidPublicKey) {
-      alert('VAPID_PUBLIC_KEY não configurada no servidor. Contate o suporte.');
+      if (requestPermission) alert('VAPID_PUBLIC_KEY não configurada no servidor. Contate o suporte.');
       return;
     }
 
-    const permission = await Notification.requestPermission();
+    let permission = Notification.permission;
+    if (permission === 'default' && requestPermission) {
+      permission = await Notification.requestPermission();
+    }
     if (permission !== 'granted') {
-      alert('Permissão de notificação não concedida.');
+      if (requestPermission) alert('Permissão de notificação não concedida.');
       return;
     }
 
@@ -97,7 +103,7 @@
 
     if (!response.ok) throw new Error('Falha ao registrar inscrição push.');
 
-    playNotificationSound(SOUND_URL);
+    if (requestPermission) playNotificationSound(SOUND_URL);
 
     const button = document.getElementById('btn-ativar-push');
     if (button) {
@@ -113,6 +119,10 @@
       }
     });
   }
+
+  window.addEventListener('load', function () {
+    enablePush({ requestPermission: true }).catch(function () {});
+  });
 
   window.enablePush = function () {
     enablePush().catch(function (err) {
