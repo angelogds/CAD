@@ -56,5 +56,7 @@ router.post("/usuarios/:id", requireLogin, requireRole(USERS_ACCESS), upload.sin
 
 router.post("/:id/reset-senha", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.resetPassword, "resetPassword"));
 router.post("/usuarios/:id/reset-senha", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.resetPassword, "resetPassword"));
+router.post("/:id/excluir", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.remove, "remove"));
+router.post("/usuarios/:id/excluir", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.remove, "remove"));
 
 module.exports = router;

@@ -32,6 +32,24 @@
           </div>
 
           <div class="topbar-right">
+            <% if ((onlineUsers || []).length) { %>
+              <div class="online-users" title="Usuários online no sistema">
+                <span class="online-users-label">Online</span>
+                <div class="online-users-list">
+                  <% (onlineUsers || []).forEach(online => { %>
+                    <div class="online-user-pill">
+                      <% if (online.photo_path) { %>
+                        <img class="online-user-avatar" src="<%= online.photo_path %>" alt="Foto de <%= online.name %>" />
+                      <% } else { %>
+                        <span class="online-user-avatar online-user-avatar-fallback" aria-hidden="true"><%= String(online.name || 'U').trim().charAt(0).toUpperCase() %></span>
+                      <% } %>
+                      <span class="online-user-name"><%= online.name %></span>
+                    </div>
+                  <% }) %>
+                </div>
+              </div>
+            <% } %>
+
             <% if (user) { %>
               <div class="pill">
                 <% if (user.photo_path) { %>

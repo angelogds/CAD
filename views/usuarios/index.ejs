@@ -67,7 +67,12 @@
               </td>
               <td><%= u.created_at ? fmtBR(u.created_at) : '-' %></td>
               <td style="text-align:right;">
-                <a class="btn btn-ghost btn-sm" href="/usuarios/<%= u.id %>/editar">Editar</a>
+                <div class="user-actions">
+                  <a class="btn btn-sm user-action-btn user-action-edit" href="/usuarios/<%= u.id %>/editar">Editar</a>
+                  <form method="POST" action="/usuarios/<%= u.id %>/excluir" onsubmit="return confirm('Confirma apagar o usuário <%= u.name %>?');">
+                    <button class="btn btn-sm user-action-btn user-action-delete" type="submit">Apagar</button>
+                  </form>
+                </div>
               </td>
             </tr>
           <% }) %>
@@ -76,3 +81,38 @@
     </table>
   </div>
 </div>
+
+<style>
+  .user-actions{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:6px;
+  }
+  .user-actions form{ margin:0; }
+  .user-action-btn{
+    min-width:78px;
+    font-weight:900;
+    transition:all .15s ease;
+  }
+  .user-action-edit{
+    background:#fff;
+    border-color:#d1d5db;
+    color:#0f172a;
+  }
+  .user-action-edit:hover{
+    background:#e9f9ef;
+    border-color:#16a34a;
+    color:#166534;
+  }
+  .user-action-delete{
+    background:#fff;
+    border-color:#d1d5db;
+    color:#0f172a;
+  }
+  .user-action-delete:hover{
+    background:#fff1f2;
+    border-color:#ef4444;
+    color:#b91c1c;
+  }
+</style>
