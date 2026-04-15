@@ -81,13 +81,31 @@ function tableExists(name) {
   return !!row;
 }
 
-function osHasFKToUsersOld() {
+function tableHasFKTo(tableName, referencedTableName) {
   try {
-    const fks = db.prepare(`PRAGMA foreign_key_list(os)`).all();
-    return fks.some((fk) => String(fk.table || "").toLowerCase() === "users_old");
+    const fks = db.prepare(`PRAGMA foreign_key_list(${tableName})`).all();
+    return fks.some((fk) => String(fk.table || "").toLowerCase() === String(referencedTableName || "").toLowerCase());
   } catch (_e) {
     return false;
   }
+}
+
+function listTables() {
+  try {
+    return db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`)
+      .all()
+      .map((row) => row.name)
+      .filter(Boolean);
+  } catch (_e) {
+    return [];
+  }
+}
+
+function hasAnyFKTo(tableName) {
+  const target = String(tableName || "").toLowerCase();
+  if (!target) return false;
+  return listTables().some((tbl) => tableHasFKTo(tbl, target));
 }
 
 /**
@@ -98,17 +116,17 @@ function osHasFKToUsersOld() {
  * Isso elimina o erro: "não existe tal tabela: main.users_old"
  * e evita gambiarra de PRAGMA foreign_keys = OFF.
  */
-function ensureUsersOldCompat() {
-  const needCompat = osHasFKToUsersOld();
+function ensureUsersCompatTable(targetTable) {
+  const needCompat = hasAnyFKTo(targetTable);
   if (!needCompat) return;
 
-  if (!tableExists("users_old")) {
-    console.log("⚠️ [db] FK detectada: os -> users_old, mas users_old não existe.");
-    console.log("🛠️ [db] Criando tabela compat users_old + triggers de sync (solução definitiva).");
+  if (!tableExists(targetTable)) {
+    console.log(`⚠️ [db] FK detectada para '${targetTable}', mas '${targetTable}' não existe.`);
+    console.log(`🛠️ [db] Criando tabela compat '${targetTable}' + triggers de sync (solução definitiva).`);
 
     // cria tabela mínima
     db.exec(`
-      CREATE TABLE IF NOT EXISTS users_old (
+      CREATE TABLE IF NOT EXISTS ${targetTable} (
         id INTEGER PRIMARY KEY
       );
     `);
@@ -116,7 +134,7 @@ function ensureUsersOldCompat() {
     // popula com ids existentes (users)
     try {
       db.exec(`
-        INSERT OR IGNORE INTO users_old (id)
+        INSERT OR IGNORE INTO ${targetTable} (id)
         SELECT id FROM users;
       `);
     } catch (_e) {
@@ -124,38 +142,39 @@ function ensureUsersOldCompat() {
     }
 
     // cria triggers para manter sync
+    const triggerSuffix = String(targetTable).replace(/[^a-zA-Z0-9_]/g, "_");
     db.exec(`
-      DROP TRIGGER IF EXISTS trg_users_ai_users_old;
-      DROP TRIGGER IF EXISTS trg_users_ad_users_old;
-      DROP TRIGGER IF EXISTS trg_users_au_users_old;
+      DROP TRIGGER IF EXISTS trg_users_ai_${triggerSuffix};
+      DROP TRIGGER IF EXISTS trg_users_ad_${triggerSuffix};
+      DROP TRIGGER IF EXISTS trg_users_au_${triggerSuffix};
 
-      CREATE TRIGGER trg_users_ai_users_old
+      CREATE TRIGGER trg_users_ai_${triggerSuffix}
       AFTER INSERT ON users
       BEGIN
-        INSERT OR IGNORE INTO users_old (id) VALUES (NEW.id);
+        INSERT OR IGNORE INTO ${targetTable} (id) VALUES (NEW.id);
       END;
 
-      CREATE TRIGGER trg_users_ad_users_old
+      CREATE TRIGGER trg_users_ad_${triggerSuffix}
       AFTER DELETE ON users
       BEGIN
-        DELETE FROM users_old WHERE id = OLD.id;
+        DELETE FROM ${targetTable} WHERE id = OLD.id;
       END;
 
-      CREATE TRIGGER trg_users_au_users_old
+      CREATE TRIGGER trg_users_au_${triggerSuffix}
       AFTER UPDATE OF id ON users
       BEGIN
-        UPDATE users_old SET id = NEW.id WHERE id = OLD.id;
+        UPDATE ${targetTable} SET id = NEW.id WHERE id = OLD.id;
       END;
     `);
 
     // reforça FK ON
     db.pragma("foreign_keys = ON");
-    console.log("✅ [db] users_old compat criado e sincronizado. foreign_keys permanece ON.");
+    console.log(`✅ [db] '${targetTable}' compat criado e sincronizado. foreign_keys permanece ON.`);
   } else {
     // tabela existe: garante que tenha todos ids de users
     try {
       db.exec(`
-        INSERT OR IGNORE INTO users_old (id)
+        INSERT OR IGNORE INTO ${targetTable} (id)
         SELECT id FROM users;
       `);
     } catch (_e) {}
@@ -164,9 +183,10 @@ function ensureUsersOldCompat() {
 
 // roda ao iniciar
 try {
-  ensureUsersOldCompat();
+  ensureUsersCompatTable("users_old");
+  ensureUsersCompatTable("users_legacy_roles_tmp");
 } catch (e) {
-  console.log("⚠️ [db] Não foi possível aplicar compat users_old:", e.message || e);
+  console.log("⚠️ [db] Não foi possível aplicar tabelas de compatibilidade de usuários:", e.message || e);
   // fallback (último caso): mantém ON mesmo assim
   try {
     db.pragma("foreign_keys = ON");
