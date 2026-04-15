@@ -172,7 +172,8 @@ class PushService {
       requireInteraction: ['CRITICA', 'EMERGENCIAL', 'ALTA'].includes(priority),
       tag: `os-${osData.id}`,
       url: `/os/${osData.id}`,
-      data: { osId: osData.id, type: 'NEW_OS', priority },
+      sound: ['CRITICA', 'EMERGENCIAL', 'ALTA'].includes(priority) ? '/audio/os-critica.mp3' : '/audio/os-nova.mp3',
+      data: { osId: osData.id, type: 'NEW_OS', priority, sound: '/audio/os-nova.mp3' },
     };
 
     if (osData.tecnico_id) {
@@ -183,13 +184,21 @@ class PushService {
   }
 
   async notifyOSStatusChange(osData, oldStatus, newStatus) {
+    const normalizedStatus = String(newStatus || '').toUpperCase();
+    const isFinalizada = ['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA'].includes(normalizedStatus);
     const payload = {
       title: `📋 OS #${osData.id} - ${newStatus}`,
       body: `${osData.equipamento}: Status alterado de ${oldStatus} para ${newStatus}`,
       type: 'MUDANCA_STATUS',
       tag: `os-status-${osData.id}`,
       url: `/os/${osData.id}`,
-      data: { osId: osData.id, oldStatus, newStatus, type: 'STATUS_CHANGE' },
+      sound: isFinalizada ? '/audio/os-finalizada.mp3' : '/audio/os-status.mp3',
+      data: {
+        osId: osData.id,
+        oldStatus,
+        newStatus,
+        type: isFinalizada ? 'OS_FINALIZADA' : 'STATUS_CHANGE',
+      },
     };
 
     if (osData.tecnico_id) await this.sendToUser(osData.tecnico_id, payload);
