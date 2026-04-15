@@ -62,6 +62,7 @@
   async function enablePush(options) {
     const opts = options || {};
     const requestPermission = opts.requestPermission !== false;
+    const playConfirmationSound = opts.playConfirmationSound === true;
 
     if (!window.isSecureContext) {
       if (requestPermission) alert('Notificações push exigem HTTPS.');
@@ -103,7 +104,7 @@
 
     if (!response.ok) throw new Error('Falha ao registrar inscrição push.');
 
-    if (requestPermission) playNotificationSound(SOUND_URL);
+    if (!existing && playConfirmationSound) playNotificationSound(SOUND_URL);
 
     const button = document.getElementById('btn-ativar-push');
     if (button) {
@@ -121,11 +122,11 @@
   }
 
   window.addEventListener('load', function () {
-    enablePush({ requestPermission: true }).catch(function () {});
+    enablePush({ requestPermission: false }).catch(function () {});
   });
 
   window.enablePush = function () {
-    enablePush().catch(function (err) {
+    enablePush({ requestPermission: true, playConfirmationSound: true }).catch(function (err) {
       alert('Não foi possível ativar os alertas neste dispositivo.');
       console.warn('Falha ao ativar push:', err?.message || err);
     });
