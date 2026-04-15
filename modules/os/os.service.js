@@ -1028,19 +1028,6 @@ function deleteOS(osId) {
     db.prepare(`UPDATE ${tableSql} SET ${columnSql} = NULL WHERE ${columnSql} = ?`).run(id);
   };
 
-  const listOSRefColumns = (table) => {
-    try {
-      return db
-        .prepare(`PRAGMA foreign_key_list(${quoteIdent(table)})`)
-        .all()
-        .filter((fk) => String(fk.table || "").toLowerCase() === "os")
-        .map((fk) => String(fk.from || "").trim())
-        .filter(Boolean);
-    } catch (_e) {
-      return [];
-    }
-  };
-
   db.transaction(() => {
     const tables = db
       .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> 'os'`)
@@ -1049,8 +1036,9 @@ function deleteOS(osId) {
       .filter(Boolean);
 
     for (const table of tables) {
-      const fkColumns = Array.from(new Set(listOSRefColumns(table)));
-      for (const column of fkColumns) detachReferences(table, column);
+      detachReferences(table, "os_id");
+      detachReferences(table, "id_os");
+      detachReferences(table, "gerou_os_id");
     }
 
     db.prepare(`DELETE FROM os WHERE id = ?`).run(id);
