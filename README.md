@@ -1,250 +1,169 @@
 # Manutenção Campo do Gado — V2
 
-Sistema V2 modular para gestão de manutenção e rotinas operacionais do **Campo do Gado – Indústria de Reciclagem Animal LTDA**.
+Sistema de manutenção industrial (Node.js + Express + EJS + SQLite) com operação web e base preparada para aplicativo Android com Capacitor.
 
-Este repositório segue um padrão rígido para acelerar evolução sem retrabalho:
-- módulos independentes (`routes/controller/service`)
-- migrations/seed padronizados
-- RBAC por `role`
-- UI com EJS (layout + parciais)
-- SQLite (better-sqlite3)
+## Visão de arquitetura (web + mobile)
 
-> **Regra de ouro:** qualquer alteração/feature deve seguir o `CODING_RULES.md`.
+- **Backend único no Railway** (sem duplicar backend).
+- **Web app** continua funcionando em navegador desktop/mobile.
+- **App Android** via Capacitor no modo remoto (`server.url`) apontando para o Railway.
+- **Push híbrido**:
+  - Web Push (VAPID) para navegador/PWA.
+  - FCM para push nativo no app Android (estrutura preparada).
+- **Base iOS-ready**: mesma estratégia, com pendência de APNs/Xcode para publicação.
 
----
+## Diagnóstico e plano detalhado
 
-## Tecnologias
-- Node.js + Express
-- EJS + ejs-mate
-- SQLite (`better-sqlite3`)
-- Sessão: `express-session` + `connect-flash`
+Consulte o relatório técnico completo em:
+- `docs/mobile-architecture-report.md`
 
----
+## Estrutura mobile adicionada
+
+### PWA
+- `public/manifest.webmanifest`
+- Ícones em `public/images/pwa/`
+- Metadados e manifest link no `views/layout.ejs`
+
+### Service Worker consolidado
+- SW principal: `public/service-worker.js`
+- Compatibilidade legada: `public/sw.js` (proxy para o principal)
+
+### Push mobile nativo (preparação)
+- Registro de token de dispositivo:
+  - `POST /mobile/devices/register`
+  - `POST /mobile/devices/revoke`
+- Nova tabela de tokens mobile: migration `140_mobile_device_tokens.js`
+- Integração opcional FCM em `modules/push/fcm.service.js`
+
+### Bridge Capacitor no front
+- `public/js/mobile-bridge.js`
+  - captura token nativo;
+  - envia token ao backend autenticado;
+  - trata deep link ao tocar notificação.
 
 ## Como rodar localmente
 
-### 1) Instalar dependências
 ```bash
 npm install
-```
-
-### 2) Rodar migrations e seed
-```bash
 npm run migrate
 npm run seed
-```
-
-### 3) Subir aplicação
-```bash
 npm run dev
 ```
 
-## Novo módulo: Desenho Técnico
+Aplicação local: `http://localhost:8080`.
 
-### Rotas principais
-- `GET /desenho-tecnico` — lista de desenhos
-- `GET /desenho-tecnico/dashboard` — visão geral do módulo
-- `GET /desenho-tecnico/cad/novo` — criação de novo desenho CAD
-- `POST /desenho-tecnico/cad` — salvar desenho CAD inicial
-- `GET /desenho-tecnico/cad/:id` — visualizar desenho
-- `GET /desenho-tecnico/cad/:id/editor` — editar desenho
-- `POST /desenho-tecnico/cad/:id` — atualizar CAD (JSON)
-- `POST /desenho-tecnico/cad/:id/metadata` — atualizar metadados
-- `POST /desenho-tecnico/cad/:id/render-3d` — gerar preview técnico 3D
-- `GET /desenho-tecnico/cad/:id/pdf` — gerar PDF técnico
+## Como rodar no Railway
 
-### Railway (deploy com 1 Volume persistente)
-1. Criar **1 Volume** no projeto Railway.
-2. Anexar o Volume ao serviço **CAD**.
-3. Definir o mount path do Volume como **`/data`**.
-4. Configurar variáveis de ambiente no serviço:
-   - `DATA_DIR=/data`
-   - `UPLOAD_DIR=/data/uploads`
-   - `PDF_DIR=/data/pdfs`
-   - `IMAGE_DIR=/data/imagens`
-   - `TEMP_DIR=/data/temp`
-   - `SQLITE_DIR=/data/sqlite`
-   - `DB_PATH=/data/sqlite/app.db`
-5. Start command recomendado:
-   ```bash
-   npm ci && npm run migrate && npm start
-   ```
-6. Validar persistência:
-   - enviar arquivo em upload;
-   - gerar PDF;
-   - reiniciar/redeploy e confirmar que os arquivos continuam acessíveis.
-
-## IA no Backend (Responses API)
-
-### Segurança
-- A chave `OPENAI_API_KEY` fica **somente** no backend via variável de ambiente.
-- Nunca publique chave em frontend, HTML/EJS, logs, seed/migration ou README.
-
-### Variáveis de ambiente (`.env`)
-Copie `.env.example` para `.env` no servidor e preencha:
+1. Configurar volume persistente (ex.: `/data`).
+2. Variáveis recomendadas:
 
 ```bash
-AI_ENABLED=true
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL_TEXT=gpt-4o-mini
-OPENAI_TIMEOUT_MS=20000
-OPENAI_MAX_OUTPUT_TOKENS=300
-
-# opcionais usados por outros fluxos
-OPENAI_MODEL_ACADEMIA=gpt-4o-mini
-OPENAI_MODEL_AVALIACAO=gpt-4o-mini
+DATA_DIR=/data
+UPLOAD_DIR=/data/uploads
+PDF_DIR=/data/pdfs
+IMAGE_DIR=/data/imagens
+TEMP_DIR=/data/temp
+SQLITE_DIR=/data/sqlite
+DB_PATH=/data/sqlite/app.db
+SESSION_SECRET=<segredo_forte>
 ```
 
-### Endpoints IA / áudio / geração técnica
+3. Start command sugerido:
 
-#### Assistente IA (texto)
-- `POST /ai/ask`
-- `POST /ai/os/:id/analyze`
-- `POST /ai/preventivas/:id/analyze`
-
-#### Fluxo OS assistido por IA
-- `POST /os` → abertura da OS com enriquecimento técnico automático (criticidade, diagnóstico, causa provável, equipe sugerida etc.)
-- `POST /os/:id/fechar` (ou `POST /os/:id/concluir`) → fechamento da OS com geração técnica automática de descrição de serviço, ação corretiva e recomendação
-
-#### Geração técnica de desenho
-- `POST /desenho-tecnico/cad/:id/render-3d` → gera preview técnico 3D a partir do CAD
-- `GET /desenho-tecnico/cad/:id/pdf` → gera PDF técnico
-
-#### Áudio / transcrição
-- Áudio de notificação é servido como arquivo estático em `/audio/*.mp3` (ex.: dashboard e push).
-- **Não existe endpoint HTTP público de transcrição de áudio neste branch.**
-
-### Fluxo de abertura e fechamento assistidos
-
-#### 1) Abertura assistida (`POST /os`)
-1. Operador envia não conformidade + sintoma principal.
-2. Backend monta contexto (equipamento, histórico, OS parecidas, preventivas).
-3. IA retorna JSON técnico estruturado.
-4. Sistema persiste os campos IA (`ai_diagnostico_inicial`, `ai_criticidade_sugerida`, `ai_sugestao_equipe_json`, etc.) e abre a OS.
-
-#### 2) Fechamento assistido (`POST /os/:id/fechar`)
-1. Operador anexa pelo menos uma foto de fechamento.
-2. Backend solicita à IA texto técnico de encerramento.
-3. Sistema grava saída estruturada (`ai_descricao_servico_executado`, `ai_acao_corretiva_realizada`, `ai_observacao_final_tecnica` etc.) e conclui OS.
-
-### Fallback quando IA estiver indisponível
-- `AI_ENABLED=false` → backend retorna mensagem amigável de IA desativada.
-- Sem `OPENAI_API_KEY` (ou chave inválida) → backend retorna erro de configuração controlado.
-- Timeout/provedor indisponível/rate limit → backend responde erro amigável (`503`) sem quebrar renderização de tela.
-- Em fluxos internos de OS (abertura/fechamento), o sistema usa fallback técnico padrão para manter continuidade operacional.
-
-## Exemplos de payload e resposta JSON estruturada
-
-### 1) Assistente geral (`POST /ai/ask`)
-
-**Payload**
-```json
-{
-  "contexto": "geral",
-  "pergunta": "Quais inspeções iniciais devo fazer em uma bomba centrífuga com aquecimento?"
-}
+```bash
+npm ci && npm run migrate && npm start
 ```
 
-**Resposta (sucesso)**
-```json
-{
-  "ok": true,
-  "resposta": "1) Verifique vibração..."
-}
+## Push web (VAPID)
+
+1. Gerar chaves:
+
+```bash
+npm run generate:vapid
 ```
 
-**Resposta (fallback IA indisponível)**
-```json
-{
-  "ok": false,
-  "error": "A IA demorou para responder. Tente novamente.",
-  "code": "AI_TIMEOUT"
-}
+2. Configurar no ambiente:
+
+```bash
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+VAPID_SUBJECT=mailto:suporte@empresa.com
 ```
 
-### 2) Análise de OS (`POST /ai/os/:id/analyze`)
+## Push nativo Android (FCM)
 
-**Payload**
-```json
-{
-  "action": "analisar"
-}
+### Variáveis de backend
+Use **uma** das opções:
+
+- `FCM_SERVICE_ACCOUNT_JSON` com JSON completo da service account, ou
+- `FCM_SERVICE_ACCOUNT_BASE64` com JSON em base64.
+
+### No app Android
+- Adicionar `google-services.json` no projeto Android nativo (quando plataforma for gerada).
+- Criar canais Android no app (ex.: `os_critica`, `preventivas`, `avisos`).
+
+## Capacitor (Android)
+
+### Dependências
+Já referenciadas no `package.json`:
+- `@capacitor/core`, `@capacitor/cli`, `@capacitor/android`
+- `@capacitor/app`, `@capacitor/push-notifications`
+
+### Configuração
+- Arquivo: `capacitor.config.ts`
+- Ajuste `CAPACITOR_SERVER_URL` para a URL do Railway.
+
+### Fluxo de geração Android
+
+```bash
+npm install
+npx cap add android
+npx cap sync android
+npx cap open android
 ```
 
-**Resposta (sucesso)**
-```json
-{
-  "ok": true,
-  "resposta": "Diagnóstico técnico recomendado..."
-}
-```
+> Se o ambiente bloquear npm/SDK, execute estes passos em uma máquina com Android Studio e acesso ao npm registry.
 
-### 3) Salvar CAD (`POST /desenho-tecnico/cad/:id`)
+## Build release e Google Play (AAB)
 
-**Payload (resumido)**
-```json
-{
-  "objects": [
-    { "id": "L1", "type": "line", "x1": 10, "y1": 10, "x2": 120, "y2": 10 }
-  ],
-  "layers": {
-    "geometria_principal": { "visible": true, "locked": false }
-  }
-}
-```
+1. No Android Studio, gerar keystore (`Build > Generate Signed Bundle/APK`).
+2. Selecionar **Android App Bundle (AAB)**.
+3. Definir assinatura de release.
+4. Validar `targetSdkVersion`/`compileSdkVersion` atuais.
+5. Publicar no Play Console com:
+   - política de privacidade;
+   - screenshots;
+   - classificação de conteúdo;
+   - formulário de segurança de dados.
 
-**Resposta (sucesso)**
-```json
-{
-  "ok": true,
-  "cad": {
-    "objects": [
-      { "id": "L1", "type": "line" }
-    ]
-  },
-  "preview3d": null,
-  "compatible3d": false
-}
-```
+### Package name sugerido
+- `br.com.campodogado.manutencao`
 
-### 4) Render 3D (`POST /desenho-tecnico/cad/:id/render-3d`)
+## Preparação para iOS (futuro)
 
-**Resposta (sucesso)**
-```json
-{
-  "ok": true,
-  "preview3d": {
-    "items": [
-      { "type": "extrude", "depth": 10 }
-    ]
-  }
-}
-```
+Pendente para publicação em iPhone:
+- macOS com Xcode;
+- conta Apple Developer ativa;
+- certificado/perfis de assinatura;
+- configuração APNs (direta ou via Firebase);
+- ícones/splash específicos iOS e revisão de permissões.
 
-**Resposta (sem geometria compatível)**
-```json
-{
-  "ok": false,
-  "error": "Desenho CAD sem geometria compatível com extrusão simples."
-}
-```
+A arquitetura já está estruturada para reutilizar backend, rotas e lógica de eventos de notificação.
 
-## Checklist manual (mobile + regressão do fluxo OS)
+## Checklist final (estado atual)
 
-### Mobile (responsividade e usabilidade)
-- [ ] Abrir `/os/novo` em viewport mobile (320px–430px).
-- [ ] Validar botão de anexar fotos de abertura (captura por câmera/galeria).
-- [ ] Validar preview das miniaturas antes de salvar.
-- [ ] Abrir `/os/:id` e validar leitura dos cards sem overflow horizontal.
-- [ ] Executar fechamento no mobile com upload de foto obrigatória.
-- [ ] Validar feedback visual de sucesso/erro (flash messages).
+### Concluído
+- [x] Diagnóstico técnico e plano de migração por fases.
+- [x] PWA padronizada (manifest + ícones + metadados).
+- [x] Service worker consolidado e sem duplicidade funcional.
+- [x] Estrutura para registro/revogação de tokens mobile.
+- [x] Camada FCM opcional no backend.
+- [x] Base Capacitor configurada para Android remoto.
 
-### Regressão do fluxo OS (abertura → execução → fechamento)
-- [ ] Criar OS corretiva com sintoma e não conformidade válidos.
-- [ ] Confirmar atribuição automática de equipe (quando disponível).
-- [ ] Iniciar OS (`/os/:id/iniciar`) e validar status `ANDAMENTO`.
-- [ ] Pausar OS (`/os/:id/pausar`) e validar status `PAUSADA`.
-- [ ] Fechar OS sem foto e confirmar bloqueio com mensagem amigável.
-- [ ] Fechar OS com foto e confirmar status final `FECHADA`.
-- [ ] Confirmar campos técnicos IA persistidos na OS (quando IA ativa).
-- [ ] Repetir cenário com IA desligada e confirmar fallback operacional sem quebra de fluxo.
+### Depende de credenciais/ambiente externo
+- [ ] Instalação das dependências npm em ambiente com acesso ao registry.
+- [ ] Geração do projeto nativo Android (`npx cap add android`).
+- [ ] Inclusão de credenciais Firebase reais.
+- [ ] Build AAB assinado e publicação na Play Store.
+- [ ] Pipeline iOS (Xcode/APNs/Apple Developer).
+

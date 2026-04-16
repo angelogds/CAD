@@ -1,0 +1,29 @@
+{
+  "name": "Manutenção Campo do Gado",
+  "short_name": "CampoGado",
+  "description": "Gestão de manutenção industrial com ordens de serviço, preventivas e notificações operacionais.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3faf6",
+  "theme_color": "#15803d",
+  "orientation": "portrait-primary",
+  "categories": [
+    "business",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "/images/pwa/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/pwa/maskable-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

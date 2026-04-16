@@ -1,5 +1,6 @@
 const webPush = require('web-push');
 const pushRepository = require('./push.repository');
+const fcmService = require('./fcm.service');
 
 function decodeBase64Url(value) {
   if (!value) return Buffer.alloc(0);
@@ -131,6 +132,14 @@ class PushService {
       }
     }
 
+    if (fcmService.isEnabled()) {
+      try {
+        await fcmService.sendToUsers([Number(userId)], payload);
+      } catch (err) {
+        console.warn('[push] falha no envio FCM para usuário', userId, err?.message || err);
+      }
+    }
+
     return { success: true, results };
   }
 
@@ -155,11 +164,22 @@ class PushService {
       }
     }
 
-    return {
+    const summary = {
       success: true,
       sent: results.filter((result) => result.status === 'sent').length,
       failed: results.filter((result) => result.status === 'failed').length,
     };
+
+    if (fcmService.isEnabled()) {
+      const userIds = [...new Set(subscriptions.map((sub) => Number(sub.user_id)).filter(Boolean))];
+      try {
+        await fcmService.sendToUsers(userIds, payload);
+      } catch (err) {
+        console.warn('[push] falha no envio FCM em massa:', err?.message || err);
+      }
+    }
+
+    return summary;
   }
 
   async notifyNewOS(osData) {
@@ -233,6 +253,34 @@ class PushService {
       url,
       data: { type: 'EMERGENCY', timestamp: Date.now() },
     });
+  }
+
+
+
+  async sendEventNotification(eventKey, users, payloadOverrides = {}) {
+    const map = {
+      nova_os_aberta: { type: 'NOVA_OS_ABERTA', channelId: 'os_critica', title: 'Nova OS aberta', body: 'Uma nova ordem de serviço foi aberta.' },
+      os_atribuida_mecanico: { type: 'OS_ATRIBUIDA_MECANICO', channelId: 'os_atribuicao', title: 'OS atribuída', body: 'Você recebeu uma nova OS para atendimento.' },
+      os_fechada: { type: 'OS_FECHADA', channelId: 'os_status', title: 'OS fechada', body: 'Uma OS foi finalizada.' },
+      preventiva_vencendo: { type: 'PREVENTIVA_VENCENDO', channelId: 'preventivas', title: 'Preventiva vencendo', body: 'Preventiva próxima do vencimento.' },
+      solicitacao_criada: { type: 'SOLICITACAO_CRIADA', channelId: 'solicitacoes', title: 'Solicitação criada', body: 'Uma nova solicitação foi criada.' },
+      solicitacao_comprada: { type: 'SOLICITACAO_COMPRADA', channelId: 'compras', title: 'Solicitação comprada', body: 'Uma solicitação foi comprada.' },
+      material_recebido: { type: 'MATERIAL_RECEBIDO', channelId: 'almoxarifado', title: 'Material recebido', body: 'Material recebido no almoxarifado.' },
+      aviso_operacional: { type: 'AVISO_OPERACIONAL', channelId: 'avisos', title: 'Aviso operacional', body: 'Novo aviso operacional.' },
+    };
+
+    const base = map[eventKey] || map.aviso_operacional;
+    const payload = { ...base, ...payloadOverrides };
+
+    for (const userId of users) {
+      await this.sendToUser(userId, payload);
+    }
+
+    if (fcmService.isEnabled()) {
+      await fcmService.sendToUsers(users, payload);
+    }
+
+    return { ok: true };
   }
 
   getStats(userId = null) {

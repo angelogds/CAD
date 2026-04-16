@@ -11,7 +11,10 @@
     "seed": "node database/seed.js",
     "test": "node --test tests/*.test.js",
     "test:openai": "node scripts/test-openai-responses.js",
-    "generate:vapid": "node scripts/generate-vapid-keys.js"
+    "generate:vapid": "node scripts/generate-vapid-keys.js",
+    "cap:sync": "npx cap sync",
+    "cap:android": "npx cap open android",
+    "cap:copy": "npx cap copy"
   },
   "engines": {
     "node": ">=18"
@@ -29,9 +32,15 @@
     "multer": "^1.4.5-lts.1",
     "pdfkit": "^0.15.0",
     "qrcode": "^1.5.4",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/push-notifications": "^7.0.0",
+    "firebase-admin": "^12.7.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.0",
+    "@capacitor/cli": "^7.0.0"
   }
 }

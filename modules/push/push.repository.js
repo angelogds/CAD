@@ -104,14 +104,18 @@ class PushRepository {
 
     const typeMap = {
       OS_CRITICA: 'os_critica',
+      NOVA_OS_ABERTA: 'os_media',
       OS_ALTA: 'os_alta',
       OS_MEDIA: 'os_media',
       OS_BAIXA: 'os_baixa',
       PREVENTIVA_ATRASADA: 'preventivas_atrasadas',
       PREVENTIVA_HOJE: 'preventivas_hoje',
       MUDANCA_STATUS: 'mudanca_status_os',
+      OS_FECHADA: 'mudanca_status_os',
+      OS_ATRIBUIDA_MECANICO: 'mudanca_status_os',
       COMPLIANCE: 'lembretes_compliance',
       EMERGENCIA: 'alertas_emergencia',
+      AVISO_OPERACIONAL: 'alertas_emergencia',
     };
 
     const prefField = typeMap[type];

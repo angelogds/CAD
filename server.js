@@ -93,6 +93,13 @@ app.use("/uploads", express.static(storage.UPLOAD_DIR));
 app.use("/pdfs", express.static(storage.PDF_DIR));
 app.use("/imagens", express.static(storage.IMAGE_DIR));
 
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
+
 // ===== Session + Flash =====
 app.use(
   session({
@@ -239,6 +246,7 @@ function mount(basePath, modPath) {
 mount("/auth", "./modules/auth/auth.routes");
 mount("/dashboard", "./modules/dashboard/dashboard.routes");
 mount("/push", "./modules/push/push.routes");
+mount("/mobile", "./modules/mobile/mobile.routes");
 mount("/pcm", "./modules/pcm/pcm.routes");
 mount("/equipamentos", "./modules/equipamentos/equipamentos.routes");
 mount("/os", "./modules/os/os.routes");
