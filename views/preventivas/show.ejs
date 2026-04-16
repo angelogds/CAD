@@ -5,17 +5,43 @@
   @media (max-width: 980px){.grid{grid-template-columns:1fr}}
   .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px}
   .muted{color:#6b7280}
-  .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#f3f4f6;font-weight:800;font-size:12px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#f3f4f6;font-weight:800;font-size:12px;border:1px solid #e5e7eb;white-space:nowrap}
+  .pill-green{ background:#ecfdf5; border-color:#bbf7d0; color:#14532d; }
+  .pill-gray{  background:#f1f5f9; border-color:#e2e8f0; color:#334155; }
+  .pill-blue{  background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
   .btn{display:inline-block;padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;font-weight:800;cursor:pointer;text-decoration:none}
   .btn:hover{border-color:#16a34a;color:#16a34a}
   .btn-primary{background:#16a34a;color:#fff;border-color:#16a34a}
   .btn-primary:hover{filter:brightness(.95);color:#fff}
-  table{width:100%;border-collapse:collapse}
+  .table-wrap{overflow:auto;-webkit-overflow-scrolling:touch}
+  table{width:100%;border-collapse:collapse;min-width:980px}
   th,td{padding:10px;border-bottom:1px solid #eef2f7;text-align:left;font-size:14px;vertical-align:top}
   th{font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}
   input,select,textarea{width:100%;height:40px;border-radius:10px;border:1px solid #e5e7eb;padding:0 10px}
   textarea{height:80px;padding:10px}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .plan-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:8px}
+  .meta-item{border:1px solid #eef2f7;border-radius:12px;padding:10px;background:#f8fafc}
+  .meta-label{font-size:12px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.03em}
+  .meta-value{margin-top:4px;font-weight:800;color:#0f172a;line-height:1.35}
+  .exec-cards{display:none;gap:10px;flex-direction:column}
+  .exec-card{border:1px solid #e5e7eb;border-radius:14px;padding:12px;background:#fff;display:grid;gap:10px}
+  .exec-card-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap}
+  .exec-card-id{font-weight:900;color:#475569}
+  .exec-meta-grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+  .exec-meta{border:1px solid #f1f5f9;border-radius:10px;padding:8px;background:#f8fafc}
+  .exec-meta .meta-label{font-size:11px}
+  .exec-meta .meta-value{font-size:13px;font-weight:700;margin-top:2px}
+  .exec-actions{border-top:1px solid #eef2f7;padding-top:10px;display:grid;gap:8px}
+  .status-form{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
+  .exec-observacao{font-size:13px;color:#475569;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:8px}
+  @media (max-width:760px){
+    .card{padding:12px}
+    .table-wrap{display:none}
+    .exec-cards{display:flex}
+    .status-form{grid-template-columns:1fr}
+    .btn{width:100%;text-align:center}
+  }
 </style>
 
 <h1>Preventiva #<%= plano.id %></h1>
@@ -30,24 +56,33 @@
   <div class="card">
     <h3 style="margin:0 0 6px;">Detalhes do Plano</h3>
 
-    <div class="row" style="margin-top:8px;">
-      <div style="flex:1;min-width:220px;">
-        <div class="muted" style="font-size:12px;font-weight:900;">Equipamento</div>
-        <div style="font-weight:900;">
+    <div class="plan-meta">
+      <div class="meta-item">
+        <div class="meta-label">Equipamento</div>
+        <div class="meta-value">
           <%= plano.equipamento_nome ? ((plano.equipamento_codigo ? plano.equipamento_codigo + " • " : "") + plano.equipamento_nome) : "-" %>
         </div>
-        <div class="muted" style="font-size:12px;">
+        <div class="muted" style="font-size:12px;margin-top:2px;">
           <%= plano.equipamento_setor ? ("Setor: " + plano.equipamento_setor) : "" %>
           <%= plano.equipamento_tipo ? (" • Tipo: " + plano.equipamento_tipo) : "" %>
         </div>
       </div>
 
-      <div style="min-width:200px;">
-        <div class="muted" style="font-size:12px;font-weight:900;">Ativa</div>
-        <div><span class="pill"><%= plano.ativo ? "ATIVA" : "INATIVA" %></span></div>
+      <div class="meta-item">
+        <div class="meta-label">Frequência</div>
+        <div class="meta-value">
+          <span class="pill pill-blue"><%= (plano.frequencia_tipo || "").toUpperCase() %></span>
+          <span class="muted">x<%= plano.frequencia_valor || 1 %></span>
+        </div>
+      </div>
+
+      <div class="meta-item">
+        <div class="meta-label">Status do plano</div>
+        <div class="meta-value">
+          <span class="pill <%= plano.ativo ? 'pill-green' : 'pill-gray' %>"><%= plano.ativo ? "ATIVA" : "INATIVA" %></span>
+        </div>
       </div>
     </div>
-
 
     <% const checklist = (() => { try { return JSON.parse(plano.checklist_json || '[]'); } catch (_e) { return []; } })(); %>
     <% if (checklist.length) { %>
@@ -69,61 +104,122 @@
 
     <h3 style="margin:0 0 8px;">Execuções</h3>
 
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Prevista</th>
-          <th>Executada</th>
-          <th>Status</th>
-          <th>Origem</th>
-          <th>Responsável</th>
-          <th>Ação</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% if (!execucoes?.length) { %>
-          <tr><td colspan="7" class="muted">Nenhuma execução registrada.</td></tr>
-        <% } %>
-
-        <% (execucoes || []).forEach(ex => { %>
+    <div class="table-wrap">
+      <table>
+        <thead>
           <tr>
-            <td>#<%= ex.id %></td>
-            <td><%= ex.data_prevista || "-" %></td>
-            <td><%= ex.data_executada || "-" %></td>
-            <td><span class="pill"><%= (ex.status || "").toUpperCase() %></span></td>
-            <td><span class="pill"><%= (ex.origem || "AUTOMATICA").toUpperCase() %></span></td>
-            <td class="muted"><%= ex.responsaveis || ex.responsavel_exibicao || ex.responsavel || "-" %></td>
-            <td>
-              <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/status" class="row" style="margin:0;">
-                <select name="status" style="width:160px">
-                  <option value="pendente" <%= String(ex.status||"").toUpperCase() === "PENDENTE" ? "selected" : "" %>>pendente</option>
-                  <option value="executada" <%= String(ex.status||"").toUpperCase() === "EXECUTADA" ? "selected" : "" %>>executada</option>
-                  <option value="atrasada" <%= String(ex.status||"").toUpperCase() === "ATRASADA" ? "selected" : "" %>>atrasada</option>
-                  <option value="cancelada" <%= String(ex.status||"").toUpperCase() === "CANCELADA" ? "selected" : "" %>>cancelada</option>
-                </select>
-                <input name="data_executada" type="date" value="<%= ex.data_executada || '' %>" style="width:170px" />
-                <button class="btn" type="submit" style="height:40px">Salvar</button>
-              </form>
-              <% if (canAdminPreventivas) { const stat = String(ex.status||'').toUpperCase(); const reforco = stat === 'EM_ANDAMENTO' ? '\nEsta preventiva está EM_ANDAMENTO e exigirá confirmação reforçada.' : ''; %>
-                <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/apagar" style="display:inline;" onsubmit="return confirm('Confirmar exclusão da preventiva #<%= ex.id %>?'+ '<%- reforco %>');">
-                  <% if (stat === 'EM_ANDAMENTO' || stat === 'ANDAMENTO' || stat === 'FINALIZADA' || stat === 'EXECUTADA' || stat === 'CONCLUIDA') { %>
-                    <input type="hidden" name="force_delete" value="1" />
-                  <% } %>
-                  <button class="btn" type="submit" style="height:40px;border-color:#fecaca;color:#b91c1c;">Apagar</button>
-                </form>
-              <% } %>
-            </td>
+            <th>ID</th>
+            <th>Prevista</th>
+            <th>Executada</th>
+            <th>Status</th>
+            <th>Origem</th>
+            <th>Executor</th>
+            <th>Ação</th>
           </tr>
-          <% if (ex.observacao) { %>
-            <tr>
-              <td></td>
-              <td colspan="6" class="muted">Obs: <%= ex.observacao %></td>
-            </tr>
+        </thead>
+        <tbody>
+          <% if (!execucoes?.length) { %>
+            <tr><td colspan="7" class="muted">Nenhuma execução registrada.</td></tr>
           <% } %>
-        <% }) %>
-      </tbody>
-    </table>
+
+          <% (execucoes || []).forEach(ex => { %>
+            <tr>
+              <td>#<%= ex.id %></td>
+              <td><%= ex.data_prevista || "-" %></td>
+              <td><%= ex.data_executada || "-" %></td>
+              <td><span class="pill"><%= (ex.status || "").toUpperCase() %></span></td>
+              <td><span class="pill"><%= (ex.origem || "AUTOMATICA").toUpperCase() %></span></td>
+              <td class="muted"><%= ex.responsaveis || ex.responsavel_exibicao || ex.responsavel || "-" %></td>
+              <td>
+                <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/status" class="row" style="margin:0;">
+                  <select name="status" style="width:160px">
+                    <option value="pendente" <%= String(ex.status||"").toUpperCase() === "PENDENTE" ? "selected" : "" %>>pendente</option>
+                    <option value="executada" <%= String(ex.status||"").toUpperCase() === "EXECUTADA" ? "selected" : "" %>>executada</option>
+                    <option value="atrasada" <%= String(ex.status||"").toUpperCase() === "ATRASADA" ? "selected" : "" %>>atrasada</option>
+                    <option value="cancelada" <%= String(ex.status||"").toUpperCase() === "CANCELADA" ? "selected" : "" %>>cancelada</option>
+                  </select>
+                  <input name="data_executada" type="date" value="<%= ex.data_executada || '' %>" style="width:170px" />
+                  <button class="btn" type="submit" style="height:40px">Salvar</button>
+                </form>
+                <% if (canAdminPreventivas) { const stat = String(ex.status||'').toUpperCase(); const reforco = stat === 'EM_ANDAMENTO' ? '\nEsta preventiva está EM_ANDAMENTO e exigirá confirmação reforçada.' : ''; %>
+                  <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/apagar" style="display:inline;" onsubmit="return confirm('Confirmar exclusão da preventiva #<%= ex.id %>?'+ '<%- reforco %>');">
+                    <% if (stat === 'EM_ANDAMENTO' || stat === 'ANDAMENTO' || stat === 'FINALIZADA' || stat === 'EXECUTADA' || stat === 'CONCLUIDA') { %>
+                      <input type="hidden" name="force_delete" value="1" />
+                    <% } %>
+                    <button class="btn" type="submit" style="height:40px;border-color:#fecaca;color:#b91c1c;">Apagar</button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+            <% if (ex.observacao) { %>
+              <tr>
+                <td></td>
+                <td colspan="6" class="muted">Obs: <%= ex.observacao %></td>
+              </tr>
+            <% } %>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="exec-cards">
+      <% if (!execucoes?.length) { %>
+        <div class="exec-card"><div class="muted">Nenhuma execução registrada.</div></div>
+      <% } %>
+      <% (execucoes || []).forEach(ex => { const stat = String(ex.status || '').toUpperCase(); const executor = ex.responsaveis || ex.responsavel_exibicao || ex.responsavel || "-"; %>
+        <div class="exec-card">
+          <div class="exec-card-head">
+            <div class="exec-card-id">Ordem de inspeção #<%= ex.id %></div>
+            <span class="pill"><%= stat || '-' %></span>
+          </div>
+
+          <div class="exec-meta-grid">
+            <div class="exec-meta">
+              <div class="meta-label">Previsão</div>
+              <div class="meta-value"><%= ex.data_prevista || "-" %></div>
+            </div>
+            <div class="exec-meta">
+              <div class="meta-label">Executada</div>
+              <div class="meta-value"><%= ex.data_executada || "-" %></div>
+            </div>
+            <div class="exec-meta">
+              <div class="meta-label">Origem</div>
+              <div class="meta-value"><%= (ex.origem || "AUTOMATICA").toUpperCase() %></div>
+            </div>
+            <div class="exec-meta">
+              <div class="meta-label">Executor</div>
+              <div class="meta-value"><%= executor %></div>
+            </div>
+          </div>
+
+          <% if (ex.observacao) { %>
+            <div class="exec-observacao"><strong>Obs:</strong> <%= ex.observacao %></div>
+          <% } %>
+
+          <div class="exec-actions">
+            <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/status" class="status-form">
+              <select name="status">
+                <option value="pendente" <%= stat === "PENDENTE" ? "selected" : "" %>>pendente</option>
+                <option value="executada" <%= stat === "EXECUTADA" ? "selected" : "" %>>executada</option>
+                <option value="atrasada" <%= stat === "ATRASADA" ? "selected" : "" %>>atrasada</option>
+                <option value="cancelada" <%= stat === "CANCELADA" ? "selected" : "" %>>cancelada</option>
+              </select>
+              <input name="data_executada" type="date" value="<%= ex.data_executada || '' %>" />
+              <button class="btn" type="submit">Salvar</button>
+            </form>
+
+            <% if (canAdminPreventivas) { const reforco = stat === 'EM_ANDAMENTO' ? '\nEsta preventiva está EM_ANDAMENTO e exigirá confirmação reforçada.' : ''; %>
+              <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/apagar" onsubmit="return confirm('Confirmar exclusão da preventiva #<%= ex.id %>?'+ '<%- reforco %>');">
+                <% if (stat === 'EM_ANDAMENTO' || stat === 'ANDAMENTO' || stat === 'FINALIZADA' || stat === 'EXECUTADA' || stat === 'CONCLUIDA') { %>
+                  <input type="hidden" name="force_delete" value="1" />
+                <% } %>
+                <button class="btn" type="submit" style="border-color:#fecaca;color:#b91c1c;">Apagar</button>
+              </form>
+            <% } %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
   </div>
 
   <!-- COLUNA DIREITA -->
