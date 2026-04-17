@@ -182,6 +182,14 @@ class PushService {
     return summary;
   }
 
+  /**
+   * Backward-compatible alias used by older modules (e.g., OS service).
+   * Keep until all callers are migrated to sendToAll.
+   */
+  async sendPushToAll(payload, filterFn = null) {
+    return this.sendToAll(payload, filterFn);
+  }
+
   async notifyNewOS(osData) {
     const priority = osData.prioridade?.toUpperCase() || 'MEDIA';
 
