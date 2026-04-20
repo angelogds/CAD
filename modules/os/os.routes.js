@@ -18,6 +18,16 @@ const upload = multer({
     destination: (_req, _file, cb) => cb(null, uploadDir),
     filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, "-")}`),
   }),
+  limits: {
+    fileSize: 60 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    const mime = String(file?.mimetype || "").toLowerCase();
+    const isImage = mime.startsWith("image/");
+    const isVideo = mime.startsWith("video/");
+    if (isImage || isVideo) return cb(null, true);
+    return cb(new Error("Formato inválido. Envie somente imagem ou vídeo."));
+  },
 });
 
 const wrap = (fn, name) =>

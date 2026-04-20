@@ -11,7 +11,7 @@
   .camera-btn{border:1px solid #d1d5db;background:#fff;border-radius:10px;padding:10px 12px;cursor:pointer}
   .galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:8px}
   .foto-card{display:block;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;background:#f8fafc;text-decoration:none}
-  .foto-card img{display:block;width:100%;height:140px;object-fit:cover;background:#e5e7eb}
+  .foto-card img,.foto-card video{display:block;width:100%;height:140px;object-fit:cover;background:#e5e7eb}
   .foto-card span{display:block;padding:6px 8px;font-size:12px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .resumo-exec{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .tabela-compacta{width:100%;border-collapse:collapse;margin-top:10px}
@@ -180,27 +180,33 @@
 
 
 <div class="card" style="margin-top:12px;">
-  <h3 style="margin:0;">Fotos de abertura da OS</h3>
-  <div class="muted">Registro visual inicial do equipamento.</div>
+  <h3 style="margin:0;">Mídias de abertura da OS</h3>
+  <div class="muted">Registro visual inicial do equipamento (foto ou vídeo).</div>
   <div class="galeria">
-    <% if (!(os.fotos_abertura||[]).length) { %><span class="muted">Sem fotos de abertura.</span><% } %>
+    <% if (!(os.fotos_abertura||[]).length) { %><span class="muted">Sem mídias de abertura.</span><% } %>
     <% (os.fotos_abertura||[]).forEach((f, idx) => { const src = f.pathPublic || f.path || f.filepath; %>
-      <% if (src) { %><a class="foto-card" href="<%= src %>" target="_blank"><img src="<%= src %>" alt="foto abertura <%= idx + 1 %>"/><span>Abertura <%= idx + 1 %></span></a><% } %>
+      <% if (src) { %>
+        <% const isVideo = /\.(mp4|mov|webm|ogg|m4v|avi)$/i.test(src); %>
+        <a class="foto-card" href="<%= src %>" target="_blank">
+          <% if (isVideo) { %><video src="<%= src %>" muted playsinline preload="metadata"></video><% } else { %><img src="<%= src %>" alt="mídia abertura <%= idx + 1 %>"/><% } %>
+          <span><%= isVideo ? 'Vídeo' : 'Foto' %> abertura <%= idx + 1 %></span>
+        </a>
+      <% } %>
     <% }) %>
   </div>
 </div>
 
-
 <% if (!isOSFechada) { %>
   <div class="card" style="margin-top:12px;">
     <h3>Concluir OS</h3>
-    <div class="muted">Adicione pelo menos uma foto de fechamento para concluir a OS.</div>
+    <div class="muted">Adicione pelo menos uma mídia de fechamento (foto ou vídeo) para concluir a OS.</div>
     <form method="POST" action="/os/<%= os.id %>/concluir" enctype="multipart/form-data" id="form-concluir">
       <div style="margin-top:10px;">
-        <label>Fotos de fechamento *</label>
-        <input id="fechamento_fotos" type="file" name="fechamento_fotos" accept="image/*" multiple required style="display:none" />
-        <button type="button" class="camera-btn" onclick="document.getElementById('fechamento_fotos').click()">📷 Adicionar fotos de fechamento</button>
+        <label>Mídias de fechamento *</label>
+        <input id="fechamento_fotos" type="file" name="fechamento_fotos" accept="image/*,video/*" capture="environment" multiple required style="display:none" />
+        <button type="button" class="camera-btn" onclick="document.getElementById('fechamento_fotos').click()">📎 Adicionar arquivo (foto ou vídeo)</button>
         <div class="thumbs" id="preview-fechamento" style="margin-top:8px;"></div>
+        <div class="muted" style="margin-top:6px;">Vídeos curtos: até 1 minuto.</div>
       </div>
 
       <div style="margin-top:12px; display:flex; justify-content:flex-end;">
@@ -211,12 +217,81 @@
 <% } %>
 
 <div class="card" style="margin-top:12px;">
-  <h3 style="margin:0;">Fotos de fechamento</h3>
-  <div class="muted">Registro visual após execução.</div>
+  <h3 style="margin:0;">Mídias de fechamento</h3>
+  <div class="muted">Registro visual após execução (foto ou vídeo).</div>
   <div class="galeria">
-    <% if (!(os.fotos_fechamento||[]).length) { %><span class="muted">Sem fotos de fechamento.</span><% } %>
+    <% if (!(os.fotos_fechamento||[]).length) { %><span class="muted">Sem mídias de fechamento.</span><% } %>
     <% (os.fotos_fechamento||[]).forEach((f, idx) => { const src = f.pathPublic || f.path || f.filepath; %>
-      <% if (src) { %><a class="foto-card" href="<%= src %>" target="_blank"><img src="<%= src %>" alt="foto fechamento <%= idx + 1 %>"/><span>Fechamento <%= idx + 1 %></span></a><% } %>
+      <% if (src) { %>
+        <% const isVideo = /\.(mp4|mov|webm|ogg|m4v|avi)$/i.test(src); %>
+        <a class="foto-card" href="<%= src %>" target="_blank">
+          <% if (isVideo) { %><video src="<%= src %>" muted playsinline preload="metadata"></video><% } else { %><img src="<%= src %>" alt="mídia fechamento <%= idx + 1 %>"/><% } %>
+          <span><%= isVideo ? 'Vídeo' : 'Foto' %> fechamento <%= idx + 1 %></span>
+        </a>
+      <% } %>
     <% }) %>
   </div>
 </div>
+
+<script>
+  (function () {
+    const input = document.getElementById('fechamento_fotos');
+    const preview = document.getElementById('preview-fechamento');
+    if (!input) return;
+
+    async function getVideoDuration(file) {
+      return new Promise(function(resolve, reject){
+        const url = URL.createObjectURL(file);
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.onloadedmetadata = function(){
+          const duration = Number(video.duration || 0);
+          URL.revokeObjectURL(url);
+          resolve(duration);
+        };
+        video.onerror = function(){
+          URL.revokeObjectURL(url);
+          reject(new Error('Falha ao ler duração do vídeo.'));
+        };
+        video.src = url;
+      });
+    }
+
+    async function sanitizeFiles() {
+      const MAX_VIDEO_SECONDS = 60;
+      const dt = new DataTransfer();
+      for (const f of Array.from(input.files || [])) {
+        const isVideo = (f.type || '').startsWith('video/');
+        if (isVideo) {
+          try {
+            const duration = await getVideoDuration(f);
+            if (duration > MAX_VIDEO_SECONDS) {
+              alert('O vídeo "' + f.name + '" excede 1 minuto. Envie um vídeo curto (até 60s).');
+              continue;
+            }
+          } catch (_e) {}
+        }
+        dt.items.add(f);
+      }
+      input.files = dt.files;
+    }
+
+    function renderPreview() {
+      if (!preview) return;
+      preview.innerHTML = '';
+      Array.from(input.files || []).forEach(function (f) {
+        const chip = document.createElement('span');
+        chip.className = 'pill-tag pill-gray';
+        chip.style.marginRight = '6px';
+        const isVideo = (f.type || '').startsWith('video/');
+        chip.textContent = (isVideo ? '🎬 ' : '🖼️ ') + f.name;
+        preview.appendChild(chip);
+      });
+    }
+
+    input.addEventListener('change', async function(){
+      await sanitizeFiles();
+      renderPreview();
+    });
+  })();
+</script>

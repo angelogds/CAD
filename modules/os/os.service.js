@@ -1581,7 +1581,7 @@ function addFotosAberturaFechamento({ osId, files = [], tipo, userId }) {
     if (hasFechamentoMidias) {
       const insertFechamentoMidia = db.prepare(
         `INSERT INTO os_fechamento_midias (os_id, caminho_arquivo, legenda, origem, user_id, created_at, updated_at)
-         VALUES (?, ?, ?, 'foto', ?, datetime('now'), datetime('now'))`
+         VALUES (?, ?, ?, 'midia', ?, datetime('now'), datetime('now'))`
       );
 
       for (const f of files || []) {

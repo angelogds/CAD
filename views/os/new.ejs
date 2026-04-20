@@ -76,10 +76,11 @@
       <input type="hidden" name="acoes_iniciais" id="acoes_iniciais_hidden" value="" />
 
       <div style="grid-column:1 / -1;">
-        <label class="label">FOTOS DE ABERTURA (OPCIONAL)</label>
-        <input id="abertura_fotos" type="file" name="abertura_fotos" accept="image/*" multiple style="display:none" />
-        <button type="button" class="btn btn-outline" onclick="document.getElementById('abertura_fotos').click()">📷 Adicionar fotos</button>
+        <label class="label">MÍDIAS DE ABERTURA (OPCIONAL)</label>
+        <input id="abertura_fotos" type="file" name="abertura_fotos" accept="image/*,video/*" capture="environment" multiple style="display:none" />
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('abertura_fotos').click()">📎 Adicionar arquivo (foto ou vídeo)</button>
         <div id="preview-abertura" style="margin-top:6px;"></div>
+        <div class="muted" style="margin-top:6px;">Vídeos curtos: até 1 minuto.</div>
       </div>
     </div>
 
@@ -148,13 +149,61 @@
     const fileInput = document.getElementById('abertura_fotos');
     const preview = document.getElementById('preview-abertura');
 
-    fileInput.addEventListener('change', function(){
+    async function validateVideos(files) {
+      const MAX_VIDEO_SECONDS = 60;
+      const validFiles = [];
+
+      async function getVideoDuration(file) {
+        return new Promise(function(resolve, reject){
+          const url = URL.createObjectURL(file);
+          const video = document.createElement('video');
+          video.preload = 'metadata';
+          video.onloadedmetadata = function(){
+            const duration = Number(video.duration || 0);
+            URL.revokeObjectURL(url);
+            resolve(duration);
+          };
+          video.onerror = function(){
+            URL.revokeObjectURL(url);
+            reject(new Error('Não foi possível ler duração do vídeo.'));
+          };
+          video.src = url;
+        });
+      }
+
+      for (const f of Array.from(files || [])) {
+        const isVideo = (f.type || '').startsWith('video/');
+        if (!isVideo) {
+          validFiles.push(f);
+          continue;
+        }
+        try {
+          const duration = await getVideoDuration(f);
+          if (duration > MAX_VIDEO_SECONDS) {
+            alert('O vídeo "' + f.name + '" excede 1 minuto. Envie um vídeo curto (até 60s).');
+            continue;
+          }
+          validFiles.push(f);
+        } catch (_e) {
+          validFiles.push(f);
+        }
+      }
+      return validFiles;
+    }
+
+    fileInput.addEventListener('change', async function(){
+      const validFiles = await validateVideos(fileInput.files);
+      const dt = new DataTransfer();
+      validFiles.forEach(function(f){ dt.items.add(f); });
+      fileInput.files = dt.files;
+
       preview.innerHTML = '';
       Array.from(fileInput.files || []).forEach(function (f) {
         const el = document.createElement('span');
         el.className = 'pill-tag pill-gray';
         el.style.marginRight = '6px';
-        el.textContent = f.name;
+        const isVideo = (f.type || '').startsWith('video/');
+        el.textContent = (isVideo ? '🎬 ' : '🖼️ ') + f.name;
         preview.appendChild(el);
       });
     });
