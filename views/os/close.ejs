@@ -39,9 +39,9 @@
     </div>
 
     <div>
-      <label class="label">Fotos de fechamento *</label>
-      <input id="fechamento_fotos" class="input" type="file" name="fechamento_fotos" accept="image/*" multiple required />
-      <div class="muted" style="margin-top:6px;">Adicione evidências visuais do serviço executado.</div>
+      <label class="label">Mídias de fechamento (foto ou vídeo) *</label>
+      <input id="fechamento_fotos" class="input" type="file" name="fechamento_fotos" accept="image/*,video/*" capture="environment" multiple required />
+      <div class="muted" style="margin-top:6px;">Adicione evidências visuais do serviço executado. Vídeos curtos: até 1 minuto.</div>
     </div>
 
     <input type="hidden" name="fotos_metadados_json" id="fotos_metadados_json" value="[]" />
@@ -82,6 +82,48 @@
     const statusGeracao = document.getElementById('status-geracao');
     const btnGerar = document.getElementById('btn-gerar-descricao');
 
+    async function validateVideos(files) {
+      const MAX_VIDEO_SECONDS = 60;
+      const validFiles = [];
+
+      async function getVideoDuration(file) {
+        return new Promise(function(resolve, reject){
+          const url = URL.createObjectURL(file);
+          const video = document.createElement('video');
+          video.preload = 'metadata';
+          video.onloadedmetadata = function(){
+            const duration = Number(video.duration || 0);
+            URL.revokeObjectURL(url);
+            resolve(duration);
+          };
+          video.onerror = function(){
+            URL.revokeObjectURL(url);
+            reject(new Error('Não foi possível ler duração do vídeo.'));
+          };
+          video.src = url;
+        });
+      }
+
+      for (const f of Array.from(files || [])) {
+        const isVideo = (f.type || '').startsWith('video/');
+        if (!isVideo) {
+          validFiles.push(f);
+          continue;
+        }
+        try {
+          const duration = await getVideoDuration(f);
+          if (duration > MAX_VIDEO_SECONDS) {
+            alert('O vídeo "' + f.name + '" excede 1 minuto. Envie um vídeo curto (até 60s).');
+            continue;
+          }
+          validFiles.push(f);
+        } catch (_e) {
+          validFiles.push(f);
+        }
+      }
+      return validFiles;
+    }
+
     function syncFotosMetadados() {
       const payload = Array.from(fotosInput?.files || []).map((f) => ({
         nome_arquivo: f.name,
@@ -92,7 +134,13 @@
       return payload;
     }
 
-    fotosInput?.addEventListener('change', syncFotosMetadados);
+    fotosInput?.addEventListener('change', async function(){
+      const validFiles = await validateVideos(fotosInput?.files || []);
+      const dt = new DataTransfer();
+      validFiles.forEach(function(f){ dt.items.add(f); });
+      fotosInput.files = dt.files;
+      syncFotosMetadados();
+    });
     syncFotosMetadados();
 
     btnGerar?.addEventListener('click', async function(){

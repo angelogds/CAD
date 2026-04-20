@@ -125,7 +125,9 @@ async function osCreate(req, res) {
 
     if (fotosAbertura.length) {
       try {
-        const primeira = req.files?.abertura_fotos?.[0];
+        const primeira = (req.files?.abertura_fotos || []).find((f) =>
+          String(f?.mimetype || "").toLowerCase().startsWith("image/")
+        );
         if (primeira?.buffer || primeira?.path) {
           const analiseVisual = await visionService.analisarImagemFalha({
             fileBuffer: primeira.buffer || null,
@@ -319,7 +321,7 @@ async function osClose(req, res) {
 
     const fotosFechamento = mapFilesToPublic(req.files?.fechamento_fotos || []);
     if (!fotosFechamento.length) {
-      req.flash("error", "Adicione pelo menos uma foto de fechamento para concluir a OS.");
+      req.flash("error", "Adicione pelo menos uma mídia (foto ou vídeo) de fechamento para concluir a OS.");
       return res.redirect(`/os/${id}`);
     }
 
