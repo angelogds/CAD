@@ -1581,13 +1581,15 @@ function addFotosAberturaFechamento({ osId, files = [], tipo, userId }) {
     if (hasFechamentoMidias) {
       const insertFechamentoMidia = db.prepare(
         `INSERT INTO os_fechamento_midias (os_id, caminho_arquivo, legenda, origem, user_id, created_at, updated_at)
-         VALUES (?, ?, ?, 'foto', ?, datetime('now'), datetime('now'))`
+         VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
       );
 
       for (const f of files || []) {
         const pathPublic = f.pathPublic || f.path || null;
         if (!pathPublic) continue;
-        insertFechamentoMidia.run(osId, pathPublic, f.originalname || null, userId || null);
+        const mime = String(f.mimetype || "").toLowerCase();
+        const origem = mime.startsWith("video/") ? "video" : "foto";
+        insertFechamentoMidia.run(osId, pathPublic, f.originalname || null, origem, userId || null);
       }
     }
 
