@@ -344,6 +344,8 @@ function getOSPainel(limit = 15) {
   return safeGet(() => {
     const tamanho = Math.min(Math.max(Number(limit) || 15, 1), 50);
     const osCols = tableExists("os") ? db.prepare("PRAGMA table_info(os)").all().map((c) => c.name) : [];
+    const hasExecColab = osCols.includes("executor_colaborador_id");
+    const hasAuxColab = osCols.includes("auxiliar_colaborador_id");
     const orderCol = osCols.includes("abertura")
       ? "o.abertura"
       : osCols.includes("opened_at")
@@ -372,21 +374,33 @@ function getOSPainel(limit = 15) {
                  COALESCE(e.nome, o.equipamento_manual, o.equipamento) AS equipamento,
                  o.tipo,
                  o.status,
+                 COALESCE(o.abertura, o.opened_at, o.created_at) AS abertura,
                  o.opened_at,
                  o.closed_at,
                  COALESCE(o.prioridade,'MEDIA') AS prioridade,
                  ${grauExpr} AS grau,
                  COALESCE(e.setor,'-') AS setor,
-                 COALESCE(u.name,'-') AS solicitante
+                 COALESCE(u.name,'-') AS solicitante,
+                 COALESCE(ce.nome, '') AS executor_nome,
+                 COALESCE(ca.nome, '') AS auxiliar_nome
           FROM os o
           LEFT JOIN equipamentos e ON e.id = o.equipamento_id
           LEFT JOIN users u ON u.id = o.opened_by
+          LEFT JOIN colaboradores ce ON ce.id = ${hasExecColab ? "o.executor_colaborador_id" : "NULL"}
+          LEFT JOIN colaboradores ca ON ca.id = ${hasAuxColab ? "o.auxiliar_colaborador_id" : "NULL"}
           WHERE UPPER(COALESCE(o.status,'')) IN ('ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA')
           ORDER BY datetime(${orderCol}) DESC
           LIMIT ?
         `
       )
-      .all(tamanho);
+      .all(tamanho)
+      .map((item) => {
+        const nomes = [item.executor_nome, item.auxiliar_nome].map((x) => String(x || "").trim()).filter(Boolean);
+        return {
+          ...item,
+          responsavel_exibicao: nomes.length ? nomes.join(", ") : "-",
+        };
+      });
 
     return {
       items: itens,
