@@ -209,13 +209,14 @@
     </div>
     <div class="table-wrap">
       <table class="table compact">
-        <thead><tr><th>#</th><th>Equipamento</th><th>Grau</th><th>Status</th><th>Abertura</th><th>Fechamento</th><th style="text-align:right;">Ações</th></tr></thead>
+        <thead><tr><th>#</th><th>Equipamento</th><th>Responsável(is)</th><th>Criticidade</th><th>Status</th><th>Abertura</th><th style="text-align:right;">Ações</th></tr></thead>
         <tbody>
           <% if (osItems.length === 0) { %><tr><td colspan="7" style="text-align:center; color:#6b7280;">Nenhuma OS aberta ou em andamento.</td></tr><% } %>
           <% osItems.forEach(function(o) { var prio = String(o.grau || o.prioridade || 'MEDIA').toUpperCase(); var rowClass = (prio === 'CRITICO' || prio === 'CRÍTICO' || prio === 'ALTO' || prio === 'EMERGENCIAL') ? 'os-row-critico' : ((prio === 'MEDIO' || prio === 'MÉDIO' || prio === 'MEDIA') ? 'os-row-medio' : 'os-row-leve'); %>
             <tr class="<%= rowClass %>">
               <td><%= o.id %></td>
               <td><strong><%= o.equipamento || '-' %></strong></td>
+              <td><%= o.responsavel_exibicao || '-' %></td>
               <td><span class="pill-prioridade <%= (prio === 'CRITICO' || prio === 'CRÍTICO' || prio === 'EMERGENCIAL') ? 'emergencial' : ((prio === 'ALTO' || prio === 'ALTA' || prio === 'MEDIO' || prio === 'MÉDIO' || prio === 'MEDIA') ? 'alta' : '') %>"><%= prio %></span></td>
               <td>
                 <% var statusOs = String(o.status || '').toUpperCase(); %>
@@ -226,8 +227,7 @@
                 <% } else if (statusOs === 'CANCELADA') { %><span class="pill-tag pill-gray pill-status">Cancelada</span>
                 <% } else { %><span class="pill-tag pill-gray pill-status"><%= statusOs || '-' %></span><% } %>
               </td>
-              <td><%= o.opened_at ? fmtBR(o.opened_at) : '-' %></td>
-              <td><%= o.closed_at ? fmtBR(o.closed_at) : '-' %></td>
+              <td><%= o.abertura ? fmtBR(o.abertura) : (o.opened_at ? fmtBR(o.opened_at) : '-') %></td>
               <td style="text-align:right;">
                 <% if (statusOs === 'ABERTA') { %>
                   <form method="POST" action="/os/<%= o.id %>/status" style="display:inline;"><input type="hidden" name="status" value="ANDAMENTO"><button class="btn-inline" type="submit">Iniciar</button></form>
@@ -304,32 +304,6 @@
   </div>
 
   <div class="dash-col">
-<section class="dashboard-card area-andamento">
-    <div class="dashboard-title">OS em andamento (equipe)</div>
-    <div class="table-wrap"><table class="table compact">
-      <thead><tr><th>OS</th><th>Equipamento</th><th>Equipe</th><th>Status</th></tr></thead>
-      <tbody>
-        <% if (osAndamento.length === 0) { %><tr><td colspan="4" class="muted-xs">Nenhuma OS atribuída à equipe no momento.</td></tr><% } %>
-        <% osAndamento.forEach(function(o){ %>
-          <tr>
-            <td><a href="/os/<%= o.id %>">#<%= o.id %></a></td>
-            <td><%= o.equipamento || '-' %></td>
-            <td><%= o.equipe || '-' %></td>
-            <td>
-              <% if ((o.status || '').toUpperCase() === 'ABERTA') { %>
-                <span class="pill-tag pill-amber">ABERTA</span>
-              <% } else if ((o.status || '').toUpperCase() === 'ANDAMENTO' || (o.status || '').toUpperCase() === 'EM_ANDAMENTO') { %>
-                <span class="pill-tag pill-blue">ANDAMENTO</span>
-              <% } else { %>
-                <span class="pill-tag pill-gray"><%= o.status || '-' %></span>
-              <% } %>
-            </td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table></div>
-  </section>
-
 <section class="dashboard-card area-escala">
     <div class="dashboard-title">Escala da Semana</div>
     <% if (escalaDiurno || escalaApoio || escalaNoturno || escalaFolgasAfastamentos.length) { %>
