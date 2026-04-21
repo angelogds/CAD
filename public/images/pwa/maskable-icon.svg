@@ -1,12 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Campo do Gado">
-  <defs>
-    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0%" stop-color="#16a34a"/>
-      <stop offset="100%" stop-color="#14532d"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="96" fill="url(#g)"/>
-  <circle cx="256" cy="200" r="96" fill="#dcfce7" opacity="0.95"/>
-  <path d="M128 336h256a24 24 0 0 1 24 24v24a24 24 0 0 1-24 24H128a24 24 0 0 1-24-24v-24a24 24 0 0 1 24-24z" fill="#f0fdf4"/>
-  <text x="256" y="394" text-anchor="middle" fill="#14532d" font-size="44" font-family="Arial, sans-serif" font-weight="700">CG</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CAD Manutenção">
+  <rect width="512" height="512" fill="#0f172a"/>
+
+  <circle cx="256" cy="256" r="184" fill="#1d4ed8"/>
+
+  <g fill="#bfdbfe">
+    <rect x="236" y="86" width="40" height="74" rx="14"/>
+    <rect x="236" y="352" width="40" height="74" rx="14"/>
+    <rect x="352" y="236" width="74" height="40" rx="14"/>
+    <rect x="86" y="236" width="74" height="40" rx="14"/>
+
+    <rect x="322" y="126" width="40" height="74" rx="14" transform="rotate(45 342 163)"/>
+    <rect x="322" y="312" width="40" height="74" rx="14" transform="rotate(-45 342 349)"/>
+    <rect x="150" y="312" width="40" height="74" rx="14" transform="rotate(45 170 349)"/>
+    <rect x="150" y="126" width="40" height="74" rx="14" transform="rotate(-45 170 163)"/>
+  </g>
+
+  <circle cx="256" cy="256" r="108" fill="#0f172a"/>
+
+  <g transform="rotate(-35 256 256)">
+    <rect x="219" y="170" width="74" height="168" rx="30" fill="#f8fafc"/>
+    <circle cx="256" cy="324" r="24" fill="#0f172a"/>
+    <path d="M220 162c0-28 22-50 50-50h6v33h-10a17 17 0 0 0-17 17v16h-29z" fill="#f8fafc"/>
+    <path d="M292 162c0-28-22-50-50-50h-6v33h10a17 17 0 0 1 17 17v16h29z" fill="#f8fafc"/>
+  </g>
 </svg>
