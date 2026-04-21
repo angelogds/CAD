@@ -6,8 +6,8 @@ const STATIC_ASSETS = [
   '/js/app-layout.js',
   '/js/push.js',
   '/manifest.webmanifest',
-  '/images/pwa/icon.svg',
-  '/images/pwa/maskable-icon.svg',
+  '/images/pwa/icon.png',
+  '/images/pwa/maskable-icon.png',
   '/images/notification-icon.png',
 ];
 
