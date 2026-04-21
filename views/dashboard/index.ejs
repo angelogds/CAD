@@ -221,6 +221,7 @@
               <td>
                 <% var statusOs = String(o.status || '').toUpperCase(); %>
                 <% if (statusOs === 'ABERTA') { %><span class="pill-tag pill-amber pill-status">Aberta</span>
+                <% } else if (statusOs === 'AGUARDANDO_EQUIPE') { %><span class="pill-tag pill-amber pill-status">Aguardando equipe</span>
                 <% } else if (statusOs === 'ANDAMENTO' || statusOs === 'EM_ANDAMENTO') { %><span class="pill-tag pill-blue pill-status">Em andamento</span>
                 <% } else if (statusOs === 'PAUSADA') { %><span class="pill-tag pill-gray pill-status">Pausada</span>
                 <% } else if (statusOs === 'CONCLUIDA' || statusOs === 'FINALIZADA' || statusOs === 'FECHADA') { %><span class="pill-tag pill-green pill-status">Fechada</span>

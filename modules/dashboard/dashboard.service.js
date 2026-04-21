@@ -329,9 +329,9 @@ function getOSResumoStatus() {
       const status = String(row.status || "").toUpperCase();
       const total = Number(row.total || 0);
 
-      if (status === "ABERTA") resumo.abertas += total;
+      if (status === "ABERTA" || status === "AGUARDANDO_EQUIPE") resumo.abertas += total;
       else if (status === "ANDAMENTO" || status === "PAUSADA") resumo.andamento += total;
-      else if (status === "CONCLUIDA" || status === "CANCELADA" || status === "FINALIZADA") {
+      else if (status === "CONCLUIDA" || status === "CANCELADA" || status === "FINALIZADA" || status === "FECHADA") {
         resumo.fechadas += total;
       }
     });
@@ -360,7 +360,7 @@ function getOSPainel(limit = 15) {
           `
           SELECT COUNT(*) AS total
           FROM os
-          WHERE UPPER(COALESCE(status,'')) IN ('ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA')
+          WHERE UPPER(COALESCE(status,'')) IN ('ABERTA','AGUARDANDO_EQUIPE','ANDAMENTO','EM_ANDAMENTO','PAUSADA')
         `
         )
         .get()?.total || 0;
@@ -388,7 +388,7 @@ function getOSPainel(limit = 15) {
           LEFT JOIN users u ON u.id = o.opened_by
           LEFT JOIN colaboradores ce ON ce.id = ${hasExecColab ? "o.executor_colaborador_id" : "NULL"}
           LEFT JOIN colaboradores ca ON ca.id = ${hasAuxColab ? "o.auxiliar_colaborador_id" : "NULL"}
-          WHERE UPPER(COALESCE(o.status,'')) IN ('ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA')
+          WHERE UPPER(COALESCE(o.status,'')) IN ('ABERTA','AGUARDANDO_EQUIPE','ANDAMENTO','EM_ANDAMENTO','PAUSADA')
           ORDER BY datetime(${orderCol}) DESC
           LIMIT ?
         `
