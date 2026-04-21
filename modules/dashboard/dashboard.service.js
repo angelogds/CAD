@@ -344,8 +344,15 @@ function getOSPainel(limit = 15) {
   return safeGet(() => {
     const tamanho = Math.min(Math.max(Number(limit) || 15, 1), 50);
     const osCols = tableExists("os") ? db.prepare("PRAGMA table_info(os)").all().map((c) => c.name) : [];
+    const usuariosSource = resolveUsuariosSource();
+    const hasColaboradores = tableExists("colaboradores");
     const hasExecColab = osCols.includes("executor_colaborador_id");
     const hasAuxColab = osCols.includes("auxiliar_colaborador_id");
+    const hasMecanicoUser = osCols.includes("mecanico_user_id");
+    const hasAuxiliarUser = osCols.includes("auxiliar_user_id");
+    const hasResponsavelUser = osCols.includes("responsavel_user_id");
+    const hasEquipamentoManual = osCols.includes("equipamento_manual");
+    const hasEquipamento = osCols.includes("equipamento");
     const orderCol = osCols.includes("abertura")
       ? "o.abertura"
       : osCols.includes("opened_at")
@@ -367,11 +374,19 @@ function getOSPainel(limit = 15) {
 
     const grauExpr = resolveOSGrauExpression();
 
+    const equipamentoExpr = hasEquipamentoManual && hasEquipamento
+      ? "COALESCE(e.nome, o.equipamento_manual, o.equipamento, '-')"
+      : hasEquipamentoManual
+      ? "COALESCE(e.nome, o.equipamento_manual, '-')"
+      : hasEquipamento
+      ? "COALESCE(e.nome, o.equipamento, '-')"
+      : "COALESCE(e.nome, '-')";
+
     const itens = db
       .prepare(
         `
           SELECT o.id,
-                 COALESCE(e.nome, o.equipamento_manual, o.equipamento) AS equipamento,
+                 ${equipamentoExpr} AS equipamento,
                  o.tipo,
                  o.status,
                  COALESCE(o.abertura, o.opened_at, o.created_at) AS abertura,
@@ -380,14 +395,23 @@ function getOSPainel(limit = 15) {
                  COALESCE(o.prioridade,'MEDIA') AS prioridade,
                  ${grauExpr} AS grau,
                  COALESCE(e.setor,'-') AS setor,
-                 COALESCE(u.name,'-') AS solicitante,
-                 COALESCE(ce.nome, '') AS executor_nome,
-                 COALESCE(ca.nome, '') AS auxiliar_nome
+                 ${hasResponsavelUser ? "o.responsavel_user_id" : "NULL"} AS responsavel_user_id,
+                 ${hasMecanicoUser ? "o.mecanico_user_id" : "NULL"} AS mecanico_user_id,
+                 ${hasAuxiliarUser ? "o.auxiliar_user_id" : "NULL"} AS auxiliar_user_id,
+                 ${usuariosSource ? `COALESCE(usol.${usuariosSource.nameCol},'-')` : "'-'"} AS solicitante,
+                 ${hasColaboradores && hasExecColab ? "COALESCE(ce.nome, '')" : "''"} AS executor_nome,
+                 ${hasColaboradores && hasAuxColab ? "COALESCE(ca.nome, '')" : "''"} AS auxiliar_nome,
+                 ${usuariosSource && hasMecanicoUser ? `COALESCE(umec.${usuariosSource.nameCol}, '')` : "''"} AS mecanico_user_nome,
+                 ${usuariosSource && hasAuxiliarUser ? `COALESCE(uaux.${usuariosSource.nameCol}, '')` : "''"} AS auxiliar_user_nome,
+                 ${usuariosSource && hasResponsavelUser ? `COALESCE(uresp.${usuariosSource.nameCol}, '')` : "''"} AS responsavel_user_nome
           FROM os o
           LEFT JOIN equipamentos e ON e.id = o.equipamento_id
-          LEFT JOIN users u ON u.id = o.opened_by
-          LEFT JOIN colaboradores ce ON ce.id = ${hasExecColab ? "o.executor_colaborador_id" : "NULL"}
-          LEFT JOIN colaboradores ca ON ca.id = ${hasAuxColab ? "o.auxiliar_colaborador_id" : "NULL"}
+          ${usuariosSource ? `LEFT JOIN ${usuariosSource.table} usol ON usol.${usuariosSource.idCol} = o.opened_by` : ""}
+          ${usuariosSource && hasMecanicoUser ? `LEFT JOIN ${usuariosSource.table} umec ON umec.${usuariosSource.idCol} = o.mecanico_user_id` : ""}
+          ${usuariosSource && hasAuxiliarUser ? `LEFT JOIN ${usuariosSource.table} uaux ON uaux.${usuariosSource.idCol} = o.auxiliar_user_id` : ""}
+          ${usuariosSource && hasResponsavelUser ? `LEFT JOIN ${usuariosSource.table} uresp ON uresp.${usuariosSource.idCol} = o.responsavel_user_id` : ""}
+          ${hasColaboradores && hasExecColab ? "LEFT JOIN colaboradores ce ON ce.id = o.executor_colaborador_id" : ""}
+          ${hasColaboradores && hasAuxColab ? "LEFT JOIN colaboradores ca ON ca.id = o.auxiliar_colaborador_id" : ""}
           WHERE UPPER(COALESCE(o.status,'')) IN ('ABERTA','AGUARDANDO_EQUIPE','ANDAMENTO','EM_ANDAMENTO','PAUSADA')
           ORDER BY datetime(${orderCol}) DESC
           LIMIT ?
@@ -395,10 +419,24 @@ function getOSPainel(limit = 15) {
       )
       .all(tamanho)
       .map((item) => {
-        const nomes = [item.executor_nome, item.auxiliar_nome].map((x) => String(x || "").trim()).filter(Boolean);
+        const nomes = [
+          item.executor_nome,
+          item.mecanico_user_nome,
+          item.auxiliar_nome,
+          item.auxiliar_user_nome,
+          item.responsavel_user_nome,
+        ]
+          .map((x) => String(x || "").trim())
+          .filter(Boolean)
+          .filter((nome, idx, arr) => arr.indexOf(nome) === idx);
+        const prio = String(item.grau || item.prioridade || "MEDIA").toUpperCase();
+        const criticidadeAlta = ["ALTA", "ALTO", "CRITICA", "CRÍTICA", "CRITICO", "CRÍTICO", "EMERGENCIAL"].includes(prio);
+        const limiteResponsaveis = criticidadeAlta ? 2 : 1;
+        const nomesLimitados = nomes.slice(0, limiteResponsaveis);
         return {
           ...item,
-          responsavel_exibicao: nomes.length ? nomes.join(", ") : "-",
+          equipamento: item.equipamento || "-",
+          responsavel_exibicao: nomesLimitados.length ? nomesLimitados.join(", ") : "-",
         };
       });
 
