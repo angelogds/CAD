@@ -353,13 +353,32 @@ function getOSPainel(limit = 15) {
     const hasResponsavelUser = osCols.includes("responsavel_user_id");
     const hasEquipamentoManual = osCols.includes("equipamento_manual");
     const hasEquipamento = osCols.includes("equipamento");
-    const orderCol = osCols.includes("abertura")
+    const hasAbertura = osCols.includes("abertura");
+    const hasOpenedAt = osCols.includes("opened_at");
+    const hasCreatedAt = osCols.includes("created_at");
+    const hasClosedAt = osCols.includes("closed_at");
+    const orderCol = hasAbertura
       ? "o.abertura"
-      : osCols.includes("opened_at")
+      : hasOpenedAt
       ? "o.opened_at"
-      : osCols.includes("created_at")
+      : hasCreatedAt
       ? "o.created_at"
       : "o.id";
+    const aberturaExpr = hasAbertura && hasOpenedAt && hasCreatedAt
+      ? "COALESCE(o.abertura, o.opened_at, o.created_at)"
+      : hasAbertura && hasOpenedAt
+      ? "COALESCE(o.abertura, o.opened_at)"
+      : hasAbertura && hasCreatedAt
+      ? "COALESCE(o.abertura, o.created_at)"
+      : hasOpenedAt && hasCreatedAt
+      ? "COALESCE(o.opened_at, o.created_at)"
+      : hasAbertura
+      ? "o.abertura"
+      : hasOpenedAt
+      ? "o.opened_at"
+      : hasCreatedAt
+      ? "o.created_at"
+      : "NULL";
 
     const total =
       db
@@ -389,9 +408,9 @@ function getOSPainel(limit = 15) {
                  ${equipamentoExpr} AS equipamento,
                  o.tipo,
                  o.status,
-                 COALESCE(o.abertura, o.opened_at, o.created_at) AS abertura,
-                 o.opened_at,
-                 o.closed_at,
+                 ${aberturaExpr} AS abertura,
+                 ${hasOpenedAt ? "o.opened_at" : "NULL"} AS opened_at,
+                 ${hasClosedAt ? "o.closed_at" : "NULL"} AS closed_at,
                  COALESCE(o.prioridade,'MEDIA') AS prioridade,
                  ${grauExpr} AS grau,
                  COALESCE(e.setor,'-') AS setor,
