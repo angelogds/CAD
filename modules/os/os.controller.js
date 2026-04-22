@@ -222,6 +222,24 @@ function normalizeText(value) {
   return text || null;
 }
 
+function summarizeSyncResult(syncResult) {
+  if (!syncResult || typeof syncResult !== "object") return syncResult;
+
+  const osByCell = syncResult.osByCell && typeof syncResult.osByCell === "object" ? syncResult.osByCell : null;
+  const cellEntries = osByCell ? Object.entries(osByCell) : [];
+  const resumoCelulas = cellEntries.slice(0, 10).map(([cell, osIds]) => ({
+    cell,
+    osCount: Array.isArray(osIds) ? osIds.length : 0,
+  }));
+
+  return {
+    ...syncResult,
+    osByCellCount: cellEntries.length,
+    osByCellSample: resumoCelulas,
+    osByCell: undefined,
+  };
+}
+
 async function osGerarDescricaoTecnica(req, res) {
   const id = Number(req.params.id);
   const os = service.getOSById(id);
@@ -396,7 +414,10 @@ async function osClose(req, res) {
       data: { osId: id, type: "OS_FINALIZADA", newStatus: "FINALIZADA" },
     }).catch(() => {});
 
-    console.log("[OS_CLOSE] Fechamento concluído", { osId: id, syncResult });
+    console.log("[OS_CLOSE] Fechamento concluído", {
+      osId: id,
+      syncResult: summarizeSyncResult(syncResult),
+    });
     req.flash("success", canViewOSDetails(user) ? "OS concluída com sucesso." : "Serviço concluído com sucesso. Retornando ao painel.");
   } catch (err) {
     console.error("[OS_CLOSE][ERROR]", err);
