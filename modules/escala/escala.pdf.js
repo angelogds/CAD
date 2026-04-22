@@ -21,7 +21,7 @@ const FOOTER_HEIGHT = 30;
 const BODY_START_GAP = 14;
 const FOOTER_TEXT = "Campo do Gado – Manutenção Industrial – 2026";
 const SIGNATURE = "Responsável técnico: Ângelo Gomes da Silva — Encarregado de Manutenção — Reciclagem Campo do Gado";
-const OS_NOTE = "Registro em OS: todas as atividades e ocorrências relacionadas ao período devem ser registradas via OS no sistema oficial: manutencao-campoLgado.app.br";
+const OS_NOTE = "Registro em OS: ocorrências relacionadas ao período devem ser registradas via OS no site oficial: manutencao.campodogado.app.br.";
 
 function formatDateBr(dateISO) {
   if (!dateISO) return "-";
@@ -55,7 +55,16 @@ function drawHeader(doc, { title, subtitle, logoPath: lPath }) {
   doc.save();
   doc.roundedRect(x, y, width, HEADER_HEIGHT, 10).fill(COLORS.green);
   if (lPath && fs.existsSync(lPath)) {
-    doc.image(lPath, x + 10, y + 9, { fit: [94, 58] });
+    const logoX = x + 10;
+    const logoY = y + 9;
+    const logoW = 94;
+    const logoH = 58;
+    const logoRadius = 8;
+    doc.roundedRect(logoX, logoY, logoW, logoH, logoRadius).fill("#ffffff");
+    doc.save();
+    doc.roundedRect(logoX, logoY, logoW, logoH, logoRadius).clip();
+    doc.image(lPath, logoX, logoY, { cover: [logoW, logoH], align: "center", valign: "center" });
+    doc.restore();
   }
   doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(13)
     .text(title, x + 110, y + 22, { width: width - 124, align: "center" });
