@@ -47,6 +47,8 @@ a{ color:inherit; }
   flex-direction:column;
   gap:14px;
   transition:transform .2s ease, width .2s ease, padding .2s ease;
+  border-top-right-radius:18px;
+  border-bottom-right-radius:18px;
 }
 
 .sidebar-title{ font-weight:900; color:#fff; font-size:14px; padding:10px 12px 16px; letter-spacing:.03em; }
@@ -99,6 +101,7 @@ a{ color:inherit; }
   height:30px;
   width:auto;
   object-fit:contain;
+  border-radius:12px;
 }
 
 .topbar-right{ display:flex; align-items:center; gap:10px; }
