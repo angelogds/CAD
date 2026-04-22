@@ -216,7 +216,13 @@ function generateWeeklyPDF({ rows = [] } = {}) {
   return doc;
 }
 
-function generatePeriodPDF({ start, end, periodoTexto, baseServicos = [], apuracao = [], registros = [], descricoes = [] } = {}) {
+function truncateText(text, max = 140) {
+  const raw = String(text || '-').replace(/\s+/g, ' ').trim();
+  if (raw.length <= max) return raw || '-';
+  return `${raw.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
+}
+
+function generatePeriodPDF({ start, end, periodoTexto, baseServicos = [], apuracao = [], registros = [] } = {}) {
   const doc = createDoc();
   const meta = {
     title: "ESCALA DE FOLGAS – COMPENSAÇÃO DE SERVIÇOS",
@@ -231,124 +237,78 @@ function generatePeriodPDF({ start, end, periodoTexto, baseServicos = [], apurac
       ? `${formatDateBr(start)} até ${formatDateBr(end)}`
       : "Todos os registros cadastrados");
 
-    ensureSpace(doc, 18, meta);
-    doc.fillColor(COLORS.text).font("Helvetica-Bold").fontSize(10)
+    const totalHoras = apuracao.reduce((acc, item) => acc + (Number(item.totalMinutos || 0) / 60), 0);
+    const totalInteiras = apuracao.reduce((acc, item) => acc + Number(item.totalInteiras || 0), 0);
+    const totalMeias = apuracao.reduce((acc, item) => acc + Number(item.totalMeias || 0), 0);
+
+    ensureSpace(doc, 24, meta);
+    doc.fillColor(COLORS.text).font("Helvetica-Bold").fontSize(10.5)
       .text(`Período: ${periodoLinha}`, PAGE.margins.left, doc.y);
-    doc.y += 14;
-
-    ensureSpace(doc, 20, meta);
-    doc.font("Helvetica-Bold").fontSize(11).fillColor(COLORS.greenDark)
-      .text("1. Base do serviço (registro de horas)", PAGE.margins.left, doc.y);
-    doc.y += 14;
-
-    if (!baseServicos.length) {
-      ensureSpace(doc, 16, meta);
-      doc.font("Helvetica").fontSize(9).fillColor(COLORS.text)
-        .text("Sem registros de serviço cadastrados.", PAGE.margins.left, doc.y);
-      doc.y += 14;
-    } else {
-      baseServicos.forEach((item) => {
-        const line = `${formatDateBr(item.data)} — ${item.colaborador} — ${item.funcao} — (${item.horaInicio}–${item.horaFim}) — ${item.equipamento} — ${item.descricaoServico}`;
-        const h = doc.heightOfString(line, { width: 520 }) + 3;
-        ensureSpace(doc, h, meta);
-        doc.font("Helvetica").fontSize(8.8).fillColor(COLORS.text)
-          .text(`• ${line}`, PAGE.margins.left, doc.y, { width: 520 });
-        doc.y += h;
-      });
-    }
-
     doc.y += 4;
+    doc.font("Helvetica").fontSize(9).fillColor(COLORS.muted)
+      .text(
+        `Resumo: ${registros.length} concessão(ões) • ${(totalHoras || 0).toFixed(1).replace('.', ',')}h apuradas • ${totalInteiras} folga(s) inteira(s) • ${totalMeias} meia(s).`,
+        PAGE.margins.left,
+        doc.y,
+        { width: 520 },
+      );
+    doc.y += 16;
+
     ensureSpace(doc, 20, meta);
     doc.font("Helvetica-Bold").fontSize(11).fillColor(COLORS.greenDark)
-      .text("2. Apuração de compensação (direito de folga)", PAGE.margins.left, doc.y);
-    doc.y += 14;
+      .text("1. Quadro consolidado para RH", PAGE.margins.left, doc.y);
+    doc.y += 12;
 
-    drawTable(doc, {
-      meta,
-      columns: [
-        { key: "colaborador", label: "Colaborador", width: 160 },
-        { key: "horas", label: "Horas", width: 75, align: "center" },
-        { key: "inteiras", label: "Inteiras", width: 75, align: "center" },
-        { key: "meias", label: "Meias", width: 75, align: "center" },
-        { key: "saldo", label: "Saldo", width: 166, align: "center" },
-      ],
-      rows: apuracao.map((a) => ({
-        colaborador: a.colaborador,
-        horas: `${(a.totalMinutos / 60).toFixed(1).replace('.', ',')}h`,
-        inteiras: String(a.totalInteiras),
-        meias: String(a.totalMeias),
-        saldo: `${a.saldo.toFixed(1).replace('.', ',')} dia(s)`,
-      })),
-      emptyRow: { colaborador: "Sem apuração cadastrada.", horas: "-", inteiras: "-", meias: "-", saldo: "-" },
-    });
-
-    doc.y += 6;
-    ensureSpace(doc, 20, meta);
-    doc.font("Helvetica-Bold").fontSize(11).fillColor(COLORS.greenDark)
-      .text("3. Concessão das folgas (dados completos para RH)", PAGE.margins.left, doc.y);
-    doc.y += 14;
-
-    drawTable(doc, {
-      meta,
-      columns: [
-        { key: "colaborador", label: "Colaborador/Função", width: 145 },
-        { key: "tipo", label: "Tipo", width: 58, align: "center" },
-        { key: "periodo", label: "Início/Fim", width: 92, align: "center" },
-        { key: "motivo", label: "Motivo", width: 86 },
-        { key: "servico", label: "Prestação de serviço (data/horas/equip./descrição)", width: 170 },
-      ],
-      rows: registros.map((r) => ({
-        colaborador: `${r.colaborador}
-${r.funcao}`,
-        tipo: r.tipo,
-        periodo: `${formatDateBr(r.inicio)}
+    const pageUsable = contentBottom(doc) - doc.y - 42;
+    const rowHeight = 48;
+    const visibleRows = Math.max(1, Math.floor((pageUsable - 24) / rowHeight));
+    const rowsToShow = registros.slice(0, visibleRows).map((r) => ({
+      colaborador: `${truncateText(r.colaborador, 26)}
+${truncateText(r.funcao, 18)}`,
+      periodo: `${formatDateBr(r.inicio)}
 ${formatDateBr(r.fim)}`,
-        motivo: r.motivo || '-',
-        servico: r.dataServico
-          ? `${formatDateBr(r.dataServico)} | ${r.horaInicio || '-'}-${r.horaFim || '-'}
-${r.equipamentoSetor || '-'}
-${r.descricaoServico || '-'}`
-          : '-',
-      })),
+      motivo: truncateText(r.motivo || '-', 120),
+      servico: r.dataServico
+        ? `${formatDateBr(r.dataServico)} ${r.horaInicio || '-'}-${r.horaFim || '-'}
+${truncateText(r.equipamentoSetor || '-', 26)}
+${truncateText(r.descricaoServico || '-', 110)}`
+        : '-',
+    }));
+
+    drawTable(doc, {
+      meta,
+      columns: [
+        { key: "colaborador", label: "Colaborador/Função", width: 120 },
+        { key: "periodo", label: "Folga (Início/Fim)", width: 82, align: "center" },
+        { key: "motivo", label: "Motivo", width: 130 },
+        { key: "servico", label: "Serviço executado (data/hora/equipamento/descrição)", width: 170 },
+      ],
+      rows: rowsToShow,
       emptyRow: {
         colaborador: "Sem concessões cadastradas.",
-        tipo: "-",
         periodo: "-",
         motivo: "-",
         servico: "-",
       },
     });
 
-    doc.y += 6;
-    ensureSpace(doc, 20, meta);
-    doc.font("Helvetica-Bold").fontSize(11).fillColor(COLORS.greenDark)
-      .text("4. Descrição dos serviços executados", PAGE.margins.left, doc.y);
-    doc.y += 14;
-    if (!descricoes.length) {
-      ensureSpace(doc, 14, meta);
-      doc.font("Helvetica").fontSize(9).fillColor(COLORS.text)
-        .text("Sem descrição de serviços no período.", PAGE.margins.left, doc.y);
-      doc.y += 12;
-    } else {
-      descricoes.forEach((d) => {
-        const h = doc.heightOfString(`• ${d}`, { width: 520 }) + 2;
-        ensureSpace(doc, h, meta);
-        doc.font("Helvetica").fontSize(8.8).fillColor(COLORS.text)
-          .text(`• ${d}`, PAGE.margins.left, doc.y, { width: 520 });
-        doc.y += h;
-      });
+    const omitted = Math.max(0, registros.length - rowsToShow.length);
+    doc.y += 8;
+    ensureSpace(doc, 26, meta);
+
+    if (omitted > 0) {
+      doc.font("Helvetica-Bold").fontSize(8.8).fillColor(COLORS.muted)
+        .text(
+          `Observação: ${omitted} registro(s) adicional(is) não exibido(s) para manter este relatório em uma única página.`,
+          PAGE.margins.left,
+          doc.y,
+          { width: 520 },
+        );
+      doc.y += 16;
     }
 
-    doc.y += 6;
-    ensureSpace(doc, 38, meta);
-    doc.font("Helvetica-Bold").fontSize(11).fillColor(COLORS.greenDark)
-      .text("5. Registro em OS", PAGE.margins.left, doc.y);
-    doc.y += 14;
-    doc.font("Helvetica").fontSize(9).fillColor(COLORS.text)
+    doc.font("Helvetica").fontSize(8.8).fillColor(COLORS.text)
       .text(OS_NOTE, PAGE.margins.left, doc.y, { width: 520 });
-    doc.y += 20;
-    doc.font("Helvetica-Oblique").fontSize(9).fillColor(COLORS.muted)
-      .text(SIGNATURE, PAGE.margins.left, doc.y, { width: 520 });
 
     doc.end();
   });
