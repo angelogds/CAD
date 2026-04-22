@@ -60,10 +60,9 @@ function drawHeader(doc, { title, subtitle, logoPath: lPath }) {
     const logoW = 94;
     const logoH = 58;
     const logoRadius = 8;
-    doc.roundedRect(logoX, logoY, logoW, logoH, logoRadius).fill("#ffffff");
     doc.save();
     doc.roundedRect(logoX, logoY, logoW, logoH, logoRadius).clip();
-    doc.image(lPath, logoX, logoY, { cover: [logoW, logoH], align: "center", valign: "center" });
+    doc.image(lPath, logoX, logoY, { fit: [logoW, logoH] });
     doc.restore();
   }
   doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(13)
