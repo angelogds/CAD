@@ -13,17 +13,36 @@ const docsDir = path.join(storagePaths.UPLOAD_DIR, "equipamentos", "documentos")
 fs.mkdirSync(fotoDir, { recursive: true });
 fs.mkdirSync(docsDir, { recursive: true });
 
+function safeUploadFileName(file) {
+  const originalName = String(file?.originalname || "arquivo");
+  const ext = path.extname(originalName).slice(0, 10).toLowerCase();
+  const baseName = path.basename(originalName, ext);
+
+  const normalizedBase = baseName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-_.]+|[-_.]+$/g, "");
+
+  const safeBase = normalizedBase || "arquivo";
+  const truncatedBase = safeBase.slice(0, 80);
+  const safeExt = ext || "";
+
+  return `${Date.now()}-${truncatedBase}${safeExt}`;
+}
+
 const fotoUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, fotoDir),
-    filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, "-")}`),
+    filename: (_req, file, cb) => cb(null, safeUploadFileName(file)),
   }),
 });
 
 const docsUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, docsDir),
-    filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, "-")}`),
+    filename: (_req, file, cb) => cb(null, safeUploadFileName(file)),
   }),
 });
 
