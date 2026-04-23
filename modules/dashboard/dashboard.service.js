@@ -211,7 +211,25 @@ function normalizeFuncaoColaborador(funcao) {
   return raw;
 }
 
-function classifyColaboradorPerfil({ role = "", funcao = "" } = {}) {
+function normalizePessoaNome(nome = "") {
+  return String(nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+// Regra operacional acordada com a manutenção:
+// nomes abaixo sempre entram no ranking do perfil correspondente,
+// mesmo que role/função cadastral esteja diferente.
+const NOMES_FIXOS_MECANICOS = new Set(["rodolfo", "diogo", "salviano", "fabio"]);
+const NOMES_FIXOS_APOIO = new Set(["emanuel", "manuel", "junior", "luiz"]);
+
+function classifyColaboradorPerfil({ name = "", role = "", funcao = "" } = {}) {
+  const nomeNorm = normalizePessoaNome(name);
+  if (NOMES_FIXOS_MECANICOS.has(nomeNorm)) return "mecanico";
+  if (NOMES_FIXOS_APOIO.has(nomeNorm)) return "apoio";
+
   const roleNorm = normalizeRole(role || "");
   const funcaoNorm = normalizeFuncaoColaborador(funcao || "");
   const isMecanico = roleNorm === "MECANICO" || funcaoNorm === "mecanico";
@@ -219,6 +237,62 @@ function classifyColaboradorPerfil({ role = "", funcao = "" } = {}) {
   if (isMecanico) return "mecanico";
   if (isApoio) return "apoio";
   return null;
+}
+
+function getUserIdsNomesFixosAtivos() {
+  if (!tableExists("users")) return [];
+
+  const userRows = db.prepare(`
+    SELECT id, name
+    FROM users
+    WHERE IFNULL(ativo, 1) = 1
+  `).all();
+
+  const ids = new Set();
+  userRows.forEach((row) => {
+    const userId = Number(row?.id || 0);
+    if (!userId) return;
+    const nomeNorm = normalizePessoaNome(row?.name || "");
+    if (NOMES_FIXOS_MECANICOS.has(nomeNorm) || NOMES_FIXOS_APOIO.has(nomeNorm)) {
+      ids.add(userId);
+    }
+  });
+
+  if (tableExists("colaboradores")) {
+    const colabRows = db.prepare(`
+      SELECT DISTINCT user_id, nome
+      FROM colaboradores
+      WHERE user_id IS NOT NULL
+        AND IFNULL(ativo, 1) = 1
+    `).all();
+    colabRows.forEach((row) => {
+      const userId = Number(row?.user_id || 0);
+      if (!userId) return;
+      const nomeNorm = normalizePessoaNome(row?.nome || "");
+      if (NOMES_FIXOS_MECANICOS.has(nomeNorm) || NOMES_FIXOS_APOIO.has(nomeNorm)) {
+        ids.add(userId);
+      }
+    });
+  }
+
+  return Array.from(ids);
+}
+
+function topComObrigatorios(items = [], limite = 5, nomesObrigatorios = new Set()) {
+  const top = items.slice(0, limite);
+  if (!nomesObrigatorios?.size) return top;
+
+  const existentes = new Set(top.map((item) => Number(item.user_id || 0)).filter(Boolean));
+  items.forEach((item) => {
+    const nomeNorm = normalizePessoaNome(item?.nome || "");
+    const userId = Number(item?.user_id || 0);
+    if (!userId || existentes.has(userId)) return;
+    if (nomesObrigatorios.has(nomeNorm)) {
+      top.push(item);
+      existentes.add(userId);
+    }
+  });
+  return top;
 }
 
 function getPerfilPorEscalaSemana(userIds = [], dataRef = "") {
@@ -347,6 +421,9 @@ function getMecanicosRankingSemana() {
       });
     });
 
+    const userIdsFixos = getUserIdsNomesFixosAtivos();
+    userIdsFixos.forEach((id) => ensure(id));
+
     const userIds = Array.from(mapa.keys());
     if (!userIds.length) {
       return {
@@ -410,9 +487,9 @@ function getMecanicosRankingSemana() {
         ALTA: 2,
         CRITICA: 3,
       },
-      items: itemsMecanicos.slice(0, 5),
-      itemsMecanicos: itemsMecanicos.slice(0, 5),
-      itemsApoio: itemsApoio.slice(0, 5),
+      items: topComObrigatorios(itemsMecanicos, 5, NOMES_FIXOS_MECANICOS),
+      itemsMecanicos: topComObrigatorios(itemsMecanicos, 5, NOMES_FIXOS_MECANICOS),
+      itemsApoio: topComObrigatorios(itemsApoio, 5, NOMES_FIXOS_APOIO),
       destaqueSemana,
       sugestaoFolgaMes: null,
     };
