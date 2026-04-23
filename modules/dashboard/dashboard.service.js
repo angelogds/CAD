@@ -221,6 +221,41 @@ function classifyColaboradorPerfil({ role = "", funcao = "" } = {}) {
   return null;
 }
 
+function getPerfilPorEscalaSemana(userIds = [], dataRef = "") {
+  const ids = Array.from(new Set((userIds || []).map((id) => Number(id || 0)).filter(Boolean)));
+  if (!ids.length) return new Map();
+  if (!tableExists("escala_semanas") || !tableExists("escala_alocacoes") || !tableExists("colaboradores") || !tableExists("users")) {
+    return new Map();
+  }
+
+  const placeholders = ids.map(() => "?").join(",");
+  const rows = db.prepare(`
+    SELECT DISTINCT
+      u.id AS user_id,
+      lower(COALESCE(a.tipo_turno, '')) AS tipo_turno
+    FROM escala_semanas s
+    JOIN escala_alocacoes a ON a.semana_id = s.id
+    JOIN colaboradores c ON c.id = a.colaborador_id
+    JOIN users u ON u.id = c.user_id
+    WHERE ? BETWEEN s.data_inicio AND s.data_fim
+      AND u.id IN (${placeholders})
+      AND IFNULL(c.ativo, 1) = 1
+      AND IFNULL(u.ativo, 1) = 1
+  `).all(dataRef, ...ids);
+
+  const perfilMap = new Map();
+  rows.forEach((row) => {
+    const userId = Number(row.user_id || 0);
+    if (!userId) return;
+    const tipoTurno = String(row.tipo_turno || "").toLowerCase();
+    const perfil = tipoTurno === "apoio" ? "apoio" : "mecanico";
+    if (!perfilMap.has(userId)) {
+      perfilMap.set(userId, perfil);
+    }
+  });
+  return perfilMap;
+}
+
 function pesoCriticidade(value) {
   const nivel = String(value || "")
     .normalize("NFD")
@@ -290,7 +325,7 @@ function getMecanicosRankingSemana() {
     osSemana.forEach((os) => {
       const participantes = Array.from(
         new Set(
-          [os.mecanico_user_id, os.auxiliar_user_id, os.responsavel_user_id, os.closed_by]
+          [os.mecanico_user_id, os.auxiliar_user_id, os.responsavel_user_id]
             .map((id) => Number(id || 0))
             .filter(Boolean)
         )
@@ -332,13 +367,14 @@ function getMecanicosRankingSemana() {
         AND ativo = 1
     `).all(...userIds);
     const usersMap = new Map(users.map((u) => [Number(u.id), u]));
+    const perfilEscalaMap = getPerfilPorEscalaSemana(userIds, inicioSemana);
 
     const itemsByPerfil = userIds
       .map((id) => {
         const raw = mapa.get(id);
         const user = usersMap.get(Number(id));
         if (!user) return null;
-        const perfil = classifyColaboradorPerfil(user);
+        const perfil = perfilEscalaMap.get(Number(id)) || classifyColaboradorPerfil(user);
         if (!perfil) return null;
         return {
           ...raw,
