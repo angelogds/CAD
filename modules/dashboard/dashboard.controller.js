@@ -21,6 +21,7 @@ function index(req, res) {
     demandasResumo: service.getDemandasResumoDashboard(),
     preventivas: service.getPreventivasDashboard(),
     escala: service.getEscalaPainelSemana() || service.getEscalaSemana(),
+    rankingMecanicos: service.getMecanicosRankingSemana(),
     avisos: service.getAvisosDashboard(12),
     alertaAtivo: alertsService.getAlertaAtivo(),
     tvMode,
