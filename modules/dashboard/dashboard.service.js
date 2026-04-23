@@ -211,7 +211,25 @@ function normalizeFuncaoColaborador(funcao) {
   return raw;
 }
 
-function classifyColaboradorPerfil({ role = "", funcao = "" } = {}) {
+function normalizePessoaNome(nome = "") {
+  return String(nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+// Regra operacional acordada com a manutenção:
+// nomes abaixo sempre entram no ranking do perfil correspondente,
+// mesmo que role/função cadastral esteja diferente.
+const NOMES_FIXOS_MECANICOS = new Set(["rodolfo", "diogo", "salviano", "fabio"]);
+const NOMES_FIXOS_APOIO = new Set(["emanuel", "manuel", "junior", "luiz"]);
+
+function classifyColaboradorPerfil({ name = "", role = "", funcao = "" } = {}) {
+  const nomeNorm = normalizePessoaNome(name);
+  if (NOMES_FIXOS_MECANICOS.has(nomeNorm)) return "mecanico";
+  if (NOMES_FIXOS_APOIO.has(nomeNorm)) return "apoio";
+
   const roleNorm = normalizeRole(role || "");
   const funcaoNorm = normalizeFuncaoColaborador(funcao || "");
   const isMecanico = roleNorm === "MECANICO" || funcaoNorm === "mecanico";
