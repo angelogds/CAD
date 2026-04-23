@@ -223,7 +223,7 @@ function normalizePessoaNome(nome = "") {
 // nomes abaixo sempre entram no ranking do perfil correspondente,
 // mesmo que role/função cadastral esteja diferente.
 const NOMES_FIXOS_MECANICOS = new Set(["rodolfo", "diogo", "salviano", "fabio"]);
-const NOMES_FIXOS_APOIO = new Set(["emanuel", "manuel", "junior", "luiz"]);
+const NOMES_FIXOS_APOIO = new Set(["emanuel", "manuel", "junior", "luiz", "luis"]);
 const NOMES_EXCLUIDOS_RANKING = new Set(["angelo"]);
 
 function matchNomeReferencia(nome = "", referencias = new Set()) {
