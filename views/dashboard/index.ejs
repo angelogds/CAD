@@ -152,7 +152,8 @@
   var escalaFolgasAfastamentos = safeEscala.folgas_afastamentos || [];
   var safeMotoresResumo = motoresResumo || {};
   var rankingMecanicosData = rankingMecanicos || {};
-  var rankingMecanicosItems = rankingMecanicosData.items || [];
+  var rankingMecanicosItems = rankingMecanicosData.itemsMecanicos || rankingMecanicosData.items || [];
+  var rankingApoioItems = rankingMecanicosData.itemsApoio || [];
   var rankingMetaMensal = Number(rankingMecanicosData.metaMensal || 100);
   var rankingPesos = rankingMecanicosData.pesosCriticidade || { BAIXA: 0.5, MEDIA: 1, ALTA: 2, CRITICA: 3 };
     var safePreventivas = preventivas || {};
@@ -366,6 +367,46 @@
     <% } else { %>
       <div class="ranking-list">
         <% rankingMecanicosItems.forEach(function(item) { %>
+          <article class="ranking-item">
+            <div class="ranking-pos"><%= item.posicao %>º</div>
+            <div class="ranking-main">
+              <% if (item.photo_path) { %>
+                <img class="ranking-avatar" src="<%= item.photo_path %>" alt="Foto de <%= item.nome %>">
+              <% } else { %>
+                <span class="ranking-avatar"><%= String(item.nome || '?').split(' ').map(function(n){return n[0];}).join('').slice(0,2).toUpperCase() %></span>
+              <% } %>
+              <div style="min-width:0;">
+                <div class="ranking-name"><%= item.nome %></div>
+                <div class="ranking-meta">
+                  <%= item.os_total || 0 %> OS finalizadas
+                  • Críticas: <%= item.os_criticas || 0 %>
+                  • Altas: <%= item.os_altas || 0 %>
+                </div>
+              </div>
+            </div>
+            <div class="ranking-score">
+              <div class="pts"><%= Number(item.score || 0).toFixed(1) %></div>
+              <div class="lbl">pontos</div>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    <% } %>
+  </section>
+
+<section class="dashboard-card area-ranking-apoio">
+    <div class="ranking-header">
+      <div class="dashboard-title" style="margin:0;">Ranking do apoio operacional</div>
+      <span class="ranking-subtitle">Auxiliares elegíveis para escala de folga</span>
+    </div>
+    <p class="muted-xs" style="margin-top:-4px; margin-bottom:10px;">
+      Controle de pontuação dos auxiliares/apoio para reconhecimento e escalonamento de folgas aos sábados após atingir a meta de <strong><%= rankingMetaMensal %> pontos</strong>.
+    </p>
+    <% if (!rankingApoioItems.length) { %>
+      <div class="ranking-empty">Sem fechamentos suficientes nesta semana para montar o ranking de apoio.</div>
+    <% } else { %>
+      <div class="ranking-list">
+        <% rankingApoioItems.forEach(function(item) { %>
           <article class="ranking-item">
             <div class="ranking-pos"><%= item.posicao %>º</div>
             <div class="ranking-main">
