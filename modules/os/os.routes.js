@@ -13,13 +13,17 @@ const { OS_EXECUTION_ACCESS, OS_DETALHE_ACCESS } = require("./os.permissions");
 const uploadDir = path.join(storagePaths.UPLOAD_DIR, "os");
 fs.mkdirSync(uploadDir, { recursive: true });
 
+const DEFAULT_FILE_SIZE_MB = 200;
+const maxFileSizeMbRaw = Number(process.env.OS_UPLOAD_FILE_SIZE_MB || DEFAULT_FILE_SIZE_MB);
+const maxFileSizeMb = Number.isFinite(maxFileSizeMbRaw) && maxFileSizeMbRaw > 0 ? maxFileSizeMbRaw : DEFAULT_FILE_SIZE_MB;
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadDir),
     filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, "-")}`),
   }),
   limits: {
-    fileSize: 60 * 1024 * 1024,
+    fileSize: maxFileSizeMb * 1024 * 1024,
   },
   fileFilter: (_req, file, cb) => {
     const mime = String(file?.mimetype || "").toLowerCase();
@@ -29,6 +33,25 @@ const upload = multer({
     return cb(new Error("Formato inválido. Envie somente imagem ou vídeo."));
   },
 });
+
+const fechamentoUpload = (req, res, next) => {
+  upload.fields([{ name: "fechamento_fotos", maxCount: 10 }])(req, res, (err) => {
+    if (!err) return next();
+
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+      req.flash("error", `Arquivo muito grande. Limite por arquivo: ${maxFileSizeMb}MB.`);
+      return res.redirect(`/os/${req.params.id}`);
+    }
+
+    if (err instanceof multer.MulterError) {
+      req.flash("error", `Falha no upload: ${err.message}`);
+      return res.redirect(`/os/${req.params.id}`);
+    }
+
+    req.flash("error", err.message || "Falha no upload de mídias de fechamento.");
+    return res.redirect(`/os/${req.params.id}`);
+  });
+};
 
 const wrap = (fn, name) =>
   typeof fn === "function"
@@ -70,7 +93,7 @@ router.post(
   "/:id/fechar",
   requireLogin,
   requireRole(OS_EXECUTION_ACCESS),
-  upload.fields([{ name: "fechamento_fotos", maxCount: 10 }]),
+  fechamentoUpload,
   wrap(ctrl.osClose, "osClose")
 );
 
@@ -78,7 +101,7 @@ router.post(
   "/:id/concluir",
   requireLogin,
   requireRole(OS_EXECUTION_ACCESS),
-  upload.fields([{ name: "fechamento_fotos", maxCount: 10 }]),
+  fechamentoUpload,
   wrap(ctrl.osClose, "osClose")
 );
 
