@@ -211,6 +211,182 @@ function normalizeFuncaoColaborador(funcao) {
   return raw;
 }
 
+function pesoCriticidade(value) {
+  const nivel = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+  if (["CRITICA", "CRITICO", "EMERGENCIAL"].includes(nivel)) return 5;
+  if (["ALTA", "ALTO"].includes(nivel)) return 3;
+  if (["MEDIA", "MEDIO"].includes(nivel)) return 2;
+  if (["BAIXA", "BAIXO"].includes(nivel)) return 1;
+  return 2;
+}
+
+function getMecanicosRankingSemana() {
+  return safeGet(() => {
+    const hasUsers = tableExists("users");
+    if (!hasUsers || !tableExists("os")) {
+      return {
+        semana: { inicio: null, fim: null },
+        items: [],
+        destaqueSemana: null,
+        sugestaoFolgaMes: null,
+      };
+    }
+
+    const rangeSemana = db.prepare(`
+      SELECT
+        date('now', 'localtime', '-' || ((strftime('%w', 'now', 'localtime') + 6) % 7) || ' days') AS inicio,
+        date('now', 'localtime', '+' || (6 - ((strftime('%w', 'now', 'localtime') + 6) % 7)) || ' days') AS fim
+    `).get() || {};
+    const inicioSemana = String(rangeSemana.inicio || "");
+    const fimSemana = String(rangeSemana.fim || "");
+
+    const osSemana = db.prepare(`
+      SELECT
+        o.id,
+        COALESCE(NULLIF(o.grau, ''), NULLIF(o.prioridade, ''), 'MEDIA') AS criticidade,
+        o.mecanico_user_id,
+        o.auxiliar_user_id,
+        o.responsavel_user_id,
+        o.closed_by
+      FROM os o
+      WHERE UPPER(COALESCE(o.status, '')) IN ('FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA')
+        AND date(COALESCE(o.data_fim, o.data_conclusao, o.closed_at, o.opened_at), 'localtime') BETWEEN ? AND ?
+    `).all(inicioSemana, fimSemana);
+
+    const mapa = new Map();
+    const ensure = (id) => {
+      const userId = Number(id || 0);
+      if (!userId) return null;
+      if (!mapa.has(userId)) {
+        mapa.set(userId, {
+          user_id: userId,
+          score: 0,
+          os_total: 0,
+          os_criticas: 0,
+          os_altas: 0,
+          os_medias: 0,
+          os_baixas: 0,
+        });
+      }
+      return mapa.get(userId);
+    };
+
+    osSemana.forEach((os) => {
+      const idMecanico = Number(os.mecanico_user_id || os.responsavel_user_id || os.closed_by || 0);
+      if (!idMecanico) return;
+      const card = ensure(idMecanico);
+      const peso = pesoCriticidade(os.criticidade);
+      card.os_total += 1;
+      card.score += peso;
+      if (peso >= 5) card.os_criticas += 1;
+      else if (peso >= 3) card.os_altas += 1;
+      else if (peso >= 2) card.os_medias += 1;
+      else card.os_baixas += 1;
+
+      const idAuxiliar = Number(os.auxiliar_user_id || 0);
+      if (idAuxiliar && idAuxiliar !== idMecanico) {
+        const aux = ensure(idAuxiliar);
+        aux.score += Number((peso * 0.4).toFixed(2));
+      }
+    });
+
+    const userIds = Array.from(mapa.keys());
+    if (!userIds.length) {
+      return {
+        semana: { inicio: inicioSemana, fim: fimSemana },
+        items: [],
+        destaqueSemana: null,
+        sugestaoFolgaMes: null,
+      };
+    }
+
+    const placeholders = userIds.map(() => "?").join(",");
+    const users = db.prepare(`
+      SELECT id, name, role, funcao, photo_path
+      FROM users
+      WHERE id IN (${placeholders})
+        AND ativo = 1
+    `).all(...userIds);
+    const usersMap = new Map(users.map((u) => [Number(u.id), u]));
+
+    const items = userIds
+      .map((id) => {
+        const raw = mapa.get(id);
+        const user = usersMap.get(Number(id));
+        if (!user) return null;
+        const roleNorm = normalizeRole(user.role || "");
+        const funcaoNorm = normalizeFuncaoColaborador(user.funcao || "");
+        const isMecanico = roleNorm === "MECANICO" || funcaoNorm === "mecanico";
+        if (!isMecanico) return null;
+        return {
+          ...raw,
+          nome: user.name || `Mecânico #${id}`,
+          photo_path: user.photo_path || null,
+          role: roleNorm,
+          funcao: user.funcao || "MECANICO",
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.score - a.score || b.os_criticas - a.os_criticas || b.os_total - a.os_total || a.nome.localeCompare(b.nome, "pt-BR"))
+      .map((item, index) => ({ ...item, posicao: index + 1 }));
+
+    const destaqueSemana = items[0] || null;
+
+    const inicioMes = db.prepare(`SELECT date('now', 'start of month', 'localtime') AS inicio`).get()?.inicio || null;
+    const folgaMes = inicioMes
+      ? db.prepare(`
+        SELECT
+          COALESCE(o.mecanico_user_id, o.responsavel_user_id, o.closed_by) AS user_id,
+          SUM(
+            CASE
+              WHEN UPPER(COALESCE(NULLIF(o.grau, ''), NULLIF(o.prioridade, ''), 'MEDIA')) IN ('CRITICA','CRITICO','EMERGENCIAL') THEN 5
+              WHEN UPPER(COALESCE(NULLIF(o.grau, ''), NULLIF(o.prioridade, ''), 'MEDIA')) IN ('ALTA','ALTO') THEN 3
+              WHEN UPPER(COALESCE(NULLIF(o.grau, ''), NULLIF(o.prioridade, ''), 'MEDIA')) IN ('BAIXA','BAIXO') THEN 1
+              ELSE 2
+            END
+          ) AS score_mes,
+          COUNT(*) AS os_mes
+        FROM os o
+        WHERE UPPER(COALESCE(o.status, '')) IN ('FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA')
+          AND date(COALESCE(o.data_fim, o.data_conclusao, o.closed_at, o.opened_at), 'localtime') BETWEEN ? AND date('now', 'localtime')
+          AND COALESCE(o.mecanico_user_id, o.responsavel_user_id, o.closed_by) IS NOT NULL
+        GROUP BY COALESCE(o.mecanico_user_id, o.responsavel_user_id, o.closed_by)
+        ORDER BY score_mes DESC, os_mes DESC
+        LIMIT 1
+      `).get(inicioMes)
+      : null;
+
+    const userFolga = folgaMes?.user_id ? db.prepare("SELECT id, name, role, funcao FROM users WHERE id = ? LIMIT 1").get(Number(folgaMes.user_id)) : null;
+    const sugestaoFolgaMes = userFolga
+      ? {
+          user_id: Number(userFolga.id),
+          nome: userFolga.name || "Colaborador",
+          role: normalizeRole(userFolga.role || ""),
+          funcao: userFolga.funcao || "-",
+          score_mes: Number(folgaMes.score_mes || 0),
+          os_mes: Number(folgaMes.os_mes || 0),
+          elegivel: true,
+        }
+      : null;
+
+    return {
+      semana: { inicio: inicioSemana, fim: fimSemana },
+      items: items.slice(0, 5),
+      destaqueSemana,
+      sugestaoFolgaMes,
+    };
+  }, {
+    semana: { inicio: null, fim: null },
+    items: [],
+    destaqueSemana: null,
+    sugestaoFolgaMes: null,
+  });
+}
+
 function getEscalaPainelSemana() {
   return safeGet(() => {
     const hoje = db.prepare(`SELECT date('now', 'localtime') AS hoje`).get()?.hoje;
@@ -1007,6 +1183,7 @@ module.exports = {
   getPreventivasDashboard,
   getEscalaSemana,
   getEscalaPainelSemana,
+  getMecanicosRankingSemana,
   iniciarPreventiva,
   finalizarPreventiva,
   getPreventivasEmAndamentoEquipe,

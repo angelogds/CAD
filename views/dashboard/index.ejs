@@ -46,6 +46,20 @@
   .aviso-item { border:1px solid #e5e7eb; border-radius:10px; padding:9px 10px; background:#fff; margin-top:8px; }
   .quick-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .dashboard-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .ranking-header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+  .ranking-subtitle { font-size:11px; color:#64748b; font-weight:700; }
+  .ranking-list { display:flex; flex-direction:column; gap:10px; }
+  .ranking-item { display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%); }
+  .ranking-pos { width:34px; height:34px; border-radius:999px; background:#0f172a; color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:900; }
+  .ranking-avatar { width:38px; height:38px; border-radius:999px; object-fit:cover; border:2px solid #dbeafe; background:#e2e8f0; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#1e293b; }
+  .ranking-main { display:flex; align-items:center; gap:9px; min-width:0; }
+  .ranking-name { font-size:14px; font-weight:900; color:#0f172a; }
+  .ranking-meta { font-size:11px; color:#64748b; margin-top:1px; }
+  .ranking-score { text-align:right; }
+  .ranking-score .pts { font-size:20px; font-weight:900; color:#0f766e; line-height:1; }
+  .ranking-score .lbl { font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
+  .ranking-highlight { border:1px solid #a7f3d0; background:#ecfdf5; color:#065f46; border-radius:10px; padding:8px 10px; font-size:12px; margin-top:10px; }
+  .ranking-empty { border:1px dashed #cbd5e1; border-radius:10px; padding:10px; color:#64748b; font-size:12px; }
 
   .op-toast{position:fixed;right:16px;bottom:16px;z-index:9999;background:#0f172a;color:#fff;padding:10px 12px;border-radius:10px;font-weight:700;box-shadow:0 10px 20px rgba(0,0,0,.2);display:none;max-width:340px;}
   .op-toast.show{display:block;}
@@ -137,6 +151,9 @@
   var escalaNoturno = (safeEscala.noturno || []).map(function(p) { return p.nome; }).join(', ');
   var escalaFolgasAfastamentos = safeEscala.folgas_afastamentos || [];
   var safeMotoresResumo = motoresResumo || {};
+  var rankingMecanicosData = rankingMecanicos || {};
+  var rankingMecanicosItems = rankingMecanicosData.items || [];
+  var rankingFolgaMes = rankingMecanicosData.sugestaoFolgaMes || null;
   var safePreventivas = preventivas || {};
   var preventivasItems = safePreventivas.items || [];
   var preventivasResumo = safePreventivas.resumo || {};
@@ -332,6 +349,55 @@
         </ul>
       <% } %>
     <% } else { %><p class="muted" style="margin:0;">Escala não disponível.</p><% } %>
+</section>
+
+<section class="dashboard-card area-ranking-mecanicos">
+    <div class="ranking-header">
+      <div class="dashboard-title" style="margin:0;">Ranking dos mecânicos</div>
+      <span class="ranking-subtitle">Pontuação por criticidade</span>
+    </div>
+    <p class="muted-xs" style="margin-top:-4px; margin-bottom:10px;">
+      Pesos da semana: <strong>Baixa 1</strong> • <strong>Média 2</strong> • <strong>Alta 3</strong> • <strong>Crítica 5</strong>.
+      Serviços mais relevantes valem mais pontos.
+    </p>
+    <% if (!rankingMecanicosItems.length) { %>
+      <div class="ranking-empty">Sem fechamentos suficientes nesta semana para montar o ranking.</div>
+    <% } else { %>
+      <div class="ranking-list">
+        <% rankingMecanicosItems.forEach(function(item) { %>
+          <article class="ranking-item">
+            <div class="ranking-pos"><%= item.posicao %>º</div>
+            <div class="ranking-main">
+              <% if (item.photo_path) { %>
+                <img class="ranking-avatar" src="<%= item.photo_path %>" alt="Foto de <%= item.nome %>">
+              <% } else { %>
+                <span class="ranking-avatar"><%= String(item.nome || '?').split(' ').map(function(n){return n[0];}).join('').slice(0,2).toUpperCase() %></span>
+              <% } %>
+              <div style="min-width:0;">
+                <div class="ranking-name"><%= item.nome %></div>
+                <div class="ranking-meta">
+                  <%= item.os_total || 0 %> OS finalizadas
+                  • Críticas: <%= item.os_criticas || 0 %>
+                  • Altas: <%= item.os_altas || 0 %>
+                </div>
+              </div>
+            </div>
+            <div class="ranking-score">
+              <div class="pts"><%= Number(item.score || 0).toFixed(1) %></div>
+              <div class="lbl">pontos</div>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+      <% if (rankingFolgaMes && rankingFolgaMes.elegivel) { %>
+        <div class="ranking-highlight">
+          🏅 <strong>Destaque do mês (sugestão de folga):</strong>
+          <%= rankingFolgaMes.nome %> —
+          <strong><%= rankingFolgaMes.score_mes %> pts</strong> em <%= rankingFolgaMes.os_mes %> OS finalizadas.
+          (Válido para mecânico/auxiliar conforme regra interna de benefício.)
+        </div>
+      <% } %>
+    <% } %>
   </section>
 
 <section class="dashboard-card area-avisos">
