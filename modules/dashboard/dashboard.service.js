@@ -224,11 +224,20 @@ function normalizePessoaNome(nome = "") {
 // mesmo que role/função cadastral esteja diferente.
 const NOMES_FIXOS_MECANICOS = new Set(["rodolfo", "diogo", "salviano", "fabio"]);
 const NOMES_FIXOS_APOIO = new Set(["emanuel", "manuel", "junior", "luiz"]);
+const NOMES_EXCLUIDOS_RANKING = new Set(["angelo"]);
+
+function matchNomeReferencia(nome = "", referencias = new Set()) {
+  const nomeNorm = normalizePessoaNome(nome);
+  if (!nomeNorm) return false;
+  if (referencias.has(nomeNorm)) return true;
+  const tokens = nomeNorm.split(/\s+/).filter(Boolean);
+  return tokens.some((token) => referencias.has(token));
+}
 
 function classifyColaboradorPerfil({ name = "", role = "", funcao = "" } = {}) {
-  const nomeNorm = normalizePessoaNome(name);
-  if (NOMES_FIXOS_MECANICOS.has(nomeNorm)) return "mecanico";
-  if (NOMES_FIXOS_APOIO.has(nomeNorm)) return "apoio";
+  if (matchNomeReferencia(name, NOMES_EXCLUIDOS_RANKING)) return null;
+  if (matchNomeReferencia(name, NOMES_FIXOS_MECANICOS)) return "mecanico";
+  if (matchNomeReferencia(name, NOMES_FIXOS_APOIO)) return "apoio";
 
   const roleNorm = normalizeRole(role || "");
   const funcaoNorm = normalizeFuncaoColaborador(funcao || "");
@@ -252,8 +261,7 @@ function getUserIdsNomesFixosAtivos() {
   userRows.forEach((row) => {
     const userId = Number(row?.id || 0);
     if (!userId) return;
-    const nomeNorm = normalizePessoaNome(row?.name || "");
-    if (NOMES_FIXOS_MECANICOS.has(nomeNorm) || NOMES_FIXOS_APOIO.has(nomeNorm)) {
+    if (matchNomeReferencia(row?.name || "", NOMES_FIXOS_MECANICOS) || matchNomeReferencia(row?.name || "", NOMES_FIXOS_APOIO)) {
       ids.add(userId);
     }
   });
@@ -268,8 +276,7 @@ function getUserIdsNomesFixosAtivos() {
     colabRows.forEach((row) => {
       const userId = Number(row?.user_id || 0);
       if (!userId) return;
-      const nomeNorm = normalizePessoaNome(row?.nome || "");
-      if (NOMES_FIXOS_MECANICOS.has(nomeNorm) || NOMES_FIXOS_APOIO.has(nomeNorm)) {
+      if (matchNomeReferencia(row?.nome || "", NOMES_FIXOS_MECANICOS) || matchNomeReferencia(row?.nome || "", NOMES_FIXOS_APOIO)) {
         ids.add(userId);
       }
     });
@@ -284,10 +291,9 @@ function topComObrigatorios(items = [], limite = 5, nomesObrigatorios = new Set(
 
   const existentes = new Set(top.map((item) => Number(item.user_id || 0)).filter(Boolean));
   items.forEach((item) => {
-    const nomeNorm = normalizePessoaNome(item?.nome || "");
     const userId = Number(item?.user_id || 0);
     if (!userId || existentes.has(userId)) return;
-    if (nomesObrigatorios.has(nomeNorm)) {
+    if (matchNomeReferencia(item?.nome || "", nomesObrigatorios)) {
       top.push(item);
       existentes.add(userId);
     }
@@ -451,6 +457,7 @@ function getMecanicosRankingSemana() {
         const raw = mapa.get(id);
         const user = usersMap.get(Number(id));
         if (!user) return null;
+        if (matchNomeReferencia(user.name || "", NOMES_EXCLUIDOS_RANKING)) return null;
         const perfil = perfilEscalaMap.get(Number(id)) || classifyColaboradorPerfil(user);
         if (!perfil) return null;
         return {
