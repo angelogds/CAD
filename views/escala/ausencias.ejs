@@ -1,0 +1,70 @@
+<%- layout('layout') -%>
+
+<div class="page-head" style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+  <div>
+    <h1 style="margin:0;">Folga / Atestado</h1>
+    <p style="margin:6px 0 0;color:#64748b;font-weight:700;">Visualize e corrija datas de colaboradores afastados.</p>
+  </div>
+
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+    <form method="GET" action="/escala/ausencias" style="display:flex;gap:8px;align-items:center;">
+      <input type="date" name="date" value="<%= alvo %>" class="input" style="height:38px;">
+      <button class="btn btn-sm" type="submit">Filtrar</button>
+    </form>
+    <a class="btn" href="/escala?date=<%= alvo %>">Voltar para Escala</a>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px;">
+  <h3 style="margin:0 0 10px;">Registros de folga, atestado e férias</h3>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Colaborador</th>
+        <th>Tipo</th>
+        <th>Início</th>
+        <th>Fim</th>
+        <th>Motivo</th>
+        <th>Situação em <%= alvo %></th>
+        <th style="width:420px;">Correção rápida</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!ausencias || ausencias.length === 0) { %>
+        <tr><td colspan="7" style="text-align:center;color:#64748b;">Nenhum registro encontrado.</td></tr>
+      <% } %>
+
+      <% (ausencias || []).forEach(item => { %>
+        <tr>
+          <td><strong><%= item.nome %></strong><br><small><%= item.funcaoLabel %></small></td>
+          <td><%= item.tipo %></td>
+          <td><%= item.inicio %></td>
+          <td><%= item.fim %></td>
+          <td><%= item.motivo || '-' %></td>
+          <td>
+            <% if (item.ativoNoDia) { %>
+              <span class="badge badge-success">Ativo</span>
+            <% } else { %>
+              <span class="badge">Inativo</span>
+            <% } %>
+          </td>
+          <td>
+            <form method="POST" action="/escala/ausencia/<%= item.id %>/update" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <input type="hidden" name="date" value="<%= alvo %>">
+              <select class="input" name="tipo" style="width:120px;" required>
+                <option value="FOLGA" <%= item.tipo === 'FOLGA' ? 'selected' : '' %>>Folga</option>
+                <option value="ATESTADO" <%= item.tipo === 'ATESTADO' ? 'selected' : '' %>>Atestado</option>
+                <option value="FERIAS" <%= item.tipo === 'FERIAS' ? 'selected' : '' %>>Férias</option>
+              </select>
+              <input class="input" type="date" name="inicio" value="<%= item.inicio %>" required>
+              <input class="input" type="date" name="fim" value="<%= item.fim %>" required>
+              <input class="input" name="motivo" value="<%= item.motivo || '' %>" placeholder="Motivo" style="min-width:140px;">
+              <button class="btn btn-sm btn-primary" type="submit">Atualizar</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

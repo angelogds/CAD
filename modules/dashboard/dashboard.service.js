@@ -213,6 +213,7 @@ function normalizeFuncaoColaborador(funcao) {
 
 function getEscalaPainelSemana() {
   return safeGet(() => {
+    const hoje = db.prepare(`SELECT date('now', 'localtime') AS hoje`).get()?.hoje;
     const semana = db
       .prepare(
         `
@@ -261,11 +262,14 @@ function getEscalaPainelSemana() {
           x.data_fim
         FROM escala_ausencias x
         JOIN colaboradores c ON c.id = x.colaborador_id
-        WHERE NOT (x.data_fim < ? OR x.data_inicio > ?)
+        WHERE ? BETWEEN x.data_inicio AND x.data_fim
         ORDER BY c.nome ASC
       `
       )
-      .all(semana.data_inicio, semana.data_fim), []);
+      .all(hoje || semana.data_inicio), []);
+
+    const colaboradoresAusentes = new Set(ausencias.map((a) => Number(a.colaborador_id)).filter(Boolean));
+    const alocacoesDisponiveis = alocacoes.filter((a) => !colaboradoresAusentes.has(Number(a.colaborador_id)));
 
     const folgasTurno = alocacoes
       .filter((a) => a.tipo_turno === "folga")
@@ -293,14 +297,14 @@ function getEscalaPainelSemana() {
       }
     });
 
-    const noturnoResponsavel = alocacoes.find((a) => a.tipo_turno === "plantao" && String(a.funcao || "").toLowerCase() === "mecanico")
-      || alocacoes.find((a) => a.tipo_turno === "noturno" && String(a.funcao || "").toLowerCase() === "mecanico")
+    const noturnoResponsavel = alocacoesDisponiveis.find((a) => a.tipo_turno === "plantao" && String(a.funcao || "").toLowerCase() === "mecanico")
+      || alocacoesDisponiveis.find((a) => a.tipo_turno === "noturno" && String(a.funcao || "").toLowerCase() === "mecanico")
       || null;
 
     return {
       ...semana,
-      diurno_mecanicos: alocacoes.filter((a) => a.tipo_turno === "diurno" && String(a.funcao || "").toLowerCase() === "mecanico"),
-      apoio_operacional: alocacoes.filter((a) => a.tipo_turno === "apoio"),
+      diurno_mecanicos: alocacoesDisponiveis.filter((a) => a.tipo_turno === "diurno" && String(a.funcao || "").toLowerCase() === "mecanico"),
+      apoio_operacional: alocacoesDisponiveis.filter((a) => a.tipo_turno === "apoio"),
       noturno: noturnoResponsavel ? [noturnoResponsavel] : [],
       folgas_afastamentos: Array.from(folgasAfastamentosMap.values()),
     };

@@ -77,6 +77,35 @@ function toDateOnly(value) {
   return String(value || "").slice(0, 10);
 }
 
+function getColaboradorIdsAusentesNoDia(dateISO) {
+  const dia = toDateOnly(dateISO) || isoToday();
+  const ids = new Set();
+
+  if (tableExists("escala_ausencias")) {
+    const rowsAus = db.prepare(`
+      SELECT DISTINCT colaborador_id
+      FROM escala_ausencias
+      WHERE ? BETWEEN data_inicio AND data_fim
+    `).all(dia);
+    rowsAus.forEach((row) => {
+      if (row?.colaborador_id) ids.add(Number(row.colaborador_id));
+    });
+  }
+
+  if (tableExists("escala_concessoes")) {
+    const rowsCon = db.prepare(`
+      SELECT DISTINCT colaborador_id
+      FROM escala_concessoes
+      WHERE ? BETWEEN inicio AND fim
+    `).all(dia);
+    rowsCon.forEach((row) => {
+      if (row?.colaborador_id) ids.add(Number(row.colaborador_id));
+    });
+  }
+
+  return ids;
+}
+
 function parseTimeToMinutes(hhmm) {
   const [h, m] = String(hhmm || "").split(":").map((v) => Number(v));
   if (!Number.isInteger(h) || !Number.isInteger(m)) return NaN;
@@ -141,7 +170,7 @@ function getSemanaPorData(dateISO) {
 
   if (!semana) return null;
 
-  const linhas = getLinhasSemanaComStatus(semana.id);
+  const linhas = getLinhasSemanaComStatus(semana.id, d);
 
   return {
     ...semana,
@@ -149,7 +178,7 @@ function getSemanaPorData(dateISO) {
   };
 }
 
-function getLinhasSemanaComStatus(semanaId) {
+function getLinhasSemanaComStatus(semanaId, dateRef) {
   const semana = db.prepare(`
     SELECT id, data_inicio, data_fim
     FROM escala_semanas
@@ -195,7 +224,12 @@ function getLinhasSemanaComStatus(semanaId) {
     if (!mapAus.has(a.colaborador_id)) mapAus.set(a.colaborador_id, a);
   }
 
-  return alocs.map((a) => {
+  const diaFiltro = toDateOnly(dateRef || semana.data_inicio);
+  const ausentesNoDia = getColaboradorIdsAusentesNoDia(diaFiltro);
+
+  return alocs
+    .filter((a) => !ausentesNoDia.has(Number(a.colaborador_id)))
+    .map((a) => {
     const aus = mapAus.get(a.colaborador_id);
     const statusLabel = aus
       ? `${String(aus.tipo || '').toUpperCase()} (${aus.inicio} a ${aus.fim})`
@@ -440,6 +474,95 @@ function lancarAusencia({
   }
 }
 
+function listarAusencias({ dateISO, limit = 200 } = {}) {
+  const dateRef = toDateOnly(dateISO || isoToday());
+  const maxRows = Math.min(Math.max(Number(limit) || 200, 1), 500);
+
+  const concessoes = tableExists("escala_concessoes")
+    ? db.prepare(`
+      SELECT ec.id,
+             ec.colaborador_id,
+             c.nome,
+             c.funcao,
+             UPPER(COALESCE(ec.tipo, '-')) AS tipo,
+             ec.inicio,
+             ec.fim,
+             ec.motivo
+      FROM escala_concessoes ec
+      JOIN colaboradores c ON c.id = ec.colaborador_id
+      ORDER BY ec.inicio DESC, ec.id DESC
+      LIMIT ?
+    `).all(maxRows)
+    : [];
+
+  return concessoes.map((row) => ({
+    id: Number(row.id),
+    colaborador_id: Number(row.colaborador_id),
+    nome: row.nome,
+    funcaoLabel: funcaoLabel(normalizeFuncao(row.funcao) || row.funcao),
+    tipo: row.tipo,
+    inicio: row.inicio,
+    fim: row.fim,
+    motivo: row.motivo || "",
+    ativoNoDia: dateRef >= row.inicio && dateRef <= row.fim,
+  }));
+}
+
+function atualizarAusencia({ id, tipo, inicio, fim, motivo }) {
+  const ausenciaId = Number(id);
+  if (!ausenciaId) throw new Error("Registro de ausência inválido.");
+
+  const tipoUpper = String(tipo || "").trim().toUpperCase();
+  if (!["FOLGA", "ATESTADO", "FERIAS"].includes(tipoUpper)) {
+    throw new Error("Tipo de ausência inválido.");
+  }
+
+  const inicioIso = toDateOnly(inicio);
+  const fimIso = toDateOnly(fim);
+  if (!inicioIso || !fimIso || inicioIso > fimIso) {
+    throw new Error("Período inválido para ausência.");
+  }
+
+  const row = tableExists("escala_concessoes")
+    ? db.prepare(`SELECT id, colaborador_id FROM escala_concessoes WHERE id = ? LIMIT 1`).get(ausenciaId)
+    : null;
+  if (!row?.id) throw new Error("Registro de ausência não encontrado.");
+
+  const rowAtual = db.prepare(`
+    SELECT id, colaborador_id, inicio, fim
+    FROM escala_concessoes
+    WHERE id = ?
+    LIMIT 1
+  `).get(ausenciaId);
+
+  db.prepare(`
+    UPDATE escala_concessoes
+    SET tipo = ?, inicio = ?, fim = ?, motivo = ?
+    WHERE id = ?
+  `).run(tipoUpper, inicioIso, fimIso, motivo || null, ausenciaId);
+
+  if (tableExists("escala_ausencias")) {
+    const legacyTipo = tipoUpper === "ATESTADO" ? "atestado" : "folga";
+    const antigos = db.prepare(`
+      SELECT id
+      FROM escala_ausencias
+      WHERE colaborador_id = ?
+        AND data_inicio = ?
+        AND data_fim = ?
+      ORDER BY id DESC
+      LIMIT 1
+    `).get(Number(row.colaborador_id), rowAtual?.inicio || inicioIso, rowAtual?.fim || fimIso);
+
+    if (antigos?.id) {
+      db.prepare(`
+        UPDATE escala_ausencias
+        SET tipo = ?, data_inicio = ?, data_fim = ?, motivo = ?
+        WHERE id = ?
+      `).run(legacyTipo, inicioIso, fimIso, motivo || null, Number(antigos.id));
+    }
+  }
+}
+
 
 function getSemanasNoPeriodo(start, end) {
   return db.prepare(`
@@ -635,7 +758,7 @@ function getUsersDoTurnoAtual({ prefer = "auto" } = {}) {
   const turno = pref === "auto" ? turnoAuto : normalizeTurno(pref);
 
   const rows = db.prepare(`
-    SELECT DISTINCT u.id, u.name, c.funcao, a.tipo_turno
+    SELECT DISTINCT u.id, u.name, c.id AS colaborador_id, c.funcao, a.tipo_turno
     FROM escala_alocacoes a
     JOIN colaboradores c ON c.id = a.colaborador_id
     JOIN users u ON u.id = c.user_id
@@ -652,8 +775,11 @@ function getUsersDoTurnoAtual({ prefer = "auto" } = {}) {
       : [...getTiposTurnoEscala("DIA"), "plantao"]
   );
 
+  const ausentesHoje = getColaboradorIdsAusentesNoDia(hoje);
+
   return rows
     .filter((r) => turnoPermitido.has(String(r.tipo_turno || "").toLowerCase()))
+    .filter((r) => !ausentesHoje.has(Number(r.colaborador_id)))
     .map((r) => ({
       id: Number(r.id),
       name: r.name,
@@ -702,6 +828,7 @@ function getUsersDoTurno(turno) {
   const rows = db.prepare(`
     SELECT DISTINCT u.id,
            u.name,
+           c.id AS colaborador_id,
            lower(COALESCE(NULLIF(c.funcao,''), 'auxiliar')) AS funcao,
            IFNULL(${hasEhReserva ? "c.eh_reserva" : "0"}, 0) AS eh_reserva,
            a.tipo_turno
@@ -720,8 +847,11 @@ function getUsersDoTurno(turno) {
       : ["diurno", "apoio", "plantao"]
   );
 
+  const ausentesHoje = getColaboradorIdsAusentesNoDia(hoje);
+
   return rows
     .filter((r) => permitidos.has(String(r.tipo_turno || "").toLowerCase()))
+    .filter((r) => !ausentesHoje.has(Number(r.colaborador_id)))
     .map((r) => ({
       id: Number(r.id),
       user_id: Number(r.id),
@@ -748,6 +878,7 @@ function getDisponiveisAgora() {
     const rows = db.prepare(`
       SELECT DISTINCT u.id,
              COALESCE(u.name, c.nome) AS name,
+             c.id AS colaborador_id,
              UPPER(COALESCE(NULLIF(${hasUserFuncao ? "u.funcao" : "''"}, ''),
                CASE
                  WHEN lower(c.funcao)='mecanico' THEN 'MECANICO'
@@ -766,7 +897,9 @@ function getDisponiveisAgora() {
       ORDER BY name ASC
     `).all(hoje, turnoAtual);
 
-    if (rows.length) return rows;
+    const ausentesHoje = getColaboradorIdsAusentesNoDia(hoje);
+    const rowsAtivos = rows.filter((row) => !ausentesHoje.has(Number(row.colaborador_id)));
+    if (rowsAtivos.length) return rowsAtivos;
   }
 
   if (hasUserTurno) {
@@ -827,6 +960,9 @@ module.exports = {
   getDisponiveisAgora,
   getMecanicosDoTurnoAtual,
   getAuxiliaresDoTurnoAtual,
+  listarAusencias,
+  atualizarAusencia,
+  getColaboradorIdsAusentesNoDia,
   normalizeTurno,
   normalizeFuncao,
 };

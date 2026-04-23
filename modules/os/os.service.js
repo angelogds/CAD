@@ -127,6 +127,35 @@ function getTurnoAtual() {
   return getTurnoAgora();
 }
 
+function getColaboradoresAusentesHoje() {
+  const ausentes = new Set();
+  if (!tableExists("colaboradores")) return ausentes;
+
+  if (tableExists("escala_ausencias")) {
+    const rows = db.prepare(`
+      SELECT DISTINCT colaborador_id
+      FROM escala_ausencias
+      WHERE date('now','localtime') BETWEEN data_inicio AND data_fim
+    `).all();
+    rows.forEach((row) => {
+      if (row?.colaborador_id) ausentes.add(Number(row.colaborador_id));
+    });
+  }
+
+  if (tableExists("escala_concessoes")) {
+    const rows = db.prepare(`
+      SELECT DISTINCT colaborador_id
+      FROM escala_concessoes
+      WHERE date('now','localtime') BETWEEN inicio AND fim
+    `).all();
+    rows.forEach((row) => {
+      if (row?.colaborador_id) ausentes.add(Number(row.colaborador_id));
+    });
+  }
+
+  return ausentes;
+}
+
 function getEscalaSemanaAtual() {
   return getSemanaAtual();
 }
@@ -141,7 +170,8 @@ function getPessoasDoTurnoAtual() {
   const placeholders = turnosPermitidos.map(() => "?").join(",");
   const usersJoin = tableExists("users");
   const rows = db.prepare(`
-    SELECT c.user_id,
+    SELECT c.id AS colaborador_id,
+           c.user_id,
            ${usersJoin ? "COALESCE(u.name, c.nome)" : "c.nome"} AS nome,
            c.funcao,
            a.tipo_turno
@@ -154,14 +184,16 @@ function getPessoasDoTurnoAtual() {
     ORDER BY nome ASC
   `).all(semanaAtual.id, ...turnosPermitidos);
 
+  const ausentesHoje = getColaboradoresAusentesHoje();
   return rows
     .map((row) => ({
+      colaborador_id: Number(row.colaborador_id || 0) || null,
       user_id: Number(row.user_id || 0) || resolveUserIdPorNome(row.nome) || null,
       nome: String(row.nome || "").trim(),
       funcao: normalizeColaboradorFuncao(row.funcao),
       tipo_turno: String(row.tipo_turno || "").toUpperCase(),
     }))
-    .filter((row) => row.nome);
+    .filter((row) => row.nome && (!row.colaborador_id || !ausentesHoje.has(row.colaborador_id)));
 }
 
 function isUserOcupado(userId) {
@@ -307,6 +339,7 @@ function getExecucaoAtiva(osId) {
   if (!tableExists("os_execucoes")) return null;
   const execCols = getTableColumns("os_execucoes");
   const executorCol = execCols.includes("executor_user_id") ? "executor_user_id" : "mecanico_user_id";
+  const ausentesHoje = getColaboradoresAusentesHoje();
   return db.prepare(`
     SELECT ex.*, u.name AS executor_nome, ua.name AS auxiliar_nome
     FROM os_execucoes ex
@@ -623,6 +656,7 @@ function getColaboradoresTurnoAtual(turno) {
   const turnoNormalizado = String(turno || "").toUpperCase() === "NOITE" ? "NOITE" : "DIA";
   const tipos = getTiposTurnoEscala(turnoNormalizado);
   const placeholders = tipos.map(() => "?").join(",");
+  const ausentesHoje = getColaboradoresAusentesHoje();
 
   return db.prepare(`
     SELECT c.id AS colaborador_id,
@@ -652,7 +686,7 @@ function getColaboradoresTurnoAtual(turno) {
     funcao: normalizeColaboradorFuncao(row.funcao),
     tipo_turno: String(row.tipo_turno || "").toLowerCase(),
     alocacao_id: Number(row.alocacao_id),
-  }));
+  })).filter((row) => !ausentesHoje.has(Number(row.colaborador_id)));
 }
 
 function getPlantonista(semanaId) {
@@ -695,7 +729,9 @@ function getEscalados(semanaId, tipoTurno, funcoes = []) {
     ORDER BY c.nome ASC
   `).all(Number(semanaId), String(tipoTurno || ""));
 
+  const ausentesHoje = getColaboradoresAusentesHoje();
   return rows.filter((row) => {
+    if (ausentesHoje.has(Number(row.id))) return false;
     if (!funcoes.length) return true;
     return funcoes.includes(normalizeColaboradorFuncao(row.funcao));
   });

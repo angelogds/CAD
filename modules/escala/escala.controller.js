@@ -74,6 +74,23 @@ exports.completa = (req, res, next) => {
   }
 };
 
+exports.ausencias = (req, res, next) => {
+  try {
+    res.locals.activeMenu = "escala";
+    const date = String(req.query?.date || "").slice(0, 10);
+    const alvo = date || isoToday();
+    const ausencias = service.listarAusencias({ dateISO: alvo });
+
+    return res.render("escala/ausencias", {
+      title: "Colaboradores em Folga/Atestado",
+      alvo,
+      ausencias,
+    });
+  } catch (e) {
+    next(e);
+  }
+};
+
 exports.adicionarRapido = (req, res, next) => {
   try {
     const inicio = String(req.body?.inicio || "").slice(0, 10);
@@ -185,6 +202,25 @@ exports.lancarAusencia = (req, res, next) => {
 
     req.flash("success", "Concessão lançada com sucesso.");
     return res.redirect(`/escala?date=${date}`);
+  } catch (e) {
+    next(e);
+  }
+};
+
+exports.atualizarAusencia = (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const date = String(req.body?.date || req.query?.date || "").slice(0, 10) || isoToday();
+    const tipo = String(req.body?.tipo || "").trim().toUpperCase();
+    const inicio = String(req.body?.inicio || "").slice(0, 10);
+    const fim = String(req.body?.fim || "").slice(0, 10);
+    const motivo = String(req.body?.motivo || "").trim();
+
+    service.atualizarAusencia({ id, tipo, inicio, fim, motivo });
+    reprocessarPreventivasComNovaEscala();
+
+    req.flash("success", "Ausência atualizada com sucesso.");
+    return res.redirect(`/escala/ausencias?date=${date}`);
   } catch (e) {
     next(e);
   }
