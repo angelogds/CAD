@@ -449,8 +449,8 @@ function getOSPainel(limit = 15) {
           .filter(Boolean)
           .filter((nome, idx, arr) => arr.indexOf(nome) === idx);
         const prio = String(item.grau || item.prioridade || "MEDIA").toUpperCase();
-        const criticidadeAlta = ["ALTA", "ALTO", "CRITICA", "CRÍTICA", "CRITICO", "CRÍTICO", "EMERGENCIAL"].includes(prio);
-        const limiteResponsaveis = criticidadeAlta ? 2 : 1;
+        const criticidadeBaixa = ["BAIXA", "BAIXO"].includes(prio);
+        const limiteResponsaveis = criticidadeBaixa ? 1 : 2;
         const nomesLimitados = nomes.slice(0, limiteResponsaveis);
         return {
           ...item,
