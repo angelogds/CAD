@@ -239,6 +239,62 @@ function classifyColaboradorPerfil({ name = "", role = "", funcao = "" } = {}) {
   return null;
 }
 
+function getUserIdsNomesFixosAtivos() {
+  if (!tableExists("users")) return [];
+
+  const userRows = db.prepare(`
+    SELECT id, name
+    FROM users
+    WHERE IFNULL(ativo, 1) = 1
+  `).all();
+
+  const ids = new Set();
+  userRows.forEach((row) => {
+    const userId = Number(row?.id || 0);
+    if (!userId) return;
+    const nomeNorm = normalizePessoaNome(row?.name || "");
+    if (NOMES_FIXOS_MECANICOS.has(nomeNorm) || NOMES_FIXOS_APOIO.has(nomeNorm)) {
+      ids.add(userId);
+    }
+  });
+
+  if (tableExists("colaboradores")) {
+    const colabRows = db.prepare(`
+      SELECT DISTINCT user_id, nome
+      FROM colaboradores
+      WHERE user_id IS NOT NULL
+        AND IFNULL(ativo, 1) = 1
+    `).all();
+    colabRows.forEach((row) => {
+      const userId = Number(row?.user_id || 0);
+      if (!userId) return;
+      const nomeNorm = normalizePessoaNome(row?.nome || "");
+      if (NOMES_FIXOS_MECANICOS.has(nomeNorm) || NOMES_FIXOS_APOIO.has(nomeNorm)) {
+        ids.add(userId);
+      }
+    });
+  }
+
+  return Array.from(ids);
+}
+
+function topComObrigatorios(items = [], limite = 5, nomesObrigatorios = new Set()) {
+  const top = items.slice(0, limite);
+  if (!nomesObrigatorios?.size) return top;
+
+  const existentes = new Set(top.map((item) => Number(item.user_id || 0)).filter(Boolean));
+  items.forEach((item) => {
+    const nomeNorm = normalizePessoaNome(item?.nome || "");
+    const userId = Number(item?.user_id || 0);
+    if (!userId || existentes.has(userId)) return;
+    if (nomesObrigatorios.has(nomeNorm)) {
+      top.push(item);
+      existentes.add(userId);
+    }
+  });
+  return top;
+}
+
 function getPerfilPorEscalaSemana(userIds = [], dataRef = "") {
   const ids = Array.from(new Set((userIds || []).map((id) => Number(id || 0)).filter(Boolean)));
   if (!ids.length) return new Map();
@@ -365,6 +421,9 @@ function getMecanicosRankingSemana() {
       });
     });
 
+    const userIdsFixos = getUserIdsNomesFixosAtivos();
+    userIdsFixos.forEach((id) => ensure(id));
+
     const userIds = Array.from(mapa.keys());
     if (!userIds.length) {
       return {
@@ -428,9 +487,9 @@ function getMecanicosRankingSemana() {
         ALTA: 2,
         CRITICA: 3,
       },
-      items: itemsMecanicos.slice(0, 5),
-      itemsMecanicos: itemsMecanicos.slice(0, 5),
-      itemsApoio: itemsApoio.slice(0, 5),
+      items: topComObrigatorios(itemsMecanicos, 5, NOMES_FIXOS_MECANICOS),
+      itemsMecanicos: topComObrigatorios(itemsMecanicos, 5, NOMES_FIXOS_MECANICOS),
+      itemsApoio: topComObrigatorios(itemsApoio, 5, NOMES_FIXOS_APOIO),
       destaqueSemana,
       sugestaoFolgaMes: null,
     };
