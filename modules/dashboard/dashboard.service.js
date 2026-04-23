@@ -211,6 +211,16 @@ function normalizeFuncaoColaborador(funcao) {
   return raw;
 }
 
+function classifyColaboradorPerfil({ role = "", funcao = "" } = {}) {
+  const roleNorm = normalizeRole(role || "");
+  const funcaoNorm = normalizeFuncaoColaborador(funcao || "");
+  const isMecanico = roleNorm === "MECANICO" || funcaoNorm === "mecanico";
+  const isApoio = ["auxiliar", "operacional"].includes(funcaoNorm);
+  if (isMecanico) return "mecanico";
+  if (isApoio) return "apoio";
+  return null;
+}
+
 function pesoCriticidade(value) {
   const nivel = String(value || "")
     .normalize("NFD")
@@ -323,28 +333,37 @@ function getMecanicosRankingSemana() {
     `).all(...userIds);
     const usersMap = new Map(users.map((u) => [Number(u.id), u]));
 
-    const items = userIds
+    const itemsByPerfil = userIds
       .map((id) => {
         const raw = mapa.get(id);
         const user = usersMap.get(Number(id));
         if (!user) return null;
-        const roleNorm = normalizeRole(user.role || "");
-        const funcaoNorm = normalizeFuncaoColaborador(user.funcao || "");
-        const isMecanico = roleNorm === "MECANICO" || funcaoNorm === "mecanico";
-        if (!isMecanico) return null;
+        const perfil = classifyColaboradorPerfil(user);
+        if (!perfil) return null;
         return {
           ...raw,
-          nome: user.name || `Mecânico #${id}`,
+          perfil,
+          nome: user.name || `Colaborador #${id}`,
           photo_path: user.photo_path || null,
-          role: roleNorm,
+          role: normalizeRole(user.role || ""),
           funcao: user.funcao || "MECANICO",
         };
       })
       .filter(Boolean)
-      .sort((a, b) => b.score - a.score || b.os_criticas - a.os_criticas || b.os_total - a.os_total || a.nome.localeCompare(b.nome, "pt-BR"))
-      .map((item, index) => ({ ...item, posicao: index + 1 }));
+      .reduce((acc, item) => {
+        if (!acc[item.perfil]) acc[item.perfil] = [];
+        acc[item.perfil].push(item);
+        return acc;
+      }, { mecanico: [], apoio: [] });
 
-    const destaqueSemana = items[0] || null;
+    const ordenarRanking = (items = []) =>
+      items
+        .sort((a, b) => b.score - a.score || b.os_criticas - a.os_criticas || b.os_total - a.os_total || a.nome.localeCompare(b.nome, "pt-BR"))
+        .map((item, index) => ({ ...item, posicao: index + 1 }));
+
+    const itemsMecanicos = ordenarRanking(itemsByPerfil.mecanico || []);
+    const itemsApoio = ordenarRanking(itemsByPerfil.apoio || []);
+    const destaqueSemana = itemsMecanicos[0] || null;
 
     return {
       semana: { inicio: inicioSemana, fim: fimSemana },
@@ -355,7 +374,9 @@ function getMecanicosRankingSemana() {
         ALTA: 2,
         CRITICA: 3,
       },
-      items: items.slice(0, 5),
+      items: itemsMecanicos.slice(0, 5),
+      itemsMecanicos: itemsMecanicos.slice(0, 5),
+      itemsApoio: itemsApoio.slice(0, 5),
       destaqueSemana,
       sugestaoFolgaMes: null,
     };
