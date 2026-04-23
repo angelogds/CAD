@@ -228,18 +228,58 @@ function parseJSONObject(rawText) {
 
   const normalized = unwrapFencedJson(text);
 
-  try {
-    return JSON.parse(normalized);
-  } catch (_e) {
-    const extracted = findFirstJSONObject(normalized);
-    if (extracted) {
-      try {
-        return JSON.parse(extracted);
-      } catch (_ignored) {}
+  const sanitizeJSONLikeText = (value) => {
+    let s = String(value || '').trim();
+    if (!s) return s;
+    s = s
+      .replace(/^\uFEFF/, '')
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'");
+    s = s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+    s = s.replace(/,\s*([}\]])/g, '$1');
+    return s.trim();
+  };
+
+  const tryParse = (candidate) => {
+    const source = String(candidate || '').trim();
+    if (!source) return null;
+    try {
+      return JSON.parse(source);
+    } catch (_e) {
+      return null;
     }
+  };
+
+  const direct = tryParse(normalized);
+  if (direct && typeof direct === 'object' && !Array.isArray(direct)) return direct;
+
+  const extracted = findFirstJSONObject(normalized);
+  const extractedParsed = tryParse(extracted);
+  if (extractedParsed && typeof extractedParsed === 'object' && !Array.isArray(extractedParsed)) return extractedParsed;
+
+  const sanitizedDirect = tryParse(sanitizeJSONLikeText(normalized));
+  if (sanitizedDirect && typeof sanitizedDirect === 'object' && !Array.isArray(sanitizedDirect)) return sanitizedDirect;
+
+  const sanitizedExtracted = tryParse(sanitizeJSONLikeText(extracted));
+  if (sanitizedExtracted && typeof sanitizedExtracted === 'object' && !Array.isArray(sanitizedExtracted)) return sanitizedExtracted;
+
+  if (direct && typeof direct === 'object') return direct;
+  if (extractedParsed && typeof extractedParsed === 'object') return extractedParsed;
+  if (sanitizedDirect && typeof sanitizedDirect === 'object') return sanitizedDirect;
+  if (sanitizedExtracted && typeof sanitizedExtracted === 'object') return sanitizedExtracted;
+
+  if (Array.isArray(direct) || Array.isArray(extractedParsed) || Array.isArray(sanitizedDirect) || Array.isArray(sanitizedExtracted)) {
+    throw buildError(
+      'AI_INVALID_JSON',
+      'IA retornou JSON fora do formato esperado.',
+      'JSON recebido é array; esperado objeto',
+      { preview: normalized.slice(0, 220) }
+    );
   }
 
-  throw buildError('AI_INVALID_JSON', 'IA retornou JSON inválido.', 'Falha ao parsear JSON da Responses API');
+  throw buildError('AI_INVALID_JSON', 'IA retornou JSON inválido.', 'Falha ao parsear JSON da Responses API', {
+    preview: normalized.slice(0, 220),
+  });
 }
 
 async function askText({ systemPrompt, userPayload, model, maxOutputTokens, temperature = 0.2 }) {
