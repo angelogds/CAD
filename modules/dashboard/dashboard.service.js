@@ -399,7 +399,7 @@ function getMecanicosRankingSemana() {
     osSemana.forEach((os) => {
       const participantes = Array.from(
         new Set(
-          [os.mecanico_user_id, os.auxiliar_user_id, os.responsavel_user_id]
+          [os.mecanico_user_id, os.auxiliar_user_id, os.responsavel_user_id, os.closed_by]
             .map((id) => Number(id || 0))
             .filter(Boolean)
         )
