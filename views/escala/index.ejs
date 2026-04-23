@@ -159,6 +159,7 @@
       <div class="label">TIPO</div>
       <select class="input" name="tipo" id="ausencia-tipo" required>
         <option value="FOLGA">Folga</option>
+        <option value="FOLGA_MEIO_PERIODO">Folga meio período</option>
         <option value="ATESTADO">Atestado</option>
         <option value="FERIAS">Férias</option>
       </select>
@@ -213,6 +214,9 @@
       const tipo = (tipoEl.value || '').toUpperCase();
       const folga = tipo === 'FOLGA';
       compEl.style.display = folga ? 'flex' : 'none';
+      if (tipo === 'FOLGA_MEIO_PERIODO') {
+        compEl.style.display = 'none';
+      }
       motivoEl.placeholder = tipo === 'ATESTADO'
         ? 'Obrigatório para Atestado'
         : 'Opcional para Folga/Férias';

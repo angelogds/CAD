@@ -54,6 +54,7 @@
               <input type="hidden" name="date" value="<%= alvo %>">
               <select class="input" name="tipo" style="width:120px;" required>
                 <option value="FOLGA" <%= item.tipo === 'FOLGA' ? 'selected' : '' %>>Folga</option>
+                <option value="FOLGA_MEIO_PERIODO" <%= item.tipo === 'FOLGA_MEIO_PERIODO' ? 'selected' : '' %>>Folga meio período</option>
                 <option value="ATESTADO" <%= item.tipo === 'ATESTADO' ? 'selected' : '' %>>Atestado</option>
                 <option value="FERIAS" <%= item.tipo === 'FERIAS' ? 'selected' : '' %>>Férias</option>
               </select>
