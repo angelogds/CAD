@@ -217,11 +217,11 @@ function pesoCriticidade(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toUpperCase();
-  if (["CRITICA", "CRITICO", "EMERGENCIAL"].includes(nivel)) return 5;
-  if (["ALTA", "ALTO"].includes(nivel)) return 3;
-  if (["MEDIA", "MEDIO"].includes(nivel)) return 2;
-  if (["BAIXA", "BAIXO"].includes(nivel)) return 1;
-  return 2;
+  if (["CRITICA", "CRITICO", "EMERGENCIAL"].includes(nivel)) return 3;
+  if (["ALTA", "ALTO"].includes(nivel)) return 2;
+  if (["MEDIA", "MEDIO"].includes(nivel)) return 1;
+  if (["BAIXA", "BAIXO"].includes(nivel)) return 0.5;
+  return 1;
 }
 
 function getMecanicosRankingSemana() {
@@ -230,6 +230,8 @@ function getMecanicosRankingSemana() {
     if (!hasUsers || !tableExists("os")) {
       return {
         semana: { inicio: null, fim: null },
+        metaMensal: 100,
+        pesosCriticidade: { BAIXA: 0.5, MEDIA: 1, ALTA: 2, CRITICA: 3 },
         items: [],
         destaqueSemana: null,
         sugestaoFolgaMes: null,
@@ -276,28 +278,36 @@ function getMecanicosRankingSemana() {
     };
 
     osSemana.forEach((os) => {
-      const idMecanico = Number(os.mecanico_user_id || os.responsavel_user_id || os.closed_by || 0);
-      if (!idMecanico) return;
-      const card = ensure(idMecanico);
-      const peso = pesoCriticidade(os.criticidade);
-      card.os_total += 1;
-      card.score += peso;
-      if (peso >= 5) card.os_criticas += 1;
-      else if (peso >= 3) card.os_altas += 1;
-      else if (peso >= 2) card.os_medias += 1;
-      else card.os_baixas += 1;
+      const participantes = Array.from(
+        new Set(
+          [os.mecanico_user_id, os.auxiliar_user_id, os.responsavel_user_id, os.closed_by]
+            .map((id) => Number(id || 0))
+            .filter(Boolean)
+        )
+      );
+      if (!participantes.length) return;
 
-      const idAuxiliar = Number(os.auxiliar_user_id || 0);
-      if (idAuxiliar && idAuxiliar !== idMecanico) {
-        const aux = ensure(idAuxiliar);
-        aux.score += Number((peso * 0.4).toFixed(2));
-      }
+      const peso = pesoCriticidade(os.criticidade);
+      const pontosPorParticipante = Number((peso / participantes.length).toFixed(2));
+
+      participantes.forEach((userId) => {
+        const card = ensure(userId);
+        card.os_total += 1;
+        card.score += pontosPorParticipante;
+
+        if (peso >= 3) card.os_criticas += 1;
+        else if (peso >= 2) card.os_altas += 1;
+        else if (peso >= 1) card.os_medias += 1;
+        else card.os_baixas += 1;
+      });
     });
 
     const userIds = Array.from(mapa.keys());
     if (!userIds.length) {
       return {
         semana: { inicio: inicioSemana, fim: fimSemana },
+        metaMensal: 100,
+        pesosCriticidade: { BAIXA: 0.5, MEDIA: 1, ALTA: 2, CRITICA: 3 },
         items: [],
         destaqueSemana: null,
         sugestaoFolgaMes: null,
@@ -336,51 +346,23 @@ function getMecanicosRankingSemana() {
 
     const destaqueSemana = items[0] || null;
 
-    const inicioMes = db.prepare(`SELECT date('now', 'start of month', 'localtime') AS inicio`).get()?.inicio || null;
-    const folgaMes = inicioMes
-      ? db.prepare(`
-        SELECT
-          COALESCE(o.mecanico_user_id, o.responsavel_user_id, o.closed_by) AS user_id,
-          SUM(
-            CASE
-              WHEN UPPER(COALESCE(NULLIF(o.grau, ''), NULLIF(o.prioridade, ''), 'MEDIA')) IN ('CRITICA','CRITICO','EMERGENCIAL') THEN 5
-              WHEN UPPER(COALESCE(NULLIF(o.grau, ''), NULLIF(o.prioridade, ''), 'MEDIA')) IN ('ALTA','ALTO') THEN 3
-              WHEN UPPER(COALESCE(NULLIF(o.grau, ''), NULLIF(o.prioridade, ''), 'MEDIA')) IN ('BAIXA','BAIXO') THEN 1
-              ELSE 2
-            END
-          ) AS score_mes,
-          COUNT(*) AS os_mes
-        FROM os o
-        WHERE UPPER(COALESCE(o.status, '')) IN ('FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA')
-          AND date(COALESCE(o.data_fim, o.data_conclusao, o.closed_at, o.opened_at), 'localtime') BETWEEN ? AND date('now', 'localtime')
-          AND COALESCE(o.mecanico_user_id, o.responsavel_user_id, o.closed_by) IS NOT NULL
-        GROUP BY COALESCE(o.mecanico_user_id, o.responsavel_user_id, o.closed_by)
-        ORDER BY score_mes DESC, os_mes DESC
-        LIMIT 1
-      `).get(inicioMes)
-      : null;
-
-    const userFolga = folgaMes?.user_id ? db.prepare("SELECT id, name, role, funcao FROM users WHERE id = ? LIMIT 1").get(Number(folgaMes.user_id)) : null;
-    const sugestaoFolgaMes = userFolga
-      ? {
-          user_id: Number(userFolga.id),
-          nome: userFolga.name || "Colaborador",
-          role: normalizeRole(userFolga.role || ""),
-          funcao: userFolga.funcao || "-",
-          score_mes: Number(folgaMes.score_mes || 0),
-          os_mes: Number(folgaMes.os_mes || 0),
-          elegivel: true,
-        }
-      : null;
-
     return {
       semana: { inicio: inicioSemana, fim: fimSemana },
+      metaMensal: 100,
+      pesosCriticidade: {
+        BAIXA: 0.5,
+        MEDIA: 1,
+        ALTA: 2,
+        CRITICA: 3,
+      },
       items: items.slice(0, 5),
       destaqueSemana,
-      sugestaoFolgaMes,
+      sugestaoFolgaMes: null,
     };
   }, {
     semana: { inicio: null, fim: null },
+    metaMensal: 100,
+    pesosCriticidade: { BAIXA: 0.5, MEDIA: 1, ALTA: 2, CRITICA: 3 },
     items: [],
     destaqueSemana: null,
     sugestaoFolgaMes: null,

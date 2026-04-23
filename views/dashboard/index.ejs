@@ -153,8 +153,9 @@
   var safeMotoresResumo = motoresResumo || {};
   var rankingMecanicosData = rankingMecanicos || {};
   var rankingMecanicosItems = rankingMecanicosData.items || [];
-  var rankingFolgaMes = rankingMecanicosData.sugestaoFolgaMes || null;
-  var safePreventivas = preventivas || {};
+  var rankingMetaMensal = Number(rankingMecanicosData.metaMensal || 100);
+  var rankingPesos = rankingMecanicosData.pesosCriticidade || { BAIXA: 0.5, MEDIA: 1, ALTA: 2, CRITICA: 3 };
+    var safePreventivas = preventivas || {};
   var preventivasItems = safePreventivas.items || [];
   var preventivasResumo = safePreventivas.resumo || {};
   var preventivasCrit = safePreventivas.criticidade || {};
@@ -354,11 +355,11 @@
 <section class="dashboard-card area-ranking-mecanicos">
     <div class="ranking-header">
       <div class="dashboard-title" style="margin:0;">Ranking dos mecânicos</div>
-      <span class="ranking-subtitle">Pontuação por criticidade</span>
+      <span class="ranking-subtitle">Ranking por participação na OS</span>
     </div>
     <p class="muted-xs" style="margin-top:-4px; margin-bottom:10px;">
-      Pesos da semana: <strong>Baixa 1</strong> • <strong>Média 2</strong> • <strong>Alta 3</strong> • <strong>Crítica 5</strong>.
-      Serviços mais relevantes valem mais pontos.
+      Meta mensal: <strong><%= rankingMetaMensal %> pontos</strong>. Pesos: <strong>Baixa <%= rankingPesos.BAIXA %></strong> • <strong>Média <%= rankingPesos.MEDIA %></strong> • <strong>Alta <%= rankingPesos.ALTA %></strong> • <strong>Crítica <%= rankingPesos.CRITICA %></strong>.
+      A pontuação é dividida igualmente entre os participantes de cada OS.
     </p>
     <% if (!rankingMecanicosItems.length) { %>
       <div class="ranking-empty">Sem fechamentos suficientes nesta semana para montar o ranking.</div>
@@ -389,14 +390,6 @@
           </article>
         <% }) %>
       </div>
-      <% if (rankingFolgaMes && rankingFolgaMes.elegivel) { %>
-        <div class="ranking-highlight">
-          🏅 <strong>Destaque do mês (sugestão de folga):</strong>
-          <%= rankingFolgaMes.nome %> —
-          <strong><%= rankingFolgaMes.score_mes %> pts</strong> em <%= rankingFolgaMes.os_mes %> OS finalizadas.
-          (Válido para mecânico/auxiliar conforme regra interna de benefício.)
-        </div>
-      <% } %>
     <% } %>
   </section>
 
