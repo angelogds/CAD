@@ -7,6 +7,15 @@ try {
   preventivasService = null;
 }
 
+function normalizeTipoAusencia(tipo) {
+  const raw = String(tipo || "").trim().toUpperCase();
+  if (raw === "FOLGA_MEIO_PERIODO") return "FOLGA_MEIO_PERIODO";
+  if (raw === "FOLGA") return "FOLGA";
+  if (raw === "ATESTADO") return "ATESTADO";
+  if (raw === "FERIAS") return "FERIAS";
+  return "";
+}
+
 function isoToday() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -146,7 +155,7 @@ exports.lancarAusencia = (req, res, next) => {
   try {
     const date = String(req.body?.date || "").slice(0, 10) || isoToday();
     const nome = String(req.body?.nome || "").trim();
-    const tipo = String(req.body?.tipo || "").trim().toUpperCase();
+    const tipo = normalizeTipoAusencia(req.body?.tipo);
     const inicio = String(req.body?.inicio || "").slice(0, 10);
     const fim = String(req.body?.fim || "").slice(0, 10);
     const motivo = String(req.body?.motivo || "").trim();
@@ -167,8 +176,8 @@ exports.lancarAusencia = (req, res, next) => {
       return res.redirect(`/escala?date=${date}`);
     }
 
-    if (!["FOLGA", "ATESTADO", "FERIAS"].includes(tipo)) {
-      req.flash("error", "Tipo inválido (use Folga, Férias ou Atestado).");
+    if (!["FOLGA", "FOLGA_MEIO_PERIODO", "ATESTADO", "FERIAS"].includes(tipo)) {
+      req.flash("error", "Tipo inválido (use Folga, Folga meio período, Férias ou Atestado).");
       return res.redirect(`/escala?date=${date}`);
     }
 
@@ -211,7 +220,7 @@ exports.atualizarAusencia = (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const date = String(req.body?.date || req.query?.date || "").slice(0, 10) || isoToday();
-    const tipo = String(req.body?.tipo || "").trim().toUpperCase();
+    const tipo = normalizeTipoAusencia(req.body?.tipo);
     const inicio = String(req.body?.inicio || "").slice(0, 10);
     const fim = String(req.body?.fim || "").slice(0, 10);
     const motivo = String(req.body?.motivo || "").trim();

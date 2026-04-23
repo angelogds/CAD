@@ -77,6 +77,15 @@ function toDateOnly(value) {
   return String(value || "").slice(0, 10);
 }
 
+function normalizeTipoAusencia(tipo) {
+  const raw = String(tipo || "").trim().toUpperCase();
+  if (raw === "FOLGA_MEIO_PERIODO") return "FOLGA_MEIO_PERIODO";
+  if (raw === "FOLGA") return "FOLGA";
+  if (raw === "ATESTADO") return "ATESTADO";
+  if (raw === "FERIAS") return "FERIAS";
+  return "";
+}
+
 function getColaboradorIdsAusentesNoDia(dateISO) {
   const dia = toDateOnly(dateISO) || isoToday();
   const ids = new Set();
@@ -423,7 +432,8 @@ function lancarAusencia({
   const colabId = ensureColaborador(nome, funcao || "mecanico");
   if (!colabId) throw new Error("Colaborador inválido.");
 
-  const tipoUpper = String(tipo || "").trim().toUpperCase();
+  const tipoUpper = normalizeTipoAusencia(tipo);
+  if (!tipoUpper) throw new Error("Tipo de ausência inválido.");
   const inicioIso = toDateOnly(inicio);
   const fimIso = toDateOnly(fim);
 
@@ -434,7 +444,9 @@ function lancarAusencia({
   let concessao = "NAO_APLICA";
   let refCompensacaoId = null;
 
-  if (tipoUpper === "FOLGA" && dataServico && horaInicio && horaFim) {
+  const tipoConcessao = tipoUpper === "FOLGA_MEIO_PERIODO" ? "FOLGA" : tipoUpper;
+
+  if (tipoConcessao === "FOLGA" && dataServico && horaInicio && horaFim) {
     const calculo = calculateCompensacao(horaInicio, horaFim);
     concessao = calculo.concessao === "SEM_DIREITO" ? "MEIA" : calculo.concessao;
 
@@ -456,17 +468,19 @@ function lancarAusencia({
     );
 
     refCompensacaoId = Number(info.lastInsertRowid);
-  } else if (tipoUpper === "FOLGA") {
+  } else if (tipoUpper === "FOLGA_MEIO_PERIODO") {
+    concessao = "MEIA";
+  } else if (tipoConcessao === "FOLGA") {
     concessao = "INTEIRA";
   }
 
   db.prepare(`
     INSERT INTO escala_concessoes (colaborador_id, tipo, inicio, fim, concessao, motivo, ref_compensacao_id)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(colabId, tipoUpper, inicioIso, fimIso, concessao, motivo || null, refCompensacaoId);
+  `).run(colabId, tipoConcessao, inicioIso, fimIso, concessao, motivo || null, refCompensacaoId);
 
-  if (tipoUpper !== "FERIAS") {
-    const tipoLegacy = tipoUpper === "ATESTADO" ? "atestado" : "folga";
+  if (tipoConcessao !== "FERIAS") {
+    const tipoLegacy = tipoConcessao === "ATESTADO" ? "atestado" : "folga";
     db.prepare(`
       INSERT INTO escala_ausencias (colaborador_id, tipo, data_inicio, data_fim, motivo)
       VALUES (?, ?, ?, ?, ?)
@@ -485,6 +499,7 @@ function listarAusencias({ dateISO, limit = 200 } = {}) {
              c.nome,
              c.funcao,
              UPPER(COALESCE(ec.tipo, '-')) AS tipo,
+             UPPER(COALESCE(ec.concessao, '-')) AS concessao,
              ec.inicio,
              ec.fim,
              ec.motivo
@@ -500,7 +515,7 @@ function listarAusencias({ dateISO, limit = 200 } = {}) {
     colaborador_id: Number(row.colaborador_id),
     nome: row.nome,
     funcaoLabel: funcaoLabel(normalizeFuncao(row.funcao) || row.funcao),
-    tipo: row.tipo,
+    tipo: row.tipo === "FOLGA" && row.concessao === "MEIA" ? "FOLGA_MEIO_PERIODO" : row.tipo,
     inicio: row.inicio,
     fim: row.fim,
     motivo: row.motivo || "",
@@ -512,10 +527,11 @@ function atualizarAusencia({ id, tipo, inicio, fim, motivo }) {
   const ausenciaId = Number(id);
   if (!ausenciaId) throw new Error("Registro de ausência inválido.");
 
-  const tipoUpper = String(tipo || "").trim().toUpperCase();
-  if (!["FOLGA", "ATESTADO", "FERIAS"].includes(tipoUpper)) {
+  const tipoUpper = normalizeTipoAusencia(tipo);
+  if (!["FOLGA", "FOLGA_MEIO_PERIODO", "ATESTADO", "FERIAS"].includes(tipoUpper)) {
     throw new Error("Tipo de ausência inválido.");
   }
+  const tipoConcessao = tipoUpper === "FOLGA_MEIO_PERIODO" ? "FOLGA" : tipoUpper;
 
   const inicioIso = toDateOnly(inicio);
   const fimIso = toDateOnly(fim);
@@ -537,12 +553,19 @@ function atualizarAusencia({ id, tipo, inicio, fim, motivo }) {
 
   db.prepare(`
     UPDATE escala_concessoes
-    SET tipo = ?, inicio = ?, fim = ?, motivo = ?
+    SET tipo = ?, concessao = ?, inicio = ?, fim = ?, motivo = ?
     WHERE id = ?
-  `).run(tipoUpper, inicioIso, fimIso, motivo || null, ausenciaId);
+  `).run(
+    tipoConcessao,
+    tipoUpper === "FOLGA_MEIO_PERIODO" ? "MEIA" : (tipoConcessao === "FOLGA" ? "INTEIRA" : "NAO_APLICA"),
+    inicioIso,
+    fimIso,
+    motivo || null,
+    ausenciaId,
+  );
 
   if (tableExists("escala_ausencias")) {
-    const legacyTipo = tipoUpper === "ATESTADO" ? "atestado" : "folga";
+    const legacyTipo = tipoConcessao === "ATESTADO" ? "atestado" : "folga";
     const antigos = db.prepare(`
       SELECT id
       FROM escala_ausencias
