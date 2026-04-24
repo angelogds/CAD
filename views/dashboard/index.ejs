@@ -52,7 +52,8 @@
   .ranking-item { display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; border:1px solid #e2e8f0; border-radius:12px; padding:10px; background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%); }
   .ranking-pos { width:34px; height:34px; border-radius:999px; background:#0f172a; color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:900; }
   .ranking-avatar-wrap { position:relative; display:inline-flex; }
-  .ranking-avatar { width:38px; height:38px; border-radius:999px; object-fit:cover; border:2px solid #dbeafe; background:#e2e8f0; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#1e293b; }
+  .ranking-avatar { width:38px; height:38px; border-radius:999px; object-fit:cover; border:2px solid #dbeafe; background:#e2e8f0; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#1e293b; transition:border-color .2s ease, box-shadow .2s ease; }
+  .ranking-avatar.online { border-color:#22c55e; box-shadow:0 0 0 2px rgba(34,197,94,.2); }
   .ranking-online-dot { position:absolute; right:-1px; bottom:-1px; width:11px; height:11px; border-radius:999px; background:#22c55e; border:2px solid #fff; box-shadow:0 0 0 1px rgba(34,197,94,.35); }
   .ranking-main { display:flex; align-items:center; gap:9px; min-width:0; }
   .ranking-name { font-size:14px; font-weight:900; color:#0f172a; }
@@ -376,9 +377,9 @@
               <% var itemOnline = onlineUserIds.has(Number(item.user_id || 0)); %>
               <span class="ranking-avatar-wrap">
                 <% if (item.photo_path) { %>
-                  <img class="ranking-avatar" src="<%= item.photo_path %>" alt="Foto de <%= item.nome %>">
+                  <img class="ranking-avatar <%= itemOnline ? 'online' : '' %>" src="<%= item.photo_path %>" alt="Foto de <%= item.nome %>">
                 <% } else { %>
-                  <span class="ranking-avatar"><%= String(item.nome || '?').split(' ').map(function(n){return n[0];}).join('').slice(0,2).toUpperCase() %></span>
+                  <span class="ranking-avatar <%= itemOnline ? 'online' : '' %>"><%= String(item.nome || '?').split(' ').map(function(n){return n[0];}).join('').slice(0,2).toUpperCase() %></span>
                 <% } %>
                 <% if (itemOnline) { %><span class="ranking-online-dot" title="Online" aria-label="Online"></span><% } %>
               </span>
@@ -420,9 +421,9 @@
               <% var itemOnline = onlineUserIds.has(Number(item.user_id || 0)); %>
               <span class="ranking-avatar-wrap">
                 <% if (item.photo_path) { %>
-                  <img class="ranking-avatar" src="<%= item.photo_path %>" alt="Foto de <%= item.nome %>">
+                  <img class="ranking-avatar <%= itemOnline ? 'online' : '' %>" src="<%= item.photo_path %>" alt="Foto de <%= item.nome %>">
                 <% } else { %>
-                  <span class="ranking-avatar"><%= String(item.nome || '?').split(' ').map(function(n){return n[0];}).join('').slice(0,2).toUpperCase() %></span>
+                  <span class="ranking-avatar <%= itemOnline ? 'online' : '' %>"><%= String(item.nome || '?').split(' ').map(function(n){return n[0];}).join('').slice(0,2).toUpperCase() %></span>
                 <% } %>
                 <% if (itemOnline) { %><span class="ranking-online-dot" title="Online" aria-label="Online"></span><% } %>
               </span>
