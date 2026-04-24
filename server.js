@@ -128,10 +128,26 @@ app.locals.fmtBR = fmtBR;
 function listOnlineUsers() {
   try {
     const nowMs = Date.now();
-    const sessions = db.prepare("SELECT sess, expired FROM sessions WHERE expired >= ?").all(nowMs);
+    const tableInfo = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND lower(name) IN ('sessions','session') ORDER BY name")
+      .all();
+    const tableName = tableInfo[0]?.name;
+    if (!tableName) return [];
+
+    const columns = new Set(
+      db.prepare(`PRAGMA table_info(${tableName})`).all().map((col) => String(col?.name || "").toLowerCase())
+    );
+    if (!columns.has("sess")) return [];
+
+    const hasExpired = columns.has("expired");
+    const hasExpires = columns.has("expires");
+
+    let query = `SELECT sess${hasExpired ? ', expired' : ''}${hasExpires ? ', expires' : ''} FROM ${tableName}`;
+    if (hasExpired) query += " WHERE expired >= ?";
+    const rows = hasExpired ? db.prepare(query).all(nowMs) : db.prepare(query).all();
     const byUserId = new Map();
 
-    for (const row of sessions) {
+    for (const row of rows) {
       if (!row?.sess) continue;
 
       let payload = null;
@@ -141,15 +157,24 @@ function listOnlineUsers() {
         continue;
       }
 
-      const sessionUser = payload?.user;
-      const userId = Number(sessionUser?.id || 0);
-      if (!userId || !sessionUser?.name) continue;
+      const expiresRaw = row?.expires;
+      if (!hasExpired && expiresRaw != null) {
+        const expiresMs = Number.isFinite(Number(expiresRaw))
+          ? Number(expiresRaw)
+          : Date.parse(String(expiresRaw));
+        if (Number.isFinite(expiresMs) && expiresMs < nowMs) continue;
+      }
+
+      const sessionUser = payload?.user || payload?.session?.user || payload?.passport?.user || null;
+      const userId = Number(sessionUser?.id || sessionUser?.user_id || 0);
+      const userName = String(sessionUser?.name || sessionUser?.username || "").trim();
+      if (!userId || !userName) continue;
 
       if (!byUserId.has(userId)) {
         byUserId.set(userId, {
           id: userId,
-          name: sessionUser.name,
-          photo_path: sessionUser.photo_path || null,
+          name: userName,
+          photo_path: sessionUser?.photo_path || null,
         });
       }
     }
