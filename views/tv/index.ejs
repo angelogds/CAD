@@ -27,16 +27,16 @@
     </div>
   </header>
 
-  <div class="screen-indicators" id="screen-indicators">
-    <button type="button" data-screen="0" class="active">OS</button>
-    <button type="button" data-screen="1">Escala</button>
-    <button type="button" data-screen="2">Preventivas</button>
-    <button type="button" data-screen="3">Alertas</button>
-  </div>
+  <main class="tv-main">
+    <div class="screen-indicators" id="screen-indicators">
+      <button type="button" data-screen="0" class="active">OS</button>
+      <button type="button" data-screen="1">Escala</button>
+      <button type="button" data-screen="2">Preventivas</button>
+      <button type="button" data-screen="3">Alertas</button>
+    </div>
 
-  <main class="tv-screens">
-    <section class="tv-screen active" data-screen="0" aria-label="Tela de ordens de serviço">
-      <div class="grid-2-1">
+    <section class="tv-screens tv-screen active" data-screen="0" aria-label="Tela de ordens de serviço">
+      <div class="tv-grid grid-2-1">
         <article class="card span-2">
           <h2>Ordens de Serviço em Tempo Real</h2>
           <div class="kpi-row three">
@@ -55,13 +55,13 @@
         </article>
         <article class="card">
           <h2>OS por Status</h2>
-          <canvas id="chart-os"></canvas>
+          <div class="chart-container"><canvas id="chart-os"></canvas></div>
         </article>
       </div>
     </section>
 
-    <section class="tv-screen" data-screen="1" aria-label="Tela de escala e ranking">
-      <div class="grid-2">
+    <section class="tv-screens tv-screen" data-screen="1" aria-label="Tela de escala e ranking">
+      <div class="tv-grid grid-2">
         <article class="card">
           <h2>Escala do Dia</h2>
           <div class="escala-block"><h3>Mecânicos do dia</h3><div id="escala-dia" class="chip-list"></div></div>
@@ -79,8 +79,8 @@
       </div>
     </section>
 
-    <section class="tv-screen" data-screen="2" aria-label="Tela de preventivas">
-      <div class="grid-2-1">
+    <section class="tv-screens tv-screen" data-screen="2" aria-label="Tela de preventivas">
+      <div class="tv-grid grid-2-1">
         <article class="card span-2">
           <h2>Preventivas</h2>
           <div class="kpi-row four">
@@ -98,13 +98,13 @@
             </table>
           </div>
         </article>
-        <article class="card"><h2>Por Criticidade</h2><canvas id="chart-prev-criticidade"></canvas></article>
-        <article class="card"><h2>Por Status</h2><canvas id="chart-prev-status"></canvas></article>
+        <article class="card"><h2>Por Criticidade</h2><div class="chart-container"><canvas id="chart-prev-criticidade"></canvas></div></article>
+        <article class="card"><h2>Por Status</h2><div class="chart-container"><canvas id="chart-prev-status"></canvas></div></article>
       </div>
     </section>
 
-    <section class="tv-screen" data-screen="3" aria-label="Tela de alertas e performance">
-      <div class="grid-2">
+    <section class="tv-screens tv-screen" data-screen="3" aria-label="Tela de alertas e performance">
+      <div class="tv-grid grid-2">
         <article class="card">
           <h2>Alertas Ativos</h2>
           <ul id="alertas-list" class="alert-list"></ul>
@@ -119,7 +119,7 @@
         </article>
         <article class="card span-2">
           <h2>Performance da Equipe</h2>
-          <canvas id="chart-team"></canvas>
+          <div class="chart-container"><canvas id="chart-team"></canvas></div>
         </article>
       </div>
     </section>
