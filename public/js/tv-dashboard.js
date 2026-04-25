@@ -2,6 +2,7 @@
   const REFRESH_MS = 10000;
   const ROTATE_MS = 30000;
   const MAX_ROWS = 8;
+  const TV_BASE_WIDTH = 1366;
 
   let currentScreen = 0;
   let osChart;
@@ -11,6 +12,21 @@
 
   const screens = Array.from(document.querySelectorAll('.tv-screen'));
   const indicators = Array.from(document.querySelectorAll('#screen-indicators button'));
+  const tvApp = document.getElementById('tv-app');
+
+  document.body.classList.add('tv-body');
+
+  function adjustScale() {
+    if (!tvApp) return;
+    const scale = Math.min(window.innerWidth / TV_BASE_WIDTH, 1);
+    if (window.innerWidth < 1024 || scale >= 1) {
+      tvApp.style.transform = '';
+      tvApp.style.transformOrigin = '';
+      return;
+    }
+    tvApp.style.transform = `scale(${scale})`;
+    tvApp.style.transformOrigin = 'top left';
+  }
 
   function initials(name = '-') {
     return String(name || '-')
@@ -69,7 +85,7 @@
           labels: ['Abertas', 'Em andamento', 'Fechadas'],
           datasets: [{ data: [0, 0, 0], backgroundColor: ['#f59e0b', '#2563eb', '#15803d'] }],
         },
-        options: { plugins: { legend: { position: 'bottom' } } },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
       });
     }
 
@@ -80,7 +96,7 @@
           labels: ['Baixa', 'Média', 'Alta', 'Crítica'],
           datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['#15803d', '#f59e0b', '#ef4444', '#dc2626'] }],
         },
-        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
       });
     }
 
@@ -91,7 +107,7 @@
           labels: ['Abertas', 'Andamento', 'Fechadas', 'Atrasadas'],
           datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['#f59e0b', '#2563eb', '#15803d', '#dc2626'] }],
         },
-        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
       });
     }
 
@@ -99,7 +115,7 @@
       teamChart = new Chart(document.getElementById('chart-team'), {
         type: 'bar',
         data: { labels: [], datasets: [{ data: [], label: 'Produtividade', backgroundColor: '#2563eb' }] },
-        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
       });
     }
 
@@ -221,9 +237,11 @@
   });
 
   setDateTime();
+  adjustScale();
   activateScreen(0);
   refreshData();
 
+  window.addEventListener('resize', adjustScale);
   setInterval(setDateTime, 1000);
   setInterval(() => activateScreen(currentScreen + 1), ROTATE_MS);
   setInterval(refreshData, REFRESH_MS);
