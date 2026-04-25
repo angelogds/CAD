@@ -96,11 +96,8 @@ function index(req, res) {
   return res.render('dashboard/index', buildDashboardPayload({ tvMode }));
 }
 
-function tv(req, res) {
-  return res.render('dashboard/tv', {
-    ...buildDashboardPayload({ tvMode: true }),
-    authFullscreen: true,
-  });
+function tv(_req, res) {
+  return res.redirect('/tv');
 }
 
 function getTVData(req, res) {

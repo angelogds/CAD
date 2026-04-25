@@ -17,8 +17,6 @@ const SQLiteStoreFactory = require("better-sqlite3-session-store")(session);
 const db = require("./database/db");
 const engine = require("ejs-mate");
 const storage = require("./config/storage");
-const { requireLogin } = require('./modules/auth/auth.middleware');
-const dashboardCtrl = require('./modules/dashboard/dashboard.controller');
 
 let webPush = null;
 try { webPush = require("web-push"); } catch (_e) { webPush = null; }
@@ -297,6 +295,7 @@ mount("/desenho-tecnico", "./modules/desenho-tecnico/desenho-tecnico.routes");
 mount("/academia", "./modules/academia/academia.routes");
 mount("/ai", "./modules/ai/ai.routes");
 mount("/ia", "./modules/ia/ia.routes");
+mount("/", "./routes/tv.routes");
 
 try {
   const osService = require("./modules/os/os.service");
@@ -327,8 +326,6 @@ app.get("/painel-operacional", (req, res) => {
   return res.redirect("/dashboard");
 });
 
-app.get('/tv', requireLogin, dashboardCtrl.tv);
-app.get('/api/tv-data', requireLogin, dashboardCtrl.getTVData);
 
 // ===== Health =====
 app.get("/health", (_req, res) => {
