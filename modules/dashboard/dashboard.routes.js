@@ -24,6 +24,7 @@ const wrap = (fn, name) =>
       };
 
 router.get('/', requireLogin, wrap(ctrl.index, 'index'));
+router.get('/tv', requireLogin, wrap(ctrl.tv, 'tv'));
 router.post('/avisos', requireLogin, wrap(ctrl.createAviso, 'createAviso'));
 
 router.get('/alertas/stream', requireLogin, wrap(ctrl.sse, 'sse'));
