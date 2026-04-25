@@ -3,6 +3,70 @@ const service = require('./dashboard.service');
 const alertsHub = require('../alerts/alerts.hub');
 const alertsService = require('../alerts/alerts.service');
 const webPushService = require('../notifications/webpush.service');
+const db = require('../../database/db');
+
+function isMecanicoLikeRole(role = '') {
+  const norm = String(role || '').toUpperCase();
+  return norm.includes('MECANICO')
+    || norm.includes('MECÂNICO')
+    || norm.includes('MANUTENCAO')
+    || norm.includes('MANUTENÇÃO');
+}
+
+function listMecanicosOnline(limit = 8) {
+  try {
+    const nowMs = Date.now();
+    const tableInfo = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND lower(name) IN ('sessions','session') ORDER BY name")
+      .all();
+    const tableName = tableInfo[0]?.name;
+    if (!tableName) return [];
+
+    const columns = new Set(
+      db.prepare(`PRAGMA table_info(${tableName})`).all().map((col) => String(col?.name || '').toLowerCase())
+    );
+    if (!columns.has('sess')) return [];
+
+    const hasExpired = columns.has('expired');
+    const hasExpires = columns.has('expires');
+    let query = `SELECT sess${hasExpired ? ', expired' : ''}${hasExpires ? ', expires' : ''} FROM ${tableName}`;
+    if (hasExpired) query += ' WHERE expired >= ?';
+    const rows = hasExpired ? db.prepare(query).all(nowMs) : db.prepare(query).all();
+
+    const byUser = new Map();
+    for (const row of rows) {
+      if (!row?.sess) continue;
+      let payload = null;
+      try {
+        payload = JSON.parse(row.sess);
+      } catch (_e) {
+        continue;
+      }
+
+      if (!hasExpired && row?.expires != null) {
+        const expiresMs = Number.isFinite(Number(row.expires)) ? Number(row.expires) : Date.parse(String(row.expires));
+        if (Number.isFinite(expiresMs) && expiresMs < nowMs) continue;
+      }
+
+      const user = payload?.user || payload?.session?.user || payload?.passport?.user || null;
+      const userId = Number(user?.id || user?.user_id || 0);
+      if (!userId) continue;
+
+      const nome = String(user?.name || user?.username || '').trim();
+      if (!nome || !isMecanicoLikeRole(user?.role || '')) continue;
+
+      if (!byUser.has(userId)) {
+        byUser.set(userId, { id: userId, nome });
+      }
+    }
+
+    return Array.from(byUser.values())
+      .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }))
+      .slice(0, limit);
+  } catch (_e) {
+    return [];
+  }
+}
 
 function buildDashboardPayload({ tvMode = false } = {}) {
   const ranking = service.getMecanicosRankingSemana() || {};
@@ -48,6 +112,7 @@ function getTVData(req, res) {
   const demandasResumo = service.getDemandasResumoDashboard();
   const avisos = service.getAvisosDashboard(10);
   const alertaAtivo = alertsService.getAlertaAtivo();
+  const mecanicosOnline = listMecanicosOnline(12);
 
   const ranking = (rankingRaw.itemsMecanicos || rankingRaw.items || [])
     .slice(0, 5)
@@ -103,6 +168,7 @@ function getTVData(req, res) {
       itens: preventivas.items || [],
     },
     ranking,
+    mecanicosOnline,
     escala: { dia, noite, apoio },
     alertas,
     charts: {
