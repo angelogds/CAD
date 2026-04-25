@@ -1,0 +1,243 @@
+<% layout('layout') %>
+<div class="tv-wrapper" id="tv-app">
+  <header class="tv-header card">
+    <div>
+      <h1>Manutenção Campo do Gado • Modo TV</h1>
+      <p class="subtitle">Monitoramento contínuo industrial em tempo real</p>
+    </div>
+    <div class="status-wrap">
+      <div id="tv-date" class="date"></div>
+      <div id="tv-clock" class="clock"></div>
+      <div class="system-online"><span class="dot"></span> Sistema Online</div>
+    </div>
+  </header>
+
+  <main class="tv-grid" id="tv-grid">
+    <section class="card" data-screen="1">
+      <h2>OS Tempo Real</h2>
+      <div class="kpi-row">
+        <div class="kpi"><span>Abertas</span><strong id="os-abertas">0</strong></div>
+        <div class="kpi"><span>Em andamento</span><strong id="os-andamento">0</strong></div>
+        <div class="kpi critica"><span>Paradas críticas</span><strong id="os-criticas">0</strong></div>
+      </div>
+      <div class="mini-list" id="os-lista"></div>
+    </section>
+
+    <section class="card" data-screen="3">
+      <h2>Ranking Mecânicos (Top 5)</h2>
+      <ol id="ranking-list" class="ranking"></ol>
+    </section>
+
+    <section class="card" data-screen="1">
+      <h2>Escala</h2>
+      <div class="escala-grid">
+        <div><label>Dia</label><p id="escala-dia">-</p></div>
+        <div><label>Noite</label><p id="escala-noite">-</p></div>
+        <div><label>Apoio</label><p id="escala-apoio">-</p></div>
+      </div>
+    </section>
+
+    <section class="card" data-screen="1">
+      <h2>Gráfico OS por Status</h2>
+      <canvas id="chart-os"></canvas>
+    </section>
+
+    <section class="card" data-screen="2">
+      <h2>Preventivas</h2>
+      <div class="kpi-row">
+        <div class="kpi"><span>Total</span><strong id="prev-total">0</strong></div>
+        <div class="kpi ok"><span>Verde (ok)</span><strong id="prev-verde">0</strong></div>
+        <div class="kpi atencao"><span>Amarelo</span><strong id="prev-amarelo">0</strong></div>
+        <div class="kpi atraso"><span>Vermelho</span><strong id="prev-vermelho">0</strong></div>
+      </div>
+      <h3>Preventivas por criticidade</h3>
+      <canvas id="chart-prev"></canvas>
+    </section>
+
+    <section class="card" data-screen="3">
+      <h2>Alertas</h2>
+      <ul id="alertas-list" class="alerts"></ul>
+      <h3>Performance da equipe</h3>
+      <canvas id="chart-team"></canvas>
+    </section>
+  </main>
+
+  <audio id="audio-critico" src="/audio/os-critica.mp3" preload="auto"></audio>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const REFRESH_MS = 10000;
+  const ROTATE_MS = 30000;
+  let osChart, prevChart, teamChart;
+  let lastCriticalCount = 0;
+  let activeScreen = 1;
+
+  function setDateTime() {
+    const now = new Date();
+    document.getElementById('tv-clock').textContent = now.toLocaleTimeString('pt-BR');
+    document.getElementById('tv-date').textContent = now.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+  }
+
+  function textList(arr) {
+    return (arr && arr.length) ? arr.join(', ') : '-';
+  }
+
+  function buildCharts(data) {
+    const osCtx = document.getElementById('chart-os');
+    const prevCtx = document.getElementById('chart-prev');
+    const teamCtx = document.getElementById('chart-team');
+
+    if (!osChart) {
+      osChart = new Chart(osCtx, {
+        type: 'doughnut',
+        data: { labels: ['Abertas', 'Em andamento', 'Fechadas'], datasets: [{ data: [0,0,0], backgroundColor: ['#2563EB','#FACC15','#16A34A'] }] },
+        options: { plugins: { legend: { labels: { color: '#0f172a' } } } }
+      });
+    }
+
+    if (!prevChart) {
+      prevChart = new Chart(prevCtx, {
+        type: 'bar',
+        data: { labels: ['Baixa', 'Média', 'Alta', 'Crítica'], datasets: [{ data: [0,0,0,0], backgroundColor: ['#16A34A','#84CC16','#FACC15','#DC2626'] }] },
+        options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+      });
+    }
+
+    if (!teamChart) {
+      teamChart = new Chart(teamCtx, {
+        type: 'bar',
+        data: { labels: [], datasets: [{ label: 'OS concluídas', data: [], backgroundColor: '#2563EB' }] },
+        options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+      });
+    }
+
+    osChart.data.datasets[0].data = [data.charts.osStatus.abertas, data.charts.osStatus.andamento, data.charts.osStatus.fechadas];
+    osChart.update();
+
+    prevChart.data.datasets[0].data = [
+      data.charts.preventivasCriticidade.baixa,
+      data.charts.preventivasCriticidade.media,
+      data.charts.preventivasCriticidade.alta,
+      data.charts.preventivasCriticidade.critica,
+    ];
+    prevChart.update();
+
+    teamChart.data.labels = (data.charts.equipePerformance || []).map((i) => i.nome);
+    teamChart.data.datasets[0].data = (data.charts.equipePerformance || []).map((i) => i.concluidas);
+    teamChart.update();
+  }
+
+  function rotateScreens() {
+    activeScreen = (activeScreen % 3) + 1;
+    document.querySelectorAll('[data-screen]').forEach((el) => {
+      el.style.display = Number(el.dataset.screen) === activeScreen ? 'block' : 'none';
+    });
+  }
+
+  function render(data) {
+    document.getElementById('os-abertas').textContent = data.os.abertas;
+    document.getElementById('os-andamento').textContent = data.os.andamento;
+    document.getElementById('os-criticas').textContent = data.os.criticas;
+
+    const criticaEl = document.querySelector('.kpi.critica');
+    criticaEl.classList.toggle('blink', data.os.criticas > 0);
+
+    document.getElementById('prev-total').textContent = data.preventivas.total;
+    document.getElementById('prev-verde').textContent = data.preventivas.status.verde;
+    document.getElementById('prev-amarelo').textContent = data.preventivas.status.amarelo;
+    document.getElementById('prev-vermelho').textContent = data.preventivas.status.vermelho;
+
+    document.getElementById('escala-dia').textContent = textList(data.escala.dia);
+    document.getElementById('escala-noite').textContent = textList(data.escala.noite);
+    document.getElementById('escala-apoio').textContent = textList(data.escala.apoio);
+
+    const osLista = document.getElementById('os-lista');
+    osLista.innerHTML = (data.os.itens || []).slice(0, 6).map((o) => {
+      const critic = ['CRITICO','CRÍTICO','ALTO','ALTA','EMERGENCIAL'].includes(String(o.grau || o.prioridade || '').toUpperCase());
+      return `<div class="line ${critic ? 'critical' : ''}">#${o.id} • ${o.equipamento || '-'} • ${o.status || '-'}</div>`;
+    }).join('') || '<div class="line">Nenhuma OS ativa.</div>';
+
+    const ranking = document.getElementById('ranking-list');
+    ranking.innerHTML = (data.ranking || []).map((r, idx) => `
+      <li class="${idx === 0 ? 'first' : ''}"><span>${r.nome}</span><strong>${r.pontuacao}</strong></li>
+    `).join('') || '<li><span>Sem dados</span><strong>0</strong></li>';
+
+    const alertas = document.getElementById('alertas-list');
+    alertas.innerHTML = (data.alertas || []).map((a) => `<li>${a.mensagem}</li>`).join('') || '<li>Nenhum alerta no momento.</li>';
+
+    if (data.os.criticas > lastCriticalCount) {
+      document.getElementById('audio-critico').play().catch(() => {});
+    }
+    lastCriticalCount = data.os.criticas;
+
+    buildCharts(data);
+  }
+
+  async function refresh() {
+    try {
+      const res = await fetch('/api/tv-data', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      render(data);
+    } catch (_e) {
+      // keep current state and retry on next cycle
+    }
+  }
+
+  setDateTime();
+  setInterval(setDateTime, 1000);
+  setInterval(refresh, REFRESH_MS);
+  setInterval(rotateScreens, ROTATE_MS);
+  refresh();
+  rotateScreens();
+</script>
+
+<style>
+  body { margin: 0; background: #f9fafb; }
+  .tv-wrapper { width: 100vw; min-height: 100vh; padding: 16px; box-sizing: border-box; color: #0f172a; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+  .tv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .tv-header h1 { font-size: 30px; margin: 0; }
+  .subtitle { margin: 4px 0 0; color: #475569; font-size: 18px; }
+  .status-wrap { text-align: right; }
+  .date { text-transform: capitalize; font-size: 18px; color: #334155; }
+  .clock { font-size: 38px; font-weight: 800; color: #2563EB; }
+  .system-online { margin-top: 4px; font-size: 16px; font-weight: 600; color: #16A34A; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #16A34A; display: inline-block; margin-right: 6px; }
+
+  .tv-grid { display: grid; gap: 12px; grid-template-columns: 2fr 1fr 1fr; }
+  .card { background: #fff; border-radius: 16px; box-shadow: 0 10px 25px rgba(15, 23, 42, .08); padding: 14px; border: 1px solid #e2e8f0; }
+  h2 { margin: 0 0 10px; font-size: 24px; }
+  h3 { margin: 12px 0 8px; font-size: 20px; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .kpi { background: #f8fafc; border-radius: 14px; padding: 12px; }
+  .kpi span { display: block; color: #475569; font-size: 16px; }
+  .kpi strong { font-size: 36px; line-height: 1.1; }
+  .kpi.ok strong { color: #16A34A; }
+  .kpi.atencao strong { color: #FACC15; }
+  .kpi.atraso strong { color: #DC2626; }
+  .kpi.critica strong { color: #DC2626; }
+
+  .mini-list { margin-top: 8px; }
+  .line { font-size: 18px; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+  .line.critical { color: #7f1d1d; background: #fee2e2; border-radius: 10px; }
+
+  .ranking { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .ranking li { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 12px; border: 1px solid #e2e8f0; font-size: 20px; }
+  .ranking li.first { background: #dbeafe; border-color: #93c5fd; font-size: 24px; }
+
+  .escala-grid { display: grid; gap: 10px; }
+  .escala-grid label { font-size: 16px; color: #475569; }
+  .escala-grid p { margin: 4px 0 0; font-size: 24px; font-weight: 700; }
+
+  .alerts { margin: 0; padding: 0 0 0 20px; display: grid; gap: 8px; font-size: 18px; }
+
+  .blink { animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+
+  @media (max-width: 1400px) {
+    .tv-grid { grid-template-columns: 1fr; }
+    .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>

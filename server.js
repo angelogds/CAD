@@ -17,6 +17,8 @@ const SQLiteStoreFactory = require("better-sqlite3-session-store")(session);
 const db = require("./database/db");
 const engine = require("ejs-mate");
 const storage = require("./config/storage");
+const { requireLogin } = require('./modules/auth/auth.middleware');
+const dashboardCtrl = require('./modules/dashboard/dashboard.controller');
 
 let webPush = null;
 try { webPush = require("web-push"); } catch (_e) { webPush = null; }
@@ -324,6 +326,9 @@ app.get("/painel-operacional", (req, res) => {
   if (!req.session?.user) return res.redirect("/auth/login");
   return res.redirect("/dashboard");
 });
+
+app.get('/tv', requireLogin, dashboardCtrl.tv);
+app.get('/api/tv-data', requireLogin, dashboardCtrl.getTVData);
 
 // ===== Health =====
 app.get("/health", (_req, res) => {
