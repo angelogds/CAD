@@ -10,6 +10,16 @@ try {
   if (!db) db = require('../../db');
 } catch (_e) {}
 
+const MAINT_FALLBACK = [
+  { nome: 'Diogo', grupo: 'MECANICO', funcao: 'Mecânico' },
+  { nome: 'Salviano', grupo: 'MECANICO', funcao: 'Mecânico' },
+  { nome: 'Rodolfo', grupo: 'MECANICO', funcao: 'Mecânico' },
+  { nome: 'Fábio', grupo: 'MECANICO', funcao: 'Mecânico' },
+  { nome: 'Júnior', grupo: 'APOIO_OPERACIONAL', funcao: 'Apoio Operacional' },
+  { nome: 'Luís', grupo: 'APOIO_OPERACIONAL', funcao: 'Auxiliar' },
+  { nome: 'Emanuel', grupo: 'APOIO_OPERACIONAL', funcao: 'Auxiliar' },
+];
+
 function safeAll(sql, params = []) {
   try {
     if (!db || !db.prepare) return [];
@@ -50,12 +60,27 @@ function pickCol(table, candidates, fallbackSql = 'NULL') {
   return found || fallbackSql;
 }
 
+function hasAny(raw, patterns = []) {
+  const s = String(raw || '')
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  return patterns.some((p) => s.includes(p));
+}
+
 function resolvePhotoPath(raw) {
   const value = String(raw || '').trim();
   if (!value) return '';
   if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/')) return value;
   if (value.startsWith('uploads/')) return `/${value}`;
   return `/uploads/users/${value}`;
+}
+
+function toIsoDate(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
 }
 
 function normalizarStatusOS(status) {
@@ -122,7 +147,7 @@ async function getOS() {
       ${created} AS created_at
     FROM ${table}
     ORDER BY id DESC
-    LIMIT 30
+    LIMIT 50
   `);
 
   if (!rows.length) return fallbackOS();
@@ -146,56 +171,202 @@ async function getOS() {
   });
 }
 
-async function getMecanicos() {
-  const table = firstTable(['users', 'usuarios', 'colaboradores']);
-  if (!table) return fallbackMecanicos();
+function extractEscalaVigenteFromTable(table) {
+  const cols = columns(table);
+  if (!cols.length) return { equipe: [], escalaVigente: { dia: [], noite: [], folga: [], ferias: [], atestado: [] } };
 
-  const id = pickCol(table, ['id']);
-  const nome = pickCol(table, ['nome', 'name', 'usuario'], "'Colaborador'");
-  const funcao = pickCol(table, ['funcao', 'cargo', 'role'], "'Mecânico'");
-  const foto = pickCol(table, ['foto', 'avatar', 'photo_url', 'imagem', 'photo_path'], 'NULL');
-  const ativo = pickCol(table, ['ativo', 'is_active'], '1');
+  const nomeCol = pickCol(table, ['nome', 'name', 'usuario_nome', 'colaborador_nome', 'funcionario_nome'], "''");
+  const funcaoCol = pickCol(table, ['funcao', 'cargo', 'perfil', 'papel'], "''");
+  const turnoCol = pickCol(table, ['turno', 'periodo', 'shift'], "''");
+  const statusCol = pickCol(table, ['status', 'situacao', 'estado'], "''");
+  const fotoCol = pickCol(table, ['foto', 'avatar', 'photo_url', 'foto_url', 'imagem'], 'NULL');
+  const idCol = pickCol(table, ['id', 'usuario_id', 'user_id', 'colaborador_id'], 'rowid');
+  const dataCol = pickCol(table, ['data', 'dia', 'data_escala', 'created_at', 'data_referencia'], 'NULL');
+
+  const today = new Date().toISOString().slice(0, 10);
+  const hasData = !['NULL', "''"].includes(dataCol);
 
   const rows = safeAll(`
     SELECT
-      ${id} AS id,
-      ${nome} AS nome,
-      ${funcao} AS funcao,
-      ${foto} AS foto
+      ${idCol} AS id,
+      ${nomeCol} AS nome,
+      ${funcaoCol} AS funcao,
+      ${turnoCol} AS turno,
+      ${statusCol} AS status,
+      ${fotoCol} AS foto,
+      ${hasData ? dataCol : 'NULL'} AS data_escala
     FROM ${table}
-    WHERE COALESCE(${ativo}, 1) = 1
-    ORDER BY nome ASC
-    LIMIT 12
+    ${hasData ? `WHERE date(${dataCol}) = date('${today}') OR ${dataCol} IS NULL` : ''}
+    ORDER BY id DESC
+    LIMIT 80
   `);
 
-  if (!rows.length) return fallbackMecanicos();
+  const escalaVigente = { dia: [], noite: [], folga: [], ferias: [], atestado: [] };
+  const equipe = [];
 
-  const colaboradores = tableExists('colaboradores')
-    ? safeAll('SELECT user_id, foto_url, nome, funcao FROM colaboradores WHERE COALESCE(ativo, 1) = 1')
-    : [];
-  const byUserId = new Map();
-  colaboradores.forEach((c) => {
-    const userId = Number(c?.user_id || 0);
-    if (!userId) return;
-    byUserId.set(userId, c);
+  rows.forEach((r) => {
+    const nome = String(r.nome || '').trim();
+    if (!nome) return;
+
+    const base = `${r.funcao || ''} ${r.status || ''} ${r.turno || ''}`;
+    if (!hasAny(base, ['MECAN', 'MANUTEN', 'AUXILIAR', 'APOIO OPERACIONAL'])) return;
+    if (hasAny(base, ['ADMIN', 'GERENTE', 'RH', 'FINANCEIRO'])) return;
+
+    let grupo = hasAny(base, ['AUXILIAR', 'APOIO OPERACIONAL']) ? 'APOIO_OPERACIONAL' : 'MECANICO';
+    let st = 'online';
+    const tag = `${r.status || ''} ${r.turno || ''}`;
+    if (hasAny(tag, ['EM OS', 'EM_ANDAMENTO', 'ATENDIMENTO'])) st = 'em_os';
+    if (hasAny(tag, ['FOLGA'])) st = 'folga';
+    if (hasAny(tag, ['FERIAS'])) st = 'ferias';
+    if (hasAny(tag, ['ATESTADO'])) st = 'atestado';
+
+    let turno = 'Turno vigente';
+    if (hasAny(tag, ['NOITE'])) turno = 'Noite';
+    if (hasAny(tag, ['DIA'])) turno = 'Dia';
+
+    const row = {
+      id: r.id,
+      nome,
+      funcao: String(r.funcao || (grupo === 'MECANICO' ? 'Mecânico' : 'Apoio Operacional')),
+      grupo,
+      foto: resolvePhotoPath(r.foto) || '/img/tv/avatar-default.jpg',
+      status: st,
+      turno,
+      osAtual: null,
+      totalOsConcluidas: 0,
+      tempoMedio: '-',
+    };
+
+    equipe.push(row);
+    if (st === 'folga') escalaVigente.folga.push(nome);
+    else if (st === 'ferias') escalaVigente.ferias.push(nome);
+    else if (st === 'atestado') escalaVigente.atestado.push(nome);
+    else if (turno === 'Noite') escalaVigente.noite.push(nome);
+    else escalaVigente.dia.push(nome);
   });
 
-  return rows.map((r, index) => {
-    const colab = byUserId.get(Number(r.id));
-    const photoFromId = colab?.foto_url || null;
-    const fotoResolvida = resolvePhotoPath(r.foto || photoFromId || '');
+  return { equipe, escalaVigente };
+}
 
+function fillEquipeStats(equipe, osList) {
+  return equipe.map((p) => {
+    const emAberto = osList.find((o) => String(o.responsavel || '').toUpperCase() === String(p.nome).toUpperCase() && o.status !== 'CONCLUIDA');
+    const concluidas = osList.filter((o) => String(o.responsavel || '').toUpperCase() === String(p.nome).toUpperCase() && o.status === 'CONCLUIDA').length;
     return {
-      id: r.id,
-      nome: r.nome || colab?.nome || `Colaborador #${r.id}`,
-      funcao: r.funcao || colab?.funcao || 'Mecânico',
-      foto: fotoResolvida || '/IMG/logo_menu.png.png',
-      status: index % 5 === 0 ? 'ativo' : 'online',
-      turno: 'Turno vigente',
-      osConcluidas: 0,
-      tempoMedio: 0,
+      ...p,
+      status: p.status === 'online' && emAberto ? 'em_os' : p.status,
+      osAtual: emAberto ? emAberto.numero : null,
+      totalOsConcluidas: concluidas,
     };
   });
+}
+
+async function getEquipeManutencaoViaEscala(osList = []) {
+  const escalaTables = ['escala', 'escalas', 'escala_dias', 'escala_colaboradores', 'escala_manutencao', 'turnos'];
+
+  for (const t of escalaTables) {
+    if (!tableExists(t)) continue;
+    const parsed = extractEscalaVigenteFromTable(t);
+    if (parsed.equipe.length) {
+      return { ...parsed, equipe: fillEquipeStats(parsed.equipe, osList) };
+    }
+  }
+
+  const userTable = firstTable(['usuarios', 'users', 'colaboradores']);
+  if (userTable) {
+    const id = pickCol(userTable, ['id']);
+    const nome = pickCol(userTable, ['nome', 'name', 'usuario'], "'Colaborador'");
+    const funcao = pickCol(userTable, ['funcao', 'cargo', 'role', 'perfil'], "''");
+    const foto = pickCol(userTable, ['foto', 'avatar', 'photo_url', 'imagem', 'photo_path', 'foto_url'], 'NULL');
+    const ativo = pickCol(userTable, ['ativo', 'is_active'], '1');
+
+    const rows = safeAll(`
+      SELECT ${id} id, ${nome} nome, ${funcao} funcao, ${foto} foto
+      FROM ${userTable}
+      WHERE COALESCE(${ativo},1)=1
+      ORDER BY nome
+      LIMIT 100
+    `);
+
+    const equipe = rows
+      .filter((r) => {
+        const base = `${r.nome || ''} ${r.funcao || ''}`;
+        return hasAny(base, ['MECANICO', 'MECANICO', 'MANUTENCAO', 'AUXILIAR', 'APOIO OPERACIONAL'])
+          && !hasAny(base, ['ADMIN', 'MAYARA', 'EDMILSON', 'GERENTE', 'SUPERVISOR']);
+      })
+      .map((r) => {
+        const grupo = hasAny(r.funcao, ['AUXILIAR', 'APOIO OPERACIONAL']) ? 'APOIO_OPERACIONAL' : 'MECANICO';
+        return {
+          id: r.id,
+          nome: r.nome,
+          funcao: r.funcao || (grupo === 'MECANICO' ? 'Mecânico' : 'Apoio Operacional'),
+          grupo,
+          foto: resolvePhotoPath(r.foto) || '/img/tv/avatar-default.jpg',
+          status: 'online',
+          turno: 'Turno vigente',
+          osAtual: null,
+          totalOsConcluidas: 0,
+          tempoMedio: '-',
+        };
+      });
+
+    if (equipe.length) {
+      return {
+        equipe: fillEquipeStats(equipe, osList),
+        escalaVigente: { dia: equipe.map((e) => e.nome), noite: [], folga: [], ferias: [], atestado: [] },
+      };
+    }
+  }
+
+  const equipeFallback = MAINT_FALLBACK.map((p, idx) => ({
+    id: idx + 1,
+    nome: p.nome,
+    funcao: p.funcao,
+    grupo: p.grupo,
+    foto: '/img/tv/avatar-default.jpg',
+    status: 'online',
+    turno: 'Turno vigente',
+    osAtual: null,
+    totalOsConcluidas: 0,
+    tempoMedio: '-',
+  }));
+
+  return {
+    equipe: fillEquipeStats(equipeFallback, osList),
+    escalaVigente: { dia: equipeFallback.map((e) => e.nome), noite: [], folga: [], ferias: [], atestado: [] },
+  };
+}
+
+async function getEscalaVigente(osList = []) {
+  const result = await getEquipeManutencaoViaEscala(osList);
+  return result.escalaVigente;
+}
+
+async function getRankingEquipe(osList = [], equipe = []) {
+  const rankingMap = new Map();
+  osList.forEach((o) => {
+    const s = String(o.status || '').toUpperCase();
+    if (!['CONCLUIDA', 'CONCLUÍDA', 'FECHADA', 'FINALIZADA'].some((x) => s.includes(x))) return;
+    const nome = String(o.responsavel || '').trim();
+    if (!nome) return;
+    rankingMap.set(nome, (rankingMap.get(nome) || 0) + 1);
+  });
+
+  const grupoPorNome = new Map(equipe.map((e) => [String(e.nome || '').toUpperCase(), e.grupo]));
+
+  const ranking = [...rankingMap.entries()]
+    .map(([nome, total]) => ({
+      nome,
+      total,
+      grupo: grupoPorNome.get(String(nome).toUpperCase()) || 'MECANICO',
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8);
+
+  return {
+    ranking,
+    mensagem: ranking.length ? '' : 'Ranking será exibido após novos fechamentos de OS.',
+  };
 }
 
 async function getPreventivas() {
@@ -247,74 +418,74 @@ async function getPreventivas() {
   });
 }
 
+function getGaleriaFromTable(table) {
+  const id = pickCol(table, ['id']);
+  const osId = pickCol(table, ['os_id', 'ordem_servico_id', 'ordem_id'], 'NULL');
+  const arquivo = pickCol(table, ['imagem_url', 'arquivo_url', 'url', 'caminho', 'path', 'filename'], 'NULL');
+  const tipo = pickCol(table, ['tipo', 'mime_type'], "''");
+  const legenda = pickCol(table, ['descricao', 'legenda', 'observacao', 'titulo'], "''");
+  const created = pickCol(table, ['created_at', 'criado_em', 'data_criacao'], 'CURRENT_TIMESTAMP');
+  const respId = pickCol(table, ['responsavel_id', 'usuario_id'], 'NULL');
+
+  const rows = safeAll(`
+    SELECT
+      ${id} id,
+      ${osId} os_id,
+      ${arquivo} arquivo,
+      ${tipo} tipo,
+      ${legenda} legenda,
+      ${created} created_at,
+      ${respId} responsavel_id
+    FROM ${table}
+    WHERE COALESCE(${arquivo}, '') <> ''
+    ORDER BY datetime(${created}) DESC
+    LIMIT 20
+  `);
+
+  return rows
+    .filter((r) => r.arquivo)
+    .map((r) => {
+      const rawUrl = String(r.arquivo || '');
+      const lower = rawUrl.toLowerCase();
+      const mime = String(r.tipo || '').toLowerCase();
+      const isVideo = mime.includes('video') || /\.(mp4|webm|ogg|mov)$/i.test(lower);
+      const src = rawUrl.startsWith('/') || rawUrl.startsWith('http') ? rawUrl : `/uploads/${rawUrl.replace(/^\/+/, '')}`;
+      return {
+        id: `${table}-${r.id}`,
+        arquivo_url: src,
+        tipo: isVideo ? 'video' : 'image',
+        legenda: r.legenda || `Fechamento da OS #${r.os_id || '-'}`,
+        os_numero: `OS #${r.os_id || '-'}`,
+        equipamento: 'Manutenção',
+        created_at: r.created_at,
+        responsavel: r.responsavel_id ? `ID ${r.responsavel_id}` : 'A definir',
+      };
+    });
+}
+
 async function getGaleria() {
-  if (tableExists('os_fechamento_fotos')) {
-    const rows = safeAll(`
-      SELECT id, os_id, imagem_url, legenda, created_at
-      FROM os_fechamento_fotos
-      ORDER BY datetime(created_at) DESC
-      LIMIT 12
-    `);
+  const tables = ['os_fechamento_fotos', 'os_anexos', 'anexos_os', 'ordem_servico_anexos', 'os_fechamentos', 'fechamentos_os'];
+  let itens = [];
+  tables.forEach((t) => {
+    if (tableExists(t)) itens = itens.concat(getGaleriaFromTable(t));
+  });
 
-    if (rows.length) {
-      return rows.map((r) => ({
-        id: r.id,
-        imagem_url: r.imagem_url,
-        legenda: r.legenda || `Fechamento da OS #${r.os_id}`,
-        os_numero: `OS #${r.os_id}`,
-        equipamento: 'Manutenção',
-        created_at: r.created_at,
-      }));
-    }
-  }
+  itens = itens
+    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    .slice(0, 8);
 
-  const anexoTable = firstTable(['os_anexos', 'anexos_os', 'ordens_servico_anexos']);
+  if (itens.length) return itens;
 
-  if (anexoTable) {
-    const id = pickCol(anexoTable, ['id']);
-    const osId = pickCol(anexoTable, ['os_id', 'ordem_servico_id', 'ordem_id'], 'NULL');
-    const arquivo = pickCol(anexoTable, ['arquivo_url', 'imagem_url', 'url', 'caminho_arquivo'], 'NULL');
-    const legenda = pickCol(anexoTable, ['descricao', 'legenda', 'titulo'], "''");
-    const created = pickCol(anexoTable, ['created_at', 'criado_em', 'data_criacao'], 'CURRENT_TIMESTAMP');
-
-    const rows = safeAll(`
-      SELECT
-        ${id} AS id,
-        ${osId} AS os_id,
-        ${arquivo} AS imagem_url,
-        ${legenda} AS legenda,
-        ${created} AS created_at
-      FROM ${anexoTable}
-      WHERE LOWER(${arquivo}) LIKE '%.jpg'
-         OR LOWER(${arquivo}) LIKE '%.jpeg'
-         OR LOWER(${arquivo}) LIKE '%.png'
-         OR LOWER(${arquivo}) LIKE '%.webp'
-      ORDER BY datetime(${created}) DESC
-      LIMIT 12
-    `);
-
-    if (rows.length) {
-      return rows.map((r) => ({
-        id: r.id,
-        imagem_url: r.imagem_url,
-        legenda: r.legenda || `Registro de fechamento da OS #${r.os_id}`,
-        os_numero: `OS #${r.os_id}`,
-        equipamento: 'Manutenção',
-        created_at: r.created_at,
-      }));
-    }
-  }
-
-  return [
-    {
-      id: 1,
-      imagem_url: '/img/tv/galeria-placeholder.jpg',
-      legenda: 'Galeria de fechamento de OS — aguardando fotos reais',
-      os_numero: 'OS',
-      equipamento: 'Manutenção',
-      created_at: new Date().toISOString(),
-    },
-  ];
+  return Array.from({ length: 8 }).map((_, i) => ({
+    id: `placeholder-${i + 1}`,
+    tipo: 'placeholder',
+    arquivo_url: '/img/tv/galeria-placeholder.jpg',
+    legenda: 'Aguardando registros de fechamento de OS',
+    os_numero: 'OS --',
+    equipamento: 'Manutenção',
+    created_at: new Date().toISOString(),
+    responsavel: 'A definir',
+  }));
 }
 
 async function getWeather() {
@@ -326,30 +497,22 @@ async function getWeather() {
     condicao: 'Previsão indisponível no momento',
     codigo: null,
     previsao: [],
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   };
 
   try {
     if (typeof fetch !== 'function') {
-      return {
-        ...fallback,
-        condicao: 'Node sem fetch nativo. Use Node 18+ ou implemente fallback.'
-      };
+      return { ...fallback, condicao: 'Node sem fetch nativo. Use Node 18+ ou implemente fallback.' };
     }
 
     const url =
       'https://api.open-meteo.com/v1/forecast' +
-      '?latitude=-12.2664' +
-      '&longitude=-38.9663' +
+      '?latitude=-12.2664&longitude=-38.9663' +
       '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m' +
       '&daily=weather_code,temperature_2m_max,temperature_2m_min' +
-      '&timezone=America%2FBahia' +
-      '&forecast_days=5';
+      '&timezone=America%2FBahia&forecast_days=5';
 
-    const response = await fetch(url, {
-      headers: { Accept: 'application/json' }
-    });
-
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
     if (!response.ok) throw new Error('Falha ao consultar clima');
 
     const json = await response.json();
@@ -358,7 +521,6 @@ async function getWeather() {
 
     const mapWeather = (code) => {
       const c = Number(code);
-
       if ([0].includes(c)) return 'Céu limpo';
       if ([1, 2].includes(c)) return 'Parcialmente nublado';
       if ([3].includes(c)) return 'Nublado';
@@ -367,7 +529,6 @@ async function getWeather() {
       if ([61, 63, 65, 66, 67].includes(c)) return 'Chuva';
       if ([80, 81, 82].includes(c)) return 'Pancadas de chuva';
       if ([95, 96, 99].includes(c)) return 'Trovoadas';
-
       return 'Condição variável';
     };
 
@@ -376,7 +537,7 @@ async function getWeather() {
       max: daily.temperature_2m_max?.[index] ?? null,
       min: daily.temperature_2m_min?.[index] ?? null,
       codigo: daily.weather_code?.[index] ?? null,
-      condicao: mapWeather(daily.weather_code?.[index])
+      condicao: mapWeather(daily.weather_code?.[index]),
     }));
 
     return {
@@ -387,7 +548,7 @@ async function getWeather() {
       codigo: current.weather_code ?? null,
       condicao: mapWeather(current.weather_code),
       previsao,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
   } catch (err) {
     console.warn('[TV] clima fallback:', err.message);
@@ -424,19 +585,18 @@ function getAlertas(osList, preventivas) {
 }
 
 function getPerformance(osList) {
-  const abertas = osList.filter(o => o.status === 'ABERTA').length;
-  const andamento = osList.filter(o => o.status === 'EM_ANDAMENTO').length;
-  const pausadas = osList.filter(o => o.status === 'PAUSADA').length;
-  const concluidas = osList.filter(o => o.status === 'CONCLUIDA').length;
+  const abertas = osList.filter((o) => o.status === 'ABERTA').length;
+  const andamento = osList.filter((o) => o.status === 'EM_ANDAMENTO').length;
+  const pausadas = osList.filter((o) => o.status === 'PAUSADA').length;
+  const concluidas = osList.filter((o) => o.status === 'CONCLUIDA').length;
 
-  const criticas = osList.filter(o => o.prioridade === 'CRITICA' && o.status !== 'CONCLUIDA').length;
-  const altas = osList.filter(o => o.prioridade === 'ALTA').length;
-  const medias = osList.filter(o => o.prioridade === 'MEDIA').length;
-  const baixas = osList.filter(o => o.prioridade === 'BAIXA').length;
+  const criticas = osList.filter((o) => o.prioridade === 'CRITICA' && o.status !== 'CONCLUIDA').length;
+  const altas = osList.filter((o) => o.prioridade === 'ALTA').length;
+  const medias = osList.filter((o) => o.prioridade === 'MEDIA').length;
+  const baixas = osList.filter((o) => o.prioridade === 'BAIXA').length;
 
   const porEquipamentoMap = {};
-
-  osList.forEach(o => {
+  osList.forEach((o) => {
     const key = o.equipamento || 'Não informado';
     porEquipamentoMap[key] = (porEquipamentoMap[key] || 0) + 1;
   });
@@ -460,21 +620,20 @@ function getPerformance(osList) {
       { label: 'Abertas', value: abertas, color: '#ef4444' },
       { label: 'Andamento', value: andamento, color: '#3b82f6' },
       { label: 'Pausadas', value: pausadas, color: '#f59e0b' },
-      { label: 'Concluídas', value: concluidas, color: '#10b981' }
+      { label: 'Concluídas', value: concluidas, color: '#10b981' },
     ],
     prioridadeChart: [
       { label: 'Crítica', value: criticas, color: '#ef4444' },
       { label: 'Alta', value: altas, color: '#f97316' },
       { label: 'Média', value: medias, color: '#eab308' },
-      { label: 'Baixa', value: baixas, color: '#3b82f6' }
+      { label: 'Baixa', value: baixas, color: '#3b82f6' },
     ],
-    porEquipamento
+    porEquipamento,
   };
 }
 
 function getAvisosAtivos() {
   const table = firstTable(['avisos', 'comunicados', 'alertas']);
-
   if (!table) return [];
 
   const id = pickCol(table, ['id']);
@@ -483,10 +642,7 @@ function getAvisosAtivos() {
   const ativo = pickCol(table, ['ativo', 'is_active'], '1');
 
   return safeAll(`
-    SELECT
-      ${id} AS id,
-      ${titulo} AS titulo,
-      ${descricao} AS descricao
+    SELECT ${id} AS id, ${titulo} AS titulo, ${descricao} AS descricao
     FROM ${table}
     WHERE COALESCE(${ativo}, 1) = 1
     ORDER BY id DESC
@@ -543,19 +699,18 @@ function getTicker(osList, preventivas, avisos = []) {
 }
 
 async function getSnapshot(user) {
-  const [os, mecanicos, preventivas, galeria, weather] = await Promise.all([
-    getOS(),
-    getMecanicos(),
-    getPreventivas(),
-    getGaleria(),
-    getWeather(),
-  ]);
+  const [os, preventivas, galeria, weather] = await Promise.all([getOS(), getPreventivas(), getGaleria(), getWeather()]);
 
+  const equipeData = await getEquipeManutencaoViaEscala(os);
+  const rankingEquipe = await getRankingEquipe(os, equipeData.equipe);
   const avisos = getAvisosAtivos();
 
   return {
     os,
-    mecanicos,
+    mecanicos: equipeData.equipe,
+    equipeManutencao: equipeData.equipe,
+    escalaVigente: equipeData.escalaVigente,
+    rankingEquipe,
     preventivas,
     galeria,
     weather,
@@ -586,17 +741,8 @@ function fallbackOS() {
   ];
 }
 
-function fallbackMecanicos() {
-  return [
-    { id: 1, nome: 'Fábio', funcao: 'Mecânico', foto: '/IMG/logo_menu.png.png', status: 'online', turno: 'Turno vigente', osConcluidas: 0, tempoMedio: 0 },
-    { id: 2, nome: 'Diogo', funcao: 'Mecânico', foto: '/IMG/logo_menu.png.png', status: 'ativo', turno: 'Turno vigente', osConcluidas: 0, tempoMedio: 0 },
-    { id: 3, nome: 'Salviano', funcao: 'Mecânico', foto: '/IMG/logo_menu.png.png', status: 'online', turno: 'Turno vigente', osConcluidas: 0, tempoMedio: 0 },
-    { id: 4, nome: 'Luiz', funcao: 'Auxiliar', foto: '/IMG/logo_menu.png.png', status: 'online', turno: 'Turno vigente', osConcluidas: 0, tempoMedio: 0 },
-  ];
-}
-
 function fallbackPreventivas() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toIsoDate(new Date()) || new Date().toISOString().slice(0, 10);
   return [
     { id: 1, tarefa: 'Lubrificação geral', equipamento: 'PRENSA P50', dataPrevista: today, status: 'PENDENTE', responsavel: 'Fábio' },
     { id: 2, tarefa: 'Inspeção de válvulas', equipamento: 'DIGESTOR 1', dataPrevista: today, status: 'NO_PRAZO', responsavel: 'Diogo' },
@@ -607,4 +753,7 @@ module.exports = {
   getSnapshot,
   getWeather,
   reconhecerAlerta,
+  getEquipeManutencaoViaEscala,
+  getEscalaVigente,
+  getRankingEquipe,
 };
