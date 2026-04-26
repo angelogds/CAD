@@ -52,7 +52,6 @@
         </button>
 
         <div id="status-converse" class="status-converse" role="status" aria-live="polite">Pronto para gravar.</div>
-        <div id="voice-preview" class="status-converse warning" style="display:none; margin-top:8px;"></div>
 
         <textarea
           id="nao_conformidade"
@@ -87,10 +86,7 @@
 
     <div class="row" style="justify-content:space-between; margin-top:16px;">
       <a href="/os" class="btn btn-ghost">Cancelar</a>
-      <div style="display:flex; gap:8px;">
-        <button type="button" class="btn btn-outline" id="btn-confirmar-voz" style="display:none;">Confirmar e criar por voz</button>
-        <button type="submit" class="btn btn-primary" id="btn-salvar-os">Salvar e gerar OS automática</button>
-      </div>
+      <button type="submit" class="btn btn-primary" id="btn-salvar-os">Salvar e gerar OS automática</button>
     </div>
   </form>
 </div>
@@ -157,8 +153,6 @@
     const btn = document.getElementById('btn-converse-mecanico');
     const btnLabel = document.getElementById('btn-converse-label');
     const statusEl = document.getElementById('status-converse');
-    const voicePreviewEl = document.getElementById('voice-preview');
-    const btnConfirmarVoz = document.getElementById('btn-confirmar-voz');
     const naoConformidadeEl = document.getElementById('nao_conformidade');
     const descricaoHiddenEl = document.getElementById('descricao_hidden');
     const criticidadeEl = document.getElementById('criticidade');
@@ -170,8 +164,6 @@
     const acoesHiddenEl = document.getElementById('acoes_iniciais_hidden');
 
     let isRecording = false;
-    let voicePreviewPayload = null;
-
     function setStatus(message, tone) {
       statusEl.textContent = message;
       statusEl.classList.remove('error', 'success', 'warning');
@@ -225,11 +217,6 @@
       causaHiddenEl.value = causaEl.value;
       acoesHiddenEl.value = acoesEl.value;
 
-      voicePreviewPayload = analise;
-      const equipe = (analise.equipe_sugerida || []).map((m) => m.nome).join(', ') || 'Sem sugestão';
-      voicePreviewEl.style.display = '';
-      voicePreviewEl.innerHTML = `<strong>Preview IA:</strong> ${analise.equipamento?.nome || analise.equipamento?.manual || '-'} • ${analise.criticidade || '-'} • ${equipe}`;
-      btnConfirmarVoz.style.display = '';
     }
 
     btn.addEventListener('click', async function () {
@@ -255,7 +242,7 @@
           setStatus('Analisando com IA...', null);
           const analise = await enviarParaAnaliseVoz(transcricao);
           preencherCampos(transcricao, analise);
-          setStatus('Preview gerado. Revise antes de confirmar.', 'success');
+          setStatus('Texto preenchido com IA. Revise e salve a OS.', 'success');
         } catch (e) {
           setStatus(e.message || 'Falha no processamento por voz.', 'warning');
         } finally {
@@ -275,26 +262,6 @@
         }
       };
       recognition.start();
-    });
-
-    btnConfirmarVoz.addEventListener('click', async function () {
-      if (!voicePreviewPayload) return;
-      btnConfirmarVoz.disabled = true;
-      btnConfirmarVoz.textContent = 'Criando...';
-      try {
-        const response = await fetch('/os/voice/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ preview: voicePreviewPayload }),
-        });
-        const payload = await parseJsonSafe(response);
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Falha ao criar OS por voz.');
-        window.location.href = `/os/${payload.os_id}`;
-      } catch (e) {
-        setStatus(e.message || 'Falha ao criar OS por voz.', 'error');
-        btnConfirmarVoz.disabled = false;
-        btnConfirmarVoz.textContent = 'Confirmar e criar por voz';
-      }
     });
 
     fileInput.addEventListener('change', function(){
