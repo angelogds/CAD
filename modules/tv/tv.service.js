@@ -82,12 +82,26 @@ function normalizeImagePath(value) {
   return `/uploads/${v.replace(/^\/+/, '')}`;
 }
 
+function canonicalizeNome(raw = '') {
+  const clean = String(raw || '').trim().toLowerCase();
+  if (!clean) return '';
+
+  const aliases = new Map([
+    ['luiz', 'luis'],
+  ]);
+  return aliases.get(clean) || clean;
+}
+
 function normalizeNome(value = '') {
-  return String(value || '')
+  const normalized = String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toLowerCase();
+  const parts = normalized.split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  parts[0] = canonicalizeNome(parts[0]);
+  return parts.join(' ');
 }
 
 function uniqueBy(items = [], getKey = (item) => item) {
