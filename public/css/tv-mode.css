@@ -36,9 +36,9 @@ html.tv-theme-light {
 * { box-sizing: border-box; }
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 body.cg-tv { font-family: Arial, Helvetica, sans-serif; background: var(--tv-bg); color: var(--tv-text); }
-.tv-shell { width: 100vw; height: 100vh; display: flex; flex-direction: column; overflow: hidden; background: radial-gradient(circle at 15% -10%, rgba(59, 130, 246, .20), transparent 32%), radial-gradient(circle at 85% 10%, rgba(16, 185, 129, .11), transparent 28%), linear-gradient(180deg, var(--tv-bg), var(--tv-bg-2)); }
+.tv-shell { width: 100vw; height: 100vh; display: flex; flex-direction: column; overflow: hidden; background: radial-gradient(circle at 15% -10%, rgba(59, 130, 246, .20), transparent 32%), radial-gradient(circle at 85% 10%, rgba(16, 185, 129, .11), transparent 28%), linear-gradient(180deg, var(--tv-bg), var(--tv-bg-2)); padding-top: 80px; }
 
-.tv-topbar { min-height: 80px; background: rgba(15, 23, 42, .88); border-bottom: 1px solid var(--tv-line); display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; position: relative; z-index: 10; backdrop-filter: blur(12px); }
+.tv-topbar { min-height: 80px; background: rgba(15, 23, 42, .88); border-bottom: 1px solid var(--tv-line); display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; position: fixed; top: 0; left: 0; right: 0; z-index: 100; backdrop-filter: blur(12px); }
 .tv-theme-light .tv-topbar { background: rgba(255, 255, 255, .90); }
 .tv-left, .tv-right { display: flex; align-items: center; gap: 10px; }
 .tv-left { min-width: 430px; }
@@ -72,7 +72,7 @@ body.cg-tv { font-family: Arial, Helvetica, sans-serif; background: var(--tv-bg)
 .tv-progress-line { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: rgba(30,58,95,.65); }
 .tv-progress { height: 100%; width: 0%; background: linear-gradient(90deg, var(--tv-blue), var(--tv-cg-green)); }
 
-.tv-led { background: linear-gradient(90deg, #450a0a, #7f1d1d); color: #fecaca; border-bottom: 1px solid #991b1b; padding: 8px 18px; display: flex; align-items: center; justify-content: space-between; animation: pulseRed 1.2s infinite; }
+.tv-led { position: fixed; top: 80px; left: 0; right: 0; z-index: 90; background: linear-gradient(90deg, #450a0a, #7f1d1d); color: #fecaca; border-bottom: 1px solid #991b1b; padding: 8px 18px; display: flex; align-items: center; justify-content: space-between; animation: pulseRed 1.2s infinite; }
 .tv-led[data-prioridade="critica"] { background: linear-gradient(90deg, #450a0a, #7f1d1d); color: #fecaca; border-bottom-color: #ef4444; animation: pulseRed 1.2s infinite; }
 .tv-led[data-prioridade="alta"] { background: linear-gradient(90deg, #7c2d12, #c2410c); color: #ffedd5; border-bottom-color: #f97316; animation: none; }
 .tv-led[data-prioridade="media"] { background: linear-gradient(90deg, #713f12, #a16207); color: #fef3c7; border-bottom-color: #eab308; animation: none; }
@@ -162,6 +162,14 @@ body.cg-tv { font-family: Arial, Helvetica, sans-serif; background: var(--tv-bg)
 .tv-alert.critical { border-color: rgba(239,68,68,.42); background: rgba(239,68,68,.09); }
 .tv-alert strong { display: block; color: var(--tv-red); font-size: 14px; }
 .tv-alert p, .tv-alert small { color: var(--tv-muted); font-weight: 700; margin: 4px 0 0; }
+.tv-os-alert-list { display: grid; gap: 8px; max-height: 240px; overflow: auto; }
+.tv-os-alert { border: 1px solid var(--tv-line-soft); border-left: 5px solid var(--tv-yellow); border-radius: 10px; padding: 8px; background: rgba(148, 163, 184, .08); animation: ledBreath 1.2s infinite ease-in-out; }
+.tv-os-alert strong { display: block; font-size: 11px; color: var(--tv-text); letter-spacing: .02em; }
+.tv-os-alert small { color: var(--tv-dim); font-weight: 800; }
+.tv-os-alert-critica { border-left-color: var(--tv-red); animation-duration: .85s; }
+.tv-os-alert-alta { border-left-color: var(--tv-orange); }
+.tv-os-alert-media { border-left-color: var(--tv-yellow); }
+.tv-os-alert-baixa { border-left-color: var(--tv-green); }
 
 .tv-weather-main { display: flex; align-items: center; gap: 12px; margin: 8px 0 10px; }
 .tv-weather-main strong { font-size: 46px; line-height: 1; }
@@ -195,6 +203,10 @@ body.cg-tv { font-family: Arial, Helvetica, sans-serif; background: var(--tv-bg)
 @keyframes marquee { from { transform: translateX(0);} to { transform: translateX(-50%);} }
 @keyframes pulseRed { 0%,100% { box-shadow: inset 0 0 0 rgba(239,68,68,0);} 50% { box-shadow: inset 0 0 32px rgba(239,68,68,.22);} }
 @keyframes criticalPulse { 0%,100% { background: rgba(239,68,68,.08);} 50% { background: rgba(239,68,68,.2);} }
+@keyframes ledBreath {
+  0%, 100% { opacity: .45; box-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+  50% { opacity: 1; box-shadow: 0 0 18px rgba(239, 68, 68, .28); }
+}
 
 @media (max-width: 1280px) {
   .tv-clock-center { display: none; }
