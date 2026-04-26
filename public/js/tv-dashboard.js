@@ -4,15 +4,19 @@
   const MAX_ROWS = 8;
   const NEW_OS_HIGHLIGHT_MS = 20000;
   const BANNER_MS = 9000;
+  const THEME_STORAGE_KEY = 'tvTheme';
 
   let currentScreen = 0;
   let osChart;
   let prevCritChart;
   let prevStatusChart;
   let teamChart;
+  let rotateStartMs = Date.now();
 
   const screens = Array.from(document.querySelectorAll('.tv-screen'));
-  const indicators = Array.from(document.querySelectorAll('#screen-indicators button'));
+  const screenTitleEl = document.getElementById('tv-screen-title');
+  const progressEl = document.getElementById('screen-progress');
+  const themeToggleEl = document.getElementById('theme-toggle');
 
   const highlightedRows = new Map();
   const knownOs = new Map();
@@ -50,10 +54,39 @@
     });
   }
 
+  function setTheme(theme) {
+    const dark = theme === 'dark';
+    document.body.classList.toggle('theme-dark', dark);
+    if (themeToggleEl) {
+      themeToggleEl.textContent = dark ? '☀️' : '🌙';
+      themeToggleEl.title = dark ? 'Ativar modo claro' : 'Ativar modo escuro';
+      themeToggleEl.setAttribute('aria-label', themeToggleEl.title);
+    }
+    localStorage.setItem(THEME_STORAGE_KEY, dark ? 'dark' : 'light');
+  }
+
+  function initTheme() {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    const preferDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    setTheme(saved || (preferDark ? 'dark' : 'light'));
+    themeToggleEl?.addEventListener('click', () => {
+      setTheme(document.body.classList.contains('theme-dark') ? 'light' : 'dark');
+    });
+  }
+
   function activateScreen(index) {
     currentScreen = index % screens.length;
     screens.forEach((section, idx) => section.classList.toggle('active', idx === currentScreen));
-    indicators.forEach((item, idx) => item.classList.toggle('active', idx === currentScreen));
+    const title = screens[currentScreen]?.dataset?.title || 'Central de operação';
+    if (screenTitleEl) screenTitleEl.textContent = `Modo TV • ${title}`;
+    rotateStartMs = Date.now();
+  }
+
+  function tickProgress() {
+    if (!progressEl) return;
+    const elapsed = Date.now() - rotateStartMs;
+    const pct = Math.max(0, Math.min(100, (elapsed / ROTATE_MS) * 100));
+    progressEl.style.width = `${pct}%`;
   }
 
   function formatDate(value) {
@@ -107,6 +140,27 @@
     localStorage.setItem('notifiedOs', JSON.stringify([...notifiedOs]));
   }
 
+  function chartTheme() {
+    return {
+      label: document.body.classList.contains('theme-dark') ? '#bfd4ff' : '#334155',
+      grid: document.body.classList.contains('theme-dark') ? '#1b3a67' : '#e2e8f0',
+    };
+  }
+
+  function applyChartColors(chart) {
+    if (!chart) return;
+    const t = chartTheme();
+    chart.options.plugins = chart.options.plugins || {};
+    chart.options.plugins.legend = chart.options.plugins.legend || {};
+    chart.options.plugins.legend.labels = { color: t.label };
+    if (chart.options.scales) {
+      Object.values(chart.options.scales).forEach((axis) => {
+        axis.ticks = { ...(axis.ticks || {}), color: t.label };
+        axis.grid = { ...(axis.grid || {}), color: t.grid };
+      });
+    }
+  }
+
   function updateCharts(data) {
     const osStatus = data?.charts?.osStatus || {};
     const prevCrit = data?.charts?.preventivasCriticidade || {};
@@ -116,7 +170,7 @@
     if (!osChart) {
       osChart = new Chart(document.getElementById('chart-os'), {
         type: 'doughnut',
-        data: { labels: ['Abertas', 'Em andamento', 'Fechadas'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#f59e0b', '#2563eb', '#15803d'] }] },
+        data: { labels: ['Abertas', 'Em andamento', 'Fechadas'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#ef4444', '#3b82f6', '#10b981'] }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
       });
     }
@@ -151,10 +205,29 @@
     teamChart.data.labels = team.map((item) => item.nome);
     teamChart.data.datasets[0].data = team.map((item) => Number(item.concluidas || 0));
 
+    [osChart, prevCritChart, prevStatusChart, teamChart].forEach(applyChartColors);
     osChart.update();
     prevCritChart.update();
     prevStatusChart.update();
     teamChart.update();
+  }
+
+  function medalByIndex(index) {
+    if (index === 0) return '🥇';
+    if (index === 1) return '🥈';
+    if (index === 2) return '🥉';
+    return `#${index + 1}`;
+  }
+
+  function resolveWeatherSymbol(weather = {}) {
+    const hour = Number(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', hour12: false })) || 12;
+    const isNight = hour >= 18 || hour < 6;
+    const condition = String(weather.condition || '').toLowerCase();
+    if (condition.includes('tempest') || condition.includes('trovo')) return '⛈️';
+    if (condition.includes('chuva') || condition.includes('garoa')) return isNight ? '🌧️' : '🌦️';
+    if (condition.includes('nublado')) return isNight ? '☁️' : '⛅';
+    if (condition.includes('limpo') || condition.includes('sol')) return isNight ? '🌙' : '☀️';
+    return weather.icon || (isNight ? '🌙' : '🌤️');
   }
 
   function render(data) {
@@ -242,7 +315,7 @@
     document.getElementById('preventivas-alert-list').innerHTML = prevAttention.map((item) => `<li class="${String(item.criticidade || '').toUpperCase().includes('CRIT') ? 'high' : ''}">#${item.id || '-'} • ${item.equipamento_nome || '-'} • ${String(item.criticidade || '-').toUpperCase()} • ${formatDate(item.data_prevista)}</li>`).join('') || '<li>Sem preventivas críticas/atrasadas.</li>';
 
     const renderRanking = (id, list, summaryLabel) => {
-      document.getElementById(id).innerHTML = (list || []).map((item, idx) => `<li><span class="rk-left"><span class="rk-pos">${idx + 1}</span>${avatarHTML(item)}<span><span class="rk-name">${item.nome || '-'}</span><span class="rk-summary">${summaryLabel}</span></span></span><strong class="rk-score">${Number(item.pontuacao || 0)}</strong></li>`).join('') || '<li><span>Sem dados</span><strong>0</strong></li>';
+      document.getElementById(id).innerHTML = (list || []).map((item, idx) => `<li><span class="rk-left"><span class="rk-pos">${idx + 1}</span><span class="rk-medal">${medalByIndex(idx)}</span>${avatarHTML(item)}<span><span class="rk-name">${item.nome || '-'}</span><span class="rk-summary">${summaryLabel}</span></span></span><strong class="rk-score">${Number(item.pontuacao || 0)}</strong></li>`).join('') || '<li><span>Sem dados</span><strong>0</strong></li>';
     };
     renderRanking('ranking-mecanicos', data?.ranking?.mecanicos || [], 'OS concluídas na semana');
     renderRanking('ranking-apoio', data?.ranking?.apoio || [], 'Apoio operacional');
@@ -250,7 +323,7 @@
     const galleryRoot = document.getElementById('maintenance-gallery');
     const gallery = data?.gallery || [];
     galleryRoot.innerHTML = gallery.length
-      ? gallery.map((item) => `<figure class="gallery-item"><img src="${item.src}" alt="Foto OS ${item.osNumero || '-'}" loading="lazy" /><small>OS #${item.osNumero || '-'} • ${item.equipamento || '-'}</small></figure>`).join('')
+      ? gallery.map((item) => `<figure class="gallery-item"><img src="${item.src}" alt="Foto OS ${item.osNumero || '-'}" loading="lazy" /><span class="gallery-meta">${avatarHTML({ foto: item.mecanicoFoto, nome: item.mecanicoNome || 'Mecânico' })}<span>${item.mecanicoNome || 'Equipe'}</span></span><small>OS #${item.osNumero || '-'} • ${item.equipamento || '-'}</small></figure>`).join('')
       : '<div class="gallery-empty">Sem imagens disponíveis</div>';
 
     document.getElementById('alertas-list').innerHTML = (data?.alertas || []).map((item) => `<li class="${item.nivel === 'alta' ? 'high' : ''}">${item.mensagem || '-'}</li>`).join('') || '<li>Nenhum alerta ativo.</li>';
@@ -259,8 +332,9 @@
     const weather = data?.weather || null;
     const weatherRoot = document.getElementById('weather-card-content');
     if (weather?.available) {
-      const weekHtml = (weather.week || []).slice(0, 7).map((day) => `<li><span>${day.day || '-'}</span><span>${day.icon || '☁️'} ${day.max || '-'} / ${day.min || '-'}</span></li>`).join('');
-      weatherRoot.innerHTML = `<div class="weather-head"><strong>${weather.city || '-'}</strong><span>${weather.temperature || '-'} • ${weather.condition || '-'}</span><small>Chuva: ${weather.rain || '-'} • Umidade: ${weather.humidity || '-'}</small></div><ul class="weather-week">${weekHtml || '<li><span>SEM DADOS</span><span>-</span></li>'}</ul>`;
+      const symbol = resolveWeatherSymbol(weather);
+      const weekHtml = (weather.week || []).slice(0, 6).map((day) => `<li><strong>${day.day || '-'}</strong><span>${day.icon || '☁️'}</span><small>${day.max || '-'} / ${day.min || '-'}</small></li>`).join('');
+      weatherRoot.innerHTML = `<div class="weather-card-modern"><div class="weather-now"><div class="weather-emoji">${symbol}</div><div><div class="weather-city">${weather.city || '-'}</div><div class="weather-temp">${weather.temperature || '-'}</div><div class="weather-meta">${weather.condition || '-'} • Chuva: ${weather.rain || '-'} • Umidade: ${weather.humidity || '-'}</div></div></div><ul class="weather-week">${weekHtml || '<li><span>SEM DADOS</span><span>-</span></li>'}</ul></div>`;
     } else {
       weatherRoot.innerHTML = 'Previsão indisponível';
     }
@@ -292,11 +366,8 @@
     } catch (_e) {}
   }
 
-  indicators.forEach((button) => {
-    button.addEventListener('click', () => activateScreen(Number(button.dataset.screen || 0)));
-  });
-
   setDateTime();
+  initTheme();
   activateScreen(0);
   refreshData();
 
@@ -316,5 +387,6 @@
 
   setInterval(setDateTime, 1000);
   setInterval(() => activateScreen(currentScreen + 1), ROTATE_MS);
+  setInterval(tickProgress, 200);
   if (!connectTVStream()) setInterval(refreshData, REFRESH_MS);
 })();
