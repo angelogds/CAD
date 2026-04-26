@@ -90,6 +90,18 @@ function normalizeNome(value = '') {
     .toLowerCase();
 }
 
+function uniqueBy(items = [], getKey = (item) => item) {
+  const seen = new Set();
+  const out = [];
+  items.forEach((item) => {
+    const key = String(getKey(item) || '').trim();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push(item);
+  });
+  return out;
+}
+
 function classificarGrupo(colaborador = {}) {
   const base = `${colaborador?.funcao || ''} ${colaborador?.role || ''} ${colaborador?.perfil || ''} ${colaborador?.grupo || ''} ${colaborador?.tipo || ''}`;
   if (hasAny(base, ['APOIO', 'OPERACIONAL', 'AUXILIAR'])) return 'APOIO_OPERACIONAL';
@@ -185,7 +197,7 @@ async function getOS() {
   const id = pickCol(table, ['id']);
   const numero = pickCol(table, ['numero', 'codigo', 'n_os'], 'id');
   const equipamento = pickCol(table, ['equipamento_nome', 'equipamento', 'maquina', 'ativo'], "'Equipamento não informado'");
-  const responsavel = pickCol(table, ['responsavel_nome', 'responsavel', 'mecanico_nome', 'atribuido_para'], "'A definir'");
+  const responsavel = pickCol(table, ['responsavel_exibicao', 'responsavel_nome', 'responsavel', 'mecanico_nome', 'atribuido_para'], "'A definir'");
   const responsavelId = pickCol(table, ['responsavel_id', 'mecanico_id', 'usuario_responsavel_id'], 'NULL');
   const status = pickCol(table, ['status', 'situacao'], "'ABERTA'");
   const prioridade = pickCol(table, ['prioridade', 'criticidade'], "'MEDIA'");
@@ -543,6 +555,7 @@ function getGaleriaFromTable(table) {
       const src = normalizeImagePath(rawUrl);
       return {
         id: `${table}-${r.id}`,
+        responsavel_id: r.responsavel_id || null,
         arquivo_url: src,
         tipo: isVideo ? 'video' : 'image',
         legenda: r.legenda || `Fechamento da OS #${r.os_id || '-'}`,
@@ -552,6 +565,58 @@ function getGaleriaFromTable(table) {
         responsavel: r.responsavel_id ? `ID ${r.responsavel_id}` : 'A definir',
       };
     });
+}
+
+function getUserNamesMap() {
+  const usersTable = firstTable(['users', 'usuarios']);
+  if (!usersTable) return new Map();
+  const idCol = pickCol(usersTable, ['id', 'user_id']);
+  const nameCol = pickCol(usersTable, ['name', 'nome', 'username'], "''");
+  const rows = safeAll(`
+    SELECT ${idCol} AS id, ${nameCol} AS nome
+    FROM ${usersTable}
+    WHERE ${idCol} IS NOT NULL
+  `);
+  const map = new Map();
+  rows.forEach((r) => {
+    const id = Number(r.id || 0);
+    const nome = String(r.nome || '').trim();
+    if (id && nome) map.set(id, nome);
+  });
+  return map;
+}
+
+function getOSDetailsMap() {
+  const table = firstTable(['ordens_servico', 'os', 'ordens', 'ordens_de_servico']);
+  if (!table) return new Map();
+
+  const id = pickCol(table, ['id']);
+  const numero = pickCol(table, ['numero', 'codigo', 'n_os'], 'id');
+  const equipamento = pickCol(table, ['equipamento_nome', 'equipamento', 'maquina', 'ativo'], "'Manutenção'");
+  const responsavel = pickCol(table, ['responsavel_exibicao', 'responsavel_nome', 'responsavel', 'mecanico_nome', 'atribuido_para'], "'A definir'");
+
+  const rows = safeAll(`
+    SELECT
+      ${id} AS id,
+      ${numero} AS numero,
+      ${equipamento} AS equipamento,
+      ${responsavel} AS responsavel
+    FROM ${table}
+    ORDER BY id DESC
+    LIMIT 200
+  `);
+
+  const map = new Map();
+  rows.forEach((r) => {
+    const osId = Number(r.id || 0);
+    if (!osId) return;
+    map.set(osId, {
+      numero: String(r.numero || osId).startsWith('OS') ? String(r.numero) : `OS #${r.numero || osId}`,
+      equipamento: String(r.equipamento || 'Manutenção'),
+      responsavel: String(r.responsavel || 'A definir'),
+    });
+  });
+  return map;
 }
 
 async function getGaleria() {
@@ -577,6 +642,7 @@ async function getGaleria() {
     `);
     itens = itens.concat(rows.map((r) => ({
       id: `anexos-${r.id}`,
+      responsavel_id: r.responsavel_id || null,
       arquivo_url: normalizeImagePath(r.arquivo),
       tipo: String(r.tipo || '').toLowerCase().includes('video') || /\.(mp4|webm|mov)$/i.test(String(r.arquivo || '')) ? 'video' : 'image',
       legenda: 'Fechamento da OS',
@@ -587,7 +653,23 @@ async function getGaleria() {
     })));
   }
 
-  itens = itens
+  const usersMap = getUserNamesMap();
+  const osMap = getOSDetailsMap();
+
+  itens = itens.map((item) => {
+    const osId = Number(String(item.os_numero || '').replace(/[^\d]/g, '')) || null;
+    const osMeta = osId ? osMap.get(osId) : null;
+    const responsavelId = Number(item.responsavel_id || 0) || null;
+    const responsavelNome = (responsavelId && usersMap.get(responsavelId)) || item.responsavel || osMeta?.responsavel || 'A definir';
+    return {
+      ...item,
+      os_numero: osMeta?.numero || item.os_numero || (osId ? `OS #${osId}` : 'OS --'),
+      equipamento: osMeta?.equipamento || item.equipamento || 'Manutenção',
+      responsavel: responsavelNome,
+    };
+  });
+
+  itens = uniqueBy(itens, (item) => `${item.arquivo_url}|${item.os_numero}|${item.tipo}`)
     .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
     .slice(0, 12);
 
