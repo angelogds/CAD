@@ -124,6 +124,13 @@ body.tv-body { margin: 0; background: var(--bg); color: var(--text); font-family
 .weather-card { justify-content: space-between; }
 .weather-fallback { color: var(--muted); border: 1px dashed var(--border); border-radius: 10px; padding: 10px; font-size: 13px; }
 
+.weather-head { display: grid; gap: 4px; margin-bottom: 8px; }
+.weather-head strong { font-size: 14px; }
+.weather-head span { font-weight: 600; font-size: 13px; }
+.weather-head small { color: var(--muted); font-size: 12px; }
+.weather-week { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.weather-week li { display: flex; justify-content: space-between; gap: 8px; border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; font-size: 12px; background: #fff; }
+
 .tv-ticker { flex: 0 0 34px; min-height: 34px; height: 34px; display: flex; align-items: center; overflow: hidden; color: #fff; border-radius: 10px; position: relative; }
 .tv-ticker.priority-baixa { background: #374151; }
 .tv-ticker.priority-media { background: #b45309; }

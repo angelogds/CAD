@@ -297,9 +297,25 @@
 
     const weather = data?.weather || null;
     const weatherRoot = document.getElementById('weather-card-content');
-    weatherRoot.innerHTML = weather?.available
-      ? `<strong>${weather.city || '-'}</strong><br>${weather.temperature || '-'} • ${weather.condition || '-'}<br>Chuva: ${weather.rain || '-'} • Umidade: ${weather.humidity || '-'}<br>${weather.icon || '☁️'}`
-      : 'Previsão indisponível no momento.';
+    if (weather?.available) {
+      const weekHtml = (weather.week || []).slice(0, 7).map((day) => `
+        <li>
+          <span>${day.day || '-'}</span>
+          <span>${day.icon || '☁️'} ${day.max || '-'} / ${day.min || '-'}</span>
+        </li>
+      `).join('');
+
+      weatherRoot.innerHTML = `
+        <div class="weather-head">
+          <strong>${weather.city || '-'}</strong>
+          <span>${weather.temperature || '-'} • ${weather.condition || '-'}</span>
+          <small>Chuva agora: ${weather.rain || '-'} • Umidade: ${weather.humidity || '-'}</small>
+        </div>
+        <ul class="weather-week">${weekHtml || '<li><span>SEM DADOS</span><span>-</span></li>'}</ul>
+      `;
+    } else {
+      weatherRoot.innerHTML = 'Previsão indisponível no momento.';
+    }
 
     const tickerItems = [...(data?.ticker || [])];
     const newestOsItem = latestOs[0];
