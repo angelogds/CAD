@@ -275,7 +275,10 @@ mount("/mobile", "./modules/mobile/mobile.routes");
 mount("/pcm", "./modules/pcm/pcm.routes");
 mount("/equipamentos", "./modules/equipamentos/equipamentos.routes");
 mount("/os", "./modules/os/os.routes");
-mount("/ordens-servico", "./modules/os/os.routes");
+app.use("/ordens-servico", (req, res) => {
+  const nextPath = `/os${req.originalUrl.replace(/^\/ordens-servico/, "") || ""}`;
+  return res.redirect(307, nextPath);
+});
 mount("/preventivas", "./modules/preventivas/preventivas.routes");
 mount("/compras", "./modules/compras/compras.routes");
 mount("/fornecedores", "./modules/fornecedores/fornecedores.routes");

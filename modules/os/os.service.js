@@ -6,6 +6,7 @@ const aiEmbeddingsService = require("../ai/ai.embeddings.service");
 const alertsHub = require("../alerts/alerts.hub");
 const alertsService = require("../alerts/alerts.service");
 const pushService = require("../push/push.service");
+const aiService = require("../ai/ai.service");
 const escalaService = require("../escala/escala.service");
 const { getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
 let inspecaoService = null;
@@ -96,6 +97,51 @@ function normalizeColaboradorFuncao(funcao) {
   if (raw.includes("AUXILIAR")) return "AUXILIAR";
   if (raw.includes("OPERACIONAL") || raw.includes("APOIO")) return "APOIO";
   return "APOIO";
+}
+
+function ensureVoiceColumns() {
+  const cols = new Set(getOSColumns());
+  const alters = [];
+  if (!cols.has("origem")) alters.push(`ALTER TABLE os ADD COLUMN origem TEXT`);
+  if (!cols.has("created_by")) alters.push(`ALTER TABLE os ADD COLUMN created_by INTEGER`);
+  if (!cols.has("created_at")) alters.push(`ALTER TABLE os ADD COLUMN created_at TEXT`);
+  for (const sql of alters) {
+    try {
+      db.prepare(sql).run();
+    } catch (_e) {}
+  }
+}
+
+function normalizeSintomaPrincipal(value) {
+  const raw = String(value || "").toLowerCase();
+  if (raw.includes("vaz")) return "vazamento";
+  if (raw.includes("el")) return "falha_eletrica";
+  if (raw.includes("par")) return "equipamento_parado";
+  if (raw.includes("trav")) return "travamento";
+  return "outro";
+}
+
+function findEquipamentoByName(nome = "") {
+  const term = String(nome || "").trim();
+  if (!term) return null;
+  try {
+    const exact = db.prepare(`
+      SELECT id, nome, codigo
+      FROM equipamentos
+      WHERE lower(nome) = lower(?)
+      LIMIT 1
+    `).get(term);
+    if (exact) return exact;
+    return db.prepare(`
+      SELECT id, nome, codigo
+      FROM equipamentos
+      WHERE lower(nome) LIKE lower(?)
+      ORDER BY id DESC
+      LIMIT 1
+    `).get(`%${term}%`) || null;
+  } catch (_e) {
+    return null;
+  }
 }
 
 function resolveUserIdPorNome(nome = "") {
@@ -1542,6 +1588,95 @@ async function createOS({
   return osId;
 }
 
+async function analyzeVoiceOS({ texto, userId }) {
+  const textoLimpo = aiService.sanitizeVoiceText(texto);
+  if (!userId) throw new Error("Usuário logado obrigatório para análise de voz.");
+  if (!textoLimpo) throw new Error("Texto transcrito obrigatório.");
+
+  const structured = await aiService.generateOSFromText(textoLimpo, { user_id: userId });
+  const equipamentoEncontrado = findEquipamentoByName(structured?.equipamento_nome);
+  const criticidade = normalizeGrau(structured?.criticidade || structured?.prioridade || "MEDIA");
+  const quantidadeSugerida = criticidade === "BAIXA" ? 1 : 2;
+
+  let equipeSugerida = [];
+  try {
+    const equipe = resolverEquipePorCriticidade(criticidade);
+    equipeSugerida = [
+      equipe?.executor ? { id: equipe.executor.user_id || null, nome: equipe.executor.nome, papel: "RESPONSAVEL" } : null,
+      equipe?.auxiliar ? { id: equipe.auxiliar.user_id || null, nome: equipe.auxiliar.nome, papel: "APOIO" } : null,
+    ].filter(Boolean);
+  } catch (_e) {}
+
+  return {
+    texto_original: textoLimpo,
+    equipamento: {
+      id: equipamentoEncontrado?.id || null,
+      nome: equipamentoEncontrado?.nome || structured?.equipamento_nome || null,
+      manual: equipamentoEncontrado ? null : (structured?.equipamento_nome || null),
+    },
+    sintoma_principal: normalizeSintomaPrincipal(structured?.sintoma_principal),
+    nao_conformidade: String(structured?.nao_conformidade || textoLimpo).trim(),
+    criticidade,
+    prioridade: criticidade,
+    causa_provavel: String(structured?.causa_provavel || "").trim() || null,
+    acao_corretiva: String(structured?.acao_corretiva || "").trim() || null,
+    acao_preventiva: String(structured?.acao_preventiva || "").trim() || null,
+    equipe_sugerida: equipeSugerida.slice(0, quantidadeSugerida),
+    avisos: equipeSugerida.length ? [] : ["Nenhum responsável disponível no turno atual; a OS pode ser criada sem alocação."],
+    origem_analise: structured?.origem_analise || "fallback_local",
+  };
+}
+
+async function createVoiceOSFromPreview(preview, userId) {
+  ensureVoiceColumns();
+  const openedBy = Number(userId || 0);
+  if (!openedBy) throw new Error("Usuário logado obrigatório para criar OS por voz.");
+  const data = preview && typeof preview === "object" ? preview : {};
+
+  const osId = await createOS({
+    equipamento_id: data?.equipamento?.id || null,
+    equipamento_manual: data?.equipamento?.manual || data?.equipamento?.nome || null,
+    nao_conformidade: data?.nao_conformidade || data?.texto_original,
+    descricao: data?.nao_conformidade || data?.texto_original,
+    sintoma_principal: data?.sintoma_principal || "outro",
+    criticidade: data?.criticidade || data?.prioridade || "MEDIA",
+    grau: data?.criticidade || data?.prioridade || "MEDIA",
+    resumo_tecnico: data?.acao_preventiva || null,
+    causa_diagnostico: data?.acao_corretiva || data?.causa_provavel || null,
+    opened_by: openedBy,
+    tipo: "CORRETIVA",
+  });
+
+  try {
+    db.prepare(`
+      UPDATE os
+      SET origem = 'VOZ',
+          created_by = COALESCE(created_by, ?),
+          created_at = COALESCE(created_at, datetime('now','localtime'))
+      WHERE id = ?
+    `).run(openedBy, osId);
+  } catch (_e) {}
+
+  let autoAssignResult = null;
+  try {
+    autoAssignResult = autoAssignOS(osId, openedBy, { force: true });
+  } catch (_e) {}
+
+  const os = getOSById(osId);
+  const equipeTxt = String(os?.responsavel_exibicao || "").trim();
+  if (equipeTxt) {
+    pushService.sendToAll({
+      title: "Nova OS atribuída",
+      body: `Nova OS atribuída: ${os?.equipamento || "-"} - ${os?.prioridade || os?.grau || "MEDIA"}`,
+      url: `/os/${osId}`,
+      type: "OS_VOICE",
+      data: { osId, origem: "VOZ" },
+    }).catch(() => {});
+  }
+
+  return { osId, os, autoAssignResult };
+}
+
 function createOSAutomatica({
   equipamento_id,
   descricao,
@@ -2061,4 +2196,6 @@ module.exports = {
   liberarEquipeQuandoFechar,
   getHistoricoEquipamento,
   patchAIFields,
+  analyzeVoiceOS,
+  createVoiceOSFromPreview,
 };

@@ -52,6 +52,7 @@
         </button>
 
         <div id="status-converse" class="status-converse" role="status" aria-live="polite">Pronto para gravar.</div>
+        <div id="voice-preview" class="status-converse warning" style="display:none; margin-top:8px;"></div>
 
         <textarea
           id="nao_conformidade"
@@ -86,7 +87,10 @@
 
     <div class="row" style="justify-content:space-between; margin-top:16px;">
       <a href="/os" class="btn btn-ghost">Cancelar</a>
-      <button type="submit" class="btn btn-primary" id="btn-salvar-os">Salvar e gerar OS automática</button>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn btn-outline" id="btn-confirmar-voz" style="display:none;">Confirmar e criar por voz</button>
+        <button type="submit" class="btn btn-primary" id="btn-salvar-os">Salvar e gerar OS automática</button>
+      </div>
     </div>
   </form>
 </div>
@@ -148,96 +152,25 @@
   (function () {
     const fileInput = document.getElementById('abertura_fotos');
     const preview = document.getElementById('preview-abertura');
-
-    async function validateVideos(files) {
-      const MAX_VIDEO_SECONDS = 60;
-      const validFiles = [];
-
-      async function getVideoDuration(file) {
-        return new Promise(function(resolve, reject){
-          const url = URL.createObjectURL(file);
-          const video = document.createElement('video');
-          video.preload = 'metadata';
-          video.onloadedmetadata = function(){
-            const duration = Number(video.duration || 0);
-            URL.revokeObjectURL(url);
-            resolve(duration);
-          };
-          video.onerror = function(){
-            URL.revokeObjectURL(url);
-            reject(new Error('Não foi possível ler duração do vídeo.'));
-          };
-          video.src = url;
-        });
-      }
-
-      for (const f of Array.from(files || [])) {
-        const isVideo = (f.type || '').startsWith('video/');
-        if (!isVideo) {
-          validFiles.push(f);
-          continue;
-        }
-        try {
-          const duration = await getVideoDuration(f);
-          if (duration > MAX_VIDEO_SECONDS) {
-            alert('O vídeo "' + f.name + '" excede 1 minuto. Envie um vídeo curto (até 60s).');
-            continue;
-          }
-          validFiles.push(f);
-        } catch (_e) {
-          validFiles.push(f);
-        }
-      }
-      return validFiles;
-    }
-
-    fileInput.addEventListener('change', async function(){
-      const validFiles = await validateVideos(fileInput.files);
-      const dt = new DataTransfer();
-      validFiles.forEach(function(f){ dt.items.add(f); });
-      fileInput.files = dt.files;
-
-      preview.innerHTML = '';
-      Array.from(fileInput.files || []).forEach(function (f) {
-        const el = document.createElement('span');
-        el.className = 'pill-tag pill-gray';
-        el.style.marginRight = '6px';
-        const isVideo = (f.type || '').startsWith('video/');
-        el.textContent = (isVideo ? '🎬 ' : '🖼️ ') + f.name;
-        preview.appendChild(el);
-      });
-    });
-
     const form = document.getElementById('os-form');
     const submitBtn = document.getElementById('btn-salvar-os');
     const btn = document.getElementById('btn-converse-mecanico');
     const btnLabel = document.getElementById('btn-converse-label');
     const statusEl = document.getElementById('status-converse');
-
+    const voicePreviewEl = document.getElementById('voice-preview');
+    const btnConfirmarVoz = document.getElementById('btn-confirmar-voz');
     const naoConformidadeEl = document.getElementById('nao_conformidade');
     const descricaoHiddenEl = document.getElementById('descricao_hidden');
     const criticidadeEl = document.getElementById('criticidade');
     const diagnosticoEl = document.getElementById('ai_diagnostico_inicial');
     const causaEl = document.getElementById('ai_causa');
     const acoesEl = document.getElementById('ai_acoes_iniciais');
-    const tempoEl = document.getElementById('ai_tempo_estimado');
-
     const diagnosticoHiddenEl = document.getElementById('diagnostico_inicial_hidden');
     const causaHiddenEl = document.getElementById('causa_mais_provavel_hidden');
     const acoesHiddenEl = document.getElementById('acoes_iniciais_hidden');
 
-    let mediaRecorder = null;
-    let mediaStream = null;
-    let chunks = [];
     let isRecording = false;
-    let isProcessing = false;
-    let recordingMimeType = 'audio/webm';
-    let autoStopTimer = null;
-
-    const MAX_RECORDING_MS = 120000;
-    const TRANSCRIBE_TIMEOUT_MS = 25000;
-    const ANALISE_TIMEOUT_MS = 20000;
-    const TRANSCRIBE_RETRIES = 1;
+    let voicePreviewPayload = null;
 
     function setStatus(message, tone) {
       statusEl.textContent = message;
@@ -248,280 +181,131 @@
     function setButtonState(state) {
       if (state === 'recording') {
         btn.classList.add('is-recording');
-        btnLabel.textContent = 'Parar gravação';
-        btn.disabled = false;
+        btnLabel.textContent = 'Parar escuta';
         return;
       }
       if (state === 'processing') {
         btn.classList.remove('is-recording');
         btnLabel.textContent = 'Processando...';
-        btn.disabled = true;
-        return;
-      }
-      if (state === 'done') {
-        btn.classList.remove('is-recording');
-        btnLabel.textContent = 'Pronto!';
-        btn.disabled = false;
-        return;
-      }
-      if (state === 'error') {
-        btn.classList.remove('is-recording');
-        btnLabel.textContent = 'Falha temporária';
-        btn.disabled = false;
         return;
       }
       btn.classList.remove('is-recording');
       btnLabel.textContent = 'Converse com o Mecânico';
-      btn.disabled = false;
-    }
-
-    function clearRecordGuards() {
-      if (autoStopTimer) {
-        clearTimeout(autoStopTimer);
-        autoStopTimer = null;
-      }
-    }
-
-    function stopTracks() {
-      clearRecordGuards();
-      if (mediaStream) {
-        mediaStream.getTracks().forEach(function (track) { track.stop(); });
-        mediaStream = null;
-      }
-    }
-
-    function stopRecordingSafely() {
-      if (!mediaRecorder || mediaRecorder.state === 'inactive') return Promise.resolve();
-      return new Promise(function (resolve) {
-        mediaRecorder.addEventListener('stop', resolve, { once: true });
-        mediaRecorder.stop();
-      });
-    }
-
-    function pickSupportedMimeType() {
-      if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
-        return '';
-      }
-      const candidates = [
-        'audio/mp4',
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/ogg;codecs=opus',
-        'audio/ogg',
-      ];
-      return candidates.find(function (type) { return MediaRecorder.isTypeSupported(type); }) || '';
     }
 
     async function parseJsonSafe(response) {
-      const contentType = response.headers.get('content-type') || '';
       const raw = await response.text();
-      if (!contentType.includes('application/json')) {
-        throw new Error('Resposta inválida do servidor (não retornou JSON).');
-      }
-      try {
-        return JSON.parse(raw);
-      } catch (_error) {
-        throw new Error('JSON inválido retornado pelo servidor.');
-      }
+      try { return JSON.parse(raw); } catch (_e) { throw new Error('Resposta inválida do servidor.'); }
     }
 
-    async function fetchWithTimeout(url, options, timeoutMs) {
-      const controller = new AbortController();
-      const timeout = setTimeout(function () { controller.abort(); }, timeoutMs);
-      try {
-        return await fetch(url, Object.assign({}, options, { signal: controller.signal }));
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-
-    function getAudioExtension(blobType) {
-      if (blobType.includes('ogg')) return 'ogg';
-      if (blobType.includes('mp4') || blobType.includes('m4a')) return 'm4a';
-      if (blobType.includes('mpeg') || blobType.includes('mp3')) return 'mp3';
-      if (blobType.includes('wav')) return 'wav';
-      return 'webm';
-    }
-
-    async function enviarParaTranscricao(audioBlob) {
-      const extension = getAudioExtension(audioBlob.type || recordingMimeType || 'audio/webm');
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'abertura-os-' + Date.now() + '.' + extension);
-
-      let lastError = null;
-      for (let tentativa = 0; tentativa <= TRANSCRIBE_RETRIES; tentativa += 1) {
-        try {
-          const response = await fetchWithTimeout('/ai/os/transcrever-abertura', {
-            method: 'POST',
-            body: formData,
-          }, TRANSCRIBE_TIMEOUT_MS);
-
-          const payload = await parseJsonSafe(response);
-          if (!response.ok || payload.status === 'erro_validacao') {
-            throw new Error(payload.erro || 'Falha na validação do áudio.');
-          }
-          if (!payload.ok || payload.status === 'erro') {
-            throw new Error(payload.erro || 'Não foi possível transcrever agora (falha temporária).');
-          }
-
-          const transcricao = String(payload.transcricao || payload.transcricao_bruta || '').trim();
-          if (!transcricao) {
-            throw new Error('Não foi possível entender o áudio. Pode continuar manualmente.');
-          }
-          return transcricao;
-        } catch (error) {
-          lastError = error;
-          if (tentativa < TRANSCRIBE_RETRIES) {
-            setStatus('Transcrição instável. Tentando novamente...', 'warning');
-            await new Promise(function (resolve) { setTimeout(resolve, 700); });
-          }
-        }
-      }
-
-      if (lastError && lastError.name === 'AbortError') {
-        throw new Error('Tempo de transcrição excedido. Continue manualmente sem bloquear o salvamento.');
-      }
-      throw new Error((lastError && lastError.message) || 'Não foi possível transcrever agora (falha temporária).');
-    }
-
-    async function enviarParaAnalise(transcricao) {
-      const body = {
-        descricao: transcricao,
-        equipamento_id: document.getElementById('equipamento_id').value || null,
-      };
-
-      const response = await fetchWithTimeout('/ai/os/analisar', {
+    async function enviarParaAnaliseVoz(transcricao) {
+      const response = await fetch('/os/voice/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }, ANALISE_TIMEOUT_MS);
-
+        body: JSON.stringify({ texto: transcricao }),
+      });
       const payload = await parseJsonSafe(response);
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error || 'Falha ao analisar descrição com IA.');
-      }
-      return payload.resultado || {};
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Falha na análise por voz.');
+      return payload.preview || {};
     }
 
     function preencherCampos(transcricao, analise) {
       naoConformidadeEl.value = transcricao;
       descricaoHiddenEl.value = transcricao;
-
-      const criticidade = String(analise.criticidade_sugerida || analise.criticidade || '').toUpperCase();
-      if (criticidade) criticidadeEl.value = criticidade;
-
-      const diagnostico = String(analise.ai_diagnostico_inicial || analise.diagnostico_inicial || '').trim();
-      const causa = String(analise.ai_causa || analise.causa_mais_provavel || '').trim();
-      const acoes = String(analise.ai_acoes_iniciais || analise.acoes_iniciais || '').trim();
-      const tempo = Number(analise.ai_tempo_estimado || analise.tempo_estimado_minutos || 0);
-
-      diagnosticoEl.value = diagnostico;
-      causaEl.value = causa;
-      acoesEl.value = acoes;
-      if (tempo > 0) tempoEl.value = String(tempo);
-
-      diagnosticoHiddenEl.value = diagnostico;
-      causaHiddenEl.value = causa;
-      acoesHiddenEl.value = acoes;
-    }
-
-    async function processarAudioGravado() {
-      const blobType = chunks[0] && chunks[0].type ? chunks[0].type : (recordingMimeType || 'audio/webm');
-      const audioBlob = new Blob(chunks, { type: blobType });
-      chunks = [];
-
-      if (!audioBlob.size) {
-        throw new Error('Áudio vazio. Tente gravar novamente ou continue manualmente.');
+      if (analise.sintoma_principal) document.getElementById('sintoma_principal').value = analise.sintoma_principal;
+      if (analise.criticidade) criticidadeEl.value = String(analise.criticidade).toUpperCase();
+      if (analise.equipamento && !document.getElementById('equipamento_id').value && analise.equipamento.manual) {
+        document.getElementById('equipamento_manual').value = analise.equipamento.manual;
       }
 
-      setStatus('Transcrevendo...', null);
-      const transcricao = await enviarParaTranscricao(audioBlob);
-      naoConformidadeEl.value = transcricao;
-      descricaoHiddenEl.value = transcricao;
+      diagnosticoEl.value = String(analise.causa_provavel || '').trim();
+      causaEl.value = String(analise.acao_corretiva || '').trim();
+      acoesEl.value = String(analise.acao_preventiva || '').trim();
+      diagnosticoHiddenEl.value = diagnosticoEl.value;
+      causaHiddenEl.value = causaEl.value;
+      acoesHiddenEl.value = acoesEl.value;
 
-      setStatus('Analisando com o Técnico...', null);
-      const analise = await enviarParaAnalise(transcricao);
-      preencherCampos(transcricao, analise);
+      voicePreviewPayload = analise;
+      const equipe = (analise.equipe_sugerida || []).map((m) => m.nome).join(', ') || 'Sem sugestão';
+      voicePreviewEl.style.display = '';
+      voicePreviewEl.innerHTML = `<strong>Preview IA:</strong> ${analise.equipamento?.nome || analise.equipamento?.manual || '-'} • ${analise.criticidade || '-'} • ${equipe}`;
+      btnConfirmarVoz.style.display = '';
     }
 
     btn.addEventListener('click', async function () {
-      if (isProcessing) return;
-
-      if (isRecording && mediaRecorder) {
-        isProcessing = true;
-        setButtonState('processing');
-        setStatus('Transcrevendo...', null);
-        await stopRecordingSafely();
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        setStatus('Reconhecimento de voz não suportado neste navegador. Digite a descrição manualmente.', 'warning');
         return;
       }
+      const recognition = new SR();
+      recognition.lang = 'pt-BR';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
 
-      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
-        setButtonState('error');
-        setStatus('Microfone indisponível neste navegador. Use preenchimento manual.', 'warning');
-        return;
-      }
-      if (typeof MediaRecorder === 'undefined') {
-        setButtonState('error');
-        setStatus('Este navegador não suporta gravação direta. Continue manualmente.', 'warning');
-        return;
-      }
+      setButtonState('recording');
+      setStatus('Ouvindo... fale agora.', null);
+      isRecording = true;
 
-      try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-        });
-        recordingMimeType = pickSupportedMimeType() || '';
-        mediaRecorder = recordingMimeType
-          ? new MediaRecorder(mediaStream, { mimeType: recordingMimeType })
-          : new MediaRecorder(mediaStream);
-
-        chunks = [];
-        mediaRecorder.addEventListener('dataavailable', function (evt) {
-          if (evt.data && evt.data.size > 0) chunks.push(evt.data);
-        });
-
-        mediaRecorder.addEventListener('stop', async function () {
-          try {
-            isRecording = false;
-            await processarAudioGravado();
-            setButtonState('done');
-            setStatus('Pronto! Texto preenchido e análise aplicada.', 'success');
-          } catch (err) {
-            const fallbackMessage = (err && err.message) || 'Falha temporária – continue manualmente.';
-            setButtonState('error');
-            setStatus(fallbackMessage + ' O salvamento manual segue liberado.', 'warning');
-          } finally {
-            stopTracks();
-            isProcessing = false;
-            setTimeout(function () {
-              if (!isRecording && !isProcessing) setButtonState('idle');
-            }, 1800);
-          }
-        }, { once: true });
-
-        mediaRecorder.start(250);
-        isRecording = true;
-        setButtonState('recording');
-        setStatus('Gravando... toque no botão novamente para parar.', null);
-        autoStopTimer = setTimeout(function () {
-          if (isRecording) {
-            isProcessing = true;
-            setButtonState('processing');
-            setStatus('Tempo máximo atingido. Encerrando e processando...', 'warning');
-            stopRecordingSafely();
-          }
-        }, MAX_RECORDING_MS);
-      } catch (_error) {
-        stopTracks();
-        isRecording = false;
-        isProcessing = false;
-        setButtonState('error');
+      recognition.onresult = async function (event) {
+        try {
+          const transcricao = String(event?.results?.[0]?.[0]?.transcript || '').trim();
+          if (!transcricao) throw new Error('Não foi possível entender a fala.');
+          setButtonState('processing');
+          setStatus('Analisando com IA...', null);
+          const analise = await enviarParaAnaliseVoz(transcricao);
+          preencherCampos(transcricao, analise);
+          setStatus('Preview gerado. Revise antes de confirmar.', 'success');
+        } catch (e) {
+          setStatus(e.message || 'Falha no processamento por voz.', 'warning');
+        } finally {
+          setButtonState('idle');
+          isRecording = false;
+        }
+      };
+      recognition.onerror = function () {
         setStatus('Permissão de microfone negada ou indisponível. Continue manualmente.', 'warning');
+        setButtonState('idle');
+        isRecording = false;
+      };
+      recognition.onend = function () {
+        if (isRecording) {
+          setButtonState('idle');
+          isRecording = false;
+        }
+      };
+      recognition.start();
+    });
+
+    btnConfirmarVoz.addEventListener('click', async function () {
+      if (!voicePreviewPayload) return;
+      btnConfirmarVoz.disabled = true;
+      btnConfirmarVoz.textContent = 'Criando...';
+      try {
+        const response = await fetch('/os/voice/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ preview: voicePreviewPayload }),
+        });
+        const payload = await parseJsonSafe(response);
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Falha ao criar OS por voz.');
+        window.location.href = `/os/${payload.os_id}`;
+      } catch (e) {
+        setStatus(e.message || 'Falha ao criar OS por voz.', 'error');
+        btnConfirmarVoz.disabled = false;
+        btnConfirmarVoz.textContent = 'Confirmar e criar por voz';
       }
+    });
+
+    fileInput.addEventListener('change', function(){
+      preview.innerHTML = '';
+      Array.from(fileInput.files || []).forEach(function (f) {
+        const el = document.createElement('span');
+        el.className = 'pill-tag pill-gray';
+        el.style.marginRight = '6px';
+        el.textContent = ((f.type || '').startsWith('video/') ? '🎬 ' : '🖼️ ') + f.name;
+        preview.appendChild(el);
+      });
     });
 
     form.addEventListener('submit', function(e){
@@ -529,41 +313,15 @@
       const manual = document.getElementById('equipamento_manual').value.trim();
       const sintoma = document.getElementById('sintoma_principal').value.trim();
       const naoConformidade = naoConformidadeEl.value.trim();
-
       descricaoHiddenEl.value = naoConformidade;
       diagnosticoHiddenEl.value = diagnosticoEl.value.trim();
       causaHiddenEl.value = causaEl.value.trim();
       acoesHiddenEl.value = acoesEl.value.trim();
-
-      if (!id && !manual) {
-        e.preventDefault();
-        alert('Selecione um equipamento cadastrado ou digite o equipamento manualmente.');
-        return;
-      }
-      if (!sintoma) {
-        e.preventDefault();
-        alert('Selecione o sintoma principal.');
-        return;
-      }
-      if (!naoConformidade || naoConformidade.length < 10) {
-        e.preventDefault();
-        alert('Descreva a não conformidade com pelo menos 10 caracteres.');
-        return;
-      }
-
-      if (submitBtn?.disabled) {
-        e.preventDefault();
-        return;
-      }
+      if (!id && !manual) { e.preventDefault(); alert('Selecione ou informe um equipamento.'); return; }
+      if (!sintoma) { e.preventDefault(); alert('Selecione o sintoma principal.'); return; }
+      if (!naoConformidade || naoConformidade.length < 10) { e.preventDefault(); alert('Descreva a não conformidade.'); return; }
       submitBtn.disabled = true;
       submitBtn.textContent = 'Salvando...';
-    });
-
-    window.addEventListener('beforeunload', stopTracks);
-    document.addEventListener('visibilitychange', function () {
-      if (document.hidden && isRecording) {
-        setStatus('App em segundo plano: a gravação pode pausar no iOS. Retorne e finalize.', 'warning');
-      }
     });
   })();
 </script>

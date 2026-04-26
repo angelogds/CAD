@@ -282,6 +282,110 @@ function parseJSONObject(rawText) {
   });
 }
 
+function sanitizeVoiceText(value) {
+  return String(value || '')
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 1200);
+}
+
+function inferPriorityFromText(texto = '', equipamentoNome = '') {
+  const text = String(texto || '').toLowerCase();
+  const equipamento = String(equipamentoNome || '').toLowerCase();
+  const isCriticoEquipamento = /(digestor|prensa|caldeira|percoladora|triturador)/i.test(equipamento) || /(digestor|prensa|caldeira|percoladora|triturador)/i.test(text);
+
+  if (text.includes('queimou') || text.includes('parou')) return 'ALTA';
+  if (text.includes('vazamento')) return isCriticoEquipamento ? 'ALTA' : 'MEDIA';
+  return isCriticoEquipamento ? 'ALTA' : 'MEDIA';
+}
+
+function normalizeVoicePriority(value) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (raw === 'MÉDIA') return 'MEDIA';
+  if (raw === 'CRÍTICA') return 'CRITICA';
+  if (['BAIXA', 'MEDIA', 'ALTA', 'CRITICA'].includes(raw)) return raw;
+  return 'MEDIA';
+}
+
+function extractEquipmentName(texto = '') {
+  const text = String(texto || '').trim();
+  const regex = /\b(digestor|prensa|caldeira|percoladora|triturador|bomba|motor|esteira)\s*(\d+)?\b/i;
+  const match = text.match(regex);
+  if (!match) return null;
+  const nomeBase = String(match[1] || '').trim();
+  const numero = String(match[2] || '').trim();
+  if (!nomeBase) return null;
+  return `${nomeBase.charAt(0).toUpperCase()}${nomeBase.slice(1).toLowerCase()}${numero ? ` ${numero}` : ''}`.trim();
+}
+
+function buildOSFallbackFromText(texto, contexto = {}) {
+  const descricao = sanitizeVoiceText(texto);
+  const equipamentoNome = String(contexto?.equipamento_nome || extractEquipmentName(descricao) || '').trim();
+  const prioridade = inferPriorityFromText(descricao, equipamentoNome);
+  const sintoma = descricao.toLowerCase().includes('vazamento')
+    ? 'Vazamento'
+    : (descricao.toLowerCase().includes('queimou') || descricao.toLowerCase().includes('elétr'))
+      ? 'Falha elétrica'
+      : descricao.toLowerCase().includes('parou')
+        ? 'Equipamento parado'
+        : 'Falha operacional';
+
+  return {
+    equipamento_nome: equipamentoNome || 'Equipamento não identificado',
+    sintoma_principal: sintoma,
+    nao_conformidade: descricao || 'Falha reportada por voz.',
+    criticidade: prioridade,
+    causa_provavel: 'Possível falha elétrica/mecânica. Necessária inspeção técnica em campo.',
+    acao_corretiva: 'Inspecionar conjunto, isolar risco e executar correção conforme diagnóstico local.',
+    acao_preventiva: 'Registrar ocorrência e revisar plano preventivo do equipamento afetado.',
+    prioridade,
+    origem_analise: 'fallback_local',
+  };
+}
+
+async function generateOSFromText(texto, contexto = {}) {
+  const descricao = sanitizeVoiceText(texto);
+  if (!descricao) {
+    throw buildError('VOICE_TEXT_EMPTY', 'Texto de voz obrigatório para gerar a OS.', 'Texto vazio em generateOSFromText');
+  }
+
+  const fallback = buildOSFallbackFromText(descricao, contexto);
+  try {
+    const result = await askText({
+      systemPrompt: [
+        'Você é um assistente de manutenção industrial.',
+        'Responda SOMENTE em JSON válido (objeto), sem markdown e sem comentários.',
+        'Campos obrigatórios: equipamento_nome, sintoma_principal, nao_conformidade, criticidade, causa_provavel, acao_corretiva, acao_preventiva, prioridade.',
+        'Use criticidade/prioridade apenas entre: BAIXA, MEDIA, ALTA, CRITICA.',
+      ].join(' '),
+      userPayload: {
+        texto_operador: descricao,
+        contexto: contexto || {},
+        fallback_referencia: fallback,
+      },
+      maxOutputTokens: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 320),
+      temperature: 0.1,
+    });
+    const parsed = parseJSONObject(result?.text || '');
+    const criticidade = normalizeVoicePriority(parsed?.criticidade || parsed?.prioridade || fallback.criticidade);
+    return {
+      equipamento_nome: String(parsed?.equipamento_nome || fallback.equipamento_nome || '').trim() || fallback.equipamento_nome,
+      sintoma_principal: String(parsed?.sintoma_principal || fallback.sintoma_principal || '').trim() || fallback.sintoma_principal,
+      nao_conformidade: String(parsed?.nao_conformidade || fallback.nao_conformidade || '').trim() || fallback.nao_conformidade,
+      criticidade,
+      causa_provavel: String(parsed?.causa_provavel || fallback.causa_provavel || '').trim() || fallback.causa_provavel,
+      acao_corretiva: String(parsed?.acao_corretiva || fallback.acao_corretiva || '').trim() || fallback.acao_corretiva,
+      acao_preventiva: String(parsed?.acao_preventiva || fallback.acao_preventiva || '').trim() || fallback.acao_preventiva,
+      prioridade: normalizeVoicePriority(parsed?.prioridade || criticidade),
+      origem_analise: 'ia',
+    };
+  } catch (err) {
+    registerAIError(err, 'generateOSFromText');
+    return fallback;
+  }
+}
+
 async function askText({ systemPrompt, userPayload, model, maxOutputTokens, temperature = 0.2 }) {
   const cfg = getAIConfig();
 
@@ -726,4 +830,7 @@ module.exports = {
   melhorarDescricaoOperador,
   sugerirPecasPorFalha,
   normalizeStructuredAIResponse,
+  generateOSFromText,
+  sanitizeVoiceText,
+  buildOSFallbackFromText,
 };

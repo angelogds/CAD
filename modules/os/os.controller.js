@@ -505,6 +505,39 @@ function osSetEquipe(req, res) {
   return res.redirect(`/os/${id}`);
 }
 
+async function osVoiceAnalyze(req, res) {
+  const userId = Number(req.session?.user?.id || 0);
+  if (!userId) return res.status(401).json({ ok: false, error: "Usuário não autenticado." });
+  const texto = String(req.body?.texto || "").trim();
+  if (!texto) return res.status(400).json({ ok: false, error: "Texto transcrito é obrigatório." });
+  try {
+    const preview = await service.analyzeVoiceOS({ texto, userId });
+    return res.json({ ok: true, preview });
+  } catch (err) {
+    return res.status(503).json({ ok: false, error: err.message || "Falha ao analisar voz." });
+  }
+}
+
+async function osVoiceCreate(req, res) {
+  const userId = Number(req.session?.user?.id || 0);
+  if (!userId) return res.status(401).json({ ok: false, error: "Usuário não autenticado." });
+  const preview = req.body?.preview || null;
+  const texto = String(req.body?.texto || "").trim();
+  if (!preview && !texto) return res.status(400).json({ ok: false, error: "Texto ou preview são obrigatórios." });
+  try {
+    const resolvedPreview = preview || (await service.analyzeVoiceOS({ texto, userId }));
+    const created = await service.createVoiceOSFromPreview(resolvedPreview, userId);
+    return res.json({
+      ok: true,
+      os_id: created.osId,
+      message: "OS criada com sucesso a partir da voz.",
+      data: created.os || null,
+    });
+  } catch (err) {
+    return res.status(503).json({ ok: false, error: err.message || "Falha ao criar OS por voz." });
+  }
+}
+
 module.exports = {
   osIndex,
   osNewForm,
@@ -519,4 +552,6 @@ module.exports = {
   osUpdateStatus,
   osAutoAssign,
   osSetEquipe,
+  osVoiceAnalyze,
+  osVoiceCreate,
 };
