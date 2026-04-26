@@ -252,8 +252,8 @@ async function getGaleria() {
     const rows = safeAll(`
       SELECT id, os_id, imagem_url, legenda, created_at
       FROM os_fechamento_fotos
-      ORDER BY created_at DESC
-      LIMIT 8
+      ORDER BY datetime(created_at) DESC
+      LIMIT 12
     `);
 
     if (rows.length) {
@@ -262,20 +262,59 @@ async function getGaleria() {
         imagem_url: r.imagem_url,
         legenda: r.legenda || `Fechamento da OS #${r.os_id}`,
         os_numero: `OS #${r.os_id}`,
-        equipamento: 'Equipamento',
+        equipamento: 'Manutenção',
         created_at: r.created_at,
       }));
     }
   }
 
-  return [{
-    id: 1,
-    imagem_url: '/img/login/slideshow/publicimglogin-bg.jpg.jpeg',
-    legenda: 'Galeria de fechamento de OS — aguardando fotos reais',
-    os_numero: 'OS',
-    equipamento: 'Manutenção',
-    created_at: new Date().toISOString(),
-  }];
+  const anexoTable = firstTable(['os_anexos', 'anexos_os', 'ordens_servico_anexos']);
+
+  if (anexoTable) {
+    const id = pickCol(anexoTable, ['id']);
+    const osId = pickCol(anexoTable, ['os_id', 'ordem_servico_id', 'ordem_id'], 'NULL');
+    const arquivo = pickCol(anexoTable, ['arquivo_url', 'imagem_url', 'url', 'caminho_arquivo'], 'NULL');
+    const legenda = pickCol(anexoTable, ['descricao', 'legenda', 'titulo'], "''");
+    const created = pickCol(anexoTable, ['created_at', 'criado_em', 'data_criacao'], 'CURRENT_TIMESTAMP');
+
+    const rows = safeAll(`
+      SELECT
+        ${id} AS id,
+        ${osId} AS os_id,
+        ${arquivo} AS imagem_url,
+        ${legenda} AS legenda,
+        ${created} AS created_at
+      FROM ${anexoTable}
+      WHERE LOWER(${arquivo}) LIKE '%.jpg'
+         OR LOWER(${arquivo}) LIKE '%.jpeg'
+         OR LOWER(${arquivo}) LIKE '%.png'
+         OR LOWER(${arquivo}) LIKE '%.webp'
+      ORDER BY datetime(${created}) DESC
+      LIMIT 12
+    `);
+
+    if (rows.length) {
+      return rows.map((r) => ({
+        id: r.id,
+        imagem_url: r.imagem_url,
+        legenda: r.legenda || `Registro de fechamento da OS #${r.os_id}`,
+        os_numero: `OS #${r.os_id}`,
+        equipamento: 'Manutenção',
+        created_at: r.created_at,
+      }));
+    }
+  }
+
+  return [
+    {
+      id: 1,
+      imagem_url: '/img/tv/galeria-placeholder.jpg',
+      legenda: 'Galeria de fechamento de OS — aguardando fotos reais',
+      os_numero: 'OS',
+      equipamento: 'Manutenção',
+      created_at: new Date().toISOString(),
+    },
+  ];
 }
 
 async function getWeather() {
@@ -433,24 +472,61 @@ function getPerformance(osList) {
   };
 }
 
-function getTicker(osList, preventivas) {
+function getAvisosAtivos() {
+  const table = firstTable(['avisos', 'comunicados', 'alertas']);
+
+  if (!table) return [];
+
+  const id = pickCol(table, ['id']);
+  const titulo = pickCol(table, ['titulo', 'title'], "'Aviso'");
+  const descricao = pickCol(table, ['descricao', 'mensagem', 'texto'], "''");
+  const ativo = pickCol(table, ['ativo', 'is_active'], '1');
+
+  return safeAll(`
+    SELECT
+      ${id} AS id,
+      ${titulo} AS titulo,
+      ${descricao} AS descricao
+    FROM ${table}
+    WHERE COALESCE(${ativo}, 1) = 1
+    ORDER BY id DESC
+    LIMIT 5
+  `);
+}
+
+function getTicker(osList, preventivas, avisos = []) {
   const msgs = [];
 
-  osList.slice(0, 6).forEach((o) => {
-    msgs.push({
-      id: `os-${o.id}`,
-      tipo: o.prioridade === 'CRITICA' ? 'nova_os' : 'manutencao',
-      texto: `${o.numero} • ${o.equipamento} • ${o.status} • Responsável: ${o.responsavel}`,
-      criticidade: o.prioridade,
+  osList
+    .filter((o) => o.status !== 'CONCLUIDA')
+    .slice(0, 6)
+    .forEach((o) => {
+      msgs.push({
+        id: `os-${o.id}`,
+        tipo: o.prioridade === 'CRITICA' ? 'nova_os' : 'manutencao',
+        texto: `${o.numero} • ${o.equipamento} • ${o.status} • Responsável: ${o.responsavel}`,
+        criticidade: o.prioridade,
+      });
     });
-  });
 
-  preventivas.filter((p) => p.status === 'ATRASADA').slice(0, 3).forEach((p) => {
+  preventivas
+    .filter((p) => p.status === 'ATRASADA')
+    .slice(0, 3)
+    .forEach((p) => {
+      msgs.push({
+        id: `prev-${p.id}`,
+        tipo: 'aviso',
+        texto: `Preventiva atrasada • ${p.equipamento} • ${p.responsavel}`,
+        criticidade: 'MEDIA',
+      });
+    });
+
+  avisos.slice(0, 5).forEach((a) => {
     msgs.push({
-      id: `prev-${p.id}`,
+      id: `aviso-${a.id}`,
       tipo: 'aviso',
-      texto: `Preventiva atrasada • ${p.equipamento} • ${p.responsavel}`,
-      criticidade: 'MEDIA',
+      texto: `${a.titulo} • ${a.descricao || ''}`,
+      criticidade: 'BAIXA',
     });
   });
 
@@ -475,6 +551,8 @@ async function getSnapshot(user) {
     getWeather(),
   ]);
 
+  const avisos = getAvisosAtivos();
+
   return {
     os,
     mecanicos,
@@ -483,7 +561,7 @@ async function getSnapshot(user) {
     weather,
     alertas: getAlertas(os, preventivas),
     performance: getPerformance(os),
-    ticker: getTicker(os, preventivas),
+    ticker: getTicker(os, preventivas, avisos),
     system: {
       online: true,
       user: user
