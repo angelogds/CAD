@@ -9,6 +9,7 @@
     theme: localStorage.getItem('cg-tv-theme') || 'dark',
     pausedUntil: 0,
     criticalLedTimer: null,
+    notificationPrimed: false,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -76,6 +77,7 @@
       const json = await response.json();
       if (!json.ok) throw new Error(json.error || 'Erro no snapshot');
       state.data = json.data;
+      preloadUpcomingMedia();
       renderTop();
       renderTicker();
       renderCurrentScreen();
@@ -87,6 +89,23 @@
         content.innerHTML = `<section class="tv-error"><h1>Erro ao carregar Modo TV</h1><p>${escapeHtml(err.message)}</p></section>`;
       }
     }
+  }
+
+  function preloadUpcomingMedia() {
+    const galeria = (state.data?.galeria || []).slice(0, 12);
+    galeria.forEach((item) => {
+      const src = item?.arquivo_url;
+      if (!src) return;
+      if (item.tipo === 'video') {
+        const v = document.createElement('video');
+        v.src = src;
+        v.preload = 'auto';
+        v.muted = true;
+      } else {
+        const img = new Image();
+        img.src = src;
+      }
+    });
   }
 
   function renderTop() {
@@ -228,7 +247,12 @@
             ${equipe.map((m) => `
               <article class="tv-mechanic compact ${m.status === 'em_os' ? 'is-working' : ''}">
                 <img src="${escapeHtml(m.foto || config.defaultAvatar)}" onerror="this.src='${config.defaultAvatar}'">
-                <div><strong>${escapeHtml(m.nome)}</strong><span>${escapeHtml(m.funcao || '-')}</span><small>${escapeHtml(m.turno || 'Turno vigente')}</small></div>
+                <div>
+                  <strong>${escapeHtml(m.nome)}</strong>
+                  <span>${escapeHtml(m.funcao || '-')}</span>
+                  <small>${escapeHtml(m.turno || 'Turno vigente')}</small>
+                  ${m.osAtual ? `<small>OS atual: ${escapeHtml(m.osAtual)}</small>` : ''}
+                </div>
                 <em>${escapeHtml(statusNome[m.status] || 'Online')}</em>
               </article>`).join('')}
           </div>
@@ -333,6 +357,14 @@
     const abertas = (state.data?.os || []).filter((o) => ['ABERTA', 'EM_ANDAMENTO'].includes(String(o.status || '').toUpperCase()));
     const notified = JSON.parse(localStorage.getItem('cg-tv-os-notified') || '[]');
     const notifiedSet = new Set(notified.map((x) => String(x)));
+
+    if (!state.notificationPrimed) {
+      abertas.forEach((o) => notifiedSet.add(String(o.id)));
+      localStorage.setItem('cg-tv-os-notified', JSON.stringify([...notifiedSet].slice(-300)));
+      state.notificationPrimed = true;
+      return;
+    }
+
     const newCritical = abertas.find((os) => !notifiedSet.has(String(os.id)));
 
     if (!newCritical) return;
@@ -366,10 +398,10 @@
 
   function playNotificationSound(prioridade = 'MEDIA') {
     const map = {
-      BAIXA: '/sounds/os-baixa.mp3',
-      MEDIA: '/sounds/os-media.mp3',
-      ALTA: '/sounds/os-alta.mp3',
-      CRITICA: '/sounds/os-critica.mp3',
+      BAIXA: '/audio/os-nova.mp3',
+      MEDIA: '/audio/notification.mp3',
+      ALTA: '/audio/os-status.mp3',
+      CRITICA: '/audio/os-critica.mp3',
     };
     const src = map[String(prioridade || '').toUpperCase()];
     if (!src) return;
