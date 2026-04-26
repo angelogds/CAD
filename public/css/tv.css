@@ -36,9 +36,9 @@ body.tv-body {
 .tv-shell {
   height: 100vh;
   display: grid;
-  grid-template-rows: clamp(80px, 11vh, 92px) 6px clamp(28px, 4.2vh, 36px) 1fr clamp(35px, 5vh, 45px);
+  grid-template-rows: clamp(80px, 11vh, 92px) 6px clamp(28px, 4.2vh, 36px) 1fr;
   gap: 8px;
-  padding: 8px;
+  padding: 8px 8px calc(clamp(35px, 5vh, 45px) + 16px);
   box-sizing: border-box;
 }
 
@@ -228,7 +228,19 @@ body.tv-body.theme-light .tv-stat-card { background: #fff; }
 .weather-week li { display: grid; gap: 2px; text-align: center; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
 .weather-fallback { border: 1px dashed var(--border); border-radius: 10px; padding: 8px; color: var(--muted); }
 
-.tv-ticker { border-radius: 10px; overflow: hidden; display: flex; align-items: center; color: #fff; }
+.tv-ticker {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  height: clamp(35px, 5vh, 45px);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  color: #fff;
+}
 .tv-ticker.priority-baixa { background: #374151; }
 .tv-ticker.priority-media { background: #b45309; }
 .tv-ticker.priority-alta { background: #b91c1c; }
@@ -267,7 +279,7 @@ body.tv-body.theme-light .tv-stat-card { background: #fff; }
 }
 
 @media (max-width: 768px) {
-  .tv-shell { grid-template-rows: auto 6px auto 1fr auto; height: auto; min-height: 100vh; }
+  .tv-shell { grid-template-rows: auto 6px auto 1fr; height: auto; min-height: 100vh; padding-bottom: calc(clamp(35px, 5vh, 45px) + 16px); }
   .tv-header { flex-direction: column; align-items: flex-start; }
   .tv-header-right { width: 100%; justify-content: space-between; }
   .tv-grid, .grid-2-1, .grid-2, .grid-escala { grid-template-columns: 1fr; }
