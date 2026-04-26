@@ -213,7 +213,7 @@
       return `
         <tr class="${isNew ? `row-new-os ${isCritical ? 'is-critical' : ''}` : ''}" style="--alert-color:${alertColor};">
           <td>#${item.id || '-'}</td>
-          <td>${item.equipamento || '-'}</td>
+          <td>${item.equipamento || '-'} ${String(item.origem || '').toUpperCase() === 'VOZ' ? '<span class="badge blue">Criada por voz</span>' : ''}</td>
           <td>${item.responsavel_exibicao || '-'}</td>
           <td><span class="badge ${badgeClassByValue(item.grau || item.prioridade, 'criticidade')}">${criticidade}</span></td>
           <td><span class="badge ${badgeClassByValue(item.status, 'status')}">${item.status || '-'}</span></td>
@@ -232,7 +232,7 @@
       .slice(0, 5);
 
     document.getElementById('latest-os-list').innerHTML = latestOs.map((item) => `
-      <li><strong>#${item.id || '-'}</strong> • ${item.equipamento || '-'} • ${item.responsavel_exibicao || '-'} • ${String(item.status || '').toUpperCase()}</li>
+      <li><strong>#${item.id || '-'}</strong> • ${item.equipamento || '-'} ${String(item.origem || '').toUpperCase() === 'VOZ' ? '• 🎤 Voz' : ''} • ${item.responsavel_exibicao || '-'} • ${String(item.status || '').toUpperCase()}</li>
     `).join('') || '<li>Nenhuma OS recente.</li>';
 
     const quickAlerts = (data?.os?.itens || [])

@@ -110,5 +110,8 @@ router.post("/:id/excluir", requireLogin, requireRole(["ADMIN"]), wrap(ctrl.osDe
 router.post("/:id/auto-alocar", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osAutoAssign, "osAutoAssign"));
 router.post("/:id/auto-assign", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osAutoAssign, "osAutoAssign"));
 router.post("/:id/equipe", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osSetEquipe, "osSetEquipe"));
+router.post("/voice/analyze", requireLogin, requireRole(ACCESS.os_open), wrap(ctrl.osVoiceAnalyze, "osVoiceAnalyze"));
+router.post("/voice/create", requireLogin, requireRole(ACCESS.os_open), wrap(ctrl.osVoiceCreate, "osVoiceCreate"));
+router.post("/voice", requireLogin, requireRole(ACCESS.os_open), wrap(ctrl.osVoiceCreate, "osVoiceCreate"));
 
 module.exports = router;
