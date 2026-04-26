@@ -219,6 +219,15 @@ function getTVData(_req, res) {
     alertas: activeAlerts,
     equipamentosIncidencia,
     ticker,
+    weather: {
+      available: false,
+      city: 'Campo do Gado',
+      temperature: null,
+      condition: null,
+      rain: null,
+      humidity: null,
+      icon: null,
+    },
     charts: {
       osStatus: {
         abertas: Number(osResumo.abertas || 0),
