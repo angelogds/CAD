@@ -16,7 +16,7 @@ test('distribuição mantém a mesma área com o mesmo primário e reparte área
     apoios: [
       criarPessoa({ id: 3, user_id: 103, nome: 'Emanuel', funcao: 'apoio', tipo_turno: 'apoio' }),
       criarPessoa({ id: 4, user_id: 104, nome: 'Júnior', funcao: 'auxiliar', tipo_turno: 'apoio' }),
-      criarPessoa({ id: 5, user_id: 105, nome: 'Luiz', funcao: 'apoio', tipo_turno: 'apoio' }),
+      criarPessoa({ id: 5, user_id: 105, nome: 'Luis', funcao: 'apoio', tipo_turno: 'apoio' }),
     ],
     cargaAtual: {},
   };
