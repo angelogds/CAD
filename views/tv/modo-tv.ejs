@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="tv-theme-dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title || 'Modo TV — Campo do Gado' %></title>
+  <link rel="stylesheet" href="/css/tv-mode.css">
+</head>
+<body class="cg-tv">
+  <div id="tvApp" class="tv-shell">
+    <header class="tv-topbar">
+      <div class="tv-left">
+        <div class="tv-logo-box">
+          <img src="/img/tv/logo-manutencao.png" alt="Campo do Gado" onerror="this.style.display='none'">
+        </div>
+
+        <div>
+          <div class="tv-kicker">MODO TV</div>
+          <div id="tvScreenLabel" class="tv-screen-label">ORDENS DE SERVIÇO</div>
+        </div>
+      </div>
+
+      <div class="tv-clock-center">
+        <div id="tvClock" class="tv-clock">--:--:--</div>
+        <div id="tvDate" class="tv-date">Carregando...</div>
+      </div>
+
+      <div class="tv-right">
+        <div id="tvWeatherMini" class="tv-weather-mini">⛅ --° Feira</div>
+
+        <button id="tvThemeToggle" class="tv-theme-btn" type="button">
+          <span id="tvThemeIcon">☀️</span>
+          <span id="tvThemeText">Modo claro</span>
+        </button>
+
+        <div class="tv-online">
+          <span class="tv-dot"></span>
+          SISTEMA ONLINE
+        </div>
+
+        <div id="tvAvatars" class="tv-avatars"></div>
+      </div>
+
+      <div class="tv-progress-line">
+        <div id="tvProgress" class="tv-progress"></div>
+      </div>
+    </header>
+
+    <section id="tvLed" class="tv-led" hidden>
+      <strong id="tvLedText">Nova OS crítica</strong>
+      <button id="tvLedClose" type="button">×</button>
+    </section>
+
+    <main id="tvContent" class="tv-content"></main>
+
+    <footer class="tv-ticker">
+      <div id="tvTickerTrack" class="tv-ticker-track"></div>
+    </footer>
+  </div>
+
+  <script>
+    window.CG_TV_CONFIG = {
+      snapshotUrl: '/api/tv/snapshot',
+      weatherUrl: '/api/tv/weather',
+      refreshMs: 15000,
+      rotationMs: 30000,
+      defaultAvatar: '/IMG/logo_menu.png.png',
+      galleryPlaceholder: '/img/login/slideshow/publicimglogin-bg.jpg.jpeg'
+    };
+  </script>
+
+  <script src="/js/tv-mode.js"></script>
+</body>
+</html>
