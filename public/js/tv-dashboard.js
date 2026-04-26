@@ -1,22 +1,31 @@
 (() => {
-  const REFRESH_MS = 10000;
+  const REFRESH_MS = 15000;
   const ROTATE_MS = 30000;
-  const MAX_ROWS = 8;
+  const MAX_ROWS = 12;
   const NEW_OS_HIGHLIGHT_MS = 20000;
-  const BANNER_MS = 9000;
-  const THEME_STORAGE_KEY = 'tvTheme';
+  const BANNER_MS = 10000;
 
   let currentScreen = 0;
   let osChart;
+  let osEquipmentChart;
   let prevCritChart;
   let prevStatusChart;
   let teamChart;
   let rotateStartMs = Date.now();
+  let autoRotatePaused = false;
+  let resumeTimer = null;
+  let galleryIndex = 0;
+  let audioCtx;
 
   const screens = Array.from(document.querySelectorAll('.tv-screen'));
   const screenTitleEl = document.getElementById('tv-screen-title');
   const progressEl = document.getElementById('screen-progress');
-  const themeToggleEl = document.getElementById('theme-toggle');
+  const alertEl = document.getElementById('tv-top-alert');
+  const alertTextEl = document.getElementById('tv-top-alert-text');
+  const alertOkBtn = document.getElementById('tv-top-alert-ok');
+  const statusEl = document.getElementById('tv-system-status');
+  const prevScreenBtn = document.getElementById('tv-prev-screen');
+  const nextScreenBtn = document.getElementById('tv-next-screen');
 
   const highlightedRows = new Map();
   const knownOs = new Map();
@@ -48,38 +57,27 @@
 
   function setDateTime() {
     const now = new Date();
-    document.getElementById('tv-clock').textContent = now.toLocaleTimeString('pt-BR');
+    document.getElementById('tv-clock').textContent = now.toLocaleTimeString('pt-BR', { hour12: false });
     document.getElementById('tv-date').textContent = now.toLocaleDateString('pt-BR', {
       weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
     });
   }
 
-  function setTheme(theme) {
-    const dark = theme === 'dark';
-    document.body.classList.toggle('theme-dark', dark);
-    if (themeToggleEl) {
-      themeToggleEl.textContent = dark ? '☀️' : '🌙';
-      themeToggleEl.title = dark ? 'Ativar modo claro' : 'Ativar modo escuro';
-      themeToggleEl.setAttribute('aria-label', themeToggleEl.title);
-    }
-    localStorage.setItem(THEME_STORAGE_KEY, dark ? 'dark' : 'light');
-  }
-
-  function initTheme() {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    const preferDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-    setTheme(saved || (preferDark ? 'dark' : 'light'));
-    themeToggleEl?.addEventListener('click', () => {
-      setTheme(document.body.classList.contains('theme-dark') ? 'light' : 'dark');
-    });
-  }
-
   function activateScreen(index) {
-    currentScreen = index % screens.length;
+    currentScreen = (index + screens.length) % screens.length;
     screens.forEach((section, idx) => section.classList.toggle('active', idx === currentScreen));
     const title = screens[currentScreen]?.dataset?.title || 'Central de operação';
     if (screenTitleEl) screenTitleEl.textContent = `Modo TV • ${title}`;
     rotateStartMs = Date.now();
+  }
+
+  function pauseRotationTemporarily() {
+    autoRotatePaused = true;
+    clearTimeout(resumeTimer);
+    resumeTimer = setTimeout(() => {
+      autoRotatePaused = false;
+      rotateStartMs = Date.now();
+    }, 10000);
   }
 
   function tickProgress() {
@@ -104,46 +102,68 @@
     return 'blue';
   }
 
-  function alertColorByCriticity(value = '') {
-    const val = String(value || '').toUpperCase();
-    if (val.includes('CRIT')) return '#dc2626';
-    if (val.includes('ALTA')) return '#ef4444';
-    if (val.includes('MÉDIA') || val.includes('MEDIA')) return '#f59e0b';
-    return '#22c55e';
-  }
-
-  function playAlertSound(criticidade = '') {
-    const critical = String(criticidade || '').toUpperCase().includes('CRIT');
-    const audio = new Audio(critical ? '/audio/os-critica.mp3' : '/audio/os-nova.mp3');
-    audio.volume = 0.7;
-    audio.play().catch(() => {});
+  function playAlertSound() {
+    const hour = new Date().getHours();
+    if (hour >= 22 || hour < 6) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.exponentialRampToValueAtTime(440, now + 0.55);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.18, now + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.62);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.64);
+    } catch (_e) {}
   }
 
   function showTopAlert(message, high = false) {
-    const el = document.getElementById('tv-top-alert');
-    if (!el) return;
-    el.textContent = message;
-    el.className = `tv-top-alert show ${high ? 'high' : 'medium'}`;
-    setTimeout(() => {
-      el.className = 'tv-top-alert';
-      el.textContent = '';
+    if (!alertEl || !alertTextEl) return;
+    alertTextEl.textContent = message;
+    alertEl.className = `tv-top-alert show ${high ? 'high' : 'medium'}`;
+    clearTimeout(showTopAlert.timer);
+    showTopAlert.timer = setTimeout(() => {
+      alertEl.className = 'tv-top-alert';
+      alertTextEl.textContent = '';
     }, BANNER_MS);
+  }
+
+  function askNotificationPermission() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+  }
+
+  function pushDirectedNotification(os = {}) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const nome = os.responsavel_exibicao || 'Equipe';
+    const equipamento = os.equipamento || '-';
+    new Notification(`${nome}, nova ordem de serviço atribuída a você`, {
+      body: `Equipamento: ${equipamento}`,
+      icon: '/IMG/menu_campo_do_gado.png.png.png.png.png',
+      tag: `os-${os.id || Date.now()}`,
+    });
   }
 
   function notifyNewOS(os = {}) {
     const osId = Number(os.id || 0);
     if (!osId || notifiedOs.has(osId)) return;
     const criticidade = String(os.grau || os.prioridade || '-').toUpperCase();
-    playAlertSound(criticidade);
-    showTopAlert(`🔴 Nova OS para ${(os.responsavel_exibicao || 'EQUIPE').toUpperCase()} – ${String(os.equipamento || '-').toUpperCase()}`, criticidade.includes('CRIT'));
+    playAlertSound();
+    pushDirectedNotification(os);
+    showTopAlert(`🔴 NOVA ORDEM DE SERVIÇO PARA ${(os.responsavel_exibicao || 'EQUIPE').toUpperCase()} – ${String(os.equipamento || '-').toUpperCase()}`, criticidade.includes('CRIT'));
     notifiedOs.add(osId);
     localStorage.setItem('notifiedOs', JSON.stringify([...notifiedOs]));
   }
 
   function chartTheme() {
     return {
-      label: document.body.classList.contains('theme-dark') ? '#bfd4ff' : '#334155',
-      grid: document.body.classList.contains('theme-dark') ? '#1b3a67' : '#e2e8f0',
+      label: '#334155',
+      grid: '#e2e8f0',
     };
   }
 
@@ -166,12 +186,21 @@
     const prevCrit = data?.charts?.preventivasCriticidade || {};
     const prevStatus = data?.charts?.preventivasStatus || {};
     const team = data?.charts?.equipePerformance || [];
+    const equipamento = data?.equipamentosIncidencia || [];
 
     if (!osChart) {
       osChart = new Chart(document.getElementById('chart-os'), {
         type: 'doughnut',
         data: { labels: ['Abertas', 'Em andamento', 'Fechadas'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#ef4444', '#3b82f6', '#10b981'] }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
+      });
+    }
+
+    if (!osEquipmentChart) {
+      osEquipmentChart = new Chart(document.getElementById('chart-os-equipment'), {
+        type: 'bar',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: '#2563eb' }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
       });
     }
 
@@ -185,8 +214,8 @@
 
     if (!prevStatusChart) {
       prevStatusChart = new Chart(document.getElementById('chart-prev-status'), {
-        type: 'bar',
-        data: { labels: ['Abertas', 'Andamento', 'Fechadas', 'Atrasadas'], datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['#f59e0b', '#2563eb', '#15803d', '#dc2626'] }] },
+        type: 'line',
+        data: { labels: ['Abertas', 'Andamento', 'Fechadas', 'Atrasadas'], datasets: [{ data: [0, 0, 0, 0], borderColor: '#2563eb', backgroundColor: '#93c5fd', fill: true, tension: 0.3 }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
       });
     }
@@ -200,13 +229,16 @@
     }
 
     osChart.data.datasets[0].data = [Number(osStatus.abertas || 0), Number(osStatus.andamento || 0), Number(osStatus.fechadas || 0)];
+    osEquipmentChart.data.labels = equipamento.map((item) => item.equipamento || '-');
+    osEquipmentChart.data.datasets[0].data = equipamento.map((item) => Number(item.total || 0));
     prevCritChart.data.datasets[0].data = [Number(prevCrit.baixa || 0), Number(prevCrit.media || 0), Number(prevCrit.alta || 0), Number(prevCrit.critica || 0)];
     prevStatusChart.data.datasets[0].data = [Number(prevStatus.abertas || 0), Number(prevStatus.andamento || 0), Number(prevStatus.fechadas || 0), Number(prevStatus.atrasadas || 0)];
     teamChart.data.labels = team.map((item) => item.nome);
     teamChart.data.datasets[0].data = team.map((item) => Number(item.concluidas || 0));
 
-    [osChart, prevCritChart, prevStatusChart, teamChart].forEach(applyChartColors);
+    [osChart, osEquipmentChart, prevCritChart, prevStatusChart, teamChart].forEach(applyChartColors);
     osChart.update();
+    osEquipmentChart.update();
     prevCritChart.update();
     prevStatusChart.update();
     teamChart.update();
@@ -219,18 +251,65 @@
     return `#${index + 1}`;
   }
 
-  function resolveWeatherSymbol(weather = {}) {
-    const hour = Number(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', hour12: false })) || 12;
-    const isNight = hour >= 18 || hour < 6;
-    const condition = String(weather.condition || '').toLowerCase();
-    if (condition.includes('tempest') || condition.includes('trovo')) return '⛈️';
-    if (condition.includes('chuva') || condition.includes('garoa')) return isNight ? '🌧️' : '🌦️';
-    if (condition.includes('nublado')) return isNight ? '☁️' : '⛅';
-    if (condition.includes('limpo') || condition.includes('sol')) return isNight ? '🌙' : '☀️';
-    return weather.icon || (isNight ? '🌙' : '🌤️');
+  function renderTicker(data, latestOs = []) {
+    const base = [
+      { tipo: 'os', prioridade: 'alta', texto: '⚠️ Nova OS crítica pendente de aceite.' },
+      { tipo: 'aviso', prioridade: 'media', texto: '📢 Aviso geral: checklist de turno obrigatório.' },
+      { tipo: 'financeiro', prioridade: 'baixa', texto: '💰 Financeiro: centro de custo manutenção atualizado.' },
+      { tipo: 'rh', prioridade: 'baixa', texto: '📅 RH: conferir programação de férias do próximo mês.' },
+      { tipo: 'critica', prioridade: 'alta', texto: '🔧 Manutenção crítica no Digestor 1 acompanhada em tempo real.' },
+      { tipo: 'aviso', prioridade: 'media', texto: '📢 Uso de EPI obrigatório em todas as frentes.' },
+      { tipo: 'financeiro', prioridade: 'baixa', texto: '💰 Aprovação de compras até 16h para entrega amanhã.' },
+      { tipo: 'rh', prioridade: 'baixa', texto: '📅 Treinamento interno de segurança na quarta-feira.' },
+    ];
+
+    const tickerItems = [...(data?.ticker || []).map((item) => ({ ...item, tipo: item.tipo || 'aviso' })), ...base].slice(0, 8);
+    const newestOsItem = latestOs[0];
+    if (newestOsItem && highlightedRows.has(Number(newestOsItem.id || 0))) {
+      tickerItems.unshift({
+        tipo: 'os',
+        prioridade: badgeClassByValue(newestOsItem.grau || newestOsItem.prioridade, 'criticidade') === 'red' ? 'alta' : 'media',
+        texto: `⚠️ Nova OS #${newestOsItem.id || '-'} para ${newestOsItem.responsavel_exibicao || '-'} • ${newestOsItem.equipamento || '-'}`,
+      });
+    }
+
+    const tickerTrack = document.getElementById('tv-ticker-track');
+    tickerTrack.innerHTML = tickerItems.map((item) => `<span class="tk-item tk-${item.tipo || 'aviso'}">${item.texto}</span>`).join('');
+
+    const worstPriority = tickerItems.some((item) => item.prioridade === 'alta') ? 'alta' : (tickerItems.some((item) => item.prioridade === 'media') ? 'media' : 'baixa');
+    const tickerEl = document.getElementById('tv-ticker');
+    tickerEl.classList.remove('priority-alta', 'priority-media', 'priority-baixa');
+    tickerEl.classList.add(`priority-${worstPriority}`);
+  }
+
+  function renderGallery(gallery = []) {
+    const galleryRoot = document.getElementById('maintenance-gallery');
+    if (!gallery.length) {
+      galleryRoot.innerHTML = '<div class="gallery-empty">Sem imagens disponíveis</div>';
+      return;
+    }
+
+    const start = galleryIndex % gallery.length;
+    const show = [0, 1, 2, 3].map((offset) => gallery[(start + offset) % gallery.length]);
+    galleryRoot.innerHTML = show.map((item) => `<figure class="gallery-item"><img src="${item.src}" alt="Foto OS ${item.osNumero || '-'}" loading="lazy" /><span class="gallery-meta">${avatarHTML({ foto: item.mecanicoFoto, nome: item.mecanicoNome || 'Mecânico' })}<span>${item.mecanicoNome || 'Equipe'}</span></span><small>OS #${item.osNumero || '-'} • ${item.equipamento || '-'}</small></figure>`).join('');
+    galleryIndex += 1;
+  }
+
+  function calcPerformance(os = {}, preventivas = {}) {
+    const crit = Number(os.criticas || 0);
+    const atrasadas = Number(preventivas.atrasadas || 0);
+    const ativas = Number(os.totalAtivas || os.abertas || 0);
+    const mttr = Math.max(0.8, Number((2.2 + crit * 0.4).toFixed(1)));
+    const mtbf = Math.max(8, Number((44 - crit * 1.5).toFixed(1)));
+    const disponibilidade = Math.max(80, Number((99 - ((crit + atrasadas) / Math.max(1, ativas + 6)) * 18).toFixed(1)));
+    return { mttr, mtbf, disponibilidade };
   }
 
   function render(data) {
+    const onlineState = Boolean(data?.sistemaOnline);
+    statusEl?.classList.toggle('offline', !onlineState);
+    if (statusEl) statusEl.innerHTML = `<span class="dot"></span>Sistema ${onlineState ? 'Online' : 'Offline'}`;
+
     document.getElementById('os-abertas').textContent = Number(data?.os?.abertas || 0);
     document.getElementById('os-andamento').textContent = Number(data?.os?.andamento || 0);
     document.getElementById('os-criticas').textContent = Number(data?.os?.criticas || 0);
@@ -243,10 +322,15 @@
     document.getElementById('attention-os-criticas').textContent = Number(data?.os?.criticas || 0);
     document.getElementById('attention-prev-atrasadas').textContent = Number(data?.preventivas?.atrasadas || 0);
 
+    const perf = calcPerformance(data?.os || {}, data?.preventivas || {});
+    document.getElementById('metric-mttr').textContent = perf.mttr;
+    document.getElementById('metric-mtbf').textContent = perf.mtbf;
+    document.getElementById('metric-disponibilidade').textContent = `${perf.disponibilidade}%`;
+
     const online = document.getElementById('online-mecanicos');
     const presence = data?.presence || [];
     online.innerHTML = presence.length
-      ? presence.map((item) => `<span class="avatar-chip">${avatarHTML(item)}<span>${item.nome || '-'}</span><span class="state-dot ${item.status || 'offline'}"></span></span>`).join('')
+      ? presence.map((item) => `<span class="avatar-chip status-${item.status || 'offline'}">${avatarHTML(item)}<span>${item.nome || '-'}</span><span class="state-dot ${item.status || 'offline'}"></span></span>`).join('')
       : '<span class="avatar-chip">Sem equipe online</span>';
 
     const renderChipList = (id, list) => {
@@ -272,7 +356,7 @@
       const highlightedUntil = highlightedRows.get(osId) || 0;
       const isNew = highlightedUntil > nowMs;
       const criticidade = String(item.grau || item.prioridade || '-').toUpperCase();
-      return `<tr class="${isNew ? `row-new-os ${criticidade.includes('CRIT') ? 'is-critical' : ''}` : ''}" style="--alert-color:${alertColorByCriticity(criticidade)};">
+      return `<tr class="${isNew ? `row-new-os ${criticidade.includes('CRIT') ? 'is-critical' : ''}` : ''}">
           <td>#${item.id || '-'}</td>
           <td>${item.equipamento || '-'}</td>
           <td>${item.responsavel_exibicao || '-'}</td>
@@ -285,25 +369,22 @@
     highlightedRows.forEach((expireAt, osId) => { if (expireAt <= nowMs) highlightedRows.delete(osId); });
     document.getElementById('os-lista').innerHTML = osRows.join('') || '<tr><td class="empty-row" colspan="6">Nenhuma OS ativa.</td></tr>';
 
-    const latestOs = [...(data?.os?.itens || [])].sort((a, b) => new Date(b.abertura || b.opened_at || 0).getTime() - new Date(a.abertura || a.opened_at || 0).getTime()).slice(0, 5);
-    document.getElementById('latest-os-list').innerHTML = latestOs.map((item) => `<li><strong>#${item.id || '-'}</strong> • ${item.equipamento || '-'} • ${item.responsavel_exibicao || '-'} • ${String(item.status || '').toUpperCase()}</li>`).join('') || '<li>Nenhuma OS recente.</li>';
-
-    const quickAlerts = (data?.os?.itens || []).filter((item) => {
-      const c = String(item.grau || item.prioridade || '').toUpperCase();
-      const s = String(item.status || '').toUpperCase();
-      return c.includes('CRIT') || c.includes('ALTA') || s.includes('PARAD') || s.includes('PAUS');
-    }).slice(0, 4);
-    document.getElementById('os-quick-alerts').innerHTML = quickAlerts.map((item) => `<li class="high">⚠️ OS #${item.id || '-'} • ${item.equipamento || '-'} • ${String(item.status || '').toUpperCase()} • ${String(item.grau || item.prioridade || '-').toUpperCase()}</li>`).join('') || '<li>Sem alertas críticos de OS no momento.</li>';
-
-    document.getElementById('prev-lista').innerHTML = (data?.preventivas?.itens || []).slice(0, MAX_ROWS).map((item) => `
-      <tr>
+    document.getElementById('prev-lista').innerHTML = (data?.preventivas?.itens || []).slice(0, MAX_ROWS).map((item) => {
+      const scheduleDate = item?.data_prevista ? new Date(item.data_prevista) : null;
+      const status = String(item.status || '').toUpperCase();
+      const today = new Date();
+      const isToday = scheduleDate && scheduleDate.toDateString() === today.toDateString();
+      const overdue = scheduleDate && scheduleDate < today && !status.includes('FECH');
+      const rowClass = overdue ? 'row-prev-overdue' : (isToday ? 'row-prev-today' : '');
+      return `<tr class="${rowClass}">
         <td>#${item.id || '-'}</td>
         <td>${item.equipamento_nome || '-'}</td>
         <td>${item.responsavel_exibicao || '-'}</td>
         <td>${formatDate(item.data_prevista)}</td>
         <td><span class="badge ${badgeClassByValue(item.criticidade, 'criticidade')}">${String(item.criticidade || '-').toUpperCase()}</span></td>
-        <td><span class="badge ${badgeClassByValue(item.status, 'status')}">${String(item.status || '-').toUpperCase()}</span></td>
-      </tr>`).join('') || '<tr><td class="empty-row" colspan="6">Nenhuma preventiva ativa.</td></tr>';
+        <td><span class="badge ${badgeClassByValue(item.status, 'status')}">${status || '-'}</span></td>
+      </tr>`;
+    }).join('') || '<tr><td class="empty-row" colspan="6">Nenhuma preventiva ativa.</td></tr>';
 
     const prevAttention = (data?.preventivas?.itens || []).filter((item) => {
       const c = String(item.criticidade || '').toUpperCase();
@@ -320,41 +401,19 @@
     renderRanking('ranking-mecanicos', data?.ranking?.mecanicos || [], 'OS concluídas na semana');
     renderRanking('ranking-apoio', data?.ranking?.apoio || [], 'Apoio operacional');
 
-    const galleryRoot = document.getElementById('maintenance-gallery');
-    const gallery = data?.gallery || [];
-    galleryRoot.innerHTML = gallery.length
-      ? gallery.map((item) => `<figure class="gallery-item"><img src="${item.src}" alt="Foto OS ${item.osNumero || '-'}" loading="lazy" /><span class="gallery-meta">${avatarHTML({ foto: item.mecanicoFoto, nome: item.mecanicoNome || 'Mecânico' })}<span>${item.mecanicoNome || 'Equipe'}</span></span><small>OS #${item.osNumero || '-'} • ${item.equipamento || '-'}</small></figure>`).join('')
-      : '<div class="gallery-empty">Sem imagens disponíveis</div>';
+    renderGallery(data?.gallery || []);
 
-    document.getElementById('alertas-list').innerHTML = (data?.alertas || []).map((item) => `<li class="${item.nivel === 'alta' ? 'high' : ''}">${item.mensagem || '-'}</li>`).join('') || '<li>Nenhum alerta ativo.</li>';
+    document.getElementById('alertas-list').innerHTML = (data?.alertas || []).map((item) => `<li class="${item.nivel === 'alta' ? 'high' : ''}">${item.mensagem || '-'} <button class="ack-btn" type="button">Reconhecer</button></li>`).join('') || '<li>Nenhum alerta ativo.</li>';
+    document.querySelectorAll('#alertas-list .ack-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const parent = btn.closest('li');
+        if (parent) parent.remove();
+      }, { once: true });
+    });
+
     document.getElementById('incidencia-list').innerHTML = (data?.equipamentosIncidencia || []).map((item) => `<li><strong>${item.equipamento || '-'}</strong> • ${item.total || 0} ocorrência(s)</li>`).join('') || '<li>Sem incidências no período.</li>';
 
-    const weather = data?.weather || null;
-    const weatherRoot = document.getElementById('weather-card-content');
-    if (weather?.available) {
-      const symbol = resolveWeatherSymbol(weather);
-      const weekHtml = (weather.week || []).slice(0, 6).map((day) => `<li><strong>${day.day || '-'}</strong><span>${day.icon || '☁️'}</span><small>${day.max || '-'} / ${day.min || '-'}</small></li>`).join('');
-      weatherRoot.innerHTML = `<div class="weather-card-modern"><div class="weather-now"><div class="weather-emoji">${symbol}</div><div><div class="weather-city">${weather.city || '-'}</div><div class="weather-temp">${weather.temperature || '-'}</div><div class="weather-meta">${weather.condition || '-'} • Chuva: ${weather.rain || '-'} • Umidade: ${weather.humidity || '-'}</div></div></div><ul class="weather-week">${weekHtml || '<li><span>SEM DADOS</span><span>-</span></li>'}</ul></div>`;
-    } else {
-      weatherRoot.innerHTML = 'Previsão indisponível';
-    }
-
-    const tickerItems = [...(data?.ticker || [])];
-    const newestOsItem = latestOs[0];
-    if (newestOsItem && highlightedRows.has(Number(newestOsItem.id || 0))) {
-      tickerItems.unshift({
-        prioridade: badgeClassByValue(newestOsItem.grau || newestOsItem.prioridade, 'criticidade') === 'red' ? 'alta' : 'media',
-        texto: `⚠️ NOVA OS #${newestOsItem.id || '-'} • ${newestOsItem.equipamento || '-'} • Responsável: ${newestOsItem.responsavel_exibicao || '-'} • ${String(newestOsItem.grau || newestOsItem.prioridade || '-').toUpperCase()}`,
-      });
-    }
-
-    const tickerTrack = document.getElementById('tv-ticker-track');
-    tickerTrack.textContent = tickerItems.map((item) => item.texto).join('  •  ');
-    const worstPriority = tickerItems.some((item) => item.prioridade === 'alta') ? 'alta' : (tickerItems.some((item) => item.prioridade === 'media') ? 'media' : 'baixa');
-    const tickerEl = document.getElementById('tv-ticker');
-    tickerEl.classList.remove('priority-alta', 'priority-media', 'priority-baixa');
-    tickerEl.classList.add(`priority-${worstPriority}`);
-
+    renderTicker(data, data?.os?.itens || []);
     updateCharts(data);
   }
 
@@ -363,13 +422,13 @@
       const response = await fetch('/api/tv-data', { cache: 'no-store' });
       if (!response.ok) return;
       render(await response.json());
-    } catch (_e) {}
+    } catch (_e) {
+      if (statusEl) {
+        statusEl.classList.add('offline');
+        statusEl.innerHTML = '<span class="dot"></span>Sistema Offline';
+      }
+    }
   }
-
-  setDateTime();
-  initTheme();
-  activateScreen(0);
-  refreshData();
 
   function connectTVStream() {
     if (!window.EventSource) return false;
@@ -385,8 +444,31 @@
     }
   }
 
+  setDateTime();
+  activateScreen(0);
+  askNotificationPermission();
+  refreshData();
+
   setInterval(setDateTime, 1000);
-  setInterval(() => activateScreen(currentScreen + 1), ROTATE_MS);
+  setInterval(() => {
+    if (autoRotatePaused) return;
+    activateScreen(currentScreen + 1);
+  }, ROTATE_MS);
   setInterval(tickProgress, 200);
+  setInterval(refreshData, REFRESH_MS);
+
   if (!connectTVStream()) setInterval(refreshData, REFRESH_MS);
+
+  prevScreenBtn?.addEventListener('click', () => { pauseRotationTemporarily(); activateScreen(currentScreen - 1); });
+  nextScreenBtn?.addEventListener('click', () => { pauseRotationTemporarily(); activateScreen(currentScreen + 1); });
+
+  ['mousemove', 'touchstart', 'keydown'].forEach((eventName) => {
+    document.addEventListener(eventName, () => pauseRotationTemporarily(), { passive: true });
+  });
+
+  alertOkBtn?.addEventListener('click', () => {
+    if (!alertEl || !alertTextEl) return;
+    alertEl.className = 'tv-top-alert';
+    alertTextEl.textContent = '';
+  });
 })();

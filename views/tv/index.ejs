@@ -14,11 +14,10 @@
     </div>
 
     <div class="tv-header-right">
-      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema">🌙</button>
       <div class="tv-clock-wrap">
         <div id="tv-date" class="tv-date"></div>
         <div id="tv-clock" class="tv-clock"></div>
-        <div class="tv-status"><span class="dot"></span>Sistema Online</div>
+        <div id="tv-system-status" class="tv-status"><span class="dot"></span>Sistema Online</div>
       </div>
       <div class="tv-online-block">
         <span class="block-title">Equipe em tempo real</span>
@@ -31,7 +30,10 @@
     <div id="screen-progress" class="screen-progress"></div>
   </div>
 
-  <div id="tv-top-alert" class="tv-top-alert" aria-live="assertive"></div>
+  <div id="tv-top-alert" class="tv-top-alert" aria-live="assertive">
+    <span id="tv-top-alert-text"></span>
+    <button id="tv-top-alert-ok" type="button">OK</button>
+  </div>
 
   <main class="tv-content">
     <section class="tv-page tv-screen active" data-screen="0" data-title="Ordens de serviço" aria-label="Tela de ordens de serviço">
@@ -59,8 +61,8 @@
             <div class="chart-box"><canvas id="chart-os"></canvas></div>
           </article>
           <article class="tv-card">
-            <h2 class="tv-section-title">Últimas OS abertas</h2>
-            <ul id="latest-os-list" class="compact-list"></ul>
+            <h2 class="tv-section-title">OS por equipamento</h2>
+            <div class="chart-box"><canvas id="chart-os-equipment"></canvas></div>
           </article>
           <article class="tv-card">
             <h2 class="tv-section-title">Alertas rápidos de OS</h2>
@@ -86,7 +88,7 @@
         </article>
         <article class="tv-card span-2">
           <h2 class="tv-section-title">Galeria da manutenção</h2>
-          <div id="maintenance-gallery" class="gallery-grid"></div>
+          <div id="maintenance-gallery" class="gallery-carousel"></div>
         </article>
       </div>
     </section>
@@ -130,7 +132,15 @@
             <div><span>Preventivas Atrasadas</span><strong id="attention-prev-atrasadas">0</strong></div>
           </div>
         </article>
-        <article class="tv-card"><h2 class="tv-section-title">Performance da equipe</h2><div class="chart-box"><canvas id="chart-team"></canvas></div></article>
+        <article class="tv-card">
+          <h2 class="tv-section-title">Performance da equipe</h2>
+          <div class="tv-kpi-row three">
+            <div class="tv-stat-card accent-blue"><span>MTTR (h)</span><strong class="number" id="metric-mttr">0</strong></div>
+            <div class="tv-stat-card accent-green"><span>MTBF (h)</span><strong class="number" id="metric-mtbf">0</strong></div>
+            <div class="tv-stat-card accent-yellow"><span>Disponibilidade</span><strong class="number" id="metric-disponibilidade">0%</strong></div>
+          </div>
+          <div class="chart-box"><canvas id="chart-team"></canvas></div>
+        </article>
         <article class="tv-card weather-card"><h2 class="tv-section-title">Previsão do tempo</h2><div id="weather-card-content" class="weather-fallback">Previsão indisponível</div></article>
       </div>
     </section>
@@ -139,6 +149,11 @@
   <footer id="tv-ticker" class="tv-ticker priority-baixa">
     <div id="tv-ticker-track" class="tv-ticker-track"></div>
   </footer>
+
+  <div class="tv-nav">
+    <button id="tv-prev-screen" type="button" aria-label="Tela anterior">←</button>
+    <button id="tv-next-screen" type="button" aria-label="Próxima tela">→</button>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
