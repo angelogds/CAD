@@ -298,7 +298,7 @@ mount("/desenho-tecnico", "./modules/desenho-tecnico/desenho-tecnico.routes");
 mount("/academia", "./modules/academia/academia.routes");
 mount("/ai", "./modules/ai/ai.routes");
 mount("/ia", "./modules/ia/ia.routes");
-mount("/", "./routes/tv.routes");
+mount("/", "./modules/tv/tv.routes");
 
 try {
   const osService = require("./modules/os/os.service");
