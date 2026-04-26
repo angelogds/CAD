@@ -2,19 +2,26 @@
 <html lang="pt-BR" class="tv-theme-dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#0a0f1a">
   <title><%= title || 'Modo TV — Campo do Gado' %></title>
   <link rel="stylesheet" href="/css/tv-mode.css">
 </head>
+
 <body class="cg-tv">
   <div id="tvApp" class="tv-shell">
+
     <header class="tv-topbar">
       <div class="tv-left">
         <div class="tv-logo-box">
-          <img src="/img/tv/logo-manutencao.png" alt="Campo do Gado" onerror="this.style.display='none'">
+          <img
+            src="/img/logo.png"
+            alt="Campo do Gado"
+            onerror="this.onerror=null; this.src='/img/tv/logo-manutencao.png';"
+          >
         </div>
 
-        <div>
+        <div class="tv-title-box">
           <div class="tv-kicker">MODO TV</div>
           <div id="tvScreenLabel" class="tv-screen-label">ORDENS DE SERVIÇO</div>
         </div>
@@ -26,18 +33,26 @@
       </div>
 
       <div class="tv-right">
-        <div id="tvWeatherMini" class="tv-weather-mini">⛅ --° Feira</div>
+        <div id="tvWeatherMini" class="tv-weather-mini">
+          <span>⛅</span>
+          <strong>--°</strong>
+          <small>Feira</small>
+        </div>
 
-        <button id="tvThemeToggle" class="tv-theme-btn" type="button">
+        <button id="tvThemeToggle" class="tv-icon-btn" type="button" title="Alternar tema">
           <span id="tvThemeIcon">☀️</span>
-          <span id="tvThemeText">Modo claro</span>
+        </button>
+
+        <button id="tvFullscreenBtn" class="tv-icon-btn" type="button" title="Tela cheia">
+          ⛶
         </button>
 
         <div class="tv-online">
           <span class="tv-dot"></span>
-          SISTEMA ONLINE
+          <span>SISTEMA ONLINE</span>
         </div>
 
+        <div class="tv-mechanics-label">MECÂNICOS</div>
         <div id="tvAvatars" class="tv-avatars"></div>
       </div>
 
@@ -46,6 +61,19 @@
       </div>
     </header>
 
+    <nav class="tv-nav">
+      <button class="tv-nav-btn is-active" data-screen="os" type="button">OS</button>
+      <button class="tv-nav-btn" data-screen="preventivas" type="button">Preventivas</button>
+      <button class="tv-nav-btn" data-screen="equipe" type="button">Equipe</button>
+      <button class="tv-nav-btn" data-screen="galeria" type="button">Galeria</button>
+      <button class="tv-nav-btn" data-screen="alertas" type="button">Alertas</button>
+
+      <div class="tv-last-update">
+        <span>Atualizado:</span>
+        <strong id="tvLastUpdate">--:--</strong>
+      </div>
+    </nav>
+
     <section id="tvLed" class="tv-led" hidden>
       <strong id="tvLedText">Nova OS crítica</strong>
       <button id="tvLedClose" type="button">×</button>
@@ -53,9 +81,12 @@
 
     <main id="tvContent" class="tv-content"></main>
 
+    <div id="tvToast" class="tv-toast" hidden></div>
+
     <footer class="tv-ticker">
       <div id="tvTickerTrack" class="tv-ticker-track"></div>
     </footer>
+
   </div>
 
   <script>
@@ -64,8 +95,8 @@
       weatherUrl: '/api/tv/weather',
       refreshMs: 15000,
       rotationMs: 30000,
-      defaultAvatar: '/IMG/logo_menu.png.png',
-      galleryPlaceholder: '/img/login/slideshow/publicimglogin-bg.jpg.jpeg'
+      defaultAvatar: '/img/tv/avatar-default.jpg',
+      galleryPlaceholder: '/img/tv/galeria-placeholder.jpg'
     };
   </script>
 
