@@ -114,7 +114,8 @@ function listMaintenanceGallery(limit = 8) {
           a.path,
           a.created_at,
           COALESCE(o.equipamento, '-') AS equipamento,
-          COALESCE(o.numero, o.id) AS os_numero
+          COALESCE(o.numero, o.id) AS os_numero,
+          COALESCE(o.responsavel_exibicao, o.responsavel_nome, o.responsavel, '-') AS mecanico_nome
         FROM os_anexos a
         LEFT JOIN os o ON o.id = a.os_id
         WHERE lower(COALESCE(a.tipo, '')) IN ('abertura','fechamento')
@@ -132,6 +133,7 @@ function listMaintenanceGallery(limit = 8) {
         src: String(row.path || '').startsWith('/') ? row.path : `/uploads/os/${row.path}`,
         equipamento: row.equipamento || '-',
         osNumero: row.os_numero || '-',
+        mecanicoNome: row.mecanico_nome || '-',
       }));
     }
 
@@ -143,7 +145,8 @@ function listMaintenanceGallery(limit = 8) {
         COALESCE(a.filepath, a.filename, '') AS filepath,
         COALESCE(a.uploaded_at, a.created_at, datetime('now')) AS created_at,
         COALESCE(o.equipamento, '-') AS equipamento,
-        COALESCE(o.numero, o.id) AS os_numero
+        COALESCE(o.numero, o.id) AS os_numero,
+          COALESCE(o.responsavel_exibicao, o.responsavel_nome, o.responsavel, '-') AS mecanico_nome
       FROM anexos a
       LEFT JOIN os o ON o.id = a.owner_id
       WHERE lower(COALESCE(a.owner_type, '')) = 'os'
@@ -165,6 +168,7 @@ function listMaintenanceGallery(limit = 8) {
         src: normalized,
         equipamento: row.equipamento || '-',
         osNumero: row.os_numero || '-',
+        mecanicoNome: row.mecanico_nome || '-',
       };
     });
   } catch (_e) {
@@ -272,7 +276,7 @@ async function getTVData(_req, res) {
       { prioridade: 'baixa', texto: 'Sistema atualizado em tempo real para monitoramento da manutenção.' },
     ];
 
-  const gallery = listMaintenanceGallery(9);
+  const galleryBase = listMaintenanceGallery(9);
   const userNotifications = osItens
     .filter((item) => Number(item.responsavel_id || item.responsavelId || 0))
     .slice(0, 20)
@@ -285,6 +289,29 @@ async function getTVData(_req, res) {
       status: String(item.status || '-').toUpperCase(),
     }));
   const presence = buildPresence(online, { dia, noite, apoio });
+
+  const photosByName = new Map();
+  [
+    ...presence,
+    ...rankingMecanicos,
+    ...rankingApoio,
+    ...dia,
+    ...noite,
+    ...apoio,
+  ].forEach((item) => {
+    const key = String(item?.nome || '').trim().toLowerCase();
+    if (!key) return;
+    const foto = resolveUserPhoto(item) || item?.foto || item?.foto_path || null;
+    if (foto && !photosByName.has(key)) photosByName.set(key, foto);
+  });
+
+  const gallery = galleryBase.map((item) => {
+    const key = String(item?.mecanicoNome || '').trim().toLowerCase();
+    return {
+      ...item,
+      mecanicoFoto: photosByName.get(key) || null,
+    };
+  });
 
   return res.json({
     updatedAt: new Date().toISOString(),

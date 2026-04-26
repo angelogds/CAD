@@ -8,12 +8,13 @@
         <img src="/IMG/menu_campo_do_gado.png.png.png.png.png" alt="Logo Campo do Gado" class="tv-logo" />
         <div>
           <h1>Manutenção Campo do Gado</h1>
-          <p>Modo TV • Central de operação</p>
+          <p id="tv-screen-title">Modo TV • Ordens de serviço</p>
         </div>
       </div>
     </div>
 
     <div class="tv-header-right">
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema">🌙</button>
       <div class="tv-clock-wrap">
         <div id="tv-date" class="tv-date"></div>
         <div id="tv-clock" class="tv-clock"></div>
@@ -26,17 +27,14 @@
     </div>
   </header>
 
+  <div id="screen-progress-wrap" class="screen-progress-wrap" aria-label="Tempo até próxima tela">
+    <div id="screen-progress" class="screen-progress"></div>
+  </div>
+
   <div id="tv-top-alert" class="tv-top-alert" aria-live="assertive"></div>
 
-  <nav class="tv-tabs" id="screen-indicators">
-    <button type="button" data-screen="0" class="active">OS</button>
-    <button type="button" data-screen="1">Escala</button>
-    <button type="button" data-screen="2">Preventivas</button>
-    <button type="button" data-screen="3">Alertas</button>
-  </nav>
-
   <main class="tv-content">
-    <section class="tv-page tv-screen active" data-screen="0" aria-label="Tela de ordens de serviço">
+    <section class="tv-page tv-screen active" data-screen="0" data-title="Ordens de serviço" aria-label="Tela de ordens de serviço">
       <div class="tv-grid grid-2-1">
         <article class="tv-card tv-card-stack">
           <h2 class="tv-section-title">Ordens de Serviço em Tempo Real</h2>
@@ -72,7 +70,7 @@
       </div>
     </section>
 
-    <section class="tv-page tv-screen" data-screen="1" aria-label="Tela de escala e ranking">
+    <section class="tv-page tv-screen" data-screen="1" data-title="Escala e ranking" aria-label="Tela de escala e ranking">
       <div class="tv-grid grid-escala">
         <article class="tv-card">
           <h2 class="tv-section-title">Escala do dia</h2>
@@ -93,7 +91,7 @@
       </div>
     </section>
 
-    <section class="tv-page tv-screen" data-screen="2" aria-label="Tela de preventivas">
+    <section class="tv-page tv-screen" data-screen="2" data-title="Preventivas" aria-label="Tela de preventivas">
       <div class="tv-grid grid-2-1">
         <article class="tv-card tv-card-stack">
           <h2 class="tv-section-title">Preventivas</h2>
@@ -121,7 +119,7 @@
       </div>
     </section>
 
-    <section class="tv-page tv-screen" data-screen="3" aria-label="Tela de alertas e performance">
+    <section class="tv-page tv-screen" data-screen="3" data-title="Alertas e críticos" aria-label="Tela de alertas e performance">
       <div class="tv-grid grid-2">
         <article class="tv-card"><h2 class="tv-section-title">Alertas Ativos</h2><ul id="alertas-list" class="alert-list"></ul></article>
         <article class="tv-card">
