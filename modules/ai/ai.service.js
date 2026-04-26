@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const storagePaths = require('../../config/storage');
 const db = require('../../database/db');
+const aiDictionary = require('./dictionary');
 
 const ENV_KEY_CANDIDATES = ['OPENAI_API_KEY', 'OPENAI_APIKEY', 'OPENAI_KEY'];
 
@@ -283,7 +284,8 @@ function parseJSONObject(rawText) {
 }
 
 function sanitizeVoiceText(value) {
-  return String(value || '')
+  const normalized = aiDictionary.normalizeEquipmentMention(aiDictionary.normalizeVoiceTerms(String(value || '')));
+  return normalized
     .replace(/[\u0000-\u001F\u007F]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -309,7 +311,7 @@ function normalizeVoicePriority(value) {
 }
 
 function extractEquipmentName(texto = '') {
-  const text = String(texto || '').trim();
+  const text = aiDictionary.normalizeEquipmentMention(String(texto || '').trim());
   const regex = /\b(digestor|prensa|caldeira|percoladora|triturador|bomba|motor|esteira)\s*(\d+)?\b/i;
   const match = text.match(regex);
   if (!match) return null;

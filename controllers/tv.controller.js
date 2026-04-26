@@ -245,7 +245,27 @@ async function getTVData(_req, res) {
   });
 }
 
+function streamTVData(req, res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const send = async () => {
+    const payload = await new Promise((resolve) => {
+      const fakeRes = { json: resolve };
+      getTVData(req, fakeRes).catch(() => resolve({ sistemaOnline: false, updatedAt: new Date().toISOString() }));
+    });
+    res.write(`event: tv_data\ndata: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  send();
+  const timer = setInterval(send, 10000);
+  req.on('close', () => clearInterval(timer));
+}
+
 module.exports = {
   tvPage,
   getTVData,
+  streamTVData,
 };
