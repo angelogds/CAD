@@ -7,6 +7,7 @@ const alertsHub = require("../alerts/alerts.hub");
 const alertsService = require("../alerts/alerts.service");
 const pushService = require("../push/push.service");
 const aiService = require("../ai/ai.service");
+const learningService = require("../ai/learning.service");
 const escalaService = require("../escala/escala.service");
 const { getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
 let inspecaoService = null;
@@ -971,8 +972,9 @@ function autoAlocarOS(osId, { force = false } = {}) {
     return marcarAguardandoEquipe(Number(osId), "NOITE", "Sem executor disponível no turno: OS aguardando alocação.");
   }
 
-  const equipe = resolverEquipePorCriticidade({ grau: os.grau, turno: "DIA" });
-  const executor = equipe.executor || null;
+  const ranking = rankMechanicsForOS(os);
+  const equipe = resolverEquipePorCriticidade({ grau: os.grau, turno: "DIA", mecanicos: ranking });
+  const executor = equipe.executor || ranking[0] || null;
   if (!executor) return marcarAguardandoEquipe(Number(osId), "DIA", "Sem executor disponível no turno: OS aguardando alocação.");
   const auxiliar = equipe.auxiliar || null;
   persistirAlocacaoOS(Number(osId), executor, auxiliar, "DIA", "AUTO");
@@ -1350,6 +1352,97 @@ function normalizeFallbackNarrative(text) {
   return collapsed;
 }
 
+
+async function enhanceOSWithAI(osData = {}, { osId = null, userId = null } = {}) {
+  const payload = { ...osData };
+  const baseText = String(payload.nao_conformidade || payload.descricao || '').trim();
+  if (!baseText) return {};
+
+  let aiResult = null;
+  try {
+    aiResult = await aiService.melhorarDescricaoOperador(baseText, {
+      sintoma_principal: payload.sintoma_principal || null,
+      criticidade: payload.criticidade || payload.grau || null,
+      equipamento_id: payload.equipamento_id || null,
+    });
+  } catch (_e) {
+    aiResult = null;
+  }
+
+  const historico = learningService.getSimilarOS(baseText, { equipamento_id: payload.equipamento_id || null, limit: 3 });
+  const fromHistory = historico[0] || {};
+
+  const enhanced = {
+    diagnostico_ia: aiResult?.diagnostico || fromHistory.descricao || null,
+    causa_ia: aiResult?.causa_provavel || fromHistory.causa || null,
+    acao_corretiva_ia: aiResult?.acao_recomendada || fromHistory.solucao || null,
+    acao_preventiva_ia: fromHistory.solucao
+      ? `Baseado no histórico da OS #${fromHistory.os_id}: padronizar checklist e inspeção no mesmo ponto de falha.`
+      : null,
+  };
+
+  const cols = getOSColumns();
+  if (osId) {
+    const entries = Object.entries(enhanced).filter(([k, v]) => cols.includes(k) && v);
+    if (entries.length) {
+      const sets = entries.map(([k]) => `${k} = COALESCE(NULLIF(${k}, ''), ?)`);
+      db.prepare(`UPDATE os SET ${sets.join(', ')} WHERE id = ?`).run(...entries.map(([,v]) => v), Number(osId));
+    }
+  }
+
+  return enhanced;
+}
+
+function rankMechanicsForOS(os = {}) {
+  const criticidade = normalizeGrau(os?.grau || os?.criticidade || os?.prioridade || 'MEDIA');
+  const mecanicos = getMecanicosDiurno();
+  const now = Date.now();
+  const cols = new Set(getOSColumns());
+
+  const safeNum = (fn, fallback = 0) => {
+    try { return Number(fn() || fallback); } catch (_e) { return Number(fallback); }
+  };
+
+  return mecanicos.map((m) => {
+    const userId = Number(m?.user_id || 0);
+    const experiencia = (cols.has('mecanico_user_id') && cols.has('equipamento_id'))
+      ? safeNum(() => db.prepare(`SELECT COUNT(*) AS c FROM os WHERE mecanico_user_id = ? AND equipamento_id = ?`).get(userId, Number(os?.equipamento_id || 0))?.c, 0)
+      : 0;
+
+    const tempoMedio = (cols.has('mecanico_user_id') && cols.has('closed_at') && cols.has('opened_at'))
+      ? safeNum(() => db.prepare(`SELECT AVG(CASE WHEN closed_at IS NOT NULL AND opened_at IS NOT NULL THEN (julianday(closed_at)-julianday(opened_at))*24*60 ELSE NULL END) AS t FROM os WHERE mecanico_user_id = ?`).get(userId)?.t, 240)
+      : 240;
+
+    const cargaAtual = cols.has('mecanico_user_id')
+      ? safeNum(() => db.prepare(`SELECT COUNT(*) AS c FROM os WHERE status IN ('ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA') AND mecanico_user_id = ?`).get(userId)?.c, 0)
+      : 0;
+
+    const pesoCrit = criticidade === 'CRITICA' ? 2.5 : criticidade === 'ALTA' ? 2 : criticidade === 'MEDIA' ? 1.4 : 1;
+    const score = (experiencia * 4 * pesoCrit) + (Math.max(0, 360 - tempoMedio) / 60) - (cargaAtual * 3);
+    return { ...m, score, experiencia, tempo_medio_min: tempoMedio, carga_atual: cargaAtual, ts: now };
+  }).sort((a, b) => b.score - a.score);
+}
+
+function inferSmartCriticidade({ equipamento = null, criticidade = 'MEDIA' } = {}) {
+  const base = normalizeGrau(criticidade || 'MEDIA');
+  if (!equipamento) return base;
+  const tipo = String(equipamento.tipo || '').toLowerCase();
+  const redundante = Number(equipamento.redundante || equipamento.tem_redundancia || 0) === 1;
+  if (!redundante && /(digestor|caldeira|prensa|triturador)/i.test(tipo || equipamento.nome || '')) return 'CRITICA';
+  if (redundante && base === 'CRITICA') return 'MEDIA';
+  return base;
+}
+
+function parseVoiceCommand(text = '') {
+  const raw = String(text || '').trim().toLowerCase();
+  if (!raw) return { action: 'unknown' };
+  if (raw.includes('abrir os')) return { action: 'open_os' };
+  const closeMatch = raw.match(/finalizar\s+os\s+(\d+)/i);
+  if (closeMatch) return { action: 'close_os', osId: Number(closeMatch[1]) };
+  if (raw.includes('mostrar preventivas')) return { action: 'show_preventivas' };
+  return { action: 'unknown' };
+}
+
 async function createOS({
   equipamento_id,
   equipamento_manual,
@@ -1393,7 +1486,7 @@ async function createOS({
   if (!equipamentoFinal) throw new Error("Informe um equipamento cadastrado ou manual.");
 
   const tipoOS = normalizeTipoOS(tipo || "CORRETIVA");
-  const criticidadeEntrada = normalizeGrau(criticidade || severidade || grau || "MEDIA");
+  const criticidadeEntradaBase = normalizeGrau(criticidade || severidade || grau || "MEDIA");
   const score = classifyOSPriority({ descricao: relatoNaoConformidade, tipo: tipoOS, equipamento_id: equipId });
 
   const equipamentoCols = getTableColumns("equipamentos");
@@ -1426,7 +1519,7 @@ async function createOS({
       equipamento_manual: equipManual,
       setor: setorInferido,
       sintoma_principal: sintoma,
-      severidade: criticidadeEntrada,
+      severidade: criticidadeEntradaBase,
       nao_conformidade: relatoNaoConformidade,
       observacao_curta: relatoNaoConformidade,
     },
@@ -1444,8 +1537,8 @@ async function createOS({
     });
     const fallbackNarrative = normalizeFallbackNarrative(relatoNaoConformidade);
     aberturaIA = {
-      criticidade_sugerida: criticidadeEntrada,
-      prioridade_sugerida: criticidadeEntrada,
+      criticidade_sugerida: criticidadeEntradaBase,
+      prioridade_sugerida: criticidadeEntradaBase,
       diagnostico_inicial: fallbackNarrative,
       causa_provavel: "Causa provável pendente de inspeção técnica em campo.",
       risco_operacional: "Avaliação pendente (fallback sem IA).",
@@ -1458,6 +1551,7 @@ async function createOS({
       justificativa_interna: "Abertura concluída sem IA por indisponibilidade temporária.",
     };
   }
+  const criticidadeEntrada = inferSmartCriticidade({ equipamento: equipamentoContext, criticidade: criticidadeEntradaBase });
   const grauOS = normalizeGrau(aberturaIA.criticidade_sugerida || aberturaIA.prioridade_sugerida || score.prioridade || criticidadeEntrada);
 
   const cols = getOSColumns();
@@ -1550,6 +1644,14 @@ async function createOS({
 
   const info = stmt.run(...values);
   const osId = Number(info.lastInsertRowid);
+
+  await enhanceOSWithAI({
+    equipamento_id: equipId,
+    nao_conformidade: relatoNaoConformidade,
+    descricao: relatoNaoConformidade,
+    sintoma_principal: sintoma,
+    criticidade: grauOS,
+  }, { osId, userId: openedBy });
 
   try {
     aiEmbeddingsService.updateOSEmbedding(osId);
@@ -2198,4 +2300,7 @@ module.exports = {
   patchAIFields,
   analyzeVoiceOS,
   createVoiceOSFromPreview,
+  enhanceOSWithAI,
+  rankMechanicsForOS,
+  parseVoiceCommand,
 };

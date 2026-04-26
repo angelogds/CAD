@@ -211,6 +211,48 @@ class PushService {
     return this.sendToAll(payload, () => true);
   }
 
+  async notifyIntelligentOSAlerts(osData = {}) {
+    const prioridade = String(osData.prioridade || osData.grau || '').toUpperCase();
+    const status = String(osData.status || '').toUpperCase();
+    const osId = Number(osData.id || osData.osId || 0);
+    if (!osId) return { skipped: true, reason: 'os_id_missing' };
+
+    if (['CRITICA', 'CRITICO', 'ALTA', 'EMERGENCIAL'].includes(prioridade)) {
+      await this.sendToAll({
+        title: '🚨 OS crítica',
+        body: `OS #${osId} requer atenção imediata.`,
+        type: 'OS_CRITICA',
+        requireInteraction: true,
+        sound: '/audio/os-critica.mp3',
+        url: `/os/${osId}`,
+        data: { osId, type: 'OS_CRITICA' },
+      });
+    }
+
+    if (status.includes('PARAD')) {
+      await this.sendToAll({
+        title: '⛔ OS parada',
+        body: `OS #${osId} está parada e precisa de ação.`,
+        type: 'OS_PARADA',
+        requireInteraction: true,
+        url: `/os/${osId}`,
+        data: { osId, type: 'OS_PARADA' },
+      });
+    }
+
+    if (osData.prazo_em_horas != null && Number(osData.prazo_em_horas) <= 4) {
+      await this.sendToAll({
+        title: '⏰ OS próxima do prazo',
+        body: `OS #${osId} próxima do prazo limite.`,
+        type: 'OS_PRAZO',
+        url: `/os/${osId}`,
+        data: { osId, type: 'OS_PRAZO' },
+      });
+    }
+
+    return { ok: true };
+  }
+
   async notifyOSStatusChange(osData, oldStatus, newStatus) {
     const normalizedStatus = String(newStatus || '').toUpperCase();
     const isFinalizada = ['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA'].includes(normalizedStatus);

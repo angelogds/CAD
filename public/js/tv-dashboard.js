@@ -358,8 +358,24 @@
   activateScreen(0);
   refreshData();
 
+  function connectTVStream() {
+    if (!window.EventSource) return false;
+    try {
+      const es = new EventSource('/api/tv-stream');
+      es.addEventListener('tv_data', (event) => {
+        try { render(JSON.parse(event.data || '{}')); } catch (_e) {}
+      });
+      es.onerror = () => {
+        try { es.close(); } catch (_e) {}
+      };
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
   window.addEventListener('resize', adjustScale);
   setInterval(setDateTime, 1000);
   setInterval(() => activateScreen(currentScreen + 1), ROTATE_MS);
-  setInterval(refreshData, REFRESH_MS);
+  if (!connectTVStream()) setInterval(refreshData, REFRESH_MS);
 })();

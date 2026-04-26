@@ -13,21 +13,37 @@ function tableExists(name) {
   }
 }
 
-function registrarLogIA({ usuarioId, osId, naoConformidadeId, tipo, entrada, resposta, status }) {
-  if (!tableExists("os_ia_logs")) return;
+function registrarLogIA({ usuarioId, osId, naoConformidadeId, tipo, entrada, resposta, status, tempoMs = null, erro = null }) {
   try {
-    db.prepare(
-      `INSERT INTO os_ia_logs (usuario_id, os_id, nao_conformidade_id, tipo, entrada_json, resposta_json, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      usuarioId || null,
-      osId || null,
-      naoConformidadeId || null,
-      tipo,
-      safeJSONStringify(entrada),
-      safeJSONStringify(resposta),
-      status || "OK"
-    );
+    if (tableExists("os_ia_logs")) {
+      db.prepare(
+        `INSERT INTO os_ia_logs (usuario_id, os_id, nao_conformidade_id, tipo, entrada_json, resposta_json, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        usuarioId || null,
+        osId || null,
+        naoConformidadeId || null,
+        tipo,
+        safeJSONStringify(entrada),
+        safeJSONStringify(resposta),
+        status || "OK"
+      );
+    }
+
+    if (tableExists("ai_logs")) {
+      db.prepare(
+        `INSERT INTO ai_logs (usuario_id, os_id, tipo, entrada, resposta, tempo_ms, erro)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        usuarioId || null,
+        osId || null,
+        tipo || null,
+        safeJSONStringify(entrada),
+        safeJSONStringify(resposta),
+        tempoMs != null ? Number(tempoMs) : null,
+        erro ? String(erro) : null
+      );
+    }
   } catch (_e) {
     // logs não devem quebrar o fluxo principal
   }

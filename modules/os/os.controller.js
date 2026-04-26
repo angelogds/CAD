@@ -518,6 +518,25 @@ async function osVoiceAnalyze(req, res) {
   }
 }
 
+async function osVoiceCommand(req, res) {
+  const userId = Number(req.session?.user?.id || 0);
+  if (!userId) return res.status(401).json({ ok: false, error: "Usuário não autenticado." });
+  const comando = String(req.body?.comando || req.body?.texto || "").trim();
+  const parsed = service.parseVoiceCommand(comando);
+
+  if (parsed.action === "open_os") return res.json({ ok: true, action: parsed.action, redirect: "/os/novo" });
+  if (parsed.action === "show_preventivas") return res.json({ ok: true, action: parsed.action, redirect: "/preventivas" });
+  if (parsed.action === "close_os" && parsed.osId) {
+    try {
+      service.updateStatus(parsed.osId, "FINALIZADA", userId);
+      return res.json({ ok: true, action: parsed.action, os_id: parsed.osId, redirect: `/os/${parsed.osId}` });
+    } catch (err) {
+      return res.status(400).json({ ok: false, error: err.message || "Falha ao finalizar OS por comando de voz." });
+    }
+  }
+  return res.status(400).json({ ok: false, error: "Comando de voz não reconhecido." });
+}
+
 async function osVoiceCreate(req, res) {
   const userId = Number(req.session?.user?.id || 0);
   if (!userId) return res.status(401).json({ ok: false, error: "Usuário não autenticado." });
@@ -553,5 +572,6 @@ module.exports = {
   osAutoAssign,
   osSetEquipe,
   osVoiceAnalyze,
+  osVoiceCommand,
   osVoiceCreate,
 };
