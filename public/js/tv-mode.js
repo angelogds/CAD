@@ -1,5 +1,8 @@
 (() => {
   const config = window.CG_TV_CONFIG || {};
+  const LED_VISIBLE_MS = 60000;
+  const LED_SOUND_MS = 10000;
+  const LED_SOUND_INTERVAL_MS = 2000;
 
   const state = {
     data: null,
@@ -8,9 +11,12 @@
     rotationStartedAt: Date.now(),
     theme: localStorage.getItem('cg-tv-theme') || 'dark',
     pausedUntil: 0,
-    criticalLedTimer: null,
     notificationPrimed: false,
     pendingLed: null,
+    osAlerts: [],
+    ledHideTimer: null,
+    ledSoundInterval: null,
+    ledSoundStopTimer: null,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -201,6 +207,15 @@
     if (!led || !ledText) return;
 
     if (!state.pendingLed) {
+      clearTimeout(state.ledHideTimer);
+      led.hidden = true;
+      return;
+    }
+
+    const expiresAt = Number(state.pendingLed.expiresAt || 0);
+    if (expiresAt && Date.now() >= expiresAt) {
+      state.pendingLed = null;
+      clearTimeout(state.ledHideTimer);
       led.hidden = true;
       return;
     }
@@ -209,11 +224,13 @@
     ledText.textContent = state.pendingLed.texto;
     led.hidden = false;
 
-    clearTimeout(state.criticalLedTimer);
-    state.criticalLedTimer = setTimeout(() => {
+    clearTimeout(state.ledHideTimer);
+    const remainingMs = Math.max(0, (expiresAt || (Date.now() + LED_VISIBLE_MS)) - Date.now());
+    state.ledHideTimer = setTimeout(() => {
       state.pendingLed = null;
       led.hidden = true;
-    }, 20000);
+      state.ledHideTimer = null;
+    }, remainingMs);
   }
 
   function renderOS() {
@@ -248,6 +265,7 @@
           </div>
           <div class="tv-card tv-chart-card"><div class="tv-card-title compact"><h3>Status das OS</h3></div><canvas id="statusChart" width="360" height="220"></canvas><div id="statusLegend" class="tv-chart-legend"></div></div>
           <div class="tv-card tv-chart-card"><div class="tv-card-title compact"><h3>OS por Equipamento</h3></div><canvas id="equipChart" width="420" height="210"></canvas></div>
+          <div class="tv-card tv-chart-card"><div class="tv-card-title compact"><h3>Painel de Alertas OS</h3></div>${renderOsAlertsPanel()}</div>
         </aside>
       </section>`;
 
@@ -393,7 +411,7 @@
   }
 
   function checkCriticalLed() {
-    const abertas = (state.data?.os || []).filter((o) => ['ABERTA', 'EM_ANDAMENTO'].includes(String(o.status || '').toUpperCase()));
+    const abertas = (state.data?.os || []).filter((o) => String(o.status || '').toUpperCase() === 'ABERTA');
     const notified = JSON.parse(localStorage.getItem('cg-tv-os-notified') || '[]');
     const notifiedSet = new Set(notified.map((x) => String(x)));
 
@@ -409,12 +427,33 @@
     if (!newCritical) return;
 
     const ledData = buildLedMessage(newCritical);
+    ledData.expiresAt = Date.now() + LED_VISIBLE_MS;
     state.pendingLed = ledData;
-    playNotificationSound(ledData.prioridade);
+    state.osAlerts.unshift({
+      id: String(newCritical.id || Date.now()),
+      prioridade: ledData.prioridade,
+      texto: ledData.texto,
+      createdAt: new Date().toISOString(),
+    });
+    state.osAlerts = state.osAlerts.slice(0, 11);
+    playLedSoundBurst(ledData.prioridade);
     syncLedVisibility();
+    if (isOSScreenActive()) renderCurrentScreen();
 
     notifiedSet.add(String(newCritical.id));
     localStorage.setItem('cg-tv-os-notified', JSON.stringify([...notifiedSet].slice(-300)));
+  }
+
+  function renderOsAlertsPanel() {
+    if (!state.osAlerts.length) {
+      return '<div class="tv-empty tv-empty-small">Sem novos alertas de OS.</div>';
+    }
+    return `<div class="tv-os-alert-list">${state.osAlerts.map((alerta) => `
+      <article class="tv-os-alert tv-os-alert-${String(alerta.prioridade || 'MEDIA').toLowerCase()}">
+        <strong>${escapeHtml(alerta.texto)}</strong>
+        <small>${new Date(alerta.createdAt).toLocaleTimeString('pt-BR')}</small>
+      </article>
+    `).join('')}</div>`;
   }
 
   function renderRankingList(items = []) {
@@ -442,6 +481,22 @@
     if (!src) return;
     const audio = new Audio(src);
     audio.play().catch(() => {});
+  }
+
+  function playLedSoundBurst(prioridade = 'MEDIA') {
+    clearInterval(state.ledSoundInterval);
+    clearTimeout(state.ledSoundStopTimer);
+
+    playNotificationSound(prioridade);
+    state.ledSoundInterval = setInterval(() => {
+      playNotificationSound(prioridade);
+    }, LED_SOUND_INTERVAL_MS);
+
+    state.ledSoundStopTimer = setTimeout(() => {
+      clearInterval(state.ledSoundInterval);
+      state.ledSoundInterval = null;
+      state.ledSoundStopTimer = null;
+    }, LED_SOUND_MS);
   }
 
   function drawDoughnut(canvasId, data, legendId) {
@@ -571,6 +626,10 @@
     $('tvLedClose')?.addEventListener('click', () => {
       const led = $('tvLed');
       state.pendingLed = null;
+      clearInterval(state.ledSoundInterval);
+      clearTimeout(state.ledSoundStopTimer);
+      state.ledSoundInterval = null;
+      state.ledSoundStopTimer = null;
       if (led) led.hidden = true;
     });
 
