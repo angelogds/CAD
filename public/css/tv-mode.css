@@ -81,7 +81,8 @@ body.cg-tv { font-family: Arial, Helvetica, sans-serif; background: var(--tv-bg)
 .tv-content { flex: 1; min-height: 0; padding: 8px 10px; overflow: hidden; }
 .tv-grid { height: 100%; display: grid; gap: 10px; }
 .tv-grid-os { grid-template-columns: 1fr 420px; }
-.tv-grid-alertas, .tv-grid-equipe { grid-template-columns: 1fr 380px; }
+.tv-grid-alertas { grid-template-columns: 1fr 380px; }
+.tv-grid-equipe { grid-template-columns: minmax(0, 1fr) 380px; }
 
 .tv-card { background: linear-gradient(180deg, rgba(255,255,255,.025), transparent), var(--tv-card); border: 1px solid var(--tv-line); border-radius: var(--tv-radius); padding: 8px; min-height: 0; overflow: hidden; box-shadow: var(--tv-shadow); }
 .tv-main-card { display: flex; flex-direction: column; }
@@ -111,6 +112,7 @@ body.cg-tv { font-family: Arial, Helvetica, sans-serif; background: var(--tv-bg)
 .prio-baixa { color: var(--tv-blue); background: rgba(59,130,246,.15); }
 
 .tv-side, .tv-side-single { display: grid; gap: 10px; align-content: start; }
+.tv-grid-equipe .tv-side { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
 .tv-stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .tv-stat-card { min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .tv-stat-card span { font-size: 10px; color: var(--tv-dim); font-weight: 900; }
@@ -125,7 +127,7 @@ body.cg-tv { font-family: Arial, Helvetica, sans-serif; background: var(--tv-bg)
 .tv-mini-stats span { color: var(--tv-dim); font-size: 11px; font-weight: 900; }
 .tv-mini-stats strong { font-size: 24px; }
 
-.tv-team-grid.compact { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; overflow: auto; }
+.tv-team-grid.compact { display: grid; grid-template-columns: 1fr; gap: 8px; overflow: auto; }
 .tv-mechanic.compact { display: flex; align-items: center; gap: 10px; background: var(--tv-card-2); border: 1px solid var(--tv-line-soft); border-radius: 14px; padding: 8px; position: relative; min-height: 92px; }
 .tv-mechanic.compact img { width: 50px; height: 50px; object-fit: cover; border-radius: 50%; border: 2px solid var(--tv-green); background: #fff; }
 .tv-mechanic.compact strong { display: block; color: var(--tv-text); font-size: 14px; }
@@ -142,6 +144,9 @@ body.cg-tv { font-family: Arial, Helvetica, sans-serif; background: var(--tv-bg)
 .tv-ranking-list li small { color: var(--tv-dim); font-size: 10px; }
 .tv-ranking-list strong { color: var(--tv-text); }
 .tv-empty-small { font-size: 12px; height: 90px; }
+.tv-escala-card, .tv-ranking-card { display: flex; flex-direction: column; min-height: 0; }
+.tv-escala-card { overflow: auto; }
+.tv-ranking-card { overflow: auto; }
 
 .tv-gallery { display: grid; gap: 10px; overflow: auto; }
 .tv-gallery.premium-full { grid-template-columns: repeat(4, 1fr); }

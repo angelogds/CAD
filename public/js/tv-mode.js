@@ -9,6 +9,8 @@
     theme: localStorage.getItem('cg-tv-theme') || 'dark',
     pausedUntil: 0,
     criticalLedTimer: null,
+    mediaPreloaded: new Set(),
+    osBaselineLoaded: false,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -76,6 +78,7 @@
       const json = await response.json();
       if (!json.ok) throw new Error(json.error || 'Erro no snapshot');
       state.data = json.data;
+      preloadGaleriaMedia(state.data?.galeria || []);
       renderTop();
       renderTicker();
       renderCurrentScreen();
@@ -228,7 +231,7 @@
             ${equipe.map((m) => `
               <article class="tv-mechanic compact ${m.status === 'em_os' ? 'is-working' : ''}">
                 <img src="${escapeHtml(m.foto || config.defaultAvatar)}" onerror="this.src='${config.defaultAvatar}'">
-                <div><strong>${escapeHtml(m.nome)}</strong><span>${escapeHtml(m.funcao || '-')}</span><small>${escapeHtml(m.turno || 'Turno vigente')}</small></div>
+                <div><strong>${escapeHtml(m.nome)}</strong><span>${escapeHtml(m.funcao || '-')}</span><small>${escapeHtml(m.turno || 'Turno vigente')}</small><small>${escapeHtml(m.habilidades || m.especialidade || '')}</small></div>
                 <em>${escapeHtml(statusNome[m.status] || 'Online')}</em>
               </article>`).join('')}
           </div>
@@ -258,7 +261,7 @@
   }
 
   function renderGaleria() {
-    const galeria = (state.data?.galeria || []).slice(0, 12);
+    const galeria = dedupeGaleria((state.data?.galeria || [])).slice(0, 12);
     const hasReal = galeria.some((g) => g.tipo !== 'placeholder');
 
     $('tvContent').innerHTML = `
@@ -275,6 +278,33 @@
           </div>
         </div>
       </section>`;
+  }
+
+  function dedupeGaleria(items = []) {
+    const seen = new Set();
+    return items.filter((g) => {
+      const key = `${String(g.os_numero || '').toLowerCase()}::${String(g.arquivo_url || '').toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function preloadGaleriaMedia(items = []) {
+    dedupeGaleria(items).forEach((item) => {
+      const src = String(item?.arquivo_url || '').trim();
+      if (!src || state.mediaPreloaded.has(src) || item.tipo === 'placeholder') return;
+      state.mediaPreloaded.add(src);
+      if (item.tipo === 'video') {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.src = src;
+        return;
+      }
+      const image = new Image();
+      image.decoding = 'async';
+      image.src = src;
+    });
   }
 
   function renderAlertas() {
@@ -333,6 +363,14 @@
     const abertas = (state.data?.os || []).filter((o) => ['ABERTA', 'EM_ANDAMENTO'].includes(String(o.status || '').toUpperCase()));
     const notified = JSON.parse(localStorage.getItem('cg-tv-os-notified') || '[]');
     const notifiedSet = new Set(notified.map((x) => String(x)));
+
+    if (!state.osBaselineLoaded) {
+      abertas.forEach((os) => notifiedSet.add(String(os.id)));
+      localStorage.setItem('cg-tv-os-notified', JSON.stringify([...notifiedSet].slice(-300)));
+      state.osBaselineLoaded = true;
+      return;
+    }
+
     const newCritical = abertas.find((os) => !notifiedSet.has(String(os.id)));
 
     if (!newCritical) return;
@@ -366,10 +404,10 @@
 
   function playNotificationSound(prioridade = 'MEDIA') {
     const map = {
-      BAIXA: '/sounds/os-baixa.mp3',
-      MEDIA: '/sounds/os-media.mp3',
-      ALTA: '/sounds/os-alta.mp3',
-      CRITICA: '/sounds/os-critica.mp3',
+      BAIXA: '/audio/os-nova.mp3',
+      MEDIA: '/audio/os-status.mp3',
+      ALTA: '/audio/os-status.mp3',
+      CRITICA: '/audio/os-critica.mp3',
     };
     const src = map[String(prioridade || '').toUpperCase()];
     if (!src) return;

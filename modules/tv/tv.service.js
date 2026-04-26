@@ -179,6 +179,32 @@ function tempoDesde(dateValue) {
 }
 
 async function getOS() {
+  try {
+    const dashboardService = require('../dashboard/dashboard.service');
+    if (dashboardService && typeof dashboardService.getOSPainel === 'function') {
+      const painel = dashboardService.getOSPainel(50) || {};
+      const items = Array.isArray(painel.items) ? painel.items : [];
+      if (items.length) {
+        return items.map((item, index) => {
+          const statusNorm = normalizarStatusOS(item.status);
+          const prioridadeNorm = normalizarPrioridade(item.grau || item.prioridade);
+          return {
+            id: item.id,
+            numero: String(item.id || item.numero || '-').startsWith('OS') ? String(item.id || item.numero) : `OS #${item.id || item.numero}`,
+            equipamento: String(item.equipamento || 'Equipamento não informado').toUpperCase(),
+            responsavel: item.responsavel_exibicao && item.responsavel_exibicao !== '-' ? item.responsavel_exibicao : 'A definir',
+            responsavel_id: item.responsavel_user_id || item.mecanico_user_id || null,
+            status: statusNorm,
+            prioridade: prioridadeNorm,
+            tempo: tempoDesde(item.abertura || item.opened_at),
+            descricao: item.tipo || '',
+            isNew: index === 0 && statusNorm === 'ABERTA',
+          };
+        });
+      }
+    }
+  } catch (_err) {}
+
   const table = firstTable(['ordens_servico', 'os', 'ordens', 'ordens_de_servico']);
   if (!table) return fallbackOS();
 
@@ -554,6 +580,31 @@ function getGaleriaFromTable(table) {
     });
 }
 
+function dedupeGaleriaItems(itens = []) {
+  const seen = new Set();
+  return itens.filter((item) => {
+    const fileKey = String(item.arquivo_url || '').trim().toLowerCase();
+    const osKey = String(item.os_numero || '').trim().toLowerCase();
+    const key = `${osKey}::${fileKey}`;
+    if (!fileKey || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function placeholdersGaleria(total = 12) {
+  return Array.from({ length: total }).map((_, i) => ({
+    id: `placeholder-${i + 1}`,
+    tipo: 'placeholder',
+    arquivo_url: '/img/tv/galeria-placeholder.jpg',
+    legenda: 'Aguardando registros de fechamento de OS',
+    os_numero: 'OS --',
+    equipamento: 'Manutenção',
+    created_at: new Date().toISOString(),
+    responsavel: 'A definir',
+  }));
+}
+
 async function getGaleria() {
   const tables = ['os_fechamento_midias', 'os_fechamento_fotos', 'os_anexos', 'anexos_os', 'ordem_servico_anexos', 'os_fechamentos', 'fechamentos_os', 'arquivos_os', 'os_midias'];
   let itens = [];
@@ -587,22 +638,19 @@ async function getGaleria() {
     })));
   }
 
-  itens = itens
+  itens = dedupeGaleriaItems(itens)
+    .filter((item) => String(item.arquivo_url || '').trim())
     .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
     .slice(0, 12);
 
-  if (itens.length) return itens;
+  if (itens.length) {
+    if (itens.length < 12) {
+      return itens.concat(placeholdersGaleria(12 - itens.length));
+    }
+    return itens;
+  }
 
-  return Array.from({ length: 12 }).map((_, i) => ({
-    id: `placeholder-${i + 1}`,
-    tipo: 'placeholder',
-    arquivo_url: '/img/tv/galeria-placeholder.jpg',
-    legenda: 'Aguardando registros de fechamento de OS',
-    os_numero: 'OS --',
-    equipamento: 'Manutenção',
-    created_at: new Date().toISOString(),
-    responsavel: 'A definir',
-  }));
+  return placeholdersGaleria(12);
 }
 
 async function getWeather() {
