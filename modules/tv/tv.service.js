@@ -191,6 +191,33 @@ function tempoDesde(dateValue) {
 }
 
 async function getOS() {
+  try {
+    const dashboardService = require('../dashboard/dashboard.service');
+    if (dashboardService && typeof dashboardService.getOSPainel === 'function') {
+      const painel = dashboardService.getOSPainel(50) || {};
+      const itens = Array.isArray(painel.items) ? painel.items : [];
+      if (itens.length) {
+        return itens.map((r, index) => {
+          const statusNorm = normalizarStatusOS(r.status);
+          const prioridadeNorm = normalizarPrioridade(r.grau || r.prioridade);
+          const aberturaBase = r.opened_at || r.abertura || r.created_at || null;
+          return {
+            id: r.id,
+            numero: String(r.numero || r.id).startsWith('OS') ? String(r.numero) : `OS #${r.numero || r.id}`,
+            equipamento: String(r.equipamento || 'Equipamento não informado').toUpperCase(),
+            responsavel: String(r.responsavel_exibicao || r.responsavel_nome || r.responsavel || '-').trim() || 'A definir',
+            responsavel_id: r.responsavel_user_id || r.mecanico_user_id || null,
+            status: statusNorm,
+            prioridade: prioridadeNorm,
+            tempo: tempoDesde(aberturaBase),
+            descricao: r.descricao || '',
+            isNew: index === 0 && statusNorm === 'ABERTA',
+          };
+        });
+      }
+    }
+  } catch (_e) {}
+
   const table = firstTable(['ordens_servico', 'os', 'ordens', 'ordens_de_servico']);
   if (!table) return fallbackOS();
 
