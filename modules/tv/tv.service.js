@@ -117,7 +117,7 @@ function normalizarRankingItem(item, index) {
     altas: Number(item.os_altas || item.altas || 0),
     pontos: Number(item.score || item.pontuacao || item.pontos || 0),
     posicao: Number(item.posicao || index + 1),
-    foto: normalizeImagePath(item.photo_path || item.foto || item.avatar || item.imagem),
+    foto: normalizeImagePath(item.photo_path || item.foto || item.avatar || item.imagem || item.imagem_perfil),
     grupo: String(item.perfil || '').toLowerCase() === 'apoio' ? 'APOIO_OPERACIONAL' : 'MECANICO',
   };
 }
@@ -142,8 +142,10 @@ async function getDadosPainelOperacionalParaTV() {
     (typeof painelService.getEscalaSemana === 'function' ? painelService.getEscalaSemana() : null) ||
     null;
   const rankingRaw = typeof painelService.getMecanicosRankingSemana === 'function' ? painelService.getMecanicosRankingSemana() : null;
+  const osPainelRaw = typeof painelService.getOSPainel === 'function' ? painelService.getOSPainel(50) : null;
+  const preventivasRaw = typeof painelService.getPreventivasDashboard === 'function' ? painelService.getPreventivasDashboard() : null;
 
-  return { escalaRaw, rankingRaw };
+  return { escalaRaw, rankingRaw, osPainelRaw, preventivasRaw };
 }
 
 function toIsoDate(value) {
@@ -192,12 +194,11 @@ function tempoDesde(dateValue) {
 
 async function getOS() {
   try {
-    const dashboardService = require('../dashboard/dashboard.service');
-    if (dashboardService && typeof dashboardService.getOSPainel === 'function') {
-      const painel = dashboardService.getOSPainel(50) || {};
-      const itens = Array.isArray(painel.items) ? painel.items : [];
-      if (itens.length) {
-        return itens.map((r, index) => {
+    const dadosPainel = await getDadosPainelOperacionalParaTV();
+    const painel = dadosPainel?.osPainelRaw || null;
+    const itens = Array.isArray(painel?.items) ? painel.items : [];
+    if (itens.length) {
+      return itens.map((r, index) => {
           const statusNorm = normalizarStatusOS(r.status);
           const prioridadeNorm = normalizarPrioridade(r.grau || r.prioridade);
           const aberturaBase = r.opened_at || r.abertura || r.created_at || null;
@@ -215,7 +216,6 @@ async function getOS() {
           };
         });
       }
-    }
   } catch (_e) {}
 
   const table = firstTable(['ordens_servico', 'os', 'ordens', 'ordens_de_servico']);
@@ -354,6 +354,19 @@ function extractEscalaVigenteFromTable(table) {
   };
 }
 
+
+function isPessoaManutencao(pessoa = {}) {
+  const base = `${pessoa?.funcao || ''} ${pessoa?.role || ''} ${pessoa?.perfil || ''} ${pessoa?.grupo || ''} ${pessoa?.tipo || ''}`;
+  const nome = String(pessoa?.nome || pessoa?.name || '').trim();
+  if (matchNomeFallback(nome)) return true;
+  return hasAny(base, ['MECAN', 'MANUTEN', 'APOIO', 'OPERACIONAL', 'AUXILIAR']);
+}
+
+function matchNomeFallback(nome = '') {
+  const norm = normalizeNome(nome);
+  return ['diogo','salviano','rodolfo','fabio','junior','luis','emanuel'].includes(norm);
+}
+
 function fillEquipeStats(equipe, osList) {
   return equipe.map((p) => {
     const emAberto = osList.find((o) => String(o.responsavel || '').toUpperCase() === String(p.nome).toUpperCase() && o.status !== 'CONCLUIDA');
@@ -385,7 +398,7 @@ async function getEquipeManutencaoViaEscala(osList = []) {
         nome,
         funcao: grupo === 'APOIO_OPERACIONAL' ? 'Apoio Operacional' : 'Mecânico',
         grupo,
-        foto: normalizeImagePath(pessoa?.photo_path || pessoa?.foto || pessoa?.avatar || pessoa?.imagem),
+        foto: normalizeImagePath(pessoa?.photo_path || pessoa?.foto || pessoa?.avatar || pessoa?.imagem || pessoa?.imagem_perfil),
         status,
         turno,
         osAtual: null,
@@ -396,8 +409,8 @@ async function getEquipeManutencaoViaEscala(osList = []) {
 
     (escalaPainel.diurno_mecanicos || []).forEach((p) => addPessoa(p, 'MECANICO', 'online', 'Dia'));
     (escalaPainel.apoio_operacional || []).forEach((p) => addPessoa(p, 'APOIO_OPERACIONAL', 'online', 'Dia'));
-    (escalaPainel.noturno || []).forEach((p) => addPessoa(p, classificarGrupo(p), 'online', 'Noite'));
-    (escalaPainel.folgas_afastamentos || []).forEach((p) => addPessoa(p, classificarGrupo(p), hasAny(p.tipo, ['FERIAS']) ? 'ferias' : hasAny(p.tipo, ['ATESTADO']) ? 'atestado' : 'folga', 'Dia'));
+    (escalaPainel.noturno || []).filter((p) => isPessoaManutencao(p)).forEach((p) => addPessoa(p, classificarGrupo(p), 'online', 'Noite'));
+    (escalaPainel.folgas_afastamentos || []).filter((p) => isPessoaManutencao(p)).forEach((p) => addPessoa(p, classificarGrupo(p), hasAny(p.tipo, ['FERIAS']) ? 'ferias' : hasAny(p.tipo, ['ATESTADO']) ? 'atestado' : 'folga', 'Dia'));
 
     const rankingRef = [...(rankingPainel.itemsMecanicos || []), ...(rankingPainel.itemsApoio || [])];
     rankingRef.forEach((item) => {
@@ -409,7 +422,7 @@ async function getEquipeManutencaoViaEscala(osList = []) {
     });
 
     const equipe = fillEquipeStats(Array.from(equipeMap.values()), osList);
-    const folgas = (escalaPainel.folgas_afastamentos || []).map((f) => ({
+    const folgas = (escalaPainel.folgas_afastamentos || []).filter((f) => isPessoaManutencao(f)).map((f) => ({
       nome: String(f.nome || '').trim(),
       status: String(f.tipo || '-').toUpperCase(),
     })).filter((f) => f.nome);
@@ -500,6 +513,31 @@ async function getRankingEquipe(osList = [], equipe = []) {
 }
 
 async function getPreventivas() {
+  try {
+    const dadosPainel = await getDadosPainelOperacionalParaTV();
+    const payload = dadosPainel?.preventivasRaw || {};
+    const itens = Array.isArray(payload.items) ? payload.items : [];
+    if (itens.length) {
+      const today = new Date().toISOString().slice(0, 10);
+      return itens.map((r) => {
+        const raw = String(r.status || '').toUpperCase();
+        let st = 'PENDENTE';
+        if (raw.includes('CONCL') || raw.includes('FINAL')) st = 'CONCLUIDA';
+        else if (raw.includes('ANDAMENTO')) st = 'NO_PRAZO';
+        if (r.data_prevista && String(r.data_prevista).slice(0, 10) < today && st !== 'CONCLUIDA') st = 'ATRASADA';
+
+        return {
+          id: r.id,
+          tarefa: r.observacao || r.tarefa || 'Preventiva',
+          equipamento: r.equipamento_nome || r.equipamento_tipo || r.equipamento || 'Equipamento',
+          dataPrevista: r.data_prevista ? String(r.data_prevista).slice(0, 10) : today,
+          status: st,
+          responsavel: r.responsavel_exibicao || r.responsavel || '-',
+        };
+      });
+    }
+  } catch (_e) {}
+
   const table = firstTable(['preventivas', 'manutencoes_preventivas', 'preventive_tasks', 'preventiva_execucoes']);
   if (!table) return fallbackPreventivas();
 
