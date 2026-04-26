@@ -200,7 +200,7 @@
     const ledText = $('tvLedText');
     if (!led || !ledText) return;
 
-    if (!isOSScreenActive() || !state.pendingLed) {
+    if (!state.pendingLed) {
       led.hidden = true;
       return;
     }
@@ -419,11 +419,13 @@
 
   function renderRankingList(items = []) {
     if (!items.length) return '<div class="tv-empty tv-empty-small">Sem dados nesta semana.</div>';
-    return `<ol class="tv-ranking-list">${items.map((r, i) => {
+    const validItems = items.filter((r) => String(r?.nome || '').trim() && !String(r.nome || '').toLowerCase().includes('a definir'));
+    if (!validItems.length) return '<div class="tv-empty tv-empty-small">Sem dados nesta semana.</div>';
+    return `<ol class="tv-ranking-list">${validItems.map((r, i) => {
       const pos = i + 1;
       const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `${pos}º`;
       return `<li>
-        <div><span>${medal} ${escapeHtml(r.nome)}</span><small>${Number(r.os_finalizadas || 0)} OS finalizadas • Críticas: ${Number(r.criticas || 0)} • Altas: ${Number(r.altas || 0)}</small></div>
+        <div class="tv-ranking-person"><img src="${escapeHtml(r.foto || config.defaultAvatar)}" onerror="this.src='${config.defaultAvatar}'"><div><span>${medal} ${escapeHtml(r.nome)}</span><small>${Number(r.os_finalizadas || 0)} OS finalizadas • Críticas: ${Number(r.criticas || 0)} • Altas: ${Number(r.altas || 0)}</small></div></div>
         <strong>${Number(r.pontos || 0).toFixed(1)} pts</strong>
       </li>`;
     }).join('')}</ol>`;

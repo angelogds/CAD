@@ -145,6 +145,8 @@ body.cg-tv { font-family: Arial, Helvetica, sans-serif; background: var(--tv-bg)
 .tv-ranking-list li div { display: flex; flex-direction: column; gap: 2px; }
 .tv-ranking-list li small { color: var(--tv-dim); font-size: 10px; }
 .tv-ranking-list strong { color: var(--tv-text); }
+.tv-ranking-person { display:flex !important; flex-direction:row !important; align-items:center; gap:8px; }
+.tv-ranking-person img { width:26px; height:26px; border-radius:50%; object-fit:cover; border:1px solid var(--tv-line-soft); background:var(--tv-card-2); }
 .tv-empty-small { font-size: 12px; height: 90px; }
 
 .tv-gallery { display: grid; gap: 10px; overflow: auto; }
