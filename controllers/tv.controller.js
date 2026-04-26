@@ -1,6 +1,7 @@
 const dashboardService = require('../modules/dashboard/dashboard.service');
 const alertsService = require('../modules/alerts/alerts.service');
 const db = require('../database/db');
+const weatherService = require('../modules/tv/weather.service');
 
 const FALLBACK_AVATAR = null;
 
@@ -111,7 +112,7 @@ function tvPage(_req, res) {
   });
 }
 
-function getTVData(_req, res) {
+async function getTVData(_req, res) {
   const osResumo = dashboardService.getOSResumoStatus();
   const osPainel = dashboardService.getOSPainel(30);
   const preventivas = dashboardService.getPreventivasDashboard();
@@ -121,6 +122,7 @@ function getTVData(_req, res) {
   const avisos = dashboardService.getAvisosDashboard(10);
   const alertaAtivo = alertsService.getAlertaAtivo();
   const online = listColaboradoresOnline(12);
+  const weather = await weatherService.getWeather();
 
   const rankingMecanicos = (rankingRaw.itemsMecanicos || rankingRaw.items || [])
     .slice(0, 5)
@@ -219,15 +221,7 @@ function getTVData(_req, res) {
     alertas: activeAlerts,
     equipamentosIncidencia,
     ticker,
-    weather: {
-      available: false,
-      city: 'Campo do Gado',
-      temperature: null,
-      condition: null,
-      rain: null,
-      humidity: null,
-      icon: null,
-    },
+    weather,
     charts: {
       osStatus: {
         abertas: Number(osResumo.abertas || 0),
