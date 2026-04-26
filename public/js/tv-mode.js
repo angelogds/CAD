@@ -95,12 +95,15 @@
     const avatarBox = $('tvAvatars');
 
     if (avatarBox) {
-      avatarBox.innerHTML = equipe.slice(0, 6).map((m) => `
+      const maxAvatars = 7;
+      const shown = equipe.slice(0, maxAvatars);
+      const extra = Math.max(0, equipe.length - maxAvatars);
+      avatarBox.innerHTML = shown.map((m) => `
         <div class="tv-avatar ${m.status === 'em_os' ? 'is-active' : ''}" title="${escapeHtml(m.nome)}">
           <img src="${escapeHtml(m.foto || config.defaultAvatar)}" onerror="this.src='${config.defaultAvatar}'">
           <span></span>
         </div>
-      `).join('');
+      `).join('') + (extra ? `<div class="tv-avatar tv-avatar-more">+${extra}</div>` : '');
     }
 
     const weatherMini = $('tvWeatherMini');
@@ -210,8 +213,9 @@
 
   function renderEquipe() {
     const equipe = state.data?.equipeManutencao || state.data?.mecanicos || [];
-    const escala = state.data?.escalaVigente || { dia: [], noite: [], folga: [], ferias: [], atestado: [] };
-    const ranking = state.data?.rankingEquipe?.ranking || [];
+    const escala = state.data?.escalaVigente || { diaMecanicos: [], apoioOperacional: [], noiteResponsavel: [], folgaAtestado: [], ferias: [] };
+    const rankingMecanicos = state.data?.rankingEquipe?.rankingMecanicos || [];
+    const rankingApoio = state.data?.rankingEquipe?.rankingApoio || [];
     const rankingMsg = state.data?.rankingEquipe?.mensagem || 'Ranking será exibido após novos fechamentos de OS.';
 
     const statusNome = { online: 'Online', em_os: 'Em OS', folga: 'Folga', ferias: 'Férias', atestado: 'Atestado' };
@@ -232,15 +236,18 @@
         <aside class="tv-side">
           <div class="tv-card tv-escala-card">
             <div class="tv-card-title compact"><h3>Escala Vigente</h3></div>
-            ${renderEscalaList('Dia', escala.dia)}
-            ${renderEscalaList('Noite', escala.noite)}
-            ${renderEscalaList('Folga', escala.folga)}
-            ${renderEscalaList('Férias', escala.ferias)}
-            ${renderEscalaList('Atestado', escala.atestado)}
+            ${renderEscalaList('Dia (mecânicos)', escala.diaMecanicos)}
+            ${renderEscalaList('Apoio operacional', escala.apoioOperacional)}
+            ${renderEscalaList('Noite (responsável)', escala.noiteResponsavel)}
+            ${renderEscalaList('Folga / Atestado', (escala.folgaAtestado || []).map((f) => `${f.nome} — ${f.status}`))}
+            ${renderEscalaList('Férias', (escala.ferias || []).map((f) => `${f.nome} — ${f.status}`))}
           </div>
           <div class="tv-card tv-ranking-card">
-            <div class="tv-card-title compact"><h3>Ranking da Manutenção</h3></div>
-            ${ranking.length ? `<ol class="tv-ranking-list">${ranking.map((r, i) => `<li><span>${i + 1}º ${escapeHtml(r.nome)}</span><strong>${r.total} OS</strong></li>`).join('')}</ol>` : `<div class="tv-empty tv-empty-small">${escapeHtml(rankingMsg)}</div>`}
+            <div class="tv-card-title compact"><h3>Ranking dos Mecânicos</h3></div>
+            ${renderRankingList(rankingMecanicos)}
+            <div class="tv-card-title compact" style="margin-top:8px;"><h3>Ranking do Apoio Operacional</h3></div>
+            ${renderRankingList(rankingApoio)}
+            ${(!rankingMecanicos.length && !rankingApoio.length) ? `<div class="tv-empty tv-empty-small">${escapeHtml(rankingMsg)}</div>` : ''}
           </div>
         </aside>
       </section>`;
@@ -251,12 +258,14 @@
   }
 
   function renderGaleria() {
-    const galeria = (state.data?.galeria || []).slice(0, 8);
+    const galeria = (state.data?.galeria || []).slice(0, 12);
+    const hasReal = galeria.some((g) => g.tipo !== 'placeholder');
 
     $('tvContent').innerHTML = `
       <section class="tv-grid">
         <div class="tv-card tv-main-card tv-appear">
-          <div class="tv-card-title"><div><h2>📸 Galeria de Fechamento das OS</h2><p>Últimos 8 registros de imagem e vídeo</p></div></div>
+          <div class="tv-card-title"><div><h2>📸 Galeria de Fechamento das OS</h2><p>Últimos 12 registros de imagem e vídeo</p></div></div>
+          ${hasReal ? '' : '<div class="tv-empty tv-empty-small">Aguardando registros de fechamento de OS</div>'}
           <div class="tv-gallery premium-full">
             ${galeria.map((g) => `
               <figure>
@@ -321,23 +330,51 @@
     const ledText = $('tvLedText');
     if (!led || !ledText) return;
 
-    const criticals = (state.data?.os || []).filter((o) => o.prioridade === 'CRITICA' && o.status !== 'CONCLUIDA');
-    const notified = JSON.parse(localStorage.getItem('cg-tv-critical-notified') || '[]');
+    const abertas = (state.data?.os || []).filter((o) => ['ABERTA', 'EM_ANDAMENTO'].includes(String(o.status || '').toUpperCase()));
+    const notified = JSON.parse(localStorage.getItem('cg-tv-os-notified') || '[]');
     const notifiedSet = new Set(notified.map((x) => String(x)));
-    const newCritical = criticals.find((os) => !notifiedSet.has(String(os.id)));
+    const newCritical = abertas.find((os) => !notifiedSet.has(String(os.id)));
 
     if (!newCritical) return;
 
-    ledText.textContent = `NOVA OS CRÍTICA • ${newCritical.numero} • ${newCritical.equipamento} • Responsável: ${newCritical.responsavel || 'A definir'}`;
+    const prioridade = String(newCritical.prioridade || 'MEDIA').toUpperCase();
+    led.dataset.prioridade = prioridade.toLowerCase();
+    ledText.textContent = `NOVA OS ${prioridade} • ${newCritical.numero} • ${newCritical.equipamento} • Responsável: ${newCritical.responsavel || 'A definir'}`;
     led.hidden = false;
+    playNotificationSound(prioridade);
 
     notifiedSet.add(String(newCritical.id));
-    localStorage.setItem('cg-tv-critical-notified', JSON.stringify([...notifiedSet].slice(-200)));
+    localStorage.setItem('cg-tv-os-notified', JSON.stringify([...notifiedSet].slice(-300)));
 
     clearTimeout(state.criticalLedTimer);
     state.criticalLedTimer = setTimeout(() => {
       led.hidden = true;
     }, 20000);
+  }
+
+  function renderRankingList(items = []) {
+    if (!items.length) return '<div class="tv-empty tv-empty-small">Sem dados nesta semana.</div>';
+    return `<ol class="tv-ranking-list">${items.map((r, i) => {
+      const pos = i + 1;
+      const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `${pos}º`;
+      return `<li>
+        <div><span>${medal} ${escapeHtml(r.nome)}</span><small>${Number(r.os_finalizadas || 0)} OS finalizadas • Críticas: ${Number(r.criticas || 0)} • Altas: ${Number(r.altas || 0)}</small></div>
+        <strong>${Number(r.pontos || 0).toFixed(1)} pts</strong>
+      </li>`;
+    }).join('')}</ol>`;
+  }
+
+  function playNotificationSound(prioridade = 'MEDIA') {
+    const map = {
+      BAIXA: '/sounds/os-baixa.mp3',
+      MEDIA: '/sounds/os-media.mp3',
+      ALTA: '/sounds/os-alta.mp3',
+      CRITICA: '/sounds/os-critica.mp3',
+    };
+    const src = map[String(prioridade || '').toUpperCase()];
+    if (!src) return;
+    const audio = new Audio(src);
+    audio.play().catch(() => {});
   }
 
   function drawDoughnut(canvasId, data, legendId) {
