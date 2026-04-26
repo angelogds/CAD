@@ -23,6 +23,11 @@ try { webPush = require("web-push"); } catch (_e) { webPush = null; }
 
 const dateUtil = require("./utils/date");
 const aiService = require("./modules/ai/ai.service");
+const {
+  OFFICIAL_ROUTES,
+  COMPATIBILITY_ALIASES,
+  registerCompatibilityAlias,
+} = require("./config/routes");
 const fmtBR =
   typeof dateUtil.fmtBR === "function" ? dateUtil.fmtBR : (v) => String(v ?? "-");
 const TZ = dateUtil.TZ || "America/Sao_Paulo";
@@ -269,36 +274,37 @@ function mount(basePath, modPath) {
 }
 
 mount("/auth", "./modules/auth/auth.routes");
-mount("/dashboard", "./modules/dashboard/dashboard.routes");
+mount(OFFICIAL_ROUTES.dashboard, "./modules/dashboard/dashboard.routes");
 mount("/push", "./modules/push/push.routes");
 mount("/mobile", "./modules/mobile/mobile.routes");
-mount("/pcm", "./modules/pcm/pcm.routes");
+mount(OFFICIAL_ROUTES.pcm, "./modules/pcm/pcm.routes");
 mount("/equipamentos", "./modules/equipamentos/equipamentos.routes");
-mount("/os", "./modules/os/os.routes");
-app.use("/ordens-servico", (req, res) => {
-  const nextPath = `/os${req.originalUrl.replace(/^\/ordens-servico/, "") || ""}`;
-  return res.redirect(307, nextPath);
-});
+mount(OFFICIAL_ROUTES.os, "./modules/os/os.routes");
 mount("/preventivas", "./modules/preventivas/preventivas.routes");
-mount("/compras", "./modules/compras/compras.routes");
+mount(OFFICIAL_ROUTES.compras, "./modules/compras/compras.routes");
 mount("/fornecedores", "./modules/fornecedores/fornecedores.routes");
 mount("/solicitacoes", "./modules/solicitacoes/solicitacoes.routes");
-mount("/estoque", "./modules/estoque/estoque.routes");
-mount("/almoxarifado", "./modules/almoxarifado/almoxarifado.routes");
+mount(OFFICIAL_ROUTES.estoque, "./modules/estoque/estoque.routes");
+mount(OFFICIAL_ROUTES.almoxarifado, "./modules/almoxarifado/almoxarifado.routes");
 mount("/escala", "./modules/escala/escala.routes");
 mount("/avisos", "./modules/avisos/avisos.routes");
 mount("/usuarios", "./modules/usuarios/usuarios.routes");
 mount("/demandas", "./modules/demandas/demandas.routes");
 mount("/motores", "./modules/motores/motores.routes");
-mount("/inspecao", "./modules/inspecao/inspecao.routes");
+mount(OFFICIAL_ROUTES.inspecao, "./modules/inspecao/inspecao.routes");
 mount("/inspection", "./modules/inspection/inspecao.routes");
 mount("/tracagem", "./modules/tracagem/tracagem.routes");
 mount("/tracagens", "./modules/tracagem/tracagens.routes");
 mount("/desenho-tecnico", "./modules/desenho-tecnico/desenho-tecnico.routes");
 mount("/academia", "./modules/academia/academia.routes");
-mount("/ai", "./modules/ai/ai.routes");
+mount(OFFICIAL_ROUTES.ia, "./modules/ai/ai.routes");
 mount("/ia", "./modules/ia/ia.routes");
 mount("/", "./modules/tv/tv.routes");
+
+// Compatibilidade de rotas legadas para não quebrar links antigos.
+for (const alias of COMPATIBILITY_ALIASES) {
+  registerCompatibilityAlias(app, alias.from, alias.to);
+}
 
 try {
   const osService = require("./modules/os/os.service");
