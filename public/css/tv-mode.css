@@ -73,9 +73,10 @@ body.cg-tv { font-family: Arial, Helvetica, sans-serif; background: var(--tv-bg)
 .tv-progress { height: 100%; width: 0%; background: linear-gradient(90deg, var(--tv-blue), var(--tv-cg-green)); }
 
 .tv-led { background: linear-gradient(90deg, #450a0a, #7f1d1d); color: #fecaca; border-bottom: 1px solid #991b1b; padding: 8px 18px; display: flex; align-items: center; justify-content: space-between; animation: pulseRed 1.2s infinite; }
+.tv-led[data-prioridade="critica"] { background: linear-gradient(90deg, #450a0a, #7f1d1d); color: #fecaca; border-bottom-color: #ef4444; animation: pulseRed 1.2s infinite; }
 .tv-led[data-prioridade="alta"] { background: linear-gradient(90deg, #7c2d12, #c2410c); color: #ffedd5; border-bottom-color: #f97316; animation: none; }
 .tv-led[data-prioridade="media"] { background: linear-gradient(90deg, #713f12, #a16207); color: #fef3c7; border-bottom-color: #eab308; animation: none; }
-.tv-led[data-prioridade="baixa"] { background: linear-gradient(90deg, #0f172a, #1e293b); color: #cbd5e1; border-bottom-color: #334155; animation: none; }
+.tv-led[data-prioridade="baixa"] { background: linear-gradient(90deg, #14532d, #166534); color: #dcfce7; border-bottom-color: #22c55e; animation: none; }
 .tv-led button { border: 0; background: transparent; color: white; font-size: 22px; cursor: pointer; }
 
 .tv-content { flex: 1; min-height: 0; padding: 8px 10px; overflow: hidden; }

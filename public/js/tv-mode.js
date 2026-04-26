@@ -10,6 +10,7 @@
     pausedUntil: 0,
     criticalLedTimer: null,
     notificationPrimed: false,
+    pendingLed: null,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -171,6 +172,48 @@
     if (screen === 'equipe') renderEquipe();
     if (screen === 'galeria') renderGaleria();
     if (screen === 'alertas') renderAlertas();
+    syncLedVisibility();
+  }
+
+  function isOSScreenActive() {
+    return state.screens[state.screenIndex] === 'os';
+  }
+
+  function normalizeLedPriority(prioridade) {
+    const p = String(prioridade || '').toUpperCase();
+    if (p.includes('CRIT')) return 'CRITICA';
+    if (p.includes('ALTA') || p.includes('ALTO')) return 'ALTA';
+    if (p.includes('MED')) return 'MEDIA';
+    return 'BAIXA';
+  }
+
+  function buildLedMessage(item = {}) {
+    const prioridade = normalizeLedPriority(item.prioridade);
+    return {
+      prioridade,
+      texto: `NOVA OS ${prioridade} • ${item.numero} • ${item.equipamento} • Responsável: ${item.responsavel || 'A definir'}`,
+    };
+  }
+
+  function syncLedVisibility() {
+    const led = $('tvLed');
+    const ledText = $('tvLedText');
+    if (!led || !ledText) return;
+
+    if (!isOSScreenActive() || !state.pendingLed) {
+      led.hidden = true;
+      return;
+    }
+
+    led.dataset.prioridade = String(state.pendingLed.prioridade || 'MEDIA').toLowerCase();
+    ledText.textContent = state.pendingLed.texto;
+    led.hidden = false;
+
+    clearTimeout(state.criticalLedTimer);
+    state.criticalLedTimer = setTimeout(() => {
+      state.pendingLed = null;
+      led.hidden = true;
+    }, 20000);
   }
 
   function renderOS() {
@@ -350,10 +393,6 @@
   }
 
   function checkCriticalLed() {
-    const led = $('tvLed');
-    const ledText = $('tvLedText');
-    if (!led || !ledText) return;
-
     const abertas = (state.data?.os || []).filter((o) => ['ABERTA', 'EM_ANDAMENTO'].includes(String(o.status || '').toUpperCase()));
     const notified = JSON.parse(localStorage.getItem('cg-tv-os-notified') || '[]');
     const notifiedSet = new Set(notified.map((x) => String(x)));
@@ -369,19 +408,13 @@
 
     if (!newCritical) return;
 
-    const prioridade = String(newCritical.prioridade || 'MEDIA').toUpperCase();
-    led.dataset.prioridade = prioridade.toLowerCase();
-    ledText.textContent = `NOVA OS ${prioridade} • ${newCritical.numero} • ${newCritical.equipamento} • Responsável: ${newCritical.responsavel || 'A definir'}`;
-    led.hidden = false;
-    playNotificationSound(prioridade);
+    const ledData = buildLedMessage(newCritical);
+    state.pendingLed = ledData;
+    playNotificationSound(ledData.prioridade);
+    syncLedVisibility();
 
     notifiedSet.add(String(newCritical.id));
     localStorage.setItem('cg-tv-os-notified', JSON.stringify([...notifiedSet].slice(-300)));
-
-    clearTimeout(state.criticalLedTimer);
-    state.criticalLedTimer = setTimeout(() => {
-      led.hidden = true;
-    }, 20000);
   }
 
   function renderRankingList(items = []) {
@@ -533,7 +566,11 @@
   function bindEvents() {
     $('tvThemeToggle')?.addEventListener('click', toggleTheme);
     $('tvFullscreenBtn')?.addEventListener('click', toggleFullscreen);
-    $('tvLedClose')?.addEventListener('click', () => { const led = $('tvLed'); if (led) led.hidden = true; });
+    $('tvLedClose')?.addEventListener('click', () => {
+      const led = $('tvLed');
+      state.pendingLed = null;
+      if (led) led.hidden = true;
+    });
 
     document.addEventListener('keydown', (event) => {
       if (event.key === 'ArrowRight') {
