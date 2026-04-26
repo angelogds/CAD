@@ -279,15 +279,81 @@ async function getGaleria() {
 }
 
 async function getWeather() {
-  return {
+  const fallback = {
     cidade: 'Feira de Santana',
     temp: '--',
     umidade: '--',
     vento: '--',
-    condicao: 'Previsão será finalizada na Parte 2',
+    condicao: 'Previsão indisponível no momento',
+    codigo: null,
     previsao: [],
-    updatedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
+
+  try {
+    if (typeof fetch !== 'function') {
+      return {
+        ...fallback,
+        condicao: 'Node sem fetch nativo. Use Node 18+ ou implemente fallback.'
+      };
+    }
+
+    const url =
+      'https://api.open-meteo.com/v1/forecast' +
+      '?latitude=-12.2664' +
+      '&longitude=-38.9663' +
+      '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m' +
+      '&daily=weather_code,temperature_2m_max,temperature_2m_min' +
+      '&timezone=America%2FBahia' +
+      '&forecast_days=5';
+
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json' }
+    });
+
+    if (!response.ok) throw new Error('Falha ao consultar clima');
+
+    const json = await response.json();
+    const current = json.current || {};
+    const daily = json.daily || {};
+
+    const mapWeather = (code) => {
+      const c = Number(code);
+
+      if ([0].includes(c)) return 'Céu limpo';
+      if ([1, 2].includes(c)) return 'Parcialmente nublado';
+      if ([3].includes(c)) return 'Nublado';
+      if ([45, 48].includes(c)) return 'Neblina';
+      if ([51, 53, 55, 56, 57].includes(c)) return 'Garoa';
+      if ([61, 63, 65, 66, 67].includes(c)) return 'Chuva';
+      if ([80, 81, 82].includes(c)) return 'Pancadas de chuva';
+      if ([95, 96, 99].includes(c)) return 'Trovoadas';
+
+      return 'Condição variável';
+    };
+
+    const previsao = (daily.time || []).map((date, index) => ({
+      data: date,
+      max: daily.temperature_2m_max?.[index] ?? null,
+      min: daily.temperature_2m_min?.[index] ?? null,
+      codigo: daily.weather_code?.[index] ?? null,
+      condicao: mapWeather(daily.weather_code?.[index])
+    }));
+
+    return {
+      cidade: 'Feira de Santana',
+      temp: Math.round(current.temperature_2m ?? 0),
+      umidade: current.relative_humidity_2m ?? '--',
+      vento: Math.round(current.wind_speed_10m ?? 0),
+      codigo: current.weather_code ?? null,
+      condicao: mapWeather(current.weather_code),
+      previsao,
+      updatedAt: new Date().toISOString()
+    };
+  } catch (err) {
+    console.warn('[TV] clima fallback:', err.message);
+    return fallback;
+  }
 }
 
 function getAlertas(osList, preventivas) {
@@ -319,10 +385,52 @@ function getAlertas(osList, preventivas) {
 }
 
 function getPerformance(osList) {
-  const abertas = osList.filter((o) => o.status !== 'CONCLUIDA').length;
-  const concluidas = osList.filter((o) => o.status === 'CONCLUIDA').length;
-  const criticas = osList.filter((o) => o.prioridade === 'CRITICA' && o.status !== 'CONCLUIDA').length;
-  return { abertas, concluidas, criticas, total: osList.length };
+  const abertas = osList.filter(o => o.status === 'ABERTA').length;
+  const andamento = osList.filter(o => o.status === 'EM_ANDAMENTO').length;
+  const pausadas = osList.filter(o => o.status === 'PAUSADA').length;
+  const concluidas = osList.filter(o => o.status === 'CONCLUIDA').length;
+
+  const criticas = osList.filter(o => o.prioridade === 'CRITICA' && o.status !== 'CONCLUIDA').length;
+  const altas = osList.filter(o => o.prioridade === 'ALTA').length;
+  const medias = osList.filter(o => o.prioridade === 'MEDIA').length;
+  const baixas = osList.filter(o => o.prioridade === 'BAIXA').length;
+
+  const porEquipamentoMap = {};
+
+  osList.forEach(o => {
+    const key = o.equipamento || 'Não informado';
+    porEquipamentoMap[key] = (porEquipamentoMap[key] || 0) + 1;
+  });
+
+  const porEquipamento = Object.entries(porEquipamentoMap)
+    .map(([equipamento, total]) => ({ equipamento, total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
+
+  return {
+    abertas,
+    andamento,
+    pausadas,
+    concluidas,
+    criticas,
+    altas,
+    medias,
+    baixas,
+    total: osList.length,
+    statusChart: [
+      { label: 'Abertas', value: abertas, color: '#ef4444' },
+      { label: 'Andamento', value: andamento, color: '#3b82f6' },
+      { label: 'Pausadas', value: pausadas, color: '#f59e0b' },
+      { label: 'Concluídas', value: concluidas, color: '#10b981' }
+    ],
+    prioridadeChart: [
+      { label: 'Crítica', value: criticas, color: '#ef4444' },
+      { label: 'Alta', value: altas, color: '#f97316' },
+      { label: 'Média', value: medias, color: '#eab308' },
+      { label: 'Baixa', value: baixas, color: '#3b82f6' }
+    ],
+    porEquipamento
+  };
 }
 
 function getTicker(osList, preventivas) {
