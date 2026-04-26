@@ -55,21 +55,22 @@
   }
 
   function setTheme(theme) {
-    const light = theme === 'light';
-    document.body.classList.toggle('theme-light', light);
+    const dark = theme === 'dark';
+    document.body.classList.toggle('theme-dark', dark);
     if (themeToggleEl) {
-      themeToggleEl.textContent = light ? '🌙' : '☀️';
-      themeToggleEl.title = light ? 'Ativar modo escuro' : 'Ativar modo claro';
+      themeToggleEl.textContent = dark ? '☀️' : '🌙';
+      themeToggleEl.title = dark ? 'Ativar modo claro' : 'Ativar modo escuro';
       themeToggleEl.setAttribute('aria-label', themeToggleEl.title);
     }
-    localStorage.setItem(THEME_STORAGE_KEY, light ? 'light' : 'dark');
+    localStorage.setItem(THEME_STORAGE_KEY, dark ? 'dark' : 'light');
   }
 
   function initTheme() {
     const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    setTheme(saved || 'dark');
+    const preferDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    setTheme(saved || (preferDark ? 'dark' : 'light'));
     themeToggleEl?.addEventListener('click', () => {
-      setTheme(document.body.classList.contains('theme-light') ? 'dark' : 'light');
+      setTheme(document.body.classList.contains('theme-dark') ? 'light' : 'dark');
     });
   }
 
@@ -141,8 +142,8 @@
 
   function chartTheme() {
     return {
-      label: document.body.classList.contains('theme-light') ? '#334155' : '#bfd4ff',
-      grid: document.body.classList.contains('theme-light') ? '#e2e8f0' : '#1b3a67',
+      label: document.body.classList.contains('theme-dark') ? '#bfd4ff' : '#334155',
+      grid: document.body.classList.contains('theme-dark') ? '#1b3a67' : '#e2e8f0',
     };
   }
 
