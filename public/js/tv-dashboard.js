@@ -3,7 +3,7 @@
   const ROTATE_MS = 30000;
   const MAX_ROWS = 8;
   const NEW_OS_HIGHLIGHT_MS = 20000;
-  const TV_BASE_WIDTH = 1366;
+  const BANNER_MS = 9000;
 
   let currentScreen = 0;
   let osChart;
@@ -13,25 +13,12 @@
 
   const screens = Array.from(document.querySelectorAll('.tv-screen'));
   const indicators = Array.from(document.querySelectorAll('#screen-indicators button'));
-  const tvApp = document.getElementById('tv-app');
 
   const highlightedRows = new Map();
   const knownOs = new Map();
   const notifiedOs = new Set(JSON.parse(localStorage.getItem('notifiedOs') || '[]'));
 
   document.body.classList.add('tv-body');
-
-  function adjustScale() {
-    if (!tvApp) return;
-    const scale = Math.min(window.innerWidth / TV_BASE_WIDTH, 1);
-    if (window.innerWidth < 1024 || scale >= 1) {
-      tvApp.style.transform = '';
-      tvApp.style.transformOrigin = '';
-      return;
-    }
-    tvApp.style.transform = `scale(${scale})`;
-    tvApp.style.transformOrigin = 'top left';
-  }
 
   function initials(name = '-') {
     return String(name || '-')
@@ -99,10 +86,23 @@
     audio.play().catch(() => {});
   }
 
+  function showTopAlert(message, high = false) {
+    const el = document.getElementById('tv-top-alert');
+    if (!el) return;
+    el.textContent = message;
+    el.className = `tv-top-alert show ${high ? 'high' : 'medium'}`;
+    setTimeout(() => {
+      el.className = 'tv-top-alert';
+      el.textContent = '';
+    }, BANNER_MS);
+  }
+
   function notifyNewOS(os = {}) {
     const osId = Number(os.id || 0);
     if (!osId || notifiedOs.has(osId)) return;
-    playAlertSound(os.grau || os.prioridade);
+    const criticidade = String(os.grau || os.prioridade || '-').toUpperCase();
+    playAlertSound(criticidade);
+    showTopAlert(`🔴 Nova OS para ${(os.responsavel_exibicao || 'EQUIPE').toUpperCase()} – ${String(os.equipamento || '-').toUpperCase()}`, criticidade.includes('CRIT'));
     notifiedOs.add(osId);
     localStorage.setItem('notifiedOs', JSON.stringify([...notifiedOs]));
   }
@@ -116,10 +116,7 @@
     if (!osChart) {
       osChart = new Chart(document.getElementById('chart-os'), {
         type: 'doughnut',
-        data: {
-          labels: ['Abertas', 'Em andamento', 'Fechadas'],
-          datasets: [{ data: [0, 0, 0], backgroundColor: ['#f59e0b', '#2563eb', '#15803d'] }],
-        },
+        data: { labels: ['Abertas', 'Em andamento', 'Fechadas'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#f59e0b', '#2563eb', '#15803d'] }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
       });
     }
@@ -127,10 +124,7 @@
     if (!prevCritChart) {
       prevCritChart = new Chart(document.getElementById('chart-prev-criticidade'), {
         type: 'bar',
-        data: {
-          labels: ['Baixa', 'Média', 'Alta', 'Crítica'],
-          datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['#15803d', '#f59e0b', '#ef4444', '#dc2626'] }],
-        },
+        data: { labels: ['Baixa', 'Média', 'Alta', 'Crítica'], datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['#15803d', '#f59e0b', '#ef4444', '#dc2626'] }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
       });
     }
@@ -138,10 +132,7 @@
     if (!prevStatusChart) {
       prevStatusChart = new Chart(document.getElementById('chart-prev-status'), {
         type: 'bar',
-        data: {
-          labels: ['Abertas', 'Andamento', 'Fechadas', 'Atrasadas'],
-          datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['#f59e0b', '#2563eb', '#15803d', '#dc2626'] }],
-        },
+        data: { labels: ['Abertas', 'Andamento', 'Fechadas', 'Atrasadas'], datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['#f59e0b', '#2563eb', '#15803d', '#dc2626'] }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
       });
     }
@@ -149,7 +140,7 @@
     if (!teamChart) {
       teamChart = new Chart(document.getElementById('chart-team'), {
         type: 'bar',
-        data: { labels: [], datasets: [{ data: [], label: 'Produtividade', backgroundColor: '#2563eb' }] },
+        data: { labels: [], datasets: [{ data: [], label: 'Produtividade', backgroundColor: '#15803d' }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
       });
     }
@@ -180,10 +171,10 @@
     document.getElementById('attention-prev-atrasadas').textContent = Number(data?.preventivas?.atrasadas || 0);
 
     const online = document.getElementById('online-mecanicos');
-    const mecanicosOnline = data?.online?.mecanicosOnline || [];
-    online.innerHTML = mecanicosOnline.length
-      ? mecanicosOnline.map((item) => `<span class="avatar-chip">${avatarHTML(item)}<span>${item.nome || '-'}</span></span>`).join('')
-      : '<span class="avatar-chip">Sem mecânicos online</span>';
+    const presence = data?.presence || [];
+    online.innerHTML = presence.length
+      ? presence.map((item) => `<span class="avatar-chip">${avatarHTML(item)}<span>${item.nome || '-'}</span><span class="state-dot ${item.status || 'offline'}"></span></span>`).join('')
+      : '<span class="avatar-chip">Sem equipe online</span>';
 
     const renderChipList = (id, list) => {
       const root = document.getElementById(id);
@@ -208,113 +199,70 @@
       const highlightedUntil = highlightedRows.get(osId) || 0;
       const isNew = highlightedUntil > nowMs;
       const criticidade = String(item.grau || item.prioridade || '-').toUpperCase();
-      const alertColor = alertColorByCriticity(criticidade);
-      const isCritical = criticidade.includes('CRIT');
-      return `
-        <tr class="${isNew ? `row-new-os ${isCritical ? 'is-critical' : ''}` : ''}" style="--alert-color:${alertColor};">
+      return `<tr class="${isNew ? `row-new-os ${criticidade.includes('CRIT') ? 'is-critical' : ''}` : ''}" style="--alert-color:${alertColorByCriticity(criticidade)};">
           <td>#${item.id || '-'}</td>
-          <td>${item.equipamento || '-'} ${String(item.origem || '').toUpperCase() === 'VOZ' ? '<span class="badge blue">Criada por voz</span>' : ''}</td>
+          <td>${item.equipamento || '-'}</td>
           <td>${item.responsavel_exibicao || '-'}</td>
           <td><span class="badge ${badgeClassByValue(item.grau || item.prioridade, 'criticidade')}">${criticidade}</span></td>
           <td><span class="badge ${badgeClassByValue(item.status, 'status')}">${item.status || '-'}</span></td>
           <td>${formatDate(item.abertura || item.opened_at)}</td>
-        </tr>
-      `;
-    });
-    highlightedRows.forEach((expireAt, osId) => {
-      if (expireAt <= nowMs) highlightedRows.delete(osId);
+      </tr>`;
     });
 
+    highlightedRows.forEach((expireAt, osId) => { if (expireAt <= nowMs) highlightedRows.delete(osId); });
     document.getElementById('os-lista').innerHTML = osRows.join('') || '<tr><td class="empty-row" colspan="6">Nenhuma OS ativa.</td></tr>';
 
-    const latestOs = [...(data?.os?.itens || [])]
-      .sort((a, b) => new Date(b.abertura || b.opened_at || 0).getTime() - new Date(a.abertura || a.opened_at || 0).getTime())
-      .slice(0, 5);
+    const latestOs = [...(data?.os?.itens || [])].sort((a, b) => new Date(b.abertura || b.opened_at || 0).getTime() - new Date(a.abertura || a.opened_at || 0).getTime()).slice(0, 5);
+    document.getElementById('latest-os-list').innerHTML = latestOs.map((item) => `<li><strong>#${item.id || '-'}</strong> • ${item.equipamento || '-'} • ${item.responsavel_exibicao || '-'} • ${String(item.status || '').toUpperCase()}</li>`).join('') || '<li>Nenhuma OS recente.</li>';
 
-    document.getElementById('latest-os-list').innerHTML = latestOs.map((item) => `
-      <li><strong>#${item.id || '-'}</strong> • ${item.equipamento || '-'} ${String(item.origem || '').toUpperCase() === 'VOZ' ? '• 🎤 Voz' : ''} • ${item.responsavel_exibicao || '-'} • ${String(item.status || '').toUpperCase()}</li>
-    `).join('') || '<li>Nenhuma OS recente.</li>';
+    const quickAlerts = (data?.os?.itens || []).filter((item) => {
+      const c = String(item.grau || item.prioridade || '').toUpperCase();
+      const s = String(item.status || '').toUpperCase();
+      return c.includes('CRIT') || c.includes('ALTA') || s.includes('PARAD') || s.includes('PAUS');
+    }).slice(0, 4);
+    document.getElementById('os-quick-alerts').innerHTML = quickAlerts.map((item) => `<li class="high">⚠️ OS #${item.id || '-'} • ${item.equipamento || '-'} • ${String(item.status || '').toUpperCase()} • ${String(item.grau || item.prioridade || '-').toUpperCase()}</li>`).join('') || '<li>Sem alertas críticos de OS no momento.</li>';
 
-    const quickAlerts = (data?.os?.itens || [])
-      .filter((item) => {
-        const criticidade = String(item.grau || item.prioridade || '').toUpperCase();
-        const status = String(item.status || '').toUpperCase();
-        return criticidade.includes('CRIT') || criticidade.includes('ALTA') || status.includes('PARAD') || status.includes('PAUS');
-      })
-      .slice(0, 4);
+    document.getElementById('prev-lista').innerHTML = (data?.preventivas?.itens || []).slice(0, MAX_ROWS).map((item) => `
+      <tr>
+        <td>#${item.id || '-'}</td>
+        <td>${item.equipamento_nome || '-'}</td>
+        <td>${item.responsavel_exibicao || '-'}</td>
+        <td>${formatDate(item.data_prevista)}</td>
+        <td><span class="badge ${badgeClassByValue(item.criticidade, 'criticidade')}">${String(item.criticidade || '-').toUpperCase()}</span></td>
+        <td><span class="badge ${badgeClassByValue(item.status, 'status')}">${String(item.status || '-').toUpperCase()}</span></td>
+      </tr>`).join('') || '<tr><td class="empty-row" colspan="6">Nenhuma preventiva ativa.</td></tr>';
 
-    document.getElementById('os-quick-alerts').innerHTML = quickAlerts.map((item) => `
-      <li class="high">⚠️ OS #${item.id || '-'} • ${item.equipamento || '-'} • ${String(item.status || '').toUpperCase()} • ${String(item.grau || item.prioridade || '-').toUpperCase()}</li>
-    `).join('') || '<li>Sem alertas críticos de OS no momento.</li>';
-
-    document.getElementById('prev-lista').innerHTML = (data?.preventivas?.itens || []).slice(0, MAX_ROWS).map((item) => {
-      const late = Number(data?.preventivas?.atrasadas || 0) > 0 && badgeClassByValue(item.status, 'status') !== 'green' && (() => {
-        const d = item?.data_prevista ? new Date(item.data_prevista) : null;
-        return d && !Number.isNaN(d.getTime()) && d < new Date();
-      })();
-      return `
-        <tr class="${late ? 'delay' : ''}">
-          <td>#${item.id || '-'}</td>
-          <td>${item.equipamento_nome || '-'}</td>
-          <td>${item.responsavel_exibicao || '-'}</td>
-          <td>${formatDate(item.data_prevista)}</td>
-          <td><span class="badge ${badgeClassByValue(item.criticidade, 'criticidade')}">${String(item.criticidade || '-').toUpperCase()}</span></td>
-          <td><span class="badge ${badgeClassByValue(item.status, 'status')}">${String(item.status || '-').toUpperCase()}</span></td>
-        </tr>
-      `;
-    }).join('') || '<tr><td class="empty-row" colspan="6">Nenhuma preventiva ativa.</td></tr>';
-
-    const preventivasAttention = (data?.preventivas?.itens || []).filter((item) => {
-      const criticidade = String(item.criticidade || '').toUpperCase();
-      const status = String(item.status || '').toUpperCase();
-      const dueDate = item?.data_prevista ? new Date(item.data_prevista) : null;
-      const isLate = dueDate && !Number.isNaN(dueDate.getTime()) && dueDate < new Date() && !status.includes('FECH');
-      return isLate || criticidade.includes('CRIT') || criticidade.includes('ALTA');
+    const prevAttention = (data?.preventivas?.itens || []).filter((item) => {
+      const c = String(item.criticidade || '').toUpperCase();
+      const s = String(item.status || '').toUpperCase();
+      const d = item?.data_prevista ? new Date(item.data_prevista) : null;
+      const late = d && !Number.isNaN(d.getTime()) && d < new Date() && !s.includes('FECH');
+      return late || c.includes('CRIT') || c.includes('ALTA');
     }).slice(0, 5);
-
-    document.getElementById('preventivas-alert-list').innerHTML = preventivasAttention.map((item) => `
-      <li class="${String(item.criticidade || '').toUpperCase().includes('CRIT') ? 'high' : ''}">#${item.id || '-'} • ${item.equipamento_nome || '-'} • ${String(item.criticidade || '-').toUpperCase()} • ${formatDate(item.data_prevista)}</li>
-    `).join('') || '<li>Sem preventivas críticas/atrasadas.</li>';
+    document.getElementById('preventivas-alert-list').innerHTML = prevAttention.map((item) => `<li class="${String(item.criticidade || '').toUpperCase().includes('CRIT') ? 'high' : ''}">#${item.id || '-'} • ${item.equipamento_nome || '-'} • ${String(item.criticidade || '-').toUpperCase()} • ${formatDate(item.data_prevista)}</li>`).join('') || '<li>Sem preventivas críticas/atrasadas.</li>';
 
     const renderRanking = (id, list, summaryLabel) => {
-      document.getElementById(id).innerHTML = (list || []).map((item, idx) => `
-        <li>
-          <span class="rk-left"><span class="rk-pos">${idx + 1}</span>${avatarHTML(item)}<span><span class="rk-name">${item.nome || '-'}</span><span class="rk-summary">${summaryLabel}</span></span></span>
-          <strong class="rk-score">${Number(item.pontuacao || 0)}</strong>
-        </li>`).join('') || '<li><span>Sem dados</span><strong>0</strong></li>';
+      document.getElementById(id).innerHTML = (list || []).map((item, idx) => `<li><span class="rk-left"><span class="rk-pos">${idx + 1}</span>${avatarHTML(item)}<span><span class="rk-name">${item.nome || '-'}</span><span class="rk-summary">${summaryLabel}</span></span></span><strong class="rk-score">${Number(item.pontuacao || 0)}</strong></li>`).join('') || '<li><span>Sem dados</span><strong>0</strong></li>';
     };
-
     renderRanking('ranking-mecanicos', data?.ranking?.mecanicos || [], 'OS concluídas na semana');
     renderRanking('ranking-apoio', data?.ranking?.apoio || [], 'Apoio operacional');
 
-    document.getElementById('alertas-list').innerHTML = (data?.alertas || []).map((item) => `
-      <li class="${item.nivel === 'alta' ? 'high' : ''}">${item.mensagem || '-'}</li>
-    `).join('') || '<li>Nenhum alerta ativo.</li>';
+    const galleryRoot = document.getElementById('maintenance-gallery');
+    const gallery = data?.gallery || [];
+    galleryRoot.innerHTML = gallery.length
+      ? gallery.map((item) => `<figure class="gallery-item"><img src="${item.src}" alt="Foto OS ${item.osNumero || '-'}" loading="lazy" /><small>OS #${item.osNumero || '-'} • ${item.equipamento || '-'}</small></figure>`).join('')
+      : '<div class="gallery-empty">Sem imagens disponíveis</div>';
 
-    document.getElementById('incidencia-list').innerHTML = (data?.equipamentosIncidencia || []).map((item) => `
-      <li><strong>${item.equipamento || '-'}</strong> • ${item.total || 0} ocorrência(s)</li>
-    `).join('') || '<li>Sem incidências no período.</li>';
+    document.getElementById('alertas-list').innerHTML = (data?.alertas || []).map((item) => `<li class="${item.nivel === 'alta' ? 'high' : ''}">${item.mensagem || '-'}</li>`).join('') || '<li>Nenhum alerta ativo.</li>';
+    document.getElementById('incidencia-list').innerHTML = (data?.equipamentosIncidencia || []).map((item) => `<li><strong>${item.equipamento || '-'}</strong> • ${item.total || 0} ocorrência(s)</li>`).join('') || '<li>Sem incidências no período.</li>';
 
     const weather = data?.weather || null;
     const weatherRoot = document.getElementById('weather-card-content');
     if (weather?.available) {
-      const weekHtml = (weather.week || []).slice(0, 7).map((day) => `
-        <li>
-          <span>${day.day || '-'}</span>
-          <span>${day.icon || '☁️'} ${day.max || '-'} / ${day.min || '-'}</span>
-        </li>
-      `).join('');
-
-      weatherRoot.innerHTML = `
-        <div class="weather-head">
-          <strong>${weather.city || '-'}</strong>
-          <span>${weather.temperature || '-'} • ${weather.condition || '-'}</span>
-          <small>Chuva agora: ${weather.rain || '-'} • Umidade: ${weather.humidity || '-'}</small>
-        </div>
-        <ul class="weather-week">${weekHtml || '<li><span>SEM DADOS</span><span>-</span></li>'}</ul>
-      `;
+      const weekHtml = (weather.week || []).slice(0, 7).map((day) => `<li><span>${day.day || '-'}</span><span>${day.icon || '☁️'} ${day.max || '-'} / ${day.min || '-'}</span></li>`).join('');
+      weatherRoot.innerHTML = `<div class="weather-head"><strong>${weather.city || '-'}</strong><span>${weather.temperature || '-'} • ${weather.condition || '-'}</span><small>Chuva: ${weather.rain || '-'} • Umidade: ${weather.humidity || '-'}</small></div><ul class="weather-week">${weekHtml || '<li><span>SEM DADOS</span><span>-</span></li>'}</ul>`;
     } else {
-      weatherRoot.innerHTML = 'Previsão indisponível no momento.';
+      weatherRoot.innerHTML = 'Previsão indisponível';
     }
 
     const tickerItems = [...(data?.ticker || [])];
@@ -322,15 +270,13 @@
     if (newestOsItem && highlightedRows.has(Number(newestOsItem.id || 0))) {
       tickerItems.unshift({
         prioridade: badgeClassByValue(newestOsItem.grau || newestOsItem.prioridade, 'criticidade') === 'red' ? 'alta' : 'media',
-        texto: `⚠️ NOVA OS #${newestOsItem.id || '-'} • ${newestOsItem.equipamento || '-'} • Responsável: ${newestOsItem.responsavel_exibicao || '-'} • Criticidade: ${String(newestOsItem.grau || newestOsItem.prioridade || '-').toUpperCase()} • Status: ${String(newestOsItem.status || '-').toUpperCase()}`,
+        texto: `⚠️ NOVA OS #${newestOsItem.id || '-'} • ${newestOsItem.equipamento || '-'} • Responsável: ${newestOsItem.responsavel_exibicao || '-'} • ${String(newestOsItem.grau || newestOsItem.prioridade || '-').toUpperCase()}`,
       });
     }
 
     const tickerTrack = document.getElementById('tv-ticker-track');
     tickerTrack.textContent = tickerItems.map((item) => item.texto).join('  •  ');
-    const worstPriority = tickerItems.some((item) => item.prioridade === 'alta')
-      ? 'alta'
-      : (tickerItems.some((item) => item.prioridade === 'media') ? 'media' : 'baixa');
+    const worstPriority = tickerItems.some((item) => item.prioridade === 'alta') ? 'alta' : (tickerItems.some((item) => item.prioridade === 'media') ? 'media' : 'baixa');
     const tickerEl = document.getElementById('tv-ticker');
     tickerEl.classList.remove('priority-alta', 'priority-media', 'priority-baixa');
     tickerEl.classList.add(`priority-${worstPriority}`);
@@ -342,11 +288,8 @@
     try {
       const response = await fetch('/api/tv-data', { cache: 'no-store' });
       if (!response.ok) return;
-      const data = await response.json();
-      render(data);
-    } catch (_error) {
-      // retry on next interval
-    }
+      render(await response.json());
+    } catch (_e) {}
   }
 
   indicators.forEach((button) => {
@@ -354,7 +297,6 @@
   });
 
   setDateTime();
-  adjustScale();
   activateScreen(0);
   refreshData();
 
@@ -365,16 +307,13 @@
       es.addEventListener('tv_data', (event) => {
         try { render(JSON.parse(event.data || '{}')); } catch (_e) {}
       });
-      es.onerror = () => {
-        try { es.close(); } catch (_e) {}
-      };
+      es.onerror = () => { try { es.close(); } catch (_e) {} };
       return true;
     } catch (_e) {
       return false;
     }
   }
 
-  window.addEventListener('resize', adjustScale);
   setInterval(setDateTime, 1000);
   setInterval(() => activateScreen(currentScreen + 1), ROTATE_MS);
   if (!connectTVStream()) setInterval(refreshData, REFRESH_MS);

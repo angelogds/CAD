@@ -104,6 +104,96 @@ function normalizeAvisoPriority(aviso = {}) {
   return 'baixa';
 }
 
+function listMaintenanceGallery(limit = 8) {
+  try {
+    const osAnexosExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='os_anexos'").get();
+    if (osAnexosExists) {
+      const rows = db.prepare(`
+        SELECT
+          a.id,
+          a.path,
+          a.created_at,
+          COALESCE(o.equipamento, '-') AS equipamento,
+          COALESCE(o.numero, o.id) AS os_numero
+        FROM os_anexos a
+        LEFT JOIN os o ON o.id = a.os_id
+        WHERE lower(COALESCE(a.tipo, '')) IN ('abertura','fechamento')
+          AND (
+            lower(COALESCE(a.path, '')) LIKE '%.jpg'
+            OR lower(COALESCE(a.path, '')) LIKE '%.jpeg'
+            OR lower(COALESCE(a.path, '')) LIKE '%.png'
+            OR lower(COALESCE(a.path, '')) LIKE '%.webp'
+          )
+        ORDER BY datetime(a.created_at) DESC
+        LIMIT ?
+      `).all(limit);
+      return rows.map((row) => ({
+        id: row.id,
+        src: String(row.path || '').startsWith('/') ? row.path : `/uploads/os/${row.path}`,
+        equipamento: row.equipamento || '-',
+        osNumero: row.os_numero || '-',
+      }));
+    }
+
+    const anexosExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='anexos'").get();
+    if (!anexosExists) return [];
+    const rows = db.prepare(`
+      SELECT
+        a.id,
+        COALESCE(a.filepath, a.filename, '') AS filepath,
+        COALESCE(a.uploaded_at, a.created_at, datetime('now')) AS created_at,
+        COALESCE(o.equipamento, '-') AS equipamento,
+        COALESCE(o.numero, o.id) AS os_numero
+      FROM anexos a
+      LEFT JOIN os o ON o.id = a.owner_id
+      WHERE lower(COALESCE(a.owner_type, '')) = 'os'
+        AND (
+          lower(COALESCE(a.filepath, a.filename, '')) LIKE '%.jpg'
+          OR lower(COALESCE(a.filepath, a.filename, '')) LIKE '%.jpeg'
+          OR lower(COALESCE(a.filepath, a.filename, '')) LIKE '%.png'
+          OR lower(COALESCE(a.filepath, a.filename, '')) LIKE '%.webp'
+        )
+      ORDER BY datetime(created_at) DESC
+      LIMIT ?
+    `).all(limit);
+
+    return rows.map((row) => {
+      const raw = String(row.filepath || '');
+      const normalized = raw.startsWith('/') ? raw : `/uploads/${raw}`;
+      return {
+        id: row.id,
+        src: normalized,
+        equipamento: row.equipamento || '-',
+        osNumero: row.os_numero || '-',
+      };
+    });
+  } catch (_e) {
+    return [];
+  }
+}
+
+function buildPresence(online = {}, escala = {}) {
+  const onlineNames = new Set((online.mecanicosOnline || []).map((p) => String(p.nome || '').trim().toLowerCase()).filter(Boolean));
+  const activeBase = [...(escala.dia || []), ...(escala.noite || []), ...(escala.apoio || [])];
+  const activeNames = new Set(activeBase.map((p) => String(p.nome || '').trim().toLowerCase()).filter(Boolean));
+  const byName = new Map();
+
+  [...(online.mecanicosOnline || []), ...activeBase].forEach((person) => {
+    const key = String(person?.nome || '').trim().toLowerCase();
+    if (!key) return;
+    if (!byName.has(key)) byName.set(key, { nome: person.nome, foto: person.foto || null, status: 'offline' });
+    const entry = byName.get(key);
+    if (!entry.foto && person.foto) entry.foto = person.foto;
+  });
+
+  byName.forEach((entry, key) => {
+    if (onlineNames.has(key)) entry.status = 'online';
+    else if (activeNames.has(key)) entry.status = 'ativo';
+  });
+
+  return Array.from(byName.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
 function tvPage(_req, res) {
   return res.render('tv/index', {
     title: 'Modo TV',
@@ -182,6 +272,20 @@ async function getTVData(_req, res) {
       { prioridade: 'baixa', texto: 'Sistema atualizado em tempo real para monitoramento da manutenção.' },
     ];
 
+  const gallery = listMaintenanceGallery(9);
+  const userNotifications = osItens
+    .filter((item) => Number(item.responsavel_id || item.responsavelId || 0))
+    .slice(0, 20)
+    .map((item) => ({
+      osId: Number(item.id || 0),
+      responsavelId: Number(item.responsavel_id || item.responsavelId || 0),
+      responsavelNome: item.responsavel_exibicao || item.responsavel || '-',
+      equipamento: item.equipamento || '-',
+      criticidade: String(item.grau || item.prioridade || '-').toUpperCase(),
+      status: String(item.status || '-').toUpperCase(),
+    }));
+  const presence = buildPresence(online, { dia, noite, apoio });
+
   return res.json({
     updatedAt: new Date().toISOString(),
     sistemaOnline: true,
@@ -218,10 +322,17 @@ async function getTVData(_req, res) {
       responsavelNoite: noite[0] || null,
     },
     online,
+    presence,
     alertas: activeAlerts,
     equipamentosIncidencia,
     ticker,
     weather,
+    gallery,
+    notifications: {
+      enabled: true,
+      provider: 'in-app-tv-base',
+      queued: userNotifications,
+    },
     charts: {
       osStatus: {
         abertas: Number(osResumo.abertas || 0),
