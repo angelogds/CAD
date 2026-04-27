@@ -324,6 +324,23 @@ try {
   console.warn("⚠️ Serviço de OS não carregado para sincronização automática:", err.message || err);
 }
 
+try {
+  const preventivasService = require("./modules/preventivas/preventivas.service");
+  if (typeof preventivasService?.lancarProgramadasComoOSDaSegunda === "function") {
+    const runProgramadasSegunda = () => {
+      try {
+        preventivasService.lancarProgramadasComoOSDaSegunda({ refDate: new Date(), automatico: true });
+      } catch (err) {
+        console.warn("⚠️ Falha no lançamento automático das preventivas programadas para OS:", err.message || err);
+      }
+    };
+    runProgramadasSegunda();
+    setInterval(runProgramadasSegunda, 15 * 60 * 1000);
+  }
+} catch (err) {
+  console.warn("⚠️ Serviço de preventivas não carregado para lançamento automático de OS:", err.message || err);
+}
+
 // ===== Home =====
 app.get("/", (req, res) => {
   if (req.session?.user) return res.redirect("/dashboard");

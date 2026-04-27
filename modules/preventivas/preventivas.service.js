@@ -1,7 +1,13 @@
 const db = require("../../database/db");
-const osService = require("../os/os.service");
 const { getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
 const aiEmbeddingsService = require("../ai/ai.embeddings.service");
+let osServiceCache = null;
+
+function getOSService() {
+  if (osServiceCache) return osServiceCache;
+  osServiceCache = require("../os/os.service");
+  return osServiceCache;
+}
 
 function tableExists(name) {
   try {
@@ -1468,6 +1474,130 @@ function listarResumoPreventivasProgramadas(refDate = new Date()) {
   };
 }
 
+function isMonday(refDate = new Date()) {
+  return Number(refDate?.getUTCDay?.()) === 1;
+}
+
+function getSegundaReferenciaISO(refDate = new Date()) {
+  const base = new Date(Date.UTC(refDate.getUTCFullYear(), refDate.getUTCMonth(), refDate.getUTCDate()));
+  if (base.getUTCDay() === 1) return formatDateISO(base);
+  return getProximaSegundaISO(base);
+}
+
+function existeOSAbertaParaExecucaoPreventiva(execucaoId) {
+  if (!execucaoId || !tableExists("os")) return false;
+  const osCols = db.prepare(`PRAGMA table_info(os)`).all().map((c) => c.name);
+  if (osCols.includes("preventiva_execucao_id")) {
+    return !!db.prepare(`
+      SELECT id
+      FROM os
+      WHERE preventiva_execucao_id = ?
+      LIMIT 1
+    `).get(Number(execucaoId));
+  }
+  return false;
+}
+
+function lancarProgramadasComoOSDaSegunda({ user = null, refDate = new Date(), automatico = false } = {}) {
+  if (!tableExists("preventiva_execucoes") || !tableExists("preventiva_planos") || !tableExists("equipamentos") || !tableExists("os")) {
+    return { ok: false, skipped: true, reason: "missing_tables", dataSegunda: getSegundaReferenciaISO(refDate), osGeradas: 0, preventivasEncontradas: 0 };
+  }
+  if (automatico && !isMonday(refDate)) {
+    return { ok: true, skipped: true, reason: "not_monday", dataSegunda: getSegundaReferenciaISO(refDate), osGeradas: 0, preventivasEncontradas: 0 };
+  }
+
+  const dataSegunda = getSegundaReferenciaISO(refDate);
+  const dataHoje = formatDateISO(refDate);
+  const chaveExecucao = `preventiva_programada_os_semana_${dataSegunda}`;
+  if (getConfig(chaveExecucao) === "1") {
+    return { ok: true, skipped: true, reason: "already_processed_week", dataSegunda, dataHoje, osGeradas: 0, preventivasEncontradas: 0 };
+  }
+
+  const geracao = gerarPreventivasProgramadasSemanais({ user, refDate: new Date(`${dataSegunda}T00:00:00.000Z`) });
+  const rows = db.prepare(`
+    SELECT pe.id, pe.plano_id, pe.data_prevista, pe.status, pe.criticidade,
+           pe.responsavel_1_id, pe.responsavel_2_id,
+           pp.titulo,
+           pp.equipamento_id,
+           e.nome AS equipamento_nome
+    FROM preventiva_execucoes pe
+    JOIN preventiva_planos pp ON pp.id = pe.plano_id
+    JOIN equipamentos e ON e.id = pp.equipamento_id
+    WHERE UPPER(COALESCE(pp.origem,'')) = 'PROGRAMADA_SEMANAL'
+      AND pe.data_prevista = ?
+      AND UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA','EM_ANDAMENTO','ANDAMENTO')
+    ORDER BY pe.id ASC
+  `).all(dataSegunda);
+
+  const executar = db.transaction(() => {
+    const osService = getOSService();
+    let osGeradas = 0;
+    let osJaExistentes = 0;
+    let reatribuicoes = 0;
+
+    for (const execucao of rows) {
+      const jaExiste = existeOSAbertaParaExecucaoPreventiva(execucao.id);
+      if (jaExiste) {
+        osJaExistentes += 1;
+        continue;
+      }
+      const osId = osService.createOSAutomatica({
+        equipamento_id: Number(execucao.equipamento_id),
+        descricao: `Preventiva programada da segunda-feira (${dataSegunda}) • ${execucao.titulo || execucao.equipamento_nome || "Equipamento"}`,
+        tipo: "PREVENTIVA",
+        prioridade: execucao.criticidade || "MEDIA",
+        opened_by: user?.id || null,
+        origem: automatico ? "AUTOMACAO" : "PREVENTIVA",
+        preventiva_execucao_id: Number(execucao.id),
+        metadata: {
+          origem_lancamento: automatico ? "AUTO_SEGUNDA" : "MANUAL_SEGUNDA",
+          preventiva_execucao_id: Number(execucao.id),
+          data_segunda: dataSegunda,
+        },
+      });
+      osGeradas += 1;
+
+      try {
+        osService.autoAssignOS(osId, user?.id || null, { force: true });
+      } catch (_e) {}
+
+      const mecanicoId = Number(execucao.responsavel_1_id || 0);
+      const auxiliarId = Number(execucao.responsavel_2_id || 0);
+      if (mecanicoId) {
+        try {
+          osService.setEquipeManual(osId, {
+            executor_colaborador_id: mecanicoId,
+            auxiliar_colaborador_id: auxiliarId || null,
+          }, user?.id || null);
+          reatribuicoes += 1;
+        } catch (_e) {}
+      }
+    }
+
+    setConfig(chaveExecucao, "1");
+    setConfig("preventiva_programada_os_ultima_data", dataHoje);
+    return { osGeradas, osJaExistentes, reatribuicoes };
+  });
+
+  const resultado = executar();
+  const payload = {
+    ok: true,
+    skipped: false,
+    dataSegunda,
+    dataHoje,
+    automatico: Boolean(automatico),
+    preventivasEncontradas: rows.length,
+    geracao,
+    ...resultado,
+  };
+  registrarLogPreventiva({
+    acao: automatico ? "PREVENTIVAS_PROGRAMADAS_OS_AUTO" : "PREVENTIVAS_PROGRAMADAS_OS_MANUAL",
+    user,
+    detalhes: payload,
+  });
+  return payload;
+}
+
 function getDisponibilidadeEscala() {
   const disponibilidade = {};
   if (!tableExists("escala_ausencias") || !tableExists("colaboradores")) return disponibilidade;
@@ -2061,6 +2191,7 @@ module.exports = {
   reprocessarModuloPreventivas,
   gerarPreventivasProgramadasSemanais,
   listarResumoPreventivasProgramadas,
+  lancarProgramadasComoOSDaSegunda,
   apagarPreventivaExecucao,
   registrarLogPreventiva,
 };

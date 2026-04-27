@@ -201,6 +201,30 @@ function gerarProgramadas(req, res) {
 
   return res.redirect("/preventivas/programadas");
 }
+
+function gerarOSProgramadasSegunda(req, res) {
+  const user = req.session?.user || null;
+  if (!isAdminOrEncarregado(user)) {
+    req.flash("error", "Sem permissão para lançar OS das preventivas programadas.");
+    return res.redirect("/preventivas");
+  }
+
+  try {
+    const result = service.lancarProgramadasComoOSDaSegunda({ user, refDate: new Date(), automatico: false });
+    if (result?.skipped) {
+      req.flash("success", `OS da segunda-feira (${result.dataSegunda || "-"}) já foram lançadas anteriormente.`);
+    } else {
+      req.flash(
+        "success",
+        `OS da segunda-feira ${result.dataSegunda || "-"} processadas. OS geradas: ${result.osGeradas || 0}, já existentes: ${result.osJaExistentes || 0}.`
+      );
+    }
+  } catch (err) {
+    console.error("[PREVENTIVAS][PROGRAMADAS_OS] erro ao lançar OS programadas:", err?.stack || err);
+    req.flash("error", "Erro ao lançar OS das preventivas programadas.");
+  }
+  return res.redirect("/preventivas/programadas");
+}
 function apagarExecucao(req, res) {
   const user = req.session?.user || null;
   if (!isAdminOrEncarregado(user)) {
@@ -228,4 +252,4 @@ function apagarExecucao(req, res) {
   return res.redirect(`/preventivas/${planoId}`);
 }
 
-module.exports = { index, newForm, create, show, programadasIndex, gerarProgramadas, execCreate, execUpdateStatus , apagarExecucao };
+module.exports = { index, newForm, create, show, programadasIndex, gerarProgramadas, gerarOSProgramadasSegunda, execCreate, execUpdateStatus , apagarExecucao };
