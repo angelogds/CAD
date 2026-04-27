@@ -527,6 +527,8 @@ function getOSById(id) {
   const osCols = getOSColumns();
   const hasExecColab = osCols.includes("executor_colaborador_id");
   const hasAuxColab = osCols.includes("auxiliar_colaborador_id");
+  const hasExecSecColab = osCols.includes("executor_secundario_colaborador_id");
+  const hasAuxSecColab = osCols.includes("auxiliar_secundario_colaborador_id");
   const hasEquipamentos = tableExists("equipamentos");
 
   const os = db.prepare(`
@@ -534,12 +536,16 @@ function getOSById(id) {
            ${hasEquipamentos ? "e.nome" : "NULL"} AS equipamento_nome,
            ce.nome AS executor_nome,
            ca.nome AS auxiliar_nome,
+           ces.nome AS executor_secundario_nome,
+           cas.nome AS auxiliar_secundario_nome,
            ue.name AS executor_user_nome,
            ua.name AS auxiliar_user_nome
     FROM os o
     ${hasEquipamentos ? "LEFT JOIN equipamentos e ON e.id = o.equipamento_id" : ""}
     LEFT JOIN colaboradores ce ON ce.id = ${hasExecColab ? "o.executor_colaborador_id" : "NULL"}
     LEFT JOIN colaboradores ca ON ca.id = ${hasAuxColab ? "o.auxiliar_colaborador_id" : "NULL"}
+    LEFT JOIN colaboradores ces ON ces.id = ${hasExecSecColab ? "o.executor_secundario_colaborador_id" : "NULL"}
+    LEFT JOIN colaboradores cas ON cas.id = ${hasAuxSecColab ? "o.auxiliar_secundario_colaborador_id" : "NULL"}
     LEFT JOIN users ue ON ue.id = o.mecanico_user_id
     LEFT JOIN users ua ON ua.id = o.auxiliar_user_id
     WHERE o.id = ?
@@ -871,6 +877,14 @@ function persistirAlocacaoOS(osId, executor, auxiliar, turno, modo = "AUTO") {
       updates.push("auxiliar_colaborador_id = ?");
       args.push(auxiliar?.id ? Number(auxiliar.id) : null);
     }
+    if (cols.includes("executor_secundario_colaborador_id")) {
+      updates.push("executor_secundario_colaborador_id = ?");
+      args.push(executor?.secundario_id ? Number(executor.secundario_id) : null);
+    }
+    if (cols.includes("auxiliar_secundario_colaborador_id")) {
+      updates.push("auxiliar_secundario_colaborador_id = ?");
+      args.push(auxiliar?.secundario_id ? Number(auxiliar.secundario_id) : null);
+    }
     if (cols.includes("mecanico_user_id")) {
       updates.push("mecanico_user_id = ?");
       args.push(executor?.user_id ? Number(executor.user_id) : null);
@@ -901,6 +915,8 @@ function marcarAguardandoEquipe(osId, turno, aviso) {
   const updates = ["status = 'AGUARDANDO_EQUIPE'"];
   if (cols.includes("executor_colaborador_id")) updates.push("executor_colaborador_id = NULL");
   if (cols.includes("auxiliar_colaborador_id")) updates.push("auxiliar_colaborador_id = NULL");
+  if (cols.includes("executor_secundario_colaborador_id")) updates.push("executor_secundario_colaborador_id = NULL");
+  if (cols.includes("auxiliar_secundario_colaborador_id")) updates.push("auxiliar_secundario_colaborador_id = NULL");
   if (cols.includes("mecanico_user_id")) updates.push("mecanico_user_id = NULL");
   if (cols.includes("auxiliar_user_id")) updates.push("auxiliar_user_id = NULL");
   if (cols.includes("turno_alocado")) updates.push("turno_alocado = ?");
@@ -1006,7 +1022,14 @@ function syncOpenOSWithCurrentShift() {
   return { turnoAtual: getTurnoAgora(), devolvidasParaFila: 0, alocadas };
 }
 
-function setEquipeManual(osId, { executor_colaborador_id, auxiliar_colaborador_id, mecanico_user_id, auxiliar_user_id }, userId) {
+function setEquipeManual(osId, {
+  executor_colaborador_id,
+  auxiliar_colaborador_id,
+  executor_secundario_colaborador_id,
+  auxiliar_secundario_colaborador_id,
+  mecanico_user_id,
+  auxiliar_user_id,
+}, userId) {
   const os = db.prepare(`SELECT id, status FROM os WHERE id = ?`).get(Number(osId));
   if (!os) throw new Error("OS não encontrada.");
   const status = String(os.status || "").toUpperCase();
@@ -1014,6 +1037,8 @@ function setEquipeManual(osId, { executor_colaborador_id, auxiliar_colaborador_i
 
   let executorId = Number(executor_colaborador_id || 0);
   let auxiliarId = Number(auxiliar_colaborador_id || 0) || null;
+  const executorSecundarioId = Number(executor_secundario_colaborador_id || 0) || null;
+  const auxiliarSecundarioId = Number(auxiliar_secundario_colaborador_id || 0) || null;
 
   if (!executorId && mecanico_user_id) {
     executorId = Number(db.prepare(`SELECT id FROM colaboradores WHERE user_id = ? LIMIT 1`).get(Number(mecanico_user_id))?.id || 0);
@@ -1032,8 +1057,30 @@ function setEquipeManual(osId, { executor_colaborador_id, auxiliar_colaborador_i
     auxiliar = db.prepare(`SELECT id, nome, user_id, funcao FROM colaboradores WHERE id = ?`).get(auxiliarId);
     if (!auxiliar?.id) throw new Error("Auxiliar inválido.");
   }
+  let executorSecundario = null;
+  if (executorSecundarioId) {
+    executorSecundario = db.prepare(`SELECT id, nome, user_id, funcao FROM colaboradores WHERE id = ?`).get(executorSecundarioId);
+    if (!executorSecundario?.id) throw new Error("Executor secundário inválido.");
+  }
+  let auxiliarSecundario = null;
+  if (auxiliarSecundarioId) {
+    auxiliarSecundario = db.prepare(`SELECT id, nome, user_id, funcao FROM colaboradores WHERE id = ?`).get(auxiliarSecundarioId);
+    if (!auxiliarSecundario?.id) throw new Error("Auxiliar secundário inválido.");
+  }
+
+  const selecionados = [executor?.id, auxiliar?.id, executorSecundario?.id, auxiliarSecundario?.id]
+    .filter((id) => Number(id) > 0);
+  const idsUnicos = new Set(selecionados.map((id) => Number(id)));
+  if (idsUnicos.size !== selecionados.length) {
+    throw new Error("Selecione colaboradores diferentes em cada posição da equipe.");
+  }
 
   const turno = getTurnoAgora();
+  if (executorSecundario?.id) executor.secundario_id = Number(executorSecundario.id);
+  if (auxiliarSecundario?.id) {
+    if (!auxiliar) auxiliar = { id: null, user_id: null, nome: null, funcao: null };
+    auxiliar.secundario_id = Number(auxiliarSecundario.id);
+  }
   persistirAlocacaoOS(Number(osId), executor, auxiliar, turno, "MANUAL");
 }
 

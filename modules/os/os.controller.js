@@ -497,6 +497,8 @@ function osSetEquipe(req, res) {
     service.setEquipeManual(id, {
       executor_colaborador_id: req.body.executor_colaborador_id ? Number(req.body.executor_colaborador_id) : null,
       auxiliar_colaborador_id: req.body.auxiliar_colaborador_id ? Number(req.body.auxiliar_colaborador_id) : null,
+      executor_secundario_colaborador_id: req.body.executor_secundario_colaborador_id ? Number(req.body.executor_secundario_colaborador_id) : null,
+      auxiliar_secundario_colaborador_id: req.body.auxiliar_secundario_colaborador_id ? Number(req.body.auxiliar_secundario_colaborador_id) : null,
     }, req.session?.user?.id || null);
     req.flash("success", "Equipe atualizada com sucesso.");
   } catch (err) {

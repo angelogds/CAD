@@ -108,12 +108,20 @@
       </thead>
       <tbody>
         <tr>
-          <td><%= (os.executor_nome || os.execucao_ativa?.executor_nome) && (os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome) ? 'Equipe alocada' : '-' %></td>
+          <td><%= (os.executor_nome || os.execucao_ativa?.executor_nome || os.executor_secundario_nome || os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || os.auxiliar_secundario_nome) ? 'Equipe alocada' : '-' %></td>
           <td><%= os.executor_nome || os.execucao_ativa?.executor_nome || '-' %></td>
           <td><%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></td>
           <td><%= os.turno_alocado || os.execucao_ativa?.turno_alocacao || '-' %></td>
           <td><%= os.alocacao_modo || '-' %></td>
         </tr>
+        <% if (os.executor_secundario_nome || os.auxiliar_secundario_nome) { %>
+          <tr>
+            <td>Complemento manual</td>
+            <td><%= os.executor_secundario_nome || '-' %></td>
+            <td><%= os.auxiliar_secundario_nome || '-' %></td>
+            <td colspan="2">Apoio extra definido manualmente</td>
+          </tr>
+        <% } %>
       </tbody>
     </table>
     <% if (canAutoAssign) { %>
@@ -126,8 +134,6 @@
     <% if (canManualEditEquipe) { %>
       <% const mecanicosTurno = (equipeUsuarios || []).filter(u => String(u.funcao || '').toLowerCase() === 'mecanico'); %>
       <% const auxiliaresTurno = (equipeUsuarios || []).filter(u => ['auxiliar','apoio'].includes(String(u.funcao || '').toLowerCase())); %>
-      <% const grauManual = String(os.grau || '').toUpperCase(); %>
-      <% const exigirMecanico = ['MEDIA','ALTA','CRITICA'].includes(grauManual); %>
       <form method="POST" action="/os/<%= os.id %>/equipe" style="margin-top:10px;">
         <div class="grid2">
           <div>
@@ -141,7 +147,7 @@
                   <% }) %>
                 </optgroup>
               <% } %>
-              <% if (!exigirMecanico && auxiliaresTurno.length) { %>
+              <% if (auxiliaresTurno.length) { %>
                 <optgroup label="Apoio/Auxiliares">
                   <% auxiliaresTurno.forEach(function(u){ %>
                     <option value="<%= u.id %>" <%= Number(os.executor_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
@@ -154,10 +160,43 @@
             <label>Auxiliar</label>
             <select class="input" name="auxiliar_colaborador_id">
               <option value="">Sem auxiliar</option>
+              <% if (mecanicosTurno.length) { %>
+                <optgroup label="Mecânicos">
+                  <% mecanicosTurno.forEach(function(u){ %>
+                    <option value="<%= u.id %>" <%= Number(os.auxiliar_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
+                  <% }) %>
+                </optgroup>
+              <% } %>
               <% if (auxiliaresTurno.length) { %>
                 <optgroup label="Auxiliares">
                   <% auxiliaresTurno.forEach(function(u){ %>
                     <option value="<%= u.id %>" <%= Number(os.auxiliar_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
+                  <% }) %>
+                </optgroup>
+              <% } %>
+            </select>
+          </div>
+          <div>
+            <label>2º mecânico (opcional)</label>
+            <select class="input" name="executor_secundario_colaborador_id">
+              <option value="">Sem 2º mecânico</option>
+              <% if (mecanicosTurno.length) { %>
+                <optgroup label="Mecânicos">
+                  <% mecanicosTurno.forEach(function(u){ %>
+                    <option value="<%= u.id %>" <%= Number(os.executor_secundario_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
+                  <% }) %>
+                </optgroup>
+              <% } %>
+            </select>
+          </div>
+          <div>
+            <label>2º apoio operacional (opcional)</label>
+            <select class="input" name="auxiliar_secundario_colaborador_id">
+              <option value="">Sem 2º apoio</option>
+              <% if (auxiliaresTurno.length) { %>
+                <optgroup label="Auxiliares">
+                  <% auxiliaresTurno.forEach(function(u){ %>
+                    <option value="<%= u.id %>" <%= Number(os.auxiliar_secundario_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
                   <% }) %>
                 </optgroup>
               <% } %>
