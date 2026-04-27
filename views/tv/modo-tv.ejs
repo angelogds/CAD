@@ -64,9 +64,9 @@
       </div>
     </header>
 
-    <section id="tvLed" class="tv-led" hidden>
-      <strong id="tvLedText">Nova OS crítica</strong>
-      <button id="tvLedClose" type="button">×</button>
+    <section id="tvLed" class="tv-led is-hidden" data-os-alert-banner aria-live="assertive" aria-atomic="true">
+      <strong id="tvLedText" data-os-alert-text></strong>
+      <button id="tvLedClose" data-os-alert-close type="button" aria-label="Fechar alerta">×</button>
     </section>
 
     <main id="tvContent" class="tv-content"></main>

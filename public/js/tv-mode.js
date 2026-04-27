@@ -13,6 +13,7 @@
     pausedUntil: 0,
     notificationPrimed: false,
     pendingLed: null,
+    lastAlertKey: null,
     osAlerts: [],
     ledHideTimer: null,
     ledSoundInterval: null,
@@ -193,44 +194,73 @@
     return 'BAIXA';
   }
 
+  function formatDateTime(value) {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function resolveResponsaveis(item = {}) {
+    if (Array.isArray(item.responsaveis) && item.responsaveis.length) {
+      return item.responsaveis.map((nome) => String(nome || '').trim()).filter(Boolean).join(', ');
+    }
+    return item.responsavel || item.responsavel_exibicao || 'Não informado';
+  }
+
   function buildLedMessage(item = {}) {
-    const prioridade = normalizeLedPriority(item.prioridade);
+    const prioridade = normalizeLedPriority(item.prioridade || item.criticidade || item.grau);
+    const numero = item.numero || item.id || '-';
+    const titulo = item.titulo || item.descricao || item.servico || item.tarefa || '';
+    const equipamento = item.equipamento || item.maquina || item.equipamento_nome || 'Equipamento não informado';
+    const status = item.status || 'ABERTA';
+    const responsaveis = resolveResponsaveis(item);
+    const abertura = formatDateTime(item.abertura || item.opened_at || item.created_at || item.data_abertura);
+    const aberturaLabel = abertura ? ` • Abertura: ${abertura}` : '';
+
     return {
       prioridade,
-      texto: `NOVA OS ${prioridade} • ${item.numero} • ${item.equipamento} • Responsável: ${item.responsavel || 'A definir'}`,
+      texto: `OS #${numero} • ${equipamento} • ${status} • Criticidade: ${prioridade} • Responsáveis: ${responsaveis}${titulo ? ` • ${titulo}` : ''}${aberturaLabel}`,
     };
+  }
+
+  function hideOSAlert() {
+    const led = document.querySelector('[data-os-alert-banner]');
+    if (!led) return;
+
+    led.classList.add('is-hidden');
+    state.pendingLed = null;
+
+    clearTimeout(state.ledHideTimer);
+    state.ledHideTimer = null;
+  }
+
+  function showOSAlert(item = {}) {
+    const led = document.querySelector('[data-os-alert-banner]');
+    const ledText = document.querySelector('[data-os-alert-text]');
+    if (!led || !ledText) return;
+
+    clearTimeout(state.ledHideTimer);
+    state.ledHideTimer = null;
+
+    const ledData = buildLedMessage(item);
+    state.pendingLed = { ...ledData, expiresAt: Date.now() + LED_VISIBLE_MS };
+
+    led.dataset.prioridade = String(ledData.prioridade || 'MEDIA').toLowerCase();
+    ledText.textContent = ledData.texto;
+    led.classList.remove('is-hidden');
+
+    state.ledHideTimer = setTimeout(() => {
+      hideOSAlert();
+    }, LED_VISIBLE_MS);
   }
 
   function syncLedVisibility() {
     const led = $('tvLed');
-    const ledText = $('tvLedText');
-    if (!led || !ledText) return;
-
+    if (!led) return;
     if (!state.pendingLed) {
-      clearTimeout(state.ledHideTimer);
-      led.hidden = true;
-      return;
+      led.classList.add('is-hidden');
     }
-
-    const expiresAt = Number(state.pendingLed.expiresAt || 0);
-    if (expiresAt && Date.now() >= expiresAt) {
-      state.pendingLed = null;
-      clearTimeout(state.ledHideTimer);
-      led.hidden = true;
-      return;
-    }
-
-    led.dataset.prioridade = String(state.pendingLed.prioridade || 'MEDIA').toLowerCase();
-    ledText.textContent = state.pendingLed.texto;
-    led.hidden = false;
-
-    clearTimeout(state.ledHideTimer);
-    const remainingMs = Math.max(0, (expiresAt || (Date.now() + LED_VISIBLE_MS)) - Date.now());
-    state.ledHideTimer = setTimeout(() => {
-      state.pendingLed = null;
-      led.hidden = true;
-      state.ledHideTimer = null;
-    }, remainingMs);
   }
 
   function renderOS() {
@@ -419,29 +449,38 @@
       abertas.forEach((o) => notifiedSet.add(String(o.id)));
       localStorage.setItem('cg-tv-os-notified', JSON.stringify([...notifiedSet].slice(-300)));
       state.notificationPrimed = true;
-      return;
     }
 
-    const newCritical = abertas.find((os) => !notifiedSet.has(String(os.id)));
+    const backendAlertOs = state.data?.osAlerta || state.data?.os_alerta || state.data?.alertaOS || null;
+    const newFromBackend = backendAlertOs
+      ? `backend-${backendAlertOs.id || backendAlertOs.numero || backendAlertOs.created_at || Date.now()}`
+      : null;
+    const newFromOpen = abertas.find((os) => !notifiedSet.has(String(os.id)));
 
-    if (!newCritical) return;
+    const incomingOs = backendAlertOs || newFromOpen;
+    if (!incomingOs) return;
 
-    const ledData = buildLedMessage(newCritical);
-    ledData.expiresAt = Date.now() + LED_VISIBLE_MS;
-    state.pendingLed = ledData;
+    const alertKey = newFromBackend || `open-${incomingOs.id || incomingOs.numero || Date.now()}`;
+    if (alertKey === state.lastAlertKey) return;
+    state.lastAlertKey = alertKey;
+
+    const ledData = buildLedMessage(incomingOs);
     state.osAlerts.unshift({
-      id: String(newCritical.id || Date.now()),
+      id: String(incomingOs.id || incomingOs.numero || Date.now()),
       prioridade: ledData.prioridade,
       texto: ledData.texto,
       createdAt: new Date().toISOString(),
     });
     state.osAlerts = state.osAlerts.slice(0, 11);
+
+    showOSAlert(incomingOs);
     playLedSoundBurst(ledData.prioridade);
-    syncLedVisibility();
     if (isOSScreenActive()) renderCurrentScreen();
 
-    notifiedSet.add(String(newCritical.id));
-    localStorage.setItem('cg-tv-os-notified', JSON.stringify([...notifiedSet].slice(-300)));
+    if (incomingOs.id != null) {
+      notifiedSet.add(String(incomingOs.id));
+      localStorage.setItem('cg-tv-os-notified', JSON.stringify([...notifiedSet].slice(-300)));
+    }
   }
 
   function renderOsAlertsPanel() {
@@ -625,12 +664,12 @@
     $('tvFullscreenBtn')?.addEventListener('click', toggleFullscreen);
     $('tvLedClose')?.addEventListener('click', () => {
       const led = $('tvLed');
-      state.pendingLed = null;
+      hideOSAlert();
       clearInterval(state.ledSoundInterval);
       clearTimeout(state.ledSoundStopTimer);
       state.ledSoundInterval = null;
       state.ledSoundStopTimer = null;
-      if (led) led.hidden = true;
+      if (led) led.classList.add('is-hidden');
     });
 
     document.addEventListener('keydown', (event) => {

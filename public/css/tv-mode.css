@@ -78,6 +78,7 @@ body.cg-tv { font-family: Arial, Helvetica, sans-serif; background: var(--tv-bg)
 .tv-led[data-prioridade="media"] { background: linear-gradient(90deg, #713f12, #a16207); color: #fef3c7; border-bottom-color: #eab308; animation: none; }
 .tv-led[data-prioridade="baixa"] { background: linear-gradient(90deg, #14532d, #166534); color: #dcfce7; border-bottom-color: #22c55e; animation: none; }
 .tv-led button { border: 0; background: transparent; color: white; font-size: 22px; cursor: pointer; }
+.tv-led.is-hidden { display: none; }
 
 .tv-content { flex: 1; min-height: 0; padding: 8px 10px; overflow: hidden; }
 .tv-grid { height: 100%; display: grid; gap: 10px; }
