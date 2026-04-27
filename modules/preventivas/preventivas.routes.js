@@ -76,6 +76,14 @@ router.post(
   safe(ctrl.gerarProgramadas, "gerarProgramadas")
 );
 
+// POST /preventivas/programadas/lancar-os-segunda
+router.post(
+  "/programadas/lancar-os-segunda",
+  requireLogin,
+  requireRole(ACCESS.preventivas_manage),
+  safe(ctrl.gerarOSProgramadasSegunda, "gerarOSProgramadasSegunda")
+);
+
 // GET  /preventivas/:id
 router.get(
   "/:id",

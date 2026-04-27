@@ -10,6 +10,9 @@
       <form method="POST" action="/preventivas/programadas/gerar" onsubmit="return confirm('Gerar preventivas programadas para a próxima segunda-feira?');">
         <button class="btn btn-primary" type="submit">Gerar preventivas programadas</button>
       </form>
+      <form method="POST" action="/preventivas/programadas/lancar-os-segunda" onsubmit="return confirm('Lançar todas as preventivas programadas da segunda-feira como OS agora?');">
+        <button class="btn btn-outline" type="submit">Lançar OS da segunda-feira</button>
+      </form>
     <% } %>
     <a class="btn" href="/preventivas">Voltar</a>
   </div>
