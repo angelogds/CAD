@@ -1131,8 +1131,9 @@ const PREVENTIVAS_PROGRAMADAS_TEMPLATE = [
     chave: "abertura-prensa",
     titulo: "Preventiva Programada • Abertura de Prensa",
     keywords: ["prensa"],
-    frequencia_tipo: "semanal",
+    frequencia_tipo: "quinzenal",
     frequencia_valor: 1,
+    revezamento: { grupo: "prensas", ordem: 1 },
     checklist: ["Abrir prensa e inspecionar pontos críticos.", "Verificar folgas, ruídos e vibração.", "Validar reapertos e estado geral da estrutura."],
   },
   {
@@ -1147,7 +1148,7 @@ const PREVENTIVAS_PROGRAMADAS_TEMPLATE = [
     chave: "triturador",
     titulo: "Preventiva Programada • Verificação do Triturador",
     keywords: ["triturador"],
-    frequencia_tipo: "semanal",
+    frequencia_tipo: "quinzenal",
     frequencia_valor: 1,
     checklist: ["Inspecionar desgaste e integridade dos conjuntos.", "Verificar vibração, ruído e fixações.", "Executar limpeza técnica e reaperto."],
   },
@@ -1160,12 +1161,20 @@ const PREVENTIVAS_PROGRAMADAS_TEMPLATE = [
     checklist: ["Verificar pugadores e possíveis trincas/desgastes.", "Inspecionar roscas, vazamentos e vedação.", "Executar limpeza e teste operacional."],
   },
   {
-    chave: "decanter",
-    titulo: "Preventiva Programada • Decanter (Óleo + Higienização)",
+    chave: "decanter-oleo",
+    titulo: "Preventiva Programada • Decanter (Óleo Semanal)",
     keywords: ["decanter", "decante"],
     frequencia_tipo: "semanal",
     frequencia_valor: 1,
-    checklist: ["Completar óleo conforme padrão do fabricante.", "Abrir decanter para higienização total semanal.", "Inspecionar tubulações e condições de vedação."],
+    checklist: ["Completar óleo conforme padrão do fabricante.", "Inspecionar tubulações e condições de vedação.", "Registrar nível, consumo e anomalias observadas."],
+  },
+  {
+    chave: "decanter-higienizacao",
+    titulo: "Preventiva Programada • Decanter (Abertura/Higienização Quinzenal)",
+    keywords: ["decanter", "decante"],
+    frequencia_tipo: "quinzenal",
+    frequencia_valor: 1,
+    checklist: ["Abrir decanter para higienização total quinzenal.", "Executar limpeza geral com apoio da produção.", "Validar vedação e condição geral antes da partida."],
   },
   {
     chave: "moinho-martelos",
@@ -1185,10 +1194,11 @@ const PREVENTIVAS_PROGRAMADAS_TEMPLATE = [
   },
   {
     chave: "caldeira-1",
-    titulo: "Preventiva Programada • Caldeira 1 (Escovação Semanal)",
+    titulo: "Preventiva Programada • Caldeira 1 (Escovação Quinzenal)",
     keywords: ["caldeira", "1"],
-    frequencia_tipo: "semanal",
+    frequencia_tipo: "quinzenal",
     frequencia_valor: 1,
+    revezamento: { grupo: "caldeiras", ordem: 2 },
     checklist: ["Abrir caldeira 1 para escovação de tubos e remoção de cinzas.", "Inspecionar obstruções/vazamentos de tubulação.", "Verificar exaustor, aperto de motor/mancal e vedação com troca de graxeta."],
   },
   {
@@ -1197,6 +1207,7 @@ const PREVENTIVAS_PROGRAMADAS_TEMPLATE = [
     keywords: ["caldeira", "2"],
     frequencia_tipo: "quinzenal",
     frequencia_valor: 1,
+    revezamento: { grupo: "caldeiras", ordem: 1 },
     checklist: ["Abrir caldeira 2 para escovação quinzenal.", "Verificar acúmulo de cinzas e condição de tubos.", "Inspecionar vazamentos/obstruções e necessidade de solda/correção."],
   },
 ];
@@ -1212,8 +1223,12 @@ function listarEquipamentosAtivosDetalhado() {
   if (!tableExists("equipamentos")) return [];
   const hasSetor = getEquipamentosColumns().includes("setor");
   const hasCriticidade = getEquipamentosColumns().includes("criticidade");
+  const hasStatusOperacional = getEquipamentosColumns().includes("status_operacional");
   return db.prepare(`
-    SELECT id, nome, tipo, ${hasSetor ? "setor" : "NULL AS setor"}, ${hasCriticidade ? "criticidade" : "'MEDIA' AS criticidade"}
+    SELECT id, nome, tipo,
+      ${hasSetor ? "setor" : "NULL AS setor"},
+      ${hasCriticidade ? "criticidade" : "'MEDIA' AS criticidade"},
+      ${hasStatusOperacional ? "status_operacional" : "NULL AS status_operacional"}
     FROM equipamentos
     WHERE IFNULL(ativo,1)=1
     ORDER BY nome ASC
@@ -1235,6 +1250,86 @@ function montarChecklistProgramada(template = {}, equipamento = {}) {
   return `Preventiva programada para ${nomeEq}. ${lista.join(" ")}`.trim();
 }
 
+function semanaBaseIndex(dateISO = "") {
+  if (!dateISO) return 0;
+  const base = new Date(`${dateISO}T00:00:00.000Z`);
+  if (Number.isNaN(base.getTime())) return 0;
+  const anchor = new Date("2026-04-27T00:00:00.000Z");
+  const diffDays = Math.floor((base.getTime() - anchor.getTime()) / 86400000);
+  return Math.floor(diffDays / 7);
+}
+
+function ordenarRevezamento(template = {}, equipamentos = []) {
+  const list = [...(equipamentos || [])];
+  const grupo = String(template?.revezamento?.grupo || "").toLowerCase();
+  if (grupo === "prensas") {
+    return list.sort((a, b) => {
+      const aTxt = normalizeTxt(`${a?.nome || ""} ${a?.tipo || ""}`);
+      const bTxt = normalizeTxt(`${b?.nome || ""} ${b?.tipo || ""}`);
+      const rank = (txt, status) => {
+        if (normalizeTxt(status || "").includes("standby")) return 99;
+        if (txt.includes("p50")) return 1;
+        if (txt.includes("p46")) return 2;
+        if (txt.includes("fast")) return 3;
+        return 10;
+      };
+      return rank(aTxt, a?.status_operacional) - rank(bTxt, b?.status_operacional) || aTxt.localeCompare(bTxt);
+    });
+  }
+  if (grupo === "caldeiras") {
+    return list.sort((a, b) => {
+      const order = Number(template?.revezamento?.ordem || 999);
+      const aTxt = normalizeTxt(`${a?.nome || ""} ${a?.tipo || ""}`);
+      const bTxt = normalizeTxt(`${b?.nome || ""} ${b?.tipo || ""}`);
+      const pos = (txt) => {
+        if (txt.includes("caldeira 2") || txt.includes("caldeira2")) return 1;
+        if (txt.includes("caldeira 1") || txt.includes("caldeira1")) return 2;
+        if (txt.includes("caldeira 3") || txt.includes("caldeira3")) return 99;
+        return 10 + order;
+      };
+      return pos(aTxt) - pos(bTxt) || aTxt.localeCompare(bTxt);
+    });
+  }
+  return list;
+}
+
+function aplicarRevezamento(template = {}, encontrados = [], dataSegundaISO = "") {
+  if (!template?.revezamento?.grupo) return encontrados;
+  const ativos = (encontrados || []).filter((eq) => !normalizeTxt(eq?.status_operacional || "").includes("inativo"));
+  if (ativos.length <= 1) return ativos;
+  const ordenados = ordenarRevezamento(template, ativos);
+  const idx = semanaBaseIndex(dataSegundaISO);
+  const selecionado = ordenados[((idx % ordenados.length) + ordenados.length) % ordenados.length];
+  return selecionado ? [selecionado] : [];
+}
+
+function deveGerarExecucaoParaData(planoId, template = {}, dataISO = "") {
+  const tipo = String(template?.frequencia_tipo || "").toLowerCase();
+  const grupoRevezamento = String(template?.revezamento?.grupo || "").toLowerCase();
+  if (dataISO && grupoRevezamento === "caldeiras") {
+    const semanaIdx = semanaBaseIndex(dataISO);
+    const ordem = Number(template?.revezamento?.ordem || 1);
+    const slotSemana = ((semanaIdx % 2) + 2) % 2;
+    const slotTemplate = ((ordem - 1) % 2 + 2) % 2;
+    if (slotSemana !== slotTemplate) return false;
+  }
+  if (!dataISO || !planoId || tipo !== "quinzenal") return true;
+  const ultima = db.prepare(`
+    SELECT data_prevista
+    FROM preventiva_execucoes
+    WHERE plano_id = ?
+      AND data_prevista IS NOT NULL
+    ORDER BY data_prevista DESC
+    LIMIT 1
+  `).get(Number(planoId));
+  if (!ultima?.data_prevista) return true;
+  const atual = new Date(`${dataISO}T00:00:00.000Z`);
+  const anterior = new Date(`${String(ultima.data_prevista)}T00:00:00.000Z`);
+  if (Number.isNaN(atual.getTime()) || Number.isNaN(anterior.getTime())) return true;
+  const diffDays = Math.floor((atual.getTime() - anterior.getTime()) / 86400000);
+  return diffDays >= 14;
+}
+
 function gerarPreventivasProgramadasSemanais({ user = null, refDate = new Date() } = {}) {
   if (!tableExists("preventiva_planos") || !tableExists("preventiva_execucoes") || !tableExists("equipamentos")) {
     return { planosCriados: 0, execucoesCriadas: 0, proximaSegunda: getProximaSegundaISO(refDate), equipamentosCobertos: 0 };
@@ -1250,7 +1345,11 @@ function gerarPreventivasProgramadasSemanais({ user = null, refDate = new Date()
     let equipamentosCobertos = 0;
 
     PREVENTIVAS_PROGRAMADAS_TEMPLATE.forEach((template) => {
-      const encontrados = localizarEquipamentosPorKeywords(equipamentos, template.keywords);
+      const encontrados = aplicarRevezamento(
+        template,
+        localizarEquipamentosPorKeywords(equipamentos, template.keywords),
+        proximaSegunda
+      );
       encontrados.forEach((eq) => {
         equipamentosCobertos += 1;
         const tituloPlano = `${template.titulo} • ${eq.nome}`;
@@ -1290,6 +1389,7 @@ function gerarPreventivasProgramadasSemanais({ user = null, refDate = new Date()
         `).get(Number(plano.id), proximaSegunda);
 
         if (existeExecucao) return;
+        if (!deveGerarExecucaoParaData(plano.id, template, proximaSegunda)) return;
 
         const criticidade = calcularCriticidade({
           id: eq.id,
