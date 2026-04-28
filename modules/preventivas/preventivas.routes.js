@@ -84,6 +84,22 @@ router.post(
   safe(ctrl.gerarOSProgramadasSegunda, "gerarOSProgramadasSegunda")
 );
 
+// POST /preventivas/programadas/lancar-os-lote-dia
+router.post(
+  "/programadas/lancar-os-lote-dia",
+  requireLogin,
+  requireRole(ACCESS.preventivas_manage),
+  safe(ctrl.lancarLoteDiarioPreventivas, "lancarLoteDiarioPreventivas")
+);
+
+// Compatibilidade retroativa (rota antiga)
+router.post(
+  "/programadas/lancar-os-bombas-dia",
+  requireLogin,
+  requireRole(ACCESS.preventivas_manage),
+  safe(ctrl.lancarLoteDiarioPreventivas, "lancarLoteDiarioPreventivas")
+);
+
 // GET  /preventivas/:id
 router.get(
   "/:id",

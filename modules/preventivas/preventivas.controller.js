@@ -225,6 +225,30 @@ function gerarOSProgramadasSegunda(req, res) {
   }
   return res.redirect("/preventivas/programadas");
 }
+
+function lancarLoteDiarioPreventivas(req, res) {
+  const user = req.session?.user || null;
+  if (!isAdminOrEncarregado(user)) {
+    req.flash("error", "Sem permissão para lançar lote diário de preventivas.");
+    return res.redirect("/preventivas");
+  }
+
+  try {
+    const result = service.lancarLoteDiarioPreventivasComoOS({ user, refDate: new Date(), quantidade: 5 });
+    if (result?.skipped) {
+      req.flash("error", result.message || "Não foi possível lançar o lote diário de preventivas.");
+    } else {
+      req.flash(
+        "success",
+        `Lote diário processado (${result.dataReferencia || "-"}). Faixa atual: ${result.faixa || "-"}. Preventivas selecionadas: ${result.preventivasSelecionadas || 0}, OS geradas: ${result.osGeradas || 0}, já existentes: ${result.osJaExistentes || 0}. Equipe padrão: Júnior (executor) e Luís (apoio).`
+      );
+    }
+  } catch (err) {
+    console.error("[PREVENTIVAS][LOTE_DIARIO_OS] erro ao lançar lote diário:", err?.stack || err);
+    req.flash("error", "Erro ao lançar lote diário de preventivas.");
+  }
+  return res.redirect("/preventivas");
+}
 function apagarExecucao(req, res) {
   const user = req.session?.user || null;
   if (!isAdminOrEncarregado(user)) {
@@ -252,4 +276,16 @@ function apagarExecucao(req, res) {
   return res.redirect(`/preventivas/${planoId}`);
 }
 
-module.exports = { index, newForm, create, show, programadasIndex, gerarProgramadas, gerarOSProgramadasSegunda, execCreate, execUpdateStatus , apagarExecucao };
+module.exports = {
+  index,
+  newForm,
+  create,
+  show,
+  programadasIndex,
+  gerarProgramadas,
+  gerarOSProgramadasSegunda,
+  lancarLoteDiarioPreventivas,
+  execCreate,
+  execUpdateStatus,
+  apagarExecucao,
+};

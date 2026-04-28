@@ -231,6 +231,15 @@
     <% if (canAdminPreventivas && !tvMode) { %>
     <a class="btn-primary" href="/preventivas/nova">+ Nova Preventiva</a>
     <a class="btn-sm" href="/preventivas/programadas">Preventivas programadas</a>
+    <form method="POST" action="/preventivas/programadas/lancar-os-lote-dia" style="margin:0;">
+      <button
+        class="btn-sm"
+        type="submit"
+        onclick="return confirm('Lançar o próximo lote de 5 preventivas para OS agora? Equipe padrão: Júnior (executor) e Luís (apoio).');"
+      >
+        Lançar 5 preventivas/dia
+      </button>
+    </form>
     <% } %>
   </div>
 </div>
