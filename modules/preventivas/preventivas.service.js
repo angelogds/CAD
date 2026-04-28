@@ -1341,6 +1341,10 @@ function gerarPreventivasProgramadasSemanais({ user = null, refDate = new Date()
     return { planosCriados: 0, execucoesCriadas: 0, proximaSegunda: getProximaSegundaISO(refDate), equipamentosCobertos: 0 };
   }
 
+  const execCols = getPreventivaExecColumns();
+  const hasResp1 = execCols.includes("responsavel_1_id");
+  const hasResp2 = execCols.includes("responsavel_2_id");
+
   const executar = db.transaction(() => {
     const equipamentos = listarEquipamentosAtivosDetalhado();
     const proximaSegunda = getProximaSegundaISO(refDate);
@@ -1498,6 +1502,23 @@ function existeOSAbertaParaExecucaoPreventiva(execucaoId) {
   return false;
 }
 
+function findColaboradorByNome(nome = "") {
+  if (!tableExists("colaboradores")) return null;
+  const alvo = normalizarNomePessoa(nome);
+  if (!alvo) return null;
+  const rows = db.prepare(`
+    SELECT id, nome, user_id
+    FROM colaboradores
+    WHERE IFNULL(ativo,1)=1
+  `).all();
+  const exato = rows.find((row) => normalizarNomePessoa(row?.nome) === alvo);
+  if (exato) return exato;
+  return rows.find((row) => {
+    const nomeNorm = normalizarNomePessoa(row?.nome);
+    return nomeNorm.includes(alvo) || alvo.includes(nomeNorm);
+  }) || null;
+}
+
 function lancarProgramadasComoOSDaSegunda({ user = null, refDate = new Date(), automatico = false } = {}) {
   if (!tableExists("preventiva_execucoes") || !tableExists("preventiva_planos") || !tableExists("equipamentos") || !tableExists("os")) {
     return { ok: false, skipped: true, reason: "missing_tables", dataSegunda: getSegundaReferenciaISO(refDate), osGeradas: 0, preventivasEncontradas: 0 };
@@ -1592,6 +1613,176 @@ function lancarProgramadasComoOSDaSegunda({ user = null, refDate = new Date(), a
   };
   registrarLogPreventiva({
     acao: automatico ? "PREVENTIVAS_PROGRAMADAS_OS_AUTO" : "PREVENTIVAS_PROGRAMADAS_OS_MANUAL",
+    user,
+    detalhes: payload,
+  });
+  return payload;
+}
+
+function lancarLoteDiarioPreventivasComoOS({ user = null, refDate = new Date(), quantidade = 5 } = {}) {
+  if (!tableExists("preventiva_execucoes") || !tableExists("preventiva_planos") || !tableExists("equipamentos") || !tableExists("os")) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: "missing_tables",
+      message: "Estrutura de tabelas não disponível para lançar lote diário.",
+      dataReferencia: formatDateISO(refDate),
+      preventivasSelecionadas: 0,
+      osGeradas: 0,
+      osJaExistentes: 0,
+    };
+  }
+
+  const limite = Math.max(1, Number(quantidade || 5));
+  const dataReferencia = formatDateISO(refDate);
+  const cursorKey = "preventiva_lote_diario_cursor_execucao_id";
+  const cursorAtual = Number(getConfig(cursorKey) || 0) || 0;
+  const baseQuery = `
+    SELECT pe.id,
+           pe.plano_id,
+           pe.data_prevista,
+           pe.status,
+           pe.criticidade,
+           pe.responsavel_1_id,
+           pe.responsavel_2_id,
+           pp.titulo,
+           pp.equipamento_id,
+           e.nome AS equipamento_nome
+    FROM preventiva_execucoes pe
+    JOIN preventiva_planos pp ON pp.id = pe.plano_id
+    JOIN equipamentos e ON e.id = pp.equipamento_id
+    WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA')
+      AND pe.id > ?
+    ORDER BY pe.id ASC
+    LIMIT ?
+  `;
+  let rows = db.prepare(baseQuery).all(cursorAtual, limite);
+  if (!rows.length) {
+    rows = db.prepare(`
+      SELECT pe.id,
+             pe.plano_id,
+             pe.data_prevista,
+             pe.status,
+             pe.criticidade,
+             pe.responsavel_1_id,
+             pe.responsavel_2_id,
+             pp.titulo,
+             pp.equipamento_id,
+             e.nome AS equipamento_nome
+      FROM preventiva_execucoes pe
+      JOIN preventiva_planos pp ON pp.id = pe.plano_id
+      JOIN equipamentos e ON e.id = pp.equipamento_id
+      WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA')
+      ORDER BY pe.id ASC
+      LIMIT ?
+    `).all(limite);
+  }
+
+  if (!rows.length) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: "no_pending_preventivas",
+      message: "Nenhuma preventiva pendente/atrasada foi encontrada para o lote diário.",
+      dataReferencia,
+      preventivasSelecionadas: 0,
+      osGeradas: 0,
+      osJaExistentes: 0,
+    };
+  }
+
+  const juniorColab = findColaboradorByNome("Júnior");
+  const luisColab = findColaboradorByNome("Luís");
+  const juniorUserId = Number(juniorColab?.user_id || findUserIdByName("Júnior") || 0) || null;
+  const luisUserId = Number(luisColab?.user_id || findUserIdByName("Luís") || 0) || null;
+  const responsavelTexto = ["Júnior", "Luís"].join(", ");
+  const execCols = getPreventivaExecColumns();
+  const hasResp1 = execCols.includes("responsavel_1_id");
+  const hasResp2 = execCols.includes("responsavel_2_id");
+
+  const executar = db.transaction(() => {
+    const osService = getOSService();
+    let osGeradas = 0;
+    let osJaExistentes = 0;
+    let equipePredefinidaAplicada = 0;
+
+    for (const execucao of rows) {
+      if (existeOSAbertaParaExecucaoPreventiva(execucao.id)) {
+        osJaExistentes += 1;
+        continue;
+      }
+      const osId = osService.createOSAutomatica({
+        equipamento_id: Number(execucao.equipamento_id),
+        descricao: `Lote diário de preventiva • ${execucao.titulo || execucao.equipamento_nome || "Equipamento"}`,
+        tipo: "PREVENTIVA",
+        prioridade: execucao.criticidade || "MEDIA",
+        opened_by: user?.id || null,
+        origem: "PREVENTIVA",
+        preventiva_execucao_id: Number(execucao.id),
+        metadata: {
+          origem_lancamento: "LOTE_DIARIO_PREVENTIVAS",
+          preventiva_execucao_id: Number(execucao.id),
+          data_referencia: dataReferencia,
+          quantidade_lote: limite,
+        },
+      });
+      osGeradas += 1;
+
+      try {
+        osService.autoAssignOS(osId, user?.id || null, { force: true });
+      } catch (_e) {}
+
+      if (juniorColab?.id) {
+        try {
+          osService.setEquipeManual(
+            osId,
+            {
+              executor_colaborador_id: Number(juniorColab.id),
+              auxiliar_colaborador_id: Number(luisColab?.id || 0) || null,
+            },
+            user?.id || null
+          );
+          equipePredefinidaAplicada += 1;
+        } catch (_e) {}
+      }
+
+      const updates = ["responsavel = ?"];
+      const args = [responsavelTexto];
+      if (hasResp1 && juniorUserId) {
+        updates.push("responsavel_1_id = ?");
+        args.push(juniorUserId);
+      }
+      if (hasResp2 && luisUserId) {
+        updates.push("responsavel_2_id = ?");
+        args.push(luisUserId);
+      }
+      db.prepare(`
+        UPDATE preventiva_execucoes
+        SET ${updates.join(", ")}
+        WHERE id = ?
+      `).run(...args, Number(execucao.id));
+    }
+
+    const ultimoIdProcessado = Number(rows[rows.length - 1]?.id || 0) || null;
+    if (ultimoIdProcessado) setConfig(cursorKey, String(ultimoIdProcessado));
+    return { osGeradas, osJaExistentes, equipePredefinidaAplicada, ultimoIdProcessado };
+  });
+
+  const resultado = executar();
+  const primeiroId = Number(rows[0]?.id || 0) || null;
+  const ultimoId = Number(rows[rows.length - 1]?.id || 0) || null;
+  const payload = {
+    ok: true,
+    skipped: false,
+    dataReferencia,
+    faixa: primeiroId && ultimoId ? `#${primeiroId} até #${ultimoId}` : null,
+    cursorAnterior: cursorAtual || null,
+    preventivasSelecionadas: rows.length,
+    equipePadrao: { principal: "Júnior", apoio: "Luís" },
+    ...resultado,
+  };
+  registrarLogPreventiva({
+    acao: "PREVENTIVAS_LOTE_DIARIO_OS",
     user,
     detalhes: payload,
   });
@@ -2192,6 +2383,7 @@ module.exports = {
   gerarPreventivasProgramadasSemanais,
   listarResumoPreventivasProgramadas,
   lancarProgramadasComoOSDaSegunda,
+  lancarLoteDiarioPreventivasComoOS,
   apagarPreventivaExecucao,
   registrarLogPreventiva,
 };
