@@ -347,42 +347,128 @@ function gerarPdf(solicitacao, res) {
     throw err;
   }
 
-  const doc = new PDFDocument({ margin: 40, size: 'A4' });
+  const doc = new PDFDocument({ margin: 34, size: 'A4', bufferPages: true });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename=solicitacao_${solicitacao.numero}.pdf`);
   doc.pipe(res);
 
+  const COLORS = {
+    green: '#16A34A',
+    greenDark: '#15803D',
+    greenInst: '#166534',
+    greenSoft: '#E7F5EE',
+    text: '#1F2937',
+    muted: '#6B7280',
+    border: '#D1D5DB',
+    white: '#FFFFFF',
+  };
+  const statusLabel = (solicitacao.status || '-').replaceAll('_', ' ');
   const logoPath = ['public/IMG/logopdf_campo_do_gado.png.png', 'public/img/logo_menu_256.png', 'public/img/logo.png'].map((p) => path.join(process.cwd(), p)).find((p) => fs.existsSync(p));
-  if (logoPath) doc.image(logoPath, 40, 30, { width: 60 });
-
-  doc.fillColor('#166534').fontSize(16).text('RECICLAGEM CAMPO DO GADO', 120, 35);
-  doc.fillColor('#15803d').fontSize(11).text('MANUTENÇÃO INDUSTRIAL', 120, 55);
-  doc.fillColor('#111827').fontSize(13).text('SOLICITAÇÃO DE MATERIAL / COTAÇÃO', 40, 95);
-  doc.fontSize(10).text(`Número: ${solicitacao.numero || `#${solicitacao.id}`}`, 40, 115).text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 260, 115);
-
-  let y = 145;
-  const linha = (k, v) => {
-    doc.font('Helvetica-Bold').text(`${k}:`, 40, y, { continued: true });
-    doc.font('Helvetica').text(` ${v || '-'}`);
-    y += 16;
+  const drawFooter = () => {
+    const bottom = doc.page.height - 44;
+    doc.strokeColor(COLORS.green).lineWidth(0.8).moveTo(34, bottom - 8).lineTo(doc.page.width - 34, bottom - 8).stroke();
+    doc.fillColor(COLORS.greenInst).fontSize(8).font('Helvetica')
+      .text('Reciclagem Campo do Gado — Manutenção Campo do Gado', 34, bottom)
+      .text('Documento gerado automaticamente pelo Sistema de Manutenção Campo do Gado V2', 34, bottom + 10)
+      .text(`Emissão: ${new Date().toLocaleString('pt-BR')}`, 34, bottom + 20);
   };
 
-  linha('Solicitante', solicitacao.solicitante_nome);
-  linha('Setor', solicitacao.setor_origem);
-  linha('Prioridade', solicitacao.prioridade);
-  linha('Equipamento', solicitacao.equipamento_nome);
-  linha('Descrição', solicitacao.descricao);
+  doc.rect(0, 0, doc.page.width, 105).fill(COLORS.green);
+  if (logoPath) doc.image(logoPath, 34, 18, { width: 55 });
+  doc.fillColor(COLORS.white).fontSize(15).font('Helvetica-Bold').text('RECICLAGEM CAMPO DO GADO', 98, 24);
+  doc.fontSize(10).text('MANUTENÇÃO CAMPO DO GADO', 98, 46);
+  doc.fontSize(12).text('SOLICITAÇÃO DE MATERIAL / COMPRA', 98, 66);
+  doc.fontSize(9)
+    .text(`Solicitação nº: ${solicitacao.numero || `#${solicitacao.id}`}`, 360, 24, { width: 190, align: 'right' })
+    .text(`Data de emissão: ${new Date().toLocaleDateString('pt-BR')}`, 360, 40, { width: 190, align: 'right' })
+    .text(`Status: ${statusLabel}`, 360, 56, { width: 190, align: 'right' });
 
-  y += 8;
-  doc.rect(40, y, 515, 20).strokeColor('#e5e7eb').stroke();
-  doc.fontSize(9).font('Helvetica-Bold').text('Item', 44, y + 6).text('Descrição', 170, y + 6).text('Unidade', 360, y + 6).text('Qtde Solicitada', 420, y + 6);
-  y += 22;
+  let y = 122;
+  doc.roundedRect(34, y, doc.page.width - 68, 96, 8).fillAndStroke(COLORS.greenSoft, '#A7DDBD');
+  const ident = [
+    ['Unidade', 'Reciclagem Campo do Gado'], ['Setor solicitante', 'Manutenção'], ['Solicitante', solicitacao.solicitante_nome || '-'],
+    ['Responsável manutenção', 'Ângelo Gomes da Silva'], ['Destino', 'Setor de Compras'], ['Responsável compras', 'Sr. Ubiratam'],
+    ['Prioridade', solicitacao.prioridade || '-'], ['Equipamento / Local', solicitacao.equipamento_nome || solicitacao.destino_uso || '-'],
+  ];
+  let ly = y + 10; let ry = y + 10;
+  ident.forEach((row, idx) => {
+    const x = idx < 4 ? 46 : 300;
+    if (idx === 4) ry = y + 10;
+    const yy = idx < 4 ? ly : ry;
+    doc.fillColor(COLORS.greenDark).fontSize(8).font('Helvetica-Bold').text(`${row[0]}:`, x, yy, { continued: true });
+    doc.fillColor(COLORS.text).font('Helvetica').text(` ${row[1]}`);
+    if (idx < 4) ly += 18; else ry += 18;
+  });
+  y += 108;
 
-  doc.font('Helvetica');
-  for (const it of solicitacao.itens || []) {
-    doc.rect(40, y, 515, 22).strokeColor('#e5e7eb').stroke();
-    doc.text(it.item_nome || '-', 44, y + 6, { width: 120 }).text(it.item_descricao || '-', 170, y + 6, { width: 180 }).text(it.unidade || 'UN', 360, y + 6, { width: 50 }).text(String(it.qtd_solicitada || 0), 420, y + 6, { width: 75 });
-    y += 22;
+  doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(11).text('Lista de Materiais', 34, y);
+  y += 18;
+  const col = [34, 74, 140, 190, 402, 550];
+  doc.rect(34, y, 520, 20).fill(COLORS.green);
+  doc.fillColor(COLORS.white).fontSize(8).font('Helvetica-Bold');
+  ['Item', 'Qtd', 'Und', 'Descrição do material', 'Aplicação / Observação'].forEach((h, i) => doc.text(h, col[i] + 4, y + 6, { width: col[i + 1] - col[i] - 8 }));
+  y += 20;
+  (solicitacao.itens || []).forEach((it, index) => {
+    const rowH = 26;
+    if (y + rowH > doc.page.height - 90) { drawFooter(); doc.addPage(); y = 40; }
+    doc.rect(34, y, 520, rowH).fill(index % 2 ? COLORS.greenSoft : COLORS.white).stroke(COLORS.border);
+    doc.fillColor(COLORS.text).fontSize(8).font('Helvetica');
+    doc.text(String(index + 1).padStart(2, '0'), col[0] + 4, y + 8, { width: col[1] - col[0] - 8 });
+    doc.text(String(it.qtd_solicitada || 0), col[1] + 4, y + 8, { width: col[2] - col[1] - 8 });
+    doc.text(it.unidade || 'UN', col[2] + 4, y + 8, { width: col[3] - col[2] - 8 });
+    doc.text(it.item_nome || it.item_descricao || '-', col[3] + 4, y + 8, { width: col[4] - col[3] - 8 });
+    doc.text(it.item_descricao || '-', col[4] + 4, y + 8, { width: col[5] - col[4] - 8 });
+    y += rowH;
+  });
+
+  const drawSection = (title, content) => {
+    if (!content) return;
+    if (y + 90 > doc.page.height - 90) { drawFooter(); doc.addPage(); y = 40; }
+    doc.fillColor(COLORS.green).rect(34, y + 2, 4, 14).fill();
+    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text(title, 42, y);
+    y += 18;
+    const h = Math.max(44, doc.heightOfString(content, { width: 500 }) + 16);
+    doc.roundedRect(34, y, 520, h, 6).fillAndStroke(COLORS.greenSoft, '#B8E7C9');
+    doc.fillColor(COLORS.text).font('Helvetica').fontSize(9).text(content, 44, y + 8, { width: 500 });
+    y += h + 12;
+  };
+  drawSection('Justificativa Técnica', solicitacao.descricao);
+  drawSection('Observações da Manutenção', solicitacao.observacoes_compras);
+
+  if (y + 110 > doc.page.height - 90) { drawFooter(); doc.addPage(); y = 40; }
+  doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text('Assinaturas / Responsáveis', 34, y);
+  y += 18;
+  [['Solicitante', ''], ['Responsável pela Manutenção', 'Ângelo Gomes da Silva'], ['Setor de Compras', 'Sr. Ubiratam']].forEach(([k, v]) => {
+    doc.fillColor(COLORS.greenInst).fontSize(9).font('Helvetica-Bold').text(`${k}: ${v}`, 34, y);
+    y += 16;
+    doc.strokeColor(COLORS.border).moveTo(34, y).lineTo(300, y).stroke();
+    y += 12;
+  });
+
+  const imageAnexos = (solicitacao.anexos || []).filter((a) => String(a.mimetype || '').startsWith('image/'));
+  if (imageAnexos.length) {
+    drawFooter();
+    doc.addPage();
+    y = 40;
+    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(11).text('Anexos Fotográficos', 34, y);
+    y += 20;
+    imageAnexos.forEach((anexo, idx) => {
+      const fullPath = path.join(process.cwd(), 'uploads', anexo.filename || '');
+      if (!fs.existsSync(fullPath)) return;
+      if (y + 220 > doc.page.height - 80) { drawFooter(); doc.addPage(); y = 40; }
+      doc.fillColor(COLORS.greenInst).fontSize(9).font('Helvetica-Bold').text(`ANEXO ${String(idx + 1).padStart(2, '0')} — ${anexo.original_name || 'Imagem'}`, 34, y);
+      y += 14;
+      doc.rect(34, y, 520, 185).strokeColor(COLORS.greenDark).stroke();
+      doc.image(fullPath, 38, y + 4, { fit: [512, 176], align: 'center', valign: 'center' });
+      y += 190;
+    });
+  }
+
+  const range = doc.bufferedPageRange();
+  for (let i = 0; i < range.count; i += 1) {
+    doc.switchToPage(i);
+    drawFooter();
+    doc.fillColor(COLORS.greenInst).fontSize(8).text(`Página ${i + 1} de ${range.count}`, 470, doc.page.height - 24, { align: 'right', width: 80 });
   }
 
   doc.end();
