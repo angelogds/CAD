@@ -363,7 +363,7 @@
       <span class="ranking-subtitle">Ranking por participação na OS</span>
     </div>
     <p class="muted-xs" style="margin-top:-4px; margin-bottom:10px;">
-      Meta mensal: <strong><%= rankingMetaMensal %> pontos</strong>. Pesos: <strong>Baixa <%= rankingPesos.BAIXA %></strong> • <strong>Média <%= rankingPesos.MEDIA %></strong> • <strong>Alta <%= rankingPesos.ALTA %></strong> • <strong>Crítica <%= rankingPesos.CRITICA %></strong>.
+      Pesos: <strong>Baixa <%= rankingPesos.BAIXA %></strong> • <strong>Média <%= rankingPesos.MEDIA %></strong> • <strong>Alta <%= rankingPesos.ALTA %></strong> • <strong>Crítica <%= rankingPesos.CRITICA %></strong>.
       A pontuação é dividida igualmente entre os participantes de cada OS.
     </p>
     <% if (!rankingMecanicosItems.length) { %>
@@ -405,10 +405,10 @@
 <section class="dashboard-card area-ranking-apoio">
     <div class="ranking-header">
       <div class="dashboard-title" style="margin:0;">Ranking do apoio operacional</div>
-      <span class="ranking-subtitle">Auxiliares elegíveis para escala de folga</span>
+      <span class="ranking-subtitle">Destaques: auxiliares mais atuantes</span>
     </div>
     <p class="muted-xs" style="margin-top:-4px; margin-bottom:10px;">
-      Controle de pontuação dos auxiliares/apoio para reconhecimento e escalonamento de folgas aos sábados após atingir a meta de <strong><%= rankingMetaMensal %> pontos</strong>.
+      Ranking do apoio operacional com os auxiliares mais atuantes no mês.
     </p>
     <% if (!rankingApoioItems.length) { %>
       <div class="ranking-empty">Sem fechamentos suficientes nesta semana para montar o ranking de apoio.</div>
