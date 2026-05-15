@@ -7,12 +7,26 @@ const { canViewOSDetails, postCloseRedirectPath } = require("./os.permissions");
 const aiService = require("../ai/ai.service");
 const embeddingsService = require("../ai/ai.embeddings.service");
 const visionService = require("../ai/ai.vision.service");
+const whatsappService = require("../whatsapp/whatsapp.service");
 
 function mapFilesToPublic(files = []) {
   return (files || []).map((f) => ({
     ...f,
     pathPublic: `/uploads/os/${f.filename}`,
   }));
+}
+
+
+async function notifyResponsavelWhatsapp(osId, tipoEvento, criadoPor) {
+  try {
+    const osAtual = service.getOSById(osId);
+    if (!osAtual) return null;
+    const usuario = whatsappService.getUsuarioResponsavelOS(osAtual);
+    return await whatsappService.sendOsNotification({ os: osAtual, usuario, tipoEvento, criadoPor });
+  } catch (err) {
+    console.error("❌ whatsapp OS:", err && err.stack ? err.stack : err);
+    return null;
+  }
 }
 
 function osIndex(req, res) {
@@ -154,6 +168,10 @@ async function osCreate(req, res) {
       data: { osId: id, type: "NEW_OS" },
     }).catch(() => {});
 
+    if (!autoResult?.aguardando) {
+      await notifyResponsavelWhatsapp(id, "CRIACAO_OS", req.session?.user?.id || null);
+    }
+
     if (autoResult?.aguardando) {
       req.flash("success", "OS criada, aguardando equipe — clique em Reatribuir automaticamente.");
     } else {
@@ -193,6 +211,11 @@ function osShow(req, res) {
 
   const equipeUsuarios = canManageEquipe ? service.listUsuariosEquipe() : [];
   const tracagens = tracagemService ? tracagemService.listByOS(id) : [];
+  const whatsappLogs = whatsappService.listOsNotificationLogs(id);
+  const whatsappLast = whatsappLogs[0] || null;
+  const whatsappProvider = whatsappService.getProvider();
+  const whatsappResponsavel = whatsappService.getUsuarioResponsavelOS(osAtual);
+  const canSendWhatsapp = ["ADMIN", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
 
   return res.render("os/show", {
     title: `OS #${id}`,
@@ -201,6 +224,11 @@ function osShow(req, res) {
     canManualEditEquipe: canManageEquipe,
     equipeUsuarios,
     tracagens,
+    whatsappLogs,
+    whatsappLast,
+    whatsappProvider,
+    whatsappResponsavel,
+    canSendWhatsapp,
     user: req.session?.user || null,
   });
 }
@@ -472,7 +500,7 @@ async function osUpdateStatus(req, res) {
   }
 }
 
-function osAutoAssign(req, res) {
+async function osAutoAssign(req, res) {
   const id = Number(req.params.id);
   try {
     const result = service.autoAssignOS(id, req.session?.user?.id || null, { force: true });
@@ -482,6 +510,7 @@ function osAutoAssign(req, res) {
       const equipeTxt = result?.auxiliar?.nome
         ? `${result.executor?.nome || result.mecanico?.nome} + ${result.auxiliar.nome}`
         : result?.executor?.nome || result?.mecanico?.nome || "Executor alocado";
+      await notifyResponsavelWhatsapp(id, "REATRIBUICAO_AUTO", req.session?.user?.id || null);
       req.flash("success", `Equipe atribuída: ${equipeTxt}.`);
     }
   } catch (err) {
@@ -491,7 +520,7 @@ function osAutoAssign(req, res) {
 }
 
 
-function osSetEquipe(req, res) {
+async function osSetEquipe(req, res) {
   const id = Number(req.params.id);
   try {
     service.setEquipeManual(id, {
@@ -500,10 +529,38 @@ function osSetEquipe(req, res) {
       executor_secundario_colaborador_id: req.body.executor_secundario_colaborador_id ? Number(req.body.executor_secundario_colaborador_id) : null,
       auxiliar_secundario_colaborador_id: req.body.auxiliar_secundario_colaborador_id ? Number(req.body.auxiliar_secundario_colaborador_id) : null,
     }, req.session?.user?.id || null);
+    await notifyResponsavelWhatsapp(id, "ATRIBUICAO", req.session?.user?.id || null);
     req.flash("success", "Equipe atualizada com sucesso.");
   } catch (err) {
     req.flash("error", err.message || "Não foi possível atualizar a equipe.");
   }
+  return res.redirect(`/os/${id}`);
+}
+
+async function osEnviarWhatsapp(req, res) {
+  const id = Number(req.params.id);
+  const role = normalizeRole(req.session?.user?.role || "");
+  const canSend = ["ADMIN", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
+  if (!canSend) {
+    req.flash("error", "Sem permissão para reenviar WhatsApp.");
+    return res.redirect(`/os/${id}`);
+  }
+
+  const os = service.getOSById(id);
+  if (!os) return res.status(404).render("errors/404", { title: "Não encontrado" });
+
+  const result = await whatsappService.sendOsNotification({
+    os,
+    usuario: whatsappService.getUsuarioResponsavelOS(os),
+    tipoEvento: "REENVIO_MANUAL",
+    criadoPor: req.session?.user?.id || null,
+  });
+
+  if (result?.waMeLink) return res.redirect(result.waMeLink);
+  if (result?.status === "ENVIADO") req.flash("success", "WhatsApp enviado ao responsável.");
+  else if (result?.status === "SEM_TELEFONE") req.flash("error", "Responsável sem número de WhatsApp cadastrado.");
+  else if (result?.status === "IGNORADO") req.flash("error", "Integração WhatsApp desabilitada.");
+  else req.flash("error", result?.error || "Não foi possível enviar WhatsApp.");
   return res.redirect(`/os/${id}`);
 }
 
@@ -573,6 +630,7 @@ module.exports = {
   osUpdateStatus,
   osAutoAssign,
   osSetEquipe,
+  osEnviarWhatsapp,
   osVoiceAnalyze,
   osVoiceCommand,
   osVoiceCreate,
