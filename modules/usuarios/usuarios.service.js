@@ -3,7 +3,14 @@ const bcrypt = require("bcryptjs");
 const db = require("../../database/db");
 
 // compatível com seu CHECK do SQLite
-const VALID_ROLES = new Set(["ADMIN", "DIRECAO", "RH", "COMPRAS", "ENCARREGADO_PRODUCAO", "PRODUCAO", "MECANICO", "ALMOXARIFE", "MANUTENCAO"]);
+const VALID_ROLES = new Set(["ADMIN", "DIRECAO", "DIRETORIA", "RH", "COMPRAS", "ENCARREGADO_PRODUCAO", "PRODUCAO", "MECANICO", "ALMOXARIFE", "ALMOXARIFADO", "MANUTENCAO", "MANUTENCAO_SUPERVISOR"]);
+
+function normalizeWhatsapp(value) {
+  const phone = String(value || "").trim();
+  if (!phone) return null;
+  if (!/^\d+$/.test(phone)) throw new Error("WhatsApp deve conter somente números no formato DDI + DDD + número.");
+  return phone;
+}
 
 function list({ q = "", role = "" } = {}) {
   const where = [];
@@ -19,7 +26,7 @@ function list({ q = "", role = "" } = {}) {
   }
 
   const sql = `
-    SELECT id, name, email, role, photo_path, created_at
+    SELECT id, name, email, role, photo_path, telefone_whatsapp, created_at
     FROM users
     ${where.length ? "WHERE " + where.join(" AND ") : ""}
     ORDER BY id DESC
@@ -29,14 +36,14 @@ function list({ q = "", role = "" } = {}) {
 }
 
 function getById(id) {
-  return db.prepare("SELECT id, name, email, role, photo_path, created_at FROM users WHERE id = ?").get(id);
+  return db.prepare("SELECT id, name, email, role, photo_path, telefone_whatsapp, created_at FROM users WHERE id = ?").get(id);
 }
 
 function getByEmail(email) {
   return db.prepare("SELECT * FROM users WHERE email = ?").get(email);
 }
 
-function create({ name, email, role, password, photo_path }) {
+function create({ name, email, role, password, photo_path, telefone_whatsapp }) {
   const r = String(role || "").toUpperCase();
   if (!VALID_ROLES.has(r)) {
     throw new Error(`Perfil inválido. Use: ${Array.from(VALID_ROLES).join(", ")}`);
@@ -45,15 +52,16 @@ function create({ name, email, role, password, photo_path }) {
   const exists = getByEmail(email);
   if (exists) throw new Error("Já existe usuário com esse e-mail.");
 
+  const telefone = normalizeWhatsapp(telefone_whatsapp);
   const password_hash = bcrypt.hashSync(password, 10);
   const created_at = new Date().toISOString();
 
   db.prepare(
-    "INSERT INTO users (name, email, password_hash, role, photo_path, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(name, email, password_hash, r, photo_path || null, created_at);
+    "INSERT INTO users (name, email, password_hash, role, photo_path, telefone_whatsapp, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).run(name, email, password_hash, r, photo_path || null, telefone, created_at);
 }
 
-function update(id, { name, email, role, photo_path }) {
+function update(id, { name, email, role, photo_path, telefone_whatsapp }) {
   const current = db.prepare("SELECT id FROM users WHERE id = ?").get(id);
   if (!current) throw new Error("Usuário não encontrado.");
 
@@ -65,12 +73,14 @@ function update(id, { name, email, role, photo_path }) {
   const other = db.prepare("SELECT id FROM users WHERE email = ? AND id <> ?").get(email, id);
   if (other) throw new Error("Este e-mail já está sendo usado por outro usuário.");
 
+  const telefone = normalizeWhatsapp(telefone_whatsapp);
+
   if (photo_path) {
-    db.prepare("UPDATE users SET name = ?, email = ?, role = ?, photo_path = ? WHERE id = ?").run(name, email, r, photo_path, id);
+    db.prepare("UPDATE users SET name = ?, email = ?, role = ?, photo_path = ?, telefone_whatsapp = ? WHERE id = ?").run(name, email, r, photo_path, telefone, id);
     return;
   }
 
-  db.prepare("UPDATE users SET name = ?, email = ?, role = ? WHERE id = ?").run(name, email, r, id);
+  db.prepare("UPDATE users SET name = ?, email = ?, role = ?, telefone_whatsapp = ? WHERE id = ?").run(name, email, r, telefone, id);
 }
 
 function resetPassword(id, password) {

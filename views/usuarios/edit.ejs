@@ -41,6 +41,12 @@
       </div>
 
       <div>
+        <label>WhatsApp</label>
+        <input class="input" name="telefone_whatsapp" inputmode="numeric" pattern="[0-9]*" value="<%= user.telefone_whatsapp || '' %>" placeholder="5575999999999" />
+        <div class="muted">Somente números (DDI + DDD + número). Se ficar vazio, não receberá notificações.</div>
+      </div>
+
+      <div>
         <label>Criado em</label>
         <input class="input" value="<%= user.created_at ? fmtBR(user.created_at) : '-' %>" disabled />
       </div>
