@@ -67,7 +67,7 @@
             <td><%= c.funcao || '-' %></td>
             <td><%= c.setor || '-' %></td>
             <td><span class="pill-tag <%= c.status==='ATIVO' ? 'pill-green':'pill-gray' %>"><%= c.status || '-' %></span></td>
-            <td><span class="pill-tag <%= c.telefone_whatsapp ? 'pill-green' : 'pill-gray' %>"><%= c.telefone_whatsapp ? 'Cadastrado' : 'Sem WhatsApp' %></span></td>
+            <td><span class="pill-tag <%= c.telefone_whatsapp ? 'pill-green' : 'pill-gray' %>"><%= c.telefone_whatsapp ? '🟢 WhatsApp' : 'Sem WhatsApp' %></span></td>
             <td><%= c.epis_ativos || 0 %></td>
             <td><%= c.ferramentas_ativas || 0 %></td>
             <td><a class="btn btn-sm btn-outline" href="/colaboradores/<%= c.id %>">Abrir</a></td>

@@ -17,13 +17,13 @@ PUBLIC_BASE_URL=https://seu-dominio-publico.example.com
 
 - `disabled`: registra o evento como ignorado e não envia mensagens.
 - `manual`: gera link `wa.me` com a mensagem pronta. O botão da OS abre uma nova aba para envio manual.
-- `cloud_api`: usa a API oficial da Meta em `https://graph.facebook.com/{version}/{phone_number_id}/messages`.
+- `cloud_api`: usa a API oficial da Meta em `https://graph.facebook.com/{version}/{phone_number_id}/messages` e envia automaticamente para o número cadastrado no perfil do funcionário.
 
 Não há automação de WhatsApp Web, QR Code, scraping ou bibliotecas não oficiais.
 
 ## Cadastro do telefone
 
-O usuário deve ter `telefone_whatsapp` com somente números, no formato DDI + DDD + número. Exemplo: `5575999999999`.
+O usuário/colaborador deve ter `telefone_whatsapp` com somente números, no formato DDI + DDD + número. Exemplo: `5575999999999`. Quando houver cadastro no perfil do colaborador e no usuário vinculado, a OS prioriza o número do perfil do colaborador.
 
 O campo pode ficar vazio; nesse caso, a OS continua funcionando e o histórico registra `SEM_TELEFONE` quando houver tentativa de envio.
 
@@ -32,7 +32,7 @@ O campo pode ficar vazio; nesse caso, a OS continua funcionando e o histórico r
 - `CRIACAO_OS`: OS criada e já alocada a um responsável.
 - `ATRIBUICAO`: equipe alterada manualmente.
 - `REATRIBUICAO_AUTO`: reprocessamento automático da equipe.
-- `REENVIO_MANUAL`: botão **Enviar WhatsApp ao responsável** na tela da OS.
+- `REENVIO_MANUAL`: botão com símbolo do WhatsApp **Enviar WhatsApp ao responsável** na tela da OS aberta.
 
 Para eventos automáticos, o serviço evita duplicidade quando já existe log `ENVIADO` para a mesma OS, usuário e evento. Reenvio manual sempre registra nova tentativa.
 

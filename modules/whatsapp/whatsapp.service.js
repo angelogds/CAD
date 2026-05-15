@@ -193,7 +193,7 @@ function getUsuarioResponsavelOS(os = {}) {
 }
 
 function getRecipientPhone(usuario = {}) {
-  return normalizePhone(usuario.user_telefone_whatsapp || usuario.telefone_whatsapp || usuario.colaborador_telefone_whatsapp || usuario.colaborador_telefone);
+  return normalizePhone(usuario.colaborador_telefone_whatsapp || usuario.telefone_whatsapp || usuario.user_telefone_whatsapp || usuario.colaborador_telefone);
 }
 
 function getRecipientUserId(usuario = {}) {

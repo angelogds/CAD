@@ -22,6 +22,9 @@
   .func-mec{background:#fee2e2;color:#991b1b}.func-mon{background:#dbeafe;color:#1e3a8a}.func-aux{background:#dcfce7;color:#166534}
   .whatsapp-status{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:800;background:#dcfce7;color:#166534}
   .whatsapp-status.erro{background:#fee2e2;color:#991b1b}.whatsapp-status.warn{background:#fef3c7;color:#92400e}
+  .whatsapp-btn{display:inline-flex;align-items:center;gap:7px;}
+  .wa-icon{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;background:#25d366;color:#fff;font-size:13px;font-weight:900;line-height:1;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+  .wa-icon::before{content:"☎";}
   @media(max-width:900px){.top{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.resumo-exec{grid-template-columns:1fr}}
 </style>
 
@@ -43,7 +46,7 @@
         <div class="actions">
           <form method="POST" action="/os/<%= os.id %>/pausar"><button class="btn" type="submit">Pausar OS</button></form>
           <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome)) { %>
-            <a class="btn btn-green" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener">Enviar WhatsApp ao responsável</a>
+            <a class="btn btn-green whatsapp-btn" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener"><span class="wa-icon" aria-hidden="true"></span> Enviar WhatsApp ao responsável</a>
           <% } %>
         </div>
       <% } %>
@@ -224,14 +227,14 @@
 
 
 <div class="card" style="margin-top:12px;">
-  <% const whatsPhone = whatsappResponsavel ? (whatsappResponsavel.user_telefone_whatsapp || whatsappResponsavel.telefone_whatsapp || whatsappResponsavel.colaborador_telefone_whatsapp || whatsappResponsavel.colaborador_telefone || '') : ''; %>
+  <% const whatsPhone = whatsappResponsavel ? (whatsappResponsavel.colaborador_telefone_whatsapp || whatsappResponsavel.telefone_whatsapp || whatsappResponsavel.user_telefone_whatsapp || whatsappResponsavel.colaborador_telefone || '') : ''; %>
   <div class="card-head">
     <div>
       <h3 style="margin:0;">Notificação WhatsApp</h3>
       <div class="muted">Envio da OS ao mecânico responsável pela execução.</div>
     </div>
     <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome)) { %>
-      <a class="btn btn-green" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener">Enviar WhatsApp ao responsável</a>
+      <a class="btn btn-green whatsapp-btn" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener"><span class="wa-icon" aria-hidden="true"></span> Enviar WhatsApp ao responsável</a>
     <% } %>
   </div>
 
@@ -249,9 +252,11 @@
   </div>
 
   <% if (!whatsPhone) { %>
-    <div style="margin-top:10px;color:#b91c1c;font-weight:800;">Responsável sem número de WhatsApp cadastrado.</div>
+    <div style="margin-top:10px;color:#b91c1c;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> Responsável sem número de WhatsApp cadastrado no perfil do funcionário.</div>
+  <% } else if (whatsappProvider === 'cloud_api') { %>
+    <div style="margin-top:10px;color:#166534;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> Envio automático ativo para o WhatsApp cadastrado no perfil do funcionário.</div>
   <% } else if (whatsappProvider === 'manual') { %>
-    <div style="margin-top:10px;color:#166534;font-weight:800;">WhatsApp pronto para envio manual.</div>
+    <div style="margin-top:10px;color:#166534;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> WhatsApp pronto para envio manual pela OS aberta.</div>
   <% } %>
   <% if (whatsappLast?.erro) { %>
     <div style="margin-top:10px;color:#991b1b;"><b>Erro do último envio:</b> <%= whatsappLast.erro %></div>
