@@ -9,6 +9,13 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function normalizeWhatsapp(value) {
+  const phone = String(value || "").trim();
+  if (!phone) return null;
+  if (!/^\d+$/.test(phone)) throw new Error("WhatsApp deve conter somente números no formato DDI + DDD + número.");
+  return phone;
+}
+
 function listColaboradores(filters = {}) {
   const where = ['c.deleted_at IS NULL'];
   const params = {};
@@ -29,7 +36,7 @@ function listColaboradores(filters = {}) {
   }
 
   return db.prepare(`
-    SELECT c.id, c.nome, c.apelido, c.funcao, c.setor, c.status, c.telefone, c.data_admissao,
+    SELECT c.id, c.nome, c.apelido, c.funcao, c.setor, c.status, c.telefone, c.telefone_whatsapp, c.data_admissao,
            c.foto_url, c.user_id,
            (SELECT COUNT(1) FROM movimentacoes_ferramentas mf
              WHERE mf.colaborador_id=c.id AND mf.deleted_at IS NULL AND mf.status IN ('ativo','pendente','confirmado')) AS ferramentas_ativas,
@@ -84,6 +91,7 @@ function createOrUpdateColaborador(payload, actor = {}) {
     data_admissao: payload.data_admissao || null,
     status: String(payload.status || 'ATIVO').trim().toUpperCase(),
     telefone: String(payload.telefone || '').trim() || null,
+    telefone_whatsapp: normalizeWhatsapp(payload.telefone_whatsapp),
     foto_url: String(payload.foto_url || '').trim() || null,
     lider_id: safeNumber(payload.lider_id),
     user_id: safeNumber(payload.user_id),
@@ -95,7 +103,7 @@ function createOrUpdateColaborador(payload, actor = {}) {
     db.prepare(`
       UPDATE colaboradores
       SET nome=@nome, apelido=@apelido, funcao=@funcao, setor=@setor, data_admissao=@data_admissao,
-          status=@status, telefone=@telefone, foto_url=@foto_url, lider_id=@lider_id, user_id=@user_id,
+          status=@status, telefone=@telefone, telefone_whatsapp=@telefone_whatsapp, foto_url=@foto_url, lider_id=@lider_id, user_id=@user_id,
           ativo=CASE WHEN upper(@status)='ATIVO' THEN 1 ELSE 0 END, updated_at=datetime('now')
       WHERE id=@id
     `).run({ id: Number(payload.id), ...data });
@@ -104,8 +112,8 @@ function createOrUpdateColaborador(payload, actor = {}) {
   }
 
   const info = db.prepare(`
-    INSERT INTO colaboradores (nome, apelido, funcao, setor, data_admissao, status, telefone, foto_url, lider_id, user_id, ativo, created_at, updated_at)
-    VALUES (@nome, @apelido, @funcao, @setor, @data_admissao, @status, @telefone, @foto_url, @lider_id, @user_id,
+    INSERT INTO colaboradores (nome, apelido, funcao, setor, data_admissao, status, telefone, telefone_whatsapp, foto_url, lider_id, user_id, ativo, created_at, updated_at)
+    VALUES (@nome, @apelido, @funcao, @setor, @data_admissao, @status, @telefone, @telefone_whatsapp, @foto_url, @lider_id, @user_id,
       CASE WHEN upper(@status)='ATIVO' THEN 1 ELSE 0 END, datetime('now'), datetime('now'))
   `).run(data);
 
