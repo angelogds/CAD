@@ -60,7 +60,6 @@ function create(req, res) {
   const role = String(req.body.role || "").trim().toUpperCase();
   const password = (req.body.password || "").trim();
   const photo_path = normalizePhotoPath(req.file);
-  const telefone_whatsapp = String(req.body.telefone_whatsapp || "").trim();
 
   if (!name || !email || !role || !password) {
     req.flash("error", "Preencha nome, e-mail, perfil e senha.");
@@ -68,8 +67,8 @@ function create(req, res) {
   }
 
   try {
-    service.create({ name, email, role, password, photo_path, telefone_whatsapp });
-    req.flash("success", telefone_whatsapp ? "Usuário criado com sucesso." : "Usuário criado. Atenção: sem WhatsApp cadastrado, ele não receberá notificações de OS.");
+    service.create({ name, email, role, password, photo_path });
+    req.flash("success", "Usuário criado com sucesso.");
     return res.redirect("/usuarios");
   } catch (e) {
     req.flash("error", e.message || "Erro ao criar usuário.");
@@ -97,7 +96,6 @@ function update(req, res) {
   const email = (req.body.email || "").trim().toLowerCase();
   const role = String(req.body.role || "").trim().toUpperCase();
   const photo_path = normalizePhotoPath(req.file);
-  const telefone_whatsapp = String(req.body.telefone_whatsapp || "").trim();
 
   if (!name || !email || !role) {
     req.flash("error", "Preencha nome, e-mail e perfil.");
@@ -105,8 +103,8 @@ function update(req, res) {
   }
 
   try {
-    service.update(id, { name, email, role, photo_path, telefone_whatsapp });
-    req.flash("success", telefone_whatsapp ? "Usuário atualizado com sucesso." : "Usuário atualizado. Atenção: sem WhatsApp cadastrado, ele não receberá notificações de OS.");
+    service.update(id, { name, email, role, photo_path });
+    req.flash("success", "Usuário atualizado com sucesso.");
     return res.redirect("/usuarios");
   } catch (e) {
     req.flash("error", e.message || "Erro ao atualizar usuário.");

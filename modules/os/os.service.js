@@ -14,10 +14,6 @@ let inspecaoService = null;
 try {
   inspecaoService = require("../inspecao/inspecao.service");
 } catch (_e) {}
-let whatsappService = null;
-try {
-  whatsappService = require("../whatsapp/whatsapp.service");
-} catch (_e) {}
 
 function getOSColumns() {
   return db.prepare(`PRAGMA table_info(os)`).all().map((c) => c.name);
@@ -1020,18 +1016,7 @@ function syncOpenOSWithCurrentShift() {
   let alocadas = 0;
   for (const os of pendentes) {
     const result = autoAssignOS(Number(os.id));
-    if (!result?.aguardando) {
-      alocadas += 1;
-      if (whatsappService) {
-        const osAtual = getOSById(Number(os.id));
-        Promise.resolve(whatsappService.sendOsNotification({
-          os: osAtual,
-          usuario: whatsappService.getUsuarioResponsavelOS(osAtual),
-          tipoEvento: "REATRIBUICAO_AUTO",
-          criadoPor: null,
-        })).catch(() => {});
-      }
-    }
+    if (!result?.aguardando) alocadas += 1;
   }
 
   return { turnoAtual: getTurnoAgora(), devolvidasParaFila: 0, alocadas };

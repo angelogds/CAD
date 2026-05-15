@@ -41,7 +41,6 @@
     <input class="input" type="date" name="data_admissao" />
     <select name="status"><option>ATIVO</option><option>INATIVO</option></select>
     <input class="input" name="telefone" placeholder="Telefone" />
-    <input class="input" name="telefone_whatsapp" inputmode="numeric" pattern="[0-9]*" placeholder="WhatsApp: 5575999999999" />
     <input class="input" name="user_id" placeholder="ID do usuário (opcional)" type="number" />
     <input class="input" type="file" name="foto" accept="image/*" />
     <button class="btn btn-primary" type="submit">Cadastrar</button>
@@ -54,12 +53,12 @@
     <table class="table">
       <thead>
         <tr>
-          <th>Nome</th><th>Função</th><th>Setor</th><th>Status</th><th>WhatsApp</th><th>EPIs Ativos</th><th>Ferramentas</th><th>Ação</th>
+          <th>Nome</th><th>Função</th><th>Setor</th><th>Status</th><th>EPIs Ativos</th><th>Ferramentas</th><th>Ação</th>
         </tr>
       </thead>
       <tbody>
         <% if (!lista.length) { %>
-          <tr><td colspan="8">Nenhum colaborador encontrado.</td></tr>
+          <tr><td colspan="7">Nenhum colaborador encontrado.</td></tr>
         <% } %>
         <% lista.forEach((c) => { %>
           <tr>
@@ -67,7 +66,6 @@
             <td><%= c.funcao || '-' %></td>
             <td><%= c.setor || '-' %></td>
             <td><span class="pill-tag <%= c.status==='ATIVO' ? 'pill-green':'pill-gray' %>"><%= c.status || '-' %></span></td>
-            <td><span class="pill-tag <%= c.telefone_whatsapp ? 'pill-green' : 'pill-gray' %>"><%= c.telefone_whatsapp ? 'Cadastrado' : 'Sem WhatsApp' %></span></td>
             <td><%= c.epis_ativos || 0 %></td>
             <td><%= c.ferramentas_ativas || 0 %></td>
             <td><a class="btn btn-sm btn-outline" href="/colaboradores/<%= c.id %>">Abrir</a></td>

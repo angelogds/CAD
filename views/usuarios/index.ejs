@@ -44,7 +44,6 @@
           <th>Nome</th>
           <th>E-mail</th>
           <th style="width:180px;">Perfil</th>
-          <th style="width:170px;">WhatsApp</th>
           <th style="width:180px;">Criado</th>
           <th style="width:140px; text-align:right;">Ações</th>
         </tr>
@@ -53,7 +52,7 @@
       <tbody>
         <% if (!lista || !lista.length) { %>
           <tr>
-            <td colspan="7" class="muted" style="text-align:center; padding:18px;">
+            <td colspan="6" class="muted" style="text-align:center; padding:18px;">
               Nenhum usuário encontrado.
             </td>
           </tr>
@@ -65,13 +64,6 @@
               <td><%= u.email %></td>
               <td>
                 <span class="pill-tag pill-gray"><%= (u.role || '').toUpperCase() %></span>
-              </td>
-              <td>
-                <% if (u.telefone_whatsapp) { %>
-                  <span class="pill-tag pill-green">Cadastrado</span>
-                <% } else { %>
-                  <span class="pill-tag pill-gray">Sem WhatsApp</span>
-                <% } %>
               </td>
               <td><%= u.created_at ? fmtBR(u.created_at) : '-' %></td>
               <td style="text-align:right;">

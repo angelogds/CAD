@@ -20,8 +20,6 @@
 
   .badge-funcao{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
   .func-mec{background:#fee2e2;color:#991b1b}.func-mon{background:#dbeafe;color:#1e3a8a}.func-aux{background:#dcfce7;color:#166534}
-  .whatsapp-status{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:800;background:#dcfce7;color:#166534}
-  .whatsapp-status.erro{background:#fee2e2;color:#991b1b}.whatsapp-status.warn{background:#fef3c7;color:#92400e}
   @media(max-width:900px){.top{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.resumo-exec{grid-template-columns:1fr}}
 </style>
 
@@ -42,9 +40,6 @@
       <% if (!isOSFechada) { %>
         <div class="actions">
           <form method="POST" action="/os/<%= os.id %>/pausar"><button class="btn" type="submit">Pausar OS</button></form>
-          <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome)) { %>
-            <a class="btn btn-green" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener">Enviar WhatsApp ao responsável</a>
-          <% } %>
         </div>
       <% } %>
     </div>
@@ -220,71 +215,6 @@
       <% }) %>
     </ul>
   </div>
-</div>
-
-
-<div class="card" style="margin-top:12px;">
-  <% const whatsPhone = whatsappResponsavel ? (whatsappResponsavel.user_telefone_whatsapp || whatsappResponsavel.telefone_whatsapp || whatsappResponsavel.colaborador_telefone_whatsapp || whatsappResponsavel.colaborador_telefone || '') : ''; %>
-  <div class="card-head">
-    <div>
-      <h3 style="margin:0;">Notificação WhatsApp</h3>
-      <div class="muted">Envio da OS ao mecânico responsável pela execução.</div>
-    </div>
-    <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome)) { %>
-      <a class="btn btn-green" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener">Enviar WhatsApp ao responsável</a>
-    <% } %>
-  </div>
-
-  <div class="grid2">
-    <div><b>Responsável:</b> <%= os.executor_nome || os.execucao_ativa?.executor_nome || '-' %></div>
-    <div><b>Telefone WhatsApp:</b> <%= whatsPhone || '-' %></div>
-    <div><b>Provider:</b> <%= whatsappProvider || 'disabled' %></div>
-    <div>
-      <b>Último envio:</b> <%= whatsappLast?.enviado_em ? fmtBR(whatsappLast.enviado_em) : '-' %>
-      <% if (whatsappLast?.status) { %>
-        <% const stW = String(whatsappLast.status || ''); %>
-        <span class="whatsapp-status <%= stW === 'ERRO' || stW === 'SEM_TELEFONE' ? 'erro' : (stW === 'IGNORADO' || stW === 'SEM_PROVIDER' ? 'warn' : '') %>"><%= stW %></span>
-      <% } %>
-    </div>
-  </div>
-
-  <% if (!whatsPhone) { %>
-    <div style="margin-top:10px;color:#b91c1c;font-weight:800;">Responsável sem número de WhatsApp cadastrado.</div>
-  <% } else if (whatsappProvider === 'manual') { %>
-    <div style="margin-top:10px;color:#166534;font-weight:800;">WhatsApp pronto para envio manual.</div>
-  <% } %>
-  <% if (whatsappLast?.erro) { %>
-    <div style="margin-top:10px;color:#991b1b;"><b>Erro do último envio:</b> <%= whatsappLast.erro %></div>
-  <% } %>
-
-  <h4 style="margin:14px 0 0;">Histórico de envio na OS</h4>
-  <table class="tabela-compacta">
-    <thead>
-      <tr>
-        <th>Data/Hora</th>
-        <th>Evento</th>
-        <th>Responsável</th>
-        <th>Telefone</th>
-        <th>Status</th>
-        <th>Erro</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% if (!(whatsappLogs || []).length) { %>
-        <tr><td colspan="6" class="muted" style="text-align:center;">Nenhum envio registrado.</td></tr>
-      <% } %>
-      <% (whatsappLogs || []).forEach(function(log){ %>
-        <tr>
-          <td><%= log.enviado_em ? fmtBR(log.enviado_em) : '-' %></td>
-          <td><%= log.tipo_evento || '-' %></td>
-          <td><%= log.usuario_nome || os.executor_nome || '-' %></td>
-          <td><%= log.telefone || '-' %></td>
-          <td><span class="whatsapp-status <%= log.status === 'ERRO' || log.status === 'SEM_TELEFONE' ? 'erro' : (log.status === 'IGNORADO' || log.status === 'SEM_PROVIDER' ? 'warn' : '') %>"><%= log.status || '-' %></span></td>
-          <td><%= log.erro || '-' %></td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
 </div>
 
 

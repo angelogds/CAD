@@ -65,8 +65,7 @@ function tempoEmpresa(dataAdmissao) {
       <input class="input" name="setor" value="<%= colaborador.setor || '' %>" />
       <input class="input" type="date" name="data_admissao" value="<%= colaborador.data_admissao || '' %>" />
       <select name="status"><option <%= colaborador.status==='ATIVO'?'selected':'' %>>ATIVO</option><option <%= colaborador.status==='INATIVO'?'selected':'' %>>INATIVO</option></select>
-      <input class="input" name="telefone" value="<%= colaborador.telefone || '' %>" placeholder="Telefone" />
-      <input class="input" name="telefone_whatsapp" inputmode="numeric" pattern="[0-9]*" value="<%= colaborador.telefone_whatsapp || '' %>" placeholder="WhatsApp: 5575999999999" />
+      <input class="input" name="telefone" value="<%= colaborador.telefone || '' %>" />
       <input class="input" type="number" name="lider_id" value="<%= colaborador.lider_id || '' %>" placeholder="ID Líder" />
       <input class="input" type="number" name="user_id" value="<%= colaborador.user_id || '' %>" placeholder="ID Usuário" />
       <input class="input" type="file" name="foto" accept="image/*" />
@@ -79,7 +78,6 @@ function tempoEmpresa(dataAdmissao) {
     <% } else { %>
       <p><strong>Tipo sanguíneo:</strong> <%= colaborador.tipo_sanguineo || '-' %></p>
       <p><strong>Contato emergência:</strong> <%= colaborador.contato_emergencia || '-' %></p>
-      <p><strong>WhatsApp:</strong> <%= colaborador.telefone_whatsapp ? 'Cadastrado' : 'Sem WhatsApp' %></p>
       <p><strong>Restrição operacional:</strong> <%= colaborador.restricao_operacional || '-' %></p>
       <p><strong>Observações:</strong> <%= colaborador.observacoes || '-' %></p>
     <% } %>
