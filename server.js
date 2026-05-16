@@ -8,6 +8,8 @@ try {
   console.error("❌ Erro nas migrations:", err.message || err);
 }
 
+console.log("[WHATSAPP] Provider ativo:", process.env.WHATSAPP_PROVIDER || "disabled");
+
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
