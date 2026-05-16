@@ -10,6 +10,36 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function normalizePersonName(value = '') {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\bluis\b/g, 'luiz');
+}
+
+function syncUserWhatsappFromColaborador({ colaboradorId, userId, nome, telefone }) {
+  const normalizedPhone = normalizeWhatsapp(telefone) || null;
+
+  let resolvedUserId = safeNumber(userId);
+  if (!resolvedUserId && normalizedPhone) {
+    const wanted = normalizePersonName(nome);
+    if (wanted) {
+      const users = db.prepare('SELECT id, name FROM users').all();
+      const match = users.find((user) => normalizePersonName(user.name) === wanted);
+      if (match) resolvedUserId = Number(match.id);
+    }
+  }
+
+  if (!resolvedUserId) return null;
+
+  db.prepare('UPDATE users SET telefone_whatsapp = ? WHERE id = ?').run(normalizedPhone, resolvedUserId);
+  db.prepare("UPDATE colaboradores SET user_id = CASE WHEN user_id IS NULL OR user_id = 0 THEN ? ELSE user_id END WHERE id = ?").run(resolvedUserId, Number(colaboradorId));
+  return resolvedUserId;
+}
+
 function listColaboradores(filters = {}) {
   const where = ['c.deleted_at IS NULL'];
   const params = {};
@@ -101,6 +131,8 @@ function createOrUpdateColaborador(payload, actor = {}) {
           ativo=CASE WHEN upper(@status)='ATIVO' THEN 1 ELSE 0 END, updated_at=datetime('now')
       WHERE id=@id
     `).run({ id: Number(payload.id), ...data });
+    const syncedUserId = syncUserWhatsappFromColaborador({ colaboradorId: Number(payload.id), userId: data.user_id, nome: data.nome, telefone: data.telefone_whatsapp });
+    if (syncedUserId && !data.user_id) data.user_id = syncedUserId;
     insertLog({ colaboradorId: Number(payload.id), entidade: 'colaboradores', acao: 'update', detalhe: data, actor });
     return Number(payload.id);
   }
@@ -111,8 +143,11 @@ function createOrUpdateColaborador(payload, actor = {}) {
       CASE WHEN upper(@status)='ATIVO' THEN 1 ELSE 0 END, datetime('now'), datetime('now'))
   `).run(data);
 
-  insertLog({ colaboradorId: Number(info.lastInsertRowid), entidade: 'colaboradores', acao: 'create', detalhe: data, actor });
-  return Number(info.lastInsertRowid);
+  const colaboradorId = Number(info.lastInsertRowid);
+  const syncedUserId = syncUserWhatsappFromColaborador({ colaboradorId, userId: data.user_id, nome: data.nome, telefone: data.telefone_whatsapp });
+  if (syncedUserId && !data.user_id) data.user_id = syncedUserId;
+  insertLog({ colaboradorId, entidade: 'colaboradores', acao: 'create', detalhe: data, actor });
+  return colaboradorId;
 }
 
 function ensureFerramenta(payload) {

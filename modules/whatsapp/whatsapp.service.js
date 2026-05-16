@@ -183,7 +183,8 @@ function normalizeLookupText(value = "") {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+    .trim()
+    .replace(/\bluis\b/g, "luiz");
 }
 
 function getExistingColumns(table, preferred = []) {
@@ -219,6 +220,11 @@ function normalizeRecipient(row = {}, papel = "Equipe", origemOverride = null) {
   const origem = origemOverride || row.origem || (row.tabela && row.id ? `${row.tabela}.id = ${row.id}` : "");
   const id = Number(row.user_id || row.id || row.colaborador_id || 0) || null;
   const nome = row.nome || row.name || row.user_name || row.colaborador_nome || "";
+  const isColaborador = (row.tabela_origem || row.tabela) === "colaboradores" || row.colaborador_id;
+  const telefonePrincipal = isColaborador
+    ? (row.telefone_whatsapp || row.colaborador_telefone_whatsapp || row.user_telefone_whatsapp || row.colaborador_telefone || row.telefone || row.celular || row.whatsapp || null)
+    : (row.telefone_whatsapp || row.user_telefone_whatsapp || row.colaborador_telefone_whatsapp || row.telefone || row.celular || row.whatsapp || null);
+  const telefoneHerdadoDeUser = isColaborador && !normalizePhone(row.telefone_whatsapp || row.colaborador_telefone_whatsapp || row.colaborador_telefone) && normalizePhone(row.user_telefone_whatsapp);
   const normalized = {
     ...row,
     papel,
@@ -227,7 +233,9 @@ function normalizeRecipient(row = {}, papel = "Equipe", origemOverride = null) {
     name: nome,
     origem,
     tabela_origem: row.tabela_origem || row.tabela || null,
-    telefone_whatsapp: row.telefone_whatsapp || row.user_telefone_whatsapp || row.colaborador_telefone_whatsapp || row.telefone || row.celular || row.whatsapp || null,
+    telefone_whatsapp: telefonePrincipal,
+    telefone_herdado_de_user_id: row.telefone_herdado_de_user_id || (telefoneHerdadoDeUser ? Number(row.user_id || 0) || null : null),
+    origem_telefone: row.origem_telefone || (telefoneHerdadoDeUser && row.user_id ? `users.id = ${row.user_id}` : null),
   };
   normalized.telefone_normalizado = getRecipientPhone(normalized);
   return normalized;
@@ -345,6 +353,75 @@ function findPeopleByName(nome, papel = "Equipe") {
   return candidates;
 }
 
+function findUserFallbackForRecipient(recipient = {}, papel = "Equipe") {
+  if (!recipient || !tableExists("users")) return null;
+  const userId = Number(recipient.user_id || 0);
+  if (userId) return queryUserById(userId, papel);
+
+  const wanted = normalizeLookupText(recipient.nome || recipient.name || recipient.colaborador_nome || "");
+  if (!wanted) return null;
+  const cols = tableColumns("users");
+  const nameCol = getExistingColumns("users", ["name", "nome", "usuario_nome"])[0];
+  if (!nameCol) return null;
+  const rows = db.prepare(`SELECT id, ${nameCol} AS nome FROM users`).all();
+  for (const row of rows) {
+    if (normalizeLookupText(row.nome) === wanted) return queryUserById(row.id, papel);
+  }
+  return null;
+}
+
+function applyUserPhoneFallback(recipient = {}, papel = "Equipe") {
+  if (!recipient) return recipient;
+  const normalized = normalizeRecipient(recipient, papel, recipient.origem);
+  if (getRecipientPhone(normalized)) return normalized;
+  const fallbackUser = findUserFallbackForRecipient(normalized, papel);
+  const fallbackPhone = getRecipientPhone(fallbackUser || {});
+  if (!fallbackPhone) return normalized;
+  return normalizeRecipient({
+    ...normalized,
+    user_id: normalized.user_id || fallbackUser.user_id || fallbackUser.id,
+    user_name: normalized.user_name || fallbackUser.nome || fallbackUser.name,
+    user_telefone_whatsapp: fallbackUser.user_telefone_whatsapp || fallbackUser.telefone_whatsapp || fallbackPhone,
+    telefone_whatsapp: fallbackPhone,
+    telefone_herdado_de_user_id: fallbackUser.user_id || fallbackUser.id,
+    origem_telefone: `users.id = ${fallbackUser.user_id || fallbackUser.id}`,
+  }, papel, normalized.origem);
+}
+
+function mergeRecipients(existing, incoming) {
+  const existingIsColaborador = !!existing.colaborador_id || existing.tabela_origem === "colaboradores";
+  const incomingIsColaborador = !!incoming.colaborador_id || incoming.tabela_origem === "colaboradores";
+  const primary = incomingIsColaborador && !existingIsColaborador ? incoming : existing;
+  const secondary = primary === existing ? incoming : existing;
+  const primaryPhone = getRecipientPhone(primary);
+  const secondaryPhone = getRecipientPhone(secondary);
+  const merged = {
+    ...secondary,
+    ...primary,
+    user_id: primary.user_id || secondary.user_id || null,
+    colaborador_id: primary.colaborador_id || secondary.colaborador_id || null,
+    user_telefone_whatsapp: primary.user_telefone_whatsapp || secondary.user_telefone_whatsapp || null,
+    colaborador_telefone_whatsapp: primary.colaborador_telefone_whatsapp || secondary.colaborador_telefone_whatsapp || null,
+    telefone_whatsapp: primaryPhone ? primary.telefone_whatsapp : (secondary.telefone_whatsapp || secondaryPhone || primary.telefone_whatsapp || null),
+    telefone_herdado_de_user_id: primary.telefone_herdado_de_user_id || secondary.telefone_herdado_de_user_id || (!primaryPhone && secondary.user_id ? secondary.user_id : null),
+    origem_telefone: primary.origem_telefone || (!primaryPhone && secondaryPhone && secondary.user_id ? `users.id = ${secondary.user_id}` : secondary.origem_telefone || null),
+  };
+  merged.telefone_normalizado = getRecipientPhone(merged) || primaryPhone || secondaryPhone;
+  return merged;
+}
+
+function shouldMergeRecipients(a = {}, b = {}) {
+  if (!a || !b) return false;
+  if (a.colaborador_id && b.colaborador_id && Number(a.colaborador_id) === Number(b.colaborador_id)) return true;
+  if (a.user_id && b.user_id && Number(a.user_id) === Number(b.user_id)) return true;
+  const aName = normalizeLookupText(a.nome || a.name || a.user_name || a.colaborador_nome || "");
+  const bName = normalizeLookupText(b.nome || b.name || b.user_name || b.colaborador_nome || "");
+  if (!aName || aName !== bName) return false;
+  const aIsColaborador = !!a.colaborador_id || a.tabela_origem === "colaboradores";
+  const bIsColaborador = !!b.colaborador_id || b.tabela_origem === "colaboradores";
+  return aIsColaborador !== bIsColaborador || !!getRecipientPhone(a) || !!getRecipientPhone(b);
+}
+
 function resolveAmbiguity(candidates = [], rawName = "") {
   if (!candidates.length) return { selected: null, warning: null };
   const topScore = candidateSortScore(candidates[0]);
@@ -373,17 +450,16 @@ function collectRoleSpecs(os = {}) {
 }
 
 function dedupeRecipients(recipients = []) {
-  const seen = new Set();
   const result = [];
   for (const recipient of recipients) {
     if (!recipient) continue;
-    const normalized = normalizeRecipient(recipient, recipient.papel || "Equipe", recipient.origem);
+    const normalized = applyUserPhoneFallback(recipient, recipient.papel || "Equipe");
     const phone = getRecipientPhone(normalized);
-    const key = normalized.colaborador_id
-      ? `c:${normalized.colaborador_id}`
-      : (normalized.user_id ? `u:${normalized.user_id}` : `p:${phone || normalizeLookupText(normalized.nome || normalized.name) || result.length}`);
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const existingIndex = result.findIndex((item) => shouldMergeRecipients(item, normalized));
+    if (existingIndex >= 0) {
+      result[existingIndex] = mergeRecipients(result[existingIndex], { ...normalized, telefone_normalizado: phone });
+      continue;
+    }
     result.push({ ...normalized, telefone_normalizado: phone });
   }
   return result;
@@ -429,7 +505,8 @@ function getUsuariosEquipeOS(os = {}) {
 }
 
 function getUsuarioResponsavelOS(os = {}) {
-  return getUsuariosEquipeOS(os)[0] || null;
+  const usuarios = getUsuariosEquipeOS(os);
+  return usuarios.find((usuario) => getRecipientPhone(usuario)) || usuarios[0] || null;
 }
 
 function getRecipientPhone(usuario = {}) {
@@ -654,7 +731,7 @@ function getWhatsappOsDiagnostic(osId, osDetalhada = null) {
   const os = osDetalhada || getOSRawById(osId);
   const provider = getProvider();
   const destinatarios = resolveWhatsappDestinatariosDaOS(os || osId);
-  const responsavel = destinatarios[0] || null;
+  const responsavel = destinatarios.find((destinatario) => getRecipientPhone(destinatario)) || destinatarios[0] || null;
   const media = getOsAberturaMedia(os?.id || osId);
   const mensagem = buildOsWhatsappMessage({ ...(os || {}), has_abertura_media: media.hasMedia });
   const telefone = responsavel ? getRecipientPhone(responsavel) : "";
