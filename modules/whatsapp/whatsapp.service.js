@@ -62,6 +62,18 @@ function buildVinculo(os) {
   return desc ? `#${solicitacao} - ${desc}` : `#${solicitacao}`;
 }
 
+function getEquipeResumo(os = {}) {
+  const membros = [
+    ["Executor", firstValue(os, ["executor_nome", "mecanico_nome", "executor_user_nome", "responsavel_nome"], "")],
+    ["Apoio operacional", firstValue(os, ["auxiliar_nome", "auxiliar_user_nome"], "")],
+    ["Executor secundário", firstValue(os, ["executor_secundario_nome"], "")],
+    ["Apoio operacional secundário", firstValue(os, ["auxiliar_secundario_nome"], "")],
+  ].filter(([, nome]) => String(nome || "").trim());
+
+  if (!membros.length) return "Equipe ainda não definida.";
+  return membros.map(([papel, nome]) => `${papel}: ${sanitizeText(nome)}`).join("\n");
+}
+
 function buildOsWhatsappMessage(os = {}) {
   const numero = firstValue(os, ["numero_os", "id"], "-");
   const setor = firstValue(os, ["setor", "equipamento_setor", "setor_nome"], "-");
@@ -70,6 +82,7 @@ function buildOsWhatsappMessage(os = {}) {
   const tipo = firstValue(os, ["tipo_corretiva", "tipo"], "-");
   const abertura = firstValue(os, ["opened_at", "created_at", "data_abertura"], null);
   const executor = firstValue(os, ["executor_nome", "mecanico_nome", "executor_user_nome", "responsavel_nome"], "-");
+  const equipeResumo = getEquipeResumo(os);
   const descricao = firstValue(os, ["descricao", "nao_conformidade", "nc_observacao_curta"], "-");
   const status = firstValue(os, ["status"], "-");
   const modo = firstValue(os, ["alocacao_modo", "modo_alocacao"], "-");
@@ -86,6 +99,9 @@ function buildOsWhatsappMessage(os = {}) {
     `🛠️ *Tipo:* ${sanitizeText(tipo)}`,
     `📅 *Abertura:* ${formatDateBR(abertura)}`,
     `👨‍🔧 *Responsável:* ${sanitizeText(executor)}`,
+    "",
+    "👥 *Equipe direcionada:*",
+    equipeResumo,
     "",
     "📝 *Problema informado:*",
     sanitizeText(descricao),
@@ -159,37 +175,79 @@ function getOsAberturaMedia(osId) {
   }
 }
 
-function getUsuarioResponsavelOS(os = {}) {
-  const colabId = Number(os.executor_colaborador_id || 0);
-  if (colabId && tableExists("colaboradores")) {
-    const cCols = tableColumns("colaboradores");
-    const uCols = tableColumns("users");
-    return db.prepare(`
-      SELECT c.id AS colaborador_id,
-             c.nome AS name,
-             c.user_id AS id,
-             ${cCols.includes("telefone_whatsapp") ? "c.telefone_whatsapp" : "NULL"} AS colaborador_telefone_whatsapp,
-             ${cCols.includes("telefone") ? "c.telefone" : "NULL"} AS colaborador_telefone,
-             u.id AS user_id,
-             u.name AS user_name,
-             ${uCols.includes("telefone_whatsapp") ? "u.telefone_whatsapp" : "NULL"} AS user_telefone_whatsapp
-      FROM colaboradores c
-      LEFT JOIN users u ON u.id = c.user_id
-      WHERE c.id = ?
-    `).get(colabId);
+function getColaboradorRecipient(colaboradorId, papel = "Equipe") {
+  const id = Number(colaboradorId || 0);
+  if (!id || !tableExists("colaboradores")) return null;
+  const cCols = tableColumns("colaboradores");
+  const hasUsers = tableExists("users");
+  const uCols = hasUsers ? tableColumns("users") : [];
+  return db.prepare(`
+    SELECT c.id AS colaborador_id,
+           c.nome AS name,
+           c.nome AS colaborador_nome,
+           c.user_id AS id,
+           c.user_id AS user_id,
+           ? AS papel,
+           ${cCols.includes("telefone_whatsapp") ? "c.telefone_whatsapp" : "NULL"} AS colaborador_telefone_whatsapp,
+           ${cCols.includes("telefone") ? "c.telefone" : "NULL"} AS colaborador_telefone,
+           ${hasUsers ? "u.name" : "NULL"} AS user_name,
+           ${hasUsers && uCols.includes("telefone_whatsapp") ? "u.telefone_whatsapp" : "NULL"} AS user_telefone_whatsapp
+    FROM colaboradores c
+    ${hasUsers ? "LEFT JOIN users u ON u.id = c.user_id" : ""}
+    WHERE c.id = ?
+  `).get(papel, id);
+}
+
+function getUserRecipient(userId, papel = "Equipe") {
+  const id = Number(userId || 0);
+  if (!id || !tableExists("users")) return null;
+  const cols = tableColumns("users");
+  return db.prepare(`
+    SELECT id, id AS user_id, name, name AS user_name, ? AS papel,
+           ${cols.includes("telefone_whatsapp") ? "telefone_whatsapp" : "NULL"} AS user_telefone_whatsapp
+    FROM users
+    WHERE id = ?
+  `).get(papel, id);
+}
+
+function dedupeRecipients(recipients = []) {
+  const seen = new Set();
+  const result = [];
+  for (const recipient of recipients) {
+    if (!recipient) continue;
+    const phone = getRecipientPhone(recipient);
+    const key = recipient.colaborador_id
+      ? `c:${recipient.colaborador_id}`
+      : (recipient.user_id ? `u:${recipient.user_id}` : `p:${phone || recipient.name || result.length}`);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push({ ...recipient, telefone_normalizado: phone });
+  }
+  return result;
+}
+
+function getUsuariosEquipeOS(os = {}) {
+  const recipients = [];
+  const colabRoles = [
+    [os.executor_colaborador_id, "Executor"],
+    [os.auxiliar_colaborador_id, "Apoio operacional"],
+    [os.executor_secundario_colaborador_id, "Executor secundário"],
+    [os.auxiliar_secundario_colaborador_id, "Apoio operacional secundário"],
+  ];
+  for (const [id, papel] of colabRoles) recipients.push(getColaboradorRecipient(id, papel));
+
+  if (!recipients.some((r) => r?.papel === "Executor")) {
+    recipients.push(getUserRecipient(os.mecanico_user_id || os.executor_user_id, "Executor"));
+  }
+  if (!recipients.some((r) => r?.papel === "Apoio operacional")) {
+    recipients.push(getUserRecipient(os.auxiliar_user_id, "Apoio operacional"));
   }
 
-  const userId = Number(os.mecanico_user_id || os.executor_user_id || 0);
-  if (userId && tableExists("users")) {
-    const cols = tableColumns("users");
-    return db.prepare(`
-      SELECT id, id AS user_id, name, name AS user_name,
-             ${cols.includes("telefone_whatsapp") ? "telefone_whatsapp" : "NULL"} AS user_telefone_whatsapp
-      FROM users
-      WHERE id = ?
-    `).get(userId);
-  }
-  return null;
+  return dedupeRecipients(recipients);
+}
+
+function getUsuarioResponsavelOS(os = {}) {
+  return getUsuariosEquipeOS(os)[0] || null;
 }
 
 function getRecipientPhone(usuario = {}) {
@@ -216,13 +274,20 @@ function insertLog({ osId, usuarioId, telefone, tipoEvento, provider, status, me
   return Number(info.lastInsertRowid || 0) || null;
 }
 
-function hasSentAutomatic({ osId, usuarioId, tipoEvento }) {
+function hasSentAutomatic({ osId, usuarioId, telefone, tipoEvento }) {
   if (!tableExists("os_whatsapp_notificacoes")) return false;
+  if (usuarioId) {
+    return !!db.prepare(`
+      SELECT 1 FROM os_whatsapp_notificacoes
+      WHERE os_id = ? AND usuario_id = ? AND tipo_evento = ? AND status = 'ENVIADO'
+      LIMIT 1
+    `).get(Number(osId), usuarioId, tipoEvento);
+  }
   return !!db.prepare(`
     SELECT 1 FROM os_whatsapp_notificacoes
-    WHERE os_id = ? AND IFNULL(usuario_id,0) = IFNULL(?,0) AND tipo_evento = ? AND status = 'ENVIADO'
+    WHERE os_id = ? AND IFNULL(telefone,'') = IFNULL(?, '') AND tipo_evento = ? AND status = 'ENVIADO'
     LIMIT 1
-  `).get(Number(osId), usuarioId || null, tipoEvento);
+  `).get(Number(osId), telefone || null, tipoEvento);
 }
 
 function listOsNotificationLogs(osId) {
@@ -313,7 +378,7 @@ async function sendOsNotification({ os, usuario, tipoEvento, criadoPor } = {}) {
       return { ok: true, status: "IGNORADO" };
     }
 
-    if (AUTO_EVENTS.has(String(tipoEvento || "")) && hasSentAutomatic({ osId: os?.id, usuarioId, tipoEvento })) {
+    if (AUTO_EVENTS.has(String(tipoEvento || "")) && hasSentAutomatic({ osId: os?.id, usuarioId, telefone, tipoEvento })) {
       return { ok: true, status: "DUPLICADO_IGNORADO" };
     }
 
@@ -344,11 +409,38 @@ async function sendOsNotification({ os, usuario, tipoEvento, criadoPor } = {}) {
   }
 }
 
+async function sendOsTeamNotifications({ os, tipoEvento, criadoPor } = {}) {
+  const recipients = getUsuariosEquipeOS(os || {});
+  if (!recipients.length) {
+    const result = await sendOsNotification({ os, usuario: null, tipoEvento, criadoPor });
+    return { ok: !!result?.ok, total: 0, sent: result?.status === "ENVIADO" ? 1 : 0, results: [result], recipients: [] };
+  }
+
+  const results = [];
+  for (const usuario of recipients) {
+    // Envia a mesma OS para executor e apoio operacional para todos saberem quem compõe a equipe.
+    // A deduplicação continua por OS + destinatário + evento para não repetir disparos automáticos.
+    // eslint-disable-next-line no-await-in-loop
+    results.push(await sendOsNotification({ os, usuario, tipoEvento, criadoPor }));
+  }
+
+  return {
+    ok: results.some((r) => r?.ok),
+    total: recipients.length,
+    sent: results.filter((r) => r?.status === "ENVIADO").length,
+    generatedLinks: results.filter((r) => r?.waMeLink).map((r) => r.waMeLink),
+    results,
+    recipients,
+  };
+}
+
 module.exports = {
   buildOsWhatsappMessage,
   getOsAberturaMedia,
   getUsuarioResponsavelOS,
+  getUsuariosEquipeOS,
   sendOsNotification,
+  sendOsTeamNotifications,
   sendTextMessage,
   sendMediaMessage,
   generateWaMeLink,
