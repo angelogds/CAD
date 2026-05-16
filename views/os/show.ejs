@@ -45,7 +45,7 @@
       <% if (!isOSFechada) { %>
         <div class="actions">
           <form method="POST" action="/os/<%= os.id %>/pausar"><button class="btn" type="submit">Pausar OS</button></form>
-          <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome)) { %>
+          <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome || whatsappResponsavel?.nome)) { %>
             <a class="btn btn-green whatsapp-btn" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener"><span class="wa-icon" aria-hidden="true"></span> Enviar WhatsApp à equipe</a>
           <% } %>
         </div>
@@ -228,52 +228,63 @@
 
 <div class="card" style="margin-top:12px;">
   <% const whatsappEquipe = whatsappDestinatarios || []; %>
-  <% const whatsPhone = whatsappResponsavel ? (whatsappResponsavel.telefone_normalizado || whatsappResponsavel.colaborador_telefone_whatsapp || whatsappResponsavel.telefone_whatsapp || whatsappResponsavel.user_telefone_whatsapp || whatsappResponsavel.colaborador_telefone || '') : ''; %>
-  <% const whatsappSemTelefone = whatsappEquipe.filter((p) => !(p.telefone_normalizado || p.colaborador_telefone_whatsapp || p.telefone_whatsapp || p.user_telefone_whatsapp || p.colaborador_telefone)); %>
+  <% const whatsPhone = whatsappResponsavel ? (whatsappResponsavel.telefone_normalizado || whatsappResponsavel.colaborador_telefone_whatsapp || whatsappResponsavel.telefone_whatsapp || whatsappResponsavel.user_telefone_whatsapp || whatsappResponsavel.colaborador_telefone || whatsappResponsavel.telefone || '') : ''; %>
+  <% const whatsappSemTelefone = whatsappEquipe.filter((p) => !(p.telefone_normalizado || p.colaborador_telefone_whatsapp || p.telefone_whatsapp || p.user_telefone_whatsapp || p.colaborador_telefone || p.telefone)); %>
+  <% const whatsappMotivo = whatsappProvider === 'disabled' ? 'WhatsApp desativado. Configure WHATSAPP_PROVIDER=manual ou cloud_api.' : (!whatsPhone ? 'Telefone não encontrado nas tabelas de usuários/colaboradores/funcionários/equipe/mecânicos ou vínculo textual ambíguo.' : ''); %>
   <div class="card-head">
     <div>
       <h3 style="margin:0;">Notificação WhatsApp</h3>
       <div class="muted">Envio da OS ao executor e ao apoio operacional da equipe direcionada.</div>
     </div>
-    <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome)) { %>
+    <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome || whatsappResponsavel?.nome)) { %>
       <a class="btn btn-green whatsapp-btn" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener"><span class="wa-icon" aria-hidden="true"></span> Enviar WhatsApp à equipe</a>
     <% } %>
   </div>
 
   <div class="grid2">
-    <div><b>Responsável:</b> <%= os.executor_nome || os.execucao_ativa?.executor_nome || '-' %></div>
+    <div><b>Responsável:</b> <%= os.executor_nome || os.execucao_ativa?.executor_nome || whatsappResponsavel?.nome || '-' %></div>
+    <div><b>ID responsável vinculado:</b> <%= whatsappResponsavel?.id || os.executor_colaborador_id || os.responsavel_user_id || os.mecanico_user_id || '-' %></div>
+    <div><b>Origem:</b> <%= whatsappResponsavel?.origem || '-' %></div>
     <div><b>Telefone WhatsApp responsável:</b> <%= whatsPhone || '-' %></div>
     <div><b>Apoio operacional:</b> <%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></div>
     <div><b>Destinatários da equipe:</b> <%= whatsappEquipe.length || 0 %></div>
     <div><b>Provider:</b> <%= whatsappProvider || 'disabled' %></div>
+    <div><b>Motivo/diagnóstico:</b> <%= whatsappMotivo || '-' %></div>
     <div>
       <b>Último envio:</b> <%= whatsappLast?.enviado_em ? fmtBR(whatsappLast.enviado_em) : '-' %>
       <% if (whatsappLast?.status) { %>
         <% const stW = String(whatsappLast.status || ''); %>
-        <span class="whatsapp-status <%= stW === 'ERRO' || stW === 'SEM_TELEFONE' ? 'erro' : (stW === 'IGNORADO' || stW === 'SEM_PROVIDER' ? 'warn' : '') %>"><%= stW %></span>
+        <span class="whatsapp-status <%= stW === 'ERRO' || stW === 'SEM_TELEFONE' ? 'erro' : (stW === 'IGNORADO' || stW === 'SEM_PROVIDER' || stW === 'WHATSAPP_DESATIVADO' ? 'warn' : '') %>"><%= stW %></span>
       <% } %>
     </div>
   </div>
 
-  <% if (whatsappSemTelefone.length) { %>
+  <% if (whatsappResponsavel?.aviso_ambiguidade) { %>
+    <div style="margin-top:10px;color:#92400e;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> <%= whatsappResponsavel.aviso_ambiguidade %></div>
+  <% } %>
+  <% if (whatsappProvider === 'disabled') { %>
+    <div style="margin-top:10px;color:#92400e;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> WhatsApp desativado. Configure WHATSAPP_PROVIDER=manual ou cloud_api.</div>
+  <% } else if (whatsappSemTelefone.length) { %>
     <div style="margin-top:10px;color:#b91c1c;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> <%= whatsappSemTelefone.length %> integrante(s) da equipe sem número de WhatsApp cadastrado no perfil.</div>
   <% } else if (whatsappProvider === 'cloud_api') { %>
     <div style="margin-top:10px;color:#166534;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> Envio automático ativo para os WhatsApps cadastrados no perfil do funcionário e do apoio operacional.</div>
   <% } else if (whatsappProvider === 'manual') { %>
     <div style="margin-top:10px;color:#166534;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> WhatsApp pronto para envio manual pela OS aberta. Para envio direto automático, configure WHATSAPP_PROVIDER=cloud_api.</div>
   <% } else { %>
-    <div style="margin-top:10px;color:#92400e;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> Integração desabilitada. Configure WHATSAPP_PROVIDER=cloud_api para envio direto.</div>
+    <div style="margin-top:10px;color:#92400e;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> Provider inválido ou não configurado.</div>
   <% } %>
 
   <% if (whatsappEquipe.length) { %>
     <h4 style="margin:14px 0 0;">Destinatários da equipe direcionada</h4>
     <table class="tabela-compacta">
-      <thead><tr><th>Papel</th><th>Nome</th><th>WhatsApp</th></tr></thead>
+      <thead><tr><th>Papel</th><th>ID</th><th>Nome</th><th>Origem</th><th>WhatsApp</th></tr></thead>
       <tbody>
-        <% whatsappEquipe.forEach(function(p){ const tel = p.telefone_normalizado || p.colaborador_telefone_whatsapp || p.telefone_whatsapp || p.user_telefone_whatsapp || p.colaborador_telefone || ''; %>
+        <% whatsappEquipe.forEach(function(p){ const tel = p.telefone_normalizado || p.colaborador_telefone_whatsapp || p.telefone_whatsapp || p.user_telefone_whatsapp || p.colaborador_telefone || p.telefone || ''; %>
           <tr>
             <td><%= p.papel || '-' %></td>
-            <td><%= p.name || p.user_name || '-' %></td>
+            <td><%= p.id || p.user_id || p.colaborador_id || '-' %></td>
+            <td><%= p.nome || p.name || p.user_name || '-' %></td>
+            <td><%= p.origem || '-' %></td>
             <td><%= tel || '-' %></td>
           </tr>
         <% }) %>

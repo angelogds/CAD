@@ -214,9 +214,10 @@ function osShow(req, res) {
   const whatsappLogs = whatsappService.listOsNotificationLogs(id, { limit: whatsappHistoricoCompleto ? 500 : 10 });
   const whatsappLast = whatsappService.listOsNotificationLogs(id, { limit: 1 })[0] || null;
   const whatsappProvider = whatsappService.getProvider();
-  const whatsappResponsavel = whatsappService.getUsuarioResponsavelOS(osAtual);
-  const whatsappDestinatarios = whatsappService.getUsuariosEquipeOS(osAtual);
-  const canSendWhatsapp = ["ADMIN", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
+  const whatsappDiagnostico = whatsappService.getWhatsappOsDiagnostic(id, osAtual);
+  const whatsappResponsavel = whatsappDiagnostico.responsavel_resolvido;
+  const whatsappDestinatarios = whatsappDiagnostico.destinatarios || [];
+  const canSendWhatsapp = whatsappProvider !== "disabled" && ["ADMIN", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
 
   return res.render("os/show", {
     title: `OS #${id}`,
@@ -231,6 +232,7 @@ function osShow(req, res) {
     whatsappProvider,
     whatsappResponsavel,
     whatsappDestinatarios,
+    whatsappDiagnostico,
     canSendWhatsapp,
     user: req.session?.user || null,
   });
@@ -567,10 +569,21 @@ async function osEnviarWhatsapp(req, res) {
     return res.redirect(result.generatedLinks[0]);
   }
   if (result?.sent > 0) req.flash("success", `WhatsApp enviado para ${result.sent} integrante(s) da equipe.`);
+  else if ((result?.results || []).some((r) => r?.status === "WHATSAPP_DESATIVADO")) req.flash("error", "WhatsApp desativado. Configure WHATSAPP_PROVIDER=manual ou cloud_api.");
   else if ((result?.results || []).some((r) => r?.status === "SEM_TELEFONE")) req.flash("error", "Equipe sem número de WhatsApp cadastrado no perfil do funcionário/apoio operacional.");
   else if ((result?.results || []).some((r) => r?.status === "IGNORADO")) req.flash("error", "Integração WhatsApp desabilitada.");
   else req.flash("error", (result?.results || []).find((r) => r?.error)?.error || "Não foi possível enviar WhatsApp.");
   return res.redirect(`/os/${id}`);
+}
+
+function debugWhatsappOS(req, res) {
+  const role = normalizeRole(req.session?.user?.role || "");
+  if (role !== "ADMIN") return res.status(403).json({ ok: false, error: "Acesso restrito a Admin." });
+  const id = Number(req.params.id);
+  const os = service.getOSById(id);
+  if (!os) return res.status(404).json({ ok: false, error: "OS não encontrada." });
+  const diagnostico = whatsappService.getWhatsappOsDiagnostic(id, os);
+  return res.json({ ok: true, ...diagnostico });
 }
 
 async function osVoiceAnalyze(req, res) {
@@ -640,6 +653,7 @@ module.exports = {
   osAutoAssign,
   osSetEquipe,
   osEnviarWhatsapp,
+  debugWhatsappOS,
   osVoiceAnalyze,
   osVoiceCommand,
   osVoiceCreate,
