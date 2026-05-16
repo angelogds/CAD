@@ -284,8 +284,18 @@
     <div style="margin-top:10px;color:#991b1b;"><b>Erro do último envio:</b> <%= whatsappLast.erro %></div>
   <% } %>
 
-  <h4 style="margin:14px 0 0;">Histórico de envio na OS</h4>
-  <table class="tabela-compacta">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:14px;">
+    <h4 style="margin:0;">Histórico de envio na OS</h4>
+    <% if (!whatsappHistoricoCompleto) { %>
+      <a class="btn btn-sm btn-outline" href="/os/<%= os.id %>?whatsapp_historico=completo#whatsapp-historico">Ver histórico completo</a>
+    <% } else { %>
+      <a class="btn btn-sm btn-outline" href="/os/<%= os.id %>#whatsapp-historico">Mostrar últimos 10</a>
+    <% } %>
+  </div>
+  <% if (!whatsappHistoricoCompleto) { %>
+    <div class="muted" style="margin-top:6px;">Mostrando apenas os últimos 10 registros.</div>
+  <% } %>
+  <table class="tabela-compacta" id="whatsapp-historico">
     <thead>
       <tr>
         <th>Data/Hora</th>

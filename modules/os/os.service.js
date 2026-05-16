@@ -961,6 +961,43 @@ function resolverEquipePorCriticidade({
   return { turno: "DIA", executor, auxiliar: apoioDisponivel[0] || null };
 }
 
+function getOsAssignmentSnapshot(osId) {
+  const cols = getOSColumns();
+  const select = [
+    cols.includes("executor_colaborador_id") ? "executor_colaborador_id" : "NULL AS executor_colaborador_id",
+    cols.includes("auxiliar_colaborador_id") ? "auxiliar_colaborador_id" : "NULL AS auxiliar_colaborador_id",
+    cols.includes("executor_secundario_colaborador_id") ? "executor_secundario_colaborador_id" : "NULL AS executor_secundario_colaborador_id",
+    cols.includes("auxiliar_secundario_colaborador_id") ? "auxiliar_secundario_colaborador_id" : "NULL AS auxiliar_secundario_colaborador_id",
+    cols.includes("mecanico_user_id") ? "mecanico_user_id" : "NULL AS mecanico_user_id",
+    cols.includes("auxiliar_user_id") ? "auxiliar_user_id" : "NULL AS auxiliar_user_id",
+  ];
+  return db.prepare(`SELECT ${select.join(", ")} FROM os WHERE id = ?`).get(Number(osId)) || {};
+}
+
+function assignmentChanged(before = {}, after = {}) {
+  return [
+    "executor_colaborador_id",
+    "auxiliar_colaborador_id",
+    "executor_secundario_colaborador_id",
+    "auxiliar_secundario_colaborador_id",
+    "mecanico_user_id",
+    "auxiliar_user_id",
+  ].some((key) => Number(before[key] || 0) !== Number(after[key] || 0));
+}
+
+function responsavelChanged(before = {}, after = {}) {
+  return ["executor_colaborador_id", "mecanico_user_id"].some((key) => Number(before[key] || 0) !== Number(after[key] || 0));
+}
+
+function buildAssignmentResult(beforeAssignment, osId, extra = {}) {
+  const afterAssignment = getOsAssignmentSnapshot(Number(osId));
+  return {
+    ...extra,
+    changed: assignmentChanged(beforeAssignment, afterAssignment),
+    responsavelChanged: responsavelChanged(beforeAssignment, afterAssignment),
+  };
+}
+
 function autoAlocarOS(osId, { force = false } = {}) {
   const cols = getOSColumns();
   const os = db.prepare(`
@@ -974,11 +1011,12 @@ function autoAlocarOS(osId, { force = false } = {}) {
   `).get(Number(osId));
 
   if (!os) throw new Error("OS não encontrada.");
+  const beforeAssignment = getOsAssignmentSnapshot(Number(osId));
   if (os.executor_colaborador_id && !force) {
     if (cols.includes("alocacao_modo") && !["AUTO", "MANUAL"].includes(String(os.alocacao_modo || "").toUpperCase())) {
       db.prepare(`UPDATE os SET alocacao_modo = 'AUTO' WHERE id = ?`).run(Number(osId));
     }
-    return { aguardando: false, aviso: "OS já possui executor alocado." };
+    return { aguardando: false, changed: false, aviso: "OS já possui executor alocado." };
   }
 
   const turno = getTurnoAtual();
@@ -987,7 +1025,7 @@ function autoAlocarOS(osId, { force = false } = {}) {
     const equipeNoite = resolverEquipePorCriticidade({ grau: os.grau, turno: "NOITE" });
     if (equipeNoite.executor?.id) {
       persistirAlocacaoOS(Number(osId), equipeNoite.executor, null, "NOITE", "AUTO");
-      return { aguardando: false, turno: "NOITE", executor: equipeNoite.executor, auxiliar: null };
+      return buildAssignmentResult(beforeAssignment, Number(osId), { aguardando: false, turno: "NOITE", executor: equipeNoite.executor, auxiliar: null });
     }
     return marcarAguardandoEquipe(Number(osId), "NOITE", "Sem executor disponível no turno: OS aguardando alocação.");
   }
@@ -998,7 +1036,7 @@ function autoAlocarOS(osId, { force = false } = {}) {
   if (!executor) return marcarAguardandoEquipe(Number(osId), "DIA", "Sem executor disponível no turno: OS aguardando alocação.");
   const auxiliar = equipe.auxiliar || null;
   persistirAlocacaoOS(Number(osId), executor, auxiliar, "DIA", "AUTO");
-  return { aguardando: false, turno: "DIA", executor, auxiliar };
+  return buildAssignmentResult(beforeAssignment, Number(osId), { aguardando: false, turno: "DIA", executor, auxiliar });
 }
 
 function autoAssignOS(osId, _alocadoPorUserId = null, opts = {}) {
@@ -1020,15 +1058,17 @@ function syncOpenOSWithCurrentShift() {
   let alocadas = 0;
   for (const os of pendentes) {
     const result = autoAssignOS(Number(os.id));
-    if (!result?.aguardando) {
+    if (!result?.aguardando && result?.changed) {
       alocadas += 1;
       if (whatsappService) {
         const osAtual = getOSById(Number(os.id));
-        Promise.resolve(whatsappService.sendOsTeamNotifications({
-          os: osAtual,
-          tipoEvento: "REATRIBUICAO_AUTO",
-          criadoPor: null,
-        })).catch(() => {});
+        if (result?.responsavelChanged) {
+          Promise.resolve(whatsappService.sendOsTeamNotifications({
+            os: osAtual,
+            tipoEvento: "REATRIBUICAO_AUTO",
+            criadoPor: null,
+          })).catch(() => {});
+        }
       }
     }
   }

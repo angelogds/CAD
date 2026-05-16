@@ -1,4 +1,5 @@
 const db = require("../../database/db");
+const { normalizeWhatsapp } = require("../../utils/whatsapp-phone");
 
 const AUTO_EVENTS = new Set(["CRIACAO_OS", "ATRIBUICAO", "REATRIBUICAO_AUTO"]);
 const VALID_PROVIDERS = new Set(["manual", "cloud_api", "disabled"]);
@@ -31,10 +32,11 @@ function sanitizeText(value, fallback = "-") {
 }
 
 function normalizePhone(phone) {
-  const digits = String(phone || "").replace(/\D/g, "");
-  const defaultCountry = String(process.env.WHATSAPP_DEFAULT_COUNTRY_CODE || "").replace(/\D/g, "");
-  if (defaultCountry && /^\d{10,11}$/.test(digits) && !digits.startsWith(defaultCountry)) return `${defaultCountry}${digits}`;
-  return digits;
+  try {
+    return normalizeWhatsapp(phone, { defaultCountryCode: process.env.WHATSAPP_DEFAULT_COUNTRY_CODE || "55" }) || "";
+  } catch (_e) {
+    return "";
+  }
 }
 
 function firstValue(obj, keys, fallback = "-") {
@@ -265,8 +267,31 @@ function sanitizeError(err) {
   return msg.slice(0, 500);
 }
 
+function hasSameEventStatus({ osId, usuarioId, telefone, tipoEvento, status }) {
+  if (!tableExists("os_whatsapp_notificacoes")) return false;
+  const normalizedOsId = Number(osId || 0);
+  const normalizedUserId = Number(usuarioId || 0) || null;
+  if (normalizedUserId) {
+    return !!db.prepare(`
+      SELECT 1 FROM os_whatsapp_notificacoes
+      WHERE os_id = ? AND usuario_id = ? AND tipo_evento = ? AND status = ?
+      LIMIT 1
+    `).get(normalizedOsId, normalizedUserId, tipoEvento, status);
+  }
+  return !!db.prepare(`
+    SELECT 1 FROM os_whatsapp_notificacoes
+    WHERE os_id = ?
+      AND usuario_id IS NULL
+      AND IFNULL(telefone,'') = IFNULL(?, '')
+      AND tipo_evento = ?
+      AND status = ?
+    LIMIT 1
+  `).get(normalizedOsId, telefone || null, tipoEvento, status);
+}
+
 function insertLog({ osId, usuarioId, telefone, tipoEvento, provider, status, mensagem, mediaUrl, erro, criadoPor }) {
   if (!tableExists("os_whatsapp_notificacoes")) return null;
+  if (status === "SEM_TELEFONE" && hasSameEventStatus({ osId, usuarioId, telefone, tipoEvento, status })) return null;
   const info = db.prepare(`
     INSERT INTO os_whatsapp_notificacoes (os_id, usuario_id, telefone, tipo_evento, provider, status, mensagem, media_url, erro, criado_por)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -290,8 +315,9 @@ function hasSentAutomatic({ osId, usuarioId, telefone, tipoEvento }) {
   `).get(Number(osId), telefone || null, tipoEvento);
 }
 
-function listOsNotificationLogs(osId) {
+function listOsNotificationLogs(osId, { limit = 50 } = {}) {
   if (!tableExists("os_whatsapp_notificacoes")) return [];
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 50)));
   return db.prepare(`
     SELECT n.*, COALESCE(u.name, c.nome) AS usuario_nome
     FROM os_whatsapp_notificacoes n
@@ -299,8 +325,8 @@ function listOsNotificationLogs(osId) {
     LEFT JOIN colaboradores c ON c.user_id = n.usuario_id
     WHERE n.os_id = ?
     ORDER BY datetime(n.enviado_em) DESC, n.id DESC
-    LIMIT 50
-  `).all(Number(osId));
+    LIMIT ?
+  `).all(Number(osId), safeLimit);
 }
 
 function getLastOsNotification(osId) {
