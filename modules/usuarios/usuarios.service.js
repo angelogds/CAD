@@ -1,16 +1,10 @@
 // modules/usuarios/usuarios.service.js
 const bcrypt = require("bcryptjs");
 const db = require("../../database/db");
+const { normalizeWhatsapp } = require("../../utils/whatsapp-phone");
 
 // compatível com seu CHECK do SQLite
 const VALID_ROLES = new Set(["ADMIN", "DIRECAO", "DIRETORIA", "RH", "COMPRAS", "ENCARREGADO_PRODUCAO", "PRODUCAO", "MECANICO", "ALMOXARIFE", "ALMOXARIFADO", "MANUTENCAO", "MANUTENCAO_SUPERVISOR"]);
-
-function normalizeWhatsapp(value) {
-  const phone = String(value || "").trim();
-  if (!phone) return null;
-  if (!/^\d+$/.test(phone)) throw new Error("WhatsApp deve conter somente números no formato DDI + DDD + número.");
-  return phone;
-}
 
 function list({ q = "", role = "" } = {}) {
   const where = [];

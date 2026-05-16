@@ -210,8 +210,9 @@ function osShow(req, res) {
 
   const equipeUsuarios = canManageEquipe ? service.listUsuariosEquipe() : [];
   const tracagens = tracagemService ? tracagemService.listByOS(id) : [];
-  const whatsappLogs = whatsappService.listOsNotificationLogs(id);
-  const whatsappLast = whatsappLogs[0] || null;
+  const whatsappHistoricoCompleto = String(req.query.whatsapp_historico || "").toLowerCase() === "completo";
+  const whatsappLogs = whatsappService.listOsNotificationLogs(id, { limit: whatsappHistoricoCompleto ? 500 : 10 });
+  const whatsappLast = whatsappService.listOsNotificationLogs(id, { limit: 1 })[0] || null;
   const whatsappProvider = whatsappService.getProvider();
   const whatsappResponsavel = whatsappService.getUsuarioResponsavelOS(osAtual);
   const whatsappDestinatarios = whatsappService.getUsuariosEquipeOS(osAtual);
@@ -225,6 +226,7 @@ function osShow(req, res) {
     equipeUsuarios,
     tracagens,
     whatsappLogs,
+    whatsappHistoricoCompleto,
     whatsappLast,
     whatsappProvider,
     whatsappResponsavel,
@@ -511,8 +513,10 @@ async function osAutoAssign(req, res) {
       const equipeTxt = result?.auxiliar?.nome
         ? `${result.executor?.nome || result.mecanico?.nome} + ${result.auxiliar.nome}`
         : result?.executor?.nome || result?.mecanico?.nome || "Executor alocado";
-      await notifyResponsavelWhatsapp(id, "REATRIBUICAO_AUTO", req.session?.user?.id || null);
-      req.flash("success", `Equipe atribuída: ${equipeTxt}.`);
+      if (result?.responsavelChanged) {
+        await notifyResponsavelWhatsapp(id, "REATRIBUICAO_AUTO", req.session?.user?.id || null);
+      }
+      req.flash("success", result?.changed ? `Equipe atribuída: ${equipeTxt}.` : `Equipe mantida sem alteração: ${equipeTxt}.`);
     }
   } catch (err) {
     req.flash("error", err.message || "Não foi possível sugerir a equipe.");

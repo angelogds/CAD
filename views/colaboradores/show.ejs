@@ -66,7 +66,7 @@ function tempoEmpresa(dataAdmissao) {
       <input class="input" type="date" name="data_admissao" value="<%= colaborador.data_admissao || '' %>" />
       <select name="status"><option <%= colaborador.status==='ATIVO'?'selected':'' %>>ATIVO</option><option <%= colaborador.status==='INATIVO'?'selected':'' %>>INATIVO</option></select>
       <input class="input" name="telefone" value="<%= colaborador.telefone || '' %>" placeholder="Telefone" />
-      <input class="input" name="telefone_whatsapp" inputmode="numeric" pattern="[0-9]*" value="<%= colaborador.telefone_whatsapp || '' %>" placeholder="WhatsApp: 5575999999999" />
+      <input class="input" name="telefone_whatsapp" inputmode="numeric" data-whatsapp-input value="<%= colaborador.telefone_whatsapp || '' %>" placeholder="WhatsApp: 5575999999999" />
       <input class="input" type="number" name="lider_id" value="<%= colaborador.lider_id || '' %>" placeholder="ID Líder" />
       <input class="input" type="number" name="user_id" value="<%= colaborador.user_id || '' %>" placeholder="ID Usuário" />
       <input class="input" type="file" name="foto" accept="image/*" />
@@ -306,3 +306,41 @@ function tempoEmpresa(dataAdmissao) {
   </div>
 </div>
 <% } %>
+
+<script>
+  (function () {
+    function normalizeWhatsappInputValue(value) {
+      const compact = String(value || '').replace(/[\s\-()+]/g, '').trim();
+      if (!compact) return '';
+      if (!/^\d+$/.test(compact)) {
+        throw new Error('WhatsApp deve conter somente números. Espaços, traços, parênteses e + são removidos automaticamente.');
+      }
+      let phone = compact;
+      if (!phone.startsWith('55') && /^\d{10,11}$/.test(phone)) phone = '55' + phone;
+      if (!/^55\d{10,11}$/.test(phone)) {
+        throw new Error('WhatsApp deve ter entre 12 e 13 dígitos no formato 55DDDNÚMERO.');
+      }
+      return phone;
+    }
+
+    document.querySelectorAll('form').forEach(function (form) {
+      form.addEventListener('submit', function (event) {
+        const input = form.querySelector('[data-whatsapp-input]');
+        if (!input || !String(input.value || '').trim()) return;
+        try {
+          const normalized = normalizeWhatsappInputValue(input.value);
+          if (normalized.length === 12 && !window.confirm('Este WhatsApp parece estar sem o 9º dígito após o DDD. Deseja salvar mesmo assim?')) {
+            event.preventDefault();
+            input.focus();
+            return;
+          }
+          input.value = normalized;
+        } catch (err) {
+          event.preventDefault();
+          alert(err.message || 'WhatsApp inválido.');
+          input.focus();
+        }
+      });
+    });
+  })();
+</script>

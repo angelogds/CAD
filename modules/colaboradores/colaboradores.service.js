@@ -1,4 +1,5 @@
 const db = require('../../database/db');
+const { normalizeWhatsapp } = require('../../utils/whatsapp-phone');
 
 function safeNumber(v, fallback = null) {
   const n = Number(v);
@@ -7,13 +8,6 @@ function safeNumber(v, fallback = null) {
 
 function nowIso() {
   return new Date().toISOString();
-}
-
-function normalizeWhatsapp(value) {
-  const phone = String(value || "").trim();
-  if (!phone) return null;
-  if (!/^\d+$/.test(phone)) throw new Error("WhatsApp deve conter somente números no formato DDI + DDD + número.");
-  return phone;
 }
 
 function listColaboradores(filters = {}) {
