@@ -1024,9 +1024,8 @@ function syncOpenOSWithCurrentShift() {
       alocadas += 1;
       if (whatsappService) {
         const osAtual = getOSById(Number(os.id));
-        Promise.resolve(whatsappService.sendOsNotification({
+        Promise.resolve(whatsappService.sendOsTeamNotifications({
           os: osAtual,
-          usuario: whatsappService.getUsuarioResponsavelOS(osAtual),
           tipoEvento: "REATRIBUICAO_AUTO",
           criadoPor: null,
         })).catch(() => {});

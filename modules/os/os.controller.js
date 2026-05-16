@@ -21,8 +21,7 @@ async function notifyResponsavelWhatsapp(osId, tipoEvento, criadoPor) {
   try {
     const osAtual = service.getOSById(osId);
     if (!osAtual) return null;
-    const usuario = whatsappService.getUsuarioResponsavelOS(osAtual);
-    return await whatsappService.sendOsNotification({ os: osAtual, usuario, tipoEvento, criadoPor });
+    return await whatsappService.sendOsTeamNotifications({ os: osAtual, tipoEvento, criadoPor });
   } catch (err) {
     console.error("❌ whatsapp OS:", err && err.stack ? err.stack : err);
     return null;
@@ -215,6 +214,7 @@ function osShow(req, res) {
   const whatsappLast = whatsappLogs[0] || null;
   const whatsappProvider = whatsappService.getProvider();
   const whatsappResponsavel = whatsappService.getUsuarioResponsavelOS(osAtual);
+  const whatsappDestinatarios = whatsappService.getUsuariosEquipeOS(osAtual);
   const canSendWhatsapp = ["ADMIN", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
 
   return res.render("os/show", {
@@ -228,6 +228,7 @@ function osShow(req, res) {
     whatsappLast,
     whatsappProvider,
     whatsappResponsavel,
+    whatsappDestinatarios,
     canSendWhatsapp,
     user: req.session?.user || null,
   });
@@ -549,18 +550,22 @@ async function osEnviarWhatsapp(req, res) {
   const os = service.getOSById(id);
   if (!os) return res.status(404).render("errors/404", { title: "Não encontrado" });
 
-  const result = await whatsappService.sendOsNotification({
+  const result = await whatsappService.sendOsTeamNotifications({
     os,
-    usuario: whatsappService.getUsuarioResponsavelOS(os),
     tipoEvento: "REENVIO_MANUAL",
     criadoPor: req.session?.user?.id || null,
   });
 
-  if (result?.waMeLink) return res.redirect(result.waMeLink);
-  if (result?.status === "ENVIADO") req.flash("success", "WhatsApp enviado ao responsável.");
-  else if (result?.status === "SEM_TELEFONE") req.flash("error", "Responsável sem número de WhatsApp cadastrado.");
-  else if (result?.status === "IGNORADO") req.flash("error", "Integração WhatsApp desabilitada.");
-  else req.flash("error", result?.error || "Não foi possível enviar WhatsApp.");
+  if (result?.generatedLinks?.length) {
+    if (result.generatedLinks.length > 1) {
+      req.flash("success", `Links de WhatsApp gerados para ${result.generatedLinks.length} integrante(s); abrindo o primeiro destinatário.`);
+    }
+    return res.redirect(result.generatedLinks[0]);
+  }
+  if (result?.sent > 0) req.flash("success", `WhatsApp enviado para ${result.sent} integrante(s) da equipe.`);
+  else if ((result?.results || []).some((r) => r?.status === "SEM_TELEFONE")) req.flash("error", "Equipe sem número de WhatsApp cadastrado no perfil do funcionário/apoio operacional.");
+  else if ((result?.results || []).some((r) => r?.status === "IGNORADO")) req.flash("error", "Integração WhatsApp desabilitada.");
+  else req.flash("error", (result?.results || []).find((r) => r?.error)?.error || "Não foi possível enviar WhatsApp.");
   return res.redirect(`/os/${id}`);
 }
 
