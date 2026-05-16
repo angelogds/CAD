@@ -28,6 +28,8 @@ const {
   COMPATIBILITY_ALIASES,
   registerCompatibilityAlias,
 } = require("./config/routes");
+const { requireLogin, requireRole } = require("./modules/auth/auth.middleware");
+const osControllerForAdminDebug = require("./modules/os/os.controller");
 const fmtBR =
   typeof dateUtil.fmtBR === "function" ? dateUtil.fmtBR : (v) => String(v ?? "-");
 const TZ = dateUtil.TZ || "America/Sao_Paulo";
@@ -280,6 +282,7 @@ mount("/mobile", "./modules/mobile/mobile.routes");
 mount(OFFICIAL_ROUTES.pcm, "./modules/pcm/pcm.routes");
 mount("/equipamentos", "./modules/equipamentos/equipamentos.routes");
 mount(OFFICIAL_ROUTES.os, "./modules/os/os.routes");
+app.get("/admin/debug-whatsapp-os/:id", requireLogin, requireRole(["ADMIN"]), osControllerForAdminDebug.debugWhatsappOS);
 mount("/preventivas", "./modules/preventivas/preventivas.routes");
 mount(OFFICIAL_ROUTES.compras, "./modules/compras/compras.routes");
 mount("/fornecedores", "./modules/fornecedores/fornecedores.routes");
