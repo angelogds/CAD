@@ -66,6 +66,7 @@ TEMP_DIR=/data/temp
 SQLITE_DIR=/data/sqlite
 DB_PATH=/data/sqlite/app.db
 SESSION_SECRET=<segredo_forte>
+WHATSAPP_VERIFY_TOKEN=campo_gado_webhook_2026
 ```
 
 3. Start command sugerido:

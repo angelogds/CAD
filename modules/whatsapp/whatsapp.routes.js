@@ -2,38 +2,43 @@ const express = require("express");
 const router = express.Router();
 const whatsappService = require("./whatsapp.service");
 
-function parseRawJson(rawBody) {
-  if (!rawBody || !Buffer.isBuffer(rawBody)) return {};
-  const text = rawBody.toString("utf8");
-  if (!text.trim()) return {};
-  return JSON.parse(text);
+function maskToken(token) {
+  const value = String(token || "");
+  if (!value) return "";
+  if (value.length <= 8) return "****";
+  return `${value.slice(0, 4)}...${value.slice(-4)}`;
 }
 
 router.get("/", (req, res) => {
   const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
+  const verifyToken = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
-  const expected = process.env.WHATSAPP_VERIFY_TOKEN;
 
-  if (mode === "subscribe" && expected && token === expected) {
-    return res.status(200).send(String(challenge || ""));
+  const expectedToken = process.env.WHATSAPP_VERIFY_TOKEN;
+  const tokenMatches = Boolean(expectedToken) && Boolean(verifyToken) && verifyToken === expectedToken;
+
+  console.log("[WhatsApp Webhook Verify]", {
+    mode,
+    hasChallenge: Boolean(challenge),
+    hasExpectedToken: Boolean(expectedToken),
+    tokenMatches,
+    receivedToken: maskToken(verifyToken),
+  });
+
+  if (mode === "subscribe" && tokenMatches) {
+    return res.status(200).type("text/plain").send(String(challenge || ""));
   }
-  return res.sendStatus(403);
+
+  return res.status(403).type("text/plain").send("Forbidden");
 });
 
 router.post("/", (req, res) => {
-  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {}));
-  const signature = whatsappService.verifyWebhookSignature(rawBody, req.get("x-hub-signature-256"));
-  if (!signature.ok) return res.status(403).send("INVALID_SIGNATURE");
+  const payload = req.body || {};
 
-  let payload = {};
-  try {
-    payload = parseRawJson(rawBody);
-  } catch (_err) {
-    return res.status(400).send("INVALID_JSON");
-  }
+  console.log("[WhatsApp Webhook Event]", JSON.stringify(payload, null, 2));
 
-  res.status(200).send("EVENT_RECEIVED");
+  res.sendStatus(200);
+
   setImmediate(() => {
     try {
       whatsappService.processWebhookPayload(payload);
@@ -42,6 +47,5 @@ router.post("/", (req, res) => {
     }
   });
 });
-
 
 module.exports = router;
