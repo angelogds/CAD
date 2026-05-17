@@ -94,16 +94,16 @@ app.locals.incluir = function (p) {
   return p;
 };
 
-// ===== Webhooks públicos com body bruto para validação HMAC =====
-app.use(
-  "/webhooks/whatsapp",
-  express.raw({ type: "application/json", limit: "2mb" }),
-  require("./modules/whatsapp/whatsapp.routes")
-);
-
-// ===== Middlewares base =====
-app.use(express.json());
+// ===== Middlewares base públicos =====
+// O parser JSON precisa estar disponível antes do webhook POST da Meta.
+// O webhook do WhatsApp fica antes de sessão/login/CSRF/proteções de rotas.
+app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: false }));
+
+// ===== Webhooks públicos =====
+app.use("/webhooks/whatsapp", require("./modules/whatsapp/whatsapp.routes"));
+
+// ===== Arquivos estáticos =====
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(storage.UPLOAD_DIR));
 app.use("/pdfs", express.static(storage.PDF_DIR));
