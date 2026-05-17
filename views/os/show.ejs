@@ -237,7 +237,10 @@
       <div class="muted">Envio da OS ao executor e ao apoio operacional da equipe direcionada.</div>
     </div>
     <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome || whatsappResponsavel?.nome)) { %>
-      <a class="btn btn-green whatsapp-btn" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener"><span class="wa-icon" aria-hidden="true"></span> Enviar WhatsApp à equipe</a>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+        <a class="btn btn-green whatsapp-btn" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener"><span class="wa-icon" aria-hidden="true"></span> Reenviar template</a>
+        <a class="btn btn-outline whatsapp-btn" href="/os/<%= os.id %>?whatsapp_historico=completo#whatsapp-eventos"><span class="wa-icon" aria-hidden="true"></span> Ver eventos do WhatsApp</a>
+      </div>
     <% } %>
   </div>
 
@@ -248,10 +251,17 @@
     <div><b>Telefone WhatsApp responsável:</b> <%= whatsPhone || '-' %></div>
     <div><b>Apoio operacional:</b> <%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></div>
     <div><b>Destinatários da equipe:</b> <%= whatsappEquipe.length || 0 %></div>
-    <div><b>Provider:</b> <%= whatsappProvider || 'disabled' %></div>
+    <div><b>Provider atual:</b> <%= whatsappProvider || 'disabled' %></div>
+    <div><b>Template usado:</b> <%= whatsappLast?.template_name || '-' %></div>
+    <div><b>ID da mensagem Meta:</b> <%= whatsappLast?.whatsapp_message_id || '-' %></div>
+    <div><b>Enviado em:</b> <%= whatsappLast?.enviado_em ? fmtBR(whatsappLast.enviado_em) : '-' %></div>
+    <div><b>Entregue em:</b> <%= whatsappLast?.entregue_em ? fmtBR(whatsappLast.entregue_em) : '-' %></div>
+    <div><b>Lido em:</b> <%= whatsappLast?.lido_em ? fmtBR(whatsappLast.lido_em) : '-' %></div>
+    <div><b>Falha em:</b> <%= whatsappLast?.falhou_em ? fmtBR(whatsappLast.falhou_em) : '-' %></div>
+    <div><b>Último erro:</b> <%= whatsappLast?.erro || '-' %></div>
     <div><b>Motivo/diagnóstico:</b> <%= whatsappMotivo || '-' %></div>
     <div>
-      <b>Último envio:</b> <%= whatsappLast?.enviado_em ? fmtBR(whatsappLast.enviado_em) : '-' %>
+      <b>Último acompanhamento:</b> <%= whatsappLast?.enviado_em ? fmtBR(whatsappLast.enviado_em) : '-' %>
       <% if (whatsappLast?.status) { %>
         <% const stW = String(whatsappLast.status || ''); %>
         <span class="whatsapp-status <%= stW === 'ERRO' || stW === 'SEM_TELEFONE' ? 'erro' : (stW === 'IGNORADO' || stW === 'SEM_PROVIDER' || stW === 'WHATSAPP_DESATIVADO' ? 'warn' : '') %>"><%= stW %></span>
@@ -314,12 +324,17 @@
         <th>Responsável</th>
         <th>Telefone</th>
         <th>Status</th>
+        <th>Template</th>
+        <th>ID Meta</th>
+        <th>Entregue</th>
+        <th>Lido</th>
+        <th>Falha</th>
         <th>Erro</th>
       </tr>
     </thead>
     <tbody>
       <% if (!(whatsappLogs || []).length) { %>
-        <tr><td colspan="6" class="muted" style="text-align:center;">Nenhum envio registrado.</td></tr>
+        <tr><td colspan="11" class="muted" style="text-align:center;">Nenhum envio registrado.</td></tr>
       <% } %>
       <% (whatsappLogs || []).forEach(function(log){ %>
         <tr>
@@ -328,11 +343,38 @@
           <td><%= log.usuario_nome || os.executor_nome || '-' %></td>
           <td><%= log.telefone || '-' %></td>
           <td><span class="whatsapp-status <%= log.status === 'ERRO' || log.status === 'SEM_TELEFONE' ? 'erro' : (log.status === 'IGNORADO' || log.status === 'SEM_PROVIDER' ? 'warn' : '') %>"><%= log.status || '-' %></span></td>
+          <td><%= log.template_name || '-' %></td>
+          <td><%= log.whatsapp_message_id || '-' %></td>
+          <td><%= log.entregue_em ? fmtBR(log.entregue_em) : '-' %></td>
+          <td><%= log.lido_em ? fmtBR(log.lido_em) : '-' %></td>
+          <td><%= log.falhou_em ? fmtBR(log.falhou_em) : '-' %></td>
           <td><%= log.erro || '-' %></td>
         </tr>
       <% }) %>
     </tbody>
   </table>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:14px;" id="whatsapp-eventos">
+    <h4 style="margin:0;">Eventos recebidos pelo webhook</h4>
+  </div>
+  <table class="tabela-compacta">
+    <thead><tr><th>Recebido em</th><th>Status/evento</th><th>Telefone</th><th>ID Meta</th><th>Erro</th></tr></thead>
+    <tbody>
+      <% if (!(whatsappEventos || []).length) { %>
+        <tr><td colspan="5" class="muted" style="text-align:center;">Nenhum evento recebido pelo webhook.</td></tr>
+      <% } %>
+      <% (whatsappEventos || []).forEach(function(ev){ %>
+        <tr>
+          <td><%= ev.recebido_em ? fmtBR(ev.recebido_em) : '-' %></td>
+          <td><%= ev.status || '-' %></td>
+          <td><%= ev.recipient_phone || '-' %></td>
+          <td><%= ev.whatsapp_message_id || '-' %></td>
+          <td><%= ev.erro || '-' %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
 </div>
 
 

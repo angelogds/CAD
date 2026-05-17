@@ -1,0 +1,25 @@
+<div class="card">
+  <h2 style="margin-top:0;">Status da integração WhatsApp</h2>
+  <p class="muted">Diagnóstico operacional da Cloud API, webhook e templates de OS. Tokens são exibidos apenas como configurado/ausente.</p>
+
+  <div class="grid2">
+    <div><b>Provider atual:</b> <%= status.provider %></div>
+    <div><b>Phone Number ID:</b> <%= status.phone_number_id_configurado ? 'Configurado' : 'Ausente' %></div>
+    <div><b>Access Token:</b> <%= status.access_token_configurado ? 'Configurado' : 'Ausente' %></div>
+    <div><b>Verify Token:</b> <%= status.verify_token_configurado ? 'Configurado' : 'Ausente' %></div>
+    <div><b>App Secret:</b> <%= status.app_secret_configurado ? 'Configurado' : 'Ausente' %></div>
+    <div><b>Template OS:</b> <%= status.template_os || '-' %></div>
+    <div><b>Template OS com foto:</b> <%= status.template_os_foto || '-' %></div>
+    <div><b>Idioma:</b> <%= status.language || 'pt_BR' %></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:12px;">
+  <h3 style="margin-top:0;">Auditoria de mensagens</h3>
+  <div class="grid2">
+    <div><b>Total de mensagens enviadas:</b> <%= status.total_enviadas %></div>
+    <div><b>Total entregues:</b> <%= status.total_entregues %></div>
+    <div><b>Total lidas:</b> <%= status.total_lidas %></div>
+    <div><b>Total com erro:</b> <%= status.total_erro %></div>
+  </div>
+</div>

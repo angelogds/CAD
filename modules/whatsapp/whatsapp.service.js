@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const db = require("../../database/db");
 const { normalizeWhatsapp } = require("../../utils/whatsapp-phone");
 
@@ -517,11 +518,54 @@ function getRecipientUserId(usuario = {}) {
   return Number(usuario.user_id || usuario.id || 0) || null;
 }
 
+function sanitizeSecretText(value) {
+  const secrets = [
+    process.env.WHATSAPP_ACCESS_TOKEN,
+    process.env.WHATSAPP_APP_SECRET,
+    process.env.WHATSAPP_VERIFY_TOKEN,
+  ].filter(Boolean).map(String);
+  let text = String(value ?? "");
+  for (const secret of secrets) text = text.split(secret).join("[segredo]");
+  return text;
+}
+
+function safeJson(value, maxLength = 4000) {
+  try {
+    return sanitizeSecretText(JSON.stringify(value || {})).slice(0, maxLength);
+  } catch (_e) {
+    return "{}";
+  }
+}
+
 function sanitizeError(err) {
-  const token = String(process.env.WHATSAPP_ACCESS_TOKEN || "");
   let msg = String(err?.message || err || "Erro desconhecido");
-  if (token) msg = msg.split(token).join("[token]");
+  msg = sanitizeSecretText(msg);
   return msg.slice(0, 500);
+}
+
+function getTemplateConfig(hasImage = false) {
+  const plain = String(process.env.WHATSAPP_TEMPLATE_OS_ABERTA || "os_aberta_manutencao").trim();
+  const withPhoto = String(process.env.WHATSAPP_TEMPLATE_OS_ABERTA_COM_FOTO || "os_aberta_manutencao_foto").trim();
+  return {
+    templateName: hasImage ? withPhoto : plain,
+    languageCode: String(process.env.WHATSAPP_TEMPLATE_LANGUAGE || "pt_BR").trim() || "pt_BR",
+  };
+}
+
+function buildOsTemplateParams(os = {}) {
+  return [
+    firstValue(os, ["numero_os", "id"], "-"),
+    firstValue(os, ["equipamento_resolvido", "equipamento_nome", "equipamento_manual", "equipamento"], "-"),
+    firstValue(os, ["criticidade", "grau", "prioridade", "severidade"], "-"),
+    firstValue(os, ["tipo_corretiva", "tipo"], "-"),
+    formatDateBR(firstValue(os, ["opened_at", "created_at", "data_abertura"], null)),
+    firstValue(os, ["executor_nome", "mecanico_nome", "executor_user_nome", "responsavel_nome"], "-"),
+    firstValue(os, ["descricao", "nao_conformidade", "nc_observacao_curta"], "-"),
+  ].map((v) => sanitizeText(v, "-"));
+}
+
+function getMetaMessageId(response = {}) {
+  return response?.messages?.[0]?.id || response?.message_id || null;
 }
 
 function hasSameEventStatus({ osId, usuarioId, telefone, tipoEvento, status }) {
@@ -546,14 +590,45 @@ function hasSameEventStatus({ osId, usuarioId, telefone, tipoEvento, status }) {
   `).get(normalizedOsId, telefone || null, tipoEvento, status);
 }
 
-function insertLog({ osId, usuarioId, telefone, tipoEvento, provider, status, mensagem, mediaUrl, erro, criadoPor }) {
+function insertLog({ osId, usuarioId, telefone, tipoEvento, provider, status, mensagem, mediaUrl, erro, criadoPor, whatsappMessageId, providerResponseJson, templateName }) {
   if (!tableExists("os_whatsapp_notificacoes")) return null;
   if (["SEM_TELEFONE", "WHATSAPP_DESATIVADO"].includes(status) && hasSameEventStatus({ osId, usuarioId, telefone, tipoEvento, status })) return null;
+
+  const cols = tableColumns("os_whatsapp_notificacoes");
+  const fields = ["os_id", "usuario_id", "telefone", "tipo_evento", "provider", "status", "mensagem", "media_url", "erro", "criado_por"];
+  const values = [Number(osId), usuarioId || null, telefone || null, tipoEvento, provider, status, mensagem || null, mediaUrl || null, erro || null, criadoPor || null];
+  const optional = [
+    ["whatsapp_message_id", whatsappMessageId || null],
+    ["provider_response_json", providerResponseJson || null],
+    ["template_name", templateName || null],
+  ];
+  for (const [field, value] of optional) {
+    if (cols.includes(field)) {
+      fields.push(field);
+      values.push(value);
+    }
+  }
+  const placeholders = fields.map(() => "?").join(", ");
   const info = db.prepare(`
-    INSERT INTO os_whatsapp_notificacoes (os_id, usuario_id, telefone, tipo_evento, provider, status, mensagem, media_url, erro, criado_por)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(Number(osId), usuarioId || null, telefone || null, tipoEvento, provider, status, mensagem || null, mediaUrl || null, erro || null, criadoPor || null);
+    INSERT INTO os_whatsapp_notificacoes (${fields.join(", ")})
+    VALUES (${placeholders})
+  `).run(...values);
   return Number(info.lastInsertRowid || 0) || null;
+}
+
+function updateNotificationMeta(id, fields = {}) {
+  if (!id || !tableExists("os_whatsapp_notificacoes")) return;
+  const cols = tableColumns("os_whatsapp_notificacoes");
+  const sets = [];
+  const args = [];
+  for (const [field, value] of Object.entries(fields)) {
+    if (!cols.includes(field)) continue;
+    sets.push(`${field} = ?`);
+    args.push(value);
+  }
+  if (!sets.length) return;
+  args.push(Number(id));
+  db.prepare(`UPDATE os_whatsapp_notificacoes SET ${sets.join(", ")} WHERE id = ?`).run(...args);
 }
 
 function hasSentAutomatic({ osId, usuarioId, telefone, tipoEvento }) {
@@ -613,7 +688,10 @@ async function postCloudApi(payload) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const apiMessage = data?.error?.message || `HTTP ${response.status}`;
-    throw new Error(`Falha WhatsApp Cloud API: ${apiMessage}`);
+    const err = new Error(`Falha WhatsApp Cloud API: ${apiMessage}`);
+    err.providerResponse = data;
+    err.statusCode = response.status;
+    throw err;
   }
   return data;
 }
@@ -638,6 +716,53 @@ async function sendMediaMessage({ to, message, mediaUrl, mediaType }) {
       : { link: mediaUrl, caption: String(message || "") },
   };
   return postCloudApi(payload);
+}
+
+async function sendTemplateMessage({ to, templateName, languageCode, bodyParams = [], headerImageUrl = null }) {
+  const name = String(templateName || "").trim();
+  if (!name) throw new Error("Template WhatsApp não configurado.");
+
+  const components = [];
+  if (headerImageUrl) {
+    components.push({
+      type: "header",
+      parameters: [{ type: "image", image: { link: headerImageUrl } }],
+    });
+  }
+  components.push({
+    type: "body",
+    parameters: bodyParams.map((param) => ({ type: "text", text: sanitizeText(param, "-") })),
+  });
+
+  return postCloudApi({
+    messaging_product: "whatsapp",
+    to: normalizePhone(to),
+    type: "template",
+    template: {
+      name,
+      language: { code: String(languageCode || "pt_BR") },
+      components,
+    },
+  });
+}
+
+async function sendInteractiveButtonsMessage({ to, bodyText, osId }) {
+  return postCloudApi({
+    messaging_product: "whatsapp",
+    to: normalizePhone(to),
+    type: "interactive",
+    interactive: {
+      type: "button",
+      body: { text: sanitizeText(bodyText || `Retorno da OS #${osId || ""}`, "Retorno da OS") },
+      action: {
+        buttons: [
+          { type: "reply", reply: { id: `os_${osId || "ultima"}_recebido`, title: "Recebido" } },
+          { type: "reply", reply: { id: `os_${osId || "ultima"}_iniciar`, title: "Iniciar OS" } },
+          { type: "reply", reply: { id: `os_${osId || "ultima"}_apoio`, title: "Preciso de apoio" } },
+        ],
+      },
+    },
+  });
 }
 
 async function sendOsNotification({ os, usuario, tipoEvento, criadoPor } = {}) {
@@ -679,18 +804,52 @@ async function sendOsNotification({ os, usuario, tipoEvento, criadoPor } = {}) {
       return { ok: false, status: "SEM_PROVIDER" };
     }
 
-    if (media.hasMedia && media.mediaType === "image" && media.publicUrl) {
-      await sendMediaMessage({ to: telefone, message: mensagem, mediaUrl: media.publicUrl, mediaType: "image" });
-    } else {
-      const obs = media.hasMedia && !media.publicUrl ? "\n\n📎 Há mídia de abertura, mas sem URL pública configurada." : "";
-      await sendTextMessage({ to: telefone, message: `${mensagem}${obs}` });
+    const canUsePhotoTemplate = media.hasMedia && media.mediaType === "image" && !!media.publicUrl;
+    const template = getTemplateConfig(canUsePhotoTemplate);
+    if (!template.templateName) {
+      insertLog({ osId: os?.id, usuarioId, telefone, tipoEvento, provider, status: "CONFIG_INCOMPLETA", mensagem, mediaUrl, erro: "Template WhatsApp da OS não configurado.", criadoPor });
+      return { ok: false, status: "CONFIG_INCOMPLETA", message: "Template WhatsApp da OS não configurado." };
     }
 
-    insertLog({ osId: os?.id, usuarioId, telefone, tipoEvento, provider, status: "ENVIADO", mensagem, mediaUrl, criadoPor });
-    return { ok: true, status: "ENVIADO" };
+    const response = await sendTemplateMessage({
+      to: telefone,
+      templateName: template.templateName,
+      languageCode: template.languageCode,
+      bodyParams: buildOsTemplateParams(osForMessage),
+      headerImageUrl: canUsePhotoTemplate ? media.publicUrl : null,
+    });
+
+    const whatsappMessageId = getMetaMessageId(response);
+    insertLog({
+      osId: os?.id,
+      usuarioId,
+      telefone,
+      tipoEvento,
+      provider,
+      status: "ENVIADO",
+      mensagem,
+      mediaUrl,
+      criadoPor,
+      whatsappMessageId,
+      providerResponseJson: safeJson(response),
+      templateName: template.templateName,
+    });
+    return { ok: true, status: "ENVIADO", whatsappMessageId, templateName: template.templateName };
   } catch (err) {
     const erro = sanitizeError(err);
-    insertLog({ osId: os?.id, usuarioId, telefone, tipoEvento, provider, status: "ERRO", mensagem, mediaUrl, erro, criadoPor });
+    insertLog({
+      osId: os?.id,
+      usuarioId,
+      telefone,
+      tipoEvento,
+      provider,
+      status: "ERRO",
+      mensagem,
+      mediaUrl,
+      erro,
+      criadoPor,
+      providerResponseJson: err?.providerResponse ? safeJson(err.providerResponse) : null,
+    });
     return { ok: false, status: "ERRO", error: erro };
   }
 }
@@ -756,6 +915,193 @@ function getWhatsappOsDiagnostic(osId, osDetalhada = null) {
   };
 }
 
+function verifyWebhookSignature(rawBody, signatureHeader) {
+  const appSecret = String(process.env.WHATSAPP_APP_SECRET || "").trim();
+  if (!appSecret) return { ok: false, reason: "WHATSAPP_APP_SECRET ausente" };
+  const header = String(signatureHeader || "").trim();
+  if (!header.startsWith("sha256=")) return { ok: false, reason: "Assinatura ausente" };
+  const expected = `sha256=${crypto.createHmac("sha256", appSecret).update(rawBody || Buffer.alloc(0)).digest("hex")}`;
+  const a = Buffer.from(header);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return { ok: false, reason: "Assinatura inválida" };
+  return { ok: crypto.timingSafeEqual(a, b), reason: "Assinatura inválida" };
+}
+
+function findNotificationByMessageId(messageId) {
+  if (!messageId || !tableExists("os_whatsapp_notificacoes")) return null;
+  return db.prepare(`SELECT * FROM os_whatsapp_notificacoes WHERE whatsapp_message_id = ? ORDER BY id DESC LIMIT 1`).get(String(messageId));
+}
+
+function findLatestNotificationByPhone(phone) {
+  if (!phone || !tableExists("os_whatsapp_notificacoes")) return null;
+  const normalized = normalizePhone(phone);
+  return db.prepare(`
+    SELECT * FROM os_whatsapp_notificacoes
+    WHERE telefone = ? AND os_id IS NOT NULL
+    ORDER BY datetime(enviado_em) DESC, id DESC
+    LIMIT 1
+  `).get(normalized);
+}
+
+function findPersonByPhone(phone) {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return null;
+  const variants = [normalized, `+${normalized}`, normalized.replace(/^55/, "")].filter(Boolean);
+  if (tableExists("users") && tableColumns("users").includes("telefone_whatsapp")) {
+    const row = db.prepare(`SELECT id, name AS nome, telefone_whatsapp, 'users' AS origem FROM users WHERE telefone_whatsapp IN (${variants.map(() => "?").join(",")}) LIMIT 1`).get(...variants);
+    if (row) return row;
+  }
+  if (tableExists("colaboradores") && tableColumns("colaboradores").includes("telefone_whatsapp")) {
+    const row = db.prepare(`SELECT id, user_id, nome, telefone_whatsapp, 'colaboradores' AS origem FROM colaboradores WHERE telefone_whatsapp IN (${variants.map(() => "?").join(",")}) LIMIT 1`).get(...variants);
+    if (row) return row;
+  }
+  return null;
+}
+
+function insertStatusEvent({ osId, notificacaoId, whatsappMessageId, recipientPhone, status, erro, raw }) {
+  if (!tableExists("os_whatsapp_status_eventos")) return null;
+  const info = db.prepare(`
+    INSERT INTO os_whatsapp_status_eventos (os_id, notificacao_id, whatsapp_message_id, recipient_phone, status, erro, raw_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(osId || null, notificacaoId || null, whatsappMessageId || null, recipientPhone || null, status || null, erro || null, safeJson(raw));
+  return Number(info.lastInsertRowid || 0) || null;
+}
+
+function listWhatsappStatusEvents(osId, { limit = 100 } = {}) {
+  if (!tableExists("os_whatsapp_status_eventos")) return [];
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
+  return db.prepare(`
+    SELECT * FROM os_whatsapp_status_eventos
+    WHERE os_id = ?
+    ORDER BY datetime(recebido_em) DESC, id DESC
+    LIMIT ?
+  `).all(Number(osId), safeLimit);
+}
+
+function processStatus(status = {}) {
+  const messageId = status.id || status.message_id || "";
+  const notification = findNotificationByMessageId(messageId);
+  const erro = status.errors?.length ? safeJson(status.errors, 1000) : null;
+  const state = String(status.status || "").toLowerCase();
+  insertStatusEvent({
+    osId: notification?.os_id || null,
+    notificacaoId: notification?.id || null,
+    whatsappMessageId: messageId,
+    recipientPhone: normalizePhone(status.recipient_id || notification?.telefone || "") || null,
+    status: state || "status",
+    erro,
+    raw: status,
+  });
+  if (!notification?.id) return;
+  const updates = { status: state === "failed" ? "ERRO" : "ENVIADO" };
+  if (state === "delivered") updates.entregue_em = new Date().toISOString();
+  if (state === "read") updates.lido_em = new Date().toISOString();
+  if (state === "failed") {
+    updates.falhou_em = new Date().toISOString();
+    updates.erro = erro || "Falha informada pela Meta.";
+  }
+  updateNotificationMeta(notification.id, updates);
+}
+
+function registerWhatsappOsHistory({ osId, phone, status, erro, raw }) {
+  const existing = findLatestNotificationByPhone(phone);
+  insertStatusEvent({
+    osId: osId || existing?.os_id || null,
+    notificacaoId: existing?.id || null,
+    whatsappMessageId: raw?.id || null,
+    recipientPhone: normalizePhone(phone) || null,
+    status,
+    erro,
+    raw,
+  });
+}
+
+function createSupportAlert(osId, phone, person) {
+  if (!osId || !tableExists("alertas_operacionais")) return;
+  const chave = `whatsapp_apoio_os_${osId}_${normalizePhone(phone)}`;
+  try {
+    db.prepare(`
+      INSERT OR IGNORE INTO alertas_operacionais (tipo, severidade, entidade_tipo, entidade_id, responsavel_user_id, mensagem, status, metadata_json, chave_unica)
+      VALUES ('WHATSAPP_APOIO_OS', 'ALTA', 'os', ?, ?, ?, 'NAO_LIDO', ?, ?)
+    `).run(
+      Number(osId),
+      Number(person?.user_id || person?.id || 0) || null,
+      `Mecânico solicitou apoio pelo WhatsApp na OS #${osId}.`,
+      safeJson({ telefone: normalizePhone(phone), pessoa: person || null }),
+      chave
+    );
+  } catch (_e) {}
+}
+
+function handleButtonReply(message = {}) {
+  const reply = message?.interactive?.button_reply || message?.button || {};
+  const title = String(reply.title || "").trim();
+  const replyId = String(reply.id || "").toLowerCase();
+  const from = normalizePhone(message.from || "");
+  const notification = findLatestNotificationByPhone(from);
+  const osId = Number(notification?.os_id || 0) || null;
+  const person = findPersonByPhone(from);
+  const normalizedTitle = normalizeLookupText(title || replyId);
+
+  let eventStatus = "BUTTON_REPLY";
+  let erro = null;
+  if (/iniciar/.test(normalizedTitle) || /_iniciar$/.test(replyId)) {
+    eventStatus = "BOTAO_INICIAR_OS";
+    if (osId && tableExists("os")) db.prepare("UPDATE os SET status = 'ANDAMENTO' WHERE id = ?").run(osId);
+  } else if (/apoio|preciso/.test(normalizedTitle) || /_apoio$/.test(replyId)) {
+    eventStatus = "BOTAO_PRECISO_APOIO";
+    createSupportAlert(osId, from, person);
+  } else if (/recebido/.test(normalizedTitle) || /_recebido$/.test(replyId)) {
+    eventStatus = "BOTAO_RECEBIDO";
+  }
+  if (!osId) erro = "Não foi possível relacionar a resposta com uma OS pela última notificação enviada ao telefone.";
+  registerWhatsappOsHistory({ osId, phone: from, status: eventStatus, erro, raw: message });
+}
+
+function processMessage(message = {}) {
+  const type = String(message.type || "").toLowerCase();
+  if (type === "interactive" && message?.interactive?.type === "button_reply") return handleButtonReply(message);
+  if (type === "button") return handleButtonReply(message);
+  registerWhatsappOsHistory({ phone: message.from, status: `MENSAGEM_${type || "recebida"}`.toUpperCase(), raw: message });
+}
+
+function processWebhookPayload(payload = {}) {
+  const entries = Array.isArray(payload.entry) ? payload.entry : [];
+  for (const entry of entries) {
+    const changes = Array.isArray(entry.changes) ? entry.changes : [];
+    for (const change of changes) {
+      const value = change.value || {};
+      for (const status of (Array.isArray(value.statuses) ? value.statuses : [])) processStatus(status);
+      for (const message of (Array.isArray(value.messages) ? value.messages : [])) processMessage(message);
+    }
+  }
+}
+
+function getAdminStatus() {
+  const counts = tableExists("os_whatsapp_notificacoes") ? db.prepare(`
+    SELECT
+      COUNT(*) AS total_enviadas,
+      SUM(CASE WHEN entregue_em IS NOT NULL THEN 1 ELSE 0 END) AS total_entregues,
+      SUM(CASE WHEN lido_em IS NOT NULL THEN 1 ELSE 0 END) AS total_lidas,
+      SUM(CASE WHEN status = 'ERRO' OR falhou_em IS NOT NULL THEN 1 ELSE 0 END) AS total_erro
+    FROM os_whatsapp_notificacoes
+  `).get() : {};
+  return {
+    provider: getProvider(),
+    phone_number_id_configurado: !!String(process.env.WHATSAPP_PHONE_NUMBER_ID || "").trim(),
+    access_token_configurado: !!String(process.env.WHATSAPP_ACCESS_TOKEN || "").trim(),
+    verify_token_configurado: !!String(process.env.WHATSAPP_VERIFY_TOKEN || "").trim(),
+    app_secret_configurado: !!String(process.env.WHATSAPP_APP_SECRET || "").trim(),
+    template_os: getTemplateConfig(false).templateName || null,
+    template_os_foto: getTemplateConfig(true).templateName || null,
+    language: getTemplateConfig(false).languageCode,
+    total_enviadas: Number(counts?.total_enviadas || 0),
+    total_entregues: Number(counts?.total_entregues || 0),
+    total_lidas: Number(counts?.total_lidas || 0),
+    total_erro: Number(counts?.total_erro || 0),
+  };
+}
+
 module.exports = {
   buildOsWhatsappMessage,
   getOsAberturaMedia,
@@ -767,8 +1113,15 @@ module.exports = {
   sendOsTeamNotifications,
   sendTextMessage,
   sendMediaMessage,
+  sendTemplateMessage,
+  sendInteractiveButtonsMessage,
   generateWaMeLink,
   listOsNotificationLogs,
   getLastOsNotification,
   getProvider,
+  getTemplateConfig,
+  listWhatsappStatusEvents,
+  verifyWebhookSignature,
+  processWebhookPayload,
+  getAdminStatus,
 };
