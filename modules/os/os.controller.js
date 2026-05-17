@@ -213,11 +213,12 @@ function osShow(req, res) {
   const whatsappHistoricoCompleto = String(req.query.whatsapp_historico || "").toLowerCase() === "completo";
   const whatsappLogs = whatsappService.listOsNotificationLogs(id, { limit: whatsappHistoricoCompleto ? 500 : 10 });
   const whatsappLast = whatsappService.listOsNotificationLogs(id, { limit: 1 })[0] || null;
+  const whatsappEventos = whatsappService.listWhatsappStatusEvents ? whatsappService.listWhatsappStatusEvents(id, { limit: whatsappHistoricoCompleto ? 500 : 10 }) : [];
   const whatsappProvider = whatsappService.getProvider();
   const whatsappDiagnostico = whatsappService.getWhatsappOsDiagnostic(id, osAtual);
   const whatsappResponsavel = whatsappDiagnostico.responsavel_resolvido;
   const whatsappDestinatarios = whatsappDiagnostico.destinatarios || [];
-  const canSendWhatsapp = whatsappProvider !== "disabled" && ["ADMIN", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
+  const canSendWhatsapp = whatsappProvider !== "disabled" && ["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
 
   return res.render("os/show", {
     title: `OS #${id}`,
@@ -229,6 +230,7 @@ function osShow(req, res) {
     whatsappLogs,
     whatsappHistoricoCompleto,
     whatsappLast,
+    whatsappEventos,
     whatsappProvider,
     whatsappResponsavel,
     whatsappDestinatarios,
@@ -547,7 +549,7 @@ async function osSetEquipe(req, res) {
 async function osEnviarWhatsapp(req, res) {
   const id = Number(req.params.id);
   const role = normalizeRole(req.session?.user?.role || "");
-  const canSend = ["ADMIN", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
+  const canSend = ["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
   if (!canSend) {
     req.flash("error", "Sem permissão para reenviar WhatsApp.");
     return res.redirect(`/os/${id}`);

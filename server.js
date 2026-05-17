@@ -94,6 +94,13 @@ app.locals.incluir = function (p) {
   return p;
 };
 
+// ===== Webhooks públicos com body bruto para validação HMAC =====
+app.use(
+  "/webhooks/whatsapp",
+  express.raw({ type: "application/json", limit: "2mb" }),
+  require("./modules/whatsapp/whatsapp.routes")
+);
+
 // ===== Middlewares base =====
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -285,6 +292,10 @@ mount(OFFICIAL_ROUTES.pcm, "./modules/pcm/pcm.routes");
 mount("/equipamentos", "./modules/equipamentos/equipamentos.routes");
 mount(OFFICIAL_ROUTES.os, "./modules/os/os.routes");
 app.get("/admin/debug-whatsapp-os/:id", requireLogin, requireRole(["ADMIN"]), osControllerForAdminDebug.debugWhatsappOS);
+app.get("/admin/whatsapp/status", requireLogin, requireRole(["ADMIN"]), (req, res) => {
+  const status = require("./modules/whatsapp/whatsapp.service").getAdminStatus();
+  return res.render("admin/whatsapp-status", { title: "Status WhatsApp", status, user: req.session?.user || null });
+});
 mount("/preventivas", "./modules/preventivas/preventivas.routes");
 mount(OFFICIAL_ROUTES.compras, "./modules/compras/compras.routes");
 mount("/fornecedores", "./modules/fornecedores/fornecedores.routes");
