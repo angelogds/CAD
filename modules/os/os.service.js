@@ -1161,6 +1161,60 @@ function autoAssign(osId, alocadoPorUserId = null) {
   return { equipe: listAlocacoesEquipe(Number(osId)), avisos: result.aviso ? [result.aviso] : [] };
 }
 
+
+function listOpenOSByColaborador(colaboradorId) {
+  const id = Number(colaboradorId || 0);
+  if (!id) return [];
+
+  const cols = getOSColumns();
+  const statusAbertos = ["ABERTA", "ANDAMENTO", "EM_ANDAMENTO", "PAUSADA", "AGUARDANDO_EQUIPE"];
+  const conditions = [];
+  const params = [];
+  const colaborador = tableExists("colaboradores")
+    ? db.prepare("SELECT id, user_id FROM colaboradores WHERE id = ? LIMIT 1").get(id)
+    : null;
+  const userId = Number(colaborador?.user_id || 0) || null;
+
+  const addColCondition = (col) => {
+    if (cols.includes(col)) {
+      conditions.push(`o.${col} = ?`);
+      params.push(id);
+    }
+  };
+
+  addColCondition("executor_colaborador_id");
+  addColCondition("auxiliar_colaborador_id");
+  addColCondition("executor_secundario_colaborador_id");
+  addColCondition("auxiliar_secundario_colaborador_id");
+
+  if (userId && cols.includes("mecanico_user_id")) {
+    conditions.push("o.mecanico_user_id = ?");
+    params.push(userId);
+  }
+  if (userId && cols.includes("auxiliar_user_id")) {
+    conditions.push("o.auxiliar_user_id = ?");
+    params.push(userId);
+  }
+
+  if (!conditions.length) return [];
+
+  const openedExpr = cols.includes("opened_at")
+    ? "opened_at"
+    : (cols.includes("created_at") ? "created_at" : "NULL");
+
+  return db.prepare(`
+    SELECT o.id,
+           o.status,
+           ${openedExpr} AS opened_at,
+           COALESCE(e.nome, o.equipamento_manual, o.equipamento, '-') AS equipamento
+    FROM os o
+    LEFT JOIN equipamentos e ON e.id = o.equipamento_id
+    WHERE UPPER(COALESCE(o.status, '')) IN (${statusAbertos.map(() => "?").join(",")})
+      AND (${conditions.join(" OR ")})
+    ORDER BY o.id DESC
+  `).all(...statusAbertos, ...params);
+}
+
 function listOS() {
   const cols = getOSColumns();
 
@@ -2356,6 +2410,7 @@ function patchAIFields(osId, payload = {}) {
 
 module.exports = {
   listOS,
+  listOpenOSByColaborador,
   deleteOS,
   listEquipamentosAtivos,
   listTipoOptions,

@@ -79,6 +79,13 @@ router.post(
   wrap(ctrl.osCreate, "osCreate")
 );
 
+router.post(
+  "/enviar-abertas-colaborador",
+  requireLogin,
+  requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"]),
+  wrap(ctrl.osEnviarAbertasColaborador, "osEnviarAbertasColaborador")
+);
+
 router.get("/:id", requireLogin, requireRole(OS_DETALHE_ACCESS), wrap(ctrl.osShow, "osShow"));
 router.post("/:id/iniciar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osIniciar, "osIniciar"));
 router.post("/:id/pausar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osPausar, "osPausar"));
