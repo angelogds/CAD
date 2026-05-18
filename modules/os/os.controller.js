@@ -32,7 +32,15 @@ function osIndex(req, res) {
   res.locals.activeMenu = "os";
   const lista = service.listOS();
   const role = normalizeRole(req.session?.user?.role || "");
-  return res.render("os/index", { title: "Ordens de Serviço", lista, canDeleteOS: role === "ADMIN" });
+  const canSendWhatsapp = ["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
+  const colaboradores = canSendWhatsapp ? service.listUsuariosEquipe() : [];
+  return res.render("os/index", {
+    title: "Ordens de Serviço",
+    lista,
+    canDeleteOS: role === "ADMIN",
+    canSendWhatsapp,
+    colaboradores,
+  });
 }
 
 function osNewForm(req, res) {
@@ -546,6 +554,70 @@ async function osSetEquipe(req, res) {
   return res.redirect(`/os/${id}`);
 }
 
+
+async function osEnviarAbertasColaborador(req, res) {
+  const role = normalizeRole(req.session?.user?.role || "");
+  const canSend = ["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
+  if (!canSend) {
+    req.flash("error", "Sem permissão para enviar OS abertas por WhatsApp.");
+    return res.redirect("/os");
+  }
+
+  const colaboradorId = Number(req.body?.colaborador_id || 0);
+  if (!colaboradorId) {
+    req.flash("error", "Selecione um colaborador para enviar as OS abertas.");
+    return res.redirect("/os");
+  }
+
+  const colaborador = service.listUsuariosEquipe().find((item) => Number(item.id) === colaboradorId);
+  if (!colaborador) {
+    req.flash("error", "Colaborador não encontrado ou inativo.");
+    return res.redirect("/os");
+  }
+
+  const ordensAbertas = service.listOpenOSByColaborador(colaboradorId);
+  if (!ordensAbertas.length) {
+    req.flash("error", `Nenhuma OS aberta encontrada para ${colaborador.name}.`);
+    return res.redirect("/os");
+  }
+
+  let enviadas = 0;
+  let linksGerados = 0;
+  let semTelefone = 0;
+  let erros = 0;
+
+  for (const ordem of ordensAbertas) {
+    const os = service.getOSById(ordem.id);
+    if (!os) {
+      erros += 1;
+      continue;
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    const result = await whatsappService.sendOsTeamNotifications({
+      os,
+      tipoEvento: "REENVIO_ABERTAS_COLABORADOR",
+      criadoPor: req.session?.user?.id || null,
+    });
+
+    enviadas += Number(result?.sent || 0);
+    linksGerados += Number(result?.generatedLinks?.length || 0);
+    if ((result?.results || []).some((r) => r?.status === "SEM_TELEFONE")) semTelefone += 1;
+    if (!result?.ok && !(result?.generatedLinks || []).length) erros += 1;
+  }
+
+  const partes = [
+    `${ordensAbertas.length} OS aberta(s) localizada(s) para ${colaborador.name}`,
+    `${enviadas} envio(s) confirmado(s)`,
+  ];
+  if (linksGerados) partes.push(`${linksGerados} link(s) manual(is) de WhatsApp gerado(s)`);
+  if (semTelefone) partes.push(`${semTelefone} OS com integrante sem telefone`);
+  if (erros) partes.push(`${erros} falha(s)`);
+
+  req.flash(erros && !enviadas && !linksGerados ? "error" : "success", partes.join("; ") + ".");
+  return res.redirect("/os");
+}
+
 async function osEnviarWhatsapp(req, res) {
   const id = Number(req.params.id);
   const role = normalizeRole(req.session?.user?.role || "");
@@ -655,6 +727,7 @@ module.exports = {
   osAutoAssign,
   osSetEquipe,
   osEnviarWhatsapp,
+  osEnviarAbertasColaborador,
   debugWhatsappOS,
   osVoiceAnalyze,
   osVoiceCommand,

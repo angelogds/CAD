@@ -49,6 +49,47 @@
     background: #15803d;
   }
 
+  .bulk-whatsapp {
+    margin-bottom: 14px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: end;
+  }
+
+  .bulk-whatsapp-title {
+    font-weight: 900;
+    color: #0f172a;
+    margin-bottom: 4px;
+  }
+
+  .bulk-whatsapp-form {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .bulk-whatsapp-form select {
+    min-width: 260px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    padding: 9px 11px;
+    font-weight: 700;
+    color: #0f172a;
+    background: #fff;
+  }
+
+  .btn-whatsapp {
+    background: #22c55e;
+    color: #052e16;
+    border-color: #16a34a;
+  }
+
+  .btn-whatsapp:hover {
+    background: #dcfce7;
+  }
+
   /* ─── TABELA DESKTOP ─── */
   .table-wrap {
     overflow-x: auto;
@@ -301,6 +342,22 @@
     .os-cards {
       display: flex;
     }
+
+    .bulk-whatsapp {
+      grid-template-columns: 1fr;
+      padding: 14px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+    }
+
+    .bulk-whatsapp-form {
+      justify-content: stretch;
+    }
+
+    .bulk-whatsapp-form select,
+    .bulk-whatsapp-form button {
+      width: 100%;
+    }
   }
 
   @media (max-width: 400px) {
@@ -322,6 +379,24 @@
   </div>
   <a class="btn-primary" href="/os/novo">+ Nova OS</a>
 </div>
+
+<% if (canSendWhatsapp) { %>
+  <div class="card bulk-whatsapp">
+    <div>
+      <div class="bulk-whatsapp-title">Enviar OS abertas do colaborador</div>
+      <div class="muted">Selecione um colaborador para reenviar, por WhatsApp, todas as OS abertas atribuídas ao nome dele.</div>
+    </div>
+    <form class="bulk-whatsapp-form" method="POST" action="/os/enviar-abertas-colaborador" onsubmit="return confirm('Enviar todas as OS abertas deste colaborador por WhatsApp?');">
+      <select name="colaborador_id" required>
+        <option value="">Selecione o colaborador</option>
+        <% (colaboradores || []).forEach((colaborador) => { %>
+          <option value="<%= colaborador.id %>"><%= colaborador.name %></option>
+        <% }) %>
+      </select>
+      <button class="btn-sm btn-whatsapp" type="submit">Enviar OS abertas</button>
+    </form>
+  </div>
+<% } %>
 
 <div class="card">
   <%# ── TABELA (desktop) ── %>
