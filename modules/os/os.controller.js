@@ -8,6 +8,7 @@ const aiService = require("../ai/ai.service");
 const embeddingsService = require("../ai/ai.embeddings.service");
 const visionService = require("../ai/ai.vision.service");
 const whatsappService = require("../whatsapp/whatsapp.service");
+const { canSendWhatsappNotificationRole } = require("../../middlewares/permissions.middleware");
 
 function mapFilesToPublic(files = []) {
   return (files || []).map((f) => ({
@@ -32,7 +33,7 @@ function osIndex(req, res) {
   res.locals.activeMenu = "os";
   const lista = service.listOS();
   const role = normalizeRole(req.session?.user?.role || "");
-  const canSendWhatsapp = ["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
+  const canSendWhatsapp = canSendWhatsappNotificationRole(role);
   const colaboradores = canSendWhatsapp ? service.listUsuariosEquipe() : [];
   return res.render("os/index", {
     title: "Ordens de Serviço",
@@ -219,14 +220,16 @@ function osShow(req, res) {
   const equipeUsuarios = canManageEquipe ? service.listUsuariosEquipe() : [];
   const tracagens = tracagemService ? tracagemService.listByOS(id) : [];
   const whatsappHistoricoCompleto = String(req.query.whatsapp_historico || "").toLowerCase() === "completo";
-  const whatsappLogs = whatsappService.listOsNotificationLogs(id, { limit: whatsappHistoricoCompleto ? 500 : 10 });
-  const whatsappLast = whatsappService.listOsNotificationLogs(id, { limit: 1 })[0] || null;
-  const whatsappEventos = whatsappService.listWhatsappStatusEvents ? whatsappService.listWhatsappStatusEvents(id, { limit: whatsappHistoricoCompleto ? 500 : 10 }) : [];
-  const whatsappProvider = whatsappService.getProvider();
-  const whatsappDiagnostico = whatsappService.getWhatsappOsDiagnostic(id, osAtual);
-  const whatsappResponsavel = whatsappDiagnostico.responsavel_resolvido;
+  const canSendWhatsappNotification = canSendWhatsappNotificationRole(role);
+  const canSendWhatsapp = whatsappService.getProvider() !== "disabled" && canSendWhatsappNotification;
+  const whatsappHistoricoCompletoSeguro = canSendWhatsappNotification && whatsappHistoricoCompleto;
+  const whatsappLogs = canSendWhatsappNotification ? whatsappService.listOsNotificationLogs(id, { limit: whatsappHistoricoCompletoSeguro ? 500 : 10 }) : [];
+  const whatsappLast = canSendWhatsappNotification ? (whatsappService.listOsNotificationLogs(id, { limit: 1 })[0] || null) : null;
+  const whatsappEventos = canSendWhatsappNotification && whatsappService.listWhatsappStatusEvents ? whatsappService.listWhatsappStatusEvents(id, { limit: whatsappHistoricoCompletoSeguro ? 500 : 10 }) : [];
+  const whatsappProvider = canSendWhatsappNotification ? whatsappService.getProvider() : null;
+  const whatsappDiagnostico = canSendWhatsappNotification ? whatsappService.getWhatsappOsDiagnostic(id, osAtual) : {};
+  const whatsappResponsavel = whatsappDiagnostico.responsavel_resolvido || null;
   const whatsappDestinatarios = whatsappDiagnostico.destinatarios || [];
-  const canSendWhatsapp = whatsappProvider !== "disabled" && ["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
 
   return res.render("os/show", {
     title: `OS #${id}`,
@@ -236,7 +239,7 @@ function osShow(req, res) {
     equipeUsuarios,
     tracagens,
     whatsappLogs,
-    whatsappHistoricoCompleto,
+    whatsappHistoricoCompleto: canSendWhatsappNotification && whatsappHistoricoCompleto,
     whatsappLast,
     whatsappEventos,
     whatsappProvider,
@@ -244,6 +247,7 @@ function osShow(req, res) {
     whatsappDestinatarios,
     whatsappDiagnostico,
     canSendWhatsapp,
+    canSendWhatsappNotification,
     user: req.session?.user || null,
   });
 }
@@ -557,7 +561,7 @@ async function osSetEquipe(req, res) {
 
 async function osEnviarAbertasColaborador(req, res) {
   const role = normalizeRole(req.session?.user?.role || "");
-  const canSend = ["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
+  const canSend = canSendWhatsappNotificationRole(role);
   if (!canSend) {
     req.flash("error", "Sem permissão para enviar OS abertas por WhatsApp.");
     return res.redirect("/os");
@@ -618,10 +622,30 @@ async function osEnviarAbertasColaborador(req, res) {
   return res.redirect("/os");
 }
 
+function osNotificacoes(req, res) {
+  return osShow(req, res);
+}
+
+function osColaboradoresContato(req, res) {
+  const id = Number(req.params.id);
+  const os = service.getOSById(id);
+  if (!os) return res.status(404).json({ ok: false, error: "OS não encontrada." });
+
+  const diagnostico = whatsappService.getWhatsappOsDiagnostic(id, os);
+  const colaboradores = (diagnostico.destinatarios || []).map((destinatario) => ({
+    id: destinatario.id || destinatario.colaborador_id || destinatario.user_id || null,
+    nome: destinatario.nome || destinatario.name || destinatario.colaborador_nome || "-",
+    origem: destinatario.origem || null,
+    telefone: destinatario.telefone_normalizado || destinatario.colaborador_telefone_whatsapp || destinatario.telefone_whatsapp || destinatario.user_telefone_whatsapp || destinatario.colaborador_telefone || destinatario.telefone || null,
+  }));
+
+  return res.json({ ok: true, os_id: id, colaboradores });
+}
+
 async function osEnviarWhatsapp(req, res) {
   const id = Number(req.params.id);
   const role = normalizeRole(req.session?.user?.role || "");
-  const canSend = ["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"].includes(role);
+  const canSend = canSendWhatsappNotificationRole(role);
   if (!canSend) {
     req.flash("error", "Sem permissão para reenviar WhatsApp.");
     return res.redirect(`/os/${id}`);
@@ -635,6 +659,10 @@ async function osEnviarWhatsapp(req, res) {
     tipoEvento: "REENVIO_MANUAL",
     criadoPor: req.session?.user?.id || null,
   });
+
+  if (String(req.originalUrl || req.path || "").startsWith("/api/")) {
+    return res.status(result?.ok ? 200 : 400).json({ ok: !!result?.ok, os_id: id, ...result });
+  }
 
   if (result?.generatedLinks?.length) {
     if (result.generatedLinks.length > 1) {
@@ -726,6 +754,8 @@ module.exports = {
   osUpdateStatus,
   osAutoAssign,
   osSetEquipe,
+  osNotificacoes,
+  osColaboradoresContato,
   osEnviarWhatsapp,
   osEnviarAbertasColaborador,
   debugWhatsappOS,

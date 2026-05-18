@@ -15,12 +15,18 @@ const ROLE = {
 };
 
 function normalizeRole(role) {
-  const r = String(role || '').trim().toUpperCase();
+  const r = String(role || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+  if (r === 'ADMINISTRADOR') return ROLE.ADMIN;
   if (r === 'DIRECAO') return ROLE.DIRETORIA;
   if (r === 'ALMOXARIFE') return ROLE.ALMOXARIFADO;
   if (r === 'MANUTENCAO') return ROLE.MANUTENCAO_SUPERVISOR;
   if (r === 'SUPERVISOR_MANUTENCAO') return ROLE.MANUTENCAO_SUPERVISOR;
-  if (r === 'ENCARREGADO DE MANUTENCAO') return ROLE.ENCARREGADO_MANUTENCAO;
+  if (['ENCARREGADO', 'ENCARREGADO_MANUTENCAO', 'ENCARREGADO_DE_MANUTENCAO'].includes(r)) return ROLE.ENCARREGADO_MANUTENCAO;
   return r;
 }
 

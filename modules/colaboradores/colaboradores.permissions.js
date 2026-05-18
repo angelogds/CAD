@@ -8,6 +8,10 @@ function isColaboradorOnly(req) {
   return roleOf(req) === 'COLABORADOR';
 }
 
+function canViewContactDetails(req) {
+  return ['ADMIN', 'ENCARREGADO_MANUTENCAO'].includes(roleOf(req));
+}
+
 function canManageProfiles(req) {
   return ['ADMIN', 'RH'].includes(roleOf(req));
 }
@@ -41,6 +45,7 @@ function canAccessColaborador(req, colaborador) {
 module.exports = {
   roleOf,
   isColaboradorOnly,
+  canViewContactDetails,
   canManageProfiles,
   canManageFerramental,
   canManageEPIAndMateriais,
