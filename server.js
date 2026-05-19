@@ -31,6 +31,7 @@ const {
   registerCompatibilityAlias,
 } = require("./config/routes");
 const { requireLogin, requireRole } = require("./modules/auth/auth.middleware");
+const { exposeNotificationPermissions, canSendWhatsappNotification } = require("./middlewares/permissions.middleware");
 const osControllerForAdminDebug = require("./modules/os/os.controller");
 const fmtBR =
   typeof dateUtil.fmtBR === "function" ? dateUtil.fmtBR : (v) => String(v ?? "-");
@@ -136,6 +137,7 @@ app.use(
   })
 );
 app.use(flash());
+app.use(exposeNotificationPermissions);
 
 // ===== Globals (views) =====
 app.locals.TZ = TZ;
@@ -291,6 +293,8 @@ mount("/mobile", "./modules/mobile/mobile.routes");
 mount(OFFICIAL_ROUTES.pcm, "./modules/pcm/pcm.routes");
 mount("/equipamentos", "./modules/equipamentos/equipamentos.routes");
 mount(OFFICIAL_ROUTES.os, "./modules/os/os.routes");
+app.post("/api/os/:id/notificacoes/whatsapp", requireLogin, canSendWhatsappNotification, osControllerForAdminDebug.osEnviarWhatsapp);
+app.get("/api/os/:id/colaboradores-contato", requireLogin, canSendWhatsappNotification, osControllerForAdminDebug.osColaboradoresContato);
 app.get("/admin/debug-whatsapp-os/:id", requireLogin, requireRole(["ADMIN"]), osControllerForAdminDebug.debugWhatsappOS);
 app.get("/admin/whatsapp/status", requireLogin, requireRole(["ADMIN"]), (req, res) => {
   const status = require("./modules/whatsapp/whatsapp.service").getAdminStatus();

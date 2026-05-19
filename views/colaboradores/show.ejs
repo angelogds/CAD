@@ -65,21 +65,31 @@ function tempoEmpresa(dataAdmissao) {
       <input class="input" name="setor" value="<%= colaborador.setor || '' %>" />
       <input class="input" type="date" name="data_admissao" value="<%= colaborador.data_admissao || '' %>" />
       <select name="status"><option <%= colaborador.status==='ATIVO'?'selected':'' %>>ATIVO</option><option <%= colaborador.status==='INATIVO'?'selected':'' %>>INATIVO</option></select>
-      <input class="input" name="telefone" value="<%= colaborador.telefone || '' %>" placeholder="Telefone" />
-      <input class="input" name="telefone_whatsapp" inputmode="numeric" data-whatsapp-input value="<%= colaborador.telefone_whatsapp || '' %>" placeholder="WhatsApp: 5575999999999" />
+      <% if (canViewContactDetails) { %>
+        <input class="input" name="telefone" value="<%= colaborador.telefone || '' %>" placeholder="Telefone" />
+        <input class="input" name="telefone_whatsapp" inputmode="numeric" data-whatsapp-input value="<%= colaborador.telefone_whatsapp || '' %>" placeholder="WhatsApp: 5575999999999" />
+      <% } else { %>
+        <div class="muted">Telefone e WhatsApp restritos a Admin e Encarregado de Manutenção.</div>
+      <% } %>
       <input class="input" type="number" name="lider_id" value="<%= colaborador.lider_id || '' %>" placeholder="ID Líder" />
       <input class="input" type="number" name="user_id" value="<%= colaborador.user_id || '' %>" placeholder="ID Usuário" />
       <input class="input" type="file" name="foto" accept="image/*" />
       <input class="input" name="tipo_sanguineo" value="<%= colaborador.tipo_sanguineo || '' %>" placeholder="Tipo sanguíneo" />
-      <input class="input" name="contato_emergencia" value="<%= colaborador.contato_emergencia || '' %>" placeholder="Contato de emergência" />
+      <% if (canViewContactDetails) { %>
+        <input class="input" name="contato_emergencia" value="<%= colaborador.contato_emergencia || '' %>" placeholder="Contato de emergência" />
+      <% } %>
       <textarea name="restricao_operacional" placeholder="Restrição operacional"><%= colaborador.restricao_operacional || '' %></textarea>
       <textarea name="observacoes" placeholder="Observações"><%= colaborador.observacoes || '' %></textarea>
       <button class="btn btn-primary" type="submit">Salvar</button>
     </form>
     <% } else { %>
       <p><strong>Tipo sanguíneo:</strong> <%= colaborador.tipo_sanguineo || '-' %></p>
-      <p><strong>Contato emergência:</strong> <%= colaborador.contato_emergencia || '-' %></p>
-      <p><strong>WhatsApp:</strong> <%= colaborador.telefone_whatsapp ? 'Cadastrado' : 'Sem WhatsApp' %></p>
+      <% if (canViewContactDetails) { %>
+        <p><strong>Contato emergência:</strong> <%= colaborador.contato_emergencia || '-' %></p>
+        <p><strong>WhatsApp:</strong> <%= colaborador.telefone_whatsapp ? 'Cadastrado' : 'Sem WhatsApp' %></p>
+      <% } else { %>
+        <p><strong>Contato/WhatsApp:</strong> Restrito</p>
+      <% } %>
       <p><strong>Restrição operacional:</strong> <%= colaborador.restricao_operacional || '-' %></p>
       <p><strong>Observações:</strong> <%= colaborador.observacoes || '-' %></p>
     <% } %>

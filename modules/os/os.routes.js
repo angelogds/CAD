@@ -9,6 +9,7 @@ const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
 const ctrl = require("./os.controller");
 const { OS_EXECUTION_ACCESS, OS_DETALHE_ACCESS } = require("./os.permissions");
+const { canSendWhatsappNotification } = require("../../middlewares/permissions.middleware");
 
 const uploadDir = path.join(storagePaths.UPLOAD_DIR, "os");
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -82,7 +83,7 @@ router.post(
 router.post(
   "/enviar-abertas-colaborador",
   requireLogin,
-  requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"]),
+  canSendWhatsappNotification,
   wrap(ctrl.osEnviarAbertasColaborador, "osEnviarAbertasColaborador")
 );
 
@@ -117,7 +118,11 @@ router.post("/:id/excluir", requireLogin, requireRole(["ADMIN"]), wrap(ctrl.osDe
 router.post("/:id/auto-alocar", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osAutoAssign, "osAutoAssign"));
 router.post("/:id/auto-assign", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osAutoAssign, "osAutoAssign"));
 router.post("/:id/equipe", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osSetEquipe, "osSetEquipe"));
-router.get("/:id/whatsapp", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO"]), wrap(ctrl.osEnviarWhatsapp, "osEnviarWhatsapp"));
+router.get("/:id/notificacoes", requireLogin, canSendWhatsappNotification, wrap(ctrl.osNotificacoes, "osNotificacoes"));
+router.get("/:id/colaboradores-contato", requireLogin, canSendWhatsappNotification, wrap(ctrl.osColaboradoresContato, "osColaboradoresContato"));
+router.get("/:id/whatsapp", requireLogin, canSendWhatsappNotification, wrap(ctrl.osEnviarWhatsapp, "osEnviarWhatsapp"));
+router.post("/:id/notificacoes/whatsapp", requireLogin, canSendWhatsappNotification, wrap(ctrl.osEnviarWhatsapp, "osEnviarWhatsapp"));
+router.post("/:id/notificar", requireLogin, canSendWhatsappNotification, wrap(ctrl.osEnviarWhatsapp, "osEnviarWhatsapp"));
 router.post("/voice/analyze", requireLogin, requireRole(ACCESS.os_open), wrap(ctrl.osVoiceAnalyze, "osVoiceAnalyze"));
 router.post("/voice/command", requireLogin, requireRole(ACCESS.os_open), wrap(ctrl.osVoiceCommand, "osVoiceCommand"));
 router.post("/voice/create", requireLogin, requireRole(ACCESS.os_open), wrap(ctrl.osVoiceCreate, "osVoiceCreate"));

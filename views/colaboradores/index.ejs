@@ -40,8 +40,10 @@
     <input class="input" name="setor" placeholder="Setor" value="MANUTENCAO" />
     <input class="input" type="date" name="data_admissao" />
     <select name="status"><option>ATIVO</option><option>INATIVO</option></select>
-    <input class="input" name="telefone" placeholder="Telefone" />
-    <input class="input" name="telefone_whatsapp" inputmode="numeric" data-whatsapp-input placeholder="WhatsApp: 5575999999999" />
+    <% if (canViewContactDetails) { %>
+      <input class="input" name="telefone" placeholder="Telefone" />
+      <input class="input" name="telefone_whatsapp" inputmode="numeric" data-whatsapp-input placeholder="WhatsApp: 5575999999999" />
+    <% } %>
     <input class="input" name="user_id" placeholder="ID do usuário (opcional)" type="number" />
     <input class="input" type="file" name="foto" accept="image/*" />
     <button class="btn btn-primary" type="submit">Cadastrar</button>
@@ -67,7 +69,13 @@
             <td><%= c.funcao || '-' %></td>
             <td><%= c.setor || '-' %></td>
             <td><span class="pill-tag <%= c.status==='ATIVO' ? 'pill-green':'pill-gray' %>"><%= c.status || '-' %></span></td>
-            <td><span class="pill-tag <%= c.telefone_whatsapp ? 'pill-green' : 'pill-gray' %>"><%= c.telefone_whatsapp ? '🟢 WhatsApp' : 'Sem WhatsApp' %></span></td>
+            <td>
+              <% if (canViewContactDetails) { %>
+                <span class="pill-tag <%= c.telefone_whatsapp ? 'pill-green' : 'pill-gray' %>"><%= c.telefone_whatsapp ? '🟢 WhatsApp' : 'Sem WhatsApp' %></span>
+              <% } else { %>
+                <span class="pill-tag pill-gray">Restrito</span>
+              <% } %>
+            </td>
             <td><%= c.epis_ativos || 0 %></td>
             <td><%= c.ferramentas_ativas || 0 %></td>
             <td><a class="btn btn-sm btn-outline" href="/colaboradores/<%= c.id %>">Abrir</a></td>

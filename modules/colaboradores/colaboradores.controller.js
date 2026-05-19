@@ -29,8 +29,19 @@ function ensureCanAccess(req, res, colaborador) {
   return true;
 }
 
+function maskColaboradorContact(colaborador, canViewContactDetails) {
+  if (canViewContactDetails) return colaborador;
+  return {
+    ...colaborador,
+    telefone: null,
+    telefone_whatsapp: null,
+    contato_emergencia: null,
+  };
+}
+
 function index(req, res) {
   const role = perms.roleOf(req);
+  const canViewContactDetails = perms.canViewContactDetails(req);
   const filtros = {
     search: req.query.search || '',
     setor: req.query.setor || '',
@@ -42,6 +53,7 @@ function index(req, res) {
     const uid = Number(req.session?.user?.id || 0);
     lista = lista.filter((c) => Number(c.user_id || 0) === uid);
   }
+  lista = lista.map((c) => maskColaboradorContact(c, canViewContactDetails));
 
   return res.render('colaboradores/index', {
     title: 'Colaboradores',
@@ -49,13 +61,16 @@ function index(req, res) {
     filtros,
     role,
     canManageProfiles: perms.canManageProfiles(req),
+    canViewContactDetails,
   });
 }
 
 function show(req, res) {
   const id = parseId(req.params.id);
-  const colaborador = service.getColaboradorById(id);
+  let colaborador = service.getColaboradorById(id);
   if (!ensureCanAccess(req, res, colaborador)) return;
+  const canViewContactDetails = perms.canViewContactDetails(req);
+  colaborador = maskColaboradorContact(colaborador, canViewContactDetails);
 
   const tabs = service.getTabData(id);
   const dashboard = service.getDashboard(id);
@@ -71,6 +86,7 @@ function show(req, res) {
     activeTab,
     role: perms.roleOf(req),
     canManageProfiles: perms.canManageProfiles(req),
+    canViewContactDetails,
     canManageFerramental: perms.canManageFerramental(req),
     canManageEPIAndMateriais: perms.canManageEPIAndMateriais(req),
     canValidateCertificados: perms.canValidateCertificados(req),
@@ -88,6 +104,12 @@ function savePerfil(req, res) {
 
   const id = parseId(req.params.id);
   const payload = { ...req.body, id };
+  if (!perms.canViewContactDetails(req)) {
+    const atual = service.getColaboradorById(id) || {};
+    payload.telefone = atual.telefone || null;
+    payload.telefone_whatsapp = atual.telefone_whatsapp || null;
+    payload.contato_emergencia = atual.contato_emergencia || null;
+  }
   const foto = req.file ? `/imagens/colaboradores/fotos/${req.file.filename}` : null;
   if (foto) payload.foto_url = foto;
 
@@ -223,8 +245,10 @@ function uploadDocumento(req, res) {
 
 function confirmarCiencia(req, res) {
   const id = parseId(req.params.id);
-  const colaborador = service.getColaboradorById(id);
+  let colaborador = service.getColaboradorById(id);
   if (!ensureCanAccess(req, res, colaborador)) return;
+  const canViewContactDetails = perms.canViewContactDetails(req);
+  colaborador = maskColaboradorContact(colaborador, canViewContactDetails);
 
   try {
     service.confirmarCiencia(id, req.body.entidade, parseId(req.body.entidade_id), actor(req));
@@ -245,6 +269,8 @@ function relatorio(req, res) {
   const id = parseId(req.params.id);
   const tipo = String(req.params.tipo || 'individual').trim().toLowerCase();
   const data = service.getReportData(id);
+  const canViewContactDetails = perms.canViewContactDetails(req);
+  if (data?.colaborador) data.colaborador = maskColaboradorContact(data.colaborador, canViewContactDetails);
 
   if (!data.colaborador) return res.status(404).render('errors/404', { title: 'Colaborador não encontrado', layout: 'layout' });
 
