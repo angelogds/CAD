@@ -34,10 +34,15 @@ function postCloseRedirectPath(userOrRole) {
   return canViewOSDetails(userOrRole) ? null : '/painel-operacional';
 }
 
+function detailUnauthorizedRedirectPath(userOrRole) {
+  return canViewOSDetails(userOrRole) ? null : '/dashboard';
+}
+
 module.exports = {
   OS_ACCESS,
   OS_EXECUTION_ACCESS,
   OS_DETALHE_ACCESS,
   canViewOSDetails,
   postCloseRedirectPath,
+  detailUnauthorizedRedirectPath,
 };
