@@ -7,6 +7,7 @@ const storagePaths = require("../../config/storage");
 
 const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
+const { canSendWhatsappNotification } = require("../../middlewares/permissions.middleware");
 const ctrl = require("./os.controller");
 const { OS_EXECUTION_ACCESS, OS_DETALHE_ACCESS, detailUnauthorizedRedirectPath } = require("./os.permissions");
 
