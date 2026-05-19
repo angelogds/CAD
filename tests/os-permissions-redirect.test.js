@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   canViewOSDetails,
   postCloseRedirectPath,
+  detailUnauthorizedRedirectPath,
   OS_EXECUTION_ACCESS,
 } = require('../modules/os/os.permissions');
 
@@ -24,4 +25,11 @@ test('direcao/diretoria e outros perfis operacionais restritos redirecionam ao p
     assert.equal(canViewOSDetails({ role }), false);
     assert.equal(postCloseRedirectPath({ role }), '/painel-operacional');
   });
+});
+
+test('perfil sem permissão de detalhe da OS é redirecionado ao painel principal', () => {
+  assert.equal(detailUnauthorizedRedirectPath({ role: 'PRODUCAO' }), '/dashboard');
+  assert.equal(detailUnauthorizedRedirectPath({ role: 'DIRETORIA' }), '/dashboard');
+  assert.equal(detailUnauthorizedRedirectPath({ role: 'ADMIN' }), null);
+  assert.equal(detailUnauthorizedRedirectPath({ role: 'MECANICO' }), null);
 });

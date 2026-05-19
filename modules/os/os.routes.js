@@ -8,8 +8,7 @@ const storagePaths = require("../../config/storage");
 const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
 const ctrl = require("./os.controller");
-const { OS_EXECUTION_ACCESS, OS_DETALHE_ACCESS } = require("./os.permissions");
-const { canSendWhatsappNotification } = require("../../middlewares/permissions.middleware");
+const { OS_EXECUTION_ACCESS, OS_DETALHE_ACCESS, detailUnauthorizedRedirectPath } = require("./os.permissions");
 
 const uploadDir = path.join(storagePaths.UPLOAD_DIR, "os");
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -54,6 +53,16 @@ const fechamentoUpload = (req, res, next) => {
   });
 };
 
+
+function requireOSDetailAccess(req, res, next) {
+  const redirectPath = detailUnauthorizedRedirectPath(req.session?.user);
+  if (!redirectPath) return next();
+
+  req.flash("error", "Sem permissão para visualizar os detalhes desta OS. Você foi redirecionado ao painel principal.");
+  if (req.accepts("html")) return res.redirect(redirectPath);
+  return res.status(403).json({ error: "Sem permissão para visualizar os detalhes desta OS." });
+}
+
 const wrap = (fn, name) =>
   typeof fn === "function"
     ? (req, res, next) => {
@@ -87,7 +96,7 @@ router.post(
   wrap(ctrl.osEnviarAbertasColaborador, "osEnviarAbertasColaborador")
 );
 
-router.get("/:id", requireLogin, requireRole(OS_DETALHE_ACCESS), wrap(ctrl.osShow, "osShow"));
+router.get("/:id", requireLogin, requireOSDetailAccess, wrap(ctrl.osShow, "osShow"));
 router.post("/:id/iniciar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osIniciar, "osIniciar"));
 router.post("/:id/pausar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osPausar, "osPausar"));
 router.get("/:id/fechar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osCloseForm, "osCloseForm"));
