@@ -26,6 +26,9 @@ const wrap = (fn, name) =>
 router.get('/', requireLogin, wrap(ctrl.index, 'index'));
 router.get('/tv', requireLogin, wrap(ctrl.tv, 'tv'));
 router.post('/avisos', requireLogin, wrap(ctrl.createAviso, 'createAviso'));
+router.post('/ranking/relatorio-mensal/gerar', requireLogin, wrap(ctrl.gerarRelatorioMensal, 'gerarRelatorioMensal'));
+router.get('/ranking/relatorio-mensal/:mes/pdf', requireLogin, wrap(ctrl.baixarRelatorioMensal, 'baixarRelatorioMensal'));
+router.get('/ranking/relatorios/ultimo/pdf', requireLogin, wrap(ctrl.baixarRelatorioMensal, 'baixarRelatorioMensal'));
 
 router.get('/alertas/stream', requireLogin, wrap(ctrl.sse, 'sse'));
 router.post('/alertas/reconhecer', requireLogin, wrap(ctrl.reconhecerAlerta, 'reconhecerAlerta'));
