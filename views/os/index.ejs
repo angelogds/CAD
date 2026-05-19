@@ -386,14 +386,14 @@
       <div class="bulk-whatsapp-title">Enviar OS abertas do colaborador</div>
       <div class="muted">Selecione um colaborador para reenviar, por WhatsApp, todas as OS abertas atribuídas ao nome dele.</div>
     </div>
-    <form class="bulk-whatsapp-form" method="POST" action="/os/enviar-abertas-colaborador" onsubmit="return confirm('Enviar todas as OS abertas deste colaborador por WhatsApp?');">
-      <select name="colaborador_id" required>
+    <form class="bulk-whatsapp-form" id="bulkWhatsappForm">
+      <select id="colaboradorWhatsAppSelect" name="colaborador_id" required>
         <option value="">Selecione o colaborador</option>
         <% (colaboradores || []).forEach((colaborador) => { %>
-          <option value="<%= colaborador.id %>"><%= colaborador.name %></option>
+          <option value="<%= colaborador.id %>" data-nome="<%= colaborador.name %>" data-telefone="<%= colaborador.telefone_whatsapp || '' %>"><%= colaborador.name %></option>
         <% }) %>
       </select>
-      <button class="btn-sm btn-whatsapp" type="submit">Enviar OS abertas</button>
+      <button class="btn-sm btn-whatsapp" type="submit" data-action="enviar-os-whatsapp" disabled>Enviar selecionadas pelo WhatsApp</button>
     </form>
   </div>
 <% } else { %>
@@ -411,6 +411,7 @@
     <table>
       <thead>
         <tr>
+          <th style="width:44px;"><input type="checkbox" id="osSelectAll" aria-label="Selecionar todas as OS visíveis"></th>
           <th style="width:60px;">#</th>
           <th>Equipamento</th>
           <th style="width:120px;">Tipo</th>
@@ -426,7 +427,7 @@
       <tbody>
         <% if (!lista || !lista.length) { %>
           <tr>
-            <td colspan="10" class="empty-state">Nenhuma OS cadastrada.</td>
+            <td colspan="11" class="empty-state">Nenhuma OS cadastrada.</td>
           </tr>
         <% } %>
         <% (lista || []).forEach(o => {
@@ -442,6 +443,19 @@
           const executores = apoio ? `${principal} + ${apoio}` : principal;
         %>
           <tr>
+            <td>
+              <input
+                type="checkbox"
+                class="os-checkbox"
+                data-os-id="<%= o.id %>"
+                data-numero="<%= o.id %>"
+                data-equipamento="<%= o.equipamento || "-" %>"
+                data-setor="<%= o.setor || "-" %>"
+                data-criticidade="<%= o.grau || "-" %>"
+                data-descricao="<%= o.descricao || o.nao_conformidade || "-" %>"
+                data-status="<%= st || "-" %>"
+              >
+            </td>
             <td><%= o.id %></td>
             <td class="td-clip"><%= o.equipamento || '-' %></td>
             <td><span class="pill pill-blue"><%= (o.tipo || '-').toUpperCase() %></span></td>
@@ -507,3 +521,102 @@
     <% }) %>
   </div>
 </div>
+
+
+<script>
+(function(){
+  const form = document.getElementById('bulkWhatsappForm');
+  if (!form) return;
+  const sendButton = form.querySelector("[data-action='enviar-os-whatsapp']");
+  const colaboradorSelect = document.getElementById('colaboradorWhatsAppSelect');
+  const selectAll = document.getElementById('osSelectAll');
+
+  function normalizeWhatsAppPhone(phone) {
+    if (!phone) return '';
+    let digits = String(phone).replace(/\D/g, '');
+    if ((digits.length === 10 || digits.length === 11) && digits.startsWith('75')) digits = '55' + digits;
+    return digits;
+  }
+
+  function buildBulkOsWhatsAppMessage(colaborador, ordens) {
+    let message = `Olá, ${colaborador.nome}.\n\n`;
+    message += 'Segue relação de OS abertas direcionadas para acompanhamento/execução:\n\n';
+    ordens.forEach((os, index) => {
+      message += `${index + 1}. OS #${os.numero || os.id}\n`;
+      message += `Equipamento: ${os.equipamento || '-'}\n`;
+      message += `Setor: ${os.setor || '-'}\n`;
+      message += `Criticidade: ${os.criticidade || '-'}\n`;
+      message += `Descrição: ${os.descricao || '-'}\n`;
+      message += `Status: ${os.status || '-'}\n\n`;
+    });
+    message += 'Favor verificar as demandas e atualizar o andamento no sistema.\n\n';
+    message += 'Manutenção Industrial Campo do Gado';
+    return message;
+  }
+
+  function selectedCheckboxes() {
+    return Array.from(document.querySelectorAll('.os-checkbox:checked'));
+  }
+
+  function syncButtonState() {
+    if (!sendButton) return;
+    const hasOs = selectedCheckboxes().length > 0;
+    const hasColaborador = !!(colaboradorSelect && colaboradorSelect.value);
+    sendButton.disabled = !(hasOs && hasColaborador);
+  }
+
+  document.addEventListener('change', function(event){
+    if (event.target.matches('.os-checkbox') || event.target === colaboradorSelect) syncButtonState();
+  });
+
+  if (selectAll) {
+    selectAll.addEventListener('change', function(){
+      document.querySelectorAll('.os-checkbox').forEach((cb) => { cb.checked = selectAll.checked; });
+      syncButtonState();
+    });
+  }
+
+  form.addEventListener('submit', function(event){
+    event.preventDefault();
+    const checked = selectedCheckboxes();
+    console.log('[WhatsApp OS] quantidade selecionada:', checked.length);
+    if (!checked.length) { alert('Selecione pelo menos uma OS para enviar.'); return; }
+    if (!colaboradorSelect || !colaboradorSelect.value) { alert('Selecione o colaborador que receberá as OS.'); return; }
+
+    const selectedOption = colaboradorSelect.options[colaboradorSelect.selectedIndex];
+    const colaboradorNome = selectedOption.dataset.nome || selectedOption.textContent.trim();
+    const colaboradorTelefone = normalizeWhatsAppPhone(selectedOption.dataset.telefone || '');
+    console.log('[WhatsApp OS] colaborador:', colaboradorNome);
+    console.log('[WhatsApp OS] telefone normalizado:', colaboradorTelefone);
+
+    if (!colaboradorTelefone || colaboradorTelefone.length < 12) {
+      alert('O colaborador selecionado não possui WhatsApp válido cadastrado.');
+      return;
+    }
+
+    const confirmar = confirm(`Enviar ${checked.length} OS selecionada(s) para ${colaboradorNome} pelo WhatsApp?`);
+    if (!confirmar) return;
+
+    const ordens = checked.slice(0, 20).map((checkbox) => ({
+      id: checkbox.dataset.osId,
+      numero: checkbox.dataset.numero,
+      equipamento: checkbox.dataset.equipamento,
+      setor: checkbox.dataset.setor,
+      criticidade: checkbox.dataset.criticidade,
+      descricao: checkbox.dataset.descricao,
+      status: checkbox.dataset.status
+    }));
+
+    let message = buildBulkOsWhatsAppMessage({ nome: colaboradorNome }, ordens);
+    if (checked.length > ordens.length) {
+      message += `\n\nObs.: envio limitado às primeiras ${ordens.length} OS selecionadas para evitar excesso de tamanho da mensagem.`;
+    }
+
+    const whatsappUrl = `https://wa.me/${colaboradorTelefone}?text=${encodeURIComponent(message)}`;
+    console.log('[WhatsApp OS] URL gerada:', whatsappUrl.slice(0, 140) + '...');
+    window.location.assign(whatsappUrl);
+  });
+
+  syncButtonState();
+})();
+</script>
