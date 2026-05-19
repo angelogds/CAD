@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const db = require("../../database/db");
 const { normalizeWhatsapp } = require("../../utils/whatsapp-phone");
+const { canSendWhatsappNotificationRole, RESTRICTED_NOTIFICATION_MESSAGE } = require("../../middlewares/permissions.middleware");
 
 const AUTO_EVENTS = new Set(["CRIACAO_OS", "ATRIBUICAO", "REATRIBUICAO_AUTO"]);
 const VALID_PROVIDERS = new Set(["manual", "cloud_api", "disabled"]);
@@ -590,6 +591,47 @@ function hasSameEventStatus({ osId, usuarioId, telefone, tipoEvento, status }) {
   `).get(normalizedOsId, telefone || null, tipoEvento, status);
 }
 
+function getAuditActor(userId) {
+  if (!userId || !tableExists("users")) return null;
+  return db.prepare("SELECT id, name, role FROM users WHERE id = ?").get(Number(userId)) || null;
+}
+
+function actorCanSendWhatsapp(criadoPor) {
+  if (!criadoPor) return true;
+  const actor = getAuditActor(criadoPor);
+  return canSendWhatsappNotificationRole(actor?.role || '');
+}
+
+function insertAuditLog({ osId, usuarioId, telefone, status, mensagem, erro, criadoPor, providerResponseJson }) {
+  if (!tableExists("os_notificacoes_whatsapp_log")) return null;
+
+  const actor = getAuditActor(criadoPor);
+  const colaborador = usuarioId && tableExists("colaboradores")
+    ? db.prepare("SELECT id, nome FROM colaboradores WHERE user_id = ? OR id = ? ORDER BY CASE WHEN user_id = ? THEN 0 ELSE 1 END LIMIT 1").get(Number(usuarioId), Number(usuarioId), Number(usuarioId))
+    : null;
+
+  const respostaApi = providerResponseJson || (erro ? JSON.stringify({ erro }) : null);
+  const info = db.prepare(`
+    INSERT INTO os_notificacoes_whatsapp_log (
+      os_id, enviado_por_usuario_id, enviado_por_nome, perfil_usuario,
+      colaborador_id, colaborador_nome, telefone_destino, mensagem,
+      status_envio, resposta_api
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    Number(osId),
+    actor?.id || criadoPor || null,
+    actor?.name || null,
+    actor?.role || null,
+    colaborador?.id || usuarioId || null,
+    colaborador?.nome || null,
+    telefone || null,
+    mensagem || null,
+    status || null,
+    respostaApi
+  );
+  return Number(info.lastInsertRowid || 0) || null;
+}
+
 function insertLog({ osId, usuarioId, telefone, tipoEvento, provider, status, mensagem, mediaUrl, erro, criadoPor, whatsappMessageId, providerResponseJson, templateName }) {
   if (!tableExists("os_whatsapp_notificacoes")) return null;
   if (["SEM_TELEFONE", "WHATSAPP_DESATIVADO"].includes(status) && hasSameEventStatus({ osId, usuarioId, telefone, tipoEvento, status })) return null;
@@ -613,6 +655,7 @@ function insertLog({ osId, usuarioId, telefone, tipoEvento, provider, status, me
     INSERT INTO os_whatsapp_notificacoes (${fields.join(", ")})
     VALUES (${placeholders})
   `).run(...values);
+  insertAuditLog({ osId, usuarioId, telefone, status, mensagem, erro, criadoPor, providerResponseJson });
   return Number(info.lastInsertRowid || 0) || null;
 }
 
@@ -775,6 +818,11 @@ async function sendOsNotification({ os, usuario, tipoEvento, criadoPor } = {}) {
   let telefone = null;
 
   try {
+    if (!actorCanSendWhatsapp(criadoPor)) {
+      insertAuditLog({ osId: os?.id, usuarioId: null, telefone: null, status: "ACESSO_NEGADO", mensagem, erro: RESTRICTED_NOTIFICATION_MESSAGE, criadoPor });
+      return { ok: false, status: "ACESSO_NEGADO", error: RESTRICTED_NOTIFICATION_MESSAGE };
+    }
+
     if (provider === "disabled") {
       insertLog({ osId: os?.id, usuarioId: null, telefone: null, tipoEvento, provider, status: "WHATSAPP_DESATIVADO", mensagem, mediaUrl, erro: "WhatsApp desativado. Configure WHATSAPP_PROVIDER=manual ou cloud_api.", criadoPor });
       return { ok: false, status: "WHATSAPP_DESATIVADO", message: "WhatsApp desativado. Configure WHATSAPP_PROVIDER=manual ou cloud_api." };

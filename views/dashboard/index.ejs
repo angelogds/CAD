@@ -360,14 +360,21 @@
 <section class="dashboard-card area-ranking-mecanicos">
     <div class="ranking-header">
       <div class="dashboard-title" style="margin:0;">Ranking dos mecânicos</div>
-      <span class="ranking-subtitle">Ranking por participação na OS</span>
+      <span class="ranking-subtitle">Ranking mensal por participação nas OS</span>
     </div>
     <p class="muted-xs" style="margin-top:-4px; margin-bottom:10px;">
       Pesos: <strong>Baixa <%= rankingPesos.BAIXA %></strong> • <strong>Média <%= rankingPesos.MEDIA %></strong> • <strong>Alta <%= rankingPesos.ALTA %></strong> • <strong>Crítica <%= rankingPesos.CRITICA %></strong>.
       A pontuação é dividida igualmente entre os participantes de cada OS.
     </p>
+
+    <div class="ranking-highlight">Período: <%= (rankingPeriodoMensal && rankingPeriodoMensal.inicio ? rankingPeriodoMensal.inicio.slice(0,10) : '-') %> até <%= (rankingPeriodoMensal && rankingPeriodoMensal.fim ? rankingPeriodoMensal.fim.slice(0,10) : '-') %> (ciclo mensal).</div>
+    <% if (rankingRelatorioMensal && rankingRelatorioMensal.caminho_pdf) { %>
+      <div style="margin-top:8px;"><a class="btn" href="/dashboard/ranking/relatorios/ultimo/pdf">Baixar PDF do ranking mensal</a></div>
+    <% } else { %>
+      <div class="ranking-empty" style="margin-top:8px;">Nenhum relatório mensal fechado disponível ainda.</div>
+    <% } %>
     <% if (!rankingMecanicosItems.length) { %>
-      <div class="ranking-empty">Sem fechamentos suficientes nesta semana para montar o ranking.</div>
+      <div class="ranking-empty">Nenhum fechamento suficiente no período mensal para montar o ranking.</div>
     <% } else { %>
       <div class="ranking-list">
         <% rankingMecanicosItems.forEach(function(item) { %>

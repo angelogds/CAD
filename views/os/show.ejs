@@ -226,6 +226,7 @@
 </div>
 
 
+<% if (canSendWhatsappNotification) { %>
 <div class="card" style="margin-top:12px;">
   <% const whatsappEquipe = whatsappDestinatarios || []; %>
   <% const whatsPhone = whatsappResponsavel ? (whatsappResponsavel.telefone_normalizado || whatsappResponsavel.colaborador_telefone_whatsapp || whatsappResponsavel.telefone_whatsapp || whatsappResponsavel.user_telefone_whatsapp || whatsappResponsavel.colaborador_telefone || whatsappResponsavel.telefone || '') : ''; %>
@@ -376,6 +377,17 @@
   </table>
 
 </div>
+<% } else { %>
+  <div class="card" style="margin-top:12px;">
+    <div class="card-head">
+      <div>
+        <h3 style="margin:0;">Notificação WhatsApp</h3>
+        <div class="muted">Notificações disponíveis apenas para Admin e Encarregado de Manutenção.</div>
+      </div>
+    </div>
+    <p class="muted" style="margin-bottom:0;">Acesso restrito. Apenas Admin e Encarregado de Manutenção podem enviar notificações via WhatsApp ou visualizar dados de contato dos colaboradores.</p>
+  </div>
+<% } %>
 
 
 <div class="card" style="margin-top:12px;">

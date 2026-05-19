@@ -69,6 +69,7 @@ function listMecanicosOnline(limit = 8) {
 }
 
 function buildDashboardPayload({ tvMode = false } = {}) {
+  service.processarFechamentoMensalAutomatico();
   const ranking = service.getMecanicosRankingSemana() || {};
   return {
     title: tvMode ? 'Modo TV' : 'Painel',
@@ -85,6 +86,8 @@ function buildDashboardPayload({ tvMode = false } = {}) {
     preventivas: service.getPreventivasDashboard(),
     escala: service.getEscalaPainelSemana() || service.getEscalaSemana(),
     rankingMecanicos: ranking,
+    rankingPeriodoMensal: service.getCurrentMonthlyPeriod(),
+    rankingRelatorioMensal: service.getUltimoRelatorioMensalFechado(),
     avisos: service.getAvisosDashboard(12),
     alertaAtivo: alertsService.getAlertaAtivo(),
     tvMode,
@@ -277,6 +280,25 @@ function createAviso(req, res) {
   return res.redirect('/avisos');
 }
 
+
+
+function gerarRelatorioMensal(req, res) {
+  const role = String(req.session?.user?.role || '').toUpperCase();
+  if (!['ADMIN','ENCARREGADO_MANUTENCAO'].includes(role)) return res.status(403).json({ ok:false, error:'Sem permissão' });
+  const sobrescrever = String(req.body?.sobrescrever || 'false') === 'true';
+  const mesReferencia = req.body?.mes_referencia || null;
+  const result = service.gerarRelatorioMensalRanking({ mesReferencia, geradoPor: req.session?.user?.name || 'sistema', sobrescrever });
+  return res.json({ ok:true, ...result });
+}
+
+function baixarRelatorioMensal(req, res) {
+  const mes = req.params.mes;
+  const row = mes
+    ? service.gerarRelatorioMensalRanking({ mesReferencia: mes, geradoPor: 'sistema', sobrescrever: false }).row
+    : service.getUltimoRelatorioMensalFechado();
+  if (!row?.caminho_pdf) return res.status(404).send('Nenhum relatório mensal fechado disponível ainda.');
+  return res.redirect(row.caminho_pdf);
+}
 module.exports = {
   index,
   tv,
@@ -287,4 +309,6 @@ module.exports = {
   subscribePush,
   iniciarPreventiva,
   finalizarPreventiva,
+  gerarRelatorioMensal,
+  baixarRelatorioMensal,
 };

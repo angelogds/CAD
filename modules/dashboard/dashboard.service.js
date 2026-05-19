@@ -1,5 +1,8 @@
 // modules/dashboard/dashboard.service.js
 const db = require("../../database/db");
+const fs = require("fs");
+const path = require("path");
+const PDFDocument = require("pdfkit");
 const { normalizeRole } = require("../../config/rbac");
 
 let escalaService = null;
@@ -363,13 +366,9 @@ function getMecanicosRankingSemana() {
       };
     }
 
-    const rangeSemana = db.prepare(`
-      SELECT
-        date('now', 'localtime', '-' || ((strftime('%w', 'now', 'localtime') + 6) % 7) || ' days') AS inicio,
-        date('now', 'localtime', '+' || (6 - ((strftime('%w', 'now', 'localtime') + 6) % 7)) || ' days') AS fim
-    `).get() || {};
-    const inicioSemana = String(rangeSemana.inicio || "");
-    const fimSemana = String(rangeSemana.fim || "");
+    const period = getCurrentMonthlyPeriod();
+    const inicioSemana = String(period.inicio || "");
+    const fimSemana = String(period.fim || "");
 
     const osSemana = db.prepare(`
       SELECT
@@ -381,7 +380,8 @@ function getMecanicosRankingSemana() {
         o.closed_by
       FROM os o
       WHERE UPPER(COALESCE(o.status, '')) IN ('FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA')
-        AND date(COALESCE(o.data_fim, o.data_conclusao, o.closed_at, o.opened_at), 'localtime') BETWEEN ? AND ?
+        AND datetime(COALESCE(o.data_fim, o.data_conclusao, o.closed_at, o.opened_at)) >= datetime(?)
+        AND datetime(COALESCE(o.data_fim, o.data_conclusao, o.closed_at, o.opened_at)) < datetime(?)
     `).all(inicioSemana, fimSemana);
 
     const mapa = new Map();
@@ -1291,6 +1291,86 @@ function getOSEmAndamento() {
   }, []);
 }
 
+
+
+function getPreferredTimezone() {
+  try {
+    new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Bahia" }).format(new Date());
+    return "America/Bahia";
+  } catch (_e) {
+    return "America/Sao_Paulo";
+  }
+}
+
+function getCurrentMonthlyPeriod(baseDate = new Date()) {
+  const tz = getPreferredTimezone();
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit" }).formatToParts(baseDate);
+  const year = Number(parts.find((p) => p.type === "year")?.value);
+  const month = Number(parts.find((p) => p.type === "month")?.value);
+  const inicio = `${year}-${String(month).padStart(2, "0")}-01 00:00:00`;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  const fim = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01 00:00:00`;
+  return { inicio, fim, mesReferencia: `${year}-${String(month).padStart(2, "0")}` };
+}
+
+function ensureRankingMensalTable() {
+  db.exec(`CREATE TABLE IF NOT EXISTS ranking_relatorios_mensais (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mes_referencia TEXT NOT NULL UNIQUE,
+    data_inicio TEXT NOT NULL,
+    data_fim TEXT NOT NULL,
+    caminho_pdf TEXT NOT NULL,
+    criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+    gerado_por TEXT NOT NULL DEFAULT 'sistema',
+    status TEXT NOT NULL DEFAULT 'gerado',
+    observacoes TEXT
+  )`);
+}
+
+function getUltimoRelatorioMensalFechado() {
+  ensureRankingMensalTable();
+  return db.prepare("SELECT * FROM ranking_relatorios_mensais ORDER BY mes_referencia DESC LIMIT 1").get() || null;
+}
+
+function gerarRelatorioMensalRanking({ mesReferencia, geradoPor = "sistema", sobrescrever = false } = {}) {
+  ensureRankingMensalTable();
+  const base = mesReferencia ? new Date(`${mesReferencia}-01T12:00:00Z`) : new Date();
+  const period = getCurrentMonthlyPeriod(base);
+  const existente = db.prepare("SELECT * FROM ranking_relatorios_mensais WHERE mes_referencia=?").get(period.mesReferencia);
+  if (existente && !sobrescrever) {
+    console.log(`[Ranking Mensal] Relatório ${period.mesReferencia} já existe, não será duplicado.`);
+    return { ok: true, existente: true, row: existente };
+  }
+  const ranking = getMecanicosRankingSemana();
+  const dir = path.join(process.cwd(), "public", "relatorios", "ranking");
+  fs.mkdirSync(dir, { recursive: true });
+  const nomeArquivo = `ranking-mensal-${period.mesReferencia}.pdf`;
+  const arquivo = path.join(dir, nomeArquivo);
+  const doc = new PDFDocument({ margin: 40 });
+  doc.pipe(fs.createWriteStream(arquivo));
+  doc.fontSize(18).text("Relatório Mensal de Ranking da Manutenção", { align: "center" });
+  doc.fontSize(12).text("Mecânicos e Apoio Operacional", { align: "center" });
+  doc.moveDown(); doc.text(`Mês de referência: ${period.mesReferencia}`); doc.text(`Período: ${period.inicio} até ${period.fim}`);
+  doc.moveDown().text("Ranking dos Mecânicos:");
+  (ranking.itemsMecanicos || []).forEach((i) => doc.text(`${i.posicao}º ${i.nome} - OS ${i.os_total} - ${Number(i.score || 0).toFixed(2)} pts`));
+  doc.moveDown().text("Ranking do Apoio Operacional:");
+  (ranking.itemsApoio || []).forEach((i) => doc.text(`${i.posicao}º ${i.nome} - OS ${i.os_total} - ${Number(i.score || 0).toFixed(2)} pts`));
+  doc.end();
+  const caminhoPdf = `/relatorios/ranking/${nomeArquivo}`;
+  if (existente) db.prepare("UPDATE ranking_relatorios_mensais SET data_inicio=?, data_fim=?, caminho_pdf=?, gerado_por=?, status='gerado', observacoes='regerado' WHERE id=?").run(period.inicio, period.fim, caminhoPdf, geradoPor, existente.id);
+  else db.prepare("INSERT INTO ranking_relatorios_mensais (mes_referencia,data_inicio,data_fim,caminho_pdf,gerado_por,status) VALUES (?,?,?,?,?,'gerado')").run(period.mesReferencia, period.inicio, period.fim, caminhoPdf, geradoPor);
+  console.log(`[Ranking Mensal] Relatório gerado para ${period.mesReferencia}`);
+  return { ok: true, existente: false, row: db.prepare("SELECT * FROM ranking_relatorios_mensais WHERE mes_referencia=?").get(period.mesReferencia) };
+}
+
+function processarFechamentoMensalAutomatico() {
+  const now = getCurrentMonthlyPeriod();
+  const d = new Date(`${now.inicio.replace(' ','T')}Z`);
+  d.setUTCMonth(d.getUTCMonth()-1);
+  const mesPrev = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+  return gerarRelatorioMensalRanking({ mesReferencia: mesPrev, geradoPor: 'sistema', sobrescrever: false });
+}
 module.exports = {
   getCards,
   getMotoresResumoDashboard,
@@ -1307,6 +1387,10 @@ module.exports = {
   getEscalaSemana,
   getEscalaPainelSemana,
   getMecanicosRankingSemana,
+  processarFechamentoMensalAutomatico,
+  gerarRelatorioMensalRanking,
+  getUltimoRelatorioMensalFechado,
+  getCurrentMonthlyPeriod,
   iniciarPreventiva,
   finalizarPreventiva,
   getPreventivasEmAndamentoEquipe,
