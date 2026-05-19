@@ -515,7 +515,7 @@ function prioritizeMecanicos(mecanicosDisponiveis = []) {
 function listUsuariosEquipe() {
   if (!tableExists("colaboradores")) return [];
   return db.prepare(`
-    SELECT id, nome, user_id, funcao
+    SELECT id, nome, user_id, funcao, telefone_whatsapp
     FROM colaboradores
     WHERE IFNULL(ativo,1)=1
     ORDER BY nome ASC
@@ -524,6 +524,7 @@ function listUsuariosEquipe() {
     name: c.nome,
     user_id: c.user_id ? Number(c.user_id) : null,
     funcao: String(normalizeColaboradorFuncao(c.funcao || "")).toLowerCase(),
+    telefone_whatsapp: String(c.telefone_whatsapp || "").trim(),
   }));
 }
 
