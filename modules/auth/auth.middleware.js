@@ -16,8 +16,10 @@ function requireLogin(req, res, next) {
  * - ADMIN sempre passa
  * - compara role da sessão (case-insensitive)
  */
-function requireRole(roles = []) {
-  const allowed = (Array.isArray(roles) ? roles : [roles]).map(normRole);
+function requireRole(roles) {
+  const raw = typeof roles === "undefined" ? [undefined] : (Array.isArray(roles) ? roles : [roles]);
+  const allowed = raw.filter((r) => !!r).map(normRole);
+  const isMisconfigured = raw.length > 0 && allowed.length === 0;
 
   return (req, res, next) => {
     const user = req.session?.user;
@@ -29,7 +31,10 @@ function requireRole(roles = []) {
     const role = normRole(user.role);
     if (role === "ADMIN") return next();
 
-    if (allowed.length === 0) return next(); // sem regra -> libera
+    if (isMisconfigured) {
+      return res.status(500).json({ error: "RBAC misconfiguration: role list is undefined/empty." });
+    }
+    if (allowed.length === 0) return next(); // sem regra explícita
     if (allowed.includes(role)) return next();
 
     req.flash("error", "Sem permissão para acessar esta área.");
