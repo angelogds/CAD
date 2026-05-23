@@ -1,0 +1,52 @@
+<section class="container">
+  <h1>Armazenamento</h1>
+  <p>Fotos e vídeos de OS com mais de <%= env.retentionDays %> dias são removidos automaticamente todo dia <%= env.dayOfMonth %> do mês. As informações escritas das ordens de serviço permanecem preservadas.</p>
+  <ul>
+    <li>Uso atual de volume (uploads OS): <strong><%= (volumeBytes / 1024 / 1024).toFixed(2) %> MB</strong></li>
+    <li>Última limpeza: <strong><%= last ? last.data_execucao : 'Nunca' %></strong></li>
+    <li>Arquivos removidos (última): <strong><%= last ? last.arquivos_removidos : 0 %></strong></li>
+    <li>Espaço liberado (última): <strong><%= last ? (last.espaco_liberado_bytes / 1024 / 1024).toFixed(2) : '0.00' %> MB</strong></li>
+    <li>Próximo agendamento: <strong><%= nextRun %></strong></li>
+  </ul>
+
+  <form method="post" action="/admin/armazenamento/limpeza-midia" onsubmit="return confirm('Confirmar execução da limpeza de mídia agora?');" style="margin-bottom:20px;">
+    <button type="submit" class="btn btn-primary">Executar limpeza de mídia agora</button>
+  </form>
+
+  <h3>Histórico de limpezas</h3>
+  <table class="table" style="width:100%; border-collapse:collapse;">
+    <thead>
+      <tr>
+        <th>Mês</th>
+        <th>Data da execução</th>
+        <th>Tipo</th>
+        <th>Arquivos removidos</th>
+        <th>Espaço liberado</th>
+        <th>Status</th>
+        <th>PDF</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!history.length) { %>
+        <tr><td colspan="7">Sem registros.</td></tr>
+      <% } %>
+      <% history.forEach((h) => { %>
+        <tr>
+          <td><%= h.mes_referencia %></td>
+          <td><%= h.data_execucao %></td>
+          <td><%= h.tipo_execucao || 'AUTOMATICA_MENSAL' %></td>
+          <td><%= h.arquivos_removidos %></td>
+          <td><%= (Number(h.espaco_liberado_bytes || 0) / 1024 / 1024).toFixed(2) %> MB</td>
+          <td><%= h.status %></td>
+          <td>
+            <% if (h.caminho_pdf) { %>
+              <a class="btn" href="/admin/armazenamento/limpeza-midia/<%= h.id %>/pdf">Baixar relatório PDF</a>
+            <% } else { %>
+              -
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>

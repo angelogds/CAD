@@ -301,7 +301,7 @@ function listAnexos(osId, tipo) {
     if (table === "os_anexos") {
       return db
         .prepare(
-          `SELECT id, os_id, tipo, path, legenda, created_at
+          `SELECT id, os_id, tipo, path, legenda, created_at, arquivo_removido, removido_em
            FROM os_anexos
            WHERE os_id = ? AND tipo = ?
            ORDER BY id DESC`
@@ -319,7 +319,7 @@ function listAnexos(osId, tipo) {
                 END) AS tipo,
                 filepath AS path,
                 filename AS legenda,
-                uploaded_at AS created_at
+                uploaded_at AS created_at, arquivo_removido, removido_em
          FROM anexos
          WHERE owner_type = 'os' AND owner_id = ?
          ORDER BY id DESC`

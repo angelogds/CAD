@@ -22,6 +22,7 @@
   const canMotores = can('motores');
   const canAvisos = can('avisos_view');
   const canUsuarios = can('usuarios');
+  const canArmazenamento = ['ADMIN','ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO'].includes(role);
   const canEscala = can('escala');
   const canInspecao = can('inspecao_view');
   const canTracagem = can('tracagem_view');
@@ -84,9 +85,10 @@
 
     <div class="nav-divider"></div>
 
-    <% if (canUsuarios) { %>
+    <% if (canUsuarios || canArmazenamento) { %>
       <div class="nav-section">ADMIN</div>
-      <%- navItem('/usuarios', 'Gerenciar Usuários', activeMenu === 'usuarios') %>
+      <% if (canUsuarios) { %><%- navItem('/usuarios', 'Gerenciar Usuários', activeMenu === 'usuarios') %><% } %>
+      <% if (canArmazenamento) { %><%- navItem('/admin/armazenamento', 'Armazenamento', activeMenu === 'admin-armazenamento') %><% } %>
     <% } %>
   </nav>
 
