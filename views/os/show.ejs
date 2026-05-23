@@ -399,7 +399,7 @@
       <% if (src) { %>
         <% const isVideo = /\.(mp4|mov|webm|ogg|m4v|avi)$/i.test(src); %>
         <a class="foto-card" href="<%= src %>" target="_blank">
-          <% if (isVideo) { %><video src="<%= src %>" muted playsinline preload="metadata"></video><% } else { %><img src="<%= src %>" alt="mídia abertura <%= idx + 1 %>"/><% } %>
+          <% if (Number(f.arquivo_removido||0) === 1) { %><div class="muted" style="padding:12px;">Arquivo removido pela limpeza automática de armazenamento em <%= (f.removido_em ? new Date(f.removido_em).toLocaleDateString('pt-BR') : '-') %>. As informações escritas da OS foram preservadas.</div><% } else if (isVideo) { %><video src="<%= src %>" muted playsinline preload="metadata"></video><% } else { %><img src="<%= src %>" alt="mídia abertura <%= idx + 1 %>"/><% } %>
           <span><%= isVideo ? 'Vídeo' : 'Foto' %> abertura <%= idx + 1 %></span>
         </a>
       <% } %>
@@ -436,7 +436,7 @@
       <% if (src) { %>
         <% const isVideo = /\.(mp4|mov|webm|ogg|m4v|avi)$/i.test(src); %>
         <a class="foto-card" href="<%= src %>" target="_blank">
-          <% if (isVideo) { %><video src="<%= src %>" muted playsinline preload="metadata"></video><% } else { %><img src="<%= src %>" alt="mídia fechamento <%= idx + 1 %>"/><% } %>
+          <% if (Number(f.arquivo_removido||0) === 1) { %><div class="muted" style="padding:12px;">Arquivo removido pela limpeza automática de armazenamento em <%= (f.removido_em ? new Date(f.removido_em).toLocaleDateString('pt-BR') : '-') %>. As informações escritas da OS foram preservadas.</div><% } else if (isVideo) { %><video src="<%= src %>" muted playsinline preload="metadata"></video><% } else { %><img src="<%= src %>" alt="mídia fechamento <%= idx + 1 %>"/><% } %>
           <span><%= isVideo ? 'Vídeo' : 'Foto' %> fechamento <%= idx + 1 %></span>
         </a>
       <% } %>

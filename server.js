@@ -309,6 +309,7 @@ mount(OFFICIAL_ROUTES.almoxarifado, "./modules/almoxarifado/almoxarifado.routes"
 mount("/escala", "./modules/escala/escala.routes");
 mount("/avisos", "./modules/avisos/avisos.routes");
 mount("/usuarios", "./modules/usuarios/usuarios.routes");
+mount("/admin", "./modules/admin/storage.routes");
 mount("/demandas", "./modules/demandas/demandas.routes");
 mount("/motores", "./modules/motores/motores.routes");
 mount(OFFICIAL_ROUTES.inspecao, "./modules/inspecao/inspecao.routes");
@@ -321,6 +322,18 @@ mount(OFFICIAL_ROUTES.ia, "./modules/ai/ai.routes");
 mount("/ia", "./modules/ia/ia.routes");
 mount("/", "./modules/tv/tv.routes");
 
+
+try {
+  const mediaCleanupService = require("./modules/os/media-cleanup.service");
+  const maybeRunCleanup = () => {
+    try { mediaCleanupService.runMonthlyMediaCleanup({ executedBy: "sistema", force: false, executionType: "AUTOMATICA_MENSAL" }).catch((e)=>{ throw e; }); }
+    catch (err) { console.warn("⚠️ Falha na limpeza automática de mídia:", err.message || err); }
+  };
+  maybeRunCleanup();
+  setInterval(maybeRunCleanup, 24 * 60 * 60 * 1000);
+} catch (err) {
+  console.warn("⚠️ Serviço de limpeza de mídia indisponível:", err.message || err);
+}
 // Compatibilidade de rotas legadas para não quebrar links antigos.
 for (const alias of COMPATIBILITY_ALIASES) {
   registerCompatibilityAlias(app, alias.from, alias.to);
