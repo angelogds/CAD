@@ -46,11 +46,24 @@ function findOldOsMediaAttachments(cutoffDate = getRetentionCutoffDate()) {
   const table = tableExists('os_anexos') ? 'os_anexos' : (tableExists('anexos') ? 'anexos' : null);
   if (!table) return [];
   const cutoff = cutoffDate.toISOString();
+  const osEquipamentoExpr = columnExists('os', 'equipamento') ? 'o.equipamento' : "'-'";
+  const osSetorExpr = columnExists('os', 'setor') ? 'o.setor' : "'-'";
+  const osStatusExpr = columnExists('os', 'status') ? 'o.status' : "'-'";
+  const osOpenedAtExpr = columnExists('os', 'opened_at') ? 'o.opened_at' : 'NULL';
+  const osClosedAtExpr = columnExists('os', 'closed_at') ? 'o.closed_at' : 'NULL';
+  const osOpenedByExpr = columnExists('os', 'opened_by') ? 'o.opened_by' : 'NULL';
+
   const rows = table === 'os_anexos'
-    ? db.prepare(`SELECT a.id, a.os_id, a.path AS filepath, a.created_at, a.arquivo_removido, o.equipamento, o.setor, o.status, o.opened_at, o.closed_at, COALESCE(u.name,'-') AS responsavel
-      FROM os_anexos a LEFT JOIN os o ON o.id = a.os_id LEFT JOIN users u ON u.id = o.opened_by WHERE datetime(a.created_at) <= datetime(?)`).all(cutoff)
-    : db.prepare(`SELECT a.id, a.owner_id AS os_id, a.filepath, a.uploaded_at AS created_at, a.arquivo_removido, o.equipamento, o.setor, o.status, o.opened_at, o.closed_at, COALESCE(u.name,'-') AS responsavel
-      FROM anexos a LEFT JOIN os o ON o.id = a.owner_id LEFT JOIN users u ON u.id = o.opened_by WHERE a.owner_type='os' AND datetime(a.uploaded_at) <= datetime(?)`).all(cutoff);
+    ? db.prepare(`SELECT a.id, a.os_id, a.path AS filepath, a.created_at, a.arquivo_removido,
+      ${osEquipamentoExpr} AS equipamento, ${osSetorExpr} AS setor, ${osStatusExpr} AS status,
+      ${osOpenedAtExpr} AS opened_at, ${osClosedAtExpr} AS closed_at, COALESCE(u.name,'-') AS responsavel
+      FROM os_anexos a LEFT JOIN os o ON o.id = a.os_id LEFT JOIN users u ON u.id = ${osOpenedByExpr}
+      WHERE datetime(a.created_at) <= datetime(?)`).all(cutoff)
+    : db.prepare(`SELECT a.id, a.owner_id AS os_id, a.filepath, a.uploaded_at AS created_at, a.arquivo_removido,
+      ${osEquipamentoExpr} AS equipamento, ${osSetorExpr} AS setor, ${osStatusExpr} AS status,
+      ${osOpenedAtExpr} AS opened_at, ${osClosedAtExpr} AS closed_at, COALESCE(u.name,'-') AS responsavel
+      FROM anexos a LEFT JOIN os o ON o.id = a.owner_id LEFT JOIN users u ON u.id = ${osOpenedByExpr}
+      WHERE a.owner_type='os' AND datetime(a.uploaded_at) <= datetime(?)`).all(cutoff);
   return rows.filter((r) => {
     const ext = path.extname(String(r.filepath || '').split('?')[0]).toLowerCase();
     return MEDIA_EXTENSIONS.has(ext) && Number(r.arquivo_removido || 0) !== 1;
