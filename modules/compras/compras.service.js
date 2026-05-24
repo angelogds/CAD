@@ -76,15 +76,24 @@ function resolveUsersTable() {
 function buildSolicitacaoItensSelect() {
   const hasItemNome = columnExists('solicitacao_itens', 'item_nome');
   const hasItemDescricao = columnExists('solicitacao_itens', 'item_descricao');
+  const hasDescricao = columnExists('solicitacao_itens', 'descricao');
   const hasQtdSolicitada = columnExists('solicitacao_itens', 'qtd_solicitada');
   const hasEstoqueItemId = columnExists('solicitacao_itens', 'estoque_item_id');
 
-  const itemNomeExpr = hasItemNome
-    ? "COALESCE(si.item_nome, ei.nome)"
-    : "COALESCE(si.descricao, ei.nome)";
-  const itemDescExpr = hasItemDescricao
+  const itemNomeExpr = hasItemNome && hasDescricao
+    ? "COALESCE(si.item_nome, si.descricao, ei.nome)"
+    : hasItemNome
+      ? "COALESCE(si.item_nome, ei.nome)"
+      : hasDescricao
+        ? "COALESCE(si.descricao, ei.nome)"
+        : "COALESCE(ei.nome, '')";
+  const itemDescExpr = hasItemDescricao && hasDescricao
     ? "COALESCE(si.item_descricao, si.descricao)"
-    : 'si.descricao';
+    : hasItemDescricao
+      ? 'si.item_descricao'
+      : hasDescricao
+        ? 'si.descricao'
+        : "''";
   const qtdExpr = hasQtdSolicitada
     ? "COALESCE(si.qtd_solicitada, si.quantidade, 0)"
     : 'COALESCE(si.quantidade, 0)';
