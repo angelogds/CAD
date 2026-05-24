@@ -8,7 +8,7 @@ function listRecebimentos() {
     STATUS.COMPRADA,
     STATUS.EM_RECEBIMENTO,
     STATUS.RECEBIDA_PARCIAL,
-    STATUS.FECHADA
+    STATUS.RECEBIDA_TOTAL
   );
 }
 
@@ -31,9 +31,14 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, userId }) {
     const item = db.prepare("SELECT * FROM solicitacao_itens WHERE id=? AND solicitacao_id=?").get(itemId, solicitacaoId);
     if (!item) throw new Error("Item não encontrado.");
 
-    const recebida = Number(item.qtd_recebida_total || 0) + Number(qtdAgora);
+    const qtdSolicitada = Number(item.qtd_solicitada || item.quantidade || 0);
+    const recebidaAtual = Number(item.qtd_recebida_total || 0);
+    const recebida = recebidaAtual + Number(qtdAgora);
+    if (recebida > qtdSolicitada) {
+      throw new Error(`Quantidade recebida excede a solicitada. Pendente atual: ${Math.max(qtdSolicitada - recebidaAtual, 0)}.`);
+    }
     let statusItem = "PENDENTE";
-    if (recebida >= Number(item.qtd_solicitada)) statusItem = "OK";
+    if (recebida >= qtdSolicitada) statusItem = "OK";
     else if (recebida > 0) statusItem = "PARCIAL";
 
     db.prepare("UPDATE solicitacao_itens SET qtd_recebida_total=?, status_item=?, observacao_item=?, updated_at=datetime('now') WHERE id=?").run(recebida, statusItem, observacao || item.observacao_item || null, itemId);

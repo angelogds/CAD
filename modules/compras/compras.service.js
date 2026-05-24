@@ -5,12 +5,19 @@ const db = require('../../database/db');
 const STATUS = Object.freeze({
   ABERTA: 'ABERTA',
   EM_COTACAO: 'EM_COTACAO',
+  AGUARDANDO_APROVACAO: 'AGUARDANDO_APROVACAO',
+  APROVADA_DIRETORIA: 'APROVADA_DIRETORIA',
+  DEVOLVIDA_REVISAO: 'DEVOLVIDA_REVISAO',
+  REPROVADA: 'REPROVADA',
   COMPRADA: 'COMPRADA',
   EM_RECEBIMENTO: 'EM_RECEBIMENTO',
   RECEBIDA_PARCIAL: 'RECEBIDA_PARCIAL',
   RECEBIDA_TOTAL: 'RECEBIDA_TOTAL',
+  SEPARADA_PARA_RETIRADA: 'SEPARADA_PARA_RETIRADA',
+  ENTREGUE_SOLICITANTE: 'ENTREGUE_SOLICITANTE',
   FECHADA: 'FECHADA',
   REABERTA: 'REABERTA',
+  CANCELADA: 'CANCELADA',
 });
 
 const STATUS_COMPRAS = [STATUS.ABERTA, STATUS.EM_COTACAO, STATUS.COMPRADA];
@@ -317,7 +324,9 @@ function atualizarDados(id, dados) {
 
 function marcarComprada(id, userId, dados = {}) {
   const cur = getSolicitacaoDetalhe(id);
-  if (!cur || cur.status !== STATUS.EM_COTACAO) throw new Error('Somente EM_COTACAO pode virar COMPRADA.');
+  if (!cur || ![STATUS.EM_COTACAO, STATUS.APROVADA_DIRETORIA].includes(cur.status)) {
+    throw new Error('Somente EM_COTACAO ou APROVADA_DIRETORIA pode virar COMPRADA.');
+  }
   db.prepare(`UPDATE solicitacoes SET status=?, compras_user_id=?, comprada_em=datetime('now'), fornecedor=?, fornecedor_id=?, previsao_entrega=?, observacoes_compras=?, valor_total=?, updated_at=datetime('now') WHERE id=?`)
     .run(STATUS.COMPRADA, userId, dados.fornecedor || cur.fornecedor || null, dados.fornecedor_id ? Number(dados.fornecedor_id) : (cur.fornecedor_id || null), dados.previsao_entrega || cur.previsao_entrega || null, dados.observacoes_compras || cur.observacoes_compras || null, dados.valor_total ? Number(dados.valor_total) : cur.valor_total || null, id);
   return getSolicitacaoDetalhe(id);
