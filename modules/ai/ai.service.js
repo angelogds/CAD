@@ -238,6 +238,10 @@ function parseJSONObject(rawText) {
       .replace(/[‘’]/g, "'");
     s = s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
     s = s.replace(/,\s*([}\]])/g, '$1');
+    // Alguns modelos ainda retornam pseudo-JSON com chaves sem aspas e strings com aspas simples.
+    // Exemplos: { prioridade: 'ALTA', descricao: 'Motor parou' }
+    s = s.replace(/([{,]\s*)([A-Za-z_][\w-]*)(\s*:)/g, '$1"$2"$3');
+    s = s.replace(/:\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g, ': "$1"');
     return s.trim();
   };
 
