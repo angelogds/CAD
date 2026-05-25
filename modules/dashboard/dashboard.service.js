@@ -222,6 +222,20 @@ function normalizePessoaNome(nome = "") {
     .toLowerCase();
 }
 
+function dedupeNomesPessoas(nomes = []) {
+  const unique = [];
+  const seen = new Set();
+  nomes.forEach((nomeRaw) => {
+    const nome = String(nomeRaw || "").trim();
+    if (!nome) return;
+    const nomeNorm = normalizePessoaNome(nome);
+    if (!nomeNorm || seen.has(nomeNorm)) return;
+    seen.add(nomeNorm);
+    unique.push(nome);
+  });
+  return unique;
+}
+
 // Regra operacional acordada com a manutenção:
 // nomes abaixo sempre entram no ranking do perfil correspondente,
 // mesmo que role/função cadastral esteja diferente.
@@ -747,7 +761,7 @@ function getOSPainel(limit = 15) {
       )
       .all(tamanho)
       .map((item) => {
-        const nomes = [
+        const nomes = dedupeNomesPessoas([
           item.executor_nome,
           item.mecanico_user_nome,
           item.auxiliar_nome,
@@ -755,10 +769,7 @@ function getOSPainel(limit = 15) {
           item.executor_secundario_nome,
           item.auxiliar_secundario_nome,
           item.responsavel_user_nome,
-        ]
-          .map((x) => String(x || "").trim())
-          .filter(Boolean)
-          .filter((nome, idx, arr) => arr.indexOf(nome) === idx);
+        ]);
         const prio = String(item.grau || item.prioridade || "MEDIA").toUpperCase();
         const criticidadeBaixa = ["BAIXA", "BAIXO"].includes(prio);
         const limiteResponsaveis = criticidadeBaixa ? 1 : 2;
