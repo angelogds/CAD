@@ -64,10 +64,29 @@ function findOldOsMediaAttachments(cutoffDate = getRetentionCutoffDate()) {
       ${osOpenedAtExpr} AS opened_at, ${osClosedAtExpr} AS closed_at, COALESCE(u.name,'-') AS responsavel
       FROM anexos a LEFT JOIN os o ON o.id = a.owner_id LEFT JOIN users u ON u.id = ${osOpenedByExpr}
       WHERE a.owner_type='os' AND datetime(a.uploaded_at) <= datetime(?)`).all(cutoff);
-  return rows.filter((r) => {
+  const anexoRows = rows.filter((r) => {
     const ext = path.extname(String(r.filepath || '').split('?')[0]).toLowerCase();
     return MEDIA_EXTENSIONS.has(ext) && Number(r.arquivo_removido || 0) !== 1;
   });
+
+  const fechamentoRows = tableExists('os_fechamento_midias')
+    ? db.prepare(`SELECT m.id, m.os_id, m.caminho_arquivo AS filepath, m.created_at, 0 AS arquivo_removido,
+      ${osEquipamentoExpr} AS equipamento, ${osSetorExpr} AS setor, ${osStatusExpr} AS status,
+      ${osOpenedAtExpr} AS opened_at, ${osClosedAtExpr} AS closed_at, COALESCE(u.name,'-') AS responsavel
+      FROM os_fechamento_midias m
+      LEFT JOIN os o ON o.id = m.os_id
+      LEFT JOIN users u ON u.id = ${osOpenedByExpr}
+      WHERE datetime(m.created_at) <= datetime(?)
+        AND m.caminho_arquivo IS NOT NULL
+        AND m.caminho_arquivo NOT LIKE '__REMOVIDO__:%'`).all(cutoff)
+    : [];
+
+  const midiaRows = fechamentoRows.filter((r) => {
+    const ext = path.extname(String(r.filepath || '').split('?')[0]).toLowerCase();
+    return MEDIA_EXTENSIONS.has(ext);
+  }).map((r) => ({ ...r, sourceTable: 'os_fechamento_midias' }));
+
+  return [...anexoRows.map((r) => ({ ...r, sourceTable: table })), ...midiaRows];
 }
 
 function deletePhysicalFileSafely(filepath) {
@@ -86,8 +105,13 @@ function deletePhysicalFileSafely(filepath) {
   return { removed: false, size: 0, missing: true };
 }
 
-function markAttachmentAsRemoved(attachmentId, executedBy = 'sistema', reason = DEFAULT_REASON) {
+function markAttachmentAsRemoved(attachmentId, executedBy = 'sistema', reason = DEFAULT_REASON, sourceTable = null) {
   const now = new Date().toISOString();
+  if (sourceTable === 'os_fechamento_midias') {
+    db.prepare(`UPDATE os_fechamento_midias SET caminho_arquivo=?, legenda=COALESCE(legenda,'') || ? , updated_at=datetime('now') WHERE id=?`)
+      .run(`__REMOVIDO__:${attachmentId}:${Date.now()}`, ` | [arquivo removido em ${now} por ${executedBy}]`, attachmentId);
+    return;
+  }
   const table = tableExists('os_anexos') ? 'os_anexos' : (tableExists('anexos') ? 'anexos' : null);
   if (!table) return;
   const has = (c) => columnExists(table, c);
@@ -210,7 +234,7 @@ async function runMonthlyMediaCleanup({ executedBy = 'sistema', force = false, e
         const current = osMap.get(item.os_id) || { os_id: item.os_id, equipamento: item.equipamento, setor: item.setor, arquivos: 0, espaco: 0 };
         current.arquivos += 1; current.espaco += del.size; osMap.set(item.os_id, current);
       }
-      markAttachmentAsRemoved(item.id, executedBy, DEFAULT_REASON);
+      markAttachmentAsRemoved(item.id, executedBy, DEFAULT_REASON, item.sourceTable);
       details.push({ os_id: item.os_id, equipamento: item.equipamento, setor: item.setor, status_os: item.status, data_abertura_os: item.opened_at, data_fechamento_os: item.closed_at, responsavel: item.responsavel, filename: path.basename(item.filepath || ''), tipo_arquivo: type, tamanho_bytes: del.size || 0, data_anexo: item.created_at, data_remocao: startedAt, motivo_remocao: DEFAULT_REASON });
     } catch (err) {
       errors.push(`arquivo=${item.filepath} erro=${err.message || err} ação=continuar_processamento`);
