@@ -185,7 +185,7 @@ function getMotoresResumoDashboard() {
         ORDER BY datetime(data_saida) ASC
       `
       )
-      .all();
+      .all(periodo.inicioMes, periodo.inicioProximoMes);
 
     return {
       em_funcionamento: Number(resumo?.em_funcionamento || 0),
@@ -946,6 +946,25 @@ function createAviso({ titulo, mensagem, colaborador_nome, data_referencia, crea
    tabelas corretas: preventiva_planos / preventiva_execucoes
 =================================*/
 
+
+function getMesReferenciaPreventivasISO() {
+  const hoje = new Date();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(hoje);
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  const hojeISO = `${map.year}-${map.month}-${map.day}`;
+  const inicioMes = `${map.year}-${map.month}-01`;
+  const inicioProximoMesDate = new Date(Date.UTC(Number(map.year), Number(map.month), 1));
+  const proxY = inicioProximoMesDate.getUTCFullYear();
+  const proxM = String(inicioProximoMesDate.getUTCMonth() + 1).padStart(2, "0");
+  const inicioProximoMes = `${proxY}-${proxM}-01`;
+  return { hojeISO, inicioMes, inicioProximoMes };
+}
+
 function parseResponsavelTextoLimitado(responsavel, limit = 2) {
   const nomes = String(responsavel || "")
     .split(",")
@@ -1006,6 +1025,14 @@ function getPreventivasDashboard() {
       ${hasResp1 && tableExists("colaboradores") ? "LEFT JOIN colaboradores c1 ON c1.id = pe.responsavel_1_id" : ""}
       ${hasResp2 && tableExists("colaboradores") ? "LEFT JOIN colaboradores c2 ON c2.id = pe.responsavel_2_id" : ""}
       WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ANDAMENTO','EM_ANDAMENTO')
+        AND pe.data_prevista >= ?
+        AND pe.data_prevista < ?
+        AND NOT EXISTS (
+          SELECT 1
+          FROM os o
+          WHERE o.preventiva_execucao_id = pe.id
+            AND UPPER(COALESCE(o.status,'')) NOT IN ('FECHADA','CONCLUIDA','FINALIZADA','CANCELADA')
+        )
       ORDER BY
         CASE WHEN pe.data_prevista IS NULL THEN 1 ELSE 0 END,
         pe.data_prevista ASC,
@@ -1013,8 +1040,9 @@ function getPreventivasDashboard() {
       LIMIT 10
     `
       )
-      .all();
+      .all(periodo.inicioMes, periodo.inicioProximoMes);
 
+    const periodo = getMesReferenciaPreventivasISO();
     let rows = fetchRows();
 
     if (typeof preventivasService?.alocarEquipeExecucaoPreventiva === "function") {
@@ -1073,9 +1101,17 @@ function getPreventivasDashboard() {
 
     const resumoRows = db.prepare(`
       SELECT UPPER(COALESCE(status, 'PENDENTE')) AS status, COUNT(*) AS total
-      FROM preventiva_execucoes
+      FROM preventiva_execucoes pe
+      WHERE pe.data_prevista >= ?
+        AND pe.data_prevista < ?
+        AND NOT EXISTS (
+          SELECT 1
+          FROM os o
+          WHERE o.preventiva_execucao_id = pe.id
+            AND UPPER(COALESCE(o.status,'')) NOT IN ('FECHADA','CONCLUIDA','FINALIZADA','CANCELADA')
+        )
       GROUP BY UPPER(COALESCE(status, 'PENDENTE'))
-    `).all();
+    `).all(periodo.inicioMes, periodo.inicioProximoMes);
     const resumo = { abertas: 0, andamento: 0, fechadas: 0 };
     resumoRows.forEach((r) => {
       const st = String(r.status || "");
@@ -1092,7 +1128,15 @@ function getPreventivasDashboard() {
       JOIN preventiva_planos pp ON pp.id = pe.plano_id
       LEFT JOIN equipamentos e ON e.id = pp.equipamento_id
       WHERE UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ANDAMENTO','EM_ANDAMENTO')
-    `).all();
+        AND pe.data_prevista >= ?
+        AND pe.data_prevista < ?
+        AND NOT EXISTS (
+          SELECT 1
+          FROM os o
+          WHERE o.preventiva_execucao_id = pe.id
+            AND UPPER(COALESCE(o.status,'')) NOT IN ('FECHADA','CONCLUIDA','FINALIZADA','CANCELADA')
+        )
+    `).all(periodo.inicioMes, periodo.inicioProximoMes);
     const criticidadeContagem = typeof preventivasService?.contarPreventivasPorCriticidade === "function"
       ? preventivasService.contarPreventivasPorCriticidade(criticidadeLista)
       : { baixa: 0, media: 0, alta: 0, critica: 0 };
