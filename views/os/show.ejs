@@ -25,6 +25,13 @@
   .whatsapp-btn{display:inline-flex;align-items:center;gap:7px;}
   .wa-icon{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;background:#25d366;color:#fff;font-size:13px;font-weight:900;line-height:1;box-shadow:0 1px 2px rgba(0,0,0,.12)}
   .wa-icon::before{content:"☎";}
+  .os-menu-wrap{position:relative;display:inline-block}
+  .os-menu-btn{display:inline-flex;align-items:center;gap:6px}
+  .os-menu-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:20;background:#fff;border:1px solid #dbe3ee;border-radius:10px;box-shadow:0 8px 20px rgba(15,23,42,.12);padding:10px;min-width:260px;display:none}
+  .os-menu-wrap.open .os-menu-panel{display:block}
+  .os-menu-list{display:flex;flex-direction:column;gap:6px}
+  .os-menu-list a,.os-menu-list button{width:100%;text-align:left}
+  .os-menu-sep{height:1px;background:#e5e7eb;margin:6px 0}
   @media(max-width:900px){.top{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.resumo-exec{grid-template-columns:1fr}}
 </style>
 
@@ -33,7 +40,31 @@
     <h1>OS #<%= os.id %></h1>
     <div class="muted">Solicitante: <strong><%= os.solicitante_nome || '-' %></strong></div>
   </div>
-  <a class="btn btn-ghost" href="/os">Voltar</a>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <% const canOpenOSMenu = canSendWhatsappNotification || canAutoAssign || canManualEditEquipe || canSendWhatsapp; %>
+    <% if (canOpenOSMenu) { %>
+      <div class="os-menu-wrap" id="os-menu-wrap">
+        <button class="btn btn-outline os-menu-btn" type="button" id="os-menu-btn" aria-expanded="false" aria-controls="os-menu-panel">☰ Menu OS</button>
+        <div class="os-menu-panel" id="os-menu-panel">
+          <div class="os-menu-list">
+            <a class="btn btn-outline" href="#tracagens-vinculadas">Traçagens vinculadas</a>
+            <a class="btn btn-outline" href="#equipe-os">Equipe da OS</a>
+            <a class="btn btn-outline" href="#whatsapp-os">Notificações WhatsApp</a>
+            <div class="os-menu-sep"></div>
+            <% if (canAutoAssign) { %>
+              <form method="POST" action="/os/<%= os.id %>/auto-alocar">
+                <button class="btn btn-primary" type="submit">Reatribuir automaticamente</button>
+              </form>
+            <% } %>
+            <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome || whatsappResponsavel?.nome)) { %>
+              <a class="btn btn-green whatsapp-btn" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener"><span class="wa-icon" aria-hidden="true"></span> Enviar WhatsApp local</a>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    <% } %>
+    <a class="btn btn-ghost" href="/os">Voltar</a>
+  </div>
 </div>
 
 <% const isOSFechada = String(os.status || '').toUpperCase() === 'FECHADA'; %>
@@ -98,7 +129,7 @@
     <% } %>
   </div>
 
-  <div class="card">
+  <div class="card" id="tracagens-vinculadas">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
       <h3 style="margin:0;">Traçagens vinculadas</h3>
       <a class="btn btn-green" href="/tracagem?os_id=<%= os.id %>">Abrir Traçagem</a>
@@ -142,7 +173,7 @@
     <% if (canManualEditEquipe) { %>
       <% const mecanicosTurno = (equipeUsuarios || []).filter(u => String(u.funcao || '').toLowerCase() === 'mecanico'); %>
       <% const auxiliaresTurno = (equipeUsuarios || []).filter(u => ['auxiliar','apoio'].includes(String(u.funcao || '').toLowerCase())); %>
-      <form method="POST" action="/os/<%= os.id %>/equipe" style="margin-top:10px;">
+      <form method="POST" action="/os/<%= os.id %>/equipe" style="margin-top:10px;" id="equipe-os">
         <div class="grid2">
           <div>
             <label>Executor</label>
@@ -227,7 +258,7 @@
 
 
 <% if (canSendWhatsappNotification) { %>
-<div class="card" style="margin-top:12px;">
+<div class="card" style="margin-top:12px;" id="whatsapp-os">
   <% const whatsappEquipe = whatsappDestinatarios || []; %>
   <% const whatsPhone = whatsappResponsavel ? (whatsappResponsavel.telefone_normalizado || whatsappResponsavel.colaborador_telefone_whatsapp || whatsappResponsavel.telefone_whatsapp || whatsappResponsavel.user_telefone_whatsapp || whatsappResponsavel.colaborador_telefone || whatsappResponsavel.telefone || '') : ''; %>
   <% const whatsappSemTelefone = whatsappEquipe.filter((p) => !(p.telefone_normalizado || p.colaborador_telefone_whatsapp || p.telefone_whatsapp || p.user_telefone_whatsapp || p.colaborador_telefone || p.telefone)); %>
@@ -445,6 +476,23 @@
 </div>
 
 <script>
+  (function(){
+    const menuWrap = document.getElementById('os-menu-wrap');
+    const menuBtn = document.getElementById('os-menu-btn');
+    if (menuWrap && menuBtn) {
+      menuBtn.addEventListener('click', function(){
+        const isOpen = menuWrap.classList.toggle('open');
+        menuBtn.setAttribute('aria-expanded', String(isOpen));
+      });
+      document.addEventListener('click', function(ev){
+        if (!menuWrap.contains(ev.target)) {
+          menuWrap.classList.remove('open');
+          menuBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+  })();
+
   (function () {
     const input = document.getElementById('fechamento_fotos');
     const preview = document.getElementById('preview-fechamento');
