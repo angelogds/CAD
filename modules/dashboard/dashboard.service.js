@@ -651,6 +651,8 @@ function getOSPainel(limit = 15) {
     const hasColaboradores = tableExists("colaboradores");
     const hasExecColab = osCols.includes("executor_colaborador_id");
     const hasAuxColab = osCols.includes("auxiliar_colaborador_id");
+    const hasExecSecColab = osCols.includes("executor_secundario_colaborador_id");
+    const hasAuxSecColab = osCols.includes("auxiliar_secundario_colaborador_id");
     const hasMecanicoUser = osCols.includes("mecanico_user_id");
     const hasAuxiliarUser = osCols.includes("auxiliar_user_id");
     const hasResponsavelUser = osCols.includes("responsavel_user_id");
@@ -723,6 +725,8 @@ function getOSPainel(limit = 15) {
                  ${usuariosSource ? `COALESCE(usol.${usuariosSource.nameCol},'-')` : "'-'"} AS solicitante,
                  ${hasColaboradores && hasExecColab ? "COALESCE(ce.nome, '')" : "''"} AS executor_nome,
                  ${hasColaboradores && hasAuxColab ? "COALESCE(ca.nome, '')" : "''"} AS auxiliar_nome,
+                 ${hasColaboradores && hasExecSecColab ? "COALESCE(ces.nome, '')" : "''"} AS executor_secundario_nome,
+                 ${hasColaboradores && hasAuxSecColab ? "COALESCE(cas.nome, '')" : "''"} AS auxiliar_secundario_nome,
                  ${usuariosSource && hasMecanicoUser ? `COALESCE(umec.${usuariosSource.nameCol}, '')` : "''"} AS mecanico_user_nome,
                  ${usuariosSource && hasAuxiliarUser ? `COALESCE(uaux.${usuariosSource.nameCol}, '')` : "''"} AS auxiliar_user_nome,
                  ${usuariosSource && hasResponsavelUser ? `COALESCE(uresp.${usuariosSource.nameCol}, '')` : "''"} AS responsavel_user_nome
@@ -734,6 +738,8 @@ function getOSPainel(limit = 15) {
           ${usuariosSource && hasResponsavelUser ? `LEFT JOIN ${usuariosSource.table} uresp ON uresp.${usuariosSource.idCol} = o.responsavel_user_id` : ""}
           ${hasColaboradores && hasExecColab ? "LEFT JOIN colaboradores ce ON ce.id = o.executor_colaborador_id" : ""}
           ${hasColaboradores && hasAuxColab ? "LEFT JOIN colaboradores ca ON ca.id = o.auxiliar_colaborador_id" : ""}
+          ${hasColaboradores && hasExecSecColab ? "LEFT JOIN colaboradores ces ON ces.id = o.executor_secundario_colaborador_id" : ""}
+          ${hasColaboradores && hasAuxSecColab ? "LEFT JOIN colaboradores cas ON cas.id = o.auxiliar_secundario_colaborador_id" : ""}
           WHERE UPPER(COALESCE(o.status,'')) IN ('ABERTA','AGUARDANDO_EQUIPE','ANDAMENTO','EM_ANDAMENTO','PAUSADA')
           ORDER BY datetime(${orderCol}) DESC
           LIMIT ?
@@ -746,6 +752,8 @@ function getOSPainel(limit = 15) {
           item.mecanico_user_nome,
           item.auxiliar_nome,
           item.auxiliar_user_nome,
+          item.executor_secundario_nome,
+          item.auxiliar_secundario_nome,
           item.responsavel_user_nome,
         ]
           .map((x) => String(x || "").trim())
@@ -758,7 +766,7 @@ function getOSPainel(limit = 15) {
         return {
           ...item,
           equipamento: item.equipamento || "-",
-          responsavel_exibicao: nomesLimitados.length ? nomesLimitados.join(", ") : "-",
+          responsavel_exibicao: nomesLimitados.length ? nomesLimitados.join("\n") : "-",
         };
       });
 
