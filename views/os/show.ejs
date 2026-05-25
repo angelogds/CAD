@@ -31,6 +31,8 @@
   .os-menu-wrap.open .os-menu-panel{display:block}
   .os-menu-list{display:flex;flex-direction:column;gap:6px}
   .os-menu-list a,.os-menu-list button{width:100%;text-align:left}
+  .os-module{display:none}
+  .os-module.active{display:block}
   .os-menu-sep{height:1px;background:#e5e7eb;margin:6px 0}
   @media(max-width:900px){.top{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.resumo-exec{grid-template-columns:1fr}}
 </style>
@@ -47,9 +49,9 @@
         <button class="btn btn-outline os-menu-btn" type="button" id="os-menu-btn" aria-expanded="false" aria-controls="os-menu-panel">☰ Menu OS</button>
         <div class="os-menu-panel" id="os-menu-panel">
           <div class="os-menu-list">
-            <a class="btn btn-outline" href="#tracagens-vinculadas">Traçagens vinculadas</a>
-            <a class="btn btn-outline" href="#equipe-os">Equipe da OS</a>
-            <a class="btn btn-outline" href="#whatsapp-os">Notificações WhatsApp</a>
+            <button class="btn btn-outline" type="button" data-os-module="tracagens-vinculadas">Traçagens vinculadas</button>
+            <button class="btn btn-outline" type="button" data-os-module="equipe-os">Equipe da OS</button>
+            <button class="btn btn-outline" type="button" data-os-module="whatsapp-os">Notificações WhatsApp</button>
             <div class="os-menu-sep"></div>
             <% if (canAutoAssign) { %>
               <form method="POST" action="/os/<%= os.id %>/auto-alocar">
@@ -131,7 +133,7 @@
     <% } %>
   </div>
 
-  <div class="card" id="tracagens-vinculadas">
+  <div class="card os-module" id="tracagens-vinculadas">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
       <h3 style="margin:0;">Traçagens vinculadas</h3>
       <a class="btn btn-green" href="/tracagem?os_id=<%= os.id %>">Abrir Traçagem</a>
@@ -175,7 +177,8 @@
     <% if (canManualEditEquipe) { %>
       <% const mecanicosTurno = (equipeUsuarios || []).filter(u => String(u.funcao || '').toLowerCase() === 'mecanico'); %>
       <% const auxiliaresTurno = (equipeUsuarios || []).filter(u => ['auxiliar','apoio'].includes(String(u.funcao || '').toLowerCase())); %>
-      <form method="POST" action="/os/<%= os.id %>/equipe" style="margin-top:10px;" id="equipe-os">
+      <div id="equipe-os">
+      <form method="POST" action="/os/<%= os.id %>/equipe" style="margin-top:10px;">
         <div class="grid2">
           <div>
             <label>Executor</label>
@@ -246,6 +249,7 @@
         </div>
         <div style="margin-top:8px;"><button class="btn" type="submit">Salvar equipe</button></div>
       </form>
+    </div>
     <% } %>
     <ul style="margin-top:8px;">
       <% if (!(tracagens||[]).length) { %>
@@ -260,7 +264,7 @@
 
 
 <% if (canSendWhatsappNotification) { %>
-<div class="card" style="margin-top:12px;" id="whatsapp-os">
+<div class="card os-module" style="margin-top:12px;" id="whatsapp-os">
   <% const whatsappEquipe = whatsappDestinatarios || []; %>
   <% const whatsPhone = whatsappResponsavel ? (whatsappResponsavel.telefone_normalizado || whatsappResponsavel.colaborador_telefone_whatsapp || whatsappResponsavel.telefone_whatsapp || whatsappResponsavel.user_telefone_whatsapp || whatsappResponsavel.colaborador_telefone || whatsappResponsavel.telefone || '') : ''; %>
   <% const whatsappSemTelefone = whatsappEquipe.filter((p) => !(p.telefone_normalizado || p.colaborador_telefone_whatsapp || p.telefone_whatsapp || p.user_telefone_whatsapp || p.colaborador_telefone || p.telefone)); %>
@@ -411,7 +415,7 @@
 
 </div>
 <% } else { %>
-  <div class="card" style="margin-top:12px;">
+  <div class="card os-module" style="margin-top:12px;" id="whatsapp-os">
     <div class="card-head">
       <div>
         <h3 style="margin:0;">Notificação WhatsApp</h3>
@@ -481,10 +485,31 @@
   (function(){
     const menuWrap = document.getElementById('os-menu-wrap');
     const menuBtn = document.getElementById('os-menu-btn');
+    function activateModule(moduleId) {
+      const modules = document.querySelectorAll('.os-module');
+      modules.forEach((el) => el.classList.remove('active'));
+      const target = document.getElementById(moduleId);
+      if (target) target.classList.add('active');
+    }
+
     if (menuWrap && menuBtn) {
       menuBtn.addEventListener('click', function(){
         const isOpen = menuWrap.classList.toggle('open');
         menuBtn.setAttribute('aria-expanded', String(isOpen));
+      });
+      menuWrap.querySelectorAll('[data-os-module]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          const moduleId = btn.getAttribute('data-os-module');
+          if (moduleId === 'equipe-os') {
+            activateModule('tracagens-vinculadas');
+            const equipe = document.getElementById('equipe-os');
+            if (equipe) equipe.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } else {
+            activateModule(moduleId);
+          }
+          menuWrap.classList.remove('open');
+          menuBtn.setAttribute('aria-expanded', 'false');
+        });
       });
       document.addEventListener('click', function(ev){
         if (!menuWrap.contains(ev.target)) {
