@@ -203,7 +203,7 @@
       return `<tr class="${critic ? 'critical-row' : ''}">
         <td>#${o.id || '-'}</td>
         <td>${o.equipamento || '-'}</td>
-        <td>${o.responsavel_exibicao || '-'}</td>
+        <td>${String(o.responsavel_exibicao || '-').replace(/\n/g, '<br>')}</td>
         <td><span class="tv-pill ${critic ? 'pill-red' : 'pill-blue'}">${prio}</span></td>
         <td>${o.status || '-'}</td>
         <td>${formatDate(o.abertura || o.opened_at)}</td>

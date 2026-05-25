@@ -239,7 +239,7 @@
             <tr class="<%= rowClass %>">
               <td><%= o.id %></td>
               <td><strong><%= o.equipamento || '-' %></strong></td>
-              <td><%= o.responsavel_exibicao || '-' %></td>
+              <td style="white-space:pre-line;"><%= o.responsavel_exibicao || '-' %></td>
               <td><span class="pill-prioridade <%= (prio === 'CRITICO' || prio === 'CRÍTICO' || prio === 'EMERGENCIAL') ? 'emergencial' : ((prio === 'ALTO' || prio === 'ALTA' || prio === 'MEDIO' || prio === 'MÉDIO' || prio === 'MEDIA') ? 'alta' : '') %>"><%= prio %></span></td>
               <td>
                 <% var statusOs = String(o.status || '').toUpperCase(); %>

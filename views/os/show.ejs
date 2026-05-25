@@ -72,6 +72,8 @@
       </div>
       <div><b>Executor em andamento:</b> <%= os.executor_nome || os.execucao_ativa?.executor_nome || '-' %></div>
       <div><b>Auxiliar em andamento:</b> <%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></div>
+      <div><b>2º mecânico em andamento:</b> <%= os.executor_secundario_nome || '-' %></div>
+      <div><b>2º apoio em andamento:</b> <%= os.auxiliar_secundario_nome || '-' %></div>
       <div><b>Modo da alocação:</b> <%= os.alocacao_modo || '-' %></div>
     </div>
 

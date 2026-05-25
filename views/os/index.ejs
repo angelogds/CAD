@@ -438,9 +438,10 @@
             : (st === 'CONCLUIDA' || st === 'FINALIZADA' || st === 'FECHADA') ? 'pill-green'
             : (st === 'CANCELADA') ? 'pill-red'
             : 'pill-gray';
-          const principal = o.mecanico_nome || '-';
-          const apoio = o.auxiliar_nome || '';
-          const executores = apoio ? `${principal} + ${apoio}` : principal;
+          const executores = [o.mecanico_nome, o.auxiliar_nome, o.mecanico_secundario_nome, o.auxiliar_secundario_nome]
+            .map(v => String(v || '').trim())
+            .filter(Boolean)
+            .join(' + ') || '-';
         %>
           <tr>
             <td>
@@ -494,9 +495,10 @@
         : (st === 'CONCLUIDA' || st === 'FINALIZADA' || st === 'FECHADA') ? 'pill-green'
         : (st === 'CANCELADA') ? 'pill-red'
         : 'pill-gray';
-      const principal = o.mecanico_nome || '-';
-      const apoio = o.auxiliar_nome || '';
-      const executores = apoio ? `${principal} + ${apoio}` : principal;
+      const executores = [o.mecanico_nome, o.auxiliar_nome, o.mecanico_secundario_nome, o.auxiliar_secundario_nome]
+        .map(v => String(v || '').trim())
+        .filter(Boolean)
+        .join(' + ') || '-';
     %>
       <a class="os-card" href="/os/<%= o.id %>">
         <div class="os-card-head">
