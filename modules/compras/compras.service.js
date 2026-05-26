@@ -79,6 +79,7 @@ function buildSolicitacaoItensSelect() {
   const hasDescricao = columnExists('solicitacao_itens', 'descricao');
   const hasQtdSolicitada = columnExists('solicitacao_itens', 'qtd_solicitada');
   const hasEstoqueItemId = columnExists('solicitacao_itens', 'estoque_item_id');
+  const hasItemId = columnExists('solicitacao_itens', 'item_id');
 
   const itemNomeExpr = hasItemNome && hasDescricao
     ? "COALESCE(si.item_nome, si.descricao, ei.nome)"
@@ -97,9 +98,13 @@ function buildSolicitacaoItensSelect() {
   const qtdExpr = hasQtdSolicitada
     ? "COALESCE(si.qtd_solicitada, si.quantidade, 0)"
     : 'COALESCE(si.quantidade, 0)';
-  const itemJoinExpr = hasEstoqueItemId
+  const itemJoinExpr = hasEstoqueItemId && hasItemId
     ? 'COALESCE(si.estoque_item_id, si.item_id)'
-    : 'si.item_id';
+    : hasEstoqueItemId
+      ? 'si.estoque_item_id'
+      : hasItemId
+        ? 'si.item_id'
+        : 'NULL';
 
   return {
     itemNomeExpr,
