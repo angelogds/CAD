@@ -165,18 +165,73 @@ function getCountersForUser(userId) {
 }
 
 function getSolicitacaoById(id) {
+  const usersTable = tableExists("users") ? "users" : (tableExists("usuarios") ? "usuarios" : "users");
+  const usersNameCol = columnExists(usersTable, "name") ? "name" : (columnExists(usersTable, "nome") ? "nome" : "name");
+  const usersRoleCol = columnExists(usersTable, "role") ? "role" : (columnExists(usersTable, "perfil") ? "perfil" : null);
+  const hasComprasUserId = hasColumn("solicitacoes", "compras_user_id");
+  const hasAlmoxUserId = hasColumn("solicitacoes", "almox_user_id");
+  const hasEquipamentoId = hasColumn("solicitacoes", "equipamento_id");
+  const hasItemNome = hasColumn("solicitacao_itens", "item_nome");
+  const hasItemDescricao = hasColumn("solicitacao_itens", "item_descricao");
+  const hasDescricao = hasColumn("solicitacao_itens", "descricao");
+  const hasQtdSolicitada = hasColumn("solicitacao_itens", "qtd_solicitada");
+  const hasQuantidade = hasColumn("solicitacao_itens", "quantidade");
+  const hasQtdRecebidaTotal = hasColumn("solicitacao_itens", "qtd_recebida_total");
+  const hasEstoqueItemId = hasColumn("solicitacao_itens", "estoque_item_id");
+  const hasItemId = hasColumn("solicitacao_itens", "item_id");
+
   const sol = db.prepare(`
-    SELECT s.*, u.name AS solicitante_nome, u.role AS solicitante_role, cu.name AS compras_nome, au.name AS almox_nome,
-           e.nome AS equipamento_nome
+    SELECT s.*, u.${usersNameCol} AS solicitante_nome, ${usersRoleCol ? `u.${usersRoleCol}` : "NULL"} AS solicitante_role,
+           ${hasComprasUserId ? `cu.${usersNameCol}` : "NULL"} AS compras_nome,
+           ${hasAlmoxUserId ? `au.${usersNameCol}` : "NULL"} AS almox_nome,
+           ${hasEquipamentoId ? "e.nome" : "NULL"} AS equipamento_nome
     FROM solicitacoes s
-    JOIN users u ON u.id = s.solicitante_user_id
-    LEFT JOIN users cu ON cu.id = s.compras_user_id
-    LEFT JOIN users au ON au.id = s.almox_user_id
-    LEFT JOIN equipamentos e ON e.id = s.equipamento_id
+    JOIN ${usersTable} u ON u.id = s.solicitante_user_id
+    ${hasComprasUserId ? `LEFT JOIN ${usersTable} cu ON cu.id = s.compras_user_id` : ""}
+    ${hasAlmoxUserId ? `LEFT JOIN ${usersTable} au ON au.id = s.almox_user_id` : ""}
+    ${hasEquipamentoId ? "LEFT JOIN equipamentos e ON e.id = s.equipamento_id" : ""}
     WHERE s.id = ?
   `).get(id);
   if (!sol) return null;
-  const itens = db.prepare(`SELECT si.*, COALESCE(si.item_nome, si.descricao, ei.nome) AS item_nome, COALESCE(si.item_descricao, si.descricao) AS item_descricao, COALESCE(si.qtd_solicitada, si.quantidade, 0) AS qtd_solicitada, COALESCE(si.qtd_recebida_total, 0) AS qtd_recebida_total, (COALESCE(si.qtd_solicitada, si.quantidade, 0) - COALESCE(si.qtd_recebida_total, 0)) AS qtd_pendente, ei.codigo AS estoque_codigo FROM solicitacao_itens si LEFT JOIN estoque_itens ei ON ei.id = COALESCE(si.estoque_item_id, si.item_id) WHERE si.solicitacao_id = ? ORDER BY si.id`).all(id);
+  const itemNomeExpr = hasItemNome && hasDescricao
+    ? "COALESCE(si.item_nome, si.descricao, ei.nome)"
+    : hasItemNome
+      ? "COALESCE(si.item_nome, ei.nome)"
+      : hasDescricao
+        ? "COALESCE(si.descricao, ei.nome)"
+        : "COALESCE(ei.nome, '')";
+  const itemDescricaoExpr = hasItemDescricao && hasDescricao
+    ? "COALESCE(si.item_descricao, si.descricao)"
+    : hasItemDescricao
+      ? "si.item_descricao"
+      : hasDescricao
+        ? "si.descricao"
+        : "''";
+  const qtdSolicitadaExpr = hasQtdSolicitada && hasQuantidade
+    ? "COALESCE(si.qtd_solicitada, si.quantidade, 0)"
+    : hasQtdSolicitada
+      ? "COALESCE(si.qtd_solicitada, 0)"
+      : hasQuantidade
+        ? "COALESCE(si.quantidade, 0)"
+        : "0";
+  const qtdRecebidaExpr = hasQtdRecebidaTotal ? "COALESCE(si.qtd_recebida_total, 0)" : "0";
+  const itemJoinExpr = hasEstoqueItemId && hasItemId
+    ? "COALESCE(si.estoque_item_id, si.item_id)"
+    : hasEstoqueItemId
+      ? "si.estoque_item_id"
+      : hasItemId
+        ? "si.item_id"
+        : "NULL";
+
+  const itens = db.prepare(`
+    SELECT si.*, ${itemNomeExpr} AS item_nome, ${itemDescricaoExpr} AS item_descricao,
+           ${qtdSolicitadaExpr} AS qtd_solicitada, ${qtdRecebidaExpr} AS qtd_recebida_total,
+           (${qtdSolicitadaExpr} - ${qtdRecebidaExpr}) AS qtd_pendente, ei.codigo AS estoque_codigo
+    FROM solicitacao_itens si
+    LEFT JOIN estoque_itens ei ON ei.id = ${itemJoinExpr}
+    WHERE si.solicitacao_id = ?
+    ORDER BY si.id
+  `).all(id);
   return { ...sol, itens };
 }
 
