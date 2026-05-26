@@ -228,13 +228,19 @@ async function runMonthlyMediaCleanup({ executedBy = 'sistema', force = false, e
     try {
       const del = deletePhysicalFileSafely(item.filepath);
       if (del.missing) missing += 1;
+      if (del.blocked) {
+        errors.push(`arquivo=${item.filepath} erro=caminho_bloqueado_ou_protegido ação=nao_marcar_removido`);
+        continue;
+      }
       if (del.removed) {
         removed += 1; freed += del.size;
         if (type === 'FOTO') fotos += 1; else if (type === 'VIDEO') videos += 1; else outros += 1;
         const current = osMap.get(item.os_id) || { os_id: item.os_id, equipamento: item.equipamento, setor: item.setor, arquivos: 0, espaco: 0 };
         current.arquivos += 1; current.espaco += del.size; osMap.set(item.os_id, current);
       }
-      markAttachmentAsRemoved(item.id, executedBy, DEFAULT_REASON, item.sourceTable);
+      if (del.removed || del.missing) {
+        markAttachmentAsRemoved(item.id, executedBy, DEFAULT_REASON, item.sourceTable);
+      }
       details.push({ os_id: item.os_id, equipamento: item.equipamento, setor: item.setor, status_os: item.status, data_abertura_os: item.opened_at, data_fechamento_os: item.closed_at, responsavel: item.responsavel, filename: path.basename(item.filepath || ''), tipo_arquivo: type, tamanho_bytes: del.size || 0, data_anexo: item.created_at, data_remocao: startedAt, motivo_remocao: DEFAULT_REASON });
     } catch (err) {
       errors.push(`arquivo=${item.filepath} erro=${err.message || err} ação=continuar_processamento`);
