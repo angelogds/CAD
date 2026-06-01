@@ -1,0 +1,25 @@
+<% layout('layout') %>
+<div class="page-head">
+  <div>
+    <h1>Relatório de OS em Andamento — Rastreabilidade de Equipamentos</h1>
+    <p class="muted">PAC 01 • <%= String(mes).padStart(2, '0') %>/<%= ano %> • Motivos de permanência em aberto e ações necessárias.</p>
+  </div>
+  <a class="btn btn-outline" href="/inspecao/<%= ano %>/<%= mes %>">← Voltar à inspeção</a>
+</div>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th>OS</th><th>Equipamento</th><th>Não conformidade</th><th>Abertura</th><th>Início</th><th>Dias em aberto</th><th>Status</th><th>Responsável</th><th>Motivo atual</th><th>Justificativa técnica</th><th>Última atualização</th><th>Material chegou em</th><th>Ação necessária</th><th>Histórico resumido</th></tr></thead>
+    <tbody>
+      <% if (!(osEmAndamento || []).length) { %><tr><td colspan="14">Nenhuma OS aberta ou em andamento no período.</td></tr><% } %>
+      <% (osEmAndamento || []).forEach((os) => { %>
+        <tr>
+          <td><a class="btn btn-outline btn-sm" href="/os/<%= os.id %>#justificativa-andamento">#<%= os.id %></a></td>
+          <td><%= os.equipamento || '-' %></td><td><%= os.nao_conformidade || '-' %></td>
+          <td><%= os.opened_at ? fmtBR(os.opened_at) : '-' %></td><td><%= os.data_inicio ? fmtBR(os.data_inicio) : '-' %></td><td><%= os.dias_aberta %></td>
+          <td><%= os.status || '-' %></td><td><%= os.responsavel || '-' %></td><td><%= os.motivo_atual || 'Justificativa pendente' %></td>
+          <td><%= os.ultima_justificativa || '-' %></td><td><%= os.ultima_atualizacao ? fmtBR(os.ultima_atualizacao) : '-' %></td><td><%= os.material_chegou_em ? fmtBR(os.material_chegou_em) : '-' %></td><td><%= os.acao_necessaria %></td><td><%= os.historico_resumido_texto || '-' %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

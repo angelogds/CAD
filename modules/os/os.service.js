@@ -1233,6 +1233,136 @@ function listOpenOSByColaborador(colaboradorId) {
   `).all(...statusAbertos, ...params);
 }
 
+const STATUS_OS_EM_ANDAMENTO = ["ABERTA", "ANDAMENTO", "EM_ANDAMENTO", "PAUSADA", "AGUARDANDO_EQUIPE"];
+
+function isStatusOSEmAndamento(status) {
+  return STATUS_OS_EM_ANDAMENTO.includes(String(status || "").trim().toUpperCase());
+}
+
+function parseLocalDateOnly(value) {
+  if (!value) return null;
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+function dataLocalHoje() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+function calcularDiasAbertaOS(os = {}) {
+  const inicioAberta = parseLocalDateOnly(os.opened_at || os.created_at || os.data_inicio);
+  const inicioAndamento = parseLocalDateOnly(os.started_at || os.data_inicio || os.opened_at || os.created_at);
+  const fim = parseLocalDateOnly(os.closed_at || os.data_fim || os.data_conclusao) || parseLocalDateOnly(dataLocalHoje());
+  const diff = (from) => from && fim ? Math.max(0, Math.floor((fim.getTime() - from.getTime()) / 86400000)) : 0;
+  const diasAberta = diff(inicioAberta);
+  return {
+    dias_aberta: diasAberta,
+    dias_em_andamento: diff(inicioAndamento),
+    status_atual: String(os.status || "").toUpperCase(),
+    tempo_total_em_aberto: `${diasAberta} dia(s)`,
+  };
+}
+
+function listMotivosAndamento() {
+  if (!tableExists("os_andamento_motivos")) return [];
+  return db.prepare(`SELECT codigo, nome, texto_padrao, exige_observacao, ordem FROM os_andamento_motivos WHERE ativo = 1 ORDER BY ordem, nome`).all();
+}
+
+function getHistoricoAndamentoOS(osId) {
+  if (!tableExists("os_andamento_historico")) return [];
+  return db.prepare(`
+    SELECT h.*, COALESCE(u.name, u.email, '-') AS registrado_por_nome
+    FROM os_andamento_historico h
+    LEFT JOIN users u ON u.id = h.registrado_por
+    WHERE h.os_id = ?
+    ORDER BY datetime(h.registrado_em) DESC, h.id DESC
+  `).all(Number(osId));
+}
+
+function temJustificativaAndamentoHoje(osId) {
+  if (!tableExists("os_andamento_historico")) return false;
+  return !!db.prepare(`
+    SELECT 1
+    FROM os_andamento_historico
+    WHERE os_id = ? AND date(registrado_em) = date('now','localtime')
+    LIMIT 1
+  `).get(Number(osId));
+}
+
+const ACAO_NECESSARIA_ANDAMENTO = {
+  FALTA_MATERIAL: "Solicitar/comprar material",
+  AGUARDANDO_COMPRA: "Acompanhar compras",
+  MATERIAL_CHEGOU: "Retomar execução",
+  FALTA_MAO_DE_OBRA: "Reprogramar equipe",
+  EQUIPAMENTO_EM_PRODUCAO: "Aguardar parada/liberação da produção",
+  AGUARDANDO_TERCEIRO: "Acompanhar prestador externo",
+  AGUARDANDO_PECA_TORNEARIA: "Acompanhar retorno da tornearia",
+  FALTA_FERRAMENTA: "Providenciar ferramenta ou recurso adequado",
+  SERVICO_COMPLEXO_CONTINUIDADE: "Reprogramar continuidade",
+  RISCO_SEGURANCA: "Liberar condição segura/bloqueio",
+  AGUARDANDO_APROVACAO: "Solicitar avaliação do encarregado",
+  OUTRO: "Avaliar observação operacional",
+};
+
+function getAcaoNecessariaAndamento(motivoCodigo) {
+  return ACAO_NECESSARIA_ANDAMENTO[String(motivoCodigo || "").trim().toUpperCase()]
+    || "Registrar e acompanhar ação necessária";
+}
+
+async function registrarJustificativaAndamento(osId, payload = {}) {
+  const id = Number(osId);
+  const os = getOSById(id);
+  if (!os) throw new Error("OS não encontrada.");
+  if (!isStatusOSEmAndamento(os.status)) throw new Error("Somente OS abertas ou em andamento podem receber justificativa.");
+  if (!tableExists("os_andamento_motivos") || !tableExists("os_andamento_historico")) throw new Error("Estrutura de justificativas ainda não migrada.");
+
+  const codigo = String(payload.motivo_codigo || "").trim().toUpperCase();
+  const motivo = db.prepare(`SELECT * FROM os_andamento_motivos WHERE codigo = ? AND ativo = 1`).get(codigo);
+  if (!motivo) throw new Error("Selecione um motivo de andamento válido.");
+  const observacao = String(payload.observacao_mecanico || "").trim().slice(0, 500) || null;
+  if (Number(motivo.exige_observacao || 0) === 1 && !observacao) throw new Error("Informe uma observação complementar para este motivo.");
+
+  const historicoAnterior = getHistoricoAndamentoOS(id);
+  const dadosJustificativa = {
+    numero_os: os.id,
+    equipamento: os.equipamento_resolvido,
+    nao_conformidade: os.descricao || os.sintoma_principal || null,
+    data_abertura: os.opened_at || os.created_at || null,
+    status_atual: os.status,
+    motivo: motivo.nome,
+    texto_padrao: motivo.texto_padrao,
+    observacao_mecanico: observacao,
+    responsavel: os.executor_nome || os.mecanico_nome || null,
+    historico_anterior: historicoAnterior.map((item) => ({ motivo: item.motivo_nome, registrado_em: item.registrado_em })),
+  };
+  const fallback = osIAService.montarFallbackJustificativaAndamento(dadosJustificativa);
+  let textoTecnico = fallback;
+  try {
+    textoTecnico = await osIAService.gerarJustificativaTecnicaAndamentoOS(dadosJustificativa) || fallback;
+  } catch (_e) {
+    textoTecnico = fallback;
+  }
+
+  db.transaction(() => {
+    db.prepare(`
+      INSERT INTO os_andamento_historico
+        (os_id, motivo_codigo, motivo_nome, texto_padrao, observacao_mecanico, texto_ia, status_os_no_momento, registrado_por)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, motivo.codigo, motivo.nome, motivo.texto_padrao, observacao, textoTecnico, os.status, Number(payload.usuario_id || 0) || null);
+    db.prepare(`
+      UPDATE os
+      SET ultimo_motivo_andamento = ?, ultima_justificativa_andamento = ?, ultimo_registro_andamento_em = datetime('now','localtime')
+      WHERE id = ?
+    `).run(motivo.nome, textoTecnico, id);
+  })();
+  syncInspecaoFromOS(id);
+  emitOSEvents(id, "status");
+  return getHistoricoAndamentoOS(id)[0];
+}
+
 function listOS() {
   const cols = getOSColumns();
 
@@ -1268,6 +1398,13 @@ function listOS() {
               ${openedExpr} AS opened_at,
               ${startedExpr} AS started_at,
               ${closedExpr} AS closed_at,
+              o.ultimo_motivo_andamento,
+              o.ultima_justificativa_andamento,
+              o.ultimo_registro_andamento_em,
+              EXISTS (
+                SELECT 1 FROM os_andamento_historico oh
+                WHERE oh.os_id = o.id AND date(oh.registrado_em) = date('now','localtime')
+              ) AS justificativa_andamento_hoje,
               COALESCE(u.name, u.email, '-') AS solicitante,
               COALESCE(ce.nome, m.name) AS mecanico_nome,
               COALESCE(ca.nome, a.name) AS auxiliar_nome,
@@ -1285,7 +1422,8 @@ function listOS() {
        ORDER BY o.id DESC
        LIMIT 300`
     )
-    .all();
+    .all()
+    .map((row) => ({ ...row, ...calcularDiasAbertaOS(row), status_em_andamento: isStatusOSEmAndamento(row.status) }));
 }
 
 function deleteOS(osId) {
@@ -2435,6 +2573,15 @@ function patchAIFields(osId, payload = {}) {
 
 
 module.exports = {
+  STATUS_OS_EM_ANDAMENTO,
+  isStatusOSEmAndamento,
+  dataLocalHoje,
+  calcularDiasAbertaOS,
+  listMotivosAndamento,
+  getHistoricoAndamentoOS,
+  temJustificativaAndamentoHoje,
+  getAcaoNecessariaAndamento,
+  registrarJustificativaAndamento,
   listOS,
   listOpenOSByColaborador,
   deleteOS,

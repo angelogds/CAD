@@ -263,6 +263,61 @@
 </div>
 
 
+
+<% const statusPermiteAndamento = ['ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA','AGUARDANDO_EQUIPE'].includes(String(os.status || '').toUpperCase()); %>
+<div class="card" id="justificativa-andamento" style="margin-top:12px;">
+  <div class="card-head">
+    <div>
+      <h3 style="margin:0;">Justificativa de OS em andamento</h3>
+      <div class="muted">Rastreabilidade diária da permanência da OS em aberto, preservada também após a finalização.</div>
+    </div>
+    <span class="badge-funcao <%= alertaJustificativaAndamento ? 'func-mec' : 'func-aux' %>"><%= metricasAndamento.dias_aberta %> dia(s) aberta</span>
+  </div>
+
+  <% if (alertaJustificativaAndamento) { %>
+    <div class="alert alert-error" style="margin-bottom:12px;">Esta OS está aberta há mais de 1 dia. Registre o motivo da permanência em andamento para manter a rastreabilidade do equipamento.</div>
+  <% } %>
+
+  <div class="grid2">
+    <div><b>Data de abertura:</b> <%= os.opened_at ? fmtBR(os.opened_at) : '-' %></div>
+    <div><b>Data de início:</b> <%= os.data_inicio ? fmtBR(os.data_inicio) : (os.execucao_iniciada_em ? fmtBR(os.execucao_iniciada_em) : '-') %></div>
+    <div><b>Responsável/mecânico:</b> <%= os.executor_nome || os.execucao_ativa?.executor_nome || '-' %></div>
+    <div><b>Último motivo:</b> <%= os.ultimo_motivo_andamento || '-' %></div>
+    <div style="grid-column:1/-1;"><b>Última justificativa técnica:</b><br><%= os.ultima_justificativa_andamento || '-' %></div>
+  </div>
+
+  <% if (statusPermiteAndamento && canRegisterAndamento) { %>
+    <form method="POST" action="/os/<%= os.id %>/andamento/registrar" style="margin-top:14px;">
+      <div class="muted" style="font-weight:700;margin-bottom:7px;">Selecione um motivo rápido:</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:7px;">
+        <% (motivosAndamento || []).forEach((motivo) => { %>
+          <label style="display:flex;gap:8px;align-items:flex-start;border:1px solid #e2e8f0;border-radius:10px;padding:9px;cursor:pointer;">
+            <input type="radio" name="motivo_codigo" value="<%= motivo.codigo %>" required>
+            <span><b><%= motivo.nome %></b><% if (motivo.exige_observacao) { %><br><small class="muted">Exige observação curta</small><% } %></span>
+          </label>
+        <% }) %>
+      </div>
+      <label style="display:block;margin-top:10px;"><b>Observação complementar do mecânico</b>
+        <textarea name="observacao_mecanico" maxlength="500" rows="3" placeholder="Opcional, exceto para Outro motivo" style="width:100%;margin-top:5px;border:1px solid #d1d5db;border-radius:10px;padding:9px;"></textarea>
+      </label>
+      <div class="actions" style="margin-top:10px;">
+        <button class="btn btn-green" type="submit">Registrar justificativa</button>
+        <button class="btn btn-outline" type="submit" formaction="/os/<%= os.id %>/material-chegou" formnovalidate>Material chegou</button>
+      </div>
+    </form>
+  <% } %>
+
+  <h4 style="margin:16px 0 6px;">Linha do tempo da OS</h4>
+  <ol style="margin:0;padding-left:20px;">
+    <li>OS aberta em <%= os.opened_at ? fmtBR(os.opened_at) : '-' %>.</li>
+    <% if (os.data_inicio || os.execucao_iniciada_em) { %><li>OS iniciada em <%= fmtBR(os.data_inicio || os.execucao_iniciada_em) %>.</li><% } %>
+    <% (historicoAndamento || []).slice().reverse().forEach((item) => { %>
+      <li style="margin-top:6px;"><b><%= item.motivo_nome %></b> — <%= item.registrado_em ? fmtBR(item.registrado_em) : '-' %><br><span class="muted"><%= item.texto_ia || item.texto_padrao %><% if (item.observacao_mecanico) { %> Observação: <%= item.observacao_mecanico %><% } %></span></li>
+    <% }) %>
+    <% if (isOSFechada) { %><li style="margin-top:6px;">OS finalizada em <%= os.data_conclusao || os.closed_at || os.data_fim ? fmtBR(os.data_conclusao || os.closed_at || os.data_fim) : '-' %>.</li><% } %>
+  </ol>
+</div>
+
 <% if (canSendWhatsappNotification) { %>
 <div class="card os-module" style="margin-top:12px;" id="whatsapp-os">
   <% const whatsappEquipe = whatsappDestinatarios || []; %>

@@ -27,6 +27,7 @@ function loadPageData(req) {
   const matrix = service.buildMatrix(inspecao.id, ano, mes, equipamentos);
   const ncList = service.listNC(inspecao.id);
   const osDetailsByCell = service.listOSDetailsByInspecao(inspecao.id, mes, ano);
+  const osEmAndamento = service.listOSEmAndamentoDetalhadas(inspecao.id, mes, ano);
 
   return {
     ano,
@@ -36,6 +37,7 @@ function loadPageData(req) {
     matrix,
     ncList,
     osDetailsByCell,
+    osEmAndamento,
     diasMes: service.daysInMonth(ano, mes),
     backUrl: req.get("Referrer") || "/dashboard",
   };
@@ -52,6 +54,19 @@ function viewMonth(req, res) {
     return res.render("inspecao/index", {
       layout: "layout",
       title: "PAC 01 – Manutenção (Inspeção)",
+      activeMenu: "inspecao",
+      ...data,
+    });
+  });
+}
+
+
+function viewOSEmAndamento(req, res) {
+  return withInspecaoErrorHandling(req, res, () => {
+    const data = loadPageData(req);
+    return res.render("inspecao/os-em-andamento", {
+      layout: "layout",
+      title: "Relatório de OS em Andamento — Rastreabilidade de Equipamentos",
       activeMenu: "inspecao",
       ...data,
     });
@@ -130,6 +145,7 @@ function exportXLS(req, res) {
 module.exports = {
   index,
   viewMonth,
+  viewOSEmAndamento,
   recalculate,
   recalculateCurrent,
   editStatus,
