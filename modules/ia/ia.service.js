@@ -391,6 +391,7 @@ async function transcreverAudioFechamento({ buffer, mimeType, timeoutMs }) {
   });
 }
 
+
 module.exports = {
   gerarAberturaAutomaticaDaOS,
   gerarFechamentoAutomaticoOS,

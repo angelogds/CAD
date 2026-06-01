@@ -12,6 +12,21 @@ const OS_EXECUTION_ACCESS = [
   'COMPRAS',
 ];
 
+// Perfis autorizados a registrar a justificativa operacional sem encerrar a OS.
+const OS_ANDAMENTO_ACCESS = [
+  'ADMIN',
+  'MECANICO',
+  'ENCARREGADO',
+  'SUPERVISOR_MANUTENCAO',
+  'MANUTENCAO_SUPERVISOR',
+];
+
+function canRegisterOSAndamento(userOrRole) {
+  const role = typeof userOrRole === 'string' ? userOrRole : userOrRole?.role;
+  const normalized = normalizeRole(role);
+  return OS_ANDAMENTO_ACCESS.map(normalizeRole).includes(normalized);
+}
+
 // Perfis com acesso à tela detalhada (inclusive quando já fechada).
 const OS_DETALHE_ACCESS = [
   'MANUTENCAO',
@@ -46,6 +61,8 @@ function detailUnauthorizedRedirectPath(userOrRole) {
 module.exports = {
   OS_ACCESS,
   OS_EXECUTION_ACCESS,
+  OS_ANDAMENTO_ACCESS,
+  canRegisterOSAndamento,
   OS_DETALHE_ACCESS,
   OS_STATUS_ACCESS,
   canViewOSDetails,

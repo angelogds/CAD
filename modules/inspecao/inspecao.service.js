@@ -594,6 +594,82 @@ function syncFromOS(osId) {
   return { synced: true, inspecaoId: inspecao.id, ...result };
 }
 
+
+const STATUS_OS_EM_ANDAMENTO = ["ABERTA", "ANDAMENTO", "EM_ANDAMENTO", "PAUSADA", "AGUARDANDO_EQUIPE"];
+const ACAO_NECESSARIA_ANDAMENTO = {
+  FALTA_MATERIAL: "Solicitar/comprar material",
+  AGUARDANDO_COMPRA: "Acompanhar compras",
+  MATERIAL_CHEGOU: "Retomar execução",
+  FALTA_MAO_DE_OBRA: "Reprogramar equipe",
+  EQUIPAMENTO_EM_PRODUCAO: "Aguardar parada/liberação da produção",
+  AGUARDANDO_TERCEIRO: "Acompanhar prestador externo",
+  AGUARDANDO_PECA_TORNEARIA: "Acompanhar retorno da tornearia",
+  FALTA_FERRAMENTA: "Providenciar ferramenta ou recurso adequado",
+  SERVICO_COMPLEXO_CONTINUIDADE: "Reprogramar continuidade",
+  RISCO_SEGURANCA: "Liberar condição segura/bloqueio",
+  AGUARDANDO_APROVACAO: "Solicitar avaliação do encarregado",
+  OUTRO: "Avaliar observação operacional",
+};
+
+function calcularDiasEntre(inicio, fim = new Date().toISOString().slice(0, 10)) {
+  const a = parseDate(inicio);
+  const b = parseDate(fim);
+  return a && b ? Math.max(0, Math.floor((b.getTime() - a.getTime()) / 86400000)) : 0;
+}
+
+function listOSEmAndamentoDetalhadas(_inspecaoId, mes, ano) {
+  const osTable = resolveOSTable();
+  if (!tableExists(osTable)) return [];
+  const cols = tableColumns(osTable);
+  const pick = (options, fallback = "NULL") => options.find((col) => cols.includes(col)) || fallback;
+  const opened = pick(["opened_at", "created_at", "data_inicio"]);
+  const started = pick(["data_inicio", "started_at", "execucao_iniciada_em"]);
+  const descricao = pick(["descricao", "descricao_problema", "solicitacao", "relato"]);
+  const ultimoMotivo = pick(["ultimo_motivo_andamento"]);
+  const ultimaJustificativa = pick(["ultima_justificativa_andamento"]);
+  const ultimoRegistro = pick(["ultimo_registro_andamento_em"]);
+  const mecanicoId = pick(["mecanico_user_id", "responsavel_user_id"]);
+  const executorColaboradorId = pick(["executor_colaborador_id"]);
+  const equipId = pick(["equipamento_id"]);
+  const equipManual = pick(["equipamento_manual", "equipamento"], "''");
+  const equipJoin = equipId === "NULL" ? "LEFT JOIN equipamentos e ON 1=0" : `LEFT JOIN equipamentos e ON e.id = o.${equipId}`;
+  const mecanicoJoin = mecanicoId === "NULL" ? "LEFT JOIN users u ON 1=0" : `LEFT JOIN users u ON u.id = o.${mecanicoId}`;
+  const colaboradorJoin = executorColaboradorId === "NULL" ? "LEFT JOIN colaboradores c ON 1=0" : `LEFT JOIN colaboradores c ON c.id = o.${executorColaboradorId}`;
+  const fimPeriodo = `${Number(ano)}-${String(Number(mes)).padStart(2, "0")}-${String(daysInMonth(Number(ano), Number(mes))).padStart(2, "0")}`;
+  const statusParams = STATUS_OS_EM_ANDAMENTO.map(() => "?").join(",");
+  const rows = db.prepare(`
+    SELECT o.id, o.status, ${opened} AS opened_at, ${started} AS data_inicio,
+           ${descricao} AS nao_conformidade, ${ultimoMotivo} AS motivo_atual,
+           ${ultimaJustificativa} AS ultima_justificativa, ${ultimoRegistro} AS ultima_atualizacao,
+           COALESCE(e.nome, ${equipManual}, '-') AS equipamento,
+           COALESCE(c.nome, u.name, u.email, '-') AS responsavel
+    FROM ${osTable} o
+    ${equipJoin}
+    ${mecanicoJoin}
+    ${colaboradorJoin}
+    WHERE UPPER(COALESCE(o.status, '')) IN (${statusParams})
+      AND date(${opened}) <= date(?)
+    ORDER BY date(${opened}), o.id
+  `).all(...STATUS_OS_EM_ANDAMENTO, fimPeriodo);
+
+  return rows.map((row) => {
+    let historico = [];
+    if (tableExists("os_andamento_historico")) {
+      historico = db.prepare(`SELECT motivo_nome, texto_ia, texto_padrao, registrado_em FROM os_andamento_historico WHERE os_id = ? ORDER BY datetime(registrado_em) DESC, id DESC LIMIT 6`).all(row.id);
+    }
+    const codigoAtual = tableExists("os_andamento_historico") ? db.prepare(`SELECT motivo_codigo FROM os_andamento_historico WHERE os_id = ? ORDER BY datetime(registrado_em) DESC, id DESC LIMIT 1`).get(row.id)?.motivo_codigo : null;
+    const materialChegouEm = tableExists("os_andamento_historico") ? db.prepare(`SELECT registrado_em FROM os_andamento_historico WHERE os_id = ? AND motivo_codigo = 'MATERIAL_CHEGOU' ORDER BY datetime(registrado_em) DESC, id DESC LIMIT 1`).get(row.id)?.registrado_em : null;
+    return {
+      ...row,
+      dias_aberta: calcularDiasEntre(row.opened_at),
+      historico_resumido: historico,
+      historico_resumido_texto: historico.map((item) => `${item.registrado_em || "-"}: ${item.motivo_nome}`).join(" | "),
+      material_chegou_em: materialChegouEm || null,
+      acao_necessaria: ACAO_NECESSARIA_ANDAMENTO[codigoAtual] || "Registrar e acompanhar ação necessária",
+    };
+  });
+}
+
 function computeGrade(inspecaoId, mes, ano) {
   return recalculate(inspecaoId, mes, ano);
 }
@@ -605,6 +681,7 @@ module.exports = {
   listEquipamentosAtivos,
   buildMatrix,
   listNC,
+  listOSEmAndamentoDetalhadas,
   computeGrade,
   recalculate,
   saveNC,

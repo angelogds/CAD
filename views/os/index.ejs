@@ -419,6 +419,8 @@
           <th style="width:130px;">Status</th>
           <th style="width:160px;">Solicitante</th>
           <th style="width:150px;">Abertura</th>
+          <th style="width:90px;">Dias aberta</th>
+          <th style="width:230px;">Andamento / rastreabilidade</th>
           <th style="width:150px;">Fechamento</th>
           <th style="width:220px;">Executores</th>
           <th style="width:120px; text-align:right;">Ações</th>
@@ -427,7 +429,7 @@
       <tbody>
         <% if (!lista || !lista.length) { %>
           <tr>
-            <td colspan="11" class="empty-state">Nenhuma OS cadastrada.</td>
+            <td colspan="13" class="empty-state">Nenhuma OS cadastrada.</td>
           </tr>
         <% } %>
         <% (lista || []).forEach(o => {
@@ -438,6 +440,9 @@
             : (st === 'CONCLUIDA' || st === 'FINALIZADA' || st === 'FECHADA') ? 'pill-green'
             : (st === 'CANCELADA') ? 'pill-red'
             : 'pill-gray';
+          const andamentoClass = o.status_em_andamento && o.dias_aberta > 1 && !o.ultimo_registro_andamento_em ? 'pill-red'
+            : o.status_em_andamento && Number(o.justificativa_andamento_hoje || 0) === 1 ? 'pill-green'
+            : o.status_em_andamento && o.dias_aberta > 1 ? 'pill-amber' : 'pill-gray';
           const executores = [o.mecanico_nome, o.auxiliar_nome, o.mecanico_secundario_nome, o.auxiliar_secundario_nome]
             .map(v => String(v || '').trim())
             .filter(Boolean)
@@ -464,6 +469,8 @@
             <td><span class="pill <%= stClass %>"><%= st || '-' %></span></td>
             <td class="td-clip"><%= o.solicitante || '-' %></td>
             <td><%= o.opened_at ? fmtBR(o.opened_at) : '-' %></td>
+            <td><%= o.dias_aberta %></td>
+            <td><span class="pill <%= andamentoClass %>"><%= o.ultimo_motivo_andamento || (o.status_em_andamento && o.dias_aberta > 1 ? 'Justificativa pendente' : '-') %></span><br><small class="muted"><%= o.ultimo_registro_andamento_em ? `Atualizada em ${fmtBR(o.ultimo_registro_andamento_em)}` : '' %></small></td>
             <td><%= o.closed_at ? fmtBR(o.closed_at) : '-' %></td>
             <td class="td-clip"><%= executores %></td>
             <td style="text-align:right;">
@@ -512,6 +519,7 @@
           <div class="os-card-desc"><%= o.descricao %></div>
         <% } %>
         <div class="os-card-executores"><b>Executores:</b> <%= executores %></div>
+        <div class="os-card-executores"><b>Dias aberta:</b> <%= o.dias_aberta %> • <b>Andamento:</b> <%= o.ultimo_motivo_andamento || (o.status_em_andamento && o.dias_aberta > 1 ? 'Justificativa pendente' : '-') %></div>
         <div class="os-card-footer">
           <span class="os-card-meta">Abertura: <%= o.opened_at ? fmtBR(o.opened_at) : '-' %> • Fechamento: <%= o.closed_at ? fmtBR(o.closed_at) : '-' %></span>
           <div class="os-card-pills">

@@ -9,7 +9,7 @@ const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
 const { canSendWhatsappNotification } = require("../../middlewares/permissions.middleware");
 const ctrl = require("./os.controller");
-const { OS_EXECUTION_ACCESS, OS_STATUS_ACCESS, detailUnauthorizedRedirectPath } = require("./os.permissions");
+const { OS_EXECUTION_ACCESS, OS_STATUS_ACCESS, OS_ANDAMENTO_ACCESS, detailUnauthorizedRedirectPath } = require("./os.permissions");
 
 const uploadDir = path.join(storagePaths.UPLOAD_DIR, "os");
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -97,6 +97,9 @@ router.post(
   wrap(ctrl.osEnviarAbertasColaborador, "osEnviarAbertasColaborador")
 );
 
+router.get("/:id/andamento", requireLogin, requireOSDetailAccess, wrap(ctrl.osAndamento, "osAndamento"));
+router.post("/:id/andamento/registrar", requireLogin, requireRole(OS_ANDAMENTO_ACCESS), wrap(ctrl.osRegistrarAndamento, "osRegistrarAndamento"));
+router.post("/:id/material-chegou", requireLogin, requireRole(OS_ANDAMENTO_ACCESS), wrap(ctrl.osMaterialChegou, "osMaterialChegou"));
 router.get("/:id", requireLogin, requireOSDetailAccess, wrap(ctrl.osShow, "osShow"));
 router.post("/:id/iniciar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osIniciar, "osIniciar"));
 router.post("/:id/pausar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osPausar, "osPausar"));

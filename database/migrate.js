@@ -77,6 +77,12 @@ function ensureOSInspectionColumns() {
   }
 }
 
+function ensureOSAndamentoColumns() {
+  addColumnIfMissing("os", "ultimo_motivo_andamento", "ultimo_motivo_andamento TEXT");
+  addColumnIfMissing("os", "ultima_justificativa_andamento", "ultima_justificativa_andamento TEXT");
+  addColumnIfMissing("os", "ultimo_registro_andamento_em", "ultimo_registro_andamento_em TEXT");
+}
+
 function applyOne(filename) {
   const full = path.join(__dirname, "migrations", filename);
   const isSql = filename.endsWith(".sql");
@@ -93,6 +99,9 @@ function applyOne(filename) {
 
     if (filename === "114_os_auto_alocacao.sql") {
       ensureOSExecucoesAutoAlocacaoColumns();
+    }
+    if (filename === "155_os_andamento_justificativas.sql") {
+      ensureOSAndamentoColumns();
     }
 
     if (isSql) {

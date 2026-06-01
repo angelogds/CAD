@@ -21,6 +21,7 @@
     <a class="btn btn-outline action-btn" href="<%= backUrl %>">← Voltar</a>
     <a class="btn btn-outline action-btn" href="/inspecao/<%= prevAno %>/<%= prevMes %>">◀ Mês anterior</a>
     <a class="btn btn-outline action-btn" href="/inspecao/<%= nextAno %>/<%= nextMes %>">Próximo mês ▶</a>
+    <a class="btn btn-outline action-btn" href="/inspecao/<%= ano %>/<%= mes %>/os-em-andamento">OS em andamento</a>
     <a class="btn btn-outline action-btn" href="/inspecao/<%= ano %>/<%= mes %>/pdf">Exportar PDF</a>
     <a class="btn btn-outline action-btn" href="/inspecao/<%= ano %>/<%= mes %>/export/csv">Exportar CSV</a>
     <% if (canEdit) { %>
@@ -71,6 +72,31 @@
       <% } %>
     </tbody>
   </table>
+</div>
+
+<div class="card inspecao-nc-card">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+    <div>
+      <h3 style="margin-bottom:4px;">OS em andamento — rastreabilidade</h3>
+      <div class="muted">Equipamentos com OS aberta, motivo atual e ação necessária.</div>
+    </div>
+    <a class="btn btn-outline btn-sm" href="/inspecao/<%= ano %>/<%= mes %>/os-em-andamento">Abrir relatório detalhado</a>
+  </div>
+  <div class="table-wrap">
+    <table class="table nc-table">
+      <thead><tr><th>OS</th><th>Equipamento</th><th>Dias em aberto</th><th>Status</th><th>Motivo atual</th><th>Última atualização</th><th>Ação necessária</th></tr></thead>
+      <tbody>
+        <% if (!(osEmAndamento || []).length) { %><tr><td colspan="7">Nenhuma OS aberta ou em andamento no período.</td></tr><% } %>
+        <% (osEmAndamento || []).forEach((ordem) => { %>
+          <tr>
+            <td><a class="btn btn-outline btn-sm" href="/os/<%= ordem.id %>#justificativa-andamento">#<%= ordem.id %></a></td>
+            <td><%= ordem.equipamento || '-' %></td><td><%= ordem.dias_aberta %></td><td><%= ordem.status || '-' %></td>
+            <td><%= ordem.motivo_atual || 'Justificativa pendente' %></td><td><%= ordem.ultima_atualizacao ? fmtBR(ordem.ultima_atualizacao) : '-' %></td><td><%= ordem.acao_necessaria %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <div class="card inspecao-nc-card">

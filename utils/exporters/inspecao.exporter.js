@@ -249,13 +249,64 @@ function drawNCBlock(doc, ncList) {
   }
 }
 
+
+function drawOSEmAndamentoBlock(doc, osEmAndamento = []) {
+  const left = doc.page.margins.left;
+  const usableW = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const baseCols = [34, 84, 50, 32, 54, 92, 192, 68, 70, 102];
+  const total = baseCols.reduce((sum, col) => sum + col, 0);
+  const cols = baseCols.map((col) => (col / total) * usableW);
+  const headers = ["OS", "Equipamento", "Abertura", "Dias", "Status", "Motivo", "Justificativa técnica", "Atualização", "Responsável", "Ação necessária"];
+  let y = 118;
+
+  const drawHeader = () => {
+    doc.font("Helvetica-Bold").fontSize(10).fillColor(COLOR.greenPrimary).text("Ordens de Serviço em Andamento — Justificativas e Rastreabilidade", left, y);
+    y += 14;
+    let x = left;
+    headers.forEach((header, index) => {
+      doc.rect(x, y, cols[index], 18).fillAndStroke(COLOR.light, COLOR.line);
+      doc.font("Helvetica-Bold").fontSize(6.5).fillColor(COLOR.text).text(header, x + 3, y + 5, { width: cols[index] - 6 });
+      x += cols[index];
+    });
+    y += 18;
+  };
+
+  drawHeader();
+  if (!osEmAndamento.length) {
+    doc.rect(left, y, usableW, 20).stroke(COLOR.line);
+    doc.font("Helvetica").fontSize(8).fillColor(COLOR.muted).text("Nenhuma OS aberta ou em andamento no período.", left + 5, y + 6);
+    return;
+  }
+
+  for (const os of osEmAndamento) {
+    const rowH = 42;
+    if (y + rowH > doc.page.height - doc.page.margins.bottom) {
+      doc.addPage({ size: "A4", layout: "landscape", margin: 24 });
+      drawOfficialHeader(doc);
+      y = 118;
+      drawHeader();
+    }
+    const values = [
+      `#${os.id}`, os.equipamento || "-", os.opened_at || "-", String(os.dias_aberta ?? "-"), os.status || "-",
+      os.motivo_atual || "Justificativa pendente", os.ultima_justificativa || "-", os.ultima_atualizacao || "-", os.responsavel || "-", os.acao_necessaria || "-",
+    ];
+    let x = left;
+    values.forEach((value, index) => {
+      doc.rect(x, y, cols[index], rowH).stroke(COLOR.line);
+      doc.font("Helvetica").fontSize(6.5).fillColor(COLOR.text).text(String(value), x + 3, y + 4, { width: cols[index] - 6, height: rowH - 6, ellipsis: true });
+      x += cols[index];
+    });
+    y += rowH;
+  }
+}
+
 function drawFooter(doc, page, total) {
   const y = doc.page.height - 18;
   doc.font("Helvetica").fontSize(7).fillColor(COLOR.muted).text("PAC 01", 24, y);
   doc.text(`Página ${page}/${total}`, doc.page.width - 80, y, { width: 56, align: "right" });
 }
 
-function generatePAC01PDF(inspecaoId, { res, inspecao, equipamentos, matrix, ncList, diasMes, monitorNome, dataVerificacao } = {}) {
+function generatePAC01PDF(inspecaoId, { res, inspecao, equipamentos, matrix, ncList, osEmAndamento, diasMes, monitorNome, dataVerificacao } = {}) {
   if (!res) throw new Error("Resposta HTTP (res) é obrigatória para gerar o PDF.");
   const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 24, bufferPages: true });
 
@@ -280,6 +331,10 @@ function generatePAC01PDF(inspecaoId, { res, inspecao, equipamentos, matrix, ncL
   doc.addPage({ size: "A4", layout: "landscape", margin: 24 });
   drawOfficialHeader(doc);
   drawNCBlock(doc, ncList || []);
+
+  doc.addPage({ size: "A4", layout: "landscape", margin: 24 });
+  drawOfficialHeader(doc);
+  drawOSEmAndamentoBlock(doc, osEmAndamento || []);
 
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i += 1) {

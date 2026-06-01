@@ -3,7 +3,7 @@ const pushService = require("../push/push.service");
 let tracagemService = null;
 try { tracagemService = require('../tracagem/tracagem.service'); } catch (_e) {}
 const { canAccessModule, normalizeRole } = require("../../config/rbac");
-const { canViewOSDetails, postCloseRedirectPath } = require("./os.permissions");
+const { canViewOSDetails, canRegisterOSAndamento, postCloseRedirectPath } = require("./os.permissions");
 const aiService = require("../ai/ai.service");
 const embeddingsService = require("../ai/ai.embeddings.service");
 const visionService = require("../ai/ai.vision.service");
@@ -236,6 +236,9 @@ function osShow(req, res) {
   const whatsappDiagnostico = canSendWhatsappNotification ? whatsappService.getWhatsappOsDiagnostic(id, osAtual) : {};
   const whatsappResponsavel = whatsappDiagnostico.responsavel_resolvido || null;
   const whatsappDestinatarios = whatsappDiagnostico.destinatarios || [];
+  const historicoAndamento = service.getHistoricoAndamentoOS(id);
+  const metricasAndamento = service.calcularDiasAbertaOS(osAtual);
+  const ultimoRegistroHoje = service.temJustificativaAndamentoHoje(id);
 
   return res.render("os/show", {
     title: `OS #${id}`,
@@ -243,6 +246,7 @@ function osShow(req, res) {
     canAutoAssign: canManageEquipe,
     canManualEditEquipe: canManageEquipe,
     canExecuteOS: canAccessModule(role, "os_execute"),
+    canRegisterAndamento: canRegisterOSAndamento(role),
     equipeUsuarios,
     tracagens,
     whatsappLogs,
@@ -255,6 +259,10 @@ function osShow(req, res) {
     whatsappDiagnostico,
     canSendWhatsapp,
     canSendWhatsappNotification,
+    motivosAndamento: service.listMotivosAndamento(),
+    historicoAndamento,
+    metricasAndamento,
+    alertaJustificativaAndamento: service.isStatusOSEmAndamento(osAtual.status) && metricasAndamento.dias_aberta > 1 && !ultimoRegistroHoje,
     user: req.session?.user || null,
   });
 }
@@ -750,11 +758,39 @@ async function osVoiceCreate(req, res) {
   }
 }
 
+
+function osAndamento(req, res) {
+  return res.redirect(`/os/${Number(req.params.id)}#justificativa-andamento`);
+}
+
+async function osRegistrarAndamento(req, res) {
+  const id = Number(req.params.id);
+  try {
+    await service.registrarJustificativaAndamento(id, {
+      motivo_codigo: req.body?.motivo_codigo,
+      observacao_mecanico: req.body?.observacao_mecanico,
+      usuario_id: req.session?.user?.id,
+    });
+    req.flash("success", "Justificativa de andamento registrada com sucesso.");
+  } catch (err) {
+    req.flash("error", err.message || "Não foi possível registrar a justificativa de andamento.");
+  }
+  return res.redirect(`/os/${id}#justificativa-andamento`);
+}
+
+async function osMaterialChegou(req, res) {
+  req.body = { ...(req.body || {}), motivo_codigo: "MATERIAL_CHEGOU" };
+  return osRegistrarAndamento(req, res);
+}
+
 module.exports = {
   osIndex,
   osNewForm,
   osCreate,
   osShow,
+  osAndamento,
+  osRegistrarAndamento,
+  osMaterialChegou,
   osCloseForm,
   osIniciar,
   osPausar,
