@@ -139,6 +139,12 @@
                     <option value="cancelada" <%= String(ex.status||"").toUpperCase() === "CANCELADA" ? "selected" : "" %>>cancelada</option>
                   </select>
                   <input name="data_executada" type="date" value="<%= ex.data_executada || '' %>" style="width:170px" />
+                  <details style="width:100%;margin-top:8px;"><summary><strong>Fechamento técnico</strong></summary><div style="display:grid;gap:6px;margin-top:6px;">
+                    <textarea name="descricao_preventiva" placeholder="Descrição da preventiva"><%= ex.descricao_preventiva || plano.titulo || '' %></textarea><textarea name="itens_verificados" placeholder="Itens verificados"><%= ex.itens_verificados || '' %></textarea>
+                    <label><input type="checkbox" name="tem_nao_conformidade" value="1" <%= Number(ex.tem_nao_conformidade) ? 'checked' : '' %> /> Preventiva com não conformidade</label><textarea name="nao_conformidade" placeholder="Não conformidades"><%= ex.nao_conformidade || '' %></textarea>
+                    <textarea name="acao_corretiva" placeholder="Ação corretiva"><%= ex.acao_corretiva || '' %></textarea><textarea name="acao_preventiva" placeholder="Ação preventiva"><%= ex.acao_preventiva || '' %></textarea><select name="situacao_final"><% [['EQUIPAMENTO_LIBERADO_OPERACAO','Equipamento liberado para operação'],['EQUIPAMENTO_LIBERADO_OBSERVACAO','Equipamento liberado com observação'],['EQUIPAMENTO_REQUER_ACOMPANHAMENTO','Equipamento requer acompanhamento'],['EQUIPAMENTO_REQUER_OS_CORRETIVA','Equipamento requer OS corretiva'],['EQUIPAMENTO_PARADO_AGUARDANDO_MATERIAL','Equipamento parado aguardando material'],['EQUIPAMENTO_PARADO_AGUARDANDO_MAO_DE_OBRA','Equipamento parado aguardando mão de obra'],['EQUIPAMENTO_PARADO_AGUARDANDO_DECISAO','Equipamento parado aguardando decisão do encarregado']].forEach(([value,label]) => { %><option value="<%= value %>" <%= ex.situacao_final === value ? 'selected' : '' %>><%= label %></option><% }) %></select>
+                    <textarea name="observacoes_tecnicas" placeholder="Observações técnicas"><%= ex.observacoes_tecnicas || ex.observacao || '' %></textarea><input name="evidencias" value="<%= ex.evidencias || '' %>" placeholder="Links ou referências de evidências" /><label><input type="checkbox" name="gerar_os_corretiva" value="1" /> Abrir OS corretiva vinculada</label>
+                  </div></details>
                   <button class="btn" type="submit" style="height:40px">Salvar</button>
                 </form>
                 <% if (canAdminPreventivas) { const stat = String(ex.status||'').toUpperCase(); const reforco = stat === 'EM_ANDAMENTO' ? '\nEsta preventiva está EM_ANDAMENTO e exigirá confirmação reforçada.' : ''; %>
@@ -205,6 +211,23 @@
                 <option value="cancelada" <%= stat === "CANCELADA" ? "selected" : "" %>>cancelada</option>
               </select>
               <input name="data_executada" type="date" value="<%= ex.data_executada || '' %>" />
+              <details style="width:100%;margin-top:8px;">
+                <summary><strong>Informações técnicas para finalizar</strong></summary>
+                <div style="display:grid;gap:8px;margin-top:8px;">
+                  <textarea name="descricao_preventiva" placeholder="Descrição da atividade"><%= ex.descricao_preventiva || plano.titulo || '' %></textarea>
+                  <textarea name="itens_verificados" placeholder="Itens verificados"><%= ex.itens_verificados || '' %></textarea>
+                  <label><input type="checkbox" name="tem_nao_conformidade" value="1" <%= Number(ex.tem_nao_conformidade) ? 'checked' : '' %> /> Preventiva com não conformidade</label>
+                  <textarea name="nao_conformidade" placeholder="Não conformidades encontradas"><%= ex.nao_conformidade || '' %></textarea>
+                  <textarea name="acao_corretiva" placeholder="Ações corretivas realizadas"><%= ex.acao_corretiva || '' %></textarea>
+                  <textarea name="acao_preventiva" placeholder="Ações preventivas recomendadas ou executadas"><%= ex.acao_preventiva || '' %></textarea>
+                  <select name="situacao_final">
+                    <% [['EQUIPAMENTO_LIBERADO_OPERACAO','Equipamento liberado para operação'],['EQUIPAMENTO_LIBERADO_OBSERVACAO','Equipamento liberado com observação'],['EQUIPAMENTO_REQUER_ACOMPANHAMENTO','Equipamento requer acompanhamento'],['EQUIPAMENTO_REQUER_OS_CORRETIVA','Equipamento requer OS corretiva'],['EQUIPAMENTO_PARADO_AGUARDANDO_MATERIAL','Equipamento parado aguardando material'],['EQUIPAMENTO_PARADO_AGUARDANDO_MAO_DE_OBRA','Equipamento parado aguardando mão de obra'],['EQUIPAMENTO_PARADO_AGUARDANDO_DECISAO','Equipamento parado aguardando decisão do encarregado']].forEach(([value,label]) => { %><option value="<%= value %>" <%= ex.situacao_final === value ? 'selected' : '' %>><%= label %></option><% }) %>
+                  </select>
+                  <textarea name="observacoes_tecnicas" placeholder="Observações técnicas"><%= ex.observacoes_tecnicas || ex.observacao || '' %></textarea>
+                  <input name="evidencias" value="<%= ex.evidencias || '' %>" placeholder="Links ou referências de fotos/evidências" />
+                  <label><input type="checkbox" name="gerar_os_corretiva" value="1" /> Abrir OS corretiva vinculada ao finalizar</label>
+                </div>
+              </details>
               <button class="btn" type="submit">Salvar</button>
             </form>
 

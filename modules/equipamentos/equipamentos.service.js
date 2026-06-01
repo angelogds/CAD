@@ -225,6 +225,7 @@ function listHistoricoPreventivas(equipamentoId, filtros = {}) {
 
   return db.prepare(`
     SELECT pe.id,
+           p.id AS plano_id,
            p.titulo AS atividade,
            pe.data_prevista,
            pe.iniciada_em,
@@ -234,7 +235,18 @@ function listHistoricoPreventivas(equipamentoId, filtros = {}) {
            u1.name AS responsavel_1_nome,
            u2.name AS responsavel_2_nome,
            pe.observacao,
-           pe.status
+           pe.status,
+           p.tipo_plano AS tipo_preventiva,
+           pe.data_executada,
+           pe.descricao_preventiva,
+           pe.itens_verificados,
+           pe.nao_conformidade,
+           pe.acao_corretiva,
+           pe.acao_preventiva,
+           pe.situacao_final,
+           pe.observacoes_tecnicas,
+           pe.evidencias,
+           pe.os_corretiva_id
     FROM preventiva_execucoes pe
     INNER JOIN preventiva_planos p ON p.id = pe.plano_id
     LEFT JOIN users u1 ON u1.id = pe.responsavel_1_id

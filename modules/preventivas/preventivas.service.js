@@ -251,7 +251,7 @@ function createExecucao(planoId, data) {
   return Number(r.lastInsertRowid);
 }
 
-function updateExecucaoStatus(planoId, execId, status, dataExecutada, userId = null) {
+function updateExecucaoStatus(planoId, execId, status, dataExecutada, userId = null, detalhes = {}) {
   const exec = db.prepare(`
     SELECT id FROM preventiva_execucoes
     WHERE id = ? AND plano_id = ?
@@ -283,6 +283,28 @@ function updateExecucaoStatus(planoId, execId, status, dataExecutada, userId = n
   }
   if (cols.includes("duracao_minutos") && ["CONCLUIDA", "EXECUTADA", "FINALIZADA"].includes(statusNorm)) {
     updates.push("duracao_minutos = CASE WHEN iniciada_em IS NULL THEN duracao_minutos ELSE CAST((julianday(COALESCE(finalizada_em, datetime('now'))) - julianday(iniciada_em)) * 24 * 60 AS INTEGER) END");
+  }
+
+  const finalizada = ["CONCLUIDA", "EXECUTADA", "FINALIZADA"].includes(statusNorm);
+  if (finalizada) {
+    const defaults = {
+      descricao_preventiva: "Preventiva executada conforme programação.",
+      itens_verificados: "Itens do plano preventivo verificados durante a execução.",
+      nao_conformidade: "Nenhuma não conformidade identificada durante a preventiva.",
+      acao_corretiva: "Não houve necessidade de ação corretiva no momento da inspeção preventiva.",
+      acao_preventiva: "Manter acompanhamento preventivo conforme plano de manutenção.",
+      situacao_final: "EQUIPAMENTO_LIBERADO_OPERACAO",
+      observacoes_tecnicas: "Preventiva executada conforme programação.",
+      evidencias: null,
+    };
+    const temNC = ["1", "true", "sim", "on"].includes(String(detalhes.tem_nao_conformidade || "").toLowerCase()) ? 1 : 0;
+    for (const field of Object.keys(defaults)) {
+      if (!cols.includes(field)) continue;
+      updates.push(`${field} = ?`);
+      args.push(String(detalhes[field] || "").trim() || defaults[field]);
+    }
+    if (cols.includes("tem_nao_conformidade")) { updates.push("tem_nao_conformidade = ?"); args.push(temNC); }
+    if (cols.includes("registrado_relatorio_em")) updates.push("registrado_relatorio_em = COALESCE(registrado_relatorio_em, datetime('now'))");
   }
 
   db.prepare(`
@@ -2343,6 +2365,71 @@ function apagarPreventivaExecucao({ planoId, execucaoId, user = null, forcar = f
 }
 
 
+function listExecutadasParaRelatorio(filtros = {}) {
+  if (!tableExists("preventiva_execucoes") || !tableExists("preventiva_planos")) return [];
+  const cols = getPreventivaExecColumns();
+  if (!cols.includes("descricao_preventiva")) return [];
+  const where = ["UPPER(COALESCE(pe.status,'')) IN ('CONCLUIDA','EXECUTADA','FINALIZADA')"];
+  const params = {};
+  if (filtros.data_inicio) { where.push("date(pe.data_executada) >= date(@data_inicio)"); params.data_inicio = filtros.data_inicio; }
+  if (filtros.data_fim) { where.push("date(pe.data_executada) <= date(@data_fim)"); params.data_fim = filtros.data_fim; }
+  if (filtros.equipamento_id) { where.push("p.equipamento_id = @equipamento_id"); params.equipamento_id = Number(filtros.equipamento_id); }
+  if (filtros.setor) { where.push("UPPER(COALESCE(e.setor,'')) = UPPER(@setor)"); params.setor = filtros.setor; }
+  if (filtros.responsavel) { where.push("LOWER(COALESCE(pe.responsavel, u1.name, '')) LIKE LOWER(@responsavel)"); params.responsavel = `%${filtros.responsavel}%`; }
+  if (filtros.status) { where.push("UPPER(pe.status) = UPPER(@status)"); params.status = filtros.status; }
+  if (filtros.nao_conformidade === "com") where.push("pe.tem_nao_conformidade = 1");
+  if (filtros.nao_conformidade === "sem") where.push("pe.tem_nao_conformidade = 0");
+  if (filtros.gerou_os === "1") where.push("pe.os_corretiva_id IS NOT NULL");
+  return db.prepare(`
+    SELECT pe.*, p.equipamento_id, p.titulo, p.tipo_plano AS tipo_preventiva,
+           e.nome AS equipamento_nome, e.codigo AS equipamento_codigo, e.setor,
+           COALESCE(NULLIF(pe.responsavel,''), u1.name, u2.name, '-') AS responsavel_exibicao
+    FROM preventiva_execucoes pe
+    JOIN preventiva_planos p ON p.id = pe.plano_id
+    LEFT JOIN equipamentos e ON e.id = p.equipamento_id
+    LEFT JOIN users u1 ON u1.id = pe.responsavel_1_id
+    LEFT JOIN users u2 ON u2.id = pe.responsavel_2_id
+    WHERE ${where.join(" AND ")}
+    ORDER BY date(pe.data_executada) DESC, pe.id DESC
+  `).all(params);
+}
+
+function getIndicadoresRelatorio(filtros = {}) {
+  if (!tableExists("preventiva_execucoes")) return {};
+  const dataInicio = filtros.data_inicio || "0000-01-01";
+  const dataFim = filtros.data_fim || "9999-12-31";
+  const row = db.prepare(`
+    SELECT COUNT(*) AS programadas,
+      SUM(CASE WHEN UPPER(status) IN ('CONCLUIDA','EXECUTADA','FINALIZADA') THEN 1 ELSE 0 END) AS executadas,
+      SUM(CASE WHEN UPPER(status) = 'PENDENTE' THEN 1 ELSE 0 END) AS pendentes,
+      SUM(CASE WHEN UPPER(status) = 'ATRASADA' OR (UPPER(status) = 'PENDENTE' AND date(data_prevista) < date('now')) THEN 1 ELSE 0 END) AS atrasadas,
+      SUM(CASE WHEN UPPER(status) IN ('CONCLUIDA','EXECUTADA','FINALIZADA') AND tem_nao_conformidade = 1 THEN 1 ELSE 0 END) AS com_nao_conformidade,
+      SUM(CASE WHEN UPPER(status) IN ('CONCLUIDA','EXECUTADA','FINALIZADA') AND IFNULL(tem_nao_conformidade,0) = 0 THEN 1 ELSE 0 END) AS sem_nao_conformidade,
+      SUM(CASE WHEN os_corretiva_id IS NOT NULL THEN 1 ELSE 0 END) AS os_corretivas
+    FROM preventiva_execucoes
+    WHERE date(COALESCE(data_executada, data_prevista)) BETWEEN date(?) AND date(?)
+  `).get(dataInicio, dataFim) || {};
+  const programadas = Number(row.programadas || 0); const executadas = Number(row.executadas || 0);
+  const equipamentos_com_mais_nc = db.prepare(`
+    SELECT COALESCE(e.nome, 'Equipamento não informado') AS equipamento, COUNT(*) AS total
+    FROM preventiva_execucoes pe
+    JOIN preventiva_planos p ON p.id = pe.plano_id
+    LEFT JOIN equipamentos e ON e.id = p.equipamento_id
+    WHERE pe.tem_nao_conformidade = 1 AND date(COALESCE(pe.data_executada, pe.data_prevista)) BETWEEN date(?) AND date(?)
+    GROUP BY p.equipamento_id, e.nome ORDER BY total DESC, equipamento LIMIT 5
+  `).all(dataInicio, dataFim);
+  return { ...row, cumprimento_percentual: programadas ? Math.round((executadas / programadas) * 100) : 0, equipamentos_com_mais_nc };
+}
+
+function abrirOSCorretivaVinculada(execId, userId = null) {
+  const row = db.prepare(`SELECT pe.*, p.equipamento_id, p.titulo FROM preventiva_execucoes pe JOIN preventiva_planos p ON p.id=pe.plano_id WHERE pe.id=?`).get(Number(execId));
+  if (!row || !row.equipamento_id || !row.tem_nao_conformidade) return null;
+  if (row.os_corretiva_id) return Number(row.os_corretiva_id);
+  const osId = getOSService().createOSAutomatica({ equipamento_id: row.equipamento_id, tipo: "CORRETIVA", prioridade: row.criticidade || "MEDIA", opened_by: userId, origem: "PREVENTIVA", preventiva_execucao_id: row.id, descricao: `Durante preventiva #${row.id} no equipamento, foi identificada não conformidade: ${row.nao_conformidade || "não informada"}. Motivo da abertura: ${row.acao_corretiva || "programar reparo corretivo"}.`, metadata: { preventiva_execucao_id: row.id } });
+  db.prepare(`UPDATE preventiva_execucoes SET os_corretiva_id=? WHERE id=?`).run(osId, row.id);
+  return osId;
+}
+
 module.exports = {
   listPlanos,
   listEquipamentosAtivos,
@@ -2386,4 +2473,7 @@ module.exports = {
   lancarLoteDiarioPreventivasComoOS,
   apagarPreventivaExecucao,
   registrarLogPreventiva,
+  listExecutadasParaRelatorio,
+  getIndicadoresRelatorio,
+  abrirOSCorretivaVinculada,
 };

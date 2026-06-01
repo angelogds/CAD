@@ -1,4 +1,5 @@
 const service = require("./inspecao.service");
+const preventivasService = require("../preventivas/preventivas.service");
 const { buildCSV, renderPDF } = require("../../utils/exporters/inspecao.exporter");
 
 function parseMesAno(req) {
@@ -28,6 +29,19 @@ function loadPageData(req) {
   const ncList = service.listNC(inspecao.id);
   const osDetailsByCell = service.listOSDetailsByInspecao(inspecao.id, mes, ano);
   const osEmAndamento = service.listOSEmAndamentoDetalhadas(inspecao.id, mes, ano);
+  const filtrosPreventivas = {
+    data_inicio: req.query.data_inicio || `${ano}-${String(mes).padStart(2, "0")}-01`,
+    data_fim: req.query.data_fim || `${ano}-${String(mes).padStart(2, "0")}-${String(service.daysInMonth(ano, mes)).padStart(2, "0")}`,
+    equipamento_id: req.query.equipamento_id || "",
+    setor: req.query.setor || "",
+    responsavel: req.query.responsavel || "",
+    status: req.query.status || "",
+    nao_conformidade: req.query.nao_conformidade || "",
+    gerou_os: req.query.gerou_os || "",
+    tipo_atividade: req.query.tipo_atividade || "",
+  };
+  const preventivasExecutadas = ["OS", "INSPECAO"].includes(filtrosPreventivas.tipo_atividade) ? [] : preventivasService.listExecutadasParaRelatorio(filtrosPreventivas);
+  const indicadoresPreventivas = preventivasService.getIndicadoresRelatorio(filtrosPreventivas);
 
   return {
     ano,
@@ -38,6 +52,10 @@ function loadPageData(req) {
     ncList,
     osDetailsByCell,
     osEmAndamento,
+    preventivasExecutadas,
+    indicadoresPreventivas,
+    filtrosPreventivas,
+    preventivasQuery: new URLSearchParams(filtrosPreventivas).toString(),
     diasMes: service.daysInMonth(ano, mes),
     backUrl: req.get("Referrer") || "/dashboard",
   };

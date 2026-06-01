@@ -22,7 +22,7 @@ function csvEscape(value) {
   return s;
 }
 
-function buildCSV({ equipamentos, matrix, ncList }) {
+function buildCSV({ equipamentos, matrix, ncList, preventivasExecutadas = [] }) {
   const lines = [];
   lines.push("GRADE");
   lines.push(["Equipamento", ...Array.from({ length: 31 }, (_, i) => i + 1)].join(";"));
@@ -49,6 +49,10 @@ function buildCSV({ equipamentos, matrix, ncList }) {
     ].join(";"));
   }
 
+  lines.push("");
+  lines.push("PREVENTIVAS_EXECUTADAS_NO_PERIODO");
+  lines.push("Codigo;Equipamento;Setor;Data programada;Data executada;Responsavel;Descricao;Itens verificados;Nao conformidade;Acao corretiva;Acao preventiva;Situacao final;OS corretiva");
+  for (const p of preventivasExecutadas) lines.push([`PREV-${p.id}`, p.equipamento_nome, p.setor, p.data_prevista, p.data_executada, p.responsavel_exibicao, p.descricao_preventiva, p.itens_verificados, p.nao_conformidade, p.acao_corretiva, p.acao_preventiva, p.situacao_final, p.os_corretiva_id].map(csvEscape).join(";"));
   return `${lines.join("\n")}\n`;
 }
 
@@ -300,13 +304,39 @@ function drawOSEmAndamentoBlock(doc, osEmAndamento = []) {
   }
 }
 
+function drawPreventivasBlock(doc, preventivas) {
+  const left = doc.page.margins.left;
+  const usableW = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  let y = 118;
+  const title = () => { doc.font("Helvetica-Bold").fontSize(11).fillColor(COLOR.greenPrimary).text("Preventivas Executadas no Período", left, y); y += 18; };
+  title();
+  if (!preventivas.length) { doc.rect(left, y, usableW, 22).stroke(COLOR.line); doc.font("Helvetica").fontSize(8).fillColor(COLOR.muted).text("Nenhuma preventiva executada no período filtrado.", left + 5, y + 7); return; }
+  for (const p of preventivas) {
+    const rowH = 82;
+    if (y + rowH > doc.page.height - doc.page.margins.bottom) { doc.addPage({ size: "A4", layout: "landscape", margin: 24 }); drawOfficialHeader(doc); y = 118; title(); }
+    doc.rect(left, y, usableW, rowH).stroke(COLOR.line);
+    doc.rect(left, y, usableW, 17).fillAndStroke(p.tem_nao_conformidade ? "#fee2e2" : "#dcfce7", COLOR.line);
+    doc.font("Helvetica-Bold").fontSize(8).fillColor(COLOR.text).text(`PREV-${p.id} • ${p.equipamento_nome || "-"} • ${p.setor || "-"} • Executada: ${p.data_executada || "-"} • Responsável: ${p.responsavel_exibicao || "-"}${p.os_corretiva_id ? ` • OS corretiva #${p.os_corretiva_id}` : ""}`, left + 5, y + 5, { width: usableW - 10 });
+    doc.font("Helvetica").fontSize(7).fillColor(COLOR.text);
+    const body = [
+      `Dados da preventiva: programada ${p.data_prevista || "-"}; tipo ${p.tipo_preventiva || "preventiva"}; situação final ${String(p.situacao_final || "-").replaceAll("_", " ")}.`,
+      `Descrição / itens verificados: ${p.descricao_preventiva || p.titulo || "-"} | ${p.itens_verificados || "-"}`,
+      `Não conformidades: ${p.nao_conformidade || "-"}`,
+      `Ações corretivas: ${p.acao_corretiva || "-"} | Ações preventivas: ${p.acao_preventiva || "-"}`,
+      `Observações técnicas / evidências: ${p.observacoes_tecnicas || "-"} | ${p.evidencias || "-"}`,
+    ].join("\n");
+    doc.text(body, left + 5, y + 22, { width: usableW - 10, height: rowH - 26, ellipsis: true });
+    y += rowH + 7;
+  }
+}
+
 function drawFooter(doc, page, total) {
   const y = doc.page.height - 18;
   doc.font("Helvetica").fontSize(7).fillColor(COLOR.muted).text("PAC 01", 24, y);
   doc.text(`Página ${page}/${total}`, doc.page.width - 80, y, { width: 56, align: "right" });
 }
 
-function generatePAC01PDF(inspecaoId, { res, inspecao, equipamentos, matrix, ncList, osEmAndamento, diasMes, monitorNome, dataVerificacao } = {}) {
+function generatePAC01PDF(inspecaoId, { res, inspecao, equipamentos, matrix, ncList, osEmAndamento, preventivasExecutadas, diasMes, monitorNome, dataVerificacao } = {}) {
   if (!res) throw new Error("Resposta HTTP (res) é obrigatória para gerar o PDF.");
   const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 24, bufferPages: true });
 
@@ -335,6 +365,10 @@ function generatePAC01PDF(inspecaoId, { res, inspecao, equipamentos, matrix, ncL
   doc.addPage({ size: "A4", layout: "landscape", margin: 24 });
   drawOfficialHeader(doc);
   drawOSEmAndamentoBlock(doc, osEmAndamento || []);
+
+  doc.addPage({ size: "A4", layout: "landscape", margin: 24 });
+  drawOfficialHeader(doc);
+  drawPreventivasBlock(doc, preventivasExecutadas || []);
 
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i += 1) {
