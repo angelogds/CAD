@@ -75,7 +75,7 @@
   <div class="card">
     <div class="card-head">
       <div class="muted">Dados principais da OS</div>
-      <% if (!isOSFechada) { %>
+      <% if (!isOSFechada && canExecuteOS) { %>
         <div class="actions">
           <form method="POST" action="/os/<%= os.id %>/pausar"><button class="btn" type="submit">Pausar OS</button></form>
           <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome || whatsappResponsavel?.nome)) { %>
@@ -444,7 +444,7 @@
   </div>
 </div>
 
-<% if (!isOSFechada) { %>
+<% if (!isOSFechada && canExecuteOS) { %>
   <div class="card" style="margin-top:12px;">
     <h3>Concluir OS</h3>
     <div class="muted">Adicione pelo menos uma mídia de fechamento (foto ou vídeo) para concluir a OS.</div>

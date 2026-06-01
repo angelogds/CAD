@@ -10,7 +10,7 @@
   <div style="margin-top:10px;"><div class="label">Descrição</div><div><%= demanda.descricao || '-' %></div></div>
 </div>
 
-<% if (String(user?.role || '').toUpperCase() === 'ADMIN') { %>
+<% if (canAccessModule(normalizeRole(user?.role), 'demandas_manage')) { %>
   <div class="card" style="margin-bottom:12px;">
     <div class="label">Ações do Admin</div>
     <form method="POST" action="/demandas/<%= demanda.id %>/status" style="display:flex; gap:10px; align-items:end; flex-wrap:wrap; margin-top:10px;">

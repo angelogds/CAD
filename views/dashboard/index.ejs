@@ -174,7 +174,7 @@
   var isMecanico = roleNorm === 'MECANICO';
   var isProducao = roleNorm === 'PRODUCAO' || roleNorm === 'ENCARREGADO_PRODUCAO';
   var isAdminPainel = roleNorm === 'ADMIN' || roleNorm === 'DIRETORIA' || roleNorm === 'RH' || roleNorm === 'MANUTENCAO_SUPERVISOR' || roleNorm === 'SUPERVISOR_MANUTENCAO' || roleNorm === 'ENCARREGADO_MANUTENCAO';
-  var showPreventivasCard = isMecanico || isProducao || isAdminPainel;
+  var showPreventivasCard = canAccessModule(roleNorm, 'preventivas_view');
 %>
 
 <div class="page-head">
@@ -292,7 +292,7 @@
           <td><span class="pill-tag <%= critic === 'CRITICA' ? 'pill-gray' : (critic === 'ALTA' ? 'pill-amber' : (critic === 'MEDIA' ? 'pill-blue' : 'pill-green')) %>"><%= critic %></span></td>
           <td><span class="pill-tag <%= stat === 'EM_ANDAMENTO' ? 'pill-blue' : (stat === 'PENDENTE' ? 'pill-amber' : 'pill-gray') %>"><%= stat %></span></td>
           <td style="text-align:right;">
-            <% var podeIniciar = roleNorm === 'ADMIN' || roleNorm === 'MANUTENCAO_SUPERVISOR' || roleNorm === 'SUPERVISOR_MANUTENCAO' || roleNorm === 'ENCARREGADO_MANUTENCAO' || Number(p.responsavel_1_id || 0) === Number(user?.id || 0) || Number(p.responsavel_2_id || 0) === Number(user?.id || 0); %>
+            <% var podeIniciar = roleNorm !== 'INSPECAO_QUALIDADE' && (roleNorm === 'ADMIN' || roleNorm === 'MANUTENCAO_SUPERVISOR' || roleNorm === 'SUPERVISOR_MANUTENCAO' || roleNorm === 'ENCARREGADO_MANUTENCAO' || Number(p.responsavel_1_id || 0) === Number(user?.id || 0) || Number(p.responsavel_2_id || 0) === Number(user?.id || 0)); %>
             <% if (stat === 'PENDENTE' && podeIniciar) { %>
               <form method="POST" action="/dashboard/preventivas/<%= p.id %>/iniciar" style="display:inline;">
                 <button class="btn-inline" type="submit">Iniciar</button>

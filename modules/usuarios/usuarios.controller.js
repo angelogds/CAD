@@ -14,6 +14,7 @@ const ROLES = [
   { key: "ALMOXARIFADO", label: "almoxarifado" },
   { key: "COMPRAS", label: "compras" },
   { key: "MANUTENCAO_SUPERVISOR", label: "manutencao_supervisor" },
+  { key: "INSPECAO_QUALIDADE", label: "Inspeção e Qualidade" },
 ];
 
 function ensureUploadDir() {

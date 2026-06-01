@@ -9,7 +9,7 @@ const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
 const { canSendWhatsappNotification } = require("../../middlewares/permissions.middleware");
 const ctrl = require("./os.controller");
-const { OS_EXECUTION_ACCESS, OS_DETALHE_ACCESS, detailUnauthorizedRedirectPath } = require("./os.permissions");
+const { OS_EXECUTION_ACCESS, OS_STATUS_ACCESS, detailUnauthorizedRedirectPath } = require("./os.permissions");
 
 const uploadDir = path.join(storagePaths.UPLOAD_DIR, "os");
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -123,7 +123,7 @@ router.post(
   wrap(ctrl.osClose, "osClose")
 );
 
-router.post("/:id/status", requireLogin, requireRole(OS_DETALHE_ACCESS), wrap(ctrl.osUpdateStatus, "osUpdateStatus"));
+router.post("/:id/status", requireLogin, requireRole(OS_STATUS_ACCESS), wrap(ctrl.osUpdateStatus, "osUpdateStatus"));
 router.post("/:id/excluir", requireLogin, requireRole(["ADMIN"]), wrap(ctrl.osDelete, "osDelete"));
 router.post("/:id/auto-alocar", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osAutoAssign, "osAutoAssign"));
 router.post("/:id/auto-assign", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osAutoAssign, "osAutoAssign"));

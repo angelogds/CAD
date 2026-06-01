@@ -2,7 +2,7 @@ const service = require("./os.service");
 const pushService = require("../push/push.service");
 let tracagemService = null;
 try { tracagemService = require('../tracagem/tracagem.service'); } catch (_e) {}
-const { normalizeRole } = require("../../config/rbac");
+const { canAccessModule, normalizeRole } = require("../../config/rbac");
 const { canViewOSDetails, postCloseRedirectPath } = require("./os.permissions");
 const aiService = require("../ai/ai.service");
 const embeddingsService = require("../ai/ai.embeddings.service");
@@ -205,6 +205,12 @@ function osShow(req, res) {
   if (!os) return res.status(404).render("errors/404", { title: "Não encontrado" });
 
   const role = normalizeRole(req.session?.user?.role || "");
+  const isInspectionQuality = role === "INSPECAO_QUALIDADE";
+  const isOpenedByCurrentUser = Number(os.opened_by || 0) === Number(req.session?.user?.id || 0);
+  if (isInspectionQuality && !isOpenedByCurrentUser && !service.isOSLinkedToInspecao(id)) {
+    return res.status(403).render("errors/403", { layout: "layout", title: "Sem permissão" });
+  }
+
   const canManageEquipe = ["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"].includes(role);
 
   let osAtual = os;
@@ -236,6 +242,7 @@ function osShow(req, res) {
     os: osAtual,
     canAutoAssign: canManageEquipe,
     canManualEditEquipe: canManageEquipe,
+    canExecuteOS: canAccessModule(role, "os_execute"),
     equipeUsuarios,
     tracagens,
     whatsappLogs,
@@ -710,6 +717,9 @@ async function osVoiceCommand(req, res) {
   if (parsed.action === "open_os") return res.json({ ok: true, action: parsed.action, redirect: "/os/novo" });
   if (parsed.action === "show_preventivas") return res.json({ ok: true, action: parsed.action, redirect: "/preventivas" });
   if (parsed.action === "close_os" && parsed.osId) {
+    if (!canAccessModule(req.session?.user?.role, "os_execute")) {
+      return res.status(403).json({ ok: false, error: "Sem permissão para finalizar OS." });
+    }
     try {
       service.updateStatus(parsed.osId, "FINALIZADA", userId);
       return res.json({ ok: true, action: parsed.action, os_id: parsed.osId, redirect: `/os/${parsed.osId}` });

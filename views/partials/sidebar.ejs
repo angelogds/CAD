@@ -14,10 +14,10 @@
   const canOS = can('os_view');
   const canPreventivas = can('preventivas_view');
   const canDemandas = can('demandas_view');
-  const canSolicitacoes = can('solicitacoes');
+  const canSolicitacoes = can('solicitacoes_read');
   const canCompras = can('compras');
   const canFornecedores = can('fornecedores');
-  const canAlmoxarifado = can('almoxarifado');
+  const canAlmoxarifado = can('almoxarifado_read');
   const canEstoque = can('estoque_view');
   const canMotores = can('motores');
   const canAvisos = can('avisos_view');
@@ -28,7 +28,7 @@
   const canTracagem = can('tracagem_view');
   const canDesenhoTecnico = can('desenho_tecnico_view');
   const canAcademia = can('academia_view');
-  const canAI = canOS || canPreventivas || canAcademia;
+  const canAI = role !== 'INSPECAO_QUALIDADE' && (canOS || canPreventivas || canAcademia);
 
   const currentPcmSection = (typeof activePcmSection !== 'undefined' ? activePcmSection : '');
 
