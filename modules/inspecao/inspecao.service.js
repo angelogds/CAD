@@ -670,6 +670,30 @@ function listOSEmAndamentoDetalhadas(_inspecaoId, mes, ano) {
   });
 }
 
+function getIndicadoresOS(mes, ano, osEmAndamento = null) {
+  const osDoMes = getOSRowsByMonth(ano, mes);
+  const abertasOuEmAndamento = Array.isArray(osEmAndamento)
+    ? osEmAndamento
+    : listOSEmAndamentoDetalhadas(null, mes, ano);
+  const motivosAguardandoMaterial = ["material", "compra", "peca", "tornearia"];
+  const equipamentosImpactados = new Set(
+    abertasOuEmAndamento.map((ordem) => normalizeText(ordem.equipamento)).filter(Boolean)
+  );
+
+  return {
+    registradas_no_mes: osDoMes.length,
+    concluidas_no_mes: osDoMes.filter((ordem) => isClosedStatus(ordem.status)).length,
+    com_nao_conformidade_no_mes: osDoMes.filter((ordem) => isNC(ordem)).length,
+    abertas_ou_em_andamento: abertasOuEmAndamento.length,
+    sem_justificativa: abertasOuEmAndamento.filter((ordem) => !String(ordem.motivo_atual || "").trim()).length,
+    aguardando_material: abertasOuEmAndamento.filter((ordem) => {
+      const motivo = normalizeText(ordem.motivo_atual);
+      return motivosAguardandoMaterial.some((termo) => motivo.includes(termo));
+    }).length,
+    equipamentos_impactados: equipamentosImpactados.size,
+  };
+}
+
 function computeGrade(inspecaoId, mes, ano) {
   return recalculate(inspecaoId, mes, ano);
 }
@@ -682,6 +706,7 @@ module.exports = {
   buildMatrix,
   listNC,
   listOSEmAndamentoDetalhadas,
+  getIndicadoresOS,
   computeGrade,
   recalculate,
   saveNC,

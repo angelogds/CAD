@@ -11,13 +11,29 @@ test('migration adds technical preventive report traceability fields', () => {
   }
 });
 
-test('inspection report renders preventive section, filters and indicators', () => {
+test('inspection report renders preventive section and OS and preventive indicators without filter card', () => {
   const view = read('views/inspecao/index.ejs');
   assert.match(view, /Preventivas Executadas no Período/);
-  assert.match(view, /Indicadores de preventivas/);
-  assert.match(view, /tipo_atividade/);
-  assert.match(view, /nao_conformidade/);
-  assert.match(view, /gerou_os/);
+  assert.match(view, /Indicadores de OS e preventivas/);
+  assert.match(view, /Ordens de serviço/);
+  assert.match(view, /Abertas ou em andamento/);
+  assert.match(view, /Sem justificativa/);
+  assert.match(view, /Aguardando material/);
+  assert.match(view, /Equipamentos impactados/);
+  assert.match(view, /Preventivas/);
+  assert.doesNotMatch(view, /Filtros do relatório de preventivas/);
+  assert.doesNotMatch(view, /Aplicar filtros/);
+});
+
+test('inspection report loads OS operational indicators from inspection service', () => {
+  const controller = read('modules/inspecao/inspecao.controller.js');
+  const service = read('modules/inspecao/inspecao.service.js');
+  assert.match(controller, /service\.getIndicadoresOS\(mes, ano, osEmAndamento\)/);
+  assert.match(controller, /indicadoresOS,/);
+  assert.match(service, /function getIndicadoresOS\(mes, ano, osEmAndamento = null\)/);
+  for (const indicador of ['registradas_no_mes', 'concluidas_no_mes', 'com_nao_conformidade_no_mes', 'abertas_ou_em_andamento', 'sem_justificativa', 'aguardando_material', 'equipamentos_impactados']) {
+    assert.match(service, new RegExp(indicador));
+  }
 });
 
 test('preventive completion supports technical fields and corrective OS link', () => {

@@ -29,6 +29,7 @@ function loadPageData(req) {
   const ncList = service.listNC(inspecao.id);
   const osDetailsByCell = service.listOSDetailsByInspecao(inspecao.id, mes, ano);
   const osEmAndamento = service.listOSEmAndamentoDetalhadas(inspecao.id, mes, ano);
+  const indicadoresOS = service.getIndicadoresOS(mes, ano, osEmAndamento);
   const filtrosPreventivas = {
     data_inicio: req.query.data_inicio || `${ano}-${String(mes).padStart(2, "0")}-01`,
     data_fim: req.query.data_fim || `${ano}-${String(mes).padStart(2, "0")}-${String(service.daysInMonth(ano, mes)).padStart(2, "0")}`,
@@ -52,6 +53,7 @@ function loadPageData(req) {
     ncList,
     osDetailsByCell,
     osEmAndamento,
+    indicadoresOS,
     preventivasExecutadas,
     indicadoresPreventivas,
     filtrosPreventivas,
