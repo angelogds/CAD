@@ -20,6 +20,18 @@
 .status-cell{padding:4px}
 .status-badge-btn{border:none;background:transparent;cursor:pointer;padding:0}
 .status-cell.disabled .status-badge-btn{cursor:not-allowed}
+.inspecao-indicadores-card h3{margin-bottom:4px}
+.inspecao-indicadores-section{margin-top:16px}
+.inspecao-indicadores-section h4{margin:0 0 8px;color:#1f2937}
+.inspecao-indicadores-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.inspecao-indicador{display:flex;flex-direction:column;gap:4px;border:1px solid;border-radius:10px;padding:12px}
+.inspecao-indicador-os{border-color:#bfdbfe;background:#eff6ff}
+.inspecao-indicador-preventiva{border-color:#d1fae5;background:#f0fdf4}
+.inspecao-indicador-label{font-size:13px;font-weight:800;color:#374151}
+.inspecao-indicador strong{font-size:24px;color:#0f5132}
+.inspecao-indicador-os strong{color:#1d4ed8}
+.inspecao-indicador small{color:#6b7280;line-height:1.35}
+.inspecao-indicadores-alerta{margin-top:12px;border-radius:8px;padding:10px;background:#fffbeb;color:#92400e}
 .inspecao-nc-card{margin-top:16px}
 .nc-table th,.nc-table td{vertical-align:top}
 .nc-edit-form{display:grid;grid-template-columns:2fr 2fr 1fr auto;gap:8px}
