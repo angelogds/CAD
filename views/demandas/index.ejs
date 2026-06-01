@@ -4,7 +4,7 @@
     <h1>Demandas</h1>
     <p class="muted">Demandas da Direção para acompanhamento e execução.</p>
   </div>
-  <% if (String(user?.role || '').toUpperCase() === 'DIRECAO' || String(user?.role || '').toUpperCase() === 'DIRETORIA') { %>
+  <% if (canAccessModule(normalizeRole(user?.role), 'demandas_open')) { %>
     <a class="btn btn-green" href="/demandas/new">+ Nova Demanda</a>
   <% } %>
 </div>

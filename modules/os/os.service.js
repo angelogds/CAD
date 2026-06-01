@@ -579,6 +579,23 @@ function getOSById(id) {
   };
 }
 
+function isOSLinkedToInspecao(osId) {
+  const id = Number(osId);
+  if (!id) return false;
+
+  const inspectionTables = [
+    "inspecao_pac01_nao_conformidades",
+    "inspecao_pac01_nc",
+    "inspecao_pac01_grade",
+    "inspecao_pac01_itens",
+  ];
+
+  return inspectionTables.some((table) => {
+    if (!tableExists(table) || !getTableColumns(table).includes("os_id")) return false;
+    return !!db.prepare(`SELECT 1 FROM ${table} WHERE os_id = ? LIMIT 1`).get(id);
+  });
+}
+
 function findRecentDuplicateOS({
   opened_by,
   equipamento_id = null,
@@ -2429,6 +2446,7 @@ module.exports = {
   createOSAutomatica,
   addFotosAberturaFechamento,
   getOSById,
+  isOSLinkedToInspecao,
   findRecentDuplicateOS,
   iniciarOS,
   pausarOS,

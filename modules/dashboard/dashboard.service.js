@@ -1160,7 +1160,7 @@ function getPreventivasDashboard() {
 
 function podeIniciarPreventiva(user, preventiva) {
   const role = normalizeRole(user?.role);
-  if (!user?.id) return false;
+  if (!user?.id || role === "INSPECAO_QUALIDADE") return false;
   if (role === "ADMIN" || role === "MANUTENCAO_SUPERVISOR" || role === "SUPERVISOR_MANUTENCAO" || role === "ENCARREGADO_MANUTENCAO") return true;
   const ids = [preventiva?.responsavel_1_id, preventiva?.responsavel_2_id].map((x) => Number(x)).filter(Boolean);
   return ids.includes(Number(user.id));

@@ -20,7 +20,12 @@ const OS_DETALHE_ACCESS = [
   'ADMIN',
   'SUPERVISOR_MANUTENCAO',
   'MANUTENCAO_SUPERVISOR',
+  'INSPECAO_QUALIDADE',
 ];
+
+// Perfis com acesso a ações manuais de status na tela detalhada.
+// Inspeção e Qualidade consulta detalhes, mas não executa o ciclo da OS.
+const OS_STATUS_ACCESS = OS_DETALHE_ACCESS.filter((role) => role !== 'INSPECAO_QUALIDADE');
 
 function canViewOSDetails(userOrRole) {
   const role = typeof userOrRole === 'string' ? userOrRole : userOrRole?.role;
@@ -42,6 +47,7 @@ module.exports = {
   OS_ACCESS,
   OS_EXECUTION_ACCESS,
   OS_DETALHE_ACCESS,
+  OS_STATUS_ACCESS,
   canViewOSDetails,
   postCloseRedirectPath,
   detailUnauthorizedRedirectPath,
