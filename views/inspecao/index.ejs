@@ -22,8 +22,8 @@
     <a class="btn btn-outline action-btn" href="/inspecao/<%= prevAno %>/<%= prevMes %>">◀ Mês anterior</a>
     <a class="btn btn-outline action-btn" href="/inspecao/<%= nextAno %>/<%= nextMes %>">Próximo mês ▶</a>
     <a class="btn btn-outline action-btn" href="/inspecao/<%= ano %>/<%= mes %>/os-em-andamento">OS em andamento</a>
-    <a class="btn btn-outline action-btn" href="/inspecao/<%= ano %>/<%= mes %>/pdf">Exportar PDF</a>
-    <a class="btn btn-outline action-btn" href="/inspecao/<%= ano %>/<%= mes %>/export/csv">Exportar CSV</a>
+    <a class="btn btn-outline action-btn" href="/inspecao/<%= ano %>/<%= mes %>/pdf?<%= preventivasQuery %>">Exportar PDF</a>
+    <a class="btn btn-outline action-btn" href="/inspecao/<%= ano %>/<%= mes %>/export/csv?<%= preventivasQuery %>">Exportar CSV</a>
     <% if (canEdit) { %>
       <form method="POST" action="/inspecao/<%= ano %>/<%= mes %>/recalcular" style="display:contents;">
         <input type="hidden" name="monitor_nome" value="<%= inspecao.monitor_nome || '' %>" />
@@ -41,6 +41,43 @@
     <input type="text" name="frequencia" placeholder="Frequência" value="<%= inspecao.frequencia || 'Diária' %>" <%= canEdit ? '' : 'readonly' %> />
     <% if (canEdit) { %><button type="submit" class="btn btn-outline">Salvar cabeçalho</button><% } %>
   </form>
+</div>
+
+<div class="card" style="margin-bottom:14px;">
+  <h3>Indicadores de preventivas</h3>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
+    <% [['Programadas', indicadoresPreventivas.programadas],['Executadas', indicadoresPreventivas.executadas],['Pendentes', indicadoresPreventivas.pendentes],['Atrasadas', indicadoresPreventivas.atrasadas],['Com NC', indicadoresPreventivas.com_nao_conformidade],['Sem NC', indicadoresPreventivas.sem_nao_conformidade],['OS corretivas', indicadoresPreventivas.os_corretivas],['Cumprimento', `${indicadoresPreventivas.cumprimento_percentual || 0}%`]].forEach(([label,value]) => { %>
+      <div style="border:1px solid #d1fae5;border-radius:8px;padding:10px;background:#f0fdf4;"><div class="muted"><%= label %></div><strong style="font-size:20px;color:#0b6b3a;"><%= value || 0 %></strong></div>
+    <% }) %>
+  </div>
+  <% if ((indicadoresPreventivas.equipamentos_com_mais_nc || []).length) { %><div style="margin-top:10px;"><strong>Equipamentos com maior número de não conformidades preventivas:</strong> <%= indicadoresPreventivas.equipamentos_com_mais_nc.map(item => `${item.equipamento} (${item.total})`).join(' • ') %></div><% } %>
+</div>
+
+<div class="card" style="margin-bottom:14px;">
+  <h3>Filtros do relatório de preventivas</h3>
+  <form method="GET" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:8px;align-items:end;">
+    <label>Data inicial<input type="date" name="data_inicio" value="<%= filtrosPreventivas.data_inicio %>" /></label>
+    <label>Data final<input type="date" name="data_fim" value="<%= filtrosPreventivas.data_fim %>" /></label>
+    <label>Equipamento<select name="equipamento_id"><option value="">Todos</option><% equipamentos.forEach(eq => { %><option value="<%= eq.id %>" <%= String(filtrosPreventivas.equipamento_id) === String(eq.id) ? 'selected' : '' %>><%= eq.nome %></option><% }) %></select></label>
+    <label>Setor<input name="setor" value="<%= filtrosPreventivas.setor %>" placeholder="Setor" /></label>
+    <label>Responsável<input name="responsavel" value="<%= filtrosPreventivas.responsavel %>" placeholder="Responsável" /></label>
+    <label>Status<select name="status"><option value="">Todos</option><% ['EXECUTADA','FINALIZADA','CONCLUIDA'].forEach(status => { %><option value="<%= status %>" <%= filtrosPreventivas.status === status ? 'selected' : '' %>><%= status %></option><% }) %></select></label>
+    <label>Tipo de atividade<select name="tipo_atividade"><option value="">Todas</option><option value="OS" <%= filtrosPreventivas.tipo_atividade === 'OS' ? 'selected' : '' %>>OS</option><option value="INSPECAO" <%= filtrosPreventivas.tipo_atividade === 'INSPECAO' ? 'selected' : '' %>>Inspeção</option><option value="PREVENTIVA" <%= filtrosPreventivas.tipo_atividade === 'PREVENTIVA' ? 'selected' : '' %>>Preventiva</option></select></label>
+    <label>Não conformidade<select name="nao_conformidade"><option value="">Todas</option><option value="com" <%= filtrosPreventivas.nao_conformidade === 'com' ? 'selected' : '' %>>Com NC</option><option value="sem" <%= filtrosPreventivas.nao_conformidade === 'sem' ? 'selected' : '' %>>Sem NC</option></select></label>
+    <label>Vínculo com OS<select name="gerou_os"><option value="">Todas</option><option value="1" <%= filtrosPreventivas.gerou_os === '1' ? 'selected' : '' %>>Gerou OS corretiva</option></select></label>
+    <button class="btn btn-primary" type="submit">Aplicar filtros</button>
+  </form>
+</div>
+
+<div class="card inspecao-nc-card">
+  <h3>Preventivas Executadas no Período</h3>
+  <p class="muted">Registros rastreáveis de inspeção preventiva, incluindo atividades sem não conformidade.</p>
+  <div class="table-wrap"><table class="table"><thead><tr><th>Código</th><th>Equipamento / setor</th><th>Datas</th><th>Responsável</th><th>Descrição e itens</th><th>Não conformidade</th><th>Ações</th><th>Situação final</th><th>OS</th></tr></thead><tbody>
+    <% if (!(preventivasExecutadas || []).length) { %><tr><td colspan="9">Nenhuma preventiva executada no período filtrado.</td></tr><% } %>
+    <% (preventivasExecutadas || []).forEach(p => { %><tr>
+      <td><a href="/preventivas/<%= p.plano_id %>">PREV-<%= p.id %></a></td><td><strong><%= p.equipamento_nome || '-' %></strong><br><span class="muted"><%= p.setor || '-' %></span></td><td>Programada: <%= p.data_prevista || '-' %><br>Executada: <%= p.data_executada || '-' %></td><td><%= p.responsavel_exibicao || '-' %></td><td><%= p.descricao_preventiva || p.titulo || '-' %><br><span class="muted"><%= p.itens_verificados || '-' %></span></td><td><strong style="color:<%= Number(p.tem_nao_conformidade) ? '#b91c1c' : '#166534' %>"><%= p.nao_conformidade || '-' %></strong></td><td>Corretiva: <%= p.acao_corretiva || '-' %><br>Preventiva: <%= p.acao_preventiva || '-' %></td><td><%= String(p.situacao_final || '-').replaceAll('_',' ') %></td><td><% if (p.os_corretiva_id) { %><a href="/os/<%= p.os_corretiva_id %>">OS #<%= p.os_corretiva_id %></a><% } else { %>-<% } %></td>
+    </tr><% }) %>
+  </tbody></table></div>
 </div>
 
 <div class="card table-wrap inspecao-grid-wrap">

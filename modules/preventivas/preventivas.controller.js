@@ -153,14 +153,19 @@ function execUpdateStatus(req, res) {
     service.sincronizarPreventivasComEscala({ origem: "preventivas.execUpdateStatus" });
   }
 
-  const ok = service.updateExecucaoStatus(planoId, execId, statusNorm, data_executada, req.session?.user?.id || null);
+  const userId = req.session?.user?.id || null;
+  const ok = service.updateExecucaoStatus(planoId, execId, statusNorm, data_executada, userId, req.body || {});
+  let osCorretivaId = null;
+  if (ok && ["FINALIZADA", "EXECUTADA", "CONCLUIDA"].includes(statusNorm) && req.body.gerar_os_corretiva === "1") {
+    osCorretivaId = service.abrirOSCorretivaVinculada(execId, userId);
+  }
 
   if (!ok) {
     req.flash("error", "Execução não encontrada para este plano.");
     return res.redirect(`/preventivas/${planoId}`);
   }
 
-  req.flash("success", "Status da execução atualizado.");
+  req.flash("success", osCorretivaId ? `Preventiva finalizada e OS corretiva #${osCorretivaId} vinculada.` : "Status e informações técnicas da execução atualizados.");
   return res.redirect(`/preventivas/${planoId}`);
 }
 
