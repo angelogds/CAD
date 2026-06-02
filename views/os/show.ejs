@@ -43,7 +43,7 @@
     <div class="muted">Solicitante: <strong><%= os.solicitante_nome || '-' %></strong></div>
   </div>
   <div style="display:flex;gap:8px;align-items:center;">
-    <% const canOpenOSMenu = canSendWhatsappNotification || canAutoAssign || canManualEditEquipe || canSendWhatsapp; %>
+    <% const canOpenOSMenu = true; // A justificativa de andamento permanece disponível no menu para todos que podem consultar a OS. %>
     <% if (canOpenOSMenu) { %>
       <div class="os-menu-wrap" id="os-menu-wrap">
         <button class="btn btn-outline os-menu-btn" type="button" id="os-menu-btn" aria-expanded="false" aria-controls="os-menu-panel">☰ Menu OS</button>
@@ -52,6 +52,7 @@
             <button class="btn btn-outline" type="button" data-os-module="tracagens-vinculadas">Traçagens vinculadas</button>
             <button class="btn btn-outline" type="button" data-os-module="equipe-os">Equipe da OS</button>
             <button class="btn btn-outline" type="button" data-os-module="whatsapp-os">Notificações WhatsApp</button>
+            <button class="btn btn-outline" type="button" data-os-module="justificativa-andamento">Justificativa de OS em andamento</button>
             <div class="os-menu-sep"></div>
             <% if (canAutoAssign) { %>
               <form method="POST" action="/os/<%= os.id %>/auto-alocar">
@@ -265,7 +266,7 @@
 
 
 <% const statusPermiteAndamento = ['ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA','AGUARDANDO_EQUIPE'].includes(String(os.status || '').toUpperCase()); %>
-<div class="card" id="justificativa-andamento" style="margin-top:12px;">
+<div class="card os-module" id="justificativa-andamento" style="margin-top:12px;">
   <div class="card-head">
     <div>
       <h3 style="margin:0;">Justificativa de OS em andamento</h3>
@@ -545,6 +546,14 @@
       modules.forEach((el) => el.classList.remove('active'));
       const target = document.getElementById(moduleId);
       if (target) target.classList.add('active');
+      return target;
+    }
+
+    function activateHashModule() {
+      const moduleId = window.location.hash.replace(/^#/, '');
+      if (!moduleId) return;
+      const target = document.getElementById(moduleId);
+      if (target && target.classList.contains('os-module')) activateModule(moduleId);
     }
 
     if (menuWrap && menuBtn) {
@@ -560,12 +569,17 @@
             const equipe = document.getElementById('equipe-os');
             if (equipe) equipe.scrollIntoView({ behavior: 'smooth', block: 'start' });
           } else {
-            activateModule(moduleId);
+            const target = activateModule(moduleId);
+            if (target && moduleId === 'justificativa-andamento') {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
           }
           menuWrap.classList.remove('open');
           menuBtn.setAttribute('aria-expanded', 'false');
         });
       });
+      activateHashModule();
+      window.addEventListener('hashchange', activateHashModule);
       document.addEventListener('click', function(ev){
         if (!menuWrap.contains(ev.target)) {
           menuWrap.classList.remove('open');
