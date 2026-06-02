@@ -66,6 +66,14 @@ test('OS andamento routes precede generic OS detail and use dedicated permission
   assert.match(routes, /requireRole\(OS_ANDAMENTO_ACCESS\)/);
 });
 
+test('OS detail keeps ongoing justification card organized inside Menu OS', () => {
+  const detail = read('views/os/show.ejs');
+  assert.match(detail, /data-os-module="justificativa-andamento">Justificativa de OS em andamento/);
+  assert.match(detail, /class="card os-module" id="justificativa-andamento"/);
+  assert.match(detail, /function activateHashModule\(\)/);
+  assert.match(detail, /window\.addEventListener\('hashchange', activateHashModule\)/);
+});
+
 test('OS service stores separate history, local-day alert state and inspection sync', () => {
   const service = read('modules/os/os.service.js');
   const registrar = service.match(/async function registrarJustificativaAndamento[\s\S]*?return getHistoricoAndamentoOS\(id\)\[0\];/)?.[0] || '';
