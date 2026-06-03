@@ -66,6 +66,14 @@
         </div>
       </div>
     <% } %>
+    <% if (canExecuteOS) { %>
+      <form method="POST" action="/os/<%= os.id %>/pdf-institucional" style="display:inline;">
+        <button class="btn btn-primary" type="submit">Gerar PDF institucional</button>
+      </form>
+    <% } %>
+    <% if (documentoInstitucional && documentoInstitucional.pdf_url) { %>
+      <a class="btn btn-outline" href="<%= documentoInstitucional.pdf_url %>" target="_blank" rel="noopener">Baixar PDF institucional</a>
+    <% } %>
     <a class="btn btn-ghost" href="/os">Voltar</a>
   </div>
 </div>
@@ -104,12 +112,24 @@
           <span class="badge-funcao func-mon" style="margin-left:6px;">PLANTONISTA</span>
         <% } %>
       </div>
+      <div><b>Setor solicitante:</b> <%= os.setor_solicitante || '-' %></div>
+      <div><b>Setor destinatário:</b> <%= os.setor_destinatario || 'Manutenção' %></div>
+      <div><b>Responsável manutenção:</b> <%= os.responsavel_manutencao || '-' %></div>
       <div><b>Executor em andamento:</b> <%= os.executor_nome || os.execucao_ativa?.executor_nome || '-' %></div>
       <div><b>Auxiliar em andamento:</b> <%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></div>
       <div><b>2º mecânico em andamento:</b> <%= os.executor_secundario_nome || '-' %></div>
       <div><b>2º apoio em andamento:</b> <%= os.auxiliar_secundario_nome || '-' %></div>
       <div><b>Modo da alocação:</b> <%= os.alocacao_modo || '-' %></div>
     </div>
+
+    <% if (documentoInstitucional && documentoInstitucional.pdf_url) { %>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0"/>
+      <div class="muted" style="font-weight:700;">Documento institucional</div>
+      <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <span>Último PDF gerado: <strong><%= documentoInstitucional.numero_os %></strong></span>
+        <a class="btn btn-outline" href="<%= documentoInstitucional.pdf_url %>" target="_blank" rel="noopener">Visualizar / imprimir</a>
+      </div>
+    <% } %>
 
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0"/>
     <div class="muted">Descrição do problema (solicitante)</div>

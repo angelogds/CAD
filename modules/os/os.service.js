@@ -2226,6 +2226,28 @@ function addFotosAberturaFechamento({ osId, files = [], tipo, userId }) {
   tx();
 }
 
+function updateInstitutionalMetadata(osId, metadata = {}) {
+  const id = Number(osId || 0);
+  if (!id) return;
+  const cols = getOSColumns();
+  const allowed = {
+    setor_solicitante: metadata.setor_solicitante,
+    setor_destinatario: metadata.setor_destinatario,
+    responsavel_manutencao: metadata.responsavel_manutencao,
+  };
+  const sets = [];
+  const values = [];
+  for (const [col, raw] of Object.entries(allowed)) {
+    if (!cols.includes(col)) continue;
+    const value = String(raw || '').trim();
+    if (!value) continue;
+    sets.push(`${col} = ?`);
+    values.push(value);
+  }
+  if (!sets.length) return;
+  db.prepare(`UPDATE os SET ${sets.join(', ')} WHERE id = ?`).run(...values, id);
+}
+
 function iniciarOS(id, userId) {
   const os = getOSById(id);
   if (!os) throw new Error("OS não encontrada.");
@@ -2592,6 +2614,7 @@ module.exports = {
   createOS,
   createOSAutomatica,
   addFotosAberturaFechamento,
+  updateInstitutionalMetadata,
   getOSById,
   isOSLinkedToInspecao,
   findRecentDuplicateOS,

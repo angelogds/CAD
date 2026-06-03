@@ -8,6 +8,7 @@ const aiService = require("../ai/ai.service");
 const embeddingsService = require("../ai/ai.embeddings.service");
 const visionService = require("../ai/ai.vision.service");
 const whatsappService = require("../whatsapp/whatsapp.service");
+const osDocumentService = require("./os-document.service");
 const { canSendWhatsappNotificationRole } = require("../../middlewares/permissions.middleware");
 
 function mapFilesToPublic(files = []) {
@@ -74,6 +75,9 @@ async function osCreate(req, res) {
       ai_acoes_iniciais,
       acoes_iniciais,
       tipo,
+      setor_solicitante,
+      setor_destinatario,
+      responsavel_manutencao,
     } = req.body;
 
     const equipamentoIdNum = equipamento_id ? Number(equipamento_id) : null;
@@ -129,6 +133,8 @@ async function osCreate(req, res) {
       causa_diagnostico: causaProvavel || diagnosticoInicial || null,
       opened_by: req.session?.user?.id || null,
     });
+
+    service.updateInstitutionalMetadata(id, { setor_solicitante, setor_destinatario, responsavel_manutencao });
 
     let autoResult = null;
     try {
@@ -239,6 +245,7 @@ function osShow(req, res) {
   const historicoAndamento = service.getHistoricoAndamentoOS(id);
   const metricasAndamento = service.calcularDiasAbertaOS(osAtual);
   const ultimoRegistroHoje = service.temJustificativaAndamentoHoje(id);
+  const documentoInstitucional = osDocumentService.getLatestInstitutionalDocument(id);
 
   return res.render("os/show", {
     title: `OS #${id}`,
@@ -263,8 +270,28 @@ function osShow(req, res) {
     historicoAndamento,
     metricasAndamento,
     alertaJustificativaAndamento: service.isStatusOSEmAndamento(osAtual.status) && metricasAndamento.dias_aberta > 1 && !ultimoRegistroHoje,
+    documentoInstitucional,
     user: req.session?.user || null,
   });
+}
+
+async function osGerarPDFInstitucional(req, res) {
+  const id = Number(req.params.id);
+  const os = service.getOSById(id);
+  if (!os) return res.status(404).render("errors/404", { title: "Não encontrado" });
+
+  try {
+    const result = await osDocumentService.gerarPDFInstitucionalOS(os, {
+      userId: req.session?.user?.id || null,
+    });
+    req.flash("success", "PDF institucional da OS gerado com sucesso.");
+    if (String(req.query.download || '') === '1') return res.redirect(result.pdfUrl);
+    return res.redirect(`/os/${id}`);
+  } catch (err) {
+    console.error("❌ osGerarPDFInstitucional:", err);
+    req.flash("error", err?.message || "Não foi possível gerar o PDF institucional da OS.");
+    return res.redirect(`/os/${id}`);
+  }
 }
 
 function osCloseForm(req, res) {
@@ -796,6 +823,7 @@ module.exports = {
   osPausar,
   osClose,
   osGerarDescricaoTecnica,
+  osGerarPDFInstitucional,
   osDelete,
   osUpdateStatus,
   osAutoAssign,
