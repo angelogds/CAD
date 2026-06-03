@@ -5,6 +5,28 @@
 
 <style>
   .escala-table-wrap { width:100%; overflow:auto; -webkit-overflow-scrolling:touch; }
+  .escala-actions {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+  }
+  .escala-action-btn {
+    justify-content: center;
+    min-width: 58px;
+    padding: 5px 6px;
+    line-height: 1.1;
+    transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
+  }
+  .escala-action-edit:hover {
+    border-color: rgba(22, 163, 74, .5);
+    background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+  }
+  .escala-action-delete:hover {
+    border-color: rgba(185, 28, 28, .5);
+    color: #7f1d1d;
+    background: linear-gradient(180deg, #fee2e2 0%, #fecaca 100%);
+  }
   @media (max-width: 760px) {
     .escala-table-wrap .table { min-width: 720px; }
     .escala-table-wrap .table th,
@@ -85,12 +107,14 @@
               <td><%= l.turnoLabel %></td>
               <td><%= l.funcaoLabel %></td>
               <td><%= l.statusLabel %></td>
-              <td style="display:flex;gap:6px;align-items:center;">
-                <a class="btn btn-sm" href="/escala/editar/<%= semana.id %>" title="Editar" aria-label="Editar">✏️</a>
-                <form method="POST" action="/escala/alocacao/<%= l.alocacao_id %>/delete" onsubmit="return confirm('Deseja excluir este registro?');" style="margin:0;">
-                  <input type="hidden" name="date" value="<%= alvo %>">
-                  <button class="btn btn-sm" type="submit" title="Excluir" aria-label="Excluir">🗑️</button>
-                </form>
+              <td>
+                <div class="escala-actions">
+                  <a class="btn btn-sm escala-action-btn escala-action-edit" href="/escala/editar/<%= semana.id %>" title="Editar" aria-label="Editar">Editar</a>
+                  <form method="POST" action="/escala/alocacao/<%= l.alocacao_id %>/delete" onsubmit="return confirm('Deseja excluir este registro?');" style="margin:0;">
+                    <input type="hidden" name="date" value="<%= alvo %>">
+                    <button class="btn btn-sm escala-action-btn escala-action-delete" type="submit" title="Excluir" aria-label="Excluir">Excluir</button>
+                  </form>
+                </div>
               </td>
             </tr>
           <% }) %>
