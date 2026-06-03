@@ -62,7 +62,8 @@ function createDatabase(databasePath) {
     return new BetterSqlite3(databasePath);
   } catch (error) {
     const isBindingError = /Could not locate the bindings file/i.test(String(error?.message || ""));
-    if (!isBindingError) throw error;
+    const isModuleMissing = error?.code === "MODULE_NOT_FOUND" && String(error?.message || "").includes("better-sqlite3");
+    if (!isBindingError && !isModuleMissing) throw error;
     console.warn("⚠️ [db] better-sqlite3 indisponível. Usando fallback node:sqlite.");
     return createNodeSqliteCompat(databasePath);
   }
