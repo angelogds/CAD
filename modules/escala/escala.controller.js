@@ -235,6 +235,30 @@ exports.atualizarAusencia = (req, res, next) => {
   }
 };
 
+exports.removerAusencia = (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const date = String(req.body?.date || req.query?.date || "").slice(0, 10) || isoToday();
+
+    if (!id) {
+      req.flash("error", "Registro inválido para exclusão.");
+      return res.redirect(`/escala/ausencias?date=${date}`);
+    }
+
+    const ok = service.removerAusencia(id);
+    if (!ok) {
+      req.flash("error", "Registro não encontrado para exclusão.");
+      return res.redirect(`/escala/ausencias?date=${date}`);
+    }
+    reprocessarPreventivasComNovaEscala();
+
+    req.flash("success", "Ausência apagada com sucesso.");
+    return res.redirect(`/escala/ausencias?date=${date}`);
+  } catch (e) {
+    next(e);
+  }
+};
+
 
 
 exports.removerAlocacao = (req, res, next) => {

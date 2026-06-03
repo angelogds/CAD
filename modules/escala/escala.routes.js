@@ -23,6 +23,7 @@ router.get("/ausencias", requireLogin, requireRole(ACCESS.escala), safe(controll
 router.post("/adicionar", requireLogin, requireRole(ACCESS.escala), safe(controller.adicionarRapido, "adicionarRapido"));
 router.post("/ausencia", requireLogin, requireRole(ACCESS.escala), safe(controller.lancarAusencia, "lancarAusencia"));
 router.post("/ausencia/:id/update", requireLogin, requireRole(ACCESS.escala), safe(controller.atualizarAusencia, "atualizarAusencia"));
+router.post("/ausencia/:id/delete", requireLogin, requireRole(ACCESS.escala), safe(controller.removerAusencia, "removerAusencia"));
 router.get("/editar/:id", requireLogin, requireRole(ACCESS.escala), safe(controller.editarSemana, "editarSemana"));
 router.post("/editar/:id", requireLogin, requireRole(ACCESS.escala), safe(controller.salvarEdicao, "salvarEdicao"));
 router.post("/alocacao/:id/delete", requireLogin, requireRole(ACCESS.escala), safe(controller.removerAlocacao, "removerAlocacao"));

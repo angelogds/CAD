@@ -3,7 +3,7 @@
 <div class="page-head" style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
   <div>
     <h1 style="margin:0;">Folga / Atestado</h1>
-    <p style="margin:6px 0 0;color:#64748b;font-weight:700;">Visualize e corrija datas de colaboradores afastados.</p>
+    <p style="margin:6px 0 0;color:#64748b;font-weight:700;">Visualize, edite e apague datas de colaboradores afastados antes de gerar o PDF.</p>
   </div>
 
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
@@ -15,7 +15,19 @@
   </div>
 </div>
 
-<div class="card" style="margin-top:14px;">
+<style>
+  .ausencias-actions .btn-danger {
+    background:#dc2626;
+    border-color:#dc2626;
+    color:#fff;
+  }
+  .ausencias-actions .btn-danger:hover {
+    background:#b91c1c;
+    border-color:#b91c1c;
+  }
+</style>
+
+<div class="card ausencias-actions" style="margin-top:14px;">
   <h3 style="margin:0 0 10px;">Registros de folga, atestado e férias</h3>
 
   <table class="table">
@@ -27,7 +39,7 @@
         <th>Fim</th>
         <th>Motivo</th>
         <th>Situação em <%= alvo %></th>
-        <th style="width:420px;">Correção rápida</th>
+        <th style="width:460px;">Ações</th>
       </tr>
     </thead>
     <tbody>
@@ -50,9 +62,34 @@
             <% } %>
           </td>
           <td>
-            <form method="POST" action="/escala/ausencia/<%= item.id %>/update" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+              <button
+                class="btn btn-sm btn-primary"
+                type="button"
+                data-edit-ausencia="<%= item.id %>"
+                aria-expanded="false"
+                aria-controls="ausencia-edit-<%= item.id %>"
+              >Editar</button>
+              <form
+                method="POST"
+                action="/escala/ausencia/<%= item.id %>/delete"
+                onsubmit="return confirm('Apagar este registro de folga/atestado/férias? Esta ação também remove o item do PDF.');"
+                style="display:inline;"
+              >
+                <input type="hidden" name="date" value="<%= alvo %>">
+                <button class="btn btn-sm btn-danger" type="submit">Apagar</button>
+              </form>
+            </div>
+
+            <form
+              id="ausencia-edit-<%= item.id %>"
+              method="POST"
+              action="/escala/ausencia/<%= item.id %>/update"
+              data-edit-form="<%= item.id %>"
+              style="display:none;gap:8px;align-items:center;flex-wrap:wrap;"
+            >
               <input type="hidden" name="date" value="<%= alvo %>">
-              <select class="input" name="tipo" style="width:120px;" required>
+              <select class="input" name="tipo" style="width:145px;" required>
                 <option value="FOLGA" <%= item.tipo === 'FOLGA' ? 'selected' : '' %>>Folga</option>
                 <option value="FOLGA_MEIO_PERIODO" <%= item.tipo === 'FOLGA_MEIO_PERIODO' ? 'selected' : '' %>>Folga meio período</option>
                 <option value="ATESTADO" <%= item.tipo === 'ATESTADO' ? 'selected' : '' %>>Atestado</option>
@@ -61,7 +98,8 @@
               <input class="input" type="date" name="inicio" value="<%= item.inicio %>" required>
               <input class="input" type="date" name="fim" value="<%= item.fim %>" required>
               <input class="input" name="motivo" value="<%= item.motivo || '' %>" placeholder="Motivo" style="min-width:140px;">
-              <button class="btn btn-sm btn-primary" type="submit">Atualizar</button>
+              <button class="btn btn-sm btn-primary" type="submit">Salvar</button>
+              <button class="btn btn-sm" type="button" data-cancel-edit="<%= item.id %>">Cancelar</button>
             </form>
           </td>
         </tr>
@@ -69,3 +107,22 @@
     </tbody>
   </table>
 </div>
+
+<script>
+  document.addEventListener('click', function (event) {
+    const editButton = event.target.closest('[data-edit-ausencia]');
+    const cancelButton = event.target.closest('[data-cancel-edit]');
+    const id = editButton?.dataset.editAusencia || cancelButton?.dataset.cancelEdit;
+
+    if (!id) return;
+
+    const form = document.querySelector(`[data-edit-form="${id}"]`);
+    const trigger = document.querySelector(`[data-edit-ausencia="${id}"]`);
+    if (!form || !trigger) return;
+
+    const shouldOpen = Boolean(editButton) && form.style.display === 'none';
+    form.style.display = shouldOpen ? 'flex' : 'none';
+    trigger.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    trigger.textContent = shouldOpen ? 'Fechar edição' : 'Editar';
+  });
+</script>

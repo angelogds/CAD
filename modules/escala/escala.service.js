@@ -565,7 +565,6 @@ function atualizarAusencia({ id, tipo, inicio, fim, motivo }) {
   );
 
   if (tableExists("escala_ausencias")) {
-    const legacyTipo = tipoConcessao === "ATESTADO" ? "atestado" : "folga";
     const antigos = db.prepare(`
       SELECT id
       FROM escala_ausencias
@@ -576,14 +575,76 @@ function atualizarAusencia({ id, tipo, inicio, fim, motivo }) {
       LIMIT 1
     `).get(Number(row.colaborador_id), rowAtual?.inicio || inicioIso, rowAtual?.fim || fimIso);
 
-    if (antigos?.id) {
-      db.prepare(`
-        UPDATE escala_ausencias
-        SET tipo = ?, data_inicio = ?, data_fim = ?, motivo = ?
-        WHERE id = ?
-      `).run(legacyTipo, inicioIso, fimIso, motivo || null, Number(antigos.id));
+    if (tipoConcessao === "FERIAS") {
+      if (antigos?.id) {
+        db.prepare(`DELETE FROM escala_ausencias WHERE id = ?`).run(Number(antigos.id));
+      }
+    } else {
+      const legacyTipo = tipoConcessao === "ATESTADO" ? "atestado" : "folga";
+      if (antigos?.id) {
+        db.prepare(`
+          UPDATE escala_ausencias
+          SET tipo = ?, data_inicio = ?, data_fim = ?, motivo = ?
+          WHERE id = ?
+        `).run(legacyTipo, inicioIso, fimIso, motivo || null, Number(antigos.id));
+      } else {
+        db.prepare(`
+          INSERT INTO escala_ausencias (colaborador_id, tipo, data_inicio, data_fim, motivo)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(Number(row.colaborador_id), legacyTipo, inicioIso, fimIso, motivo || null);
+      }
     }
   }
+}
+
+function removerAusencia(id) {
+  const ausenciaId = Number(id);
+  if (!ausenciaId) throw new Error("Registro de ausência inválido.");
+
+  if (!tableExists("escala_concessoes")) return false;
+
+  const row = db.prepare(`
+    SELECT id, colaborador_id, tipo, inicio, fim, ref_compensacao_id
+    FROM escala_concessoes
+    WHERE id = ?
+    LIMIT 1
+  `).get(ausenciaId);
+
+  if (!row?.id) return false;
+
+  const transaction = db.transaction(() => {
+    if (tableExists("escala_ausencias") && row.tipo !== "FERIAS") {
+      db.prepare(`
+        DELETE FROM escala_ausencias
+        WHERE id = (
+          SELECT id
+          FROM escala_ausencias
+          WHERE colaborador_id = ?
+            AND data_inicio = ?
+            AND data_fim = ?
+          ORDER BY id DESC
+          LIMIT 1
+        )
+      `).run(Number(row.colaborador_id), row.inicio, row.fim);
+    }
+
+    db.prepare(`DELETE FROM escala_concessoes WHERE id = ?`).run(ausenciaId);
+
+    if (row.ref_compensacao_id && tableExists("escala_compensacoes")) {
+      const usos = db.prepare(`
+        SELECT COUNT(*) AS total
+        FROM escala_concessoes
+        WHERE ref_compensacao_id = ?
+      `).get(Number(row.ref_compensacao_id));
+
+      if (Number(usos?.total || 0) === 0) {
+        db.prepare(`DELETE FROM escala_compensacoes WHERE id = ?`).run(Number(row.ref_compensacao_id));
+      }
+    }
+  });
+
+  transaction();
+  return true;
 }
 
 
@@ -985,6 +1046,7 @@ module.exports = {
   getAuxiliaresDoTurnoAtual,
   listarAusencias,
   atualizarAusencia,
+  removerAusencia,
   getColaboradorIdsAusentesNoDia,
   normalizeTurno,
   normalizeFuncao,
