@@ -32,26 +32,7 @@ function nova(req, res) {
 
 function criar(req, res) {
   try {
-    const toArray = (value) => {
-      if (Array.isArray(value)) return value;
-      if (value === undefined || value === null || value === "") return [];
-      return [value];
-    };
-
-    const nomes = toArray(req.body.itens_nome ?? req.body['itens_nome[]'] ?? req.body.item_nome);
-    const especificacoes = toArray(req.body.itens_especificacao ?? req.body['itens_especificacao[]'] ?? req.body.item_descricao);
-    const unidades = toArray(req.body.itens_un ?? req.body['itens_un[]'] ?? req.body.unidade);
-    const quantidades = toArray(req.body.itens_qtd ?? req.body['itens_qtd[]'] ?? req.body.qtd_solicitada);
-    const itemIds = toArray(req.body.itens_item_id ?? req.body['itens_item_id[]'] ?? req.body.estoque_item_id);
-
-    const tamanho = Math.max(nomes.length, especificacoes.length, unidades.length, quantidades.length, itemIds.length);
-    const itens = Array.from({ length: tamanho }, (_, i) => ({
-      item_nome: String(nomes[i] || "").trim(),
-      item_descricao: String(especificacoes[i] || "").trim(),
-      unidade: String(unidades[i] || "UN").trim() || "UN",
-      qtd_solicitada: Number(quantidades[i] || 0),
-      estoque_item_id: itemIds[i] ? Number(itemIds[i]) : null,
-    })).filter((item) => item.item_nome && item.qtd_solicitada > 0);
+    const itens = service.parseItensFromBody(req.body);
 
     if (!itens.length) {
       req.flash("error", "Informe ao menos um item válido.");
@@ -67,12 +48,57 @@ function criar(req, res) {
   }
 }
 
+function editar(req, res) {
+  const solicitacao = service.getSolicitacaoById(Number(req.params.id));
+  if (!solicitacao) return res.status(404).send("Solicitação não encontrada");
+  if (!service.canEditSolicitacao(solicitacao, req.session.user)) {
+    req.flash("error", "Esta solicitação não pode ser editada neste status ou por este usuário.");
+    return res.redirect(`/solicitacoes/${solicitacao.id}`);
+  }
+
+  return res.render("solicitacoes/new", {
+    title: "Editar Solicitação",
+    activeMenu: "solicitacoes",
+    equipamentos: service.listEquipamentos(),
+    estoqueItens: service.listEstoqueItens(),
+    formData: solicitacao,
+    formItens: solicitacao.itens || [],
+    editMode: true,
+    actionUrl: `/solicitacoes/${solicitacao.id}/editar`,
+  });
+}
+
+function atualizar(req, res) {
+  const id = Number(req.params.id);
+  try {
+    const solicitacao = service.getSolicitacaoById(id);
+    if (!solicitacao) return res.status(404).send("Solicitação não encontrada");
+    if (!service.canEditSolicitacao(solicitacao, req.session.user)) {
+      req.flash("error", "Esta solicitação não pode ser editada neste status ou por este usuário.");
+      return res.redirect(`/solicitacoes/${id}`);
+    }
+
+    const itens = service.parseItensFromBody(req.body);
+    if (!itens.length) {
+      req.flash("error", "Informe ao menos um item válido.");
+      return res.redirect(`/solicitacoes/${id}/editar`);
+    }
+
+    service.updateSolicitacao(id, { ...req.body, itens });
+    req.flash("success", "Solicitação atualizada com sucesso.");
+    return res.redirect(`/solicitacoes/${id}`);
+  } catch (error) {
+    req.flash("error", error.message || "Não foi possível atualizar a solicitação.");
+    return res.redirect(`/solicitacoes/${id}/editar`);
+  }
+}
+
 function detalhe(req, res) {
   try {
     const solicitacao = service.getSolicitacaoById(Number(req.params.id));
     if (!solicitacao) return res.status(404).send("Solicitação não encontrada");
 
-    if (req.session.user.role !== "ADMIN" && solicitacao.solicitante_user_id !== req.session.user.id) {
+    if (!service.canViewSolicitacao(solicitacao, req.session.user)) {
       req.flash("error", "Sem permissão para esta solicitação.");
       return res.redirect("/solicitacoes/minhas");
     }
@@ -99,6 +125,7 @@ function detalhe(req, res) {
         fechada_em: solicitacao.fechada_em || null,
       },
       itens,
+      canEdit: service.canEditSolicitacao(solicitacao, req.session.user),
       backUrl,
     });
   } catch (error) {
@@ -111,7 +138,7 @@ function pdf(req, res) {
     const solicitacao = service.getSolicitacaoById(Number(req.params.id));
     if (!solicitacao) return res.status(404).send("Solicitação não encontrada");
 
-    if (req.session.user.role !== "ADMIN" && solicitacao.solicitante_user_id !== req.session.user.id) {
+    if (!service.canViewSolicitacao(solicitacao, req.session.user)) {
       req.flash("error", "Sem permissão para esta solicitação.");
       return res.redirect("/solicitacoes/minhas");
     }
@@ -122,4 +149,4 @@ function pdf(req, res) {
   }
 }
 
-module.exports = { minhas, nova, criar, detalhe, pdf };
+module.exports = { minhas, nova, criar, editar, atualizar, detalhe, pdf };

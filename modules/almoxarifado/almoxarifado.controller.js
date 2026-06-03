@@ -2,7 +2,8 @@ const service = require("./almoxarifado.service");
 const estoqueService = require("../estoque/estoque.service");
 
 function recebimentos(req, res) {
-  res.render("almoxarifado/recebimentos", { title: "Recebimentos", activeMenu: "almoxarifado", lista: service.listRecebimentos(), status: req.query.status || "" });
+  const status = req.query.status || "";
+  res.render("almoxarifado/recebimentos", { title: "Recebimentos", activeMenu: "almoxarifado", lista: service.listRecebimentos(status), status });
 }
 
 function iniciarRecebimento(req, res) {

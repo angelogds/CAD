@@ -3,13 +3,18 @@ const { STATUS } = require("../solicitacoes/solicitacoes.service");
 function hasColumn(table, name) { try { return db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === name); } catch { return false; } }
 const HAS_SALDO_ATUAL = hasColumn('estoque_itens','saldo_atual');
 
-function listRecebimentos() {
-  return db.prepare(`SELECT s.*, u.name AS solicitante_nome FROM solicitacoes s JOIN users u ON u.id=s.solicitante_user_id WHERE s.status IN (?, ?, ?, ?) ORDER BY s.id DESC`).all(
-    STATUS.COMPRADA,
-    STATUS.EM_RECEBIMENTO,
-    STATUS.RECEBIDA_PARCIAL,
-    STATUS.RECEBIDA_TOTAL
-  );
+function listRecebimentos(status = "") {
+  const statusPermitidos = [STATUS.COMPRADA, STATUS.EM_RECEBIMENTO, STATUS.RECEBIDA_PARCIAL, STATUS.RECEBIDA_TOTAL, STATUS.FECHADA];
+  const filtroStatus = statusPermitidos.includes(status) ? status : "";
+  const where = filtroStatus ? "s.status = ?" : `s.status IN (${statusPermitidos.map(() => "?").join(",")})`;
+  const params = filtroStatus ? [filtroStatus] : statusPermitidos;
+  return db.prepare(`
+    SELECT s.*, u.name AS solicitante_nome
+    FROM solicitacoes s
+    JOIN users u ON u.id=s.solicitante_user_id
+    WHERE ${where}
+    ORDER BY s.id DESC
+  `).all(...params);
 }
 
 function getSolicitacao(id) {

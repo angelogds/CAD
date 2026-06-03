@@ -25,8 +25,8 @@ const upload = multer({
 });
 
 router.get('/solicitacoes', requireLogin, requireRole(ACCESS.compras_read), ctrl.lista);
+router.get('/solicitacoes/:id/pdf', requireLogin, requireRole(ACCESS.compras_read), ctrl.pdf);
 router.get('/solicitacoes/:id', requireLogin, requireRole(ACCESS.compras_read), ctrl.detalhe);
-router.get('/solicitacoes/:id/pdf', requireLogin, requireRole(ACCESS.compras_manage), ctrl.pdf);
 
 router.post('/solicitacoes/:id/cotacoes', requireLogin, requireRole(ACCESS.compras_manage), ctrl.criarCotacao);
 router.post('/solicitacoes/:id/cotacoes/:cotacaoId/selecionar', requireLogin, requireRole(ACCESS.compras_manage), ctrl.selecionarCotacao);

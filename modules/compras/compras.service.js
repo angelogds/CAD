@@ -78,6 +78,7 @@ function buildSolicitacaoItensSelect() {
   const hasItemDescricao = columnExists('solicitacao_itens', 'item_descricao');
   const hasDescricao = columnExists('solicitacao_itens', 'descricao');
   const hasQtdSolicitada = columnExists('solicitacao_itens', 'qtd_solicitada');
+  const hasQuantidade = columnExists('solicitacao_itens', 'quantidade');
   const hasEstoqueItemId = columnExists('solicitacao_itens', 'estoque_item_id');
   const hasItemId = columnExists('solicitacao_itens', 'item_id');
 
@@ -95,9 +96,13 @@ function buildSolicitacaoItensSelect() {
       : hasDescricao
         ? 'si.descricao'
         : "''";
-  const qtdExpr = hasQtdSolicitada
+  const qtdExpr = hasQtdSolicitada && hasQuantidade
     ? "COALESCE(si.qtd_solicitada, si.quantidade, 0)"
-    : 'COALESCE(si.quantidade, 0)';
+    : hasQtdSolicitada
+      ? "COALESCE(si.qtd_solicitada, 0)"
+      : hasQuantidade
+        ? "COALESCE(si.quantidade, 0)"
+        : "0";
   const itemJoinExpr = hasEstoqueItemId && hasItemId
     ? 'COALESCE(si.estoque_item_id, si.item_id)'
     : hasEstoqueItemId
@@ -125,7 +130,8 @@ function listSolicitacoesPorStatus(filters = {}) {
   if (status) { where.push('s.status = ?'); params.push(status); }
   if (filters.query) {
     const fornecedorExpr = hasFornecedorCol ? "COALESCE(s.fornecedor, '')" : "''";
-    where.push(`(LOWER(s.numero) LIKE ? OR LOWER(s.titulo) LIKE ? OR LOWER(${fornecedorExpr}) LIKE ? OR LOWER(COALESCE(f.nome, '')) LIKE ?)`);
+    const fornecedorNomeExpr = hasFornecedorIdCol && hasFornecedoresTable ? "COALESCE(f.nome, '')" : "''";
+    where.push(`(LOWER(s.numero) LIKE ? OR LOWER(s.titulo) LIKE ? OR LOWER(${fornecedorExpr}) LIKE ? OR LOWER(${fornecedorNomeExpr}) LIKE ?)`);
     const q = `%${String(filters.query).trim().toLowerCase()}%`;
     params.push(q, q, q, q);
   }
@@ -174,51 +180,65 @@ function listCotacoes(solicitacaoId) {
 }
 
 function listAnexosSolicitacao(solicitacaoId) {
-  if (!tableExists('anexos')) return [];
+  const anexos = [];
   const usersRef = resolveUsersTable();
 
-  const hasOwnerType = columnExists('anexos', 'owner_type');
-  const hasOwnerId = columnExists('anexos', 'owner_id');
+  if (tableExists('anexos')) {
+    const hasOwnerType = columnExists('anexos', 'owner_type');
+    const hasOwnerId = columnExists('anexos', 'owner_id');
+    const hasReferencia = columnExists('anexos', 'referencia_tipo') && columnExists('anexos', 'referencia_id');
+    const hasUploadedBy = columnExists('anexos', 'uploaded_by');
+    const uploadedJoin = hasUploadedBy ? `LEFT JOIN ${usersRef.table} u ON u.id = a.uploaded_by` : `LEFT JOIN ${usersRef.table} u ON 1=0`;
+    const baseSelect = `
+      SELECT a.*, u.${usersRef.nameCol} AS uploaded_by_nome, 'anexos' AS origem_tabela
+      FROM anexos a
+      ${uploadedJoin}
+    `;
 
-  const baseSelect = `
-    SELECT a.*, u.${usersRef.nameCol} AS uploaded_by_nome
-    FROM anexos a
-    LEFT JOIN ${usersRef.table} u ON u.id = a.uploaded_by
-  `;
-
-  if (hasOwnerType && hasOwnerId) {
-    if (columnExists('anexos', 'referencia_tipo') && columnExists('anexos', 'referencia_id')) {
-      return db.prepare(`
+    if (hasOwnerType && hasOwnerId && hasReferencia) {
+      anexos.push(...db.prepare(`
         ${baseSelect}
         WHERE (a.referencia_tipo='SOLICITACAO' AND a.referencia_id=?)
            OR (a.owner_type='SOLICITACAO' AND a.owner_id=?)
         ORDER BY a.id DESC
-      `).all(solicitacaoId, solicitacaoId);
+      `).all(solicitacaoId, solicitacaoId));
+    } else if (hasOwnerType && hasOwnerId) {
+      anexos.push(...db.prepare(`
+        ${baseSelect}
+        WHERE a.owner_type='SOLICITACAO' AND a.owner_id=?
+        ORDER BY a.id DESC
+      `).all(solicitacaoId));
+    } else if (hasReferencia) {
+      anexos.push(...db.prepare(`
+        ${baseSelect}
+        WHERE a.referencia_tipo='SOLICITACAO' AND a.referencia_id=?
+        ORDER BY a.id DESC
+      `).all(solicitacaoId));
     }
-
-    return db.prepare(`
-      ${baseSelect}
-      WHERE (a.owner_type='SOLICITACAO' AND a.owner_id=?)
-      ORDER BY a.id DESC
-    `).all(solicitacaoId);
   }
 
-  if (!columnExists('anexos', 'referencia_tipo') || !columnExists('anexos', 'referencia_id')) return [];
+  if (tableExists('compras_anexos')) {
+    anexos.push(...db.prepare(`
+      SELECT ca.*, u.${usersRef.nameCol} AS uploaded_by_nome, 'compras_anexos' AS origem_tabela
+      FROM compras_anexos ca
+      LEFT JOIN ${usersRef.table} u ON u.id = ca.uploaded_by
+      WHERE ca.referencia_tipo='SOLICITACAO' AND ca.referencia_id=?
+      ORDER BY ca.id DESC
+    `).all(solicitacaoId));
+  }
 
-  return db.prepare(`
-    ${baseSelect}
-    WHERE (a.referencia_tipo='SOLICITACAO' AND a.referencia_id=?)
-    ORDER BY a.id DESC
-  `).all(solicitacaoId);
+  return anexos.sort((a, b) => String(b.created_at || b.uploaded_at || '').localeCompare(String(a.created_at || a.uploaded_at || '')));
 }
 
 function getCotacaoSelecionada(solicitacaoId) {
   if (!tableExists('compras_cotacoes')) return null;
+  const selectedCol = columnExists('compras_cotacoes', 'selecionada') ? 'selecionada' : (columnExists('compras_cotacoes', 'escolhida') ? 'escolhida' : null);
+  if (!selectedCol) return null;
   if (!tableExists('fornecedores')) {
     return db.prepare(`
       SELECT c.*, NULL AS fornecedor_cadastro_nome
       FROM compras_cotacoes c
-      WHERE c.solicitacao_id = ? AND c.selecionada = 1
+      WHERE c.solicitacao_id = ? AND c.${selectedCol} = 1
       ORDER BY c.id DESC LIMIT 1
     `).get(solicitacaoId);
   }
@@ -226,17 +246,18 @@ function getCotacaoSelecionada(solicitacaoId) {
     SELECT c.*, f.nome AS fornecedor_cadastro_nome
     FROM compras_cotacoes c
     LEFT JOIN fornecedores f ON f.id = c.fornecedor_id
-    WHERE c.solicitacao_id = ? AND c.selecionada = 1
+    WHERE c.solicitacao_id = ? AND c.${selectedCol} = 1
     ORDER BY c.id DESC LIMIT 1
   `).get(solicitacaoId);
 }
 
 function getHistoricoPrecos(solicitacaoId) {
-  if (!tableExists('historico_precos')) return [];
+  const histTable = tableExists('historico_precos') ? 'historico_precos' : (tableExists('compras_historico_preco') ? 'compras_historico_preco' : null);
+  if (!histTable) return [];
   if (!tableExists('fornecedores')) {
     return db.prepare(`
       SELECT hp.*, NULL AS fornecedor_cadastro_nome
-      FROM historico_precos hp
+      FROM ${histTable} hp
       WHERE hp.solicitacao_id = ?
       ORDER BY datetime(COALESCE(hp.data_compra, hp.rowid)) DESC
       LIMIT 5
@@ -244,7 +265,7 @@ function getHistoricoPrecos(solicitacaoId) {
   }
   return db.prepare(`
     SELECT hp.*, f.nome AS fornecedor_cadastro_nome
-    FROM historico_precos hp
+    FROM ${histTable} hp
     LEFT JOIN fornecedores f ON f.id = hp.fornecedor_id
     WHERE hp.solicitacao_id = ?
     ORDER BY datetime(COALESCE(hp.data_compra, hp.rowid)) DESC
@@ -312,20 +333,35 @@ function iniciarCotacaoViaPdf(id, userId) {
 }
 
 function createCotacao(solicitacaoId, dados = {}) {
+  if (!tableExists('compras_cotacoes')) throw new Error('Tabela de cotações não está disponível. Execute as migrations.');
   const fornecedorId = dados.fornecedor_id ? Number(dados.fornecedor_id) : null;
-  const fornecedor = fornecedorId ? db.prepare('SELECT id, nome FROM fornecedores WHERE id = ?').get(fornecedorId) : null;
-  db.prepare(`
-    INSERT INTO compras_cotacoes (solicitacao_id, fornecedor_id, fornecedor_nome, valor_total, prazo_entrega, observacao, selecionada, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, 0, datetime('now'))
-  `).run(solicitacaoId, fornecedor?.id || null, fornecedor?.nome || (dados.fornecedor_nome || null), dados.valor_total ? Number(dados.valor_total) : null, dados.prazo_entrega || null, dados.observacao || null);
+  const fornecedor = fornecedorId && tableExists('fornecedores') ? db.prepare('SELECT id, nome FROM fornecedores WHERE id = ?').get(fornecedorId) : null;
+  const cols = ['solicitacao_id'];
+  const vals = [solicitacaoId];
+  const add = (col, val) => { if (columnExists('compras_cotacoes', col)) { cols.push(col); vals.push(val); } };
+
+  add('fornecedor_id', fornecedor?.id || null);
+  add('fornecedor_nome', fornecedor?.nome || (dados.fornecedor_nome || null));
+  add('valor_total', dados.valor_total ? Number(dados.valor_total) : 0);
+  add('prazo_entrega', dados.prazo_entrega || null);
+  add('prazo_entrega_dias', dados.prazo_entrega_dias || dados.prazo_entrega || null);
+  add('observacao', dados.observacao || null);
+  add('observacoes', dados.observacoes || dados.observacao || null);
+  add('selecionada', 0);
+  add('escolhida', 0);
+  add('created_at', new Date().toISOString());
+
+  db.prepare(`INSERT INTO compras_cotacoes (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).run(...vals);
 }
 
 function selecionarCotacao(solicitacaoId, cotacaoId) {
+  const selectedCol = columnExists('compras_cotacoes', 'selecionada') ? 'selecionada' : (columnExists('compras_cotacoes', 'escolhida') ? 'escolhida' : null);
+  if (!selectedCol) throw new Error('Tabela de cotações sem coluna de seleção.');
   return db.transaction(() => {
     const cotacao = db.prepare('SELECT * FROM compras_cotacoes WHERE id = ? AND solicitacao_id = ?').get(cotacaoId, solicitacaoId);
     if (!cotacao) throw new Error('Cotação não encontrada para a solicitação.');
-    db.prepare('UPDATE compras_cotacoes SET selecionada = 0 WHERE solicitacao_id = ?').run(solicitacaoId);
-    db.prepare('UPDATE compras_cotacoes SET selecionada = 1 WHERE id = ?').run(cotacaoId);
+    db.prepare(`UPDATE compras_cotacoes SET ${selectedCol} = 0 WHERE solicitacao_id = ?`).run(solicitacaoId);
+    db.prepare(`UPDATE compras_cotacoes SET ${selectedCol} = 1 WHERE id = ?`).run(cotacaoId);
   })();
 }
 
@@ -476,7 +512,8 @@ function gerarPdf(solicitacao, res) {
     doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(11).text('Anexos Fotográficos', 34, y);
     y += 20;
     imageAnexos.forEach((anexo, idx) => {
-      const fullPath = path.join(process.cwd(), 'uploads', anexo.filename || '');
+      const storagePaths = require('../../config/storage');
+      const fullPath = path.join(storagePaths.UPLOAD_DIR, anexo.filename || '');
       if (!fs.existsSync(fullPath)) return;
       if (y + 220 > doc.page.height - 80) { drawFooter(); doc.addPage(); y = 40; }
       doc.fillColor(COLORS.greenInst).fontSize(9).font('Helvetica-Bold').text(`ANEXO ${String(idx + 1).padStart(2, '0')} — ${anexo.original_name || 'Imagem'}`, 34, y);
