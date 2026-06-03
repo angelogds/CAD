@@ -997,6 +997,8 @@ function getPreventivasDashboard() {
       ? "UPPER(COALESCE(pe.criticidade, e.criticidade, 'MEDIA'))"
       : "UPPER(COALESCE(e.criticidade, 'MEDIA'))";
 
+    const periodo = getMesReferenciaPreventivasISO();
+
     const fetchRows = () => db
       .prepare(
         `
@@ -1042,7 +1044,6 @@ function getPreventivasDashboard() {
       )
       .all(periodo.inicioMes, periodo.inicioProximoMes);
 
-    const periodo = getMesReferenciaPreventivasISO();
     let rows = fetchRows();
 
     if (typeof preventivasService?.alocarEquipeExecucaoPreventiva === "function") {
