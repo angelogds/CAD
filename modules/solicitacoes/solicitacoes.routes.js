@@ -7,6 +7,8 @@ router.get("/minhas", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.
 router.get("/nova", requireLogin, requireRole(ACCESS.solicitacoes_create), ctrl.nova);
 router.post("/", requireLogin, requireRole(ACCESS.solicitacoes_create), ctrl.criar);
 router.get("/:id/pdf", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.pdf);
+router.get("/:id/editar", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.editar);
+router.post("/:id/editar", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.atualizar);
 router.get("/:id", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.detalhe);
 router.get("/", (_req, res) => res.redirect("/solicitacoes/minhas"));
 

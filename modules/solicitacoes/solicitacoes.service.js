@@ -48,8 +48,28 @@ function canManageByRole(role) {
     isAdmin: r === "ADMIN",
     isCompras: r === "COMPRAS",
     isAlmox: r === "ALMOXARIFADO",
-    isSolicitante: ["ENCARREGADO_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_PRODUCAO"].includes(r),
+    isDiretoria: ["DIRETORIA", "GESTAO"].includes(r),
+    isSolicitante: ["ENCARREGADO_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_PRODUCAO", "INSPECAO_QUALIDADE"].includes(r),
   };
+}
+
+function canViewSolicitacao(solicitacao, user) {
+  if (!solicitacao || !user) return false;
+  const roleInfo = canManageByRole(user.role);
+  return roleInfo.isAdmin
+    || roleInfo.isCompras
+    || roleInfo.isAlmox
+    || roleInfo.isDiretoria
+    || Number(solicitacao.solicitante_user_id) === Number(user.id);
+}
+
+function canEditSolicitacao(solicitacao, user) {
+  if (!solicitacao || !user) return false;
+  const role = normalizeRole(user.role);
+  const editableStatuses = [STATUS.ABERTA, STATUS.DEVOLVIDA_REVISAO];
+  const isOwner = Number(solicitacao.solicitante_user_id) === Number(user.id);
+  const isManager = ["ADMIN", "ENCARREGADO_MANUTENCAO", "MANUTENCAO_SUPERVISOR"].includes(role);
+  return editableStatuses.includes(solicitacao.status) && (isOwner || isManager);
 }
 
 function nextNumero() {
@@ -124,6 +144,82 @@ function createSolicitacao({ userId, setor_origem, prioridade, titulo, descricao
     }
 
     return solicitacaoId;
+  })();
+}
+
+
+function parseItensFromBody(body = {}) {
+  const toArray = (value) => {
+    if (Array.isArray(value)) return value;
+    if (value === undefined || value === null || value === "") return [];
+    return [value];
+  };
+
+  const nomes = toArray(body.itens_nome ?? body['itens_nome[]'] ?? body.item_nome);
+  const especificacoes = toArray(body.itens_especificacao ?? body['itens_especificacao[]'] ?? body.item_descricao);
+  const unidades = toArray(body.itens_un ?? body['itens_un[]'] ?? body.unidade);
+  const quantidades = toArray(body.itens_qtd ?? body['itens_qtd[]'] ?? body.qtd_solicitada);
+  const itemIds = toArray(body.itens_item_id ?? body['itens_item_id[]'] ?? body.estoque_item_id);
+
+  const tamanho = Math.max(nomes.length, especificacoes.length, unidades.length, quantidades.length, itemIds.length);
+  return Array.from({ length: tamanho }, (_, i) => ({
+    item_nome: String(nomes[i] || "").trim(),
+    item_descricao: String(especificacoes[i] || "").trim(),
+    unidade: String(unidades[i] || "UN").trim() || "UN",
+    qtd_solicitada: Number(quantidades[i] || 0),
+    estoque_item_id: itemIds[i] ? Number(itemIds[i]) : null,
+  })).filter((item) => item.item_nome && item.qtd_solicitada > 0);
+}
+
+function insertSolicitacaoItens(solicitacaoId, itens) {
+  const fallbackItemId = ITEM_HAS_ITEM_ID ? getFallbackItemId() : null;
+  const itemColumns = ["solicitacao_id"];
+  if (ITEM_HAS_ITEM_NOME) itemColumns.push("item_nome");
+  if (ITEM_HAS_ITEM_DESCRICAO) itemColumns.push("item_descricao");
+  itemColumns.push("unidade");
+  if (ITEM_HAS_ESTOQUE_ITEM_ID) itemColumns.push("estoque_item_id");
+  if (ITEM_HAS_QTD_SOLICITADA) itemColumns.push("qtd_solicitada");
+  if (ITEM_HAS_ITEM_ID) itemColumns.push("item_id");
+  if (ITEM_HAS_DESCRICAO) itemColumns.push("descricao");
+  if (ITEM_HAS_QUANTIDADE) itemColumns.push("quantidade");
+  const insertItem = db.prepare(`INSERT INTO solicitacao_itens (${itemColumns.join(",")}) VALUES (${itemColumns.map(() => "?").join(",")})`);
+
+  for (const item of itens || []) {
+    const row = [solicitacaoId];
+    if (ITEM_HAS_ITEM_NOME) row.push(item.item_nome);
+    if (ITEM_HAS_ITEM_DESCRICAO) row.push(item.item_descricao || null);
+    row.push((item.unidade || "UN").toUpperCase());
+    const estoqueItemId = validateEstoqueItemId(item.estoque_item_id);
+    if (ITEM_HAS_ESTOQUE_ITEM_ID) row.push(estoqueItemId);
+    if (ITEM_HAS_QTD_SOLICITADA) row.push(Number(item.qtd_solicitada || 0));
+    if (ITEM_HAS_ITEM_ID) row.push(estoqueItemId || fallbackItemId || null);
+    if (ITEM_HAS_DESCRICAO) row.push(item.item_descricao || item.item_nome);
+    if (ITEM_HAS_QUANTIDADE) row.push(Number(item.qtd_solicitada || 0));
+    insertItem.run(...row);
+  }
+}
+
+function updateSolicitacao(id, data = {}) {
+  const itens = data.itens || parseItensFromBody(data);
+  if (!itens.length) throw new Error("Informe ao menos um item válido.");
+
+  return db.transaction(() => {
+    db.prepare(`
+      UPDATE solicitacoes
+      SET setor_origem = ?, prioridade = ?, titulo = ?, descricao = ?, equipamento_id = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(
+      data.setor_origem || "Manutenção",
+      data.prioridade || "MEDIA",
+      data.titulo,
+      data.descricao || null,
+      sanitizePositiveId(data.equipamento_id),
+      id
+    );
+
+    db.prepare("DELETE FROM solicitacao_itens WHERE solicitacao_id = ?").run(id);
+    insertSolicitacaoItens(id, itens);
+    return getSolicitacaoById(id);
   })();
 }
 
@@ -243,4 +339,4 @@ function listEstoqueItens() {
   return db.prepare("SELECT id, codigo, nome, unidade FROM estoque_itens WHERE ativo = 1 ORDER BY nome").all();
 }
 
-module.exports = { STATUS, canManageByRole, createSolicitacao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };
+module.exports = { STATUS, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, createSolicitacao, updateSolicitacao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };
