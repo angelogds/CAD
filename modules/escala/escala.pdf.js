@@ -35,8 +35,12 @@ function createDoc() {
 }
 
 function logoPath() {
-  const target = path.resolve(process.cwd(), "public/IMG/logo_menu.png.png");
-  return fs.existsSync(target) ? target : null;
+  const options = [
+    path.resolve(process.cwd(), "public/IMG/login_campo_do_gado.png.png.png"),
+    path.resolve(process.cwd(), "public/IMG/logo_menu.png.png"),
+  ];
+
+  return options.find((target) => fs.existsSync(target)) || null;
 }
 
 function contentTop() {
@@ -56,14 +60,14 @@ function drawHeader(doc, { title, subtitle, logoPath: lPath }) {
   doc.roundedRect(x, y, width, HEADER_HEIGHT, 10).fill(COLORS.green);
   if (lPath && fs.existsSync(lPath)) {
     const logoX = x + 10;
-    const logoY = y + 9;
+    const logoY = y + 7;
     const logoW = 94;
-    const logoH = 58;
-    const logoRadius = 8;
-    doc.save();
-    doc.roundedRect(logoX, logoY, logoW, logoH, logoRadius).clip();
-    doc.image(lPath, logoX, logoY, { fit: [logoW, logoH] });
-    doc.restore();
+    const logoH = 62;
+    doc.image(lPath, logoX, logoY, {
+      fit: [logoW, logoH],
+      align: "center",
+      valign: "center",
+    });
   }
   doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(13)
     .text(title, x + 110, y + 22, { width: width - 124, align: "center" });
