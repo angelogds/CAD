@@ -43,6 +43,8 @@
     align-items: center;
     gap: 8px;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .btn-primary:hover {
@@ -92,24 +94,52 @@
 
   /* ─── TABELA DESKTOP ─── */
   .table-wrap {
-    overflow-x: auto;
+    max-width: 100%;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
   }
 
-  table {
+  .os-table {
     width: 100%;
+    min-width: 0;
     border-collapse: separate;
     border-spacing: 0;
-    min-width: 1080px;
+    table-layout: fixed;
+  }
+
+
+  .os-col-select { width: 3%; }
+  .os-col-id { width: 4%; }
+  .os-col-equipamento { width: 14%; }
+  .os-col-tipo { width: 7%; }
+  .os-col-grau { width: 6%; }
+  .os-col-status { width: 8%; }
+  .os-col-solicitante { width: 9%; }
+  .os-col-abertura { width: 8%; }
+  .os-col-dias { width: 5%; }
+  .os-col-andamento { width: 14%; }
+  .os-col-fechamento { width: 8%; }
+  .os-col-executores { width: 9%; }
+  .os-col-acoes { width: 6%; }
+
+  .os-table small.muted {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   thead th {
     text-align: left;
-    font-size: 12px;
+    font-size: 11px;
     color: #64748b;
     font-weight: 700;
-    letter-spacing: .02em;
-    padding: 10px 12px;
+    letter-spacing: .01em;
+    padding: 8px 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     border-bottom: 1px solid #e5e7eb;
     background: #fff;
     position: sticky;
@@ -118,11 +148,14 @@
   }
 
   tbody td {
-    padding: 11px 12px;
+    padding: 8px 6px;
     border-bottom: 1px solid #f1f5f9;
     vertical-align: middle;
-    font-size: 13px;
+    font-size: 11px;
     color: #0f172a;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   tbody tr:hover td {
@@ -130,7 +163,7 @@
   }
 
   .td-clip {
-    max-width: 240px;
+    max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -139,8 +172,9 @@
   .pill {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 3px 9px;
+    gap: 4px;
+    max-width: 100%;
+    padding: 3px 7px;
     border-radius: 999px;
     font-weight: 800;
     font-size: 11px;
@@ -148,6 +182,12 @@
     background: #f8fafc;
     color: #0f172a;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .os-list-card {
+    padding: 12px;
   }
 
   .pill-blue {
@@ -190,7 +230,7 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 6px 11px;
+    padding: 5px 8px;
     border-radius: 9px;
     border: 1px solid #d1d5db;
     background: #fff;
@@ -216,8 +256,8 @@
 
   .os-action-btn {
     justify-content: center;
-    min-width: 74px;
-    padding: 5px 10px;
+    min-width: 58px;
+    padding: 5px 6px;
     line-height: 1.1;
     transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
   }
@@ -405,25 +445,40 @@
   </div>
 <% } %>
 
-<div class="card">
+<div class="card os-list-card">
   <%# ── TABELA (desktop) ── %>
   <div class="table-wrap">
-    <table>
+    <table class="os-table">
+      <colgroup>
+        <col class="os-col-select">
+        <col class="os-col-id">
+        <col class="os-col-equipamento">
+        <col class="os-col-tipo">
+        <col class="os-col-grau">
+        <col class="os-col-status">
+        <col class="os-col-solicitante">
+        <col class="os-col-abertura">
+        <col class="os-col-dias">
+        <col class="os-col-andamento">
+        <col class="os-col-fechamento">
+        <col class="os-col-executores">
+        <col class="os-col-acoes">
+      </colgroup>
       <thead>
         <tr>
-          <th style="width:44px;"><input type="checkbox" id="osSelectAll" aria-label="Selecionar todas as OS visíveis"></th>
-          <th style="width:60px;">#</th>
+          <th><input type="checkbox" id="osSelectAll" aria-label="Selecionar todas as OS visíveis"></th>
+          <th>#</th>
           <th>Equipamento</th>
-          <th style="width:120px;">Tipo</th>
-          <th style="width:100px;">Grau</th>
-          <th style="width:130px;">Status</th>
-          <th style="width:160px;">Solicitante</th>
-          <th style="width:150px;">Abertura</th>
-          <th style="width:90px;">Dias aberta</th>
-          <th style="width:230px;">Andamento / rastreabilidade</th>
-          <th style="width:150px;">Fechamento</th>
-          <th style="width:220px;">Executores</th>
-          <th style="width:120px; text-align:right;">Ações</th>
+          <th>Tipo</th>
+          <th>Grau</th>
+          <th>Status</th>
+          <th>Solicitante</th>
+          <th>Abertura</th>
+          <th>Dias</th>
+          <th title="Andamento / rastreabilidade">Andamento</th>
+          <th>Fechamento</th>
+          <th>Executores</th>
+          <th style="text-align:right;">Ações</th>
         </tr>
       </thead>
       <tbody>
