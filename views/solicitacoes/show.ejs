@@ -15,15 +15,18 @@
 <div class="card" style="margin-bottom:14px;">
   <div class="grid-3">
     <div><div class="label">Solicitante</div><div><strong><%= solicitacao.solicitante_nome || '-' %></strong></div></div>
-    <div><div class="label">Setor</div><div><strong><%= solicitacao.setor_origem || '-' %></strong></div></div>
-    <div><div class="label">Prioridade</div><div><strong><%= solicitacao.prioridade || '-' %></strong></div></div>
-    <div><div class="label">Status</div><span class="pill-tag pill-gray"><%= solicitacao.status || '-' %></span></div>
-    <div><div class="label">Criado em</div><div><strong><%= solicitacao.created_at ? fmtBR(solicitacao.created_at) : '-' %></strong></div></div>
-    <div><div class="label">Título</div><div><strong><%= solicitacao.titulo || '-' %></strong></div></div>
+    <div><div class="label">Setor solicitante</div><div><strong><%= solicitacao.setor_origem || 'Não informado' %></strong></div></div>
+    <div><div class="label">Setor destinatário</div><div><strong><%= solicitacao.setor_destino || 'Não informado' %></strong></div></div>
+    <div><div class="label">Responsável</div><div><strong><%= solicitacao.responsavel_nome || 'Informação pendente de confirmação' %></strong></div></div>
+    <div><div class="label">Prioridade</div><div><strong><%= solicitacao.prioridade || 'Não informado' %></strong></div></div>
+    <div><div class="label">Status</div><span class="pill-tag pill-gray"><%= solicitacao.status || 'Não informado' %></span></div>
+    <div><div class="label">Criado em</div><div><strong><%= solicitacao.created_at ? fmtBR(solicitacao.created_at) : 'Não informado' %></strong></div></div>
+    <div><div class="label">Aplicação</div><div><strong><%= solicitacao.aplicacao || 'Informação pendente de confirmação' %></strong></div></div>
+    <div><div class="label">Título</div><div><strong><%= solicitacao.titulo || 'Não informado' %></strong></div></div>
   </div>
   <div style="margin-top:12px;">
     <div class="label">Descrição</div>
-    <div class="note"><%= solicitacao.descricao || '-' %></div>
+    <div class="note"><%= solicitacao.descricao || 'Informação pendente de confirmação' %></div>
   </div>
 </div>
 
@@ -50,13 +53,28 @@
         <% } %>
         <% itens.forEach((item) => { %>
           <tr>
-            <td><strong><%= item.item_nome %></strong></td>
-            <td><%= item.unidade %></td>
-            <td><%= item.qtd_solicitada %></td>
-            <td><%= item.item_descricao || item.observacao_item || '-' %></td>
+            <td><strong><%= item.item_nome || 'Não informado' %></strong></td>
+            <td><%= item.unidade || 'UN' %></td>
+            <td><%= item.qtd_solicitada ?? item.quantidade ?? 0 %></td>
+            <td><%= item.item_descricao || item.observacao_item || 'Não informado' %></td>
           </tr>
         <% }) %>
       </tbody>
     </table>
   </div>
+</div>
+
+
+<div class="card" style="margin-top:14px;">
+  <div class="label">Fotos / anexos</div>
+  <% const anexosSeguros = Array.isArray(anexos) ? anexos : []; %>
+  <% if (!anexosSeguros.length) { %>
+    <p class="muted" style="margin-top:8px;">Sem fotos ou anexos cadastrados.</p>
+  <% } else { %>
+    <ul style="margin-top:8px;">
+      <% anexosSeguros.forEach((anexo) => { %>
+        <li><%= anexo.original_name || anexo.filename || 'Anexo sem nome informado' %></li>
+      <% }) %>
+    </ul>
+  <% } %>
 </div>

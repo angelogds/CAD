@@ -1,6 +1,46 @@
 const service = require("./solicitacoes.service");
 const comprasService = require("../compras/compras.service");
 
+const PENDENTE = "Informação pendente de confirmação";
+
+function fallback(value, fallbackText = "Não informado") {
+  if (value === null || value === undefined) return fallbackText;
+  const text = String(value).trim();
+  return text || fallbackText;
+}
+
+function normalizeSolicitacaoForView(solicitacao) {
+  return {
+    id: solicitacao.id,
+    numero: fallback(solicitacao.numero, `#${solicitacao.id}`),
+    solicitante_nome: fallback(solicitacao.solicitante_nome, PENDENTE),
+    setor_origem: fallback(solicitacao.setor_origem),
+    setor_destino: fallback(solicitacao.setor_destino || solicitacao.destino_uso || "Setor de Compras"),
+    responsavel_nome: fallback(solicitacao.responsavel_nome || solicitacao.compras_nome || solicitacao.almox_nome, PENDENTE),
+    prioridade: fallback(solicitacao.prioridade),
+    status: fallback(solicitacao.status),
+    created_at: solicitacao.created_at || null,
+    titulo: fallback(solicitacao.titulo),
+    descricao: fallback(solicitacao.descricao, PENDENTE),
+    aplicacao: fallback(solicitacao.equipamento_nome || solicitacao.destino_uso || solicitacao.tipo_origem, PENDENTE),
+    observacoes: fallback(solicitacao.observacoes_compras, "Não informado"),
+    cotacao_inicio_em: solicitacao.cotacao_inicio_em || null,
+    comprada_em: solicitacao.comprada_em || null,
+    recebida_em: solicitacao.recebida_em || null,
+    fechada_em: solicitacao.fechada_em || null,
+  };
+}
+
+function normalizeItens(itens) {
+  return (Array.isArray(itens) ? itens : []).map((item) => ({
+    ...item,
+    item_nome: fallback(item.item_nome || item.item_descricao),
+    unidade: fallback(item.unidade, "UN"),
+    qtd_solicitada: item.qtd_solicitada ?? item.quantidade ?? 0,
+    item_descricao: fallback(item.item_descricao || item.observacao_item, "Não informado"),
+  }));
+}
+
 function minhas(req, res) {
   const userId = req.session.user.id;
   const filters = {
@@ -94,8 +134,9 @@ function atualizar(req, res) {
 }
 
 function detalhe(req, res) {
+  const id = Number(req.params.id);
   try {
-    const solicitacao = service.getSolicitacaoById(Number(req.params.id));
+    const solicitacao = service.getSolicitacaoById(id);
     if (!solicitacao) return res.status(404).send("Solicitação não encontrada");
 
     if (!service.canViewSolicitacao(solicitacao, req.session.user)) {
@@ -109,33 +150,27 @@ function detalhe(req, res) {
     return res.render("solicitacoes/show", {
       title: "Solicitação",
       activeMenu: "solicitacoes",
-      solicitacao: {
-        id: solicitacao.id,
-        numero: solicitacao.numero || null,
-        solicitante_nome: solicitacao.solicitante_nome || "-",
-        setor_origem: solicitacao.setor_origem || "-",
-        prioridade: solicitacao.prioridade || "-",
-        status: solicitacao.status || "-",
-        created_at: solicitacao.created_at || null,
-        titulo: solicitacao.titulo || "-",
-        descricao: solicitacao.descricao || "",
-        cotacao_inicio_em: solicitacao.cotacao_inicio_em || null,
-        comprada_em: solicitacao.comprada_em || null,
-        recebida_em: solicitacao.recebida_em || null,
-        fechada_em: solicitacao.fechada_em || null,
-      },
-      itens,
+      solicitacao: normalizeSolicitacaoForView(solicitacao),
+      itens: normalizeItens(itens),
+      anexos: Array.isArray(solicitacao.anexos) ? solicitacao.anexos : [],
       canEdit: service.canEditSolicitacao(solicitacao, req.session.user),
       backUrl,
     });
   } catch (error) {
-    return res.status(500).send("500 - Erro interno");
+    console.error("[solicitacoes.detalhe] Erro ao abrir solicitação", {
+      id: req.params.id,
+      userId: req.session?.user?.id,
+      message: error.message,
+      stack: error.stack,
+    });
+    return res.status(500).send("Não foi possível abrir esta solicitação. Verifique os dados ou contate o suporte.");
   }
 }
 
 function pdf(req, res) {
+  const id = Number(req.params.id);
   try {
-    const solicitacao = service.getSolicitacaoById(Number(req.params.id));
+    const solicitacao = service.getSolicitacaoById(id);
     if (!solicitacao) return res.status(404).send("Solicitação não encontrada");
 
     if (!service.canViewSolicitacao(solicitacao, req.session.user)) {
@@ -143,9 +178,33 @@ function pdf(req, res) {
       return res.redirect("/solicitacoes/minhas");
     }
 
+    console.info("[solicitacoes.pdf] Iniciando geração do PDF", {
+      solicitacaoId: solicitacao.id,
+      usuarioLogado: req.session?.user?.id,
+      numero: solicitacao.numero || null,
+      status: solicitacao.status || null,
+      solicitante: solicitacao.solicitante_nome || null,
+      materiais: Array.isArray(solicitacao.itens) ? solicitacao.itens.length : 0,
+      fotos: Array.isArray(solicitacao.anexos) ? solicitacao.anexos.length : 0,
+      template: "modules/compras/compras.service.js#gerarPdf",
+      logo: comprasService.getSolicitacaoPdfLogoPath?.() || null,
+    });
+
     return comprasService.gerarPdf(solicitacao, res);
   } catch (error) {
-    return res.status(500).send(error.message || "Falha ao gerar PDF da solicitação.");
+    console.error("[solicitacoes.pdf] Falha ao gerar PDF", {
+      solicitacaoId: id,
+      usuarioLogado: req.session?.user?.id,
+      message: error.message,
+      file: error.stack?.split("\n")?.[1]?.trim(),
+      stack: error.stack,
+    });
+
+    if (process.env.NODE_ENV !== "production") {
+      return res.status(500).send(`Falha ao gerar PDF da solicitação ${id}: ${error.message}\n${error.stack || ""}`);
+    }
+
+    return res.status(500).send("Não foi possível gerar o PDF desta solicitação. Verifique os dados da solicitação ou contate o suporte.");
   }
 }
 

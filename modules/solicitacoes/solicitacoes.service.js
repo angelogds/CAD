@@ -22,6 +22,16 @@ const STATUS = {
 function hasColumn(table, name) {
   try { return db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === name); } catch { return false; }
 }
+
+function tableExists(name) {
+  return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);
+}
+
+const columnExists = hasColumn;
+
+function selectableColumn(table, preferred, fallback = "NULL") {
+  return tableExists(table) && hasColumn(table, preferred) ? preferred : fallback;
+}
 const ITEM_HAS_ITEM_NOME = hasColumn("solicitacao_itens", "item_nome");
 const ITEM_HAS_ITEM_DESCRICAO = hasColumn("solicitacao_itens", "item_descricao");
 const ITEM_HAS_ESTOQUE_ITEM_ID = hasColumn("solicitacao_itens", "estoque_item_id");
@@ -261,12 +271,15 @@ function getCountersForUser(userId) {
 }
 
 function getSolicitacaoById(id) {
-  const usersTable = tableExists("users") ? "users" : (tableExists("usuarios") ? "usuarios" : "users");
-  const usersNameCol = columnExists(usersTable, "name") ? "name" : (columnExists(usersTable, "nome") ? "nome" : "name");
-  const usersRoleCol = columnExists(usersTable, "role") ? "role" : (columnExists(usersTable, "perfil") ? "perfil" : null);
+  if (!Number.isFinite(Number(id)) || Number(id) <= 0) return null;
+
+  const usersTable = tableExists("users") ? "users" : (tableExists("usuarios") ? "usuarios" : null);
+  const usersNameCol = usersTable ? selectableColumn(usersTable, "name", selectableColumn(usersTable, "nome", null)) : null;
+  const usersRoleCol = usersTable ? selectableColumn(usersTable, "role", selectableColumn(usersTable, "perfil", null)) : null;
   const hasComprasUserId = hasColumn("solicitacoes", "compras_user_id");
   const hasAlmoxUserId = hasColumn("solicitacoes", "almox_user_id");
   const hasEquipamentoId = hasColumn("solicitacoes", "equipamento_id");
+  const hasSolicitacaoItens = tableExists("solicitacao_itens");
   const hasItemNome = hasColumn("solicitacao_itens", "item_nome");
   const hasItemDescricao = hasColumn("solicitacao_itens", "item_descricao");
   const hasDescricao = hasColumn("solicitacao_itens", "descricao");
@@ -275,27 +288,33 @@ function getSolicitacaoById(id) {
   const hasQtdRecebidaTotal = hasColumn("solicitacao_itens", "qtd_recebida_total");
   const hasEstoqueItemId = hasColumn("solicitacao_itens", "estoque_item_id");
   const hasItemId = hasColumn("solicitacao_itens", "item_id");
+  const hasEstoqueItens = tableExists("estoque_itens");
+  const estoqueCodigoExpr = hasEstoqueItens && hasColumn("estoque_itens", "codigo") ? "ei.codigo" : "NULL";
+  const userJoin = usersTable ? `LEFT JOIN ${usersTable} u ON u.id = s.solicitante_user_id` : "";
+  const comprasJoin = usersTable && hasComprasUserId ? `LEFT JOIN ${usersTable} cu ON cu.id = s.compras_user_id` : "";
+  const almoxJoin = usersTable && hasAlmoxUserId ? `LEFT JOIN ${usersTable} au ON au.id = s.almox_user_id` : "";
 
   const sol = db.prepare(`
-    SELECT s.*, u.${usersNameCol} AS solicitante_nome, ${usersRoleCol ? `u.${usersRoleCol}` : "NULL"} AS solicitante_role,
-           ${hasComprasUserId ? `cu.${usersNameCol}` : "NULL"} AS compras_nome,
-           ${hasAlmoxUserId ? `au.${usersNameCol}` : "NULL"} AS almox_nome,
-           ${hasEquipamentoId ? "e.nome" : "NULL"} AS equipamento_nome
+    SELECT s.*, ${usersNameCol ? `u.${usersNameCol}` : "NULL"} AS solicitante_nome, ${usersRoleCol ? `u.${usersRoleCol}` : "NULL"} AS solicitante_role,
+           ${usersNameCol && hasComprasUserId ? `cu.${usersNameCol}` : "NULL"} AS compras_nome,
+           ${usersNameCol && hasAlmoxUserId ? `au.${usersNameCol}` : "NULL"} AS almox_nome,
+           ${hasEquipamentoId && tableExists("equipamentos") ? "e.nome" : "NULL"} AS equipamento_nome
     FROM solicitacoes s
-    JOIN ${usersTable} u ON u.id = s.solicitante_user_id
-    ${hasComprasUserId ? `LEFT JOIN ${usersTable} cu ON cu.id = s.compras_user_id` : ""}
-    ${hasAlmoxUserId ? `LEFT JOIN ${usersTable} au ON au.id = s.almox_user_id` : ""}
-    ${hasEquipamentoId ? "LEFT JOIN equipamentos e ON e.id = s.equipamento_id" : ""}
+    ${userJoin}
+    ${comprasJoin}
+    ${almoxJoin}
+    ${hasEquipamentoId && tableExists("equipamentos") ? "LEFT JOIN equipamentos e ON e.id = s.equipamento_id" : ""}
     WHERE s.id = ?
   `).get(id);
   if (!sol) return null;
+  const estoqueNomeExpr = hasEstoqueItens && hasColumn("estoque_itens", "nome") ? "ei.nome" : "NULL";
   const itemNomeExpr = hasItemNome && hasDescricao
-    ? "COALESCE(si.item_nome, si.descricao, ei.nome)"
+    ? `COALESCE(si.item_nome, si.descricao, ${estoqueNomeExpr})`
     : hasItemNome
-      ? "COALESCE(si.item_nome, ei.nome)"
+      ? `COALESCE(si.item_nome, ${estoqueNomeExpr})`
       : hasDescricao
-        ? "COALESCE(si.descricao, ei.nome)"
-        : "COALESCE(ei.nome, '')";
+        ? `COALESCE(si.descricao, ${estoqueNomeExpr})`
+        : `COALESCE(${estoqueNomeExpr}, '')`;
   const itemDescricaoExpr = hasItemDescricao && hasDescricao
     ? "COALESCE(si.item_descricao, si.descricao)"
     : hasItemDescricao
@@ -319,16 +338,43 @@ function getSolicitacaoById(id) {
         ? "si.item_id"
         : "NULL";
 
-  const itens = db.prepare(`
+  const estoqueJoin = hasEstoqueItens ? `LEFT JOIN estoque_itens ei ON ei.id = ${itemJoinExpr}` : "";
+  const itens = hasSolicitacaoItens ? db.prepare(`
     SELECT si.*, ${itemNomeExpr} AS item_nome, ${itemDescricaoExpr} AS item_descricao,
            ${qtdSolicitadaExpr} AS qtd_solicitada, ${qtdRecebidaExpr} AS qtd_recebida_total,
-           (${qtdSolicitadaExpr} - ${qtdRecebidaExpr}) AS qtd_pendente, ei.codigo AS estoque_codigo
+           (${qtdSolicitadaExpr} - ${qtdRecebidaExpr}) AS qtd_pendente, ${estoqueCodigoExpr} AS estoque_codigo
     FROM solicitacao_itens si
-    LEFT JOIN estoque_itens ei ON ei.id = ${itemJoinExpr}
+    ${estoqueJoin}
     WHERE si.solicitacao_id = ?
     ORDER BY si.id
-  `).all(id);
-  return { ...sol, itens };
+  `).all(id) : [];
+  return { ...sol, itens, anexos: listAnexosSolicitacao(id) };
+}
+
+function listAnexosSolicitacao(solicitacaoId) {
+  if (!tableExists("compras_anexos")) return [];
+  const columns = db.prepare("PRAGMA table_info(compras_anexos)").all().map((c) => c.name);
+  const hasReferencia = columns.includes("referencia_tipo") && columns.includes("referencia_id");
+  const hasSolicitacaoId = columns.includes("solicitacao_id");
+
+  const clauses = [];
+  const params = [];
+  if (hasReferencia) {
+    clauses.push("(referencia_tipo = 'SOLICITACAO' AND referencia_id = ?)");
+    params.push(solicitacaoId);
+  }
+  if (hasSolicitacaoId) {
+    clauses.push("solicitacao_id = ?");
+    params.push(solicitacaoId);
+  }
+  if (!clauses.length) return [];
+
+  return db.prepare(`
+    SELECT *
+    FROM compras_anexos
+    WHERE ${clauses.join(" OR ")}
+    ORDER BY id
+  `).all(...params);
 }
 
 function listEquipamentos() {

@@ -398,6 +398,32 @@ const listarAnexos = listAnexosSolicitacao;
 const getAnexo = getAnexoById;
 const deletarAnexo = deleteAnexo;
 
+const PDF_FALLBACK = 'Não informado';
+const PDF_PENDING = 'Informação pendente de confirmação';
+
+function pdfValue(value, fallback = PDF_FALLBACK) {
+  if (value === null || value === undefined) return fallback;
+  const text = String(value).trim();
+  return text || fallback;
+}
+
+function getSolicitacaoPdfLogoPath() {
+  return [
+    'public/IMG/logopdf_campo_do_gado.png.png',
+    'public/img/logo_menu_256.png',
+    'public/img/logo.png',
+  ].map((p) => path.join(process.cwd(), p)).find((p) => fs.existsSync(p)) || null;
+}
+
+function resolveAnexoPath(anexo) {
+  if (!anexo?.filename) return null;
+  const storagePaths = require('../../config/storage');
+  const candidate = path.isAbsolute(anexo.filename)
+    ? anexo.filename
+    : path.join(storagePaths.UPLOAD_DIR, anexo.filename);
+  return fs.existsSync(candidate) ? candidate : null;
+}
+
 function gerarPdf(solicitacao, res) {
   const PDFDocument = getPDFKit();
   if (!PDFDocument) {
@@ -408,7 +434,8 @@ function gerarPdf(solicitacao, res) {
 
   const doc = new PDFDocument({ margin: 34, size: 'A4', bufferPages: true });
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename=solicitacao_${solicitacao.numero}.pdf`);
+  const numeroArquivo = pdfValue(solicitacao.numero, solicitacao.id || 'sem-numero').replace(/[^a-z0-9_-]+/gi, '_');
+  res.setHeader('Content-Disposition', `attachment; filename=solicitacao_${numeroArquivo}.pdf`);
   doc.pipe(res);
 
   const COLORS = {
@@ -421,8 +448,9 @@ function gerarPdf(solicitacao, res) {
     border: '#D1D5DB',
     white: '#FFFFFF',
   };
-  const statusLabel = (solicitacao.status || '-').replaceAll('_', ' ');
-  const logoPath = ['public/IMG/logopdf_campo_do_gado.png.png', 'public/img/logo_menu_256.png', 'public/img/logo.png'].map((p) => path.join(process.cwd(), p)).find((p) => fs.existsSync(p));
+  const statusLabel = pdfValue(solicitacao.status).replaceAll('_', ' ');
+  const numeroSolicitacao = pdfValue(solicitacao.numero, `#${solicitacao.id || 'sem-id'}`);
+  const logoPath = getSolicitacaoPdfLogoPath();
   const drawFooter = () => {
     const bottom = doc.page.height - 44;
     doc.strokeColor(COLORS.green).lineWidth(0.8).moveTo(34, bottom - 8).lineTo(doc.page.width - 34, bottom - 8).stroke();
@@ -433,21 +461,30 @@ function gerarPdf(solicitacao, res) {
   };
 
   doc.rect(0, 0, doc.page.width, 105).fill(COLORS.green);
-  if (logoPath) doc.image(logoPath, 34, 18, { width: 55 });
+  if (logoPath) {
+    try {
+      doc.image(logoPath, 34, 18, { width: 55 });
+    } catch (error) {
+      console.error('[compras.gerarPdf] Logo não pôde ser renderizado', { logoPath, message: error.message });
+      doc.fillColor(COLORS.white).fontSize(7).font('Helvetica').text('Logo não localizado', 34, 42, { width: 55, align: 'center' });
+    }
+  } else {
+    doc.fillColor(COLORS.white).fontSize(7).font('Helvetica').text('Logo não localizado', 34, 42, { width: 55, align: 'center' });
+  }
   doc.fillColor(COLORS.white).fontSize(15).font('Helvetica-Bold').text('RECICLAGEM CAMPO DO GADO', 98, 24);
   doc.fontSize(10).text('MANUTENÇÃO CAMPO DO GADO', 98, 46);
   doc.fontSize(12).text('SOLICITAÇÃO DE MATERIAL / COMPRA', 98, 66);
   doc.fontSize(9)
-    .text(`Solicitação nº: ${solicitacao.numero || `#${solicitacao.id}`}`, 360, 24, { width: 190, align: 'right' })
+    .text(`Solicitação nº: ${numeroSolicitacao}`, 360, 24, { width: 190, align: 'right' })
     .text(`Data de emissão: ${new Date().toLocaleDateString('pt-BR')}`, 360, 40, { width: 190, align: 'right' })
     .text(`Status: ${statusLabel}`, 360, 56, { width: 190, align: 'right' });
 
   let y = 122;
   doc.roundedRect(34, y, doc.page.width - 68, 96, 8).fillAndStroke(COLORS.greenSoft, '#A7DDBD');
   const ident = [
-    ['Unidade', 'Reciclagem Campo do Gado'], ['Setor solicitante', 'Manutenção'], ['Solicitante', solicitacao.solicitante_nome || '-'],
-    ['Responsável manutenção', 'Ângelo Gomes da Silva'], ['Destino', 'Setor de Compras'], ['Responsável compras', 'Sr. Ubiratam'],
-    ['Prioridade', solicitacao.prioridade || '-'], ['Equipamento / Local', solicitacao.equipamento_nome || solicitacao.destino_uso || '-'],
+    ['Unidade', 'Reciclagem Campo do Gado'], ['Setor solicitante', pdfValue(solicitacao.setor_origem, 'Manutenção')], ['Solicitante', pdfValue(solicitacao.solicitante_nome, PDF_PENDING)],
+    ['Responsável manutenção', pdfValue(solicitacao.responsavel_manutencao || solicitacao.almox_nome, 'Ângelo Gomes da Silva')], ['Destino', pdfValue(solicitacao.setor_destino || solicitacao.destino_uso, 'Setor de Compras')], ['Responsável compras', pdfValue(solicitacao.compras_nome, 'Sr. Ubiratam')],
+    ['Prioridade', pdfValue(solicitacao.prioridade)], ['Equipamento / Local', pdfValue(solicitacao.equipamento_nome || solicitacao.destino_uso || solicitacao.tipo_origem, PDF_PENDING)],
   ];
   let ly = y + 10; let ry = y + 10;
   ident.forEach((row, idx) => {
@@ -467,16 +504,22 @@ function gerarPdf(solicitacao, res) {
   doc.fillColor(COLORS.white).fontSize(8).font('Helvetica-Bold');
   ['Item', 'Qtd', 'Und', 'Descrição do material', 'Aplicação / Observação'].forEach((h, i) => doc.text(h, col[i] + 4, y + 6, { width: col[i + 1] - col[i] - 8 }));
   y += 20;
-  (solicitacao.itens || []).forEach((it, index) => {
+  const materiais = Array.isArray(solicitacao.itens) ? solicitacao.itens : [];
+  if (!materiais.length) {
+    doc.rect(34, y, 520, 24).fill(COLORS.greenSoft).stroke(COLORS.border);
+    doc.fillColor(COLORS.muted).fontSize(8).font('Helvetica').text('Não informado', 42, y + 8, { width: 500 });
+    y += 24;
+  }
+  materiais.forEach((it, index) => {
     const rowH = 26;
     if (y + rowH > doc.page.height - 90) { drawFooter(); doc.addPage(); y = 40; }
     doc.rect(34, y, 520, rowH).fill(index % 2 ? COLORS.greenSoft : COLORS.white).stroke(COLORS.border);
     doc.fillColor(COLORS.text).fontSize(8).font('Helvetica');
     doc.text(String(index + 1).padStart(2, '0'), col[0] + 4, y + 8, { width: col[1] - col[0] - 8 });
-    doc.text(String(it.qtd_solicitada || 0), col[1] + 4, y + 8, { width: col[2] - col[1] - 8 });
-    doc.text(it.unidade || 'UN', col[2] + 4, y + 8, { width: col[3] - col[2] - 8 });
-    doc.text(it.item_nome || it.item_descricao || '-', col[3] + 4, y + 8, { width: col[4] - col[3] - 8 });
-    doc.text(it.item_descricao || '-', col[4] + 4, y + 8, { width: col[5] - col[4] - 8 });
+    doc.text(String(it.qtd_solicitada ?? it.quantidade ?? 0), col[1] + 4, y + 8, { width: col[2] - col[1] - 8 });
+    doc.text(pdfValue(it.unidade, 'UN'), col[2] + 4, y + 8, { width: col[3] - col[2] - 8 });
+    doc.text(pdfValue(it.item_nome || it.item_descricao), col[3] + 4, y + 8, { width: col[4] - col[3] - 8 });
+    doc.text(pdfValue(it.item_descricao || it.observacao_item), col[4] + 4, y + 8, { width: col[5] - col[4] - 8 });
     y += rowH;
   });
 
@@ -486,13 +529,14 @@ function gerarPdf(solicitacao, res) {
     doc.fillColor(COLORS.green).rect(34, y + 2, 4, 14).fill();
     doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text(title, 42, y);
     y += 18;
-    const h = Math.max(44, doc.heightOfString(content, { width: 500 }) + 16);
+    const safeContent = pdfValue(content);
+    const h = Math.max(44, doc.heightOfString(safeContent, { width: 500 }) + 16);
     doc.roundedRect(34, y, 520, h, 6).fillAndStroke(COLORS.greenSoft, '#B8E7C9');
-    doc.fillColor(COLORS.text).font('Helvetica').fontSize(9).text(content, 44, y + 8, { width: 500 });
+    doc.fillColor(COLORS.text).font('Helvetica').fontSize(9).text(safeContent, 44, y + 8, { width: 500 });
     y += h + 12;
   };
-  drawSection('Justificativa Técnica', solicitacao.descricao);
-  drawSection('Observações da Manutenção', solicitacao.observacoes_compras);
+  drawSection('Descrição Técnica', pdfValue(solicitacao.descricao, PDF_PENDING));
+  drawSection('Justificativa / Observação', pdfValue(solicitacao.observacoes_compras, PDF_FALLBACK));
 
   if (y + 110 > doc.page.height - 90) { drawFooter(); doc.addPage(); y = 40; }
   doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text('Assinaturas / Responsáveis', 34, y);
@@ -504,7 +548,7 @@ function gerarPdf(solicitacao, res) {
     y += 12;
   });
 
-  const imageAnexos = (solicitacao.anexos || []).filter((a) => String(a.mimetype || '').startsWith('image/'));
+  const imageAnexos = (Array.isArray(solicitacao.anexos) ? solicitacao.anexos : []).filter((a) => String(a.mimetype || '').startsWith('image/'));
   if (imageAnexos.length) {
     drawFooter();
     doc.addPage();
@@ -512,14 +556,21 @@ function gerarPdf(solicitacao, res) {
     doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(11).text('Anexos Fotográficos', 34, y);
     y += 20;
     imageAnexos.forEach((anexo, idx) => {
-      const storagePaths = require('../../config/storage');
-      const fullPath = path.join(storagePaths.UPLOAD_DIR, anexo.filename || '');
-      if (!fs.existsSync(fullPath)) return;
       if (y + 220 > doc.page.height - 80) { drawFooter(); doc.addPage(); y = 40; }
-      doc.fillColor(COLORS.greenInst).fontSize(9).font('Helvetica-Bold').text(`ANEXO ${String(idx + 1).padStart(2, '0')} — ${anexo.original_name || 'Imagem'}`, 34, y);
+      const fullPath = resolveAnexoPath(anexo);
+      doc.fillColor(COLORS.greenInst).fontSize(9).font('Helvetica-Bold').text(`ANEXO ${String(idx + 1).padStart(2, '0')} — ${pdfValue(anexo.original_name, 'Imagem')}`, 34, y);
       y += 14;
       doc.rect(34, y, 520, 185).strokeColor(COLORS.greenDark).stroke();
-      doc.image(fullPath, 38, y + 4, { fit: [512, 176], align: 'center', valign: 'center' });
+      if (!fullPath) {
+        doc.fillColor(COLORS.muted).font('Helvetica').fontSize(10).text('Imagem não localizada no servidor.', 44, y + 82, { width: 500, align: 'center' });
+      } else {
+        try {
+          doc.image(fullPath, 38, y + 4, { fit: [512, 176], align: 'center', valign: 'center' });
+        } catch (error) {
+          console.error('[compras.gerarPdf] Imagem não pôde ser renderizada', { anexoId: anexo.id, fullPath, message: error.message });
+          doc.fillColor(COLORS.muted).font('Helvetica').fontSize(10).text('Imagem não localizada no servidor.', 44, y + 82, { width: 500, align: 'center' });
+        }
+      }
       y += 190;
     });
   }
@@ -553,5 +604,6 @@ module.exports = {
   deletarAnexo,
   getAnexoById,
   deleteAnexo,
+  getSolicitacaoPdfLogoPath,
   gerarPdf,
 };
