@@ -185,7 +185,7 @@ function getMotoresResumoDashboard() {
         ORDER BY datetime(data_saida) ASC
       `
       )
-      .all(periodo.inicioMes, periodo.inicioProximoMes);
+      .all();
 
     return {
       em_funcionamento: Number(resumo?.em_funcionamento || 0),
