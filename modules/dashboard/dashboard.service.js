@@ -524,19 +524,63 @@ function getMecanicosRankingSemana() {
   });
 }
 
-function getEscalaPainelSemana() {
+
+function toDateOnly(value) {
+  return String(value || "").slice(0, 10);
+}
+
+function normalizeTipoAfastamento(tipo) {
+  return String(tipo || "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function formatarTipoAfastamento(tipo) {
+  const normalized = normalizeTipoAfastamento(tipo);
+
+  const map = {
+    FOLGA: "FOLGA",
+    FOLGA_MEIO_PERIODO: "FOLGA MEIO PERÍODO",
+    MEIO_PERIODO: "FOLGA MEIO PERÍODO",
+    ATESTADO: "ATESTADO",
+    FERIAS: "FÉRIAS",
+  };
+
+  return map[normalized] || String(tipo || "").trim() || "NÃO INFORMADO";
+}
+
+function tipoAfastamentoPrioridade(tipo) {
+  const normalized = normalizeTipoAfastamento(tipo);
+  if (normalized === "ATESTADO") return 4;
+  if (normalized === "FERIAS") return 3;
+  if (normalized === "FOLGA_MEIO_PERIODO" || normalized === "MEIO_PERIODO") return 2;
+  if (normalized === "FOLGA") return 1;
+  return 0;
+}
+
+function isRegistroAtivoNaData(registro, dataReferencia) {
+  const data = toDateOnly(dataReferencia);
+  const inicio = toDateOnly(registro?.data_inicio || registro?.inicio);
+  const fim = toDateOnly(registro?.data_fim || registro?.fim);
+  if (!data || !inicio || !fim) return false;
+  return data >= inicio && data <= fim;
+}
+
+function getEscalaPainelSemana(options = {}) {
   return safeGet(() => {
-    const hoje = db.prepare(`SELECT date('now', 'localtime') AS hoje`).get()?.hoje;
+    const dataRef = toDateOnly(options?.dataReferencia) || db.prepare(`SELECT date('now', 'localtime') AS hoje`).get()?.hoje;
     const semana = db
       .prepare(
         `
         SELECT id, semana_numero, data_inicio, data_fim
         FROM escala_semanas
-        WHERE date('now', 'localtime') BETWEEN data_inicio AND data_fim
+        WHERE ? >= data_inicio AND ? <= data_fim
         LIMIT 1
       `
       )
-      .get();
+      .get(dataRef, dataRef);
 
     if (!semana) return null;
 
@@ -564,25 +608,43 @@ function getEscalaPainelSemana() {
       )
       .all(semana.id);
 
-    const ausencias = safeGet(() => db
+    const ausenciasLegacy = tableExists("escala_ausencias") ? safeGet(() => db
       .prepare(
         `
         SELECT
           c.id AS colaborador_id,
           c.nome,
-          UPPER(COALESCE(x.tipo, '-')) AS tipo,
+          UPPER(COALESCE(x.tipo, '')) AS tipo,
           x.data_inicio,
           x.data_fim
         FROM escala_ausencias x
         JOIN colaboradores c ON c.id = x.colaborador_id
-        WHERE ? BETWEEN x.data_inicio AND x.data_fim
+        WHERE ? >= x.data_inicio AND ? <= x.data_fim
         ORDER BY c.nome ASC
       `
       )
-      .all(hoje || semana.data_inicio), []);
+      .all(dataRef, dataRef), []) : [];
 
-    const colaboradoresAusentes = new Set(ausencias.map((a) => Number(a.colaborador_id)).filter(Boolean));
-    const alocacoesDisponiveis = alocacoes.filter((a) => !colaboradoresAusentes.has(Number(a.colaborador_id)));
+    const concessoesAtivas = tableExists("escala_concessoes") ? safeGet(() => db
+      .prepare(
+        `
+        SELECT
+          c.id AS colaborador_id,
+          c.nome,
+          CASE
+            WHEN UPPER(COALESCE(ec.tipo, '')) = 'FOLGA' AND UPPER(COALESCE(ec.concessao, '')) = 'MEIA'
+              THEN 'FOLGA_MEIO_PERIODO'
+            ELSE UPPER(COALESCE(ec.tipo, ''))
+          END AS tipo,
+          ec.inicio AS data_inicio,
+          ec.fim AS data_fim
+        FROM escala_concessoes ec
+        JOIN colaboradores c ON c.id = ec.colaborador_id
+        WHERE ? >= ec.inicio AND ? <= ec.fim
+        ORDER BY c.nome ASC
+      `
+      )
+      .all(dataRef, dataRef), []) : [];
 
     const folgasTurno = alocacoes
       .filter((a) => a.tipo_turno === "folga")
@@ -592,21 +654,31 @@ function getEscalaPainelSemana() {
         tipo: "FOLGA",
         data_inicio: semana.data_inicio,
         data_fim: semana.data_fim,
-      }));
+      }))
+      .filter((item) => isRegistroAtivoNaData(item, dataRef));
+
+    const registrosAtivos = [...folgasTurno, ...ausenciasLegacy, ...concessoesAtivas]
+      .filter((item) => isRegistroAtivoNaData(item, dataRef));
+
+    const colaboradoresAusentes = new Set(registrosAtivos.map((a) => Number(a.colaborador_id)).filter(Boolean));
+    const alocacoesDisponiveis = alocacoes.filter((a) => !colaboradoresAusentes.has(Number(a.colaborador_id)));
 
     const folgasAfastamentosMap = new Map();
-    [...folgasTurno, ...ausencias].forEach((item) => {
+    registrosAtivos.forEach((item) => {
       if (!item?.colaborador_id) return;
       const key = String(item.colaborador_id);
+      const tipoFormatado = formatarTipoAfastamento(item.tipo);
+      const novo = {
+        colaborador_id: item.colaborador_id,
+        nome: item.nome,
+        tipo: tipoFormatado,
+        tipo_codigo: normalizeTipoAfastamento(item.tipo),
+        data_inicio: item.data_inicio || semana.data_inicio,
+        data_fim: item.data_fim || semana.data_fim,
+      };
       const atual = folgasAfastamentosMap.get(key);
-      if (!atual || String(item.tipo || '').toUpperCase() === 'ATESTADO') {
-        folgasAfastamentosMap.set(key, {
-          colaborador_id: item.colaborador_id,
-          nome: item.nome,
-          tipo: String(item.tipo || '-').toUpperCase(),
-          data_inicio: item.data_inicio || semana.data_inicio,
-          data_fim: item.data_fim || semana.data_fim,
-        });
+      if (!atual || tipoAfastamentoPrioridade(novo.tipo_codigo) >= tipoAfastamentoPrioridade(atual.tipo_codigo)) {
+        folgasAfastamentosMap.set(key, novo);
       }
     });
 
@@ -616,6 +688,7 @@ function getEscalaPainelSemana() {
 
     return {
       ...semana,
+      data_referencia: dataRef,
       diurno_mecanicos: alocacoesDisponiveis.filter((a) => a.tipo_turno === "diurno" && String(a.funcao || "").toLowerCase() === "mecanico"),
       apoio_operacional: alocacoesDisponiveis.filter((a) => a.tipo_turno === "apoio"),
       noturno: noturnoResponsavel ? [noturnoResponsavel] : [],
@@ -1455,6 +1528,8 @@ module.exports = {
   gerarRelatorioMensalRanking,
   getUltimoRelatorioMensalFechado,
   getCurrentMonthlyPeriod,
+  formatarTipoAfastamento,
+  isRegistroAtivoNaData,
   iniciarPreventiva,
   finalizarPreventiva,
   getPreventivasEmAndamentoEquipe,
