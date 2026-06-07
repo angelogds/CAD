@@ -95,7 +95,9 @@ test('PAC 01 page, detailed report and PDF expose ongoing OS traceability', () =
   assert.match(service, /historico_resumido_texto/);
   assert.match(routes, /\/:ano\/:mes\/os-em-andamento/);
   assert.match(report, /Ação necessária/);
-  assert.match(report, /Histórico resumido/);
+  assert.match(report, /os-tech-card/);
+  assert.match(report, /data-filter="dias_45"/);
+  assert.match(report, /Ver Histórico/);
   assert.match(exporter, /Ordens de Serviço em Andamento — Justificativas e Rastreabilidade/);
   assert.match(exporter, /drawOSEmAndamentoBlock/);
 });
