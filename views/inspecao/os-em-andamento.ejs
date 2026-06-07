@@ -1,25 +1,228 @@
 <% layout('layout') %>
-<div class="page-head">
-  <div>
-    <h1>Relatório de OS em Andamento — Rastreabilidade de Equipamentos</h1>
-    <p class="muted">PAC 01 • <%= String(mes).padStart(2, '0') %>/<%= ano %> • Motivos de permanência em aberto e ações necessárias.</p>
+<%
+  const ordens = osEmAndamento || [];
+  const normalizarStatus = (status, motivo) => {
+    const textoStatus = String(status || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s-]+/g, '_');
+    const textoMotivo = String(motivo || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (textoMotivo.includes('material') || textoMotivo.includes('compra') || textoMotivo.includes('peca') || textoMotivo.includes('tornearia')) return 'AGUARDANDO_MATERIAL';
+    if (textoStatus.includes('FINALIZ') || textoStatus.includes('CONCLUID') || textoStatus.includes('FECHAD')) return 'FINALIZADA';
+    if (textoStatus.includes('PAUS') || textoStatus.includes('PARAD')) return 'PAUSADA';
+    if (textoStatus.includes('ANDAMENTO') || textoStatus === 'ANDAMENTO') return 'EM_ANDAMENTO';
+    return 'ABERTA';
+  };
+  const rotuloStatus = (status) => ({
+    ABERTA: 'ABERTA',
+    EM_ANDAMENTO: 'EM ANDAMENTO',
+    PAUSADA: 'PAUSADA',
+    AGUARDANDO_MATERIAL: 'AGUARDANDO MATERIAL',
+    FINALIZADA: 'FINALIZADA',
+  }[status] || 'ABERTA');
+  const statusClasse = (status) => ({
+    ABERTA: 'status-aberta',
+    EM_ANDAMENTO: 'status-em-andamento',
+    PAUSADA: 'status-pausada',
+    AGUARDANDO_MATERIAL: 'status-aguardando-material',
+    FINALIZADA: 'status-finalizada',
+  }[status] || 'status-aberta');
+  const materialPendente = (os) => normalizarStatus(os.status, os.motivo_atual) === 'AGUARDANDO_MATERIAL' && !os.material_chegou_em;
+  const resumo = ordens.reduce((acc, os) => {
+    const status = normalizarStatus(os.status, os.motivo_atual);
+    const dias = Number(os.dias_aberta || 0);
+    acc.total += 1;
+    acc.dias += dias;
+    if (status === 'PAUSADA') acc.pausada += 1;
+    if (status === 'AGUARDANDO_MATERIAL') acc.aguardandoMaterial += 1;
+    if (dias > 30 || status === 'AGUARDANDO_MATERIAL') acc.critica += 1;
+    return acc;
+  }, { total: 0, pausada: 0, aguardandoMaterial: 0, critica: 0, dias: 0 });
+  const mediaDias = resumo.total ? Math.round(resumo.dias / resumo.total) : 0;
+%>
+<style>
+  .os-rastreio-page { --campo-green: #0b6b3a; --campo-green-2: #15803d; --campo-soft: #f3f7f4; --campo-border: #d9e4dc; --campo-text: #111827; --campo-muted: #6b7280; }
+  .os-rastreio-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:flex-end; }
+  .os-summary-grid { display:grid; grid-template-columns: repeat(5, minmax(140px, 1fr)); gap:12px; margin:16px 0; }
+  .os-summary-card { background:#fff; border:1px solid var(--campo-border); border-radius:16px; padding:16px; box-shadow:0 8px 22px rgba(11,107,58,.07); position:relative; overflow:hidden; }
+  .os-summary-card::before { content:""; position:absolute; inset:0 auto 0 0; width:5px; background:var(--campo-green); }
+  .os-summary-card span { display:block; color:var(--campo-muted); font-size:.82rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+  .os-summary-card strong { display:block; color:var(--campo-green); font-size:2rem; line-height:1.1; margin-top:4px; }
+  .os-filter-bar { display:flex; gap:8px; flex-wrap:wrap; margin: 12px 0 18px; }
+  .os-filter-btn { border:1px solid var(--campo-border); background:#fff; color:var(--campo-text); border-radius:999px; padding:8px 13px; font-weight:700; cursor:pointer; transition:.18s ease; }
+  .os-filter-btn:hover, .os-filter-btn.active { background:var(--campo-green); border-color:var(--campo-green); color:#fff; box-shadow:0 6px 16px rgba(11,107,58,.18); }
+  .os-cards-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:18px; align-items:start; }
+  .os-tech-card { background:#fff; border:1px solid var(--campo-border); border-radius:18px; box-shadow:0 10px 28px rgba(17,24,39,.08); overflow:hidden; }
+  .os-card-head { background:linear-gradient(135deg, var(--campo-green), var(--campo-green-2)); color:#fff; padding:16px 18px; display:flex; justify-content:space-between; gap:14px; align-items:flex-start; }
+  .os-card-title { margin:0; font-size:1.1rem; line-height:1.25; }
+  .os-card-title a { color:#fff; text-decoration:none; }
+  .os-card-title a:hover { text-decoration:underline; }
+  .os-equipment { display:block; font-size:1rem; margin-top:5px; font-weight:800; letter-spacing:.02em; }
+  .os-days { font-weight:800; background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.25); padding:8px 10px; border-radius:12px; white-space:nowrap; text-align:center; }
+  .os-days small { display:block; font-weight:600; opacity:.86; }
+  .os-status-pill { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:7px 10px; color:#fff; font-size:.76rem; font-weight:900; letter-spacing:.04em; margin-top:10px; }
+  .status-aberta { background:#2563eb; }
+  .status-em-andamento { background:#f97316; }
+  .status-pausada { background:#facc15; color:#713f12; }
+  .status-aguardando-material { background:#dc2626; }
+  .status-finalizada { background:#16a34a; }
+  .os-card-body { padding:16px 18px 18px; }
+  .os-meta-grid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:10px; margin-bottom:14px; }
+  .os-meta-item { background:var(--campo-soft); border:1px solid var(--campo-border); border-radius:12px; padding:10px; }
+  .os-meta-item span { display:block; color:var(--campo-muted); font-size:.76rem; font-weight:800; text-transform:uppercase; margin-bottom:3px; }
+  .os-meta-item strong { color:var(--campo-text); font-size:.9rem; word-break:break-word; }
+  .os-section { border-top:1px solid var(--campo-border); padding-top:13px; margin-top:13px; }
+  .os-section h3 { margin:0 0 8px; color:var(--campo-green); font-size:.86rem; letter-spacing:.05em; text-transform:uppercase; display:flex; gap:7px; align-items:center; }
+  .os-section p { margin:0; color:var(--campo-text); line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .os-material { display:inline-flex; align-items:center; gap:8px; border-radius:12px; padding:9px 11px; font-weight:800; }
+  .os-material.ok { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+  .os-material.pending { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
+  .os-history-toggle { margin-top:13px; width:100%; justify-content:center; }
+  .os-history { display:none; margin-top:12px; border-left:3px solid var(--campo-green); padding-left:13px; }
+  .os-history.open { display:block; }
+  .os-history-item { padding:8px 0; border-bottom:1px dashed var(--campo-border); }
+  .os-history-item:last-child { border-bottom:0; }
+  .os-history-date { color:var(--campo-green); font-weight:900; display:block; margin-bottom:3px; }
+  .os-empty-state { background:#fff; border:1px dashed var(--campo-border); border-radius:16px; padding:28px; color:var(--campo-muted); text-align:center; grid-column:1 / -1; }
+  .os-filter-empty { display:none; }
+  @media (max-width: 1100px) { .os-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .os-cards-grid { grid-template-columns:1fr; } }
+  @media (max-width: 700px) { .os-rastreio-actions { justify-content:flex-start; } .os-summary-grid, .os-meta-grid { grid-template-columns:1fr; } .os-card-head { flex-direction:column; } .os-days { width:100%; } }
+  @media print { .os-filter-bar, .os-history-toggle, .page-head .btn, .os-rastreio-actions { display:none !important; } .os-cards-grid { grid-template-columns:1fr; } .os-tech-card { break-inside:avoid; box-shadow:none; } .os-history { display:block; } }
+</style>
+
+<div class="os-rastreio-page">
+  <div class="page-head">
+    <div>
+      <h1>Relatório de OS em Andamento — Rastreabilidade de Equipamentos</h1>
+      <p class="muted">PAC 01 • <%= String(mes).padStart(2, '0') %>/<%= ano %> • Painel técnico de PCM para acompanhamento, auditoria e rastreabilidade das Ordens de Serviço.</p>
+    </div>
+    <div class="os-rastreio-actions">
+      <a class="btn btn-outline" href="/inspecao/<%= ano %>/<%= mes %>/pdf" target="_blank">Exportar PDF</a>
+      <a class="btn btn-outline" href="/inspecao/<%= ano %>/<%= mes %>">← Voltar à inspeção</a>
+    </div>
   </div>
-  <a class="btn btn-outline" href="/inspecao/<%= ano %>/<%= mes %>">← Voltar à inspeção</a>
+
+  <section class="os-summary-grid" aria-label="Resumo executivo das OS em andamento">
+    <div class="os-summary-card"><span>Total em andamento</span><strong id="summary-total"><%= resumo.total %></strong></div>
+    <div class="os-summary-card"><span>Pausadas</span><strong><%= resumo.pausada %></strong></div>
+    <div class="os-summary-card"><span>Aguardando material</span><strong><%= resumo.aguardandoMaterial %></strong></div>
+    <div class="os-summary-card"><span>Críticas</span><strong><%= resumo.critica %></strong></div>
+    <div class="os-summary-card"><span>Média em aberto</span><strong><%= mediaDias %>d</strong></div>
+  </section>
+
+  <section class="card" aria-label="Filtros rápidos de OS">
+    <strong>Filtros rápidos</strong>
+    <div class="os-filter-bar" role="group" aria-label="Filtrar ordens de serviço">
+      <button class="os-filter-btn active" type="button" data-filter="todos">Todos</button>
+      <button class="os-filter-btn" type="button" data-filter="abertas">Abertas</button>
+      <button class="os-filter-btn" type="button" data-filter="em_andamento">Em andamento</button>
+      <button class="os-filter-btn" type="button" data-filter="pausadas">Pausadas</button>
+      <button class="os-filter-btn" type="button" data-filter="aguardando_material">Aguardando material</button>
+      <button class="os-filter-btn" type="button" data-filter="dias_7">Mais de 7 dias</button>
+      <button class="os-filter-btn" type="button" data-filter="dias_15">Mais de 15 dias</button>
+      <button class="os-filter-btn" type="button" data-filter="dias_30">Mais de 30 dias</button>
+      <button class="os-filter-btn" type="button" data-filter="dias_45">Mais de 45 dias</button>
+    </div>
+    <span class="muted" id="filter-count"><%= resumo.total %> OS exibidas</span>
+  </section>
+
+  <section class="os-cards-grid" id="os-cards-grid" aria-live="polite">
+    <% if (!ordens.length) { %>
+      <div class="os-empty-state">Nenhuma OS aberta ou em andamento no período.</div>
+    <% } %>
+    <% ordens.forEach((os) => {
+      const statusNormalizado = normalizarStatus(os.status, os.motivo_atual);
+      const dias = Number(os.dias_aberta || 0);
+      const historico = os.historico_resumido || [];
+      const pendenteMaterial = materialPendente(os);
+    %>
+      <article class="os-tech-card" data-os-card data-status="<%= statusNormalizado %>" data-days="<%= dias %>">
+        <header class="os-card-head">
+          <div>
+            <h2 class="os-card-title">📋 <a href="/os/<%= os.id %>#justificativa-andamento">OS #<%= os.id %></a><span class="os-equipment"><%= os.equipamento || '-' %></span></h2>
+            <span class="os-status-pill <%= statusClasse(statusNormalizado) %>"><%= rotuloStatus(statusNormalizado) %></span>
+          </div>
+          <div class="os-days"><%= dias %><small>dias em aberto</small></div>
+        </header>
+        <div class="os-card-body">
+          <div class="os-meta-grid">
+            <div class="os-meta-item"><span>👨 Responsável</span><strong><%= os.responsavel || '-' %></strong></div>
+            <div class="os-meta-item"><span>📅 Data de abertura</span><strong><%= os.opened_at ? fmtBR(os.opened_at) : '-' %></strong></div>
+            <div class="os-meta-item"><span>📅 Última atualização</span><strong><%= os.ultima_atualizacao ? fmtBR(os.ultima_atualizacao) : '-' %></strong></div>
+          </div>
+
+          <section class="os-section"><h3>⚠ Não conformidade</h3><p><%= os.nao_conformidade || '-' %></p></section>
+          <section class="os-section"><h3>Motivo da paralisação</h3><p><%= os.motivo_atual || 'Justificativa pendente' %></p></section>
+          <section class="os-section"><h3>Justificativa técnica</h3><p><%= os.ultima_justificativa || '-' %></p></section>
+          <section class="os-section"><h3>🔧 Ação necessária</h3><p><%= os.acao_necessaria || 'Registrar e acompanhar ação necessária' %></p></section>
+          <section class="os-section">
+            <h3>📦 Material</h3>
+            <span class="os-material <%= pendenteMaterial ? 'pending' : 'ok' %>"><%= pendenteMaterial ? 'Material pendente' : 'Material disponível' %><% if (os.material_chegou_em) { %> • <%= fmtBR(os.material_chegou_em) %><% } %></span>
+          </section>
+          <section class="os-section">
+            <h3>📝 Histórico</h3>
+            <button class="btn btn-outline os-history-toggle" type="button" data-history-toggle aria-expanded="false">Ver Histórico</button>
+            <div class="os-history" id="historico-os-<%= os.id %>">
+              <% if (!historico.length) { %>
+                <p class="muted">Nenhum histórico registrado para esta OS.</p>
+              <% } %>
+              <% historico.forEach((item) => { %>
+                <div class="os-history-item">
+                  <span class="os-history-date"><%= item.registrado_em ? fmtBR(item.registrado_em) : '-' %></span>
+                  <p><strong><%= item.motivo_nome || 'Atualização' %></strong><% if (item.texto_ia || item.texto_padrao) { %><br><%= item.texto_ia || item.texto_padrao %><% } %></p>
+                </div>
+              <% }) %>
+            </div>
+          </section>
+        </div>
+      </article>
+    <% }) %>
+    <div class="os-empty-state os-filter-empty" id="os-filter-empty">Nenhuma OS encontrada para o filtro selecionado.</div>
+  </section>
 </div>
-<div class="card table-wrap">
-  <table class="table">
-    <thead><tr><th>OS</th><th>Equipamento</th><th>Não conformidade</th><th>Abertura</th><th>Início</th><th>Dias em aberto</th><th>Status</th><th>Responsável</th><th>Motivo atual</th><th>Justificativa técnica</th><th>Última atualização</th><th>Material chegou em</th><th>Ação necessária</th><th>Histórico resumido</th></tr></thead>
-    <tbody>
-      <% if (!(osEmAndamento || []).length) { %><tr><td colspan="14">Nenhuma OS aberta ou em andamento no período.</td></tr><% } %>
-      <% (osEmAndamento || []).forEach((os) => { %>
-        <tr>
-          <td><a class="btn btn-outline btn-sm" href="/os/<%= os.id %>#justificativa-andamento">#<%= os.id %></a></td>
-          <td><%= os.equipamento || '-' %></td><td><%= os.nao_conformidade || '-' %></td>
-          <td><%= os.opened_at ? fmtBR(os.opened_at) : '-' %></td><td><%= os.data_inicio ? fmtBR(os.data_inicio) : '-' %></td><td><%= os.dias_aberta %></td>
-          <td><%= os.status || '-' %></td><td><%= os.responsavel || '-' %></td><td><%= os.motivo_atual || 'Justificativa pendente' %></td>
-          <td><%= os.ultima_justificativa || '-' %></td><td><%= os.ultima_atualizacao ? fmtBR(os.ultima_atualizacao) : '-' %></td><td><%= os.material_chegou_em ? fmtBR(os.material_chegou_em) : '-' %></td><td><%= os.acao_necessaria %></td><td><%= os.historico_resumido_texto || '-' %></td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
-</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var buttons = Array.prototype.slice.call(document.querySelectorAll('[data-filter]'));
+    var cards = Array.prototype.slice.call(document.querySelectorAll('[data-os-card]'));
+    var counter = document.getElementById('filter-count');
+    var empty = document.getElementById('os-filter-empty');
+
+    function matches(card, filter) {
+      var status = card.getAttribute('data-status');
+      var days = Number(card.getAttribute('data-days') || 0);
+      if (filter === 'todos') return true;
+      if (filter === 'abertas') return status === 'ABERTA';
+      if (filter === 'em_andamento') return status === 'EM_ANDAMENTO';
+      if (filter === 'pausadas') return status === 'PAUSADA';
+      if (filter === 'aguardando_material') return status === 'AGUARDANDO_MATERIAL';
+      if (filter === 'dias_7') return days > 7;
+      if (filter === 'dias_15') return days > 15;
+      if (filter === 'dias_30') return days > 30;
+      if (filter === 'dias_45') return days > 45;
+      return true;
+    }
+
+    buttons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        var filter = button.getAttribute('data-filter');
+        var visible = 0;
+        buttons.forEach(function (item) { item.classList.remove('active'); });
+        button.classList.add('active');
+        cards.forEach(function (card) {
+          var show = matches(card, filter);
+          card.style.display = show ? '' : 'none';
+          if (show) visible += 1;
+        });
+        if (counter) counter.textContent = visible + (visible === 1 ? ' OS exibida' : ' OS exibidas');
+        if (empty) empty.style.display = visible === 0 && cards.length ? 'block' : 'none';
+      });
+    });
+
+    document.querySelectorAll('[data-history-toggle]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var history = button.nextElementSibling;
+        var open = history && history.classList.toggle('open');
+        button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        button.textContent = open ? 'Ocultar Histórico' : 'Ver Histórico';
+      });
+    });
+  });
+</script>

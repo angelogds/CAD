@@ -254,53 +254,139 @@ function drawNCBlock(doc, ncList) {
 }
 
 
-function drawOSEmAndamentoBlock(doc, osEmAndamento = []) {
+function normalizePDFStatus(status, motivo) {
+  const rawStatus = String(status || "")
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\s-]+/g, "_");
+  const rawMotivo = String(motivo || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (rawMotivo.includes("material") || rawMotivo.includes("compra") || rawMotivo.includes("peca") || rawMotivo.includes("tornearia")) return "AGUARDANDO_MATERIAL";
+  if (rawStatus.includes("FINALIZ") || rawStatus.includes("CONCLUID") || rawStatus.includes("FECHAD")) return "FINALIZADA";
+  if (rawStatus.includes("PAUS") || rawStatus.includes("PARAD")) return "PAUSADA";
+  if (rawStatus.includes("ANDAMENTO") || rawStatus === "ANDAMENTO") return "EM_ANDAMENTO";
+  return "ABERTA";
+}
+
+function pdfStatusMeta(status) {
+  const map = {
+    ABERTA: { label: "ABERTA", color: "#2563eb", text: "#ffffff" },
+    EM_ANDAMENTO: { label: "EM ANDAMENTO", color: "#f97316", text: "#ffffff" },
+    PAUSADA: { label: "PAUSADA", color: "#facc15", text: "#713f12" },
+    AGUARDANDO_MATERIAL: { label: "AGUARDANDO MATERIAL", color: "#dc2626", text: "#ffffff" },
+    FINALIZADA: { label: "FINALIZADA", color: "#16a34a", text: "#ffffff" },
+  };
+  return map[status] || map.ABERTA;
+}
+
+function formatPDFDate(value) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function textHeight(doc, text, width, fontSize = 7.5, font = "Helvetica") {
+  doc.font(font).fontSize(fontSize);
+  return Math.max(13, doc.heightOfString(String(text || "-"), { width, lineGap: 1 }));
+}
+
+function drawCardSection(doc, title, text, x, y, width, options = {}) {
+  const titleH = 10;
+  const bodyH = textHeight(doc, text, width - 18, options.fontSize || 7.5);
+  doc.font("Helvetica-Bold").fontSize(7.8).fillColor(COLOR.greenPrimary).text(title, x + 9, y, { width: width - 18 });
+  doc.font("Helvetica").fontSize(options.fontSize || 7.5).fillColor(COLOR.text).text(String(text || "-"), x + 9, y + titleH, { width: width - 18, lineGap: 1 });
+  return titleH + bodyH + 8;
+}
+
+function drawOSEmAndamentoBlock(doc, osEmAndamento = [], meta = {}) {
   const left = doc.page.margins.left;
   const usableW = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  const baseCols = [34, 84, 50, 32, 54, 92, 192, 68, 70, 102];
-  const total = baseCols.reduce((sum, col) => sum + col, 0);
-  const cols = baseCols.map((col) => (col / total) * usableW);
-  const headers = ["OS", "Equipamento", "Abertura", "Dias", "Status", "Motivo", "Justificativa técnica", "Atualização", "Responsável", "Ação necessária"];
   let y = 118;
 
   const drawHeader = () => {
-    doc.font("Helvetica-Bold").fontSize(10).fillColor(COLOR.greenPrimary).text("Ordens de Serviço em Andamento — Justificativas e Rastreabilidade", left, y);
-    y += 14;
-    let x = left;
-    headers.forEach((header, index) => {
-      doc.rect(x, y, cols[index], 18).fillAndStroke(COLOR.light, COLOR.line);
-      doc.font("Helvetica-Bold").fontSize(6.5).fillColor(COLOR.text).text(header, x + 3, y + 5, { width: cols[index] - 6 });
-      x += cols[index];
-    });
-    y += 18;
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(COLOR.greenPrimary).text("Ordens de Serviço em Andamento — Justificativas e Rastreabilidade", left, y);
+    y += 15;
+    doc.font("Helvetica").fontSize(7.5).fillColor(COLOR.muted).text(
+      `Campo do Gado • Data de emissão: ${formatPDFDate(new Date())} • Responsável pela emissão: ${meta.monitorNome || meta.inspecao?.monitor_nome || "Administrador"}`,
+      left,
+      y,
+      { width: usableW }
+    );
+    y += 17;
+  };
+
+  const ensureSpace = (height) => {
+    if (y + height <= doc.page.height - doc.page.margins.bottom - 8) return;
+    doc.addPage({ size: "A4", layout: "landscape", margin: 24 });
+    drawOfficialHeader(doc);
+    y = 118;
+    drawHeader();
   };
 
   drawHeader();
   if (!osEmAndamento.length) {
-    doc.rect(left, y, usableW, 20).stroke(COLOR.line);
-    doc.font("Helvetica").fontSize(8).fillColor(COLOR.muted).text("Nenhuma OS aberta ou em andamento no período.", left + 5, y + 6);
+    doc.rect(left, y, usableW, 24).stroke(COLOR.line);
+    doc.font("Helvetica").fontSize(8).fillColor(COLOR.muted).text("Nenhuma OS aberta ou em andamento no período.", left + 7, y + 8);
     return;
   }
 
   for (const os of osEmAndamento) {
-    const rowH = 42;
-    if (y + rowH > doc.page.height - doc.page.margins.bottom) {
-      doc.addPage({ size: "A4", layout: "landscape", margin: 24 });
-      drawOfficialHeader(doc);
-      y = 118;
-      drawHeader();
-    }
-    const values = [
-      `#${os.id}`, os.equipamento || "-", os.opened_at || "-", String(os.dias_aberta ?? "-"), os.status || "-",
-      os.motivo_atual || "Justificativa pendente", os.ultima_justificativa || "-", os.ultima_atualizacao || "-", os.responsavel || "-", os.acao_necessaria || "-",
+    const status = normalizePDFStatus(os.status, os.motivo_atual);
+    const statusMeta = pdfStatusMeta(status);
+    const sectionW = (usableW - 18) / 2;
+    const historico = Array.isArray(os.historico_resumido) && os.historico_resumido.length
+      ? os.historico_resumido.map((item) => `${formatPDFDate(item.registrado_em)} — ${item.motivo_nome || "Atualização"}${item.texto_ia || item.texto_padrao ? `: ${item.texto_ia || item.texto_padrao}` : ""}`).join("\n")
+      : "Nenhum histórico registrado.";
+    const materialText = os.material_chegou_em ? `Material disponível desde ${formatPDFDate(os.material_chegou_em)}` : status === "AGUARDANDO_MATERIAL" ? "Material pendente" : "Material disponível";
+    const leftSections = [
+      ["NÃO CONFORMIDADE", os.nao_conformidade || "-"],
+      ["MOTIVO DA PARALISAÇÃO", os.motivo_atual || "Justificativa pendente"],
+      ["JUSTIFICATIVA TÉCNICA", os.ultima_justificativa || "-"],
     ];
-    let x = left;
-    values.forEach((value, index) => {
-      doc.rect(x, y, cols[index], rowH).stroke(COLOR.line);
-      doc.font("Helvetica").fontSize(6.5).fillColor(COLOR.text).text(String(value), x + 3, y + 4, { width: cols[index] - 6, height: rowH - 6, ellipsis: true });
-      x += cols[index];
+    const rightSections = [
+      ["AÇÃO NECESSÁRIA", os.acao_necessaria || "Registrar e acompanhar ação necessária"],
+      ["MATERIAL", materialText],
+      ["HISTÓRICO", historico],
+    ];
+    const leftH = leftSections.reduce((sum, [, text]) => sum + 8 + textHeight(doc, text, sectionW - 18, 7.2), 0);
+    const rightH = rightSections.reduce((sum, [, text]) => sum + 8 + textHeight(doc, text, sectionW - 18, 7.2), 0);
+    const cardH = Math.max(118, 70 + Math.max(leftH, rightH));
+
+    ensureSpace(cardH + 10);
+
+    doc.roundedRect(left, y, usableW, cardH, 10).fillAndStroke("#ffffff", COLOR.line);
+    doc.roundedRect(left, y, usableW, 42, 10).fill(statusMeta.color);
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(11).text(`OS #${os.id} • ${os.equipamento || "-"}`, left + 12, y + 10, { width: usableW - 170 });
+    doc.fillColor(statusMeta.text).font("Helvetica-Bold").fontSize(8).text(statusMeta.label, left + usableW - 145, y + 11, { width: 128, align: "center" });
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(9).text(`${os.dias_aberta ?? "-"} dias em aberto`, left + usableW - 145, y + 24, { width: 128, align: "center" });
+
+    const metaY = y + 50;
+    const metaW = (usableW - 24) / 3;
+    const metaFields = [
+      ["Responsável", os.responsavel || "-"],
+      ["Data de abertura", formatPDFDate(os.opened_at)],
+      ["Última atualização", formatPDFDate(os.ultima_atualizacao)],
+    ];
+    metaFields.forEach(([label, value], index) => {
+      const x = left + 8 + index * (metaW + 4);
+      doc.roundedRect(x, metaY, metaW, 25, 6).fillAndStroke(COLOR.light, "#d9e4dc");
+      doc.font("Helvetica-Bold").fontSize(6.7).fillColor(COLOR.muted).text(label, x + 6, metaY + 5, { width: metaW - 12 });
+      doc.font("Helvetica-Bold").fontSize(7.2).fillColor(COLOR.text).text(String(value), x + 6, metaY + 15, { width: metaW - 12 });
     });
-    y += rowH;
+
+    let ly = y + 84;
+    let ry = y + 84;
+    leftSections.forEach(([title, text]) => {
+      ly += drawCardSection(doc, title, text, left + 6, ly, sectionW, { fontSize: 7.2 });
+    });
+    rightSections.forEach(([title, text]) => {
+      ry += drawCardSection(doc, title, text, left + 12 + sectionW, ry, sectionW, { fontSize: 7.2 });
+    });
+    y += cardH + 10;
   }
 }
 
@@ -364,7 +450,7 @@ function generatePAC01PDF(inspecaoId, { res, inspecao, equipamentos, matrix, ncL
 
   doc.addPage({ size: "A4", layout: "landscape", margin: 24 });
   drawOfficialHeader(doc);
-  drawOSEmAndamentoBlock(doc, osEmAndamento || []);
+  drawOSEmAndamentoBlock(doc, osEmAndamento || [], { inspecao, monitorNome });
 
   doc.addPage({ size: "A4", layout: "landscape", margin: 24 });
   drawOfficialHeader(doc);
