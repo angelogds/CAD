@@ -1,0 +1,103 @@
+<% layout('layout') %>
+
+<div class="page-head" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+  <div>
+    <h1>Eleger Mecânico da Preventiva</h1>
+    <p class="muted" style="margin-top:6px;">Defina os responsáveis padrão para preventivas novas, programadas, pendentes, abertas e lançadas no painel.</p>
+  </div>
+  <a class="btn" href="/preventivas">Voltar</a>
+</div>
+
+<div class="card" style="margin-top:12px;max-width:860px;">
+  <div class="alert alert-info" style="margin-bottom:14px;">
+    Somente colaboradores disponíveis na escala atual podem ser selecionados. Férias, atestado, folga, ausência e colaboradores fora da escala ficam bloqueados.
+  </div>
+
+  <form method="POST" action="/preventivas/eleger-mecanico" id="formResponsaveisPreventiva">
+    <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
+      <div>
+        <label class="label" for="mecanico_1_id">Mecânico 1</label>
+        <select class="input" id="mecanico_1_id" name="mecanico_1_id" required>
+          <option value="">Selecione</option>
+          <% (colaboradores || []).forEach(function(c){ %>
+            <option
+              value="<%= c.id %>"
+              <%= Number(config?.mecanico_1_id || 0) === Number(c.id) ? 'selected' : '' %>
+              <%= c.disponivel ? '' : 'disabled' %>
+              data-disponivel="<%= c.disponivel ? '1' : '0' %>"
+              data-motivo="<%= c.indisponibilidade_motivo || '' %>"
+            >
+              <%= c.nome %> <%= c.funcao ? ('• ' + c.funcao) : '' %><%= c.disponivel ? '' : (' — indisponível: ' + (c.indisponibilidade_motivo || 'fora da escala')) %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div>
+        <label class="label" for="mecanico_2_id">Mecânico 2 ou Auxiliar</label>
+        <select class="input" id="mecanico_2_id" name="mecanico_2_id">
+          <option value="">Sem auxiliar</option>
+          <% (colaboradores || []).forEach(function(c){ %>
+            <option
+              value="<%= c.id %>"
+              <%= Number(config?.mecanico_2_id || 0) === Number(c.id) ? 'selected' : '' %>
+              <%= c.disponivel ? '' : 'disabled' %>
+              data-disponivel="<%= c.disponivel ? '1' : '0' %>"
+              data-motivo="<%= c.indisponibilidade_motivo || '' %>"
+            >
+              <%= c.nome %> <%= c.funcao ? ('• ' + c.funcao) : '' %><%= c.disponivel ? '' : (' — indisponível: ' + (c.indisponibilidade_motivo || 'fora da escala')) %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+
+    <div id="avisoResponsaveis" class="alert alert-warning" style="display:none;margin-top:14px;"></div>
+
+    <% if (config?.mecanico_1_id) { %>
+      <div class="muted" style="margin-top:14px;">
+        Configuração atual: <strong><%= config.mecanico_1_nome || '-' %></strong><%= config.mecanico_2_nome ? (' e ' + config.mecanico_2_nome) : '' %>
+        <% if (config.atualizado_em) { %> • atualizada em <%= config.atualizado_em %><% } %>
+      </div>
+    <% } %>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;">
+      <button class="btn btn-primary" type="submit">Salvar responsáveis</button>
+      <a class="btn btn-outline" href="/preventivas">Cancelar</a>
+    </div>
+  </form>
+</div>
+
+<script>
+  (function(){
+    const form = document.getElementById('formResponsaveisPreventiva');
+    const mec1 = document.getElementById('mecanico_1_id');
+    const mec2 = document.getElementById('mecanico_2_id');
+    const aviso = document.getElementById('avisoResponsaveis');
+
+    function show(msg) {
+      aviso.textContent = msg || '';
+      aviso.style.display = msg ? 'block' : 'none';
+    }
+
+    form.addEventListener('submit', function(ev){
+      show('');
+      if (!mec1.value) {
+        ev.preventDefault();
+        show('Selecione o Mecânico 1.');
+        return;
+      }
+      if (mec1.value && mec2.value && mec1.value === mec2.value) {
+        ev.preventDefault();
+        show('Selecione colaboradores diferentes para Mecânico 1 e Mecânico 2/Auxiliar.');
+        return;
+      }
+      const selected = [mec1.options[mec1.selectedIndex], mec2.options[mec2.selectedIndex]].filter(Boolean);
+      const indisponivel = selected.find((opt) => opt.value && opt.dataset.disponivel !== '1');
+      if (indisponivel) {
+        ev.preventDefault();
+        show('Não é permitido selecionar colaborador indisponível: ' + (indisponivel.textContent || '').trim());
+      }
+    });
+  })();
+</script>

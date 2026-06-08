@@ -732,6 +732,9 @@ function getOSResumoStatus() {
 
 function getOSPainel(limit = 15) {
   return safeGet(() => {
+    if (typeof preventivasService?.sincronizarOSPreventivasComResponsaveis === "function") {
+      preventivasService.sincronizarOSPreventivasComResponsaveis({ origem: "dashboard.getOSPainel" });
+    }
     const tamanho = Math.min(Math.max(Number(limit) || 15, 1), 50);
     const osCols = tableExists("os") ? db.prepare("PRAGMA table_info(os)").all().map((c) => c.name) : [];
     const usuariosSource = resolveUsuariosSource();

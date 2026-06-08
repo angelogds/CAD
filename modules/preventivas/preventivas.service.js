@@ -110,6 +110,207 @@ function getUsersNameColumn() {
   return resolveUsuariosSource()?.nameCol || null;
 }
 
+function getColaboradorById(id) {
+  if (!tableExists("colaboradores")) return null;
+  const colaboradorId = Number(id || 0);
+  if (!colaboradorId) return null;
+  try {
+    const usersSource = resolveUsuariosSource();
+    const userJoin = usersSource?.table === "users" ? "LEFT JOIN users u ON u.id = c.user_id" : "";
+    const userNameExpr = usersSource?.table === "users" ? "COALESCE(u.name, c.nome)" : "c.nome";
+    return db.prepare(`
+      SELECT c.id, c.nome, ${userNameExpr} AS nome_exibicao, c.funcao, c.user_id, IFNULL(c.ativo,1) AS ativo
+      FROM colaboradores c
+      ${userJoin}
+      WHERE c.id = ?
+      LIMIT 1
+    `).get(colaboradorId) || null;
+  } catch (_e) {
+    return db.prepare(`SELECT id, nome, nome AS nome_exibicao, funcao, user_id, IFNULL(ativo,1) AS ativo FROM colaboradores WHERE id = ? LIMIT 1`).get(colaboradorId) || null;
+  }
+}
+
+function getColaboradorByUserId(userId) {
+  if (!tableExists("colaboradores")) return null;
+  const id = Number(userId || 0);
+  if (!id) return null;
+  try {
+    return db.prepare(`SELECT id, nome, nome AS nome_exibicao, funcao, user_id, IFNULL(ativo,1) AS ativo FROM colaboradores WHERE user_id = ? LIMIT 1`).get(id) || null;
+  } catch (_e) {
+    return null;
+  }
+}
+
+function getColaboradorUserId(colaborador = {}) {
+  return Number(colaborador?.user_id || 0) || findUserIdByName(colaborador?.nome || colaborador?.nome_exibicao) || Number(colaborador?.id || 0) || null;
+}
+
+function normalizeTipoIndisponibilidade(tipo = "") {
+  const n = normalizeTxt(tipo).toUpperCase();
+  if (!n) return "INDISPONIVEL";
+  if (n.includes("FERIA")) return "FÉRIAS";
+  if (n.includes("ATEST")) return "ATESTADO";
+  if (n.includes("FOLGA")) return "FOLGA";
+  if (n.includes("AUSEN")) return "AUSÊNCIA";
+  if (n.includes("CONCESS")) return "AUSÊNCIA";
+  return n;
+}
+
+function getDataReferenciaISO(refDate = new Date()) {
+  if (typeof refDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(refDate)) return refDate;
+  return formatDateISO(refDate instanceof Date ? refDate : new Date());
+}
+
+function getColaboradorIndisponibilidade(colaboradorId, { refDate = new Date(), turno = getTurnoAtual() } = {}) {
+  const id = Number(colaboradorId || 0);
+  if (!id) return { disponivel: false, motivo: "Colaborador inválido" };
+  if (!tableExists("colaboradores")) return { disponivel: false, motivo: "Cadastro de colaboradores indisponível" };
+
+  const colaborador = getColaboradorById(id);
+  if (!colaborador?.id || Number(colaborador.ativo || 0) !== 1) {
+    return { disponivel: false, motivo: "Colaborador inativo ou inexistente" };
+  }
+
+  const dataRef = getDataReferenciaISO(refDate);
+
+  if (tableExists("escala_ausencias")) {
+    const ausencia = db.prepare(`
+      SELECT tipo, data_inicio, data_fim, motivo
+      FROM escala_ausencias
+      WHERE colaborador_id = ?
+        AND ? BETWEEN data_inicio AND data_fim
+      ORDER BY data_inicio DESC, id DESC
+      LIMIT 1
+    `).get(id, dataRef);
+    if (ausencia) {
+      return { disponivel: false, motivo: normalizeTipoIndisponibilidade(ausencia.tipo), detalhe: ausencia.motivo || null };
+    }
+  }
+
+  if (tableExists("escala_concessoes")) {
+    const concessao = db.prepare(`
+      SELECT tipo, concessao, inicio, fim, motivo
+      FROM escala_concessoes
+      WHERE colaborador_id = ?
+        AND ? BETWEEN inicio AND fim
+      ORDER BY inicio DESC, id DESC
+      LIMIT 1
+    `).get(id, dataRef);
+    if (concessao) {
+      return { disponivel: false, motivo: normalizeTipoIndisponibilidade(concessao.tipo || concessao.concessao), detalhe: concessao.motivo || null };
+    }
+  }
+
+  if (!tableExists("escala_semanas") || !tableExists("escala_alocacoes")) {
+    return { disponivel: false, motivo: "Escala da semana não encontrada" };
+  }
+
+  const semana = db.prepare(`
+    SELECT id
+    FROM escala_semanas
+    WHERE ? BETWEEN data_inicio AND data_fim
+    ORDER BY id DESC
+    LIMIT 1
+  `).get(dataRef);
+  if (!semana?.id) return { disponivel: false, motivo: "Fora da escala da semana" };
+
+  const tiposPermitidos = getTiposTurnoPorPeriodo(turno);
+  const alocacao = db.prepare(`
+    SELECT tipo_turno
+    FROM escala_alocacoes
+    WHERE semana_id = ?
+      AND colaborador_id = ?
+    LIMIT 1
+  `).get(Number(semana.id), id);
+
+  if (!alocacao?.tipo_turno) return { disponivel: false, motivo: "Fora da escala da semana" };
+  if (normalizeTxt(alocacao.tipo_turno) === "folga") return { disponivel: false, motivo: "FOLGA" };
+  if (tiposPermitidos.length && !tiposPermitidos.map(normalizeTxt).includes(normalizeTxt(alocacao.tipo_turno))) {
+    return { disponivel: false, motivo: "Fora da escala do turno" };
+  }
+
+  return { disponivel: true, motivo: null, tipo_turno: alocacao.tipo_turno };
+}
+
+function listColaboradoresParaPreventiva() {
+  if (!tableExists("colaboradores")) return [];
+  const rows = db.prepare(`
+    SELECT id, nome, funcao, user_id, IFNULL(ativo,1) AS ativo
+    FROM colaboradores
+    WHERE IFNULL(ativo,1)=1
+    ORDER BY nome ASC
+  `).all();
+  return rows.map((row) => {
+    const disponibilidade = getColaboradorIndisponibilidade(row.id);
+    return {
+      ...row,
+      user_id: Number(row.user_id || 0) || findUserIdByName(row.nome),
+      disponivel: Boolean(disponibilidade.disponivel),
+      indisponibilidade_motivo: disponibilidade.disponivel ? null : disponibilidade.motivo,
+    };
+  });
+}
+
+function getConfiguracaoResponsaveisPreventiva() {
+  if (!tableExists("preventiva_config_responsaveis")) return null;
+  const usuariosSource = resolveUsuariosSource();
+  const joinUsuario = usuariosSource ? `LEFT JOIN ${usuariosSource.table} u ON u.${usuariosSource.idCol} = cfg.atualizado_por` : "";
+  const nomeUsuario = usuariosSource ? `u.${usuariosSource.nameCol}` : "NULL";
+  const row = db.prepare(`
+    SELECT cfg.*, ${nomeUsuario} AS atualizado_por_nome
+    FROM preventiva_config_responsaveis cfg
+    ${joinUsuario}
+    ORDER BY cfg.id DESC
+    LIMIT 1
+  `).get();
+  if (!row) return null;
+  const mecanico1 = getColaboradorById(row.mecanico_1_id);
+  const mecanico2 = getColaboradorById(row.mecanico_2_id);
+  return {
+    ...row,
+    mecanico_1: mecanico1,
+    mecanico_2: mecanico2,
+    mecanico_1_nome: mecanico1?.nome_exibicao || mecanico1?.nome || null,
+    mecanico_2_nome: mecanico2?.nome_exibicao || mecanico2?.nome || null,
+  };
+}
+
+function resolverResponsaveisConfiguradosPreventiva({ exigirDisponiveis = true } = {}) {
+  const cfg = getConfiguracaoResponsaveisPreventiva();
+  if (!cfg?.mecanico_1_id) return null;
+  const mecanico1 = getColaboradorById(cfg.mecanico_1_id);
+  const mecanico2 = cfg.mecanico_2_id ? getColaboradorById(cfg.mecanico_2_id) : null;
+  const selecionados = [mecanico1, mecanico2].filter(Boolean);
+  if (!mecanico1?.id) return null;
+  if (exigirDisponiveis) {
+    for (const colaborador of selecionados) {
+      const disponibilidade = getColaboradorIndisponibilidade(colaborador.id);
+      if (!disponibilidade.disponivel) return null;
+    }
+  }
+  return montarResponsaveisRetorno(selecionados.map((c) => ({ ...c, user_id: getColaboradorUserId(c) })),
+    { ...mecanico1, user_id: getColaboradorUserId(mecanico1) },
+    mecanico2 ? { ...mecanico2, user_id: getColaboradorUserId(mecanico2) } : null);
+}
+
+function aplicarResponsaveisEmExecucao(execucaoId, responsaveis) {
+  const cols = getPreventivaExecColumns();
+  if (!tableExists("preventiva_execucoes") || !cols.includes("responsavel")) return false;
+  const updates = ["responsavel = ?"];
+  const args = [responsaveis?.responsavelTexto || ""];
+  if (cols.includes("responsavel_1_id")) {
+    updates.push("responsavel_1_id = ?");
+    args.push(responsaveis?.responsavel_1_id || null);
+  }
+  if (cols.includes("responsavel_2_id")) {
+    updates.push("responsavel_2_id = ?");
+    args.push(responsaveis?.responsavel_2_id || null);
+  }
+  args.push(Number(execucaoId));
+  db.prepare(`UPDATE preventiva_execucoes SET ${updates.join(", ")} WHERE id = ?`).run(...args);
+  return true;
+}
+
 function createPlano(data) {
   const cols = getPlanoColumns();
   const fields = ["equipamento_id", "titulo", "frequencia_tipo", "frequencia_valor", "ativo", "observacao"];
@@ -895,6 +1096,9 @@ function distribuirPreventivasPorAreaECarga(preventivas = [], equipeDia = {}) {
 }
 
 function montarEquipePreventiva(preventiva, escalaSemana = [], disponibilidade = {}) {
+  const configurados = resolverResponsaveisConfiguradosPreventiva({ exigirDisponiveis: true });
+  if (configurados?.responsavel_1_id) return configurados;
+
   const indisponiveis = new Set(
     Object.entries(disponibilidade || {})
       .filter(([, info]) => !info?.disponivel || info?.noite_pesada)
@@ -1604,13 +1808,15 @@ function lancarProgramadasComoOSDaSegunda({ user = null, refDate = new Date(), a
         osService.autoAssignOS(osId, user?.id || null, { force: true });
       } catch (_e) {}
 
-      const mecanicoId = Number(execucao.responsavel_1_id || 0);
-      const auxiliarId = Number(execucao.responsavel_2_id || 0);
-      if (mecanicoId) {
+      const mecanicoUserId = Number(execucao.responsavel_1_id || 0);
+      const auxiliarUserId = Number(execucao.responsavel_2_id || 0);
+      const mecanicoColab = getColaboradorByUserId(mecanicoUserId) || getColaboradorById(mecanicoUserId);
+      const auxiliarColab = getColaboradorByUserId(auxiliarUserId) || getColaboradorById(auxiliarUserId);
+      if (mecanicoColab?.id) {
         try {
           osService.setEquipeManual(osId, {
-            executor_colaborador_id: mecanicoId,
-            auxiliar_colaborador_id: auxiliarId || null,
+            executor_colaborador_id: Number(mecanicoColab.id),
+            auxiliar_colaborador_id: Number(auxiliarColab?.id || 0) || null,
           }, user?.id || null);
           reatribuicoes += 1;
         } catch (_e) {}
@@ -1713,11 +1919,13 @@ function lancarLoteDiarioPreventivasComoOS({ user = null, refDate = new Date(), 
     };
   }
 
-  const juniorColab = findColaboradorByNome("Júnior");
-  const luisColab = findColaboradorByNome("Luís");
-  const juniorUserId = Number(juniorColab?.user_id || findUserIdByName("Júnior") || 0) || null;
-  const luisUserId = Number(luisColab?.user_id || findUserIdByName("Luís") || 0) || null;
-  const responsavelTexto = ["Júnior", "Luís"].join(", ");
+  const responsaveisConfigurados = resolverResponsaveisConfiguradosPreventiva({ exigirDisponiveis: true });
+  const cfgPreventiva = getConfiguracaoResponsaveisPreventiva();
+  const mecanico1Colab = cfgPreventiva?.mecanico_1 || findColaboradorByNome("Júnior");
+  const mecanico2Colab = cfgPreventiva?.mecanico_2 || findColaboradorByNome("Luís");
+  const mecanico1UserId = responsaveisConfigurados?.responsavel_1_id || Number(mecanico1Colab?.user_id || findUserIdByName(mecanico1Colab?.nome || "Júnior") || 0) || null;
+  const mecanico2UserId = responsaveisConfigurados?.responsavel_2_id || Number(mecanico2Colab?.user_id || findUserIdByName(mecanico2Colab?.nome || "Luís") || 0) || null;
+  const responsavelTexto = responsaveisConfigurados?.responsavelTexto || [mecanico1Colab?.nome || "Júnior", mecanico2Colab?.nome || "Luís"].filter(Boolean).join(", ");
   const execCols = getPreventivaExecColumns();
   const hasResp1 = execCols.includes("responsavel_1_id");
   const hasResp2 = execCols.includes("responsavel_2_id");
@@ -1754,13 +1962,13 @@ function lancarLoteDiarioPreventivasComoOS({ user = null, refDate = new Date(), 
         osService.autoAssignOS(osId, user?.id || null, { force: true });
       } catch (_e) {}
 
-      if (juniorColab?.id) {
+      if (mecanico1Colab?.id) {
         try {
           osService.setEquipeManual(
             osId,
             {
-              executor_colaborador_id: Number(juniorColab.id),
-              auxiliar_colaborador_id: Number(luisColab?.id || 0) || null,
+              executor_colaborador_id: Number(mecanico1Colab.id),
+              auxiliar_colaborador_id: Number(mecanico2Colab?.id || 0) || null,
             },
             user?.id || null
           );
@@ -1770,13 +1978,13 @@ function lancarLoteDiarioPreventivasComoOS({ user = null, refDate = new Date(), 
 
       const updates = ["responsavel = ?"];
       const args = [responsavelTexto];
-      if (hasResp1 && juniorUserId) {
+      if (hasResp1 && mecanico1UserId) {
         updates.push("responsavel_1_id = ?");
-        args.push(juniorUserId);
+        args.push(mecanico1UserId);
       }
-      if (hasResp2 && luisUserId) {
+      if (hasResp2 && mecanico2UserId) {
         updates.push("responsavel_2_id = ?");
-        args.push(luisUserId);
+        args.push(mecanico2UserId);
       }
       db.prepare(`
         UPDATE preventiva_execucoes
@@ -1800,7 +2008,7 @@ function lancarLoteDiarioPreventivasComoOS({ user = null, refDate = new Date(), 
     faixa: primeiroId && ultimoId ? `#${primeiroId} até #${ultimoId}` : null,
     cursorAnterior: cursorAtual || null,
     preventivasSelecionadas: rows.length,
-    equipePadrao: { principal: "Júnior", apoio: "Luís" },
+    equipePadrao: { principal: mecanico1Colab?.nome || "Júnior", apoio: mecanico2Colab?.nome || "Luís" },
     ...resultado,
   };
   registrarLogPreventiva({
@@ -1813,24 +2021,37 @@ function lancarLoteDiarioPreventivasComoOS({ user = null, refDate = new Date(), 
 
 function getDisponibilidadeEscala() {
   const disponibilidade = {};
-  if (!tableExists("escala_ausencias") || !tableExists("colaboradores")) return disponibilidade;
+  if (!tableExists("colaboradores")) return disponibilidade;
 
   const hoje = formatDateISO(new Date());
-  const ausencias = db.prepare(`
-    SELECT c.user_id, c.id AS colaborador_id, UPPER(COALESCE(a.tipo,'')) AS tipo
-    FROM escala_ausencias a
-    JOIN colaboradores c ON c.id = a.colaborador_id
-    WHERE ? BETWEEN a.data_inicio AND a.data_fim
-  `).all(hoje);
-
-  for (const item of ausencias) {
-    const tipo = String(item.tipo || "").trim();
-    if (!["FOLGA", "ATESTADO", "AUSENCIA", "AUSÊNCIA"].includes(tipo)) continue;
+  const marcar = (item, motivoRaw) => {
+    const tipo = normalizeTipoIndisponibilidade(motivoRaw || item?.tipo || "AUSENTE");
     const keyUser = String(item.user_id || "").trim();
-    const keyColab = Number(item.colaborador_id || 0) || null;
-    if (keyUser) disponibilidade[keyUser] = { disponivel: false, noite_pesada: false, motivo: tipo || "AUSENTE" };
-    if (keyColab) disponibilidade[`colab:${keyColab}`] = { disponivel: false, noite_pesada: false, motivo: tipo || "AUSENTE" };
+    const keyColab = Number(item.colaborador_id || item.id || 0) || null;
+    if (keyUser) disponibilidade[keyUser] = { disponivel: false, noite_pesada: false, motivo: tipo };
+    if (keyColab) disponibilidade[`colab:${keyColab}`] = { disponivel: false, noite_pesada: false, motivo: tipo };
+  };
+
+  if (tableExists("escala_ausencias")) {
+    const ausencias = db.prepare(`
+      SELECT c.user_id, c.id AS colaborador_id, COALESCE(a.tipo,'') AS tipo
+      FROM escala_ausencias a
+      JOIN colaboradores c ON c.id = a.colaborador_id
+      WHERE ? BETWEEN a.data_inicio AND a.data_fim
+    `).all(hoje);
+    for (const item of ausencias) marcar(item, item.tipo);
   }
+
+  if (tableExists("escala_concessoes")) {
+    const concessoes = db.prepare(`
+      SELECT c.user_id, c.id AS colaborador_id, COALESCE(ec.tipo, ec.concessao, '') AS tipo
+      FROM escala_concessoes ec
+      JOIN colaboradores c ON c.id = ec.colaborador_id
+      WHERE ? BETWEEN ec.inicio AND ec.fim
+    `).all(hoje);
+    for (const item of concessoes) marcar(item, item.tipo);
+  }
+
   return disponibilidade;
 }
 
@@ -2178,6 +2399,124 @@ function criarPreventivaManual(data = {}) {
   return { planoId, execucaoId };
 }
 
+
+function validarColaboradorPreventivaDisponivel(colaboradorId, label = "Colaborador") {
+  const colaborador = getColaboradorById(colaboradorId);
+  if (!colaborador?.id) throw new Error(`${label} inválido.`);
+  const disponibilidade = getColaboradorIndisponibilidade(colaborador.id);
+  if (!disponibilidade.disponivel) {
+    throw new Error(`${label} ${colaborador.nome || "selecionado"} está indisponível (${disponibilidade.motivo || "fora da escala"}).`);
+  }
+  return colaborador;
+}
+
+function atualizarPreventivasExistentesComResponsaveis(responsaveis, { user = null } = {}) {
+  if (!tableExists("preventiva_execucoes")) return { atualizadas: 0, osAtualizadas: 0 };
+  const rows = db.prepare(`
+    SELECT id
+    FROM preventiva_execucoes
+    WHERE UPPER(COALESCE(status,'')) IN ('PENDENTE','ATRASADA','EM_ANDAMENTO','ANDAMENTO')
+    ORDER BY id ASC
+  `).all();
+  let atualizadas = 0;
+  for (const row of rows) {
+    if (aplicarResponsaveisEmExecucao(row.id, responsaveis)) atualizadas += 1;
+  }
+
+  let osAtualizadas = 0;
+  const osCols = tableExists("os") ? db.prepare(`PRAGMA table_info(os)`).all().map((c) => String(c.name || "")) : [];
+  if (tableExists("os") && osCols.includes("preventiva_execucao_id")) {
+    const osRows = db.prepare(`
+      SELECT id
+      FROM os
+      WHERE preventiva_execucao_id IS NOT NULL
+        AND UPPER(COALESCE(status,'')) NOT IN ('FECHADA','CONCLUIDA','FINALIZADA','CANCELADA')
+    `).all();
+    const cfg = getConfiguracaoResponsaveisPreventiva();
+    const osService = getOSService();
+    for (const os of osRows) {
+      try {
+        osService.setEquipeManual(Number(os.id), {
+          executor_colaborador_id: Number(cfg?.mecanico_1_id || 0),
+          auxiliar_colaborador_id: Number(cfg?.mecanico_2_id || 0) || null,
+        }, user?.id || null);
+        osAtualizadas += 1;
+      } catch (_e) {}
+    }
+  }
+
+  return { atualizadas, osAtualizadas };
+}
+
+
+function sincronizarOSPreventivasComResponsaveis({ user = null } = {}) {
+  const osCols = tableExists("os") ? db.prepare(`PRAGMA table_info(os)`).all().map((c) => String(c.name || "")) : [];
+  if (!tableExists("os") || !osCols.includes("preventiva_execucao_id")) return { osAtualizadas: 0 };
+  const responsaveis = resolverResponsaveisConfiguradosPreventiva({ exigirDisponiveis: true });
+  const cfg = getConfiguracaoResponsaveisPreventiva();
+  if (!responsaveis?.responsavel_1_id || !cfg?.mecanico_1_id) return { osAtualizadas: 0 };
+
+  const rows = db.prepare(`
+    SELECT o.id, o.preventiva_execucao_id
+    FROM os o
+    WHERE o.preventiva_execucao_id IS NOT NULL
+      AND UPPER(COALESCE(o.status,'')) NOT IN ('FECHADA','CONCLUIDA','FINALIZADA','CANCELADA')
+      AND UPPER(COALESCE(o.tipo,'')) = 'PREVENTIVA'
+  `).all();
+
+  const osService = getOSService();
+  let osAtualizadas = 0;
+  for (const row of rows) {
+    try {
+      aplicarResponsaveisEmExecucao(row.preventiva_execucao_id, responsaveis);
+      osService.setEquipeManual(Number(row.id), {
+        executor_colaborador_id: Number(cfg.mecanico_1_id),
+        auxiliar_colaborador_id: Number(cfg.mecanico_2_id || 0) || null,
+      }, user?.id || null);
+      osAtualizadas += 1;
+    } catch (_e) {}
+  }
+  return { osAtualizadas };
+}
+
+function salvarConfiguracaoResponsaveisPreventiva({ mecanico_1_id, mecanico_2_id = null, user = null } = {}) {
+  if (!tableExists("preventiva_config_responsaveis")) {
+    throw new Error("Tabela preventiva_config_responsaveis não encontrada. Execute as migrations.");
+  }
+  const mec1 = validarColaboradorPreventivaDisponivel(mecanico_1_id, "Mecânico 1");
+  const mec2 = mecanico_2_id ? validarColaboradorPreventivaDisponivel(mecanico_2_id, "Mecânico 2/Auxiliar") : null;
+  if (mec2?.id && Number(mec1.id) === Number(mec2.id)) {
+    throw new Error("Selecione colaboradores diferentes para Mecânico 1 e Mecânico 2/Auxiliar.");
+  }
+
+  const executar = db.transaction(() => {
+    const existente = db.prepare(`SELECT id FROM preventiva_config_responsaveis ORDER BY id DESC LIMIT 1`).get();
+    if (existente?.id) {
+      db.prepare(`
+        UPDATE preventiva_config_responsaveis
+        SET mecanico_1_id = ?, mecanico_2_id = ?, atualizado_por = ?, atualizado_em = datetime('now')
+        WHERE id = ?
+      `).run(Number(mec1.id), mec2?.id ? Number(mec2.id) : null, user?.id ? Number(user.id) : null, Number(existente.id));
+    } else {
+      db.prepare(`
+        INSERT INTO preventiva_config_responsaveis (mecanico_1_id, mecanico_2_id, atualizado_por, atualizado_em)
+        VALUES (?, ?, ?, datetime('now'))
+      `).run(Number(mec1.id), mec2?.id ? Number(mec2.id) : null, user?.id ? Number(user.id) : null);
+    }
+
+    const responsaveis = resolverResponsaveisConfiguradosPreventiva({ exigirDisponiveis: true });
+    const resultado = atualizarPreventivasExistentesComResponsaveis(responsaveis, { user });
+    registrarLogPreventiva({
+      acao: "PREVENTIVA_RESPONSAVEIS_CONFIGURADOS",
+      user,
+      detalhes: { mecanico_1_id: Number(mec1.id), mecanico_2_id: mec2?.id ? Number(mec2.id) : null, ...resultado },
+    });
+    return { ok: true, responsaveis, ...resultado };
+  });
+
+  return executar();
+}
+
 function auditarLeituraEquipamentosPreventivas() {
   const base = {
     equipamentosElegiveis: 0,
@@ -2464,6 +2803,12 @@ module.exports = {
   executarCicloAutonomo,
   executarCicloProgramadoSemanal,
   criarPreventivaManual,
+  listColaboradoresParaPreventiva,
+  getConfiguracaoResponsaveisPreventiva,
+  resolverResponsaveisConfiguradosPreventiva,
+  salvarConfiguracaoResponsaveisPreventiva,
+  atualizarPreventivasExistentesComResponsaveis,
+  sincronizarOSPreventivasComResponsaveis,
   auditarLeituraEquipamentosPreventivas,
   prevalidarReprocessamentoPreventivas,
   reprocessarModuloPreventivas,

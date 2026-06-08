@@ -254,6 +254,44 @@ function lancarLoteDiarioPreventivas(req, res) {
   }
   return res.redirect("/preventivas");
 }
+function elegerMecanicoForm(req, res) {
+  const user = req.session?.user || null;
+  if (!isAdminOrEncarregado(user)) {
+    req.flash("error", "Sem permissão para eleger mecânicos da preventiva.");
+    return res.redirect("/preventivas");
+  }
+
+  return res.render("preventivas/eleger-mecanico", {
+    layout: "layout",
+    title: "Eleger Mecânico da Preventiva",
+    activeMenu: "preventivas",
+    colaboradores: service.listColaboradoresParaPreventiva(),
+    config: service.getConfiguracaoResponsaveisPreventiva(),
+    canAdminPreventivas: true,
+  });
+}
+
+function salvarElegerMecanico(req, res) {
+  const user = req.session?.user || null;
+  if (!isAdminOrEncarregado(user)) {
+    req.flash("error", "Sem permissão para eleger mecânicos da preventiva.");
+    return res.redirect("/preventivas");
+  }
+
+  try {
+    service.salvarConfiguracaoResponsaveisPreventiva({
+      mecanico_1_id: Number(req.body.mecanico_1_id || 0),
+      mecanico_2_id: Number(req.body.mecanico_2_id || 0) || null,
+      user,
+    });
+    req.flash("success", "Responsáveis das preventivas atualizados com sucesso.");
+    return res.redirect("/preventivas");
+  } catch (err) {
+    req.flash("error", err?.message || "Não foi possível salvar os responsáveis das preventivas.");
+    return res.redirect("/preventivas/eleger-mecanico");
+  }
+}
+
 function apagarExecucao(req, res) {
   const user = req.session?.user || null;
   if (!isAdminOrEncarregado(user)) {
@@ -290,6 +328,8 @@ module.exports = {
   gerarProgramadas,
   gerarOSProgramadasSegunda,
   lancarLoteDiarioPreventivas,
+  elegerMecanicoForm,
+  salvarElegerMecanico,
   execCreate,
   execUpdateStatus,
   apagarExecucao,
