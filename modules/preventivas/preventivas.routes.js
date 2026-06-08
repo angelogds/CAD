@@ -60,6 +60,23 @@ router.post(
 );
 
 
+
+// GET /preventivas/eleger-mecanico
+router.get(
+  "/eleger-mecanico",
+  requireLogin,
+  requireRole(ACCESS.preventivas_manage),
+  safe(ctrl.elegerMecanicoForm, "elegerMecanicoForm")
+);
+
+// POST /preventivas/eleger-mecanico
+router.post(
+  "/eleger-mecanico",
+  requireLogin,
+  requireRole(ACCESS.preventivas_manage),
+  safe(ctrl.salvarElegerMecanico, "salvarElegerMecanico")
+);
+
 // GET /preventivas/programadas
 router.get(
   "/programadas",
