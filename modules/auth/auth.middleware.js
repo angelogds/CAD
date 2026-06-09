@@ -1,6 +1,8 @@
 // modules/auth/auth.middleware.js
 const { normalizeRole } = require("../../config/rbac");
 
+const ADMIN_DELETE_MESSAGE = "Apenas administradores podem excluir registros do sistema.";
+
 function normRole(role) {
   return normalizeRole(role);
 }
@@ -43,4 +45,22 @@ function requireRole(roles) {
   };
 }
 
-module.exports = { requireLogin, requireRole };
+
+function requireAdmin(req, res, next) {
+  const user = req.session?.user;
+  if (!user) {
+    req.flash("error", "Faça login para continuar.");
+    return res.redirect(`/auth/login?next=${encodeURIComponent(req.originalUrl || "/dashboard")}`);
+  }
+
+  if (normRole(user.role) === "ADMIN") return next();
+
+  if (typeof req.flash === "function") req.flash("error", ADMIN_DELETE_MESSAGE);
+  if (req.accepts("html")) {
+    const back = req.get("Referrer") || "/dashboard";
+    return res.redirect(back);
+  }
+  return res.status(403).json({ error: ADMIN_DELETE_MESSAGE });
+}
+
+module.exports = { requireLogin, requireRole, requireAdmin, ADMIN_DELETE_MESSAGE };

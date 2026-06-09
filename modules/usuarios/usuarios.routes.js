@@ -5,7 +5,7 @@ const multer = require("multer");
 const router = express.Router();
 const storagePaths = require("../../config/storage");
 
-const { requireLogin, requireRole } = require("../auth/auth.middleware");
+const { requireLogin, requireRole, requireAdmin } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
 
 let ctrl = {};
@@ -56,7 +56,7 @@ router.post("/usuarios/:id", requireLogin, requireRole(USERS_ACCESS), upload.sin
 
 router.post("/:id/reset-senha", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.resetPassword, "resetPassword"));
 router.post("/usuarios/:id/reset-senha", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.resetPassword, "resetPassword"));
-router.post("/:id/excluir", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.remove, "remove"));
-router.post("/usuarios/:id/excluir", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.remove, "remove"));
+router.post("/:id/excluir", requireLogin, requireAdmin, safe(ctrl.remove, "remove"));
+router.post("/usuarios/:id/excluir", requireLogin, requireAdmin, safe(ctrl.remove, "remove"));
 
 module.exports = router;

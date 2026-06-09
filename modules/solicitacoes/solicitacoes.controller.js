@@ -25,7 +25,12 @@ function normalizeSolicitacaoForView(solicitacao) {
     titulo: fallback(solicitacao.titulo),
     descricao: fallback(solicitacao.descricao, PENDENTE),
     aplicacao: fallback(solicitacao.equipamento_nome || solicitacao.destino_uso || solicitacao.tipo_origem, PENDENTE),
-    observacoes: fallback(solicitacao.observacoes_compras, "Não informado"),
+    observacoes: fallback(solicitacao.observacoes_compras || solicitacao.observacoes || solicitacao.descricao, "Não informado"),
+    fornecedor: fallback(solicitacao.fornecedor_nome || solicitacao.fornecedor, "Não informado"),
+    previsao_entrega: solicitacao.previsao_entrega || null,
+    valor_total: solicitacao.valor_total || null,
+    equipamento_nome: fallback(solicitacao.equipamento_nome || solicitacao.destino_uso, "Não informado"),
+    motivo: fallback(solicitacao.motivo || solicitacao.descricao, PENDENTE),
     cotacao_inicio_em: solicitacao.cotacao_inicio_em || null,
     comprada_em: solicitacao.comprada_em || null,
     recebida_em: solicitacao.recebida_em || null,
@@ -50,15 +55,17 @@ function minhas(req, res) {
     query: (req.query.q || "").trim(),
     status: Object.values(service.STATUS).includes(req.query.status) ? req.query.status : "",
     date: req.query.date || "",
+    vinculadasOs: req.query.vinculadas_os === "1",
+    urgentes: req.query.urgentes === "1",
   };
 
   res.render("solicitacoes/minhas", {
-    title: "Minhas Solicitações",
+    title: "Solicitações de Material",
     activeMenu: "solicitacoes",
-    lista: service.listMinhasSolicitacoes(userId, filters),
-    counters: service.getCountersForUser(userId),
+    lista: service.listMinhasSolicitacoes(userId, filters, req.session.user),
+    counters: service.getCountersForUser(userId, req.session.user),
     filters,
-    statuses: Object.values(service.STATUS),
+    statuses: service.LIST_STATUS,
   });
 }
 

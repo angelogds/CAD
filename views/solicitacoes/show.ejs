@@ -1,89 +1,129 @@
 <% layout('layout') %>
+<%
+const statusLabels = {
+  ABERTA: 'Aberta', EM_COTACAO: 'Em cotação', COMPRADA: 'Comprada', EM_RECEBIMENTO: 'Em recebimento', RECEBIDA_PARCIAL: 'Recebida parcial', RECEBIDA_TOTAL: 'Recebida total', FECHADA: 'Fechada', REABERTA: 'Reaberta', CANCELADA: 'Cancelada'
+};
+const statusClass = String(solicitacao.status || '').toLowerCase().replace(/_/g, '-');
+const prioridadeAlta = ['ALTA','URGENTE','CRITICA','CRÍTICA','EMERGENCIAL'].includes(String(solicitacao.prioridade || '').toUpperCase());
+%>
 
-<div class="page-head">
-  <div>
-    <h1>Solicitação <%= solicitacao.numero || ('#' + solicitacao.id) %></h1>
-    <p class="muted">Acompanhe os dados e itens da solicitação criada.</p>
-  </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <% if (canEdit) { %><a class="btn btn-green" href="/solicitacoes/<%= solicitacao.id %>/editar">Editar</a><% } %>
-    <a class="btn btn-ghost" href="/solicitacoes/<%= solicitacao.id %>/pdf" target="_blank" rel="noopener">Baixar cópia do PDF</a>
-    <a class="btn btn-ghost" href="<%= backUrl %>">Voltar</a>
-  </div>
-</div>
+<style>
+  .sol-detail { display:grid; gap:14px; }
+  .sol-hero { background:linear-gradient(135deg,#166534,#16a34a); color:#fff; border-radius:20px; padding:18px; display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; box-shadow:0 16px 36px rgba(22,101,52,.18); }
+  .sol-hero h1 { color:#fff; margin:0; }
+  .sol-hero .muted { color:#dcfce7; }
+  .sol-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-start; }
+  .sol-section { background:#fff; border:1px solid #e5e7eb; border-radius:18px; padding:16px; box-shadow:0 10px 28px rgba(15,23,42,.04); }
+  .sol-section-title { font-size:1rem; font-weight:900; color:#14532d; margin-bottom:12px; display:flex; justify-content:space-between; gap:8px; align-items:center; }
+  .sol-info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; }
+  .sol-info { background:#f8fafc; border:1px solid #eef2f7; border-radius:14px; padding:10px; }
+  .sol-info small { display:block; color:#64748b; font-weight:900; margin-bottom:3px; }
+  .sol-info strong { color:#0f172a; }
+  .sol-badge { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:6px 10px; font-size:.8rem; font-weight:900; border:1px solid #bbf7d0; background:#ecfdf5; color:#166534; }
+  .sol-badge.status-cancelada { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+  .sol-badge.status-comprada { background:#fef3c7; color:#92400e; border-color:#fde68a; }
+  .sol-badge.status-em-cotacao { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+  .sol-badge.status-em-recebimento,.sol-badge.status-recebida-parcial { background:#f5f3ff; color:#6d28d9; border-color:#ddd6fe; }
+  .sol-badge.priority-danger { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+  .sol-timeline { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; }
+  .sol-step { border-left:4px solid #16a34a; background:#f0fdf4; border-radius:12px; padding:9px; }
+  .sol-step small { display:block; color:#166534; font-weight:900; }
+  .sol-link-card { border-left:5px solid #16a34a; background:#f0fdf4; }
+  .sol-note { white-space:pre-wrap; line-height:1.45; }
+  @media (max-width: 720px) { .sol-hero { display:grid; } .sol-actions { justify-content:flex-start; } }
+</style>
 
-<div class="card" style="margin-bottom:14px;">
-  <div class="grid-3">
-    <div><div class="label">Solicitante</div><div><strong><%= solicitacao.solicitante_nome || '-' %></strong></div></div>
-    <div><div class="label">Setor solicitante</div><div><strong><%= solicitacao.setor_origem || 'Não informado' %></strong></div></div>
-    <div><div class="label">Setor destinatário</div><div><strong><%= solicitacao.setor_destino || 'Não informado' %></strong></div></div>
-    <div><div class="label">Responsável</div><div><strong><%= solicitacao.responsavel_nome || 'Informação pendente de confirmação' %></strong></div></div>
-    <div><div class="label">Prioridade</div><div><strong><%= solicitacao.prioridade || 'Não informado' %></strong></div></div>
-    <div><div class="label">Status</div><span class="pill-tag pill-gray"><%= solicitacao.status || 'Não informado' %></span></div>
-    <div><div class="label">Criado em</div><div><strong><%= solicitacao.created_at ? fmtBR(solicitacao.created_at) : 'Não informado' %></strong></div></div>
-    <div><div class="label">Aplicação</div><div><strong><%= solicitacao.aplicacao || 'Informação pendente de confirmação' %></strong></div></div>
-    <div><div class="label">Título</div><div><strong><%= solicitacao.titulo || 'Não informado' %></strong></div></div>
-  </div>
-  <div style="margin-top:12px;">
-    <div class="label">Descrição</div>
-    <div class="note"><%= solicitacao.descricao || 'Informação pendente de confirmação' %></div>
-  </div>
-</div>
-
-<% if (solicitacao.os_id) { %>
-  <div class="card" style="margin-bottom:14px;border-left:4px solid #16a34a;">
-    <strong>🔗 Vinculada à OS <%= solicitacao.os_id %></strong>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-      <a class="btn btn-green" href="/chat-os/<%= solicitacao.os_id %>">Abrir conversa da OS</a>
-      <a class="btn btn-ghost" href="/os/<%= solicitacao.os_id %>">Abrir OS</a>
+<div class="sol-detail">
+  <div class="sol-hero">
+    <div>
+      <h1>Solicitação nº <%= solicitacao.numero || ('#' + solicitacao.id) %></h1>
+      <p class="muted">Material, compras, almoxarifado e vínculo com OS em uma visão rastreável.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <span class="sol-badge status-<%= statusClass %>"><%= statusLabels[solicitacao.status] || solicitacao.status || 'Não informado' %></span>
+        <span class="sol-badge <%= prioridadeAlta ? 'priority-danger' : '' %>">Prioridade: <%= solicitacao.prioridade || 'Não informado' %></span>
+      </div>
+    </div>
+    <div class="sol-actions">
+      <% if (canEdit) { %><a class="btn btn-green" href="/solicitacoes/<%= solicitacao.id %>/editar">Editar</a><% } %>
+      <% if (canAccessModule(user?.role, 'compras_manage')) { %><a class="btn btn-ghost" href="/compras/solicitacoes/<%= solicitacao.id %>">Abrir em compras</a><% } %>
+      <% if (canAccessModule(user?.role, 'almoxarifado_read')) { %><a class="btn btn-ghost" href="/almoxarifado/solicitacoes/<%= solicitacao.id %>/conferir">Abrir no almoxarifado</a><% } %>
+      <a class="btn btn-ghost" href="/solicitacoes/<%= solicitacao.id %>/pdf" target="_blank" rel="noopener">Gerar PDF</a>
+      <a class="btn btn-ghost" href="<%= backUrl %>">Voltar</a>
     </div>
   </div>
-<% } %>
 
-<div class="card" style="margin-bottom:14px;">
-  <div class="label">Timeline</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-    <span class="pill-tag pill-gray">Abertura: <%= solicitacao.created_at ? fmtBR(solicitacao.created_at) : '-' %></span>
-    <span class="pill-tag pill-gray">Início cotação: <%= solicitacao.cotacao_inicio_em ? fmtBR(solicitacao.cotacao_inicio_em) : '-' %></span>
-    <span class="pill-tag pill-gray">Comprada: <%= solicitacao.comprada_em ? fmtBR(solicitacao.comprada_em) : '-' %></span>
-    <span class="pill-tag pill-gray">Recebida: <%= solicitacao.recebida_em ? fmtBR(solicitacao.recebida_em) : '-' %></span>
-    <span class="pill-tag pill-gray">Fechada: <%= solicitacao.fechada_em ? fmtBR(solicitacao.fechada_em) : '-' %></span>
-  </div>
-</div>
-
-<div class="card">
-  <div class="label">Itens da solicitação</div>
-  <div class="table-wrap" style="margin-top:10px;">
-    <table class="table">
-      <thead><tr><th>Item</th><th>Unidade</th><th>Qtde</th><th>Observação</th></tr></thead>
-      <tbody>
-        <% if (!itens.length) { %>
-          <tr><td colspan="4" class="muted" style="text-align:center;">Sem itens cadastrados.</td></tr>
-        <% } %>
-        <% itens.forEach((item) => { %>
-          <tr>
-            <td><strong><%= item.item_nome || 'Não informado' %></strong></td>
-            <td><%= item.unidade || 'UN' %></td>
-            <td><%= item.qtd_solicitada ?? item.quantidade ?? 0 %></td>
-            <td><%= item.item_descricao || item.observacao_item || 'Não informado' %></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-
-<div class="card" style="margin-top:14px;">
-  <div class="label">Fotos / anexos</div>
-  <% const anexosSeguros = Array.isArray(anexos) ? anexos : []; %>
-  <% if (!anexosSeguros.length) { %>
-    <p class="muted" style="margin-top:8px;">Sem fotos ou anexos cadastrados.</p>
-  <% } else { %>
-    <ul style="margin-top:8px;">
-      <% anexosSeguros.forEach((anexo) => { %>
-        <li><%= anexo.original_name || anexo.filename || 'Anexo sem nome informado' %></li>
-      <% }) %>
-    </ul>
+  <% if (solicitacao.os_id) { %>
+    <div class="sol-section sol-link-card">
+      <div class="sol-section-title">🔗 Vinculada à OS <%= solicitacao.os_id %> – <%= solicitacao.equipamento_nome || solicitacao.aplicacao || 'Equipamento não informado' %></div>
+      <div class="sol-actions">
+        <a class="btn btn-green" href="/os/<%= solicitacao.os_id %>">Abrir OS</a>
+        <a class="btn btn-ghost" href="/chat-os/<%= solicitacao.os_id %>">Abrir conversa da OS</a>
+      </div>
+    </div>
   <% } %>
+
+  <div class="sol-section">
+    <div class="sol-section-title">Dados principais</div>
+    <div class="sol-info-grid">
+      <div class="sol-info"><small>Data da solicitação</small><strong><%= solicitacao.created_at ? fmtBR(solicitacao.created_at) : 'Não informado' %></strong></div>
+      <div class="sol-info"><small>Solicitante</small><strong><%= solicitacao.solicitante_nome || '-' %></strong></div>
+      <div class="sol-info"><small>Setor</small><strong><%= solicitacao.setor_origem || 'Não informado' %></strong></div>
+      <div class="sol-info"><small>Responsável atual</small><strong><%= solicitacao.responsavel_nome || 'Informação pendente de confirmação' %></strong></div>
+      <div class="sol-info"><small>Equipamento / aplicação</small><strong><%= solicitacao.equipamento_nome || solicitacao.aplicacao || 'Não informado' %></strong></div>
+      <div class="sol-info"><small>Destino</small><strong><%= solicitacao.setor_destino || 'Setor de Compras' %></strong></div>
+      <div class="sol-info"><small>Fornecedor / compras</small><strong><%= solicitacao.fornecedor || 'Não informado' %></strong></div>
+      <div class="sol-info"><small>Previsão de entrega</small><strong><%= solicitacao.previsao_entrega ? fmtBR(solicitacao.previsao_entrega) : 'Não informado' %></strong></div>
+    </div>
+  </div>
+
+  <div class="sol-section">
+    <div class="sol-section-title">Materiais solicitados</div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Descrição do material</th><th>Quantidade</th><th>Unidade</th><th>Motivo / observação</th></tr></thead>
+        <tbody>
+          <% if (!itens.length) { %><tr><td colspan="4" class="muted" style="text-align:center;">Sem itens cadastrados.</td></tr><% } %>
+          <% itens.forEach((item) => { %>
+            <tr>
+              <td><strong><%= item.item_nome || 'Não informado' %></strong></td>
+              <td><%= item.qtd_solicitada ?? item.quantidade ?? 0 %></td>
+              <td><%= item.unidade || 'UN' %></td>
+              <td><%= item.item_descricao || item.observacao_item || solicitacao.motivo || 'Não informado' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="sol-section">
+    <div class="sol-section-title">Motivo, observações e histórico</div>
+    <div class="sol-info-grid">
+      <div class="sol-info" style="grid-column:1/-1;"><small>Motivo da solicitação</small><div class="sol-note"><%= solicitacao.motivo || 'Informação pendente de confirmação' %></div></div>
+      <div class="sol-info" style="grid-column:1/-1;"><small>Observações</small><div class="sol-note"><%= solicitacao.observacoes || 'Não informado' %></div></div>
+    </div>
+    <div class="sol-timeline" style="margin-top:12px;">
+      <div class="sol-step"><small>ABERTA</small><%= solicitacao.created_at ? fmtBR(solicitacao.created_at) : '-' %></div>
+      <div class="sol-step"><small>EM COTAÇÃO</small><%= solicitacao.cotacao_inicio_em ? fmtBR(solicitacao.cotacao_inicio_em) : '-' %></div>
+      <div class="sol-step"><small>COMPRADA</small><%= solicitacao.comprada_em ? fmtBR(solicitacao.comprada_em) : '-' %></div>
+      <div class="sol-step"><small>RECEBIMENTO</small><%= solicitacao.recebida_em ? fmtBR(solicitacao.recebida_em) : '-' %></div>
+      <div class="sol-step"><small>FECHADA</small><%= solicitacao.fechada_em ? fmtBR(solicitacao.fechada_em) : '-' %></div>
+    </div>
+  </div>
+
+  <div class="sol-section">
+    <div class="sol-section-title">Anexos</div>
+    <% const anexosSeguros = Array.isArray(anexos) ? anexos : []; %>
+    <% if (!anexosSeguros.length) { %>
+      <p class="muted">Sem fotos ou anexos cadastrados.</p>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="table"><thead><tr><th>Arquivo</th><th>Tipo</th><th>Data</th></tr></thead><tbody>
+          <% anexosSeguros.forEach((anexo) => { %>
+            <tr><td><%= anexo.original_name || anexo.filename || 'Anexo sem nome informado' %></td><td><%= anexo.tipo || '-' %></td><td><%= anexo.created_at ? fmtBR(anexo.created_at) : '-' %></td></tr>
+          <% }) %>
+        </tbody></table>
+      </div>
+    <% } %>
+  </div>
 </div>

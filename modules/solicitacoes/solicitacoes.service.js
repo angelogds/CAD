@@ -19,6 +19,18 @@ const STATUS = {
   CANCELADA: "CANCELADA",
 };
 
+const LIST_STATUS = [
+  STATUS.ABERTA,
+  STATUS.EM_COTACAO,
+  STATUS.COMPRADA,
+  STATUS.EM_RECEBIMENTO,
+  STATUS.RECEBIDA_PARCIAL,
+  STATUS.RECEBIDA_TOTAL,
+  STATUS.FECHADA,
+  STATUS.REABERTA,
+  STATUS.CANCELADA,
+];
+
 function hasColumn(table, name) {
   try { return db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === name); } catch { return false; }
 }
@@ -238,19 +250,31 @@ function updateSolicitacao(id, data = {}) {
   })();
 }
 
-function listMinhasSolicitacoes(userId, filters = {}) {
-  const where = ["s.solicitante_user_id = ?"];
-  const params = [userId];
+function canListAllSolicitacoes(user) {
+  const role = normalizeRole(user?.role);
+  return ["ADMIN", "COMPRAS", "ALMOXARIFADO", "DIRETORIA", "GESTAO", "ENCARREGADO_MANUTENCAO", "MANUTENCAO_SUPERVISOR"].includes(role);
+}
+
+function listMinhasSolicitacoes(userId, filters = {}, user = null) {
+  const where = [];
+  const params = [];
+  if (!canListAllSolicitacoes(user)) {
+    where.push("s.solicitante_user_id = ?");
+    params.push(userId);
+  }
 
   if (Object.values(STATUS).includes(filters.status)) {
     where.push("s.status = ?");
     params.push(filters.status);
   }
 
+  if (filters.vinculadasOs) where.push("s.os_id IS NOT NULL");
+  if (filters.urgentes) where.push("UPPER(COALESCE(s.prioridade, '')) IN ('ALTA','URGENTE','CRITICA','CRÍTICA','EMERGENCIAL')");
+
   if (filters.query) {
-    where.push("(LOWER(s.numero) LIKE ? OR LOWER(s.titulo) LIKE ?)");
+    where.push("(LOWER(COALESCE(s.numero,'')) LIKE ? OR LOWER(COALESCE(s.titulo,'')) LIKE ? OR LOWER(COALESCE(s.setor_origem,'')) LIKE ? OR LOWER(COALESCE(u.name,'')) LIKE ?)");
     const q = `%${String(filters.query).trim().toLowerCase()}%`;
-    params.push(q, q);
+    params.push(q, q, q, q);
   }
 
   if (filters.date) {
@@ -258,20 +282,26 @@ function listMinhasSolicitacoes(userId, filters = {}) {
     params.push(filters.date);
   }
 
+  const hasEquipamentoId = hasColumn("solicitacoes", "equipamento_id");
+  const equipJoin = hasEquipamentoId && tableExists("equipamentos") ? "LEFT JOIN equipamentos e ON e.id = s.equipamento_id" : "";
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   return db.prepare(`
     SELECT s.*, u.name AS solicitante_nome,
+      ${equipJoin ? "e.nome" : "NULL"} AS equipamento_nome,
       (SELECT COUNT(*) FROM solicitacao_itens i WHERE i.solicitacao_id = s.id) AS itens_count
     FROM solicitacoes s
-    JOIN users u ON u.id = s.solicitante_user_id
-    WHERE ${where.join(" AND ")}
+    LEFT JOIN users u ON u.id = s.solicitante_user_id
+    ${equipJoin}
+    ${whereSql}
     ORDER BY s.id DESC
   `).all(...params);
 }
 
-function getCountersForUser(userId) {
-  const rows = db.prepare("SELECT status, COUNT(*) AS total FROM solicitacoes WHERE solicitante_user_id = ? GROUP BY status").all(userId);
-  const counters = Object.values(STATUS).reduce((acc, st) => ({ ...acc, [st]: 0 }), {});
-  rows.forEach((r) => { counters[r.status] = r.total; });
+function getCountersForUser(userId, user = null) {
+  const where = canListAllSolicitacoes(user) ? "" : "WHERE solicitante_user_id = ?";
+  const rows = db.prepare(`SELECT status, COUNT(*) AS total FROM solicitacoes ${where} GROUP BY status`).all(...(where ? [userId] : []));
+  const counters = LIST_STATUS.reduce((acc, st) => ({ ...acc, [st]: 0 }), {});
+  rows.forEach((r) => { if (Object.prototype.hasOwnProperty.call(counters, r.status)) counters[r.status] = r.total; });
   return counters;
 }
 
@@ -390,4 +420,4 @@ function listEstoqueItens() {
   return db.prepare("SELECT id, codigo, nome, unidade FROM estoque_itens WHERE ativo = 1 ORDER BY nome").all();
 }
 
-module.exports = { STATUS, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, createSolicitacao, updateSolicitacao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };
+module.exports = { STATUS, LIST_STATUS, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, createSolicitacao, updateSolicitacao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };

@@ -222,6 +222,7 @@ app.use((req, res, next) => {
   // ✅ RBAC helpers disponíveis no EJS (sem require no template)
   res.locals.canAccessModule = canAccessModule;
   res.locals.normalizeRole = normalizeRole;
+  res.locals.isAdmin = normalizeRole(req.session?.user?.role || "") === "ADMIN";
 
   // ✅ alias "incluir" também disponível no res.locals (alguns layouts chamam direto)
   res.locals.incluir = app.locals.incluir;

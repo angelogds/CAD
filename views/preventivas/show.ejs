@@ -147,7 +147,7 @@
                   </div></details>
                   <button class="btn" type="submit" style="height:40px">Salvar</button>
                 </form>
-                <% if (canAdminPreventivas) { const stat = String(ex.status||'').toUpperCase(); const reforco = stat === 'EM_ANDAMENTO' ? '\nEsta preventiva está EM_ANDAMENTO e exigirá confirmação reforçada.' : ''; %>
+                <% if (isAdmin && canAdminPreventivas) { const stat = String(ex.status||'').toUpperCase(); const reforco = stat === 'EM_ANDAMENTO' ? '\nEsta preventiva está EM_ANDAMENTO e exigirá confirmação reforçada.' : ''; %>
                   <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/apagar" style="display:inline;" onsubmit="return confirm('Confirmar exclusão da preventiva #<%= ex.id %>?'+ '<%- reforco %>');">
                     <% if (stat === 'EM_ANDAMENTO' || stat === 'ANDAMENTO' || stat === 'FINALIZADA' || stat === 'EXECUTADA' || stat === 'CONCLUIDA') { %>
                       <input type="hidden" name="force_delete" value="1" />
@@ -231,7 +231,7 @@
               <button class="btn" type="submit">Salvar</button>
             </form>
 
-            <% if (canAdminPreventivas) { const reforco = stat === 'EM_ANDAMENTO' ? '\nEsta preventiva está EM_ANDAMENTO e exigirá confirmação reforçada.' : ''; %>
+            <% if (isAdmin && canAdminPreventivas) { const reforco = stat === 'EM_ANDAMENTO' ? '\nEsta preventiva está EM_ANDAMENTO e exigirá confirmação reforçada.' : ''; %>
               <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/apagar" onsubmit="return confirm('Confirmar exclusão da preventiva #<%= ex.id %>?'+ '<%- reforco %>');">
                 <% if (stat === 'EM_ANDAMENTO' || stat === 'ANDAMENTO' || stat === 'FINALIZADA' || stat === 'EXECUTADA' || stat === 'CONCLUIDA') { %>
                   <input type="hidden" name="force_delete" value="1" />

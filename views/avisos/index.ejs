@@ -45,9 +45,11 @@
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
             <div style="font-weight:800;"><%= a.titulo %></div>
             <% if (canPublishAviso) { %>
-              <form method="POST" action="/avisos/<%= a.id %>/delete" onsubmit="return confirm('Excluir este aviso?');" style="margin:0;">
-                <button type="submit" class="btn btn-red" style="padding:6px 10px;">Excluir</button>
-              </form>
+              <% if (isAdmin) { %>
+                <form method="POST" action="/avisos/<%= a.id %>/delete" onsubmit="return confirm('Excluir este aviso?');" style="margin:0;">
+                  <button type="submit" class="btn btn-red" style="padding:6px 10px;">Excluir</button>
+                </form>
+              <% } %>
             <% } %>
           </div>
           <div class="muted" style="margin-top:4px; white-space:pre-wrap;"><%= a.mensagem %></div>
