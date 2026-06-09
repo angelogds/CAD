@@ -27,6 +27,10 @@ function tableExists(name) {
   return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);
 }
 
+function tableColumns(table) {
+  try { return db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name); } catch { return []; }
+}
+
 const columnExists = hasColumn;
 
 function selectableColumn(table, preferred, fallback = "NULL") {
@@ -104,10 +108,25 @@ function validateEstoqueItemId(value) {
 
 function createSolicitacao({ userId, setor_origem, prioridade, titulo, descricao, equipamento_id, preventiva_id, os_id, demanda_id, itens }) {
   const fallbackItemId = ITEM_HAS_ITEM_ID ? getFallbackItemId() : null;
+  const solColumns = tableColumns("solicitacoes");
+  const solPayload = {
+    numero: nextNumero(),
+    solicitante_user_id: sanitizePositiveId(userId),
+    setor_origem: setor_origem || "Manutenção",
+    prioridade: prioridade || "MEDIA",
+    titulo: titulo || "Solicitação de material",
+    descricao: descricao || null,
+    equipamento_id: sanitizePositiveId(equipamento_id),
+    preventiva_id: sanitizePositiveId(preventiva_id),
+    os_id: sanitizePositiveId(os_id),
+    demanda_id: sanitizePositiveId(demanda_id),
+    tipo_origem: sanitizePositiveId(os_id) ? "OS" : "SOLICITACAO",
+    status: STATUS.ABERTA,
+  };
+  const insertSolColumns = Object.keys(solPayload).filter((column) => solColumns.includes(column));
   const insertSol = db.prepare(`
-    INSERT INTO solicitacoes (
-      numero, solicitante_user_id, setor_origem, prioridade, titulo, descricao, equipamento_id, preventiva_id, os_id, demanda_id, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO solicitacoes (${insertSolColumns.join(", ")})
+    VALUES (${insertSolColumns.map(() => "?").join(", ")})
   `);
 
   const itemColumns = ["solicitacao_id"];
@@ -122,20 +141,7 @@ function createSolicitacao({ userId, setor_origem, prioridade, titulo, descricao
   const insertItem = db.prepare(`INSERT INTO solicitacao_itens (${itemColumns.join(",")}) VALUES (${itemColumns.map(() => "?").join(",")})`);
 
   return db.transaction(() => {
-    const numero = nextNumero();
-    const info = insertSol.run(
-      numero,
-      userId,
-      setor_origem || "Manutenção",
-      prioridade || "MEDIA",
-      titulo,
-      descricao || null,
-      sanitizePositiveId(equipamento_id),
-      sanitizePositiveId(preventiva_id),
-      sanitizePositiveId(os_id),
-      sanitizePositiveId(demanda_id),
-      STATUS.ABERTA
-    );
+    const info = insertSol.run(...insertSolColumns.map((column) => solPayload[column]));
 
     const solicitacaoId = Number(info.lastInsertRowid);
 
@@ -156,7 +162,6 @@ function createSolicitacao({ userId, setor_origem, prioridade, titulo, descricao
     return solicitacaoId;
   })();
 }
-
 
 function parseItensFromBody(body = {}) {
   const toArray = (value) => {

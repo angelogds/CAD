@@ -215,11 +215,25 @@ function listarNotificacoesChat(userId) {
   `).all(Number(userId));
 }
 function criarVinculoSolicitacaoOS(osId, solicitacaoId, userId) {
-  if (!osId || !solicitacaoId || !tableExists('os_solicitacoes_vinculos')) return null;
-  db.prepare(`INSERT OR IGNORE INTO os_solicitacoes_vinculos (os_id, solicitacao_id, created_by) VALUES (?, ?, ?)`)
-    .run(Number(osId), Number(solicitacaoId), Number(userId || 0) || null);
-  if (tableExists('solicitacoes') && columnExists('solicitacoes','os_id')) db.prepare(`UPDATE solicitacoes SET os_id = COALESCE(os_id, ?) WHERE id = ?`).run(Number(osId), Number(solicitacaoId));
-  registrarMensagemSistema(osId, 'SOLICITACAO_CRIADA', `Solicitação de Material nº ${solicitacaoId} criada e vinculada à OS ${osId}.`, { solicitacao_id: solicitacaoId, user_id: userId });
-  return buscarSolicitacaoVinculada(osId);
+  const osIdNum = Number(osId);
+  const solicitacaoIdNum = Number(solicitacaoId);
+  if (!osIdNum || !solicitacaoIdNum) return null;
+  if (!getOs(osIdNum)) throw new Error('OS não encontrada para vínculo da solicitação.');
+  if (!tableExists('solicitacoes')) throw new Error('Tabela de solicitações não encontrada.');
+  const solicitacao = db.prepare(`SELECT * FROM solicitacoes WHERE id = ?`).get(solicitacaoIdNum);
+  if (!solicitacao) throw new Error('Solicitação não encontrada para vínculo com a OS.');
+
+  if (tableExists('os_solicitacoes_vinculos')) {
+    db.prepare(`INSERT OR IGNORE INTO os_solicitacoes_vinculos (os_id, solicitacao_id, created_by) VALUES (?, ?, ?)`)
+      .run(osIdNum, solicitacaoIdNum, Number(userId || 0) || null);
+  }
+  if (columnExists('solicitacoes','os_id')) {
+    db.prepare(`UPDATE solicitacoes SET os_id = ? WHERE id = ?`).run(osIdNum, solicitacaoIdNum);
+  }
+  if (tableExists('os_chat_mensagens')) {
+    const numero = solicitacao.numero || solicitacaoIdNum;
+    registrarMensagemSistema(osIdNum, 'SOLICITACAO_CRIADA', `Solicitação de material nº ${numero} criada e vinculada à OS ${osIdNum}.`, { solicitacao_id: solicitacaoIdNum, user_id: userId });
+  }
+  return buscarSolicitacaoVinculada(osIdNum) || { ...solicitacao, os_id: osIdNum };
 }
 module.exports = { listarConversasOS, buscarConversaPorOS, listarMensagens, enviarMensagem, registrarMensagemSistema, marcarComoLida, contarNaoLidas, contarNaoLidasPorOS, listarNotificacoesChat, criarVinculoSolicitacaoOS, buscarSolicitacaoVinculada };
