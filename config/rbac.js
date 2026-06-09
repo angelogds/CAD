@@ -101,6 +101,26 @@ const ACCESS = {
   academia_view: [ROLE.ADMIN, ROLE.MANUTENCAO_SUPERVISOR, ROLE.MECANICO],
   academia_manage: [ROLE.ADMIN, ROLE.MANUTENCAO_SUPERVISOR],
   colaboradores: [ROLE.ADMIN, ROLE.RH, ROLE.ENCARREGADO_MANUTENCAO, ROLE.MANUTENCAO_SUPERVISOR, ROLE.COLABORADOR],
+
+  equipamentos_delete: [ROLE.ADMIN],
+  os_delete: [ROLE.ADMIN],
+  preventivas_delete: [ROLE.ADMIN],
+  demandas_delete: [ROLE.ADMIN],
+  solicitacoes_delete: [ROLE.ADMIN],
+  compras_delete: [ROLE.ADMIN],
+  fornecedores_delete: [ROLE.ADMIN],
+  almoxarifado_delete: [ROLE.ADMIN],
+  estoque_delete: [ROLE.ADMIN],
+  motores_delete: [ROLE.ADMIN],
+  avisos_delete: [ROLE.ADMIN],
+  escala_delete: [ROLE.ADMIN],
+  inspecao_delete: [ROLE.ADMIN],
+  tracagem_delete: [ROLE.ADMIN],
+  desenho_tecnico_delete: [ROLE.ADMIN],
+  pcm_delete: [ROLE.ADMIN],
+  usuarios_delete: [ROLE.ADMIN],
+  arquivos_delete: [ROLE.ADMIN],
+  anexos_delete: [ROLE.ADMIN],
 };
 
 function canAccessModule(role, moduleKey) {

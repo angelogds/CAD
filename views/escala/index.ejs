@@ -110,10 +110,12 @@
               <td>
                 <div class="escala-actions">
                   <a class="btn btn-sm escala-action-btn escala-action-edit" href="/escala/editar/<%= semana.id %>" title="Editar" aria-label="Editar">Editar</a>
-                  <form method="POST" action="/escala/alocacao/<%= l.alocacao_id %>/delete" onsubmit="return confirm('Deseja excluir este registro?');" style="margin:0;">
-                    <input type="hidden" name="date" value="<%= alvo %>">
-                    <button class="btn btn-sm escala-action-btn escala-action-delete" type="submit" title="Excluir" aria-label="Excluir">Excluir</button>
-                  </form>
+                  <% if (isAdmin) { %>
+                    <form method="POST" action="/escala/alocacao/<%= l.alocacao_id %>/delete" onsubmit="return confirm('Deseja excluir este registro?');" style="margin:0;">
+                      <input type="hidden" name="date" value="<%= alvo %>">
+                      <button class="btn btn-sm escala-action-btn escala-action-delete" type="submit" title="Excluir" aria-label="Excluir">Excluir</button>
+                    </form>
+                  <% } %>
                 </div>
               </td>
             </tr>

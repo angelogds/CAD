@@ -77,9 +77,11 @@
               <td style="text-align:right;">
                 <div class="user-actions">
                   <a class="btn btn-sm user-action-btn user-action-edit" href="/usuarios/<%= u.id %>/editar">Editar</a>
-                  <form method="POST" action="/usuarios/<%= u.id %>/excluir" onsubmit="return confirm('Confirma apagar o usuário <%= u.name %>?');">
-                    <button class="btn btn-sm user-action-btn user-action-delete" type="submit">Apagar</button>
-                  </form>
+                  <% if (isAdmin) { %>
+                    <form method="POST" action="/usuarios/<%= u.id %>/excluir" onsubmit="return confirm('Confirma apagar o usuário <%= u.name %>?');">
+                      <button class="btn btn-sm user-action-btn user-action-delete" type="submit">Apagar</button>
+                    </form>
+                  <% } %>
                 </div>
               </td>
             </tr>

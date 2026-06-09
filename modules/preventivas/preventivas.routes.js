@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { requireLogin, requireRole } = require("../auth/auth.middleware");
+const { requireLogin, requireRole, requireAdmin } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
 
 // controller
@@ -146,7 +146,7 @@ router.post(
 router.post(
   "/:id/execucoes/:execId/apagar",
   requireLogin,
-  requireRole(ACCESS.preventivas_manage),
+  requireAdmin,
   safe(ctrl.apagarExecucao, "apagarExecucao")
 );
 

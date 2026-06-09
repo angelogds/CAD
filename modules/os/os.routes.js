@@ -5,7 +5,7 @@ const fs = require("fs");
 const router = express.Router();
 const storagePaths = require("../../config/storage");
 
-const { requireLogin, requireRole } = require("../auth/auth.middleware");
+const { requireLogin, requireRole, requireAdmin } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
 const { canSendWhatsappNotification } = require("../../middlewares/permissions.middleware");
 const ctrl = require("./os.controller");
@@ -134,7 +134,7 @@ router.post(
 );
 
 router.post("/:id/status", requireLogin, requireRole(OS_STATUS_ACCESS), wrap(ctrl.osUpdateStatus, "osUpdateStatus"));
-router.post("/:id/excluir", requireLogin, requireRole(["ADMIN"]), wrap(ctrl.osDelete, "osDelete"));
+router.post("/:id/excluir", requireLogin, requireAdmin, wrap(ctrl.osDelete, "osDelete"));
 router.post("/:id/auto-alocar", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osAutoAssign, "osAutoAssign"));
 router.post("/:id/auto-assign", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osAutoAssign, "osAutoAssign"));
 router.post("/:id/equipe", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osSetEquipe, "osSetEquipe"));

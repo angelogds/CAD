@@ -192,9 +192,11 @@
             <td style="text-align:right;">
               <span class="acoes-col">
                 <a class="btn-sm" href="/equipamentos/<%= e.id %>">Abrir</a>
-                <form method="POST" action="/equipamentos/<%= e.id %>/excluir" onsubmit="return confirm('Excluir este equipamento permanentemente?');">
-                  <button type="submit" class="btn-sm btn-danger">Apagar</button>
-                </form>
+                <% if (isAdmin) { %>
+                  <form method="POST" action="/equipamentos/<%= e.id %>/excluir" onsubmit="return confirm('Excluir este equipamento permanentemente?');">
+                    <button type="submit" class="btn-sm btn-danger">Apagar</button>
+                  </form>
+                <% } %>
               </span>
             </td>
           </tr>

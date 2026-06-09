@@ -102,7 +102,7 @@
             <td><%= fmtBR(a.created_at || a.uploaded_at) %></td>
             <td style="display:flex;gap:6px;">
               <a class="btn btn-sm btn-ghost" href="/compras/anexos/<%= a.id %>/download">Download</a>
-              <form method="POST" action="/compras/anexos/<%= a.id %>/delete"><button class="btn btn-sm" type="submit">Excluir</button></form>
+              <% if (isAdmin) { %><form method="POST" action="/compras/anexos/<%= a.id %>/delete"><button class="btn btn-sm" type="submit">Excluir</button></form><% } %>
             </td>
           </tr>
         <% }) %>

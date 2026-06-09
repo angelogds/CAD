@@ -439,7 +439,7 @@ function gerarPdf(solicitacao, res) {
     throw err;
   }
 
-  const doc = new PDFDocument({ margin: 34, size: 'A4', bufferPages: true });
+  const doc = new PDFDocument({ margin: 34, size: 'A4', bufferPages: true, autoFirstPage: true });
   res.setHeader('Content-Type', 'application/pdf');
   const numeroArquivo = pdfValue(solicitacao.numero, solicitacao.id || 'sem-numero').replace(/[^a-z0-9_-]+/gi, '_');
   res.setHeader('Content-Disposition', `attachment; filename=solicitacao_${numeroArquivo}.pdf`);
@@ -487,22 +487,24 @@ function gerarPdf(solicitacao, res) {
     .text(`Status: ${statusLabel}`, 360, 56, { width: 190, align: 'right' });
 
   let y = 122;
-  doc.roundedRect(34, y, doc.page.width - 68, 96, 8).fillAndStroke(COLORS.greenSoft, '#A7DDBD');
+  doc.roundedRect(34, y, doc.page.width - 68, 132, 8).fillAndStroke(COLORS.greenSoft, '#A7DDBD');
   const ident = [
     ['Unidade', 'Reciclagem Campo do Gado'], ['Setor solicitante', pdfValue(solicitacao.setor_origem, 'Manutenção')], ['Solicitante', pdfValue(solicitacao.solicitante_nome, PDF_PENDING)],
     ['Responsável manutenção', pdfValue(solicitacao.responsavel_manutencao || solicitacao.almox_nome, 'Ângelo Gomes da Silva')], ['Destino', pdfValue(solicitacao.setor_destino || solicitacao.destino_uso, 'Setor de Compras')], ['Responsável compras', pdfValue(solicitacao.compras_nome, 'Sr. Ubiratam')],
     ['Prioridade', pdfValue(solicitacao.prioridade)], ['Equipamento / Local', pdfValue(solicitacao.equipamento_nome || solicitacao.destino_uso || solicitacao.tipo_origem, PDF_PENDING)],
+    ['OS vinculada', solicitacao.os_id ? `OS ${solicitacao.os_id}` : PDF_FALLBACK], ['Número interno', numeroSolicitacao],
   ];
   let ly = y + 10; let ry = y + 10;
   ident.forEach((row, idx) => {
-    const x = idx < 4 ? 46 : 300;
-    if (idx === 4) ry = y + 10;
-    const yy = idx < 4 ? ly : ry;
+    const leftColumn = idx < 5;
+    const x = leftColumn ? 46 : 300;
+    if (idx === 5) ry = y + 10;
+    const yy = leftColumn ? ly : ry;
     doc.fillColor(COLORS.greenDark).fontSize(8).font('Helvetica-Bold').text(`${row[0]}:`, x, yy, { continued: true });
     doc.fillColor(COLORS.text).font('Helvetica').text(` ${row[1]}`);
-    if (idx < 4) ly += 18; else ry += 18;
+    if (leftColumn) ly += 18; else ry += 18;
   });
-  y += 108;
+  y += 144;
 
   doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(11).text('Lista de Materiais', 34, y);
   y += 18;
@@ -518,15 +520,17 @@ function gerarPdf(solicitacao, res) {
     y += 24;
   }
   materiais.forEach((it, index) => {
-    const rowH = 26;
+    const obsText = pdfValue(it.item_descricao || it.observacao_item);
+    const descText = pdfValue(it.item_nome || it.item_descricao);
+    const rowH = Math.max(28, doc.heightOfString(obsText, { width: col[5] - col[4] - 8 }) + 16, doc.heightOfString(descText, { width: col[4] - col[3] - 8 }) + 16);
     if (y + rowH > doc.page.height - 90) { drawFooter(); doc.addPage(); y = 40; }
     doc.rect(34, y, 520, rowH).fill(index % 2 ? COLORS.greenSoft : COLORS.white).stroke(COLORS.border);
     doc.fillColor(COLORS.text).fontSize(8).font('Helvetica');
     doc.text(String(index + 1).padStart(2, '0'), col[0] + 4, y + 8, { width: col[1] - col[0] - 8 });
     doc.text(String(it.qtd_solicitada ?? it.quantidade ?? 0), col[1] + 4, y + 8, { width: col[2] - col[1] - 8 });
     doc.text(pdfValue(it.unidade, 'UN'), col[2] + 4, y + 8, { width: col[3] - col[2] - 8 });
-    doc.text(pdfValue(it.item_nome || it.item_descricao), col[3] + 4, y + 8, { width: col[4] - col[3] - 8 });
-    doc.text(pdfValue(it.item_descricao || it.observacao_item), col[4] + 4, y + 8, { width: col[5] - col[4] - 8 });
+    doc.text(descText, col[3] + 4, y + 8, { width: col[4] - col[3] - 8 });
+    doc.text(obsText, col[4] + 4, y + 8, { width: col[5] - col[4] - 8 });
     y += rowH;
   });
 
@@ -542,13 +546,34 @@ function gerarPdf(solicitacao, res) {
     doc.fillColor(COLORS.text).font('Helvetica').fontSize(9).text(safeContent, 44, y + 8, { width: 500 });
     y += h + 12;
   };
-  drawSection('Descrição Técnica', pdfValue(solicitacao.descricao, PDF_PENDING));
-  drawSection('Justificativa / Observação', pdfValue(solicitacao.observacoes_compras, PDF_FALLBACK));
+  drawSection('Motivo da solicitação', pdfValue(solicitacao.motivo || solicitacao.descricao, PDF_PENDING));
+  drawSection('Observações', pdfValue(solicitacao.observacoes_compras || solicitacao.observacoes, PDF_FALLBACK));
 
-  if (y + 110 > doc.page.height - 90) { drawFooter(); doc.addPage(); y = 40; }
-  doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text('Assinaturas / Responsáveis', 34, y);
+  if (y + 92 > doc.page.height - 90) { drawFooter(); doc.addPage(); y = 40; }
+  doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text('Histórico de Status', 34, y);
+  y += 16;
+  const history = [
+    ['ABERTA', solicitacao.created_at],
+    ['EM_COTACAO', solicitacao.cotacao_inicio_em],
+    ['COMPRADA', solicitacao.comprada_em],
+    ['RECEBIDA', solicitacao.recebida_em],
+    ['FECHADA', solicitacao.fechada_em],
+  ];
+  history.forEach(([label, value], idx) => {
+    const x = 34 + (idx * 104);
+    doc.roundedRect(x, y, 96, 34, 5).fillAndStroke(idx % 2 ? COLORS.white : COLORS.greenSoft, COLORS.border);
+    doc.fillColor(COLORS.greenInst).font('Helvetica-Bold').fontSize(7).text(label.replaceAll('_', ' '), x + 6, y + 7, { width: 84 });
+    doc.fillColor(COLORS.text).font('Helvetica').fontSize(7).text(value ? new Date(value).toLocaleDateString('pt-BR') : '-', x + 6, y + 20, { width: 84 });
+  });
+  y += 50;
+
+  if (y + 130 > doc.page.height - 90) { drawFooter(); doc.addPage(); y = 40; }
+  doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text('Conferência e Assinaturas', 34, y);
   y += 18;
-  [['Solicitante', ''], ['Responsável pela Manutenção', 'Ângelo Gomes da Silva'], ['Setor de Compras', 'Sr. Ubiratam']].forEach(([k, v]) => {
+  doc.roundedRect(34, y, 520, 32, 5).strokeColor(COLORS.border).stroke();
+  doc.fillColor(COLORS.muted).font('Helvetica').fontSize(8).text('Conferência do almoxarifado: recebido conforme (  ) sim   (  ) parcial   (  ) divergente', 44, y + 10, { width: 500 });
+  y += 48;
+  [['Solicitante', ''], ['Responsável pela Manutenção', ''], ['Compras / Almoxarifado', '']].forEach(([k, v]) => {
     doc.fillColor(COLORS.greenInst).fontSize(9).font('Helvetica-Bold').text(`${k}: ${v}`, 34, y);
     y += 16;
     doc.strokeColor(COLORS.border).moveTo(34, y).lineTo(300, y).stroke();

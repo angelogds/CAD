@@ -3,7 +3,7 @@ const path = require('path');
 const multer = require('multer');
 const router = require('express').Router();
 
-const { requireLogin, requireRole } = require('../auth/auth.middleware');
+const { requireLogin, requireRole, requireAdmin } = require('../auth/auth.middleware');
 const { ACCESS } = require('../../config/rbac');
 const ctrl = require('./compras.controller');
 const storagePaths = require('../../config/storage');
@@ -35,7 +35,7 @@ router.post('/solicitacoes/:id/marcar-comprada', requireLogin, requireRole(ACCES
 
 router.post('/solicitacoes/:id/anexos', requireLogin, requireRole(ACCESS.compras_manage), upload.single('arquivo'), ctrl.uploadAnexo);
 router.get('/anexos/:anexoId/download', requireLogin, requireRole(ACCESS.compras_read), ctrl.downloadAnexo);
-router.post('/anexos/:anexoId/delete', requireLogin, requireRole(ACCESS.compras_manage), ctrl.deleteAnexo);
+router.post('/anexos/:anexoId/delete', requireLogin, requireAdmin, ctrl.deleteAnexo);
 
 router.get('/', (_req, res) => res.redirect('/compras/solicitacoes'));
 
