@@ -103,13 +103,46 @@ function listarConversasOS(user, filtros = {}) {
   const hasHist = tableExists('os_andamento_historico');
   const hasVinc = tableExists('os_solicitacoes_vinculos');
   const hasSol = tableExists('solicitacoes');
+  const hasSolOsId = hasSol && columnExists('solicitacoes', 'os_id');
   const hasEquip = tableExists('equipamentos');
   const lastMsg = hasMsgs ? ultimaMensagemExpr() : 'NULL';
   const lastAt = hasMsgs ? ultimaMensagemDataExpr() : 'NULL';
   const unread = hasMsgs ? `(SELECT COUNT(*) FROM os_chat_mensagens cm LEFT JOIN os_chat_leituras l ON l.os_id=cm.os_id AND l.user_id=? WHERE cm.os_id=o.id AND cm.deleted_at IS NULL AND COALESCE(cm.user_id, 0) <> ? AND cm.id > COALESCE(l.ultima_mensagem_lida_id,0))` : '0';
-  const vincExists = hasSol ? (hasVinc ? `EXISTS(SELECT 1 FROM os_solicitacoes_vinculos v WHERE v.os_id=o.id) OR EXISTS(SELECT 1 FROM solicitacoes s WHERE s.os_id=o.id)` : `EXISTS(SELECT 1 FROM solicitacoes s WHERE s.os_id=o.id)`) : '0';
+  const participantes = hasMsgs ? `(
+    SELECT GROUP_CONCAT(nome_perfil, ', ')
+    FROM (
+      SELECT (COALESCE(NULLIF(TRIM(cm.autor_nome), ''), 'Sistema') || CASE WHEN COALESCE(NULLIF(TRIM(cm.perfil), ''), NULLIF(TRIM(cm.tipo), '')) IS NOT NULL THEN '/' || REPLACE(COALESCE(NULLIF(TRIM(cm.perfil), ''), NULLIF(TRIM(cm.tipo), '')), '_', ' ') ELSE '' END) AS nome_perfil,
+             MIN(cm.id) AS ordem
+      FROM os_chat_mensagens cm
+      WHERE cm.os_id=o.id AND cm.deleted_at IS NULL
+      GROUP BY COALESCE(cm.autor_nome, ''), COALESCE(cm.perfil, ''), COALESCE(cm.tipo, '')
+      ORDER BY ordem
+    )
+  )` : 'NULL';
+  const vincExists = hasSol
+    ? [hasVinc ? `EXISTS(SELECT 1 FROM os_solicitacoes_vinculos v WHERE v.os_id=o.id)` : null, hasSolOsId ? `EXISTS(SELECT 1 FROM solicitacoes s WHERE s.os_id=o.id)` : null].filter(Boolean).join(' OR ') || '0'
+    : '0';
+  const vincAbertaExists = hasSol
+    ? [
+        hasVinc ? `EXISTS(SELECT 1 FROM os_solicitacoes_vinculos v JOIN solicitacoes s ON s.id=v.solicitacao_id WHERE v.os_id=o.id AND UPPER(COALESCE(s.status,'')) NOT IN ('FECHADA','FECHADO','CONCLUIDA','CONCLUÍDA','CANCELADA','CANCELADO'))` : null,
+        hasSolOsId ? `EXISTS(SELECT 1 FROM solicitacoes s WHERE s.os_id=o.id AND UPPER(COALESCE(s.status,'')) NOT IN ('FECHADA','FECHADO','CONCLUIDA','CONCLUÍDA','CANCELADA','CANCELADO'))` : null,
+      ].filter(Boolean).join(' OR ') || '0'
+    : '0';
   const histExists = hasHist ? `EXISTS(SELECT 1 FROM os_andamento_historico h WHERE h.os_id=o.id)` : '0';
   const msgExists = hasMsgs ? `EXISTS(SELECT 1 FROM os_chat_mensagens cm WHERE cm.os_id=o.id AND cm.deleted_at IS NULL)` : '0';
+  const histComprasExists = hasHist ? `EXISTS(SELECT 1 FROM os_andamento_historico h WHERE h.os_id=o.id AND (UPPER(COALESCE(h.motivo_codigo,'')) IN ('AGUARDANDO_COMPRA','FALTA_MATERIAL','AGUARDANDO_PECA_TORNEARIA') OR LOWER(COALESCE(h.motivo_nome,'')) LIKE '%compra%'))` : '0';
+  const histMaterialExists = hasHist ? `EXISTS(SELECT 1 FROM os_andamento_historico h WHERE h.os_id=o.id AND (UPPER(COALESCE(h.motivo_codigo,'')) IN ('FALTA_MATERIAL','MATERIAL_CHEGOU','AGUARDANDO_PECA_TORNEARIA') OR LOWER(COALESCE(h.motivo_nome,'')) LIKE '%material%' OR LOWER(COALESCE(h.motivo_nome,'')) LIKE '%peça%' OR LOWER(COALESCE(h.motivo_nome,'')) LIKE '%peca%'))` : '0';
+  const histInspecaoExists = hasMsgs ? `EXISTS(SELECT 1 FROM os_chat_mensagens cm WHERE cm.os_id=o.id AND cm.deleted_at IS NULL AND (LOWER(COALESCE(cm.perfil,'')) LIKE '%inspec%' OR LOWER(COALESCE(cm.tipo,'')) LIKE '%inspec%' OR LOWER(COALESCE(cm.mensagem,'')) LIKE '%inspe%'))` : '0';
+  const histComprasMsgExists = hasMsgs ? `EXISTS(SELECT 1 FROM os_chat_mensagens cm WHERE cm.os_id=o.id AND cm.deleted_at IS NULL AND (LOWER(COALESCE(cm.perfil,'')) LIKE '%compra%' OR LOWER(COALESCE(cm.tipo,'')) LIKE '%compra%' OR LOWER(COALESCE(cm.mensagem,'')) LIKE '%compra%'))` : '0';
+  const activeStatus = `UPPER(COALESCE(o.status,'')) IN ('ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA','AGUARDANDO_EQUIPE')`;
+  const closedStatus = `UPPER(COALESCE(o.status,'')) IN ('FECHADA','FECHADO','CONCLUIDA','CONCLUÍDA','FINALIZADA','FINALIZADO','CANCELADA','CANCELADO')`;
+  const pausedStatus = `UPPER(COALESCE(o.status,'')) = 'PAUSADA'`;
+  const delayed = `(${activeStatus} AND (julianday('now','localtime') - julianday(COALESCE(o.opened_at,o.created_at,o.data_inicio))) > 1)`;
+  const critical = `UPPER(COALESCE(o.prioridade,'')) IN ('CRITICA','CRÍTICA','ALTA','URGENTE','EMERGENCIAL')`;
+  const hasSummaryReason = `(NULLIF(TRIM(COALESCE(o.ultimo_motivo_andamento,'')), '') IS NOT NULL OR NULLIF(TRIM(COALESCE(o.ultima_justificativa_andamento,'')), '') IS NOT NULL OR NULLIF(TRIM(COALESCE(o.ultimo_registro_andamento_em,'')), '') IS NOT NULL)`;
+  const relevantTrace = `(${msgExists} OR ${histExists} OR ${vincExists} OR ${hasSummaryReason} OR ${pausedStatus} OR ${delayed} OR ${critical})`;
+  const closedRecentEligible = `(${closedStatus} AND date(COALESCE(o.closed_at,o.data_conclusao,'')) >= date('now','localtime','-15 days') AND (${msgExists} OR ${histExists} OR ${vincAbertaExists} OR ${hasSummaryReason}))`;
+  const eligible = `((${relevantTrace} AND (NOT (${closedStatus}) OR ${msgExists} OR ${histExists} OR ${vincAbertaExists} OR ${hasSummaryReason})) OR ${closedRecentEligible})`;
   const rows = db.prepare(`
     SELECT o.id, o.status, o.prioridade, o.opened_at, o.closed_at,
            COALESCE(${hasEquip ? 'e.nome' : 'NULL'}, o.equipamento_manual, o.equipamento, '-') AS equipamento,
@@ -120,31 +153,39 @@ function listarConversasOS(user, filtros = {}) {
            COALESCE(u.name, u.email, '-') AS responsavel,
            ${lastMsg} AS ultima_mensagem,
            ${lastAt} AS ultima_mensagem_em,
+           COALESCE(${lastAt}, o.ultimo_registro_andamento_em, o.opened_at) AS ultima_interacao_em,
+           ${participantes} AS participantes,
            ${unread} AS nao_lidas,
            (${vincExists}) AS tem_solicitacao,
-           (${histExists}) AS tem_justificativa,
-           (${msgExists}) AS tem_chat
+           (${vincAbertaExists}) AS tem_solicitacao_aberta,
+           (${histExists} OR ${hasSummaryReason}) AS tem_justificativa,
+           (${msgExists}) AS tem_chat,
+           (${histMaterialExists} OR LOWER(COALESCE(o.ultimo_motivo_andamento,'')) LIKE '%material%' OR LOWER(COALESCE(o.ultimo_motivo_andamento,'')) LIKE '%peça%' OR LOWER(COALESCE(o.ultimo_motivo_andamento,'')) LIKE '%peca%') AS aguarda_material,
+           (${histComprasExists} OR ${histComprasMsgExists} OR LOWER(COALESCE(o.ultimo_motivo_andamento,'')) LIKE '%compra%') AS aguarda_compras,
+           (${histInspecaoExists}) AS tem_interacao_inspecao,
+           (${pausedStatus}) AS esta_pausada,
+           (${delayed}) AS esta_atrasada,
+           (${critical}) AS eh_critica,
+           (${closedStatus} AND date(COALESCE(o.closed_at,o.data_conclusao,'')) >= date('now','localtime','-15 days')) AS finalizada_recente
     FROM os o
     ${hasEquip ? 'LEFT JOIN equipamentos e ON e.id = o.equipamento_id' : ''}
     LEFT JOIN users u ON u.id = COALESCE(o.mecanico_user_id, o.responsavel_user_id, o.opened_by)
-    WHERE UPPER(COALESCE(o.status,'')) IN ('ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA','AGUARDANDO_EQUIPE')
-       OR ${histExists} OR ${msgExists} OR ${vincExists}
-       OR date(COALESCE(o.closed_at,o.data_conclusao,'')) >= date('now','localtime','-15 days')
+    WHERE ${eligible}
     ORDER BY datetime(COALESCE(${lastAt}, o.ultimo_registro_andamento_em, o.opened_at)) DESC, o.id DESC
     LIMIT 300
   `).all(userId, userId).map((row) => ({ ...row, dias_aberta: diasEmAberto(row.opened_at, row.closed_at), nao_lidas: Number(row.nao_lidas || 0) }));
 
   return rows.filter((row) => {
-    const motivo = String(row.motivo_atual || '').toLowerCase();
     const status = String(row.status || '').toUpperCase();
+    const finalizada = ['FECHADA','FECHADO','CONCLUIDA','CONCLUÍDA','FINALIZADA','FINALIZADO','CANCELADA','CANCELADO'].includes(status);
     if (filtro === 'nao_lidas') return row.nao_lidas > 0;
-    if (filtro === 'aguardando_material') return motivo.includes('material') || row.tem_solicitacao;
-    if (filtro === 'aguardando_compras') return motivo.includes('compra');
-    if (filtro === 'aguardando_manutencao') return ['ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA','AGUARDANDO_EQUIPE'].includes(status);
-    if (filtro === 'aguardando_inspecao') return row.tem_chat && String(row.ultima_mensagem || '').toLowerCase().includes('inspe');
-    if (filtro === 'criticas') return ['CRITICA','CRÍTICA','ALTA','URGENTE','EMERGENCIAL'].includes(String(row.prioridade || '').toUpperCase());
+    if (filtro === 'aguardando_material') return Number(row.aguarda_material || 0) === 1 || Number(row.tem_solicitacao_aberta || row.tem_solicitacao || 0) === 1;
+    if (filtro === 'aguardando_compras') return Number(row.aguarda_compras || 0) === 1 || Number(row.tem_solicitacao_aberta || 0) === 1;
+    if (filtro === 'aguardando_manutencao') return !finalizada && ['ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA','AGUARDANDO_EQUIPE'].includes(status);
+    if (filtro === 'aguardando_inspecao') return Number(row.tem_interacao_inspecao || 0) === 1;
+    if (filtro === 'criticas') return Number(row.eh_critica || 0) === 1;
     if (filtro === 'em_andamento') return ['ANDAMENTO','EM_ANDAMENTO','PAUSADA'].includes(status);
-    if (filtro === 'finalizadas_recentes') return !['ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA','AGUARDANDO_EQUIPE'].includes(status);
+    if (filtro === 'finalizadas_recentes') return finalizada && Number(row.finalizada_recente || 0) === 1;
     return true;
   });
 }
