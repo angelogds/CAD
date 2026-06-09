@@ -1,6 +1,7 @@
 const PDFDocument = require("pdfkit");
 const path = require("path");
 const fs = require("fs");
+const { renderSectionTitle, renderTable, sanitizePdfText } = require("../pdf/pdfTable");
 
 const PDF_LOGO_PATH = path.resolve(__dirname, "../../public/IMG/logopdf_campo_do_gado.png.png");
 
@@ -302,122 +303,171 @@ function drawCardSection(doc, title, text, x, y, width, options = {}) {
   return titleH + bodyH + 8;
 }
 
+function buildRastreabilidadeRows(os) {
+  const status = normalizePDFStatus(os.status, os.motivo_atual);
+  const historico = Array.isArray(os.historico_resumido) ? os.historico_resumido : [];
+  const chat = Array.isArray(os.chat_historico) ? os.chat_historico : [];
+  const materialText = os.solicitacao_vinculada
+    ? `Material solicitado: sim • Solicitação ${os.solicitacao_vinculada.numero || ('#' + os.solicitacao_vinculada.id)} • Status ${os.solicitacao_vinculada.status || '-'}`
+    : (os.material_chegou_em ? `Material disponível desde ${formatPDFDate(os.material_chegou_em)}` : status === "AGUARDANDO_MATERIAL" ? "Material pendente" : "Material disponível");
+
+  const rows = [
+    [formatPDFDate(os.opened_at), "Abertura", os.responsavel || "-", `OS #${os.id} • ${os.equipamento || "-"} • ${os.dias_aberta ?? "-"} dias em aberto`, pdfStatusMeta(status).label],
+    [formatPDFDate(os.ultima_atualizacao), "Não conformidade", os.responsavel || "-", os.nao_conformidade || "-", pdfStatusMeta(status).label],
+    [formatPDFDate(os.ultimo_registro_andamento_em || os.ultima_atualizacao), "Paralisação", os.responsavel || "-", os.motivo_atual || "Justificativa pendente", pdfStatusMeta(status).label],
+    [formatPDFDate(os.ultimo_registro_andamento_em || os.ultima_atualizacao), "Justificativa", os.responsavel || "-", os.ultima_justificativa || "-", pdfStatusMeta(status).label],
+    [formatPDFDate(os.ultima_atualizacao), "Ação necessária", os.responsavel || "-", os.acao_necessaria || "Registrar e acompanhar ação necessária", pdfStatusMeta(status).label],
+    [formatPDFDate(os.material_chegou_em || os.ultima_atualizacao), "Material", os.responsavel || "-", materialText, pdfStatusMeta(status).label],
+  ];
+
+  historico.forEach((item) => {
+    rows.push([
+      formatPDFDate(item.registrado_em),
+      item.motivo_nome || "Histórico",
+      item.responsavel_nome || os.responsavel || "-",
+      item.texto_ia || item.texto_padrao || item.observacao || "-",
+      pdfStatusMeta(status).label,
+    ]);
+  });
+
+  chat.forEach((item) => {
+    rows.push([
+      formatPDFDate(item.created_at),
+      item.tipo || "Chat OS",
+      item.autor_nome || os.responsavel || "-",
+      item.mensagem || "-",
+      pdfStatusMeta(status).label,
+    ]);
+  });
+
+  if (!historico.length) rows.push([formatPDFDate(os.ultima_atualizacao), "Histórico", os.responsavel || "-", "Nenhum histórico registrado.", pdfStatusMeta(status).label]);
+  if (!chat.length) rows.push([formatPDFDate(os.ultima_atualizacao), "Tratativas", os.responsavel || "-", "Nenhuma tratativa registrada no Chat de OS.", pdfStatusMeta(status).label]);
+  return rows;
+}
+
 function drawOSEmAndamentoBlock(doc, osEmAndamento = [], meta = {}) {
   const left = doc.page.margins.left;
   const usableW = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  let y = 118;
-
-  const drawHeader = () => {
-    doc.font("Helvetica-Bold").fontSize(11).fillColor(COLOR.greenPrimary).text("Ordens de Serviço em Andamento — Justificativas e Rastreabilidade", left, y);
-    y += 15;
-    doc.font("Helvetica").fontSize(7.5).fillColor(COLOR.muted).text(
-      `Campo do Gado • Data de emissão: ${formatPDFDate(new Date())} • Responsável pela emissão: ${meta.monitorNome || meta.inspecao?.monitor_nome || "Administrador"}`,
-      left,
-      y,
-      { width: usableW }
-    );
-    y += 17;
-  };
-
-  const ensureSpace = (height) => {
-    if (y + height <= doc.page.height - doc.page.margins.bottom - 8) return;
-    doc.addPage({ size: "A4", layout: "landscape", margin: 24 });
+  const tableColors = { border: "#d1d5db", headerBg: COLOR.light, alternateBg: "#ffffff", text: COLOR.text, title: COLOR.greenPrimary };
+  const resetPage = () => {
     drawOfficialHeader(doc);
-    y = 118;
-    drawHeader();
+    doc.y = 118;
   };
 
-  drawHeader();
+  doc.y = 118;
+  renderSectionTitle(doc, "Ordens de Serviço em Andamento — Justificativas e Rastreabilidade", {
+    x: left,
+    width: usableW,
+    color: COLOR.greenPrimary,
+    fontSize: 11,
+    colors: tableColors,
+    pageOptions: { size: "A4", layout: "landscape", margin: 24 },
+    onPageAdded: resetPage,
+    startY: 118,
+  });
+  doc.font("Helvetica").fontSize(7.5).fillColor(COLOR.muted).text(
+    `Campo do Gado • Data de emissão: ${formatPDFDate(new Date())} • Responsável pela emissão: ${meta.monitorNome || meta.inspecao?.monitor_nome || "Administrador"}`,
+    left,
+    doc.y,
+    { width: usableW }
+  );
+  doc.y += 12;
+
   if (!osEmAndamento.length) {
-    doc.rect(left, y, usableW, 24).stroke(COLOR.line);
-    doc.font("Helvetica").fontSize(8).fillColor(COLOR.muted).text("Nenhuma OS aberta ou em andamento no período.", left + 7, y + 8);
+    renderTable(doc, [{ label: "Registro", width: 1 }], [["Nenhuma OS aberta ou em andamento no período."]], {
+      x: left,
+      width: usableW,
+      colors: tableColors,
+      pageOptions: { size: "A4", layout: "landscape", margin: 24 },
+      onPageAdded: resetPage,
+      startY: 118,
+    });
     return;
   }
 
-  for (const os of osEmAndamento) {
+  osEmAndamento.forEach((os) => {
     const status = normalizePDFStatus(os.status, os.motivo_atual);
     const statusMeta = pdfStatusMeta(status);
-    const sectionW = (usableW - 18) / 2;
-    const historico = Array.isArray(os.historico_resumido) && os.historico_resumido.length
-      ? os.historico_resumido.map((item) => `${formatPDFDate(item.registrado_em)} — ${item.motivo_nome || "Atualização"}${item.texto_ia || item.texto_padrao ? `: ${item.texto_ia || item.texto_padrao}` : ""}`).join("\n")
-      : "Nenhum histórico registrado.";
-    const materialText = os.solicitacao_vinculada ? `Material solicitado: sim • Solicitação ${os.solicitacao_vinculada.numero || ('#' + os.solicitacao_vinculada.id)} • Status ${os.solicitacao_vinculada.status || '-'}` : (os.material_chegou_em ? `Material disponível desde ${formatPDFDate(os.material_chegou_em)}` : status === "AGUARDANDO_MATERIAL" ? "Material pendente" : "Material disponível");
-    const chatTratativas = Array.isArray(os.chat_historico) && os.chat_historico.length
-      ? os.chat_historico.map((item) => `${formatPDFDate(item.created_at)} — ${item.tipo || 'CHAT'} ${item.autor_nome ? '(' + item.autor_nome + ')' : ''}: ${item.mensagem || '-'}`).join("\n")
-      : "Nenhuma tratativa registrada no Chat de OS.";
-    const leftSections = [
-      ["NÃO CONFORMIDADE", os.nao_conformidade || "-"],
-      ["MOTIVO DA PARALISAÇÃO", os.motivo_atual || "Justificativa pendente"],
-      ["JUSTIFICATIVA TÉCNICA", os.ultima_justificativa || "-"],
-    ];
-    const rightSections = [
-      ["AÇÃO NECESSÁRIA", os.acao_necessaria || "Registrar e acompanhar ação necessária"],
-      ["MATERIAL", materialText],
-      ["HISTÓRICO", historico],
-      ["HISTÓRICO DE TRATATIVAS DA OS", chatTratativas],
-    ];
-    const leftH = leftSections.reduce((sum, [, text]) => sum + 8 + textHeight(doc, text, sectionW - 18, 7.2), 0);
-    const rightH = rightSections.reduce((sum, [, text]) => sum + 8 + textHeight(doc, text, sectionW - 18, 7.2), 0);
-    const cardH = Math.max(118, 70 + Math.max(leftH, rightH));
-
-    ensureSpace(cardH + 10);
-
-    doc.roundedRect(left, y, usableW, cardH, 10).fillAndStroke("#ffffff", COLOR.line);
-    doc.roundedRect(left, y, usableW, 42, 10).fill(statusMeta.color);
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(11).text(`OS #${os.id} • ${os.equipamento || "-"}`, left + 12, y + 10, { width: usableW - 170 });
-    doc.fillColor(statusMeta.text).font("Helvetica-Bold").fontSize(8).text(statusMeta.label, left + usableW - 145, y + 11, { width: 128, align: "center" });
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(9).text(`${os.dias_aberta ?? "-"} dias em aberto`, left + usableW - 145, y + 24, { width: 128, align: "center" });
-
-    const metaY = y + 50;
-    const metaW = (usableW - 24) / 3;
-    const metaFields = [
-      ["Responsável", os.responsavel || "-"],
-      ["Data de abertura", formatPDFDate(os.opened_at)],
-      ["Última atualização", formatPDFDate(os.ultima_atualizacao)],
-    ];
-    metaFields.forEach(([label, value], index) => {
-      const x = left + 8 + index * (metaW + 4);
-      doc.roundedRect(x, metaY, metaW, 25, 6).fillAndStroke(COLOR.light, "#d9e4dc");
-      doc.font("Helvetica-Bold").fontSize(6.7).fillColor(COLOR.muted).text(label, x + 6, metaY + 5, { width: metaW - 12 });
-      doc.font("Helvetica-Bold").fontSize(7.2).fillColor(COLOR.text).text(String(value), x + 6, metaY + 15, { width: metaW - 12 });
+    renderSectionTitle(doc, `OS #${os.id} • ${sanitizePdfText(os.equipamento || "-")} • ${statusMeta.label}`, {
+      x: left,
+      width: usableW,
+      color: COLOR.greenPrimary,
+      fontSize: 9.5,
+      colors: tableColors,
+      neededHeight: 58,
+      pageOptions: { size: "A4", layout: "landscape", margin: 24 },
+      onPageAdded: resetPage,
+      startY: 118,
     });
-
-    let ly = y + 84;
-    let ry = y + 84;
-    leftSections.forEach(([title, text]) => {
-      ly += drawCardSection(doc, title, text, left + 6, ly, sectionW, { fontSize: 7.2 });
+    renderTable(doc, [
+      { label: "Data/Hora", width: 0.17 },
+      { label: "Origem", width: 0.15 },
+      { label: "Responsável", width: 0.18 },
+      { label: "Registro / Tratativa", width: 0.35 },
+      { label: "Status", width: 0.15 },
+    ], buildRastreabilidadeRows(os), {
+      x: left,
+      width: usableW,
+      colors: tableColors,
+      striped: true,
+      bodyFontSize: 7.2,
+      headerFontSize: 7.3,
+      minRowHeight: 24,
+      pageOptions: { size: "A4", layout: "landscape", margin: 24 },
+      onPageAdded: resetPage,
+      startY: 118,
     });
-    rightSections.forEach(([title, text]) => {
-      ry += drawCardSection(doc, title, text, left + 12 + sectionW, ry, sectionW, { fontSize: 7.2 });
-    });
-    y += cardH + 10;
-  }
+  });
 }
 
 function drawPreventivasBlock(doc, preventivas) {
   const left = doc.page.margins.left;
   const usableW = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  let y = 118;
-  const title = () => { doc.font("Helvetica-Bold").fontSize(11).fillColor(COLOR.greenPrimary).text("Preventivas Executadas no Período", left, y); y += 18; };
-  title();
-  if (!preventivas.length) { doc.rect(left, y, usableW, 22).stroke(COLOR.line); doc.font("Helvetica").fontSize(8).fillColor(COLOR.muted).text("Nenhuma preventiva executada no período filtrado.", left + 5, y + 7); return; }
-  for (const p of preventivas) {
-    const rowH = 82;
-    if (y + rowH > doc.page.height - doc.page.margins.bottom) { doc.addPage({ size: "A4", layout: "landscape", margin: 24 }); drawOfficialHeader(doc); y = 118; title(); }
-    doc.rect(left, y, usableW, rowH).stroke(COLOR.line);
-    doc.rect(left, y, usableW, 17).fillAndStroke(p.tem_nao_conformidade ? "#fee2e2" : "#dcfce7", COLOR.line);
-    doc.font("Helvetica-Bold").fontSize(8).fillColor(COLOR.text).text(`PREV-${p.id} • ${p.equipamento_nome || "-"} • ${p.setor || "-"} • Executada: ${p.data_executada || "-"} • Responsável: ${p.responsavel_exibicao || "-"}${p.os_corretiva_id ? ` • OS corretiva #${p.os_corretiva_id}` : ""}`, left + 5, y + 5, { width: usableW - 10 });
-    doc.font("Helvetica").fontSize(7).fillColor(COLOR.text);
-    const body = [
-      `Dados da preventiva: programada ${p.data_prevista || "-"}; tipo ${p.tipo_preventiva || "preventiva"}; situação final ${String(p.situacao_final || "-").replaceAll("_", " ")}.`,
-      `Descrição / itens verificados: ${p.descricao_preventiva || p.titulo || "-"} | ${p.itens_verificados || "-"}`,
-      `Não conformidades: ${p.nao_conformidade || "-"}`,
-      `Ações corretivas: ${p.acao_corretiva || "-"} | Ações preventivas: ${p.acao_preventiva || "-"}`,
-      `Observações técnicas / evidências: ${p.observacoes_tecnicas || "-"} | ${p.evidencias || "-"}`,
-    ].join("\n");
-    doc.text(body, left + 5, y + 22, { width: usableW - 10, height: rowH - 26, ellipsis: true });
-    y += rowH + 7;
-  }
+  const tableColors = { border: "#d1d5db", headerBg: COLOR.light, alternateBg: "#ffffff", text: COLOR.text, title: COLOR.greenPrimary };
+  const resetPage = () => {
+    drawOfficialHeader(doc);
+    doc.y = 118;
+  };
+  doc.y = 118;
+  renderSectionTitle(doc, "Preventivas Executadas no Período", {
+    x: left,
+    width: usableW,
+    color: COLOR.greenPrimary,
+    fontSize: 11,
+    colors: tableColors,
+    pageOptions: { size: "A4", layout: "landscape", margin: 24 },
+    onPageAdded: resetPage,
+    startY: 118,
+  });
+
+  const rows = (preventivas.length ? preventivas : [{ id: "-", equipamento_nome: "-", data_prevista: "-", data_executada: "-", responsavel_exibicao: "-", situacao_final: "-" }]).map((p) => [
+    p.id === "-" ? "-" : `PREV-${p.id}`,
+    [p.equipamento_nome || "-", p.setor || "-", p.descricao_preventiva || p.titulo || "-", p.itens_verificados ? `Itens: ${p.itens_verificados}` : "", p.nao_conformidade ? `Não conformidades: ${p.nao_conformidade}` : "Não conformidades: -", p.acao_corretiva ? `Ação corretiva: ${p.acao_corretiva}` : "", p.acao_preventiva ? `Ação preventiva: ${p.acao_preventiva}` : "", p.observacoes_tecnicas ? `Obs.: ${p.observacoes_tecnicas}` : ""].filter(Boolean).join(" • "),
+    p.data_prevista || "-",
+    p.data_executada || "-",
+    p.responsavel_exibicao || "-",
+    String(p.situacao_final || "-").replaceAll("_", " "),
+  ]);
+
+  renderTable(doc, [
+    { label: "Código", width: 0.10 },
+    { label: "Atividade / Evidência", width: 0.45 },
+    { label: "Prevista", width: 0.12 },
+    { label: "Executada", width: 0.12 },
+    { label: "Responsável", width: 0.13 },
+    { label: "Status", width: 0.08 },
+  ], rows, {
+    x: left,
+    width: usableW,
+    colors: tableColors,
+    striped: true,
+    bodyFontSize: 7.1,
+    headerFontSize: 7.2,
+    minRowHeight: 24,
+    pageOptions: { size: "A4", layout: "landscape", margin: 24 },
+    onPageAdded: resetPage,
+    startY: 118,
+  });
 }
 
 function drawFooter(doc, page, total) {

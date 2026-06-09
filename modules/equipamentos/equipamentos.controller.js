@@ -1,6 +1,7 @@
 const QRCode = require("qrcode");
 const PDFDocument = require("pdfkit");
 const service = require("./equipamentos.service");
+const { renderSectionTitle, renderTable, renderTextBlock, sanitizePdfText } = require("../../utils/pdf/pdfTable");
 let tracagemService = null;
 let desenhoTecnicoService = null;
 let pcmIntelligenceService = null;
@@ -31,39 +32,13 @@ function formatDateTime(value) {
 }
 
 function drawSimpleTable(doc, headers, rows, widths) {
-  const startX = doc.page.margins.left;
-  const startY = doc.y;
-  const rowHeight = 22;
-  const tableWidth = widths.reduce((acc, n) => acc + n, 0);
-  const bottomLimit = doc.page.height - doc.page.margins.bottom - rowHeight;
-
-  doc.rect(startX, startY, tableWidth, rowHeight).fill("#f3f4f6");
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(9);
-  let cursorX = startX + 6;
-  headers.forEach((header, idx) => {
-    doc.text(header, cursorX, startY + 7, { width: widths[idx] - 10, ellipsis: true });
-    cursorX += widths[idx];
-  });
-
-  doc.font("Helvetica").fontSize(8.5);
-  let currentY = startY + rowHeight;
-  rows.forEach((row, rowIndex) => {
-    if (currentY > bottomLimit) {
-      doc.addPage();
-      currentY = doc.page.margins.top;
-    }
-    if (rowIndex % 2 === 1) {
-      doc.rect(startX, currentY, tableWidth, rowHeight).fill("#fafafa");
-    }
-    doc.fillColor("#111827");
-    let colX = startX + 6;
-    row.forEach((value, idx) => {
-      doc.text(String(value ?? "-"), colX, currentY + 7, { width: widths[idx] - 10, ellipsis: true });
-      colX += widths[idx];
-    });
-    currentY += rowHeight;
-  });
-  doc.moveDown(1);
+  const total = widths.reduce((acc, n) => acc + n, 0);
+  renderTable(
+    doc,
+    headers.map((header, index) => ({ label: header, width: widths[index] / total })),
+    rows,
+    { striped: true, colors: { border: "#e5e7eb", headerBg: "#f3f4f6" } }
+  );
 }
 
 function equipNewForm(req, res) {
@@ -192,12 +167,16 @@ function exportEquipamentoPdf(req, res) {
   res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
   doc.pipe(res);
 
-  doc.fontSize(17).font("Helvetica-Bold").text(`Relatório Técnico - ${equip.nome}`);
-  doc.fontSize(10).font("Helvetica").text(`Gerado em ${new Date().toLocaleString("pt-BR")}`);
+  const tableColors = { border: "#d1d5db", headerBg: "#f3f4f6", alternateBg: "#fafafa", title: "#111827", text: "#111827" };
+  const sectionOptions = { colors: tableColors, color: "#111827", fontSize: 12, neededHeight: 48 };
+
+  doc.fontSize(17).font("Helvetica-Bold").fillColor("#111827").text(`Relatório Técnico - ${sanitizePdfText(equip.nome)}`, {
+    width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
+  });
+  doc.fontSize(10).font("Helvetica").fillColor("#111827").text(`Gerado em ${new Date().toLocaleString("pt-BR")}`);
   doc.moveDown(0.8);
 
-  doc.fontSize(12).font("Helvetica-Bold").text("Dados gerais");
-  doc.moveDown(0.3);
+  renderSectionTitle(doc, "Dados gerais", sectionOptions);
   const gerais = [
     ["Código", equip.codigo || "-"],
     ["Setor", equip.setor || "-"],
@@ -213,47 +192,80 @@ function exportEquipamentoPdf(req, res) {
     ["QR Code ativo", qr ? "Sim" : "Não"],
     ["Observação", equip.observacao || "-"],
   ];
-  gerais.forEach(([k, v]) => doc.font("Helvetica-Bold").text(`${k}: `, { continued: true }).font("Helvetica").text(String(v)));
-  doc.moveDown(0.8);
+  renderTable(doc, [{ label: "Campo", width: 0.32 }, { label: "Informação", width: 0.68 }], gerais, {
+    striped: true,
+    colors: tableColors,
+    bodyFontSize: 8.5,
+    headerFontSize: 8.5,
+  });
 
-  doc.fontSize(12).font("Helvetica-Bold").text("Peças associadas");
-  drawSimpleTable(doc, ["Descrição", "Medida", "Unidade", "Qtde"], (pecas.length ? pecas : [{ descricao_item: "-", modelo_descricao: "-", unidade_medida: "-", quantidade: "-" }]).map((p) => [
+  renderSectionTitle(doc, "Peças associadas", sectionOptions);
+  renderTable(doc, [
+    { label: "Descrição", width: 0.47 },
+    { label: "Medida", width: 0.23 },
+    { label: "Unidade", width: 0.18 },
+    { label: "Qtde", width: 0.12 },
+  ], (pecas.length ? pecas : [{ descricao_item: "-", modelo_descricao: "-", unidade_medida: "-", quantidade: "-" }]).map((p) => [
     p.descricao_item || "-",
     p.modelo_descricao || "-",
     p.unidade_medida || "-",
     p.quantidade || "-",
-  ]), [250, 120, 100, 60]);
+  ]), { striped: true, colors: tableColors });
 
-  doc.fontSize(12).font("Helvetica-Bold").text("Documentos");
-  drawSimpleTable(doc, ["Tipo", "Descrição", "Emissão", "Validade"], (documentos.length ? documentos : [{ tipo_documento: "-", descricao: "-", data_emissao: "-", validade: "-" }]).map((d) => [
+  renderSectionTitle(doc, "Documentos", sectionOptions);
+  renderTable(doc, [
+    { label: "Tipo", width: 0.15 },
+    { label: "Descrição", width: 0.55 },
+    { label: "Emissão", width: 0.15 },
+    { label: "Validade", width: 0.15 },
+  ], (documentos.length ? documentos : [{ tipo_documento: "-", descricao: "-", data_emissao: "-", validade: "-" }]).map((d) => [
     d.tipo_documento || "-",
     d.descricao || "-",
     d.data_emissao || "-",
     d.validade || "-",
-  ]), [90, 220, 90, 90]);
+  ]), { striped: true, colors: tableColors });
 
-  doc.addPage();
-  doc.fontSize(12).font("Helvetica-Bold").text("Histórico de Ordens de Serviço");
-  drawSimpleTable(doc, ["OS", "Abertura", "Fechamento", "Tipo", "Parada(h)"], (historicoOS.length ? historicoOS : [{ id: "-", opened_at: "-", closed_at: "-", tipo: "-", tempo_parada_horas: "-" }]).map((o) => [
+  renderSectionTitle(doc, "Histórico de Ordens de Serviço", sectionOptions);
+  renderTable(doc, [
+    { label: "OS", width: 0.10 },
+    { label: "Abertura", width: 0.25 },
+    { label: "Fechamento", width: 0.25 },
+    { label: "Tipo", width: 0.20 },
+    { label: "Parada(h)", width: 0.20 },
+  ], (historicoOS.length ? historicoOS : [{ id: "-", opened_at: "-", closed_at: "-", tipo: "-", tempo_parada_horas: "-" }]).map((o) => [
     o.id,
     formatDateTime(o.opened_at),
     formatDateTime(o.closed_at),
     o.tipo || "-",
     o.tempo_parada_horas || "-",
-  ]), [60, 130, 130, 100, 90]);
+  ]), { striped: true, colors: tableColors });
 
-  doc.fontSize(12).font("Helvetica-Bold").text("Preventivas executadas");
-  drawSimpleTable(doc, ["Atividade", "Prevista", "Status", "Duração"], (historicoPreventivas.length ? historicoPreventivas : [{ atividade: "-", data_prevista: "-", status: "-", duracao_minutos: "-" }]).map((p) => [
+  renderSectionTitle(doc, "Preventivas executadas", sectionOptions);
+  renderTable(doc, [
+    { label: "Atividade", width: 0.55 },
+    { label: "Prevista", width: 0.15 },
+    { label: "Status", width: 0.15 },
+    { label: "Duração", width: 0.15 },
+  ], (historicoPreventivas.length ? historicoPreventivas : [{ atividade: "-", data_prevista: "-", status: "-", duracao_minutos: "-" }]).map((p) => [
     p.atividade || "-",
     p.data_prevista || "-",
     p.status || "-",
     p.duracao_minutos ? `${p.duracao_minutos} min` : "-",
-  ]), [250, 100, 100, 60]);
+  ]), { striped: true, colors: tableColors, minRowHeight: 24 });
 
-  doc.fontSize(12).font("Helvetica-Bold").text("Traçagens e desenhos técnicos");
-  doc.font("Helvetica").fontSize(10).text(`Traçagens vinculadas: ${tracagens.length}`);
-  doc.text(`Desenhos técnicos vinculados: ${desenhosTecnicos.length}`);
-  doc.text("Este PDF consolida a vida do equipamento para consulta técnica e PCM.");
+  renderSectionTitle(doc, "Traçagens e desenhos técnicos", sectionOptions);
+  renderTextBlock(doc, `Traçagens vinculadas: ${tracagens.length}\nDesenhos técnicos vinculados: ${desenhosTecnicos.length}`, {
+    colors: tableColors,
+    fontSize: 9.5,
+    minHeight: 42,
+  });
+
+  renderTextBlock(doc, "Este PDF consolida a vida do equipamento para consulta técnica e PCM.", {
+    colors: tableColors,
+    fontSize: 10,
+    border: false,
+    padding: 0,
+  });
 
   doc.end();
 }
