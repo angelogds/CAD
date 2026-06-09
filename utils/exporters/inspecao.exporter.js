@@ -341,7 +341,10 @@ function drawOSEmAndamentoBlock(doc, osEmAndamento = [], meta = {}) {
     const historico = Array.isArray(os.historico_resumido) && os.historico_resumido.length
       ? os.historico_resumido.map((item) => `${formatPDFDate(item.registrado_em)} — ${item.motivo_nome || "Atualização"}${item.texto_ia || item.texto_padrao ? `: ${item.texto_ia || item.texto_padrao}` : ""}`).join("\n")
       : "Nenhum histórico registrado.";
-    const materialText = os.material_chegou_em ? `Material disponível desde ${formatPDFDate(os.material_chegou_em)}` : status === "AGUARDANDO_MATERIAL" ? "Material pendente" : "Material disponível";
+    const materialText = os.solicitacao_vinculada ? `Material solicitado: sim • Solicitação ${os.solicitacao_vinculada.numero || ('#' + os.solicitacao_vinculada.id)} • Status ${os.solicitacao_vinculada.status || '-'}` : (os.material_chegou_em ? `Material disponível desde ${formatPDFDate(os.material_chegou_em)}` : status === "AGUARDANDO_MATERIAL" ? "Material pendente" : "Material disponível");
+    const chatTratativas = Array.isArray(os.chat_historico) && os.chat_historico.length
+      ? os.chat_historico.map((item) => `${formatPDFDate(item.created_at)} — ${item.tipo || 'CHAT'} ${item.autor_nome ? '(' + item.autor_nome + ')' : ''}: ${item.mensagem || '-'}`).join("\n")
+      : "Nenhuma tratativa registrada no Chat de OS.";
     const leftSections = [
       ["NÃO CONFORMIDADE", os.nao_conformidade || "-"],
       ["MOTIVO DA PARALISAÇÃO", os.motivo_atual || "Justificativa pendente"],
@@ -351,6 +354,7 @@ function drawOSEmAndamentoBlock(doc, osEmAndamento = [], meta = {}) {
       ["AÇÃO NECESSÁRIA", os.acao_necessaria || "Registrar e acompanhar ação necessária"],
       ["MATERIAL", materialText],
       ["HISTÓRICO", historico],
+      ["HISTÓRICO DE TRATATIVAS DA OS", chatTratativas],
     ];
     const leftH = leftSections.reduce((sum, [, text]) => sum + 8 + textHeight(doc, text, sectionW - 18, 7.2), 0);
     const rightH = rightSections.reduce((sum, [, text]) => sum + 8 + textHeight(doc, text, sectionW - 18, 7.2), 0);

@@ -1,0 +1,31 @@
+<% layout('layout') %>
+<%- include('partials-styles') %>
+<% const os = conversa.os; const sol = conversa.solicitacao; %>
+<div class="page-head"><div><h1>💬 Chat de OS #<%= os.id %></h1><p class="muted">Conversa oficial da Ordem de Serviço.</p></div><a class="btn btn-ghost" href="/chat-os">Todas as conversas</a></div>
+<div class="os-chat-shell">
+  <aside class="os-chat-list compact">
+    <% conversas.forEach((c) => { %><a class="os-chat-contact <%= Number(c.id)===Number(os.id)?'active':'' %>" href="/chat-os/<%= c.id %>?filtro=<%= filtro %>"><strong>OS <%= c.id %> - <%= c.equipamento %></strong><small><%= c.ultima_mensagem || c.motivo_atual || 'Sem mensagens' %></small><% if(c.nao_lidas>0){%><span class="badge-unread"><%= c.nao_lidas %></span><%}%></a><% }) %>
+  </aside>
+  <section class="os-chat-conversation">
+    <header class="os-chat-header">
+      <div><h2>OS <%= os.id %> – <%= os.equipamento_resolvido %></h2><p><%= os.setor_resolvido %></p></div>
+      <div class="os-chat-meta">
+        <span>Status: <strong><%= os.status %></strong></span><span>Abertura: <strong><%= os.opened_at ? fmtBR(os.opened_at) : '-' %></strong></span><span>Dias em aberto: <strong><%= os.dias_aberta %></strong></span>
+        <span>Motivo: <strong><%= os.motivo_atual || 'Sem motivo atual' %></strong></span><span>Ação necessária: <strong><%= os.acao_necessaria %></strong></span>
+        <span>Solicitação: <strong><%= sol ? ((sol.numero || ('#'+sol.id)) + ' • ' + sol.status) : 'Não vinculada' %></strong></span>
+      </div>
+      <div class="os-chat-actions"><a class="btn btn-sm btn-ghost" href="/os/<%= os.id %>">Abrir OS</a><% if (sol) { %><a class="btn btn-sm btn-ghost" href="/solicitacoes/<%= sol.id %>">Abrir solicitação</a><% } else { %><a class="btn btn-sm btn-green" href="/solicitacoes/nova?os_id=<%= os.id %>">Criar solicitação vinculada</a><% } %><a class="btn btn-sm" href="/chat-os/<%= os.id %>">Atualizar</a></div>
+    </header>
+    <div class="os-chat-messages">
+      <% if (!conversa.mensagens.length) { %><div class="os-chat-empty">Ainda não há mensagens. Registre a primeira tratativa da OS.</div><% } %>
+      <% conversa.mensagens.forEach((m) => { const mine = Number(m.user_id||0)===Number(user.id||0); const t=String(m.tipo||'MENSAGEM').toLowerCase(); %>
+        <article class="msg <%= mine?'mine':'' %> <%= t==='sistema'||t.includes('solicitacao')?'system':'' %>">
+          <div class="msg-head"><strong><%= m.tipo || 'MENSAGEM' %> • <%= m.autor_nome || 'Sistema' %></strong><span><%= m.created_at ? fmtBR(m.created_at) : '-' %></span></div>
+          <p><%= m.mensagem %></p>
+        </article>
+      <% }) %>
+    </div>
+    <form class="os-chat-input" method="POST" action="/chat-os/<%= os.id %>/mensagens"><textarea name="mensagem" placeholder="Digite uma mensagem sobre esta OS..." required></textarea><button class="btn btn-green" type="submit">Enviar</button></form>
+  </section>
+</div>
+<script>setTimeout(function(){ if(!document.hidden) location.reload(); }, 30000);</script>

@@ -12,6 +12,7 @@
   const canPCM = can('pcm');
   const canEquipamentos = can('equipamentos');
   const canOS = can('os_view');
+  const canOSChat = can('os_chat_read');
   const canPreventivas = can('preventivas_view');
   const canDemandas = can('demandas_view');
   const canSolicitacoes = can('solicitacoes_read');
@@ -47,6 +48,7 @@
     <% if (canPainel) { %><%- navItem('/dashboard', 'Painel Principal', activeMenu === 'dashboard') %><% } %>
     <% if (canEquipamentos) { %><%- navItem('/equipamentos', 'Equipamentos', activeMenu === 'equipamentos') %><% } %>
     <% if (canOS) { %><%- navItem('/os', 'Ordens de Serviço', activeMenu === 'os', '', badge(counters.osAbertas, counters.osCriticas > 0 ? 'amber' : 'gray')) %><% } %>
+    <% if (canOSChat) { %><%- navItem('/chat-os', 'Chat de OS', activeMenu === 'os-chat', '', badge(counters.osChatNaoLidas || 0, 'green')) %><% } %>
     <% if (canPreventivas) { %><%- navItem('/preventivas', 'Preventivas', activeMenu === 'preventivas', '', badge(counters.preventivasHoje, 'blue')) %><% } %>
     <% if (canDemandas) { %><%- navItem('/demandas', 'Demandas', activeMenu === 'demandas') %><% } %>
     <% if (canSolicitacoes) { %><%- navItem('/solicitacoes/minhas', 'Solicitações', activeMenu === 'solicitacoes') %><% } %>

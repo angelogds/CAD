@@ -10,6 +10,7 @@
 
 <div class="card">
   <form method="POST" action="<%= actionUrl || '/solicitacoes' %>" id="form-solicitacao">
+    <% if (fd.os_id) { %><input type="hidden" name="os_id" value="<%= fd.os_id %>" /><div class="note" style="margin-bottom:12px;">🔗 Solicitação vinculada à OS #<%= fd.os_id %>. Ao salvar, o vínculo e a mensagem automática serão registrados no Chat de OS.</div><% } %>
     <div class="grid-3">
       <div>
         <div class="label">Título</div>

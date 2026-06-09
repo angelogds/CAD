@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('../../database/db');
+const osChatService = require('../os-chat/os-chat.service');
 
 const STATUS = Object.freeze({
   ABERTA: 'ABERTA',
@@ -329,6 +330,7 @@ function iniciarCotacaoViaPdf(id, userId) {
   if (cur.status === STATUS.ABERTA) {
     db.prepare("UPDATE solicitacoes SET status=?, compras_user_id=?, cotacao_inicio_em=datetime('now'), updated_at=datetime('now') WHERE id=?")
       .run(STATUS.EM_COTACAO, userId, id);
+    if (cur.os_id) { try { osChatService.registrarMensagemSistema(cur.os_id, 'COMPRA_ATUALIZADA', `Solicitação nº ${cur.numero || id} entrou em cotação.`, { solicitacao_id: id, user_id: userId }); } catch (_e) {} }
   }
 }
 
@@ -368,8 +370,12 @@ function selecionarCotacao(solicitacaoId, cotacaoId) {
 function atualizarDados(id, dados) {
   const fornecedorId = dados.fornecedor_id ? Number(dados.fornecedor_id) : null;
   const fornecedorSelecionado = fornecedorId ? db.prepare('SELECT id, nome FROM fornecedores WHERE id = ?').get(fornecedorId) : null;
+  const cur = getSolicitacaoDetalhe(id);
   db.prepare(`UPDATE solicitacoes SET fornecedor=?, fornecedor_id=?, previsao_entrega=?, observacoes_compras=?, valor_total=?, updated_at=datetime('now') WHERE id=?`)
     .run(fornecedorSelecionado?.nome || dados.fornecedor || null, fornecedorSelecionado?.id || null, dados.previsao_entrega || null, dados.observacoes_compras || null, dados.valor_total ? Number(dados.valor_total) : null, id);
+  if (cur?.os_id && (dados.observacoes_compras || dados.previsao_entrega || dados.fornecedor || fornecedorSelecionado?.nome)) {
+    try { osChatService.registrarMensagemSistema(cur.os_id, 'COMPRAS', `Compras atualizou a solicitação nº ${cur.numero || id}. ${dados.observacoes_compras || 'Dados de cotação/compra atualizados.'}`, { solicitacao_id: id }); } catch (_e) {}
+  }
 }
 
 function marcarComprada(id, userId, dados = {}) {
@@ -379,6 +385,7 @@ function marcarComprada(id, userId, dados = {}) {
   }
   db.prepare(`UPDATE solicitacoes SET status=?, compras_user_id=?, comprada_em=datetime('now'), fornecedor=?, fornecedor_id=?, previsao_entrega=?, observacoes_compras=?, valor_total=?, updated_at=datetime('now') WHERE id=?`)
     .run(STATUS.COMPRADA, userId, dados.fornecedor || cur.fornecedor || null, dados.fornecedor_id ? Number(dados.fornecedor_id) : (cur.fornecedor_id || null), dados.previsao_entrega || cur.previsao_entrega || null, dados.observacoes_compras || cur.observacoes_compras || null, dados.valor_total ? Number(dados.valor_total) : cur.valor_total || null, id);
+  if (cur.os_id) { try { osChatService.registrarMensagemSistema(cur.os_id, 'COMPRA_ATUALIZADA', `Solicitação nº ${cur.numero || id} marcada como comprada.`, { solicitacao_id: id, user_id: userId }); } catch (_e) {} }
   return getSolicitacaoDetalhe(id);
 }
 

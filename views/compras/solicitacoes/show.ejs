@@ -11,6 +11,16 @@
   </div>
 </div>
 
+<% if (sol.os_id) { %>
+  <div class="card" style="margin-bottom:12px;border-left:4px solid #16a34a;">
+    <strong>🔗 Vinculada à OS <%= sol.os_id %><%= sol.equipamento_nome ? (' – ' + sol.equipamento_nome) : '' %></strong>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+      <a class="btn btn-green" href="/chat-os/<%= sol.os_id %>">Abrir conversa da OS</a>
+      <a class="btn btn-ghost" href="/os/<%= sol.os_id %>">Abrir OS</a>
+    </div>
+  </div>
+<% } %>
+
 <div class="card" style="margin-bottom:12px;">
   <div class="label" style="margin-bottom:8px;">Itens solicitados</div>
   <div class="table-wrap">

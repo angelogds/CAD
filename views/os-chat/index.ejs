@@ -1,0 +1,28 @@
+<% layout('layout') %>
+<%- include('partials-styles') %>
+<div class="page-head">
+  <div><h1>💬 Chat de OS</h1><p class="muted">Cada Ordem de Serviço aparece como uma conversa rastreável.</p></div>
+  <a class="btn btn-ghost" href="/chat-os">Atualizar</a>
+</div>
+<div class="os-chat-filters">
+  <% filtros.forEach(([value,label]) => { %><a class="pill-tag <%= filtro===value?'pill-green':'pill-gray' %>" href="/chat-os?filtro=<%= value %>"><%= label %></a><% }) %>
+</div>
+<div class="os-chat-shell os-chat-list-only">
+  <aside class="os-chat-list">
+    <% if (!conversas.length) { %><div class="os-chat-empty">Nenhuma OS encontrada para este filtro.</div><% } %>
+    <% conversas.forEach((c) => { const pr=String(c.prioridade||'').toUpperCase(); const dot=pr.includes('CRIT')||pr.includes('ALTA')||pr.includes('URG')?'🔴':(c.tem_solicitacao?'🟡':'🟢'); %>
+      <a class="os-chat-contact" href="/chat-os/<%= c.id %>?filtro=<%= filtro %>">
+        <div class="os-chat-contact-top"><strong><%= dot %> OS <%= c.id %> - <%= c.equipamento %></strong><span><%= c.ultima_mensagem_em ? fmtBR(c.ultima_mensagem_em) : '' %></span></div>
+        <div class="muted"><%= c.setor || '-' %> • <%= c.status || '-' %></div>
+        <div><%= c.motivo_atual || 'Sem pendências registradas' %></div>
+        <div class="os-chat-preview">Última mensagem: <%= c.ultima_mensagem || c.ultima_justificativa || 'Sem mensagens no chat' %></div>
+        <div class="os-chat-badges">
+          <% if (c.nao_lidas > 0) { %><span class="badge-unread"><%= c.nao_lidas %> não lida(s)</span><% } else { %><span class="pill-tag pill-gray">Sem não lidas</span><% } %>
+          <% if (c.tem_solicitacao) { %><span class="pill-tag pill-blue">Solicitação vinculada</span><% } %>
+          <% if (String(c.motivo_atual||'').toLowerCase().includes('material')) { %><span class="pill-tag pill-amber">Depende de material</span><% } %>
+        </div>
+      </a>
+    <% }) %>
+  </aside>
+  <section class="os-chat-placeholder"><h2>Selecione uma OS</h2><p>Abra uma conversa para registrar tratativas, compras, inspeção e andamento oficial.</p></section>
+</div>

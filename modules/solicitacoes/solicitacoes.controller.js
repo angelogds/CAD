@@ -1,5 +1,7 @@
 const service = require("./solicitacoes.service");
 const comprasService = require("../compras/compras.service");
+const osChatService = require("../os-chat/os-chat.service");
+const osService = require("../os/os.service");
 
 const PENDENTE = "Informação pendente de confirmação";
 
@@ -28,6 +30,7 @@ function normalizeSolicitacaoForView(solicitacao) {
     comprada_em: solicitacao.comprada_em || null,
     recebida_em: solicitacao.recebida_em || null,
     fechada_em: solicitacao.fechada_em || null,
+    os_id: solicitacao.os_id || null,
   };
 }
 
@@ -60,12 +63,22 @@ function minhas(req, res) {
 }
 
 function nova(req, res) {
+  const osId = Number(req.query.os_id || 0) || null;
+  const os = osId ? osService.getOSById(osId) : null;
+  const formData = os ? {
+    os_id: os.id,
+    equipamento_id: os.equipamento_id || '',
+    setor_origem: 'Manutenção',
+    prioridade: os.prioridade || os.grau || 'MEDIA',
+    titulo: `Material para OS #${os.id} - ${os.equipamento_resolvido || os.equipamento || ''}`,
+    descricao: [`OS #${os.id}`, `Equipamento: ${os.equipamento_resolvido || os.equipamento || '-'}`, `Descrição da OS: ${os.descricao || '-'}`, `Motivo da paralisação: ${os.ultimo_motivo_andamento || '-'}`, `Justificativa técnica: ${os.ultima_justificativa_andamento || '-'}`, 'Solicitação vinculada à OS para rastreabilidade no Chat de OS.'].join('\n'),
+  } : {};
   res.render("solicitacoes/new", {
     title: "Nova Solicitação",
     activeMenu: "solicitacoes",
     equipamentos: service.listEquipamentos(),
     estoqueItens: service.listEstoqueItens(),
-    formData: {},
+    formData,
     formItens: [],
   });
 }
@@ -80,8 +93,11 @@ function criar(req, res) {
     }
 
     const id = service.createSolicitacao({ ...req.body, userId: req.session.user.id, itens });
+    if (req.body.os_id) {
+      try { osChatService.criarVinculoSolicitacaoOS(Number(req.body.os_id), id, req.session.user.id); } catch (_e) {}
+    }
     req.flash("success", "✅ Solicitação criada com sucesso!");
-    return res.redirect(`/solicitacoes/${id}`);
+    return res.redirect(req.body.os_id ? `/chat-os/${Number(req.body.os_id)}` : `/solicitacoes/${id}`);
   } catch (error) {
     req.flash("error", error.message || "Não foi possível criar a solicitação.");
     return res.redirect("/solicitacoes/nova");
