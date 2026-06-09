@@ -1,7 +1,10 @@
 <% layout('layout') %>
 
 <style>
-  .top{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+  .top{display:grid;grid-template-columns:1fr;gap:12px}
+  .os-detail-card{width:100%;box-sizing:border-box}
+  .os-primary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+  @media (max-width: 720px){.top{grid-template-columns:1fr}.grid2,.os-primary-grid{grid-template-columns:1fr}}
   .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px}
   .muted{color:#64748b;font-size:13px}
   .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
@@ -106,7 +109,7 @@
 </div>
 
 <div class="top" style="margin-top:10px;">
-  <div class="card">
+  <div class="card os-detail-card os-primary-card">
     <div class="card-head">
       <div class="muted">Dados principais da OS</div>
       <% if (!isOSFechada && canExecuteOS) { %>
@@ -118,7 +121,7 @@
         </div>
       <% } %>
     </div>
-    <div class="grid2">
+    <div class="os-primary-grid">
       <div><b>Equipamento:</b> <%= os.equipamento_resolvido || '-' %></div>
       <div><b>Tipo:</b> <%= os.tipo || '-' %></div>
       <div><b>Grau:</b>
@@ -179,7 +182,7 @@
     <% } %>
   </div>
 
-  <div class="card os-module" id="tracagens-vinculadas">
+  <div class="card os-module os-detail-card" id="tracagens-vinculadas">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
       <h3 style="margin:0;">Traçagens vinculadas</h3>
       <a class="btn btn-green" href="/tracagem?os_id=<%= os.id %>">Abrir Traçagem</a>

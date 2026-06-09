@@ -1,5 +1,5 @@
 <% layout('layout') %>
-<% const fd = formData || {}; const rows = (formItens && formItens.length) ? formItens : [{}]; const editing = !!editMode; %>
+<% const fd = (typeof formData !== "undefined" && formData) ? formData : {}; const rows = (typeof formItens !== "undefined" && formItens && formItens.length) ? formItens : [{}]; const editing = typeof editMode !== "undefined" ? !!editMode : false; const submitUrl = typeof actionUrl !== "undefined" && actionUrl ? actionUrl : "/solicitacoes"; %>
 
 <div class="page-head">
   <div>
@@ -9,8 +9,21 @@
 </div>
 
 <div class="card">
-  <form method="POST" action="<%= actionUrl || '/solicitacoes' %>" id="form-solicitacao">
-    <% if (fd.os_id) { %><input type="hidden" name="os_id" value="<%= fd.os_id %>" /><div class="note" style="margin-bottom:12px;">🔗 Solicitação vinculada à OS #<%= fd.os_id %>. Ao salvar, o vínculo e a mensagem automática serão registrados no Chat de OS.</div><% } %>
+  <form method="POST" action="<%= submitUrl %>" id="form-solicitacao">
+    <% if (fd.os_id) { %>
+      <input type="hidden" name="os_id" value="<%= fd.os_id %>" />
+      <% if (fd.equipamento_id) { %><input type="hidden" name="equipamento_id" value="<%= fd.equipamento_id %>" /><% } %>
+      <div class="note" style="margin-bottom:12px;">🔗 Solicitação vinculada à OS #<%= fd.os_id %>. Ao salvar, o vínculo e a mensagem automática serão registrados no Chat de OS.</div>
+      <div class="grid-3" style="margin-bottom:12px;">
+        <div><div class="label">Número da OS</div><input class="input" value="OS #<%= fd.os_id %>" readonly /></div>
+        <div><div class="label">Equipamento</div><input class="input" value="<%= fd.equipamento_nome || '-' %>" readonly /></div>
+        <div><div class="label">Setor</div><input class="input" value="<%= fd.setor_os || fd.setor_origem || '-' %>" readonly /></div>
+        <div><div class="label">Motivo da paralisação</div><input class="input" value="<%= fd.motivo_paralisacao || '-' %>" readonly /></div>
+        <div><div class="label">Justificativa técnica</div><input class="input" value="<%= fd.justificativa_tecnica || '-' %>" readonly /></div>
+        <div><div class="label">Ação necessária</div><input class="input" value="<%= fd.acao_necessaria || '-' %>" readonly /></div>
+        <div><div class="label">Usuário solicitante</div><input class="input" value="<%= fd.solicitante_nome || '-' %>" readonly /></div>
+      </div>
+    <% } %>
     <div class="grid-3">
       <div>
         <div class="label">Título</div>
@@ -19,8 +32,10 @@
       <div>
         <div class="label">Setor origem</div>
         <select class="input" name="setor_origem">
-          <option value="Manutenção" <%= (fd.setor_origem || "Manutenção") === "Manutenção" ? "selected" : "" %>>Manutenção</option>
-          <option value="Produção" <%= fd.setor_origem === "Produção" ? "selected" : "" %>>Produção</option>
+          <% const setorOrigemAtual = fd.setor_origem || "Manutenção"; %>
+          <% if (!["Manutenção", "Produção"].includes(setorOrigemAtual)) { %><option value="<%= setorOrigemAtual %>" selected><%= setorOrigemAtual %></option><% } %>
+          <option value="Manutenção" <%= setorOrigemAtual === "Manutenção" ? "selected" : "" %>>Manutenção</option>
+          <option value="Produção" <%= setorOrigemAtual === "Produção" ? "selected" : "" %>>Produção</option>
         </select>
       </div>
       <div>

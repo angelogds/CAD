@@ -63,44 +63,76 @@ function minhas(req, res) {
 }
 
 function nova(req, res) {
-  const osId = Number(req.query.os_id || 0) || null;
-  const os = osId ? osService.getOSById(osId) : null;
-  const formData = os ? {
-    os_id: os.id,
-    equipamento_id: os.equipamento_id || '',
-    setor_origem: 'Manutenção',
-    prioridade: os.prioridade || os.grau || 'MEDIA',
-    titulo: `Material para OS #${os.id} - ${os.equipamento_resolvido || os.equipamento || ''}`,
-    descricao: [`OS #${os.id}`, `Equipamento: ${os.equipamento_resolvido || os.equipamento || '-'}`, `Descrição da OS: ${os.descricao || '-'}`, `Motivo da paralisação: ${os.ultimo_motivo_andamento || '-'}`, `Justificativa técnica: ${os.ultima_justificativa_andamento || '-'}`, 'Solicitação vinculada à OS para rastreabilidade no Chat de OS.'].join('\n'),
-  } : {};
-  res.render("solicitacoes/new", {
-    title: "Nova Solicitação",
-    activeMenu: "solicitacoes",
-    equipamentos: service.listEquipamentos(),
-    estoqueItens: service.listEstoqueItens(),
-    formData,
-    formItens: [],
-  });
+  try {
+    const osId = Number(req.query.os_id || 0) || null;
+    const os = osId ? osService.getOSById(osId) : null;
+    const equipamento = os?.equipamento_resolvido || os?.equipamento_nome || os?.equipamento || '';
+    const motivoParalisacao = os?.ultimo_motivo_andamento || os?.motivo_atual || os?.status || '';
+    const justificativaTecnica = os?.ultima_justificativa_andamento || os?.ultima_justificativa || os?.diagnostico || '';
+    const acaoNecessaria = os?.acao_corretiva || os?.acao_preventiva || os?.resumo_tecnico || os?.acao_executada || '';
+    const prioridade = os?.prioridade || os?.grau || os?.criticidade || 'MEDIA';
+    const solicitante = req.session?.user?.name || req.session?.user?.email || '';
+    const formData = os ? {
+      os_id: os.id,
+      equipamento_id: os.equipamento_id || '',
+      equipamento_nome: equipamento,
+      setor_origem: os.setor_solicitante || os.setor_destinatario || 'Manutenção',
+      setor_os: os.setor_solicitante || os.setor_destinatario || '',
+      prioridade,
+      solicitante_nome: solicitante,
+      motivo_paralisacao: motivoParalisacao,
+      justificativa_tecnica: justificativaTecnica,
+      acao_necessaria: acaoNecessaria,
+      titulo: `Material para OS #${os.id}${equipamento ? ` - ${equipamento}` : ''}`,
+      descricao: [
+        `Número da OS: ${os.id}`,
+        `Equipamento: ${equipamento || '-'}`,
+        `Setor: ${os.setor_solicitante || os.setor_destinatario || '-'}`,
+        `Descrição da OS: ${os.descricao || '-'}`,
+        `Motivo da paralisação: ${motivoParalisacao || '-'}`,
+        `Justificativa técnica: ${justificativaTecnica || '-'}`,
+        `Ação necessária: ${acaoNecessaria || '-'}`,
+        `Prioridade: ${prioridade || '-'}`,
+        `Usuário solicitante: ${solicitante || '-'}`,
+      ].join('\n'),
+    } : {};
+    res.render("solicitacoes/new", {
+      title: "Nova Solicitação",
+      activeMenu: "solicitacoes",
+      equipamentos: service.listEquipamentos(),
+      estoqueItens: service.listEstoqueItens(),
+      formData,
+      formItens: [],
+      editMode: false,
+      actionUrl: "/solicitacoes",
+    });
+  } catch (error) {
+    console.error('[OS_SOLICITACAO_VINCULADA_ERRO]', error);
+    req.flash("error", "Não foi possível abrir a solicitação vinculada à OS.");
+    return res.redirect(req.query.os_id ? `/os/${Number(req.query.os_id)}` : "/solicitacoes/minhas");
+  }
 }
 
 function criar(req, res) {
+  const osId = Number(req.body.os_id || 0) || null;
   try {
     const itens = service.parseItensFromBody(req.body);
 
     if (!itens.length) {
       req.flash("error", "Informe ao menos um item válido.");
-      return res.redirect("/solicitacoes/nova");
+      return res.redirect(osId ? `/solicitacoes/nova?os_id=${osId}` : "/solicitacoes/nova");
     }
 
     const id = service.createSolicitacao({ ...req.body, userId: req.session.user.id, itens });
-    if (req.body.os_id) {
-      try { osChatService.criarVinculoSolicitacaoOS(Number(req.body.os_id), id, req.session.user.id); } catch (_e) {}
+    if (osId) {
+      osChatService.criarVinculoSolicitacaoOS(osId, id, req.session.user.id);
     }
-    req.flash("success", "✅ Solicitação criada com sucesso!");
-    return res.redirect(req.body.os_id ? `/chat-os/${Number(req.body.os_id)}` : `/solicitacoes/${id}`);
+    req.flash("success", osId ? "✅ Solicitação criada e vinculada à OS com sucesso!" : "✅ Solicitação criada com sucesso!");
+    return res.redirect(osId ? `/os/${osId}` : `/solicitacoes/${id}`);
   } catch (error) {
+    if (osId) console.error('[OS_SOLICITACAO_VINCULADA_ERRO]', error);
     req.flash("error", error.message || "Não foi possível criar a solicitação.");
-    return res.redirect("/solicitacoes/nova");
+    return res.redirect(osId ? `/solicitacoes/nova?os_id=${osId}` : "/solicitacoes/nova");
   }
 }
 

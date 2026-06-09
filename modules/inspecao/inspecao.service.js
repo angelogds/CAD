@@ -659,11 +659,25 @@ function listOSEmAndamentoDetalhadas(_inspecaoId, mes, ano) {
     }
     const codigoAtual = tableExists("os_andamento_historico") ? db.prepare(`SELECT motivo_codigo FROM os_andamento_historico WHERE os_id = ? ORDER BY datetime(registrado_em) DESC, id DESC LIMIT 1`).get(row.id)?.motivo_codigo : null;
     const materialChegouEm = tableExists("os_andamento_historico") ? db.prepare(`SELECT registrado_em FROM os_andamento_historico WHERE os_id = ? AND motivo_codigo = 'MATERIAL_CHEGOU' ORDER BY datetime(registrado_em) DESC, id DESC LIMIT 1`).get(row.id)?.registrado_em : null;
-    const chatUltima = tableExists("os_chat_mensagens") ? db.prepare(`SELECT tipo, mensagem, autor_nome, created_at FROM os_chat_mensagens WHERE os_id = ? AND deleted_at IS NULL ORDER BY datetime(created_at) DESC, id DESC LIMIT 1`).get(row.id) : null;
-    const chatHistorico = tableExists("os_chat_mensagens") ? db.prepare(`SELECT tipo, mensagem, autor_nome, created_at FROM os_chat_mensagens WHERE os_id = ? AND deleted_at IS NULL ORDER BY datetime(created_at) DESC, id DESC LIMIT 6`).all(row.id) : [];
-    const chatInspecaoComentou = tableExists("os_chat_mensagens") ? !!db.prepare(`SELECT 1 FROM os_chat_mensagens WHERE os_id = ? AND tipo = 'INSPECAO' AND deleted_at IS NULL LIMIT 1`).get(row.id) : false;
-    const chatComprasRespondeu = tableExists("os_chat_mensagens") ? !!db.prepare(`SELECT 1 FROM os_chat_mensagens WHERE os_id = ? AND tipo IN ('COMPRAS','COMPRA_ATUALIZADA') AND deleted_at IS NULL LIMIT 1`).get(row.id) : false;
-    const solicitacaoVinculada = tableExists("solicitacoes") ? db.prepare(`SELECT id, numero, status FROM solicitacoes WHERE os_id = ? ORDER BY id DESC LIMIT 1`).get(row.id) : null;
+    const hasChatMensagens = tableExists("os_chat_mensagens");
+    const chatUltima = hasChatMensagens ? db.prepare(`SELECT tipo, mensagem, autor_nome, perfil, created_at FROM os_chat_mensagens WHERE os_id = ? AND deleted_at IS NULL ORDER BY datetime(created_at) DESC, id DESC LIMIT 1`).get(row.id) : null;
+    const chatHistorico = hasChatMensagens ? db.prepare(`SELECT tipo, mensagem, autor_nome, perfil, created_at FROM os_chat_mensagens WHERE os_id = ? AND deleted_at IS NULL ORDER BY datetime(created_at) DESC, id DESC LIMIT 6`).all(row.id) : [];
+    const chatParticipantesRows = hasChatMensagens ? db.prepare(`
+      SELECT autor_nome, perfil, tipo, MIN(id) AS ordem
+      FROM os_chat_mensagens
+      WHERE os_id = ? AND deleted_at IS NULL
+      GROUP BY COALESCE(autor_nome, ''), COALESCE(perfil, ''), COALESCE(tipo, '')
+      ORDER BY ordem
+    `).all(row.id) : [];
+    const chatParticipantes = chatParticipantesRows
+      .map((p) => {
+        const nome = String(p.autor_nome || 'Sistema').trim() || 'Sistema';
+        const perfil = String(p.perfil || p.tipo || '').trim().replace(/_/g, ' ');
+        return perfil ? `${nome}/${perfil}` : nome;
+      })
+      .filter(Boolean)
+      .join(', ');
+    const solicitacaoVinculada = tableExists("solicitacoes") && tableColumns("solicitacoes").includes("os_id") ? db.prepare(`SELECT id, numero, status FROM solicitacoes WHERE os_id = ? ORDER BY id DESC LIMIT 1`).get(row.id) : null;
     return {
       ...row,
       dias_aberta: calcularDiasEntre(row.opened_at),
@@ -673,8 +687,7 @@ function listOSEmAndamentoDetalhadas(_inspecaoId, mes, ano) {
       acao_necessaria: ACAO_NECESSARIA_ANDAMENTO[codigoAtual] || "Registrar e acompanhar ação necessária",
       chat_ultima_interacao: chatUltima,
       chat_historico: chatHistorico,
-      chat_inspecao_comentou: chatInspecaoComentou,
-      chat_compras_respondeu: chatComprasRespondeu,
+      chat_participantes: chatParticipantes,
       solicitacao_vinculada: solicitacaoVinculada,
     };
   });
