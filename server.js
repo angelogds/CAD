@@ -251,11 +251,23 @@ app.use((req, res, next) => {
       WHERE UPPER(COALESCE(status,'')) IN ('PENDENTE','ATRASADA') AND date(COALESCE(data_prevista,'')) = date('now','localtime')
     `).get()?.total || 0;
 
+    let osChatNaoLidas = 0;
+    let osChatNotificacoes = [];
+    try {
+      if (req.session?.user?.id) {
+        const osChatService = require("./modules/os-chat/os-chat.service");
+        osChatNaoLidas = osChatService.contarNaoLidas(req.session.user.id);
+        osChatNotificacoes = osChatService.listarNotificacoesChat(req.session.user.id);
+      }
+    } catch (_chatErr) {}
+
     res.locals.operationalCounters = {
       osAbertas: Number(osAbertas || 0),
       osCriticas: Number(osCriticas || 0),
       preventivasHoje: Number(preventivasHoje || 0),
+      osChatNaoLidas: Number(osChatNaoLidas || 0),
     };
+    res.locals.osChatNotificacoes = osChatNotificacoes;
   } catch (_e) {
     res.locals.operationalCounters = { osAbertas: 0, osCriticas: 0, preventivasHoje: 0 };
   }
@@ -293,6 +305,7 @@ mount("/mobile", "./modules/mobile/mobile.routes");
 mount(OFFICIAL_ROUTES.pcm, "./modules/pcm/pcm.routes");
 mount("/equipamentos", "./modules/equipamentos/equipamentos.routes");
 mount(OFFICIAL_ROUTES.os, "./modules/os/os.routes");
+mount("/chat-os", "./modules/os-chat/os-chat.routes");
 app.post("/api/os/:id/notificacoes/whatsapp", requireLogin, canSendWhatsappNotification, osControllerForAdminDebug.osEnviarWhatsapp);
 app.get("/api/os/:id/colaboradores-contato", requireLogin, canSendWhatsappNotification, osControllerForAdminDebug.osColaboradoresContato);
 app.get("/admin/debug-whatsapp-os/:id", requireLogin, requireRole(["ADMIN"]), osControllerForAdminDebug.debugWhatsappOS);

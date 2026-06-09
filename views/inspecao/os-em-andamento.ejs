@@ -152,6 +152,15 @@
           <section class="os-section"><h3>Motivo da paralisação</h3><p><%= os.motivo_atual || 'Justificativa pendente' %></p></section>
           <section class="os-section"><h3>Justificativa técnica</h3><p><%= os.ultima_justificativa || '-' %></p></section>
           <section class="os-section"><h3>🔧 Ação necessária</h3><p><%= os.acao_necessaria || 'Registrar e acompanhar ação necessária' %></p></section>
+          <section class="os-section"><h3>💬 Chat de OS</h3>
+            <p><strong>Última interação:</strong> <%= os.chat_ultima_interacao ? os.chat_ultima_interacao.mensagem : 'Sem interação no chat' %></p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+              <span class="os-material <%= os.chat_inspecao_comentou ? 'ok' : 'pending' %>">Inspeção <%= os.chat_inspecao_comentou ? 'comentou' : 'não comentou' %></span>
+              <span class="os-material <%= os.chat_compras_respondeu ? 'ok' : 'pending' %>">Compras <%= os.chat_compras_respondeu ? 'respondeu' : 'sem resposta' %></span>
+              <span class="os-material <%= os.solicitacao_vinculada ? 'ok' : 'pending' %>"><%= os.solicitacao_vinculada ? ('Solicitação ' + (os.solicitacao_vinculada.numero || ('#' + os.solicitacao_vinculada.id))) : 'Sem solicitação vinculada' %></span>
+            </div>
+            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;"><a class="btn btn-outline" href="/chat-os/<%= os.id %>">💬 Conversa</a><a class="btn btn-outline" href="/os/<%= os.id %>">Abrir OS</a></div>
+          </section>
           <section class="os-section">
             <h3>📦 Material</h3>
             <span class="os-material <%= pendenteMaterial ? 'pending' : 'ok' %>"><%= pendenteMaterial ? 'Material pendente' : 'Material disponível' %><% if (os.material_chegou_em) { %> • <%= fmtBR(os.material_chegou_em) %><% } %></span>

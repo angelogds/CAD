@@ -30,6 +30,15 @@
   </div>
 </div>
 
+<% if (solicitacao.os_id) { %>
+  <div class="card" style="margin-bottom:14px;border-left:4px solid #16a34a;">
+    <strong>🔗 Vinculada à OS <%= solicitacao.os_id %></strong>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+      <a class="btn btn-green" href="/chat-os/<%= solicitacao.os_id %>">Abrir conversa da OS</a>
+      <a class="btn btn-ghost" href="/os/<%= solicitacao.os_id %>">Abrir OS</a>
+    </div>
+  </div>
+<% } %>
 
 <div class="card" style="margin-bottom:14px;">
   <div class="label">Timeline</div>

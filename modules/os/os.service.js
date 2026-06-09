@@ -1,4 +1,6 @@
 const db = require("../../database/db");
+let osChatService = null;
+try { osChatService = require('../os-chat/os-chat.service'); } catch (_e) {}
 const { classifyOSPriority } = require("./os-priority.service");
 const osIAService = require("./os-ia.service");
 const iaRepository = require("../ia/ia.repository");
@@ -1359,6 +1361,7 @@ async function registrarJustificativaAndamento(osId, payload = {}) {
     `).run(motivo.nome, textoTecnico, id);
   })();
   syncInspecaoFromOS(id);
+  try { osChatService?.registrarMensagemSistema(id, 'JUSTIFICATIVA_REGISTRADA', `Justificativa registrada: ${motivo.nome}. ${textoTecnico}`, { user_id: payload.usuario_id }); } catch (_e) {}
   emitOSEvents(id, "status");
   return getHistoricoAndamentoOS(id)[0];
 }
@@ -2269,6 +2272,7 @@ function iniciarOS(id, userId) {
 
   args.push(id);
   db.prepare(`UPDATE os SET ${sets.join(", ")} WHERE id = ?`).run(...args);
+  try { osChatService?.registrarMensagemSistema(id, 'STATUS_OS_ALTERADO', `OS #${id} iniciada e colocada em andamento.`, { user_id: userId }); } catch (_e) {}
 
   emitOSEvents(id, "status");
   pushService
@@ -2290,6 +2294,7 @@ function pausarOS(id) {
   if (!os) throw new Error("OS não encontrada.");
 
   db.prepare(`UPDATE os SET status = 'PAUSADA' WHERE id = ?`).run(id);
+  try { osChatService?.registrarMensagemSistema(id, 'STATUS_OS_ALTERADO', `OS #${id} pausada.`, {}); } catch (_e) {}
   emitOSEvents(id, "status");
   if (inspecaoService?.syncFromOS) {
     try {
@@ -2550,6 +2555,7 @@ function updateStatus(id, status) {
   if (!st) return;
 
   db.prepare(`UPDATE os SET status = ? WHERE id = ?`).run(st, id);
+  try { osChatService?.registrarMensagemSistema(id, 'STATUS_OS_ALTERADO', `Status da OS alterado para ${st}.`, {}); } catch (_e) {}
   emitOSEvents(id, "status");
 
   if (st === "ANDAMENTO" || st === "EM_ANDAMENTO") {

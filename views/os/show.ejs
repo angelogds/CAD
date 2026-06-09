@@ -80,6 +80,31 @@
 
 <% const isOSFechada = String(os.status || '').toUpperCase() === 'FECHADA'; %>
 
+<div class="card" style="margin-top:10px;border-left:4px solid #16a34a;">
+  <div class="card-head">
+    <div><strong>💬 Conversa da OS</strong><div class="muted">Comunicação oficial, rastreabilidade e tratativas vinculadas a esta OS.</div></div>
+    <div class="actions"><a class="btn btn-green" href="/chat-os/<%= os.id %>">Abrir conversa da OS</a><a class="btn btn-ghost" href="/solicitacoes/nova?os_id=<%= os.id %>">Criar solicitação vinculada</a></div>
+  </div>
+  <% const ultMsg = chatResumo && chatResumo.mensagens && chatResumo.mensagens.length ? chatResumo.mensagens[chatResumo.mensagens.length - 1] : null; %>
+  <div class="grid2">
+    <div><b>Última mensagem:</b> <%= ultMsg ? ultMsg.mensagem : 'Sem mensagens registradas' %></div>
+    <div><b>Não lidas:</b> <%= chatResumo ? chatResumo.naoLidas : 0 %></div>
+    <div><b>Solicitação vinculada:</b> <%= chatResumo && chatResumo.solicitacao ? (chatResumo.solicitacao.numero || ('#' + chatResumo.solicitacao.id)) : 'Não' %></div>
+    <div><b>Status da solicitação:</b> <%= chatResumo && chatResumo.solicitacao ? chatResumo.solicitacao.status : '-' %></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:10px;">
+  <div class="card-head"><strong>Rastreabilidade da OS</strong><span class="muted">Abertura, andamento, solicitação, compras, inspeção e chat.</span></div>
+  <ul style="margin:0;padding-left:18px;">
+    <li>Abertura da OS: <%= os.opened_at ? fmtBR(os.opened_at) : '-' %> por <%= os.solicitante_nome || '-' %>.</li>
+    <li>Status atual: <%= os.status || '-' %>; motivo atual: <%= os.ultimo_motivo_andamento || 'Sem motivo registrado' %>.</li>
+    <li>Última justificativa: <%= os.ultima_justificativa_andamento || 'Sem justificativa técnica registrada' %>.</li>
+    <% if (chatResumo && chatResumo.solicitacao) { %><li>Solicitação vinculada: <a href="/solicitacoes/<%= chatResumo.solicitacao.id %>"><%= chatResumo.solicitacao.numero || ('#' + chatResumo.solicitacao.id) %></a> — <%= chatResumo.solicitacao.status %>.</li><% } %>
+    <% (chatResumo && chatResumo.mensagens ? chatResumo.mensagens.slice(-3) : []).forEach((m) => { %><li><%= m.created_at ? fmtBR(m.created_at) : '-' %> — <strong><%= m.tipo %></strong>: <%= m.mensagem %></li><% }) %>
+  </ul>
+</div>
+
 <div class="top" style="margin-top:10px;">
   <div class="card">
     <div class="card-head">

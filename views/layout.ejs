@@ -40,6 +40,19 @@
 
           <div class="topbar-right">
             <% if (user) { %>
+              <% const chatNotifs = Array.isArray(typeof osChatNotificacoes !== 'undefined' ? osChatNotificacoes : []) ? osChatNotificacoes : []; %>
+              <% const chatUnread = Number((operationalCounters && operationalCounters.osChatNaoLidas) || 0); %>
+              <details class="chat-bell" style="position:relative;">
+                <summary class="btn btn-ghost" style="list-style:none;cursor:pointer;">🔔 <strong><%= chatUnread %></strong></summary>
+                <div style="position:absolute;right:0;top:42px;width:320px;max-width:80vw;background:#fff;border:1px solid #d1d5db;border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,.14);padding:8px;z-index:30;">
+                  <% if (!chatNotifs.length) { %><div class="muted" style="padding:10px;">Sem novas notificações do Chat de OS.</div><% } %>
+                  <% chatNotifs.forEach((n) => { %>
+                    <a href="/chat-os/<%= n.origem_id %>" style="display:block;padding:9px;border-radius:10px;text-decoration:none;color:inherit;border-bottom:1px solid #f1f5f9;">
+                      <strong><%= n.titulo %></strong><br><span class="muted"><%= n.mensagem %></span>
+                    </a>
+                  <% }) %>
+                </div>
+              </details>
               <div class="pill">
                 <% if (user.photo_path) { %>
                   <img class="pill-avatar" src="<%= user.photo_path %>" alt="Foto de <%= user.name %>" />

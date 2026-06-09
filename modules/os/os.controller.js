@@ -9,6 +9,7 @@ const embeddingsService = require("../ai/ai.embeddings.service");
 const visionService = require("../ai/ai.vision.service");
 const whatsappService = require("../whatsapp/whatsapp.service");
 const osDocumentService = require("./os-document.service");
+const osChatService = require("../os-chat/os-chat.service");
 const { canSendWhatsappNotificationRole } = require("../../middlewares/permissions.middleware");
 
 function mapFilesToPublic(files = []) {
@@ -246,6 +247,8 @@ function osShow(req, res) {
   const metricasAndamento = service.calcularDiasAbertaOS(osAtual);
   const ultimoRegistroHoje = service.temJustificativaAndamentoHoje(id);
   const documentoInstitucional = osDocumentService.getLatestInstitutionalDocument(id);
+  let chatResumo = null;
+  try { chatResumo = osChatService.buscarConversaPorOS(id, req.session?.user || {}); } catch (_e) { chatResumo = null; }
 
   return res.render("os/show", {
     title: `OS #${id}`,
@@ -271,6 +274,7 @@ function osShow(req, res) {
     metricasAndamento,
     alertaJustificativaAndamento: service.isStatusOSEmAndamento(osAtual.status) && metricasAndamento.dias_aberta > 1 && !ultimoRegistroHoje,
     documentoInstitucional,
+    chatResumo,
     user: req.session?.user || null,
   });
 }
