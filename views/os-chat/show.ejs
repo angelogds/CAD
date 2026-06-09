@@ -1,10 +1,10 @@
 <% layout('layout') %>
 <%- include('partials-styles') %>
 <% const os = conversa.os; const sol = conversa.solicitacao; %>
-<div class="page-head"><div><h1>💬 Chat de OS #<%= os.id %></h1><p class="muted">Conversa oficial da Ordem de Serviço.</p></div><a class="btn btn-ghost" href="/chat-os">Todas as conversas</a></div>
+<div class="page-head"><div><h1>💬 Chat de OS #<%= os.id %></h1><p class="muted">Conversa oficial da Ordem de Serviço.</p></div><a class="btn btn-ghost" href="/chat-os">Conversas elegíveis</a></div>
 <div class="os-chat-shell">
   <aside class="os-chat-list compact">
-    <% conversas.forEach((c) => { %><a class="os-chat-contact <%= Number(c.id)===Number(os.id)?'active':'' %>" href="/chat-os/<%= c.id %>?filtro=<%= filtro %>"><strong>OS <%= c.id %> - <%= c.equipamento %></strong><small><%= c.ultima_mensagem || c.motivo_atual || 'Sem mensagens' %></small><% if(c.nao_lidas>0){%><span class="badge-unread"><%= c.nao_lidas %></span><%}%></a><% }) %>
+    <% conversas.forEach((c) => { const motivo=c.motivo_atual || (c.esta_atrasada ? 'OS em atraso' : (c.tem_solicitacao ? 'Solicitação vinculada' : (c.tem_chat ? 'Conversa registrada' : 'Tratativa registrada'))); %><a class="os-chat-contact <%= Number(c.id)===Number(os.id)?'active':'' %>" href="/chat-os/<%= c.id %>?filtro=<%= filtro %>"><strong>OS <%= c.id %> - <%= c.equipamento %></strong><small>Status: <%= c.status || '-' %> • <%= motivo %></small><small>Última interação: <%= c.ultima_mensagem_em ? fmtBR(c.ultima_mensagem_em) : 'Sem mensagens no chat' %></small><% if(c.nao_lidas>0){%><span class="badge-unread"><%= c.nao_lidas %></span><%}%></a><% }) %>
   </aside>
   <section class="os-chat-conversation">
     <header class="os-chat-header">

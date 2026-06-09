@@ -6,7 +6,7 @@ O módulo **Chat de OS** transforma cada Ordem de Serviço em uma conversa ofici
 
 ## Fluxo operacional
 
-1. **OS aberta ou em andamento** aparece na lista `/chat-os`.
+1. **Somente OS com motivo real de acompanhamento** aparece na lista `/chat-os`: conversa, justificativa, atraso, pausa, criticidade, solicitação vinculada ou histórico de tratativa. OS aberta simples sem pendência não é listada.
 2. **Justificativa de andamento** registrada na OS gera mensagem automática no chat.
 3. Usuários autorizados enviam mensagens por setor: Manutenção, Inspeção, Compras ou Almoxarifado.
 4. Quando houver falta de material, a partir da OS ou do chat é possível abrir uma **solicitação vinculada**.
@@ -54,9 +54,9 @@ Migração: `database/migrations/160_os_chat_por_os.js`.
 
 ## Como testar manualmente
 
-1. Abrir uma OS.
+1. Abrir uma OS simples, sem justificativa, sem atraso e sem conversa, e confirmar que ela **não** aparece em `/chat-os`.
 2. Registrar motivo de andamento, por exemplo `Falta de material`.
-3. Abrir `/chat-os` e confirmar que a OS aparece como conversa.
+3. Abrir `/chat-os` e confirmar que a OS passa a aparecer como conversa elegível.
 4. Entrar na conversa da OS e enviar mensagem pela manutenção.
 5. Entrar com perfil inspeção e responder na mesma conversa.
 6. Verificar contador e dropdown do sino no topo.
