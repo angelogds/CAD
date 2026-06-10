@@ -250,6 +250,99 @@ function updateSolicitacao(id, data = {}) {
   })();
 }
 
+function getOsIdsVinculadas(solicitacao) {
+  const ids = new Set();
+  const directOsId = sanitizePositiveId(solicitacao?.os_id);
+  if (directOsId) ids.add(directOsId);
+
+  if (tableExists("os_solicitacoes_vinculos")) {
+    db.prepare("SELECT os_id FROM os_solicitacoes_vinculos WHERE solicitacao_id = ?")
+      .all(Number(solicitacao.id))
+      .forEach((row) => {
+        const osId = sanitizePositiveId(row.os_id);
+        if (osId) ids.add(osId);
+      });
+  }
+
+  return Array.from(ids);
+}
+
+function hasMovimentacaoSolicitacao(solicitacao) {
+  if (!solicitacao) return false;
+  if (getOsIdsVinculadas(solicitacao).length > 0) return true;
+
+  const statusAtual = String(solicitacao.status || "").toUpperCase();
+  if (statusAtual && ![STATUS.ABERTA, STATUS.DEVOLVIDA_REVISAO, STATUS.CANCELADA].includes(statusAtual)) return true;
+
+  const trackingFields = [
+    "compras_user_id",
+    "almox_user_id",
+    "cotacao_inicio_em",
+    "comprada_em",
+    "recebimento_inicio_em",
+    "recebida_em",
+    "fechada_em",
+    "reaberta_em",
+    "fornecedor",
+    "previsao_entrega",
+    "valor_total",
+  ];
+  if (trackingFields.some((field) => solicitacao[field] !== null && solicitacao[field] !== undefined && String(solicitacao[field]).trim() !== "")) return true;
+
+  if (tableExists("estoque_movimentos")) {
+    const movimento = db.prepare("SELECT 1 FROM estoque_movimentos WHERE referencia_tipo = 'SOLICITACAO' AND referencia_id = ? LIMIT 1").get(Number(solicitacao.id));
+    if (movimento) return true;
+  }
+
+  return false;
+}
+
+function removeAnexosSolicitacao(solicitacaoId) {
+  if (!tableExists("compras_anexos")) return;
+  const columns = tableColumns("compras_anexos");
+  const clauses = [];
+  const params = [];
+
+  if (columns.includes("referencia_tipo") && columns.includes("referencia_id")) {
+    clauses.push("(referencia_tipo = 'SOLICITACAO' AND referencia_id = ?)");
+    params.push(solicitacaoId);
+  }
+  if (columns.includes("solicitacao_id")) {
+    clauses.push("solicitacao_id = ?");
+    params.push(solicitacaoId);
+  }
+  if (clauses.length) db.prepare(`DELETE FROM compras_anexos WHERE ${clauses.join(" OR ")}`).run(...params);
+}
+
+function excluirSolicitacao(id) {
+  const solicitacao = getSolicitacaoById(id);
+  if (!solicitacao) throw new Error("Solicitação não encontrada.");
+
+  return db.transaction(() => {
+    const osIds = getOsIdsVinculadas(solicitacao);
+    const manterRastreabilidade = hasMovimentacaoSolicitacao(solicitacao);
+
+    if (manterRastreabilidade) {
+      const updates = ["status = ?"];
+      const params = [STATUS.CANCELADA];
+      if (hasColumn("solicitacoes", "updated_at")) updates.push("updated_at = datetime('now')");
+      if (hasColumn("solicitacoes", "deleted_at")) updates.push("deleted_at = datetime('now')");
+      if (hasColumn("solicitacoes", "ativo")) {
+        updates.push("ativo = ?");
+        params.push(0);
+      }
+      params.push(Number(id));
+      db.prepare(`UPDATE solicitacoes SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+      return { modo: "cancelada", solicitacao, osIds };
+    }
+
+    removeAnexosSolicitacao(Number(id));
+    if (tableExists("solicitacao_itens")) db.prepare("DELETE FROM solicitacao_itens WHERE solicitacao_id = ?").run(Number(id));
+    db.prepare("DELETE FROM solicitacoes WHERE id = ?").run(Number(id));
+    return { modo: "excluida", solicitacao, osIds };
+  })();
+}
+
 function canListAllSolicitacoes(user) {
   const role = normalizeRole(user?.role);
   return ["ADMIN", "COMPRAS", "ALMOXARIFADO", "DIRETORIA", "GESTAO", "ENCARREGADO_MANUTENCAO", "MANUTENCAO_SUPERVISOR"].includes(role);
@@ -420,4 +513,4 @@ function listEstoqueItens() {
   return db.prepare("SELECT id, codigo, nome, unidade FROM estoque_itens WHERE ativo = 1 ORDER BY nome").all();
 }
 
-module.exports = { STATUS, LIST_STATUS, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, createSolicitacao, updateSolicitacao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };
+module.exports = { STATUS, LIST_STATUS, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, createSolicitacao, updateSolicitacao, excluirSolicitacao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };
