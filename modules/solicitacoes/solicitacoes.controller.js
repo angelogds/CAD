@@ -222,6 +222,43 @@ function detalhe(req, res) {
   }
 }
 
+
+function excluir(req, res) {
+  const id = Number(req.params.id);
+  try {
+    const resultado = service.excluirSolicitacao(id);
+    const numero = resultado.solicitacao?.numero || id;
+
+    for (const osId of resultado.osIds || []) {
+      try {
+        osChatService.registrarMensagemSistema(
+          osId,
+          "SOLICITACAO_CANCELADA",
+          `Solicitação de material nº ${numero} foi cancelada/excluída pelo administrador.`,
+          { solicitacao_id: id, user_id: req.session.user.id }
+        );
+      } catch (chatError) {
+        console.warn("[solicitacoes.excluir] Não foi possível registrar histórico da OS", {
+          solicitacaoId: id,
+          osId,
+          message: chatError.message,
+        });
+      }
+    }
+
+    req.flash("success", "Solicitação excluída com sucesso.");
+  } catch (error) {
+    console.error("[solicitacoes.excluir] Falha ao excluir solicitação", {
+      solicitacaoId: id,
+      usuarioLogado: req.session?.user?.id,
+      message: error.message,
+      stack: error.stack,
+    });
+    req.flash("error", "Não foi possível excluir a solicitação.");
+  }
+  return res.redirect("/solicitacoes/minhas");
+}
+
 function pdf(req, res) {
   const id = Number(req.params.id);
   try {
@@ -263,4 +300,4 @@ function pdf(req, res) {
   }
 }
 
-module.exports = { minhas, nova, criar, editar, atualizar, detalhe, pdf };
+module.exports = { minhas, nova, criar, editar, atualizar, detalhe, excluir, pdf };
