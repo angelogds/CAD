@@ -408,10 +408,28 @@ const deletarAnexo = deleteAnexo;
 const PDF_FALLBACK = 'Não informado';
 const PDF_PENDING = 'Informação pendente de confirmação';
 
+function sanitizePdfText(value) {
+  return String(value ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/Ð/g, '')
+    .replace(/\u0000/g, '')
+    .trim();
+}
+
+function hasUsefulPdfText(value) {
+  const text = sanitizePdfText(value);
+  return !!text && !['-', PDF_FALLBACK, PDF_PENDING].includes(text);
+}
+
 function pdfValue(value, fallback = PDF_FALLBACK) {
-  if (value === null || value === undefined) return fallback;
-  const text = String(value).trim();
+  const text = sanitizePdfText(value);
   return text || fallback;
+}
+
+function pdfOptional(value) {
+  const text = sanitizePdfText(value);
+  return hasUsefulPdfText(text) ? text : '';
 }
 
 function getSolicitacaoPdfLogoPath() {
@@ -431,6 +449,56 @@ function resolveAnexoPath(anexo) {
   return fs.existsSync(candidate) ? candidate : null;
 }
 
+function getSolicitacaoOsContext(osId) {
+  if (!osId || !tableExists('os')) return null;
+  try {
+    const canJoinEquipamento = tableExists('equipamentos') && columnExists('os', 'equipamento_id');
+    const equipamentoParts = [];
+    if (canJoinEquipamento) equipamentoParts.push('e.nome');
+    if (columnExists('os', 'equipamento_manual')) equipamentoParts.push('o.equipamento_manual');
+    if (columnExists('os', 'equipamento')) equipamentoParts.push('o.equipamento');
+    const equipamentoExpr = equipamentoParts.length ? `COALESCE(${equipamentoParts.join(', ')})` : "''";
+    const equipamentoJoin = canJoinEquipamento ? 'LEFT JOIN equipamentos e ON e.id = o.equipamento_id' : '';
+    return db.prepare(`
+      SELECT o.*, ${equipamentoExpr} AS equipamento_resolvido
+      FROM os o
+      ${equipamentoJoin}
+      WHERE o.id = ?
+    `).get(osId) || null;
+  } catch (_e) {
+    return null;
+  }
+}
+
+function buildMotivoSolicitacao(solicitacao, osContext, equipamentoNome) {
+  const rawDescricao = pdfOptional(solicitacao.descricao || solicitacao.motivo);
+  const lines = rawDescricao.split('\n').map((line) => sanitizePdfText(line)).filter(Boolean);
+  const byLabel = new Map();
+  lines.forEach((line) => {
+    const match = line.match(/^([^:]+):\s*(.*)$/);
+    if (!match) return;
+    byLabel.set(match[1].trim().toLowerCase(), match[2].trim());
+  });
+
+  const osNumero = solicitacao.os_id || byLabel.get('número da os') || byLabel.get('numero da os') || osContext?.id;
+  const problema = pdfOptional(osContext?.descricao)
+    || pdfOptional(byLabel.get('problema identificado') || byLabel.get('problema'))
+    || lines.find((line) => !line.includes(':'))
+    || '';
+  const motivoParalisacao = pdfOptional(byLabel.get('motivo da paralisação') || byLabel.get('motivo da paralisacao') || byLabel.get('motivo'));
+  const justificativa = pdfOptional(byLabel.get('justificativa técnica') || byLabel.get('justificativa tecnica') || osContext?.diagnostico || osContext?.resumo_tecnico || osContext?.causa_diagnostico);
+  const acaoNecessaria = pdfOptional(byLabel.get('ação necessária') || byLabel.get('acao necessaria') || osContext?.acao_executada)
+    || 'Isolar a falha, inspecionar os componentes e corrigir após diagnóstico.';
+
+  const blocks = [];
+  if (osNumero || equipamentoNome) blocks.push(`OS ${osNumero || '-'}${equipamentoNome ? ` - ${equipamentoNome}` : ''}`);
+  if (problema) blocks.push(`Problema:\n${problema}`);
+  if (motivoParalisacao) blocks.push(`Motivo da paralisação:\n${motivoParalisacao}`);
+  if (justificativa) blocks.push(`Justificativa técnica:\n${justificativa}`);
+  if (acaoNecessaria) blocks.push(`Ação necessária:\n${acaoNecessaria}`);
+  return blocks.join('\n\n') || PDF_PENDING;
+}
+
 function gerarPdf(solicitacao, res) {
   const PDFDocument = getPDFKit();
   if (!PDFDocument) {
@@ -439,7 +507,7 @@ function gerarPdf(solicitacao, res) {
     throw err;
   }
 
-  const doc = new PDFDocument({ margin: 34, size: 'A4', bufferPages: true, autoFirstPage: true });
+  const doc = new PDFDocument({ margin: 28, size: 'A4', bufferPages: true, autoFirstPage: true });
   res.setHeader('Content-Type', 'application/pdf');
   const numeroArquivo = pdfValue(solicitacao.numero, solicitacao.id || 'sem-numero').replace(/[^a-z0-9_-]+/gi, '_');
   res.setHeader('Content-Disposition', `attachment; filename=solicitacao_${numeroArquivo}.pdf`);
@@ -455,163 +523,242 @@ function gerarPdf(solicitacao, res) {
     border: '#D1D5DB',
     white: '#FFFFFF',
   };
+  const LEFT = 28;
+  const RIGHT = doc.page.width - 28;
+  const WIDTH = RIGHT - LEFT;
+  const CONTENT_BOTTOM = doc.page.height - 66;
+  const issuedAt = new Date();
   const statusLabel = pdfValue(solicitacao.status).replaceAll('_', ' ');
   const numeroSolicitacao = pdfValue(solicitacao.numero, `#${solicitacao.id || 'sem-id'}`);
+  const osContext = getSolicitacaoOsContext(solicitacao.os_id);
+  const equipamentoNome = pdfOptional(solicitacao.equipamento_nome)
+    || pdfOptional(osContext?.equipamento_resolvido)
+    || pdfOptional(osContext?.equipamento_manual)
+    || pdfOptional(osContext?.equipamento);
   const logoPath = getSolicitacaoPdfLogoPath();
-  const drawFooter = () => {
-    const bottom = doc.page.height - 44;
-    doc.strokeColor(COLORS.green).lineWidth(0.8).moveTo(34, bottom - 8).lineTo(doc.page.width - 34, bottom - 8).stroke();
-    doc.fillColor(COLORS.greenInst).fontSize(8).font('Helvetica')
-      .text('Reciclagem Campo do Gado — Manutenção Campo do Gado', 34, bottom)
-      .text('Documento gerado automaticamente pelo Sistema de Manutenção Campo do Gado V2', 34, bottom + 10)
-      .text(`Emissão: ${new Date().toLocaleString('pt-BR')}`, 34, bottom + 20);
+  let y = 0;
+
+  const formatDate = (value, withTime = false) => {
+    if (!value) return '';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return pdfOptional(value);
+    return withTime
+      ? date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+      : date.toLocaleDateString('pt-BR');
   };
 
-  doc.rect(0, 0, doc.page.width, 105).fill(COLORS.green);
+  const drawFooter = (pageNumber, totalPages) => {
+    const lineY = doc.page.height - 43;
+    doc.strokeColor(COLORS.green).lineWidth(0.7).moveTo(LEFT, lineY - 5).lineTo(RIGHT, lineY - 5).stroke();
+    doc.fillColor(COLORS.greenInst).font('Helvetica').fontSize(7.5);
+    doc.text('Reciclagem Campo do Gado - Manutenção Campo do Gado', LEFT, lineY, { width: WIDTH, align: 'left', lineBreak: false });
+    doc.text(
+      `Documento gerado automaticamente em ${formatDate(issuedAt, true)} - Página ${pageNumber} de ${totalPages}`,
+      LEFT,
+      lineY + 10,
+      { width: WIDTH, align: 'left', lineBreak: false },
+    );
+  };
+
+  const drawCompactHeader = (label = 'Continuação da solicitação') => {
+    doc.fillColor(COLORS.greenInst).font('Helvetica-Bold').fontSize(8)
+      .text(`${label} ${numeroSolicitacao}`, LEFT, 26, { width: WIDTH * 0.65, lineBreak: false });
+    doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7)
+      .text(`Status: ${statusLabel}`, LEFT + WIDTH * 0.65, 26, { width: WIDTH * 0.35, align: 'right', lineBreak: false });
+    doc.strokeColor(COLORS.border).lineWidth(0.5).moveTo(LEFT, 38).lineTo(RIGHT, 38).stroke();
+    y = 46;
+  };
+
+  const drawTableHeader = () => {
+    const col = [LEFT, LEFT + 34, LEFT + 82, LEFT + 126, LEFT + 360, RIGHT];
+    doc.rect(LEFT, y, WIDTH, 18).fill(COLORS.green);
+    doc.fillColor(COLORS.white).fontSize(7.4).font('Helvetica-Bold');
+    ['Item', 'Qtd', 'Und', 'Descrição do material', 'Aplicação / Observação'].forEach((h, i) => {
+      doc.text(h, col[i] + 4, y + 5, { width: col[i + 1] - col[i] - 8, lineBreak: false });
+    });
+    y += 18;
+    return col;
+  };
+
+  const addPage = ({ repeatTableHeader = false } = {}) => {
+    doc.addPage();
+    drawCompactHeader();
+    if (repeatTableHeader) return drawTableHeader();
+    return null;
+  };
+
+  const ensureSpace = (height, options = {}) => {
+    if (y + height <= CONTENT_BOTTOM) return options.repeatTableHeader ? options.col : null;
+    return addPage(options);
+  };
+
+  doc.rect(0, 0, doc.page.width, 82).fill(COLORS.green);
   if (logoPath) {
     try {
-      doc.image(logoPath, 34, 18, { width: 55 });
+      doc.image(logoPath, LEFT, 14, { width: 42 });
     } catch (error) {
       console.error('[compras.gerarPdf] Logo não pôde ser renderizado', { logoPath, message: error.message });
-      doc.fillColor(COLORS.white).fontSize(7).font('Helvetica').text('Logo não localizado', 34, 42, { width: 55, align: 'center' });
+      doc.fillColor(COLORS.white).fontSize(6).font('Helvetica').text('Logo não localizado', LEFT, 34, { width: 42, align: 'center' });
     }
   } else {
-    doc.fillColor(COLORS.white).fontSize(7).font('Helvetica').text('Logo não localizado', 34, 42, { width: 55, align: 'center' });
+    doc.fillColor(COLORS.white).fontSize(6).font('Helvetica').text('Logo não localizado', LEFT, 34, { width: 42, align: 'center' });
   }
-  doc.fillColor(COLORS.white).fontSize(15).font('Helvetica-Bold').text('RECICLAGEM CAMPO DO GADO', 98, 24);
-  doc.fontSize(10).text('MANUTENÇÃO CAMPO DO GADO', 98, 46);
-  doc.fontSize(12).text('SOLICITAÇÃO DE MATERIAL / COMPRA', 98, 66);
-  doc.fontSize(9)
-    .text(`Solicitação nº: ${numeroSolicitacao}`, 360, 24, { width: 190, align: 'right' })
-    .text(`Data de emissão: ${new Date().toLocaleDateString('pt-BR')}`, 360, 40, { width: 190, align: 'right' })
-    .text(`Status: ${statusLabel}`, 360, 56, { width: 190, align: 'right' });
+  doc.fillColor(COLORS.white).fontSize(13).font('Helvetica-Bold').text('RECICLAGEM CAMPO DO GADO', 78, 18, { width: 260, lineBreak: false });
+  doc.fontSize(9).text('MANUTENÇÃO CAMPO DO GADO', 78, 37, { width: 260, lineBreak: false });
+  doc.fontSize(10).text('SOLICITAÇÃO DE MATERIAL / COMPRA', 78, 54, { width: 260, lineBreak: false });
+  doc.fontSize(8.2)
+    .text(`Solicitação nº ${numeroSolicitacao}`, 350, 18, { width: 210, align: 'right', lineBreak: false })
+    .text(`Emissão: ${formatDate(issuedAt)}`, 350, 34, { width: 210, align: 'right', lineBreak: false })
+    .text(`Status: ${statusLabel}`, 350, 50, { width: 210, align: 'right', lineBreak: false });
 
-  let y = 122;
-  doc.roundedRect(34, y, doc.page.width - 68, 132, 8).fillAndStroke(COLORS.greenSoft, '#A7DDBD');
-  const ident = [
-    ['Unidade', 'Reciclagem Campo do Gado'], ['Setor solicitante', pdfValue(solicitacao.setor_origem, 'Manutenção')], ['Solicitante', pdfValue(solicitacao.solicitante_nome, PDF_PENDING)],
-    ['Responsável manutenção', pdfValue(solicitacao.responsavel_manutencao || solicitacao.almox_nome, 'Ângelo Gomes da Silva')], ['Destino', pdfValue(solicitacao.setor_destino || solicitacao.destino_uso, 'Setor de Compras')], ['Responsável compras', pdfValue(solicitacao.compras_nome, 'Sr. Ubiratam')],
-    ['Prioridade', pdfValue(solicitacao.prioridade)], ['Equipamento / Local', pdfValue(solicitacao.equipamento_nome || solicitacao.destino_uso || solicitacao.tipo_origem, PDF_PENDING)],
-    ['OS vinculada', solicitacao.os_id ? `OS ${solicitacao.os_id}` : PDF_FALLBACK], ['Número interno', numeroSolicitacao],
+  y = 94;
+  const infoRowsLeft = [
+    ['Unidade', 'Reciclagem Campo do Gado'],
+    ['Setor solicitante', pdfValue(solicitacao.setor_origem, 'Manutenção')],
+    ['Solicitante', pdfValue(solicitacao.solicitante_nome, PDF_PENDING)],
+    ['Responsável manutenção', pdfValue(solicitacao.responsavel_manutencao || solicitacao.almox_nome, 'Ângelo Gomes da Silva')],
+    ['Destino', pdfValue(solicitacao.setor_destino || solicitacao.destino_uso, 'Setor de Compras')],
   ];
-  let ly = y + 10; let ry = y + 10;
-  ident.forEach((row, idx) => {
-    const leftColumn = idx < 5;
-    const x = leftColumn ? 46 : 300;
-    if (idx === 5) ry = y + 10;
-    const yy = leftColumn ? ly : ry;
-    doc.fillColor(COLORS.greenDark).fontSize(8).font('Helvetica-Bold').text(`${row[0]}:`, x, yy, { continued: true });
-    doc.fillColor(COLORS.text).font('Helvetica').text(` ${row[1]}`);
-    if (leftColumn) ly += 18; else ry += 18;
-  });
-  y += 144;
+  const infoRowsRight = [
+    ['Responsável compras', pdfValue(solicitacao.compras_nome, 'Sr. Ubiratam')],
+    ['Prioridade', pdfValue(solicitacao.prioridade)],
+    ['Equipamento / Local', equipamentoNome || PDF_FALLBACK],
+    ['OS vinculada', solicitacao.os_id ? `OS ${solicitacao.os_id}` : PDF_FALLBACK],
+  ].filter(([, value]) => hasUsefulPdfText(value));
+  const infoHeight = Math.max(infoRowsLeft.length, infoRowsRight.length) * 14 + 14;
+  doc.roundedRect(LEFT, y, WIDTH, infoHeight, 6).fillAndStroke(COLORS.greenSoft, '#A7DDBD');
+  const drawInfoRows = (rows, x, startY, width) => {
+    let rowY = startY;
+    rows.forEach(([label, value]) => {
+      doc.fillColor(COLORS.greenDark).fontSize(7.5).font('Helvetica-Bold').text(`${label}:`, x, rowY, { width: 88, continued: true });
+      doc.fillColor(COLORS.text).font('Helvetica').text(` ${value}`, { width: width - 88 });
+      rowY += 14;
+    });
+  };
+  drawInfoRows(infoRowsLeft.filter(([, value]) => hasUsefulPdfText(value)), LEFT + 10, y + 8, 245);
+  drawInfoRows(infoRowsRight, LEFT + 276, y + 8, 250);
+  y += infoHeight + 12;
 
-  doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(11).text('Lista de Materiais', 34, y);
-  y += 18;
-  const col = [34, 74, 140, 190, 402, 550];
-  doc.rect(34, y, 520, 20).fill(COLORS.green);
-  doc.fillColor(COLORS.white).fontSize(8).font('Helvetica-Bold');
-  ['Item', 'Qtd', 'Und', 'Descrição do material', 'Aplicação / Observação'].forEach((h, i) => doc.text(h, col[i] + 4, y + 6, { width: col[i + 1] - col[i] - 8 }));
-  y += 20;
+  doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text('Lista de Materiais', LEFT, y, { lineBreak: false });
+  y += 14;
+  let col = drawTableHeader();
   const materiais = Array.isArray(solicitacao.itens) ? solicitacao.itens : [];
   if (!materiais.length) {
-    doc.rect(34, y, 520, 24).fill(COLORS.greenSoft).stroke(COLORS.border);
-    doc.fillColor(COLORS.muted).fontSize(8).font('Helvetica').text('Não informado', 42, y + 8, { width: 500 });
-    y += 24;
+    ensureSpace(22);
+    doc.rect(LEFT, y, WIDTH, 22).fill(COLORS.greenSoft).stroke(COLORS.border);
+    doc.fillColor(COLORS.muted).fontSize(8).font('Helvetica').text('Nenhum item informado.', LEFT + 8, y + 7, { width: WIDTH - 16, lineBreak: false });
+    y += 22;
   }
   materiais.forEach((it, index) => {
-    const obsText = pdfValue(it.item_descricao || it.observacao_item);
-    const descText = pdfValue(it.item_nome || it.item_descricao);
-    const rowH = Math.max(28, doc.heightOfString(obsText, { width: col[5] - col[4] - 8 }) + 16, doc.heightOfString(descText, { width: col[4] - col[3] - 8 }) + 16);
-    if (y + rowH > doc.page.height - 90) { drawFooter(); doc.addPage(); y = 40; }
-    doc.rect(34, y, 520, rowH).fill(index % 2 ? COLORS.greenSoft : COLORS.white).stroke(COLORS.border);
-    doc.fillColor(COLORS.text).fontSize(8).font('Helvetica');
-    doc.text(String(index + 1).padStart(2, '0'), col[0] + 4, y + 8, { width: col[1] - col[0] - 8 });
-    doc.text(String(it.qtd_solicitada ?? it.quantidade ?? 0), col[1] + 4, y + 8, { width: col[2] - col[1] - 8 });
-    doc.text(pdfValue(it.unidade, 'UN'), col[2] + 4, y + 8, { width: col[3] - col[2] - 8 });
-    doc.text(descText, col[3] + 4, y + 8, { width: col[4] - col[3] - 8 });
-    doc.text(obsText, col[4] + 4, y + 8, { width: col[5] - col[4] - 8 });
+    const obsText = pdfOptional(it.item_descricao || it.observacao_item);
+    const descText = pdfValue(it.item_nome || it.descricao || it.item_descricao, PDF_PENDING);
+    const rowH = Math.max(
+      22,
+      doc.heightOfString(obsText || ' ', { width: col[5] - col[4] - 8 }) + 12,
+      doc.heightOfString(descText, { width: col[4] - col[3] - 8 }) + 12,
+    );
+    const newCol = ensureSpace(rowH, { repeatTableHeader: true, col });
+    if (newCol) col = newCol;
+    doc.rect(LEFT, y, WIDTH, rowH).fill(index % 2 ? COLORS.greenSoft : COLORS.white).stroke(COLORS.border);
+    doc.fillColor(COLORS.text).fontSize(7.5).font('Helvetica');
+    doc.text(String(index + 1).padStart(2, '0'), col[0] + 4, y + 6, { width: col[1] - col[0] - 8 });
+    doc.text(String(it.qtd_solicitada ?? it.quantidade ?? 0), col[1] + 4, y + 6, { width: col[2] - col[1] - 8 });
+    doc.text(pdfValue(it.unidade, 'UN'), col[2] + 4, y + 6, { width: col[3] - col[2] - 8 });
+    doc.text(descText, col[3] + 4, y + 6, { width: col[4] - col[3] - 8 });
+    if (obsText) doc.text(obsText, col[4] + 4, y + 6, { width: col[5] - col[4] - 8 });
     y += rowH;
   });
+  y += 8;
 
   const drawSection = (title, content) => {
-    if (!content) return;
-    if (y + 90 > doc.page.height - 90) { drawFooter(); doc.addPage(); y = 40; }
-    doc.fillColor(COLORS.green).rect(34, y + 2, 4, 14).fill();
-    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text(title, 42, y);
-    y += 18;
-    const safeContent = pdfValue(content);
-    const h = Math.max(44, doc.heightOfString(safeContent, { width: 500 }) + 16);
-    doc.roundedRect(34, y, 520, h, 6).fillAndStroke(COLORS.greenSoft, '#B8E7C9');
-    doc.fillColor(COLORS.text).font('Helvetica').fontSize(9).text(safeContent, 44, y + 8, { width: 500 });
-    y += h + 12;
+    const safeContent = pdfOptional(content);
+    if (!safeContent) return;
+    const contentHeight = Math.max(28, doc.heightOfString(safeContent, { width: WIDTH - 18 }) + 12);
+    const maxBoxHeight = CONTENT_BOTTOM - 66;
+    ensureSpace(Math.min(14 + contentHeight + 8, maxBoxHeight));
+    doc.fillColor(COLORS.green).rect(LEFT, y + 1, 3, 11).fill();
+    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(9).text(title, LEFT + 8, y, { lineBreak: false });
+    y += 14;
+    if (contentHeight > maxBoxHeight) {
+      doc.fillColor(COLORS.text).font('Helvetica').fontSize(8).text(safeContent, LEFT + 2, y, { width: WIDTH - 4 });
+      y = doc.y + 8;
+      if (y > CONTENT_BOTTOM) addPage();
+      return;
+    }
+    doc.roundedRect(LEFT, y, WIDTH, contentHeight, 5).fillAndStroke(COLORS.greenSoft, '#B8E7C9');
+    doc.fillColor(COLORS.text).font('Helvetica').fontSize(8).text(safeContent, LEFT + 9, y + 7, { width: WIDTH - 18 });
+    y += contentHeight + 8;
   };
-  drawSection('Motivo da solicitação', pdfValue(solicitacao.motivo || solicitacao.descricao, PDF_PENDING));
-  drawSection('Observações', pdfValue(solicitacao.observacoes_compras || solicitacao.observacoes, PDF_FALLBACK));
+  drawSection('Motivo da solicitação', buildMotivoSolicitacao(solicitacao, osContext, equipamentoNome));
+  drawSection('Observações', solicitacao.observacoes_compras || solicitacao.observacoes);
 
-  if (y + 92 > doc.page.height - 90) { drawFooter(); doc.addPage(); y = 40; }
-  doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text('Histórico de Status', 34, y);
-  y += 16;
   const history = [
-    ['ABERTA', solicitacao.created_at],
-    ['EM_COTACAO', solicitacao.cotacao_inicio_em],
-    ['COMPRADA', solicitacao.comprada_em],
-    ['RECEBIDA', solicitacao.recebida_em],
-    ['FECHADA', solicitacao.fechada_em],
-  ];
-  history.forEach(([label, value], idx) => {
-    const x = 34 + (idx * 104);
-    doc.roundedRect(x, y, 96, 34, 5).fillAndStroke(idx % 2 ? COLORS.white : COLORS.greenSoft, COLORS.border);
-    doc.fillColor(COLORS.greenInst).font('Helvetica-Bold').fontSize(7).text(label.replaceAll('_', ' '), x + 6, y + 7, { width: 84 });
-    doc.fillColor(COLORS.text).font('Helvetica').fontSize(7).text(value ? new Date(value).toLocaleDateString('pt-BR') : '-', x + 6, y + 20, { width: 84 });
-  });
-  y += 50;
+    ['Solicitação aberta', solicitacao.created_at, solicitacao.solicitante_nome],
+    ['Entrou em cotação', solicitacao.cotacao_inicio_em, solicitacao.compras_nome],
+    ['Comprada', solicitacao.comprada_em, solicitacao.compras_nome],
+    ['Recebida', solicitacao.recebida_em, solicitacao.almox_nome],
+    ['Fechada', solicitacao.fechada_em, solicitacao.almox_nome],
+  ].filter(([, value]) => hasUsefulPdfText(value));
+  if (history.length) {
+    const histHeight = 14 + (history.length * 13) + 6;
+    ensureSpace(histHeight + 6);
+    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(9).text('Histórico de Status', LEFT, y, { lineBreak: false });
+    y += 13;
+    history.forEach(([label, value, user], idx) => {
+      doc.rect(LEFT, y, WIDTH, 13).fill(idx % 2 ? COLORS.white : COLORS.greenSoft).stroke(COLORS.border);
+      const suffix = hasUsefulPdfText(user) ? ` por ${pdfOptional(user)}` : '';
+      doc.fillColor(COLORS.text).font('Helvetica').fontSize(7.5)
+        .text(`${formatDate(value)} - ${label}${suffix}`, LEFT + 6, y + 3, { width: WIDTH - 12, lineBreak: false });
+      y += 13;
+    });
+    y += 8;
+  }
 
-  if (y + 130 > doc.page.height - 90) { drawFooter(); doc.addPage(); y = 40; }
-  doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text('Conferência e Assinaturas', 34, y);
-  y += 18;
-  doc.roundedRect(34, y, 520, 32, 5).strokeColor(COLORS.border).stroke();
-  doc.fillColor(COLORS.muted).font('Helvetica').fontSize(8).text('Conferência do almoxarifado: recebido conforme (  ) sim   (  ) parcial   (  ) divergente', 44, y + 10, { width: 500 });
-  y += 48;
-  [['Solicitante', ''], ['Responsável pela Manutenção', ''], ['Compras / Almoxarifado', '']].forEach(([k, v]) => {
-    doc.fillColor(COLORS.greenInst).fontSize(9).font('Helvetica-Bold').text(`${k}: ${v}`, 34, y);
-    y += 16;
-    doc.strokeColor(COLORS.border).moveTo(34, y).lineTo(300, y).stroke();
-    y += 12;
+  ensureSpace(86);
+  doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(9).text('Conferência e Assinaturas', LEFT, y, { lineBreak: false });
+  y += 14;
+  doc.roundedRect(LEFT, y, WIDTH, 24, 5).strokeColor(COLORS.border).stroke();
+  doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.8)
+    .text('Conferência do almoxarifado: (  ) Conforme   (  ) Parcial   (  ) Divergente', LEFT + 9, y + 8, { width: WIDTH - 18, lineBreak: false });
+  y += 42;
+  const sigWidth = (WIDTH - 28) / 3;
+  [['Solicitante'], ['Responsável Manutenção'], ['Compras / Almoxarifado']].forEach(([label], idx) => {
+    const x = LEFT + idx * (sigWidth + 14);
+    doc.strokeColor(COLORS.border).moveTo(x, y).lineTo(x + sigWidth, y).stroke();
+    doc.fillColor(COLORS.greenInst).font('Helvetica-Bold').fontSize(7.5).text(label, x, y + 5, { width: sigWidth, align: 'center', lineBreak: false });
   });
+  y += 24;
 
   const imageAnexos = (Array.isArray(solicitacao.anexos) ? solicitacao.anexos : []).filter((a) => String(a.mimetype || '').startsWith('image/'));
   if (imageAnexos.length) {
-    drawFooter();
-    doc.addPage();
-    y = 40;
-    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(11).text('Anexos Fotográficos', 34, y);
-    y += 20;
+    addPage();
+    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text('Anexos Fotográficos', LEFT, y, { lineBreak: false });
+    y += 16;
     imageAnexos.forEach((anexo, idx) => {
-      if (y + 220 > doc.page.height - 80) { drawFooter(); doc.addPage(); y = 40; }
+      ensureSpace(202);
       const fullPath = resolveAnexoPath(anexo);
-      doc.fillColor(COLORS.greenInst).fontSize(9).font('Helvetica-Bold').text(`ANEXO ${String(idx + 1).padStart(2, '0')} — ${pdfValue(anexo.original_name, 'Imagem')}`, 34, y);
-      y += 14;
-      doc.rect(34, y, 520, 185).strokeColor(COLORS.greenDark).stroke();
+      doc.fillColor(COLORS.greenInst).fontSize(8).font('Helvetica-Bold')
+        .text(`ANEXO ${String(idx + 1).padStart(2, '0')} — ${pdfValue(anexo.original_name, 'Imagem')}`, LEFT, y, { lineBreak: false });
+      y += 12;
+      doc.rect(LEFT, y, WIDTH, 176).strokeColor(COLORS.greenDark).stroke();
       if (!fullPath) {
-        doc.fillColor(COLORS.muted).font('Helvetica').fontSize(10).text('Imagem não localizada no servidor.', 44, y + 82, { width: 500, align: 'center' });
+        doc.fillColor(COLORS.muted).font('Helvetica').fontSize(9).text('Imagem não localizada no servidor.', LEFT + 10, y + 78, { width: WIDTH - 20, align: 'center' });
       } else {
         try {
-          doc.image(fullPath, 38, y + 4, { fit: [512, 176], align: 'center', valign: 'center' });
+          doc.image(fullPath, LEFT + 4, y + 4, { fit: [WIDTH - 8, 168], align: 'center', valign: 'center' });
         } catch (error) {
           console.error('[compras.gerarPdf] Imagem não pôde ser renderizada', { anexoId: anexo.id, fullPath, message: error.message });
-          doc.fillColor(COLORS.muted).font('Helvetica').fontSize(10).text('Imagem não localizada no servidor.', 44, y + 82, { width: 500, align: 'center' });
+          doc.fillColor(COLORS.muted).font('Helvetica').fontSize(9).text('Imagem não localizada no servidor.', LEFT + 10, y + 78, { width: WIDTH - 20, align: 'center' });
         }
       }
-      y += 190;
+      y += 188;
     });
   }
 
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i += 1) {
     doc.switchToPage(i);
-    drawFooter();
-    doc.fillColor(COLORS.greenInst).fontSize(8).text(`Página ${i + 1} de ${range.count}`, 470, doc.page.height - 24, { align: 'right', width: 80 });
+    drawFooter(i + 1, range.count);
   }
 
   doc.end();
