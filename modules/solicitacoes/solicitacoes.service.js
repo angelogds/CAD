@@ -267,12 +267,119 @@ function getOsIdsVinculadas(solicitacao) {
   return Array.from(ids);
 }
 
-function hasMovimentacaoSolicitacao(solicitacao) {
-  if (!solicitacao) return false;
-  if (getOsIdsVinculadas(solicitacao).length > 0) return true;
 
+class SolicitacaoOperacaoError extends Error {
+  constructor(message, code = "SOLICITACAO_OPERACAO_INVALIDA", details = {}) {
+    super(message);
+    this.name = "SolicitacaoOperacaoError";
+    this.code = code;
+    this.userMessage = message;
+    this.details = details;
+  }
+}
+
+function countRows(table, whereSql, params = []) {
+  if (!tableExists(table)) return 0;
+  return Number(db.prepare(`SELECT COUNT(*) AS total FROM ${table} WHERE ${whereSql}`).get(...params)?.total || 0);
+}
+
+function hasTableColumns(table, columns) {
+  if (!tableExists(table)) return false;
+  const existing = tableColumns(table);
+  return columns.every((column) => existing.includes(column));
+}
+
+function getSolicitacaoItemIds(solicitacaoId) {
+  if (!tableExists("solicitacao_itens")) return [];
+  return db.prepare("SELECT id FROM solicitacao_itens WHERE solicitacao_id = ?").all(Number(solicitacaoId)).map((row) => Number(row.id)).filter(Boolean);
+}
+
+function countRowsReferencingValues(table, column, values) {
+  if (!tableExists(table) || !hasColumn(table, column) || !values.length) return 0;
+  const placeholders = values.map(() => "?").join(", ");
+  return Number(db.prepare(`SELECT COUNT(*) AS total FROM ${table} WHERE ${column} IN (${placeholders})`).get(...values)?.total || 0);
+}
+
+function tableHasFkTo(table, targetTable) {
+  if (!tableExists(table)) return false;
+  try {
+    return db.prepare(`PRAGMA foreign_key_list(${table})`).all()
+      .some((fk) => String(fk.table || "").toLowerCase() === String(targetTable || "").toLowerCase());
+  } catch (_error) {
+    return false;
+  }
+}
+
+function diagnosticarVinculosSolicitacao(solicitacao) {
+  const solicitacaoId = Number(solicitacao?.id || 0);
+  const vinculos = [];
+  const itemIds = getSolicitacaoItemIds(solicitacaoId);
+  const osIds = getOsIdsVinculadas(solicitacao);
+
+  if (osIds.length > 0) {
+    vinculos.push({ tipo: "OS", tabela: "os_solicitacoes_vinculos/solicitacoes.os_id", total: osIds.length });
+  }
+
+  if (hasTableColumns("os_chat_mensagens", ["solicitacao_id"])) {
+    const whereChat = hasColumn("os_chat_mensagens", "deleted_at") ? "solicitacao_id = ? AND deleted_at IS NULL" : "solicitacao_id = ?";
+    const total = countRows("os_chat_mensagens", whereChat, [solicitacaoId]);
+    if (total) vinculos.push({ tipo: "CHAT_OS", tabela: "os_chat_mensagens", total });
+  }
+
+  for (const table of ["compras_cotacoes", "compras_cotacoes_anexos", "solicitacao_cotacoes"]) {
+    if (hasTableColumns(table, ["solicitacao_id"])) {
+      const total = countRows(table, "solicitacao_id = ?", [solicitacaoId]);
+      if (total) vinculos.push({ tipo: "COTACAO", tabela: table, total });
+    }
+  }
+
+  if (hasTableColumns("compras", ["solicitacao_id"])) {
+    const total = countRows("compras", "solicitacao_id = ?", [solicitacaoId]);
+    if (total) vinculos.push({ tipo: "COMPRA", tabela: "compras", total });
+  }
+
+  if (hasTableColumns("estoque_movimentos", ["referencia_tipo", "referencia_id"])) {
+    const total = countRows("estoque_movimentos", "UPPER(COALESCE(referencia_tipo, '')) = 'SOLICITACAO' AND referencia_id = ?", [solicitacaoId]);
+    if (total) vinculos.push({ tipo: "ESTOQUE", tabela: "estoque_movimentos", total });
+  }
+
+  if (hasTableColumns("solicitacao_itens", ["solicitacao_id", "qtd_recebida_total"])) {
+    const total = countRows("solicitacao_itens", "solicitacao_id = ? AND COALESCE(qtd_recebida_total, 0) > 0", [solicitacaoId]);
+    if (total) vinculos.push({ tipo: "RECEBIMENTO", tabela: "solicitacao_itens.qtd_recebida_total", total });
+  }
+
+  if (hasTableColumns("solicitacao_itens", ["solicitacao_id", "status_item"])) {
+    const total = countRows("solicitacao_itens", "solicitacao_id = ? AND UPPER(COALESCE(status_item, 'PENDENTE')) NOT IN ('', 'PENDENTE', 'ABERTO', 'ABERTA')", [solicitacaoId]);
+    if (total) vinculos.push({ tipo: "RECEBIMENTO", tabela: "solicitacao_itens.status_item", total });
+  }
+
+  const historicoPrecoTotal = countRowsReferencingValues("compras_historico_preco", "solicitacao_item_id", itemIds);
+  if (historicoPrecoTotal) vinculos.push({ tipo: "HISTORICO_PRECO", tabela: "compras_historico_preco", total: historicoPrecoTotal });
+
+  for (const table of db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all().map((row) => row.name)) {
+    if (table === "solicitacao_itens" || !tableHasFkTo(table, "solicitacao_itens")) continue;
+    const fks = db.prepare(`PRAGMA foreign_key_list(${table})`).all().filter((fk) => String(fk.table || "").toLowerCase() === "solicitacao_itens");
+    for (const fk of fks) {
+      const total = countRowsReferencingValues(table, fk.from, itemIds);
+      if (total) vinculos.push({ tipo: "FK_ITEM", tabela: table, coluna: fk.from, total });
+    }
+  }
+
+  return { osIds, vinculos, possuiMovimentacaoRelevante: vinculos.length > 0 };
+}
+
+function avaliarExclusaoFisica(solicitacao) {
+  if (!solicitacao) return { podeExcluir: false, motivo: "Solicitação não encontrada.", vinculos: [], osIds: [] };
   const statusAtual = String(solicitacao.status || "").toUpperCase();
-  if (statusAtual && ![STATUS.ABERTA, STATUS.DEVOLVIDA_REVISAO, STATUS.CANCELADA].includes(statusAtual)) return true;
+  const statusPermitidos = [STATUS.ABERTA, STATUS.CANCELADA];
+  if (!statusPermitidos.includes(statusAtual)) {
+    return {
+      podeExcluir: false,
+      motivo: "Esta solicitação não pode ser excluída porque já possui movimentações. Utilize a opção Cancelar.",
+      vinculos: [{ tipo: "STATUS", valor: statusAtual }],
+      osIds: getOsIdsVinculadas(solicitacao),
+    };
+  }
 
   const trackingFields = [
     "compras_user_id",
@@ -284,17 +391,65 @@ function hasMovimentacaoSolicitacao(solicitacao) {
     "fechada_em",
     "reaberta_em",
     "fornecedor",
+    "fornecedor_id",
     "previsao_entrega",
     "valor_total",
   ];
-  if (trackingFields.some((field) => solicitacao[field] !== null && solicitacao[field] !== undefined && String(solicitacao[field]).trim() !== "")) return true;
-
-  if (tableExists("estoque_movimentos")) {
-    const movimento = db.prepare("SELECT 1 FROM estoque_movimentos WHERE referencia_tipo = 'SOLICITACAO' AND referencia_id = ? LIMIT 1").get(Number(solicitacao.id));
-    if (movimento) return true;
+  const camposRastreio = trackingFields.filter((field) => solicitacao[field] !== null && solicitacao[field] !== undefined && String(solicitacao[field]).trim() !== "");
+  if (camposRastreio.length) {
+    return {
+      podeExcluir: false,
+      motivo: "Esta solicitação não pode ser excluída porque já possui movimentações. Utilize a opção Cancelar.",
+      vinculos: camposRastreio.map((field) => ({ tipo: "CAMPO_RASTREIO", campo: field })),
+      osIds: getOsIdsVinculadas(solicitacao),
+    };
   }
 
-  return false;
+  const diagnostico = diagnosticarVinculosSolicitacao(solicitacao);
+  if (diagnostico.possuiMovimentacaoRelevante) {
+    const possuiOs = diagnostico.vinculos.some((v) => ["OS", "CHAT_OS"].includes(v.tipo));
+    return {
+      podeExcluir: false,
+      motivo: possuiOs
+        ? "Esta solicitação está vinculada a uma OS e possui rastreabilidade. Ela pode ser cancelada, mas não excluída definitivamente."
+        : "Esta solicitação não pode ser excluída porque já possui movimentações. Utilize a opção Cancelar.",
+      vinculos: diagnostico.vinculos,
+      osIds: diagnostico.osIds,
+    };
+  }
+
+  return { podeExcluir: true, motivo: null, vinculos: [], osIds: diagnostico.osIds };
+}
+
+function deleteWhereIfColumns(table, requiredColumns, whereSql, params = []) {
+  if (!hasTableColumns(table, requiredColumns)) return;
+  db.prepare(`DELETE FROM ${table} WHERE ${whereSql}`).run(...params);
+}
+
+function excluirRegistrosFilhosDescartaveis(solicitacaoId) {
+  deleteWhereIfColumns("notificacoes", ["origem_tipo", "origem_id"], "UPPER(COALESCE(origem_tipo, '')) IN ('SOLICITACAO', 'SOLICITACAO_MATERIAL') AND origem_id = ?", [solicitacaoId]);
+  deleteWhereIfColumns("notificacoes", ["solicitacao_id"], "solicitacao_id = ?", [solicitacaoId]);
+  deleteWhereIfColumns("solicitacao_logs", ["solicitacao_id"], "solicitacao_id = ?", [solicitacaoId]);
+  deleteWhereIfColumns("anexos", ["referencia_tipo", "referencia_id"], "UPPER(COALESCE(referencia_tipo, '')) = 'SOLICITACAO' AND referencia_id = ?", [solicitacaoId]);
+  removeAnexosSolicitacao(solicitacaoId);
+  deleteWhereIfColumns("solicitacao_itens", ["solicitacao_id"], "solicitacao_id = ?", [solicitacaoId]);
+}
+
+function registrarLogSolicitacao(solicitacaoId, userId, statusAnterior, statusNovo, acao, observacao) {
+  if (!tableExists("solicitacao_logs")) return;
+  const columns = tableColumns("solicitacao_logs");
+  const payload = {
+    solicitacao_id: Number(solicitacaoId),
+    user_id: sanitizePositiveId(userId),
+    status_anterior: statusAnterior || null,
+    status_novo: statusNovo || null,
+    acao,
+    observacao: observacao || null,
+  };
+  const useColumns = Object.keys(payload).filter((column) => columns.includes(column));
+  if (!useColumns.length) return;
+  db.prepare(`INSERT INTO solicitacao_logs (${useColumns.join(", ")}) VALUES (${useColumns.map(() => "?").join(", ")})`)
+    .run(...useColumns.map((column) => payload[column]));
 }
 
 function removeAnexosSolicitacao(solicitacaoId) {
@@ -314,32 +469,44 @@ function removeAnexosSolicitacao(solicitacaoId) {
   if (clauses.length) db.prepare(`DELETE FROM compras_anexos WHERE ${clauses.join(" OR ")}`).run(...params);
 }
 
-function excluirSolicitacao(id) {
+function excluirSolicitacao(id, adminId = null) {
   const solicitacao = getSolicitacaoById(id);
-  if (!solicitacao) throw new Error("Solicitação não encontrada.");
+  if (!solicitacao) throw new SolicitacaoOperacaoError("Solicitação não encontrada.", "SOLICITACAO_NAO_ENCONTRADA");
 
   return db.transaction(() => {
-    const osIds = getOsIdsVinculadas(solicitacao);
-    const manterRastreabilidade = hasMovimentacaoSolicitacao(solicitacao);
-
-    if (manterRastreabilidade) {
-      const updates = ["status = ?"];
-      const params = [STATUS.CANCELADA];
-      if (hasColumn("solicitacoes", "updated_at")) updates.push("updated_at = datetime('now')");
-      if (hasColumn("solicitacoes", "deleted_at")) updates.push("deleted_at = datetime('now')");
-      if (hasColumn("solicitacoes", "ativo")) {
-        updates.push("ativo = ?");
-        params.push(0);
-      }
-      params.push(Number(id));
-      db.prepare(`UPDATE solicitacoes SET ${updates.join(", ")} WHERE id = ?`).run(...params);
-      return { modo: "cancelada", solicitacao, osIds };
+    const avaliacao = avaliarExclusaoFisica(solicitacao);
+    if (!avaliacao.podeExcluir) {
+      throw new SolicitacaoOperacaoError(avaliacao.motivo, "SOLICITACAO_EXCLUSAO_BLOQUEADA", { vinculos: avaliacao.vinculos });
     }
 
-    removeAnexosSolicitacao(Number(id));
-    if (tableExists("solicitacao_itens")) db.prepare("DELETE FROM solicitacao_itens WHERE solicitacao_id = ?").run(Number(id));
-    db.prepare("DELETE FROM solicitacoes WHERE id = ?").run(Number(id));
-    return { modo: "excluida", solicitacao, osIds };
+    excluirRegistrosFilhosDescartaveis(Number(id));
+    const info = db.prepare("DELETE FROM solicitacoes WHERE id = ?").run(Number(id));
+    if (!info.changes) throw new SolicitacaoOperacaoError("Solicitação não encontrada.", "SOLICITACAO_NAO_ENCONTRADA");
+
+    return { modo: "excluida", solicitacao, osIds: avaliacao.osIds, adminId };
+  })();
+}
+
+function cancelarSolicitacao(id, adminId = null) {
+  const solicitacao = getSolicitacaoById(id);
+  if (!solicitacao) throw new SolicitacaoOperacaoError("Solicitação não encontrada.", "SOLICITACAO_NAO_ENCONTRADA");
+
+  return db.transaction(() => {
+    const updates = ["status = ?"];
+    const params = [STATUS.CANCELADA];
+    if (hasColumn("solicitacoes", "cancelada_em")) updates.push("cancelada_em = datetime('now')");
+    if (hasColumn("solicitacoes", "updated_at")) updates.push("updated_at = datetime('now')");
+    params.push(Number(id));
+    db.prepare(`UPDATE solicitacoes SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+    registrarLogSolicitacao(
+      id,
+      adminId,
+      solicitacao.status,
+      STATUS.CANCELADA,
+      "CANCELAR_SOLICITACAO",
+      `Solicitação ${solicitacao.numero || id} cancelada pelo administrador.`
+    );
+    return { modo: "cancelada", solicitacao: { ...solicitacao, status: STATUS.CANCELADA }, osIds: getOsIdsVinculadas(solicitacao), adminId };
   })();
 }
 
@@ -378,7 +545,7 @@ function listMinhasSolicitacoes(userId, filters = {}, user = null) {
   const hasEquipamentoId = hasColumn("solicitacoes", "equipamento_id");
   const equipJoin = hasEquipamentoId && tableExists("equipamentos") ? "LEFT JOIN equipamentos e ON e.id = s.equipamento_id" : "";
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
-  return db.prepare(`
+  const rows = db.prepare(`
     SELECT s.*, u.name AS solicitante_nome,
       ${equipJoin ? "e.nome" : "NULL"} AS equipamento_nome,
       (SELECT COUNT(*) FROM solicitacao_itens i WHERE i.solicitacao_id = s.id) AS itens_count
@@ -388,6 +555,15 @@ function listMinhasSolicitacoes(userId, filters = {}, user = null) {
     ${whereSql}
     ORDER BY s.id DESC
   `).all(...params);
+
+  return rows.map((row) => {
+    const avaliacao = avaliarExclusaoFisica(row);
+    return {
+      ...row,
+      podeExcluir: avaliacao.podeExcluir,
+      motivoBloqueioExclusao: avaliacao.motivo,
+    };
+  });
 }
 
 function getCountersForUser(userId, user = null) {
@@ -513,4 +689,4 @@ function listEstoqueItens() {
   return db.prepare("SELECT id, codigo, nome, unidade FROM estoque_itens WHERE ativo = 1 ORDER BY nome").all();
 }
 
-module.exports = { STATUS, LIST_STATUS, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, createSolicitacao, updateSolicitacao, excluirSolicitacao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };
+module.exports = { STATUS, LIST_STATUS, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, createSolicitacao, updateSolicitacao, avaliarExclusaoFisica, excluirSolicitacao, cancelarSolicitacao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };

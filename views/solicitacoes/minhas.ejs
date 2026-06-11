@@ -33,6 +33,8 @@ const prioridadeClass = (p) => ['ALTA','URGENTE','CRITICA','CRÍTICA','EMERGENCI
   .sol-actions form { margin:0; }
   .sol-actions .btn-danger { background:#dc2626; border-color:#dc2626; color:#fff; }
   .sol-actions .btn-danger:hover { background:#b91c1c; border-color:#b91c1c; color:#fff; }
+  .sol-actions .btn-warning { background:#f59e0b; border-color:#f59e0b; color:#fff; }
+  .sol-actions .btn-warning:hover { background:#d97706; border-color:#d97706; color:#fff; }
   .sol-badge { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:5px 9px; font-size:.78rem; font-weight:900; border:1px solid transparent; white-space:nowrap; }
   .sol-badge.open { background:#ecfdf5; color:#166534; border-color:#bbf7d0; }
   .sol-badge.quote { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
@@ -124,9 +126,13 @@ const prioridadeClass = (p) => ['ALTA','URGENTE','CRITICA','CRÍTICA','EMERGENCI
           <% if (s.status === 'ABERTA' && canAccessModule(user?.role, 'compras_manage')) { %><a class="btn btn-sm btn-green" href="/compras/solicitacoes/<%= s.id %>">Enviar para compras</a><% } %>
           <% if (['COMPRADA','EM_RECEBIMENTO','RECEBIDA_PARCIAL'].includes(s.status) && canAccessModule(user?.role, 'almoxarifado_manage')) { %><a class="btn btn-sm btn-green" href="/almoxarifado/solicitacoes/<%= s.id %>/conferir">Conferir recebimento</a><% } %>
           <a class="btn btn-sm btn-ghost" href="/solicitacoes/<%= s.id %>/pdf" target="_blank" rel="noopener">Gerar PDF</a>
-          <% if (canAccessModule(user?.role, 'solicitacoes_delete')) { %>
-            <form method="POST" action="/solicitacoes/<%= s.id %>/excluir" onsubmit="return confirm('Tem certeza que deseja excluir esta solicitação de material?');">
+          <% if (canAccessModule(user?.role, 'solicitacoes_delete') && s.podeExcluir) { %>
+            <form method="POST" action="/solicitacoes/<%= s.id %>/excluir" onsubmit="return confirm('Tem certeza que deseja excluir definitivamente esta solicitação?\n\nEssa ação deve ser utilizada apenas para solicitações criadas por engano e sem movimentações.');">
               <button type="submit" class="btn btn-sm btn-danger">Excluir</button>
+            </form>
+          <% } else if (canAccessModule(user?.role, 'solicitacoes_delete') && !['CANCELADA','FECHADA'].includes(s.status)) { %>
+            <form method="POST" action="/solicitacoes/<%= s.id %>/cancelar" onsubmit="return confirm('Tem certeza que deseja cancelar esta solicitação?\n\nO histórico será preservado.');">
+              <button type="submit" class="btn btn-sm btn-warning">Cancelar solicitação</button>
             </form>
           <% } %>
         </div>

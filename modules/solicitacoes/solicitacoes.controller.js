@@ -223,38 +223,61 @@ function detalhe(req, res) {
 }
 
 
+function registrarCancelamentoNoChatOs(resultado, req) {
+  const numero = resultado.solicitacao?.numero || resultado.solicitacao?.id || req.params.id;
+  for (const osId of resultado.osIds || []) {
+    try {
+      osChatService.registrarMensagemSistema(
+        osId,
+        "SOLICITACAO_CANCELADA",
+        `Solicitação de material ${numero} cancelada pelo administrador.`,
+        { solicitacao_id: Number(req.params.id), user_id: req.session.user.id }
+      );
+    } catch (chatError) {
+      console.warn("[solicitacoes.cancelar] Não foi possível registrar histórico da OS", {
+        solicitacaoId: Number(req.params.id),
+        osId,
+        message: chatError.message,
+      });
+    }
+  }
+}
+
 function excluir(req, res) {
   const id = Number(req.params.id);
   try {
-    const resultado = service.excluirSolicitacao(id);
-    const numero = resultado.solicitacao?.numero || id;
-
-    for (const osId of resultado.osIds || []) {
-      try {
-        osChatService.registrarMensagemSistema(
-          osId,
-          "SOLICITACAO_CANCELADA",
-          `Solicitação de material nº ${numero} foi cancelada/excluída pelo administrador.`,
-          { solicitacao_id: id, user_id: req.session.user.id }
-        );
-      } catch (chatError) {
-        console.warn("[solicitacoes.excluir] Não foi possível registrar histórico da OS", {
-          solicitacaoId: id,
-          osId,
-          message: chatError.message,
-        });
-      }
-    }
-
+    service.excluirSolicitacao(id, req.session.user.id);
     req.flash("success", "Solicitação excluída com sucesso.");
   } catch (error) {
-    console.error("[solicitacoes.excluir] Falha ao excluir solicitação", {
-      solicitacaoId: id,
-      usuarioLogado: req.session?.user?.id,
-      message: error.message,
-      stack: error.stack,
+    console.error("[ERRO_EXCLUIR_SOLICITACAO]", {
+      solicitacaoId: req.params.id,
+      usuarioId: req.user?.id || req.session?.user?.id,
+      perfil: req.user?.perfil || req.user?.role || req.session?.user?.perfil || req.session?.user?.role,
+      codigo: error?.code,
+      mensagem: error?.message,
+      stack: error?.stack,
     });
-    req.flash("error", "Não foi possível excluir a solicitação.");
+    req.flash("error", error?.userMessage || "Não foi possível concluir a operação. Nenhuma alteração foi realizada.");
+  }
+  return res.redirect("/solicitacoes/minhas");
+}
+
+function cancelar(req, res) {
+  const id = Number(req.params.id);
+  try {
+    const resultado = service.cancelarSolicitacao(id, req.session.user.id);
+    registrarCancelamentoNoChatOs(resultado, req);
+    req.flash("success", "Solicitação cancelada com sucesso. O histórico foi preservado.");
+  } catch (error) {
+    console.error("[ERRO_CANCELAR_SOLICITACAO]", {
+      solicitacaoId: req.params.id,
+      usuarioId: req.user?.id || req.session?.user?.id,
+      perfil: req.user?.perfil || req.user?.role || req.session?.user?.perfil || req.session?.user?.role,
+      codigo: error?.code,
+      mensagem: error?.message,
+      stack: error?.stack,
+    });
+    req.flash("error", error?.userMessage || "Não foi possível concluir a operação. Nenhuma alteração foi realizada.");
   }
   return res.redirect("/solicitacoes/minhas");
 }
@@ -300,4 +323,4 @@ function pdf(req, res) {
   }
 }
 
-module.exports = { minhas, nova, criar, editar, atualizar, detalhe, excluir, pdf };
+module.exports = { minhas, nova, criar, editar, atualizar, detalhe, excluir, cancelar, pdf };
