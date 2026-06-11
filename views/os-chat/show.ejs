@@ -6,7 +6,7 @@
   <aside class="os-chat-list compact">
     <% conversas.forEach((c) => { const motivo=c.motivo_atual || (c.esta_atrasada ? 'OS em atraso' : (c.tem_solicitacao ? 'Solicitação vinculada' : (c.tem_chat ? 'Conversa registrada' : 'Tratativa registrada'))); %><a class="os-chat-contact <%= Number(c.id)===Number(os.id)?'active':'' %>" href="/chat-os/<%= c.id %>?filtro=<%= filtro %>"><strong>OS <%= c.id %> - <%= c.equipamento %></strong><small>Status: <%= c.status || '-' %> • <%= motivo %></small><small>Última interação: <%= c.ultima_mensagem_em ? fmtBR(c.ultima_mensagem_em) : 'Sem mensagens no chat' %></small><% if(c.nao_lidas>0){%><span class="badge-unread"><%= c.nao_lidas %></span><%}%></a><% }) %>
   </aside>
-  <section class="os-chat-conversation">
+  <section class="os-chat-conversation" data-os-chat-root data-os-id="<%= os.id %>" data-user-id="<%= user.id %>" data-polling-ms="20000">
     <header class="os-chat-header">
       <div><h2>OS <%= os.id %> – <%= os.equipamento_resolvido %></h2><p><%= os.setor_resolvido %></p></div>
       <div class="os-chat-meta">
@@ -16,16 +16,21 @@
       </div>
       <div class="os-chat-actions"><a class="btn btn-sm btn-ghost" href="/os/<%= os.id %>">Abrir OS</a><% if (sol) { %><a class="btn btn-sm btn-ghost" href="/solicitacoes/<%= sol.id %>">Abrir solicitação</a><% } else { %><a class="btn btn-sm btn-green" href="/solicitacoes/nova?os_id=<%= os.id %>">Criar solicitação vinculada</a><% } %><a class="btn btn-sm" href="/chat-os/<%= os.id %>">Atualizar</a></div>
     </header>
-    <div class="os-chat-messages">
+    <% const messageSignature = conversa.mensagens.map((m) => `${m.id}:${m.created_at}`).join('|'); %>
+    <div id="chat-messages" class="os-chat-messages" data-signature="<%= messageSignature %>" aria-live="polite">
       <% if (!conversa.mensagens.length) { %><div class="os-chat-empty">Ainda não há mensagens. Registre a primeira tratativa da OS.</div><% } %>
       <% conversa.mensagens.forEach((m) => { const mine = Number(m.user_id||0)===Number(user.id||0); const t=String(m.tipo||'MENSAGEM').toLowerCase(); %>
-        <article class="msg <%= mine?'mine':'' %> <%= t==='sistema'||t.includes('solicitacao')?'system':'' %>">
+        <article class="msg <%= mine?'mine':'' %> <%= t==='sistema'||t.includes('solicitacao')?'system':'' %>" data-message-id="<%= m.id %>">
           <div class="msg-head"><strong><%= m.tipo || 'MENSAGEM' %> • <%= m.autor_nome || 'Sistema' %></strong><span><%= m.created_at ? fmtBR(m.created_at) : '-' %></span></div>
           <p><%= m.mensagem %></p>
         </article>
       <% }) %>
     </div>
-    <form class="os-chat-input" method="POST" action="/chat-os/<%= os.id %>/mensagens"><textarea name="mensagem" placeholder="Digite uma mensagem sobre esta OS..." required></textarea><button class="btn btn-green" type="submit">Enviar</button></form>
+    <div id="chat-status" class="os-chat-status" hidden role="status" aria-live="polite"></div>
+    <form id="chat-form" class="os-chat-input" method="POST" action="/chat-os/<%= os.id %>/mensagens" data-enviando="0">
+      <textarea id="chat-input" name="mensagem" placeholder="Digite uma mensagem sobre esta OS..." autocomplete="off" required></textarea>
+      <button id="chat-submit" class="btn btn-green" type="submit">Enviar</button>
+    </form>
   </section>
 </div>
-<script>setTimeout(function(){ if(!document.hidden) location.reload(); }, 30000);</script>
+<script src="/js/chat-os.js" defer></script>
