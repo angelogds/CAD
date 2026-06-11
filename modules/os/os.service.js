@@ -21,6 +21,138 @@ try {
   whatsappService = require("../whatsapp/whatsapp.service");
 } catch (_e) {}
 
+
+const STATUS_OS_FINALIZADA = new Set(['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA', 'CANCELADA']);
+const STATUS_OS_EXECUCAO_POTENCIAL = new Set(['ANDAMENTO', 'EM_ANDAMENTO', 'EXECUTANDO', 'EM_EXECUCAO', 'EM EXECUÇÃO']);
+const STATUS_OS_PAUSADA = new Set(['PAUSADA', 'PAUSADO', 'AGUARDANDO']);
+
+const MOTIVOS_ANDAMENTO_DISPONIBILIDADE = Object.freeze({
+  FALTA_MATERIAL: { libera_mecanico: true },
+  AGUARDANDO_COMPRA: { libera_mecanico: true },
+  MATERIAL_CHEGOU: { libera_mecanico: false },
+  FALTA_MAO_DE_OBRA: { libera_mecanico: true },
+  EQUIPAMENTO_EM_PRODUCAO: { libera_mecanico: true },
+  AGUARDANDO_TERCEIRO: { libera_mecanico: true },
+  AGUARDANDO_PECA_TORNEARIA: { libera_mecanico: true },
+  FALTA_FERRAMENTA: { libera_mecanico: true },
+  SERVICO_COMPLEXO_CONTINUIDADE: { libera_mecanico: false },
+  RISCO_SEGURANCA: { libera_mecanico: true },
+  AGUARDANDO_APROVACAO: { libera_mecanico: true },
+  OUTRO: { libera_mecanico: true },
+});
+
+function normalizeStatusOS(status) {
+  return String(status || '').trim().toUpperCase();
+}
+
+function motivoAndamentoLiberaMecanico(motivo = {}) {
+  const codigo = String(motivo?.motivo_codigo || motivo?.codigo || '').trim().toUpperCase();
+  if (Object.prototype.hasOwnProperty.call(motivo || {}, 'libera_mecanico') && motivo.libera_mecanico !== null && motivo.libera_mecanico !== undefined) return Number(motivo.libera_mecanico || 0) === 1;
+  if (codigo && MOTIVOS_ANDAMENTO_DISPONIBILIDADE[codigo]) return !!MOTIVOS_ANDAMENTO_DISPONIBILIDADE[codigo].libera_mecanico;
+  return true;
+}
+
+function getUltimoMotivoAndamentoOS(osId) {
+  const id = Number(osId || 0);
+  if (!id || !tableExists('os_andamento_historico')) return null;
+  const motivoCols = tableExists('os_andamento_motivos') ? getTableColumns('os_andamento_motivos') : [];
+  const liberaExpr = motivoCols.includes('libera_mecanico') ? 'm.libera_mecanico' : 'NULL';
+  try {
+    return db.prepare(`
+      SELECT h.motivo_codigo,
+             h.motivo_nome,
+             ${liberaExpr} AS libera_mecanico
+      FROM os_andamento_historico h
+      ${tableExists('os_andamento_motivos') ? 'LEFT JOIN os_andamento_motivos m ON m.codigo = h.motivo_codigo' : ''}
+      WHERE h.os_id = ?
+      ORDER BY datetime(h.registrado_em) DESC, h.id DESC
+      LIMIT 1
+    `).get(id) || null;
+  } catch (_e) {
+    return null;
+  }
+}
+
+function osBloqueiaDisponibilidade(os = {}) {
+  const status = normalizeStatusOS(os.status);
+  if (!status || STATUS_OS_FINALIZADA.has(status)) return false;
+
+  const motivo = os.motivo_codigo || Object.prototype.hasOwnProperty.call(os, 'libera_mecanico')
+    ? os
+    : getUltimoMotivoAndamentoOS(os.id || os.os_id);
+
+  if (motivo?.motivo_codigo || motivo?.codigo) {
+    return !motivoAndamentoLiberaMecanico(motivo);
+  }
+
+  if (STATUS_OS_PAUSADA.has(status)) return false;
+  return STATUS_OS_EXECUCAO_POTENCIAL.has(status);
+}
+
+function encerrarExecucoesAtivasOS(osId) {
+  if (!tableExists('os_execucoes')) return;
+  db.prepare(`UPDATE os_execucoes SET finalizado_em = datetime('now','localtime') WHERE os_id = ? AND finalizado_em IS NULL`).run(Number(osId));
+}
+
+function getResponsavelExecucaoUserId(os = {}) {
+  const direto = Number(os.mecanico_user_id || os.executor_user_id || 0);
+  if (direto) return direto;
+  const colabId = Number(os.executor_colaborador_id || os.responsavel_colaborador_id || 0);
+  if (!colabId || !tableExists('colaboradores')) return null;
+  return Number(db.prepare(`SELECT user_id FROM colaboradores WHERE id = ?`).get(colabId)?.user_id || 0) || null;
+}
+
+function colaboradorTemAtendimentoAtivo(colaboradorId, { ignorarOsId = null } = {}) {
+  const id = Number(colaboradorId || 0);
+  if (!id || !tableExists('os')) return false;
+  const cols = getOSColumns();
+  const conds = [];
+  const args = [];
+  if (cols.includes('executor_colaborador_id')) { conds.push('executor_colaborador_id = ?'); args.push(id); }
+  if (cols.includes('auxiliar_colaborador_id')) { conds.push('auxiliar_colaborador_id = ?'); args.push(id); }
+  if (!conds.length) return false;
+
+  const rows = db.prepare(`
+    SELECT id, status,
+           ${cols.includes('ultimo_motivo_andamento') ? 'ultimo_motivo_andamento' : 'NULL'} AS ultimo_motivo_andamento
+    FROM os
+    WHERE (${conds.join(' OR ')})
+      AND UPPER(COALESCE(status,'')) NOT IN ('FECHADA','FINALIZADA','CONCLUIDA','CONCLUÍDA','CANCELADA')
+  `).all(...args);
+
+  return rows.some((row) => Number(row.id) !== Number(ignorarOsId || 0) && osBloqueiaDisponibilidade(row));
+}
+
+function calcularDisponibilidadeMecanico(userId, _dataHora = null, { ignorarOsId = null } = {}) {
+  const uid = Number(userId || 0);
+  if (!uid) return { estado: 'INDISPONIVEL_ESCALA', disponivel: false, motivo: 'Usuário inválido' };
+
+  let colaborador = null;
+  if (tableExists('colaboradores')) {
+    colaborador = db.prepare(`SELECT id, nome, ativo FROM colaboradores WHERE user_id = ? LIMIT 1`).get(uid) || null;
+    if (colaborador && Number(colaborador.ativo || 1) !== 1) {
+      return { estado: 'AFASTADO', disponivel: false, motivo: 'Colaborador inativo', colaborador_id: Number(colaborador.id) };
+    }
+  }
+
+  const colabId = Number(colaborador?.id || 0);
+  const turnoAtual = getTurnoAtual();
+  const escalados = getColaboradoresTurnoAtual(turnoAtual);
+  if (colabId && !escalados.some((c) => Number(c.id) === colabId)) {
+    return { estado: 'INDISPONIVEL_ESCALA', disponivel: false, motivo: 'Fora da escala atual', colaborador_id: colabId };
+  }
+
+  if (colabId && colaboradorTemAtendimentoAtivo(colabId, { ignorarOsId })) {
+    return { estado: 'EM_ATENDIMENTO', disponivel: false, motivo: 'Execução ativa de OS', colaborador_id: colabId };
+  }
+
+  if (isUserOcupado(uid, { ignorarOsId })) {
+    return { estado: 'EM_ATENDIMENTO', disponivel: false, motivo: 'Execução ativa de OS', colaborador_id: colabId || null };
+  }
+
+  return { estado: 'DISPONIVEL', disponivel: true, motivo: 'Disponível para novos chamados', colaborador_id: colabId || null };
+}
+
 function getOSColumns() {
   return db.prepare(`PRAGMA table_info(os)`).all().map((c) => c.name);
 }
@@ -249,17 +381,19 @@ function getPessoasDoTurnoAtual() {
     .filter((row) => row.nome && (!row.colaborador_id || !ausentesHoje.has(row.colaborador_id)));
 }
 
-function isUserOcupado(userId) {
+function isUserOcupado(userId, { ignorarOsId = null } = {}) {
   if (!userId || !tableExists("os_execucoes")) return false;
   const execCols = getTableColumns("os_execucoes");
   const executorCol = execCols.includes("executor_user_id") ? "executor_user_id" : "mecanico_user_id";
-  const row = db.prepare(`
-    SELECT 1 FROM os_execucoes
-    WHERE finalizado_em IS NULL
-      AND (${executorCol} = ? OR auxiliar_user_id = ?)
-    LIMIT 1
-  `).get(Number(userId), Number(userId));
-  return !!row;
+  const hasAux = execCols.includes("auxiliar_user_id");
+  const rows = db.prepare(`
+    SELECT ex.os_id, o.id, o.status
+    FROM os_execucoes ex
+    LEFT JOIN os o ON o.id = ex.os_id
+    WHERE ex.finalizado_em IS NULL
+      AND (ex.${executorCol} = ? ${hasAux ? `OR ex.auxiliar_user_id = ?` : ``})
+  `).all(...(hasAux ? [Number(userId), Number(userId)] : [Number(userId)]));
+  return rows.some((row) => Number(row.os_id || row.id || 0) !== Number(ignorarOsId || 0) && osBloqueiaDisponibilidade(row));
 }
 
 function getPlantonistaNoite() {
@@ -817,8 +951,6 @@ function getEscalados(semanaId, tipoTurno, funcoes = []) {
 function listarOcupados() {
   if (!tableExists("os") || !tableExists("colaboradores")) return new Set();
 
-  const ativos = ["ABERTA", "AGUARDANDO_EQUIPE", "ANDAMENTO", "PAUSADA"];
-  const placeholders = ativos.map(() => "?").join(",");
   const cols = getOSColumns();
   const hasExecColab = cols.includes("executor_colaborador_id");
   const hasAuxColab = cols.includes("auxiliar_colaborador_id");
@@ -827,17 +959,19 @@ function listarOcupados() {
 
   const rows = db.prepare(`
     SELECT id,
+           status,
            ${hasExecColab ? "executor_colaborador_id" : "NULL"} AS executor_colaborador_id,
            ${hasAuxColab ? "auxiliar_colaborador_id" : "NULL"} AS auxiliar_colaborador_id,
            ${hasExecUser ? "mecanico_user_id" : "NULL"} AS mecanico_user_id,
            ${hasAuxUser ? "auxiliar_user_id" : "NULL"} AS auxiliar_user_id
     FROM os
-    WHERE UPPER(COALESCE(status,'')) IN (${placeholders})
-  `).all(...ativos);
+    WHERE UPPER(COALESCE(status,'')) NOT IN ('FECHADA','FINALIZADA','CONCLUIDA','CONCLUÍDA','CANCELADA')
+  `).all();
 
   const userToColab = db.prepare(`SELECT id FROM colaboradores WHERE user_id = ? LIMIT 1`);
   const ocupados = new Set();
   for (const row of rows) {
+    if (!osBloqueiaDisponibilidade(row)) continue;
     if (row.executor_colaborador_id) ocupados.add(Number(row.executor_colaborador_id));
     if (row.auxiliar_colaborador_id) ocupados.add(Number(row.auxiliar_colaborador_id));
 
@@ -853,19 +987,8 @@ function listarOcupados() {
   return ocupados;
 }
 
-function isColaboradorOcupado(colaboradorId) {
-  if (!colaboradorId || !tableExists("os")) return false;
-  const cols = getOSColumns();
-  if (!cols.includes("executor_colaborador_id") || !cols.includes("auxiliar_colaborador_id")) return false;
-
-  const row = db.prepare(`
-    SELECT 1
-    FROM os
-    WHERE UPPER(COALESCE(status,'')) IN ('ABERTA','AGUARDANDO_EQUIPE','ANDAMENTO','PAUSADA')
-      AND (executor_colaborador_id = ? OR auxiliar_colaborador_id = ?)
-    LIMIT 1
-  `).get(Number(colaboradorId), Number(colaboradorId));
-  return !!row;
+function isColaboradorOcupado(colaboradorId, opts = {}) {
+  return colaboradorTemAtendimentoAtivo(colaboradorId, opts);
 }
 
 function isColaboradorDisponivel(colaboradorId) {
@@ -1270,7 +1393,9 @@ function calcularDiasAbertaOS(os = {}) {
 
 function listMotivosAndamento() {
   if (!tableExists("os_andamento_motivos")) return [];
-  return db.prepare(`SELECT codigo, nome, texto_padrao, exige_observacao, ordem FROM os_andamento_motivos WHERE ativo = 1 ORDER BY ordem, nome`).all();
+  const cols = getTableColumns("os_andamento_motivos");
+  const liberaExpr = cols.includes("libera_mecanico") ? "libera_mecanico" : "1 AS libera_mecanico";
+  return db.prepare(`SELECT codigo, nome, texto_padrao, exige_observacao, ${liberaExpr}, ordem FROM os_andamento_motivos WHERE ativo = 1 ORDER BY ordem, nome`).all();
 }
 
 function getHistoricoAndamentoOS(osId) {
@@ -1348,6 +1473,8 @@ async function registrarJustificativaAndamento(osId, payload = {}) {
     textoTecnico = fallback;
   }
 
+  const liberaMecanico = motivoAndamentoLiberaMecanico(motivo);
+
   db.transaction(() => {
     db.prepare(`
       INSERT INTO os_andamento_historico
@@ -1359,9 +1486,13 @@ async function registrarJustificativaAndamento(osId, payload = {}) {
       SET ultimo_motivo_andamento = ?, ultima_justificativa_andamento = ?, ultimo_registro_andamento_em = datetime('now','localtime')
       WHERE id = ?
     `).run(motivo.nome, textoTecnico, id);
+    if (liberaMecanico) encerrarExecucoesAtivasOS(id);
   })();
   syncInspecaoFromOS(id);
-  try { osChatService?.registrarMensagemSistema(id, 'JUSTIFICATIVA_REGISTRADA', `Justificativa registrada: ${motivo.nome}. ${textoTecnico}`, { user_id: payload.usuario_id }); } catch (_e) {}
+  const mensagemDisponibilidade = liberaMecanico
+    ? `Mecânico liberado para novos atendimentos porque a OS foi justificada com o motivo “${motivo.nome}”.`
+    : 'Mecânico mantido em atendimento porque a justificativa indica continuidade do serviço.';
+  try { osChatService?.registrarMensagemSistema(id, 'JUSTIFICATIVA_REGISTRADA', `Justificativa registrada: ${motivo.nome}. ${textoTecnico} ${mensagemDisponibilidade}`, { user_id: payload.usuario_id }); } catch (_e) {}
   emitOSEvents(id, "status");
   return getHistoricoAndamentoOS(id)[0];
 }
@@ -1736,7 +1867,9 @@ function rankMechanicsForOS(os = {}) {
       : 240;
 
     const cargaAtual = cols.has('mecanico_user_id')
-      ? safeNum(() => db.prepare(`SELECT COUNT(*) AS c FROM os WHERE status IN ('ABERTA','ANDAMENTO','EM_ANDAMENTO','PAUSADA') AND mecanico_user_id = ?`).get(userId)?.c, 0)
+      ? db.prepare(`SELECT id, status FROM os WHERE UPPER(COALESCE(status,'')) NOT IN ('FECHADA','FINALIZADA','CONCLUIDA','CONCLUÍDA','CANCELADA') AND mecanico_user_id = ?`)
+        .all(userId)
+        .filter((row) => osBloqueiaDisponibilidade(row)).length
       : 0;
 
     const pesoCrit = criticidade === 'CRITICA' ? 2.5 : criticidade === 'ALTA' ? 2 : criticidade === 'MEDIA' ? 1.4 : 1;
@@ -2255,6 +2388,14 @@ function iniciarOS(id, userId) {
   const os = getOSById(id);
   if (!os) throw new Error("OS não encontrada.");
 
+  const responsavelUserId = getResponsavelExecucaoUserId(os);
+  if (responsavelUserId) {
+    const disponibilidade = calcularDisponibilidadeMecanico(responsavelUserId, null, { ignorarOsId: id });
+    if (!disponibilidade.disponivel) {
+      throw new Error("Mecânico responsável já está em outro atendimento ativo. Encaminhe ao encarregado para manter o mesmo mecânico, transferir a OS ou programar retomada posterior.");
+    }
+  }
+
   const cols = getOSColumns();
   const sets = ["status = 'ANDAMENTO'"];
   const args = [];
@@ -2271,8 +2412,13 @@ function iniciarOS(id, userId) {
   }
 
   args.push(id);
-  db.prepare(`UPDATE os SET ${sets.join(", ")} WHERE id = ?`).run(...args);
-  try { osChatService?.registrarMensagemSistema(id, 'STATUS_OS_ALTERADO', `OS #${id} iniciada e colocada em andamento.`, { user_id: userId }); } catch (_e) {}
+  db.transaction(() => {
+    db.prepare(`UPDATE os SET ${sets.join(", ")} WHERE id = ?`).run(...args);
+    if (tableExists("os_execucoes") && responsavelUserId && !getExecucaoAtiva(id)) {
+      createExecucao(Number(id), Number(responsavelUserId), os.auxiliar_user_id ? Number(os.auxiliar_user_id) : null, userId || null, "Retomada/início confirmado da OS.", os.turno_alocado || getTurnoAtual());
+    }
+  })();
+  try { osChatService?.registrarMensagemSistema(id, 'STATUS_OS_ALTERADO', `OS #${id} iniciada e colocada em andamento. Mecânico mantido em atendimento porque houve retomada confirmada da OS.`, { user_id: userId }); } catch (_e) {}
 
   emitOSEvents(id, "status");
   pushService
@@ -2293,8 +2439,17 @@ function pausarOS(id) {
   const os = getOSById(id);
   if (!os) throw new Error("OS não encontrada.");
 
-  db.prepare(`UPDATE os SET status = 'PAUSADA' WHERE id = ?`).run(id);
-  try { osChatService?.registrarMensagemSistema(id, 'STATUS_OS_ALTERADO', `OS #${id} pausada.`, {}); } catch (_e) {}
+  const ultimoMotivo = getUltimoMotivoAndamentoOS(id);
+  const liberaMecanico = ultimoMotivo ? motivoAndamentoLiberaMecanico(ultimoMotivo) : true;
+  db.transaction(() => {
+    db.prepare(`UPDATE os SET status = 'PAUSADA' WHERE id = ?`).run(id);
+    if (liberaMecanico) encerrarExecucoesAtivasOS(id);
+  })();
+  const motivoTexto = ultimoMotivo?.motivo_nome ? ` com o motivo “${ultimoMotivo.motivo_nome}”` : '';
+  const mensagemDisponibilidade = liberaMecanico
+    ? `Mecânico liberado para novos atendimentos porque a OS foi pausada${motivoTexto}.`
+    : 'Mecânico mantido em atendimento porque a justificativa indica continuidade do serviço.';
+  try { osChatService?.registrarMensagemSistema(id, 'STATUS_OS_ALTERADO', `OS #${id} pausada. ${mensagemDisponibilidade}`, {}); } catch (_e) {}
   emitOSEvents(id, "status");
   if (inspecaoService?.syncFromOS) {
     try {
@@ -2554,7 +2709,13 @@ function updateStatus(id, status) {
   const st = String(status || "").trim().toUpperCase();
   if (!st) return;
 
-  db.prepare(`UPDATE os SET status = ? WHERE id = ?`).run(st, id);
+  db.transaction(() => {
+    db.prepare(`UPDATE os SET status = ? WHERE id = ?`).run(st, id);
+    if (STATUS_OS_PAUSADA.has(st)) {
+      const ultimoMotivo = getUltimoMotivoAndamentoOS(id);
+      if (!ultimoMotivo || motivoAndamentoLiberaMecanico(ultimoMotivo)) encerrarExecucoesAtivasOS(id);
+    }
+  })();
   try { osChatService?.registrarMensagemSistema(id, 'STATUS_OS_ALTERADO', `Status da OS alterado para ${st}.`, {}); } catch (_e) {}
   emitOSEvents(id, "status");
 
@@ -2586,6 +2747,69 @@ function updateStatus(id, status) {
   }
 }
 
+function calcularDisponibilidadeResponsavelOS(osId) {
+  const os = typeof osId === 'object' ? osId : getOSById(Number(osId));
+  if (!os) return null;
+  const responsavelUserId = getResponsavelExecucaoUserId(os);
+  if (!responsavelUserId) return null;
+  const disponibilidade = calcularDisponibilidadeMecanico(responsavelUserId, null, { ignorarOsId: os.id });
+  const bloqueiaEstaOS = osBloqueiaDisponibilidade(os);
+  if (bloqueiaEstaOS) {
+    return { ...disponibilidade, estado: 'EM_ATENDIMENTO', disponivel: false, motivo: 'Ocupado nesta OS' };
+  }
+  return disponibilidade;
+}
+
+function registrarHistoricoDisponibilidadeManual(osId, tipo, mensagem, userId) {
+  try { osChatService?.registrarMensagemSistema(osId, tipo, mensagem, { user_id: userId }); } catch (_e) {}
+}
+
+function liberarMecanicoManual(osId, { usuario_id = null, motivo = '', observacao = '' } = {}) {
+  const id = Number(osId || 0);
+  const os = getOSById(id);
+  if (!os) throw new Error('OS não encontrada.');
+  const motivoLimpo = String(motivo || '').trim();
+  if (!motivoLimpo) throw new Error('Informe o motivo da liberação manual.');
+  encerrarExecucoesAtivasOS(id);
+  const autor = getUserNameById(usuario_id) || 'encarregado/admin';
+  const obs = String(observacao || '').trim();
+  registrarHistoricoDisponibilidadeManual(
+    id,
+    'DISPONIBILIDADE_MANUAL',
+    `Mecânico liberado manualmente por ${autor}. Motivo: ${motivoLimpo}.${obs ? ` Observação: ${obs}` : ''}`,
+    usuario_id
+  );
+  emitOSEvents(id, 'status');
+  return getOSById(id);
+}
+
+function manterMecanicoVinculadoExecucao(osId, { usuario_id = null, motivo = '', observacao = '' } = {}) {
+  const id = Number(osId || 0);
+  const os = getOSById(id);
+  if (!os) throw new Error('OS não encontrada.');
+  const motivoLimpo = String(motivo || '').trim();
+  if (!motivoLimpo) throw new Error('Informe o motivo para manter o mecânico vinculado.');
+  const responsavelUserId = getResponsavelExecucaoUserId(os);
+  if (!responsavelUserId) throw new Error('OS sem mecânico responsável para vincular à execução.');
+  const disponibilidade = calcularDisponibilidadeMecanico(responsavelUserId, null, { ignorarOsId: id });
+  if (!disponibilidade.disponivel) {
+    throw new Error('Mecânico responsável já está em outro atendimento ativo. Decida se a OS será transferida ou reprogramada.');
+  }
+  if (tableExists('os_execucoes') && !getExecucaoAtiva(id)) {
+    createExecucao(id, responsavelUserId, os.auxiliar_user_id ? Number(os.auxiliar_user_id) : null, usuario_id || null, motivoLimpo, os.turno_alocado || getTurnoAtual());
+  }
+  const autor = getUserNameById(usuario_id) || 'encarregado/admin';
+  const obs = String(observacao || '').trim();
+  registrarHistoricoDisponibilidadeManual(
+    id,
+    'DISPONIBILIDADE_MANUAL',
+    `Mecânico mantido vinculado à execução por ${autor}. Motivo: ${motivoLimpo}.${obs ? ` Observação: ${obs}` : ''}`,
+    usuario_id
+  );
+  emitOSEvents(id, 'status');
+  return getOSById(id);
+}
+
 function patchAIFields(osId, payload = {}) {
   const cols = getOSColumns();
   const allowed = ['ai_diagnostico', 'ai_sugestao', 'ai_criticidade', 'ai_embedding'];
@@ -2610,6 +2834,12 @@ module.exports = {
   temJustificativaAndamentoHoje,
   getAcaoNecessariaAndamento,
   registrarJustificativaAndamento,
+  motivoAndamentoLiberaMecanico,
+  osBloqueiaDisponibilidade,
+  calcularDisponibilidadeMecanico,
+  calcularDisponibilidadeResponsavelOS,
+  liberarMecanicoManual,
+  manterMecanicoVinculadoExecucao,
   listOS,
   listOpenOSByColaborador,
   deleteOS,

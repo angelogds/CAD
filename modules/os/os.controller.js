@@ -3,7 +3,7 @@ const pushService = require("../push/push.service");
 let tracagemService = null;
 try { tracagemService = require('../tracagem/tracagem.service'); } catch (_e) {}
 const { canAccessModule, normalizeRole } = require("../../config/rbac");
-const { canViewOSDetails, canRegisterOSAndamento, postCloseRedirectPath } = require("./os.permissions");
+const { canViewOSDetails, canRegisterOSAndamento, canManageOSDisponibilidade, postCloseRedirectPath } = require("./os.permissions");
 const aiService = require("../ai/ai.service");
 const embeddingsService = require("../ai/ai.embeddings.service");
 const visionService = require("../ai/ai.vision.service");
@@ -218,7 +218,7 @@ function osShow(req, res) {
     return res.status(403).render("errors/403", { layout: "layout", title: "Sem permissão" });
   }
 
-  const canManageEquipe = ["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"].includes(role);
+  const canManageEquipe = ["ADMIN", "ENCARREGADO_MANUTENCAO", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"].includes(role);
 
   let osAtual = os;
   if (String(osAtual.status || "").toUpperCase() === "AGUARDANDO_EQUIPE" && !osAtual.executor_colaborador_id) {
@@ -247,6 +247,7 @@ function osShow(req, res) {
   const metricasAndamento = service.calcularDiasAbertaOS(osAtual);
   const ultimoRegistroHoje = service.temJustificativaAndamentoHoje(id);
   const documentoInstitucional = osDocumentService.getLatestInstitutionalDocument(id);
+  const disponibilidadeResponsavel = service.calcularDisponibilidadeResponsavelOS(osAtual);
   let chatResumo = null;
   try { chatResumo = osChatService.buscarConversaPorOS(id, req.session?.user || {}); } catch (_e) { chatResumo = null; }
 
@@ -255,6 +256,7 @@ function osShow(req, res) {
     os: osAtual,
     canAutoAssign: canManageEquipe,
     canManualEditEquipe: canManageEquipe,
+    canManageDisponibilidade: canManageOSDisponibilidade(role),
     canExecuteOS: canAccessModule(role, "os_execute"),
     canRegisterAndamento: canRegisterOSAndamento(role),
     equipeUsuarios,
@@ -274,6 +276,7 @@ function osShow(req, res) {
     metricasAndamento,
     alertaJustificativaAndamento: service.isStatusOSEmAndamento(osAtual.status) && metricasAndamento.dias_aberta > 1 && !ultimoRegistroHoje,
     documentoInstitucional,
+    disponibilidadeResponsavel,
     chatResumo,
     user: req.session?.user || null,
   });
@@ -734,6 +737,31 @@ function debugWhatsappOS(req, res) {
   return res.json({ ok: true, ...diagnostico });
 }
 
+function osDisponibilidadeManual(req, res) {
+  const id = Number(req.params.id);
+  const acao = String(req.body?.acao || '').trim();
+  try {
+    if (acao === 'manter') {
+      service.manterMecanicoVinculadoExecucao(id, {
+        usuario_id: req.session?.user?.id,
+        motivo: req.body?.motivo,
+        observacao: req.body?.observacao,
+      });
+      req.flash('success', 'Mecânico mantido vinculado à execução.');
+    } else {
+      service.liberarMecanicoManual(id, {
+        usuario_id: req.session?.user?.id,
+        motivo: req.body?.motivo,
+        observacao: req.body?.observacao,
+      });
+      req.flash('success', 'Mecânico liberado manualmente para novas OSs.');
+    }
+  } catch (err) {
+    req.flash('error', err.message || 'Não foi possível atualizar a disponibilidade do mecânico.');
+  }
+  return res.redirect(`/os/${id}#equipe-os`);
+}
+
 async function osVoiceAnalyze(req, res) {
   const userId = Number(req.session?.user?.id || 0);
   if (!userId) return res.status(401).json({ ok: false, error: "Usuário não autenticado." });
@@ -822,6 +850,7 @@ module.exports = {
   osAndamento,
   osRegistrarAndamento,
   osMaterialChegou,
+  osDisponibilidadeManual,
   osCloseForm,
   osIniciar,
   osPausar,

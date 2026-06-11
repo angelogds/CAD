@@ -136,6 +136,12 @@
         <span class="status <%= gg==='BAIXA'?'g-baixa':(gg==='MEDIA'?'g-media':(gg==='ALTA'?'g-alta':'g-critica')) %>"><%= gg || '-' %></span>
       </div>
       <div><b>Status:</b> <%= os.status %></div>
+      <% if (os.ultimo_motivo_andamento) { %>
+        <div><b>Motivo atual:</b> <%= os.ultimo_motivo_andamento %></div>
+      <% } %>
+      <% if (disponibilidadeResponsavel) { %>
+        <div><b>Disponibilidade atual:</b> <%= disponibilidadeResponsavel.disponivel ? 'Liberado para novas OSs' : disponibilidadeResponsavel.motivo %></div>
+      <% } %>
       <% if (String(os.status || "").toUpperCase() === "AGUARDANDO_EQUIPE") { %>
         <div style="grid-column:1/-1;color:#b91c1c;font-weight:700;">Sem executor disponível no turno: OS aguardando alocação.</div>
       <% } %>
@@ -305,6 +311,18 @@
         </div>
         <div style="margin-top:8px;"><button class="btn" type="submit">Salvar equipe</button></div>
       </form>
+      <% if (canManageDisponibilidade) { %>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:14px 0"/>
+        <div class="muted" style="font-weight:700;">Disponibilidade manual do mecânico</div>
+        <form method="POST" action="/os/<%= os.id %>/disponibilidade-manual" style="margin-top:10px;display:grid;gap:8px;">
+          <input class="input" name="motivo" required maxlength="180" placeholder="Motivo obrigatório da decisão manual">
+          <textarea class="input" name="observacao" maxlength="500" rows="2" placeholder="Observação opcional"></textarea>
+          <div class="actions">
+            <button class="btn btn-outline" name="acao" value="liberar" type="submit">Liberar mecânico para novas OSs</button>
+            <button class="btn" name="acao" value="manter" type="submit">Manter mecânico vinculado à execução</button>
+          </div>
+        </form>
+      <% } %>
     </div>
     <% } %>
     <ul style="margin-top:8px;">

@@ -101,3 +101,32 @@ test('PAC 01 page, detailed report and PDF expose ongoing OS traceability', () =
   assert.match(exporter, /Ordens de Serviço em Andamento — Justificativas e Rastreabilidade/);
   assert.match(exporter, /drawOSEmAndamentoBlock/);
 });
+
+test('catálogo de motivos controla disponibilidade do mecânico sem comparação textual espalhada', () => {
+  const migration = read('database/migrations/155_os_andamento_justificativas.sql');
+  const migration157 = read('database/migrations/157_os_andamento_libera_mecanico.js');
+  const service = read('modules/os/os.service.js');
+  assert.match(migration, /libera_mecanico INTEGER NOT NULL DEFAULT 1/);
+  assert.match(migration, /SERVICO_COMPLEXO_CONTINUIDADE'[^\n]+, 0, 9\)/);
+  assert.match(migration, /FALTA_MATERIAL'[^\n]+, 1, 1\)/);
+  assert.match(migration157, /addColumnIfMissing\("os_andamento_motivos", "libera_mecanico"/);
+  assert.match(service, /function osBloqueiaDisponibilidade/);
+  assert.match(service, /function calcularDisponibilidadeMecanico/);
+  assert.match(service, /STATUS_OS_EXECUCAO_POTENCIAL = new Set\(\['ANDAMENTO', 'EM_ANDAMENTO'/);
+  assert.match(service, /motivoAndamentoLiberaMecanico/);
+  assert.match(service, /Mecânico liberado para novos atendimentos porque a OS foi pausada/);
+  assert.match(service, /Mecânico mantido em atendimento porque a justificativa indica continuidade do serviço/);
+  assert.doesNotMatch(service, /motivo\s*===\s*['"]Falta de material['"]/);
+});
+
+test('rota manual de disponibilidade fica restrita a encarregado ou admin', () => {
+  const routes = read('modules/os/os.routes.js');
+  const permissions = read('modules/os/os.permissions.js');
+  const view = read('views/os/show.ejs');
+  assert.match(routes, /\/:id\/disponibilidade-manual/);
+  assert.match(routes, /requireRole\(OS_MANUAL_DISPONIBILIDADE_ACCESS\)/);
+  assert.match(permissions, /OS_MANUAL_DISPONIBILIDADE_ACCESS/);
+  assert.match(permissions, /ENCARREGADO_MANUTENCAO/);
+  assert.match(view, /Liberar mecânico para novas OSs/);
+  assert.match(view, /Manter mecânico vinculado à execução/);
+});
