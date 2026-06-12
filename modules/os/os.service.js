@@ -2661,6 +2661,7 @@ async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, fechamento
   });
 
   tx();
+  try { osChatService?.arquivarConversaOS(id, { user_id: closedBy || null }); } catch (_e) {}
   emitOSEvents(id, "status");
   pushService
     .sendPushToAll({
@@ -2705,18 +2706,40 @@ function liberarEquipeQuandoFechar(osId) {
   return !!db.prepare(`SELECT id FROM os WHERE id = ?`).get(Number(osId));
 }
 
-function updateStatus(id, status) {
+function updateStatus(id, status, userId = null) {
   const st = String(status || "").trim().toUpperCase();
   if (!st) return;
+  const isFinalizada = ["FECHADA", "FINALIZADA", "CONCLUIDA", "CONCLUÍDA", "CANCELADA"].includes(st);
 
   db.transaction(() => {
-    db.prepare(`UPDATE os SET status = ? WHERE id = ?`).run(st, id);
+    const cols = getOSColumns();
+    const sets = ["status = ?"];
+    const args = [st];
+    if (isFinalizada) {
+      if (cols.includes("closed_at")) sets.push("closed_at = COALESCE(closed_at, datetime('now'))");
+      if (cols.includes("closed_by")) {
+        sets.push("closed_by = COALESCE(closed_by, ?)");
+        args.push(userId || null);
+      }
+      if (cols.includes("data_conclusao")) sets.push("data_conclusao = COALESCE(data_conclusao, datetime('now'))");
+      if (cols.includes("data_fim")) sets.push("data_fim = COALESCE(data_fim, datetime('now'))");
+      if (cols.includes("chat_arquivada")) sets.push("chat_arquivada = 1");
+      if (cols.includes("status_chat")) sets.push("status_chat = 'ARQUIVADO'");
+    } else {
+      if (cols.includes("chat_arquivada")) sets.push("chat_arquivada = 0");
+      if (cols.includes("status_chat")) sets.push("status_chat = 'ATIVO'");
+    }
+    args.push(id);
+    db.prepare(`UPDATE os SET ${sets.join(', ')} WHERE id = ?`).run(...args);
     if (STATUS_OS_PAUSADA.has(st)) {
       const ultimoMotivo = getUltimoMotivoAndamentoOS(id);
       if (!ultimoMotivo || motivoAndamentoLiberaMecanico(ultimoMotivo)) encerrarExecucoesAtivasOS(id);
     }
   })();
-  try { osChatService?.registrarMensagemSistema(id, 'STATUS_OS_ALTERADO', `Status da OS alterado para ${st}.`, {}); } catch (_e) {}
+  try { osChatService?.registrarMensagemSistema(id, 'STATUS_OS_ALTERADO', `Status da OS alterado para ${st}.`, { user_id: userId || null }); } catch (_e) {}
+  if (isFinalizada) {
+    try { osChatService?.arquivarConversaOS(id, { user_id: userId || null }); } catch (_e) {}
+  }
   emitOSEvents(id, "status");
 
   if (st === "ANDAMENTO" || st === "EM_ANDAMENTO") {
