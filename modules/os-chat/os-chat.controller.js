@@ -5,7 +5,7 @@ const filtros = [
   ['todas', 'Todas'], ['nao_lidas', 'Não lidas'], ['aguardando_material', 'Aguardando material'],
   ['aguardando_compras', 'Aguardando compras'], ['aguardando_manutencao', 'Aguardando manutenção'],
   ['aguardando_inspecao', 'Aguardando inspeção'], ['criticas', 'Críticas'], ['em_andamento', 'Em andamento'],
-  ['finalizadas_recentes', 'Finalizadas recentemente'],
+  ['finalizadas', 'Finalizadas'],
 ];
 
 function wantsJson(req) {

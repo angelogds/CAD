@@ -1,33 +1,42 @@
 <% layout('layout') %>
 <%- include('partials-styles') %>
+<% const isHistorico = ['historico','finalizadas','finalizadas_recentes'].includes(String(filtro || '').toLowerCase()); %>
 <div class="page-head">
-  <div><h1>💬 Chat de OS</h1><p class="muted">Apenas OSs com conversa, justificativa, atraso, pendência ou rastreabilidade aparecem aqui.</p></div>
-  <a class="btn btn-ghost" href="/chat-os">Atualizar</a>
+  <div><h1>💬 Chat de OS</h1><p class="muted"><%= isHistorico ? 'Consulta de OSs encerradas arquivadas, sem carregar por padrão.' : 'Painel operacional com apenas OSs ativas, pendentes, pausadas ou aguardando ação.' %></p></div>
+  <a class="btn btn-ghost" href="/chat-os<%= isHistorico ? '?filtro=finalizadas' : '' %>">Atualizar</a>
 </div>
 <div class="os-chat-filters">
   <% filtros.forEach(([value,label]) => { %><a class="pill-tag <%= filtro===value?'pill-green':'pill-gray' %>" href="/chat-os?filtro=<%= value %>"><%= label %></a><% }) %>
 </div>
-<div class="os-chat-shell os-chat-list-only">
+<div class="os-chat-shell os-chat-list-only <%= isHistorico ? 'history-mode' : '' %>">
   <aside class="os-chat-list">
-    <% if (!conversas.length) { %><div class="os-chat-empty"><strong>Nenhuma OS com tratativa pendente no momento.</strong><br>As OSs aparecerão aqui quando tiverem justificativa, atraso, falta de material, solicitação vinculada ou conversa registrada.</div><% } %>
-    <% conversas.forEach((c) => { const pr=String(c.prioridade||'').toUpperCase(); const dot=Number(c.eh_critica||0)===1||pr.includes('CRIT')||pr.includes('ALTA')||pr.includes('URG')?'🔴':(c.tem_solicitacao?'🟡':'🟢'); const motivo=c.motivo_atual || (c.esta_atrasada ? 'OS em atraso' : (c.tem_solicitacao ? 'Solicitação vinculada' : (c.tem_chat ? 'Conversa registrada' : 'Tratativa registrada'))); %>
+    <% if (!conversas.length) { %><div class="os-chat-empty"><strong><%= isHistorico ? 'Nenhuma OS finalizada encontrada no histórico.' : 'Nenhuma OS ativa com tratativa pendente no momento.' %></strong><br><%= isHistorico ? 'OSs fechadas, finalizadas, concluídas ou canceladas aparecerão aqui para consulta posterior.' : 'As OSs aparecerão aqui enquanto estiverem abertas, em andamento, pausadas, pendentes ou aguardando alguma ação.' %></div><% } %>
+    <% conversas.forEach((c) => { const pr=String(c.prioridade||'').toUpperCase(); const dot=isHistorico?'📁':(Number(c.eh_critica||0)===1||pr.includes('CRIT')||pr.includes('ALTA')||pr.includes('URG')?'🔴':(c.tem_solicitacao?'🟡':'🟢')); const motivo=c.motivo_atual || (c.esta_atrasada ? 'OS em atraso' : (c.tem_solicitacao ? 'Solicitação vinculada' : (c.tem_chat ? 'Conversa registrada' : 'Tratativa registrada'))); %>
       <a class="os-chat-contact" href="/chat-os/<%= c.id %>?filtro=<%= filtro %>">
         <div class="os-chat-contact-top"><strong><%= dot %> OS <%= c.id %> - <%= c.equipamento %></strong><span><%= c.ultima_interacao_em ? fmtBR(c.ultima_interacao_em) : '' %></span></div>
         <div class="muted"><%= c.setor || '-' %></div>
         <div>Status: <strong><%= c.status || '-' %></strong></div>
-        <div>Motivo: <%= motivo %></div>
-        <div class="os-chat-preview">Última interação: <%= c.ultima_mensagem_em ? fmtBR(c.ultima_mensagem_em) : 'Sem mensagens no chat' %></div>
-        <% if (c.participantes) { %><div class="os-chat-preview">Participantes: <%= c.participantes %></div><% } %>
+        <% if (isHistorico) { %>
+          <div>Responsável: <strong><%= c.responsavel || '-' %></strong></div>
+          <div>Abertura: <strong><%= c.opened_at ? fmtBR(c.opened_at) : '-' %></strong></div>
+          <div>Fechamento: <strong><%= c.data_fechamento ? fmtBR(c.data_fechamento) : '-' %></strong></div>
+          <div class="os-chat-preview">Última mensagem: <%= c.ultima_mensagem || 'Sem mensagens registradas' %></div>
+        <% } else { %>
+          <div>Motivo: <%= motivo %></div>
+          <div class="os-chat-preview">Última interação: <%= c.ultima_mensagem_em ? fmtBR(c.ultima_mensagem_em) : 'Sem mensagens no chat' %></div>
+          <% if (c.participantes) { %><div class="os-chat-preview">Participantes: <%= c.participantes %></div><% } %>
+        <% } %>
         <div class="os-chat-badges">
-          <% if (c.nao_lidas > 0) { %><span class="badge-unread"><%= c.nao_lidas %> não lida(s)</span><% } %>
-          <% if (Number(c.aguarda_material || 0) === 1) { %><span class="pill-tag pill-amber">Depende de material</span><% } %>
-          <% if (Number(c.aguarda_compras || 0) === 1) { %><span class="pill-tag pill-blue">Aguardando compras</span><% } %>
-          <% if (Number(c.esta_pausada || 0) === 1) { %><span class="pill-tag pill-amber">Pausada</span><% } %>
-          <% if (Number(c.eh_critica || 0) === 1) { %><span class="pill-tag pill-amber">Crítica</span><% } %>
-          <% if (c.tem_solicitacao) { %><span class="pill-tag pill-blue">Solicitação vinculada</span><% } %>
+          <% if (!isHistorico && c.nao_lidas > 0) { %><span class="badge-unread"><%= c.nao_lidas %> não lida(s)</span><% } %>
+          <% if (!isHistorico && Number(c.aguarda_material || 0) === 1) { %><span class="pill-tag pill-amber">Depende de material</span><% } %>
+          <% if (!isHistorico && Number(c.aguarda_compras || 0) === 1) { %><span class="pill-tag pill-blue">Aguardando compras</span><% } %>
+          <% if (!isHistorico && Number(c.esta_pausada || 0) === 1) { %><span class="pill-tag pill-amber">Pausada</span><% } %>
+          <% if (!isHistorico && Number(c.eh_critica || 0) === 1) { %><span class="pill-tag pill-amber">Crítica</span><% } %>
+          <% if (!isHistorico && c.tem_solicitacao) { %><span class="pill-tag pill-blue">Solicitação vinculada</span><% } %>
+          <% if (isHistorico) { %><span class="pill-tag pill-gray">Arquivada</span><% } %>
         </div>
       </a>
     <% }) %>
   </aside>
-  <section class="os-chat-placeholder"><h2>Selecione uma OS</h2><p>Abra uma conversa para registrar tratativas, compras, inspeção e andamento oficial.</p></section>
+  <section class="os-chat-placeholder"><h2><%= isHistorico ? 'Histórico de OSs finalizadas' : 'Selecione uma OS' %></h2><p><%= isHistorico ? 'Clique em uma OS arquivada para consultar a conversa mantida para auditoria.' : 'Abra uma conversa para registrar tratativas, compras, inspeção e andamento oficial.' %></p></section>
 </div>
