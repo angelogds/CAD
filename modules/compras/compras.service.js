@@ -507,7 +507,12 @@ function gerarPdf(solicitacao, res) {
     throw err;
   }
 
-  const doc = new PDFDocument({ margin: 28, size: 'A4', bufferPages: true, autoFirstPage: true });
+  const doc = new PDFDocument({
+    size: 'A4',
+    margins: { top: 0, left: 0, right: 0, bottom: 0 },
+    bufferPages: true,
+    autoFirstPage: true,
+  });
   res.setHeader('Content-Type', 'application/pdf');
   const numeroArquivo = pdfValue(solicitacao.numero, solicitacao.id || 'sem-numero').replace(/[^a-z0-9_-]+/gi, '_');
   res.setHeader('Content-Disposition', `attachment; filename=solicitacao_${numeroArquivo}.pdf`);
@@ -515,27 +520,38 @@ function gerarPdf(solicitacao, res) {
 
   const COLORS = {
     green: '#16A34A',
-    greenDark: '#15803D',
-    greenInst: '#166534',
-    greenSoft: '#E7F5EE',
-    text: '#1F2937',
+    greenDark: '#166534',
+    greenHeader: '#159947',
+    greenBand: '#16A34A',
+    greenSoft: '#E7F4EC',
+    yellow: '#FFF8D8',
+    yellowBorder: '#E4BE47',
+    red: '#8B1E1E',
+    text: '#374151',
     muted: '#6B7280',
-    border: '#D1D5DB',
+    border: '#DDE5DE',
+    row: '#F8FBF9',
     white: '#FFFFFF',
   };
-  const LEFT = 28;
-  const RIGHT = doc.page.width - 28;
+  const PAGE_W = doc.page.width;
+  const PAGE_H = doc.page.height;
+  const LEFT = 40;
+  const RIGHT = PAGE_W - 40;
   const WIDTH = RIGHT - LEFT;
-  const CONTENT_BOTTOM = doc.page.height - 66;
-  const issuedAt = new Date();
-  const statusLabel = pdfValue(solicitacao.status).replaceAll('_', ' ');
+  const FOOTER_Y = PAGE_H - 42;
+  const CONTENT_BOTTOM = PAGE_H - 70;
+  const logoPath = getSolicitacaoPdfLogoPath();
+  const issuedAt = solicitacao.created_at || solicitacao.data_emissao || new Date();
   const numeroSolicitacao = pdfValue(solicitacao.numero, `#${solicitacao.id || 'sem-id'}`);
+  const statusLabel = pdfValue(solicitacao.status).replaceAll('_', ' ');
+  const prioridade = pdfValue(solicitacao.prioridade, 'MÉDIA').toUpperCase();
+  const isUrgent = ['URGENTE', 'ALTA', 'CRITICA', 'CRÍTICA'].includes(prioridade);
   const osContext = getSolicitacaoOsContext(solicitacao.os_id);
   const equipamentoNome = pdfOptional(solicitacao.equipamento_nome)
     || pdfOptional(osContext?.equipamento_resolvido)
     || pdfOptional(osContext?.equipamento_manual)
-    || pdfOptional(osContext?.equipamento);
-  const logoPath = getSolicitacaoPdfLogoPath();
+    || pdfOptional(osContext?.equipamento)
+    || pdfOptional(solicitacao.destino_uso);
   let y = 0;
 
   const formatDate = (value, withTime = false) => {
@@ -547,213 +563,319 @@ function gerarPdf(solicitacao, res) {
       : date.toLocaleDateString('pt-BR');
   };
 
-  const drawFooter = (pageNumber, totalPages) => {
-    const lineY = doc.page.height - 43;
-    doc.strokeColor(COLORS.green).lineWidth(0.7).moveTo(LEFT, lineY - 5).lineTo(RIGHT, lineY - 5).stroke();
-    doc.fillColor(COLORS.greenInst).font('Helvetica').fontSize(7.5);
-    doc.text('Reciclagem Campo do Gado - Manutenção Campo do Gado', LEFT, lineY, { width: WIDTH, align: 'left', lineBreak: false });
-    doc.text(
-      `Documento gerado automaticamente em ${formatDate(issuedAt, true)} - Página ${pageNumber} de ${totalPages}`,
-      LEFT,
-      lineY + 10,
-      { width: WIDTH, align: 'left', lineBreak: false },
-    );
-  };
-
-  const drawCompactHeader = (label = 'Continuação da solicitação') => {
-    doc.fillColor(COLORS.greenInst).font('Helvetica-Bold').fontSize(8)
-      .text(`${label} ${numeroSolicitacao}`, LEFT, 26, { width: WIDTH * 0.65, lineBreak: false });
-    doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7)
-      .text(`Status: ${statusLabel}`, LEFT + WIDTH * 0.65, 26, { width: WIDTH * 0.35, align: 'right', lineBreak: false });
-    doc.strokeColor(COLORS.border).lineWidth(0.5).moveTo(LEFT, 38).lineTo(RIGHT, 38).stroke();
-    y = 46;
-  };
-
-  const drawTableHeader = () => {
-    const col = [LEFT, LEFT + 34, LEFT + 82, LEFT + 126, LEFT + 360, RIGHT];
-    doc.rect(LEFT, y, WIDTH, 18).fill(COLORS.green);
-    doc.fillColor(COLORS.white).fontSize(7.4).font('Helvetica-Bold');
-    ['Item', 'Qtd', 'Und', 'Descrição do material', 'Aplicação / Observação'].forEach((h, i) => {
-      doc.text(h, col[i] + 4, y + 5, { width: col[i + 1] - col[i] - 8, lineBreak: false });
-    });
-    y += 18;
-    return col;
-  };
-
-  const addPage = ({ repeatTableHeader = false } = {}) => {
-    doc.addPage();
-    drawCompactHeader();
-    if (repeatTableHeader) return drawTableHeader();
-    return null;
-  };
-
-  const ensureSpace = (height, options = {}) => {
-    if (y + height <= CONTENT_BOTTOM) return options.repeatTableHeader ? options.col : null;
-    return addPage(options);
-  };
-
-  doc.rect(0, 0, doc.page.width, 82).fill(COLORS.green);
-  if (logoPath) {
-    try {
-      doc.image(logoPath, LEFT, 14, { width: 42 });
-    } catch (error) {
-      console.error('[compras.gerarPdf] Logo não pôde ser renderizado', { logoPath, message: error.message });
-      doc.fillColor(COLORS.white).fontSize(6).font('Helvetica').text('Logo não localizado', LEFT, 34, { width: 42, align: 'center' });
+  const getByLabel = (labels = []) => {
+    const rawDescricao = pdfOptional(solicitacao.descricao || solicitacao.motivo);
+    const lines = rawDescricao.split('\n').map((line) => sanitizePdfText(line)).filter(Boolean);
+    for (const line of lines) {
+      const match = line.match(/^([^:]+):\s*(.*)$/);
+      if (!match) continue;
+      const key = match[1].trim().toLowerCase();
+      if (labels.includes(key)) return match[2].trim();
     }
-  } else {
-    doc.fillColor(COLORS.white).fontSize(6).font('Helvetica').text('Logo não localizado', LEFT, 34, { width: 42, align: 'center' });
-  }
-  doc.fillColor(COLORS.white).fontSize(13).font('Helvetica-Bold').text('RECICLAGEM CAMPO DO GADO', 78, 18, { width: 260, lineBreak: false });
-  doc.fontSize(9).text('MANUTENÇÃO CAMPO DO GADO', 78, 37, { width: 260, lineBreak: false });
-  doc.fontSize(10).text('SOLICITAÇÃO DE MATERIAL / COMPRA', 78, 54, { width: 260, lineBreak: false });
-  doc.fontSize(8.2)
-    .text(`Solicitação nº ${numeroSolicitacao}`, 350, 18, { width: 210, align: 'right', lineBreak: false })
-    .text(`Emissão: ${formatDate(issuedAt)}`, 350, 34, { width: 210, align: 'right', lineBreak: false })
-    .text(`Status: ${statusLabel}`, 350, 50, { width: 210, align: 'right', lineBreak: false });
-
-  y = 94;
-  const infoRowsLeft = [
-    ['Unidade', 'Reciclagem Campo do Gado'],
-    ['Setor solicitante', pdfValue(solicitacao.setor_origem, 'Manutenção')],
-    ['Solicitante', pdfValue(solicitacao.solicitante_nome, PDF_PENDING)],
-    ['Responsável manutenção', pdfValue(solicitacao.responsavel_manutencao || solicitacao.almox_nome, 'Ângelo Gomes da Silva')],
-    ['Destino', pdfValue(solicitacao.setor_destino || solicitacao.destino_uso, 'Setor de Compras')],
-  ];
-  const infoRowsRight = [
-    ['Responsável compras', pdfValue(solicitacao.compras_nome, 'Sr. Ubiratam')],
-    ['Prioridade', pdfValue(solicitacao.prioridade)],
-    ['Equipamento / Local', equipamentoNome || PDF_FALLBACK],
-    ['OS vinculada', solicitacao.os_id ? `OS ${solicitacao.os_id}` : PDF_FALLBACK],
-  ].filter(([, value]) => hasUsefulPdfText(value));
-  const infoHeight = Math.max(infoRowsLeft.length, infoRowsRight.length) * 14 + 14;
-  doc.roundedRect(LEFT, y, WIDTH, infoHeight, 6).fillAndStroke(COLORS.greenSoft, '#A7DDBD');
-  const drawInfoRows = (rows, x, startY, width) => {
-    let rowY = startY;
-    rows.forEach(([label, value]) => {
-      doc.fillColor(COLORS.greenDark).fontSize(7.5).font('Helvetica-Bold').text(`${label}:`, x, rowY, { width: 88, continued: true });
-      doc.fillColor(COLORS.text).font('Helvetica').text(` ${value}`, { width: width - 88 });
-      rowY += 14;
-    });
+    return '';
   };
-  drawInfoRows(infoRowsLeft.filter(([, value]) => hasUsefulPdfText(value)), LEFT + 10, y + 8, 245);
-  drawInfoRows(infoRowsRight, LEFT + 276, y + 8, 250);
-  y += infoHeight + 12;
 
-  doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text('Lista de Materiais', LEFT, y, { lineBreak: false });
-  y += 14;
-  let col = drawTableHeader();
-  const materiais = Array.isArray(solicitacao.itens) ? solicitacao.itens : [];
-  if (!materiais.length) {
-    ensureSpace(22);
-    doc.rect(LEFT, y, WIDTH, 22).fill(COLORS.greenSoft).stroke(COLORS.border);
-    doc.fillColor(COLORS.muted).fontSize(8).font('Helvetica').text('Nenhum item informado.', LEFT + 8, y + 7, { width: WIDTH - 16, lineBreak: false });
-    y += 22;
-  }
-  materiais.forEach((it, index) => {
-    const obsText = pdfOptional(it.item_descricao || it.observacao_item);
-    const descText = pdfValue(it.item_nome || it.descricao || it.item_descricao, PDF_PENDING);
-    const rowH = Math.max(
-      22,
-      doc.heightOfString(obsText || ' ', { width: col[5] - col[4] - 8 }) + 12,
-      doc.heightOfString(descText, { width: col[4] - col[3] - 8 }) + 12,
-    );
-    const newCol = ensureSpace(rowH, { repeatTableHeader: true, col });
-    if (newCol) col = newCol;
-    doc.rect(LEFT, y, WIDTH, rowH).fill(index % 2 ? COLORS.greenSoft : COLORS.white).stroke(COLORS.border);
-    doc.fillColor(COLORS.text).fontSize(7.5).font('Helvetica');
-    doc.text(String(index + 1).padStart(2, '0'), col[0] + 4, y + 6, { width: col[1] - col[0] - 8 });
-    doc.text(String(it.qtd_solicitada ?? it.quantidade ?? 0), col[1] + 4, y + 6, { width: col[2] - col[1] - 8 });
-    doc.text(pdfValue(it.unidade, 'UN'), col[2] + 4, y + 6, { width: col[3] - col[2] - 8 });
-    doc.text(descText, col[3] + 4, y + 6, { width: col[4] - col[3] - 8 });
-    if (obsText) doc.text(obsText, col[4] + 4, y + 6, { width: col[5] - col[4] - 8 });
-    y += rowH;
-  });
-  y += 8;
+  const drawHeader = () => {
+    doc.save();
+    doc.rect(0, 0, PAGE_W, 78).fill(COLORS.greenHeader);
+    doc.rect(0, 78, PAGE_W, 10).fill(COLORS.greenDark);
+    if (logoPath) {
+      try {
+        doc.image(logoPath, LEFT + 8, 9, { fit: [70, 58], align: 'center', valign: 'center' });
+      } catch (error) {
+        console.error('[compras.gerarPdf] Logo não pôde ser renderizado', { logoPath, message: error.message });
+        doc.fillColor(COLORS.white).font('Helvetica-Bold').fontSize(7).text('CAMPO\nDO GADO', LEFT + 10, 28, { width: 64, align: 'center' });
+      }
+    } else {
+      doc.fillColor(COLORS.white).font('Helvetica-Bold').fontSize(7).text('CAMPO\nDO GADO', LEFT + 10, 28, { width: 64, align: 'center' });
+    }
+    doc.fillColor(COLORS.white).font('Helvetica-Bold').fontSize(14)
+      .text('RECICLAGEM CAMPO DO GADO', LEFT + 100, 22, { width: 270, lineBreak: false });
+    doc.font('Helvetica').fontSize(8.5)
+      .text('Solicitação de material | Manutenção Campo do Gado', LEFT + 100, 43, { width: 280, lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(8.5)
+      .text('SETOR DE COMPRAS', RIGHT - 155, 22, { width: 155, align: 'right', lineBreak: false });
+    doc.font('Helvetica').fontSize(7.8)
+      .text(`Data: ${formatDate(issuedAt)}`, RIGHT - 155, 43, { width: 155, align: 'right', lineBreak: false });
+    doc.restore();
+    y = 116;
+  };
 
-  const drawSection = (title, content) => {
-    const safeContent = pdfOptional(content);
-    if (!safeContent) return;
-    const contentHeight = Math.max(28, doc.heightOfString(safeContent, { width: WIDTH - 18 }) + 12);
-    const maxBoxHeight = CONTENT_BOTTOM - 66;
-    ensureSpace(Math.min(14 + contentHeight + 8, maxBoxHeight));
-    doc.fillColor(COLORS.green).rect(LEFT, y + 1, 3, 11).fill();
-    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(9).text(title, LEFT + 8, y, { lineBreak: false });
+  const drawFooter = (pageNumber, totalPages) => {
+    doc.save();
+    doc.strokeColor(COLORS.border).lineWidth(0.8).moveTo(LEFT, FOOTER_Y - 9).lineTo(RIGHT, FOOTER_Y - 9).stroke();
+    doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.2)
+      .text('Manutenção Campo do Gado - Documento para controle interno e compra de materiais.', LEFT, FOOTER_Y, { width: WIDTH * 0.7, lineBreak: false });
+    doc.text(`Página ${pageNumber} de ${totalPages}`, LEFT + WIDTH * 0.7, FOOTER_Y, { width: WIDTH * 0.3, align: 'right', lineBreak: false });
+    doc.restore();
+  };
+
+  const addPage = () => {
+    doc.addPage();
+    drawHeader();
+  };
+
+  const ensureSpace = (height) => {
+    if (y + height <= CONTENT_BOTTOM) return;
+    addPage();
+  };
+
+  const sectionBand = (title) => {
+    ensureSpace(28);
+    doc.rect(LEFT, y, WIDTH, 24).fill(COLORS.greenBand);
+    doc.fillColor(COLORS.white).font('Helvetica-Bold').fontSize(9.5).text(title, LEFT + 12, y + 7, { width: WIDTH - 24, lineBreak: false });
+    y += 32;
+  };
+
+  const drawTextBlock = (text, { fill = COLORS.white, stroke = COLORS.border, fontSize = 8.5, padding = 8 } = {}) => {
+    const safeText = pdfValue(text, PDF_PENDING);
+    const boxHeight = Math.max(30, doc.heightOfString(safeText, { width: WIDTH - (padding * 2), align: 'justify' }) + (padding * 2));
+    ensureSpace(boxHeight + 8);
+    doc.rect(LEFT, y, WIDTH, boxHeight).fillAndStroke(fill, stroke);
+    doc.fillColor(COLORS.text).font('Helvetica').fontSize(fontSize).text(safeText, LEFT + padding, y + padding - 1, {
+      width: WIDTH - (padding * 2),
+      align: 'justify',
+    });
+    y += boxHeight + 12;
+  };
+
+  const drawTitle = () => {
+    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(18)
+      .text('SOLICITAÇÃO DE MATERIAL / COMPRA', LEFT, 108, { width: WIDTH, align: 'center', lineBreak: false });
+    doc.fillColor(isUrgent ? COLORS.red : COLORS.muted).font('Helvetica-Bold').fontSize(9.5)
+      .text(
+        isUrgent ? 'Urgência para continuidade dos serviços' : 'Documento para controle interno e compra de materiais.',
+        LEFT,
+        132,
+        { width: WIDTH, align: 'center', lineBreak: false },
+      );
+    y = 156;
+  };
+
+  const drawIdentificationTable = () => {
+    const rows = [
+      ['Empresa / Unidade', 'Reciclagem Campo do Gado', 'Setor solicitante', pdfValue(solicitacao.setor_origem, 'Manutenção')],
+      ['Destinatário', pdfValue(solicitacao.setor_destino || solicitacao.destino_uso, 'Setor de Compras'), 'Responsável compras', pdfValue(solicitacao.compras_nome, 'Sr. Ubiratam')],
+      ['Responsável pela manutenção', pdfValue(solicitacao.responsavel_manutencao || solicitacao.almox_nome, 'Ângelo Gomes da Silva'), 'Data', formatDate(issuedAt)],
+      ['Aplicação / Equipamento / Local', equipamentoNome || PDF_FALLBACK, 'Prioridade', prioridade],
+      ['Solicitação nº', numeroSolicitacao, 'OS vinculada', solicitacao.os_id ? `OS ${solicitacao.os_id}` : PDF_FALLBACK],
+      ['Status', statusLabel, 'Solicitante', pdfValue(solicitacao.solicitante_nome, PDF_PENDING)],
+    ];
+    const col = [LEFT, LEFT + 116, LEFT + 262, LEFT + 365, RIGHT];
+    const rowHeights = rows.map((row) => Math.max(
+      24,
+      doc.heightOfString(row[1], { width: col[2] - col[1] - 10 }) + 11,
+      doc.heightOfString(row[3], { width: col[4] - col[3] - 10 }) + 11,
+    ));
+    const tableHeight = rowHeights.reduce((sum, h) => sum + h, 0);
+    ensureSpace(tableHeight + 14);
+    rows.forEach((row, rowIndex) => {
+      const rowY = y;
+      const h = rowHeights[rowIndex];
+      doc.rect(col[0], rowY, col[1] - col[0], h).fillAndStroke(COLORS.greenSoft, COLORS.border);
+      doc.rect(col[1], rowY, col[2] - col[1], h).fillAndStroke(COLORS.white, COLORS.border);
+      doc.rect(col[2], rowY, col[3] - col[2], h).fillAndStroke(COLORS.greenSoft, COLORS.border);
+      doc.rect(col[3], rowY, col[4] - col[3], h).fillAndStroke(COLORS.white, COLORS.border);
+      doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(7.6)
+        .text(row[0], col[0] + 6, rowY + 7, { width: col[1] - col[0] - 12 });
+      doc.text(row[2], col[2] + 6, rowY + 7, { width: col[3] - col[2] - 12 });
+      doc.fillColor(COLORS.text).font('Helvetica').fontSize(7.8)
+        .text(row[1], col[1] + 6, rowY + 7, { width: col[2] - col[1] - 12 });
+      doc.text(row[3], col[3] + 6, rowY + 7, { width: col[4] - col[3] - 12 });
+      y += h;
+    });
     y += 14;
-    if (contentHeight > maxBoxHeight) {
-      doc.fillColor(COLORS.text).font('Helvetica').fontSize(8).text(safeContent, LEFT + 2, y, { width: WIDTH - 4 });
-      y = doc.y + 8;
-      if (y > CONTENT_BOTTOM) addPage();
+  };
+
+  const buildFinalidade = () => {
+    const motivoOs = pdfOptional(getByLabel(['motivo da solicitação', 'motivo da solicitacao', 'descrição da os', 'descricao da os']) || osContext?.descricao);
+    if (motivoOs) return motivoOs;
+    const destino = equipamentoNome ? ` no equipamento/local ${equipamentoNome}` : ' no equipamento/local informado';
+    const osText = solicitacao.os_id ? ` vinculados à OS ${solicitacao.os_id}` : '';
+    return `Solicita-se a aquisição/liberação dos materiais relacionados abaixo, necessários para execução da manutenção${destino}${osText}. O objetivo é agilizar a correção da falha, reduzir o tempo de parada e garantir a continuidade operacional.`;
+  };
+
+  const buildJustificativa = () => {
+    const problema = pdfOptional(osContext?.descricao || getByLabel(['problema encontrado', 'problema identificado', 'problema', 'descrição da os', 'descricao da os']));
+    const motivo = pdfOptional(getByLabel(['motivo da paralisação', 'motivo da paralisacao', 'motivo da solicitação', 'motivo da solicitacao', 'motivo']) || solicitacao.motivo);
+    const justificativa = pdfOptional(getByLabel(['justificativa técnica', 'justificativa tecnica']) || osContext?.diagnostico || osContext?.resumo_tecnico || osContext?.causa_diagnostico);
+    const acao = pdfOptional(getByLabel(['ação necessária', 'acao necessaria']) || osContext?.acao_executada || osContext?.acao_corretiva || osContext?.acao_preventiva);
+    const parts = [];
+    if (problema) parts.push(`Problema encontrado: ${problema}`);
+    if (motivo) parts.push(`Motivo da solicitação: ${motivo}`);
+    if (acao) parts.push(`Ação necessária: ${acao}`);
+    if (justificativa) parts.push(`Justificativa técnica: ${justificativa}`);
+    parts.push('Impacto operacional: a falta dos materiais pode atrasar a manutenção, prolongar a indisponibilidade do equipamento/local e comprometer a continuidade operacional. Necessidade da compra: liberar itens disponíveis e adquirir imediatamente os itens faltantes para concluir o serviço com segurança e padrão adequado.');
+    return parts.join('\n\n');
+  };
+
+  const drawMaterialsTable = () => {
+    sectionBand('2. LISTA DE MATERIAIS, FERRAMENTAS E APOIO SOLICITADO');
+    const col = [LEFT, LEFT + 34, LEFT + 72, LEFT + 112, RIGHT];
+    const drawTableHeader = () => {
+      doc.rect(LEFT, y, WIDTH, 20).fill(COLORS.greenDark);
+      doc.fillColor(COLORS.white).font('Helvetica-Bold').fontSize(7.8);
+      ['Item', 'Qtd.', 'Unid.', 'Descrição do material / serviço e aplicação'].forEach((h, i) => {
+        doc.text(h, col[i] + 5, y + 6, { width: col[i + 1] - col[i] - 10, lineBreak: false });
+      });
+      y += 20;
+    };
+    drawTableHeader();
+    const materiais = Array.isArray(solicitacao.itens) ? solicitacao.itens : [];
+    if (!materiais.length) {
+      doc.rect(LEFT, y, WIDTH, 24).fillAndStroke(COLORS.row, COLORS.border);
+      doc.fillColor(COLORS.muted).font('Helvetica').fontSize(8).text('Nenhum item informado.', LEFT + 8, y + 8, { width: WIDTH - 16, lineBreak: false });
+      y += 32;
       return;
     }
-    doc.roundedRect(LEFT, y, WIDTH, contentHeight, 5).fillAndStroke(COLORS.greenSoft, '#B8E7C9');
-    doc.fillColor(COLORS.text).font('Helvetica').fontSize(8).text(safeContent, LEFT + 9, y + 7, { width: WIDTH - 18 });
-    y += contentHeight + 8;
-  };
-  drawSection('Motivo da solicitação', buildMotivoSolicitacao(solicitacao, osContext, equipamentoNome));
-  drawSection('Observações', solicitacao.observacoes_compras || solicitacao.observacoes);
-
-  const history = [
-    ['Solicitação aberta', solicitacao.created_at, solicitacao.solicitante_nome],
-    ['Entrou em cotação', solicitacao.cotacao_inicio_em, solicitacao.compras_nome],
-    ['Comprada', solicitacao.comprada_em, solicitacao.compras_nome],
-    ['Recebida', solicitacao.recebida_em, solicitacao.almox_nome],
-    ['Fechada', solicitacao.fechada_em, solicitacao.almox_nome],
-  ].filter(([, value]) => hasUsefulPdfText(value));
-  if (history.length) {
-    const histHeight = 14 + (history.length * 13) + 6;
-    ensureSpace(histHeight + 6);
-    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(9).text('Histórico de Status', LEFT, y, { lineBreak: false });
-    y += 13;
-    history.forEach(([label, value, user], idx) => {
-      doc.rect(LEFT, y, WIDTH, 13).fill(idx % 2 ? COLORS.white : COLORS.greenSoft).stroke(COLORS.border);
-      const suffix = hasUsefulPdfText(user) ? ` por ${pdfOptional(user)}` : '';
-      doc.fillColor(COLORS.text).font('Helvetica').fontSize(7.5)
-        .text(`${formatDate(value)} - ${label}${suffix}`, LEFT + 6, y + 3, { width: WIDTH - 12, lineBreak: false });
-      y += 13;
+    materiais.forEach((it, index) => {
+      const descBase = pdfValue(it.item_nome || it.descricao || it.item_descricao, PDF_PENDING);
+      const obsText = pdfOptional(it.item_descricao || it.observacao_item);
+      const descText = obsText && obsText !== descBase ? `${descBase}. Aplicação/observação: ${obsText}` : descBase;
+      const rowH = Math.max(21, doc.heightOfString(descText, { width: col[4] - col[3] - 10 }) + 11);
+      if (y + rowH > CONTENT_BOTTOM) {
+        addPage();
+        sectionBand('2. LISTA DE MATERIAIS, FERRAMENTAS E APOIO SOLICITADO (continuação)');
+        drawTableHeader();
+      }
+      doc.rect(LEFT, y, WIDTH, rowH).fillAndStroke(index % 2 ? COLORS.row : COLORS.white, COLORS.border);
+      doc.fillColor(COLORS.text).font('Helvetica').fontSize(7.7);
+      doc.text(String(index + 1).padStart(2, '0'), col[0] + 5, y + 6, { width: col[1] - col[0] - 10, lineBreak: false });
+      doc.text(String(it.qtd_solicitada ?? it.quantidade ?? 0), col[1] + 5, y + 6, { width: col[2] - col[1] - 10, lineBreak: false });
+      doc.text(pdfValue(it.unidade, 'UN'), col[2] + 5, y + 6, { width: col[3] - col[2] - 10, lineBreak: false });
+      doc.text(descText, col[3] + 5, y + 6, { width: col[4] - col[3] - 10 });
+      y += rowH;
     });
-    y += 8;
-  }
+    y += 12;
+  };
 
-  ensureSpace(86);
-  doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(9).text('Conferência e Assinaturas', LEFT, y, { lineBreak: false });
-  y += 14;
-  doc.roundedRect(LEFT, y, WIDTH, 24, 5).strokeColor(COLORS.border).stroke();
-  doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.8)
-    .text('Conferência do almoxarifado: (  ) Conforme   (  ) Parcial   (  ) Divergente', LEFT + 9, y + 8, { width: WIDTH - 18, lineBreak: false });
-  y += 42;
-  const sigWidth = (WIDTH - 28) / 3;
-  [['Solicitante'], ['Responsável Manutenção'], ['Compras / Almoxarifado']].forEach(([label], idx) => {
-    const x = LEFT + idx * (sigWidth + 14);
-    doc.strokeColor(COLORS.border).moveTo(x, y).lineTo(x + sigWidth, y).stroke();
-    doc.fillColor(COLORS.greenInst).font('Helvetica-Bold').fontSize(7.5).text(label, x, y + 5, { width: sigWidth, align: 'center', lineBreak: false });
-  });
-  y += 24;
+  const drawObservation = () => {
+    const text = isUrgent
+      ? 'Observação: solicitação urgente para retorno da operação. Priorizar a liberação dos itens disponíveis e a compra imediata dos itens faltantes, evitando atraso na manutenção.'
+      : 'Observação: priorizar a liberação dos itens disponíveis e a compra dos itens faltantes, evitando atraso na manutenção e no retorno operacional do equipamento.';
+    drawTextBlock(text, { fill: COLORS.yellow, stroke: COLORS.yellowBorder, fontSize: 8 });
+  };
 
-  const imageAnexos = (Array.isArray(solicitacao.anexos) ? solicitacao.anexos : []).filter((a) => String(a.mimetype || '').startsWith('image/'));
-  if (imageAnexos.length) {
+  const getStatusHistory = () => {
+    const history = [
+      [solicitacao.created_at, 'Solicitação aberta', solicitacao.solicitante_nome],
+      [solicitacao.cotacao_inicio_em, 'Entrou em cotação', solicitacao.compras_nome],
+      [solicitacao.comprada_em, 'Compra registrada', solicitacao.compras_nome],
+      [solicitacao.recebida_em, 'Recebimento registrado', solicitacao.almox_nome],
+      [solicitacao.fechada_em, 'Solicitação fechada', solicitacao.almox_nome],
+    ].filter(([value]) => hasUsefulPdfText(value));
+
+    if (tableExists('solicitacao_logs')) {
+      try {
+        const createdCol = columnExists('solicitacao_logs', 'created_at') ? 'created_at' : (columnExists('solicitacao_logs', 'data') ? 'data' : 'NULL');
+        const acaoCol = columnExists('solicitacao_logs', 'acao') ? 'acao' : (columnExists('solicitacao_logs', 'status_novo') ? 'status_novo' : 'NULL');
+        const userJoin = tableExists('users') && columnExists('solicitacao_logs', 'user_id') ? 'LEFT JOIN users u ON u.id = l.user_id' : '';
+        const userSelect = userJoin ? 'u.name' : 'NULL';
+        const logRows = db.prepare(`
+          SELECT ${createdCol} AS data_evento, ${acaoCol} AS evento, ${userSelect} AS responsavel
+          FROM solicitacao_logs l
+          ${userJoin}
+          WHERE l.solicitacao_id = ?
+          ORDER BY datetime(COALESCE(${createdCol}, 'now')) ASC
+          LIMIT 8
+        `).all(solicitacao.id);
+        logRows.forEach((row) => {
+          if (hasUsefulPdfText(row.data_evento) || hasUsefulPdfText(row.evento)) {
+            history.push([row.data_evento, pdfValue(row.evento, 'Atualização de status'), row.responsavel]);
+          }
+        });
+      } catch (_e) {}
+    }
+    return history;
+  };
+
+  const drawHistory = () => {
+    const history = getStatusHistory();
+    if (!history.length) return;
+    sectionBand('4. HISTÓRICO DE STATUS');
+    const col = [LEFT, LEFT + 90, LEFT + 345, RIGHT];
+    const headerH = 18;
+    ensureSpace(headerH + 20);
+    doc.rect(LEFT, y, WIDTH, headerH).fill(COLORS.greenDark);
+    doc.fillColor(COLORS.white).font('Helvetica-Bold').fontSize(7.6);
+    ['Data', 'Evento', 'Responsável'].forEach((h, i) => doc.text(h, col[i] + 5, y + 5, { width: col[i + 1] - col[i] - 10, lineBreak: false }));
+    y += headerH;
+    history.slice(0, 8).forEach(([date, event, user], index) => {
+      const rowH = 18;
+      ensureSpace(rowH + 8);
+      doc.rect(LEFT, y, WIDTH, rowH).fillAndStroke(index % 2 ? COLORS.row : COLORS.white, COLORS.border);
+      doc.fillColor(COLORS.text).font('Helvetica').fontSize(7.4);
+      doc.text(formatDate(date, true) || '-', col[0] + 5, y + 5, { width: col[1] - col[0] - 10, lineBreak: false });
+      doc.text(pdfValue(event, 'Atualização'), col[1] + 5, y + 5, { width: col[2] - col[1] - 10, lineBreak: false });
+      doc.text(pdfValue(user, '-'), col[2] + 5, y + 5, { width: col[3] - col[2] - 10, lineBreak: false });
+      y += rowH;
+    });
+    y += 12;
+  };
+
+  const drawSignatures = () => {
+    ensureSpace(86);
+    const headerH = 21;
+    const bodyH = 42;
+    const footerH = 18;
+    const half = WIDTH / 2;
+    doc.rect(LEFT, y, WIDTH, headerH).fillAndStroke(COLORS.greenSoft, COLORS.border);
+    const tableTop = y;
+    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(7.8)
+      .text('Solicitante / Manutenção', LEFT + 7, y + 7, { width: half - 14, lineBreak: false })
+      .text('Compras / Almoxarifado / Recebimento', LEFT + half + 7, y + 7, { width: half - 14, lineBreak: false });
+    y += headerH;
+    doc.rect(LEFT, y, WIDTH, bodyH).fillAndStroke(COLORS.white, COLORS.border);
+    y += bodyH;
+    doc.rect(LEFT, y, WIDTH, footerH).fillAndStroke(COLORS.white, COLORS.border);
+    doc.moveTo(LEFT + half, tableTop).lineTo(LEFT + half, tableTop + headerH + bodyH + footerH).strokeColor(COLORS.border).stroke();
+    doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.4)
+      .text(pdfValue(solicitacao.solicitante_nome || solicitacao.responsavel_manutencao, 'Responsável Manutenção'), LEFT + 7, y + 5, { width: half - 14, lineBreak: false })
+      .text(pdfValue(solicitacao.compras_nome, 'Responsável de Compras'), LEFT + half + 7, y + 5, { width: half - 14, lineBreak: false });
+    y += footerH + 8;
+  };
+
+  const drawAttachmentPages = () => {
+    const imageAnexos = (Array.isArray(solicitacao.anexos) ? solicitacao.anexos : []).filter((a) => String(a.mimetype || '').startsWith('image/'));
+    if (!imageAnexos.length) return;
     addPage();
-    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(10).text('Anexos Fotográficos', LEFT, y, { lineBreak: false });
-    y += 16;
+    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(18).text('ANEXOS FOTOGRÁFICOS', LEFT, 112, { width: WIDTH, align: 'center', lineBreak: false });
+    doc.fillColor(COLORS.red).font('Helvetica-Bold').fontSize(9.5)
+      .text('Registro visual dos pontos de intervenção vinculados à solicitação.', LEFT, 137, { width: WIDTH, align: 'center' });
+    y = 168;
+    sectionBand('5. REGISTROS DO LOCAL');
     imageAnexos.forEach((anexo, idx) => {
-      ensureSpace(202);
+      ensureSpace(226);
       const fullPath = resolveAnexoPath(anexo);
-      doc.fillColor(COLORS.greenInst).fontSize(8).font('Helvetica-Bold')
-        .text(`ANEXO ${String(idx + 1).padStart(2, '0')} — ${pdfValue(anexo.original_name, 'Imagem')}`, LEFT, y, { lineBreak: false });
-      y += 12;
-      doc.rect(LEFT, y, WIDTH, 176).strokeColor(COLORS.greenDark).stroke();
+      doc.rect(LEFT, y, WIDTH, 208).fillAndStroke(COLORS.white, COLORS.border);
       if (!fullPath) {
-        doc.fillColor(COLORS.muted).font('Helvetica').fontSize(9).text('Imagem não localizada no servidor.', LEFT + 10, y + 78, { width: WIDTH - 20, align: 'center' });
+        doc.fillColor(COLORS.muted).font('Helvetica').fontSize(9).text('Imagem não localizada no servidor.', LEFT + 12, y + 88, { width: WIDTH - 24, align: 'center' });
       } else {
         try {
-          doc.image(fullPath, LEFT + 4, y + 4, { fit: [WIDTH - 8, 168], align: 'center', valign: 'center' });
+          doc.image(fullPath, LEFT + 18, y + 14, { fit: [WIDTH - 36, 160], align: 'center', valign: 'center' });
         } catch (error) {
           console.error('[compras.gerarPdf] Imagem não pôde ser renderizada', { anexoId: anexo.id, fullPath, message: error.message });
-          doc.fillColor(COLORS.muted).font('Helvetica').fontSize(9).text('Imagem não localizada no servidor.', LEFT + 10, y + 78, { width: WIDTH - 20, align: 'center' });
+          doc.fillColor(COLORS.muted).font('Helvetica').fontSize(9).text('Imagem não localizada no servidor.', LEFT + 12, y + 88, { width: WIDTH - 24, align: 'center' });
         }
       }
-      y += 188;
+      doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(8)
+        .text(`Foto ${idx + 1} - ${pdfValue(anexo.original_name, 'Registro fotográfico do local de aplicação.')}`, LEFT + 18, y + 180, { width: WIDTH - 36, align: 'center' });
+      y += 224;
     });
-  }
+  };
+
+  drawHeader();
+  drawTitle();
+  drawIdentificationTable();
+  sectionBand('1. FINALIDADE DA SOLICITAÇÃO');
+  drawTextBlock(buildFinalidade(), { fill: COLORS.white, stroke: COLORS.white, fontSize: 8.6, padding: 0 });
+  drawMaterialsTable();
+  drawObservation();
+  sectionBand('3. JUSTIFICATIVA TÉCNICA E OPERACIONAL');
+  drawTextBlock(buildJustificativa(), { fill: COLORS.yellow, stroke: COLORS.yellowBorder, fontSize: 8.1 });
+  drawHistory();
+  drawSignatures();
+  drawAttachmentPages();
 
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i += 1) {
