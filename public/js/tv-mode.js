@@ -325,7 +325,7 @@
     const equipe = state.data?.equipeManutencao || state.data?.mecanicos || [];
     const escala = state.data?.escalaVigente || { diaMecanicos: [], mecanicosIndustriais: [], noiteResponsavel: [], folgaAtestado: [], ferias: [] };
     const rankingMecanicos = state.data?.rankingEquipe?.rankingMecanicos || [];
-    const rankingMecânicos Industriais = state.data?.rankingEquipe?.rankingMecânicos Industriais || [];
+    const rankingMecanicosIndustriais = state.data?.rankingEquipe?.rankingApoio || [];
     const rankingMsg = state.data?.rankingEquipe?.mensagem || 'Ranking será exibido após novos fechamentos de OS.';
 
     const statusNome = { online: 'Online', em_os: 'Em OS', folga: 'Folga', ferias: 'Férias', atestado: 'Atestado' };
@@ -361,8 +361,8 @@
             <div class="tv-card-title compact"><h3>Ranking dos Mecânicos</h3></div>
             ${renderRankingList(rankingMecanicos)}
             <div class="tv-card-title compact" style="margin-top:8px;"><h3>Ranking do Mecânicos Industriais Operacional</h3></div>
-            ${renderRankingList(rankingMecânicos Industriais)}
-            ${(!rankingMecanicos.length && !rankingMecânicos Industriais.length) ? `<div class="tv-empty tv-empty-small">${escapeHtml(rankingMsg)}</div>` : ''}
+            ${renderRankingList(rankingMecanicosIndustriais)}
+            ${(!rankingMecanicos.length && !rankingMecanicosIndustriais.length) ? `<div class="tv-empty tv-empty-small">${escapeHtml(rankingMsg)}</div>` : ''}
           </div>
         </aside>
       </section>`;
