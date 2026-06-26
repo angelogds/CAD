@@ -121,7 +121,7 @@ function seedEscala2026() {
       "Escala 2026 (Manutenção)",
       "2026-01-05",
       "2027-01-01",
-      "Noturno rotativo (Diogo/Salviano/Rodolfo) + 2 diurnos + apoio fixo.",
+      "Plantão noturno individual + distribuição diurna flexível entre mecânicos industriais.",
       "17h–19h"
     );
     periodo = { id: Number(info.lastInsertRowid) };
@@ -161,7 +161,7 @@ function seedEscala2026() {
       }
 
       for (const a of w.apoio) {
-        const idA = ensureColaborador(a, "apoio");
+        const idA = ensureColaborador(a, "mecanico");
         insertAloc.run(semanaId, "apoio", idA, "Manutenção");
       }
     }
