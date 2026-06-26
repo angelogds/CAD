@@ -122,7 +122,7 @@ exports.adicionarRapido = (req, res, next) => {
       return res.redirect(`/escala?date=${inicio}`);
     }
     if (!turno) {
-      req.flash("error", "Turno inválido. Use Dia, Noite, Apoio ou Plantão.");
+      req.flash("error", "Turno inválido. Use Dia, Noite ou Plantão.");
       return res.redirect(`/escala?date=${inicio}`);
     }
     if (!funcao) {
@@ -307,7 +307,6 @@ exports.salvarEdicao = (req, res, next) => {
     const tipo_turno =
       novoTurno === "noturno" || novoTurno === "noite" ? "noturno" :
       novoTurno === "diurno" || novoTurno === "dia" ? "diurno" :
-      novoTurno === "apoio" ? "apoio" :
       novoTurno === "folga" ? "folga" :
       novoTurno === "plantao" ? "plantao" :
       "";

@@ -34,9 +34,9 @@
       </div>
 
       <div>
-        <label class="label" for="mecanico_2_id">Mecânico 2 ou Auxiliar</label>
+        <label class="label" for="mecanico_2_id">Mecânico 2</label>
         <select class="input" id="mecanico_2_id" name="mecanico_2_id">
-          <option value="">Sem auxiliar</option>
+          <option value="">Sem mecânico 2</option>
           <% (colaboradores || []).forEach(function(c){ %>
             <option
               value="<%= c.id %>"
@@ -89,7 +89,7 @@
       }
       if (mec1.value && mec2.value && mec1.value === mec2.value) {
         ev.preventDefault();
-        show('Selecione colaboradores diferentes para Mecânico 1 e Mecânico 2/Auxiliar.');
+        show('Selecione colaboradores diferentes para Mecânico 1 e Mecânico 2.');
         return;
       }
       const selected = [mec1.options[mec1.selectedIndex], mec2.options[mec2.selectedIndex]].filter(Boolean);

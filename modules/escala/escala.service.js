@@ -305,9 +305,10 @@ function getEscalaCompletaComTimes() {
       WHERE a.semana_id=?
     `).all(s.id);
 
-    const times = { noturno: [], diurno: [], apoio: [] };
+    const times = { noturno: [], diurno: [] };
     for (const a of alocs) {
-      if (times[a.tipo_turno]) times[a.tipo_turno].push(a.nome);
+      const turno = a.tipo_turno === "apoio" ? "diurno" : a.tipo_turno;
+      if (times[turno]) times[turno].push(a.nome);
     }
 
     return { ...s, times };
@@ -698,10 +699,10 @@ function getEscalaSemanalPdfData() {
     `).all(s.id);
 
     const montarGrupo = () => ({ mecanico: [] });
-    const grupos = { noturno: montarGrupo(), diurno: montarGrupo(), apoio: montarGrupo() };
+    const grupos = { noturno: montarGrupo(), diurno: montarGrupo() };
 
     linhas.forEach((l) => {
-      const turno = l.tipo_turno === "apoio" ? "apoio" : l.tipo_turno;
+      const turno = l.tipo_turno === "apoio" ? "diurno" : l.tipo_turno;
       if (!grupos[turno]) return;
       const key = "mecanico";
       if (!grupos[turno][key].includes(l.nome)) {
@@ -715,7 +716,6 @@ function getEscalaSemanalPdfData() {
       data_fim: s.data_fim,
       noturno: grupos.noturno,
       diurno: grupos.diurno,
-      apoio: grupos.apoio,
     };
   });
 }

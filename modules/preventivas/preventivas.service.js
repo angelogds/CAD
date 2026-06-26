@@ -1406,7 +1406,7 @@ const PREVENTIVAS_PROGRAMADAS_TEMPLATE = [
     keywords: ["decanter", "decante"],
     frequencia_tipo: "quinzenal",
     frequencia_valor: 1,
-    checklist: ["Abrir decanter para higienização total quinzenal.", "Executar limpeza geral com apoio da produção.", "Validar vedação e condição geral antes da partida."],
+    checklist: ["Abrir decanter para higienização total quinzenal.", "Executar limpeza geral com suporte da produção.", "Validar vedação e condição geral antes da partida."],
   },
   {
     chave: "moinho-martelos",
@@ -2008,7 +2008,7 @@ function lancarLoteDiarioPreventivasComoOS({ user = null, refDate = new Date(), 
     faixa: primeiroId && ultimoId ? `#${primeiroId} até #${ultimoId}` : null,
     cursorAnterior: cursorAtual || null,
     preventivasSelecionadas: rows.length,
-    equipePadrao: { principal: mecanico1Colab?.nome || "Júnior", apoio: mecanico2Colab?.nome || "Luís" },
+    equipePadrao: { mecanico_1: mecanico1Colab?.nome || "Júnior", mecanico_2: mecanico2Colab?.nome || "Luís", descricao: "Júnior e Luís — Mecânicos Industriais" },
     ...resultado,
   };
   registrarLogPreventiva({
@@ -2484,9 +2484,9 @@ function salvarConfiguracaoResponsaveisPreventiva({ mecanico_1_id, mecanico_2_id
     throw new Error("Tabela preventiva_config_responsaveis não encontrada. Execute as migrations.");
   }
   const mec1 = validarColaboradorPreventivaDisponivel(mecanico_1_id, "Mecânico 1");
-  const mec2 = mecanico_2_id ? validarColaboradorPreventivaDisponivel(mecanico_2_id, "Mecânico 2/Auxiliar") : null;
+  const mec2 = mecanico_2_id ? validarColaboradorPreventivaDisponivel(mecanico_2_id, "Mecânico 2") : null;
   if (mec2?.id && Number(mec1.id) === Number(mec2.id)) {
-    throw new Error("Selecione colaboradores diferentes para Mecânico 1 e Mecânico 2/Auxiliar.");
+    throw new Error("Selecione colaboradores diferentes para Mecânico 1 e Mecânico 2.");
   }
 
   const executar = db.transaction(() => {

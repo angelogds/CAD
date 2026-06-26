@@ -341,7 +341,6 @@
     };
 
     renderChipList('escala-dia', data?.escala?.dia || []);
-    renderChipList('escala-apoio', data?.escala?.apoio || []);
     renderChipList('escala-noite', data?.escala?.responsavelNoite ? [data.escala.responsavelNoite] : (data?.escala?.noite || []).slice(0, 1));
 
     const nowMs = Date.now();
@@ -399,7 +398,7 @@
       document.getElementById(id).innerHTML = (list || []).map((item, idx) => `<li><span class="rk-left"><span class="rk-pos">${idx + 1}</span><span class="rk-medal">${medalByIndex(idx)}</span>${avatarHTML(item)}<span><span class="rk-name">${item.nome || '-'}</span><span class="rk-summary">${summaryLabel}</span></span></span><strong class="rk-score">${Number(item.pontuacao || 0)}</strong></li>`).join('') || '<li><span>Sem dados</span><strong>0</strong></li>';
     };
     renderRanking('ranking-mecanicos', data?.ranking?.mecanicos || [], 'OS concluídas na semana');
-    renderRanking('ranking-apoio', data?.ranking?.apoio || [], 'Apoio operacional');
+    renderRanking('ranking-mecanicos', data?.ranking?.mecanicos || [], 'Mecânicos Industriais');
 
     renderGallery(data?.gallery || []);
 

@@ -56,7 +56,7 @@
       <div class="escala-grid">
         <div><label>Dia</label><p id="escala-dia">-</p></div>
         <div><label>Noite</label><p id="escala-noite">-</p></div>
-        <div><label>Apoio</label><p id="escala-apoio">-</p></div>
+
       </div>
     </section>
 
@@ -193,7 +193,6 @@
 
     document.getElementById('escala-dia').textContent = textList(data.escala.dia);
     document.getElementById('escala-noite').textContent = textList(data.escala.noite);
-    document.getElementById('escala-apoio').textContent = textList(data.escala.apoio);
     renderOnlineMecanicos(data.mecanicosOnline || []);
 
     const osLista = document.getElementById('os-lista');
