@@ -15,7 +15,7 @@
 </style>
 
 <h1>Lançar escala</h1>
-<p class="muted" style="margin-top:-6px;">Registrar mecânicos do dia/noite e apoio operacional.</p>
+<p class="muted" style="margin-top:-6px;">Registrar mecânicos industriais do dia/noite.</p>
 
 <div class="card">
   <form action="/escala" method="POST">
@@ -36,8 +36,7 @@
       <div style="flex:1; min-width:200px;">
         <label>Categoria</label>
         <select name="categoria">
-          <option value="mecanico">mecânico</option>
-          <option value="apoio">apoio operacional</option>
+          <option value="mecanico">mecânico industrial</option>
         </select>
       </div>
     </div>
@@ -52,7 +51,7 @@
 
       <div style="flex:3; min-width:260px;">
         <label>Observação (opcional)</label>
-        <input name="observacao" placeholder="Ex.: plantão / apoio / substituição..." />
+        <input name="observacao" placeholder="Ex.: plantão / substituição..." />
       </div>
     </div>
 

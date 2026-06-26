@@ -36,7 +36,7 @@ function getTurnoOperacionalAgora(date = new Date()) {
 function getTiposTurnoEscala(turno = "DIA") {
   return String(turno || "").toUpperCase() === "NOITE"
     ? ["plantao", "noturno"]
-    : ["diurno", "apoio"];
+    : ["diurno", "apoio"]; // "apoio" permanece apenas como legado de banco; todos são mecânicos industriais.
 }
 
 module.exports = {
