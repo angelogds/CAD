@@ -239,8 +239,8 @@ function dedupeNomesPessoas(nomes = []) {
 // Regra operacional acordada com a manutenção:
 // nomes abaixo sempre entram no ranking do perfil correspondente,
 // mesmo que role/função cadastral esteja diferente.
-const NOMES_FIXOS_MECANICOS = new Set(["rodolfo", "diogo", "salviano", "fabio"]);
-const NOMES_FIXOS_APOIO = new Set(["emanuel", "manuel", "junior", "luiz", "luis"]);
+const NOMES_FIXOS_MECANICOS = new Set(["rodolfo", "diogo", "salviano", "emanuel", "manuel", "junior", "luiz", "luis"]);
+const NOMES_FIXOS_APOIO = new Set();
 const NOMES_EXCLUIDOS_RANKING = new Set(["angelo"]);
 
 function matchNomeReferencia(nome = "", referencias = new Set()) {
@@ -254,14 +254,12 @@ function matchNomeReferencia(nome = "", referencias = new Set()) {
 function classifyColaboradorPerfil({ name = "", role = "", funcao = "" } = {}) {
   if (matchNomeReferencia(name, NOMES_EXCLUIDOS_RANKING)) return null;
   if (matchNomeReferencia(name, NOMES_FIXOS_MECANICOS)) return "mecanico";
-  if (matchNomeReferencia(name, NOMES_FIXOS_APOIO)) return "apoio";
+  if (matchNomeReferencia(name, NOMES_FIXOS_APOIO)) return "mecanico";
 
   const roleNorm = normalizeRole(role || "");
   const funcaoNorm = normalizeFuncaoColaborador(funcao || "");
   const isMecanico = roleNorm === "MECANICO" || funcaoNorm === "mecanico";
-  const isApoio = ["auxiliar", "operacional"].includes(funcaoNorm);
-  if (isMecanico) return "mecanico";
-  if (isApoio) return "apoio";
+  if (isMecanico || ["auxiliar", "operacional"].includes(funcaoNorm)) return "mecanico";
   return null;
 }
 
@@ -495,8 +493,8 @@ function getMecanicosRankingSemana() {
         .sort((a, b) => b.score - a.score || b.os_criticas - a.os_criticas || b.os_total - a.os_total || a.nome.localeCompare(b.nome, "pt-BR"))
         .map((item, index) => ({ ...item, posicao: index + 1 }));
 
-    const itemsMecanicos = ordenarRanking(itemsByPerfil.mecanico || []);
-    const itemsApoio = ordenarRanking(itemsByPerfil.apoio || []);
+    const itemsMecanicos = ordenarRanking([...(itemsByPerfil.mecanico || []), ...(itemsByPerfil.apoio || [])]);
+    const itemsApoio = [];
     const destaqueSemana = itemsMecanicos[0] || null;
 
     return {
@@ -690,7 +688,7 @@ function getEscalaPainelSemana(options = {}) {
       ...semana,
       data_referencia: dataRef,
       diurno_mecanicos: alocacoesDisponiveis.filter((a) => a.tipo_turno === "diurno" && String(a.funcao || "").toLowerCase() === "mecanico"),
-      apoio_operacional: alocacoesDisponiveis.filter((a) => a.tipo_turno === "apoio"),
+      apoio_operacional: [],
       noturno: noturnoResponsavel ? [noturnoResponsavel] : [],
       folgas_afastamentos: Array.from(folgasAfastamentosMap.values()),
     };
@@ -1490,12 +1488,10 @@ function gerarRelatorioMensalRanking({ mesReferencia, geradoPor = "sistema", sob
   const doc = new PDFDocument({ margin: 40 });
   doc.pipe(fs.createWriteStream(arquivo));
   doc.fontSize(18).text("Relatório Mensal de Ranking da Manutenção", { align: "center" });
-  doc.fontSize(12).text("Mecânicos e Apoio Operacional", { align: "center" });
+  doc.fontSize(12).text("Mecânicos Industriais", { align: "center" });
   doc.moveDown(); doc.text(`Mês de referência: ${period.mesReferencia}`); doc.text(`Período: ${period.inicio} até ${period.fim}`);
-  doc.moveDown().text("Ranking dos Mecânicos:");
+  doc.moveDown().text("Ranking dos Mecânicos Industriais:");
   (ranking.itemsMecanicos || []).forEach((i) => doc.text(`${i.posicao}º ${i.nome} - OS ${i.os_total} - ${Number(i.score || 0).toFixed(2)} pts`));
-  doc.moveDown().text("Ranking do Apoio Operacional:");
-  (ranking.itemsApoio || []).forEach((i) => doc.text(`${i.posicao}º ${i.nome} - OS ${i.os_total} - ${Number(i.score || 0).toFixed(2)} pts`));
   doc.end();
   const caminhoPdf = `/relatorios/ranking/${nomeArquivo}`;
   if (existente) db.prepare("UPDATE ranking_relatorios_mensais SET data_inicio=?, data_fim=?, caminho_pdf=?, gerado_por=?, status='gerado', observacoes='regerado' WHERE id=?").run(period.inicio, period.fim, caminhoPdf, geradoPor, existente.id);

@@ -323,9 +323,9 @@
 
   function renderEquipe() {
     const equipe = state.data?.equipeManutencao || state.data?.mecanicos || [];
-    const escala = state.data?.escalaVigente || { diaMecanicos: [], apoioOperacional: [], noiteResponsavel: [], folgaAtestado: [], ferias: [] };
+    const escala = state.data?.escalaVigente || { diaMecanicos: [], mecanicosIndustriais: [], noiteResponsavel: [], folgaAtestado: [], ferias: [] };
     const rankingMecanicos = state.data?.rankingEquipe?.rankingMecanicos || [];
-    const rankingApoio = state.data?.rankingEquipe?.rankingApoio || [];
+    const rankingMecânicos Industriais = state.data?.rankingEquipe?.rankingMecânicos Industriais || [];
     const rankingMsg = state.data?.rankingEquipe?.mensagem || 'Ranking será exibido após novos fechamentos de OS.';
 
     const statusNome = { online: 'Online', em_os: 'Em OS', folga: 'Folga', ferias: 'Férias', atestado: 'Atestado' };
@@ -333,7 +333,7 @@
     $('tvContent').innerHTML = `
       <section class="tv-grid tv-grid-equipe">
         <div class="tv-card tv-main-card tv-appear">
-          <div class="tv-card-title"><div><h2>👷 Equipe de Manutenção</h2><p>Escala vigente com mecânicos e apoio operacional</p></div></div>
+          <div class="tv-card-title"><div><h2>👷 Equipe de Manutenção</h2><p>Escala vigente com mecânicos e mecânicos industriais</p></div></div>
           <div class="tv-team-grid compact">
             ${equipe.map((m) => `
               <article class="tv-mechanic compact ${m.status === 'em_os' ? 'is-working' : ''}">
@@ -352,7 +352,7 @@
           <div class="tv-card tv-escala-card">
             <div class="tv-card-title compact"><h3>Escala Vigente</h3></div>
             ${renderEscalaList('Dia (mecânicos)', escala.diaMecanicos)}
-            ${renderEscalaList('Apoio operacional', escala.apoioOperacional)}
+            ${renderEscalaList('Mecânico industrial', escala.mecanicosIndustriais)}
             ${renderEscalaList('Noite (responsável)', escala.noiteResponsavel)}
             ${renderEscalaList('Folga / Atestado', (escala.folgaAtestado || []).map((f) => `${f.nome} — ${f.status}`))}
             ${renderEscalaList('Férias', (escala.ferias || []).map((f) => `${f.nome} — ${f.status}`))}
@@ -360,9 +360,9 @@
           <div class="tv-card tv-ranking-card">
             <div class="tv-card-title compact"><h3>Ranking dos Mecânicos</h3></div>
             ${renderRankingList(rankingMecanicos)}
-            <div class="tv-card-title compact" style="margin-top:8px;"><h3>Ranking do Apoio Operacional</h3></div>
-            ${renderRankingList(rankingApoio)}
-            ${(!rankingMecanicos.length && !rankingApoio.length) ? `<div class="tv-empty tv-empty-small">${escapeHtml(rankingMsg)}</div>` : ''}
+            <div class="tv-card-title compact" style="margin-top:8px;"><h3>Ranking do Mecânicos Industriais Operacional</h3></div>
+            ${renderRankingList(rankingMecânicos Industriais)}
+            ${(!rankingMecanicos.length && !rankingMecânicos Industriais.length) ? `<div class="tv-empty tv-empty-small">${escapeHtml(rankingMsg)}</div>` : ''}
           </div>
         </aside>
       </section>`;

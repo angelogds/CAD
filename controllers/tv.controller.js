@@ -33,12 +33,12 @@ function listColaboradoresOnline(limit = 12) {
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND lower(name) IN ('sessions','session') ORDER BY name")
       .all();
     const tableName = tableInfo[0]?.name;
-    if (!tableName) return { mecanicosOnline: [], apoioOnline: [] };
+    if (!tableName) return { mecanicosOnline: [], mecanicosOnline: [] };
 
     const columns = new Set(
       db.prepare(`PRAGMA table_info(${tableName})`).all().map((col) => String(col?.name || '').toLowerCase())
     );
-    if (!columns.has('sess')) return { mecanicosOnline: [], apoioOnline: [] };
+    if (!columns.has('sess')) return { mecanicosOnline: [], mecanicosOnline: [] };
 
     const hasExpired = columns.has('expired');
     const hasExpires = columns.has('expires');
@@ -47,7 +47,7 @@ function listColaboradoresOnline(limit = 12) {
     const rows = hasExpired ? db.prepare(query).all(nowMs) : db.prepare(query).all();
 
     const mecanicos = new Map();
-    const apoio = new Map();
+    const manutencao = mecanicos;
 
     for (const row of rows) {
       if (!row?.sess) continue;
@@ -78,10 +78,10 @@ function listColaboradoresOnline(limit = 12) {
     const sorter = (a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' });
     return {
       mecanicosOnline: Array.from(mecanicos.values()).sort(sorter).slice(0, limit),
-      apoioOnline: Array.from(apoio.values()).sort(sorter).slice(0, limit),
+
     };
   } catch (_e) {
-    return { mecanicosOnline: [], apoioOnline: [] };
+    return { mecanicosOnline: [], mecanicosOnline: [] };
   }
 }
 
@@ -238,7 +238,7 @@ async function getTVData(_req, res) {
 
   const dia = (escalaRaw.diurno_mecanicos || []).map((p) => ({ nome: p.nome, foto: p.foto_path || null })).filter((p) => p.nome);
   const noite = (escalaRaw.noturno || []).map((p) => ({ nome: p.nome, foto: p.foto_path || null })).filter((p) => p.nome);
-  const apoio = (escalaRaw.apoio_operacional || []).map((p) => ({ nome: p.nome, foto: p.foto_path || null })).filter((p) => p.nome);
+  const apoio = [];
 
   const osItens = osPainel.items || [];
   const osCriticas = osItens.filter((o) => {

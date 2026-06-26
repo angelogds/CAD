@@ -157,9 +157,9 @@
       <div><b>Setor destinatário:</b> <%= os.setor_destinatario || 'Manutenção' %></div>
       <div><b>Responsável manutenção:</b> <%= os.responsavel_manutencao || '-' %></div>
       <div><b>Executor em andamento:</b> <%= os.executor_nome || os.execucao_ativa?.executor_nome || '-' %></div>
-      <div><b>Auxiliar em andamento:</b> <%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></div>
+      <div><b>Mecânico 2 em andamento:</b> <%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></div>
       <div><b>2º mecânico em andamento:</b> <%= os.executor_secundario_nome || '-' %></div>
-      <div><b>2º apoio em andamento:</b> <%= os.auxiliar_secundario_nome || '-' %></div>
+      <div><b>Mecânico 4 em andamento:</b> <%= os.auxiliar_secundario_nome || '-' %></div>
       <div><b>Modo da alocação:</b> <%= os.alocacao_modo || '-' %></div>
     </div>
 
@@ -206,7 +206,7 @@
         <tr>
           <th>Equipe</th>
           <th>Executor</th>
-          <th>Auxiliar</th>
+          <th>Mecânico 2</th>
           <th>Turno</th>
           <th>Modo</th>
         </tr>
@@ -224,7 +224,7 @@
             <td>Complemento manual</td>
             <td><%= os.executor_secundario_nome || '-' %></td>
             <td><%= os.auxiliar_secundario_nome || '-' %></td>
-            <td colspan="2">Apoio extra definido manualmente</td>
+            <td colspan="2">Mecânicos extras definidos manualmente</td>
           </tr>
         <% } %>
       </tbody>
@@ -238,7 +238,7 @@
     <% } %>
     <% if (canManualEditEquipe) { %>
       <% const mecanicosTurno = (equipeUsuarios || []).filter(u => String(u.funcao || '').toLowerCase() === 'mecanico'); %>
-      <% const auxiliaresTurno = (equipeUsuarios || []).filter(u => ['auxiliar','apoio'].includes(String(u.funcao || '').toLowerCase())); %>
+      <% const mecanicosTurnoExtras = (equipeUsuarios || []).filter(u => ['mecanico'].includes(String(u.funcao || '').toLowerCase())); %>
       <div id="equipe-os">
       <form method="POST" action="/os/<%= os.id %>/equipe" style="margin-top:10px;">
         <div class="grid2">
@@ -253,9 +253,9 @@
                   <% }) %>
                 </optgroup>
               <% } %>
-              <% if (auxiliaresTurno.length) { %>
-                <optgroup label="Apoio/Auxiliares">
-                  <% auxiliaresTurno.forEach(function(u){ %>
+              <% if (mecanicosTurnoExtras.length) { %>
+                <optgroup label="Mecânicos Industriais">
+                  <% mecanicosTurnoExtras.forEach(function(u){ %>
                     <option value="<%= u.id %>" <%= Number(os.executor_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
                   <% }) %>
                 </optgroup>
@@ -263,9 +263,9 @@
             </select>
           </div>
           <div>
-            <label>Auxiliar</label>
+            <label>Mecânico 2</label>
             <select class="input" name="auxiliar_colaborador_id">
-              <option value="">Sem auxiliar</option>
+              <option value="">Sem mecânico 2</option>
               <% if (mecanicosTurno.length) { %>
                 <optgroup label="Mecânicos">
                   <% mecanicosTurno.forEach(function(u){ %>
@@ -273,9 +273,9 @@
                   <% }) %>
                 </optgroup>
               <% } %>
-              <% if (auxiliaresTurno.length) { %>
-                <optgroup label="Auxiliares">
-                  <% auxiliaresTurno.forEach(function(u){ %>
+              <% if (mecanicosTurnoExtras.length) { %>
+                <optgroup label="Mecânicos Industriais">
+                  <% mecanicosTurnoExtras.forEach(function(u){ %>
                     <option value="<%= u.id %>" <%= Number(os.auxiliar_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
                   <% }) %>
                 </optgroup>
@@ -296,12 +296,12 @@
             </select>
           </div>
           <div>
-            <label>2º apoio operacional (opcional)</label>
+            <label>Mecânico 4 (opcional)</label>
             <select class="input" name="auxiliar_secundario_colaborador_id">
-              <option value="">Sem 2º apoio</option>
-              <% if (auxiliaresTurno.length) { %>
-                <optgroup label="Auxiliares">
-                  <% auxiliaresTurno.forEach(function(u){ %>
+              <option value="">Sem mecânico 4</option>
+              <% if (mecanicosTurnoExtras.length) { %>
+                <optgroup label="Mecânicos Industriais">
+                  <% mecanicosTurnoExtras.forEach(function(u){ %>
                     <option value="<%= u.id %>" <%= Number(os.auxiliar_secundario_colaborador_id)===Number(u.id) ? 'selected' : '' %>><%= u.name %></option>
                   <% }) %>
                 </optgroup>
@@ -401,7 +401,7 @@
   <div class="card-head">
     <div>
       <h3 style="margin:0;">Notificação WhatsApp</h3>
-      <div class="muted">Envio da OS ao executor e ao apoio operacional da equipe direcionada.</div>
+      <div class="muted">Envio da OS ao executor e ao mecânicos industriais da equipe direcionada.</div>
     </div>
     <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome || whatsappResponsavel?.nome)) { %>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
@@ -416,7 +416,7 @@
     <div><b>ID responsável vinculado:</b> <%= whatsappResponsavel?.id || os.executor_colaborador_id || os.responsavel_user_id || os.mecanico_user_id || '-' %></div>
     <div><b>Origem:</b> <%= whatsappResponsavel?.origem || '-' %></div>
     <div><b>Telefone WhatsApp responsável:</b> <%= whatsPhone || '-' %></div>
-    <div><b>Apoio operacional:</b> <%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></div>
+    <div><b>Mecânico industrial:</b> <%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></div>
     <div><b>Destinatários da equipe:</b> <%= whatsappEquipe.length || 0 %></div>
     <div><b>Provider atual:</b> <%= whatsappProvider || 'disabled' %></div>
     <div><b>Template usado:</b> <%= whatsappLast?.template_name || '-' %></div>
@@ -444,7 +444,7 @@
   <% } else if (whatsappSemTelefone.length) { %>
     <div style="margin-top:10px;color:#b91c1c;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> <%= whatsappSemTelefone.length %> integrante(s) da equipe sem número de WhatsApp cadastrado no perfil.</div>
   <% } else if (whatsappProvider === 'cloud_api') { %>
-    <div style="margin-top:10px;color:#166534;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> Envio automático ativo para os WhatsApps cadastrados no perfil do funcionário e do apoio operacional.</div>
+    <div style="margin-top:10px;color:#166534;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> Envio automático ativo para os WhatsApps cadastrados no perfil do funcionário e do mecânicos industriais.</div>
   <% } else if (whatsappProvider === 'manual') { %>
     <div style="margin-top:10px;color:#166534;font-weight:800;"><span class="wa-icon" aria-hidden="true"></span> WhatsApp pronto para envio manual pela OS aberta. Para envio direto automático, configure WHATSAPP_PROVIDER=cloud_api.</div>
   <% } else { %>

@@ -150,13 +150,13 @@
   var safeAvisos = avisos || [];
   var safeEscala = escala || {};
   var escalaDiurno = (safeEscala.diurno_mecanicos || []).map(function(p) { return p.nome; }).join(', ');
-  var escalaApoio = (safeEscala.apoio_operacional || []).map(function(p) { return p.nome; }).join(', ');
+  var escalaMecânicos Industriais = (safeEscala.apoio_operacional || []).map(function(p) { return p.nome; }).join(', ');
   var escalaNoturno = (safeEscala.noturno || []).map(function(p) { return p.nome; }).join(', ');
   var escalaFolgasAfastamentos = safeEscala.folgas_afastamentos || [];
   var safeMotoresResumo = motoresResumo || {};
   var rankingMecanicosData = rankingMecanicos || {};
   var rankingMecanicosItems = rankingMecanicosData.itemsMecanicos || rankingMecanicosData.items || [];
-  var rankingApoioItems = rankingMecanicosData.itemsApoio || [];
+  var rankingMecânicos IndustriaisItems = rankingMecanicosData.itemsMecânicos Industriais || [];
   var rankingMetaMensal = Number(rankingMecanicosData.metaMensal || 100);
   var rankingPesos = rankingMecanicosData.pesosCriticidade || { BAIXA: 0.5, MEDIA: 1, ALTA: 2, CRITICA: 3 };
   var onlineUserIds = new Set((onlineUsers || []).map(function(u) { return Number(u && u.id || 0); }).filter(Boolean));
@@ -330,11 +330,11 @@
   <div class="dash-col">
 <section class="dashboard-card area-escala">
     <div class="dashboard-title">Escala da Semana</div>
-    <% if (escalaDiurno || escalaApoio || escalaNoturno || escalaFolgasAfastamentos.length) { %>
+    <% if (escalaDiurno || escalaMecânicos Industriais || escalaNoturno || escalaFolgasAfastamentos.length) { %>
       <div class="muted-xs" style="margin-bottom:8px;">Semana #<%= safeEscala.semana_numero || '-' %> • <%= safeEscala.data_inicio || '-' %> até <%= safeEscala.data_fim || '-' %></div>
       <table class="table compact"><tbody>
         <tr><td><strong>Dia (mecânicos)</strong></td><td><%= escalaDiurno || '-' %></td></tr>
-        <tr><td><strong>Apoio operacional</strong></td><td><%= escalaApoio || '-' %></td></tr>
+        <tr><td><strong>Mecânico industrial</strong></td><td><%= escalaMecânicos Industriais || '-' %></td></tr>
         <tr><td><strong>Noite (responsável)</strong></td><td><%= escalaNoturno || '-' %></td></tr>
       </tbody></table>
 
@@ -411,17 +411,17 @@
 
 <section class="dashboard-card area-ranking-apoio">
     <div class="ranking-header">
-      <div class="dashboard-title" style="margin:0;">Ranking do apoio operacional</div>
-      <span class="ranking-subtitle">Destaques: auxiliares mais atuantes</span>
+      <div class="dashboard-title" style="margin:0;">Ranking do mecânicos industriais</div>
+      <span class="ranking-subtitle">Destaques: mecânicos industriais mais atuantes</span>
     </div>
     <p class="muted-xs" style="margin-top:-4px; margin-bottom:10px;">
-      Ranking do apoio operacional com os auxiliares mais atuantes no mês.
+      Ranking do mecânicos industriais com os mecânicos industriais mais atuantes no mês.
     </p>
-    <% if (!rankingApoioItems.length) { %>
-      <div class="ranking-empty">Sem fechamentos suficientes nesta semana para montar o ranking de apoio.</div>
+    <% if (!rankingMecânicos IndustriaisItems.length) { %>
+      <div class="ranking-empty">Sem fechamentos suficientes nesta semana para montar o ranking de mecânicos industriais.</div>
     <% } else { %>
       <div class="ranking-list">
-        <% rankingApoioItems.forEach(function(item) { %>
+        <% rankingMecânicos IndustriaisItems.forEach(function(item) { %>
           <article class="ranking-item">
             <div class="ranking-pos"><%= item.posicao %>º</div>
             <div class="ranking-main">
