@@ -141,40 +141,44 @@
 </style>
 
 <%
-  var safeDemandasResumo = demandasResumo || {};
+  var safeDemandasResumo = (typeof demandasResumo !== 'undefined' && demandasResumo) ? demandasResumo : {};
   var demandasEmTrabalho = safeDemandasResumo.em_trabalho || [];
-  var safeOSResumo = osResumo || {};
-  var safeOSPainel = osPainel || {};
+  var safeOSResumo = (typeof osResumo !== 'undefined' && osResumo) ? osResumo : {};
+  var safeOSPainel = (typeof osPainel !== 'undefined' && osPainel) ? osPainel : {};
   var osItems = safeOSPainel.items || [];
-  var osAndamento = osEmAndamento || [];
-  var safeAvisos = avisos || [];
-  var safeEscala = escala || {};
+  var osAndamento = (typeof osEmAndamento !== 'undefined' && osEmAndamento) ? osEmAndamento : [];
+  var safeAvisos = (typeof avisos !== 'undefined' && avisos) ? avisos : [];
+  var safeEscala = (typeof escala !== 'undefined' && escala) ? escala : {};
   var escalaDiurno = (safeEscala.diurno_mecanicos || []).map(function(p) { return p.nome; }).join(', ');
-  var escalaMecânicos Industriais = (safeEscala.apoio_operacional || []).map(function(p) { return p.nome; }).join(', ');
+  var escalaMecanicosIndustriais = (safeEscala.mecanicos_industriais || safeEscala.diurno_mecanicos || []).map(function(p) { return p.nome; }).join(', ');
   var escalaNoturno = (safeEscala.noturno || []).map(function(p) { return p.nome; }).join(', ');
   var escalaFolgasAfastamentos = safeEscala.folgas_afastamentos || [];
-  var safeMotoresResumo = motoresResumo || {};
-  var rankingMecanicosData = rankingMecanicos || {};
+  var safeMotoresResumo = (typeof motoresResumo !== 'undefined' && motoresResumo) ? motoresResumo : {};
+  var rankingMecanicosData = (typeof rankingMecanicos !== 'undefined' && rankingMecanicos) ? rankingMecanicos : {};
   var rankingMecanicosItems = rankingMecanicosData.itemsMecanicos || rankingMecanicosData.items || [];
-  var rankingMecânicos IndustriaisItems = rankingMecanicosData.itemsMecânicos Industriais || [];
+  var rankingMecanicosIndustriaisItems = rankingMecanicosData.itemsMecanicosIndustriais || [];
   var rankingMetaMensal = Number(rankingMecanicosData.metaMensal || 100);
   var rankingPesos = rankingMecanicosData.pesosCriticidade || { BAIXA: 0.5, MEDIA: 1, ALTA: 2, CRITICA: 3 };
-  var onlineUserIds = new Set((onlineUsers || []).map(function(u) { return Number(u && u.id || 0); }).filter(Boolean));
-    var safePreventivas = preventivas || {};
+  var onlineUserIds = new Set(((typeof onlineUsers !== 'undefined' && onlineUsers) ? onlineUsers : []).map(function(u) { return Number(u && u.id || 0); }).filter(Boolean));
+  var safePreventivas = (typeof preventivas !== 'undefined' && preventivas) ? preventivas : {};
   var preventivasItems = safePreventivas.items || [];
   var preventivasResumo = safePreventivas.resumo || {};
   var preventivasCrit = safePreventivas.criticidade || {};
-  var alertaInicial = alertaAtivo || null;
-  var counters = operationalCounters || { osAbertas: 0, osCriticas: 0, preventivasHoje: 0 };
-  var timezonePainel = TZ || 'America/Sao_Paulo';
+  var alertaInicial = (typeof alertaAtivo !== 'undefined' && alertaAtivo) ? alertaAtivo : null;
+  var counters = (typeof operationalCounters !== 'undefined' && operationalCounters) ? operationalCounters : { osAbertas: 0, osCriticas: 0, preventivasHoje: 0 };
+  var timezonePainel = (typeof TZ !== 'undefined' && TZ) ? TZ : 'America/Sao_Paulo';
   var horaPainel = Number(new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', hour12: false, timeZone: timezonePainel }).format(new Date()));
   var horaAtualFmt = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: timezonePainel }).format(new Date());
   var saudacao = (horaPainel < 12) ? "Bom dia" : (horaPainel < 18 ? "Boa tarde" : "Boa noite");
-  var roleNorm = (typeof normalizeRole === 'function') ? normalizeRole(user?.role || '') : String(user?.role || '').toUpperCase();
+  var safeUser = (typeof user !== 'undefined' && user) ? user : {};
+  var roleNorm = (typeof normalizeRole === 'function') ? normalizeRole(safeUser.role || '') : String(safeUser.role || '').toUpperCase();
   var isMecanico = roleNorm === 'MECANICO';
   var isProducao = roleNorm === 'PRODUCAO' || roleNorm === 'ENCARREGADO_PRODUCAO';
   var isAdminPainel = roleNorm === 'ADMIN' || roleNorm === 'DIRETORIA' || roleNorm === 'RH' || roleNorm === 'MANUTENCAO_SUPERVISOR' || roleNorm === 'SUPERVISOR_MANUTENCAO' || roleNorm === 'ENCARREGADO_MANUTENCAO';
+  if (typeof canAccessModule !== 'function') { var canAccessModule = function() { return true; }; }
   var showPreventivasCard = canAccessModule(roleNorm, 'preventivas_view');
+  var safeRankingPeriodoMensal = (typeof rankingPeriodoMensal !== 'undefined' && rankingPeriodoMensal) ? rankingPeriodoMensal : {};
+  var safeRankingRelatorioMensal = (typeof rankingRelatorioMensal !== 'undefined' && rankingRelatorioMensal) ? rankingRelatorioMensal : {};
 %>
 
 <div class="page-head">
@@ -205,7 +209,7 @@
 </section>
 
 <section class="boasvindas">
-  <strong><%= saudacao %>, senhor <%= user?.name || "Equipe" %>.</strong>
+  <strong><%= saudacao %>, senhor <%= safeUser.name || "Equipe" %>.</strong>
   Bem-vindo ao sistema de manutenção Campo do Gado.
   <% if (isMecanico) { %>
     Você tem <strong><%= counters.osAbertas %></strong> ordens de serviço abertas
@@ -292,7 +296,7 @@
           <td><span class="pill-tag <%= critic === 'CRITICA' ? 'pill-gray' : (critic === 'ALTA' ? 'pill-amber' : (critic === 'MEDIA' ? 'pill-blue' : 'pill-green')) %>"><%= critic %></span></td>
           <td><span class="pill-tag <%= stat === 'EM_ANDAMENTO' ? 'pill-blue' : (stat === 'PENDENTE' ? 'pill-amber' : 'pill-gray') %>"><%= stat %></span></td>
           <td style="text-align:right;">
-            <% var podeIniciar = roleNorm !== 'INSPECAO_QUALIDADE' && (roleNorm === 'ADMIN' || roleNorm === 'MANUTENCAO_SUPERVISOR' || roleNorm === 'SUPERVISOR_MANUTENCAO' || roleNorm === 'ENCARREGADO_MANUTENCAO' || Number(p.responsavel_1_id || 0) === Number(user?.id || 0) || Number(p.responsavel_2_id || 0) === Number(user?.id || 0)); %>
+            <% var podeIniciar = roleNorm !== 'INSPECAO_QUALIDADE' && (roleNorm === 'ADMIN' || roleNorm === 'MANUTENCAO_SUPERVISOR' || roleNorm === 'SUPERVISOR_MANUTENCAO' || roleNorm === 'ENCARREGADO_MANUTENCAO' || Number(p.responsavel_1_id || 0) === Number(safeUser.id || 0) || Number(p.responsavel_2_id || 0) === Number(safeUser.id || 0)); %>
             <% if (stat === 'PENDENTE' && podeIniciar) { %>
               <form method="POST" action="/dashboard/preventivas/<%= p.id %>/iniciar" style="display:inline;">
                 <button class="btn-inline" type="submit">Iniciar</button>
@@ -330,17 +334,17 @@
   <div class="dash-col">
 <section class="dashboard-card area-escala">
     <div class="dashboard-title">Escala da Semana</div>
-    <% if (escalaDiurno || escalaMecânicos Industriais || escalaNoturno || escalaFolgasAfastamentos.length) { %>
+    <% if (escalaDiurno || escalaMecanicosIndustriais || escalaNoturno || escalaFolgasAfastamentos.length) { %>
       <div class="muted-xs" style="margin-bottom:8px;">Semana #<%= safeEscala.semana_numero || '-' %> • <%= safeEscala.data_inicio || '-' %> até <%= safeEscala.data_fim || '-' %></div>
       <table class="table compact"><tbody>
-        <tr><td><strong>Dia (mecânicos)</strong></td><td><%= escalaDiurno || '-' %></td></tr>
-        <tr><td><strong>Mecânico industrial</strong></td><td><%= escalaMecânicos Industriais || '-' %></td></tr>
+        <tr><td><strong>Dia (mecânicos industriais)</strong></td><td><%= escalaDiurno || '-' %></td></tr>
+        <tr><td><strong>Mecânico industrial</strong></td><td><%= escalaMecanicosIndustriais || '-' %></td></tr>
         <tr><td><strong>Noite (responsável)</strong></td><td><%= escalaNoturno || '-' %></td></tr>
       </tbody></table>
 
       <div class="dashboard-title" style="margin-top:10px; margin-bottom:6px; font-size:11px;">Folga / atestado</div>
       <% if (escalaFolgasAfastamentos.length === 0) { %>
-        <p class="muted-xs" style="margin:0;">Sem mecânicos em folga/atestado nesta semana.</p>
+        <p class="muted-xs" style="margin:0;">Sem mecânicos industriais em folga/atestado nesta semana.</p>
       <% } else { %>
         <ul class="list-tight" style="margin-top:0;">
           <% escalaFolgasAfastamentos.forEach(function(item) { %>
@@ -359,16 +363,16 @@
 
 <section class="dashboard-card area-ranking-mecanicos">
     <div class="ranking-header">
-      <div class="dashboard-title" style="margin:0;">Ranking dos mecânicos</div>
-      <span class="ranking-subtitle">Ranking mensal por participação nas OS</span>
+      <div class="dashboard-title" style="margin:0;">Ranking dos mecânicos industriais</div>
+      <span class="ranking-subtitle">Ranking mensal dos mecânicos industriais por participação nas OS</span>
     </div>
     <p class="muted-xs" style="margin-top:-4px; margin-bottom:10px;">
       Pesos: <strong>Baixa <%= rankingPesos.BAIXA %></strong> • <strong>Média <%= rankingPesos.MEDIA %></strong> • <strong>Alta <%= rankingPesos.ALTA %></strong> • <strong>Crítica <%= rankingPesos.CRITICA %></strong>.
       A pontuação é dividida igualmente entre os participantes de cada OS.
     </p>
 
-    <div class="ranking-highlight">Período: <%= (rankingPeriodoMensal && rankingPeriodoMensal.inicio ? rankingPeriodoMensal.inicio.slice(0,10) : '-') %> até <%= (rankingPeriodoMensal && rankingPeriodoMensal.fim ? rankingPeriodoMensal.fim.slice(0,10) : '-') %> (ciclo mensal).</div>
-    <% if (rankingRelatorioMensal && rankingRelatorioMensal.caminho_pdf) { %>
+    <div class="ranking-highlight">Período: <%= (safeRankingPeriodoMensal.inicio ? safeRankingPeriodoMensal.inicio.slice(0,10) : '-') %> até <%= (safeRankingPeriodoMensal.fim ? safeRankingPeriodoMensal.fim.slice(0,10) : '-') %> (ciclo mensal).</div>
+    <% if (safeRankingRelatorioMensal.caminho_pdf) { %>
       <div style="margin-top:8px;"><a class="btn" href="/dashboard/ranking/relatorios/ultimo/pdf">Baixar PDF do ranking mensal</a></div>
     <% } else { %>
       <div class="ranking-empty" style="margin-top:8px;">Nenhum relatório mensal fechado disponível ainda.</div>
@@ -409,19 +413,19 @@
     <% } %>
   </section>
 
-<section class="dashboard-card area-ranking-apoio">
+<section class="dashboard-card area-ranking-mecanicos-industriais">
     <div class="ranking-header">
-      <div class="dashboard-title" style="margin:0;">Ranking do mecânicos industriais</div>
+      <div class="dashboard-title" style="margin:0;">Ranking dos mecânicos industriais</div>
       <span class="ranking-subtitle">Destaques: mecânicos industriais mais atuantes</span>
     </div>
     <p class="muted-xs" style="margin-top:-4px; margin-bottom:10px;">
-      Ranking do mecânicos industriais com os mecânicos industriais mais atuantes no mês.
+      Ranking dos mecânicos industriais com os mecânicos industriais mais atuantes no mês.
     </p>
-    <% if (!rankingMecânicos IndustriaisItems.length) { %>
+    <% if (!rankingMecanicosIndustriaisItems.length) { %>
       <div class="ranking-empty">Sem fechamentos suficientes nesta semana para montar o ranking de mecânicos industriais.</div>
     <% } else { %>
       <div class="ranking-list">
-        <% rankingMecânicos IndustriaisItems.forEach(function(item) { %>
+        <% rankingMecanicosIndustriaisItems.forEach(function(item) { %>
           <article class="ranking-item">
             <div class="ranking-pos"><%= item.posicao %>º</div>
             <div class="ranking-main">
@@ -570,7 +574,7 @@
 
 
 
-  var isTVMode = <%- JSON.stringify(Boolean(tvMode)) %>;
+  var isTVMode = <%- JSON.stringify(Boolean(typeof tvMode !== 'undefined' && tvMode)) %>;
   if (isTVMode) {
     setInterval(function(){ window.location.reload(); }, 30000);
     if (document.documentElement && document.documentElement.requestFullscreen) {
