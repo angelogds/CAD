@@ -920,10 +920,13 @@ function getPlantonista(semanaId) {
 }
 
 function getMecanicosDiurno() {
-  return getColaboradoresTurnoAtual("DIA").filter((c) => c.tipo_turno === "diurno" && normalizeColaboradorFuncao(c.funcao) === "MECANICO");
+  return getColaboradoresTurnoAtual("DIA").filter((c) => normalizeColaboradorFuncao(c.funcao) === "MECANICO");
 }
 
 function getApoioDiurno() {
+  // Mantido por compatibilidade com telas/fluxos legados. Na regra atual de OS,
+  // todos da manutenção são MECÂNICO INDUSTRIAL e a equipe diurna é montada
+  // exclusivamente a partir de mecânicos disponíveis.
   return getColaboradoresTurnoAtual("DIA").filter((c) => c.tipo_turno === "apoio" && ["APOIO", "AUXILIAR"].includes(normalizeColaboradorFuncao(c.funcao)));
 }
 
@@ -1096,12 +1099,28 @@ function resolverEquipePorCriticidade({
   }
 
   const grauNorm = normalizeGrau(grau);
-  const apoioDisponivel = (apoios || getApoioDiurno()).filter((c) => disponivel(c));
-  const mecanicosDisponiveis = (mecanicos || getMecanicosDiurno()).filter((c) => disponivel(c));
-  const executor = mecanicosDisponiveis[0] || null;
-  if (!executor) return { turno: "DIA", executor: null, auxiliar: null };
-  if (grauNorm === "BAIXA") return { turno: "DIA", executor, auxiliar: null };
-  return { turno: "DIA", executor, auxiliar: apoioDisponivel[0] || null };
+  const qtdPorCriticidade = { BAIXA: 1, MEDIA: 2, ALTA: 2, CRITICA: 4 };
+  const quantidadeNecessaria = qtdPorCriticidade[grauNorm] || qtdPorCriticidade.MEDIA;
+  const porId = new Set();
+  const mecanicosDisponiveis = [
+    ...(mecanicos || getMecanicosDiurno()),
+    ...(apoios || []),
+  ].filter((c) => {
+    const id = Number(c?.id || c?.colaborador_id || 0);
+    if (!id || porId.has(id) || normalizeColaboradorFuncao(c.funcao) !== "MECANICO" || !disponivel(c)) return false;
+    porId.add(id);
+    return true;
+  });
+
+  const selecionados = mecanicosDisponiveis.slice(0, quantidadeNecessaria);
+  const executor = selecionados[0] || null;
+  if (!executor) return { turno: "DIA", executor: null, auxiliar: null, equipe: [] };
+
+  const auxiliar = selecionados[1] || null;
+  if (selecionados[2]) executor.secundario_id = Number(selecionados[2].id);
+  if (selecionados[3]) auxiliar.secundario_id = Number(selecionados[3].id);
+
+  return { turno: "DIA", executor, auxiliar, equipe: selecionados };
 }
 
 function getOsAssignmentSnapshot(osId) {

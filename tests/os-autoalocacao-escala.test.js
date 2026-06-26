@@ -72,6 +72,8 @@ function resetSchema() {
       status TEXT,
       executor_colaborador_id INTEGER,
       auxiliar_colaborador_id INTEGER,
+      executor_secundario_colaborador_id INTEGER,
+      auxiliar_secundario_colaborador_id INTEGER,
       mecanico_user_id INTEGER,
       auxiliar_user_id INTEGER,
       turno_alocado TEXT,
@@ -115,10 +117,10 @@ test('Teste 1: DIA + BAIXA usa 1 mecânico como executor', () => {
   assert.equal(osAlocada.alocacao_modo, 'AUTO');
 });
 
-test('Teste 2: DIA + ALTA usa mecânico executor e apoio auxiliar', () => {
+test('Teste 2: DIA + ALTA usa 2 mecânicos disponíveis', () => {
   resetSchema();
   const mecanico = addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
-  const apoio = addColaborador({ nome: 'Junior', funcao: 'operacional', tipo_turno: 'apoio' });
+  const apoio = addColaborador({ nome: 'Junior', funcao: 'mecanico', tipo_turno: 'apoio' });
   const osId = addOS('ALTA');
 
   withMockedSaoPauloTime(9, 10, () => {
@@ -129,6 +131,8 @@ test('Teste 2: DIA + ALTA usa mecânico executor e apoio auxiliar', () => {
   const osAlocada = osService.getOSById(osId);
   assert.equal(osAlocada.executor_colaborador_id, mecanico.id);
   assert.equal(osAlocada.auxiliar_colaborador_id, apoio.id);
+  assert.equal(osAlocada.executor_secundario_colaborador_id, null);
+  assert.equal(osAlocada.auxiliar_secundario_colaborador_id, null);
   assert.equal(osAlocada.turno_alocado, 'DIA');
   assert.equal(osAlocada.alocacao_modo, 'AUTO');
 });
@@ -147,13 +151,15 @@ test('Teste 3: NOITE usa plantonista mecânico (Rodolfo) como único responsáve
   const osAlocada = osService.getOSById(osId);
   assert.equal(osAlocada.executor_colaborador_id, rodolfo.id);
   assert.equal(osAlocada.auxiliar_colaborador_id, null);
+  assert.equal(osAlocada.executor_secundario_colaborador_id, null);
+  assert.equal(osAlocada.auxiliar_secundario_colaborador_id, null);
   assert.equal(osAlocada.turno_alocado, 'NOITE');
   assert.equal(osAlocada.alocacao_modo, 'AUTO');
 });
 
 test('Teste 4: colaborador já em OS ativa não pode ser realocado', () => {
   resetSchema();
-  const apoio = addColaborador({ nome: 'Junior', funcao: 'operacional', tipo_turno: 'apoio' });
+  const apoio = addColaborador({ nome: 'Junior', funcao: 'mecanico', tipo_turno: 'apoio' });
   const mecanico = addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
 
   const osAtiva = addOS('BAIXA');
@@ -168,4 +174,41 @@ test('Teste 4: colaborador já em OS ativa não pode ser realocado', () => {
   const osAlocada = osService.getOSById(osNova);
   assert.equal(osAlocada.executor_colaborador_id, mecanico.id);
   assert.notEqual(osAlocada.executor_colaborador_id, apoio.id);
+});
+
+
+test('Teste 5: DIA + CRITICA usa até 4 mecânicos e NOITE mantém só plantonista', () => {
+  resetSchema();
+  const diogo = addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
+  const salviano = addColaborador({ nome: 'Salviano', funcao: 'mecanico', tipo_turno: 'diurno' });
+  const emanuel = addColaborador({ nome: 'Emanuel', funcao: 'mecanico', tipo_turno: 'apoio' });
+  const luiz = addColaborador({ nome: 'Luiz', funcao: 'mecanico', tipo_turno: 'apoio' });
+  const osDia = addOS('CRITICA');
+
+  withMockedSaoPauloTime(10, 0, () => {
+    const result = osService.autoAssignOS(osDia);
+    assert.equal(result.aguardando, false);
+  });
+
+  const diaAlocada = osService.getOSById(osDia);
+  assert.equal(diaAlocada.executor_colaborador_id, diogo.id);
+  assert.equal(diaAlocada.auxiliar_colaborador_id, salviano.id);
+  assert.equal(diaAlocada.executor_secundario_colaborador_id, emanuel.id);
+  assert.equal(diaAlocada.auxiliar_secundario_colaborador_id, luiz.id);
+
+  resetSchema();
+  const rodolfo = addColaborador({ nome: 'Rodolfo', funcao: 'mecanico', tipo_turno: 'plantao' });
+  addColaborador({ nome: 'Backup Noturno', funcao: 'mecanico', tipo_turno: 'noturno' });
+  const osNoite = addOS('CRITICA');
+
+  withMockedSaoPauloTime(23, 30, () => {
+    const result = osService.autoAssignOS(osNoite);
+    assert.equal(result.aguardando, false);
+  });
+
+  const noiteAlocada = osService.getOSById(osNoite);
+  assert.equal(noiteAlocada.executor_colaborador_id, rodolfo.id);
+  assert.equal(noiteAlocada.auxiliar_colaborador_id, null);
+  assert.equal(noiteAlocada.executor_secundario_colaborador_id, null);
+  assert.equal(noiteAlocada.auxiliar_secundario_colaborador_id, null);
 });
