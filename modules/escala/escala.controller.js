@@ -126,7 +126,7 @@ exports.adicionarRapido = (req, res, next) => {
       return res.redirect(`/escala?date=${inicio}`);
     }
     if (!funcao) {
-      req.flash("error", "Função inválida. Use Mecânico, Auxiliar ou Operacional.");
+      req.flash("error", "Função inválida. Use Mecânico Industrial.");
       return res.redirect(`/escala?date=${inicio}`);
     }
 
@@ -334,7 +334,7 @@ exports.pdfSemana = (req, res, next) => {
       periodoTexto: `${generator.formatDateBr(s.data_inicio)} até ${generator.formatDateBr(s.data_fim)}`,
       noturno: s.noturno,
       diurno: s.diurno,
-      apoioOperacionalDiurno: s.apoio,
+      observacoes: "Todos como Mecânico Industrial",
     }));
 
     res.setHeader("Content-Type", "application/pdf");
@@ -363,9 +363,9 @@ exports.pdfSemanaById = (req, res, next) => {
         {
           semanaNumero: String(semana.semana_numero),
           periodoTexto: `${generator.formatDateBr(semana.data_inicio)} até ${generator.formatDateBr(semana.data_fim)}`,
-          noturno: consolidado?.noturno || { mecanico: [], auxiliar: [], operacional: [] },
-          diurno: consolidado?.diurno || { mecanico: [], auxiliar: [], operacional: [] },
-          apoioOperacionalDiurno: consolidado?.apoio || { mecanico: [], auxiliar: [], operacional: [] },
+          noturno: consolidado?.noturno || { mecanico: [] },
+          diurno: consolidado?.diurno || { mecanico: [] },
+          observacoes: "Todos como Mecânico Industrial",
         },
       ],
     });

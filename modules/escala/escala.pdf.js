@@ -178,9 +178,7 @@ function drawTable(doc, { columns, rows, meta, emptyRow }) {
 function roleText(group) {
   if (!group) return "-";
   const out = [];
-  out.push(group.mecanico?.length ? `Mecânico: ${group.mecanico.join(", ")}` : "Mecânico: -");
-  if (group.auxiliar?.length) out.push(`Auxiliar: ${group.auxiliar.join(", ")}`);
-  if (group.operacional?.length) out.push(`Operacional: ${group.operacional.join(", ")}`);
+  out.push(group.mecanico?.length ? `Mecânicos: ${group.mecanico.join(", ")}` : "Mecânicos: -");
   return out.join("\n");
 }
 
@@ -200,7 +198,7 @@ function generateWeeklyPDF({ rows = [] } = {}) {
       periodo: item.periodoTexto || item.periodo || "-",
       noturno: roleText(item.noturno),
       diurno: roleText(item.diurno),
-      apoio: roleText(item.apoioOperacionalDiurno || item.apoio || { operacional: item.diurno?.operacional || [] }),
+      observacoes: item.observacoes || "Todos como Mecânico Industrial",
     }));
 
     drawTable(doc, {
@@ -208,9 +206,9 @@ function generateWeeklyPDF({ rows = [] } = {}) {
       columns: [
         { key: "semana", label: "Semana", width: 52, align: "center" },
         { key: "periodo", label: "Período (serviço)", width: 114, align: "center" },
-        { key: "noturno", label: "Turno noturno (19h–05h)", width: 128 },
-        { key: "diurno", label: "Turno diurno (07h–17h)", width: 128 },
-        { key: "apoio", label: "Apoio operacional (diurno)", width: 127 },
+        { key: "noturno", label: "Mecânico Plantonista (Noturno)", width: 150 },
+        { key: "diurno", label: "Mecânicos Escalados (Diurno)", width: 180 },
+        { key: "observacoes", label: "Observações", width: 53 },
       ],
       rows: tableRows,
       emptyRow: {
@@ -218,7 +216,7 @@ function generateWeeklyPDF({ rows = [] } = {}) {
         periodo: "-",
         noturno: "-",
         diurno: "Sem dados de escala semanal cadastrados.",
-        apoio: "-",
+        observacoes: "-",
       },
     });
 

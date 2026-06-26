@@ -102,9 +102,7 @@ function drawTableRow(doc, columns, startX, y, rowHeight, row, striped = false) 
 
 function funcaoAgrupada(nomesPorFuncao = {}) {
   const partes = [];
-  if (nomesPorFuncao.mecanico?.length) partes.push(`Mecânico: ${nomesPorFuncao.mecanico.join(", ")}`);
-  if (nomesPorFuncao.auxiliar?.length) partes.push(`Auxiliar: ${nomesPorFuncao.auxiliar.join(", ")}`);
-  if (nomesPorFuncao.operacional?.length) partes.push(`Operacional: ${nomesPorFuncao.operacional.join(", ")}`);
+  if (nomesPorFuncao.mecanico?.length) partes.push(`Mecânicos: ${nomesPorFuncao.mecanico.join(", ")}`);
   return partes.length ? partes.join(" | ") : "-";
 }
 
@@ -119,9 +117,9 @@ function renderEscalaSemanalPdf(res, { rows = [] }) {
   const columns = [
     { key: "semana", label: "Semana", width: 55, align: "center" },
     { key: "periodo", label: "Período (serviço)", width: 120, align: "center" },
-    { key: "noturno", label: "Turno noturno (19h–05h)", width: 122, align: "left" },
-    { key: "diurno", label: "Turno diurno (07h–17h)", width: 122, align: "left" },
-    { key: "apoio", label: "Apoio operacional (diurno)", width: 122, align: "left" },
+    { key: "noturno", label: "Mecânico Plantonista (Noturno)", width: 150, align: "left" },
+    { key: "diurno", label: "Mecânicos Escalados (Diurno)", width: 210, align: "left" },
+    { key: "observacoes", label: "Observações", width: 106, align: "left" },
   ];
 
   const rowHeight = 48;
@@ -143,7 +141,7 @@ function renderEscalaSemanalPdf(res, { rows = [] }) {
         periodo: "-",
         noturno: "Não há dados de escala semanal cadastrados.",
         diurno: "-",
-        apoio: "-",
+        observacoes: "-",
       },
       false
     );
@@ -175,7 +173,7 @@ function renderEscalaSemanalPdf(res, { rows = [] }) {
         periodo: row.periodo,
         noturno: funcaoAgrupada(row.noturno),
         diurno: funcaoAgrupada(row.diurno),
-        apoio: funcaoAgrupada(row.apoio),
+        observacoes: row.observacoes || "Rodízio balanceado",
       },
       index % 2 !== 0
     );

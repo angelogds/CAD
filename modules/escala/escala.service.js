@@ -27,7 +27,7 @@ function isoToday() {
 function turnoLabel(tipo_turno) {
   if (tipo_turno === "noturno") return "Noite";
   if (tipo_turno === "diurno") return "Dia";
-  if (tipo_turno === "apoio") return "Apoio";
+  if (tipo_turno === "apoio") return "Dia";
   if (tipo_turno === "folga") return "Folga";
   if (tipo_turno === "plantao") return "Plantão";
   return String(tipo_turno || "-");
@@ -37,7 +37,7 @@ function normalizeTurno(turno) {
   const t = String(turno || "").trim().toLowerCase();
   if (t === "noite" || t === "noturno") return "noturno";
   if (t === "dia" || t === "diurno") return "diurno";
-  if (t === "apoio") return "apoio";
+  if (t === "apoio") return "diurno";
   if (t === "plantao" || t === "plantão") return "plantao";
   if (t === "folga") return "folga";
   return "";
@@ -45,16 +45,14 @@ function normalizeTurno(turno) {
 
 function normalizeFuncao(funcao) {
   const f = String(funcao || "").trim().toLowerCase();
-  if (f === "mecânico" || f === "mecanico") return "mecanico";
-  if (f === "auxiliar") return "auxiliar";
-  if (f === "operacional" || f === "apoio") return "operacional";
-  return "";
+  if (["mecânico", "mecanico", "mecanico industrial", "mecânico industrial", "auxiliar", "ajudante", "operacional", "apoio", "apoio operacional", "auxiliar de mecanico", "auxiliar de mecânico"].includes(f)) return "mecanico";
+  return "mecanico";
 }
 
 function roleToFuncao(role) {
   const r = String(role || "").trim().toUpperCase();
   if (r === "MECANICO") return "MECANICO";
-  return "AUXILIAR";
+  return "MECANICO";
 }
 
 function currentTurno() {
@@ -66,10 +64,8 @@ function getTurnoAtual() {
 }
 
 function funcaoLabel(funcao) {
-  if (funcao === "mecanico") return "Mecânico";
-  if (funcao === "auxiliar") return "Auxiliar";
-  if (funcao === "operacional") return "Operacional";
-  return String(funcao || "-");
+  if (funcao === "mecanico") return "Mecânico Industrial";
+  return "Mecânico Industrial";
 }
 
 
@@ -701,14 +697,13 @@ function getEscalaSemanalPdfData() {
       ORDER BY c.nome ASC
     `).all(s.id);
 
-    const montarGrupo = () => ({ mecanico: [], auxiliar: [], operacional: [] });
+    const montarGrupo = () => ({ mecanico: [] });
     const grupos = { noturno: montarGrupo(), diurno: montarGrupo(), apoio: montarGrupo() };
 
     linhas.forEach((l) => {
       const turno = l.tipo_turno === "apoio" ? "apoio" : l.tipo_turno;
       if (!grupos[turno]) return;
-      const funcao = normalizeFuncao(l.funcao) || "mecanico";
-      const key = funcao === "operacional" ? "operacional" : funcao;
+      const key = "mecanico";
       if (!grupos[turno][key].includes(l.nome)) {
         grupos[turno][key].push(l.nome);
       }
@@ -1015,10 +1010,7 @@ function getMecanicosDoTurnoAtual() {
 }
 
 function getAuxiliaresDoTurnoAtual() {
-  return (getDisponiveisAgora() || []).filter((p) => {
-    const funcao = String(p.funcao || '').toUpperCase();
-    return funcao === 'AUXILIAR' || funcao === 'APOIO' || funcao === 'MONTADOR' || funcao === 'OPERACIONAL';
-  });
+  return [];
 }
 
 

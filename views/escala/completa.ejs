@@ -11,7 +11,7 @@
         <th style="width:220px;">Período</th>
         <th>Noturno</th>
         <th>Diurno</th>
-        <th>Apoio</th>
+        <th>Observações</th>
       </tr>
     </thead>
     <tbody>
@@ -21,7 +21,7 @@
           <td><%= s.data_inicio %> → <%= s.data_fim %></td>
           <td><%= (s.times.noturno || []).join(", ") %></td>
           <td><%= (s.times.diurno || []).join(", ") %></td>
-          <td><%= (s.times.apoio || []).join(", ") %></td>
+          <td>Todos como Mecânico Industrial</td>
         </tr>
       <% }) %>
     </tbody>

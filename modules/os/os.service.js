@@ -232,10 +232,10 @@ function normalizeColaboradorFuncao(funcao) {
     .trim()
     .toUpperCase();
 
-  if (raw.includes("MECAN")) return "MECANICO";
-  if (raw.includes("AUXILIAR")) return "AUXILIAR";
-  if (raw.includes("OPERACIONAL") || raw.includes("APOIO")) return "APOIO";
-  return "APOIO";
+  // Estrutura vigente: não existe mais distinção operacional entre
+  // mecânico, apoio, auxiliar ou ajudante. Todos são mecânicos industriais.
+  if (raw.includes("MECAN") || raw.includes("AUXILIAR") || raw.includes("AJUDANTE") || raw.includes("OPERACIONAL") || raw.includes("APOIO")) return "MECANICO";
+  return "MECANICO";
 }
 
 function ensureVoiceColumns() {
@@ -1112,13 +1112,17 @@ function resolverEquipePorCriticidade({
     return true;
   });
 
-  const selecionados = mecanicosDisponiveis.slice(0, quantidadeNecessaria);
+  const ultimoId = Number(getConfig("os_autoalocacao_ultimo_mecanico_diurno") || 0) || null;
+  const filaBalanceada = rotateByLastId(mecanicosDisponiveis, ultimoId);
+  const selecionados = filaBalanceada.slice(0, quantidadeNecessaria);
   const executor = selecionados[0] || null;
   if (!executor) return { turno: "DIA", executor: null, auxiliar: null, equipe: [] };
 
   const auxiliar = selecionados[1] || null;
   if (selecionados[2]) executor.secundario_id = Number(selecionados[2].id);
   if (selecionados[3]) auxiliar.secundario_id = Number(selecionados[3].id);
+  const ultimoSelecionado = selecionados[selecionados.length - 1];
+  if (ultimoSelecionado?.id) setConfig("os_autoalocacao_ultimo_mecanico_diurno", Number(ultimoSelecionado.id));
 
   return { turno: "DIA", executor, auxiliar, equipe: selecionados };
 }
