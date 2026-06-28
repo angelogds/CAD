@@ -1,0 +1,18 @@
+<%- layout('layout') -%>
+<div class="page-head"><h1>Registrar Hora Extra</h1><a class="btn" href="/escala">Voltar</a></div>
+<div class="card"><p style="color:#64748b;font-weight:800;">Controle interno da manutenção para horas extras vinculadas a OS e aprovação do encarregado.</p>
+<% if (!colaborador) { %><div class="alert alert-warning">Nenhum colaborador vinculado/encontrado para o usuário.</div><% } else if (emAndamento) { %>
+<h3>Hora extra em andamento</h3><p><b>Início:</b> <%= emAndamento.inicio_extra %> · <b>Serviço:</b> <%= emAndamento.descricao_servico %></p>
+<form method="POST" action="/escala/hora-extra/<%= emAndamento.id %>/finalizar" enctype="multipart/form-data">
+<input type="hidden" name="latitude_fim"><input type="hidden" name="longitude_fim"><input type="hidden" name="precisao_fim">
+<div class="label">Foto final (opcional)</div><input class="input" type="file" name="foto_fim" accept="image/*" capture="environment"><button class="btn btn-green" style="margin-top:10px;">Finalizar Hora Extra</button></form>
+<% } else { %>
+<form method="POST" action="/escala/hora-extra/iniciar" enctype="multipart/form-data" style="display:grid;gap:12px;">
+<input type="hidden" name="colaborador_id" value="<%= colaborador.id %>"><input type="hidden" name="latitude_inicio"><input type="hidden" name="longitude_inicio"><input type="hidden" name="precisao_inicio">
+<div><div class="label">Funcionário</div><input class="input" value="<%= colaborador.nome %>" disabled></div>
+<div><div class="label">OS</div><select class="input" name="os_id"><option value="">Sem OS - justificar na descrição</option><% osDisponiveis.forEach(os=>{ %><option value="<%= os.id %>">OS <%= os.id %> — <%= os.equipamento_nome || os.equipamento || 'Equipamento' %> — <%= os.descricao %></option><% }) %></select></div>
+<div><div class="label">Descrição do serviço / justificativa se sem OS</div><textarea class="input" name="descricao_servico" rows="4" required></textarea></div>
+<div><div class="label">Foto inicial (opcional)</div><input class="input" type="file" name="foto_inicio" accept="image/*" capture="environment"></div>
+<button class="btn btn-green">Iniciar Hora Extra</button></form><% } %></div>
+<div class="card" style="margin-top:14px;"><h3>Últimas horas extras</h3><table class="table"><thead><tr><th>Data</th><th>Início</th><th>Fim</th><th>Total</th><th>Status</th><th>OS</th></tr></thead><tbody><% if(!historico.length){ %><tr><td colspan="6">Nenhum registro.</td></tr><% } historico.forEach(h=>{ %><tr><td><%= h.data_servico %></td><td><%= h.inicio_extra %></td><td><%= h.fim_extra || '-' %></td><td><%= h.total_minutos || 0 %> min</td><td><span class="badge"><%= h.status %></span></td><td><%= h.os_id || '-' %></td></tr><% }) %></tbody></table></div>
+<script>function geo(){if(!navigator.geolocation)return;navigator.geolocation.getCurrentPosition(p=>{document.querySelectorAll('[name*=latitude]').forEach(i=>i.value=p.coords.latitude);document.querySelectorAll('[name*=longitude]').forEach(i=>i.value=p.coords.longitude);document.querySelectorAll('[name*=precisao]').forEach(i=>i.value=p.coords.accuracy);},()=>{});}geo();</script>
