@@ -5,7 +5,7 @@
 2. Defina em `escala_alocacoes`:
    - `plantao`: Rodolfo.
    - `diurno`: Diogo e Salviano.
-   - `apoio`: Emanuel, Luís e Júnior.
+   - `apoio`: Emanuel, Luiz e Júnior.
 
 ## Cenários obrigatórios
 1. **Noite (20:54), OS CRÍTICA**
@@ -18,7 +18,7 @@
 
 3. **Dia (10:05), OS ALTA**
    - Criar OS com grau `ALTA`.
-   - Esperado: par mecânico+auxiliar conforme `equipe_pares` em ordem (Diogo+Emanuel; se ocupados, Salviano+Luís; etc.).
+   - Esperado: par mecânico+auxiliar conforme `equipe_pares` em ordem (Diogo+Emanuel; se ocupados, Salviano+Luiz; etc.).
 
 4. **Fechamento e retorno de disponibilidade**
    - Concluir/cancelar OS do Diogo.

@@ -1309,7 +1309,7 @@ function setupPairsIfEmpty() {
   const total = db.prepare(`SELECT COUNT(*) AS total FROM equipe_pares`).get()?.total || 0;
   if (Number(total) > 0) return;
 
-  const pares = [["Diogo", "Emanuel"], ["Salviano", "Luís"], ["Rodolfo", "Júnior"], ["Fábio", "Léo"]];
+  const pares = [["Diogo", "Emanuel"], ["Salviano", "Luiz"], ["Rodolfo", "Júnior"], ["Fábio", "Léo"]];
   const findLike = db.prepare(`SELECT id FROM colaboradores WHERE nome LIKE ? COLLATE NOCASE ORDER BY id LIMIT 1`);
   const insert = db.prepare(`INSERT OR IGNORE INTO equipe_pares (mecanico_colaborador_id, auxiliar_colaborador_id, ativo, ordem) VALUES (?, ?, 1, ?)`);
 

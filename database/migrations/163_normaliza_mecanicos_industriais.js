@@ -1,5 +1,5 @@
 module.exports = function up({ db, tableExists, columnExists }) {
-  const nomesOficiais = ["Diogo", "Salviano", "Rodolfo", "Emanuel", "Luiz", "Luis", "Luís", "Júnior", "Junior"];
+  const nomesOficiais = ["Diogo", "Salviano", "Rodolfo", "Emanuel", "Luiz", "Luiz", "Luiz", "Júnior", "Junior"];
   const funcoesAntigas = [
     "apoio",
     "apoio operacional",

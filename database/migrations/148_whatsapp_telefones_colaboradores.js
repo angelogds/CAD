@@ -20,7 +20,7 @@ module.exports = function up({ db, tableExists, columnExists, addColumnIfMissing
     { terms: ['Diogo'], phone: '5575982563752' },
     { terms: ['Salviano'], phone: '5575981966712' },
     { terms: ['Rodolfo'], phone: '5575991566685' },
-    { terms: ['Luiz', 'Luís'], phone: '5575991634369' },
+    { terms: ['Luiz', 'Luiz'], phone: '5575991634369' },
     { terms: ['Guarani'], phone: '5575991857441' },
     { terms: ['Junio', 'Júnio', 'Junior Feira', 'Júnior Feira'], phone: '5575982331550' },
   ].map((item) => ({ ...item, phone: normalizeWhatsapp(item.phone) }));

@@ -245,7 +245,7 @@ function lancarLoteDiarioPreventivas(req, res) {
     } else {
       req.flash(
         "success",
-        `Lote diário processado (${result.dataReferencia || "-"}). Faixa atual: ${result.faixa || "-"}. Preventivas selecionadas: ${result.preventivasSelecionadas || 0}, OS geradas: ${result.osGeradas || 0}, já existentes: ${result.osJaExistentes || 0}. Equipe padrão: Júnior e Luís — Mecânicos Industriais.`
+        `Lote diário processado (${result.dataReferencia || "-"}). Faixa atual: ${result.faixa || "-"}. Preventivas selecionadas: ${result.preventivasSelecionadas || 0}, OS geradas: ${result.osGeradas || 0}, já existentes: ${result.osJaExistentes || 0}. Equipe padrão: Júnior e Luiz — Mecânicos Industriais.`
       );
     }
   } catch (err) {

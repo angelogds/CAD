@@ -16,7 +16,7 @@ const MAINT_FALLBACK = [
   { nome: 'Salviano', grupo: 'MECANICO', funcao: 'Mecânico Industrial' },
   { nome: 'Rodolfo', grupo: 'MECANICO', funcao: 'Mecânico Industrial' },
   { nome: 'Emanuel', grupo: 'MECANICO', funcao: 'Mecânico Industrial' },
-  { nome: 'Luís', grupo: 'MECANICO', funcao: 'Mecânico Industrial' },
+  { nome: 'Luiz', grupo: 'MECANICO', funcao: 'Mecânico Industrial' },
   { nome: 'Júnior', grupo: 'MECANICO', funcao: 'Mecânico Industrial' },
 ];
 
