@@ -1043,3 +1043,125 @@ module.exports = {
   normalizeTurno,
   normalizeFuncao,
 };
+
+// ===== Banco de Horas da Manutenção =====
+const MINUTOS_DIA_FOLGA = 480;
+
+function hasColumn(table, column) {
+  try { return db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column); } catch (_e) { return false; }
+}
+
+function userIdFrom(user) { return Number(user?.id || user?.user_id || 0) || null; }
+function userRole(user) { return String(user?.role || user?.perfil || '').toUpperCase(); }
+function isAdminUser(user) { return userRole(user) === 'ADMIN'; }
+function canManageBancoHoras(user) { return ['ADMIN','ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO'].includes(userRole(user)); }
+function canReadBancoHoras(user) { return canManageBancoHoras(user) || ['RH','DIRETORIA'].includes(userRole(user)); }
+function minutosToHoras(minutos) { const m = Math.abs(Number(minutos)||0); const sign = Number(minutos)<0 ? '-' : ''; return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; }
+function saldoResumo(minutos) { return { minutos, horas: minutosToHoras(minutos), diasFolga: Math.floor(minutos / MINUTOS_DIA_FOLGA), diasFolgaDecimal: Math.round((minutos / MINUTOS_DIA_FOLGA) * 100) / 100 }; }
+
+function listarPainelEscala() {
+  return { pendentes: tableExists('escala_horas_extras') ? db.prepare("SELECT COUNT(*) AS total FROM escala_horas_extras WHERE status='PENDENTE_APROVACAO'").get().total : 0 };
+}
+
+function listarColaboradoresManutencao() {
+  const cols = tableExists('colaboradores') ? db.prepare('PRAGMA table_info(colaboradores)').all().map(c=>c.name) : [];
+  const statusCol = cols.includes('status') ? "AND lower(COALESCE(status,'ativo')) NOT IN ('inativo','desligado')" : '';
+  return db.prepare(`SELECT id, nome, funcao ${cols.includes('user_id') ? ', user_id' : ', NULL AS user_id'} FROM colaboradores WHERE IFNULL(ativo,1)=1 ${statusCol} ORDER BY nome`).all();
+}
+
+function buscarColaboradorDoUsuario(userId) {
+  if (!userId || !tableExists('colaboradores')) return null;
+  if (hasColumn('colaboradores', 'user_id')) {
+    const row = db.prepare('SELECT * FROM colaboradores WHERE user_id=? AND IFNULL(ativo,1)=1 LIMIT 1').get(userId);
+    if (row) return row;
+  }
+  return null;
+}
+
+function listarOsDisponiveisParaHoraExtra() {
+  if (!tableExists('os')) return [];
+  return db.prepare(`
+    SELECT o.id, o.equipamento_id, o.equipamento, o.descricao, o.status, e.nome AS equipamento_nome, e.setor
+    FROM os o
+    LEFT JOIN equipamentos e ON e.id = o.equipamento_id
+    WHERE upper(COALESCE(o.status,'')) NOT IN ('CONCLUIDA','CONCLUÍDA','CANCELADA','FECHADA')
+    ORDER BY o.id DESC LIMIT 200
+  `).all();
+}
+
+function buscarHoraExtraEmAndamento(colaboradorId) {
+  if (!tableExists('escala_horas_extras')) return null;
+  return db.prepare("SELECT * FROM escala_horas_extras WHERE colaborador_id=? AND status='EM_ANDAMENTO' LIMIT 1").get(colaboradorId);
+}
+
+function getHoraExtra(id) { return db.prepare('SELECT * FROM escala_horas_extras WHERE id=?').get(id); }
+function filePath(file) { return file ? `/uploads/escala-horas/${file.filename}` : null; }
+
+function iniciarHoraExtra(dados) {
+  const colaboradorId = Number(dados.colaborador_id); if (!colaboradorId) throw new Error('Colaborador obrigatório.');
+  if (buscarHoraExtraEmAndamento(colaboradorId)) throw new Error('Já existe hora extra em andamento para este colaborador.');
+  const descricao = String(dados.descricao_servico||'').trim(); if (!descricao) throw new Error('Descrição do serviço obrigatória.');
+  const osId = Number(dados.os_id || 0) || null; if (!osId && descricao.length < 10) throw new Error('Sem OS vinculada, informe uma justificativa detalhada na descrição.');
+  const os = osId ? db.prepare('SELECT id, equipamento_id FROM os WHERE id=?').get(osId) : null;
+  const now = new Date(); const iso = now.toISOString();
+  const info = db.prepare(`INSERT INTO escala_horas_extras (user_id,colaborador_id,os_id,equipamento_id,data_servico,inicio_extra,descricao_servico,foto_inicio_path,latitude_inicio,longitude_inicio,precisao_inicio,status,criado_em,atualizado_em)
+    VALUES (@user_id,@colaborador_id,@os_id,@equipamento_id,@data_servico,@inicio_extra,@descricao_servico,@foto_inicio_path,@latitude_inicio,@longitude_inicio,@precisao_inicio,'EM_ANDAMENTO',datetime('now'),datetime('now'))`).run({
+    user_id: dados.user_id || null, colaborador_id: colaboradorId, os_id: osId, equipamento_id: os?.equipamento_id || null, data_servico: iso.slice(0,10), inicio_extra: iso, descricao_servico: descricao, foto_inicio_path: dados.foto_inicio_path || null,
+    latitude_inicio: dados.latitude_inicio || null, longitude_inicio: dados.longitude_inicio || null, precisao_inicio: dados.precisao_inicio || null,
+  });
+  return info.lastInsertRowid;
+}
+
+function finalizarHoraExtra(id, dados) {
+  const he = getHoraExtra(id); if (!he) throw new Error('Registro não encontrado.');
+  if (he.status !== 'EM_ANDAMENTO') throw new Error('Somente horas extras em andamento podem ser finalizadas.');
+  const fim = new Date(); const inicio = new Date(he.inicio_extra); const minutos = Math.round((fim - inicio)/60000);
+  if (minutos <= 0) throw new Error('Total de minutos precisa ser maior que zero.');
+  db.prepare(`UPDATE escala_horas_extras SET fim_extra=?, total_minutos=?, foto_fim_path=?, latitude_fim=?, longitude_fim=?, precisao_fim=?, status='PENDENTE_APROVACAO', atualizado_em=datetime('now') WHERE id=?`).run(fim.toISOString(), minutos, dados.foto_fim_path || null, dados.latitude_fim || null, dados.longitude_fim || null, dados.precisao_fim || null, id);
+}
+
+function listarHorasExtrasPendentes() { return listarHorasExtras({ status: 'PENDENTE_APROVACAO' }); }
+function listarHorasExtras(filtros={}) {
+  const params=[]; let where='1=1';
+  if (filtros.status) { where += ' AND he.status=?'; params.push(filtros.status); }
+  if (filtros.colaborador_id) { where += ' AND he.colaborador_id=?'; params.push(filtros.colaborador_id); }
+  if (filtros.os_id) { where += ' AND he.os_id=?'; params.push(filtros.os_id); }
+  if (filtros.inicio) { where += ' AND he.data_servico>=?'; params.push(filtros.inicio); }
+  if (filtros.fim) { where += ' AND he.data_servico<=?'; params.push(filtros.fim); }
+  return db.prepare(`SELECT he.*, c.nome AS colaborador_nome, o.equipamento AS os_equipamento, o.descricao AS os_descricao, e.nome AS equipamento_nome, u.name AS aprovado_por_nome
+    FROM escala_horas_extras he JOIN colaboradores c ON c.id=he.colaborador_id LEFT JOIN os o ON o.id=he.os_id LEFT JOIN equipamentos e ON e.id=he.equipamento_id LEFT JOIN users u ON u.id=he.aprovado_por
+    WHERE ${where} ORDER BY he.data_servico DESC, he.id DESC LIMIT 500`).all(...params);
+}
+
+function aprovarHoraExtra(id, usuarioAprovador, observacao) {
+  if (!canManageBancoHoras(usuarioAprovador)) throw new Error('Perfil sem permissão para aprovar hora extra.');
+  const he = getHoraExtra(id); if (!he) throw new Error('Registro não encontrado.');
+  if (he.status === 'APROVADO') throw new Error('Hora extra já aprovada.');
+  if (he.status !== 'PENDENTE_APROVACAO') throw new Error('Somente registros pendentes podem ser aprovados.');
+  if ((Number(he.total_minutos)||0) <= 0) throw new Error('Total inválido para crédito.');
+  const tx = db.transaction(() => {
+    db.prepare("UPDATE escala_horas_extras SET status='APROVADO', aprovado_por=?, aprovado_em=datetime('now'), observacao_aprovacao=?, atualizado_em=datetime('now') WHERE id=?").run(userIdFrom(usuarioAprovador), String(observacao||'').trim() || null, id);
+    const exists = db.prepare("SELECT id FROM escala_banco_horas_movimentos WHERE hora_extra_id=? AND tipo='CREDITO_HORA_EXTRA'").get(id);
+    if (!exists) db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,hora_extra_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(he.user_id, he.colaborador_id, id, 'CREDITO_HORA_EXTRA', he.total_minutos, `Hora extra aprovada referente à OS ${he.os_id || 'sem OS'}`, userIdFrom(usuarioAprovador));
+  }); tx();
+}
+
+function reprovarHoraExtra(id, usuarioResponsavel, motivo) { if (!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); if (!String(motivo||'').trim()) throw new Error('Motivo da reprovação obrigatório.'); db.prepare("UPDATE escala_horas_extras SET status='REPROVADO', motivo_reprovacao=?, aprovado_por=?, aprovado_em=datetime('now'), atualizado_em=datetime('now') WHERE id=? AND status='PENDENTE_APROVACAO'").run(String(motivo).trim(), userIdFrom(usuarioResponsavel), id); }
+function cancelarHoraExtra(id, usuarioResponsavel, motivo) { if (!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); if (!String(motivo||'').trim()) throw new Error('Motivo do cancelamento obrigatório.'); db.prepare("UPDATE escala_horas_extras SET status='CANCELADO', motivo_cancelamento=?, atualizado_em=datetime('now') WHERE id=? AND status<>'APROVADO'").run(String(motivo).trim(), id); }
+function ajustarHoraExtra(id, dados, usuarioResponsavel) { if (!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); const just=String(dados.justificativa||dados.observacao||'').trim(); if (!just) throw new Error('Justificativa obrigatória.'); const he=getHoraExtra(id); if(!he) throw new Error('Registro não encontrado.'); const inicio=dados.inicio_extra?new Date(dados.inicio_extra):new Date(he.inicio_extra); const fim=dados.fim_extra?new Date(dados.fim_extra):new Date(he.fim_extra||new Date()); const minutos=Math.round((fim-inicio)/60000); if(minutos<=0) throw new Error('Fim não pode ser menor que início.'); db.prepare('UPDATE escala_horas_extras SET inicio_extra=?, fim_extra=?, total_minutos=?, observacao_aprovacao=?, atualizado_em=datetime(\'now\') WHERE id=?').run(inicio.toISOString(), fim.toISOString(), minutos, just, id); if(he.status==='APROVADO'){ const diff=minutos-Number(he.total_minutos||0); if(diff) db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,hora_extra_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(he.user_id, he.colaborador_id, id, diff>0?'AJUSTE_CREDITO':'AJUSTE_DEBITO', Math.abs(diff), `Ajuste de hora extra: ${just}`, userIdFrom(usuarioResponsavel)); } }
+
+function calcularSaldoBancoHoras(colaboradorId) {
+  const rows = db.prepare(`SELECT tipo, SUM(minutos) AS total FROM escala_banco_horas_movimentos WHERE colaborador_id=? GROUP BY tipo`).all(colaboradorId);
+  let creditos=0, debitos=0; rows.forEach(r=>{ if(['CREDITO_HORA_EXTRA','AJUSTE_CREDITO'].includes(r.tipo)) creditos+=Number(r.total||0); else debitos+=Number(r.total||0); });
+  return { creditos, debitos, ...saldoResumo(creditos-debitos) };
+}
+function listarBancoHoras() { return listarColaboradoresManutencao().map(c=>({ ...c, saldo: calcularSaldoBancoHoras(c.id), ultimasHorasExtras: listarHorasExtras({colaborador_id:c.id}).slice(0,3), ultimasFolgas: listarFolgas({colaborador_id:c.id}).slice(0,3) })); }
+function listarMovimentosBancoHoras(colaboradorId) { return db.prepare('SELECT * FROM escala_banco_horas_movimentos WHERE colaborador_id=? ORDER BY data_movimento DESC, id DESC').all(colaboradorId); }
+function listarFolgas(filtros={}) { const params=[]; let where='1=1'; if(filtros.colaborador_id){where+=' AND f.colaborador_id=?'; params.push(filtros.colaborador_id)} return db.prepare(`SELECT f.*, c.nome AS colaborador_nome, u.name AS aprovado_por_nome FROM escala_folgas_programadas f JOIN colaboradores c ON c.id=f.colaborador_id LEFT JOIN users u ON u.id=f.aprovado_por WHERE ${where} ORDER BY f.data_folga DESC, f.id DESC`).all(...params); }
+
+function programarFolgaCompensatoria(dados) { const col=Number(dados.colaborador_id); const minutos=Number(dados.minutos_descontados); const motivo=String(dados.motivo||'').trim(); if(!col||!dados.data_folga||!minutos) throw new Error('Preencha funcionário, data e horas.'); const saldo=calcularSaldoBancoHoras(col).minutos; if(saldo<minutos && !(isAdminUser(dados.usuario)&&motivo)) throw new Error('Saldo insuficiente para programar folga. ADMIN deve informar justificativa.'); const tx=db.transaction(()=>{ const info=db.prepare(`INSERT INTO escala_folgas_programadas (user_id,colaborador_id,data_folga,minutos_descontados,motivo,status,aprovado_por,criado_em,atualizado_em) VALUES (?,?,?,?,?,'PROGRAMADA',?,datetime('now'),datetime('now'))`).run(dados.user_id||null,col,dados.data_folga,minutos,motivo||'Folga compensatória',userIdFrom(dados.usuario)); db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,folga_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(dados.user_id||null,col,info.lastInsertRowid,'DEBITO_FOLGA',minutos,`Folga compensatória programada para ${dados.data_folga}`,userIdFrom(dados.usuario)); if(tableExists('escala_ausencias')) db.prepare(`INSERT INTO escala_ausencias (colaborador_id,tipo,data_inicio,data_fim,motivo,created_at) VALUES (?,'folga',?,?,?,datetime('now'))`).run(col,dados.data_folga,dados.data_folga,'Folga compensatória - Banco de Horas'); return info.lastInsertRowid; }); return tx(); }
+function cancelarFolgaCompensatoria(id, usuarioResponsavel, motivo) { if(!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); if(!String(motivo||'').trim()) throw new Error('Motivo obrigatório.'); const f=db.prepare('SELECT * FROM escala_folgas_programadas WHERE id=?').get(id); if(!f) throw new Error('Folga não encontrada.'); if(f.status==='CANCELADA') throw new Error('Folga já cancelada.'); const tx=db.transaction(()=>{ db.prepare("UPDATE escala_folgas_programadas SET status='CANCELADA', motivo=COALESCE(motivo,'') || ' | Cancelamento: ' || ?, atualizado_em=datetime('now') WHERE id=?").run(String(motivo).trim(),id); db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,folga_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(f.user_id,f.colaborador_id,id,'AJUSTE_CREDITO',f.minutos_descontados,`Estorno de folga cancelada: ${motivo}`,userIdFrom(usuarioResponsavel)); }); tx(); }
+function realizarFolgaCompensatoria(id, usuarioResponsavel) { if(!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); db.prepare("UPDATE escala_folgas_programadas SET status='REALIZADA', atualizado_em=datetime('now') WHERE id=? AND status='PROGRAMADA'").run(id); }
+function gerarDadosRelatorioBancoHoras(filtros={}) { return { filtros, emitidoEm: new Date().toISOString(), banco: listarBancoHoras(), horasExtras: listarHorasExtras(filtros), folgas: listarFolgas(filtros) }; }
+
+Object.assign(module.exports, { MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtras, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });

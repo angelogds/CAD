@@ -376,6 +376,57 @@ function generatePeriodPDF({ start, end, periodoTexto, baseServicos = [], apurac
   return doc;
 }
 
+function fmtMin(min) { const m = Math.abs(Number(min) || 0); return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; }
+
+function gerarPdfBancoHorasGeral(dados = {}) {
+  const doc = createDoc();
+  const meta = { title: "Campo do Gado\nBanco de Horas da Manutenção", subtitle: "Controle Interno de Horas Extras e Folgas Compensatórias", logoPath: logoPath() };
+  process.nextTick(() => {
+    setupPage(doc, meta, false);
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(COLORS.greenDark).text("Relatório Geral do Banco de Horas", PAGE.margins.left, doc.y);
+    doc.moveDown(.4).font("Helvetica").fontSize(9).fillColor(COLORS.muted).text(`Emissão: ${formatDateBr(String(dados.emitidoEm || '').slice(0,10))}`);
+    drawTable(doc, { meta, columns: [
+      {key:'funcionario', label:'Funcionário', width:150}, {key:'creditos', label:'Créditos', width:75, align:'center'}, {key:'debitos', label:'Débitos', width:75, align:'center'}, {key:'saldo', label:'Saldo', width:75, align:'center'}, {key:'dias', label:'Dias', width:55, align:'center'}, {key:'obs', label:'Observações', width:119}
+    ], rows: (dados.banco || []).map(b => ({ funcionario:b.nome, creditos:fmtMin(b.saldo?.creditos), debitos:fmtMin(b.saldo?.debitos), saldo:b.saldo?.horas, dias:String(b.saldo?.diasFolgaDecimal ?? 0), obs:'Controle interno da manutenção' })), emptyRow:{funcionario:'Sem dados',creditos:'-',debitos:'-',saldo:'-',dias:'-',obs:'-'} });
+    doc.moveDown().font("Helvetica").fontSize(8.5).fillColor(COLORS.muted).text("Este relatório é um controle interno da manutenção, utilizado para organização das horas extras, banco de horas e programação de folgas compensatórias da equipe.", PAGE.margins.left, doc.y, { width: 520 });
+    doc.moveDown(2).font("Helvetica").fontSize(9).fillColor(COLORS.text).text("Assinaturas: Encarregado de manutenção __________________  Funcionário __________________  Direção/RH __________________");
+    doc.end();
+  });
+  return doc;
+}
+
+function gerarPdfBancoHorasFuncionario(dados = {}) {
+  const doc = createDoc();
+  const meta = { title: "Banco de Horas da Manutenção", subtitle: "Relatório Individual do Funcionário", logoPath: logoPath() };
+  process.nextTick(() => {
+    setupPage(doc, meta, false);
+    const nome = dados.horasExtras?.[0]?.colaborador_nome || dados.banco?.find(b => String(b.id) === String(dados.filtros?.colaborador_id))?.nome || "Funcionário";
+    doc.font("Helvetica-Bold").fontSize(12).fillColor(COLORS.greenDark).text(nome);
+    drawTable(doc, { meta, columns: [
+      {key:'data',label:'Data',width:62},{key:'hora',label:'Horário',width:110},{key:'total',label:'Total',width:55},{key:'os',label:'OS',width:45},{key:'servico',label:'Serviço executado',width:210},{key:'status',label:'Status',width:67}
+    ], rows: (dados.horasExtras || []).map(h=>({data:formatDateBr(h.data_servico),hora:`${h.inicio_extra || '-'} até ${h.fim_extra || '-'}`,total:fmtMin(h.total_minutos),os:h.os_id || '-',servico:h.descricao_servico,status:h.status})), emptyRow:{data:'-',hora:'-',total:'-',os:'-',servico:'Sem horas extras no período.',status:'-'} });
+    doc.end();
+  });
+  return doc;
+}
+
+function gerarPdfBancoHorasPorOs(dados = {}) {
+  const doc = createDoc();
+  const meta = { title: "Banco de Horas da Manutenção", subtitle: "Relatório por OS", logoPath: logoPath() };
+  process.nextTick(() => {
+    setupPage(doc, meta, false);
+    drawTable(doc, { meta, columns: [
+      {key:'os',label:'OS',width:45},{key:'funcionario',label:'Funcionário',width:125},{key:'data',label:'Data',width:62},{key:'horario',label:'Horário',width:112},{key:'total',label:'Total',width:55},{key:'servico',label:'Serviço',width:150}
+    ], rows: (dados.horasExtras || []).map(h=>({os:h.os_id || '-', funcionario:h.colaborador_nome, data:formatDateBr(h.data_servico), horario:`${h.inicio_extra || '-'} até ${h.fim_extra || '-'}`, total:fmtMin(h.total_minutos), servico:h.descricao_servico})), emptyRow:{os:'-',funcionario:'-',data:'-',horario:'-',total:'-',servico:'Sem horas extras vinculadas.'} });
+    const total = (dados.horasExtras || []).reduce((s,h)=>s+Number(h.total_minutos||0),0);
+    doc.moveDown().font("Helvetica-Bold").fontSize(10).fillColor(COLORS.greenDark).text(`Total geral da OS: ${fmtMin(total)}`);
+    doc.end();
+  });
+  return doc;
+}
+
+function gerarPdfFolgasProgramadas(dados = {}) { return gerarPdfBancoHorasGeral(dados); }
+
 
 module.exports = {
   drawHeader,
@@ -385,4 +436,8 @@ module.exports = {
   formatDateBr,
   generateWeeklyPDF,
   generatePeriodPDF,
+  gerarPdfBancoHorasGeral,
+  gerarPdfBancoHorasFuncionario,
+  gerarPdfBancoHorasPorOs,
+  gerarPdfFolgasProgramadas,
 };

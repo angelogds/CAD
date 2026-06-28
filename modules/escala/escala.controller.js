@@ -50,6 +50,16 @@ function reprocessarPreventivasComNovaEscala() {
 exports.index = (req, res, next) => {
   try {
     res.locals.activeMenu = "escala";
+    const painel = service.listarPainelEscala();
+    return res.render("escala/index", { title: "Escala", painel });
+  } catch (e) {
+    next(e);
+  }
+};
+
+exports.semana = (req, res, next) => {
+  try {
+    res.locals.activeMenu = "escala";
 
     const date = String(req.query?.date || "").slice(0, 10);
     const alvo = date || isoToday();
@@ -60,8 +70,8 @@ exports.index = (req, res, next) => {
     const pdfStart = String(req.query?.start || monthRange.start).slice(0, 10);
     const pdfEnd = String(req.query?.end || monthRange.end).slice(0, 10);
 
-    return res.render("escala/index", {
-      title: "Escala",
+    return res.render("escala/semana", {
+      title: "Escala da Semana",
       alvo,
       semana,
       publicacoes,
@@ -412,3 +422,40 @@ exports.pdfPeriodo = (req, res, next) => {
     next(e);
   }
 };
+
+function currentUser(req) { return req.user || req.session?.user || {}; }
+function uploadPath(req) { return service.filePath(req.file); }
+function redirectBack(req, res, fallback) { return res.redirect(req.get('Referrer') || fallback); }
+function flashError(req, message) { if (req.flash) req.flash('error', message); }
+function flashSuccess(req, message) { if (req.flash) req.flash('success', message); }
+
+exports.horaExtraNova = (req, res, next) => { try {
+  const user = currentUser(req);
+  const colaborador = service.buscarColaboradorDoUsuario(user.id) || service.listarColaboradoresManutencao()[0] || null;
+  const emAndamento = colaborador ? service.buscarHoraExtraEmAndamento(colaborador.id) : null;
+  const historico = colaborador ? service.listarHorasExtras({ colaborador_id: colaborador.id }).slice(0, 10) : [];
+  return res.render('escala/hora-extra-nova', { title: 'Registrar Hora Extra', colaborador, emAndamento, historico, osDisponiveis: service.listarOsDisponiveisParaHoraExtra() });
+} catch(e){ next(e); } };
+
+exports.iniciarHoraExtra = (req, res, next) => { try {
+  const user = currentUser(req); const colaborador = service.buscarColaboradorDoUsuario(user.id) || service.listarColaboradoresManutencao().find(c => c.id === Number(req.body.colaborador_id));
+  service.iniciarHoraExtra({ ...req.body, user_id: user.id, colaborador_id: colaborador?.id || req.body.colaborador_id, foto_inicio_path: uploadPath(req) });
+  flashSuccess(req, 'Hora extra iniciada com sucesso.'); return res.redirect('/escala/hora-extra/nova');
+} catch(e){ flashError(req, e.message); return res.redirect('/escala/hora-extra/nova'); } };
+
+exports.finalizarHoraExtra = (req, res, next) => { try { service.finalizarHoraExtra(Number(req.params.id), { ...req.body, foto_fim_path: uploadPath(req) }); flashSuccess(req, 'Hora extra finalizada e enviada para aprovação.'); return res.redirect('/escala/hora-extra/nova'); } catch(e){ flashError(req, e.message); return res.redirect('/escala/hora-extra/nova'); } };
+exports.horasExtrasPendentes = (req, res, next) => { try { return res.render('escala/hora-extra-pendentes', { title: 'Horas Extras Pendentes', pendentes: service.listarHorasExtrasPendentes() }); } catch(e){ next(e); } };
+exports.aprovarHoraExtra = (req, res) => { try { service.aprovarHoraExtra(Number(req.params.id), currentUser(req), req.body.observacao); flashSuccess(req, 'Hora extra aprovada e creditada no banco.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/hora-extra/pendentes'); };
+exports.reprovarHoraExtra = (req, res) => { try { service.reprovarHoraExtra(Number(req.params.id), currentUser(req), req.body.motivo); flashSuccess(req, 'Hora extra reprovada.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/hora-extra/pendentes'); };
+exports.ajustarHoraExtra = (req, res) => { try { service.ajustarHoraExtra(Number(req.params.id), req.body, currentUser(req)); flashSuccess(req, 'Hora extra ajustada.'); } catch(e){ flashError(req, e.message); } return redirectBack(req, res, '/escala/hora-extra/pendentes'); };
+exports.cancelarHoraExtra = (req, res) => { try { service.cancelarHoraExtra(Number(req.params.id), currentUser(req), req.body.motivo); flashSuccess(req, 'Hora extra cancelada.'); } catch(e){ flashError(req, e.message); } return redirectBack(req, res, '/escala/hora-extra/pendentes'); };
+exports.bancoHoras = (req, res, next) => { try { return res.render('escala/banco-horas', { title: 'Banco de Horas', banco: service.listarBancoHoras(), selecionado: null, movimentos: [], horasExtras: [], folgas: [] }); } catch(e){ next(e); } };
+exports.bancoHorasFuncionario = (req, res, next) => { try { const id=Number(req.params.colaboradorId); const banco=service.listarBancoHoras(); const selecionado=banco.find(c=>c.id===id); return res.render('escala/banco-horas', { title: 'Banco de Horas', banco, selecionado, movimentos: service.listarMovimentosBancoHoras(id), horasExtras: service.listarHorasExtras({colaborador_id:id}), folgas: service.listarFolgas({colaborador_id:id}) }); } catch(e){ next(e); } };
+exports.folgas = (req, res, next) => { try { return res.render('escala/folgas-programadas', { title: 'Programar Folga', colaboradores: service.listarBancoHoras(), folgas: service.listarFolgas() }); } catch(e){ next(e); } };
+exports.programarFolga = (req, res) => { try { service.programarFolgaCompensatoria({ ...req.body, minutos_descontados: Math.round(Number(req.body.horas || 0) * 60) || Number(req.body.minutos_descontados), usuario: currentUser(req), user_id: currentUser(req).id }); flashSuccess(req, 'Folga compensatória programada.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/folgas'); };
+exports.cancelarFolga = (req, res) => { try { service.cancelarFolgaCompensatoria(Number(req.params.id), currentUser(req), req.body.motivo); flashSuccess(req, 'Folga cancelada e saldo estornado.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/folgas'); };
+exports.realizarFolga = (req, res) => { try { service.realizarFolgaCompensatoria(Number(req.params.id), currentUser(req)); flashSuccess(req, 'Folga marcada como realizada.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/folgas'); };
+exports.relatorios = (req, res, next) => { try { return res.render('escala/relatorios', { title: 'Relatórios PDF', colaboradores: service.listarColaboradoresManutencao(), osDisponiveis: service.listarOsDisponiveisParaHoraExtra() }); } catch(e){ next(e); } };
+exports.relatorioPdf = (req, res, next) => { try { const doc = generator.gerarPdfBancoHorasGeral(service.gerarDadosRelatorioBancoHoras(req.query)); res.setHeader('Content-Type','application/pdf'); res.setHeader('Content-Disposition','inline; filename="banco-horas-manutencao.pdf"'); doc.pipe(res); return doc; } catch(e){ next(e); } };
+exports.relatorioFuncionarioPdf = (req, res, next) => { try { const dados = service.gerarDadosRelatorioBancoHoras({ ...req.query, colaborador_id: Number(req.params.colaboradorId) }); const doc = generator.gerarPdfBancoHorasFuncionario(dados); res.setHeader('Content-Type','application/pdf'); res.setHeader('Content-Disposition','inline; filename="banco-horas-funcionario.pdf"'); doc.pipe(res); return doc; } catch(e){ next(e); } };
+exports.relatorioOsPdf = (req, res, next) => { try { const dados = service.gerarDadosRelatorioBancoHoras({ ...req.query, os_id: Number(req.params.osId) }); const doc = generator.gerarPdfBancoHorasPorOs(dados); res.setHeader('Content-Type','application/pdf'); res.setHeader('Content-Disposition','inline; filename="banco-horas-os.pdf"'); doc.pipe(res); return doc; } catch(e){ next(e); } };
