@@ -65,7 +65,7 @@ module.exports = function up({ db, tableExists, columnExists }) {
 
   const seedPairs = [
     ["Diogo", "Emanuel"],
-    ["Salviano", "Luís"],
+    ["Salviano", "Luiz"],
     ["Rodolfo", "Júnior"],
     ["Fábio", "Léo"],
   ];

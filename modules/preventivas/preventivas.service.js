@@ -1922,10 +1922,10 @@ function lancarLoteDiarioPreventivasComoOS({ user = null, refDate = new Date(), 
   const responsaveisConfigurados = resolverResponsaveisConfiguradosPreventiva({ exigirDisponiveis: true });
   const cfgPreventiva = getConfiguracaoResponsaveisPreventiva();
   const mecanico1Colab = cfgPreventiva?.mecanico_1 || findColaboradorByNome("Júnior");
-  const mecanico2Colab = cfgPreventiva?.mecanico_2 || findColaboradorByNome("Luís");
+  const mecanico2Colab = cfgPreventiva?.mecanico_2 || findColaboradorByNome("Luiz");
   const mecanico1UserId = responsaveisConfigurados?.responsavel_1_id || Number(mecanico1Colab?.user_id || findUserIdByName(mecanico1Colab?.nome || "Júnior") || 0) || null;
-  const mecanico2UserId = responsaveisConfigurados?.responsavel_2_id || Number(mecanico2Colab?.user_id || findUserIdByName(mecanico2Colab?.nome || "Luís") || 0) || null;
-  const responsavelTexto = responsaveisConfigurados?.responsavelTexto || [mecanico1Colab?.nome || "Júnior", mecanico2Colab?.nome || "Luís"].filter(Boolean).join(", ");
+  const mecanico2UserId = responsaveisConfigurados?.responsavel_2_id || Number(mecanico2Colab?.user_id || findUserIdByName(mecanico2Colab?.nome || "Luiz") || 0) || null;
+  const responsavelTexto = responsaveisConfigurados?.responsavelTexto || [mecanico1Colab?.nome || "Júnior", mecanico2Colab?.nome || "Luiz"].filter(Boolean).join(", ");
   const execCols = getPreventivaExecColumns();
   const hasResp1 = execCols.includes("responsavel_1_id");
   const hasResp2 = execCols.includes("responsavel_2_id");
@@ -2008,7 +2008,7 @@ function lancarLoteDiarioPreventivasComoOS({ user = null, refDate = new Date(), 
     faixa: primeiroId && ultimoId ? `#${primeiroId} até #${ultimoId}` : null,
     cursorAnterior: cursorAtual || null,
     preventivasSelecionadas: rows.length,
-    equipePadrao: { mecanico_1: mecanico1Colab?.nome || "Júnior", mecanico_2: mecanico2Colab?.nome || "Luís", descricao: "Júnior e Luís — Mecânicos Industriais" },
+    equipePadrao: { mecanico_1: mecanico1Colab?.nome || "Júnior", mecanico_2: mecanico2Colab?.nome || "Luiz", descricao: "Júnior e Luiz — Mecânicos Industriais" },
     ...resultado,
   };
   registrarLogPreventiva({

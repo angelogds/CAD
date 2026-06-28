@@ -357,6 +357,7 @@ test('reprocesso redistribui responsáveis com variação de nomes para criticid
   const emanuel = addColaborador({ nome: 'Emanuel', funcao: 'apoio', tipo_turno: 'apoio' });
   const salviano = addColaborador({ nome: 'Salviano', funcao: 'mecanico', tipo_turno: 'diurno' });
   const junior = addColaborador({ nome: 'Junior', funcao: 'apoio', tipo_turno: 'apoio' });
+  const luiz = addColaborador({ nome: 'Luiz', funcao: 'mecanico', tipo_turno: 'diurno' });
   addColaborador({ nome: 'Rodolfo', funcao: 'mecanico', tipo_turno: 'plantao' });
 
   const eqId = Number(db.prepare(`INSERT INTO equipamentos (nome, tipo, criticidade, ativo) VALUES ('Linha de Bombas', 'bomba', 'ALTA', 1)`).run().lastInsertRowid);
@@ -375,7 +376,7 @@ test('reprocesso redistribui responsáveis com variação de nomes para criticid
   const pares = rows.map((r) => [Number(r.responsavel_1_id || 0), Number(r.responsavel_2_id || 0)].sort((a, b) => a - b).join('-'));
   assert.ok(new Set(pares).size >= 2, 'deve variar pares atribuídos e evitar repetição fixa');
 
-  const idsEscala = new Set([diogo.userId, emanuel.userId, salviano.userId, junior.userId]);
+  const idsEscala = new Set([diogo.userId, emanuel.userId, salviano.userId, junior.userId, luiz.userId]);
   rows.forEach((r) => {
     assert.ok(idsEscala.has(Number(r.responsavel_1_id || 0)));
     assert.ok(idsEscala.has(Number(r.responsavel_2_id || 0)));

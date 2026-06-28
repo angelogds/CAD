@@ -19,7 +19,7 @@ module.exports = function up({ db, tableExists, columnExists }) {
     `).run();
 
     if (columnExists("colaboradores", "nome")) {
-      const nomes = ["Diogo", "Salviano", "Rodolfo", "Emanuel", "Luiz", "Luis", "Luís", "Júnior", "Junior"];
+      const nomes = ["Diogo", "Salviano", "Rodolfo", "Emanuel", "Luiz", "Luiz", "Luiz", "Júnior", "Junior"];
       const placeholders = nomes.map(() => "lower(?)").join(",");
       db.prepare(`
         UPDATE colaboradores

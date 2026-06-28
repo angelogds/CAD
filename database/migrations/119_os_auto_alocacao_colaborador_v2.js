@@ -57,7 +57,7 @@ module.exports = function up({ db, tableExists, columnExists, addColumnIfMissing
 
   const pairs = [
     ["Diogo", "Emanuel", 1],
-    ["Salviano", "Luís", 2],
+    ["Salviano", "Luiz", 2],
     ["Rodolfo", "Júnior", 3],
     ["Fábio", "Léo", 4],
   ];
