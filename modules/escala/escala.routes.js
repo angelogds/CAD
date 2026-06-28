@@ -20,6 +20,7 @@ const safe = (fn, name) =>
 router.get("/", requireLogin, requireRole(ACCESS.escala), safe(controller.index, "index"));
 router.get("/completa", requireLogin, requireRole(ACCESS.escala), safe(controller.completa, "completa"));
 router.get("/ausencias", requireLogin, requireRole(ACCESS.escala), safe(controller.ausencias, "ausencias"));
+router.get("/hora-extra/nova", requireLogin, requireRole(ACCESS.escala), safe(controller.novaHoraExtra, "novaHoraExtra"));
 router.post("/adicionar", requireLogin, requireRole(ACCESS.escala), safe(controller.adicionarRapido, "adicionarRapido"));
 router.post("/ausencia", requireLogin, requireRole(ACCESS.escala), safe(controller.lancarAusencia, "lancarAusencia"));
 router.post("/ausencia/:id/update", requireLogin, requireRole(ACCESS.escala), safe(controller.atualizarAusencia, "atualizarAusencia"));

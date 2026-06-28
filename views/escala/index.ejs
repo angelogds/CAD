@@ -219,6 +219,29 @@
         <div class="label">DESCRIÇÃO DOS SERVIÇOS EXECUTADOS</div>
         <input class="input" name="descricaoServico" placeholder="Ex.: troca de rolamento, alinhamento e teste final">
       </div>
+      <div style="width:100%;border:1px solid #bfdbfe;background:#eff6ff;border-radius:12px;padding:12px;">
+        <strong>Geolocalização de apoio da manutenção</strong>
+        <p style="margin:6px 0 10px;color:#1e40af;">Esta localização será usada apenas como apoio ao controle interno da manutenção, para vincular a hora extra ao serviço executado.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+          <button class="btn btn-secondary" type="button" id="btn-geo-inicio">Iniciar Hora Extra / Capturar localização</button>
+          <button class="btn btn-secondary" type="button" id="btn-geo-fim">Finalizar Hora Extra / Capturar localização</button>
+          <span id="geo-status" style="font-weight:600;color:#1f2937;">Status da localização: não capturada.</span>
+        </div>
+        <div id="geo-precisao" style="margin-top:8px;color:#374151;">Precisão: -</div>
+        <div id="geo-msg" style="margin-top:6px;color:#92400e;"></div>
+        <div style="margin-top:10px;min-width:260px;">
+          <div class="label">JUSTIFICATIVA SE A LOCALIZAÇÃO NÃO FOR CAPTURADA OU ESTIVER FORA DA ÁREA</div>
+          <input class="input" id="geo-justificativa" name="justificativaSemLocalizacao" placeholder="Ex.: sinal de GPS indisponível no setor da caldeira">
+        </div>
+        <input type="hidden" name="latitudeInicio" id="geo-lat-inicio">
+        <input type="hidden" name="longitudeInicio" id="geo-lon-inicio">
+        <input type="hidden" name="precisaoInicio" id="geo-prec-inicio">
+        <input type="hidden" name="statusLocalizacaoInicio" id="geo-status-inicio" value="NAO_CAPTURADA">
+        <input type="hidden" name="latitudeFim" id="geo-lat-fim">
+        <input type="hidden" name="longitudeFim" id="geo-lon-fim">
+        <input type="hidden" name="precisaoFim" id="geo-prec-fim">
+        <input type="hidden" name="statusLocalizacaoFim" id="geo-status-fim" value="NAO_CAPTURADA">
+      </div>
     </div>
 
     <button class="btn btn-primary" type="submit">Lançar</button>
@@ -244,6 +267,43 @@
       motivoEl.required = tipo === 'ATESTADO';
     }
 
+    function setGeoStatus(kind, status, position) {
+      const suffix = kind === 'inicio' ? 'inicio' : 'fim';
+      document.getElementById(`geo-status-${suffix}`).value = status;
+      if (position && position.coords) {
+        document.getElementById(`geo-lat-${suffix}`).value = position.coords.latitude;
+        document.getElementById(`geo-lon-${suffix}`).value = position.coords.longitude;
+        document.getElementById(`geo-prec-${suffix}`).value = Math.round(position.coords.accuracy || 0);
+        document.getElementById('geo-precisao').textContent = `Precisão ${kind}: ${Math.round(position.coords.accuracy || 0)} m`;
+      }
+      document.getElementById('geo-status').textContent = `Status da localização (${kind}): ${status}`;
+      const justificativa = document.getElementById('geo-justificativa');
+      justificativa.required = ['NAO_AUTORIZADA', 'GPS_INDISPONIVEL', 'NAO_CAPTURADA', 'FORA_DA_AREA'].includes(status);
+    }
+
+    function capturarLocalizacao(kind) {
+      const msg = document.getElementById('geo-msg');
+      msg.textContent = '';
+      if (!navigator.geolocation) {
+        msg.textContent = 'GPS indisponível neste navegador. Informe uma justificativa para análise do encarregado.';
+        setGeoStatus(kind, 'GPS_INDISPONIVEL');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => setGeoStatus(kind, 'NAO_CAPTURADA', position),
+        (error) => {
+          const status = error && error.code === error.PERMISSION_DENIED ? 'NAO_AUTORIZADA' : 'GPS_INDISPONIVEL';
+          msg.textContent = status === 'NAO_AUTORIZADA'
+            ? 'Permissão de localização negada. O lançamento continuará pendente de justificativa/análise.'
+            : 'GPS indisponível ou sem sinal. O lançamento continuará pendente de justificativa/análise.';
+          setGeoStatus(kind, status);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    document.getElementById('btn-geo-inicio')?.addEventListener('click', () => capturarLocalizacao('inicio'));
+    document.getElementById('btn-geo-fim')?.addEventListener('click', () => capturarLocalizacao('fim'));
     tipoEl.addEventListener('change', syncFields);
     syncFields();
   })();
