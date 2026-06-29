@@ -40,7 +40,7 @@ function requireRole(roles) {
     if (allowed.includes(role)) return next();
 
     req.flash("error", "Sem permissão para acessar esta área.");
-    if (req.accepts("html")) return res.status(403).render("errors/403", { layout: "layout", title: "Sem permissão" });
+    if (req.accepts("html")) return res.status(403).render("errors/403", { layout: "layout", title: "Sem permissão", message: "Sem permissão para acessar esta área." });
     return res.status(403).json({ error: "Sem permissão" });
   };
 }
