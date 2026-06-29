@@ -30,82 +30,17 @@
 <div class="card ausencias-actions" style="margin-top:14px;">
   <h3 style="margin:0 0 10px;">Registros de folga, atestado e férias</h3>
 
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Colaborador</th>
-        <th>Tipo</th>
-        <th>Início</th>
-        <th>Fim</th>
-        <th>Motivo</th>
-        <th>Situação em <%= alvo %></th>
-        <th style="width:460px;">Ações</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% if (!ausencias || ausencias.length === 0) { %>
-        <tr><td colspan="7" style="text-align:center;color:#64748b;">Nenhum registro encontrado.</td></tr>
-      <% } %>
-
-      <% (ausencias || []).forEach(item => { %>
-        <tr>
-          <td><strong><%= item.nome %></strong><br><small><%= item.funcaoLabel %></small></td>
-          <td><%= item.tipo %></td>
-          <td><%= item.inicio %></td>
-          <td><%= item.fim %></td>
-          <td><%= item.motivo || '-' %></td>
-          <td>
-            <% if (item.ativoNoDia) { %>
-              <span class="badge badge-success">Ativo</span>
-            <% } else { %>
-              <span class="badge">Inativo</span>
-            <% } %>
-          </td>
-          <td>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
-              <button
-                class="btn btn-sm btn-primary"
-                type="button"
-                data-edit-ausencia="<%= item.id %>"
-                aria-expanded="false"
-                aria-controls="ausencia-edit-<%= item.id %>"
-              >Editar</button>
-              <form
-                method="POST"
-                action="/escala/ausencia/<%= item.id %>/delete"
-                onsubmit="return confirm('Apagar este registro de folga/atestado/férias? Esta ação também remove o item do PDF.');"
-                style="display:inline;"
-              >
-                <input type="hidden" name="date" value="<%= alvo %>">
-                <button class="btn btn-sm btn-danger" type="submit">Apagar</button>
-              </form>
-            </div>
-
-            <form
-              id="ausencia-edit-<%= item.id %>"
-              method="POST"
-              action="/escala/ausencia/<%= item.id %>/update"
-              data-edit-form="<%= item.id %>"
-              style="display:none;gap:8px;align-items:center;flex-wrap:wrap;"
-            >
-              <input type="hidden" name="date" value="<%= alvo %>">
-              <select class="input" name="tipo" style="width:145px;" required>
-                <option value="FOLGA" <%= item.tipo === 'FOLGA' ? 'selected' : '' %>>Folga</option>
-                <option value="FOLGA_MEIO_PERIODO" <%= item.tipo === 'FOLGA_MEIO_PERIODO' ? 'selected' : '' %>>Folga meio período</option>
-                <option value="ATESTADO" <%= item.tipo === 'ATESTADO' ? 'selected' : '' %>>Atestado</option>
-                <option value="FERIAS" <%= item.tipo === 'FERIAS' ? 'selected' : '' %>>Férias</option>
-              </select>
-              <input class="input" type="date" name="inicio" value="<%= item.inicio %>" required>
-              <input class="input" type="date" name="fim" value="<%= item.fim %>" required>
-              <input class="input" name="motivo" value="<%= item.motivo || '' %>" placeholder="Motivo" style="min-width:140px;">
-              <button class="btn btn-sm btn-primary" type="submit">Salvar</button>
-              <button class="btn btn-sm" type="button" data-cancel-edit="<%= item.id %>">Cancelar</button>
-            </form>
-          </td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+  <div class="escala-card-grid">
+    <% if (!ausencias || ausencias.length === 0) { %><div class="escala-empty" style="grid-column:1/-1;">Nenhum registro encontrado.</div><% } %>
+    <% (ausencias || []).forEach(item => { const tipoUp = String(item.tipo || '').replace(/_/g,' '); const tipoClass = tipoUp.includes('ATEST') ? 'is-warning' : (tipoUp.includes('FÉRI') || tipoUp.includes('FERI') ? 'is-info' : 'is-success'); %>
+      <article class="card-padrao-escala">
+        <div class="card-padrao-header"><div class="card-padrao-person"><span class="card-padrao-avatar"><%= String(item.nome || 'M').charAt(0).toUpperCase() %></span><div><h3 class="card-padrao-title"><%= item.nome %></h3><div class="card-padrao-subtitle"><%= item.funcaoLabel %></div></div></div><span class="card-padrao-badge <%= tipoClass %>"><%= tipoUp %></span></div>
+        <div class="card-padrao-body"><div class="card-padrao-row"><span class="label-text">Função</span><span class="value-text"><%= item.funcaoLabel %></span></div><div class="card-padrao-row"><span class="label-text">Início</span><span class="value-text"><%= item.inicio %></span></div><div class="card-padrao-row"><span class="label-text">Fim</span><span class="value-text"><%= item.fim %></span></div><div class="card-padrao-row"><span class="label-text">Motivo</span><span class="value-text"><%= item.motivo || '-' %></span></div><div class="card-padrao-row"><span class="label-text">Situação</span><span class="value-text"><span class="card-padrao-badge <%= item.ativoNoDia ? 'is-success' : 'is-muted' %>"><%= item.ativoNoDia ? 'Ativo' : 'Inativo' %></span></span></div></div>
+        <div class="card-padrao-footer"><button class="btn btn-sm btn-primary" type="button" data-edit-ausencia="<%= item.id %>" aria-expanded="false" aria-controls="ausencia-edit-<%= item.id %>">Editar</button><form method="POST" action="/escala/ausencia/<%= item.id %>/delete" onsubmit="return confirm('Apagar este registro de folga/atestado/férias? Esta ação também remove o item do PDF.');" style="margin:0;flex:1 1 auto;"><input type="hidden" name="date" value="<%= alvo %>"><button class="btn btn-sm btn-danger" type="submit">Apagar</button></form></div>
+        <form id="ausencia-edit-<%= item.id %>" method="POST" action="/escala/ausencia/<%= item.id %>/update" data-edit-form="<%= item.id %>" style="display:none;gap:8px;align-items:center;flex-wrap:wrap;"><input type="hidden" name="date" value="<%= alvo %>"><select class="input" name="tipo" style="width:145px;" required><option value="FOLGA" <%= item.tipo === 'FOLGA' ? 'selected' : '' %>>Folga</option><option value="FOLGA_MEIO_PERIODO" <%= item.tipo === 'FOLGA_MEIO_PERIODO' ? 'selected' : '' %>>Folga meio período</option><option value="ATESTADO" <%= item.tipo === 'ATESTADO' ? 'selected' : '' %>>Atestado</option><option value="FERIAS" <%= item.tipo === 'FERIAS' ? 'selected' : '' %>>Férias</option></select><input class="input" type="date" name="inicio" value="<%= item.inicio %>" required><input class="input" type="date" name="fim" value="<%= item.fim %>" required><input class="input" name="motivo" value="<%= item.motivo || '' %>" placeholder="Motivo" style="min-width:140px;"><button class="btn btn-sm btn-primary" type="submit">Salvar</button><button class="btn btn-sm" type="button" data-cancel-edit="<%= item.id %>">Cancelar</button></form>
+      </article>
+    <% }) %>
+  </div>
 </div>
 
 <script>

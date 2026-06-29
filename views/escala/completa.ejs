@@ -1,4 +1,18 @@
 <%- layout('layout') -%>
-<h1>Escala Completa</h1><p style="color:#64748b;font-weight:700;">Visualizar, editar e recalcular a escala antes da impressão.</p>
+<div class="page-head"><div><h1>Escala Completa</h1><p style="color:#64748b;font-weight:700;">Visualizar, editar e recalcular a escala antes da impressão.</p></div><a class="btn" href="/escala">Voltar</a></div>
 <% if (canManageEscala) { %><div class="card" style="margin-top:12px;"><h3>Editar Escala Completa</h3><form method="POST" action="/escala/completa/recalcular" onsubmit="return confirm('Essa ação irá redistribuir os colaboradores nas próximas semanas conforme a quantidade selecionada. Deseja continuar?');" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><div><div class="label">Quantidade de colaboradores por semana</div><select class="input" name="quantidade"><option value="2">2 colaboradores</option><option value="3" selected>3 colaboradores</option><option value="4">4 colaboradores</option><option value="5">5 colaboradores</option></select></div><button class="btn btn-green">Recalcular Escala</button></form><p class="muted">Após recalcular, use Editar nas semanas para corrigir turno, função e remover/adicionar colaborador manualmente.</p></div><% } %>
-<div class="card" style="margin-top:12px;"><table class="table"><thead><tr><th>Semana</th><th>Período</th><th>Mecânico Plantonista Noturno</th><th>Mecânicos do Turno Diurno</th><th>Observações</th><% if (canManageEscala) { %><th>Ações</th><% } %></tr></thead><tbody><% semanas.forEach(s => { %><tr><td>#<%= s.semana_numero %></td><td><%= s.data_inicio %> → <%= s.data_fim %></td><td><%= (s.times.noturno || []).join(', ') %></td><td><%= (s.times.diurno || []).join(', ') %></td><td>Todos como Mecânico Industrial</td><% if (canManageEscala) { %><td><a class="btn btn-sm" href="/escala/editar/<%= s.id %>">Editar</a></td><% } %></tr><% }) %></tbody></table></div><div style="margin-top:12px;"><a class="btn" href="/escala">Voltar</a></div>
+<div class="escala-card-grid" style="margin-top:12px;">
+  <% if (!semanas || semanas.length === 0) { %><div class="escala-empty" style="grid-column:1/-1;">Nenhuma semana encontrada.</div><% } %>
+  <% (semanas || []).forEach(s => { %>
+    <article class="card-padrao-escala">
+      <div class="card-padrao-header"><div><h3 class="card-padrao-title">Semana #<%= s.semana_numero %></h3><div class="card-padrao-subtitle"><%= s.data_inicio %> → <%= s.data_fim %></div></div><span class="card-padrao-badge is-info">Escala Completa</span></div>
+      <div class="card-padrao-body">
+        <div class="card-padrao-row"><span class="label-text">Período</span><span class="value-text"><%= s.data_inicio %> → <%= s.data_fim %></span></div>
+        <div class="card-padrao-row"><span class="label-text">Plantonista noturno</span><span class="value-text"><%= (s.times.noturno || []).join(', ') || '-' %></span></div>
+        <div class="card-padrao-row"><span class="label-text">Turno diurno</span><span class="value-text"><%= (s.times.diurno || []).join(', ') || '-' %></span></div>
+        <div class="card-padrao-row"><span class="label-text">Observação</span><span class="value-text">Todos como Mecânico Industrial</span></div>
+      </div>
+      <% if (canManageEscala) { %><div class="card-padrao-footer"><a class="btn btn-sm btn-green" href="/escala/editar/<%= s.id %>">Editar Semana</a><a class="btn btn-sm" href="/escala/editar/<%= s.id %>">Ajustar Colaboradores</a></div><% } %>
+    </article>
+  <% }) %>
+</div>
