@@ -11,6 +11,61 @@ function tableExists(tableName) {
   }
 }
 
+
+function sqlColumnOrNull(table, candidates, alias, tableAlias = '') {
+  if (!tableExists(table)) return `NULL AS ${alias}`;
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  const found = candidates.find((name) => cols.includes(name));
+  const prefix = tableAlias ? `${tableAlias}.` : '';
+  return found ? `${prefix}${found} AS ${alias}` : `NULL AS ${alias}`;
+}
+
+function normalizarNome(nome) {
+  return String(nome || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function isColaboradorDemo(colaborador = {}) {
+  const nome = normalizarNome(colaborador.nome || colaborador.name || '');
+  return Boolean(
+    nome.includes('demo') ||
+    nome.includes('teste') ||
+    nome.includes('colaborador demo') ||
+    Number(colaborador.is_demo || 0) === 1
+  );
+}
+
+function isColaboradorAtivo(row = {}) {
+  const status = normalizarNome(row.status || 'ativo');
+  if (Number(row.ativo ?? 1) !== 1) return false;
+  if (row.deleted_at) return false;
+  if (row.excluido !== undefined && Number(row.excluido || 0) === 1) return false;
+  if (row.is_active !== undefined && Number(row.is_active ?? 1) !== 1) return false;
+  if (row.visivel !== undefined && Number(row.visivel ?? 1) !== 1) return false;
+  return !['inativo', 'desligado', 'excluido', 'apagado', 'removido'].includes(status);
+}
+
+function colaboradorNomeOficial(row = {}) {
+  const nome = String(row.nome || '').trim();
+  const norm = normalizarNome(nome);
+  if (norm === 'luiz' || norm === 'luis') return 'Luiz';
+  return nome;
+}
+
+function initials(nome) {
+  return String(nome || 'M')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p.charAt(0).toUpperCase())
+    .join('') || 'M';
+}
+
 function getNowSaoPauloParts() {
   const now = getAgoraSaoPauloParts();
   return {
@@ -1059,25 +1114,128 @@ function canReadBancoHoras(user) { return canManageBancoHoras(user) || ['RH','DI
 function minutosToHoras(minutos) { const m = Math.abs(Number(minutos)||0); const sign = Number(minutos)<0 ? '-' : ''; return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; }
 function saldoResumo(minutos) { return { minutos, horas: minutosToHoras(minutos), diasFolga: Math.floor(minutos / MINUTOS_DIA_FOLGA), diasFolgaDecimal: Math.round((minutos / MINUTOS_DIA_FOLGA) * 100) / 100 }; }
 
-function listarPainelEscala({ canViewAll = false, colaboradorId = null } = {}) {
-  const banco = listarBancoHoras({ colaborador_id: canViewAll ? null : colaboradorId });
+function getAusenciaPrioritaria(colaboradorId, inicio, fim, hoje) {
+  if (!tableExists('escala_ausencias')) return null;
+  const rows = db.prepare(`
+    SELECT tipo, data_inicio, data_fim, motivo
+    FROM escala_ausencias
+    WHERE colaborador_id = ?
+      AND NOT (data_fim < ? OR data_inicio > ?)
+    ORDER BY
+      CASE upper(tipo)
+        WHEN 'FERIAS' THEN 1
+        WHEN 'FÉRIAS' THEN 1
+        WHEN 'ATESTADO' THEN 2
+        WHEN 'FOLGA' THEN 3
+        WHEN 'FOLGA_MEIO_PERIODO' THEN 3
+        WHEN 'FALTA' THEN 4
+        ELSE 9
+      END,
+      CASE WHEN ? BETWEEN data_inicio AND data_fim THEN 0 ELSE 1 END
+    LIMIT 1
+  `).all(colaboradorId, inicio, fim, hoje);
+  return rows[0] || null;
+}
+
+function statusAusenciaLabel(ausencia) {
+  const tipo = normalizarNome(ausencia?.tipo || '');
+  if (tipo === 'ferias') return 'Férias';
+  if (tipo === 'atestado') return 'Atestado';
+  if (tipo.includes('folga')) return 'Folga';
+  if (tipo === 'falta') return 'Falta';
+  return ausencia ? 'Ausente' : '';
+}
+
+function listarColaboradoresDaEscalaDaSemana({ dateISO = isoToday(), colaboradorId = null } = {}) {
+  if (!tableExists('escala_semanas') || !tableExists('escala_alocacoes') || !tableExists('colaboradores')) return [];
+
+  const cFoto = sqlColumnOrNull('colaboradores', ['foto_path', 'avatar_path', 'imagem', 'foto_url', 'foto'], 'foto_colaborador', 'c');
+  const uAvatar = sqlColumnOrNull('users', ['avatar', 'foto', 'foto_path', 'avatar_path', 'imagem'], 'foto_usuario', 'u');
+  const cCols = db.prepare('PRAGMA table_info(colaboradores)').all().map((c) => c.name);
+  const uCols = tableExists('users') ? db.prepare('PRAGMA table_info(users)').all().map((c) => c.name) : [];
+  const joinUser = cCols.includes('user_id') && tableExists('users') ? 'LEFT JOIN users u ON u.id = c.user_id' : 'LEFT JOIN (SELECT NULL AS id) u ON 1=0';
+  const userAtivoWhere = uCols.includes('ativo') ? 'AND IFNULL(u.ativo, 1) = 1' : '';
+  const whereOwn = colaboradorId ? 'AND c.id = ?' : '';
+  const params = colaboradorId ? [dateISO, colaboradorId] : [dateISO];
+
+  return db.prepare(`
+    SELECT a.id AS alocacao_id,
+           a.tipo_turno,
+           a.observacao AS escala_observacao,
+           s.id AS semana_id,
+           s.data_inicio,
+           s.data_fim,
+           c.id,
+           c.nome,
+           c.funcao,
+           ${cCols.includes('ativo') ? 'c.ativo' : '1 AS ativo'},
+           ${cCols.includes('status') ? 'c.status' : "'ATIVO' AS status"},
+           ${cCols.includes('deleted_at') ? 'c.deleted_at' : 'NULL AS deleted_at'},
+           ${cCols.includes('excluido') ? 'c.excluido' : '0 AS excluido'},
+           ${cCols.includes('is_active') ? 'c.is_active' : '1 AS is_active'},
+           ${cCols.includes('visivel') ? 'c.visivel' : '1 AS visivel'},
+           ${cCols.includes('is_demo') ? 'c.is_demo' : '0 AS is_demo'},
+           ${cCols.includes('user_id') ? 'c.user_id' : 'NULL AS user_id'},
+           ${cFoto},
+           ${uAvatar}
+    FROM escala_semanas s
+    JOIN escala_alocacoes a ON a.semana_id = s.id
+    JOIN colaboradores c ON c.id = a.colaborador_id
+    ${joinUser}
+    WHERE ? BETWEEN s.data_inicio AND s.data_fim
+      ${whereOwn}
+      ${userAtivoWhere}
+    ORDER BY c.id ASC, length(COALESCE(c.nome, '')) DESC, a.id ASC
+  `).all(...params);
+}
+
+function deduplicarColaboradoresEscala(rows = []) {
+  const byKey = new Map();
+  for (const row of rows) {
+    if (!isColaboradorAtivo(row) || isColaboradorDemo(row)) continue;
+    const nomeNorm = normalizarNome(row.nome);
+    const key = row.id ? `id:${row.id}` : `nome:${nomeNorm}`;
+    const current = byKey.get(key);
+    const score = (row.id ? 1000 : 0) + (row.semana_id ? 100 : 0) + (isColaboradorAtivo(row) ? 50 : 0) + (row.foto_colaborador || row.foto_usuario ? 20 : 0) + String(row.nome || '').length;
+    if (!current || score > current.__score) byKey.set(key, { ...row, __score: score });
+  }
+  return [...byKey.values()].map(({ __score, ...row }) => row);
+}
+
+function listarPainelEscala({ user = null, canViewAll = false, colaboradorId = null } = {}) {
   const hoje = isoToday();
+  const ownColaboradorId = canViewAll ? null : (colaboradorId || buscarColaboradorDoUsuario(userIdFrom(user))?.id || null);
+  if (!canViewAll && !ownColaboradorId) {
+    return { pendentes: 0, colaboradores: [] };
+  }
+
   const pendentes = tableExists('escala_horas_extras') ? db.prepare("SELECT COUNT(*) AS total FROM escala_horas_extras WHERE status='PENDENTE_APROVACAO'").get().total : 0;
-  const cards = banco.map((c) => {
+  const rows = deduplicarColaboradoresEscala(listarColaboradoresDaEscalaDaSemana({ dateISO: hoje, colaboradorId: ownColaboradorId }));
+
+  const cards = rows.map((c) => {
     const emAndamento = buscarHoraExtraEmAndamento(c.id);
-    const ultima = c.ultimasHorasExtras?.[0];
-    const ausenteHoje = getColaboradorIdsAusentesNoDia(hoje).has(Number(c.id));
+    const ausencia = getAusenciaPrioritaria(c.id, c.data_inicio, c.data_fim, hoje);
+    const saldo = calcularSaldoBancoHoras(c.id);
+    const extras = listarHorasExtras({ colaborador_id: c.id });
+    const horasExtrasMesMinutos = extras.filter((h) => String(h.data_servico || '').slice(0, 7) === hoje.slice(0, 7) && h.status === 'APROVADO').reduce((sum, h) => sum + Number(h.total_minutos || 0), 0);
+    const ultima = extras[0];
+    const statusAusencia = statusAusenciaLabel(ausencia);
     return {
       ...c,
-      foto_path: c.foto_path || null,
-      turnoAtual: getTurnoAtual(),
-      statusAtual: emAndamento ? 'Hora extra em andamento' : (ausenteHoje ? 'Folga / afastamento' : 'Trabalhando'),
+      nome: colaboradorNomeOficial(c),
+      foto_path: c.foto_colaborador || c.foto_usuario || null,
+      iniciais: initials(c.nome),
+      funcaoLabel: funcaoLabel(normalizeFuncao(c.funcao)),
+      saldo,
+      turnoAtual: turnoLabel(c.tipo_turno),
+      statusAtual: emAndamento ? 'Hora extra em andamento' : (statusAusencia || (c.tipo_turno === 'folga' ? 'Folga' : 'Trabalhando')),
       horaExtraEmAndamento: Boolean(emAndamento),
       ultimaHoraExtra: ultima ? `OS ${ultima.os_id || 'sem OS'}${ultima.equipamento_nome ? ' — ' + ultima.equipamento_nome : ''}` : '',
-      horasExtrasMes: minutosToHoras(c.horasExtrasMesMinutos || 0),
+      horasExtrasMes: minutosToHoras(horasExtrasMesMinutos || 0),
+      horasExtrasMesMinutos,
+      ausenciasJustificadas: ausencia ? 1 : 0,
     };
   }).sort((a,b) => {
-    if (b.saldo.minutos !== a.saldo.minutos) return b.saldo.minutos - a.saldo.minutos;
     if (Number(b.horaExtraEmAndamento) !== Number(a.horaExtraEmAndamento)) return Number(b.horaExtraEmAndamento) - Number(a.horaExtraEmAndamento);
     return String(a.nome||'').localeCompare(String(b.nome||''), 'pt-BR');
   });
@@ -1144,6 +1302,7 @@ function finalizarHoraExtra(id, dados) {
 
 function listarHorasExtrasPendentes() { return listarHorasExtras({ status: 'PENDENTE_APROVACAO' }); }
 function listarHorasExtras(filtros={}) {
+  if (!tableExists('escala_horas_extras')) return [];
   const params=[]; let where='1=1';
   if (filtros.status) { where += ' AND he.status=?'; params.push(filtros.status); }
   if (filtros.colaborador_id) { where += ' AND he.colaborador_id=?'; params.push(filtros.colaborador_id); }
@@ -1173,6 +1332,7 @@ function cancelarHoraExtra(id, usuarioResponsavel, motivo) { if (!canManageBanco
 function ajustarHoraExtra(id, dados, usuarioResponsavel) { if (!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); const just=String(dados.justificativa||dados.observacao||'').trim(); if (!just) throw new Error('Justificativa obrigatória.'); const he=getHoraExtra(id); if(!he) throw new Error('Registro não encontrado.'); const inicio=dados.inicio_extra?new Date(dados.inicio_extra):new Date(he.inicio_extra); const fim=dados.fim_extra?new Date(dados.fim_extra):new Date(he.fim_extra||new Date()); const minutos=Math.round((fim-inicio)/60000); if(minutos<=0) throw new Error('Fim não pode ser menor que início.'); db.prepare('UPDATE escala_horas_extras SET inicio_extra=?, fim_extra=?, total_minutos=?, observacao_aprovacao=?, atualizado_em=datetime(\'now\') WHERE id=?').run(inicio.toISOString(), fim.toISOString(), minutos, just, id); if(he.status==='APROVADO'){ const diff=minutos-Number(he.total_minutos||0); if(diff) db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,hora_extra_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(he.user_id, he.colaborador_id, id, diff>0?'AJUSTE_CREDITO':'AJUSTE_DEBITO', Math.abs(diff), `Ajuste de hora extra: ${just}`, userIdFrom(usuarioResponsavel)); } }
 
 function calcularSaldoBancoHoras(colaboradorId) {
+  if (!tableExists('escala_banco_horas_movimentos')) return { creditos: 0, debitos: 0, ...saldoResumo(0) };
   const rows = db.prepare(`SELECT tipo, SUM(minutos) AS total FROM escala_banco_horas_movimentos WHERE colaborador_id=? GROUP BY tipo`).all(colaboradorId);
   let creditos=0, debitos=0; rows.forEach(r=>{ if(['CREDITO_HORA_EXTRA','AJUSTE_CREDITO'].includes(r.tipo)) creditos+=Number(r.total||0); else debitos+=Number(r.total||0); });
   return { creditos, debitos, ...saldoResumo(creditos-debitos) };
@@ -1191,7 +1351,7 @@ function listarBancoHoras(filtros = {}) {
     });
 }
 function listarMovimentosBancoHoras(colaboradorId) { return db.prepare('SELECT * FROM escala_banco_horas_movimentos WHERE colaborador_id=? ORDER BY data_movimento DESC, id DESC').all(colaboradorId); }
-function listarFolgas(filtros={}) { const params=[]; let where='1=1'; if(filtros.colaborador_id){where+=' AND f.colaborador_id=?'; params.push(filtros.colaborador_id)} return db.prepare(`SELECT f.*, c.nome AS colaborador_nome, u.name AS aprovado_por_nome FROM escala_folgas_programadas f JOIN colaboradores c ON c.id=f.colaborador_id LEFT JOIN users u ON u.id=f.aprovado_por WHERE ${where} ORDER BY f.data_folga DESC, f.id DESC`).all(...params); }
+function listarFolgas(filtros={}) { if (!tableExists('escala_folgas_programadas')) return []; const params=[]; let where='1=1'; if(filtros.colaborador_id){where+=' AND f.colaborador_id=?'; params.push(filtros.colaborador_id)} return db.prepare(`SELECT f.*, c.nome AS colaborador_nome, u.name AS aprovado_por_nome FROM escala_folgas_programadas f JOIN colaboradores c ON c.id=f.colaborador_id LEFT JOIN users u ON u.id=f.aprovado_por WHERE ${where} ORDER BY f.data_folga DESC, f.id DESC`).all(...params); }
 
 function programarFolgaCompensatoria(dados) { const col=Number(dados.colaborador_id); const minutos=Number(dados.minutos_descontados); const motivo=String(dados.motivo||'').trim(); if(!col||!dados.data_folga||!minutos) throw new Error('Preencha funcionário, data e horas.'); const saldo=calcularSaldoBancoHoras(col).minutos; if(saldo<minutos && !(isAdminUser(dados.usuario)&&motivo)) throw new Error('Saldo insuficiente para programar folga. ADMIN deve informar justificativa.'); const tx=db.transaction(()=>{ const info=db.prepare(`INSERT INTO escala_folgas_programadas (user_id,colaborador_id,data_folga,minutos_descontados,motivo,status,aprovado_por,criado_em,atualizado_em) VALUES (?,?,?,?,?,'PROGRAMADA',?,datetime('now'),datetime('now'))`).run(dados.user_id||null,col,dados.data_folga,minutos,motivo||'Folga compensatória',userIdFrom(dados.usuario)); db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,folga_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(dados.user_id||null,col,info.lastInsertRowid,'DEBITO_FOLGA',minutos,`Folga compensatória programada para ${dados.data_folga}`,userIdFrom(dados.usuario)); if(tableExists('escala_ausencias')) db.prepare(`INSERT INTO escala_ausencias (colaborador_id,tipo,data_inicio,data_fim,motivo,created_at) VALUES (?,'folga',?,?,?,datetime('now'))`).run(col,dados.data_folga,dados.data_folga,'Folga compensatória - Banco de Horas'); return info.lastInsertRowid; }); return tx(); }
 function cancelarFolgaCompensatoria(id, usuarioResponsavel, motivo) { if(!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); if(!String(motivo||'').trim()) throw new Error('Motivo obrigatório.'); const f=db.prepare('SELECT * FROM escala_folgas_programadas WHERE id=?').get(id); if(!f) throw new Error('Folga não encontrada.'); if(f.status==='CANCELADA') throw new Error('Folga já cancelada.'); const tx=db.transaction(()=>{ db.prepare("UPDATE escala_folgas_programadas SET status='CANCELADA', motivo=COALESCE(motivo,'') || ' | Cancelamento: ' || ?, atualizado_em=datetime('now') WHERE id=?").run(String(motivo).trim(),id); db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,folga_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(f.user_id,f.colaborador_id,id,'AJUSTE_CREDITO',f.minutos_descontados,`Estorno de folga cancelada: ${motivo}`,userIdFrom(usuarioResponsavel)); }); tx(); }

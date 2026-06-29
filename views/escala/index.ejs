@@ -1,6 +1,6 @@
 <%- layout('layout') -%>
 <style>
-.escala-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}.escala-card,.oper-card{display:flex;flex-direction:column;gap:10px;border:1px solid #e2e8f0;border-radius:18px;padding:18px;background:#fff;box-shadow:0 10px 26px rgba(15,23,42,.06);min-height:155px}.escala-card h3,.oper-card h3{margin:0;color:#14532d}.escala-card p{margin:0;color:#64748b;font-weight:700;line-height:1.35}.escala-card .btn{margin-top:auto;justify-content:center}.info-banco{border-left:5px solid #16a34a;background:#f0fdf4;border-radius:16px;padding:16px;color:#14532d;font-weight:800;line-height:1.45}.avatar{width:58px;height:58px;border-radius:999px;object-fit:cover;background:#dcfce7;display:grid;place-items:center;font-weight:900;color:#14532d}.oper-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}.oper-meta{display:grid;gap:6px;color:#334155;font-weight:700}.fab-extra{display:none}@media(max-width:760px){.escala-grid,.oper-grid{grid-template-columns:1fr}.escala-card .btn{min-height:46px}.fab-extra{display:block;position:fixed;right:16px;bottom:16px;z-index:20;border-radius:999px;padding:14px 18px;box-shadow:0 16px 34px rgba(22,163,74,.35)}}
+.escala-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}.escala-card,.oper-card{display:flex;flex-direction:column;gap:10px;border:1px solid #e2e8f0;border-radius:18px;padding:18px;background:#fff;box-shadow:0 10px 26px rgba(15,23,42,.06);min-height:155px}.escala-card h3,.oper-card h3{margin:0;color:#14532d}.escala-card p{margin:0;color:#64748b;font-weight:700;line-height:1.35}.escala-card .btn{margin-top:auto;justify-content:center}.info-banco{border-left:5px solid #16a34a;background:#f0fdf4;border-radius:16px;padding:16px;color:#14532d;font-weight:800;line-height:1.45}.colaborador-avatar,.colaborador-avatar-placeholder{width:58px;height:58px;border-radius:50%;object-fit:cover;flex-shrink:0}.colaborador-avatar-placeholder{display:flex;align-items:center;justify-content:center;background:#dcfce7;color:#166534;font-weight:800}.oper-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}.oper-meta{display:grid;gap:6px;color:#334155;font-weight:700}.fab-extra{display:none}@media(max-width:760px){.escala-grid,.oper-grid{grid-template-columns:1fr}.escala-card .btn{min-height:46px}.fab-extra{display:block;position:fixed;right:16px;bottom:16px;z-index:20;border-radius:999px;padding:14px 18px;box-shadow:0 16px 34px rgba(22,163,74,.35)}}
 </style>
 <div class="page-head"><h1 style="margin:0;">Escala</h1><p style="margin:6px 0 0;color:#64748b;font-weight:800;">Central da escala e do Banco de Horas da Manutenção.</p></div>
 <div class="info-banco" style="margin-top:14px;">Controle interno da manutenção para organizar escala, banco de horas, folga compensatória e hora extra vinculada à OS. Não é ponto eletrônico, ponto RH ou registro oficial de jornada.</div>
@@ -17,13 +17,13 @@
     <% (painel.colaboradores || []).forEach(c => { %>
       <div class="oper-card">
         <div style="display:flex;gap:12px;align-items:center;">
-          <% if (c.foto_path) { %><img class="avatar" src="<%= c.foto_path %>" alt="Foto de <%= c.nome %>"><% } else { %><div class="avatar"><%= String(c.nome||'M').charAt(0).toUpperCase() %></div><% } %>
+          <% if (c.foto_path) { %><img class="colaborador-avatar" src="<%= c.foto_path %>" alt="Foto de <%= c.nome %>"><% } else { %><div class="colaborador-avatar-placeholder"><%= c.iniciais || String(c.nome||'M').charAt(0).toUpperCase() %></div><% } %>
           <div><h3><%= c.nome %></h3><div class="muted"><%= c.funcaoLabel || 'Mecânico Industrial' %></div></div>
         </div>
         <div class="oper-meta">
           <span>Turno atual: <%= c.turnoAtual %></span><span>Status: <%= c.statusAtual %></span><span>Saldo: <%= c.saldo.horas %></span><span>Equiv.: <%= c.saldo.diasFolgaDecimal %> dia(s)</span><span>Extras aprovadas no mês: <%= c.horasExtrasMes %></span><span>Ausências: <%= c.ausenciasJustificadas || 0 %></span><span>Última hora extra: <%= c.ultimaHoraExtra || '-' %></span>
         </div>
-        <% if (canManageEscala) { %><a class="btn btn-sm" href="/escala/banco-horas/<%= c.id %>">Ver detalhes</a><% } %>
+        <% if (canReadEscalaDetails) { %><a class="btn btn-sm" href="/escala/banco-horas/<%= c.id %>">Ver detalhes</a><% } %>
       </div>
     <% }) %>
   </div>
