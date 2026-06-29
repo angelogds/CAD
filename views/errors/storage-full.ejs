@@ -1,0 +1,10 @@
+<% layout('layout') %>
+<section class="container">
+  <div class="card" style="border-left:6px solid #dc2626;">
+    <h1>Armazenamento insuficiente</h1>
+    <p><%= message %></p>
+    <% if (user && String(user.role || '').toUpperCase() === 'ADMIN') { %>
+      <a class="btn btn-primary" href="/admin/armazenamento">Abrir manutenção de armazenamento</a>
+    <% } %>
+  </div>
+</section>
