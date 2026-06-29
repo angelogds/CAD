@@ -8,7 +8,8 @@ const { requireLogin, requireRole, requireAdmin } = require("../auth/auth.middle
 const { ACCESS, ROLE } = require("../../config/rbac");
 const controller = require("./escala.controller");
 
-const uploadDir = path.resolve(process.cwd(), "public/uploads/escala-horas");
+const storagePaths = require("../../config/storage");
+const uploadDir = path.join(storagePaths.UPLOAD_DIR, "escala-horas");
 fs.mkdirSync(uploadDir, { recursive: true });
 const upload = multer({
   storage: multer.diskStorage({

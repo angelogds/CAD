@@ -8,7 +8,7 @@
   <div class="foto-col">
     <div class="card">
       <div class="foto-box">
-        <% if (equip.foto_url) { %><img src="<%= equip.foto_url %>" alt="Foto de <%= equip.nome %>"/><% } else { %><div>Sem foto cadastrada</div><% } %>
+        <% if (equip.foto_url && (typeof attachmentExists !== "function" || attachmentExists(equip.foto_url))) { %><img src="<%= equip.foto_url %>" alt="Foto de <%= equip.nome %>"/><% } else if (equip.foto_url) { %><div class="muted"><%= REMOVED_ATTACHMENT_MESSAGE || "Anexo removido para economia de espaço." %></div><% } else { %><div>Sem foto cadastrada</div><% } %>
       </div>
       <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
         <a href="/equipamentos/<%= equip.id %>/editar" class="btn">Editar ficha</a>

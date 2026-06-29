@@ -5,9 +5,25 @@ const storage = require("../config/storage");
 
 const dbPath = storage.DB_PATH;
 
-// garante pasta existente
+// garante pasta existente e gravável antes de abrir o banco
 const dir = path.dirname(dbPath);
-if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+fs.mkdirSync(dir, { recursive: true });
+try {
+  fs.accessSync(dir, fs.constants.R_OK | fs.constants.W_OK);
+} catch (error) {
+  const msg = `Diretório SQLite sem permissão de leitura/escrita: ${dir}`;
+  console.error(`❌ [db] ${msg}`);
+  throw new Error(`${msg}. Verifique o volume persistente do Railway (/data).`);
+}
+
+function isSqliteIoError(error) {
+  const msg = String(error?.message || error || '').toLowerCase();
+  return error?.code === 'SQLITE_IOERR_SHMSIZE'
+    || error?.code === 'SQLITE_IOERR'
+    || msg.includes('sqlite_ioerr_shmsize')
+    || msg.includes('disk i/o error')
+    || msg.includes('shmsize');
+}
 
 function createNodeSqliteCompat(databasePath) {
   // fallback nativo do Node.js para ambientes sem binário do better-sqlite3
@@ -69,11 +85,43 @@ function createDatabase(databasePath) {
   }
 }
 
-const db = createDatabase(dbPath);
+let db;
+try {
+  db = createDatabase(dbPath);
+} catch (error) {
+  if (isSqliteIoError(error)) {
+    console.error(`❌ [db] Falha de I/O ao abrir SQLite em ${dbPath}: ${error.message || error}`);
+    console.error('❌ [db] O volume persistente pode estar cheio ou sem suporte seguro a WAL/SHM. Libere espaço e execute npm run db:manutencao.');
+  }
+  throw error;
+}
 
-// pragmas base
-db.pragma("journal_mode = WAL");
-db.pragma("foreign_keys = ON");
+function applyPragmas(database) {
+  try {
+    database.pragma('journal_mode = DELETE');
+    database.pragma('synchronous = NORMAL');
+    database.pragma('busy_timeout = 5000');
+    database.pragma('foreign_keys = ON');
+  } catch (error) {
+    if (isSqliteIoError(error)) {
+      console.error(`❌ [db] Erro SQLite I/O/SHM ao aplicar PRAGMA: ${error.message || error}`);
+      try {
+        database.pragma('journal_mode = DELETE');
+        database.pragma('synchronous = NORMAL');
+        database.pragma('busy_timeout = 5000');
+        database.pragma('foreign_keys = ON');
+        console.warn('⚠️ [db] Fallback aplicado com journal_mode=DELETE para evitar arquivos -wal/-shm no Railway Volume.');
+        return;
+      } catch (fallbackError) {
+        throw new Error(`SQLite não abriu com segurança após fallback DELETE: ${fallbackError.message || fallbackError}`);
+      }
+    }
+    throw error;
+  }
+}
+
+// pragmas base seguros para Railway Volume
+applyPragmas(db);
 
 function tableExists(name) {
   const row = db

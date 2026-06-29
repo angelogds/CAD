@@ -1,0 +1,37 @@
+<section class="page-header"><div><h1>Limpeza de volume</h1><p class="muted">Remove somente imagens e vídeos. PDFs, textos e SQLite são preservados.</p></div></section>
+
+<div class="card">
+  <h2>Resumo dos anexos apagáveis</h2>
+  <ul>
+    <li>Total de imagens e vídeos: <strong><%= formatBytes(stats.totalBytes) %></strong></li>
+    <li>Imagens: <strong><%= stats.imageCount %></strong> (<%= formatBytes(stats.imageBytes) %>)</li>
+    <li>Vídeos: <strong><%= stats.videoCount %></strong> (<%= formatBytes(stats.videoBytes) %>)</li>
+    <li>Filtro atual: <strong><%= olderThanDays ? 'mais de ' + olderThanDays + ' dia(s)' : 'sem filtro de idade' %></strong></li>
+  </ul>
+  <p class="muted">Pastas verificadas: <%= stats.dirs.join(', ') %></p>
+</div>
+
+<div class="card">
+  <h2>Simular ou apagar imagens/vídeos</h2>
+  <form method="post" action="/admin/limpeza-volume" class="grid-3">
+    <div><label class="label">Apagar somente arquivos com mais de X dias</label><input class="input" type="number" min="0" name="older_than_days" value="<%= olderThanDays || '' %>" placeholder="Ex.: 30"></div>
+    <div><label class="label">Confirmação textual para apagar</label><input class="input" name="confirm_text" placeholder="APAGAR ANEXOS"></div>
+    <div style="align-self:end;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn" name="action" value="dry-run">Simular limpeza</button>
+      <button class="btn btn-red" name="action" value="confirm" onclick="return confirm('Confirma apagar imagens e vídeos selecionados? PDFs e banco não serão apagados.');">Apagar imagens e vídeos</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Maiores arquivos</h2>
+  <div class="table-wrap"><table class="table"><thead><tr><th>Arquivo</th><th>Tipo</th><th>Tamanho</th><th>Modificado</th></tr></thead><tbody>
+    <% if (!stats.topFiles.length) { %><tr><td colspan="4">Nenhuma imagem ou vídeo encontrado.</td></tr><% } %>
+    <% stats.topFiles.forEach(function(file){ %><tr><td><code><%= file.path %></code></td><td><%= file.kind === 'video' ? 'Vídeo' : 'Imagem' %></td><td><%= formatBytes(file.size) %></td><td><%= file.mtime ? new Date(file.mtime).toLocaleString('pt-BR') : '-' %></td></tr><% }) %>
+  </tbody></table></div>
+</div>
+
+<div class="card">
+  <h2>Últimos logs</h2>
+  <pre style="white-space:pre-wrap;max-height:260px;overflow:auto;"><%= logs || 'Nenhuma limpeza registrada ainda.' %></pre>
+</div>

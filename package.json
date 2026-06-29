@@ -14,7 +14,10 @@
     "generate:vapid": "node scripts/generate-vapid-keys.js",
     "cap:sync": "npx cap sync",
     "cap:android": "npx cap open android",
-    "cap:copy": "npx cap copy"
+    "cap:copy": "npx cap copy",
+    "limpar:anexos": "node scripts/limpar-anexos.js --dry-run",
+    "limpar:anexos:confirmar": "node scripts/limpar-anexos.js --confirm",
+    "db:manutencao": "node scripts/manutencao-db.js"
   },
   "engines": {
     "node": ">=18"
