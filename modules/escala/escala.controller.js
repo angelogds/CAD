@@ -41,6 +41,12 @@ function isValidDateISO(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+
+function userRole(req) { return String(currentUser(req).role || '').toUpperCase(); }
+function canManageEscala(req) { return ['ADMIN','ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO'].includes(userRole(req)); }
+function canViewAllEscala(req) { return canManageEscala(req) || ['RH','DIRETORIA'].includes(userRole(req)); }
+function visibleColaboradorId(req) { return service.buscarColaboradorDoUsuario(currentUser(req).id)?.id || null; }
+
 function reprocessarPreventivasComNovaEscala() {
   if (typeof preventivasService?.reprocessarPreventivasComNovaEscala === "function") {
     preventivasService.reprocessarPreventivasComNovaEscala();
@@ -50,8 +56,8 @@ function reprocessarPreventivasComNovaEscala() {
 exports.index = (req, res, next) => {
   try {
     res.locals.activeMenu = "escala";
-    const painel = service.listarPainelEscala();
-    return res.render("escala/index", { title: "Escala", painel });
+    const painel = service.listarPainelEscala({ user: currentUser(req), canViewAll: canViewAllEscala(req), colaboradorId: visibleColaboradorId(req) });
+    return res.render("escala/index", { title: "Escala", painel, canManageEscala: canManageEscala(req), canViewAllEscala: canViewAllEscala(req) });
   } catch (e) {
     next(e);
   }
@@ -77,6 +83,7 @@ exports.semana = (req, res, next) => {
       publicacoes,
       pdfStart,
       pdfEnd,
+      canManageEscala: canManageEscala(req),
     });
   } catch (e) {
     next(e);
@@ -87,7 +94,7 @@ exports.completa = (req, res, next) => {
   try {
     res.locals.activeMenu = "escala";
     const semanas = service.getEscalaCompletaComTimes();
-    return res.render("escala/completa", { title: "Escala Completa", semanas });
+    return res.render("escala/completa", { title: "Escala Completa", semanas, canManageEscala: canManageEscala(req), colaboradores: service.listarColaboradoresManutencao(), quantidadeSemanal: Number(req.query.quantidade || 3) });
   } catch (e) {
     next(e);
   }
@@ -121,23 +128,23 @@ exports.adicionarRapido = (req, res, next) => {
 
     if (!inicio || !fim) {
       req.flash("error", "Preencha início e fim do período.");
-      return res.redirect(`/escala?date=${dateRef}`);
+      return res.redirect(`/escala/semana?date=${dateRef}`);
     }
     if (fim < inicio) {
       req.flash("error", "Data final não pode ser menor que data inicial.");
-      return res.redirect(`/escala?date=${inicio}`);
+      return res.redirect(`/escala/semana?date=${inicio}`);
     }
     if (!nome) {
       req.flash("error", "Informe o nome do colaborador.");
-      return res.redirect(`/escala?date=${inicio}`);
+      return res.redirect(`/escala/semana?date=${inicio}`);
     }
     if (!turno) {
       req.flash("error", "Turno inválido. Use Dia, Noite ou Plantão.");
-      return res.redirect(`/escala?date=${inicio}`);
+      return res.redirect(`/escala/semana?date=${inicio}`);
     }
     if (!funcao) {
       req.flash("error", "Função inválida. Use Mecânico Industrial.");
-      return res.redirect(`/escala?date=${inicio}`);
+      return res.redirect(`/escala/semana?date=${inicio}`);
     }
 
     const resultado = service.adicionarRapidoPeriodo({
@@ -155,7 +162,7 @@ exports.adicionarRapido = (req, res, next) => {
     }
 
     req.flash("success", msg);
-    return res.redirect(`/escala?date=${inicio}`);
+    return res.redirect(`/escala/semana?date=${inicio}`);
   } catch (e) {
     next(e);
   }
@@ -178,29 +185,29 @@ exports.lancarAusencia = (req, res, next) => {
 
     if (!nome || !inicio || !fim || !tipo) {
       req.flash("error", "Preencha: Colaborador, Tipo, Início e Fim.");
-      return res.redirect(`/escala?date=${date}`);
+      return res.redirect(`/escala/semana?date=${date}`);
     }
 
     if (inicio > fim) {
       req.flash("error", "Data início não pode ser maior que data fim.");
-      return res.redirect(`/escala?date=${date}`);
+      return res.redirect(`/escala/semana?date=${date}`);
     }
 
     if (!["FOLGA", "FOLGA_MEIO_PERIODO", "ATESTADO", "FERIAS"].includes(tipo)) {
       req.flash("error", "Tipo inválido (use Folga, Folga meio período, Férias ou Atestado).");
-      return res.redirect(`/escala?date=${date}`);
+      return res.redirect(`/escala/semana?date=${date}`);
     }
 
     if (tipo === "ATESTADO" && !motivo) {
       req.flash("error", "Motivo é obrigatório para atestado.");
-      return res.redirect(`/escala?date=${date}`);
+      return res.redirect(`/escala/semana?date=${date}`);
     }
 
     if (tipo === "FOLGA") {
       const hasAnyCompField = dataServico || horaInicio || horaFim || equipamento || descricaoServico;
       if (hasAnyCompField && (!dataServico || !horaInicio || !horaFim || !equipamento || !descricaoServico)) {
         req.flash("error", "Para folga por compensação, preencha todos os campos do serviço prestado.");
-        return res.redirect(`/escala?date=${date}`);
+        return res.redirect(`/escala/semana?date=${date}`);
       }
     }
 
@@ -220,7 +227,7 @@ exports.lancarAusencia = (req, res, next) => {
     reprocessarPreventivasComNovaEscala();
 
     req.flash("success", "Concessão lançada com sucesso.");
-    return res.redirect(`/escala?date=${date}`);
+    return res.redirect(`/escala/semana?date=${date}`);
   } catch (e) {
     next(e);
   }
@@ -278,18 +285,18 @@ exports.removerAlocacao = (req, res, next) => {
 
     if (!alocacaoId) {
       req.flash("error", "Alocação inválida para exclusão.");
-      return res.redirect(`/escala?date=${date}`);
+      return res.redirect(`/escala/semana?date=${date}`);
     }
 
     const ok = service.removerAlocacao(alocacaoId);
     if (!ok) {
       req.flash("error", "Registro não encontrado para exclusão.");
-      return res.redirect(`/escala?date=${date}`);
+      return res.redirect(`/escala/semana?date=${date}`);
     }
     reprocessarPreventivasComNovaEscala();
 
     req.flash("success", "Registro removido com sucesso.");
-    return res.redirect(`/escala?date=${date}`);
+    return res.redirect(`/escala/semana?date=${date}`);
   } catch (e) {
     next(e);
   }
@@ -449,8 +456,8 @@ exports.aprovarHoraExtra = (req, res) => { try { service.aprovarHoraExtra(Number
 exports.reprovarHoraExtra = (req, res) => { try { service.reprovarHoraExtra(Number(req.params.id), currentUser(req), req.body.motivo); flashSuccess(req, 'Hora extra reprovada.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/hora-extra/pendentes'); };
 exports.ajustarHoraExtra = (req, res) => { try { service.ajustarHoraExtra(Number(req.params.id), req.body, currentUser(req)); flashSuccess(req, 'Hora extra ajustada.'); } catch(e){ flashError(req, e.message); } return redirectBack(req, res, '/escala/hora-extra/pendentes'); };
 exports.cancelarHoraExtra = (req, res) => { try { service.cancelarHoraExtra(Number(req.params.id), currentUser(req), req.body.motivo); flashSuccess(req, 'Hora extra cancelada.'); } catch(e){ flashError(req, e.message); } return redirectBack(req, res, '/escala/hora-extra/pendentes'); };
-exports.bancoHoras = (req, res, next) => { try { return res.render('escala/banco-horas', { title: 'Banco de Horas', banco: service.listarBancoHoras(), selecionado: null, movimentos: [], horasExtras: [], folgas: [] }); } catch(e){ next(e); } };
-exports.bancoHorasFuncionario = (req, res, next) => { try { const id=Number(req.params.colaboradorId); const banco=service.listarBancoHoras(); const selecionado=banco.find(c=>c.id===id); return res.render('escala/banco-horas', { title: 'Banco de Horas', banco, selecionado, movimentos: service.listarMovimentosBancoHoras(id), horasExtras: service.listarHorasExtras({colaborador_id:id}), folgas: service.listarFolgas({colaborador_id:id}) }); } catch(e){ next(e); } };
+exports.bancoHoras = (req, res, next) => { try { const user=currentUser(req); const own=service.buscarColaboradorDoUsuario(user.id); const all=canViewAllEscala(req); const banco=service.listarBancoHoras({ colaborador_id: all ? null : own?.id }); return res.render('escala/banco-horas', { title: 'Banco de Horas', banco, selecionado: null, movimentos: [], horasExtras: [], folgas: [], canManageEscala: canManageEscala(req), canViewAllEscala: all }); } catch(e){ next(e); } };
+exports.bancoHorasFuncionario = (req, res, next) => { try { let id=Number(req.params.colaboradorId); const user=currentUser(req); const own=service.buscarColaboradorDoUsuario(user.id); const all=canViewAllEscala(req); if(!all && own?.id !== id) return res.status(403).send('Acesso negado. Mecânico visualiza apenas o próprio banco de horas.'); const banco=service.listarBancoHoras({ colaborador_id: all ? null : own?.id }); const selecionado=banco.find(c=>c.id===id); return res.render('escala/banco-horas', { title: 'Banco de Horas', banco, selecionado, movimentos: service.listarMovimentosBancoHoras(id), horasExtras: service.listarHorasExtras({colaborador_id:id}), folgas: service.listarFolgas({colaborador_id:id}), canManageEscala: canManageEscala(req), canViewAllEscala: all }); } catch(e){ next(e); } };
 exports.folgas = (req, res, next) => { try { return res.render('escala/folgas-programadas', { title: 'Programar Folga', colaboradores: service.listarBancoHoras(), folgas: service.listarFolgas() }); } catch(e){ next(e); } };
 exports.programarFolga = (req, res) => { try { service.programarFolgaCompensatoria({ ...req.body, minutos_descontados: Math.round(Number(req.body.horas || 0) * 60) || Number(req.body.minutos_descontados), usuario: currentUser(req), user_id: currentUser(req).id }); flashSuccess(req, 'Folga compensatória programada.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/folgas'); };
 exports.cancelarFolga = (req, res) => { try { service.cancelarFolgaCompensatoria(Number(req.params.id), currentUser(req), req.body.motivo); flashSuccess(req, 'Folga cancelada e saldo estornado.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/folgas'); };
@@ -459,3 +466,5 @@ exports.relatorios = (req, res, next) => { try { return res.render('escala/relat
 exports.relatorioPdf = (req, res, next) => { try { const doc = generator.gerarPdfBancoHorasGeral(service.gerarDadosRelatorioBancoHoras(req.query)); res.setHeader('Content-Type','application/pdf'); res.setHeader('Content-Disposition','inline; filename="banco-horas-manutencao.pdf"'); doc.pipe(res); return doc; } catch(e){ next(e); } };
 exports.relatorioFuncionarioPdf = (req, res, next) => { try { const dados = service.gerarDadosRelatorioBancoHoras({ ...req.query, colaborador_id: Number(req.params.colaboradorId) }); const doc = generator.gerarPdfBancoHorasFuncionario(dados); res.setHeader('Content-Type','application/pdf'); res.setHeader('Content-Disposition','inline; filename="banco-horas-funcionario.pdf"'); doc.pipe(res); return doc; } catch(e){ next(e); } };
 exports.relatorioOsPdf = (req, res, next) => { try { const dados = service.gerarDadosRelatorioBancoHoras({ ...req.query, os_id: Number(req.params.osId) }); const doc = generator.gerarPdfBancoHorasPorOs(dados); res.setHeader('Content-Type','application/pdf'); res.setHeader('Content-Disposition','inline; filename="banco-horas-os.pdf"'); doc.pipe(res); return doc; } catch(e){ next(e); } };
+
+exports.recalcularCompleta = (req, res) => { try { const quantidade = Number(req.body.quantidade || 3); const r = service.recalcularEscalaCompleta({ quantidade }); reprocessarPreventivasComNovaEscala(); flashSuccess(req, `Escala recalculada: ${r.semanas} semana(s), ${r.alocacoes} alocação(ões).`); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/completa'); };

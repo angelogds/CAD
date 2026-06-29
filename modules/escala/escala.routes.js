@@ -58,13 +58,14 @@ router.get("/relatorios/pdf", requireLogin, requireRole(escalaRead), safe(contro
 router.get("/relatorios/funcionario/:colaboradorId/pdf", requireLogin, requireRole(escalaRead), safe(controller.relatorioFuncionarioPdf, "relatorioFuncionarioPdf"));
 router.get("/relatorios/os/:osId/pdf", requireLogin, requireRole(escalaRead), safe(controller.relatorioOsPdf, "relatorioOsPdf"));
 
-router.post("/adicionar", requireLogin, requireRole(escalaRead), safe(controller.adicionarRapido, "adicionarRapido"));
-router.post("/ausencia", requireLogin, requireRole(escalaRead), safe(controller.lancarAusencia, "lancarAusencia"));
-router.post("/ausencia/:id/update", requireLogin, requireRole(escalaRead), safe(controller.atualizarAusencia, "atualizarAusencia"));
+router.post("/adicionar", requireLogin, requireRole(escalaManage), safe(controller.adicionarRapido, "adicionarRapido"));
+router.post("/ausencia", requireLogin, requireRole(escalaManage), safe(controller.lancarAusencia, "lancarAusencia"));
+router.post("/ausencia/:id/update", requireLogin, requireRole(escalaManage), safe(controller.atualizarAusencia, "atualizarAusencia"));
 router.post("/ausencia/:id/delete", requireLogin, requireAdmin, safe(controller.removerAusencia, "removerAusencia"));
-router.get("/editar/:id", requireLogin, requireRole(escalaRead), safe(controller.editarSemana, "editarSemana"));
-router.post("/editar/:id", requireLogin, requireRole(escalaRead), safe(controller.salvarEdicao, "salvarEdicao"));
-router.post("/alocacao/:id/delete", requireLogin, requireAdmin, safe(controller.removerAlocacao, "removerAlocacao"));
+router.get("/editar/:id", requireLogin, requireRole(escalaManage), safe(controller.editarSemana, "editarSemana"));
+router.post("/editar/:id", requireLogin, requireRole(escalaManage), safe(controller.salvarEdicao, "salvarEdicao"));
+router.post("/alocacao/:id/delete", requireLogin, requireRole(escalaManage), safe(controller.removerAlocacao, "removerAlocacao"));
+router.post("/completa/recalcular", requireLogin, requireRole(escalaManage), safe(controller.recalcularCompleta, "recalcularCompleta"));
 
 router.get("/pdf/semana", requireLogin, requireRole(escalaRead), safe(controller.pdfSemana, "pdfSemana"));
 router.get("/pdf/semana/:id", requireLogin, requireRole(escalaRead), safe(controller.pdfSemanaById, "pdfSemanaById"));
