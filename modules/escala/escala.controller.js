@@ -100,6 +100,15 @@ exports.completa = (req, res, next) => {
   }
 };
 
+exports.novaHoraExtra = (req, res, next) => {
+  try {
+    req.query = { ...(req.query || {}), foco: 'hora-extra' };
+    return exports.index(req, res, next);
+  } catch (e) {
+    next(e);
+  }
+};
+
 exports.ausencias = (req, res, next) => {
   try {
     res.locals.activeMenu = "escala";
@@ -182,6 +191,17 @@ exports.lancarAusencia = (req, res, next) => {
     const equipamento = String(req.body?.equipamento || "").trim();
     const descricaoServico = String(req.body?.descricaoServico || "").trim();
     const funcao = service.normalizeFuncao(req.body?.funcao) || "mecanico";
+    const geolocalizacao = {
+      latitudeInicio: req.body?.latitudeInicio,
+      longitudeInicio: req.body?.longitudeInicio,
+      precisaoInicio: req.body?.precisaoInicio,
+      statusLocalizacaoInicio: req.body?.statusLocalizacaoInicio,
+      latitudeFim: req.body?.latitudeFim,
+      longitudeFim: req.body?.longitudeFim,
+      precisaoFim: req.body?.precisaoFim,
+      statusLocalizacaoFim: req.body?.statusLocalizacaoFim,
+      justificativaSemLocalizacao: String(req.body?.justificativaSemLocalizacao || '').trim(),
+    };
 
     if (!nome || !inicio || !fim || !tipo) {
       req.flash("error", "Preencha: Colaborador, Tipo, Início e Fim.");
@@ -223,6 +243,7 @@ exports.lancarAusencia = (req, res, next) => {
       equipamento,
       descricaoServico,
       funcao,
+      geolocalizacao,
     });
     reprocessarPreventivasComNovaEscala();
 

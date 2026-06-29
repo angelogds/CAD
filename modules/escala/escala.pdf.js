@@ -226,6 +226,24 @@ function generateWeeklyPDF({ rows = [] } = {}) {
   return doc;
 }
 
+
+function formatGeoStatus(status) {
+  const labels = {
+    DENTRO_DA_UNIDADE: 'Dentro da unidade',
+    PROXIMO_DA_UNIDADE: 'Próximo da unidade',
+    FORA_DA_AREA: 'Fora da área da unidade',
+    NAO_AUTORIZADA: 'Localização não autorizada',
+    GPS_INDISPONIVEL: 'GPS indisponível',
+    NAO_CAPTURADA: 'Localização não capturada',
+  };
+  return labels[String(status || '').toUpperCase()] || 'Localização não capturada';
+}
+
+function geoLine(label, status, precisao) {
+  const precision = precisao !== null && precisao !== undefined && precisao !== '' ? ` — precisão ${Math.round(Number(precisao))} m` : '';
+  return `${label}: ${formatGeoStatus(status)}${precision}.`;
+}
+
 function truncateText(text, max = 140) {
   const raw = String(text || '-').replace(/\s+/g, ' ').trim();
   if (raw.length <= max) return raw || '-';
@@ -246,6 +264,12 @@ function drawPeriodCard(doc, { meta, registro, index }) {
   const tipoConcessao = `${truncateText(registro.tipo || "-", 16)}${registro.concessao ? ` (${registro.concessao})` : ''}`;
   const motivo = truncateText(registro.motivo || "-", 200);
   const equipeDescricao = `Colaborador: ${colaborador} • Função: ${funcao} • Tipo: ${tipoConcessao}`;
+  const geoDescricao = [
+    geoLine('Localização inicial', registro.statusLocalizacaoInicio, registro.precisaoInicio),
+    geoLine('Localização final', registro.statusLocalizacaoFim, registro.precisaoFim),
+    registro.justificativaSemLocalizacao ? `Localização não capturada. Justificativa: ${registro.justificativaSemLocalizacao}` : '',
+    registro.alertaLocalizacao ? 'ALERTA: localização fora da área da unidade; registro pendente de análise do encarregado.' : '',
+  ].filter(Boolean).join(' ');
   const dataHora = registro.dataServico
     ? `${formatDateBr(registro.dataServico)} • ${registro.horaInicio || '-'} às ${registro.horaFim || '-'}`
     : "-";
@@ -264,7 +288,8 @@ function drawPeriodCard(doc, { meta, registro, index }) {
   const topInfoH = 54;
   const motivoH = Math.max(30, doc.heightOfString(motivo, { width: width - 24 }) + 12);
   const equipeH = Math.max(30, doc.heightOfString(equipeDescricao, { width: width - 24 }) + 12);
-  const cardHeight = 16 + topInfoH + 10 + motivoH + 10 + serviceHeaderHeight + serviceRowHeight + 10 + equipeH + 16;
+  const geoH = Math.max(34, doc.heightOfString(geoDescricao, { width: width - 24 }) + 14);
+  const cardHeight = 16 + topInfoH + 10 + motivoH + 10 + serviceHeaderHeight + serviceRowHeight + 10 + geoH + 10 + equipeH + 16;
 
   ensureSpace(doc, cardHeight + 10, meta);
   const top = doc.y;
@@ -310,7 +335,14 @@ function drawPeriodCard(doc, { meta, registro, index }) {
     .text(equipamento, x + 10 + col1 + pad, rowY + pad, { width: col2 - (pad * 2) })
     .text(descricaoServico, x + 10 + col1 + col2 + pad, rowY + pad, { width: col3 - (pad * 2) });
 
-  const equipeY = rowY + serviceRowHeight + 10;
+  const geoY = rowY + serviceRowHeight + 10;
+  doc.roundedRect(x + 10, geoY, width - 20, geoH, 8).lineWidth(0.7).strokeColor(registro.alertaLocalizacao ? '#f59e0b' : COLORS.border).stroke();
+  doc.font('Helvetica-Bold').fontSize(8.4).fillColor(registro.alertaLocalizacao ? '#92400e' : COLORS.muted)
+    .text('Geolocalização de apoio interno da manutenção', x + 16, geoY + 7, { width: width - 30 });
+  doc.font('Helvetica').fontSize(8.6).fillColor(COLORS.text)
+    .text(geoDescricao, x + 16, geoY + 18, { width: width - 30 });
+
+  const equipeY = geoY + geoH + 10;
   doc.roundedRect(x + 10, equipeY, width - 20, equipeH, 8).lineWidth(0.7).strokeColor(COLORS.border).stroke();
   doc.font("Helvetica-Bold").fontSize(8.4).fillColor(COLORS.muted)
     .text("Descrição da equipe", x + 16, equipeY + 7, { width: width - 30 });

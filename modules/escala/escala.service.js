@@ -1,4 +1,5 @@
 const db = require("../../database/db");
+const { classificarLocalizacao, STATUS_LOCALIZACAO } = require("./escala.geo");
 const { getAgoraSaoPauloParts, getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
 
 
@@ -480,6 +481,7 @@ function lancarAusencia({
   equipamento,
   descricaoServico,
   funcao,
+  geolocalizacao = {},
 }) {
   const colabId = ensureColaborador(nome, funcao || "mecanico");
   if (!colabId) throw new Error("Colaborador inválido.");
@@ -502,11 +504,26 @@ function lancarAusencia({
     const calculo = calculateCompensacao(horaInicio, horaFim);
     concessao = calculo.concessao === "SEM_DIREITO" ? "MEIA" : calculo.concessao;
 
+    const inicioGeo = classificarLocalizacao({
+      latitude: geolocalizacao.latitudeInicio,
+      longitude: geolocalizacao.longitudeInicio,
+      status: geolocalizacao.statusLocalizacaoInicio,
+    });
+    const fimGeo = classificarLocalizacao({
+      latitude: geolocalizacao.latitudeFim,
+      longitude: geolocalizacao.longitudeFim,
+      status: geolocalizacao.statusLocalizacaoFim,
+    });
+    const alertaLocalizacao = [inicioGeo.status, fimGeo.status].includes(STATUS_LOCALIZACAO.FORA_DA_AREA) ? 1 : 0;
+
     const info = db.prepare(`
       INSERT INTO escala_compensacoes (
         colaborador_id, funcao, data_servico, hora_inicio, hora_fim,
-        minutos_total, concessao_sugerida, equipamento, descricao_servico
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        minutos_total, concessao_sugerida, equipamento, descricao_servico,
+        latitude_inicio, longitude_inicio, precisao_inicio, status_localizacao_inicio, distancia_inicio_metros,
+        latitude_fim, longitude_fim, precisao_fim, status_localizacao_fim, distancia_fim_metros,
+        justificativa_sem_localizacao, alerta_localizacao
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       colabId,
       normalizeFuncao(funcao) || "mecanico",
@@ -517,6 +534,18 @@ function lancarAusencia({
       calculo.concessao,
       equipamento || null,
       descricaoServico || null,
+      geolocalizacao.latitudeInicio || null,
+      geolocalizacao.longitudeInicio || null,
+      geolocalizacao.precisaoInicio || null,
+      inicioGeo.status,
+      inicioGeo.distanciaMetros,
+      geolocalizacao.latitudeFim || null,
+      geolocalizacao.longitudeFim || null,
+      geolocalizacao.precisaoFim || null,
+      fimGeo.status,
+      fimGeo.distanciaMetros,
+      geolocalizacao.justificativaSemLocalizacao || null,
+      alertaLocalizacao,
     );
 
     refCompensacaoId = Number(info.lastInsertRowid);
@@ -793,6 +822,8 @@ function getPeriodoCompensacaoData(start, end) {
   const baseQuery = `
     SELECT cp.id, cp.data_servico, cp.hora_inicio, cp.hora_fim, cp.equipamento, cp.descricao_servico,
            cp.minutos_total, cp.concessao_sugerida,
+           cp.status_localizacao_inicio, cp.status_localizacao_fim, cp.precisao_inicio, cp.precisao_fim,
+           cp.distancia_inicio_metros, cp.distancia_fim_metros, cp.justificativa_sem_localizacao, cp.alerta_localizacao,
            c.nome AS colaborador, c.funcao
     FROM escala_compensacoes cp
     JOIN colaboradores c ON c.id = cp.colaborador_id
@@ -813,6 +844,14 @@ function getPeriodoCompensacaoData(start, end) {
       descricaoServico: row.descricao_servico || '-',
       minutosTotal: row.minutos_total,
       concessaoSugerida: row.concessao_sugerida,
+      statusLocalizacaoInicio: row.status_localizacao_inicio || '',
+      statusLocalizacaoFim: row.status_localizacao_fim || '',
+      precisaoInicio: row.precisao_inicio,
+      precisaoFim: row.precisao_fim,
+      distanciaInicioMetros: row.distancia_inicio_metros,
+      distanciaFimMetros: row.distancia_fim_metros,
+      justificativaSemLocalizacao: row.justificativa_sem_localizacao || '',
+      alertaLocalizacao: Number(row.alerta_localizacao || 0),
     }));
 
   const apuracaoMap = new Map();
@@ -837,7 +876,9 @@ function getPeriodoCompensacaoData(start, end) {
   const concessoesQuery = `
     SELECT ec.inicio, ec.fim, ec.tipo, ec.concessao, ec.motivo,
            c.nome AS colaborador, c.funcao,
-           cp.data_servico, cp.hora_inicio, cp.hora_fim, cp.equipamento, cp.descricao_servico
+           cp.data_servico, cp.hora_inicio, cp.hora_fim, cp.equipamento, cp.descricao_servico,
+           cp.status_localizacao_inicio, cp.status_localizacao_fim, cp.precisao_inicio, cp.precisao_fim,
+           cp.distancia_inicio_metros, cp.distancia_fim_metros, cp.justificativa_sem_localizacao, cp.alerta_localizacao
     FROM escala_concessoes ec
     JOIN colaboradores c ON c.id = ec.colaborador_id
     LEFT JOIN escala_compensacoes cp ON cp.id = ec.ref_compensacao_id
@@ -860,6 +901,14 @@ function getPeriodoCompensacaoData(start, end) {
     horaFim: item.hora_fim || '',
     equipamentoSetor: item.equipamento || '',
     descricaoServico: item.descricao_servico || '',
+    statusLocalizacaoInicio: item.status_localizacao_inicio || '',
+    statusLocalizacaoFim: item.status_localizacao_fim || '',
+    precisaoInicio: item.precisao_inicio,
+    precisaoFim: item.precisao_fim,
+    distanciaInicioMetros: item.distancia_inicio_metros,
+    distanciaFimMetros: item.distancia_fim_metros,
+    justificativaSemLocalizacao: item.justificativa_sem_localizacao || '',
+    alertaLocalizacao: Number(item.alerta_localizacao || 0),
   }));
 
   const descricoes = baseServicos
