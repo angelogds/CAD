@@ -1,45 +1,15 @@
 <%- layout('layout') -%>
-
 <h1>Editar Semana <%= semana.semana_numero %></h1>
-<p style="color:#64748b;font-weight:800;">Período: <%= semana.data_inicio %> até <%= semana.data_fim %></p>
-
+<p style="color:#64748b;font-weight:800;">Período: <%= semana.data_inicio %> até <%= semana.data_fim %> <% if(semana.ajuste_manual){ %>• Ajuste manual<% } %></p>
 <div class="card" style="margin-top:12px;">
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Colaborador</th>
-        <th style="width:160px;">Turno</th>
-        <th style="width:260px;">Ação</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% if (!semana.alocacoes || semana.alocacoes.length === 0) { %>
-        <tr><td colspan="3" style="text-align:center;color:#64748b;">Sem alocações nessa semana.</td></tr>
-      <% } else { %>
-        <% semana.alocacoes.forEach(a => { %>
-          <tr>
-            <td style="font-weight:900;"><%= a.nome %></td>
-            <td><%= a.tipo_turno %></td>
-            <td>
-              <form method="POST" action="/escala/editar/<%= semana.id %>" style="display:flex;gap:8px;align-items:center;">
-                <input type="hidden" name="alocacaoId" value="<%= a.id %>">
-                <select class="input" name="novoTurno" style="height:36px;">
-                  <option value="diurno">Dia</option>
-                  <option value="noturno">Noite</option>
-                  <option value="plantao">Plantão</option>
-                  <option value="folga">Folga</option>
-                </select>
-                <button class="btn btn-sm btn-primary" type="submit">Salvar</button>
-              </form>
-            </td>
-          </tr>
-        <% }) %>
-      <% } %>
-    </tbody>
-  </table>
+  <form method="POST" action="/escala/editar/<%= semana.id %>" style="display:grid;gap:12px;">
+    <input type="hidden" name="modo" value="semana">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;"><div><div class="label">Início</div><input class="input" type="date" name="data_inicio" value="<%= semana.data_inicio %>"></div><div><div class="label">Fim</div><input class="input" type="date" name="data_fim" value="<%= semana.data_fim %>"></div><div><div class="label">Status</div><input class="input" name="status" value="<%= semana.status || 'ATIVA' %>"></div></div>
+    <div><div class="label">Plantonista noturno</div><select class="input" name="noturno_id"><option value="">Sem noturno</option><% colaboradores.forEach(c=>{ const sel=(semana.alocacoes||[]).some(a=>a.tipo_turno==='noturno'&&Number(a.colaborador_id)===Number(c.id)); %><option value="<%= c.id %>" <%= sel?'selected':'' %>><%= c.nome %></option><% }) %></select></div>
+    <div><div class="label">Mecânicos diurnos</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;"><% colaboradores.forEach(c=>{ const checked=(semana.alocacoes||[]).some(a=>(a.tipo_turno==='diurno'||a.tipo_turno==='apoio')&&Number(a.colaborador_id)===Number(c.id)); %><label class="card" style="padding:10px;"><input type="checkbox" name="diurnos" value="<%= c.id %>" <%= checked?'checked':'' %>> <%= c.nome %></label><% }) %></div></div>
+    <div><div class="label">Observação / função</div><textarea class="input" name="observacao" rows="3"><%= semana.observacao || '' %></textarea></div>
+    <button class="btn btn-green">Salvar como ajuste manual</button>
+  </form>
 </div>
-
-<div style="margin-top:12px;display:flex;gap:10px;">
-  <a class="btn" href="/escala">Voltar</a>
-  <a class="btn btn-primary" href="/escala/pdf/semana/<%= semana.id %>">PDF da Semana</a>
-</div>
+<div class="card" style="margin-top:12px;"><h3>Alocações atuais</h3><% (semana.alocacoes||[]).forEach(a=>{ %><p><strong><%= a.nome %></strong> — <%= a.tipo_turno %></p><% }) %></div>
+<div style="margin-top:12px;display:flex;gap:10px;"><a class="btn" href="/escala/completa">Voltar</a><a class="btn btn-primary" href="/escala/pdf/semana/<%= semana.id %>">PDF da Semana</a></div>

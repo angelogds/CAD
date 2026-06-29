@@ -94,7 +94,7 @@ exports.completa = (req, res, next) => {
   try {
     res.locals.activeMenu = "escala";
     const semanas = service.getEscalaCompletaComTimes();
-    return res.render("escala/completa", { title: "Escala Completa", semanas, canManageEscala: canManageEscala(req), colaboradores: service.listarColaboradoresManutencao(), quantidadeSemanal: Number(req.query.quantidade || 3) });
+    return res.render("escala/completa", { title: "Escala Completa", semanas, rodizioAtivo: service.buscarRodizioAtivo(), canManageEscala: canManageEscala(req), colaboradores: service.listarColaboradoresManutencao(), quantidadeSemanal: Number(req.query.quantidade || 3) });
   } catch (e) {
     next(e);
   }
@@ -309,7 +309,7 @@ exports.editarSemana = (req, res, next) => {
     const semana = service.getSemanaById(semanaId);
     if (!semana) return res.status(404).send("Semana não encontrada");
 
-    return res.render("escala/editar", { title: "Editar Semana", semana });
+    return res.render("escala/editar", { title: "Editar Semana", semana, colaboradores: service.listarColaboradoresManutencao() });
   } catch (e) {
     next(e);
   }
@@ -318,25 +318,19 @@ exports.editarSemana = (req, res, next) => {
 exports.salvarEdicao = (req, res, next) => {
   try {
     const semanaId = Number(req.params.id);
-    const alocacaoId = Number(req.body?.alocacaoId);
-    const novoTurno = String(req.body?.novoTurno || "").trim().toLowerCase();
-
-    const tipo_turno =
-      novoTurno === "noturno" || novoTurno === "noite" ? "noturno" :
-      novoTurno === "diurno" || novoTurno === "dia" ? "diurno" :
-      novoTurno === "folga" ? "folga" :
-      novoTurno === "plantao" ? "plantao" :
-      "";
-
-    if (!alocacaoId || !tipo_turno) {
-      req.flash("error", "Dados inválidos para edição.");
+    if (req.body?.modo === 'semana') {
+      service.salvarSemanaManual(semanaId, req.body);
+      reprocessarPreventivasComNovaEscala();
+      req.flash('success', 'Semana salva como ajuste manual.');
       return res.redirect(`/escala/editar/${semanaId}`);
     }
-
-    service.atualizarTurno(alocacaoId, tipo_turno);
+    const alocacaoId = Number(req.body?.alocacaoId);
+    const novoTurno = String(req.body?.novoTurno || '').trim().toLowerCase();
+    const tipo_turno = novoTurno === 'noturno' || novoTurno === 'noite' ? 'noturno' : novoTurno === 'diurno' || novoTurno === 'dia' ? 'diurno' : novoTurno === 'folga' ? 'folga' : novoTurno === 'plantao' ? 'plantao' : '';
+    if (!alocacaoId || !tipo_turno) { req.flash('error', 'Dados inválidos para edição.'); return res.redirect(`/escala/editar/${semanaId}`); }
+    service.atualizarTurno(alocacaoId, tipo_turno); service.salvarSemanaManual(semanaId, { noturno_id: req.body.noturno_id, diurnos: req.body.diurnos, observacao: 'Ajuste manual de turno' });
     reprocessarPreventivasComNovaEscala();
-
-    req.flash("success", "Turno atualizado.");
+    req.flash('success', 'Turno atualizado e semana marcada como ajuste manual.');
     return res.redirect(`/escala/editar/${semanaId}`);
   } catch (e) {
     next(e);
@@ -350,7 +344,7 @@ exports.pdfSemana = (req, res, next) => {
       periodoTexto: `${generator.formatDateBr(s.data_inicio)} até ${generator.formatDateBr(s.data_fim)}`,
       noturno: s.noturno,
       diurno: s.diurno,
-      observacoes: "Todos como Mecânico Industrial",
+      observacoes: s.ajuste_manual ? 'Semana ajustada manualmente pelo encarregado.' : (s.observacao || 'Todos como Mecânico Industrial'),
     }));
 
     res.setHeader("Content-Type", "application/pdf");
@@ -381,7 +375,7 @@ exports.pdfSemanaById = (req, res, next) => {
           periodoTexto: `${generator.formatDateBr(semana.data_inicio)} até ${generator.formatDateBr(semana.data_fim)}`,
           noturno: consolidado?.noturno || { mecanico: [] },
           diurno: consolidado?.diurno || { mecanico: [] },
-          observacoes: "Todos como Mecânico Industrial",
+          observacoes: semana.ajuste_manual ? 'Semana ajustada manualmente pelo encarregado.' : (semana.observacao || 'Todos como Mecânico Industrial'),
         },
       ],
     });
@@ -468,3 +462,15 @@ exports.relatorioFuncionarioPdf = (req, res, next) => { try { const dados = serv
 exports.relatorioOsPdf = (req, res, next) => { try { const dados = service.gerarDadosRelatorioBancoHoras({ ...req.query, os_id: Number(req.params.osId) }); const doc = generator.gerarPdfBancoHorasPorOs(dados); res.setHeader('Content-Type','application/pdf'); res.setHeader('Content-Disposition','inline; filename="banco-horas-os.pdf"'); doc.pipe(res); return doc; } catch(e){ next(e); } };
 
 exports.recalcularCompleta = (req, res) => { try { const quantidade = Number(req.body.quantidade || 3); const r = service.recalcularEscalaCompleta({ quantidade }); reprocessarPreventivasComNovaEscala(); flashSuccess(req, `Escala recalculada: ${r.semanas} semana(s), ${r.alocacoes} alocação(ões).`); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/completa'); };
+
+exports.rodizioIndex = (req, res, next) => { try {
+  res.locals.activeMenu = 'escala';
+  const config = service.buscarRodizioAtivo();
+  const preview = req.query.preview ? service.gerarPreviewRodizio({ data_inicio: req.query.data_inicio, data_fim: req.query.data_fim }) : [];
+  return res.render('escala/rodizio', { title: 'Editor de Rodízio da Escala', config, configs: service.listarConfiguracoesRodizio(), colaboradores: service.listarColaboradoresManutencao(), preview, canManageEscala: canManageEscala(req) });
+} catch(e){ next(e); } };
+exports.salvarRodizio = (req, res) => { try { service.salvarConfiguracaoRodizio(req.body, currentUser(req)); flashSuccess(req, 'Configuração de rodízio salva.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/rodizio'); };
+exports.previewRodizio = (req, res) => { try { const preview = service.gerarPreviewRodizio(req.body); return res.render('escala/rodizio-preview', { title: 'Pré-visualizar escala', preview, dados: req.body }); } catch(e){ flashError(req, e.message); return res.redirect('/escala/rodizio'); } };
+exports.aplicarRodizio = (req, res) => { try { const r = service.aplicarRodizioNaEscala(req.body, currentUser(req)); reprocessarPreventivasComNovaEscala(); flashSuccess(req, `Rodízio aplicado: ${r.semanas} semana(s), ${r.alocacoes} alocação(ões), ${r.puladas} ajuste(s) manual(is) preservado(s).`); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/completa'); };
+exports.recalcularRodizio = (req, res) => { try { const r = service.recalcularEscalaPorRodizio(req.body.config_id, req.body, currentUser(req)); reprocessarPreventivasComNovaEscala(); flashSuccess(req, `Escala recalculada pelo rodízio. ${r.puladas} ajuste(s) manual(is) preservado(s).`); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/completa'); };
+exports.desativarRodizio = (req, res) => { try { service.desativarRodizio?.(Number(req.params.id)); flashSuccess(req, 'Rodízio desativado.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/rodizio'); };
