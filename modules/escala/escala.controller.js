@@ -57,7 +57,7 @@ exports.index = (req, res, next) => {
   try {
     res.locals.activeMenu = "escala";
     const painel = service.listarPainelEscala({ user: currentUser(req), canViewAll: canViewAllEscala(req), colaboradorId: visibleColaboradorId(req) });
-    return res.render("escala/index", { title: "Escala", painel, canManageEscala: canManageEscala(req), canViewAllEscala: canViewAllEscala(req) });
+    return res.render("escala/index", { title: "Escala", painel, canManageEscala: canManageEscala(req), canViewAllEscala: canViewAllEscala(req), canReadEscalaDetails: canViewAllEscala(req) || Boolean(visibleColaboradorId(req)) });
   } catch (e) {
     next(e);
   }
