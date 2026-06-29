@@ -490,7 +490,21 @@ exports.rodizioIndex = (req, res, next) => { try {
   const preview = req.query.preview ? service.gerarPreviewRodizio({ data_inicio: req.query.data_inicio, data_fim: req.query.data_fim }) : [];
   return res.render('escala/rodizio', { title: 'Editor de Rodízio da Escala', config, configs: service.listarConfiguracoesRodizio(), colaboradores: service.listarColaboradoresManutencao(), preview, canManageEscala: canManageEscala(req) });
 } catch(e){ next(e); } };
-exports.salvarRodizio = (req, res) => { try { service.salvarConfiguracaoRodizio(req.body, currentUser(req)); flashSuccess(req, 'Configuração de rodízio salva.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/rodizio'); };
+exports.salvarRodizio = (req, res) => {
+  try {
+    const config = service.salvarConfiguracaoRodizio(req.body, currentUser(req));
+    const resultado = service.aplicarRodizioNaEscala({
+      ...req.body,
+      config_id: config?.id,
+      sobrescrever: '1',
+    }, currentUser(req));
+    reprocessarPreventivasComNovaEscala();
+    flashSuccess(req, `Configuração de rodízio salva e escala reescrita automaticamente: ${resultado.semanas} semana(s), ${resultado.alocacoes} alocação(ões).`);
+  } catch(e){
+    flashError(req, e.message);
+  }
+  return res.redirect('/escala/completa');
+};
 exports.previewRodizio = (req, res) => { try { const preview = service.gerarPreviewRodizio(req.body); return res.render('escala/rodizio-preview', { title: 'Pré-visualizar escala', preview, dados: req.body }); } catch(e){ flashError(req, e.message); return res.redirect('/escala/rodizio'); } };
 exports.aplicarRodizio = (req, res) => { try { const r = service.aplicarRodizioNaEscala(req.body, currentUser(req)); reprocessarPreventivasComNovaEscala(); flashSuccess(req, `Rodízio aplicado: ${r.semanas} semana(s), ${r.alocacoes} alocação(ões), ${r.puladas} ajuste(s) manual(is) preservado(s).`); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/completa'); };
 exports.recalcularRodizio = (req, res) => { try { const r = service.recalcularEscalaPorRodizio(req.body.config_id, req.body, currentUser(req)); reprocessarPreventivasComNovaEscala(); flashSuccess(req, `Escala recalculada pelo rodízio. ${r.puladas} ajuste(s) manual(is) preservado(s).`); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/completa'); };
