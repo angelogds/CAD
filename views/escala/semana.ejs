@@ -30,15 +30,37 @@
     </form>
   </div>
 
-  <div class="escala-table-wrap" style="margin-top:12px;">
-    <table class="table">
-      <thead><tr><th style="width:160px;">Data</th><th>Colaborador</th><th style="width:140px;">Turno</th><th style="width:160px;">Função</th><th style="width:240px;">Status</th><% if (canManageEscala) { %><th style="width:120px;">Ações</th><% } %></tr></thead>
-      <tbody>
-        <% if (!semana || !semana.linhas || semana.linhas.length === 0) { %><tr><td colspan="<%= canManageEscala ? 6 : 5 %>" style="text-align:center;color:#64748b;">Nenhum item cadastrado nesta semana.</td></tr><% } else { %>
-          <% semana.linhas.forEach(l => { %><tr><td><%= semana.data_inicio %> a <%= semana.data_fim %></td><td style="font-weight:900;"><%= l.nome %></td><td><%= l.turnoLabel %></td><td><%= l.funcaoLabel %></td><td><%= l.statusLabel %></td><% if (canManageEscala) { %><td><div class="escala-actions"><a class="btn btn-sm escala-action-btn" href="/escala/editar/<%= semana.id %>">Editar</a><form method="POST" action="/escala/alocacao/<%= l.alocacao_id %>/delete" onsubmit="return confirm('Deseja excluir este registro?');" style="margin:0;"><input type="hidden" name="date" value="<%= alvo %>"><button class="btn btn-sm escala-action-btn" type="submit">Excluir</button></form></div></td><% } %></tr><% }) %>
-        <% } %>
-      </tbody>
-    </table>
+  <div class="escala-card-grid" style="margin-top:12px;">
+    <% if (!semana || !semana.linhas || semana.linhas.length === 0) { %>
+      <div class="escala-empty" style="grid-column:1/-1;">Nenhum item cadastrado nesta semana.</div>
+    <% } else { %>
+      <% semana.linhas.forEach(l => { const turno = String(l.turnoLabel || '').toUpperCase(); const status = String(l.statusLabel || 'Trabalhando'); const statusUp = status.toUpperCase(); const statusClass = statusUp.includes('FOLGA') || statusUp.includes('TRABALH') ? 'is-success' : (statusUp.includes('ATEST') || statusUp.includes('FÉRI') || statusUp.includes('FERI') ? 'is-warning' : 'is-info'); %>
+        <article class="card-padrao-escala">
+          <div class="card-padrao-header">
+            <div class="card-padrao-person">
+              <span class="card-padrao-avatar"><%= String(l.nome || 'M').charAt(0).toUpperCase() %></span>
+              <div>
+                <h3 class="card-padrao-title"><%= l.nome %></h3>
+                <div class="card-padrao-subtitle"><%= l.funcaoLabel %></div>
+              </div>
+            </div>
+            <span class="card-padrao-badge is-info"><%= turno || 'TURNO' %></span>
+          </div>
+          <div class="card-padrao-body">
+            <div class="card-padrao-row"><span class="label-text">Período</span><span class="value-text"><%= semana.data_inicio %> até <%= semana.data_fim %></span></div>
+            <div class="card-padrao-row"><span class="label-text">Função</span><span class="value-text"><%= l.funcaoLabel %></span></div>
+            <div class="card-padrao-row"><span class="label-text">Status</span><span class="value-text"><span class="card-padrao-badge <%= statusClass %>"><%= status %></span></span></div>
+            <% if (l.observacao) { %><div class="card-padrao-row"><span class="label-text">Observação</span><span class="value-text"><%= l.observacao %></span></div><% } %>
+          </div>
+          <% if (canManageEscala) { %>
+            <div class="card-padrao-footer">
+              <a class="btn btn-sm" href="/escala/editar/<%= semana.id %>">Editar</a>
+              <form method="POST" action="/escala/alocacao/<%= l.alocacao_id %>/delete" onsubmit="return confirm('Deseja excluir este registro?');" style="margin:0;flex:1 1 auto;"><input type="hidden" name="date" value="<%= alvo %>"><button class="btn btn-sm" type="submit">Excluir</button></form>
+            </div>
+          <% } %>
+        </article>
+      <% }) %>
+    <% } %>
   </div>
 
   <% if (canManageEscala) { %>
