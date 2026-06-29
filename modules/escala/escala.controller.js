@@ -93,8 +93,13 @@ exports.semana = (req, res, next) => {
 exports.completa = (req, res, next) => {
   try {
     res.locals.activeMenu = "escala";
-    const dataInicio = service.normalizarDataFormulario(req.query.data_inicio || req.query.start || req.query.inicio);
-    const dataFim = service.normalizarDataFormulario(req.query.data_fim || req.query.end || req.query.fim);
+    let dataInicio = service.normalizarDataFormulario(req.query.data_inicio || req.query.start || req.query.inicio);
+    let dataFim = service.normalizarDataFormulario(req.query.data_fim || req.query.end || req.query.fim);
+    if (!dataInicio && !dataFim) {
+      const now = new Date();
+      dataInicio = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10);
+      dataFim = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 3, 0)).toISOString().slice(0, 10);
+    }
     const semanas = service.listarEscalaCompleta({ dataInicio, dataFim });
     return res.render("escala/completa", { title: "Escala Completa", semanas, rodizioAtivo: service.buscarRodizioAtivo(), canManageEscala: canManageEscala(req), colaboradores: service.listarColaboradoresManutencao(), quantidadeSemanal: Number(req.query.quantidade || 3), filtros: { dataInicio, dataFim } });
   } catch (e) {

@@ -1,5 +1,25 @@
 <section class="container">
   <h1>Armazenamento</h1>
+  
+  <div class="card" style="margin:14px 0;">
+    <h3>Diagnóstico geral</h3>
+    <ul>
+      <li>Espaço livre: <strong><%= formatBytes(diagnostic.free) %></strong> de <%= formatBytes(diagnostic.total) %></li>
+      <li>Banco SQLite: <strong><%= formatBytes(diagnostic.db) %></strong> (WAL <%= formatBytes(diagnostic.wal) %>)</li>
+      <li>Uploads: <strong><%= formatBytes(diagnostic.uploads) %></strong></li>
+      <li>Logs: <strong><%= formatBytes(diagnostic.logs) %></strong></li>
+      <li>Tmp: <strong><%= formatBytes(diagnostic.tmp) %></strong></li>
+      <li>PDFs: <strong><%= formatBytes(diagnostic.pdfs) %></strong></li>
+      <li>Sessões: <strong><%= diagnostic.sessions.total %></strong> total; <strong><%= diagnostic.sessions.expired %></strong> expiradas</li>
+    </ul>
+    <% if (isAdmin) { %>
+      <form method="post" action="/admin/armazenamento/limpar-sessoes" style="display:inline"><button class="btn">Limpar sessões expiradas</button></form>
+      <form method="post" action="/admin/armazenamento/limpar-temporarios" style="display:inline"><button class="btn">Limpar temporários/logs/PDFs</button></form>
+      <form method="post" action="/admin/armazenamento/checkpoint-wal" style="display:inline"><button class="btn">Checkpoint WAL</button></form>
+      <form method="post" action="/admin/armazenamento/otimizar" style="display:inline" onsubmit="return confirm('Executar VACUUM somente se houver espaço suficiente. Confirmar?')"><button class="btn btn-primary">Otimizar SQLite</button></form>
+    <% } %>
+  </div>
+
   <p>Fotos e vídeos de OS com mais de <%= env.retentionDays %> dias são removidos automaticamente todo dia <%= env.dayOfMonth %> do mês. As informações escritas das ordens de serviço permanecem preservadas.</p>
   <ul>
     <li>Uso atual de volume (uploads OS): <strong><%= (volumeBytes / 1024 / 1024).toFixed(2) %> MB</strong></li>

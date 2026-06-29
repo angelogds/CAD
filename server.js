@@ -19,6 +19,7 @@ const SQLiteStoreFactory = require("better-sqlite3-session-store")(session);
 const db = require("./database/db");
 const engine = require("ejs-mate");
 const storage = require("./config/storage");
+const storageMaintenance = require("./modules/admin/storage-maintenance.service");
 
 let webPush = null;
 try { webPush = require("web-push"); } catch (_e) { webPush = null; }
@@ -97,6 +98,12 @@ app.set("trust proxy", 1);
 try {
   storage.ensurePersistentDirs();
   console.log(`✅ Storage pronto: DATA_DIR=${storage.DATA_DIR}`);
+  const usage = storageMaintenance.diagnostic();
+  console.log(`📦 Espaço livre em ${storage.DATA_DIR}: ${storageMaintenance.formatBytes(usage.free)} de ${storageMaintenance.formatBytes(usage.total)}`);
+  if (usage.free && usage.free < 25 * storageMaintenance.MB) console.error(`🚨 Armazenamento crítico em ${storage.DATA_DIR}: ${storageMaintenance.formatBytes(usage.free)} livres. Seeds/rotinas pesadas devem ser evitadas.`);
+  else if (usage.free && usage.free < 100 * storageMaintenance.MB) console.warn(`⚠️ Atenção: pouco espaço livre em ${storage.DATA_DIR}: ${storageMaintenance.formatBytes(usage.free)} livres.`);
+  const sessionCleanup = storageMaintenance.ensureSessionMaintenance();
+  if (sessionCleanup.table) console.log(`🧹 Sessões expiradas removidas na inicialização: ${sessionCleanup.deleted}`);
 } catch (err) {
   console.error("❌ Erro ao preparar diretórios persistentes:", err.message || err);
 }
@@ -176,6 +183,7 @@ app.use(
       httpOnly: true,
       sameSite: "lax",
       secure: "auto",
+      maxAge: Number(process.env.SESSION_MAX_AGE_MS || 1000 * 60 * 60 * 12),
     },
   })
 );
@@ -266,6 +274,13 @@ app.use((req, res, next) => {
   res.locals.canAccessModule = canAccessModule;
   res.locals.normalizeRole = normalizeRole;
   res.locals.isAdmin = normalizeRole(req.session?.user?.role || "") === "ADMIN";
+  try {
+    const diag = storageMaintenance.diagnostic();
+    const role = normalizeRole(req.session?.user?.role || "").toUpperCase();
+    res.locals.storageAlert = ["ADMIN", "DIRETORIA", "ENCARREGADO_MANUTENCAO"].includes(role) && diag.free && diag.free < 100 * storageMaintenance.MB
+      ? { critical: diag.free < 25 * storageMaintenance.MB, freeLabel: storageMaintenance.formatBytes(diag.free), dataDir: storage.DATA_DIR }
+      : null;
+  } catch (_storageAlertErr) { res.locals.storageAlert = null; }
 
   // ✅ alias "incluir" também disponível no res.locals (alguns layouts chamam direto)
   res.locals.incluir = app.locals.incluir;
@@ -461,6 +476,13 @@ app.use((err, req, res, next) => {
   console.error("❌ ERRO 500:", req.method, req.originalUrl);
   console.error(err && err.stack ? err.stack : err);
   if (res.headersSent) return next(err);
+  if (storageMaintenance.isStorageFullError(err)) {
+    console.error(`🚨 SQLITE_FULL: sem espaço em ${storage.DATA_DIR}. Execute node scripts/storage-cleanup.js ou use /admin/armazenamento.`);
+    return res.status(507).render("errors/storage-full", {
+      title: "Armazenamento insuficiente",
+      message: `O sistema está sem espaço de armazenamento. Libere espaço no volume ${storage.DATA_DIR} ou execute a rotina de limpeza administrativa.`,
+    });
+  }
   res.status(500).send("500 - Erro interno");
 });
 

@@ -24,6 +24,11 @@
       <%- include("partials/sidebar") %>
 
       <main class="main">
+        <% if (typeof storageAlert !== "undefined" && storageAlert) { %>
+          <div class="alert" style="margin:12px;padding:12px;border-radius:10px;border:1px solid #f59e0b;background:#fffbeb;">
+            ⚠️ <strong><%= storageAlert.critical ? 'Armazenamento crítico' : 'Pouco armazenamento' %></strong> — O volume <%= storageAlert.dataDir %> possui apenas <%= storageAlert.freeLabel %> livres. Execute a limpeza de sessões, logs e temporários.
+          </div>
+        <% } %>
         <header class="topbar">
           <div class="topbar-left">
             <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Mostrar/ocultar menu">☰</button>
