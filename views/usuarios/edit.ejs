@@ -58,7 +58,7 @@
 
       <div>
         <label>Foto atual</label>
-        <% if (user.photo_path) { %>
+        <% if (user.photo_path && (typeof attachmentExists !== "function" || attachmentExists(user.photo_path))) { %>
           <img src="<%= user.photo_path %>" alt="Foto usuário" style="width:72px;height:72px;border-radius:999px;object-fit:cover;border:1px solid #e5e7eb;" />
         <% } else { %>
           <div class="muted">Sem foto cadastrada</div>

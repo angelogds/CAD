@@ -90,7 +90,7 @@
     <% if (canUsuarios || canArmazenamento) { %>
       <div class="nav-section">ADMIN</div>
       <% if (canUsuarios) { %><%- navItem('/usuarios', 'Gerenciar Usuários', activeMenu === 'usuarios') %><% } %>
-      <% if (canArmazenamento) { %><%- navItem('/admin/armazenamento', 'Armazenamento', activeMenu === 'admin-armazenamento') %><% } %>
+      <% if (canArmazenamento) { %><%- navItem('/admin/armazenamento', 'Armazenamento', activeMenu === 'admin-armazenamento') %><%- navItem('/admin/limpeza-volume', 'Limpeza de volume', activeMenu === 'admin-limpeza-volume') %><% } %>
     <% } %>
   </nav>
 

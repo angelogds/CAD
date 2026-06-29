@@ -11,7 +11,7 @@ function tempoEmpresa(dataAdmissao) {
 %>
 
 <section class="colab-top card">
-  <img src="<%= colaborador.foto_url || '/IMG/logo_menu.png.png' %>" alt="Foto" class="colab-avatar" />
+  <img src="<%= (colaborador.foto_url && (typeof attachmentExists !== "function" || attachmentExists(colaborador.foto_url))) ? colaborador.foto_url : '/IMG/logo_menu.png.png' %>" alt="Foto" class="colab-avatar" />
   <div>
     <h1 style="margin:0"><%= colaborador.nome %></h1>
     <p class="muted" style="margin:6px 0 0"><%= colaborador.funcao || '-' %> • <%= colaborador.setor || '-' %> • Tempo de empresa: <strong><%= tempoEmpresa(colaborador.data_admissao) %></strong></p>

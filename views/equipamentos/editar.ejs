@@ -17,7 +17,7 @@
     <select class="input" name="ativo"><option value="1" <%= Number(equip.ativo)===1?'selected':'' %>>Ativo no cadastro</option><option value="0" <%= Number(equip.ativo)!==1?'selected':'' %>>Inativo no cadastro</option></select>
     <div class="full">
       <label>Foto atual</label>
-      <% if (equip.foto_url) { %>
+      <% if (equip.foto_url && (typeof attachmentExists !== "function" || attachmentExists(equip.foto_url))) { %>
         <img src="<%= equip.foto_url %>" style="max-width:220px;border-radius:12px;display:block;margin-bottom:8px;"/>
       <% } else { %>
         <div style="padding:18px;background:#f3f4f6;border-radius:8px;">Sem foto cadastrada</div>

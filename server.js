@@ -20,6 +20,7 @@ const db = require("./database/db");
 const engine = require("ejs-mate");
 const storage = require("./config/storage");
 const storageMaintenance = require("./modules/admin/storage-maintenance.service");
+const mediaVolume = require("./modules/admin/media-volume.service");
 
 let webPush = null;
 try { webPush = require("web-push"); } catch (_e) { webPush = null; }
@@ -130,6 +131,8 @@ if (webPush && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 }
 
 app.locals.VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
+app.locals.attachmentExists = mediaVolume.attachmentExists;
+app.locals.REMOVED_ATTACHMENT_MESSAGE = mediaVolume.REMOVED_MESSAGE;
 
 // ===== View engine =====
 app.engine("ejs", engine);
