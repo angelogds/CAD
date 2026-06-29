@@ -42,12 +42,13 @@
             <% if (user) { %>
               <% const extraRoles = ['MECANICO','ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO','ADMIN']; %>
               <% if (extraRoles.includes(String(user.role || '').toUpperCase())) { %>
-                <a class="btn btn-green" href="/escala/hora-extra/nova" title="Hora extra vinculada à OS">⏱ Extra</a>
+                <a class="btn btn-green topbar-extra-btn" href="/escala/hora-extra/nova" title="Hora extra vinculada à OS">⏱ Extra</a>
               <% } %>
               <% const chatNotifs = Array.isArray(typeof osChatNotificacoes !== 'undefined' ? osChatNotificacoes : []) ? osChatNotificacoes : []; %>
-              <% const chatUnread = Number((operationalCounters && operationalCounters.osChatNaoLidas) || 0); %>
-              <details class="chat-bell" style="position:relative;">
-                <summary class="btn btn-ghost" style="list-style:none;cursor:pointer;">🔔 <strong><%= chatUnread %></strong></summary>
+              <% const topbarCounters = (typeof operationalCounters !== 'undefined' && operationalCounters) ? operationalCounters : {}; %>
+              <% const chatUnread = Number(topbarCounters.osChatNaoLidas || 0); %>
+              <details class="chat-bell topbar-notification-wrap" style="position:relative;">
+                <summary class="btn btn-ghost topbar-notification" style="list-style:none;cursor:pointer;" aria-label="Notificações do Chat de OS">🔔 <strong><%= chatUnread %></strong></summary>
                 <div style="position:absolute;right:0;top:42px;width:320px;max-width:80vw;background:#fff;border:1px solid #d1d5db;border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,.14);padding:8px;z-index:30;">
                   <% if (!chatNotifs.length) { %><div class="muted" style="padding:10px;">Sem novas notificações do Chat de OS.</div><% } %>
                   <% chatNotifs.forEach((n) => { %>
@@ -57,16 +58,25 @@
                   <% }) %>
                 </div>
               </details>
-              <div class="pill">
-                <% if (user.photo_path) { %>
-                  <img class="pill-avatar" src="<%= user.photo_path %>" alt="Foto de <%= user.name %>" />
-                <% } else { %>
-                  <span class="pill-avatar pill-avatar-fallback" aria-hidden="true"><%= String(user.name || 'U').trim().charAt(0).toUpperCase() %></span>
-                <% } %>
-                <span class="pill-name"><%= user.name %></span>
-                <span class="pill-role"><%= String(user.role || '').toUpperCase() %></span>
-              </div>
-              <form action="/auth/logout" method="POST">
+              <details class="user-menu">
+                <summary class="pill user-menu-summary" aria-label="Abrir menu do usuário">
+                  <% if (user.photo_path) { %>
+                    <img class="pill-avatar" src="<%= user.photo_path %>" alt="Foto de <%= user.name %>" />
+                  <% } else { %>
+                    <span class="pill-avatar pill-avatar-fallback" aria-hidden="true"><%= String(user.name || 'U').trim().charAt(0).toUpperCase() %></span>
+                  <% } %>
+                  <span class="pill-name"><%= user.name %></span>
+                  <span class="pill-role"><%= String(user.role || '').toUpperCase() %></span>
+                </summary>
+                <div class="user-menu-dropdown">
+                  <strong><%= user.name %></strong>
+                  <span class="pill-role"><%= String(user.role || '').toUpperCase() %></span>
+                  <form action="/auth/logout" method="POST">
+                    <button class="btn btn-ghost" type="submit">Sair</button>
+                  </form>
+                </div>
+              </details>
+              <form class="desktop-logout" action="/auth/logout" method="POST">
                 <button class="btn btn-ghost" type="submit">Sair</button>
               </form>
             <% } %>
