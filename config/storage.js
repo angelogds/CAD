@@ -1,8 +1,30 @@
 const fs = require("fs");
 const path = require("path");
 
-const hasDataMount = fs.existsSync("/data");
-const defaultBaseDir = hasDataMount ? "/data" : path.join(process.cwd(), "data");
+function firstWritableDir(candidates) {
+  for (const candidate of candidates) {
+    if (!candidate || !String(candidate).trim()) continue;
+    const dir = path.resolve(String(candidate).trim());
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.accessSync(dir, fs.constants.R_OK | fs.constants.W_OK);
+      return dir;
+    } catch (_error) {
+      // tenta o próximo candidato
+    }
+  }
+  return path.join(process.cwd(), "data");
+}
+
+// No Railway, o volume pode ser montado em um caminho dinâmico e exposto por
+// RAILWAY_VOLUME_MOUNT_PATH. Preferir esse caminho evita gravar SQLite em /data
+// quando /data existe na imagem, mas não é o volume persistente real.
+const defaultBaseDir = firstWritableDir([
+  process.env.RAILWAY_VOLUME_MOUNT_PATH,
+  process.env.RAILWAY_VOLUME_PATH,
+  fs.existsSync("/data") ? "/data" : null,
+  path.join(process.cwd(), "data"),
+]);
 
 function resolveDir(envKey, fallbackPath) {
   const envValue = process.env[envKey];
