@@ -223,7 +223,7 @@ function getSemanaPorData(dateISO) {
   const d = (dateISO || isoToday()).slice(0, 10);
 
   const semana = db.prepare(`
-    SELECT id, semana_numero, data_inicio, data_fim
+    SELECT id, semana_numero, data_inicio, data_fim, COALESCE(origem,'GERADA') AS origem, COALESCE(ajuste_manual,0) AS ajuste_manual, observacao, status
     FROM escala_semanas
     WHERE ? BETWEEN data_inicio AND data_fim
     LIMIT 1
@@ -313,7 +313,7 @@ function getLinhasSemanaComStatus(semanaId, dateRef) {
 
 function getSemanaById(id) {
   const semana = db.prepare(`
-    SELECT id, semana_numero, data_inicio, data_fim
+    SELECT id, semana_numero, data_inicio, data_fim, COALESCE(origem,'GERADA') AS origem, COALESCE(ajuste_manual,0) AS ajuste_manual, observacao, status
     FROM escala_semanas
     WHERE id=?
   `).get(id);
@@ -348,7 +348,7 @@ function atualizarTurno(alocacaoId, tipo_turno) {
 
 function getEscalaCompletaComTimes() {
   const semanas = db.prepare(`
-    SELECT s.id, s.semana_numero, s.data_inicio, s.data_fim
+    SELECT s.id, s.semana_numero, s.data_inicio, s.data_fim, COALESCE(s.ajuste_manual,0) AS ajuste_manual, s.observacao
     FROM escala_semanas s
     ORDER BY s.semana_numero ASC
   `).all();
@@ -731,7 +731,7 @@ function removerAusencia(id) {
 
 function getSemanasNoPeriodo(start, end) {
   return db.prepare(`
-    SELECT id, semana_numero, data_inicio, data_fim
+    SELECT id, semana_numero, data_inicio, data_fim, COALESCE(origem,'GERADA') AS origem, COALESCE(ajuste_manual,0) AS ajuste_manual, observacao, status
     FROM escala_semanas
     WHERE NOT (data_fim < ? OR data_inicio > ?)
     ORDER BY data_inicio ASC
@@ -800,6 +800,8 @@ function getEscalaSemanalPdfData() {
       data_fim: s.data_fim,
       noturno: grupos.noturno,
       diurno: grupos.diurno,
+      ajuste_manual: Number(s.ajuste_manual || 0),
+      observacao: s.observacao || '',
     };
   });
 }
@@ -1407,14 +1409,117 @@ function cancelarFolgaCompensatoria(id, usuarioResponsavel, motivo) { if(!canMan
 function realizarFolgaCompensatoria(id, usuarioResponsavel) { if(!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); db.prepare("UPDATE escala_folgas_programadas SET status='REALIZADA', atualizado_em=datetime('now') WHERE id=? AND status='PROGRAMADA'").run(id); }
 function gerarDadosRelatorioBancoHoras(filtros={}) { return { filtros, emitidoEm: new Date().toISOString(), banco: listarBancoHoras(), horasExtras: listarHorasExtras(filtros), folgas: listarFolgas(filtros) }; }
 
+function parseIds(value) {
+  if (Array.isArray(value)) return value.map(Number).filter(Boolean);
+  return String(value || '').split(',').map((v) => Number(v.trim())).filter(Boolean);
+}
+function addDaysISO(dateISO, days) { const d = new Date(`${dateISO}T00:00:00Z`); d.setUTCDate(d.getUTCDate()+days); return d.toISOString().slice(0,10); }
+function colaboradorDisponivelNoPeriodo(colaboradorId, inicio, fim) {
+  const c = db.prepare(`SELECT * FROM colaboradores WHERE id=?`).get(colaboradorId);
+  if (!c || !isColaboradorAtivo(c) || isColaboradorDemo(c) || Number(c.fora_escala || 0) === 1) return false;
+  return buscarIndisponibilidadesNoPeriodo(colaboradorId, inicio, fim).length === 0;
+}
+function buscarIndisponibilidadesNoPeriodo(colaboradorId, inicio, fim) {
+  const rows = [];
+  if (tableExists('escala_ausencias')) rows.push(...db.prepare(`SELECT tipo, data_inicio AS inicio, data_fim AS fim, motivo FROM escala_ausencias WHERE colaborador_id=? AND NOT (data_fim < ? OR data_inicio > ?)`).all(colaboradorId, inicio, fim));
+  if (tableExists('escala_concessoes')) rows.push(...db.prepare(`SELECT tipo, inicio, fim, motivo FROM escala_concessoes WHERE colaborador_id=? AND NOT (fim < ? OR inicio > ?)`).all(colaboradorId, inicio, fim));
+  if (tableExists('escala_folgas_programadas')) rows.push(...db.prepare(`SELECT 'FOLGA_PROGRAMADA' AS tipo, data_folga AS inicio, data_folga AS fim, motivo FROM escala_folgas_programadas WHERE colaborador_id=? AND status <> 'CANCELADA' AND data_folga BETWEEN ? AND ?`).all(colaboradorId, inicio, fim));
+  return rows;
+}
+function listarConfiguracoesRodizio() {
+  if (!tableExists('escala_rodizio_config')) return [];
+  return db.prepare(`SELECT * FROM escala_rodizio_config ORDER BY ativo DESC, data_inicio DESC, id DESC`).all();
+}
+function buscarRodizioAtivo() {
+  if (!tableExists('escala_rodizio_config')) return null;
+  const cfg = db.prepare(`SELECT * FROM escala_rodizio_config WHERE ativo=1 ORDER BY data_inicio DESC, id DESC LIMIT 1`).get();
+  if (!cfg) return null;
+  cfg.noturnos = db.prepare(`SELECT i.*, c.nome FROM escala_rodizio_itens i JOIN colaboradores c ON c.id=i.colaborador_id WHERE i.config_id=? AND i.ativo=1 AND UPPER(i.turno)='NOITE' ORDER BY i.posicao`).all(cfg.id);
+  cfg.diurnosFixos = db.prepare(`SELECT f.*, c.nome FROM escala_diurno_fixos f JOIN colaboradores c ON c.id=f.colaborador_id WHERE f.config_id=? AND f.ativo=1 ORDER BY c.nome`).all(cfg.id);
+  return cfg;
+}
+function salvarConfiguracaoRodizio(dados, usuario) {
+  const inicio = toDateOnly(dados.data_inicio); const fim = toDateOnly(dados.data_fim) || null;
+  const noturnos = parseIds(dados.noturnos || dados.rodizioNoturno || dados.colaboradores_noturnos);
+  const diurnos = parseIds(dados.diurnos_fixos || dados.diurnosFixos || dados.colaboradores_diurnos);
+  if (!inicio || (fim && fim < inicio)) throw new Error('Período inválido do rodízio.');
+  if (!noturnos.length) throw new Error('Informe ao menos um colaborador no rodízio noturno.');
+  const tamanho = Math.max(1, Number(dados.tamanho_ciclo || noturnos.length));
+  const tx = db.transaction(() => {
+    db.prepare(`UPDATE escala_rodizio_config SET ativo=0, atualizado_em=datetime('now') WHERE ativo=1`).run();
+    const info = db.prepare(`INSERT INTO escala_rodizio_config (nome,data_inicio,data_fim,tamanho_ciclo,ativo,criado_por) VALUES (?,?,?,?,1,?)`).run(String(dados.nome || 'Rodízio da Escala'), inicio, fim, tamanho, userIdFrom(usuario));
+    const id = Number(info.lastInsertRowid);
+    noturnos.slice(0, tamanho).forEach((cid, idx) => db.prepare(`INSERT INTO escala_rodizio_itens (config_id,posicao,colaborador_id,turno,ativo) VALUES (?,?,?,'NOITE',1)`).run(id, idx + 1, cid));
+    [...new Set(diurnos)].forEach((cid) => db.prepare(`INSERT INTO escala_diurno_fixos (config_id,colaborador_id,ativo) VALUES (?,?,1)`).run(id, cid));
+    return id;
+  });
+  return buscarRodizioAtivo(tx());
+}
+function semanasEntre(inicio, fim) { return db.prepare(`SELECT id, semana_numero, data_inicio, data_fim, ajuste_manual, origem FROM escala_semanas WHERE data_fim >= ? AND data_inicio <= ? ORDER BY data_inicio`).all(inicio, fim); }
+function montarSemanaRodizio(semana, config) {
+  const noturnos = config.noturnos || []; const fixos = config.diurnosFixos || [];
+  const idx = (Number(semana.semana_indice || 0)) % Math.max(1, Number(config.tamanho_ciclo || noturnos.length));
+  const itemNoite = noturnos[idx % noturnos.length];
+  const conflitos = itemNoite ? buscarIndisponibilidadesNoPeriodo(itemNoite.colaborador_id, semana.data_inicio, semana.data_fim).map(a => `${itemNoite.nome} está em ${a.tipo}`) : ['Sem plantonista noturno configurado.'];
+  const diurnos = [...fixos, ...noturnos.filter((n) => Number(n.colaborador_id) !== Number(itemNoite?.colaborador_id))]
+    .filter((c, pos, arr) => arr.findIndex((x) => Number(x.colaborador_id) === Number(c.colaborador_id)) === pos)
+    .filter((c) => colaboradorDisponivelNoPeriodo(c.colaborador_id, semana.data_inicio, semana.data_fim));
+  return { ...semana, noturno: itemNoite || null, diurnos, conflitos, semana_indice: idx };
+}
+function montarConfigRodizioTemporaria(dados) {
+  const noturnosIds = parseIds(dados.noturnos || dados.rodizioNoturno || dados.colaboradores_noturnos);
+  const diurnosIds = parseIds(dados.diurnos_fixos || dados.diurnosFixos || dados.colaboradores_diurnos);
+  const colaboradores = listarColaboradoresManutencao();
+  const byId = new Map(colaboradores.map(c => [Number(c.id), c]));
+  return { id: null, nome: String(dados.nome || 'Prévia do Rodízio'), data_inicio: toDateOnly(dados.data_inicio), data_fim: toDateOnly(dados.data_fim) || null, tamanho_ciclo: Math.max(1, Number(dados.tamanho_ciclo || noturnosIds.length || 1)), noturnos: noturnosIds.map((id, idx) => ({ colaborador_id: id, nome: byId.get(id)?.nome || `#${id}`, posicao: idx + 1 })), diurnosFixos: diurnosIds.map((id) => ({ colaborador_id: id, nome: byId.get(id)?.nome || `#${id}` })) };
+}
+function gerarPreviewRodizio(dados) {
+  const config = dados.config_id ? buscarRodizioAtivo() : ((dados.noturnos || dados.colaboradores_noturnos) ? montarConfigRodizioTemporaria(dados) : buscarRodizioAtivo());
+  if (!config) throw new Error('Configure o rodízio antes de pré-visualizar.');
+  const inicio = toDateOnly(dados.data_inicio || config.data_inicio); const fim = toDateOnly(dados.data_fim || config.data_fim) || addDaysISO(inicio, 364);
+  return semanasEntre(inicio, fim).map((s, i) => montarSemanaRodizio({ ...s, semana_indice: i }, config));
+}
+function detectarConflitosRodizio(config, periodo) { return gerarPreviewRodizio({ config_id: config?.id, data_inicio: periodo?.inicio, data_fim: periodo?.fim }).filter(s => s.conflitos.length); }
+function aplicarRodizioNaEscala(dados, usuario) {
+  const config = dados.config_id ? buscarRodizioAtivo() : salvarConfiguracaoRodizio(dados, usuario);
+  const inicio = toDateOnly(dados.data_inicio || config.data_inicio); const fim = toDateOnly(dados.data_fim || config.data_fim) || addDaysISO(inicio, 364);
+  const sobrescrever = String(dados.sobrescrever || dados.sobrescrever_manuais || '').toLowerCase() === 'true' || dados.sobrescrever === '1';
+  const preview = semanasEntre(inicio, fim).map((s, i) => montarSemanaRodizio({ ...s, semana_indice: i }, config));
+  let puladas = 0, alocacoes = 0;
+  const tx = db.transaction(() => {
+    for (const sem of preview) {
+      if (Number(sem.ajuste_manual) === 1 && !sobrescrever) { puladas++; continue; }
+      db.prepare(`DELETE FROM escala_alocacoes WHERE semana_id=?`).run(sem.id);
+      if (sem.noturno && colaboradorDisponivelNoPeriodo(sem.noturno.colaborador_id, sem.data_inicio, sem.data_fim)) { db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,'noturno',?,'Rodízio da Escala')`).run(sem.id, sem.noturno.colaborador_id); alocacoes++; }
+      sem.diurnos.forEach((c) => { db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,'diurno',?,'Rodízio da Escala')`).run(sem.id, c.colaborador_id); alocacoes++; });
+      db.prepare(`UPDATE escala_semanas SET origem='GERADA', ajuste_manual=0, rodizio_config_id=?, semana_indice=?, observacao=COALESCE(observacao,''), status=COALESCE(status,'ATIVA') WHERE id=?`).run(config.id, sem.semana_indice, sem.id);
+    }
+  }); tx(); return { semanas: preview.length, alocacoes, puladas, conflitos: preview.filter(s=>s.conflitos.length).length };
+}
+function recalcularEscalaPorRodizio(configId, filtros, usuario) { return aplicarRodizioNaEscala({ ...(filtros || {}), config_id: Number(configId), sobrescrever: filtros?.sobrescrever }, usuario); }
+function desativarRodizio(id) { if (!id) return false; return db.prepare(`UPDATE escala_rodizio_config SET ativo=0, atualizado_em=datetime('now') WHERE id=?`).run(id).changes > 0; }
+function salvarSemanaManual(semanaId, dados) {
+  const inicio = toDateOnly(dados.data_inicio); const fim = toDateOnly(dados.data_fim);
+  const noturnoId = Number(dados.noturno_id || 0); const diurnoIds = parseIds(dados.diurnos || dados.diurnos_ids);
+  const obs = String(dados.observacao || '').trim(); const status = String(dados.status || 'ATIVA').trim().toUpperCase();
+  const tx = db.transaction(() => {
+    if (inicio && fim && fim >= inicio) db.prepare(`UPDATE escala_semanas SET data_inicio=?, data_fim=? WHERE id=?`).run(inicio, fim, semanaId);
+    db.prepare(`DELETE FROM escala_alocacoes WHERE semana_id=?`).run(semanaId);
+    if (noturnoId) db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,'noturno',?,?)`).run(semanaId, noturnoId, obs || 'Ajuste manual');
+    [...new Set(diurnoIds)].filter(id => id !== noturnoId).forEach(id => db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,'diurno',?,?)`).run(semanaId, id, obs || 'Ajuste manual'));
+    db.prepare(`UPDATE escala_semanas SET origem='MANUAL', ajuste_manual=1, observacao=?, status=? WHERE id=?`).run(obs || null, status || 'ATIVA', semanaId);
+  }); tx();
+}
+
 function recalcularEscalaCompleta({ quantidade = 3 } = {}) {
   const qtd = Math.min(5, Math.max(2, Number(quantidade) || 3));
   const colaboradores = listarColaboradoresManutencao();
   if (colaboradores.length === 0) throw new Error('Nenhum colaborador disponível para recalcular.');
-  const semanas = db.prepare(`SELECT id, data_inicio, data_fim FROM escala_semanas WHERE data_fim >= ? ORDER BY data_inicio ASC`).all(isoToday());
+  const semanas = db.prepare(`SELECT id, data_inicio, data_fim, COALESCE(ajuste_manual,0) AS ajuste_manual FROM escala_semanas WHERE data_fim >= ? ORDER BY data_inicio ASC`).all(isoToday());
   let idx = 0, alocacoes = 0;
   const tx = db.transaction(() => {
     for (const sem of semanas) {
+      if (Number(sem.ajuste_manual) === 1 && !arguments[0]?.sobrescrever) continue;
       db.prepare(`DELETE FROM escala_alocacoes WHERE semana_id=?`).run(sem.id);
       const selecionados = []; let tentativas = 0;
       while (selecionados.length < qtd && tentativas < colaboradores.length * 2) {
@@ -1428,4 +1533,4 @@ function recalcularEscalaCompleta({ quantidade = 3 } = {}) {
   return { semanas: semanas.length, alocacoes, quantidade: qtd };
 }
 
-Object.assign(module.exports, { recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtras, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });
+Object.assign(module.exports, { listarConfiguracoesRodizio, buscarRodizioAtivo, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtras, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });

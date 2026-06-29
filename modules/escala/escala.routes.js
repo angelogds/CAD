@@ -37,6 +37,13 @@ router.get("/semana", requireLogin, requireRole(escalaRead), safe(controller.sem
 router.get("/completa", requireLogin, requireRole(escalaRead), safe(controller.completa, "completa"));
 router.get("/ausencias", requireLogin, requireRole(escalaRead), safe(controller.ausencias, "ausencias"));
 
+router.get("/rodizio", requireLogin, requireRole(escalaManage), safe(controller.rodizioIndex, "rodizioIndex"));
+router.post("/rodizio/salvar", requireLogin, requireRole(escalaManage), safe(controller.salvarRodizio, "salvarRodizio"));
+router.post("/rodizio/preview", requireLogin, requireRole(escalaManage), safe(controller.previewRodizio, "previewRodizio"));
+router.post("/rodizio/aplicar", requireLogin, requireRole(escalaManage), safe(controller.aplicarRodizio, "aplicarRodizio"));
+router.post("/rodizio/recalcular", requireLogin, requireRole(escalaManage), safe(controller.recalcularRodizio, "recalcularRodizio"));
+router.post("/rodizio/:id/desativar", requireLogin, requireRole(escalaManage), safe(controller.desativarRodizio, "desativarRodizio"));
+
 router.get("/hora-extra/nova", requireLogin, requireRole(escalaRead), safe(controller.horaExtraNova, "horaExtraNova"));
 router.post("/hora-extra/iniciar", requireLogin, requireRole(escalaRead), upload.single("foto_inicio"), safe(controller.iniciarHoraExtra, "iniciarHoraExtra"));
 router.post("/hora-extra/:id/finalizar", requireLogin, requireRole(escalaRead), upload.single("foto_fim"), safe(controller.finalizarHoraExtra, "finalizarHoraExtra"));
