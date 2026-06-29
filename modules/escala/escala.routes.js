@@ -39,6 +39,7 @@ router.get("/ausencias", requireLogin, requireRole(escalaRead), safe(controller.
 
 router.get("/rodizio", requireLogin, requireRole(escalaManage), safe(controller.rodizioIndex, "rodizioIndex"));
 router.post("/rodizio/salvar", requireLogin, requireRole(escalaManage), safe(controller.salvarRodizio, "salvarRodizio"));
+router.post("/rodizio/salvar-aplicar", requireLogin, requireRole(escalaManage), safe(controller.salvarAplicarRodizio, "salvarAplicarRodizio"));
 router.post("/rodizio/preview", requireLogin, requireRole(escalaManage), safe(controller.previewRodizio, "previewRodizio"));
 router.post("/rodizio/aplicar", requireLogin, requireRole(escalaManage), safe(controller.aplicarRodizio, "aplicarRodizio"));
 router.post("/rodizio/recalcular", requireLogin, requireRole(escalaManage), safe(controller.recalcularRodizio, "recalcularRodizio"));

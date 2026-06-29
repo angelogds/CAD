@@ -2,7 +2,7 @@
 <div class="page-head"><div><h1>Pré-visualizar escala</h1><p class="muted">Confira conflitos antes de aplicar.</p></div><a class="btn" href="/escala/rodizio">Voltar</a></div>
 <form method="POST" action="/escala/rodizio/aplicar" class="card" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
   <% Object.entries(dados || {}).forEach(([k,v])=>{ if(Array.isArray(v)){ v.forEach(x=>{ %><input type="hidden" name="<%= k %>" value="<%= x %>"><% }) } else { %><input type="hidden" name="<%= k %>" value="<%= v %>"><% } }) %>
-  <label><input type="checkbox" name="sobrescrever" value="1"> Sobrescrever ajustes manuais</label>
+  <label><input type="checkbox" name="sobrescreverTudo" value="1"> Sobrescrever ajustes manuais</label>
   <button class="btn btn-green">Aplicar escala</button>
 </form>
 <div class="escala-card-grid" style="margin-top:12px;">
