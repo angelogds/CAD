@@ -125,8 +125,22 @@ function funcaoLabel(funcao) {
 }
 
 
+function normalizarDataFormulario(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const br = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (br) {
+    const dia = br[1].padStart(2, "0");
+    const mes = br[2].padStart(2, "0");
+    return `${br[3]}-${mes}-${dia}`;
+  }
+  return raw.slice(0, 10);
+}
+
 function toDateOnly(value) {
-  return String(value || "").slice(0, 10);
+  return normalizarDataFormulario(value);
 }
 
 function normalizeTipoAusencia(tipo) {
@@ -346,12 +360,21 @@ function atualizarTurno(alocacaoId, tipo_turno) {
   `).run(tipo_turno, alocacaoId);
 }
 
-function getEscalaCompletaComTimes() {
+function listarEscalaCompleta({ dataInicio, dataFim } = {}) {
+  const inicio = toDateOnly(dataInicio);
+  const fim = toDateOnly(dataFim);
+  const params = [];
+  let where = "1=1";
+  if (inicio) { where += " AND s.data_fim >= ?"; params.push(inicio); }
+  if (fim) { where += " AND s.data_inicio <= ?"; params.push(fim); }
+
   const semanas = db.prepare(`
-    SELECT s.id, s.semana_numero, s.data_inicio, s.data_fim, COALESCE(s.ajuste_manual,0) AS ajuste_manual, s.observacao
+    SELECT s.id, s.semana_numero, s.data_inicio, s.data_fim, COALESCE(s.ajuste_manual,0) AS ajuste_manual, s.observacao,
+           COALESCE(s.origem,'GERADA') AS origem, s.rodizio_config_id, s.semana_indice, COALESCE(s.status,'ATIVA') AS status
     FROM escala_semanas s
-    ORDER BY s.semana_numero ASC
-  `).all();
+    WHERE ${where}
+    ORDER BY s.data_inicio ASC, s.semana_numero ASC
+  `).all(...params);
 
   return semanas.map((s) => {
     const alocs = db.prepare(`
@@ -369,6 +392,14 @@ function getEscalaCompletaComTimes() {
 
     return { ...s, times };
   });
+}
+
+function getEscalaCompletaComTimes(filtros = {}) {
+  return listarEscalaCompleta({ dataInicio: filtros.dataInicio || filtros.data_inicio, dataFim: filtros.dataFim || filtros.data_fim });
+}
+
+function buscarDadosPdfEscalaCompleta(filtros = {}) {
+  return listarEscalaCompleta({ dataInicio: filtros.dataInicio || filtros.data_inicio || filtros.start || filtros.inicio, dataFim: filtros.dataFim || filtros.data_fim || filtros.end || filtros.fim });
 }
 
 function ensureColaborador(nome, funcao = "mecanico") {
@@ -1127,6 +1158,9 @@ module.exports = {
   atualizarTurno,
   removerAlocacao,
   getEscalaCompletaComTimes,
+  listarEscalaCompleta,
+  buscarDadosPdfEscalaCompleta,
+  normalizarDataFormulario,
   adicionarRapidoPeriodo,
   lancarAusencia,
   getLinhasSemanaComStatus,
@@ -1295,9 +1329,16 @@ function listarPainelEscala({ user = null, canViewAll = false, colaboradorId = n
 
 function listarColaboradoresManutencao() {
   const cols = tableExists('colaboradores') ? db.prepare('PRAGMA table_info(colaboradores)').all().map(c=>c.name) : [];
-  const statusCol = cols.includes('status') ? "AND lower(COALESCE(status,'ativo')) NOT IN ('inativo','desligado')" : '';
+  if (!cols.length) return [];
+  const statusCol = cols.includes('status') ? "AND lower(COALESCE(status,'ativo')) NOT IN ('inativo','desligado','excluido','apagado','removido')" : '';
   const fotoExpr = cols.includes('foto_path') ? 'foto_path' : (cols.includes('foto') ? 'foto AS foto_path' : 'NULL AS foto_path');
-  return db.prepare(`SELECT id, nome, funcao, ${fotoExpr} ${cols.includes('user_id') ? ', user_id' : ', NULL AS user_id'} FROM colaboradores WHERE IFNULL(ativo,1)=1 ${statusCol} ORDER BY nome`).all();
+  const deletedCol = cols.includes('deleted_at') ? 'AND deleted_at IS NULL' : '';
+  const excluidoCol = cols.includes('excluido') ? 'AND IFNULL(excluido,0)=0' : '';
+  const demoCol = cols.includes('is_demo') ? 'AND IFNULL(is_demo,0)=0' : '';
+  const foraEscalaCol = cols.includes('fora_escala') ? 'AND IFNULL(fora_escala,0)=0' : '';
+  const rows = db.prepare(`SELECT * FROM colaboradores WHERE IFNULL(ativo,1)=1 ${statusCol} ${deletedCol} ${excluidoCol} ${demoCol} ${foraEscalaCol} AND lower(nome) NOT LIKE '%demo%' AND lower(nome) NOT LIKE '%teste%' ORDER BY nome`).all();
+  const dedup = deduplicarColaboradoresEscala(rows);
+  return dedup.map((row) => ({ ...row, foto_path: row.foto_path || row.foto || null, user_id: cols.includes('user_id') ? row.user_id : null }));
 }
 
 function buscarColaboradorDoUsuario(userId) {
@@ -1440,8 +1481,9 @@ function buscarRodizioAtivo() {
 }
 function salvarConfiguracaoRodizio(dados, usuario) {
   const inicio = toDateOnly(dados.data_inicio); const fim = toDateOnly(dados.data_fim) || null;
-  const noturnos = parseIds(dados.noturnos || dados.rodizioNoturno || dados.colaboradores_noturnos);
-  const diurnos = parseIds(dados.diurnos_fixos || dados.diurnosFixos || dados.colaboradores_diurnos);
+  const colaboradoresValidos = new Set(listarColaboradoresManutencao().map((c) => Number(c.id)));
+  const noturnos = parseIds(dados.noturnos || dados.rodizioNoturno || dados.colaboradores_noturnos).filter((id) => colaboradoresValidos.has(Number(id)));
+  const diurnos = parseIds(dados.diurnos_fixos || dados.diurnosFixos || dados.colaboradores_diurnos).filter((id) => colaboradoresValidos.has(Number(id)));
   if (!inicio || (fim && fim < inicio)) throw new Error('Período inválido do rodízio.');
   if (!noturnos.length) throw new Error('Informe ao menos um colaborador no rodízio noturno.');
   const tamanho = Math.max(1, Number(dados.tamanho_ciclo || noturnos.length));
@@ -1455,7 +1497,46 @@ function salvarConfiguracaoRodizio(dados, usuario) {
   });
   return buscarRodizioAtivo(tx());
 }
-function semanasEntre(inicio, fim) { return db.prepare(`SELECT id, semana_numero, data_inicio, data_fim, ajuste_manual, origem FROM escala_semanas WHERE data_fim >= ? AND data_inicio <= ? ORDER BY data_inicio`).all(inicio, fim); }
+function getPeriodoRodizioId(inicio, fim) {
+  const existente = db.prepare(`
+    SELECT id FROM escala_periodos
+    WHERE titulo = 'Rodízio da Escala' AND vigencia_inicio = ? AND vigencia_fim = ?
+    ORDER BY id DESC LIMIT 1
+  `).get(inicio, fim);
+  if (existente?.id) return existente.id;
+  return Number(db.prepare(`
+    INSERT INTO escala_periodos (titulo, vigencia_inicio, vigencia_fim, regra_texto, intervalo_tecnico)
+    VALUES ('Rodízio da Escala', ?, ?, 'Gerado pelo Editor de Rodízio da Escala', '19h-05h')
+  `).run(inicio, fim).lastInsertRowid);
+}
+
+function garantirSemanasEscala(inicio, fim) {
+  const periodoId = getPeriodoRodizioId(inicio, fim);
+  const semanas = [];
+  let cursor = inicio;
+  let numero = Number(db.prepare(`SELECT COALESCE(MAX(semana_numero),0) + 1 AS n FROM escala_semanas`).get()?.n || 1);
+  while (cursor <= fim) {
+    const semFim = addDaysISO(cursor, 6) > fim ? fim : addDaysISO(cursor, 6);
+    let row = db.prepare(`
+      SELECT id, semana_numero, data_inicio, data_fim, ajuste_manual, origem, rodizio_config_id, semana_indice
+      FROM escala_semanas
+      WHERE data_inicio = ? AND data_fim = ?
+      LIMIT 1
+    `).get(cursor, semFim);
+    if (!row) {
+      const info = db.prepare(`INSERT INTO escala_semanas (periodo_id, semana_numero, data_inicio, data_fim) VALUES (?,?,?,?)`).run(periodoId, numero++, cursor, semFim);
+      row = { id: Number(info.lastInsertRowid), semana_numero: numero - 1, data_inicio: cursor, data_fim: semFim, ajuste_manual: 0, origem: 'GERADA' };
+    }
+    semanas.push(row);
+    cursor = addDaysISO(semFim, 1);
+  }
+  return semanas;
+}
+
+function semanasEntre(inicio, fim, { criar = false } = {}) {
+  if (criar) return garantirSemanasEscala(inicio, fim);
+  return db.prepare(`SELECT id, semana_numero, data_inicio, data_fim, ajuste_manual, origem, rodizio_config_id, semana_indice FROM escala_semanas WHERE data_fim >= ? AND data_inicio <= ? ORDER BY data_inicio`).all(inicio, fim);
+}
 function montarSemanaRodizio(semana, config) {
   const noturnos = config.noturnos || []; const fixos = config.diurnosFixos || [];
   const idx = (Number(semana.semana_indice || 0)) % Math.max(1, Number(config.tamanho_ciclo || noturnos.length));
@@ -1467,9 +1548,10 @@ function montarSemanaRodizio(semana, config) {
   return { ...semana, noturno: itemNoite || null, diurnos, conflitos, semana_indice: idx };
 }
 function montarConfigRodizioTemporaria(dados) {
-  const noturnosIds = parseIds(dados.noturnos || dados.rodizioNoturno || dados.colaboradores_noturnos);
-  const diurnosIds = parseIds(dados.diurnos_fixos || dados.diurnosFixos || dados.colaboradores_diurnos);
   const colaboradores = listarColaboradoresManutencao();
+  const validos = new Set(colaboradores.map((c) => Number(c.id)));
+  const noturnosIds = parseIds(dados.noturnos || dados.rodizioNoturno || dados.colaboradores_noturnos).filter((id) => validos.has(Number(id)));
+  const diurnosIds = parseIds(dados.diurnos_fixos || dados.diurnosFixos || dados.colaboradores_diurnos).filter((id) => validos.has(Number(id)));
   const byId = new Map(colaboradores.map(c => [Number(c.id), c]));
   return { id: null, nome: String(dados.nome || 'Prévia do Rodízio'), data_inicio: toDateOnly(dados.data_inicio), data_fim: toDateOnly(dados.data_fim) || null, tamanho_ciclo: Math.max(1, Number(dados.tamanho_ciclo || noturnosIds.length || 1)), noturnos: noturnosIds.map((id, idx) => ({ colaborador_id: id, nome: byId.get(id)?.nome || `#${id}`, posicao: idx + 1 })), diurnosFixos: diurnosIds.map((id) => ({ colaborador_id: id, nome: byId.get(id)?.nome || `#${id}` })) };
 }
@@ -1477,14 +1559,14 @@ function gerarPreviewRodizio(dados) {
   const config = dados.config_id ? buscarRodizioAtivo() : ((dados.noturnos || dados.colaboradores_noturnos) ? montarConfigRodizioTemporaria(dados) : buscarRodizioAtivo());
   if (!config) throw new Error('Configure o rodízio antes de pré-visualizar.');
   const inicio = toDateOnly(dados.data_inicio || config.data_inicio); const fim = toDateOnly(dados.data_fim || config.data_fim) || addDaysISO(inicio, 364);
-  return semanasEntre(inicio, fim).map((s, i) => montarSemanaRodizio({ ...s, semana_indice: i }, config));
+  return semanasEntre(inicio, fim, { criar: true }).map((s, i) => montarSemanaRodizio({ ...s, semana_indice: i }, config));
 }
 function detectarConflitosRodizio(config, periodo) { return gerarPreviewRodizio({ config_id: config?.id, data_inicio: periodo?.inicio, data_fim: periodo?.fim }).filter(s => s.conflitos.length); }
 function aplicarRodizioNaEscala(dados, usuario) {
   const config = dados.config_id ? buscarRodizioAtivo() : salvarConfiguracaoRodizio(dados, usuario);
   const inicio = toDateOnly(dados.data_inicio || config.data_inicio); const fim = toDateOnly(dados.data_fim || config.data_fim) || addDaysISO(inicio, 364);
-  const sobrescrever = String(dados.sobrescrever || dados.sobrescrever_manuais || '').toLowerCase() === 'true' || dados.sobrescrever === '1';
-  const preview = semanasEntre(inicio, fim).map((s, i) => montarSemanaRodizio({ ...s, semana_indice: i }, config));
+  const sobrescrever = String(dados.sobrescreverTudo || dados.sobrescrever || dados.sobrescrever_manuais || '').toLowerCase() === 'true' || dados.sobrescreverTudo === '1' || dados.sobrescrever === '1';
+  const preview = semanasEntre(inicio, fim, { criar: true }).map((s, i) => montarSemanaRodizio({ ...s, semana_indice: i }, config));
   let puladas = 0, alocacoes = 0;
   const tx = db.transaction(() => {
     for (const sem of preview) {
@@ -1494,9 +1576,9 @@ function aplicarRodizioNaEscala(dados, usuario) {
       sem.diurnos.forEach((c) => { db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,'diurno',?,'Rodízio da Escala')`).run(sem.id, c.colaborador_id); alocacoes++; });
       db.prepare(`UPDATE escala_semanas SET origem='GERADA', ajuste_manual=0, rodizio_config_id=?, semana_indice=?, observacao=COALESCE(observacao,''), status=COALESCE(status,'ATIVA') WHERE id=?`).run(config.id, sem.semana_indice, sem.id);
     }
-  }); tx(); return { semanas: preview.length, alocacoes, puladas, conflitos: preview.filter(s=>s.conflitos.length).length };
+  }); tx(); return { semanas: preview.length, semanasGeradas: preview.length, semanasAtualizadas: preview.length - puladas, semanasPreservadasPorAjusteManual: puladas, alocacoes, puladas, conflitos: preview.flatMap(s=>s.conflitos || []), periodoInicio: inicio, periodoFim: fim };
 }
-function recalcularEscalaPorRodizio(configId, filtros, usuario) { return aplicarRodizioNaEscala({ ...(filtros || {}), config_id: Number(configId), sobrescrever: filtros?.sobrescrever }, usuario); }
+function recalcularEscalaPorRodizio(configId, filtros, usuario) { return aplicarRodizioNaEscala({ ...(filtros || {}), config_id: Number(configId), sobrescreverTudo: filtros?.sobrescreverTudo || filtros?.sobrescrever }, usuario); }
 function desativarRodizio(id) { if (!id) return false; return db.prepare(`UPDATE escala_rodizio_config SET ativo=0, atualizado_em=datetime('now') WHERE id=?`).run(id).changes > 0; }
 function salvarSemanaManual(semanaId, dados) {
   const inicio = toDateOnly(dados.data_inicio); const fim = toDateOnly(dados.data_fim);
@@ -1533,4 +1615,4 @@ function recalcularEscalaCompleta({ quantidade = 3 } = {}) {
   return { semanas: semanas.length, alocacoes, quantidade: qtd };
 }
 
-Object.assign(module.exports, { listarConfiguracoesRodizio, buscarRodizioAtivo, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtras, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });
+Object.assign(module.exports, { listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtras, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });

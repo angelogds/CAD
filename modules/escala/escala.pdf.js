@@ -457,6 +457,36 @@ function gerarPdfBancoHorasPorOs(dados = {}) {
   return doc;
 }
 
+
+function gerarPdfEscalaCompleta({ semanas = [], filtros = {} } = {}) {
+  const doc = createDoc();
+  const meta = { title: "ESCALA COMPLETA", subtitle: "Campo do Gado – Manutenção Industrial", logoPath: logoPath() };
+  process.nextTick(() => {
+    setupPage(doc, meta, false);
+    const periodo = filtros.dataInicio || filtros.dataFim ? `${formatDateBr(filtros.dataInicio)} até ${formatDateBr(filtros.dataFim)}` : "Todas as semanas oficiais";
+    doc.font("Helvetica-Bold").fontSize(10.5).fillColor(COLORS.text).text(`Período: ${periodo}`);
+    doc.moveDown(0.5);
+    drawTable(doc, {
+      meta,
+      columns: [
+        { key: 'semana', label: 'Semana', width: 55 },
+        { key: 'periodo', label: 'Período', width: 105 },
+        { key: 'noturno', label: 'Noturno', width: 130 },
+        { key: 'diurno', label: 'Diurno', width: 205 },
+      ],
+      rows: semanas.map((s) => ({
+        semana: `#${s.semana_numero}`,
+        periodo: `${formatDateBr(s.data_inicio)} a ${formatDateBr(s.data_fim)}`,
+        noturno: (s.times?.noturno || []).join(', ') || '-',
+        diurno: (s.times?.diurno || []).join(', ') || '-',
+      })),
+      emptyRow: { semana: '-', periodo: '-', noturno: '-', diurno: 'Nenhuma semana encontrada.' },
+    });
+    doc.end();
+  });
+  return doc;
+}
+
 function gerarPdfFolgasProgramadas(dados = {}) { return gerarPdfBancoHorasGeral(dados); }
 
 
@@ -471,5 +501,6 @@ module.exports = {
   gerarPdfBancoHorasGeral,
   gerarPdfBancoHorasFuncionario,
   gerarPdfBancoHorasPorOs,
+  gerarPdfEscalaCompleta,
   gerarPdfFolgasProgramadas,
 };

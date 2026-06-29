@@ -20,6 +20,6 @@
         <label class="card" style="padding:10px;"><input type="checkbox" name="diurnos_fixos" value="<%= c.id %>" <%= checked?'checked':'' %>> <%= c.nome %></label>
       <% }) %>
     </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;"><button class="btn btn-primary" type="submit">Pré-visualizar escala</button><button class="btn btn-green" formaction="/escala/rodizio/salvar">Salvar configuração</button></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;"><button class="btn btn-primary" type="submit">Pré-visualizar escala</button><button class="btn" formaction="/escala/rodizio/salvar">Salvar configuração</button><label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" name="sobrescreverTudo" value="1"> Sobrescrever tudo ao aplicar</label><button class="btn btn-green" formaction="/escala/rodizio/salvar-aplicar">Salvar e aplicar na escala</button></div>
   </form>
 </div>
