@@ -457,9 +457,10 @@ app.get("/health", (_req, res) => {
 app.use((_req, res) => res.status(404).send("404 - Página não encontrada"));
 
 // ===== Error handler =====
-app.use((err, req, res, _next) => {
+app.use((err, req, res, next) => {
   console.error("❌ ERRO 500:", req.method, req.originalUrl);
   console.error(err && err.stack ? err.stack : err);
+  if (res.headersSent) return next(err);
   res.status(500).send("500 - Erro interno");
 });
 
