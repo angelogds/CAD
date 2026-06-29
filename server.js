@@ -49,6 +49,49 @@ try {
 }
 
 const app = express();
+const shutdownIntervals = [];
+let server = null;
+let isShuttingDown = false;
+
+function trackInterval(intervalId) {
+  shutdownIntervals.push(intervalId);
+  return intervalId;
+}
+
+function shutdownGracefully(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  console.log(`🛑 ${signal} recebido. Encerrando servidor com segurança...`);
+  for (const intervalId of shutdownIntervals) clearInterval(intervalId);
+
+  const finish = () => {
+    try {
+      if (typeof db?.close === "function") db.close();
+    } catch (err) {
+      console.warn("⚠️ Falha ao fechar banco de dados:", err.message || err);
+    }
+    process.exit(0);
+  };
+
+  if (!server) return finish();
+
+  const forceTimer = setTimeout(() => {
+    console.warn("⚠️ Encerramento demorou demais; finalizando processo.");
+    finish();
+  }, Number(process.env.SHUTDOWN_TIMEOUT_MS || 10000));
+  forceTimer.unref?.();
+
+  server.close((err) => {
+    clearTimeout(forceTimer);
+    if (err) console.warn("⚠️ Falha ao encerrar servidor HTTP:", err.message || err);
+    finish();
+  });
+}
+
+process.on("SIGTERM", () => shutdownGracefully("SIGTERM"));
+process.on("SIGINT", () => shutdownGracefully("SIGINT"));
+
 app.set("trust proxy", 1);
 
 try {
@@ -344,7 +387,7 @@ try {
     catch (err) { console.warn("⚠️ Falha na limpeza automática de mídia:", err.message || err); }
   };
   maybeRunCleanup();
-  setInterval(maybeRunCleanup, 24 * 60 * 60 * 1000);
+  trackInterval(setInterval(maybeRunCleanup, 24 * 60 * 60 * 1000));
 } catch (err) {
   console.warn("⚠️ Serviço de limpeza de mídia indisponível:", err.message || err);
 }
@@ -365,7 +408,7 @@ try {
     };
 
     run();
-    setInterval(run, 60 * 1000);
+    trackInterval(setInterval(run, 60 * 1000));
   }
 } catch (err) {
   console.warn("⚠️ Serviço de OS não carregado para sincronização automática:", err.message || err);
@@ -382,7 +425,7 @@ try {
       }
     };
     runProgramadasSegunda();
-    setInterval(runProgramadasSegunda, 15 * 60 * 1000);
+    trackInterval(setInterval(runProgramadasSegunda, 15 * 60 * 1000));
   }
 } catch (err) {
   console.warn("⚠️ Serviço de preventivas não carregado para lançamento automático de OS:", err.message || err);
@@ -421,4 +464,4 @@ app.use((err, req, res, _next) => {
 });
 
 const port = process.env.PORT || 8080;
-app.listen(port, () => console.log(`🚀 Servidor ativo na porta ${port}`));
+server = app.listen(port, () => console.log(`🚀 Servidor ativo na porta ${port}`));
