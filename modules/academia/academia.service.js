@@ -550,6 +550,43 @@ function seedConteudoCursos() {
   return resumoExecucao;
 }
 
+
+function getAcademiaSeedMinFreeBytes() {
+  const minMb = Number(process.env.ACADEMIA_SEED_MIN_FREE_MB || 25);
+  if (!Number.isFinite(minMb) || minMb <= 0) return 0;
+  return Math.floor(minMb * 1024 * 1024);
+}
+
+function getExistingPathForStatfs(targetPath) {
+  let current = path.resolve(targetPath || storagePaths.DATA_DIR || process.cwd());
+  while (!fs.existsSync(current)) {
+    const parent = path.dirname(current);
+    if (parent === current) return process.cwd();
+    current = parent;
+  }
+  return current;
+}
+
+function hasFreeSpaceForAcademiaSeed() {
+  const minFreeBytes = getAcademiaSeedMinFreeBytes();
+  if (!minFreeBytes || typeof fs.statfsSync !== 'function') return true;
+
+  try {
+    const statPath = getExistingPathForStatfs(storagePaths.DB_PATH || storagePaths.DATA_DIR);
+    const stats = fs.statfsSync(statPath);
+    const freeBytes = Number(stats.bavail || stats.bfree || 0) * Number(stats.bsize || 0);
+    if (freeBytes >= minFreeBytes) return true;
+
+    const freeMb = Math.max(0, freeBytes / 1024 / 1024).toFixed(1);
+    const minMb = (minFreeBytes / 1024 / 1024).toFixed(1);
+    console.warn(`[academia] Seed inicial ignorado: espaço livre insuficiente em ${statPath} (${freeMb} MB disponíveis; mínimo ${minMb} MB).`);
+    return false;
+  } catch (err) {
+    console.warn('[academia] Não foi possível verificar espaço livre antes do seed inicial:', err && (err.message || err));
+    return true;
+  }
+}
+
 function seedAcademiaInicial() {
   const trilhas = [
     ['Fundamentos da Manutenção', 'Base institucional de manutenção industrial e segurança operacional.'],
@@ -672,6 +709,7 @@ function bootstrapAcademia() {
   }
 
   try {
+    if (!hasFreeSpaceForAcademiaSeed()) return;
     seedAcademiaInicial();
   } catch (err) {
     console.error('[academia] Falha ao executar seed inicial:', err && (err.stack || err.message || err));
