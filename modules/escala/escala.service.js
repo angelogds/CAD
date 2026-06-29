@@ -1059,14 +1059,36 @@ function canReadBancoHoras(user) { return canManageBancoHoras(user) || ['RH','DI
 function minutosToHoras(minutos) { const m = Math.abs(Number(minutos)||0); const sign = Number(minutos)<0 ? '-' : ''; return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; }
 function saldoResumo(minutos) { return { minutos, horas: minutosToHoras(minutos), diasFolga: Math.floor(minutos / MINUTOS_DIA_FOLGA), diasFolgaDecimal: Math.round((minutos / MINUTOS_DIA_FOLGA) * 100) / 100 }; }
 
-function listarPainelEscala() {
-  return { pendentes: tableExists('escala_horas_extras') ? db.prepare("SELECT COUNT(*) AS total FROM escala_horas_extras WHERE status='PENDENTE_APROVACAO'").get().total : 0 };
+function listarPainelEscala({ canViewAll = false, colaboradorId = null } = {}) {
+  const banco = listarBancoHoras({ colaborador_id: canViewAll ? null : colaboradorId });
+  const hoje = isoToday();
+  const pendentes = tableExists('escala_horas_extras') ? db.prepare("SELECT COUNT(*) AS total FROM escala_horas_extras WHERE status='PENDENTE_APROVACAO'").get().total : 0;
+  const cards = banco.map((c) => {
+    const emAndamento = buscarHoraExtraEmAndamento(c.id);
+    const ultima = c.ultimasHorasExtras?.[0];
+    const ausenteHoje = getColaboradorIdsAusentesNoDia(hoje).has(Number(c.id));
+    return {
+      ...c,
+      foto_path: c.foto_path || null,
+      turnoAtual: getTurnoAtual(),
+      statusAtual: emAndamento ? 'Hora extra em andamento' : (ausenteHoje ? 'Folga / afastamento' : 'Trabalhando'),
+      horaExtraEmAndamento: Boolean(emAndamento),
+      ultimaHoraExtra: ultima ? `OS ${ultima.os_id || 'sem OS'}${ultima.equipamento_nome ? ' — ' + ultima.equipamento_nome : ''}` : '',
+      horasExtrasMes: minutosToHoras(c.horasExtrasMesMinutos || 0),
+    };
+  }).sort((a,b) => {
+    if (b.saldo.minutos !== a.saldo.minutos) return b.saldo.minutos - a.saldo.minutos;
+    if (Number(b.horaExtraEmAndamento) !== Number(a.horaExtraEmAndamento)) return Number(b.horaExtraEmAndamento) - Number(a.horaExtraEmAndamento);
+    return String(a.nome||'').localeCompare(String(b.nome||''), 'pt-BR');
+  });
+  return { pendentes, colaboradores: cards };
 }
 
 function listarColaboradoresManutencao() {
   const cols = tableExists('colaboradores') ? db.prepare('PRAGMA table_info(colaboradores)').all().map(c=>c.name) : [];
   const statusCol = cols.includes('status') ? "AND lower(COALESCE(status,'ativo')) NOT IN ('inativo','desligado')" : '';
-  return db.prepare(`SELECT id, nome, funcao ${cols.includes('user_id') ? ', user_id' : ', NULL AS user_id'} FROM colaboradores WHERE IFNULL(ativo,1)=1 ${statusCol} ORDER BY nome`).all();
+  const fotoExpr = cols.includes('foto_path') ? 'foto_path' : (cols.includes('foto') ? 'foto AS foto_path' : 'NULL AS foto_path');
+  return db.prepare(`SELECT id, nome, funcao, ${fotoExpr} ${cols.includes('user_id') ? ', user_id' : ', NULL AS user_id'} FROM colaboradores WHERE IFNULL(ativo,1)=1 ${statusCol} ORDER BY nome`).all();
 }
 
 function buscarColaboradorDoUsuario(userId) {
@@ -1155,7 +1177,19 @@ function calcularSaldoBancoHoras(colaboradorId) {
   let creditos=0, debitos=0; rows.forEach(r=>{ if(['CREDITO_HORA_EXTRA','AJUSTE_CREDITO'].includes(r.tipo)) creditos+=Number(r.total||0); else debitos+=Number(r.total||0); });
   return { creditos, debitos, ...saldoResumo(creditos-debitos) };
 }
-function listarBancoHoras() { return listarColaboradoresManutencao().map(c=>({ ...c, saldo: calcularSaldoBancoHoras(c.id), ultimasHorasExtras: listarHorasExtras({colaborador_id:c.id}).slice(0,3), ultimasFolgas: listarFolgas({colaborador_id:c.id}).slice(0,3) })); }
+function listarBancoHoras(filtros = {}) {
+  const inicioMes = new Date(); inicioMes.setUTCDate(1);
+  const inicio = inicioMes.toISOString().slice(0,10);
+  return listarColaboradoresManutencao()
+    .filter(c => !filtros.colaborador_id || Number(c.id) === Number(filtros.colaborador_id))
+    .map(c=>{
+      const extras = listarHorasExtras({colaborador_id:c.id});
+      const folgas = listarFolgas({colaborador_id:c.id});
+      const horasExtrasMesMinutos = extras.filter(h => h.status === 'APROVADO' && String(h.data_servico||'') >= inicio).reduce((t,h)=>t+Number(h.total_minutos||0),0);
+      const folgasCompensadasMinutos = folgas.filter(f => f.status !== 'CANCELADA').reduce((t,f)=>t+Number(f.minutos_descontados||0),0);
+      return { ...c, funcaoLabel: funcaoLabel(normalizeFuncao(c.funcao)), saldo: calcularSaldoBancoHoras(c.id), horasExtrasMesMinutos, folgasCompensadasMinutos, ausenciasJustificadas: 0, ultimasHorasExtras: extras.slice(0,3), ultimasFolgas: folgas.slice(0,3) };
+    });
+}
 function listarMovimentosBancoHoras(colaboradorId) { return db.prepare('SELECT * FROM escala_banco_horas_movimentos WHERE colaborador_id=? ORDER BY data_movimento DESC, id DESC').all(colaboradorId); }
 function listarFolgas(filtros={}) { const params=[]; let where='1=1'; if(filtros.colaborador_id){where+=' AND f.colaborador_id=?'; params.push(filtros.colaborador_id)} return db.prepare(`SELECT f.*, c.nome AS colaborador_nome, u.name AS aprovado_por_nome FROM escala_folgas_programadas f JOIN colaboradores c ON c.id=f.colaborador_id LEFT JOIN users u ON u.id=f.aprovado_por WHERE ${where} ORDER BY f.data_folga DESC, f.id DESC`).all(...params); }
 
@@ -1164,4 +1198,25 @@ function cancelarFolgaCompensatoria(id, usuarioResponsavel, motivo) { if(!canMan
 function realizarFolgaCompensatoria(id, usuarioResponsavel) { if(!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); db.prepare("UPDATE escala_folgas_programadas SET status='REALIZADA', atualizado_em=datetime('now') WHERE id=? AND status='PROGRAMADA'").run(id); }
 function gerarDadosRelatorioBancoHoras(filtros={}) { return { filtros, emitidoEm: new Date().toISOString(), banco: listarBancoHoras(), horasExtras: listarHorasExtras(filtros), folgas: listarFolgas(filtros) }; }
 
-Object.assign(module.exports, { MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtras, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });
+function recalcularEscalaCompleta({ quantidade = 3 } = {}) {
+  const qtd = Math.min(5, Math.max(2, Number(quantidade) || 3));
+  const colaboradores = listarColaboradoresManutencao();
+  if (colaboradores.length === 0) throw new Error('Nenhum colaborador disponível para recalcular.');
+  const semanas = db.prepare(`SELECT id, data_inicio, data_fim FROM escala_semanas WHERE data_fim >= ? ORDER BY data_inicio ASC`).all(isoToday());
+  let idx = 0, alocacoes = 0;
+  const tx = db.transaction(() => {
+    for (const sem of semanas) {
+      db.prepare(`DELETE FROM escala_alocacoes WHERE semana_id=?`).run(sem.id);
+      const selecionados = []; let tentativas = 0;
+      while (selecionados.length < qtd && tentativas < colaboradores.length * 2) {
+        const c = colaboradores[idx % colaboradores.length]; idx += 1; tentativas += 1;
+        const ausente = db.prepare(`SELECT 1 FROM escala_ausencias WHERE colaborador_id=? AND NOT (data_fim < ? OR data_inicio > ?) LIMIT 1`).get(c.id, sem.data_inicio, sem.data_fim);
+        if (!ausente && !selecionados.some(s => s.id === c.id)) selecionados.push(c);
+      }
+      selecionados.forEach((c, i) => { db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,?,?,?)`).run(sem.id, i === 0 ? 'noturno' : 'diurno', c.id, `Recalculado: ${qtd} colaboradores/semana`); alocacoes += 1; });
+    }
+  }); tx();
+  return { semanas: semanas.length, alocacoes, quantidade: qtd };
+}
+
+Object.assign(module.exports, { recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtras, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });

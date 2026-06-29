@@ -40,6 +40,10 @@
 
           <div class="topbar-right">
             <% if (user) { %>
+              <% const extraRoles = ['MECANICO','ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO','ADMIN']; %>
+              <% if (extraRoles.includes(String(user.role || '').toUpperCase())) { %>
+                <a class="btn btn-green" href="/escala/hora-extra/nova" title="Hora extra vinculada à OS">⏱ Extra</a>
+              <% } %>
               <% const chatNotifs = Array.isArray(typeof osChatNotificacoes !== 'undefined' ? osChatNotificacoes : []) ? osChatNotificacoes : []; %>
               <% const chatUnread = Number((operationalCounters && operationalCounters.osChatNaoLidas) || 0); %>
               <details class="chat-bell" style="position:relative;">
