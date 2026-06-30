@@ -381,6 +381,21 @@
     </form>
   <% } %>
 
+
+  <% const horasExtrasDaOS = Array.isArray(horasExtrasOS) ? horasExtrasOS : []; %>
+  <% if (horasExtrasDaOS.length) { %>
+    <h4 style="margin:16px 0 6px;">Horas extras vinculadas à OS</h4>
+    <ol style="margin:0;padding-left:20px;">
+      <% horasExtrasDaOS.forEach((he) => { %>
+        <li style="margin-top:6px;">
+          <b><%= he.colaborador_nome || 'Mecânico' %></b> — <%= he.data_servico || '-' %> — <%= he.inicio_extra || '-' %> até <%= he.fim_extra || '-' %> — <%= he.total_minutos || 0 %> min — <%= he.status || '-' %><br>
+          <span class="muted"><%= he.descricao_servico || 'Sem descrição complementar.' %></span>
+          <% if (he.foto_inicio_path || he.foto_fim_path) { %><br><span class="muted">Anexos: <%= he.foto_inicio_path ? 'foto inicial' : '' %><%= he.foto_inicio_path && he.foto_fim_path ? ' / ' : '' %><%= he.foto_fim_path ? 'foto final' : '' %></span><% } %>
+        </li>
+      <% }) %>
+    </ol>
+  <% } %>
+
   <h4 style="margin:16px 0 6px;">Linha do tempo da OS</h4>
   <ol style="margin:0;padding-left:20px;">
     <li>OS aberta em <%= os.opened_at ? fmtBR(os.opened_at) : '-' %>.</li>

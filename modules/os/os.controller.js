@@ -10,6 +10,7 @@ const visionService = require("../ai/ai.vision.service");
 const whatsappService = require("../whatsapp/whatsapp.service");
 const osDocumentService = require("./os-document.service");
 const osChatService = require("../os-chat/os-chat.service");
+const escalaService = require("../escala/escala.service");
 const { canSendWhatsappNotificationRole } = require("../../middlewares/permissions.middleware");
 
 function mapFilesToPublic(files = []) {
@@ -244,6 +245,7 @@ function osShow(req, res) {
   const whatsappResponsavel = whatsappDiagnostico.responsavel_resolvido || null;
   const whatsappDestinatarios = whatsappDiagnostico.destinatarios || [];
   const historicoAndamento = service.getHistoricoAndamentoOS(id);
+  const horasExtrasOS = escalaService.listarHorasExtras({ os_id: id });
   const metricasAndamento = service.calcularDiasAbertaOS(osAtual);
   const ultimoRegistroHoje = service.temJustificativaAndamentoHoje(id);
   const documentoInstitucional = osDocumentService.getLatestInstitutionalDocument(id);
@@ -273,6 +275,7 @@ function osShow(req, res) {
     canSendWhatsappNotification,
     motivosAndamento: service.listMotivosAndamento(),
     historicoAndamento,
+    horasExtrasOS,
     metricasAndamento,
     alertaJustificativaAndamento: service.isStatusOSEmAndamento(osAtual.status) && metricasAndamento.dias_aberta > 1 && !ultimoRegistroHoje,
     documentoInstitucional,
