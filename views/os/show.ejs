@@ -383,7 +383,7 @@
 
 
   <% const horasExtrasDaOS = Array.isArray(horasExtrasOS) ? horasExtrasOS : []; %>
-  <% if (horasExtrasDaOS.length) { %>
+  <% if (horasExtrasDaOS.length) { const totalGeralHE = horasExtrasDaOS.reduce((sum, he) => sum + Number(he.total_minutos || 0), 0); const totaisPorColaboradorHE = horasExtrasDaOS.reduce((acc, he) => { const nome = he.colaborador_nome || 'Mecânico'; acc[nome] = (acc[nome] || 0) + Number(he.total_minutos || 0); return acc; }, {}); %>
     <h4 style="margin:16px 0 6px;">Horas extras vinculadas à OS</h4>
     <ol style="margin:0;padding-left:20px;">
       <% horasExtrasDaOS.forEach((he) => { %>
@@ -394,6 +394,7 @@
         </li>
       <% }) %>
     </ol>
+    <div class="muted" style="margin-top:8px;"><b>Total geral da OS:</b> <%= totalGeralHE %> min. <b>Total por colaborador:</b> <% Object.entries(totaisPorColaboradorHE).forEach(([nome,total],idx)=>{ %><%= idx ? ' • ' : '' %><%= nome %>: <%= total %> min<% }) %></div>
   <% } %>
 
   <h4 style="margin:16px 0 6px;">Linha do tempo da OS</h4>
