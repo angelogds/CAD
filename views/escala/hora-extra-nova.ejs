@@ -1,6 +1,16 @@
 <%- layout('layout') -%>
 <div class="page-head"><h1>Registrar Hora Extra</h1><a class="btn" href="/escala">Voltar</a></div>
 <div class="card"><p style="color:#64748b;font-weight:800;">Controle interno da manutenção para horas extras vinculadas a OS e aprovação do encarregado.</p>
+<% const listaColaboradores = Array.isArray(colaboradores) ? colaboradores : (colaborador ? [colaborador] : []); %>
+<% if (listaColaboradores.length > 1) { %>
+<form method="GET" action="/escala/hora-extra/nova" style="display:grid;gap:8px;margin:12px 0 16px;max-width:520px;">
+<div class="label">Funcionário</div>
+<select class="input" name="colaborador_id" onchange="this.form.submit()">
+<% listaColaboradores.forEach(c=>{ %><option value="<%= c.id %>" <%= colaborador && Number(colaborador.id) === Number(c.id) ? 'selected' : '' %>><%= c.nome %></option><% }) %>
+</select>
+<small style="color:#64748b;font-weight:700;">Selecione o mecânico para registrar ou finalizar a hora extra individual dele na OS.</small>
+</form>
+<% } %>
 <% if (!colaborador) { %><div class="alert alert-warning">Nenhum colaborador vinculado/encontrado para o usuário.</div><% } else if (emAndamento) { %>
 <article class="card-padrao-escala"><div class="card-padrao-header"><h3 class="card-padrao-title">Hora extra em andamento</h3><span class="card-padrao-badge is-warning">Em andamento</span></div><div class="card-padrao-body"><div class="card-padrao-row"><span class="label-text">Início</span><span class="value-text"><%= emAndamento.inicio_extra %></span></div><div class="card-padrao-row"><span class="label-text">Serviço</span><span class="value-text"><%= emAndamento.descricao_servico %></span></div><div class="card-padrao-row"><span class="label-text">OS</span><span class="value-text"><%= emAndamento.os_id ? ('OS ' + emAndamento.os_id) : '-' %></span></div></div>
 <form method="POST" action="/escala/hora-extra/<%= emAndamento.id %>/finalizar" enctype="multipart/form-data">
@@ -8,8 +18,14 @@
 <div class="label">Foto final (opcional)</div><input class="input" type="file" name="foto_fim" accept="image/*" capture="environment"><button class="btn btn-green" style="margin-top:10px;">Finalizar Hora Extra</button></form></article>
 <% } else { %>
 <form method="POST" action="/escala/hora-extra/iniciar" enctype="multipart/form-data" style="display:grid;gap:12px;">
-<input type="hidden" name="colaborador_id" value="<%= colaborador.id %>"><input type="hidden" name="latitude_inicio"><input type="hidden" name="longitude_inicio"><input type="hidden" name="precisao_inicio">
-<div><div class="label">Funcionário</div><input class="input" value="<%= colaborador.nome %>" disabled></div>
+<input type="hidden" name="latitude_inicio"><input type="hidden" name="longitude_inicio"><input type="hidden" name="precisao_inicio">
+<div><div class="label">Funcionário</div>
+<% if (listaColaboradores.length > 1) { %>
+<select class="input" name="colaborador_id" required><% listaColaboradores.forEach(c=>{ %><option value="<%= c.id %>" <%= Number(colaborador.id) === Number(c.id) ? 'selected' : '' %>><%= c.nome %></option><% }) %></select>
+<% } else { %>
+<input type="hidden" name="colaborador_id" value="<%= colaborador.id %>"><input class="input" value="<%= colaborador.nome %>" disabled>
+<% } %>
+</div>
 <div><div class="label">OS</div><select class="input" name="os_id"><option value="">Sem OS - justificar na descrição</option><% osDisponiveis.forEach(os=>{ %><option value="<%= os.id %>">OS <%= os.id %> — <%= os.equipamento_nome || os.equipamento || 'Equipamento' %> — <%= os.descricao %></option><% }) %></select></div>
 <div><div class="label">Descrição do serviço / justificativa se sem OS</div><textarea class="input" name="descricao_servico" rows="4" required></textarea></div>
 <div><div class="label">Foto inicial (opcional)</div><input class="input" type="file" name="foto_inicio" accept="image/*" capture="environment"></div>
