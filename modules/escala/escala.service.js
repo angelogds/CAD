@@ -1192,7 +1192,15 @@ function hasColumn(table, column) {
 }
 
 function userIdFrom(user) { return Number(user?.id || user?.user_id || 0) || null; }
-function userRole(user) { return String(user?.role || user?.perfil || '').toUpperCase(); }
+function userRole(user) { return String(user?.role || user?.perfil || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[\s-]+/g, '_'); }
+function isMecanicoText(value) {
+  const norm = String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  return norm.includes('MECANICO');
+}
+function isColaboradorMecanico(colaborador = {}) {
+  return isMecanicoText(colaborador.funcao) || isMecanicoText(colaborador.cargo) || isMecanicoText(colaborador.perfil) || isMecanicoText(colaborador.role);
+}
+function isMecanicoUser(user = {}) { return userRole(user) === 'MECANICO' || isMecanicoText(user.funcao) || isMecanicoText(user.cargo) || isMecanicoText(user.perfil); }
 function isAdminUser(user) { return userRole(user) === 'ADMIN'; }
 function canManageBancoHoras(user) { return ['ADMIN','ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO'].includes(userRole(user)); }
 function canReadBancoHoras(user) { return canManageBancoHoras(user) || ['RH','DIRETORIA'].includes(userRole(user)); }
@@ -1343,11 +1351,30 @@ function listarColaboradoresManutencao() {
 
 function buscarColaboradorDoUsuario(userId) {
   if (!userId || !tableExists('colaboradores')) return null;
-  if (hasColumn('colaboradores', 'user_id')) {
-    const row = db.prepare('SELECT * FROM colaboradores WHERE user_id=? AND IFNULL(ativo,1)=1 LIMIT 1').get(userId);
+  const cols = db.prepare('PRAGMA table_info(colaboradores)').all().map((c) => c.name);
+  const activeFilter = "IFNULL(ativo,1)=1";
+  if (cols.includes('user_id')) {
+    const row = db.prepare(`SELECT * FROM colaboradores WHERE user_id=? AND ${activeFilter} LIMIT 1`).get(userId);
     if (row) return row;
   }
-  return null;
+
+  if (!tableExists('users')) return null;
+  const userCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+  const nameExpr = userCols.includes('name') ? 'name' : (userCols.includes('nome') ? 'nome' : null);
+  if (!nameExpr || !cols.includes('nome')) return null;
+  const user = db.prepare(`SELECT id, ${nameExpr} AS nome FROM users WHERE id=? LIMIT 1`).get(userId);
+  const nome = String(user?.nome || '').trim();
+  if (!nome) return null;
+  return db.prepare(`
+    SELECT * FROM colaboradores
+    WHERE ${activeFilter}
+      AND lower(trim(nome)) = lower(trim(?))
+    LIMIT 1
+  `).get(nome) || null;
+}
+
+function listarColaboradoresMecanicosHoraExtra() {
+  return listarColaboradoresManutencao().filter(isColaboradorMecanico);
 }
 
 function listarOsDisponiveisParaHoraExtra() {
@@ -1367,13 +1394,16 @@ function buscarHoraExtraEmAndamento(colaboradorId) {
 }
 
 function getHoraExtra(id) { return db.prepare('SELECT * FROM escala_horas_extras WHERE id=?').get(id); }
+function buscarHoraExtraPorId(id) { return getHoraExtra(id); }
 function filePath(file) { return file ? `/uploads/escala-horas/${file.filename}` : null; }
 
 function iniciarHoraExtra(dados) {
   const colaboradorId = Number(dados.colaborador_id); if (!colaboradorId) throw new Error('Colaborador obrigatório.');
   if (buscarHoraExtraEmAndamento(colaboradorId)) throw new Error('Já existe hora extra em andamento para este colaborador.');
-  const descricao = String(dados.descricao_servico||'').trim(); if (!descricao) throw new Error('Descrição do serviço obrigatória.');
-  const osId = Number(dados.os_id || 0) || null; if (!osId && descricao.length < 10) throw new Error('Sem OS vinculada, informe uma justificativa detalhada na descrição.');
+  const descricao = String(dados.descricao_servico||'').trim();
+  const osId = Number(dados.os_id || 0) || null;
+  if (!osId && !descricao) throw new Error('Informe uma OS vinculada ou descreva o serviço executado.');
+  if (!osId && descricao.length < 10) throw new Error('Sem OS vinculada, informe uma descrição do serviço com pelo menos 10 caracteres.');
   const os = osId ? db.prepare('SELECT id, equipamento_id FROM os WHERE id=?').get(osId) : null;
   const now = new Date(); const iso = now.toISOString();
   const info = db.prepare(`INSERT INTO escala_horas_extras (user_id,colaborador_id,os_id,equipamento_id,data_servico,inicio_extra,descricao_servico,foto_inicio_path,latitude_inicio,longitude_inicio,precisao_inicio,status,criado_em,atualizado_em)
@@ -1615,4 +1645,4 @@ function recalcularEscalaCompleta({ quantidade = 3 } = {}) {
   return { semanas: semanas.length, alocacoes, quantidade: qtd };
 }
 
-Object.assign(module.exports, { listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtras, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });
+Object.assign(module.exports, { listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarColaboradoresMecanicosHoraExtra, isMecanicoUser, isColaboradorMecanico, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, buscarHoraExtraPorId, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtras, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });

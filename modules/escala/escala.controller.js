@@ -42,7 +42,7 @@ function isValidDateISO(value) {
 }
 
 
-function userRole(req) { return String(currentUser(req).role || '').toUpperCase(); }
+function userRole(req) { return String(currentUser(req).role || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[\s-]+/g, '_'); }
 function canManageEscala(req) { return ['ADMIN','ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO'].includes(userRole(req)); }
 function canViewAllEscala(req) { return canManageEscala(req) || ['RH','DIRETORIA'].includes(userRole(req)); }
 function visibleColaboradorId(req) { return service.buscarColaboradorDoUsuario(currentUser(req).id)?.id || null; }
@@ -468,10 +468,12 @@ function flashError(req, message) { if (req.flash) req.flash('error', message); 
 function flashSuccess(req, message) { if (req.flash) req.flash('success', message); }
 
 function colaboradoresPermitidosHoraExtra(req) {
-  const colaboradores = service.listarColaboradoresManutencao();
+  const colaboradores = service.listarColaboradoresMecanicosHoraExtra();
   if (canManageEscala(req)) return colaboradores;
-  const vinculado = service.buscarColaboradorDoUsuario(currentUser(req).id);
-  return vinculado ? colaboradores.filter((c) => Number(c.id) === Number(vinculado.id)) : [];
+  const user = currentUser(req);
+  if (!service.isMecanicoUser(user)) return [];
+  const vinculado = service.buscarColaboradorDoUsuario(user.id);
+  return vinculado && service.isColaboradorMecanico(vinculado) ? colaboradores.filter((c) => Number(c.id) === Number(vinculado.id)) : [];
 }
 
 function selecionarColaboradorHoraExtra(req, colaboradores) {
@@ -506,9 +508,17 @@ exports.iniciarHoraExtra = (req, res, next) => { try {
   if (!colaborador) throw new Error('Colaborador obrigatório ou sem permissão para registrar hora extra.');
   service.iniciarHoraExtra({ ...req.body, user_id: user.id, colaborador_id: colaborador.id, foto_inicio_path: uploadPath(req) });
   flashSuccess(req, 'Hora extra iniciada com sucesso.'); return res.redirect(`/escala/hora-extra/nova?colaborador_id=${colaborador.id}`);
-} catch(e){ flashError(req, e.message); return res.redirect('/escala/hora-extra/nova'); } };
+} catch(e){ console.error('❌ iniciarHoraExtra:', e && e.stack ? e.stack : e); flashError(req, e.message); return res.redirect('/escala/hora-extra/nova'); } };
 
-exports.finalizarHoraExtra = (req, res, next) => { try { service.finalizarHoraExtra(Number(req.params.id), { ...req.body, foto_fim_path: uploadPath(req) }); flashSuccess(req, 'Hora extra finalizada e enviada para aprovação.'); return res.redirect('/escala/hora-extra/nova'); } catch(e){ flashError(req, e.message); return res.redirect('/escala/hora-extra/nova'); } };
+exports.finalizarHoraExtra = (req, res, next) => { try {
+  const id = Number(req.params.id);
+  const registro = service.buscarHoraExtraPorId(id);
+  if (!registro) throw new Error('Registro não encontrado.');
+  const permitido = colaboradoresPermitidosHoraExtra(req).some((c) => Number(c.id) === Number(registro.colaborador_id));
+  if (!permitido) throw new Error('Sem permissão para finalizar hora extra de outro colaborador.');
+  service.finalizarHoraExtra(id, { ...req.body, foto_fim_path: uploadPath(req) });
+  flashSuccess(req, 'Hora extra finalizada e enviada para aprovação.'); return res.redirect(`/escala/hora-extra/nova?colaborador_id=${registro.colaborador_id}`);
+} catch(e){ console.error('❌ finalizarHoraExtra:', e && e.stack ? e.stack : e); flashError(req, e.message); return res.redirect('/escala/hora-extra/nova'); } };
 exports.horasExtrasPendentes = (req, res, next) => { try { return res.render('escala/hora-extra-pendentes', { title: 'Horas Extras Pendentes', pendentes: service.listarHorasExtrasPendentes() }); } catch(e){ next(e); } };
 exports.aprovarHoraExtra = (req, res) => { try { service.aprovarHoraExtra(Number(req.params.id), currentUser(req), req.body.observacao); flashSuccess(req, 'Hora extra aprovada e creditada no banco.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/hora-extra/pendentes'); };
 exports.reprovarHoraExtra = (req, res) => { try { service.reprovarHoraExtra(Number(req.params.id), currentUser(req), req.body.motivo); flashSuccess(req, 'Hora extra reprovada.'); } catch(e){ flashError(req, e.message); } return res.redirect('/escala/hora-extra/pendentes'); };
