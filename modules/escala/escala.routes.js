@@ -33,6 +33,36 @@ const safe = (fn, name) =>
 const escalaManage = [ROLE.ADMIN, ROLE.ENCARREGADO_MANUTENCAO, ROLE.MANUTENCAO_SUPERVISOR, ROLE.SUPERVISOR_MANUTENCAO];
 const escalaRead = ACCESS.escala;
 
+function normalizeTextRole(value) {
+  return String(value || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+}
+
+function isMecanicoProfile(user = {}) {
+  const values = [user.role, user.funcao, user.cargo, user.perfil];
+  return values.some((value) => normalizeTextRole(value).includes('MECANICO'));
+}
+
+function requireHoraExtraAccess(req, res, next) {
+  const user = req.session?.user || {};
+  const role = normalizeTextRole(user.role);
+  if (role === ROLE.ADMIN || isMecanicoProfile(user)) return next();
+
+  req.flash?.('error', 'Apenas mecânicos podem registrar hora extra.');
+  if (req.accepts('html')) {
+    return res.status(403).render('errors/403', {
+      layout: 'layout',
+      title: 'Sem permissão',
+      message: 'Apenas mecânicos podem registrar hora extra.',
+    });
+  }
+  return res.status(403).json({ error: 'Apenas mecânicos podem registrar hora extra.' });
+}
+
 router.get("/", requireLogin, requireRole(escalaRead), safe(controller.index, "index"));
 router.get("/semana", requireLogin, requireRole(escalaRead), safe(controller.semana, "semana"));
 router.get("/completa", requireLogin, requireRole(escalaRead), safe(controller.completa, "completa"));
@@ -46,9 +76,9 @@ router.post("/rodizio/aplicar", requireLogin, requireRole(escalaManage), safe(co
 router.post("/rodizio/recalcular", requireLogin, requireRole(escalaManage), safe(controller.recalcularRodizio, "recalcularRodizio"));
 router.post("/rodizio/:id/desativar", requireLogin, requireRole(escalaManage), safe(controller.desativarRodizio, "desativarRodizio"));
 
-router.get("/hora-extra/nova", requireLogin, requireRole(escalaRead), safe(controller.horaExtraNova, "horaExtraNova"));
-router.post("/hora-extra/iniciar", requireLogin, requireRole(escalaRead), upload.single("foto_inicio"), safe(controller.iniciarHoraExtra, "iniciarHoraExtra"));
-router.post("/hora-extra/:id/finalizar", requireLogin, requireRole(escalaRead), upload.single("foto_fim"), safe(controller.finalizarHoraExtra, "finalizarHoraExtra"));
+router.get("/hora-extra/nova", requireLogin, requireHoraExtraAccess, safe(controller.horaExtraNova, "horaExtraNova"));
+router.post("/hora-extra/iniciar", requireLogin, requireHoraExtraAccess, upload.single("foto_inicio"), safe(controller.iniciarHoraExtra, "iniciarHoraExtra"));
+router.post("/hora-extra/:id/finalizar", requireLogin, requireHoraExtraAccess, upload.single("foto_fim"), safe(controller.finalizarHoraExtra, "finalizarHoraExtra"));
 router.get("/hora-extra/pendentes", requireLogin, requireRole(escalaManage), safe(controller.horasExtrasPendentes, "horasExtrasPendentes"));
 router.post("/hora-extra/:id/aprovar", requireLogin, requireRole(escalaManage), safe(controller.aprovarHoraExtra, "aprovarHoraExtra"));
 router.post("/hora-extra/:id/reprovar", requireLogin, requireRole(escalaManage), safe(controller.reprovarHoraExtra, "reprovarHoraExtra"));

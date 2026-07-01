@@ -13,6 +13,7 @@ const rbac = readFileSync('config/rbac.js', 'utf8');
 const migration = readFileSync('database/migrations/164_horas_extras_multi_colaborador_por_os.js', 'utf8');
 const horaExtraView = readFileSync('views/escala/hora-extra-nova.ejs', 'utf8');
 const osView = readFileSync('views/os/show.ejs', 'utf8');
+const routes = readFileSync('modules/escala/escala.routes.js', 'utf8');
 
 test('bloqueio de hora extra ativa é por colaborador, não por OS', () => {
   assert.match(service, /SELECT \* FROM escala_horas_extras WHERE colaborador_id=\? AND status='EM_ANDAMENTO' LIMIT 1/);
@@ -74,4 +75,12 @@ test('telas exibem contador individual e totais separados por colaborador na OS'
   assert.match(horaExtraView, /não bloqueia outros mecânicos/);
   assert.match(osView, /Total geral da OS/);
   assert.match(osView, /Total por colaborador/);
+});
+
+
+test('rotas do painel de hora extra aceitam perfil/cargo/função de mecânico', () => {
+  assert.match(routes, /function requireHoraExtraAccess/);
+  assert.match(routes, /user\.funcao, user\.cargo, user\.perfil/);
+  assert.match(routes, /role === ROLE\.ADMIN \|\| isMecanicoProfile\(user\)/);
+  assert.doesNotMatch(routes, /hora-extra\/nova", requireLogin, requireRole\(escalaRead\)/);
 });
