@@ -1399,11 +1399,14 @@ function filePath(file) { return file ? `/uploads/escala-horas/${file.filename}`
 
 function iniciarHoraExtra(dados) {
   const colaboradorId = Number(dados.colaborador_id); if (!colaboradorId) throw new Error('Colaborador obrigatório.');
+  // Bloqueio correto: somente o próprio colaborador não pode ter dois lançamentos ativos.
+  // Não consultar/bloquear por OS: a mesma OS pode ter vários mecânicos simultâneos.
   if (buscarHoraExtraEmAndamento(colaboradorId)) throw new Error('Você já possui uma hora extra em andamento. Finalize o lançamento atual antes de iniciar outro.');
   const descricao = String(dados.descricao_servico||'').trim();
   const osId = Number(dados.os_id || 0) || null;
   if (!osId && !descricao) throw new Error('Informe uma OS ou descreva o serviço realizado.');
   const os = osId ? db.prepare('SELECT id, equipamento_id FROM os WHERE id=?').get(osId) : null;
+  if (osId && !os) throw new Error('OS selecionada não foi encontrada ou não está disponível para hora extra.');
   const now = new Date(); const iso = now.toISOString();
   const info = db.prepare(`INSERT INTO escala_horas_extras (user_id,colaborador_id,os_id,equipamento_id,data_servico,inicio_extra,descricao_servico,foto_inicio_path,latitude_inicio,longitude_inicio,precisao_inicio,status,criado_em,atualizado_em)
     VALUES (@user_id,@colaborador_id,@os_id,@equipamento_id,@data_servico,@inicio_extra,@descricao_servico,@foto_inicio_path,@latitude_inicio,@longitude_inicio,@precisao_inicio,'EM_ANDAMENTO',datetime('now'),datetime('now'))`).run({
