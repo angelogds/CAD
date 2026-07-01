@@ -1,12 +1,29 @@
 <%- layout('layout') -%>
-<div class="page-head"><h1>Horas Extras Pendentes</h1><a class="btn" href="/escala">Voltar</a></div>
+<div class="page-head">
+  <h1><%= canDeleteHorasExtras ? 'Horas Extras Lançadas' : 'Horas Extras Pendentes' %></h1>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <% if (canDeleteHorasExtras) { %>
+      <form method="POST" action="/escala/admin/horas-extras/limpar-testes" onsubmit="return confirm('Tem certeza que deseja apagar todas as horas extras lançadas?') && confirm('Essa ação limpará os lançamentos de horas extras e recalculará o banco de horas dos colaboradores. Deseja continuar?');">
+        <button class="btn btn-sm" type="submit">Limpar horas extras de teste</button>
+      </form>
+    <% } %>
+    <a class="btn" href="/escala">Voltar</a>
+  </div>
+</div>
 <div class="escala-card-grid">
-  <% if(!pendentes.length){ %><div class="escala-empty" style="grid-column:1/-1;">Nenhuma hora extra pendente.</div><% } %>
-  <% pendentes.forEach(h=>{ %>
+  <% if(!pendentes.length){ %><div class="escala-empty" style="grid-column:1/-1;">Nenhuma hora extra encontrada.</div><% } %>
+  <% pendentes.forEach(h=>{ const st = String(h.status || ''); const stClass = st.includes('APROV') ? 'is-success' : (st.includes('REPROV') || st.includes('CANCEL') ? 'is-danger' : 'is-warning'); %>
     <article class="card-padrao-escala">
-      <div class="card-padrao-header"><div class="card-padrao-person"><span class="card-padrao-avatar"><%= String(h.colaborador_nome || 'M').charAt(0).toUpperCase() %></span><div><h3 class="card-padrao-title"><%= h.colaborador_nome %></h3><div class="card-padrao-subtitle"><%= h.data_servico %></div></div></div><span class="card-padrao-badge is-warning">Pendente</span></div>
-      <div class="card-padrao-body"><div class="card-padrao-row"><span class="label-text">Data</span><span class="value-text"><%= h.data_servico %></span></div><div class="card-padrao-row"><span class="label-text">Início / Fim</span><span class="value-text"><%= h.inicio_extra %> → <%= h.fim_extra || '-' %></span></div><div class="card-padrao-row"><span class="label-text">Total</span><span class="value-text"><%= h.total_minutos %> min</span></div><div class="card-padrao-row"><span class="label-text">OS</span><span class="value-text"><%= h.os_id ? ('OS ' + h.os_id) : '-' %></span></div><div class="card-padrao-row"><span class="label-text">Equipamento</span><span class="value-text"><%= h.equipamento_nome || h.os_equipamento || '-' %></span></div><div class="card-padrao-row"><span class="label-text">Serviço</span><span class="value-text"><%= h.descricao_servico %></span></div><div class="card-padrao-row"><span class="label-text">Localização</span><span class="value-text"><%= h.status_localizacao || h.localizacao_status || 'Não capturada' %></span></div></div>
-      <div class="card-padrao-footer"><form method="POST" action="/escala/hora-extra/<%= h.id %>/aprovar"><input class="input" name="observacao" placeholder="Observação"><button class="btn btn-green btn-sm">Aprovar</button></form><form method="POST" action="/escala/hora-extra/<%= h.id %>/reprovar"><input class="input" name="motivo" placeholder="Motivo" required><button class="btn btn-sm">Reprovar</button></form><form method="POST" action="/escala/hora-extra/<%= h.id %>/cancelar"><input class="input" name="motivo" placeholder="Motivo" required><button class="btn btn-sm">Ajustar/Cancelar</button></form></div>
+      <div class="card-padrao-header"><div class="card-padrao-person"><span class="card-padrao-avatar"><%= String(h.colaborador_nome || 'M').charAt(0).toUpperCase() %></span><div><h3 class="card-padrao-title"><%= h.colaborador_nome %></h3><div class="card-padrao-subtitle"><%= h.data_servico %></div></div></div><span class="card-padrao-badge <%= stClass %>"><%= h.status || 'Pendente' %></span></div>
+      <div class="card-padrao-body"><div class="card-padrao-row"><span class="label-text">Colaborador</span><span class="value-text"><%= h.colaborador_nome || '-' %></span></div><div class="card-padrao-row"><span class="label-text">Data</span><span class="value-text"><%= h.data_servico %></span></div><div class="card-padrao-row"><span class="label-text">Início</span><span class="value-text"><%= h.inicio_extra || '-' %></span></div><div class="card-padrao-row"><span class="label-text">Fim</span><span class="value-text"><%= h.fim_extra || '-' %></span></div><div class="card-padrao-row"><span class="label-text">Total</span><span class="value-text"><%= h.total_minutos || 0 %> min</span></div><div class="card-padrao-row"><span class="label-text">OS</span><span class="value-text"><%= h.os_id ? ('OS ' + h.os_id) : '-' %></span></div><div class="card-padrao-row"><span class="label-text">Equipamento</span><span class="value-text"><%= h.equipamento_nome || h.os_equipamento || '-' %></span></div><div class="card-padrao-row"><span class="label-text">Serviço</span><span class="value-text"><%= h.descricao_servico || h.os_descricao || '-' %></span></div><div class="card-padrao-row"><span class="label-text">Status</span><span class="value-text"><%= h.status || '-' %></span></div><div class="card-padrao-row"><span class="label-text">Localização</span><span class="value-text"><%= h.status_localizacao || h.localizacao_status || 'Não capturada' %></span></div></div>
+      <div class="card-padrao-footer">
+        <% if (!canDeleteHorasExtras) { %>
+          <form method="POST" action="/escala/hora-extra/<%= h.id %>/aprovar"><input class="input" name="observacao" placeholder="Observação"><button class="btn btn-green btn-sm">Aprovar</button></form><form method="POST" action="/escala/hora-extra/<%= h.id %>/reprovar"><input class="input" name="motivo" placeholder="Motivo" required><button class="btn btn-sm">Reprovar</button></form><form method="POST" action="/escala/hora-extra/<%= h.id %>/cancelar"><input class="input" name="motivo" placeholder="Motivo" required><button class="btn btn-sm">Ajustar/Cancelar</button></form>
+        <% } %>
+        <% if (canDeleteHorasExtras) { %>
+          <form method="POST" action="/escala/hora-extra/<%= h.id %>/excluir" onsubmit="return confirm('Tem certeza que deseja apagar este lançamento de hora extra? Essa ação removerá o registro do banco de horas do colaborador.');"><button class="btn btn-sm" type="submit">Apagar</button></form>
+        <% } %>
+      </div>
     </article>
   <% }) %>
 </div>

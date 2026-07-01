@@ -1425,6 +1425,7 @@ function finalizarHoraExtra(id, dados) {
 }
 
 function listarHorasExtrasPendentes() { return listarHorasExtras({ status: 'PENDENTE_APROVACAO' }); }
+function listarTodasHorasExtras() { return listarHorasExtras({ semLimite: true }); }
 function listarHorasExtrasEmAndamentoPorOs(osId) { return listarHorasExtras({ os_id: osId, status: 'EM_ANDAMENTO' }); }
 function listarHorasExtras(filtros={}) {
   if (!tableExists('escala_horas_extras')) return [];
@@ -1436,7 +1437,46 @@ function listarHorasExtras(filtros={}) {
   if (filtros.fim) { where += ' AND he.data_servico<=?'; params.push(filtros.fim); }
   return db.prepare(`SELECT he.*, c.nome AS colaborador_nome, o.equipamento AS os_equipamento, o.descricao AS os_descricao, e.nome AS equipamento_nome, u.name AS aprovado_por_nome
     FROM escala_horas_extras he JOIN colaboradores c ON c.id=he.colaborador_id LEFT JOIN os o ON o.id=he.os_id LEFT JOIN equipamentos e ON e.id=he.equipamento_id LEFT JOIN users u ON u.id=he.aprovado_por
-    WHERE ${where} ORDER BY he.data_servico DESC, he.id DESC LIMIT 500`).all(...params);
+    WHERE ${where} ORDER BY he.data_servico DESC, he.id DESC ${filtros.semLimite ? '' : 'LIMIT 500'}`).all(...params);
+}
+
+
+function registrarAuditoriaHoraExtra(acao, registro, usuario, detalhes = {}) {
+  if (!tableExists('escala_auditoria') || !registro) return;
+  const colaboradorNome = registro.colaborador_nome || db.prepare('SELECT nome FROM colaboradores WHERE id=?').get(registro.colaborador_id)?.nome || null;
+  const payload = { ...registro, colaborador_nome: colaboradorNome, os_id: registro.os_id || null, total_minutos: Number(registro.total_minutos || 0), ...detalhes };
+  db.prepare(`INSERT INTO escala_auditoria (entidade, entidade_id, acao, antes_json, depois_json, usuario, created_at)
+    VALUES ('escala_horas_extras', ?, ?, ?, NULL, ?, datetime('now'))`)
+    .run(registro.id, acao, JSON.stringify(payload), JSON.stringify({ id: userIdFrom(usuario), nome: usuario?.name || usuario?.nome || usuario?.email || null, role: userRole(usuario) }));
+}
+
+function assertAdminHoraExtra(usuario) {
+  if (!isAdminUser(usuario)) throw new Error('Apenas administradores podem apagar lançamentos de hora extra.');
+}
+
+function apagarHoraExtra(id, usuarioAdmin) {
+  assertAdminHoraExtra(usuarioAdmin);
+  const registro = listarHorasExtras({ semLimite: true }).find((h) => Number(h.id) === Number(id));
+  if (!registro) throw new Error('Registro de hora extra não encontrado.');
+  const tx = db.transaction(() => {
+    registrarAuditoriaHoraExtra('delete', registro, usuarioAdmin, { tipo_exclusao: 'INDIVIDUAL' });
+    if (tableExists('escala_banco_horas_movimentos')) db.prepare('DELETE FROM escala_banco_horas_movimentos WHERE hora_extra_id=?').run(id);
+    db.prepare('DELETE FROM escala_horas_extras WHERE id=?').run(id);
+  });
+  tx();
+  return registro;
+}
+
+function limparHorasExtrasTeste(usuarioAdmin) {
+  assertAdminHoraExtra(usuarioAdmin);
+  const registros = listarHorasExtras({ semLimite: true });
+  const tx = db.transaction(() => {
+    registros.forEach((registro) => registrarAuditoriaHoraExtra('delete', registro, usuarioAdmin, { tipo_exclusao: 'LIMPEZA_TESTE' }));
+    if (tableExists('escala_banco_horas_movimentos')) db.prepare('DELETE FROM escala_banco_horas_movimentos WHERE hora_extra_id IS NOT NULL').run();
+    db.prepare('DELETE FROM escala_horas_extras').run();
+  });
+  tx();
+  return { total: registros.length };
 }
 
 function aprovarHoraExtra(id, usuarioAprovador, observacao) {
@@ -1648,4 +1688,4 @@ function recalcularEscalaCompleta({ quantidade = 3 } = {}) {
   return { semanas: semanas.length, alocacoes, quantidade: qtd };
 }
 
-Object.assign(module.exports, { listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarColaboradoresMecanicosHoraExtra, isMecanicoUser, isColaboradorMecanico, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, buscarHoraExtraPorId, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtrasEmAndamentoPorOs, listarHorasExtras, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });
+Object.assign(module.exports, { listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarColaboradoresMecanicosHoraExtra, isMecanicoUser, isColaboradorMecanico, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, buscarHoraExtraPorId, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtrasEmAndamentoPorOs, listarTodasHorasExtras, listarHorasExtras, apagarHoraExtra, limparHorasExtrasTeste, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });
