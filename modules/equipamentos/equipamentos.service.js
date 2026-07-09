@@ -73,19 +73,75 @@ function update(id, data) {
   try { aiEmbeddingsService.updateEquipamentoEmbedding(id); } catch (_e) {}
 }
 
+function tableExists(name) {
+  return Boolean(db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(String(name)));
+}
+
+function columnExists(tableName, columnName) {
+  if (!tableExists(tableName)) return false;
+  return db.prepare(`PRAGMA table_info(${tableName})`).all().some((c) => String(c.name) === String(columnName));
+}
+
+function countEquipamentoVinculos(equipamentoId) {
+  const tabelas = [
+    { table: "os", label: "ordens de serviço" },
+    { table: "preventiva_planos", label: "planos preventivos" },
+    { table: "preventiva_execucoes", label: "execuções preventivas" },
+    { table: "inspecao_grade", label: "grade de inspeção" },
+    { table: "inspecao_nao_conformidades", label: "não conformidades de inspeção" },
+    { table: "solicitacoes", label: "solicitações" },
+    { table: "tracagens", label: "traçagens" },
+    { table: "desenhos_tecnicos", label: "desenhos técnicos" },
+    { table: "pcm_planos", label: "planos PCM" },
+    { table: "pcm_equipamento_criticidade", label: "criticidade PCM" },
+    { table: "escala_horas_extras", label: "horas extras" },
+    { table: "ia_interacoes", label: "interações de IA" },
+    { table: "ai_image_analyses", label: "análises de imagem" },
+    { table: "academia_biblioteca", label: "biblioteca da academia" },
+  ];
+
+  return tabelas
+    .filter(({ table }) => columnExists(table, "equipamento_id"))
+    .map(({ table, label }) => {
+      const total = db.prepare(`SELECT COUNT(*) AS total FROM ${table} WHERE equipamento_id = ?`).get(equipamentoId)?.total || 0;
+      return { table, label, total: Number(total) || 0 };
+    })
+    .filter((item) => item.total > 0);
+}
+
+function deactivate(id) {
+  db.prepare(`
+    UPDATE equipamentos
+    SET ativo = 0, status_operacional = 'INATIVO', updated_at = datetime('now')
+    WHERE id = ?
+  `).run(Number(id));
+}
+
+function deleteEquipamentoChildren(tableName, equipamentoId) {
+  if (!columnExists(tableName, "equipamento_id")) return;
+  db.prepare(`DELETE FROM ${tableName} WHERE equipamento_id = ?`).run(equipamentoId);
+}
+
 function remove(id) {
   const equipamentoId = Number(id);
+  const vinculos = countEquipamentoVinculos(equipamentoId);
+
+  if (vinculos.length) {
+    deactivate(equipamentoId);
+    return { removed: false, deactivated: true, vinculos };
+  }
+
   try {
     const tx = db.transaction(() => {
-      db.prepare(`DELETE FROM equipamento_pecas WHERE equipamento_id = ?`).run(equipamentoId);
-      db.prepare(`DELETE FROM documentos_equipamento WHERE equipamento_id = ?`).run(equipamentoId);
-      db.prepare(`DELETE FROM equipamento_qrcode WHERE equipamento_id = ?`).run(equipamentoId);
+      deleteEquipamentoChildren("equipamento_pecas", equipamentoId);
+      deleteEquipamentoChildren("documentos_equipamento", equipamentoId);
+      deleteEquipamentoChildren("equipamento_qrcode", equipamentoId);
       db.prepare(`DELETE FROM equipamentos WHERE id = ?`).run(equipamentoId);
     });
     tx();
-    return true;
-  } catch (_err) {
-    return false;
+    return { removed: true, deactivated: false, vinculos: [] };
+  } catch (err) {
+    return { removed: false, deactivated: false, vinculos: [], error: err };
   }
 }
 

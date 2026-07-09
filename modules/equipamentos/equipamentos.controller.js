@@ -304,9 +304,18 @@ function equipDelete(req, res) {
   const equip = service.getById(id);
   if (!equip) return res.status(404).render("errors/404", { title: "Não encontrado" });
 
-  const removido = service.remove(id);
-  if (!removido) {
-    req.flash("error", "Não foi possível excluir o equipamento porque ele possui vínculos no sistema.");
+  const resultado = service.remove(id);
+  if (resultado?.deactivated) {
+    const detalhes = (resultado.vinculos || [])
+      .slice(0, 3)
+      .map((v) => `${v.total} ${v.label}`)
+      .join(", ");
+    req.flash("warning", `O equipamento possui histórico/vínculos (${detalhes || "registros vinculados"}) e por segurança foi inativado em vez de apagado.`);
+    return res.redirect("/equipamentos");
+  }
+
+  if (!resultado?.removed) {
+    req.flash("error", "Não foi possível excluir o equipamento. Tente novamente ou inative o cadastro.");
     return res.redirect(`/equipamentos/${id}`);
   }
 
