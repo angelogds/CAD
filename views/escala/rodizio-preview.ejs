@@ -9,7 +9,7 @@
   <% preview.forEach((s,idx)=>{ %>
     <article class="card-padrao-escala">
       <div class="card-padrao-header"><div><h3 class="card-padrao-title">Semana #<%= idx+1 %></h3><div class="card-padrao-subtitle"><%= s.data_inicio %> até <%= s.data_fim %></div></div><span class="card-padrao-badge <%= s.conflitos.length?'is-warning':'is-success' %>"><%= s.conflitos.length?'Conflito':'OK' %></span></div>
-      <div class="card-padrao-row"><span class="label-text">Noturno</span><span class="value-text"><%= s.noturno?.nome || '-' %></span></div>
+      <div class="card-padrao-row"><span class="label-text">Noturno</span><span class="value-text"><%= (s.plantonistasNoturnos||[]).map(p=>p.nome).join(' e ') || s.noturno?.nome || '-' %></span></div>
       <div class="card-padrao-row"><span class="label-text">Diurno</span><span class="value-text"><%= (s.diurnos||[]).map(d=>d.nome).join(', ') || '-' %></span></div>
       <div class="card-padrao-row"><span class="label-text">Conflitos</span><span class="value-text"><%= s.conflitos.join('; ') || 'nenhum' %></span></div>
     </article>

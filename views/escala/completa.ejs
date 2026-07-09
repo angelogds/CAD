@@ -8,7 +8,7 @@
       <div class="card-padrao-header"><div><h3 class="card-padrao-title">Semana #<%= s.semana_numero %></h3><div class="card-padrao-subtitle"><%= s.data_inicio %> → <%= s.data_fim %></div></div><span class="card-padrao-badge <%= s.ajuste_manual?'is-warning':'is-info' %>"><%= s.ajuste_manual?'Ajuste manual':'Escala Completa' %></span></div>
       <div class="card-padrao-body">
         <div class="card-padrao-row"><span class="label-text">Período</span><span class="value-text"><%= s.data_inicio %> → <%= s.data_fim %></span></div>
-        <div class="card-padrao-row"><span class="label-text">Plantonista noturno</span><span class="value-text"><%= (s.times.noturno || []).join(', ') || '-' %></span></div>
+        <div class="card-padrao-row"><span class="label-text">Plantonista<%= (s.times.noturno || []).length > 1 ? 's' : '' %> da noite</span><span class="value-text"><%= (s.times.noturno || []).join(' e ') || '-' %></span></div>
         <div class="card-padrao-row"><span class="label-text">Turno diurno</span><span class="value-text"><%= (s.times.diurno || []).join(', ') || '-' %></span></div>
         <div class="card-padrao-row"><span class="label-text">Observação</span><span class="value-text"><%= s.ajuste_manual ? 'Semana ajustada manualmente pelo encarregado.' : (s.observacao || 'Todos como Mecânico Industrial') %></span></div>
       </div>
