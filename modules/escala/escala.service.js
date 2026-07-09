@@ -54,6 +54,7 @@ function colaboradorNomeOficial(row = {}) {
   const nome = String(row.nome || '').trim();
   const norm = normalizarNome(nome);
   if (norm === 'luiz' || norm === 'luis') return 'Luiz';
+  if (norm === 'junior') return 'Júnior';
   return nome;
 }
 
@@ -1346,7 +1347,7 @@ function listarColaboradoresManutencao() {
   const foraEscalaCol = cols.includes('fora_escala') ? 'AND IFNULL(fora_escala,0)=0' : '';
   const rows = db.prepare(`SELECT * FROM colaboradores WHERE IFNULL(ativo,1)=1 ${statusCol} ${deletedCol} ${excluidoCol} ${demoCol} ${foraEscalaCol} AND lower(nome) NOT LIKE '%demo%' AND lower(nome) NOT LIKE '%teste%' ORDER BY nome`).all();
   const dedup = deduplicarColaboradoresEscala(rows);
-  return dedup.map((row) => ({ ...row, foto_path: row.foto_path || row.foto || null, user_id: cols.includes('user_id') ? row.user_id : null }));
+  return dedup.map((row) => ({ ...row, nome: colaboradorNomeOficial(row), foto_path: row.foto_path || row.foto || null, user_id: cols.includes('user_id') ? row.user_id : null }));
 }
 
 function buscarColaboradorDoUsuario(userId) {
@@ -1548,23 +1549,71 @@ function buscarRodizioAtivo() {
   if (!tableExists('escala_rodizio_config')) return null;
   const cfg = db.prepare(`SELECT * FROM escala_rodizio_config WHERE ativo=1 ORDER BY data_inicio DESC, id DESC LIMIT 1`).get();
   if (!cfg) return null;
-  cfg.noturnos = db.prepare(`SELECT i.*, c.nome FROM escala_rodizio_itens i JOIN colaboradores c ON c.id=i.colaborador_id WHERE i.config_id=? AND i.ativo=1 AND UPPER(i.turno)='NOITE' ORDER BY i.posicao`).all(cfg.id);
+  cfg.modo_noturno = String(cfg.modo_noturno || 'individual').toLowerCase() === 'dupla' ? 'dupla' : 'individual';
+  cfg.plantonistas_por_semana = cfg.modo_noturno === 'dupla' ? 2 : 1;
+  cfg.noturnos = db.prepare(`SELECT i.*, COALESCE(i.ordem_noturno,1) AS ordem_noturno, c.nome FROM escala_rodizio_itens i JOIN colaboradores c ON c.id=i.colaborador_id WHERE i.config_id=? AND i.ativo=1 AND UPPER(i.turno)='NOITE' ORDER BY i.posicao, COALESCE(i.ordem_noturno,1), i.id`).all(cfg.id);
+  cfg.semanas = agruparNoturnosPorSemana(cfg.noturnos, Number(cfg.tamanho_ciclo || 1));
   cfg.diurnosFixos = db.prepare(`SELECT f.*, c.nome FROM escala_diurno_fixos f JOIN colaboradores c ON c.id=f.colaborador_id WHERE f.config_id=? AND f.ativo=1 ORDER BY c.nome`).all(cfg.id);
   return cfg;
 }
+
+function modoNoturnoRodizio(dados = {}) {
+  const raw = String(dados.modoNoturno || dados.modo_noturno || dados.plantonistas_por_semana || dados.quantidade_plantonistas_noturnos || '').toLowerCase();
+  return raw === 'dupla' || raw === '2' ? 'dupla' : 'individual';
+}
+
+function agruparNoturnosPorSemana(noturnos = [], tamanho = 1) {
+  const semanas = Array.from({ length: Math.max(1, Number(tamanho || 1)) }, (_, idx) => []);
+  for (const item of noturnos) {
+    const pos = Math.max(1, Number(item.posicao || 1));
+    if (!semanas[pos - 1]) semanas[pos - 1] = [];
+    semanas[pos - 1].push(item);
+  }
+  return semanas;
+}
+
+function montarNoturnosPorSemana(dados, colaboradoresValidos) {
+  const tamanho = Math.max(1, Number(dados.tamanho_ciclo || 1));
+  const modo = modoNoturnoRodizio(dados);
+  const porSemana = [];
+
+  if (dados.plantonistasNoturnos) {
+    const raw = Array.isArray(dados.plantonistasNoturnos) ? dados.plantonistasNoturnos : [dados.plantonistasNoturnos];
+    for (let i = 0; i < tamanho; i += 1) {
+      porSemana.push(parseIds(raw[i]).filter((id) => colaboradoresValidos.has(Number(id))).slice(0, modo === 'dupla' ? 2 : 1));
+    }
+  } else {
+    const ids = parseIds(dados.noturnos || dados.rodizioNoturno || dados.colaboradores_noturnos).filter((id) => colaboradoresValidos.has(Number(id)));
+    const qtd = modo === 'dupla' ? 2 : 1;
+    for (let i = 0; i < tamanho; i += 1) {
+      porSemana.push(ids.slice(i * qtd, (i * qtd) + qtd));
+    }
+  }
+
+  return porSemana.map((ids, idx) => {
+    const limpos = ids.filter(Boolean);
+    if (!limpos.length) throw new Error(`Informe o plantonista noturno da Semana ${idx + 1}.`);
+    if (modo === 'dupla' && limpos.length < 2) throw new Error(`Informe dois colaboradores para o plantão noturno da Semana ${idx + 1}.`);
+    if (modo === 'dupla' && new Set(limpos).size !== limpos.length) throw new Error(`Selecione dois colaboradores diferentes para o plantão noturno da Semana ${idx + 1}.`);
+    return modo === 'dupla' ? limpos.slice(0, 2) : limpos.slice(0, 1);
+  });
+}
+
 function salvarConfiguracaoRodizio(dados, usuario) {
   const inicio = toDateOnly(dados.data_inicio); const fim = toDateOnly(dados.data_fim) || null;
   const colaboradoresValidos = new Set(listarColaboradoresManutencao().map((c) => Number(c.id)));
-  const noturnos = parseIds(dados.noturnos || dados.rodizioNoturno || dados.colaboradores_noturnos).filter((id) => colaboradoresValidos.has(Number(id)));
+  const modo = modoNoturnoRodizio(dados);
+  const porSemana = montarNoturnosPorSemana(dados, colaboradoresValidos);
+  const noturnos = porSemana.flat();
   const diurnos = parseIds(dados.diurnos_fixos || dados.diurnosFixos || dados.colaboradores_diurnos).filter((id) => colaboradoresValidos.has(Number(id)));
   if (!inicio || (fim && fim < inicio)) throw new Error('Período inválido do rodízio.');
   if (!noturnos.length) throw new Error('Informe ao menos um colaborador no rodízio noturno.');
-  const tamanho = Math.max(1, Number(dados.tamanho_ciclo || noturnos.length));
+  const tamanho = Math.max(1, Number(dados.tamanho_ciclo || porSemana.length));
   const tx = db.transaction(() => {
     db.prepare(`UPDATE escala_rodizio_config SET ativo=0, atualizado_em=datetime('now') WHERE ativo=1`).run();
-    const info = db.prepare(`INSERT INTO escala_rodizio_config (nome,data_inicio,data_fim,tamanho_ciclo,ativo,criado_por) VALUES (?,?,?,?,1,?)`).run(String(dados.nome || 'Rodízio da Escala'), inicio, fim, tamanho, userIdFrom(usuario));
+    const info = db.prepare(`INSERT INTO escala_rodizio_config (nome,data_inicio,data_fim,tamanho_ciclo,modo_noturno,ativo,criado_por) VALUES (?,?,?,?,?,1,?)`).run(String(dados.nome || 'Rodízio da Escala'), inicio, fim, tamanho, modo, userIdFrom(usuario));
     const id = Number(info.lastInsertRowid);
-    noturnos.slice(0, tamanho).forEach((cid, idx) => db.prepare(`INSERT INTO escala_rodizio_itens (config_id,posicao,colaborador_id,turno,ativo) VALUES (?,?,?,'NOITE',1)`).run(id, idx + 1, cid));
+    porSemana.forEach((ids, idx) => ids.forEach((cid, ordem) => db.prepare(`INSERT INTO escala_rodizio_itens (config_id,posicao,colaborador_id,turno,ordem_noturno,ativo) VALUES (?,?,?,'NOITE',?,1)`).run(id, idx + 1, cid, ordem + 1)));
     [...new Set(diurnos)].forEach((cid) => db.prepare(`INSERT INTO escala_diurno_fixos (config_id,colaborador_id,ativo) VALUES (?,?,1)`).run(id, cid));
     return id;
   });
@@ -1612,21 +1661,27 @@ function semanasEntre(inicio, fim, { criar = false } = {}) {
 }
 function montarSemanaRodizio(semana, config) {
   const noturnos = config.noturnos || []; const fixos = config.diurnosFixos || [];
-  const idx = (Number(semana.semana_indice || 0)) % Math.max(1, Number(config.tamanho_ciclo || noturnos.length));
-  const itemNoite = noturnos[idx % noturnos.length];
-  const conflitos = itemNoite ? buscarIndisponibilidadesNoPeriodo(itemNoite.colaborador_id, semana.data_inicio, semana.data_fim).map(a => `${itemNoite.nome} está em ${a.tipo}`) : ['Sem plantonista noturno configurado.'];
-  const diurnos = [...fixos, ...noturnos.filter((n) => Number(n.colaborador_id) !== Number(itemNoite?.colaborador_id))]
+  const tamanho = Math.max(1, Number(config.tamanho_ciclo || config.semanas?.length || noturnos.length || 1));
+  const idx = (Number(semana.semana_indice || 0)) % tamanho;
+  const plantonistasNoturnos = (config.semanas?.[idx] || noturnos.filter((n) => Number(n.posicao || 1) === idx + 1));
+  const conflitos = plantonistasNoturnos.length
+    ? plantonistasNoturnos.flatMap((item) => buscarIndisponibilidadesNoPeriodo(item.colaborador_id, semana.data_inicio, semana.data_fim).map(a => `${item.nome} está em ${a.tipo}`))
+    : ['Sem plantonista noturno configurado.'];
+  const noturnosSet = new Set(plantonistasNoturnos.map((n) => Number(n.colaborador_id)));
+  const diurnos = [...fixos, ...noturnos.filter((n) => !noturnosSet.has(Number(n.colaborador_id)))]
     .filter((c, pos, arr) => arr.findIndex((x) => Number(x.colaborador_id) === Number(c.colaborador_id)) === pos)
     .filter((c) => colaboradorDisponivelNoPeriodo(c.colaborador_id, semana.data_inicio, semana.data_fim));
-  return { ...semana, noturno: itemNoite || null, diurnos, conflitos, semana_indice: idx };
+  return { ...semana, noturno: plantonistasNoturnos[0] || null, plantonistasNoturnos, noturnos: plantonistasNoturnos, diurnos, conflitos, semana_indice: idx };
 }
 function montarConfigRodizioTemporaria(dados) {
   const colaboradores = listarColaboradoresManutencao();
   const validos = new Set(colaboradores.map((c) => Number(c.id)));
-  const noturnosIds = parseIds(dados.noturnos || dados.rodizioNoturno || dados.colaboradores_noturnos).filter((id) => validos.has(Number(id)));
+  const porSemana = montarNoturnosPorSemana(dados, validos);
+  const noturnosIds = porSemana.flat();
   const diurnosIds = parseIds(dados.diurnos_fixos || dados.diurnosFixos || dados.colaboradores_diurnos).filter((id) => validos.has(Number(id)));
   const byId = new Map(colaboradores.map(c => [Number(c.id), c]));
-  return { id: null, nome: String(dados.nome || 'Prévia do Rodízio'), data_inicio: toDateOnly(dados.data_inicio), data_fim: toDateOnly(dados.data_fim) || null, tamanho_ciclo: Math.max(1, Number(dados.tamanho_ciclo || noturnosIds.length || 1)), noturnos: noturnosIds.map((id, idx) => ({ colaborador_id: id, nome: byId.get(id)?.nome || `#${id}`, posicao: idx + 1 })), diurnosFixos: diurnosIds.map((id) => ({ colaborador_id: id, nome: byId.get(id)?.nome || `#${id}` })) };
+  const noturnos = porSemana.flatMap((ids, idx) => ids.map((id, ordem) => ({ colaborador_id: id, nome: byId.get(id)?.nome || `#${id}`, posicao: idx + 1, ordem_noturno: ordem + 1 })));
+  return { id: null, nome: String(dados.nome || 'Prévia do Rodízio'), data_inicio: toDateOnly(dados.data_inicio), data_fim: toDateOnly(dados.data_fim) || null, modo_noturno: modoNoturnoRodizio(dados), tamanho_ciclo: Math.max(1, Number(dados.tamanho_ciclo || porSemana.length || 1)), noturnos, semanas: agruparNoturnosPorSemana(noturnos, Math.max(1, Number(dados.tamanho_ciclo || porSemana.length || 1))), diurnosFixos: diurnosIds.map((id) => ({ colaborador_id: id, nome: byId.get(id)?.nome || `#${id}` })) };
 }
 function gerarPreviewRodizio(dados) {
   const config = dados.config_id ? buscarRodizioAtivo() : ((dados.noturnos || dados.colaboradores_noturnos) ? montarConfigRodizioTemporaria(dados) : buscarRodizioAtivo());
@@ -1645,7 +1700,12 @@ function aplicarRodizioNaEscala(dados, usuario) {
     for (const sem of preview) {
       if (Number(sem.ajuste_manual) === 1 && !sobrescrever) { puladas++; continue; }
       db.prepare(`DELETE FROM escala_alocacoes WHERE semana_id=?`).run(sem.id);
-      if (sem.noturno && colaboradorDisponivelNoPeriodo(sem.noturno.colaborador_id, sem.data_inicio, sem.data_fim)) { db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,'noturno',?,'Rodízio da Escala')`).run(sem.id, sem.noturno.colaborador_id); alocacoes++; }
+      (sem.plantonistasNoturnos || [sem.noturno].filter(Boolean)).forEach((plantonista) => {
+        if (plantonista && colaboradorDisponivelNoPeriodo(plantonista.colaborador_id, sem.data_inicio, sem.data_fim)) {
+          db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,'noturno',?,'Rodízio da Escala')`).run(sem.id, plantonista.colaborador_id);
+          alocacoes++;
+        }
+      });
       sem.diurnos.forEach((c) => { db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,'diurno',?,'Rodízio da Escala')`).run(sem.id, c.colaborador_id); alocacoes++; });
       db.prepare(`UPDATE escala_semanas SET origem='GERADA', ajuste_manual=0, rodizio_config_id=?, semana_indice=?, observacao=COALESCE(observacao,''), status=COALESCE(status,'ATIVA') WHERE id=?`).run(config.id, sem.semana_indice, sem.id);
     }

@@ -2,16 +2,22 @@
 <div class="page-head"><div><h1>Editor de Rodízio da Escala</h1><p class="muted">Configure o ciclo base do plantão noturno e os fixos do turno diurno.</p></div><a class="btn" href="/escala/completa">Voltar</a></div>
 <div class="card" style="margin-top:12px;">
   <form method="POST" action="/escala/rodizio/preview" style="display:grid;gap:14px;">
+    <% const modoAtual = config?.modo_noturno === 'dupla' ? 'dupla' : 'individual'; const tamanhoCiclo = Math.max(Number(config?.tamanho_ciclo||3),3); %>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
       <div><div class="label">Nome</div><input class="input" name="nome" value="<%= config?.nome || 'Rodízio da Escala' %>"></div>
       <div><div class="label">Quantidade de semanas no ciclo</div><input class="input" type="number" min="1" name="tamanho_ciclo" value="<%= config?.tamanho_ciclo || 3 %>"></div>
+      <div><div class="label">Modo do plantão noturno</div><select class="input" name="modoNoturno" id="modoNoturno"><option value="individual" <%= modoAtual==='individual'?'selected':'' %>>Individual: 1 colaborador por semana</option><option value="dupla" <%= modoAtual==='dupla'?'selected':'' %>>Equipe dupla: 2 colaboradores por semana</option></select></div>
       <div><div class="label">Data inicial de aplicação</div><input class="input" type="date" name="data_inicio" value="<%= config?.data_inicio || '' %>" required></div>
       <div><div class="label">Data final de aplicação</div><input class="input" type="date" name="data_fim" value="<%= config?.data_fim || '' %>"></div>
     </div>
     <h3>Ciclo do turno noturno</h3>
     <div class="escala-card-grid">
-      <% for (let i=0;i<Math.max(Number(config?.tamanho_ciclo||3),3);i++) { const atual=(config?.noturnos||[])[i]; %>
-        <article class="card-padrao-escala"><div class="label">Semana <%= i+1 %></div><select class="input" name="noturnos"><option value="">Selecione</option><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>" <%= Number(atual?.colaborador_id)===Number(c.id)?'selected':'' %>><%= c.nome %></option><% }) %></select></article>
+      <% for (let i=0;i<tamanhoCiclo;i++) { const semanaAtual=(config?.semanas||[])[i] || []; const atual1=semanaAtual[0] || (config?.noturnos||[]).find(n=>Number(n.posicao)===i+1 && Number(n.ordem_noturno||1)===1); const atual2=semanaAtual[1] || (config?.noturnos||[]).find(n=>Number(n.posicao)===i+1 && Number(n.ordem_noturno||1)===2); %>
+        <article class="card-padrao-escala"><div class="label">Semana <%= i+1 %></div>
+          <div class="label">Plantonista <span class="label-individual">da noite</span><span class="label-dupla">Noite 1</span></div>
+          <select class="input" name="noturnos"><option value="">Selecione</option><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>" <%= Number(atual1?.colaborador_id)===Number(c.id)?'selected':'' %>><%= c.nome %></option><% }) %></select>
+          <div class="campo-dupla" style="margin-top:8px;"><div class="label">Plantonista Noite 2</div><select class="input" name="noturnos"><option value="">Selecione</option><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>" <%= Number(atual2?.colaborador_id)===Number(c.id)?'selected':'' %>><%= c.nome %></option><% }) %></select></div>
+        </article>
       <% } %>
     </div>
     <h3>Colaboradores fixos do turno diurno</h3>
@@ -23,3 +29,16 @@
     <div style="display:flex;gap:10px;flex-wrap:wrap;"><button class="btn btn-primary" type="submit">Pré-visualizar escala</button><button class="btn" formaction="/escala/rodizio/salvar">Salvar configuração</button><label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" name="sobrescreverTudo" value="1"> Sobrescrever tudo ao aplicar</label><button class="btn btn-green" formaction="/escala/rodizio/salvar-aplicar">Salvar e aplicar na escala</button></div>
   </form>
 </div>
+<script>
+(function(){
+  const select = document.getElementById('modoNoturno');
+  function sync(){
+    const dupla = select && select.value === 'dupla';
+    document.querySelectorAll('.campo-dupla,.label-dupla').forEach(el => { el.style.display = dupla ? '' : 'none'; });
+    document.querySelectorAll('.campo-dupla select').forEach(el => { el.disabled = !dupla; });
+    document.querySelectorAll('.label-individual').forEach(el => { el.style.display = dupla ? 'none' : ''; });
+  }
+  if (select) select.addEventListener('change', sync);
+  sync();
+})();
+</script>
