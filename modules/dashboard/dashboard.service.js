@@ -680,16 +680,15 @@ function getEscalaPainelSemana(options = {}) {
       }
     });
 
-    const noturnoResponsavel = alocacoesDisponiveis.find((a) => a.tipo_turno === "plantao" && String(a.funcao || "").toLowerCase() === "mecanico")
-      || alocacoesDisponiveis.find((a) => a.tipo_turno === "noturno" && String(a.funcao || "").toLowerCase() === "mecanico")
-      || null;
+    const noturnoResponsaveis = alocacoesDisponiveis
+      .filter((a) => ["plantao", "noturno"].includes(a.tipo_turno) && String(a.funcao || "").toLowerCase() === "mecanico");
 
     return {
       ...semana,
       data_referencia: dataRef,
       diurno_mecanicos: alocacoesDisponiveis.filter((a) => a.tipo_turno === "diurno" && String(a.funcao || "").toLowerCase() === "mecanico"),
       apoio_operacional: [],
-      noturno: noturnoResponsavel ? [noturnoResponsavel] : [],
+      noturno: noturnoResponsaveis,
       folgas_afastamentos: Array.from(folgasAfastamentosMap.values()),
     };
   }, null);

@@ -137,10 +137,10 @@ test('Teste 2: DIA + ALTA usa 2 mecânicos disponíveis', () => {
   assert.equal(osAlocada.alocacao_modo, 'AUTO');
 });
 
-test('Teste 3: NOITE usa plantonista mecânico (Rodolfo) como único responsável', () => {
+test('Teste 3: NOITE + MEDIA usa dois plantonistas mecânicos', () => {
   resetSchema();
   const rodolfo = addColaborador({ nome: 'Rodolfo', funcao: 'mecanico', tipo_turno: 'plantao' });
-  addColaborador({ nome: 'Backup Noturno', funcao: 'mecanico', tipo_turno: 'noturno' });
+  const backup = addColaborador({ nome: 'Backup Noturno', funcao: 'mecanico', tipo_turno: 'noturno' });
   const osId = addOS('MEDIA');
 
   withMockedSaoPauloTime(23, 10, () => {
@@ -150,7 +150,7 @@ test('Teste 3: NOITE usa plantonista mecânico (Rodolfo) como único responsáve
 
   const osAlocada = osService.getOSById(osId);
   assert.equal(osAlocada.executor_colaborador_id, rodolfo.id);
-  assert.equal(osAlocada.auxiliar_colaborador_id, null);
+  assert.equal(osAlocada.auxiliar_colaborador_id, backup.id);
   assert.equal(osAlocada.executor_secundario_colaborador_id, null);
   assert.equal(osAlocada.auxiliar_secundario_colaborador_id, null);
   assert.equal(osAlocada.turno_alocado, 'NOITE');
@@ -177,7 +177,7 @@ test('Teste 4: colaborador já em OS ativa não pode ser realocado', () => {
 });
 
 
-test('Teste 5: DIA + CRITICA usa até 4 mecânicos e NOITE mantém só plantonista', () => {
+test('Teste 5: DIA + CRITICA usa até 4 mecânicos e NOITE crítica usa dois plantonistas', () => {
   resetSchema();
   const diogo = addColaborador({ nome: 'Diogo', funcao: 'mecanico', tipo_turno: 'diurno' });
   const salviano = addColaborador({ nome: 'Salviano', funcao: 'mecanico', tipo_turno: 'diurno' });
@@ -198,7 +198,7 @@ test('Teste 5: DIA + CRITICA usa até 4 mecânicos e NOITE mantém só plantonis
 
   resetSchema();
   const rodolfo = addColaborador({ nome: 'Rodolfo', funcao: 'mecanico', tipo_turno: 'plantao' });
-  addColaborador({ nome: 'Backup Noturno', funcao: 'mecanico', tipo_turno: 'noturno' });
+  const backup = addColaborador({ nome: 'Backup Noturno', funcao: 'mecanico', tipo_turno: 'noturno' });
   const osNoite = addOS('CRITICA');
 
   withMockedSaoPauloTime(23, 30, () => {
@@ -208,7 +208,24 @@ test('Teste 5: DIA + CRITICA usa até 4 mecânicos e NOITE mantém só plantonis
 
   const noiteAlocada = osService.getOSById(osNoite);
   assert.equal(noiteAlocada.executor_colaborador_id, rodolfo.id);
-  assert.equal(noiteAlocada.auxiliar_colaborador_id, null);
+  assert.equal(noiteAlocada.auxiliar_colaborador_id, backup.id);
   assert.equal(noiteAlocada.executor_secundario_colaborador_id, null);
   assert.equal(noiteAlocada.auxiliar_secundario_colaborador_id, null);
+});
+
+test('Teste 6: NOITE + BAIXA usa apenas um plantonista mesmo com dois cadastrados', () => {
+  resetSchema();
+  const rodolfo = addColaborador({ nome: 'Rodolfo', funcao: 'mecanico', tipo_turno: 'plantao' });
+  addColaborador({ nome: 'Backup Noturno', funcao: 'mecanico', tipo_turno: 'noturno' });
+  const osId = addOS('BAIXA');
+
+  withMockedSaoPauloTime(22, 15, () => {
+    const result = osService.autoAssignOS(osId);
+    assert.equal(result.aguardando, false);
+  });
+
+  const osAlocada = osService.getOSById(osId);
+  assert.equal(osAlocada.executor_colaborador_id, rodolfo.id);
+  assert.equal(osAlocada.auxiliar_colaborador_id, null);
+  assert.equal(osAlocada.turno_alocado, 'NOITE');
 });

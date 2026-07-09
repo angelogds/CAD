@@ -1655,13 +1655,16 @@ function recalcularEscalaPorRodizio(configId, filtros, usuario) { return aplicar
 function desativarRodizio(id) { if (!id) return false; return db.prepare(`UPDATE escala_rodizio_config SET ativo=0, atualizado_em=datetime('now') WHERE id=?`).run(id).changes > 0; }
 function salvarSemanaManual(semanaId, dados) {
   const inicio = toDateOnly(dados.data_inicio); const fim = toDateOnly(dados.data_fim);
-  const noturnoId = Number(dados.noturno_id || 0); const diurnoIds = parseIds(dados.diurnos || dados.diurnos_ids);
+  const noturnoIds = parseIds(dados.noturnos || dados.noturno_ids || dados.noturno_id).slice(0, 2);
+  const noturnosUnicos = [...new Set(noturnoIds)].filter(Boolean);
+  const diurnoIds = parseIds(dados.diurnos || dados.diurnos_ids);
   const obs = String(dados.observacao || '').trim(); const status = String(dados.status || 'ATIVA').trim().toUpperCase();
   const tx = db.transaction(() => {
     if (inicio && fim && fim >= inicio) db.prepare(`UPDATE escala_semanas SET data_inicio=?, data_fim=? WHERE id=?`).run(inicio, fim, semanaId);
     db.prepare(`DELETE FROM escala_alocacoes WHERE semana_id=?`).run(semanaId);
-    if (noturnoId) db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,'noturno',?,?)`).run(semanaId, noturnoId, obs || 'Ajuste manual');
-    [...new Set(diurnoIds)].filter(id => id !== noturnoId).forEach(id => db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,'diurno',?,?)`).run(semanaId, id, obs || 'Ajuste manual'));
+    noturnosUnicos.forEach((id) => db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,'noturno',?,?)`).run(semanaId, id, obs || 'Ajuste manual'));
+    const noturnosSet = new Set(noturnosUnicos);
+    [...new Set(diurnoIds)].filter(id => !noturnosSet.has(id)).forEach(id => db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,'diurno',?,?)`).run(semanaId, id, obs || 'Ajuste manual'));
     db.prepare(`UPDATE escala_semanas SET origem='MANUAL', ajuste_manual=1, observacao=?, status=? WHERE id=?`).run(obs || null, status || 'ATIVA', semanaId);
   }); tx();
 }

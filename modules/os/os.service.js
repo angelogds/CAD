@@ -396,9 +396,19 @@ function isUserOcupado(userId, { ignorarOsId = null } = {}) {
   return rows.some((row) => Number(row.os_id || row.id || 0) !== Number(ignorarOsId || 0) && osBloqueiaDisponibilidade(row));
 }
 
+function getPlantonistasNoite() {
+  const vistos = new Set();
+  return getColaboradoresTurnoAtual("NOITE")
+    .filter((c) => {
+      const id = Number(c?.id || c?.colaborador_id || 0);
+      if (!id || vistos.has(id) || normalizeColaboradorFuncao(c.funcao) !== "MECANICO") return false;
+      vistos.add(id);
+      return true;
+    });
+}
+
 function getPlantonistaNoite() {
-  const candidatos = getColaboradoresTurnoAtual("NOITE");
-  return candidatos.find((c) => normalizeColaboradorFuncao(c.funcao) === "MECANICO") || null;
+  return getPlantonistasNoite()[0] || null;
 }
 
 function listEquipamentosAtivos() {
@@ -1093,12 +1103,25 @@ function resolverEquipePorCriticidade({
     ? predicateDisponivel
     : (colab) => isColaboradorDisponivel(Number(colab?.id || 0));
 
+  const grauNorm = normalizeGrau(grau);
+
   if (turno === "NOITE") {
-    const escolhidoNoite = plantonista || getPlantonistaNoite();
-    return { turno: "NOITE", executor: disponivel(escolhidoNoite) ? escolhidoNoite : null, auxiliar: null };
+    const candidatosNoite = (Array.isArray(plantonista) ? plantonista : [plantonista].filter(Boolean)).length
+      ? (Array.isArray(plantonista) ? plantonista : [plantonista])
+      : getPlantonistasNoite();
+    const vistosNoite = new Set();
+    const plantonistasDisponiveis = candidatosNoite.filter((c) => {
+      const id = Number(c?.id || c?.colaborador_id || 0);
+      if (!id || vistosNoite.has(id) || normalizeColaboradorFuncao(c.funcao) !== "MECANICO" || !disponivel(c)) return false;
+      vistosNoite.add(id);
+      return true;
+    });
+    const qtdPorCriticidadeNoite = { BAIXA: 1, MEDIA: 2, ALTA: 2, CRITICA: 2 };
+    const quantidadeNecessariaNoite = qtdPorCriticidadeNoite[grauNorm] || qtdPorCriticidadeNoite.MEDIA;
+    const selecionadosNoite = plantonistasDisponiveis.slice(0, quantidadeNecessariaNoite);
+    return { turno: "NOITE", executor: selecionadosNoite[0] || null, auxiliar: selecionadosNoite[1] || null, equipe: selecionadosNoite };
   }
 
-  const grauNorm = normalizeGrau(grau);
   const qtdPorCriticidade = { BAIXA: 1, MEDIA: 2, ALTA: 2, CRITICA: 4 };
   const quantidadeNecessaria = qtdPorCriticidade[grauNorm] || qtdPorCriticidade.MEDIA;
   const porId = new Set();
@@ -1190,8 +1213,8 @@ function autoAlocarOS(osId, { force = false } = {}) {
   if (turno === "NOITE") {
     const equipeNoite = resolverEquipePorCriticidade({ grau: os.grau, turno: "NOITE" });
     if (equipeNoite.executor?.id) {
-      persistirAlocacaoOS(Number(osId), equipeNoite.executor, null, "NOITE", "AUTO");
-      return buildAssignmentResult(beforeAssignment, Number(osId), { aguardando: false, turno: "NOITE", executor: equipeNoite.executor, auxiliar: null });
+      persistirAlocacaoOS(Number(osId), equipeNoite.executor, equipeNoite.auxiliar || null, "NOITE", "AUTO");
+      return buildAssignmentResult(beforeAssignment, Number(osId), { aguardando: false, turno: "NOITE", executor: equipeNoite.executor, auxiliar: equipeNoite.auxiliar || null });
     }
     return marcarAguardandoEquipe(Number(osId), "NOITE", "Sem executor disponível no turno: OS aguardando alocação.");
   }
