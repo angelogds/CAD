@@ -5,7 +5,11 @@
   <form method="POST" action="/escala/editar/<%= semana.id %>" style="display:grid;gap:12px;">
     <input type="hidden" name="modo" value="semana">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;"><div><div class="label">Início</div><input class="input" type="date" name="data_inicio" value="<%= semana.data_inicio %>"></div><div><div class="label">Fim</div><input class="input" type="date" name="data_fim" value="<%= semana.data_fim %>"></div><div><div class="label">Status</div><input class="input" name="status" value="<%= semana.status || 'ATIVA' %>"></div></div>
-    <div><div class="label">Plantonista noturno</div><select class="input" name="noturno_id"><option value="">Sem noturno</option><% colaboradores.forEach(c=>{ const sel=(semana.alocacoes||[]).some(a=>a.tipo_turno==='noturno'&&Number(a.colaborador_id)===Number(c.id)); %><option value="<%= c.id %>" <%= sel?'selected':'' %>><%= c.nome %></option><% }) %></select></div>
+    <% const noturnosAtuais = (semana.alocacoes||[]).filter(a=>a.tipo_turno==='noturno').map(a=>Number(a.colaborador_id)); %>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+      <div><div class="label">Plantonista Noite 1</div><select class="input" name="noturnos"><option value="">Sem noturno</option><% colaboradores.forEach(c=>{ const sel=Number(noturnosAtuais[0]||0)===Number(c.id); %><option value="<%= c.id %>" <%= sel?'selected':'' %>><%= c.nome %></option><% }) %></select></div>
+      <div><div class="label">Plantonista Noite 2</div><select class="input" name="noturnos"><option value="">Sem noturno</option><% colaboradores.forEach(c=>{ const sel=Number(noturnosAtuais[1]||0)===Number(c.id); %><option value="<%= c.id %>" <%= sel?'selected':'' %>><%= c.nome %></option><% }) %></select></div>
+    </div>
     <div><div class="label">Mecânicos diurnos</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;"><% colaboradores.forEach(c=>{ const checked=(semana.alocacoes||[]).some(a=>(a.tipo_turno==='diurno'||a.tipo_turno==='apoio')&&Number(a.colaborador_id)===Number(c.id)); %><label class="card" style="padding:10px;"><input type="checkbox" name="diurnos" value="<%= c.id %>" <%= checked?'checked':'' %>> <%= c.nome %></label><% }) %></div></div>
     <div><div class="label">Observação / função</div><textarea class="input" name="observacao" rows="3"><%= semana.observacao || '' %></textarea></div>
     <button class="btn btn-green">Salvar como ajuste manual</button>
