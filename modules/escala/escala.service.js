@@ -1468,18 +1468,6 @@ function apagarHoraExtra(id, usuarioAdmin) {
   return registro;
 }
 
-function limparHorasExtrasTeste(usuarioAdmin) {
-  assertAdminHoraExtra(usuarioAdmin);
-  const registros = listarHorasExtras({ semLimite: true });
-  const tx = db.transaction(() => {
-    registros.forEach((registro) => registrarAuditoriaHoraExtra('delete', registro, usuarioAdmin, { tipo_exclusao: 'LIMPEZA_TESTE' }));
-    if (tableExists('escala_banco_horas_movimentos')) db.prepare('DELETE FROM escala_banco_horas_movimentos WHERE hora_extra_id IS NOT NULL').run();
-    db.prepare('DELETE FROM escala_horas_extras').run();
-  });
-  tx();
-  return { total: registros.length };
-}
-
 function aprovarHoraExtra(id, usuarioAprovador, observacao) {
   if (!canManageBancoHoras(usuarioAprovador)) throw new Error('Perfil sem permissão para aprovar hora extra.');
   const he = getHoraExtra(id); if (!he) throw new Error('Registro não encontrado.');
@@ -1751,4 +1739,4 @@ function recalcularEscalaCompleta({ quantidade = 3 } = {}) {
   return { semanas: semanas.length, alocacoes, quantidade: qtd };
 }
 
-Object.assign(module.exports, { listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarColaboradoresMecanicosHoraExtra, isMecanicoUser, isColaboradorMecanico, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, buscarHoraExtraPorId, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtrasEmAndamentoPorOs, listarTodasHorasExtras, listarHorasExtras, apagarHoraExtra, limparHorasExtrasTeste, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });
+Object.assign(module.exports, { listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarColaboradoresMecanicosHoraExtra, isMecanicoUser, isColaboradorMecanico, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, buscarHoraExtraPorId, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtrasEmAndamentoPorOs, listarTodasHorasExtras, listarHorasExtras, apagarHoraExtra, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });
