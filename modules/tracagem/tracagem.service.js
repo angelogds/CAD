@@ -205,9 +205,14 @@ function calcCilindro(params) {
 
   return buildResult({
     entrada: { D: n2(D), h: n2(h), E: n2(E), folgaSolda: n2(folgaSolda), unidadeEntrada: unidade, unidadeInterna: 'mm' },
-    resultado: { A: n2(A), B: n2(B), comprimento: n2(A), comprimentoChapa: n2(A), comprimentoComFolga: n2(A + folgaSolda), area: n2(area) },
-    planificacao: { labels: { A: n2(A), B: n2(B) }, pontos: [], linhas: [], divisoes: [] },
-    observacoes: ['A = πD e B = altura útil da chapa.'],
+    resultado: { A: n2(A), B: n2(B), FS: n2(folgaSolda), comprimento: n2(A), comprimentoChapa: n2(A), comprimentoComFolga: n2(A + folgaSolda), medidaFinalCorte: n2(A + folgaSolda), area: n2(area) },
+    planificacao: { labels: { A: n2(A), B: n2(B), FS: n2(folgaSolda), comprimentoFinal: n2(A + folgaSolda) }, pontos: [], linhas: [], divisoes: [] },
+    observacoes: [
+      'A corresponde ao comprimento desenvolvido da chapa.',
+      'B corresponde à altura útil da chapa.',
+      'A folga para solda foi acrescentada à medida final, quando informada.',
+      'Todas as medidas estão expressas na unidade selecionada pelo usuário.',
+    ],
   });
 }
 
@@ -697,7 +702,7 @@ function listByEquipamento(equipamentoId) {
 
 function listEquipamentos() {
   return db.prepare(`
-    SELECT id, nome, COALESCE(codigo, '') AS codigo, COALESCE(setor, '') AS setor, COALESCE(tipo, '') AS tipo
+    SELECT id, nome, COALESCE(codigo, '') AS codigo, COALESCE(setor, '') AS setor, COALESCE(tipo, '') AS tipo, '' AS local
     FROM equipamentos
     ORDER BY nome ASC
   `).all();
@@ -707,7 +712,7 @@ function listEquipamentosParaVinculo(search = '') {
   const query = String(search || '').trim();
   const hasQuery = query.length > 0;
   return db.prepare(`
-    SELECT id, nome, COALESCE(codigo, '') AS codigo, COALESCE(setor, '') AS setor, COALESCE(tipo, '') AS tipo
+    SELECT id, nome, COALESCE(codigo, '') AS codigo, COALESCE(setor, '') AS setor, COALESCE(tipo, '') AS tipo, '' AS local
     FROM equipamentos
     ${hasQuery ? "WHERE lower(nome) LIKE @q OR lower(codigo) LIKE @q OR lower(setor) LIKE @q" : ''}
     ORDER BY nome ASC
@@ -717,7 +722,7 @@ function listEquipamentosParaVinculo(search = '') {
 
 function getEquipamentoById(id) {
   return db.prepare(`
-    SELECT id, nome, COALESCE(codigo, '') AS codigo, COALESCE(setor, '') AS setor, COALESCE(tipo, '') AS tipo
+    SELECT id, nome, COALESCE(codigo, '') AS codigo, COALESCE(setor, '') AS setor, COALESCE(tipo, '') AS tipo, '' AS local
     FROM equipamentos
     WHERE id = ?
   `).get(Number(id)) || null;
