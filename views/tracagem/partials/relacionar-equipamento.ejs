@@ -14,10 +14,35 @@
     <input type="hidden" name="tipo" value="<%= tipo %>">
     <input type="hidden" name="parametros_json" value='<%- JSON.stringify(calculo?.parametros || {}) %>'>
     <input type="hidden" name="resultado_json" value='<%- JSON.stringify(calculo?.resultado || {}) %>'>
+    <input type="hidden" name="os_id" id="pdf_os_id" value="">
+    <input type="hidden" name="equipamento_id" id="pdf_equipamento_id" value="">
+    <input type="hidden" name="equipamento_nome" id="pdf_equipamento_nome" value="">
+    <input type="hidden" name="equipamento_codigo" id="pdf_equipamento_codigo" value="">
+    <input type="hidden" name="equipamento_setor" id="pdf_equipamento_setor" value="">
+    <input type="hidden" name="equipamento_local" id="pdf_equipamento_local" value="">
+    <input type="hidden" name="observacao_peca" id="pdf_observacao_peca" value="">
     <button class="btn btn-green" type="submit">Gerar PDF</button>
   </form>
 
   <button class="btn btn-green" id="open-relacionar" type="button">Relacionar ao equipamento</button>
+</div>
+
+<div style="margin-top:12px;display:grid;gap:10px;">
+  <h3 class="optional-title">Identificação da traçagem — opcional</h3>
+  <p class="hint">Preencha somente se desejar um relatório técnico mais completo.</p>
+  <div class="tr-grid">
+    <div><label>Vincular a uma Ordem de Serviço — opcional</label><select class="input" id="ident_os_id"><option value="">Sem OS vinculada</option><% (ordensServico || []).forEach((os) => { %><option value="<%= os.id %>">OS #<%= os.id %> — <%= os.status || '' %></option><% }) %></select></div>
+    <div><label>Vincular a um equipamento cadastrado — opcional</label><input class="input" id="ident_equip_search" list="equipamentos-cilindro" placeholder="Buscar por nome, código ou setor"><datalist id="equipamentos-cilindro"><% (equipamentos || []).forEach((equip) => { %><option value="<%= equip.nome %>" data-id="<%= equip.id %>"></option><% }) %></datalist></div>
+    <div><label>Opção manual</label><select class="input" id="equip_mode"><option value="cadastro">Usar equipamento cadastrado</option><option value="manual">Equipamento não cadastrado / informar manualmente</option></select></div>
+    <div class="manual-equipment" id="manual_equipment_wrap"><label>Nome manual do equipamento</label><input class="input" id="manual_equipment_name" placeholder="Nome do equipamento"></div>
+  </div>
+  <div class="tr-grid">
+    <div><label>Nome do equipamento</label><input class="input" id="ident_equip_nome" readonly></div>
+    <div><label>Código do equipamento</label><input class="input" id="ident_equip_codigo" readonly></div>
+    <div><label>ID do equipamento</label><input class="input" id="ident_equip_id" readonly></div>
+    <div><label>Setor</label><input class="input" id="ident_equip_setor" readonly></div>
+  </div>
+  <div><label>Descrição ou observação da peça — opcional</label><textarea class="input" id="ident_observacao" rows="2"></textarea></div>
 </div>
 
 <div class="modal-overlay" id="modal-relacionar" aria-hidden="true">
@@ -41,7 +66,7 @@
           </thead>
           <tbody id="equip-tbody">
             <% (equipamentos || []).forEach((equip) => { %>
-              <tr class="equip-row" data-id="<%= equip.id %>" data-nome="<%= equip.nome %>" data-codigo="<%= equip.codigo || '' %>" data-setor="<%= equip.setor || '' %>">
+              <tr class="equip-row" data-id="<%= equip.id %>" data-nome="<%= equip.nome %>" data-codigo="<%= equip.codigo || '' %>" data-setor="<%= equip.setor || '' %>" data-local="<%= equip.local || '' %>">
                 <td><%= equip.codigo || '-' %></td>
                 <td><%= equip.nome %></td>
                 <td><%= equip.tipo || '-' %></td>
@@ -59,6 +84,7 @@
       <input type="hidden" name="parametros_json" value='<%- JSON.stringify(calculo?.parametros || {}) %>'>
       <input type="hidden" name="resultado_json" value='<%- JSON.stringify(calculo?.resultado || {}) %>'>
       <input type="hidden" name="equipamento_id" id="equipamento_id_selected" value="">
+      <input type="hidden" name="os_id" id="rel_os_id" value="">
       <div style="display:flex;justify-content:flex-end;gap:8px;">
         <button class="btn" type="button" id="cancel-relacionar">Cancelar</button>
         <button class="btn btn-green" type="submit" id="confirm-relacionar">Confirmar</button>
@@ -78,10 +104,38 @@
     const hiddenSelected = document.getElementById('equipamento_id_selected');
     const form = document.getElementById('form-relacionar');
     const confirm = document.getElementById('confirm-relacionar');
+    const equipamentos = <%- JSON.stringify(equipamentos || []) %>;
+    const byId = new Map(equipamentos.map((e) => [String(e.id), e]));
+    const identSearch = document.getElementById('ident_equip_search');
+    const identOs = document.getElementById('ident_os_id');
+    const mode = document.getElementById('equip_mode');
+    const manualWrap = document.getElementById('manual_equipment_wrap');
+    const manualName = document.getElementById('manual_equipment_name');
+    const obs = document.getElementById('ident_observacao');
     let selectedRow = null;
 
     function openModal() { modal.classList.add('open'); modal.setAttribute('aria-hidden', 'false'); }
     function closeModal() { modal.classList.remove('open'); modal.setAttribute('aria-hidden', 'true'); }
+    function syncHidden(equip = {}) {
+      const manual = mode?.value === 'manual';
+      document.getElementById('pdf_os_id').value = identOs?.value || '';
+      document.getElementById('pdf_equipamento_id').value = manual ? '' : (equip.id || '');
+      document.getElementById('pdf_equipamento_nome').value = manual ? (manualName?.value || '') : (equip.nome || '');
+      document.getElementById('pdf_equipamento_codigo').value = manual ? '' : (equip.codigo || '');
+      document.getElementById('pdf_equipamento_setor').value = manual ? '' : (equip.setor || '');
+      document.getElementById('pdf_equipamento_local').value = manual ? '' : (equip.local || '');
+      document.getElementById('pdf_observacao_peca').value = obs?.value || '';
+      const relOs = document.getElementById('rel_os_id'); if (relOs) relOs.value = identOs?.value || '';
+      document.getElementById('ident_equip_nome').value = manual ? (manualName?.value || '') : (equip.nome || '');
+      document.getElementById('ident_equip_codigo').value = manual ? '' : (equip.codigo || '');
+      document.getElementById('ident_equip_id').value = manual ? '' : (equip.id || '');
+      document.getElementById('ident_equip_setor').value = manual ? '' : (equip.setor || '');
+    }
+    function selectEquipByText() {
+      const q = (identSearch?.value || '').toLowerCase().trim();
+      const equip = equipamentos.find((e) => [e.nome, e.codigo, e.setor].join(' ').toLowerCase().includes(q));
+      syncHidden(equip || {});
+    }
 
     openBtn?.addEventListener('click', openModal);
     closeBtn?.addEventListener('click', closeModal);
@@ -94,6 +148,8 @@
       row.classList.add('selected');
       selectedRow = row;
       hiddenSelected.value = row.dataset.id;
+      const equip = byId.get(row.dataset.id) || {};
+      syncHidden(equip);
     });
 
     searchInput?.addEventListener('input', () => {
@@ -103,6 +159,10 @@
         row.style.display = ok ? '' : 'none';
       });
     });
+
+    [identSearch, identOs, manualName, obs].forEach((el) => { el?.addEventListener('input', selectEquipByText); el?.addEventListener('change', selectEquipByText); });
+    mode?.addEventListener('change', () => { manualWrap?.classList.toggle('open', mode.value === 'manual'); syncHidden({}); });
+    syncHidden({});
 
     form?.addEventListener('submit', (e) => {
       if (!hiddenSelected.value) {

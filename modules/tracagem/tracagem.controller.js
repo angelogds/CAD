@@ -279,6 +279,27 @@ function formatValue(value, unit = '', forceUnit = false) {
   return String(value);
 }
 
+
+function buildTracagemIdentifier(tracagem) {
+  if (tracagem?.codigo_tracagem) return tracagem.codigo_tracagem;
+  const tipoSlug = String(tracagem?.tipo || 'TRC').replace(/[^a-z0-9]/gi, '').slice(0, 3).toUpperCase() || 'TRC';
+  const date = new Date(tracagem?.created_at || Date.now());
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const seqSource = String(tracagem?.id && !Number.isNaN(Number(tracagem.id)) ? tracagem.id : Date.now()).slice(-4);
+  return `TRC-${tipoSlug}-${y}${m}${d}-${seqSource.padStart(4, '0')}`;
+}
+
+function toDisplayMeasure(value, unidade) {
+  if (value === null || value === undefined || value === '' || Number.isNaN(Number(value))) return value;
+  return unidade === 'cm' ? Number(value) / 10 : Number(value);
+}
+
+function formatMeasure(value, unidade) {
+  return formatValue(toDisplayMeasure(value, unidade), unidade);
+}
+
 function buildFormattedData(tracagem) {
   const unidade = tracagem.parametros?.unidade || tracagem.resultado?.entrada?.unidadeEntrada || 'mm';
   const entrada = tracagem.resultado?.entrada || {};
@@ -290,11 +311,13 @@ function buildFormattedData(tracagem) {
     { campo: 'Data', valor: formatDate(tracagem.created_at) },
     { campo: 'Usuário', valor: tracagem.usuario_nome || '-' },
     { campo: 'Unidade', valor: unidade },
-    { campo: 'OS', valor: tracagem.os_id || '-' },
+    { campo: 'Ordem de Serviço', valor: tracagem.os_id && tracagem.os_id !== '-' ? tracagem.os_id : '-' },
     { campo: 'Equipamento', valor: tracagem.equipamento_nome || '-' },
     { campo: 'Código equipamento', valor: tracagem.equipamento_codigo || '-' },
+    { campo: 'ID do equipamento', valor: tracagem.equipamento_id || '-' },
     { campo: 'Setor', valor: tracagem.equipamento_setor || '-' },
-    { campo: 'Traçagem ID', valor: tracagem.id || '-' },
+    { campo: 'Unidade/local', valor: tracagem.equipamento_local || '-' },
+    { campo: 'ID da traçagem', valor: buildTracagemIdentifier(tracagem) },
   ];
 
   const parametrosFormatados = Object.entries(entrada)
@@ -304,7 +327,7 @@ function buildFormattedData(tracagem) {
       return {
         parametro: key,
         descricao: PARAM_DESCRIPTIONS[key] || key,
-        valor: formatValue(value, isNumeric ? unidade : ''),
+        valor: isNumeric ? formatMeasure(value, unidade) : formatValue(value, ''),
       };
     });
 
@@ -344,6 +367,13 @@ function buildFormattedData(tracagem) {
         valorNumerico: Number(altura),
       });
     });
+  } else if (tracagem.tipo === 'cilindro') {
+    medidasPlanificacaoFormatadas.push(
+      { medida: 'A', legenda: 'Comprimento desenvolvido da chapa', valor: formatMeasure(resultado.A, unidade) },
+      { medida: 'B', legenda: 'Altura útil da chapa', valor: formatMeasure(resultado.B, unidade) },
+      { medida: 'FS', legenda: 'Folga para solda', valor: formatMeasure(resultado.FS ?? entrada.folgaSolda, unidade) },
+      { medida: 'Comprimento final', legenda: 'Medida final para corte (A + FS)', valor: formatMeasure(resultado.medidaFinalCorte ?? resultado.comprimentoComFolga, unidade) },
+    );
   } else {
   const medidasMapeadas = new Map([
       ['R1', resultado.R1_dev ?? resultado.R1],
@@ -369,7 +399,7 @@ function buildFormattedData(tracagem) {
       medidasPlanificacaoFormatadas.push({
         medida: label,
         legenda: PLAN_LEGENDS[key] || label,
-        valor: label === 'Ângulo' ? `${formatNumber(Number(value))}°` : formatValue(value, unidade),
+        valor: label === 'Ângulo' ? `${formatNumber(Number(value))}°` : formatMeasure(value, unidade),
       });
     });
 
@@ -382,7 +412,7 @@ function buildFormattedData(tracagem) {
       medidasPlanificacaoFormatadas.push({
         medida,
         legenda: PLAN_LEGENDS[key] || PLAN_LEGENDS[medida] || medida,
-        valor: medida === 'Ângulo' ? `${formatNumber(Number(value))}°` : formatValue(value, unidade),
+        valor: medida === 'Ângulo' ? `${formatNumber(Number(value))}°` : formatMeasure(value, unidade),
       });
     });
   }
@@ -390,6 +420,10 @@ function buildFormattedData(tracagem) {
   const observacoesFormatadas = Array.isArray(tracagem.resultado?.observacoes)
     ? tracagem.resultado.observacoes.filter((item) => item && String(item).trim() !== '').map((item) => String(item).trim())
     : [];
+
+  if (tracagem.observacao_peca && String(tracagem.observacao_peca).trim()) {
+    observacoesFormatadas.unshift(`Observação da peça: ${String(tracagem.observacao_peca).trim()}`);
+  }
 
   if (!observacoesFormatadas.length) {
     observacoesFormatadas.push('Conferir folga, solda, sentido de montagem e espessura da chapa antes do corte final.');
@@ -639,6 +673,9 @@ function gerarPdfCalculo(req, res) {
       equipamento_nome: req.body.equipamento_nome || '-',
       equipamento_codigo: req.body.equipamento_codigo || '-',
       equipamento_setor: req.body.equipamento_setor || '-',
+      equipamento_id: req.body.equipamento_id || '-',
+      equipamento_local: req.body.equipamento_local || '-',
+      observacao_peca: req.body.observacao_peca || '',
     };
 
     const filename = `tracagem_${tracagem.tipo || 'calculo'}_${Date.now()}.pdf`;
@@ -711,6 +748,8 @@ function relacionarEquipamento(req, res) {
       equipamento_nome: equipamento.nome,
       equipamento_codigo: equipamento.codigo || '-',
       equipamento_setor: equipamento.setor || '-',
+      equipamento_id: equipamento.id || equipamentoId,
+      equipamento_local: equipamento.local || '-',
     };
 
     renderPdfReport(null, tracagemPdfContext, filename, { outputPath: storedPath });
