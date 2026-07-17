@@ -378,7 +378,7 @@ exports.pdfSemana = (req, res, next) => {
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", 'inline; filename="escala-semanal.pdf"');
-    const doc = generator.generateWeeklyPDF({ rows });
+    const doc = generator.generateWeeklyPDF({ rows, coberturas: service.listarFolgasSabado() });
     doc.pipe(res);
     return doc;
   } catch (e) {
@@ -406,13 +406,32 @@ exports.pdfSemanaById = (req, res, next) => {
           diurno: consolidado?.diurno || { mecanico: [] },
           observacoes: semana.ajuste_manual ? 'Semana ajustada manualmente pelo encarregado.' : (semana.observacao || 'Todos como Mecânico Industrial'),
         },
-      ],
+      ], coberturas: service.listarFolgasSabado().filter((item) => Number(item.semana_id) === semanaId),
     });
     doc.pipe(res);
     return doc;
   } catch (e) {
     next(e);
   }
+};
+
+exports.folgasSabado = (req, res, next) => {
+  try {
+    return res.render('escala/folgas-sabado', {
+      title: 'Folgas e Plantão de Sábado',
+      registros: service.listarFolgasSabado({ inicio: req.query.inicio, fim: req.query.fim }),
+      colaboradores: service.listarColaboradoresManutencao(),
+      canManageEscala: canManageEscala(req),
+    });
+  } catch (e) { return next(e); }
+};
+
+exports.salvarFolgaSabado = (req, res) => {
+  try {
+    service.salvarFolgaSabadoManual(Number(req.params.semanaId), req.body, currentUser(req));
+    flashSuccess(req, 'Folga e cobertura de sábado atualizadas com histórico de auditoria.');
+  } catch (e) { flashError(req, e.message); }
+  return res.redirect('/escala/folgas-sabado');
 };
 
 exports.pdfPeriodo = (req, res, next) => {

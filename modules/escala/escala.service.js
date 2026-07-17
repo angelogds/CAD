@@ -1741,9 +1741,71 @@ function aplicarRodizioNaEscala(dados, usuario) {
       });
       sem.diurnos.forEach((c) => { db.prepare(`INSERT OR IGNORE INTO escala_alocacoes (semana_id,tipo_turno,colaborador_id,observacao) VALUES (?,'diurno',?,'Rodízio da Escala')`).run(sem.id, c.colaborador_id); alocacoes++; });
       db.prepare(`UPDATE escala_semanas SET origem='GERADA', ajuste_manual=0, rodizio_config_id=?, semana_indice=?, observacao=COALESCE(observacao,''), status=COALESCE(status,'ATIVA') WHERE id=?`).run(config.id, sem.semana_indice, sem.id);
+      sincronizarFolgaSabado(sem, usuario, { sobrescrever });
+      sincronizarAdicionalNoturno(sem, usuario);
     }
   }); tx(); return { semanas: preview.length, semanasGeradas: preview.length, semanasAtualizadas: preview.length - puladas, semanasPreservadasPorAjusteManual: puladas, alocacoes, puladas, conflitos: preview.flatMap(s=>s.conflitos || []), periodoInicio: inicio, periodoFim: fim };
 }
+const INICIO_NOVA_ESCALA = '2026-07-20';
+const MOTIVOS_FOLGA_SABADO = new Set(['PLANTAO_NOTURNO','TRABALHO_FIM_SEMANA','BANCO_HORAS','HORAS_EXTRAS','AUTORIZADA_ENCARREGADO','OUTRO']);
+function colaboradorEscalaPorNome(nome) {
+  const alvo = normalizarNome(nome);
+  return listarColaboradoresManutencao().find((c) => normalizarNome(c.nome) === alvo) || null;
+}
+function sincronizarFolgaSabado(semana, usuario, { sobrescrever = false } = {}) {
+  if (!tableExists('escala_folgas_sabado') || semana.data_inicio < INICIO_NOVA_ESCALA) return null;
+  const existente = db.prepare(`SELECT * FROM escala_folgas_sabado WHERE semana_id=?`).get(semana.id);
+  if (existente && !sobrescrever) return existente;
+  const noite = new Set((semana.plantonistasNoturnos || []).map((c) => normalizarNome(c.nome)));
+  const duplaRetorno = noite.has('emanuel') ? ['Salviano','Luiz'] : ['Emanuel','Júnior'];
+  const semanasDesdeInicio = Math.max(0, Math.round((Date.parse(`${semana.data_inicio}T00:00:00Z`) - Date.parse(`${INICIO_NOVA_ESCALA}T00:00:00Z`)) / 604800000));
+  const ocorrencia = Math.floor(semanasDesdeInicio / 2);
+  const folga = colaboradorEscalaPorNome(duplaRetorno[ocorrencia % 2]);
+  const parceiro = colaboradorEscalaPorNome(duplaRetorno[(ocorrencia + 1) % 2]);
+  const diogo = colaboradorEscalaPorNome('Diogo');
+  if (!folga || !parceiro || !diogo) throw new Error('Diogo e os quatro colaboradores do revezamento devem estar ativos.');
+  db.prepare(`INSERT INTO escala_folgas_sabado (semana_id,data_sexta,colaborador_folga_id,motivo_folga,data_sabado,colaborador_fixo_id,parceiro_diogo_id,responsavel_id)
+    VALUES (?,? ,?,'PLANTAO_NOTURNO',?,?,?,?) ON CONFLICT(semana_id) DO UPDATE SET data_sexta=excluded.data_sexta,colaborador_folga_id=excluded.colaborador_folga_id,motivo_folga='PLANTAO_NOTURNO',data_sabado=excluded.data_sabado,colaborador_fixo_id=excluded.colaborador_fixo_id,parceiro_diogo_id=excluded.parceiro_diogo_id,responsavel_id=excluded.responsavel_id,substituto_diogo_id=NULL,atualizado_em=datetime('now')`).run(semana.id,addDaysISO(semana.data_inicio,4),folga.id,addDaysISO(semana.data_inicio,5),diogo.id,parceiro.id,userIdFrom(usuario));
+  return db.prepare(`SELECT * FROM escala_folgas_sabado WHERE semana_id=?`).get(semana.id);
+}
+function sincronizarAdicionalNoturno(semana, usuario) {
+  if (!tableExists('escala_adicional_noturno')) return;
+  const ids = (semana.plantonistasNoturnos || []).map((c) => Number(c.colaborador_id)).filter(Boolean);
+  db.prepare(`DELETE FROM escala_adicional_noturno WHERE semana_id=?`).run(semana.id);
+  ids.forEach((id) => db.prepare(`INSERT INTO escala_adicional_noturno (semana_id,colaborador_id,recebe_adicional,periodo_inicio,periodo_fim,situacao,atualizado_por) VALUES (?,?,1,?,?,'PREVISTO',?)`).run(semana.id,id,semana.data_inicio,semana.data_fim,userIdFrom(usuario)));
+}
+function listarFolgasSabado({ inicio, fim } = {}) {
+  if (!tableExists('escala_folgas_sabado')) return [];
+  return db.prepare(`SELECT fs.*,s.semana_numero,s.data_inicio,s.data_fim,cf.nome AS colaborador_folga,fixo.nome AS colaborador_fixo,parceiro.nome AS parceiro_diogo,sub.nome AS substituto_diogo,COALESCE(u.name,'Sistema') AS responsavel
+    FROM escala_folgas_sabado fs JOIN escala_semanas s ON s.id=fs.semana_id JOIN colaboradores cf ON cf.id=fs.colaborador_folga_id LEFT JOIN colaboradores fixo ON fixo.id=fs.colaborador_fixo_id JOIN colaboradores parceiro ON parceiro.id=fs.parceiro_diogo_id LEFT JOIN colaboradores sub ON sub.id=fs.substituto_diogo_id LEFT JOIN users u ON u.id=fs.responsavel_id
+    WHERE (? IS NULL OR s.data_fim>=?) AND (? IS NULL OR s.data_inicio<=?) ORDER BY s.data_inicio`).all(inicio||null,inicio||null,fim||null,fim||null);
+}
+function salvarFolgaSabadoManual(semanaId, dados, usuario) {
+  const anterior = db.prepare(`SELECT * FROM escala_folgas_sabado WHERE semana_id=?`).get(semanaId);
+  if (!anterior) throw new Error('Cobertura de sábado não encontrada. Recalcule a escala primeiro.');
+  const motivo = String(dados.motivo_folga || '').toUpperCase();
+  const justificativa = String(dados.justificativa || '').trim();
+  if (!MOTIVOS_FOLGA_SABADO.has(motivo)) throw new Error('Selecione um motivo de folga válido.');
+  if (motivo === 'OUTRO' && !justificativa) throw new Error('Outro motivo exige justificativa.');
+  if (dados.alterar_sequencia === '1' && !justificativa) throw new Error('Informe a justificativa para alterar toda a sequência futura.');
+  const folgaId=Number(dados.colaborador_folga_id), parceiroId=Number(dados.parceiro_diogo_id), substitutoId=Number(dados.substituto_diogo_id)||null;
+  const diogoFolga=['BANCO_HORAS','HORAS_EXTRAS'].includes(motivo) && String(dados.diogo_folga||'')==='1';
+  if (!folgaId || !parceiroId) throw new Error('Informe a folga de sexta e o parceiro de sábado.');
+  if (diogoFolga && !substitutoId) throw new Error('A folga de Diogo exige a indicação de um substituto.');
+  if (new Set([diogoFolga ? substitutoId : anterior.colaborador_fixo_id, parceiroId].filter(Boolean)).size < 2) throw new Error('O sábado deve manter cobertura mínima de dois mecânicos diferentes.');
+  db.prepare(`UPDATE escala_folgas_sabado SET colaborador_folga_id=?,motivo_folga=?,justificativa_outro=?,parceiro_diogo_id=?,substituto_diogo_id=?,situacao=?,observacao=?,responsavel_id=?,autorizado_por=?,atualizado_em=datetime('now') WHERE semana_id=?`).run(folgaId,motivo,justificativa||null,parceiroId,diogoFolga?substitutoId:null,String(dados.situacao||'AJUSTADA').toUpperCase(),String(dados.observacao||'').trim()||null,userIdFrom(usuario),userIdFrom(usuario),semanaId);
+  const nova=db.prepare(`SELECT * FROM escala_folgas_sabado WHERE semana_id=?`).get(semanaId);
+  db.prepare(`INSERT INTO escala_alteracoes_historico (semana_id,usuario_id,escala_anterior,nova_escala,justificativa,alcance) VALUES (?,?,?,?,?,?)`).run(semanaId,userIdFrom(usuario),JSON.stringify(anterior),JSON.stringify(nova),justificativa||'Ajuste autorizado pelo encarregado',dados.alterar_sequencia==='1'?'FUTURO':'SEMANA');
+  if (dados.alterar_sequencia === '1') {
+    const futuros = db.prepare(`SELECT fs.semana_id FROM escala_folgas_sabado fs JOIN escala_semanas s ON s.id=fs.semana_id WHERE s.data_inicio>(SELECT data_inicio FROM escala_semanas WHERE id=?) ORDER BY s.data_inicio`).all(semanaId);
+    futuros.filter((_item, indice) => indice % 2 === 1).forEach((item, indice) => {
+      const inverter = indice % 2 === 0;
+      db.prepare(`UPDATE escala_folgas_sabado SET colaborador_folga_id=?,parceiro_diogo_id=?,responsavel_id=?,atualizado_em=datetime('now') WHERE semana_id=?`).run(inverter?parceiroId:folgaId,inverter?folgaId:parceiroId,userIdFrom(usuario),item.semana_id);
+    });
+  }
+  return nova;
+}
+
 function recalcularEscalaPorRodizio(configId, filtros, usuario) { return aplicarRodizioNaEscala({ ...(filtros || {}), config_id: Number(configId), sobrescreverTudo: filtros?.sobrescreverTudo || filtros?.sobrescrever }, usuario); }
 function desativarRodizio(id) { if (!id) return false; return db.prepare(`UPDATE escala_rodizio_config SET ativo=0, atualizado_em=datetime('now') WHERE id=?`).run(id).changes > 0; }
 function salvarSemanaManual(semanaId, dados) {
@@ -1784,4 +1846,4 @@ function recalcularEscalaCompleta({ quantidade = 3 } = {}) {
   return { semanas: semanas.length, alocacoes, quantidade: qtd };
 }
 
-Object.assign(module.exports, { listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarColaboradoresMecanicosHoraExtra, isMecanicoUser, isColaboradorMecanico, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, buscarHoraExtraPorId, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtrasEmAndamentoPorOs, listarTodasHorasExtras, listarHorasExtras, apagarHoraExtra, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });
+Object.assign(module.exports, { listarFolgasSabado, salvarFolgaSabadoManual, sincronizarFolgaSabado, sincronizarAdicionalNoturno, MOTIVOS_FOLGA_SABADO, listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarColaboradoresMecanicosHoraExtra, isMecanicoUser, isColaboradorMecanico, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, buscarHoraExtraPorId, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtrasEmAndamentoPorOs, listarTodasHorasExtras, listarHorasExtras, apagarHoraExtra, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });
