@@ -89,7 +89,7 @@ router.post("/hora-extra/:id/excluir", requireLogin, safe(controller.apagarHoraE
 router.get("/banco-horas", requireLogin, requireRole(escalaRead), safe(controller.bancoHoras, "bancoHoras"));
 router.get("/banco-horas/:colaboradorId", requireLogin, requireRole(escalaRead), safe(controller.bancoHorasFuncionario, "bancoHorasFuncionario"));
 router.get("/folgas", requireLogin, requireRole(escalaRead), safe(controller.folgas, "folgas"));
-router.post("/folgas/programar", requireLogin, requireRole(escalaManage), safe(controller.programarFolga, "programarFolga"));
+router.post("/folgas/programar", requireLogin, requireRole(escalaManage), upload.single("anexo"), safe(controller.programarFolga, "programarFolga"));
 router.post("/folgas/:id/cancelar", requireLogin, requireRole(escalaManage), safe(controller.cancelarFolga, "cancelarFolga"));
 router.post("/folgas/:id/realizar", requireLogin, requireRole(escalaManage), safe(controller.realizarFolga, "realizarFolga"));
 

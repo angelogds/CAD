@@ -412,7 +412,7 @@ function fmtMin(min) { const m = Math.abs(Number(min) || 0); return `${Math.floo
 
 function gerarPdfBancoHorasGeral(dados = {}) {
   const doc = createDoc();
-  const meta = { title: "Campo do Gado\nBanco de Horas da Manutenção", subtitle: "Controle Interno de Horas Extras e Folgas Compensatórias", logoPath: logoPath() };
+  const meta = { title: dados.reportTitle || "Campo do Gado\nBanco de Horas da Manutenção", subtitle: dados.reportSubtitle || "Controle Interno de Horas Extras e Folgas Compensatórias", logoPath: logoPath() };
   process.nextTick(() => {
     setupPage(doc, meta, false);
     doc.font("Helvetica-Bold").fontSize(11).fillColor(COLORS.greenDark).text("Relatório Geral do Banco de Horas", PAGE.margins.left, doc.y);
@@ -487,7 +487,10 @@ function gerarPdfEscalaCompleta({ semanas = [], filtros = {} } = {}) {
   return doc;
 }
 
-function gerarPdfFolgasProgramadas(dados = {}) { return gerarPdfBancoHorasGeral(dados); }
+function gerarPdfFolgasProgramadas(dados = {}) {
+  const doc=createDoc(); const meta={title:dados.reportTitle||'FOLGAS E AFASTAMENTOS',subtitle:'Campo do Gado – Manutenção Industrial',logoPath:logoPath()};
+  process.nextTick(()=>{setupPage(doc,meta,false);drawTable(doc,{meta,columns:[{key:'funcionario',label:'Funcionário',width:125},{key:'tipo',label:'Tipo',width:110},{key:'periodo',label:'Período',width:120},{key:'debito',label:'Banco',width:75},{key:'status',label:'Status',width:80}],rows:(dados.folgas||[]).map(f=>({funcionario:f.colaborador_nome,tipo:f.tipo_lancamento,periodo:`${formatDateBr(f.data_folga)} a ${formatDateBr(f.data_fim||f.data_folga)}`,debito:f.debita_banco?`${fmtMin(f.minutos_descontados)} (${f.saldo_antes_minutos}→${f.saldo_depois_minutos})`:'Não desconta',status:f.status})),emptyRow:{funcionario:'Sem registros',tipo:'-',periodo:'-',debito:'-',status:'-'}});doc.end();}); return doc;
+}
 
 
 module.exports = {

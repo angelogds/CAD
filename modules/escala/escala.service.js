@@ -1505,12 +1505,57 @@ function listarBancoHoras(filtros = {}) {
     });
 }
 function listarMovimentosBancoHoras(colaboradorId) { return db.prepare('SELECT * FROM escala_banco_horas_movimentos WHERE colaborador_id=? ORDER BY data_movimento DESC, id DESC').all(colaboradorId); }
-function listarFolgas(filtros={}) { if (!tableExists('escala_folgas_programadas')) return []; const params=[]; let where='1=1'; if(filtros.colaborador_id){where+=' AND f.colaborador_id=?'; params.push(filtros.colaborador_id)} return db.prepare(`SELECT f.*, c.nome AS colaborador_nome, u.name AS aprovado_por_nome FROM escala_folgas_programadas f JOIN colaboradores c ON c.id=f.colaborador_id LEFT JOIN users u ON u.id=f.aprovado_por WHERE ${where} ORDER BY f.data_folga DESC, f.id DESC`).all(...params); }
-
-function programarFolgaCompensatoria(dados) { const col=Number(dados.colaborador_id); const minutos=Number(dados.minutos_descontados); const motivo=String(dados.motivo||'').trim(); if(!col||!dados.data_folga||!minutos) throw new Error('Preencha funcionário, data e horas.'); const saldo=calcularSaldoBancoHoras(col).minutos; if(saldo<minutos && !(isAdminUser(dados.usuario)&&motivo)) throw new Error('Saldo insuficiente para programar folga. ADMIN deve informar justificativa.'); const tx=db.transaction(()=>{ const info=db.prepare(`INSERT INTO escala_folgas_programadas (user_id,colaborador_id,data_folga,minutos_descontados,motivo,status,aprovado_por,criado_em,atualizado_em) VALUES (?,?,?,?,?,'PROGRAMADA',?,datetime('now'),datetime('now'))`).run(dados.user_id||null,col,dados.data_folga,minutos,motivo||'Folga compensatória',userIdFrom(dados.usuario)); db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,folga_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(dados.user_id||null,col,info.lastInsertRowid,'DEBITO_FOLGA',minutos,`Folga compensatória programada para ${dados.data_folga}`,userIdFrom(dados.usuario)); if(tableExists('escala_ausencias')) db.prepare(`INSERT INTO escala_ausencias (colaborador_id,tipo,data_inicio,data_fim,motivo,created_at) VALUES (?,'folga',?,?,?,datetime('now'))`).run(col,dados.data_folga,dados.data_folga,'Folga compensatória - Banco de Horas'); return info.lastInsertRowid; }); return tx(); }
-function cancelarFolgaCompensatoria(id, usuarioResponsavel, motivo) { if(!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); if(!String(motivo||'').trim()) throw new Error('Motivo obrigatório.'); const f=db.prepare('SELECT * FROM escala_folgas_programadas WHERE id=?').get(id); if(!f) throw new Error('Folga não encontrada.'); if(f.status==='CANCELADA') throw new Error('Folga já cancelada.'); const tx=db.transaction(()=>{ db.prepare("UPDATE escala_folgas_programadas SET status='CANCELADA', motivo=COALESCE(motivo,'') || ' | Cancelamento: ' || ?, atualizado_em=datetime('now') WHERE id=?").run(String(motivo).trim(),id); db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,folga_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(f.user_id,f.colaborador_id,id,'AJUSTE_CREDITO',f.minutos_descontados,`Estorno de folga cancelada: ${motivo}`,userIdFrom(usuarioResponsavel)); }); tx(); }
-function realizarFolgaCompensatoria(id, usuarioResponsavel) { if(!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); db.prepare("UPDATE escala_folgas_programadas SET status='REALIZADA', atualizado_em=datetime('now') WHERE id=? AND status='PROGRAMADA'").run(id); }
-function gerarDadosRelatorioBancoHoras(filtros={}) { return { filtros, emitidoEm: new Date().toISOString(), banco: listarBancoHoras(), horasExtras: listarHorasExtras(filtros), folgas: listarFolgas(filtros) }; }
+const TIPOS_FOLGA = new Set(['FOLGA_COMPENSATORIA','FOLGA_MANUAL','ATESTADO','FERIAS','FALTA_JUSTIFICADA','FALTA_NAO_JUSTIFICADA','OUTRO']);
+function normalizarTipoFolga(value) {
+  const tipo = String(value || 'FOLGA_COMPENSATORIA').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/-]+/g,'_');
+  return TIPOS_FOLGA.has(tipo) ? tipo : 'FOLGA_COMPENSATORIA';
+}
+function listarFolgas(filtros={}) {
+  if (!tableExists('escala_folgas_programadas')) return [];
+  const params=[]; let where='1=1';
+  if(filtros.colaborador_id){where+=' AND f.colaborador_id=?';params.push(filtros.colaborador_id)}
+  if(filtros.inicio){where+=' AND COALESCE(f.data_fim,f.data_folga)>=?';params.push(filtros.inicio)}
+  if(filtros.fim){where+=' AND f.data_folga<=?';params.push(filtros.fim)}
+  if(filtros.tipo_ausencia){where+=' AND f.tipo_lancamento=?';params.push(normalizarTipoFolga(filtros.tipo_ausencia))}
+  if(filtros.status){where+=' AND f.status=?';params.push(filtros.status)}
+  if(filtros.equipamento){where+=' AND lower(COALESCE(f.equipamento,\'\')) LIKE ?';params.push(`%${String(filtros.equipamento).toLowerCase()}%`)}
+  return db.prepare(`SELECT f.*, c.nome AS colaborador_nome, u.name AS aprovado_por_nome FROM escala_folgas_programadas f JOIN colaboradores c ON c.id=f.colaborador_id LEFT JOIN users u ON u.id=f.aprovado_por WHERE ${where} ORDER BY f.data_folga DESC, f.id DESC`).all(...params);
+}
+function programarFolgaCompensatoria(dados) {
+  const col=Number(dados.colaborador_id); const tipo=normalizarTipoFolga(dados.tipo_lancamento||dados.tipo);
+  const debita=tipo==='FOLGA_COMPENSATORIA'; const minutos=debita?Number(dados.minutos_descontados):0;
+  const motivo=String(dados.motivo||'').trim(); const inicio=String(dados.data_folga||dados.data_inicio||''); const fim=String(dados.data_fim||inicio);
+  if(!col||!inicio||!fim) throw new Error('Preencha funcionário e período.');
+  if(fim<inicio) throw new Error('Data final não pode ser anterior à inicial.');
+  if(!motivo) throw new Error('Motivo obrigatório.');
+  if(debita && (!Number.isInteger(minutos)||minutos<=0)) throw new Error('Informe a quantidade exata de horas da folga compensatória.');
+  const conflito=db.prepare(`SELECT id FROM escala_folgas_programadas WHERE colaborador_id=? AND status<>'CANCELADA' AND NOT(COALESCE(data_fim,data_folga)<? OR data_folga>?) LIMIT 1`).get(col,inicio,fim);
+  if(conflito) throw new Error('O colaborador já possui afastamento ativo sobreposto neste período.');
+  const saldo=calcularSaldoBancoHoras(col).minutos;
+  const justificativa=String(dados.justificativa_saldo_negativo||'').trim();
+  if(debita && saldo<minutos && !(isAdminUser(dados.usuario)&&justificativa)) throw new Error('Saldo insuficiente. ADMIN deve autorizar e informar justificativa específica.');
+  return db.transaction(()=>{
+    const info=db.prepare(`INSERT INTO escala_folgas_programadas (user_id,colaborador_id,data_folga,data_fim,tipo_lancamento,minutos_descontados,motivo,status,aprovado_por,data_servico,hora_inicio,hora_fim,equipamento,descricao_servico,anexo_path,debita_banco,saldo_antes_minutos,saldo_depois_minutos,justificativa_saldo_negativo,criado_em,atualizado_em) VALUES (?,?,?,?,?,?,?,'PROGRAMADA',?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`).run(dados.user_id||null,col,inicio,fim,tipo,minutos,motivo,userIdFrom(dados.usuario),dados.data_servico||null,dados.hora_inicio||null,dados.hora_fim||null,dados.equipamento||null,dados.descricao_servico||null,dados.anexo_path||null,debita?1:0,saldo,saldo-minutos,justificativa||null);
+    if(debita) db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,folga_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(dados.user_id||null,col,info.lastInsertRowid,'DEBITO_FOLGA',minutos,`Folga compensatória de ${inicio} a ${fim}; saldo ${saldo} → ${saldo-minutos} min`,userIdFrom(dados.usuario));
+    let ausenciaId=null;
+    if(tableExists('escala_ausencias')) { const legacy=tipo==='ATESTADO'?'atestado':'folga'; ausenciaId=db.prepare(`INSERT INTO escala_ausencias (colaborador_id,tipo,tipo_lancamento,data_inicio,data_fim,motivo,created_at) VALUES (?,?,?,?,?,?,datetime('now'))`).run(col,legacy,tipo,inicio,fim,motivo).lastInsertRowid; db.prepare('UPDATE escala_folgas_programadas SET ausencia_id=? WHERE id=?').run(ausenciaId,info.lastInsertRowid); }
+    return info.lastInsertRowid;
+  })();
+}
+function cancelarFolgaCompensatoria(id, usuarioResponsavel, motivo) {
+  if(!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.');
+  if(!String(motivo||'').trim()) throw new Error('Motivo obrigatório.');
+  const f=db.prepare('SELECT * FROM escala_folgas_programadas WHERE id=?').get(id);
+  if(!f) throw new Error('Afastamento não encontrado.'); if(f.status==='CANCELADA') throw new Error('Afastamento já cancelado.');
+  db.transaction(()=>{ db.prepare("UPDATE escala_folgas_programadas SET status='CANCELADA', motivo=motivo || ' | Cancelamento: ' || ?, atualizado_em=datetime('now') WHERE id=?").run(String(motivo).trim(),id);
+    if(f.ausencia_id&&tableExists('escala_ausencias')) db.prepare('DELETE FROM escala_ausencias WHERE id=?').run(f.ausencia_id);
+    const debitado=Number(f.debita_banco)===1 && db.prepare("SELECT 1 FROM escala_banco_horas_movimentos WHERE folga_id=? AND tipo='DEBITO_FOLGA'").get(id);
+    const estorno=db.prepare("SELECT 1 FROM escala_banco_horas_movimentos WHERE folga_id=? AND tipo='AJUSTE_CREDITO'").get(id);
+    if(debitado&&!estorno){db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,folga_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(f.user_id,f.colaborador_id,id,'AJUSTE_CREDITO',f.minutos_descontados,`Estorno de afastamento cancelado: ${motivo}`,userIdFrom(usuarioResponsavel));db.prepare("UPDATE escala_folgas_programadas SET estornado_em=datetime('now') WHERE id=?").run(id);}
+  })();
+}
+function realizarFolgaCompensatoria(id, usuarioResponsavel) { if(!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); db.prepare("UPDATE escala_folgas_programadas SET status='REALIZADA', realizado_em=datetime('now'), atualizado_em=datetime('now') WHERE id=? AND status='PROGRAMADA'").run(id); }
+function gerarDadosRelatorioBancoHoras(filtros={}) { return { filtros, emitidoEm:new Date().toISOString(), banco:listarBancoHoras(filtros), horasExtras:listarHorasExtras(filtros), folgas:listarFolgas(filtros) }; }
 
 function parseIds(value) {
   if (Array.isArray(value)) return value.map(Number).filter(Boolean);
@@ -1526,7 +1571,7 @@ function buscarIndisponibilidadesNoPeriodo(colaboradorId, inicio, fim) {
   const rows = [];
   if (tableExists('escala_ausencias')) rows.push(...db.prepare(`SELECT tipo, data_inicio AS inicio, data_fim AS fim, motivo FROM escala_ausencias WHERE colaborador_id=? AND NOT (data_fim < ? OR data_inicio > ?)`).all(colaboradorId, inicio, fim));
   if (tableExists('escala_concessoes')) rows.push(...db.prepare(`SELECT tipo, inicio, fim, motivo FROM escala_concessoes WHERE colaborador_id=? AND NOT (fim < ? OR inicio > ?)`).all(colaboradorId, inicio, fim));
-  if (tableExists('escala_folgas_programadas')) rows.push(...db.prepare(`SELECT 'FOLGA_PROGRAMADA' AS tipo, data_folga AS inicio, data_folga AS fim, motivo FROM escala_folgas_programadas WHERE colaborador_id=? AND status <> 'CANCELADA' AND data_folga BETWEEN ? AND ?`).all(colaboradorId, inicio, fim));
+  if (tableExists('escala_folgas_programadas')) rows.push(...db.prepare(`SELECT tipo_lancamento AS tipo, data_folga AS inicio, COALESCE(data_fim,data_folga) AS fim, motivo FROM escala_folgas_programadas WHERE colaborador_id=? AND status <> 'CANCELADA' AND NOT (COALESCE(data_fim,data_folga) < ? OR data_folga > ?)`).all(colaboradorId, inicio, fim));
   return rows;
 }
 function listarConfiguracoesRodizio() {
