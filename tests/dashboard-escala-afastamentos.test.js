@@ -137,3 +137,21 @@ test('isRegistroAtivoNaData usa intervalo inclusivo de início e fim', () => {
   assert.equal(dashboardService.isRegistroAtivoNaData(registro, '2026-06-30'), true);
   assert.equal(dashboardService.isRegistroAtivoNaData(registro, '2026-07-01'), false);
 });
+
+test('responsável do final de semana é o mecânico industrial escalado à noite', () => {
+  resetSchema();
+
+  addColaborador('Diogo', 'diurno');
+  addColaborador('Luiz', 'noturno');
+
+  const escala = dashboardService.getEscalaPainelSemana({ dataReferencia: '2026-06-06' });
+
+  assert.deepEqual(
+    (escala.final_semana_responsavel || []).map((p) => p.nome),
+    ['Luiz']
+  );
+  assert.deepEqual(
+    (escala.final_semana_responsavel || []).map((p) => p.nome),
+    (escala.noturno || []).map((p) => p.nome)
+  );
+});
