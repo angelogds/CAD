@@ -150,8 +150,8 @@
   var safeAvisos = (typeof avisos !== 'undefined' && avisos) ? avisos : [];
   var safeEscala = (typeof escala !== 'undefined' && escala) ? escala : {};
   var escalaDiurno = (safeEscala.diurno_mecanicos || []).map(function(p) { return p.nome; }).join(', ');
-  var escalaMecanicosIndustriais = (safeEscala.mecanicos_industriais || safeEscala.diurno_mecanicos || []).map(function(p) { return p.nome; }).join(', ');
   var escalaNoturno = (safeEscala.noturno || []).map(function(p) { return p.nome; }).join(', ');
+  var escalaFinalSemana = (safeEscala.final_semana_responsavel || safeEscala.noturno || []).map(function(p) { return p.nome; }).join(', ');
   var escalaFolgasAfastamentos = safeEscala.folgas_afastamentos || [];
   var safeMotoresResumo = (typeof motoresResumo !== 'undefined' && motoresResumo) ? motoresResumo : {};
   var rankingMecanicosData = (typeof rankingMecanicos !== 'undefined' && rankingMecanicos) ? rankingMecanicos : {};
@@ -334,12 +334,12 @@
   <div class="dash-col">
 <section class="dashboard-card area-escala">
     <div class="dashboard-title">Escala da Semana</div>
-    <% if (escalaDiurno || escalaMecanicosIndustriais || escalaNoturno || escalaFolgasAfastamentos.length) { %>
+    <% if (escalaDiurno || escalaNoturno || escalaFinalSemana || escalaFolgasAfastamentos.length) { %>
       <div class="muted-xs" style="margin-bottom:8px;">Semana #<%= safeEscala.semana_numero || '-' %> • <%= safeEscala.data_inicio || '-' %> até <%= safeEscala.data_fim || '-' %></div>
       <table class="table compact"><tbody>
-        <tr><td><strong>Dia (mecânicos industriais)</strong></td><td><%= escalaDiurno || '-' %></td></tr>
-        <tr><td><strong>Mecânico industrial</strong></td><td><%= escalaMecanicosIndustriais || '-' %></td></tr>
-        <tr><td><strong>Noite (responsável)</strong></td><td><%= escalaNoturno || '-' %></td></tr>
+        <tr><td><strong>Dia — mecânico industrial</strong></td><td><%= escalaDiurno || '-' %></td></tr>
+        <tr><td><strong>Noite — mecânico industrial</strong></td><td><%= escalaNoturno || '-' %></td></tr>
+        <tr><td><strong>Final de semana — responsável</strong></td><td><%= escalaFinalSemana || '-' %></td></tr>
       </tbody></table>
 
       <div class="dashboard-title" style="margin-top:10px; margin-bottom:6px; font-size:11px;">Folga / atestado</div>

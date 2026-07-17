@@ -689,6 +689,7 @@ function getEscalaPainelSemana(options = {}) {
       diurno_mecanicos: alocacoesDisponiveis.filter((a) => a.tipo_turno === "diurno" && String(a.funcao || "").toLowerCase() === "mecanico"),
       apoio_operacional: [],
       noturno: noturnoResponsaveis,
+      final_semana_responsavel: noturnoResponsaveis,
       folgas_afastamentos: Array.from(folgasAfastamentosMap.values()),
     };
   }, null);
