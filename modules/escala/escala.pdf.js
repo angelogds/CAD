@@ -182,7 +182,7 @@ function roleText(group) {
   return out.join("\n");
 }
 
-function generateWeeklyPDF({ rows = [] } = {}) {
+function generateWeeklyPDF({ rows = [], coberturas = [] } = {}) {
   const doc = createDoc();
   const meta = {
     title: "ESCALA SEMANAL – MANUTENÇÃO INDUSTRIAL",
@@ -192,6 +192,9 @@ function generateWeeklyPDF({ rows = [] } = {}) {
 
   process.nextTick(() => {
     setupPage(doc, meta, false);
+
+    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(11).text('Tabela 1 — Escala semanal');
+    doc.moveDown(0.4);
 
     const tableRows = rows.map((item) => ({
       semana: String(item.semanaNumero || item.semana || "-"),
@@ -219,6 +222,34 @@ function generateWeeklyPDF({ rows = [] } = {}) {
         observacoes: "-",
       },
     });
+
+    ensureSpace(doc, 54, meta);
+    doc.moveDown(1).fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(11)
+      .text('Tabela 2 — Folgas e cobertura de sábado');
+    doc.moveDown(0.4);
+    drawTable(doc, {
+      meta,
+      columns: [
+        { key: 'semana', label: 'Semana', width: 50, align: 'center' },
+        { key: 'sexta', label: 'Sexta-feira', width: 76, align: 'center' },
+        { key: 'folga', label: 'Colaborador de folga', width: 105 },
+        { key: 'sabado', label: 'Sábado', width: 76, align: 'center' },
+        { key: 'equipe', label: 'Equipe de sábado', width: 120 },
+        { key: 'observacao', label: 'Observação', width: 122 },
+      ],
+      rows: coberturas.map((item) => ({
+        semana: String(item.semana_numero || '-'), sexta: formatDateBr(item.data_sexta),
+        folga: item.colaborador_folga || '-', sabado: formatDateBr(item.data_sabado),
+        equipe: [item.substituto_diogo || item.colaborador_fixo, item.parceiro_diogo].filter(Boolean).join(' e '),
+        observacao: item.observacao || 'Compensação após plantão noturno',
+      })),
+      emptyRow: { semana: '-', sexta: '-', folga: 'Sem cobertura cadastrada.', sabado: '-', equipe: '-', observacao: '-' },
+    });
+    ensureSpace(doc, 72, meta);
+    doc.moveDown(0.8).fillColor(COLORS.muted).font('Helvetica-Oblique').fontSize(8.2).text(
+      'Diogo permanece fixo no turno diurno e integra a equipe-base dos sábados. Emanuel, Júnior, Salviano e Luiz revezam o turno noturno, a folga compensatória da sexta-feira e o plantão de sábado. Quando Diogo utilizar banco de horas, deverá ser indicado outro colaborador para garantir a presença mínima de dois mecânicos no sábado.',
+      { align: 'justify' },
+    );
 
     doc.end();
   });
