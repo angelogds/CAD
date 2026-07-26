@@ -97,31 +97,78 @@ try {
 }
 
 function applyPragmas(database) {
+  // Try WAL mode first — it eliminates SQLITE_IOERR_SHMSIZE by using memory-mapped
+  // shared memory instead of the -shm file, and dramatically improves concurrency.
+  const walPragmas = [
+    ['journal_mode', 'WAL'],
+    ['synchronous', 'NORMAL'],
+    ['cache_size', '-64000'],   // 64 MB page cache
+    ['temp_store', 'MEMORY'],   // temp tables in RAM
+    ['mmap_size', '30000000'],  // 30 MB memory-mapped I/O
+    ['busy_timeout', '10000'],  // 10 s busy wait before SQLITE_BUSY
+    ['foreign_keys', 'ON'],
+  ];
+
+  try {
+    for (const [key, value] of walPragmas) {
+      database.pragma(`${key} = ${value}`);
+    }
+    console.log('✅ [db] SQLite WAL mode + optimised pragmas applied.');
+    return;
+  } catch (error) {
+    if (isSqliteIoError(error)) {
+      console.error(`❌ [db] Erro SQLite I/O/SHM ao aplicar PRAGMA WAL: ${error.message || error}`);
+      console.warn('⚠️ [db] Tentando fallback com journal_mode=DELETE...');
+    } else {
+      console.warn(`⚠️ [db] Falha ao aplicar pragmas WAL (${error.message || error}). Tentando fallback DELETE...`);
+    }
+  }
+
+  // Fallback: DELETE journal mode (no -wal/-shm files, safer on some volumes)
   try {
     database.pragma('journal_mode = DELETE');
     database.pragma('synchronous = NORMAL');
-    database.pragma('busy_timeout = 5000');
+    database.pragma('cache_size = -64000');
+    database.pragma('temp_store = MEMORY');
+    database.pragma('busy_timeout = 10000');
     database.pragma('foreign_keys = ON');
-  } catch (error) {
-    if (isSqliteIoError(error)) {
-      console.error(`❌ [db] Erro SQLite I/O/SHM ao aplicar PRAGMA: ${error.message || error}`);
-      try {
-        database.pragma('journal_mode = DELETE');
-        database.pragma('synchronous = NORMAL');
-        database.pragma('busy_timeout = 5000');
-        database.pragma('foreign_keys = ON');
-        console.warn('⚠️ [db] Fallback aplicado com journal_mode=DELETE para evitar arquivos -wal/-shm no Railway Volume.');
-        return;
-      } catch (fallbackError) {
-        throw new Error(`SQLite não abriu com segurança após fallback DELETE: ${fallbackError.message || fallbackError}`);
-      }
-    }
-    throw error;
+    console.warn('⚠️ [db] Fallback aplicado com journal_mode=DELETE.');
+  } catch (fallbackError) {
+    throw new Error(`SQLite não abriu com segurança após fallback DELETE: ${fallbackError.message || fallbackError}`);
   }
 }
 
 // pragmas base seguros para Railway Volume
 applyPragmas(db);
+
+/**
+ * withRetry(fn, maxAttempts, delayMs)
+ * Execute fn() with exponential backoff on SQLITE_BUSY / SQLITE_IOERR.
+ * Use this wrapper for write-heavy operations that may contend.
+ */
+function withRetry(fn, maxAttempts = 3, delayMs = 100) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return fn();
+    } catch (err) {
+      lastError = err;
+      const code = String(err?.code || '');
+      const isRetryable = code === 'SQLITE_BUSY'
+        || code === 'SQLITE_LOCKED'
+        || isSqliteIoError(err);
+      if (!isRetryable || attempt === maxAttempts) throw err;
+      // Synchronous exponential backoff (acceptable for SQLite retry)
+      const wait = delayMs * Math.pow(2, attempt - 1);
+      console.warn(`⚠️ [db] Retry ${attempt}/${maxAttempts} after ${wait}ms (${code || err.message})`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait);
+    }
+  }
+  throw lastError;
+}
+
+// Expose withRetry on the db object so other modules can use it
+db.withRetry = withRetry;
 
 function tableExists(name) {
   const row = db

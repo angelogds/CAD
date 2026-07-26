@@ -1,8 +1,86 @@
 <section class="container">
   <h1>Armazenamento</h1>
-  
+
+  <%
+    // Fetch live storage stats via the storageManager (injected by route or available globally)
+    let liveStats = null;
+    let liveBreakdown = null;
+    let liveBackups = [];
+    let recentErrors = [];
+    try {
+      const sm = require(require('path').join(process.cwd(), 'src/services/storageManager'));
+      liveStats = sm.getStorageStats();
+      liveBreakdown = sm.getStorageBreakdown();
+      liveBackups = sm.listBackups();
+    } catch (_e) {}
+    try {
+      const lg = require(require('path').join(process.cwd(), 'utils/logger'));
+      recentErrors = lg.getRecentErrors(100);
+    } catch (_e) {}
+  %>
+
+  <%# ── Volume Usage Gauge ─────────────────────────────────────────────────── %>
+  <% if (liveStats) { %>
+    <%
+      const gaugePct = liveStats.pct || 0;
+      const gaugeColor = liveStats.critical ? '#dc2626' : liveStats.warning ? '#d97706' : '#16a34a';
+    %>
+    <div class="card" style="margin:14px 0;">
+      <h3>Uso do volume <code><%= liveStats.dataDir %></code></h3>
+      <div style="background:#e5e7eb; border-radius:8px; height:22px; overflow:hidden; margin:10px 0;">
+        <div style="width:<%= gaugePct %>%; background:<%= gaugeColor %>; height:100%; transition:width .4s; display:flex; align-items:center; justify-content:center;">
+          <span style="color:#fff; font-size:12px; font-weight:700; padding:0 6px;"><%= gaugePct %>%</span>
+        </div>
+      </div>
+      <ul style="margin:6px 0; padding-left:18px;">
+        <li>Usado: <strong><%= liveStats.usedLabel %></strong> de <strong><%= liveStats.totalLabel %></strong></li>
+        <li>Livre: <strong style="color:<%= gaugeColor %>"><%= liveStats.freeLabel %></strong></li>
+        <li>Status: <strong style="color:<%= gaugeColor %>"><%= liveStats.status.toUpperCase() %></strong></li>
+      </ul>
+      <% if (liveStats.critical) { %>
+        <div style="background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; padding:10px; color:#991b1b; margin-top:8px;">
+          🚨 <strong>Armazenamento crítico!</strong> Menos de 5% livre. Execute a limpeza imediatamente.
+        </div>
+      <% } else if (liveStats.warning) { %>
+        <div style="background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:10px; color:#92400e; margin-top:8px;">
+          ⚠️ <strong>Atenção:</strong> Volume acima de 80% de uso. Considere executar a limpeza em breve.
+        </div>
+      <% } %>
+    </div>
+  <% } %>
+
+  <%# ── Storage Breakdown ──────────────────────────────────────────────────── %>
+  <% if (liveBreakdown) { %>
+    <div class="card" style="margin:14px 0;">
+      <h3>Uso por diretório</h3>
+      <table class="table" style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr><th>Diretório</th><th>Tamanho</th><th>Caminho</th></tr>
+        </thead>
+        <tbody>
+          <% const bdKeys = ['uploads','pdfs','images','backups','temp','sqlite']; %>
+          <% bdKeys.forEach((k) => { const bd = liveBreakdown[k]; if (!bd) return; %>
+            <tr>
+              <td><strong><%= k %></strong></td>
+              <td><%= bd.label %></td>
+              <td style="font-size:12px; color:#6b7280;"><%= bd.dir %></td>
+            </tr>
+          <% }); %>
+          <% if (liveBreakdown.db) { %>
+            <tr>
+              <td><strong>SQLite DB</strong></td>
+              <td><%= liveBreakdown.db.label %></td>
+              <td style="font-size:12px; color:#6b7280;">main + WAL + SHM</td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <%# ── Diagnóstico geral (existing) ──────────────────────────────────────── %>
   <div class="card" style="margin:14px 0;">
-    <h3>Diagnóstico geral</h3>
+    <h3>Diagnóstico SQLite</h3>
     <ul>
       <li>Espaço livre: <strong><%= formatBytes(diagnostic.free) %></strong> de <%= formatBytes(diagnostic.total) %></li>
       <li>Banco SQLite: <strong><%= formatBytes(diagnostic.db) %></strong> (WAL <%= formatBytes(diagnostic.wal) %>)</li>
@@ -13,26 +91,71 @@
       <li>Sessões: <strong><%= diagnostic.sessions.total %></strong> total; <strong><%= diagnostic.sessions.expired %></strong> expiradas</li>
     </ul>
     <% if (isAdmin) { %>
-      <form method="post" action="/admin/armazenamento/limpar-sessoes" style="display:inline"><button class="btn">Limpar sessões expiradas</button></form>
-      <form method="post" action="/admin/armazenamento/limpar-temporarios" style="display:inline"><button class="btn">Limpar temporários/logs/PDFs</button></form>
-      <form method="post" action="/admin/armazenamento/checkpoint-wal" style="display:inline"><button class="btn">Checkpoint WAL</button></form>
-      <form method="post" action="/admin/armazenamento/otimizar" style="display:inline" onsubmit="return confirm('Executar VACUUM somente se houver espaço suficiente. Confirmar?')"><button class="btn btn-primary">Otimizar SQLite</button></form>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+        <form method="post" action="/admin/armazenamento/limpar-sessoes"><button class="btn">Limpar sessões expiradas</button></form>
+        <form method="post" action="/admin/armazenamento/limpar-temporarios"><button class="btn">Limpar temporários/logs/PDFs</button></form>
+        <form method="post" action="/admin/armazenamento/checkpoint-wal"><button class="btn">Checkpoint WAL</button></form>
+        <form method="post" action="/admin/armazenamento/otimizar" onsubmit="return confirm('Executar VACUUM somente se houver espaço suficiente. Confirmar?')"><button class="btn btn-primary">Otimizar SQLite</button></form>
+      </div>
     <% } %>
   </div>
 
-  <p>Fotos e vídeos de OS com mais de <%= env.retentionDays %> dias são removidos automaticamente todo dia <%= env.dayOfMonth %> do mês. As informações escritas das ordens de serviço permanecem preservadas.</p>
-  <ul>
-    <li>Uso atual de volume (uploads OS): <strong><%= (volumeBytes / 1024 / 1024).toFixed(2) %> MB</strong></li>
-    <li>Última limpeza: <strong><%= last ? last.data_execucao : 'Nunca' %></strong></li>
-    <li>Arquivos removidos (última): <strong><%= last ? last.arquivos_removidos : 0 %></strong></li>
-    <li>Espaço liberado (última): <strong><%= last ? (last.espaco_liberado_bytes / 1024 / 1024).toFixed(2) : '0.00' %> MB</strong></li>
-    <li>Próximo agendamento: <strong><%= nextRun %></strong></li>
-  </ul>
+  <%# ── Backup Now ─────────────────────────────────────────────────────────── %>
+  <% if (isAdmin) { %>
+    <div class="card" style="margin:14px 0;">
+      <h3>Backup do banco de dados</h3>
+      <p style="margin:6px 0 12px;">Cria uma cópia do SQLite em <code>/data/backups/</code> com timestamp. Backups automáticos ocorrem diariamente.</p>
+      <form method="post" action="/api/storage/backup-now" onsubmit="return handleBackupNow(event);" style="display:inline;">
+        <button type="submit" class="btn btn-primary" id="btn-backup-now">Fazer backup agora</button>
+      </form>
+      <span id="backup-status" style="margin-left:12px; font-size:13px;"></span>
+    </div>
+  <% } %>
 
-  <form method="post" action="/admin/armazenamento/limpeza-midia" onsubmit="return confirm('Confirmar execução da limpeza de mídia agora?');" style="margin-bottom:20px;">
-    <button type="submit" class="btn btn-primary">Executar limpeza de mídia agora</button>
-  </form>
+  <%# ── Available Backups ───────────────────────────────────────────────────── %>
+  <% if (liveBackups && liveBackups.length > 0) { %>
+    <div class="card" style="margin:14px 0;">
+      <h3>Backups disponíveis (<%= liveBackups.length %>)</h3>
+      <table class="table" style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr><th>Arquivo</th><th>Tamanho</th><th>Data</th></tr>
+        </thead>
+        <tbody>
+          <% liveBackups.forEach((b) => { %>
+            <tr>
+              <td style="font-size:13px;"><%= b.name %></td>
+              <td><%= b.sizeLabel %></td>
+              <td style="font-size:12px; color:#6b7280;"><%= new Date(b.mtime).toLocaleString('pt-BR') %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
 
+  <%# ── Media Cleanup ───────────────────────────────────────────────────────── %>
+  <div class="card" style="margin:14px 0;">
+    <h3>Limpeza de mídia</h3>
+    <p>Fotos e vídeos de OS com mais de <strong><%= env.retentionDays %></strong> dias são removidos automaticamente todo dia <strong><%= env.dayOfMonth %></strong> do mês. As informações escritas das ordens de serviço permanecem preservadas.</p>
+    <ul>
+      <li>Uso atual de volume (uploads OS): <strong><%= (volumeBytes / 1024 / 1024).toFixed(2) %> MB</strong></li>
+      <li>Última limpeza: <strong><%= last ? last.data_execucao : 'Nunca' %></strong></li>
+      <li>Arquivos removidos (última): <strong><%= last ? last.arquivos_removidos : 0 %></strong></li>
+      <li>Espaço liberado (última): <strong><%= last ? (last.espaco_liberado_bytes / 1024 / 1024).toFixed(2) : '0.00' %> MB</strong></li>
+      <li>Próximo agendamento: <strong><%= nextRun %></strong></li>
+    </ul>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+      <form method="post" action="/admin/armazenamento/limpeza-midia" onsubmit="return confirm('Confirmar execução da limpeza de mídia agora?');">
+        <button type="submit" class="btn btn-primary">Executar limpeza de mídia agora</button>
+      </form>
+      <% if (isAdmin) { %>
+        <button type="button" class="btn" onclick="handleCleanupDryRun()">Simular limpeza de arquivos antigos</button>
+      <% } %>
+    </div>
+    <div id="cleanup-result" style="margin-top:10px; font-size:13px;"></div>
+  </div>
+
+  <%# ── Cleanup History ─────────────────────────────────────────────────────── %>
   <h3>Histórico de limpezas</h3>
   <table class="table" style="width:100%; border-collapse:collapse;">
     <thead>
@@ -69,4 +192,78 @@
       <% }) %>
     </tbody>
   </table>
+
+  <%# ── System Logs Viewer ──────────────────────────────────────────────────── %>
+  <% if (isAdmin && recentErrors && recentErrors.length > 0) { %>
+    <div class="card" style="margin:24px 0 14px;">
+      <h3>Últimos erros do sistema (<%= recentErrors.length %>)</h3>
+      <div style="max-height:320px; overflow-y:auto; background:#1e1e1e; border-radius:6px; padding:12px;">
+        <% recentErrors.slice().reverse().forEach((e) => { %>
+          <div style="margin-bottom:8px; font-family:monospace; font-size:12px; color:<%= e.level === 'ERROR' ? '#f87171' : '#fbbf24' %>;">
+            <span style="color:#9ca3af;"><%= e.timestamp || '' %></span>
+            <strong> [<%= e.level || '?' %>]</strong>
+            <%= e.message || e.raw || '' %>
+            <% if (e.error && e.error.message) { %>
+              <span style="color:#d1d5db;"> — <%= e.error.message %></span>
+            <% } %>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+  <% } else if (isAdmin) { %>
+    <div class="card" style="margin:24px 0 14px;">
+      <h3>Logs do sistema</h3>
+      <p style="color:#6b7280;">Nenhum erro registrado hoje.</p>
+    </div>
+  <% } %>
+
 </section>
+
+<script>
+async function handleBackupNow(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btn-backup-now');
+  const status = document.getElementById('backup-status');
+  btn.disabled = true;
+  status.textContent = 'Criando backup...';
+  try {
+    const r = await fetch('/api/storage/backup-now', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const data = await r.json();
+    if (data.ok) {
+      status.style.color = '#16a34a';
+      status.textContent = `✅ Backup criado: ${data.result.backupName} (${(data.result.sizeBytes / 1024 / 1024).toFixed(2)} MB)`;
+    } else {
+      status.style.color = '#dc2626';
+      status.textContent = `❌ Erro: ${data.error}`;
+    }
+  } catch (err) {
+    status.style.color = '#dc2626';
+    status.textContent = `❌ Falha na requisição: ${err.message}`;
+  }
+  btn.disabled = false;
+}
+
+async function handleCleanupDryRun() {
+  const result = document.getElementById('cleanup-result');
+  result.textContent = 'Simulando limpeza...';
+  try {
+    const r = await fetch('/api/storage/cleanup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dryRun: true }),
+    });
+    const data = await r.json();
+    if (data.ok) {
+      const res = data.result;
+      result.style.color = '#92400e';
+      result.textContent = `Simulação: ${res.candidates} arquivo(s) seriam removidos (mais de ${res.thresholdDays} dias), liberando aprox. ${(res.freedBytes / 1024 / 1024).toFixed(2)} MB.`;
+    } else {
+      result.style.color = '#dc2626';
+      result.textContent = `Erro: ${data.error}`;
+    }
+  } catch (err) {
+    result.style.color = '#dc2626';
+    result.textContent = `Falha: ${err.message}`;
+  }
+}
+</script>

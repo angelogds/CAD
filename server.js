@@ -1,11 +1,16 @@
 // server.js
 require("dotenv").config();
 
+// ===== Logger (must be first — registers global crash handlers) =====
+const logger = require("./utils/logger");
+logger.registerGlobalHandlers();
+logger.info("🚀 [server] Iniciando servidor...", { node: process.version, env: process.env.NODE_ENV || "production" });
+
 try {
   require("./database/migrate");
-  console.log("✅ Migrations carregadas");
+  logger.info("✅ [server] Migrations carregadas");
 } catch (err) {
-  console.error("❌ Erro nas migrations:", err.message || err);
+  logger.error("❌ [server] Erro nas migrations", { message: err.message }, err);
 }
 
 console.log("[WHATSAPP] Provider ativo:", process.env.WHATSAPP_PROVIDER || "disabled");
@@ -21,6 +26,7 @@ const engine = require("ejs-mate");
 const storage = require("./config/storage");
 const storageMaintenance = require("./modules/admin/storage-maintenance.service");
 const mediaVolume = require("./modules/admin/media-volume.service");
+const storageManager = require("./src/services/storageManager");
 
 let webPush = null;
 try { webPush = require("web-push"); } catch (_e) { webPush = null; }
@@ -98,15 +104,22 @@ app.set("trust proxy", 1);
 
 try {
   storage.ensurePersistentDirs();
-  console.log(`✅ Storage pronto: DATA_DIR=${storage.DATA_DIR}`);
+  logger.info(`✅ [server] Storage pronto`, { dataDir: storage.DATA_DIR });
   const usage = storageMaintenance.diagnostic();
-  console.log(`📦 Espaço livre em ${storage.DATA_DIR}: ${storageMaintenance.formatBytes(usage.free)} de ${storageMaintenance.formatBytes(usage.total)}`);
-  if (usage.free && usage.free < 25 * storageMaintenance.MB) console.error(`🚨 Armazenamento crítico em ${storage.DATA_DIR}: ${storageMaintenance.formatBytes(usage.free)} livres. Seeds/rotinas pesadas devem ser evitadas.`);
-  else if (usage.free && usage.free < 100 * storageMaintenance.MB) console.warn(`⚠️ Atenção: pouco espaço livre em ${storage.DATA_DIR}: ${storageMaintenance.formatBytes(usage.free)} livres.`);
+  logger.info(`📦 [server] Espaço livre em ${storage.DATA_DIR}`, { free: storageMaintenance.formatBytes(usage.free), total: storageMaintenance.formatBytes(usage.total) });
+  if (usage.free && usage.free < 25 * storageMaintenance.MB) {
+    logger.error(`🚨 [server] Armazenamento crítico em ${storage.DATA_DIR}`, { free: storageMaintenance.formatBytes(usage.free) });
+  } else if (usage.free && usage.free < 100 * storageMaintenance.MB) {
+    logger.warn(`⚠️ [server] Pouco espaço livre em ${storage.DATA_DIR}`, { free: storageMaintenance.formatBytes(usage.free) });
+  }
   const sessionCleanup = storageMaintenance.ensureSessionMaintenance();
-  if (sessionCleanup.table) console.log(`🧹 Sessões expiradas removidas na inicialização: ${sessionCleanup.deleted}`);
+  if (sessionCleanup.table) logger.info(`🧹 [server] Sessões expiradas removidas na inicialização`, { deleted: sessionCleanup.deleted });
+
+  // Start automatic cleanup/backup scheduler
+  const schedulerIntervals = storageManager.startAutoCleanup();
+  for (const id of schedulerIntervals) trackInterval(id);
 } catch (err) {
-  console.error("❌ Erro ao preparar diretórios persistentes:", err.message || err);
+  logger.error("❌ [server] Erro ao preparar diretórios persistentes", { message: err.message }, err);
 }
 
 aiService.validateAIEnvironment();
@@ -385,6 +398,7 @@ mount("/escala", "./modules/escala/escala.routes");
 mount("/avisos", "./modules/avisos/avisos.routes");
 mount("/usuarios", "./modules/usuarios/usuarios.routes");
 mount("/admin", "./modules/admin/storage.routes");
+mount("/api/storage", "./src/routes/storage.routes");
 mount("/demandas", "./modules/demandas/demandas.routes");
 mount("/motores", "./modules/motores/motores.routes");
 mount(OFFICIAL_ROUTES.inspecao, "./modules/inspecao/inspecao.routes");
@@ -463,11 +477,27 @@ app.get("/painel-operacional", (req, res) => {
 
 // ===== Health =====
 app.get("/health", (_req, res) => {
-  res.status(200).json({
-    status: "ok",
+  let storageStatus = null;
+  try {
+    const stats = storageManager.getStorageStats();
+    storageStatus = {
+      status: stats.status,
+      pct: stats.pct,
+      free: stats.freeLabel,
+      total: stats.totalLabel,
+      dataDir: stats.dataDir,
+    };
+  } catch (_e) {
+    storageStatus = { status: "unknown" };
+  }
+
+  const healthy = !storageStatus || storageStatus.status !== "critical";
+  res.status(healthy ? 200 : 507).json({
+    status: healthy ? "ok" : "degraded",
     app: "manutencao-campo-do-gado-v2",
     timezone: TZ,
     timestamp_utc: new Date().toISOString(),
+    storage: storageStatus,
   });
 });
 
@@ -476,11 +506,15 @@ app.use((_req, res) => res.status(404).send("404 - Página não encontrada"));
 
 // ===== Error handler =====
 app.use((err, req, res, next) => {
-  console.error("❌ ERRO 500:", req.method, req.originalUrl);
-  console.error(err && err.stack ? err.stack : err);
+  logger.error("❌ [server] ERRO 500", {
+    method: req.method,
+    url: req.originalUrl,
+    user: req.session?.user?.id,
+    code: err?.code,
+  }, err);
   if (res.headersSent) return next(err);
   if (storageMaintenance.isStorageFullError(err)) {
-    console.error(`🚨 SQLITE_FULL: sem espaço em ${storage.DATA_DIR}. Execute node scripts/storage-cleanup.js ou use /admin/armazenamento.`);
+    logger.error(`🚨 [server] SQLITE_FULL: sem espaço em ${storage.DATA_DIR}`, { dataDir: storage.DATA_DIR });
     return res.status(507).render("errors/storage-full", {
       title: "Armazenamento insuficiente",
       message: `O sistema está sem espaço de armazenamento. Libere espaço no volume ${storage.DATA_DIR} ou execute a rotina de limpeza administrativa.`,
@@ -490,4 +524,4 @@ app.use((err, req, res, next) => {
 });
 
 const port = process.env.PORT || 8080;
-server = app.listen(port, () => console.log(`🚀 Servidor ativo na porta ${port}`));
+server = app.listen(port, () => logger.info(`🚀 [server] Servidor ativo na porta ${port}`, { port }));
