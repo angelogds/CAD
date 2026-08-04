@@ -1,4 +1,5 @@
 const service = require("./pcm.service");
+const PDFDocument = require("pdfkit");
 
 function baseView(req) {
   return {
@@ -379,8 +380,97 @@ function salvarExecucaoRota(req, res) {
 }
 
 
+
+function dashboardGerencial(req, res) {
+  const data = service.getDashboardGerencial(req.query, req.session?.user?.id || null);
+  return res.render("pcm/dashboard-gerencial", {
+    ...baseView(req),
+    title: "Dashboard Gerencial da Manutenção",
+    activePcmSection: "dashboard-gerencial",
+    dashboard: data,
+  });
+}
+
+function dashboardConfig(req, res) {
+  const prefs = service.getDashboardPreferences(req.session?.user?.id || null);
+  return res.render("pcm/dashboard-config", {
+    ...baseView(req),
+    title: "Configurar dashboard",
+    activePcmSection: "dashboard-gerencial",
+    prefs,
+    cardsDisponiveis: service.DASHBOARD_DEFAULT_CARDS,
+    graficosDisponiveis: service.DASHBOARD_DEFAULT_GRAFICOS,
+  });
+}
+
+function salvarDashboardConfig(req, res) {
+  const arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);
+  service.saveDashboardPreferences(req.session?.user?.id || null, {
+    cards: arr(req.body.cards),
+    graficos: arr(req.body.graficos),
+    periodo_padrao: req.body.periodo_padrao || 'mes_atual',
+    limites: {
+      falhas_periodo: Number(req.body.falhas_periodo || 3),
+      dias_preventiva_atraso: Number(req.body.dias_preventiva_atraso || 1),
+      horas_parada: Number(req.body.horas_parada || 24),
+    },
+  });
+  req.flash('success', 'Preferências do dashboard salvas.');
+  return res.redirect('/pcm/dashboard-gerencial');
+}
+
+function resetDashboardConfig(req, res) {
+  service.saveDashboardPreferences(req.session?.user?.id || null, { cards: service.DASHBOARD_DEFAULT_CARDS, graficos: service.DASHBOARD_DEFAULT_GRAFICOS, periodo_padrao: 'mes_atual', limites: {} });
+  req.flash('success', 'Preferências padrão restauradas.');
+  return res.redirect('/pcm/dashboard-gerencial/configurar');
+}
+
+function dashboardPdf(req, res) {
+  const data = service.getDashboardGerencial(req.query, req.session?.user?.id || null);
+  service.logDashboardReport(req.session?.user?.id || null, 'PDF', data.filtros);
+  const doc = new PDFDocument({ margin: 36, size: 'A4' });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="relatorio-gerencial-pcm.pdf"');
+  doc.pipe(res);
+  doc.fillColor('#166534').fontSize(16).text('Campo do Gado', { align: 'center' });
+  doc.fillColor('#111827').fontSize(14).text('Relatório Gerencial de Manutenção – PCM', { align: 'center' });
+  doc.moveDown().fontSize(9).text(`Período: ${data.filtros.data_inicial} a ${data.filtros.data_final}`);
+  doc.text(`Emitido em: ${new Date().toLocaleString('pt-BR')} por ${req.session?.user?.name || req.session?.user?.email || 'Usuário'}`);
+  doc.moveDown().fontSize(12).fillColor('#166534').text('Indicadores principais');
+  doc.fillColor('#111827').fontSize(9);
+  Object.entries(data.cards).forEach(([k,v]) => doc.text(`${k}: ${v ?? 'sem dado registrado'}`));
+  doc.moveDown().fontSize(12).fillColor('#166534').text('Equipamentos que exigem atenção');
+  doc.fillColor('#111827').fontSize(9);
+  if (!data.equipamentos_atencao.length) doc.text('Sem equipamentos sinalizados pelos limites atuais.');
+  data.equipamentos_atencao.slice(0, 20).forEach((e) => doc.text(`${e.codigo || '-'} ${e.nome} • ${e.setor || '-'} • ${e.motivos.join('; ')}`));
+  doc.moveDown().fontSize(12).fillColor('#166534').text('Rankings');
+  doc.fillColor('#111827').fontSize(9).text(`Falhas por equipamento: ${data.graficos.falhas_equipamento.length} linhas`);
+  doc.text(`Ranking de solicitantes: ${data.graficos.ranking_solicitantes.length} linhas`);
+  doc.text(`Ranking operacional de mecânicos: ${data.graficos.ranking_mecanicos.length} linhas`);
+  doc.end();
+}
+
+function esc(v) { return String(v ?? '').replace(/[&<>]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function tableHtml(title, rows) { const keys = rows[0] ? Object.keys(rows[0]) : ['mensagem']; const body = rows.length ? rows : [{ mensagem: 'Sem dados' }]; return `<h2>${esc(title)}</h2><table border="1"><tr>${keys.map(k=>`<th>${esc(k)}</th>`).join('')}</tr>${body.map(r=>`<tr>${keys.map(k=>`<td>${esc(r[k])}</td>`).join('')}</tr>`).join('')}</table>`; }
+function dashboardExcel(req, res) {
+  const data = service.getDashboardGerencial(req.query, req.session?.user?.id || null);
+  service.logDashboardReport(req.session?.user?.id || null, 'EXCEL', data.filtros);
+  const sheets = [
+    tableHtml('Resumo', [data.cards]), tableHtml('Ordens de serviço', data.tabelas.ordens), tableHtml('Equipamentos', data.tabelas.equipamentos), tableHtml('Preventivas', data.tabelas.preventivas), tableHtml('Falhas por equipamento', data.graficos.falhas_equipamento), tableHtml('Ranking dos mecânicos', data.graficos.ranking_mecanicos), tableHtml('Ranking dos solicitantes', data.graficos.ranking_solicitantes), tableHtml('Equipamentos que exigem atenção', data.equipamentos_atencao)
+  ];
+  res.setHeader('Content-Type', 'application/vnd.ms-excel; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="dashboard-gerencial-pcm.xls"');
+  return res.send(`<!doctype html><html><head><meta charset="utf-8"><style>table{border-collapse:collapse}th{background:#166534;color:#fff}</style></head><body>${sheets.join('<br style="page-break-after:always">')}</body></html>`);
+}
+
 module.exports = {
   index,
+  dashboardGerencial,
+  dashboardConfig,
+  salvarDashboardConfig,
+  resetDashboardConfig,
+  dashboardPdf,
+  dashboardExcel,
   planejamento,
   falhas,
   engenharia,

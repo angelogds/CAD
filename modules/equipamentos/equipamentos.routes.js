@@ -5,7 +5,8 @@ const fs = require("fs");
 const router = express.Router();
 const storagePaths = require("../../config/storage");
 
-const { requireLogin, requireAdmin } = require("../auth/auth.middleware");
+const { requireLogin, requireRole, requireAdmin } = require("../auth/auth.middleware");
+const { ACCESS } = require("../../config/rbac");
 const ctrl = require("./equipamentos.controller");
 
 const fotoDir = path.join(storagePaths.IMAGE_DIR, "equipamentos", "fotos");
@@ -91,25 +92,25 @@ const safe = (fn) => (req, res, next) => {
 
 router.get("/qrcode/:token", safe(ctrl.qrPublicPage));
 
-router.get("/", requireLogin, safe(ctrl.equipIndex));
-router.get("/pdf/lista", requireLogin, safe(ctrl.exportListaPdf));
-router.get("/novo", requireLogin, safe(ctrl.equipNewForm));
-router.post("/", requireLogin, fotoUpload.single("foto"), safe(ctrl.equipCreate));
+router.get("/", requireLogin, requireRole(ACCESS.equipamentos), safe(ctrl.equipIndex));
+router.get("/pdf/lista", requireLogin, requireRole(ACCESS.equipamentos), safe(ctrl.exportListaPdf));
+router.get("/novo", requireLogin, requireRole(ACCESS.equipamentos_manage), safe(ctrl.equipNewForm));
+router.post("/", requireLogin, requireRole(ACCESS.equipamentos_manage), fotoUpload.single("foto"), safe(ctrl.equipCreate));
 
-router.get("/:id", requireLogin, safe(ctrl.equipShow));
-router.get("/:id/pdf", requireLogin, safe(ctrl.exportEquipamentoPdf));
-router.get("/:id/editar", requireLogin, safe(ctrl.equipEditForm));
-router.post("/:id/editar", requireLogin, fotoUpload.single("foto"), safe(ctrl.equipUpdate));
+router.get("/:id", requireLogin, requireRole(ACCESS.equipamentos), safe(ctrl.equipShow));
+router.get("/:id/pdf", requireLogin, requireRole(ACCESS.equipamentos), safe(ctrl.exportEquipamentoPdf));
+router.get("/:id/editar", requireLogin, requireRole(ACCESS.equipamentos_manage), safe(ctrl.equipEditForm));
+router.post("/:id/editar", requireLogin, requireRole(ACCESS.equipamentos_manage), fotoUpload.single("foto"), safe(ctrl.equipUpdate));
 router.post("/:id/excluir", requireLogin, requireAdmin, safe(ctrl.equipDelete));
 
-router.post("/:id/pecas", requireLogin, safe(ctrl.addPeca));
-router.post("/:id/pecas/:associacaoId", requireLogin, safe(ctrl.updatePeca));
+router.post("/:id/pecas", requireLogin, requireRole(ACCESS.equipamentos_manage), safe(ctrl.addPeca));
+router.post("/:id/pecas/:associacaoId", requireLogin, requireRole(ACCESS.equipamentos_manage), safe(ctrl.updatePeca));
 router.post("/:id/pecas/:associacaoId/remover", requireLogin, requireAdmin, safe(ctrl.removePeca));
 
-router.post("/:id/documentos", requireLogin, docsUploadSingle, safe(ctrl.addDocumento));
+router.post("/:id/documentos", requireLogin, requireRole(ACCESS.equipamentos_manage), docsUploadSingle, safe(ctrl.addDocumento));
 router.post("/:id/documentos/:documentoId/remover", requireLogin, requireAdmin, safe(ctrl.removeDocumento));
 
-router.post("/:id/qrcode", requireLogin, safe(ctrl.gerarQr));
-router.get("/:id/qrcode/print", requireLogin, safe(ctrl.qrPrint));
+router.post("/:id/qrcode", requireLogin, requireRole(ACCESS.equipamentos_manage), safe(ctrl.gerarQr));
+router.get("/:id/qrcode/print", requireLogin, requireRole(ACCESS.equipamentos), safe(ctrl.qrPrint));
 
 module.exports = router;
