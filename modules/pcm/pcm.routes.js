@@ -7,6 +7,12 @@ const ctrl = require("./pcm.controller");
 const PCM_ACCESS = ACCESS.pcm;
 
 router.get("/", requireLogin, requireRole(PCM_ACCESS), ctrl.index);
+router.get("/dashboard-gerencial", requireLogin, requireRole(PCM_ACCESS), ctrl.dashboardGerencial);
+router.get("/dashboard-gerencial/configurar", requireLogin, requireRole(PCM_ACCESS), ctrl.dashboardConfig);
+router.post("/dashboard-gerencial/configurar", requireLogin, requireRole(PCM_ACCESS), ctrl.salvarDashboardConfig);
+router.post("/dashboard-gerencial/configurar/restaurar", requireLogin, requireRole(PCM_ACCESS), ctrl.resetDashboardConfig);
+router.get("/dashboard-gerencial/pdf", requireLogin, requireRole(PCM_ACCESS), ctrl.dashboardPdf);
+router.get("/dashboard-gerencial/excel", requireLogin, requireRole(PCM_ACCESS), ctrl.dashboardExcel);
 router.get("/planejamento", requireLogin, requireRole(PCM_ACCESS), ctrl.planejamento);
 router.get("/falhas", requireLogin, requireRole(PCM_ACCESS), ctrl.falhas);
 router.get("/engenharia", requireLogin, requireRole(PCM_ACCESS), ctrl.engenharia);
