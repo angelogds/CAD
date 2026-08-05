@@ -799,9 +799,9 @@ function registrarExecucaoRota({ rota_id, observacao, gerar_os }, userId) {
 
 
 const DASHBOARD_DEFAULT_CARDS = [
-  'total_os','os_abertas','os_andamento','os_concluidas','os_atrasadas','preventivas_realizadas','preventivas_programadas','preventivas_pendentes','preventivas_atrasadas','falhas_recorrentes','tempo_medio_atendimento','tempo_medio_conclusao','corretivas','preventivas','equipamentos_parados','equipamentos_atencao'
+  'total_os','os_abertas','os_andamento','os_concluidas','os_atrasadas','preventivas_programadas','preventivas_vencidas','preventivas_concluidas','demandas_abertas','solicitacoes_pendentes','equipamentos_criticos','tempo_medio_atendimento','tempo_medio_conclusao','manutencoes_por_equipamento','servicos_por_mecanico','falhas_por_setor','percentual_corretiva','percentual_preventiva','corretivas','preventivas','equipamentos_atencao'
 ];
-const DASHBOARD_DEFAULT_GRAFICOS = ['os_periodo','falhas_equipamento','tipos_manutencao','preventivas_cumprimento','ranking_mecanicos','ranking_solicitantes','comparativo_mensal'];
+const DASHBOARD_DEFAULT_GRAFICOS = ['os_status','os_periodo','corretivas_preventivas','falhas_equipamento','servicos_setor','servicos_mecanico','preventivas_cumprimento','evolucao_ocorrencias','ranking_mecanicos','ranking_solicitantes'];
 
 function parseJsonSafe(value, fallback) { try { const out = JSON.parse(value || ''); return out ?? fallback; } catch (_e) { return fallback; } }
 function ymd(date) { return date.toISOString().slice(0, 10); }
@@ -867,19 +867,107 @@ function saveDashboardPreferences(userId, payload = {}) {
   return prefs;
 }
 
+function dashboardQueryLog(label, sql, params, error) {
+  console.error('[PCM Dashboard] Falha na consulta:', label, { sql, params, erro: error?.message || error });
+}
+
+function safeGetDashboard(label, sql, params = {}) {
+  try { return db.prepare(sql).get(params) || {}; } catch (e) { dashboardQueryLog(label, sql, params, e); return {}; }
+}
+
+function safeAllDashboard(label, sql, params = {}) {
+  try { return db.prepare(sql).all(params) || []; } catch (e) { dashboardQueryLog(label, sql, params, e); return []; }
+}
+
+function sqlExpr(table, candidates, fallbackSql) {
+  const found = candidates.find((name) => hasColumn(table, name));
+  return found ? `${table}.${found}` : fallbackSql;
+}
+
+function getResponsaveisFiltro() {
+  if (!tableExistsLocal('users')) return [];
+  return safeAllDashboard('filtro_mecanicos', `SELECT id, COALESCE(name,email,'Usuário #' || id) nome FROM users WHERE UPPER(COALESCE(role,'')) IN ('MECANICO','MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO','ENCARREGADO_MANUTENCAO','PCM','ADMIN') ORDER BY nome LIMIT 200`);
+}
+
+function getStatusFiltro() {
+  if (!tableExistsLocal('os')) return [];
+  return safeAllDashboard('filtro_status_os', `SELECT DISTINCT UPPER(COALESCE(status,'')) status FROM os WHERE COALESCE(status,'')<>'' ORDER BY status`).map((r) => r.status);
+}
+
+function getTiposFiltro() {
+  if (!tableExistsLocal('os')) return ['CORRETIVA','PREVENTIVA','INSPECAO','LUBRIFICACAO','PREDITIVA'];
+  const tipos = safeAllDashboard('filtro_tipos_os', `SELECT DISTINCT UPPER(COALESCE(tipo,'')) tipo FROM os WHERE COALESCE(tipo,'')<>'' ORDER BY tipo`).map((r) => r.tipo);
+  return [...new Set([...tipos, 'CORRETIVA','PREVENTIVA','INSPECAO','LUBRIFICACAO','PREDITIVA'])];
+}
+
+function getCriticidadesFiltro() {
+  if (!tableExistsLocal('equipamentos') || !hasColumn('equipamentos', 'criticidade')) return ['BAIXA','MEDIA','ALTA','CRITICA'];
+  const vals = safeAllDashboard('filtro_criticidades', `SELECT DISTINCT UPPER(COALESCE(criticidade,'')) criticidade FROM equipamentos WHERE COALESCE(criticidade,'')<>'' ORDER BY criticidade`).map((r) => r.criticidade);
+  return [...new Set([...vals, 'BAIXA','MEDIA','ALTA','CRITICA'])];
+}
+
 function getDashboardGerencial(query = {}, userId = null) {
-  const prefs = getDashboardPreferences(userId); const filtros = buildDashboardFilters({ periodo: prefs.periodo_padrao, ...query }); const w = whereOS(filtros);
-  const statusConcluida = "('CONCLUIDA','FINALIZADA','FECHADA')"; const statusAberta = "('ABERTA','NOVA')"; const statusAnd = "('ANDAMENTO','EM_ANDAMENTO','EM EXECUCAO','PAUSADA')";
-  const resumo = db.prepare(`SELECT COUNT(*) total_os, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusAberta} THEN 1 ELSE 0 END) os_abertas, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusAnd} THEN 1 ELSE 0 END) os_andamento, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusConcluida} THEN 1 ELSE 0 END) os_concluidas, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) NOT IN ${statusConcluida} AND datetime(o.opened_at) < datetime('now','-7 day') THEN 1 ELSE 0 END) os_atrasadas, SUM(CASE WHEN UPPER(COALESCE(o.tipo,''))='CORRETIVA' THEN 1 ELSE 0 END) corretivas, SUM(CASE WHEN UPPER(COALESCE(o.tipo,''))='PREVENTIVA' THEN 1 ELSE 0 END) preventivas, AVG(CASE WHEN o.closed_at IS NOT NULL THEN (julianday(o.closed_at)-julianday(o.opened_at))*24 END) tempo_conclusao_h FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql}`).get(w.params) || {};
-  const planos = db.prepare(`SELECT COUNT(*) programadas, SUM(CASE WHEN date(p.proxima_data_prevista)<date('now') THEN 1 ELSE 0 END) atrasadas FROM pcm_planos p LEFT JOIN equipamentos e ON e.id=p.equipamento_id WHERE date(COALESCE(p.proxima_data_prevista,'now')) BETWEEN date(@data_inicial) AND date(@data_final) ${filtros.setor ? "AND COALESCE(e.setor,'')=@setor" : ''} ${filtros.equipamento_id ? 'AND p.equipamento_id=@equipamento_id' : ''}`).get(w.params) || {};
-  const byMonth = db.prepare(`SELECT strftime('%Y-%m', o.opened_at) mes, COUNT(*) total, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusAberta} THEN 1 ELSE 0 END) abertas, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusAnd} THEN 1 ELSE 0 END) andamento, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusConcluida} THEN 1 ELSE 0 END) concluidas, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) NOT IN ${statusConcluida} AND datetime(o.opened_at)<datetime('now','-7 day') THEN 1 ELSE 0 END) atrasadas FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql} GROUP BY strftime('%Y-%m', o.opened_at) ORDER BY mes`).all(w.params);
-  const falhas = db.prepare(`SELECT COALESCE(e.id,o.equipamento_id,0) equipamento_id, COALESCE(e.codigo,e.tag,'') codigo, COALESCE(e.nome,o.equipamento,'Sem equipamento') nome, COALESCE(e.setor,'') setor, COALESCE(e.criticidade,'') criticidade, COUNT(*) falhas, MAX(o.opened_at) ultima_ocorrencia FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql} AND UPPER(COALESCE(o.tipo,''))='CORRETIVA' GROUP BY COALESCE(e.id,o.equipamento_id,0), nome, setor ORDER BY falhas DESC, ultima_ocorrencia DESC LIMIT 20`).all(w.params);
-  const tipos = db.prepare(`SELECT UPPER(COALESCE(o.tipo,'OUTROS')) tipo, COUNT(*) total FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql} GROUP BY UPPER(COALESCE(o.tipo,'OUTROS')) ORDER BY total DESC`).all(w.params);
-  const solicitantes = db.prepare(`SELECT COALESCE(u.name,u.email,'Não informado') solicitante, COUNT(*) demandas, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusConcluida} THEN 1 ELSE 0 END) concluidas, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) NOT IN ${statusConcluida} THEN 1 ELSE 0 END) pendentes, GROUP_CONCAT(DISTINCT COALESCE(e.nome,o.equipamento)) equipamentos FROM os o LEFT JOIN users u ON u.id=o.opened_by LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql} GROUP BY COALESCE(u.id,0), solicitante ORDER BY demandas DESC LIMIT 20`).all(w.params);
+  const prefs = getDashboardPreferences(userId);
+  const filtros = buildDashboardFilters({ periodo: prefs.periodo_padrao, ...query });
+  if (filtros.data_inicial > filtros.data_final) {
+    const tmp = filtros.data_inicial; filtros.data_inicial = filtros.data_final; filtros.data_final = tmp; filtros.aviso = 'Período inicial maior que o final: as datas foram ajustadas automaticamente.';
+  }
+
+  const empty = { filtros, prefs, cards: {}, graficos: {}, equipamentos_atencao: [], tabelas: { ordens: [], equipamentos: [], preventivas: [] }, opcoesExtras: { mecanicos: [], status: [], tipos: [], criticidades: [] }, erros: [] };
+  if (!tableExistsLocal('os')) {
+    empty.erros.push('Tabela de ordens de serviço ainda não existe. Execute as migrations do banco.');
+    return empty;
+  }
+
+  const w = whereOS(filtros);
+  const statusConcluida = "('CONCLUIDA','FINALIZADA','FECHADA')";
+  const statusAberta = "('ABERTA','NOVA')";
+  const statusAnd = "('ANDAMENTO','EM_ANDAMENTO','EM EXECUCAO','EM_EXECUCAO','PAUSADA')";
+  const equipNome = tableExistsLocal('equipamentos') ? "COALESCE(e.nome,o.equipamento,'Sem equipamento')" : "COALESCE(o.equipamento,'Sem equipamento')";
+  const equipCodigo = tableExistsLocal('equipamentos') ? "COALESCE(e.codigo,e.tag,'')" : "''";
+  const equipSetor = tableExistsLocal('equipamentos') ? "COALESCE(e.setor,'')" : "''";
+  const equipCrit = tableExistsLocal('equipamentos') && hasColumn('equipamentos','criticidade') ? "COALESCE(e.criticidade,'')" : "''";
+  const closedAt = sqlExpr('o', ['closed_at','data_fim','finished_at'], 'NULL');
+  const startedAt = sqlExpr('o', ['started_at','data_inicio','opened_at'], 'o.opened_at');
+
+  const resumo = safeGetDashboard('resumo_cards', `SELECT COUNT(*) total_os,
+    SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusAberta} THEN 1 ELSE 0 END) os_abertas,
+    SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusAnd} THEN 1 ELSE 0 END) os_andamento,
+    SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusConcluida} THEN 1 ELSE 0 END) os_concluidas,
+    SUM(CASE WHEN UPPER(COALESCE(o.status,'')) NOT IN ${statusConcluida} AND o.opened_at IS NOT NULL AND datetime(o.opened_at) < datetime('now','-7 day') THEN 1 ELSE 0 END) os_atrasadas,
+    SUM(CASE WHEN UPPER(COALESCE(o.tipo,''))='CORRETIVA' THEN 1 ELSE 0 END) corretivas,
+    SUM(CASE WHEN UPPER(COALESCE(o.tipo,''))='PREVENTIVA' THEN 1 ELSE 0 END) preventivas,
+    AVG(CASE WHEN ${startedAt} IS NOT NULL THEN (julianday(${startedAt})-julianday(o.opened_at))*24 END) tempo_atendimento_h,
+    AVG(CASE WHEN ${closedAt} IS NOT NULL THEN (julianday(${closedAt})-julianday(o.opened_at))*24 END) tempo_conclusao_h
+    FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql}`, w.params);
+
+  const planosWhere = [`date(COALESCE(p.proxima_data_prevista,p.created_at,'now')) BETWEEN date(@data_inicial) AND date(@data_final)`];
+  if (filtros.setor) planosWhere.push("COALESCE(e.setor,'')=@setor");
+  if (filtros.equipamento_id) planosWhere.push('p.equipamento_id=@equipamento_id');
+  if (filtros.tipo_manutencao) planosWhere.push("UPPER(COALESCE(p.tipo_manutencao,''))=@tipo_manutencao");
+  const planosSql = tableExistsLocal('pcm_planos') ? `SELECT COUNT(*) programadas, SUM(CASE WHEN date(p.proxima_data_prevista)<date('now') THEN 1 ELSE 0 END) vencidas FROM pcm_planos p LEFT JOIN equipamentos e ON e.id=p.equipamento_id WHERE ${planosWhere.join(' AND ')}` : null;
+  const planos = planosSql ? safeGetDashboard('preventivas_planos', planosSql, w.params) : {};
+  const demandas = tableExistsLocal('demandas') ? safeGetDashboard('demandas_abertas', `SELECT COUNT(*) abertas FROM demandas WHERE UPPER(COALESCE(status,'')) NOT IN ${statusConcluida}`, w.params) : {};
+  const solicitacoes = tableExistsLocal('solicitacoes') ? safeGetDashboard('solicitacoes_pendentes', `SELECT COUNT(*) pendentes FROM solicitacoes WHERE UPPER(COALESCE(status,'')) NOT IN ('FECHADA','CONCLUIDA','CANCELADA','RECEBIDA')`, w.params) : {};
+  const criticos = tableExistsLocal('equipamentos') ? safeGetDashboard('equipamentos_criticos', `SELECT COUNT(*) total FROM equipamentos WHERE ativo=1 AND UPPER(COALESCE(criticidade,'')) IN ('ALTA','CRITICA','CRÍTICA')`) : {};
+
+  const byStatus = safeAllDashboard('os_por_status', `SELECT UPPER(COALESCE(o.status,'SEM STATUS')) status, COUNT(*) total FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql} GROUP BY UPPER(COALESCE(o.status,'SEM STATUS')) ORDER BY total DESC`, w.params);
+  const byMonth = safeAllDashboard('os_por_mes', `SELECT strftime('%Y-%m', o.opened_at) mes, COUNT(*) total, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusAberta} THEN 1 ELSE 0 END) abertas, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusAnd} THEN 1 ELSE 0 END) andamento, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusConcluida} THEN 1 ELSE 0 END) concluidas, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) NOT IN ${statusConcluida} AND datetime(o.opened_at)<datetime('now','-7 day') THEN 1 ELSE 0 END) atrasadas FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql} AND o.opened_at IS NOT NULL GROUP BY strftime('%Y-%m', o.opened_at) ORDER BY mes`, w.params);
+  const falhas = safeAllDashboard('falhas_por_equipamento', `SELECT COALESCE(e.id,o.equipamento_id,0) equipamento_id, ${equipCodigo} codigo, ${equipNome} nome, ${equipSetor} setor, ${equipCrit} criticidade, COUNT(*) falhas, MAX(o.opened_at) ultima_ocorrencia FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql} AND UPPER(COALESCE(o.tipo,''))='CORRETIVA' GROUP BY COALESCE(e.id,o.equipamento_id,0), nome, setor, criticidade ORDER BY falhas DESC, ultima_ocorrencia DESC LIMIT 20`, w.params);
+  const tipos = safeAllDashboard('corretivas_preventivas', `SELECT UPPER(COALESCE(o.tipo,'OUTROS')) tipo, COUNT(*) total FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql} GROUP BY UPPER(COALESCE(o.tipo,'OUTROS')) ORDER BY total DESC`, w.params);
+  const servicosSetor = safeAllDashboard('servicos_por_setor', `SELECT ${equipSetor} setor, COUNT(*) total FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql} GROUP BY ${equipSetor} ORDER BY total DESC LIMIT 20`, w.params);
+  const falhasSetor = safeAllDashboard('falhas_por_setor', `SELECT ${equipSetor} setor, COUNT(*) total FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql} AND UPPER(COALESCE(o.tipo,''))='CORRETIVA' GROUP BY ${equipSetor} ORDER BY total DESC LIMIT 20`, w.params);
   const execUserCol = firstColumn('os_execucoes', ['mecanico_user_id','executor_user_id','user_id','responsavel_id','tecnico_id']);
-  const mecanicos = tableExistsLocal('os_execucoes') && execUserCol ? safeAll(`SELECT COALESCE(u.name,u.email,'Não informado') mecanico, COUNT(DISTINCT o.id) atendidas, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusConcluida} THEN 1 ELSE 0 END) concluidas, AVG(CASE WHEN o.closed_at IS NOT NULL THEN (julianday(o.closed_at)-julianday(o.opened_at))*24 END) tempo_medio_h, GROUP_CONCAT(DISTINCT UPPER(COALESCE(o.tipo,'OUTROS'))) tipos_servico FROM os o JOIN os_execucoes x ON x.os_id=o.id LEFT JOIN users u ON u.id=x.${execUserCol} LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql} GROUP BY u.id, mecanico ORDER BY atendidas DESC LIMIT 20`, w.params) : [];
+  const mecanicos = tableExistsLocal('os_execucoes') && execUserCol ? safeAllDashboard('servicos_por_mecanico', `SELECT COALESCE(u.name,u.email,'Não informado') mecanico, COUNT(DISTINCT o.id) atendidas, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusConcluida} THEN 1 ELSE 0 END) concluidas, AVG(CASE WHEN ${closedAt} IS NOT NULL THEN (julianday(${closedAt})-julianday(o.opened_at))*24 END) tempo_medio_h, GROUP_CONCAT(DISTINCT UPPER(COALESCE(o.tipo,'OUTROS'))) tipos_servico FROM os o JOIN os_execucoes x ON x.os_id=o.id LEFT JOIN users u ON u.id=x.${execUserCol} LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql} GROUP BY u.id, mecanico ORDER BY atendidas DESC LIMIT 20`, w.params) : [];
+  const solicitantes = tableExistsLocal('users') ? safeAllDashboard('ranking_solicitantes', `SELECT COALESCE(u.name,u.email,'Não informado') solicitante, COUNT(*) demandas, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) IN ${statusConcluida} THEN 1 ELSE 0 END) concluidas, SUM(CASE WHEN UPPER(COALESCE(o.status,'')) NOT IN ${statusConcluida} THEN 1 ELSE 0 END) pendentes, GROUP_CONCAT(DISTINCT ${equipNome}) equipamentos FROM os o LEFT JOIN users u ON u.id=o.opened_by LEFT JOIN equipamentos e ON e.id=o.equipamento_id WHERE ${w.sql} GROUP BY COALESCE(u.id,0), solicitante ORDER BY demandas DESC LIMIT 20`, w.params) : [];
+  const ordens = safeAllDashboard('tabela_ordens', `SELECT o.id, o.opened_at, ${closedAt} closed_at, o.tipo, o.status, ${hasColumn('os','prioridade')?'o.prioridade':'NULL'} prioridade, ${equipCodigo} codigo, ${equipNome} equipamento, ${equipSetor} setor, ${tableExistsLocal('users')?"COALESCE(u.name,u.email,'')":"''"} solicitante FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id LEFT JOIN users u ON u.id=o.opened_by WHERE ${w.sql} ORDER BY datetime(o.opened_at) DESC LIMIT 1000`, w.params);
+  const prevTabela = tableExistsLocal('pcm_planos') ? safeAllDashboard('tabela_preventivas', `SELECT p.id, p.tipo_manutencao, p.atividade_descricao, p.proxima_data_prevista, COALESCE(e.nome,'Sem equipamento') equipamento, COALESCE(e.setor,'') setor FROM pcm_planos p LEFT JOIN equipamentos e ON e.id=p.equipamento_id WHERE ${planosWhere.join(' AND ')} ORDER BY date(p.proxima_data_prevista)`, w.params) : [];
+  const total = toNum(resumo.total_os); const cor = toNum(resumo.corretivas); const prev = toNum(resumo.preventivas);
   const atencao = falhas.filter(f => Number(f.falhas) >= Number(prefs.limites?.falhas_periodo || 3)).map(f => ({ ...f, motivos: [`${f.falhas} corretivas no período`] }));
-  return { filtros, prefs, cards: { total_os: toNum(resumo.total_os), os_abertas: toNum(resumo.os_abertas), os_andamento: toNum(resumo.os_andamento), os_concluidas: toNum(resumo.os_concluidas), os_atrasadas: toNum(resumo.os_atrasadas), preventivas_realizadas: toNum(resumo.preventivas), preventivas_programadas: toNum(planos.programadas), preventivas_pendentes: Math.max(0, toNum(planos.programadas)-toNum(resumo.preventivas)), preventivas_atrasadas: toNum(planos.atrasadas), falhas_recorrentes: falhas.filter(f=>Number(f.falhas)>=2).length, tempo_medio_atendimento: null, tempo_medio_conclusao: Math.round(toNum(resumo.tempo_conclusao_h)*10)/10, corretivas: toNum(resumo.corretivas), preventivas: toNum(resumo.preventivas), equipamentos_parados: toNum(resumo.os_atrasadas), equipamentos_atencao: atencao.length }, graficos: { os_periodo: byMonth, falhas_equipamento: falhas, tipos_manutencao: tipos, preventivas_cumprimento: [{ situacao:'Programadas', total: toNum(planos.programadas) },{ situacao:'Atrasadas', total: toNum(planos.atrasadas) },{ situacao:'Realizadas', total: toNum(resumo.preventivas) }], ranking_mecanicos: mecanicos, ranking_solicitantes: solicitantes, comparativo_mensal: byMonth }, equipamentos_atencao: atencao, tabelas: { ordens: db.prepare(`SELECT o.id, o.opened_at, o.closed_at, o.tipo, o.status, o.prioridade, COALESCE(e.codigo,e.tag,'') codigo, COALESCE(e.nome,o.equipamento) equipamento, COALESCE(e.setor,'') setor, COALESCE(u.name,u.email,'') solicitante FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id LEFT JOIN users u ON u.id=o.opened_by WHERE ${w.sql} ORDER BY datetime(o.opened_at) DESC LIMIT 1000`).all(w.params), equipamentos: falhas, preventivas: safeAll(`SELECT p.id, p.tipo_manutencao, p.atividade_descricao, p.proxima_data_prevista, e.nome equipamento, e.setor FROM pcm_planos p LEFT JOIN equipamentos e ON e.id=p.equipamento_id WHERE date(COALESCE(p.proxima_data_prevista,'now')) BETWEEN date(@data_inicial) AND date(@data_final) ORDER BY date(p.proxima_data_prevista)`, w.params) }, observacoes: { visualizacoes: 'Não foram encontradas tabelas confiáveis de ciência/visualização de demandas; o dashboard não inventa histórico e mantém estrutura para registrar preferências e emissões futuras.' } };
+  return { filtros, prefs,
+    cards: { total_os: total, os_abertas: toNum(resumo.os_abertas), os_andamento: toNum(resumo.os_andamento), os_concluidas: toNum(resumo.os_concluidas), os_atrasadas: toNum(resumo.os_atrasadas), preventivas_programadas: toNum(planos.programadas), preventivas_vencidas: toNum(planos.vencidas), preventivas_concluidas: prev, preventivas_realizadas: prev, preventivas_pendentes: Math.max(0, toNum(planos.programadas)-prev), preventivas_atrasadas: toNum(planos.vencidas), demandas_abertas: toNum(demandas.abertas), solicitacoes_pendentes: toNum(solicitacoes.pendentes), equipamentos_criticos: toNum(criticos.total), tempo_medio_atendimento: Math.round(toNum(resumo.tempo_atendimento_h)*10)/10, tempo_medio_conclusao: Math.round(toNum(resumo.tempo_conclusao_h)*10)/10, manutencoes_por_equipamento: falhas.reduce((a,b)=>a+toNum(b.falhas),0), servicos_por_mecanico: mecanicos.reduce((a,b)=>a+toNum(b.atendidas),0), falhas_por_setor: falhasSetor.reduce((a,b)=>a+toNum(b.total),0), corretivas: cor, preventivas: prev, percentual_corretiva: total ? Math.round(cor*1000/total)/10 : 0, percentual_preventiva: total ? Math.round(prev*1000/total)/10 : 0, equipamentos_parados: toNum(resumo.os_atrasadas), equipamentos_atencao: atencao.length },
+    graficos: { os_status: byStatus, os_periodo: byMonth, os_mes: byMonth, corretivas_preventivas: tipos.filter(t=>['CORRETIVA','PREVENTIVA'].includes(t.tipo)), falhas_equipamento: falhas, servicos_setor: servicosSetor, servicos_mecanico: mecanicos, falhas_setor: falhasSetor, tipos_manutencao: tipos, preventivas_cumprimento: [{ situacao:'Concluídas', total: prev },{ situacao:'Pendentes', total: Math.max(0, toNum(planos.programadas)-prev) },{ situacao:'Vencidas', total: toNum(planos.vencidas) }], ranking_mecanicos: mecanicos, ranking_solicitantes: solicitantes, comparativo_mensal: byMonth, evolucao_ocorrencias: byMonth },
+    equipamentos_atencao: atencao, tabelas: { ordens, equipamentos: falhas, preventivas: prevTabela }, opcoesExtras: { mecanicos: getResponsaveisFiltro(), status: getStatusFiltro(), tipos: getTiposFiltro(), criticidades: getCriticidadesFiltro() }, erros: [], observacoes: { visualizacoes: 'Quando não houver dados, os cards e gráficos são exibidos zerados para evitar tela em branco.' } };
 }
 
 function logDashboardReport(userId, tipo, filtros) { if (tableExistsLocal('pcm_dashboard_report_logs')) db.prepare('INSERT INTO pcm_dashboard_report_logs (user_id,tipo,filtros_json,emitted_at) VALUES (?,?,?,datetime(\'now\'))').run(userId || null, tipo, JSON.stringify(filtros || {})); }
