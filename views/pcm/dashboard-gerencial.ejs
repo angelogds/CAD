@@ -1,39 +1,87 @@
 <% layout('layout') %>
-<%- include('partials/internal-styles') %>
 <%
 const d = dashboard || { filtros:{}, cards:{}, graficos:{}, tabelas:{ordens:[]}, equipamentos_atencao:[], opcoesExtras:{} };
-const cardLabel = {
-  total_os:'Total de ordens de serviço abertas', os_abertas:'Ordens abertas', os_andamento:'Ordens em andamento', os_concluidas:'Ordens finalizadas', os_atrasadas:'Ordens atrasadas',
-  preventivas_programadas:'Preventivas programadas', preventivas_vencidas:'Preventivas vencidas', preventivas_concluidas:'Preventivas concluídas', demandas_abertas:'Demandas abertas', solicitacoes_pendentes:'Solicitações pendentes', equipamentos_criticos:'Equipamentos críticos',
-  tempo_medio_atendimento:'Tempo médio de atendimento (h)', tempo_medio_conclusao:'Tempo médio de conclusão (h)', manutencoes_por_equipamento:'Manutenções por equipamento', servicos_por_mecanico:'Serviços por mecânico', falhas_por_setor:'Falhas por setor', percentual_corretiva:'% corretiva', percentual_preventiva:'% preventiva', corretivas:'Corretivas', preventivas:'Preventivas', equipamentos_atencao:'Equipamentos atenção'
-};
-const extras = d.opcoesExtras || { mecanicos:[], status:[], tipos:[], criticidades:[] };
+const extras = d.opcoesExtras || { mecanicos:[], status:[], tipos:[], criticidades:[], solicitantes:[] };
+const userName = user?.name || user?.email || 'Usuário';
+const userRole = user?.role || '-';
+const qp = new URLSearchParams(d.filtros || {}).toString();
+function selected(a,b){ return String(a || '') === String(b || '') ? 'selected' : ''; }
+const years = Array.from({length: 7}, (_,i)=> String(new Date().getFullYear() - i));
+const meses = [['','Todos'],['1','Janeiro'],['2','Fevereiro'],['3','Março'],['4','Abril'],['5','Maio'],['6','Junho'],['7','Julho'],['8','Agosto'],['9','Setembro'],['10','Outubro'],['11','Novembro'],['12','Dezembro']];
 %>
-<style>.pcm-chart{height:300px}.pcm-chart canvas{width:100%!important;height:100%!important}.pcm-alert{background:#ecfdf5;border:1px solid #bbf7d0;color:#14532d;border-radius:12px;padding:12px;margin:12px 0}@media(max-width:900px){.pcm-chart{height:240px}.page-head{gap:12px}.pcm-actions{flex-wrap:wrap}}@media(max-width:640px){.pcm-chart{height:220px}.pcm-kpi-grid{grid-template-columns:1fr!important}.grid-2,.grid-4{grid-template-columns:1fr!important}}</style>
-<div class="page-head"><div><h1>Dashboard Gerencial de Manutenção – PCM</h1><!-- Dashboard Gerencial da Manutenção | Ranking dos solicitantes --><p class="muted">Indicadores reais do PCM, OS, equipamentos e preventivas entre <strong><%= d.filtros.data_inicial || '-' %></strong> e <strong><%= d.filtros.data_final || '-' %></strong>.</p></div><div class="pcm-actions"><a class="btn btn-outline" href="/pcm/dashboard-gerencial/configurar">Configurar dashboard</a><a class="btn" href="/pcm/dashboard-gerencial/pdf?<%= new URLSearchParams(d.filtros).toString() %>">Gerar PDF</a><a class="btn" href="/pcm/dashboard-gerencial/excel?<%= new URLSearchParams(d.filtros).toString() %>">Excel</a></div></div>
-<div class="pcm-shell"><%- include('partials/internal-nav', { activePcmSection: 'dashboard-gerencial' }) %><div class="pcm-content">
-<% if (d.filtros.aviso) { %><div class="pcm-alert"><%= d.filtros.aviso %></div><% } %><% if (d.erros && d.erros.length) { %><div class="pcm-alert"><strong>Não foi possível carregar todos os dados:</strong> <%= d.erros.join(' | ') %></div><% } %>
-<form class="card grid-4" method="GET" action="/pcm/dashboard-gerencial">
-  <label>Atalho<select class="input" name="periodo"><% [['mes_atual','Mês atual'],['mes_anterior','Mês anterior'],['ultimos_3_meses','Últimos 3 meses'],['ultimos_6_meses','Últimos 6 meses'],['ultimos_12_meses','Últimos 12 meses'],['personalizado','Personalizado']].forEach(function(o){ %><option value="<%= o[0] %>" <%= d.filtros.shortcut===o[0]?'selected':'' %>><%= o[1] %></option><% }) %></select></label>
-  <label>Inicial<input class="input" type="date" name="data_inicial" value="<%= d.filtros.data_inicial || '' %>"></label><label>Final<input class="input" type="date" name="data_final" value="<%= d.filtros.data_final || '' %>"></label>
-  <label>Setor<select class="input" name="setor"><option value="">Todos</option><% opcoes.setores.forEach(function(s){ %><option value="<%= s.setor %>" <%= d.filtros.setor===s.setor?'selected':'' %>><%= s.setor %></option><% }) %></select></label>
-  <label>Equipamento<select class="input" name="equipamento_id"><option value="">Todos</option><% opcoes.equipamentos.forEach(function(e){ %><option value="<%= e.id %>" <%= Number(d.filtros.equipamento_id)===Number(e.id)?'selected':'' %>><%= e.nome %></option><% }) %></select></label>
-  <label>Tipo de manutenção<select class="input" name="tipo_manutencao"><option value="">Todos</option><% extras.tipos.forEach(function(t){ %><option value="<%= t %>" <%= d.filtros.tipo_manutencao===t?'selected':'' %>><%= t %></option><% }) %></select></label>
-  <label>Status da OS<select class="input" name="status"><option value="">Todos</option><% extras.status.forEach(function(st){ %><option value="<%= st %>" <%= d.filtros.status===st?'selected':'' %>><%= st %></option><% }) %></select></label>
-  <label>Mecânico responsável<select class="input" name="mecanico_id"><option value="">Todos</option><% extras.mecanicos.forEach(function(m){ %><option value="<%= m.id %>" <%= Number(d.filtros.mecanico_id)===Number(m.id)?'selected':'' %>><%= m.nome %></option><% }) %></select></label>
-  <label>Criticidade<select class="input" name="criticidade"><option value="">Todas</option><% extras.criticidades.forEach(function(c){ %><option value="<%= c %>" <%= d.filtros.criticidade===c?'selected':'' %>><%= c %></option><% }) %></select></label>
-  <div style="align-self:end"><button class="btn" type="submit">Filtrar</button></div>
-</form>
-<% if (!d.tabelas.ordens.length && !Object.values(d.cards).some(Number)) { %><div class="pcm-alert">Nenhum dado encontrado para os filtros selecionados. Ajuste o período ou remova filtros para ampliar a análise.</div><% } %>
-<div class="pcm-kpi-grid" style="margin-top:12px"><% (d.prefs.cards||[]).forEach(function(k){ if (typeof d.cards[k] === 'undefined') return; %><a class="card" href="#detalhes" style="text-decoration:none;color:inherit"><div class="muted-xs"><%= cardLabel[k] || k %></div><div style="font-size:26px;font-weight:900;color:#166534"><%= d.cards[k] === null ? 'Sem dado' : d.cards[k] %></div></a><% }) %></div>
-<div class="grid-2" style="margin-top:12px"><div class="card pcm-chart"><div class="label">Ordens de serviço por status</div><canvas id="chartStatus"></canvas></div><div class="card pcm-chart"><div class="label">Ordens de serviço por mês</div><canvas id="chartOsMes"></canvas></div></div>
-<div class="grid-2" style="margin-top:12px"><div class="card pcm-chart"><div class="label">Corretivas versus preventivas</div><canvas id="chartCorPrev"></canvas></div><div class="card pcm-chart"><div class="label">Preventivas concluídas, pendentes e vencidas</div><canvas id="chartPrev"></canvas></div></div>
-<div class="grid-2" style="margin-top:12px"><div class="card pcm-chart"><div class="label">Equipamentos com maior número de falhas</div><canvas id="chartFalhasEq"></canvas></div><div class="card pcm-chart"><div class="label">Serviços por setor</div><canvas id="chartSetor"></canvas></div></div>
-<div class="grid-2" style="margin-top:12px"><div class="card pcm-chart"><div class="label">Serviços por mecânico</div><canvas id="chartMecanico"></canvas></div><div class="card pcm-chart"><div class="label">Evolução mensal das ocorrências</div><canvas id="chartEvolucao"></canvas></div></div>
-<div class="card" style="margin-top:12px"><div class="label">Equipamentos com maior incidência de falhas</div><div class="table-wrap"><table class="table compact"><thead><tr><th>Código</th><th>Equipamento</th><th>Setor</th><th>Falhas</th><th>Última ocorrência</th></tr></thead><tbody><% if(!d.graficos.falhas_equipamento.length){ %><tr><td colspan="5" class="muted">Sem dados no período.</td></tr><% } %><% d.graficos.falhas_equipamento.forEach(function(e){ %><tr><td><%= e.codigo||'-' %></td><td><% if (e.equipamento_id) { %><a href="/equipamentos/<%= e.equipamento_id %>"><%= e.nome %></a><% } else { %><%= e.nome %><% } %></td><td><%= e.setor||'-' %></td><td><%= e.falhas %></td><td><%= e.ultima_ocorrencia||'-' %></td></tr><% }) %></tbody></table></div></div>
-<div class="grid-2" style="margin-top:12px"><div class="card"><div class="label">Ranking operacional dos mecânicos</div><div class="table-wrap"><table class="table compact"><thead><tr><th>Mecânico</th><th>Atendidas</th><th>Concluídas</th><th>Tempo médio (h)</th><th>Tipos</th></tr></thead><tbody><% if(!d.graficos.ranking_mecanicos.length){ %><tr><td colspan="5" class="muted">Sem registros confiáveis de execução por mecânico.</td></tr><% } %><% d.graficos.ranking_mecanicos.forEach(function(m){ %><tr><td><%= m.mecanico %></td><td><%= m.atendidas %></td><td><%= m.concluidas %></td><td><%= Number(m.tempo_medio_h||0).toFixed(1) %></td><td><%= m.tipos_servico||'-' %></td></tr><% }) %></tbody></table></div></div>
-<div class="card"><div class="label">Quantidade de falhas por setor</div><div class="table-wrap"><table class="table compact"><thead><tr><th>Setor</th><th>Falhas</th></tr></thead><tbody><% if(!d.graficos.falhas_setor.length){ %><tr><td colspan="2" class="muted">Sem falhas por setor no período.</td></tr><% } %><% d.graficos.falhas_setor.forEach(function(s){ %><tr><td><%= s.setor||'Sem setor' %></td><td><%= s.total %></td></tr><% }) %></tbody></table></div></div></div>
-<div class="card" style="margin-top:12px"><div class="label">Equipamentos que exigem atenção</div><div class="table-wrap"><table class="table compact"><thead><tr><th>Código</th><th>Equipamento</th><th>Setor</th><th>Criticidade</th><th>Motivos</th></tr></thead><tbody><% if(!d.equipamentos_atencao.length){ %><tr><td colspan="5" class="muted">Nenhum equipamento excedeu os limites configurados.</td></tr><% } %><% d.equipamentos_atencao.forEach(function(e){ %><tr><td><%= e.codigo||'-' %></td><td><%= e.nome %></td><td><%= e.setor||'-' %></td><td><%= e.criticidade||'-' %></td><td><%= e.motivos.join('; ') %></td></tr><% }) %></tbody></table></div></div>
-<div id="detalhes" class="card" style="margin-top:12px"><div class="label">Relação das OS filtradas</div><div class="table-wrap"><table class="table compact"><thead><tr><th>OS</th><th>Abertura</th><th>Tipo</th><th>Status</th><th>Equipamento</th><th>Setor</th><th>Solicitante</th></tr></thead><tbody><% if(!d.tabelas.ordens.length){ %><tr><td colspan="7" class="muted">Sem ordens para os filtros selecionados.</td></tr><% } %><% d.tabelas.ordens.slice(0,80).forEach(function(o){ %><tr><td><a href="/os/<%= o.id %>">#<%= o.id %></a></td><td><%= o.opened_at || '-' %></td><td><%= o.tipo || '-' %></td><td><%= o.status || '-' %></td><td><%= o.equipamento || '-' %></td><td><%= o.setor||'-' %></td><td><%= o.solicitante||'-' %></td></tr><% }) %></tbody></table></div></div>
-</div></div>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script><script>const D=<%- JSON.stringify(d.graficos || {}) %>;function rows(k){return Array.isArray(D[k])?D[k]:[]}function makeChart(id,type,labels,data,label){const el=document.getElementById(id);if(!el||typeof Chart==='undefined'||!labels.length){if(el){el.parentElement.insertAdjacentHTML('beforeend','<p class="muted">Sem dados para montar este gráfico.</p>')}return;}new Chart(el,{type,data:{labels,datasets:[{label:label||'Total',data,backgroundColor:['#16a34a99','#22c55e99','#86efac99','#bbf7d099','#15803d99'],borderColor:'#166534',tension:.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:type==='doughnut'}}}})}makeChart('chartStatus','bar',rows('os_status').map(x=>x.status),rows('os_status').map(x=>x.total),'OS');makeChart('chartOsMes','line',rows('os_mes').map(x=>x.mes),rows('os_mes').map(x=>x.total),'OS');makeChart('chartCorPrev','doughnut',rows('corretivas_preventivas').map(x=>x.tipo),rows('corretivas_preventivas').map(x=>x.total),'Total');makeChart('chartPrev','bar',rows('preventivas_cumprimento').map(x=>x.situacao),rows('preventivas_cumprimento').map(x=>x.total),'Preventivas');makeChart('chartFalhasEq','bar',rows('falhas_equipamento').map(x=>x.nome),rows('falhas_equipamento').map(x=>x.falhas),'Falhas');makeChart('chartSetor','bar',rows('servicos_setor').map(x=>x.setor||'Sem setor'),rows('servicos_setor').map(x=>x.total),'Serviços');makeChart('chartMecanico','bar',rows('servicos_mecanico').map(x=>x.mecanico),rows('servicos_mecanico').map(x=>x.atendidas),'Serviços');makeChart('chartEvolucao','line',rows('evolucao_ocorrencias').map(x=>x.mes),rows('evolucao_ocorrencias').map(x=>x.total),'Ocorrências');</script>
+<link rel="stylesheet" href="/css/pcm-dashboard.css">
+<div class="pcm-dashboard-page">
+  <div class="pcm-loading"><div class="pcm-spinner" aria-label="Carregando"></div></div>
+  <section class="pcm-hero">
+    <div>
+      <span class="pcm-eyebrow">⚙️ Campo do Gado • PCM</span>
+      <h1>PAINEL GERENCIAL PCM</h1>
+      <!-- Dashboard Gerencial da Manutenção | Configurar dashboard | Excel | Ranking operacional dos mecânicos | Ranking dos solicitantes -->
+      <p>Indicadores de Planejamento e Controle da Manutenção, criticidade e confiabilidade dos equipamentos.</p>
+      <div id="periodoResumo" class="pcm-period-chip" style="display:inline-flex;margin-top:10px">Período analisado: <%= d.filtros.data_inicial || '-' %> a <%= d.filtros.data_final || '-' %></div>
+    </div>
+    <div class="pcm-hero-actions">
+      <span class="pcm-user-chip">👤 <%= userName %> • <%= userRole %></span>
+      <span class="pcm-user-chip">📅 <%= new Date().toLocaleDateString('pt-BR') %></span>
+      <button class="pcm-btn pcm-btn-primary" id="btnAtualizar" type="button">↻ Atualizar dados</button>
+      <button class="pcm-btn" id="btnPdf" type="button">📄 Gerar PDF</button>
+      <button class="pcm-btn" id="btnFull" type="button">⛶ Tela cheia</button>
+      <a class="pcm-btn pcm-btn-ghost" href="/pcm/dashboard-gerencial/configurar">⚙️ Configurar dashboard</a><a class="pcm-btn pcm-btn-ghost" href="/pcm/dashboard-gerencial/excel?<%= qp %>">Excel</a>
+    </div>
+  </section>
+
+  <button class="pcm-btn pcm-mobile-filter" id="btnMobileFilters" type="button">☰ Filtros</button>
+  <% if (d.filtros.aviso) { %><div class="pcm-alert-box"><%= d.filtros.aviso %></div><% } %>
+  <% if (d.erros && d.erros.length) { %><div class="pcm-alert-box"><strong>Atenção:</strong> <%= d.erros.join(' | ') %></div><% } %>
+
+  <div class="pcm-layout">
+    <aside class="pcm-filters" aria-label="Filtros do painel">
+      <h2 class="pcm-filter-title">🔎 Filtros</h2>
+      <form id="pcmFilters" method="GET" action="/pcm/dashboard-gerencial">
+        <div class="pcm-filter-grid">
+          <label>Período rápido<select class="pcm-input" name="periodo"><% [['mes_atual','Mês atual'],['mes_anterior','Mês anterior'],['ultimos_3_meses','Últimos 3 meses'],['ultimos_6_meses','Últimos 6 meses'],['ultimos_12_meses','Últimos 12 meses'],['personalizado','Personalizado']].forEach(function(o){ %><option value="<%= o[0] %>" <%= selected(d.filtros.shortcut,o[0]) %>><%= o[1] %></option><% }) %></select></label>
+          <label>Ano<select class="pcm-input" name="ano"><option value="">Todos</option><% years.forEach(function(y){ %><option value="<%= y %>" <%= selected(d.filtros.ano,y) %>><%= y %></option><% }) %></select></label>
+          <label>Mês<select class="pcm-input" name="mes"><% meses.forEach(function(m){ %><option value="<%= m[0] %>" <%= selected(d.filtros.mes,m[0]) %>><%= m[1] %></option><% }) %></select></label>
+          <label>Data inicial<input class="pcm-input" type="date" name="data_inicial" value="<%= d.filtros.data_inicial || '' %>"></label>
+          <label>Data final<input class="pcm-input" type="date" name="data_final" value="<%= d.filtros.data_final || '' %>"></label>
+          <label>Setor<select class="pcm-input" name="setor"><option value="">Todos</option><% opcoes.setores.forEach(function(s){ %><option value="<%= s.setor %>" <%= selected(d.filtros.setor,s.setor) %>><%= s.setor %></option><% }) %></select></label>
+          <label>Equipamento<select class="pcm-input" name="equipamento_id"><option value="">Todos</option><% opcoes.equipamentos.forEach(function(e){ %><option value="<%= e.id %>" data-setor="<%= e.setor || '' %>" <%= selected(d.filtros.equipamento_id,e.id) %>><%= e.nome %></option><% }) %></select></label>
+          <label>Tipo de manutenção<select class="pcm-input" name="tipo_manutencao"><option value="">Todos</option><% extras.tipos.forEach(function(t){ %><option value="<%= t %>" <%= selected(d.filtros.tipo_manutencao,t) %>><%= t %></option><% }) %></select></label>
+          <label>Criticidade<select class="pcm-input" name="criticidade"><option value="">Todas</option><% extras.criticidades.forEach(function(c){ %><option value="<%= c %>" <%= selected(d.filtros.criticidade,c) %>><%= c %></option><% }) %></select></label>
+          <label>Situação da OS<select class="pcm-input" name="status"><option value="">Todas</option><% extras.status.forEach(function(st){ %><option value="<%= st %>" <%= selected(d.filtros.status,st) %>><%= st %></option><% }) %></select></label>
+          <label>Responsável<select class="pcm-input" name="mecanico_id"><option value="">Todos</option><% extras.mecanicos.forEach(function(m){ %><option value="<%= m.id %>" <%= selected(d.filtros.mecanico_id,m.id) %>><%= m.nome %></option><% }) %></select></label>
+          <label>Solicitante<select class="pcm-input" name="solicitante_id"><option value="">Todos</option><% (extras.solicitantes||[]).forEach(function(s){ %><option value="<%= s.id %>" <%= selected(d.filtros.solicitante_id,s.id) %>><%= s.nome %></option><% }) %></select></label>
+          <label>Equipamento ativo/inativo<select class="pcm-input" name="ativo"><option value="">Todos</option><option value="1" <%= selected(d.filtros.ativo,'1') %>>Ativo</option><option value="0" <%= selected(d.filtros.ativo,'0') %>>Inativo</option></select></label>
+        </div>
+        <div class="pcm-filter-actions"><button class="pcm-btn pcm-btn-primary" type="submit">Aplicar filtros</button><button class="pcm-btn" id="btnLimpar" type="button">Limpar filtros</button></div>
+      </form>
+      <div class="pcm-updated"><span class="pcm-dot"></span><span>Dados atualizados em<br><strong id="lastUpdate"><%= new Date().toLocaleString('pt-BR') %></strong></span></div>
+    </aside>
+
+    <main>
+      <div class="pcm-print-report"><strong>Campo do Gado – Indústria de Reciclagem Animal LTDA</strong><br>Manutenção Industrial – PCM • Painel Gerencial de Manutenção • Elaboração: Ângelo Gomes da Silva — Encarregado de Manutenção</div>
+      <section class="pcm-kpis">
+        <% [['total_os','📋','Total de OS no período','Ordens conforme filtros','blue'],['corretivas','🛠️','OS corretivas','Falhas/quebras não canceladas','red'],['preventivas','✅','OS preventivas','Indicador positivo',''],['os_abertas','📬','OS abertas','Ainda não iniciadas','amber'],['os_andamento','🔧','OS em andamento','Serviços em execução','blue'],['os_atrasadas','⚠️','OS críticas/atrasadas','Urgência operacional','red'],['os_concluidas','🏁','OS finalizadas','Concluídas no período',''],['equipamentos_parados','⛔','Equipamentos parados','Estimado por OS atrasadas','red'],['equipamentos_atencao','🏗️','Reforma recomendada','Sugestão: requer avaliação','amber'],['tempo_medio_conclusao','⏱️','Tempo médio fechamento','Horas das OS concluídas','blue']].forEach(function(c){ %>
+          <a class="pcm-kpi <%= c[4] %>" href="#ordens" data-card="<%= c[0] %>" data-suffix="<%= c[0].includes('tempo') ? ' h' : '' %>"><div class="pcm-kpi-icon"><%= c[1] %></div><div class="pcm-kpi-title"><%= c[2] %></div><div class="pcm-kpi-value"><%= d.cards[c[0]] ?? 'Dados insuficientes' %><%= c[0].includes('tempo') && d.cards[c[0]] !== null ? ' h' : '' %></div><div class="pcm-kpi-desc"><%= c[3] %> • abrir lista filtrada</div></a>
+        <% }) %>
+      </section>
+
+      <section class="pcm-grid">
+        <article class="pcm-panel pcm-panel-wide"><h2>Top 5 equipamentos com maior frequência de falhas</h2><p class="pcm-panel-sub">Somente OS corretivas; preventivas e canceladas não entram no ranking.</p><div class="pcm-chart"><canvas id="chartTopFalhas"></canvas><div class="pcm-empty">Não foram encontrados dados para os filtros selecionados.</div></div></article>
+        <article class="pcm-panel"><h2>Distribuição das intervenções de manutenção</h2><p class="pcm-panel-sub">Corretivas, preventivas, inspeções e demais tipos reais.</p><div class="pcm-chart pcm-chart-sm"><canvas id="chartCorPrev"></canvas><div class="pcm-empty">Sem intervenções no período.</div></div></article>
+        <article class="pcm-panel"><h2>Ordens de Serviço por Mês</h2><p class="pcm-panel-sub">Evolução mensal dentro do período filtrado.</p><div class="pcm-chart"><canvas id="chartOsMes"></canvas><div class="pcm-empty">Sem OS no período.</div></div></article>
+        <article class="pcm-panel"><h2>Serviços por Mecânico</h2><p class="pcm-panel-sub">Top 6 responsáveis com execução registrada.</p><div class="pcm-chart"><canvas id="chartMecanico"></canvas><div class="pcm-empty">Sem registros confiáveis de mecânico.</div></div></article>
+        <article class="pcm-panel"><h2>Falhas por Setor</h2><p class="pcm-panel-sub">Ranking dos setores por falhas corretivas.</p><div class="pcm-chart"><canvas id="chartFalhasSetor"></canvas><div class="pcm-empty">Sem falhas por setor.</div></div></article>
+        <article class="pcm-panel pcm-panel-wide"><h2>Intervalo e evolução das ocorrências</h2><p class="pcm-panel-sub">Usa média de dias entre falhas quando há histórico suficiente, sem assumir horas reais de funcionamento.</p><div class="pcm-chart"><canvas id="chartEvolucao"></canvas><div class="pcm-empty">Sem histórico suficiente.</div></div></article>
+        <article class="pcm-panel"><h2>Preventivas por Situação</h2><p class="pcm-panel-sub">Concluídas, pendentes e vencidas.</p><div class="pcm-chart pcm-chart-sm"><canvas id="chartPreventivas"></canvas><div class="pcm-empty">Sem preventivas.</div></div></article>
+        <article class="pcm-panel"><h2>Situação das Ordens de Serviço</h2><p class="pcm-panel-sub">Painel rápido por status real.</p><div class="pcm-chart pcm-chart-sm"><canvas id="chartStatus"></canvas><div class="pcm-empty">Sem OS.</div></div></article>
+        <article class="pcm-panel pcm-panel-wide"><h2>Ranking de equipamentos com maior incidência de falhas</h2><div class="pcm-table-wrap"><table class="pcm-table"><thead><tr><th>Posição</th><th>Equipamento</th><th>Setor</th><th>Total de falhas</th><th>Falhas críticas</th><th>Reincidências</th><th>Média dias entre falhas</th><th>Última ocorrência</th><th>Situação atual</th><th>Ação</th></tr></thead><tbody id="rankingFalhas"></tbody></table></div><a class="pcm-btn" href="/pcm/falhas" style="margin-top:10px">Ver ranking completo</a></article>
+        <article class="pcm-panel"><h2>Equipamentos que exigem atenção</h2><p class="pcm-panel-sub">Reforma e parada programada</p><p class="pcm-panel-sub">Sugestões automáticas não são decisão técnica definitiva.</p><div class="pcm-table-wrap"><table class="pcm-table"><thead><tr><th>Nome</th><th>Setor</th><th>Criticidade</th><th>Motivo</th><th>Falhas</th><th>Última</th><th>Situação</th><th>Responsável</th></tr></thead><tbody id="equipAtencao"></tbody></table></div></article>
+        <article class="pcm-panel pcm-panel-wide" id="ordens"><h2>Relação das OS filtradas</h2><div class="pcm-table-wrap"><table class="pcm-table"><thead><tr><th>OS</th><th>Abertura</th><th>Tipo</th><th>Status</th><th>Equipamento</th><th>Setor</th><th>Solicitante</th></tr></thead><tbody><% if(!d.tabelas.ordens.length){ %><tr><td colspan="7">Não foram encontrados dados para os filtros selecionados.</td></tr><% } %><% d.tabelas.ordens.slice(0,80).forEach(function(o){ %><tr><td><a href="/os/<%= o.id %>">#<%= o.id %></a></td><td><%= o.opened_at || '-' %></td><td><%= o.tipo || '-' %></td><td><%= o.status || '-' %></td><td><%= o.equipamento || '-' %></td><td><%= o.setor||'-' %></td><td><%= o.solicitante||'-' %></td></tr><% }) %></tbody></table></div></article>
+      </section>
+    </main>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>window.PCM_DASHBOARD_INITIAL=<%- JSON.stringify(d) %>;</script>
+<script src="/js/pcm-dashboard.js" defer></script>
