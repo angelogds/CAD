@@ -382,10 +382,17 @@ function salvarExecucaoRota(req, res) {
 
 
 function dashboardGerencial(req, res) {
-  const data = service.getDashboardGerencial(req.query, req.session?.user?.id || null);
+  let data;
+  try {
+    data = service.getDashboardGerencial(req.query, req.session?.user?.id || null);
+  } catch (e) {
+    console.error('[PCM Dashboard] Falha ao abrir dashboard gerencial:', e);
+    const hoje = new Date().toISOString().slice(0, 10);
+    data = { filtros: { data_inicial: hoje, data_final: hoje }, prefs: { cards: service.DASHBOARD_DEFAULT_CARDS }, cards: {}, graficos: {}, tabelas: { ordens: [] }, equipamentos_atencao: [], opcoesExtras: { mecanicos: [], status: [], tipos: [], criticidades: [] }, erros: ['Falha ao carregar indicadores. A equipe técnica já recebeu o erro no log do servidor.'] };
+  }
   return res.render("pcm/dashboard-gerencial", {
     ...baseView(req),
-    title: "Dashboard Gerencial da Manutenção",
+    title: "Dashboard Gerencial de Manutenção – PCM",
     activePcmSection: "dashboard-gerencial",
     dashboard: data,
   });
@@ -433,9 +440,10 @@ function dashboardPdf(req, res) {
   res.setHeader('Content-Disposition', 'attachment; filename="relatorio-gerencial-pcm.pdf"');
   doc.pipe(res);
   doc.fillColor('#166534').fontSize(16).text('Campo do Gado', { align: 'center' });
-  doc.fillColor('#111827').fontSize(14).text('Relatório Gerencial de Manutenção – PCM', { align: 'center' });
+  doc.fillColor('#111827').fontSize(14).text('Dashboard Gerencial de Manutenção – PCM', { align: 'center' });
   doc.moveDown().fontSize(9).text(`Período: ${data.filtros.data_inicial} a ${data.filtros.data_final}`);
   doc.text(`Emitido em: ${new Date().toLocaleString('pt-BR')} por ${req.session?.user?.name || req.session?.user?.email || 'Usuário'}`);
+  doc.text('Rodapé institucional: Sistema Manutenção Campo do Gado V2 • PCM');
   doc.moveDown().fontSize(12).fillColor('#166534').text('Indicadores principais');
   doc.fillColor('#111827').fontSize(9);
   Object.entries(data.cards).forEach(([k,v]) => doc.text(`${k}: ${v ?? 'sem dado registrado'}`));
