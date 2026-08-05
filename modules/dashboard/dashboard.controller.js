@@ -4,6 +4,7 @@ const alertsHub = require('../alerts/alerts.hub');
 const alertsService = require('../alerts/alerts.service');
 const webPushService = require('../notifications/webpush.service');
 const db = require('../../database/db');
+const criticalityService = require('./operational-criticality.service');
 
 function isMecanicoLikeRole(role = '') {
   const norm = String(role || '').toUpperCase();
@@ -90,8 +91,30 @@ function buildDashboardPayload({ tvMode = false } = {}) {
     rankingRelatorioMensal: service.getUltimoRelatorioMensalFechado(),
     avisos: service.getAvisosDashboard(12),
     alertaAtivo: alertsService.getAlertaAtivo(),
+    criticidadeOperacional: criticalityService.getDashboard({}),
     tvMode,
   };
+}
+
+
+function criticidade(req, res) {
+  const role = req.session?.user?.role || '';
+  if (!criticalityService.canView(role)) return res.status(403).render('errors/403', { title: 'Acesso negado' });
+  return res.render('dashboard/criticidade', {
+    title: 'Painel de Criticidade dos Equipamentos',
+    activeMenu: 'dashboard',
+    criticidadeOperacional: criticalityService.getDashboard(req.query || {}),
+  });
+}
+
+function criticidadeEquipamento(req, res) {
+  const role = req.session?.user?.role || '';
+  if (!criticalityService.canView(role)) return res.status(403).render('errors/403', { title: 'Acesso negado' });
+  return res.render('dashboard/criticidade-detalhe', {
+    title: 'Histórico operacional do equipamento',
+    activeMenu: 'dashboard',
+    detalhe: criticalityService.getDetalhe(Number(req.params.equipamentoId), req.query || {}),
+  });
 }
 
 function index(req, res) {
@@ -301,6 +324,8 @@ function baixarRelatorioMensal(req, res) {
 }
 module.exports = {
   index,
+  criticidade,
+  criticidadeEquipamento,
   tv,
   getTVData,
   createAviso,

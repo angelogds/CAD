@@ -24,6 +24,8 @@ const wrap = (fn, name) =>
       };
 
 router.get('/', requireLogin, wrap(ctrl.index, 'index'));
+router.get('/criticidade', requireLogin, requireRole(ACCESS.dashboard_criticidade), wrap(ctrl.criticidade, 'criticidade'));
+router.get('/criticidade/equipamentos/:equipamentoId', requireLogin, requireRole(ACCESS.dashboard_criticidade), wrap(ctrl.criticidadeEquipamento, 'criticidadeEquipamento'));
 router.get('/tv', requireLogin, wrap(ctrl.tv, 'tv'));
 router.post('/avisos', requireLogin, wrap(ctrl.createAviso, 'createAviso'));
 router.post('/ranking/relatorio-mensal/gerar', requireLogin, wrap(ctrl.gerarRelatorioMensal, 'gerarRelatorioMensal'));

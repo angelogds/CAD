@@ -86,6 +86,7 @@
   .op-toast-grande.show{display:block;}
   .op-toast-grande__titulo{font-size:30px;font-weight:900;letter-spacing:.02em;}
   .op-toast-grande__meta{font-size:20px;font-weight:800;margin-top:6px;}
+  .crit-mini{display:grid;grid-template-columns:1fr;gap:8px}.crit-mini-item{display:block;border:1px solid #e2e8f0;border-radius:12px;padding:10px;text-decoration:none;color:inherit;background:#f8fafc}.crit-mini-bar{height:9px;background:#fee2e2;border-radius:999px;overflow:hidden;margin-top:7px}.crit-mini-fill{height:100%;background:#dc2626}.crit-mini-meta{font-size:12px;color:#64748b;margin-top:4px}
   .boasvindas{border:1px solid #e2e8f0; background:#f8fafc; border-radius:12px; padding:10px 12px; margin-bottom:10px;}
   .alerta-tv { border:2px solid #dc2626; border-radius:14px; background:#fff1f2; color:#7f1d1d; padding:14px; margin-bottom:10px; display:flex; gap:14px; align-items:center; justify-content:space-between; }
   .alerta-tv.hidden { display:none; }
@@ -179,6 +180,8 @@
   var showPreventivasCard = canAccessModule(roleNorm, 'preventivas_view');
   var safeRankingPeriodoMensal = (typeof rankingPeriodoMensal !== 'undefined' && rankingPeriodoMensal) ? rankingPeriodoMensal : {};
   var safeRankingRelatorioMensal = (typeof rankingRelatorioMensal !== 'undefined' && rankingRelatorioMensal) ? rankingRelatorioMensal : {};
+  var safeCriticidadeOperacional = (typeof criticidadeOperacional !== 'undefined' && criticidadeOperacional) ? criticidadeOperacional : {};
+  var criticidadeRankingMini = safeCriticidadeOperacional.ranking || [];
 %>
 
 <div class="page-head">
@@ -227,6 +230,27 @@
 
 <div class="dash-grid">
   <div class="dash-col">
+
+<section class="dashboard-card area-criticidade">
+  <div class="ranking-header">
+    <div class="dashboard-title" style="margin:0;">Criticidade dos equipamentos</div>
+    <a class="btn-outline" href="/dashboard/criticidade">Abrir painel completo</a>
+  </div>
+  <% if (!criticidadeRankingMini.length) { %>
+    <p class="muted" style="margin:0;">Nenhuma falha corretiva registrada nos últimos 30 dias.</p>
+  <% } else { var critMaxMini = Math.max.apply(null, criticidadeRankingMini.map(function(i){ return i.total_falhas || 0; })); %>
+    <div class="crit-mini">
+      <% criticidadeRankingMini.slice(0,5).forEach(function(i){ var pct = critMaxMini ? Math.max(8, Math.round((i.total_falhas || 0) / critMaxMini * 100)) : 0; %>
+        <a class="crit-mini-item" href="<%= i.historico_url || ('/dashboard/criticidade/equipamentos/' + i.equipamento_id) %>">
+          <strong><%= i.equipamento_nome || '-' %></strong>
+          <div class="crit-mini-meta"><%= i.setor || '-' %> • Falhas: <%= i.total_falhas || 0 %> • Reinc.: <%= i.reincidencias || 0 %> • Média: <%= i.frequencia_media || 'Dados insuficientes' %></div>
+          <div class="crit-mini-bar" aria-hidden="true"><div class="crit-mini-fill" style="width:<%= pct %>%"></div></div>
+        </a>
+      <% }) %>
+    </div>
+  <% } %>
+</section>
+
 <section class="dashboard-card area-os">
     <div class="dashboard-title">Ordem de Serviço</div>
     <div class="kpi-grid">
