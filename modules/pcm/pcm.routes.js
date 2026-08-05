@@ -8,6 +8,7 @@ const PCM_ACCESS = ACCESS.pcm;
 
 router.get("/", requireLogin, requireRole(PCM_ACCESS), ctrl.index);
 router.get("/dashboard-gerencial", requireLogin, requireRole(PCM_ACCESS), ctrl.dashboardGerencial);
+router.get("/dashboard-gerencial/dados", requireLogin, requireRole(PCM_ACCESS), ctrl.dashboardDados);
 router.get("/dashboard-gerencial/configurar", requireLogin, requireRole(PCM_ACCESS), ctrl.dashboardConfig);
 router.post("/dashboard-gerencial/configurar", requireLogin, requireRole(PCM_ACCESS), ctrl.salvarDashboardConfig);
 router.post("/dashboard-gerencial/configurar/restaurar", requireLogin, requireRole(PCM_ACCESS), ctrl.resetDashboardConfig);

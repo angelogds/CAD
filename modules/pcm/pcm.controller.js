@@ -398,6 +398,16 @@ function dashboardGerencial(req, res) {
   });
 }
 
+function dashboardDados(req, res) {
+  try {
+    const data = service.getDashboardGerencial(req.query, req.session?.user?.id || null);
+    return res.json({ ok: true, dashboard: data });
+  } catch (e) {
+    console.error('[PCM Dashboard] Falha ao consultar dados:', { endpoint: req.originalUrl, filtros: req.query, erro: e?.message || e });
+    return res.status(400).json({ ok: false, message: e?.message || 'Não foi possível carregar os dados do painel.' });
+  }
+}
+
 function dashboardConfig(req, res) {
   const prefs = service.getDashboardPreferences(req.session?.user?.id || null);
   return res.render("pcm/dashboard-config", {
@@ -474,6 +484,7 @@ function dashboardExcel(req, res) {
 module.exports = {
   index,
   dashboardGerencial,
+  dashboardDados,
   dashboardConfig,
   salvarDashboardConfig,
   resetDashboardConfig,
