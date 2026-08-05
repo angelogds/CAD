@@ -14,29 +14,29 @@ const meses = [['','Todos'],['1','Janeiro'],['2','Fevereiro'],['3','Março'],['4
   <div class="pcm-loading"><div class="pcm-spinner" aria-label="Carregando"></div></div>
   <section class="pcm-hero">
     <div>
-      <span class="pcm-eyebrow">⚙️ Campo do Gado • PCM</span>
+      <span class="pcm-eyebrow">Campo do Gado • PCM</span>
       <h1>PAINEL GERENCIAL PCM</h1>
       <!-- Dashboard Gerencial da Manutenção | Configurar dashboard | Excel | Ranking operacional dos mecânicos | Ranking dos solicitantes -->
       <p>Indicadores de Planejamento e Controle da Manutenção, criticidade e confiabilidade dos equipamentos.</p>
       <div id="periodoResumo" class="pcm-period-chip" style="display:inline-flex;margin-top:10px">Período analisado: <%= d.filtros.data_inicial || '-' %> a <%= d.filtros.data_final || '-' %></div>
     </div>
     <div class="pcm-hero-actions">
-      <span class="pcm-user-chip">👤 <%= userName %> • <%= userRole %></span>
-      <span class="pcm-user-chip">📅 <%= new Date().toLocaleDateString('pt-BR') %></span>
-      <button class="pcm-btn pcm-btn-primary" id="btnAtualizar" type="button">↻ Atualizar dados</button>
-      <button class="pcm-btn" id="btnPdf" type="button">📄 Gerar PDF</button>
-      <button class="pcm-btn" id="btnFull" type="button">⛶ Tela cheia</button>
-      <a class="pcm-btn pcm-btn-ghost" href="/pcm/dashboard-gerencial/configurar">⚙️ Configurar dashboard</a><a class="pcm-btn pcm-btn-ghost" href="/pcm/dashboard-gerencial/excel?<%= qp %>">Excel</a>
+      <span class="pcm-user-chip"><%= userName %> • <%= userRole %></span>
+      <span class="pcm-user-chip"><%= new Date().toLocaleDateString('pt-BR') %></span>
+      <button class="pcm-btn pcm-btn-primary" id="btnAtualizar" type="button">Atualizar dados</button>
+      <button class="pcm-btn" id="btnPdf" type="button">Gerar PDF</button>
+      <button class="pcm-btn" id="btnFull" type="button">Tela cheia</button>
+      <a class="pcm-btn pcm-btn-ghost" href="/pcm/dashboard-gerencial/configurar">Configurar dashboard</a><a class="pcm-btn pcm-btn-ghost" href="/pcm/dashboard-gerencial/excel?<%= qp %>">Excel</a>
     </div>
   </section>
 
-  <button class="pcm-btn pcm-mobile-filter" id="btnMobileFilters" type="button">☰ Filtros</button>
+  <button class="pcm-btn pcm-mobile-filter" id="btnMobileFilters" type="button">Filtros</button>
   <% if (d.filtros.aviso) { %><div class="pcm-alert-box"><%= d.filtros.aviso %></div><% } %>
   <% if (d.erros && d.erros.length) { %><div class="pcm-alert-box"><strong>Atenção:</strong> <%= d.erros.join(' | ') %></div><% } %>
 
   <div class="pcm-layout">
     <aside class="pcm-filters" aria-label="Filtros do painel">
-      <h2 class="pcm-filter-title">🔎 Filtros</h2>
+      <h2 class="pcm-filter-title">Filtros</h2>
       <form id="pcmFilters" method="GET" action="/pcm/dashboard-gerencial">
         <div class="pcm-filter-grid">
           <label>Período rápido<select class="pcm-input" name="periodo"><% [['mes_atual','Mês atual'],['mes_anterior','Mês anterior'],['ultimos_3_meses','Últimos 3 meses'],['ultimos_6_meses','Últimos 6 meses'],['ultimos_12_meses','Últimos 12 meses'],['personalizado','Personalizado']].forEach(function(o){ %><option value="<%= o[0] %>" <%= selected(d.filtros.shortcut,o[0]) %>><%= o[1] %></option><% }) %></select></label>
@@ -61,10 +61,16 @@ const meses = [['','Todos'],['1','Janeiro'],['2','Fevereiro'],['3','Março'],['4
     <main>
       <div class="pcm-print-report"><strong>Campo do Gado – Indústria de Reciclagem Animal LTDA</strong><br>Manutenção Industrial – PCM • Painel Gerencial de Manutenção • Elaboração: Ângelo Gomes da Silva — Encarregado de Manutenção</div>
       <section class="pcm-kpis">
-        <% [['total_os','📋','Total de OS no período','Ordens conforme filtros','blue'],['corretivas','🛠️','OS corretivas','Falhas/quebras não canceladas','red'],['preventivas','✅','OS preventivas','Indicador positivo',''],['os_abertas','📬','OS abertas','Ainda não iniciadas','amber'],['os_andamento','🔧','OS em andamento','Serviços em execução','blue'],['os_atrasadas','⚠️','OS críticas/atrasadas','Urgência operacional','red'],['os_concluidas','🏁','OS finalizadas','Concluídas no período',''],['equipamentos_parados','⛔','Equipamentos parados','Estimado por OS atrasadas','red'],['equipamentos_atencao','🏗️','Reforma recomendada','Sugestão: requer avaliação','amber'],['tempo_medio_conclusao','⏱️','Tempo médio fechamento','Horas das OS concluídas','blue']].forEach(function(c){ %>
+        <% [['total_os','','Total de OS no período','Ordens conforme filtros','blue'],['corretivas','','OS corretivas','Falhas/quebras não canceladas','red'],['preventivas','','OS preventivas','Indicador positivo',''],['os_abertas','','OS abertas','Ainda não iniciadas','amber'],['os_andamento','','OS em andamento','Serviços em execução','blue'],['os_atrasadas','⚠️','OS críticas/atrasadas','Urgência operacional','red'],['os_concluidas','','OS finalizadas','Concluídas no período',''],['cumprimento_programacao','','Cumprimento da Programação','Programados concluídos / programados',''],['percentual_manutencao_planejada','','% Manutenção Planejada','Planejados / total de serviços','blue'],['backlog_manutencao','','Backlog da manutenção','OS e demandas pendentes','amber']].forEach(function(c){ %>
           <a class="pcm-kpi <%= c[4] %>" href="#ordens" data-card="<%= c[0] %>" data-suffix="<%= c[0].includes('tempo') ? ' h' : '' %>"><div class="pcm-kpi-icon"><%= c[1] %></div><div class="pcm-kpi-title"><%= c[2] %></div><div class="pcm-kpi-value"><%= d.cards[c[0]] ?? 'Dados insuficientes' %><%= c[0].includes('tempo') && d.cards[c[0]] !== null ? ' h' : '' %></div><div class="pcm-kpi-desc"><%= c[3] %> • abrir lista filtrada</div></a>
         <% }) %>
       </section>
+
+
+      <section class="pcm-panel" id="planejamento"><h2>Planejamento e Programação</h2><div class="pcm-mini-grid"><span>Serviços planejados: <strong><%= d.cards.servicos_planejados || 0 %></strong></span><span>Não planejados: <strong><%= d.cards.servicos_nao_planejados || 0 %></strong></span><span>Programados: <strong><%= d.cards.servicos_programados || 0 %></strong></span><span>Executados: <strong><%= d.cards.servicos_executados || 0 %></strong></span><span>Serviços pendentes: <strong><%= d.cards.servicos_pendentes || 0 %></strong></span><span>Preventivas programadas x executadas: <strong><%= d.cards.preventivas_programadas || 0 %> x <%= d.cards.preventivas_concluidas || 0 %></strong></span></div></section>
+      <section class="pcm-panel" id="demandas"><h2>Demandas</h2><div class="pcm-mini-grid"><span>Total: <strong><%= d.cards.demandas_total || 0 %></strong></span><span>Abertas: <strong><%= d.cards.demandas_abertas || 0 %></strong></span><span>Programadas: <strong><%= d.cards.demandas_programadas || 0 %></strong></span><span>Em andamento: <strong><%= d.cards.demandas_andamento || 0 %></strong></span><span>Atrasadas: <strong><%= d.cards.demandas_atrasadas || 0 %></strong></span><span>Concluídas: <strong><%= d.cards.demandas_concluidas || 0 %></strong></span><span>Convertidas em OS: <strong><%= d.cards.demandas_convertidas_os || 0 %></strong></span><span>Prazo médio: <strong><%= d.cards.prazo_medio_demandas || 'Dados insuficientes' %> h</strong></span></div><p class="pcm-panel-sub">Status exibidos conforme cadastro real do banco, sem criação de situações paralelas.</p></section>
+      <section class="pcm-panel" id="criticidade"><h2>Criticidade</h2><div class="pcm-mini-grid"><span>Alta criticidade: <strong><%= d.criticidade?.alta_criticidade || 0 %></strong></span><span>Críticos com OS aberta: <strong><%= d.criticidade?.criticos_os_aberta || 0 %></strong></span><span>Preventiva vencida: <strong><%= d.criticidade?.criticos_preventiva_vencida || 0 %></strong></span><span>Críticos parados: <strong><%= d.criticidade?.criticos_parados || 0 %></strong></span><span>Sem preventiva: <strong><%= d.criticidade?.criticos_sem_preventiva || 0 %></strong></span><span>Demanda pendente: <strong><%= d.criticidade?.criticos_demanda_pendente || 0 %></strong></span></div></section>
+      <section class="pcm-panel" id="confiabilidade"><h2>Confiabilidade</h2><div class="pcm-mini-grid"><span>MTBF: <strong><%= d.confiabilidade?.mtbf ?? 'Dados insuficientes para cálculo' %></strong></span><span>MTTR: <strong><%= d.confiabilidade?.mttr ?? 'Dados insuficientes para cálculo' %></strong></span><span>Disponibilidade: <strong><%= d.confiabilidade?.disponibilidade ?? 'Dados insuficientes para cálculo' %></strong></span><span>Campos necessários: <strong><%= (d.confiabilidade?.campos_necessarios || []).join(', ') %></strong></span></div></section>
 
       <section class="pcm-grid">
         <article class="pcm-panel pcm-panel-wide"><h2>Top 5 equipamentos com maior frequência de falhas</h2><p class="pcm-panel-sub">Somente OS corretivas; preventivas e canceladas não entram no ranking.</p><div class="pcm-chart"><canvas id="chartTopFalhas"></canvas><div class="pcm-empty">Não foram encontrados dados para os filtros selecionados.</div></div></article>
