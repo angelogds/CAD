@@ -21,7 +21,20 @@ const STATUS = Object.freeze({
   CANCELADA: 'CANCELADA',
 });
 
-const STATUS_COMPRAS = [STATUS.ABERTA, STATUS.EM_COTACAO, STATUS.COMPRADA];
+// The purchasing dashboard follows the request through its entire lifecycle.
+// Workflow-only statuses remain available in detail screens, while these are
+// the statuses that make sense as managerial indicators and list filters.
+const STATUS_COMPRAS = [
+  STATUS.ABERTA,
+  STATUS.EM_COTACAO,
+  STATUS.COMPRADA,
+  STATUS.EM_RECEBIMENTO,
+  STATUS.RECEBIDA_PARCIAL,
+  STATUS.RECEBIDA_TOTAL,
+  STATUS.FECHADA,
+  STATUS.REABERTA,
+  STATUS.CANCELADA,
+];
 
 function normalizeStatus(status) {
   return Object.values(STATUS).includes(status) ? status : '';
@@ -132,15 +145,19 @@ function listSolicitacoesPorStatus(filters = {}) {
   if (filters.query) {
     const fornecedorExpr = hasFornecedorCol ? "COALESCE(s.fornecedor, '')" : "''";
     const fornecedorNomeExpr = hasFornecedorIdCol && hasFornecedoresTable ? "COALESCE(f.nome, '')" : "''";
-    where.push(`(LOWER(s.numero) LIKE ? OR LOWER(s.titulo) LIKE ? OR LOWER(${fornecedorExpr}) LIKE ? OR LOWER(${fornecedorNomeExpr}) LIKE ?)`);
+    where.push(`(LOWER(s.numero) LIKE ? OR LOWER(s.titulo) LIKE ? OR LOWER(COALESCE(s.setor_origem, '')) LIKE ? OR LOWER(COALESCE(u.${usersRef.nameCol}, '')) LIKE ? OR LOWER(${fornecedorExpr}) LIKE ? OR LOWER(${fornecedorNomeExpr}) LIKE ?)`);
     const q = `%${String(filters.query).trim().toLowerCase()}%`;
-    params.push(q, q, q, q);
+    params.push(q, q, q, q, q, q);
   }
+  if (filters.date) { where.push('date(s.created_at) = date(?)'); params.push(filters.date); }
   if (filters.startDate) { where.push('date(s.created_at) >= date(?)'); params.push(filters.startDate); }
   if (filters.endDate) { where.push('date(s.created_at) <= date(?)'); params.push(filters.endDate); }
+  if (filters.vinculadasOs) where.push('s.os_id IS NOT NULL');
+  if (filters.urgentes) where.push("UPPER(COALESCE(s.prioridade, '')) IN ('ALTA', 'URGENTE', 'CRITICA', 'CRÍTICA', 'EMERGENCIAL')");
 
   return db.prepare(`
-    SELECT s.*, u.${usersRef.nameCol} AS solicitante_nome, ${hasFornecedorIdCol && hasFornecedoresTable ? 'f.nome' : 'NULL'} AS fornecedor_nome
+    SELECT s.*, u.${usersRef.nameCol} AS solicitante_nome, ${hasFornecedorIdCol && hasFornecedoresTable ? 'f.nome' : 'NULL'} AS fornecedor_nome,
+      (SELECT COUNT(*) FROM solicitacao_itens si WHERE si.solicitacao_id = s.id) AS itens_count
     FROM solicitacoes s
     JOIN ${usersRef.table} u ON u.id = s.solicitante_user_id
     ${hasFornecedorIdCol && hasFornecedoresTable ? 'LEFT JOIN fornecedores f ON f.id = s.fornecedor_id' : ''}
