@@ -17,10 +17,10 @@
 
 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
   <div>
-    <h1>Assistente IA</h1>
-    <p class="ai-muted">Chat técnico para OS, preventiva, equipamentos e academia.</p>
+    <h1>Assistente da Manutenção</h1>
+    <p class="ai-muted">Assistente virtual para pesquisar informações sobre OS, equipamentos e manutenção.</p>
   </div>
-  <a href="/dashboard" class="btn btn-ghost">Voltar</a>
+  <a href="<%= backHref || '/dashboard' %>" class="btn btn-ghost">Voltar</a>
 </div>
 
 <% if (!aiEnabled) { %>

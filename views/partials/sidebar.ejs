@@ -29,7 +29,8 @@
   const canTracagem = can('tracagem_view');
   const canDesenhoTecnico = can('desenho_tecnico_view');
   const canAcademia = can('academia_view');
-  const canAI = role !== 'INSPECAO_QUALIDADE' && (canOS || canPreventivas || canAcademia);
+  const canAI = role !== 'INSPECAO_QUALIDADE' && can('assistente_manutencao');
+  const isCompras = role === 'COMPRAS';
 
   const currentPcmSection = (typeof activePcmSection !== 'undefined' ? activePcmSection : '');
 
@@ -51,7 +52,7 @@
     <% if (canOSChat) { %><%- navItem('/chat-os', 'Chat de OS', activeMenu === 'os-chat', '', badge(counters.osChatNaoLidas || 0, 'green')) %><% } %>
     <% if (canPreventivas) { %><%- navItem('/preventivas', 'Preventivas', activeMenu === 'preventivas', '', badge(counters.preventivasHoje, 'blue')) %><% } %>
     <% if (canDemandas) { %><%- navItem('/demandas', 'Demandas', activeMenu === 'demandas') %><% } %>
-    <% if (canSolicitacoes) { %><%- navItem('/solicitacoes/minhas', 'Solicitações', activeMenu === 'solicitacoes') %><% } %>
+    <% if (canSolicitacoes && !isCompras) { %><%- navItem('/solicitacoes/minhas', 'Solicitações', activeMenu === 'solicitacoes') %><% } %>
     <% if (canCompras) { %><%- navItem('/compras/solicitacoes', 'Compras', activeMenu === 'compras') %><% } %>
     <% if (canFornecedores) { %><%- navItem('/fornecedores', 'Fornecedores', activeMenu === 'fornecedores') %><% } %>
     <% if (canAlmoxarifado) { %><%- navItem('/almoxarifado/recebimentos', 'Almoxarifado', activeMenu === 'almoxarifado') %><% } %>
@@ -64,7 +65,7 @@
     <% if (canTracagem) { %><%- navItem('/tracagem', 'Traçagem', activeMenu === 'tracagem') %><% } %>
     <% if (canDesenhoTecnico) { %><%- navItem('/desenho-tecnico', 'Desenho Técnico', activeMenu === 'desenho-tecnico') %><% } %>
     <% if (canAcademia) { %><%- navItem('/academia', 'Academia da Manutenção', activeMenu === 'academia') %><% } %>
-    <% if (canAI) { %><%- navItem('/ai/chat', 'Assistente IA', activeMenu === 'ai') %><% } %>
+    <% if (canAI) { %><%- navItem('/ai/chat', 'Assistente da Manutenção', activeMenu === 'ai') %><% } %>
 
     <% if (canPCM) { %>
       <%- navItem('/pcm', 'PCM – Planejamento', activeMenu === 'pcm') %>
