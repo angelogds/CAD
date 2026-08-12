@@ -129,3 +129,14 @@ test('cancelamento é operação separada e preserva registro com log', () => {
   assert.equal(log.status_novo, 'CANCELADA');
   assert.equal(log.acao, 'CANCELAR_SOLICITACAO');
 });
+
+test('permite apagar definitivamente uma solicitação cancelada sem movimentações', () => {
+  const id = criarSolicitacao({ status: 'CANCELADA' });
+
+  const resultado = service.excluirSolicitacao(id, 1);
+
+  assert.equal(resultado.modo, 'excluida');
+  assert.equal(db.prepare('SELECT COUNT(*) AS total FROM solicitacoes WHERE id=?').get(id).total, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS total FROM solicitacao_itens WHERE solicitacao_id=?').get(id).total, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS total FROM notificacoes WHERE origem_id=?').get(id).total, 0);
+});
