@@ -126,11 +126,15 @@ const prioridadeClass = (p) => ['ALTA','URGENTE','CRITICA','CRÍTICA','EMERGENCI
           <% if (s.status === 'ABERTA' && canAccessModule(user?.role, 'compras_manage')) { %><a class="btn btn-sm btn-green" href="/compras/solicitacoes/<%= s.id %>">Enviar para compras</a><% } %>
           <% if (['COMPRADA','EM_RECEBIMENTO','RECEBIDA_PARCIAL'].includes(s.status) && canAccessModule(user?.role, 'almoxarifado_manage')) { %><a class="btn btn-sm btn-green" href="/almoxarifado/solicitacoes/<%= s.id %>/conferir">Conferir recebimento</a><% } %>
           <a class="btn btn-sm btn-ghost" href="/solicitacoes/<%= s.id %>/pdf" target="_blank" rel="noopener">Gerar PDF</a>
-          <% if (canAccessModule(user?.role, 'solicitacoes_delete') && s.podeExcluir) { %>
+          <% if (canAccessModule(user?.role || user?.perfil, 'solicitacoes_delete') && s.status === 'CANCELADA' && s.podeExcluir) { %>
+            <form method="POST" action="/solicitacoes/<%= s.id %>/excluir" onsubmit="return confirm('Tem certeza que deseja apagar definitivamente esta solicitação cancelada?\n\nEssa ação não poderá ser desfeita.');">
+              <button type="submit" class="btn btn-sm btn-danger">Apagar solicitação</button>
+            </form>
+          <% } else if (canAccessModule(user?.role || user?.perfil, 'solicitacoes_delete') && s.podeExcluir) { %>
             <form method="POST" action="/solicitacoes/<%= s.id %>/excluir" onsubmit="return confirm('Tem certeza que deseja excluir definitivamente esta solicitação?\n\nEssa ação deve ser utilizada apenas para solicitações criadas por engano e sem movimentações.');">
               <button type="submit" class="btn btn-sm btn-danger">Excluir</button>
             </form>
-          <% } else if (canAccessModule(user?.role, 'solicitacoes_delete') && !['CANCELADA','FECHADA'].includes(s.status)) { %>
+          <% } else if (canAccessModule(user?.role || user?.perfil, 'solicitacoes_delete') && !['CANCELADA','FECHADA'].includes(s.status)) { %>
             <form method="POST" action="/solicitacoes/<%= s.id %>/cancelar" onsubmit="return confirm('Tem certeza que deseja cancelar esta solicitação?\n\nO histórico será preservado.');">
               <button type="submit" class="btn btn-sm btn-warning">Cancelar solicitação</button>
             </form>
