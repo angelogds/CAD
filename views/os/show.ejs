@@ -63,7 +63,7 @@
               </form>
             <% } %>
             <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome || whatsappResponsavel?.nome)) { %>
-              <a class="btn btn-green whatsapp-btn" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener"><span class="wa-icon" aria-hidden="true"></span> Enviar WhatsApp local</a>
+              <a class="btn btn-green whatsapp-btn" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener">WhatsApp</a>
             <% } %>
           </div>
         </div>
@@ -71,11 +71,11 @@
     <% } %>
     <% if (canExecuteOS) { %>
       <form method="POST" action="/os/<%= os.id %>/pdf-institucional" style="display:inline;">
-        <button class="btn btn-primary" type="submit">Gerar PDF institucional</button>
+        <button class="btn btn-primary" type="submit">PDF OS</button>
       </form>
     <% } %>
     <% if (documentoInstitucional && documentoInstitucional.pdf_url) { %>
-      <a class="btn btn-outline" href="<%= documentoInstitucional.pdf_url %>" target="_blank" rel="noopener">Baixar PDF institucional</a>
+      <a class="btn btn-outline" href="<%= documentoInstitucional.pdf_url %>" target="_blank" rel="noopener">Baixar PDF OS</a>
     <% } %>
     <a class="btn btn-ghost" href="/os">Voltar</a>
   </div>
@@ -123,7 +123,7 @@
         <div class="actions">
           <form method="POST" action="/os/<%= os.id %>/pausar"><button class="btn" type="submit">Pausar OS</button></form>
           <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome || whatsappResponsavel?.nome)) { %>
-            <a class="btn btn-green whatsapp-btn" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener"><span class="wa-icon" aria-hidden="true"></span> Enviar WhatsApp à equipe</a>
+            <a class="btn btn-green whatsapp-btn" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener">WhatsApp</a>
           <% } %>
         </div>
       <% } %>

@@ -183,18 +183,31 @@ function publicPathToAbsolute(pathPublic) {
   return null;
 }
 
-function mapFotos(os) {
-  return (os?.fotos_abertura || [])
+function mapFotos(os, tipo = 'ABERTURA') {
+  const source = tipo === 'FECHAMENTO' ? os?.fotos_fechamento : os?.fotos_abertura;
+  const label = tipo === 'FECHAMENTO' ? 'fechamento' : 'abertura';
+  return (source || [])
     .filter((foto) => !String(foto?.path || '').toLowerCase().match(/\.mp4|\.mov|\.avi|\.webm$/))
     .map((foto, index) => {
       const publicPath = foto.path || foto.filepath || foto.caminho_arquivo || '';
       return {
         nome_arquivo: path.basename(publicPath || foto.legenda || `foto_${index + 1}`),
-        descricao_usuario: foto.legenda || foto.filename || `Foto de abertura ${index + 1}`,
+        descricao_usuario: foto.legenda || foto.filename || `Foto de ${label} ${index + 1}`,
+        tipo,
         pathPublic: publicPath,
         absolutePath: publicPathToAbsolute(publicPath),
       };
     });
+}
+
+function getSolicitacaoVinculada(osId) {
+  if (!tableExists('solicitacoes') || !columnExists('solicitacoes', 'os_id')) return null;
+  try {
+    return db.prepare(`
+      SELECT id, numero, titulo, status, prioridade, created_at
+      FROM solicitacoes WHERE os_id = ? ORDER BY id DESC LIMIT 1
+    `).get(Number(osId)) || null;
+  } catch (_e) { return null; }
 }
 
 function buildPayloadFromOS(os = {}) {
@@ -227,7 +240,8 @@ function buildPayloadFromOS(os = {}) {
     recomendacoes_tecnicas: safeText(os.ai_acao_preventiva_sugerida || os.ai_recomendacao_reincidencia, 'Informação pendente de confirmação'),
     pendencias: [],
     observacoes: safeText(os.observacao_ia || os.ai_justificativa_criticidade, 'Não informado'),
-    fotos: mapFotos(os).map(({ nome_arquivo, descricao_usuario }) => ({ nome_arquivo, descricao_usuario })),
+    fotos: [...mapFotos(os, 'ABERTURA'), ...mapFotos(os, 'FECHAMENTO')]
+      .map(({ nome_arquivo, descricao_usuario }) => ({ nome_arquivo, descricao_usuario })),
   };
 }
 
@@ -342,13 +356,25 @@ function storeGeneratedDocument({ osId, userId, numeroOS, content, pdfUrl, fotos
 
 async function gerarPDFInstitucionalOS(os, { userId = null } = {}) {
   ensureInstitutionalTables();
-  if (!os?.id) throw new Error('OS inválida para geração do PDF institucional.');
+  if (!os?.id) throw new Error('OS inválida para geração do PDF OS.');
   const payload = buildPayloadFromOS(os);
   const content = await generateDocumentContent(payload);
-  const fotos = mapFotos(os).map((foto, index) => ({
+  const fotos = [...mapFotos(os, 'ABERTURA'), ...mapFotos(os, 'FECHAMENTO')].map((foto, index) => ({
     ...foto,
     legenda: content.fotos?.[index]?.legenda || `Foto ${index + 1} - Registro visual relacionado à OS.`,
   }));
+  const solicitacao = getSolicitacaoVinculada(os.id);
+  content.dados_os = {
+    solicitacao_vinculada: solicitacao,
+    diagnostico_inicial: safeText(os.ai_diagnostico_inicial || os.diagnostico || os.causa_diagnostico),
+    diagnostico_final: safeText(os.diagnostico_final || os.resumo_tecnico || os.ai_descricao_servico_executado),
+    acao_executada: safeText(os.acao_executada || os.ai_descricao_servico_executado),
+    acao_corretiva: safeText(os.acao_corretiva || os.ai_acao_corretiva_sugerida),
+    acao_preventiva: safeText(os.acao_preventiva || os.ai_acao_preventiva_sugerida),
+    inicio: safeText(os.data_inicio || os.execucao_iniciada_em),
+    conclusao: safeText(os.data_conclusao || os.closed_at),
+    equipe: [os.executor_nome, os.auxiliar_nome, os.executor_secundario_nome, os.auxiliar_secundario_nome].filter(Boolean),
+  };
   const opened = parseDateTimeParts(os.opened_at || os.created_at);
   const numeroLimpo = String(os.id || '').padStart(6, '0');
   const filename = `OS_${numeroLimpo}_Manutencao_Campo_do_Gado_${opened.isoDate}.pdf`;
