@@ -11,6 +11,9 @@ const COLORS = {
   border: '#E5E7EB',
   text: '#1F2937',
   muted: '#6B7280',
+  yellow: '#FFF8D8',
+  yellowBorder: '#E4BE47',
+  row: '#F8FBF9',
 };
 
 const LOGO_CANDIDATES = [
@@ -89,15 +92,29 @@ function ensureSpace(doc, content, issuedAt, needed) {
 }
 
 function drawSection(doc, content, issuedAt, title, body) {
-  ensureSpace(doc, content, issuedAt, 56);
-  const info = pageInfo(doc);
-  doc.fillColor(COLORS.primaryClosed).font('Helvetica-Bold').fontSize(10.5).text(title, info.left, doc.y, { width: info.width });
-  doc.moveDown(0.25);
   const text = Array.isArray(body)
     ? (body.length ? body.map((item) => `• ${safe(item)}`).join('\n') : 'Não informado')
     : safe(body);
-  doc.fillColor(COLORS.text).font('Helvetica').fontSize(9.5).text(text, { width: info.width, lineGap: 2 });
-  doc.moveDown(0.65);
+  const info = pageInfo(doc);
+  doc.font('Helvetica').fontSize(8.5);
+  const bodyH = Math.max(32, doc.heightOfString(text, { width: info.width - 20, lineGap: 2 }) + 18);
+  ensureSpace(doc, content, issuedAt, bodyH + 34);
+  doc.rect(info.left, doc.y, info.width, 24).fill(COLORS.primary);
+  doc.fillColor(COLORS.white).font('Helvetica-Bold').fontSize(9.5)
+    .text(title, info.left + 10, doc.y + 7, { width: info.width - 20, lineBreak: false });
+  doc.y += 24;
+  doc.rect(info.left, doc.y, info.width, bodyH).fillAndStroke(COLORS.white, COLORS.border);
+  doc.fillColor(COLORS.text).font('Helvetica').fontSize(8.5)
+    .text(text, info.left + 10, doc.y + 9, { width: info.width - 20, lineGap: 2, align: 'justify' });
+  doc.y += bodyH + 12;
+}
+
+function drawOsLink(doc, content, issuedAt) {
+  const link = content.dados_os?.solicitacao_vinculada;
+  const text = link
+    ? `Solicitação nº ${safe(link.numero, `#${link.id}`)} | Status: ${safe(link.status)} | Prioridade: ${safe(link.prioridade)}\n${safe(link.titulo)}`
+    : 'Esta ordem de serviço não possui solicitação de material/compra vinculada.';
+  drawSection(doc, content, issuedAt, '2. VINCULAÇÃO À SOLICITAÇÃO DE COMPRAS', text);
 }
 
 function drawIdentification(doc, content, issuedAt) {
@@ -158,19 +175,23 @@ function drawSignatures(doc, content, issuedAt) {
 
 function drawPhotoGrid(doc, content, fotos, issuedAt) {
   if (!fotos.length) return;
-  addManagedPage(doc, content, issuedAt);
-  const info = pageInfo(doc);
-  doc.fillColor(COLORS.primaryClosed).font('Helvetica-Bold').fontSize(14).text('ANEXOS FOTOGRÁFICOS', info.left, doc.y, { width: info.width, align: 'center' });
-  doc.moveDown(0.2);
-  doc.fillColor(COLORS.muted).font('Helvetica').fontSize(9.5).text('Registros visuais relacionados à Ordem de Serviço.', { width: info.width, align: 'center' });
-  doc.moveDown(1);
-
-  const gap = 14;
-  const itemW = fotos.length === 1 ? Math.min(info.width, 390) : (info.width - gap) / 2;
-  const itemH = fotos.length === 1 ? 250 : 180;
-  let x = fotos.length === 1 ? info.left + (info.width - itemW) / 2 : info.left;
-  let y = doc.y;
-  fotos.forEach((foto, index) => {
+  const groups = [
+    ['ABERTURA', 'IMAGENS DE ABERTURA', fotos.filter((foto) => foto.tipo !== 'FECHAMENTO')],
+    ['FECHAMENTO', 'IMAGENS DE FECHAMENTO', fotos.filter((foto) => foto.tipo === 'FECHAMENTO')],
+  ].filter(([, , items]) => items.length);
+  groups.forEach(([, title, items]) => {
+    addManagedPage(doc, content, issuedAt);
+    const info = pageInfo(doc);
+    doc.fillColor(COLORS.primaryClosed).font('Helvetica-Bold').fontSize(16).text(title, info.left, doc.y, { width: info.width, align: 'center' });
+    doc.moveDown(0.3);
+    doc.fillColor(COLORS.muted).font('Helvetica').fontSize(9).text('Registro visual e rastreável da ordem de serviço.', { width: info.width, align: 'center' });
+    doc.moveDown(1);
+    const gap = 14;
+    const itemW = items.length === 1 ? Math.min(info.width, 390) : (info.width - gap) / 2;
+    const itemH = items.length === 1 ? 250 : 180;
+    let x = items.length === 1 ? info.left + (info.width - itemW) / 2 : info.left;
+    let y = doc.y;
+    items.forEach((foto, index) => {
     if (y + itemH + 46 > info.bottom - 18) {
       addManagedPage(doc, content, issuedAt);
       y = doc.y;
@@ -185,14 +206,15 @@ function drawPhotoGrid(doc, content, fotos, issuedAt) {
     }
     doc.fillColor(COLORS.text).font('Helvetica').fontSize(8.2).text(safe(foto.legenda, `Foto ${index + 1}`), x, y + itemH + 6, { width: itemW, align: 'center' });
 
-    if (fotos.length === 1 || x > info.left) {
+    if (items.length === 1 || x > info.left) {
       x = info.left;
       y += itemH + 48;
     } else {
       x += itemW + gap;
     }
+    });
+    doc.y = y + 4;
   });
-  doc.y = y + 4;
   drawSection(doc, content, issuedAt, 'NOTA TÉCNICA SOBRE AS IMAGENS', content.nota_tecnica_fotos);
 }
 
@@ -218,16 +240,16 @@ function generateOrdemServicoPdf({ content, fotos = [], outputPath, issuedAt = n
 
     drawIdentification(doc, content, issuedAt);
     drawPriorityBadge(doc, content, issuedAt);
-    drawSection(doc, content, issuedAt, '1. DESCRIÇÃO DA SOLICITAÇÃO', content.descricao_solicitacao);
-    drawSection(doc, content, issuedAt, '2. SITUAÇÃO ATUAL', content.situacao_atual);
-    drawSection(doc, content, issuedAt, '3. SERVIÇO SOLICITADO', content.servico_solicitado);
-    drawSection(doc, content, issuedAt, '4. ANÁLISE TÉCNICA', content.analise_tecnica);
-    drawSection(doc, content, issuedAt, '5. IMPACTO OPERACIONAL', content.impacto_operacional);
-    drawSection(doc, content, issuedAt, '6. MATERIAIS UTILIZADOS', content.materiais_utilizados);
-    drawSection(doc, content, issuedAt, '7. MATERIAIS NECESSÁRIOS', content.materiais_necessarios);
-    drawSection(doc, content, issuedAt, '8. RECOMENDAÇÕES', content.recomendacoes);
-    drawSection(doc, content, issuedAt, '9. PENDÊNCIAS', content.pendencias);
-    drawSection(doc, content, issuedAt, '10. OBSERVAÇÃO FINAL', content.observacao_final);
+    drawSection(doc, content, issuedAt, '1. DESCRIÇÃO E CONTEXTO DA OS', content.descricao_solicitacao);
+    drawOsLink(doc, content, issuedAt);
+    drawSection(doc, content, issuedAt, '3. DIAGNÓSTICO INICIAL', content.dados_os?.diagnostico_inicial || content.situacao_atual);
+    drawSection(doc, content, issuedAt, '4. DIAGNÓSTICO FINAL', content.dados_os?.diagnostico_final);
+    drawSection(doc, content, issuedAt, '5. SERVIÇO SOLICITADO E AÇÃO EXECUTADA', [content.servico_solicitado, content.dados_os?.acao_executada]);
+    drawSection(doc, content, issuedAt, '6. AÇÕES CORRETIVA E PREVENTIVA', [`Corretiva: ${safe(content.dados_os?.acao_corretiva)}`, `Preventiva: ${safe(content.dados_os?.acao_preventiva)}`]);
+    drawSection(doc, content, issuedAt, '7. ANÁLISE TÉCNICA E IMPACTO OPERACIONAL', `${safe(content.analise_tecnica)}\n\nImpacto operacional: ${safe(content.impacto_operacional)}`);
+    drawSection(doc, content, issuedAt, '8. EQUIPE E PERÍODO DE EXECUÇÃO', [`Equipe: ${(content.dados_os?.equipe || []).join(', ') || 'Não informado'}`, `Início: ${safe(content.dados_os?.inicio)}`, `Conclusão: ${safe(content.dados_os?.conclusao)}`]);
+    drawSection(doc, content, issuedAt, '9. MATERIAIS UTILIZADOS E NECESSÁRIOS', [...(content.materiais_utilizados || []).map((i) => `Utilizado: ${i}`), ...(content.materiais_necessarios || []).map((i) => `Necessário: ${i}`)]);
+    drawSection(doc, content, issuedAt, '10. RECOMENDAÇÕES, PENDÊNCIAS E OBSERVAÇÕES', [...(content.recomendacoes || []), ...(content.pendencias || []), content.observacao_final]);
     drawSignatures(doc, content, issuedAt);
     drawPhotoGrid(doc, content, fotos, issuedAt);
 

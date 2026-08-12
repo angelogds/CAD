@@ -294,12 +294,12 @@ async function osGerarPDFInstitucional(req, res) {
     const result = await osDocumentService.gerarPDFInstitucionalOS(os, {
       userId: req.session?.user?.id || null,
     });
-    req.flash("success", "PDF institucional da OS gerado com sucesso.");
+    req.flash("success", "PDF OS gerado com sucesso.");
     if (String(req.query.download || '') === '1') return res.redirect(result.pdfUrl);
     return res.redirect(`/os/${id}`);
   } catch (err) {
     console.error("❌ osGerarPDFInstitucional:", err);
-    req.flash("error", err?.message || "Não foi possível gerar o PDF institucional da OS.");
+    req.flash("error", err?.message || "Não foi possível gerar o PDF OS.");
     return res.redirect(`/os/${id}`);
   }
 }
