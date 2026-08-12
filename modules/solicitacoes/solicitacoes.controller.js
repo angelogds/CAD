@@ -2,42 +2,7 @@ const service = require("./solicitacoes.service");
 const comprasService = require("../compras/compras.service");
 const osChatService = require("../os-chat/os-chat.service");
 const osService = require("../os/os.service");
-
-const PENDENTE = "Informação pendente de confirmação";
-
-function fallback(value, fallbackText = "Não informado") {
-  if (value === null || value === undefined) return fallbackText;
-  const text = String(value).trim();
-  return text || fallbackText;
-}
-
-function normalizeSolicitacaoForView(solicitacao) {
-  return {
-    id: solicitacao.id,
-    numero: fallback(solicitacao.numero, `#${solicitacao.id}`),
-    solicitante_nome: fallback(solicitacao.solicitante_nome, PENDENTE),
-    setor_origem: fallback(solicitacao.setor_origem),
-    setor_destino: fallback(solicitacao.setor_destino || solicitacao.destino_uso || "Setor de Compras"),
-    responsavel_nome: fallback(solicitacao.responsavel_nome || solicitacao.compras_nome || solicitacao.almox_nome, PENDENTE),
-    prioridade: fallback(solicitacao.prioridade),
-    status: fallback(solicitacao.status),
-    created_at: solicitacao.created_at || null,
-    titulo: fallback(solicitacao.titulo),
-    descricao: fallback(solicitacao.descricao, PENDENTE),
-    aplicacao: fallback(solicitacao.equipamento_nome || solicitacao.destino_uso || solicitacao.tipo_origem, PENDENTE),
-    observacoes: fallback(solicitacao.observacoes_compras || solicitacao.observacoes || solicitacao.descricao, "Não informado"),
-    fornecedor: fallback(solicitacao.fornecedor_nome || solicitacao.fornecedor, "Não informado"),
-    previsao_entrega: solicitacao.previsao_entrega || null,
-    valor_total: solicitacao.valor_total || null,
-    equipamento_nome: fallback(solicitacao.equipamento_nome || solicitacao.destino_uso, "Não informado"),
-    motivo: fallback(solicitacao.motivo || solicitacao.descricao, PENDENTE),
-    cotacao_inicio_em: solicitacao.cotacao_inicio_em || null,
-    comprada_em: solicitacao.comprada_em || null,
-    recebida_em: solicitacao.recebida_em || null,
-    fechada_em: solicitacao.fechada_em || null,
-    os_id: solicitacao.os_id || null,
-  };
-}
+const { fallback, normalizeSolicitacaoForView } = require("./solicitacoes.presenter");
 
 function normalizeItens(itens) {
   return (Array.isArray(itens) ? itens : []).map((item) => ({
