@@ -1,89 +1,100 @@
 <% layout('layout') %>
 <%
-const activeStatus = filters?.status || 'ABERTA';
-const tabs = [
-  { key: 'ABERTA', label: 'Abertas' },
-  { key: 'EM_COTACAO', label: 'Em Cotação' },
-  { key: 'COMPRADA', label: 'Compradas' },
-];
-const statusConfig = {
-  ABERTA: { label: 'Aberta', className: 'is-open', icon: '📝' },
-  EM_COTACAO: { label: 'Em cotação', className: 'is-quote', icon: '💬' },
-  COMPRADA: { label: 'Comprada', className: 'is-bought', icon: '✅' },
+const statusMeta = {
+  ABERTA: { label: 'Aberta', icon: '📝', cls: 'open' },
+  EM_COTACAO: { label: 'Em cotação', icon: '💬', cls: 'quote' },
+  COMPRADA: { label: 'Comprada', icon: '🛒', cls: 'bought' },
+  EM_RECEBIMENTO: { label: 'Em recebimento', icon: '📦', cls: 'receive' },
+  RECEBIDA_PARCIAL: { label: 'Recebida parcial', icon: '◐', cls: 'partial' },
+  RECEBIDA_TOTAL: { label: 'Recebida total', icon: '✅', cls: 'done' },
+  FECHADA: { label: 'Fechada', icon: '🔒', cls: 'closed' },
+  REABERTA: { label: 'Reaberta', icon: '↺', cls: 'open' },
+  CANCELADA: { label: 'Cancelada', icon: '✕', cls: 'cancel' },
 };
+const prioridadeClass = (p) => ['ALTA','URGENTE','CRITICA','CRÍTICA','EMERGENCIAL'].includes(String(p || '').toUpperCase()) ? 'danger' : 'soft';
+const queryFor = (values = {}) => new URLSearchParams(values).toString();
 %>
 
-<div class="page-head">
-  <div>
-    <h1>Compras • Solicitações</h1>
-    <p class="muted">Acompanhe cotações, anexos e evolução das solicitações.</p>
-  </div>
-</div>
+<style>
+  .compras-page { display:grid; gap:14px; }
+  .compras-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:10px; }
+  .compras-indicator { min-height:76px; background:#fff; border:1px solid #dcfce7; border-radius:16px; padding:12px; box-shadow:0 8px 24px rgba(22,101,52,.06); text-decoration:none; }
+  .compras-indicator span { color:#64748b; font-size:.82rem; font-weight:700; }
+  .compras-indicator strong { display:block; color:#14532d; font-size:1.35rem; margin-top:5px; }
+  .compras-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .compras-filters { display:grid; grid-template-columns:1.3fr 1fr 1fr auto; gap:10px; align-items:end; }
+  .compras-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .compras-card { border:1px solid #e5e7eb; border-radius:18px; background:#fff; padding:14px; display:grid; gap:12px; box-shadow:0 10px 28px rgba(15,23,42,.05); }
+  .compras-card-head { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+  .compras-title { color:#0f172a; font-weight:900; font-size:1rem; }
+  .compras-meta { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .compras-meta div { background:#f8fafc; border:1px solid #eef2f7; border-radius:12px; padding:8px; min-width:0; }
+  .compras-meta small { display:block; color:#64748b; font-weight:800; margin-bottom:2px; }
+  .compras-actions { display:flex; justify-content:flex-end; gap:7px; flex-wrap:wrap; border-top:1px solid #f1f5f9; padding-top:10px; }
+  .compras-badge { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:5px 9px; font-size:.78rem; font-weight:900; border:1px solid transparent; white-space:nowrap; }
+  .compras-badge.open { background:#ecfdf5; color:#166534; border-color:#bbf7d0; }
+  .compras-badge.quote { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+  .compras-badge.bought { background:#fef3c7; color:#92400e; border-color:#fde68a; }
+  .compras-badge.receive,.compras-badge.partial { background:#f5f3ff; color:#6d28d9; border-color:#ddd6fe; }
+  .compras-badge.done,.compras-badge.closed { background:#f0fdf4; color:#15803d; border-color:#bbf7d0; }
+  .compras-badge.cancel,.compras-badge.danger { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+  .compras-badge.soft { background:#f8fafc; color:#475569; border-color:#e2e8f0; }
+  @media (max-width:900px) { .compras-filters { grid-template-columns:1fr 1fr; } .compras-grid { grid-template-columns:1fr; } }
+  @media (max-width:600px) { .compras-filters,.compras-meta { grid-template-columns:1fr; } }
+</style>
 
-<div class="card" style="margin-bottom:12px;">
-  <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <% tabs.forEach((tab) => { %>
-      <a class="btn <%= activeStatus === tab.key ? 'btn-green' : 'btn-ghost' %>" href="/compras/solicitacoes?status=<%= tab.key %>">
-        <%= tab.label %> (<%= resumo?.[tab.key] || 0 %>)
+<div class="compras-page">
+  <div class="page-head">
+    <div>
+      <h1>Compras • Solicitações</h1>
+      <p class="muted">Dashboard gerencial e acompanhamento do fluxo de compras e recebimento.</p>
+    </div>
+  </div>
+
+  <section class="compras-summary" aria-label="Resumo gerencial das solicitações">
+    <% statusList.forEach((status) => { const meta = statusMeta[status] || { label: status, icon: '•' }; %>
+      <a class="compras-indicator" href="/compras/solicitacoes?<%= queryFor({ status }) %>">
+        <span><%= meta.icon %> <%= meta.label %></span>
+        <strong><%= resumo?.[status] || 0 %></strong>
       </a>
     <% }) %>
-  </div>
-</div>
+  </section>
 
-<div class="card">
-  <form method="GET" action="/compras/solicitacoes" class="grid-3">
-    <input type="hidden" name="status" value="<%= activeStatus %>" />
-    <div>
-      <label class="label">Pesquisar</label>
-      <input class="input" type="text" name="q" placeholder="Número, título ou fornecedor" value="<%= filters?.query || '' %>" />
-    </div>
-    <div>
-      <label class="label">De</label>
-      <input class="input" type="date" name="startDate" value="<%= filters?.startDate || '' %>" />
-    </div>
-    <div>
-      <label class="label">Até</label>
-      <input class="input" type="date" name="endDate" value="<%= filters?.endDate || '' %>" />
-    </div>
-    <div style="grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn" type="submit">Filtrar</button>
-      <a class="btn btn-ghost" href="/compras/solicitacoes?status=<%= activeStatus %>">Limpar</a>
-      <a class="btn btn-ghost" href="/compras/solicitacoes?status=<%= activeStatus %>&q=<%= encodeURIComponent(filters?.query || '') %>&startDate=<%= encodeURIComponent(filters?.startDate || '') %>&endDate=<%= encodeURIComponent(filters?.endDate || '') %>&export=excel">Excel</a>
-    </div>
-  </form>
-</div>
-
-<div class="card" style="margin-top:12px;">
-  <div class="table-wrap">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Número</th>
-          <th>Título</th>
-          <th>Status</th>
-          <th>Fornecedor</th>
-          <th>Criada em</th>
-          <th>Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% if (!lista?.length) { %>
-          <tr><td colspan="6" class="muted" style="text-align:center;">Nenhuma solicitação encontrada.</td></tr>
-        <% } %>
-        <% (lista || []).forEach((s) => { const conf = statusConfig[s.status] || { label: s.status || '-', className: 'is-bought', icon: '📌' }; %>
-          <tr>
-            <td><strong><%= s.numero || ('#' + s.id) %></strong></td>
-            <td><%= s.titulo || '-' %></td>
-            <td><span class="sol-status <%= conf.className %>"><span><%= conf.icon %></span> <%= conf.label %></span></td>
-            <td><%= s.fornecedor_nome || s.fornecedor || '-' %></td>
-            <td><%= s.created_at ? fmtBR(s.created_at) : '-' %></td>
-            <td style="display:flex;gap:6px;flex-wrap:wrap;">
-              <a class="btn btn-sm btn-ghost" href="/compras/solicitacoes/<%= s.id %>">Detalhes</a>
-              <a class="btn btn-sm btn-ghost" href="/compras/solicitacoes/<%= s.id %>/pdf" target="_blank" rel="noopener">PDF</a>
-            </td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
+  <div class="card">
+    <nav class="compras-tabs" aria-label="Filtros rápidos">
+      <a class="btn <%= !filters?.status && !filters?.vinculadasOs && !filters?.urgentes ? 'btn-green' : 'btn-ghost' %>" href="/compras/solicitacoes">Todas</a>
+      <% statusList.forEach((status) => { const meta = statusMeta[status] || { label: status }; %>
+        <a class="btn <%= filters?.status === status ? 'btn-green' : 'btn-ghost' %>" href="/compras/solicitacoes?<%= queryFor({ status }) %>"><%= meta.label %></a>
+      <% }) %>
+      <a class="btn <%= filters?.vinculadasOs ? 'btn-green' : 'btn-ghost' %>" href="/compras/solicitacoes?vinculadas_os=1">Vinculadas à OS</a>
+      <a class="btn <%= filters?.urgentes ? 'btn-green' : 'btn-ghost' %>" href="/compras/solicitacoes?urgentes=1">Urgentes</a>
+    </nav>
+    <form class="compras-filters" method="GET" action="/compras/solicitacoes">
+      <div><label class="label">Buscar</label><input class="input" name="q" placeholder="Número, título, setor ou solicitante" value="<%= filters?.query || '' %>"></div>
+      <div><label class="label">Status</label><select class="input" name="status"><option value="">Todos</option><% statusList.forEach((status) => { %><option value="<%= status %>" <%= filters?.status === status ? 'selected' : '' %>><%= statusMeta[status]?.label || status %></option><% }) %></select></div>
+      <div><label class="label">Data</label><input class="input" type="date" name="date" value="<%= filters?.date || '' %>"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn" type="submit">Filtrar</button><a class="btn btn-ghost" href="/compras/solicitacoes">Limpar</a></div>
+    </form>
   </div>
+
+  <section class="compras-grid" aria-label="Solicitações de compras">
+    <% if (!lista?.length) { %><div class="card muted">Nenhuma solicitação encontrada com os filtros informados.</div><% } %>
+    <% (lista || []).forEach((s) => { const meta = statusMeta[s.status] || { label: s.status || '-', icon: '•', cls: 'soft' }; %>
+      <article class="compras-card">
+        <div class="compras-card-head"><div><div class="compras-title">Solicitação nº <%= s.numero || ('#' + s.id) %></div><div class="muted"><%= s.titulo || 'Solicitação de material' %></div></div><span class="compras-badge <%= meta.cls %>"><%= meta.icon %> <%= meta.label %></span></div>
+        <div class="compras-meta">
+          <div><small>Setor</small><strong><%= s.setor_origem || 'Manutenção Industrial' %></strong></div>
+          <div><small>OS vinculada</small><strong><%= s.os_id ? ('OS ' + s.os_id) : 'Sem OS vinculada' %></strong></div>
+          <div><small>Prioridade</small><span class="compras-badge <%= prioridadeClass(s.prioridade) %>"><%= s.prioridade || 'Média' %></span></div>
+          <div><small>Solicitante</small><strong><%= s.solicitante_nome || '-' %></strong></div>
+          <div><small>Data</small><strong><%= s.created_at ? fmtBR(s.created_at) : '-' %></strong></div>
+          <div><small>Itens</small><strong><%= s.itens_count || 0 %> material(is)</strong></div>
+        </div>
+        <div class="compras-actions">
+          <a class="btn btn-sm btn-ghost" href="/compras/solicitacoes/<%= s.id %>">Abrir</a>
+          <a class="btn btn-sm btn-ghost" href="/compras/solicitacoes/<%= s.id %>/pdf" target="_blank" rel="noopener">Gerar PDF</a>
+        </div>
+      </article>
+    <% }) %>
+  </section>
 </div>

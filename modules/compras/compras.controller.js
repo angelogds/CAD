@@ -22,8 +22,11 @@ function lista(req, res) {
   const filters = {
     query: (req.query.q || '').trim(),
     status: service.STATUS_COMPRAS.includes(req.query.status) ? req.query.status : '',
+    date: req.query.date || '',
     startDate: req.query.startDate || '',
     endDate: req.query.endDate || '',
+    vinculadasOs: req.query.vinculadas_os === '1',
+    urgentes: req.query.urgentes === '1',
   };
 
   const lista = service.listSolicitacoesPorStatus(filters);
