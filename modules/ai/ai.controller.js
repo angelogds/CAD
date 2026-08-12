@@ -121,8 +121,9 @@ function renderChat(req, res) {
   const cfg = getAIConfig();
   return res.render('ai/chat', {
     layout: 'layout',
-    title: 'Assistente IA',
+    title: 'Assistente da Manutenção',
     activeMenu: 'ai',
+    backHref: String(req.session?.user?.role || '').toUpperCase() === 'COMPRAS' ? '/compras/solicitacoes' : '/dashboard',
     aiConfigured: cfg.enabled && !!cfg.apiKey,
     aiEnabled: cfg.enabled,
   });

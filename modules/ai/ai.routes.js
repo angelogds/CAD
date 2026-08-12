@@ -8,6 +8,7 @@ const iaCtrl = require('../ia/ia.controller');
 const router = express.Router();
 
 const AI_ACCESS = Array.from(new Set([
+  ...(ACCESS.assistente_manutencao || []),
   ...(ACCESS.os_view || []),
   ...(ACCESS.preventivas_view || []),
   ...(ACCESS.academia_view || []),
