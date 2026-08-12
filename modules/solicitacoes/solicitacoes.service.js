@@ -406,14 +406,17 @@ function avaliarExclusaoFisica(solicitacao) {
   }
 
   const diagnostico = diagnosticarVinculosSolicitacao(solicitacao);
-  if (diagnostico.possuiMovimentacaoRelevante) {
-    const possuiOs = diagnostico.vinculos.some((v) => ["OS", "CHAT_OS"].includes(v.tipo));
+  const vinculosBloqueadores = statusAtual === STATUS.CANCELADA
+    ? diagnostico.vinculos.filter((v) => !["OS", "CHAT_OS"].includes(v.tipo))
+    : diagnostico.vinculos;
+  if (vinculosBloqueadores.length) {
+    const possuiOs = vinculosBloqueadores.some((v) => ["OS", "CHAT_OS"].includes(v.tipo));
     return {
       podeExcluir: false,
       motivo: possuiOs
         ? "Esta solicitação está vinculada a uma OS e possui rastreabilidade. Ela pode ser cancelada, mas não excluída definitivamente."
         : "Esta solicitação não pode ser excluída porque já possui movimentações. Utilize a opção Cancelar.",
-      vinculos: diagnostico.vinculos,
+      vinculos: vinculosBloqueadores,
       osIds: diagnostico.osIds,
     };
   }
@@ -431,6 +434,8 @@ function excluirRegistrosFilhosDescartaveis(solicitacaoId) {
   deleteWhereIfColumns("notificacoes", ["solicitacao_id"], "solicitacao_id = ?", [solicitacaoId]);
   deleteWhereIfColumns("solicitacao_logs", ["solicitacao_id"], "solicitacao_id = ?", [solicitacaoId]);
   deleteWhereIfColumns("anexos", ["referencia_tipo", "referencia_id"], "UPPER(COALESCE(referencia_tipo, '')) = 'SOLICITACAO' AND referencia_id = ?", [solicitacaoId]);
+  deleteWhereIfColumns("os_chat_mensagens", ["solicitacao_id"], "solicitacao_id = ?", [solicitacaoId]);
+  deleteWhereIfColumns("os_solicitacoes_vinculos", ["solicitacao_id"], "solicitacao_id = ?", [solicitacaoId]);
   removeAnexosSolicitacao(solicitacaoId);
   deleteWhereIfColumns("solicitacao_itens", ["solicitacao_id"], "solicitacao_id = ?", [solicitacaoId]);
 }

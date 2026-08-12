@@ -140,3 +140,13 @@ test('permite apagar definitivamente uma solicitação cancelada sem movimentaç
   assert.equal(db.prepare('SELECT COUNT(*) AS total FROM solicitacao_itens WHERE solicitacao_id=?').get(id).total, 0);
   assert.equal(db.prepare('SELECT COUNT(*) AS total FROM notificacoes WHERE origem_id=?').get(id).total, 0);
 });
+
+test('permite apagar solicitação cancelada vinculada a OS quando não há movimentação de compra', () => {
+  const id = criarSolicitacao({ status: 'CANCELADA', osId: 269 });
+
+  const resultado = service.excluirSolicitacao(id, 1);
+
+  assert.equal(resultado.modo, 'excluida');
+  assert.deepEqual(resultado.osIds, [269]);
+  assert.equal(db.prepare('SELECT COUNT(*) AS total FROM solicitacoes WHERE id=?').get(id).total, 0);
+});
