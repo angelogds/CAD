@@ -50,13 +50,15 @@
           ⛶
         </button>
 
-        <div class="tv-online">
+        <div id="tvOnlineStatus" class="tv-online">
           <span class="tv-dot"></span>
           <span>SISTEMA ONLINE</span>
         </div>
 
-        <div class="tv-mechanics-label">EQUIPE</div>
-        <div id="tvAvatars" class="tv-avatars"></div>
+        <div class="tv-update-box">
+          <span id="tvConnectionState" class="tv-connection is-loading">Inicializando...</span>
+          <small id="tvLastUpdate">Última atualização: --:--:--</small>
+        </div>
       </div>
 
       <div class="tv-progress-line">
@@ -69,7 +71,9 @@
       <button id="tvLedClose" data-os-alert-close type="button" aria-label="Fechar alerta">×</button>
     </section>
 
-    <main id="tvContent" class="tv-content"></main>
+    <main id="tvContent" class="tv-content" aria-live="polite"></main>
+
+    <div id="tvScreenIndicator" class="tv-screen-indicator" aria-label="Tela atual">1 / 6</div>
 
     <div id="tvToast" class="tv-toast" hidden></div>
 
@@ -83,8 +87,8 @@
     window.CG_TV_CONFIG = {
       snapshotUrl: '/api/tv/snapshot',
       weatherUrl: '/api/tv/weather',
-      refreshMs: 15000,
-      rotationMs: 30000,
+      refreshMs: 60000,
+      rotationMs: 18000,
       defaultAvatar: '/IMG/login_campo_do_gado.png.png.png',
       galleryPlaceholder: '/img/tv/galeria-placeholder.jpg'
     };
