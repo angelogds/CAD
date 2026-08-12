@@ -118,9 +118,29 @@ function validateEstoqueItemId(value) {
   return exists ? id : null;
 }
 
-function createSolicitacao({ userId, setor_origem, prioridade, titulo, descricao, equipamento_id, preventiva_id, os_id, demanda_id, itens }) {
+function normalizeAplicacaoInput({ os_id, tipo_aplicacao, equipamento_id, destino_uso } = {}) {
+  const osId = sanitizePositiveId(os_id);
+  const equipamentoId = sanitizePositiveId(equipamento_id);
+  const destinoUso = String(destino_uso || "").trim();
+
+  if (osId) return { equipamentoId, destinoUso: null };
+  if (tipo_aplicacao === "EQUIPAMENTO") {
+    if (!equipamentoId || !db.prepare("SELECT 1 FROM equipamentos WHERE id = ?").get(equipamentoId)) {
+      throw new Error("Selecione um equipamento cadastrado para indicar onde o material será utilizado.");
+    }
+    return { equipamentoId, destinoUso: null };
+  }
+  if (tipo_aplicacao === "OUTRO") {
+    if (!destinoUso) throw new Error("Descreva a obra, estrutura ou outro local onde o material será utilizado.");
+    return { equipamentoId: null, destinoUso };
+  }
+  throw new Error("Informe onde o material será utilizado: em um equipamento ou em outra aplicação.");
+}
+
+function createSolicitacao({ userId, setor_origem, prioridade, titulo, descricao, equipamento_id, destino_uso, tipo_aplicacao, preventiva_id, os_id, demanda_id, itens }) {
   const fallbackItemId = ITEM_HAS_ITEM_ID ? getFallbackItemId() : null;
   const solColumns = tableColumns("solicitacoes");
+  const aplicacao = normalizeAplicacaoInput({ os_id, tipo_aplicacao, equipamento_id, destino_uso });
   const solPayload = {
     numero: nextNumero(),
     solicitante_user_id: sanitizePositiveId(userId),
@@ -128,7 +148,8 @@ function createSolicitacao({ userId, setor_origem, prioridade, titulo, descricao
     prioridade: prioridade || "MEDIA",
     titulo: titulo || "Solicitação de material",
     descricao: descricao || null,
-    equipamento_id: sanitizePositiveId(equipamento_id),
+    equipamento_id: aplicacao.equipamentoId,
+    destino_uso: aplicacao.destinoUso,
     preventiva_id: sanitizePositiveId(preventiva_id),
     os_id: sanitizePositiveId(os_id),
     demanda_id: sanitizePositiveId(demanda_id),
@@ -230,19 +251,14 @@ function updateSolicitacao(id, data = {}) {
   const itens = data.itens || parseItensFromBody(data);
   if (!itens.length) throw new Error("Informe ao menos um item válido.");
 
+  const atual = getSolicitacaoById(id);
+  const aplicacao = normalizeAplicacaoInput({ ...data, os_id: atual?.os_id });
   return db.transaction(() => {
-    db.prepare(`
-      UPDATE solicitacoes
-      SET setor_origem = ?, prioridade = ?, titulo = ?, descricao = ?, equipamento_id = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `).run(
-      data.setor_origem || "Manutenção",
-      data.prioridade || "MEDIA",
-      data.titulo,
-      data.descricao || null,
-      sanitizePositiveId(data.equipamento_id),
-      id
-    );
+    const columns = ["setor_origem = ?", "prioridade = ?", "titulo = ?", "descricao = ?", "equipamento_id = ?"];
+    const values = [data.setor_origem || "Manutenção", data.prioridade || "MEDIA", data.titulo, data.descricao || null, aplicacao.equipamentoId];
+    if (hasColumn("solicitacoes", "destino_uso")) { columns.push("destino_uso = ?"); values.push(aplicacao.destinoUso); }
+    values.push(id);
+    db.prepare(`UPDATE solicitacoes SET ${columns.join(", ")}, updated_at = datetime('now') WHERE id = ?`).run(...values);
 
     db.prepare("DELETE FROM solicitacao_itens WHERE solicitacao_id = ?").run(id);
     insertSolicitacaoItens(id, itens);
@@ -689,4 +705,4 @@ function listEstoqueItens() {
   return db.prepare("SELECT id, codigo, nome, unidade FROM estoque_itens WHERE ativo = 1 ORDER BY nome").all();
 }
 
-module.exports = { STATUS, LIST_STATUS, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, createSolicitacao, updateSolicitacao, avaliarExclusaoFisica, excluirSolicitacao, cancelarSolicitacao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };
+module.exports = { STATUS, LIST_STATUS, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, normalizeAplicacaoInput, createSolicitacao, updateSolicitacao, avaliarExclusaoFisica, excluirSolicitacao, cancelarSolicitacao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };

@@ -24,6 +24,27 @@
         <div><div class="label">Usuário solicitante</div><input class="input" value="<%= fd.solicitante_nome || '-' %>" readonly /></div>
       </div>
     <% } %>
+    <% if (!fd.os_id) { const tipoAplicacao = fd.equipamento_id ? "EQUIPAMENTO" : (fd.destino_uso ? "OUTRO" : "EQUIPAMENTO"); %>
+      <section style="margin-bottom:18px;">
+        <div class="label">Onde o material será utilizado?</div>
+        <p class="muted" style="margin:4px 0 10px;">Vincule a solicitação a um equipamento cadastrado ou informe manualmente uma obra, estrutura ou outra aplicação.</p>
+        <div role="radiogroup" aria-label="Tipo de aplicação" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+          <label class="btn btn-ghost"><input type="radio" name="tipo_aplicacao" value="EQUIPAMENTO" <%= tipoAplicacao === "EQUIPAMENTO" ? "checked" : "" %> /> Equipamento cadastrado</label>
+          <label class="btn btn-ghost"><input type="radio" name="tipo_aplicacao" value="OUTRO" <%= tipoAplicacao === "OUTRO" ? "checked" : "" %> /> Outra obra ou estrutura</label>
+        </div>
+        <div id="aplicacao-equipamento">
+          <div class="label">Equipamento</div>
+          <select class="input" name="equipamento_id">
+            <option value="">Selecione um equipamento</option>
+            <% equipamentos.forEach((equipamento) => { %><option value="<%= equipamento.id %>" <%= Number(fd.equipamento_id) === Number(equipamento.id) ? "selected" : "" %>><%= equipamento.nome %></option><% }) %>
+          </select>
+        </div>
+        <div id="aplicacao-outro">
+          <div class="label">Descrição da aplicação</div>
+          <input class="input" name="destino_uso" maxlength="500" placeholder="Ex.: reforma do telhado do galpão 2" value="<%= fd.destino_uso || "" %>" />
+        </div>
+      </section>
+    <% } %>
     <div class="grid-3">
       <div>
         <div class="label">Título</div>
@@ -113,6 +134,20 @@
     const tpl = document.getElementById("item-row-template");
     const btnAdd = document.getElementById("btn-add-item");
     const initialRows = <%- JSON.stringify(rows) %>;
+    const applicationRadios = document.querySelectorAll('[name="tipo_aplicacao"]');
+    const equipmentPanel = document.getElementById("aplicacao-equipamento");
+    const otherPanel = document.getElementById("aplicacao-outro");
+
+    function updateApplicationFields() {
+      if (!applicationRadios.length) return;
+      const type = document.querySelector('[name="tipo_aplicacao"]:checked')?.value;
+      equipmentPanel.hidden = type !== "EQUIPAMENTO";
+      otherPanel.hidden = type !== "OUTRO";
+      equipmentPanel.querySelector("select").required = type === "EQUIPAMENTO";
+      otherPanel.querySelector("input").required = type === "OUTRO";
+    }
+    applicationRadios.forEach((radio) => radio.addEventListener("change", updateApplicationFields));
+    updateApplicationFields();
 
     function bindRemoveButtons() {
       const rowsEls = tbody.querySelectorAll("tr");
