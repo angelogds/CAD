@@ -100,7 +100,9 @@ const prioridadeAlta = ['ALTA','URGENTE','CRITICA','CRÍTICA','EMERGENCIAL'].inc
     <div class="sol-section-title">Motivo, observações e histórico</div>
     <div class="sol-info-grid">
       <div class="sol-info" style="grid-column:1/-1;"><small>Motivo da solicitação</small><div class="sol-note"><%= solicitacao.motivo || 'Informação pendente de confirmação' %></div></div>
-      <div class="sol-info" style="grid-column:1/-1;"><small>Observações</small><div class="sol-note"><%= solicitacao.observacoes || 'Não informado' %></div></div>
+      <% if (solicitacao.observacoes) { %>
+        <div class="sol-info" style="grid-column:1/-1;"><small>Observações</small><div class="sol-note"><%= solicitacao.observacoes %></div></div>
+      <% } %>
     </div>
     <div class="sol-timeline" style="margin-top:12px;">
       <div class="sol-step"><small>ABERTA</small><%= solicitacao.created_at ? fmtBR(solicitacao.created_at) : '-' %></div>
