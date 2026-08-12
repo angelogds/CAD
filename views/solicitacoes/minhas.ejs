@@ -122,13 +122,9 @@ const prioridadeClass = (p) => ['ALTA','URGENTE','CRITICA','CRÍTICA','EMERGENCI
         </div>
         <div class="sol-actions">
           <a class="btn btn-sm btn-ghost" href="/solicitacoes/<%= s.id %>">Abrir</a>
-          <a class="btn btn-sm" href="/solicitacoes/<%= s.id %>/editar">Editar</a>
-          <% if (s.status === 'ABERTA' && canAccessModule(user?.role, 'compras_manage')) { %><a class="btn btn-sm btn-green" href="/compras/solicitacoes/<%= s.id %>">Enviar para compras</a><% } %>
-          <% if (['COMPRADA','EM_RECEBIMENTO','RECEBIDA_PARCIAL'].includes(s.status) && canAccessModule(user?.role, 'almoxarifado_manage')) { %><a class="btn btn-sm btn-green" href="/almoxarifado/solicitacoes/<%= s.id %>/conferir">Conferir recebimento</a><% } %>
-          <a class="btn btn-sm btn-ghost" href="/solicitacoes/<%= s.id %>/pdf" target="_blank" rel="noopener">Gerar PDF</a>
           <% if (canAccessModule(user?.role || user?.perfil, 'solicitacoes_delete') && s.status === 'CANCELADA' && s.podeExcluir) { %>
             <form method="POST" action="/solicitacoes/<%= s.id %>/excluir" onsubmit="return confirm('Tem certeza que deseja apagar definitivamente esta solicitação cancelada?\n\nEssa ação não poderá ser desfeita.');">
-              <button type="submit" class="btn btn-sm btn-danger">Apagar solicitação</button>
+              <button type="submit" class="btn btn-sm btn-danger">Apagar</button>
             </form>
           <% } else if (canAccessModule(user?.role || user?.perfil, 'solicitacoes_delete') && s.podeExcluir) { %>
             <form method="POST" action="/solicitacoes/<%= s.id %>/excluir" onsubmit="return confirm('Tem certeza que deseja excluir definitivamente esta solicitação?\n\nEssa ação deve ser utilizada apenas para solicitações criadas por engano e sem movimentações.');">
@@ -139,6 +135,10 @@ const prioridadeClass = (p) => ['ALTA','URGENTE','CRITICA','CRÍTICA','EMERGENCI
               <button type="submit" class="btn btn-sm btn-warning">Cancelar solicitação</button>
             </form>
           <% } %>
+          <a class="btn btn-sm" href="/solicitacoes/<%= s.id %>/editar">Editar</a>
+          <% if (s.status === 'ABERTA' && canAccessModule(user?.role, 'compras_manage')) { %><a class="btn btn-sm btn-green" href="/compras/solicitacoes/<%= s.id %>">Enviar para compras</a><% } %>
+          <% if (['COMPRADA','EM_RECEBIMENTO','RECEBIDA_PARCIAL'].includes(s.status) && canAccessModule(user?.role, 'almoxarifado_manage')) { %><a class="btn btn-sm btn-green" href="/almoxarifado/solicitacoes/<%= s.id %>/conferir">Conferir recebimento</a><% } %>
+          <a class="btn btn-sm btn-ghost" href="/solicitacoes/<%= s.id %>/pdf" target="_blank" rel="noopener">Gerar PDF</a>
         </div>
       </article>
     <% }) %>
