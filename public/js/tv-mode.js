@@ -1,703 +1,95 @@
 (() => {
+  'use strict';
   const config = window.CG_TV_CONFIG || {};
-  const LED_VISIBLE_MS = 60000;
-  const LED_SOUND_MS = 10000;
-  const LED_SOUND_INTERVAL_MS = 2000;
-
-  const state = {
-    data: null,
-    screenIndex: 0,
-    screens: ['os', 'preventivas', 'equipe', 'galeria', 'alertas'],
-    rotationStartedAt: Date.now(),
-    theme: localStorage.getItem('cg-tv-theme') || 'dark',
-    pausedUntil: 0,
-    notificationPrimed: false,
-    pendingLed: null,
-    lastAlertKey: null,
-    osAlerts: [],
-    ledHideTimer: null,
-    ledSoundInterval: null,
-    ledSoundStopTimer: null,
-  };
-
+  const REFRESH_MS = Number(config.refreshMs) || 60000;
+  const ROTATION_MS = Number(config.rotationMs) || 18000;
+  const RETRY_MS = 10000;
+  const screens = ['geral', 'criticos', 'os', 'preventivas', 'materiais', 'programacao'];
+  const labels = ['VISÃO OPERACIONAL', 'EQUIPAMENTOS CRÍTICOS', 'ORDENS DE SERVIÇO', 'PREVENTIVAS X CORRETIVAS', 'COMPRAS E MATERIAIS', 'PROGRAMAÇÃO DA MANUTENÇÃO'];
+  const state = { data: null, index: 0, loading: false, failures: 0, refreshTimer: null, rotationTimer: null, progressTimer: null, rotationAt: Date.now() };
   const $ = (id) => document.getElementById(id);
+  const debug = (...args) => { if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') console.info('[TV]', ...args); };
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[c]));
+  const list = (items, empty, formatter) => items?.length ? `<div class="op-list">${items.map(formatter).join('')}</div>` : `<div class="tv-empty">${empty}</div>`;
 
-  function escapeHtml(value) {
-    return String(value ?? '')
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
+  function setConnection(status, message) {
+    const el = $('tvConnectionState');
+    if (el) { el.className = `tv-connection is-${status}`; el.textContent = message; }
+    const online = $('tvOnlineStatus');
+    if (online) { online.classList.toggle('is-offline', status === 'error'); online.querySelector('span:last-child').textContent = status === 'error' ? 'SISTEMA INDISPONÍVEL' : 'SISTEMA ONLINE'; }
   }
-
-  function setTheme() {
-    document.documentElement.classList.toggle('tv-theme-light', state.theme === 'light');
-    document.documentElement.classList.toggle('tv-theme-dark', state.theme !== 'light');
-
-    const icon = $('tvThemeIcon');
-    if (icon) icon.textContent = state.theme === 'light' ? '🌙' : '☀️';
-
-    document.querySelector('meta[name="theme-color"]')?.setAttribute(
-      'content',
-      state.theme === 'light' ? '#eef4f8' : '#0a0f1a'
-    );
+  function renderLoading() {
+    if (state.data) return;
+    $('tvContent').innerHTML = '<section class="tv-state"><span class="tv-loader" aria-hidden="true"></span><h2>Carregando informações da manutenção...</h2><p>Aguarde enquanto os indicadores são atualizados.</p></section>';
   }
-
-  function toggleTheme() {
-    state.theme = state.theme === 'light' ? 'dark' : 'light';
-    localStorage.setItem('cg-tv-theme', state.theme);
-    setTheme();
-    showToast(state.theme === 'light' ? 'Modo claro ativado' : 'Modo escuro ativado');
-    renderCurrentScreen();
+  function scheduleRefresh(delay = REFRESH_MS) {
+    clearTimeout(state.refreshTimer);
+    state.refreshTimer = setTimeout(loadSnapshot, delay);
   }
-
-  function showToast(message) {
-    const toast = $('tvToast');
-    if (!toast) return;
-    toast.textContent = message;
-    toast.hidden = false;
-    clearTimeout(showToast.timer);
-    showToast.timer = setTimeout(() => {
-      toast.hidden = true;
-    }, 2600);
-  }
-
-  function startClock() {
-    function tick() {
-      const now = new Date();
-      const clock = $('tvClock');
-      const date = $('tvDate');
-      if (clock) {
-        clock.textContent = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      }
-      if (date) {
-        date.textContent = now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
-      }
-    }
-    tick();
-    setInterval(tick, 1000);
-  }
-
   async function loadSnapshot() {
+    if (state.loading) return;
+    state.loading = true;
+    if (!state.data) renderLoading();
+    setConnection(state.failures ? 'retrying' : 'loading', state.failures ? 'Tentando reconectar...' : 'Atualizando dados...');
+    debug('Buscando indicadores');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
     try {
-      const response = await fetch(config.snapshotUrl || '/api/tv/snapshot', { headers: { Accept: 'application/json' } });
-      const json = await response.json();
-      if (!json.ok) throw new Error(json.error || 'Erro no snapshot');
-      state.data = json.data;
-      preloadUpcomingMedia();
-      renderTop();
-      renderTicker();
-      renderCurrentScreen();
-      checkCriticalLed();
-    } catch (err) {
-      console.error('[TV] erro ao carregar snapshot:', err);
-      const content = $('tvContent');
-      if (content) {
-        content.innerHTML = `<section class="tv-error"><h1>Erro ao carregar Modo TV</h1><p>${escapeHtml(err.message)}</p></section>`;
-      }
-    }
+      const response = await fetch(config.snapshotUrl || '/api/tv/snapshot', { cache: 'no-store', headers: { Accept: 'application/json' }, signal: controller.signal });
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok) throw new Error(`API respondeu HTTP ${response.status}`);
+      if (!contentType.includes('application/json')) throw new Error('API retornou conteúdo inválido (JSON esperado)');
+      const payload = await response.json();
+      if (!payload?.ok || !payload.data) throw new Error(payload?.error || 'Resposta da API sem dados');
+      state.data = payload.data;
+      state.failures = 0;
+      renderTop(payload.generatedAt);
+      renderCurrent();
+      setConnection('loaded', 'Dados atualizados');
+      debug('Dados recebidos');
+      scheduleRefresh();
+    } catch (error) {
+      state.failures += 1;
+      console.error('[TV] Erro ao buscar indicadores:', error);
+      setConnection('error', 'Erro de comunicação');
+      if (!state.data) $('tvContent').innerHTML = '<section class="tv-state is-error"><h2>Não foi possível atualizar os dados.</h2><p>Nova tentativa em alguns segundos.</p></section>';
+      scheduleRefresh(RETRY_MS);
+    } finally { clearTimeout(timeout); state.loading = false; }
   }
-
-  function preloadUpcomingMedia() {
-    const galeria = (state.data?.galeria || []).slice(0, 12);
-    galeria.forEach((item) => {
-      const src = item?.arquivo_url;
-      if (!src) return;
-      if (item.tipo === 'video') {
-        const v = document.createElement('video');
-        v.src = src;
-        v.preload = 'auto';
-        v.muted = true;
-      } else {
-        const img = new Image();
-        img.src = src;
-      }
-    });
+  function renderTop(generatedAt) {
+    const updated = $('tvLastUpdate');
+    if (updated) updated.textContent = `Última atualização: ${new Date(generatedAt || Date.now()).toLocaleTimeString('pt-BR')}`;
+    const w = state.data?.weather;
+    if (w && $('tvWeatherMini')) $('tvWeatherMini').innerHTML = `<span>⛅</span><strong>${escapeHtml(w.temp ?? '--')}°</strong><small>${escapeHtml(w.cidade || 'Feira')}</small>`;
   }
-
-  function renderTop() {
-    const data = state.data || {};
-    const equipe = data.equipeManutencao || data.mecanicos || [];
-    const avatarBox = $('tvAvatars');
-
-    if (avatarBox) {
-      const maxAvatars = 7;
-      const shown = equipe.slice(0, maxAvatars);
-      const extra = Math.max(0, equipe.length - maxAvatars);
-      avatarBox.innerHTML = shown.map((m) => `
-        <div class="tv-avatar ${m.status === 'em_os' ? 'is-active' : ''}" title="${escapeHtml(m.nome)}">
-          <img src="${escapeHtml(m.foto || config.defaultAvatar)}" onerror="this.src='${config.defaultAvatar}'">
-          <span></span>
-        </div>
-      `).join('') + (extra ? `<div class="tv-avatar tv-avatar-more">+${extra}</div>` : '');
-    }
-
-    const weatherMini = $('tvWeatherMini');
-    if (weatherMini && data.weather) {
-      weatherMini.innerHTML = `
-        <span>${weatherIcon(data.weather.codigo)}</span>
-        <strong>${escapeHtml(data.weather.temp)}°</strong>
-        <small>${escapeHtml(data.weather.cidade || 'Feira')}</small>
-      `;
-    }
+  function kpis(os = {}) {
+    const values = [['OS abertas', os.abertas, ''], ['Em andamento', os.andamento, ''], ['OS críticas', os.criticas, 'danger'], ['Aguardando material', os.aguardandoMaterial, 'warning'], ['Concluídas hoje', os.concluidasHoje, 'success'], ['OS atrasadas', os.atrasadas, 'danger']];
+    return `<div class="op-kpis">${values.map(([label,value,klass]) => `<article class="op-kpi ${klass}"><strong>${Number(value || 0)}</strong><span>${label}</span></article>`).join('')}</div>`;
   }
-
-  function weatherIcon(code) {
-    const c = Number(code);
-    if (c === 0) return '☀️';
-    if ([1, 2].includes(c)) return '🌤️';
-    if (c === 3) return '☁️';
-    if ([45, 48].includes(c)) return '🌫️';
-    if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(c)) return '🌧️';
-    if ([95, 96, 99].includes(c)) return '⛈️';
-    return '⛅';
+  function renderGeral(op) {
+    return `<section class="op-screen">${kpis(op.os)}<div class="op-columns"><article class="tv-card"><h2>EQUIPAMENTOS PARADOS</h2>${list(op.equipamentosParados, 'Todos os equipamentos registrados estão disponíveis.', x => `<div class="op-row"><strong>${escapeHtml(x.equipamento)}</strong><span class="critical">${escapeHtml(x.status)}</span><small>${escapeHtml(x.motivo)}</small></div>`)}</article><article class="tv-card"><h2>PRÓXIMAS MANUTENÇÕES</h2>${programacao(op.programacao, 5)}</article></div></section>`;
   }
-
-  function statusBadge(status) {
-    const label = {
-      ABERTA: '⚠ ABERTA', EM_ANDAMENTO: '🔧 EM ANDAMENTO', PAUSADA: '⏸ PAUSADA', CONCLUIDA: '✅ CONCLUÍDA',
-      ATRASADA: '⚠ ATRASADA', PENDENTE: '⏳ PENDENTE', NO_PRAZO: '✅ NO PRAZO',
-    }[status] || status;
-    return `<span class="tv-badge status-${String(status).toLowerCase()}">${label}</span>`;
+  function renderCriticos(op) {
+    debug('Atualizando ranking');
+    return `<section class="op-screen op-columns"><article class="tv-card"><h2>EQUIPAMENTOS CRÍTICOS</h2>${list(op.equipamentosCriticos, 'Nenhum equipamento crítico no momento.', x => `<div class="op-row"><strong>${escapeHtml(x.equipamento)}</strong><span class="critical">${escapeHtml(x.criticidade)}</span><small>${x.falhas} ocorrência(s) • ${x.os} OS • ${escapeHtml(x.status)} • Última: ${escapeHtml(x.ultimaOcorrencia)}</small></div>`)}</article><article class="tv-card"><h2>TOP 5 EQUIPAMENTOS COM MAIOR INCIDÊNCIA DE FALHAS</h2>${bars(op.rankingFalhas)}</article></section>`;
   }
-
-  function prioridadeBadge(prioridade) {
-    const label = prioridade === 'CRITICA' ? 'CRÍTICA' : prioridade;
-    return `<span class="tv-badge prio-${String(prioridade).toLowerCase()}">${label}</span>`;
+  function renderOS(op) { const active = (state.data?.os || []).filter(x => x.status !== 'CONCLUIDA'); return `<section class="op-screen"><article class="tv-card fill"><h2>ORDENS DE SERVIÇO</h2>${kpis(op.os)}${list(active, 'Nenhuma OS ativa no momento.', x => `<div class="op-row grid"><strong>${escapeHtml(x.numero)}</strong><span>${escapeHtml(x.equipamento)}</span><span>${escapeHtml(x.responsavel)}</span><span class="${x.prioridade === 'CRITICA' ? 'critical' : ''}">${escapeHtml(x.prioridade)}</span><small>${escapeHtml(x.status)} • ${escapeHtml(x.tempo)}</small></div>`)}</article></section>`; }
+  function renderTipos(op) { const t=op.tipos || {}; return `<section class="op-screen op-columns"><article class="tv-card type-card"><h2>MANUTENÇÃO PREVENTIVA X CORRETIVA</h2><div class="type-values"><div><strong>${t.preventivas || 0}</strong><span>Preventivas • ${t.percentualPreventivas || 0}%</span></div><div><strong>${t.corretivas || 0}</strong><span>Corretivas • ${t.percentualCorretivas || 0}%</span></div></div><div class="type-bar"><i style="width:${t.percentualPreventivas || 0}%"></i></div></article><article class="tv-card"><h2>PREVENTIVAS EM DESTAQUE</h2>${programacao(op.programacao, 8)}</article></section>`; }
+  function renderMateriais(op) { return `<section class="op-screen"><article class="tv-card fill"><h2>AGUARDANDO MATERIAL</h2>${list(op.aguardandoMaterial, 'Nenhuma OS aguardando material no momento.', x => `<div class="op-row material"><strong>${escapeHtml(x.os)}</strong><span>${escapeHtml(x.equipamento)}</span><span>${escapeHtml(x.material)}</span><span>${escapeHtml(x.compra)}</span><small>Aguarda há ${escapeHtml(x.espera)}</small></div>`)}</article></section>`; }
+  function programacao(items=[], max=10) { return list(items.slice(0,max), 'Nenhuma manutenção programada.', x => `<div class="op-row grid"><strong>${escapeHtml(x.equipamento)}</strong><span>${escapeHtml(x.tarefa)}</span><span>${escapeHtml(x.dataPrevista)}</span><span>${escapeHtml(x.responsavel)}</span><small>${escapeHtml(x.status)}</small></div>`); }
+  function renderProgramacao(op) { return `<section class="op-screen"><article class="tv-card fill"><h2>PRÓXIMAS MANUTENÇÕES</h2>${programacao(op.programacao)}</article></section>`; }
+  function bars(items=[]) { if (!items.length) return '<div class="tv-empty">Indicador ainda sem dados suficientes.</div>'; const max=Math.max(...items.map(x=>x.falhas),1); return `<div class="op-bars">${items.map(x=>`<div><span>${escapeHtml(x.equipamento)}</span><i><b style="width:${Math.max(4,x.falhas/max*100)}%"></b></i><strong>${x.falhas}</strong></div>`).join('')}</div>`; }
+  function renderCurrent() {
+    if (!state.data) return;
+    const op=state.data.operacao || {};
+    const renderers=[renderGeral,renderCriticos,renderOS,renderTipos,renderMateriais,renderProgramacao];
+    $('tvScreenLabel').textContent=labels[state.index];
+    $('tvScreenIndicator').textContent=`${state.index+1} / ${screens.length}`;
+    try { $('tvContent').innerHTML=renderers[state.index](op); } catch(error) { console.error(`[TV] Erro ao renderizar ${screens[state.index]}:`,error); $('tvContent').innerHTML='<section class="tv-state is-error"><h2>Esta seção não pôde ser exibida.</h2><p>Os demais indicadores continuarão atualizando.</p></section>'; }
   }
-
-  function renderCurrentScreen() {
-    const screen = state.screens[state.screenIndex];
-    const labels = {
-      os: 'ORDENS DE SERVIÇO', preventivas: 'PREVENTIVAS', equipe: 'EQUIPE EM OPERAÇÃO', galeria: 'GALERIA DE FECHAMENTO DAS OS', alertas: 'ALERTAS OPERACIONAIS',
-    };
-    const label = $('tvScreenLabel');
-    if (label) label.textContent = labels[screen] || 'PAINEL TV';
-    if (screen === 'os') renderOS();
-    if (screen === 'preventivas') renderPreventivas();
-    if (screen === 'equipe') renderEquipe();
-    if (screen === 'galeria') renderGaleria();
-    if (screen === 'alertas') renderAlertas();
-    syncLedVisibility();
-  }
-
-  function isOSScreenActive() {
-    return state.screens[state.screenIndex] === 'os';
-  }
-
-  function normalizeLedPriority(prioridade) {
-    const p = String(prioridade || '').toUpperCase();
-    if (p.includes('CRIT')) return 'CRITICA';
-    if (p.includes('ALTA') || p.includes('ALTO')) return 'ALTA';
-    if (p.includes('MED')) return 'MEDIA';
-    return 'BAIXA';
-  }
-
-  function formatDateTime(value) {
-    if (!value) return '';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return String(value);
-    return parsed.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  }
-
-  function resolveResponsaveis(item = {}) {
-    if (Array.isArray(item.responsaveis) && item.responsaveis.length) {
-      return item.responsaveis.map((nome) => String(nome || '').trim()).filter(Boolean).join(', ');
-    }
-    return item.responsavel || item.responsavel_exibicao || 'Não informado';
-  }
-
-  function buildLedMessage(item = {}) {
-    const prioridade = normalizeLedPriority(item.prioridade || item.criticidade || item.grau);
-    const numero = item.numero || item.id || '-';
-    const titulo = item.titulo || item.descricao || item.servico || item.tarefa || '';
-    const equipamento = item.equipamento || item.maquina || item.equipamento_nome || 'Equipamento não informado';
-    const status = item.status || 'ABERTA';
-    const responsaveis = resolveResponsaveis(item);
-    const abertura = formatDateTime(item.abertura || item.opened_at || item.created_at || item.data_abertura);
-    const aberturaLabel = abertura ? ` • Abertura: ${abertura}` : '';
-
-    return {
-      prioridade,
-      texto: `OS #${numero} • ${equipamento} • ${status} • Criticidade: ${prioridade} • Responsáveis: ${responsaveis}${titulo ? ` • ${titulo}` : ''}${aberturaLabel}`,
-    };
-  }
-
-  function hideOSAlert() {
-    const led = document.querySelector('[data-os-alert-banner]');
-    if (!led) return;
-
-    led.classList.add('is-hidden');
-    state.pendingLed = null;
-
-    clearTimeout(state.ledHideTimer);
-    state.ledHideTimer = null;
-  }
-
-  function showOSAlert(item = {}) {
-    const led = document.querySelector('[data-os-alert-banner]');
-    const ledText = document.querySelector('[data-os-alert-text]');
-    if (!led || !ledText) return;
-
-    clearTimeout(state.ledHideTimer);
-    state.ledHideTimer = null;
-
-    const ledData = buildLedMessage(item);
-    state.pendingLed = { ...ledData, expiresAt: Date.now() + LED_VISIBLE_MS };
-
-    led.dataset.prioridade = String(ledData.prioridade || 'MEDIA').toLowerCase();
-    ledText.textContent = ledData.texto;
-    led.classList.remove('is-hidden');
-
-    state.ledHideTimer = setTimeout(() => {
-      hideOSAlert();
-    }, LED_VISIBLE_MS);
-  }
-
-  function syncLedVisibility() {
-    const led = $('tvLed');
-    if (!led) return;
-    if (!state.pendingLed) {
-      led.classList.add('is-hidden');
-    }
-  }
-
-  function renderOS() {
-    const data = state.data || {};
-    const os = data.os || [];
-    const perf = data.performance || {};
-
-    $('tvContent').innerHTML = `
-      <section class="tv-grid tv-grid-os">
-        <div class="tv-card tv-main-card tv-appear">
-          <div class="tv-card-title"><div><h2>🔧 Ordens de Serviço</h2><p>Monitoramento em tempo real da manutenção</p></div></div>
-          <div class="tv-table-wrap">
-            <table class="tv-table"><thead><tr><th>OS</th><th>Equipamento</th><th>Responsável</th><th>Status</th><th>Prioridade</th><th>Tempo</th></tr></thead>
-              <tbody>
-                ${os.map((item) => `
-                  <tr class="${item.prioridade === 'CRITICA' && item.status !== 'CONCLUIDA' ? 'tv-row-critical' : item.isNew ? 'tv-row-new' : ''}">
-                    <td><strong>${escapeHtml(item.numero)}</strong></td>
-                    <td class="tv-equipment">${escapeHtml(item.equipamento)}</td>
-                    <td>${escapeHtml(item.responsavel)}</td>
-                    <td>${statusBadge(item.status)}</td>
-                    <td>${prioridadeBadge(item.prioridade)}</td>
-                    <td class="tv-time">◷ ${escapeHtml(item.tempo)}</td>
-                  </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <aside class="tv-side tv-appear">
-          <div class="tv-stat-row">
-            <div class="tv-card tv-stat-card"><span>OS ABERTAS</span><strong>${Number(perf.abertas || 0) + Number(perf.andamento || 0) + Number(perf.pausadas || 0)}</strong></div>
-            <div class="tv-card tv-stat-card danger"><span>OS CRÍTICAS</span><strong>${Number(perf.criticas || 0)}</strong></div>
-          </div>
-          <div class="tv-card tv-chart-card"><div class="tv-card-title compact"><h3>Status das OS</h3></div><canvas id="statusChart" width="360" height="220"></canvas><div id="statusLegend" class="tv-chart-legend"></div></div>
-          <div class="tv-card tv-chart-card"><div class="tv-card-title compact"><h3>OS por Equipamento</h3></div><canvas id="equipChart" width="420" height="210"></canvas></div>
-          <div class="tv-card tv-chart-card"><div class="tv-card-title compact"><h3>Painel de Alertas OS</h3></div>${renderOsAlertsPanel()}</div>
-        </aside>
-      </section>`;
-
-    drawDoughnut('statusChart', perf.statusChart || [], 'statusLegend');
-    drawHorizontalBarChart('equipChart', perf.porEquipamento || []);
-  }
-
-  function renderPreventivas() {
-    const preventivas = state.data?.preventivas || [];
-    const atrasadas = preventivas.filter((p) => p.status === 'ATRASADA').length;
-    const pendentes = preventivas.filter((p) => p.status === 'PENDENTE').length;
-    const prazo = preventivas.filter((p) => p.status === 'NO_PRAZO').length;
-
-    $('tvContent').innerHTML = `
-      <section class="tv-grid">
-        <div class="tv-card tv-main-card tv-appear">
-          <div class="tv-card-title"><div><h2>🛠 Preventivas</h2><p>Programação, atrasos e serviços pendentes</p></div></div>
-          <div class="tv-mini-stats"><div><span>Atrasadas</span><strong>${atrasadas}</strong></div><div><span>Pendentes</span><strong>${pendentes}</strong></div><div><span>No prazo</span><strong>${prazo}</strong></div></div>
-          <div class="tv-table-wrap"><table class="tv-table"><thead><tr><th>Tarefa</th><th>Equipamento</th><th>Data</th><th>Status</th><th>Responsável</th></tr></thead><tbody>
-          ${preventivas.map((p) => `<tr><td>${escapeHtml(p.tarefa)}</td><td class="tv-equipment">${escapeHtml(p.equipamento)}</td><td>${escapeHtml(p.dataPrevista)}</td><td>${statusBadge(p.status)}</td><td>${escapeHtml(p.responsavel)}</td></tr>`).join('')}
-          </tbody></table></div>
-        </div>
-      </section>`;
-  }
-
-  function renderEquipe() {
-    const equipe = state.data?.equipeManutencao || state.data?.mecanicos || [];
-    const escala = state.data?.escalaVigente || { diaMecanicos: [], mecanicosIndustriais: [], noiteResponsavel: [], folgaAtestado: [], ferias: [] };
-    const rankingMecanicos = state.data?.rankingEquipe?.rankingMecanicos || [];
-    const rankingMecânicos Industriais = state.data?.rankingEquipe?.rankingMecânicos Industriais || [];
-    const rankingMsg = state.data?.rankingEquipe?.mensagem || 'Ranking será exibido após novos fechamentos de OS.';
-
-    const statusNome = { online: 'Online', em_os: 'Em OS', folga: 'Folga', ferias: 'Férias', atestado: 'Atestado' };
-
-    $('tvContent').innerHTML = `
-      <section class="tv-grid tv-grid-equipe">
-        <div class="tv-card tv-main-card tv-appear">
-          <div class="tv-card-title"><div><h2>👷 Equipe de Manutenção</h2><p>Escala vigente com mecânicos e mecânicos industriais</p></div></div>
-          <div class="tv-team-grid compact">
-            ${equipe.map((m) => `
-              <article class="tv-mechanic compact ${m.status === 'em_os' ? 'is-working' : ''}">
-                <img src="${escapeHtml(m.foto || config.defaultAvatar)}" onerror="this.src='${config.defaultAvatar}'">
-                <div>
-                  <strong>${escapeHtml(m.nome)}</strong>
-                  <span>${escapeHtml(m.funcao || '-')}</span>
-                  <small>${escapeHtml(m.turno || 'Turno vigente')}</small>
-                  ${m.osAtual ? `<small>OS atual: ${escapeHtml(m.osAtual)}</small>` : ''}
-                </div>
-                <em>${escapeHtml(statusNome[m.status] || 'Online')}</em>
-              </article>`).join('')}
-          </div>
-        </div>
-        <aside class="tv-side">
-          <div class="tv-card tv-escala-card">
-            <div class="tv-card-title compact"><h3>Escala Vigente</h3></div>
-            ${renderEscalaList('Dia (mecânicos)', escala.diaMecanicos)}
-            ${renderEscalaList('Mecânico industrial', escala.mecanicosIndustriais)}
-            ${renderEscalaList('Noite (responsável)', escala.noiteResponsavel)}
-            ${renderEscalaList('Folga / Atestado', (escala.folgaAtestado || []).map((f) => `${f.nome} — ${f.status}`))}
-            ${renderEscalaList('Férias', (escala.ferias || []).map((f) => `${f.nome} — ${f.status}`))}
-          </div>
-          <div class="tv-card tv-ranking-card">
-            <div class="tv-card-title compact"><h3>Ranking dos Mecânicos</h3></div>
-            ${renderRankingList(rankingMecanicos)}
-            <div class="tv-card-title compact" style="margin-top:8px;"><h3>Ranking do Mecânicos Industriais Operacional</h3></div>
-            ${renderRankingList(rankingMecânicos Industriais)}
-            ${(!rankingMecanicos.length && !rankingMecânicos Industriais.length) ? `<div class="tv-empty tv-empty-small">${escapeHtml(rankingMsg)}</div>` : ''}
-          </div>
-        </aside>
-      </section>`;
-  }
-
-  function renderEscalaList(label, list = []) {
-    return `<div class="tv-escala-item"><strong>${label}</strong><span>${list.length ? escapeHtml(list.join(' • ')) : '—'}</span></div>`;
-  }
-
-  function renderGaleria() {
-    const galeria = (state.data?.galeria || []).slice(0, 12);
-    const hasReal = galeria.some((g) => g.tipo !== 'placeholder');
-
-    $('tvContent').innerHTML = `
-      <section class="tv-grid">
-        <div class="tv-card tv-main-card tv-appear">
-          <div class="tv-card-title"><div><h2>📸 Galeria de Fechamento das OS</h2><p>Últimos 12 registros de imagem e vídeo</p></div></div>
-          ${hasReal ? '' : '<div class="tv-empty tv-empty-small">Aguardando registros de fechamento de OS</div>'}
-          <div class="tv-gallery premium-full">
-            ${galeria.map((g) => `
-              <figure>
-                ${g.tipo === 'video' ? `<video src="${escapeHtml(g.arquivo_url || '')}" muted autoplay loop playsinline></video>` : `<img src="${escapeHtml(g.arquivo_url || config.galleryPlaceholder)}" onerror="this.src='${config.galleryPlaceholder}'">`}
-                <figcaption><strong>${escapeHtml(g.os_numero || 'OS')}</strong><span>${escapeHtml(g.equipamento || 'Manutenção')}</span><span>${escapeHtml(g.legenda || '')}</span><small>${escapeHtml((g.created_at || '').slice(0, 10))} • ${escapeHtml(g.responsavel || 'A definir')}</small></figcaption>
-              </figure>`).join('')}
-          </div>
-        </div>
-      </section>`;
-  }
-
-  function renderAlertas() {
-    const alertas = state.data?.alertas || [];
-    $('tvContent').innerHTML = `
-      <section class="tv-grid tv-grid-alertas">
-        <div class="tv-card tv-main-card tv-appear">
-          <div class="tv-card-title"><div><h2>🚨 Alertas Operacionais</h2><p>OS críticas, preventivas atrasadas e pontos de atenção</p></div></div>
-          <div class="tv-alert-list">
-            ${alertas.length ? alertas.map((a) => `<article class="tv-alert ${a.tipo === 'CRITICO' ? 'critical' : ''}"><strong>${escapeHtml(a.titulo)}</strong><p>${escapeHtml(a.descricao)}</p><small>${escapeHtml(a.timestamp)}</small></article>`).join('') : '<div class="tv-empty">✅ Nenhum alerta crítico no momento.</div>'}
-          </div>
-        </div>
-        <aside class="tv-side-single">${renderWeatherCard()}${renderCalendarCard()}</aside>
-      </section>`;
-  }
-
-  function renderWeatherCard() {
-    const w = state.data?.weather || {};
-    return `<div class="tv-card tv-weather-card premium"><div class="tv-card-title compact"><h3>${weatherIcon(w.codigo)} Previsão do Tempo</h3></div>
-      <div class="tv-weather-main"><strong>${escapeHtml(w.temp ?? '--')}°</strong><div><span>${escapeHtml(w.cidade || 'Feira de Santana')}</span><small>${escapeHtml(w.condicao || 'Condição indisponível')}</small></div></div>
-      <div class="tv-weather-meta"><span>Umidade: <strong>${escapeHtml(w.umidade ?? '--')}%</strong></span><span>Vento: <strong>${escapeHtml(w.vento ?? '--')} km/h</strong></span></div>
-      <div class="tv-weather-days">${(w.previsao || []).slice(0, 5).map((day) => `<div><span>${new Date(`${day.data}T00:00:00`).toLocaleDateString('pt-BR', { weekday: 'short' })}</span><strong>${weatherIcon(day.codigo)}</strong><small>${Math.round(day.min ?? 0)}° / ${Math.round(day.max ?? 0)}°</small></div>`).join('')}</div>
-    </div>`;
-  }
-
-  function renderCalendarCard() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const first = new Date(year, month, 1);
-    const last = new Date(year, month + 1, 0);
-    const startDay = first.getDay();
-    const days = [];
-    for (let i = 0; i < startDay; i++) days.push('');
-    for (let d = 1; d <= last.getDate(); d++) days.push(d);
-
-    return `<div class="tv-card tv-calendar-card"><div class="tv-card-title compact"><h3>📅 ${now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h3></div>
-      <div class="tv-calendar-weekdays"><span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span></div>
-      <div class="tv-calendar-grid">${days.map((d) => `<span class="${d === now.getDate() ? 'today' : ''}">${d || ''}</span>`).join('')}</div>
-    </div>`;
-  }
-
-  function renderTicker() {
-    const ticker = state.data?.ticker || [];
-    const track = $('tvTickerTrack');
-    if (!track) return;
-    const html = ticker.map((t) => `<span class="tv-ticker-item tipo-${escapeHtml(t.tipo)}">${escapeHtml(t.texto)}</span>`).join('');
-    track.innerHTML = html + html;
-  }
-
-  function checkCriticalLed() {
-    const abertas = (state.data?.os || []).filter((o) => String(o.status || '').toUpperCase() === 'ABERTA');
-    const notified = JSON.parse(localStorage.getItem('cg-tv-os-notified') || '[]');
-    const notifiedSet = new Set(notified.map((x) => String(x)));
-
-    if (!state.notificationPrimed) {
-      abertas.forEach((o) => notifiedSet.add(String(o.id)));
-      localStorage.setItem('cg-tv-os-notified', JSON.stringify([...notifiedSet].slice(-300)));
-      state.notificationPrimed = true;
-    }
-
-    const backendAlertOs = state.data?.osAlerta || state.data?.os_alerta || state.data?.alertaOS || null;
-    const newFromBackend = backendAlertOs
-      ? `backend-${backendAlertOs.id || backendAlertOs.numero || backendAlertOs.created_at || Date.now()}`
-      : null;
-    const newFromOpen = abertas.find((os) => !notifiedSet.has(String(os.id)));
-
-    const incomingOs = backendAlertOs || newFromOpen;
-    if (!incomingOs) return;
-
-    const alertKey = newFromBackend || `open-${incomingOs.id || incomingOs.numero || Date.now()}`;
-    if (alertKey === state.lastAlertKey) return;
-    state.lastAlertKey = alertKey;
-
-    const ledData = buildLedMessage(incomingOs);
-    state.osAlerts.unshift({
-      id: String(incomingOs.id || incomingOs.numero || Date.now()),
-      prioridade: ledData.prioridade,
-      texto: ledData.texto,
-      createdAt: new Date().toISOString(),
-    });
-    state.osAlerts = state.osAlerts.slice(0, 11);
-
-    showOSAlert(incomingOs);
-    playLedSoundBurst(ledData.prioridade);
-    if (isOSScreenActive()) renderCurrentScreen();
-
-    if (incomingOs.id != null) {
-      notifiedSet.add(String(incomingOs.id));
-      localStorage.setItem('cg-tv-os-notified', JSON.stringify([...notifiedSet].slice(-300)));
-    }
-  }
-
-  function renderOsAlertsPanel() {
-    if (!state.osAlerts.length) {
-      return '<div class="tv-empty tv-empty-small">Sem novos alertas de OS.</div>';
-    }
-    return `<div class="tv-os-alert-list">${state.osAlerts.map((alerta) => `
-      <article class="tv-os-alert tv-os-alert-${String(alerta.prioridade || 'MEDIA').toLowerCase()}">
-        <strong>${escapeHtml(alerta.texto)}</strong>
-        <small>${new Date(alerta.createdAt).toLocaleTimeString('pt-BR')}</small>
-      </article>
-    `).join('')}</div>`;
-  }
-
-  function renderRankingList(items = []) {
-    if (!items.length) return '<div class="tv-empty tv-empty-small">Sem dados nesta semana.</div>';
-    const validItems = items.filter((r) => String(r?.nome || '').trim() && !String(r.nome || '').toLowerCase().includes('a definir'));
-    if (!validItems.length) return '<div class="tv-empty tv-empty-small">Sem dados nesta semana.</div>';
-    return `<ol class="tv-ranking-list">${validItems.map((r, i) => {
-      const pos = i + 1;
-      const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `${pos}º`;
-      return `<li>
-        <div class="tv-ranking-person"><img src="${escapeHtml(r.foto || config.defaultAvatar)}" onerror="this.src='${config.defaultAvatar}'"><div><span>${medal} ${escapeHtml(r.nome)}</span><small>${Number(r.os_finalizadas || 0)} OS finalizadas • Críticas: ${Number(r.criticas || 0)} • Altas: ${Number(r.altas || 0)}</small></div></div>
-        <strong>${Number(r.pontos || 0).toFixed(1)} pts</strong>
-      </li>`;
-    }).join('')}</ol>`;
-  }
-
-  function playNotificationSound(prioridade = 'MEDIA') {
-    const map = {
-      BAIXA: '/audio/os-nova.mp3',
-      MEDIA: '/audio/notification.mp3',
-      ALTA: '/audio/os-status.mp3',
-      CRITICA: '/audio/os-critica.mp3',
-    };
-    const src = map[String(prioridade || '').toUpperCase()];
-    if (!src) return;
-    const audio = new Audio(src);
-    audio.play().catch(() => {});
-  }
-
-  function playLedSoundBurst(prioridade = 'MEDIA') {
-    clearInterval(state.ledSoundInterval);
-    clearTimeout(state.ledSoundStopTimer);
-
-    playNotificationSound(prioridade);
-    state.ledSoundInterval = setInterval(() => {
-      playNotificationSound(prioridade);
-    }, LED_SOUND_INTERVAL_MS);
-
-    state.ledSoundStopTimer = setTimeout(() => {
-      clearInterval(state.ledSoundInterval);
-      state.ledSoundInterval = null;
-      state.ledSoundStopTimer = null;
-    }, LED_SOUND_MS);
-  }
-
-  function drawDoughnut(canvasId, data, legendId) {
-    const canvas = $(canvasId);
-    if (!canvas || !data.length) return;
-    const ctx = canvas.getContext('2d');
-    const total = data.reduce((sum, item) => sum + Number(item.value || 0), 0) || 1;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const radius = Math.min(cx, cy) - 20;
-    const inner = radius * 0.56;
-    let start = -Math.PI / 2;
-
-    data.forEach((item) => {
-      const value = Number(item.value || 0);
-      const angle = (value / total) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, radius, start, start + angle);
-      ctx.closePath();
-      ctx.fillStyle = item.color || '#3b82f6';
-      ctx.fill();
-      start += angle;
-    });
-
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.beginPath();
-    ctx.arc(cx, cy, inner, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalCompositeOperation = 'source-over';
-
-    const legend = $(legendId);
-    if (legend) legend.innerHTML = data.map((item) => `<span><i style="background:${item.color}"></i>${escapeHtml(item.label)}: <strong>${escapeHtml(item.value)}</strong></span>`).join('');
-  }
-
-  function drawHorizontalBarChart(canvasId, data) {
-    const canvas = $(canvasId);
-    if (!canvas || !data.length) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const max = Math.max(...data.map((d) => Number(d.total || 0)), 1);
-    const left = 150;
-    const right = 50;
-    const lineHeight = Math.max(28, Math.floor((canvas.height - 12) / data.length));
-    const barHeight = Math.min(18, lineHeight - 8);
-    const barSpace = canvas.width - left - right;
-    const accent = getCssVar('--tv-cg-green') || '#10b981';
-    const accent2 = getCssVar('--tv-blue') || '#3b82f6';
-
-    ctx.font = '12px Arial';
-    ctx.textBaseline = 'middle';
-
-    data.forEach((item, idx) => {
-      const y = 10 + idx * lineHeight + lineHeight / 2;
-      const label = String(item.equipamento || 'Não informado');
-      const short = label.length > 26 ? `${label.slice(0, 24)}…` : label;
-      const value = Number(item.total || 0);
-      const width = Math.max(4, (value / max) * barSpace);
-
-      ctx.fillStyle = getCssVar('--tv-muted') || '#94a3b8';
-      ctx.textAlign = 'left';
-      ctx.fillText(short, 8, y);
-
-      const grad = ctx.createLinearGradient(left, y - barHeight / 2, left + width, y + barHeight / 2);
-      grad.addColorStop(0, accent2);
-      grad.addColorStop(1, accent);
-      ctx.fillStyle = grad;
-      roundedRect(ctx, left, y - barHeight / 2, width, barHeight, 6);
-      ctx.fill();
-
-      ctx.fillStyle = getCssVar('--tv-text') || '#f8fafc';
-      ctx.textAlign = 'right';
-      ctx.fillText(String(value), canvas.width - 12, y);
-    });
-  }
-
-  function roundedRect(ctx, x, y, width, height, radius) {
-    const r = Math.min(radius, width / 2, height / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + width, y, x + width, y + height, r);
-    ctx.arcTo(x + width, y + height, x, y + height, r);
-    ctx.arcTo(x, y + height, x, y, r);
-    ctx.arcTo(x, y, x + width, y, r);
-    ctx.closePath();
-  }
-
-  function getCssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  }
-
-  function startRotation() {
-    setInterval(() => {
-      if (Date.now() < state.pausedUntil) return;
-      state.screenIndex = (state.screenIndex + 1) % state.screens.length;
-      state.rotationStartedAt = Date.now();
-      renderCurrentScreen();
-    }, config.rotationMs || 30000);
-
-    setInterval(() => {
-      const progress = $('tvProgress');
-      if (!progress) return;
-      const elapsed = Date.now() - state.rotationStartedAt;
-      progress.style.width = `${Math.min(100, (elapsed / (config.rotationMs || 30000)) * 100)}%`;
-    }, 500);
-  }
-
-  async function toggleFullscreen() {
-    try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
-        showToast('Modo tela cheia ativado');
-      } else {
-        await document.exitFullscreen();
-        showToast('Modo tela cheia desativado');
-      }
-    } catch (_err) {
-      showToast('Não foi possível alterar tela cheia');
-    }
-  }
-
-  function bindEvents() {
-    $('tvThemeToggle')?.addEventListener('click', toggleTheme);
-    $('tvFullscreenBtn')?.addEventListener('click', toggleFullscreen);
-    $('tvLedClose')?.addEventListener('click', () => {
-      const led = $('tvLed');
-      hideOSAlert();
-      clearInterval(state.ledSoundInterval);
-      clearTimeout(state.ledSoundStopTimer);
-      state.ledSoundInterval = null;
-      state.ledSoundStopTimer = null;
-      if (led) led.classList.add('is-hidden');
-    });
-
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'ArrowRight') {
-        state.screenIndex = (state.screenIndex + 1) % state.screens.length;
-        state.rotationStartedAt = Date.now();
-        state.pausedUntil = Date.now() + 20000;
-        renderCurrentScreen();
-      }
-      if (event.key === 'ArrowLeft') {
-        state.screenIndex = (state.screenIndex - 1 + state.screens.length) % state.screens.length;
-        state.rotationStartedAt = Date.now();
-        state.pausedUntil = Date.now() + 20000;
-        renderCurrentScreen();
-      }
-      if (event.key.toLowerCase() === 'f') toggleFullscreen();
-      if (event.key.toLowerCase() === 't') toggleTheme();
-    });
-  }
-
-  function init() {
-    setTheme();
-    bindEvents();
-    startClock();
-    loadSnapshot();
-    startRotation();
-    setInterval(loadSnapshot, config.refreshMs || 15000);
-  }
-
-  document.addEventListener('DOMContentLoaded', init);
+  function startClock() { const tick=()=>{ const now=new Date(); $('tvClock').textContent=now.toLocaleTimeString('pt-BR'); $('tvDate').textContent=now.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}); }; tick(); setInterval(tick,1000); }
+  function startRotation() { clearInterval(state.rotationTimer); clearInterval(state.progressTimer); state.rotationTimer=setInterval(()=>{state.index=(state.index+1)%screens.length;state.rotationAt=Date.now();renderCurrent();},ROTATION_MS); state.progressTimer=setInterval(()=>{if($('tvProgress'))$('tvProgress').style.width=`${Math.min(100,(Date.now()-state.rotationAt)/ROTATION_MS*100)}%`;},250); }
+  function bind() { $('tvFullscreenBtn')?.addEventListener('click',()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()); $('tvThemeToggle')?.addEventListener('click',()=>document.documentElement.classList.toggle('tv-theme-light')); }
+  function init() { debug('Inicializando painel'); startClock(); bind(); renderLoading(); loadSnapshot(); startRotation(); }
+  document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded',init,{once:true}) : init();
 })();

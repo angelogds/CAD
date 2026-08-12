@@ -23,7 +23,7 @@ const MAINT_FALLBACK = [
 function safeAll(sql, params = []) {
   try {
     if (!db || !db.prepare) return [];
-    return db.prepare(sql).all(params);
+    return db.prepare(sql).all(...params);
   } catch (err) {
     console.warn('[TV] safeAll fallback:', err.message);
     return [];
@@ -33,7 +33,7 @@ function safeAll(sql, params = []) {
 function safeGet(sql, params = []) {
   try {
     if (!db || !db.prepare) return null;
-    return db.prepare(sql).get(params);
+    return db.prepare(sql).get(...params);
   } catch (err) {
     console.warn('[TV] safeGet fallback:', err.message);
     return null;
@@ -231,7 +231,7 @@ async function getOS() {
   } catch (_e) {}
 
   const table = firstTable(['ordens_servico', 'os', 'ordens', 'ordens_de_servico']);
-  if (!table) return fallbackOS();
+  if (!table) return [];
 
   const id = pickCol(table, ['id']);
   const numero = pickCol(table, ['numero', 'codigo', 'n_os'], 'id');
@@ -259,7 +259,7 @@ async function getOS() {
     LIMIT 50
   `);
 
-  if (!rows.length) return fallbackOS();
+  if (!rows.length) return [];
 
   return rows.map((r, index) => {
     const statusNorm = normalizarStatusOS(r.status);
@@ -550,7 +550,7 @@ async function getPreventivas() {
   } catch (_e) {}
 
   const table = firstTable(['preventivas', 'manutencoes_preventivas', 'preventive_tasks', 'preventiva_execucoes']);
-  if (!table) return fallbackPreventivas();
+  if (!table) return [];
 
   const id = pickCol(table, ['id']);
   const tarefa = pickCol(table, ['tarefa', 'titulo', 'descricao', 'plano_nome'], "'Preventiva'");
@@ -572,7 +572,7 @@ async function getPreventivas() {
     LIMIT 30
   `);
 
-  if (!rows.length) return fallbackPreventivas();
+  if (!rows.length) return [];
 
   const today = new Date().toISOString().slice(0, 10);
   return rows.map((r) => {
@@ -980,6 +980,7 @@ async function getSnapshot(user) {
   const rankingEquipe = await getRankingEquipe(os, equipeData.equipe);
   const avisos = getAvisosAtivos();
 
+  const operacao = buildOperationalSnapshot(os, preventivas);
   return {
     os,
     mecanicos: equipeData.equipe,
@@ -991,6 +992,7 @@ async function getSnapshot(user) {
     weather,
     alertas: getAlertas(os, preventivas),
     performance: getPerformance(os),
+    operacao,
     ticker: getTicker(os, preventivas, avisos),
     system: {
       online: true,
@@ -1004,24 +1006,53 @@ async function getSnapshot(user) {
   };
 }
 
+function buildOperationalSnapshot(os = [], preventivas = []) {
+  const today = new Date().toISOString().slice(0, 10);
+  const active = os.filter((item) => item.status !== 'CONCLUIDA');
+  const isWaitingMaterial = (item) => item.status === 'PAUSADA' && hasAny(`${item.descricao || ''} ${item.status || ''}`, ['PECA', 'MATERIAL', 'COMPRA', 'ROLAMENTO']);
+  const waiting = active.filter(isWaitingMaterial);
+  const concludedToday = os.filter((item) => item.status === 'CONCLUIDA' && String(item.dataConclusao || item.fechado_em || '').slice(0, 10) === today);
+  const overdue = active.filter((item) => item.dataPrevista && String(item.dataPrevista).slice(0, 10) < today);
+  const byEquipment = new Map();
+  os.forEach((item) => {
+    const name = String(item.equipamento || 'Equipamento não informado');
+    const entry = byEquipment.get(name) || { equipamento: name, falhas: 0, os: 0, ultimaOcorrencia: item.tempo || '-', status: 'DISPONÍVEL', criticidade: 'BAIXA' };
+    entry.falhas += 1;
+    entry.os += 1;
+    if (item.status !== 'CONCLUIDA') entry.status = item.status === 'PAUSADA' ? 'PARADO' : 'EM MANUTENÇÃO';
+    if (normalizarPrioridade(item.prioridade) === 'CRITICA') entry.criticidade = 'CRÍTICA';
+    else if (normalizarPrioridade(item.prioridade) === 'ALTA' && entry.criticidade !== 'CRÍTICA') entry.criticidade = 'ALTA';
+    byEquipment.set(name, entry);
+  });
+  const rankingFalhas = [...byEquipment.values()].sort((a, b) => b.falhas - a.falhas).slice(0, 5);
+  const corretivas = os.length;
+  const preventivasTotal = preventivas.length;
+  const totalTipos = corretivas + preventivasTotal;
+  return {
+    os: {
+      abertas: active.filter((item) => item.status === 'ABERTA').length,
+      andamento: active.filter((item) => item.status === 'EM_ANDAMENTO').length,
+      criticas: active.filter((item) => item.prioridade === 'CRITICA').length,
+      aguardandoMaterial: waiting.length,
+      concluidasHoje: concludedToday.length,
+      atrasadas: overdue.length,
+    },
+    equipamentosCriticos: rankingFalhas.filter((item) => item.criticidade === 'CRÍTICA' || item.criticidade === 'ALTA').slice(0, 5),
+    rankingFalhas,
+    equipamentosParados: active.filter((item) => item.status === 'PAUSADA').slice(0, 5).map((item) => ({ equipamento: item.equipamento, motivo: item.descricao || 'Motivo não informado', status: 'PARADO' })),
+    aguardandoMaterial: waiting.slice(0, 8).map((item) => ({ os: item.numero, equipamento: item.equipamento, material: item.descricao || 'Material não informado', compra: 'Situação não informada', espera: item.tempo || '-' })),
+    programacao: preventivas.slice().sort((a, b) => String(a.dataPrevista || '').localeCompare(String(b.dataPrevista || ''))).slice(0, 10),
+    tipos: {
+      preventivas: preventivasTotal,
+      corretivas,
+      percentualPreventivas: totalTipos ? Math.round((preventivasTotal / totalTipos) * 100) : 0,
+      percentualCorretivas: totalTipos ? Math.round((corretivas / totalTipos) * 100) : 0,
+    },
+  };
+}
+
 async function reconhecerAlerta(_id, _user) {
   return true;
-}
-
-function fallbackOS() {
-  return [
-    { id: 102, numero: 'OS #102', equipamento: 'PRENSA P50', responsavel: 'Fábio', status: 'ABERTA', prioridade: 'CRITICA', tempo: '15 min', descricao: 'Falha crítica aguardando intervenção', isNew: true },
-    { id: 98, numero: 'OS #98', equipamento: 'DIGESTOR 1', responsavel: 'Diogo', status: 'EM_ANDAMENTO', prioridade: 'ALTA', tempo: '2h 30min', descricao: 'Serviço em andamento' },
-    { id: 91, numero: 'OS #91', equipamento: 'TRANSPORTADOR T10', responsavel: 'Carlos', status: 'PAUSADA', prioridade: 'ALTA', tempo: '1h 45min', descricao: 'Aguardando peças' },
-  ];
-}
-
-function fallbackPreventivas() {
-  const today = toIsoDate(new Date()) || new Date().toISOString().slice(0, 10);
-  return [
-    { id: 1, tarefa: 'Lubrificação geral', equipamento: 'PRENSA P50', dataPrevista: today, status: 'PENDENTE', responsavel: 'Fábio' },
-    { id: 2, tarefa: 'Inspeção de válvulas', equipamento: 'DIGESTOR 1', dataPrevista: today, status: 'NO_PRAZO', responsavel: 'Diogo' },
-  ];
 }
 
 module.exports = {

@@ -231,3 +231,28 @@ body.cg-tv { font-family: Arial, Helvetica, sans-serif; background: var(--tv-bg)
   .tv-mini-stats,.tv-weather-meta,.tv-weather-days,.tv-stat-row { grid-template-columns: 1fr; }
   .tv-table { min-width: 760px; }
 }
+
+/* Painel operacional TV */
+.tv-update-box { display:grid; gap:3px; min-width:155px; text-align:right; color:var(--tv-muted); font-size:10px; font-weight:800; }
+.tv-connection { color:var(--tv-green); text-transform:uppercase; }
+.tv-connection.is-loading,.tv-connection.is-retrying { color:var(--tv-orange); }
+.tv-connection.is-error,.tv-online.is-offline { color:var(--tv-red); }
+.tv-screen-indicator { position:fixed; right:18px; bottom:50px; z-index:20; padding:6px 12px; border:1px solid var(--tv-line); border-radius:999px; background:var(--tv-card); font-weight:900; font-size:13px; }
+.tv-state { height:100%; display:grid; place-content:center; justify-items:center; gap:8px; text-align:center; color:var(--tv-muted); }
+.tv-state h2,.tv-state p { margin:0; }.tv-state.is-error h2{color:var(--tv-red)}
+.tv-loader { width:32px; height:32px; border:4px solid var(--tv-line); border-top-color:var(--tv-green); border-radius:50%; animation:tvSpin .8s linear infinite; }
+@keyframes tvSpin { to { transform:rotate(360deg); } }
+.op-screen { height:100%; display:grid; gap:12px; min-height:0; }
+.op-columns { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.op-screen .tv-card h2 { margin:0 0 12px; color:var(--tv-text); font-size:clamp(17px,1.35vw,25px); letter-spacing:.05em; }
+.op-screen .fill { display:flex; flex-direction:column; }
+.op-kpis { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }
+.op-kpi { min-height:125px; display:grid; place-content:center; text-align:center; border:1px solid var(--tv-line); border-top:5px solid var(--tv-blue); border-radius:14px; background:var(--tv-card); }
+.op-kpi strong { font-size:clamp(42px,4.2vw,72px); line-height:1; }.op-kpi span{margin-top:8px;color:var(--tv-muted);font-weight:900;text-transform:uppercase;font-size:clamp(11px,.9vw,16px)}
+.op-kpi.danger{border-top-color:var(--tv-red)}.op-kpi.warning{border-top-color:var(--tv-orange)}.op-kpi.success{border-top-color:var(--tv-green)}
+.op-list { display:grid; gap:8px; overflow:auto; min-height:0; }
+.op-row { display:grid; grid-template-columns:minmax(160px,1fr) auto; gap:5px 14px; align-items:center; padding:12px 14px; border:1px solid var(--tv-line-soft); border-left:5px solid var(--tv-green); border-radius:10px; background:var(--tv-card-2); font-size:clamp(13px,1vw,18px); }
+.op-row strong{color:var(--tv-text);font-size:1.08em}.op-row small{grid-column:1/-1;color:var(--tv-muted)}.op-row.grid{grid-template-columns:.65fr 1.3fr 1fr .8fr}.op-row.grid small{grid-column:auto}.op-row.material{grid-template-columns:.55fr 1fr 1.5fr 1fr auto}.op-row.material small{grid-column:auto}.critical{color:var(--tv-red);font-weight:900}.tv-empty{display:grid;place-content:center;min-height:130px;text-align:center;color:var(--tv-muted);font-size:clamp(15px,1.2vw,22px);border:1px dashed var(--tv-line);border-radius:12px;padding:20px}
+.op-bars{display:grid;gap:20px;padding:10px}.op-bars>div{display:grid;grid-template-columns:minmax(180px,1fr) 2fr 45px;gap:12px;align-items:center;font-weight:900;font-size:clamp(14px,1vw,19px)}.op-bars i{height:24px;background:var(--tv-card-2);border-radius:99px;overflow:hidden}.op-bars b{display:block;height:100%;background:linear-gradient(90deg,var(--tv-orange),var(--tv-red));border-radius:99px}
+.type-card{display:grid;align-content:center}.type-values{display:grid;grid-template-columns:1fr 1fr;gap:20px}.type-values div{text-align:center}.type-values strong{display:block;font-size:clamp(60px,7vw,120px)}.type-values span{color:var(--tv-muted);font-size:clamp(16px,1.4vw,25px);font-weight:900}.type-bar{height:30px;margin-top:28px;border-radius:99px;background:var(--tv-red);overflow:hidden}.type-bar i{display:block;height:100%;background:var(--tv-green)}
+@media(max-width:1100px){.tv-left{min-width:380px}.tv-right{min-width:auto}.tv-weather-mini{display:none}.op-kpis{grid-template-columns:repeat(3,1fr)}.op-kpi{min-height:90px}.op-columns{grid-template-columns:1fr}.op-row.material,.op-row.grid{grid-template-columns:1fr 1fr}.op-row.material small,.op-row.grid small{grid-column:auto}}
