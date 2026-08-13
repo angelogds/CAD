@@ -2,6 +2,7 @@
 <link rel="stylesheet" href="/css/operational-dashboard.css">
 <%
 const op = operational || { os:{items:[],counts:{},distribution:[]}, preventivas:{items:[],deadlines:{}}, alerts:[], indicators:{}, critical:[], period:{} };
+const safeCriticidadeOperacional = (typeof criticidadeOperacional !== 'undefined' && criticidadeOperacional) ? criticidadeOperacional : {};
 const osCounts = op.os.counts || {};
 const demandas = demandasResumo || {};
 const prev = op.preventivas || {items:[],deadlines:{}};
