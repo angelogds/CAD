@@ -45,6 +45,7 @@ const prioridadeAlta = ['ALTA','URGENTE','CRITICA','CRÍTICA','EMERGENCIAL'].inc
     </div>
     <div class="sol-actions">
       <% if (canEdit) { %><a class="btn btn-green" href="/solicitacoes/<%= solicitacao.id %>/editar">Editar</a><% } %>
+      <% if (canEdit && !solicitacao.disponivel_compras) { %><form method="POST" action="/solicitacoes/<%= solicitacao.id %>/finalizar" onsubmit="return confirm('Finalizar a elaboração e disponibilizar para Compras?')"><button class="btn btn-green" type="submit">Finalizar elaboração</button></form><% } %>
       <% if (canAccessModule(user?.role, 'compras_manage')) { %><a class="btn btn-ghost" href="/compras/solicitacoes/<%= solicitacao.id %>">Abrir em compras</a><% } %>
       <% if (canAccessModule(user?.role, 'almoxarifado_read')) { %><a class="btn btn-ghost" href="/almoxarifado/solicitacoes/<%= solicitacao.id %>/conferir">Abrir no almoxarifado</a><% } %>
       <a class="btn btn-ghost" href="/solicitacoes/<%= solicitacao.id %>/pdf" target="_blank" rel="noopener">Gerar PDF</a>

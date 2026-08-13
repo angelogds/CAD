@@ -531,6 +531,26 @@ function cancelarSolicitacao(id, adminId = null) {
   })();
 }
 
+function finalizarElaboracao(id, userId) {
+  return db.transaction(() => {
+    const solicitacao = db.prepare('SELECT * FROM solicitacoes WHERE id=?').get(Number(id));
+    if (!solicitacao) throw new SolicitacaoOperacaoError('Solicitação não encontrada.', 'SOLICITACAO_NAO_ENCONTRADA');
+    if (![STATUS.ABERTA, STATUS.REABERTA, STATUS.DEVOLVIDA_REVISAO].includes(solicitacao.status)) {
+      if (Number(solicitacao.disponivel_compras) === 1) return { ...solicitacao, idempotente: true };
+      throw new SolicitacaoOperacaoError('A elaboração não pode ser finalizada neste status.', 'STATUS_INVALIDO');
+    }
+    if (Number(solicitacao.disponivel_compras) === 1) return { ...solicitacao, idempotente: true };
+    const now = db.prepare("SELECT datetime('now') agora").get().agora;
+    // FECHADA é o encerramento definitivo; a conclusão da elaboração usa campos próprios.
+    db.prepare(`UPDATE solicitacoes SET disponivel_compras=1, disponivel_compras_em=?,
+      disponivel_compras_por=?, elaboracao_finalizada_em=?, elaboracao_finalizada_por=?, updated_at=?
+      WHERE id=? AND COALESCE(disponivel_compras,0)=0`).run(now, userId, now, userId, now, Number(id));
+    registrarLogSolicitacao(id, userId, solicitacao.status, solicitacao.status,
+      'FINALIZAR_ELABORACAO', 'Elaboração finalizada e disponibilizada automaticamente para Compras.');
+    return { ...solicitacao, disponivel_compras: 1, disponivel_compras_em: now, disponivel_compras_por: userId };
+  })();
+}
+
 function canListAllSolicitacoes(user) {
   const role = normalizeRole(user?.role);
   return ["ADMIN", "COMPRAS", "ALMOXARIFADO", "DIRETORIA", "GESTAO", "ENCARREGADO_MANUTENCAO", "MANUTENCAO_SUPERVISOR"].includes(role);
@@ -551,6 +571,7 @@ function listMinhasSolicitacoes(userId, filters = {}, user = null) {
 
   if (filters.vinculadasOs) where.push("s.os_id IS NOT NULL");
   if (filters.urgentes) where.push("UPPER(COALESCE(s.prioridade, '')) IN ('ALTA','URGENTE','CRITICA','CRÍTICA','EMERGENCIAL')");
+  if (filters.prioridade) { where.push("UPPER(COALESCE(s.prioridade,'')) = ?"); params.push(filters.prioridade); }
 
   if (filters.query) {
     where.push("(LOWER(COALESCE(s.numero,'')) LIKE ? OR LOWER(COALESCE(s.titulo,'')) LIKE ? OR LOWER(COALESCE(s.setor_origem,'')) LIKE ? OR LOWER(COALESCE(u.name,'')) LIKE ?)");
@@ -574,7 +595,9 @@ function listMinhasSolicitacoes(userId, filters = {}, user = null) {
     LEFT JOIN users u ON u.id = s.solicitante_user_id
     ${equipJoin}
     ${whereSql}
-    ORDER BY s.id DESC
+    ORDER BY
+      CASE WHEN s.previsao_entrega IS NOT NULL AND date(s.previsao_entrega)<date('now') AND s.status NOT IN ('FECHADA','CANCELADA','RECEBIDA_TOTAL') THEN 0 ELSE 1 END,
+      CASE WHEN s.previsao_entrega IS NULL THEN 1 ELSE 0 END, date(s.previsao_entrega), datetime(s.created_at), s.numero
   `).all(...params);
 
   return rows.map((row) => {
@@ -710,4 +733,4 @@ function listEstoqueItens() {
   return db.prepare("SELECT id, codigo, nome, unidade FROM estoque_itens WHERE ativo = 1 ORDER BY nome").all();
 }
 
-module.exports = { STATUS, LIST_STATUS, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, normalizeAplicacaoInput, createSolicitacao, updateSolicitacao, avaliarExclusaoFisica, excluirSolicitacao, cancelarSolicitacao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };
+module.exports = { STATUS, LIST_STATUS, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, normalizeAplicacaoInput, createSolicitacao, updateSolicitacao, avaliarExclusaoFisica, excluirSolicitacao, cancelarSolicitacao, finalizarElaboracao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };

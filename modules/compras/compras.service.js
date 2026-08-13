@@ -141,6 +141,7 @@ function listSolicitacoesPorStatus(filters = {}) {
   const hasFornecedoresTable = tableExists('fornecedores');
   const where = [];
   const params = [];
+  if (columnExists('solicitacoes', 'disponivel_compras')) where.push('COALESCE(s.disponivel_compras, 0) = 1');
   const status = normalizeStatus(filters.status);
   if (status) { where.push('s.status = ?'); params.push(status); }
   if (filters.query) {

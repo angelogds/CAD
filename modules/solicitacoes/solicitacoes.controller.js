@@ -2,6 +2,7 @@ const service = require("./solicitacoes.service");
 const comprasService = require("../compras/compras.service");
 const osChatService = require("../os-chat/os-chat.service");
 const osService = require("../os/os.service");
+const acompanhamentoService = require('../compras/acompanhamento.service');
 const { fallback, normalizeSolicitacaoForView } = require("./solicitacoes.presenter");
 
 function normalizeItens(itens) {
@@ -22,6 +23,7 @@ function minhas(req, res) {
     date: req.query.date || "",
     vinculadasOs: req.query.vinculadas_os === "1",
     urgentes: req.query.urgentes === "1",
+    prioridade: ['URGENTE','ALTA','MEDIA','BAIXA'].includes(String(req.query.prioridade || '').toUpperCase()) ? String(req.query.prioridade).toUpperCase() : '',
   };
 
   res.render("solicitacoes/minhas", {
@@ -32,6 +34,20 @@ function minhas(req, res) {
     filters,
     statuses: service.LIST_STATUS,
   });
+}
+
+function finalizar(req, res) {
+  try {
+    const solicitacao = service.getSolicitacaoById(Number(req.params.id));
+    if (!solicitacao || !service.canEditSolicitacao(solicitacao, req.session.user)) throw new Error('Sem permissão para finalizar esta solicitação.');
+    const resultado = service.finalizarElaboracao(Number(req.params.id), req.session.user.id);
+    req.flash('success', resultado.idempotente ? 'A solicitação já estava disponível em Compras.' : 'Elaboração finalizada. Solicitação disponível em Compras.');
+  } catch (error) { req.flash('error', error.message || 'Não foi possível finalizar a elaboração.'); }
+  return res.redirect(`/solicitacoes/${req.params.id}`);
+}
+
+function acompanhamentoCompras(req, res) {
+  return res.render('solicitacoes/acompanhamento-compras', { title: 'Acompanhamento de Compras', activeMenu: 'solicitacoes', painel: acompanhamentoService.getDashboard(req.query) });
 }
 
 function nova(req, res) {
@@ -288,4 +304,4 @@ function pdf(req, res) {
   }
 }
 
-module.exports = { minhas, nova, criar, editar, atualizar, detalhe, excluir, cancelar, pdf };
+module.exports = { minhas, nova, criar, editar, atualizar, finalizar, acompanhamentoCompras, detalhe, excluir, cancelar, pdf };
