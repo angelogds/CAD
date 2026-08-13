@@ -12,7 +12,7 @@
     ['escala', 'Escala da semana'], ['desempenho', 'Desempenho da equipe'],
     ['criticidade', 'Criticidade dos equipamentos'], ['materiais', 'Materiais e programação'],
   ];
-  const state = { data: null, index: 0, active: false, baselineReady: false, loading: false, stream: null, streamOnline: false, snapshotTimer: null, fastTimer: null, reconnectTimer: null, rotationTimer: null, progressTimer: null, rotationStarted: 0, rotationRemaining: ROTATION_MS, alertQueue: [], alertShowing: false, processed: new Map(), wakeLock: null };
+  const state = { data: null, index: 0, active: false, baselineReady: false, loading: false, snapshotPromise: null, stream: null, streamOnline: false, snapshotTimer: null, fastTimer: null, reconnectTimer: null, rotationTimer: null, progressTimer: null, rotationStarted: 0, rotationRemaining: ROTATION_MS, alertQueue: [], alertShowing: false, processed: new Map(), pendingEvents: new Map(), wakeLock: null };
   const $ = (id) => document.getElementById(id);
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
   const plain = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
@@ -45,9 +45,9 @@
   }
 
   async function fetchSnapshot({ detectNew = true } = {}) {
-    if (state.loading) return;
+    if (state.snapshotPromise) return state.snapshotPromise;
     state.loading = true;
-    try {
+    state.snapshotPromise = (async () => { try {
       const response = await fetch(config.snapshotUrl || '/api/tv/snapshot', { cache: 'no-store', headers: { Accept: 'application/json' } });
       if (!response.ok || !(response.headers.get('content-type') || '').includes('application/json')) throw new Error(`Snapshot HTTP ${response.status}`);
       const payload = await response.json();
@@ -63,10 +63,34 @@
       setOnline(true);
       if ($('tvLastUpdate')) $('tvLastUpdate').textContent = `Última atualização: ${new Date(payload.generatedAt || Date.now()).toLocaleTimeString('pt-BR')}`;
       renderAll();
+      return payload.data;
     } catch (error) {
       console.error('[TV]', error);
       setOnline(false); // conserva o último snapshot válido
-    } finally { state.loading = false; }
+      return state.data;
+    } finally { state.loading = false; state.snapshotPromise = null; } })();
+    return state.snapshotPromise;
+  }
+
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  function eventId(raw) { return String(raw?.id || raw?.id_os || raw?.os_id || String(raw?.numero || '').replace(/\D/g, '')); }
+  function findSnapshotOS(id, data = state.data) { return items(data?.os).find((os) => String(os.id) === String(id) || String(os.numero || '').replace(/\D/g, '') === String(id)); }
+  function isCompleteOS(os) { return Boolean(os && os.id && os.abertura && os.numero && os.equipamento && os.equipamento !== 'Equipamento não informado' && os.descricao && os.responsavel && os.responsavel !== 'A definir'); }
+  async function resolveNewOSEvent(raw) {
+    const id = eventId(raw); if (!id || !state.baselineReady || !isOSAtiva(raw)) return false;
+    if (state.pendingEvents.has(id)) return state.pendingEvents.get(id);
+    const task = (async () => {
+      let resolved = null;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const data = await fetchSnapshot({ detectNew: false });
+        resolved = findSnapshotOS(id, data);
+        if (isCompleteOS(resolved)) break;
+        if (attempt < 3) await sleep(750 * (attempt + 1));
+      }
+      const candidate = resolved ? { ...raw, ...resolved } : raw;
+      return isOSAtiva(candidate) ? enqueueAlert(candidate) : false;
+    })().finally(() => state.pendingEvents.delete(id));
+    state.pendingEvents.set(id, task); return task;
   }
 
   function connectStream() {
@@ -77,8 +101,7 @@
     ['os_criada', 'nova_os_emergencial'].forEach((name) => source.addEventListener(name, (event) => {
       let os = {}; try { os = JSON.parse(event.data || '{}'); } catch (_error) {}
       if (name === 'nova_os_emergencial') os.prioridade = 'EMERGENCIAL';
-      if (isOSAtiva(os) && state.baselineReady) enqueueAlert(os);
-      fetchSnapshot({ detectNew: false });
+      resolveNewOSEvent(os);
     }));
     ['os_atualizada', 'os_status_alterado', 'os_em_andamento'].forEach((name) => source.addEventListener(name, () => fetchSnapshot({ detectNew: false })));
     source.onerror = () => {
@@ -122,11 +145,11 @@
   function sortedActiveOS() {
     return items(state.data?.os).filter(isOSAtiva).sort((a, b) => priorities[priority(a.prioridade)] - priorities[priority(b.prioridade)] || new Date(a.abertura || a.opened_at || 0) - new Date(b.abertura || b.opened_at || 0));
   }
-  function metrics(values) { return `<div class="metrics">${values.map(([label, value, cls = '']) => `<article class="metric ${cls}"><strong>${Number(value || 0)}</strong><span>${esc(label)}</span></article>`).join('')}</div>`; }
+  function metrics(values) { return `<div class="metrics">${values.map(([label, value, cls = '']) => `<article class="metric ${cls}"><strong>${typeof value === 'string' ? esc(value) : Number(value || 0)}</strong><span>${esc(label)}</span></article>`).join('')}</div>`; }
   function renderOS() {
     const os = sortedActiveOS().slice(0, 9), m = state.data?.operacao?.os || {};
     const rows = os.map((o) => `<tr class="priority-${priority(o.prioridade)}"><td><strong>${esc(o.numero)}</strong></td><td>${esc(o.equipamento)}</td><td title="${esc(o.descricao)}">${esc(o.descricao || 'Não informada')}</td><td>${esc(o.responsavel || 'A definir')}</td><td><span class="badge ${priority(o.prioridade)}">${priority(o.prioridade)}</span></td><td>${esc(status(o.status).replaceAll('_', ' '))}</td><td>${esc(o.abertura ? new Date(o.abertura).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-')}</td><td>${esc(o.tempo)}</td></tr>`).join('');
-    return `<div class="screen os-screen">${metrics([['OS abertas',m.abertas],['Em andamento',m.andamento],['Pausadas',m.pausadas,'warning'],['Atrasadas',m.atrasadas,'danger'],['Críticas / urgentes',m.criticas,'danger'],['Concluídas hoje',m.concluidasHoje]])}<article class="panel"><table><thead><tr><th>OS</th><th>Equipamento</th><th>Serviço</th><th>Mecânico(s)</th><th>Prioridade</th><th>Status</th><th>Abertura</th><th>Em aberto</th></tr></thead><tbody>${rows}</tbody></table>${os.length ? '' : empty('Nenhuma OS ativa no momento.')}</article></div>`;
+    return `<div class="screen os-screen">${metrics([['OS abertas',m.abertas],['Em andamento',m.andamento],['Pausadas',m.pausadas,'warning'],['Atrasadas',m.atrasadasDisponivel ? m.atrasadas : 'Prazo não cadastrado','danger'],['Críticas / urgentes',m.criticas,'danger'],['Concluídas hoje',m.concluidasHoje]])}<article class="panel"><table><thead><tr><th>OS</th><th>Equipamento</th><th>Serviço</th><th>Mecânico(s)</th><th>Prioridade</th><th>Status</th><th>Abertura</th><th>Em aberto</th></tr></thead><tbody>${rows}</tbody></table>${os.length ? '' : empty('Nenhuma OS ativa no momento.')}</article></div>`;
   }
   function renderPreventivas() {
     const m = state.data?.operacao?.preventivas || {}, prev = items(state.data?.preventivas).slice(0, 7);
@@ -145,7 +168,7 @@
   }
   function renderCriticidade() {
     const list = items(state.data?.operacao?.equipamentos), max = Math.max(1,...list.map((e)=>e.falhas));
-    return `<div class="screen two"><article class="panel"><h2>Top 5 — incidência de falhas</h2>${list.map((e)=>`<div class="bar-row"><span>${esc(e.nome)}</span><i><b style="width:${e.falhas/max*100}%"></b></i><strong>${e.falhas}</strong></div>`).join('') || empty('Sem dados suficientes de falhas.')}</article><article class="panel"><h2>Criticidade dos equipamentos</h2>${list.map((e)=>`<div class="list-row"><div><strong>${esc(e.nome)}</strong><small>${e.reincidencias} reincidência(s) · MTBF ${e.mtbf || 'indisponível'}</small></div><span class="badge">${esc(e.criticidade)}</span><strong>${esc(e.situacao)}</strong></div>`).join('') || empty('Nenhuma ocorrência registrada.')}</article></div>`;
+    return `<div class="screen two"><article class="panel"><h2>Top 5 — incidência de falhas</h2>${list.map((e)=>`<div class="bar-row"><span>${esc(e.nome)}</span><i><b style="width:${e.falhas/max*100}%"></b></i><strong>${e.falhas}</strong></div>`).join('') || empty('Sem dados suficientes de falhas.')}</article><article class="panel"><h2>Criticidade dos equipamentos</h2>${list.map((e)=>`<div class="list-row"><div><strong>${esc(e.nome)}</strong><small>${e.reincidencias} reincidência(s) · MTBF ${e.mtbf || 'Dados insuficientes'}</small></div><span class="badge">${esc(e.criticidade)}</span><strong>${esc(e.situacao)}</strong></div>`).join('') || empty('Nenhuma ocorrência registrada.')}</article></div>`;
   }
   function renderMateriais() {
     const waiting = items(state.data?.operacao?.aguardandoMaterial), plan = items(state.data?.operacao?.programacao).slice(0,6);
@@ -190,6 +213,6 @@
   }
   function clock() { const tick = () => { const now = new Date(); $('tvClock').textContent = now.toLocaleTimeString('pt-BR'); $('tvDate').textContent = now.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}); }; tick(); setInterval(tick,1000); }
   function init() { readProcessed(); document.documentElement.classList.toggle('tv-theme-dark', localStorage.getItem('cgTvTheme') === 'dark'); bind(); clock(); fetchSnapshot({ detectNew: false }); updateSoundLabel(); }
-  window.CGTVTest = { priority, status, isOSAtiva, osKey, enqueueAlert, finishAlert, state, constants: { ROTATION_MS, SNAPSHOT_MS, FAST_MS, ALERT_MS } };
+  window.CGTVTest = { priority, status, isOSAtiva, osKey, enqueueAlert, resolveNewOSEvent, findSnapshotOS, isCompleteOS, fetchSnapshot, finishAlert, state, constants: { ROTATION_MS, SNAPSHOT_MS, FAST_MS, ALERT_MS } };
   document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init, { once: true }) : init();
 })();
