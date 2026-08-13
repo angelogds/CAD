@@ -136,6 +136,16 @@ function marcarComprada(req, res) {
   return res.redirect(`/compras/solicitacoes/${req.params.id}`);
 }
 
+function salvarPainelItens(req, res) {
+  try {
+    service.salvarPainelItens(Number(req.params.id), req.body, req.session.user.id);
+    req.flash('success', 'Cotação, compra e recebimento atualizados com segurança.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível salvar o painel por item.');
+  }
+  return res.redirect(`/compras/solicitacoes/${req.params.id}`);
+}
+
 function uploadAnexo(req, res) {
   try {
     if (!req.file) throw new Error('Nenhum arquivo foi enviado.');
@@ -184,6 +194,7 @@ module.exports = {
   selecionarCotacao,
   atualizarDados,
   marcarComprada,
+  salvarPainelItens,
   uploadAnexo,
   downloadAnexo,
   deleteAnexo,

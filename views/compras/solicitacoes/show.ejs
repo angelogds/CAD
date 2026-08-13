@@ -1,112 +1,25 @@
 <% layout('layout') %>
+<% const money = (c) => (Number(c || 0) / 100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); %>
+<div class="page-head"><div><h1><%= sol.numero || ('Solicitação #' + sol.id) %></h1><p class="muted"><%= sol.solicitante_nome || '-' %> • <%= sol.setor_origem || '-' %> • <strong><%= String(sol.status).replaceAll('_',' ') %></strong></p></div><div class="quote-actions"><a class="btn btn-ghost" href="/compras/solicitacoes">Voltar</a><a class="btn btn-green" href="/compras/solicitacoes/<%= sol.id %>/pdf">Baixar PDF</a></div></div>
+<% if (sol.os_id) { %><div class="card linked-os"><strong>🔗 <%= sol.numero %> → OS <%= sol.os_id %><%= sol.equipamento_nome ? (' → ' + sol.equipamento_nome) : '' %></strong><div><a class="btn btn-sm btn-green" href="/os/<%= sol.os_id %>">Abrir OS</a></div></div><% } %>
 
-<div class="page-head">
-  <div>
-    <h1><%= sol.numero || ('Solicitação #' + sol.id) %></h1>
-    <p class="muted">Solicitante: <%= sol.solicitante_nome || '-' %> • Setor: <%= sol.setor_origem || '-' %> • Prioridade: <%= sol.prioridade || '-' %></p>
-  </div>
-  <div style="display:flex;gap:8px;">
-    <a class="btn btn-ghost" href="/compras/solicitacoes?status=<%= sol.status || 'ABERTA' %>">Voltar</a>
-    <a class="btn btn-green" href="/compras/solicitacoes/<%= sol.id %>/pdf">Baixar cópia do PDF</a>
-  </div>
-</div>
+<div class="card progress-card"><div class="section-title">ANDAMENTO DA COTAÇÃO</div><div class="progress-track"><span style="width:<%= sol.resumoItens.progresso %>%"></span></div><div class="progress-stats"><strong><%= sol.resumoItens.cotados %> de <%= sol.resumoItens.total %> itens cotados (<%= sol.resumoItens.progresso %>%)</strong><span><%= sol.resumoItens.comprados %> comprados</span><span><%= sol.resumoItens.recebidos %> de <%= sol.resumoItens.total %> recebidos</span><strong data-total-geral><%= money(sol.resumoItens.totalCentavos) %></strong></div></div>
 
-<% if (sol.os_id) { %>
-  <div class="card" style="margin-bottom:12px;border-left:4px solid #16a34a;">
-    <strong>🔗 Vinculada à OS <%= sol.os_id %><%= sol.equipamento_nome ? (' – ' + sol.equipamento_nome) : '' %></strong>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-      <a class="btn btn-green" href="/chat-os/<%= sol.os_id %>">Abrir conversa da OS</a>
-      <a class="btn btn-ghost" href="/os/<%= sol.os_id %>">Abrir OS</a>
-    </div>
-  </div>
-<% } %>
+<form id="quote-form" method="POST" action="/compras/solicitacoes/<%= sol.id %>/painel-itens">
+<div class="card"><div class="section-title">COTAÇÃO E RECEBIMENTO POR ITEM</div>
+<% if (!sol.valores_itens_revisados && sol.valor_total) { %><div class="legacy-warning">⚠️ Valor legado preservado: <strong><%= Number(sol.valor_total).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) %></strong>. Revise os preços por item.</div><% } %>
+<div class="table-wrap quote-table-wrap"><table class="table quote-table"><thead><tr><th>Seleção</th><th>Status</th><th>Item e descrição</th><th>Quantidade</th><th>Unidade</th><th>Fornecedor</th><th>Valor unitário</th><th>Subtotal</th><th>Recebimento</th><th>Ações</th></tr></thead><tbody>
+<% if (!sol.itens.length) { %><tr><td colspan="10" class="muted">Sem itens.</td></tr><% } %>
+<% sol.itens.forEach((it) => { const state=it.status_compra==='COMPRADO'?'comprado':it.status_cotacao==='COTADO'?'cotado':'pendente'; %>
+<tr class="quote-row state-<%= state %>" data-quantity="<%= it.qtd_solicitada %>"><td data-label="Seleção"><input type="hidden" name="item_id" value="<%= it.id %>"><input class="buy-check" type="checkbox" name="comprar" value="<%= it.id %>" aria-label="Selecionar para comprar"></td><td data-label="Status"><label class="check-label"><input class="quoted-check" type="checkbox" name="cotado" value="<%= it.id %>" <%= it.status_cotacao==='COTADO'?'checked':'' %>><span class="status-badge"><%= state.toUpperCase() %></span></label></td><td data-label="Item"><strong><%= it.item_nome || '-' %></strong><small><%= it.item_descricao || '' %></small></td><td data-label="Quantidade"><%= it.qtd_solicitada %></td><td data-label="Unidade"><%= it.unidade || 'UN' %></td><td data-label="Fornecedor"><select class="input supplier" name="fornecedor_id"><option value="">Selecione</option><% fornecedores.forEach(f=>{ %><option value="<%= f.id %>" <%= Number(it.fornecedor_id)===Number(f.id)?'selected':'' %>><%= f.nome %></option><% }) %></select></td><td data-label="Valor unitário"><input class="input unit-price" name="valor_unitario" inputmode="decimal" value="<%= it.valor_unitario_centavos == null ? '' : (it.valor_unitario_centavos/100).toFixed(2).replace('.',',') %>" placeholder="R$ 0,00"></td><td data-label="Subtotal"><strong class="item-subtotal"><%= money(it.subtotal_centavos) %></strong></td><td data-label="Recebimento"><input class="input received" name="qtd_recebida" type="number" step="0.01" min="0" max="<%= it.qtd_comprada ?? it.qtd_solicitada %>" value="<%= it.qtd_recebida_total || 0 %>"><small><%= it.qtd_recebida_total || 0 %> de <%= it.qtd_comprada ?? it.qtd_solicitada %> — <%= it.situacao_recebimento.replaceAll('_',' ') %></small></td><td data-label="Ações"><button type="button" class="btn btn-sm btn-ghost edit-item">Editar / cotar</button></td></tr>
+<% }) %></tbody></table></div></div>
 
-<div class="card" style="margin-bottom:12px;">
-  <div class="label" style="margin-bottom:8px;">Itens solicitados</div>
-  <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th>Item</th><th>Descrição</th><th>UN</th><th>Qtd</th></tr></thead>
-      <tbody>
-        <% if (!sol.itens?.length) { %><tr><td colspan="4" class="muted">Sem itens.</td></tr><% } %>
-        <% (sol.itens || []).forEach((it) => { %>
-          <tr>
-            <td><strong><%= it.item_nome || '-' %></strong></td>
-            <td><%= it.item_descricao || '-' %></td>
-            <td><%= it.unidade || 'UN' %></td>
-            <td><%= it.qtd_solicitada || 0 %></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  </div>
-</div>
+<div class="purchase-grid"><div class="card"><div class="section-title">DADOS GERAIS DA COMPRA</div><div class="grid-3">
+<div><label class="label">Fornecedor principal</label><select class="input" name="fornecedor_principal_id" id="main-supplier"><option value="">Selecionar</option><% fornecedores.forEach(f=>{ %><option value="<%= f.id %>" <%= Number(sol.fornecedor_id)===Number(f.id)?'selected':'' %>><%= f.nome %></option><% }) %></select><button type="button" class="link-button" id="apply-supplier">Aplicar aos itens sem fornecedor</button></div>
+<div><label class="label">Condição de pagamento</label><input class="input" name="condicao_pagamento" value="<%= sol.condicao_pagamento || '' %>"></div><div><label class="label">Validade da cotação</label><input class="input" type="date" name="validade_cotacao" value="<%= sol.validade_cotacao ? String(sol.validade_cotacao).slice(0,10):'' %>"></div>
+<div><label class="label">Previsão de entrega</label><input class="input" type="date" name="previsao_entrega" value="<%= sol.previsao_entrega ? String(sol.previsao_entrega).slice(0,10):'' %>"></div><div><label class="label">Número do pedido</label><input class="input" name="numero_pedido" value="<%= sol.numero_pedido || '' %>"></div><div><label class="label">Número da nota fiscal</label><input class="input" name="numero_nota_fiscal" value="<%= sol.numero_nota_fiscal || '' %>"></div><div class="span-all"><label class="label">Observações de Compras</label><textarea class="input" name="observacoes_compras"><%= sol.observacoes_compras || '' %></textarea></div></div></div>
+<div class="card financial"><div class="section-title">RESUMO FINANCEIRO</div><div><span>Subtotal dos itens</span><strong data-subtotal><%= money(sol.resumoItens.subtotalCentavos) %></strong></div><label><span>Frete</span><input class="input adjustment" name="frete" value="<%= (sol.resumoItens.freteCentavos/100).toFixed(2).replace('.',',') %>"></label><label><span>Desconto</span><input class="input adjustment" name="desconto" value="<%= (sol.resumoItens.descontoCentavos/100).toFixed(2).replace('.',',') %>"></label><div class="grand-total"><span>Total geral</span><strong data-total-geral><%= money(sol.resumoItens.totalCentavos) %></strong></div></div></div>
+<div class="form-actions"><button class="btn btn-ghost" type="submit">Salvar rascunho</button><button class="btn btn-green" type="submit">Marcar itens selecionados como COMPRADOS</button></div></form>
 
-<div class="card" style="margin-bottom:12px;">
-  <div class="label" style="margin-bottom:8px;">Dados de cotação/compra</div>
-  <form method="POST" action="/compras/solicitacoes/<%= sol.id %>/atualizar-dados" class="grid-3">
-    <div>
-      <div class="label">Fornecedor (cadastro)</div>
-      <select class="input" name="fornecedor_id" onchange="const opt=this.options[this.selectedIndex]; document.getElementById('fornecedor_nome').value = opt.dataset.nome || '';">
-        <option value="">Selecionar fornecedor</option>
-        <% (fornecedores || []).forEach((f) => { %>
-          <option value="<%= f.id %>" data-nome="<%= f.nome %>" <%= Number(sol.fornecedor_id || 0) === Number(f.id) ? 'selected' : '' %>>
-            <%= f.nome %><%= f.cnpj ? (' • ' + f.cnpj) : '' %><%= f.cidade ? (' • ' + f.cidade) : '' %>
-          </option>
-        <% }) %>
-      </select>
-    </div>
-    <div>
-      <div class="label">Fornecedor (texto livre)</div>
-      <input id="fornecedor_nome" class="input" name="fornecedor" value="<%= sol.fornecedor || sol.fornecedor_nome || '' %>" />
-    </div>
-    <div><div class="label">Previsão de entrega</div><input class="input" type="date" name="previsao_entrega" value="<%= sol.previsao_entrega ? String(sol.previsao_entrega).slice(0,10) : '' %>" /></div>
-    <div><div class="label">Valor total</div><input class="input" name="valor_total" type="number" step="0.01" min="0" value="<%= sol.valor_total || '' %>" /></div>
-    <div style="grid-column:1/-1;"><div class="label">Observações compras</div><textarea class="input" name="observacoes_compras"><%= sol.observacoes_compras || '' %></textarea></div>
-    <div style="grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn btn-ghost" type="submit">Salvar dados</button>
-    </div>
-  </form>
-  <% if (sol.status === 'EM_COTACAO') { %>
-    <form method="POST" action="/compras/solicitacoes/<%= sol.id %>/marcar-comprada" style="margin-top:8px;">
-      <button class="btn btn-green" type="submit">Marcar como COMPRADA</button>
-    </form>
-  <% } %>
-</div>
-
-<div class="card" style="margin-bottom:12px;">
-  <div class="label" style="margin-bottom:8px;">Anexar cotação</div>
-  <form method="POST" action="/compras/solicitacoes/<%= sol.id %>/anexos" enctype="multipart/form-data" class="grid-3">
-    <div>
-      <div class="label">Tipo</div>
-      <select class="input" name="tipo">
-        <option value="COTACAO">COTAÇÃO</option>
-        <option value="NF">NF</option>
-      </select>
-    </div>
-    <div style="grid-column: span 2;">
-      <div class="label">Arquivo (PDF/JPG/PNG/WEBP)</div>
-      <input class="input" type="file" name="arquivo" accept="application/pdf,image/jpeg,image/png,image/webp" required />
-    </div>
-    <div style="grid-column:1/-1;"><button class="btn" type="submit">Enviar anexo</button></div>
-  </form>
-
-  <div class="table-wrap" style="margin-top:10px;">
-    <table class="table">
-      <thead><tr><th>Tipo</th><th>Nome original</th><th>Data</th><th>Ações</th></tr></thead>
-      <tbody>
-        <% if (!sol.anexos?.length) { %><tr><td colspan="4" class="muted">Sem anexos.</td></tr><% } %>
-        <% (sol.anexos || []).forEach((a) => { %>
-          <tr>
-            <td><%= a.tipo || '-' %></td>
-            <td><%= a.original_name || a.filename %></td>
-            <td><%= fmtBR(a.created_at || a.uploaded_at) %></td>
-            <td style="display:flex;gap:6px;">
-              <a class="btn btn-sm btn-ghost" href="/compras/anexos/<%= a.id %>/download">Download</a>
-              <% if (isAdmin) { %><form method="POST" action="/compras/anexos/<%= a.id %>/delete"><button class="btn btn-sm" type="submit">Excluir</button></form><% } %>
-            </td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  </div>
-</div>
+<div class="card attachments"><div class="section-title">ANEXOS</div><form method="POST" action="/compras/solicitacoes/<%= sol.id %>/anexos" enctype="multipart/form-data" class="grid-3"><select class="input" name="tipo"><option>COTACAO</option><option>PEDIDO_COMPRA</option><option>NOTA_FISCAL</option><option>COMPROVANTE</option><option>OUTRO</option></select><input class="input" type="file" name="arquivo" accept="application/pdf,image/jpeg,image/png,image/webp" required><button class="btn" type="submit">Enviar anexo</button></form><div class="table-wrap"><table class="table"><thead><tr><th>Tipo</th><th>Nome original</th><th>Data</th><th>Usuário</th><th>Ações</th></tr></thead><tbody><% if(!sol.anexos.length){ %><tr><td colspan="5">Sem anexos.</td></tr><% } sol.anexos.forEach(a=>{ %><tr><td><%= a.tipo %></td><td><%= a.original_name || a.filename %></td><td><%= fmtBR(a.created_at || a.uploaded_at) %></td><td><%= a.uploaded_by_nome || '-' %></td><td><a class="btn btn-sm btn-ghost" href="/compras/anexos/<%= a.id %>/download">Visualizar / baixar</a></td></tr><% }) %></tbody></table></div></div>
+<link rel="stylesheet" href="/css/compras-painel.css"><script src="/js/compras-painel.js" defer></script>
