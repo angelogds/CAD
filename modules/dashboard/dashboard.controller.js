@@ -5,6 +5,7 @@ const alertsService = require('../alerts/alerts.service');
 const webPushService = require('../notifications/webpush.service');
 const db = require('../../database/db');
 const criticalityService = require('./operational-criticality.service');
+const operationalDashboardService = require('./operational-dashboard.service');
 
 function isMecanicoLikeRole(role = '') {
   const norm = String(role || '').toUpperCase();
@@ -69,29 +70,36 @@ function listMecanicosOnline(limit = 8) {
   }
 }
 
-function buildDashboardPayload({ tvMode = false } = {}) {
+function buildDashboardPayload({ tvMode = false, query = {} } = {}) {
   service.processarFechamentoMensalAutomatico();
   const ranking = service.getMecanicosRankingSemana() || {};
+  const osPainel = service.getOSPainel(tvMode ? 30 : 50);
+  const preventivas = service.getPreventivasDashboard();
+  const demandasResumo = service.getDemandasResumoDashboard();
+  const criticidadeOperacional = criticalityService.getDashboard({ ...query, periodo: query.periodo === '7d' ? 7 : query.periodo === '30d' ? 30 : undefined });
+  const operational = operationalDashboardService.buildOperationalDashboard({ query, osPainel, preventivas, demandas: demandasResumo, criticidade: criticidadeOperacional });
+  operational.os.closedInPeriod = service.getOSFechadasPeriodo({ inicio: operational.period.start, fim: operational.period.end, setor: operational.sector });
   return {
     title: tvMode ? 'Modo TV' : 'Painel',
     activeMenu: 'dashboard',
     cards: service.getCards(),
     osResumo: service.getOSResumoStatus(),
-    osPainel: service.getOSPainel(tvMode ? 30 : 15),
+    osPainel,
     osEmAndamento: service.getOSEmAndamento(),
     historicoEquipamentos: service.getHistoricoEquipamentos(10),
     motoresResumo: service.getMotoresResumoDashboard(),
     comprasResumo: service.getComprasResumoDashboard(),
     estoqueResumo: service.getEstoqueResumoDashboard(),
-    demandasResumo: service.getDemandasResumoDashboard(),
-    preventivas: service.getPreventivasDashboard(),
+    demandasResumo,
+    preventivas,
     escala: service.getEscalaPainelSemana() || service.getEscalaSemana(),
     rankingMecanicos: ranking,
     rankingPeriodoMensal: service.getCurrentMonthlyPeriod(),
     rankingRelatorioMensal: service.getUltimoRelatorioMensalFechado(),
     avisos: service.getAvisosDashboard(12),
     alertaAtivo: alertsService.getAlertaAtivo(),
-    criticidadeOperacional: criticalityService.getDashboard({}),
+    criticidadeOperacional,
+    operational,
     tvMode,
   };
 }
@@ -119,7 +127,7 @@ function criticidadeEquipamento(req, res) {
 
 function index(req, res) {
   const tvMode = ['1', 'true', 'tv'].includes(String(req.query.tv || '').toLowerCase());
-  return res.render('dashboard/index', buildDashboardPayload({ tvMode }));
+  return res.render('dashboard/index', buildDashboardPayload({ tvMode, query: req.query || {} }));
 }
 
 function tv(_req, res) {

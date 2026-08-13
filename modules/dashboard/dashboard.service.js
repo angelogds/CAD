@@ -728,6 +728,28 @@ function getOSResumoStatus() {
   }, { abertas: 0, andamento: 0, fechadas: 0 });
 }
 
+function getOSFechadasPeriodo({ inicio, fim, setor = '' } = {}) {
+  return safeGet(() => {
+    if (!inicio || !fim) return 0;
+    const osCols = db.prepare('PRAGMA table_info(os)').all().map((c) => c.name);
+    const closedColumn = osCols.includes('closed_at') ? 'o.closed_at' : (osCols.includes('updated_at') ? 'o.updated_at' : null);
+    if (!closedColumn) return null;
+    const params = [`${inicio} 00:00:00`, `${fim} 23:59:59`];
+    let sectorSql = '';
+    if (setor && tableExists('equipamentos')) {
+      sectorSql = ' AND UPPER(COALESCE(e.setor,\'\')) = UPPER(?)';
+      params.push(setor);
+    }
+    return Number(db.prepare(`
+      SELECT COUNT(DISTINCT o.id) AS total
+      FROM os o
+      LEFT JOIN equipamentos e ON e.id = o.equipamento_id
+      WHERE UPPER(COALESCE(o.status,'')) IN ('CONCLUIDA','FINALIZADA','FECHADA')
+        AND datetime(${closedColumn}) BETWEEN datetime(?) AND datetime(?)${sectorSql}
+    `).get(...params)?.total || 0);
+  }, null);
+}
+
 function getOSPainel(limit = 15) {
   return safeGet(() => {
     if (typeof preventivasService?.sincronizarOSPreventivasComResponsaveis === "function") {
@@ -1511,6 +1533,7 @@ module.exports = {
   getCards,
   getMotoresResumoDashboard,
   getOSResumoStatus,
+  getOSFechadasPeriodo,
   getOSPainel,
   getOSEmAndamento,
   getHistoricoEquipamentos,
