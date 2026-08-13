@@ -53,9 +53,10 @@ test('view mantém ordem, ações, filtros, estados vazios e modo TV', () => {
   const css=fs.readFileSync('public/css/operational-dashboard.css','utf8');
   const js=fs.readFileSync('public/js/operational-dashboard.js','utf8');
   assert.ok(view.indexOf('id="os"') < view.indexOf('id="criticidade"'));
-  assert.ok(view.indexOf('id="criticidade"') < view.indexOf('id="performance"'));
-  assert.ok(view.indexOf('id="performance"') < view.indexOf('id="preventivas"'));
-  for(const text of ['ATENÇÃO IMEDIATA','Todos os setores','Período personalizado','Motivo não informado','Sem dados suficientes','Nenhuma demanda em andamento.']) assert.match(view,new RegExp(text));
+  assert.ok(view.indexOf('id="criticidade"') < view.indexOf('id="preventivas"'));
+  for(const text of ['Todos os setores','Personalizado','DISTRIBUIÇÃO DAS OS','FALHAS — ÚLTIMOS 30 DIAS','Nenhuma demanda em andamento.']) assert.match(view,new RegExp(text));
+  for(const removed of ['ATENÇÃO IMEDIATA','INDICADORES DE DESEMPENHO DA MANUTENÇÃO','Tempo aberto','Motivo não informado']) assert.doesNotMatch(view,new RegExp(removed));
+  assert.match(view,/\.slice\(0,5\)/); assert.match(view,/\.slice\(0,6\)/);
   assert.match(view,/action="\/os\/<%= o\.id %>\/status"/);
   assert.match(js,/setInterval\(\(\) => location\.reload\(\), 60000\)/);
   assert.match(css,/@media\(max-width:700px\)/); assert.match(css,/grid-template-columns:repeat\(2,1fr\)/);
