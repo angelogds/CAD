@@ -436,6 +436,13 @@ async function osClose(req, res) {
       return res.redirect(redirectAfterClose);
     }
 
+    const statusConclusao = String(osAtual.status || "").trim().toUpperCase();
+    const statusPermitidos = ["ANDAMENTO", "EM_ANDAMENTO", "PAUSADA", "AGUARDANDO_MATERIAL"];
+    if (!statusPermitidos.includes(statusConclusao)) {
+      req.flash("error", "Inicie a OS antes de registrar a conclusão.");
+      return res.redirect(`/os/${id}#evidencias`);
+    }
+
     const fotosFechamento = mapFilesToPublic(req.files?.fechamento_fotos || []);
     if (!fotosFechamento.length) {
       req.flash("error", "Adicione pelo menos uma mídia (foto ou vídeo) de fechamento para concluir a OS.");

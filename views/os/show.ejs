@@ -1,94 +1,70 @@
 <% layout('layout') %>
-
 <link rel="stylesheet" href="/css/os-detail.css" />
-
-<% const isOSFechada = String(os.status || '').toUpperCase() === 'FECHADA'; %>
-<% const osStatus = String(os.status || '-').toUpperCase().replace(/_/g, ' '); %>
-<% const osPrioridade = String(os.grau || '-').toUpperCase(); %>
-<% const diagnosticoInicialOS = os.ai_diagnostico_inicial || os.diagnostico || os.causa_diagnostico || '-'; %>
-<% const equipePrincipal = [os.executor_nome || os.execucao_ativa?.executor_nome, os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome].filter(Boolean); %>
-
-<section class="os-page">
+<%
+  const rawStatus = String(os.status || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+  const statusAliases = { EM_ANDAMENTO: 'ANDAMENTO', FINALIZADA: 'FECHADA', FINALIZADO: 'FECHADA', CONCLUIDA: 'FECHADA', CONCLUÍDA: 'FECHADA' };
+  const statusKey = statusAliases[rawStatus] || rawStatus || 'ABERTA';
+  const statusMetaMap = {
+    ABERTA: { label: 'ABERTA', phase: 'open', action: 'Iniciar OS' },
+    AGUARDANDO_EQUIPE: { label: 'AGUARDANDO EQUIPE', phase: 'open', action: 'Iniciar OS' },
+    ANDAMENTO: { label: 'EM ANDAMENTO', phase: 'running', action: 'Pausar OS' },
+    PAUSADA: { label: 'PAUSADA', phase: 'paused', action: 'Retomar OS' },
+    AGUARDANDO_MATERIAL: { label: 'AGUARDANDO MATERIAL', phase: 'material', action: 'Registrar chegada do material' },
+    FECHADA: { label: 'CONCLUÍDA', phase: 'closed', action: null }
+  };
+  const statusMeta = statusMetaMap[statusKey] || { label: statusKey.replace(/_/g, ' '), phase: 'open', action: 'Iniciar OS' };
+  const isOSFechada = statusMeta.phase === 'closed';
+  const canConcluir = ['running', 'paused', 'material'].includes(statusMeta.phase) && canExecuteOS;
+  const osStatus = statusMeta.label;
+  const osPrioridade = String(os.grau || '-').toUpperCase();
+  const diagnosticoInicialOS = os.ai_diagnostico_inicial || os.diagnostico || os.causa_diagnostico || 'Diagnóstico ainda não registrado';
+  const equipePrincipal = [os.executor_nome || os.execucao_ativa?.executor_nome, os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome].filter(Boolean);
+  const initials = (name) => { const parts = String(name || '').trim().split(/\s+/).filter(Boolean); return parts.length ? (parts[0][0] + (parts.length > 1 ? parts[1][0] : '')).toLocaleUpperCase('pt-BR') : '?'; };
+  const linkedRequest = chatResumo && chatResumo.solicitacao && Number(chatResumo.solicitacao.id) > 0 ? chatResumo.solicitacao : null;
+  const openedAt = os.opened_at || os.data_abertura || os.created_at || '';
+  const startedAt = os.data_inicio || os.execucao_iniciada_em || '';
+  const closedAt = os.data_conclusao || os.closed_at || os.data_fim || '';
+%>
+<section class="os-page" data-os-status="<%= statusKey %>">
   <header class="os-hero">
     <div class="os-heading">
-      <div class="os-title-row">
-        <h1>OS #<%= os.id %> <span>•</span> <%= os.equipamento_resolvido || 'Equipamento' %></h1>
-        <span class="os-badge os-badge-status"><%= osStatus %></span>
-        <span class="os-badge os-badge-priority"><%= osPrioridade %></span>
-        <span class="os-badge os-badge-type"><%= String(os.tipo || 'Corretiva').toUpperCase() %></span>
-      </div>
-      <p><%= os.descricao || 'Sem descrição informada.' %></p>
+      <div class="os-title-row"><h1>OS #<%= os.id %> <span aria-hidden="true">·</span> <%= os.equipamento_resolvido || 'Equipamento' %></h1><span class="os-badge os-badge-status status-<%= statusMeta.phase %>"><%= osStatus %></span><span class="os-badge os-badge-priority"><%= osPrioridade %></span><span class="os-badge os-badge-type"><%= String(os.tipo || 'Corretiva').toUpperCase() %></span></div>
+      <p class="os-description" id="os-description"><%= os.descricao || 'Sem descrição informada.' %></p><button type="button" class="os-description-more" aria-controls="os-description" aria-expanded="false">Ver mais</button>
     </div>
     <div class="os-actions">
-      <% if (!isOSFechada && canExecuteOS) { %><form method="POST" action="/os/<%= os.id %>/pausar"><button class="btn btn-outline" type="submit">Ⅱ&nbsp; Pausar OS</button></form><% } %>
-      <a class="btn btn-outline" href="/chat-os/<%= os.id %>">▣&nbsp; Abrir conversa</a>
-      <% if (canExecuteOS) { %><form method="POST" action="/os/<%= os.id %>/pdf-institucional"><button class="btn btn-outline" type="submit">PDF OS</button></form><% } %>
-      <div class="os-menu-wrap" id="os-menu-wrap">
-        <button class="btn btn-outline os-menu-btn" type="button" id="os-menu-btn" aria-expanded="false" aria-controls="os-menu-panel">⋮&nbsp; Mais ações⌄</button>
-        <div class="os-menu-panel" id="os-menu-panel"><div class="os-menu-list">
-          <button class="btn btn-outline" type="button" data-os-module="tracagens-vinculadas">Traçagens vinculadas</button>
-          <button class="btn btn-outline" type="button" data-os-module="equipe-os">Equipe da OS</button>
-          <button class="btn btn-outline" type="button" data-os-module="whatsapp-os">Notificações WhatsApp</button>
-          <button class="btn btn-outline" type="button" data-os-module="justificativa-andamento">Justificativa de OS em andamento</button>
-          <% if (documentoInstitucional && documentoInstitucional.pdf_url) { %><a class="btn btn-outline" href="<%= documentoInstitucional.pdf_url %>" target="_blank" rel="noopener">Baixar PDF OS</a><% } %>
-        </div></div>
-      </div>
-      <a class="btn btn-outline" href="/os">‹&nbsp; Voltar</a>
+      <% if (canExecuteOS && statusMeta.phase === 'open') { %><form method="POST" action="/os/<%= os.id %>/iniciar"><button class="btn btn-primary" type="submit">Iniciar OS</button></form><% } %>
+      <% if (canExecuteOS && statusMeta.phase === 'running') { %><form method="POST" action="/os/<%= os.id %>/pausar"><button class="btn btn-outline" type="submit">Pausar OS</button></form><% } %>
+      <% if (canExecuteOS && statusMeta.phase === 'paused') { %><form method="POST" action="/os/<%= os.id %>/iniciar"><button class="btn btn-primary" type="submit">Retomar OS</button></form><% } %>
+      <% if (canRegisterAndamento && statusMeta.phase === 'material') { %><form method="POST" action="/os/<%= os.id %>/material-chegou"><button class="btn btn-primary" type="submit">Registrar chegada do material</button></form><% } %>
+      <a class="btn btn-outline" href="/chat-os/<%= os.id %>">Abrir conversa</a>
+      <% if (canExecuteOS) { %><form method="POST" action="/os/<%= os.id %>/pdf-institucional"><button class="btn btn-outline" type="submit">PDF da OS</button></form><% } %>
+      <div class="os-menu-wrap" id="os-menu-wrap"><button class="btn btn-outline os-menu-btn" type="button" id="os-menu-btn" aria-expanded="false" aria-controls="os-menu-panel">Mais ações</button><div class="os-menu-panel" id="os-menu-panel"><div class="os-menu-list"><button class="btn btn-outline" type="button" data-os-module="tracagens-vinculadas">Traçagens vinculadas</button><button class="btn btn-outline" type="button" data-os-module="equipe-os">Equipe da OS</button><button class="btn btn-outline" type="button" data-os-module="whatsapp-os">Notificações WhatsApp</button><button class="btn btn-outline" type="button" data-os-module="justificativa-andamento">Justificativa de OS em andamento</button><% if (documentoInstitucional && documentoInstitucional.pdf_url) { %><a class="btn btn-outline" href="<%= documentoInstitucional.pdf_url %>" target="_blank" rel="noopener">Baixar PDF OS</a><% } %></div></div></div>
+      <a class="btn btn-outline" href="/os">Voltar</a>
     </div>
   </header>
 
   <div class="os-progress" aria-label="Progresso da ordem de serviço">
-    <div class="os-step complete"><span class="os-step-dot">✓</span><div><strong>Aberta</strong><small><%= os.opened_at ? fmtBR(os.opened_at) : '-' %></small></div></div>
-    <span class="os-step-line active"></span>
-    <div class="os-step current"><span class="os-step-dot">2</span><div><strong>Em andamento</strong><small>Desde <%= os.data_inicio || os.execucao_iniciada_em ? fmtBR(os.data_inicio || os.execucao_iniciada_em) : '-' %></small></div></div>
-    <span class="os-step-line"></span>
-    <div class="os-step"><span class="os-step-dot">3</span><div><strong>Concluída</strong><small><%= isOSFechada ? fmtBR(os.data_conclusao || os.closed_at || os.data_fim) : 'Aguardando conclusão' %></small></div></div>
-    <div class="os-open-time"><span>◷</span><div><small>Tempo em aberto</small><strong><%= isOSFechada ? 'Concluída' : 'Em andamento' %></strong></div></div>
+    <div class="os-step <%= statusMeta.phase === 'open' ? 'current' : 'complete' %>"><span class="os-step-dot">1</span><div><strong>Aberta</strong><small><%= openedAt ? fmtBR(openedAt) : 'Data não informada' %></small></div></div><span class="os-step-line <%= statusMeta.phase !== 'open' ? 'active' : '' %>"></span>
+    <div class="os-step <%= ['running','paused','material'].includes(statusMeta.phase) ? 'current warning-' + statusMeta.phase : (isOSFechada ? 'complete' : '') %>"><span class="os-step-dot">2</span><div><strong>Em andamento<%= statusMeta.phase === 'paused' ? ' — pausada' : statusMeta.phase === 'material' ? ' — aguardando material' : '' %></strong><small><%= statusMeta.phase === 'open' ? 'Ainda não iniciada' : (startedAt ? ('Desde ' + fmtBR(startedAt)) : (isOSFechada ? 'Início não informado' : 'Início não informado')) %></small></div></div><span class="os-step-line <%= isOSFechada ? 'active' : '' %>"></span>
+    <div class="os-step <%= isOSFechada ? 'current' : '' %>"><span class="os-step-dot">3</span><div><strong>Concluída</strong><small><%= isOSFechada ? (closedAt ? fmtBR(closedAt) : 'Data não informada') : 'Aguardando conclusão' %></small></div></div>
+    <div class="os-open-time"><div><small><%= isOSFechada ? 'Tempo total' : 'Tempo em aberto' %></small><strong id="os-elapsed" data-start="<%= openedAt %>" data-end="<%= isOSFechada ? closedAt : '' %>">Duração indisponível</strong></div></div>
   </div>
 
-  <div class="os-kpis">
-    <article class="os-kpi blue"><span class="os-kpi-icon">▣</span><div><small>Equipamento</small><strong><%= os.equipamento_resolvido || '-' %></strong></div></article>
-    <article class="os-kpi cyan"><span class="os-kpi-icon">⌁</span><div><small>Status</small><strong class="os-inline-badge"><%= osStatus %></strong></div></article>
-    <article class="os-kpi orange"><span class="os-kpi-icon">⚑</span><div><small>Prioridade</small><strong class="os-inline-badge priority"><%= osPrioridade %></strong></div></article>
-    <article class="os-kpi green"><span class="os-kpi-icon">♧</span><div><small>Equipe</small><strong><%= equipePrincipal.join(' e ') || 'Não alocada' %></strong></div></article>
+  <div class="os-kpis"><article class="os-kpi blue"><div><small>Equipamento</small><strong><%= os.equipamento_resolvido || '-' %></strong></div></article><article class="os-kpi cyan"><div><small>Status</small><strong class="os-inline-badge status-<%= statusMeta.phase %>"><%= osStatus %></strong></div></article><article class="os-kpi orange"><div><small>Prioridade</small><strong class="os-inline-badge priority"><%= osPrioridade %></strong></div></article><article class="os-kpi green"><div><small>Equipe</small><strong><%= equipePrincipal.join(' e ') || 'Não alocada' %></strong></div></article></div>
+
+  <div class="os-summary-grid"><article class="os-panel service-panel"><h2>Serviço e diagnóstico</h2><div class="os-info-list"><div><p><strong>Descrição do problema</strong><small><%= os.descricao || 'Descrição não informada' %></small></p></div><div><p><strong>Diagnóstico inicial</strong><small><%= diagnosticoInicialOS %></small></p></div><div><p><strong>Ação corretiva</strong><small><%= os.acao_corretiva || 'Aguardando registro da execução.' %></small></p></div><div><p><strong>Ação preventiva</strong><small><%= os.acao_preventiva || 'Aguardando registro da execução.' %></small></p></div></div></article>
+    <div class="os-side-stack"><article class="os-panel"><h2>Equipe e execução</h2><div class="os-team-grid"><p><strong>Responsável manutenção:</strong><span><b class="avatar green"><%= initials(os.responsavel_manutencao) %></b><%= os.responsavel_manutencao || '-' %></span></p><p><strong>Turno da alocação:</strong><span><%= os.turno_alocado || os.execucao_ativa?.turno_alocacao || '-' %></span></p><p><strong>Executor em andamento:</strong><span><b class="avatar"><%= initials(os.executor_nome || os.execucao_ativa?.executor_nome) %></b><%= os.executor_nome || os.execucao_ativa?.executor_nome || '-' %></span></p><p><strong>Modo da alocação:</strong><span><%= os.alocacao_modo || '-' %></span></p><p><strong>Mecânico 2 em andamento:</strong><span><b class="avatar"><%= initials(os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome) %></b><%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></span></p></div></article>
+      <article class="os-panel communication"><h2>Solicitação e comunicação</h2><div class="communication-grid"><p><span>Solicitação de material vinculada<small><%= linkedRequest ? ((linkedRequest.numero || '#' + linkedRequest.id) + ' — ' + (linkedRequest.status || 'status não informado')) : 'Nenhuma solicitação vinculada' %></small></span></p><p><span>Mensagens não lidas<small><%= chatResumo ? chatResumo.naoLidas : 0 %> mensagens não lidas</small></span></p></div><div class="actions"><a class="btn btn-green" href="/chat-os/<%= os.id %>">Abrir conversa</a><% if (linkedRequest) { %><a class="btn btn-outline" href="/solicitacoes/<%= linkedRequest.id %>">Abrir solicitação</a><% } else { %><a class="btn btn-outline" href="/solicitacoes/nova?os_id=<%= os.id %>">Criar solicitação</a><% } %></div></article></div>
   </div>
 
-  <div class="os-summary-grid">
-    <article class="os-panel service-panel"><h2>Serviço e diagnóstico</h2>
-      <div class="os-info-list">
-        <div><span>ⓘ</span><p><strong>Descrição do problema</strong><small><%= os.descricao || '-' %></small></p></div>
-        <div><span>♧</span><p><strong>Diagnóstico inicial</strong><small><%= diagnosticoInicialOS %></small></p></div>
-        <div><span>⌕</span><p><strong>Ação corretiva</strong><small><%= os.acao_corretiva || 'Aguardando registro da execução.' %></small></p></div>
-        <div><span>♢</span><p><strong>Ação preventiva</strong><small><%= os.acao_preventiva || 'Aguardando registro da execução.' %></small></p></div>
-      </div>
-    </article>
-    <div class="os-side-stack">
-      <article class="os-panel"><h2>Equipe e execução</h2><div class="os-team-grid">
-        <p><strong>Responsável manutenção:</strong><span><b class="avatar green">R</b><%= os.responsavel_manutencao || '-' %></span></p>
-        <p><strong>Turno da alocação:</strong><span><%= os.turno_alocado || os.execucao_ativa?.turno_alocacao || '-' %></span></p>
-        <p><strong>Executor em andamento:</strong><span><b class="avatar">E</b><%= os.executor_nome || os.execucao_ativa?.executor_nome || '-' %></span></p>
-        <p><strong>Modo da alocação:</strong><span><%= os.alocacao_modo || '-' %></span></p>
-        <p><strong>Mecânico 2 em andamento:</strong><span><b class="avatar">M</b><%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></span></p>
-      </div></article>
-      <article class="os-panel communication"><h2>Solicitação e comunicação</h2>
-        <div class="communication-grid"><p>▣ <span>Solicitação de material vinculada<small><%= chatResumo && chatResumo.solicitacao ? (chatResumo.solicitacao.numero || '#' + chatResumo.solicitacao.id) : 'Nenhuma solicitação vinculada' %></small></span></p><p>▤ <span>Mensagens não lidas<small><%= chatResumo ? chatResumo.naoLidas : 0 %> mensagens não lidas</small></span></p></div>
-        <div class="actions"><a class="btn btn-green" href="/chat-os/<%= os.id %>">▣&nbsp; Abrir conversa</a><a class="btn btn-outline" href="/solicitacoes/nova?os_id=<%= os.id %>">⊕&nbsp; Criar solicitação</a></div>
-      </article>
-    </div>
-  </div>
-
-  <article class="os-panel os-workspace">
-    <nav class="os-tabs"><button class="active" type="button">Resumo</button><button type="button" data-os-module="justificativa-andamento">Execução</button><button type="button" data-os-module="tracagens-vinculadas">Materiais e compras</button><button type="button">Evidências</button><button type="button">Histórico</button></nav>
-    <div class="os-media-grid">
-      <section><h3>Mídias de abertura</h3><p>Registro visual inicial do equipamento (foto ou vídeo).</p><div class="os-upload-zone"><span>↥ &nbsp; Mídias registradas: <strong><%= (os.fotos_abertura || []).length %></strong></span><small>Fotos e vídeos da abertura.</small></div></section>
-      <section><h3>Mídias de fechamento</h3><p>Registro visual após execução (foto ou vídeo).</p>
-      <% if (!isOSFechada && canExecuteOS) { %><form method="POST" action="/os/<%= os.id %>/concluir" enctype="multipart/form-data" id="form-concluir"><label class="os-upload-zone" for="fechamento_fotos"><span>↥ &nbsp; Adicionar arquivo (foto ou vídeo)</span><small>Vídeos curtos: até 1 minuto.</small></label><input id="fechamento_fotos" type="file" name="fechamento_fotos" accept="image/*,video/*" capture="environment" multiple required hidden><div class="thumbs" id="preview-fechamento"></div></form><% } else { %><div class="os-upload-zone"><span>↥ &nbsp; Mídias registradas: <strong><%= (os.fotos_fechamento || []).length %></strong></span><small>Fotos e vídeos do fechamento.</small></div><% } %>
-      </section>
-    </div>
+  <article class="os-panel os-workspace"><nav class="os-tabs" role="tablist" aria-label="Detalhes da OS"><button id="tab-resumo" role="tab" aria-selected="true" aria-controls="panel-resumo" tabindex="0" data-tab="resumo">Resumo</button><button id="tab-execucao" role="tab" aria-selected="false" aria-controls="panel-execucao" tabindex="-1" data-tab="execucao">Execução</button><button id="tab-materiais" role="tab" aria-selected="false" aria-controls="panel-materiais" tabindex="-1" data-tab="materiais">Materiais e compras</button><button id="tab-evidencias" role="tab" aria-selected="false" aria-controls="panel-evidencias" tabindex="-1" data-tab="evidencias">Evidências</button><button id="tab-historico" role="tab" aria-selected="false" aria-controls="panel-historico" tabindex="-1" data-tab="historico">Histórico</button></nav>
+    <section id="panel-resumo" class="os-tab-panel" role="tabpanel" aria-labelledby="tab-resumo"><h3>Dados principais da OS</h3><p>Status <strong><%= osStatus %></strong>, prioridade <strong><%= osPrioridade %></strong> e tipo <strong><%= String(os.tipo || 'Corretiva').toUpperCase() %></strong>. O serviço, diagnóstico, equipe, solicitação e comunicação estão resumidos nos cards acima.</p></section>
+    <section id="panel-execucao" class="os-tab-panel" role="tabpanel" aria-labelledby="tab-execucao" hidden><div data-module-slot="justificativa-andamento"></div><div data-module-slot="equipe"></div></section>
+    <section id="panel-materiais" class="os-tab-panel" role="tabpanel" aria-labelledby="tab-materiais" hidden><h3>Solicitação, materiais e compras</h3><p><%= linkedRequest ? 'Consulte a solicitação vinculada e seus itens, cotações, compras, recebimentos e custos.' : 'Nenhuma solicitação vinculada.' %></p><% if (linkedRequest) { %><a class="btn btn-outline" href="/solicitacoes/<%= linkedRequest.id %>">Abrir solicitação</a><% } %><div data-module-slot="tracagens-vinculadas"></div></section>
+    <section id="panel-evidencias" class="os-tab-panel" role="tabpanel" aria-labelledby="tab-evidencias" hidden><div class="os-media-grid"><section><h3>Mídias de abertura</h3><p>Registro visual inicial do equipamento.</p><div class="os-gallery"><% if (!(os.fotos_abertura || []).length) { %><span class="muted">Nenhuma mídia de abertura registrada</span><% } %><% (os.fotos_abertura || []).forEach((f, idx) => { const src=f.pathPublic||f.path||f.filepath; if(src){ const video=/\.(mp4|mov|webm|ogg|m4v|avi)$/i.test(src); %><a href="<%= src %>" target="_blank" rel="noopener"><% if(video){ %><video src="<%= src %>" muted playsinline preload="metadata"></video><% }else{ %><img src="<%= src %>" alt="Mídia de abertura <%= idx+1 %>"><% } %></a><% } }); %></div></section><section><h3>Mídias de fechamento</h3><p>Registro visual após execução.</p><% if (canConcluir) { %><form method="POST" action="/os/<%= os.id %>/concluir" enctype="multipart/form-data" id="form-concluir"><label class="os-upload-zone" for="fechamento_fotos">Selecionar foto ou vídeo<small>Vídeos curtos: até 1 minuto.</small></label><input id="fechamento_fotos" type="file" name="fechamento_fotos" accept="image/*,video/*" multiple required hidden><div id="upload-message" class="muted" aria-live="polite">Adicione uma foto ou vídeo de fechamento para concluir</div><div class="thumbs" id="preview-fechamento"></div></form><% } else { %><div class="os-gallery"><% if (!(os.fotos_fechamento || []).length) { %><span class="muted">Nenhuma mídia de fechamento registrada</span><% } %><% (os.fotos_fechamento || []).forEach((f,idx)=>{ const src=f.pathPublic||f.path||f.filepath; if(src){ const video=/\.(mp4|mov|webm|ogg|m4v|avi)$/i.test(src); %><a href="<%= src %>" target="_blank"><% if(video){ %><video src="<%= src %>" muted controls preload="metadata"></video><% }else{ %><img src="<%= src %>" alt="Mídia de fechamento <%= idx+1 %>"><% } %></a><% } }); %></div><% } %></section></div><% if (canConcluir) { %><div class="os-conclusion"><div><strong>Conclusão da OS</strong><small>Adicione uma foto ou vídeo de fechamento para concluir</small></div><button id="btn-concluir-os" class="btn btn-green" type="submit" form="form-concluir" disabled>Concluir OS</button></div><% } else if (statusMeta.phase === 'open' && canExecuteOS) { %><p class="os-operational-note">Inicie a OS antes de registrar a conclusão.</p><% } %></section>
+    <section id="panel-historico" class="os-tab-panel" role="tabpanel" aria-labelledby="tab-historico" hidden><h3>Histórico e rastreabilidade</h3><p>Alterações de status, responsáveis, datas, traçagens, WhatsApp e webhooks.</p><div data-module-slot="historico"></div></section>
   </article>
-  <% if (!isOSFechada && canExecuteOS) { %><article class="os-conclusion"><div><strong>Conclusão da OS</strong><small>Adicione uma foto ou vídeo de fechamento</small></div><button class="btn btn-green" type="submit" form="form-concluir">✓&nbsp; Concluir OS</button></article><% } %>
 </section>
-
 <div class="card os-module os-detail-card" id="tracagens-vinculadas">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
       <h3 style="margin:0;">Traçagens vinculadas</h3>
@@ -466,170 +442,4 @@
 <% } %>
 
 
-<div class="card os-legacy-media" style="margin-top:12px;">
-  <h3 style="margin:0;">Mídias de abertura da OS</h3>
-  <div class="muted">Registro visual inicial do equipamento (foto ou vídeo).</div>
-  <div class="galeria">
-    <% if (!(os.fotos_abertura||[]).length) { %><span class="muted">Sem mídias de abertura.</span><% } %>
-    <% (os.fotos_abertura||[]).forEach((f, idx) => { const src = f.pathPublic || f.path || f.filepath; %>
-      <% if (src) { %>
-        <% const isVideo = /\.(mp4|mov|webm|ogg|m4v|avi)$/i.test(src); %>
-        <a class="foto-card" href="<%= src %>" target="_blank">
-          <% if (Number(f.arquivo_removido||0) === 1 || (typeof attachmentExists === "function" && !attachmentExists(src))) { %><div class="muted" style="padding:12px;"><%= REMOVED_ATTACHMENT_MESSAGE || "Anexo removido para economia de espaço." %></div><% } else if (isVideo) { %><video src="<%= src %>" muted playsinline preload="metadata"></video><% } else { %><img src="<%= src %>" alt="mídia abertura <%= idx + 1 %>"/><% } %>
-          <span><%= isVideo ? 'Vídeo' : 'Foto' %> abertura <%= idx + 1 %></span>
-        </a>
-      <% } %>
-    <% }) %>
-  </div>
-</div>
-
-<% if (!isOSFechada && canExecuteOS) { %>
-  <div class="card os-legacy-media" style="margin-top:12px;">
-    <h3>Concluir OS</h3>
-    <div class="muted">Adicione pelo menos uma mídia de fechamento (foto ou vídeo) para concluir a OS.</div>
-    <form method="POST" action="/os/<%= os.id %>/concluir" enctype="multipart/form-data" id="form-concluir">
-      <div style="margin-top:10px;">
-        <label>Mídias de fechamento *</label>
-        <input id="fechamento_fotos" type="file" name="fechamento_fotos" accept="image/*,video/*" capture="environment" multiple required style="display:none" />
-        <button type="button" class="camera-btn" onclick="document.getElementById('fechamento_fotos').click()">📎 Adicionar arquivo (foto ou vídeo)</button>
-        <div class="thumbs" id="preview-fechamento" style="margin-top:8px;"></div>
-        <div class="muted" style="margin-top:6px;">Vídeos curtos: até 1 minuto.</div>
-      </div>
-
-      <div style="margin-top:12px; display:flex; justify-content:flex-end;">
-        <button class="btn btn-green" type="submit">Concluir OS</button>
-      </div>
-    </form>
-  </div>
-<% } %>
-
-<div class="card os-legacy-media" style="margin-top:12px;">
-  <h3 style="margin:0;">Mídias de fechamento</h3>
-  <div class="muted">Registro visual após execução (foto ou vídeo).</div>
-  <div class="galeria">
-    <% if (!(os.fotos_fechamento||[]).length) { %><span class="muted">Sem mídias de fechamento.</span><% } %>
-    <% (os.fotos_fechamento||[]).forEach((f, idx) => { const src = f.pathPublic || f.path || f.filepath; %>
-      <% if (src) { %>
-        <% const isVideo = /\.(mp4|mov|webm|ogg|m4v|avi)$/i.test(src); %>
-        <a class="foto-card" href="<%= src %>" target="_blank">
-          <% if (Number(f.arquivo_removido||0) === 1 || (typeof attachmentExists === "function" && !attachmentExists(src))) { %><div class="muted" style="padding:12px;"><%= REMOVED_ATTACHMENT_MESSAGE || "Anexo removido para economia de espaço." %></div><% } else if (isVideo) { %><video src="<%= src %>" muted playsinline preload="metadata"></video><% } else { %><img src="<%= src %>" alt="mídia fechamento <%= idx + 1 %>"/><% } %>
-          <span><%= isVideo ? 'Vídeo' : 'Foto' %> fechamento <%= idx + 1 %></span>
-        </a>
-      <% } %>
-    <% }) %>
-  </div>
-</div>
-
-<script>
-  (function(){
-    const menuWrap = document.getElementById('os-menu-wrap');
-    const menuBtn = document.getElementById('os-menu-btn');
-    function activateModule(moduleId) {
-      const modules = document.querySelectorAll('.os-module');
-      modules.forEach((el) => el.classList.remove('active'));
-      const target = document.getElementById(moduleId);
-      if (target) target.classList.add('active');
-      return target;
-    }
-
-    function activateHashModule() {
-      const moduleId = window.location.hash.replace(/^#/, '');
-      if (!moduleId) return;
-      const target = document.getElementById(moduleId);
-      if (target && target.classList.contains('os-module')) activateModule(moduleId);
-    }
-
-    if (menuWrap && menuBtn) {
-      menuBtn.addEventListener('click', function(){
-        const isOpen = menuWrap.classList.toggle('open');
-        menuBtn.setAttribute('aria-expanded', String(isOpen));
-      });
-      menuWrap.querySelectorAll('[data-os-module]').forEach(function(btn){
-        btn.addEventListener('click', function(){
-          const moduleId = btn.getAttribute('data-os-module');
-          if (moduleId === 'equipe-os') {
-            activateModule('tracagens-vinculadas');
-            const equipe = document.getElementById('equipe-os');
-            if (equipe) equipe.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          } else {
-            const target = activateModule(moduleId);
-            if (target && moduleId === 'justificativa-andamento') {
-              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-          }
-          menuWrap.classList.remove('open');
-          menuBtn.setAttribute('aria-expanded', 'false');
-        });
-      });
-      activateHashModule();
-      window.addEventListener('hashchange', activateHashModule);
-      document.addEventListener('click', function(ev){
-        if (!menuWrap.contains(ev.target)) {
-          menuWrap.classList.remove('open');
-          menuBtn.setAttribute('aria-expanded', 'false');
-        }
-      });
-    }
-  })();
-
-  (function () {
-    const input = document.getElementById('fechamento_fotos');
-    const preview = document.getElementById('preview-fechamento');
-    if (!input) return;
-
-    async function getVideoDuration(file) {
-      return new Promise(function(resolve, reject){
-        const url = URL.createObjectURL(file);
-        const video = document.createElement('video');
-        video.preload = 'metadata';
-        video.onloadedmetadata = function(){
-          const duration = Number(video.duration || 0);
-          URL.revokeObjectURL(url);
-          resolve(duration);
-        };
-        video.onerror = function(){
-          URL.revokeObjectURL(url);
-          reject(new Error('Falha ao ler duração do vídeo.'));
-        };
-        video.src = url;
-      });
-    }
-
-    async function sanitizeFiles() {
-      const MAX_VIDEO_SECONDS = 60;
-      const dt = new DataTransfer();
-      for (const f of Array.from(input.files || [])) {
-        const isVideo = (f.type || '').startsWith('video/');
-        if (isVideo) {
-          try {
-            const duration = await getVideoDuration(f);
-            if (duration > MAX_VIDEO_SECONDS) {
-              alert('O vídeo "' + f.name + '" excede 1 minuto. Envie um vídeo curto (até 60s).');
-              continue;
-            }
-          } catch (_e) {}
-        }
-        dt.items.add(f);
-      }
-      input.files = dt.files;
-    }
-
-    function renderPreview() {
-      if (!preview) return;
-      preview.innerHTML = '';
-      Array.from(input.files || []).forEach(function (f) {
-        const chip = document.createElement('span');
-        chip.className = 'pill-tag pill-gray';
-        chip.style.marginRight = '6px';
-        const isVideo = (f.type || '').startsWith('video/');
-        chip.textContent = (isVideo ? '🎬 ' : '🖼️ ') + f.name;
-        preview.appendChild(chip);
-      });
-    }
-
-    input.addEventListener('change', async function(){
-      await sanitizeFiles();
-      renderPreview();
-    });
-  })();
-</script>
+<script src="/js/os-detalhe.js" defer></script>
