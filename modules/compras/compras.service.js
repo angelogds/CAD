@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('../../database/db');
 const osChatService = require('../os-chat/os-chat.service');
+const calculos = require('./compras.calculos');
 
 const STATUS = Object.freeze({
   ABERTA: 'ABERTA',
@@ -331,7 +332,92 @@ function getSolicitacaoDetalhe(id) {
   try { historicoPrecos = getHistoricoPrecos(id); } catch (_e) { historicoPrecos = []; }
   try { cotacaoSelecionada = getCotacaoSelecionada(id); } catch (_e) { cotacaoSelecionada = null; }
 
-  return { ...sol, itens, cotacoes, anexos, historicoPrecos, cotacaoSelecionada };
+  const itensResumo = itens.map((item) => {
+    const quantidade = Number(item.qtd_comprada ?? item.qtd_solicitada ?? 0);
+    const recebida = Number(item.qtd_recebida_total || 0);
+    const unitario = Number(item.valor_unitario_centavos || 0);
+    return { ...item, subtotal_centavos: calculos.subtotalCentavos(Number(item.qtd_solicitada || 0), unitario), situacao_recebimento: calculos.statusRecebimento(recebida, quantidade) };
+  });
+  const cotados = itensResumo.filter((i) => i.status_cotacao === 'COTADO').length;
+  const comprados = itensResumo.filter((i) => i.status_compra === 'COMPRADO').length;
+  const recebidos = itensResumo.filter((i) => i.situacao_recebimento === 'RECEBIDO').length;
+  const subtotalCentavos = itensResumo.reduce((sum, i) => sum + i.subtotal_centavos, 0);
+  const freteCentavos = Number(sol.frete_centavos || 0);
+  const descontoCentavos = Number(sol.desconto_centavos || 0);
+  return { ...sol, itens: itensResumo, cotacoes, anexos, historicoPrecos, cotacaoSelecionada,
+    resumoItens: { total: itensResumo.length, cotados, comprados, recebidos, progresso: calculos.progresso(cotados, itensResumo.length), subtotalCentavos, freteCentavos, descontoCentavos, totalCentavos: Math.max(0, subtotalCentavos + freteCentavos - descontoCentavos) } };
+}
+
+function fornecedorAtivo(id) {
+  if (!id || !tableExists('fornecedores')) return null;
+  return db.prepare('SELECT id, nome FROM fornecedores WHERE id=? AND ativo=1').get(Number(id));
+}
+
+function recalcularStatus(itens, atual) {
+  if (atual === STATUS.FECHADA) return atual;
+  const validos = itens.filter((i) => i.status_compra !== 'CANCELADO');
+  if (!validos.length) return STATUS.ABERTA;
+  const comprados = validos.filter((i) => i.status_compra === 'COMPRADO');
+  const recebida = validos.reduce((s, i) => s + Number(i.qtd_recebida_total || 0), 0);
+  const esperada = comprados.reduce((s, i) => s + Number(i.qtd_comprada ?? i.qtd_solicitada ?? 0), 0);
+  if (comprados.length === validos.length) {
+    if (esperada > 0 && recebida >= esperada) return STATUS.RECEBIDA_TOTAL;
+    if (recebida > 0) return STATUS.RECEBIDA_PARCIAL;
+    return atual === STATUS.COMPRADA ? STATUS.EM_RECEBIMENTO : STATUS.COMPRADA;
+  }
+  if (validos.some((i) => i.status_cotacao === 'COTADO')) return STATUS.EM_COTACAO;
+  return STATUS.ABERTA;
+}
+
+function salvarPainelItens(solicitacaoId, payload = {}, userId) {
+  const ids = Array.isArray(payload.item_id) ? payload.item_id : [payload.item_id].filter(Boolean);
+  const values = (name) => Array.isArray(payload[name]) ? payload[name] : [payload[name]];
+  const cotados = new Set((Array.isArray(payload.cotado) ? payload.cotado : [payload.cotado]).filter(Boolean).map(Number));
+  const comprar = new Set((Array.isArray(payload.comprar) ? payload.comprar : [payload.comprar]).filter(Boolean).map(Number));
+  const frete = calculos.parseCentavos(payload.frete, 'Frete');
+  const desconto = calculos.parseCentavos(payload.desconto, 'Desconto');
+  return db.transaction(() => {
+    const sol = db.prepare('SELECT * FROM solicitacoes WHERE id=?').get(solicitacaoId);
+    if (!sol) throw new Error('Solicitação não encontrada.');
+    ids.forEach((rawId, index) => {
+      const id = Number(rawId);
+      const item = db.prepare('SELECT * FROM solicitacao_itens WHERE id=? AND solicitacao_id=?').get(id, solicitacaoId);
+      if (!item) throw new Error('Item não pertence à solicitação.');
+      const fornecedorId = Number(values('fornecedor_id')[index] || 0) || null;
+      if (fornecedorId && !fornecedorAtivo(fornecedorId)) throw new Error('Fornecedor inválido ou inativo.');
+      const unitario = calculos.parseCentavos(values('valor_unitario')[index], 'Valor unitário');
+      const isCotado = cotados.has(id);
+      if (isCotado && !fornecedorId) throw new Error('Fornecedor é obrigatório para item cotado.');
+      const limite = Number(item.qtd_comprada ?? item.qtd_solicitada);
+      const recebida = Number(String(values('qtd_recebida')[index] ?? '0').replace(',', '.'));
+      if (!Number.isFinite(recebida) || recebida < 0 || recebida > limite) throw new Error('Quantidade recebida inválida ou superior à comprada.');
+      const anterior = Number(item.qtd_recebida_total || 0);
+      const isComprado = comprar.has(id) || item.status_compra === 'COMPRADO';
+      if (isComprado && !isCotado) throw new Error('Somente itens cotados podem ser comprados.');
+      if (recebida > 0 && !isComprado) throw new Error('Somente itens comprados podem ter recebimento.');
+      db.prepare(`UPDATE solicitacao_itens SET fornecedor_id=?, valor_unitario_centavos=?, status_cotacao=?,
+        status_compra=?, qtd_comprada=?, qtd_recebida_total=?, cotado_em=CASE WHEN ?='COTADO' THEN COALESCE(cotado_em,datetime('now')) ELSE cotado_em END,
+        comprado_em=CASE WHEN ?='COMPRADO' THEN COALESCE(comprado_em,datetime('now')) ELSE comprado_em END,
+        recebido_em=CASE WHEN ?>=qtd_solicitada THEN datetime('now') ELSE recebido_em END, atualizado_por=?, updated_at=datetime('now') WHERE id=?`)
+        .run(fornecedorId, unitario, isCotado ? 'COTADO' : 'PENDENTE', isComprado ? 'COMPRADO' : 'PENDENTE', isComprado ? Number(item.qtd_solicitada) : null,
+          recebida, isCotado ? 'COTADO' : 'PENDENTE', isComprado ? 'COMPRADO' : 'PENDENTE', recebida, userId, id);
+      if (recebida > anterior) db.prepare('INSERT INTO compras_recebimentos (solicitacao_id,solicitacao_item_id,quantidade,usuario_id) VALUES (?,?,?,?)').run(solicitacaoId, id, recebida - anterior, userId);
+    });
+    const itens = db.prepare('SELECT * FROM solicitacao_itens WHERE solicitacao_id=?').all(solicitacaoId);
+    const subtotal = itens.reduce((sum, i) => sum + calculos.subtotalCentavos(Number(i.qtd_solicitada || 0), Number(i.valor_unitario_centavos || 0)), 0);
+    const total = subtotal + frete - desconto;
+    if (total < 0) throw new Error('O desconto não pode tornar o total geral negativo.');
+    const status = recalcularStatus(itens, sol.status);
+    const fornecedorPrincipal = Number(payload.fornecedor_principal_id || 0) || null;
+    if (fornecedorPrincipal && !fornecedorAtivo(fornecedorPrincipal)) throw new Error('Fornecedor principal inválido.');
+    db.prepare(`UPDATE solicitacoes SET fornecedor_id=?, fornecedor=COALESCE((SELECT nome FROM fornecedores WHERE id=?),fornecedor),
+      frete_centavos=?, desconto_centavos=?, condicao_pagamento=?, validade_cotacao=?, previsao_entrega=?, numero_pedido=?, numero_nota_fiscal=?,
+      observacoes_compras=?, valor_total=?, valores_itens_revisados=?, status=?, updated_at=datetime('now') WHERE id=?`)
+      .run(fornecedorPrincipal, fornecedorPrincipal, frete, desconto, payload.condicao_pagamento || null, payload.validade_cotacao || null,
+        payload.previsao_entrega || null, payload.numero_pedido || null, payload.numero_nota_fiscal || null, payload.observacoes_compras || null,
+        total / 100, itens.every((i) => i.valor_unitario_centavos != null) ? 1 : 0, status, solicitacaoId);
+    return getSolicitacaoDetalhe(solicitacaoId);
+  })();
 }
 
 function assumirSolicitacao(id, userId) {
@@ -748,7 +834,13 @@ function gerarPdf(solicitacao, res) {
     materiais.forEach((it, index) => {
       const descBase = pdfValue(it.item_nome || it.descricao || it.item_descricao, PDF_PENDING);
       const obsText = pdfOptional(it.item_descricao || it.observacao_item);
-      const descText = obsText && obsText !== descBase ? `${descBase}. Aplicação/observação: ${obsText}` : descBase;
+      const fornecedorItem = it.fornecedor_nome || (tableExists('fornecedores') && it.fornecedor_id ? db.prepare('SELECT nome FROM fornecedores WHERE id=?').pluck().get(it.fornecedor_id) : '');
+      const unitarioPdf = Number(it.valor_unitario_centavos || 0) / 100;
+      const subtotalPdf = Number(it.qtd_solicitada || 0) * unitarioPdf;
+      const recebimentoPdf = `${Number(it.qtd_recebida_total || 0)} de ${Number(it.qtd_comprada ?? it.qtd_solicitada ?? 0)} - ${calculos.statusRecebimento(Number(it.qtd_recebida_total || 0), Number(it.qtd_comprada ?? it.qtd_solicitada ?? 0)).replaceAll('_', ' ')}`;
+      const detalheFinanceiro = `Fornecedor: ${fornecedorItem || PDF_FALLBACK} | Unitário: ${unitarioPdf.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} | Subtotal: ${subtotalPdf.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} | Recebimento: ${recebimentoPdf}`;
+      const descOriginal = obsText && obsText !== descBase ? `${descBase}. Aplicação/observação: ${obsText}` : descBase;
+      const descText = `${descOriginal}\n${detalheFinanceiro}`;
       const rowH = Math.max(21, doc.heightOfString(descText, { width: col[4] - col[3] - 10 }) + 11);
       if (y + rowH > CONTENT_BOTTOM) {
         addPage();
@@ -763,6 +855,14 @@ function gerarPdf(solicitacao, res) {
       doc.text(descText, col[3] + 5, y + 6, { width: col[4] - col[3] - 10 });
       y += rowH;
     });
+    const subtotal = materiais.reduce((sum, it) => sum + Number(it.qtd_solicitada || 0) * Number(it.valor_unitario_centavos || 0), 0);
+    const frete = Number(solicitacao.frete_centavos || 0);
+    const desconto = Number(solicitacao.desconto_centavos || 0);
+    const total = Math.max(0, subtotal + frete - desconto);
+    ensureSpace(45);
+    doc.fillColor(COLORS.greenDark).font('Helvetica-Bold').fontSize(8)
+      .text(`Subtotal: ${(subtotal / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}   Frete: ${(frete / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}   Desconto: ${(desconto / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}   TOTAL: ${(total / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, LEFT, y, { width: WIDTH, align: 'right' });
+    y += 24;
     y += 12;
   };
 
@@ -916,6 +1016,9 @@ module.exports = {
   selecionarCotacao,
   atualizarDados,
   marcarComprada,
+  salvarPainelItens,
+  recalcularStatus,
+  calculos,
   salvarAnexo,
   listarAnexos,
   getAnexo,
