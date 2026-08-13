@@ -11,3 +11,5 @@
     button.setAttribute('aria-busy', 'true');
   });
 })();
+
+document.querySelector('.attention-controls select')?.addEventListener('change', (event) => event.currentTarget.form.submit());

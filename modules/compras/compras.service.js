@@ -164,7 +164,8 @@ function listSolicitacoesPorStatus(filters = {}) {
 
   return db.prepare(`
     SELECT s.*, u.${usersRef.nameCol} AS solicitante_nome, ${hasFornecedorIdCol && hasFornecedoresTable ? 'f.nome' : 'NULL'} AS fornecedor_nome,
-      (SELECT COUNT(*) FROM solicitacao_itens si WHERE si.solicitacao_id = s.id) AS itens_count
+      (SELECT COUNT(*) FROM solicitacao_itens si WHERE si.solicitacao_id = s.id) AS itens_count,
+      (SELECT COUNT(*) FROM solicitacao_itens si WHERE si.solicitacao_id = s.id AND si.status_cotacao = 'COTADO') AS itens_cotados
     FROM solicitacoes s
     JOIN ${usersRef.table} u ON u.id = s.solicitante_user_id
     ${hasFornecedorIdCol && hasFornecedoresTable ? 'LEFT JOIN fornecedores f ON f.id = s.fornecedor_id' : ''}
