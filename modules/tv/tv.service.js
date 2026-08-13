@@ -1,1065 +1,184 @@
-let db;
+const db = require('../../database/db');
 
-try {
-  db = require('../../database/db');
-} catch (_e) {}
-try {
-  if (!db) db = require('../../database');
-} catch (_e) {}
-try {
-  if (!db) db = require('../../db');
-} catch (_e) {}
+const STATUS_ENCERRADOS = new Set(['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CANCELADA', 'CANCELADO']);
+const STATUS_ATIVOS = new Set(['ABERTA', 'EM_ANDAMENTO', 'ANDAMENTO', 'PAUSADA', 'AGUARDANDO', 'AGUARDANDO_EQUIPE']);
 
-const DEFAULT_AVATAR = '/IMG/login_campo_do_gado.png.png.png';
-const MAINT_FALLBACK = [
-  { nome: 'Diogo', grupo: 'MECANICO', funcao: 'Mecânico Industrial' },
-  { nome: 'Salviano', grupo: 'MECANICO', funcao: 'Mecânico Industrial' },
-  { nome: 'Rodolfo', grupo: 'MECANICO', funcao: 'Mecânico Industrial' },
-  { nome: 'Emanuel', grupo: 'MECANICO', funcao: 'Mecânico Industrial' },
-  { nome: 'Luiz', grupo: 'MECANICO', funcao: 'Mecânico Industrial' },
-  { nome: 'Júnior', grupo: 'MECANICO', funcao: 'Mecânico Industrial' },
-];
-
-function safeAll(sql, params = []) {
-  try {
-    if (!db || !db.prepare) return [];
-    return db.prepare(sql).all(...params);
-  } catch (err) {
-    console.warn('[TV] safeAll fallback:', err.message);
-    return [];
-  }
+function semAcentos(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
 }
 
-function safeGet(sql, params = []) {
-  try {
-    if (!db || !db.prepare) return null;
-    return db.prepare(sql).get(...params);
-  } catch (err) {
-    console.warn('[TV] safeGet fallback:', err.message);
-    return null;
-  }
+function normalizarStatusOS(value) {
+  const status = semAcentos(value).replace(/[\s-]+/g, '_');
+  if (STATUS_ENCERRADOS.has(status)) return status === 'CANCELADO' ? 'CANCELADA' : 'CONCLUIDA';
+  if (['ANDAMENTO', 'EXECUTANDO', 'EM_EXECUCAO'].includes(status)) return 'EM_ANDAMENTO';
+  if (['AGUARDANDO', 'AGUARDANDO_PECA', 'AGUARDANDO_MATERIAL'].includes(status)) return 'PAUSADA';
+  if (['ABERTO', 'PENDENTE', 'NOVA', 'AGUARDANDO_EQUIPE'].includes(status)) return 'ABERTA';
+  return STATUS_ATIVOS.has(status) ? status : 'ABERTA';
 }
 
-function tableExists(name) {
-  const row = safeGet("SELECT name FROM sqlite_master WHERE type='table' AND name = ?", [name]);
-  return !!row;
+function isOSAtiva(os) {
+  const raw = semAcentos(typeof os === 'object' ? os?.status : os).replace(/[\s-]+/g, '_');
+  return !STATUS_ENCERRADOS.has(raw) && normalizarStatusOS(raw) !== 'CONCLUIDA';
 }
 
-function firstTable(names) {
-  return names.find(tableExists);
-}
-
-function columns(table) {
-  if (!table) return [];
-  return safeAll(`PRAGMA table_info(${table})`).map((c) => c.name);
-}
-
-function pickCol(table, candidates, fallbackSql = 'NULL') {
-  const cols = columns(table);
-  const found = candidates.find((c) => cols.includes(c));
-  return found || fallbackSql;
-}
-
-function hasAny(raw, patterns = []) {
-  const s = String(raw || '')
-    .toUpperCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-  return patterns.some((p) => s.includes(p));
-}
-
-function normalizeImagePath(value) {
-  if (!value) return DEFAULT_AVATAR;
-
-  const v = String(value).trim();
-  if (!v) return DEFAULT_AVATAR;
-  if (v.startsWith('http://') || v.startsWith('https://')) return v;
-  if (v.startsWith('/')) return v;
-  if (v.startsWith('uploads/')) return `/${v}`;
-  if (v.startsWith('public/')) return v.replace(/^public/, '');
-
-  return `/uploads/${v.replace(/^\/+/, '')}`;
-}
-
-function canonicalizeNome(raw = '') {
-  const clean = String(raw || '').trim().toLowerCase();
-  if (!clean) return '';
-
-  const aliases = new Map([
-    ['luiz', 'luis'],
-  ]);
-  return aliases.get(clean) || clean;
-}
-
-function normalizeNome(value = '') {
-  const normalized = String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase();
-  const parts = normalized.split(/\s+/).filter(Boolean);
-  if (!parts.length) return '';
-  parts[0] = canonicalizeNome(parts[0]);
-  return parts.join(' ');
-}
-
-function uniqueBy(items = [], getKey = (item) => item) {
-  const seen = new Set();
-  const out = [];
-  items.forEach((item) => {
-    const key = String(getKey(item) || '').trim();
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    out.push(item);
-  });
-  return out;
-}
-
-function classificarGrupo(colaborador = {}) {
-  const base = `${colaborador?.funcao || ''} ${colaborador?.role || ''} ${colaborador?.perfil || ''} ${colaborador?.grupo || ''} ${colaborador?.tipo || ''}`;
-  return 'MECANICO';
-}
-
-function normalizarRankingItem(item, index) {
-  return {
-    user_id: Number(item.user_id || item.id || 0) || null,
-    nome: item.nome || item.name || `Colaborador ${index + 1}`,
-    os_finalizadas: Number(item.os_total || item.total || 0),
-    criticas: Number(item.os_criticas || item.criticas || 0),
-    altas: Number(item.os_altas || item.altas || 0),
-    pontos: Number(item.score || item.pontuacao || item.pontos || 0),
-    posicao: Number(item.posicao || index + 1),
-    foto: normalizeImagePath(item.photo_path || item.foto || item.avatar || item.imagem || item.imagem_perfil),
-    grupo: 'MECANICO',
-  };
-}
-
-async function getDadosPainelOperacionalParaTV() {
-  let painelService = null;
-
-  try {
-    painelService = require('../dashboard/dashboard.service');
-  } catch (_) {}
-  try {
-    if (!painelService) painelService = require('../painel/painel.service');
-  } catch (_) {}
-  try {
-    if (!painelService) painelService = require('../painel-operacional/painel.service');
-  } catch (_) {}
-
-  if (!painelService) return null;
-
-  const escalaRaw =
-    (typeof painelService.getEscalaPainelSemana === 'function' ? painelService.getEscalaPainelSemana() : null) ||
-    (typeof painelService.getEscalaSemana === 'function' ? painelService.getEscalaSemana() : null) ||
-    null;
-  const rankingRaw = typeof painelService.getMecanicosRankingSemana === 'function' ? painelService.getMecanicosRankingSemana() : null;
-  const osPainelRaw = typeof painelService.getOSPainel === 'function' ? painelService.getOSPainel(50) : null;
-  const preventivasRaw = typeof painelService.getPreventivasDashboard === 'function' ? painelService.getPreventivasDashboard() : null;
-
-  return { escalaRaw, rankingRaw, osPainelRaw, preventivasRaw };
-}
-
-function toIsoDate(value) {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
-}
-
-function normalizarStatusOS(status) {
-  const s = String(status || '').toUpperCase().trim();
-  if (['ABERTA', 'ABERTO', 'PENDENTE', 'NOVA'].includes(s)) return 'ABERTA';
-  if (['EM_ANDAMENTO', 'ANDAMENTO', 'EXECUTANDO', 'EM EXECUÇÃO', 'EM_EXECUCAO'].includes(s)) return 'EM_ANDAMENTO';
-  if (['PAUSADA', 'PAUSADO', 'AGUARDANDO', 'AGUARDANDO_PECA', 'AGUARDANDO PEÇA'].includes(s)) return 'PAUSADA';
-  if (['CONCLUIDA', 'CONCLUÍDA', 'FINALIZADA', 'FECHADA'].includes(s)) return 'CONCLUIDA';
-  return 'ABERTA';
-}
-
-function normalizarPrioridade(prioridade) {
-  const s = String(prioridade || '')
-    .toUpperCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-
-  if (['CRITICA', 'CRITICO'].includes(s)) return 'CRITICA';
-  if (s === 'ALTA') return 'ALTA';
-  if (s === 'MEDIA') return 'MEDIA';
+function normalizarPrioridade(value) {
+  const prioridade = semAcentos(value);
+  if (['EMERGENCIAL', 'URGENTE', 'CRITICA', 'CRITICO'].includes(prioridade)) return 'CRITICA';
+  if (prioridade === 'ALTA') return 'ALTA';
+  if (['MEDIA', 'MEDIO'].includes(prioridade)) return 'MEDIA';
   return 'BAIXA';
 }
 
-function tempoDesde(dateValue) {
-  if (!dateValue) return '-';
-  const start = new Date(dateValue);
-  if (Number.isNaN(start.getTime())) return '-';
-
-  const diffMin = Math.max(0, Math.floor((Date.now() - start.getTime()) / 60000));
-  if (diffMin < 60) return `${diffMin} min`;
-
-  const h = Math.floor(diffMin / 60);
-  const m = diffMin % 60;
-  if (h < 24) return m ? `${h}h ${m}min` : `${h}h`;
-
-  const d = Math.floor(h / 24);
-  return `${d}d ${h % 24}h`;
+function safe(fn, fallback = []) {
+  try { return fn(); } catch (error) { console.warn('[TV]', error.message); return fallback; }
 }
 
-async function getOS() {
+function tableExists(name) {
+  return Boolean(safe(() => db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name), null));
+}
+
+function imagePath(value) {
+  if (!value) return null;
+  const path = String(value).trim();
+  if (/^https?:\/\//.test(path) || path.startsWith('/')) return path;
+  return `/${path.replace(/^public\//, '')}`;
+}
+
+function tempoDesde(value) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return 'tempo não informado';
+  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
+  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}min` : ''}`;
+  return `${Math.floor(minutes / 1440)}d ${Math.floor((minutes % 1440) / 60)}h`;
+}
+
+function getOS() {
+  if (!tableExists('os')) return [];
+  const rows = safe(() => db.prepare(`
+    SELECT o.id, o.id AS numero, COALESCE(e.nome, o.equipamento_manual, o.equipamento, 'Equipamento não informado') equipamento,
+      COALESCE(o.descricao, '') descricao, o.status, COALESCE(NULLIF(o.grau,''), o.prioridade, 'MEDIA') prioridade,
+      o.opened_at, o.closed_at, o.data_conclusao,
+      TRIM(COALESCE(uc.nome, um.name, ur.name, '') || CASE WHEN COALESCE(ua.nome, ux.name, '') <> '' THEN ', ' || COALESCE(ua.nome, ux.name) ELSE '' END) responsavel
+    FROM os o
+    LEFT JOIN equipamentos e ON e.id=o.equipamento_id
+    LEFT JOIN colaboradores uc ON uc.id=o.executor_colaborador_id
+    LEFT JOIN colaboradores ua ON ua.id=o.auxiliar_colaborador_id
+    LEFT JOIN users um ON um.id=o.mecanico_user_id
+    LEFT JOIN users ux ON ux.id=o.auxiliar_user_id
+    LEFT JOIN users ur ON ur.id=o.responsavel_user_id
+    ORDER BY datetime(o.opened_at) DESC, o.id DESC LIMIT 100
+  `).all(), []);
+  return rows.map((row) => ({
+    ...row,
+    numero: `OS #${row.numero}`,
+    equipamento: String(row.equipamento).toUpperCase(),
+    responsavel: row.responsavel || 'A definir',
+    status: normalizarStatusOS(row.status),
+    statusOriginal: row.status,
+    prioridade: normalizarPrioridade(row.prioridade),
+    tempo: tempoDesde(row.opened_at),
+    abertura: row.opened_at,
+  }));
+}
+
+function getPreventivas() {
+  if (!tableExists('preventiva_execucoes') || !tableExists('preventiva_planos')) return [];
+  return safe(() => db.prepare(`
+    SELECT pe.id, COALESCE(e.nome, pp.titulo) equipamento, pp.titulo tarefa, pe.data_prevista,
+      UPPER(COALESCE(pe.status,'PENDENTE')) status, COALESCE(pe.responsavel,'A definir') responsavel,
+      UPPER(COALESCE(e.criticidade,'MEDIA')) criticidade
+    FROM preventiva_execucoes pe JOIN preventiva_planos pp ON pp.id=pe.plano_id
+    LEFT JOIN equipamentos e ON e.id=pp.equipamento_id
+    WHERE UPPER(COALESCE(pe.status,'')) NOT IN ('CONCLUIDA','FINALIZADA','CANCELADA')
+    ORDER BY date(pe.data_prevista), pe.id LIMIT 30
+  `).all().map((item) => ({ ...item, dataPrevista: item.data_prevista, criticidade: semAcentos(item.criticidade) })), []);
+}
+
+function getEquipe(osAtivas) {
+  let escala = null;
+  let ranking = null;
   try {
-    const dadosPainel = await getDadosPainelOperacionalParaTV();
-    const painel = dadosPainel?.osPainelRaw || null;
-    const itens = Array.isArray(painel?.items) ? painel.items : [];
-    if (itens.length) {
-      return itens.map((r, index) => {
-          const statusNorm = normalizarStatusOS(r.status);
-          const prioridadeNorm = normalizarPrioridade(r.grau || r.prioridade);
-          const aberturaBase = r.opened_at || r.abertura || r.created_at || null;
-          return {
-            id: r.id,
-            numero: String(r.numero || r.id).startsWith('OS') ? String(r.numero) : `OS #${r.numero || r.id}`,
-            equipamento: String(r.equipamento || 'Equipamento não informado').toUpperCase(),
-            responsavel: String(r.responsavel_exibicao || r.responsavel_nome || r.responsavel || '-').trim() || 'A definir',
-            responsavel_id: r.responsavel_user_id || r.mecanico_user_id || null,
-            status: statusNorm,
-            prioridade: prioridadeNorm,
-            tempo: tempoDesde(aberturaBase),
-            descricao: r.descricao || '',
-            isNew: index === 0 && statusNorm === 'ABERTA',
-          };
-        });
-      }
-  } catch (_e) {}
-
-  const table = firstTable(['ordens_servico', 'os', 'ordens', 'ordens_de_servico']);
-  if (!table) return [];
-
-  const id = pickCol(table, ['id']);
-  const numero = pickCol(table, ['numero', 'codigo', 'n_os'], 'id');
-  const equipamento = pickCol(table, ['equipamento_nome', 'equipamento', 'maquina', 'ativo'], "'Equipamento não informado'");
-  const responsavel = pickCol(table, ['responsavel_exibicao', 'responsavel_nome', 'responsavel', 'mecanico_nome', 'atribuido_para'], "'A definir'");
-  const responsavelId = pickCol(table, ['responsavel_id', 'mecanico_id', 'usuario_responsavel_id'], 'NULL');
-  const status = pickCol(table, ['status', 'situacao'], "'ABERTA'");
-  const prioridade = pickCol(table, ['prioridade', 'criticidade'], "'MEDIA'");
-  const descricao = pickCol(table, ['descricao', 'problema', 'observacao', 'solicitacao'], "''");
-  const created = pickCol(table, ['created_at', 'criado_em', 'data_abertura', 'abertura_em'], 'NULL');
-
-  const rows = safeAll(`
-    SELECT
-      ${id} AS id,
-      ${numero} AS numero,
-      ${equipamento} AS equipamento,
-      ${responsavel} AS responsavel,
-      ${responsavelId} AS responsavel_id,
-      ${status} AS status,
-      ${prioridade} AS prioridade,
-      ${descricao} AS descricao,
-      ${created} AS created_at
-    FROM ${table}
-    ORDER BY id DESC
-    LIMIT 50
-  `);
-
-  if (!rows.length) return [];
-
-  return rows.map((r, index) => {
-    const statusNorm = normalizarStatusOS(r.status);
-    const prioridadeNorm = normalizarPrioridade(r.prioridade);
-
-    return {
-      id: r.id,
-      numero: String(r.numero || r.id).startsWith('OS') ? String(r.numero) : `OS #${r.numero || r.id}`,
-      equipamento: String(r.equipamento || 'Equipamento não informado').toUpperCase(),
-      responsavel: r.responsavel || 'A definir',
-      responsavel_id: r.responsavel_id || null,
-      status: statusNorm,
-      prioridade: prioridadeNorm,
-      tempo: tempoDesde(r.created_at),
-      descricao: r.descricao || '',
-      isNew: index === 0 && statusNorm === 'ABERTA',
-    };
-  });
-}
-
-function extractEscalaVigenteFromTable(table) {
-  const cols = columns(table);
-  if (!cols.length) return { equipe: [], escalaVigente: { diaMecanicos: [], apoioOperacional: [], noiteResponsavel: [], folgaAtestado: [], ferias: [] } };
-
-  const nomeCol = pickCol(table, ['nome', 'name', 'usuario_nome', 'colaborador_nome', 'funcionario_nome'], "''");
-  const funcaoCol = pickCol(table, ['funcao', 'cargo', 'perfil', 'papel'], "''");
-  const turnoCol = pickCol(table, ['turno', 'periodo', 'shift'], "''");
-  const statusCol = pickCol(table, ['status', 'situacao', 'estado'], "''");
-  const fotoCol = pickCol(table, ['foto', 'avatar', 'photo_url', 'foto_url', 'imagem'], 'NULL');
-  const idCol = pickCol(table, ['id', 'usuario_id', 'user_id', 'colaborador_id'], 'rowid');
-  const dataCol = pickCol(table, ['data', 'dia', 'data_escala', 'created_at', 'data_referencia'], 'NULL');
-
-  const today = new Date().toISOString().slice(0, 10);
-  const hasData = !['NULL', "''"].includes(dataCol);
-
-  const rows = safeAll(`
-    SELECT
-      ${idCol} AS id,
-      ${nomeCol} AS nome,
-      ${funcaoCol} AS funcao,
-      ${turnoCol} AS turno,
-      ${statusCol} AS status,
-      ${fotoCol} AS foto,
-      ${hasData ? dataCol : 'NULL'} AS data_escala
-    FROM ${table}
-    ${hasData ? `WHERE date(${dataCol}) = date('${today}') OR ${dataCol} IS NULL` : ''}
-    ORDER BY id DESC
-    LIMIT 80
-  `);
-
-  const escalaVigente = { dia: [], noite: [], folga: [], ferias: [] };
-  const equipe = [];
-
-  rows.forEach((r) => {
-    const nome = String(r.nome || '').trim();
+    const dashboard = require('../dashboard/dashboard.service');
+    escala = dashboard.getEscalaPainelSemana?.() || null;
+    ranking = dashboard.getMecanicosRankingSemana?.() || null;
+  } catch (_error) {}
+  const pessoas = new Map();
+  const add = (p, turno, situacao = 'disponivel') => {
+    const nome = String(p?.nome || '').trim();
     if (!nome) return;
-
-    const base = `${r.funcao || ''} ${r.status || ''} ${r.turno || ''}`;
-    if (!hasAny(base, ['MECAN', 'MANUTEN'])) return;
-    if (hasAny(base, ['ADMIN', 'GERENTE', 'RH', 'FINANCEIRO'])) return;
-
-    let grupo = 'MECANICO';
-    let st = 'online';
-    const tag = `${r.status || ''} ${r.turno || ''}`;
-    if (hasAny(tag, ['EM OS', 'EM_ANDAMENTO', 'ATENDIMENTO'])) st = 'em_os';
-    if (hasAny(tag, ['FOLGA'])) st = 'folga';
-    if (hasAny(tag, ['FERIAS'])) st = 'ferias';
-    if (hasAny(tag, ['ATESTADO'])) st = 'atestado';
-
-    let turno = 'Turno vigente';
-    if (hasAny(tag, ['NOITE'])) turno = 'Noite';
-    if (hasAny(tag, ['DIA'])) turno = 'Dia';
-
-    const row = {
-      id: r.id,
-      nome,
-      funcao: 'Mecânico Industrial',
-      grupo: 'MECANICO',
-      foto: normalizeImagePath(r.foto),
-      status: st,
-      turno,
-      osAtual: null,
-      totalOsConcluidas: 0,
-      tempoMedio: '-',
-    };
-
-    equipe.push(row);
-    if (st === 'folga' || st === 'atestado') escalaVigente.folga.push(nome);
-    else if (st === 'ferias') escalaVigente.ferias.push(nome);
-    else if (turno === 'Noite') escalaVigente.noite.push(nome);
-    else escalaVigente.dia.push(nome);
-  });
-
+    const key = semAcentos(nome);
+    const rank = [...(ranking?.itemsMecanicos || ranking?.items || [])].find((x) => semAcentos(x.nome) === key);
+    const ocupada = osAtivas.some((os) => semAcentos(os.responsavel).includes(key));
+    pessoas.set(key, { id: p.user_id || p.id || null, nome, funcao: p.funcao || 'Mecânico', turno, situacao: ocupada ? 'ocupado' : situacao, foto: imagePath(p.photo_path || rank?.photo_path), osAtual: ocupada ? osAtivas.find((os) => semAcentos(os.responsavel).includes(key))?.numero : null });
+  };
+  (escala?.diurno_mecanicos || []).forEach((p) => add(p, 'Dia'));
+  (escala?.apoio_operacional || []).forEach((p) => add(p, 'Dia'));
+  (escala?.noturno || []).forEach((p) => add(p, 'Noite'));
+  (escala?.folgas_afastamentos || []).forEach((p) => add(p, 'Fora da escala', 'indisponivel'));
+  const equipe = [...pessoas.values()];
+  const rankItems = (ranking?.itemsMecanicos || ranking?.items || []).filter((r) => Number(r.os_total || 0) || Number(r.score || 0));
   return {
     equipe,
-    escalaVigente: {
-      diaMecanicos: escalaVigente.dia,
-      apoioOperacional: [],
-      noiteResponsavel: escalaVigente.noite,
-      folgaAtestado: escalaVigente.folga.map((nome) => ({ nome, status: 'FOLGA' })),
-      ferias: escalaVigente.ferias.map((nome) => ({ nome, status: 'FERIAS' })),
-    },
+    escalaVigente: escala ? {
+      dia: equipe.filter((p) => p.turno === 'Dia' && p.situacao !== 'indisponivel'),
+      noite: equipe.filter((p) => p.turno === 'Noite'),
+      finalSemana: (escala.final_semana_responsavel || []).map((p) => p.nome),
+      afastados: equipe.filter((p) => p.situacao === 'indisponivel'),
+      foraEscala: [],
+    } : null,
+    rankingEquipe: rankItems.map((item, index) => ({
+      posicao: index + 1, nome: item.nome, foto: imagePath(item.photo_path),
+      os_finalizadas: Number(item.os_total || 0), pontos: Number(item.score || 0),
+      criticas: Number(item.os_criticas || 0), altas: Number(item.os_altas || 0),
+      cargaAtual: osAtivas.filter((os) => semAcentos(os.responsavel).includes(semAcentos(item.nome))).length,
+    })),
   };
 }
 
-
-function isPessoaManutencao(pessoa = {}) {
-  const base = `${pessoa?.funcao || ''} ${pessoa?.role || ''} ${pessoa?.perfil || ''} ${pessoa?.grupo || ''} ${pessoa?.tipo || ''}`;
-  const nome = String(pessoa?.nome || pessoa?.name || '').trim();
-  if (matchNomeFallback(nome)) return true;
-  return hasAny(base, ['MECAN', 'MANUTEN']);
+function getEquipamentos(os) {
+  if (!tableExists('equipamentos')) return [];
+  const equipamentos = safe(() => db.prepare('SELECT id,nome,criticidade,status_operacional FROM equipamentos WHERE ativo=1').all(), []);
+  return equipamentos.map((eq) => {
+    const ocorrencias = os.filter((item) => String(item.equipamento).toUpperCase() === String(eq.nome).toUpperCase());
+    const ativa = ocorrencias.find(isOSAtiva);
+    return { nome: eq.nome, falhas: ocorrencias.length, reincidencias: Math.max(0, ocorrencias.length - 1), mtbf: null, criticidade: semAcentos(eq.criticidade || 'NAO INFORMADA'), situacao: ativa ? ativa.status : (eq.status_operacional || 'DISPONIVEL') };
+  }).filter((eq) => eq.falhas > 0).sort((a, b) => b.falhas - a.falhas).slice(0, 5);
 }
 
-function matchNomeFallback(nome = '') {
-  const norm = normalizeNome(nome);
-  return ['diogo','salviano','rodolfo','fabio','junior','luis','emanuel'].includes(norm);
-}
-
-function fillEquipeStats(equipe, osList) {
-  return equipe.map((p) => {
-    const emAberto = osList.find((o) => String(o.responsavel || '').toUpperCase() === String(p.nome).toUpperCase() && o.status !== 'CONCLUIDA');
-    const concluidas = osList.filter((o) => String(o.responsavel || '').toUpperCase() === String(p.nome).toUpperCase() && o.status === 'CONCLUIDA').length;
-    return {
-      ...p,
-      status: p.status === 'online' && emAberto ? 'em_os' : p.status,
-      osAtual: emAberto ? emAberto.numero : null,
-      totalOsConcluidas: concluidas,
-    };
-  });
-}
-
-async function getEquipeManutencaoViaEscala(osList = []) {
-  const painelData = await getDadosPainelOperacionalParaTV();
-  const escalaPainel = painelData?.escalaRaw;
-  const rankingPainel = painelData?.rankingRaw || {};
-
-  if (escalaPainel && typeof escalaPainel === 'object') {
-    const equipeMap = new Map();
-    const addPessoa = (pessoa, grupo = 'MECANICO', status = 'online', turno = 'Dia') => {
-      const nome = String(pessoa?.nome || pessoa || '').trim();
-      if (!nome) return;
-      const key = normalizeNome(nome);
-      if (!key) return;
-      if (equipeMap.has(key)) return;
-      equipeMap.set(key, {
-        id: Number(pessoa?.user_id || pessoa?.id || 0) || null,
-        nome,
-        funcao: 'Mecânico Industrial',
-        grupo: 'MECANICO',
-        foto: normalizeImagePath(pessoa?.photo_path || pessoa?.foto || pessoa?.avatar || pessoa?.imagem || pessoa?.imagem_perfil),
-        status,
-        turno,
-        osAtual: null,
-        totalOsConcluidas: 0,
-        tempoMedio: '-',
-      });
-    };
-
-    (escalaPainel.diurno_mecanicos || []).forEach((p) => addPessoa(p, 'MECANICO', 'online', 'Dia'));
-    (escalaPainel.apoio_operacional || []).forEach((p) => addPessoa(p, 'MECANICO', 'online', 'Dia'));
-    (escalaPainel.noturno || []).filter((p) => isPessoaManutencao(p)).forEach((p) => addPessoa(p, classificarGrupo(p), 'online', 'Noite'));
-    (escalaPainel.folgas_afastamentos || []).filter((p) => isPessoaManutencao(p)).forEach((p) => addPessoa(p, classificarGrupo(p), hasAny(p.tipo, ['FERIAS']) ? 'ferias' : hasAny(p.tipo, ['ATESTADO']) ? 'atestado' : 'folga', 'Dia'));
-
-    const rankingRef = [...(rankingPainel.itemsMecanicos || []), ...(rankingPainel.itemsApoio || [])];
-    rankingRef.forEach((item) => {
-      const key = normalizeNome(item.nome);
-      const atual = equipeMap.get(key);
-      if (!atual) return;
-      atual.id = atual.id || Number(item.user_id || 0) || null;
-      atual.foto = normalizeImagePath(item.photo_path || atual.foto);
-    });
-
-    const equipe = fillEquipeStats(Array.from(equipeMap.values()), osList);
-    const folgas = (escalaPainel.folgas_afastamentos || []).filter((f) => isPessoaManutencao(f)).map((f) => ({
-      nome: String(f.nome || '').trim(),
-      status: String(f.tipo || '-').toUpperCase(),
-    })).filter((f) => f.nome);
-
-    return {
-      equipe,
-      escalaVigente: {
-        diaMecanicos: (escalaPainel.diurno_mecanicos || []).map((p) => p.nome).filter(Boolean),
-        apoioOperacional: (escalaPainel.apoio_operacional || []).map((p) => p.nome).filter(Boolean),
-        noiteResponsavel: (escalaPainel.noturno || []).map((p) => p.nome).filter(Boolean),
-        folgaAtestado: folgas,
-        ferias: folgas.filter((f) => hasAny(f.status, ['FERIAS'])),
-      },
-    };
-  }
-
-  const escalaTables = ['escala', 'escalas', 'escala_dias', 'escala_colaboradores', 'escala_manutencao', 'turnos'];
-
-  for (const t of escalaTables) {
-    if (!tableExists(t)) continue;
-    const parsed = extractEscalaVigenteFromTable(t);
-    if (parsed.equipe.length) {
-      return { ...parsed, equipe: fillEquipeStats(parsed.equipe, osList) };
-    }
-  }
-
-  const equipeFallback = MAINT_FALLBACK.map((p, idx) => ({
-    id: idx + 1,
-    nome: p.nome,
-    funcao: p.funcao,
-    grupo: 'MECANICO',
-    foto: DEFAULT_AVATAR,
-    status: 'online',
-    turno: 'Turno vigente',
-    osAtual: null,
-    totalOsConcluidas: 0,
-    tempoMedio: '-',
-  }));
-
-  return {
-    equipe: fillEquipeStats(equipeFallback, osList),
-    escalaVigente: {
-      diaMecanicos: equipeFallback.filter((e) => e.grupo === 'MECANICO').map((e) => e.nome),
-      apoioOperacional: [],
-      noiteResponsavel: [],
-      folgaAtestado: [],
-      ferias: [],
-    },
-  };
-}
-
-async function getEscalaVigente(osList = []) {
-  const result = await getEquipeManutencaoViaEscala(osList);
-  return result.escalaVigente;
-}
-
-async function getRankingEquipe(osList = [], equipe = []) {
-  const painelData = await getDadosPainelOperacionalParaTV();
-  const rankingRaw = painelData?.rankingRaw || {};
-  const rankingMecanicos = (rankingRaw.itemsMecanicos || rankingRaw.items || []).map(normalizarRankingItem);
-  const rankingTodos = [...rankingMecanicos, ...(rankingRaw.itemsApoio || []).map(normalizarRankingItem)];
-
-  if (rankingTodos.length) {
-    return {
-      rankingMecanicos: rankingTodos,
-      rankingApoio: [],
-      mensagem: '',
-    };
-  }
-
-  const fallback = equipe.slice(0, 8).map((p, index) => ({
-    user_id: p.id || null,
-    nome: p.nome,
-    os_finalizadas: Number(p.totalOsConcluidas || 0),
-    criticas: 0,
-    altas: 0,
-    pontos: Number(p.totalOsConcluidas || 0),
-    posicao: index + 1,
-    foto: normalizeImagePath(p.foto),
-    grupo: p.grupo || 'MECANICO',
-  }));
-
-  return {
-    rankingMecanicos: fallback,
-    rankingApoio: [],
-    mensagem: 'Ranking será exibido após novos fechamentos de OS.',
-  };
-}
-
-async function getPreventivas() {
-  try {
-    const dadosPainel = await getDadosPainelOperacionalParaTV();
-    const payload = dadosPainel?.preventivasRaw || {};
-    const itens = Array.isArray(payload.items) ? payload.items : [];
-    if (itens.length) {
-      const today = new Date().toISOString().slice(0, 10);
-      return itens.map((r) => {
-        const raw = String(r.status || '').toUpperCase();
-        let st = 'PENDENTE';
-        if (raw.includes('CONCL') || raw.includes('FINAL')) st = 'CONCLUIDA';
-        else if (raw.includes('ANDAMENTO')) st = 'NO_PRAZO';
-        if (r.data_prevista && String(r.data_prevista).slice(0, 10) < today && st !== 'CONCLUIDA') st = 'ATRASADA';
-
-        return {
-          id: r.id,
-          tarefa: r.observacao || r.tarefa || 'Preventiva',
-          equipamento: r.equipamento_nome || r.equipamento_tipo || r.equipamento || 'Equipamento',
-          dataPrevista: r.data_prevista ? String(r.data_prevista).slice(0, 10) : today,
-          status: st,
-          responsavel: r.responsavel_exibicao || r.responsavel || '-',
-        };
-      });
-    }
-  } catch (_e) {}
-
-  const table = firstTable(['preventivas', 'manutencoes_preventivas', 'preventive_tasks', 'preventiva_execucoes']);
-  if (!table) return [];
-
-  const id = pickCol(table, ['id']);
-  const tarefa = pickCol(table, ['tarefa', 'titulo', 'descricao', 'plano_nome'], "'Preventiva'");
-  const equipamento = pickCol(table, ['equipamento_nome', 'equipamento', 'ativo', 'equipamento_tag'], "'Equipamento'");
-  const data = pickCol(table, ['data_prevista', 'proxima_execucao', 'data_programada', 'vencimento'], 'NULL');
-  const status = pickCol(table, ['status', 'situacao'], "'PENDENTE'");
-  const responsavel = pickCol(table, ['responsavel_nome', 'responsavel', 'mecanico'], "'A definir'");
-
-  const rows = safeAll(`
-    SELECT
-      ${id} AS id,
-      ${tarefa} AS tarefa,
-      ${equipamento} AS equipamento,
-      ${data} AS dataPrevista,
-      ${status} AS status,
-      ${responsavel} AS responsavel
-    FROM ${table}
-    ORDER BY COALESCE(${data}, CURRENT_TIMESTAMP) ASC
-    LIMIT 30
-  `);
-
-  if (!rows.length) return [];
-
+function buildOperationalSnapshot(os, preventivas) {
   const today = new Date().toISOString().slice(0, 10);
-  return rows.map((r) => {
-    const raw = String(r.status || '').toUpperCase();
-    let st = 'PENDENTE';
-    if (raw.includes('CONCL')) st = 'CONCLUIDA';
-    else if (raw.includes('ATRAS')) st = 'ATRASADA';
-    else if (raw.includes('PRAZO')) st = 'NO_PRAZO';
-
-    if (r.dataPrevista && String(r.dataPrevista).slice(0, 10) < today && st !== 'CONCLUIDA') {
-      st = 'ATRASADA';
-    }
-
-    return {
-      id: r.id,
-      tarefa: r.tarefa,
-      equipamento: r.equipamento,
-      dataPrevista: r.dataPrevista ? String(r.dataPrevista).slice(0, 10) : today,
-      status: st,
-      responsavel: r.responsavel || 'A definir',
-    };
-  });
-}
-
-function getGaleriaFromTable(table) {
-  const id = pickCol(table, ['id']);
-  const osId = pickCol(table, ['os_id', 'ordem_servico_id', 'ordem_id'], 'NULL');
-  const arquivo = pickCol(table, ['imagem_url', 'arquivo_url', 'url', 'caminho', 'path', 'filename', 'caminho_arquivo', 'filepath'], 'NULL');
-  const tipo = pickCol(table, ['tipo', 'mime_type', 'mimetype', 'origem'], "''");
-  const legenda = pickCol(table, ['descricao', 'legenda', 'observacao', 'titulo'], "''");
-  const created = pickCol(table, ['created_at', 'criado_em', 'data_criacao'], 'CURRENT_TIMESTAMP');
-  const respId = pickCol(table, ['responsavel_id', 'usuario_id'], 'NULL');
-
-  const rows = safeAll(`
-    SELECT
-      ${id} id,
-      ${osId} os_id,
-      ${arquivo} arquivo,
-      ${tipo} tipo,
-      ${legenda} legenda,
-      ${created} created_at,
-      ${respId} responsavel_id
-    FROM ${table}
-    WHERE COALESCE(${arquivo}, '') <> ''
-    ORDER BY datetime(${created}) DESC
-    LIMIT 30
-  `);
-
-  return rows
-    .filter((r) => r.arquivo)
-    .map((r) => {
-      const rawUrl = String(r.arquivo || '');
-      const lower = rawUrl.toLowerCase();
-      const mime = String(r.tipo || '').toLowerCase();
-      const isVideo = mime.includes('video') || /\.(mp4|webm|ogg|mov)$/i.test(lower);
-      const src = normalizeImagePath(rawUrl);
-      return {
-        id: `${table}-${r.id}`,
-        responsavel_id: r.responsavel_id || null,
-        arquivo_url: src,
-        tipo: isVideo ? 'video' : 'image',
-        legenda: r.legenda || `Fechamento da OS #${r.os_id || '-'}`,
-        os_numero: `OS #${r.os_id || '-'}`,
-        equipamento: 'Manutenção',
-        created_at: r.created_at,
-        responsavel: r.responsavel_id ? `ID ${r.responsavel_id}` : 'A definir',
-      };
-    });
-}
-
-function getUserNamesMap() {
-  const usersTable = firstTable(['users', 'usuarios']);
-  if (!usersTable) return new Map();
-  const idCol = pickCol(usersTable, ['id', 'user_id']);
-  const nameCol = pickCol(usersTable, ['name', 'nome', 'username'], "''");
-  const rows = safeAll(`
-    SELECT ${idCol} AS id, ${nameCol} AS nome
-    FROM ${usersTable}
-    WHERE ${idCol} IS NOT NULL
-  `);
-  const map = new Map();
-  rows.forEach((r) => {
-    const id = Number(r.id || 0);
-    const nome = String(r.nome || '').trim();
-    if (id && nome) map.set(id, nome);
-  });
-  return map;
-}
-
-function getOSDetailsMap() {
-  const table = firstTable(['ordens_servico', 'os', 'ordens', 'ordens_de_servico']);
-  if (!table) return new Map();
-
-  const id = pickCol(table, ['id']);
-  const numero = pickCol(table, ['numero', 'codigo', 'n_os'], 'id');
-  const equipamento = pickCol(table, ['equipamento_nome', 'equipamento', 'maquina', 'ativo'], "'Manutenção'");
-  const responsavel = pickCol(table, ['responsavel_exibicao', 'responsavel_nome', 'responsavel', 'mecanico_nome', 'atribuido_para'], "'A definir'");
-
-  const rows = safeAll(`
-    SELECT
-      ${id} AS id,
-      ${numero} AS numero,
-      ${equipamento} AS equipamento,
-      ${responsavel} AS responsavel
-    FROM ${table}
-    ORDER BY id DESC
-    LIMIT 200
-  `);
-
-  const map = new Map();
-  rows.forEach((r) => {
-    const osId = Number(r.id || 0);
-    if (!osId) return;
-    map.set(osId, {
-      numero: String(r.numero || osId).startsWith('OS') ? String(r.numero) : `OS #${r.numero || osId}`,
-      equipamento: String(r.equipamento || 'Manutenção'),
-      responsavel: String(r.responsavel || 'A definir'),
-    });
-  });
-  return map;
-}
-
-async function getGaleria() {
-  const tables = ['os_fechamento_midias', 'os_fechamento_fotos', 'os_anexos', 'anexos_os', 'ordem_servico_anexos', 'os_fechamentos', 'fechamentos_os', 'arquivos_os', 'os_midias'];
-  let itens = [];
-  tables.forEach((t) => {
-    if (tableExists(t)) itens = itens.concat(getGaleriaFromTable(t));
-  });
-
-  if (tableExists('anexos')) {
-    const ownerType = pickCol('anexos', ['owner_type', 'ownerType', 'tipo_dono'], "'os'");
-    const ownerId = pickCol('anexos', ['owner_id', 'ownerId'], 'NULL');
-    const filepath = pickCol('anexos', ['filepath', 'path', 'arquivo_url', 'url'], 'NULL');
-    const filename = pickCol('anexos', ['filename', 'nome_arquivo'], "''");
-    const created = pickCol('anexos', ['uploaded_at', 'created_at'], 'CURRENT_TIMESTAMP');
-    const mime = pickCol('anexos', ['mime_type', 'mimetype'], "''");
-    const rows = safeAll(`
-      SELECT id, ${ownerId} os_id, COALESCE(${filepath}, ${filename}) arquivo, ${mime} tipo, '' legenda, ${created} created_at, NULL responsavel_id
-      FROM anexos
-      WHERE lower(COALESCE(${ownerType}, '')) = 'os'
-      ORDER BY datetime(${created}) DESC
-      LIMIT 20
-    `);
-    itens = itens.concat(rows.map((r) => ({
-      id: `anexos-${r.id}`,
-      responsavel_id: r.responsavel_id || null,
-      arquivo_url: normalizeImagePath(r.arquivo),
-      tipo: String(r.tipo || '').toLowerCase().includes('video') || /\.(mp4|webm|mov)$/i.test(String(r.arquivo || '')) ? 'video' : 'image',
-      legenda: 'Fechamento da OS',
-      os_numero: `OS #${r.os_id || '-'}`,
-      equipamento: 'Manutenção',
-      created_at: r.created_at,
-      responsavel: 'A definir',
-    })));
-  }
-
-  const usersMap = getUserNamesMap();
-  const osMap = getOSDetailsMap();
-
-  itens = itens.map((item) => {
-    const osId = Number(String(item.os_numero || '').replace(/[^\d]/g, '')) || null;
-    const osMeta = osId ? osMap.get(osId) : null;
-    const responsavelId = Number(item.responsavel_id || 0) || null;
-    const responsavelNome = (responsavelId && usersMap.get(responsavelId)) || item.responsavel || osMeta?.responsavel || 'A definir';
-    return {
-      ...item,
-      os_numero: osMeta?.numero || item.os_numero || (osId ? `OS #${osId}` : 'OS --'),
-      equipamento: osMeta?.equipamento || item.equipamento || 'Manutenção',
-      responsavel: responsavelNome,
-    };
-  });
-
-  itens = uniqueBy(itens, (item) => `${item.arquivo_url}|${item.os_numero}|${item.tipo}`)
-    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-    .slice(0, 12);
-
-  if (itens.length) return itens;
-
-  return Array.from({ length: 12 }).map((_, i) => ({
-    id: `placeholder-${i + 1}`,
-    tipo: 'placeholder',
-    arquivo_url: '/img/tv/galeria-placeholder.jpg',
-    legenda: 'Aguardando registros de fechamento de OS',
-    os_numero: 'OS --',
-    equipamento: 'Manutenção',
-    created_at: new Date().toISOString(),
-    responsavel: 'A definir',
-  }));
-}
-
-async function getWeather() {
-  const fallback = {
-    cidade: 'Feira de Santana',
-    temp: '--',
-    umidade: '--',
-    vento: '--',
-    condicao: 'Previsão indisponível no momento',
-    codigo: null,
-    previsao: [],
-    updatedAt: new Date().toISOString(),
-  };
-
-  try {
-    if (typeof fetch !== 'function') {
-      return { ...fallback, condicao: 'Node sem fetch nativo. Use Node 18+ ou implemente fallback.' };
-    }
-
-    const url =
-      'https://api.open-meteo.com/v1/forecast' +
-      '?latitude=-12.2664&longitude=-38.9663' +
-      '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m' +
-      '&daily=weather_code,temperature_2m_max,temperature_2m_min' +
-      '&timezone=America%2FBahia&forecast_days=5';
-
-    const response = await fetch(url, { headers: { Accept: 'application/json' } });
-    if (!response.ok) throw new Error('Falha ao consultar clima');
-
-    const json = await response.json();
-    const current = json.current || {};
-    const daily = json.daily || {};
-
-    const mapWeather = (code) => {
-      const c = Number(code);
-      if ([0].includes(c)) return 'Céu limpo';
-      if ([1, 2].includes(c)) return 'Parcialmente nublado';
-      if ([3].includes(c)) return 'Nublado';
-      if ([45, 48].includes(c)) return 'Neblina';
-      if ([51, 53, 55, 56, 57].includes(c)) return 'Garoa';
-      if ([61, 63, 65, 66, 67].includes(c)) return 'Chuva';
-      if ([80, 81, 82].includes(c)) return 'Pancadas de chuva';
-      if ([95, 96, 99].includes(c)) return 'Trovoadas';
-      return 'Condição variável';
-    };
-
-    const previsao = (daily.time || []).map((date, index) => ({
-      data: date,
-      max: daily.temperature_2m_max?.[index] ?? null,
-      min: daily.temperature_2m_min?.[index] ?? null,
-      codigo: daily.weather_code?.[index] ?? null,
-      condicao: mapWeather(daily.weather_code?.[index]),
-    }));
-
-    return {
-      cidade: 'Feira de Santana',
-      temp: Math.round(current.temperature_2m ?? 0),
-      umidade: current.relative_humidity_2m ?? '--',
-      vento: Math.round(current.wind_speed_10m ?? 0),
-      codigo: current.weather_code ?? null,
-      condicao: mapWeather(current.weather_code),
-      previsao,
-      updatedAt: new Date().toISOString(),
-    };
-  } catch (err) {
-    console.warn('[TV] clima fallback:', err.message);
-    return fallback;
-  }
-}
-
-function getAlertas(osList, preventivas) {
-  const alertas = [];
-
-  osList.filter((o) => o.prioridade === 'CRITICA' && o.status !== 'CONCLUIDA').slice(0, 5).forEach((o) => {
-    alertas.push({
-      id: Number(o.id),
-      tipo: 'CRITICO',
-      titulo: `${o.numero} - ${o.equipamento}`,
-      descricao: o.descricao || 'OS crítica em aberto',
-      timestamp: o.tempo,
-      reconhecido: false,
-    });
-  });
-
-  preventivas.filter((p) => p.status === 'ATRASADA').slice(0, 5).forEach((p) => {
-    alertas.push({
-      id: 100000 + Number(p.id),
-      tipo: 'MEDIO',
-      titulo: 'Preventiva atrasada',
-      descricao: `${p.tarefa} — ${p.equipamento}`,
-      timestamp: 'Atrasada',
-      reconhecido: false,
-    });
-  });
-
-  return alertas;
-}
-
-function getPerformance(osList) {
-  const abertas = osList.filter((o) => o.status === 'ABERTA').length;
-  const andamento = osList.filter((o) => o.status === 'EM_ANDAMENTO').length;
-  const pausadas = osList.filter((o) => o.status === 'PAUSADA').length;
-  const concluidas = osList.filter((o) => o.status === 'CONCLUIDA').length;
-
-  const criticas = osList.filter((o) => o.prioridade === 'CRITICA' && o.status !== 'CONCLUIDA').length;
-  const altas = osList.filter((o) => o.prioridade === 'ALTA').length;
-  const medias = osList.filter((o) => o.prioridade === 'MEDIA').length;
-  const baixas = osList.filter((o) => o.prioridade === 'BAIXA').length;
-
-  const porEquipamentoMap = {};
-  osList.forEach((o) => {
-    const key = o.equipamento || 'Não informado';
-    porEquipamentoMap[key] = (porEquipamentoMap[key] || 0) + 1;
-  });
-
-  const porEquipamento = Object.entries(porEquipamentoMap)
-    .map(([equipamento, total]) => ({ equipamento, total }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 6);
-
+  const weekEnd = new Date(`${today}T12:00:00`); weekEnd.setDate(weekEnd.getDate() + 7);
+  const active = os.filter(isOSAtiva);
+  const waiting = active.filter((item) => item.status === 'PAUSADA' && /MATERIAL|PECA|COMPRA|ROLAMENTO/.test(semAcentos(item.descricao)));
+  const overduePreventivas = preventivas.filter((p) => p.dataPrevista && p.dataPrevista < today);
+  const preventiveTotal = preventivas.length;
+  const total = active.length + preventiveTotal;
   return {
-    abertas,
-    andamento,
-    pausadas,
-    concluidas,
-    criticas,
-    altas,
-    medias,
-    baixas,
-    total: osList.length,
-    statusChart: [
-      { label: 'Abertas', value: abertas, color: '#ef4444' },
-      { label: 'Andamento', value: andamento, color: '#3b82f6' },
-      { label: 'Pausadas', value: pausadas, color: '#f59e0b' },
-      { label: 'Concluídas', value: concluidas, color: '#10b981' },
-    ],
-    prioridadeChart: [
-      { label: 'Crítica', value: criticas, color: '#ef4444' },
-      { label: 'Alta', value: altas, color: '#f97316' },
-      { label: 'Média', value: medias, color: '#eab308' },
-      { label: 'Baixa', value: baixas, color: '#3b82f6' },
-    ],
-    porEquipamento,
+    os: { abertas: active.filter((o) => o.status === 'ABERTA').length, andamento: active.filter((o) => o.status === 'EM_ANDAMENTO').length, pausadas: active.filter((o) => o.status === 'PAUSADA').length, atrasadas: 0, criticas: active.filter((o) => o.prioridade === 'CRITICA').length, concluidasHoje: os.filter((o) => !isOSAtiva(o) && String(o.closed_at || o.data_conclusao || '').slice(0, 10) === today).length },
+    preventivas: { pendentes: preventiveTotal, vencidas: overduePreventivas.length, hoje: preventivas.filter((p) => p.dataPrevista === today).length, semana: preventivas.filter((p) => p.dataPrevista >= today && new Date(`${p.dataPrevista}T12:00:00`) <= weekEnd).length, corretivas: active.length, percentualPreventivas: total ? Math.round(preventiveTotal / total * 100) : 0, percentualCorretivas: total ? Math.round(active.length / total * 100) : 0 },
+    aguardandoMaterial: waiting.map((o) => ({ os: o.numero, equipamento: o.equipamento, material: o.descricao || null, espera: o.tempo })),
+    programacao: preventivas,
   };
 }
 
-function getAvisosAtivos() {
-  const table = firstTable(['avisos', 'comunicados', 'alertas']);
-  if (!table) return [];
-
-  const id = pickCol(table, ['id']);
-  const titulo = pickCol(table, ['titulo', 'title'], "'Aviso'");
-  const descricao = pickCol(table, ['descricao', 'mensagem', 'texto'], "''");
-  const ativo = pickCol(table, ['ativo', 'is_active'], '1');
-
-  return safeAll(`
-    SELECT ${id} AS id, ${titulo} AS titulo, ${descricao} AS descricao
-    FROM ${table}
-    WHERE COALESCE(${ativo}, 1) = 1
-    ORDER BY id DESC
-    LIMIT 5
-  `);
-}
-
-function getTicker(osList, preventivas, avisos = []) {
-  const msgs = [];
-
-  osList
-    .filter((o) => o.status !== 'CONCLUIDA')
-    .slice(0, 6)
-    .forEach((o) => {
-      msgs.push({
-        id: `os-${o.id}`,
-        tipo: o.prioridade === 'CRITICA' ? 'nova_os' : 'manutencao',
-        texto: `${o.numero} • ${o.equipamento} • ${o.status} • Responsável: ${o.responsavel}`,
-        criticidade: o.prioridade,
-      });
-    });
-
-  preventivas
-    .filter((p) => p.status === 'ATRASADA')
-    .slice(0, 3)
-    .forEach((p) => {
-      msgs.push({
-        id: `prev-${p.id}`,
-        tipo: 'aviso',
-        texto: `Preventiva atrasada • ${p.equipamento} • ${p.responsavel}`,
-        criticidade: 'MEDIA',
-      });
-    });
-
-  avisos.slice(0, 5).forEach((a) => {
-    msgs.push({
-      id: `aviso-${a.id}`,
-      tipo: 'aviso',
-      texto: `${a.titulo} • ${a.descricao || ''}`,
-      criticidade: 'BAIXA',
-    });
-  });
-
-  if (!msgs.length) {
-    msgs.push({
-      id: 'ok',
-      tipo: 'aviso',
-      texto: 'Sistema de manutenção operacional • Sem alertas críticos no momento',
-      criticidade: 'BAIXA',
-    });
-  }
-
-  return msgs;
+function getTicker(active) {
+  const weight = { CRITICA: 0, ALTA: 1, MEDIA: 2, BAIXA: 3 };
+  return active.slice().sort((a, b) => weight[a.prioridade] - weight[b.prioridade] || new Date(a.abertura) - new Date(b.abertura)).map((o) => ({ id: `os-${o.id}`, texto: `${o.numero} • ${o.equipamento} • ${o.responsavel} • ${o.prioridade} • ${o.status} HÁ ${o.tempo}`, criticidade: o.prioridade }));
 }
 
 async function getSnapshot(user) {
-  const [os, preventivas, galeria, weather] = await Promise.all([getOS(), getPreventivas(), getGaleria(), getWeather()]);
-
-  const equipeData = await getEquipeManutencaoViaEscala(os);
-  const rankingEquipe = await getRankingEquipe(os, equipeData.equipe);
-  const avisos = getAvisosAtivos();
-
-  const operacao = buildOperationalSnapshot(os, preventivas);
-  return {
-    os,
-    mecanicos: equipeData.equipe,
-    equipeManutencao: equipeData.equipe,
-    escalaVigente: equipeData.escalaVigente,
-    rankingEquipe,
-    preventivas,
-    galeria,
-    weather,
-    alertas: getAlertas(os, preventivas),
-    performance: getPerformance(os),
-    operacao,
-    ticker: getTicker(os, preventivas, avisos),
-    system: {
-      online: true,
-      user: user
-        ? {
-            id: user.id,
-            nome: user.nome || user.name || user.email,
-          }
-        : null,
-    },
-  };
+  const os = getOS();
+  const active = os.filter(isOSAtiva);
+  const preventivas = getPreventivas();
+  const team = getEquipe(active);
+  const weather = await getWeather();
+  return { os, mecanicos: team.equipe, equipeManutencao: team.equipe, escalaVigente: team.escalaVigente, rankingEquipe: team.rankingEquipe, preventivas, weather, alertas: active.filter((o) => o.prioridade === 'CRITICA'), performance: {}, operacao: { ...buildOperationalSnapshot(os, preventivas), equipamentos: getEquipamentos(os) }, ticker: getTicker(active), system: { online: true, user: user ? { id: user.id, nome: user.nome || user.name } : null } };
 }
 
-function buildOperationalSnapshot(os = [], preventivas = []) {
-  const today = new Date().toISOString().slice(0, 10);
-  const active = os.filter((item) => item.status !== 'CONCLUIDA');
-  const isWaitingMaterial = (item) => item.status === 'PAUSADA' && hasAny(`${item.descricao || ''} ${item.status || ''}`, ['PECA', 'MATERIAL', 'COMPRA', 'ROLAMENTO']);
-  const waiting = active.filter(isWaitingMaterial);
-  const concludedToday = os.filter((item) => item.status === 'CONCLUIDA' && String(item.dataConclusao || item.fechado_em || '').slice(0, 10) === today);
-  const overdue = active.filter((item) => item.dataPrevista && String(item.dataPrevista).slice(0, 10) < today);
-  const byEquipment = new Map();
-  os.forEach((item) => {
-    const name = String(item.equipamento || 'Equipamento não informado');
-    const entry = byEquipment.get(name) || { equipamento: name, falhas: 0, os: 0, ultimaOcorrencia: item.tempo || '-', status: 'DISPONÍVEL', criticidade: 'BAIXA' };
-    entry.falhas += 1;
-    entry.os += 1;
-    if (item.status !== 'CONCLUIDA') entry.status = item.status === 'PAUSADA' ? 'PARADO' : 'EM MANUTENÇÃO';
-    if (normalizarPrioridade(item.prioridade) === 'CRITICA') entry.criticidade = 'CRÍTICA';
-    else if (normalizarPrioridade(item.prioridade) === 'ALTA' && entry.criticidade !== 'CRÍTICA') entry.criticidade = 'ALTA';
-    byEquipment.set(name, entry);
-  });
-  const rankingFalhas = [...byEquipment.values()].sort((a, b) => b.falhas - a.falhas).slice(0, 5);
-  const corretivas = os.length;
-  const preventivasTotal = preventivas.length;
-  const totalTipos = corretivas + preventivasTotal;
-  return {
-    os: {
-      abertas: active.filter((item) => item.status === 'ABERTA').length,
-      andamento: active.filter((item) => item.status === 'EM_ANDAMENTO').length,
-      criticas: active.filter((item) => item.prioridade === 'CRITICA').length,
-      aguardandoMaterial: waiting.length,
-      concluidasHoje: concludedToday.length,
-      atrasadas: overdue.length,
-    },
-    equipamentosCriticos: rankingFalhas.filter((item) => item.criticidade === 'CRÍTICA' || item.criticidade === 'ALTA').slice(0, 5),
-    rankingFalhas,
-    equipamentosParados: active.filter((item) => item.status === 'PAUSADA').slice(0, 5).map((item) => ({ equipamento: item.equipamento, motivo: item.descricao || 'Motivo não informado', status: 'PARADO' })),
-    aguardandoMaterial: waiting.slice(0, 8).map((item) => ({ os: item.numero, equipamento: item.equipamento, material: item.descricao || 'Material não informado', compra: 'Situação não informada', espera: item.tempo || '-' })),
-    programacao: preventivas.slice().sort((a, b) => String(a.dataPrevista || '').localeCompare(String(b.dataPrevista || ''))).slice(0, 10),
-    tipos: {
-      preventivas: preventivasTotal,
-      corretivas,
-      percentualPreventivas: totalTipos ? Math.round((preventivasTotal / totalTipos) * 100) : 0,
-      percentualCorretivas: totalTipos ? Math.round((corretivas / totalTipos) * 100) : 0,
-    },
-  };
+async function getWeather() {
+  try { return await require('./weather.service').getWeather(); }
+  catch (_error) { return { available: false, city: 'Feira de Santana - Campo do Gado', week: [] }; }
 }
 
-async function reconhecerAlerta(_id, _user) {
-  return true;
-}
-
-module.exports = {
-  getSnapshot,
-  getWeather,
-  reconhecerAlerta,
-  getEquipeManutencaoViaEscala,
-  getEscalaVigente,
-  getRankingEquipe,
-};
+module.exports = { getSnapshot, getWeather, normalizarStatusOS, normalizarPrioridade, isOSAtiva, buildOperationalSnapshot };

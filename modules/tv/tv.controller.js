@@ -1,4 +1,5 @@
 const tvService = require('./tv.service');
+const alertsHub = require('../alerts/alerts.hub');
 
 exports.page = async (req, res, next) => {
   try {
@@ -45,17 +46,11 @@ exports.weather = async (_req, res) => {
   }
 };
 
-exports.reconhecerAlerta = async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const user = req.session?.user || req.user || null;
-    await tvService.reconhecerAlerta(id, user);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('[TV] Erro ao reconhecer alerta:', err);
-    res.status(500).json({
-      ok: false,
-      error: 'Erro ao reconhecer alerta.',
-    });
-  }
+exports.stream = (req, res) => {
+  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+  res.flushHeaders?.();
+  alertsHub.subscribe('tv', res);
+  res.write(`event: connected\ndata: ${JSON.stringify({ ts: Date.now() })}\n\n`);
+  const ping = setInterval(() => res.write(`event: ping\ndata: ${JSON.stringify({ ts: Date.now() })}\n\n`), 20000);
+  req.on('close', () => { clearInterval(ping); alertsHub.unsubscribe('tv', res); });
 };

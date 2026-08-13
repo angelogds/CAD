@@ -25,7 +25,7 @@ router.get('/dashboard/tv', ensureAuthenticated, (_req, res) => {
 });
 
 router.get('/api/tv/snapshot', ensureAuthenticated, tvController.snapshot);
+router.get('/api/tv/stream', ensureAuthenticated, tvController.stream);
 router.get('/api/tv/weather', ensureAuthenticated, tvController.weather);
-router.post('/api/tv/alertas/:id/reconhecer', ensureAuthenticated, tvController.reconhecerAlerta);
 
 module.exports = router;

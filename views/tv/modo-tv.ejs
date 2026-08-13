@@ -1,99 +1,36 @@
-<!DOCTYPE html>
-<html lang="pt-BR" class="tv-theme-dark">
+<!doctype html>
+<html lang="pt-BR" class="tv-theme-light">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <meta name="theme-color" content="#0a0f1a">
-  <title><%= title || 'Modo TV — Campo do Gado' %></title>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <meta name="theme-color" content="#087443"><title><%= title || 'Modo TV — Oficina' %></title>
   <link rel="stylesheet" href="/css/tv-mode.css">
 </head>
+<body>
+<div id="tvApp" class="tv-shell">
+  <header class="tv-header">
+    <div class="tv-brand"><img src="/IMG/logo_menu.png.png" alt="Campo do Gado"><div><strong>Manutenção Campo do Gado</strong><span>Modo TV — Oficina</span></div></div>
+    <div id="tvMechanics" class="tv-mechanics" aria-label="Mecânicos da escala atual"></div>
+    <div class="tv-screen-meta"><strong id="tvScreenLabel">Ordens de Serviço ativas</strong><span id="tvScreenIndicator">Tela 1 de 6</span></div>
+    <div class="tv-status"><strong id="tvClock">--:--:--</strong><span id="tvDate">--</span><small id="tvOnlineStatus">Sistema online</small><small id="tvLastUpdate">Última atualização: --:--</small></div>
+    <div class="tv-controls"><button id="tvSoundBtn" type="button">Som ativo</button><button id="tvThemeToggle" type="button" aria-label="Alternar tema">◐</button><button id="tvFullscreenBtn" type="button" aria-label="Tela cheia">⛶</button></div>
+    <div class="tv-progress-line"><i id="tvProgress"></i></div>
+  </header>
 
-<body class="cg-tv">
-  <div id="tvApp" class="tv-shell">
+  <main id="tvContent" class="tv-content">
+    <section class="tv-slide is-active" data-tv-screen="os" aria-label="Ordens de Serviço ativas"></section>
+    <section class="tv-slide" data-tv-screen="preventivas" aria-label="Preventivas e corretivas"></section>
+    <section class="tv-slide" data-tv-screen="escala" aria-label="Escala da semana"></section>
+    <section class="tv-slide" data-tv-screen="desempenho" aria-label="Desempenho da equipe"></section>
+    <section class="tv-slide" data-tv-screen="criticidade" aria-label="Criticidade dos equipamentos"></section>
+    <section class="tv-slide" data-tv-screen="materiais" aria-label="Materiais e programação"></section>
+  </main>
 
-    <header class="tv-topbar">
-      <div class="tv-left">
-        <div class="tv-logo-box">
-          <img
-            src="/IMG/login_campo_do_gado.png.png.png"
-            alt="Campo do Gado"
-            onerror="this.onerror=null; this.src='/img/tv/avatar-default.jpg'; this.onerror=function(){ this.onerror=null; this.src='/img/logo.png'; this.onerror=function(){ this.onerror=null; this.src='/IMG/logo.png'; }; };"
-            class="tv-header-logo"
-          >
-        </div>
+  <footer class="tv-ticker" aria-label="Ordens de Serviço ativas"><strong>OS ATIVAS</strong><div class="tv-ticker-window"><div id="tvTickerTrack" class="tv-ticker-track"></div></div></footer>
 
-        <div class="tv-title-box">
-          <div class="tv-kicker">GERENCIAMENTO DA MANUTENÇÃO</div>
-          <div class="tv-brand">RECICLAGEM CAMPO DO GADO</div>
-          <div class="tv-responsavel">Responsável: Ângelo Gomes da Silva — Encarregado de Manutenção</div>
-          <div id="tvScreenLabel" class="tv-screen-label">ORDENS DE SERVIÇO</div>
-        </div>
-      </div>
-
-      <div class="tv-clock-center">
-        <div id="tvClock" class="tv-clock">--:--:--</div>
-        <div id="tvDate" class="tv-date">Carregando...</div>
-      </div>
-
-      <div class="tv-right">
-        <div id="tvWeatherMini" class="tv-weather-mini">
-          <span>⛅</span>
-          <strong>--°</strong>
-          <small>Feira</small>
-        </div>
-
-        <button id="tvThemeToggle" class="tv-icon-btn" type="button" title="Alternar tema">
-          <span id="tvThemeIcon">☀️</span>
-        </button>
-
-        <button id="tvFullscreenBtn" class="tv-icon-btn" type="button" title="Tela cheia">
-          ⛶
-        </button>
-
-        <div id="tvOnlineStatus" class="tv-online">
-          <span class="tv-dot"></span>
-          <span>SISTEMA ONLINE</span>
-        </div>
-
-        <div class="tv-update-box">
-          <span id="tvConnectionState" class="tv-connection is-loading">Inicializando...</span>
-          <small id="tvLastUpdate">Última atualização: --:--:--</small>
-        </div>
-      </div>
-
-      <div class="tv-progress-line">
-        <div id="tvProgress" class="tv-progress"></div>
-      </div>
-    </header>
-
-    <section id="tvLed" class="tv-led is-hidden" data-os-alert-banner aria-live="assertive" aria-atomic="true">
-      <strong id="tvLedText" data-os-alert-text></strong>
-      <button id="tvLedClose" data-os-alert-close type="button" aria-label="Fechar alerta">×</button>
-    </section>
-
-    <main id="tvContent" class="tv-content" aria-live="polite"></main>
-
-    <div id="tvScreenIndicator" class="tv-screen-indicator" aria-label="Tela atual">1 / 6</div>
-
-    <div id="tvToast" class="tv-toast" hidden></div>
-
-    <footer class="tv-ticker">
-      <div id="tvTickerTrack" class="tv-ticker-track"></div>
-    </footer>
-
-  </div>
-
-  <script>
-    window.CG_TV_CONFIG = {
-      snapshotUrl: '/api/tv/snapshot',
-      weatherUrl: '/api/tv/weather',
-      refreshMs: 60000,
-      rotationMs: 18000,
-      defaultAvatar: '/IMG/login_campo_do_gado.png.png.png',
-      galleryPlaceholder: '/img/tv/galeria-placeholder.jpg'
-    };
-  </script>
-
-  <script src="/js/tv-mode.js"></script>
-</body>
-</html>
+  <div id="tvActivation" class="tv-activation"><div><img src="/IMG/logo_menu.png.png" alt=""><h1>Modo TV — Oficina</h1><p>Painel operacional somente para acompanhamento.</p><button id="tvActivateBtn" type="button">Ativar Modo TV</button></div></div>
+  <section id="tvNewOSAlert" class="tv-alert" hidden aria-live="assertive"><div class="tv-alert-card"><span>NOVA ORDEM DE SERVIÇO</span><strong id="tvAlertNumber"></strong><h2 id="tvAlertEquipment"></h2><p id="tvAlertDescription"></p><dl id="tvAlertDetails"></dl><small>O painel retornará automaticamente após o aviso.</small></div></section>
+  <audio id="tvAudioNew" preload="auto" src="/audio/os-nova.mp3"></audio><audio id="tvAudioCritical" preload="auto" src="/audio/os-critica.mp3"></audio>
+</div>
+<script>window.CG_TV_CONFIG={snapshotUrl:'/api/tv/snapshot',streamUrl:'/api/tv/stream',refreshMs:60000,fastRefreshMs:15000,rotationMs:30000,alertMs:60000};</script>
+<script src="/js/tv-mode.js"></script>
+</body></html>
