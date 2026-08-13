@@ -200,9 +200,28 @@
   async function requestWakeLock() { try { if ('wakeLock' in navigator && document.visibilityState === 'visible') state.wakeLock = await navigator.wakeLock.request('screen'); } catch (_error) {} }
   function updateSoundLabel(enabled = localStorage.getItem('cgTvSound') !== 'off') { $('tvSoundBtn').textContent = enabled ? 'Som ativo' : 'Som desativado'; }
   async function activate() {
-    state.active = true; $('tvActivation').hidden = true;
-    for (const audio of [$('tvAudioNew'), $('tvAudioCritical')]) { audio.load(); try { audio.muted = true; await audio.play(); audio.pause(); audio.currentTime = 0; audio.muted = false; } catch (_error) {} }
-    document.documentElement.requestFullscreen?.().catch?.(() => {}); requestWakeLock(); scheduleRotation(ROTATION_MS); startProgress(); startSnapshotPolling(); connectStream(); updateSoundLabel();
+    const activation = $('tvActivation');
+    if (activation) {
+      activation.hidden = true;
+      activation.classList.add('is-hidden');
+    }
+
+    for (const audio of [$('tvAudioNew'), $('tvAudioCritical')]) {
+      if (!audio) continue;
+      audio.load();
+      try {
+        audio.muted = true;
+        await audio.play();
+        audio.pause();
+        audio.currentTime = 0;
+        audio.muted = false;
+      } catch (_error) {}
+    }
+
+    localStorage.setItem('cgTvSound', 'on');
+    updateSoundLabel(true);
+    try { await document.documentElement.requestFullscreen?.(); } catch (_error) {}
+    requestWakeLock();
   }
   function bind() {
     $('tvActivateBtn').addEventListener('click', activate);
@@ -212,7 +231,21 @@
     document.addEventListener('visibilitychange', () => { document.querySelector('.tv-ticker').classList.toggle('is-paused', document.hidden); if (!document.hidden && state.active) requestWakeLock(); });
   }
   function clock() { const tick = () => { const now = new Date(); $('tvClock').textContent = now.toLocaleTimeString('pt-BR'); $('tvDate').textContent = now.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}); }; tick(); setInterval(tick,1000); }
-  function init() { readProcessed(); document.documentElement.classList.toggle('tv-theme-dark', localStorage.getItem('cgTvTheme') === 'dark'); bind(); clock(); fetchSnapshot({ detectNew: false }); updateSoundLabel(); }
+  function init() {
+    readProcessed();
+    document.documentElement.classList.toggle('tv-theme-dark', localStorage.getItem('cgTvTheme') === 'dark');
+    bind();
+    clock();
+
+    // Os dados e a rotação nunca dependem da permissão de áudio/tela cheia.
+    state.active = true;
+    fetchSnapshot({ detectNew: false });
+    scheduleRotation(ROTATION_MS);
+    startProgress();
+    startSnapshotPolling();
+    connectStream();
+    updateSoundLabel(false);
+  }
   window.CGTVTest = { priority, status, isOSAtiva, osKey, enqueueAlert, resolveNewOSEvent, findSnapshotOS, isCompleteOS, fetchSnapshot, finishAlert, state, constants: { ROTATION_MS, SNAPSHOT_MS, FAST_MS, ALERT_MS } };
   document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init, { once: true }) : init();
 })();
