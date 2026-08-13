@@ -25,6 +25,8 @@ function lista(req, res) {
     date: req.query.date || '',
     startDate: req.query.startDate || '',
     endDate: req.query.endDate || '',
+    period: ['7', '30', '90'].includes(req.query.period) ? Number(req.query.period) : 30,
+    setor: (req.query.setor || '').trim(),
     vinculadasOs: req.query.vinculadas_os === '1',
     urgentes: req.query.urgentes === '1',
   };

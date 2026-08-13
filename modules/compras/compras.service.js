@@ -153,6 +153,11 @@ function listSolicitacoesPorStatus(filters = {}) {
   if (filters.date) { where.push('date(s.created_at) = date(?)'); params.push(filters.date); }
   if (filters.startDate) { where.push('date(s.created_at) >= date(?)'); params.push(filters.startDate); }
   if (filters.endDate) { where.push('date(s.created_at) <= date(?)'); params.push(filters.endDate); }
+  if (filters.period && !filters.date && !filters.startDate && !filters.endDate) {
+    where.push("date(s.created_at) >= date('now', ?)");
+    params.push(`-${Number(filters.period)} days`);
+  }
+  if (filters.setor) { where.push('s.setor_origem = ?'); params.push(filters.setor); }
   if (filters.vinculadasOs) where.push('s.os_id IS NOT NULL');
   if (filters.urgentes) where.push("UPPER(COALESCE(s.prioridade, '')) IN ('ALTA', 'URGENTE', 'CRITICA', 'CRÍTICA', 'EMERGENCIAL')");
 
