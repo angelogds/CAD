@@ -141,7 +141,9 @@ function marcarComprada(req, res) {
 function salvarPainelItens(req, res) {
   try {
     service.salvarPainelItens(Number(req.params.id), req.body, req.session.user.id);
-    req.flash('success', 'Cotação, compra e recebimento atualizados com segurança.');
+    req.flash('success', req.body.acao === 'comprar'
+      ? 'Itens selecionados marcados como comprados com segurança.'
+      : 'Rascunho da cotação salvo com sucesso.');
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível salvar o painel por item.');
   }

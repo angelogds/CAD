@@ -378,7 +378,11 @@ function salvarPainelItens(solicitacaoId, payload = {}, userId) {
   const ids = Array.isArray(payload.item_id) ? payload.item_id : [payload.item_id].filter(Boolean);
   const values = (name) => Array.isArray(payload[name]) ? payload[name] : [payload[name]];
   const cotados = new Set((Array.isArray(payload.cotado) ? payload.cotado : [payload.cotado]).filter(Boolean).map(Number));
-  const comprar = new Set((Array.isArray(payload.comprar) ? payload.comprar : [payload.comprar]).filter(Boolean).map(Number));
+  // O rascunho atualiza cotações e dados gerais sem efetivar uma compra. A
+  // transição só acontece quando o botão de compra envia a intenção explícita.
+  const comprar = payload.acao === 'comprar'
+    ? new Set((Array.isArray(payload.comprar) ? payload.comprar : [payload.comprar]).filter(Boolean).map(Number))
+    : new Set();
   const frete = calculos.parseCentavos(payload.frete, 'Frete');
   const desconto = calculos.parseCentavos(payload.desconto, 'Desconto');
   return db.transaction(() => {
