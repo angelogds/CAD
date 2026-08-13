@@ -27,7 +27,10 @@
 
   <footer class="tv-ticker" aria-label="Ordens de Serviço ativas"><strong>OS ATIVAS</strong><div class="tv-ticker-window"><div id="tvTickerTrack" class="tv-ticker-track"></div></div></footer>
 
-  <div id="tvActivation" class="tv-activation"><div><img src="/IMG/logo_menu.png.png" alt=""><h1>Modo TV — Oficina</h1><p>Painel operacional somente para acompanhamento.</p><button id="tvActivateBtn" type="button">Ativar Modo TV</button></div></div>
+  <aside id="tvActivation" class="tv-activation" role="status">
+    <span>Para receber os chamados com aviso sonoro, clique em “Ativar som e tela cheia”.</span>
+    <button id="tvActivateBtn" type="button">Ativar som e tela cheia</button>
+  </aside>
   <section id="tvNewOSAlert" class="tv-alert" hidden aria-live="assertive"><div class="tv-alert-card"><span>NOVA ORDEM DE SERVIÇO</span><strong id="tvAlertNumber"></strong><h2 id="tvAlertEquipment"></h2><p id="tvAlertDescription"></p><dl id="tvAlertDetails"></dl><small>O painel retornará automaticamente após o aviso.</small></div></section>
   <audio id="tvAudioNew" preload="auto" src="/audio/os-nova.mp3"></audio><audio id="tvAudioCritical" preload="auto" src="/audio/os-critica.mp3"></audio>
 </div>

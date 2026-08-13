@@ -18,8 +18,19 @@ test('rota oficial /tv, redirect legado e stream pertencem ao módulo oficial', 
 test('tela oficial possui seis seções, ticker e não possui ações operacionais', () => {
   assert.equal((view().match(/data-tv-screen=/g) || []).length, 6);
   assert.match(view(), /id="tvTickerTrack"/);
-  assert.match(view(), /Ativar Modo TV/);
+  assert.match(view(), /Para receber os chamados com aviso sonoro/);
+  assert.match(view(), /Ativar som e tela cheia/);
   assert.doesNotMatch(view(), />\s*(Abrir|Iniciar|Editar|Fechar)\s*</);
+});
+
+test('painel inicia imediatamente e ativação libera somente recursos do navegador', () => {
+  const js = source();
+  assert.match(js, /state\.active = true;[\s\S]*fetchSnapshot\(\{ detectNew: false \}\);[\s\S]*scheduleRotation\(ROTATION_MS\);[\s\S]*startSnapshotPolling\(\);[\s\S]*connectStream\(\);/);
+  assert.match(js, /localStorage\.setItem\('cgTvSound', 'on'\)/);
+  assert.match(js, /requestFullscreen/);
+  assert.match(js, /requestWakeLock\(\)/);
+  assert.match(css(), /\.tv-activation\.is-hidden,\.tv-activation\[hidden\]\{display:none!important\}/);
+  assert.doesNotMatch(css(), /\.tv-activation,\.tv-alert\{/);
 });
 
 test('rotação, atualização, fallback e alerta usam os intervalos especificados', () => {
