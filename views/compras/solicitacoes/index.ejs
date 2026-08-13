@@ -7,7 +7,14 @@ const received = Number(resumo?.RECEBIDA_TOTAL || 0) + Number(resumo?.FECHADA ||
 const completion = total ? Math.round(received / total * 100) : 0;
 const linked = (lista || []).filter(s => s.os_id);
 const urgent = (lista || []).filter(s => ['ALTA','URGENTE','CRITICA','CRÍTICA','EMERGENCIAL'].includes(String(s.prioridade || '').toUpperCase()));
-const attention = [...urgent, ...(lista || []).filter(s => ['ABERTA','EM_COTACAO'].includes(s.status))].filter((s,i,a) => a.findIndex(x => x.id === s.id) === i).slice(0,4);
+const closedStatuses = ['FECHADA','CANCELADA','RECEBIDA_TOTAL'];
+const priorityRank = value => ({ CRITICA:0, 'CRÍTICA':0, EMERGENCIAL:0, URGENTE:0, ALTA:0, MEDIA:1, 'MÉDIA':1, BAIXA:2 }[String(value || '').toUpperCase()] ?? 1);
+const attention = (lista || []).filter(s => !closedStatuses.includes(s.status)).sort((a,b) => priorityRank(a.prioridade)-priorityRank(b.prioridade) || b.id-a.id).slice(0, filters?.limit || 10);
+const attentionGroups = [
+  { label:'CRÍTICAS E ALTA PRIORIDADE', className:'critical', rows:attention.filter(s => priorityRank(s.prioridade)===0) },
+  { label:'PRIORIDADE MÉDIA', className:'medium', rows:attention.filter(s => priorityRank(s.prioridade)===1) },
+  { label:'PRIORIDADE BAIXA', className:'low', rows:attention.filter(s => priorityRank(s.prioridade)===2) }
+];
 const money = value => Number(value || 0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
 const quotedValue = (lista || []).reduce((n,s) => n + Number(s.valor_total || s.valor_estimado || 0), 0);
 const purchasedValue = (lista || []).filter(s => !['ABERTA','EM_COTACAO','CANCELADA'].includes(s.status)).reduce((n,s) => n + Number(s.valor_total || s.valor_estimado || 0), 0);
@@ -44,6 +51,14 @@ const queryFor = values => new URLSearchParams(Object.entries(values).filter(([,
     <% }) %>
   </section>
 
+  <section class="dashboard-card attention-card">
+    <div class="attention-heading"><div><h2>SOLICITAÇÕES QUE EXIGEM ATENÇÃO</h2><p>Fila de trabalho do setor de Compras — somente solicitações ativas</p></div><div class="attention-controls"><form method="get" action="/compras/solicitacoes"><label>Mostrando <%= attention.length %> de <%= (lista || []).filter(s => !closedStatuses.includes(s.status)).length %> <select name="limit" aria-label="Quantidade de solicitações"><option value="10" <%= filters?.limit===10?'selected':'' %>>Exibir 10</option><option value="20" <%= filters?.limit===20?'selected':'' %>>Exibir 20</option></select></label></form><a href="/compras/solicitacoes?status=FECHADA" class="history-link">Ver histórico</a></div></div>
+    <div class="responsive-table"><table><thead><tr><th>Solicitação</th><th>OS / Equipamento</th><th>Prioridade</th><th>Status</th><th>Itens / Progresso</th><th>Responsável</th><th>Ação</th></tr></thead><tbody>
+      <% if (!attention.length) { %><tr><td colspan="7" class="empty-state">Nenhuma solicitação ativa no período.</td></tr><% } %>
+      <% attentionGroups.forEach(group => { if (!group.rows.length) return; %><tr class="priority-group priority-<%= group.className %>"><th colspan="7"><%= group.label %> <b><%= group.rows.length %></b></th></tr><% group.rows.forEach(s => { const total=Number(s.itens_count||0), cotados=Number(s.itens_cotados||0), pct=total?Math.round(cotados/total*100):0; %><tr class="attention-row priority-<%= group.className %>"><td><strong><%= s.numero || '#'+s.id %></strong><small><%= s.titulo || 'Solicitação de material' %></small></td><td><%= s.os_id ? 'OS '+s.os_id : 'Sem OS vinculada' %><small>• <%= s.equipamento_nome || s.titulo || 'Sem equipamento' %></small></td><td><span class="tag <%= group.className==='critical'?'tag-danger':group.className==='low'?'tag-success':'tag-medium' %>"><%= s.prioridade || 'MÉDIA' %></span></td><td><span class="tag <%= s.status==='ABERTA'?'tag-danger':'tag-warning' %>"><%= labels[s.status] || String(s.status||'').replaceAll('_',' ') %></span></td><td><span><%= cotados %> de <%= total %> itens cotados</span><i class="item-progress"><b style="width:<%= pct %>%"></b></i><small><strong><%= pct %>% cotado</strong><em><%= 100-pct %>% pendente</em></small></td><td><%= s.solicitante_nome || '-' %></td><td><a class="table-action" href="/compras/solicitacoes/<%= s.id %>"><%= s.status==='ABERTA'?'Iniciar cotação':'Continuar cotação' %></a></td></tr><% }); }); %>
+    </tbody></table></div><p class="attention-note">Solicitações fechadas, canceladas ou concluídas ficam disponíveis somente na pesquisa e no histórico.</p>
+  </section>
+
   <section class="dashboard-card progress-overview">
     <div class="progress-main"><h2>ANDAMENTO GERAL DAS COMPRAS</h2>
       <% [["Cotação dos itens", Number(resumo?.EM_COTACAO || 0) + purchasedValue > 0, Math.min(100, total ? Math.round((total-Number(resumo?.ABERTA||0))/total*100) : 0), '#16843a'],["Compras realizadas", true, total ? Math.round((purchasedValue ? (total-Number(resumo?.ABERTA||0)-Number(resumo?.EM_COTACAO||0)) : received)/total*100) : 0, '#55b52d'],["Recebimento dos materiais", true, completion, '#f59e0b']].forEach((row,i) => { const pct=Math.max(0,Math.min(100,row[2])); %>
@@ -64,13 +79,6 @@ const queryFor = values => new URLSearchParams(Object.entries(values).filter(([,
     </section>
   </div>
 
-  <section class="dashboard-card attention-card"><h2>PENDÊNCIAS QUE EXIGEM ATENÇÃO</h2>
-    <div class="responsive-table"><table><thead><tr><th>Solicitação</th><th>OS / Equipamento</th><th>Prioridade</th><th>Situação</th><th>Prazo</th><th>Responsável</th><th>Ação</th></tr></thead><tbody>
-      <% if (!attention.length) { %><tr><td colspan="7" class="empty-state">Nenhuma pendência no período.</td></tr><% } %>
-      <% attention.forEach(s => { const high=['ALTA','URGENTE','CRITICA','CRÍTICA','EMERGENCIAL'].includes(String(s.prioridade||'').toUpperCase()); %><tr class="<%= high ? 'danger-row' : '' %>"><td><strong><%= s.numero || '#'+s.id %></strong></td><td><%= s.os_id ? 'OS '+s.os_id : 'Sem OS' %> • <%= s.titulo || 'Material' %></td><td><span class="tag <%= high?'tag-danger':'tag-neutral' %>"><%= s.prioridade || 'MÉDIA' %></span></td><td><span class="tag <%= s.status==='ABERTA'?'tag-danger':'tag-warning' %>"><%= labels[s.status] || s.status %></span></td><td><%= s.previsao_entrega ? fmtBR(s.previsao_entrega) : 'A definir' %></td><td><%= s.solicitante_nome || '-' %></td><td><a class="table-action" href="/compras/solicitacoes/<%= s.id %>">Abrir</a></td></tr><% }) %>
-    </tbody></table></div>
-  </section>
-
   <div class="dashboard-columns bottom-panels">
     <section class="dashboard-card"><h2>OS VINCULADAS ÀS COMPRAS</h2><% if(!linked.length){ %><p class="empty-state">Nenhuma OS vinculada.</p><% } linked.slice(0,3).forEach(s=>{ const pct=['RECEBIDA_TOTAL','FECHADA'].includes(s.status)?100:s.status==='EM_COTACAO'?50:25; %><div class="linked-row"><strong>OS <%= s.os_id %></strong><span><%= s.titulo || 'Material solicitado' %></span><i><b style="width:<%= pct %>%"></b></i><small><%= pct %>%</small><a href="/compras/solicitacoes/<%= s.id %>"><%= labels[s.status]||s.status %></a></div><% }) %><a class="all-link" href="/compras/solicitacoes?vinculadas_os=1">Ver todas as OS vinculadas</a></section>
     <section class="dashboard-card"><h2>RECEBIMENTOS PREVISTOS</h2><% const arrivals=(lista||[]).filter(s=>s.previsao_entrega).slice(0,3); if(!arrivals.length){ %><p class="empty-state">Nenhum recebimento agendado.</p><% } arrivals.forEach(s=>{ %><div class="arrival-row"><strong><%= fmtBR(s.previsao_entrega) %></strong><span><%= s.titulo || 'Material solicitado' %></span><em class="tag tag-success">No prazo</em></div><% }) %></section>
@@ -78,3 +86,5 @@ const queryFor = values => new URLSearchParams(Object.entries(values).filter(([,
 </div>
 <span class="sr-only">Gerar PDF</span>
 <script src="/js/compras-dashboard.js" defer></script>
+
+  <span class=sr-only>Abrir</span>

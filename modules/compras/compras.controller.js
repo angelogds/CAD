@@ -29,6 +29,7 @@ function lista(req, res) {
     setor: (req.query.setor || '').trim(),
     vinculadasOs: req.query.vinculadas_os === '1',
     urgentes: req.query.urgentes === '1',
+    limit: ['10', '20'].includes(req.query.limit) ? Number(req.query.limit) : 10,
   };
 
   const lista = service.listSolicitacoesPorStatus(filters);
