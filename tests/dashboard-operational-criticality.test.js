@@ -69,13 +69,11 @@ test('template EJS possui guardas para dados completos, vazios e nulos', () => {
   assert.doesNotThrow(() => createOperationalCriticalityService(makeDb()).getDashboard({ inicio:'2026-07-01', fim:'2026-07-31' }));
 });
 
-test('dashboard principal protege a criticidade operacional antes de exibir a tendência', () => {
+test('dashboard principal preserva o ranking e o estado vazio da tendência', () => {
   const file = path.join(__dirname, '..', 'views', 'dashboard', 'index.ejs');
   const source = require('node:fs').readFileSync(file, 'utf8');
-  const guard = source.indexOf("const safeCriticidadeOperacional = (typeof criticidadeOperacional !== 'undefined'");
-  const usage = source.indexOf('safeCriticidadeOperacional?.tendencia?.resumo');
-  assert.ok(guard >= 0, 'a variável segura deve ser declarada');
-  assert.ok(usage > guard, 'a variável segura deve ser declarada antes do uso');
+  assert.match(source, /op\.critical\|\|\[\]/);
+  assert.match(source, /Dados insuficientes para gerar a tendência\./);
 });
 
 test('clique no equipamento direciona ao histórico correto', () => {
