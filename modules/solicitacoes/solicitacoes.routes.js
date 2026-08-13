@@ -12,12 +12,14 @@ function requireAdminDeleteSolicitacao(req, res, next) {
 
 router.get("/minhas", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.minhas);
 router.get("/nova", requireLogin, requireRole(ACCESS.solicitacoes_create), ctrl.nova);
+router.get("/acompanhamento-compras", requireLogin, requireRole(ACCESS.compras_read), ctrl.acompanhamentoCompras);
 router.post("/", requireLogin, requireRole(ACCESS.solicitacoes_create), ctrl.criar);
 router.get("/:id/pdf", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.pdf);
 router.post("/:id/excluir", requireLogin, requireAdminDeleteSolicitacao, requireRole(ACCESS.solicitacoes_delete), ctrl.excluir);
 router.post("/:id/cancelar", requireLogin, requireAdminDeleteSolicitacao, requireRole(ACCESS.solicitacoes_delete), ctrl.cancelar);
 router.get("/:id/editar", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.editar);
 router.post("/:id/editar", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.atualizar);
+router.post("/:id/finalizar", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.finalizar);
 router.get("/:id", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.detalhe);
 router.get("/", (_req, res) => res.redirect("/solicitacoes/minhas"));
 
