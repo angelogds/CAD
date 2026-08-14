@@ -1,6 +1,88 @@
-<% layout('layout') %><link rel="stylesheet" href="/css/fornecedores.css"><script src="/js/fornecedores.js" defer></script><%const selected=fornecedor?.categorias||[];const products=(fornecedor?.produtos_servicos||[]).filter(x=>x.tipo==='PRODUTO').map(x=>x.nome).join(', ');const services=(fornecedor?.produtos_servicos||[]).filter(x=>x.tipo==='SERVICO').map(x=>x.nome).join(', ');%>
-<div class="supplier-page"><header class="supplier-head"><div><h1><%=fornecedor?'Editar fornecedor':'Novo fornecedor'%> <small>CADASTRO RÁPIDO</small></h1><p>Cadastre os dados essenciais para cotações e histórico de compras</p></div><a class="ui-btn ghost" href="<%=context?.returnTo||'/fornecedores'%>">← Voltar</a></header><div class="steps"><b>1 <span>Dados principais</span></b><b>2 <span>Produtos e serviços</span></b><b>3 <span>Condições comerciais</span></b></div>
-<form class="supplier-form" method="post" action="<%=formAction%>" data-supplier-form><main><%if(context){%><section class="supplier-card quote-context"><h2>Contexto da cotação</h2><b><%=context.numero||('Solicitação #'+context.solicitacaoId)%><%=context.equipamento?' · '+context.equipamento:''%></b><p>Item em cotação: <%=context.item||('item #'+context.itemId)%></p></section><input type="hidden" name="solicitacao_id" value="<%=context.solicitacaoId%>"><input type="hidden" name="item_id" value="<%=context.itemId||''%>"><input type="hidden" name="contexto_numero" value="<%=context.numero%>"><input type="hidden" name="contexto_equipamento" value="<%=context.equipamento%>"><input type="hidden" name="contexto_item" value="<%=context.item%>"><%}%>
-<section class="supplier-card"><h2>♙ Dados principais</h2><div class="form-grid"><label>Nome fantasia *<input class="input" name="nome_fantasia" required value="<%=fornecedor?.nome_fantasia||fornecedor?.nome||''%>"></label><label>Razão social<input class="input" name="razao_social" value="<%=fornecedor?.razao_social||''%>"></label><label>CNPJ<input class="input" name="cnpj" inputmode="numeric" value="<%=fornecedor?.cnpj||''%>" placeholder="00.000.000/0000-00"></label><label>Situação<select class="input" name="situacao"><option value="ATIVO">Ativo</option><option value="INATIVO" <%=fornecedor?.situacao==='INATIVO'?'selected':''%>>Inativo</option></select></label><label>Responsável comercial *<input class="input" name="responsavel_comercial" required value="<%=fornecedor?.responsavel_comercial||''%>"></label><label>WhatsApp<input class="input" name="whatsapp" value="<%=fornecedor?.whatsapp||''%>"></label><label>Telefone alternativo<input class="input" name="telefone" value="<%=fornecedor?.telefone||''%>"></label><label>E-mail<input class="input" type="email" name="email" value="<%=fornecedor?.email||''%>"></label><label>Cidade<input class="input" name="cidade" value="<%=fornecedor?.cidade||''%>"></label><label>UF<input class="input" maxlength="2" name="uf" value="<%=fornecedor?.uf||''%>"></label><label class="wide">Endereço<input class="input" name="endereco" value="<%=fornecedor?.endereco||''%>"></label></div></section>
-<section class="supplier-card"><h2>◇ Produtos e serviços</h2><label>Adicionar produto, serviço ou marca<input class="input" name="produtos_servicos" value="<%=products%>" placeholder="Separe múltiplos itens por vírgula"></label><div class="category-picker"><b>Categorias *</b><%categories.forEach(c=>{%><label><input type="checkbox" name="categorias" value="<%=c.nome%>" <%=selected.includes(c.nome)?'checked':''%>><span><%=c.nome%></span></label><%})%><label class="new-category">Nova categoria<input class="input" name="categorias" placeholder="Adicionar autorizada"></label></div><div class="form-grid"><label>Serviços<input class="input" name="servicos" value="<%=services%>"></label><label>Marcas representadas<input class="input" name="marcas" value="<%=fornecedor?.marcas||''%>"></label><label>Região atendida<input class="input" name="regiao_atendida" value="<%=fornecedor?.regiao_atendida||''%>"></label><label>Especialidade<input class="input" name="especialidade" value="<%=fornecedor?.especialidade||''%>"></label></div></section>
-<section class="supplier-card"><h2>▱ Condições comerciais</h2><div class="form-grid commercial"><label>Prazo médio de entrega<input class="input" type="number" min="0" name="prazo_medio_entrega" value="<%=fornecedor?.lead_time_medio_dias||''%>"></label><label>Condição de pagamento<input class="input" name="condicao_pagamento" value="<%=fornecedor?.condicao_pagamento||''%>"></label><label>Pedido mínimo<input class="input" name="pedido_minimo" value="<%=fornecedor?.pedido_minimo_centavos?fornecedor.pedido_minimo_centavos/100:''%>"></label><label>Tipo de frete<input class="input" name="frete" value="<%=fornecedor?.frete||''%>"></label><label>Validade da proposta (dias)<input class="input" type="number" min="0" name="validade_proposta_dias" value="<%=fornecedor?.validade_proposta_dias||''%>"></label><label>Garantia<input class="input" name="garantia" value="<%=fornecedor?.garantia||''%>"></label><label class="wide">Observações comerciais<textarea class="input" name="observacoes_comerciais"><%=fornecedor?.observacoes_comerciais||''%></textarea></label></div></section></main><aside><section class="supplier-card summary"><h2>Resumo do cadastro</h2><ul><li data-check="id">Identificação</li><li data-check="contact">Contato</li><li data-check="products">Produtos e serviços</li><li data-check="commercial">Condições comerciais</li></ul><hr><h3>Como será usado</h3><p>✓ Disponível na seleção de fornecedores da cotação</p><p>✓ Histórico de preços e compras centralizado</p><p>✓ Busca por materiais fornecidos</p></section></aside><footer><a class="ui-btn ghost" href="<%=context?.returnTo||'/fornecedores'%>">Cancelar</a><button class="ui-btn ghost" name="acao" value="salvar">Salvar fornecedor</button><%if(context){%><button class="ui-btn" name="acao" value="salvar_selecionar">Salvar e selecionar na cotação</button><%}%></footer></form></div>
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/fornecedores.css">
+<script src="/js/fornecedores.js" defer></script>
+<%
+  const selected = fornecedor?.categorias || [];
+  const productItems = (fornecedor?.produtos_servicos || []).filter(x => x.tipo === 'PRODUTO').map(x => x.nome);
+  const serviceItems = (fornecedor?.produtos_servicos || []).filter(x => x.tipo === 'SERVICO').map(x => x.nome);
+  const backUrl = context?.returnTo || '/fornecedores';
+  const icon = (name, className = '') => {
+    const paths = {
+      arrowLeft: '<path d="M19 12H5M11 18l-6-6 6-6"/>',
+      identity: '<path d="M4 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M18 8h4M20 6v4"/>',
+      boxes: '<path d="m12 2 8 4-8 4-8-4 8-4zM4 10l8 4 8-4M4 14l8 4 8-4"/>',
+      wallet: '<path d="M20 7V5a2 2 0 0 0-2-2H5a3 3 0 0 0 0 6h15v12H5a3 3 0 0 1-3-3V6M16 14h.01"/>',
+      check: '<path d="m5 12 4 4L19 6"/>',
+      quote: '<path d="M4 4h16v16H4zM8 9h8M8 13h5"/>',
+      plus: '<path d="M12 5v14M5 12h14"/>',
+      info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'
+    };
+    return `<svg class="supplier-icon ${className}" aria-hidden="true" viewBox="0 0 24 24">${paths[name] || ''}</svg>`;
+  };
+%>
+<div class="supplier-page supplier-form-page">
+  <header class="supplier-head form-head">
+    <div><div class="title-with-badge"><h1><%= fornecedor ? 'Editar fornecedor' : 'Novo fornecedor' %></h1><span>Cadastro rápido</span></div><p>Cadastre os dados essenciais para cotações e histórico de compras</p></div>
+    <a class="supplier-btn supplier-btn-quiet" href="<%= backUrl %>"><%- icon('arrowLeft') %> Voltar</a>
+  </header>
+
+  <ol class="supplier-steps" aria-label="Etapas do cadastro">
+    <li class="is-current"><span>1</span><strong>Dados principais</strong></li>
+    <li><span>2</span><strong>Produtos e serviços</strong></li>
+    <li><span>3</span><strong>Condições comerciais</strong></li>
+  </ol>
+
+  <form class="supplier-form" method="post" action="<%= formAction %>" data-supplier-form>
+    <main>
+      <section class="supplier-card form-section" data-form-section="identity">
+        <div class="section-heading"><span><%- icon('identity') %></span><div><h2>Dados principais</h2><p>Identificação, contato e localização do parceiro.</p></div></div>
+        <div class="form-grid">
+          <label>Nome fantasia <em>*</em><input class="supplier-input" name="nome_fantasia" required value="<%= fornecedor?.nome_fantasia || fornecedor?.nome || '' %>" autocomplete="organization"></label>
+          <label>Razão social<input class="supplier-input" name="razao_social" value="<%= fornecedor?.razao_social || '' %>"></label>
+          <label>CNPJ<input class="supplier-input" name="cnpj" inputmode="numeric" value="<%= fornecedor?.cnpj || '' %>" placeholder="00.000.000/0000-00"></label>
+          <label>Situação<select class="supplier-input" name="situacao"><option value="ATIVO">Ativo</option><option value="INATIVO" <%= fornecedor?.situacao === 'INATIVO' ? 'selected' : '' %>>Inativo</option></select></label>
+          <label>Responsável comercial <em>*</em><input class="supplier-input" name="responsavel_comercial" required value="<%= fornecedor?.responsavel_comercial || '' %>" autocomplete="name"></label>
+          <label>WhatsApp <em>*</em><input class="supplier-input" name="whatsapp" inputmode="tel" value="<%= fornecedor?.whatsapp || '' %>" placeholder="(00) 00000-0000" autocomplete="tel"></label>
+          <label>E-mail<input class="supplier-input" type="email" name="email" value="<%= fornecedor?.email || '' %>" autocomplete="email"></label>
+          <label>Cidade<input class="supplier-input" name="cidade" value="<%= fornecedor?.cidade || '' %>" autocomplete="address-level2"></label>
+          <label class="field-uf">UF<input class="supplier-input" maxlength="2" name="uf" value="<%= fornecedor?.uf || '' %>" autocomplete="address-level1"></label>
+          <details class="secondary-fields"><summary>Informações adicionais</summary><div class="form-grid"><label>Telefone alternativo<input class="supplier-input" name="telefone" inputmode="tel" value="<%= fornecedor?.telefone || '' %>"></label><label>Endereço<input class="supplier-input" name="endereco" value="<%= fornecedor?.endereco || '' %>" autocomplete="street-address"></label></div></details>
+        </div>
+      </section>
+
+      <section class="supplier-card form-section" data-form-section="products">
+        <div class="section-heading"><span><%- icon('boxes') %></span><div><h2>Produtos e serviços</h2><p>Adicione itens e selecione as categorias que facilitam a busca.</p></div></div>
+        <label class="item-entry-label">Adicionar produto, serviço ou marca</label>
+        <div class="item-entry"><input class="supplier-input" type="text" data-item-entry placeholder="Digite para buscar ou adicionar" aria-label="Produto ou serviço"><button class="supplier-btn supplier-btn-secondary" type="button" data-add-item><%- icon('plus') %> Adicionar</button></div>
+        <input type="hidden" name="produtos_servicos" value="<%= productItems.join(', ') %>" data-products-value>
+        <div class="category-picker"><h3>Categorias <em>*</em></h3><div><% categories.forEach(c => { %><label><input type="checkbox" name="categorias" value="<%= c.nome %>" <%= selected.includes(c.nome) ? 'checked' : '' %>><span><%= c.nome %></span></label><% }) %></div></div>
+        <div class="selected-items"><h3>Selecionados</h3><div data-selected-items aria-live="polite"></div><p data-no-items>Nenhum produto adicionado.</p></div>
+        <div class="form-grid product-details">
+          <label>Serviços<input class="supplier-input" name="servicos" value="<%= serviceItems.join(', ') %>" placeholder="Ex.: instalação, manutenção"></label>
+          <label>Marcas representadas<input class="supplier-input" name="marcas" value="<%= fornecedor?.marcas || '' %>" placeholder="Ex.: SKF, WEG, Emerson..."></label>
+          <label>Região atendida<input class="supplier-input" name="regiao_atendida" value="<%= fornecedor?.regiao_atendida || '' %>" placeholder="Ex.: Nordeste, Brasil"></label>
+          <label>Especialidade<input class="supplier-input" name="especialidade" value="<%= fornecedor?.especialidade || '' %>" placeholder="Principal área de atuação"></label>
+        </div>
+      </section>
+
+      <section class="supplier-card form-section" data-form-section="commercial">
+        <div class="section-heading"><span><%- icon('wallet') %></span><div><h2>Condições comerciais</h2><p>Informações de prazo, pagamento e entrega.</p></div></div>
+        <div class="commercial-grid">
+          <label>Prazo médio de entrega<div class="input-suffix"><input class="supplier-input" type="number" min="0" name="prazo_medio_entrega" value="<%= fornecedor?.lead_time_medio_dias || '' %>" placeholder="3"><span>dias</span></div></label>
+          <label>Condição de pagamento<input class="supplier-input" name="condicao_pagamento" value="<%= fornecedor?.condicao_pagamento || '' %>" placeholder="Ex.: 28 dias"></label>
+          <label>Pedido mínimo<div class="input-prefix"><span>R$</span><input class="supplier-input" name="pedido_minimo" inputmode="decimal" value="<%= fornecedor?.pedido_minimo_centavos ? fornecedor.pedido_minimo_centavos / 100 : '' %>" placeholder="0,00"></div></label>
+          <label>Frete<input class="supplier-input" name="frete" value="<%= fornecedor?.frete || '' %>" placeholder="Ex.: A combinar"></label>
+        </div>
+        <details class="secondary-fields commercial-secondary"><summary>Outras condições</summary><div class="form-grid"><label>Validade da proposta (dias)<input class="supplier-input" type="number" min="0" name="validade_proposta_dias" value="<%= fornecedor?.validade_proposta_dias || '' %>"></label><label>Garantia<input class="supplier-input" name="garantia" value="<%= fornecedor?.garantia || '' %>"></label></div></details>
+        <label class="textarea-label">Observações comerciais<textarea class="supplier-input" name="observacoes_comerciais" rows="3" placeholder="Registre acordos ou informações relevantes"><%= fornecedor?.observacoes_comerciais || '' %></textarea></label>
+      </section>
+    </main>
+
+    <aside class="supplier-form-aside">
+      <% if (context) { %><section class="supplier-card quote-context"><div class="aside-heading"><span><%- icon('quote') %></span><h2>Contexto da cotação</h2></div><strong><%= context.numero || ('Solicitação #' + context.solicitacaoId) %><%= context.equipamento ? ' • ' + context.equipamento : '' %></strong><% if (context.item || context.itemId) { %><small>Item em cotação</small><p><%= context.item || ('Item #' + context.itemId) %></p><% } %></section><input type="hidden" name="solicitacao_id" value="<%= context.solicitacaoId %>"><input type="hidden" name="item_id" value="<%= context.itemId || '' %>"><input type="hidden" name="contexto_numero" value="<%= context.numero || '' %>"><input type="hidden" name="contexto_equipamento" value="<%= context.equipamento || '' %>"><input type="hidden" name="contexto_item" value="<%= context.item || '' %>"><% } %>
+      <section class="supplier-card summary"><h2>Resumo do cadastro</h2><ul><li data-check="id"><span><%- icon('check') %></span>Identificação</li><li data-check="contact"><span><%- icon('check') %></span>Contato</li><li data-check="products"><span><%- icon('check') %></span>Produtos e serviços</li><li data-check="commercial"><span><%- icon('check') %></span>Condições comerciais</li></ul><div class="summary-usage"><h3>Como será usado</h3><p><%- icon('check') %> Disponível na seleção de fornecedores da cotação</p><p><%- icon('check') %> Histórico de preços e compras centralizado</p><p><%- icon('check') %> Busca por materiais fornecidos</p></div></section>
+    </aside>
+
+    <footer class="supplier-form-actions"><a class="supplier-btn supplier-btn-quiet" href="<%= backUrl %>">Cancelar</a><div><button class="supplier-btn supplier-btn-secondary" name="acao" value="salvar">Salvar fornecedor</button><% if (context) { %><button class="supplier-btn supplier-btn-primary" name="acao" value="salvar_selecionar">Salvar e selecionar na cotação</button><% } %></div></footer>
+  </form>
+</div>
