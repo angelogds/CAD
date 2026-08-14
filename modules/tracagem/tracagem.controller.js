@@ -141,7 +141,11 @@ function baseRender(req, res, view, payload = {}) {
 }
 
 function index(req, res) {
-  return baseRender(req, res, 'tracagem/index', { title: 'Traçagem' });
+  const osContext = req.query.os_id ? service.getOSContext(req.query.os_id) : null;
+  if (req.query.os_id && (!osContext || Number(osContext.equipamento_id) !== Number(req.query.equipamento_id))) {
+    return res.status(400).send('Contexto de OS/equipamento inválido.');
+  }
+  return baseRender(req, res, 'tracagem/index', { title: 'Traçagem', osContext });
 }
 
 function lista(req, res) {
@@ -175,6 +179,22 @@ function show(req, res) {
     labels: LABELS,
     desenhoVinculado,
   });
+}
+
+function vincularOS(req, res) {
+  try {
+    const result = service.vincularOS({
+      tracagem_id: req.params.id,
+      os_id: req.body.os_id,
+      equipamento_id: req.body.equipamento_id,
+      usuario_id: req.session?.user?.id,
+    });
+    req.flash('success', result.idempotent ? 'Traçagem já vinculada a esta OS.' : `Traçagem #${req.params.id} vinculada à OS #${req.body.os_id}.`);
+    return res.redirect(`/os/${req.body.os_id}#historico`);
+  } catch (err) {
+    req.flash('error', err.message || 'Não foi possível vincular a traçagem.');
+    return res.redirect(`/tracagem/${req.params.id}`);
+  }
 }
 
 function renderCalc(tipo, viewName, title) {
@@ -795,6 +815,7 @@ module.exports = {
   index,
   lista,
   show,
+  vincularOS,
   roscaForm: renderCalc('rosca-helicoidal', 'rosca-helicoidal', 'Rosca helicoidal'),
   roscaCalcular: calcular('rosca-helicoidal', 'rosca-helicoidal', 'Rosca helicoidal'),
   flangeForm: renderCalc('furacao-flange', 'furacao-flange', 'Furação de flange'),

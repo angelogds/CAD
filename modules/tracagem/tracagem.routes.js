@@ -60,6 +60,7 @@ router.post('/salvar', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.s
 router.post('/pdf-calculo', requireLogin, requireRole(VIEW_ACCESS), withMenu(ctrl.gerarPdfCalculo));
 router.get('/:id/pdf', requireLogin, requireRole(VIEW_ACCESS), withMenu(ctrl.gerarPdf));
 router.get('/:id/pdf/download', requireLogin, requireRole(VIEW_ACCESS), withMenu(ctrl.baixarPdfVinculado));
+router.post('/:id/vincular-os', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.vincularOS));
 router.get('/:id', requireLogin, requireRole(VIEW_ACCESS), withMenu(ctrl.show));
 
 

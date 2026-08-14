@@ -11,9 +11,12 @@
   <h1>Traçagem / Caldeiraria</h1>
   <a class="btn" href="/tracagem/lista">Histórico</a>
 </div>
+<% if (osContext) { %>
+  <div class="alert alert-info" style="margin-top:10px;"><strong>Traçagem iniciada pela OS #<%= osContext.id %> — <%= osContext.equipamento_nome %></strong><br><small>O vínculo definitivo será confirmado depois que a traçagem for salva.</small></div>
+<% } %>
 
 <div class="tr-grid" style="margin-top:10px;">
-  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/rosca-helicoidal.png" alt="Rosca helicoidal"></div><h3>Rosca helicoidal</h3><a class="btn btn-green" href="/tracagem/rosca-helicoidal">Abrir</a></div>
+  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/rosca-helicoidal.png" alt="Rosca helicoidal"></div><h3>Rosca helicoidal</h3><a class="btn btn-green" href="/tracagem/rosca-helicoidal<%= osContext ? ('?os_id='+osContext.id+'&equipamento_id='+osContext.equipamento_id) : '' %>">Abrir</a></div>
   <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/furacao-flange.png" alt="Furação de flange"></div><h3>Furação de flange</h3><a class="btn btn-green" href="/tracagem/furacao-flange">Abrir</a></div>
   <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/cilindro.png" alt="Cilindro"></div><h3>Cilindro</h3><a class="btn btn-green" href="/tracagem/cilindro">Abrir</a></div>
   <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/curva-gomos.png" alt="Curva de gomos"></div><h3>Curva de gomos</h3><a class="btn btn-green" href="/tracagem/curva-gomos">Abrir</a></div>

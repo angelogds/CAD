@@ -21,6 +21,24 @@ const OS_ANDAMENTO_ACCESS = [
   'MANUTENCAO_SUPERVISOR',
 ];
 
+// Redistribuir equipe e regenerar orientações técnicas são atribuições de
+// supervisão. Deliberadamente não inclui MANUTENCAO, MECANICO ou ENCARREGADO.
+const OS_TEAM_REDISTRIBUTION_ACCESS = [
+  'ADMIN',
+  'SUPERVISOR_MANUTENCAO',
+  'MANUTENCAO_SUPERVISOR',
+];
+
+function canRedistributeTeam(userOrRole) {
+  const role = typeof userOrRole === 'string' ? userOrRole : userOrRole?.role;
+  return OS_TEAM_REDISTRIBUTION_ACCESS.map(normalizeRole).includes(normalizeRole(role));
+}
+
+function requireTeamRedistribution(req, res, next) {
+  if (canRedistributeTeam(req.session?.user)) return next();
+  return res.status(403).json({ error: 'Somente ADMIN ou supervisor de manutenção pode redistribuir a equipe.' });
+}
+
 function canRegisterOSAndamento(userOrRole) {
   const role = typeof userOrRole === 'string' ? userOrRole : userOrRole?.role;
   const normalized = normalizeRole(role);
@@ -78,6 +96,9 @@ module.exports = {
   OS_ANDAMENTO_ACCESS,
   OS_MANUAL_DISPONIBILIDADE_ACCESS,
   canRegisterOSAndamento,
+  OS_TEAM_REDISTRIBUTION_ACCESS,
+  canRedistributeTeam,
+  requireTeamRedistribution,
   canManageOSDisponibilidade,
   OS_DETALHE_ACCESS,
   OS_STATUS_ACCESS,

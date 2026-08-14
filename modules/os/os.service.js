@@ -1272,7 +1272,13 @@ function setEquipeManual(osId, {
   auxiliar_secundario_colaborador_id,
   mecanico_user_id,
   auxiliar_user_id,
-}, userId) {
+}, userId, actor = null) {
+  const { canRedistributeTeam } = require('./os.permissions');
+  if (!canRedistributeTeam(actor)) {
+    const error = new Error("Sem permissão para redistribuir a equipe.");
+    error.status = 403;
+    throw error;
+  }
   const os = db.prepare(`SELECT id, status FROM os WHERE id = ?`).get(Number(osId));
   if (!os) throw new Error("OS não encontrada.");
   const status = String(os.status || "").toUpperCase();
@@ -2044,8 +2050,10 @@ async function createOS({
       causa_provavel: "Causa provável pendente de inspeção técnica em campo.",
       risco_operacional: "Avaliação pendente (fallback sem IA).",
       risco_seguranca: "Avaliação pendente (fallback sem IA).",
-      acao_corretiva: "Isolar a falha, inspecionar componentes críticos e corrigir após diagnóstico local.",
-      acao_preventiva: "Registrar causa raiz após execução e incluir inspeção preventiva do ponto com falha.",
+      // Uma indisponibilidade da IA não pode ser persistida como se fosse uma
+      // análise. Os campos continuam editáveis e vazios até nova ação explícita.
+      acao_corretiva: null,
+      acao_preventiva: null,
       servico_sugerido: "Executar inspeção técnica inicial, registrar evidências e definir plano de correção.",
       sugestao_equipe: { quantidade_recomendada: 1, perfil_minimo: "Mecânico", racional: "Fallback sem IA" },
       descricao_tecnica_os: fallbackNarrative,
