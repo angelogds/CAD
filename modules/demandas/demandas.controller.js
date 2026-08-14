@@ -1,14 +1,28 @@
 const service = require('./demandas.service');
 
+function normalizeChoice(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
 function index(req, res) {
-  const status = (req.query.status || '').toString().trim();
-  const lista = service.list({ status }, req.session?.user);
+  const filters = {
+    q: String(req.query.q || '').trim(),
+    status: normalizeChoice(req.query.status),
+    prioridade: normalizeChoice(req.query.prioridade),
+    responsavel_user_id: String(req.query.responsavel_user_id || '').trim(),
+    tab: normalizeChoice(req.query.tab) || 'ATIVAS',
+    limit: Number(req.query.limit || 20),
+  };
+
+  const lista = service.list(filters, req.session?.user);
 
   return res.render('demandas/index', {
     title: 'Demandas',
     activeMenu: 'demandas',
     lista,
-    status,
+    filters,
+    painel: service.getPainel(req.session?.user),
+    responsaveis: service.listResponsaveis(),
   });
 }
 
