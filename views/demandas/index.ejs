@@ -1,44 +1,204 @@
 <% layout('layout') %>
-<div class="page-head">
-  <div>
-    <h1>Demandas</h1>
-    <p class="muted">Demandas da Direção para acompanhamento e execução.</p>
-  </div>
-  <% if (canAccessModule(normalizeRole(user?.role), 'demandas_open')) { %>
-    <a class="btn btn-green" href="/demandas/new">+ Nova Demanda</a>
-  <% } %>
-</div>
+<link rel="stylesheet" href="/css/demandas.css">
+<%
+  const statusLabel = value => ({
+    NOVA: 'Nova', EM_ANALISE: 'Em análise', EM_ANDAMENTO: 'Em andamento',
+    PARADA: 'Parada', CONCLUIDA: 'Concluída', CANCELADA: 'Cancelada'
+  }[value] || value || 'Não informado');
+  const priorityLabel = value => ({ BAIXA: 'Baixa', NORMAL: 'Média', ALTA: 'Alta', URGENTE: 'Crítica' }[value] || value || 'Média');
+  const slug = value => String(value || '').toLowerCase().replace(/_/g, '-');
+  const query = changes => {
+    const values = { ...filters, ...changes };
+    const params = new URLSearchParams();
+    Object.entries(values).forEach(([key, value]) => {
+      if (value !== '' && value !== null && value !== undefined) params.set(key, value);
+    });
+    return params.toString();
+  };
+  const groups = [
+    { key: 'alta', title: 'Críticas e altas', note: 'Demandas que exigem resposta prioritária', items: lista.filter(d => ['URGENTE', 'ALTA'].includes(d.prioridade)) },
+    { key: 'media', title: 'Prioridade média', note: 'Demandas do fluxo operacional', items: lista.filter(d => d.prioridade === 'NORMAL') },
+    { key: 'baixa', title: 'Prioridade baixa', note: 'Demandas programáveis', items: lista.filter(d => d.prioridade === 'BAIXA') },
+  ];
+  const metrics = [
+    { label: 'Demandas ativas', value: painel.ativas, note: 'Fila operacional', tone: 'green', href: query({ tab: 'ATIVAS', status: '', prioridade: '' }) },
+    { label: 'Novas', value: painel.novas, note: 'Aguardando análise', tone: 'blue', href: query({ tab: 'ATIVAS', status: 'NOVA' }) },
+    { label: 'Em análise', value: painel.em_analise, note: 'Em avaliação', tone: 'violet', href: query({ tab: 'ATIVAS', status: 'EM_ANALISE' }) },
+    { label: 'Em andamento', value: painel.em_andamento, note: 'Execução ativa', tone: 'teal', href: query({ tab: 'ATIVAS', status: 'EM_ANDAMENTO' }) },
+    { label: 'Paradas', value: painel.paradas, note: painel.paradas ? 'Requer atenção' : 'Nenhuma no momento', tone: 'red', href: query({ tab: 'ATIVAS', status: 'PARADA' }) },
+    { label: 'Críticas e altas', value: painel.prioritarias, note: 'Prioridade elevada', tone: 'orange', href: query({ tab: 'ATIVAS', status: '', prioridade: 'ELEVADA' }) },
+  ];
+%>
 
-<div class="card">
-  <form method="GET" action="/demandas" style="display:flex; gap:10px; align-items:end; margin-bottom:12px;">
+<div class="demand-page">
+  <header class="demand-head">
     <div>
-      <div class="label">Filtrar status</div>
-      <select class="input" name="status">
-        <option value="">Todos</option>
-        <% ['NOVA','EM_ANALISE','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %>
-          <option value="<%= st %>" <%= status===st ? 'selected' : '' %>><%= st %></option>
-        <% }) %>
-      </select>
+      <h1>Demandas</h1>
+      <p>Fila operacional da Direção para acompanhamento, definição de responsáveis e execução.</p>
     </div>
-    <button class="btn" type="submit">Aplicar</button>
-  </form>
+    <% if (canAccessModule(normalizeRole(user?.role), 'demandas_open')) { %>
+      <a class="demand-btn demand-btn-primary" href="/demandas/new">
+        <span aria-hidden="true">＋</span> Nova demanda
+      </a>
+    <% } %>
+  </header>
 
-  <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th>#</th><th>Título</th><th>Prioridade</th><th>Status</th><th>Criado por</th><th></th></tr></thead>
-      <tbody>
-      <% if (!lista?.length) { %><tr><td colspan="6" style="text-align:center;color:#6b7280;">Sem demandas.</td></tr><% } %>
-      <% (lista||[]).forEach(d => { %>
-        <tr>
-          <td><%= d.id %></td>
-          <td><strong><%= d.titulo %></strong></td>
-          <td><span class="pill-tag pill-amber"><%= d.prioridade %></span></td>
-          <td><span class="pill-tag pill-blue"><%= d.status %></span></td>
-          <td><%= d.created_by_nome || '-' %></td>
-          <td><a class="btn btn-sm" href="/demandas/<%= d.id %>">Abrir</a></td>
-        </tr>
+  <section class="demand-metrics" aria-label="Indicadores das demandas">
+    <% metrics.forEach(metric => { %>
+      <a class="demand-metric tone-<%= metric.tone %>" href="/demandas?<%= metric.href %>">
+        <span class="metric-mark" aria-hidden="true"></span>
+        <span class="metric-label"><%= metric.label %></span>
+        <strong><%= metric.value || 0 %></strong>
+        <small><%= metric.note %></small>
+      </a>
+    <% }) %>
+  </section>
+
+  <% if (painel.paradas || painel.prioritarias) { %>
+    <section class="demand-attention" aria-label="Atenções da fila">
+      <span class="attention-icon" aria-hidden="true">!</span>
+      <div>
+        <strong>Atenção à fila operacional</strong>
+        <p>
+          <% if (painel.paradas) { %><b><%= painel.paradas %></b> demanda(s) parada(s)<% } %>
+          <% if (painel.paradas && painel.prioritarias) { %> e <% } %>
+          <% if (painel.prioritarias) { %><b><%= painel.prioritarias %></b> demanda(s) crítica(s) ou alta(s)<% } %>.
+        </p>
+      </div>
+      <a href="/demandas?<%= query({ tab: 'ATIVAS', status: painel.paradas ? 'PARADA' : '', prioridade: painel.paradas ? '' : 'ELEVADA' }) %>">Ver demandas</a>
+    </section>
+  <% } %>
+
+  <section class="demand-card demand-filter-card">
+    <nav class="demand-tabs" aria-label="Visualização das demandas">
+      <a class="<%= filters.tab === 'ATIVAS' ? 'active' : '' %>" href="/demandas?<%= query({ tab: 'ATIVAS', status: '' }) %>">Ativas <span><%= painel.ativas || 0 %></span></a>
+      <a class="<%= filters.tab === 'HISTORICO' ? 'active' : '' %>" href="/demandas?<%= query({ tab: 'HISTORICO', status: '' }) %>">Concluídas e histórico <span><%= painel.concluidas || 0 %></span></a>
+      <a class="<%= filters.tab === 'TODAS' ? 'active' : '' %>" href="/demandas?<%= query({ tab: 'TODAS', status: '' }) %>">Todas</a>
+    </nav>
+
+    <form class="demand-filters" method="GET" action="/demandas">
+      <input type="hidden" name="tab" value="<%= filters.tab %>">
+      <label class="filter-search">
+        <span>Buscar</span>
+        <input name="q" value="<%= filters.q %>" placeholder="Número, título, descrição ou pessoa">
+      </label>
+      <label>
+        <span>Status</span>
+        <select name="status">
+          <option value="">Todos</option>
+          <% ['NOVA','EM_ANALISE','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %>
+            <option value="<%= st %>" <%= filters.status === st ? 'selected' : '' %>><%= statusLabel(st) %></option>
+          <% }) %>
+        </select>
+      </label>
+      <label>
+        <span>Prioridade</span>
+        <select name="prioridade">
+          <option value="">Todas</option>
+          <option value="ELEVADA" <%= filters.prioridade === 'ELEVADA' ? 'selected' : '' %>>Críticas e altas</option>
+          <% ['URGENTE','ALTA','NORMAL','BAIXA'].forEach(pr => { %>
+            <option value="<%= pr %>" <%= filters.prioridade === pr ? 'selected' : '' %>><%= priorityLabel(pr) %></option>
+          <% }) %>
+        </select>
+      </label>
+      <label>
+        <span>Responsável</span>
+        <select name="responsavel_user_id">
+          <option value="">Todos</option>
+          <% (responsaveis || []).forEach(person => { %>
+            <option value="<%= person.id %>" <%= String(filters.responsavel_user_id) === String(person.id) ? 'selected' : '' %>><%= person.name %></option>
+          <% }) %>
+        </select>
+      </label>
+      <label class="filter-limit">
+        <span>Exibir</span>
+        <select name="limit">
+          <% [10,20,50].forEach(value => { %><option value="<%= value %>" <%= Number(filters.limit) === value ? 'selected' : '' %>><%= value %></option><% }) %>
+        </select>
+      </label>
+      <div class="filter-actions">
+        <button class="demand-btn demand-btn-primary" type="submit">Aplicar filtros</button>
+        <a class="demand-btn demand-btn-secondary" href="/demandas?tab=<%= filters.tab %>">Limpar</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="demand-card demand-list-card">
+    <div class="section-heading">
+      <div>
+        <h2><%= filters.tab === 'HISTORICO' ? 'Histórico de demandas' : filters.tab === 'TODAS' ? 'Todas as demandas' : 'Demandas ativas' %></h2>
+        <p>Mostrando <strong><%= lista.length %></strong> registro(s), ordenados por prioridade e última atualização.</p>
+      </div>
+      <span class="section-total"><%= painel.ativas || 0 %> ativa(s)</span>
+    </div>
+
+    <% if (!lista.length) { %>
+      <div class="demand-empty">
+        <span class="empty-icon" aria-hidden="true">✓</span>
+        <h3>Nenhuma demanda encontrada</h3>
+        <p><%= Object.values(filters).some(value => value && value !== 'ATIVAS' && value !== 20) ? 'Ajuste os filtros para ampliar a pesquisa.' : 'A fila está livre. Novas demandas aparecerão aqui para acompanhamento.' %></p>
+        <% if (canAccessModule(normalizeRole(user?.role), 'demandas_open')) { %><a class="demand-btn demand-btn-secondary" href="/demandas/new">Criar demanda</a><% } %>
+      </div>
+    <% } else { %>
+      <% groups.forEach(group => { if (group.items.length) { %>
+        <section class="priority-group priority-<%= group.key %>">
+          <div class="priority-heading">
+            <div><h3><%= group.title %> <span><%= group.items.length %></span></h3><p><%= group.note %></p></div>
+          </div>
+          <div class="demand-table" role="table" aria-label="<%= group.title %>">
+            <div class="demand-row demand-columns" role="row">
+              <span>Demanda</span><span>Status / prioridade</span><span>Responsáveis</span><span>Última movimentação</span><span>Ação</span>
+            </div>
+            <% group.items.forEach(d => { %>
+              <article class="demand-row" role="row">
+                <div class="demand-identity" data-label="Demanda">
+                  <strong>#<%= d.id %> · <%= d.titulo %></strong>
+                  <p><%= d.descricao || 'Descrição não informada.' %></p>
+                </div>
+                <div class="demand-badges" data-label="Status / prioridade">
+                  <span class="demand-badge priority-<%= slug(d.prioridade) %>"><%= priorityLabel(d.prioridade) %></span>
+                  <span class="demand-badge status-<%= slug(d.status) %>"><%= statusLabel(d.status) %></span>
+                </div>
+                <div class="demand-people" data-label="Responsáveis">
+                  <strong><%= d.responsavel_nome || 'A definir' %></strong>
+                  <small>Criada por <%= d.created_by_nome || 'Não informado' %></small>
+                </div>
+                <div class="demand-update" data-label="Última movimentação">
+                  <strong><%= fmtBR(d.updated_at || d.created_at) %></strong>
+                  <small><%= d.ultima_atualizacao || 'Sem atualização registrada' %></small>
+                </div>
+                <div class="demand-row-action" data-label="Ação">
+                  <a class="demand-btn demand-btn-secondary demand-btn-small" href="/demandas/<%= d.id %>">Abrir demanda</a>
+                </div>
+              </article>
+            <% }) %>
+          </div>
+        </section>
+      <% } }) %>
+    <% } %>
+  </section>
+
+  <div class="demand-bottom-grid">
+    <section class="demand-card compact-card">
+      <div class="section-heading"><div><h2>Distribuição por status</h2><p>Visão rápida da situação atual.</p></div></div>
+      <% const maxStatus = Math.max(1, ...(painel.distribution || []).map(item => Number(item.total || 0))); %>
+      <% if (!(painel.distribution || []).length) { %><p class="compact-empty">Sem dados para comparar.</p><% } %>
+      <% (painel.distribution || []).forEach(item => { %>
+        <div class="status-bar">
+          <span><%= statusLabel(item.status) %></span>
+          <div><i style="width:<%= (Number(item.total || 0) / maxStatus) * 100 %>%"></i></div>
+          <strong><%= item.total %></strong>
+        </div>
       <% }) %>
-      </tbody>
-    </table>
+    </section>
+    <section class="demand-card compact-card workflow-card">
+      <div class="section-heading"><div><h2>Fluxo da demanda</h2><p>Acompanhamento até a conclusão.</p></div></div>
+      <ol>
+        <li><span>1</span><div><strong>Nova</strong><small>Registro recebido</small></div></li>
+        <li><span>2</span><div><strong>Em análise</strong><small>Responsável e ação definidos</small></div></li>
+        <li><span>3</span><div><strong>Em andamento</strong><small>Execução acompanhada</small></div></li>
+        <li><span>4</span><div><strong>Concluída</strong><small>Histórico preservado</small></div></li>
+      </ol>
+    </section>
   </div>
 </div>
