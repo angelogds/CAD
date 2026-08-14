@@ -13,3 +13,19 @@
 })();
 
 document.querySelector('.attention-controls select')?.addEventListener('change', (event) => event.currentTarget.form.submit());
+
+// Cards inteiros funcionam como links. No Safari móvel, arrastar para rolar sobre
+// seu texto pode manter uma seleção nativa azul mesmo com `user-select: none`.
+const requestList = document.querySelector('.request-list');
+if (requestList) {
+  requestList.addEventListener('selectstart', (event) => {
+    if (event.target.closest('.request-row')) event.preventDefault();
+  });
+
+  document.addEventListener('selectionchange', () => {
+    const selection = window.getSelection();
+    const anchor = selection?.anchorNode;
+    const element = anchor?.nodeType === Node.ELEMENT_NODE ? anchor : anchor?.parentElement;
+    if (element?.closest?.('.request-row')) selection.removeAllRanges();
+  });
+}

@@ -205,8 +205,12 @@
 
 /* Fila de compras no mesmo padrão visual das solicitações de material */
 .request-columns,.request-row{grid-template-columns:minmax(190px,1.2fr) minmax(180px,1fr) minmax(280px,1.55fr) minmax(175px,1fr) minmax(190px,auto)}
-.request-row{align-items:center;min-height:88px;border-left:4px solid transparent;cursor:pointer;user-select:none;-webkit-user-select:none;transition:background .15s ease,box-shadow .15s ease}
-.request-row a,.request-row button,.request-row summary{user-select:auto;-webkit-user-select:auto}
+.request-row{align-items:center;min-height:88px;border-left:4px solid transparent;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;transition:background .15s ease,box-shadow .15s ease}
+/* Safari/iOS pode voltar a habilitar a seleção nos descendentes de um card clicável.
+   Aplique a proteção em toda a árvore para impedir os destaques azuis durante o scroll. */
+.request-row *{user-select:none!important;-webkit-user-select:none!important;-webkit-touch-callout:none}
+.request-row::selection,.request-row *::selection{background:transparent;color:inherit}
+.request-row::-moz-selection,.request-row *::-moz-selection{background:transparent;color:inherit}
 .request-row:hover,.request-row:focus-visible{background:#f9fcfa;box-shadow:inset 0 0 0 1px #dce9e1;outline:0}
 .priority-high .request-row{border-left-color:#ef2938}.priority-medium .request-row{border-left-color:#3273c7}.priority-low .request-row{border-left-color:#20a253}.priority-undefined .request-row{border-left-color:#94a3b8}
 .request-title-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.request-title-line .tag-status{color:#16733d;background:#edf9f1;border-color:#bee2ca}
