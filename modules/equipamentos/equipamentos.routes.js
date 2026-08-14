@@ -35,10 +35,42 @@ function safeUploadFileName(file) {
 
 const fotoUpload = multer({
   storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, fotoDir),
-    filename: (_req, file, cb) => cb(null, safeUploadFileName(file)),
+    destination: (_req, file, cb) => cb(null, file.fieldname === "documento_tecnico" ? docsDir : fotoDir),
+    filename: (_req, file, cb) => cb(null, `${require("crypto").randomUUID()}${path.extname(file.originalname).toLowerCase()}`),
   }),
+  limits: { fileSize: Number(process.env.EQUIPAMENTOS_UPLOAD_MAX_BYTES || 10 * 1024 * 1024), files: 2 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = file.fieldname === "foto"
+      ? ["image/jpeg", "image/png", "image/webp"]
+      : ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(String(file.mimetype).toLowerCase())) return cb(new Error("Formato de arquivo não permitido."));
+    cb(null, true);
+  },
 });
+
+function equipmentUpload(req, res, next) {
+  return fotoUpload.fields([{ name: "foto", maxCount: 1 }, { name: "documento_tecnico", maxCount: 1 }])(req, res, (err) => {
+    if (!err) {
+      const uploaded = Object.values(req.files || {}).flat();
+      const validMagic = uploaded.every((file) => {
+        const bytes = fs.readFileSync(file.path).subarray(0, 12);
+        const hex = bytes.toString("hex");
+        const mime = String(file.mimetype).toLowerCase();
+        if (mime === "application/pdf") return bytes.toString("ascii", 0, 4) === "%PDF";
+        if (mime === "image/jpeg") return hex.startsWith("ffd8ff");
+        if (mime === "image/png") return hex.startsWith("89504e470d0a1a0a");
+        if (mime === "image/webp") return bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP";
+        return false;
+      });
+      if (validMagic) return next();
+      uploaded.forEach((file) => { try { fs.unlinkSync(file.path); } catch (_e) {} });
+      req.flash("error", "O conteúdo do arquivo não corresponde a um formato permitido.");
+    } else {
+      req.flash("error", err.code === "LIMIT_FILE_SIZE" ? "O arquivo excede o limite de 10 MB." : (err.message || "Upload inválido."));
+    }
+    return res.redirect(req.params.id ? `/equipamentos/${Number(req.params.id)}/editar` : "/equipamentos/novo");
+  });
+}
 
 const docsUpload = multer({
   storage: multer.diskStorage({
@@ -95,12 +127,12 @@ router.get("/qrcode/:token", safe(ctrl.qrPublicPage));
 router.get("/", requireLogin, requireRole(ACCESS.equipamentos), safe(ctrl.equipIndex));
 router.get("/pdf/lista", requireLogin, requireRole(ACCESS.equipamentos), safe(ctrl.exportListaPdf));
 router.get("/novo", requireLogin, requireRole(ACCESS.equipamentos_manage), safe(ctrl.equipNewForm));
-router.post("/", requireLogin, requireRole(ACCESS.equipamentos_manage), fotoUpload.single("foto"), safe(ctrl.equipCreate));
+router.post("/", requireLogin, requireRole(ACCESS.equipamentos_manage), equipmentUpload, safe(ctrl.equipCreate));
 
 router.get("/:id", requireLogin, requireRole(ACCESS.equipamentos), safe(ctrl.equipShow));
 router.get("/:id/pdf", requireLogin, requireRole(ACCESS.equipamentos), safe(ctrl.exportEquipamentoPdf));
 router.get("/:id/editar", requireLogin, requireRole(ACCESS.equipamentos_manage), safe(ctrl.equipEditForm));
-router.post("/:id/editar", requireLogin, requireRole(ACCESS.equipamentos_manage), fotoUpload.single("foto"), safe(ctrl.equipUpdate));
+router.post("/:id/editar", requireLogin, requireRole(ACCESS.equipamentos_manage), equipmentUpload, safe(ctrl.equipUpdate));
 router.post("/:id/excluir", requireLogin, requireAdmin, safe(ctrl.equipDelete));
 
 router.post("/:id/pecas", requireLogin, requireRole(ACCESS.equipamentos_manage), safe(ctrl.addPeca));

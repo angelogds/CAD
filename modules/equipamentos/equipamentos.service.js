@@ -2,16 +2,69 @@ const crypto = require("crypto");
 const db = require("../../database/db");
 const aiEmbeddingsService = require("../ai/ai.embeddings.service");
 
+function normalizeText(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+}
+
+const OPEN_OS_SQL = "UPPER(COALESCE(o.status,'')) NOT IN ('CONCLUIDA','CONCLUÍDA','FINALIZADA','FECHADA','CANCELADA')";
+
 function list() {
-  return db
-    .prepare(
-      `
-      SELECT id, codigo, nome, setor, tipo, criticidade, ativo, status_operacional, foto_url, created_at, updated_at
-      FROM equipamentos
-      ORDER BY ativo DESC, nome ASC
-    `
-    )
-    .all();
+  return db.prepare(`SELECT * FROM equipamentos ORDER BY ativo DESC, nome COLLATE NOCASE`).all();
+}
+
+function dashboard(filters = {}) {
+  const pageSize = [10, 20, 50].includes(Number(filters.limit)) ? Number(filters.limit) : 20;
+  const page = Math.max(Number(filters.page) || 1, 1);
+  const where = [];
+  const params = {};
+  const status = String(filters.situacao || filters.tab || "").toUpperCase();
+  if (filters.q) {
+    where.push("(UPPER(e.codigo) LIKE @q OR UPPER(e.nome) LIKE @q OR UPPER(e.setor) LIKE @q OR UPPER(e.tipo) LIKE @q)");
+    params.q = `%${normalizeText(filters.q)}%`;
+  }
+  [["setor", "e.setor"], ["tipo", "e.tipo"], ["criticidade", "e.criticidade"]].forEach(([key, col]) => {
+    if (filters[key]) { where.push(`UPPER(${col}) = @${key}`); params[key] = normalizeText(filters[key]); }
+  });
+  if (status === "INATIVOS") where.push("e.ativo = 0");
+  else if (status === "OS_ABERTAS") where.push(`EXISTS (SELECT 1 FROM os ox WHERE ox.equipamento_id=e.id AND ${OPEN_OS_SQL.replaceAll('o.', 'ox.')})`);
+  else if (["EM_OPERACAO", "EM_MANUTENCAO", "PARADO", "INATIVO"].includes(status)) where.push("e.status_operacional = @status"), params.status = status;
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const base = `FROM equipamentos e ${whereSql}`;
+  const total = db.prepare(`SELECT COUNT(*) total ${base}`).get(params).total;
+  params.limit = pageSize; params.offset = (Math.min(page, Math.max(Math.ceil(total / pageSize), 1)) - 1) * pageSize;
+  const items = db.prepare(`
+    SELECT e.*,
+      (SELECT COUNT(*) FROM os o WHERE o.equipamento_id=e.id AND ${OPEN_OS_SQL}) AS os_ativas,
+      (SELECT MAX(COALESCE(o.closed_at,o.data_conclusao,o.data_fim)) FROM os o WHERE o.equipamento_id=e.id AND o.closed_at IS NOT NULL) AS ultima_manutencao
+    ${base}
+    ORDER BY CASE WHEN e.criticidade='critica' AND e.status_operacional='PARADO' THEN 0
+      WHEN e.criticidade='critica' AND EXISTS(SELECT 1 FROM os o WHERE o.equipamento_id=e.id AND ${OPEN_OS_SQL}) THEN 1
+      WHEN e.status_operacional='EM_MANUTENCAO' THEN 2 ELSE 3 END, e.nome COLLATE NOCASE
+    LIMIT @limit OFFSET @offset`).all(params);
+  const indicators = db.prepare(`SELECT COUNT(*) total,
+    SUM(CASE WHEN ativo=1 AND status_operacional='EM_OPERACAO' THEN 1 ELSE 0 END) operacao,
+    SUM(CASE WHEN status_operacional='EM_MANUTENCAO' OR EXISTS(SELECT 1 FROM os o WHERE o.equipamento_id=e.id AND ${OPEN_OS_SQL} AND UPPER(o.status) IN ('EM_ANDAMENTO','EM ANDAMENTO')) THEN 1 ELSE 0 END) manutencao,
+    SUM(CASE WHEN ativo=1 AND criticidade='critica' THEN 1 ELSE 0 END) criticos,
+    (SELECT COUNT(*) FROM os o WHERE o.equipamento_id IS NOT NULL AND ${OPEN_OS_SQL}) os_abertas FROM equipamentos e`).get();
+  const distribution = db.prepare("SELECT LOWER(COALESCE(criticidade,'media')) criticidade, COUNT(*) total FROM equipamentos WHERE ativo=1 GROUP BY 1").all();
+  const attention = db.prepare(`SELECT e.*,
+    (SELECT COUNT(*) FROM os o WHERE o.equipamento_id=e.id) falhas,
+    (SELECT COUNT(*) FROM os o WHERE o.equipamento_id=e.id AND ${OPEN_OS_SQL}) os_ativas
+    FROM equipamentos e WHERE e.ativo=1 AND (e.status_operacional IN ('PARADO','EM_MANUTENCAO') OR
+      (e.criticidade='critica' AND EXISTS(SELECT 1 FROM os o WHERE o.equipamento_id=e.id AND ${OPEN_OS_SQL})))
+    ORDER BY CASE WHEN e.criticidade='critica' AND e.status_operacional='PARADO' THEN 0 WHEN e.criticidade='critica' THEN 1 ELSE 2 END,
+      falhas DESC LIMIT 3`).all();
+  const maintenance = db.prepare(`SELECT e.id,e.nome,e.status_operacional,o.id os_id,o.status os_status,
+    COALESCE(u.name,e.responsavel_setor) responsavel, ROUND(julianday('now')-julianday(COALESCE(o.data_inicio,o.opened_at)),0) dias
+    FROM equipamentos e LEFT JOIN os o ON o.id=(SELECT id FROM os ox WHERE ox.equipamento_id=e.id AND ${OPEN_OS_SQL.replaceAll('o.', 'ox.')} ORDER BY ox.opened_at DESC LIMIT 1)
+    LEFT JOIN users u ON u.id=COALESCE(o.responsavel_user_id,o.mecanico_user_id)
+    WHERE e.status_operacional='EM_MANUTENCAO' OR o.id IS NOT NULL ORDER BY e.nome LIMIT 8`).all();
+  return { items, total, page: Math.floor(params.offset/pageSize)+1, pageSize, pages: Math.max(Math.ceil(total/pageSize),1), indicators, distribution, attention, maintenance };
+}
+
+function filterOptions() {
+  const values = (column) => db.prepare(`SELECT DISTINCT ${column} value FROM equipamentos WHERE ${column} IS NOT NULL AND trim(${column})<>'' ORDER BY ${column} COLLATE NOCASE`).all().map(r => r.value);
+  return { setores: values('setor'), tipos: values('tipo') };
 }
 
 function getById(id) {
@@ -32,12 +85,12 @@ function create(data) {
     INSERT INTO equipamentos (
       codigo, nome, setor, tipo, criticidade, ativo, status_operacional,
       fabricante, ano_fabricacao, ano_instalacao, capacidade, pressao_trabalho,
-      observacao, foto_url, created_at, updated_at
+      observacao, foto_url, modelo, numero_serie, data_instalacao, responsavel_setor, possui_plano_preventivo, periodicidade_preventiva, unidade_capacidade, unidade_pressao, potencia, unidade_potencia, tensao, observacoes_tecnicas, created_at, updated_at
     )
     VALUES (
       @codigo, @nome, @setor, @tipo, @criticidade, @ativo, @status_operacional,
       @fabricante, @ano_fabricacao, @ano_instalacao, @capacidade, @pressao_trabalho,
-      @observacao, @foto_url, datetime('now'), datetime('now')
+      @observacao, @foto_url, @modelo, @numero_serie, @data_instalacao, @responsavel_setor, @possui_plano_preventivo, @periodicidade_preventiva, @unidade_capacidade, @unidade_pressao, @potencia, @unidade_potencia, @tensao, @observacoes_tecnicas, datetime('now'), datetime('now')
     )
   `);
 
@@ -65,6 +118,11 @@ function update(id, data) {
       pressao_trabalho = @pressao_trabalho,
       observacao = @observacao,
       foto_url = @foto_url,
+      modelo=@modelo, numero_serie=@numero_serie, data_instalacao=@data_instalacao,
+      responsavel_setor=@responsavel_setor, possui_plano_preventivo=@possui_plano_preventivo,
+      periodicidade_preventiva=@periodicidade_preventiva, unidade_capacidade=@unidade_capacidade,
+      unidade_pressao=@unidade_pressao, potencia=@potencia, unidade_potencia=@unidade_potencia,
+      tensao=@tensao, observacoes_tecnicas=@observacoes_tecnicas,
       updated_at = datetime('now')
     WHERE id = @id
   `);
@@ -191,7 +249,7 @@ function normalizeEquipData(data) {
     tipo: (data.tipo || "").trim() || null,
     criticidade: (data.criticidade || "media").trim(),
     ativo: data.ativo ? 1 : 0,
-    status_operacional: (data.status_operacional || "ATIVO").trim().toUpperCase(),
+    status_operacional: (data.status_operacional || "EM_OPERACAO").trim().toUpperCase(),
     fabricante: (data.fabricante || "").trim() || null,
     ano_fabricacao: safeInt(data.ano_fabricacao),
     ano_instalacao: safeInt(data.ano_instalacao),
@@ -199,7 +257,29 @@ function normalizeEquipData(data) {
     pressao_trabalho: (data.pressao_trabalho || "").trim() || null,
     observacao: (data.observacao || "").trim() || null,
     foto_url: (data.foto_url || "").trim() || null,
+    modelo: (data.modelo || "").trim() || null,
+    numero_serie: (data.numero_serie || "").trim() || null,
+    data_instalacao: (data.data_instalacao || "").trim() || null,
+    responsavel_setor: (data.responsavel_setor || "").trim() || null,
+    possui_plano_preventivo: data.possui_plano_preventivo ? 1 : 0,
+    periodicidade_preventiva: (data.periodicidade_preventiva || "").trim() || null,
+    unidade_capacidade: (data.unidade_capacidade || "").trim() || null,
+    unidade_pressao: (data.unidade_pressao || "").trim() || null,
+    potencia: safeDecimal(data.potencia), unidade_potencia: (data.unidade_potencia || "").trim() || null,
+    tensao: (data.tensao || "").trim() || null,
+    observacoes_tecnicas: (data.observacoes_tecnicas || "").trim() || null,
   };
+}
+
+function safeDecimal(v) {
+  if (v === null || v === undefined || String(v).trim() === "") return null;
+  const n = Number(String(v).replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+function codeExists(codigo, exceptId = null) {
+  if (!String(codigo || "").trim()) return false;
+  return Boolean(db.prepare("SELECT 1 FROM equipamentos WHERE UPPER(codigo)=UPPER(?) AND (? IS NULL OR id<>?)").get(String(codigo).trim(), exceptId, exceptId));
 }
 
 function safeInt(v) {
@@ -450,6 +530,9 @@ function getEquipamentoByQrToken(token) {
 
 module.exports = {
   list,
+  dashboard,
+  filterOptions,
+  codeExists,
   getById,
   create,
   update,
