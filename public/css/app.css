@@ -439,6 +439,22 @@ textarea{ min-height:110px; resize:vertical; }
 .badge-param{background:#dcfce7;color:#166534}
 .badge-cad{background:#dbeafe;color:#1d4ed8}
 .btn-dark{background:#0f172a;color:#fff;border-color:#0f172a}
+
+/* Padrão oficial de botões para telas modernizadas. O prefixo evita conflito com Bootstrap/legado. */
+.ui-btn{height:38px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:0 15px;border:1px solid #69ad83;border-radius:9px;background:#fff;color:#12643a;font:600 13px/1 inherit;text-decoration:none;white-space:nowrap;cursor:pointer;box-shadow:0 1px 2px rgba(15,79,45,.04);transition:background-color .16s ease,border-color .16s ease,color .16s ease}
+.ui-btn:hover{background:#edf8f1;border-color:#3d9160;color:#0c5830}
+.ui-btn:active{background:#dcefe3;border-color:#2f7c50}
+.ui-btn:focus-visible{outline:3px solid rgba(34,165,83,.26);outline-offset:2px}
+.ui-btn:disabled,.ui-btn[aria-disabled="true"]{background:#f1f3f2;border-color:#cbd1ce;color:#89928e;cursor:not-allowed;box-shadow:none;pointer-events:none}
+.ui-btn--outline{background:transparent}
+.ui-btn--soft,.ui-btn--soft:hover{background:#f5fbf7}
+.ui-btn--danger{background:#fff;border-color:#e7a1a7;color:#b42332}
+.ui-btn--danger:hover{background:#fff1f2;border-color:#d86d78;color:#961d29}
+.ui-btn--table{height:34px;min-width:86px;padding:0 13px;font-size:12px}
+.ui-btn--icon{width:38px;padding:0}
+.ui-btn--compact{height:32px;padding-inline:11px;font-size:12px}
+.ui-btn--large{height:42px;padding-inline:18px}
+.ui-btn--icon>svg,.ui-btn--icon>img{width:16px;height:16px}
 .cad-minimal-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .cad-shell{display:grid;gap:12px}
 .cad-topbar{display:flex;justify-content:space-between;align-items:center;gap:8px}
