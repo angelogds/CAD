@@ -63,13 +63,26 @@ export class DesenhoTecnicoRenderer {
     return { name: layerName, ...(this.state.layers?.[layerName] || {}) };
   }
 
+  getScreenStroke(color) {
+    const fallback = color || '#e5edf6';
+    const dark = document.querySelector('.cad-fullscreen')?.classList.contains('cad-theme-dark');
+    const match = /^#([0-9a-f]{6})$/i.exec(fallback);
+    if (!dark || !match) return fallback;
+    const value = Number.parseInt(match[1], 16);
+    const r = (value >> 16) & 255;
+    const g = (value >> 8) & 255;
+    const b = value & 255;
+    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    return luminance < 0.23 ? '#dbe7f3' : fallback;
+  }
+
   renderGrid() {
     const g = this.layers.grid;
     g.innerHTML = '';
     if (!this.state.gridConfig.visible) return;
 
     const v = this.viewport.getViewState();
-    const baseStep = Math.max(1, this.state.gridConfig.step || 20);
+    const baseStep = Math.max(0.001, this.state.gridConfig.step || 20);
     const targetPx = 36;
     const zoom = Math.max(0.0001, v.zoom);
     const scaled = baseStep * zoom;
@@ -89,14 +102,14 @@ export class DesenhoTecnicoRenderer {
       const p1 = this.viewport.worldToScreen(x, startY);
       const p2 = this.viewport.worldToScreen(x, endY);
       const isMajor = Math.abs(Math.round(x / majorStep) - x / majorStep) < 1e-6;
-      g.insertAdjacentHTML('beforeend', `<line x1='${p1.x.toFixed(2)}' y1='${p1.y.toFixed(2)}' x2='${p2.x.toFixed(2)}' y2='${p2.y.toFixed(2)}' stroke='${isMajor ? '#c5ced8' : '#e7edf3'}' stroke-width='1'/>`);
+      g.insertAdjacentHTML('beforeend', `<line x1='${p1.x.toFixed(2)}' y1='${p1.y.toFixed(2)}' x2='${p2.x.toFixed(2)}' y2='${p2.y.toFixed(2)}' stroke='${isMajor ? 'var(--cad-grid-major)' : 'var(--cad-grid-minor)'}' stroke-width='1'/>`);
     }
 
     for (let y = startY; y <= endY + minorStep * 0.5; y += minorStep) {
       const p1 = this.viewport.worldToScreen(startX, y);
       const p2 = this.viewport.worldToScreen(endX, y);
       const isMajor = Math.abs(Math.round(y / majorStep) - y / majorStep) < 1e-6;
-      g.insertAdjacentHTML('beforeend', `<line x1='${p1.x.toFixed(2)}' y1='${p1.y.toFixed(2)}' x2='${p2.x.toFixed(2)}' y2='${p2.y.toFixed(2)}' stroke='${isMajor ? '#c5ced8' : '#e7edf3'}' stroke-width='1'/>`);
+      g.insertAdjacentHTML('beforeend', `<line x1='${p1.x.toFixed(2)}' y1='${p1.y.toFixed(2)}' x2='${p2.x.toFixed(2)}' y2='${p2.y.toFixed(2)}' stroke='${isMajor ? 'var(--cad-grid-major)' : 'var(--cad-grid-minor)'}' stroke-width='1'/>`);
     }
   }
 
@@ -114,7 +127,7 @@ export class DesenhoTecnicoRenderer {
       if (orientation === 'horizontal') x += len; else y += len;
       const c1 = this.viewport.worldToScreen(orientation === 'horizontal' ? x - len : x, orientation === 'horizontal' ? origin.y : y - len);
       const c2 = this.viewport.worldToScreen(orientation === 'horizontal' ? x : origin.x, orientation === 'horizontal' ? origin.y : y);
-      g.insertAdjacentHTML('beforeend', `<line x1='${c1.x}' y1='${c1.y}' x2='${c2.x}' y2='${c2.y}' stroke='#0f766e' stroke-width='1.2' stroke-dasharray='8 4 2 4'/>`);
+      g.insertAdjacentHTML('beforeend', `<line x1='${c1.x}' y1='${c1.y}' x2='${c2.x}' y2='${c2.y}' stroke='var(--cad-centerline)' stroke-width='1.2' stroke-dasharray='8 4 2 4'/>`);
       if (idx < segments.length - 1) {
         const step = this.viewport.worldToScreen(x, y);
         g.insertAdjacentHTML('beforeend', `<line x1='${step.x}' y1='${step.y - 8}' x2='${step.x}' y2='${step.y + 8}' stroke='${stroke}' stroke-width='1'/>`);
@@ -131,12 +144,14 @@ export class DesenhoTecnicoRenderer {
       if (layerCfg.visible === false) return;
       const selected = this.selection.includes(e.id);
       const hover = this.selection.hoverId === e.id;
-      const baseStroke = e.style.stroke || layerCfg.color || '#1f2937';
+      const baseStroke = this.getScreenStroke(e.style.stroke || layerCfg.color || '#e5edf6');
       const stroke = selected ? '#0ea5e9' : hover ? '#f59e0b' : baseStroke;
+      const dash = e.style?.dasharray ? `stroke-dasharray='${e.style.dasharray}'` : '';
+      const opacity = Number.isFinite(Number(e.style?.opacity)) ? `opacity='${Number(e.style.opacity)}'` : '';
       if (e.type === 'line' || e.type === 'centerline') {
         const a = this.viewport.worldToScreen(e.geometry.x1, e.geometry.y1);
         const b = this.viewport.worldToScreen(e.geometry.x2, e.geometry.y2);
-        g.insertAdjacentHTML('beforeend', `<line x1='${a.x}' y1='${a.y}' x2='${b.x}' y2='${b.y}' stroke='${stroke}' stroke-width='2' ${e.type === 'centerline' ? "stroke-dasharray='10 4 2 4'" : ''}/>`);
+        g.insertAdjacentHTML('beforeend', `<line x1='${a.x}' y1='${a.y}' x2='${b.x}' y2='${b.y}' stroke='${stroke}' stroke-width='2' ${e.type === 'centerline' ? "stroke-dasharray='10 4 2 4'" : dash} ${opacity}/>`);
       } else if (e.type === 'rect') {
         const x = e.geometry.width < 0 ? e.geometry.x + e.geometry.width : e.geometry.x;
         const y = e.geometry.height < 0 ? e.geometry.y + e.geometry.height : e.geometry.y;
@@ -145,7 +160,7 @@ export class DesenhoTecnicoRenderer {
       } else if (e.type === 'circle') {
         const c = this.viewport.worldToScreen(e.geometry.cx, e.geometry.cy);
         const radiusScreen = Math.abs(e.geometry.radius * this.viewport.getViewState().zoom);
-        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='${radiusScreen}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
+        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='${radiusScreen}' fill='none' stroke='${stroke}' stroke-width='2' ${dash} ${opacity}/>`);
       } else if (e.type === 'arc') {
         g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, e.geometry)}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
       } else if (e.type === 'shaft') {
@@ -159,17 +174,17 @@ export class DesenhoTecnicoRenderer {
       } else if (e.type === 'dimension') {
         if (e.geometry.mode === 'angular') {
           const v = this.viewport.worldToScreen(e.geometry.vertex.x, e.geometry.vertex.y);
-          g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, { cx: e.geometry.vertex.x, cy: e.geometry.vertex.y, radius: e.geometry.radius, startAngle: e.geometry.startAngle, endAngle: e.geometry.endAngle, ccw: true })}' fill='none' stroke='#1d4ed8' stroke-width='1.5'/>`);
+          g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, { cx: e.geometry.vertex.x, cy: e.geometry.vertex.y, radius: e.geometry.radius, startAngle: e.geometry.startAngle, endAngle: e.geometry.endAngle, ccw: true })}' fill='none' stroke='var(--cad-dimension)' stroke-width='1.5'/>`);
           const mid = (e.geometry.startAngle + e.geometry.endAngle) / 2;
           const tp = this.viewport.worldToScreen(e.geometry.vertex.x + Math.cos(mid) * (e.geometry.radius + 10), e.geometry.vertex.y + Math.sin(mid) * (e.geometry.radius + 10));
-          g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='#1d4ed8' font-size='12' font-family='monospace'>${e.geometry.label || ''}</text>`);
-          g.insertAdjacentHTML('beforeend', `<circle cx='${v.x}' cy='${v.y}' r='2' fill='#1d4ed8'/>`);
+          g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='var(--cad-dimension)' font-size='12' font-family='monospace'>${e.geometry.label || ''}</text>`);
+          g.insertAdjacentHTML('beforeend', `<circle cx='${v.x}' cy='${v.y}' r='2' fill='var(--cad-dimension)'/>`);
         } else {
           const p1 = this.viewport.worldToScreen(e.geometry.p1.x, e.geometry.p1.y);
           const p2 = this.viewport.worldToScreen(e.geometry.p2.x, e.geometry.p2.y);
           const tp = this.viewport.worldToScreen(e.geometry.textPoint.x, e.geometry.textPoint.y);
-          g.insertAdjacentHTML('beforeend', `<line x1='${p1.x}' y1='${p1.y}' x2='${p2.x}' y2='${p2.y}' stroke='#1d4ed8' stroke-width='1.5'/>`);
-          g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='#1d4ed8' font-size='12' font-family='monospace'>${e.geometry.label || ''}</text>`);
+          g.insertAdjacentHTML('beforeend', `<line x1='${p1.x}' y1='${p1.y}' x2='${p2.x}' y2='${p2.y}' stroke='var(--cad-dimension)' stroke-width='1.5'/>`);
+          g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='var(--cad-dimension)' font-size='12' font-family='monospace'>${e.geometry.label || ''}</text>`);
         }
       }
     });

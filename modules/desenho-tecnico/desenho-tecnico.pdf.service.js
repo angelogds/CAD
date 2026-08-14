@@ -221,6 +221,7 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area) {
         break;
       
       case 'circle':
+        if (obj.style?.dasharray || obj.layer === 'construcao') doc.dash(6, { space: 4 });
         doc.circle(
           obj.x * scale + offsetX,
           obj.y * scale + offsetY,
@@ -228,6 +229,7 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area) {
         )
           .lineWidth(1)
           .stroke(color);
+        doc.undash();
         break;
 
       case 'polyline': {
