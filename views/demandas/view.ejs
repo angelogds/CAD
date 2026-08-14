@@ -1,44 +1,99 @@
 <% layout('layout') %>
-<div class="page-head"><div><h1>Demanda #<%= demanda.id %></h1><p class="muted"><%= demanda.titulo %></p></div></div>
+<link rel="stylesheet" href="/css/demandas.css">
+<%
+  const statusLabel = value => ({ NOVA: 'Nova', EM_ANALISE: 'Em análise', EM_ANDAMENTO: 'Em andamento', PARADA: 'Parada', CONCLUIDA: 'Concluída', CANCELADA: 'Cancelada' }[value] || value);
+  const priorityLabel = value => ({ BAIXA: 'Baixa', NORMAL: 'Média', ALTA: 'Alta', URGENTE: 'Crítica' }[value] || value);
+  const slug = value => String(value || '').toLowerCase().replace(/_/g, '-');
+  const isFinished = ['CONCLUIDA', 'CANCELADA'].includes(demanda.status);
+  const elapsed = (() => {
+    const start = new Date(demanda.created_at);
+    const end = demanda.finished_at ? new Date(demanda.finished_at) : new Date();
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'Não disponível';
+    const hours = Math.max(0, Math.floor((end - start) / 3600000));
+    const days = Math.floor(hours / 24);
+    return days ? `${days}d ${hours % 24}h` : `${hours}h`;
+  })();
+%>
 
-<div class="card" style="margin-bottom:12px;">
-  <div class="grid-3">
-    <div><div class="label">Status</div><strong><%= demanda.status %></strong></div>
-    <div><div class="label">Prioridade</div><strong><%= demanda.prioridade %></strong></div>
-    <div><div class="label">Responsável</div><strong><%= demanda.responsavel_nome || '-' %></strong></div>
+<div class="demand-page demand-detail-page">
+  <header class="demand-detail-head">
+    <div>
+      <a class="demand-back-link" href="/demandas">← Voltar para demandas</a>
+      <div class="detail-title-line">
+        <h1>Demanda #<%= demanda.id %></h1>
+        <span class="demand-badge status-<%= slug(demanda.status) %>"><%= statusLabel(demanda.status) %></span>
+        <span class="demand-badge priority-<%= slug(demanda.prioridade) %>"><%= priorityLabel(demanda.prioridade) %></span>
+      </div>
+      <p><%= demanda.titulo %></p>
+    </div>
+    <div class="detail-head-actions">
+      <% if (canAccessModule(normalizeRole(user?.role), 'demandas_manage') && !isFinished) { %>
+        <form method="POST" action="/demandas/<%= demanda.id %>/convert-to-os" onsubmit="return confirm('Converter esta demanda em Ordem de Serviço?')">
+          <button class="demand-btn demand-btn-primary" type="submit">Converter em OS</button>
+        </form>
+      <% } %>
+    </div>
+  </header>
+
+  <section class="demand-progress" aria-label="Andamento da demanda">
+    <div class="progress-step done"><span>1</span><div><strong>Registrada</strong><small><%= fmtBR(demanda.created_at) %></small></div></div>
+    <i class="<%= demanda.started_at || isFinished ? 'done' : '' %>"></i>
+    <div class="progress-step <%= demanda.started_at || isFinished ? 'done' : '' %>"><span>2</span><div><strong>Em execução</strong><small><%= demanda.started_at ? fmtBR(demanda.started_at) : 'Aguardando início' %></small></div></div>
+    <i class="<%= demanda.finished_at ? 'done' : '' %>"></i>
+    <div class="progress-step <%= demanda.finished_at ? 'done' : '' %>"><span>3</span><div><strong>Finalizada</strong><small><%= demanda.finished_at ? fmtBR(demanda.finished_at) : 'Aguardando conclusão' %></small></div></div>
+    <div class="progress-time"><small><%= isFinished ? 'Tempo total' : 'Tempo em aberto' %></small><strong><%= elapsed %></strong></div>
+  </section>
+
+  <section class="demand-detail-metrics">
+    <article class="detail-metric metric-blue"><small>Status</small><strong><%= statusLabel(demanda.status) %></strong></article>
+    <article class="detail-metric metric-orange"><small>Prioridade</small><strong><%= priorityLabel(demanda.prioridade) %></strong></article>
+    <article class="detail-metric metric-green"><small>Responsável</small><strong><%= demanda.responsavel_nome || 'A definir' %></strong></article>
+    <article class="detail-metric metric-slate"><small>Criada por</small><strong><%= demanda.created_by_nome || 'Não informado' %></strong></article>
+  </section>
+
+  <div class="demand-detail-grid">
+    <section class="demand-card demand-description-card">
+      <div class="section-heading"><div><h2>Descrição da demanda</h2><p>Escopo informado no registro inicial.</p></div></div>
+      <div class="demand-description"><%= demanda.descricao || 'Nenhuma descrição informada.' %></div>
+      <% if (demanda.ultima_atualizacao) { %>
+        <div class="latest-update"><span>Última atualização</span><p><%= demanda.ultima_atualizacao %></p></div>
+      <% } %>
+    </section>
+
+    <% if (canAccessModule(normalizeRole(user?.role), 'demandas_manage')) { %>
+      <section class="demand-card demand-control-card">
+        <div class="section-heading"><div><h2>Controle da demanda</h2><p>Defina responsável e etapa atual.</p></div></div>
+        <form method="POST" action="/demandas/<%= demanda.id %>/status" class="demand-control-form">
+          <label><span>Status</span><select name="status"><% ['NOVA','EM_ANALISE','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %><option value="<%= st %>" <%= demanda.status === st ? 'selected' : '' %>><%= statusLabel(st) %></option><% }) %></select></label>
+          <label><span>Responsável</span><select name="responsavel_user_id"><option value="">A definir</option><% (responsaveis || []).forEach(person => { %><option value="<%= person.id %>" <%= Number(demanda.responsavel_user_id || 0) === Number(person.id) ? 'selected' : '' %>><%= person.name %></option><% }) %></select></label>
+          <button class="demand-btn demand-btn-primary" type="submit">Salvar controle</button>
+        </form>
+      </section>
+    <% } %>
   </div>
-  <div style="margin-top:10px;"><div class="label">Descrição</div><div><%= demanda.descricao || '-' %></div></div>
-</div>
 
-<% if (canAccessModule(normalizeRole(user?.role), 'demandas_manage')) { %>
-  <div class="card" style="margin-bottom:12px;">
-    <div class="label">Ações do Admin</div>
-    <form method="POST" action="/demandas/<%= demanda.id %>/status" style="display:flex; gap:10px; align-items:end; flex-wrap:wrap; margin-top:10px;">
-      <div><div class="label">Status</div><select class="input" name="status"><% ['NOVA','EM_ANALISE','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %><option value="<%= st %>" <%= demanda.status===st?'selected':'' %>><%= st %></option><% }) %></select></div>
-      <div><div class="label">Responsável</div><select class="input" name="responsavel_user_id"><option value="">--</option><% (responsaveis||[]).forEach(u=>{ %><option value="<%= u.id %>" <%= Number(demanda.responsavel_user_id||0)===u.id?'selected':'' %>><%= u.name %></option><% }) %></select></div>
-      <button class="btn btn-green">Atualizar status</button>
-    </form>
+  <div class="demand-activity-grid">
+    <% if (canAccessModule(normalizeRole(user?.role), 'demandas_manage')) { %>
+      <section class="demand-card demand-update-card">
+        <div class="section-heading"><div><h2>Registrar atualização</h2><p>Adicione uma tratativa objetiva ao histórico.</p></div></div>
+        <form method="POST" action="/demandas/<%= demanda.id %>/update">
+          <textarea name="texto" rows="5" required placeholder="Informe andamento, decisão, impedimento ou próxima ação."></textarea>
+          <div class="update-actions"><small>A atualização ficará registrada com data e usuário.</small><button class="demand-btn demand-btn-secondary" type="submit">Salvar atualização</button></div>
+        </form>
+      </section>
+    <% } %>
 
-    <form method="POST" action="/demandas/<%= demanda.id %>/update" style="margin-top:10px;">
-      <div class="label">Nova atualização</div>
-      <textarea class="input" name="texto" required></textarea>
-      <div style="margin-top:8px;"><button class="btn">Salvar atualização</button></div>
-    </form>
-
-    <form method="POST" action="/demandas/<%= demanda.id %>/convert-to-os" style="margin-top:10px;">
-      <button class="btn btn-green" type="submit">Converter em OS</button>
-    </form>
-  </div>
-<% } %>
-
-<div class="card">
-  <div class="label">Histórico</div>
-  <div class="table-wrap" style="margin-top:10px;">
-    <table class="table"><thead><tr><th>Data</th><th>Usuário</th><th>Atualização</th></tr></thead><tbody>
-      <% if (!demanda.logs?.length) { %><tr><td colspan="3" style="text-align:center;color:#6b7280;">Sem atualizações.</td></tr><% } %>
-      <% (demanda.logs||[]).forEach(l => { %>
-        <tr><td><%= fmtBR(l.created_at) %></td><td><%= l.user_nome || '-' %></td><td><%= l.texto %></td></tr>
-      <% }) %>
-    </tbody></table>
+    <section class="demand-card demand-history-card">
+      <div class="section-heading"><div><h2>Histórico e rastreabilidade</h2><p>Movimentações registradas nesta demanda.</p></div><span class="section-total"><%= demanda.logs?.length || 0 %> evento(s)</span></div>
+      <% if (!demanda.logs?.length) { %>
+        <div class="history-empty">Nenhuma atualização registrada.</div>
+      <% } else { %>
+        <ol class="demand-timeline">
+          <% demanda.logs.forEach(log => { %>
+            <li><span class="timeline-dot"></span><div><p><%= log.texto %></p><small><%= fmtBR(log.created_at) %> · <%= log.user_nome || 'Sistema' %></small></div></li>
+          <% }) %>
+        </ol>
+      <% } %>
+    </section>
   </div>
 </div>
