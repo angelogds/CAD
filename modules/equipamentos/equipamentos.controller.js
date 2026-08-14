@@ -20,8 +20,10 @@ function calcIdade(anoInstalacao) {
 }
 
 function equipIndex(req, res) {
-  const lista = service.list();
-  return res.render("equipamentos/index", { title: "Equipamentos", lista });
+  const filters = { q: req.query.q || "", setor: req.query.setor || "", tipo: req.query.tipo || "", criticidade: req.query.criticidade || "", situacao: req.query.situacao || "", tab: req.query.tab || "", page: req.query.page, limit: req.query.limit };
+  const painel = service.dashboard(filters);
+  const canManage = require("../../config/rbac").canAccessModule(req.session?.user?.role, "equipamentos_manage");
+  return res.render("equipamentos/index", { title: "Equipamentos", painel, filters, options: service.filterOptions(), canManage });
 }
 
 function formatDateTime(value) {
@@ -41,25 +43,31 @@ function drawSimpleTable(doc, headers, rows, widths) {
   );
 }
 
-function equipNewForm(req, res) {
-  return res.render("equipamentos/novo", { title: "Novo Equipamento" });
+function renderForm(res, { equip = {}, errors = {}, editing = false, status = 200 } = {}) {
+  return res.status(status).render("equipamentos/form", { title: editing ? "Editar equipamento" : "Novo equipamento", equip, errors, editing, options: service.filterOptions() });
+}
+function equipNewForm(req, res) { return renderForm(res); }
+function validateEquip(data, id = null) {
+  const errors = {};
+  if (!String(data.codigo || "").trim()) errors.codigo = "Informe o código interno / Tag.";
+  else if (service.codeExists(data.codigo, id)) errors.codigo = "Este código já está cadastrado.";
+  if (!String(data.nome || "").trim()) errors.nome = "Informe o nome do equipamento.";
+  if (!String(data.setor || "").trim()) errors.setor = "Informe o setor / área.";
+  if (!String(data.tipo || "").trim()) errors.tipo = "Informe o tipo / categoria.";
+  const year = Number(data.ano_fabricacao);
+  if (data.ano_fabricacao && (!Number.isInteger(year) || year < 1900 || year > new Date().getFullYear() + 1)) errors.ano_fabricacao = "Informe um ano válido.";
+  return errors;
 }
 
 function equipCreate(req, res) {
-  const { nome } = req.body;
-  if (!nome || !String(nome).trim()) {
-    req.flash("error", "Informe o nome do equipamento.");
-    return res.redirect("/equipamentos/novo");
-  }
-
-  const id = service.create({
-    ...req.body,
-    foto_url: resolveFoto(req.file),
-    ativo: req.body.ativo === "1" || req.body.ativo === "on" || req.body.ativo === 1,
-  });
-
+  const errors = validateEquip(req.body);
+  if (Object.keys(errors).length) return renderForm(res, { equip: req.body, errors, status: 422 });
+  const foto = req.files?.foto?.[0];
+  const documento = req.files?.documento_tecnico?.[0];
+  const id = service.create({ ...req.body, foto_url: resolveFoto(foto), ativo: req.body.ativo === "1", possui_plano_preventivo: req.body.possui_plano_preventivo === "1" });
+  if (documento) service.createDocumento(id, { tipo_documento: "manual", descricao: documento.originalname, caminho_arquivo: `/uploads/equipamentos/documentos/${documento.filename}` });
   req.flash("success", "Equipamento cadastrado com sucesso.");
-  return res.redirect(`/equipamentos/${id}`);
+  return res.redirect(req.body.submit_action === "open" ? `/equipamentos/${id}` : "/equipamentos");
 }
 
 async function equipShow(req, res) {
@@ -113,7 +121,7 @@ function equipEditForm(req, res) {
   const id = Number(req.params.id);
   const equip = service.getById(id);
   if (!equip) return res.status(404).render("errors/404", { title: "Não encontrado" });
-  return res.render("equipamentos/editar", { title: `Editar ${equip.nome}`, equip });
+  return renderForm(res, { equip, editing: true });
 }
 
 function exportListaPdf(req, res) {
@@ -274,29 +282,15 @@ function equipUpdate(req, res) {
   const id = Number(req.params.id);
   const equip = service.getById(id);
   if (!equip) return res.status(404).render("errors/404", { title: "Não encontrado" });
-
-  const { nome } = req.body;
-  if (!nome || !String(nome).trim()) {
-    req.flash("error", "Informe o nome do equipamento.");
-    return res.redirect(`/equipamentos/${id}/editar`);
-  }
-
-  let fotoAtual = equip.foto_url;
-  if (req.body.remover_foto === "1") {
-    fotoAtual = null;
-  }
-  if (req.file) {
-    fotoAtual = resolveFoto(req.file);
-  }
-
-  service.update(id, {
-    ...req.body,
-    foto_url: fotoAtual,
-    ativo: req.body.ativo === "1" || req.body.ativo === "on" || req.body.ativo === 1,
-  });
-
+  const errors = validateEquip(req.body, id);
+  if (Object.keys(errors).length) return renderForm(res, { equip: { ...equip, ...req.body, id }, errors, editing: true, status: 422 });
+  let fotoAtual = req.body.remover_foto === "1" ? null : equip.foto_url;
+  const foto = req.files?.foto?.[0]; const documento = req.files?.documento_tecnico?.[0];
+  if (foto) fotoAtual = resolveFoto(foto);
+  service.update(id, { ...req.body, foto_url: fotoAtual, ativo: req.body.ativo === "1", possui_plano_preventivo: req.body.possui_plano_preventivo === "1" });
+  if (documento) service.createDocumento(id, { tipo_documento: "manual", descricao: documento.originalname, caminho_arquivo: `/uploads/equipamentos/documentos/${documento.filename}` });
   req.flash("success", "Equipamento atualizado com sucesso.");
-  return res.redirect(`/equipamentos/${id}`);
+  return res.redirect(req.body.submit_action === "list" ? "/equipamentos" : `/equipamentos/${id}`);
 }
 
 function equipDelete(req, res) {
