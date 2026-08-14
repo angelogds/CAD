@@ -50,20 +50,23 @@ function diasEmAberto(openedAt, closedAt) {
   if (!start || Number.isNaN(start.getTime())) return 0;
   return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86400000));
 }
-function buscarSolicitacaoVinculada(osId) {
+function buscarSolicitacoesVinculadas(osId) {
   if (!tableExists('solicitacoes')) return null;
+  let rows = [];
   if (tableExists('os_solicitacoes_vinculos')) {
-    const row = db.prepare(`
+    rows = db.prepare(`
       SELECT s.* FROM os_solicitacoes_vinculos v JOIN solicitacoes s ON s.id = v.solicitacao_id
-      WHERE v.os_id = ? ORDER BY v.id DESC LIMIT 1
-    `).get(Number(osId));
-    if (row) return row;
+      WHERE v.os_id = ? ORDER BY v.id DESC
+    `).all(Number(osId));
   }
   if (columnExists('solicitacoes', 'os_id')) {
-    return db.prepare(`SELECT * FROM solicitacoes WHERE os_id = ? ORDER BY id DESC LIMIT 1`).get(Number(osId)) || null;
+    const direct = db.prepare(`SELECT * FROM solicitacoes WHERE os_id = ? ORDER BY id DESC`).all(Number(osId));
+    const ids = new Set(rows.map((row) => Number(row.id)));
+    rows.push(...direct.filter((row) => !ids.has(Number(row.id))));
   }
-  return null;
+  return rows;
 }
+function buscarSolicitacaoVinculada(osId) { return buscarSolicitacoesVinculadas(osId)[0] || null; }
 function getUltimoHistorico(osId) {
   if (!tableExists('os_andamento_historico')) return null;
   return db.prepare(`SELECT * FROM os_andamento_historico WHERE os_id = ? ORDER BY datetime(registrado_em) DESC, id DESC LIMIT 1`).get(Number(osId)) || null;
@@ -118,7 +121,7 @@ function ultimaMensagemDataExpr() {
 }
 function listarConversasOS(user, filtros = {}) {
   const userId = Number(user?.id || 0) || 0;
-  const filtro = String(filtros.filtro || 'todas').toLowerCase();
+  const filtro = String(filtros.filtro || filtros.aba || 'todas').toLowerCase();
   const isHistory = HISTORY_FILTERS.has(filtro);
   const hasMsgs = tableExists('os_chat_mensagens');
   const hasHist = tableExists('os_andamento_historico');
@@ -171,7 +174,7 @@ function listarConversasOS(user, filtros = {}) {
   const where = isHistory ? `(${closedStatus} OR ${archiveExpr})` : `(${activeStatus} AND NOT (${archiveExpr}))`;
   const limit = isHistory ? 500 : 300;
 
-  const rows = db.prepare(`
+  let rows = db.prepare(`
     SELECT o.id, o.status, o.prioridade, o.opened_at, o.closed_at,
            ${closedAtExpr} AS data_fechamento,
            COALESCE(${hasEquip ? 'e.nome' : 'NULL'}, o.equipamento_manual, o.equipamento, '-') AS equipamento,
@@ -204,10 +207,9 @@ function listarConversasOS(user, filtros = {}) {
     LIMIT ${limit}
   `).all(userId, userId).map((row) => ({ ...row, dias_aberta: diasEmAberto(row.opened_at, row.closed_at), nao_lidas: Number(row.nao_lidas || 0), historico: isHistory }));
 
-  if (isHistory) return rows;
-
-  return rows.filter((row) => {
+  rows = rows.filter((row) => {
     const status = String(row.status || '').toUpperCase();
+    if (isHistory) return true;
     if (isClosedStatus(status)) return false;
     if (filtro === 'nao_lidas') return row.nao_lidas > 0;
     if (filtro === 'aguardando_material') return Number(row.aguarda_material || 0) === 1 || Number(row.tem_solicitacao_aberta || row.tem_solicitacao || 0) === 1;
@@ -218,13 +220,63 @@ function listarConversasOS(user, filtros = {}) {
     if (filtro === 'em_andamento') return ['ANDAMENTO','EM_ANDAMENTO','PAUSADA'].includes(status);
     return true;
   });
+  const busca = normText(filtros.busca).toLocaleLowerCase('pt-BR');
+  const prioridade = normText(filtros.prioridade).toUpperCase();
+  const motivo = normText(filtros.motivo).toUpperCase();
+  if (busca) rows = rows.filter((row) => [row.id, row.equipamento, row.ultima_mensagem, row.ultima_justificativa, row.responsavel].some((value) => String(value || '').toLocaleLowerCase('pt-BR').includes(busca)));
+  if (prioridade) rows = rows.filter((row) => String(row.prioridade || '').toUpperCase() === prioridade);
+  if (motivo) rows = rows.filter((row) => String(row.motivo_atual || '').toUpperCase().includes(motivo));
+  const order = String(filtros.ordenacao || 'recentes');
+  if (order === 'antigas') rows.reverse();
+  if (order === 'prioridade') {
+    const rank = { EMERGENCIAL: 0, URGENTE: 0, 'CRÍTICA': 0, CRITICA: 0, ALTA: 1, MEDIA: 2, 'MÉDIA': 2, BAIXA: 3 };
+    rows.sort((a, b) => (rank[String(a.prioridade || '').toUpperCase()] ?? 9) - (rank[String(b.prioridade || '').toUpperCase()] ?? 9));
+  }
+  if (order === 'nao_lidas') rows.sort((a, b) => b.nao_lidas - a.nao_lidas);
+  return rows;
+}
+
+function listarMotivos() {
+  if (!tableExists('os_andamento_motivos')) return [];
+  return db.prepare(`SELECT codigo, nome FROM os_andamento_motivos WHERE COALESCE(ativo,1)=1 ORDER BY ordem, nome`).all();
+}
+function listarPrioridades() {
+  return db.prepare(`SELECT DISTINCT TRIM(prioridade) AS nome FROM os WHERE NULLIF(TRIM(prioridade),'') IS NOT NULL ORDER BY nome`).all().map((r) => r.nome);
+}
+function getDashboard(user, filtros = {}) {
+  const allActive = listarConversasOS(user, { filtro: 'todas' });
+  const filtered = listarConversasOS(user, filtros);
+  const pageSize = Math.min(50, Math.max(5, Number(filtros.limite || 12) || 12));
+  const total = filtered.length;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(pages, Math.max(1, Number(filtros.pagina || 1) || 1));
+  return {
+    metrics: {
+      ativas: allActive.length,
+      naoLidas: allActive.reduce((sum, row) => sum + Number(row.nao_lidas || 0), 0),
+      aguardandoCompras: allActive.filter((row) => Number(row.aguarda_compras || row.tem_solicitacao_aberta || 0) === 1).length,
+      aguardandoMaterial: allActive.filter((row) => Number(row.aguarda_material || 0) === 1).length,
+      criticas: allActive.filter((row) => Number(row.eh_critica || 0) === 1).length,
+    },
+    conversas: filtered.slice((page - 1) * pageSize, page * pageSize),
+    pagination: { page, pages, total, limit: pageSize },
+    filters: filtros,
+    motivos: listarMotivos(),
+    prioridades: listarPrioridades(),
+  };
 }
 
 function buscarConversaPorOS(osId, user) {
   const os = getOs(osId);
   if (!os) return null;
   const historico = getUltimoHistorico(osId);
-  const solicitacao = buscarSolicitacaoVinculada(osId);
+  const solicitacoes = buscarSolicitacoesVinculadas(osId);
+  const solicitacao = solicitacoes[0] || null;
+  const historicoCompleto = tableExists('os_andamento_historico') ? db.prepare(`
+    SELECT h.*, COALESCE(u.name,u.email,'Sistema') AS autor_nome
+    FROM os_andamento_historico h LEFT JOIN users u ON u.id=h.registrado_por
+    WHERE h.os_id=? ORDER BY datetime(h.registrado_em), h.id
+  `).all(Number(osId)) : [];
   return {
     os: {
       ...os,
@@ -236,6 +288,8 @@ function buscarConversaPorOS(osId, user) {
     },
     mensagens: listarMensagens(osId),
     solicitacao,
+    solicitacoes,
+    historico: historicoCompleto,
     naoLidas: contarNaoLidasPorOS(osId, user?.id),
   };
 }
@@ -330,4 +384,4 @@ function criarVinculoSolicitacaoOS(osId, solicitacaoId, userId) {
   }
   return buscarSolicitacaoVinculada(osIdNum) || { ...solicitacao, os_id: osIdNum };
 }
-module.exports = { listarConversasOS, buscarConversaPorOS, listarMensagens, enviarMensagem, registrarMensagemSistema, arquivarConversaOS, marcarComoLida, contarNaoLidas, contarNaoLidasPorOS, listarNotificacoesChat, criarVinculoSolicitacaoOS, buscarSolicitacaoVinculada, ACTIVE_OS_STATUSES, CLOSED_OS_STATUSES };
+module.exports = { listarConversasOS, getDashboard, listarMotivos, buscarConversaPorOS, listarMensagens, enviarMensagem, registrarMensagemSistema, arquivarConversaOS, marcarComoLida, contarNaoLidas, contarNaoLidasPorOS, listarNotificacoesChat, criarVinculoSolicitacaoOS, buscarSolicitacaoVinculada, buscarSolicitacoesVinculadas, ACTIVE_OS_STATUSES, CLOSED_OS_STATUSES };

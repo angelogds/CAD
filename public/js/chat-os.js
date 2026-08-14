@@ -81,11 +81,12 @@
         const mine = Number(message.user_id || 0) === Number(userId || 0);
         const tipo = String(message.tipo || 'MENSAGEM').toLowerCase();
         const system = tipo === 'sistema' || tipo.includes('solicitacao');
-        const classes = ['msg', mine ? 'mine' : '', system ? 'system' : ''].filter(Boolean).join(' ');
+        const classes = [system ? 'chat-os-system-event' : 'chat-os-message', mine ? 'mine' : '', `sector-${tipo}`].filter(Boolean).join(' ');
         return `
           <article class="${classes}" data-message-id="${escapeHtml(message.id)}">
-            <div class="msg-head"><strong>${escapeHtml(message.tipo || 'MENSAGEM')} • ${escapeHtml(message.autor_nome || 'Sistema')}</strong><span>${escapeHtml(message.created_at_fmt || message.created_at || '-')}</span></div>
-            <p>${escapeHtml(message.mensagem)}</p>
+            ${system ? '' : `<span class="avatar">${escapeHtml(String(message.autor_nome || 'S').charAt(0).toUpperCase())}</span><div>`}
+            <header><b>${escapeHtml(message.tipo || 'MENSAGEM')} • ${escapeHtml(message.autor_nome || 'Sistema')}</b><time>${escapeHtml(message.created_at_fmt || message.created_at || '-')}</time></header>
+            <p>${escapeHtml(message.mensagem)}</p>${system ? '' : '</div>'}
           </article>`;
       }).join('');
     }
@@ -191,6 +192,20 @@
       submitButton.textContent = originalButtonText;
     }
   });
+
+  document.getElementById('quick-reply')?.addEventListener('change', (event) => {
+    if (!event.target.value) return;
+    textarea.value = event.target.value;
+    saveDraft();
+    textarea.focus();
+    event.target.value = '';
+  });
+  document.querySelector('[data-contact-search]')?.addEventListener('input', (event) => {
+    const value = event.target.value.toLocaleLowerCase('pt-BR');
+    document.querySelectorAll('[data-contact]').forEach((contact) => { contact.hidden = !contact.textContent.toLocaleLowerCase('pt-BR').includes(value); });
+  });
+  document.querySelector('.chat-os-info-toggle')?.addEventListener('click', () => document.getElementById('os-details')?.classList.add('open'));
+  document.querySelector('.chat-os-details-close')?.addEventListener('click', () => document.getElementById('os-details')?.classList.remove('open'));
 
   window.addEventListener('beforeunload', () => saveDraft());
   document.addEventListener('visibilitychange', () => {
