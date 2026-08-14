@@ -37,8 +37,56 @@ const STATUS_COMPRAS = [
   STATUS.CANCELADA,
 ];
 
+function normalizeToken(value) {
+  return String(value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
 function normalizeStatus(status) {
-  return Object.values(STATUS).includes(status) ? status : '';
+  const token = normalizeToken(status);
+  const aliases = { ABERTO: STATUS.ABERTA, COTACAO: STATUS.EM_COTACAO, EM_COTACAO: STATUS.EM_COTACAO,
+    RECEBIDO_PARCIAL: STATUS.RECEBIDA_PARCIAL, RECEBIDO_TOTAL: STATUS.RECEBIDA_TOTAL, FECHADO: STATUS.FECHADA,
+    CANCELADO: STATUS.CANCELADA, REABERTO: STATUS.REABERTA };
+  return Object.values(STATUS).includes(token) ? token : (aliases[token] || token);
+}
+
+const CLOSED_STATUSES = new Set([STATUS.FECHADA, STATUS.CANCELADA]);
+const ACTIVE_STATUSES = new Set(Object.values(STATUS).filter((status) => !CLOSED_STATUSES.has(status)));
+const CARD_STATUS = Object.freeze({
+  abertas: new Set([STATUS.ABERTA, STATUS.REABERTA]),
+  cotacao: new Set([STATUS.EM_COTACAO]),
+  recebimento: new Set([STATUS.COMPRADA, STATUS.EM_RECEBIMENTO]),
+  recebidas: new Set([STATUS.RECEBIDA_PARCIAL, STATUS.RECEBIDA_TOTAL]),
+});
+const isActiveStatus = (status) => !CLOSED_STATUSES.has(normalizeStatus(status));
+
+function priorityGroup(value) {
+  const priority = normalizeToken(value);
+  if (['CRITICA', 'URGENTE', 'EMERGENCIAL', 'ALTA'].includes(priority)) return 'high';
+  if (priority === 'MEDIA') return 'medium';
+  if (priority === 'BAIXA') return 'low';
+  return 'undefined';
+}
+
+function enrichOperational(row, today = new Date().toISOString().slice(0, 10)) {
+  const status = normalizeStatus(row.status);
+  const deadline = row.previsao_entrega ? String(row.previsao_entrega).slice(0, 10) : '';
+  return { ...row, status, active: isActiveStatus(status), hasOs: row.os_id != null,
+    deadline, overdue: Boolean(deadline && deadline < today && isActiveStatus(status)),
+    dueToday: Boolean(deadline && deadline === today && isActiveStatus(status)), priorityGroup: priorityGroup(row.prioridade) };
+}
+
+function matchesCard(row, card) {
+  if (!card) return true;
+  if (card === 'os') return row.hasOs;
+  if (card === 'atrasadas') return row.overdue;
+  return CARD_STATUS[card]?.has(row.status) || false;
+}
+
+function operationalSort(a, b) {
+  return Number(b.overdue) - Number(a.overdue) || Number(b.dueToday) - Number(a.dueToday)
+    || Number(!a.deadline) - Number(!b.deadline) || String(a.deadline).localeCompare(String(b.deadline))
+    || String(a.created_at || '').localeCompare(String(b.created_at || '')) || Number(b.id) - Number(a.id);
 }
 
 function ensureComprasAnexosTable() {
@@ -179,6 +227,61 @@ function getResumoSolicitacoes() {
   const totals = Object.fromEntries(STATUS_COMPRAS.map((status) => [status, 0]));
   rows.forEach((row) => { if (row.status in totals) totals[row.status] = row.total; });
   return totals;
+}
+
+/** One source of truth for the operational queue and its counters.  The
+ * analytics period is intentionally not accepted here. */
+function getOperationalQueue(filters = {}) {
+  const usersRef = resolveUsersTable();
+  const hasEquip = columnExists('solicitacoes', 'equipamento_id') && tableExists('equipamentos');
+  const hasSupplier = columnExists('solicitacoes', 'fornecedor_id') && tableExists('fornecedores');
+  const hasClosing = columnExists('solicitacoes', 'fechada_em');
+  const itemCols = tableExists('solicitacao_itens') ? new Set(db.prepare('PRAGMA table_info(solicitacao_itens)').all().map(c => c.name)) : new Set();
+  const quoted = itemCols.has('status_cotacao') ? "SUM(CASE WHEN UPPER(TRIM(COALESCE(si.status_cotacao,'')))='COTADO' THEN 1 ELSE 0 END)" : '0';
+  const bought = itemCols.has('status_compra') ? "SUM(CASE WHEN UPPER(TRIM(COALESCE(si.status_compra,'')))='COMPRADO' THEN 1 ELSE 0 END)" : '0';
+  const received = itemCols.has('qtd_recebida_total') ? `SUM(CASE WHEN COALESCE(si.qtd_recebida_total,0) >= COALESCE(${itemCols.has('qtd_comprada') ? 'si.qtd_comprada' : itemCols.has('qtd_solicitada') ? 'si.qtd_solicitada' : 'si.quantidade'},0) AND COALESCE(${itemCols.has('qtd_comprada') ? 'si.qtd_comprada' : itemCols.has('qtd_solicitada') ? 'si.qtd_solicitada' : 'si.quantidade'},0)>0 THEN 1 ELSE 0 END)` : '0';
+  const rows = db.prepare(`SELECT s.*, req.${usersRef.nameCol} solicitante_nome,
+      resp.${usersRef.nameCol} responsavel_nome, ${hasEquip ? 'e.nome' : 'NULL'} equipamento_nome,
+      ${hasSupplier ? 'f.nome' : 'NULL'} fornecedor_nome, COUNT(si.id) itens_count,
+      ${quoted} itens_cotados, ${bought} itens_comprados, ${received} itens_recebidos,
+      ${hasClosing ? 's.fechada_em' : 's.updated_at'} data_fechamento
+    FROM solicitacoes s
+    LEFT JOIN ${usersRef.table} req ON req.id=s.solicitante_user_id
+    LEFT JOIN ${usersRef.table} resp ON resp.id=s.compras_user_id
+    ${hasEquip ? 'LEFT JOIN equipamentos e ON e.id=s.equipamento_id' : ''}
+    ${hasSupplier ? 'LEFT JOIN fornecedores f ON f.id=s.fornecedor_id' : ''}
+    LEFT JOIN solicitacao_itens si ON si.solicitacao_id=s.id
+    GROUP BY s.id`).all().map((row) => enrichOperational(row));
+
+  const tab = filters.tab === 'history' ? 'history' : 'active';
+  let filtered = rows.filter((row) => tab === 'active' ? row.active : !row.active);
+  const q = normalizeToken(filters.query);
+  if (q) filtered = filtered.filter((row) => [row.numero, row.titulo, row.os_id, row.equipamento_nome, row.setor_origem,
+    row.fornecedor_nome || row.fornecedor, row.responsavel_nome || row.solicitante_nome].some((value) => normalizeToken(value).includes(q)));
+  if (filters.setor) filtered = filtered.filter((row) => normalizeToken(row.setor_origem) === normalizeToken(filters.setor));
+  if (filters.responsavel) filtered = filtered.filter((row) => String(row.compras_user_id || '') === String(filters.responsavel));
+  if (filters.prioridade) filtered = filtered.filter((row) => row.priorityGroup === filters.prioridade);
+  if (tab === 'active' && filters.card) filtered = filtered.filter((row) => matchesCard(row, filters.card));
+  if (tab === 'history' && filters.startDate) filtered = filtered.filter((row) => String(row.data_fechamento || '').slice(0, 10) >= filters.startDate);
+  if (tab === 'history' && filters.endDate) filtered = filtered.filter((row) => String(row.data_fechamento || '').slice(0, 10) <= filters.endDate);
+  filtered.sort(operationalSort);
+  const active = rows.filter((row) => row.active);
+  const cards = { os: active.filter((r) => matchesCard(r, 'os')).length, abertas: active.filter((r) => matchesCard(r, 'abertas')).length,
+    cotacao: active.filter((r) => matchesCard(r, 'cotacao')).length, recebimento: active.filter((r) => matchesCard(r, 'recebimento')).length,
+    recebidas: active.filter((r) => matchesCard(r, 'recebidas')).length, atrasadas: active.filter((r) => matchesCard(r, 'atrasadas')).length };
+  const total = filtered.length; const limit = [10, 20, 50].includes(Number(filters.limit)) ? Number(filters.limit) : 20;
+  const pages = Math.max(1, Math.ceil(total / limit)); const page = Math.min(Math.max(1, Number(filters.page) || 1), pages);
+  return { rows: filtered.slice((page - 1) * limit, page * limit), total, limit, page, pages, cards,
+    groups: ['high', 'medium', 'low', 'undefined'], setores: [...new Set(rows.map(r => r.setor_origem).filter(Boolean))].sort(),
+    responsaveis: [...new Map(rows.filter(r => r.compras_user_id).map(r => [String(r.compras_user_id), { id: r.compras_user_id, nome: r.responsavel_nome || 'Não definido' }])).values()] };
+}
+
+function getAnalytics(period = 30) {
+  const days = [7, 30, 90].includes(Number(period)) ? Number(period) : 30;
+  const rows = db.prepare("SELECT status, COUNT(*) total FROM solicitacoes WHERE date(created_at)>=date('now', ?) GROUP BY status").all(`-${days} days`);
+  const resumo = Object.fromEntries(STATUS_COMPRAS.map(status => [status, 0]));
+  rows.forEach(row => { const status = normalizeStatus(row.status); if (status in resumo) resumo[status] += row.total; });
+  return resumo;
 }
 
 function listFornecedoresAtivos() {
@@ -1017,6 +1120,17 @@ function gerarPdf(solicitacao, res) {
 module.exports = {
   STATUS,
   STATUS_COMPRAS,
+  CLOSED_STATUSES,
+  ACTIVE_STATUSES,
+  CARD_STATUS,
+  normalizeStatus,
+  isActiveStatus,
+  priorityGroup,
+  enrichOperational,
+  matchesCard,
+  operationalSort,
+  getOperationalQueue,
+  getAnalytics,
   listSolicitacoesPorStatus,
   getResumoSolicitacoes,
   getSolicitacaoDetalhe,

@@ -21,18 +21,20 @@ function tryRenderDetalhe(id, res) {
 function lista(req, res) {
   const filters = {
     query: (req.query.q || '').trim(),
-    status: service.STATUS_COMPRAS.includes(req.query.status) ? req.query.status : '',
-    date: req.query.date || '',
+    tab: req.query.tab === 'history' ? 'history' : 'active',
+    card: ['os', 'abertas', 'cotacao', 'recebimento', 'recebidas', 'atrasadas'].includes(req.query.card) ? req.query.card : '',
     startDate: req.query.startDate || '',
     endDate: req.query.endDate || '',
     period: ['7', '30', '90'].includes(req.query.period) ? Number(req.query.period) : 30,
     setor: (req.query.setor || '').trim(),
-    vinculadasOs: req.query.vinculadas_os === '1',
-    urgentes: req.query.urgentes === '1',
-    limit: ['10', '20'].includes(req.query.limit) ? Number(req.query.limit) : 10,
+    prioridade: ['high', 'medium', 'low', 'undefined'].includes(req.query.prioridade) ? req.query.prioridade : '',
+    responsavel: (req.query.responsavel || '').trim(),
+    limit: ['10', '20', '50'].includes(req.query.limit) ? Number(req.query.limit) : 20,
+    page: Math.max(1, Number(req.query.page) || 1),
   };
 
-  const lista = service.listSolicitacoesPorStatus(filters);
+  const queue = service.getOperationalQueue(filters);
+  const lista = queue.rows;
 
   if (req.query.export === 'excel') {
     const escapeCsv = (value) => `"${String(value == null ? '' : value).replace(/"/g, '""')}"`;
@@ -59,9 +61,10 @@ function lista(req, res) {
     title: 'Compras',
     activeMenu: 'compras',
     lista,
+    queue,
     filters,
     statusList: service.STATUS_COMPRAS,
-    resumo: service.getResumoSolicitacoes(),
+    resumo: service.getAnalytics(filters.period),
   });
 }
 
