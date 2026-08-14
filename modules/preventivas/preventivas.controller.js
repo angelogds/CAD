@@ -1,4 +1,5 @@
 const service = require("./preventivas.service");
+const PDFDocument = require("pdfkit");
 
 function isAdminOrEncarregado(user = null) {
   const role = String(user?.role || "").toUpperCase();
@@ -6,43 +7,42 @@ function isAdminOrEncarregado(user = null) {
 }
 
 function index(req, res) {
-  let ciclo = { skipped: true, reason: "erro_ciclo" };
-  let lista = [];
-  let diagnosticoLeitura = null;
+  let dashboard;
   try {
-    ciclo = service.executarCicloProgramadoSemanal(new Date());
-    service.sincronizarPreventivasComEscala({ origem: "preventivas.index" });
-    lista = service.listPlanos();
-    diagnosticoLeitura = service.auditarLeituraEquipamentosPreventivas();
+    dashboard = service.getPreventiveDashboard(req.query || {});
   } catch (err) {
     console.error("[PREVENTIVAS][INDEX] erro ao carregar módulo:", err?.stack || err);
-    let mensagemAlerta = "Preventivas carregadas com alertas. Não foi possível sincronizar automaticamente com a escala.";
-    try {
-      const prevalidacao = service.prevalidarReprocessamentoPreventivas();
-      const alertasEscala = (prevalidacao?.alertas || [])
-        .filter((alerta) => /^Escala da semana não encontrada|^Sem colaboradores ativos no turno/i.test(String(alerta || "")))
-        .slice(0, 2);
-      if (alertasEscala.length) {
-        mensagemAlerta = `Preventivas carregadas com alertas. ${alertasEscala.join(" ")}`;
-      }
-    } catch (_e) {}
-    req.flash("error", mensagemAlerta);
-    try {
-      lista = service.listPlanos();
-      diagnosticoLeitura = service.auditarLeituraEquipamentosPreventivas();
-    } catch (_e) {}
+    req.flash("error", "Não foi possível carregar o painel de preventivas.");
+    dashboard = service.getPreventiveDashboard({}, new Date());
   }
-  console.log("[PREVENTIVA_IA] ciclo autônomo", ciclo);
 
   return res.render("preventivas/index", {
     layout: "layout",
     title: "Preventivas",
     activeMenu: "preventivas",
-    lista,
-    diagnosticoLeitura,
+    dashboard,
     tvMode: ["1", "true", "tv"].includes(String(req.query.tv || "").toLowerCase()),
     canAdminPreventivas: isAdminOrEncarregado(req.session?.user || null),
   });
+}
+
+function exportPdf(req, res) {
+  const dashboard = service.getPreventiveDashboard({ ...req.query, tab: "programacao", pageSize: 100 });
+  const doc = new PDFDocument({ size: "A4", margin: 36 });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", 'inline; filename="programacao-preventiva.pdf"');
+  doc.pipe(res);
+  doc.fontSize(17).text("Programação de Manutenção Preventiva");
+  doc.moveDown(0.4).fontSize(9).fillColor("#475569").text("Equipamento | Atividade | Frequência | Criticidade | Responsáveis | Data prevista | Situação");
+  doc.moveDown().fillColor("#0f172a");
+  (dashboard.programming || []).forEach((item) => {
+    if (doc.y > 750) doc.addPage();
+    doc.fontSize(9).text(`#${item.id} • ${item.equipamento_nome || "Equipamento não informado"}`);
+    doc.fontSize(8).fillColor("#475569").text(`${item.titulo || "-"} | ${item.frequencia_tipo || "-"} | ${item.criticidade_exibicao || "-"} | ${item.responsaveis || "A definir"} | ${item.data_prevista || "-"} | ${item.prazo || item.status || "-"}`);
+    doc.fillColor("#0f172a").moveDown(0.5);
+  });
+  if (!(dashboard.programming || []).length) doc.text("Nenhuma preventiva pendente no período.");
+  doc.end();
 }
 
 function newForm(req, res) {
@@ -321,6 +321,7 @@ function apagarExecucao(req, res) {
 
 module.exports = {
   index,
+  exportPdf,
   newForm,
   create,
   show,

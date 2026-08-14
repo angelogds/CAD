@@ -2769,6 +2769,78 @@ function abrirOSCorretivaVinculada(execId, userId = null) {
   return osId;
 }
 
+const STATUS_CONCLUIDOS = ["CONCLUIDA", "EXECUTADA", "FINALIZADA"];
+const STATUS_ANDAMENTO = ["EM_ANDAMENTO", "ANDAMENTO"];
+
+function dataLocalISO(refDate = new Date()) {
+  const date = refDate instanceof Date ? refDate : new Date(refDate);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function classificarVencimento(dataPrevista, status, refDate = new Date()) {
+  const operacional = normalizePreventivaStatus(status);
+  if (STATUS_CONCLUIDOS.includes(operacional)) return "CONCLUIDA";
+  if (operacional === "CANCELADA") return "CANCELADA";
+  if (STATUS_ANDAMENTO.includes(operacional)) return "EM_EXECUCAO";
+  if (!/^\d{4}-\d{2}-\d{2}/.test(String(dataPrevista || ""))) return "PROGRAMADA";
+  const prevista = String(dataPrevista).slice(0, 10);
+  const hoje = dataLocalISO(refDate);
+  const limite = new Date(`${hoje}T12:00:00`);
+  limite.setDate(limite.getDate() + 7);
+  if (prevista < hoje) return "ATRASADA";
+  if (prevista === hoje) return "VENCE_HOJE";
+  if (prevista <= dataLocalISO(limite)) return "NA_SEMANA";
+  return "PROGRAMADA";
+}
+
+function formatarResponsaveis(nomes = [], legado = "") {
+  const unicos = [...new Set((Array.isArray(nomes) ? nomes : []).map((n) => String(n || "").trim()).filter(Boolean))];
+  if (!unicos.length && String(legado || "").trim()) return String(legado).trim();
+  if (!unicos.length) return "A definir";
+  if (unicos.length === 1) return unicos[0];
+  if (unicos.length === 2) return `${unicos[0]} e ${unicos[1]}`;
+  return `${unicos[0]}, ${unicos[1]} +${unicos.length - 2}`;
+}
+
+function getPreventiveDashboard(filters = {}, refDate = new Date()) {
+  const vazio = { metrics: { elegiveis: 0, planosAtivos: 0, semPlano: 0, pendentes: 0, vencemHoje: 0, vencemSemana: 0 }, coverage: { covered: 0, eligible: 0, percent: 0, byCriticality: [] }, weeklyPriorities: [], programming: [], pagination: { page: 1, pageSize: 20, total: 0, pages: 1 }, frequencyDistribution: [], executionSummary: { noPrazo: 0, comAtraso: 0, pendentes: 0, emAndamento: 0 }, filterOptions: { setores: [], frequencias: [], criticidades: [], statuses: [] }, activeTab: "programacao", filters };
+  if (!tableExists("equipamentos") || !tableExists("preventiva_planos") || !tableExists("preventiva_execucoes")) return vazio;
+  const eqCols = getEquipamentosColumns();
+  const exCols = getPreventivaExecColumns();
+  const users = resolveUsuariosSource();
+  const codigo = eqCols.includes("codigo") ? "e.codigo" : "NULL";
+  const setor = eqCols.includes("setor") ? "e.setor" : "NULL";
+  const critEq = eqCols.includes("criticidade") ? "e.criticidade" : "NULL";
+  const critEx = exCols.includes("criticidade") ? "pe.criticidade" : "NULL";
+  const resp1 = exCols.includes("responsavel_1_id") && users ? `u1.${users.nameCol}` : "NULL";
+  const resp2 = exCols.includes("responsavel_2_id") && users ? `u2.${users.nameCol}` : "NULL";
+  const joins = `${exCols.includes("responsavel_1_id") && users ? `LEFT JOIN ${users.table} u1 ON u1.${users.idCol}=pe.responsavel_1_id` : ""} ${exCols.includes("responsavel_2_id") && users ? `LEFT JOIN ${users.table} u2 ON u2.${users.idCol}=pe.responsavel_2_id` : ""}`;
+  const baseSql = `SELECT pe.*, p.titulo, p.frequencia_tipo, p.frequencia_valor, p.ativo AS plano_ativo, p.equipamento_id, e.nome AS equipamento_nome, ${codigo} AS equipamento_codigo, ${setor} AS setor, COALESCE(NULLIF(${critEx},''), ${critEq}, 'MEDIA') AS criticidade_exibicao, ${resp1} AS responsavel_1_nome, ${resp2} AS responsavel_2_nome FROM preventiva_execucoes pe JOIN preventiva_planos p ON p.id=pe.plano_id LEFT JOIN equipamentos e ON e.id=p.equipamento_id ${joins}`;
+  const all = db.prepare(baseSql).all().map((row) => ({ ...row, prazo: classificarVencimento(row.data_prevista, row.status, refDate), responsaveis: formatarResponsaveis([row.responsavel_1_nome, row.responsavel_2_nome], row.responsavel), criticidade_exibicao: String(row.criticidade_exibicao || "MEDIA").toUpperCase() }));
+  const ativos = db.prepare(`SELECT id, ${critEq.replaceAll("e.", "")} AS criticidade FROM equipamentos e WHERE IFNULL(ativo,1)=1`).all();
+  const planos = db.prepare(`SELECT id, equipamento_id, frequencia_tipo FROM preventiva_planos WHERE IFNULL(ativo,1)=1`).all();
+  const cobertos = new Set(planos.map((p) => Number(p.equipamento_id)).filter(Boolean));
+  const pendentes = all.filter((r) => !STATUS_CONCLUIDOS.includes(normalizePreventivaStatus(r.status)) && normalizePreventivaStatus(r.status) !== "CANCELADA");
+  const hoje = dataLocalISO(refDate);
+  const limite = new Date(`${hoje}T12:00:00`); limite.setDate(limite.getDate() + 7); const semana = dataLocalISO(limite);
+  const byCriticality = ["CRITICA", "ALTA", "MEDIA", "BAIXA"].map((key) => { const matching = ativos.filter((e) => String(e.criticidade || "MEDIA").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() === key); return { key, label: key === "CRITICA" ? "Críticos" : key.charAt(0) + key.slice(1).toLowerCase(), total: matching.length, covered: matching.filter((e) => cobertos.has(Number(e.id))).length }; });
+  const metrics = { elegiveis: ativos.length, planosAtivos: planos.length, semPlano: ativos.filter((e) => !cobertos.has(Number(e.id))).length, pendentes: pendentes.length, vencemHoje: pendentes.filter((r) => r.prazo === "VENCE_HOJE").length, vencemSemana: pendentes.filter((r) => String(r.data_prevista || "").slice(0,10) > hoje && String(r.data_prevista || "").slice(0,10) <= semana).length };
+  const tab = ["programacao", "planos", "execucao", "historico", "sem_plano"].includes(filters.tab) ? filters.tab : "programacao";
+  let rows = tab === "historico" ? all.filter((r) => STATUS_CONCLUIDOS.includes(normalizePreventivaStatus(r.status))) : tab === "execucao" ? all.filter((r) => STATUS_ANDAMENTO.includes(normalizePreventivaStatus(r.status))) : pendentes;
+  const q = String(filters.q || "").trim().toLowerCase(); if (q) rows = rows.filter((r) => [r.id, r.plano_id, r.titulo, r.equipamento_nome, r.equipamento_codigo, r.observacao, r.responsaveis].some((v) => String(v || "").toLowerCase().includes(q)));
+  if (filters.setor) rows = rows.filter((r) => String(r.setor || "") === filters.setor);
+  if (filters.frequencia) rows = rows.filter((r) => String(r.frequencia_tipo || "") === filters.frequencia);
+  if (filters.criticidade) rows = rows.filter((r) => r.criticidade_exibicao === String(filters.criticidade).toUpperCase());
+  if (filters.situacao) rows = rows.filter((r) => r.prazo === filters.situacao || normalizePreventivaStatus(r.status) === filters.situacao);
+  const dias = { hoje: 0, 7: 7, 30: 30, 90: 90 }[filters.periodo]; if (dias !== undefined) { const fim = new Date(`${hoje}T12:00:00`); fim.setDate(fim.getDate() + dias); rows = rows.filter((r) => { const d=String(r.data_prevista || r.data_executada || "").slice(0,10); return d >= hoje && d <= dataLocalISO(fim); }); }
+  const peso = { ATRASADA: 0, VENCE_HOJE: 1, EM_EXECUCAO: 2, NA_SEMANA: 3, PROGRAMADA: 4, CONCLUIDA: 5 }; const critPeso = { CRITICA: 0, ALTA: 1, MEDIA: 2, BAIXA: 3 }; rows.sort((a,b) => (peso[a.prazo] ?? 9)-(peso[b.prazo] ?? 9) || (critPeso[a.criticidade_exibicao] ?? 9)-(critPeso[b.criticidade_exibicao] ?? 9) || String(a.data_prevista || "9999").localeCompare(String(b.data_prevista || "9999")) || Number(a.id)-Number(b.id));
+  const pageSize = [10,20,50,100].includes(Number(filters.pageSize)) ? Number(filters.pageSize) : 20; const total = rows.length; const pages = Math.max(1, Math.ceil(total/pageSize)); const page = Math.min(Math.max(1, Number(filters.page)||1), pages);
+  const freqMap = new Map(); planos.forEach((p) => freqMap.set(p.frequencia_tipo || "Sem frequência", (freqMap.get(p.frequencia_tipo || "Sem frequência") || 0)+1));
+  const periodoRows = all.filter((r) => { const d=String(r.data_executada || r.data_prevista || "").slice(0,10); return !filters.data_inicio || d >= filters.data_inicio; }).filter((r) => !filters.data_fim || String(r.data_executada || r.data_prevista || "").slice(0,10) <= filters.data_fim);
+  return { metrics, coverage: { covered: cobertos.size, eligible: ativos.length, percent: ativos.length ? Math.round(cobertos.size*100/ativos.length) : 0, byCriticality }, weeklyPriorities: pendentes.slice().sort((a,b)=>(peso[a.prazo]??9)-(peso[b.prazo]??9)||(critPeso[a.criticidade_exibicao]??9)-(critPeso[b.criticidade_exibicao]??9)).slice(0,5), programming: rows.slice((page-1)*pageSize,page*pageSize), planos: tab === "planos" ? listPlanos().filter((p)=>Number(p.ativo||0)===1) : [], semPlano: tab === "sem_plano" ? ativos.filter((e)=>!cobertos.has(Number(e.id))) : [], pagination: { page,pageSize,total,pages }, frequencyDistribution: [...freqMap].map(([label,total])=>({label,total})).sort((a,b)=>b.total-a.total), executionSummary: { noPrazo: periodoRows.filter((r)=>STATUS_CONCLUIDOS.includes(normalizePreventivaStatus(r.status)) && r.data_executada && r.data_prevista && r.data_executada <= r.data_prevista).length, comAtraso: periodoRows.filter((r)=>STATUS_CONCLUIDOS.includes(normalizePreventivaStatus(r.status)) && r.data_executada && r.data_prevista && r.data_executada > r.data_prevista).length, pendentes: periodoRows.filter((r)=>normalizePreventivaStatus(r.status)==="PENDENTE" || normalizePreventivaStatus(r.status)==="ATRASADA").length, emAndamento: periodoRows.filter((r)=>STATUS_ANDAMENTO.includes(normalizePreventivaStatus(r.status))).length }, filterOptions: { setores: [...new Set(all.map((r)=>r.setor).filter(Boolean))].sort(), frequencias: [...new Set(planos.map((p)=>p.frequencia_tipo).filter(Boolean))].sort(), criticidades: [...new Set(all.map((r)=>r.criticidade_exibicao).filter(Boolean))], statuses: [...new Set(all.map((r)=>normalizePreventivaStatus(r.status)).filter(Boolean))] }, activeTab: tab, filters };
+}
+
 module.exports = {
   listPlanos,
   listEquipamentosAtivos,
@@ -2821,4 +2893,7 @@ module.exports = {
   listExecutadasParaRelatorio,
   getIndicadoresRelatorio,
   abrirOSCorretivaVinculada,
+  classificarVencimento,
+  formatarResponsaveis,
+  getPreventiveDashboard,
 };

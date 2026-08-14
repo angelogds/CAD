@@ -43,6 +43,8 @@ router.get(
   safe(ctrl.index, "index")
 );
 
+router.get("/pdf", requireLogin, requireRole(PREV_ACCESS), safe(ctrl.exportPdf, "exportPdf"));
+
 // GET  /preventivas/nova
 router.get(
   "/nova",

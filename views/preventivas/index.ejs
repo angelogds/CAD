@@ -1,395 +1,46 @@
 <% layout('layout') %>
+<link rel="stylesheet" href="/css/preventivas-index.css">
+<% const d=dashboard||{}; const m=d.metrics||{}; const cov=d.coverage||{}; const f=d.filters||{}; const qs=(extra={})=>{const p=new URLSearchParams(); Object.entries({...f,...extra}).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=='')p.set(k,v)}); return p.toString()}; const prazoLabel={ATRASADA:'Atrasada',VENCE_HOJE:'Vence hoje',NA_SEMANA:'Na semana',PROGRAMADA:'Programada',EM_EXECUCAO:'Em execução',CONCLUIDA:'Concluída',CANCELADA:'Cancelada'}; %>
+<main class="preventive-page">
+  <header class="preventive-header">
+    <div><h1>Manutenção Preventiva</h1><p>Planejamento dos equipamentos, execução das rotinas e controle de vencimentos</p></div>
+    <div class="preventive-header-actions">
+      <a class="pv-btn" href="/preventivas/programadas">Calendário</a>
+      <a class="pv-btn" href="/preventivas/pdf?<%= qs() %>">PDF das preventivas</a>
+      <% if(canAdminPreventivas){ %><a class="pv-btn pv-btn-primary" href="/preventivas/nova">+ Novo plano</a><details class="preventive-menu"><summary class="pv-btn">Menu Preventivas</summary><div><a href="/preventivas/nova">Nova preventiva manual</a><a href="/preventivas/programadas">Preventivas programadas</a><a href="/preventivas/eleger-mecanico">Eleger mecânico</a><form method="post" action="/preventivas/programadas/lancar-os-lote-dia" onsubmit="return confirm('Confirmar lançamento do lote diário de preventivas?')"><button>Lançar lote de preventivas</button></form></div></details><% } %>
+    </div>
+  </header>
 
-<style>
-  .prev-page-head{
-    display:flex;
-    align-items:flex-end;
-    justify-content:space-between;
-    gap:12px;
-    margin-bottom:14px;
-    flex-wrap:wrap;
-  }
-
-  .muted{ font-size:13px; color:#6b7280; margin-top:6px; }
-
-  .card{
-    background:#fff;
-    border:1px solid #e5e7eb;
-    border-radius:16px;
-    padding:18px;
-  }
-
-  .actions{
-    display:flex;
-    gap:10px;
-    align-items:center;
-    flex-wrap:wrap;
-  }
-
-  .btn-primary{
-    background:#16a34a;
-    color:#fff;
-    border:none;
-    padding:10px 16px;
-    border-radius:10px;
-    font-weight:700;
-    cursor:pointer;
-    text-decoration:none;
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    white-space:nowrap;
-  }
-  .btn-primary:hover{ background:#15803d; }
-
-  .table-wrap{ overflow:auto; -webkit-overflow-scrolling:touch; }
-  table{
-    width:100%;
-    border-collapse:separate;
-    border-spacing:0;
-    min-width:980px;
-  }
-
-  thead th{
-    text-align:left;
-    font-size:12px;
-    color:#64748b;
-    font-weight:700;
-    letter-spacing:.02em;
-    padding:12px 12px;
-    border-bottom:1px solid #e5e7eb;
-    background:#fff;
-    position:sticky;
-    top:0;
-    z-index:1;
-  }
-
-  tbody td{
-    padding:12px 12px;
-    border-bottom:1px solid #f1f5f9;
-    vertical-align:top;
-    font-size:14px;
-    color:#0f172a;
-  }
-  tbody tr:hover td{ background:#f8fafc; }
-
-  .link{
-    font-weight:800;
-    text-decoration:none;
-    color:#0f172a;
-  }
-  .link:hover{ text-decoration:underline; }
-
-  .pill{
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    padding:4px 10px;
-    border-radius:999px;
-    font-weight:800;
-    font-size:12px;
-    border:1px solid #e5e7eb;
-    background:#f8fafc;
-    color:#0f172a;
-    white-space:nowrap;
-  }
-  .pill-green{ background:#ecfdf5; border-color:#bbf7d0; color:#14532d; }
-  .pill-gray{  background:#f1f5f9; border-color:#e2e8f0; color:#334155; }
-  .pill-blue{  background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
-
-  .freq{
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    white-space:nowrap;
-  }
-  .freq .muted-inline{ color:#6b7280; font-size:13px; }
-
-  .btn-sm{
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    padding:8px 12px;
-    border-radius:10px;
-    border:1px solid #d1d5db;
-    background:#fff;
-    cursor:pointer;
-    text-decoration:none;
-    font-weight:800;
-    color:#0f172a;
-    white-space:nowrap;
-  }
-  .btn-sm:hover{
-    border-color: rgba(22,163,74,.45);
-    background:#ecfdf5;
-  }
-
-  .prev-menu{ position:relative; display:inline-block; }
-  .prev-menu summary{ list-style:none; }
-  .prev-menu summary::-webkit-details-marker{ display:none; }
-  .prev-menu-panel{
-    position:absolute;
-    right:0;
-    top:calc(100% + 8px);
-    min-width:260px;
-    background:#fff;
-    border:1px solid #e5e7eb;
-    border-radius:14px;
-    box-shadow:0 14px 32px rgba(15,23,42,.16);
-    padding:8px;
-    z-index:10;
-  }
-  .prev-menu-item{
-    width:100%;
-    display:flex;
-    align-items:center;
-    gap:8px;
-    padding:10px 12px;
-    border-radius:10px;
-    border:0;
-    background:#fff;
-    color:#0f172a;
-    font-weight:800;
-    text-decoration:none;
-    cursor:pointer;
-    text-align:left;
-    font-size:14px;
-  }
-  .prev-menu-item:hover{ background:#ecfdf5; color:#14532d; }
-
-  .prev-cards{
-    display:none;
-    gap:10px;
-    flex-direction:column;
-  }
-
-  .prev-card{
-    background:#fff;
-    border:1px solid #e5e7eb;
-    border-radius:14px;
-    padding:14px;
-    display:grid;
-    gap:8px;
-    text-decoration:none;
-    color:inherit;
-    transition:box-shadow .15s ease;
-  }
-
-  .prev-card:hover{ box-shadow:0 4px 12px rgba(0,0,0,.08); }
-
-  .prev-card-head{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap:8px;
-  }
-
-  .prev-card-id{
-    font-weight:900;
-    font-size:13px;
-    color:#64748b;
-  }
-
-  .prev-card-title{
-    font-weight:800;
-    font-size:15px;
-    color:#0f172a;
-    line-height:1.35;
-  }
-
-  .prev-card-equip{
-    font-size:13px;
-    color:#475569;
-    line-height:1.4;
-  }
-
-  .prev-card-footer{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:8px;
-    flex-wrap:wrap;
-    padding-top:8px;
-    border-top:1px solid #f1f5f9;
-  }
-
-  .prev-card-pills{
-    display:flex;
-    gap:6px;
-    flex-wrap:wrap;
-  }
-
-  .prev-card-open{
-    font-size:12px;
-    color:#334155;
-    font-weight:700;
-  }
-
-  .empty-state{
-    text-align:center;
-    padding:40px 20px;
-    color:#94a3b8;
-    font-size:14px;
-  }
-
-  @media (max-width:760px){
-    .card{
-      padding:0;
-      border:none;
-      background:transparent;
-    }
-
-    .table-wrap{ display:none; }
-    .prev-cards{ display:flex; }
-  }
-
-  @media (max-width:400px){
-    .btn-primary,
-    .btn-sm{
-      width:100%;
-      justify-content:center;
-    }
-
-    .actions{ width:100%; }
-  }
-</style>
-
-<div class="prev-page-head">
-  <div>
-    <h1>Preventivas</h1>
-    <div class="muted">Planos de manutenção preventiva.</div>
-  </div>
-
-  <div class="actions">
-    <% if (canAdminPreventivas && !tvMode) { %>
-      <details class="prev-menu">
-        <summary class="btn-primary">☰ Menu Preventivas</summary>
-        <div class="prev-menu-panel">
-          <a class="prev-menu-item" href="/preventivas/nova">+ Nova Preventiva</a>
-          <a class="prev-menu-item" href="/preventivas/programadas">Preventivas Programadas</a>
-          <form method="POST" action="/preventivas/programadas/lancar-os-lote-dia" style="margin:0;" onsubmit="return confirm('Lançar o próximo lote de 5 preventivas para OS agora?');">
-            <button class="prev-menu-item" type="submit">Lançar 5 Preventivas</button>
-          </form>
-          <a class="prev-menu-item" href="/preventivas/eleger-mecanico">Eleger Mecânico da Preventiva</a>
-        </div>
-      </details>
-    <% } %>
-  </div>
-</div>
-
-
-<% if (diagnosticoLeitura) { %>
-<div class="card" style="margin-bottom:12px;">
-  <div class="muted" style="font-weight:800;">Auditoria de leitura de equipamentos</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-    <span class="pill pill-blue">Elegíveis: <%= diagnosticoLeitura.equipamentosElegiveis || 0 %></span>
-    <span class="pill">Sem plano: <%= diagnosticoLeitura.equipamentosSemPlano || 0 %></span>
-    <span class="pill">Planos ativos: <%= diagnosticoLeitura.planosAtivos || 0 %></span>
-    <span class="pill">Pendentes/andamento: <%= diagnosticoLeitura.execucoesPendentes || 0 %></span>
-  </div>
-</div>
-<% } %>
-<div class="card">
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th style="width:80px;">ID</th>
-          <th>Título</th>
-          <th>Equipamento</th>
-          <th style="width:200px;">Frequência</th>
-          <th style="width:140px;">Status</th>
-          <th style="width:140px; text-align:right;">Ações</th>
-        </tr>
-      </thead>
-
-      <tbody>
-        <% if (!lista || !lista.length) { %>
-          <tr>
-            <td colspan="6" style="padding:18px; color:#6b7280; text-align:center;">
-              Nenhuma preventiva cadastrada.
-            </td>
-          </tr>
-        <% } %>
-
-        <% (lista || []).forEach(p => { %>
-          <tr>
-            <td>
-              <a class="link" href="/preventivas/<%= p.id %>">#<%= p.id %></a>
-            </td>
-
-            <td>
-              <%= p.titulo || "-" %>
-            </td>
-
-            <td class="muted">
-              <%= p.equipamento_nome
-                    ? (p.equipamento_codigo
-                        ? (p.equipamento_codigo + " • " + p.equipamento_nome)
-                        : p.equipamento_nome)
-                    : "-" %>
-            </td>
-
-            <td>
-              <div class="freq">
-                <span class="pill pill-blue"><%= (p.frequencia_tipo || "-").toUpperCase() %></span>
-                <span class="muted-inline">x<%= p.frequencia_valor || 1 %></span>
-              </div>
-            </td>
-
-            <td>
-              <% if (Number(p.ativo) === 1 || p.ativo === true) { %>
-                <span class="pill pill-green">ATIVA</span>
-              <% } else { %>
-                <span class="pill pill-gray">INATIVA</span>
-              <% } %>
-            </td>
-
-            <td style="text-align:right;">
-              <a class="btn-sm" href="/preventivas/<%= p.id %>">Abrir</a>
-            </td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="prev-cards">
-    <% if (!lista || !lista.length) { %>
-      <div class="empty-state">Nenhuma preventiva cadastrada.</div>
-    <% } %>
-
-    <% (lista || []).forEach(p => {
-      const equipamento = p.equipamento_nome
-        ? (p.equipamento_codigo
-            ? (p.equipamento_codigo + ' • ' + p.equipamento_nome)
-            : p.equipamento_nome)
-        : '-';
-      const ativa = Number(p.ativo) === 1 || p.ativo === true;
-    %>
-      <a class="prev-card" href="/preventivas/<%= p.id %>">
-        <div class="prev-card-head">
-          <div>
-            <div class="prev-card-id">PREV #<%= p.id %></div>
-            <div class="prev-card-title"><%= p.titulo || '-' %></div>
-          </div>
-          <% if (ativa) { %>
-            <span class="pill pill-green">ATIVA</span>
-          <% } else { %>
-            <span class="pill pill-gray">INATIVA</span>
-          <% } %>
-        </div>
-
-        <div class="prev-card-equip"><strong>Equipamento:</strong> <%= equipamento %></div>
-
-        <div class="prev-card-footer">
-          <div class="prev-card-open">Toque para abrir detalhes</div>
-          <div class="prev-card-pills">
-            <span class="pill pill-blue"><%= (p.frequencia_tipo || '-').toUpperCase() %></span>
-            <span class="pill">x<%= p.frequencia_valor || 1 %></span>
-          </div>
-        </div>
-      </a>
+  <section class="preventive-kpis" aria-label="Indicadores preventivos">
+    <% [['elegiveis','Equipamentos elegíveis','Parque monitorado','',{}],['planosAtivos','Planos ativos','Rotinas cadastradas','green',{tab:'planos'}],['semPlano','Sem plano','Requer planejamento','orange',{tab:'sem_plano'}],['pendentes','Pendentes','Aguardando execução','red',{tab:'programacao'}],['vencemHoje','Vencem hoje','Prioridade do dia','red',{tab:'programacao',situacao:'VENCE_HOJE'}],['vencemSemana','Vencem na semana','Próximos 7 dias','blue',{tab:'programacao',periodo:'7'}]].forEach(([key,title,sub,tone,query])=>{ %>
+      <a class="preventive-kpi <%= tone %>" href="/preventivas?<%= qs(query) %>"><span><%= title %></span><strong><%= m[key]||0 %></strong><small><%= sub %></small></a>
     <% }) %>
-  </div>
-</div>
+  </section>
+
+  <section class="preventive-overview">
+    <article class="preventive-coverage panel">
+      <h2>Cobertura do plano preventivo</h2><div class="coverage-main"><div class="coverage-copy"><p><strong><%= cov.covered||0 %> de <%= cov.eligible||0 %></strong> equipamentos cobertos — <%= cov.percent||0 %>%</p><div class="bar"><i style="width:<%= cov.percent||0 %>%"></i></div></div><div class="ring" style="--value:<%= cov.percent||0 %>"><strong><%= cov.percent||0 %>%</strong></div></div>
+      <div class="criticality-grid"><% (cov.byCriticality||[]).forEach(c=>{ %><div class="crit <%= c.key.toLowerCase() %>"><span><%= c.label %></span><strong><%= c.covered %> de <%= c.total %></strong></div><% }) %></div>
+      <a class="panel-link" href="/preventivas?<%= qs({tab:'sem_plano'}) %>">Ver equipamentos sem plano →</a>
+    </article>
+    <article class="preventive-week-priority panel"><div class="panel-head"><h2>Prioridades da semana</h2><a href="/preventivas?<%= qs({tab:'programacao'}) %>">Ver programação completa →</a></div>
+      <div class="priority-list"><% if(!(d.weeklyPriorities||[]).length){ %><p class="empty">Nenhuma preventiva pendente no período.</p><% } %><% (d.weeklyPriorities||[]).forEach(r=>{ %><div class="priority priority-<%= String(r.prazo||'').toLowerCase() %>"><div><strong>#<%= r.id %> • <%= r.equipamento_nome||'Equipamento não informado' %></strong><small><%= r.titulo||r.observacao||'-' %></small></div><span class="badge"><%= prazoLabel[r.prazo]||r.status %></span><span><%= r.responsaveis %></span><a class="pv-open" href="/preventivas/<%= r.plano_id %>">Abrir</a></div><% }) %></div>
+    </article>
+  </section>
+
+  <section class="preventive-workspace panel">
+    <nav class="preventive-tabs"><% [['programacao','Programação'],['planos','Planos ativos'],['execucao','Em execução'],['historico','Histórico']].forEach(([key,label])=>{ %><a class="<%= d.activeTab===key?'active':'' %>" href="/preventivas?<%= qs({tab:key,page:1}) %>"><%= label %></a><% }) %></nav>
+    <details class="mobile-filter"><summary>Filtros da programação</summary>
+    <form class="preventive-toolbar" method="get"><input type="hidden" name="tab" value="<%= d.activeTab %>"><label class="search"><span>Busca</span><input name="q" value="<%= f.q||'' %>" placeholder="Plano, equipamento, código ou responsável"></label><label>Setor<select name="setor"><option value="">Todos</option><% (d.filterOptions?.setores||[]).forEach(v=>{ %><option <%= f.setor===v?'selected':'' %>><%= v %></option><% }) %></select></label><label>Frequência<select name="frequencia"><option value="">Todas</option><% (d.filterOptions?.frequencias||[]).forEach(v=>{ %><option <%= f.frequencia===v?'selected':'' %>><%= v %></option><% }) %></select></label><label>Criticidade<select name="criticidade"><option value="">Todas</option><% (d.filterOptions?.criticidades||[]).forEach(v=>{ %><option <%= f.criticidade===v?'selected':'' %>><%= v %></option><% }) %></select></label><label>Situação<select name="situacao"><option value="">Todas</option><% ['ATRASADA','VENCE_HOJE','NA_SEMANA','PROGRAMADA','EM_EXECUCAO','CONCLUIDA'].forEach(v=>{ %><option value="<%= v %>" <%= f.situacao===v?'selected':'' %>><%= prazoLabel[v] %></option><% }) %></select></label><label>Período<select name="periodo"><option value="">Todos</option><option value="hoje" <%= f.periodo==='hoje'?'selected':'' %>>Hoje</option><option value="7" <%= f.periodo==='7'?'selected':'' %>>Próximos 7 dias</option><option value="30" <%= f.periodo==='30'?'selected':'' %>>Próximos 30 dias</option><option value="90" <%= f.periodo==='90'?'selected':'' %>>Próximos 90 dias</option></select></label><button class="pv-btn pv-btn-primary">Filtrar</button><a class="pv-btn" href="/preventivas?tab=<%= d.activeTab %>">Limpar filtros</a></form></details>
+
+    <% if(d.activeTab==='sem_plano'){ %><div class="section-title"><div><h2>Equipamentos sem plano</h2><p>Equipamentos elegíveis que requerem planejamento preventivo.</p></div></div><div class="empty-list"><% (d.semPlano||[]).forEach(e=>{ %><div><strong><%= e.nome||('Equipamento #'+e.id) %></strong><span><%= e.criticidade||'Criticidade não informada' %></span><% if(canAdminPreventivas){ %><a class="pv-open" href="/preventivas/nova?equipamento_id=<%= e.id %>">Criar plano</a><% } %></div><% }) %><% if(!(d.semPlano||[]).length){ %><p class="empty">Todos os equipamentos elegíveis possuem plano ativo.</p><% } %></div><% } else if(d.activeTab==='planos'){ %>
+      <div class="section-title"><div><h2>Planos ativos</h2><p>Rotinas preventivas cadastradas e disponíveis.</p></div></div><div class="table-scroll"><table class="preventive-table"><thead><tr><th>ID / Equipamento</th><th>Atividade</th><th>Frequência</th><th>Status</th><th>Ação</th></tr></thead><tbody><% (d.planos||[]).forEach(p=>{ %><tr><td>#<%= p.id %> • <%= p.equipamento_nome||'-' %></td><td><%= p.titulo %></td><td><span class="badge"><%= p.frequencia_tipo||'-' %></span></td><td><span class="badge good">Ativo</span></td><td><a class="pv-open" href="/preventivas/<%= p.id %>">Abrir</a></td></tr><% }) %><% if(!(d.planos||[]).length){ %><tr><td colspan="5" class="empty">Nenhum plano preventivo ativo.</td></tr><% } %></tbody></table></div>
+    <% } else { %>
+      <div class="section-title"><div><h2><%= d.activeTab==='historico'?'Histórico preventivo':d.activeTab==='execucao'?'Preventivas em execução':'Programação preventiva' %></h2><p><%= d.activeTab==='historico'?'Preventivas concluídas e vínculos técnicos.':d.activeTab==='execucao'?'Atividades com execução iniciada.':'Atividades pendentes organizadas por vencimento e criticidade.' %></p></div><form method="get"><% Object.entries(f).forEach(([k,v])=>{if(k!=='pageSize'&&v){ %><input type="hidden" name="<%= k %>" value="<%= v %>"><% }}); %><label>Mostrando <strong><%= d.programming.length %> de <%= d.pagination.total %></strong> preventivas <select name="pageSize" onchange="this.form.submit()"><% [10,20,50,100].forEach(v=>{ %><option value="<%= v %>" <%= d.pagination.pageSize===v?'selected':'' %>>Exibir <%= v %></option><% }) %></select></label></form></div>
+      <div class="table-scroll"><table class="preventive-table"><thead><tr><th>ID / Equipamento</th><th>Atividade</th><th>Frequência</th><th>Criticidade</th><th>Responsáveis</th><th>Data prevista</th><th>Situação</th><th>Ação</th></tr></thead><tbody><% (d.programming||[]).forEach(r=>{ %><tr class="row-<%= String(r.prazo||'').toLowerCase() %>"><td data-label="Equipamento"><strong>#<%= r.id %> • <%= r.equipamento_codigo||r.equipamento_nome||'-' %></strong><small><%= r.equipamento_codigo?r.equipamento_nome:'' %></small></td><td data-label="Atividade"><%= r.titulo||r.observacao||'-' %></td><td data-label="Frequência"><span class="badge"><%= r.frequencia_tipo||'-' %></span></td><td data-label="Criticidade"><span class="badge crit-<%= r.criticidade_exibicao.toLowerCase() %>"><%= r.criticidade_exibicao %></span></td><td data-label="Responsáveis"><%= r.responsaveis %></td><td data-label="Data prevista"><%= r.data_prevista?String(r.data_prevista).slice(0,10).split('-').reverse().join('/'):'-' %></td><td data-label="Situação"><span class="badge status-<%= String(r.prazo).toLowerCase() %>"><%= prazoLabel[r.prazo]||r.status %></span><% if(r.os_corretiva_id){ %><a class="os-link" href="/os/<%= r.os_corretiva_id %>">OS #<%= r.os_corretiva_id %></a><% } %></td><td><a class="pv-open" href="/preventivas/<%= r.plano_id %>">Abrir</a></td></tr><% }) %><% if(!(d.programming||[]).length){ %><tr><td colspan="8" class="empty"><%= d.activeTab==='historico'?'Nenhuma preventiva concluída encontrada.':'Nenhuma preventiva pendente no período.' %></td></tr><% } %></tbody></table></div>
+      <footer class="pagination"><span>Exibindo <%= d.programming.length %> de <%= d.pagination.total %> atividades</span><div><a class="<%= d.pagination.page<=1?'disabled':'' %>" href="/preventivas?<%= qs({page:Math.max(1,d.pagination.page-1)}) %>">Anterior</a><% for(let p=Math.max(1,d.pagination.page-2);p<=Math.min(d.pagination.pages,d.pagination.page+2);p++){ %><a class="<%= p===d.pagination.page?'active':'' %>" href="/preventivas?<%= qs({page:p}) %>"><%= p %></a><% } %><a class="<%= d.pagination.page>=d.pagination.pages?'disabled':'' %>" href="/preventivas?<%= qs({page:Math.min(d.pagination.pages,d.pagination.page+1)}) %>">Próxima</a></div></footer>
+    <% } %>
+  </section>
+
+  <section class="preventive-charts"><article class="preventive-frequency-chart panel"><h2>Distribuição por frequência</h2><% const maxFreq=Math.max(1,...(d.frequencyDistribution||[]).map(x=>x.total)); (d.frequencyDistribution||[]).forEach(x=>{ %><div class="chart-row"><span><%= x.label %></span><div class="bar"><i style="width:<%= Math.round(x.total*100/maxFreq) %>%"></i></div><strong><%= x.total %></strong></div><% }) %></article><article class="preventive-execution-chart panel"><h2>Execução no período</h2><% const es=d.executionSummary||{}; const maxEx=Math.max(1,es.noPrazo||0,es.comAtraso||0,es.pendentes||0,es.emAndamento||0); [['noPrazo','Concluídas no prazo','good'],['comAtraso','Concluídas com atraso','bad'],['pendentes','Pendentes','warn'],['emAndamento','Em andamento','info']].forEach(([k,l,c])=>{ %><div class="chart-row <%= c %>"><span><%= l %></span><div class="bar"><i style="width:<%= Math.round((es[k]||0)*100/maxEx) %>%"></i></div><strong><%= es[k]||0 %></strong></div><% }) %></article></section>
+</main>
