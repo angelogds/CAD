@@ -182,6 +182,8 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area) {
     centerline: '#0284c7',
     rect: '#0f172a',
     circle: '#0f172a',
+    arc: '#0f172a',
+    polyline: '#0f172a',
     shaft: '#0f172a',
     text: '#334155'
   };
@@ -227,6 +229,35 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area) {
           .lineWidth(1)
           .stroke(color);
         break;
+
+      case 'polyline': {
+        const points = Array.isArray(obj.points) ? obj.points : [];
+        if (points.length < 2) break;
+        doc.moveTo(points[0].x * scale + offsetX, points[0].y * scale + offsetY);
+        points.slice(1).forEach((point) => doc.lineTo(point.x * scale + offsetX, point.y * scale + offsetY));
+        if (obj.closed) doc.closePath();
+        doc.lineWidth(1).stroke(color);
+        break;
+      }
+
+      case 'arc': {
+        const geometry = obj.geometry || obj;
+        const startAngle = Number(geometry.startAngle || 0);
+        const endAngle = Number(geometry.endAngle || 0);
+        const ccw = geometry.ccw !== false;
+        let sweep = ccw ? endAngle - startAngle : startAngle - endAngle;
+        while (sweep < 0) sweep += Math.PI * 2;
+        while (sweep > Math.PI * 2) sweep -= Math.PI * 2;
+        const steps = Math.max(12, Math.ceil(sweep * 24));
+        for (let index = 0; index <= steps; index += 1) {
+          const angle = startAngle + (ccw ? 1 : -1) * (sweep * index / steps);
+          const x = (geometry.cx + Math.cos(angle) * geometry.radius) * scale + offsetX;
+          const y = (geometry.cy + Math.sin(angle) * geometry.radius) * scale + offsetY;
+          if (index === 0) doc.moveTo(x, y); else doc.lineTo(x, y);
+        }
+        doc.lineWidth(1).stroke(color);
+        break;
+      }
       
       case 'shaft':
         renderShaftToPdf(doc, obj, scale, offsetX, offsetY);
@@ -247,61 +278,32 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area) {
 }
 
 function renderShaftToPdf(doc, shaft, scale, offsetX, offsetY) {
-  let currentX = shaft.startX;
-  const axisY = shaft.axisY;
+  const geometry = shaft.geometry || shaft;
+  const origin = geometry.origin || { x: shaft.startX || 0, y: shaft.axisY || 0 };
+  const orientation = geometry.orientation === 'vertical' ? 'vertical' : 'horizontal';
+  const segments = Array.isArray(geometry.segments) ? geometry.segments : [];
+  let currentX = origin.x;
+  let currentY = origin.y;
 
   // Desenhar contorno do eixo
-  for (let i = 0; i < shaft.segments.length; i++) {
-    const seg = shaft.segments[i];
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
     const halfDiam = seg.diameter / 2;
-
-    // Contorno superior
-    doc.moveTo(currentX * scale + offsetX, (axisY - halfDiam) * scale + offsetY)
-      .lineTo((currentX + seg.length) * scale + offsetX, (axisY - halfDiam) * scale + offsetY)
-      .lineWidth(1.2)
-      .stroke('#0f172a');
-
-    // Contorno inferior
-    doc.moveTo(currentX * scale + offsetX, (axisY + halfDiam) * scale + offsetY)
-      .lineTo((currentX + seg.length) * scale + offsetX, (axisY + halfDiam) * scale + offsetY)
-      .lineWidth(1.2)
-      .stroke('#0f172a');
-
-    // Ombro inicial
-    if (i === 0) {
-      doc.moveTo(currentX * scale + offsetX, (axisY - halfDiam) * scale + offsetY)
-        .lineTo(currentX * scale + offsetX, (axisY + halfDiam) * scale + offsetY)
-        .stroke('#0f172a');
-    }
-
-    currentX += seg.length;
-
-    // Ombros entre segmentos
-    if (i < shaft.segments.length - 1) {
-      const nextHalfDiam = shaft.segments[i + 1].diameter / 2;
-      if (halfDiam !== nextHalfDiam) {
-        // Conexão vertical superior
-        doc.moveTo(currentX * scale + offsetX, (axisY - halfDiam) * scale + offsetY)
-          .lineTo(currentX * scale + offsetX, (axisY - nextHalfDiam) * scale + offsetY)
-          .stroke('#0f172a');
-        // Conexão vertical inferior
-        doc.moveTo(currentX * scale + offsetX, (axisY + halfDiam) * scale + offsetY)
-          .lineTo(currentX * scale + offsetX, (axisY + nextHalfDiam) * scale + offsetY)
-          .stroke('#0f172a');
-      }
-    } else {
-      // Ombro final
-      doc.moveTo(currentX * scale + offsetX, (axisY - halfDiam) * scale + offsetY)
-        .lineTo(currentX * scale + offsetX, (axisY + halfDiam) * scale + offsetY)
-        .stroke('#0f172a');
-    }
+    const x = orientation === 'horizontal' ? currentX : currentX - halfDiam;
+    const y = orientation === 'horizontal' ? currentY - halfDiam : currentY;
+    const width = orientation === 'horizontal' ? seg.length : seg.diameter;
+    const height = orientation === 'horizontal' ? seg.diameter : seg.length;
+    doc.rect(x * scale + offsetX, y * scale + offsetY, width * scale, height * scale).lineWidth(1.2).stroke('#0f172a');
+    if (orientation === 'horizontal') currentX += seg.length; else currentY += seg.length;
   }
 
   // Linha de centro
-  if (shaft.showCenterline !== false) {
-    const totalLength = shaft.segments.reduce((sum, s) => sum + s.length, 0);
-    doc.moveTo((shaft.startX - 15) * scale + offsetX, axisY * scale + offsetY)
-      .lineTo((shaft.startX + totalLength + 15) * scale + offsetX, axisY * scale + offsetY)
+  if (shaft.showCenterline !== false && segments.length) {
+    const totalLength = segments.reduce((sum, s) => sum + s.length, 0);
+    const start = orientation === 'horizontal' ? { x: origin.x - 15, y: origin.y } : { x: origin.x, y: origin.y - 15 };
+    const end = orientation === 'horizontal' ? { x: origin.x + totalLength + 15, y: origin.y } : { x: origin.x, y: origin.y + totalLength + 15 };
+    doc.moveTo(start.x * scale + offsetX, start.y * scale + offsetY)
+      .lineTo(end.x * scale + offsetX, end.y * scale + offsetY)
       .lineWidth(0.5)
       .dash(10, { space: 3 })
       .stroke('#0284c7')
@@ -309,19 +311,19 @@ function renderShaftToPdf(doc, shaft, scale, offsetX, offsetY) {
   }
 
   // Cotas do eixo
-  if (shaft.showDimensions !== false) {
-    let segX = shaft.startX;
-    for (const seg of shaft.segments) {
+  if (shaft.showDimensions !== false && orientation === 'horizontal') {
+    let segX = origin.x;
+    for (const seg of segments) {
       // Cota de diâmetro
       const dimX = (segX + seg.length / 2) * scale + offsetX;
       doc.fontSize(7)
         .fillColor('#166534')
-        .text(`Ø${seg.diameter}`, dimX + 8, (axisY - 4) * scale + offsetY);
+        .text(`Ø${seg.diameter}`, dimX + 8, (origin.y - 4) * scale + offsetY);
 
       // Cota de comprimento
       doc.fontSize(7)
         .fillColor('#166534')
-        .text(`${seg.length}`, dimX - 10, (axisY + seg.diameter / 2 + 15) * scale + offsetY);
+        .text(`${seg.length}`, dimX - 10, (origin.y + seg.diameter / 2 + 15) * scale + offsetY);
 
       segX += seg.length;
     }
@@ -329,10 +331,26 @@ function renderShaftToPdf(doc, shaft, scale, offsetX, offsetY) {
 }
 
 function renderDimensionToPdf(doc, dim, scale, offsetX, offsetY) {
-  const x1 = dim.x1 * scale + offsetX;
-  const y1 = dim.y1 * scale + offsetY;
-  const x2 = dim.x2 * scale + offsetX;
-  const y2 = dim.y2 * scale + offsetY;
+  const geometry = dim.geometry || dim;
+  if (geometry.mode === 'angular' && geometry.vertex) {
+    const steps = 24;
+    doc.moveTo(
+      (geometry.vertex.x + Math.cos(geometry.startAngle) * geometry.radius) * scale + offsetX,
+      (geometry.vertex.y + Math.sin(geometry.startAngle) * geometry.radius) * scale + offsetY,
+    );
+    for (let index = 1; index <= steps; index += 1) {
+      const angle = geometry.startAngle + (geometry.endAngle - geometry.startAngle) * index / steps;
+      doc.lineTo((geometry.vertex.x + Math.cos(angle) * geometry.radius) * scale + offsetX, (geometry.vertex.y + Math.sin(angle) * geometry.radius) * scale + offsetY);
+    }
+    doc.lineWidth(0.5).stroke('#059669');
+    doc.fontSize(8).fillColor('#059669').text(geometry.label || '', geometry.vertex.x * scale + offsetX + 8, geometry.vertex.y * scale + offsetY - 12);
+    return;
+  }
+  if (!geometry.p1 || !geometry.p2) return;
+  const x1 = geometry.p1.x * scale + offsetX;
+  const y1 = geometry.p1.y * scale + offsetY;
+  const x2 = geometry.p2.x * scale + offsetX;
+  const y2 = geometry.p2.y * scale + offsetY;
 
   // Linhas de extensão e cota
   doc.moveTo(x1, y1).lineTo(x2, y2)
@@ -345,7 +363,7 @@ function renderDimensionToPdf(doc, dim, scale, offsetX, offsetY) {
   
   doc.fontSize(8)
     .fillColor('#059669')
-    .text(dim.text || `${dim.value}`, midX - 15, midY - 12);
+    .text(geometry.label || dim.text || `${dim.value || ''}`, midX - 15, midY - 12);
 }
 
 function getObjectBounds(obj) {
@@ -371,13 +389,36 @@ function getObjectBounds(obj) {
       minY = obj.y - obj.radius;
       maxY = obj.y + obj.radius;
       break;
+    case 'polyline': {
+      const points = Array.isArray(obj.points) ? obj.points : [];
+      if (!points.length) return null;
+      minX = Math.min(...points.map((point) => point.x));
+      maxX = Math.max(...points.map((point) => point.x));
+      minY = Math.min(...points.map((point) => point.y));
+      maxY = Math.max(...points.map((point) => point.y));
+      break;
+    }
+    case 'arc': {
+      const geometry = obj.geometry || obj;
+      minX = geometry.cx - geometry.radius;
+      maxX = geometry.cx + geometry.radius;
+      minY = geometry.cy - geometry.radius;
+      maxY = geometry.cy + geometry.radius;
+      break;
+    }
     case 'shaft':
-      const totalLen = (obj.segments || []).reduce((sum, s) => sum + (s.length || 0), 0);
-      const maxDiam = Math.max(...(obj.segments || []).map(s => s.diameter || 0), 0);
-      minX = obj.startX || 0;
-      maxX = (obj.startX || 0) + totalLen;
-      minY = (obj.axisY || 0) - maxDiam / 2;
-      maxY = (obj.axisY || 0) + maxDiam / 2;
+      {
+        const geometry = obj.geometry || obj;
+        const segments = geometry.segments || [];
+        const origin = geometry.origin || { x: obj.startX || 0, y: obj.axisY || 0 };
+        const totalLen = segments.reduce((sum, s) => sum + (s.length || 0), 0);
+        const maxDiam = Math.max(...segments.map(s => s.diameter || 0), 0);
+        if (geometry.orientation === 'vertical') {
+          minX = origin.x - maxDiam / 2; maxX = origin.x + maxDiam / 2; minY = origin.y; maxY = origin.y + totalLen;
+        } else {
+          minX = origin.x; maxX = origin.x + totalLen; minY = origin.y - maxDiam / 2; maxY = origin.y + maxDiam / 2;
+        }
+      }
       break;
     case 'text':
       minX = obj.x;

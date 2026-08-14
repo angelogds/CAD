@@ -1,6 +1,6 @@
 import { BaseTool } from './base.tool.js';
 import { LineEntity } from '../entities/line.entity.js';
-import { distance2D } from '../core/geometry.js';
+import { distance2D, parseCadPointInput } from '../core/geometry.js';
 
 export class LineTool extends BaseTool {
   constructor(ctx) {
@@ -13,7 +13,7 @@ export class LineTool extends BaseTool {
   }
 
   activate() {
-    this.ctx.prompt.set({ message: 'Clique para definir o primeiro ponto' });
+    this.ctx.prompt.set({ message: 'Linha: clique no primeiro ponto. Depois use comprimento, @ΔX,ΔY ou @distância<ângulo.' });
     this.ctx.hideDynamicInput?.();
   }
 
@@ -39,12 +39,8 @@ export class LineTool extends BaseTool {
         this.dynamicValue = v;
       },
       onConfirm: (v) => {
-        const parsed = Number(v);
-        if (!Number.isFinite(parsed) || parsed <= 0) return false;
-        this.dynamicValue = String(parsed);
-        this.manualLength = parsed;
-        this.applyManualLength();
-        return true;
+        this.dynamicValue = String(v);
+        return this.applyManualLength();
       },
       onCancel: () => {
         this.dynamicValue = '';
@@ -54,13 +50,8 @@ export class LineTool extends BaseTool {
 
   applyManualLength() {
     if (!this.start) return;
-    const value = Number(this.manualLength || this.dynamicValue);
-    if (!Number.isFinite(value) || value <= 0) return;
-    const target = this.currentPoint || { x: this.start.x + value, y: this.start.y };
-    const dx = target.x - this.start.x;
-    const dy = target.y - this.start.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const end = { x: this.start.x + (dx / len) * value, y: this.start.y + (dy / len) * value };
+    const end = parseCadPointInput(this.dynamicValue, this.start, this.currentPoint);
+    if (!end || distance2D(this.start, end) <= 1e-9) return false;
     this.ctx.addEntity(new LineEntity({ geometry: { x1: this.start.x, y1: this.start.y, x2: end.x, y2: end.y }, metadata: { layer: this.ctx.state.activeLayer } }));
     this.start = end;
     this.currentPoint = end;
@@ -69,6 +60,7 @@ export class LineTool extends BaseTool {
     this.setPreview([{ type: 'line', from: this.start, to: this.start }]);
     this.ctx.hideDynamicInput?.();
     this.ctx.prompt.set({ message: 'Linha criada. Clique para continuar ou ESC para finalizar.' });
+    return true;
   }
 
   onMouseDown(evt) {
@@ -96,8 +88,8 @@ export class LineTool extends BaseTool {
   onKeyDown(evt) {
     if (!this.start) return;
     const key = evt.key;
-    if (/^[0-9.,]$/.test(key)) {
-      this.dynamicValue += key === ',' ? '.' : key;
+    if (/^[0-9.,;@<+\-]$/.test(key)) {
+      this.dynamicValue += key;
       this.manualLength = null;
       this.ctx.statusMessage = `Digite comprimento e Enter: ${this.dynamicValue}`;
       this.updatePreview(this.currentPoint || this.start);
@@ -109,7 +101,6 @@ export class LineTool extends BaseTool {
       return;
     }
     if (key !== 'Enter') return;
-    this.manualLength = Number(this.dynamicValue);
     this.applyManualLength();
   }
 

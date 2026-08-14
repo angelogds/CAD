@@ -36,6 +36,24 @@ export class Matrix3 {
 
 export const distance2D = (a, b) => Math.hypot((b.x - a.x), (b.y - a.y));
 export const angle2D = (a, b) => Math.atan2((b.y - a.y), (b.x - a.x));
+export const EPSILON = 1e-9;
+
+export const isFinitePoint = (point) => Boolean(
+  point
+  && Number.isFinite(Number(point.x))
+  && Number.isFinite(Number(point.y)),
+);
+
+export function normalizeRect(x, y, width, height) {
+  const x2 = Number(x) + Number(width);
+  const y2 = Number(y) + Number(height);
+  return {
+    x: Math.min(Number(x), x2),
+    y: Math.min(Number(y), y2),
+    width: Math.abs(Number(width)),
+    height: Math.abs(Number(height)),
+  };
+}
 export const normalizeAngle = (a) => {
   let n = a % (Math.PI * 2);
   if (n < 0) n += Math.PI * 2;
@@ -60,11 +78,111 @@ export const translatePoint = (p, dx, dy) => new Point2D(p.x + dx, p.y + dy);
 export const scalePoint = (p, sx, sy = sx, center = new Point2D()) => new Point2D(center.x + (p.x - center.x) * sx, center.y + (p.y - center.y) * sy);
 
 export function hitTestPointToSegment(point, a, b, tolerance = 6) {
-  const ab = { x: b.x - a.x, y: b.y - a.y }; const ap = { x: point.x - a.x, y: point.y - a.y };
-  const len2 = ab.x * ab.x + ab.y * ab.y; if (!len2) return distance2D(point, a) <= tolerance;
+  return projectPointToSegment(point, a, b).distance <= tolerance;
+}
+
+export function projectPointToSegment(point, a, b) {
+  const ab = { x: b.x - a.x, y: b.y - a.y };
+  const ap = { x: point.x - a.x, y: point.y - a.y };
+  const len2 = ab.x * ab.x + ab.y * ab.y;
+  if (len2 <= EPSILON) return { point: { x: a.x, y: a.y }, t: 0, distance: distance2D(point, a) };
   const t = Math.max(0, Math.min(1, (ap.x * ab.x + ap.y * ab.y) / len2));
-  const proj = { x: a.x + ab.x * t, y: a.y + ab.y * t };
-  return distance2D(point, proj) <= tolerance;
+  const projected = { x: a.x + ab.x * t, y: a.y + ab.y * t };
+  return { point: projected, t, distance: distance2D(point, projected) };
+}
+
+export function lineIntersection(a1, a2, b1, b2, options = {}) {
+  const segmentA = options.segmentA === true;
+  const segmentB = options.segmentB === true;
+  const dax = a2.x - a1.x;
+  const day = a2.y - a1.y;
+  const dbx = b2.x - b1.x;
+  const dby = b2.y - b1.y;
+  const denominator = dax * dby - day * dbx;
+  if (Math.abs(denominator) <= EPSILON) return null;
+  const qx = b1.x - a1.x;
+  const qy = b1.y - a1.y;
+  const t = (qx * dby - qy * dbx) / denominator;
+  const u = (qx * day - qy * dax) / denominator;
+  if (segmentA && (t < -EPSILON || t > 1 + EPSILON)) return null;
+  if (segmentB && (u < -EPSILON || u > 1 + EPSILON)) return null;
+  return { x: a1.x + t * dax, y: a1.y + t * day, t, u };
+}
+
+export function segmentIntersection(a1, a2, b1, b2) {
+  return lineIntersection(a1, a2, b1, b2, { segmentA: true, segmentB: true });
+}
+
+export function lineCircleIntersections(a, b, center, radius, segmentOnly = true) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const fx = a.x - center.x;
+  const fy = a.y - center.y;
+  const qa = dx * dx + dy * dy;
+  if (qa <= EPSILON || !Number.isFinite(radius) || radius < 0) return [];
+  const qb = 2 * (fx * dx + fy * dy);
+  const qc = fx * fx + fy * fy - radius * radius;
+  const discriminant = qb * qb - 4 * qa * qc;
+  if (discriminant < -EPSILON) return [];
+  const root = Math.sqrt(Math.max(0, discriminant));
+  const values = [(-qb - root) / (2 * qa), (-qb + root) / (2 * qa)];
+  const unique = [];
+  values.forEach((t) => {
+    if (segmentOnly && (t < -EPSILON || t > 1 + EPSILON)) return;
+    const point = { x: a.x + t * dx, y: a.y + t * dy, t };
+    if (!unique.some((p) => distance2D(p, point) <= EPSILON)) unique.push(point);
+  });
+  return unique;
+}
+
+export function circleCircleIntersections(c1, r1, c2, r2) {
+  const d = distance2D(c1, c2);
+  if (d <= EPSILON || d > r1 + r2 + EPSILON || d < Math.abs(r1 - r2) - EPSILON) return [];
+  const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+  const h2 = r1 * r1 - a * a;
+  if (h2 < -EPSILON) return [];
+  const h = Math.sqrt(Math.max(0, h2));
+  const x0 = c1.x + (a * (c2.x - c1.x)) / d;
+  const y0 = c1.y + (a * (c2.y - c1.y)) / d;
+  const rx = -(c2.y - c1.y) * (h / d);
+  const ry = (c2.x - c1.x) * (h / d);
+  const points = [{ x: x0 + rx, y: y0 + ry }];
+  if (h > EPSILON) points.push({ x: x0 - rx, y: y0 - ry });
+  return points;
+}
+
+export function parseCadPointInput(raw, basePoint = null, cursorPoint = null) {
+  const text = String(raw || '').trim().replace(/\s+/g, '');
+  if (!text) return null;
+  const relative = text.startsWith('@');
+  const body = relative ? text.slice(1) : text;
+  if (body.includes('<')) {
+    if (!basePoint) return null;
+    const [distanceRaw, angleRaw] = body.split('<');
+    const length = Number(distanceRaw);
+    const degrees = Number(angleRaw);
+    if (!Number.isFinite(length) || length < 0 || !Number.isFinite(degrees)) return null;
+    const radians = degrees * Math.PI / 180;
+    return { x: basePoint.x + Math.cos(radians) * length, y: basePoint.y + Math.sin(radians) * length };
+  }
+  const coordinates = body.split(/[;,]/);
+  if (coordinates.length === 2) {
+    const x = Number(coordinates[0]);
+    const y = Number(coordinates[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    if (relative) {
+      if (!basePoint) return null;
+      return { x: basePoint.x + x, y: basePoint.y + y };
+    }
+    return { x, y };
+  }
+  const length = Number(body);
+  if (!Number.isFinite(length) || length < 0 || !basePoint) return null;
+  const target = cursorPoint || { x: basePoint.x + 1, y: basePoint.y };
+  const dx = target.x - basePoint.x;
+  const dy = target.y - basePoint.y;
+  const currentLength = Math.hypot(dx, dy) || 1;
+  return { x: basePoint.x + (dx / currentLength) * length, y: basePoint.y + (dy / currentLength) * length };
 }
 
 export function snapPoint(point, { gridEnabled = false, gridSize = 10 } = {}) {

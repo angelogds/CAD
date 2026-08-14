@@ -7,12 +7,12 @@ export class TrimTool extends BaseTool {
   onMouseDown(evt) {
     const hit = this.ctx.findEntityAt(evt.world);
     if (!this.boundary) {
-      if (!hit || !['line', 'centerline'].includes(hit.type)) return;
+      if (!hit || !this.ctx.isEntityEditable(hit) || !['line', 'centerline'].includes(hit.type)) return;
       this.boundary = hit;
       this.ctx.prompt.set({ message: 'Selecione a entidade a ser cortada (lado pelo clique)' });
       return;
     }
-    if (!hit || !['line', 'centerline', 'polyline'].includes(hit.type) || hit.id === this.boundary.id) return;
+    if (!hit || !this.ctx.isEntityEditable(hit) || !['line', 'centerline', 'polyline'].includes(hit.type) || hit.id === this.boundary.id) return;
     if (this.trim(hit, evt.world)) {
       this.ctx.pushHistory();
       this.ctx.markDirty('Trim aplicado');
@@ -37,7 +37,7 @@ export class TrimTool extends BaseTool {
     if (entity.type === 'line' || entity.type === 'centerline') {
       const a1 = { x: entity.geometry.x1, y: entity.geometry.y1 };
       const a2 = { x: entity.geometry.x2, y: entity.geometry.y2 };
-      const i = lineIntersection(a1, a2, b1, b2);
+      const i = lineIntersection(a1, a2, b1, b2, { segmentA: true, segmentB: true });
       if (!i) return false;
       const d1 = Math.hypot(clickPoint.x - a1.x, clickPoint.y - a1.y);
       const d2 = Math.hypot(clickPoint.x - a2.x, clickPoint.y - a2.y);
@@ -47,8 +47,8 @@ export class TrimTool extends BaseTool {
     if (entity.type === 'polyline') {
       const pts = entity.geometry.points || [];
       if (pts.length < 2) return false;
-      const i0 = lineIntersection(pts[0], pts[1], b1, b2);
-      const il = lineIntersection(pts[pts.length - 2], pts[pts.length - 1], b1, b2);
+      const i0 = lineIntersection(pts[0], pts[1], b1, b2, { segmentA: true, segmentB: true });
+      const il = lineIntersection(pts[pts.length - 2], pts[pts.length - 1], b1, b2, { segmentA: true, segmentB: true });
       const d0 = Math.hypot(clickPoint.x - pts[0].x, clickPoint.y - pts[0].y);
       const dl = Math.hypot(clickPoint.x - pts[pts.length - 1].x, clickPoint.y - pts[pts.length - 1].y);
       if (d0 < dl && i0) pts[0] = i0;

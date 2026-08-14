@@ -10,7 +10,7 @@ export class MirrorTool extends BaseTool {
     if (!this.axisA) { this.axisA = p; return; }
     this.axisB = p;
     const copies = this.ctx.state.entities
-      .filter((e) => this.ctx.selection.includes(e.id))
+      .filter((e) => this.ctx.selection.includes(e.id) && this.ctx.isEntityEditable(e))
       .map((e) => cloneEntityForMirror(e, this.axisA, this.axisB));
     copies.forEach((c) => this.ctx.state.entities.push(c));
     this.ctx.pushHistory();
@@ -23,7 +23,7 @@ export class MirrorTool extends BaseTool {
     if (!this.axisA || !this.ctx.selection.ids.size) return;
     const b = this.ctx.getPoint(evt.world, this.axisA);
     const previews = [{ type: 'line', from: this.axisA, to: b }];
-    this.ctx.state.entities.filter((e) => this.ctx.selection.includes(e.id)).forEach((e) => previews.push({ type: 'ghost-entity', entity: cloneEntityForMirror(e, this.axisA, b) }));
+    this.ctx.state.entities.filter((e) => this.ctx.selection.includes(e.id) && this.ctx.isEntityEditable(e)).forEach((e) => previews.push({ type: 'ghost-entity', entity: cloneEntityForMirror(e, this.axisA, b) }));
     this.ctx.preview.set(previews);
   }
   cancel() { this.axisA = null; this.axisB = null; this.ctx.preview.clear(); }

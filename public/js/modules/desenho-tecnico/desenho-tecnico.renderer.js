@@ -8,6 +8,7 @@ const SNAP_SHORT_LABELS = {
   'arc-midpoint': 'MID',
   intersection: 'INT',
   center: 'CTR',
+  quadrant: 'QUAD',
   nearest: 'NEAR',
   grid: 'GRID',
 };
@@ -27,7 +28,7 @@ function arcPath(viewport, geometry = {}) {
   const p2w = { x: cx + Math.cos(endAngle) * radius, y: cy + Math.sin(endAngle) * radius };
   const p1 = viewport.worldToScreen(p1w.x, p1w.y);
   const p2 = viewport.worldToScreen(p2w.x, p2w.y);
-  let delta = endAngle - startAngle;
+  let delta = ccw ? endAngle - startAngle : startAngle - endAngle;
   while (delta < 0) delta += Math.PI * 2;
   while (delta > Math.PI * 2) delta -= Math.PI * 2;
   const sweep = ccw ? 1 : 0;
@@ -246,11 +247,24 @@ export class DesenhoTecnicoRenderer {
           const c = this.viewport.worldToScreen(e.geometry.cx, e.geometry.cy);
           g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='${Math.abs(e.geometry.radius * this.viewport.getViewState().zoom)}' fill='none' stroke='${stroke}' stroke-dasharray='6 4'/>`);
         } else if (e.type === 'rect') {
-          const p0 = this.viewport.worldToScreen(e.geometry.x, e.geometry.y);
+          const x = Math.min(e.geometry.x, e.geometry.x + e.geometry.width);
+          const y = Math.min(e.geometry.y, e.geometry.y + e.geometry.height);
+          const p0 = this.viewport.worldToScreen(x, y);
           g.insertAdjacentHTML('beforeend', `<rect x='${p0.x}' y='${p0.y}' width='${Math.abs(e.geometry.width * this.viewport.getViewState().zoom)}' height='${Math.abs(e.geometry.height * this.viewport.getViewState().zoom)}' fill='none' stroke='${stroke}' stroke-dasharray='6 4'/>`);
         } else if (e.type === 'polyline') {
           const points = (e.geometry.points || []).map((pp) => this.viewport.worldToScreen(pp.x, pp.y));
           if (points.length > 1) g.insertAdjacentHTML('beforeend', `<polyline points='${points.map((pp) => `${pp.x},${pp.y}`).join(' ')}' fill='none' stroke='${stroke}' stroke-dasharray='6 4'/>`);
+        } else if (e.type === 'arc') {
+          g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, e.geometry)}' fill='none' stroke='${stroke}' stroke-dasharray='6 4'/>`);
+        } else if (e.type === 'text') {
+          const point = this.viewport.worldToScreen(e.geometry.x, e.geometry.y);
+          g.insertAdjacentHTML('beforeend', `<text x='${point.x}' y='${point.y}' fill='${stroke}' font-size='${Math.max(10, e.geometry.size || 14)}' font-family='monospace' opacity='0.8'>${String(e.geometry.text || '').replace(/</g, '&lt;')}</text>`);
+        } else if (e.type === 'shaft') {
+          this.renderShaft(g, e, stroke);
+        } else if (e.type === 'dimension' && e.geometry.p1 && e.geometry.p2) {
+          const p1 = this.viewport.worldToScreen(e.geometry.p1.x, e.geometry.p1.y);
+          const p2 = this.viewport.worldToScreen(e.geometry.p2.x, e.geometry.p2.y);
+          g.insertAdjacentHTML('beforeend', `<line x1='${p1.x}' y1='${p1.y}' x2='${p2.x}' y2='${p2.y}' stroke='${stroke}' stroke-dasharray='6 4'/>`);
         }
       }
     });

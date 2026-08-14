@@ -125,7 +125,9 @@ function saveCad(desenhoId, cadData, userId) {
   const objetos = Array.isArray(payload.objects) ? payload.objects : [];
 
   for (const obj of objetos) {
-    if (obj.radius != null && Number(obj.radius) <= 0) throw new Error('Raio inválido.');
+    const radius = obj.type === 'arc' ? obj.geometry?.radius : obj.radius;
+    if ((obj.type === 'circle' || obj.type === 'arc') && (!Number.isFinite(Number(radius)) || Number(radius) <= 0)) throw new Error('Raio inválido.');
+    if (obj.type === 'rect' && (Number(obj.width) <= 0 || Number(obj.height) <= 0)) throw new Error('Retângulo com dimensão inválida.');
     if (obj.thickness != null && Number(obj.thickness) < 0) throw new Error('Espessura negativa não permitida.');
     if (obj.type === 'text' && (!Number.isFinite(Number(obj.x)) || !Number.isFinite(Number(obj.y)))) throw new Error('Texto sem posição válida.');
   }

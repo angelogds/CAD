@@ -23,6 +23,9 @@ import { TrimTool } from './tools/trim.tool.js';
 import { ExtendTool } from './tools/extend.tool.js';
 import { OffsetTool } from './tools/offset.tool.js';
 import { MirrorTool } from './tools/mirror.tool.js';
+import { MoveTool } from './tools/move.tool.js';
+import { CopyTool } from './tools/copy.tool.js';
+import { EraseTool } from './tools/erase.tool.js';
 import { LineEntity } from './entities/line.entity.js';
 import { RectEntity } from './entities/rect.entity.js';
 import { CircleEntity } from './entities/circle.entity.js';
@@ -31,6 +34,15 @@ import { TextEntity } from './entities/text.entity.js';
 import { DimensionEntity } from './entities/dimension.entity.js';
 import { ArcEntity } from './entities/arc.entity.js';
 import { ShaftEntity } from './entities/shaft.entity.js';
+import {
+  angle2D,
+  circleCircleIntersections,
+  isAngleBetween,
+  lineCircleIntersections,
+  normalizeAngle,
+  projectPointToSegment,
+  segmentIntersection as intersectSegments,
+} from './core/geometry.js';
 
 class ToolManager {
   constructor(state) { this.tools = new Map(); this.active = null; this.name = 'select'; this.state = state; }
@@ -84,6 +96,39 @@ const TOOL_HINTS = {
   dim_linear: 'cotar distância linear',
 };
 
+const COMMAND_ALIASES = {
+  s: 'tool-select', select: 'tool-select', selecionar: 'tool-select',
+  h: 'tool-pan', pan: 'tool-pan',
+  l: 'tool-line', line: 'tool-line', linha: 'tool-line',
+  p: 'tool-polyline', pl: 'tool-polyline', polyline: 'tool-polyline', polilinha: 'tool-polyline',
+  r: 'tool-rect', rec: 'tool-rect', rect: 'tool-rect', retangulo: 'tool-rect', 'retângulo': 'tool-rect',
+  c: 'tool-circle', circle: 'tool-circle', circulo: 'tool-circle', 'círculo': 'tool-circle',
+  a: 'tool-arc', arc: 'tool-arc', arco: 'tool-arc',
+  t: 'tool-text', text: 'tool-text', texto: 'tool-text',
+  m: 'tool-move', move: 'tool-move', mover: 'tool-move',
+  co: 'tool-copy', cp: 'tool-copy', copy: 'tool-copy', copiar: 'tool-copy',
+  e: 'tool-erase', erase: 'tool-erase', apagar: 'tool-erase',
+  o: 'tool-offset', offset: 'tool-offset',
+  tr: 'tool-trim', trim: 'tool-trim', cortar: 'tool-trim',
+  ex: 'tool-extend', extend: 'tool-extend', estender: 'tool-extend',
+  mi: 'tool-mirror', mirror: 'tool-mirror', espelhar: 'tool-mirror',
+  di: 'tool-measure', dist: 'tool-measure', measure: 'tool-measure', medir: 'tool-measure',
+  d: 'tool-dim-linear', dim: 'tool-dim-linear', cota: 'tool-dim-linear',
+  dd: 'tool-dim-diameter', diametro: 'tool-dim-diameter', 'diâmetro': 'tool-dim-diameter',
+  da: 'tool-dim-angular', angular: 'tool-dim-angular',
+  cl: 'tool-centerline', centro: 'tool-centerline',
+  x: 'tool-shaft', eixo: 'tool-shaft',
+  zw: 'tool-zoom-window', janela: 'tool-zoom-window',
+  ze: 'zoom-extents', extents: 'zoom-extents',
+  u: 'undo', undo: 'undo', desfazer: 'undo',
+  redo: 'redo', refazer: 'redo',
+  del: 'delete-selection', delete: 'delete-selection',
+  grid: 'toggle-grid', grade: 'toggle-grid',
+  snap: 'toggle-snap', osnap: 'toggle-snap',
+  ortho: 'toggle-ortho', ortogonal: 'toggle-ortho',
+  save: 'save', salvar: 'save',
+};
+
 export class DesenhoTecnicoController {
   constructor(svg, initial = {}) {
     this.state = createDesenhoTecnicoState();
@@ -106,6 +151,7 @@ export class DesenhoTecnicoController {
       prompt: this.prompt,
       addEntity: (e) => this.addEntity(e),
       findEntityAt: (w) => this.findEntityAt(w),
+      isEntityEditable: (entity) => this.isEntityEditable(entity),
       toolManager: this.toolManager,
       markDirty: (msg) => this.markDirty(msg),
       pushHistory: () => this.pushHistory(),
@@ -121,6 +167,7 @@ export class DesenhoTecnicoController {
       new SelectTool(this.ctx), new PanTool(this.ctx), new LineTool(this.ctx), new PolylineTool(this.ctx), new RectTool(this.ctx), new CircleTool(this.ctx), new ArcTool(this.ctx), new TextTool(this.ctx),
       new CenterlineTool(this.ctx), new ShaftTool(this.ctx), new DimensionTool(this.ctx), new MeasureTool(this.ctx), new ZoomWindowTool(this.ctx),
       new TrimTool(this.ctx), new ExtendTool(this.ctx), new OffsetTool(this.ctx), new MirrorTool(this.ctx),
+      new MoveTool(this.ctx), new CopyTool(this.ctx), new EraseTool(this.ctx),
     ].forEach((t) => this.toolManager.register(t));
     this.interaction = new InteractionController(svg, this.toolManager, this.viewport, this.eventBus);
     this.loadInitial(initial);
@@ -142,35 +189,45 @@ export class DesenhoTecnicoController {
     this.state.snappingConfig = { ...this.state.snappingConfig, ...(initial.snappingConfig || {}), enabled: initial.snapEnabled !== false };
     this.state.orthoEnabled = Boolean(initial.orthoEnabled);
     this.state.metadata = {
-      codigo: initial.codigo || '', titulo: initial.titulo || '', material: initial.material || '', equipamento_id: initial.equipamento_id || '', observacoes: initial.observacoes || '',
+      codigo: initial.codigo || '', titulo: initial.titulo || '', material: initial.material || '', equipamento_id: initial.equipamento_id || '', observacoes: initial.observacoes || '', unidade: initial.unidade || 'mm',
     };
+    const base = (o, fallbackLayer = this.state.activeLayer) => ({
+      id: o.id,
+      style: { ...(o.style || {}) },
+      visible: o.visible !== false,
+      metadata: { ...(o.metadata || {}), layer: o.layer || o.metadata?.layer || fallbackLayer },
+    });
     const map = {
-      line: (o) => new LineEntity({ id: o.id, type: o.type, geometry: { x1: o.x, y1: o.y, x2: o.x2, y2: o.y2 }, metadata: { layer: o.layer } }),
-      centerline: (o) => new LineEntity({ id: o.id, type: 'centerline', geometry: { x1: o.x, y1: o.y, x2: o.x2, y2: o.y2 }, metadata: { layer: o.layer }, style: { stroke: '#93c5fd' } }),
-      rect: (o) => new RectEntity({ id: o.id, geometry: { x: o.x, y: o.y, width: o.width, height: o.height }, metadata: { layer: o.layer } }),
-      circle: (o) => new CircleEntity({ id: o.id, geometry: { cx: o.x, cy: o.y, radius: o.radius }, metadata: { layer: o.layer } }),
-      polyline: (o) => new PolylineEntity({ id: o.id, geometry: { points: o.points || [] }, metadata: { layer: o.layer, ...(o.metadata || {}) } }),
-      text: (o) => new TextEntity({ id: o.id, geometry: { x: o.x, y: o.y, text: o.text, size: o.size || 14 }, metadata: { layer: o.layer } }),
-      dimension: (o) => new DimensionEntity({ id: o.id, geometry: o.geometry || {}, metadata: { layer: o.layer || 'cotas' } }),
-      arc: (o) => new ArcEntity({ id: o.id, geometry: o.geometry || { cx: o.cx, cy: o.cy, radius: o.radius, startAngle: o.startAngle, endAngle: o.endAngle, ccw: o.ccw !== false }, metadata: { layer: o.layer } }),
-      shaft: (o) => new ShaftEntity({ id: o.id, geometry: o.geometry || {}, metadata: { layer: o.layer } }),
+      line: (o) => new LineEntity({ ...base(o), type: o.type, geometry: { x1: o.x, y1: o.y, x2: o.x2, y2: o.y2 } }),
+      centerline: (o) => new LineEntity({ ...base(o, 'centro'), type: 'centerline', geometry: { x1: o.x, y1: o.y, x2: o.x2, y2: o.y2 }, style: { stroke: '#93c5fd', ...(o.style || {}) } }),
+      rect: (o) => new RectEntity({ ...base(o), geometry: { x: o.x, y: o.y, width: o.width, height: o.height } }),
+      circle: (o) => new CircleEntity({ ...base(o), geometry: { cx: o.x, cy: o.y, radius: o.radius } }),
+      polyline: (o) => new PolylineEntity({ ...base(o), geometry: { points: o.points || [], closed: Boolean(o.closed) } }),
+      text: (o) => new TextEntity({ ...base(o, 'observacoes'), geometry: { x: o.x, y: o.y, text: o.text, size: o.size || 14 } }),
+      dimension: (o) => new DimensionEntity({ ...base(o, 'cotas'), geometry: o.geometry || {} }),
+      arc: (o) => new ArcEntity({ ...base(o), geometry: o.geometry || { cx: o.cx, cy: o.cy, radius: o.radius, startAngle: o.startAngle, endAngle: o.endAngle, ccw: o.ccw !== false } }),
+      shaft: (o) => new ShaftEntity({ ...base(o, 'eixos'), geometry: o.geometry || {} }),
     };
-    (initial.objects || []).forEach((o) => { if (map[o.type]) this.state.entities.push(map[o.type](o)); });
-    (initial.dimensions || []).forEach((d) => this.state.entities.push(new DimensionEntity({ ...d, metadata: { layer: 'cotas' } })));
+    const entityById = new Map();
+    [...(initial.objects || []), ...(initial.dimensions || [])].forEach((o) => {
+      if (!map[o.type]) return;
+      const entity = map[o.type](o);
+      entityById.set(String(entity.id), entity);
+    });
+    this.state.entities.push(...entityById.values());
   }
 
   serialize() {
     const objects = this.state.entities.map((e) => {
       const layer = e.metadata?.layer || this.state.activeLayer;
-      if (e.type === 'line' || e.type === 'centerline') return { id: e.id, type: e.type, x: e.geometry.x1, y: e.geometry.y1, x2: e.geometry.x2, y2: e.geometry.y2, layer };
-      if (e.type === 'rect') return { id: e.id, type: 'rect', x: e.geometry.x, y: e.geometry.y, width: e.geometry.width, height: e.geometry.height, layer };
-      if (e.type === 'circle') return { id: e.id, type: 'circle', x: e.geometry.cx, y: e.geometry.cy, radius: e.geometry.radius, layer };
-      if (e.type === 'polyline') return { id: e.id, type: 'polyline', points: e.geometry.points, layer, metadata: e.metadata || {} };
-      if (e.type === 'text') return { id: e.id, type: 'text', x: e.geometry.x, y: e.geometry.y, text: e.geometry.text, size: e.geometry.size, layer };
-      if (e.type === 'dimension') return { id: e.id, type: 'dimension', geometry: e.geometry, layer };
-      if (e.type === 'arc') return { id: e.id, type: 'arc', geometry: e.geometry, layer };
-      if (e.type === 'shaft') return { id: e.id, type: 'shaft', geometry: e.geometry, layer };
-      return { id: e.id, type: e.type, layer };
+      const common = { id: e.id, type: e.type, layer, style: e.style || {}, metadata: e.metadata || {}, visible: e.visible !== false };
+      if (e.type === 'line' || e.type === 'centerline') return { ...common, x: e.geometry.x1, y: e.geometry.y1, x2: e.geometry.x2, y2: e.geometry.y2 };
+      if (e.type === 'rect') return { ...common, x: e.geometry.x, y: e.geometry.y, width: e.geometry.width, height: e.geometry.height };
+      if (e.type === 'circle') return { ...common, x: e.geometry.cx, y: e.geometry.cy, radius: e.geometry.radius };
+      if (e.type === 'polyline') return { ...common, points: e.geometry.points, closed: Boolean(e.geometry.closed) };
+      if (e.type === 'text') return { ...common, x: e.geometry.x, y: e.geometry.y, text: e.geometry.text, size: e.geometry.size };
+      if (e.type === 'dimension' || e.type === 'arc' || e.type === 'shaft') return { ...common, geometry: e.geometry };
+      return common;
     });
     return {
       schemaVersion: 2,
@@ -190,7 +247,9 @@ export class DesenhoTecnicoController {
   }
 
   pushHistory() {
-    this.undoStack.push(JSON.stringify(this.serialize()));
+    const snapshot = JSON.stringify(this.serialize());
+    if (this.undoStack[this.undoStack.length - 1] === snapshot) return;
+    this.undoStack.push(snapshot);
     if (this.undoStack.length > 100) this.undoStack.shift();
     this.redoStack = [];
   }
@@ -209,38 +268,79 @@ export class DesenhoTecnicoController {
   getSnapCandidates() {
     const points = [];
     const segments = [];
-    const asPoint = (x, y, kind) => points.push({ x, y, kind });
+    const circles = [];
+    const asPoint = (x, y, kind) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      if (!points.some((point) => point.kind === kind && Math.hypot(point.x - x, point.y - y) <= 1e-8)) points.push({ x, y, kind });
+    };
+    const asSegment = (a, b, entity) => segments.push({ a, b, entity });
     this.state.entities.forEach((e) => {
+      const layer = this.state.layers[e.metadata?.layer || this.state.activeLayer] || {};
+      if (e.visible === false || layer.visible === false) return;
       if (e.type === 'line' || e.type === 'centerline') {
         asPoint(e.geometry.x1, e.geometry.y1, 'endpoint');
         asPoint(e.geometry.x2, e.geometry.y2, 'endpoint');
         asPoint((e.geometry.x1 + e.geometry.x2) / 2, (e.geometry.y1 + e.geometry.y2) / 2, 'midpoint');
-        segments.push([{ x: e.geometry.x1, y: e.geometry.y1 }, { x: e.geometry.x2, y: e.geometry.y2 }]);
+        asSegment({ x: e.geometry.x1, y: e.geometry.y1 }, { x: e.geometry.x2, y: e.geometry.y2 }, e);
       }
       if (e.type === 'rect') {
-        asPoint(e.geometry.x, e.geometry.y, 'endpoint');
-        asPoint(e.geometry.x + e.geometry.width, e.geometry.y + e.geometry.height, 'endpoint');
+        const minX = Math.min(e.geometry.x, e.geometry.x + e.geometry.width);
+        const maxX = Math.max(e.geometry.x, e.geometry.x + e.geometry.width);
+        const minY = Math.min(e.geometry.y, e.geometry.y + e.geometry.height);
+        const maxY = Math.max(e.geometry.y, e.geometry.y + e.geometry.height);
+        const corners = [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: minX, y: maxY }];
+        corners.forEach((corner, index) => {
+          const next = corners[(index + 1) % corners.length];
+          asPoint(corner.x, corner.y, 'endpoint');
+          asPoint((corner.x + next.x) / 2, (corner.y + next.y) / 2, 'midpoint');
+          asSegment(corner, next, e);
+        });
+        asPoint((minX + maxX) / 2, (minY + maxY) / 2, 'center');
       }
-      if (e.type === 'circle') asPoint(e.geometry.cx, e.geometry.cy, 'center');
+      if (e.type === 'circle') {
+        asPoint(e.geometry.cx, e.geometry.cy, 'center');
+        [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].forEach((angle) => asPoint(e.geometry.cx + Math.cos(angle) * e.geometry.radius, e.geometry.cy + Math.sin(angle) * e.geometry.radius, 'quadrant'));
+        circles.push({ center: { x: e.geometry.cx, y: e.geometry.cy }, radius: e.geometry.radius, entity: e });
+      }
       if (e.type === 'arc') {
         asPoint(e.geometry.cx, e.geometry.cy, 'center');
-        const a0 = e.geometry.startAngle || 0;
-        const a1 = e.geometry.endAngle || 0;
-        const mid = (a0 + a1) / 2;
-        asPoint(e.geometry.cx + Math.cos(mid) * e.geometry.radius, e.geometry.cy + Math.sin(mid) * e.geometry.radius, 'arc-midpoint');
+        const a0 = normalizeAngle(e.geometry.startAngle || 0);
+        const a1 = normalizeAngle(e.geometry.endAngle || 0);
+        const ccw = e.geometry.ccw !== false;
+        const sweep = ccw ? normalizeAngle(a1 - a0) : normalizeAngle(a0 - a1);
+        const mid = a0 + (ccw ? 1 : -1) * sweep / 2;
+        asPoint(e.geometry.cx + Math.cos(a0) * e.geometry.radius, e.geometry.cy + Math.sin(a0) * e.geometry.radius, 'endpoint');
+        asPoint(e.geometry.cx + Math.cos(a1) * e.geometry.radius, e.geometry.cy + Math.sin(a1) * e.geometry.radius, 'endpoint');
+        asPoint(e.geometry.cx + Math.cos(mid) * e.geometry.radius, e.geometry.cy + Math.sin(mid) * e.geometry.radius, 'midpoint');
+        circles.push({ center: { x: e.geometry.cx, y: e.geometry.cy }, radius: e.geometry.radius, entity: e });
       }
       if (e.type === 'polyline') (e.geometry.points || []).forEach((pt, idx, arr) => {
         asPoint(pt.x, pt.y, 'endpoint');
         if (idx < arr.length - 1) {
           asPoint((pt.x + arr[idx + 1].x) / 2, (pt.y + arr[idx + 1].y) / 2, 'midpoint');
-          segments.push([pt, arr[idx + 1]]);
+          asSegment(pt, arr[idx + 1], e);
         }
       });
     });
     for (let i = 0; i < segments.length; i += 1) {
       for (let j = i + 1; j < segments.length; j += 1) {
-        const hit = this.segmentIntersection(segments[i][0], segments[i][1], segments[j][0], segments[j][1]);
+        if (segments[i].entity.id === segments[j].entity.id) continue;
+        const hit = intersectSegments(segments[i].a, segments[i].b, segments[j].a, segments[j].b);
         if (hit) asPoint(hit.x, hit.y, 'intersection');
+      }
+    }
+    const isOnCircleEntity = (point, item) => item.entity.type !== 'arc' || isAngleBetween(angle2D(item.center, point), item.entity.geometry.startAngle, item.entity.geometry.endAngle, item.entity.geometry.ccw !== false);
+    segments.forEach((segment) => circles.forEach((circle) => {
+      if (segment.entity.id === circle.entity.id) return;
+      lineCircleIntersections(segment.a, segment.b, circle.center, circle.radius, true)
+        .filter((point) => isOnCircleEntity(point, circle))
+        .forEach((point) => asPoint(point.x, point.y, 'intersection'));
+    }));
+    for (let i = 0; i < circles.length; i += 1) {
+      for (let j = i + 1; j < circles.length; j += 1) {
+        circleCircleIntersections(circles[i].center, circles[i].radius, circles[j].center, circles[j].radius)
+          .filter((point) => isOnCircleEntity(point, circles[i]) && isOnCircleEntity(point, circles[j]))
+          .forEach((point) => asPoint(point.x, point.y, 'intersection'));
       }
     }
     return points;
@@ -249,27 +349,27 @@ export class DesenhoTecnicoController {
   getNearestPointOnEntity(entity, point) {
     const g = entity.geometry || {};
     if (entity.type === 'line' || entity.type === 'centerline') {
-      const ax = g.x1; const ay = g.y1; const bx = g.x2; const by = g.y2;
-      const dx = bx - ax; const dy = by - ay;
-      const len2 = dx * dx + dy * dy || 1;
-      const t = Math.max(0, Math.min(1, ((point.x - ax) * dx + (point.y - ay) * dy) / len2));
-      return { x: ax + t * dx, y: ay + t * dy, kind: 'nearest' };
+      return { ...projectPointToSegment(point, { x: g.x1, y: g.y1 }, { x: g.x2, y: g.y2 }).point, kind: 'nearest' };
     }
-    if (entity.type === 'circle') {
+    if (entity.type === 'circle' || entity.type === 'arc') {
       const a = Math.atan2(point.y - g.cy, point.x - g.cx);
+      if (entity.type === 'arc' && !isAngleBetween(a, g.startAngle, g.endAngle, g.ccw !== false)) return null;
       return { x: g.cx + Math.cos(a) * g.radius, y: g.cy + Math.sin(a) * g.radius, kind: 'nearest' };
     }
+    let segments = [];
+    if (entity.type === 'polyline') segments = (g.points || []).slice(1).map((end, index) => [g.points[index], end]);
+    if (entity.type === 'rect') {
+      const x2 = g.x + g.width; const y2 = g.y + g.height;
+      const corners = [{ x: g.x, y: g.y }, { x: x2, y: g.y }, { x: x2, y: y2 }, { x: g.x, y: y2 }];
+      segments = corners.map((start, index) => [start, corners[(index + 1) % corners.length]]);
+    }
+    const best = segments.map(([a, b]) => projectPointToSegment(point, a, b)).sort((a, b) => a.distance - b.distance)[0];
+    if (best) return { ...best.point, kind: 'nearest' };
     return null;
   }
 
   segmentIntersection(p1, p2, p3, p4) {
-    const den = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
-    if (Math.abs(den) < 1e-9) return null;
-    const x = ((p1.x * p2.y - p1.y * p2.x) * (p3.x - p4.x) - (p1.x - p2.x) * (p3.x * p4.y - p3.y * p4.x)) / den;
-    const y = ((p1.x * p2.y - p1.y * p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x * p4.y - p3.y * p4.x)) / den;
-    const inside = (p, a, b) => p >= Math.min(a, b) - 1e-6 && p <= Math.max(a, b) + 1e-6;
-    if (!inside(x, p1.x, p2.x) || !inside(y, p1.y, p2.y) || !inside(x, p3.x, p4.x) || !inside(y, p3.y, p4.y)) return null;
-    return { x, y };
+    return intersectSegments(p1, p2, p3, p4);
   }
 
   getPoint(point, from = null) {
@@ -281,7 +381,7 @@ export class DesenhoTecnicoController {
     if (!this.state.snappingConfig.enabled) return p;
     const tol = 10 / this.viewport.getViewState().zoom;
     const cfg = this.state.snappingConfig || {};
-    const priority = { endpoint: 1, midpoint: 2, intersection: 3, center: 4, nearest: 5, grid: 6 };
+    const priority = { intersection: 1, endpoint: 2, midpoint: 3, center: 4, quadrant: 4, nearest: 5, grid: 6 };
     const candidates = this.getSnapCandidates().filter((c) => cfg[c.kind] !== false);
     if (cfg.nearest !== false) {
       this.state.entities.forEach((e) => {
@@ -382,7 +482,18 @@ export class DesenhoTecnicoController {
   }
 
 
-  findEntityAt(world) { return [...this.state.entities].reverse().find((e) => e.hitTest(world, 6 / this.viewport.getViewState().zoom)); }
+  findEntityAt(world) {
+    return [...this.state.entities].reverse().find((entity) => {
+      const layer = this.state.layers[entity.metadata?.layer || this.state.activeLayer] || {};
+      return entity.visible !== false && layer.visible !== false && entity.hitTest(world, 6 / this.viewport.getViewState().zoom);
+    });
+  }
+
+  isEntityEditable(entity) {
+    if (!entity || entity.visible === false) return false;
+    const layer = this.state.layers[entity.metadata?.layer || this.state.activeLayer] || {};
+    return layer.visible !== false && layer.locked !== true;
+  }
 
   fitInitial() { const b = this.renderer.getGlobalBounds(); if (b.isValid()) this.viewport.zoomExtents(b); }
 
@@ -469,7 +580,7 @@ export class DesenhoTecnicoController {
       details += input('label', 'Texto', geo.label || '');
     }
     props.innerHTML = `<div class='cad-prop-row'><span class='cad-prop-label'>Tipo</span><span>${entity.type}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>ID</span><span>${entity.id}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>Camada</span><select class='cad-select' id='propLayer'>${Object.keys(this.state.layers || {}).map((l) => `<option ${l === layer ? 'selected' : ''} value='${l}'>${l}</option>`).join('')}</select></div>${details}`;
-    document.getElementById('propLayer')?.addEventListener('change', (e) => { entity.metadata = { ...(entity.metadata || {}), layer: e.target.value }; this.pushHistory(); this.render(); });
+    document.getElementById('propLayer')?.addEventListener('change', (e) => { entity.metadata = { ...(entity.metadata || {}), layer: e.target.value }; this.pushHistory(); this.markDirty('Camada do objeto atualizada'); this.render(); });
     props.querySelectorAll('[data-prop]').forEach((el) => el.addEventListener('change', (e) => {
       const path = e.target.dataset.prop;
       const value = e.target.type === 'number' ? Number(e.target.value) : e.target.value;
@@ -485,12 +596,14 @@ export class DesenhoTecnicoController {
         entity.geometry.x2 = x1 + Math.cos(angleRad) * length;
         entity.geometry.y2 = y1 + Math.sin(angleRad) * length;
         this.pushHistory();
+        this.markDirty('Propriedade atualizada');
         this.render();
         return;
       }
       if (entity.type === 'circle' && path === 'diameter') {
         entity.geometry.radius = Number(value) / 2;
         this.pushHistory();
+        this.markDirty('Propriedade atualizada');
         this.render();
         return;
       }
@@ -502,6 +615,7 @@ export class DesenhoTecnicoController {
       }
       target[keys[keys.length - 1]] = value;
       this.pushHistory();
+      this.markDirty('Propriedade atualizada');
       this.render();
     }));
   }
@@ -511,6 +625,12 @@ export class DesenhoTecnicoController {
     document.querySelectorAll('.cad-status-toggle[data-toggle="grid"],#cadGridToggle').forEach((b) => b.classList.toggle('active', this.state.gridConfig.visible));
     document.querySelectorAll('.cad-status-toggle[data-toggle="snap"],#cadSnapToggle').forEach((b) => b.classList.toggle('active', this.state.snappingConfig.enabled));
     document.querySelectorAll('.cad-status-toggle[data-toggle="ortho"],#cadOrthoToggle').forEach((b) => b.classList.toggle('active', this.state.orthoEnabled));
+    const gridStepInput = document.getElementById('cadGridStepInput');
+    if (gridStepInput && document.activeElement !== gridStepInput) gridStepInput.value = String(this.state.gridConfig.step);
+    document.querySelectorAll('[data-snap-option]').forEach((input) => {
+      input.checked = this.state.snappingConfig[input.dataset.snapOption] !== false;
+      input.disabled = !this.state.snappingConfig.enabled;
+    });
   }
 
 
@@ -518,11 +638,14 @@ export class DesenhoTecnicoController {
     const defaults = {
       contorno: { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' },
       centro: { color: '#0f766e', visible: true, locked: false, lineType: 'center' },
+      linhas_de_centro: { color: '#0f766e', visible: true, locked: false, lineType: 'center' },
       cotas: { color: '#2563eb', visible: true, locked: false, lineType: 'continuous' },
       eixos: { color: '#0e7490', visible: true, locked: false, lineType: 'center' },
       furacao: { color: '#065f46', visible: true, locked: false, lineType: 'dashed' },
+      furos: { color: '#065f46', visible: true, locked: false, lineType: 'dashed' },
       construcao: { color: '#6b7280', visible: true, locked: false, lineType: 'dashed' },
       observacoes: { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' },
+      textos: { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' },
       geometria_principal: { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' },
     };
     this.state.layers = { ...defaults, ...(this.state.layers || {}) };
@@ -558,12 +681,6 @@ export class DesenhoTecnicoController {
     if (!action) return;
     if (action.startsWith('tool-')) {
       const tool = source?.dataset?.tool || action.slice(5).replaceAll('-', '_');
-      const unsupported = ['copy', 'move', 'erase'];
-      if (unsupported.includes(tool)) {
-        this.state.statusMessage = `Ferramenta ${this.getToolLabel(tool)} em desenvolvimento`;
-        this.render();
-        return;
-      }
       this.toolManager.set(tool);
       this.eventBus.emit('tool:changed', this.toolManager.name);
       this.state.statusMessage = `Ferramenta ativa: ${this.getToolLabel(tool)}`;
@@ -574,9 +691,9 @@ export class DesenhoTecnicoController {
     const actions = {
       'zoom-extents': () => this.viewport.zoomExtents(this.renderer.getGlobalBounds()),
       'reset-view': () => { this.viewport.resetView(); this.fitInitial(); },
-      'toggle-grid': () => { this.state.gridConfig.visible = !this.state.gridConfig.visible; this.render(); },
-      'toggle-snap': () => { this.state.snappingConfig.enabled = !this.state.snappingConfig.enabled; this.render(); },
-      'toggle-ortho': () => { this.state.orthoEnabled = !this.state.orthoEnabled; this.render(); },
+      'toggle-grid': () => { this.state.gridConfig.visible = !this.state.gridConfig.visible; this.markDirty('Grade atualizada'); this.render(); },
+      'toggle-snap': () => { this.state.snappingConfig.enabled = !this.state.snappingConfig.enabled; this.markDirty('Snap atualizado'); this.render(); },
+      'toggle-ortho': () => { this.state.orthoEnabled = !this.state.orthoEnabled; this.markDirty('Ortho atualizado'); this.render(); },
       'toggle-right-panel': () => {
         const root = document.querySelector('.cad-fullscreen');
         if (!root) return;
@@ -593,9 +710,12 @@ export class DesenhoTecnicoController {
         this.render();
       },
       'delete-selection': () => {
-        this.state.entities = this.state.entities.filter((e) => !this.selection.includes(e.id));
+        const removable = new Set(this.state.entities.filter((entity) => this.selection.includes(entity.id) && this.isEntityEditable(entity)).map((entity) => entity.id));
+        if (!removable.size) return;
+        this.state.entities = this.state.entities.filter((entity) => !removable.has(entity.id));
         this.selection.clear();
         this.pushHistory();
+        this.markDirty(`Apagados ${removable.size} objeto(s)`);
         this.render();
       },
       undo: () => {
@@ -603,12 +723,14 @@ export class DesenhoTecnicoController {
         const cur = this.undoStack.pop();
         this.redoStack.push(cur);
         this.applySerialized(this.undoStack[this.undoStack.length - 1]);
+        this.markDirty('Alteração desfeita');
       },
       redo: () => {
         if (!this.redoStack.length) return;
         const state = this.redoStack.pop();
         this.undoStack.push(state);
         this.applySerialized(state);
+        this.markDirty('Alteração refeita');
       },
       save: async () => { await this.saveDrawing(); this.render(); },
       'save-metadata': async () => { await this.saveMetadata(); },
@@ -624,6 +746,20 @@ export class DesenhoTecnicoController {
       this.state.statusMessage = e.message;
       this.render();
     });
+  }
+
+  executeCommand(rawCommand) {
+    const command = String(rawCommand || '').trim().toLowerCase();
+    if (!command) return false;
+    const action = COMMAND_ALIASES[command];
+    if (!action) {
+      this.state.statusMessage = `Comando não reconhecido: ${rawCommand}`;
+      this.render();
+      return false;
+    }
+    const tool = action.startsWith('tool-dim-') ? action.slice(5).replace('dim-', 'dim_') : (action.startsWith('tool-') ? action.slice(5) : '');
+    this.executeAction(action, tool ? { dataset: { tool } } : null);
+    return true;
   }
 
   scheduleAutosave() {
@@ -677,12 +813,6 @@ export class DesenhoTecnicoController {
     this.eventBus.on('entity:hovered', () => this.render());
     this.eventBus.on('prompt:changed', () => this.render());
     this.eventBus.on('cursor:move', (c) => { this.updateStatus(c); this.render(); });
-    document.querySelectorAll('[data-tool]').forEach((btn) => {
-      const unsupported = ['copy', 'move', 'erase'];
-      if (!unsupported.includes(btn.dataset.tool)) return;
-      btn.disabled = true;
-      btn.title = 'Ferramenta em desenvolvimento';
-    });
     this.configureTooltips();
     const cadRoot = document.querySelector('.cad-fullscreen');
     if (!cadRoot) {
@@ -704,14 +834,30 @@ export class DesenhoTecnicoController {
     });
     cadRoot.addEventListener('change', (event) => {
       const target = event.target;
-      if (target.dataset.layerVisible) {
+      if (target.id === 'cadGridStepInput') {
+        const value = Number(target.value);
+        if (!Number.isFinite(value) || value < 0.001) {
+          target.value = String(this.state.gridConfig.step);
+          return;
+        }
+        this.state.gridConfig.step = value;
+        this.markDirty('Passo da grade atualizado');
+        this.render();
+      } else if (target.dataset.snapOption) {
+        this.state.snappingConfig[target.dataset.snapOption] = target.checked;
+        this.markDirty(`Snap ${target.dataset.snapOption} atualizado`);
+        this.render();
+      } else if (target.dataset.layerVisible) {
         this.state.layers[target.dataset.layerVisible].visible = target.checked;
+        this.markDirty('Visibilidade da camada atualizada');
         this.render();
       } else if (target.dataset.layerLocked) {
         this.state.layers[target.dataset.layerLocked].locked = target.checked;
+        this.markDirty('Bloqueio da camada atualizado');
         this.render();
       } else if (target.dataset.layerColor) {
         this.state.layers[target.dataset.layerColor].color = target.value;
+        this.markDirty('Cor da camada atualizada');
         this.render();
       }
     });
@@ -722,19 +868,41 @@ export class DesenhoTecnicoController {
     this.render();
     // eslint-disable-next-line no-console
     console.info('[CAD] Bind de eventos concluído');
+    const commandInput = document.getElementById('cadCommandInput');
+    commandInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        commandInput.value = '';
+        commandInput.blur();
+        return;
+      }
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      event.stopPropagation();
+      const command = commandInput.value;
+      commandInput.value = '';
+      if (this.executeCommand(command)) commandInput.blur();
+    });
     window.addEventListener('keydown', async (e) => {
+      const activeEl = document.activeElement;
+      const isFormField = activeEl && (
+        activeEl.tagName === 'INPUT'
+        || activeEl.tagName === 'TEXTAREA'
+        || activeEl.tagName === 'SELECT'
+        || activeEl.isContentEditable
+      );
       if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); this.executeAction('save'); }
-      if (e.key === 'Delete') this.executeAction('delete-selection');
+      if (!isFormField && e.key === 'Delete') this.executeAction('delete-selection');
       if (e.ctrlKey && e.key.toLowerCase() === 'z') this.executeAction('undo');
       if (e.ctrlKey && e.key.toLowerCase() === 'y') this.executeAction('redo');
+      if (!isFormField && !e.ctrlKey && !e.altKey && !e.metaKey && this.toolManager.name === 'select' && /^[a-zA-Z]$/.test(e.key)) {
+        e.preventDefault();
+        commandInput?.focus();
+        if (commandInput) commandInput.value += e.key;
+        return;
+      }
       if (e.key === 'Escape') {
-        const activeEl = document.activeElement;
-        const isFormField = activeEl && (
-          activeEl.tagName === 'INPUT'
-          || activeEl.tagName === 'TEXTAREA'
-          || activeEl.tagName === 'SELECT'
-          || activeEl.isContentEditable
-        );
         const isCadDynInput = activeEl?.classList?.contains('cad-dyn-input');
         if (isFormField && !isCadDynInput) return;
         e.preventDefault();

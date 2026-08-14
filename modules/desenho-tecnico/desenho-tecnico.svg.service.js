@@ -144,7 +144,34 @@ function renderTechnicalDrawing(data = {}) {
 
 function renderCadDrawing(cad = {}) {
   const objects = Array.isArray(cad.objects) ? cad.objects : [];
+  const dimensions = Array.isArray(cad.dimensions) ? cad.dimensions : [];
   const layers = cad.layers || {};
+  const escapeXml = (value) => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const arcPath = (obj) => {
+    const geometry = obj.geometry || obj;
+    const start = { x: geometry.cx + Math.cos(geometry.startAngle) * geometry.radius, y: geometry.cy + Math.sin(geometry.startAngle) * geometry.radius };
+    const end = { x: geometry.cx + Math.cos(geometry.endAngle) * geometry.radius, y: geometry.cy + Math.sin(geometry.endAngle) * geometry.radius };
+    const ccw = geometry.ccw !== false;
+    let delta = ccw ? geometry.endAngle - geometry.startAngle : geometry.startAngle - geometry.endAngle;
+    while (delta < 0) delta += Math.PI * 2;
+    while (delta > Math.PI * 2) delta -= Math.PI * 2;
+    return `M ${start.x} ${start.y} A ${geometry.radius} ${geometry.radius} 0 ${delta > Math.PI ? 1 : 0} ${ccw ? 1 : 0} ${end.x} ${end.y}`;
+  };
+  const shaftSvg = (obj) => {
+    const geometry = obj.geometry || {};
+    const origin = geometry.origin || { x: 0, y: 0 };
+    const vertical = geometry.orientation === 'vertical';
+    let x = origin.x;
+    let y = origin.y;
+    return (geometry.segments || []).map((segment) => {
+      const radius = segment.diameter / 2;
+      const rect = vertical
+        ? `<rect x="${x - radius}" y="${y}" width="${segment.diameter}" height="${segment.length}" />`
+        : `<rect x="${x}" y="${y - radius}" width="${segment.length}" height="${segment.diameter}" />`;
+      if (vertical) y += segment.length; else x += segment.length;
+      return rect;
+    }).join('');
+  };
   const byLayer = {};
   for (const obj of objects) {
     const layer = obj.layer || 'geometria_principal';
@@ -161,17 +188,26 @@ function renderCadDrawing(cad = {}) {
       if (obj.type === 'rect') return `<rect x="${obj.x}" y="${obj.y}" width="${obj.width}" height="${obj.height}" transform="rotate(${obj.rotation || 0} ${obj.x || 0} ${obj.y || 0})" stroke-width="${obj.strokeWidth || 2}" />`;
       if (obj.type === 'circle' || obj.type === 'hole') return `<circle cx="${obj.x}" cy="${obj.y}" r="${obj.radius}" stroke-width="${obj.strokeWidth || 2}" />`;
       if (obj.type === 'centerline') return `<line x1="${obj.x}" y1="${obj.y}" x2="${obj.x2}" y2="${obj.y2}" stroke-dasharray="8 4" stroke-width="1.5" />`;
-      if (obj.type === 'text' || obj.type === 'note') return `<text x="${obj.x}" y="${obj.y}" fill="${color}" font-size="${obj.fontSize || 12}">${obj.text || ''}</text>`;
-      if (obj.type === 'polyline' && Array.isArray(obj.points)) return `<polyline points="${obj.points.map((pt) => `${pt.x},${pt.y}`).join(' ')}" stroke-width="${obj.strokeWidth || 2}" />`;
-      if (obj.type === 'arc') return `<path d="M ${obj.x} ${obj.y} A ${obj.radius || 20} ${obj.radius || 20} 0 0 1 ${obj.x2 || obj.x} ${obj.y2 || obj.y}" stroke-width="${obj.strokeWidth || 2}" />`;
+      if (obj.type === 'text' || obj.type === 'note') return `<text x="${obj.x}" y="${obj.y}" fill="${color}" font-size="${obj.size || obj.fontSize || 12}">${escapeXml(obj.text || '')}</text>`;
+      if (obj.type === 'polyline' && Array.isArray(obj.points)) return `<${obj.closed ? 'polygon' : 'polyline'} points="${obj.points.map((pt) => `${pt.x},${pt.y}`).join(' ')}" stroke-width="${obj.strokeWidth || 2}" />`;
+      if (obj.type === 'arc') return `<path d="${arcPath(obj)}" stroke-width="${obj.strokeWidth || 2}" />`;
+      if (obj.type === 'shaft') return shaftSvg(obj);
       return '';
     }).join('')}</g>`;
+  }).join('');
+
+  const dimensionSvg = dimensions.map((dimension) => {
+    const geometry = dimension.geometry || dimension;
+    if (!geometry.p1 || !geometry.p2) return '';
+    const textPoint = geometry.textPoint || { x: (geometry.p1.x + geometry.p2.x) / 2, y: (geometry.p1.y + geometry.p2.y) / 2 };
+    return `<g data-layer="cotas" stroke="#2563eb" fill="none"><line x1="${geometry.p1.x}" y1="${geometry.p1.y}" x2="${geometry.p2.x}" y2="${geometry.p2.y}"/><text x="${textPoint.x}" y="${textPoint.y}" fill="#2563eb" font-size="12">${escapeXml(geometry.label || '')}</text></g>`;
   }).join('');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" width="100%" height="100%">
     ${generateGrid(1200, 760, cad.gridStep || 25)}
     ${generateDrawingFrame(1200, 760)}
     ${objectSvg}
+    ${dimensionSvg}
     ${generateTitleBlock({ codigo: cad.codigo || 'CAD', titulo: cad.titulo || 'Desenho CAD', revisao: cad.revisao || 0 }, 1200, 760)}
   </svg>`;
 }
