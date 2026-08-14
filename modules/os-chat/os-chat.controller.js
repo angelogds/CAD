@@ -20,16 +20,20 @@ function serializeMensagem(mensagem) {
 }
 
 function index(req, res) {
-  const filtro = req.query.filtro || 'todas';
-  const conversas = service.listarConversasOS(req.session.user, { filtro });
-  return res.render('os-chat/index', { title: 'Chat de OS', activeMenu: 'os-chat', conversas, filtro, filtros, user: req.session.user });
+  const filters = {
+    filtro: req.query.filtro || req.query.aba || 'todas', busca: req.query.busca || '',
+    motivo: req.query.motivo || '', prioridade: req.query.prioridade || '',
+    ordenacao: req.query.ordenacao || 'recentes', pagina: req.query.pagina || 1, limite: req.query.limite || 12,
+  };
+  const dashboard = service.getDashboard(req.session.user, filters);
+  return res.render('os-chat/index', { title: 'Chat das OS', activeMenu: 'os-chat', ...dashboard, filtro: filters.filtro, filtros, user: req.session.user });
 }
 function show(req, res) {
   const osId = Number(req.params.osId);
   const conversa = service.buscarConversaPorOS(osId, req.session.user);
   if (!conversa) return res.status(404).render('errors/404', { title: 'OS não encontrada' });
   service.marcarComoLida(osId, req.session.user.id);
-  const conversas = service.listarConversasOS(req.session.user, { filtro: req.query.filtro || 'todas' });
+  const conversas = service.listarConversasOS(req.session.user, { filtro: req.query.filtro || 'todas' }).slice(0, 50);
   return res.render('os-chat/show', { title: `Chat OS #${osId}`, activeMenu: 'os-chat', conversa, conversas, filtro: req.query.filtro || 'todas', filtros, user: req.session.user });
 }
 function apiMensagens(req, res) {

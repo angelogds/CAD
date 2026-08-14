@@ -1,42 +1,33 @@
 <% layout('layout') %>
-<%- include('partials-styles') %>
-<% const isHistorico = ['historico','finalizadas','finalizadas_recentes'].includes(String(filtro || '').toLowerCase()); %>
-<div class="page-head">
-  <div><h1>💬 Chat de OS</h1><p class="muted"><%= isHistorico ? 'Consulta de OSs encerradas arquivadas, sem carregar por padrão.' : 'Painel operacional com apenas OSs ativas, pendentes, pausadas ou aguardando ação.' %></p></div>
-  <a class="btn btn-ghost" href="/chat-os<%= isHistorico ? '?filtro=finalizadas' : '' %>">Atualizar</a>
-</div>
-<div class="os-chat-filters">
-  <% filtros.forEach(([value,label]) => { %><a class="pill-tag <%= filtro===value?'pill-green':'pill-gray' %>" href="/chat-os?filtro=<%= value %>"><%= label %></a><% }) %>
-</div>
-<div class="os-chat-shell os-chat-list-only <%= isHistorico ? 'history-mode' : '' %>">
-  <aside class="os-chat-list">
-    <% if (!conversas.length) { %><div class="os-chat-empty"><strong><%= isHistorico ? 'Nenhuma OS finalizada encontrada no histórico.' : 'Nenhuma OS ativa com tratativa pendente no momento.' %></strong><br><%= isHistorico ? 'OSs fechadas, finalizadas, concluídas ou canceladas aparecerão aqui para consulta posterior.' : 'As OSs aparecerão aqui enquanto estiverem abertas, em andamento, pausadas, pendentes ou aguardando alguma ação.' %></div><% } %>
-    <% conversas.forEach((c) => { const pr=String(c.prioridade||'').toUpperCase(); const dot=isHistorico?'📁':(Number(c.eh_critica||0)===1||pr.includes('CRIT')||pr.includes('ALTA')||pr.includes('URG')?'🔴':(c.tem_solicitacao?'🟡':'🟢')); const motivo=c.motivo_atual || (c.esta_atrasada ? 'OS em atraso' : (c.tem_solicitacao ? 'Solicitação vinculada' : (c.tem_chat ? 'Conversa registrada' : 'Tratativa registrada'))); %>
-      <a class="os-chat-contact" href="/chat-os/<%= c.id %>?filtro=<%= filtro %>">
-        <div class="os-chat-contact-top"><strong><%= dot %> OS <%= c.id %> - <%= c.equipamento %></strong><span><%= c.ultima_interacao_em ? fmtBR(c.ultima_interacao_em) : '' %></span></div>
-        <div class="muted"><%= c.setor || '-' %></div>
-        <div>Status: <strong><%= c.status || '-' %></strong></div>
-        <% if (isHistorico) { %>
-          <div>Responsável: <strong><%= c.responsavel || '-' %></strong></div>
-          <div>Abertura: <strong><%= c.opened_at ? fmtBR(c.opened_at) : '-' %></strong></div>
-          <div>Fechamento: <strong><%= c.data_fechamento ? fmtBR(c.data_fechamento) : '-' %></strong></div>
-          <div class="os-chat-preview">Última mensagem: <%= c.ultima_mensagem || 'Sem mensagens registradas' %></div>
-        <% } else { %>
-          <div>Motivo: <%= motivo %></div>
-          <div class="os-chat-preview">Última interação: <%= c.ultima_mensagem_em ? fmtBR(c.ultima_mensagem_em) : 'Sem mensagens no chat' %></div>
-          <% if (c.participantes) { %><div class="os-chat-preview">Participantes: <%= c.participantes %></div><% } %>
-        <% } %>
-        <div class="os-chat-badges">
-          <% if (!isHistorico && c.nao_lidas > 0) { %><span class="badge-unread"><%= c.nao_lidas %> não lida(s)</span><% } %>
-          <% if (!isHistorico && Number(c.aguarda_material || 0) === 1) { %><span class="pill-tag pill-amber">Depende de material</span><% } %>
-          <% if (!isHistorico && Number(c.aguarda_compras || 0) === 1) { %><span class="pill-tag pill-blue">Aguardando compras</span><% } %>
-          <% if (!isHistorico && Number(c.esta_pausada || 0) === 1) { %><span class="pill-tag pill-amber">Pausada</span><% } %>
-          <% if (!isHistorico && Number(c.eh_critica || 0) === 1) { %><span class="pill-tag pill-amber">Crítica</span><% } %>
-          <% if (!isHistorico && c.tem_solicitacao) { %><span class="pill-tag pill-blue">Solicitação vinculada</span><% } %>
-          <% if (isHistorico) { %><span class="pill-tag pill-gray">Arquivada</span><% } %>
-        </div>
-      </a>
+<link rel="stylesheet" href="/css/chat-os.css">
+<% const q = (extra={}) => new URLSearchParams({...filters,...extra}).toString(); const history = ['finalizadas','historico'].includes(filters.filtro); %>
+<div class="chat-os-page">
+  <header class="chat-os-page-header">
+    <div><h1><span class="chat-os-title-icon" aria-hidden="true">◌</span> Chat das OS</h1><p>Comunicação oficial, pendências e decisões vinculadas às ordens de serviço</p></div>
+    <div class="chat-os-header-actions"><a class="btn btn-ghost" href="/chat-os?<%= q() %>">↻&nbsp; Atualizar</a><a class="btn btn-ghost" href="/push/config">Configurar notificações</a><small>Atualizado agora</small></div>
+  </header>
+  <section class="chat-os-kpis" aria-label="Indicadores operacionais">
+    <% [['todas','Conversas ativas',metrics.ativas,'OS aguardando acompanhamento','green'],['nao_lidas','Não lidas',metrics.naoLidas,'Novas atualizações','red'],['aguardando_compras','Aguardando compras',metrics.aguardandoCompras,'Solicitações vinculadas','blue'],['aguardando_material','Aguardando material',metrics.aguardandoMaterial,'Material pendente','orange'],['criticas','Críticas',metrics.criticas,'Prioridade imediata','red']].forEach(k=>{ %>
+      <a href="/chat-os?<%= q({filtro:k[0],pagina:1}) %>" class="chat-os-kpi chat-os-kpi--<%= k[4] %> <%= filters.filtro===k[0]?'is-active':'' %>"><span class="chat-os-kpi-icon" aria-hidden="true"></span><span><b><%= k[1] %></b><strong><%= k[2] %></strong><small><%= k[3] %></small></span><i>›</i></a>
     <% }) %>
-  </aside>
-  <section class="os-chat-placeholder"><h2><%= isHistorico ? 'Histórico de OSs finalizadas' : 'Selecione uma OS' %></h2><p><%= isHistorico ? 'Clique em uma OS arquivada para consultar a conversa mantida para auditoria.' : 'Abra uma conversa para registrar tratativas, compras, inspeção e andamento oficial.' %></p></section>
+  </section>
+  <form class="chat-os-toolbar" method="get" action="/chat-os">
+    <label class="chat-os-search"><span aria-hidden="true">⌕</span><input name="busca" value="<%= filters.busca %>" placeholder="Buscar por OS, equipamento ou mensagem"></label>
+    <nav class="chat-os-tabs"><a class="<%= filters.filtro==='todas'?'active':'' %>" href="/chat-os?<%= q({filtro:'todas',pagina:1}) %>">Ativas</a><a class="<%= filters.filtro==='nao_lidas'?'active':'' %>" href="/chat-os?<%= q({filtro:'nao_lidas',pagina:1}) %>">Não lidas</a><a class="<%= history?'active':'' %>" href="/chat-os?<%= q({filtro:'finalizadas',pagina:1}) %>">Finalizadas</a></nav>
+    <input type="hidden" name="filtro" value="<%= filters.filtro %>"><label>Motivo<select name="motivo"><option value="">Todos os motivos</option><% motivos.forEach(m=>{ %><option value="<%= m.nome %>" <%= filters.motivo===m.nome?'selected':'' %>><%= m.nome %></option><% }) %></select></label>
+    <label>Prioridade<select name="prioridade"><option value="">Todas</option><% prioridades.forEach(p=>{ %><option <%= filters.prioridade===p?'selected':'' %>><%= p %></option><% }) %></select></label>
+    <button class="btn btn-green">Filtrar</button><a href="/chat-os" class="chat-os-clear">Limpar filtros</a>
+  </form>
+  <div class="chat-os-layout">
+    <section class="chat-os-sidebar">
+      <header><div><h2>Conversas</h2><small><%= pagination.total %> conversa(s) <%= history?'finalizada(s)':'ativa(s)' %></small></div><form><% Object.entries(filters).filter(([k])=>k!=='ordenacao').forEach(([k,v])=>{ %><input type="hidden" name="<%= k %>" value="<%= v %>"><% }) %><select name="ordenacao" onchange="this.form.submit()"><option value="recentes">Mais recentes</option><option value="antigas" <%= filters.ordenacao==='antigas'?'selected':'' %>>Mais antigas</option><option value="prioridade" <%= filters.ordenacao==='prioridade'?'selected':'' %>>Prioridade</option><option value="nao_lidas" <%= filters.ordenacao==='nao_lidas'?'selected':'' %>>Não lidas</option></select></form></header>
+      <div class="chat-os-contacts">
+      <% if(!conversas.length){ %><div class="chat-os-empty"><span class="chat-os-empty-icon">⌕</span><h3>Nenhuma conversa encontrada</h3><p>Ajuste os filtros ou consulte outra aba.</p></div><% } %>
+      <% conversas.forEach(c=>{ const tone=history?'gray':(c.eh_critica||c.nao_lidas?'red':c.aguarda_material?'orange':c.aguarda_compras?'blue':'green'); const summary=c.motivo_atual||c.ultima_justificativa||c.ultima_mensagem; %>
+        <a class="chat-os-contact chat-os-contact--<%= tone %>" href="/chat-os/<%= c.id %>?filtro=<%= filters.filtro %>"><div class="chat-os-contact-top"><strong>OS #<%= c.id %> • <%= c.equipamento %></strong><time><%= c.ultima_interacao_em?fmtBR(c.ultima_interacao_em):'' %></time><% if(c.nao_lidas){ %><b class="badge-unread"><%= c.nao_lidas %></b><% } %></div><div class="chat-os-badges"><span><%= c.status||'-' %></span><span class="priority"><%= c.prioridade||'-' %></span></div><p><%= summary||'Sem atualizações registradas.' %></p><small>Responsável: <b><%= c.responsavel||'-' %></b></small><div class="chat-os-flags"><% if(c.tem_solicitacao){ %><span>Solicitação vinculada</span><% } %><% if(c.aguarda_compras){ %><span>Compras</span><% } %><% if(c.aguarda_material){ %><span>Material</span><% } %><% if(c.tem_interacao_inspecao){ %><span>Inspeção</span><% } %></div></a>
+      <% }) %></div>
+      <footer><span>Mostrando <%= conversas.length %> de <%= pagination.total %></span><nav><a class="<%= pagination.page<=1?'disabled':'' %>" href="/chat-os?<%= q({pagina:pagination.page-1}) %>">‹</a><a class="<%= pagination.page>=pagination.pages?'disabled':'' %>" href="/chat-os?<%= q({pagina:pagination.page+1}) %>">›</a></nav></footer>
+    </section>
+    <section class="chat-os-selection"><div class="chat-os-hero-icon"><span></span></div><h2>Selecione uma conversa</h2><p>Escolha uma OS na lista para acompanhar mensagens, justificativas, compras e decisões operacionais.</p><div class="chat-os-feature-grid"><article><i>▢</i><b>Mensagens oficiais</b><small>Comunicações e atualizações da equipe.</small></article><article><i>◷</i><b>Eventos da OS</b><small>Histórico de ações e movimentações.</small></article><article><i>⌁</i><b>Solicitações vinculadas</b><small>Compras, materiais e aprovações.</small></article><article><i>▤</i><b>Fotos e documentos</b><small>Evidências e arquivos anexados à OS.</small></article></div><div class="chat-os-record-note">Todas as interações ficam registradas no histórico da Ordem de Serviço.</div></section>
+  </div>
 </div>
