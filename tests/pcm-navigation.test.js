@@ -39,9 +39,10 @@ test('All PCM pages include internal nav and responsive helpers', () => {
 
 test('Primary action buttons exist in key pages', () => {
   const home = fs.readFileSync('views/pcm/index.ejs', 'utf8');
-  assert.ok(home.includes('Abrir tela de Planejamento'));
-  assert.ok(home.includes('Abrir Backlog'));
+  assert.ok(home.includes('Fila de trabalho do PCM'));
   assert.ok(home.includes('Atualizar indicadores'));
+  assert.ok(home.includes('Executar automação'));
+  assert.ok(home.includes('Gerar análise com IA'));
 
   const planejamento = fs.readFileSync('views/pcm/planejamento.ejs', 'utf8');
   assert.ok(planejamento.includes('Nova atividade / nova preventiva'));
