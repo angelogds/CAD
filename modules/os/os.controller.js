@@ -3,7 +3,7 @@ const pushService = require("../push/push.service");
 let tracagemService = null;
 try { tracagemService = require('../tracagem/tracagem.service'); } catch (_e) {}
 const { canAccessModule, normalizeRole } = require("../../config/rbac");
-const { canViewOSDetails, canRegisterOSAndamento, canManageOSDisponibilidade, postCloseRedirectPath } = require("./os.permissions");
+const { canViewOSDetails, canRegisterOSAndamento, canRedistributeTeam, postCloseRedirectPath } = require("./os.permissions");
 const aiService = require("../ai/ai.service");
 const embeddingsService = require("../ai/ai.embeddings.service");
 const visionService = require("../ai/ai.vision.service");
@@ -220,7 +220,7 @@ function osShow(req, res) {
     return res.status(403).render("errors/403", { layout: "layout", title: "Sem permissão" });
   }
 
-  const canManageEquipe = ["ADMIN", "ENCARREGADO_MANUTENCAO", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"].includes(role);
+  const canManageEquipe = canRedistributeTeam(req.session?.user);
 
   let osAtual = os;
   if (String(osAtual.status || "").toUpperCase() === "AGUARDANDO_EQUIPE" && !osAtual.executor_colaborador_id) {
@@ -264,7 +264,7 @@ function osShow(req, res) {
     os: osAtual,
     canAutoAssign: canManageEquipe,
     canManualEditEquipe: canManageEquipe,
-    canManageDisponibilidade: canManageOSDisponibilidade(role),
+    canManageDisponibilidade: canManageEquipe,
     canExecuteOS: canAccessModule(role, "os_execute"),
     canRegisterAndamento: canRegisterOSAndamento(role),
     equipeUsuarios,
@@ -284,6 +284,7 @@ function osShow(req, res) {
     horasExtrasOS,
     metricasAndamento,
     alertaJustificativaAndamento: service.isStatusOSEmAndamento(osAtual.status) && metricasAndamento.dias_aberta > 1 && !ultimoRegistroHoje,
+    ultimoRegistroHoje,
     documentoInstitucional,
     disponibilidadeResponsavel,
     chatResumo,
@@ -588,7 +589,7 @@ async function osUpdateStatus(req, res) {
 async function osAutoAssign(req, res) {
   const id = Number(req.params.id);
   try {
-    const result = service.autoAssignOS(id, req.session?.user?.id || null, { force: true });
+    const result = service.autoAssignOS(id, req.session?.user?.id || null, { force: true, actor: req.session?.user });
     if (result?.aguardando) {
       req.flash("error", result.aviso);
     } else {
@@ -615,7 +616,9 @@ async function osSetEquipe(req, res) {
       auxiliar_colaborador_id: req.body.auxiliar_colaborador_id ? Number(req.body.auxiliar_colaborador_id) : null,
       executor_secundario_colaborador_id: req.body.executor_secundario_colaborador_id ? Number(req.body.executor_secundario_colaborador_id) : null,
       auxiliar_secundario_colaborador_id: req.body.auxiliar_secundario_colaborador_id ? Number(req.body.auxiliar_secundario_colaborador_id) : null,
-    }, req.session?.user?.id || null);
+      turno: req.body.turno,
+      observacao: req.body.observacao,
+    }, req.session?.user?.id || null, req.session?.user);
     await notifyResponsavelWhatsapp(id, "ATRIBUICAO", req.session?.user?.id || null);
     req.flash("success", "Equipe atualizada com sucesso.");
   } catch (err) {

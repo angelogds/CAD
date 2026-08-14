@@ -17,9 +17,8 @@
   const canConcluir = ['running', 'paused', 'material'].includes(statusMeta.phase) && canExecuteOS;
   const osStatus = statusMeta.label;
   const osPrioridade = String(os.grau || '-').toUpperCase();
-  const diagnosticoInicialOS = os.diagnostico || os.ai_diagnostico_inicial || 'Não registrado';
   const equipePrincipal = [os.executor_nome || os.execucao_ativa?.executor_nome, os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome].filter(Boolean);
-  const initials = (name) => { const parts = String(name || '').trim().split(/\s+/).filter(Boolean); return parts.length ? (parts[0][0] + (parts.length > 1 ? parts[1][0] : '')).toLocaleUpperCase('pt-BR') : '?'; };
+  const initials = (name) => { const parts = String(name || '').trim().split(/\s+/).filter(Boolean); return parts.length ? (parts[0][0] + (parts.length > 1 ? parts[1][0] : '')).toLocaleUpperCase('pt-BR') : '—'; };
   const linkedRequest = chatResumo && chatResumo.solicitacao && Number(chatResumo.solicitacao.id) > 0 ? chatResumo.solicitacao : null;
   const openedAt = os.opened_at || os.data_abertura || os.created_at || '';
   const startedAt = os.data_inicio || os.execucao_iniciada_em || '';
@@ -38,7 +37,7 @@
       <% if (canRegisterAndamento && statusMeta.phase === 'material') { %><form method="POST" action="/os/<%= os.id %>/material-chegou"><button class="btn btn-primary" type="submit">Registrar chegada do material</button></form><% } %>
       <a class="btn btn-outline" href="/chat-os/<%= os.id %>">Abrir conversa</a>
       <% if (canExecuteOS) { %><form method="POST" action="/os/<%= os.id %>/pdf-institucional"><button class="btn btn-outline" type="submit">PDF da OS</button></form><% } %>
-      <div class="os-menu-wrap" id="os-menu-wrap"><button class="btn btn-outline os-menu-btn" type="button" id="os-menu-btn" aria-expanded="false" aria-controls="os-menu-panel">Mais ações</button><div class="os-menu-panel" id="os-menu-panel"><div class="os-menu-list"><button class="btn btn-outline" type="button" data-os-module="tracagens-vinculadas">Traçagens vinculadas</button><button class="btn btn-outline" type="button" data-os-module="equipe-os">Equipe da OS</button><% if (canSendWhatsappNotification) { %><button class="btn btn-outline" type="button" data-os-module="whatsapp-os">Diagnóstico da integração WhatsApp</button><% } %><% if (!isOSFechada) { %><button class="btn btn-outline" type="button" data-os-module="justificativa-andamento">Registros da execução</button><% } %><% if (documentoInstitucional && documentoInstitucional.pdf_url) { %><a class="btn btn-outline" href="<%= documentoInstitucional.pdf_url %>" target="_blank" rel="noopener">Baixar PDF OS</a><% } %></div></div></div>
+      <div class="os-menu-wrap" id="os-menu-wrap"><button class="btn btn-outline os-menu-btn" type="button" id="os-menu-btn" aria-expanded="false" aria-controls="os-menu-panel">Mais ações</button><div class="os-menu-panel" id="os-menu-panel"><div class="os-menu-list"><% if (!isOSFechada && os.equipamento_id) { %><a class="btn btn-outline" href="/tracagem?os_id=<%= os.id %>&amp;equipamento_id=<%= os.equipamento_id %>">Criar traçagem vinculada</a><% } %><% if (canAutoAssign && !isOSFechada) { %><button class="btn btn-outline" type="button" data-os-module="redistribuicao-equipe">Redistribuição da equipe</button><% } %><% if (canSendWhatsappNotification) { %><button class="btn btn-outline" type="button" data-os-module="whatsapp-os">Diagnóstico da integração WhatsApp</button><% } %><% if (!isOSFechada) { %><button class="btn btn-outline" type="button" data-os-module="justificativa-andamento">Justificativa técnica</button><% } %><% if (documentoInstitucional && documentoInstitucional.pdf_url) { %><a class="btn btn-outline" href="<%= documentoInstitucional.pdf_url %>" target="_blank" rel="noopener">Baixar PDF OS</a><% } %></div></div></div>
       <a class="btn btn-outline" href="/os">Voltar</a>
     </div>
   </header>
@@ -47,12 +46,12 @@
     <div class="os-step <%= statusMeta.phase === 'open' ? 'current' : 'complete' %>"><span class="os-step-dot">1</span><div><strong>Aberta</strong><small><%= openedAt ? fmtBR(openedAt) : 'Data não informada' %></small></div></div><span class="os-step-line <%= statusMeta.phase !== 'open' ? 'active' : '' %>"></span>
     <div class="os-step <%= ['running','paused','material'].includes(statusMeta.phase) ? 'current warning-' + statusMeta.phase : (isOSFechada ? 'complete' : '') %>"><span class="os-step-dot">2</span><div><strong>Em andamento<%= statusMeta.phase === 'paused' ? ' — pausada' : statusMeta.phase === 'material' ? ' — aguardando material' : '' %></strong><small><%= statusMeta.phase === 'open' ? 'Ainda não iniciada' : (startedAt ? ('Desde ' + fmtBR(startedAt)) : (isOSFechada ? 'Início não informado' : 'Início não informado')) %></small></div></div><span class="os-step-line <%= isOSFechada ? 'active' : '' %>"></span>
     <div class="os-step <%= isOSFechada ? 'current' : '' %>"><span class="os-step-dot">3</span><div><strong>Concluída</strong><small><%= isOSFechada ? (closedAt ? fmtBR(closedAt) : 'Data não informada') : 'Aguardando conclusão' %></small></div></div>
-    <div class="os-open-time"><div><small><%= isOSFechada ? 'Tempo total' : 'Tempo em aberto' %></small><strong id="os-elapsed" data-start="<%= openedAt %>" data-end="<%= isOSFechada ? closedAt : '' %>">Duração indisponível</strong></div></div>
+    <div class="os-open-time"><div><small><%= isOSFechada ? 'Tempo total' : 'Tempo em aberto' %></small><strong id="os-elapsed" data-start="<%= openedAt %>" data-end="<%= isOSFechada ? closedAt : '' %>"><%= metricasAndamento.dias_aberta %> dia(s)</strong></div></div>
   </div>
 
   <div class="os-kpis"><article class="os-kpi blue"><div><small>Equipamento</small><strong><%= os.equipamento_resolvido || '-' %></strong></div></article><article class="os-kpi cyan"><div><small>Status</small><strong class="os-inline-badge status-<%= statusMeta.phase %>"><%= osStatus %></strong></div></article><article class="os-kpi orange"><div><small>Prioridade</small><strong class="os-inline-badge priority"><%= osPrioridade %></strong></div></article><article class="os-kpi green"><div><small>Equipe</small><strong><%= equipePrincipal.join(' e ') || 'Não alocada' %></strong></div></article></div>
 
-  <div class="os-summary-grid"><article class="os-panel service-panel"><h2>Serviço e diagnóstico</h2><div class="os-info-list"><div><p><strong>Descrição do problema</strong><small><%= os.descricao || 'Não registrado' %></small></p></div><div><p><strong>Diagnóstico inicial</strong><small><%= diagnosticoInicialOS %></small></p></div><div><p><strong>Ação corretiva</strong><small><%= os.acao_corretiva || 'Não registrado' %></small></p></div><div><p><strong>Ação preventiva</strong><small><%= os.acao_preventiva || 'Não registrado' %></small></p></div></div></article>
+  <div class="os-summary-grid"><article class="os-panel service-panel"><h2>Serviço e ações técnicas</h2><div class="os-info-list"><div><p><strong>Descrição do problema</strong><small class="technical-text"><%= os.descricao || 'Sem descrição registrada.' %></small></p></div><div><p><strong>Ação corretiva</strong><small class="technical-text"><%= os.acao_corretiva || os.causa_diagnostico || 'Ação corretiva não registrada.' %></small></p></div><div><p><strong>Ação preventiva</strong><small class="technical-text"><%= os.acao_preventiva || os.resumo_tecnico || 'Ação preventiva não registrada.' %></small></p></div></div><p class="ai-disclaimer">Sugestão gerada por IA. Validar tecnicamente antes da execução.</p></article>
     <div class="os-side-stack"><article class="os-panel"><h2>Equipe e execução</h2><div class="os-team-grid"><p><strong>Responsável manutenção:</strong><span><b class="avatar green"><%= initials(os.responsavel_manutencao) %></b><%= os.responsavel_manutencao || '-' %></span></p><p><strong>Turno da alocação:</strong><span><%= os.turno_alocado || os.execucao_ativa?.turno_alocacao || '-' %></span></p><p><strong><%= isOSFechada ? 'Executor da OS:' : 'Executor:' %></strong><span><b class="avatar"><%= initials(os.executor_nome || os.execucao_ativa?.executor_nome) %></b><%= os.executor_nome || os.execucao_ativa?.executor_nome || '-' %></span></p><p><strong>Modo da alocação:</strong><span><%= os.alocacao_modo || '-' %></span></p><p><strong><%= isOSFechada ? 'Segundo mecânico:' : 'Segundo mecânico:' %></strong><span><b class="avatar"><%= initials(os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome) %></b><%= os.auxiliar_nome || os.execucao_ativa?.auxiliar_nome || '-' %></span></p></div></article>
       <article class="os-panel communication"><h2>Solicitação e comunicação</h2><div class="communication-grid"><p><span>Solicitação de material vinculada<small><%= linkedRequest ? ((linkedRequest.numero || '#' + linkedRequest.id) + ' — ' + (linkedRequest.status || 'status não informado')) : 'Nenhuma solicitação vinculada' %></small></span></p><p><span>Mensagens não lidas<small><%= chatResumo ? chatResumo.naoLidas : 0 %> mensagens não lidas</small><% const ultimaMensagem = chatResumo?.mensagens?.length ? chatResumo.mensagens[chatResumo.mensagens.length - 1] : null; %><small>Última mensagem: <%= ultimaMensagem?.mensagem || 'Nenhuma mensagem' %></small><small><%= ultimaMensagem?.created_at ? fmtBR(ultimaMensagem.created_at) : 'Sem interação registrada' %></small></span></p></div><div class="actions"><a class="btn btn-green" href="/chat-os/<%= os.id %>">Abrir conversa</a><% if (linkedRequest) { %><a class="btn btn-outline" href="/solicitacoes/<%= linkedRequest.id %>">Abrir solicitação</a><% } else if (!isOSFechada && canExecuteOS) { %><a class="btn btn-outline" href="/solicitacoes/nova?os_id=<%= os.id %>">Criar solicitação</a><% } %></div></article></div>
   </div>
@@ -71,10 +70,11 @@
     </div>
   </article>
 
-  <article class="os-panel os-workspace"><nav class="os-tabs" role="tablist" aria-label="Detalhes da OS"><button id="tab-execucao" role="tab" aria-selected="true" aria-controls="panel-execucao" tabindex="0" data-tab="execucao">Execução</button><button id="tab-materiais" role="tab" aria-selected="false" aria-controls="panel-materiais" tabindex="-1" data-tab="materiais">Materiais e compras</button><button id="tab-historico" role="tab" aria-selected="false" aria-controls="panel-historico" tabindex="-1" data-tab="historico">Histórico da OS</button></nav>
-    <section id="panel-execucao" class="os-tab-panel" role="tabpanel" aria-labelledby="tab-execucao"><div data-module-slot="justificativa-andamento"></div><div data-module-slot="equipe"></div></section>
+  <article class="os-panel os-workspace" data-default-tab="<%= isOSFechada ? 'historico' : 'justificativa' %>"><nav class="os-tabs" role="tablist" aria-label="Detalhes da OS"><button id="tab-justificativa" role="tab" aria-selected="<%= !isOSFechada %>" aria-controls="panel-justificativa" tabindex="0" data-tab="justificativa">Justificativa técnica</button><% if (canAutoAssign && !isOSFechada) { %><button id="tab-redistribuicao" role="tab" aria-selected="false" aria-controls="panel-redistribuicao" tabindex="-1" data-tab="redistribuicao">Redistribuição da equipe</button><% } %><button id="tab-materiais" role="tab" aria-selected="false" aria-controls="panel-materiais" tabindex="-1" data-tab="materiais">Materiais e compras</button><button id="tab-historico" role="tab" aria-selected="<%= isOSFechada %>" aria-controls="panel-historico" tabindex="-1" data-tab="historico">Histórico da OS</button></nav>
+    <section id="panel-justificativa" class="os-tab-panel" role="tabpanel" aria-labelledby="tab-justificativa"><div data-module-slot="justificativa-andamento"></div></section>
+    <% if (canAutoAssign && !isOSFechada) { %><section id="panel-redistribuicao" class="os-tab-panel" role="tabpanel" aria-labelledby="tab-redistribuicao" hidden><div data-module-slot="redistribuicao-equipe"></div></section><% } %>
     <section id="panel-materiais" class="os-tab-panel" role="tabpanel" aria-labelledby="tab-materiais" hidden>
-      <% if (!materialRequest) { %><div class="empty-state"><strong>Nenhuma solicitação de material vinculada a esta OS.</strong><% if (!isOSFechada && canExecuteOS) { %><a class="btn btn-green" href="/solicitacoes/nova?os_id=<%= os.id %>">Criar solicitação de material</a><% } %></div><% } else { const itensMaterial = materialRequest.itens || []; %>
+      <% if (!isOSFechada && canRegisterAndamento && statusMeta.phase === 'material') { %><form method="POST" action="/os/<%= os.id %>/material-chegou" class="material-arrived"><button class="btn btn-green" type="submit">Material chegou</button></form><% } %><% if (!materialRequest) { %><div class="empty-state"><strong>Nenhuma solicitação de material vinculada a esta OS.</strong><% if (!isOSFechada && canExecuteOS) { %><a class="btn btn-green" href="/solicitacoes/nova?os_id=<%= os.id %>">Criar solicitação de material</a><% } %></div><% } else { const itensMaterial = materialRequest.itens || []; %>
       <div class="material-head"><div><h3>Solicitação <%= materialRequest.numero || '#' + materialRequest.id %></h3><p><%= materialRequest.descricao || materialRequest.justificativa || 'Não registrado' %></p></div><a class="btn btn-outline" href="/solicitacoes/<%= materialRequest.id %>">Abrir solicitação</a></div>
       <div class="material-meta"><span><b>Status</b><%= materialRequest.status || 'Não registrado' %></span><span><b>Data</b><%= materialRequest.created_at ? fmtBR(materialRequest.created_at) : 'Não registrado' %></span><span><b>Solicitante</b><%= materialRequest.solicitante_nome || 'Não registrado' %></span><span><b>Itens</b><%= itensMaterial.length %></span></div>
       <div class="material-table-wrap"><table class="tabela-compacta material-table"><thead><tr><th>Item / descrição</th><th>Un.</th><th>Solicitada</th><th>Cotada</th><th>Comprada</th><th>Recebida</th><th>Utilizada</th><th>Valor unit.</th><th>Valor total</th><th>Fornecedor</th><th>Situação</th></tr></thead><tbody><% itensMaterial.forEach((item)=>{ const hasPrice=item.valor_unitario_centavos!==null&&item.valor_unitario_centavos!==undefined; const qtd=Number(item.qtd_comprada ?? item.qtd_solicitada); %><tr><td data-label="Item"><b><%= item.item_nome || ('#'+item.id) %></b><br><small><%= item.item_descricao || 'Não registrado' %></small></td><td data-label="Un."><%= item.unidade || '—' %></td><td data-label="Solicitada"><%= item.qtd_solicitada ?? '—' %></td><td data-label="Cotada"><%= item.status_cotacao === 'COTADO' ? (item.qtd_solicitada ?? '—') : '—' %></td><td data-label="Comprada"><%= item.qtd_comprada ?? '—' %></td><td data-label="Recebida"><%= item.qtd_recebida_total ?? '—' %></td><td data-label="Utilizada"><%= item.qtd_utilizada ?? '—' %></td><td data-label="Valor unit."><%= hasPrice ? (Number(item.valor_unitario_centavos)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—' %></td><td data-label="Valor total"><%= hasPrice && Number.isFinite(qtd) ? (Number(item.valor_unitario_centavos)*qtd/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—' %></td><td data-label="Fornecedor"><%= item.fornecedor_nome || '—' %></td><td data-label="Situação"><%= item.status_compra || item.status_cotacao || item.status_item || 'Não registrado' %></td></tr><% }) %></tbody></table></div><% } %>
@@ -84,17 +84,17 @@
       <% if ((os.fotos_fechamento || []).length) { %><li><time><%= closedAt ? fmtBR(closedAt) : 'Data não registrada' %></time><div><strong>Mídia de fechamento registrada</strong><span><%= (os.fotos_fechamento || []).length %> arquivo(s) vinculados ao fechamento.</span></div></li><% } %>
       <% (whatsappLogs || []).forEach((log)=>{ %><li><time><%= log.enviado_em ? fmtBR(log.enviado_em) : 'Data não registrada' %></time><div><strong>Notificação da OS</strong><span><%= ['ERRO','SEM_TELEFONE'].includes(log.status) ? ('Falha ao enviar notificação' + (log.usuario_nome ? ' para '+log.usuario_nome : '') + (log.erro ? ': '+log.erro : '.')) : 'Notificação da OS enviada à equipe.' %></span></div></li><% }) %>
       <% (historicoAndamento || []).slice().reverse().forEach((item)=>{ %><li><time><%= item.registrado_em ? fmtBR(item.registrado_em) : 'Data não registrada' %></time><div><strong><%= item.motivo_nome || 'Registro da execução' %></strong><span><%= item.observacao_mecanico || item.texto_padrao || 'Registro operacional.' %></span></div></li><% }) %>
+      <% (tracagens || []).forEach((t)=>{ %><li class="tracagem-history-event"><time><%= fmtBR(t.os_linked_at || t.created_at) %></time><div><strong>Traçagem #<%= t.id %> vinculada à OS #<%= os.id %>.</strong><span><%= t.vinculado_por_nome ? ('Responsável: '+t.vinculado_por_nome+'. ') : '' %><%= t.tipo %> — <%= t.equipamento_nome || os.equipamento_resolvido %></span><div class="actions"><a class="btn btn-outline" href="/tracagem/<%= t.id %>">Abrir traçagem</a><a class="btn btn-outline" href="/tracagem/<%= t.id %>/pdf">Gerar PDF</a></div></div></li><% }) %>
       <% if (startedAt) { %><li><time><%= fmtBR(startedAt) %></time><div><strong>OS iniciada</strong><span>Execução do serviço iniciada.</span></div></li><% } %>
       <% if ((os.fotos_abertura || []).length) { %><li><time><%= openedAt ? fmtBR(openedAt) : 'Data não registrada' %></time><div><strong>Mídia de abertura registrada</strong><span><%= (os.fotos_abertura || []).length %> arquivo(s) vinculados à abertura.</span></div></li><% } %>
       <li><time><%= openedAt ? fmtBR(openedAt) : 'Data não registrada' %></time><div><strong>OS criada</strong><span><%= os.opened_by_nome ? ('Responsável: '+os.opened_by_nome+'.') : 'Responsável não registrado.' %></span></div></li>
     </ol></section>
   </article>
-<div class="card os-module os-detail-card" id="tracagens-vinculadas">
+<div class="card os-module os-detail-card" id="redistribuicao-equipe">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-      <h3 style="margin:0;">Traçagens vinculadas</h3>
-      <% if (!isOSFechada) { %><a class="btn btn-green" href="/tracagem?os_id=<%= os.id %>">Abrir Traçagem</a><% } %>
+      <h3 style="margin:0;">Equipe atual</h3>
     </div>
-    <div class="muted">Cálculos de caldeiraria relacionados a esta OS.</div>
+    <div class="muted">Consulte a alocação vigente e redistribua respeitando escala e disponibilidade.</div>
     <table class="tabela-compacta">
       <thead>
         <tr>
@@ -126,7 +126,7 @@
     <% if (canAutoAssign && !isOSFechada) { %>
       <div style="margin-top:8px;display:flex;justify-content:flex-end;">
         <form method="POST" action="/os/<%= os.id %>/auto-alocar">
-          <button class="btn btn-primary" type="submit">Reatribuir automaticamente</button>
+          <button class="btn btn-primary" type="submit" data-confirm-team>Redistribuir automaticamente</button>
         </form>
       </div>
     <% } %>
@@ -203,7 +203,7 @@
             </select>
           </div>
         </div>
-        <div style="margin-top:8px;"><button class="btn" type="submit">Salvar equipe</button></div>
+        <label style="display:block;margin-top:8px;">Observação da alteração<textarea class="input" name="observacao" rows="2" maxlength="500"></textarea></label><div style="margin-top:8px;"><button class="btn" type="submit">Salvar nova equipe</button></div>
       </form>
       <% if (canManageDisponibilidade) { %>
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:14px 0"/>
@@ -219,14 +219,6 @@
       <% } %>
     </div>
     <% } %>
-    <ul style="margin-top:8px;">
-      <% if (!(tracagens||[]).length) { %>
-        <li class="muted">Nenhuma traçagem vinculada.</li>
-      <% } %>
-      <% (tracagens||[]).forEach((t) => { %>
-        <li><a href="/tracagem/<%= t.id %>">#<%= t.id %> - <%= t.titulo || t.tipo %></a> (<%= fmtBR(t.created_at) %>)</li>
-      <% }) %>
-    </ul>
   </div>
 </div>
 
@@ -236,7 +228,7 @@
 <div class="card os-module" id="justificativa-andamento" style="margin-top:12px;">
   <div class="card-head">
     <div>
-      <h3 style="margin:0;"><%= isOSFechada ? 'Registros da execução' : 'Justificativa técnica diária' %></h3>
+      <h3 style="margin:0;">Justificativa técnica</h3>
       <div class="muted">Rastreabilidade diária da permanência da OS em aberto, preservada também após a finalização.</div>
     </div>
     <span class="badge-funcao <%= alertaJustificativaAndamento ? 'func-mec' : 'func-aux' %>"><%= metricasAndamento.dias_aberta %> dia(s) aberta</span>
@@ -246,18 +238,22 @@
     <div class="alert alert-error" style="margin-bottom:12px;">Esta OS está aberta há mais de 1 dia. Registre o motivo da permanência em andamento para manter a rastreabilidade do equipamento.</div>
   <% } %>
 
-  <div class="grid2">
+  <div class="justification-summary">
     <div><b>Data de abertura:</b> <%= os.opened_at ? fmtBR(os.opened_at) : '-' %></div>
     <div><b>Data de início:</b> <%= os.data_inicio ? fmtBR(os.data_inicio) : (os.execucao_iniciada_em ? fmtBR(os.execucao_iniciada_em) : '-') %></div>
     <div><b>Responsável/mecânico:</b> <%= os.executor_nome || os.execucao_ativa?.executor_nome || '-' %></div>
     <div><b>Último motivo:</b> <%= os.ultimo_motivo_andamento || '-' %></div>
-    <div style="grid-column:1/-1;"><b>Última justificativa técnica:</b><br><%= os.ultima_justificativa_andamento || '-' %></div>
+    <div><b>Data da última justificativa:</b> <%= os.ultimo_registro_andamento_em ? fmtBR(os.ultimo_registro_andamento_em) : 'Nenhuma' %></div>
+    <div><b>Situação de hoje:</b> <%= isOSFechada ? 'OS concluída' : (ultimoRegistroHoje ? 'Justificativa registrada hoje' : (metricasAndamento.dias_aberta > 1 ? 'Justificativa pendente' : 'Ainda não é necessário justificar')) %></div>
   </div>
+
+  <% const ultimaJustificativa = (historicoAndamento || [])[0]; %>
+  <section class="latest-justification"><h4>Última justificativa</h4><% if (ultimaJustificativa) { %><p><b><%= fmtBR(ultimaJustificativa.registrado_em) %></b> — <%= ultimaJustificativa.registrado_por_nome || 'Responsável não informado' %></p><p><strong><%= ultimaJustificativa.motivo_nome %></strong></p><p><%= ultimaJustificativa.observacao_mecanico || 'Sem observação complementar.' %></p><small><%= metricasAndamento.dias_aberta %> dia(s) em aberto no registro.</small><% } else { %><p>Nenhuma justificativa técnica registrada.</p><% } %></section>
 
   <% if (statusPermiteAndamento && canRegisterAndamento) { %>
     <form method="POST" action="/os/<%= os.id %>/andamento/registrar" style="margin-top:14px;">
       <div class="muted" style="font-weight:700;margin-bottom:7px;">Selecione um motivo rápido:</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:7px;">
+      <div class="justification-reasons">
         <% (motivosAndamento || []).forEach((motivo) => { %>
           <label style="display:flex;gap:8px;align-items:flex-start;border:1px solid #e2e8f0;border-radius:10px;padding:9px;cursor:pointer;">
             <input type="radio" name="motivo_codigo" value="<%= motivo.codigo %>" required>
@@ -270,7 +266,7 @@
       </label>
       <div class="actions" style="margin-top:10px;">
         <button class="btn btn-green" type="submit">Registrar justificativa</button>
-        <button class="btn btn-outline" type="submit" formaction="/os/<%= os.id %>/material-chegou" formnovalidate>Material chegou</button>
+        <button class="btn btn-outline" type="reset">Limpar formulário</button>
       </div>
     </form>
   <% } %>

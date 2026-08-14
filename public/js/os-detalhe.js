@@ -14,6 +14,7 @@
     });
     panels.forEach((panel) => { panel.hidden = panel.id !== selected.getAttribute('aria-controls'); });
     if (!options || options.updateHash !== false) history.replaceState(null, '', '#' + selected.dataset.tab);
+    try { localStorage.setItem('os-detail-last-tab', selected.dataset.tab); } catch (_) {}
     if (options && options.focus) selected.focus();
   }
 
@@ -33,7 +34,10 @@
 
   const knownTabs = tabs.map((tab) => tab.dataset.tab);
   const initialHash = location.hash.slice(1);
-  selectTab(knownTabs.includes(initialHash) ? initialHash : 'execucao', { updateHash: false });
+  let remembered = '';
+  try { remembered = localStorage.getItem('os-detail-last-tab') || ''; } catch (_) {}
+  const defaultTab = document.querySelector('.os-workspace')?.dataset.defaultTab || 'justificativa';
+  selectTab(knownTabs.includes(initialHash) ? initialHash : (knownTabs.includes(remembered) ? remembered : defaultTab), { updateHash: false });
   window.addEventListener('hashchange', () => {
     const hash = location.hash.slice(1);
     if (knownTabs.includes(hash)) selectTab(hash, { updateHash: false });
@@ -49,19 +53,27 @@
       button.addEventListener('click', () => selectTab(tab));
     });
   }
-  moveModule('justificativa-andamento', 'justificativa-andamento', 'execucao');
-  moveModule('tracagens-vinculadas', 'equipe', 'execucao');
+  moveModule('justificativa-andamento', 'justificativa-andamento', 'justificativa');
+  moveModule('redistribuicao-equipe', 'redistribuicao-equipe', 'redistribuicao');
 
 
   document.querySelectorAll('[data-os-module]').forEach((button) => {
     button.addEventListener('click', () => {
       const id = button.dataset.osModule;
-      const tab = 'execucao';
+      const tab = id === 'redistribuicao-equipe' || id === 'equipe-os' ? 'redistribuicao' : 'justificativa';
       if (id !== 'whatsapp-os') selectTab(tab);
       if (id === 'whatsapp-os') document.getElementById(id)?.classList.toggle('active');
       document.getElementById(id === 'equipe-os' ? 'equipe-os' : id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
+
+  document.querySelectorAll('[data-confirm-team]').forEach((button) => button.addEventListener('click', (event) => {
+    if (!window.confirm('Confirmar redistribuição automática? A equipe atual será comparada à escala e aos conflitos de outras OS.')) event.preventDefault();
+  }));
+  document.querySelectorAll('input[name="motivo_codigo"]').forEach((radio) => radio.addEventListener('change', () => {
+    const note = document.querySelector('textarea[name="observacao_mecanico"]');
+    if (note) note.required = radio.checked && radio.value === 'OUTRO';
+  }));
 
   const menuWrap = document.getElementById('os-menu-wrap');
   const menuButton = document.getElementById('os-menu-btn');
@@ -93,7 +105,7 @@
     if (!elapsed) return;
     const start = parseDate(elapsed.dataset.start);
     const end = parseDate(elapsed.dataset.end) || new Date();
-    if (!start || end < start) { elapsed.textContent = 'Duração indisponível'; return; }
+    if (!start || end < start) { elapsed.textContent = 'Data de abertura não informada'; return; }
     const minutes = Math.floor((end - start) / 60000);
     elapsed.textContent = Math.floor(minutes / 1440) + 'd ' + String(Math.floor((minutes % 1440) / 60)).padStart(2, '0') + 'h ' + String(minutes % 60).padStart(2, '0') + 'm';
   }

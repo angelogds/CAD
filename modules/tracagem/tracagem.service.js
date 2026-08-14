@@ -688,7 +688,44 @@ function list({ tipo, equipamento_id, os_id, periodo_inicio, periodo_fim } = {})
 }
 
 function listByOS(osId) {
-  return db.prepare('SELECT id, tipo, titulo, created_at FROM tracagens WHERE os_id = ? ORDER BY datetime(created_at) DESC').all(Number(osId));
+  return db.prepare(`
+    SELECT t.id, t.tipo, t.titulo, t.created_at, t.os_linked_at,
+           COALESCE(u.name, u.email, '-') AS vinculado_por_nome,
+           e.nome AS equipamento_nome
+    FROM tracagens t
+    LEFT JOIN users u ON u.id = t.os_linked_by
+    LEFT JOIN equipamentos e ON e.id = t.equipamento_id
+    WHERE t.os_id = ? ORDER BY datetime(COALESCE(t.os_linked_at, t.created_at)) DESC
+  `).all(Number(osId));
+}
+
+function getOSContext(osId) {
+  return db.prepare(`SELECT o.id, o.equipamento_id, o.equipamento,
+    COALESCE(e.nome, o.equipamento) AS equipamento_nome
+    FROM os o LEFT JOIN equipamentos e ON e.id = o.equipamento_id WHERE o.id = ?`).get(Number(osId)) || null;
+}
+
+function vincularOS({ tracagem_id, os_id, equipamento_id, usuario_id }) {
+  const tracagem = db.prepare('SELECT id, os_id, equipamento_id FROM tracagens WHERE id = ?').get(Number(tracagem_id));
+  if (!tracagem) throw new Error('Traçagem não encontrada.');
+  const os = getOSContext(os_id);
+  if (!os) throw new Error('OS não encontrada.');
+  if (!os.equipamento_id || Number(os.equipamento_id) !== Number(equipamento_id)) {
+    throw new Error('O equipamento informado não pertence a esta OS.');
+  }
+  if (tracagem.os_id && Number(tracagem.os_id) !== Number(os_id)) {
+    throw new Error('Esta traçagem já está vinculada a outra OS.');
+  }
+  if (tracagem.equipamento_id && Number(tracagem.equipamento_id) !== Number(equipamento_id)) {
+    throw new Error('A traçagem pertence a outro equipamento.');
+  }
+  if (Number(tracagem.os_id) === Number(os_id) && Number(tracagem.equipamento_id) === Number(equipamento_id)) {
+    return { linked: false, idempotent: true, os };
+  }
+  db.prepare(`UPDATE tracagens SET os_id=?, equipamento_id=?, os_linked_by=?,
+    os_linked_at=datetime('now','localtime'), updated_at=datetime('now') WHERE id=?`)
+    .run(Number(os_id), Number(equipamento_id), Number(usuario_id) || null, Number(tracagem_id));
+  return { linked: true, idempotent: false, os };
 }
 
 function listByEquipamento(equipamentoId) {
@@ -778,6 +815,8 @@ module.exports = {
   getById,
   list,
   listByOS,
+  getOSContext,
+  vincularOS,
   listByEquipamento,
   listEquipamentos,
   listEquipamentosParaVinculo,

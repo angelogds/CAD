@@ -17,6 +17,15 @@
   <div><b>OS:</b> <%= tracagem.os_id || '-' %></div>
   <div><b>Equipamento:</b> <%= tracagem.equipamento_nome || '-' %></div>
   <div><b>Data:</b> <%= fmtBR(tracagem.created_at) %></div>
+  <% if (!tracagem.os_id && tracagem.equipamento_id) { %>
+    <form method="POST" action="/tracagem/<%= tracagem.id %>/vincular-os" style="margin-top:12px;display:flex;gap:8px;align-items:end;flex-wrap:wrap;">
+      <label>OS de origem <input class="input" required inputmode="numeric" name="os_id" placeholder="Número da OS"></label>
+      <input type="hidden" name="equipamento_id" value="<%= tracagem.equipamento_id %>">
+      <button class="btn btn-green" type="submit">Vincular à OS</button>
+    </form>
+  <% } else if (tracagem.os_id) { %>
+    <a class="btn btn-outline" style="margin-top:12px" href="/os/<%= tracagem.os_id %>#historico">Vinculada à OS #<%= tracagem.os_id %></a>
+  <% } %>
 
   <h3>Parâmetros</h3>
   <pre><%= JSON.stringify(tracagem.parametros, null, 2) %></pre>

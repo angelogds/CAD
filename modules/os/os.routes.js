@@ -9,7 +9,7 @@ const { requireLogin, requireRole, requireAdmin } = require("../auth/auth.middle
 const { ACCESS } = require("../../config/rbac");
 const { canSendWhatsappNotification } = require("../../middlewares/permissions.middleware");
 const ctrl = require("./os.controller");
-const { OS_EXECUTION_ACCESS, OS_STATUS_ACCESS, OS_ANDAMENTO_ACCESS, OS_MANUAL_DISPONIBILIDADE_ACCESS, detailUnauthorizedRedirectPath } = require("./os.permissions");
+const { OS_EXECUTION_ACCESS, OS_STATUS_ACCESS, OS_ANDAMENTO_ACCESS, detailUnauthorizedRedirectPath, requireTeamRedistribution } = require("./os.permissions");
 
 const uploadDir = path.join(storagePaths.UPLOAD_DIR, "os");
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -100,7 +100,7 @@ router.post(
 router.get("/:id/andamento", requireLogin, requireOSDetailAccess, wrap(ctrl.osAndamento, "osAndamento"));
 router.post("/:id/andamento/registrar", requireLogin, requireRole(OS_ANDAMENTO_ACCESS), wrap(ctrl.osRegistrarAndamento, "osRegistrarAndamento"));
 router.post("/:id/material-chegou", requireLogin, requireRole(OS_ANDAMENTO_ACCESS), wrap(ctrl.osMaterialChegou, "osMaterialChegou"));
-router.post("/:id/disponibilidade-manual", requireLogin, requireRole(OS_MANUAL_DISPONIBILIDADE_ACCESS), wrap(ctrl.osDisponibilidadeManual, "osDisponibilidadeManual"));
+router.post("/:id/disponibilidade-manual", requireLogin, requireTeamRedistribution, wrap(ctrl.osDisponibilidadeManual, "osDisponibilidadeManual"));
 router.get("/:id", requireLogin, requireOSDetailAccess, wrap(ctrl.osShow, "osShow"));
 router.post("/:id/iniciar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osIniciar, "osIniciar"));
 router.post("/:id/pausar", requireLogin, requireRole(OS_EXECUTION_ACCESS), wrap(ctrl.osPausar, "osPausar"));
@@ -136,9 +136,9 @@ router.post(
 
 router.post("/:id/status", requireLogin, requireRole(OS_STATUS_ACCESS), wrap(ctrl.osUpdateStatus, "osUpdateStatus"));
 router.post("/:id/excluir", requireLogin, requireAdmin, wrap(ctrl.osDelete, "osDelete"));
-router.post("/:id/auto-alocar", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osAutoAssign, "osAutoAssign"));
-router.post("/:id/auto-assign", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osAutoAssign, "osAutoAssign"));
-router.post("/:id/equipe", requireLogin, requireRole(["ADMIN", "SUPERVISOR_MANUTENCAO", "MANUTENCAO_SUPERVISOR"]), wrap(ctrl.osSetEquipe, "osSetEquipe"));
+router.post("/:id/auto-alocar", requireLogin, requireTeamRedistribution, wrap(ctrl.osAutoAssign, "osAutoAssign"));
+router.post("/:id/auto-assign", requireLogin, requireTeamRedistribution, wrap(ctrl.osAutoAssign, "osAutoAssign"));
+router.post("/:id/equipe", requireLogin, requireTeamRedistribution, wrap(ctrl.osSetEquipe, "osSetEquipe"));
 router.get("/:id/notificacoes", requireLogin, canSendWhatsappNotification, wrap(ctrl.osNotificacoes, "osNotificacoes"));
 router.get("/:id/colaboradores-contato", requireLogin, canSendWhatsappNotification, wrap(ctrl.osColaboradoresContato, "osColaboradoresContato"));
 router.get("/:id/whatsapp", requireLogin, canSendWhatsappNotification, wrap(ctrl.osEnviarWhatsapp, "osEnviarWhatsapp"));
