@@ -28,6 +28,8 @@ router.get("/relatorios-avancados", requireLogin, requireRole(PCM_ACCESS), ctrl.
 
 
 router.post("/atualizar-indicadores", requireLogin, requireRole(PCM_ACCESS), ctrl.atualizarIndicadores);
+router.post("/executar-automacao", requireLogin, requireRole(PCM_ACCESS), ctrl.executarAutomacao);
+router.post("/analisar-ia", requireLogin, requireRole(PCM_ACCESS), ctrl.analisarIA);
 router.post("/falhas/registrar", requireLogin, requireRole(PCM_ACCESS), ctrl.registrarFalha);
 router.post("/engenharia/componentes", requireLogin, requireRole(PCM_ACCESS), ctrl.adicionarComponente);
 router.post("/lubrificacao/pontos", requireLogin, requireRole(PCM_ACCESS), ctrl.adicionarLubrificacao);

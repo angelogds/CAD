@@ -1,4 +1,5 @@
 const service = require("./pcm.service");
+const operationalService = require("./pcm.operational.service");
 const PDFDocument = require("pdfkit");
 
 function baseView(req) {
@@ -10,35 +11,22 @@ function baseView(req) {
 }
 
 function index(req, res) {
-  let automacaoResumo = { geradas: 0, riscosAltos: 0 };
+  let painel;
   try {
-    automacaoResumo = service.processarAutomacaoOS({ userId: req.session?.user?.id || null });
-  } catch (_e) {}
-
-  let riscos = [];
-  let rankingTecnicos = [];
-  let alertasOperacionais = [];
-  try { riscos = service.atualizarScoresRiscoEquipamentos().slice(0, 8); } catch (_e) {}
-  try { rankingTecnicos = service.getRankingTecnicos({ dias: Number(req.query.dias || 90), setor: req.query.setor || "" }).slice(0, 10); } catch (_e) {}
-  try { alertasOperacionais = service.listarAlertasOperacionais({ limit: 8 }); } catch (_e) {}
-
-  const filtros = {
-    equipamento_id: req.query.equipamento_id || "",
-    setor: req.query.setor || "",
-    tipo_manutencao: req.query.tipo_manutencao || "",
-  };
+    painel = operationalService.getOverview(req.query, req.session?.user?.id || null);
+  } catch (error) {
+    console.error('[PCM] Falha ao montar visão operacional:', error);
+    painel = {
+      filtros: operationalService.resolveFilters(req.query), cards: {}, fila: [], riscos: [],
+      planos: [], alertas: [], distribuicao_status: [], preventivas: {}, analise_ia: null,
+      atualizado_em: new Date().toISOString(), erro: 'Não foi possível carregar todos os indicadores.',
+    };
+  }
 
   return res.render("pcm/index", {
     ...baseView(req),
     activePcmSection: "visao-geral",
-    indicadores: service.getIndicadores(),
-    ranking: service.getRankingEquipamentos(5, Number(req.query.meses || 6)),
-    rankingTecnicos,
-    riscos,
-    alertasOperacionais,
-    automacaoResumo,
-    planos: service.listPlanos(filtros),
-    filtros,
+    painel,
   });
 }
 
@@ -154,26 +142,23 @@ function programacaoSemanal(req, res) {
     criticidade: req.query.criticidade || "",
   };
 
-  const atividadesSemProgramacao = service.listBacklogSimples().slice(0, 12).map((b) => ({
+  const programacao = operationalService.getWeeklySchedule({ semana_inicio: filtros.semana || req.query.semana_inicio });
+  const programadas = new Set(programacao.itens.map((item) => Number(item.os_id)));
+  const atividadesSemProgramacao = service.listBacklogSimples().filter((b) => !programadas.has(Number(b.id))).slice(0, 20).map((b) => ({
     id: b.id,
     equipamento: b.equipamento,
     tipo: b.tipo,
     horas: 2,
     criticidade: b.criticidade || "N/D",
-  }));
-
-  const semanaGrid = ["Mecânico 1", "Mecânico 2", "Eletricista", "Equipe A"].map((responsavel, idx) => ({
-    responsavel,
-    dias: [0, 1, 2, 3, 4, 5, 6].map((d) => ({
-      itens: atividadesSemProgramacao.filter((_, i) => (i + idx + d) % 11 === 0).slice(0, 2),
-    })),
+    prioridade: b.prioridade || 'MEDIA',
+    status: b.status || 'ABERTA',
   }));
 
   return res.render("pcm/programacao-semanal", {
     ...baseView(req),
     activePcmSection: "programacao-semanal",
     filtros,
-    semanaGrid,
+    programacao,
     atividadesSemProgramacao,
   });
 }
@@ -282,8 +267,38 @@ function registrarExecucao(req, res) {
 }
 
 
-function atualizarIndicadores(_req, res) {
-  return res.redirect('/pcm');
+function atualizarIndicadores(req, res) {
+  try {
+    const riscos = service.atualizarScoresRiscoEquipamentos();
+    const result = { equipamentos_processados: riscos.length, riscos_altos: riscos.filter((item) => item.classificacao_risco === 'ALTO').length };
+    operationalService.logOperationalCycle('ATUALIZAR_INDICADORES', req.session?.user?.id || null, result);
+    req.flash('success', `Indicadores atualizados: ${result.equipamentos_processados} equipamento(s) processado(s).`);
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível atualizar os indicadores do PCM.');
+  }
+  return res.redirect(`/pcm?${new URLSearchParams(req.body || {}).toString()}`);
+}
+
+function executarAutomacao(req, res) {
+  try {
+    const result = service.processarAutomacaoOS({ userId: req.session?.user?.id || null });
+    operationalService.logOperationalCycle('EXECUTAR_AUTOMACAO', req.session?.user?.id || null, result);
+    req.flash('success', `Ciclo concluído: ${result.geradas || 0} OS automática(s) gerada(s) e ${result.riscosAltos || 0} risco(s) alto(s) revisado(s).`);
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível executar o ciclo automático.');
+  }
+  return res.redirect(`/pcm?${new URLSearchParams(req.body || {}).toString()}`);
+}
+
+async function analisarIA(req, res) {
+  try {
+    const result = await operationalService.generateAIAnalysis(req.body || {}, req.session?.user?.id || null);
+    const origem = result.origem === 'OPENAI' ? 'OpenAI' : 'análise local de contingência';
+    req.flash('success', `Análise do PCM atualizada com ${origem}.`);
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível gerar a análise do PCM.');
+  }
+  return res.redirect(`/pcm?${new URLSearchParams(req.body || {}).toString()}`);
 }
 
 function registrarFalha(req, res) {
@@ -344,15 +359,25 @@ function aplicarSugestaoLubrificacaoIA(req, res) {
 }
 
 function salvarProgramacao(req, res) {
-  // TODO: persistir programação semanal em pcm_programacao_semana/itens
-  req.flash('success', 'Programação da semana salva (integração pendente).');
-  return res.redirect('/pcm/programacao-semanal');
+  try {
+    operationalService.scheduleBacklogItem(req.body.os_id, req.body, req.session?.user?.id || null);
+    req.flash('success', `OS #${req.body.os_id} programada com sucesso.`);
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível salvar a programação.');
+  }
+  const week = encodeURIComponent(req.body.semana_inicio || '');
+  return res.redirect(`/pcm/programacao-semanal${week ? `?semana_inicio=${week}` : ''}`);
 }
 
 function programarBacklog(req, res) {
-  // TODO: mover item backlog para programação semanal
-  req.flash('success', `Item ${req.params.id} enviado para programação (integração pendente).`);
-  return res.redirect('/pcm/programacao-semanal');
+  try {
+    operationalService.scheduleBacklogItem(req.params.id, req.body, req.session?.user?.id || null);
+    req.flash('success', `OS #${req.params.id} incluída na programação semanal.`);
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível programar a OS.');
+  }
+  const week = encodeURIComponent(req.body.semana_inicio || '');
+  return res.redirect(`/pcm/programacao-semanal${week ? `?semana_inicio=${week}` : ''}`);
 }
 
 function novaRota(req, res) {
@@ -502,6 +527,8 @@ module.exports = {
   rotasInspecao,
   relatoriosAvancados,
   atualizarIndicadores,
+  executarAutomacao,
+  analisarIA,
   registrarFalha,
   adicionarComponente,
   adicionarLubrificacao,
