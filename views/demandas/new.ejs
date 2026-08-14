@@ -1,10 +1,66 @@
 <% layout('layout') %>
-<div class="page-head"><div><h1>Nova Demanda</h1><p class="muted">Cadastro de demanda pela Direção.</p></div></div>
-<div class="card">
-  <form method="POST" action="/demandas">
-    <div><div class="label">Título</div><input class="input" name="titulo" required /></div>
-    <div style="margin-top:10px;"><div class="label">Prioridade</div><select class="input" name="prioridade"><option>BAIXA</option><option selected>NORMAL</option><option>ALTA</option><option>URGENTE</option></select></div>
-    <div style="margin-top:10px;"><div class="label">Descrição</div><textarea class="input" name="descricao" rows="5"></textarea></div>
-    <div style="margin-top:14px;"><button class="btn btn-green">Criar demanda</button></div>
-  </form>
+<link rel="stylesheet" href="/css/demandas.css">
+
+<div class="demand-page demand-form-page">
+  <header class="demand-head">
+    <div>
+      <a class="demand-back-link" href="/demandas">← Voltar para demandas</a>
+      <h1>Nova demanda</h1>
+      <p>Registre a necessidade da Direção com prioridade e descrição objetivas.</p>
+    </div>
+  </header>
+
+  <div class="demand-form-layout">
+    <section class="demand-card demand-form-card">
+      <div class="section-heading">
+        <div><h2>Informações da demanda</h2><p>Os campos marcados com * são obrigatórios.</p></div>
+        <span class="form-step">Cadastro</span>
+      </div>
+
+      <form method="POST" action="/demandas" class="modern-demand-form">
+        <label class="form-wide">
+          <span>Título da demanda *</span>
+          <input name="titulo" maxlength="160" required autofocus placeholder="Ex.: Adequação da proteção da esteira principal">
+          <small>Use um título curto que facilite a localização e o acompanhamento.</small>
+        </label>
+
+        <label>
+          <span>Prioridade *</span>
+          <select name="prioridade" required>
+            <option value="BAIXA">Baixa — pode ser programada</option>
+            <option value="NORMAL" selected>Média — fluxo normal</option>
+            <option value="ALTA">Alta — requer prioridade</option>
+            <option value="URGENTE">Crítica — ação imediata</option>
+          </select>
+        </label>
+
+        <div class="priority-guide" aria-label="Guia de prioridades">
+          <span class="demand-badge priority-normal">Média</span>
+          <p>Selecione Alta ou Crítica somente quando houver impacto direto na operação, segurança ou prazo.</p>
+        </div>
+
+        <label class="form-wide">
+          <span>Descrição detalhada *</span>
+          <textarea name="descricao" rows="8" required placeholder="Descreva o que precisa ser feito, o resultado esperado, o local e as informações importantes para execução."></textarea>
+          <small>Uma descrição clara reduz retornos e acelera a definição do responsável.</small>
+        </label>
+
+        <div class="form-actions form-wide">
+          <a class="demand-btn demand-btn-secondary" href="/demandas">Cancelar</a>
+          <button class="demand-btn demand-btn-primary" type="submit">Criar demanda</button>
+        </div>
+      </form>
+    </section>
+
+    <aside class="demand-card demand-form-help">
+      <span class="help-icon" aria-hidden="true">i</span>
+      <h2>Como registrar bem</h2>
+      <ul>
+        <li><strong>Seja específico:</strong> informe equipamento, setor ou processo afetado.</li>
+        <li><strong>Defina o resultado:</strong> descreva o que deve estar resolvido ao final.</li>
+        <li><strong>Use a prioridade real:</strong> isso organiza a fila para toda a equipe.</li>
+      </ul>
+      <div class="help-note">Depois de criada, a demanda poderá receber responsável, atualizações e ser convertida em Ordem de Serviço.</div>
+    </aside>
+  </div>
 </div>
