@@ -18,14 +18,24 @@ document.querySelector('.attention-controls select')?.addEventListener('change',
 // seu texto pode manter uma seleção nativa azul mesmo com `user-select: none`.
 const requestList = document.querySelector('.request-list');
 if (requestList) {
+  const clearRequestSelection = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+
+    const range = selection.getRangeAt(0);
+    const touchesRequestRow = [...requestList.querySelectorAll('.request-row')]
+      .some((row) => range.intersectsNode(row));
+
+    if (touchesRequestRow) selection.removeAllRanges();
+  };
+
   requestList.addEventListener('selectstart', (event) => {
     if (event.target.closest('.request-row')) event.preventDefault();
   });
 
-  document.addEventListener('selectionchange', () => {
-    const selection = window.getSelection();
-    const anchor = selection?.anchorNode;
-    const element = anchor?.nodeType === Node.ELEMENT_NODE ? anchor : anchor?.parentElement;
-    if (element?.closest?.('.request-row')) selection.removeAllRanges();
-  });
+  // Limpa também seleções antigas restauradas pelo cache de navegação. Verificar o
+  // intervalo inteiro (e não apenas a âncora) cobre arrastos iniciados fora da linha.
+  document.addEventListener('selectionchange', clearRequestSelection);
+  window.addEventListener('pageshow', clearRequestSelection);
+  clearRequestSelection();
 }
