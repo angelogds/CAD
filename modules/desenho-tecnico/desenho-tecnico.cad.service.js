@@ -1,4 +1,17 @@
-const TECH_LAYERS = ['geometria_principal', 'linhas_de_centro', 'cotas', 'textos', 'furos', 'construcao', 'observacoes'];
+const TECH_LAYERS = ['geometria_principal', 'contorno', 'centro', 'linhas_de_centro', 'cotas', 'eixos', 'furacao', 'furos', 'construcao', 'observacoes', 'textos'];
+const TECH_LAYER_COLORS = {
+  geometria_principal: '#e5edf6',
+  contorno: '#e5edf6',
+  centro: '#2dd4bf',
+  linhas_de_centro: '#2dd4bf',
+  cotas: '#60a5fa',
+  eixos: '#22d3ee',
+  furacao: '#f59e0b',
+  furos: '#fb7185',
+  construcao: '#64748b',
+  observacoes: '#f8fafc',
+  textos: '#f8fafc',
+};
 
 function toFinite(value, fallback = 0) {
   const n = Number(value);
@@ -132,7 +145,7 @@ function normalizeObject(obj = {}) {
 function sanitizeCadData(payload = {}) {
   const layers = { ...(payload.layers || {}) };
   for (const key of TECH_LAYERS) {
-    if (!layers[key]) layers[key] = { color: '#cbd5e1', visible: true, locked: false };
+    if (!layers[key]) layers[key] = { color: TECH_LAYER_COLORS[key] || '#cbd5e1', visible: true, locked: false };
   }
 
   const normalizedObjects = (Array.isArray(payload.objects) ? payload.objects : []).map(normalizeObject);

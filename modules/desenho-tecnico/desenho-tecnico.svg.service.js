@@ -186,7 +186,10 @@ function renderCadDrawing(cad = {}) {
     return `<g data-layer="${layer}" stroke="${color}" fill="none">${layerObjects.map((obj) => {
       if (obj.type === 'line') return `<line x1="${obj.x}" y1="${obj.y}" x2="${obj.x2}" y2="${obj.y2}" stroke-width="${obj.strokeWidth || 2}" />`;
       if (obj.type === 'rect') return `<rect x="${obj.x}" y="${obj.y}" width="${obj.width}" height="${obj.height}" transform="rotate(${obj.rotation || 0} ${obj.x || 0} ${obj.y || 0})" stroke-width="${obj.strokeWidth || 2}" />`;
-      if (obj.type === 'circle' || obj.type === 'hole') return `<circle cx="${obj.x}" cy="${obj.y}" r="${obj.radius}" stroke-width="${obj.strokeWidth || 2}" />`;
+      if (obj.type === 'circle' || obj.type === 'hole') {
+        const dash = obj.style?.dasharray || obj.layer === 'construcao' ? ' stroke-dasharray="8 5"' : '';
+        return `<circle cx="${obj.x}" cy="${obj.y}" r="${obj.radius}" stroke-width="${obj.strokeWidth || 2}"${dash} />`;
+      }
       if (obj.type === 'centerline') return `<line x1="${obj.x}" y1="${obj.y}" x2="${obj.x2}" y2="${obj.y2}" stroke-dasharray="8 4" stroke-width="1.5" />`;
       if (obj.type === 'text' || obj.type === 'note') return `<text x="${obj.x}" y="${obj.y}" fill="${color}" font-size="${obj.size || obj.fontSize || 12}">${escapeXml(obj.text || '')}</text>`;
       if (obj.type === 'polyline' && Array.isArray(obj.points)) return `<${obj.closed ? 'polygon' : 'polyline'} points="${obj.points.map((pt) => `${pt.x},${pt.y}`).join(' ')}" stroke-width="${obj.strokeWidth || 2}" />`;

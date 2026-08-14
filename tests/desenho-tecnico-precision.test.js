@@ -14,6 +14,11 @@ async function loadGeometry() {
   return import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 }
 
+async function loadFlangeFactory() {
+  const source = read('public/js/modules/desenho-tecnico/core/flange.factory.js');
+  return import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+}
+
 test('salvamento preserva geometria precisa de arco e configurações do viewport', () => {
   const payload = sanitizeCadData({
     schemaVersion: 2,
@@ -119,4 +124,44 @@ test('exportações PDF e SVG suportam arcos, polilinhas, eixos e cotas do schem
   assert.match(svg, /const arcPath = \(obj\)/);
   assert.match(svg, /const shaftSvg = \(obj\)/);
   assert.match(svg, /const dimensionSvg = dimensions\.map/);
+});
+
+test('gerador de flange cria geometria paramétrica exata e separada por camadas', async () => {
+  const { createFlangeGeometry } = await loadFlangeFactory();
+  const flange = createFlangeGeometry({
+    outerDiameter: 200,
+    boreDiameter: 60,
+    pitchDiameter: 150,
+    holeDiameter: 18,
+    holeCount: 8,
+    rotation: 0,
+  }, { x: 25, y: -10 }, { groupId: 'flange-test' });
+
+  assert.equal(flange.objects.length, 13);
+  assert.deepEqual(flange.objects[0].geometry, { cx: 25, cy: -10, radius: 100 });
+  assert.equal(flange.objects.filter((item) => item.metadata.layer === 'furos').length, 8);
+  assert.equal(flange.objects.filter((item) => item.type === 'centerline').length, 2);
+  assert.deepEqual(flange.objects[3].geometry, { cx: 100, cy: -10, radius: 9 });
+  assert.ok(flange.objects.every((item) => item.metadata.groupId === 'flange-test'));
+});
+
+test('gerador de flange rejeita medidas incompatíveis com fabricação', async () => {
+  const { normalizeFlangeParameters } = await loadFlangeFactory();
+  assert.throws(() => normalizeFlangeParameters({ outerDiameter: 100, boreDiameter: 40, pitchDiameter: 95, holeDiameter: 12, holeCount: 6 }), /ultrapassam/);
+  assert.throws(() => normalizeFlangeParameters({ outerDiameter: 100, boreDiameter: 80, pitchDiameter: 60, holeDiameter: 10, holeCount: 6 }), /invadem/);
+  assert.throws(() => normalizeFlangeParameters({ outerDiameter: 100, boreDiameter: 20, pitchDiameter: 70, holeDiameter: 10, holeCount: 1 }), /2 a 72/);
+});
+
+test('interface moderna mantém comandos, modelos mecânicos e vínculo de equipamento', () => {
+  const editor = read('views/desenho-tecnico/cad-editor-v2.ejs');
+  const controller = read('public/js/modules/desenho-tecnico/desenho-tecnico.controller.js');
+  const shaftTool = read('public/js/modules/desenho-tecnico/tools/shaft.tool.js');
+  assert.match(editor, /id="cadFlangeModal"/);
+  assert.match(editor, /id="cadShaftModal"/);
+  assert.match(editor, /id="cadMetaEquipamento"/);
+  assert.match(editor, /id="cadEmptyState"/);
+  assert.match(controller, /new FlangeTool\(this\.ctx\)/);
+  assert.match(controller, /Math\.max\(0\.001, this\.state\.gridConfig\.step/);
+  assert.doesNotMatch(shaftTool, /window\.prompt/);
+  assert.match(shaftTool, /data-shaft-segment-row/);
 });

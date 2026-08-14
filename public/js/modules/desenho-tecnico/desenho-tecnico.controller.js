@@ -26,6 +26,7 @@ import { MirrorTool } from './tools/mirror.tool.js';
 import { MoveTool } from './tools/move.tool.js';
 import { CopyTool } from './tools/copy.tool.js';
 import { EraseTool } from './tools/erase.tool.js';
+import { FlangeTool } from './tools/flange.tool.js';
 import { LineEntity } from './entities/line.entity.js';
 import { RectEntity } from './entities/rect.entity.js';
 import { CircleEntity } from './entities/circle.entity.js';
@@ -68,6 +69,7 @@ const TOOL_LABELS = {
   arc: 'Arco',
   text: 'Texto',
   shaft: 'Eixo Paramétrico',
+  flange: 'Flange Paramétrico',
   centerline: 'Linha de Centro',
   dim_linear: 'Cota Linear',
   dim_diameter: 'Cota Diâmetro',
@@ -92,6 +94,7 @@ const TOOL_HINTS = {
   arc: 'desenhar arco técnico',
   text: 'inserir anotação técnica',
   shaft: 'gerar eixo mecânico paramétrico',
+  flange: 'gerar flange com furação circular exata',
   centerline: 'marcar eixo de simetria',
   dim_linear: 'cotar distância linear',
 };
@@ -118,6 +121,7 @@ const COMMAND_ALIASES = {
   da: 'tool-dim-angular', angular: 'tool-dim-angular',
   cl: 'tool-centerline', centro: 'tool-centerline',
   x: 'tool-shaft', eixo: 'tool-shaft',
+  f: 'tool-flange', fl: 'tool-flange', flange: 'tool-flange',
   zw: 'tool-zoom-window', janela: 'tool-zoom-window',
   ze: 'zoom-extents', extents: 'zoom-extents',
   u: 'undo', undo: 'undo', desfazer: 'undo',
@@ -150,6 +154,7 @@ export class DesenhoTecnicoController {
       preview: this.previewLayer,
       prompt: this.prompt,
       addEntity: (e) => this.addEntity(e),
+      addEntities: (entities, message) => this.addEntities(entities, message),
       findEntityAt: (w) => this.findEntityAt(w),
       isEntityEditable: (entity) => this.isEntityEditable(entity),
       toolManager: this.toolManager,
@@ -168,6 +173,7 @@ export class DesenhoTecnicoController {
       new CenterlineTool(this.ctx), new ShaftTool(this.ctx), new DimensionTool(this.ctx), new MeasureTool(this.ctx), new ZoomWindowTool(this.ctx),
       new TrimTool(this.ctx), new ExtendTool(this.ctx), new OffsetTool(this.ctx), new MirrorTool(this.ctx),
       new MoveTool(this.ctx), new CopyTool(this.ctx), new EraseTool(this.ctx),
+      new FlangeTool(this.ctx),
     ].forEach((t) => this.toolManager.register(t));
     this.interaction = new InteractionController(svg, this.toolManager, this.viewport, this.eventBus);
     this.loadInitial(initial);
@@ -254,7 +260,11 @@ export class DesenhoTecnicoController {
     this.redoStack = [];
   }
 
-  markDirty(msg = 'Editado') { this.state.statusMessage = msg; this.scheduleAutosave(); }
+  markDirty(msg = 'Editado') {
+    this.state.statusMessage = msg;
+    this.setSaveState('dirty', 'Alterações pendentes');
+    this.scheduleAutosave();
+  }
 
   applySerialized(raw) {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -264,6 +274,16 @@ export class DesenhoTecnicoController {
   }
 
   addEntity(entity) { this.state.entities.push(entity); this.pushHistory(); this.markDirty('Entidade criada'); this.eventBus.emit('entity:created', entity); this.render(); }
+
+  addEntities(entities = [], message = 'Entidades criadas') {
+    const valid = entities.filter(Boolean);
+    if (!valid.length) return;
+    this.state.entities.push(...valid);
+    this.pushHistory();
+    this.markDirty(message);
+    valid.forEach((entity) => this.eventBus.emit('entity:created', entity));
+    this.render();
+  }
 
   getSnapCandidates() {
     const points = [];
@@ -390,7 +410,7 @@ export class DesenhoTecnicoController {
       });
     }
     if (cfg.grid !== false) {
-      const step = Math.max(0.1, this.state.gridConfig.step || 20);
+      const step = Math.max(0.001, this.state.gridConfig.step || 20);
       candidates.push({ x: Math.round(p.x / step) * step, y: Math.round(p.y / step) * step, kind: 'grid' });
     }
     const nearest = candidates
@@ -511,6 +531,17 @@ export class DesenhoTecnicoController {
     this.renderLayersPanel();
     this.updateStatus();
     this.syncToolbarState();
+    const emptyState = document.getElementById('cadEmptyState');
+    if (emptyState) emptyState.hidden = this.state.entities.length > 0;
+    const entityCount = document.getElementById('cadEntityCount');
+    if (entityCount) entityCount.textContent = `${this.state.entities.length} objeto${this.state.entities.length === 1 ? '' : 's'}`;
+  }
+
+  setSaveState(state, label) {
+    const indicator = document.getElementById('cadSaveState');
+    if (!indicator) return;
+    indicator.dataset.state = state;
+    indicator.textContent = label;
   }
 
   updateStatus(cursor = null) {
@@ -636,17 +667,17 @@ export class DesenhoTecnicoController {
 
   ensureDefaultLayers() {
     const defaults = {
-      contorno: { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' },
-      centro: { color: '#0f766e', visible: true, locked: false, lineType: 'center' },
-      linhas_de_centro: { color: '#0f766e', visible: true, locked: false, lineType: 'center' },
-      cotas: { color: '#2563eb', visible: true, locked: false, lineType: 'continuous' },
-      eixos: { color: '#0e7490', visible: true, locked: false, lineType: 'center' },
-      furacao: { color: '#065f46', visible: true, locked: false, lineType: 'dashed' },
-      furos: { color: '#065f46', visible: true, locked: false, lineType: 'dashed' },
-      construcao: { color: '#6b7280', visible: true, locked: false, lineType: 'dashed' },
-      observacoes: { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' },
-      textos: { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' },
-      geometria_principal: { color: '#1f2937', visible: true, locked: false, lineType: 'continuous' },
+      contorno: { color: '#e5edf6', visible: true, locked: false, lineType: 'continuous' },
+      centro: { color: '#2dd4bf', visible: true, locked: false, lineType: 'center' },
+      linhas_de_centro: { color: '#2dd4bf', visible: true, locked: false, lineType: 'center' },
+      cotas: { color: '#60a5fa', visible: true, locked: false, lineType: 'continuous' },
+      eixos: { color: '#22d3ee', visible: true, locked: false, lineType: 'center' },
+      furacao: { color: '#f59e0b', visible: true, locked: false, lineType: 'dashed' },
+      furos: { color: '#fb7185', visible: true, locked: false, lineType: 'dashed' },
+      construcao: { color: '#64748b', visible: true, locked: false, lineType: 'dashed' },
+      observacoes: { color: '#f8fafc', visible: true, locked: false, lineType: 'continuous' },
+      textos: { color: '#f8fafc', visible: true, locked: false, lineType: 'continuous' },
+      geometria_principal: { color: '#e5edf6', visible: true, locked: false, lineType: 'continuous' },
     };
     this.state.layers = { ...defaults, ...(this.state.layers || {}) };
     if (!this.state.layers[this.state.activeLayer]) this.state.activeLayer = 'geometria_principal';
@@ -694,6 +725,15 @@ export class DesenhoTecnicoController {
       'toggle-grid': () => { this.state.gridConfig.visible = !this.state.gridConfig.visible; this.markDirty('Grade atualizada'); this.render(); },
       'toggle-snap': () => { this.state.snappingConfig.enabled = !this.state.snappingConfig.enabled; this.markDirty('Snap atualizado'); this.render(); },
       'toggle-ortho': () => { this.state.orthoEnabled = !this.state.orthoEnabled; this.markDirty('Ortho atualizado'); this.render(); },
+      'toggle-theme': () => {
+        const root = document.querySelector('.cad-fullscreen');
+        if (!root) return;
+        const useLight = !root.classList.contains('cad-theme-light');
+        root.classList.toggle('cad-theme-light', useLight);
+        root.classList.toggle('cad-theme-dark', !useLight);
+        localStorage.setItem('cad-theme', useLight ? 'light' : 'dark');
+        this.render();
+      },
       'toggle-right-panel': () => {
         const root = document.querySelector('.cad-fullscreen');
         if (!root) return;
@@ -777,9 +817,16 @@ export class DesenhoTecnicoController {
   async saveDrawing() {
     const id = window.CAD_INITIAL?.desenhoId;
     if (!id) return;
-    const res = await fetch(`/desenho-tecnico/cad/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.serialize()) });
-    if (!res.ok) throw new Error('Falha ao salvar desenho');
-    this.state.statusMessage = 'Desenho salvo com sucesso';
+    this.setSaveState('saving', 'Salvando…');
+    try {
+      const res = await fetch(`/desenho-tecnico/cad/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.serialize()) });
+      if (!res.ok) throw new Error('Falha ao salvar desenho');
+      this.state.statusMessage = 'Desenho salvo com sucesso';
+      this.setSaveState('saved', 'Tudo salvo');
+    } catch (error) {
+      this.setSaveState('error', 'Falha ao salvar');
+      throw error;
+    }
   }
 
   async saveMetadata() {
@@ -820,6 +867,10 @@ export class DesenhoTecnicoController {
       console.warn('[CAD] Container raiz não encontrado para bind da toolbar');
       return;
     }
+    const savedTheme = localStorage.getItem('cad-theme');
+    cadRoot.classList.toggle('cad-theme-light', savedTheme === 'light');
+    cadRoot.classList.toggle('cad-theme-dark', savedTheme !== 'light');
+    this.setSaveState('saved', 'Tudo salvo');
     // eslint-disable-next-line no-console
     console.info('[CAD] Toolbar encontrada; registrando delegação de eventos');
     cadRoot.addEventListener('click', (event) => {
