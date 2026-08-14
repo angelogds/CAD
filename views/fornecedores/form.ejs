@@ -1,55 +1,6 @@
-<% layout('layout') %>
-
-<div class="page-head">
-  <div>
-    <h1><%= fornecedor ? 'Editar fornecedor' : 'Novo fornecedor' %></h1>
-    <p class="muted">Mantenha os dados de contato e performance de entrega centralizados.</p>
-  </div>
-  <a class="btn btn-ghost" href="/fornecedores">← Voltar</a>
-</div>
-
-<div class="card" style="max-width: 900px;">
-  <form method="POST" action="<%= formAction %>">
-    <div class="grid-2">
-      <div>
-        <div class="label">Nome *</div>
-        <input class="input" name="nome" required value="<%= fornecedor?.nome || '' %>" />
-      </div>
-      <div>
-        <div class="label">CNPJ</div>
-        <input class="input" name="cnpj" value="<%= fornecedor?.cnpj || '' %>" />
-      </div>
-
-      <div>
-        <div class="label">Telefone</div>
-        <input class="input" name="telefone" value="<%= fornecedor?.telefone || '' %>" />
-      </div>
-      <div>
-        <div class="label">E-mail</div>
-        <input class="input" name="email" value="<%= fornecedor?.email || '' %>" />
-      </div>
-
-      <div>
-        <div class="label">Cidade</div>
-        <input class="input" name="cidade" value="<%= fornecedor?.cidade || '' %>" />
-      </div>
-      <div>
-        <div class="label">Situação</div>
-        <select class="input" name="ativo">
-          <option value="1" <%= Number(fornecedor?.ativo ?? 1) === 1 ? 'selected' : '' %>>Ativo</option>
-          <option value="0" <%= Number(fornecedor?.ativo ?? 1) === 0 ? 'selected' : '' %>>Inativo</option>
-        </select>
-      </div>
-    </div>
-
-    <div style="margin-top: 12px;">
-      <div class="label">Observações</div>
-      <textarea class="input" style="min-height:120px;" name="observacoes"><%= fornecedor?.observacoes || '' %></textarea>
-    </div>
-
-    <div style="margin-top:14px; display:flex; gap:8px;">
-      <button class="btn btn-green" type="submit">Salvar</button>
-      <a class="btn btn-ghost" href="/fornecedores">Cancelar</a>
-    </div>
-  </form>
-</div>
+<% layout('layout') %><link rel="stylesheet" href="/css/fornecedores.css"><script src="/js/fornecedores.js" defer></script><%const selected=fornecedor?.categorias||[];const products=(fornecedor?.produtos_servicos||[]).filter(x=>x.tipo==='PRODUTO').map(x=>x.nome).join(', ');const services=(fornecedor?.produtos_servicos||[]).filter(x=>x.tipo==='SERVICO').map(x=>x.nome).join(', ');%>
+<div class="supplier-page"><header class="supplier-head"><div><h1><%=fornecedor?'Editar fornecedor':'Novo fornecedor'%> <small>CADASTRO RÁPIDO</small></h1><p>Cadastre os dados essenciais para cotações e histórico de compras</p></div><a class="ui-btn ghost" href="<%=context?.returnTo||'/fornecedores'%>">← Voltar</a></header><div class="steps"><b>1 <span>Dados principais</span></b><b>2 <span>Produtos e serviços</span></b><b>3 <span>Condições comerciais</span></b></div>
+<form class="supplier-form" method="post" action="<%=formAction%>" data-supplier-form><main><%if(context){%><section class="supplier-card quote-context"><h2>Contexto da cotação</h2><b><%=context.numero||('Solicitação #'+context.solicitacaoId)%><%=context.equipamento?' · '+context.equipamento:''%></b><p>Item em cotação: <%=context.item||('item #'+context.itemId)%></p></section><input type="hidden" name="solicitacao_id" value="<%=context.solicitacaoId%>"><input type="hidden" name="item_id" value="<%=context.itemId||''%>"><input type="hidden" name="contexto_numero" value="<%=context.numero%>"><input type="hidden" name="contexto_equipamento" value="<%=context.equipamento%>"><input type="hidden" name="contexto_item" value="<%=context.item%>"><%}%>
+<section class="supplier-card"><h2>♙ Dados principais</h2><div class="form-grid"><label>Nome fantasia *<input class="input" name="nome_fantasia" required value="<%=fornecedor?.nome_fantasia||fornecedor?.nome||''%>"></label><label>Razão social<input class="input" name="razao_social" value="<%=fornecedor?.razao_social||''%>"></label><label>CNPJ<input class="input" name="cnpj" inputmode="numeric" value="<%=fornecedor?.cnpj||''%>" placeholder="00.000.000/0000-00"></label><label>Situação<select class="input" name="situacao"><option value="ATIVO">Ativo</option><option value="INATIVO" <%=fornecedor?.situacao==='INATIVO'?'selected':''%>>Inativo</option></select></label><label>Responsável comercial *<input class="input" name="responsavel_comercial" required value="<%=fornecedor?.responsavel_comercial||''%>"></label><label>WhatsApp<input class="input" name="whatsapp" value="<%=fornecedor?.whatsapp||''%>"></label><label>Telefone alternativo<input class="input" name="telefone" value="<%=fornecedor?.telefone||''%>"></label><label>E-mail<input class="input" type="email" name="email" value="<%=fornecedor?.email||''%>"></label><label>Cidade<input class="input" name="cidade" value="<%=fornecedor?.cidade||''%>"></label><label>UF<input class="input" maxlength="2" name="uf" value="<%=fornecedor?.uf||''%>"></label><label class="wide">Endereço<input class="input" name="endereco" value="<%=fornecedor?.endereco||''%>"></label></div></section>
+<section class="supplier-card"><h2>◇ Produtos e serviços</h2><label>Adicionar produto, serviço ou marca<input class="input" name="produtos_servicos" value="<%=products%>" placeholder="Separe múltiplos itens por vírgula"></label><div class="category-picker"><b>Categorias *</b><%categories.forEach(c=>{%><label><input type="checkbox" name="categorias" value="<%=c.nome%>" <%=selected.includes(c.nome)?'checked':''%>><span><%=c.nome%></span></label><%})%><label class="new-category">Nova categoria<input class="input" name="categorias" placeholder="Adicionar autorizada"></label></div><div class="form-grid"><label>Serviços<input class="input" name="servicos" value="<%=services%>"></label><label>Marcas representadas<input class="input" name="marcas" value="<%=fornecedor?.marcas||''%>"></label><label>Região atendida<input class="input" name="regiao_atendida" value="<%=fornecedor?.regiao_atendida||''%>"></label><label>Especialidade<input class="input" name="especialidade" value="<%=fornecedor?.especialidade||''%>"></label></div></section>
+<section class="supplier-card"><h2>▱ Condições comerciais</h2><div class="form-grid commercial"><label>Prazo médio de entrega<input class="input" type="number" min="0" name="prazo_medio_entrega" value="<%=fornecedor?.lead_time_medio_dias||''%>"></label><label>Condição de pagamento<input class="input" name="condicao_pagamento" value="<%=fornecedor?.condicao_pagamento||''%>"></label><label>Pedido mínimo<input class="input" name="pedido_minimo" value="<%=fornecedor?.pedido_minimo_centavos?fornecedor.pedido_minimo_centavos/100:''%>"></label><label>Tipo de frete<input class="input" name="frete" value="<%=fornecedor?.frete||''%>"></label><label>Validade da proposta (dias)<input class="input" type="number" min="0" name="validade_proposta_dias" value="<%=fornecedor?.validade_proposta_dias||''%>"></label><label>Garantia<input class="input" name="garantia" value="<%=fornecedor?.garantia||''%>"></label><label class="wide">Observações comerciais<textarea class="input" name="observacoes_comerciais"><%=fornecedor?.observacoes_comerciais||''%></textarea></label></div></section></main><aside><section class="supplier-card summary"><h2>Resumo do cadastro</h2><ul><li data-check="id">Identificação</li><li data-check="contact">Contato</li><li data-check="products">Produtos e serviços</li><li data-check="commercial">Condições comerciais</li></ul><hr><h3>Como será usado</h3><p>✓ Disponível na seleção de fornecedores da cotação</p><p>✓ Histórico de preços e compras centralizado</p><p>✓ Busca por materiais fornecidos</p></section></aside><footer><a class="ui-btn ghost" href="<%=context?.returnTo||'/fornecedores'%>">Cancelar</a><button class="ui-btn ghost" name="acao" value="salvar">Salvar fornecedor</button><%if(context){%><button class="ui-btn" name="acao" value="salvar_selecionar">Salvar e selecionar na cotação</button><%}%></footer></form></div>

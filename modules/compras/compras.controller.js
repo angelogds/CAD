@@ -11,11 +11,12 @@ function isSchemaError(error) {
   return msg.includes('no such table') || msg.includes('no such column') || msg.includes('sqlite_error');
 }
 
-function tryRenderDetalhe(id, res) {
+function tryRenderDetalhe(id, res, req) {
   const sol = service.getSolicitacaoDetalhe(id);
   if (!sol) return res.status(404).send('Solicitação não encontrada');
   const fornecedores = service.listFornecedoresAtivos();
-  return res.render('compras/solicitacoes/show', { title: `Compras ${sol.numero}`, activeMenu: 'compras', sol, fornecedores });
+  return res.render('compras/solicitacoes/show', { title: `Compras ${sol.numero}`, activeMenu: 'compras', sol, fornecedores,
+    selectedSupplierId:Number(req?.query?.fornecedor_selecionado)||null,selectedItemId:Number(req?.query?.item_id)||null });
 }
 
 function lista(req, res) {
@@ -71,13 +72,13 @@ function lista(req, res) {
 function detalhe(req, res) {
   const id = Number(req.params.id);
   try {
-    return tryRenderDetalhe(id, res);
+    return tryRenderDetalhe(id, res, req);
   } catch (e) {
     if (isSchemaError(e)) {
       try {
         console.warn('⚠️ Schema de compras incompleto. Tentando aplicar migrations automaticamente...');
         applyMigrations();
-        return tryRenderDetalhe(id, res);
+        return tryRenderDetalhe(id, res, req);
       } catch (migrationError) {
         console.error('❌ Falha ao aplicar migrations automaticamente:', migrationError && migrationError.stack ? migrationError.stack : migrationError);
       }

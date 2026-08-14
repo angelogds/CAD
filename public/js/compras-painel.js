@@ -78,3 +78,12 @@
   });
   update();
 })();
+
+// Seletor pesquisável e retorno seguro do cadastro rápido. O rascunho fica apenas nesta aba.
+(() => {
+  const form=document.querySelector('#quote-form'); if(!form)return;
+  const key=`cotacao-rascunho-${location.pathname}`;
+  document.querySelectorAll('.supplier-search').forEach(input=>input.addEventListener('input',()=>{const select=input.nextElementSibling;const q=input.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();[...select.options].forEach((o,i)=>{o.hidden=i>0&&!o.dataset.search?.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes(q)});if(q){const first=[...select.options].find(o=>!o.hidden&&o.value);if(first)select.value=first.value;}}));
+  document.querySelectorAll('.new-supplier').forEach(link=>link.addEventListener('click',()=>{const data={};new FormData(form).forEach((v,k)=>(data[k]??=[]).push(v));sessionStorage.setItem(key,JSON.stringify(data));}));
+  const draft=sessionStorage.getItem(key);if(draft&&new URLSearchParams(location.search).has('fornecedor_selecionado')){try{const data=JSON.parse(draft);Object.entries(data).forEach(([name,vals])=>{const fields=[...form.querySelectorAll(`[name="${CSS.escape(name)}"]`)];fields.forEach((field,i)=>{if(field.type==='checkbox')field.checked=vals.includes(field.value);else if(!field.classList.contains('supplier')||!field.value)field.value=vals[i]??vals[0]??'';});});sessionStorage.removeItem(key);form.dispatchEvent(new Event('input',{bubbles:true}));}catch{sessionStorage.removeItem(key);}}
+})();
