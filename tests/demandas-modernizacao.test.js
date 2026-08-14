@@ -22,6 +22,12 @@ test('controller envia filtros e painel consolidado para a listagem', () => {
   assert.match(controller, /tab: normalizeChoice/);
 });
 
+test('lista somente responsáveis ativos usando a coluna do schema de usuários', () => {
+  const service = read('modules/demandas/demandas.service.js');
+  assert.match(service, /FROM users WHERE ativo=1 ORDER BY name/);
+  assert.doesNotMatch(service, /FROM users WHERE active=1/);
+});
+
 test('detalhe e cadastro usam o mesmo padrão visual', () => {
   const form = read('views/demandas/new.ejs');
   const detail = read('views/demandas/view.ejs');

@@ -208,7 +208,7 @@ function getResumoDashboard() {
 }
 
 function listResponsaveis() {
-  return db.prepare(`SELECT id, name FROM users WHERE active=1 ORDER BY name`).all();
+  return db.prepare(`SELECT id, name FROM users WHERE ativo=1 ORDER BY name`).all();
 }
 
 module.exports = {
