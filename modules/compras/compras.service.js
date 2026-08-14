@@ -286,7 +286,11 @@ function getAnalytics(period = 30) {
 
 function listFornecedoresAtivos() {
   if (!tableExists('fornecedores')) return [];
-  return db.prepare('SELECT id, nome, cnpj, cidade FROM fornecedores WHERE ativo = 1 ORDER BY nome ASC').all();
+  return db.prepare(`SELECT f.id,COALESCE(f.nome_fantasia,f.nome) nome,f.cnpj,f.cidade,f.uf,f.lead_time_medio_dias,
+    (SELECT group_concat(c.nome, ', ') FROM fornecedor_categoria_vinculos v JOIN fornecedor_categorias c ON c.id=v.categoria_id WHERE v.fornecedor_id=f.id) categorias,
+    (SELECT group_concat(p.nome, ', ') FROM fornecedor_produto_vinculos v JOIN fornecedor_produtos_servicos p ON p.id=v.produto_servico_id WHERE v.fornecedor_id=f.id) produtos,
+    (SELECT COUNT(*) FROM solicitacao_itens si WHERE si.fornecedor_id=f.id AND si.status_compra='COMPRADO') total_compras
+    FROM fornecedores f WHERE f.ativo=1 ORDER BY f.favorito DESC,COALESCE(f.nome_fantasia,f.nome)`).all();
 }
 
 function listCotacoes(solicitacaoId) {
