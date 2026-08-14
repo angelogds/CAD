@@ -33,7 +33,7 @@
 
   const knownTabs = tabs.map((tab) => tab.dataset.tab);
   const initialHash = location.hash.slice(1);
-  selectTab(knownTabs.includes(initialHash) ? initialHash : 'resumo', { updateHash: false });
+  selectTab(knownTabs.includes(initialHash) ? initialHash : 'execucao', { updateHash: false });
   window.addEventListener('hashchange', () => {
     const hash = location.hash.slice(1);
     if (knownTabs.includes(hash)) selectTab(hash, { updateHash: false });
@@ -50,14 +50,15 @@
     });
   }
   moveModule('justificativa-andamento', 'justificativa-andamento', 'execucao');
-  moveModule('tracagens-vinculadas', 'tracagens-vinculadas', 'materiais');
-  moveModule('whatsapp-os', 'historico', 'historico');
+  moveModule('tracagens-vinculadas', 'equipe', 'execucao');
+
 
   document.querySelectorAll('[data-os-module]').forEach((button) => {
     button.addEventListener('click', () => {
       const id = button.dataset.osModule;
-      const tab = id === 'tracagens-vinculadas' ? 'materiais' : id === 'whatsapp-os' ? 'historico' : 'execucao';
-      selectTab(tab);
+      const tab = 'execucao';
+      if (id !== 'whatsapp-os') selectTab(tab);
+      if (id === 'whatsapp-os') document.getElementById(id)?.classList.toggle('active');
       document.getElementById(id === 'equipe-os' ? 'equipe-os' : id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
