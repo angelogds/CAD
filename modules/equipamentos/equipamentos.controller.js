@@ -95,6 +95,7 @@ async function equipShow(req, res) {
   const tracagens = tracagemService ? tracagemService.listByEquipamento(id) : [];
   const desenhosTecnicos = desenhoTecnicoService ? desenhoTecnicoService.listByEquipamento(id) : [];
   const riscoFalha = pcmIntelligenceService ? pcmIntelligenceService.calcularScoreRiscoEquipamento(id) : null;
+  const dashboard = service.getEquipmentDashboard(id);
 
   return res.render("equipamentos/show", {
     title: equip.nome,
@@ -114,6 +115,7 @@ async function equipShow(req, res) {
     tracagens,
     desenhosTecnicos,
     riscoFalha,
+    dashboard,
   });
 }
 
