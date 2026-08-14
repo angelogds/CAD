@@ -35,13 +35,19 @@ async function notifyResponsavelWhatsapp(osId, tipoEvento, criadoPor) {
 
 function osIndex(req, res) {
   res.locals.activeMenu = "os";
-  const lista = service.listOS();
+  const dashboard = service.getOperationalDashboard({
+    tab: req.query.tab, quick: req.query.quick, q: req.query.q,
+    status: req.query.status, priority: req.query.priority,
+    criticality: req.query.criticality, sector: req.query.sector,
+    responsible: req.query.responsible, period: req.query.period,
+    page: req.query.page, perPage: req.query.per_page,
+  });
   const role = normalizeRole(req.session?.user?.role || "");
   const canSendWhatsapp = canSendWhatsappNotificationRole(role);
   const colaboradores = canSendWhatsapp ? service.listUsuariosEquipe() : [];
   return res.render("os/index", {
     title: "Ordens de Serviço",
-    lista,
+    dashboard,
     canDeleteOS: role === "ADMIN",
     canSendWhatsapp,
     colaboradores,

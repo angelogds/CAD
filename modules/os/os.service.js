@@ -1549,6 +1549,124 @@ async function registrarJustificativaAndamento(osId, payload = {}) {
   return getHistoricoAndamentoOS(id)[0];
 }
 
+function normalizeOperationalValue(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
+}
+
+function isFinalOperationalStatus(status) {
+  return STATUS_OS_FINALIZADA.has(normalizeOperationalValue(status));
+}
+
+function startOfLocalDay(value = new Date()) {
+  const date = value instanceof Date ? new Date(value) : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function operationalDateInfo(row, now = new Date()) {
+  const today = startOfLocalDay(now);
+  const opened = row.opened_at ? new Date(row.opened_at) : null;
+  const closed = row.closed_at ? new Date(row.closed_at) : null;
+  const due = row.due_at ? startOfLocalDay(row.due_at) : null;
+  const validOpened = opened && !Number.isNaN(opened.getTime()) ? opened : null;
+  const validClosed = closed && !Number.isNaN(closed.getTime()) ? closed : null;
+  const openDays = validOpened ? Math.max(0, Math.floor((now - validOpened) / 86400000)) : null;
+  const dueDays = due && today ? Math.round((due - today) / 86400000) : null;
+  const overdue = !isFinalOperationalStatus(row.status) && dueDays !== null && dueDays < 0;
+  let deadlineLabel = 'Sem prazo definido';
+  if (dueDays !== null) {
+    if (overdue) deadlineLabel = `Atrasada há ${Math.abs(dueDays)} ${Math.abs(dueDays) === 1 ? 'dia' : 'dias'}`;
+    else if (dueDays === 0) deadlineLabel = 'Vence hoje';
+    else if (dueDays === 1) deadlineLabel = 'Vence amanhã';
+    else deadlineLabel = 'No prazo';
+  }
+  let ageLabel = '';
+  if (!isFinalOperationalStatus(row.status) && openDays !== null) {
+    ageLabel = openDays === 0 ? 'Aberta hoje' : `Aberta há ${openDays} ${openDays === 1 ? 'dia' : 'dias'}`;
+  } else if (validOpened && validClosed) {
+    const total = Math.max(0, Math.floor((validClosed - validOpened) / 86400000));
+    ageLabel = `${total} ${total === 1 ? 'dia' : 'dias'} no total`;
+  }
+  return { overdue, dueDays, deadlineLabel, ageLabel, openDays };
+}
+
+function getOperationalDashboard(filters = {}) {
+  const cols = getOSColumns();
+  const pick = (candidates, fallback = 'NULL') => candidates.find((name) => cols.includes(name)) || fallback;
+  const grau = pick(['prioridade', 'grau', 'grau_dificuldade', 'nivel_grau']);
+  const opened = pick(['opened_at', 'created_at']);
+  const started = pick(['started_at', 'data_inicio']);
+  const closed = pick(['closed_at', 'data_conclusao', 'data_fim']);
+  const due = pick(['prazo', 'prazo_em', 'data_prazo', 'previsao_conclusao', 'data_prevista', 'data_programada', 'sla_at']);
+  const desc = pick(['descricao', 'nao_conformidade'], "''");
+  const has = (name) => cols.includes(name);
+  const rows = db.prepare(`
+    SELECT o.id, COALESCE(e.nome, o.equipamento_manual, o.equipamento, '-') equipamento,
+      ${desc === "''" ? desc : `o.${desc}`} descricao, o.tipo, o.status,
+      ${grau === 'NULL' ? grau : `o.${grau}`} prioridade,
+      ${opened === 'NULL' ? opened : `o.${opened}`} opened_at,
+      ${started === 'NULL' ? started : `o.${started}`} started_at,
+      ${closed === 'NULL' ? closed : `o.${closed}`} closed_at,
+      ${due === 'NULL' ? due : `o.${due}`} due_at,
+      e.criticidade equipamento_criticidade, e.setor,
+      COALESCE(ce.nome, m.name, '') mecanico_nome,
+      COALESCE(ca.nome, a.name, '') auxiliar_nome,
+      ${has('ultimo_motivo_andamento') ? 'o.ultimo_motivo_andamento' : 'NULL'} ultimo_motivo_andamento
+    FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id
+    LEFT JOIN users m ON m.id=o.mecanico_user_id LEFT JOIN users a ON a.id=o.auxiliar_user_id
+    LEFT JOIN colaboradores ce ON ce.id=o.executor_colaborador_id
+    LEFT JOIN colaboradores ca ON ca.id=o.auxiliar_colaborador_id
+    ORDER BY o.id DESC
+  `).all().map((row) => {
+    const names = [...new Set([row.mecanico_nome, row.auxiliar_nome].map(v => String(v || '').trim()).filter(Boolean))];
+    return { ...row, prioridade: normalizeOperationalValue(row.prioridade || 'MEDIA'), status_key: normalizeOperationalValue(row.status), equipe: names, ...operationalDateInfo(row) };
+  });
+
+  const active = rows.filter(row => !isFinalOperationalStatus(row.status));
+  const waiting = row => /PAUS|AGUARD/.test(row.status_key) || /FALTA|AGUARD/.test(normalizeOperationalValue(row.ultimo_motivo_andamento));
+  const running = row => STATUS_OS_EXECUCAO_POTENCIAL.has(row.status_key);
+  const openedOnly = row => !running(row) && !waiting(row) && !isFinalOperationalStatus(row.status);
+  const period = ['today', '7', '30', '90'].includes(String(filters.period)) ? String(filters.period) : '30';
+  const periodDays = period === 'today' ? 0 : Number(period);
+  const cutoff = startOfLocalDay(new Date()); cutoff.setDate(cutoff.getDate() - periodDays);
+  const closedInPeriod = rows.filter(row => isFinalOperationalStatus(row.status) && row.closed_at && new Date(row.closed_at) >= cutoff).length;
+  const metrics = { open: active.filter(openedOnly).length, running: active.filter(running).length, waiting: active.filter(waiting).length, overdue: active.filter(r => r.overdue).length, urgent: active.filter(r => ['CRITICA', 'ALTA'].includes(r.prioridade)).length, closed: closedInPeriod };
+
+  let filtered = rows;
+  const tab = ['active', 'closed', 'all'].includes(filters.tab) ? filters.tab : 'active';
+  if (tab === 'active') filtered = filtered.filter(r => !isFinalOperationalStatus(r.status));
+  if (tab === 'closed') filtered = filtered.filter(r => isFinalOperationalStatus(r.status));
+  const quick = String(filters.quick || '');
+  if (quick === 'open') filtered = filtered.filter(openedOnly);
+  if (quick === 'running') filtered = filtered.filter(running);
+  if (quick === 'waiting') filtered = filtered.filter(waiting);
+  if (quick === 'overdue') filtered = filtered.filter(r => r.overdue);
+  if (quick === 'urgent') filtered = filtered.filter(r => ['CRITICA', 'ALTA'].includes(r.prioridade));
+  if (filters.status) filtered = filtered.filter(r => r.status_key === normalizeOperationalValue(filters.status));
+  if (filters.priority) filtered = filtered.filter(r => r.prioridade === normalizeOperationalValue(filters.priority));
+  if (filters.criticality) filtered = filtered.filter(r => normalizeOperationalValue(r.equipamento_criticidade) === normalizeOperationalValue(filters.criticality));
+  if (filters.sector) filtered = filtered.filter(r => String(r.setor || '') === String(filters.sector));
+  if (filters.responsible) filtered = filtered.filter(r => r.equipe.includes(String(filters.responsible)));
+  if (filters.q) { const q = normalizeOperationalValue(filters.q); filtered = filtered.filter(r => normalizeOperationalValue(`${r.id} ${r.equipamento} ${r.descricao} ${r.equipe.join(' ')}`).includes(q)); }
+  if (period) filtered = filtered.filter(r => { const value = tab === 'closed' ? r.closed_at : r.opened_at; return value && new Date(value) >= cutoff; });
+  const rank = { CRITICA: 0, ALTA: 1, MEDIA: 2, BAIXA: 3 };
+  filtered.sort((a,b) => Number(b.overdue)-Number(a.overdue) || (rank[a.prioridade] ?? 4)-(rank[b.prioridade] ?? 4) || (a.dueDays ?? 99999)-(b.dueDays ?? 99999) || new Date(a.opened_at || 0)-new Date(b.opened_at || 0));
+  const total = filtered.length, perPage = [10,20,50,100].includes(Number(filters.perPage)) ? Number(filters.perPage) : 20;
+  const pages = Math.max(1, Math.ceil(total/perPage)), page = Math.min(Math.max(1, Number(filters.page)||1), pages);
+  const items = filtered.slice((page-1)*perPage, page*perPage);
+  const groups = tab === 'active' ? [
+    { key:'urgent', label:'Críticas e altas', items:items.filter(r=>['CRITICA','ALTA'].includes(r.prioridade)) },
+    { key:'medium', label:'Prioridade média', items:items.filter(r=>r.prioridade==='MEDIA') },
+    { key:'low', label:'Prioridade baixa', items:items.filter(r=>r.prioridade==='BAIXA') },
+    { key:'other', label:'Outras prioridades', items:items.filter(r=>!['CRITICA','ALTA','MEDIA','BAIXA'].includes(r.prioridade)) }
+  ].filter(g=>g.items.length) : [{ key:'all', label: tab === 'closed' ? 'Fechadas e histórico' : 'Todas as ordens', items }];
+  const attention = [...active].filter(r => r.overdue || ['CRITICA','ALTA'].includes(r.prioridade) || r.dueDays === 0 || waiting(r)).sort((a,b) => ((b.overdue?40:0)+(b.prioridade==='CRITICA'?30:b.prioridade==='ALTA'?15:0)+(b.dueDays===0?8:0)+(waiting(b)?4:0))-((a.overdue?40:0)+(a.prioridade==='CRITICA'?30:a.prioridade==='ALTA'?15:0)+(a.dueDays===0?8:0)+(waiting(a)?4:0)) || a.id-b.id).slice(0,4);
+  const load = new Map(); active.forEach(r => r.equipe.forEach(name => load.set(name, (load.get(name)||0)+1)));
+  const teamLoad = [...load].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count || a.name.localeCompare(b.name,'pt-BR')).slice(0,5);
+  return { metrics, attention, groups, items, pagination:{page,pages,total,perPage}, distribution:[{label:'Abertas',count:metrics.open,key:'open'},{label:'Em andamento',count:metrics.running,key:'running'},{label:'Aguardando/pausadas',count:metrics.waiting,key:'waiting'},{label:'Atrasadas',count:metrics.overdue,key:'overdue'}], teamLoad, filterOptions:{ statuses:[...new Set(rows.map(r=>r.status).filter(Boolean))].sort(), priorities:[...new Set(rows.map(r=>r.prioridade).filter(Boolean))], criticalities:[...new Set(rows.map(r=>r.equipamento_criticidade).filter(Boolean))].sort(), sectors:[...new Set(rows.map(r=>r.setor).filter(Boolean))].sort(), responsibles:[...new Set(rows.flatMap(r=>r.equipe))].sort() }, filters:{...filters,tab,period} };
+}
+
 function listOS() {
   const cols = getOSColumns();
 
@@ -2918,6 +3036,8 @@ module.exports = {
   liberarMecanicoManual,
   manterMecanicoVinculadoExecucao,
   listOS,
+  getOperationalDashboard,
+  operationalDateInfo,
   listOpenOSByColaborador,
   deleteOS,
   listEquipamentosAtivos,

@@ -1,687 +1,95 @@
 <% layout('layout') %>
-
-<style>
-  /* ─── OS INDEX — responsivo completo ─── */
-  .os-page-head {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 14px;
-    flex-wrap: wrap;
-  }
-
-  .os-page-head h1 {
-    margin: 0;
-    font-size: 30px;
-    letter-spacing: -.02em;
-  }
-
-  .muted {
-    font-size: 13px;
-    color: #6b7280;
-    margin-top: 4px;
-  }
-
-  .card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 16px;
-    padding: 18px;
-  }
-
-  .btn-primary {
-    background: #16a34a;
-    color: #fff;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 10px;
-    font-weight: 700;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .btn-primary:hover {
-    background: #15803d;
-  }
-
-  .bulk-whatsapp {
-    margin-bottom: 14px;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 12px;
-    align-items: end;
-  }
-
-  .bulk-whatsapp-title {
-    font-weight: 900;
-    color: #0f172a;
-    margin-bottom: 4px;
-  }
-
-  .bulk-whatsapp-form {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
-
-  .bulk-whatsapp-form select {
-    min-width: 260px;
-    border: 1px solid #d1d5db;
-    border-radius: 10px;
-    padding: 9px 11px;
-    font-weight: 700;
-    color: #0f172a;
-    background: #fff;
-  }
-
-  .btn-whatsapp {
-    background: #22c55e;
-    color: #052e16;
-    border-color: #16a34a;
-  }
-
-  .btn-whatsapp:hover {
-    background: #dcfce7;
-  }
-
-  /* ─── TABELA DESKTOP ─── */
-  .table-wrap {
-    max-width: 100%;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .os-table {
-    width: 100%;
-    min-width: 0;
-    border-collapse: separate;
-    border-spacing: 0;
-    table-layout: fixed;
-  }
-
-
-  .os-col-select { width: 3%; }
-  .os-col-id { width: 4%; }
-  .os-col-equipamento { width: 14%; }
-  .os-col-tipo { width: 7%; }
-  .os-col-grau { width: 6%; }
-  .os-col-status { width: 8%; }
-  .os-col-solicitante { width: 9%; }
-  .os-col-abertura { width: 8%; }
-  .os-col-dias { width: 5%; }
-  .os-col-andamento { width: 14%; }
-  .os-col-fechamento { width: 8%; }
-  .os-col-executores { width: 9%; }
-  .os-col-acoes { width: 6%; }
-
-  .os-table small.muted {
-    display: block;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  thead th {
-    text-align: left;
-    font-size: 11px;
-    color: #64748b;
-    font-weight: 700;
-    letter-spacing: .01em;
-    padding: 8px 6px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    border-bottom: 1px solid #e5e7eb;
-    background: #fff;
-    position: sticky;
-    top: 0;
-    z-index: 1;
-  }
-
-  tbody td {
-    padding: 8px 6px;
-    border-bottom: 1px solid #f1f5f9;
-    vertical-align: middle;
-    font-size: 11px;
-    color: #0f172a;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  tbody tr:hover td {
-    background: #f8fafc;
-  }
-
-  .td-clip {
-    max-width: 100%;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    max-width: 100%;
-    padding: 3px 7px;
-    border-radius: 999px;
-    font-weight: 800;
-    font-size: 11px;
-    border: 1px solid #e5e7eb;
-    background: #f8fafc;
-    color: #0f172a;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .os-list-card {
-    padding: 12px;
-  }
-
-  .pill-blue {
-    background: #eff6ff;
-    border-color: #bfdbfe;
-    color: #1d4ed8;
-  }
-
-  .pill-amber {
-    background: #fff7ed;
-    border-color: #fed7aa;
-    color: #9a3412;
-  }
-
-  .pill-sky {
-    background: #ecfeff;
-    border-color: #a5f3fc;
-    color: #155e75;
-  }
-
-  .pill-gray {
-    background: #f1f5f9;
-    border-color: #e2e8f0;
-    color: #334155;
-  }
-
-  .pill-green {
-    background: #ecfdf5;
-    border-color: #bbf7d0;
-    color: #14532d;
-  }
-
-  .pill-red {
-    background: #fef2f2;
-    border-color: #fecaca;
-    color: #991b1b;
-  }
-
-  .btn-sm {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 5px 8px;
-    border-radius: 9px;
-    border: 1px solid #d1d5db;
-    background: #fff;
-    cursor: pointer;
-    text-decoration: none;
-    font-weight: 800;
-    font-size: 12px;
-    color: #0f172a;
-    white-space: nowrap;
-  }
-
-  .btn-sm:hover {
-    border-color: rgba(22, 163, 74, .45);
-    background: #ecfdf5;
-  }
-
-  .os-actions {
-    display: inline-flex;
-    flex-direction: column;
-    gap: 6px;
-    align-items: stretch;
-  }
-
-  .os-action-btn {
-    justify-content: center;
-    min-width: 58px;
-    padding: 5px 6px;
-    line-height: 1.1;
-    transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
-  }
-
-  .os-action-open:hover {
-    border-color: rgba(22, 163, 74, .5);
-    background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
-  }
-
-  .os-action-delete:hover {
-    border-color: rgba(185, 28, 28, .5);
-    color: #7f1d1d;
-    background: linear-gradient(180deg, #fee2e2 0%, #fecaca 100%);
-  }
-
-  /* ─── CARDS MOBILE (escondidos no desktop) ─── */
-  .os-cards {
-    display: none;
-    gap: 10px;
-    flex-direction: column;
-  }
-
-  .os-card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 14px;
-    padding: 14px;
-    display: grid;
-    gap: 8px;
-    text-decoration: none;
-    color: inherit;
-    transition: box-shadow .15s ease;
-  }
-
-  .os-card:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, .08);
-  }
-
-  .os-card-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .os-card-id {
-    font-weight: 900;
-    font-size: 13px;
-    color: #64748b;
-  }
-
-  .os-card-equip {
-    font-weight: 700;
-    font-size: 15px;
-    color: #0f172a;
-    line-height: 1.3;
-  }
-
-  .os-card-desc {
-    font-size: 13px;
-    color: #475569;
-    line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .os-card-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    flex-wrap: wrap;
-    padding-top: 6px;
-    border-top: 1px solid #f1f5f9;
-  }
-
-  .os-card-meta {
-    font-size: 12px;
-    color: #94a3b8;
-  }
-
-  .os-card-pills {
-    display: flex;
-    gap: 5px;
-    flex-wrap: wrap;
-  }
-
-  .os-card-executores {
-    font-size: 12px;
-    color: #334155;
-  }
-
-  .empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    color: #94a3b8;
-    font-size: 14px;
-  }
-
-  /* ─── BREAKPOINTS ─── */
-  @media (max-width: 760px) {
-    .os-page-head h1 {
-      font-size: 24px;
-    }
-
-    .os-page-head {
-      align-items: flex-start;
-    }
-
-    .card {
-      padding: 0;
-      border: none;
-      background: transparent;
-    }
-
-    .table-wrap {
-      display: none;
-    }
-
-    .os-cards {
-      display: flex;
-    }
-
-    .bulk-whatsapp {
-      grid-template-columns: 1fr;
-      padding: 14px;
-      border: 1px solid #e5e7eb;
-      background: #fff;
-    }
-
-    .bulk-whatsapp-form {
-      justify-content: stretch;
-    }
-
-    .bulk-whatsapp-form select,
-    .bulk-whatsapp-form button {
-      width: 100%;
-    }
-  }
-
-  @media (max-width: 400px) {
-    .btn-primary {
-      width: 100%;
-      justify-content: center;
-    }
-
-    .os-page-head {
-      gap: 8px;
-    }
-  }
-</style>
-
-<div class="os-page-head">
-  <div>
-    <h1>Ordens de Serviço</h1>
-    <div class="muted">Abertas, em andamento e finalizadas.</div>
-  </div>
-  <a class="btn-primary" href="/os/novo">+ Nova OS</a>
-</div>
-
-<% if (canSendWhatsapp) { %>
-  <div class="card bulk-whatsapp">
-    <div>
-      <div class="bulk-whatsapp-title">Enviar OS abertas do colaborador</div>
-      <div class="muted">Selecione um colaborador para reenviar, por WhatsApp, todas as OS abertas atribuídas ao nome dele.</div>
+<link rel="stylesheet" href="/css/os-index.css">
+<%
+  const d = dashboard;
+  const f = d.filters;
+  const query = (changes = {}) => {
+    const p = new URLSearchParams();
+    Object.entries({ tab:f.tab, q:f.q, status:f.status, priority:f.priority, criticality:f.criticality, sector:f.sector, responsible:f.responsible, period:f.period, per_page:d.pagination.perPage, ...changes }).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') p.set(k,v); });
+    return `/os?${p.toString()}`;
+  };
+  const statusClass = value => /ANDAMENTO|EXECU/.test(String(value).toUpperCase()) ? 'info' : /PAUS|AGUARD/.test(String(value).toUpperCase()) ? 'warning' : /FECH|FINAL|CONCLU/.test(String(value).toUpperCase()) ? 'neutral' : 'success';
+  const priorityClass = value => String(value).toUpperCase()==='CRITICA'?'danger':String(value).toUpperCase()==='ALTA'?'warning':String(value).toUpperCase()==='MEDIA'?'info':'success';
+  const maxDistribution = Math.max(1, ...d.distribution.map(x=>x.count));
+  const maxLoad = Math.max(1, ...d.teamLoad.map(x=>x.count));
+%>
+<section class="os-operational">
+  <header class="os-heading">
+    <div><h1>Ordens de Serviço</h1><p>Fila operacional, acompanhamento das equipes e histórico de manutenção</p></div>
+    <div class="os-heading-actions">
+      <a class="os-btn secondary" href="/painel-operacional">Painel operacional</a>
+      <button class="os-btn secondary" type="button" data-print>PDF das OS</button>
+      <a class="os-btn primary" href="/os/novo">+ Nova OS</a>
     </div>
-    <form class="bulk-whatsapp-form" id="bulkWhatsappForm">
-      <select id="colaboradorWhatsAppSelect" name="colaborador_id" required>
-        <option value="">Selecione o colaborador</option>
-        <% (colaboradores || []).forEach((colaborador) => { %>
-          <option value="<%= colaborador.id %>" data-nome="<%= colaborador.name %>" data-telefone="<%= colaborador.telefone_whatsapp || '' %>"><%= colaborador.name %></option>
-        <% }) %>
-      </select>
-      <button class="btn-sm btn-whatsapp" type="submit" data-action="enviar-os-whatsapp" disabled>Enviar selecionadas pelo WhatsApp</button>
-    </form>
-  </div>
-<% } else { %>
-  <div class="card bulk-whatsapp">
-    <div>
-      <div class="bulk-whatsapp-title">Notificações WhatsApp</div>
-      <div class="muted">Notificações disponíveis apenas para Admin e Encarregado de Manutenção.</div>
-    </div>
-  </div>
-<% } %>
+  </header>
 
-<div class="card os-list-card">
-  <%# ── TABELA (desktop) ── %>
-  <div class="table-wrap">
-    <table class="os-table">
-      <colgroup>
-        <col class="os-col-select">
-        <col class="os-col-id">
-        <col class="os-col-equipamento">
-        <col class="os-col-tipo">
-        <col class="os-col-grau">
-        <col class="os-col-status">
-        <col class="os-col-solicitante">
-        <col class="os-col-abertura">
-        <col class="os-col-dias">
-        <col class="os-col-andamento">
-        <col class="os-col-fechamento">
-        <col class="os-col-executores">
-        <col class="os-col-acoes">
-      </colgroup>
-      <thead>
-        <tr>
-          <th><input type="checkbox" id="osSelectAll" aria-label="Selecionar todas as OS visíveis"></th>
-          <th>#</th>
-          <th>Equipamento</th>
-          <th>Tipo</th>
-          <th>Grau</th>
-          <th>Status</th>
-          <th>Solicitante</th>
-          <th>Abertura</th>
-          <th>Dias</th>
-          <th title="Andamento / rastreabilidade">Andamento</th>
-          <th>Fechamento</th>
-          <th>Executores</th>
-          <th style="text-align:right;">Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% if (!lista || !lista.length) { %>
-          <tr>
-            <td colspan="13" class="empty-state">Nenhuma OS cadastrada.</td>
-          </tr>
-        <% } %>
-        <% (lista || []).forEach(o => {
-          const st = (o.status || '').toUpperCase();
-          const stClass = st === 'ABERTA' ? 'pill-amber'
-            : (st === 'ANDAMENTO' || st === 'EM_ANDAMENTO') ? 'pill-sky'
-            : (st === 'PAUSADA') ? 'pill-gray'
-            : (st === 'CONCLUIDA' || st === 'FINALIZADA' || st === 'FECHADA') ? 'pill-green'
-            : (st === 'CANCELADA') ? 'pill-red'
-            : 'pill-gray';
-          const andamentoClass = o.status_em_andamento && o.dias_aberta > 1 && !o.ultimo_registro_andamento_em ? 'pill-red'
-            : o.status_em_andamento && Number(o.justificativa_andamento_hoje || 0) === 1 ? 'pill-green'
-            : o.status_em_andamento && o.dias_aberta > 1 ? 'pill-amber' : 'pill-gray';
-          const executores = [o.mecanico_nome, o.auxiliar_nome, o.mecanico_secundario_nome, o.auxiliar_secundario_nome]
-            .map(v => String(v || '').trim())
-            .filter(Boolean)
-            .join(' + ') || '-';
-        %>
-          <tr>
-            <td>
-              <input
-                type="checkbox"
-                class="os-checkbox"
-                data-os-id="<%= o.id %>"
-                data-numero="<%= o.id %>"
-                data-equipamento="<%= o.equipamento || "-" %>"
-                data-setor="<%= o.setor || "-" %>"
-                data-criticidade="<%= o.grau || "-" %>"
-                data-descricao="<%= o.descricao || o.nao_conformidade || "-" %>"
-                data-status="<%= st || "-" %>"
-              >
-            </td>
-            <td><%= o.id %></td>
-            <td class="td-clip"><%= o.equipamento || '-' %></td>
-            <td><span class="pill pill-blue"><%= (o.tipo || '-').toUpperCase() %></span></td>
-            <td><span class="pill pill-gray"><%= o.grau || '-' %></span></td>
-            <td><span class="pill <%= stClass %>"><%= st || '-' %></span></td>
-            <td class="td-clip"><%= o.solicitante || '-' %></td>
-            <td><%= o.opened_at ? fmtBR(o.opened_at) : '-' %></td>
-            <td><%= o.dias_aberta %></td>
-            <td><span class="pill <%= andamentoClass %>"><%= o.ultimo_motivo_andamento || (o.status_em_andamento && o.dias_aberta > 1 ? 'Justificativa pendente' : '-') %></span><br><small class="muted"><%= o.ultimo_registro_andamento_em ? `Atualizada em ${fmtBR(o.ultimo_registro_andamento_em)}` : '' %></small></td>
-            <td><%= o.closed_at ? fmtBR(o.closed_at) : '-' %></td>
-            <td class="td-clip"><%= executores %></td>
-            <td style="text-align:right;">
-              <div class="os-actions">
-                <a class="btn-sm os-action-btn os-action-open" href="/os/<%= o.id %>">Abrir</a>
-                <% if (canDeleteOS) { %>
-                  <form method="POST" action="/os/<%= o.id %>/excluir" style="display:inline;" onsubmit="return confirm('Confirma excluir a OS #<%= o.id %>?');">
-                    <button class="btn-sm os-action-btn os-action-delete" type="submit">Excluir</button>
-                  </form>
-                <% } %>
-              </div>
-            </td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  </div>
-
-  <%# ── CARDS (mobile) ── %>
-  <div class="os-cards">
-    <% if (!lista || !lista.length) { %>
-      <div class="empty-state">Nenhuma OS cadastrada.</div>
-    <% } %>
-    <% (lista || []).forEach(o => {
-      const st = (o.status || '').toUpperCase();
-      const stClass = st === 'ABERTA' ? 'pill-amber'
-        : (st === 'ANDAMENTO' || st === 'EM_ANDAMENTO') ? 'pill-sky'
-        : (st === 'PAUSADA') ? 'pill-gray'
-        : (st === 'CONCLUIDA' || st === 'FINALIZADA' || st === 'FECHADA') ? 'pill-green'
-        : (st === 'CANCELADA') ? 'pill-red'
-        : 'pill-gray';
-      const executores = [o.mecanico_nome, o.auxiliar_nome, o.mecanico_secundario_nome, o.auxiliar_secundario_nome]
-        .map(v => String(v || '').trim())
-        .filter(Boolean)
-        .join(' + ') || '-';
-    %>
-      <a class="os-card" href="/os/<%= o.id %>">
-        <div class="os-card-head">
-          <div>
-            <div class="os-card-id">OS #<%= o.id %></div>
-            <div class="os-card-equip"><%= o.equipamento || '-' %></div>
-          </div>
-          <span class="pill <%= stClass %>"><%= st || '-' %></span>
-        </div>
-        <% if (o.descricao) { %>
-          <div class="os-card-desc"><%= o.descricao %></div>
-        <% } %>
-        <div class="os-card-executores"><b>Executores:</b> <%= executores %></div>
-        <div class="os-card-executores"><b>Dias aberta:</b> <%= o.dias_aberta %> • <b>Andamento:</b> <%= o.ultimo_motivo_andamento || (o.status_em_andamento && o.dias_aberta > 1 ? 'Justificativa pendente' : '-') %></div>
-        <div class="os-card-footer">
-          <span class="os-card-meta">Abertura: <%= o.opened_at ? fmtBR(o.opened_at) : '-' %> • Fechamento: <%= o.closed_at ? fmtBR(o.closed_at) : '-' %></span>
-          <div class="os-card-pills">
-            <span class="pill pill-blue"><%= (o.tipo || '-').toUpperCase() %></span>
-            <span class="pill pill-gray"><%= o.grau || '-' %></span>
-          </div>
-        </div>
+  <div class="os-kpis" aria-label="Indicadores operacionais">
+    <% [
+      ['open','OS abertas',d.metrics.open,'Aguardando início','success'],
+      ['running','Em andamento',d.metrics.running,'Equipe em atividade','info'],
+      ['waiting','Pausadas / aguardando',d.metrics.waiting,'Aguardando retorno','warning'],
+      ['overdue','Atrasadas',d.metrics.overdue,'Requerem atenção','danger'],
+      ['urgent','Críticas e altas',d.metrics.urgent,'Prioridade operacional','danger'],
+      ['', 'Fechadas no período',d.metrics.closed,f.period==='today'?'Hoje':`Últimos ${f.period} dias`,'neutral']
+    ].forEach(k => { const active=f.quick===k[0]; %>
+      <a class="os-kpi <%= k[4] %> <%= active?'active':'' %>" href="<%= query({quick:active?'':k[0],page:1}) %>" aria-pressed="<%= active %>">
+        <span class="os-kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6zM9 7h6M9 11h6M9 15h4"/></svg></span>
+        <span><small><%= k[1] %></small><strong><%= k[2] %></strong><em><%= k[3] %></em></span><b aria-hidden="true">›</b>
       </a>
     <% }) %>
   </div>
-</div>
 
+  <% if (d.attention.length) { %><section class="os-panel attention">
+    <div class="os-panel-title"><h2>Atenção imediata</h2><a href="<%= query({quick:'urgent',page:1}) %>">Ver todas as pendências</a></div>
+    <div class="attention-list">
+      <% d.attention.forEach(o => { %><a href="/os/<%= o.id %>" class="attention-item">
+        <span><strong>OS #<%= o.id %> · <span title="<%= o.equipamento %>"><%= o.equipamento %></span></strong><small><%= o.ageLabel %></small></span>
+        <span class="os-badge <%= o.overdue?'danger':priorityClass(o.prioridade) %>"><%= o.overdue?'Atrasada':o.prioridade %></span><b>›</b>
+      </a><% }) %>
+    </div>
+  </section><% } %>
 
-<script>
-(function(){
-  const form = document.getElementById('bulkWhatsappForm');
-  if (!form) return;
-  const sendButton = form.querySelector("[data-action='enviar-os-whatsapp']");
-  const colaboradorSelect = document.getElementById('colaboradorWhatsAppSelect');
-  const selectAll = document.getElementById('osSelectAll');
+  <section class="os-panel queue-panel">
+    <nav class="os-tabs" aria-label="Visões da fila">
+      <a class="<%= f.tab==='active'?'active':'' %>" href="<%= query({tab:'active',page:1}) %>">Ativas</a>
+      <a class="<%= f.tab==='closed'?'active':'' %>" href="<%= query({tab:'closed',page:1}) %>">Fechadas e histórico</a>
+      <a class="<%= f.tab==='all'?'active':'' %>" href="<%= query({tab:'all',page:1}) %>">Todas</a>
+    </nav>
+    <details class="os-filter-details" open><summary>Filtros da fila</summary>
+      <form class="os-filters" method="get" action="/os">
+        <input type="hidden" name="tab" value="<%= f.tab %>"><input type="hidden" name="quick" value="<%= f.quick||'' %>">
+        <label class="search"><span>Busca</span><input name="q" value="<%= f.q||'' %>" placeholder="Número, equipamento, serviço ou responsável"></label>
+        <% [['status','Status',d.filterOptions.statuses],['priority','Prioridade',d.filterOptions.priorities],['criticality','Criticidade',d.filterOptions.criticalities],['sector','Setor',d.filterOptions.sectors],['responsible','Responsável',d.filterOptions.responsibles]].forEach(opt => { %>
+          <label><span><%= opt[1] %></span><select name="<%= opt[0] %>"><option value="">Todos</option><% opt[2].forEach(v=>{ %><option value="<%= v %>" <%= String(f[opt[0]]||'')===String(v)?'selected':'' %>><%= v %></option><% }) %></select></label>
+        <% }) %>
+        <label><span>Período</span><select name="period"><option value="today" <%= f.period==='today'?'selected':'' %>>Hoje</option><% [['7','Últimos 7 dias'],['30','Últimos 30 dias'],['90','Últimos 90 dias']].forEach(x=>{ %><option value="<%= x[0] %>" <%= f.period===x[0]?'selected':'' %>><%= x[1] %></option><% }) %></select></label>
+        <div class="filter-actions"><button class="os-btn secondary" type="submit">Filtrar</button><a href="/os?tab=<%= f.tab %>">Limpar filtros</a></div>
+      </form>
+    </details>
 
-  function normalizeWhatsAppPhone(phone) {
-    if (!phone) return '';
-    let digits = String(phone).replace(/\D/g, '');
-    if ((digits.length === 10 || digits.length === 11) && digits.startsWith('75')) digits = '55' + digits;
-    return digits;
-  }
+    <div class="queue-heading"><div><h2>Fila de ordens de serviço</h2><p><%= f.tab==='active'?'OS ativas organizadas por prioridade. As concluídas ficam disponíveis no histórico.':'Ordens organizadas por condição operacional e data.' %></p></div><div><span>Mostrando <%= d.items.length %> de <%= d.pagination.total %> OS</span><form method="get"><% Object.entries(f).forEach(([k,v])=>{if(v && k!=='perPage'){%><input type="hidden" name="<%= k==='perPage'?'per_page':k %>" value="<%= v %>"><%}})%><label>Exibir <select name="per_page" data-auto-submit><% [10,20,50,100].forEach(n=>{ %><option <%= d.pagination.perPage===n?'selected':'' %>><%= n %></option><% }) %></select></label></form></div></div>
 
-  function buildBulkOsWhatsAppMessage(colaborador, ordens) {
-    let message = `Olá, ${colaborador.nome}.\n\n`;
-    message += 'Segue relação de OS abertas direcionadas para acompanhamento/execução:\n\n';
-    ordens.forEach((os, index) => {
-      message += `${index + 1}. OS #${os.numero || os.id}\n`;
-      message += `Equipamento: ${os.equipamento || '-'}\n`;
-      message += `Setor: ${os.setor || '-'}\n`;
-      message += `Criticidade: ${os.criticidade || '-'}\n`;
-      message += `Descrição: ${os.descricao || '-'}\n`;
-      message += `Status: ${os.status || '-'}\n\n`;
-    });
-    message += 'Favor verificar as demandas e atualizar o andamento no sistema.\n\n';
-    message += 'Manutenção Industrial Campo do Gado';
-    return message;
-  }
+    <% if (!d.items.length) { %><div class="os-empty"><h3>Nenhuma ordem de serviço <%= f.tab==='active'?'ativa':'' %>.</h3><p>As novas ordens aparecerão aqui após a abertura.</p><a class="os-btn primary" href="/os/novo">+ Nova OS</a></div><% } %>
+    <% d.groups.forEach(group => { %><section class="priority-group <%= group.key %>"><h3><%= group.label %> — <%= group.items.length %></h3>
+      <div class="os-table-wrap"><table><thead><tr><th>OS / Equipamento</th><th>Serviço</th><th>Tipo / Prioridade</th><th>Equipe</th><th>Status / Andamento</th><th>Prazo / Tempo aberto</th><th>Ação</th></tr></thead><tbody>
+      <% group.items.forEach(o=>{ const team=o.equipe.length?o.equipe.join(' e '):'Sem responsável'; %><tr class="<%= o.overdue?'overdue':'' %>">
+        <td data-label="OS / Equipamento"><a href="/os/<%= o.id %>">OS #<%= o.id %></a><small title="<%= o.equipamento %>"><%= o.equipamento %></small></td>
+        <td data-label="Serviço"><span class="truncate" title="<%= o.descricao||'Sem descrição' %>"><%= o.descricao||'Sem descrição' %></span></td>
+        <td data-label="Tipo / Prioridade"><span><%= o.tipo||'-' %></span><span class="os-badge <%= priorityClass(o.prioridade) %>"><%= o.prioridade %></span></td>
+        <td data-label="Equipe"><span class="truncate" title="<%= team %>"><%= team %></span></td>
+        <td data-label="Status / Andamento"><span class="os-badge <%= statusClass(o.status) %>"><%= o.status %></span><small><%= o.ultimo_motivo_andamento||'' %></small></td>
+        <td data-label="Prazo / Tempo aberto"><strong class="<%= o.overdue?'text-danger':'' %>"><%= o.deadlineLabel %></strong><small><%= o.ageLabel %></small></td>
+        <td data-label="Ação"><div class="row-actions"><a class="os-btn compact" href="/os/<%= o.id %>">Abrir OS</a><details><summary aria-label="Mais ações da OS <%= o.id %>">⋮</summary><div><a href="/os/<%= o.id %>">Visualizar</a><% if(canDeleteOS){%><form method="post" action="/os/<%= o.id %>/excluir" onsubmit="return confirm('Confirma excluir esta OS?')"><button>Excluir</button></form><%}%></div></details></div></td>
+      </tr><% }) %></tbody></table></div>
+    </section><% }) %>
 
-  function selectedCheckboxes() {
-    return Array.from(document.querySelectorAll('.os-checkbox:checked'));
-  }
+    <% if(d.pagination.pages>1){ %><nav class="pagination" aria-label="Paginação"><a class="<%= d.pagination.page===1?'disabled':'' %>" href="<%= query({page:d.pagination.page-1}) %>">Anterior</a><% for(let p=Math.max(1,d.pagination.page-2);p<=Math.min(d.pagination.pages,d.pagination.page+2);p++){%><a class="<%= p===d.pagination.page?'active':'' %>" href="<%= query({page:p}) %>"><%= p %></a><%}%><a class="<%= d.pagination.page===d.pagination.pages?'disabled':'' %>" href="<%= query({page:d.pagination.page+1}) %>">Próxima</a></nav><% } %>
+  </section>
 
-  function syncButtonState() {
-    if (!sendButton) return;
-    const hasOs = selectedCheckboxes().length > 0;
-    const hasColaborador = !!(colaboradorSelect && colaboradorSelect.value);
-    sendButton.disabled = !(hasOs && hasColaborador);
-  }
+  <div class="os-insights"><section class="os-panel"><h2>Distribuição das OS ativas</h2><% d.distribution.forEach(x=>{%><div class="bar-row"><span><%= x.label %></span><i><b class="<%= x.key %>" style="--value:<%= Math.round(x.count/maxDistribution*100) %>%"></b></i><strong><%= x.count %></strong></div><%})%></section>
+    <section class="os-panel"><h2>Carga da equipe</h2><% if(!d.teamLoad.length){%><p class="subtle">Nenhuma equipe atribuída às OS ativas.</p><%}%><% d.teamLoad.forEach(x=>{%><div class="bar-row"><span title="<%= x.name %>"><%= x.name %></span><i><b class="team" style="--value:<%= Math.round(x.count/maxLoad*100) %>%"></b></i><strong><%= x.count %> OS</strong></div><%})%><a class="insight-link" href="/escala">Ver escala da equipe →</a></section>
+  </div>
 
-  document.addEventListener('change', function(event){
-    if (event.target.matches('.os-checkbox') || event.target === colaboradorSelect) syncButtonState();
-  });
-
-  if (selectAll) {
-    selectAll.addEventListener('change', function(){
-      document.querySelectorAll('.os-checkbox').forEach((cb) => { cb.checked = selectAll.checked; });
-      syncButtonState();
-    });
-  }
-
-  form.addEventListener('submit', function(event){
-    event.preventDefault();
-    const checked = selectedCheckboxes();
-    console.log('[WhatsApp OS] quantidade selecionada:', checked.length);
-    if (!checked.length) { alert('Selecione pelo menos uma OS para enviar.'); return; }
-    if (!colaboradorSelect || !colaboradorSelect.value) { alert('Selecione o colaborador que receberá as OS.'); return; }
-
-    const selectedOption = colaboradorSelect.options[colaboradorSelect.selectedIndex];
-    const colaboradorNome = selectedOption.dataset.nome || selectedOption.textContent.trim();
-    const colaboradorTelefone = normalizeWhatsAppPhone(selectedOption.dataset.telefone || '');
-    console.log('[WhatsApp OS] colaborador:', colaboradorNome);
-    console.log('[WhatsApp OS] telefone normalizado:', colaboradorTelefone);
-
-    if (!colaboradorTelefone || colaboradorTelefone.length < 12) {
-      alert('O colaborador selecionado não possui WhatsApp válido cadastrado.');
-      return;
-    }
-
-    const confirmar = confirm(`Enviar ${checked.length} OS selecionada(s) para ${colaboradorNome} pelo WhatsApp?`);
-    if (!confirmar) return;
-
-    const ordens = checked.slice(0, 20).map((checkbox) => ({
-      id: checkbox.dataset.osId,
-      numero: checkbox.dataset.numero,
-      equipamento: checkbox.dataset.equipamento,
-      setor: checkbox.dataset.setor,
-      criticidade: checkbox.dataset.criticidade,
-      descricao: checkbox.dataset.descricao,
-      status: checkbox.dataset.status
-    }));
-
-    let message = buildBulkOsWhatsAppMessage({ nome: colaboradorNome }, ordens);
-    if (checked.length > ordens.length) {
-      message += `\n\nObs.: envio limitado às primeiras ${ordens.length} OS selecionadas para evitar excesso de tamanho da mensagem.`;
-    }
-
-    const whatsappUrl = `https://wa.me/${colaboradorTelefone}?text=${encodeURIComponent(message)}`;
-    console.log('[WhatsApp OS] URL gerada:', whatsappUrl.slice(0, 140) + '...');
-    window.location.assign(whatsappUrl);
-  });
-
-  syncButtonState();
-})();
-</script>
+  <details class="os-panel whatsapp-panel"><summary>Mais ações e WhatsApp</summary><% if(canSendWhatsapp){%><form id="bulkWhatsappForm"><label>Colaborador<select id="colaboradorWhatsAppSelect" required><option value="">Selecione</option><% (colaboradores||[]).forEach(c=>{%><option value="<%= c.id %>" data-nome="<%= c.name %>" data-telefone="<%= c.telefone_whatsapp||'' %>"><%= c.name %></option><%})%></select></label><button class="os-btn secondary" type="submit">Enviar OS ativas pelo WhatsApp</button></form><%}else{%><p class="subtle">Notificações disponíveis conforme as permissões do seu perfil.</p><%}%></details>
+</section>
+<script src="/js/os-index.js" defer></script>
