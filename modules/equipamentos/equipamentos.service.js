@@ -338,6 +338,34 @@ function listHistoricoOS(equipamentoId, filtros = {}) {
     .all(params);
 }
 
+/** Dados gerenciais confiáveis usados pela ficha do ativo. */
+function getEquipmentDashboard(equipamentoId) {
+  const id = Number(equipamentoId);
+  const osAtivas = db.prepare(`
+    SELECT o.id, o.status, o.tipo, o.prioridade, o.opened_at, o.descricao
+    FROM os o WHERE o.equipamento_id = ? AND ${OPEN_OS_SQL}
+    ORDER BY datetime(o.opened_at) DESC LIMIT 20
+  `).all(id);
+  const ultimaManutencao = db.prepare(`
+    SELECT o.id, COALESCE(o.closed_at, o.data_conclusao, o.data_fim) AS data
+    FROM os o WHERE o.equipamento_id = ?
+      AND COALESCE(o.closed_at, o.data_conclusao, o.data_fim) IS NOT NULL
+    ORDER BY datetime(COALESCE(o.closed_at, o.data_conclusao, o.data_fim)) DESC LIMIT 1
+  `).get(id) || null;
+  const proximaPreventiva = db.prepare(`
+    SELECT pe.id, pe.data_prevista, pe.status, p.titulo, p.id AS plano_id
+    FROM preventiva_execucoes pe INNER JOIN preventiva_planos p ON p.id=pe.plano_id
+    WHERE p.equipamento_id=? AND pe.data_prevista IS NOT NULL
+      AND UPPER(COALESCE(pe.status,'')) NOT IN ('CONCLUIDA','CONCLUÍDA','FINALIZADA','CANCELADA')
+    ORDER BY date(pe.data_prevista), pe.id LIMIT 1
+  `).get(id) || null;
+  const ultimaFalha = db.prepare(`
+    SELECT opened_at FROM os WHERE equipamento_id=? AND UPPER(COALESCE(tipo,''))='CORRETIVA'
+    ORDER BY datetime(opened_at) DESC LIMIT 1
+  `).get(id) || null;
+  return { osAtivas, ultimaManutencao, proximaPreventiva, ultimaFalha };
+}
+
 function resolveGrauColumn() {
   const names = db.prepare("PRAGMA table_info(os)").all().map((c) => c.name);
   if (names.includes("grau")) return "grau";
@@ -539,6 +567,7 @@ module.exports = {
   remove,
   listHistoricoOS,
   listHistoricoPreventivas,
+  getEquipmentDashboard,
   listPecasCatalogo,
   listPecasByEquipamento,
   addPecaToEquipamento,
