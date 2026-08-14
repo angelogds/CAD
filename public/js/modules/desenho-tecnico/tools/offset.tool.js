@@ -8,7 +8,11 @@ export class OffsetTool extends BaseTool {
     this.ctx.prompt.set({ message: 'Offset: selecione entidade e indique o lado' });
   }
   onMouseDown(evt) {
-    if (!this.base) { this.base = this.ctx.findEntityAt(evt.world); return; }
+    if (!this.base) {
+      const hit = this.ctx.findEntityAt(evt.world);
+      this.base = this.ctx.isEntityEditable(hit) ? hit : null;
+      return;
+    }
     const copy = this.createOffset(this.base, evt.world);
     if (!copy) return;
     this.ctx.addEntity(copy);

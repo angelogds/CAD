@@ -1,9 +1,7 @@
-export function lineIntersection(a1, a2, b1, b2) {
-  const d = (a1.x - a2.x) * (b1.y - b2.y) - (a1.y - a2.y) * (b1.x - b2.x);
-  if (Math.abs(d) < 1e-9) return null;
-  const x = ((a1.x * a2.y - a1.y * a2.x) * (b1.x - b2.x) - (a1.x - a2.x) * (b1.x * b2.y - b1.y * b2.x)) / d;
-  const y = ((a1.x * a2.y - a1.y * a2.x) * (b1.y - b2.y) - (a1.y - a2.y) * (b1.x * b2.y - b1.y * b2.x)) / d;
-  return { x, y };
+import { lineIntersection as preciseLineIntersection } from '../core/geometry.js';
+
+export function lineIntersection(a1, a2, b1, b2, options = {}) {
+  return preciseLineIntersection(a1, a2, b1, b2, options);
 }
 
 export function cloneEntityForMirror(entity, a, b) {
@@ -38,6 +36,15 @@ export function cloneEntityForMirror(entity, a, b) {
   } else if (copy.type === 'circle') {
     const c = mirrorPoint({ x: copy.geometry.cx, y: copy.geometry.cy });
     copy.geometry.cx = c.x; copy.geometry.cy = c.y;
+  } else if (copy.type === 'arc') {
+    const start = mirrorPoint({ x: copy.geometry.cx + Math.cos(copy.geometry.startAngle) * copy.geometry.radius, y: copy.geometry.cy + Math.sin(copy.geometry.startAngle) * copy.geometry.radius });
+    const end = mirrorPoint({ x: copy.geometry.cx + Math.cos(copy.geometry.endAngle) * copy.geometry.radius, y: copy.geometry.cy + Math.sin(copy.geometry.endAngle) * copy.geometry.radius });
+    const center = mirrorPoint({ x: copy.geometry.cx, y: copy.geometry.cy });
+    copy.geometry.cx = center.x;
+    copy.geometry.cy = center.y;
+    copy.geometry.startAngle = Math.atan2(start.y - center.y, start.x - center.x);
+    copy.geometry.endAngle = Math.atan2(end.y - center.y, end.x - center.x);
+    copy.geometry.ccw = copy.geometry.ccw === false;
   } else if (copy.type === 'text') {
     const p = mirrorPoint({ x: copy.geometry.x, y: copy.geometry.y });
     copy.geometry.x = p.x; copy.geometry.y = p.y;

@@ -27,6 +27,7 @@ export class SelectTool extends BaseTool {
     const grips = [];
     this.ctx.state.entities.forEach((entity) => {
       if (!this.ctx.selection.includes(entity.id)) return;
+      if (!this.ctx.isEntityEditable(entity)) return;
       const g = entity.geometry || {};
       if (entity.type === 'line' || entity.type === 'centerline') {
         grips.push({ entityId: entity.id, role: 'start', x: g.x1, y: g.y1 });
@@ -107,7 +108,7 @@ export class SelectTool extends BaseTool {
       return;
     }
     const hit = this.ctx.findEntityAt(evt.world);
-    if (hit && this.ctx.selection.includes(hit.id)) {
+    if (hit && this.ctx.selection.includes(hit.id) && this.ctx.isEntityEditable(hit)) {
       this.moveStart = evt.world;
       this.moved = false;
       return;
@@ -129,7 +130,7 @@ export class SelectTool extends BaseTool {
     if (this.moveStart) {
       const dx = evt.world.x - this.moveStart.x;
       const dy = evt.world.y - this.moveStart.y;
-      this.ctx.state.entities.filter((e) => this.ctx.selection.includes(e.id)).forEach((e) => e.move(dx, dy));
+      this.ctx.state.entities.filter((e) => this.ctx.selection.includes(e.id) && this.ctx.isEntityEditable(e)).forEach((e) => e.move(dx, dy));
       this.moveStart = evt.world;
       this.moved = true;
       this.ctx.markDirty('Mover seleção');
@@ -163,6 +164,8 @@ export class SelectTool extends BaseTool {
       const leftToRight = evt.world.x >= this.boxStart.x;
       const b = new Bounds2D(Math.min(this.boxStart.x, evt.world.x), Math.min(this.boxStart.y, evt.world.y), Math.max(this.boxStart.x, evt.world.x), Math.max(this.boxStart.y, evt.world.y));
       const ids = this.ctx.state.entities.filter((e) => {
+        const layer = this.ctx.state.layers[e.metadata?.layer || this.ctx.state.activeLayer] || {};
+        if (e.visible === false || layer.visible === false) return false;
         const eb = e.getBounds();
         if (leftToRight) return eb.minX >= b.minX && eb.maxX <= b.maxX && eb.minY >= b.minY && eb.maxY <= b.maxY;
         return eb.maxX >= b.minX && eb.minX <= b.maxX && eb.maxY >= b.minY && eb.minY <= b.maxY;

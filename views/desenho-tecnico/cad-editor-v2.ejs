@@ -213,6 +213,25 @@
           <div id="cadLayersList"></div>
         </div>
       </div>
+
+      <div class="cad-panel-section">
+        <div class="cad-panel-header">Precisão 2D</div>
+        <div class="cad-panel-content">
+          <div class="cad-prop-row">
+            <label class="cad-prop-label" for="cadGridStepInput">Passo da grade (mm)</label>
+            <input class="cad-input" id="cadGridStepInput" type="number" min="0.001" step="0.001" value="20">
+          </div>
+          <div class="cad-snap-options" aria-label="Modos de snap">
+            <label><input type="checkbox" data-snap-option="endpoint"> Extremidade</label>
+            <label><input type="checkbox" data-snap-option="midpoint"> Meio</label>
+            <label><input type="checkbox" data-snap-option="intersection"> Interseção</label>
+            <label><input type="checkbox" data-snap-option="center"> Centro</label>
+            <label><input type="checkbox" data-snap-option="quadrant"> Quadrante</label>
+            <label><input type="checkbox" data-snap-option="nearest"> Mais próximo</label>
+          </div>
+          <p class="cad-precision-help">Linha: informe comprimento, @ΔX,ΔY ou @distância&lt;ângulo.</p>
+        </div>
+      </div>
       
       <div class="cad-panel-section">
         <div class="cad-panel-header">Metadados</div>
@@ -270,6 +289,10 @@
   <!-- STATUS BAR -->
   <div class="cad-statusbar" id="cadStatusBar">
     <div class="cad-status-left">
+      <div class="cad-command-wrap">
+        <label for="cadCommandInput">Comando</label>
+        <input id="cadCommandInput" class="cad-command-input" type="text" autocomplete="off" spellcheck="false" placeholder="L, PL, C, M, CO, E, DI..." aria-label="Linha de comando CAD">
+      </div>
       <div class="cad-status-item">
         <span class="cad-status-value" id="cadStatusMessage">Inicializando...</span>
       </div>

@@ -457,6 +457,62 @@
   gap: 10px;
 }
 
+.cad-command-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 250px;
+  padding-right: 8px;
+  border-right: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.cad-command-wrap label {
+  color: #38bdf8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.cad-command-input {
+  width: 190px;
+  height: 24px;
+  border: 1px solid #334155;
+  border-radius: 3px;
+  background: #020617;
+  color: #e2e8f0;
+  padding: 2px 7px;
+  font: 12px/1.2 Consolas, Monaco, monospace;
+  outline: none;
+}
+
+.cad-command-input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, .18);
+}
+
+.cad-snap-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 8px;
+  margin-top: 10px;
+  color: #cbd5e1;
+  font-size: 11px;
+}
+
+.cad-snap-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.cad-precision-help {
+  margin: 10px 0 0;
+  color: #94a3b8;
+  font: 10px/1.45 Consolas, Monaco, monospace;
+}
+
 .cad-status-item {
   display: flex;
   align-items: center;

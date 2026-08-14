@@ -16,6 +16,7 @@ export function createDesenhoTecnicoState(initial = {}) {
       midpoint: true,
       intersection: true,
       center: true,
+      quadrant: true,
       nearest: true,
       activeKind: null,
     },
