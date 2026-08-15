@@ -48,14 +48,26 @@ function createItem(data) {
 }
 function getItem(id) { return db.prepare(`SELECT i.*, ${saldoExpr()} AS saldo_atual, ${minExpr()} AS saldo_minimo FROM estoque_itens i LEFT JOIN vw_estoque_saldo v ON v.item_id=i.id WHERE i.id=?`).get(id); }
 
-function registrarSaida({ item_id, quantidade, usuario_id, observacao, referencia_id }) {
+function listOrdensAtivas() {
+  return db.prepare(`SELECT o.id,o.status,o.equipamento_id,COALESCE(e.nome,o.equipamento,o.equipamento_manual) equipamento_nome
+    FROM os o LEFT JOIN equipamentos e ON e.id=o.equipamento_id
+    WHERE UPPER(COALESCE(o.status,'')) NOT IN ('CANCELADA','CANCELADO','CONCLUIDA','CONCLUÍDA','CONCLUIDO','FECHADA','FECHADO') ORDER BY o.id DESC`).all();
+}
+
+function registrarSaida({ item_id, quantidade, usuario_id, observacao, os_id, origem = 'MANUAL' }) {
   const item = getItem(item_id); if (!item) throw new Error("Item não encontrado");
+  if (!os_id) throw new Error('Uma OS ativa é obrigatória para registrar a retirada.');
+  const os = db.prepare('SELECT id,status,equipamento_id FROM os WHERE id=?').get(Number(os_id));
+  if (!os || ['CANCELADA','CANCELADO','CONCLUIDA','CONCLUÍDA','CONCLUIDO','FECHADA','FECHADO'].includes(String(os.status || '').toUpperCase())) throw new Error('A OS informada não está ativa.');
   const qtd = Number(quantidade); if (qtd <= 0) throw new Error("Quantidade inválida"); if (qtd > Number(item.saldo_atual || 0)) throw new Error("Saldo insuficiente");
   db.transaction(() => {
-    if (HAS_SALDO_ATUAL) db.prepare("UPDATE estoque_itens SET saldo_atual=COALESCE(saldo_atual,0)-? WHERE id=?").run(qtd, item_id);
-    db.prepare("INSERT INTO estoque_movimentos (tipo,item_id,quantidade,usuario_id,referencia_tipo,referencia_id,observacao,created_at) VALUES ('SAIDA_REQUISICAO_INTERNA',?,?,?,?,?,?,datetime('now'))")
-      .run(item_id, qtd, usuario_id || null, 'SOLICITACAO', referencia_id || null, observacao || null);
+    const anterior = Number(item.saldo_atual || 0); const posterior = anterior - qtd;
+    db.prepare("UPDATE estoque_itens SET saldo_atual=?,updated_at=datetime('now') WHERE id=? AND saldo_atual>=?").run(posterior, item_id, qtd);
+    db.prepare(`INSERT INTO estoque_movimentos (tipo,item_id,quantidade,origem,os_id,equipamento_id,usuario_id,saldo_anterior,saldo_posterior,observacao,created_at)
+      VALUES ('SAIDA_REQUISICAO_INTERNA',?,?,?,?,?,?,?,?,?,datetime('now'))`)
+      .run(item_id, qtd, String(origem).toUpperCase() === 'QR_CODE' ? 'QR_CODE' : 'MANUAL', os.id, os.equipamento_id || null,
+        usuario_id || null, anterior, posterior, observacao || null);
   })();
 }
 
-module.exports = { dashboard, listItens, listCategorias, listLocais, listMovimentos, createCategoria, createLocal, createItem, getItem, registrarSaida };
+module.exports = { dashboard, listItens, listCategorias, listLocais, listMovimentos, createCategoria, createLocal, createItem, getItem, listOrdensAtivas, registrarSaida };

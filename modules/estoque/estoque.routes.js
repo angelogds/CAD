@@ -14,7 +14,8 @@ router.post("/categorias", requireLogin, requireRole(ACCESS.estoque_manage), ctr
 router.get("/locais", requireLogin, requireRole(ACCESS.estoque_view), ctrl.locais);
 router.post("/locais", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.criarLocal);
 router.get("/movimentos", requireLogin, requireRole(ACCESS.estoque_view), ctrl.movimentos);
-router.get("/saidas/nova", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.saidaNova);
-router.post("/saidas", requireLogin, requireRole(ACCESS.estoque_manage), almoxCtrl.registrarSaida);
+router.get("/itens/:id/qr", requireLogin, requireRole(ACCESS.estoque_view), ctrl.qrItem);
+router.get("/saidas/nova", requireLogin, requireRole(ACCESS.estoque_retirada), ctrl.saidaNova);
+router.post("/saidas", requireLogin, requireRole(ACCESS.estoque_retirada), almoxCtrl.registrarSaida);
 
 module.exports = router;
