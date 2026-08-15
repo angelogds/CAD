@@ -19,6 +19,15 @@ function movimentos(req, res) {
   const movimentos = service.listMovimentos().filter((mov) => (!filtros.tipo || mov.tipo === filtros.tipo) && (!filtros.item_id || String(mov.item_id) === String(filtros.item_id)));
   res.render("estoque/movimentos", { title: "Movimentos", activeMenu: "estoque", movimentos, filtros, itens: service.listItens() });
 }
-function saidaNova(req, res) { res.render("estoque/saida_nova", { title: "Registrar saída", activeMenu: "estoque", itens: service.listItens() }); }
+function saidaNova(req, res) { res.render("estoque/saida_nova", { title: "Registrar saída", activeMenu: "estoque", itens: service.listItens(), ordens: service.listOrdensAtivas(), itemSelecionado: Number(req.query.item) || null, origem: req.query.origem === 'QR_CODE' ? 'QR_CODE' : 'MANUAL' }); }
+async function qrItem(req, res, next) {
+  try {
+    const item = service.getItem(Number(req.params.id)); if (!item) return res.status(404).send('Item não encontrado');
+    const QRCode = require('qrcode');
+    const url = `${req.protocol}://${req.get('host')}/estoque/saidas/nova?item=${item.id}&origem=QR_CODE`;
+    const qrDataUrl = await QRCode.toDataURL(url, { width: 360, margin: 1, errorCorrectionLevel: 'H' });
+    return res.render('estoque/qr_item', { title: `QR - ${item.nome}`, activeMenu: 'estoque', item, url, qrDataUrl });
+  } catch (error) { return next(error); }
+}
 
-module.exports = { index, itens, novoItem, criarItem, detalheItem, categorias, criarCategoria, locais, criarLocal, movimentos, saidaNova };
+module.exports = { index, itens, novoItem, criarItem, detalheItem, categorias, criarCategoria, locais, criarLocal, movimentos, saidaNova, qrItem };

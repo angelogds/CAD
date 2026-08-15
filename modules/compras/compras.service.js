@@ -450,7 +450,8 @@ function getSolicitacaoDetalhe(id) {
     const quantidade = Number(item.qtd_comprada ?? item.qtd_solicitada ?? 0);
     const recebida = Number(item.qtd_recebida_total || 0);
     const unitario = Number(item.valor_unitario_centavos || 0);
-    return { ...item, subtotal_centavos: calculos.subtotalCentavos(Number(item.qtd_solicitada || 0), unitario), situacao_recebimento: calculos.statusRecebimento(recebida, quantidade) };
+    const disponibilidade = calcularNecessidadeCompra(item.qtd_solicitada, consultarSaldoItem(item.estoque_item_id));
+    return { ...item, ...disponibilidade, subtotal_centavos: calculos.subtotalCentavos(Number(item.qtd_solicitada || 0), unitario), situacao_recebimento: calculos.statusRecebimento(recebida, quantidade) };
   });
   const cotados = itensResumo.filter((i) => i.status_cotacao === 'COTADO').length;
   const comprados = itensResumo.filter((i) => i.status_compra === 'COMPRADO').length;
@@ -467,14 +468,46 @@ function fornecedorAtivo(id) {
   return db.prepare('SELECT id, nome FROM fornecedores WHERE id=? AND ativo=1').get(Number(id));
 }
 
+function consultarSaldoItem(estoqueItemId) {
+  if (!estoqueItemId || !tableExists('estoque_itens') || !columnExists('estoque_itens', 'saldo_atual')) return 0;
+  const row = db.prepare(`SELECT saldo_atual,codigo,nome FROM estoque_itens WHERE id=? AND ativo=1
+    AND UPPER(TRIM(COALESCE(codigo,'')))<>'AUTO' AND UPPER(TRIM(COALESCE(nome,'')))<>'ITEM AUTOMÁTICO'`).get(Number(estoqueItemId));
+  return Math.max(Number(row?.saldo_atual || 0), 0);
+}
+
+function calcularNecessidadeCompra(quantidadeSolicitada, saldoDisponivel) {
+  const solicitada = Math.max(Number(quantidadeSolicitada) || 0, 0);
+  const saldo = Math.max(Number(saldoDisponivel) || 0, 0);
+  return { quantidade_solicitada: solicitada, saldo_disponivel: saldo,
+    percentual_cobertura: solicitada ? Math.min((saldo / solicitada) * 100, 100) : 100,
+    quantidade_sugerida: Math.max(solicitada - saldo, 0) };
+}
+
+function resolverItemPorEstoque(solicitacaoId, itemId, userId) {
+  return db.transaction(() => {
+    const item = db.prepare('SELECT * FROM solicitacao_itens WHERE id=? AND solicitacao_id=?').get(itemId, solicitacaoId);
+    if (!item) throw new Error('Item não pertence à solicitação.');
+    const cobertura = calcularNecessidadeCompra(item.qtd_solicitada, consultarSaldoItem(item.estoque_item_id));
+    if (cobertura.quantidade_sugerida > 0) throw new Error('Saldo insuficiente para atendimento integral pelo estoque.');
+    db.prepare(`UPDATE solicitacao_itens SET status_compra='ATENDIDO_ESTOQUE',qtd_comprada=0,fornecedor_id=NULL,
+      valor_unitario_centavos=0,atualizado_por=?,updated_at=datetime('now') WHERE id=?`).run(userId || null, itemId);
+    const itens = db.prepare('SELECT * FROM solicitacao_itens WHERE solicitacao_id=?').all(solicitacaoId);
+    const status = recalcularStatus(itens, STATUS.EM_COTACAO);
+    db.prepare("UPDATE solicitacoes SET status=?,updated_at=datetime('now') WHERE id=?").run(status, solicitacaoId);
+    return cobertura;
+  })();
+}
+
 function recalcularStatus(itens, atual) {
   if (atual === STATUS.FECHADA) return atual;
   const validos = itens.filter((i) => i.status_compra !== 'CANCELADO');
   if (!validos.length) return STATUS.ABERTA;
   const comprados = validos.filter((i) => i.status_compra === 'COMPRADO');
+  const estoque = validos.filter((i) => i.status_compra === 'ATENDIDO_ESTOQUE');
   const recebida = validos.reduce((s, i) => s + Number(i.qtd_recebida_total || 0), 0);
   const esperada = comprados.reduce((s, i) => s + Number(i.qtd_comprada ?? i.qtd_solicitada ?? 0), 0);
-  if (comprados.length === validos.length) {
+  if (comprados.length + estoque.length === validos.length) {
+    if (!comprados.length) return STATUS.SEPARADA_PARA_RETIRADA;
     if (esperada > 0 && recebida >= esperada) return STATUS.RECEBIDA_TOTAL;
     if (recebida > 0) return STATUS.RECEBIDA_PARCIAL;
     return atual === STATUS.COMPRADA ? STATUS.EM_RECEBIMENTO : STATUS.COMPRADA;
@@ -492,6 +525,7 @@ function salvarPainelItens(solicitacaoId, payload = {}, userId) {
   const comprar = payload.acao === 'comprar'
     ? new Set((Array.isArray(payload.comprar) ? payload.comprar : [payload.comprar]).filter(Boolean).map(Number))
     : new Set();
+  const atenderEstoque = new Set((Array.isArray(payload.atendido_estoque) ? payload.atendido_estoque : [payload.atendido_estoque]).filter(Boolean).map(Number));
   const frete = calculos.parseCentavos(payload.frete, 'Frete');
   const desconto = calculos.parseCentavos(payload.desconto, 'Desconto');
   return db.transaction(() => {
@@ -504,6 +538,13 @@ function salvarPainelItens(solicitacaoId, payload = {}, userId) {
       const fornecedorId = Number(values('fornecedor_id')[index] || 0) || null;
       if (fornecedorId && !fornecedorAtivo(fornecedorId)) throw new Error('Fornecedor inválido ou inativo.');
       const unitario = calculos.parseCentavos(values('valor_unitario')[index], 'Valor unitário');
+      const cobertura = calcularNecessidadeCompra(item.qtd_solicitada, consultarSaldoItem(item.estoque_item_id));
+      if (atenderEstoque.has(id)) {
+        if (cobertura.quantidade_sugerida > 0) throw new Error('Saldo insuficiente para atendimento integral pelo estoque.');
+        db.prepare(`UPDATE solicitacao_itens SET status_compra='ATENDIDO_ESTOQUE',qtd_comprada=0,fornecedor_id=NULL,
+          valor_unitario_centavos=0,atualizado_por=?,updated_at=datetime('now') WHERE id=?`).run(userId || null, id);
+        return;
+      }
       const isCotado = cotados.has(id);
       if (isCotado && !fornecedorId) throw new Error('Fornecedor é obrigatório para item cotado.');
       const limite = Number(item.qtd_comprada ?? item.qtd_solicitada);
@@ -511,15 +552,18 @@ function salvarPainelItens(solicitacaoId, payload = {}, userId) {
       if (!Number.isFinite(recebida) || recebida < 0 || recebida > limite) throw new Error('Quantidade recebida inválida ou superior à comprada.');
       const anterior = Number(item.qtd_recebida_total || 0);
       const isComprado = comprar.has(id) || item.status_compra === 'COMPRADO';
+      const qtdCompra = Number(String(values('qtd_comprada')[index] ?? cobertura.quantidade_sugerida).replace(',', '.'));
+      if (isComprado && qtdCompra > cobertura.quantidade_sugerida && String(payload.confirmar_excesso || '') !== '1') {
+        throw new Error(`Compra acima da necessidade sugerida (${cobertura.quantidade_sugerida}). Confirme conscientemente o excesso.`);
+      }
       if (isComprado && !isCotado) throw new Error('Somente itens cotados podem ser comprados.');
       if (recebida > 0 && !isComprado) throw new Error('Somente itens comprados podem ter recebimento.');
       db.prepare(`UPDATE solicitacao_itens SET fornecedor_id=?, valor_unitario_centavos=?, status_cotacao=?,
-        status_compra=?, qtd_comprada=?, qtd_recebida_total=?, cotado_em=CASE WHEN ?='COTADO' THEN COALESCE(cotado_em,datetime('now')) ELSE cotado_em END,
+        status_compra=?, qtd_comprada=?, cotado_em=CASE WHEN ?='COTADO' THEN COALESCE(cotado_em,datetime('now')) ELSE cotado_em END,
         comprado_em=CASE WHEN ?='COMPRADO' THEN COALESCE(comprado_em,datetime('now')) ELSE comprado_em END,
-        recebido_em=CASE WHEN ?>=qtd_solicitada THEN datetime('now') ELSE recebido_em END, atualizado_por=?, updated_at=datetime('now') WHERE id=?`)
-        .run(fornecedorId, unitario, isCotado ? 'COTADO' : 'PENDENTE', isComprado ? 'COMPRADO' : 'PENDENTE', isComprado ? Number(item.qtd_solicitada) : null,
-          recebida, isCotado ? 'COTADO' : 'PENDENTE', isComprado ? 'COMPRADO' : 'PENDENTE', recebida, userId, id);
-      if (recebida > anterior) db.prepare('INSERT INTO compras_recebimentos (solicitacao_id,solicitacao_item_id,quantidade,usuario_id) VALUES (?,?,?,?)').run(solicitacaoId, id, recebida - anterior, userId);
+        atualizado_por=?, updated_at=datetime('now') WHERE id=?`)
+        .run(fornecedorId, unitario, isCotado ? 'COTADO' : 'PENDENTE', isComprado ? 'COMPRADO' : 'PENDENTE', isComprado ? qtdCompra : null,
+          isCotado ? 'COTADO' : 'PENDENTE', isComprado ? 'COMPRADO' : 'PENDENTE', userId, id);
     });
     const itens = db.prepare('SELECT * FROM solicitacao_itens WHERE solicitacao_id=?').all(solicitacaoId);
     const subtotal = itens.reduce((sum, i) => sum + calculos.subtotalCentavos(Number(i.qtd_solicitada || 0), Number(i.valor_unitario_centavos || 0)), 0);
@@ -1147,6 +1191,9 @@ module.exports = {
   marcarComprada,
   salvarPainelItens,
   recalcularStatus,
+  consultarSaldoItem,
+  calcularNecessidadeCompra,
+  resolverItemPorEstoque,
   calculos,
   salvarAnexo,
   listarAnexos,

@@ -1,0 +1,9 @@
+<% layout('layout') %>
+<style>@media print{header,nav,.no-print{display:none!important}.qr-card{box-shadow:none!important;border:2px solid #14532d!important}}</style>
+<div class="page-head no-print"><div><h1>Cartão QR Code</h1><p class="muted">Retirada rastreável vinculada à OS.</p></div><button class="btn btn-green" onclick="window.print()">Imprimir</button></div>
+<div class="card qr-card" style="max-width:480px;margin:20px auto;text-align:center;border:3px solid #166534">
+  <h2 style="color:#166534"><%= item.nome %></h2><p><strong><%= item.codigo || ('ITEM-' + item.id) %></strong> · <%= item.unidade %></p>
+  <img src="<%= qrDataUrl %>" alt="QR Code para retirada de <%= item.nome %>" style="width:300px;max-width:100%">
+  <p>Escaneie para retirar este material.<br><strong>Uma OS ativa será obrigatória.</strong></p>
+  <small><%= url %></small>
+</div>

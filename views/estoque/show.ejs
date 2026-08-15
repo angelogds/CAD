@@ -4,7 +4,7 @@
     <h1><%= item.nome %></h1>
     <p class="muted">Código: <%= item.codigo || '-' %> • Unidade: <%= item.unidade %></p>
   </div>
-  <div><a class="btn btn-ghost" href="/estoque/itens">Voltar</a></div>
+  <div><a class="btn btn-green" href="/estoque/itens/<%= item.id %>/qr">Imprimir QR Code</a> <a class="btn btn-ghost" href="/estoque/itens">Voltar</a></div>
 </div>
 <%- include('_tabs', { tab: 'itens' }) %>
 <div class="card" style="margin-bottom:14px;">

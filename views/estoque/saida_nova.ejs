@@ -14,7 +14,7 @@
       <select class="input" name="item_id" required>
         <option value="">Selecione</option>
         <% itens.forEach((item) => { %>
-          <option value="<%= item.id %>"><%= item.nome %> (saldo: <%= item.saldo_atual %> <%= item.unidade %>)</option>
+          <option value="<%= item.id %>" <%= Number(itemSelecionado) === Number(item.id) ? 'selected' : '' %>><%= item.nome %> (saldo: <%= item.saldo_atual %> <%= item.unidade %>)</option>
         <% }) %>
       </select>
     </div>
@@ -23,8 +23,11 @@
       <input class="input" type="number" step="0.01" min="0.01" name="quantidade" required />
     </div>
     <div>
-      <div class="label">Referência (ID Solicitação)</div>
-      <input class="input" name="referencia_id" placeholder="Opcional" />
+      <div class="label">OS ativa (obrigatória)</div>
+      <select class="input" name="os_id" required><option value="">Selecione a OS</option>
+        <% ordens.forEach((os) => { %><option value="<%= os.id %>">OS #<%= os.id %> — <%= os.equipamento_nome || 'Equipamento não informado' %></option><% }) %>
+      </select>
+      <input type="hidden" name="origem" value="<%= origem %>" />
     </div>
     <div style="grid-column:1/-1;">
       <div class="label">Observação</div>

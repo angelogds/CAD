@@ -20,7 +20,7 @@ function listRecebimentos(status = "") {
 function getSolicitacao(id) {
   const sol = db.prepare("SELECT * FROM solicitacoes WHERE id=?").get(id);
   if (!sol) return null;
-  const itens = db.prepare("SELECT *, (qtd_solicitada-qtd_recebida_total) AS pendente FROM solicitacao_itens WHERE solicitacao_id=? ORDER BY id").all(id);
+  const itens = db.prepare("SELECT *, (COALESCE(qtd_comprada,0)-qtd_recebida_total) AS pendente FROM solicitacao_itens WHERE solicitacao_id=? AND status_compra='COMPRADO' ORDER BY id").all(id);
   return { ...sol, itens };
 }
 
@@ -35,8 +35,9 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, userId }) {
   return db.transaction(() => {
     const item = db.prepare("SELECT * FROM solicitacao_itens WHERE id=? AND solicitacao_id=?").get(itemId, solicitacaoId);
     if (!item) throw new Error("Item não encontrado.");
+    if (item.status_compra !== 'COMPRADO') throw new Error('Somente itens realmente comprados podem ser recebidos.');
 
-    const qtdSolicitada = Number(item.qtd_solicitada || item.quantidade || 0);
+    const qtdSolicitada = Number(item.qtd_comprada || 0);
     const recebidaAtual = Number(item.qtd_recebida_total || 0);
     const recebida = recebidaAtual + Number(qtdAgora);
     if (recebida > qtdSolicitada) {
@@ -48,18 +49,30 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, userId }) {
 
     db.prepare("UPDATE solicitacao_itens SET qtd_recebida_total=?, status_item=?, observacao_item=?, updated_at=datetime('now') WHERE id=?").run(recebida, statusItem, observacao || item.observacao_item || null, itemId);
 
-    if (item.estoque_item_id) {
-      if (HAS_SALDO_ATUAL) {
-        db.prepare("UPDATE estoque_itens SET saldo_atual = COALESCE(saldo_atual,0) + ?, updated_at=datetime('now') WHERE id=?").run(Number(qtdAgora), item.estoque_item_id);
-      }
-      db.prepare(`INSERT INTO estoque_movimentos (tipo, item_id, quantidade, usuario_id, referencia_tipo, referencia_id, observacao) VALUES ('ENTRADA_COMPRA', ?, ?, ?, 'SOLICITACAO', ?, ?)`)
-        .run(item.estoque_item_id, Number(qtdAgora), userId || null, solicitacaoId, observacao || `Recebimento solicitação #${solicitacaoId}`);
+    let estoqueItemId = item.estoque_item_id;
+    if (!estoqueItemId) {
+      estoqueItemId = Number(db.prepare(`INSERT INTO estoque_itens (codigo,nome,unidade,saldo_atual,updated_at)
+        VALUES (?,?,?,?,datetime('now'))`).run(`CMP-${solicitacaoId}-${itemId}`, item.item_nome || item.item_descricao || `Item ${itemId}`, item.unidade || 'UN', 0).lastInsertRowid);
+      db.prepare('UPDATE solicitacao_itens SET estoque_item_id=? WHERE id=?').run(estoqueItemId, itemId);
     }
+    const saldoAnterior = Number(db.prepare('SELECT saldo_atual FROM estoque_itens WHERE id=?').pluck().get(estoqueItemId) || 0);
+    const saldoPosterior = saldoAnterior + Number(qtdAgora);
+    db.prepare("UPDATE estoque_itens SET saldo_atual=?, updated_at=datetime('now') WHERE id=?").run(saldoPosterior, estoqueItemId);
+    const sol = db.prepare('SELECT os_id,equipamento_id FROM solicitacoes WHERE id=?').get(solicitacaoId);
+    const movimentoId = Number(db.prepare(`INSERT INTO estoque_movimentos
+      (tipo,item_id,quantidade,origem,os_id,equipamento_id,solicitacao_id,solicitacao_item_id,usuario_id,saldo_anterior,saldo_posterior,observacao)
+      VALUES ('ENTRADA_COMPRA',?,?,?,?,?,?,?,?,?,?,?)`).run(estoqueItemId, Number(qtdAgora), 'COMPRA', sol?.os_id || null,
+      sol?.equipamento_id || null, solicitacaoId, itemId, userId || null, saldoAnterior, saldoPosterior,
+      observacao || `Recebimento solicitação #${solicitacaoId}`).lastInsertRowid);
+    db.prepare(`INSERT INTO compras_recebimentos
+      (solicitacao_id,solicitacao_item_id,quantidade,estoque_item_id,estoque_movimento_id,usuario_id)
+      VALUES (?,?,?,?,?,?)`).run(solicitacaoId, itemId, Number(qtdAgora), estoqueItemId, movimentoId, userId || null);
   })();
 }
 
 function finalizarRecebimento(id) {
-  const itens = db.prepare("SELECT status_item FROM solicitacao_itens WHERE solicitacao_id=?").all(id);
+  const itens = db.prepare("SELECT status_item FROM solicitacao_itens WHERE solicitacao_id=? AND status_compra='COMPRADO'").all(id);
+  if (!itens.length) throw new Error('A solicitação não possui itens comprados para recebimento.');
   const parcial = itens.some((i) => i.status_item === "PENDENTE" || i.status_item === "PARCIAL");
   const status = parcial ? STATUS.RECEBIDA_PARCIAL : STATUS.RECEBIDA_TOTAL;
   db.prepare("UPDATE solicitacoes SET status=?, recebida_em=datetime('now'), updated_at=datetime('now') WHERE id=?").run(status, id);
@@ -67,14 +80,14 @@ function finalizarRecebimento(id) {
 
 function fechar(id) {
   const s = getSolicitacao(id);
-  if (!s || ![STATUS.RECEBIDA_PARCIAL, STATUS.RECEBIDA_TOTAL].includes(s.status)) throw new Error("Somente recebidas podem ser fechadas.");
+  if (!s || s.status !== STATUS.RECEBIDA_TOTAL) throw new Error("Somente uma solicitação RECEBIDA_TOTAL pode ser fechada.");
   db.prepare("UPDATE solicitacoes SET status=?, fechada_em=datetime('now'), updated_at=datetime('now') WHERE id=?").run(STATUS.FECHADA, id);
 }
 
 function reabrir(id) {
   const s = getSolicitacao(id);
   if (!s || ![STATUS.FECHADA, STATUS.RECEBIDA_PARCIAL].includes(s.status)) throw new Error("Somente FECHADA ou RECEBIDA_PARCIAL podem ser reabertas.");
-  db.prepare("UPDATE solicitacoes SET status=?, reaberta_em=datetime('now'), updated_at=datetime('now') WHERE id=?").run(STATUS.REABERTA, id);
+  db.prepare("UPDATE solicitacoes SET status=?, reaberta_em=datetime('now'), updated_at=datetime('now') WHERE id=?").run(STATUS.COMPRADA, id);
 }
 
 module.exports = { listRecebimentos, getSolicitacao, iniciarRecebimento, receberItem, finalizarRecebimento, fechar, reabrir };
