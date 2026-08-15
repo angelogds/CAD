@@ -12,8 +12,18 @@ export class ViewportController {
 
   resize() {
     const r = this.svg.getBoundingClientRect();
-    this.state.width = Math.max(1, r.width || 1);
-    this.state.height = Math.max(1, r.height || 1);
+    const previousWidth = this.state.width;
+    const previousHeight = this.state.height;
+    const width = Math.max(1, r.width || 1);
+    const height = Math.max(1, r.height || 1);
+    if (previousWidth > 1 && previousHeight > 1) {
+      this.state.offsetX += (width - previousWidth) / 2;
+      this.state.offsetY += (height - previousHeight) / 2;
+    }
+    this.state.width = width;
+    this.state.height = height;
+    this.svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    this.svg.setAttribute('preserveAspectRatio', 'none');
   }
 
   setView(partial = {}) {
@@ -64,6 +74,10 @@ export class ViewportController {
   }
 
   zoomExtents(bounds) {
+    if (!bounds?.isValid()) {
+      this.resetView();
+      return;
+    }
     this.fitToBounds(bounds);
   }
 
