@@ -165,3 +165,24 @@ test('interface moderna mantém comandos, modelos mecânicos e vínculo de equip
   assert.doesNotMatch(shaftTool, /window\.prompt/);
   assert.match(shaftTool, /data-shaft-segment-row/);
 });
+
+test('viewport CAD cobre o SVG, preserva zoom no cursor e oferece pan temporário', () => {
+  const viewport = read('public/js/modules/desenho-tecnico/viewport/viewport.controller.js');
+  const interaction = read('public/js/modules/desenho-tecnico/interaction/interaction.controller.js');
+  assert.match(viewport, /setAttribute\('viewBox', `0 0 \$\{width\} \$\{height\}`\)/);
+  assert.match(viewport, /screenPoint\.x - screenAfter\.x/);
+  assert.match(viewport, /if \(!bounds\?\.isValid\(\)\)/);
+  assert.match(interaction, /e\.code === 'Space'/);
+  assert.match(interaction, /e\.button === 1/);
+  assert.match(interaction, /Math\.exp\(-e\.deltaY \* 0\.0015\)/);
+});
+
+test('linha de comando mantém histórico, repete comando e expõe aliases industriais', () => {
+  const controller = read('public/js/modules/desenho-tecnico/desenho-tecnico.controller.js');
+  assert.match(controller, /commandHistoryIndex/);
+  assert.match(controller, /commandInput\.value\.trim\(\) \|\| this\.lastCommand/);
+  assert.match(controller, /p: 'tool-pan'/);
+  assert.match(controller, /pl: 'tool-polyline'/);
+  assert.match(controller, /z: 'zoom-extents'/);
+  assert.match(controller, /e\.key === 'F8'/);
+});

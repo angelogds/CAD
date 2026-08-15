@@ -101,9 +101,9 @@ const TOOL_HINTS = {
 
 const COMMAND_ALIASES = {
   s: 'tool-select', select: 'tool-select', selecionar: 'tool-select',
-  h: 'tool-pan', pan: 'tool-pan',
+  h: 'tool-pan', p: 'tool-pan', pan: 'tool-pan',
   l: 'tool-line', line: 'tool-line', linha: 'tool-line',
-  p: 'tool-polyline', pl: 'tool-polyline', polyline: 'tool-polyline', polilinha: 'tool-polyline',
+  pl: 'tool-polyline', polyline: 'tool-polyline', polilinha: 'tool-polyline',
   r: 'tool-rect', rec: 'tool-rect', rect: 'tool-rect', retangulo: 'tool-rect', 'retângulo': 'tool-rect',
   c: 'tool-circle', circle: 'tool-circle', circulo: 'tool-circle', 'círculo': 'tool-circle',
   a: 'tool-arc', arc: 'tool-arc', arco: 'tool-arc',
@@ -123,7 +123,7 @@ const COMMAND_ALIASES = {
   x: 'tool-shaft', eixo: 'tool-shaft',
   f: 'tool-flange', fl: 'tool-flange', flange: 'tool-flange',
   zw: 'tool-zoom-window', janela: 'tool-zoom-window',
-  ze: 'zoom-extents', extents: 'zoom-extents',
+  z: 'zoom-extents', ze: 'zoom-extents', zoom: 'zoom-extents', extents: 'zoom-extents',
   u: 'undo', undo: 'undo', desfazer: 'undo',
   redo: 'redo', refazer: 'redo',
   del: 'delete-selection', delete: 'delete-selection',
@@ -147,6 +147,9 @@ export class DesenhoTecnicoController {
     this.initial = initial;
     this.toolManager = new ToolManager(this.state);
     this.isUiBound = false;
+    this.commandHistory = [];
+    this.commandHistoryIndex = 0;
+    this.lastCommand = '';
     this.ctx = {
       state: this.state,
       viewport: this.viewport,
@@ -401,7 +404,7 @@ export class DesenhoTecnicoController {
     if (!this.state.snappingConfig.enabled) return p;
     const tol = 10 / this.viewport.getViewState().zoom;
     const cfg = this.state.snappingConfig || {};
-    const priority = { intersection: 1, endpoint: 2, midpoint: 3, center: 4, quadrant: 4, nearest: 5, grid: 6 };
+    const priority = { endpoint: 1, intersection: 2, midpoint: 3, center: 4, quadrant: 5, nearest: 6, grid: 7 };
     const candidates = this.getSnapCandidates().filter((c) => cfg[c.kind] !== false);
     if (cfg.nearest !== false) {
       this.state.entities.forEach((e) => {
@@ -550,8 +553,10 @@ export class DesenhoTecnicoController {
     set('cadStatusTool', `Ferramenta: ${this.getToolLabel(this.state.activeTool)}`);
     set('cadStatusZoom', `Zoom: ${(zoom * 100).toFixed(0)}%`);
     if (cursor) { set('cadStatusX', `X: ${cursor.world.x.toFixed(2)}`); set('cadStatusY', `Y: ${cursor.world.y.toFixed(2)}`); }
-    const first = this.state.entities.find((e) => this.selection.includes(e.id));
-    set('cadStatusSelected', `Selecionado: ${first?.type || '-'} • Layer: ${this.state.activeLayer} • Snap: ${this.state.snappingConfig.activeKind || (this.state.snappingConfig.enabled ? 'on' : 'off')} • Unidade: ${this.state.metadata?.unidade || 'mm'}`);
+    const selected = this.state.entities.filter((e) => this.selection.includes(e.id));
+    const first = selected[0];
+    const selectionLabel = selected.length > 1 ? `${selected.length} objetos` : (first?.type || '-');
+    set('cadStatusSelected', `Selecionado: ${selectionLabel} • Layer: ${this.state.activeLayer} • Snap: ${this.state.snappingConfig.activeKind || (this.state.snappingConfig.enabled ? 'on' : 'off')} • Unidade: ${this.state.metadata?.unidade || 'mm'}`);
     this.renderProperties(first);
     set('cadStatusMessage', this.state.statusMessage || this.prompt.message || 'Pronto');
   }
@@ -559,6 +564,10 @@ export class DesenhoTecnicoController {
   renderProperties(entity) {
     const props = document.getElementById('cadProperties');
     if (!props) return;
+    if (this.selection.ids.size > 1) {
+      props.innerHTML = `<p class='cad-muted'><strong>${this.selection.ids.size} objetos selecionados</strong></p><p class='cad-muted'>Use Mover, Copiar ou Apagar para editar o conjunto.</p>`;
+      return;
+    }
     if (!entity) {
       props.innerHTML = '<p style="color:#94a3b8;font-size:12px;">Selecione um objeto para editar suas propriedades.</p>';
       return;
@@ -797,6 +806,9 @@ export class DesenhoTecnicoController {
       this.render();
       return false;
     }
+    this.lastCommand = command;
+    if (this.commandHistory[this.commandHistory.length - 1] !== command) this.commandHistory.push(command);
+    this.commandHistoryIndex = this.commandHistory.length;
     const tool = action.startsWith('tool-dim-') ? action.slice(5).replace('dim-', 'dim_') : (action.startsWith('tool-') ? action.slice(5) : '');
     this.executeAction(action, tool ? { dataset: { tool } } : null);
     return true;
@@ -855,6 +867,13 @@ export class DesenhoTecnicoController {
       this.viewport.resize();
       this.render();
     });
+    if (window.ResizeObserver) {
+      this.workspaceResizeObserver = new ResizeObserver(() => {
+        this.viewport.resize();
+        this.render();
+      });
+      this.workspaceResizeObserver.observe(this.viewport.svg);
+    }
     this.eventBus.on('viewport:changed', () => this.render());
     this.eventBus.on('selection:changed', () => this.render());
     this.eventBus.on('entity:hovered', () => this.render());
@@ -928,10 +947,17 @@ export class DesenhoTecnicoController {
         commandInput.blur();
         return;
       }
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        event.preventDefault();
+        const delta = event.key === 'ArrowUp' ? -1 : 1;
+        this.commandHistoryIndex = Math.max(0, Math.min(this.commandHistory.length, this.commandHistoryIndex + delta));
+        commandInput.value = this.commandHistory[this.commandHistoryIndex] || '';
+        return;
+      }
       if (event.key !== 'Enter') return;
       event.preventDefault();
       event.stopPropagation();
-      const command = commandInput.value;
+      const command = commandInput.value.trim() || this.lastCommand;
       commandInput.value = '';
       if (this.executeCommand(command)) commandInput.blur();
     });
@@ -947,6 +973,7 @@ export class DesenhoTecnicoController {
       if (!isFormField && e.key === 'Delete') this.executeAction('delete-selection');
       if (e.ctrlKey && e.key.toLowerCase() === 'z') this.executeAction('undo');
       if (e.ctrlKey && e.key.toLowerCase() === 'y') this.executeAction('redo');
+      if (!isFormField && e.key === 'F8') { e.preventDefault(); this.executeAction('toggle-ortho'); }
       if (!isFormField && !e.ctrlKey && !e.altKey && !e.metaKey && this.toolManager.name === 'select' && /^[a-zA-Z]$/.test(e.key)) {
         e.preventDefault();
         commandInput?.focus();
