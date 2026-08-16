@@ -2,6 +2,7 @@ const db = require('../../database/db');
 const { getAIConfig } = require('./ai.service');
 const industrialAssistant = require('./industrial-assistant.service');
 const observability = require('./industrial-assistant.observability.service');
+const providerRouter = require('./providers/provider-router');
 const { normalizeRole } = require('../../config/rbac');
 
 function safeJsonParse(value, fallback = {}) {
@@ -122,34 +123,7 @@ function recentConversationTranscript({ userId, conversationId, limit = 4 }) {
 }
 
 async function openAIResponse({ apiKey, body, timeoutMs }) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    const raw = await response.text();
-    const data = safeJsonParse(raw, null);
-    if (!response.ok) {
-      const err = new Error(data?.error?.message || `OpenAI Responses retornou HTTP ${response.status}.`);
-      err.status = 503;
-      err.code = data?.error?.code || 'OPENAI_RESPONSES_ERROR';
-      err.technical = raw.slice(0, 1000);
-      throw err;
-    }
-    return data || {};
-  } catch (err) {
-    if (err?.name === 'AbortError') {
-      const timeoutErr = new Error('O Assistente Industrial demorou para responder. Tente novamente.');
-      timeoutErr.status = 504;
-      timeoutErr.code = 'AI_TIMEOUT';
-      throw timeoutErr;
-    }
-    throw err;
-  } finally { clearTimeout(timer); }
+  return providerRouter.runWithFallback('createResponse', { apiKey, body, timeoutMs });
 }
 
 async function runTextAssistant({ message, user, context = {}, conversationId = null }) {
@@ -160,7 +134,7 @@ async function runTextAssistant({ message, user, context = {}, conversationId = 
 
   const cfg = getAIConfig();
   const apiKey = String(cfg?.apiKey || process.env.OPENAI_API_KEY || '').trim();
-  if (!apiKey) { const err = new Error('OPENAI_API_KEY não configurada no servidor.'); err.status = 503; throw err; }
+  if (providerRouter.primaryName() === 'openai' && !apiKey) { const err = new Error('OPENAI_API_KEY não configurada no servidor.'); err.status = 503; throw err; }
 
   const model = String(process.env.OPENAI_MODEL_ASSISTANT || cfg?.model || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini').trim();
   const timeoutMs = Math.max(5000, Number(process.env.OPENAI_TIMEOUT_MS || 45000));
