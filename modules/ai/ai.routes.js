@@ -23,18 +23,8 @@ const AI_TRANSCRICAO_ACCESS = Array.from(new Set([
   ...(ACCESS.preventivas_view || []),
 ]));
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: Number(process.env.OPENAI_AUDIO_MAX_BYTES || 12 * 1024 * 1024),
-    files: 1,
-  },
-});
-
-const uploadImage = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: Number(process.env.OPENAI_IMAGE_MAX_BYTES || 8 * 1024 * 1024), files: 1 },
-});
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: Number(process.env.OPENAI_AUDIO_MAX_BYTES || 12 * 1024 * 1024), files: 1 } });
+const uploadImage = multer({ storage: multer.memoryStorage(), limits: { fileSize: Number(process.env.OPENAI_IMAGE_MAX_BYTES || 8 * 1024 * 1024), files: 1 } });
 
 router.get('/chat', requireLogin, requireRole(AI_ACCESS), ctrl.renderChat);
 router.post('/ask', requireLogin, requireRole(AI_ACCESS), ctrl.askGeneral);
@@ -43,7 +33,6 @@ router.post('/preventivas/:id/analyze', requireLogin, requireRole(ACCESS.prevent
 router.post('/os/transcrever-abertura', requireLogin, requireRole(AI_TRANSCRICAO_ACCESS), upload.single('audio'), iaCtrl.transcreverAbertura);
 router.post('/os/transcrever-fechamento', requireLogin, requireRole(AI_TRANSCRICAO_ACCESS), upload.single('audio'), iaCtrl.transcreverFechamento);
 router.post('/os/analisar', requireLogin, requireRole(AI_TRANSCRICAO_ACCESS), iaCtrl.analisarAberturaOS);
-
 router.post('/os/diagnosticar', requireLogin, requireRole(ACCESS.os_view), ctrl.diagnosticarOS);
 router.post('/os/melhorar-descricao', requireLogin, requireRole(ACCESS.os_view), ctrl.melhorarDescricaoOS);
 router.post('/os/analisar-imagem', requireLogin, requireRole(ACCESS.os_view), uploadImage.single('imagem'), ctrl.analisarImagemOS);
@@ -66,6 +55,8 @@ router.post('/webhook/os-created', requireLogin, requireRole(ACCESS.os_view), ct
 // Assistente Industrial: texto e voz compartilham o mesmo registro de ferramentas e RBAC do backend.
 router.get('/industrial/capabilities', requireLogin, requireRole(AI_ACCESS), industrialCtrl.capabilities);
 router.post('/industrial/message', requireLogin, requireRole(AI_ACCESS), industrialCtrl.textMessage);
+router.get('/industrial/history', requireLogin, requireRole(AI_ACCESS), industrialCtrl.history);
+router.get('/industrial/briefing', requireLogin, requireRole(ACCESS.pcm || []), industrialCtrl.briefing);
 router.post('/realtime/call', requireLogin, requireRole(AI_ACCESS), industrialCtrl.realtimeCall);
 router.post('/tools/execute', requireLogin, requireRole(AI_ACCESS), industrialCtrl.executeTool);
 
