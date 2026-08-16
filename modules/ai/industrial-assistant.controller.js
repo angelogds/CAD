@@ -52,6 +52,7 @@ async function textMessage(req, res) {
       ok: true,
       resposta: result.text,
       tools: result.tools || [],
+      sources: result.sources || [],
       model: result.model || null,
       conversation_id: result.conversationId || null,
       context: resolvedContext,
@@ -101,7 +102,7 @@ async function executeTool(req, res) {
 }
 
 function capabilities(_req, res) {
-  return res.json({ ok: true, voice: true, text_tools: true, briefing: true, server_history: true, page_context: true, tools: industrialAssistant.getRealtimeTools().map((tool) => tool.name) });
+  return res.json({ ok: true, voice: true, text_tools: true, briefing: true, server_history: true, page_context: true, evidence_sources: true, tools: industrialAssistant.getRealtimeTools().map((tool) => tool.name) });
 }
 
 module.exports = { realtimeCall, pageContext, textMessage, briefing, history, executeTool, capabilities };
