@@ -39,17 +39,27 @@ function fallback() {
   return name ? getProvider(name) : null;
 }
 
+function shouldFallback(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const providerStatus = Number(error?.provider_status || 0);
+  if (code === 'AI_TIMEOUT') return true;
+  if (providerStatus === 429 || providerStatus >= 500) return true;
+  if (!providerStatus && error?.name === 'TypeError') return true;
+  return false;
+}
+
 async function runWithFallback(method, args) {
   const first = primary();
   try {
     return await first[method](args);
   } catch (primaryError) {
     const second = fallback();
-    if (!second || second.name === first.name || typeof second[method] !== 'function') throw primaryError;
+    if (!second || second.name === first.name || typeof second[method] !== 'function' || !shouldFallback(primaryError)) throw primaryError;
     try {
       return await second[method](args);
     } catch (fallbackError) {
       fallbackError.primary_error_code = primaryError?.code || 'AI_PROVIDER_ERROR';
+      fallbackError.primary_provider_status = Number(primaryError?.provider_status || 0) || null;
       throw fallbackError;
     }
   }
@@ -71,6 +81,7 @@ module.exports = {
   fallbackName,
   primary,
   fallback,
+  shouldFallback,
   runWithFallback,
   status,
 };
