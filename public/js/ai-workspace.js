@@ -114,7 +114,9 @@
       answer.style.whiteSpace = 'pre-wrap';
       item.appendChild(answer);
       const tools = Array.isArray(row?.context?.tools) ? row.context.tools.filter((tool) => tool?.ok).map((tool) => tool.name) : [];
-      if (tools.length) item.appendChild(el('div', `Consultas: ${tools.join(', ')}`, 'assistant-muted'));
+      if (tools.length) item.appendChild(el('div', `Consultas: ${[...new Set(tools)].join(', ')}`, 'assistant-muted'));
+      const sources = Array.isArray(row?.context?.sources) ? row.context.sources.map((source) => source?.source).filter(Boolean) : [];
+      if (sources.length) item.appendChild(el('div', `Fontes do sistema: ${[...new Set(sources)].join(' • ')}`, 'assistant-muted'));
       serverHistory.appendChild(item);
     });
   }
