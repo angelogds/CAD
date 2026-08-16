@@ -17,7 +17,7 @@
     localStorage.setItem(storageKey, JSON.stringify(items.slice(-40)));
   }
 
-  function addBubble(role, label, text) {
+  function addBubble(role, label, text, tools) {
     const el = document.createElement('div');
     el.className = `assistant-msg ${role === 'user' ? 'user' : 'ai'}`;
     const strong = document.createElement('strong');
@@ -25,6 +25,19 @@
     el.appendChild(strong);
     el.appendChild(document.createElement('br'));
     el.appendChild(document.createTextNode(String(text || '')));
+
+    if (role !== 'user' && Array.isArray(tools) && tools.length) {
+      const source = document.createElement('div');
+      source.className = 'assistant-muted';
+      source.style.marginTop = '8px';
+      const used = tools.filter((tool) => tool?.ok).map((tool) => tool.name);
+      const blocked = tools.filter((tool) => !tool?.ok).map((tool) => tool.name);
+      const parts = [];
+      if (used.length) parts.push(`Consultas: ${used.join(', ')}`);
+      if (blocked.length) parts.push(`Bloqueadas: ${blocked.join(', ')}`);
+      source.textContent = parts.join(' • ');
+      if (source.textContent) el.appendChild(source);
+    }
     historyEl.appendChild(el);
   }
 
@@ -40,7 +53,7 @@
     }
     items.forEach((item) => {
       addBubble('user', `Você (${item.contexto || 'geral'}):`, item.pergunta);
-      addBubble('ai', 'Assistente:', item.resposta || 'Sem resposta.');
+      addBubble('ai', 'Assistente:', item.resposta || 'Sem resposta.', item.tools || []);
     });
     historyEl.scrollTop = historyEl.scrollHeight;
   }
@@ -53,21 +66,27 @@
       return;
     }
 
-    statusEl.textContent = 'Consultando o Assistente Industrial...';
+    statusEl.textContent = 'Consultando dados reais do sistema...';
     enviarBtn.disabled = true;
     try {
-      const response = await fetch('/ai/ask', {
+      const response = await fetch('/ai/industrial/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pergunta, contexto }),
+        body: JSON.stringify({
+          pergunta,
+          contexto,
+          module: contexto,
+          route: window.location.pathname,
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error || 'Falha ao consultar IA.');
       const items = readHistory();
-      items.push({ pergunta, contexto, resposta: data.resposta || 'Sem resposta.' });
+      items.push({ pergunta, contexto, resposta: data.resposta || 'Sem resposta.', tools: Array.isArray(data.tools) ? data.tools : [] });
       saveHistory(items);
       renderHistory();
-      statusEl.textContent = 'Resposta recebida.';
+      const used = (data.tools || []).filter((tool) => tool?.ok).length;
+      statusEl.textContent = used ? `Resposta recebida com ${used} consulta(s) ao sistema.` : 'Resposta recebida.';
       perguntaEl.value = '';
     } catch (err) {
       statusEl.textContent = err.message || 'Erro ao consultar IA.';
