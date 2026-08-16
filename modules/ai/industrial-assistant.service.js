@@ -25,7 +25,7 @@ function compactOS(row = {}) {
     status: row.status || null,
     prioridade: row.prioridade || row.grau || null,
     setor: row.setor || null,
-    opened_at: row.opened_at || row.created_at || null,
+    opened_at: row.opened_at || null,
   };
 }
 
@@ -39,7 +39,7 @@ function listarOSCriticas({ limit = 10 } = {}) {
     WHERE UPPER(COALESCE(o.status,'')) NOT IN ('FECHADA','FINALIZADA','CONCLUIDA','CONCLUÍDA','CANCELADA')
       AND UPPER(COALESCE(o.prioridade,o.grau,'MEDIA')) IN ('CRITICA','CRÍTICA','EMERGENCIAL','ALTA')
     ORDER BY CASE WHEN UPPER(COALESCE(o.prioridade,o.grau,'')) IN ('CRITICA','CRÍTICA','EMERGENCIAL') THEN 0 ELSE 1 END,
-             datetime(COALESCE(o.opened_at,o.created_at,'now')) ASC
+             datetime(COALESCE(o.opened_at,'now')) ASC
     LIMIT ?
   `).all(n).map(compactOS);
 }
