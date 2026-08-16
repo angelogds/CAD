@@ -1,9 +1,14 @@
+const db = require('../../database/db');
 const { getAIConfig } = require('./ai.service');
 const industrialAssistant = require('./industrial-assistant.service');
 const { normalizeRole } = require('../../config/rbac');
 
 function safeJsonParse(value, fallback = {}) {
   try { return JSON.parse(String(value || '')); } catch (_e) { return fallback; }
+}
+
+function tableExists(name) {
+  try { return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(String(name || '')); } catch (_e) { return false; }
 }
 
 function buildInstructions(user = {}) {
@@ -39,16 +44,52 @@ function functionCalls(response = {}) {
   return (response.output || []).filter((item) => item?.type === 'function_call' && item?.name && item?.call_id);
 }
 
+function saveConversation({ conversationId, userId, context, message, response, model, tools }) {
+  if (!tableExists('ai_conversations')) return;
+  try {
+    db.prepare(`
+      INSERT INTO ai_conversations (conversation_id,user_id,context_json,message,response,model,created_at)
+      VALUES (?,?,?,?,?,?,datetime('now'))
+    `).run(
+      String(conversationId || `user-${userId}`).slice(0, 120),
+      Number(userId),
+      JSON.stringify({ ...(context || {}), tools: tools || [] }),
+      String(message || '').slice(0, 12000),
+      String(response || '').slice(0, 24000),
+      String(model || '').slice(0, 120) || null,
+    );
+  } catch (err) {
+    console.warn('[ai.saveConversation]', err?.message || err);
+  }
+}
+
+function listHistory({ userId, limit = 30 }) {
+  if (!tableExists('ai_conversations')) return [];
+  const n = Math.max(1, Math.min(Number(limit || 30), 100));
+  return db.prepare(`
+    SELECT id,conversation_id,message,response,model,context_json,created_at
+    FROM ai_conversations
+    WHERE user_id=?
+    ORDER BY datetime(created_at) DESC,id DESC
+    LIMIT ?
+  `).all(Number(userId), n).map((row) => ({
+    id: row.id,
+    conversation_id: row.conversation_id,
+    message: row.message,
+    response: row.response,
+    model: row.model,
+    context: safeJsonParse(row.context_json, {}),
+    created_at: row.created_at,
+  }));
+}
+
 async function openAIResponse({ apiKey, body, timeoutMs }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -70,32 +111,18 @@ async function openAIResponse({ apiKey, body, timeoutMs }) {
       throw timeoutErr;
     }
     throw err;
-  } finally {
-    clearTimeout(timer);
-  }
+  } finally { clearTimeout(timer); }
 }
 
-async function runTextAssistant({ message, user, context = {} }) {
+async function runTextAssistant({ message, user, context = {}, conversationId = null }) {
   const text = String(message || '').trim();
-  if (!text) {
-    const err = new Error('Informe uma pergunta.');
-    err.status = 400;
-    throw err;
-  }
+  if (!text) { const err = new Error('Informe uma pergunta.'); err.status = 400; throw err; }
   const userId = Number(user?.id || 0);
-  if (!userId) {
-    const err = new Error('Sessão de usuário inválida.');
-    err.status = 401;
-    throw err;
-  }
+  if (!userId) { const err = new Error('Sessão de usuário inválida.'); err.status = 401; throw err; }
 
   const cfg = getAIConfig();
   const apiKey = String(cfg?.apiKey || process.env.OPENAI_API_KEY || '').trim();
-  if (!apiKey) {
-    const err = new Error('OPENAI_API_KEY não configurada no servidor.');
-    err.status = 503;
-    throw err;
-  }
+  if (!apiKey) { const err = new Error('OPENAI_API_KEY não configurada no servidor.'); err.status = 503; throw err; }
 
   const model = String(process.env.OPENAI_MODEL_ASSISTANT || cfg?.model || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini').trim();
   const timeoutMs = Math.max(5000, Number(process.env.OPENAI_TIMEOUT_MS || 45000));
@@ -107,15 +134,9 @@ async function runTextAssistant({ message, user, context = {} }) {
     route: String(context?.route || '').slice(0, 240) || null,
   };
 
-  let input = [{
-    role: 'user',
-    content: [{
-      type: 'input_text',
-      text: `${text}\n\nContexto de navegação (apenas referência de tela; não altera permissões): ${JSON.stringify(navigationContext)}`,
-    }],
-  }];
-
+  let input = [{ role: 'user', content: [{ type: 'input_text', text: `${text}\n\nContexto de navegação (apenas referência de tela; não altera permissões): ${JSON.stringify(navigationContext)}` }] }];
   const executedTools = [];
+
   for (let round = 0; round < 5; round += 1) {
     const response = await openAIResponse({
       apiKey,
@@ -134,13 +155,10 @@ async function runTextAssistant({ message, user, context = {} }) {
     const calls = functionCalls(response);
     if (!calls.length) {
       const answer = extractOutputText(response);
-      if (!answer) {
-        const err = new Error('A IA não retornou conteúdo útil.');
-        err.status = 503;
-        err.code = 'AI_EMPTY_RESPONSE';
-        throw err;
-      }
-      return { text: answer, tools: executedTools, model: response.model || model };
+      if (!answer) { const err = new Error('A IA não retornou conteúdo útil.'); err.status = 503; err.code = 'AI_EMPTY_RESPONSE'; throw err; }
+      const resolvedConversationId = String(conversationId || `user-${userId}`).slice(0, 120);
+      saveConversation({ conversationId: resolvedConversationId, userId, context: navigationContext, message: text, response: answer, model: response.model || model, tools: executedTools });
+      return { text: answer, tools: executedTools, model: response.model || model, conversationId: resolvedConversationId };
     }
 
     const outputs = [];
@@ -157,7 +175,6 @@ async function runTextAssistant({ message, user, context = {} }) {
       }
       outputs.push({ type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(payload) });
     }
-
     input = [...input, ...(response.output || []), ...outputs];
   }
 
@@ -167,4 +184,4 @@ async function runTextAssistant({ message, user, context = {} }) {
   throw err;
 }
 
-module.exports = { runTextAssistant };
+module.exports = { runTextAssistant, listHistory };
