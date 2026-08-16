@@ -32,9 +32,7 @@ function normalizeRoute(value) {
   if (!raw) return '/';
   try {
     const parsed = new URL(raw, 'http://assistente.local');
-    const pathname = String(parsed.pathname || '/').replace(/\/{2,}/g, '/');
-    const search = String(parsed.search || '').slice(0, 300);
-    return `${pathname}${search}`;
+    return String(parsed.pathname || '/').replace(/\/{2,}/g, '/');
   } catch (_e) {
     return '/';
   }
@@ -70,7 +68,7 @@ function osContext(route, user, id) {
       status: row.status || null,
       prioridade: row.prioridade || row.grau || null,
       equipamento_id: Number(row.equipamento_id || 0) || null,
-      equipamento: equipamento,
+      equipamento,
       setor: row.setor || row.equipamento_setor || null,
     },
   };
