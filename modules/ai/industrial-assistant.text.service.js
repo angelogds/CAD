@@ -48,6 +48,21 @@ function functionCalls(response = {}) {
   return (response.output || []).filter((item) => item?.type === 'function_call' && item?.name && item?.call_id);
 }
 
+function buildEvidence(executedTools = []) {
+  const seen = new Set();
+  const sources = [];
+  for (const tool of executedTools) {
+    if (tool?.ok !== true || !tool?.source) continue;
+    const source = String(tool.source).trim().slice(0, 240);
+    if (!source) continue;
+    const key = `${tool.name || 'tool'}|${source}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    sources.push({ tool: String(tool.name || 'tool').slice(0, 100), source });
+  }
+  return sources.slice(0, 20);
+}
+
 function saveConversation({ conversationId, userId, context, message, response, model, tools }) {
   if (!tableExists('ai_conversations')) return;
   try {
@@ -57,7 +72,7 @@ function saveConversation({ conversationId, userId, context, message, response, 
     `).run(
       String(conversationId || `user-${userId}`).slice(0, 120),
       Number(userId),
-      JSON.stringify({ ...(context || {}), tools: tools || [] }),
+      JSON.stringify({ ...(context || {}), tools: tools || [], sources: buildEvidence(tools) }),
       String(message || '').slice(0, 12000),
       String(response || '').slice(0, 24000),
       String(model || '').slice(0, 120) || null,
@@ -188,8 +203,9 @@ async function runTextAssistant({ message, user, context = {}, conversationId = 
     if (!calls.length) {
       const answer = extractOutputText(response);
       if (!answer) { const err = new Error('A IA não retornou conteúdo útil.'); err.status = 503; err.code = 'AI_EMPTY_RESPONSE'; throw err; }
+      const sources = buildEvidence(executedTools);
       saveConversation({ conversationId: resolvedConversationId, userId, context: navigationContext, message: text, response: answer, model: response.model || model, tools: executedTools });
-      return { text: answer, tools: executedTools, model: response.model || model, conversationId: resolvedConversationId };
+      return { text: answer, tools: executedTools, sources, model: response.model || model, conversationId: resolvedConversationId };
     }
 
     const outputs = [];
@@ -215,4 +231,4 @@ async function runTextAssistant({ message, user, context = {}, conversationId = 
   throw err;
 }
 
-module.exports = { runTextAssistant, listHistory, recentConversationTranscript };
+module.exports = { runTextAssistant, listHistory, recentConversationTranscript, buildEvidence };
