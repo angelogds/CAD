@@ -1,4 +1,5 @@
 const db = require('../../database/db');
+const providerRouter = require('./providers/provider-router');
 
 function tableExists(name) {
   try { return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(String(name || '')); } catch (_e) { return false; }
@@ -113,13 +114,28 @@ function pendingStats() {
   return { pendentes: number(row.pendentes), executando: number(row.executando), expiradas: number(row.expiradas) };
 }
 
+function safeProviderStatus() {
+  try {
+    return providerRouter.status();
+  } catch (err) {
+    return {
+      primary: { selected: String(process.env.AI_PROVIDER_PRIMARY || 'openai').trim() || 'openai', configured: false },
+      fallback: String(process.env.AI_PROVIDER_FALLBACK || '').trim() ? { selected: String(process.env.AI_PROVIDER_FALLBACK).trim(), configured: false } : null,
+      error: { code: String(err?.code || 'AI_PROVIDER_STATUS_ERROR').slice(0, 120) },
+    };
+  }
+}
+
 function healthSnapshot() {
   const configured = Boolean(String(process.env.OPENAI_API_KEY || '').trim());
   const enabled = String(process.env.AI_ENABLED ?? 'true').trim().toLowerCase() !== 'false';
+  const providers = safeProviderStatus();
+  const primaryConfigured = providers?.primary?.configured !== false;
   return {
-    ok: enabled && configured,
+    ok: enabled && primaryConfigured,
     enabled,
-    provider_primary: String(process.env.AI_PROVIDER_PRIMARY || 'openai').trim() || 'openai',
+    provider_primary: providers?.primary?.selected || String(process.env.AI_PROVIDER_PRIMARY || 'openai').trim() || 'openai',
+    providers,
     openai_key_configured: configured,
     models: {
       assistant: String(process.env.OPENAI_MODEL_ASSISTANT || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini').trim(),
@@ -139,4 +155,4 @@ function healthSnapshot() {
   };
 }
 
-module.exports = { compactUsage, addUsage, sanitizeTools, logUsage, healthSnapshot };
+module.exports = { compactUsage, addUsage, sanitizeTools, logUsage, safeProviderStatus, healthSnapshot };
