@@ -26,4 +26,16 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Run tests
-        run: npm test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.log
+
+      - name: Upload failing test output
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: node-test-output-${{ github.run_id }}
+          path: test-output.log
+          if-no-files-found: error
+          retention-days: 3
