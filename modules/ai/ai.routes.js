@@ -13,6 +13,9 @@ const AI_ACCESS = Array.from(new Set([
   ...(ACCESS.os_view || []),
   ...(ACCESS.preventivas_view || []),
   ...(ACCESS.academia_view || []),
+  'PCM',
+  'RH',
+  'ALMOXARIFADO',
 ]));
 
 const AI_TRANSCRICAO_ACCESS = Array.from(new Set([
