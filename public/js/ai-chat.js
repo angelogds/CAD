@@ -1,6 +1,6 @@
 (function () {
-  const storageKey = 'cg_ai_chat_history_v2';
-  const conversationStorageKey = 'cg_ai_chat_conversation_id_v1';
+  const storageKey = 'cg_ai_chat_history_v3';
+  const conversationStorageKey = 'cg_ai_industrial_conversation_id_v1';
   const historyEl = document.getElementById('aiHistory');
   const perguntaEl = document.getElementById('aiPergunta');
   const contextoEl = document.getElementById('aiContexto');
@@ -34,11 +34,11 @@
   if (backLink && sourceRoute !== '/ai/chat' && !sourceRoute.startsWith('/auth/')) backLink.href = sourceRoute;
 
   function readHistory() {
-    try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch (_e) { return []; }
+    try { return JSON.parse(sessionStorage.getItem(storageKey) || '[]'); } catch (_e) { return []; }
   }
 
   function saveHistory(items) {
-    localStorage.setItem(storageKey, JSON.stringify(items.slice(-40)));
+    sessionStorage.setItem(storageKey, JSON.stringify(items.slice(-40)));
   }
 
   function addBubble(role, label, text, tools) {
@@ -145,9 +145,9 @@
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') enviarPergunta();
   });
   limparBtn?.addEventListener('click', () => {
-    localStorage.removeItem(storageKey);
+    sessionStorage.removeItem(storageKey);
     renderHistory();
-    statusEl.textContent = 'Histórico local limpo.';
+    statusEl.textContent = 'Histórico visual desta sessão limpo.';
   });
 
   renderHistory();
