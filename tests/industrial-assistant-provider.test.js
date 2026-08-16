@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const providerRouter = require('../modules/ai/providers/provider-router');
 
 function read(relativePath) {
   return fs.readFileSync(path.join(__dirname, '..', relativePath), 'utf8');
@@ -29,6 +30,7 @@ test('OpenAI provider encapsula Responses e Realtime com chave somente no backen
   assert.match(source, /https:\/\/api\.openai\.com\/v1\/responses/);
   assert.match(source, /https:\/\/api\.openai\.com\/v1\/realtime\/calls/);
   assert.match(source, /Authorization: `Bearer \$\{key\}`/);
+  assert.match(source, /provider_status/);
   assert.doesNotMatch(source, /window\.|document\.|localStorage|sessionStorage/);
 });
 
@@ -43,5 +45,19 @@ test('fallback só existe quando AI_PROVIDER_FALLBACK é configurado', () => {
   const source = read('modules/ai/providers/provider-router.js');
   assert.match(source, /process\.env\.AI_PROVIDER_PRIMARY/);
   assert.match(source, /process\.env\.AI_PROVIDER_FALLBACK/);
-  assert.match(source, /if \(!second \|\| second\.name === first\.name/);
+  assert.match(source, /!shouldFallback\(primaryError\)/);
+});
+
+test('fallback é permitido apenas para falhas transitórias', () => {
+  assert.equal(providerRouter.shouldFallback({ code: 'AI_TIMEOUT', status: 504 }), true);
+  assert.equal(providerRouter.shouldFallback({ provider_status: 429 }), true);
+  assert.equal(providerRouter.shouldFallback({ provider_status: 500 }), true);
+  assert.equal(providerRouter.shouldFallback({ provider_status: 503 }), true);
+  assert.equal(providerRouter.shouldFallback({ name: 'TypeError' }), true);
+
+  assert.equal(providerRouter.shouldFallback({ code: 'OPENAI_KEY_MISSING', status: 503 }), false);
+  assert.equal(providerRouter.shouldFallback({ provider_status: 400 }), false);
+  assert.equal(providerRouter.shouldFallback({ provider_status: 401 }), false);
+  assert.equal(providerRouter.shouldFallback({ provider_status: 403 }), false);
+  assert.equal(providerRouter.shouldFallback({ code: 'AI_REALTIME_SDP_MISSING', provider_status: 400 }), false);
 });
