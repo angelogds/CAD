@@ -47,7 +47,7 @@ test('setup de voz registra apenas duração e status no backend', () => {
   assert.doesNotMatch(realtimeBlock, /usage:\s*req\.body/);
 });
 
-test('health do assistente continua protegido por login e role', () => {
+test('health do assistente é restrito aos perfis do PCM', () => {
   const routes = read('modules/ai/ai.routes.js');
-  assert.match(routes, /router\.get\('\/industrial\/health', requireLogin, requireRole\(AI_ACCESS\), industrialCtrl\.health\)/);
+  assert.match(routes, /router\.get\('\/industrial\/health', requireLogin, requireRole\(ACCESS\.pcm \|\| \[\]\), industrialCtrl\.health\)/);
 });
