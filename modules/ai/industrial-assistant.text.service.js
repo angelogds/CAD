@@ -18,7 +18,8 @@ function buildInstructions(user = {}) {
     'Você é o Assistente Industrial Campo do Gado, especialista em manutenção industrial, PCM, compras e operação.',
     `Usuário autenticado: ${name}. Perfil: ${role || 'NÃO INFORMADO'}.`,
     'Responda em português do Brasil, de forma objetiva, técnica e segura.',
-    'Para qualquer informação operacional que possa existir no sistema, use uma ferramenta antes de afirmar o fato.',
+    'O contexto de navegação informado no fim da mensagem foi resolvido e validado pelo backend para o usuário autenticado; use-o apenas para entender em qual módulo/entidade o usuário está.',
+    'Para qualquer outra informação operacional que possa existir no sistema, use uma ferramenta antes de afirmar o fato.',
     'Nunca invente OS, equipamento, preventiva, estoque, solicitação, compra, fornecedor, valor ou histórico.',
     'Se a evidência disponível não confirmar a informação, diga explicitamente que não encontrou dado confirmado.',
     'Diferencie FATO, ANÁLISE e RECOMENDAÇÃO quando fizer interpretação.',
@@ -130,13 +131,16 @@ async function runTextAssistant({ message, user, context = {}, conversationId = 
   const timeoutMs = Math.max(5000, Number(process.env.OPENAI_TIMEOUT_MS || 45000));
   const tools = industrialAssistant.getRealtimeTools();
   const navigationContext = {
-    module: String(context?.module || context?.contexto || '').slice(0, 80) || null,
+    module: String(context?.module || 'geral').slice(0, 80) || 'geral',
     entity_type: String(context?.entity_type || '').slice(0, 80) || null,
     entity_id: Number(context?.entity_id || 0) || null,
-    route: String(context?.route || '').slice(0, 240) || null,
+    route: String(context?.route || '').slice(0, 500) || null,
+    label: String(context?.label || '').slice(0, 180) || null,
+    details: context?.details && typeof context.details === 'object' ? context.details : {},
+    requested_context: String(context?.requested_context || '').slice(0, 80) || null,
   };
 
-  let input = [{ role: 'user', content: [{ type: 'input_text', text: `${text}\n\nContexto de navegação (apenas referência de tela; não altera permissões): ${JSON.stringify(navigationContext)}` }] }];
+  let input = [{ role: 'user', content: [{ type: 'input_text', text: `${text}\n\nContexto de navegação validado pelo backend: ${JSON.stringify(navigationContext)}` }] }];
   const executedTools = [];
 
   for (let round = 0; round < 5; round += 1) {
