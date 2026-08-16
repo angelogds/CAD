@@ -1,7 +1,8 @@
-function providerError(code, message, technical = null, status = 503) {
+function providerError(code, message, technical = null, status = 503, providerStatus = null) {
   const err = new Error(message);
   err.code = code;
   err.status = status;
+  if (Number.isFinite(Number(providerStatus))) err.provider_status = Number(providerStatus);
   if (technical) err.technical = String(technical).slice(0, 1200);
   return err;
 }
@@ -31,12 +32,13 @@ async function createResponse({ apiKey, body, timeoutMs = 45000 } = {}) {
         data?.error?.code || 'OPENAI_RESPONSES_ERROR',
         data?.error?.message || `OpenAI Responses retornou HTTP ${response.status}.`,
         raw,
-        503,
+        response.status >= 500 || response.status === 429 ? 503 : response.status,
+        response.status,
       );
     }
     return data || {};
   } catch (err) {
-    if (err?.name === 'AbortError') throw providerError('AI_TIMEOUT', 'O Assistente Industrial demorou para responder. Tente novamente.', null, 504);
+    if (err?.name === 'AbortError') throw providerError('AI_TIMEOUT', 'O Assistente Industrial demorou para responder. Tente novamente.', null, 504, 504);
     throw err;
   } finally {
     clearTimeout(timer);
@@ -46,7 +48,7 @@ async function createResponse({ apiKey, body, timeoutMs = 45000 } = {}) {
 async function createRealtimeCall({ apiKey, sdp, session } = {}) {
   const key = requireApiKey(apiKey);
   const offer = String(sdp || '').trim();
-  if (!offer) throw providerError('AI_REALTIME_SDP_MISSING', 'SDP WebRTC ausente.', null, 400);
+  if (!offer) throw providerError('AI_REALTIME_SDP_MISSING', 'SDP WebRTC ausente.', null, 400, 400);
 
   const form = new FormData();
   form.append('sdp', new Blob([offer], { type: 'application/sdp' }), 'offer.sdp');
@@ -59,7 +61,13 @@ async function createRealtimeCall({ apiKey, sdp, session } = {}) {
   });
   const answer = await response.text();
   if (!response.ok) {
-    throw providerError('OPENAI_REALTIME_ERROR', `Falha ao iniciar voz em tempo real: OpenAI ${response.status}.`, answer, 503);
+    throw providerError(
+      'OPENAI_REALTIME_ERROR',
+      `Falha ao iniciar voz em tempo real: OpenAI ${response.status}.`,
+      answer,
+      response.status >= 500 || response.status === 429 ? 503 : response.status,
+      response.status,
+    );
   }
   return { sdp: answer, contentType: response.headers.get('content-type') || 'application/sdp' };
 }
