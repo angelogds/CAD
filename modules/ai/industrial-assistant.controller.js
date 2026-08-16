@@ -1,5 +1,6 @@
 const industrialAssistant = require('./industrial-assistant.service');
 const industrialTextAssistant = require('./industrial-assistant.text.service');
+const industrialRealtimeAssistant = require('./industrial-assistant.realtime.service');
 const industrialContext = require('./industrial-assistant.context.service');
 const observability = require('./industrial-assistant.observability.service');
 
@@ -12,7 +13,7 @@ async function realtimeCall(req, res) {
   const userId = Number(req.session?.user?.id || 0) || null;
   const model = String(process.env.OPENAI_MODEL_VOICE || 'gpt-realtime').trim();
   try {
-    const result = await industrialAssistant.createRealtimeCall({
+    const result = await industrialRealtimeAssistant.createRealtimeCall({
       sdp: req.body?.sdp,
       user: req.session?.user || null,
     });
