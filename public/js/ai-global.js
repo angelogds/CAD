@@ -41,7 +41,7 @@
     if (empty) empty.remove();
   }
 
-  function addMessage(role, text, tools) {
+  function addMessage(role, text, tools, sources) {
     clearEmptyState();
     const bubble = document.createElement('div');
     bubble.className = `ai-global-msg ${role === 'user' ? 'user' : 'ai'}`;
@@ -55,6 +55,16 @@
       if (names.length) {
         toolLine.textContent = `Consultas: ${[...new Set(names)].join(', ')}`;
         messages.appendChild(toolLine);
+      }
+    }
+
+    if (Array.isArray(sources) && sources.length) {
+      const sourceLine = document.createElement('div');
+      sourceLine.className = 'ai-global-tools';
+      const labels = [...new Set(sources.map((item) => item?.source).filter(Boolean))];
+      if (labels.length) {
+        sourceLine.textContent = `Fontes do sistema: ${labels.join(' • ')}`;
+        messages.appendChild(sourceLine);
       }
     }
     messages.scrollTop = messages.scrollHeight;
@@ -146,7 +156,7 @@
         contextDetail.textContent = describeContext(data.context);
         contextLoaded = true;
       }
-      addMessage('ai', data.resposta || 'Sem resposta.', data.tools || []);
+      addMessage('ai', data.resposta || 'Sem resposta.', data.tools || [], data.sources || []);
       setStatus('Resposta recebida.');
     } catch (err) {
       addMessage('ai', `Não foi possível concluir a consulta: ${err?.message || 'erro inesperado.'}`);
