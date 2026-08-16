@@ -24,8 +24,19 @@ test('health expõe somente presença da chave e nunca o valor', () => {
   const healthBlock = source.match(/function healthSnapshot[\s\S]*?module\.exports/)?.[0] || '';
 
   assert.match(healthBlock, /openai_key_configured: configured/);
+  assert.match(healthBlock, /providers,/);
+  assert.match(healthBlock, /safeProviderStatus\(\)/);
   assert.doesNotMatch(healthBlock, /api_key:/);
   assert.doesNotMatch(healthBlock, /OPENAI_API_KEY\s*[,}]/);
+});
+
+test('status de provider falha de forma segura sem expor segredo', () => {
+  const source = read('modules/ai/industrial-assistant.observability.service.js');
+  const statusBlock = source.match(/function safeProviderStatus[\s\S]*?function healthSnapshot/)?.[0] || '';
+
+  assert.match(statusBlock, /providerRouter\.status\(\)/);
+  assert.match(statusBlock, /AI_PROVIDER_STATUS_ERROR/);
+  assert.doesNotMatch(statusBlock, /OPENAI_API_KEY/);
 });
 
 test('texto acumula uso de todas as rodadas e registra sucesso ou erro', () => {
