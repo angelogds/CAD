@@ -41,7 +41,7 @@
     sessionStorage.setItem(storageKey, JSON.stringify(items.slice(-40)));
   }
 
-  function addBubble(role, label, text, tools) {
+  function addBubble(role, label, text, tools, sources) {
     const el = document.createElement('div');
     el.className = `assistant-msg ${role === 'user' ? 'user' : 'ai'}`;
     const strong = document.createElement('strong');
@@ -51,16 +51,25 @@
     el.appendChild(document.createTextNode(String(text || '')));
 
     if (role !== 'user' && Array.isArray(tools) && tools.length) {
-      const source = document.createElement('div');
-      source.className = 'assistant-muted';
-      source.style.marginTop = '8px';
+      const meta = document.createElement('div');
+      meta.className = 'assistant-muted';
+      meta.style.marginTop = '8px';
       const used = tools.filter((tool) => tool?.ok).map((tool) => tool.name);
       const blocked = tools.filter((tool) => !tool?.ok).map((tool) => tool.name);
       const parts = [];
       if (used.length) parts.push(`Consultas: ${[...new Set(used)].join(', ')}`);
       if (blocked.length) parts.push(`Bloqueadas: ${[...new Set(blocked)].join(', ')}`);
-      source.textContent = parts.join(' • ');
-      if (source.textContent) el.appendChild(source);
+      meta.textContent = parts.join(' • ');
+      if (meta.textContent) el.appendChild(meta);
+    }
+
+    if (role !== 'user' && Array.isArray(sources) && sources.length) {
+      const evidence = document.createElement('div');
+      evidence.className = 'assistant-muted';
+      evidence.style.marginTop = '4px';
+      const labels = [...new Set(sources.map((item) => item?.source).filter(Boolean))];
+      evidence.textContent = labels.length ? `Fontes do sistema: ${labels.join(' • ')}` : '';
+      if (evidence.textContent) el.appendChild(evidence);
     }
     historyEl.appendChild(el);
   }
@@ -77,7 +86,7 @@
     }
     items.forEach((item) => {
       addBubble('user', `Você (${item.contextLabel || item.contexto || 'geral'}):`, item.pergunta);
-      addBubble('ai', 'Assistente:', item.resposta || 'Sem resposta.', item.tools || []);
+      addBubble('ai', 'Assistente:', item.resposta || 'Sem resposta.', item.tools || [], item.sources || []);
     });
     historyEl.scrollTop = historyEl.scrollHeight;
   }
@@ -126,6 +135,7 @@
         contextLabel: data.context?.label || contexto,
         resposta: data.resposta || 'Sem resposta.',
         tools: Array.isArray(data.tools) ? data.tools : [],
+        sources: Array.isArray(data.sources) ? data.sources : [],
       });
       saveHistory(items);
       renderHistory();
