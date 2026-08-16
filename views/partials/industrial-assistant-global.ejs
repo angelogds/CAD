@@ -1,0 +1,53 @@
+<style>
+  .ai-global-launcher{position:fixed;right:22px;bottom:22px;z-index:85;border:0;border-radius:999px;background:#147a45;color:#fff;font-weight:800;padding:12px 17px;box-shadow:0 12px 28px rgba(15,23,42,.24);cursor:pointer;display:flex;align-items:center;gap:8px}
+  .ai-global-launcher:hover{background:#10693a}.ai-global-launcher:focus-visible,.ai-global-close:focus-visible,.ai-global-send:focus-visible{outline:3px solid rgba(20,122,69,.28);outline-offset:2px}
+  .ai-global-dot{width:9px;height:9px;border-radius:50%;background:#b9f6ce;box-shadow:0 0 0 4px rgba(185,246,206,.15)}
+  .ai-global-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.26);z-index:89;display:none}
+  .ai-global-backdrop.open{display:block}
+  .ai-global-panel{position:fixed;right:0;top:0;bottom:0;width:min(430px,100vw);background:#fff;z-index:90;box-shadow:-18px 0 44px rgba(15,23,42,.2);transform:translateX(102%);transition:transform .2s ease;display:flex;flex-direction:column}
+  .ai-global-panel.open{transform:translateX(0)}
+  .ai-global-head{padding:16px 17px 13px;border-bottom:1px solid #e5e7eb;background:#f8fbf9;display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+  .ai-global-title{font-size:17px;font-weight:800;color:#163828;margin:0}.ai-global-sub{font-size:12px;color:#667085;margin-top:4px}
+  .ai-global-close{border:1px solid #d0d5dd;background:#fff;border-radius:10px;width:36px;height:36px;cursor:pointer;font-size:18px;color:#344054}
+  .ai-global-context{padding:10px 16px;border-bottom:1px solid #e5e7eb;background:#fff}.ai-global-context-label{display:inline-flex;max-width:100%;align-items:center;padding:6px 9px;border-radius:999px;background:#edf7f1;color:#137a46;font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ai-global-context-detail{font-size:11px;color:#667085;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ai-global-messages{flex:1;overflow:auto;padding:14px;background:#f7f9f8}.ai-global-empty{color:#667085;font-size:13px;padding:10px;line-height:1.45}
+  .ai-global-msg{padding:10px 12px;border-radius:13px;border:1px solid #e5e7eb;background:#fff;margin-bottom:9px;white-space:pre-wrap;line-height:1.45;font-size:13px}.ai-global-msg.user{margin-left:35px;background:#eef9f2;border-color:#cdebd7}.ai-global-msg.ai{margin-right:20px}
+  .ai-global-tools{font-size:10px;color:#667085;margin:-3px 0 10px 2px}
+  .ai-global-compose{border-top:1px solid #e5e7eb;padding:12px;background:#fff}.ai-global-textarea{width:100%;box-sizing:border-box;min-height:78px;max-height:150px;resize:vertical;border:1px solid #d0d5dd;border-radius:12px;padding:11px;font:inherit;font-size:13px}
+  .ai-global-actions{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px}.ai-global-status{font-size:11px;color:#667085;min-height:16px}.ai-global-send{border:0;border-radius:10px;background:#147a45;color:#fff;font-weight:800;padding:9px 14px;cursor:pointer}.ai-global-send:disabled{opacity:.55;cursor:not-allowed}
+  .ai-global-open-full{font-size:12px;color:#147a45;text-decoration:none;font-weight:700}.ai-global-open-full:hover{text-decoration:underline}
+  @media(max-width:620px){.ai-global-launcher{right:14px;bottom:14px;padding:11px 14px}.ai-global-panel{width:100vw}.ai-global-msg.user{margin-left:20px}.ai-global-msg.ai{margin-right:8px}}
+</style>
+
+<button id="aiGlobalLauncher" class="ai-global-launcher" type="button" aria-controls="aiGlobalPanel" aria-expanded="false">
+  <span class="ai-global-dot" aria-hidden="true"></span>
+  <span>Assistente</span>
+</button>
+<div id="aiGlobalBackdrop" class="ai-global-backdrop" aria-hidden="true"></div>
+<aside id="aiGlobalPanel" class="ai-global-panel" aria-hidden="true" aria-label="Assistente Industrial">
+  <div class="ai-global-head">
+    <div>
+      <h2 class="ai-global-title">Assistente Industrial</h2>
+      <div class="ai-global-sub">Contexto automático da página atual</div>
+    </div>
+    <button id="aiGlobalClose" class="ai-global-close" type="button" aria-label="Fechar assistente">×</button>
+  </div>
+  <div class="ai-global-context">
+    <div id="aiGlobalContextLabel" class="ai-global-context-label">Identificando contexto…</div>
+    <div id="aiGlobalContextDetail" class="ai-global-context-detail"></div>
+  </div>
+  <div id="aiGlobalMessages" class="ai-global-messages">
+    <div class="ai-global-empty">Pergunte sobre a página em que você está. Em uma OS ou equipamento, o assistente usa esse contexto automaticamente, respeitando suas permissões.</div>
+  </div>
+  <div class="ai-global-compose">
+    <textarea id="aiGlobalInput" class="ai-global-textarea" maxlength="12000" placeholder="Ex.: o que preciso priorizar neste equipamento?"></textarea>
+    <div class="ai-global-actions">
+      <div>
+        <div id="aiGlobalStatus" class="ai-global-status"></div>
+        <a id="aiGlobalOpenFull" class="ai-global-open-full" href="/ai/chat">Abrir assistente completo</a>
+      </div>
+      <button id="aiGlobalSend" class="ai-global-send" type="button">Enviar</button>
+    </div>
+  </div>
+</aside>
