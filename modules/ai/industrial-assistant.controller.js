@@ -1,5 +1,6 @@
 const industrialAssistant = require('./industrial-assistant.service');
 const industrialTextAssistant = require('./industrial-assistant.text.service');
+const industrialContext = require('./industrial-assistant.context.service');
 
 function friendlyStatus(err) {
   return Number(err?.status || 500) || 500;
@@ -19,21 +20,42 @@ async function realtimeCall(req, res) {
   }
 }
 
+function pageContext(req, res) {
+  try {
+    const result = industrialContext.resolvePageContext({
+      route: req.query?.route,
+      user: req.session?.user || null,
+    });
+    return res.json({ ok: true, context: result });
+  } catch (err) {
+    console.warn('[ai.pageContext]', { message: err?.message });
+    return res.status(friendlyStatus(err)).json({ ok: false, error: 'Falha ao resolver contexto da página.' });
+  }
+}
+
 async function textMessage(req, res) {
   try {
+    const resolvedContext = industrialContext.resolvePageContext({
+      route: req.body?.route,
+      user: req.session?.user || null,
+    });
     const result = await industrialTextAssistant.runTextAssistant({
       message: req.body?.pergunta || req.body?.message,
       conversationId: req.body?.conversation_id,
       context: {
-        contexto: req.body?.contexto,
-        module: req.body?.module,
-        entity_type: req.body?.entity_type,
-        entity_id: req.body?.entity_id,
-        route: req.body?.route,
+        ...resolvedContext,
+        requested_context: String(req.body?.contexto || '').slice(0, 80) || null,
       },
       user: req.session?.user || null,
     });
-    return res.json({ ok: true, resposta: result.text, tools: result.tools || [], model: result.model || null, conversation_id: result.conversationId || null });
+    return res.json({
+      ok: true,
+      resposta: result.text,
+      tools: result.tools || [],
+      model: result.model || null,
+      conversation_id: result.conversationId || null,
+      context: resolvedContext,
+    });
   } catch (err) {
     console.warn('[ai.textMessage]', { code: err?.code, message: err?.message, technical: err?.technical });
     return res.status(friendlyStatus(err)).json({ ok: false, error: err?.message || 'Falha ao consultar o Assistente Industrial.', code: err?.code || 'AI_TEXT_ERROR' });
@@ -79,7 +101,7 @@ async function executeTool(req, res) {
 }
 
 function capabilities(_req, res) {
-  return res.json({ ok: true, voice: true, text_tools: true, briefing: true, server_history: true, tools: industrialAssistant.getRealtimeTools().map((tool) => tool.name) });
+  return res.json({ ok: true, voice: true, text_tools: true, briefing: true, server_history: true, page_context: true, tools: industrialAssistant.getRealtimeTools().map((tool) => tool.name) });
 }
 
-module.exports = { realtimeCall, textMessage, briefing, history, executeTool, capabilities };
+module.exports = { realtimeCall, pageContext, textMessage, briefing, history, executeTool, capabilities };
