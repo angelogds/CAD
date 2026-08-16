@@ -63,8 +63,9 @@ router.post('/analyze-image', requireLogin, requireRole(ACCESS.os_view), ctrl.an
 router.get('/dashboard', requireLogin, requireRole(AI_ACCESS), ctrl.dashboard);
 router.post('/webhook/os-created', requireLogin, requireRole(ACCESS.os_view), ctrl.webhookOSCreated);
 
-// Assistente Industrial V1: voz WebRTC + tools executadas somente no backend autenticado.
+// Assistente Industrial: texto e voz compartilham o mesmo registro de ferramentas e RBAC do backend.
 router.get('/industrial/capabilities', requireLogin, requireRole(AI_ACCESS), industrialCtrl.capabilities);
+router.post('/industrial/message', requireLogin, requireRole(AI_ACCESS), industrialCtrl.textMessage);
 router.post('/realtime/call', requireLogin, requireRole(AI_ACCESS), industrialCtrl.realtimeCall);
 router.post('/tools/execute', requireLogin, requireRole(AI_ACCESS), industrialCtrl.executeTool);
 
