@@ -3,6 +3,7 @@ const multer = require('multer');
 const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const { ACCESS } = require('../../config/rbac');
 const ctrl = require('./ai.controller');
+const industrialCtrl = require('./industrial-assistant.controller');
 const iaCtrl = require('../ia/ia.controller');
 
 const router = express.Router();
@@ -26,7 +27,6 @@ const upload = multer({
     files: 1,
   },
 });
-
 
 const uploadImage = multer({
   storage: multer.memoryStorage(),
@@ -59,5 +59,10 @@ router.get('/equipamentos/:id/health', requireLogin, requireRole(ACCESS.os_view)
 router.post('/analyze-image', requireLogin, requireRole(ACCESS.os_view), ctrl.analyzeImage);
 router.get('/dashboard', requireLogin, requireRole(AI_ACCESS), ctrl.dashboard);
 router.post('/webhook/os-created', requireLogin, requireRole(ACCESS.os_view), ctrl.webhookOSCreated);
+
+// Assistente Industrial V1: voz WebRTC + tools executadas somente no backend autenticado.
+router.get('/industrial/capabilities', requireLogin, requireRole(AI_ACCESS), industrialCtrl.capabilities);
+router.post('/realtime/call', requireLogin, requireRole(AI_ACCESS), industrialCtrl.realtimeCall);
+router.post('/tools/execute', requireLogin, requireRole(AI_ACCESS), industrialCtrl.executeTool);
 
 module.exports = router;
