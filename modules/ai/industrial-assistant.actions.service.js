@@ -62,6 +62,13 @@ function requireDate(value, label) {
     err.status = 400;
     throw err;
   }
+  const [year, month, day] = date.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+    const err = new Error(`${label} é inválida.`);
+    err.status = 400;
+    throw err;
+  }
   return date;
 }
 
@@ -108,12 +115,25 @@ function restorePending(actionId, userId) {
 }
 
 function finishPending(pending, userId, result) {
-  db.prepare(`
+  const info = db.prepare(`
     UPDATE ai_pending_actions
     SET status='EXECUTED', executed_at=datetime('now'), result_json=?
     WHERE id=? AND user_id=? AND status='EXECUTING'
   `).run(JSON.stringify(result || {}), Number(pending.id), Number(userId));
+  if (info.changes !== 1) {
+    const err = new Error('Não foi possível concluir a ação pendente de forma atômica.');
+    err.code = 'AI_PENDING_FINISH_CONFLICT';
+    err.status = 409;
+    throw err;
+  }
   return { action_id: Number(pending.id), status: 'EXECUTED', result };
+}
+
+function runAtomicConfirmedAction(pending, userId, action) {
+  return db.transaction(() => {
+    const result = action();
+    return finishPending(pending, userId, result);
+  })();
 }
 
 function validateConfirmation(value) {
@@ -133,7 +153,7 @@ function normalizeItems(items) {
     unidade: normalizeText(item?.unidade || 'UN', 12).toUpperCase() || 'UN',
     qtd_solicitada: Number(item?.qtd_solicitada || item?.quantidade || 0),
     estoque_item_id: Number(item?.estoque_item_id || 0) || null,
-  })).filter((item) => item.item_nome && Number.isFinite(item.qtd_solicitada) && item.qtd_solicitada > 0);
+  })).filter((item) => item.item_nome && Number.isFinite(item.qtd_solicitada) && item.qtd_solicitada > 0 && item.qtd_solicitada <= 1000000000);
   if (!normalized.length) {
     const err = new Error('Informe ao menos um item com nome e quantidade maior que zero.');
     err.status = 400;
@@ -266,6 +286,27 @@ function listPendingActions(userId) {
   });
 }
 
+function compactSolicitacaoResult(solicitacao) {
+  if (!solicitacao) return null;
+  return {
+    id: solicitacao.id,
+    numero: solicitacao.numero || null,
+    status: solicitacao.status || null,
+    titulo: solicitacao.titulo || null,
+    prioridade: solicitacao.prioridade || null,
+    os_id: solicitacao.os_id || null,
+    equipamento_nome: solicitacao.equipamento_nome || null,
+    itens: (solicitacao.itens || []).map((item) => ({
+      id: item.id,
+      item_nome: item.item_nome || null,
+      item_descricao: item.item_descricao || null,
+      unidade: item.unidade || null,
+      qtd_solicitada: Number(item.qtd_solicitada || 0),
+      estoque_codigo: item.estoque_codigo || null,
+    })),
+  };
+}
+
 function getTools() {
   const itemSchema = {
     type: 'object', additionalProperties: false, required: ['item_nome', 'qtd_solicitada'], properties: {
@@ -306,9 +347,11 @@ async function executeTool({ name, args = {}, user }) {
       if (!pending) { const err = new Error('Solicitação pendente não encontrada, expirada, em execução ou já criada.'); err.status = 409; throw err; }
       try {
         const payload = JSON.parse(pending.payload_json || '{}');
-        const solicitacaoId = solicitacoesService.createSolicitacao({ ...payload, userId });
-        const solicitacao = solicitacoesService.getSolicitacaoById(solicitacaoId);
-        return finishPending(pending, userId, { solicitacao_id: solicitacaoId, solicitacao: solicitacao ? { id: solicitacao.id, numero: solicitacao.numero, status: solicitacao.status, titulo: solicitacao.titulo, os_id: solicitacao.os_id, equipamento_nome: solicitacao.equipamento_nome, itens: solicitacao.itens } : null });
+        return runAtomicConfirmedAction(pending, userId, () => {
+          const solicitacaoId = solicitacoesService.createSolicitacao({ ...payload, userId });
+          const solicitacao = solicitacoesService.getSolicitacaoById(solicitacaoId);
+          return { solicitacao_id: solicitacaoId, solicitacao: compactSolicitacaoResult(solicitacao) };
+        });
       } catch (err) { restorePending(pending.id, userId); throw err; }
     }
     case 'preparar_programacao_pcm': {
@@ -324,8 +367,7 @@ async function executeTool({ name, args = {}, user }) {
       if (!pending) { const err = new Error('Programação pendente não encontrada, expirada, em execução ou já confirmada.'); err.status = 409; throw err; }
       try {
         const payload = JSON.parse(pending.payload_json || '{}');
-        const result = pcmOperationalService.scheduleBacklogItem(payload.os_id, payload, userId);
-        return finishPending(pending, userId, result);
+        return runAtomicConfirmedAction(pending, userId, () => pcmOperationalService.scheduleBacklogItem(payload.os_id, payload, userId));
       } catch (err) { restorePending(pending.id, userId); throw err; }
     }
     case 'preparar_preventiva': {
@@ -341,8 +383,7 @@ async function executeTool({ name, args = {}, user }) {
       if (!pending) { const err = new Error('Preventiva pendente não encontrada, expirada, em execução ou já criada.'); err.status = 409; throw err; }
       try {
         const payload = JSON.parse(pending.payload_json || '{}');
-        const result = preventivasService.criarPreventivaManual({ ...payload, user });
-        return finishPending(pending, userId, result);
+        return runAtomicConfirmedAction(pending, userId, () => preventivasService.criarPreventivaManual({ ...payload, user }));
       } catch (err) { restorePending(pending.id, userId); throw err; }
     }
     case 'cancelar_acao_operacional': {
