@@ -1,6 +1,7 @@
 const db = require('../../database/db');
 const { getAIConfig } = require('./ai.service');
 const industrialAssistant = require('./industrial-assistant.service');
+const observability = require('./industrial-assistant.observability.service');
 const { normalizeRole } = require('../../config/rbac');
 
 function safeJsonParse(value, fallback = {}) {
@@ -183,52 +184,87 @@ async function runTextAssistant({ message, user, context = {}, conversationId = 
 
   let input = [{ role: 'user', content: [{ type: 'input_text', text: userInput }] }];
   const executedTools = [];
+  let usage = observability.compactUsage({});
+  let rounds = 0;
+  const startedAt = Date.now();
 
-  for (let round = 0; round < 5; round += 1) {
-    const response = await openAIResponse({
-      apiKey,
-      timeoutMs,
-      body: {
-        model,
-        instructions: buildInstructions(user),
-        input,
-        tools,
-        tool_choice: 'auto',
-        store: false,
-        max_output_tokens: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS_ASSISTANT || 1200),
-      },
-    });
+  try {
+    for (let round = 0; round < 5; round += 1) {
+      rounds = round + 1;
+      const response = await openAIResponse({
+        apiKey,
+        timeoutMs,
+        body: {
+          model,
+          instructions: buildInstructions(user),
+          input,
+          tools,
+          tool_choice: 'auto',
+          store: false,
+          max_output_tokens: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS_ASSISTANT || 1200),
+        },
+      });
+      usage = observability.addUsage(usage, response?.usage || {});
 
-    const calls = functionCalls(response);
-    if (!calls.length) {
-      const answer = extractOutputText(response);
-      if (!answer) { const err = new Error('A IA não retornou conteúdo útil.'); err.status = 503; err.code = 'AI_EMPTY_RESPONSE'; throw err; }
-      const sources = buildEvidence(executedTools);
-      saveConversation({ conversationId: resolvedConversationId, userId, context: navigationContext, message: text, response: answer, model: response.model || model, tools: executedTools });
-      return { text: answer, tools: executedTools, sources, model: response.model || model, conversationId: resolvedConversationId };
-    }
-
-    const outputs = [];
-    for (const call of calls) {
-      const args = safeJsonParse(call.arguments, {});
-      let payload;
-      try {
-        const result = await industrialAssistant.executeTool({ name: call.name, args, user });
-        payload = { ok: true, result };
-        executedTools.push({ name: call.name, ok: true, source: result?.fonte || null });
-      } catch (err) {
-        payload = { ok: false, error: err?.message || 'Falha ao executar ferramenta.', code: err?.code || 'AI_TOOL_ERROR' };
-        executedTools.push({ name: call.name, ok: false, code: payload.code });
+      const calls = functionCalls(response);
+      if (!calls.length) {
+        const answer = extractOutputText(response);
+        if (!answer) { const err = new Error('A IA não retornou conteúdo útil.'); err.status = 503; err.code = 'AI_EMPTY_RESPONSE'; throw err; }
+        const sources = buildEvidence(executedTools);
+        const resolvedModel = response.model || model;
+        saveConversation({ conversationId: resolvedConversationId, userId, context: navigationContext, message: text, response: answer, model: resolvedModel, tools: executedTools });
+        observability.logUsage({
+          tipo: 'INDUSTRIAL_TEXT',
+          userId,
+          conversationId: resolvedConversationId,
+          model: resolvedModel,
+          durationMs: Date.now() - startedAt,
+          usage,
+          tools: executedTools,
+          status: 'ok',
+          context: navigationContext,
+          rounds,
+        });
+        return { text: answer, tools: executedTools, sources, usage, model: resolvedModel, conversationId: resolvedConversationId };
       }
-      outputs.push({ type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(payload) });
-    }
-    input = [...input, ...(response.output || []), ...outputs];
-  }
 
-  const err = new Error('O Assistente excedeu o limite de etapas para responder com segurança.');
-  err.status = 503;
-  err.code = 'AI_TOOL_LOOP_LIMIT';
-  throw err;
+      const outputs = [];
+      for (const call of calls) {
+        const args = safeJsonParse(call.arguments, {});
+        let payload;
+        try {
+          const result = await industrialAssistant.executeTool({ name: call.name, args, user });
+          payload = { ok: true, result };
+          executedTools.push({ name: call.name, ok: true, source: result?.fonte || null });
+        } catch (err) {
+          payload = { ok: false, error: err?.message || 'Falha ao executar ferramenta.', code: err?.code || 'AI_TOOL_ERROR' };
+          executedTools.push({ name: call.name, ok: false, code: payload.code });
+        }
+        outputs.push({ type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(payload) });
+      }
+      input = [...input, ...(response.output || []), ...outputs];
+    }
+
+    const err = new Error('O Assistente excedeu o limite de etapas para responder com segurança.');
+    err.status = 503;
+    err.code = 'AI_TOOL_LOOP_LIMIT';
+    throw err;
+  } catch (err) {
+    observability.logUsage({
+      tipo: 'INDUSTRIAL_TEXT',
+      userId,
+      conversationId: resolvedConversationId,
+      model,
+      durationMs: Date.now() - startedAt,
+      usage,
+      tools: executedTools,
+      status: 'error',
+      errorCode: err?.code || 'AI_TEXT_ERROR',
+      context: navigationContext,
+      rounds,
+    });
+    throw err;
+  }
 }
 
 module.exports = { runTextAssistant, listHistory, recentConversationTranscript, buildEvidence };
