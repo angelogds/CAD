@@ -97,6 +97,15 @@
       </main>
     </div>
 
+    <% if (user) { %>
+      <% const aiRole = normalizeRole(user.role || ''); %>
+      <% const aiGlobalAllowed = canAccessModule(aiRole, 'assistente_manutencao') || canAccessModule(aiRole, 'os_view') || canAccessModule(aiRole, 'preventivas_view') || canAccessModule(aiRole, 'academia_view') || ['PCM','RH','ALMOXARIFADO'].includes(aiRole); %>
+      <% if (aiGlobalAllowed) { %>
+        <%- include("partials/industrial-assistant-global") %>
+        <script src="/js/ai-global.js" defer></script>
+      <% } %>
+    <% } %>
+
     <script src="/js/app-layout.js" defer></script>
     <script src="/js/push.js" defer></script>
     <script src="/js/mobile-bridge.js" defer></script>
