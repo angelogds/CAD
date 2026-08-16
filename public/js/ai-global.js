@@ -20,7 +20,7 @@
   }
 
   const sourceRoute = `${window.location.pathname}${window.location.search}`;
-  const storageKey = 'cg_ai_global_conversation_id_v1';
+  const storageKey = 'cg_ai_industrial_conversation_id_v1';
   let conversationId = sessionStorage.getItem(storageKey) || '';
   let contextLoaded = false;
   let busy = false;
@@ -73,7 +73,6 @@
 
   async function loadContext() {
     if (contextLoaded) return;
-    contextLoaded = true;
     try {
       const response = await fetch(`/ai/industrial/context?route=${encodeURIComponent(sourceRoute)}`, {
         headers: { Accept: 'application/json' },
@@ -83,7 +82,9 @@
       const context = data.context || {};
       contextLabel.textContent = context.label || 'Contexto geral';
       contextDetail.textContent = describeContext(context);
+      contextLoaded = true;
     } catch (err) {
+      contextLoaded = false;
       contextLabel.textContent = 'Contexto geral';
       contextDetail.textContent = '';
       setStatus(err?.message || 'Contexto automático indisponível.');
@@ -143,6 +144,7 @@
       if (data.context?.label) {
         contextLabel.textContent = data.context.label;
         contextDetail.textContent = describeContext(data.context);
+        contextLoaded = true;
       }
       addMessage('ai', data.resposta || 'Sem resposta.', data.tools || []);
       setStatus('Resposta recebida.');
