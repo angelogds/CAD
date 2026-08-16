@@ -13,6 +13,17 @@ test('texto do Assistente usa provider router em vez de endpoint OpenAI direto',
   assert.doesNotMatch(source, /api\.openai\.com\/v1\/responses/);
 });
 
+test('rota ativa de voz passa pelo serviço Realtime e pelo provider router', () => {
+  const controller = read('modules/ai/industrial-assistant.controller.js');
+  const realtime = read('modules/ai/industrial-assistant.realtime.service.js');
+
+  assert.match(controller, /industrialRealtimeAssistant = require\('\.\/industrial-assistant\.realtime\.service'\)/);
+  assert.match(controller, /industrialRealtimeAssistant\.createRealtimeCall\(/);
+  assert.doesNotMatch(controller, /industrialAssistant\.createRealtimeCall\(/);
+  assert.match(realtime, /providerRouter\.runWithFallback\('createRealtimeCall'/);
+  assert.doesNotMatch(realtime, /api\.openai\.com\/v1\/realtime\/calls/);
+});
+
 test('OpenAI provider encapsula Responses e Realtime com chave somente no backend', () => {
   const source = read('modules/ai/providers/openai.provider.js');
   assert.match(source, /https:\/\/api\.openai\.com\/v1\/responses/);
