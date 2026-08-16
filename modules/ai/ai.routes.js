@@ -4,6 +4,7 @@ const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const { ACCESS } = require('../../config/rbac');
 const ctrl = require('./ai.controller');
 const industrialCtrl = require('./industrial-assistant.controller');
+const { requireTrustedAIWrite } = require('./ai.security.middleware');
 const iaCtrl = require('../ia/ia.controller');
 
 const router = express.Router();
@@ -55,10 +56,10 @@ router.post('/webhook/os-created', requireLogin, requireRole(ACCESS.os_view), ct
 // Assistente Industrial: texto e voz compartilham o mesmo registro de ferramentas e RBAC do backend.
 router.get('/industrial/capabilities', requireLogin, requireRole(AI_ACCESS), industrialCtrl.capabilities);
 router.get('/industrial/context', requireLogin, requireRole(AI_ACCESS), industrialCtrl.pageContext);
-router.post('/industrial/message', requireLogin, requireRole(AI_ACCESS), industrialCtrl.textMessage);
+router.post('/industrial/message', requireLogin, requireRole(AI_ACCESS), requireTrustedAIWrite, industrialCtrl.textMessage);
 router.get('/industrial/history', requireLogin, requireRole(AI_ACCESS), industrialCtrl.history);
 router.get('/industrial/briefing', requireLogin, requireRole(ACCESS.pcm || []), industrialCtrl.briefing);
-router.post('/realtime/call', requireLogin, requireRole(AI_ACCESS), industrialCtrl.realtimeCall);
-router.post('/tools/execute', requireLogin, requireRole(AI_ACCESS), industrialCtrl.executeTool);
+router.post('/realtime/call', requireLogin, requireRole(AI_ACCESS), requireTrustedAIWrite, industrialCtrl.realtimeCall);
+router.post('/tools/execute', requireLogin, requireRole(AI_ACCESS), requireTrustedAIWrite, industrialCtrl.executeTool);
 
 module.exports = router;
