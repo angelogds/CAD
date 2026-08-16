@@ -54,6 +54,7 @@ router.post('/webhook/os-created', requireLogin, requireRole(ACCESS.os_view), ct
 
 // Assistente Industrial: texto e voz compartilham o mesmo registro de ferramentas e RBAC do backend.
 router.get('/industrial/capabilities', requireLogin, requireRole(AI_ACCESS), industrialCtrl.capabilities);
+router.get('/industrial/context', requireLogin, requireRole(AI_ACCESS), industrialCtrl.pageContext);
 router.post('/industrial/message', requireLogin, requireRole(AI_ACCESS), industrialCtrl.textMessage);
 router.get('/industrial/history', requireLogin, requireRole(AI_ACCESS), industrialCtrl.history);
 router.get('/industrial/briefing', requireLogin, requireRole(ACCESS.pcm || []), industrialCtrl.briefing);
