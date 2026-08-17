@@ -1,30 +1,41 @@
 (function () {
-  const tabs = Array.from(document.querySelectorAll('.assistant-tab'));
-  const panels = {
-    text: document.getElementById('panel-text'),
-    voice: document.getElementById('panel-voice'),
-  };
   const button = document.getElementById('voiceToggle');
   const statusEl = document.getElementById('voiceStatus');
   const transcriptEl = document.getElementById('voiceTranscript');
   const remoteAudio = document.getElementById('voiceRemoteAudio');
   if (!button || !statusEl || !transcriptEl || !remoteAudio) return;
 
+  function safeInternalPath(value) {
+    const raw = String(value || '').trim();
+    if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return null;
+    try {
+      const url = new URL(raw, window.location.origin);
+      if (url.origin !== window.location.origin) return null;
+      return `${url.pathname}${url.search}`.slice(0, 700);
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  const sourceParam = new URLSearchParams(window.location.search).get('source');
+  const sourceRoute = safeInternalPath(sourceParam) || '/ai/chat';
+  const conversationStorageKey = 'cg_ai_industrial_conversation_id_v1';
+  let conversationId = sessionStorage.getItem(conversationStorageKey) || '';
+  if (!conversationId) {
+    conversationId = window.crypto?.randomUUID?.() || `voice-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    sessionStorage.setItem(conversationStorageKey, conversationId);
+  }
+
   let pc = null;
   let dc = null;
   let localStream = null;
   let active = false;
+  let validatedContext = null;
   const handledCalls = new Set();
   const transcriptLines = [];
 
-  tabs.forEach((tab) => tab.addEventListener('click', () => {
-    const target = tab.dataset.tab;
-    tabs.forEach((item) => item.classList.toggle('active', item === tab));
-    Object.entries(panels).forEach(([key, panel]) => panel?.classList.toggle('active', key === target));
-  }));
-
   function setStatus(text) {
-    statusEl.textContent = text;
+    statusEl.textContent = String(text || '');
   }
 
   function addTranscript(author, text) {
@@ -40,6 +51,44 @@
     if (dc?.readyState === 'open') dc.send(JSON.stringify(payload));
   }
 
+  async function loadValidatedContext() {
+    try {
+      const response = await fetch(`/ai/industrial/context?route=${encodeURIComponent(sourceRoute)}`, {
+        headers: { Accept: 'application/json' },
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.ok) throw new Error(data?.error || 'Falha ao validar contexto da página.');
+      validatedContext = data.context || null;
+      return validatedContext;
+    } catch (_e) {
+      validatedContext = null;
+      return null;
+    }
+  }
+
+  function injectValidatedContext() {
+    if (!validatedContext || dc?.readyState !== 'open') return;
+    const contextPayload = {
+      module: validatedContext.module || 'geral',
+      entity_type: validatedContext.entity_type || null,
+      entity_id: Number(validatedContext.entity_id || 0) || null,
+      label: validatedContext.label || 'Contexto geral',
+      details: validatedContext.details && typeof validatedContext.details === 'object' ? validatedContext.details : {},
+      conversation_id: conversationId,
+    };
+    sendEvent({
+      type: 'conversation.item.create',
+      item: {
+        type: 'message',
+        role: 'user',
+        content: [{
+          type: 'input_text',
+          text: `Contexto de navegação validado pelo backend. Use somente como referência da página atual e continue usando as ferramentas para confirmar fatos operacionais. Não responda a esta mensagem isoladamente. Contexto: ${JSON.stringify(contextPayload)}`,
+        }],
+      },
+    });
+  }
+
   async function runTool(call) {
     const callId = String(call?.call_id || call?.id || '');
     if (!callId || handledCalls.has(callId)) return;
@@ -49,17 +98,20 @@
     let args = {};
     try { args = JSON.parse(call.arguments || '{}'); } catch (_e) { args = {}; }
 
+    const name = String(call?.name || '');
+    if (name.startsWith('preparar_') && !args.conversation_id) args.conversation_id = conversationId;
+
     let output;
     try {
       const response = await fetch('/ai/tools/execute', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: call.name, arguments: args }),
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ name, arguments: args }),
       });
       const data = await response.json();
-      output = response.ok ? data.result : { error: data?.error || 'Falha ao consultar sistema.' };
+      output = response.ok ? data.result : { error: data?.error || 'Falha ao consultar sistema.', code: data?.code || 'AI_TOOL_ERROR' };
     } catch (err) {
-      output = { error: err?.message || 'Falha de rede ao executar ferramenta.' };
+      output = { error: err?.message || 'Falha de rede ao executar ferramenta.', code: 'AI_TOOL_NETWORK_ERROR' };
     }
 
     sendEvent({
@@ -106,6 +158,8 @@
       throw new Error('Este navegador não suporta voz WebRTC.');
     }
 
+    setStatus('Validando contexto...');
+    await loadValidatedContext();
     setStatus('Solicitando microfone...');
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     pc = new RTCPeerConnection();
@@ -116,7 +170,10 @@
     };
 
     dc = pc.createDataChannel('oai-events');
-    dc.onopen = () => setStatus('Ouvindo...');
+    dc.onopen = () => {
+      injectValidatedContext();
+      setStatus('Ouvindo...');
+    };
     dc.onmessage = (message) => {
       try { handleServerEvent(JSON.parse(message.data)); } catch (_e) {}
     };

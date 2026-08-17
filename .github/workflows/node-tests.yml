@@ -1,0 +1,74 @@
+name: Node test suite
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  assistant-regression:
+    name: Assistente Industrial - regressão
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run Assistente Industrial tests
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test --test-concurrency=1 tests/industrial-assistant-*.test.js 2>&1 | tee assistant-test-output.log
+
+      - name: Upload failing Assistente output
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: assistant-test-output-${{ github.run_id }}
+          path: assistant-test-output.log
+          if-no-files-found: error
+          retention-days: 3
+
+  full-suite-diagnostic:
+    name: Suíte completa - diagnóstico legado
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run full test suite
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee full-test-output.log
+
+      - name: Upload failing full-suite output
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: full-test-output-${{ github.run_id }}
+          path: full-test-output.log
+          if-no-files-found: error
+          retention-days: 3

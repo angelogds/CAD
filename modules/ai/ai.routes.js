@@ -4,6 +4,7 @@ const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const { ACCESS } = require('../../config/rbac');
 const ctrl = require('./ai.controller');
 const industrialCtrl = require('./industrial-assistant.controller');
+const { requireTrustedAIWrite } = require('./ai.security.middleware');
 const iaCtrl = require('../ia/ia.controller');
 
 const router = express.Router();
@@ -23,18 +24,8 @@ const AI_TRANSCRICAO_ACCESS = Array.from(new Set([
   ...(ACCESS.preventivas_view || []),
 ]));
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: Number(process.env.OPENAI_AUDIO_MAX_BYTES || 12 * 1024 * 1024),
-    files: 1,
-  },
-});
-
-const uploadImage = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: Number(process.env.OPENAI_IMAGE_MAX_BYTES || 8 * 1024 * 1024), files: 1 },
-});
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: Number(process.env.OPENAI_AUDIO_MAX_BYTES || 12 * 1024 * 1024), files: 1 } });
+const uploadImage = multer({ storage: multer.memoryStorage(), limits: { fileSize: Number(process.env.OPENAI_IMAGE_MAX_BYTES || 8 * 1024 * 1024), files: 1 } });
 
 router.get('/chat', requireLogin, requireRole(AI_ACCESS), ctrl.renderChat);
 router.post('/ask', requireLogin, requireRole(AI_ACCESS), ctrl.askGeneral);
@@ -43,7 +34,6 @@ router.post('/preventivas/:id/analyze', requireLogin, requireRole(ACCESS.prevent
 router.post('/os/transcrever-abertura', requireLogin, requireRole(AI_TRANSCRICAO_ACCESS), upload.single('audio'), iaCtrl.transcreverAbertura);
 router.post('/os/transcrever-fechamento', requireLogin, requireRole(AI_TRANSCRICAO_ACCESS), upload.single('audio'), iaCtrl.transcreverFechamento);
 router.post('/os/analisar', requireLogin, requireRole(AI_TRANSCRICAO_ACCESS), iaCtrl.analisarAberturaOS);
-
 router.post('/os/diagnosticar', requireLogin, requireRole(ACCESS.os_view), ctrl.diagnosticarOS);
 router.post('/os/melhorar-descricao', requireLogin, requireRole(ACCESS.os_view), ctrl.melhorarDescricaoOS);
 router.post('/os/analisar-imagem', requireLogin, requireRole(ACCESS.os_view), uploadImage.single('imagem'), ctrl.analisarImagemOS);
@@ -63,9 +53,14 @@ router.post('/analyze-image', requireLogin, requireRole(ACCESS.os_view), ctrl.an
 router.get('/dashboard', requireLogin, requireRole(AI_ACCESS), ctrl.dashboard);
 router.post('/webhook/os-created', requireLogin, requireRole(ACCESS.os_view), ctrl.webhookOSCreated);
 
-// Assistente Industrial V1: voz WebRTC + tools executadas somente no backend autenticado.
+// Assistente Industrial: texto e voz compartilham o mesmo registro de ferramentas e RBAC do backend.
 router.get('/industrial/capabilities', requireLogin, requireRole(AI_ACCESS), industrialCtrl.capabilities);
-router.post('/realtime/call', requireLogin, requireRole(AI_ACCESS), industrialCtrl.realtimeCall);
-router.post('/tools/execute', requireLogin, requireRole(AI_ACCESS), industrialCtrl.executeTool);
+router.get('/industrial/context', requireLogin, requireRole(AI_ACCESS), industrialCtrl.pageContext);
+router.get('/industrial/health', requireLogin, requireRole(ACCESS.pcm || []), industrialCtrl.health);
+router.post('/industrial/message', requireLogin, requireRole(AI_ACCESS), requireTrustedAIWrite, industrialCtrl.textMessage);
+router.get('/industrial/history', requireLogin, requireRole(AI_ACCESS), industrialCtrl.history);
+router.get('/industrial/briefing', requireLogin, requireRole(ACCESS.pcm || []), industrialCtrl.briefing);
+router.post('/realtime/call', requireLogin, requireRole(AI_ACCESS), requireTrustedAIWrite, industrialCtrl.realtimeCall);
+router.post('/tools/execute', requireLogin, requireRole(AI_ACCESS), requireTrustedAIWrite, industrialCtrl.executeTool);
 
 module.exports = router;
