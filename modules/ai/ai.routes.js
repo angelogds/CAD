@@ -26,6 +26,9 @@ const AI_TRANSCRICAO_ACCESS = Array.from(new Set([
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: Number(process.env.OPENAI_AUDIO_MAX_BYTES || 12 * 1024 * 1024), files: 1 } });
 const uploadImage = multer({ storage: multer.memoryStorage(), limits: { fileSize: Number(process.env.OPENAI_IMAGE_MAX_BYTES || 8 * 1024 * 1024), files: 1 } });
+// A interface unificada Realtime da OpenAI recomenda que o navegador envie
+// a offer SDP como corpo bruto application/sdp para o servidor da aplicação.
+const realtimeSdpBody = express.text({ type: ['application/sdp', 'text/plain'], limit: '128kb' });
 
 router.get('/chat', requireLogin, requireRole(AI_ACCESS), ctrl.renderChat);
 router.post('/ask', requireLogin, requireRole(AI_ACCESS), ctrl.askGeneral);
@@ -60,7 +63,7 @@ router.get('/industrial/health', requireLogin, requireRole(ACCESS.pcm || []), in
 router.post('/industrial/message', requireLogin, requireRole(AI_ACCESS), requireTrustedAIWrite, industrialCtrl.textMessage);
 router.get('/industrial/history', requireLogin, requireRole(AI_ACCESS), industrialCtrl.history);
 router.get('/industrial/briefing', requireLogin, requireRole(ACCESS.pcm || []), industrialCtrl.briefing);
-router.post('/realtime/call', requireLogin, requireRole(AI_ACCESS), requireTrustedAIWrite, industrialCtrl.realtimeCall);
+router.post('/realtime/call', requireLogin, requireRole(AI_ACCESS), requireTrustedAIWrite, realtimeSdpBody, industrialCtrl.realtimeCall);
 router.post('/tools/execute', requireLogin, requireRole(AI_ACCESS), requireTrustedAIWrite, industrialCtrl.executeTool);
 
 module.exports = router;
