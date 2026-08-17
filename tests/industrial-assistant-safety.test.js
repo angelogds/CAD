@@ -81,11 +81,15 @@ test('voz segue interface unificada oficial com SDP bruto ponta a ponta', () => 
   assert.doesNotMatch(realtimeService, /String\(sdp \|\| ''\)\.trim\(\)/);
 });
 
-test('modo voz é contínuo, com VAD semântico e reprodução de áudio remoto', () => {
+test('modo voz é contínuo, usa configuração atual e reproduz áudio remoto', () => {
   const service = read('modules/ai/industrial-assistant.realtime.service.js');
   const client = read('public/js/ai-realtime.js');
 
+  assert.match(service, /OPENAI_MODEL_VOICE \|\| 'gpt-realtime-2\.1'/);
+  assert.doesNotMatch(service, /OPENAI_MODEL_VOICE \|\| 'gpt-realtime'/);
+  assert.doesNotMatch(service, /tracing:/);
   assert.match(service, /type: 'semantic_vad'/);
+  assert.match(service, /eagerness: 'auto'/);
   assert.match(service, /create_response: true/);
   assert.match(service, /interrupt_response: true/);
   assert.match(service, /output_modalities: \['audio'\]/);
