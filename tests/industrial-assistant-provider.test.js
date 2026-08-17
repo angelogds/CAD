@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const providerRouter = require('../modules/ai/providers/provider-router');
+const openAIProvider = require('../modules/ai/providers/openai.provider');
 
 function read(relativePath) {
   return fs.readFileSync(path.join(__dirname, '..', relativePath), 'utf8');
@@ -32,6 +33,26 @@ test('OpenAI provider encapsula Responses e Realtime com chave somente no backen
   assert.match(source, /Authorization: `Bearer \$\{key\}`/);
   assert.match(source, /provider_status/);
   assert.doesNotMatch(source, /window\.|document\.|localStorage|sessionStorage/);
+});
+
+test('multipart do Realtime envia session como campo application/json, não arquivo', () => {
+  const { boundary, body } = openAIProvider.buildRealtimeMultipart({
+    sdp: 'v=0\r\ns=test',
+    session: { type: 'realtime', model: 'gpt-realtime' },
+  });
+  const raw = body.toString('utf8');
+
+  assert.ok(boundary.startsWith('----openai-realtime-'));
+  assert.match(raw, /Content-Disposition: form-data; name="sdp"; filename="offer\.sdp"\r\nContent-Type: application\/sdp/);
+  assert.match(raw, /Content-Disposition: form-data; name="session"\r\nContent-Type: application\/json\r\n\r\n\{"type":"realtime","model":"gpt-realtime"\}/);
+  assert.doesNotMatch(raw, /name="session"; filename=/);
+});
+
+test('erro Realtime preserva mensagem específica retornada pela OpenAI sem expor chave', () => {
+  const source = read('modules/ai/providers/openai.provider.js');
+  assert.match(source, /data\?\.error\?\.message/);
+  assert.match(source, /Falha ao iniciar voz em tempo real: \$\{detail\}/);
+  assert.doesNotMatch(source, /OPENAI_API_KEY.*technical/);
 });
 
 test('provider local é stub explícito e não faz fallback silencioso para rede', () => {
