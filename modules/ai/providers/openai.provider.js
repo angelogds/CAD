@@ -55,7 +55,7 @@ function buildRealtimeMultipart({ sdp, session } = {}) {
   const chunks = [
     Buffer.from(
       `--${boundary}${crlf}`
-      + `Content-Disposition: form-data; name="sdp"; filename="offer.sdp"${crlf}`
+      + `Content-Disposition: form-data; name="sdp"${crlf}`
       + `Content-Type: application/sdp${crlf}${crlf}`,
       'utf8',
     ),
