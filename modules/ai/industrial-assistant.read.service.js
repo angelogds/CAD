@@ -79,7 +79,7 @@ function compactRecebimentoItem(item = {}) {
   return {
     id: Number(item.id || 0) || null,
     nome: item.item_nome || item.item_descricao || item.descricao || null,
-    unidade: item.unidade || 'UN',
+    unidade: String(item.unidade || 'UN').trim().toUpperCase().slice(0, 20) || 'UN',
     quantidade_comprada: comprada,
     quantidade_recebida: recebida,
     quantidade_pendente: Math.max(comprada - recebida, 0),
@@ -89,12 +89,20 @@ function compactRecebimentoItem(item = {}) {
 
 function resumoItens(itens = []) {
   const compactos = itens.map(compactRecebimentoItem);
+  const quantidadesPorUnidade = {};
+  for (const item of compactos) {
+    const unidade = item.unidade || 'UN';
+    if (!quantidadesPorUnidade[unidade]) {
+      quantidadesPorUnidade[unidade] = { comprada: 0, recebida: 0, pendente: 0 };
+    }
+    quantidadesPorUnidade[unidade].comprada += item.quantidade_comprada;
+    quantidadesPorUnidade[unidade].recebida += item.quantidade_recebida;
+    quantidadesPorUnidade[unidade].pendente += item.quantidade_pendente;
+  }
   return {
     itens_comprados: compactos.length,
     itens_com_pendencia: compactos.filter((item) => item.quantidade_pendente > 0).length,
-    quantidade_comprada_total: compactos.reduce((sum, item) => sum + item.quantidade_comprada, 0),
-    quantidade_recebida_total: compactos.reduce((sum, item) => sum + item.quantidade_recebida, 0),
-    quantidade_pendente_total: compactos.reduce((sum, item) => sum + item.quantidade_pendente, 0),
+    quantidades_por_unidade: quantidadesPorUnidade,
   };
 }
 
