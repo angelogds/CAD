@@ -55,8 +55,8 @@ test('sidebar usa chaves granulares e oculta módulos não liberados para o perf
 
 test('painel mantém preventivas somente para acompanhamento do perfil', () => {
   const dashboard = read('views/dashboard/index.ejs');
-  assert.match(dashboard, /showPreventivasCard = canAccessModule\(roleNorm, 'preventivas_view'\)/);
-  assert.match(dashboard, /roleNorm !== 'INSPECAO_QUALIDADE'/);
+  assert.match(dashboard, /canPreventivas=canAccessModule\(roleNorm,'preventivas_view'\)/);
+  assert.match(dashboard, /canOperatePreventivas=roleNorm!==['"]INSPECAO_QUALIDADE['"]/);
   assert.match(read('modules/dashboard/dashboard.service.js'), /role === "INSPECAO_QUALIDADE"/);
 });
 
