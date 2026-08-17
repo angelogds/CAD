@@ -35,7 +35,7 @@ test('OpenAI provider encapsula Responses e Realtime com chave somente no backen
   assert.doesNotMatch(source, /window\.|document\.|localStorage|sessionStorage/);
 });
 
-test('multipart do Realtime envia session como campo application/json, não arquivo', () => {
+test('multipart do Realtime envia sdp e session como campos tipados, sem filename', () => {
   const { boundary, body } = openAIProvider.buildRealtimeMultipart({
     sdp: 'v=0\r\ns=test',
     session: { type: 'realtime', model: 'gpt-realtime' },
@@ -43,8 +43,9 @@ test('multipart do Realtime envia session como campo application/json, não arqu
   const raw = body.toString('utf8');
 
   assert.ok(boundary.startsWith('----openai-realtime-'));
-  assert.match(raw, /Content-Disposition: form-data; name="sdp"; filename="offer\.sdp"\r\nContent-Type: application\/sdp/);
+  assert.match(raw, /Content-Disposition: form-data; name="sdp"\r\nContent-Type: application\/sdp\r\n\r\nv=0/);
   assert.match(raw, /Content-Disposition: form-data; name="session"\r\nContent-Type: application\/json\r\n\r\n\{"type":"realtime","model":"gpt-realtime"\}/);
+  assert.doesNotMatch(raw, /name="sdp"; filename=/);
   assert.doesNotMatch(raw, /name="session"; filename=/);
 });
 
