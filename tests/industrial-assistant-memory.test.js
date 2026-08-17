@@ -70,8 +70,8 @@ test('arquivos binários de academia/equipamento não são fingidos como conteú
   assert.match(service, /ACADEMIA_BIBLIOTECA/);
   assert.match(service, /EQUIPAMENTO_DOCUMENTO/);
   assert.match(service, /conteudo_ia_json/);
-  assert.match(text, /binary_content_indexed for false|binary_content_indexed for false/i);
-  assert.match(realtime, /binary_content_indexed for false|binary_content_indexed for false/i);
+  assert.match(text, /binary_content_indexed=false/);
+  assert.match(realtime, /binary_content_indexed=false/);
 });
 
 test('FactoryMemory reutiliza o serviço de embeddings existente', () => {
