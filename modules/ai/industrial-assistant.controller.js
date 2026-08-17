@@ -14,8 +14,11 @@ async function realtimeCall(req, res) {
   const userId = Number(req.session?.user?.id || 0) || null;
   const model = String(process.env.OPENAI_MODEL_VOICE || 'gpt-realtime').trim();
   try {
+    // Fluxo novo/oficial: application/sdp chega como string bruta.
+    // Mantém compatibilidade com clientes antigos que ainda enviem JSON { sdp }.
+    const rawSdp = typeof req.body === 'string' ? req.body : req.body?.sdp;
     const result = await industrialRealtimeAssistant.createRealtimeCall({
-      sdp: req.body?.sdp,
+      sdp: rawSdp,
       user: req.session?.user || null,
     });
     observability.logUsage({
