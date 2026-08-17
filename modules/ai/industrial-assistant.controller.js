@@ -12,7 +12,7 @@ function friendlyStatus(err) {
 async function realtimeCall(req, res) {
   const startedAt = Date.now();
   const userId = Number(req.session?.user?.id || 0) || null;
-  const model = String(process.env.OPENAI_MODEL_VOICE || 'gpt-realtime').trim();
+  const model = industrialRealtimeAssistant.getVoiceModel();
   try {
     // Fluxo novo/oficial: application/sdp chega como string bruta.
     // Mantém compatibilidade com clientes antigos que ainda enviem JSON { sdp }.
@@ -140,6 +140,7 @@ function capabilities(_req, res) {
   return res.json({
     ok: true,
     voice: true,
+    voice_model: industrialRealtimeAssistant.getVoiceModel(),
     text_tools: true,
     briefing: true,
     server_history: true,
