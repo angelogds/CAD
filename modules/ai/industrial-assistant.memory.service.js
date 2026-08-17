@@ -186,12 +186,16 @@ function equipamentoDocumentSources(limit = 100) {
   }));
 }
 
-async function syncKnownSources({ limitPerType = 100 } = {}) {
+async function syncKnownSources({ limitPerType = 100, sourceTypes = [] } = {}) {
   if (!memoryReady()) return { ok: false, skipped: true, reason: 'missing_ai_memory_chunks', indexed_sources: 0, chunks: 0 };
   const limit = Math.max(1, Math.min(Number(limitPerType || 100), 300));
-  const osSources = osDocumentSources(limit);
-  const academySources = academiaSources(limit);
-  const equipmentSources = equipamentoDocumentSources(limit);
+  const requestedTypes = (Array.isArray(sourceTypes) ? sourceTypes : []).filter((type) => Object.values(SOURCE_TYPES).includes(type));
+  const includeAll = requestedTypes.length === 0;
+  const canSync = (type) => includeAll || requestedTypes.includes(type);
+
+  const osSources = canSync(SOURCE_TYPES.OS_DOCUMENTO) ? osDocumentSources(limit) : [];
+  const academySources = canSync(SOURCE_TYPES.ACADEMIA_BIBLIOTECA) ? academiaSources(limit) : [];
+  const equipmentSources = canSync(SOURCE_TYPES.EQUIPAMENTO_DOCUMENTO) ? equipamentoDocumentSources(limit) : [];
   const sources = [...osSources, ...academySources, ...equipmentSources];
   let indexedSources = 0;
   let chunks = 0;
@@ -226,15 +230,28 @@ async function searchMemory({ query, sourceTypes = [], limit = 8, ensureIndexed 
   const q = normalizeMemoryText(query);
   if (!q) return { items: [], indexed: true };
   const cap = Math.max(1, Math.min(Number(limit || 8), 20));
-  let total = Number(db.prepare('SELECT COUNT(*) AS total FROM ai_memory_chunks WHERE active=1').get()?.total || 0);
+  const allowedTypes = (Array.isArray(sourceTypes) ? sourceTypes : []).filter((type) => Object.values(SOURCE_TYPES).includes(type));
+
+  let total;
+  if (allowedTypes.length) {
+    const placeholders = allowedTypes.map(() => '?').join(',');
+    total = Number(db.prepare(`SELECT COUNT(*) AS total FROM ai_memory_chunks WHERE active=1 AND source_type IN (${placeholders})`).get(...allowedTypes)?.total || 0);
+  } else {
+    total = Number(db.prepare('SELECT COUNT(*) AS total FROM ai_memory_chunks WHERE active=1').get()?.total || 0);
+  }
+
   let sync = null;
   if (!total && ensureIndexed) {
-    sync = await syncKnownSources({ limitPerType: 100 });
-    total = Number(db.prepare('SELECT COUNT(*) AS total FROM ai_memory_chunks WHERE active=1').get()?.total || 0);
+    sync = await syncKnownSources({ limitPerType: 100, sourceTypes: allowedTypes });
+    if (allowedTypes.length) {
+      const placeholders = allowedTypes.map(() => '?').join(',');
+      total = Number(db.prepare(`SELECT COUNT(*) AS total FROM ai_memory_chunks WHERE active=1 AND source_type IN (${placeholders})`).get(...allowedTypes)?.total || 0);
+    } else {
+      total = Number(db.prepare('SELECT COUNT(*) AS total FROM ai_memory_chunks WHERE active=1').get()?.total || 0);
+    }
   }
   if (!total) return { items: [], indexed: true, sync };
 
-  const allowedTypes = (Array.isArray(sourceTypes) ? sourceTypes : []).filter((type) => Object.values(SOURCE_TYPES).includes(type));
   const params = [];
   let typeClause = '';
   if (allowedTypes.length) {
