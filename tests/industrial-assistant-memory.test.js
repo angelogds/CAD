@@ -96,12 +96,14 @@ test('FactoryMemory usa exatamente as colunas reais de documentos_equipamento', 
   assert.match(service, /row\.validade/);
 });
 
-test('tool da memória aplica RBAC por fonte e nunca transforma lista vazia em acesso total', () => {
+test('tool da memória replica a permissão da fonte original e nunca transforma lista vazia em acesso total', () => {
   const tool = read('modules/ai/industrial-assistant.memory.tool.js');
 
-  assert.match(tool, /OS_DOCUMENTO\]: 'os_view'/);
-  assert.match(tool, /ACADEMIA_BIBLIOTECA\]: 'academia_view'/);
-  assert.match(tool, /EQUIPAMENTO_DOCUMENTO\]: 'equipamentos'/);
+  assert.match(tool, /require\('\.\.\/os\/os\.permissions'\)/);
+  assert.match(tool, /if \(canViewOSDetails\(user\)\) allowed\.push\(factoryMemory\.SOURCE_TYPES\.OS_DOCUMENTO\)/);
+  assert.match(tool, /canAccessModule\(role, 'academia_view'\)/);
+  assert.match(tool, /canAccessModule\(role, 'equipamentos'\)/);
+  assert.doesNotMatch(tool, /OS_DOCUMENTO\]: 'os_view'/);
   assert.match(tool, /if \(!allowed\.length\)/);
   assert.match(tool, /AI_MEMORY_RBAC_DENIED/);
   assert.match(tool, /if \(!allowed\.includes\(sourceType\)\)/);
