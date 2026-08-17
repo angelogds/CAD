@@ -130,8 +130,8 @@
     if (type === 'input_audio_buffer.speech_started') setStatus('Ouvindo...');
     if (type === 'input_audio_buffer.speech_stopped') setStatus('Entendendo...');
     if (type === 'response.created') setStatus('Respondendo...');
-    if (type === 'response.output_audio.started') setStatus('Falando...');
-    if (type === 'response.done') setStatus(active ? 'Ouvindo...' : 'Pronto para conversar');
+    if (type === 'output_audio_buffer.started' || type === 'response.output_audio.started') setStatus('Falando...');
+    if (type === 'output_audio_buffer.stopped' || type === 'response.done') setStatus(active ? 'Ouvindo...' : 'Pronto para conversar');
 
     if (type === 'conversation.item.input_audio_transcription.completed') {
       addTranscript('Você', event.transcript);
@@ -153,6 +153,11 @@
     }
   }
 
+  function validSdp(value) {
+    const sdp = String(value || '');
+    return sdp.startsWith('v=0') && sdp.includes('\nm=');
+  }
+
   async function startVoice() {
     if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) {
       throw new Error('Este navegador não suporta voz WebRTC.');
@@ -161,18 +166,36 @@
     setStatus('Validando contexto...');
     await loadValidatedContext();
     setStatus('Solicitando microfone...');
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+
     pc = new RTCPeerConnection();
-    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+    localStream.getAudioTracks().forEach((track) => pc.addTrack(track, localStream));
+
     pc.ontrack = (event) => {
       const [stream] = event.streams;
-      if (stream) remoteAudio.srcObject = stream;
+      if (!stream) return;
+      remoteAudio.srcObject = stream;
+      remoteAudio.autoplay = true;
+      remoteAudio.play().catch(() => {});
+    };
+
+    pc.onconnectionstatechange = () => {
+      const state = pc?.connectionState;
+      if (state === 'connected') setStatus('Ouvindo...');
+      if (state === 'failed') setStatus('Falha na conexão de voz.');
+      if (state === 'disconnected' && active) setStatus('Reconectando voz...');
     };
 
     dc = pc.createDataChannel('oai-events');
     dc.onopen = () => {
       injectValidatedContext();
-      setStatus('Ouvindo...');
+      setStatus('Ouvindo... fale normalmente');
     };
     dc.onmessage = (message) => {
       try { handleServerEvent(JSON.parse(message.data)); } catch (_e) {}
@@ -181,24 +204,34 @@
       if (active) setStatus('Conexão de voz encerrada.');
     };
 
+    // Fluxo oficial da interface unificada OpenAI: offer SDP bruto -> backend.
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
+    const localSdp = String(pc.localDescription?.sdp || offer.sdp || '');
+    if (!validSdp(localSdp)) {
+      throw new Error('O navegador não gerou uma oferta SDP válida para a sessão de voz.');
+    }
+
     const response = await fetch('/ai/realtime/call', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sdp: offer.sdp }),
+      headers: { 'Content-Type': 'application/sdp', Accept: 'application/sdp, application/json' },
+      body: localSdp,
     });
-    const answerSdp = await response.text();
+    const answerBody = await response.text();
     if (!response.ok) {
       let message = 'Não foi possível iniciar a voz.';
-      try { message = JSON.parse(answerSdp)?.error || message; } catch (_e) {}
+      try { message = JSON.parse(answerBody)?.error || message; } catch (_e) {}
       throw new Error(message);
     }
-    await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+    if (!validSdp(answerBody)) {
+      throw new Error('O servidor de voz não retornou uma resposta SDP válida.');
+    }
+
+    await pc.setRemoteDescription({ type: 'answer', sdp: answerBody });
     active = true;
     button.classList.add('active');
     button.textContent = '■';
-    setStatus('Ouvindo...');
+    setStatus('Ouvindo... fale normalmente');
   }
 
   function stopVoice() {
@@ -209,6 +242,7 @@
     dc = null;
     pc = null;
     localStream = null;
+    remoteAudio.pause();
     remoteAudio.srcObject = null;
     button.classList.remove('active');
     button.textContent = '🎙️';

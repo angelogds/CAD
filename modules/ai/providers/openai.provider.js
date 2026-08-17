@@ -1,5 +1,3 @@
-const crypto = require('crypto');
-
 function providerError(code, message, technical = null, status = 503, providerStatus = null) {
   const err = new Error(message);
   err.code = code;
@@ -47,48 +45,33 @@ async function createResponse({ apiKey, body, timeoutMs = 45000 } = {}) {
   }
 }
 
-function buildRealtimeMultipart({ sdp, session } = {}) {
-  const boundary = `----openai-realtime-${crypto.randomBytes(12).toString('hex')}`;
-  const offer = String(sdp || '').trim();
-  const sessionJson = JSON.stringify(session || {});
-  const crlf = '\r\n';
-  const chunks = [
-    Buffer.from(
-      `--${boundary}${crlf}`
-      + `Content-Disposition: form-data; name="sdp"${crlf}`
-      + `Content-Type: application/sdp${crlf}${crlf}`,
-      'utf8',
-    ),
-    Buffer.from(offer, 'utf8'),
-    Buffer.from(
-      `${crlf}--${boundary}${crlf}`
-      + `Content-Disposition: form-data; name="session"${crlf}`
-      + `Content-Type: application/json${crlf}${crlf}`,
-      'utf8',
-    ),
-    Buffer.from(sessionJson, 'utf8'),
-    Buffer.from(`${crlf}--${boundary}--${crlf}`, 'utf8'),
-  ];
+function requireValidSdp(sdp) {
+  const offer = String(sdp || '');
+  if (!offer.trim()) throw providerError('AI_REALTIME_SDP_MISSING', 'SDP WebRTC ausente.', null, 400, 400);
+  if (!offer.startsWith('v=0')) {
+    throw providerError('AI_REALTIME_SDP_INVALID', 'SDP WebRTC inválido: offer não inicia com v=0.', null, 400, 400);
+  }
+  return offer;
+}
 
-  return {
-    boundary,
-    body: Buffer.concat(chunks),
-  };
+function buildRealtimeForm({ sdp, session } = {}) {
+  const offer = requireValidSdp(sdp);
+  const form = new FormData();
+  // Contrato oficial da interface unificada: campos string no FormData.
+  // Não reconstruir multipart manualmente e não transformar SDP em arquivo/Blob.
+  form.set('sdp', offer);
+  form.set('session', JSON.stringify(session || {}));
+  return form;
 }
 
 async function createRealtimeCall({ apiKey, sdp, session } = {}) {
   const key = requireApiKey(apiKey);
-  const offer = String(sdp || '').trim();
-  if (!offer) throw providerError('AI_REALTIME_SDP_MISSING', 'SDP WebRTC ausente.', null, 400, 400);
+  const form = buildRealtimeForm({ sdp, session });
 
-  const multipart = buildRealtimeMultipart({ sdp: offer, session });
   const response = await fetch('https://api.openai.com/v1/realtime/calls', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': `multipart/form-data; boundary=${multipart.boundary}`,
-    },
-    body: multipart.body,
+    headers: { Authorization: `Bearer ${key}` },
+    body: form,
   });
   const answer = await response.text();
   if (!response.ok) {
@@ -103,6 +86,17 @@ async function createRealtimeCall({ apiKey, sdp, session } = {}) {
       response.status,
     );
   }
+
+  if (!String(answer || '').startsWith('v=0')) {
+    throw providerError(
+      'OPENAI_REALTIME_ANSWER_INVALID',
+      'A OpenAI não retornou um SDP de resposta válido para a sessão de voz.',
+      answer,
+      502,
+      502,
+    );
+  }
+
   return { sdp: answer, contentType: response.headers.get('content-type') || 'application/sdp' };
 }
 
@@ -119,5 +113,6 @@ module.exports = {
   createResponse,
   createRealtimeCall,
   status,
-  buildRealtimeMultipart,
+  buildRealtimeForm,
+  requireValidSdp,
 };

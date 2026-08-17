@@ -35,18 +35,28 @@ test('OpenAI provider encapsula Responses e Realtime com chave somente no backen
   assert.doesNotMatch(source, /window\.|document\.|localStorage|sessionStorage/);
 });
 
-test('multipart do Realtime envia sdp e session como campos tipados, sem filename', () => {
-  const { boundary, body } = openAIProvider.buildRealtimeMultipart({
-    sdp: 'v=0\r\ns=test',
+test('Realtime usa FormData nativo com campos string e preserva o SDP bruto', () => {
+  const rawSdp = 'v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n';
+  const form = openAIProvider.buildRealtimeForm({
+    sdp: rawSdp,
     session: { type: 'realtime', model: 'gpt-realtime' },
   });
-  const raw = body.toString('utf8');
 
-  assert.ok(boundary.startsWith('----openai-realtime-'));
-  assert.match(raw, /Content-Disposition: form-data; name="sdp"\r\nContent-Type: application\/sdp\r\n\r\nv=0/);
-  assert.match(raw, /Content-Disposition: form-data; name="session"\r\nContent-Type: application\/json\r\n\r\n\{"type":"realtime","model":"gpt-realtime"\}/);
-  assert.doesNotMatch(raw, /name="sdp"; filename=/);
-  assert.doesNotMatch(raw, /name="session"; filename=/);
+  assert.equal(form.get('sdp'), rawSdp);
+  assert.equal(form.get('session'), '{"type":"realtime","model":"gpt-realtime"}');
+
+  const source = read('modules/ai/providers/openai.provider.js');
+  assert.match(source, /form\.set\('sdp', offer\)/);
+  assert.match(source, /form\.set\('session', JSON\.stringify\(session \|\| \{\}\)\)/);
+  assert.doesNotMatch(source, /multipart\/form-data; boundary=/);
+  assert.doesNotMatch(source, /Buffer\.concat|randomBytes|filename=/);
+});
+
+test('validação do SDP não remove CRLF final nem normaliza a offer', () => {
+  const rawSdp = 'v=0\r\ns=-\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\n';
+  assert.equal(openAIProvider.requireValidSdp(rawSdp), rawSdp);
+  assert.throws(() => openAIProvider.requireValidSdp(''), /SDP WebRTC ausente/);
+  assert.throws(() => openAIProvider.requireValidSdp('s=-\r\n'), /não inicia com v=0/);
 });
 
 test('erro Realtime preserva mensagem específica retornada pela OpenAI sem expor chave', () => {
