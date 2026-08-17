@@ -75,3 +75,18 @@ test('FactoryMemory reutiliza o serviço de embeddings existente', () => {
   assert.match(service, /embeddings\.generateEmbedding/);
   assert.match(service, /embeddings\.cosineSimilarity/);
 });
+
+test('FactoryMemory usa exatamente as colunas reais de documentos_equipamento', () => {
+  const schema = read('database/migrations/095_equipamentos_ficha_tecnica.sql');
+  const service = read('modules/ai/industrial-assistant.memory.service.js');
+
+  assert.match(schema, /tipo_documento TEXT NOT NULL/);
+  assert.match(schema, /validade TEXT/);
+  assert.doesNotMatch(schema, /data_validade TEXT/);
+
+  assert.match(service, /d\.tipo_documento/);
+  assert.match(service, /d\.validade/);
+  assert.doesNotMatch(service, /d\.data_validade/);
+  assert.match(service, /row\.tipo_documento/);
+  assert.match(service, /row\.validade/);
+});
