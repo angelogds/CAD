@@ -31,6 +31,8 @@
   let localStream = null;
   let active = false;
   let validatedContext = null;
+  let turnStartedAt = 0;
+  let lastResponseLatencyMs = 0;
   const handledCalls = new Set();
   const transcriptLines = [];
 
@@ -49,6 +51,20 @@
 
   function sendEvent(payload) {
     if (dc?.readyState === 'open') dc.send(JSON.stringify(payload));
+  }
+
+  function reportRealtimeUsage(usage, latencyMs) {
+    if (!usage || typeof usage !== 'object') return;
+    fetch('/ai/realtime/usage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        conversation_id: conversationId,
+        latency_ms: Math.max(0, Math.round(Number(latencyMs || 0))),
+        usage,
+      }),
+      keepalive: true,
+    }).catch(() => {});
   }
 
   async function loadValidatedContext() {
@@ -127,11 +143,21 @@
 
   function handleServerEvent(event) {
     const type = String(event?.type || '');
-    if (type === 'input_audio_buffer.speech_started') setStatus('Ouvindo...');
-    if (type === 'input_audio_buffer.speech_stopped') setStatus('Entendendo...');
+    if (type === 'input_audio_buffer.speech_started') {
+      turnStartedAt = 0;
+      lastResponseLatencyMs = 0;
+      setStatus('Ouvindo...');
+    }
+    if (type === 'input_audio_buffer.speech_stopped') {
+      turnStartedAt = performance.now();
+      setStatus('Entendendo...');
+    }
     if (type === 'response.created') setStatus('Respondendo...');
-    if (type === 'output_audio_buffer.started' || type === 'response.output_audio.started') setStatus('Falando...');
-    if (type === 'output_audio_buffer.stopped' || type === 'response.done') setStatus(active ? 'Ouvindo...' : 'Pronto para conversar');
+    if (type === 'output_audio_buffer.started' || type === 'response.output_audio.started') {
+      if (turnStartedAt > 0 && !lastResponseLatencyMs) lastResponseLatencyMs = performance.now() - turnStartedAt;
+      setStatus('Falando...');
+    }
+    if (type === 'output_audio_buffer.stopped') setStatus(active ? 'Ouvindo...' : 'Pronto para conversar');
 
     if (type === 'conversation.item.input_audio_transcription.completed') {
       addTranscript('Você', event.transcript);
@@ -145,6 +171,10 @@
     }
     if (type === 'response.output_item.done' && event?.item?.type === 'function_call') {
       runTool(event.item);
+    }
+    if (type === 'response.done') {
+      reportRealtimeUsage(event?.response?.usage, lastResponseLatencyMs);
+      setStatus(active ? 'Ouvindo...' : 'Pronto para conversar');
     }
     if (type === 'error') {
       const message = event?.error?.message || 'Erro na sessão de voz.';
@@ -204,7 +234,6 @@
       if (active) setStatus('Conexão de voz encerrada.');
     };
 
-    // Fluxo oficial da interface unificada OpenAI: offer SDP bruto -> backend.
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     const localSdp = String(pc.localDescription?.sdp || offer.sdp || '');
@@ -236,6 +265,8 @@
 
   function stopVoice() {
     active = false;
+    turnStartedAt = 0;
+    lastResponseLatencyMs = 0;
     try { dc?.close(); } catch (_e) {}
     try { pc?.close(); } catch (_e) {}
     try { localStream?.getTracks()?.forEach((track) => track.stop()); } catch (_e) {}
