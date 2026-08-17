@@ -70,10 +70,10 @@ test('OS detail organizes execution, permanent evidence and operational history'
   const detail = read('views/os/show.ejs');
   const script = read('public/js/os-detalhe.js');
   assert.match(detail, /Evidências e fechamento da OS/);
-  assert.match(detail, /data-os-module="justificativa-andamento">Registros da execução/);
+  assert.match(detail, /data-os-module="justificativa-andamento">Justificativa técnica/);
   assert.match(detail, /class="card os-module" id="justificativa-andamento"/);
-  assert.match(detail, /data-module-slot="equipe"/);
-  assert.match(script, /moveModule\('tracagens-vinculadas', 'equipe', 'execucao'\)/);
+  assert.match(detail, /data-module-slot="justificativa-andamento"/);
+  assert.match(script, /moveModule\('justificativa-andamento', 'justificativa-andamento', 'justificativa'\)/);
 });
 
 test('OS service stores separate history, local-day alert state and inspection sync', () => {
