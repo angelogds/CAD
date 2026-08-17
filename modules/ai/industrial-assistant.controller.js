@@ -1,6 +1,7 @@
 const industrialAssistant = require('./industrial-assistant.service');
 const industrialTextAssistant = require('./industrial-assistant.text.service');
 const industrialRealtimeAssistant = require('./industrial-assistant.realtime.service');
+const memoryTool = require('./industrial-assistant.memory.tool');
 const industrialContext = require('./industrial-assistant.context.service');
 const observability = require('./industrial-assistant.observability.service');
 
@@ -118,11 +119,12 @@ function health(_req, res) {
 
 async function executeTool(req, res) {
   try {
-    const result = await industrialAssistant.executeTool({
-      name: req.body?.name,
-      args: req.body?.arguments || req.body?.args || {},
-      user: req.session?.user || null,
-    });
+    const name = req.body?.name;
+    const args = req.body?.arguments || req.body?.args || {};
+    const user = req.session?.user || null;
+    const result = memoryTool.hasTool(name)
+      ? await memoryTool.executeTool({ name, args, user })
+      : await industrialAssistant.executeTool({ name, args, user });
     return res.json({ ok: true, result });
   } catch (err) {
     console.warn('[ai.executeTool]', { tool: req.body?.name, code: err?.code, message: err?.message });
@@ -131,7 +133,19 @@ async function executeTool(req, res) {
 }
 
 function capabilities(_req, res) {
-  return res.json({ ok: true, voice: true, text_tools: true, briefing: true, server_history: true, page_context: true, evidence_sources: true, health: true, tools: industrialAssistant.getRealtimeTools().map((tool) => tool.name) });
+  const tools = [...industrialAssistant.getRealtimeTools(), ...memoryTool.getTools()];
+  return res.json({
+    ok: true,
+    voice: true,
+    text_tools: true,
+    briefing: true,
+    server_history: true,
+    page_context: true,
+    evidence_sources: true,
+    factory_memory: true,
+    health: true,
+    tools: tools.map((tool) => tool.name),
+  });
 }
 
 module.exports = { realtimeCall, pageContext, textMessage, briefing, history, health, executeTool, capabilities };
