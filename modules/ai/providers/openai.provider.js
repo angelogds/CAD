@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 function providerError(code, message, technical = null, status = 503, providerStatus = null) {
   const err = new Error(message);
   err.code = code;
@@ -45,25 +47,57 @@ async function createResponse({ apiKey, body, timeoutMs = 45000 } = {}) {
   }
 }
 
+function buildRealtimeMultipart({ sdp, session } = {}) {
+  const boundary = `----openai-realtime-${crypto.randomBytes(12).toString('hex')}`;
+  const offer = String(sdp || '').trim();
+  const sessionJson = JSON.stringify(session || {});
+  const crlf = '\r\n';
+  const chunks = [
+    Buffer.from(
+      `--${boundary}${crlf}`
+      + `Content-Disposition: form-data; name="sdp"; filename="offer.sdp"${crlf}`
+      + `Content-Type: application/sdp${crlf}${crlf}`,
+      'utf8',
+    ),
+    Buffer.from(offer, 'utf8'),
+    Buffer.from(
+      `${crlf}--${boundary}${crlf}`
+      + `Content-Disposition: form-data; name="session"${crlf}`
+      + `Content-Type: application/json${crlf}${crlf}`,
+      'utf8',
+    ),
+    Buffer.from(sessionJson, 'utf8'),
+    Buffer.from(`${crlf}--${boundary}--${crlf}`, 'utf8'),
+  ];
+
+  return {
+    boundary,
+    body: Buffer.concat(chunks),
+  };
+}
+
 async function createRealtimeCall({ apiKey, sdp, session } = {}) {
   const key = requireApiKey(apiKey);
   const offer = String(sdp || '').trim();
   if (!offer) throw providerError('AI_REALTIME_SDP_MISSING', 'SDP WebRTC ausente.', null, 400, 400);
 
-  const form = new FormData();
-  form.append('sdp', new Blob([offer], { type: 'application/sdp' }), 'offer.sdp');
-  form.append('session', new Blob([JSON.stringify(session || {})], { type: 'application/json' }), 'session.json');
-
+  const multipart = buildRealtimeMultipart({ sdp: offer, session });
   const response = await fetch('https://api.openai.com/v1/realtime/calls', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${key}` },
-    body: form,
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': `multipart/form-data; boundary=${multipart.boundary}`,
+    },
+    body: multipart.body,
   });
   const answer = await response.text();
   if (!response.ok) {
+    let data = null;
+    try { data = JSON.parse(answer); } catch (_e) {}
+    const detail = String(data?.error?.message || '').trim().slice(0, 400);
     throw providerError(
-      'OPENAI_REALTIME_ERROR',
-      `Falha ao iniciar voz em tempo real: OpenAI ${response.status}.`,
+      data?.error?.code || 'OPENAI_REALTIME_ERROR',
+      detail ? `Falha ao iniciar voz em tempo real: ${detail}` : `Falha ao iniciar voz em tempo real: OpenAI ${response.status}.`,
       answer,
       response.status >= 500 || response.status === 429 ? 503 : response.status,
       response.status,
@@ -80,4 +114,10 @@ function status() {
   };
 }
 
-module.exports = { name: 'openai', createResponse, createRealtimeCall, status };
+module.exports = {
+  name: 'openai',
+  createResponse,
+  createRealtimeCall,
+  status,
+  buildRealtimeMultipart,
+};
