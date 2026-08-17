@@ -108,6 +108,18 @@ test('tool da memória aplica RBAC por fonte e nunca transforma lista vazia em a
   assert.match(tool, /sourceTypes = resolveSourceTypes/);
 });
 
+test('sincronização da memória também fica restrita às fontes autorizadas', () => {
+  const service = read('modules/ai/industrial-assistant.memory.service.js');
+  const tool = read('modules/ai/industrial-assistant.memory.tool.js');
+
+  assert.match(service, /syncKnownSources\(\{ limitPerType = 100, sourceTypes = \[\] \}/);
+  assert.match(service, /const canSync = \(type\) => includeAll \|\| requestedTypes\.includes\(type\)/);
+  assert.match(service, /canSync\(SOURCE_TYPES\.OS_DOCUMENTO\)/);
+  assert.match(service, /canSync\(SOURCE_TYPES\.ACADEMIA_BIBLIOTECA\)/);
+  assert.match(service, /canSync\(SOURCE_TYPES\.EQUIPAMENTO_DOCUMENTO\)/);
+  assert.match(tool, /syncKnownSources\(\{ limitPerType: 100, sourceTypes \}\)/);
+});
+
 test('tool consultar_memoria_fabrica está ligada tanto ao texto quanto à voz e ao endpoint de tools', () => {
   const memoryTool = read('modules/ai/industrial-assistant.memory.tool.js');
   const text = read('modules/ai/industrial-assistant.text.service.js');
