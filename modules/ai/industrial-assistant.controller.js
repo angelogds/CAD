@@ -14,8 +14,6 @@ async function realtimeCall(req, res) {
   const userId = Number(req.session?.user?.id || 0) || null;
   const model = industrialRealtimeAssistant.getVoiceModel();
   try {
-    // Fluxo novo/oficial: application/sdp chega como string bruta.
-    // Mantém compatibilidade com clientes antigos que ainda enviem JSON { sdp }.
     const rawSdp = typeof req.body === 'string' ? req.body : req.body?.sdp;
     const result = await industrialRealtimeAssistant.createRealtimeCall({
       sdp: rawSdp,
@@ -42,6 +40,25 @@ async function realtimeCall(req, res) {
     console.error('[ai.realtimeCall]', err?.technical || err?.stack || err?.message || err);
     return res.status(friendlyStatus(err)).json({ ok: false, error: err?.message || 'Falha ao iniciar sessão de voz.' });
   }
+}
+
+function realtimeUsage(req, res) {
+  const userId = Number(req.session?.user?.id || 0);
+  if (!userId) return res.status(401).json({ ok: false, error: 'Sessão inválida.' });
+
+  const conversationId = String(req.body?.conversation_id || '').trim().slice(0, 120) || null;
+  const durationMs = Math.max(0, Math.min(Number(req.body?.latency_ms || 0) || 0, 120000));
+  const usage = observability.compactUsage(req.body?.usage || {});
+  observability.logUsage({
+    tipo: 'INDUSTRIAL_REALTIME_TURN',
+    userId,
+    conversationId,
+    model: industrialRealtimeAssistant.getVoiceModel(),
+    durationMs,
+    usage,
+    status: 'ok',
+  });
+  return res.json({ ok: true });
 }
 
 function pageContext(req, res) {
@@ -135,21 +152,22 @@ async function executeTool(req, res) {
   }
 }
 
-function capabilities(_req, res) {
-  const tools = [...industrialAssistant.getRealtimeTools(), ...memoryTool.getTools()];
+function capabilities(req, res) {
+  const tools = industrialRealtimeAssistant.getRealtimeTools(req.session?.user || null);
   return res.json({
     ok: true,
     voice: true,
     voice_model: industrialRealtimeAssistant.getVoiceModel(),
+    voice_vad_eagerness: industrialRealtimeAssistant.getVadEagerness(),
     text_tools: true,
     briefing: true,
     server_history: true,
     page_context: true,
     evidence_sources: true,
-    factory_memory: true,
+    factory_memory: tools.some((tool) => tool.name === memoryTool.TOOL_NAME),
     health: true,
     tools: tools.map((tool) => tool.name),
   });
 }
 
-module.exports = { realtimeCall, pageContext, textMessage, briefing, history, health, executeTool, capabilities };
+module.exports = { realtimeCall, realtimeUsage, pageContext, textMessage, briefing, history, health, executeTool, capabilities };

@@ -108,8 +108,9 @@ test('tool consultar_memoria_fabrica está ligada tanto ao texto quanto à voz e
   assert.match(text, /\.\.\.memoryTool\.getTools\(\)/);
   assert.match(text, /memoryTool\.hasTool\(name\)/);
   assert.match(realtime, /\.\.\.memoryTool\.getTools\(\)/);
+  assert.match(realtime, /memoryTool\.allowedSourceTypes\(user\)/);
   assert.match(controller, /memoryTool\.hasTool\(name\)/);
-  assert.match(controller, /factory_memory: true/);
+  assert.match(controller, /factory_memory: tools\.some\(\(tool\) => tool\.name === memoryTool\.TOOL_NAME\)/);
 });
 
 test('conteúdo da memória é marcado como dado não confiável e fonte original verificada', () => {
