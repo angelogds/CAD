@@ -64,6 +64,38 @@ test('voz usa contexto validado e não disputa o controle das abas com o workspa
   assert.match(workspace, /querySelectorAll\('\.assistant-tab'\)/);
 });
 
+test('voz segue interface unificada oficial com SDP bruto ponta a ponta', () => {
+  const routes = read('modules/ai/ai.routes.js');
+  const controller = read('modules/ai/industrial-assistant.controller.js');
+  const realtimeService = read('modules/ai/industrial-assistant.realtime.service.js');
+  const client = read('public/js/ai-realtime.js');
+
+  assert.match(routes, /express\.text\(\{ type: \['application\/sdp', 'text\/plain'\]/);
+  assert.match(routes, /realtimeSdpBody, industrialCtrl\.realtimeCall/);
+  assert.match(controller, /typeof req\.body === 'string' \? req\.body : req\.body\?\.sdp/);
+  assert.match(client, /'Content-Type': 'application\/sdp'/);
+  assert.match(client, /body: localSdp/);
+  assert.match(client, /pc\.localDescription\?\.sdp \|\| offer\.sdp/);
+  assert.doesNotMatch(client, /JSON\.stringify\(\{ sdp:/);
+  assert.match(realtimeService, /const offer = String\(sdp \|\| ''\);/);
+  assert.doesNotMatch(realtimeService, /String\(sdp \|\| ''\)\.trim\(\)/);
+});
+
+test('modo voz é contínuo, com VAD semântico e reprodução de áudio remoto', () => {
+  const service = read('modules/ai/industrial-assistant.realtime.service.js');
+  const client = read('public/js/ai-realtime.js');
+
+  assert.match(service, /type: 'semantic_vad'/);
+  assert.match(service, /create_response: true/);
+  assert.match(service, /interrupt_response: true/);
+  assert.match(service, /output_modalities: \['audio'\]/);
+  assert.match(service, /language: 'pt'/);
+  assert.match(client, /remoteAudio\.srcObject = stream/);
+  assert.match(client, /remoteAudio\.play\(\)\.catch/);
+  assert.match(client, /output_audio_buffer\.started/);
+  assert.match(client, /output_audio_buffer\.stopped/);
+});
+
 test('launcher global só é incluído após regra de acesso do servidor', () => {
   const layout = read('views/layout.ejs');
 
