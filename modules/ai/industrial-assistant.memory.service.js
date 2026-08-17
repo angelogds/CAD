@@ -164,7 +164,7 @@ function academiaSources(limit = 100) {
 function equipamentoDocumentSources(limit = 100) {
   if (!tableExists('documentos_equipamento')) return [];
   return db.prepare(`
-    SELECT d.id,d.equipamento_id,d.tipo,d.descricao,d.caminho_arquivo,d.data_emissao,d.data_validade,d.responsavel,e.nome AS equipamento_nome
+    SELECT d.id,d.equipamento_id,d.tipo_documento,d.descricao,d.caminho_arquivo,d.data_emissao,d.validade,d.responsavel,e.nome AS equipamento_nome
     FROM documentos_equipamento d
     LEFT JOIN equipamentos e ON e.id=d.equipamento_id
     ORDER BY d.id DESC
@@ -172,16 +172,16 @@ function equipamentoDocumentSources(limit = 100) {
   `).all(limit).map((row) => ({
     sourceType: SOURCE_TYPES.EQUIPAMENTO_DOCUMENTO,
     sourceId: row.id,
-    title: `${row.tipo || 'Documento'} • ${row.equipamento_nome || `Equipamento #${row.equipamento_id}`}`,
+    title: `${row.tipo_documento || 'Documento'} • ${row.equipamento_nome || `Equipamento #${row.equipamento_id}`}`,
     content: normalizeMemoryText([
       row.equipamento_nome ? `Equipamento: ${row.equipamento_nome}` : '',
-      row.tipo ? `Tipo de documento: ${row.tipo}` : '',
+      row.tipo_documento ? `Tipo de documento: ${row.tipo_documento}` : '',
       row.descricao ? `Descrição: ${row.descricao}` : '',
       row.responsavel ? `Responsável: ${row.responsavel}` : '',
       row.data_emissao ? `Emissão: ${row.data_emissao}` : '',
-      row.data_validade ? `Validade: ${row.data_validade}` : '',
+      row.validade ? `Validade: ${row.validade}` : '',
     ].filter(Boolean).join('\n')),
-    metadata: { equipamento_id: row.equipamento_id || null, equipamento_nome: row.equipamento_nome || null, caminho_arquivo: row.caminho_arquivo || null, binary_content_indexed: false },
+    metadata: { equipamento_id: row.equipamento_id || null, equipamento_nome: row.equipamento_nome || null, caminho_arquivo: row.caminho_arquivo || null, tipo_documento: row.tipo_documento || null, validade: row.validade || null, binary_content_indexed: false },
     sourceUpdatedAt: row.data_emissao || null,
   }));
 }
@@ -189,7 +189,10 @@ function equipamentoDocumentSources(limit = 100) {
 async function syncKnownSources({ limitPerType = 100 } = {}) {
   if (!memoryReady()) return { ok: false, skipped: true, reason: 'missing_ai_memory_chunks', indexed_sources: 0, chunks: 0 };
   const limit = Math.max(1, Math.min(Number(limitPerType || 100), 300));
-  const sources = [...osDocumentSources(limit), ...academiaSources(limit), ...equipamentoDocumentSources(limit)];
+  const osSources = osDocumentSources(limit);
+  const academySources = academiaSources(limit);
+  const equipmentSources = equipamentoDocumentSources(limit);
+  const sources = [...osSources, ...academySources, ...equipmentSources];
   let indexedSources = 0;
   let chunks = 0;
   for (const source of sources) {
@@ -201,9 +204,9 @@ async function syncKnownSources({ limitPerType = 100 } = {}) {
     }
   }
   return { ok: true, indexed_sources: indexedSources, chunks, source_counts: {
-    os_documentos: osDocumentSources(limit).length,
-    academia_biblioteca: academiaSources(limit).length,
-    equipamento_documentos: equipamentoDocumentSources(limit).length,
+    os_documentos: osSources.length,
+    academia_biblioteca: academySources.length,
+    equipamento_documentos: equipmentSources.length,
   } };
 }
 
