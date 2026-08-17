@@ -370,7 +370,7 @@ test('reprocesso redistribui responsáveis com variação de nomes para criticid
     `).run(planoId, `+${i} day`);
   }
 
-  service.reorganizarPreventivasPendentesPorEscala();
+  withMockedSaoPauloTime(9, 0, () => service.reorganizarPreventivasPendentesPorEscala());
   const rows = db.prepare(`SELECT responsavel_1_id, responsavel_2_id FROM preventiva_execucoes ORDER BY id ASC`).all();
 
   const pares = rows.map((r) => [Number(r.responsavel_1_id || 0), Number(r.responsavel_2_id || 0)].sort((a, b) => a - b).join('-'));
@@ -398,7 +398,11 @@ test('reprocesso corrige datas pendentes para hoje em diante de forma sequencial
   service.reorganizarPreventivasPendentesPorEscala();
 
   const rows = db.prepare(`SELECT data_prevista FROM preventiva_execucoes ORDER BY id ASC`).all();
-  const hoje = new Date().toISOString().slice(0, 10);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const hoje = `${map.year}-${map.month}-${map.day}`;
   rows.forEach((row) => assert.ok(row.data_prevista >= hoje));
   assert.ok(rows[1].data_prevista >= rows[0].data_prevista);
   assert.ok(rows[2].data_prevista >= rows[1].data_prevista);
