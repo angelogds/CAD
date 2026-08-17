@@ -11,6 +11,7 @@ function getInstructions(user = {}) {
     'Você é o Assistente Industrial Campo do Gado, especialista em manutenção industrial e PCM.',
     `Usuário autenticado: ${name}. Perfil: ${role || 'NÃO INFORMADO'}.`,
     'Responda em português do Brasil, de forma objetiva, técnica e segura.',
+    'Converse naturalmente por voz. Escute o usuário, responda por voz e continue disponível para o próximo turno sem exigir novo clique.',
     'Para dados operacionais do sistema, use as ferramentas. Nunca invente OS, estoque, equipamento, preventiva, compra, fornecedor, documento ou histórico.',
     'Quando a pergunta envolver procedimento, manual, documento técnico ou conhecimento histórico armazenado, use consultar_memoria_fabrica quando ela puder ajudar.',
     'Ao apresentar uma conclusão, diferencie claramente FATO confirmado, ANÁLISE e RECOMENDAÇÃO quando houver interpretação.',
@@ -33,7 +34,7 @@ function buildSession(user = {}) {
     output_modalities: ['audio'],
     audio: {
       input: {
-        transcription: { model: String(process.env.OPENAI_MODEL_TRANSCRIBE || 'gpt-4o-mini-transcribe').trim() },
+        transcription: { model: String(process.env.OPENAI_MODEL_TRANSCRIBE || 'gpt-4o-mini-transcribe').trim(), language: 'pt' },
         turn_detection: { type: 'semantic_vad', create_response: true, interrupt_response: true, eagerness: 'auto' },
       },
       output: { voice: String(process.env.OPENAI_VOICE || 'marin').trim() },
@@ -45,8 +46,10 @@ function buildSession(user = {}) {
 }
 
 async function createRealtimeCall({ sdp, user } = {}) {
-  const offer = String(sdp || '').trim();
-  if (!offer) {
+  // O SDP precisa atravessar o backend sem trim/normalização. O parser da
+  // OpenAI é sensível ao conteúdo da offer gerada pelo RTCPeerConnection.
+  const offer = String(sdp || '');
+  if (!offer.trim()) {
     const err = new Error('SDP WebRTC ausente.');
     err.code = 'AI_REALTIME_SDP_MISSING';
     err.status = 400;
