@@ -26,15 +26,28 @@
     sessionStorage.setItem(conversationStorageKey, conversationId);
   }
 
+  const fullName = String(document.querySelector('.pill-name')?.textContent || 'Usuário').trim().slice(0, 80) || 'Usuário';
+  const firstName = fullName.split(/\s+/)[0] || fullName;
   let pc = null;
   let dc = null;
   let localStream = null;
   let active = false;
   let validatedContext = null;
+  let greetingInProgress = false;
   let turnStartedAt = 0;
   let lastResponseLatencyMs = 0;
   const handledCalls = new Set();
   const transcriptLines = [];
+
+  function greetingForHour(hour = new Date().getHours()) {
+    if (hour >= 5 && hour < 12) return 'Bom dia';
+    if (hour >= 12 && hour < 18) return 'Boa tarde';
+    return 'Boa noite';
+  }
+
+  function greetingText() {
+    return `${greetingForHour()}, ${firstName}.`;
+  }
 
   function setStatus(text) {
     statusEl.textContent = String(text || '');
@@ -47,6 +60,12 @@
     if (transcriptLines.length > 30) transcriptLines.splice(0, transcriptLines.length - 30);
     transcriptEl.textContent = transcriptLines.join('\n\n');
     transcriptEl.scrollTop = transcriptEl.scrollHeight;
+  }
+
+  function setMicEnabled(enabled) {
+    try {
+      localStream?.getAudioTracks()?.forEach((track) => { track.enabled = Boolean(enabled); });
+    } catch (_e) {}
   }
 
   function sendEvent(payload) {
@@ -105,6 +124,27 @@
     });
   }
 
+  function startGreeting() {
+    if (dc?.readyState !== 'open') return;
+    const greeting = greetingText();
+    greetingInProgress = true;
+    setMicEnabled(false);
+    setStatus('Cumprimentando...');
+    sendEvent({
+      type: 'response.create',
+      response: {
+        instructions: `Diga somente esta saudação, de forma natural, clara e breve em português do Brasil: "${greeting} Assistente por voz ativo. Como posso ajudar?" Não consulte ferramentas e não acrescente outras informações nesta saudação.`,
+      },
+    });
+  }
+
+  function finishGreeting() {
+    if (!greetingInProgress) return;
+    greetingInProgress = false;
+    setMicEnabled(true);
+    setStatus('Ouvindo... fale normalmente');
+  }
+
   async function runTool(call) {
     const callId = String(call?.call_id || call?.id || '');
     if (!callId || handledCalls.has(callId)) return;
@@ -143,21 +183,24 @@
 
   function handleServerEvent(event) {
     const type = String(event?.type || '');
-    if (type === 'input_audio_buffer.speech_started') {
+    if (type === 'input_audio_buffer.speech_started' && !greetingInProgress) {
       turnStartedAt = 0;
       lastResponseLatencyMs = 0;
       setStatus('Ouvindo...');
     }
-    if (type === 'input_audio_buffer.speech_stopped') {
+    if (type === 'input_audio_buffer.speech_stopped' && !greetingInProgress) {
       turnStartedAt = performance.now();
       setStatus('Entendendo...');
     }
-    if (type === 'response.created') setStatus('Respondendo...');
+    if (type === 'response.created') setStatus(greetingInProgress ? 'Cumprimentando...' : 'Respondendo...');
     if (type === 'output_audio_buffer.started' || type === 'response.output_audio.started') {
       if (turnStartedAt > 0 && !lastResponseLatencyMs) lastResponseLatencyMs = performance.now() - turnStartedAt;
-      setStatus('Falando...');
+      setStatus(greetingInProgress ? 'Assistente por voz ativo' : 'Falando...');
     }
-    if (type === 'output_audio_buffer.stopped') setStatus(active ? 'Ouvindo...' : 'Pronto para conversar');
+    if (type === 'output_audio_buffer.stopped') {
+      if (greetingInProgress) finishGreeting();
+      else setStatus(active ? 'Ouvindo...' : 'Pronto para conversar');
+    }
 
     if (type === 'conversation.item.input_audio_transcription.completed') {
       addTranscript('Você', event.transcript);
@@ -174,10 +217,12 @@
     }
     if (type === 'response.done') {
       reportRealtimeUsage(event?.response?.usage, lastResponseLatencyMs);
-      setStatus(active ? 'Ouvindo...' : 'Pronto para conversar');
+      if (!greetingInProgress) setStatus(active ? 'Ouvindo...' : 'Pronto para conversar');
     }
     if (type === 'error') {
       const message = event?.error?.message || 'Erro na sessão de voz.';
+      greetingInProgress = false;
+      setMicEnabled(true);
       addTranscript('Sistema', message);
       setStatus(message);
     }
@@ -217,7 +262,7 @@
 
     pc.onconnectionstatechange = () => {
       const state = pc?.connectionState;
-      if (state === 'connected') setStatus('Ouvindo...');
+      if (state === 'connected' && !greetingInProgress) setStatus('Ouvindo...');
       if (state === 'failed') setStatus('Falha na conexão de voz.');
       if (state === 'disconnected' && active) setStatus('Reconectando voz...');
     };
@@ -225,7 +270,7 @@
     dc = pc.createDataChannel('oai-events');
     dc.onopen = () => {
       injectValidatedContext();
-      setStatus('Ouvindo... fale normalmente');
+      startGreeting();
     };
     dc.onmessage = (message) => {
       try { handleServerEvent(JSON.parse(message.data)); } catch (_e) {}
@@ -260,11 +305,13 @@
     active = true;
     button.classList.add('active');
     button.textContent = '■';
-    setStatus('Ouvindo... fale normalmente');
+    button.setAttribute('aria-pressed', 'true');
+    button.setAttribute('aria-label', 'Encerrar conversa por voz');
   }
 
   function stopVoice() {
     active = false;
+    greetingInProgress = false;
     turnStartedAt = 0;
     lastResponseLatencyMs = 0;
     try { dc?.close(); } catch (_e) {}
@@ -277,6 +324,8 @@
     remoteAudio.srcObject = null;
     button.classList.remove('active');
     button.textContent = '🎙️';
+    button.setAttribute('aria-pressed', 'false');
+    button.setAttribute('aria-label', 'Iniciar conversa por voz');
     setStatus('Pronto para conversar');
   }
 
