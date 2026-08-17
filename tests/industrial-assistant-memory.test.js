@@ -2,12 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const {
-  hashContent,
-  chunkText,
-  flattenJsonText,
-  lexicalScore,
-} = require('../modules/ai/industrial-assistant.memory.utils');
+const { hashContent, chunkText, flattenJsonText, lexicalScore } = require('../modules/ai/industrial-assistant.memory.utils');
 
 function read(relativePath) {
   return fs.readFileSync(path.join(__dirname, '..', relativePath), 'utf8');
