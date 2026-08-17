@@ -5,8 +5,8 @@ const path = require('node:path');
 
 test('tela da OS usa ações compactas para PDF OS e WhatsApp', () => {
   const view = fs.readFileSync(path.join(__dirname, '..', 'views', 'os', 'show.ejs'), 'utf8');
-  assert.match(view, />PDF OS</);
-  assert.match(view, />WhatsApp</);
+  assert.match(view, />PDF da OS</);
+  assert.match(view, /data-os-module="whatsapp-os">Diagnóstico da integração WhatsApp/);
   assert.doesNotMatch(view, /Gerar PDF institucional|Enviar WhatsApp à equipe|Enviar WhatsApp local/);
 });
 
