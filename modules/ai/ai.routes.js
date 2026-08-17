@@ -26,8 +26,6 @@ const AI_TRANSCRICAO_ACCESS = Array.from(new Set([
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: Number(process.env.OPENAI_AUDIO_MAX_BYTES || 12 * 1024 * 1024), files: 1 } });
 const uploadImage = multer({ storage: multer.memoryStorage(), limits: { fileSize: Number(process.env.OPENAI_IMAGE_MAX_BYTES || 8 * 1024 * 1024), files: 1 } });
-// A interface unificada Realtime da OpenAI recomenda que o navegador envie
-// a offer SDP como corpo bruto application/sdp para o servidor da aplicação.
 const realtimeSdpBody = express.text({ type: ['application/sdp', 'text/plain'], limit: '128kb' });
 
 router.get('/chat', requireLogin, requireRole(AI_ACCESS), ctrl.renderChat);
@@ -56,7 +54,7 @@ router.post('/analyze-image', requireLogin, requireRole(ACCESS.os_view), ctrl.an
 router.get('/dashboard', requireLogin, requireRole(AI_ACCESS), ctrl.dashboard);
 router.post('/webhook/os-created', requireLogin, requireRole(ACCESS.os_view), ctrl.webhookOSCreated);
 
-// Assistente Industrial: texto e voz compartilham o mesmo registro de ferramentas e RBAC do backend.
+// Assistente Industrial: texto e voz compartilham o mesmo backend e RBAC.
 router.get('/industrial/capabilities', requireLogin, requireRole(AI_ACCESS), industrialCtrl.capabilities);
 router.get('/industrial/context', requireLogin, requireRole(AI_ACCESS), industrialCtrl.pageContext);
 router.get('/industrial/health', requireLogin, requireRole(ACCESS.pcm || []), industrialCtrl.health);
@@ -64,6 +62,7 @@ router.post('/industrial/message', requireLogin, requireRole(AI_ACCESS), require
 router.get('/industrial/history', requireLogin, requireRole(AI_ACCESS), industrialCtrl.history);
 router.get('/industrial/briefing', requireLogin, requireRole(ACCESS.pcm || []), industrialCtrl.briefing);
 router.post('/realtime/call', requireLogin, requireRole(AI_ACCESS), requireTrustedAIWrite, realtimeSdpBody, industrialCtrl.realtimeCall);
+router.post('/realtime/usage', requireLogin, requireRole(AI_ACCESS), requireTrustedAIWrite, industrialCtrl.realtimeUsage);
 router.post('/tools/execute', requireLogin, requireRole(AI_ACCESS), requireTrustedAIWrite, industrialCtrl.executeTool);
 
 module.exports = router;
