@@ -1,186 +1,336 @@
 (function () {
-  const launcher = document.getElementById('aiGlobalLauncher');
-  const panel = document.getElementById('aiGlobalPanel');
-  const backdrop = document.getElementById('aiGlobalBackdrop');
-  const closeBtn = document.getElementById('aiGlobalClose');
-  const contextLabel = document.getElementById('aiGlobalContextLabel');
-  const contextDetail = document.getElementById('aiGlobalContextDetail');
-  const messages = document.getElementById('aiGlobalMessages');
-  const input = document.getElementById('aiGlobalInput');
-  const sendBtn = document.getElementById('aiGlobalSend');
-  const statusEl = document.getElementById('aiGlobalStatus');
-  const openFull = document.getElementById('aiGlobalOpenFull');
-  if (!launcher || !panel || !backdrop || !closeBtn || !messages || !input || !sendBtn) return;
+  const root = document.getElementById('aiGlobalVoice');
+  const button = document.getElementById('aiGlobalLauncher');
+  const greetingEl = document.getElementById('aiGlobalVoiceGreeting');
+  const statusEl = document.getElementById('aiGlobalVoiceStatus');
+  const remoteAudio = document.getElementById('aiGlobalVoiceAudio');
+  if (!root || !button || !greetingEl || !statusEl || !remoteAudio) return;
 
+  // A página completa do Assistente já possui seu próprio controle de voz.
+  // Evita duas conexões Realtime concorrentes na mesma tela.
   if (window.location.pathname === '/ai/chat') {
-    launcher.hidden = true;
-    panel.hidden = true;
-    backdrop.hidden = true;
+    root.hidden = true;
     return;
   }
 
   const sourceRoute = `${window.location.pathname}${window.location.search}`;
-  const storageKey = 'cg_ai_industrial_conversation_id_v1';
-  let conversationId = sessionStorage.getItem(storageKey) || '';
-  let contextLoaded = false;
-  let busy = false;
-
+  const conversationStorageKey = 'cg_ai_industrial_conversation_id_v1';
+  let conversationId = sessionStorage.getItem(conversationStorageKey) || '';
   if (!conversationId) {
-    conversationId = window.crypto?.randomUUID?.() || `web-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    sessionStorage.setItem(storageKey, conversationId);
+    conversationId = window.crypto?.randomUUID?.() || `voice-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    sessionStorage.setItem(conversationStorageKey, conversationId);
   }
 
-  openFull.href = `/ai/chat?source=${encodeURIComponent(sourceRoute)}`;
+  const fullName = String(root.dataset.userName || 'Usuário').trim().slice(0, 80) || 'Usuário';
+  const firstName = fullName.split(/\s+/)[0] || fullName;
+  let pc = null;
+  let dc = null;
+  let localStream = null;
+  let active = false;
+  let starting = false;
+  let validatedContext = null;
+  let greetingInProgress = false;
+  let turnStartedAt = 0;
+  let lastResponseLatencyMs = 0;
+  const handledCalls = new Set();
 
-  function setStatus(text) {
-    if (statusEl) statusEl.textContent = String(text || '');
+  function greetingForHour(hour = new Date().getHours()) {
+    if (hour >= 5 && hour < 12) return 'Bom dia';
+    if (hour >= 12 && hour < 18) return 'Boa tarde';
+    return 'Boa noite';
   }
 
-  function clearEmptyState() {
-    const empty = messages.querySelector('.ai-global-empty');
-    if (empty) empty.remove();
+  function greetingText() {
+    return `${greetingForHour()}, ${firstName}.`;
   }
 
-  function addMessage(role, text, tools, sources) {
-    clearEmptyState();
-    const bubble = document.createElement('div');
-    bubble.className = `ai-global-msg ${role === 'user' ? 'user' : 'ai'}`;
-    bubble.textContent = String(text || '');
-    messages.appendChild(bubble);
-
-    if (Array.isArray(tools) && tools.length) {
-      const toolLine = document.createElement('div');
-      toolLine.className = 'ai-global-tools';
-      const names = tools.filter((item) => item?.ok !== false).map((item) => item?.name).filter(Boolean);
-      if (names.length) {
-        toolLine.textContent = `Consultas: ${[...new Set(names)].join(', ')}`;
-        messages.appendChild(toolLine);
-      }
-    }
-
-    if (Array.isArray(sources) && sources.length) {
-      const sourceLine = document.createElement('div');
-      sourceLine.className = 'ai-global-tools';
-      const labels = [...new Set(sources.map((item) => item?.source).filter(Boolean))];
-      if (labels.length) {
-        sourceLine.textContent = `Fontes do sistema: ${labels.join(' • ')}`;
-        messages.appendChild(sourceLine);
-      }
-    }
-    messages.scrollTop = messages.scrollHeight;
+  function setState(state, statusText, greeting) {
+    root.dataset.state = state || 'idle';
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.setAttribute('aria-label', active ? 'Encerrar assistente por voz' : 'Iniciar assistente por voz');
+    if (greeting !== undefined) greetingEl.textContent = String(greeting || 'Assistente por voz');
+    if (statusText !== undefined) statusEl.textContent = String(statusText || '');
   }
 
-  function describeContext(context) {
-    const details = context?.details || {};
-    const parts = [];
-    if (details.status) parts.push(`Status: ${details.status}`);
-    if (details.prioridade) parts.push(`Prioridade: ${details.prioridade}`);
-    if (details.setor || details.setor_origem) parts.push(`Setor: ${details.setor || details.setor_origem}`);
-    if (details.tipo) parts.push(`Tipo: ${details.tipo}`);
-    if (details.criticidade) parts.push(`Criticidade: ${details.criticidade}`);
-    return parts.slice(0, 3).join(' • ');
+  function setMicEnabled(enabled) {
+    try {
+      localStream?.getAudioTracks()?.forEach((track) => { track.enabled = Boolean(enabled); });
+    } catch (_e) {}
   }
 
-  async function loadContext() {
-    if (contextLoaded) return;
+  function sendEvent(payload) {
+    if (dc?.readyState === 'open') dc.send(JSON.stringify(payload));
+  }
+
+  function reportRealtimeUsage(usage, latencyMs) {
+    if (!usage || typeof usage !== 'object') return;
+    fetch('/ai/realtime/usage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        conversation_id: conversationId,
+        latency_ms: Math.max(0, Math.round(Number(latencyMs || 0))),
+        usage,
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  }
+
+  async function loadValidatedContext() {
     try {
       const response = await fetch(`/ai/industrial/context?route=${encodeURIComponent(sourceRoute)}`, {
         headers: { Accept: 'application/json' },
       });
       const data = await response.json();
-      if (!response.ok || !data?.ok) throw new Error(data?.error || 'Falha ao identificar contexto.');
-      const context = data.context || {};
-      contextLabel.textContent = context.label || 'Contexto geral';
-      contextDetail.textContent = describeContext(context);
-      contextLoaded = true;
-    } catch (err) {
-      contextLoaded = false;
-      contextLabel.textContent = 'Contexto geral';
-      contextDetail.textContent = '';
-      setStatus(err?.message || 'Contexto automático indisponível.');
+      if (!response.ok || !data?.ok) throw new Error(data?.error || 'Falha ao validar contexto da página.');
+      validatedContext = data.context || null;
+      return validatedContext;
+    } catch (_e) {
+      validatedContext = null;
+      return null;
     }
   }
 
-  function openPanel() {
-    panel.classList.add('open');
-    backdrop.classList.add('open');
-    panel.setAttribute('aria-hidden', 'false');
-    backdrop.setAttribute('aria-hidden', 'false');
-    launcher.setAttribute('aria-expanded', 'true');
-    loadContext();
-    window.setTimeout(() => input.focus(), 80);
+  function injectValidatedContext() {
+    if (!validatedContext || dc?.readyState !== 'open') return;
+    const contextPayload = {
+      module: validatedContext.module || 'geral',
+      entity_type: validatedContext.entity_type || null,
+      entity_id: Number(validatedContext.entity_id || 0) || null,
+      label: validatedContext.label || 'Contexto geral',
+      details: validatedContext.details && typeof validatedContext.details === 'object' ? validatedContext.details : {},
+      conversation_id: conversationId,
+    };
+    sendEvent({
+      type: 'conversation.item.create',
+      item: {
+        type: 'message',
+        role: 'user',
+        content: [{
+          type: 'input_text',
+          text: `Contexto de navegação validado pelo backend. Use somente como referência da página atual e continue usando as ferramentas para confirmar fatos operacionais. Não responda a esta mensagem isoladamente. Contexto: ${JSON.stringify(contextPayload)}`,
+        }],
+      },
+    });
   }
 
-  function closePanel() {
-    panel.classList.remove('open');
-    backdrop.classList.remove('open');
-    panel.setAttribute('aria-hidden', 'true');
-    backdrop.setAttribute('aria-hidden', 'true');
-    launcher.setAttribute('aria-expanded', 'false');
-    launcher.focus();
+  function startGreeting() {
+    if (dc?.readyState !== 'open') return;
+    const greeting = greetingText();
+    greetingInProgress = true;
+    setMicEnabled(false);
+    setState('starting', 'Assistente por voz ativo', greeting);
+    sendEvent({
+      type: 'response.create',
+      response: {
+        instructions: `Diga somente esta saudação, de forma natural, clara e breve em português do Brasil: "${greeting} Assistente por voz ativo. Como posso ajudar?" Não consulte ferramentas e não acrescente outras informações nesta saudação.`,
+      },
+    });
   }
 
-  async function sendMessage() {
-    if (busy) return;
-    const text = String(input.value || '').trim();
-    if (!text) {
-      setStatus('Digite uma pergunta.');
-      return;
-    }
+  async function runTool(call) {
+    const callId = String(call?.call_id || call?.id || '');
+    if (!callId || handledCalls.has(callId)) return;
+    handledCalls.add(callId);
+    setState('thinking', `Consultando sistema: ${call.name || 'ferramenta'}...`, greetingText());
 
-    busy = true;
-    sendBtn.disabled = true;
-    input.disabled = true;
-    setStatus('Consultando o sistema…');
-    addMessage('user', text);
-    input.value = '';
+    let args = {};
+    try { args = JSON.parse(call.arguments || '{}'); } catch (_e) { args = {}; }
+    const name = String(call?.name || '');
+    if (name.startsWith('preparar_') && !args.conversation_id) args.conversation_id = conversationId;
 
+    let output;
     try {
-      const response = await fetch('/ai/industrial/message', {
+      const response = await fetch('/ai/tools/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          conversation_id: conversationId,
-          route: sourceRoute,
-        }),
+        body: JSON.stringify({ name, arguments: args }),
       });
       const data = await response.json();
-      if (!response.ok || !data?.ok) throw new Error(data?.error || 'Falha ao consultar o Assistente Industrial.');
-      if (data.conversation_id) {
-        conversationId = String(data.conversation_id);
-        sessionStorage.setItem(storageKey, conversationId);
-      }
-      if (data.context?.label) {
-        contextLabel.textContent = data.context.label;
-        contextDetail.textContent = describeContext(data.context);
-        contextLoaded = true;
-      }
-      addMessage('ai', data.resposta || 'Sem resposta.', data.tools || [], data.sources || []);
-      setStatus('Resposta recebida.');
+      output = response.ok
+        ? data.result
+        : { error: data?.error || 'Falha ao consultar sistema.', code: data?.code || 'AI_TOOL_ERROR' };
     } catch (err) {
-      addMessage('ai', `Não foi possível concluir a consulta: ${err?.message || 'erro inesperado.'}`);
-      setStatus('Falha na consulta.');
-      if (/sessão|login/i.test(String(err?.message || ''))) sessionStorage.removeItem(storageKey);
-    } finally {
-      busy = false;
-      sendBtn.disabled = false;
-      input.disabled = false;
-      input.focus();
+      output = { error: err?.message || 'Falha de rede ao executar ferramenta.', code: 'AI_TOOL_NETWORK_ERROR' };
+    }
+
+    sendEvent({
+      type: 'conversation.item.create',
+      item: {
+        type: 'function_call_output',
+        call_id: callId,
+        output: JSON.stringify(output),
+      },
+    });
+    sendEvent({ type: 'response.create' });
+  }
+
+  function finishGreeting() {
+    if (!greetingInProgress) return;
+    greetingInProgress = false;
+    setMicEnabled(true);
+    setState('listening', 'Ouvindo... fale normalmente', greetingText());
+  }
+
+  function handleServerEvent(event) {
+    const type = String(event?.type || '');
+
+    if (type === 'input_audio_buffer.speech_started' && !greetingInProgress) {
+      turnStartedAt = 0;
+      lastResponseLatencyMs = 0;
+      setState('listening', 'Ouvindo...', greetingText());
+    }
+    if (type === 'input_audio_buffer.speech_stopped' && !greetingInProgress) {
+      turnStartedAt = performance.now();
+      setState('thinking', 'Entendendo...', greetingText());
+    }
+    if (type === 'response.created') {
+      setState(greetingInProgress ? 'starting' : 'thinking', greetingInProgress ? 'Cumprimentando...' : 'Respondendo...', greetingText());
+    }
+    if (type === 'output_audio_buffer.started' || type === 'response.output_audio.started') {
+      if (turnStartedAt > 0 && !lastResponseLatencyMs) lastResponseLatencyMs = performance.now() - turnStartedAt;
+      setState('speaking', greetingInProgress ? 'Assistente por voz ativo' : 'Falando...', greetingText());
+    }
+    if (type === 'output_audio_buffer.stopped') {
+      if (greetingInProgress) finishGreeting();
+      else if (active) setState('listening', 'Ouvindo... fale normalmente', greetingText());
+    }
+
+    if (type === 'response.function_call_arguments.done') {
+      runTool({ call_id: event.call_id, name: event.name, arguments: event.arguments });
+    }
+    if (type === 'response.output_item.done' && event?.item?.type === 'function_call') {
+      runTool(event.item);
+    }
+    if (type === 'response.done') {
+      reportRealtimeUsage(event?.response?.usage, lastResponseLatencyMs);
+      if (!greetingInProgress && active) setState('listening', 'Ouvindo... fale normalmente', greetingText());
+    }
+    if (type === 'error') {
+      const message = event?.error?.message || 'Erro na sessão de voz.';
+      greetingInProgress = false;
+      setMicEnabled(true);
+      setState('error', message, 'Assistente indisponível');
     }
   }
 
-  launcher.addEventListener('click', openPanel);
-  closeBtn.addEventListener('click', closePanel);
-  backdrop.addEventListener('click', closePanel);
-  sendBtn.addEventListener('click', sendMessage);
-  input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      sendMessage();
+  function validSdp(value) {
+    const sdp = String(value || '');
+    return sdp.startsWith('v=0') && sdp.includes('\nm=');
+  }
+
+  function teardownVoice() {
+    active = false;
+    starting = false;
+    greetingInProgress = false;
+    turnStartedAt = 0;
+    lastResponseLatencyMs = 0;
+    try { dc?.close(); } catch (_e) {}
+    try { pc?.close(); } catch (_e) {}
+    try { localStream?.getTracks()?.forEach((track) => track.stop()); } catch (_e) {}
+    dc = null;
+    pc = null;
+    localStream = null;
+    remoteAudio.pause();
+    remoteAudio.srcObject = null;
+    button.disabled = false;
+  }
+
+  async function startVoice() {
+    if (starting || active) return;
+    if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) {
+      throw new Error('Este navegador não suporta voz WebRTC.');
+    }
+
+    starting = true;
+    button.disabled = true;
+    setState('starting', 'Validando contexto...', greetingText());
+    await loadValidatedContext();
+    setState('starting', 'Solicitando microfone...', greetingText());
+
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+
+    pc = new RTCPeerConnection();
+    localStream.getAudioTracks().forEach((track) => pc.addTrack(track, localStream));
+
+    pc.ontrack = (event) => {
+      const [stream] = event.streams;
+      if (!stream) return;
+      remoteAudio.srcObject = stream;
+      remoteAudio.autoplay = true;
+      remoteAudio.play().catch(() => {});
+    };
+
+    pc.onconnectionstatechange = () => {
+      const state = pc?.connectionState;
+      if (state === 'failed') {
+        teardownVoice();
+        setState('error', 'Falha na conexão de voz. Toque para tentar novamente.', 'Assistente indisponível');
+      }
+      if (state === 'disconnected' && active) {
+        setState('thinking', 'Reconectando voz...', greetingText());
+      }
+    };
+
+    dc = pc.createDataChannel('oai-events');
+    dc.onopen = () => {
+      injectValidatedContext();
+      startGreeting();
+    };
+    dc.onmessage = (message) => {
+      try { handleServerEvent(JSON.parse(message.data)); } catch (_e) {}
+    };
+    dc.onclose = () => {
+      if (active) setState('error', 'Conexão de voz encerrada. Toque para iniciar novamente.', 'Assistente por voz');
+    };
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const localSdp = String(pc.localDescription?.sdp || offer.sdp || '');
+    if (!validSdp(localSdp)) throw new Error('O navegador não gerou uma oferta SDP válida para a sessão de voz.');
+
+    const response = await fetch('/ai/realtime/call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/sdp', Accept: 'application/sdp, application/json' },
+      body: localSdp,
+    });
+    const answerBody = await response.text();
+    if (!response.ok) {
+      let message = 'Não foi possível iniciar a voz.';
+      try { message = JSON.parse(answerBody)?.error || message; } catch (_e) {}
+      throw new Error(message);
+    }
+    if (!validSdp(answerBody)) throw new Error('O servidor de voz não retornou uma resposta SDP válida.');
+
+    await pc.setRemoteDescription({ type: 'answer', sdp: answerBody });
+    active = true;
+    starting = false;
+    button.disabled = false;
+    button.setAttribute('aria-pressed', 'true');
+  }
+
+  function stopVoice() {
+    teardownVoice();
+    setState('idle', 'Pronto para conversar', 'Assistente por voz');
+    button.focus();
+  }
+
+  button.addEventListener('click', async () => {
+    if (active) return stopVoice();
+    if (starting) return;
+    try {
+      await startVoice();
+    } catch (err) {
+      teardownVoice();
+      setState('error', err?.message || 'Falha ao iniciar voz.', 'Assistente indisponível');
     }
   });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && panel.classList.contains('open')) closePanel();
-  });
+
+  window.addEventListener('beforeunload', teardownVoice);
 })();
