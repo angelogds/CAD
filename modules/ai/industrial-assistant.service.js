@@ -7,6 +7,7 @@ const comprasService = require('../compras/compras.service');
 const fornecedoresService = require('../fornecedores/fornecedores.service');
 const pcmOperationalService = require('../pcm/pcm.operational.service');
 const operationalActions = require('./industrial-assistant.actions.service');
+const operationalRead = require('./industrial-assistant.read.service');
 
 function safeJsonParse(value, fallback = {}) {
   try { return JSON.parse(String(value || '')); } catch (_e) { return fallback; }
@@ -228,6 +229,7 @@ function getRealtimeTools() {
     { type: 'function', name: 'consultar_compras', description: 'Consulta a fila operacional de Compras, incluindo cotação, compra, recebimento e atrasos.', parameters: { type: 'object', additionalProperties: false, properties: { termo: { type: 'string' }, setor: { type: 'string' }, prioridade: { type: 'string' }, card: { type: 'string' }, incluir_fechadas: { type: 'boolean' }, limit: { type: 'integer', minimum: 1, maximum: 20 } } } },
     { type: 'function', name: 'consultar_fornecedores', description: 'Pesquisa fornecedores reais por nome, produto, categoria ou localização e retorna histórico agregado.', parameters: { type: 'object', additionalProperties: false, properties: { termo: { type: 'string' }, situacao: { type: 'string' }, local: { type: 'string' }, somente_favoritos: { type: 'boolean' }, limit: { type: 'integer', minimum: 1, maximum: 20 } } } },
     { type: 'function', name: 'consultar_historico_fornecedor', description: 'Consulta o histórico real de cotações e compras de um fornecedor pelo ID.', parameters: { type: 'object', additionalProperties: false, required: ['fornecedor_id'], properties: { fornecedor_id: { type: 'integer' }, termo: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 30 } } } },
+    ...operationalRead.getTools(),
     { type: 'function', name: 'preparar_abertura_os', description: 'Prepara uma nova OS a partir do relato do usuário, mas NÃO grava. Retorna uma ação pendente que exige confirmação explícita.', parameters: { type: 'object', additionalProperties: false, required: ['relato'], properties: { relato: { type: 'string' }, conversation_id: { type: 'string' } } } },
     ...operationalActions.getTools(),
     { type: 'function', name: 'confirmar_acao', description: 'Confirma e executa uma abertura de OS previamente preparada. Só use quando o usuário disser explicitamente confirmar/sim.', parameters: { type: 'object', additionalProperties: false, required: ['action_id','confirmation_text'], properties: { action_id: { type: 'integer' }, confirmation_text: { type: 'string' } } } },
@@ -242,7 +244,7 @@ function getInstructions(user = {}) {
     'Você é o Assistente Industrial Campo do Gado, especialista em manutenção industrial e PCM.',
     `Usuário autenticado: ${name}. Perfil: ${role || 'NÃO INFORMADO'}.`,
     'Responda em português do Brasil, de forma objetiva, técnica e segura.',
-    'Para dados operacionais do sistema, use as ferramentas. Nunca invente OS, estoque, equipamento, preventiva, compra, fornecedor ou histórico.',
+    'Para dados operacionais do sistema, use as ferramentas. Nunca invente OS, estoque, equipamento, preventiva, demanda, recebimento, compra, fornecedor ou histórico.',
     'Ao apresentar uma conclusão, diferencie claramente FATO confirmado, ANÁLISE e RECOMENDAÇÃO quando houver interpretação.',
     'Se uma ferramenta retornar vazio, diga que não encontrou dado confirmado.',
     'Ações que alteram dados devem ser apenas preparadas primeiro. Só execute depois de confirmação explícita do usuário.',
@@ -285,6 +287,10 @@ async function executeTool({ name, args = {}, user }) {
     const err = new Error('Sessão de usuário inválida.');
     err.status = 401;
     throw err;
+  }
+
+  if (operationalRead.hasTool(name)) {
+    return operationalRead.executeTool({ name, args, user });
   }
 
   if (operationalActions.hasTool(name)) {
