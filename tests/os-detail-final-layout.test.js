@@ -3,12 +3,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const read = (path) => fs.readFileSync(path, 'utf8');
 
-test('OS detail exposes evidence before exactly three domain tabs', () => {
+test('OS detail exposes evidence before three fixed tabs and optional team redistribution', () => {
   const view = read('views/os/show.ejs');
   const evidence = view.indexOf('class="os-panel os-evidence-card"');
   const tabs = view.indexOf('class="os-panel os-workspace"');
   assert.ok(evidence > 0 && evidence < tabs);
-  assert.equal((view.match(/role="tab"/g) || []).length, 3);
+  for (const tab of ['tab-justificativa', 'tab-materiais', 'tab-historico']) assert.match(view, new RegExp(`id="${tab}"[^>]*role="tab"`));
+  assert.match(view, /canAutoAssign && !isOSFechada[\s\S]*id="tab-redistribuicao"[^>]*role="tab"/);
   assert.doesNotMatch(view, /id="tab-(resumo|evidencias)"/);
   assert.match(view, /Histórico da OS/);
 });
