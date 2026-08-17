@@ -27,7 +27,7 @@ function getRealtimeTools() {
 }
 
 function getVoiceModel() {
-  return String(process.env.OPENAI_MODEL_VOICE || 'gpt-realtime-1.5').trim();
+  return String(process.env.OPENAI_MODEL_VOICE || 'gpt-realtime-2.1').trim();
 }
 
 function buildSession(user = {}) {
@@ -45,7 +45,6 @@ function buildSession(user = {}) {
     },
     tools: getRealtimeTools(),
     tool_choice: 'auto',
-    tracing: 'auto',
   };
 }
 
