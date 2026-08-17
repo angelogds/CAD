@@ -11,24 +11,25 @@ function number(value) {
 }
 
 function compactUsage(usage = {}) {
+  const inputDetails = usage.input_token_details || usage.input_tokens_details || {};
+  const outputDetails = usage.output_token_details || usage.output_tokens_details || {};
   return {
     input_tokens: number(usage.input_tokens),
     output_tokens: number(usage.output_tokens),
     total_tokens: number(usage.total_tokens),
-    cached_tokens: number(usage?.input_tokens_details?.cached_tokens),
-    reasoning_tokens: number(usage?.output_tokens_details?.reasoning_tokens),
+    cached_tokens: number(inputDetails.cached_tokens),
+    input_audio_tokens: number(inputDetails.audio_tokens),
+    input_text_tokens: number(inputDetails.text_tokens),
+    output_audio_tokens: number(outputDetails.audio_tokens),
+    output_text_tokens: number(outputDetails.text_tokens),
+    reasoning_tokens: number(outputDetails.reasoning_tokens),
   };
 }
 
 function addUsage(total = {}, usage = {}) {
   const next = compactUsage(usage);
-  return {
-    input_tokens: number(total.input_tokens) + next.input_tokens,
-    output_tokens: number(total.output_tokens) + next.output_tokens,
-    total_tokens: number(total.total_tokens) + next.total_tokens,
-    cached_tokens: number(total.cached_tokens) + next.cached_tokens,
-    reasoning_tokens: number(total.reasoning_tokens) + next.reasoning_tokens,
-  };
+  const current = compactUsage(total);
+  return Object.fromEntries(Object.keys(next).map((key) => [key, number(current[key]) + number(next[key])]));
 }
 
 function sanitizeTools(tools = []) {
@@ -76,28 +77,34 @@ function logUsage({ tipo, userId = null, conversationId = null, model = null, du
 }
 
 function recentStats() {
-  if (!tableExists('ai_usage_logs')) return { total_24h: 0, sucessos_24h: 0, erros_24h: 0, tokens_24h: 0, ultima_execucao: null };
+  if (!tableExists('ai_usage_logs')) return { total_24h: 0, sucessos_24h: 0, erros_24h: 0, tokens_24h: 0, audio_tokens_24h: 0, ultima_execucao: null };
   const rows = db.prepare(`
     SELECT status,payload_json,criado_em
     FROM ai_usage_logs
-    WHERE tipo IN ('INDUSTRIAL_TEXT','INDUSTRIAL_REALTIME_SETUP')
+    WHERE tipo IN ('INDUSTRIAL_TEXT','INDUSTRIAL_REALTIME_SETUP','INDUSTRIAL_REALTIME_TURN')
       AND datetime(criado_em)>=datetime('now','-24 hours')
     ORDER BY datetime(criado_em) DESC,id DESC
-    LIMIT 1000
+    LIMIT 2000
   `).all();
   let tokens = 0;
+  let audioTokens = 0;
   let success = 0;
   let errors = 0;
   for (const row of rows) {
     if (String(row.status || '').toLowerCase() === 'ok') success += 1;
     else errors += 1;
-    try { tokens += number(JSON.parse(row.payload_json || '{}')?.usage?.total_tokens); } catch (_e) {}
+    try {
+      const usage = JSON.parse(row.payload_json || '{}')?.usage || {};
+      tokens += number(usage.total_tokens);
+      audioTokens += number(usage.input_audio_tokens) + number(usage.output_audio_tokens);
+    } catch (_e) {}
   }
   return {
     total_24h: rows.length,
     sucessos_24h: success,
     erros_24h: errors,
     tokens_24h: tokens,
+    audio_tokens_24h: audioTokens,
     ultima_execucao: rows[0]?.criado_em || null,
   };
 }
@@ -139,8 +146,9 @@ function healthSnapshot() {
     openai_key_configured: configured,
     models: {
       assistant: String(process.env.OPENAI_MODEL_ASSISTANT || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini').trim(),
-      voice: String(process.env.OPENAI_MODEL_VOICE || 'gpt-realtime').trim(),
+      voice: String(process.env.OPENAI_MODEL_VOICE || 'gpt-realtime-2.1-mini').trim(),
       transcription: String(process.env.OPENAI_MODEL_TRANSCRIBE || 'gpt-4o-mini-transcribe').trim(),
+      transcription_enabled: String(process.env.OPENAI_REALTIME_TRANSCRIPTION_ENABLED || 'false').trim().toLowerCase() === 'true',
       embeddings: String(process.env.OPENAI_MODEL_EMBEDDINGS || 'text-embedding-3-small').trim(),
     },
     storage: {
