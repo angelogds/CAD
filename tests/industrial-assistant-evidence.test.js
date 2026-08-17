@@ -32,13 +32,21 @@ test('evidência do FactoryMemory nasce do resultado verificado da tool, não do
   assert.match(textService, /evidence: Array\.isArray\(result\?\.evidencias\)/);
 });
 
-test('interfaces exibem fontes do sistema sem innerHTML', () => {
+test('interfaces textuais exibem fontes do sistema sem innerHTML e launcher global permanece somente voz', () => {
   const chat = read('public/js/ai-chat.js');
   const global = read('public/js/ai-global.js');
   const workspace = read('public/js/ai-workspace.js');
 
-  [chat, global, workspace].forEach((source) => {
+  [chat, workspace].forEach((source) => {
     assert.match(source, /Fontes do sistema:/);
     assert.doesNotMatch(source, /innerHTML/);
   });
+
+  // O launcher global não renderiza respostas textuais: ele é exclusivamente
+  // uma interface de voz. As evidências continuam disponíveis nas interfaces
+  // textuais completas e continuam sendo derivadas pelo backend.
+  assert.doesNotMatch(global, /innerHTML/);
+  assert.doesNotMatch(global, /\/ai\/industrial\/message/);
+  assert.match(global, /\/ai\/realtime\/call/);
+  assert.match(global, /\/ai\/tools\/execute/);
 });
