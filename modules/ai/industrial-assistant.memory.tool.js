@@ -89,7 +89,7 @@ async function executeTool({ name, args = {}, user } = {}) {
   const sourceTypes = resolveSourceTypes(user, args.fonte || 'TODAS');
   const limit = Math.max(1, Math.min(Number(args.limit || 6), 12));
 
-  const sync = await factoryMemory.syncKnownSources({ limitPerType: 100 });
+  const sync = await factoryMemory.syncKnownSources({ limitPerType: 100, sourceTypes });
   const result = await factoryMemory.searchMemory({
     query,
     sourceTypes,
