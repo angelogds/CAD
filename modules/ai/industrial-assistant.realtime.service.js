@@ -26,10 +26,14 @@ function getRealtimeTools() {
   return [...industrialAssistant.getRealtimeTools(), ...memoryTool.getTools()];
 }
 
+function getVoiceModel() {
+  return String(process.env.OPENAI_MODEL_VOICE || 'gpt-realtime-1.5').trim();
+}
+
 function buildSession(user = {}) {
   return {
     type: 'realtime',
-    model: String(process.env.OPENAI_MODEL_VOICE || 'gpt-realtime').trim(),
+    model: getVoiceModel(),
     instructions: getInstructions(user),
     output_modalities: ['audio'],
     audio: {
@@ -63,4 +67,4 @@ async function createRealtimeCall({ sdp, user } = {}) {
   });
 }
 
-module.exports = { getInstructions, getRealtimeTools, buildSession, createRealtimeCall };
+module.exports = { getInstructions, getRealtimeTools, getVoiceModel, buildSession, createRealtimeCall };
