@@ -49,7 +49,7 @@ test('arquivos binários de academia/equipamento não são fingidos como conteú
   const text = read('modules/ai/industrial-assistant.text.service.js');
   const realtime = read('modules/ai/industrial-assistant.realtime.service.js');
   assert.match(service, /binary_content_indexed: false/);
-  assert.match(service, /ACADEMIA_BIBLIOTECA/);
+  assert.match(service, /ACAMIA_BIBLIOTECA/);
   assert.match(service, /EQUIPAMENTO_DOCUMENTO/);
   assert.match(service, /conteudo_ia_json/);
   assert.match(text, /binary_content_indexed=false/);
