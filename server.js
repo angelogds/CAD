@@ -1,5 +1,7 @@
 // server.js
 require("dotenv").config();
+const { resolveSessionSecret } = require("./config/runtime-security");
+const SESSION_SECRET = resolveSessionSecret(process.env);
 
 try {
   require("./database/migrate");
@@ -40,14 +42,17 @@ const fmtBR =
 const TZ = dateUtil.TZ || "America/Sao_Paulo";
 
 // ✅ RBAC helpers (para usar no EJS sem require)
-let canAccessModule = () => true;
+let canAccessModule = () => false;
 let normalizeRole = (v) => String(v || "").toLowerCase();
 try {
   const rbac = require("./config/rbac");
-  if (typeof rbac.canAccessModule === "function") canAccessModule = rbac.canAccessModule;
-  if (typeof rbac.normalizeRole === "function") normalizeRole = rbac.normalizeRole;
+  if (typeof rbac.canAccessModule !== "function" || typeof rbac.normalizeRole !== "function") {
+    throw new Error("config/rbac inválido ou incompleto");
+  }
+  canAccessModule = rbac.canAccessModule;
+  normalizeRole = rbac.normalizeRole;
 } catch (e) {
-  console.warn("⚠️ [rbac] não carregado (seguindo permissivo):", e.message || e);
+  console.error("❌ [rbac] não carregado; acesso aos módulos permanecerá bloqueado por segurança:", e.message || e);
 }
 
 const app = express();
@@ -174,7 +179,7 @@ app.use((req, res, next) => {
 app.use(
   session({
     name: process.env.SESSION_COOKIE_NAME || "cg.sid",
-    secret: process.env.SESSION_SECRET || "dev-secret",
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     proxy: true,
