@@ -4,7 +4,7 @@
     : String(user?.role || '').toUpperCase();
 
   const can = (moduleKey) => {
-    if (typeof canAccessModule !== 'function') return true;
+    if (typeof canAccessModule !== 'function') return false;
     return canAccessModule(role, moduleKey);
   };
 
