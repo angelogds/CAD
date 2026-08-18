@@ -6,7 +6,7 @@ const osCounts = op.os.counts || {}, demandas = demandasResumo || {}, prev = op.
 const activeDemands = Number(demandas.novas||0)+Number(demandas.em_andamento||0)+Number(demandas.paradas||0);
 const criticalCount = (op.critical||[]).filter(i=>['CRITICO','CRÍTICO','ALTO'].includes(String(i.nivel||i.situacao_atual||'').toUpperCase()) || Number(i.reincidencias||0)>0).length;
 const roleNorm = typeof normalizeRole==='function' ? normalizeRole(user?.role||'') : String(user?.role||'').toUpperCase();
-if(typeof canAccessModule!=='function'){ var canAccessModule=()=>true; }
+if(typeof canAccessModule!=='function'){ var canAccessModule=()=>false; }
 const canPreventivas=canAccessModule(roleNorm,'preventivas_view'), canOperatePreventivas=roleNorm!=='INSPECAO_QUALIDADE';
 const qs=new URLSearchParams({periodo:op.period.key||'30d',...(op.sector?{setor:op.sector}:{}),...(tvMode?{tv:'1'}:{})}).toString();
 const statusNorm=v=>String(v||'').toUpperCase();
