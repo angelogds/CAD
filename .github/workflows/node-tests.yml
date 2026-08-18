@@ -41,11 +41,10 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-  full-suite-diagnostic:
-    name: Suíte completa - diagnóstico legado
+  full-suite-regression:
+    name: Suíte completa - regressão
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v7
