@@ -23,7 +23,7 @@ function minhas(req, res) {
     date: req.query.date || "",
     vinculadasOs: req.query.vinculadas_os === "1",
     urgentes: req.query.urgentes === "1",
-    prioridade: ['URGENTE','ALTA','MEDIA','BAIXA'].includes(String(req.query.prioridade || '').toUpperCase()) ? String(req.query.prioridade).toUpperCase() : '',
+    prioridade: ['CRITICA','ALTA','MEDIA','BAIXA'].includes(String(req.query.prioridade || '').toUpperCase()) ? String(req.query.prioridade).toUpperCase() : '',
   };
 
   res.render("solicitacoes/minhas", {
