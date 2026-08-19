@@ -1,309 +1,158 @@
 <% layout('layout') %>
+<link rel="stylesheet" href="/css/os-new.css?v=20260819-nova-os-mobile">
 
-<div class="card" style="max-width:980px; margin:0 auto;">
-  <div class="page-head" style="margin-top:0;">
+<section class="os-new-page" aria-labelledby="os-new-title">
+  <header class="os-new-head">
     <div>
-      <h1 style="font-size:28px;">Nova Não Conformidade / OS</h1>
-      <p class="muted">Abertura rápida da ocorrência para geração automática da ordem de serviço.</p>
+      <h1 id="os-new-title">Nova Não Conformidade / OS</h1>
+      <p>Abertura rápida da ocorrência para geração automática da ordem de serviço.</p>
     </div>
-  </div>
+    <span class="os-new-kicker">Abertura operacional</span>
+  </header>
 
-  <form method="POST" action="/os" enctype="multipart/form-data" id="os-form">
-    <div class="grid-2" style="gap:16px;">
-      <div style="grid-column:1 / -1;">
-        <label class="label" for="equipamento_id">EQUIPAMENTO</label>
-        <div class="muted" style="margin-bottom:8px;">Selecione o equipamento cadastrado ou informe manualmente.</div>
-        <select name="equipamento_id" id="equipamento_id" class="input">
-          <option value="">Selecionar equipamento cadastrado</option>
-          <% (equipamentos || []).forEach(e => { %>
-            <option value="<%= e.id %>" <%= String(prefillEquipamentoId||'')===String(e.id)?'selected':'' %>><%= e.codigo ? e.codigo + ' - ' : '' %><%= e.nome %></option>
-          <% }) %>
-        </select>
-        <div class="muted" style="margin:10px 0 6px;">Ou digitar equipamento manualmente</div>
-        <input class="input" type="text" name="equipamento_manual" id="equipamento_manual" placeholder="Ex.: Bomba de recirculação do setor de lavagem" />
+  <form method="POST" action="/os" enctype="multipart/form-data" id="os-form" class="os-new-form">
+    <section class="os-new-card" aria-labelledby="os-new-identificacao">
+      <div class="os-new-card-head">
+        <div>
+          <h2 class="os-new-card-title" id="os-new-identificacao">1. Identificação</h2>
+          <p class="os-new-card-help">Selecione o equipamento cadastrado ou informe manualmente quando ele ainda não existir no cadastro.</p>
+        </div>
       </div>
-
-      <div>
-        <label class="label" for="setor_solicitante">SETOR SOLICITANTE</label>
-        <input class="input" type="text" name="setor_solicitante" id="setor_solicitante" placeholder="Ex.: Produção" />
+      <div class="os-new-grid">
+        <div class="os-new-field">
+          <label class="label" for="equipamento_id">Equipamento cadastrado</label>
+          <select name="equipamento_id" id="equipamento_id" class="input" aria-describedby="equipamento-ajuda">
+            <option value="">Selecionar equipamento cadastrado</option>
+            <% (equipamentos || []).forEach(e => { %>
+              <option value="<%= e.id %>" <%= String(prefillEquipamentoId||'')===String(e.id)?'selected':'' %>><%= e.codigo ? e.codigo + ' - ' : '' %><%= e.nome %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="os-new-field">
+          <label class="label" for="equipamento_manual">Equipamento manual</label>
+          <input class="input" type="text" name="equipamento_manual" id="equipamento_manual" placeholder="Ex.: Bomba de recirculação do setor de lavagem" aria-describedby="equipamento-ajuda" />
+        </div>
+        <div id="equipamento-ajuda" class="os-new-hint os-new-field--full">Preencha somente uma das opções acima.</div>
       </div>
+    </section>
 
-      <div>
-        <label class="label" for="setor_destinatario">SETOR DESTINATÁRIO</label>
-        <input class="input" type="text" name="setor_destinatario" id="setor_destinatario" value="Manutenção" />
+    <section class="os-new-card" aria-labelledby="os-new-solicitacao">
+      <div class="os-new-card-head">
+        <div>
+          <h2 class="os-new-card-title" id="os-new-solicitacao">2. Solicitação</h2>
+          <p class="os-new-card-help">Identifique a origem da ocorrência e quem receberá o atendimento.</p>
+        </div>
       </div>
-
-      <div style="grid-column:1 / -1;">
-        <label class="label" for="responsavel_manutencao">RESPONSÁVEL PELA MANUTENÇÃO</label>
-        <input class="input" type="text" name="responsavel_manutencao" id="responsavel_manutencao" value="Ângelo Gomes da Silva" />
+      <div class="os-new-grid">
+        <div class="os-new-field">
+          <label class="label" for="setor_solicitante">Setor solicitante</label>
+          <input class="input" type="text" name="setor_solicitante" id="setor_solicitante" placeholder="Ex.: Produção" />
+        </div>
+        <div class="os-new-field">
+          <label class="label" for="setor_destinatario">Setor destinatário</label>
+          <input class="input" type="text" name="setor_destinatario" id="setor_destinatario" value="Manutenção" />
+        </div>
+        <div class="os-new-field os-new-field--full">
+          <label class="label" for="responsavel_manutencao">Responsável pela manutenção</label>
+          <input class="input" type="text" name="responsavel_manutencao" id="responsavel_manutencao" value="Ângelo Gomes da Silva" />
+        </div>
       </div>
+    </section>
 
-      <div style="grid-column:1 / -1;">
-        <label class="label" for="sintoma_principal">SINTOMA PRINCIPAL *</label>
-        <select name="sintoma_principal" id="sintoma_principal" class="input" required>
-          <option value="">Selecione...</option>
-          <option value="equipamento_parado">Equipamento parado</option>
-          <option value="vazamento">Vazamento</option>
-          <option value="aquecimento">Aquecimento</option>
-          <option value="vibracao">Vibração</option>
-          <option value="ruido_anormal">Ruído anormal</option>
-          <option value="travamento">Travamento</option>
-          <option value="baixa_performance">Baixa performance</option>
-          <option value="falha_eletrica">Falha elétrica</option>
-          <option value="desalinhamento">Desalinhamento</option>
-          <option value="folga_mecanica">Folga mecânica</option>
-          <option value="material_acumulado">Material acumulado</option>
-          <option value="outro">Outro</option>
-        </select>
+    <section class="os-new-card" aria-labelledby="os-new-ocorrencia">
+      <div class="os-new-card-head">
+        <div>
+          <h2 class="os-new-card-title" id="os-new-ocorrencia">3. Ocorrência</h2>
+          <p class="os-new-card-help">Registre o sintoma percebido e descreva objetivamente a não conformidade.</p>
+        </div>
       </div>
+      <div class="os-new-grid">
+        <div class="os-new-field os-new-field--full">
+          <label class="label" for="sintoma_principal">Sintoma principal *</label>
+          <select name="sintoma_principal" id="sintoma_principal" class="input" required>
+            <option value="">Selecione...</option>
+            <option value="equipamento_parado">Equipamento parado</option>
+            <option value="vazamento">Vazamento</option>
+            <option value="aquecimento">Aquecimento</option>
+            <option value="vibracao">Vibração</option>
+            <option value="ruido_anormal">Ruído anormal</option>
+            <option value="travamento">Travamento</option>
+            <option value="baixa_performance">Baixa performance</option>
+            <option value="falha_eletrica">Falha elétrica</option>
+            <option value="desalinhamento">Desalinhamento</option>
+            <option value="folga_mecanica">Folga mecânica</option>
+            <option value="material_acumulado">Material acumulado</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="os-new-field os-new-field--full">
+          <label class="label" for="nao_conformidade">Não conformidade do equipamento *</label>
+          <textarea
+            id="nao_conformidade"
+            name="nao_conformidade"
+            class="input"
+            minlength="10"
+            required
+            placeholder="Ex.: Equipamento apresentando vibração forte, ruído e aquecimento durante operação."
+          ></textarea>
+          <div class="os-new-hint">Descreva o que está acontecendo. A assistência por voz abaixo pode preencher este campo e os dados técnicos automaticamente.</div>
+        </div>
+      </div>
+    </section>
 
-      <div style="grid-column:1 / -1;">
-        <label class="label" for="nao_conformidade">NÃO CONFORMIDADE DO EQUIPAMENTO *</label>
-        <div class="muted" style="margin-bottom:10px;">Fale o problema e deixe a IA preencher a descrição e os campos técnicos automaticamente.</div>
-
+    <section class="os-new-card" aria-labelledby="os-new-assistencia">
+      <div class="os-new-card-head">
+        <div>
+          <h2 class="os-new-card-title" id="os-new-assistencia">4. Assistência técnica</h2>
+          <p class="os-new-card-help">Use a voz para registrar a ocorrência e receber o preenchimento assistido pela IA. Revise o resultado antes de salvar.</p>
+        </div>
+      </div>
+      <div class="os-new-assistant-panel">
         <button type="button" id="btn-converse-mecanico" class="btn-converse-mecanico" aria-label="Converse com o Mecânico">
-          <span class="emoji">🎤</span>
+          <span aria-hidden="true">🎤</span>
           <span id="btn-converse-label">Converse com o Mecânico</span>
         </button>
-
         <div id="status-converse" class="status-converse" role="status" aria-live="polite">Pronto para gravar.</div>
-
-        <textarea
-          id="nao_conformidade"
-          name="nao_conformidade"
-          class="input"
-          style="min-height:150px; margin-top:10px;"
-          minlength="10"
-          required
-          placeholder="Ex.: Equipamento apresentando vibração forte, ruído e aquecimento durante operação."
-        ></textarea>
       </div>
+    </section>
 
-      <input type="hidden" name="criticidade" id="criticidade" value="MEDIA" />
-      <input type="hidden" name="ai_tempo_estimado" id="ai_tempo_estimado" value="" />
-      <input type="hidden" name="ai_diagnostico_inicial" id="ai_diagnostico_inicial" value="" />
-      <input type="hidden" name="ai_causa" id="ai_causa" value="" />
-      <input type="hidden" name="ai_acoes_iniciais" id="ai_acoes_iniciais" value="" />
+    <input type="hidden" name="criticidade" id="criticidade" value="MEDIA" />
+    <input type="hidden" name="ai_tempo_estimado" id="ai_tempo_estimado" value="" />
+    <input type="hidden" name="ai_diagnostico_inicial" id="ai_diagnostico_inicial" value="" />
+    <input type="hidden" name="ai_causa" id="ai_causa" value="" />
+    <input type="hidden" name="ai_acoes_iniciais" id="ai_acoes_iniciais" value="" />
+    <input type="hidden" name="descricao" id="descricao_hidden" value="" />
+    <input type="hidden" name="diagnostico_inicial" id="diagnostico_inicial_hidden" value="" />
+    <input type="hidden" name="causa_mais_provavel" id="causa_mais_provavel_hidden" value="" />
+    <input type="hidden" name="acoes_iniciais" id="acoes_iniciais_hidden" value="" />
 
-      <input type="hidden" name="descricao" id="descricao_hidden" value="" />
-      <input type="hidden" name="diagnostico_inicial" id="diagnostico_inicial_hidden" value="" />
-      <input type="hidden" name="causa_mais_provavel" id="causa_mais_provavel_hidden" value="" />
-      <input type="hidden" name="acoes_iniciais" id="acoes_iniciais_hidden" value="" />
-
-      <div style="grid-column:1 / -1;">
-        <label class="label">MÍDIAS DE ABERTURA (OPCIONAL)</label>
-        <input id="abertura_fotos" type="file" name="abertura_fotos" accept="image/*,video/*" capture="environment" multiple style="display:none" />
-        <button type="button" class="btn btn-outline" onclick="document.getElementById('abertura_fotos').click()">📎 Adicionar arquivo (foto ou vídeo)</button>
-        <div id="preview-abertura" style="margin-top:6px;"></div>
-        <div class="muted" style="margin-top:6px;">Vídeos curtos: até 1 minuto.</div>
+    <section class="os-new-card" aria-labelledby="os-new-evidencias">
+      <div class="os-new-card-head">
+        <div>
+          <h2 class="os-new-card-title" id="os-new-evidencias">5. Evidências</h2>
+          <p class="os-new-card-help">Adicione fotos ou vídeos do estado inicial para deixar o histórico da OS mais completo.</p>
+        </div>
       </div>
-    </div>
+      <div class="os-new-field">
+        <label class="label" for="abertura_fotos">Mídias de abertura (opcional)</label>
+        <input id="abertura_fotos" type="file" name="abertura_fotos" accept="image/*,video/*" capture="environment" multiple hidden />
+        <button type="button" class="btn btn-outline os-new-media-button" id="btn-adicionar-midia">📎 Adicionar foto ou vídeo</button>
+        <div id="preview-abertura" class="os-new-preview" aria-live="polite"></div>
+        <div class="os-new-hint">Vídeos curtos: até 1 minuto. O fluxo e os limites atuais de upload permanecem inalterados.</div>
+      </div>
+    </section>
 
-    <div class="row" style="justify-content:space-between; margin-top:16px;">
-      <a href="/os" class="btn btn-ghost">Cancelar</a>
-      <button type="submit" class="btn btn-primary" id="btn-salvar-os">Salvar e gerar OS automática</button>
-    </div>
+    <section class="os-new-actions-card" aria-labelledby="os-new-acoes">
+      <div class="os-new-actions-copy">
+        <h2 id="os-new-acoes">6. Ações da ordem de serviço</h2>
+        <p>Revise as informações antes de gerar a OS. Durante o envio, aguarde a confirmação do sistema.</p>
+      </div>
+      <div class="os-new-actions">
+        <a href="/os" class="btn btn-ghost os-new-cancel">Cancelar</a>
+        <button type="submit" class="btn btn-primary os-new-submit" id="btn-salvar-os">Salvar e gerar OS</button>
+      </div>
+    </section>
   </form>
-</div>
+</section>
 
-<style>
-  .btn-converse-mecanico {
-    width: 100%;
-    border: none;
-    border-radius: 14px;
-    padding: 12px 14px;
-    background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
-    color: #fff;
-    font-weight: 700;
-    font-size: 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    cursor: pointer;
-    transition: transform .12s ease, box-shadow .2s ease, filter .2s ease;
-    box-shadow: 0 6px 16px rgba(37, 99, 235, .25);
-  }
-  .btn-converse-mecanico:hover { filter: brightness(1.03); transform: translateY(-1px); }
-  .btn-converse-mecanico.is-recording {
-    background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
-    box-shadow: 0 6px 16px rgba(185, 28, 28, .25);
-  }
-  .btn-converse-mecanico[disabled] { opacity: .7; cursor: wait; transform: none; }
-  .status-converse {
-    margin-top: 10px;
-    border: 1px solid #bfdbfe;
-    background: #eff6ff;
-    color: #1d4ed8;
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: .92rem;
-  }
-  .status-converse.error {
-    border-color: #fecaca;
-    background: #fef2f2;
-    color: #991b1b;
-  }
-  .status-converse.success {
-    border-color: #bbf7d0;
-    background: #f0fdf4;
-    color: #166534;
-  }
-  .status-converse.warning {
-    border-color: #fde68a;
-    background: #fffbeb;
-    color: #92400e;
-  }
-  @media (max-width: 768px) {
-    .btn-converse-mecanico { font-size: .96rem; padding: 12px; }
-  }
-</style>
-
-<script>
-  (function () {
-    const fileInput = document.getElementById('abertura_fotos');
-    const preview = document.getElementById('preview-abertura');
-    const form = document.getElementById('os-form');
-    const submitBtn = document.getElementById('btn-salvar-os');
-    const btn = document.getElementById('btn-converse-mecanico');
-    const btnLabel = document.getElementById('btn-converse-label');
-    const statusEl = document.getElementById('status-converse');
-    const naoConformidadeEl = document.getElementById('nao_conformidade');
-    const descricaoHiddenEl = document.getElementById('descricao_hidden');
-    const criticidadeEl = document.getElementById('criticidade');
-    const diagnosticoEl = document.getElementById('ai_diagnostico_inicial');
-    const causaEl = document.getElementById('ai_causa');
-    const acoesEl = document.getElementById('ai_acoes_iniciais');
-    const diagnosticoHiddenEl = document.getElementById('diagnostico_inicial_hidden');
-    const causaHiddenEl = document.getElementById('causa_mais_provavel_hidden');
-    const acoesHiddenEl = document.getElementById('acoes_iniciais_hidden');
-
-    let isRecording = false;
-    function setStatus(message, tone) {
-      statusEl.textContent = message;
-      statusEl.classList.remove('error', 'success', 'warning');
-      if (tone) statusEl.classList.add(tone);
-    }
-
-    function setButtonState(state) {
-      if (state === 'recording') {
-        btn.classList.add('is-recording');
-        btnLabel.textContent = 'Parar escuta';
-        return;
-      }
-      if (state === 'processing') {
-        btn.classList.remove('is-recording');
-        btnLabel.textContent = 'Processando...';
-        return;
-      }
-      btn.classList.remove('is-recording');
-      btnLabel.textContent = 'Converse com o Mecânico';
-    }
-
-    async function parseJsonSafe(response) {
-      const raw = await response.text();
-      try { return JSON.parse(raw); } catch (_e) { throw new Error('Resposta inválida do servidor.'); }
-    }
-
-    async function enviarParaAnaliseVoz(transcricao) {
-      const response = await fetch('/os/voice/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texto: transcricao }),
-      });
-      const payload = await parseJsonSafe(response);
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Falha na análise por voz.');
-      return payload.preview || {};
-    }
-
-    function preencherCampos(transcricao, analise) {
-      naoConformidadeEl.value = transcricao;
-      descricaoHiddenEl.value = transcricao;
-      if (analise.sintoma_principal) document.getElementById('sintoma_principal').value = analise.sintoma_principal;
-      if (analise.criticidade) criticidadeEl.value = String(analise.criticidade).toUpperCase();
-      if (analise.equipamento && !document.getElementById('equipamento_id').value && analise.equipamento.manual) {
-        document.getElementById('equipamento_manual').value = analise.equipamento.manual;
-      }
-
-      diagnosticoEl.value = String(analise.causa_provavel || '').trim();
-      causaEl.value = String(analise.acao_corretiva || '').trim();
-      acoesEl.value = String(analise.acao_preventiva || '').trim();
-      diagnosticoHiddenEl.value = diagnosticoEl.value;
-      causaHiddenEl.value = causaEl.value;
-      acoesHiddenEl.value = acoesEl.value;
-
-    }
-
-    btn.addEventListener('click', async function () {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SR) {
-        setStatus('Reconhecimento de voz não suportado neste navegador. Digite a descrição manualmente.', 'warning');
-        return;
-      }
-      const recognition = new SR();
-      recognition.lang = 'pt-BR';
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-
-      setButtonState('recording');
-      setStatus('Ouvindo... fale agora.', null);
-      isRecording = true;
-
-      recognition.onresult = async function (event) {
-        try {
-          const transcricao = String(event?.results?.[0]?.[0]?.transcript || '').trim();
-          if (!transcricao) throw new Error('Não foi possível entender a fala.');
-          setButtonState('processing');
-          setStatus('Analisando com IA...', null);
-          const analise = await enviarParaAnaliseVoz(transcricao);
-          preencherCampos(transcricao, analise);
-          setStatus('Texto preenchido com IA. Revise e salve a OS.', 'success');
-        } catch (e) {
-          setStatus(e.message || 'Falha no processamento por voz.', 'warning');
-        } finally {
-          setButtonState('idle');
-          isRecording = false;
-        }
-      };
-      recognition.onerror = function () {
-        setStatus('Permissão de microfone negada ou indisponível. Continue manualmente.', 'warning');
-        setButtonState('idle');
-        isRecording = false;
-      };
-      recognition.onend = function () {
-        if (isRecording) {
-          setButtonState('idle');
-          isRecording = false;
-        }
-      };
-      recognition.start();
-    });
-
-    fileInput.addEventListener('change', function(){
-      preview.innerHTML = '';
-      Array.from(fileInput.files || []).forEach(function (f) {
-        const el = document.createElement('span');
-        el.className = 'pill-tag pill-gray';
-        el.style.marginRight = '6px';
-        el.textContent = ((f.type || '').startsWith('video/') ? '🎬 ' : '🖼️ ') + f.name;
-        preview.appendChild(el);
-      });
-    });
-
-    form.addEventListener('submit', function(e){
-      const id = document.getElementById('equipamento_id').value.trim();
-      const manual = document.getElementById('equipamento_manual').value.trim();
-      const sintoma = document.getElementById('sintoma_principal').value.trim();
-      const naoConformidade = naoConformidadeEl.value.trim();
-      descricaoHiddenEl.value = naoConformidade;
-      diagnosticoHiddenEl.value = diagnosticoEl.value.trim();
-      causaHiddenEl.value = causaEl.value.trim();
-      acoesHiddenEl.value = acoesEl.value.trim();
-      if (!id && !manual) { e.preventDefault(); alert('Selecione ou informe um equipamento.'); return; }
-      if (!sintoma) { e.preventDefault(); alert('Selecione o sintoma principal.'); return; }
-      if (!naoConformidade || naoConformidade.length < 10) { e.preventDefault(); alert('Descreva a não conformidade.'); return; }
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Salvando...';
-    });
-  })();
-</script>
+<script src="/js/os-new.js?v=20260819-nova-os-mobile" defer></script>
