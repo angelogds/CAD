@@ -26,10 +26,29 @@ function minhas(req, res) {
     prioridade: ['CRITICA','ALTA','MEDIA','BAIXA'].includes(String(req.query.prioridade || '').toUpperCase()) ? String(req.query.prioridade).toUpperCase() : '',
   };
 
+  const serviceFilters = {
+    ...filters,
+    // A prioridade crítica é um agrupamento semântico que inclui URGENTE/EMERGENCIAL.
+    prioridade: filters.prioridade === 'CRITICA' ? '' : filters.prioridade,
+    // O atalho visual "Críticas" é refinado abaixo para não misturar ALTA.
+    urgentes: false,
+  };
+
+  let lista = service.listMinhasSolicitacoes(userId, serviceFilters, req.session.user);
+  const operationalClosed = new Set(['RECEBIDA_TOTAL', 'ENTREGUE_SOLICITANTE', 'FECHADA', 'CANCELADA']);
+  const criticalPriorities = new Set(['URGENTE', 'CRITICA', 'CRÍTICA', 'EMERGENCIAL']);
+
+  if (!filters.status) {
+    lista = lista.filter((item) => !operationalClosed.has(String(item.status || '').toUpperCase()));
+  }
+  if (filters.urgentes || filters.prioridade === 'CRITICA') {
+    lista = lista.filter((item) => criticalPriorities.has(String(item.prioridade || '').toUpperCase()));
+  }
+
   res.render("solicitacoes/minhas", {
     title: "Solicitações de Material",
     activeMenu: "solicitacoes",
-    lista: service.listMinhasSolicitacoes(userId, filters, req.session.user),
+    lista,
     counters: service.getCountersForUser(userId, req.session.user),
     filters,
     statuses: service.LIST_STATUS,
@@ -202,7 +221,6 @@ function detalhe(req, res) {
     return res.status(500).send("Não foi possível abrir esta solicitação. Verifique os dados ou contate o suporte.");
   }
 }
-
 
 function registrarCancelamentoNoChatOs(resultado, req) {
   const numero = resultado.solicitacao?.numero || resultado.solicitacao?.id || req.params.id;
