@@ -1,63 +1,17 @@
 <%- layout('layout') -%>
-
-<div class="page-head" style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
-  <div>
-    <h1 style="margin:0;">Folga / Atestado</h1>
-    <p style="margin:6px 0 0;color:#64748b;font-weight:700;">Visualize, edite e apague datas de colaboradores afastados antes de gerar o PDF.</p>
-  </div>
-
-  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
-    <form method="GET" action="/escala/ausencias" style="display:flex;gap:8px;align-items:center;">
-      <input type="date" name="date" value="<%= alvo %>" class="input" style="height:38px;">
-      <button class="btn btn-sm" type="submit">Filtrar</button>
-    </form>
-    <a class="btn" href="/escala?date=<%= alvo %>">Voltar para Escala</a>
-  </div>
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260819a">
+<%
+  const lista = ausencias || [];
+  const statusClass = (tipo) => { const s=String(tipo||'').toUpperCase(); if(s.includes('FERI')) return 'is-ferias'; if(s.includes('ATEST')) return 'is-atestado'; if(s.includes('FOLGA')) return 'is-folga'; return 'is-ausente'; };
+%>
+<div class="escala-page">
+  <header class="escala-head"><div><h1>Folgas, Atestados e Férias</h1><p>Indisponibilidades que afetam a composição operacional da equipe.</p></div><div class="escala-actions"><form method="GET" action="/escala/ausencias" style="display:flex;gap:6px"><input type="date" name="date" value="<%= alvo %>" class="input"><button class="btn" type="submit">Filtrar data</button></form><a class="btn" href="/escala">← Voltar</a></div></header>
+  <div class="escala-notice">Férias, atestados e folgas devem impedir a pessoa de aparecer como disponível no mesmo período. O registro aqui não representa automaticamente crédito ou débito no Banco de Horas, salvo quando o fluxo específico de folga compensatória determinar isso.</div>
+  <nav class="escala-tabs"><a class="escala-tab" href="/escala">Painel da Equipe</a><a class="escala-tab" href="/escala/completa">Escalas</a><a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a><a class="escala-tab" href="/escala/hora-extra/pendentes">Horas Extras</a><a class="escala-tab is-active" href="/escala/ausencias">Ausências</a></nav>
+  <section class="escala-kpis"><div class="escala-kpi"><span>Registros</span><strong><%= lista.length %></strong><small>No recorte consultado</small></div><div class="escala-kpi"><span>Folgas</span><strong><%= lista.filter(a=>String(a.tipo||'').includes('FOLGA')).length %></strong><small>Folgas e meio período</small></div><div class="escala-kpi"><span>Atestados</span><strong><%= lista.filter(a=>String(a.tipo||'').includes('ATESTADO')).length %></strong><small>Afastamento informado</small></div><div class="escala-kpi"><span>Férias</span><strong><%= lista.filter(a=>String(a.tipo||'').includes('FERIAS')).length %></strong><small>Períodos de férias</small></div></section>
+  <section class="escala-section"><div class="escala-section-head"><div><h2>Registros de indisponibilidade</h2><div class="muted">Visualize e ajuste os períodos antes de gerar os relatórios.</div></div></div><div class="escala-team-grid">
+    <% if(!lista.length){ %><div class="escala-audit-note">Nenhum registro encontrado para a data selecionada.</div><% } %>
+    <% lista.forEach(item=>{ const tipoUp=String(item.tipo||'').replace(/_/g,' '); %><article class="escala-person"><div class="escala-person-head"><div class="escala-avatar"><%= String(item.nome||'M').charAt(0).toUpperCase() %></div><div class="escala-person-name"><strong><%= item.nome %></strong><small><%= item.funcaoLabel || 'Manutenção' %></small></div><span class="escala-status <%= statusClass(item.tipo) %>"><%= tipoUp %></span></div><div class="escala-person-meta"><div class="escala-meta"><span>Início</span><strong><%= item.inicio %></strong></div><div class="escala-meta"><span>Fim</span><strong><%= item.fim %></strong></div><div class="escala-meta"><span>Situação na data</span><strong><%= item.ativoNoDia ? 'Ativo' : 'Fora do dia' %></strong></div><div class="escala-meta"><span>Motivo</span><strong><%= item.motivo || '-' %></strong></div></div><div class="escala-person-foot" style="gap:6px"><button class="btn btn-sm" type="button" data-edit-ausencia="<%= item.id %>" aria-expanded="false" aria-controls="ausencia-edit-<%= item.id %>">Editar</button><form method="POST" action="/escala/ausencia/<%= item.id %>/delete" onsubmit="return confirm('Apagar este registro de indisponibilidade?');"><input type="hidden" name="date" value="<%= alvo %>"><button class="btn btn-sm btn-red" type="submit">Apagar</button></form></div><form id="ausencia-edit-<%= item.id %>" method="POST" action="/escala/ausencia/<%= item.id %>/update" data-edit-form="<%= item.id %>" hidden style="margin-top:10px;display:grid;gap:7px"><input type="hidden" name="date" value="<%= alvo %>"><select class="input" name="tipo" required><option value="FOLGA" <%= item.tipo==='FOLGA'?'selected':'' %>>Folga</option><option value="FOLGA_MEIO_PERIODO" <%= item.tipo==='FOLGA_MEIO_PERIODO'?'selected':'' %>>Folga meio período</option><option value="ATESTADO" <%= item.tipo==='ATESTADO'?'selected':'' %>>Atestado</option><option value="FERIAS" <%= item.tipo==='FERIAS'?'selected':'' %>>Férias</option></select><input class="input" type="date" name="inicio" value="<%= item.inicio %>" required><input class="input" type="date" name="fim" value="<%= item.fim %>" required><input class="input" name="motivo" value="<%= item.motivo || '' %>" placeholder="Motivo"><div><button class="btn btn-sm btn-green" type="submit">Salvar</button> <button class="btn btn-sm" type="button" data-cancel-edit="<%= item.id %>">Cancelar</button></div></form></article><% }) %>
+  </div></section>
 </div>
-
-<style>
-  .ausencias-actions .btn-danger {
-    background:#dc2626;
-    border-color:#dc2626;
-    color:#fff;
-  }
-  .ausencias-actions .btn-danger:hover {
-    background:#b91c1c;
-    border-color:#b91c1c;
-  }
-</style>
-
-<div class="card ausencias-actions" style="margin-top:14px;">
-  <h3 style="margin:0 0 10px;">Registros de folga, atestado e férias</h3>
-
-  <div class="escala-card-grid">
-    <% if (!ausencias || ausencias.length === 0) { %><div class="escala-empty" style="grid-column:1/-1;">Nenhum registro encontrado.</div><% } %>
-    <% (ausencias || []).forEach(item => { const tipoUp = String(item.tipo || '').replace(/_/g,' '); const tipoClass = tipoUp.includes('ATEST') ? 'is-warning' : (tipoUp.includes('FÉRI') || tipoUp.includes('FERI') ? 'is-info' : 'is-success'); %>
-      <article class="card-padrao-escala">
-        <div class="card-padrao-header"><div class="card-padrao-person"><span class="card-padrao-avatar"><%= String(item.nome || 'M').charAt(0).toUpperCase() %></span><div><h3 class="card-padrao-title"><%= item.nome %></h3><div class="card-padrao-subtitle"><%= item.funcaoLabel %></div></div></div><span class="card-padrao-badge <%= tipoClass %>"><%= tipoUp %></span></div>
-        <div class="card-padrao-body"><div class="card-padrao-row"><span class="label-text">Função</span><span class="value-text"><%= item.funcaoLabel %></span></div><div class="card-padrao-row"><span class="label-text">Início</span><span class="value-text"><%= item.inicio %></span></div><div class="card-padrao-row"><span class="label-text">Fim</span><span class="value-text"><%= item.fim %></span></div><div class="card-padrao-row"><span class="label-text">Motivo</span><span class="value-text"><%= item.motivo || '-' %></span></div><div class="card-padrao-row"><span class="label-text">Situação</span><span class="value-text"><span class="card-padrao-badge <%= item.ativoNoDia ? 'is-success' : 'is-muted' %>"><%= item.ativoNoDia ? 'Ativo' : 'Inativo' %></span></span></div></div>
-        <div class="card-padrao-footer"><button class="btn btn-sm btn-primary" type="button" data-edit-ausencia="<%= item.id %>" aria-expanded="false" aria-controls="ausencia-edit-<%= item.id %>">Editar</button><form method="POST" action="/escala/ausencia/<%= item.id %>/delete" onsubmit="return confirm('Apagar este registro de folga/atestado/férias? Esta ação também remove o item do PDF.');" style="margin:0;flex:1 1 auto;"><input type="hidden" name="date" value="<%= alvo %>"><button class="btn btn-sm btn-danger" type="submit">Apagar</button></form></div>
-        <form id="ausencia-edit-<%= item.id %>" method="POST" action="/escala/ausencia/<%= item.id %>/update" data-edit-form="<%= item.id %>" style="display:none;gap:8px;align-items:center;flex-wrap:wrap;"><input type="hidden" name="date" value="<%= alvo %>"><select class="input" name="tipo" style="width:145px;" required><option value="FOLGA" <%= item.tipo === 'FOLGA' ? 'selected' : '' %>>Folga</option><option value="FOLGA_MEIO_PERIODO" <%= item.tipo === 'FOLGA_MEIO_PERIODO' ? 'selected' : '' %>>Folga meio período</option><option value="ATESTADO" <%= item.tipo === 'ATESTADO' ? 'selected' : '' %>>Atestado</option><option value="FERIAS" <%= item.tipo === 'FERIAS' ? 'selected' : '' %>>Férias</option></select><input class="input" type="date" name="inicio" value="<%= item.inicio %>" required><input class="input" type="date" name="fim" value="<%= item.fim %>" required><input class="input" name="motivo" value="<%= item.motivo || '' %>" placeholder="Motivo" style="min-width:140px;"><button class="btn btn-sm btn-primary" type="submit">Salvar</button><button class="btn btn-sm" type="button" data-cancel-edit="<%= item.id %>">Cancelar</button></form>
-      </article>
-    <% }) %>
-  </div>
-</div>
-
-<script>
-  document.addEventListener('click', function (event) {
-    const editButton = event.target.closest('[data-edit-ausencia]');
-    const cancelButton = event.target.closest('[data-cancel-edit]');
-    const id = editButton?.dataset.editAusencia || cancelButton?.dataset.cancelEdit;
-
-    if (!id) return;
-
-    const form = document.querySelector(`[data-edit-form="${id}"]`);
-    const trigger = document.querySelector(`[data-edit-ausencia="${id}"]`);
-    if (!form || !trigger) return;
-
-    const shouldOpen = Boolean(editButton) && form.style.display === 'none';
-    form.style.display = shouldOpen ? 'flex' : 'none';
-    trigger.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
-    trigger.textContent = shouldOpen ? 'Fechar edição' : 'Editar';
-  });
-</script>
+<script>document.addEventListener('click',function(e){var edit=e.target.closest('[data-edit-ausencia]');var cancel=e.target.closest('[data-cancel-edit]');var id=edit&&edit.dataset.editAusencia||cancel&&cancel.dataset.cancelEdit;if(!id)return;var form=document.querySelector('[data-edit-form="'+id+'"]');var trigger=document.querySelector('[data-edit-ausencia="'+id+'"]');if(!form||!trigger)return;var open=Boolean(edit)&&form.hasAttribute('hidden');if(open)form.removeAttribute('hidden');else form.setAttribute('hidden','');trigger.setAttribute('aria-expanded',open?'true':'false');trigger.textContent=open?'Fechar edição':'Editar';});</script>

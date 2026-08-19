@@ -1,82 +1,32 @@
-const db = require("../../database/db");
+const db = require('../../database/db');
 
-function hasVisibleUntilColumn() {
-  try {
-    const cols = db.prepare("PRAGMA table_info(avisos)").all();
-    return cols.some(function (c) {
-      return String(c.name || "").toLowerCase() === "visible_until";
-    });
-  } catch (_) {
-    return false;
-  }
-}
+const CATEGORIAS = Object.freeze({ SEGURANCA:'Segurança', OPERACAO:'Operação', MANUTENCAO:'Manutenção', MEIO_AMBIENTE:'Meio Ambiente', QUALIDADE:'Qualidade', GERAL:'Geral' });
+const PRIORIDADES = Object.freeze({ BAIXA:'Baixa', NORMAL:'Normal', ALTA:'Alta', CRITICA:'Crítica' });
+const STATUS = Object.freeze({ RASCUNHO:'Rascunho', AGENDADO:'Agendado', PUBLICADO:'Publicado', EXPIRADO:'Expirado' });
 
-function listAvisos(limit = 100) {
-  const safeLimit = Number(limit) || 100;
+function tableColumns(table) { try { return db.prepare(`PRAGMA table_info(${table})`).all().map(c=>c.name); } catch(_e) { return []; } }
+function hasColumn(name) { return tableColumns('avisos').includes(name); }
+function normalizeEnum(value, allowed, fallback) { const n=String(value||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[\s-]+/g,'_'); return Object.prototype.hasOwnProperty.call(allowed,n)?n:fallback; }
+function normalizeDateTime(value) { const raw=String(value||'').trim(); if(!raw) return null; const d=new Date(raw); if(Number.isNaN(d.getTime())) return null; return raw.length===10?`${raw} 00:00:00`:raw.replace('T',' ').slice(0,19); }
+function nowSql() { return new Date().toISOString().slice(0,19).replace('T',' '); }
+function calculateEffectiveStatus(aviso, now=nowSql()) { const stored=normalizeEnum(aviso.status,STATUS,'PUBLICADO'); const publishAt=aviso.publish_at||aviso.created_at||null; const until=aviso.visible_until||null; if(stored==='RASCUNHO') return 'RASCUNHO'; if(until&&String(until)<String(now)) return 'EXPIRADO'; if(publishAt&&String(publishAt)>String(now)) return 'AGENDADO'; return 'PUBLICADO'; }
+function authorExpression() { const cols=tableColumns('users'); if(cols.includes('name')) return 'u.name'; if(cols.includes('nome')) return 'u.nome'; return 'NULL'; }
+function baseSelect() { const cols=tableColumns('avisos'); const cat=cols.includes('categoria')?"COALESCE(NULLIF(a.categoria,''),'GERAL')":"'GERAL'"; const pri=cols.includes('prioridade')?"COALESCE(NULLIF(a.prioridade,''),'NORMAL')":"'NORMAL'"; const sta=cols.includes('status')?"COALESCE(NULLIF(a.status,''),'PUBLICADO')":"'PUBLICADO'"; const pub=cols.includes('publish_at')?'COALESCE(a.publish_at,a.created_at)':'a.created_at'; const vis=cols.includes('visible_until')?'a.visible_until':'NULL'; return `SELECT a.*, ${cat} AS categoria, ${pri} AS prioridade, ${sta} AS status, ${pub} AS publish_at, ${vis} AS visible_until, COALESCE(${authorExpression()}, 'Sistema') AS autor_nome FROM avisos a LEFT JOIN users u ON u.id=a.created_by`; }
+function buildRows(filters={}) { const where=[]; const params=[]; const busca=String(filters.busca||'').trim(); if(busca){ where.push(`(a.titulo LIKE ? OR a.mensagem LIKE ? OR COALESCE(a.colaborador_nome,'') LIKE ? OR COALESCE(${authorExpression()},'') LIKE ?)`); const t=`%${busca}%`; params.push(t,t,t,t); } if(filters.categoria){ where.push(`${hasColumn('categoria')?'a.categoria':"'GERAL'"}=?`); params.push(normalizeEnum(filters.categoria,CATEGORIAS,'GERAL')); } if(filters.prioridade){ where.push(`${hasColumn('prioridade')?'a.prioridade':"'NORMAL'"}=?`); params.push(normalizeEnum(filters.prioridade,PRIORIDADES,'NORMAL')); } const p=String(filters.periodo||'').toUpperCase(); const days={HOJE:0,'7D':7,'30D':30,'90D':90}[p]; if(days!==undefined){ const dateExpr=`COALESCE(${hasColumn('publish_at')?'a.publish_at,':''}a.created_at)`; if(days===0) where.push(`date(${dateExpr})=date('now')`); else { where.push(`datetime(${dateExpr})>=datetime('now', ?)`); params.push(`-${days} days`); } } const orderExpr=`COALESCE(${hasColumn('publish_at')?'a.publish_at,':''}a.created_at)`; const sql=`${baseSelect()} ${where.length?`WHERE ${where.join(' AND ')}`:''} ORDER BY ${orderExpr} DESC, a.id DESC`; return db.prepare(sql).all(...params).map(r=>({...r,effective_status:calculateEffectiveStatus(r)})); }
+function listAvisos(filters={}, pagination={}) { const sf=String(filters.status||'').trim().toUpperCase(); let rows=buildRows(filters); if(sf&&STATUS[sf]) rows=rows.filter(r=>r.effective_status===sf); const total=rows.length; const perPage=Math.min(100,Math.max(10,Number(pagination.perPage||20))); const pages=Math.max(1,Math.ceil(total/perPage)); const page=Math.min(pages,Math.max(1,Number(pagination.page||1))); return {items:rows.slice((page-1)*perPage,page*perPage),total,page,perPage,pages}; }
+function getDashboardMetrics(filters={}) { const rows=buildRows(filters); const m={PUBLICADO:0,AGENDADO:0,RASCUNHO:0,EXPIRADO:0,TOTAL:rows.length}; rows.forEach(r=>{m[r.effective_status]=(m[r.effective_status]||0)+1;}); return m; }
+function getCategorySummary(){ const rows=buildRows({}); return Object.keys(CATEGORIAS).map(key=>({key,label:CATEGORIAS[key],total:rows.filter(r=>r.categoria===key).length})); }
+function getRecentAvisos(limit=5){ return buildRows({}).filter(r=>r.effective_status==='PUBLICADO').slice(0,limit); }
+function getUpcomingAvisos(limit=5){ return buildRows({}).filter(r=>r.effective_status==='AGENDADO').sort((a,b)=>String(a.publish_at).localeCompare(String(b.publish_at))).slice(0,limit); }
+function getAvisoById(id){ const row=db.prepare(`${baseSelect()} WHERE a.id=? LIMIT 1`).get(Number(id)); return row?{...row,effective_status:calculateEffectiveStatus(row)}:null; }
+function normalizeVisibilityDays(value){ const n=Number.parseInt(String(value||'30'),10); return [7,15,30,60,90].includes(n)?n:30; }
+function prepareData(data={},userId){ const categoria=normalizeEnum(data.categoria,CATEGORIAS,'GERAL'); const prioridade=normalizeEnum(data.prioridade,PRIORIDADES,'NORMAL'); const requested=normalizeEnum(data.status,STATUS,'PUBLICADO'); const publishAt=requested==='AGENDADO'?normalizeDateTime(data.publish_at):(requested==='RASCUNHO'?null:nowSql()); if(requested==='AGENDADO'&&(!publishAt||publishAt<=nowSql())) throw new Error('Informe uma data futura para o agendamento.'); const days=normalizeVisibilityDays(data.visibility_days); let visibleUntil=normalizeDateTime(data.visible_until); if(!visibleUntil&&requested!=='RASCUNHO'){ const base=new Date((publishAt||nowSql()).replace(' ','T')+'Z'); base.setUTCDate(base.getUTCDate()+days); visibleUntil=base.toISOString().slice(0,19).replace('T',' '); } if(visibleUntil&&publishAt&&visibleUntil<=publishAt) throw new Error('O fim da exibição deve ser posterior à publicação.'); return {titulo:String(data.titulo||'').trim(),mensagem:String(data.mensagem||'').trim(),colaborador_nome:String(data.colaborador_nome||'').trim()||null,data_referencia:String(data.data_referencia||'').trim()||null,categoria,prioridade,status:requested,publish_at:publishAt,visible_until:visibleUntil,created_by:Number(userId)||null}; }
+function validatePublishable(row){ if(!row.titulo) throw new Error('Título é obrigatório.'); if(!row.mensagem) throw new Error('Mensagem é obrigatória.'); }
+function createAviso(data,userId){ const row=prepareData(data,userId); validatePublishable(row); const cols=tableColumns('avisos'); const fields=['titulo','mensagem','colaborador_nome','data_referencia','created_by']; const values=[row.titulo,row.mensagem,row.colaborador_nome,row.data_referencia,row.created_by]; [['categoria',row.categoria],['prioridade',row.prioridade],['status',row.status],['publish_at',row.publish_at],['visible_until',row.visible_until]].forEach(([f,v])=>{if(cols.includes(f)){fields.push(f);values.push(v);}}); const info=db.prepare(`INSERT INTO avisos (${fields.join(',')}) VALUES (${fields.map(()=>'?').join(',')})`).run(...values); return Number(info.lastInsertRowid); }
+function updateAviso(id,data,userId){ if(!getAvisoById(id)) throw new Error('Aviso não encontrado.'); const row=prepareData(data,userId); validatePublishable(row); const sets=['titulo=?','mensagem=?','colaborador_nome=?','data_referencia=?']; const values=[row.titulo,row.mensagem,row.colaborador_nome,row.data_referencia]; [['categoria',row.categoria],['prioridade',row.prioridade],['status',row.status],['publish_at',row.publish_at],['visible_until',row.visible_until]].forEach(([f,v])=>{if(hasColumn(f)){sets.push(`${f}=?`);values.push(v);}}); if(hasColumn('updated_at')) sets.push("updated_at=datetime('now')"); values.push(Number(id)); db.prepare(`UPDATE avisos SET ${sets.join(',')} WHERE id=?`).run(...values); }
+function publishNow(id){ if(!getAvisoById(id)) throw new Error('Aviso não encontrado.'); const sets=[]; if(hasColumn('status')) sets.push("status='PUBLICADO'"); if(hasColumn('publish_at')) sets.push("publish_at=datetime('now')"); if(hasColumn('updated_at')) sets.push("updated_at=datetime('now')"); if(sets.length) db.prepare(`UPDATE avisos SET ${sets.join(',')} WHERE id=?`).run(Number(id)); }
+function cancelSchedule(id){ if(!getAvisoById(id)) throw new Error('Aviso não encontrado.'); const sets=[]; if(hasColumn('status')) sets.push("status='RASCUNHO'"); if(hasColumn('publish_at')) sets.push('publish_at=NULL'); if(hasColumn('updated_at')) sets.push("updated_at=datetime('now')"); if(sets.length) db.prepare(`UPDATE avisos SET ${sets.join(',')} WHERE id=?`).run(Number(id)); }
+function duplicateAviso(id,userId){ const item=getAvisoById(id); if(!item) throw new Error('Aviso não encontrado.'); return createAviso({...item,titulo:`${item.titulo} (cópia)`,status:'RASCUNHO'},userId); }
+function deleteAviso(id){ const info=db.prepare('DELETE FROM avisos WHERE id=?').run(Number(id)); return Number(info.changes||0); }
 
-  if (hasVisibleUntilColumn()) {
-    return db
-      .prepare(`
-        SELECT a.id, a.titulo, a.mensagem, a.created_at, a.visible_until,
-               COALESCE(u.name, 'Sistema') AS autor_nome
-        FROM avisos a
-        LEFT JOIN users u ON u.id = a.created_by
-        ORDER BY a.id DESC
-        LIMIT ?
-      `)
-      .all(safeLimit);
-  }
-
-  return db
-    .prepare(`
-      SELECT a.id, a.titulo, a.mensagem, a.created_at,
-             COALESCE(u.name, 'Sistema') AS autor_nome
-      FROM avisos a
-      LEFT JOIN users u ON u.id = a.created_by
-      ORDER BY a.id DESC
-      LIMIT ?
-    `)
-    .all(safeLimit);
-}
-
-function normalizeVisibilityDays(days) {
-  const n = Number(days);
-  if ([7, 15, 30].includes(n)) return n;
-  return 7;
-}
-
-function createAviso({ titulo, mensagem, createdBy, diasVisiveis }) {
-  const days = normalizeVisibilityDays(diasVisiveis);
-  const modifier = `+${days} days`;
-
-  if (hasVisibleUntilColumn()) {
-    const info = db
-      .prepare(`
-        INSERT INTO avisos (titulo, mensagem, created_by, visible_until, created_at, updated_at)
-        VALUES (?, ?, ?, datetime('now', ?), datetime('now'), datetime('now'))
-      `)
-      .run(String(titulo || "").trim(), String(mensagem || "").trim(), createdBy || null, modifier);
-
-    return Number(info.lastInsertRowid);
-  }
-
-  const info = db
-    .prepare(`
-      INSERT INTO avisos (titulo, mensagem, created_by, created_at, updated_at)
-      VALUES (?, ?, ?, datetime('now'), datetime('now'))
-    `)
-    .run(String(titulo || "").trim(), String(mensagem || "").trim(), createdBy || null);
-
-  return Number(info.lastInsertRowid);
-}
-
-function deleteAviso(id) {
-  const info = db.prepare(`DELETE FROM avisos WHERE id = ?`).run(Number(id));
-  return Number(info.changes || 0);
-}
-
-module.exports = {
-  listAvisos,
-  createAviso,
-  deleteAviso,
-};
+module.exports={CATEGORIAS,PRIORIDADES,STATUS,calculateEffectiveStatus,listAvisos,getDashboardMetrics,getCategorySummary,getRecentAvisos,getUpcomingAvisos,getAvisoById,createAviso,updateAviso,publishNow,cancelSchedule,duplicateAviso,deleteAviso,normalizeVisibilityDays};
