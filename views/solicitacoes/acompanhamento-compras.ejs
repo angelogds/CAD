@@ -1,11 +1,103 @@
-<% layout('layout') %><link rel="stylesheet" href="/css/acompanhamento-compras.css">
-<% const p=painel; const money=c=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((c||0)/100); const round=n=>Math.round(n||0); %>
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/acompanhamento-compras.css?v=20260819-prioridades-todas">
+<%
+const p=painel;
+const money=c=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((c||0)/100);
+const round=n=>Math.round(n||0);
+const statusLabel=value=>String(value||'-').replaceAll('_',' ');
+%>
 <div class="buy-watch">
-  <header class="watch-head"><div><div class="title-line"><h1>Acompanhamento de Compras</h1><span class="readonly">PAINEL SOMENTE LEITURA</span></div><p>Controle das cotações, compras, recebimentos e custos por OS e equipamento</p></div><a class="btn btn-ghost" href="/solicitacoes/minhas">← Voltar às solicitações</a></header>
-  <form class="watch-filters" method="get"><select name="periodo" aria-label="Período"><% [['7','Últimos 7 dias'],['30','Últimos 30 dias'],['90','Últimos 90 dias'],['ano','Ano atual'],['todos','Todos os períodos'],['personalizado','Período personalizado']].forEach(x=>{ %><option value="<%= x[0] %>" <%= p.filters.periodo===x[0]?'selected':'' %>><%= x[1] %></option><% }) %></select><select name="setor" aria-label="Setor"><option value="">Todos os setores</option><% p.setores.forEach(x=>{ %><option <%= p.filters.setor===x.nome?'selected':'' %>><%= x.nome %></option><% }) %></select><select name="responsavel" aria-label="Responsável"><option value="">Todos os responsáveis</option><% p.responsaveis.forEach(x=>{ %><option value="<%= x.id %>" <%= String(p.filters.responsavel)===String(x.id)?'selected':'' %>><%= x.name %></option><% }) %></select><select name="status" aria-label="Status"><option value="">Todos os status</option><% ['ABERTA','EM_COTACAO','COMPRADA','EM_RECEBIMENTO','RECEBIDA_PARCIAL','RECEBIDA_TOTAL','FECHADA'].forEach(x=>{ %><option <%= p.filters.status===x?'selected':'' %>><%= x.replaceAll('_',' ') %></option><% }) %></select><button class="btn btn-green">↻ Atualizar</button></form>
+  <header class="watch-head">
+    <div>
+      <div class="title-line"><h1>Acompanhamento de Compras</h1><span class="readonly">PAINEL SOMENTE LEITURA</span></div>
+      <p>Visão completa das solicitações, cotações, compras e recebimentos, organizada por prioridade.</p>
+    </div>
+    <a class="btn btn-ghost" href="/solicitacoes/minhas">← Voltar às solicitações</a>
+  </header>
+
+  <form class="watch-filters" method="get">
+    <label><span>Período</span><select name="periodo" aria-label="Período"><% [['todos','Todos os períodos'],['7','Últimos 7 dias'],['30','Últimos 30 dias'],['90','Últimos 90 dias'],['ano','Ano atual'],['personalizado','Período personalizado']].forEach(x=>{ %><option value="<%= x[0] %>" <%= p.filters.periodo===x[0]?'selected':'' %>><%= x[1] %></option><% }) %></select></label>
+    <label><span>Setor</span><select name="setor" aria-label="Setor"><option value="">Todos os setores</option><% p.setores.forEach(x=>{ %><option value="<%= x.nome %>" <%= p.filters.setor===x.nome?'selected':'' %>><%= x.nome %></option><% }) %></select></label>
+    <label><span>Responsável</span><select name="responsavel" aria-label="Responsável"><option value="">Todos os responsáveis</option><% p.responsaveis.forEach(x=>{ %><option value="<%= x.id %>" <%= String(p.filters.responsavel)===String(x.id)?'selected':'' %>><%= x.name %></option><% }) %></select></label>
+    <label><span>Status</span><select name="status" aria-label="Status"><option value="">Todos os status</option><% ['ABERTA','REABERTA','EM_COTACAO','COMPRADA','EM_RECEBIMENTO','RECEBIDA_PARCIAL','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE','FECHADA','CANCELADA'].forEach(x=>{ %><option value="<%= x %>" <%= p.filters.status===x?'selected':'' %>><%= statusLabel(x) %></option><% }) %></select></label>
+    <label><span>Prioridade</span><select name="prioridade" aria-label="Prioridade"><option value="">Todas as prioridades</option><% [['critical','Críticas / imediatas'],['high','Alta'],['medium','Média'],['low','Baixa'],['undefined','Sem prioridade']].forEach(x=>{ %><option value="<%= x[0] %>" <%= p.filters.prioridade===x[0]?'selected':'' %>><%= x[1] %></option><% }) %></select></label>
+    <button class="btn btn-green">↻ Atualizar</button>
+  </form>
+
   <section class="metrics"><% [['Solicitações',p.indicadores.solicitacoes],['Itens solicitados',p.indicadores.total],['Itens cotados',p.indicadores.cotados],['Sem cotação',p.indicadores.semCotacao],['Itens comprados',p.indicadores.comprados],['Itens recebidos',p.indicadores.recebidos],['Valor cotado',money(p.indicadores.valorCotadoCentavos)]].forEach(x=>{ %><div><small><%= x[0] %></small><strong><%= x[1] %></strong></div><% }) %></section>
-  <section class="watch-section"><h2>ANDAMENTO DO FLUXO DE COMPRAS</h2><div class="flow-grid"><% [['Cotação',p.fluxo.cotacao],['Compra',p.fluxo.compra],['Recebimento',p.fluxo.recebimento],['Solicitações concluídas',p.fluxo.concluidas]].forEach(x=>{ %><div><b><%= x[0] %></b><span><%= round(x[1]) %>%</span><i><em style="width:<%= Math.min(100,x[1]) %>%"></em></i></div><% }) %></div><div class="flow-steps">Solicitado <b>→</b> Cotado <b>→</b> Comprado <b>→</b> Recebido</div></section>
-  <section class="watch-section"><h2>ACOMPANHAMENTO POR SOLICITAÇÃO</h2><p>Progresso individual da cotação, sem acesso às OS ou às solicitações</p><div class="request-grid"><% p.solicitacoes.forEach(s=>{ %><article class="request-watch"><small class="os-label"><%= s.os_id?'OS '+s.os_id+' — '+(s.equipamento_nome||'Equipamento não informado'):'Sem OS vinculada' %></small><b><%= s.numero||'#'+s.id %></b><h3><%= s.titulo||'Solicitação de material' %></h3><div class="request-stats"><span><small>Itens ativos</small><b><%= s.total %></b></span><span><small>Status</small><b><%= String(s.status).replaceAll('_',' ') %></b></span><span><small>Cotados</small><b><%= s.cotados %></b></span><span><small>Sem cotação</small><b><%= s.semCotacao %></b></span></div><div class="stacked" aria-label="<%= round(s.percentualCotado) %>% cotado e <%= round(s.percentualSemCotacao) %>% não cotado"><i style="width:<%= s.percentualCotado %>%"></i><em style="width:<%= s.percentualSemCotacao %>%"></em></div><div class="legend"><span><%= round(s.percentualCotado) %>% COTADO</span><span><%= round(s.percentualSemCotacao) %>% NÃO COTADO</span></div><footer><span><small>Valor cotado</small><b><%= money(s.cotadoCentavos) %></b></span><span>Responsável: <%= s.responsavel_nome||'Não atribuído' %> · <%= s.atrasada?'Atrasada':s.venceHoje?'Vence hoje':s.previsao_entrega?'No prazo':'Sem prazo' %></span></footer></article><% }) %></div></section>
-  <div class="bottom-grid"><section class="watch-section"><h2>VALORES POR ETAPA</h2><dl><dt>Cotado</dt><dd><%= money(p.valores.cotado) %></dd><dt>Comprado / comprometido</dt><dd><%= money(p.valores.comprometido) %></dd><dt>Recebido / realizado</dt><dd><%= money(p.valores.recebido) %></dd><dt>Saldo a receber</dt><dd><%= money(p.valores.saldo) %></dd></dl></section><section class="watch-section"><h2>CUSTO COTADO POR EQUIPAMENTO</h2><% const max=Math.max(1,...p.equipamentos.map(x=>x.valor)); p.equipamentos.slice(0,8).forEach(x=>{ %><div class="equipment"><span><%= x.nome %></span><i><em style="width:<%= x.valor/max*100 %>%"></em></i><b><%= money(x.valor) %></b></div><% }) %></section><section class="watch-section"><h2>RESUMO DAS PENDÊNCIAS</h2><div class="pending"><span><b><%= p.pendencias.semCotacao %></b><small>itens aguardando cotação</small></span><span><b><%= p.pendencias.atrasadas %></b><small>solicitações atrasadas</small></span><span><b><%= p.pendencias.vencemHoje %></b><small>vencem hoje</small></span><span><b><%= p.pendencias.semOs %></b><small>sem OS vinculada</small></span></div></section></div>
+
+  <section class="watch-section flow-section">
+    <div class="section-title-row"><div><h2>ANDAMENTO DO FLUXO DE COMPRAS</h2><p>Percentuais calculados sobre todas as solicitações exibidas pelos filtros atuais.</p></div></div>
+    <div class="flow-grid"><% [['Cotação',p.fluxo.cotacao],['Compra',p.fluxo.compra],['Recebimento',p.fluxo.recebimento],['Solicitações concluídas',p.fluxo.concluidas]].forEach(x=>{ %><div><b><%= x[0] %></b><span><%= round(x[1]) %>%</span><i><em style="width:<%= Math.min(100,x[1]) %>%"></em></i></div><% }) %></div>
+    <div class="flow-steps">Solicitado <b>→</b> Cotado <b>→</b> Comprado <b>→</b> Recebido</div>
+  </section>
+
+  <section class="watch-section priority-summary-section">
+    <div class="section-title-row"><div><h2>DISTRIBUIÇÃO POR PRIORIDADE</h2><p>Quantidade de solicitações e percentual de participação na fila acompanhada.</p></div></div>
+    <div class="priority-summary">
+      <% p.priorityOverview.forEach(g=>{ %>
+        <div class="priority-summary-card priority-<%= g.key %>">
+          <div class="priority-summary-head"><span><%= g.label %></span><strong><%= g.totalSolicitacoes %></strong></div>
+          <div class="priority-share"><b><%= round(g.percentualSolicitacoes) %>%</b><span>das solicitações</span></div>
+          <div class="priority-mini-progress"><i style="width:<%= Math.min(100,g.percentualCotado) %>%"></i></div>
+          <small><%= g.totalItens %> itens · <%= round(g.percentualCotado) %>% cotados</small>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="watch-section requests-section">
+    <div class="section-title-row">
+      <div><h2>ACOMPANHAMENTO POR SOLICITAÇÃO</h2><p>Somente leitura. Todas as solicitações são agrupadas por criticidade e prioridade.</p></div>
+      <span class="request-total"><%= p.indicadores.solicitacoes %> solicitações</span>
+    </div>
+
+    <% if(!p.priorityGroups.length){ %>
+      <div class="watch-empty">Nenhuma solicitação encontrada para os filtros selecionados.</div>
+    <% } %>
+
+    <% p.priorityGroups.forEach(g=>{ %>
+      <section class="priority-watch priority-<%= g.key %>">
+        <header class="priority-watch-head">
+          <div><span class="priority-dot"></span><h3><%= g.label %></h3></div>
+          <div class="priority-watch-numbers"><strong><%= g.totalSolicitacoes %></strong><span><%= round(g.percentualSolicitacoes) %>% das solicitações · <%= g.totalItens %> itens</span></div>
+        </header>
+        <div class="request-grid">
+          <% g.solicitacoes.forEach(s=>{ %>
+            <article class="request-watch priority-card-<%= s.priorityGroup %>">
+              <div class="request-topline">
+                <small class="os-label"><%= s.os_id?'OS '+s.os_id+' — '+(s.equipamento_nome||'Equipamento não informado'):'Sem OS vinculada' %></small>
+                <span class="status-chip"><%= statusLabel(s.status) %></span>
+              </div>
+              <b class="request-number"><%= s.numero||'#'+s.id %></b>
+              <h3><%= s.titulo||'Solicitação de material' %></h3>
+              <div class="request-stats">
+                <span><small>Itens</small><b><%= s.total %></b></span>
+                <span><small>Cotados</small><b><%= s.cotados %></b></span>
+                <span><small>Comprados</small><b><%= s.comprados %></b></span>
+                <span><small>Recebidos</small><b><%= s.recebidos %></b></span>
+              </div>
+              <div class="request-progress-grid">
+                <% [['Cotação',s.percentualCotado],['Compra',s.percentualComprado],['Recebimento',s.percentualRecebido]].forEach(progress=>{ %>
+                  <div class="request-progress"><div><span><%= progress[0] %></span><b><%= round(progress[1]) %>%</b></div><i><em style="width:<%= Math.min(100,progress[1]) %>%"></em></i></div>
+                <% }) %>
+              </div>
+              <footer>
+                <span><small>Valor cotado</small><b><%= money(s.cotadoCentavos) %></b></span>
+                <span>Responsável: <%= s.responsavel_nome||'Não atribuído' %> · <%= s.atrasada?'Atrasada':s.venceHoje?'Vence hoje':s.previsao_entrega?'No prazo':'Sem prazo' %></span>
+              </footer>
+            </article>
+          <% }) %>
+        </div>
+      </section>
+    <% }) %>
+  </section>
+
+  <div class="bottom-grid">
+    <section class="watch-section"><h2>VALORES POR ETAPA</h2><dl><dt>Cotado</dt><dd><%= money(p.valores.cotado) %></dd><dt>Comprado / comprometido</dt><dd><%= money(p.valores.comprometido) %></dd><dt>Recebido / realizado</dt><dd><%= money(p.valores.recebido) %></dd><dt>Saldo a receber</dt><dd><%= money(p.valores.saldo) %></dd></dl></section>
+    <section class="watch-section"><h2>CUSTO COTADO POR EQUIPAMENTO</h2><% const max=Math.max(1,...p.equipamentos.map(x=>x.valor)); p.equipamentos.slice(0,8).forEach(x=>{ %><div class="equipment"><span><%= x.nome %></span><i><em style="width:<%= x.valor/max*100 %>%"></em></i><b><%= money(x.valor) %></b></div><% }) %></section>
+    <section class="watch-section"><h2>RESUMO DAS PENDÊNCIAS</h2><div class="pending"><span><b><%= p.pendencias.semCotacao %></b><small>itens aguardando cotação</small></span><span><b><%= p.pendencias.atrasadas %></b><small>solicitações atrasadas</small></span><span><b><%= p.pendencias.vencemHoje %></b><small>vencem hoje</small></span><span><b><%= p.pendencias.semOs %></b><small>sem OS vinculada</small></span></div></section>
+  </div>
+
   <footer class="watch-foot">Painel somente para acompanhamento. Última atualização: <%= fmtBR(p.atualizadoEm) %></footer>
 </div>
