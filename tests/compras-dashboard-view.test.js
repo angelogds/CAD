@@ -36,6 +36,7 @@ test('painel de compras acompanha todos os estados gerenciais da solicitação',
 test('painel força a atualização dos recursos que impedem seleção azul na fila', () => {
   const view = fs.readFileSync(viewPath, 'utf8');
 
-  assert.match(view, /compras-dashboard\.css\?v=20260814-blue-selection-fix/);
-  assert.match(view, /compras-dashboard\.js\?v=20260814-blue-selection-fix/);
+  assert.match(view, /compras-dashboard\.css\?v=20260819-active-priority-selection-fix/);
+  assert.match(view, /compras-active-priority-fix\.css\?v=20260819/);
+  assert.match(view, /compras-dashboard\.js\?v=20260819-active-priority-selection-fix/);
 });
