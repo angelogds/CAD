@@ -1,48 +1,18 @@
 <% layout('layout') %>
-<h1>Histórico de traçagens</h1>
-
-<form method="GET" action="/tracagem/lista" class="card" style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
-  <select class="input" name="tipo">
-    <option value="">Todos os tipos</option>
-    <% Object.keys(labels).forEach((k) => { %>
-      <option value="<%= k %>" <%= filtros.tipo === k ? 'selected' : '' %>><%= labels[k] %></option>
-    <% }) %>
-  </select>
-  <select class="input" name="equipamento_id">
-    <option value="">Todos equipamentos</option>
-    <% equipamentos.forEach((equip) => { %>
-      <option value="<%= equip.id %>" <%= String(filtros.equipamento_id) === String(equip.id) ? 'selected' : '' %>><%= equip.nome %></option>
-    <% }) %>
-  </select>
-  <select class="input" name="os_id">
-    <option value="">Todas OS</option>
-    <% ordensServico.forEach((os) => { %>
-      <option value="<%= os.id %>" <%= String(filtros.os_id) === String(os.id) ? 'selected' : '' %>>OS #<%= os.id %></option>
-    <% }) %>
-  </select>
-  <input class="input" type="date" name="periodo_inicio" value="<%= filtros.periodo_inicio %>" />
-  <input class="input" type="date" name="periodo_fim" value="<%= filtros.periodo_fim %>" />
-  <button class="btn btn-green" type="submit">Filtrar</button>
-</form>
-
-<div class="card" style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;margin-top:10px;">
-  <table class="table" style="width:100%;">
-    <thead><tr><th>Tipo</th><th>Título</th><th>Equipamento</th><th>OS</th><th>Usuário</th><th>Data</th><th></th></tr></thead>
-    <tbody>
-      <% if (!tracagens.length) { %>
-        <tr><td colspan="7">Nenhum registro encontrado.</td></tr>
-      <% } %>
-      <% tracagens.forEach((item) => { %>
-        <tr>
-          <td><%= labels[item.tipo] || item.tipo %></td>
-          <td><%= item.titulo || '-' %></td>
-          <td><%= item.equipamento_nome || '-' %></td>
-          <td><%= item.os_codigo ? ('OS #' + item.os_codigo) : '-' %></td>
-          <td><%= item.usuario_nome || '-' %></td>
-          <td><%= fmtBR(item.created_at) %></td>
-          <td><a class="btn" href="/tracagem/<%= item.id %>">Abrir</a></td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+<link rel="stylesheet" href="/css/tracagem.css?v=20260819">
+<div class="tracagem-page">
+  <nav class="tracagem-breadcrumb"><a href="/tracagem">Traçagem / Caldeiraria</a><span>›</span><strong>Histórico</strong></nav>
+  <header class="tracagem-history-head"><div><h1>Histórico de Traçagens</h1><p class="muted">Cálculos, planificações e vínculos técnicos realizados.</p></div><a class="btn btn-green" href="/tracagem">Novo cálculo</a></header>
+  <form method="GET" action="/tracagem/lista" class="tracagem-card tracagem-filter-grid">
+    <label>Tipo<select class="input" name="tipo"><option value="">Todos os tipos</option><% Object.keys(labels).forEach((k) => { %><option value="<%= k %>" <%= filtros.tipo === k ? 'selected' : '' %>><%= labels[k] %></option><% }) %></select></label>
+    <label>Equipamento<select class="input" name="equipamento_id"><option value="">Todos equipamentos</option><% equipamentos.forEach((equip) => { %><option value="<%= equip.id %>" <%= String(filtros.equipamento_id) === String(equip.id) ? 'selected' : '' %>><%= equip.nome %></option><% }) %></select></label>
+    <label>OS<select class="input" name="os_id"><option value="">Todas OS</option><% ordensServico.forEach((os) => { %><option value="<%= os.id %>" <%= String(filtros.os_id) === String(os.id) ? 'selected' : '' %>>OS #<%= os.id %></option><% }) %></select></label>
+    <label>Período inicial<input class="input" type="date" name="periodo_inicio" value="<%= filtros.periodo_inicio %>"></label>
+    <label>Período final<input class="input" type="date" name="periodo_fim" value="<%= filtros.periodo_fim %>"></label>
+    <button class="btn btn-green" type="submit">Filtrar</button>
+  </form>
+  <section class="tracagem-card"><div class="table-wrap"><table class="tracagem-table"><thead><tr><th>ID</th><th>Tipo</th><th>Título</th><th>Equipamento</th><th>OS</th><th>Usuário</th><th>Data</th><th>Ação</th></tr></thead><tbody>
+    <% if (!tracagens.length) { %><tr><td colspan="8">Nenhum registro encontrado para os filtros informados.</td></tr><% } %>
+    <% tracagens.forEach((item) => { %><tr><td>#<%= item.id %></td><td><%= labels[item.tipo] || item.tipo %></td><td><strong><%= item.titulo || '-' %></strong></td><td><%= item.equipamento_nome || '-' %></td><td><%= item.os_codigo ? ('OS #' + item.os_codigo) : '-' %></td><td><%= item.usuario_nome || '-' %></td><td><%= fmtBR(item.created_at) %></td><td><div class="tr-actions"><a class="btn btn-outline btn-sm" href="/tracagem/<%= item.id %>">Abrir</a><a class="btn btn-outline btn-sm" href="/tracagem/<%= item.id %>/pdf">PDF</a><% if (item.os_codigo) { %><a class="btn btn-ghost btn-sm" href="/os/<%= item.os_codigo %>">OS</a><% } %></div></td></tr><% }) %>
+  </tbody></table></div></section>
 </div>

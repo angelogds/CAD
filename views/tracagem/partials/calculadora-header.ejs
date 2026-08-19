@@ -1,0 +1,13 @@
+<% const hasCalcResult = typeof calculo !== 'undefined' && Boolean(calculo?.resultado); %>
+<nav class="tracagem-breadcrumb" aria-label="Navegação da Traçagem">
+  <a href="/tracagem">Traçagem / Caldeiraria</a><span>›</span><strong><%= titulo %></strong>
+</nav>
+<header class="tracagem-header">
+  <div><h1><%= titulo %></h1><p><%= subtitulo || 'Planificação e medidas para fabricação industrial' %></p></div>
+  <div class="tracagem-header-actions">
+    <a class="btn btn-outline" href="/tracagem/lista<%= tipo ? ('?tipo=' + encodeURIComponent(tipo)) : '' %>">Histórico</a>
+    <a class="btn btn-outline <%= hasCalcResult ? '' : 'tracagem-disabled' %>" href="<%= hasCalcResult ? '#tracagem-actions' : '#' %>" aria-disabled="<%= hasCalcResult ? 'false' : 'true' %>" title="<%= hasCalcResult ? 'Ir para exportação do cálculo' : 'Calcule primeiro' %>">Exportar PDF</a>
+    <button class="btn btn-green" type="button" data-tr-submit>Calcular</button>
+    <a class="btn btn-ghost" href="/tracagem">Voltar</a>
+  </div>
+</header>

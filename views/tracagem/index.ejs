@@ -1,30 +1,43 @@
 <% layout('layout') %>
-
-<style>
-  .tr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
-  .tr-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
-  .tr-illu{height:130px;border:1px solid #e2e8f0;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#f8fafc;margin-bottom:10px;overflow:hidden}
-  .tr-illu img{width:100%;height:100%;object-fit:cover}
-</style>
-
-<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
-  <h1>Traçagem / Caldeiraria</h1>
-  <a class="btn" href="/tracagem/lista">Histórico</a>
-</div>
-<% if (osContext) { %>
-  <div class="alert alert-info" style="margin-top:10px;"><strong>Traçagem iniciada pela OS #<%= osContext.id %> — <%= osContext.equipamento_nome %></strong><br><small>O vínculo definitivo será confirmado depois que a traçagem for salva.</small></div>
-<% } %>
-
-<div class="tr-grid" style="margin-top:10px;">
-  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/rosca-helicoidal.png" alt="Rosca helicoidal"></div><h3>Rosca helicoidal</h3><a class="btn btn-green" href="/tracagem/rosca-helicoidal<%= osContext ? ('?os_id='+osContext.id+'&equipamento_id='+osContext.equipamento_id) : '' %>">Abrir</a></div>
-  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/furacao-flange.png" alt="Furação de flange"></div><h3>Furação de flange</h3><a class="btn btn-green" href="/tracagem/furacao-flange">Abrir</a></div>
-  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/cilindro.png" alt="Cilindro"></div><h3>Cilindro</h3><a class="btn btn-green" href="/tracagem/cilindro">Abrir</a></div>
-  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/curva-gomos.png" alt="Curva de gomos"></div><h3>Curva de gomos</h3><a class="btn btn-green" href="/tracagem/curva-gomos">Abrir</a></div>
-  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/quadrado-para-redondo.png" alt="Quadrado para redondo"></div><h3>Quadrado para redondo</h3><a class="btn btn-green" href="/tracagem/quadrado-para-redondo">Abrir</a></div>
-  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/reducao-concentrica.png" alt="Redução concêntrica"></div><h3>Redução concêntrica</h3><a class="btn btn-green" href="/tracagem/reducao-concentrica">Abrir</a></div>
-  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/semicilindro.png.png" alt="Semicílindro"></div><h3>Semicílindro</h3><a class="btn btn-green" href="/tracagem/semi-cilindro">Abrir</a></div>
-  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/boca-de-lobo-excentrica.png.png" alt="Boca de lobo excêntrica"></div><h3>Boca de lobo excêntrica</h3><a class="btn btn-green" href="/tracagem/boca-de-lobo-excentrica">Abrir</a></div>
-  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/boca-de-lobo-45.png.png" alt="Boca de lobo 45°"></div><h3>Boca de lobo 45°</h3><a class="btn btn-green" href="/tracagem/boca-de-lobo-45-graus">Abrir</a></div>
-  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/boca-de-lobo-90.png.png" alt="Boca de lobo 90°"></div><h3>Boca de lobo 90°</h3><a class="btn btn-green" href="/tracagem/boca-de-lobo-90-graus">Abrir</a></div>
-  <div class="tr-card"><div class="tr-illu"><img src="/img/tracagem/capas/mao-francesa.png.png" alt="Mão francesa"></div><h3>Mão francesa</h3><a class="btn btn-green" href="/tracagem/mao-francesa">Abrir</a></div>
+<link rel="stylesheet" href="/css/tracagem.css?v=20260819">
+<script src="/js/tracagem.js?v=20260819" defer></script>
+<%
+  const ferramentas = [
+    ['rosca-helicoidal','Rosca helicoidal','/tracagem/rosca-helicoidal','/img/tracagem/capas/rosca-helicoidal.png'],
+    ['furacao-flange','Furação de flange','/tracagem/furacao-flange','/img/tracagem/capas/furacao-flange.png'],
+    ['cilindro','Cilindro','/tracagem/cilindro','/img/tracagem/capas/cilindro.png'],
+    ['curva-gomos','Curva de gomos','/tracagem/curva-gomos','/img/tracagem/capas/curva-gomos.png'],
+    ['quadrado-para-redondo','Quadrado para redondo','/tracagem/quadrado-para-redondo','/img/tracagem/capas/quadrado-para-redondo.png'],
+    ['reducao-concentrica','Redução concêntrica','/tracagem/reducao-concentrica','/img/tracagem/capas/reducao-concentrica.png'],
+    ['semi-cilindro','Semicílindro','/tracagem/semi-cilindro','/img/tracagem/capas/semicilindro.png.png'],
+    ['boca-de-lobo-excentrica','Boca de lobo excêntrica','/tracagem/boca-de-lobo-excentrica','/img/tracagem/capas/boca-de-lobo-excentrica.png.png'],
+    ['boca-de-lobo-45','Boca de lobo 45°','/tracagem/boca-de-lobo-45-graus','/img/tracagem/capas/boca-de-lobo-45.png.png'],
+    ['boca-de-lobo-90','Boca de lobo 90°','/tracagem/boca-de-lobo-90-graus','/img/tracagem/capas/boca-de-lobo-90.png.png'],
+    ['mao-francesa','Mão francesa','/tracagem/mao-francesa','/img/tracagem/capas/mao-francesa.png.png'],
+  ];
+  const osSuffix = osContext ? ('?os_id='+osContext.id+'&equipamento_id='+osContext.equipamento_id) : '';
+%>
+<div class="tracagem-page">
+  <nav class="tracagem-breadcrumb"><strong>Traçagem / Caldeiraria</strong></nav>
+  <header class="tracagem-header">
+    <div><h1>Traçagem / Caldeiraria</h1><p>Ferramentas de desenvolvimento e planificação para fabricação industrial</p></div>
+    <div class="tracagem-header-actions"><a class="btn btn-outline" href="/tracagem/lista">Histórico</a><a class="btn btn-green" href="#ferramentas">Novo cálculo</a></div>
+  </header>
+  <% if (osContext) { %><div class="tracagem-note"><strong>Contexto da OS #<%= osContext.id %> — <%= osContext.equipamento_nome %></strong><br><small>O vínculo definitivo será confirmado depois que a traçagem for salva.</small></div><% } %>
+  <section class="tracagem-summary-grid" aria-label="Resumo do módulo">
+    <article class="tracagem-summary-card"><small>Ferramentas</small><strong>11</strong><span>calculadoras disponíveis</span></article>
+    <article class="tracagem-summary-card"><small>Histórico</small><strong>Registros salvos</strong><span>consulta por tipo, equipamento, OS e período</span></article>
+    <article class="tracagem-summary-card"><small>Favoritos</small><strong data-tr-favorite-count>0</strong><span>atalhos salvos neste dispositivo</span></article>
+    <article class="tracagem-summary-card"><small>Integrações</small><strong>OS + Equipamentos</strong><span>PDF e arquivo técnico preservados</span></article>
+  </section>
+  <section id="ferramentas">
+    <div class="tracagem-history-head"><div><h2>Central de cálculos e planificação</h2><p class="muted">Selecione a ferramenta técnica para iniciar o desenvolvimento.</p></div></div>
+    <div class="tracagem-tool-grid">
+      <% ferramentas.forEach((f) => { %><article class="tracagem-tool-card">
+        <div class="tracagem-tool-visual"><img src="<%= f[3] %>" alt="<%= f[1] %>"></div>
+        <h3><%= f[1] %></h3><p>Planificação e medidas para fabricação.</p>
+        <div class="tracagem-tool-actions"><a class="btn btn-green" href="<%= f[2] %><%= f[0] === 'rosca-helicoidal' ? osSuffix : '' %>">Abrir</a><button class="tr-favorite" type="button" data-tr-favorite="<%= f[0] %>" aria-pressed="false">Favoritar</button></div>
+      </article><% }) %>
+    </div>
+  </section>
 </div>
