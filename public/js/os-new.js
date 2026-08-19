@@ -159,6 +159,8 @@
       try {
         const transcricao = String(event?.results?.[0]?.[0]?.transcript || '').trim();
         if (!transcricao) throw new Error('Não foi possível entender a fala.');
+        isRecording = false;
+        activeRecognition = null;
         setButtonState('processing');
         setStatus('Transcrição concluída. Analisando com IA...', null);
         const analise = await enviarParaAnaliseVoz(transcricao);
