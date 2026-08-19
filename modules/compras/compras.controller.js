@@ -28,7 +28,7 @@ function lista(req, res) {
     endDate: req.query.endDate || '',
     period: ['7', '30', '90'].includes(req.query.period) ? Number(req.query.period) : 30,
     setor: (req.query.setor || '').trim(),
-    prioridade: ['high', 'medium', 'low', 'undefined'].includes(req.query.prioridade) ? req.query.prioridade : '',
+    prioridade: ['critical', 'high', 'medium', 'low', 'undefined'].includes(req.query.prioridade) ? req.query.prioridade : '',
     responsavel: (req.query.responsavel || '').trim(),
     limit: ['10', '20', '50'].includes(req.query.limit) ? Number(req.query.limit) : 20,
     page: Math.max(1, Number(req.query.page) || 1),
