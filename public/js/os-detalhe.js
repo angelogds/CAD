@@ -120,6 +120,8 @@
   if (!input || !preview || !submit || !form) return;
 
   let objectUrls = [];
+  let validFilesCount = 0;
+  const canRewriteFileList = typeof DataTransfer === 'function';
   const videoDuration = (file) => new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement('video');
@@ -129,38 +131,59 @@
     video.src = url;
   });
   async function validateFiles() {
-    const transfer = new DataTransfer();
+    const selectedFiles = Array.from(input.files || []);
+    const acceptedFiles = [];
     const errors = [];
-    for (const file of Array.from(input.files || [])) {
-      const image = file.type.startsWith('image/');
-      const video = file.type.startsWith('video/');
-      if (!image && !video) { errors.push(file.name + ': use uma foto ou vídeo válido.'); continue; }
+    submit.disabled = true;
+    message.textContent = selectedFiles.length ? 'Validando mídia de fechamento...' : 'Adicione uma foto ou vídeo de fechamento para concluir';
+
+    for (const file of selectedFiles) {
+      const fileName = String(file.name || 'arquivo');
+      const mime = String(file.type || '').toLowerCase();
+      const image = mime.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif|gif|bmp)$/i.test(fileName);
+      const video = mime.startsWith('video/') || /\.(mp4|mov|webm|ogg|m4v|avi)$/i.test(fileName);
+      if (!image && !video) { errors.push(fileName + ': use uma foto ou vídeo válido.'); continue; }
       if (video) {
-        try { if ((await videoDuration(file)) > 60) { errors.push(file.name + ': o vídeo excede 1 minuto.'); continue; } }
-        catch (_) { errors.push(file.name + ': não foi possível validar o vídeo.'); continue; }
+        try { if ((await videoDuration(file)) > 60) { errors.push(fileName + ': o vídeo excede 1 minuto.'); continue; } }
+        catch (_) { errors.push(fileName + ': não foi possível validar o vídeo.'); continue; }
       }
-      transfer.items.add(file);
+      acceptedFiles.push(file);
     }
-    input.files = transfer.files;
+
+    if (canRewriteFileList) {
+      const transfer = new DataTransfer();
+      acceptedFiles.forEach((file) => transfer.items.add(file));
+      input.files = transfer.files;
+    }
+
     objectUrls.forEach(URL.revokeObjectURL); objectUrls = [];
     preview.replaceChildren();
-    Array.from(input.files).forEach((file, index) => {
+    acceptedFiles.forEach((file, index) => {
       const card = document.createElement('div'); card.className = 'os-file-preview';
       const url = URL.createObjectURL(file); objectUrls.push(url);
-      const media = file.type.startsWith('video/') ? document.createElement('video') : document.createElement('img');
+      const media = (String(file.type || '').startsWith('video/') || /\.(mp4|mov|webm|ogg|m4v|avi)$/i.test(file.name || '')) ? document.createElement('video') : document.createElement('img');
       media.src = url; if (media.tagName === 'VIDEO') media.muted = true;
-      const info = document.createElement('span'); info.textContent = file.name + ' — ' + file.type;
-      const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Remover';
-      remove.addEventListener('click', () => { const dt = new DataTransfer(); Array.from(input.files).forEach((item, i) => { if (i !== index) dt.items.add(item); }); input.files = dt.files; validateFiles(); });
+      const info = document.createElement('span'); info.textContent = file.name + (file.type ? ' — ' + file.type : '');
+      const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = canRewriteFileList ? 'Remover' : 'Limpar seleção';
+      remove.addEventListener('click', () => {
+        if (!canRewriteFileList) { input.value = ''; validateFiles(); return; }
+        const dt = new DataTransfer();
+        Array.from(input.files).forEach((item, i) => { if (i !== index) dt.items.add(item); });
+        input.files = dt.files;
+        validateFiles();
+      });
       card.append(media, info, remove); preview.appendChild(card);
     });
-    submit.disabled = input.files.length === 0;
-    message.textContent = errors.join(' ') || (input.files.length ? input.files.length + ' arquivo(s) válido(s) selecionado(s).' : 'Adicione uma foto ou vídeo de fechamento para concluir');
+
+    validFilesCount = acceptedFiles.length;
+    const hasUnremovableInvalidFiles = !canRewriteFileList && errors.length > 0;
+    submit.disabled = validFilesCount === 0 || hasUnremovableInvalidFiles;
+    message.textContent = errors.join(' ') || (validFilesCount ? validFilesCount + ' arquivo(s) válido(s) selecionado(s).' : 'Adicione uma foto ou vídeo de fechamento para concluir');
     message.classList.toggle('error', errors.length > 0);
   }
   input.addEventListener('change', validateFiles);
   form.addEventListener('submit', (event) => {
-    if (!input.files.length) { event.preventDefault(); message.textContent = 'Adicione uma foto ou vídeo de fechamento para concluir'; return; }
+    if (!validFilesCount || !input.files.length) { event.preventDefault(); message.textContent = 'Adicione uma foto ou vídeo de fechamento para concluir'; return; }
     if (form.dataset.submitting === 'true') { event.preventDefault(); return; }
     form.dataset.submitting = 'true'; submit.disabled = true; submit.textContent = 'Concluindo...';
   });
