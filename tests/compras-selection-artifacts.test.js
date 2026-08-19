@@ -14,6 +14,13 @@ test('fila de compras neutraliza seleção nativa sem afetar filtros', () => {
   assert.doesNotMatch(css, /dashboard-filters[^\{]*\{[^}]*user-select:none/i);
 });
 
+test('textos da fila nao herdam fundo vermelho ou azul dos grupos de prioridade', () => {
+  const css = read('public/css/compras-active-priority-fix.css');
+  assert.match(css, /\.priority-section \.request-row \.request-os > b[\s\S]*\.priority-section \.request-row \.purchase-data > span > b[\s\S]*background:transparent!important/);
+  assert.match(css, /\.priority-section > h3 > b[\s\S]*background:#eef2f7!important/);
+  assert.doesNotMatch(css, /\.item-progress\s*>\s*b[^\{]*\{[^}]*background:transparent!important/i);
+});
+
 test('javascript limpa ranges residuais somente na fila operacional', () => {
   const js = read('public/js/compras-dashboard.js');
   assert.match(js, /selectionTouchesRequestRow/);
