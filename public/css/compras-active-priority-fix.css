@@ -5,16 +5,71 @@
 .tag-high{color:#a15c0b!important;background:#fff7ed!important;border:1px solid #fed7aa!important}
 .priority-critical .request-row{border-left-color:#ef2938!important}
 .priority-high .request-row{border-left-color:#f97316!important}
-.request-list,.request-row,.request-row *,.row-actions,.row-actions *{
+
+/*
+ * A fila inteira é clicável. Alguns navegadores (principalmente Safari/iOS e
+ * Chromium após arrastar o ponteiro) podem manter seleção nativa de texto e
+ * desenhar blocos azul/vermelho sobre OS/equipamento e dados da compra.
+ * A neutralização fica restrita à fila operacional para não afetar filtros.
+ */
+.request-list,
+.request-row,
+.request-row *,
+.request-os,
+.request-os *,
+.purchase-data,
+.purchase-data *,
+.request-flow,
+.request-flow *,
+.row-actions,
+.row-actions *{
   user-select:none!important;
   -webkit-user-select:none!important;
+  -moz-user-select:none!important;
+  -ms-user-select:none!important;
   -webkit-touch-callout:none!important;
   -webkit-tap-highlight-color:transparent!important;
+  -webkit-user-drag:none!important;
   caret-color:transparent!important;
 }
-.request-list::selection,.request-list *::selection{background:transparent!important;color:inherit!important}
-.request-list::-moz-selection,.request-list *::-moz-selection{background:transparent!important;color:inherit!important}
-.request-row :is(a,button,summary){-webkit-tap-highlight-color:transparent!important}
+
+.request-list::selection,
+.request-list *::selection,
+.request-row::selection,
+.request-row *::selection,
+.request-os::selection,
+.request-os *::selection,
+.purchase-data::selection,
+.purchase-data *::selection{
+  background:transparent!important;
+  color:inherit!important;
+  text-shadow:none!important;
+}
+
+.request-list::-moz-selection,
+.request-list *::-moz-selection,
+.request-row::-moz-selection,
+.request-row *::-moz-selection,
+.request-os::-moz-selection,
+.request-os *::-moz-selection,
+.purchase-data::-moz-selection,
+.purchase-data *::-moz-selection{
+  background:transparent!important;
+  color:inherit!important;
+  text-shadow:none!important;
+}
+
+.request-row :is(a,button,summary){
+  -webkit-tap-highlight-color:transparent!important;
+  -webkit-user-drag:none!important;
+}
+
+/* Mantém acessibilidade por teclado sem reintroduzir seleção de texto. */
+.request-row:focus-visible{
+  outline:2px solid #15803d;
+  outline-offset:-2px;
+}
+
 @media(max-width:980px){
   .priority-critical .request-row{border-left-color:#ef2938!important}
   .priority-high .request-row{border-left-color:#f97316!important}
