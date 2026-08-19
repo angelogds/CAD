@@ -1,35 +1,32 @@
 <% layout('layout') %>
-<div style="display:flex;justify-content:space-between;align-items:center;">
-  <h1>Traçagem #<%= tracagem.id %></h1>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <a class="btn" href="/tracagem/lista">Histórico</a>
-    <a class="btn btn-green" href="/tracagem/<%= tracagem.id %>/pdf">Gerar PDF</a>
-    <a class="btn" href="/desenho-tecnico/cad/novo">Novo desenho CAD</a>
-    <a class="btn" href="/desenho-tecnico">Abrir lista de desenhos</a>
-    <% if (desenhoVinculado) { %><a class="btn" href="/desenho-tecnico/cad/<%= desenhoVinculado.id %>/editor">Desenho vinculado #<%= desenhoVinculado.id %></a><% } %>
+<link rel="stylesheet" href="/css/tracagem.css?v=20260819">
+<script src="/js/tracagem.js?v=20260819" defer></script>
+<%
+  const primitiveEntries = (obj) => Object.entries(obj || {}).filter(([,v]) => ['string','number','boolean'].includes(typeof v));
+  const nestedEntries = (obj) => Object.entries(obj || {}).filter(([,v]) => v && typeof v === 'object');
+  const fmtValue = (v) => typeof v === 'number' ? (Number.isInteger(v) ? String(v) : v.toFixed(2)) : String(v ?? '-');
+  const imageSlugMap = {
+    'quadrado-redondo':'quadrado-para-redondo', 'quadrado-para-redondo':'quadrado-para-redondo',
+    'boca-lobo-excentrica':'boca-de-lobo-excentrica', 'boca-de-lobo-excentrica':'boca-de-lobo-excentrica',
+    'boca-lobo-45':'boca-de-lobo-45', 'boca-de-lobo-45':'boca-de-lobo-45',
+    'boca-lobo-90':'boca-de-lobo-90', 'boca-de-lobo-90':'boca-de-lobo-90'
+  };
+  const imageSlug = imageSlugMap[tracagem.tipo] || tracagem.tipo;
+  const imageExt = imageSlug === 'semi-cilindro' ? '.png.JPG' : '.png';
+  const imageBase = imageSlug === 'semi-cilindro' ? 'semicilindro' : imageSlug;
+%>
+<div class="tracagem-page">
+  <nav class="tracagem-breadcrumb"><a href="/tracagem">Traçagem / Caldeiraria</a><span>›</span><a href="/tracagem/lista">Histórico</a><span>›</span><strong>Traçagem #<%= tracagem.id %></strong></nav>
+  <header class="tracagem-detail-head"><div><h1>Traçagem #<%= tracagem.id %></h1><p class="muted"><%= labels[tracagem.tipo] || tracagem.tipo %> • ficha técnica do cálculo salvo</p></div><div class="tracagem-header-actions"><a class="btn btn-outline" href="/tracagem/lista">Histórico</a><a class="btn btn-green" href="/tracagem/<%= tracagem.id %>/pdf">Gerar PDF</a></div></header>
+  <section class="tracagem-meta-grid">
+    <div class="tracagem-meta-item"><small>Título</small><strong><%= tracagem.titulo || '-' %></strong></div><div class="tracagem-meta-item"><small>Tipo</small><strong><%= labels[tracagem.tipo] || tracagem.tipo %></strong></div><div class="tracagem-meta-item"><small>Usuário</small><strong><%= tracagem.usuario_nome || '-' %></strong></div><div class="tracagem-meta-item"><small>Equipamento</small><strong><%= tracagem.equipamento_nome || '-' %></strong></div><div class="tracagem-meta-item"><small>OS</small><strong><%= tracagem.os_id ? ('#'+tracagem.os_id) : '-' %></strong></div><div class="tracagem-meta-item"><small>Data</small><strong><%= fmtBR(tracagem.created_at) %></strong></div>
+  </section>
+  <section class="tracagem-card"><h3>Vista técnica e planificação</h3><div class="tracagem-detail-images"><figure><figcaption>Peça</figcaption><img class="img-tecnica" src="/img/tracagem/planificacoes/<%= imageBase %>-peca<%= imageExt %>" alt="Vista técnica de <%= labels[tracagem.tipo] || tracagem.tipo %>"></figure><figure><figcaption>Planificação</figcaption><img class="img-tecnica" src="/img/tracagem/planificacoes/<%= imageBase %>-planificacao<%= imageExt %>" alt="Planificação de <%= labels[tracagem.tipo] || tracagem.tipo %>"></figure></div></section>
+  <div class="tracagem-data-grid">
+    <section class="tracagem-card"><h3>Parâmetros</h3><div class="tracagem-data-list"><% primitiveEntries(tracagem.parametros).forEach(([k,v]) => { %><div class="tracagem-data-item"><small><%= k %></small><strong><%= fmtValue(v) %></strong></div><% }) %></div></section>
+    <section class="tracagem-card"><h3>Resultados principais</h3><div class="tracagem-data-list"><% primitiveEntries(tracagem.resultado?.resultado || tracagem.resultado).forEach(([k,v]) => { %><div class="tracagem-data-item"><small><%= k %></small><strong><%= fmtValue(v) %></strong></div><% }) %></div><% if (!primitiveEntries(tracagem.resultado?.resultado || tracagem.resultado).length) { %><div class="tracagem-result-empty">Resultado técnico disponível nos dados completos abaixo.</div><% } %></section>
   </div>
-</div>
-
-<div class="card" style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;margin-top:10px;">
-  <div><b>Título:</b> <%= tracagem.titulo || '-' %></div>
-  <div><b>Tipo:</b> <%= labels[tracagem.tipo] || tracagem.tipo %></div>
-  <div><b>Usuário:</b> <%= tracagem.usuario_nome || '-' %></div>
-  <div><b>OS:</b> <%= tracagem.os_id || '-' %></div>
-  <div><b>Equipamento:</b> <%= tracagem.equipamento_nome || '-' %></div>
-  <div><b>Data:</b> <%= fmtBR(tracagem.created_at) %></div>
-  <% if (!tracagem.os_id && tracagem.equipamento_id) { %>
-    <form method="POST" action="/tracagem/<%= tracagem.id %>/vincular-os" style="margin-top:12px;display:flex;gap:8px;align-items:end;flex-wrap:wrap;">
-      <label>OS de origem <input class="input" required inputmode="numeric" name="os_id" placeholder="Número da OS"></label>
-      <input type="hidden" name="equipamento_id" value="<%= tracagem.equipamento_id %>">
-      <button class="btn btn-green" type="submit">Vincular à OS</button>
-    </form>
-  <% } else if (tracagem.os_id) { %>
-    <a class="btn btn-outline" style="margin-top:12px" href="/os/<%= tracagem.os_id %>#historico">Vinculada à OS #<%= tracagem.os_id %></a>
-  <% } %>
-
-  <h3>Parâmetros</h3>
-  <pre><%= JSON.stringify(tracagem.parametros, null, 2) %></pre>
-
-  <h3>Resultados</h3>
-  <pre><%= JSON.stringify(tracagem.resultado, null, 2) %></pre>
+  <% if (tracagem.resultado?.observacoes?.length || tracagem.resultado?.observacao_tecnica) { %><section class="tracagem-note"><strong>Observações técnicas</strong><ul><% (tracagem.resultado.observacoes || [tracagem.resultado.observacao_tecnica]).filter(Boolean).forEach(o => { %><li><%= o %></li><% }) %></ul></section><% } %>
+  <section class="tracagem-card"><h3>Vínculos técnicos</h3><div class="tr-actions"><% if (tracagem.os_id) { %><a class="btn btn-outline" href="/os/<%= tracagem.os_id %>#historico">Abrir OS #<%= tracagem.os_id %></a><% } else if (tracagem.equipamento_id) { %><form method="POST" action="/tracagem/<%= tracagem.id %>/vincular-os" class="tr-actions"><input class="input" required inputmode="numeric" name="os_id" placeholder="Número da OS"><input type="hidden" name="equipamento_id" value="<%= tracagem.equipamento_id %>"><button class="btn btn-green" type="submit">Vincular à OS</button></form><% } %><% if (desenhoVinculado) { %><a class="btn btn-outline" href="/desenho-tecnico/cad/<%= desenhoVinculado.id %>/editor">Abrir desenho vinculado</a><% } %><a class="btn btn-outline" href="/desenho-tecnico/cad/novo">Novo desenho CAD</a></div></section>
+  <% if (nestedEntries(tracagem.resultado).length) { %><details class="tracagem-card tracagem-debug"><summary>Dados técnicos completos</summary><pre><%= JSON.stringify(tracagem.resultado, null, 2) %></pre></details><% } %>
 </div>

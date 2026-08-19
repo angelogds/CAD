@@ -1,16 +1,7 @@
-<style>
-  .tr-actions{display:flex;gap:8px;flex-wrap:wrap}
-  .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:60;padding:12px}
-  .modal-overlay.open{display:flex}
-  .modal-card{width:min(920px,96vw);max-height:88vh;overflow:auto;background:#fff;border-radius:16px;border:1px solid #dcfce7;padding:14px}
-  .equip-table{width:100%;border-collapse:collapse}
-  .equip-table th,.equip-table td{padding:8px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:.92rem}
-  .equip-row{cursor:pointer}
-  .equip-row.selected{background:#ecfdf5}
-</style>
-
-<div class="tr-actions">
-  <form method="POST" action="/tracagem/pdf-calculo" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;">
+<div class="tracagem-actions-card" id="tracagem-actions">
+  <div><h3 style="margin:0 0 4px;">Salvar e integrar cálculo</h3><p class="hint">Gere o PDF, salve no histórico ou vincule ao arquivo técnico do equipamento.</p></div>
+  <div class="tr-actions">
+  <form method="POST" action="/tracagem/pdf-calculo" class="tr-actions">
     <input type="hidden" name="tipo" value="<%= tipo %>">
     <input type="hidden" name="parametros_json" value='<%- JSON.stringify(calculo?.parametros || {}) %>'>
     <input type="hidden" name="resultado_json" value='<%- JSON.stringify(calculo?.resultado || {}) %>'>
@@ -27,7 +18,7 @@
   <button class="btn btn-green" id="open-relacionar" type="button">Relacionar ao equipamento</button>
 </div>
 
-<div style="margin-top:12px;display:grid;gap:10px;">
+<div class="tracagem-subcard">
   <h3 class="optional-title">Identificação da traçagem — opcional</h3>
   <p class="hint">Preencha somente se desejar um relatório técnico mais completo.</p>
   <div class="tr-grid">
@@ -45,16 +36,25 @@
   <div><label>Descrição ou observação da peça — opcional</label><textarea class="input" id="ident_observacao" rows="2"></textarea></div>
 </div>
 
+
+  <form method="POST" action="/tracagem/salvar" class="tracagem-subcard">
+    <h4>Salvar cálculo</h4><p>Guarde a traçagem no histórico com vínculos opcionais.</p>
+    <div class="tr-grid"><div><label>Título da traçagem</label><input class="input" name="titulo" required value="<%= tituloPadrao || 'Traçagem técnica' %>"></div><div><label>Vincular à OS</label><select class="input" name="os_id"><option value="">Sem vínculo</option><% (ordensServico || []).forEach((os)=> { %><option value="<%= os.id %>">OS #<%= os.id %> — <%= os.status || '' %></option><% }) %></select></div><div><label>Vincular ao equipamento</label><select class="input" name="equipamento_id"><option value="">Sem vínculo</option><% (equipamentos || []).forEach((equip)=> { %><option value="<%= equip.id %>"><%= equip.nome %></option><% }) %></select></div></div>
+    <input type="hidden" name="tipo" value="<%= tipo %>"><input type="hidden" name="parametros_json" value='<%- JSON.stringify(calculo?.parametros || {}) %>'><input type="hidden" name="resultado_json" value='<%- JSON.stringify(calculo?.resultado || {}) %>'>
+    <button class="btn btn-green" type="submit">Salvar traçagem</button>
+  </form>
+</div>
+
 <div class="modal-overlay" id="modal-relacionar" aria-hidden="true">
   <div class="modal-card">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+    <div class="tracagem-history-head">
       <h3 style="margin:0;">Relacionar traçagem ao equipamento</h3>
       <button class="btn" type="button" id="close-relacionar">Cancelar</button>
     </div>
 
-    <div style="margin-top:10px;display:grid;gap:8px;">
+    <div class="tracagem-subcard">
       <input class="input" id="equip-search" placeholder="Buscar por nome, código ou setor" />
-      <div style="overflow:auto;max-height:320px;border:1px solid #e2e8f0;border-radius:12px;">
+      <div class="table-wrap">
         <table class="equip-table">
           <thead>
             <tr>
@@ -78,14 +78,14 @@
       </div>
     </div>
 
-    <form method="POST" action="/tracagem/relacionar-equipamento" id="form-relacionar" style="display:grid;gap:8px;margin-top:12px;">
+    <form method="POST" action="/tracagem/relacionar-equipamento" id="form-relacionar" class="tracagem-subcard">
       <input class="input" name="titulo" placeholder="Título da traçagem" required value="<%= tituloPadrao || 'Traçagem' %>">
       <input type="hidden" name="tipo" value="<%= tipo %>">
       <input type="hidden" name="parametros_json" value='<%- JSON.stringify(calculo?.parametros || {}) %>'>
       <input type="hidden" name="resultado_json" value='<%- JSON.stringify(calculo?.resultado || {}) %>'>
       <input type="hidden" name="equipamento_id" id="equipamento_id_selected" value="">
       <input type="hidden" name="os_id" id="rel_os_id" value="">
-      <div style="display:flex;justify-content:flex-end;gap:8px;">
+      <div class="tr-actions">
         <button class="btn" type="button" id="cancel-relacionar">Cancelar</button>
         <button class="btn btn-green" type="submit" id="confirm-relacionar">Confirmar</button>
       </div>

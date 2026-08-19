@@ -22,7 +22,9 @@ test('inspection report renders preventive section and OS and preventive indicat
   assert.match(view, /Equipamentos impactados/);
   assert.match(view, /Preventivas/);
   assert.doesNotMatch(view, /Filtros do relatório de preventivas/);
-  assert.doesNotMatch(view, /Aplicar filtros/);
+  for (const field of ['data_inicio', 'data_fim', 'equipamento_id', 'setor', 'responsavel', 'status', 'nao_conformidade', 'gerou_os', 'tipo_atividade']) {
+    assert.match(view, new RegExp(`name=\"${field}\"`), `filtro visual ${field} deve permanecer disponível`);
+  }
 });
 
 test('inspection report loads OS operational indicators from inspection service', () => {

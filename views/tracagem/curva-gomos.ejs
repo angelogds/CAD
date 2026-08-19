@@ -1,21 +1,9 @@
 <% layout('layout') %>
-<style>
-  .tr-page{display:grid;gap:14px}.tr-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px}
-  .tr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-  .img-tecnica{width:100%;max-width:980px;display:block;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;background:#fff;object-fit:contain}
-  .img-planificacao{max-width:760px}.resultado{display:grid;gap:6px;font-size:1rem}
-  .planificacao-title{text-align:center;margin-bottom:10px}
-  .planificacao-info{margin-top:12px;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#f8fafc;display:grid;gap:8px}
-  .planificacao-info h4{margin:0;font-size:1rem}
-  .planificacao-info p{margin:0}
-  .tr-table{width:100%;border-collapse:collapse}
-  .tr-table th,.tr-table td{padding:10px;border-bottom:1px solid #e2e8f0;text-align:left}
-  .tr-table th{background:#f8fafc;font-weight:700}
-  @media(max-width:920px){.tr-grid{grid-template-columns:1fr}}
-</style>
+<link rel="stylesheet" href="/css/tracagem.css?v=20260819">
+<script src="/js/tracagem.js?v=20260819" defer></script>
 <div class="tr-page">
-  <div style="display:flex;justify-content:space-between;align-items:center;"><h1>Curva de gomos</h1><a class="btn" href="/tracagem">Voltar</a></div>
-  <div class="tr-card"><form method="POST" action="/tracagem/curva-gomos/calcular" style="display:grid;gap:10px;">
+  <%- include('partials/calculadora-header', { titulo: 'Curva de gomos', tipo: 'curva-gomos' }) %>
+  <div class="tr-card"><form class="tracagem-calculator-form" method="POST" action="/tracagem/curva-gomos/calcular">
     <div class="tr-grid">
       <div><label>D (diâmetro)</label><input class="input" name="D" type="number" step="0.01" required value="<%= calculo?.parametros?.D || '' %>"></div>
       <div><label>A (ângulo total)</label><input class="input" name="A" type="number" step="0.01" required value="<%= calculo?.parametros?.A || '' %>"></div>
