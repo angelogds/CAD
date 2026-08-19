@@ -1,0 +1,21 @@
+/* Correções incrementais da fila de Compras — 19/08/2026. */
+.priority-critical h3{color:#b42332!important}
+.priority-high h3{color:#b45309!important}
+.tag-critical{color:#b42332!important;background:#fff1f2!important;border:1px solid #fecdd3!important}
+.tag-high{color:#a15c0b!important;background:#fff7ed!important;border:1px solid #fed7aa!important}
+.priority-critical .request-row{border-left-color:#ef2938!important}
+.priority-high .request-row{border-left-color:#f97316!important}
+.request-list,.request-row,.request-row *,.row-actions,.row-actions *{
+  user-select:none!important;
+  -webkit-user-select:none!important;
+  -webkit-touch-callout:none!important;
+  -webkit-tap-highlight-color:transparent!important;
+  caret-color:transparent!important;
+}
+.request-list::selection,.request-list *::selection{background:transparent!important;color:inherit!important}
+.request-list::-moz-selection,.request-list *::-moz-selection{background:transparent!important;color:inherit!important}
+.request-row :is(a,button,summary){-webkit-tap-highlight-color:transparent!important}
+@media(max-width:980px){
+  .priority-critical .request-row{border-left-color:#ef2938!important}
+  .priority-high .request-row{border-left-color:#f97316!important}
+}
