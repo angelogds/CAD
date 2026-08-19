@@ -6,6 +6,100 @@ const storagePaths = require('../../config/storage');
 
 const UPLOADS_DIR = storagePaths.UPLOAD_DIR;
 
+
+const OPERATIONALLY_CLOSED = new Set(['RECEBIDA_TOTAL', 'ENTREGUE_SOLICITANTE', 'FECHADA', 'CANCELADA']);
+
+function normalizeToken(value) {
+  return String(value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+function queuePriorityGroup(value) {
+  const priority = normalizeToken(value);
+  if (['CRITICA', 'URGENTE', 'EMERGENCIAL'].includes(priority)) return 'critical';
+  if (priority === 'ALTA') return 'high';
+  if (priority === 'MEDIA') return 'medium';
+  if (priority === 'BAIXA') return 'low';
+  return 'undefined';
+}
+
+function matchesOperationalCard(row, card) {
+  if (!card) return true;
+  if (card === 'os') return row.os_id != null;
+  if (card === 'abertas') return ['ABERTA', 'REABERTA'].includes(row.status);
+  if (card === 'cotacao') return row.status === 'EM_COTACAO';
+  if (card === 'recebimento') return ['COMPRADA', 'EM_RECEBIMENTO'].includes(row.status);
+  if (card === 'recebidas') return row.status === 'RECEBIDA_PARCIAL';
+  if (card === 'atrasadas') return Boolean(row.overdue);
+  return true;
+}
+
+function loadAllLegacyQueueRows(filters, tab) {
+  const common = { ...filters, tab, prioridade: '', card: '', limit: 50, page: 1 };
+  const first = service.getOperationalQueue(common);
+  const rows = [...first.rows];
+  for (let page = 2; page <= first.pages; page += 1) {
+    rows.push(...service.getOperationalQueue({ ...common, page }).rows);
+  }
+  return { queue: first, rows };
+}
+
+function getOperationalQueue(filters) {
+  // O service legado considerava RECEBIDA_TOTAL/ENTREGUE_SOLICITANTE como ativos e
+  // agrupava crítica + alta. A política abaixo corrige somente a apresentação da fila,
+  // preservando detalhes, banco, rotas e o restante do fluxo existente.
+  const activeSource = loadAllLegacyQueueRows(filters, 'active');
+  const historySource = loadAllLegacyQueueRows(filters, 'history');
+  const unique = new Map();
+  [...activeSource.rows, ...historySource.rows].forEach((row) => unique.set(String(row.id), row));
+
+  const allRows = [...unique.values()].map((row) => ({
+    ...row,
+    status: service.normalizeStatus(row.status),
+    priorityGroup: queuePriorityGroup(row.prioridade),
+  }));
+  const activeRows = allRows.filter((row) => !OPERATIONALLY_CLOSED.has(row.status));
+  const historyRows = allRows.filter((row) => OPERATIONALLY_CLOSED.has(row.status));
+  let filtered = filters.tab === 'history' ? historyRows : activeRows;
+
+  if (filters.prioridade) filtered = filtered.filter((row) => row.priorityGroup === filters.prioridade);
+  if (filters.tab !== 'history' && filters.card) filtered = filtered.filter((row) => matchesOperationalCard(row, filters.card));
+  filtered.sort(service.operationalSort);
+
+  const cards = {
+    os: activeRows.filter((row) => matchesOperationalCard(row, 'os')).length,
+    abertas: activeRows.filter((row) => matchesOperationalCard(row, 'abertas')).length,
+    cotacao: activeRows.filter((row) => matchesOperationalCard(row, 'cotacao')).length,
+    recebimento: activeRows.filter((row) => matchesOperationalCard(row, 'recebimento')).length,
+    recebidas: activeRows.filter((row) => matchesOperationalCard(row, 'recebidas')).length,
+    atrasadas: activeRows.filter((row) => matchesOperationalCard(row, 'atrasadas')).length,
+  };
+
+  const limit = [10, 20, 50].includes(Number(filters.limit)) ? Number(filters.limit) : 20;
+  const total = filtered.length;
+  const pages = Math.max(1, Math.ceil(total / limit));
+  const page = Math.min(Math.max(1, Number(filters.page) || 1), pages);
+  const rows = filtered.slice((page - 1) * limit, page * limit);
+  const setores = [...new Set(allRows.map((row) => row.setor_origem).filter(Boolean))].sort();
+  const responsaveis = [...new Map(allRows.filter((row) => row.compras_user_id).map((row) => [
+    String(row.compras_user_id),
+    { id: row.compras_user_id, nome: row.responsavel_nome || 'Não definido' },
+  ])).values()];
+
+  return {
+    ...activeSource.queue,
+    rows,
+    total,
+    limit,
+    page,
+    pages,
+    cards,
+    groups: ['critical', 'high', 'medium', 'low', 'undefined'],
+    setores,
+    responsaveis,
+  };
+}
+
 function isSchemaError(error) {
   const msg = String(error?.message || error || '').toLowerCase();
   return msg.includes('no such table') || msg.includes('no such column') || msg.includes('sqlite_error');
@@ -28,13 +122,13 @@ function lista(req, res) {
     endDate: req.query.endDate || '',
     period: ['7', '30', '90'].includes(req.query.period) ? Number(req.query.period) : 30,
     setor: (req.query.setor || '').trim(),
-    prioridade: ['high', 'medium', 'low', 'undefined'].includes(req.query.prioridade) ? req.query.prioridade : '',
+    prioridade: ['critical', 'high', 'medium', 'low', 'undefined'].includes(req.query.prioridade) ? req.query.prioridade : '',
     responsavel: (req.query.responsavel || '').trim(),
     limit: ['10', '20', '50'].includes(req.query.limit) ? Number(req.query.limit) : 20,
     page: Math.max(1, Number(req.query.page) || 1),
   };
 
-  const queue = service.getOperationalQueue(filters);
+  const queue = getOperationalQueue(filters);
   const lista = queue.rows;
 
   if (req.query.export === 'excel') {

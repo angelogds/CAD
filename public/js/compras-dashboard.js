@@ -33,9 +33,19 @@ if (requestList) {
     if (event.target.closest('.request-row')) event.preventDefault();
   });
 
+  // Safari/iOS pode restaurar uma seleção azul durante/ao fim do gesto de scroll.
+  // Limpar no ciclo do ponteiro evita a mancha visual sem bloquear links e botões.
+  ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown'].forEach((eventName) => {
+    requestList.addEventListener(eventName, (event) => {
+      if (!event.target.closest('.request-row')) return;
+      requestAnimationFrame(clearRequestSelection);
+    }, { passive: true });
+  });
+
   // Limpa também seleções antigas restauradas pelo cache de navegação. Verificar o
   // intervalo inteiro (e não apenas a âncora) cobre arrastos iniciados fora da linha.
   document.addEventListener('selectionchange', clearRequestSelection);
   window.addEventListener('pageshow', clearRequestSelection);
+  window.addEventListener('blur', clearRequestSelection);
   clearRequestSelection();
 }
