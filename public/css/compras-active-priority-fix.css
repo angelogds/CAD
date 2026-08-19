@@ -64,6 +64,35 @@
   -webkit-user-drag:none!important;
 }
 
+/*
+ * O CSS histórico do dashboard possui seletores amplos do tipo
+ * `.priority-critical b` e `.priority-medium b`. Com a estrutura atual em
+ * sections, esses seletores atingem também os <b> que exibem OS/equipamento e
+ * contadores da compra, criando as "manchas" vermelhas/azuis vistas na fila.
+ * Limita a neutralização apenas aos textos da linha e preserva o <b> interno
+ * de `.item-progress`, que continua sendo a barra verde de andamento.
+ */
+.priority-section .request-row .request-os > b,
+.priority-section .request-row .purchase-data > span > b{
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+/* O contador colorido deve existir somente no cabeçalho do agrupamento. */
+.priority-section > h3 > b{
+  display:inline-grid;
+  place-items:center;
+  min-width:20px;
+  height:20px;
+  margin-left:6px;
+  padding:0 6px;
+  border-radius:999px;
+  color:#475569;
+  background:#eef2f7!important;
+  font-size:11px;
+  line-height:1;
+}
+
 /* Mantém acessibilidade por teclado sem reintroduzir seleção de texto. */
 .request-row:focus-visible{
   outline:2px solid #15803d;
