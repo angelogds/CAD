@@ -1,0 +1,144 @@
+/* Ajustes de prioridade e estabilidade visual — 19/08/2026
+   Escopo: Solicitações + Compras. Sem alteração de regras de negócio. */
+
+/* ==============================
+   SOLICITAÇÕES
+   ============================== */
+.priority-group.critical h2{
+  border-color:#dc2626;
+  color:#b91c1c;
+}
+.priority-group.high h2{
+  border-color:#f97316;
+  color:#c2410c;
+}
+.priority-group.medium h2{
+  border-color:#2563eb;
+  color:#1d4ed8;
+}
+.priority-group.low h2{
+  border-color:#16a34a;
+  color:#15803d;
+}
+
+.priority-group.critical .sol-row{border-left-color:#dc2626}
+.priority-group.high .sol-row{border-left-color:#f97316}
+.priority-group.medium .sol-row{border-left-color:#2563eb}
+.priority-group.low .sol-row{border-left-color:#16a34a}
+
+.priority-group.critical .priority-badge{
+  color:#b91c1c!important;
+  background:#fff1f2;
+}
+.priority-group.high .priority-badge{
+  color:#c2410c!important;
+  background:#fff7ed;
+}
+.priority-group.medium .priority-badge{
+  color:#1d4ed8!important;
+  background:#eff6ff;
+}
+.priority-group.low .priority-badge{
+  color:#15803d!important;
+  background:#f0fdf4;
+}
+
+/* ==============================
+   COMPRAS — PRIORIDADES SEPARADAS
+   ============================== */
+.purchase-dashboard .priority-critical h3{
+  color:#b91c1c;
+  border-left:4px solid #dc2626;
+}
+.purchase-dashboard .priority-high h3{
+  color:#c2410c;
+  border-left:4px solid #f97316;
+}
+.purchase-dashboard .priority-medium h3{
+  color:#1d4ed8;
+  border-left:4px solid #2563eb;
+}
+.purchase-dashboard .priority-low h3{
+  color:#15803d;
+  border-left:4px solid #16a34a;
+}
+
+.purchase-dashboard .priority-critical .request-row{border-left-color:#dc2626}
+.purchase-dashboard .priority-high .request-row{border-left-color:#f97316}
+.purchase-dashboard .priority-medium .request-row{border-left-color:#2563eb}
+.purchase-dashboard .priority-low .request-row{border-left-color:#16a34a}
+
+.purchase-dashboard .tag-critical{
+  color:#b91c1c;
+  background:#fff1f2;
+  border:1px solid #fecdd3;
+}
+.purchase-dashboard .tag-high{
+  color:#c2410c;
+  background:#fff7ed;
+  border:1px solid #fed7aa;
+}
+.purchase-dashboard .tag-medium{
+  color:#1d4ed8;
+  background:#eff6ff;
+  border:1px solid #bfdbfe;
+}
+.purchase-dashboard .tag-low{
+  color:#15803d;
+  background:#f0fdf4;
+  border:1px solid #bbf7d0;
+}
+
+/* ==============================
+   CORREÇÃO DAS "MANCHAS AZUIS"
+   ==============================
+   A fila usa a linha inteira como área clicável. Em navegadores móveis,
+   o gesto de rolagem pode restaurar seleção de texto azul. Bloqueamos o
+   highlight apenas dentro da fila operacional, sem afetar inputs/filtros.
+*/
+.purchase-dashboard .request-list,
+.purchase-dashboard .request-list *,
+.purchase-dashboard .request-row,
+.purchase-dashboard .request-row *{
+  -webkit-user-select:none!important;
+  user-select:none!important;
+  -webkit-touch-callout:none!important;
+  -webkit-tap-highlight-color:transparent!important;
+}
+
+.purchase-dashboard .request-list::selection,
+.purchase-dashboard .request-list *::selection,
+.purchase-dashboard .request-row::selection,
+.purchase-dashboard .request-row *::selection{
+  background:transparent!important;
+  color:inherit!important;
+}
+
+.purchase-dashboard .request-list::-moz-selection,
+.purchase-dashboard .request-list *::-moz-selection,
+.purchase-dashboard .request-row::-moz-selection,
+.purchase-dashboard .request-row *::-moz-selection{
+  background:transparent!important;
+  color:inherit!important;
+}
+
+/* Remove qualquer fundo residual dos textos das linhas médias sem
+   alterar badge/status, borda lateral ou barra de progresso. */
+.purchase-dashboard .priority-medium .request-row .request-main > span:not(.request-title-line),
+.purchase-dashboard .priority-medium .request-row .request-os > b,
+.purchase-dashboard .priority-medium .request-row .purchase-data > span,
+.purchase-dashboard .priority-medium .request-row .request-flow > span:not(.tag){
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+.purchase-dashboard .request-row:focus{
+  outline:none;
+}
+
+@media(max-width:700px){
+  .priority-group h2,
+  .purchase-dashboard .priority-section h3{
+    line-height:1.25;
+  }
+}
