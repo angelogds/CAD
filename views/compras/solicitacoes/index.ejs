@@ -9,6 +9,7 @@ const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'B
 const totalAnalytics=statusList.reduce((n,s)=>n+Number(resumo?.[s]||0),0); const received=Number(resumo?.RECEBIDA_TOTAL||0)+Number(resumo?.FECHADA||0); const completion=totalAnalytics?Math.round(received/totalAnalytics*100):0;
 %>
 <link rel="stylesheet" href="/css/compras-dashboard.css?v=20260819-active-priority-selection-fix">
+<link rel="stylesheet" href="/css/compras-active-priority-fix.css?v=20260819">
 <div class="purchase-dashboard">
 <header class="dashboard-heading"><h1>Painel de Compras</h1><p>Fila operacional e indicadores do setor de Compras</p></header>
 <form class="dashboard-filters" method="get"><input type="hidden" name="tab" value="<%= filters.tab %>"><input type="hidden" name="card" value="<%= filters.card %>">
