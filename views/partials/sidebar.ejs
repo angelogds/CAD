@@ -40,12 +40,19 @@
     : '';
   const navItem = (href, label, isActive, extraClass = '', suffix = '') =>
     `<a class="nav-item ${extraClass} ${isActive ? 'active' : ''}" href="${href}"><span class="nav-label">${label}</span>${suffix}</a>`;
+
+  const hasOperationGroup = canPainel || canEquipamentos || canOS || canOSChat || canPreventivas || canDemandas || canSolicitacoes || canCompras || canFornecedores || canAlmoxarifado || canEstoque || canMotores;
+  const hasSupportGroup = canAvisos || canEscala || canInspecao || canTracagem || canDesenhoTecnico || canAcademia || canAI || canPCM;
 %>
 
 <aside class="sidebar">
-  <div class="sidebar-title">Gestão Industrial</div>
+  <div class="sidebar-title">
+    <span class="sidebar-brand-title">Gestão Industrial</span>
+    <small class="sidebar-brand-subtitle">Manutenção Integrada</small>
+  </div>
 
-  <nav class="nav">
+  <nav class="nav" aria-label="Navegação principal">
+    <% if (hasOperationGroup) { %><div class="nav-section nav-section-shell">OPERAÇÃO</div><% } %>
     <% if (canPainel) { %><%- navItem('/dashboard', 'Painel Principal', activeMenu === 'dashboard') %><% } %>
     <% if (canEquipamentos) { %><%- navItem('/equipamentos', 'Equipamentos', activeMenu === 'equipamentos') %><% } %>
     <% if (canOS) { %><%- navItem('/os', 'Ordens de Serviço', activeMenu === 'os', '', badge(counters.osAbertas, counters.osCriticas > 0 ? 'amber' : 'gray')) %><% } %>
@@ -59,6 +66,10 @@
     <% if (canEstoque) { %><%- navItem('/estoque', 'Estoque', activeMenu === 'estoque') %><% } %>
     <% if (canMotores) { %><%- navItem('/motores', 'Motores', activeMenu === 'motores') %><% } %>
 
+    <% if (hasSupportGroup) { %>
+      <div class="nav-divider nav-divider-soft"></div>
+      <div class="nav-section nav-section-shell">GESTÃO E APOIO</div>
+    <% } %>
     <% if (canAvisos) { %><%- navItem('/avisos', 'Avisos', activeMenu === 'avisos') %><% } %>
     <% if (canEscala) { %><%- navItem('/escala', 'Escala', activeMenu === 'escala') %><% } %>
     <% if (canInspecao) { %><%- navItem('/inspecao', 'Inspeção', activeMenu === 'inspecao') %><% } %>
@@ -75,7 +86,7 @@
           <a class="nav-item nav-subitem <%= currentPcmSection === 'dashboard-gerencial' ? 'active' : '' %>" href="/pcm/dashboard-gerencial"><span class="nav-label">📊 Painel Gerencial</span></a>
           <a class="nav-item nav-subitem <%= currentPcmSection === 'planejamento' ? 'active' : '' %>" href="/pcm/planejamento"><span class="nav-label">Planejamento</span></a>
           <a class="nav-item nav-subitem <%= currentPcmSection === 'falhas' ? 'active' : '' %>" href="/pcm/falhas"><span class="nav-label">Falhas</span></a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'engenharia' ? 'active' : '' %>" href="/pcm/engenharia"><span class="nav-label">Engenharia</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'engenharia' ? 'active' '' %>" href="/pcm/engenharia"><span class="nav-label">Engenharia</span></a>
           <a class="nav-item nav-subitem <%= currentPcmSection === 'criticidade' ? 'active' : '' %>" href="/pcm/criticidade"><span class="nav-label">Criticidade</span></a>
           <a class="nav-item nav-subitem <%= currentPcmSection === 'lubrificacao' ? 'active' : '' %>" href="/pcm/lubrificacao"><span class="nav-label">Lubrificação</span></a>
           <a class="nav-item nav-subitem <%= currentPcmSection === 'pecas-criticas' ? 'active' : '' %>" href="/pcm/pecas-criticas"><span class="nav-label">Peças Críticas</span></a>
@@ -87,9 +98,8 @@
       <% } %>
     <% } %>
 
-    <div class="nav-divider"></div>
-
     <% if (canUsuarios || canArmazenamento) { %>
+      <div class="nav-divider"></div>
       <div class="nav-section">ADMIN</div>
       <% if (canUsuarios) { %><%- navItem('/usuarios', 'Gerenciar Usuários', activeMenu === 'usuarios') %><% } %>
       <% if (canArmazenamento) { %><%- navItem('/admin/armazenamento', 'Armazenamento', activeMenu === 'admin-armazenamento') %><%- navItem('/admin/limpeza-volume', 'Limpeza de volume', activeMenu === 'admin-limpeza-volume') %><% } %>
@@ -97,7 +107,7 @@
   </nav>
 
   <div class="sidebar-footer">
-    <a href="/tv" target="_blank" rel="noopener" class="nav-item" style="margin-bottom:8px;">
+    <a href="/tv" target="_blank" rel="noopener" class="nav-item sidebar-tv-link">
       <span class="nav-label">Modo TV</span>
     </a>
     <small>© <%= new Date().getFullYear() %> Campo do Gado</small>
