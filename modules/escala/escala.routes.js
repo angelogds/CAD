@@ -84,7 +84,7 @@ router.post("/hora-extra/:id/aprovar", requireLogin, requireRole(escalaManage), 
 router.post("/hora-extra/:id/reprovar", requireLogin, requireRole(escalaManage), safe(controller.reprovarHoraExtra, "reprovarHoraExtra"));
 router.post("/hora-extra/:id/ajustar", requireLogin, requireRole(escalaManage), safe(controller.ajustarHoraExtra, "ajustarHoraExtra"));
 router.post("/hora-extra/:id/cancelar", requireLogin, requireRole(escalaManage), safe(controller.cancelarHoraExtra, "cancelarHoraExtra"));
-router.post("/hora-extra/:id/excluir", requireLogin, safe(controller.apagarHoraExtra, "apagarHoraExtra"));
+router.post("/hora-extra/:id/excluir", requireLogin, requireAdmin, safe(controller.apagarHoraExtra, "apagarHoraExtra"));
 
 router.get("/banco-horas", requireLogin, requireRole(escalaRead), safe(controller.bancoHoras, "bancoHoras"));
 router.get("/banco-horas/:colaboradorId", requireLogin, requireRole(escalaRead), safe(controller.bancoHorasFuncionario, "bancoHorasFuncionario"));

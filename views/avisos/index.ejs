@@ -1,64 +1,68 @@
 <% layout('layout') %>
+<link rel="stylesheet" href="/css/avisos.css?v=20260819a">
+<%
+  const queryFor = (overrides={}) => {
+    const data = { ...filtros, per_page:listagem.perPage, ...overrides };
+    const params = new URLSearchParams();
+    Object.entries(data).forEach(([k,v]) => { if (v !== '' && v != null) params.set(k, String(v)); });
+    return params.toString();
+  };
+  const fmtPeriod = (a) => {
+    if (a.effective_status === 'AGENDADO') return `Agendado para ${fmtBR(a.publish_at)}`;
+    if (a.effective_status === 'EXPIRADO') return `Expirado em ${fmtBR(a.visible_until)}`;
+    if (a.visible_until) return `Até ${fmtBR(a.visible_until)}`;
+    return `Publicado ${fmtBR(a.publish_at || a.created_at)}`;
+  };
+%>
+<div class="avisos-page">
+  <header class="avisos-header">
+    <div><h1>Avisos</h1><p>Mural de informações relevantes para reciclagem, operação e manutenção.</p></div>
+    <div class="avisos-actions"><% if (canManageAvisos) { %><button class="btn btn-green" type="button" data-new-aviso>+ Novo aviso</button><% } %></div>
+  </header>
 
-<div class="page-head">
-  <div>
-    <h1>Avisos</h1>
-    <p class="muted">Mural de informações relevantes para reciclagem, operação e manutenção.</p>
-  </div>
-</div>
+  <section class="avisos-kpis" aria-label="Resumo dos avisos">
+    <a class="avisos-kpi is-green" href="/avisos?<%= queryFor({status:'PUBLICADO',page:1}) %>"><span>Publicados</span><strong><%= metrics.PUBLICADO %></strong><small>Visíveis para todos</small></a>
+    <a class="avisos-kpi is-blue" href="/avisos?<%= queryFor({status:'AGENDADO',page:1}) %>"><span>Agendados</span><strong><%= metrics.AGENDADO %></strong><small>Programados para publicação</small></a>
+    <a class="avisos-kpi is-orange" href="/avisos?<%= queryFor({status:'RASCUNHO',page:1}) %>"><span>Rascunhos</span><strong><%= metrics.RASCUNHO %></strong><small>Em elaboração</small></a>
+    <a class="avisos-kpi is-red" href="/avisos?<%= queryFor({status:'EXPIRADO',page:1}) %>"><span>Expirados</span><strong><%= metrics.EXPIRADO %></strong><small>Fora do período</small></a>
+    <a class="avisos-kpi" href="/avisos"><span>Total</span><strong><%= metrics.TOTAL %></strong><small>Todos os avisos</small></a>
+  </section>
 
-<% if (canPublishAviso) { %>
-  <div class="card" style="margin-bottom:16px;">
-    <div class="label">Novo aviso</div>
-    <form method="POST" action="/avisos" style="margin-top:12px;">
-      <div class="grid-2">
-        <input class="input" name="titulo" placeholder="Título do aviso" required>
-      </div>
-      <div style="margin-top:10px;">
-        <textarea class="input" name="mensagem" placeholder="Mensagem do aviso" style="min-height:110px;" required></textarea>
-      </div>
-      <div class="grid-2" style="margin-top:10px; align-items:end; gap:10px;">
-        <div>
-          <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Tempo de exibição</label>
-          <select class="input" name="dias_visiveis">
-            <option value="7">7 dias</option>
-            <option value="15">15 dias</option>
-            <option value="30">30 dias</option>
-          </select>
-        </div>
-        <div>
-          <button class="btn btn-green" type="submit">Publicar aviso</button>
-        </div>
-      </div>
+  <section class="avisos-card">
+    <form class="avisos-toolbar" method="GET" action="/avisos">
+      <div class="avisos-field"><label>Busca</label><input name="busca" value="<%= filtros.busca %>" placeholder="Título, conteúdo, autor..."></div>
+      <div class="avisos-field"><label>Categoria</label><select name="categoria"><option value="">Todas</option><% Object.entries(categorias).forEach(([key,label]) => { %><option value="<%= key %>" <%= filtros.categoria===key?'selected':'' %>><%= label %></option><% }) %></select></div>
+      <div class="avisos-field"><label>Prioridade</label><select name="prioridade"><option value="">Todas</option><% Object.entries(prioridades).forEach(([key,label]) => { %><option value="<%= key %>" <%= filtros.prioridade===key?'selected':'' %>><%= label %></option><% }) %></select></div>
+      <div class="avisos-field"><label>Período</label><select name="periodo"><option value="">Todos</option><option value="HOJE" <%= filtros.periodo==='HOJE'?'selected':'' %>>Hoje</option><option value="7D" <%= filtros.periodo==='7D'?'selected':'' %>>Últimos 7 dias</option><option value="30D" <%= filtros.periodo==='30D'?'selected':'' %>>Últimos 30 dias</option><option value="90D" <%= filtros.periodo==='90D'?'selected':'' %>>Últimos 90 dias</option></select></div>
+      <button class="btn btn-green" type="submit">Filtrar</button><a class="btn" href="/avisos">Limpar</a>
+      <% if (filtros.status) { %><input type="hidden" name="status" value="<%= filtros.status %>"><% } %>
     </form>
-  </div>
-<% } %>
+  </section>
 
-<div class="card">
-  <div class="label">Mural</div>
-  <% if (!avisos || avisos.length === 0) { %>
-    <p class="muted" style="margin-top:10px;">Sem avisos publicados.</p>
-  <% } else { %>
-    <div style="display:grid; gap:10px; margin-top:12px;">
-      <% avisos.forEach(function(a) { %>
-        <div style="border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px;">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
-            <div style="font-weight:800;"><%= a.titulo %></div>
-            <% if (canPublishAviso) { %>
-              <% if (isAdmin) { %>
-                <form method="POST" action="/avisos/<%= a.id %>/delete" onsubmit="return confirm('Excluir este aviso?');" style="margin:0;">
-                  <button type="submit" class="btn btn-red" style="padding:6px 10px;">Excluir</button>
-                </form>
-              <% } %>
-            <% } %>
-          </div>
-          <div class="muted" style="margin-top:4px; white-space:pre-wrap;"><%= a.mensagem %></div>
-          <div class="muted-xs" style="margin-top:6px;">
-            por <%= a.autor_nome || 'Sistema' %> • <%= fmtBR(a.created_at) %>
-            <% if (a.visible_until) { %> • visível até <%= fmtBR(a.visible_until) %><% } %>
-          </div>
-        </div>
+  <section class="avisos-card">
+    <div class="avisos-table-wrap"><table class="avisos-table"><thead><tr><th>Aviso</th><th>Categoria</th><th>Prioridade</th><th>Status</th><th>Período</th><th>Criado por</th><th>Ações</th></tr></thead><tbody>
+      <% if (!avisos.length) { %><tr><td colspan="7"><div class="avisos-empty"><strong>Nenhum aviso encontrado</strong><span>Crie um novo aviso para compartilhar informações importantes com sua equipe.</span><% if(canManageAvisos){ %><div style="margin-top:12px"><button class="btn btn-green" type="button" data-new-aviso>+ Criar primeiro aviso</button></div><% } %></div></td></tr><% } %>
+      <% avisos.forEach((a) => { const editData=encodeURIComponent(JSON.stringify({id:a.id,titulo:a.titulo,mensagem:a.mensagem,categoria:a.categoria,prioridade:a.prioridade,status:a.status,publish_at:a.publish_at,visible_until:a.visible_until})); %>
+        <tr><td data-label="Aviso"><div class="avisos-title"><%= a.titulo %></div><div class="avisos-preview"><%= String(a.mensagem||'').slice(0,150) %></div></td><td data-label="Categoria"><span class="avisos-badge cat-<%= a.categoria %>"><%= categorias[a.categoria] || 'Geral' %></span></td><td data-label="Prioridade"><span class="avisos-badge prio-<%= a.prioridade %>"><%= prioridades[a.prioridade] || 'Normal' %></span></td><td data-label="Status"><span class="avisos-badge status-<%= a.effective_status %>"><%= statusLabels[a.effective_status] || a.effective_status %></span></td><td data-label="Período"><%= fmtPeriod(a) %></td><td data-label="Criado por"><%= a.autor_nome || 'Sistema' %><br><small class="muted"><%= fmtBR(a.created_at) %></small></td><td data-label="Ações"><div class="avisos-row-actions">
+          <% if(canManageAvisos){ %><button class="btn btn-sm" type="button" data-edit-aviso data-aviso="<%= editData %>">Editar</button><form method="POST" action="/avisos/<%= a.id %>/duplicar"><button class="btn btn-sm" type="submit">Duplicar</button></form><% if(a.effective_status==='AGENDADO'){ %><form method="POST" action="/avisos/<%= a.id %>/cancelar-agendamento"><button class="btn btn-sm" type="submit">Cancelar agendamento</button></form><% } else if(a.effective_status==='RASCUNHO'){ %><form method="POST" action="/avisos/<%= a.id %>/publicar"><button class="btn btn-sm btn-green" type="submit">Publicar agora</button></form><% } %><% } %>
+          <% if(canDeleteAvisos){ %><form method="POST" action="/avisos/<%= a.id %>/delete" onsubmit="return confirm('Excluir este aviso?');"><button class="btn btn-sm btn-red" type="submit">Excluir</button></form><% } %>
+        </div></td></tr>
       <% }) %>
-    </div>
-  <% } %>
+    </tbody></table></div>
+    <div class="avisos-pagination"><span class="muted">Mostrando <%= avisos.length %> de <%= listagem.total %> aviso(s)</span><div class="avisos-pagination-nav"><% if(listagem.page>1){ %><a class="btn btn-sm" href="/avisos?<%= queryFor({page:listagem.page-1}) %>">Anterior</a><% } %><span class="btn btn-sm">Página <%= listagem.page %> / <%= listagem.pages %></span><% if(listagem.page<listagem.pages){ %><a class="btn btn-sm" href="/avisos?<%= queryFor({page:listagem.page+1}) %>">Próxima</a><% } %></div></div>
+  </section>
+
+  <section class="avisos-bottom-grid">
+    <article class="avisos-card"><h3>Categorias</h3><div class="avisos-mini-list"><% categoriasResumo.forEach(c=>{ %><a class="avisos-mini-item" href="/avisos?categoria=<%= c.key %>"><strong><%= c.label %></strong><small><%= c.total %> aviso(s)</small></a><% }) %></div></article>
+    <article class="avisos-card"><h3>Avisos recentes</h3><div class="avisos-mini-list"><% if(!recentes.length){ %><div class="avisos-empty"><strong>Nenhum aviso recente</strong><span>Os mais recentes aparecerão aqui.</span></div><% } %><% recentes.forEach(a=>{ %><div class="avisos-mini-item"><strong><%= a.titulo %></strong><small><%= categorias[a.categoria] || 'Geral' %> • <%= fmtBR(a.publish_at||a.created_at) %> • <%= a.autor_nome %></small></div><% }) %></div></article>
+    <article class="avisos-card"><h3>Próximos agendados</h3><div class="avisos-mini-list"><% if(!agendados.length){ %><div class="avisos-empty"><strong>Nenhum aviso agendado</strong><span>Avisos com data futura serão exibidos aqui.</span></div><% } %><% agendados.forEach(a=>{ %><div class="avisos-mini-item"><strong><%= a.titulo %></strong><small><%= categorias[a.categoria] || 'Geral' %> • <%= fmtBR(a.publish_at) %></small></div><% }) %></div></article>
+  </section>
 </div>
+
+<% if(canManageAvisos){ %><div class="avisos-modal" id="aviso-modal" aria-hidden="true"><div class="avisos-modal-card"><div class="avisos-modal-head"><div><h2 id="aviso-modal-title" style="margin:0">Novo aviso</h2><div class="muted">Comunicação interna da fábrica</div></div><button class="btn" type="button" data-close-aviso>Fechar</button></div><form id="aviso-form" method="POST" action="/avisos"><div class="avisos-form-grid">
+  <div class="avisos-field span-2"><label>Título *</label><input name="titulo" required maxlength="160"></div><div class="avisos-field span-2"><label>Mensagem *</label><textarea name="mensagem" rows="5" required></textarea></div>
+  <div class="avisos-field"><label>Categoria</label><select name="categoria"><% Object.entries(categorias).forEach(([key,label])=>{ %><option value="<%= key %>"><%= label %></option><% }) %></select></div><div class="avisos-field"><label>Prioridade</label><select name="prioridade"><% Object.entries(prioridades).forEach(([key,label])=>{ %><option value="<%= key %>" <%= key==='NORMAL'?'selected':'' %>><%= label %></option><% }) %></select></div>
+  <div class="avisos-field"><label>Publicação</label><select name="status" id="aviso-status"><option value="PUBLICADO">Publicar agora</option><option value="AGENDADO">Agendar</option><option value="RASCUNHO">Salvar como rascunho</option></select></div><div class="avisos-field" id="aviso-publish-at-wrap" hidden><label>Data e hora</label><input type="datetime-local" name="publish_at"></div>
+  <div class="avisos-field"><label>Tempo de exibição</label><select name="visibility_days"><option value="7">7 dias</option><option value="15">15 dias</option><option value="30" selected>30 dias</option><option value="60">60 dias</option><option value="90">90 dias</option></select></div><div class="avisos-field"><label>Fim personalizado (opcional)</label><input type="datetime-local" name="visible_until"></div>
+</div><div class="avisos-form-actions"><button class="btn" type="button" data-close-aviso>Cancelar</button><button class="btn btn-green" type="submit">Salvar aviso</button></div></form></div></div><% } %>
+<script src="/js/avisos.js?v=20260819a"></script>
