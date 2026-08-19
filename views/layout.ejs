@@ -14,6 +14,7 @@
   <title><%= title || "Manutenção Campo do Gado" %></title>
   <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/css/ui-maintenance-shell-2026.css" />
+  <link rel="stylesheet" href="/css/ui-shell-modern-2026.css?v=20260819-shell-01" />
   <script>window.__VAPID_PUBLIC_KEY__ = "<%= VAPID_PUBLIC_KEY || "" %>";</script>
 </head>
 <body>
@@ -33,7 +34,7 @@
         <header class="topbar">
           <div class="topbar-left">
             <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Mostrar/ocultar menu">☰</button>
-            <div>
+            <div class="topbar-brand-copy">
               <div class="topbar-title">Manutenção Campo do Gado</div>
               <div class="topbar-sub">Sistema Industrial V2</div>
             </div>
@@ -53,12 +54,15 @@
               <% const chatNotifs = Array.isArray(typeof osChatNotificacoes !== 'undefined' ? osChatNotificacoes : []) ? osChatNotificacoes : []; %>
               <% const topbarCounters = (typeof operationalCounters !== 'undefined' && operationalCounters) ? operationalCounters : {}; %>
               <% const chatUnread = Number(topbarCounters.osChatNaoLidas || 0); %>
-              <details class="chat-bell topbar-notification-wrap" style="position:relative;">
-                <summary class="btn btn-ghost topbar-notification" style="list-style:none;cursor:pointer;" aria-label="Notificações do Chat de OS">🔔 <strong><%= chatUnread %></strong></summary>
-                <div style="position:absolute;right:0;top:42px;width:320px;max-width:80vw;background:#fff;border:1px solid #d1d5db;border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,.14);padding:8px;z-index:30;">
-                  <% if (!chatNotifs.length) { %><div class="muted" style="padding:10px;">Sem novas notificações do Chat de OS.</div><% } %>
+              <details class="chat-bell topbar-notification-wrap">
+                <summary class="btn btn-ghost topbar-notification" aria-label="Notificações do Chat de OS">
+                  <span aria-hidden="true">🔔</span>
+                  <strong class="topbar-counter"><%= chatUnread %></strong>
+                </summary>
+                <div class="topbar-popover topbar-notification-dropdown">
+                  <% if (!chatNotifs.length) { %><div class="muted topbar-empty-state">Sem novas notificações do Chat de OS.</div><% } %>
                   <% chatNotifs.forEach((n) => { %>
-                    <a href="/chat-os/<%= n.origem_id %>" style="display:block;padding:9px;border-radius:10px;text-decoration:none;color:inherit;border-bottom:1px solid #f1f5f9;">
+                    <a class="topbar-notification-item" href="/chat-os/<%= n.origem_id %>">
                       <strong><%= n.titulo %></strong><br><span class="muted"><%= n.mensagem %></span>
                     </a>
                   <% }) %>
@@ -75,16 +79,15 @@
                   <span class="pill-role"><%= String(user.role || '').toUpperCase() %></span>
                 </summary>
                 <div class="user-menu-dropdown">
-                  <strong><%= user.name %></strong>
-                  <span class="pill-role"><%= String(user.role || '').toUpperCase() %></span>
+                  <div class="user-menu-identity">
+                    <strong><%= user.name %></strong>
+                    <span class="pill-role"><%= String(user.role || '').toUpperCase() %></span>
+                  </div>
                   <form action="/auth/logout" method="POST">
-                    <button class="btn btn-ghost" type="submit">Sair</button>
+                    <button class="btn btn-ghost user-menu-logout" type="submit">Sair</button>
                   </form>
                 </div>
               </details>
-              <form class="desktop-logout" action="/auth/logout" method="POST">
-                <button class="btn btn-ghost" type="submit">Sair</button>
-              </form>
             <% } %>
           </div>
         </header>
