@@ -1,11 +1,11 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/os-new.css?v=20260819-nova-os-mobile">
+<link rel="stylesheet" href="/css/os-new.css?v=20260819-nova-os-escrita-v2">
 
 <section class="os-new-page" aria-labelledby="os-new-title">
   <header class="os-new-head">
     <div>
       <h1 id="os-new-title">Nova Não Conformidade / OS</h1>
-      <p>Abertura rápida da ocorrência para geração automática da ordem de serviço.</p>
+      <p>Abertura rápida por escrito, com identificação automática do solicitante e foto opcional.</p>
     </div>
     <span class="os-new-kicker">Abertura operacional</span>
   </header>
@@ -40,21 +40,26 @@
       <div class="os-new-card-head">
         <div>
           <h2 class="os-new-card-title" id="os-new-solicitacao">2. Solicitação</h2>
-          <p class="os-new-card-help">Identifique a origem da ocorrência e quem receberá o atendimento.</p>
+          <p class="os-new-card-help">Os dados do solicitante são identificados automaticamente pelo usuário autenticado.</p>
         </div>
       </div>
-      <div class="os-new-grid">
-        <div class="os-new-field">
-          <label class="label" for="setor_solicitante">Setor solicitante</label>
-          <input class="input" type="text" name="setor_solicitante" id="setor_solicitante" placeholder="Ex.: Produção" />
+
+      <input type="hidden" name="setor_solicitante" value="Manutenção" />
+      <input type="hidden" name="setor_destinatario" value="Manutenção" />
+      <input type="hidden" name="responsavel_manutencao" value="Ângelo Gomes da Silva" />
+
+      <div class="os-new-auto-grid" aria-label="Dados automáticos da solicitação">
+        <div class="os-new-auto-item">
+          <span>Setor solicitante</span>
+          <strong>Manutenção</strong>
         </div>
-        <div class="os-new-field">
-          <label class="label" for="setor_destinatario">Setor destinatário</label>
-          <input class="input" type="text" name="setor_destinatario" id="setor_destinatario" value="Manutenção" />
+        <div class="os-new-auto-item">
+          <span>Solicitante</span>
+          <strong><%= user?.name || 'Usuário autenticado' %></strong>
         </div>
-        <div class="os-new-field os-new-field--full">
-          <label class="label" for="responsavel_manutencao">Responsável pela manutenção</label>
-          <input class="input" type="text" name="responsavel_manutencao" id="responsavel_manutencao" value="Ângelo Gomes da Silva" />
+        <div class="os-new-auto-item">
+          <span>Setor destinatário</span>
+          <strong>Manutenção</strong>
         </div>
       </div>
     </section>
@@ -95,57 +100,34 @@
             required
             placeholder="Ex.: Equipamento apresentando vibração forte, ruído e aquecimento durante operação."
           ></textarea>
-          <div class="os-new-hint">Descreva o que está acontecendo. A assistência por voz abaixo pode preencher este campo e os dados técnicos automaticamente.</div>
+          <div class="os-new-hint">Descreva por escrito o que está acontecendo de forma objetiva. Essa descrição ficará registrada no histórico da OS.</div>
         </div>
-      </div>
-    </section>
-
-    <section class="os-new-card" aria-labelledby="os-new-assistencia">
-      <div class="os-new-card-head">
-        <div>
-          <h2 class="os-new-card-title" id="os-new-assistencia">4. Assistência técnica</h2>
-          <p class="os-new-card-help">Use a voz para registrar a ocorrência e receber o preenchimento assistido pela IA. Revise o resultado antes de salvar.</p>
-        </div>
-      </div>
-      <div class="os-new-assistant-panel">
-        <button type="button" id="btn-converse-mecanico" class="btn-converse-mecanico" aria-label="Converse com o Mecânico">
-          <span aria-hidden="true">🎤</span>
-          <span id="btn-converse-label">Converse com o Mecânico</span>
-        </button>
-        <div id="status-converse" class="status-converse" role="status" aria-live="polite">Pronto para gravar.</div>
       </div>
     </section>
 
     <input type="hidden" name="criticidade" id="criticidade" value="MEDIA" />
-    <input type="hidden" name="ai_tempo_estimado" id="ai_tempo_estimado" value="" />
-    <input type="hidden" name="ai_diagnostico_inicial" id="ai_diagnostico_inicial" value="" />
-    <input type="hidden" name="ai_causa" id="ai_causa" value="" />
-    <input type="hidden" name="ai_acoes_iniciais" id="ai_acoes_iniciais" value="" />
     <input type="hidden" name="descricao" id="descricao_hidden" value="" />
-    <input type="hidden" name="diagnostico_inicial" id="diagnostico_inicial_hidden" value="" />
-    <input type="hidden" name="causa_mais_provavel" id="causa_mais_provavel_hidden" value="" />
-    <input type="hidden" name="acoes_iniciais" id="acoes_iniciais_hidden" value="" />
 
     <section class="os-new-card" aria-labelledby="os-new-evidencias">
       <div class="os-new-card-head">
         <div>
-          <h2 class="os-new-card-title" id="os-new-evidencias">5. Evidências</h2>
-          <p class="os-new-card-help">Adicione fotos ou vídeos do estado inicial para deixar o histórico da OS mais completo.</p>
+          <h2 class="os-new-card-title" id="os-new-evidencias">4. Evidências</h2>
+          <p class="os-new-card-help">A foto de abertura é opcional e pode ser adicionada quando ajudar a registrar o estado inicial do equipamento.</p>
         </div>
       </div>
       <div class="os-new-field">
-        <label class="label" for="abertura_fotos">Mídias de abertura (opcional)</label>
-        <input id="abertura_fotos" type="file" name="abertura_fotos" accept="image/*,video/*" capture="environment" multiple hidden />
-        <button type="button" class="btn btn-outline os-new-media-button" id="btn-adicionar-midia">📎 Adicionar foto ou vídeo</button>
+        <label class="label" for="abertura_fotos">Foto de abertura (opcional)</label>
+        <input id="abertura_fotos" type="file" name="abertura_fotos" accept="image/*" capture="environment" multiple hidden />
+        <button type="button" class="btn btn-outline os-new-media-button" id="btn-adicionar-midia">📷 Adicionar foto</button>
         <div id="preview-abertura" class="os-new-preview" aria-live="polite"></div>
-        <div class="os-new-hint">Vídeos curtos: até 1 minuto. O fluxo e os limites atuais de upload permanecem inalterados.</div>
+        <div class="os-new-hint">Você pode abrir a OS sem foto. Quando anexada, a imagem será preservada no histórico de abertura.</div>
       </div>
     </section>
 
     <section class="os-new-actions-card" aria-labelledby="os-new-acoes">
       <div class="os-new-actions-copy">
-        <h2 id="os-new-acoes">6. Ações da ordem de serviço</h2>
-        <p>Revise as informações antes de gerar a OS. Durante o envio, aguarde a confirmação do sistema.</p>
+        <h2 id="os-new-acoes">5. Ações da ordem de serviço</h2>
+        <p>Revise as informações escritas antes de gerar a OS. Durante o envio, aguarde a confirmação do sistema.</p>
       </div>
       <div class="os-new-actions">
         <a href="/os" class="btn btn-ghost os-new-cancel">Cancelar</a>
@@ -155,4 +137,4 @@
   </form>
 </section>
 
-<script src="/js/os-new.js?v=20260819-nova-os-mobile" defer></script>
+<script src="/js/os-new.js?v=20260819-nova-os-escrita-v2" defer></script>
