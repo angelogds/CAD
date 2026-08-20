@@ -1,0 +1,4 @@
+fastapi==0.140.8
+uvicorn[standard]==0.52.0
+ezdxf==1.4.4
+shapely==2.1.2

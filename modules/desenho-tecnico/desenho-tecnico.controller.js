@@ -1,6 +1,8 @@
+const crypto = require('crypto');
 const service = require('./desenho-tecnico.service');
 const equipamentosService = require('../equipamentos/equipamentos.service');
 const cadService = require('./desenho-tecnico.cad.service');
+const cadPythonService = require('./cad-python.service');
 
 function base(res, view, payload = {}) {
   return res.render(view, {
@@ -235,6 +237,96 @@ function renderCad3d(req, res) {
   return res.json({ ok: true, preview3d: service.build3dFromCad(cadPayload) });
 }
 
+async function pythonStatus(_req, res) {
+  const result = await cadPythonService.health();
+  return res.status(result.ok ? 200 : 503).json({
+    ok: result.ok,
+    configured: cadPythonService.isConfigured(),
+    available: result.ok,
+    service: result.data || null,
+    error: result.ok ? null : result.error,
+  });
+}
+
+function pythonCadPayload(desenho) {
+  return {
+    ...(desenho.cad_data || {}),
+    material: desenho.material || desenho.cad_data?.material || '',
+    codigo: desenho.codigo || desenho.cad_data?.codigo || '',
+    titulo: desenho.titulo || desenho.cad_data?.titulo || '',
+  };
+}
+
+async function analyzeCadPython(req, res) {
+  const desenho = service.getById(req.params.id);
+  if (!desenho || desenho.tipo_origem !== 'cad') return res.status(404).json({ ok: false, error: 'CAD não encontrado' });
+
+  const result = await cadPythonService.analyze(pythonCadPayload(desenho), {
+    thickness_mm: req.body?.thickness_mm,
+    density_kg_m3: req.body?.density_kg_m3,
+  });
+  if (!result.ok) return res.status(result.status || 503).json({ ok: false, error: result.error, available: result.available });
+  return res.json({ ok: true, data: result.data?.data || result.data });
+}
+
+async function exportCadDxf(req, res) {
+  const desenho = service.getById(req.params.id);
+  if (!desenho || desenho.tipo_origem !== 'cad') return res.status(404).json({ ok: false, error: 'CAD não encontrado' });
+
+  const safeCode = String(desenho.codigo || `CAD-${desenho.id}`).replace(/[^a-z0-9._-]+/gi, '-');
+  const result = await cadPythonService.exportDxf(pythonCadPayload(desenho), `${safeCode}.dxf`);
+  if (!result.ok) return res.status(result.status || 503).json({ ok: false, error: result.error, available: result.available });
+
+  const payload = result.data || {};
+  const content = Buffer.from(String(payload.content_base64 || ''), 'base64');
+  if (!content.length) return res.status(502).json({ ok: false, error: 'CAD Python Engine retornou DXF vazio.' });
+  res.setHeader('Content-Type', 'application/dxf; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${safeCode}.dxf"`);
+  if (Array.isArray(payload.warnings) && payload.warnings.length) res.setHeader('X-CAD-Warnings', String(payload.warnings.length));
+  return res.send(content);
+}
+
+async function importCadDxf(req, res) {
+  const desenho = service.getById(req.params.id);
+  if (!desenho || desenho.tipo_origem !== 'cad') return res.status(404).json({ ok: false, error: 'CAD não encontrado' });
+  if (!req.file?.buffer?.length) return res.status(400).json({ ok: false, error: 'Selecione um arquivo DXF válido.' });
+
+  const result = await cadPythonService.importDxf(req.file.buffer);
+  if (!result.ok) return res.status(result.status || 503).json({ ok: false, error: result.error, available: result.available });
+
+  const importedCad = result.data?.cad || {};
+  const importedObjects = (Array.isArray(importedCad.objects) ? importedCad.objects : []).map((obj) => ({
+    ...obj,
+    id: crypto.randomUUID(),
+    metadata: { ...(obj.metadata || {}), source: 'dxf-import', imported_at: new Date().toISOString() },
+  }));
+  if (!importedObjects.length) {
+    return res.status(422).json({ ok: false, error: 'O arquivo DXF não contém entidades 2D compatíveis.', warnings: result.data?.warnings || [] });
+  }
+
+  const current = desenho.cad_data || service.buildDefaultCadData({
+    codigo: desenho.codigo,
+    titulo: desenho.titulo,
+    material: desenho.material,
+    equipamento_id: desenho.equipamento_id,
+    observacoes: desenho.observacoes,
+  });
+  const merged = cadService.sanitizeCadData({
+    ...current,
+    layers: { ...(current.layers || {}), ...(importedCad.layers || {}) },
+    objects: [...(Array.isArray(current.objects) ? current.objects : []), ...importedObjects],
+    dimensions: Array.isArray(current.dimensions) ? current.dimensions : [],
+    activeLayer: current.activeLayer || importedCad.activeLayer || 'geometria_principal',
+  });
+  const saved = service.saveCad(desenho.id, merged, req.session?.user?.id || null);
+  return res.json({
+    ok: true,
+    imported: importedObjects.length,
+    warnings: result.data?.warnings || [],
+    revisao: saved?.revisao ?? null,
+  });
+}
+
 function openById(req, res) {
   const desenho = service.getById(req.params.id);
   if (!desenho) return res.status(404).render('errors/404', { title: 'Não encontrado' });
@@ -266,6 +358,10 @@ module.exports = {
   cadEditor,
   saveCad,
   renderCad3d,
+  pythonStatus,
+  analyzeCadPython,
+  exportCadDxf,
+  importCadDxf,
   updateCadMetadata,
   openById,
   gerarPdf,

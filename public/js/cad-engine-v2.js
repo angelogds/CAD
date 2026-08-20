@@ -1,3 +1,4 @@
+import './cad-python-integration.js';
 import { bootstrapDesenhoTecnico } from './modules/desenho-tecnico/desenho-tecnico.service.js';
 import { RotateTool } from './modules/desenho-tecnico/tools/rotate.tool.js';
 import { FilletTool } from './modules/desenho-tecnico/tools/fillet.tool.js';
@@ -70,22 +71,10 @@ function installAdvancedTools(cad) {
   };
 
   const advancedAliases = {
-    ro: 'tool-rotate',
-    rotate: 'tool-rotate',
-    rotacionar: 'tool-rotate',
-    girar: 'tool-rotate',
-    fi: 'tool-fillet',
-    fillet: 'tool-fillet',
-    arredondar: 'tool-fillet',
-    arredondamento: 'tool-fillet',
-    ch: 'tool-chamfer',
-    cha: 'tool-chamfer',
-    chamfer: 'tool-chamfer',
-    chanfro: 'tool-chamfer',
-    all: 'select-all',
-    selecionartudo: 'select-all',
-    clearsel: 'clear-selection',
-    limparsel: 'clear-selection',
+    ro: 'tool-rotate', rotate: 'tool-rotate', rotacionar: 'tool-rotate', girar: 'tool-rotate',
+    fi: 'tool-fillet', fillet: 'tool-fillet', arredondar: 'tool-fillet', arredondamento: 'tool-fillet',
+    ch: 'tool-chamfer', cha: 'tool-chamfer', chamfer: 'tool-chamfer', chanfro: 'tool-chamfer',
+    all: 'select-all', selecionartudo: 'select-all', clearsel: 'clear-selection', limparsel: 'clear-selection',
   };
   const originalExecuteCommand = cad.executeCommand.bind(cad);
   cad.executeCommand = (rawCommand) => {
