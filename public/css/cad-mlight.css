@@ -1,0 +1,178 @@
+:root {
+  --mlight-bg: #161d24;
+  --mlight-panel: #202a33;
+  --mlight-panel-2: #2a3540;
+  --mlight-border: #3a4652;
+  --mlight-text: #e7edf4;
+  --mlight-muted: #94a3b3;
+  --mlight-accent: #31a8e0;
+  --mlight-accent-2: #58c4f3;
+  --mlight-success: #33c27f;
+  --mlight-danger: #ef5f67;
+}
+
+body.cad-mlight-mode { overflow: hidden !important; background: var(--mlight-bg); }
+
+.cad-mlight-page {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  grid-template-rows: 58px minmax(0, 1fr) 38px;
+  background: var(--mlight-bg);
+  color: var(--mlight-text);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.cad-mlight-appbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--mlight-border);
+  background: linear-gradient(180deg, #303b46, #26313a);
+}
+
+.cad-mlight-back,
+.cad-mlight-action {
+  min-height: 36px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #4b5966;
+  border-radius: 5px;
+  background: #303b46;
+  color: var(--mlight-text);
+  font: 700 12px/1 system-ui, sans-serif;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cad-mlight-action:hover,
+.cad-mlight-back:hover { background: #394754; border-color: #617180; color: #fff; }
+.cad-mlight-action.primary { background: #1887bd; border-color: #2aa6df; color: #fff; }
+.cad-mlight-action.accent { background: #21465a; border-color: #2d88b2; }
+
+.cad-mlight-brand {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: #168ac2;
+  color: #fff;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+
+.cad-mlight-title { min-width: 130px; line-height: 1.08; }
+.cad-mlight-title small { display: block; color: #9fb0bf; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.cad-mlight-title strong { display: block; overflow: hidden; color: #fff; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.cad-mlight-title span { display: block; overflow: hidden; max-width: 240px; color: #aebdca; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.cad-mlight-spacer { flex: 1; }
+
+.cad-mlight-engine,
+.cad-mlight-save-state {
+  padding: 7px 9px;
+  border: 1px solid #44525f;
+  border-radius: 5px;
+  background: #1f2931;
+  color: #b9c7d2;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.cad-mlight-engine[data-state="ok"] { color: #73e4ad; border-color: #2d7657; }
+.cad-mlight-engine[data-state="error"], .cad-mlight-save-state[data-state="error"] { color: #ff9aa1; border-color: #8a4249; }
+.cad-mlight-engine[data-state="loading"], .cad-mlight-save-state[data-state="saving"] { color: #ffd36d; }
+
+.cad-mlight-main { position: relative; min-height: 0; overflow: hidden; background: #10171e; }
+#mlightCadHost,
+#mlightCadCanvas { position: absolute; inset: 0; min-width: 0; min-height: 0; background: #111820; }
+#mlightCadCanvas canvas { outline: none; }
+
+.cad-mlight-floating-tools {
+  position: absolute;
+  top: 52px;
+  right: 12px;
+  z-index: 40;
+  display: flex;
+  gap: 6px;
+  pointer-events: none;
+}
+.cad-mlight-floating-tools > * { pointer-events: auto; }
+
+.cad-mlight-statusbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+  border-top: 1px solid var(--mlight-border);
+  background: #242f38;
+}
+#mlightCommandForm { display: flex; min-width: 0; }
+#mlightCommandInput {
+  width: 100%;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #465562;
+  border-radius: 4px;
+  outline: none;
+  background: #151d24;
+  color: #dbe8f2;
+  font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+#mlightCommandInput:focus { border-color: #3c9ed0; box-shadow: 0 0 0 1px rgba(60,158,208,.2); }
+.cad-mlight-status-actions { display: flex; gap: 5px; }
+.cad-mlight-status-actions .cad-mlight-action { min-height: 28px; padding: 0 8px; font-size: 10px; }
+
+.cad-mlight-fallback {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  z-index: 80;
+  width: min(520px, calc(100% - 32px));
+  padding: 22px;
+  transform: translate(-50%, -50%);
+  border: 1px solid #7d4850;
+  border-radius: 8px;
+  background: #27323c;
+  box-shadow: 0 20px 60px rgba(0,0,0,.45);
+}
+.cad-mlight-fallback h2 { margin: 0 0 8px; color: #fff; }
+.cad-mlight-fallback p { margin: 0; color: #b9c6d1; }
+.cad-mlight-fallback[hidden] { display: none; }
+
+/* MLightCAD simple-ui adapts to the technical shell, not to the green ERP theme. */
+.cad-mlight-page .ml-ex-ui-toolbar { border-radius: 3px !important; background: #2a343d !important; border-color: #44515d !important; box-shadow: 0 3px 12px rgba(0,0,0,.3) !important; }
+.cad-mlight-page .ml-ex-ui-toolbar-btn { background: #303b45 !important; border-color: #485764 !important; color: #dbe6ee !important; }
+.cad-mlight-page .ml-ex-ui-toolbar-btn:hover:not(:disabled),
+.cad-mlight-page .ml-ex-ui-toolbar-btn.is-open { border-color: #3ba6dc !important; color: #70c9f2 !important; }
+.cad-mlight-page .ml-ex-ui-dock { background: #222c34 !important; border-color: #46535e !important; }
+
+@media (max-width: 1100px) {
+  .cad-mlight-title span { display: none; }
+  .cad-mlight-appbar { gap: 5px; }
+  .cad-mlight-action { padding-inline: 8px; }
+}
+
+@media (max-width: 820px) {
+  .cad-mlight-page { grid-template-rows: auto minmax(0,1fr) 38px; }
+  .cad-mlight-appbar { flex-wrap: wrap; }
+  .cad-mlight-title { flex: 1; }
+  .cad-mlight-spacer { display: none; }
+  .cad-mlight-engine { order: 20; flex: 1 1 100%; text-align: center; }
+  .cad-mlight-appbar .cad-mlight-action span { display: none; }
+}
+
+@media (max-width: 600px) {
+  .cad-mlight-save-state { display: none; }
+  .cad-mlight-statusbar { grid-template-columns: 1fr; }
+  .cad-mlight-status-actions { display: none; }
+  .cad-mlight-floating-tools { top: 8px; }
+}
