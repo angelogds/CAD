@@ -21,7 +21,9 @@ export class SelectTool extends BaseTool {
     this.gripChanged = false;
   }
 
-  activate() { this.ctx.prompt.set({ message: 'Arraste para selecionar ou clique em uma entidade' }); }
+  activate() {
+    this.ctx.prompt.set({ message: 'Seleção: clique ou arraste • Shift adiciona • Ctrl alterna • Ctrl+A seleciona tudo' });
+  }
 
   getGrips() {
     const grips = [];
@@ -98,6 +100,13 @@ export class SelectTool extends BaseTool {
     if (entity.type === 'dimension' && g.textPoint) { g.textPoint.x = p.x; g.textPoint.y = p.y; }
   }
 
+  visibleSelectableIds() {
+    return this.ctx.state.entities.filter((entity) => {
+      const layer = this.ctx.state.layers[entity.metadata?.layer || this.ctx.state.activeLayer] || {};
+      return entity.visible !== false && layer.visible !== false;
+    }).map((entity) => entity.id);
+  }
+
   onMouseDown(evt) {
     const grip = this.getGrips().find((g) => Math.hypot(g.x - evt.world.x, g.y - evt.world.y) <= (10 / this.ctx.viewport.getViewState().zoom));
     if (grip) {
@@ -108,7 +117,7 @@ export class SelectTool extends BaseTool {
       return;
     }
     const hit = this.ctx.findEntityAt(evt.world);
-    if (hit && this.ctx.selection.includes(hit.id) && this.ctx.isEntityEditable(hit)) {
+    if (hit && this.ctx.selection.includes(hit.id) && this.ctx.isEntityEditable(hit) && !evt.shiftKey && !evt.ctrlKey) {
       this.moveStart = evt.world;
       this.moved = false;
       return;
@@ -136,7 +145,10 @@ export class SelectTool extends BaseTool {
       this.ctx.markDirty('Mover seleção');
       return;
     }
-    if (this.boxStart) this.ctx.preview.set([{ type: 'selection-box', from: this.boxStart, to: evt.world }]);
+    if (this.boxStart) {
+      const leftToRight = evt.world.x >= this.boxStart.x;
+      this.ctx.preview.set([{ type: 'selection-box', from: this.boxStart, to: evt.world, mode: leftToRight ? 'window' : 'crossing' }]);
+    }
   }
 
   onMouseUp(evt) {
@@ -158,8 +170,13 @@ export class SelectTool extends BaseTool {
     const dragDist = Math.hypot(evt.screen.x - startScreen.x, evt.screen.y - startScreen.y);
     if (dragDist < 3) {
       const hit = this.ctx.findEntityAt(evt.world);
-      if (!evt.shiftKey && !evt.ctrlKey) this.ctx.selection.clear();
-      if (hit) evt.shiftKey || evt.ctrlKey ? this.ctx.selection.toggle(hit.id) : this.ctx.selection.set([hit.id]);
+      if (hit) {
+        if (evt.ctrlKey) this.ctx.selection.toggle(hit.id);
+        else if (evt.shiftKey) this.ctx.selection.add(hit.id);
+        else this.ctx.selection.set([hit.id]);
+      } else if (!evt.shiftKey && !evt.ctrlKey) {
+        this.ctx.selection.clear();
+      }
     } else {
       const leftToRight = evt.world.x >= this.boxStart.x;
       const b = new Bounds2D(Math.min(this.boxStart.x, evt.world.x), Math.min(this.boxStart.y, evt.world.y), Math.max(this.boxStart.x, evt.world.x), Math.max(this.boxStart.y, evt.world.y));
@@ -170,10 +187,35 @@ export class SelectTool extends BaseTool {
         if (leftToRight) return eb.minX >= b.minX && eb.maxX <= b.maxX && eb.minY >= b.minY && eb.maxY <= b.maxY;
         return eb.maxX >= b.minX && eb.minX <= b.maxX && eb.maxY >= b.minY && eb.minY <= b.maxY;
       }).map((e) => e.id);
-      this.ctx.selection.set(ids);
+      if (evt.ctrlKey) this.ctx.selection.toggleMany(ids);
+      else if (evt.shiftKey) this.ctx.selection.addMany(ids);
+      else this.ctx.selection.set(ids);
+      this.ctx.statusMessage = `${leftToRight ? 'Janela' : 'Cruzamento'}: ${ids.length} objeto(s) encontrado(s).`;
     }
     this.boxStart = null;
     this.ctx.preview.clear();
+    this.ctx.render?.();
+  }
+
+  onKeyDown(e) {
+    const targetIsField = e.target?.matches?.('input, textarea, select, [contenteditable="true"]');
+    if (!targetIsField && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+      e.preventDefault();
+      const ids = this.visibleSelectableIds();
+      this.ctx.selection.set(ids);
+      this.ctx.statusMessage = `Selecionados ${ids.length} objeto(s) visíveis.`;
+      this.ctx.render?.();
+      return;
+    }
+    if (!targetIsField && e.key === 'Escape') {
+      e.preventDefault();
+      this.cancel();
+      this.ctx.selection.clear();
+      this.ctx.statusMessage = 'Seleção limpa.';
+      this.ctx.render?.();
+      return;
+    }
+    super.onKeyDown(e);
   }
 
   cancel() {
