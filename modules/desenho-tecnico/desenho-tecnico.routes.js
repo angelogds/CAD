@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 const ctrl = require('./desenho-tecnico.controller');
 const { requireLogin, requireRole } = require('../auth/auth.middleware');
@@ -6,6 +7,14 @@ const { ACCESS } = require('../../config/rbac');
 
 const VIEW_ACCESS = ACCESS.desenho_tecnico_view || ['ADMIN'];
 const MANAGE_ACCESS = ACCESS.desenho_tecnico_manage || ['ADMIN'];
+const dxfUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const valid = String(file?.originalname || '').toLowerCase().endsWith('.dxf');
+    cb(valid ? null : new Error('Envie um arquivo .DXF válido.'), valid);
+  },
+});
 
 const withMenu = (handler) => (req, res, next) => {
   res.locals.activeMenu = 'desenho-tecnico';
@@ -18,6 +27,10 @@ router.get('/dashboard', requireLogin, requireRole(VIEW_ACCESS), withMenu(ctrl.d
 router.get('/cad/novo', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.novoCad));
 router.post('/cad', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.createCad));
 router.get('/cad/:id/editor', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.cadEditor));
+router.get('/cad/:id/python/status', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.pythonStatus));
+router.post('/cad/:id/analisar', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.analyzeCadPython));
+router.get('/cad/:id/dxf', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.exportCadDxf));
+router.post('/cad/:id/dxf/importar', requireLogin, requireRole(MANAGE_ACCESS), dxfUpload.single('dxf'), withMenu(ctrl.importCadDxf));
 router.get('/cad/:id', requireLogin, requireRole(VIEW_ACCESS), withMenu(ctrl.showCad));
 router.post('/cad/:id', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.saveCad));
 router.post('/cad/:id/metadata', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.updateCadMetadata));
