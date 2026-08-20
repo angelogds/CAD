@@ -47,23 +47,43 @@ function dashboard(_req, res) {
 function index(req, res) {
   const filtros = {
     q: String(req.query.q || '').trim(),
+    equipamento_id: String(req.query.equipamento_id || '').trim(),
+    status: String(req.query.status || '').trim().toUpperCase(),
     tipo_origem: 'cad',
   };
 
-  const lista = service
-    .list(filtros)
-    .filter((item) => item.tipo_origem === 'cad')
-    .map((item) => ({
-      id: item.id,
-      titulo: item.titulo,
-      equipamento_nome: item.equipamento_nome || '-',
-      atualizado_em: item.atualizado_em,
-    }));
+  let lista = service
+    .list({ q: filtros.q, tipo_origem: 'cad' })
+    .filter((item) => item.tipo_origem === 'cad');
+
+  if (filtros.equipamento_id) {
+    lista = lista.filter((item) => String(item.equipamento_id || '') === filtros.equipamento_id);
+  }
+  if (filtros.status) {
+    lista = lista.filter((item) => String(item.status || '').toUpperCase() === filtros.status);
+  }
+
+  const now = Date.now();
+  const recentThreshold = now - (30 * 24 * 60 * 60 * 1000);
+  const resumo = {
+    total: lista.length,
+    vinculados: lista.filter((item) => Number(item.equipamento_id) > 0).length,
+    semVinculo: lista.filter((item) => !Number(item.equipamento_id)).length,
+    comPdf: lista.filter((item) => Number(item.total_pdfs || 0) > 0).length,
+    recentes: lista.filter((item) => {
+      const ts = Date.parse(item.atualizado_em || '');
+      return Number.isFinite(ts) && ts >= recentThreshold;
+    }).length,
+  };
 
   return base(res, 'desenho-tecnico/index', {
     title: 'Desenho Técnico',
+    user: req.user || req.session?.user || null,
     lista,
     filtros,
+    resumo,
+    equipamentos: safeEquipamentos(),
+    canManage: req.can && req.can('desenho_tecnico_manage'),
   });
 }
 
@@ -214,7 +234,6 @@ function renderCad3d(req, res) {
   }
   return res.json({ ok: true, preview3d: service.build3dFromCad(cadPayload) });
 }
-
 
 function openById(req, res) {
   const desenho = service.getById(req.params.id);
