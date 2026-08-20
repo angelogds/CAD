@@ -30,11 +30,11 @@ test('rotas do desenho técnico expõem análise e DXF sem alterar permissões b
 
 test('editor oferece análise técnica, exportação e importação DXF', () => {
   const ui = read('public/js/cad-python-integration.js');
-  const view = read('views/desenho-tecnico/cad-editor-v2.ejs');
+  const entry = read('public/js/cad-engine-v2.js');
   assert.match(ui, /Análise técnica do desenho/);
   assert.match(ui, /Importar DXF/);
   assert.match(ui, /estimated_mass_kg/);
-  assert.match(view, /cad-python-integration\.js/);
+  assert.match(entry, /import '\.\/cad-python-integration\.js'/);
 });
 
 test('workflow inclui suíte Python independente', () => {
