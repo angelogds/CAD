@@ -17,7 +17,7 @@ function createModal() {
   modal.innerHTML = `
     <div class="cad-python-backdrop" data-python-close></div>
     <section class="cad-python-dialog" role="dialog" aria-modal="true" aria-labelledby="cadPythonTitle">
-      <header><div><small>CAD PYTHON ENGINE</small><strong id="cadPythonTitle">Análise técnica do desenho</strong></div><button type="button" data-python-close aria-label="Fechar">×</button></header>
+      <header><div><small>MOTOR TÉCNICO AVANÇADO</small><strong id="cadPythonTitle">Análise técnica do desenho</strong></div><button type="button" data-python-close aria-label="Fechar">×</button></header>
       <div class="cad-python-form">
         <label>Espessura da peça (mm)<input id="cadPythonThickness" type="number" min="0" step="0.1" placeholder="Opcional para cálculo de peso"></label>
         <label>Densidade (kg/m³)<input id="cadPythonDensity" type="number" min="0" step="1" placeholder="Opcional; material conhecido é inferido"></label>
@@ -36,25 +36,29 @@ function installStyles() {
   const style = document.createElement('style');
   style.id = 'cadPythonStyles';
   style.textContent = `
-    .cad-python-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border:1px solid #5b6672;border-radius:3px;font:700 10px/1 system-ui;color:#cbd5e1;background:#202833}.cad-python-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:#f59e0b}.cad-python-badge.online::before{background:#22c55e}.cad-python-badge.offline{opacity:.65}.cad-python-action{white-space:nowrap}.cad-python-modal{position:fixed;inset:0;z-index:9999}.cad-python-backdrop{position:absolute;inset:0;background:rgba(2,6,23,.7)}.cad-python-dialog{position:relative;margin:8vh auto 0;width:min(760px,92vw);max-height:82vh;overflow:auto;background:#111827;color:#e5e7eb;border:1px solid #475569;border-radius:8px;box-shadow:0 24px 80px rgba(0,0,0,.45)}.cad-python-dialog header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #334155;background:#1f2937}.cad-python-dialog header div{display:flex;flex-direction:column;gap:2px}.cad-python-dialog header small{color:#60a5fa;font-weight:800;letter-spacing:.08em}.cad-python-dialog header strong{font-size:16px}.cad-python-dialog header button{border:0;background:transparent;color:#e5e7eb;font-size:25px;cursor:pointer}.cad-python-form{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;padding:14px 16px;border-bottom:1px solid #334155}.cad-python-form label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#94a3b8}.cad-python-form input{height:34px;border:1px solid #475569;border-radius:4px;background:#0f172a;color:#e5e7eb;padding:0 9px}.cad-python-form button{align-self:end;height:34px;border:1px solid #2563eb;border-radius:4px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer}.cad-python-result{padding:16px}.cad-python-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.cad-python-kpi{padding:10px;border:1px solid #334155;border-radius:5px;background:#0f172a}.cad-python-kpi small{display:block;color:#94a3b8;font-size:9px;text-transform:uppercase}.cad-python-kpi strong{display:block;margin-top:4px;font-size:17px}.cad-python-score.good{color:#4ade80}.cad-python-score.warn{color:#fbbf24}.cad-python-score.bad{color:#fb7185}.cad-python-issues{margin:14px 0 0;padding:0;list-style:none}.cad-python-issues li{padding:8px 9px;border-bottom:1px solid #263244;font-size:12px}.cad-python-issues li.error{color:#fda4af}.cad-python-issues li.warning{color:#fde68a}.cad-python-note{margin-top:12px;color:#94a3b8;font-size:11px}@media(max-width:760px){.cad-python-form{grid-template-columns:1fr}.cad-python-kpis{grid-template-columns:1fr 1fr}.cad-python-dialog{margin-top:3vh}}`;
+    .cad-python-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid #5b6672;border-radius:3px;font:700 9px/1 system-ui;color:#cbd5e1;background:#202833;white-space:nowrap}.cad-python-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:#6b7280}.cad-python-badge.online::before{background:#22c55e}.cad-python-badge.offline::before{background:#60a5fa}.cad-python-action{white-space:nowrap}.cad-python-tools{position:relative}.cad-python-tools>summary{list-style:none}.cad-python-tools>summary::-webkit-details-marker{display:none}.cad-python-tools-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:140;min-width:190px;padding:6px;display:grid;gap:5px;border:1px solid #4b5862;border-radius:4px;background:#252d34;box-shadow:0 12px 30px rgba(0,0,0,.38)}.cad-python-tools:not([open]) .cad-python-tools-menu{display:none}.cad-python-tools-menu .cad-python-action{width:100%}.cad-python-modal{position:fixed;inset:0;z-index:9999}.cad-python-backdrop{position:absolute;inset:0;background:rgba(2,6,23,.7)}.cad-python-dialog{position:relative;margin:8vh auto 0;width:min(760px,92vw);max-height:82vh;overflow:auto;background:#111827;color:#e5e7eb;border:1px solid #475569;border-radius:8px;box-shadow:0 24px 80px rgba(0,0,0,.45)}.cad-python-dialog header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #334155;background:#1f2937}.cad-python-dialog header div{display:flex;flex-direction:column;gap:2px}.cad-python-dialog header small{color:#60a5fa;font-weight:800;letter-spacing:.08em}.cad-python-dialog header strong{font-size:16px}.cad-python-dialog header button{border:0;background:transparent;color:#e5e7eb;font-size:25px;cursor:pointer}.cad-python-form{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;padding:14px 16px;border-bottom:1px solid #334155}.cad-python-form label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#94a3b8}.cad-python-form input{height:34px;border:1px solid #475569;border-radius:4px;background:#0f172a;color:#e5e7eb;padding:0 9px}.cad-python-form button{align-self:end;height:34px;border:1px solid #2563eb;border-radius:4px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer}.cad-python-result{padding:16px}.cad-python-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.cad-python-kpi{padding:10px;border:1px solid #334155;border-radius:5px;background:#0f172a}.cad-python-kpi small{display:block;color:#94a3b8;font-size:9px;text-transform:uppercase}.cad-python-kpi strong{display:block;margin-top:4px;font-size:17px}.cad-python-score.good{color:#4ade80}.cad-python-score.warn{color:#fbbf24}.cad-python-score.bad{color:#fb7185}.cad-python-issues{margin:14px 0 0;padding:0;list-style:none}.cad-python-issues li{padding:8px 9px;border-bottom:1px solid #263244;font-size:12px}.cad-python-issues li.error{color:#fda4af}.cad-python-issues li.warning{color:#fde68a}.cad-python-note{margin-top:12px;color:#94a3b8;font-size:11px}@media(max-width:760px){.cad-python-form{grid-template-columns:1fr}.cad-python-kpis{grid-template-columns:1fr 1fr}.cad-python-dialog{margin-top:3vh}}`;
   document.head.appendChild(style);
 }
 
 async function checkStatus(badge, actions) {
   const id = drawingId();
   if (!id) return;
+  const setState = (online) => {
+    badge.textContent = online ? 'MOTOR TÉCNICO • AVANÇADO' : 'MOTOR TÉCNICO • BÁSICO';
+    badge.classList.toggle('online', online);
+    badge.classList.toggle('offline', !online);
+    badge.title = online ? 'Python ativo para análise e DXF' : 'Editor 2D normal ativo; recursos avançados Python ainda não estão disponíveis';
+    actions.forEach((el) => {
+      el.disabled = !online;
+      el.title = online ? el.dataset.onlineTitle || el.title : 'Recurso avançado indisponível; o desenho 2D continua funcionando normalmente';
+    });
+  };
   try {
     const res = await fetch(`/desenho-tecnico/cad/${id}/python/status`, { headers: { Accept: 'application/json' } });
     const data = await res.json();
-    const online = Boolean(res.ok && data.ok && data.available !== false);
-    badge.textContent = online ? 'PYTHON ONLINE' : 'PYTHON OFFLINE';
-    badge.classList.toggle('online', online);
-    badge.classList.toggle('offline', !online);
-    actions.forEach((el) => { el.disabled = !online; el.title = online ? el.dataset.onlineTitle || el.title : 'CAD Python Engine indisponível ou não configurado'; });
+    setState(Boolean(res.ok && data.ok && data.available !== false));
   } catch (_e) {
-    badge.textContent = 'PYTHON OFFLINE';
-    badge.classList.add('offline');
-    actions.forEach((el) => { el.disabled = true; });
+    setState(false);
   }
 }
 
@@ -124,14 +128,14 @@ function install() {
   const badge = document.createElement('span');
   badge.className = 'cad-python-badge offline';
   badge.dataset.cadPython = 'badge';
-  badge.textContent = 'PYTHON…';
+  badge.textContent = 'MOTOR TÉCNICO…';
 
   const analyze = document.createElement('button');
-  analyze.type = 'button'; analyze.className = 'cad-btn cad-btn-secondary cad-python-action'; analyze.textContent = 'Analisar'; analyze.dataset.onlineTitle = 'Validar geometria e calcular métricas';
+  analyze.type = 'button'; analyze.className = 'cad-btn cad-btn-secondary cad-python-action'; analyze.textContent = 'Analisar desenho'; analyze.dataset.onlineTitle = 'Validar geometria e calcular métricas';
   analyze.addEventListener('click', () => { document.getElementById('cadPythonModal').hidden = false; });
 
   const exportDxf = document.createElement('button');
-  exportDxf.type = 'button'; exportDxf.className = 'cad-btn cad-btn-secondary cad-python-action'; exportDxf.textContent = 'DXF'; exportDxf.dataset.onlineTitle = 'Exportar desenho em DXF';
+  exportDxf.type = 'button'; exportDxf.className = 'cad-btn cad-btn-secondary cad-python-action'; exportDxf.textContent = 'Exportar DXF'; exportDxf.dataset.onlineTitle = 'Exportar desenho em DXF';
   exportDxf.addEventListener('click', () => { window.location.href = `/desenho-tecnico/cad/${id}/dxf`; });
 
   const input = document.createElement('input');
@@ -141,11 +145,16 @@ function install() {
   importButton.type = 'button'; importButton.className = 'cad-btn cad-btn-secondary cad-python-action'; importButton.textContent = 'Importar DXF'; importButton.dataset.onlineTitle = 'Adicionar geometria de um arquivo DXF';
   importButton.addEventListener('click', () => input.click());
 
-  actionsHost.prepend(input);
-  actionsHost.prepend(importButton);
-  actionsHost.prepend(exportDxf);
-  actionsHost.prepend(analyze);
-  actionsHost.prepend(badge);
+  const tools = document.createElement('details');
+  tools.className = 'cad-python-tools';
+  tools.dataset.cadPython = 'tools';
+  const summary = document.createElement('summary');
+  summary.appendChild(badge);
+  const menu = document.createElement('div');
+  menu.className = 'cad-python-tools-menu';
+  menu.append(analyze, exportDxf, importButton, input);
+  tools.append(summary, menu);
+  actionsHost.prepend(tools);
   checkStatus(badge, [analyze, exportDxf, importButton]);
 }
 
