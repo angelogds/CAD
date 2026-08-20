@@ -9,6 +9,7 @@ try {
   await build({
     root,
     configFile: false,
+    publicDir: false,
     logLevel: 'info',
     build: {
       target: 'es2020',
