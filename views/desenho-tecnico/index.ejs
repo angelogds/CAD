@@ -1,35 +1,158 @@
 <% layout("layout") %>
-<section class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
-  <h1>Desenho Técnico</h1>
-  <a class="btn btn-dark" href="/desenho-tecnico/cad/novo">Novo Desenho CAD</a>
-</section>
+<link rel="stylesheet" href="/css/desenho-tecnico-central.css?v=20260819a">
 
-<form class="card" method="GET" action="/desenho-tecnico" style="display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:10px;align-items:end;">
-  <div>
-    <label class="label" for="q">Buscar</label>
-    <input class="input" type="text" id="q" name="q" placeholder="Buscar por título" value="<%= filtros.q %>">
-  </div>
-  <button class="btn" type="submit">Filtrar</button>
-</form>
+<%
+  const stats = resumo || { total: 0, vinculados: 0, semVinculo: 0, comPdf: 0, recentes: 0 };
+  const listaSegura = Array.isArray(lista) ? lista : [];
+  const equipamentosSeguros = Array.isArray(equipamentos) ? equipamentos : [];
+  const formatDate = (value) => {
+    const raw = String(value || '').slice(0, 10);
+    if (!raw) return '—';
+    const parts = raw.split('-');
+    return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : raw;
+  };
+%>
 
-<section class="card">
-  <h2 style="margin-top:0;">Lista de Desenhos</h2>
-  <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th>ID</th><th>Título</th><th>Equipamento vinculado</th><th>Data</th><th>Abrir editor</th><th>PDF</th></tr></thead>
-      <tbody>
-      <% if(!lista.length){ %><tr><td colspan="6">Nenhum desenho CAD encontrado.</td></tr><% } %>
-      <% lista.forEach((d)=>{ %>
-        <tr>
-          <td><%= d.id %></td>
-          <td><%= d.titulo %></td>
-          <td><%= d.equipamento_nome || '-' %></td>
-          <td><%= (d.atualizado_em || '').slice(0,10) %></td>
-          <td><a class="btn" href="/desenho-tecnico/cad/<%= d.id %>/editor">Abrir editor</a></td>
-          <td><a class="btn" href="/desenho-tecnico/cad/<%= d.id %>/pdf" target="_blank" rel="noopener">PDF</a></td>
-        </tr>
-      <% }) %>
-      </tbody>
-    </table>
+<section class="dtc-page">
+  <header class="dtc-hero">
+    <div class="dtc-hero-copy">
+      <span class="dtc-eyebrow">ENGENHARIA DE MANUTENÇÃO</span>
+      <h1>Central de Desenhos Técnicos</h1>
+      <p>Organize desenhos mecânicos 2D, revisões e vínculos com os equipamentos da fábrica em um único lugar.</p>
+    </div>
+    <div class="dtc-hero-actions">
+      <% if (canManage) { %>
+        <a class="dtc-btn dtc-btn-primary" href="/desenho-tecnico/cad/novo">
+          <span aria-hidden="true">＋</span> Novo desenho 2D
+        </a>
+      <% } %>
+    </div>
+  </header>
+
+  <div class="dtc-kpis" aria-label="Resumo dos desenhos técnicos">
+    <article class="dtc-kpi">
+      <span class="dtc-kpi-icon">▱</span>
+      <div><strong><%= stats.total %></strong><span>Desenhos exibidos</span></div>
+    </article>
+    <article class="dtc-kpi">
+      <span class="dtc-kpi-icon">⚙</span>
+      <div><strong><%= stats.vinculados %></strong><span>Vinculados a equipamentos</span></div>
+    </article>
+    <article class="dtc-kpi">
+      <span class="dtc-kpi-icon">⌁</span>
+      <div><strong><%= stats.semVinculo %></strong><span>Sem vínculo técnico</span></div>
+    </article>
+    <article class="dtc-kpi">
+      <span class="dtc-kpi-icon">PDF</span>
+      <div><strong><%= stats.comPdf %></strong><span>Com PDF gerado</span></div>
+    </article>
+    <article class="dtc-kpi">
+      <span class="dtc-kpi-icon">↻</span>
+      <div><strong><%= stats.recentes %></strong><span>Atualizados em 30 dias</span></div>
+    </article>
   </div>
+
+  <form class="dtc-filters" method="GET" action="/desenho-tecnico">
+    <div class="dtc-filter-main">
+      <label class="dtc-field dtc-search">
+        <span>Buscar desenho</span>
+        <input type="search" name="q" placeholder="Código ou título do desenho" value="<%= filtros.q || '' %>">
+      </label>
+      <label class="dtc-field">
+        <span>Equipamento</span>
+        <select name="equipamento_id">
+          <option value="">Todos os equipamentos</option>
+          <% equipamentosSeguros.forEach((eq) => { %>
+            <option value="<%= eq.id %>" <%= String(filtros.equipamento_id || '') === String(eq.id) ? 'selected' : '' %>>
+              <%= eq.codigo ? `${eq.codigo} — ` : '' %><%= eq.nome %>
+            </option>
+          <% }) %>
+        </select>
+      </label>
+      <label class="dtc-field">
+        <span>Status</span>
+        <select name="status">
+          <option value="">Todos</option>
+          <option value="ATIVO" <%= filtros.status === 'ATIVO' ? 'selected' : '' %>>Ativos</option>
+          <option value="INATIVO" <%= filtros.status === 'INATIVO' ? 'selected' : '' %>>Inativos</option>
+        </select>
+      </label>
+    </div>
+    <div class="dtc-filter-actions">
+      <a class="dtc-btn dtc-btn-ghost" href="/desenho-tecnico">Limpar</a>
+      <button class="dtc-btn dtc-btn-secondary" type="submit">Aplicar filtros</button>
+    </div>
+  </form>
+
+  <section class="dtc-list-card">
+    <div class="dtc-section-head">
+      <div>
+        <span class="dtc-eyebrow">ARQUIVO TÉCNICO</span>
+        <h2>Desenhos cadastrados</h2>
+      </div>
+      <span class="dtc-count"><%= listaSegura.length %> registro<%= listaSegura.length === 1 ? '' : 's' %></span>
+    </div>
+
+    <% if (!listaSegura.length) { %>
+      <div class="dtc-empty">
+        <span class="dtc-empty-icon">⌑</span>
+        <h3>Nenhum desenho encontrado</h3>
+        <p>Ajuste os filtros ou crie um novo desenho técnico 2D.</p>
+        <% if (canManage) { %><a class="dtc-btn dtc-btn-primary" href="/desenho-tecnico/cad/novo">Criar primeiro desenho</a><% } %>
+      </div>
+    <% } else { %>
+      <div class="dtc-table-wrap">
+        <table class="dtc-table">
+          <thead>
+            <tr>
+              <th>Desenho</th>
+              <th>Equipamento</th>
+              <th>Material</th>
+              <th>Revisão</th>
+              <th>Atualização</th>
+              <th>Status</th>
+              <th class="dtc-actions-col">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% listaSegura.forEach((d) => { %>
+              <tr>
+                <td data-label="Desenho">
+                  <div class="dtc-drawing-id">
+                    <span class="dtc-drawing-icon">⌗</span>
+                    <div>
+                      <strong><%= d.codigo || `CAD-${d.id}` %></strong>
+                      <span><%= d.titulo %></span>
+                    </div>
+                  </div>
+                </td>
+                <td data-label="Equipamento">
+                  <% if (d.equipamento_nome) { %>
+                    <span class="dtc-equipment">⚙ <%= d.equipamento_nome %></span>
+                  <% } else { %>
+                    <span class="dtc-muted">Sem vínculo</span>
+                  <% } %>
+                </td>
+                <td data-label="Material"><%= d.material || '—' %></td>
+                <td data-label="Revisão"><span class="dtc-revision">REV. <%= Number(d.revisao || 0) %></span></td>
+                <td data-label="Atualização"><%= formatDate(d.atualizado_em) %></td>
+                <td data-label="Status">
+                  <span class="dtc-status <%= String(d.status || 'ATIVO').toUpperCase() === 'ATIVO' ? 'is-active' : 'is-inactive' %>"><%= d.status || 'ATIVO' %></span>
+                </td>
+                <td data-label="Ações" class="dtc-actions-col">
+                  <div class="dtc-row-actions">
+                    <a class="dtc-action" href="/desenho-tecnico/cad/<%= d.id %>">Visualizar</a>
+                    <% if (canManage) { %>
+                      <a class="dtc-action dtc-action-primary" href="/desenho-tecnico/cad/<%= d.id %>/editor">Editar</a>
+                      <a class="dtc-action" href="/desenho-tecnico/cad/<%= d.id %>/pdf" target="_blank" rel="noopener">PDF</a>
+                    <% } %>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
 </section>
