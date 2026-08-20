@@ -33,11 +33,13 @@ export class RotateTool extends BaseTool {
     if (!solved.ok) return { ok: false, error: solved.error, entity };
 
     if (solved.type === 'polyline' && entity.type === 'rect') {
+      const basePoints = Array.isArray(solved.geometry.points) ? solved.geometry.points : [];
+      const points = basePoints.length ? [...basePoints, { ...basePoints[0] }] : basePoints;
       return {
         ok: true,
         replacement: new PolylineEntity({
           id: entity.id,
-          geometry: solved.geometry,
+          geometry: { ...solved.geometry, points, closed: true },
           style: { ...(entity.style || {}) },
           visible: entity.visible !== false,
           metadata: { ...(entity.metadata || {}) },
