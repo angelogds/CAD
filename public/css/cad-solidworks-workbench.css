@@ -1,91 +1,663 @@
-/* SolidWorks-inspired CommandManager / FeatureManager shell for the in-browser 2D CAD.
-   Visual reference only: preserves Campo do Gado identity and the existing CAD engine. */
-body.cad-solidworks-mode { background: #eef1f3; }
-.cad-solidworks-shell {
-  --sw-bg: #e8ecef;
-  --sw-surface: #f8f9fa;
-  --sw-panel: #ffffff;
-  --sw-border: #cbd2d8;
-  --sw-border-soft: #dfe4e8;
-  --sw-text: #17212b;
-  --sw-muted: #66727d;
-  --sw-accent: #159653;
-  --sw-accent-soft: #e4f6ec;
-  --sw-blue: #1687d9;
-  --sw-shadow: 0 8px 24px rgba(40, 52, 61, .10);
-  background: var(--sw-bg) !important;
-  color: var(--sw-text) !important;
+/* Technical CAD workspace inspired by professional 2D CAD applications.
+   Neutral palette on purpose: the CAD workspace is visually independent from the ERP shell. */
+body.cad-solidworks-mode,
+body.cad-technical-mode {
+  background: #171c21;
 }
-.cad-solidworks-shell .cad-toolbar { background: #f5f6f7 !important; border-bottom: 1px solid var(--sw-border); box-shadow: 0 2px 8px rgba(20, 32, 43, .08); }
-.cad-solidworks-shell .cad-appbar { min-height: 52px; background: linear-gradient(#fff, #f1f3f5) !important; border-bottom: 1px solid var(--sw-border-soft); padding: 6px 10px; }
-.cad-solidworks-shell .cad-brand-mark { border-radius: 4px !important; background: var(--sw-accent) !important; color: #fff !important; box-shadow: none !important; }
-.cad-solidworks-shell .cad-document-heading { gap: 2px; }
-.cad-solidworks-shell .cad-workbench-badge { display: inline-flex; width: fit-content; padding: 2px 6px; border: 1px solid #b9c2c9; border-radius: 3px; font-size: 9px; font-weight: 800; letter-spacing: .07em; color: #44515c; background: #f7f8f9; }
-.cad-solidworks-shell .cad-document-eyebrow { color: var(--sw-muted) !important; font-size: 10px; }
-.cad-solidworks-shell .cad-document-title, .cad-solidworks-shell .cad-document-title strong { color: var(--sw-text) !important; }
-.cad-solidworks-shell .cad-save-summary { background: var(--sw-accent-soft) !important; color: #17613d !important; border: 1px solid #bfe5cf; border-radius: 4px !important; }
-.cad-solidworks-shell .cad-btn, .cad-solidworks-shell .cad-icon-btn { border-radius: 4px !important; box-shadow: none !important; }
-.cad-solidworks-shell .cad-btn-primary { background: var(--sw-accent) !important; border-color: #0d8044 !important; color: #fff !important; }
-.cad-solidworks-shell .cad-btn-secondary, .cad-solidworks-shell .cad-icon-btn { background: #fff !important; color: #293540 !important; border-color: #c5ccd2 !important; }
 
-/* CommandManager */
-.cad-solidworks-shell .cad-ribbon {
-  gap: 0 !important; padding: 0 8px 5px !important; background: linear-gradient(#f7f8f9, #e5e8eb) !important;
-  border-bottom: 1px solid #bcc4cb !important; overflow-x: auto; align-items: stretch;
+.cad-solidworks-shell,
+.cad-technical-shell {
+  --cad-ui-0: #171c21;
+  --cad-ui-1: #20262c;
+  --cad-ui-2: #282f35;
+  --cad-ui-3: #313941;
+  --cad-ui-4: #3c4650;
+  --cad-border: #46515b;
+  --cad-border-soft: #384149;
+  --cad-text: #e5e9ed;
+  --cad-text-strong: #f5f7f8;
+  --cad-muted: #9ca7b0;
+  --cad-accent: #43a6e2;
+  --cad-accent-strong: #2490cf;
+  --cad-accent-soft: rgba(67, 166, 226, .16);
+  --cad-warning: #d9a441;
+  --cad-danger: #df6670;
+  --cad-panel: #252c32;
+  --cad-panel-alt: #2a3239;
+  --cad-canvas: #1c2329;
+  --cad-canvas-light: #edf1f4;
+  --cad-grid-minor: #2b353d;
+  --cad-grid-major: #3a4650;
+  --cad-centerline: #38bdf8;
+  --cad-dimension: #8dc9f2;
+  --cad-shadow: 0 10px 28px rgba(0, 0, 0, .28);
+  background: var(--cad-ui-0) !important;
+  color: var(--cad-text) !important;
 }
-.cad-solidworks-shell .cad-ribbon-group { min-height: 72px; padding: 20px 7px 6px !important; margin: 0 !important; border: 0 !important; border-right: 1px solid #c8ced4 !important; border-radius: 0 !important; background: transparent !important; position: relative; }
-.cad-solidworks-shell .cad-ribbon-label { position: absolute; top: 3px; left: 8px; color: #596670 !important; font-size: 9px !important; font-weight: 800 !important; text-transform: uppercase; letter-spacing: .045em; }
-.cad-solidworks-shell .cad-ribbon-btn { min-width: 52px; height: 46px; padding: 4px 6px !important; border: 1px solid transparent !important; border-radius: 3px !important; color: #25313b !important; background: transparent !important; font-size: 10px !important; }
-.cad-solidworks-shell .cad-ribbon-btn:hover { border-color: #aeb8c0 !important; background: linear-gradient(#fff, #e6eaed) !important; }
-.cad-solidworks-shell .cad-ribbon-btn.active, .cad-solidworks-shell .cad-ribbon-btn[aria-pressed="true"] { border-color: #8fc9aa !important; background: var(--sw-accent-soft) !important; color: #0e6d3a !important; }
-.cad-solidworks-shell .cad-ribbon-icon { color: var(--sw-blue) !important; font-weight: 700; }
-.cad-solidworks-shell .cad-ribbon-featured .cad-ribbon-icon, .cad-solidworks-shell .cad-ribbon-hatch-final .cad-ribbon-icon { color: var(--sw-accent) !important; }
-.cad-solidworks-shell .cad-chip { background: #fff !important; color: #394650 !important; border: 1px solid #c2c9cf !important; border-radius: 3px !important; }
 
-.cad-solidworks-shell .cad-workspace { background: #dfe4e7 !important; grid-template-columns: 176px minmax(0, 1fr) 302px !important; gap: 1px !important; }
-.cad-solidworks-shell .cad-panel-left, .cad-solidworks-shell .cad-panel-right { background: var(--sw-panel) !important; border-color: var(--sw-border) !important; box-shadow: none !important; }
-.cad-solidworks-shell .cad-panel-left { width: auto !important; padding: 0 0 10px !important; }
-.cad-solidworks-shell .cad-feature-manager-head { padding: 10px 10px 8px; border-bottom: 1px solid var(--sw-border); background: linear-gradient(#f8f9fa, #eef1f3); display: flex; flex-direction: column; gap: 1px; }
-.cad-solidworks-shell .cad-feature-manager-head strong { font-size: 12px; color: #202b34; }
-.cad-solidworks-shell .cad-feature-manager-head span { font-size: 9px; color: #74808a; text-transform: uppercase; letter-spacing: .05em; }
-.cad-solidworks-shell .cad-tool-group { margin: 0 !important; padding: 8px 8px 6px !important; border-bottom: 1px solid #edf0f2 !important; }
-.cad-solidworks-shell .cad-tool-group-label { color: #6a7680 !important; font-size: 9px !important; font-weight: 800 !important; text-transform: uppercase; }
-.cad-solidworks-shell .cad-tool-btn { min-height: 30px !important; padding: 4px 6px !important; border-radius: 3px !important; color: #2c3943 !important; background: transparent !important; border: 1px solid transparent !important; }
-.cad-solidworks-shell .cad-tool-btn:hover { background: #eff4f7 !important; border-color: #d4dce2 !important; }
-.cad-solidworks-shell .cad-tool-btn.active { background: var(--sw-accent-soft) !important; border-color: #b9dfca !important; color: #0e6d3a !important; }
-.cad-solidworks-shell .cad-tool-icon { color: var(--sw-blue) !important; }
-.cad-solidworks-shell .cad-tool-group-final2d .cad-tool-icon { color: var(--sw-accent) !important; }
-
-.cad-solidworks-shell .cad-canvas-container { background: #f7f8f8 !important; border: 0 !important; box-shadow: inset 0 0 0 1px #d0d6db; }
-.cad-solidworks-shell #cadCanvas { background: linear-gradient(#fafbfb, #f2f4f5) !important; }
-.cad-solidworks-shell .cad-canvas-context { color: #4f5c66 !important; background: rgba(255,255,255,.88) !important; border-bottom: 1px solid #d6dce1 !important; }
-.cad-solidworks-shell .cad-empty-state { background: rgba(255,255,255,.94) !important; border: 1px solid #cfd6dc !important; box-shadow: var(--sw-shadow) !important; color: #24303a !important; }
-.cad-solidworks-shell .cad-start-card { background: #f8fafb !important; border-color: #cbd4db !important; color: #26323c !important; }
-.cad-solidworks-shell .cad-start-card:hover { border-color: #7cb99a !important; background: #edf8f2 !important; }
-
-.cad-solidworks-shell .cad-panel-right { border-left: 1px solid var(--sw-border) !important; }
-.cad-solidworks-shell .cad-inspector-head { background: linear-gradient(#f8f9fa, #eef1f3) !important; border-bottom: 1px solid var(--sw-border) !important; color: #24303a !important; }
-.cad-solidworks-shell .cad-inspector-section { border-bottom: 1px solid #e3e7ea !important; }
-.cad-solidworks-shell .cad-inspector-section summary { background: #f8f9fa !important; color: #33404a !important; }
-.cad-solidworks-shell .cad-panel-content, .cad-solidworks-shell .cad-muted, .cad-solidworks-shell .cad-field span { color: #4e5b65 !important; }
-.cad-solidworks-shell .cad-input, .cad-solidworks-shell .cad-select { background: #fff !important; color: #1e2932 !important; border-color: #bfc8cf !important; border-radius: 3px !important; }
-.cad-solidworks-shell .cad-input:focus, .cad-solidworks-shell .cad-select:focus { border-color: var(--sw-accent) !important; box-shadow: 0 0 0 2px rgba(21,150,83,.10) !important; }
-.cad-solidworks-shell .cad-equipment-card { background: #eef8f2 !important; border-color: #c6e4d2 !important; color: #24553a !important; }
-
-.cad-solidworks-shell .cad-statusbar { background: #eef1f3 !important; color: #36424c !important; border-top: 1px solid #bbc4cb !important; }
-.cad-solidworks-shell .cad-command-wrap { background: #fff !important; border-color: #bdc6cd !important; }
-.cad-solidworks-shell .cad-command-input { color: #17212b !important; }
-.cad-solidworks-shell .cad-status-toggle { color: #53606a !important; border-color: #c4ccd2 !important; background: #fff !important; }
-.cad-solidworks-shell .cad-status-toggle.active { color: #0c753e !important; background: #dff4e8 !important; border-color: #a9d8bd !important; }
-
-@media (max-width: 1180px) {
-  .cad-solidworks-shell .cad-workspace { grid-template-columns: 154px minmax(0, 1fr) 270px !important; }
-  .cad-solidworks-shell .cad-ribbon-btn { min-width: 46px; }
+/* Application / quick access bar */
+.cad-technical-shell .cad-toolbar {
+  background: var(--cad-ui-1) !important;
+  border-bottom: 1px solid #11161a !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .28) !important;
 }
+
+.cad-technical-shell .cad-appbar {
+  min-height: 48px !important;
+  padding: 5px 8px !important;
+  background: linear-gradient(#343c43, #2b3238) !important;
+  border-bottom: 1px solid #161b20 !important;
+}
+
+.cad-technical-shell .cad-appbar-start,
+.cad-technical-shell .cad-appbar-actions {
+  gap: 6px !important;
+}
+
+.cad-technical-shell .cad-brand-mark {
+  min-width: 34px !important;
+  height: 34px !important;
+  border-radius: 3px !important;
+  background: #1f7fb8 !important;
+  border: 1px solid #5fb5e7 !important;
+  color: #fff !important;
+  box-shadow: none !important;
+  font-size: 11px !important;
+  letter-spacing: .04em !important;
+}
+
+.cad-technical-shell .cad-document-heading {
+  gap: 1px !important;
+}
+
+.cad-technical-shell .cad-workbench-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 1px 6px;
+  border: 1px solid #58636d;
+  border-radius: 2px;
+  background: #242b31;
+  color: #b8c2ca;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.cad-technical-shell .cad-document-eyebrow {
+  color: #9ba6af !important;
+  font-size: 9px !important;
+}
+
+.cad-technical-shell .cad-document-title,
+.cad-technical-shell .cad-document-title strong {
+  color: var(--cad-text-strong) !important;
+}
+
+.cad-technical-shell .cad-document-title {
+  font-size: 12px !important;
+}
+
+.cad-technical-shell .cad-save-summary {
+  min-height: 26px !important;
+  padding: 3px 8px !important;
+  background: #28333b !important;
+  color: #b8c2ca !important;
+  border: 1px solid #4b5660 !important;
+  border-radius: 3px !important;
+}
+
+.cad-technical-shell .cad-save-dot {
+  background: #5fb7e8 !important;
+}
+
+.cad-technical-shell .cad-btn,
+.cad-technical-shell .cad-icon-btn {
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  font-weight: 700 !important;
+}
+
+.cad-technical-shell .cad-icon-btn,
+.cad-technical-shell .cad-btn-secondary {
+  background: #30383f !important;
+  color: #d8dde1 !important;
+  border-color: #4d5862 !important;
+}
+
+.cad-technical-shell .cad-icon-btn:hover,
+.cad-technical-shell .cad-btn-secondary:hover {
+  background: #3b454e !important;
+  border-color: #66737d !important;
+}
+
+.cad-technical-shell .cad-btn-primary {
+  background: #287faf !important;
+  border-color: #4ea8da !important;
+  color: #fff !important;
+}
+
+.cad-technical-shell .cad-btn-primary:hover {
+  background: #3294c9 !important;
+}
+
+/* CommandManager tabs */
+.cad-command-tabs {
+  display: flex;
+  align-items: end;
+  min-height: 29px;
+  padding: 0 8px;
+  gap: 1px;
+  background: #252c32;
+  border-bottom: 1px solid #151a1e;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.cad-command-tab {
+  appearance: none;
+  border: 0;
+  border-left: 1px solid transparent;
+  border-right: 1px solid transparent;
+  border-top: 2px solid transparent;
+  background: transparent;
+  color: #b8c1c8;
+  min-width: 76px;
+  height: 29px;
+  padding: 0 13px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.cad-command-tab:hover {
+  background: #313941;
+  color: #f0f3f5;
+}
+
+.cad-command-tab.active {
+  background: #343d45;
+  color: #fff;
+  border-left-color: #4a5660;
+  border-right-color: #4a5660;
+  border-top-color: var(--cad-accent);
+}
+
+/* Ribbon: only the active tab groups are visible. */
+.cad-technical-shell .cad-ribbon {
+  min-height: 82px !important;
+  padding: 4px 7px 5px !important;
+  gap: 0 !important;
+  align-items: stretch !important;
+  background: linear-gradient(#343c43, #2c343a) !important;
+  border-bottom: 1px solid #12171b !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+}
+
+.cad-technical-shell .cad-ribbon-group[hidden] {
+  display: none !important;
+}
+
+.cad-technical-shell .cad-ribbon-group {
+  min-height: 70px !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 19px 7px 5px !important;
+  gap: 4px !important;
+  border: 0 !important;
+  border-right: 1px solid #4a545e !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  position: relative !important;
+  display: flex !important;
+  align-content: flex-start !important;
+  align-items: flex-start !important;
+  flex-wrap: wrap !important;
+}
+
+.cad-technical-shell .cad-ribbon-label {
+  position: absolute !important;
+  top: 3px !important;
+  left: 8px !important;
+  color: #aeb8c0 !important;
+  font-size: 8px !important;
+  font-weight: 800 !important;
+  letter-spacing: .07em !important;
+  text-transform: uppercase !important;
+}
+
+.cad-technical-shell .cad-ribbon-btn {
+  min-width: 66px !important;
+  height: 42px !important;
+  padding: 4px 7px !important;
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  border: 1px solid transparent !important;
+  border-radius: 3px !important;
+  background: transparent !important;
+  color: #e0e5e9 !important;
+  font-size: 9px !important;
+  line-height: 1 !important;
+}
+
+.cad-technical-shell .cad-ribbon-btn:hover {
+  background: #414b54 !important;
+  border-color: #5a6670 !important;
+}
+
+.cad-technical-shell .cad-ribbon-btn.active,
+.cad-technical-shell .cad-ribbon-btn[aria-pressed="true"] {
+  background: rgba(67, 166, 226, .18) !important;
+  border-color: #4aa1d3 !important;
+  color: #fff !important;
+}
+
+.cad-technical-shell .cad-ribbon-icon {
+  min-height: 17px;
+  color: #68b9e8 !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+
+.cad-technical-shell .cad-ribbon-featured .cad-ribbon-icon,
+.cad-technical-shell .cad-ribbon-hatch-final .cad-ribbon-icon {
+  color: #8bc7ea !important;
+}
+
+.cad-technical-shell .cad-chip {
+  height: 27px !important;
+  background: #30383f !important;
+  color: #d6dce0 !important;
+  border: 1px solid #515d67 !important;
+  border-radius: 3px !important;
+}
+
+.cad-technical-shell .cad-chip.active,
+.cad-technical-shell .cad-chip[aria-pressed="true"] {
+  background: #264e67 !important;
+  border-color: #4da8da !important;
+  color: #fff !important;
+}
+
+/* Workspace */
+.cad-technical-shell .cad-workspace {
+  background: #151a1e !important;
+  grid-template-columns: 218px minmax(0, 1fr) 292px !important;
+  gap: 1px !important;
+}
+
+.cad-technical-shell .cad-panel-left,
+.cad-technical-shell .cad-panel-right {
+  background: var(--cad-panel) !important;
+  color: var(--cad-text) !important;
+  border-color: #11161a !important;
+  box-shadow: none !important;
+}
+
+.cad-technical-shell .cad-panel-left {
+  width: auto !important;
+  padding: 0 0 10px !important;
+  overflow-y: auto !important;
+}
+
+.cad-technical-shell .cad-feature-manager-head {
+  padding: 9px 10px 8px !important;
+  border-bottom: 1px solid #414b54 !important;
+  background: linear-gradient(#353e46, #2e363d) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+}
+
+.cad-technical-shell .cad-feature-manager-head strong {
+  color: #f1f4f6 !important;
+  font-size: 11px !important;
+}
+
+.cad-technical-shell .cad-feature-manager-head span {
+  color: #9da8b0 !important;
+  font-size: 8px !important;
+  text-transform: uppercase !important;
+  letter-spacing: .06em !important;
+}
+
+.cad-feature-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  padding: 1px;
+  background: #161b20;
+  border-bottom: 1px solid #414b54;
+}
+
+.cad-feature-summary > div {
+  min-height: 48px;
+  padding: 6px 7px;
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  background: #2a3239;
+}
+
+.cad-feature-summary span {
+  grid-row: 1 / span 2;
+  color: #65b8e7;
+  font-size: 14px;
+}
+
+.cad-feature-summary strong {
+  color: #edf2f5;
+  font-size: 12px;
+}
+
+.cad-feature-summary small {
+  color: #929ea7;
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.cad-technical-shell .cad-tool-group {
+  margin: 0 !important;
+  padding: 8px 8px 6px !important;
+  border-bottom: 1px solid #39424a !important;
+}
+
+.cad-technical-shell .cad-tool-group-label {
+  display: block !important;
+  margin-bottom: 5px !important;
+  color: #9aa6ae !important;
+  font-size: 8px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .06em !important;
+}
+
+.cad-technical-shell .cad-tool-btn {
+  min-height: 30px !important;
+  width: 100% !important;
+  padding: 4px 7px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  border-radius: 2px !important;
+  color: #d7dde1 !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  font-size: 10px !important;
+}
+
+.cad-technical-shell .cad-tool-btn > span:last-child {
+  display: inline !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.cad-technical-shell .cad-tool-btn:hover {
+  background: #353f47 !important;
+  border-color: #4a5660 !important;
+}
+
+.cad-technical-shell .cad-tool-btn.active {
+  background: rgba(67, 166, 226, .16) !important;
+  border-color: #397da5 !important;
+  color: #fff !important;
+}
+
+.cad-technical-shell .cad-tool-icon {
+  min-width: 18px !important;
+  color: #68b9e8 !important;
+  text-align: center !important;
+}
+
+/* Canvas */
+.cad-technical-shell .cad-canvas-container {
+  background: var(--cad-canvas) !important;
+  border: 0 !important;
+  box-shadow: inset 0 0 0 1px #0f1317 !important;
+}
+
+.cad-technical-shell #cadCanvas {
+  background: #1b2228 !important;
+}
+
+.cad-technical-shell.cad-theme-light .cad-canvas-container,
+.cad-technical-shell.cad-theme-light #cadCanvas {
+  background: var(--cad-canvas-light) !important;
+}
+
+.cad-technical-shell .cad-canvas-context {
+  color: #c4ccd2 !important;
+  background: rgba(35, 43, 49, .90) !important;
+  border: 1px solid #4b5660 !important;
+  border-radius: 3px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .18) !important;
+}
+
+.cad-technical-shell .cad-context-label,
+.cad-technical-shell .cad-context-meta {
+  color: #8f9ba4 !important;
+}
+
+.cad-technical-shell .cad-empty-state {
+  background: rgba(38, 46, 53, .96) !important;
+  border: 1px solid #56616b !important;
+  box-shadow: var(--cad-shadow) !important;
+  color: #e3e8eb !important;
+}
+
+.cad-technical-shell .cad-empty-state p,
+.cad-technical-shell .cad-empty-state small {
+  color: #aab5bd !important;
+}
+
+.cad-technical-shell .cad-start-card {
+  background: #30383f !important;
+  border-color: #4c5862 !important;
+  color: #e0e6ea !important;
+}
+
+.cad-technical-shell .cad-start-card:hover {
+  border-color: #4aa5d9 !important;
+  background: #334653 !important;
+}
+
+/* PropertyManager */
+.cad-technical-shell .cad-panel-right {
+  border-left: 1px solid #11161a !important;
+  overflow-y: auto !important;
+}
+
+.cad-technical-shell .cad-inspector-head {
+  background: linear-gradient(#353e46, #2d353c) !important;
+  border-bottom: 1px solid #444f58 !important;
+  color: #edf1f4 !important;
+}
+
+.cad-technical-shell .cad-inspector-head span {
+  color: #a8b2ba !important;
+}
+
+.cad-technical-shell .cad-inspector-section {
+  border-bottom: 1px solid #3d464e !important;
+}
+
+.cad-technical-shell .cad-inspector-section summary {
+  background: #2b333a !important;
+  color: #dce2e6 !important;
+}
+
+.cad-technical-shell .cad-inspector-section summary:hover {
+  background: #333c44 !important;
+}
+
+.cad-technical-shell .cad-panel-content,
+.cad-technical-shell .cad-muted,
+.cad-technical-shell .cad-field span,
+.cad-technical-shell .cad-precision-help {
+  color: #adb7bf !important;
+}
+
+.cad-technical-shell .cad-input,
+.cad-technical-shell .cad-select,
+.cad-technical-shell textarea.cad-input {
+  background: #1f262c !important;
+  color: #edf1f4 !important;
+  border-color: #4e5a64 !important;
+  border-radius: 2px !important;
+}
+
+.cad-technical-shell .cad-input:focus,
+.cad-technical-shell .cad-select:focus {
+  border-color: #4aa4d8 !important;
+  box-shadow: 0 0 0 2px rgba(67, 166, 226, .14) !important;
+}
+
+.cad-technical-shell .cad-equipment-card {
+  background: #29333a !important;
+  border-color: #46535d !important;
+  color: #c7d1d7 !important;
+}
+
+/* Status / command line */
+.cad-technical-shell .cad-statusbar {
+  min-height: 31px !important;
+  background: #252c32 !important;
+  color: #bec7ce !important;
+  border-top: 1px solid #11161a !important;
+}
+
+.cad-technical-shell .cad-command-wrap {
+  background: #1d2429 !important;
+  border-color: #4a5660 !important;
+}
+
+.cad-technical-shell .cad-command-input {
+  color: #e5eaed !important;
+}
+
+.cad-technical-shell .cad-command-input::placeholder {
+  color: #7f8b94 !important;
+}
+
+.cad-technical-shell .cad-status-toggle {
+  color: #b7c0c7 !important;
+  border-color: #4b5660 !important;
+  background: #30383f !important;
+}
+
+.cad-technical-shell .cad-status-toggle.active {
+  color: #fff !important;
+  background: #275d7b !important;
+  border-color: #449acb !important;
+}
+
+.cad-display-status-switch {
+  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 6px;
+  border-left: 1px solid #46515b;
+}
+
+.cad-display-status-switch > span {
+  margin-right: 3px;
+  color: #7f8b94;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.cad-display-status-switch button {
+  min-height: 23px;
+  padding: 2px 7px;
+  border: 1px solid #46515b;
+  border-radius: 2px;
+  background: #30383f;
+  color: #aeb8c0;
+  font-size: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cad-display-status-switch button.active,
+.cad-display-status-switch button[aria-pressed="true"] {
+  border-color: #4aa5d9;
+  background: #285a77;
+  color: #fff;
+}
+
+/* Solid 2D is only a display mode; original vector entities remain untouched. */
+.cad-technical-shell[data-display-mode="solid"] .cad-canvas-context::after {
+  content: 'SÓLIDO 2D';
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 2px 5px;
+  border: 1px solid #4f7f9b;
+  border-radius: 2px;
+  background: #273e4c;
+  color: #a8d9f4;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+
+@media (max-width: 1280px) {
+  .cad-technical-shell .cad-workspace {
+    grid-template-columns: 196px minmax(0, 1fr) 270px !important;
+  }
+  .cad-technical-shell .cad-ribbon-btn {
+    min-width: 60px !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .cad-command-tab {
+    min-width: 64px;
+    padding-inline: 9px;
+  }
+  .cad-technical-shell .cad-workspace {
+    grid-template-columns: 170px minmax(0, 1fr) 245px !important;
+  }
+  .cad-technical-shell .cad-ribbon {
+    min-height: 78px !important;
+  }
+}
+
 @media (max-width: 860px) {
-  .cad-solidworks-shell .cad-workspace { grid-template-columns: 1fr !important; }
-  .cad-solidworks-shell .cad-panel-left, .cad-solidworks-shell .cad-panel-right { position: fixed !important; top: 116px; bottom: 34px; z-index: 80; width: min(82vw, 300px) !important; box-shadow: var(--sw-shadow) !important; }
-  .cad-solidworks-shell .cad-panel-left { left: 0; }
-  .cad-solidworks-shell .cad-panel-right { right: 0; }
-  .cad-solidworks-shell .cad-ribbon { min-height: 72px; }
+  .cad-technical-shell .cad-workspace {
+    grid-template-columns: 1fr !important;
+  }
+  .cad-technical-shell .cad-panel-left,
+  .cad-technical-shell .cad-panel-right {
+    position: fixed !important;
+    top: 158px !important;
+    bottom: 34px !important;
+    z-index: 80 !important;
+    width: min(84vw, 310px) !important;
+    box-shadow: var(--cad-shadow) !important;
+  }
+  .cad-technical-shell .cad-panel-left { left: 0 !important; }
+  .cad-technical-shell .cad-panel-right { right: 0 !important; }
+  .cad-technical-shell .cad-ribbon { min-height: 74px !important; }
+  .cad-technical-shell .cad-ribbon-btn { min-width: 58px !important; }
+  .cad-feature-summary { grid-template-columns: repeat(4, minmax(56px, 1fr)); }
+}
+
+@media (max-width: 620px) {
+  .cad-technical-shell .cad-document-eyebrow,
+  .cad-technical-shell .cad-save-summary {
+    display: none !important;
+  }
+  .cad-command-tabs { padding-inline: 3px; }
+  .cad-command-tab { min-width: 58px; padding-inline: 7px; }
+  .cad-technical-shell .cad-appbar { min-height: 44px !important; }
+  .cad-technical-shell .cad-ribbon { padding-inline: 3px !important; }
+  .cad-display-status-switch > span { display: none; }
 }
