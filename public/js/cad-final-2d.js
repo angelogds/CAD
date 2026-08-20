@@ -40,7 +40,17 @@ function addGroup(ribbon, className, label, items, before = null) {
   if (before) ribbon.insertBefore(group, before); else ribbon.appendChild(group);
 }
 
+function ensureStyleSheet() {
+  if (document.querySelector('link[data-cad-final2d-style]')) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = '/css/cad-solidworks-workbench.css?v=20260819-final2d-v1';
+  link.dataset.cadFinal2dStyle = '1';
+  document.head.appendChild(link);
+}
+
 function installSolidWorksLayout(cad) {
+  ensureStyleSheet();
   const shell = document.querySelector('.cad-fullscreen');
   if (!shell) return;
   shell.classList.add('cad-solidworks-shell');
@@ -71,7 +81,8 @@ function installSolidWorksLayout(cad) {
 }
 
 function installFinalTools(cad) {
-  if (!cad?.toolManager || !cad?.ctx) return;
+  if (!cad?.toolManager || !cad?.ctx || cad.__final2dToolsInstalled) return;
+  cad.__final2dToolsInstalled = true;
   [
     new EllipseTool(cad.ctx), new SplineTool(cad.ctx), new HatchTool(cad.ctx), new ScaleTool(cad.ctx), new StretchTool(cad.ctx),
     new BreakTool(cad.ctx), new JoinTool(cad.ctx), new ExplodeTool(cad.ctx), new RectangularArrayTool(cad.ctx), new PolarArrayTool(cad.ctx),
@@ -166,10 +177,9 @@ function installFinalRibbon() {
   if (command) command.placeholder = 'Comandos: L, C, EL, SPL, H, M, RO, FI, CHA, SC, ST, BR, J, XP, AR, AP...';
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  const cad = window.CAD_APP;
+export function installCadFinal2D(cad) {
   if (!cad) return;
   installFinalTools(cad);
   installFinalRibbon();
   installSolidWorksLayout(cad);
-});
+}
