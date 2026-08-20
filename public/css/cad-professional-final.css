@@ -1,0 +1,325 @@
+/* Final professional layer for the 2D CAD workspace.
+   Keeps the engineering workspace neutral and avoids touching the ERP shell. */
+.cad-technical-shell .cad-ribbon {
+  min-height: 72px !important;
+  padding-block: 3px 4px !important;
+}
+
+.cad-technical-shell .cad-ribbon-group {
+  min-height: 62px !important;
+  padding: 17px 5px 4px !important;
+  gap: 2px !important;
+}
+
+.cad-technical-shell .cad-ribbon-btn {
+  min-width: 54px !important;
+  height: 37px !important;
+  padding: 3px 5px !important;
+  font-size: 8px !important;
+}
+
+.cad-technical-shell .cad-ribbon-icon {
+  min-height: 15px !important;
+  font-size: 13px !important;
+}
+
+/* The left side is now a real model tree, not a duplicated toolbar. */
+.cad-panel-left.cad-feature-tree-mode > .cad-tool-group {
+  display: none !important;
+}
+
+.cad-feature-tree {
+  padding: 6px 0 12px;
+  color: #dce3e8;
+  font-size: 10px;
+}
+
+.cad-feature-root,
+.cad-feature-plane {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 7px;
+  align-items: center;
+  min-height: 38px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #39424a;
+  background: #252d34;
+}
+
+.cad-feature-root > span,
+.cad-feature-plane > span {
+  color: #73c0eb;
+  text-align: center;
+  font-size: 14px;
+}
+
+.cad-feature-root div,
+.cad-feature-plane div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cad-feature-root strong,
+.cad-feature-plane strong {
+  overflow: hidden;
+  color: #eef3f6;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cad-feature-root small,
+.cad-feature-plane small {
+  overflow: hidden;
+  color: #8f9ca5;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cad-feature-layer {
+  border-bottom: 1px solid #343d45;
+}
+
+.cad-feature-layer > summary {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 5px;
+  align-items: center;
+  min-height: 31px;
+  padding: 4px 9px;
+  cursor: pointer;
+  list-style: none;
+  background: #293138;
+  color: #dbe2e7;
+}
+
+.cad-feature-layer > summary::-webkit-details-marker { display: none; }
+.cad-feature-layer > summary:hover { background: #333d45; }
+.cad-feature-layer > summary > span { color: #63b4e2; text-align: center; }
+.cad-feature-layer > summary > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
+.cad-feature-layer > summary > small { color: #8f9aa3; font-size: 8px; }
+
+.cad-feature-entities {
+  padding: 2px 5px 5px 20px;
+  background: #222a30;
+}
+
+.cad-feature-entity {
+  appearance: none;
+  width: 100%;
+  min-height: 26px;
+  padding: 3px 6px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: #c7d0d6;
+  font: inherit;
+  font-size: 9px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cad-feature-entity:hover {
+  border-color: #485763;
+  background: #313b43;
+  color: #fff;
+}
+
+.cad-feature-entity.active {
+  border-color: #3e8fbd;
+  background: rgba(67, 166, 226, .18);
+  color: #fff;
+}
+
+.cad-feature-entity.muted { opacity: .48; }
+.cad-feature-entity-icon { width: 16px; color: #69b9e7; text-align: center; }
+.cad-feature-empty { display: block; padding: 7px; color: #7f8a92; font-size: 8px; }
+
+/* Point grid and origin axes. */
+.cad-origin-axis {
+  pointer-events: none;
+  stroke-width: 1;
+  opacity: .36;
+}
+.cad-origin-axis-x { stroke: #b65454; }
+.cad-origin-axis-y { stroke: #4f9d68; }
+
+.cad-ucs-widget {
+  position: absolute;
+  left: 18px;
+  bottom: 40px;
+  z-index: 12;
+  width: 54px;
+  height: 54px;
+  pointer-events: none;
+  color: #d5dde2;
+  font: 800 9px/1 system-ui;
+}
+
+.cad-ucs-widget::before,
+.cad-ucs-widget::after {
+  content: '';
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  transform-origin: left center;
+}
+
+.cad-ucs-widget::before {
+  width: 30px;
+  border-top: 2px solid #c95d5d;
+}
+
+.cad-ucs-widget::after {
+  width: 30px;
+  border-top: 2px solid #55a36c;
+  transform: rotate(-90deg);
+}
+
+.cad-ucs-origin {
+  position: absolute;
+  left: 13px;
+  bottom: 13px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid #cfd8de;
+  border-radius: 50%;
+  background: #20282e;
+}
+
+.cad-ucs-x { position: absolute; right: 0; bottom: 12px; color: #e77979; }
+.cad-ucs-y { position: absolute; left: 13px; top: 0; color: #71c38a; }
+
+.cad-top-view-widget {
+  position: absolute;
+  right: 18px;
+  top: 56px;
+  z-index: 18;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-content: center;
+  gap: 1px;
+  border: 1px solid #56636d;
+  border-radius: 50%;
+  background: rgba(39, 48, 55, .9);
+  color: #dce4e9;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .28);
+  cursor: pointer;
+}
+
+.cad-top-view-widget:hover { border-color: #61b3e2; background: #33414a; }
+.cad-top-view-widget strong { font-size: 9px; }
+.cad-top-view-widget span { color: #7fbfe4; font-size: 7px; }
+
+/* Model / paper layout switch. Paper modes are a non-persistent print preview only. */
+.cad-layout-tabs {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  z-index: 22;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid #3e4952;
+  border-radius: 2px;
+  background: rgba(32, 39, 45, .94);
+}
+
+.cad-layout-tabs button {
+  min-height: 23px;
+  padding: 2px 9px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: #9ea9b1;
+  font: 800 8px/1 system-ui;
+  cursor: pointer;
+}
+
+.cad-layout-tabs button:hover { color: #fff; background: #343f47; }
+.cad-layout-tabs button.active { border-color: #4a9dcc; background: #285b78; color: #fff; }
+
+.cad-sheet-frame {
+  position: absolute;
+  inset: 12% 12% 12% 12%;
+  z-index: 2;
+  display: none;
+  pointer-events: none;
+  border: 1px solid rgba(210, 219, 225, .72);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .4), 0 10px 35px rgba(0, 0, 0, .25);
+}
+
+.cad-sheet-frame::after {
+  content: attr(data-paper) ' • PREVIEW';
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  padding: 2px 5px;
+  background: rgba(31, 39, 45, .88);
+  color: #cad3d9;
+  font: 800 8px/1 system-ui;
+  letter-spacing: .04em;
+}
+
+.cad-technical-shell[data-sheet-mode="a4"] .cad-sheet-frame,
+.cad-technical-shell[data-sheet-mode="a3"] .cad-sheet-frame { display: block; }
+.cad-technical-shell[data-sheet-mode="a3"] .cad-sheet-frame { inset: 8% 7% 11% 7%; }
+
+/* Three explicit 2D visualization modes. */
+.cad-technical-shell[data-display-mode="hatch"] .cad-canvas-context::after,
+.cad-technical-shell[data-display-mode="wireframe"] .cad-canvas-context::after {
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 2px 5px;
+  border: 1px solid #53616c;
+  border-radius: 2px;
+  background: #283139;
+  color: #aebac2;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+.cad-technical-shell[data-display-mode="wireframe"] .cad-canvas-context::after { content: 'ARAME'; }
+.cad-technical-shell[data-display-mode="hatch"] .cad-canvas-context::after { content: 'HACHURA'; }
+
+/* Compact Python/advanced engine status. */
+.cad-python-tools { position: relative; }
+.cad-python-tools > summary { list-style: none; cursor: pointer; }
+.cad-python-tools > summary::-webkit-details-marker { display: none; }
+.cad-python-tools-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 140;
+  min-width: 190px;
+  padding: 6px;
+  display: grid;
+  gap: 5px;
+  border: 1px solid #4b5862;
+  border-radius: 4px;
+  background: #252d34;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .38);
+}
+.cad-python-tools-menu .cad-python-action { width: 100%; justify-content: flex-start; }
+.cad-python-tools:not([open]) .cad-python-tools-menu { display: none; }
+
+@media (max-width: 980px) {
+  .cad-technical-shell .cad-ribbon-btn { min-width: 50px !important; }
+  .cad-ucs-widget { left: 10px; }
+  .cad-top-view-widget { right: 10px; }
+  .cad-layout-tabs button { padding-inline: 6px; }
+}
+
+@media (max-width: 700px) {
+  .cad-layout-tabs { display: none; }
+  .cad-ucs-widget { bottom: 10px; transform: scale(.82); transform-origin: left bottom; }
+  .cad-top-view-widget { top: 10px; width: 42px; height: 42px; }
+}
