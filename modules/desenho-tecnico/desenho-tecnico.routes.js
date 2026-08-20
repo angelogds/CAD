@@ -10,10 +10,6 @@ const MANAGE_ACCESS = ACCESS.desenho_tecnico_manage || ['ADMIN'];
 const dxfUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
-  fileFilter: (_req, file, cb) => {
-    const valid = String(file?.originalname || '').toLowerCase().endsWith('.dxf');
-    cb(valid ? null : new Error('Envie um arquivo .DXF válido.'), valid);
-  },
 });
 
 const withMenu = (handler) => (req, res, next) => {
