@@ -33,10 +33,11 @@ test('painel de compras acompanha todos os estados gerenciais da solicitação',
   ]);
 });
 
-test('painel força a atualização dos recursos que impedem seleção azul na fila', () => {
+test('painel força a atualização coordenada dos recursos que impedem seleção azul na fila', () => {
   const view = fs.readFileSync(viewPath, 'utf8');
+  const version = '20260819-selection-artifacts-v2';
 
-  assert.match(view, /compras-dashboard\.css\?v=20260819-active-priority-selection-fix/);
-  assert.match(view, /compras-active-priority-fix\.css\?v=20260819/);
-  assert.match(view, /compras-dashboard\.js\?v=20260819-active-priority-selection-fix/);
+  assert.match(view, new RegExp(`compras-dashboard\\.css\\?v=${version}`));
+  assert.match(view, new RegExp(`compras-active-priority-fix\\.css\\?v=${version}`));
+  assert.match(view, new RegExp(`compras-dashboard\\.js\\?v=${version}`));
 });

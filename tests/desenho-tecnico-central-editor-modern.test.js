@@ -7,6 +7,7 @@ const ejs = require('ejs');
 const root = process.cwd();
 const indexView = path.join(root, 'views', 'desenho-tecnico', 'index.ejs');
 const cadEntry = path.join(root, 'public', 'js', 'cad-engine-v2.js');
+const uiStabilization = path.join(root, 'public', 'js', 'cad-ui-stabilization.js');
 
 function renderCentral(canManage = true) {
   return ejs.renderFile(indexView, {
@@ -50,14 +51,18 @@ test('central respeita modo somente leitura para usuário sem gerenciamento', as
   assert.match(html, /\/desenho-tecnico\/cad\/41/);
 });
 
-test('ribbon do CAD expõe ferramentas existentes sem criar nova geometria', () => {
-  const source = fs.readFileSync(cadEntry, 'utf8');
-  assert.match(source, /tool-mirror/);
-  assert.match(source, /tool-dim-linear/);
-  assert.match(source, /tool-dim-diameter/);
-  assert.match(source, /tool-dim-angular/);
-  assert.match(source, /tool-centerline/);
-  assert.match(source, /tool-measure/);
-  assert.match(source, /Mecânica/);
-  assert.match(source, /Cotas e anotação/);
+test('entrada atual do CAD carrega MLightCAD e o menu técnico sem reativar o motor SVG', () => {
+  const entry = fs.readFileSync(cadEntry, 'utf8');
+  const stabilization = fs.readFileSync(uiStabilization, 'utf8');
+
+  assert.match(entry, /cad-mlight-runtime\.js/);
+  assert.match(entry, /cad-round3-runtime\.js/);
+  assert.match(entry, /cad-round4-runtime\.js/);
+  assert.match(entry, /cad-ui-stabilization\.js/);
+  assert.match(entry, /cad-style-runtime\.js/);
+  assert.match(stabilization, /CRIAR E COTAR/);
+  assert.match(stabilization, /FABRICAÇÃO/);
+  assert.match(stabilization, /VISTAS E ANÁLISE/);
+  assert.match(stabilization, /BIBLIOTECA E PRODUÇÃO/);
+  assert.match(stabilization, /hideLegacyEditor/);
 });
