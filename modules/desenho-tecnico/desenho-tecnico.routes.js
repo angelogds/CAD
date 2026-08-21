@@ -23,6 +23,7 @@ const ensureCan = (req) => {
 const withMenu = (handler) => (req, res, next) => {
   ensureCan(req);
   res.locals.activeMenu = 'desenho-tecnico';
+  res.locals.canDelete = req.can('desenho_tecnico_delete');
   return handler(req, res, next);
 };
 
