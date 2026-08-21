@@ -67,6 +67,14 @@ async function analyze(cad, options = {}) {
   });
 }
 
+async function nesting(payload = {}) {
+  return request('/v1/nesting', {
+    method: 'POST',
+    body: payload || {},
+    timeoutMs: 25000,
+  });
+}
+
 async function exportDxf(cad, filename) {
   return request('/v1/dxf/export', {
     method: 'POST',
@@ -90,6 +98,7 @@ module.exports = {
   isConfigured,
   health,
   analyze,
+  nesting,
   exportDxf,
   importDxf,
 };
