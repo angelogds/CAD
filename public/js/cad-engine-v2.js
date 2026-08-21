@@ -3,6 +3,7 @@ try {
   await import('./cad-round3-runtime.js');
   await import('./cad-round4-runtime.js');
   await import('./cad-ui-stabilization.js');
+  await import('./cad-style-runtime.js');
 } catch (error) {
   console.error('[CAD] Falha ao iniciar o MLightCAD:', error);
   document.documentElement.dataset.cadEngine = 'mlightcad-error';
