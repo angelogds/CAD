@@ -8,8 +8,9 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from .cad_engine import analyze_cad, export_dxf, import_dxf
+from .manufacturing_metrics import enhance_analysis, prepare_analysis_cad
 
-app = FastAPI(title="Campo do Gado CAD Python Engine", version="1.0.0")
+app = FastAPI(title="Campo do Gado CAD Python Engine", version="1.1.0")
 
 
 class AnalyzeRequest(BaseModel):
@@ -36,12 +37,14 @@ def require_internal_token(x_cad_engine_token: str | None = Header(default=None)
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "cad-python-engine", "version": "1.0.0"}
+    return {"ok": True, "service": "cad-python-engine", "version": "1.1.0"}
 
 
 @app.post("/v1/analyze", dependencies=[Depends(require_internal_token)])
 def analyze(payload: AnalyzeRequest) -> dict[str, Any]:
-    result = analyze_cad(payload.cad, payload.thickness_mm, payload.density_kg_m3)
+    analysis_cad = prepare_analysis_cad(payload.cad)
+    result = analyze_cad(analysis_cad, payload.thickness_mm, payload.density_kg_m3)
+    result = enhance_analysis(payload.cad, result, payload.thickness_mm, payload.density_kg_m3)
     return {"ok": True, "data": result}
 
 
