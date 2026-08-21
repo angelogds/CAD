@@ -55,7 +55,7 @@ test('interface expoe Layout, Vistas Auto e Analise tecnica com degradacao do Py
   assert.match(runtime, /persistCurrent/);
 });
 
-test('Python avancado ignora camadas FAB e calcula solidos de revolucao', () => {
+test('Python avançado 1.2 ignora camadas FAB e calcula sólidos de revolução', () => {
   const metrics = read('services/cad-python/app/manufacturing_metrics.py');
   const main = read('services/cad-python/app/main.py');
   assert.match(metrics, /GENERATED_LAYER_PREFIX = "FAB_"/);
@@ -66,5 +66,6 @@ test('Python avancado ignora camadas FAB e calcula solidos de revolucao', () => 
   assert.match(metrics, /estimated_mass_kg/);
   assert.match(main, /prepare_analysis_cad/);
   assert.match(main, /enhance_analysis/);
-  assert.match(main, /version="1\.1\.0"/);
+  assert.match(main, /version="1\.2\.0"/);
+  assert.match(main, /\/v1\/nesting/);
 });
