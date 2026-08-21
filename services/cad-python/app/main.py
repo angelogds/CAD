@@ -9,8 +9,9 @@ from pydantic import BaseModel, Field
 
 from .cad_engine import analyze_cad, export_dxf, import_dxf
 from .manufacturing_metrics import enhance_analysis, prepare_analysis_cad
+from .nesting import pack_rectangles
 
-app = FastAPI(title="Campo do Gado CAD Python Engine", version="1.1.0")
+app = FastAPI(title="Campo do Gado CAD Python Engine", version="1.2.0")
 
 
 class AnalyzeRequest(BaseModel):
@@ -29,6 +30,16 @@ class DxfImportRequest(BaseModel):
     content_text: str | None = None
 
 
+class NestingRequest(BaseModel):
+    sheet_width_mm: float
+    sheet_height_mm: float
+    margin_mm: float = 10.0
+    spacing_mm: float = 5.0
+    allow_rotate: bool = True
+    max_sheets: int = 20
+    parts: list[dict[str, Any]] = Field(default_factory=list)
+
+
 def require_internal_token(x_cad_engine_token: str | None = Header(default=None)) -> None:
     expected = str(os.getenv("CAD_ENGINE_TOKEN") or "").strip()
     if expected and x_cad_engine_token != expected:
@@ -37,7 +48,7 @@ def require_internal_token(x_cad_engine_token: str | None = Header(default=None)
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "service": "cad-python-engine", "version": "1.1.0"}
+    return {"ok": True, "service": "cad-python-engine", "version": "1.2.0"}
 
 
 @app.post("/v1/analyze", dependencies=[Depends(require_internal_token)])
@@ -46,6 +57,15 @@ def analyze(payload: AnalyzeRequest) -> dict[str, Any]:
     result = analyze_cad(analysis_cad, payload.thickness_mm, payload.density_kg_m3)
     result = enhance_analysis(payload.cad, result, payload.thickness_mm, payload.density_kg_m3)
     return {"ok": True, "data": result}
+
+
+@app.post("/v1/nesting", dependencies=[Depends(require_internal_token)])
+def nesting(payload: NestingRequest) -> dict[str, Any]:
+    try:
+        data = pack_rectangles(payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"ok": True, "data": data}
 
 
 @app.post("/v1/dxf/export", dependencies=[Depends(require_internal_token)])
