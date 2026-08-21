@@ -2,7 +2,7 @@ function ensureStyles() {
   if (document.querySelector('link[data-cad-mlight-style]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = '/css/cad-mlight.css?v=20260820-round2-v1';
+  link.href = '/css/cad-mlight.css?v=20260821-fabricacao-v1';
   link.dataset.cadMlightStyle = '1';
   document.head.appendChild(link);
 }
@@ -47,6 +47,17 @@ function createShell(initial) {
     </header>
     <main class="cad-mlight-main">
       <div id="mlightCadHost"><div id="mlightCadCanvas"></div></div>
+      <div class="cad-mlight-fabbar" aria-label="Ferramentas de fabricação">
+        <span class="cad-mlight-fabbar-title">FABRICAÇÃO</span>
+        <button id="mlightSheetBtn" class="cad-mlight-action" type="button" title="Gerar folha técnica A3/A4">▤ <span>Folha A3/A4</span></button>
+        <button id="mlightCenterMarksBtn" class="cad-mlight-action" type="button" title="Criar marcas de centro nos círculos">⊕ <span>Centros</span></button>
+        <button id="mlightSurfaceBtn" class="cad-mlight-action" type="button" title="Adicionar rugosidade">⌁ <span>Rugosidade</span></button>
+        <button id="mlightToleranceBtn" class="cad-mlight-action" type="button" title="Adicionar tolerância ou ajuste">± <span>Tolerância</span></button>
+        <button id="mlightThreadBtn" class="cad-mlight-action" type="button" title="Adicionar especificação de rosca">M <span>Rosca</span></button>
+        <button id="mlightKeywayBtn" class="cad-mlight-action" type="button" title="Criar rasgo de chaveta">▭ <span>Chaveta</span></button>
+        <button id="mlightSectionBtn" class="cad-mlight-action" type="button" title="Adicionar linha de corte">A-A <span>Corte</span></button>
+        <button id="mlightChamferBtn" class="cad-mlight-action" type="button" title="Adicionar chanfro ou raio">◩ <span>Chanfro/Raio</span></button>
+      </div>
       <div class="cad-mlight-floating-tools" aria-label="Ações de visualização">
         <button id="mlightZoomExtentsBtn" class="cad-mlight-action" type="button">Enquadrar tudo</button>
       </div>
@@ -59,7 +70,7 @@ function createShell(initial) {
     </main>
     <footer class="cad-mlight-statusbar">
       <form id="mlightCommandForm" autocomplete="off">
-        <input id="mlightCommandInput" placeholder="Comando: LINE, PLINE, CIRCLE, ARC, HATCH, MOVE, COPY, ROTATE, OFFSET, DIMLINEAR, AUTOCOTAR…" aria-label="Linha de comando CAD">
+        <input id="mlightCommandInput" placeholder="Comando: LINE, PLINE, CIRCLE, AUTOCOTAR, FOLHA, RUGOSIDADE, TOLERANCIA, ROSCA, CHAVETA, CORTE…" aria-label="Linha de comando CAD">
       </form>
       <div class="cad-mlight-status-actions">
         <button class="cad-mlight-action" type="button" data-cad-command="undo">Desfazer</button>
@@ -93,9 +104,10 @@ async function boot() {
   const cadData = initial.data || {};
 
   try {
-    const [coreModule, fabricationModule] = await Promise.all([
+    const [coreModule, fabricationModule, manufacturingModule] = await Promise.all([
       import('/vendor/mlightcad/mlightcad-core.js'),
-      import('/vendor/mlightcad/mlightcad-auto-dimension.js')
+      import('/vendor/mlightcad/mlightcad-auto-dimension.js'),
+      import('/vendor/mlightcad/mlightcad-manufacturing.js')
     ]);
     const { createMlightCadWorkbench, MLIGHTCAD_VERSION } = coreModule;
     const app = await createMlightCadWorkbench({
@@ -108,21 +120,29 @@ async function boot() {
     const fabrication = fabricationModule.createMlightAutoDimensionTools({
       onStatus: (message) => setStatus(message, 'ok')
     });
+    const manufacturing = manufacturingModule.createMlightManufacturingTools({
+      cadData,
+      onStatus: (message) => setStatus(message, 'ok')
+    });
 
     window.CAD_MLIGHT_APP = app;
     window.CAD_MLIGHT_FABRICATION = fabrication;
+    window.CAD_MLIGHT_MANUFACTURING = manufacturing;
     window.CAD_MLIGHT_READY = true;
     document.documentElement.dataset.cadEngine = 'mlightcad';
-    setStatus(`MLightCAD ${MLIGHTCAD_VERSION} • fabricação 2D ativa`, 'ok');
+    setStatus(`MLightCAD ${MLIGHTCAD_VERSION} • fabricação profissional ativa`, 'ok');
 
     const markDirty = () => setSaveState('Alterações não salvas', 'saving');
-    const runFabrication = async (action) => {
+    const runTool = async (action) => {
       try {
         const result = await action();
-        if (result !== false && result?.count !== 0) markDirty();
+        if (result !== false && result?.count !== 0) {
+          if (result?.manufacturing) cadData.manufacturing = result.manufacturing;
+          markDirty();
+        }
         return result;
       } catch (error) {
-        console.error('[CAD][MLightCAD] fabrication error', error);
+        console.error('[CAD][MLightCAD] manufacturing error', error);
         setStatus(`Falha na ferramenta de fabricação: ${error.message || error}`, 'error');
         return false;
       }
@@ -132,6 +152,7 @@ async function boot() {
       try {
         setSaveState('Salvando…', 'saving');
         const payload = app.serializeForSave(cadData);
+        if (cadData.manufacturing) payload.manufacturing = cadData.manufacturing;
         const snapshot = [...(Array.isArray(payload.history) ? payload.history : [])].reverse()
           .find((item) => item && typeof item === 'object' && item.kind === 'mlightcad-document');
         if (String(snapshot?.dxfBase64 || '').length > 1_500_000) {
@@ -157,10 +178,18 @@ async function boot() {
     document.getElementById('mlightSaveBtn')?.addEventListener('click', save);
     document.getElementById('mlightDxfExportBtn')?.addEventListener('click', () => app.downloadDxf(cadData.codigo || `CAD-${drawingId}`));
     document.getElementById('mlightZoomExtentsBtn')?.addEventListener('click', () => app.zoomExtents());
-    document.getElementById('mlightFlangeBtn')?.addEventListener('click', () => runFabrication(() => fabrication.createFlange()));
-    document.getElementById('mlightDiscBtn')?.addEventListener('click', () => runFabrication(() => fabrication.createDisc()));
-    document.getElementById('mlightShaftBtn')?.addEventListener('click', () => runFabrication(() => fabrication.createShaft()));
-    document.getElementById('mlightAutoDimBtn')?.addEventListener('click', () => runFabrication(() => fabrication.autoDimensionAll()));
+    document.getElementById('mlightFlangeBtn')?.addEventListener('click', () => runTool(() => fabrication.createFlange()));
+    document.getElementById('mlightDiscBtn')?.addEventListener('click', () => runTool(() => fabrication.createDisc()));
+    document.getElementById('mlightShaftBtn')?.addEventListener('click', () => runTool(() => fabrication.createShaft()));
+    document.getElementById('mlightAutoDimBtn')?.addEventListener('click', () => runTool(() => fabrication.autoDimensionAll()));
+    document.getElementById('mlightSheetBtn')?.addEventListener('click', () => runTool(() => manufacturing.createTechnicalSheet()));
+    document.getElementById('mlightCenterMarksBtn')?.addEventListener('click', () => runTool(() => manufacturing.addCenterMarks()));
+    document.getElementById('mlightSurfaceBtn')?.addEventListener('click', () => runTool(() => manufacturing.addSurfaceFinish()));
+    document.getElementById('mlightToleranceBtn')?.addEventListener('click', () => runTool(() => manufacturing.addTolerance()));
+    document.getElementById('mlightThreadBtn')?.addEventListener('click', () => runTool(() => manufacturing.addThread()));
+    document.getElementById('mlightKeywayBtn')?.addEventListener('click', () => runTool(() => manufacturing.createKeyway()));
+    document.getElementById('mlightSectionBtn')?.addEventListener('click', () => runTool(() => manufacturing.addSectionMarker()));
+    document.getElementById('mlightChamferBtn')?.addEventListener('click', () => runTool(() => manufacturing.addChamferRadius()));
     document.getElementById('mlightReloadBtn')?.addEventListener('click', () => window.location.reload());
 
     const fileInput = document.getElementById('mlightDxfInput');
@@ -189,8 +218,24 @@ async function boot() {
       const value = commandInput?.value?.trim();
       if (!value) return;
       const normalized = value.toLowerCase().replace(/[\s_-]+/g, '');
+      const manufacturingCommands = {
+        folha: () => manufacturing.createTechnicalSheet(),
+        folhatecnica: () => manufacturing.createTechnicalSheet(),
+        rugosidade: () => manufacturing.addSurfaceFinish(),
+        tolerancia: () => manufacturing.addTolerance(),
+        ajuste: () => manufacturing.addTolerance(),
+        rosca: () => manufacturing.addThread(),
+        chaveta: () => manufacturing.createKeyway(),
+        rasgo: () => manufacturing.createKeyway(),
+        corte: () => manufacturing.addSectionMarker(),
+        centros: () => manufacturing.addCenterMarks(),
+        chanfro: () => manufacturing.addChamferRadius(),
+        raio: () => manufacturing.addChamferRadius()
+      };
       if (['autocotar', 'autodim', 'cotas', 'dimauto'].includes(normalized)) {
-        runFabrication(() => fabrication.autoDimensionAll());
+        runTool(() => fabrication.autoDimensionAll());
+      } else if (manufacturingCommands[normalized]) {
+        runTool(manufacturingCommands[normalized]);
       } else {
         app.runCommand(value);
       }

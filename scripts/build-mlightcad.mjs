@@ -20,7 +20,8 @@ try {
       lib: {
         entry: {
           'mlightcad-core': path.join(root, 'frontend/mlightcad-core.entry.js'),
-          'mlightcad-auto-dimension': path.join(root, 'frontend/mlightcad-auto-dimension.entry.js')
+          'mlightcad-auto-dimension': path.join(root, 'frontend/mlightcad-auto-dimension.entry.js'),
+          'mlightcad-manufacturing': path.join(root, 'frontend/mlightcad-manufacturing.entry.js')
         },
         formats: ['es'],
         fileName: (_format, entryName) => `${entryName}.js`
@@ -33,7 +34,7 @@ try {
       }
     }
   });
-  console.log('[CAD][MLightCAD] bundles profissional e auto-cotas gerados em public/vendor/mlightcad');
+  console.log('[CAD][MLightCAD] bundles core, auto-cotas e fabricacao gerados em public/vendor/mlightcad');
 } catch (error) {
   console.error('[CAD][MLightCAD] falha ao gerar bundle:', error?.stack || error);
   process.exitCode = 1;

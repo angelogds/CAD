@@ -96,6 +96,41 @@ body.cad-mlight-mode { overflow: hidden !important; background: var(--mlight-bg)
 #mlightCadCanvas { position: absolute; inset: 0; min-width: 0; min-height: 0; background: #111820; }
 #mlightCadCanvas canvas { outline: none; }
 
+.cad-mlight-fabbar {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  z-index: 45;
+  max-width: calc(100% - 280px);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px;
+  transform: translateX(-50%);
+  border: 1px solid #3f4d59;
+  border-radius: 6px;
+  background: rgba(34, 44, 52, .94);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .28);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.cad-mlight-fabbar-title {
+  padding: 0 6px;
+  color: #86a1b5;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  white-space: nowrap;
+}
+.cad-mlight-fabbar .cad-mlight-action {
+  min-height: 30px;
+  padding: 0 8px;
+  border-color: #465661;
+  background: #293640;
+  font-size: 10px;
+}
+.cad-mlight-fabbar .cad-mlight-action:hover { border-color: #42a8d8; color: #83d6fb; }
+
 .cad-mlight-floating-tools {
   position: absolute;
   top: 52px;
@@ -155,6 +190,10 @@ body.cad-mlight-mode { overflow: hidden !important; background: var(--mlight-bg)
 .cad-mlight-page .ml-ex-ui-toolbar-btn.is-open { border-color: #3ba6dc !important; color: #70c9f2 !important; }
 .cad-mlight-page .ml-ex-ui-dock { background: #222c34 !important; border-color: #46535e !important; }
 
+@media (max-width: 1280px) {
+  .cad-mlight-fabbar { left: 12px; right: 12px; max-width: none; transform: none; }
+}
+
 @media (max-width: 1100px) {
   .cad-mlight-title span { display: none; }
   .cad-mlight-appbar { gap: 5px; }
@@ -168,11 +207,14 @@ body.cad-mlight-mode { overflow: hidden !important; background: var(--mlight-bg)
   .cad-mlight-spacer { display: none; }
   .cad-mlight-engine { order: 20; flex: 1 1 100%; text-align: center; }
   .cad-mlight-appbar .cad-mlight-action span { display: none; }
+  .cad-mlight-fabbar { top: 6px; left: 6px; right: 6px; }
+  .cad-mlight-fabbar-title { display: none; }
+  .cad-mlight-fabbar .cad-mlight-action span { display: none; }
 }
 
 @media (max-width: 600px) {
   .cad-mlight-save-state { display: none; }
   .cad-mlight-statusbar { grid-template-columns: 1fr; }
   .cad-mlight-status-actions { display: none; }
-  .cad-mlight-floating-tools { top: 8px; }
+  .cad-mlight-floating-tools { top: 48px; }
 }
