@@ -52,6 +52,10 @@ function doc() {
   return current;
 }
 
+function view() {
+  return AcApDocManager.instance?.curView;
+}
+
 function db() {
   return doc().database;
 }
@@ -84,14 +88,13 @@ function toColor(style, inheritance = BY_LAYER) {
 function ensureLineTypes(database) {
   for (const spec of LINE_TYPES) {
     if (database.tables.linetypeTable.getAt(spec.name)) continue;
-    const record = new AcDbLinetypeTableRecord({
+    database.tables.linetypeTable.add(new AcDbLinetypeTableRecord({
       name: spec.name,
       standardFlag: 0,
       description: spec.description,
       totalPatternLength: spec.totalPatternLength,
       pattern: spec.pattern.map((elementLength) => ({ elementLength, elementTypeFlag: 0 }))
-    });
-    database.tables.linetypeTable.add(record);
+    }));
   }
 }
 
@@ -173,15 +176,14 @@ function applyDimensionStyleToEntity(entity, style) {
 
 function styleAllDimensions(style) {
   const currentDoc = doc();
-  const entityService = currentDoc.entityService;
   const changed = [];
-  entityService.runEntityEdit(() => {
+  currentDoc.entityService.runEntityEdit(() => {
     for (const entity of modelSpace().newIterator()) {
       if (!applyDimensionStyleToEntity(entity, style)) continue;
       changed.push(entity);
     }
   });
-  if (changed.length) currentDoc.curView?.updateEntity?.(changed);
+  if (changed.length) view()?.updateEntity?.(changed);
   return changed.length;
 }
 
@@ -201,7 +203,7 @@ function installDimensionAppendHook(getDimensionStyle) {
 
 function applyStyleToSelection(style) {
   const currentDoc = doc();
-  const ids = Array.from(currentDoc.curView?.selectionSet?.ids || []);
+  const ids = Array.from(view()?.selectionSet?.ids || []);
   if (!ids.length) return { count: 0, message: 'Selecione um ou mais objetos antes de aplicar o estilo.' };
   const normalized = cloneStyle(style, DEFAULT_CURRENT);
   ensureLineTypes(currentDoc.database);
@@ -222,13 +224,13 @@ function applyStyleToSelection(style) {
       changed.push(entity);
     }
   });
-  if (changed.length) currentDoc.curView?.updateEntity?.(changed);
+  if (changed.length) view()?.updateEntity?.(changed);
   return { count: changed.length, message: `${changed.length} objeto(s) atualizado(s).` };
 }
 
 function resetSelectionByLayer() {
   const currentDoc = doc();
-  const ids = Array.from(currentDoc.curView?.selectionSet?.ids || []);
+  const ids = Array.from(view()?.selectionSet?.ids || []);
   if (!ids.length) return { count: 0, message: 'Selecione um ou mais objetos.' };
   const changed = [];
   currentDoc.entityService.runEntityEdit(() => {
@@ -242,7 +244,7 @@ function resetSelectionByLayer() {
       changed.push(entity);
     }
   });
-  if (changed.length) currentDoc.curView?.updateEntity?.(changed);
+  if (changed.length) view()?.updateEntity?.(changed);
   return { count: changed.length, message: `${changed.length} objeto(s) retornado(s) para BYLAYER.` };
 }
 
