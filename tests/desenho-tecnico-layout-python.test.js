@@ -28,8 +28,9 @@ test('Paper Space usa layout real e viewport em escala sem redimensionar o Model
   assert.match(layout, /blockTableRecordId/);
   assert.match(layout, /viewHeight = viewportH \* denominator/);
   assert.match(layout, /STANDARD_SCALES/);
-  assert.match(layout, /FAB-A3/);
-  assert.match(layout, /FAB-A4/);
+  assert.match(layout, /PAPER_LAYOUT_PREFIX = 'FAB-'/);
+  assert.match(layout, /switchA4/);
+  assert.match(layout, /switchA3/);
   assert.match(layout, /switchModel/);
 });
 
