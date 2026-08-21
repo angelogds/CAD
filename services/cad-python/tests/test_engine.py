@@ -3,6 +3,7 @@ import unittest
 
 from app.cad_engine import analyze_cad, export_dxf, import_dxf
 from app.manufacturing_metrics import enhance_analysis, prepare_analysis_cad
+from app.nesting import pack_rectangles
 
 
 class CadEngineTests(unittest.TestCase):
@@ -108,6 +109,45 @@ class CadEngineTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["volume_mm3"], expected_volume, places=2)
         self.assertAlmostEqual(metrics["total_length_mm"], 260, places=3)
         self.assertAlmostEqual(metrics["max_diameter_mm"], 60, places=3)
+
+    def test_nesting_rotates_piece_when_required(self):
+        result = pack_rectangles({
+            "sheet_width_mm": 300,
+            "sheet_height_mm": 200,
+            "margin_mm": 0,
+            "spacing_mm": 0,
+            "allow_rotate": True,
+            "parts": [{"name": "P1", "width_mm": 180, "height_mm": 280, "quantity": 1}],
+        })
+        self.assertEqual(result["summary"]["parts_placed"], 1)
+        self.assertEqual(result["summary"]["sheets_used"], 1)
+        self.assertTrue(result["placements"][0]["rotated"])
+        self.assertEqual(result["placements"][0]["width_mm"], 280)
+        self.assertEqual(result["placements"][0]["height_mm"], 180)
+
+    def test_nesting_uses_multiple_sheets_without_overlap(self):
+        result = pack_rectangles({
+            "sheet_width_mm": 220,
+            "sheet_height_mm": 220,
+            "margin_mm": 0,
+            "spacing_mm": 5,
+            "allow_rotate": True,
+            "parts": [{"name": "PLACA", "width_mm": 100, "height_mm": 100, "quantity": 6}],
+        })
+        self.assertEqual(result["summary"]["parts_placed"], 6)
+        self.assertEqual(result["summary"]["parts_unplaced"], 0)
+        self.assertGreaterEqual(result["summary"]["sheets_used"], 2)
+        for sheet in range(1, result["summary"]["sheets_used"] + 1):
+            placements = [item for item in result["placements"] if item["sheet"] == sheet]
+            for index, first in enumerate(placements):
+                for second in placements[index + 1:]:
+                    separated = (
+                        first["x_mm"] + first["width_mm"] <= second["x_mm"]
+                        or second["x_mm"] + second["width_mm"] <= first["x_mm"]
+                        or first["y_mm"] + first["height_mm"] <= second["y_mm"]
+                        or second["y_mm"] + second["height_mm"] <= first["y_mm"]
+                    )
+                    self.assertTrue(separated)
 
 
 if __name__ == "__main__":
