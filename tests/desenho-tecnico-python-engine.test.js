@@ -28,13 +28,19 @@ test('rotas do desenho técnico expõem análise e DXF sem alterar permissões b
   assert.match(routes, /requireRole\(MANAGE_ACCESS\)/);
 });
 
-test('editor oferece análise técnica, exportação e importação DXF', () => {
-  const ui = read('public/js/cad-python-integration.js');
+test('editor MLightCAD oferece análise técnica e fluxo DXF no runtime atual', () => {
+  const runtime = read('public/js/cad-round3-runtime.js');
+  const mlightRuntime = read('public/js/cad-mlight-runtime.js');
   const entry = read('public/js/cad-engine-v2.js');
-  assert.match(ui, /Análise técnica do desenho/);
-  assert.match(ui, /Importar DXF/);
-  assert.match(ui, /estimated_mass_kg/);
-  assert.match(entry, /import '\.\/cad-python-integration\.js'/);
+
+  assert.match(runtime, /Análise de fabricação/);
+  assert.match(runtime, /estimated_mass_kg/);
+  assert.match(runtime, /\/python\/status/);
+  assert.match(runtime, /\/analisar/);
+  assert.match(mlightRuntime, /Abrir DXF/);
+  assert.match(mlightRuntime, /Exportar DXF/);
+  assert.match(entry, /cad-round3-runtime\.js/);
+  assert.doesNotMatch(entry, /cad-python-integration\.js/);
 });
 
 test('workflow inclui suíte Python independente', () => {
