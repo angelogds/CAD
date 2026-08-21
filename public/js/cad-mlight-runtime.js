@@ -2,7 +2,7 @@ function ensureStyles() {
   if (document.querySelector('link[data-cad-mlight-style]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = '/css/cad-mlight.css?v=20260820-core-v1';
+  link.href = '/css/cad-mlight.css?v=20260820-round2-v1';
   link.dataset.cadMlightStyle = '1';
   document.head.appendChild(link);
 }
@@ -29,18 +29,19 @@ function createShell(initial) {
       <a class="cad-mlight-back" href="/desenho-tecnico/cad/${drawingId}" title="Voltar">←</a>
       <span class="cad-mlight-brand" aria-hidden="true">2D</span>
       <div class="cad-mlight-title">
-        <small>CAD MECÂNICO • MLIGHTCAD CORE</small>
+        <small>CAD MECÂNICO • MLIGHTCAD</small>
         <strong>${safeText(code)}</strong>
         <span>${safeText(title)}</span>
       </div>
       <span id="mlightCadStatus" class="cad-mlight-engine" data-state="loading">Inicializando motor…</span>
       <div class="cad-mlight-spacer"></div>
       <button id="mlightFlangeBtn" class="cad-mlight-action accent" type="button">◎ <span>Flange</span></button>
+      <button id="mlightDiscBtn" class="cad-mlight-action accent" type="button">◉ <span>Disco</span></button>
       <button id="mlightShaftBtn" class="cad-mlight-action accent" type="button">⇥ <span>Eixo</span></button>
+      <button id="mlightAutoDimBtn" class="cad-mlight-action primary" type="button" title="Gerar automaticamente as principais cotas de fabricação">↔ <span>AUTO COTAR</span></button>
       <button id="mlightDxfImportBtn" class="cad-mlight-action" type="button">⇧ <span>Abrir DXF</span></button>
       <button id="mlightDxfExportBtn" class="cad-mlight-action" type="button">⇩ <span>Exportar DXF</span></button>
       <a class="cad-mlight-action" href="/desenho-tecnico/cad/${drawingId}/pdf">PDF</a>
-      <a class="cad-mlight-action" href="?engine=legacy" title="Abrir o motor anterior para contingência">Motor anterior</a>
       <span id="mlightSaveState" class="cad-mlight-save-state" data-state="saved">Tudo salvo</span>
       <button id="mlightSaveBtn" class="cad-mlight-action primary" type="button">Salvar desenho</button>
     </header>
@@ -50,14 +51,15 @@ function createShell(initial) {
         <button id="mlightZoomExtentsBtn" class="cad-mlight-action" type="button">Enquadrar tudo</button>
       </div>
       <div id="mlightFallbackCard" class="cad-mlight-fallback" hidden>
-        <h2>Motor profissional indisponível</h2>
-        <p>O editor anterior será carregado automaticamente para você não perder acesso ao desenho.</p>
+        <h2>Editor CAD indisponível</h2>
+        <p>O MLightCAD não conseguiu iniciar. Recarregue a página; se persistir, registre o erro exibido no status técnico.</p>
+        <button id="mlightReloadBtn" class="cad-mlight-action primary" type="button">Recarregar editor</button>
       </div>
       <input id="mlightDxfInput" type="file" accept=".dxf,application/dxf" hidden>
     </main>
     <footer class="cad-mlight-statusbar">
       <form id="mlightCommandForm" autocomplete="off">
-        <input id="mlightCommandInput" placeholder="Comando: LINE, PLINE, CIRCLE, ARC, HATCH, MOVE, COPY, ROTATE, OFFSET, DIMLINEAR…" aria-label="Linha de comando CAD">
+        <input id="mlightCommandInput" placeholder="Comando: LINE, PLINE, CIRCLE, ARC, HATCH, MOVE, COPY, ROTATE, OFFSET, DIMLINEAR, AUTOCOTAR…" aria-label="Linha de comando CAD">
       </form>
       <div class="cad-mlight-status-actions">
         <button class="cad-mlight-action" type="button" data-cad-command="undo">Desfazer</button>
@@ -68,11 +70,6 @@ function createShell(initial) {
   document.body.appendChild(page);
   document.body.classList.add('cad-mlight-mode');
   return page;
-}
-
-function removeShell() {
-  document.getElementById('cadMlightPage')?.remove();
-  document.body.classList.remove('cad-mlight-mode');
 }
 
 function setStatus(message, state = 'ok') {
@@ -96,7 +93,11 @@ async function boot() {
   const cadData = initial.data || {};
 
   try {
-    const { createMlightCadWorkbench, MLIGHTCAD_VERSION } = await import('/vendor/mlightcad/mlightcad-core.js');
+    const [coreModule, fabricationModule] = await Promise.all([
+      import('/vendor/mlightcad/mlightcad-core.js'),
+      import('/vendor/mlightcad/mlightcad-auto-dimension.js')
+    ]);
+    const { createMlightCadWorkbench, MLIGHTCAD_VERSION } = coreModule;
     const app = await createMlightCadWorkbench({
       container: document.getElementById('mlightCadCanvas'),
       host: document.getElementById('mlightCadHost'),
@@ -104,10 +105,28 @@ async function boot() {
       fileName: `${cadData.codigo || `CAD-${drawingId}`}.dxf`,
       onStatus: (message) => setStatus(message, 'ok')
     });
+    const fabrication = fabricationModule.createMlightAutoDimensionTools({
+      onStatus: (message) => setStatus(message, 'ok')
+    });
+
     window.CAD_MLIGHT_APP = app;
+    window.CAD_MLIGHT_FABRICATION = fabrication;
     window.CAD_MLIGHT_READY = true;
     document.documentElement.dataset.cadEngine = 'mlightcad';
-    setStatus(`MLightCAD ${MLIGHTCAD_VERSION} • motor profissional ativo`, 'ok');
+    setStatus(`MLightCAD ${MLIGHTCAD_VERSION} • fabricação 2D ativa`, 'ok');
+
+    const markDirty = () => setSaveState('Alterações não salvas', 'saving');
+    const runFabrication = async (action) => {
+      try {
+        const result = await action();
+        if (result !== false && result?.count !== 0) markDirty();
+        return result;
+      } catch (error) {
+        console.error('[CAD][MLightCAD] fabrication error', error);
+        setStatus(`Falha na ferramenta de fabricação: ${error.message || error}`, 'error');
+        return false;
+      }
+    };
 
     const save = async () => {
       try {
@@ -116,7 +135,7 @@ async function boot() {
         const snapshot = [...(Array.isArray(payload.history) ? payload.history : [])].reverse()
           .find((item) => item && typeof item === 'object' && item.kind === 'mlightcad-document');
         if (String(snapshot?.dxfBase64 || '').length > 1_500_000) {
-          throw new Error('Desenho muito grande para o salvamento integrado desta primeira versão. Exporte o DXF e reduza o arquivo antes de salvar.');
+          throw new Error('Desenho muito grande para o salvamento integrado desta versão. Exporte o DXF e reduza o arquivo antes de salvar.');
         }
         const response = await fetch(`/desenho-tecnico/cad/${drawingId}`, {
           method: 'POST',
@@ -138,8 +157,11 @@ async function boot() {
     document.getElementById('mlightSaveBtn')?.addEventListener('click', save);
     document.getElementById('mlightDxfExportBtn')?.addEventListener('click', () => app.downloadDxf(cadData.codigo || `CAD-${drawingId}`));
     document.getElementById('mlightZoomExtentsBtn')?.addEventListener('click', () => app.zoomExtents());
-    document.getElementById('mlightFlangeBtn')?.addEventListener('click', () => app.createFlange());
-    document.getElementById('mlightShaftBtn')?.addEventListener('click', () => app.createShaft());
+    document.getElementById('mlightFlangeBtn')?.addEventListener('click', () => runFabrication(() => fabrication.createFlange()));
+    document.getElementById('mlightDiscBtn')?.addEventListener('click', () => runFabrication(() => fabrication.createDisc()));
+    document.getElementById('mlightShaftBtn')?.addEventListener('click', () => runFabrication(() => fabrication.createShaft()));
+    document.getElementById('mlightAutoDimBtn')?.addEventListener('click', () => runFabrication(() => fabrication.autoDimensionAll()));
+    document.getElementById('mlightReloadBtn')?.addEventListener('click', () => window.location.reload());
 
     const fileInput = document.getElementById('mlightDxfInput');
     document.getElementById('mlightDxfImportBtn')?.addEventListener('click', () => fileInput?.click());
@@ -152,6 +174,7 @@ async function boot() {
       setStatus(`Abrindo ${file.name}…`, 'loading');
       try {
         const ok = await app.openDxfFile(file);
+        if (ok) markDirty();
         setStatus(ok ? `${file.name} aberto. Clique em Salvar desenho para vincular.` : 'Falha ao abrir DXF.', ok ? 'ok' : 'error');
       } catch (error) {
         setStatus(`Falha ao abrir DXF: ${error.message || error}`, 'error');
@@ -165,7 +188,12 @@ async function boot() {
       event.preventDefault();
       const value = commandInput?.value?.trim();
       if (!value) return;
-      app.runCommand(value);
+      const normalized = value.toLowerCase().replace(/[\s_-]+/g, '');
+      if (['autocotar', 'autodim', 'cotas', 'dimauto'].includes(normalized)) {
+        runFabrication(() => fabrication.autoDimensionAll());
+      } else {
+        app.runCommand(value);
+      }
       commandInput.value = '';
       commandInput.focus();
     });
@@ -184,11 +212,9 @@ async function boot() {
     window.dispatchEvent(new CustomEvent('cad:mlight-ready', { detail: { version: MLIGHTCAD_VERSION } }));
   } catch (error) {
     console.error('[CAD][MLightCAD] bootstrap error', error);
+    window.CAD_MLIGHT_READY = false;
     page.querySelector('#mlightFallbackCard')?.removeAttribute('hidden');
     setStatus(`MLightCAD indisponível: ${error.message || error}`, 'error');
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    removeShell();
-    throw error;
   }
 }
 
