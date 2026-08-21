@@ -1,0 +1,29 @@
+.cad-style-group{border-top:1px solid rgba(100,116,139,.28)}
+.cad-style-panel{margin:0 10px 10px;padding:10px;border:1px solid #41505d;border-radius:7px;background:#1b252d}
+.cad-style-dimension-panel{border-color:#653d3f;background:#211f24}
+.cad-style-current-head{display:grid;grid-template-columns:24px minmax(0,1fr) 70px;gap:8px;align-items:center;margin-bottom:9px}
+.cad-style-current-head strong{display:block;color:#e8eef3;font-size:10px;letter-spacing:.06em}
+.cad-style-current-head small{display:block;margin-top:2px;color:#899ba9;font-size:9px}
+.cad-style-swatch{width:22px;height:22px;border:1px solid #71808d;border-radius:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}
+.cad-style-line-preview{height:12px;position:relative;overflow:hidden}
+.cad-style-line-preview:after{content:"";position:absolute;left:0;right:0;top:5px;height:2px;background:#d9e3ea}
+.cad-style-line-preview[data-line-type="dashed"]:after{background:repeating-linear-gradient(90deg,#d9e3ea 0 12px,transparent 12px 18px)}
+.cad-style-line-preview[data-line-type="center"]:after{background:repeating-linear-gradient(90deg,#d9e3ea 0 18px,transparent 18px 23px,#d9e3ea 23px 26px,transparent 26px 31px)}
+.cad-style-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.cad-style-grid label{display:flex;min-width:0;flex-direction:column;gap:4px;color:#91a4b2;font-size:9px;font-weight:700}
+.cad-style-grid select,.cad-style-grid input[type="number"]{width:100%;height:30px;padding:0 7px;border:1px solid #465663;border-radius:4px;outline:none;background:#131b21;color:#e7eef3;font:600 10px/1 system-ui,sans-serif}
+.cad-style-grid select:focus,.cad-style-grid input[type="number"]:focus{border-color:#319fd1;box-shadow:0 0 0 1px rgba(49,159,209,.18)}
+.cad-style-color-field input[type="color"]{width:100%;height:30px;padding:2px;border:1px solid #465663;border-radius:4px;background:#131b21;cursor:pointer}
+.cad-style-color-field input[type="color"].is-muted{opacity:.42;cursor:not-allowed}
+.cad-style-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px}
+.cad-style-btn{min-height:31px;padding:0 9px;border:1px solid #4a5b67;border-radius:5px;background:#2b3842;color:#dde7ed;font:800 9px/1 system-ui,sans-serif;cursor:pointer;text-transform:uppercase;letter-spacing:.025em}
+.cad-style-btn:hover{border-color:#45a9d7;color:#8ed9fa}
+.cad-style-btn.primary{grid-column:1/-1;background:#175f82;border-color:#288fbe;color:#fff}
+.cad-style-btn.danger{width:100%;margin-top:9px;background:#6d292d;border-color:#a34247;color:#ffd9db}
+.cad-style-btn.danger:hover{background:#823237;border-color:#e36167;color:#fff}
+.cad-style-btn.ghost{background:#202b33;color:#aebdc8}
+.cad-style-dimension-panel .cad-style-line-preview:after{background:#ff5b52}
+.cad-style-dimension-panel .cad-style-line-preview[data-line-type="dashed"]:after{background:repeating-linear-gradient(90deg,#ff5b52 0 12px,transparent 12px 18px)}
+.cad-style-dimension-panel .cad-style-line-preview[data-line-type="center"]:after{background:repeating-linear-gradient(90deg,#ff5b52 0 18px,transparent 18px 23px,#ff5b52 23px 26px,transparent 26px 31px)}
+@media(max-width:1180px){.cad-style-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.cad-style-grid,.cad-style-actions{grid-template-columns:1fr}.cad-style-btn.primary{grid-column:auto}}
