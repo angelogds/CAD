@@ -137,20 +137,22 @@ test('CHAMFER rejeita distância maior que o segmento disponível', async () => 
   assert.match(result.error, /maior que o comprimento disponível/i);
 });
 
-test('editor expõe ferramentas avançadas e seleção por janela/cruzamento', () => {
-  const engine = fs.readFileSync(path.join(process.cwd(), 'public/js/cad-engine-v2.js'), 'utf8');
-  const selectTool = fs.readFileSync(path.join(process.cwd(), 'public/js/modules/desenho-tecnico/tools/select.tool.js'), 'utf8');
-  const selection = fs.readFileSync(path.join(process.cwd(), 'public/js/modules/desenho-tecnico/interaction/selection.manager.js'), 'utf8');
+test('MLightCAD expõe comandos principais atuais e preserva os algoritmos avançados para adaptação', () => {
+  const entry = fs.readFileSync(path.join(process.cwd(), 'public/js/cad-engine-v2.js'), 'utf8');
+  const core = fs.readFileSync(path.join(process.cwd(), 'frontend/mlightcad-core.entry.js'), 'utf8');
+  const geometry = fs.readFileSync(path.join(process.cwd(), 'public/js/modules/desenho-tecnico/core/modify.geometry.mjs'), 'utf8');
 
-  assert.match(engine, /tool-rotate/);
-  assert.match(engine, /tool-fillet/);
-  assert.match(engine, /tool-chamfer/);
-  assert.match(engine, /select-all/);
-  assert.match(engine, /RO, FI, CHA/);
-  assert.match(selectTool, /leftToRight \? 'window' : 'crossing'/);
-  assert.match(selectTool, /selection\.addMany\(ids\)/);
-  assert.match(selectTool, /selection\.toggleMany\(ids\)/);
-  assert.match(selectTool, /Ctrl\+A/);
-  assert.match(selection, /addMany\(ids = \[\]\)/);
-  assert.match(selection, /toggleMany\(ids = \[\]\)/);
+  assert.match(entry, /cad-mlight-runtime\.js/);
+  assert.match(core, /preset: 'select'/);
+  assert.match(core, /preset: 'pan'/);
+  assert.match(core, /preset: 'zoom-extent'/);
+  assert.match(core, /item\('move', 'Mover', 'move'\)/);
+  assert.match(core, /item\('copy', 'Copiar', 'copy'\)/);
+  assert.match(core, /item\('rotate', 'Rotacionar', 'rotate'\)/);
+  assert.match(core, /item\('offset', 'Offset', 'offset'\)/);
+  assert.match(core, /item\('erase', 'Apagar', 'erase'\)/);
+  assert.match(core, /item\('dimlinear', 'Cota linear', 'dimlinear'\)/);
+  assert.match(geometry, /export function solveFillet/);
+  assert.match(geometry, /export function solveChamfer/);
+  assert.match(geometry, /export function rotateEntitySnapshot/);
 });
