@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 const ctrl = require('./desenho-tecnico.controller');
+const nestingCtrl = require('./nesting.controller');
 const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const { ACCESS } = require('../../config/rbac');
 
@@ -25,6 +26,7 @@ router.post('/cad', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.crea
 router.get('/cad/:id/editor', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.cadEditor));
 router.get('/cad/:id/python/status', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.pythonStatus));
 router.post('/cad/:id/analisar', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.analyzeCadPython));
+router.post('/cad/:id/nesting', requireLogin, requireRole(MANAGE_ACCESS), withMenu(nestingCtrl.nestingCadPython));
 router.get('/cad/:id/dxf', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.exportCadDxf));
 router.post('/cad/:id/dxf/importar', requireLogin, requireRole(MANAGE_ACCESS), dxfUpload.single('dxf'), withMenu(ctrl.importCadDxf));
 router.get('/cad/:id', requireLogin, requireRole(VIEW_ACCESS), withMenu(ctrl.showCad));
