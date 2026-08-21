@@ -29,10 +29,11 @@ test('rotas e controller expõem exclusão individual e aprovação de hora extr
 });
 
 test('frontend mostra aprovação para pendentes e apagar somente quando permitido', () => {
-  assert.match(view, /String\(h\.status \|\| ''\) === 'PENDENTE_APROVACAO'/);
+  assert.match(view, /const st=String\(h\.status\|\|''\)/);
+  assert.match(view, /if\(st==='PENDENTE_APROVACAO'\)/);
   assert.match(view, /Aprovar/);
   assert.match(view, /creditar no banco de horas do colaborador/);
-  assert.match(view, /if \(canDeleteHorasExtras\)/);
+  assert.match(view, /if\(canDeleteHorasExtras\)/);
   assert.match(view, /Apagar/);
-  assert.match(view, /Tem certeza que deseja apagar este lançamento de hora extra/);
+  assert.match(view, /Apagar este lançamento\? A exclusão continua restrita ao ADMIN\./);
 });
