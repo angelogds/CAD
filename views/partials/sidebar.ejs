@@ -83,17 +83,14 @@
       <% if (activeMenu === 'pcm') { %>
         <div class="nav-submenu">
           <a class="nav-item nav-subitem <%= currentPcmSection === 'visao-geral' ? 'active' : '' %>" href="/pcm"><span class="nav-label">Visão Geral</span></a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'dashboard-gerencial' ? 'active' : '' %>" href="/pcm/dashboard-gerencial"><span class="nav-label">📊 Painel Gerencial</span></a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'planejamento' ? 'active' : '' %>" href="/pcm/planejamento"><span class="nav-label">Planejamento</span></a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'falhas' ? 'active' : '' %>" href="/pcm/falhas"><span class="nav-label">Falhas</span></a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'engenharia' ? 'active' : '' %>" href="/pcm/engenharia"><span class="nav-label">Engenharia</span></a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'criticidade' ? 'active' : '' %>" href="/pcm/criticidade"><span class="nav-label">Criticidade</span></a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'lubrificacao' ? 'active' : '' %>" href="/pcm/lubrificacao"><span class="nav-label">Lubrificação</span></a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'pecas-criticas' ? 'active' : '' %>" href="/pcm/pecas-criticas"><span class="nav-label">Peças Críticas</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'dashboard-gerencial' ? 'active' : '' %>" href="/pcm/dashboard-gerencial"><span class="nav-label">Painel da Diretoria</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'planejamento' ? 'active' : '' %>" href="/pcm/planejamento"><span class="nav-label">Plano Mestre</span></a>
           <a class="nav-item nav-subitem <%= currentPcmSection === 'programacao-semanal' ? 'active' : '' %>" href="/pcm/programacao-semanal"><span class="nav-label">Programação Semanal</span></a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'backlog' ? 'active' : '' %>" href="/pcm/backlog"><span class="nav-label">Backlog</span></a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'rotas-inspecao' ? 'active' : '' %>" href="/pcm/rotas-inspecao"><span class="nav-label">Rotas de Inspeção</span></a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'relatorios-avancados' ? 'active' : '' %>" href="/pcm/relatorios-avancados"><span class="nav-label">Relatórios Avançados</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'lubrificacao' ? 'active' : '' %>" href="/pcm/lubrificacao"><span class="nav-label">Plano de Lubrificação</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'engenharia' ? 'active' : '' %>" href="/pcm/engenharia"><span class="nav-label">Engenharia e Criticidade</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'falhas' ? 'active' : '' %>" href="/pcm/falhas"><span class="nav-label">Falhas e Confiabilidade</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'pecas-criticas' ? 'active' : '' %>" href="/pcm/pecas-criticas"><span class="nav-label">Peças Críticas</span></a>
+          <a class="nav-item nav-subitem <%= currentPcmSection === 'relatorios-avancados' ? 'active' : '' %>" href="/pcm/relatorios-avancados"><span class="nav-label">Relatórios e Indicadores</span></a>
         </div>
       <% } %>
     <% } %>

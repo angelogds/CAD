@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('dotenv').config({ path: '.env.local' });
 require('dotenv').config();
 
 const { getAIConfig } = require('../modules/ai/ai.service');

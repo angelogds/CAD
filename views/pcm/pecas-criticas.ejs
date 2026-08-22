@@ -1,24 +1,10 @@
 <% layout('layout') %>
 <%- include('partials/internal-styles') %>
-<div class="page-head"><div><h1>PCM • Peças Críticas em Estoque</h1><p class="muted">Visão das peças técnicas críticas vinculadas ao almoxarifado.</p></div></div>
-<div class="pcm-shell">
-  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
-  <div class="pcm-content">
-    <div class="card">
-      <form class="pcm-toolbar" method="GET" action="/pcm/pecas-criticas">
-        <input class="input" name="tipo" value="<%= filtros.tipo || '' %>" placeholder="Tipo de componente">
-        <label style="display:flex; align-items:center; gap:6px;"><input type="checkbox" name="abaixo_minimo" value="1" <%= filtros.abaixo_minimo ? 'checked' : '' %>>Abaixo do mínimo</label>
-        <input class="input" name="busca" value="<%= filtros.busca || '' %>" placeholder="Buscar código/modelo">
-        <button class="btn" type="submit">Filtrar</button>
-      </form>
-      <div class="pcm-actions" style="margin-bottom:8px;"><button class="btn btn-outline" type="button">Exportar para PDF (em breve)</button></div>
-      <div class="table-wrap"><table class="table compact" style="margin-top:10px;">
-        <thead><tr><th>Código interno</th><th>Descrição/Modelo</th><th>Tipo</th><th>Crítica</th><th>Estoque atual</th><th>Estoque mínimo</th><th>Qtd. equipamentos</th><th>Ação</th></tr></thead>
-        <tbody>
-          <% if (!pecas.length) { %><tr><td colspan="8" class="muted">Sem dados (TODO integração com BOM/estoque).</td></tr><% } %>
-          <% pecas.forEach(function(p){ %><tr><td><%= p.codigo_interno || '-' %></td><td><%= p.descricao_tecnica || p.modelo_comercial || '-' %></td><td><%= p.categoria || '-' %></td><td><%= p.peca_critica ? 'Sim' : 'Não' %></td><td><%= p.estoque_atual ?? '-' %></td><td><%= p.estoque_minimo ?? '-' %></td><td><%= p.qtd_equipamentos || 1 %></td><td><button class="btn btn-outline" type="button">Ver aplicações</button></td></tr><% }) %>
-        </tbody>
-      </table></div>
-    </div>
-  </div>
+<div class="pcm-module-page">
+  <header class="pcm-module-head"><div><span class="pcm-section-label">Disponibilidade de materiais</span><h1>Peças críticas em estoque</h1><p>Posição real das peças estratégicas vinculadas à lista técnica dos equipamentos.</p></div><div class="pcm-module-actions"><a class="pcm-button" href="/pcm/pecas-criticas/pdf?<%= new URLSearchParams(filtros).toString() %>">Baixar PDF</a><a class="pcm-button" href="/estoque">Abrir estoque</a></div></header>
+  <div class="pcm-shell"><%- include('partials/internal-nav', { activePcmSection }) %><main class="pcm-module-content">
+    <section class="pcm-stat-grid"><div class="pcm-stat"><span>Peças críticas</span><strong><%= resumo.total %></strong><small>no filtro</small></div><div class="pcm-stat danger"><span>Abaixo do mínimo</span><strong><%= resumo.abaixo_minimo %></strong><small>risco de indisponibilidade</small></div><div class="pcm-stat warn"><span>Estoque zerado</span><strong><%= resumo.zeradas %></strong><small>prioridade de suprimento</small></div><div class="pcm-stat info"><span>Sem vínculo</span><strong><%= resumo.sem_vinculo %></strong><small>corrigir cadastro técnico</small></div></section>
+    <section class="pcm-card"><form class="pcm-filter" method="GET" action="/pcm/pecas-criticas"><label class="pcm-field">Categoria<input class="pcm-input" name="tipo" value="<%= filtros.tipo %>" placeholder="Rolamento, correia..."></label><label class="pcm-field">Código ou modelo<input class="pcm-input" name="busca" value="<%= filtros.busca %>"></label><label class="pcm-field"><span>Situação</span><span><input type="checkbox" name="abaixo_minimo" value="1" <%= filtros.abaixo_minimo?'checked':'' %>> Somente abaixo do mínimo</span></label><span></span><button class="pcm-button primary">Aplicar filtros</button></form></section>
+    <section class="pcm-card"><div class="pcm-card-head"><div><span class="pcm-section-label">Cobertura do estoque</span><h2>Itens estratégicos</h2></div></div><div class="pcm-table-wrap"><table class="pcm-table"><thead><tr><th>Código</th><th>Descrição/modelo</th><th>Categoria</th><th>Atual</th><th>Mínimo</th><th>Cobertura</th><th>Ação</th></tr></thead><tbody><% if (!pecas.length) { %><tr><td colspan="7" class="pcm-empty-row">Nenhuma peça crítica encontrada.</td></tr><% } %><% pecas.forEach(function(p){ const atual=Number(p.estoque_atual||0), minimo=Number(p.estoque_minimo||0), baixa=atual<minimo; %><tr><td><%= p.codigo_interno || '-' %></td><td><strong><%= p.descricao_tecnica || p.modelo_comercial || '-' %></strong><small><%= p.qtd_equipamentos || 1 %> aplicação(ões)</small></td><td><%= p.categoria || '-' %></td><td><strong><%= atual %></strong></td><td><%= minimo %></td><td><span class="pcm-badge <%= baixa?'danger':'' %>"><%= baixa?'Repor':'Coberto' %></span></td><td><div class="pcm-inline-actions"><a class="pcm-button small" href="/estoque">Estoque</a><a class="pcm-button small" href="/pcm/engenharia?busca=<%= encodeURIComponent(p.codigo_interno || p.modelo_comercial || '') %>">Aplicações</a></div></td></tr><% }) %></tbody></table></div></section>
+  </main></div>
 </div>

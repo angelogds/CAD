@@ -1,41 +1,11 @@
 <% layout('layout') %>
 <%- include('partials/internal-styles') %>
-<div class="page-head"><div><h1>PCM • Falhas</h1><p class="muted">Ponto de integração com o banco de falhas já existente.</p></div></div>
-<div class="pcm-shell">
-  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
-  <div class="pcm-content">
-    <div class="card">
-      <div class="pcm-actions" style="margin-bottom:8px;">
-        <form method="POST" action="/pcm/falhas/registrar" class="grid-4" style="width:100%; gap:8px; align-items:end;">
-          <select class="input" name="equipamento_id" required>
-            <option value="">Equipamento...</option>
-            <% (equipamentos || []).forEach(function(eq){ %>
-              <option value="<%= eq.id %>"><%= eq.nome %></option>
-            <% }) %>
-          </select>
-          <input class="input" name="descricao" placeholder="Descrição da falha" required>
-          <input class="input" type="number" min="1" max="5" name="impacto_producao" placeholder="Impacto produção (1-5)">
-          <input class="input" type="number" min="1" max="5" name="impacto_seguranca" placeholder="Impacto segurança (1-5)">
-          <input class="input" type="number" min="1" max="5" name="impacto_ambiental" placeholder="Impacto ambiental (1-5)">
-          <input class="input" type="number" min="1" max="5" name="custo_parada" placeholder="Custo parada (1-5)">
-          <input class="input" name="observacao" placeholder="Observações">
-          <button class="btn" type="submit">Registrar falha / Nova OS</button>
-        </form>
-      </div>
-      <form class="pcm-toolbar" method="GET" action="/pcm/falhas">
-        <input class="input" type="month" name="periodo" value="<%= filtros?.periodo || '' %>" placeholder="Período">
-        <input class="input" name="equipamento" value="<%= filtros?.equipamento || '' %>" placeholder="Equipamento">
-        <input class="input" name="tipo_falha" value="<%= filtros?.tipo_falha || '' %>" placeholder="Tipo de falha">
-        <button class="btn" type="submit">Filtrar</button>
-      </form>
-      <div class="table-wrap"><table class="table compact">
-        <thead><tr><th>OS</th><th>Equipamento</th><th>Tipo de falha</th><th>Data</th><th>Status</th><th>Ação</th></tr></thead>
-        <tbody>
-          <% if (!falhas.length) { %><tr><td colspan="6" class="muted">Sem dados carregados nesta tela base.</td></tr><% } %>
-          <% falhas.forEach(function(f){ %><tr><td>#<%= f.id %></td><td><%= f.equipamento || '-' %></td><td><%= f.tipo || '-' %></td><td><%= f.opened_at || '-' %></td><td><%= f.status || '-' %></td><td><a class="btn btn-outline" href="/os/<%= f.id %>">Ver OS</a></td></tr><% }) %>
-        </tbody>
-      </table></div>
-      <p class="muted" style="margin-top:8px;">TODO: integrar com endpoint consolidado de falhas e classificação por causa.</p>
-    </div>
-  </div>
+<div class="pcm-module-page">
+  <header class="pcm-module-head"><div><span class="pcm-section-label">Confiabilidade</span><h1>Falhas e causas</h1><p>Histórico das corretivas com modo de falha, causa provável, ação e impacto técnico.</p></div><div class="pcm-module-actions"><% if (!canManagePcm) { %><span class="pcm-readonly">Modo consulta</span><% } %><a class="pcm-button" href="/pcm/relatorios-avancados">Indicadores</a></div></header>
+  <div class="pcm-shell"><%- include('partials/internal-nav', { activePcmSection }) %><main class="pcm-module-content">
+    <section class="pcm-stat-grid"><div class="pcm-stat"><span>Corretivas</span><strong><%= resumo.total %></strong><small>no período</small></div><div class="pcm-stat danger"><span>Alta prioridade</span><strong><%= resumo.criticas %></strong><small>atenção imediata</small></div><div class="pcm-stat warn"><span>Sem classificação</span><strong><%= resumo.sem_classificacao %></strong><small>completar análise</small></div><div class="pcm-stat info"><span>Equipamentos</span><strong><%= resumo.equipamentos %></strong><small>com ocorrência</small></div></section>
+    <section class="pcm-card"><form class="pcm-filter" method="GET" action="/pcm/falhas"><label class="pcm-field">Período<input class="pcm-input" type="month" name="periodo" value="<%= filtros.periodo %>"></label><label class="pcm-field">Equipamento<select class="pcm-input" name="equipamento"><option value="">Todos</option><% equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>" <%= String(filtros.equipamento)===String(eq.id)?'selected':'' %>><%= eq.nome %></option><% }) %></select></label><label class="pcm-field">Falha, modo ou causa<input class="pcm-input" name="tipo_falha" value="<%= filtros.tipo_falha %>"></label><span></span><button class="pcm-button primary" type="submit">Aplicar filtros</button></form></section>
+    <% if (canManagePcm) { %><details class="pcm-card"><summary>+ Registrar falha e abrir OS corretiva</summary><form method="POST" action="/pcm/falhas/registrar" class="pcm-form-grid"><label class="pcm-field">Equipamento<select class="pcm-input" name="equipamento_id" required><option value="">Selecione</option><% equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>"><%= eq.nome %></option><% }) %></select></label><label class="pcm-field">Categoria<select class="pcm-input" name="categoria"><% ['MECANICA','ELETRICA','HIDRAULICA','OPERACIONAL','PROCESSO','OUTRA'].forEach(function(v){ %><option><%= v %></option><% }) %></select></label><label class="pcm-field pcm-span-2">Descrição<input class="pcm-input" name="descricao" required></label><label class="pcm-field pcm-span-2">Modo de falha<input class="pcm-input" name="modo_falha"></label><label class="pcm-field pcm-span-2">Causa provável<input class="pcm-input" name="causa_provavel"></label><label class="pcm-field pcm-span-2">Ação corretiva<input class="pcm-input" name="acao_corretiva"></label><% [['impacto_producao','Impacto na produção'],['impacto_seguranca','Impacto na segurança'],['impacto_ambiental','Impacto ambiental'],['custo_parada','Custo da parada']].forEach(function(i){ %><label class="pcm-field"><%= i[1] %><input class="pcm-input" type="number" min="1" max="5" value="3" name="<%= i[0] %>"></label><% }) %><div class="pcm-span-4 pcm-inline-actions"><button class="pcm-button primary" type="submit">Registrar e abrir OS</button></div></form></details><% } %>
+    <section class="pcm-card"><div class="pcm-card-head"><div><span class="pcm-section-label">Banco de falhas</span><h2>Ocorrências corretivas</h2></div></div><div class="pcm-table-wrap"><table class="pcm-table"><thead><tr><th>OS</th><th>Equipamento</th><th>Classificação</th><th>Abertura</th><th>Prioridade</th><th>Ação</th></tr></thead><tbody><% if (!falhas.length) { %><tr><td colspan="6" class="pcm-empty-row">Nenhuma falha encontrada.</td></tr><% } %><% falhas.forEach(function(f){ %><tr><td><a href="/os/<%= f.id %>">#<%= f.id %></a><small><%= f.status || '-' %></small></td><td><strong><%= f.equipamento %></strong><small><%= f.setor %></small></td><td><%= f.categoria || 'Não classificada' %><small><%= f.modo_falha || f.causa_provavel || 'Sem modo ou causa registrados' %></small></td><td><%= f.opened_at ? String(f.opened_at).slice(0,16) : '-' %></td><td><span class="pcm-badge <%= ['ALTA','CRITICA','CRÍTICA'].includes(String(f.prioridade||'').toUpperCase())?'danger':'' %>"><%= f.prioridade || 'MEDIA' %></span></td><td><div class="pcm-inline-actions"><a class="pcm-button small" href="/os/<%= f.id %>">Abrir OS</a><% if (canManagePcm) { %><details><summary class="pcm-button small"><%= f.classificada ? 'Revisar' : 'Classificar' %></summary><form method="POST" action="/pcm/falhas/<%= f.id %>/classificar" class="pcm-form" style="min-width:290px;margin-top:8px"><select class="pcm-input" name="categoria"><% ['MECANICA','ELETRICA','HIDRAULICA','OPERACIONAL','PROCESSO','OUTRA'].forEach(function(v){ %><option <%= f.categoria===v?'selected':'' %>><%= v %></option><% }) %></select><input class="pcm-input" name="modo_falha" value="<%= f.modo_falha || '' %>" placeholder="Modo de falha"><input class="pcm-input" name="causa_provavel" value="<%= f.causa_provavel || '' %>" placeholder="Causa provável"><input class="pcm-input" type="hidden" name="impacto_producao" value="3"><input class="pcm-input" type="hidden" name="impacto_seguranca" value="3"><input class="pcm-input" type="hidden" name="impacto_ambiental" value="3"><input class="pcm-input" type="hidden" name="custo_parada" value="3"><button class="pcm-button primary small">Salvar classificação</button></form></details><% } %></div></td></tr><% }) %></tbody></table></div></section>
+  </main></div>
 </div>

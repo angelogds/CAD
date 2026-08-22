@@ -1,73 +1,13 @@
 <% layout('layout') %>
 <%- include('partials/internal-styles') %>
-<div class="page-head"><div><h1>PCM • Plano de Lubrificação</h1><p class="muted">Pontos de lubrificação e integração com plano mestre.</p></div></div>
-<div class="pcm-shell">
-  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
-  <div class="pcm-content">
-    <div class="card">
-      <form method="GET" action="/pcm/lubrificacao" class="pcm-toolbar">
-        <select class="input" id="equipamento-filtro" name="equipamento_id"><option value="">Equipamento</option><% equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>" data-setor="<%= eq.setor || '' %>" <%= String(filtros.equipamento_id||'')===String(eq.id)?'selected':'' %>><%= eq.nome %></option><% }) %></select>
-        <input class="input" id="setor-filtro" name="setor" placeholder="Setor" value="<%= filtros.setor || '' %>" readonly>
-        <button class="btn" type="submit">Filtrar</button>
-      </form>
-      <div class="pcm-actions" style="margin-bottom:8px;">
-        <form method="POST" action="/pcm/lubrificacao/pontos" class="grid-4" style="width:100%; gap:8px; align-items:end;">
-          <input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id || '' %>">
-          <input class="input" name="ponto_lubrificacao" placeholder="Ponto de lubrificação" required>
-          <input class="input" name="tipo_lubrificante_texto" placeholder="Lubrificante (ex: Graxa EP2)" value="Graxa EP2">
-          <input class="input" type="number" step="0.1" min="0" name="quantidade" placeholder="Quantidade">
-          <input class="input" name="unidade" placeholder="Unidade (g, L, ml)">
-          <input class="input" type="number" min="1" name="frequencia_dias" placeholder="Frequência (dias)">
-          <input class="input" name="observacao" placeholder="Observações">
-          <button class="btn" type="submit">+ Adicionar ponto de lubrificação</button>
-        </form>
-        <form method="POST" action="/pcm/lubrificacao/sugerir-ia" style="display:inline;">
-          <input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id || '' %>">
-          <button class="btn btn-outline" type="submit">Gerar sugestão IA</button>
-        </form>
-      </div>
-
-      <div class="card" style="margin:8px 0 0;">
-        <div class="label">Resumo de lubrificação principal</div>
-        <% if (sugestaoIA && sugestaoIA.plano && sugestaoIA.plano.length) { %>
-          <div class="muted" style="margin-top:8px;">Sugestão IA para <strong><%= sugestaoIA.equipamento_nome %></strong> (setor <strong><%= sugestaoIA.setor || '-' %></strong>, criticidade <%= sugestaoIA.criticidade %>):</div>
-          <ul style="margin:8px 0 0 18px;">
-            <% sugestaoIA.plano.forEach(function(p){ %>
-              <li><strong><%= p.ponto_lubrificacao %></strong> — <%= p.tipo_lubrificante_texto %> • a cada <%= p.frequencia_dias %> dias • <%= p.quantidade %> <%= p.unidade %></li>
-            <% }) %>
-          </ul>
-          <form method="POST" action="/pcm/lubrificacao/aplicar-sugestao-ia" style="margin-top:10px;">
-            <input type="hidden" name="equipamento_id" value="<%= sugestaoIA.equipamento_id || filtros.equipamento_id || '' %>">
-            <button class="btn" type="submit">Aplicar sugestão IA e gerar pontos automaticamente</button>
-          </form>
-        <% } else { %>
-          <div class="muted" style="margin-top:8px;">Use “Gerar sugestão IA” para criar um plano inicial baseado na criticidade do equipamento.</div>
-        <% } %>
-      </div>
-
-      <div class="table-wrap"><table class="table compact" style="margin-top:10px;">
-        <thead><tr><th>Ponto</th><th>Lubrificante</th><th>Frequência</th><th>Quantidade</th><th>Próxima data</th><th>Situação</th></tr></thead>
-        <tbody>
-          <% if (!lubrificacoes.length) { %><tr><td colspan="6" class="muted">Sem pontos cadastrados para os filtros informados.</td></tr><% } %>
-          <% lubrificacoes.forEach(function(p){ %><tr><td><%= p.ponto_lubrificacao %></td><td><%= p.tipo_lubrificante_texto || '-' %></td><td><%= p.frequencia_label || '-' %></td><td><%= p.quantidade || '-' %> <%= p.unidade || '' %></td><td><%= p.proxima_execucao_em || '-' %></td><td><span class="status-dot <%= p.situacao === 'ATRASADO' ? 'danger' : (p.situacao === 'EM_BREVE' ? 'warn' : '') %>"><%= p.situacao || '-' %></span></td></tr><% }) %>
-        </tbody>
-      </table></div>
-
-      <label style="display:block; margin-top:8px;"><input type="checkbox"> Gerar OS preventiva automaticamente conforme frequência</label>
-      <label style="display:block; margin-top:4px;"><input type="checkbox"> Vincular ao plano mestre de manutenção</label>
-    </div>
-  </div>
+<div class="pcm-module-page">
+  <header class="pcm-module-head"><div><span class="pcm-section-label">Plano essencial</span><h1>Plano de lubrificação</h1><p>Pontos, produto, quantidade e frequência com revisão técnica obrigatória para rascunhos assistidos.</p></div><div class="pcm-module-actions"><% if (!canManagePcm) { %><span class="pcm-readonly">Modo consulta</span><% } %><a class="pcm-button" href="/pcm/planejamento">Plano mestre</a></div></header>
+  <div class="pcm-shell"><%- include('partials/internal-nav', { activePcmSection }) %><main class="pcm-module-content">
+    <section class="pcm-stat-grid"><div class="pcm-stat"><span>Pontos ativos</span><strong><%= resumo.pontos %></strong><small>no filtro</small></div><div class="pcm-stat danger"><span>Atrasados</span><strong><%= resumo.atrasados %></strong><small>executar/reprogramar</small></div><div class="pcm-stat warn"><span>Próximos 7 dias</span><strong><%= resumo.em_breve %></strong><small>preparar material</small></div><div class="pcm-stat info"><span>Cobertura</span><strong><%= resumo.cobertura %>%</strong><small>equipamentos com plano</small></div></section>
+    <section class="pcm-card"><form method="GET" action="/pcm/lubrificacao" class="pcm-filter"><label class="pcm-field">Equipamento<select class="pcm-input" id="equipamento-filtro" name="equipamento_id"><option value="">Todos</option><% equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>" data-setor="<%= eq.setor || '' %>" <%= String(filtros.equipamento_id)===String(eq.id)?'selected':'' %>><%= eq.nome %></option><% }) %></select></label><label class="pcm-field">Setor<input class="pcm-input" id="setor-filtro" name="setor" value="<%= filtros.setor %>" readonly></label><span></span><span></span><button class="pcm-button primary">Aplicar filtros</button></form></section>
+    <% if (canManagePcm && filtros.equipamento_id) { %><section class="pcm-split"><details class="pcm-card"><summary>+ Cadastrar ponto manualmente</summary><form method="POST" action="/pcm/lubrificacao/pontos" class="pcm-form"><input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id %>"><input class="pcm-input" name="ponto_lubrificacao" placeholder="Ponto de lubrificação" required><input class="pcm-input" name="tipo_lubrificante_texto" placeholder="Lubrificante especificado tecnicamente" required><div class="pcm-split"><input class="pcm-input" type="number" step="0.1" min="0" name="quantidade" placeholder="Quantidade"><input class="pcm-input" name="unidade" placeholder="g, ml, L"></div><input class="pcm-input" type="number" min="1" name="frequencia_dias" placeholder="Frequência em dias" required><input class="pcm-input" name="observacao" placeholder="Observações"><button class="pcm-button primary">Salvar ponto</button></form></details><article class="pcm-card"><span class="pcm-section-label">Assistente técnico</span><h2>Rascunho de plano</h2><p>A IA usa somente os dados cadastrados e não substitui manual do fabricante, inspeção ou validação da manutenção.</p><form method="POST" action="/pcm/lubrificacao/sugerir-ia"><input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id %>"><button class="pcm-button" type="submit">Gerar rascunho assistido</button></form></article></section><% } %>
+    <% if (sugestaoIA && sugestaoIA.plano?.length) { %><section class="pcm-card"><div class="pcm-card-head"><div><span class="pcm-section-label">Rascunho <%= sugestaoIA.origem === 'OPENAI' ? 'OpenAI' : 'local' %></span><h2><%= sugestaoIA.equipamento_nome %></h2><p><%= sugestaoIA.alerta || 'Revise todos os valores antes de cadastrar.' %></p></div></div><ul class="pcm-list"><% sugestaoIA.plano.forEach(function(p){ %><li><strong><%= p.ponto_lubrificacao %></strong> — <%= p.tipo_lubrificante_texto %>; <%= p.quantidade %> <%= p.unidade %>; a cada <%= p.frequencia_dias %> dias.</li><% }) %></ul><% if (canManagePcm) { %><form method="POST" action="/pcm/lubrificacao/aplicar-sugestao-ia" class="pcm-form" style="margin-top:14px"><input type="hidden" name="equipamento_id" value="<%= sugestaoIA.equipamento_id || filtros.equipamento_id %>"><label class="pcm-note warn"><input type="checkbox" name="confirmacao_tecnica" value="1" required> Confirmo que conferi o manual, os pontos, o produto, a quantidade e a frequência.</label><div class="pcm-inline-actions"><button class="pcm-button primary">Cadastrar pontos revisados</button></div></form><% } %></section><% } %>
+    <section class="pcm-card"><div class="pcm-card-head"><div><span class="pcm-section-label">Execução</span><h2>Pontos cadastrados</h2></div></div><div class="pcm-table-wrap"><table class="pcm-table"><thead><tr><th>Equipamento</th><th>Ponto</th><th>Lubrificante</th><th>Frequência</th><th>Quantidade</th><th>Próxima</th><th>Situação</th></tr></thead><tbody><% if (!lubrificacoes.length) { %><tr><td colspan="7" class="pcm-empty-row">Nenhum ponto encontrado.</td></tr><% } %><% lubrificacoes.forEach(function(p){ const tone=p.situacao==='ATRASADO'?'danger':(p.situacao==='EM_BREVE'?'warn':''); %><tr><td><%= p.equipamento_nome %><small><%= p.setor || '-' %></small></td><td><strong><%= p.ponto_lubrificacao %></strong></td><td><%= p.tipo_lubrificante_texto || '-' %></td><td><%= p.frequencia_label %></td><td><%= p.quantidade ?? '-' %> <%= p.unidade || '' %></td><td><%= p.proxima_execucao_em || '-' %></td><td><span class="pcm-badge <%= tone %>"><%= String(p.situacao).replaceAll('_',' ') %></span></td></tr><% }) %></tbody></table></div></section>
+  </main></div>
 </div>
-<script>
-  (function() {
-    var equipamento = document.getElementById('equipamento-filtro');
-    var setor = document.getElementById('setor-filtro');
-    if (!equipamento || !setor) return;
-    function syncSetor() {
-      var selected = equipamento.options[equipamento.selectedIndex];
-      setor.value = (selected && selected.dataset && selected.dataset.setor) ? selected.dataset.setor : '';
-    }
-    equipamento.addEventListener('change', syncSetor);
-    syncSetor();
-  })();
-</script>
+<script>(function(){const e=document.getElementById('equipamento-filtro'),s=document.getElementById('setor-filtro');if(!e||!s)return;function sync(){const o=e.options[e.selectedIndex];s.value=o?.dataset?.setor||''}e.addEventListener('change',sync);if(!s.value)sync()})();</script>
