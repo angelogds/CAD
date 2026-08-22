@@ -1,17 +1,28 @@
 import {
   AcApDocManager,
   AcApSettingManager,
+  AcEdPromptPointOptions,
+  AcEdPromptStatus,
   POLARMODE_POLAR_TRACKING,
   togglePolarTracking as togglePolarTrackingSysVar
 } from '@mlightcad/cad-simple-viewer';
 import {
+  AcDbAngleUnits,
+  AcDbLinearUnits,
   AcDbOsnapMode,
   AcDbSystemVariables,
   AcDbSysVarManager,
+  AcDbUnitsValue,
   acdbHasOsnapMode,
   acdbOsnapModesToMask,
   acdbToggleOsnapMode
 } from '@mlightcad/data-model';
+import {
+  buildAbsolutePointToken,
+  buildRelativePolarToken,
+  computeMeasurement,
+  formatCursorCoordinates
+} from './mlightcad-precision.logic.mjs';
 
 export const PRECISION_OSNAP_MODES = Object.freeze([
   { key: 'endpoint', label: 'Extremidade', mode: AcDbOsnapMode.EndPoint },
@@ -29,6 +40,18 @@ function getDatabase() {
   const database = AcApDocManager.instance?.curDocument?.database;
   if (!database) throw new Error('Documento MLightCAD não está disponível.');
   return database;
+}
+
+function getView() {
+  const view = AcApDocManager.instance?.curView;
+  if (!view) throw new Error('Viewport MLightCAD não está disponível.');
+  return view;
+}
+
+function getEditor() {
+  const editor = AcApDocManager.instance?.editor;
+  if (!editor) throw new Error('Editor MLightCAD não está disponível.');
+  return editor;
 }
 
 function getSysVar(name, fallback = 0) {
@@ -50,14 +73,47 @@ function normalizePolarAngle(value) {
   return angle;
 }
 
+function clampPrecision(value, fallback = 3) {
+  const n = Math.trunc(Number(value));
+  return Number.isFinite(n) ? Math.max(0, Math.min(8, n)) : fallback;
+}
+
 function isPolarEnabled() {
   return (Number(getSysVar(AcDbSystemVariables.POLARMODE, 0)) & POLARMODE_POLAR_TRACKING) !== 0;
+}
+
+function getUnitsState() {
+  const db = getDatabase();
+  const lengthPrecision = clampPrecision(db.luprec ?? getSysVar(AcDbSystemVariables.LUPREC, 3), 3);
+  const anglePrecision = clampPrecision(db.auprec ?? getSysVar(AcDbSystemVariables.AUPREC, 2), 2);
+  const insertionUnits = Number(db.insunits ?? getSysVar(AcDbSystemVariables.INSUNITS, AcDbUnitsValue.Millimeters));
+  return {
+    lengthType: Number(db.lunits ?? getSysVar(AcDbSystemVariables.LUNITS, AcDbLinearUnits.Decimal)),
+    lengthPrecision,
+    angleType: Number(db.aunits ?? getSysVar(AcDbSystemVariables.AUNITS, AcDbAngleUnits.DecimalDegrees)),
+    anglePrecision,
+    insertionUnits,
+    isMillimeters: insertionUnits === AcDbUnitsValue.Millimeters,
+    label: insertionUnits === AcDbUnitsValue.Millimeters ? 'mm' : 'u'
+  };
+}
+
+async function acquirePoint(message, basePoint = null) {
+  const prompt = new AcEdPromptPointOptions(message);
+  if (basePoint) {
+    prompt.useBasePoint = true;
+    prompt.useDashedLine = true;
+    prompt.basePoint = basePoint;
+  }
+  const result = await getEditor().getPoint(prompt);
+  return result.status === AcEdPromptStatus.OK ? result.value : null;
 }
 
 export function createMlightPrecisionTools({ onChange = () => {} } = {}) {
   const settings = AcApSettingManager.instance;
   let lastOsnapMask = Number(settings.osnapModes || DEFAULT_OSNAP_MASK) || DEFAULT_OSNAP_MASK;
   let disposed = false;
+  const cursorSubscriptions = new Set();
 
   const getState = () => {
     const osnapMask = Number(settings.osnapModes || 0);
@@ -70,7 +126,8 @@ export function createMlightPrecisionTools({ onChange = () => {} } = {}) {
       osnapMask,
       osnapModes: Object.fromEntries(
         PRECISION_OSNAP_MODES.map((item) => [item.key, acdbHasOsnapMode(osnapMask, item.mode)])
-      )
+      ),
+      units: getUnitsState()
     };
   };
 
@@ -142,6 +199,75 @@ export function createMlightPrecisionTools({ onChange = () => {} } = {}) {
     return emit();
   };
 
+  const setLengthPrecision = (value) => {
+    setSysVar(AcDbSystemVariables.LUPREC, clampPrecision(value, 3));
+    return emit();
+  };
+
+  const setAnglePrecision = (value) => {
+    setSysVar(AcDbSystemVariables.AUPREC, clampPrecision(value, 2));
+    return emit();
+  };
+
+  const applyManufacturingUnits = ({ lengthPrecision = 3, anglePrecision = 2 } = {}) => {
+    setSysVar(AcDbSystemVariables.LUNITS, AcDbLinearUnits.Decimal);
+    setSysVar(AcDbSystemVariables.LUPREC, clampPrecision(lengthPrecision, 3));
+    setSysVar(AcDbSystemVariables.AUNITS, AcDbAngleUnits.DecimalDegrees);
+    setSysVar(AcDbSystemVariables.AUPREC, clampPrecision(anglePrecision, 2));
+    setSysVar(AcDbSystemVariables.ANGDIR, 0);
+    setSysVar(AcDbSystemVariables.INSUNITS, AcDbUnitsValue.Millimeters);
+    return emit();
+  };
+
+  const subscribeCursor = (listener) => {
+    if (typeof listener !== 'function') return () => {};
+    const view = getView();
+    const handler = (point) => {
+      const value = {
+        x: Number(point?.x || 0),
+        y: Number(point?.y || 0)
+      };
+      const decimals = getUnitsState().lengthPrecision;
+      listener({ ...value, text: formatCursorCoordinates(value, decimals) });
+    };
+    view.events.mouseMove.addEventListener(handler);
+    const unsubscribe = () => {
+      try { view.events.mouseMove.removeEventListener(handler); } catch (_error) {}
+      cursorSubscriptions.delete(unsubscribe);
+    };
+    cursorSubscriptions.add(unsubscribe);
+    return unsubscribe;
+  };
+
+  const measureDistance = async () => {
+    const editor = getEditor();
+    if (editor.isActive) throw new Error('Finalize o comando atual antes de medir.');
+    const first = await acquirePoint('MEDIR: informe o primeiro ponto');
+    if (!first) return null;
+    const second = await acquirePoint('MEDIR: informe o segundo ponto', first);
+    if (!second) return null;
+    return computeMeasurement(first, second);
+  };
+
+  const createPolarLine = async ({ distance, angleDeg } = {}) => {
+    const editor = getEditor();
+    if (editor.isActive) throw new Error('Finalize o comando atual antes de criar a linha.');
+    const polarToken = buildRelativePolarToken(distance, angleDeg);
+    const start = await acquirePoint('LINHA D×Â: informe o ponto inicial');
+    if (!start) return null;
+    const startToken = buildAbsolutePointToken(start);
+    editor.enqueueScriptInputs([startToken, polarToken, '']);
+    AcApDocManager.instance.sendStringToExecute('line\n');
+    return { start, startToken, polarToken, distance: Number(distance), angleDeg: Number(angleDeg) };
+  };
+
+  const runNativeMeasurement = (kind) => {
+    const command = ({ area: 'measurearea', angle: 'measureangle', distance: 'measuredistance' })[String(kind || '').toLowerCase()];
+    if (!command) return false;
+    AcApDocManager.instance.sendStringToExecute(`${command}\n`);
+    return true;
+  };
+
   const sysVarHandler = () => {
     if (!disposed) emit();
   };
@@ -154,6 +280,7 @@ export function createMlightPrecisionTools({ onChange = () => {} } = {}) {
 
   const dispose = () => {
     disposed = true;
+    for (const unsubscribe of [...cursorSubscriptions]) unsubscribe();
     try { AcDbSysVarManager.instance().events.sysVarChanged.removeEventListener(sysVarHandler); } catch (_error) {}
     try { settings.events.modified.removeEventListener(settingHandler); } catch (_error) {}
   };
@@ -162,6 +289,7 @@ export function createMlightPrecisionTools({ onChange = () => {} } = {}) {
 
   return {
     getState,
+    getUnitsState,
     setOrtho,
     toggleOrtho,
     setDynamicInput,
@@ -173,6 +301,13 @@ export function createMlightPrecisionTools({ onChange = () => {} } = {}) {
     toggleOsnap,
     setOsnapMode,
     applyDefaultOsnaps,
+    setLengthPrecision,
+    setAnglePrecision,
+    applyManufacturingUnits,
+    subscribeCursor,
+    measureDistance,
+    createPolarLine,
+    runNativeMeasurement,
     dispose,
     polarAngles: [...POLAR_ANGLES],
     osnapModes: PRECISION_OSNAP_MODES.map(({ key, label }) => ({ key, label }))
