@@ -6,6 +6,7 @@ try {
   await import('./cad-style-runtime.js');
   await import('./cad-advanced-modify-runtime.js');
   await import('./cad-auto-dimension-v3-runtime.js');
+  await import('./cad-precision-assist-runtime.js');
 } catch (error) {
   console.error('[CAD] Falha ao iniciar o MLightCAD:', error);
   document.documentElement.dataset.cadEngine = 'mlightcad-error';
