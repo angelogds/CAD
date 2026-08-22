@@ -14,9 +14,21 @@
   border-right: 1px solid rgba(145, 163, 176, 0.18);
 }
 
+.cad-precision-coords {
+  min-width: 146px;
+  padding: 0 7px;
+  color: #a9c1cf;
+  font: 700 10px/28px ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  border-right: 1px solid rgba(145, 163, 176, 0.16);
+}
+
 .cad-precision-toggle,
+.cad-precision-action,
 .cad-precision-more,
 .cad-precision-secondary,
+.cad-precision-primary,
 #cadPrecisionClose {
   border: 1px solid rgba(126, 147, 162, 0.35);
   background: #202c35;
@@ -27,10 +39,24 @@
 }
 
 .cad-precision-toggle,
+.cad-precision-action,
 .cad-precision-more {
   min-height: 28px;
   padding: 0 8px;
   white-space: nowrap;
+}
+
+.cad-precision-action {
+  border-color: rgba(49, 145, 194, .42);
+  color: #bfe8fb;
+}
+
+.cad-precision-action:hover,
+.cad-precision-secondary:hover,
+.cad-precision-primary:hover {
+  border-color: #379ed2;
+  background: #183b4e;
+  color: #f3fbff;
 }
 
 .cad-precision-toggle[data-active="true"] {
@@ -56,8 +82,8 @@
   position: absolute;
   right: 0;
   bottom: calc(100% + 8px);
-  width: min(360px, calc(100vw - 24px));
-  max-height: min(520px, calc(100vh - 130px));
+  width: min(390px, calc(100vw - 24px));
+  max-height: min(610px, calc(100vh - 130px));
   overflow: auto;
   z-index: 80;
   padding: 12px;
@@ -123,9 +149,22 @@
   accent-color: #2d9bd2;
 }
 
+.cad-precision-secondary,
+.cad-precision-primary {
+  padding: 7px 9px;
+}
+
 .cad-precision-secondary {
   margin-top: 10px;
-  padding: 7px 9px;
+}
+
+.cad-precision-primary {
+  width: 100%;
+  margin-top: 10px;
+  min-height: 34px;
+  border-color: #2e8dbd;
+  background: #15506d;
+  color: #f1fbff;
 }
 
 .cad-precision-row {
@@ -136,13 +175,62 @@
   font: 600 12px/1.2 system-ui, sans-serif;
 }
 
-.cad-precision-row select {
+.cad-precision-row select,
+.cad-precision-form-grid input {
   min-width: 100px;
   padding: 6px 8px;
   border: 1px solid #455968;
   border-radius: 5px;
   background: #111a20;
   color: #edf4f7;
+  font: 600 12px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.cad-precision-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cad-precision-form-grid label {
+  display: grid;
+  gap: 5px;
+  color: #a9bac5;
+  font: 700 10px/1.2 system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.cad-precision-form-grid input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cad-precision-measure-result {
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px;
+  border: 1px solid rgba(64, 137, 176, .35);
+  border-radius: 6px;
+  background: #101b21;
+  color: #adc1cc;
+  font: 600 11px/1.35 system-ui, sans-serif;
+}
+
+.cad-precision-measure-result strong {
+  color: #77d3ff;
+  font: 800 16px/1.15 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.cad-precision-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cad-precision-inline-actions .cad-precision-secondary {
+  margin-top: 0;
 }
 
 .cad-precision-help {
@@ -167,18 +255,53 @@
 }
 
 .cad-precision-note {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: #8fa3b0;
   font: 500 10px/1.35 system-ui, sans-serif;
 }
 
-@media (max-width: 980px) {
+.cad-precision-footer-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(135, 153, 166, .18);
+}
+
+.cad-precision-footer-row .cad-precision-secondary {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+.cad-precision-feedback {
+  min-width: 0;
+  color: #8fb0c1;
+  font: 600 10px/1.3 system-ui, sans-serif;
+}
+
+.cad-precision-feedback[data-error="true"] {
+  color: #ffaeae;
+}
+
+@media (max-width: 1180px) {
+  .cad-precision-coords {
+    min-width: 126px;
+    font-size: 9px;
+  }
   .cad-precision-toggle kbd {
     display: none;
   }
   .cad-precision-toggle,
+  .cad-precision-action,
   .cad-precision-more {
     padding-inline: 6px;
+  }
+}
+
+@media (max-width: 900px) {
+  .cad-precision-coords {
+    display: none;
   }
 }
 
@@ -200,5 +323,8 @@
     left: 10px;
     bottom: 58px;
     width: auto;
+  }
+  .cad-precision-form-grid {
+    grid-template-columns: 1fr;
   }
 }
