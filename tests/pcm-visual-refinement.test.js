@@ -11,17 +11,25 @@ const dashboardCss = fs.readFileSync('public/css/pcm-dashboard.css', 'utf8');
 test('submenu do PCM usa barra horizontal acessível e não comprime o conteúdo', () => {
   assert.match(internalNav, /<nav class="pcm-nav" aria-label="Submódulos do PCM">/);
   assert.match(internalStyles, /\.pcm-shell\{display:grid;grid-template-columns:minmax\(0,1fr\)/);
-  assert.match(internalStyles, /\.pcm-nav\{display:flex;align-items:center/);
-  assert.match(internalStyles, /overflow-x:auto/);
+  assert.match(internalStyles, /\.pcm-nav\{display:grid;grid-template-columns:repeat\(5/);
+  assert.match(internalStyles, /@media\(max-width:850px\)[\s\S]*\.pcm-nav\{display:flex;[^}]*overflow-x:auto/);
   assert.doesNotMatch(internalStyles, /grid-template-columns:220px minmax\(0,1fr\)/);
 });
 
 test('painel principal aproveita largura e evita cards esticados', () => {
   assert.match(operationalCss, /\.pcm-op-page\{[^}]*width:100%;max-width:none;min-width:0/);
   assert.match(operationalCss, /\.pcm-op-kpis\{display:grid;grid-template-columns:repeat\(3/);
-  assert.match(operationalCss, /\.pcm-op-grid\{display:grid;gap:14px;align-items:start/);
+  assert.match(operationalCss, /\.pcm-op-workspace\{display:grid;grid-template-columns:minmax\(0,1\.08fr\)/);
+  assert.match(operationalCss, /\.pcm-op-workspace-column\{display:grid;align-content:start/);
   assert.match(operationalCss, /\.pcm-op-table\{width:100%;min-width:860px/);
   assert.match(dashboardCss, /\.pcm-directors-layout\{display:grid;grid-template-columns:minmax\(0,1fr\)/);
+});
+
+test('área analítica usa duas colunas independentes para evitar vazios verticais', () => {
+  assert.ok(indexView.includes('class="pcm-op-workspace"'));
+  assert.equal((indexView.match(/class="pcm-op-workspace-column"/g) || []).length, 2);
+  assert.doesNotMatch(indexView, /pcm-op-grid-main|pcm-op-grid-three/);
+  assert.doesNotMatch(operationalCss, /\.pcm-op-grid-main|\.pcm-op-grid-three/);
 });
 
 test('fila compacta informações relacionadas para preservar a coluna de ação', () => {
