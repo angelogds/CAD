@@ -1,0 +1,204 @@
+.cad-precision-assist {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.cad-precision-quick {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border-left: 1px solid rgba(145, 163, 176, 0.18);
+  border-right: 1px solid rgba(145, 163, 176, 0.18);
+}
+
+.cad-precision-toggle,
+.cad-precision-more,
+.cad-precision-secondary,
+#cadPrecisionClose {
+  border: 1px solid rgba(126, 147, 162, 0.35);
+  background: #202c35;
+  color: #cbd7df;
+  border-radius: 5px;
+  font: 700 11px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.cad-precision-toggle,
+.cad-precision-more {
+  min-height: 28px;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.cad-precision-toggle[data-active="true"] {
+  border-color: #2d9bd2;
+  background: #123c53;
+  color: #ecfaff;
+  box-shadow: inset 0 0 0 1px rgba(45, 155, 210, 0.18);
+}
+
+.cad-precision-toggle kbd {
+  margin-left: 4px;
+  opacity: .58;
+  font: inherit;
+  font-size: 9px;
+}
+
+.cad-precision-more[aria-expanded="true"] {
+  border-color: #5f7584;
+  background: #2a3944;
+}
+
+.cad-precision-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(520px, calc(100vh - 130px));
+  overflow: auto;
+  z-index: 80;
+  padding: 12px;
+  border: 1px solid #425563;
+  border-radius: 8px;
+  background: #18232b;
+  color: #dce5ea;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, .42);
+}
+
+.cad-precision-panel[hidden] {
+  display: none;
+}
+
+.cad-precision-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  color: #9fb6c5;
+  letter-spacing: .08em;
+  font: 800 11px/1.2 system-ui, sans-serif;
+}
+
+#cadPrecisionClose {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 18px;
+}
+
+.cad-precision-panel section + section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(135, 153, 166, .18);
+}
+
+.cad-precision-section-title,
+.cad-precision-help strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #93a9b8;
+  font: 800 10px/1.2 system-ui, sans-serif;
+  letter-spacing: .08em;
+}
+
+.cad-precision-osnaps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 10px;
+}
+
+.cad-precision-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: #d3dee5;
+  font: 600 12px/1.2 system-ui, sans-serif;
+}
+
+.cad-precision-check input {
+  accent-color: #2d9bd2;
+}
+
+.cad-precision-secondary {
+  margin-top: 10px;
+  padding: 7px 9px;
+}
+
+.cad-precision-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font: 600 12px/1.2 system-ui, sans-serif;
+}
+
+.cad-precision-row select {
+  min-width: 100px;
+  padding: 6px 8px;
+  border: 1px solid #455968;
+  border-radius: 5px;
+  background: #111a20;
+  color: #edf4f7;
+}
+
+.cad-precision-help {
+  display: grid;
+  gap: 7px;
+  font: 500 11px/1.25 system-ui, sans-serif;
+}
+
+.cad-precision-help span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cad-precision-help code {
+  min-width: 72px;
+  padding: 3px 5px;
+  border-radius: 4px;
+  background: #0e171c;
+  color: #79d1ff;
+  font: 700 11px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.cad-precision-note {
+  margin: 10px 0 0;
+  color: #8fa3b0;
+  font: 500 10px/1.35 system-ui, sans-serif;
+}
+
+@media (max-width: 980px) {
+  .cad-precision-toggle kbd {
+    display: none;
+  }
+  .cad-precision-toggle,
+  .cad-precision-more {
+    padding-inline: 6px;
+  }
+}
+
+@media (max-width: 760px) {
+  .cad-precision-assist {
+    order: 20;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .cad-precision-quick {
+    min-width: max-content;
+    padding: 4px 2px;
+    border: 0;
+  }
+  .cad-precision-panel {
+    position: fixed;
+    right: 10px;
+    left: 10px;
+    bottom: 58px;
+    width: auto;
+  }
+}
