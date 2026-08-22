@@ -1,0 +1,380 @@
+.cad-mlight-page[data-interface-v2="1"],
+html[data-cad-interface="v2"] .cad-mlight-page {
+  --cad-ui-panel: #1b252d;
+  --cad-ui-panel-2: #222f38;
+  --cad-ui-border: #3b4d59;
+  --cad-ui-text: #dce7ee;
+  --cad-ui-muted: #8fa4b2;
+  --cad-ui-accent: #2f9ed4;
+}
+
+html[data-cad-interface="v2"] .cad-mlight-appbar {
+  min-height: 48px;
+  gap: 7px;
+  padding-inline: 8px;
+  border-bottom-color: #31414d;
+  background: linear-gradient(180deg, #25323b 0%, #202b33 100%);
+}
+
+html[data-cad-interface="v2"] .cad-mlight-title {
+  min-width: 130px;
+  max-width: min(430px, 34vw);
+}
+
+html[data-cad-interface="v2"] .cad-mlight-title small {
+  opacity: .68;
+  font-size: 8px;
+  letter-spacing: .08em;
+}
+
+html[data-cad-interface="v2"] .cad-mlight-title strong,
+html[data-cad-interface="v2"] .cad-mlight-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-cad-interface="v2"] .cad-interface-engine {
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding-inline: 8px;
+  font-size: 9px;
+}
+
+html[data-cad-interface="v2"] .cad-interface-file-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+html[data-cad-interface="v2"] .cad-interface-file-trigger {
+  min-width: 76px;
+  justify-content: center;
+}
+
+html[data-cad-interface="v2"] .cad-interface-file-popover {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 95;
+  min-width: 176px;
+  padding: 6px;
+  border: 1px solid #415461;
+  border-radius: 8px;
+  background: #172129;
+  box-shadow: 0 16px 36px rgba(0,0,0,.42);
+}
+
+html[data-cad-interface="v2"] .cad-interface-file-popover[hidden] { display: none; }
+
+html[data-cad-interface="v2"] .cad-interface-file-action {
+  width: 100%;
+  min-height: 34px;
+  margin: 0;
+  justify-content: flex-start;
+  border-color: transparent;
+  background: transparent;
+}
+
+html[data-cad-interface="v2"] .cad-interface-file-action:hover {
+  border-color: #3e6275;
+  background: #233541;
+}
+
+html[data-cad-interface="v2"] .cad-tools-drawer.cad-mlight-fabbar {
+  width: min(350px, calc(100vw - 28px));
+  border-radius: 8px;
+  border-color: #40525f;
+}
+
+html[data-cad-interface="v2"] .cad-tool-drawer-head {
+  min-height: 50px;
+  background: #222e37;
+}
+
+html[data-cad-interface="v2"] .cad-tool-search {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 20px 1fr 28px;
+  align-items: center;
+  gap: 4px;
+  margin: 9px 9px 4px;
+  padding: 0 6px;
+  min-height: 36px;
+  border: 1px solid #3b4d59;
+  border-radius: 7px;
+  background: #111b21;
+  color: #778d9c;
+}
+
+html[data-cad-interface="v2"] .cad-tool-search input {
+  min-width: 0;
+  width: 100%;
+  height: 32px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #edf5f8;
+  font: 600 12px/1 system-ui, sans-serif;
+}
+
+html[data-cad-interface="v2"] .cad-tool-search input::placeholder { color: #6f8491; }
+
+html[data-cad-interface="v2"] .cad-tool-search button {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #92a5b2;
+  cursor: pointer;
+}
+
+html[data-cad-interface="v2"] .cad-tool-search button:hover { background: #263742; color: #fff; }
+html[data-cad-interface="v2"] .cad-tool-search button[hidden] { display: none; }
+
+html[data-cad-interface="v2"] .cad-tool-drawer-body {
+  padding: 6px 9px 10px;
+}
+
+html[data-cad-interface="v2"] .cad-tool-drawer-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+html[data-cad-interface="v2"] .cad-tool-drawer-group + .cad-tool-drawer-group {
+  margin-top: 5px;
+}
+
+html[data-cad-interface="v2"] .cad-tool-group-toggle {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #a8bbc7;
+  cursor: pointer;
+  font: 800 10px/1 system-ui, sans-serif;
+  letter-spacing: .07em;
+  text-align: left;
+}
+
+html[data-cad-interface="v2"] .cad-tool-group-toggle:hover,
+html[data-cad-interface="v2"] .cad-tool-group-toggle[aria-expanded="true"] {
+  border-color: #344955;
+  background: #22313a;
+  color: #edf6fa;
+}
+
+html[data-cad-interface="v2"] .cad-tool-group-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #718996;
+}
+
+html[data-cad-interface="v2"] .cad-tool-group-meta small {
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #172229;
+  text-align: center;
+  font-size: 9px;
+}
+
+html[data-cad-interface="v2"] .cad-tool-group-meta b {
+  display: inline-block;
+  font-size: 14px;
+  transition: transform .16s ease;
+}
+
+html[data-cad-interface="v2"] .cad-tool-group-toggle[aria-expanded="false"] .cad-tool-group-meta b {
+  transform: rotate(-90deg);
+}
+
+html[data-cad-interface="v2"] .cad-tool-drawer-group-body {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  padding: 5px 0 7px;
+}
+
+html[data-cad-interface="v2"] .cad-tool-drawer-group-body[hidden] { display: none; }
+
+html[data-cad-interface="v2"] .cad-tool-drawer-group-body > .cad-mlight-action {
+  min-height: 34px;
+  border-color: #354955;
+  background: #1b2830;
+}
+
+html[data-cad-interface="v2"] .cad-tool-drawer-group-body > .cad-mlight-action:hover {
+  border-color: #3e8eb5;
+  background: #203746;
+}
+
+html[data-cad-interface="v2"] .cad-tool-drawer-group-body > .cad-mlight-action[hidden],
+html[data-cad-interface="v2"] .cad-tool-drawer-group-body > .cad-round3-python[hidden] { display: none !important; }
+
+html[data-cad-interface="v2"] .cad-mlight-statusbar {
+  min-height: 34px;
+  gap: 6px;
+  padding: 3px 5px;
+  border-top-color: #30414c;
+  background: #182229;
+}
+
+html[data-cad-interface="v2"] #mlightCommandForm {
+  flex: 1 1 260px;
+  min-width: 180px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 1px solid #344752;
+  border-radius: 6px;
+  background: #10181d;
+}
+
+html[data-cad-interface="v2"] .cad-interface-command-label {
+  flex: 0 0 auto;
+  color: #5eaed5;
+  font: 800 13px/1 ui-monospace, monospace;
+}
+
+html[data-cad-interface="v2"] #mlightCommandInput {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+}
+
+html[data-cad-interface="v2"] .cad-mlight-status-actions {
+  gap: 3px;
+}
+
+html[data-cad-interface="v2"] .cad-mlight-status-actions .cad-mlight-action {
+  min-width: 30px;
+  min-height: 28px;
+  padding: 0 7px;
+}
+
+html[data-cad-interface="v2"] .cad-mlight-status-actions .cad-mlight-action span {
+  font-size: 14px;
+}
+
+html[data-cad-interface="v2"] .cad-mlight-status-actions .cad-mlight-action em {
+  margin-left: 4px;
+  font-style: normal;
+  font-size: 10px;
+}
+
+html[data-cad-interface="v2"] .cad-precision-quick {
+  gap: 3px;
+  padding-inline: 4px;
+}
+
+html[data-cad-interface="v2"] .cad-precision-toggle,
+html[data-cad-interface="v2"] .cad-precision-more {
+  min-height: 27px;
+  padding-inline: 6px;
+  font-size: 10px;
+}
+
+html[data-cad-interface="v2"] .cad-precision-coords {
+  min-width: 130px;
+  padding-inline: 5px;
+  line-height: 27px;
+}
+
+html[data-cad-interface="v2"] .cad-interface-precision-actions {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 11px;
+  border-top: 0 !important;
+  border-bottom: 1px solid rgba(135,153,166,.18);
+}
+
+html[data-cad-interface="v2"] .cad-interface-precision-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+html[data-cad-interface="v2"] .cad-interface-precision-panel-action {
+  width: 100%;
+  min-height: 34px;
+  justify-content: center;
+}
+
+@media (min-width: 1181px) {
+  html[data-cad-interface="v2"] .cad-mlight-page.cad-tools-open #mlightCadHost,
+  html[data-cad-interface="v2"] .cad-mlight-page.cad-tools-open #mlightCadCanvas {
+    left: 364px;
+  }
+}
+
+@media (max-width: 1280px) {
+  html[data-cad-interface="v2"] .cad-interface-engine {
+    max-width: 92px;
+    font-size: 0;
+  }
+  html[data-cad-interface="v2"] .cad-interface-engine::before {
+    content: 'CAD';
+    font-size: 9px;
+  }
+  html[data-cad-interface="v2"] .cad-mlight-save-state { display: none; }
+}
+
+@media (max-width: 980px) {
+  html[data-cad-interface="v2"] .cad-mlight-title small,
+  html[data-cad-interface="v2"] .cad-mlight-title span { display: none; }
+  html[data-cad-interface="v2"] .cad-mlight-title { max-width: 180px; }
+  html[data-cad-interface="v2"] .cad-precision-coords { display: none; }
+  html[data-cad-interface="v2"] .cad-mlight-status-actions .cad-mlight-action em { display: none; }
+}
+
+@media (max-width: 760px) {
+  html[data-cad-interface="v2"] .cad-mlight-appbar {
+    min-height: 44px;
+    padding-inline: 4px;
+  }
+  html[data-cad-interface="v2"] .cad-mlight-brand,
+  html[data-cad-interface="v2"] .cad-interface-engine { display: none; }
+  html[data-cad-interface="v2"] .cad-mlight-title { min-width: 0; max-width: 110px; }
+  html[data-cad-interface="v2"] .cad-interface-file-trigger { min-width: 36px; font-size: 0; }
+  html[data-cad-interface="v2"] .cad-interface-file-trigger::before { content: '☰'; font-size: 14px; }
+
+  html[data-cad-interface="v2"] .cad-mlight-statusbar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+  html[data-cad-interface="v2"] #mlightCommandForm { grid-column: 1 / -1; }
+  html[data-cad-interface="v2"] .cad-precision-assist {
+    order: initial;
+    width: auto;
+    overflow-x: visible;
+  }
+  html[data-cad-interface="v2"] .cad-precision-quick {
+    overflow-x: auto;
+    max-width: calc(100vw - 118px);
+    scrollbar-width: none;
+  }
+  html[data-cad-interface="v2"] .cad-precision-quick::-webkit-scrollbar { display: none; }
+  html[data-cad-interface="v2"] .cad-tool-drawer.cad-mlight-fabbar {
+    width: min(340px, calc(100vw - 12px));
+  }
+}
+
+@media (max-width: 520px) {
+  html[data-cad-interface="v2"] .cad-tool-drawer-group-body { grid-template-columns: 1fr 1fr; }
+  html[data-cad-interface="v2"] .cad-tool-drawer-group-body .cad-mlight-action span { font-size: 10px; }
+  html[data-cad-interface="v2"] .cad-interface-precision-action-grid { grid-template-columns: 1fr; }
+}
