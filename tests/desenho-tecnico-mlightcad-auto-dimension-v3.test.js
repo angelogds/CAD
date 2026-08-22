@@ -147,11 +147,12 @@ test('planejador limita quantidade de cotas automáticas para preservar legibili
   assert.equal(plan.dimensions.length, AUTO_DIM_V3_MAX);
 });
 
-test('integração V3 mantém V2 como fallback e liga build, runtime e FAB_COTAS', () => {
+test('integração V3 mantém V2 como fallback e liga build, runtime e layer centralizado de cotas', () => {
   const build = read('scripts/build-mlightcad.mjs');
   const loader = read('public/js/cad-engine-v2.js');
   const runtime = read('public/js/cad-auto-dimension-v3-runtime.js');
   const entry = read('frontend/mlightcad-auto-dimension-v3.entry.js');
+  const logic = read('frontend/mlightcad-auto-dimension-v3.logic.mjs');
 
   assert.match(build, /mlightcad-auto-dimension-v3/);
   assert.match(loader, /cad-auto-dimension-v3-runtime\.js/);
@@ -160,7 +161,8 @@ test('integração V3 mantém V2 como fallback e liga build, runtime e FAB_COTAS
   assert.match(runtime, /v2-fallback/);
   assert.match(runtime, /AUTO COTAR V3/);
   assert.match(entry, /AcDbAlignedDimension/);
-  assert.match(entry, /FAB_COTAS/);
+  assert.match(entry, /TECHNICAL_LAYERS\.DIMENSIONS/);
+  assert.match(logic, /DIMENSIONS: 'FAB_COTAS'/);
   assert.match(entry, /AUTO_DIM_PREFIX = '\*AD'/);
   assert.match(entry, /isNonModelLayer/);
   assert.match(entry, /clearAutoDimensions/);
