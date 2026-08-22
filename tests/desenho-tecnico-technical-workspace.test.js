@@ -51,3 +51,37 @@ test('FeatureManager mantém nomes visíveis e mostra resumo do desenho', () => 
   assert.match(css, /\.cad-tool-btn > span:last-child/);
   assert.match(css, /display: inline !important/);
 });
+
+test('ribbon usa ícones SVG técnicos consistentes em vez de glifos como acabamento final', () => {
+  assert.match(entry, /const CAD_ICONS =/);
+  assert.match(entry, /const CAD_ACTION_ICONS =/);
+  assert.match(entry, /function cadIcon/);
+  assert.match(entry, /viewBox=\"0 0 24 24\"/);
+  assert.match(entry, /'tool-line': 'line'/);
+  assert.match(entry, /'tool-circle': 'circle'/);
+  assert.match(entry, /'tool-trim': 'trim'/);
+  assert.match(entry, /'tool-dim-linear': 'dimLinear'/);
+  assert.match(entry, /installProfessionalIcons/);
+  assert.match(css, /\.cad-icon-svg/);
+  assert.match(css, /\.cad-ribbon-btn\[data-shortcut\]::after/);
+});
+
+test('workspace adiciona cromado de navegação 2D inspirado em CAD profissional', () => {
+  assert.match(entry, /installProfessionalChrome/);
+  assert.match(entry, /cad-quick-access/);
+  assert.match(entry, /cad-drawing-tabbar/);
+  assert.match(entry, /cad-navigation-bar/);
+  assert.match(entry, /cad-ucs-indicator/);
+  assert.match(entry, /SUPERIOR/);
+  assert.match(entry, /WCS/);
+  assert.match(css, /\.cad-ribbon-home-quick/);
+  assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.cad-navigation-bar/);
+  assert.match(css, /\.cad-ucs-indicator/);
+});
+
+test('aba ativa do CommandManager é lembrada sem entrar no JSON persistido', () => {
+  assert.match(entry, /cad2d\.commandTab/);
+  assert.match(entry, /localStorage/);
+  assert.doesNotMatch(entry, /state\.commandTab\s*=/);
+});
