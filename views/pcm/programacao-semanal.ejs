@@ -1,6 +1,5 @@
 <% layout('layout') %>
 <%- include('partials/internal-styles') %>
-<link rel="stylesheet" href="/css/pcm-operational.css">
 <%
   const weekdays = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
   const formatDate = (value) => value ? new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR') : '-';
