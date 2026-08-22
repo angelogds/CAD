@@ -74,7 +74,9 @@ test('bundle e runtime carregam os modificadores avançados no workspace atual',
   assert.match(runtime, /mlightMirrorGeometryBtn/);
   assert.match(runtime, /mlightFilletGeometryBtn/);
   assert.match(runtime, /mlightChamferGeometryBtn/);
-  assert.match(runtime, /app\.runCommand\('mirror'/);
-  assert.match(runtime, /app\.runCommand\('fillet'/);
-  assert.match(runtime, /app\.runCommand\('chamfer'/);
+  assert.match(runtime, /const run = \(command, label\) =>/);
+  assert.match(runtime, /run\('mirror', 'Espelhar'\)/);
+  assert.match(runtime, /run\('fillet', 'Arredondar'\)/);
+  assert.match(runtime, /run\('chamfer', 'Chanfro 2D'\)/);
+  assert.match(runtime, /app\.runCommand\(command\)/);
 });
