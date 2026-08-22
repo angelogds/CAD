@@ -1,5 +1,6 @@
 const db = require("../../database/db");
 const intelligenceService = require("./pcm.intelligence.service");
+const aiService = require("../ai/ai.service");
 
 function toNum(v, d = 0) {
   const n = Number(v);
@@ -569,38 +570,67 @@ function listBacklogSimples() {
   return osRows.map((r) => ({ ...r, numero: `OS-${r.id}` }));
 }
 
-function listOSFalhasPreview() {
+function listOSFalhasPreview({ periodo, equipamento, tipo_falha } = {}) {
+  const params = {};
+  const where = ["UPPER(COALESCE(o.tipo,''))='CORRETIVA'"];
+  if (periodo && /^\d{4}-\d{2}$/.test(String(periodo))) {
+    where.push("strftime('%Y-%m', o.opened_at)=@periodo");
+    params.periodo = String(periodo);
+  }
+  if (equipamento) {
+    where.push("(CAST(o.equipamento_id AS TEXT)=@equipamento OR COALESCE(e.nome,'') LIKE @equipamento_busca)");
+    params.equipamento = String(equipamento);
+    params.equipamento_busca = `%${String(equipamento).trim()}%`;
+  }
+  if (tipo_falha) {
+    where.push("(COALESCE(f.categoria,'') LIKE @tipo_falha OR COALESCE(f.modo_falha,'') LIKE @tipo_falha OR COALESCE(f.causa_provavel,'') LIKE @tipo_falha)");
+    params.tipo_falha = `%${String(tipo_falha).trim()}%`;
+  }
+
+  const falhaJoin = tableExistsLocal('pcm_falhas')
+    ? 'LEFT JOIN pcm_falhas f ON f.os_id=o.id'
+    : 'LEFT JOIN (SELECT NULL os_id, NULL categoria, NULL modo_falha, NULL causa_provavel, NULL indice_criticidade) f ON 1=0';
+  const equipamentoManual = hasColumn('os', 'equipamento_manual') ? 'o.equipamento_manual' : 'NULL';
   return safeAll(`
-    SELECT o.id,
-           COALESCE(e.nome, o.equipamento_manual, o.equipamento, '-') AS equipamento,
-           o.tipo,
-           o.status,
-           o.opened_at
+    SELECT o.id, o.equipamento_id,
+           COALESCE(e.nome, ${equipamentoManual}, o.equipamento, '-') AS equipamento,
+           COALESCE(e.setor,'Setor não informado') AS setor,
+           o.tipo, o.status, o.opened_at, COALESCE(o.prioridade,o.grau,'MEDIA') AS prioridade,
+           f.categoria, f.modo_falha, f.causa_provavel, f.indice_criticidade,
+           CASE WHEN f.os_id IS NULL THEN 0 ELSE 1 END AS classificada
     FROM os o
     LEFT JOIN equipamentos e ON e.id = o.equipamento_id
-    WHERE UPPER(COALESCE(tipo,''))='CORRETIVA'
-    ORDER BY datetime(o.opened_at) DESC
-    LIMIT 20
-  `);
+    ${falhaJoin}
+    WHERE ${where.join(' AND ')}
+    ORDER BY datetime(o.opened_at) DESC, o.id DESC
+    LIMIT 200
+  `, params);
 }
 
-function createFalhaOS({ equipamento_id, descricao, impacto_producao, impacto_seguranca, impacto_ambiental, custo_parada, observacao }, userId) {
+function failureImpact(payload = {}) {
+  const values = [payload.impacto_producao, payload.impacto_seguranca, payload.impacto_ambiental, payload.custo_parada]
+    .map((value) => Math.max(1, Math.min(5, Math.round(Number(value) || 3))));
+  const indice = Math.round(((values[0] + values[1] + values[2] + values[3]) / 4) * 10) / 10;
+  let grau = 'MEDIA';
+  if (indice >= 4.5) grau = 'CRITICA';
+  else if (indice >= 3.5) grau = 'ALTA';
+  else if (indice < 2) grau = 'BAIXA';
+  return { values, indice, grau };
+}
+
+function createFalhaOS({ equipamento_id, descricao, categoria, modo_falha, causa_provavel, acao_corretiva, inicio_parada_em, fim_parada_em, impacto_producao, impacto_seguranca, impacto_ambiental, custo_parada, observacao }, userId) {
   const equipamentoId = Number(equipamento_id);
   if (!equipamentoId) throw new Error("Selecione um equipamento para registrar a falha.");
   const eq = getEquipamentoById(equipamentoId);
   if (!eq) throw new Error("Equipamento não encontrado.");
 
-  const calc = [impacto_producao, impacto_seguranca, impacto_ambiental, custo_parada]
-    .map((v) => Math.max(1, Math.min(5, Number(v) || 3)));
-  const indice = Math.round(((calc[0] + calc[1] + calc[2] + calc[3]) / 4) * 10) / 10;
-
-  let grau = "MEDIA";
-  if (indice >= 4.5) grau = "CRITICA";
-  else if (indice >= 3.5) grau = "ALTA";
-  else if (indice < 2) grau = "BAIXA";
+  const { values: calc, indice, grau } = failureImpact({ impacto_producao, impacto_seguranca, impacto_ambiental, custo_parada });
 
   const payload = [
     `[PCM-FALHA] ${String(descricao || "Falha registrada via PCM").trim()}`,
+    categoria ? `Categoria: ${String(categoria).trim()}` : null,
+    modo_falha ? `Modo de falha: ${String(modo_falha).trim()}` : null,
+    causa_provavel ? `Causa provável: ${String(causa_provavel).trim()}` : null,
     `Impacto produção: ${calc[0]}/5`,
     `Impacto segurança: ${calc[1]}/5`,
     `Impacto ambiental: ${calc[2]}/5`,
@@ -609,12 +639,64 @@ function createFalhaOS({ equipamento_id, descricao, impacto_producao, impacto_se
     observacao ? `Observações: ${String(observacao).trim()}` : null,
   ].filter(Boolean).join("\n");
 
-  const info = db.prepare(`
-    INSERT INTO os (equipamento, equipamento_id, descricao, tipo, status, prioridade, grau, opened_by, opened_at)
-    VALUES (?, ?, ?, 'CORRETIVA', 'ABERTA', ?, ?, ?, datetime('now'))
-  `).run(eq.nome, equipamentoId, payload, grau, grau, userId || null);
+  return db.transaction(() => {
+    const info = db.prepare(`
+      INSERT INTO os (equipamento, equipamento_id, descricao, tipo, status, prioridade, grau, opened_by, opened_at)
+      VALUES (?, ?, ?, 'CORRETIVA', 'ABERTA', ?, ?, ?, datetime('now'))
+    `).run(eq.nome, equipamentoId, payload, grau, grau, userId || null);
+    const osId = Number(info.lastInsertRowid);
+    if (tableExistsLocal('pcm_falhas')) {
+      db.prepare(`
+        INSERT INTO pcm_falhas (
+          os_id,equipamento_id,categoria,modo_falha,causa_provavel,acao_corretiva,
+          inicio_parada_em,fim_parada_em,impacto_producao,impacto_seguranca,
+          impacto_ambiental,custo_parada,indice_criticidade,observacao,created_by,updated_by
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      `).run(
+        osId, equipamentoId, String(categoria || 'OUTRA').trim().toUpperCase(),
+        String(modo_falha || descricao || '').trim() || null,
+        String(causa_provavel || '').trim() || null,
+        String(acao_corretiva || '').trim() || null,
+        inicio_parada_em || null, fim_parada_em || null,
+        calc[0], calc[1], calc[2], calc[3], indice,
+        String(observacao || '').trim() || null, userId || null, userId || null
+      );
+    }
+    return osId;
+  })();
+}
 
-  return Number(info.lastInsertRowid);
+function classificarFalhaOS(osId, payload = {}, userId = null) {
+  const ordemId = Number(osId);
+  const ordem = db.prepare("SELECT id,equipamento_id,tipo FROM os WHERE id=?").get(ordemId);
+  if (!ordem || String(ordem.tipo || '').toUpperCase() !== 'CORRETIVA') {
+    throw new Error('A classificação deve estar vinculada a uma OS corretiva válida.');
+  }
+  if (!ordem.equipamento_id) throw new Error('A OS precisa possuir equipamento vinculado.');
+  if (!tableExistsLocal('pcm_falhas')) throw new Error('A migration do banco de falhas ainda não foi aplicada.');
+  const { values, indice } = failureImpact(payload);
+  db.prepare(`
+    INSERT INTO pcm_falhas (
+      os_id,equipamento_id,categoria,modo_falha,causa_provavel,acao_corretiva,
+      inicio_parada_em,fim_parada_em,impacto_producao,impacto_seguranca,
+      impacto_ambiental,custo_parada,indice_criticidade,observacao,created_by,updated_by,updated_at
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+    ON CONFLICT(os_id) DO UPDATE SET
+      categoria=excluded.categoria,modo_falha=excluded.modo_falha,
+      causa_provavel=excluded.causa_provavel,acao_corretiva=excluded.acao_corretiva,
+      inicio_parada_em=excluded.inicio_parada_em,fim_parada_em=excluded.fim_parada_em,
+      impacto_producao=excluded.impacto_producao,impacto_seguranca=excluded.impacto_seguranca,
+      impacto_ambiental=excluded.impacto_ambiental,custo_parada=excluded.custo_parada,
+      indice_criticidade=excluded.indice_criticidade,observacao=excluded.observacao,
+      updated_by=excluded.updated_by,updated_at=datetime('now')
+  `).run(
+    ordemId, Number(ordem.equipamento_id), String(payload.categoria || 'OUTRA').trim().toUpperCase(),
+    String(payload.modo_falha || '').trim() || null, String(payload.causa_provavel || '').trim() || null,
+    String(payload.acao_corretiva || '').trim() || null, payload.inicio_parada_em || null,
+    payload.fim_parada_em || null, values[0], values[1], values[2], values[3], indice,
+    String(payload.observacao || '').trim() || null, userId || null, userId || null
+  );
+  return ordemId;
 }
 
 function addComponenteBOM({ equipamento_id, categoria, modelo_comercial, descricao_tecnica, codigo_interno, aplicacao_posicao, estoque_item_id, peca_critica }, userId) {
@@ -677,7 +759,7 @@ function addPontoLubrificacao({ equipamento_id, ponto_lubrificacao, tipo_lubrifi
   return Number(info.lastInsertRowid);
 }
 
-function gerarSugestaoPlanoLubrificacao(equipamentoId) {
+function gerarSugestaoPlanoLubrificacaoLocal(equipamentoId) {
   const eq = getEquipamentoById(equipamentoId);
   if (!eq) throw new Error("Equipamento não encontrado para sugestão de lubrificação.");
   const critic = String(eq.criticidade || "MEDIA").toUpperCase();
@@ -688,6 +770,8 @@ function gerarSugestaoPlanoLubrificacao(equipamentoId) {
     equipamento_nome: eq.nome,
     setor: eq.setor || "",
     criticidade: critic,
+    origem: 'LOCAL',
+    aviso: 'Plano inicial genérico. Confirme lubrificante, quantidade e frequência no manual do fabricante antes de aplicar.',
     plano: [
       {
         ponto_lubrificacao: "Mancal principal",
@@ -709,6 +793,57 @@ function gerarSugestaoPlanoLubrificacao(equipamentoId) {
   };
 }
 
+async function gerarSugestaoPlanoLubrificacao(equipamentoId) {
+  const local = gerarSugestaoPlanoLubrificacaoLocal(equipamentoId);
+  const existentes = listLubrificacao({ equipamento_id: equipamentoId }).map((item) => ({
+    ponto: item.ponto_lubrificacao,
+    lubrificante: item.tipo_lubrificante_texto,
+    frequencia_dias: item.frequencia_dias,
+  }));
+  try {
+    const result = await aiService.askJSONSchemaStrict({
+      model: process.env.OPENAI_MODEL_PCM || process.env.OPENAI_MODEL_TEXT,
+      schemaName: 'pcm_plano_lubrificacao_sugerido',
+      systemPrompt: [
+        'Você auxilia um planejador de manutenção industrial a preparar um rascunho de plano de lubrificação.',
+        'Use somente os dados informados. Não invente especificação do fabricante, viscosidade, compatibilidade química ou intervalo garantido.',
+        'Quando os dados forem insuficientes, mantenha recomendações conservadoras e declare a necessidade de consultar o manual.',
+        'A resposta será revisada por um técnico antes de qualquer cadastro. Responda em português-BR no schema solicitado.',
+      ].join(' '),
+      userPayload: {
+        equipamento: local.equipamento_nome,
+        setor: local.setor,
+        criticidade: local.criticidade,
+        pontos_ja_cadastrados: existentes,
+      },
+      schema: {
+        type: 'object', additionalProperties: false,
+        required: ['aviso_tecnico', 'plano'],
+        properties: {
+          aviso_tecnico: { type: 'string' },
+          plano: { type: 'array', minItems: 1, maxItems: 6, items: {
+            type: 'object', additionalProperties: false,
+            required: ['ponto_lubrificacao','tipo_lubrificante_texto','frequencia_dias','quantidade','unidade','observacao'],
+            properties: {
+              ponto_lubrificacao: { type: 'string' },
+              tipo_lubrificante_texto: { type: 'string' },
+              frequencia_dias: { type: 'integer', minimum: 1, maximum: 365 },
+              quantidade: { type: 'number', minimum: 0 },
+              unidade: { type: 'string' },
+              observacao: { type: 'string' },
+            },
+          } },
+        },
+      },
+      maxOutputTokens: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS_PCM || 700),
+      temperature: 0.1,
+    });
+    return { ...local, origem: 'OPENAI', aviso: result.aviso_tecnico, plano: result.plano };
+  } catch (error) {
+    return { ...local, erro_codigo: String(error?.code || 'AI_ERROR') };
+  }
+}
+
 function aplicarSugestaoPlanoLubrificacao(sugestao, userId) {
   if (!sugestao?.equipamento_id || !Array.isArray(sugestao?.plano) || !sugestao.plano.length) {
     throw new Error("Gere uma sugestão IA antes de aplicar automaticamente.");
@@ -728,82 +863,11 @@ function aplicarSugestaoPlanoLubrificacao(sugestao, userId) {
   return ids;
 }
 
-function listRotasInspecao() {
-  ensurePcmTables();
-  const rows = safeAll(`
-    SELECT *
-    FROM pcm_rotas_inspecao
-    WHERE COALESCE(ativo,1)=1
-    ORDER BY datetime(updated_at) DESC, id DESC
-    LIMIT 100
-  `);
-  return rows.map((r) => {
-    let equipamentos = [];
-    try { equipamentos = JSON.parse(r.equipamentos_json || "[]"); } catch (_e) {}
-    const freq = Number(r.frequencia_dias || 0) > 0 ? `${r.frequencia_dias} dia(s)` : "-";
-    return {
-      ...r,
-      frequencia: freq,
-      qtd_equipamentos: equipamentos.length,
-      proxima_execucao: r.frequencia_dias ? db.prepare(`SELECT date('now', '+' || ? || ' day') AS dt`).get(Number(r.frequencia_dias))?.dt : "-",
-    };
-  });
-}
-
-function createRotaInspecaoRapida({ nome, tipo, frequencia_dias, responsavel, equipamentos }, userId) {
-  ensurePcmTables();
-  const nomeRota = String(nome || "").trim();
-  if (!nomeRota) throw new Error("Informe o nome da rota.");
-  const equipamentoIds = Array.isArray(equipamentos)
-    ? equipamentos.map(Number).filter(Boolean)
-    : String(equipamentos || "").split(",").map((x) => Number(x.trim())).filter(Boolean);
-  const info = db.prepare(`
-    INSERT INTO pcm_rotas_inspecao (nome, tipo, frequencia_dias, responsavel, equipamentos_json, created_by, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-  `).run(
-    nomeRota,
-    String(tipo || "INSPECAO").toUpperCase(),
-    frequencia_dias ? Number(frequencia_dias) : null,
-    (responsavel || "").trim() || null,
-    JSON.stringify(equipamentoIds),
-    userId || null
-  );
-  return Number(info.lastInsertRowid);
-}
-
-function registrarExecucaoRota({ rota_id, observacao, gerar_os }, userId) {
-  ensurePcmTables();
-  const rotaId = Number(rota_id);
-  if (!rotaId) throw new Error("Selecione a rota executada.");
-  const rota = db.prepare(`SELECT * FROM pcm_rotas_inspecao WHERE id=?`).get(rotaId);
-  if (!rota) throw new Error("Rota não encontrada.");
-  let osId = null;
-  if (gerar_os) {
-    let equipamentos = [];
-    try { equipamentos = JSON.parse(rota.equipamentos_json || "[]"); } catch (_e) {}
-    const equipamentoId = Number(equipamentos[0] || 0);
-    if (equipamentoId) {
-      osId = createFalhaOS({
-        equipamento_id: equipamentoId,
-        descricao: `Rota de inspeção "${rota.nome}" apontou necessidade de intervenção.`,
-        observacao,
-      }, userId);
-    }
-  }
-  db.prepare(`
-    INSERT INTO pcm_rotas_execucoes (rota_id, observacao, gerou_os_id, created_by, created_at)
-    VALUES (?, ?, ?, ?, datetime('now'))
-  `).run(rotaId, (observacao || "").trim() || null, osId, userId || null);
-  return { rota: rota.nome, osId };
-}
-
-
 const DASHBOARD_DEFAULT_CARDS = [
   'total_os','os_abertas','os_andamento','os_concluidas','os_atrasadas','preventivas_programadas','preventivas_vencidas','preventivas_concluidas','demandas_abertas','solicitacoes_pendentes','equipamentos_criticos','tempo_medio_atendimento','tempo_medio_conclusao','manutencoes_por_equipamento','servicos_por_mecanico','falhas_por_setor','percentual_corretiva','percentual_preventiva','corretivas','preventivas','equipamentos_atencao'
 ];
 const DASHBOARD_DEFAULT_GRAFICOS = ['os_status','os_periodo','corretivas_preventivas','falhas_equipamento','servicos_setor','servicos_mecanico','preventivas_cumprimento','evolucao_ocorrencias','ranking_mecanicos','ranking_solicitantes'];
 
-function parseJsonSafe(value, fallback) { try { const out = JSON.parse(value || ''); return out ?? fallback; } catch (_e) { return fallback; } }
 function ymd(date) { return date.toISOString().slice(0, 10); }
 function addMonths(date, months) { const d = new Date(date); d.setMonth(d.getMonth() + months); return d; }
 function monthStart(date) { return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)); }
@@ -848,25 +912,7 @@ function whereOS(filtros) {
   return { sql: where.join(' AND '), params };
 }
 function tableExistsLocal(name) { try { return !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name); } catch(_e){ return false; } }
-function col(table, name) { return hasColumn(table, name); }
 function firstColumn(table, names) { return names.find((n) => hasColumn(table, n)); }
-
-function getDashboardPreferences(userId) {
-  const fallback = { cards: DASHBOARD_DEFAULT_CARDS, graficos: DASHBOARD_DEFAULT_GRAFICOS, periodo_padrao: 'mes_atual', ordem: [], limites: { falhas_periodo: 3, dias_preventiva_atraso: 1, horas_parada: 24 } };
-  if (!userId || !tableExistsLocal('pcm_dashboard_preferences')) return fallback;
-  const row = db.prepare('SELECT * FROM pcm_dashboard_preferences WHERE user_id=?').get(Number(userId));
-  if (!row) return fallback;
-  return { cards: parseJsonSafe(row.cards_json, fallback.cards), graficos: parseJsonSafe(row.graficos_json, fallback.graficos), periodo_padrao: row.periodo_padrao || 'mes_atual', ordem: parseJsonSafe(row.ordem_json, []), limites: { ...fallback.limites, ...parseJsonSafe(row.limites_json, {}) } };
-}
-
-function saveDashboardPreferences(userId, payload = {}) {
-  const prefs = { cards: Array.isArray(payload.cards) ? payload.cards : DASHBOARD_DEFAULT_CARDS, graficos: Array.isArray(payload.graficos) ? payload.graficos : DASHBOARD_DEFAULT_GRAFICOS, periodo_padrao: String(payload.periodo_padrao || 'mes_atual'), ordem: Array.isArray(payload.ordem) ? payload.ordem : [], limites: payload.limites && typeof payload.limites === 'object' ? payload.limites : {} };
-  db.prepare(`INSERT INTO pcm_dashboard_preferences (user_id,cards_json,graficos_json,periodo_padrao,ordem_json,limites_json,created_at,updated_at)
-    VALUES (@user_id,@cards,@graficos,@periodo,@ordem,@limites,datetime('now'),datetime('now'))
-    ON CONFLICT(user_id) DO UPDATE SET cards_json=excluded.cards_json, graficos_json=excluded.graficos_json, periodo_padrao=excluded.periodo_padrao, ordem_json=excluded.ordem_json, limites_json=excluded.limites_json, updated_at=datetime('now')`)
-    .run({ user_id: Number(userId), cards: JSON.stringify(prefs.cards), graficos: JSON.stringify(prefs.graficos), periodo: prefs.periodo_padrao, ordem: JSON.stringify(prefs.ordem), limites: JSON.stringify(prefs.limites) });
-  return prefs;
-}
 
 function dashboardQueryLog(label, sql, params, error) {
   console.error('[PCM Dashboard] Falha na consulta:', label, { sql, params, erro: error?.message || error });
@@ -952,7 +998,15 @@ function demandaWhere(filtros) {
 }
 
 function getDashboardGerencial(query = {}, userId = null) {
-  const prefs = getDashboardPreferences(userId);
+  // O painel da Diretoria possui composição institucional fixa. Preferências
+  // legadas são preservadas no banco apenas para compatibilidade/histórico.
+  const prefs = {
+    cards: DASHBOARD_DEFAULT_CARDS,
+    graficos: DASHBOARD_DEFAULT_GRAFICOS,
+    periodo_padrao: 'mes_atual',
+    ordem: [],
+    limites: { falhas_periodo: 3, dias_preventiva_atraso: 1, horas_parada: 24 },
+  };
   const filtros = buildDashboardFilters({ periodo: prefs.periodo_padrao, ...query });
   if (filtros.data_inicial > filtros.data_final) {
     const tmp = filtros.data_inicial; filtros.data_inicial = filtros.data_final; filtros.data_final = tmp; filtros.aviso = 'Período inicial maior que o final: as datas foram ajustadas automaticamente.';
@@ -1069,21 +1123,17 @@ module.exports = {
   listBacklogSimples,
   listOSFalhasPreview,
   createFalhaOS,
+  classificarFalhaOS,
   addComponenteBOM,
   addPontoLubrificacao,
   gerarSugestaoPlanoLubrificacao,
   aplicarSugestaoPlanoLubrificacao,
-  listRotasInspecao,
-  createRotaInspecaoRapida,
-  registrarExecucaoRota,
   atualizarScoresRiscoEquipamentos: intelligenceService.atualizarScoresRiscoEquipamentos,
   getRankingTecnicos: intelligenceService.getRankingTecnicos,
   listarAlertasOperacionais: intelligenceService.listarAlertas,
   processarAutomacaoOS: intelligenceService.processarAutomacaoOS,
   buildDashboardFilters,
   getDashboardGerencial,
-  getDashboardPreferences,
-  saveDashboardPreferences,
   logDashboardReport,
   DASHBOARD_DEFAULT_CARDS,
   DASHBOARD_DEFAULT_GRAFICOS,

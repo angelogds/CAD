@@ -1,4 +1,7 @@
 // server.js
+// O arquivo local tem precedência apenas no ambiente de desenvolvimento.
+// Em produção, Railway continua fornecendo as variáveis diretamente ao processo.
+require("dotenv").config({ path: ".env.local" });
 require("dotenv").config();
 const { resolveSessionSecret } = require("./config/runtime-security");
 const SESSION_SECRET = resolveSessionSecret(process.env);

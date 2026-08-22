@@ -1,46 +1,11 @@
 <% layout('layout') %>
 <%- include('partials/internal-styles') %>
-<div class="page-head"><div><h1>PCM • Planejamento</h1><p class="muted">Plano Mestre e geração de OS preventivas.</p></div></div>
-<div class="pcm-shell">
-  <%- include('partials/internal-nav', { activePcmSection: (typeof activePcmSection !== 'undefined' ? activePcmSection : '') }) %>
-  <div class="pcm-content">
-    <div class="card">
-      <div class="pcm-actions" style="margin-bottom:8px;">
-        <button class="btn" type="button" onclick="document.getElementById('novo-plano').scrollIntoView({behavior:'smooth'})">Nova atividade / nova preventiva</button>
-        <button class="btn btn-outline" type="button">Exportar para PDF (em breve)</button>
-      </div>
-      <form method="GET" action="/pcm/planejamento" class="pcm-toolbar">
-        <select class="input" name="equipamento_id"><option value="">Equipamento...</option><% opcoes.equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>" <%= String(filtros.equipamento_id||'')===String(eq.id)?'selected':'' %>><%= eq.nome %></option><% }) %></select>
-        <select class="input" name="setor"><option value="">Setor...</option><% opcoes.setores.forEach(function(s){ %><option value="<%= s.setor %>" <%= filtros.setor===s.setor?'selected':'' %>><%= s.setor || 'Sem setor' %></option><% }) %></select>
-        <select class="input" name="tipo_manutencao"><option value="">Tipo...</option><% opcoes.tipos.forEach(function(t){ %><option value="<%= t %>" <%= filtros.tipo_manutencao===t?'selected':'' %>><%= t %></option><% }) %></select>
-        <input class="input" type="month" name="periodo" value="<%= filtros.periodo || '' %>">
-        <button class="btn" type="submit">Filtrar</button>
-      </form>
-    </div>
-
-    <div class="card" id="novo-plano" style="margin-top:12px;">
-      <div class="label">Novo plano mestre</div>
-      <form method="POST" action="/pcm/planos" class="grid-2" style="margin-top:10px; gap:10px;">
-        <select class="input" name="equipamento_id" required><option value="">Equipamento...</option><% opcoes.equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>"><%= eq.nome %></option><% }) %></select>
-        <select class="input" name="tipo_manutencao" required><% opcoes.tipos.forEach(function(t){ %><option value="<%= t %>"><%= t %></option><% }) %></select>
-        <input class="input" name="atividade_descricao" placeholder="Descrição da atividade" required>
-        <input class="input" type="date" name="proxima_data_prevista">
-        <input class="input" type="number" min="1" name="frequencia_dias" placeholder="Frequência (dias)">
-        <input class="input" type="number" min="1" name="frequencia_horas" placeholder="Frequência (horas)">
-        <textarea class="input" name="observacao" placeholder="Observações"></textarea>
-        <div class="pcm-actions"><button class="btn" type="submit">Salvar plano</button></div>
-      </form>
-    </div>
-
-    <div class="card" style="margin-top:12px;">
-      <div class="label">Planos cadastrados</div>
-      <div class="table-wrap"><table class="table compact" style="margin-top:8px;">
-        <thead><tr><th>Equipamento</th><th>Atividade</th><th>Tipo</th><th>Próxima</th><th>Situação</th><th>Ações</th></tr></thead>
-        <tbody>
-          <% if (!planos.length) { %><tr><td colspan="6" class="muted">Sem registros.</td></tr><% } %>
-          <% planos.forEach(function(p){ %><tr><td><%= p.equipamento_nome %></td><td><%= p.atividade_descricao %></td><td><%= p.tipo_manutencao %></td><td><%= p.proxima_data_prevista || '-' %></td><td><%= p.situacao %></td><td><form method="POST" action="/pcm/planos/<%= p.id %>/gerar-os" style="display:inline;"><button class="btn btn-outline" type="submit">Gerar OS</button></form> <form method="POST" action="/pcm/planos/<%= p.id %>/registrar-execucao" style="display:inline;"><button class="btn btn-outline" type="submit">Registrar execução</button></form></td></tr><% }) %>
-        </tbody>
-      </table></div>
-    </div>
-  </div>
+<div class="pcm-module-page">
+  <header class="pcm-module-head"><div><span class="pcm-section-label">Plano mestre</span><h1>Planejamento da manutenção</h1><p>Preventivas, inspeções e atividades recorrentes com prazo, frequência e geração de OS.</p></div><div class="pcm-module-actions"><% if (!canManagePcm) { %><span class="pcm-readonly">Modo consulta</span><% } %><a class="pcm-button" href="/pcm/planejamento/pdf?<%= new URLSearchParams(filtros).toString() %>">Baixar PDF</a><a class="pcm-button" href="/pcm">Visão geral</a></div></header>
+  <div class="pcm-shell"><%- include('partials/internal-nav', { activePcmSection }) %><main class="pcm-module-content">
+    <section class="pcm-stat-grid"><div class="pcm-stat"><span>Planos ativos</span><strong><%= resumo.total %></strong><small>no filtro atual</small></div><div class="pcm-stat danger"><span>Atrasados</span><strong><%= resumo.atrasados %></strong><small>exigem decisão</small></div><div class="pcm-stat warn"><span>Próximos 7 dias</span><strong><%= resumo.proximos %></strong><small>janela de preparação</small></div><div class="pcm-stat info"><span>Sem próxima data</span><strong><%= resumo.sem_data %></strong><small>cadastro incompleto</small></div></section>
+    <section class="pcm-card"><form method="GET" action="/pcm/planejamento" class="pcm-filter"><label class="pcm-field">Equipamento<select class="pcm-input" name="equipamento_id"><option value="">Todos</option><% opcoes.equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>" <%= String(filtros.equipamento_id||'')===String(eq.id)?'selected':'' %>><%= eq.nome %></option><% }) %></select></label><label class="pcm-field">Setor<select class="pcm-input" name="setor"><option value="">Todos</option><% opcoes.setores.forEach(function(s){ %><option value="<%= s.setor %>" <%= filtros.setor===s.setor?'selected':'' %>><%= s.setor %></option><% }) %></select></label><label class="pcm-field">Tipo<select class="pcm-input" name="tipo_manutencao"><option value="">Todos</option><% opcoes.tipos.forEach(function(t){ %><option value="<%= t %>" <%= filtros.tipo_manutencao===t?'selected':'' %>><%= t %></option><% }) %></select></label><span></span><button class="pcm-button primary" type="submit">Aplicar filtros</button></form></section>
+    <% if (canManagePcm) { %><details class="pcm-card"><summary>+ Cadastrar atividade no plano mestre</summary><form method="POST" action="/pcm/planos" class="pcm-form-grid"><label class="pcm-field">Equipamento<select class="pcm-input" name="equipamento_id" required><option value="">Selecione</option><% opcoes.equipamentos.forEach(function(eq){ %><option value="<%= eq.id %>"><%= eq.nome %></option><% }) %></select></label><label class="pcm-field">Tipo<select class="pcm-input" name="tipo_manutencao" required><% opcoes.tipos.forEach(function(t){ %><option value="<%= t %>"><%= t %></option><% }) %></select></label><label class="pcm-field pcm-span-2">Atividade<input class="pcm-input" name="atividade_descricao" required></label><label class="pcm-field">Próxima execução<input class="pcm-input" type="date" name="proxima_data_prevista"></label><label class="pcm-field">Frequência em dias<input class="pcm-input" type="number" min="1" name="frequencia_dias"></label><label class="pcm-field">Frequência em horas<input class="pcm-input" type="number" min="1" name="frequencia_horas"></label><label class="pcm-field">Observação<input class="pcm-input" name="observacao"></label><div class="pcm-span-4 pcm-inline-actions"><button class="pcm-button primary" type="submit">Salvar plano</button></div></form></details><% } %>
+    <section class="pcm-card"><div class="pcm-card-head"><div><span class="pcm-section-label">Atividades</span><h2>Planos cadastrados</h2></div></div><div class="pcm-table-wrap"><table class="pcm-table"><thead><tr><th>Equipamento</th><th>Atividade</th><th>Tipo</th><th>Próxima</th><th>Situação</th><th>Ações</th></tr></thead><tbody><% if (!planos.length) { %><tr><td colspan="6" class="pcm-empty-row">Nenhum plano encontrado.</td></tr><% } %><% planos.forEach(function(p){ const tone=p.situacao==='ATRASADO'?'danger':(p.situacao==='PROXIMO_VENCIMENTO'?'warn':''); %><tr><td><strong><%= p.equipamento_nome %></strong><small><%= p.equipamento_setor || '-' %></small></td><td><%= p.atividade_descricao %></td><td><%= p.tipo_manutencao %></td><td><%= p.proxima_data_prevista || 'Não definida' %></td><td><span class="pcm-badge <%= tone %>"><%= String(p.situacao||'').replaceAll('_',' ') %></span></td><td><% if (canManagePcm) { %><div class="pcm-inline-actions"><form method="POST" action="/pcm/planos/<%= p.id %>/gerar-os"><button class="pcm-button small" type="submit">Gerar OS</button></form><form method="POST" action="/pcm/planos/<%= p.id %>/registrar-execucao"><button class="pcm-button small" type="submit">Registrar execução</button></form></div><% } else { %><span class="pcm-readonly">Consulta</span><% } %></td></tr><% }) %></tbody></table></div></section>
+  </main></div>
 </div>

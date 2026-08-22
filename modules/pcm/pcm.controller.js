@@ -1,12 +1,56 @@
 const service = require("./pcm.service");
 const operationalService = require("./pcm.operational.service");
 const PDFDocument = require("pdfkit");
+const { canAccessModule } = require("../../config/rbac");
 
 function baseView(req) {
+  const role = req.session?.user?.role || "";
   return {
     title: "PCM – Planejamento e Controle da Manutenção",
     activeMenu: "pcm",
     opcoes: service.listFiltros(),
+    canManagePcm: canAccessModule(role, "pcm_manage"),
+  };
+}
+
+function countBy(rows, predicate) {
+  return (rows || []).reduce((total, row) => total + (predicate(row) ? 1 : 0), 0);
+}
+
+function planningSummary(planos = []) {
+  return {
+    total: planos.length,
+    atrasados: countBy(planos, (item) => item.situacao === "ATRASADO"),
+    proximos: countBy(planos, (item) => item.situacao === "PROXIMO_VENCIMENTO"),
+    sem_data: countBy(planos, (item) => !item.proxima_data_prevista),
+  };
+}
+
+function failureSummary(falhas = []) {
+  return {
+    total: falhas.length,
+    criticas: countBy(falhas, (item) => ["CRITICA", "CRÍTICA", "ALTA"].includes(String(item.prioridade || "").toUpperCase())),
+    sem_classificacao: countBy(falhas, (item) => !Number(item.classificada)),
+    equipamentos: new Set(falhas.map((item) => Number(item.equipamento_id)).filter(Boolean)).size,
+  };
+}
+
+function lubricationSummary(planos = [], totalEquipamentos = 0) {
+  const cobertos = new Set(planos.map((item) => Number(item.equipamento_id)).filter(Boolean)).size;
+  return {
+    pontos: planos.length,
+    atrasados: countBy(planos, (item) => item.situacao === "ATRASADO"),
+    em_breve: countBy(planos, (item) => item.situacao === "EM_BREVE"),
+    cobertura: totalEquipamentos ? Math.round((cobertos * 1000) / totalEquipamentos) / 10 : 0,
+  };
+}
+
+function partsSummary(pecas = []) {
+  return {
+    total: pecas.length,
+    abaixo_minimo: countBy(pecas, (item) => Number(item.estoque_atual || 0) < Number(item.estoque_minimo || 0)),
+    zeradas: countBy(pecas, (item) => Number(item.estoque_atual || 0) <= 0),
+    sem_vinculo: countBy(pecas, (item) => !item.estoque_item_id),
   };
 }
 
@@ -36,10 +80,12 @@ function planejamento(req, res) {
     setor: req.query.setor || "",
     tipo_manutencao: req.query.tipo_manutencao || "",
   };
+  const planos = service.listPlanos(filtros);
   return res.render("pcm/planejamento", {
     ...baseView(req),
     activePcmSection: "planejamento",
-    planos: service.listPlanos(filtros),
+    planos,
+    resumo: planningSummary(planos),
     filtros,
   });
 }
@@ -50,11 +96,13 @@ function falhas(req, res) {
     equipamento: req.query.equipamento || "",
     tipo_falha: req.query.tipo_falha || "",
   };
+  const falhasEncontradas = service.listOSFalhasPreview(filtros);
   return res.render("pcm/falhas", {
     ...baseView(req),
     activePcmSection: "falhas",
     filtros,
-    falhas: service.listOSFalhasPreview(),
+    falhas: falhasEncontradas,
+    resumo: failureSummary(falhasEncontradas),
     equipamentos: service.getEquipamentos(),
   });
 }
@@ -65,27 +113,22 @@ function engenharia(req, res) {
     categoria: req.query.categoria || "",
     busca: req.query.busca || "",
   };
+  const bom = service.listBom(filtros);
+  const criticidadeAtual = service.getCriticidadeByEquipamentoId(filtros.equipamento_id);
   return res.render("pcm/engenharia", {
     ...baseView(req),
     activePcmSection: "engenharia",
     filtros,
     equipamentos: service.getEquipamentos(),
     equipamentoSelecionado: service.getEquipamentoById(filtros.equipamento_id),
-    bom: service.listBom(filtros),
-  });
-}
-
-function criticidade(req, res) {
-  const filtros = {
-    equipamento_id: req.query.equipamento_id || "",
-  };
-  const criticidadeAtual = service.getCriticidadeByEquipamentoId(filtros.equipamento_id);
-  return res.render("pcm/criticidade", {
-    ...baseView(req),
-    activePcmSection: "criticidade",
-    filtros,
-    equipamentos: service.getEquipamentos(),
     criticidadeAtual,
+    bom,
+    resumo: {
+      componentes: bom.length,
+      criticos: countBy(bom, (item) => Number(item.peca_critica) === 1),
+      vinculados_estoque: countBy(bom, (item) => Boolean(item.estoque_item_id)),
+      indice_criticidade: criticidadeAtual?.indice_criticidade ?? null,
+    },
   });
 }
 
@@ -99,7 +142,7 @@ function salvarCriticidade(req, res) {
   } catch (e) {
     req.flash("error", e.message || "Falha ao salvar criticidade do equipamento.");
   }
-  return res.redirect(`/pcm/criticidade?equipamento_id=${encodeURIComponent(req.body.equipamento_id || "")}`);
+  return res.redirect(`/pcm/engenharia?equipamento_id=${encodeURIComponent(req.body.equipamento_id || "")}#criticidade`);
 }
 
 function lubrificacao(req, res) {
@@ -109,12 +152,15 @@ function lubrificacao(req, res) {
   };
   const sugestaoIA = req.session?.pcmLubrificacaoSugestao || null;
   if (req.session) req.session.pcmLubrificacaoSugestao = null;
+  const equipamentos = service.getEquipamentos();
+  const lubrificacoes = service.listLubrificacao(filtros);
   return res.render("pcm/lubrificacao", {
     ...baseView(req),
     activePcmSection: "lubrificacao",
     filtros,
-    equipamentos: service.getEquipamentos(),
-    lubrificacoes: service.listLubrificacao(filtros),
+    equipamentos,
+    lubrificacoes,
+    resumo: lubricationSummary(lubrificacoes, equipamentos.length),
     sugestaoIA,
   });
 }
@@ -125,11 +171,13 @@ function pecasCriticas(req, res) {
     busca: req.query.busca || "",
     abaixo_minimo: req.query.abaixo_minimo || "",
   };
+  const pecas = service.listPecasCriticas(filtros);
   return res.render("pcm/pecas-criticas", {
     ...baseView(req),
     activePcmSection: "pecas-criticas",
     filtros,
-    pecas: service.listPecasCriticas(filtros),
+    pecas,
+    resumo: partsSummary(pecas),
   });
 }
 
@@ -160,70 +208,28 @@ function programacaoSemanal(req, res) {
     filtros,
     programacao,
     atividadesSemProgramacao,
-  });
-}
-
-function backlog(req, res) {
-  const filtros = {
-    tipo: req.query.tipo || "",
-    setor: req.query.setor || "",
-    criticidade: req.query.criticidade || "",
-    prioridade: req.query.prioridade || "",
-    dias_atraso: req.query.dias_atraso || "",
-  };
-
-  let items = service.listBacklogSimples().map((b) => ({
-    tipo: b.tipo,
-    numero: b.numero,
-    equipamento: b.equipamento,
-    criticidade: b.criticidade,
-    prioridade: b.prioridade,
-    data_ref: b.data_ref,
-    atraso: b.atraso,
-    status: b.status,
-    setor: b.setor || "",
-  }));
-
-  if (filtros.tipo) items = items.filter((i) => String(i.tipo).includes(filtros.tipo.toUpperCase()));
-  if (filtros.criticidade) items = items.filter((i) => String(i.criticidade).includes(filtros.criticidade.toUpperCase()));
-  if (filtros.prioridade) items = items.filter((i) => String(i.prioridade).includes(filtros.prioridade.toUpperCase()));
-  if (filtros.dias_atraso) items = items.filter((i) => Number(i.atraso || 0) >= Number(filtros.dias_atraso));
-
-  return res.render("pcm/backlog", {
-    ...baseView(req),
-    activePcmSection: "backlog",
-    filtros,
-    backlog: items,
-  });
-}
-
-function rotasInspecao(req, res) {
-  return res.render("pcm/rotas-inspecao", {
-    ...baseView(req),
-    activePcmSection: "rotas-inspecao",
-    rotas: service.listRotasInspecao(),
-    equipamentos: service.getEquipamentos(),
+    resumo: {
+      total: programacao.itens.length,
+      horas: programacao.itens.reduce((sum, item) => sum + Number(item.horas_estimadas || 0), 0),
+      sem_responsavel: countBy(programacao.itens, (item) => !item.responsavel_user_id),
+      pendentes: atividadesSemProgramacao.length,
+    },
   });
 }
 
 function relatoriosAvancados(req, res) {
-  const indicadores = service.getIndicadores();
   const filtros = {
-    periodo_inicio: req.query.periodo_inicio || "",
-    periodo_fim: req.query.periodo_fim || "",
+    data_inicial: req.query.data_inicial || "",
+    data_final: req.query.data_final || "",
     setor: req.query.setor || "",
+    equipamento_id: req.query.equipamento_id || "",
   };
+  const dashboard = service.getDashboardGerencial({ periodo: 'ultimos_6_meses', ...filtros }, req.session?.user?.id || null);
   return res.render("pcm/relatorios-avancados", {
     ...baseView(req),
     activePcmSection: "relatorios-avancados",
-    filtros,
-    ranking: service.getRankingEquipamentos(10, Number(req.query.meses || 6)),
-    resumo: {
-      custo_total: Number(indicadores.custo_manutencao_mes || 0).toFixed(2),
-      falhas: indicadores.corretiva_qtd_mes || 0,
-      pct_preventiva: indicadores.preventiva_pct_mes || 0,
-      pct_corretiva: indicadores.corretiva_pct_mes || 0,
-    },
+    filtros: dashboard.filtros,
+    relatorio: dashboard,
   });
 }
 
@@ -311,6 +317,16 @@ function registrarFalha(req, res) {
   return res.redirect('/pcm/falhas');
 }
 
+function classificarFalha(req, res) {
+  try {
+    service.classificarFalhaOS(req.params.osId, req.body, req.session?.user?.id || null);
+    req.flash('success', `Classificação técnica da OS #${req.params.osId} salva com sucesso.`);
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível classificar a falha.');
+  }
+  return res.redirect('/pcm/falhas');
+}
+
 function adicionarComponente(req, res) {
   try {
     const itemId = service.addComponenteBOM(req.body, req.session?.user?.id || null);
@@ -333,11 +349,12 @@ function adicionarLubrificacao(req, res) {
   return res.redirect(`/pcm/lubrificacao?equipamento_id=${eid}`);
 }
 
-function sugerirPlanoLubrificacaoIA(req, res) {
+async function sugerirPlanoLubrificacaoIA(req, res) {
   try {
-    const sugestao = service.gerarSugestaoPlanoLubrificacao(req.body.equipamento_id || req.query.equipamento_id);
+    const sugestao = await service.gerarSugestaoPlanoLubrificacao(req.body.equipamento_id || req.query.equipamento_id);
     if (req.session) req.session.pcmLubrificacaoSugestao = sugestao;
-    req.flash("success", `Sugestão de IA gerada para ${sugestao.equipamento_nome}.`);
+    const origem = sugestao.origem === 'OPENAI' ? 'OpenAI' : 'modelo local de contingência';
+    req.flash("success", `Rascunho de lubrificação gerado com ${origem} para ${sugestao.equipamento_nome}. Revise antes de aplicar.`);
   } catch (e) {
     req.flash("error", e.message || "Falha ao gerar sugestão de lubrificação.");
   }
@@ -347,9 +364,12 @@ function sugerirPlanoLubrificacaoIA(req, res) {
 
 function aplicarSugestaoLubrificacaoIA(req, res) {
   try {
+    if (String(req.body.confirmacao_tecnica || '') !== '1') {
+      throw new Error('Confirme a revisão técnica do rascunho antes de cadastrar os pontos.');
+    }
     const sugestao = req.session?.pcmLubrificacaoSugestao || null;
     const ids = service.aplicarSugestaoPlanoLubrificacao(sugestao, req.session?.user?.id || null);
-    req.flash("success", `IA aplicou ${ids.length} ponto(s) de lubrificação automaticamente. Você pode editar/corrigir na sequência.`);
+    req.flash("success", `${ids.length} ponto(s) de lubrificação cadastrado(s) após confirmação técnica.`);
     if (req.session) req.session.pcmLubrificacaoSugestao = null;
   } catch (e) {
     req.flash("error", e.message || "Falha ao aplicar sugestão automática de lubrificação.");
@@ -378,30 +398,6 @@ function programarBacklog(req, res) {
   }
   const week = encodeURIComponent(req.body.semana_inicio || '');
   return res.redirect(`/pcm/programacao-semanal${week ? `?semana_inicio=${week}` : ''}`);
-}
-
-function novaRota(req, res) {
-  try {
-    const id = service.createRotaInspecaoRapida(req.body, req.session?.user?.id || null);
-    req.flash('success', `Rota de inspeção #${id} criada com sucesso.`);
-  } catch (e) {
-    req.flash('error', e.message || 'Falha ao criar rota.');
-  }
-  return res.redirect('/pcm/rotas-inspecao');
-}
-
-function salvarExecucaoRota(req, res) {
-  try {
-    const out = service.registrarExecucaoRota(req.body, req.session?.user?.id || null);
-    if (out.osId) {
-      req.flash('success', `Execução da rota "${out.rota}" salva e OS #${out.osId} gerada.`);
-    } else {
-      req.flash('success', `Execução da rota "${out.rota}" salva com sucesso.`);
-    }
-  } catch (e) {
-    req.flash('error', e.message || 'Falha ao salvar execução da rota.');
-  }
-  return res.redirect('/pcm/rotas-inspecao');
 }
 
 
@@ -433,63 +429,77 @@ function dashboardDados(req, res) {
   }
 }
 
-function dashboardConfig(req, res) {
-  const prefs = service.getDashboardPreferences(req.session?.user?.id || null);
-  return res.render("pcm/dashboard-config", {
-    ...baseView(req),
-    title: "Configurar dashboard",
-    activePcmSection: "dashboard-gerencial",
-    prefs,
-    cardsDisponiveis: service.DASHBOARD_DEFAULT_CARDS,
-    graficosDisponiveis: service.DASHBOARD_DEFAULT_GRAFICOS,
-  });
+function pdfHeader(req, res, filename, title, subtitle = '') {
+  const doc = new PDFDocument({ margin: 34, size: 'A4', layout: 'landscape' });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  doc.pipe(res);
+  doc.fillColor('#137a3a').fontSize(17).text('CAMPO DO GADO', { align: 'center' });
+  doc.fillColor('#10233e').fontSize(15).text(title, { align: 'center' });
+  if (subtitle) doc.fillColor('#5d6c7d').fontSize(9).text(subtitle, { align: 'center' });
+  doc.moveDown(0.5).fillColor('#5d6c7d').fontSize(8)
+    .text(`Emitido em ${new Date().toLocaleString('pt-BR')} por ${req.session?.user?.name || req.session?.user?.email || 'Usuário do sistema'}`);
+  doc.moveTo(34, doc.y + 5).lineTo(808, doc.y + 5).strokeColor('#b9d8c3').stroke();
+  doc.moveDown();
+  return doc;
 }
 
-function salvarDashboardConfig(req, res) {
-  const arr = (v) => Array.isArray(v) ? v : (v ? [v] : []);
-  service.saveDashboardPreferences(req.session?.user?.id || null, {
-    cards: arr(req.body.cards),
-    graficos: arr(req.body.graficos),
-    periodo_padrao: req.body.periodo_padrao || 'mes_atual',
-    limites: {
-      falhas_periodo: Number(req.body.falhas_periodo || 3),
-      dias_preventiva_atraso: Number(req.body.dias_preventiva_atraso || 1),
-      horas_parada: Number(req.body.horas_parada || 24),
-    },
-  });
-  req.flash('success', 'Preferências do dashboard salvas.');
-  return res.redirect('/pcm/dashboard-gerencial');
+function pdfSection(doc, title) {
+  if (doc.y > 520) doc.addPage();
+  doc.moveDown(0.5).fillColor('#137a3a').fontSize(11).text(title);
+  doc.moveDown(0.25).fillColor('#1f2937').fontSize(8);
 }
 
-function resetDashboardConfig(req, res) {
-  service.saveDashboardPreferences(req.session?.user?.id || null, { cards: service.DASHBOARD_DEFAULT_CARDS, graficos: service.DASHBOARD_DEFAULT_GRAFICOS, periodo_padrao: 'mes_atual', limites: {} });
-  req.flash('success', 'Preferências padrão restauradas.');
-  return res.redirect('/pcm/dashboard-gerencial/configurar');
+function pdfLines(doc, rows, formatter, emptyText = 'Sem dados para os filtros selecionados.') {
+  if (!rows.length) return doc.text(emptyText);
+  rows.forEach((row, index) => {
+    if (doc.y > 535) doc.addPage();
+    doc.text(`${index + 1}. ${formatter(row)}`, { width: 770, lineGap: 2 });
+  });
 }
 
 function dashboardPdf(req, res) {
   const data = service.getDashboardGerencial(req.query, req.session?.user?.id || null);
   service.logDashboardReport(req.session?.user?.id || null, 'PDF', data.filtros);
-  const doc = new PDFDocument({ margin: 36, size: 'A4' });
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', 'attachment; filename="relatorio-gerencial-pcm.pdf"');
-  doc.pipe(res);
-  doc.fillColor('#166534').fontSize(16).text('Campo do Gado', { align: 'center' });
-  doc.fillColor('#111827').fontSize(14).text('Dashboard Gerencial de Manutenção – PCM', { align: 'center' });
-  doc.moveDown().fontSize(9).text(`Período: ${data.filtros.data_inicial} a ${data.filtros.data_final}`);
-  doc.text(`Emitido em: ${new Date().toLocaleString('pt-BR')} por ${req.session?.user?.name || req.session?.user?.email || 'Usuário'}`);
-  doc.text('Rodapé institucional: Sistema Manutenção Campo do Gado V2 • PCM');
-  doc.moveDown().fontSize(12).fillColor('#166534').text('Indicadores principais');
-  doc.fillColor('#111827').fontSize(9);
-  Object.entries(data.cards).forEach(([k,v]) => doc.text(`${k}: ${v ?? 'sem dado registrado'}`));
-  doc.moveDown().fontSize(12).fillColor('#166534').text('Equipamentos que exigem atenção');
-  doc.fillColor('#111827').fontSize(9);
-  if (!data.equipamentos_atencao.length) doc.text('Sem equipamentos sinalizados pelos limites atuais.');
-  data.equipamentos_atencao.slice(0, 20).forEach((e) => doc.text(`${e.codigo || '-'} ${e.nome} • ${e.setor || '-'} • ${e.motivos.join('; ')}`));
-  doc.moveDown().fontSize(12).fillColor('#166534').text('Rankings');
-  doc.fillColor('#111827').fontSize(9).text(`Falhas por equipamento: ${data.graficos.falhas_equipamento.length} linhas`);
-  doc.text(`Ranking de solicitantes: ${data.graficos.ranking_solicitantes.length} linhas`);
-  doc.text(`Ranking operacional de mecânicos: ${data.graficos.ranking_mecanicos.length} linhas`);
+  const doc = pdfHeader(req, res, 'relatorio-gerencial-pcm.pdf', 'Painel Gerencial de Manutenção – PCM', `Período: ${data.filtros.data_inicial} a ${data.filtros.data_final}`);
+  pdfSection(doc, 'Resumo executivo');
+  doc.text(`OS no período: ${data.cards.total_os || 0} | Corretivas: ${data.cards.corretivas || 0} | Preventivas: ${data.cards.preventivas || 0} | Atrasadas: ${data.cards.os_atrasadas || 0}`);
+  doc.text(`Backlog: ${data.cards.backlog_manutencao || 0} | Cumprimento da programação: ${data.cards.cumprimento_programacao || 0}% | Equipamentos críticos: ${data.cards.equipamentos_criticos || 0}`);
+  pdfSection(doc, 'Equipamentos que exigem atenção');
+  pdfLines(doc, data.equipamentos_atencao.slice(0, 20), (item) => `${item.codigo || '-'} ${item.nome} | ${item.setor || '-'} | ${item.falhas || 0} falhas | ${(item.motivos || []).join('; ')}`);
+  pdfSection(doc, 'Ranking de falhas');
+  pdfLines(doc, (data.graficos.falhas_equipamento || []).slice(0, 15), (item) => `${item.nome} | ${item.setor || '-'} | ${item.falhas || 0} falhas | ${item.falhas_criticas || 0} críticas | última: ${item.ultima_ocorrencia || '-'}`);
+  doc.end();
+}
+
+function planejamentoPdf(req, res) {
+  const planos = service.listPlanos(req.query || {});
+  const resumo = planningSummary(planos);
+  const doc = pdfHeader(req, res, 'plano-mestre-pcm.pdf', 'Plano Mestre de Manutenção', `Planos ativos: ${resumo.total} | Atrasados: ${resumo.atrasados} | Próximos: ${resumo.proximos}`);
+  pdfSection(doc, 'Atividades planejadas');
+  pdfLines(doc, planos, (item) => `${item.equipamento_nome} | ${item.tipo_manutencao} | ${item.atividade_descricao} | próxima: ${item.proxima_data_prevista || 'não definida'} | ${item.situacao}`);
+  doc.end();
+}
+
+function pecasCriticasPdf(req, res) {
+  const pecas = service.listPecasCriticas(req.query || {});
+  const resumo = partsSummary(pecas);
+  const doc = pdfHeader(req, res, 'pecas-criticas-pcm.pdf', 'Peças Críticas em Estoque', `Itens: ${resumo.total} | Abaixo do mínimo: ${resumo.abaixo_minimo} | Zerados: ${resumo.zeradas}`);
+  pdfSection(doc, 'Posição de estoque');
+  pdfLines(doc, pecas, (item) => `${item.codigo_interno || '-'} | ${item.descricao_tecnica || item.modelo_comercial || '-'} | atual: ${item.estoque_atual ?? '-'} | mínimo: ${item.estoque_minimo ?? '-'} | ${item.categoria || '-'}`);
+  doc.end();
+}
+
+function relatoriosAvancadosPdf(req, res) {
+  const data = service.getDashboardGerencial(req.query, req.session?.user?.id || null);
+  service.logDashboardReport(req.session?.user?.id || null, 'PDF_ANALITICO', data.filtros);
+  const doc = pdfHeader(req, res, 'relatorio-indicadores-pcm.pdf', 'Relatório de Indicadores do PCM', `Período: ${data.filtros.data_inicial} a ${data.filtros.data_final}`);
+  pdfSection(doc, 'Indicadores do período');
+  doc.text(`OS: ${data.cards.total_os || 0} | Corretivas: ${data.cards.corretivas || 0} (${data.cards.percentual_corretiva || 0}%) | Preventivas: ${data.cards.preventivas || 0} (${data.cards.percentual_preventiva || 0}%) | Atrasadas: ${data.cards.os_atrasadas || 0}`);
+  pdfSection(doc, 'Ranking de falhas por equipamento');
+  pdfLines(doc, (data.graficos.falhas_equipamento || []).slice(0, 30), (item) => `${item.nome} | ${item.setor || '-'} | ${item.falhas || 0} falhas | ${item.falhas_criticas || 0} críticas | média entre falhas: ${item.media_dias_entre_falhas ?? 'dados insuficientes'} dias`);
+  pdfSection(doc, 'Ordens consideradas');
+  pdfLines(doc, (data.tabelas.ordens || []).slice(0, 80), (item) => `OS #${item.id} | ${item.opened_at || '-'} | ${item.tipo || '-'} | ${item.status || '-'} | ${item.equipamento || '-'} | ${item.setor || '-'}`);
   doc.end();
 }
 
@@ -506,38 +516,50 @@ function dashboardExcel(req, res) {
   return res.send(`<!doctype html><html><head><meta charset="utf-8"><style>table{border-collapse:collapse}th{background:#166534;color:#fff}</style></head><body>${sheets.join('<br style="page-break-after:always">')}</body></html>`);
 }
 
+function relatoriosAvancadosExcel(req, res) {
+  const data = service.getDashboardGerencial(req.query, req.session?.user?.id || null);
+  service.logDashboardReport(req.session?.user?.id || null, 'EXCEL_ANALITICO', data.filtros);
+  const sheets = [
+    tableHtml('Indicadores', [data.cards]),
+    tableHtml('Ordens consideradas', data.tabelas.ordens),
+    tableHtml('Falhas por equipamento', data.graficos.falhas_equipamento),
+    tableHtml('Tipos de manutenção', data.graficos.tipos_manutencao),
+    tableHtml('OS por mês', data.graficos.os_mes),
+  ];
+  res.setHeader('Content-Type', 'application/vnd.ms-excel; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="relatorio-indicadores-pcm.xls"');
+  return res.send(`<!doctype html><html><head><meta charset="utf-8"><style>table{border-collapse:collapse}th{background:#166534;color:#fff}</style></head><body>${sheets.join('<br style="page-break-after:always">')}</body></html>`);
+}
+
 module.exports = {
   index,
   dashboardGerencial,
   dashboardDados,
-  dashboardConfig,
-  salvarDashboardConfig,
-  resetDashboardConfig,
   dashboardPdf,
   dashboardExcel,
+  planejamentoPdf,
+  pecasCriticasPdf,
+  relatoriosAvancadosPdf,
+  relatoriosAvancadosExcel,
   planejamento,
   falhas,
   engenharia,
-  criticidade,
   salvarCriticidade,
   lubrificacao,
   pecasCriticas,
   programacaoSemanal,
-  backlog,
-  rotasInspecao,
   relatoriosAvancados,
   atualizarIndicadores,
   executarAutomacao,
   analisarIA,
   registrarFalha,
+  classificarFalha,
   adicionarComponente,
   adicionarLubrificacao,
   sugerirPlanoLubrificacaoIA,
   aplicarSugestaoLubrificacaoIA,
   salvarProgramacao,
   programarBacklog,
-  novaRota,
-  salvarExecucaoRota,
   createPlano,
   gerarOS,
   registrarExecucao,
