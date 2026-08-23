@@ -121,9 +121,25 @@ test('exportações PDF e SVG suportam arcos, polilinhas, eixos e cotas do schem
   assert.match(pdf, /case 'polyline'/);
   assert.match(pdf, /const geometry = shaft\.geometry \|\| shaft/);
   assert.match(pdf, /const geometry = dim\.geometry \|\| dim/);
+  assert.match(pdf, /function collectCadContent/);
+  assert.match(pdf, /function getDimensionBounds/);
+  assert.match(pdf, /geometry\.textPoint/);
+  assert.match(pdf, /drawArrowHead/);
   assert.match(svg, /const arcPath = \(obj\)/);
   assert.match(svg, /const shaftSvg = \(obj\)/);
   assert.match(svg, /const dimensionSvg = dimensions\.map/);
+});
+
+test('exportação do editor salva as cotas antes de abrir o PDF', () => {
+  const editor = read('views/desenho-tecnico/cad-editor-v2.ejs');
+  const controller = read('public/js/modules/desenho-tecnico/desenho-tecnico.controller.js');
+  assert.match(editor, /data-action="export-pdf"/);
+  assert.match(editor, /data-pdf-url="\/desenho-tecnico\/cad\/<%= desenho\.id %>\/pdf"/);
+  assert.match(controller, /'export-pdf': async \(\) =>/);
+  assert.match(controller, /Salvando cotas antes de gerar o PDF/);
+  assert.match(controller, /await this\.saveDrawing\(\)/);
+  assert.match(controller, /window\.location\.assign\(pdfUrl\)/);
+  assert.match(controller, /target\.dataset\.action === 'export-pdf'\) event\.preventDefault\(\)/);
 });
 
 test('gerador de flange cria geometria paramétrica exata e separada por camadas', async () => {
