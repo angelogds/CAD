@@ -124,7 +124,8 @@ function drawDrawingArea(doc, area, desenho, svgMarkup, options) {
   // Processar objetos do CAD e renderizar no PDF
   const cadData = options.cadData || desenho.cad_data;
   if (cadData && Array.isArray(cadData.objects)) {
-    renderCadObjectsToPdf(doc, cadData.objects, cadData.dimensions || [], area);
+    const content = collectCadContent(cadData);
+    renderCadObjectsToPdf(doc, content.objects, content.dimensions, area, cadData.layers || {});
   } else {
     // Fallback: mostrar informação textual
     doc.fontSize(11)
@@ -147,11 +148,47 @@ function drawDrawingArea(doc, area, desenho, svgMarkup, options) {
   }
 }
 
-function renderCadObjectsToPdf(doc, objects, dimensions, area) {
+function getEntityLayer(entity = {}, fallback = 'geometria_principal') {
+  return entity.layer || entity.metadata?.layer || fallback;
+}
+
+function isEntityVisible(entity, layers = {}, fallbackLayer) {
+  if (!entity || entity.visible === false) return false;
+  const layer = getEntityLayer(entity, fallbackLayer);
+  return layers[layer]?.visible !== false;
+}
+
+function collectCadContent(cadData = {}) {
+  const rawObjects = Array.isArray(cadData.objects) ? cadData.objects : [];
+  const dimensionMap = new Map();
+  const addDimension = (dimension, index) => {
+    if (!dimension || typeof dimension !== 'object') return;
+    const geometry = dimension.geometry || dimension;
+    const fallbackKey = `${index}:${geometry.mode || 'linear'}:${JSON.stringify(geometry)}`;
+    dimensionMap.set(String(dimension.id || fallbackKey), {
+      ...dimension,
+      type: 'dimension',
+      layer: getEntityLayer(dimension, 'cotas'),
+    });
+  };
+
+  rawObjects.filter((object) => object?.type === 'dimension').forEach(addDimension);
+  (Array.isArray(cadData.dimensions) ? cadData.dimensions : []).forEach(addDimension);
+
+  return {
+    objects: rawObjects.filter((object) => object?.type !== 'dimension'),
+    dimensions: Array.from(dimensionMap.values()),
+  };
+}
+
+function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}) {
+  const visibleObjects = objects.filter((object) => isEntityVisible(object, layers));
+  const visibleDimensions = dimensions.filter((dimension) => isEntityVisible(dimension, layers, 'cotas'));
+
   // Calcular bounds dos objetos para escala
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   
-  for (const obj of objects) {
+  for (const obj of [...visibleObjects, ...visibleDimensions]) {
     const bounds = getObjectBounds(obj);
     if (bounds) {
       minX = Math.min(minX, bounds.minX);
@@ -189,7 +226,7 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area) {
   };
 
   // Renderizar objetos
-  for (const obj of objects) {
+  for (const obj of visibleObjects) {
     const color = colors[obj.type] || '#0f172a';
     
     switch (obj.type) {
@@ -274,7 +311,7 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area) {
   }
 
   // Renderizar cotas
-  for (const dim of dimensions) {
+  for (const dim of visibleDimensions) {
     renderDimensionToPdf(doc, dim, scale, offsetX, offsetY);
   }
 }
@@ -332,20 +369,76 @@ function renderShaftToPdf(doc, shaft, scale, offsetX, offsetY) {
   }
 }
 
+function normalizeDimensionLabel(dim, geometry) {
+  const label = geometry.label || dim.text || `${dim.value || ''}`;
+  return String(label || '').replace(/[⌀⌾]/g, 'Ø');
+}
+
+function drawArrowHead(doc, x, y, directionX, directionY, color, size = 4.5) {
+  const length = Math.hypot(directionX, directionY);
+  if (length < 0.001) return;
+  const ux = directionX / length;
+  const uy = directionY / length;
+  const nx = -uy;
+  const ny = ux;
+  const wing = size * 0.42;
+  doc.save()
+    .fillColor(color)
+    .moveTo(x, y)
+    .lineTo(x - ux * size + nx * wing, y - uy * size + ny * wing)
+    .lineTo(x - ux * size - nx * wing, y - uy * size - ny * wing)
+    .closePath()
+    .fill()
+    .restore();
+}
+
+function drawDimensionLabel(doc, label, x, y, color) {
+  if (!label) return;
+  doc.save().font('Helvetica').fontSize(8);
+  const width = Math.max(18, doc.widthOfString(label) + 6);
+  doc.rect(x - width / 2, y - 5, width, 11).fill('#f8fafc');
+  doc.fillColor(color).text(label, x - width / 2, y - 3.5, {
+    width,
+    align: 'center',
+    lineBreak: false,
+  });
+  doc.restore();
+}
+
 function renderDimensionToPdf(doc, dim, scale, offsetX, offsetY) {
   const geometry = dim.geometry || dim;
+  const color = '#1d4ed8';
+  const label = normalizeDimensionLabel(dim, geometry);
   if (geometry.mode === 'angular' && geometry.vertex) {
     const steps = 24;
+    const radius = Math.max(1, Number(geometry.radius || 1));
+    const startAngle = Number(geometry.startAngle || 0);
+    const endAngle = Number(geometry.endAngle || 0);
+    const vertexX = geometry.vertex.x * scale + offsetX;
+    const vertexY = geometry.vertex.y * scale + offsetY;
+    const startX = (geometry.vertex.x + Math.cos(startAngle) * radius) * scale + offsetX;
+    const startY = (geometry.vertex.y + Math.sin(startAngle) * radius) * scale + offsetY;
+    const endX = (geometry.vertex.x + Math.cos(endAngle) * radius) * scale + offsetX;
+    const endY = (geometry.vertex.y + Math.sin(endAngle) * radius) * scale + offsetY;
+
+    doc.moveTo(vertexX, vertexY).lineTo(startX, startY)
+      .moveTo(vertexX, vertexY).lineTo(endX, endY)
+      .lineWidth(0.45).stroke(color);
     doc.moveTo(
-      (geometry.vertex.x + Math.cos(geometry.startAngle) * geometry.radius) * scale + offsetX,
-      (geometry.vertex.y + Math.sin(geometry.startAngle) * geometry.radius) * scale + offsetY,
+      startX,
+      startY,
     );
     for (let index = 1; index <= steps; index += 1) {
-      const angle = geometry.startAngle + (geometry.endAngle - geometry.startAngle) * index / steps;
-      doc.lineTo((geometry.vertex.x + Math.cos(angle) * geometry.radius) * scale + offsetX, (geometry.vertex.y + Math.sin(angle) * geometry.radius) * scale + offsetY);
+      const angle = startAngle + (endAngle - startAngle) * index / steps;
+      doc.lineTo((geometry.vertex.x + Math.cos(angle) * radius) * scale + offsetX, (geometry.vertex.y + Math.sin(angle) * radius) * scale + offsetY);
     }
-    doc.lineWidth(0.5).stroke('#059669');
-    doc.fontSize(8).fillColor('#059669').text(geometry.label || '', geometry.vertex.x * scale + offsetX + 8, geometry.vertex.y * scale + offsetY - 12);
+    doc.lineWidth(0.65).stroke(color);
+    const middleAngle = startAngle + (endAngle - startAngle) / 2;
+    const textPoint = geometry.textPoint || {
+      x: geometry.vertex.x + Math.cos(middleAngle) * (radius + 10 / Math.max(scale, 0.001)),
+      y: geometry.vertex.y + Math.sin(middleAngle) * (radius + 10 / Math.max(scale, 0.001)),
+    };
+    drawDimensionLabel(doc, label, textPoint.x * scale + offsetX, textPoint.y * scale + offsetY, color);
     return;
   }
   if (!geometry.p1 || !geometry.p2) return;
@@ -354,24 +447,80 @@ function renderDimensionToPdf(doc, dim, scale, offsetX, offsetY) {
   const x2 = geometry.p2.x * scale + offsetX;
   const y2 = geometry.p2.y * scale + offsetY;
 
-  // Linhas de extensão e cota
-  doc.moveTo(x1, y1).lineTo(x2, y2)
-    .lineWidth(0.5)
-    .stroke('#059669');
-
-  // Texto da cota
   const midX = (x1 + x2) / 2;
   const midY = (y1 + y2) / 2;
-  
-  doc.fontSize(8)
-    .fillColor('#059669')
-    .text(geometry.label || dim.text || `${dim.value || ''}`, midX - 15, midY - 12);
+  const textPoint = geometry.textPoint || {
+    x: (geometry.p1.x + geometry.p2.x) / 2,
+    y: (geometry.p1.y + geometry.p2.y) / 2,
+  };
+  const textX = textPoint.x * scale + offsetX;
+  const textY = textPoint.y * scale + offsetY;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const length = Math.hypot(dx, dy);
+  if (length < 0.001) return;
+  const ux = dx / length;
+  const uy = dy / length;
+  const nx = -uy;
+  const ny = ux;
+  const dimensionOffset = (textX - midX) * nx + (textY - midY) * ny;
+  const dimensionStart = { x: x1 + nx * dimensionOffset, y: y1 + ny * dimensionOffset };
+  const dimensionEnd = { x: x2 + nx * dimensionOffset, y: y2 + ny * dimensionOffset };
+
+  const drawExtension = (origin, end) => {
+    const ex = end.x - origin.x;
+    const ey = end.y - origin.y;
+    const extensionLength = Math.hypot(ex, ey);
+    if (extensionLength < 0.001) return;
+    const vx = ex / extensionLength;
+    const vy = ey / extensionLength;
+    doc.moveTo(origin.x + vx * 1.5, origin.y + vy * 1.5)
+      .lineTo(end.x + vx * 3, end.y + vy * 3);
+  };
+
+  drawExtension({ x: x1, y: y1 }, dimensionStart);
+  drawExtension({ x: x2, y: y2 }, dimensionEnd);
+  doc.moveTo(dimensionStart.x, dimensionStart.y)
+    .lineTo(dimensionEnd.x, dimensionEnd.y)
+    .lineWidth(0.65)
+    .stroke(color);
+  drawArrowHead(doc, dimensionStart.x, dimensionStart.y, ux, uy, color);
+  drawArrowHead(doc, dimensionEnd.x, dimensionEnd.y, -ux, -uy, color);
+  drawDimensionLabel(doc, label, textX, textY, color);
+}
+
+function getDimensionBounds(dim) {
+  const geometry = dim.geometry || dim;
+  if (geometry.mode === 'angular' && geometry.vertex) {
+    const radius = Math.max(0, Number(geometry.radius || 0));
+    const points = [
+      { x: geometry.vertex.x - radius, y: geometry.vertex.y - radius },
+      { x: geometry.vertex.x + radius, y: geometry.vertex.y + radius },
+      geometry.textPoint,
+    ].filter(Boolean);
+    const minX = Math.min(...points.map((point) => Number(point.x)));
+    const maxX = Math.max(...points.map((point) => Number(point.x)));
+    const minY = Math.min(...points.map((point) => Number(point.y)));
+    const maxY = Math.max(...points.map((point) => Number(point.y)));
+    return { minX: minX - 8, minY: minY - 8, maxX: maxX + 8, maxY: maxY + 8 };
+  }
+
+  const points = [geometry.p1, geometry.p2, geometry.textPoint].filter(Boolean);
+  if (!points.length) return null;
+  const minX = Math.min(...points.map((point) => Number(point.x)));
+  const maxX = Math.max(...points.map((point) => Number(point.x)));
+  const minY = Math.min(...points.map((point) => Number(point.y)));
+  const maxY = Math.max(...points.map((point) => Number(point.y)));
+  if (![minX, minY, maxX, maxY].every(Number.isFinite)) return null;
+  return { minX: minX - 8, minY: minY - 8, maxX: maxX + 8, maxY: maxY + 8 };
 }
 
 function getObjectBounds(obj) {
   let minX, minY, maxX, maxY;
 
   switch (obj.type) {
+    case 'dimension':
+      return getDimensionBounds(obj);
     case 'line':
     case 'centerline':
       minX = Math.min(obj.x, obj.x2);
@@ -482,8 +631,9 @@ function drawLegend(doc, desenho, pageWidth, pageHeight, margin, options) {
   doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, col3, legendY + 34);
   doc.text(`Hora: ${new Date().toLocaleTimeString('pt-BR')}`, col3, legendY + 46);
   
-  const objCount = options.cadData?.objects?.length || 0;
-  const dimCount = options.cadData?.dimensions?.length || 0;
+  const content = collectCadContent(options.cadData || {});
+  const objCount = content.objects.length;
+  const dimCount = content.dimensions.length;
   doc.text(`Objetos: ${objCount} | Cotas: ${dimCount}`, col3, legendY + 58);
 
   // Coluna 4: Escala e observações

@@ -782,6 +782,15 @@ export class DesenhoTecnicoController {
         this.markDirty('Alteração refeita');
       },
       save: async () => { await this.saveDrawing(); this.render(); },
+      'export-pdf': async () => {
+        clearTimeout(this.autoSaveTimer);
+        this.state.statusMessage = 'Salvando cotas antes de gerar o PDF…';
+        this.render();
+        await this.saveDrawing();
+        const pdfUrl = source?.dataset?.pdfUrl || source?.getAttribute?.('href');
+        if (!pdfUrl) throw new Error('Rota de exportação do PDF não encontrada');
+        window.location.assign(pdfUrl);
+      },
       'save-metadata': async () => { await this.saveMetadata(); },
     };
 
@@ -900,6 +909,7 @@ export class DesenhoTecnicoController {
         this.render();
         return;
       }
+      if (target.dataset.action === 'export-pdf') event.preventDefault();
       this.executeAction(target.dataset.action, target);
     });
     cadRoot.addEventListener('change', (event) => {
