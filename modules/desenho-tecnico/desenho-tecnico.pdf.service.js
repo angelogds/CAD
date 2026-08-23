@@ -165,7 +165,11 @@ function collectCadContent(cadData = {}) {
     if (!dimension || typeof dimension !== 'object') return;
     const geometry = dimension.geometry || dimension;
     const fallbackKey = `${index}:${geometry.mode || 'linear'}:${JSON.stringify(geometry)}`;
-    dimensionMap.set(String(dimension.id || fallbackKey), dimension);
+    dimensionMap.set(String(dimension.id || fallbackKey), {
+      ...dimension,
+      type: 'dimension',
+      layer: getEntityLayer(dimension, 'cotas'),
+    });
   };
 
   rawObjects.filter((object) => object?.type === 'dimension').forEach(addDimension);
