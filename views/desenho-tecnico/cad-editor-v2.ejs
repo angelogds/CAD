@@ -26,7 +26,7 @@
         <button class="cad-icon-btn" data-action="undo" id="cadUndoBtn" type="button" title="Desfazer (Ctrl+Z)" aria-label="Desfazer">↶</button>
         <button class="cad-icon-btn" data-action="redo" id="cadRedoBtn" type="button" title="Refazer (Ctrl+Y)" aria-label="Refazer">↷</button>
         <button class="cad-icon-btn" data-action="toggle-theme" type="button" title="Alternar tema" aria-label="Alternar tema">◐</button>
-        <a class="cad-btn cad-btn-secondary" href="/desenho-tecnico/cad/<%= desenho.id %>/pdf" title="Gerar PDF">Exportar PDF</a>
+        <a class="cad-btn cad-btn-secondary" data-action="export-pdf" data-pdf-url="/desenho-tecnico/cad/<%= desenho.id %>/pdf" href="/desenho-tecnico/cad/<%= desenho.id %>/pdf" title="Salvar desenho e gerar PDF">Exportar PDF</a>
         <button class="cad-btn cad-btn-primary" id="cadSaveBtn" data-action="save" type="button" title="Salvar (Ctrl+S)">Salvar desenho</button>
       </div>
     </header>
