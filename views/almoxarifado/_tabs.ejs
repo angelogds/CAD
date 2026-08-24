@@ -1,7 +1,11 @@
 <%
   const currentTab = tab || almoxTab || '';
 %>
-<div class="subtabs">
-  <a class="subtab <%= currentTab === 'retiradas' ? 'active' : '' %>" href="/almoxarifado">Retiradas</a>
-  <a class="subtab <%= currentTab === 'recebimentos' ? 'active' : '' %>" href="/almoxarifado/recebimentos">Recebimentos</a>
-</div>
+<nav class="almox-tabs" aria-label="Navegação do Almoxarifado">
+  <a class="almox-tab <%= currentTab === 'retiradas' ? 'active' : '' %>" href="/estoque/saidas/nova?contexto=almoxarifado">
+    <span aria-hidden="true">↗</span> Retiradas
+  </a>
+  <a class="almox-tab <%= currentTab === 'recebimentos' ? 'active' : '' %>" href="/almoxarifado/recebimentos">
+    <span aria-hidden="true">↘</span> Recebimentos
+  </a>
+</nav>
