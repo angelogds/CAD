@@ -63,15 +63,16 @@ function receberItem(req, res) {
 }
 
 function finalizar(req, res) {
+  let statusFinal = STATUS.COMPRADA;
   try {
-    const status = service.finalizarRecebimento(Number(req.params.id));
-    req.flash("success", status === STATUS.RECEBIDA_TOTAL
+    statusFinal = service.finalizarRecebimento(Number(req.params.id));
+    req.flash("success", statusFinal === STATUS.RECEBIDA_TOTAL
       ? "Recebimento concluído integralmente."
       : "Etapa finalizada como recebimento parcial; os saldos pendentes permanecem abertos.");
   } catch (e) {
     req.flash("error", e.message);
   }
-  res.redirect("/almoxarifado/recebimentos");
+  res.redirect(`/almoxarifado/recebimentos?status=${encodeURIComponent(statusFinal)}`);
 }
 
 function fechar(req, res) {
