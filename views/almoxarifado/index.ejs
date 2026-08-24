@@ -1,60 +1,47 @@
 <% layout('layout') %>
+<link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20260824-v1" />
 
-<div class="page-head">
-  <div>
-    <h1>Almoxarifado</h1>
-    <p class="muted">Retirada com identificação do funcionário e baixa automática no estoque.</p>
-  </div>
-</div>
-
-<%- include('_tabs', { tab: 'retiradas' }) %>
-
-<div class="grid-2">
-  <div class="card">
-    <div class="label">Registrar retirada</div>
-    <form method="POST" action="/almoxarifado/retiradas" class="grid-2" style="margin-top:10px;">
-      <select class="input" name="funcionario_id" required>
-        <option value="">Funcionário</option>
-        <% funcionarios.forEach((f) => { %><option value="<%= f.id %>"><%= f.codigo %> - <%= f.nome %></option><% }) %>
-      </select>
-      <select class="input" name="item_id" required>
-        <option value="">Item do estoque</option>
-        <% itens.forEach((i) => { %><option value="<%= i.id %>"><%= i.nome %> (saldo <%= i.saldo %> <%= i.unidade %>)</option><% }) %>
-      </select>
-      <input class="input" name="quantidade" type="number" step="0.01" min="0.01" placeholder="Quantidade" required />
-      <select class="input" name="solicitacao_id">
-        <option value="">Solicitação vinculada (opcional)</option>
-        <% solicitacoes.forEach((s) => { %><option value="<%= s.id %>"><%= s.numero || ('#' + s.id) %> - <%= s.status %></option><% }) %>
-      </select>
-      <input class="input" name="destino" placeholder="Destino/Setor" />
-      <input class="input" name="finalidade" placeholder="Finalidade" />
-      <button class="btn btn-green" style="grid-column:1/-1;">Registrar retirada</button>
-    </form>
-  </div>
-
-  <div class="card">
-    <div class="label">Últimas retiradas</div>
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr><th>#</th><th>Funcionário</th><th>Item</th><th>Qtd</th><th>Destino</th><th>Data</th></tr>
-        </thead>
-        <tbody>
-          <% if (!retiradas.length) { %>
-            <tr><td colspan="6" class="muted">Sem retiradas registradas.</td></tr>
-          <% } %>
-          <% retiradas.forEach((r) => { %>
-            <tr>
-              <td><%= r.id %></td>
-              <td><%= r.funcionario_codigo %> - <%= r.funcionario_nome %></td>
-              <td><%= r.item_nome %></td>
-              <td><%= r.quantidade %> <%= r.unidade %></td>
-              <td><%= r.destino || '-' %></td>
-              <td><%= fmtBR(r.created_at) %></td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
+<div class="almox-page">
+  <header class="almox-hero">
+    <div>
+      <span class="almox-hero__eyebrow">ALMOXARIFADO • CONTROLE DE MATERIAIS</span>
+      <h1>Central do Almoxarifado</h1>
+      <p class="muted">Entrada de compras, retirada vinculada à manutenção e consulta do saldo em estoque em um único fluxo integrado.</p>
     </div>
-  </div>
+  </header>
+
+  <%- include('_tabs', { tab: typeof tab !== 'undefined' ? tab : '' }) %>
+
+  <section class="almox-kpis">
+    <a class="almox-kpi" href="/almoxarifado/recebimentos" style="text-decoration:none;">
+      <span class="almox-kpi__label">Recebimentos</span>
+      <strong class="almox-kpi__value" style="font-size:1.08rem;">Compras → Estoque</strong>
+      <span class="almox-kpi__meta">Conferir materiais comprados e registrar a entrada.</span>
+    </a>
+    <a class="almox-kpi almox-kpi--blue" href="/estoque/saidas/nova?contexto=almoxarifado" style="text-decoration:none;">
+      <span class="almox-kpi__label">Retiradas</span>
+      <strong class="almox-kpi__value" style="font-size:1.08rem;">Estoque → OS</strong>
+      <span class="almox-kpi__meta">Dar baixa no material com vínculo obrigatório à OS.</span>
+    </a>
+    <a class="almox-kpi almox-kpi--amber" href="/estoque" style="text-decoration:none;">
+      <span class="almox-kpi__label">Estoque</span>
+      <strong class="almox-kpi__value" style="font-size:1.08rem;">Consultar saldo</strong>
+      <span class="almox-kpi__meta">Visualizar materiais cadastrados e disponibilidade.</span>
+    </a>
+    <a class="almox-kpi almox-kpi--slate" href="/estoque/movimentos" style="text-decoration:none;">
+      <span class="almox-kpi__label">Rastreabilidade</span>
+      <strong class="almox-kpi__value" style="font-size:1.08rem;">Movimentações</strong>
+      <span class="almox-kpi__meta">Auditar entradas e saídas registradas no estoque.</span>
+    </a>
+  </section>
+
+  <section class="almox-summary-card">
+    <div class="almox-summary-card__title">Fluxo operacional preservado</div>
+    <div class="almox-summary-list">
+      <div class="almox-summary-box"><span>1. Compras</span><strong>Define item e quantidade comprada</strong></div>
+      <div class="almox-summary-box"><span>2. Almoxarifado</span><strong>Confere a quantidade recebida</strong></div>
+      <div class="almox-summary-box"><span>3. Estoque</span><strong>Recebe a entrada automaticamente</strong></div>
+      <div class="almox-summary-box"><span>4. Manutenção</span><strong>Retira o material vinculado à OS</strong></div>
+    </div>
+  </section>
 </div>
