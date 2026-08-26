@@ -1,4 +1,5 @@
 const service = require("./estoque.service");
+const { normalizeRole } = require("../../config/rbac");
 
 function index(req, res) { res.render("estoque/index", { title: "Estoque", activeMenu: "estoque", cards: service.dashboard(), itens: service.listItens() }); }
 function itens(req, res) { res.render("estoque/itens", { title: "Itens", activeMenu: "estoque", itens: service.listItens() }); }
@@ -19,7 +20,21 @@ function movimentos(req, res) {
   const movimentos = service.listMovimentos().filter((mov) => (!filtros.tipo || mov.tipo === filtros.tipo) && (!filtros.item_id || String(mov.item_id) === String(filtros.item_id)));
   res.render("estoque/movimentos", { title: "Movimentos", activeMenu: "estoque", movimentos, filtros, itens: service.listItens() });
 }
-function saidaNova(req, res) { res.render("estoque/saida_nova", { title: "Registrar saída", activeMenu: "estoque", itens: service.listItens(), ordens: service.listOrdensAtivas(), itemSelecionado: Number(req.query.item) || null, origem: req.query.origem === 'QR_CODE' ? 'QR_CODE' : 'MANUAL' }); }
+function saidaNova(req, res) {
+  const contextoAlmox = String(req.query.contexto || "").toLowerCase() === "almoxarifado";
+  const role = normalizeRole(req.session?.user?.role);
+  const canAlmoxRead = ["ADMIN", "ALMOXARIFADO", "DIRETORIA"].includes(role);
+  res.render("estoque/saida_nova", {
+    title: contextoAlmox ? "Retirada de materiais" : "Registrar saída",
+    activeMenu: contextoAlmox ? "almoxarifado" : "estoque",
+    itens: service.listItens(),
+    ordens: service.listOrdensAtivas(),
+    itemSelecionado: Number(req.query.item) || null,
+    origem: req.query.origem === "QR_CODE" ? "QR_CODE" : "MANUAL",
+    contextoAlmox,
+    canAlmoxRead,
+  });
+}
 async function qrItem(req, res, next) {
   try {
     const item = service.getItem(Number(req.params.id)); if (!item) return res.status(404).send('Item não encontrado');
