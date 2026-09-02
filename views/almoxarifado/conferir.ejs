@@ -1,6 +1,7 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20260824-v1" />
 <link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-recebimento-item-v2" />
+<link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
 
 <%
   const statusConfig = {
@@ -16,7 +17,7 @@
   const canReceiveInCurrentStatus = ['EM_COTACAO', 'COMPRADA', 'EM_RECEBIMENTO', 'RECEBIDA_PARCIAL', 'REABERTA'].includes(String(sol.status || '').toUpperCase());
   const hasToReceive = Number(sol.resumo.qtd_a_receber ?? sol.resumo.qtd_pendente ?? 0) > 0;
   const hasReceived = Number(sol.resumo.qtd_recebida || 0) > 0;
-  const canWithdrawAll = canWithdraw && Number(sol.resumo.itens_disponiveis_retirada || 0) > 0;
+  const hasReservedForWithdrawal = canWithdraw && Number(sol.resumo.itens_disponiveis_retirada || 0) > 0;
   const dateBR = (v) => { if(!v)return 'A definir'; const p=String(v).slice(0,10).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:String(v); };
   const itemStage = (item) => {
     const bought=String(item.status_compra||'').toUpperCase()==='COMPRADO';
@@ -36,7 +37,8 @@
     <div><span class="almox-hero__eyebrow">ALMOXARIFADO • SOLICITAÇÃO COMPLETA</span><h1><%= sol.numero || ('Solicitação #' + sol.id) %></h1><p class="muted"><%= sol.titulo || 'Acompanhamento do material desde a cotação até a retirada.' %></p></div>
     <div class="almox-hero__actions">
       <a class="btn btn-ghost" href="/almoxarifado/recebimentos">← Voltar às solicitações</a>
-      <% if (canWithdrawAll) { %><form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/retirar-todos" data-confirm-message="Retirar todo o saldo recebido e disponível desta solicitação?" data-lock-submit><button class="btn btn-green" type="submit" data-pending-text="Retirando...">Retirar todos disponíveis</button></form><% } %>
+      <a class="btn btn-ghost" href="/estoque/reservas?q=<%= encodeURIComponent(sol.numero || String(sol.id)) %>">Ver materiais separados</a>
+      <% if (hasReservedForWithdrawal) { %><a class="btn btn-green" href="/almoxarifado/retiradas/qr?solicitacao_id=<%= sol.id %>">Entregar materiais por QR</a><% } %>
     </div>
   </header>
 
@@ -60,7 +62,7 @@
   <section id="materiais" class="card almox-materials-card">
     <div class="almox-request-head">
       <div><h2>Materiais da solicitação</h2><p>O recebimento é liberado por item assim que Compras marcar o material como COMPRADO.</p></div>
-      <span class="almox-note-info">Itens em cotação continuam somente para consulta. Itens comprados já podem ser conferidos aqui.</span>
+      <span class="almox-note-info">Após o recebimento, o material fica reservado para esta solicitação até a entrega identificada ao colaborador.</span>
     </div>
     <% if (!sol.itens.length) { %><div class="almox-empty">Esta solicitação não possui itens.</div><% } %>
     <div class="almox-material-list">
@@ -97,7 +99,11 @@
           <% } %>
 
           <% if (canWithdraw && maxRetirada > 0) { %>
-            <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/itens/<%= item.id %>/retirar" class="almox-inline-operation withdraw-operation" data-lock-submit><div><label>Retirar agora</label><input class="input" type="number" min="0.01" max="<%= maxRetirada %>" step="0.01" name="quantidade" required value="<%= maxRetirada %>" /></div><div class="grow"><label>Finalidade / observação</label><input class="input" name="observacao" placeholder="Destino do material ou serviço executado" /></div><div class="almox-withdraw-balance"><small>Disponível nesta solicitação</small><strong><%= disponivel %> <%= item.unidade||'UN' %></strong><span>Saldo físico: <%= saldoEstoque %></span></div><button class="btn btn-green" type="submit" data-pending-text="Baixando...">Dar baixa / retirar</button></form>
+            <div class="almox-inline-operation withdraw-operation qr-withdraw-callout">
+              <div class="grow"><strong>Material separado para retirada</strong><div class="almox-subline">Identifique o colaborador pelo cartão QR antes de confirmar a entrega.</div></div>
+              <div class="almox-withdraw-balance"><small>Reservado nesta solicitação</small><strong><%= disponivel %> <%= item.unidade||'UN' %></strong><span>Saldo físico: <%= saldoEstoque %></span></div>
+              <a class="btn btn-green" href="/almoxarifado/retiradas/qr?solicitacao_id=<%= sol.id %>">Entregar por QR</a>
+            </div>
           <% } else if (disponivel > 0 && saldoEstoque <= 0) { %><div class="almox-warning">Há quantidade recebida vinculada a esta solicitação, mas o saldo físico atual do item está zerado. Consulte os movimentos antes de tentar nova baixa.</div><% } %>
         </article>
       <% }) %>
@@ -106,7 +112,7 @@
 
   <% if (historico && historico.length) { %><section class="card almox-history"><h3>Histórico de entradas desta solicitação</h3><div class="table-wrap"><table class="table"><thead><tr><th>Item</th><th>Quantidade</th><th>Usuário</th><th>Estoque</th><th>Data</th></tr></thead><tbody><% historico.forEach(mov=>{ %><tr><td><strong><%=mov.item_nome||('Item #'+mov.solicitacao_item_id)%></strong></td><td><%=Number(mov.quantidade||0)%> <%=mov.unidade||'UN'%></td><td><%=mov.usuario_nome||'-'%></td><td><%=mov.estoque_item_nome||('#'+mov.estoque_item_id)%></td><td><%=typeof fmtBR==='function'&&mov.created_at?fmtBR(mov.created_at):(mov.created_at||'-')%></td></tr><% }) %></tbody></table></div></section><% } %>
 
-  <% if (canManage) { %><div class="almox-footer-actions"><div><strong>Próxima ação</strong><div class="almox-subline"><% if(sol.status==='EM_COTACAO'){%>Receba normalmente os itens já marcados como COMPRADO. Os demais permanecem em cotação sem bloquear o Almoxarifado.<%}%><% if(sol.status==='COMPRADA'){%>Confirme cada material que chegou. O primeiro recebimento inicia automaticamente a etapa de recebimento.<%}%><% if(receiptWorkflowActive&&hasToReceive){%>Continue registrando apenas as quantidades fisicamente conferidas.<%}%><% if(receiptWorkflowActive&&!hasToReceive&&hasReceived){%>Todos os itens comprados foram recebidos; conclua a etapa.<%}%><% if(sol.status==='RECEBIDA_TOTAL'){%>Material recebido integralmente e disponível conforme saldo para retirada.<%}%></div></div><div class="almox-actions"><% if(receiptWorkflowActive&&hasReceived){%><form method="POST" action="/almoxarifado/solicitacoes/<%=sol.id%>/finalizar-recebimento" data-lock-submit><button class="btn btn-green" type="submit"><%=hasToReceive?'Finalizar como parcial':'Concluir recebimento'%></button></form><%}%><% if(sol.status==='RECEBIDA_TOTAL'){%><form method="POST" action="/almoxarifado/solicitacoes/<%=sol.id%>/fechar" data-lock-submit><button class="btn btn-green" type="submit">Fechar processo</button></form><%}%></div></div><% } %>
+  <% if (canManage) { %><div class="almox-footer-actions"><div><strong>Próxima ação</strong><div class="almox-subline"><% if(sol.status==='EM_COTACAO'){%>Receba normalmente os itens já marcados como COMPRADO. Os demais permanecem em cotação sem bloquear o Almoxarifado.<%}%><% if(sol.status==='COMPRADA'){%>Confirme cada material que chegou. O primeiro recebimento inicia automaticamente a etapa de recebimento e cria a reserva da solicitação.<%}%><% if(receiptWorkflowActive&&hasToReceive){%>Continue registrando apenas as quantidades fisicamente conferidas.<%}%><% if(receiptWorkflowActive&&!hasToReceive&&hasReceived){%>Todos os itens comprados foram recebidos; conclua a etapa e entregue os materiais por identificação QR.<%}%><% if(sol.status==='RECEBIDA_TOTAL'){%>Material recebido e reservado. Use “Entregar materiais por QR” para registrar quem retirou cada item.<%}%></div></div><div class="almox-actions"><% if(receiptWorkflowActive&&hasReceived){%><form method="POST" action="/almoxarifado/solicitacoes/<%=sol.id%>/finalizar-recebimento" data-lock-submit><button class="btn btn-green" type="submit"><%=hasToReceive?'Finalizar como parcial':'Concluir recebimento'%></button></form><%}%><% if(sol.status==='RECEBIDA_TOTAL'){%><form method="POST" action="/almoxarifado/solicitacoes/<%=sol.id%>/fechar" data-lock-submit><button class="btn btn-green" type="submit">Fechar processo</button></form><%}%></div></div><% } %>
 </div>
 
 <script src="/js/almoxarifado-modern.js?v=20260824-v1" defer></script>
