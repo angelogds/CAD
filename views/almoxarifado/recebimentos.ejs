@@ -1,6 +1,7 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20260824-v1" />
 <link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
 
 <%
   const statusConfig = {
@@ -25,7 +26,9 @@
     </div>
     <div class="almox-hero__actions">
       <a class="btn btn-ghost" href="/estoque">Consultar estoque</a>
-      <a class="btn btn-green" href="/estoque/saidas/nova?contexto=almoxarifado">Retirada avulsa</a>
+      <a class="btn btn-ghost" href="/estoque/reservas">Materiais separados</a>
+      <a class="btn btn-green" href="/almoxarifado/retiradas/qr">Retirada por QR</a>
+      <a class="btn btn-ghost" href="/estoque/saidas/nova?contexto=almoxarifado">Retirada avulsa</a>
     </div>
   </header>
 
