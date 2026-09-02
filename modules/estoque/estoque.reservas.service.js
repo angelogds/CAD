@@ -19,19 +19,23 @@ function normalizeQr(value) {
   return code.trim();
 }
 function itemNameExpr(alias = 'si') {
-  if (hasColumn('solicitacao_itens', 'item_nome')) return `COALESCE(${alias}.item_nome,${alias}.item_descricao,'Item #' || ${alias}.id)`;
-  if (hasColumn('solicitacao_itens', 'item_descricao')) return `COALESCE(${alias}.item_descricao,'Item #' || ${alias}.id)`;
-  if (hasColumn('solicitacao_itens', 'descricao')) return `COALESCE(${alias}.descricao,'Item #' || ${alias}.id)`;
-  return `'Item #' || ${alias}.id`;
+  const parts = [];
+  if (hasColumn('solicitacao_itens', 'item_nome')) parts.push(`${alias}.item_nome`);
+  if (hasColumn('solicitacao_itens', 'item_descricao')) parts.push(`${alias}.item_descricao`);
+  if (hasColumn('solicitacao_itens', 'descricao')) parts.push(`${alias}.descricao`);
+  parts.push(`'Item #' || ${alias}.id`);
+  return `COALESCE(${parts.join(',')})`;
 }
 
 function getColaboradorByQr(codigo) {
   const token = normalizeQr(codigo);
   if (!token || !tableExists('colaboradores') || !hasColumn('colaboradores', 'qr_token')) return null;
+  const deletedFilter = hasColumn('colaboradores', 'deleted_at') ? 'AND deleted_at IS NULL' : '';
   return db.prepare(`
     SELECT id,nome,apelido,funcao,setor,status,foto_url,user_id,qr_emitido_em
     FROM colaboradores
-    WHERE qr_token=? AND COALESCE(qr_ativo,0)=1 AND deleted_at IS NULL AND UPPER(COALESCE(status,'ATIVO'))='ATIVO'
+    WHERE qr_token=? AND COALESCE(qr_ativo,0)=1 ${deletedFilter}
+      AND UPPER(COALESCE(status,'ATIVO'))='ATIVO'
   `).get(token) || null;
 }
 
@@ -129,7 +133,8 @@ function listSolicitacoes(options = {}) {
 }
 
 function getReserva(id) {
-  return listReservas({}).find((row) => Number(row.id) === Number(id)) || null;
+  if (!tableExists('estoque_reservas')) return null;
+  return db.prepare('SELECT * FROM estoque_reservas WHERE id=?').get(Number(id)) || null;
 }
 
 function insertMovimento(data) {
@@ -172,16 +177,22 @@ function retirarReserva({ reservaId, quantidade, qrCode, entreguePorUserId, obse
     if (qtd > disponivelReserva) throw new Error(`Quantidade acima da reserva disponível. Máximo: ${disponivelReserva}.`);
     if (qtd > Number(reserva.saldo_fisico || 0)) throw new Error('Saldo físico insuficiente no estoque.');
 
-    const anterior = Number(reserva.saldo_fisico || 0);
-    const posterior = anterior - qtd;
-    const update = db.prepare(`UPDATE estoque_itens SET saldo_atual=?,updated_at=datetime('now') WHERE id=? AND COALESCE(saldo_atual,0)>=?`)
-      .run(posterior, reserva.estoque_item_id, qtd);
-    if (!update.changes) throw new Error('Saldo foi alterado por outro usuário. Atualize e tente novamente.');
-
     const retiradaNova = Number(reserva.quantidade_retirada || 0) + qtd;
     const status = retiradaNova >= Number(reserva.quantidade_reservada || 0) ? 'RETIRADA' : 'PARCIAL';
-    db.prepare(`UPDATE estoque_reservas SET quantidade_retirada=?,status=?,updated_at=datetime('now') WHERE id=?`)
-      .run(retiradaNova, status, reserva.id);
+    const reservaUpdate = db.prepare(`
+      UPDATE estoque_reservas
+      SET quantidade_retirada=?,status=?,updated_at=datetime('now')
+      WHERE id=? AND quantidade_retirada=?
+    `).run(retiradaNova, status, reserva.id, Number(reserva.quantidade_retirada || 0));
+    if (!reservaUpdate.changes) throw new Error('Reserva alterada por outro usuário. Atualize a página e tente novamente.');
+
+    const anterior = Number(reserva.saldo_fisico || 0);
+    const posterior = anterior - qtd;
+    const stockUpdate = db.prepare(`
+      UPDATE estoque_itens SET saldo_atual=?,updated_at=datetime('now')
+      WHERE id=? AND COALESCE(saldo_atual,0)=?
+    `).run(posterior, reserva.estoque_item_id, anterior);
+    if (!stockUpdate.changes) throw new Error('Saldo foi alterado por outro usuário. Atualize e tente novamente.');
 
     const movimentoId = insertMovimento({
       tipo: 'SAIDA_REQUISICAO_INTERNA',
