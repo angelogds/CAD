@@ -1,53 +1,20 @@
 <% layout('layout') %>
-<div class="page-head">
-  <div>
-    <h1>Movimentos de Estoque</h1>
-    <p class="muted">Entradas e saídas com rastreabilidade.</p>
-  </div>
-</div>
-<%- include('_tabs', { tab: 'movimentos' }) %>
+<link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-v1" />
+<div class="stock-flow-page">
+  <header class="stock-flow-head"><div><span>ESTOQUE • RASTREABILIDADE</span><h1>Movimentos de Estoque</h1><p>Entradas e saídas vinculadas à solicitação, OS e equipamento sempre que houver origem conhecida.</p></div><div class="stock-flow-actions"><a class="btn btn-ghost" href="/estoque">Voltar ao estoque</a><a class="btn btn-green" href="/estoque/saidas/nova">Registrar saída</a></div></header>
+  <%- include('_tabs', { tab: 'movimentos' }) %>
 
-<div class="card" style="margin-bottom:14px;">
-  <form method="GET" action="/estoque/movimentos" class="grid-3">
-    <div>
-      <div class="label">Tipo</div>
-      <select class="input" name="tipo">
-        <option value="">Todos</option>
-        <option value="ENTRADA_COMPRA" <%= filtros.tipo === 'ENTRADA_COMPRA' ? 'selected' : '' %>>Entrada compra</option>
-        <option value="SAIDA_REQUISICAO_INTERNA" <%= filtros.tipo === 'SAIDA_REQUISICAO_INTERNA' ? 'selected' : '' %>>Saída requisição</option>
-      </select>
-    </div>
-    <div>
-      <div class="label">Item</div>
-      <select class="input" name="item_id">
-        <option value="">Todos</option>
-        <% itens.forEach((item) => { %><option value="<%= item.id %>" <%= String(filtros.item_id) === String(item.id) ? 'selected' : '' %>><%= item.nome %></option><% }) %>
-      </select>
-    </div>
-    <div style="display:flex;align-items:end;gap:8px;">
-      <button class="btn btn-green">Filtrar</button>
-      <a class="btn btn-ghost" href="/estoque/movimentos">Limpar</a>
-    </div>
+  <form method="GET" action="/estoque/movimentos" class="stock-flow-filters">
+    <label><span>Tipo</span><select class="input" name="tipo"><option value="">Todos</option><option value="ENTRADA_COMPRA" <%= filtros.tipo==='ENTRADA_COMPRA'?'selected':'' %>>Entrada de compra</option><option value="SAIDA_REQUISICAO_INTERNA" <%= filtros.tipo==='SAIDA_REQUISICAO_INTERNA'?'selected':'' %>>Baixa / retirada</option></select></label>
+    <label class="stock-search"><span>Item</span><select class="input" name="item_id"><option value="">Todos os materiais</option><% itens.forEach(item=>{ %><option value="<%=item.id%>" <%=String(filtros.item_id)===String(item.id)?'selected':''%>><%=item.nome%></option><% }) %></select></label>
+    <div class="stock-filter-actions"><button class="btn btn-green" type="submit">Aplicar</button><a class="btn btn-ghost" href="/estoque/movimentos">Limpar</a></div>
   </form>
-</div>
 
-<div class="card">
-  <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th>Data</th><th>Tipo</th><th>Item</th><th>Quantidade</th><th>Usuário</th><th>Observação</th></tr></thead>
-      <tbody>
-        <% if (!movimentos.length) { %><tr><td colspan="6" class="muted">Nenhum movimento encontrado.</td></tr><% } %>
-        <% movimentos.forEach((mov) => { %>
-          <tr>
-            <td><%= fmtBR(mov.data_mov) %></td>
-            <td><span class="pill-tag <%= mov.tipo === 'ENTRADA_COMPRA' ? 'pill-green' : 'pill-amber' %>"><%= mov.tipo %></span></td>
-            <td><%= mov.item_nome %></td>
-            <td><%= mov.quantidade %> <%= mov.item_unidade || '' %></td>
-            <td><%= mov.usuario_nome || '-' %></td>
-            <td><%= mov.observacao || '-' %></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  </div>
+  <section class="card stock-table-card">
+    <div class="stock-table-head"><div><h2>Histórico de movimentações</h2><p>Cada baixa deve explicar de onde veio e para onde foi o material.</p></div><span><%=movimentos.length%> movimento(s)</span></div>
+    <div class="table-wrap"><table class="table"><thead><tr><th>Data</th><th>Tipo</th><th>Material</th><th>Quantidade</th><th>Origem / vínculo</th><th>Usuário</th><th>Observação</th></tr></thead><tbody>
+      <% if(!movimentos.length){ %><tr><td colspan="7" class="muted">Nenhum movimento encontrado.</td></tr><% } %>
+      <% movimentos.forEach(mov=>{ %><tr><td><%=fmtBR(mov.data_mov)%></td><td><span class="pill-tag <%=mov.tipo==='ENTRADA_COMPRA'?'pill-green':'pill-amber'%>"><%=mov.tipo==='ENTRADA_COMPRA'?'ENTRADA':'SAÍDA'%></span></td><td><strong><%=mov.item_nome%></strong></td><td><%=Number(mov.quantidade||0)%> <%=mov.item_unidade||''%></td><td><div style="display:grid;gap:2px"><strong><%=mov.origem||'-'%></strong><% if(mov.solicitacao_id){%><span>Solicitação #<%=mov.solicitacao_id%><% if(mov.solicitacao_item_id){%> • item #<%=mov.solicitacao_item_id%><%}%></span><%}%><% if(mov.os_id){%><span>OS #<%=mov.os_id%></span><%}%><% if(mov.equipamento_id){%><span>Equipamento #<%=mov.equipamento_id%></span><%}%></div></td><td><%=mov.usuario_nome||'-'%></td><td><%=mov.observacao||'-'%></td></tr><% }) %>
+    </tbody></table></div>
+  </section>
 </div>
