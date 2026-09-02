@@ -8,12 +8,13 @@ const url=(changes={})=>{const p=new URLSearchParams(params);Object.entries(chan
 const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const dateBR=v=>{if(!v)return'-';const parts=String(v).slice(0,10).split('-');return parts.length===3?`${parts[2]}/${parts[1]}/${parts[0]}`:String(v)};
 const totalAnalytics=statusList.reduce((n,s)=>n+Number(resumo?.[s]||0),0); const received=Number(resumo?.RECEBIDA_TOTAL||0)+Number(resumo?.FECHADA||0); const completion=totalAnalytics?Math.round(received/totalAnalytics*100):0;
-const lower=lowerDashboard||{period:filters.period,total:0,status:[],financial:{committed:0,quoted:0,receivedTracked:0,hasTrackedReceivedValue:false,withValue:0},requestCosts:[],linkedOs:[],receipts:[]};
+const lower=lowerDashboard||{period:filters.period,total:0,status:[],financial:{committed:0,quoted:0,receivedTracked:0,hasTrackedReceivedValue:false,withValue:0},requestCosts:[],linkedOs:[],receipts:[],receiptShortages:[],receiptShortageItems:0,receiptShortageQty:0};
 const statusColors={ABERTA:'#16843a',EM_COTACAO:'#2563eb',COMPRADA:'#7c3aed',EM_RECEBIMENTO:'#f97316',RECEBIDA_PARCIAL:'#0ea5a4',RECEBIDA_TOTAL:'#15803d',FECHADA:'#64748b',REABERTA:'#a16207',CANCELADA:'#ef2938'};
 %>
 <link rel="stylesheet" href="/css/compras-dashboard.css?v=20260819-selection-artifacts-v2">
 <link rel="stylesheet" href="/css/compras-active-priority-fix.css?v=20260819-selection-artifacts-v2">
 <link rel="stylesheet" href="/css/compras-dashboard-lower.css?v=20260902-lower-real-v1">
+<link rel="stylesheet" href="/css/compras-recebimento-alertas.css?v=20260902-v1">
 <div class="purchase-dashboard">
 <header class="dashboard-heading"><h1>Painel de Compras</h1><p>Fila operacional e indicadores do setor de Compras</p></header>
 <form class="dashboard-filters" method="get"><input type="hidden" name="tab" value="<%= filters.tab %>"><input type="hidden" name="card" value="<%= filters.card %>">
@@ -25,6 +26,25 @@ const statusColors={ABERTA:'#16843a',EM_COTACAO:'#2563eb',COMPRADA:'#7c3aed',EM_
 <div class="dashboard-filter-actions"><button class="ui-btn" type="submit">Aplicar</button><a class="ui-btn ui-btn--outline" href="/compras/solicitacoes">Limpar filtros</a></div></form>
 <span class="sr-only">Vinculadas à OS</span><span class="sr-only">Urgentes</span><section class="metric-grid compras-summary" aria-label="Filtros rápidos da fila"><% cardDefs.forEach(([key,label,color])=>{const selected=filters.tab==='active'&&filters.card===key;%>
 <form method="get" class="metric-form"><% Object.entries(filters).forEach(([k,v])=>{if(v&& !['card','page','tab'].includes(k)){%><input type="hidden" name="<%= k==='query'?'q':k %>" value="<%= v %>"><%}})%><input type="hidden" name="tab" value="active"><% if(!selected){%><input type="hidden" name="card" value="<%= key %>"><%}%><button type="submit" class="metric-card <%= selected?'is-selected':'' %>" style="--metric-color:<%=color%>" aria-pressed="<%= selected %>"><span><%= label %></span><strong><%= queue.cards[key] %></strong><small><%= selected?'Filtro ativo':'Filtrar fila' %></small></button></form><% }) %></section>
+
+<% if(lower.receiptShortages && lower.receiptShortages.length){ %>
+<section class="dashboard-card receipt-shortage-panel" aria-labelledby="receipt-shortage-title">
+  <div class="receipt-shortage-head">
+    <div><span class="receipt-shortage-kicker">ALERTA DO ALMOXARIFADO</span><h2 id="receipt-shortage-title">Material recebido com quantidade menor que a comprada</h2><p>O alerta nasce somente após uma conferência física parcial e desaparece automaticamente quando o Almoxarifado recebe o restante.</p></div>
+    <div class="receipt-shortage-total"><strong><%= lower.receiptShortageItems %></strong><span>item(ns) com falta</span><small>Quantidade faltante somada: <%= Number(lower.receiptShortageQty||0) %></small></div>
+  </div>
+  <div class="receipt-shortage-list">
+    <% lower.receiptShortages.forEach(row=>{ %>
+      <a class="receipt-shortage-row" href="/compras/solicitacoes/<%= row.id %>">
+        <div><strong><%= row.numero || '#'+row.id %></strong><span><%= row.titulo || 'Solicitação de materiais' %></span></div>
+        <div><small>Divergência no recebimento</small><b><%= row.itens_divergentes_recebimento %> item(ns) • faltam <%= Number(row.qtd_faltante_recebimento||0) %></b></div>
+        <span class="receipt-shortage-action">Abrir e verificar fornecedor →</span>
+      </a>
+    <% }) %>
+  </div>
+</section>
+<% } %>
+
 <section class="dashboard-card attention-card">
 <div class="queue-tabs" role="tablist"><a role="tab" aria-selected="<%= filters.tab==='active' %>" class="ui-btn ui-btn--soft <%= filters.tab==='active'?'active':'' %>" href="<%= url({tab:'active',card:null,page:null}) %>">Ativas</a><a role="tab" aria-selected="<%= filters.tab==='history' %>" class="ui-btn ui-btn--soft <%= filters.tab==='history'?'active':'' %>" href="<%= url({tab:'history',card:null,page:null}) %>">Fechadas e histórico</a></div>
 <div class="attention-heading"><div><h2><%= filters.tab==='active'?'Solicitações ativas para Compras':'Fechadas e histórico' %></h2><p><%= filters.tab==='active'?'Fila operacional com solicitações que ainda exigem acompanhamento do setor de Compras.':'Solicitações concluídas, fechadas e canceladas para consulta.' %></p></div><div class="attention-controls"><span>Mostrando <%= lista.length %> de <%= queue.total %> solicitações <%= filters.tab==='active'?'ativas':'' %></span><form method="get"><% Object.entries(filters).forEach(([k,v])=>{if(v&&k!=='limit'&&k!=='page'){%><input type="hidden" name="<%= k==='query'?'q':k %>" value="<%= v %>"><%}})%><select name="limit" aria-label="Quantidade de solicitações" onchange="this.form.submit()"><% [10,20,50].forEach(n=>{%><option value="<%=n%>" <%=queue.limit===n?'selected':''%>>Exibir <%=n%></option><%})%></select></form></div></div>
