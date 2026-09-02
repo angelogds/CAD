@@ -80,4 +80,20 @@ module.exports = ({ db, tableExists, addColumnIfMissing }) => {
     db.exec('CREATE INDEX IF NOT EXISTS idx_estoque_mov_reserva ON estoque_movimentos(reserva_id);');
     db.exec('CREATE INDEX IF NOT EXISTS idx_estoque_mov_retirado_por ON estoque_movimentos(retirado_por_colaborador_id);');
   }
+
+  if (tableExists('estoque_itens')) {
+    db.exec(`
+      DROP TRIGGER IF EXISTS trg_estoque_proteger_saldo_reservado;
+      CREATE TRIGGER trg_estoque_proteger_saldo_reservado
+      BEFORE UPDATE OF saldo_atual ON estoque_itens
+      WHEN NEW.saldo_atual < COALESCE((
+        SELECT SUM(MAX(r.quantidade_reservada-r.quantidade_retirada,0))
+        FROM estoque_reservas r
+        WHERE r.estoque_item_id=NEW.id AND r.status<>'CANCELADA'
+      ),0)
+      BEGIN
+        SELECT RAISE(ABORT,'Saldo reservado para solicitações não pode ser consumido por retirada avulsa.');
+      END;
+    `);
+  }
 };
