@@ -11,6 +11,18 @@ function withReserva(itens) {
   });
 }
 
+function filtrarSituacaoLivre(itens, situacao) {
+  if (!situacao) return itens;
+  return itens.filter((item) => {
+    const saldo = Number(item.saldo_disponivel || 0);
+    const minimo = Number(item.saldo_minimo || 0);
+    if (situacao === 'zerado') return saldo <= 0;
+    if (situacao === 'baixo') return saldo > 0 && saldo < minimo;
+    if (situacao === 'ok') return saldo > 0 && saldo >= minimo;
+    return true;
+  });
+}
+
 function index(req, res) {
   const filtros = {
     q: String(req.query.q || "").trim(),
@@ -18,7 +30,8 @@ function index(req, res) {
     local_id: req.query.local_id || "",
     situacao: ["", "ok", "baixo", "zerado"].includes(req.query.situacao || "") ? (req.query.situacao || "") : "",
   };
-  const itens = withReserva(service.listItens(filtros));
+  const baseFilters = { ...filtros, situacao: "" };
+  const itens = filtrarSituacaoLivre(withReserva(service.listItens(baseFilters)), filtros.situacao);
   res.render("estoque/index", {
     title: "Estoque",
     activeMenu: "estoque",
@@ -73,4 +86,4 @@ async function qrItem(req, res, next) {
   } catch (error) { return next(error); }
 }
 
-module.exports = { index, itens, novoItem, criarItem, detalheItem, categorias, criarCategoria, locais, criarLocal, movimentos, saidaNova, qrItem };
+module.exports = { index, itens, novoItem, criarItem, detalheItem, categorias, criarCategoria, locais, movimentos, saidaNova, qrItem };
