@@ -1,7 +1,23 @@
 const service = require("./estoque.service");
 const { normalizeRole } = require("../../config/rbac");
 
-function index(req, res) { res.render("estoque/index", { title: "Estoque", activeMenu: "estoque", cards: service.dashboard(), itens: service.listItens() }); }
+function index(req, res) {
+  const filtros = {
+    q: String(req.query.q || "").trim(),
+    categoria_id: req.query.categoria_id || "",
+    local_id: req.query.local_id || "",
+    situacao: ["", "ok", "baixo", "zerado"].includes(req.query.situacao || "") ? (req.query.situacao || "") : "",
+  };
+  res.render("estoque/index", {
+    title: "Estoque",
+    activeMenu: "estoque",
+    cards: service.dashboard(),
+    itens: service.listItens(filtros),
+    categorias: service.listCategorias(),
+    locais: service.listLocais(),
+    filtros,
+  });
+}
 function itens(req, res) { res.render("estoque/itens", { title: "Itens", activeMenu: "estoque", itens: service.listItens() }); }
 function novoItem(req, res) { res.render("estoque/novo_item", { title: "Novo Item", activeMenu: "estoque", categorias: service.listCategorias(), locais: service.listLocais() }); }
 function criarItem(req, res) { try { const id = service.createItem(req.body); req.flash("success", "Item criado."); return res.redirect(`/estoque/itens/${id}`);} catch (e) { req.flash("error", e.message); return res.redirect("/estoque/itens/novo"); } }
