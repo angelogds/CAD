@@ -1,0 +1,76 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
+
+<div class="reserve-page">
+  <header class="reserve-head">
+    <div>
+      <span class="eyebrow">ESTOQUE • SEPARAÇÃO POR SOLICITAÇÃO</span>
+      <h1>Materiais separados</h1>
+      <p>Organização do saldo recebido por solicitação, OS e equipamento antes da retirada física.</p>
+    </div>
+    <div class="reserve-head__actions">
+      <a class="btn btn-ghost" href="/almoxarifado/recebimentos">Recebimentos</a>
+      <a class="btn btn-green" href="/almoxarifado/retiradas/qr">Retirada por QR</a>
+    </div>
+  </header>
+
+  <%- include('_tabs', { tab: 'reservas' }) %>
+
+  <section class="reserve-kpis">
+    <article><span>Solicitações com reserva</span><strong><%= resumo.solicitacoes %></strong><small>Pedidos já recebidos no estoque</small></article>
+    <article><span>Prontas para retirada</span><strong><%= resumo.prontas %></strong><small>Possuem saldo reservado</small></article>
+    <article><span>Quantidade reservada</span><strong><%= resumo.reservado %></strong><small>Saldo comprometido com solicitações</small></article>
+    <article><span>Quantidade retirada</span><strong><%= resumo.retirado %></strong><small>Já entregue aos colaboradores</small></article>
+  </section>
+
+  <form class="reserve-search" method="GET" action="/estoque/reservas">
+    <input class="input" type="search" name="q" value="<%= q %>" placeholder="Solicitação, serviço, material ou equipamento" />
+    <button class="btn btn-green" type="submit">Buscar</button>
+    <% if (q) { %><a class="btn btn-ghost" href="/estoque/reservas">Limpar</a><% } %>
+  </form>
+
+  <% if (!grupos.length) { %>
+    <section class="card reserve-empty"><strong>Nenhum material reservado.</strong><p>As reservas são criadas automaticamente quando o Almoxarifado recebe materiais vinculados a uma solicitação.</p></section>
+  <% } %>
+
+  <section class="reserve-groups">
+    <% grupos.forEach((grupo) => { %>
+      <article class="reserve-card">
+        <header class="reserve-card__head">
+          <div>
+            <span class="reserve-number"><%= grupo.numero %></span>
+            <h2><%= grupo.titulo %></h2>
+            <p><%= grupo.solicitante_nome %> • <%= grupo.setor_origem %></p>
+          </div>
+          <div class="reserve-context">
+            <strong><%= grupo.os_numero ? ('OS #' + grupo.os_numero) : 'Sem OS vinculada' %></strong>
+            <span><%= grupo.equipamento_nome || 'Equipamento não informado' %></span>
+          </div>
+        </header>
+
+        <div class="reserve-card__summary">
+          <span>Reservado <b><%= grupo.total_reservado %></b></span>
+          <span>Retirado <b><%= grupo.total_retirado %></b></span>
+          <span>Disponível <b><%= grupo.total_disponivel %></b></span>
+        </div>
+
+        <div class="reserve-items">
+          <% grupo.itens.forEach((item) => { %>
+            <div class="reserve-item">
+              <div><strong><%= item.item_nome %></strong><small><%= item.estoque_item_nome || '-' %> • <%= item.unidade || 'UN' %></small></div>
+              <div><span>Recebido/Reservado</span><b><%= Number(item.quantidade_reservada||0) %></b></div>
+              <div><span>Retirado</span><b><%= Number(item.quantidade_retirada||0) %></b></div>
+              <div><span>A retirar</span><b><%= Number(item.quantidade_disponivel||0) %></b></div>
+              <div><span>Saldo físico</span><b><%= Number(item.saldo_fisico||0) %></b></div>
+            </div>
+          <% }) %>
+        </div>
+
+        <footer class="reserve-card__actions">
+          <a class="btn btn-ghost" href="/almoxarifado/solicitacoes/<%= grupo.solicitacao_id %>/conferir">Abrir solicitação</a>
+          <% if (Number(grupo.total_disponivel||0) > 0) { %><a class="btn btn-green" href="/almoxarifado/retiradas/qr?solicitacao_id=<%= grupo.solicitacao_id %>">Entregar por QR</a><% } %>
+        </footer>
+      </article>
+    <% }) %>
+  </section>
+</div>

@@ -80,20 +80,23 @@ test('alerta de compras é derivado dos dados e some quando o recebimento comple
   assert.doesNotMatch(dashboardService, /CREATE TABLE .*alert/i);
 });
 
-test('retirada contextual permanece vinculada à solicitação, OS e equipamento', () => {
+test('retirada contextual permanece vinculada à solicitação, OS e equipamento e passa por identificação QR', () => {
   const stock = read('modules/estoque/estoque.service.js');
+  const reservationStock = read('modules/estoque/estoque.reservas.service.js');
   const routes = read('modules/almoxarifado/almoxarifado.routes.js');
   const detail = read('views/almoxarifado/conferir.ejs');
 
   assert.match(stock, /solicitacao_id/);
   assert.match(stock, /solicitacao_item_id/);
   assert.match(stock, /equipamento_id/);
-  assert.match(stock, /registrarSaidasSolicitacao/);
   assert.match(stock, /Uma OS ativa é obrigatória para registrar uma retirada manual/);
-  assert.match(routes, /retirar-todos/);
-  assert.match(routes, /itens\/:itemId\/retirar/);
-  assert.match(detail, /Dar baixa \/ retirar/);
-  assert.match(detail, /Retirar todos disponíveis/);
+  assert.match(reservationStock, /retirado_por_colaborador_id/);
+  assert.match(reservationStock, /entregue_por_user_id/);
+  assert.match(routes, /retiradas\/qr/);
+  assert.match(routes, /reservas\/:reservaId\/retirar/);
+  assert.match(detail, /Entregar materiais por QR/);
+  assert.match(detail, /Entregar por QR/);
+  assert.doesNotMatch(detail, />Dar baixa \/ retirar</);
 });
 
 test('migration preserva dados e adiciona somente rastreabilidade necessária', () => {
@@ -108,10 +111,15 @@ test('estoque usa painel padronizado com filtros e status de saldo', () => {
   const view = read('views/estoque/index.ejs');
   const controller = read('modules/estoque/estoque.controller.js');
   assert.match(view, /ESTOQUE • ALMOXARIFADO DA MANUTENÇÃO/);
+  assert.match(view, /Saldo físico/);
+  assert.match(view, /Reservado/);
+  assert.match(view, /Disponível livre/);
   assert.match(view, /Abaixo do mínimo/);
   assert.match(view, /Estoque zerado/);
   assert.match(view, /Último movimento/);
   assert.match(controller, /situacao/);
   assert.match(controller, /categoria_id/);
   assert.match(controller, /local_id/);
+  assert.match(controller, /saldo_reservado/);
+  assert.match(controller, /saldo_disponivel/);
 });

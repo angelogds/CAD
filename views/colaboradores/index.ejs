@@ -1,7 +1,7 @@
 <section class="page-head">
   <div>
     <h1>Colaboradores</h1>
-    <p class="muted">Gestão integrada de perfil, ferramental, EPI, materiais, certificados, escala e custos.</p>
+    <p class="muted">Gestão integrada de perfil, ferramental, EPI, materiais, certificados, escala, custos e identificação para o Almoxarifado.</p>
   </div>
   <a class="btn btn-outline" href="/colaboradores/instalacao">Instalação</a>
 </section>
@@ -56,7 +56,7 @@
     <table class="table">
       <thead>
         <tr>
-          <th>Nome</th><th>Função</th><th>Setor</th><th>Status</th><th>WhatsApp</th><th>EPIs Ativos</th><th>Ferramentas</th><th>Ação</th>
+          <th>Nome</th><th>Função</th><th>Setor</th><th>Status</th><th>WhatsApp</th><th>EPIs Ativos</th><th>Ferramentas</th><th>Ações</th>
         </tr>
       </thead>
       <tbody>
@@ -78,7 +78,10 @@
             </td>
             <td><%= c.epis_ativos || 0 %></td>
             <td><%= c.ferramentas_ativas || 0 %></td>
-            <td><a class="btn btn-sm btn-outline" href="/colaboradores/<%= c.id %>">Abrir</a></td>
+            <td style="display:flex;gap:6px;flex-wrap:wrap;">
+              <a class="btn btn-sm btn-outline" href="/colaboradores/<%= c.id %>">Abrir</a>
+              <% if (canManageProfiles) { %><a class="btn btn-sm btn-outline" href="/colaboradores/<%= c.id %>/cartao">Cartão QR</a><% } %>
+            </td>
           </tr>
         <% }) %>
       </tbody>

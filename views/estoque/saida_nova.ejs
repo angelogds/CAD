@@ -1,9 +1,11 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20260824-v1" />
 <link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
 <%
   const isAlmoxContext = typeof contextoAlmox !== 'undefined' && contextoAlmox;
   const showAlmoxTabs = isAlmoxContext && typeof canAlmoxRead !== 'undefined' && canAlmoxRead;
+  const itensLivres = itens.filter(item => Number(item.saldo_disponivel || 0) > 0);
 %>
 
 <div class="almox-page almox-flow-page">
@@ -11,37 +13,36 @@
     <div>
       <span class="almox-hero__eyebrow"><%= isAlmoxContext ? 'ALMOXARIFADO • RETIRADA AVULSA' : 'ESTOQUE • MOVIMENTAÇÃO' %></span>
       <h1>Retirada de Materiais</h1>
-      <p class="muted">Use esta tela para uma saída avulsa vinculada a OS ativa. Materiais originados de compra devem ser retirados preferencialmente dentro da própria solicitação.</p>
+      <p class="muted">Saída avulsa vinculada a OS ativa. Materiais reservados para solicitações devem ser entregues pelo fluxo da solicitação/QR.</p>
     </div>
     <div class="almox-hero__actions">
-      <% if (showAlmoxTabs) { %><a class="btn btn-green" href="/almoxarifado/recebimentos">Abrir solicitações</a><% } %>
+      <% if (showAlmoxTabs) { %><a class="btn btn-ghost" href="/almoxarifado/recebimentos">Abrir solicitações</a><% } %>
+      <a class="btn btn-ghost" href="/estoque/reservas">Materiais separados</a>
+      <a class="btn btn-green" href="/almoxarifado/retiradas/qr">Retirada por QR</a>
       <a class="btn btn-ghost" href="/estoque">Consultar estoque</a>
-      <a class="btn btn-ghost" href="/estoque/movimentos">Ver movimentos</a>
     </div>
   </header>
 
   <% if (showAlmoxTabs) { %><%- include('../almoxarifado/_tabs', { tab: 'retiradas' }) %><% } else { %><%- include('_tabs', { tab: 'saida' }) %><% } %>
 
-  <% if (isAlmoxContext) { %>
-    <div class="almox-warning"><strong>Fluxo recomendado:</strong> se o material veio de uma solicitação de compra, volte para <a href="/almoxarifado/recebimentos">Solicitações do Almoxarifado</a>, abra o pedido e use “Dar baixa / retirar”. Assim a saída fica ligada automaticamente à solicitação, OS e equipamento. Esta tela continua disponível para retiradas avulsas.</div>
-  <% } %>
+  <div class="almox-warning"><strong>Saldo protegido:</strong> esta tela só pode consumir o saldo livre. Quantidades reservadas para solicitações/OS ficam protegidas no banco até a entrega pelo fluxo de materiais separados.</div>
 
   <section class="almox-kpis">
-    <article class="almox-kpi"><span class="almox-kpi__label">Itens disponíveis</span><strong class="almox-kpi__value"><%= itens.length %></strong><span class="almox-kpi__meta">Materiais ativos no estoque</span></article>
+    <article class="almox-kpi"><span class="almox-kpi__label">Itens com saldo livre</span><strong class="almox-kpi__value"><%= itensLivres.length %></strong><span class="almox-kpi__meta">Disponíveis para retirada avulsa</span></article>
     <article class="almox-kpi almox-kpi--blue"><span class="almox-kpi__label">OS ativas</span><strong class="almox-kpi__value"><%= ordens.length %></strong><span class="almox-kpi__meta">Destinos válidos para retirada avulsa</span></article>
     <article class="almox-kpi almox-kpi--amber"><span class="almox-kpi__label">Regra da retirada avulsa</span><strong class="almox-kpi__value" style="font-size:1.05rem;">OS obrigatória</strong><span class="almox-kpi__meta">Mantém a rastreabilidade do consumo</span></article>
-    <article class="almox-kpi almox-kpi--slate"><span class="almox-kpi__label">Origem</span><strong class="almox-kpi__value" style="font-size:1.05rem;"><%= origem === 'QR_CODE' ? 'QR Code' : 'Manual' %></strong><span class="almox-kpi__meta">Movimento registrado no histórico</span></article>
+    <article class="almox-kpi almox-kpi--slate"><span class="almox-kpi__label">Reservas</span><strong class="almox-kpi__value" style="font-size:1.05rem;">Protegidas</strong><span class="almox-kpi__meta">Não podem ser consumidas aqui</span></article>
   </section>
 
   <section class="card almox-withdraw-card">
-    <div class="almox-summary-card__head" style="margin-bottom:16px;"><div><div class="almox-summary-card__title">Registrar retirada avulsa</div><div class="almox-subline">Selecione o material, confira o saldo e informe a OS que receberá o consumo.</div></div><span class="almox-status almox-status--recebimento">Baixa imediata</span></div>
+    <div class="almox-summary-card__head" style="margin-bottom:16px;"><div><div class="almox-summary-card__title">Registrar retirada avulsa</div><div class="almox-subline">Selecione o material, confira o saldo livre e informe a OS que receberá o consumo.</div></div><span class="almox-status almox-status--recebimento">Baixa imediata</span></div>
     <form method="POST" action="/estoque/saidas" class="almox-withdraw-grid" data-lock-submit>
       <% if (isAlmoxContext) { %><input type="hidden" name="contexto" value="almoxarifado" /><% } %><input type="hidden" name="origem" value="<%= origem %>" />
-      <div class="almox-field almox-field--full"><label for="almoxStockItem">Item do estoque</label><select id="almoxStockItem" class="input" name="item_id" required data-stock-item-select><option value="">Selecione o material</option><% itens.forEach(item=>{ %><option value="<%=item.id%>" data-balance="<%=Number(item.saldo_atual||0)%>" data-unit="<%=item.unidade||'UN'%>" <%=Number(itemSelecionado)===Number(item.id)?'selected':''%>><%=item.codigo?(item.codigo+' • '):''%><%=item.nome%> — saldo <%=Number(item.saldo_atual||0)%> <%=item.unidade||'UN'%></option><% }) %></select><div class="almox-stock-hint" data-stock-hint>Selecione um item para consultar o saldo disponível.</div></div>
+      <div class="almox-field almox-field--full"><label for="almoxStockItem">Item do estoque</label><select id="almoxStockItem" class="input" name="item_id" required data-stock-item-select><option value="">Selecione o material</option><% itens.forEach(item=>{ const livre=Number(item.saldo_disponivel||0), reservado=Number(item.saldo_reservado||0); %><option value="<%=item.id%>" data-balance="<%=livre%>" data-unit="<%=item.unidade||'UN'%>" <%=Number(itemSelecionado)===Number(item.id)?'selected':''%> <%=livre<=0?'disabled':''%>><%=item.codigo?(item.codigo+' • '):''%><%=item.nome%> — livre <%=livre%> <%=item.unidade||'UN'%><%= reservado>0 ? (' • reservado '+reservado) : '' %></option><% }) %></select><div class="almox-stock-hint" data-stock-hint>O valor exibido é o saldo livre: saldo físico menos reservas.</div></div>
       <div class="almox-field"><label for="almoxQtdSaida">Quantidade</label><input id="almoxQtdSaida" class="input" type="number" step="0.01" min="0.01" name="quantidade" placeholder="0,00" data-stock-quantity required /></div>
-      <div class="almox-field"><label for="almoxOsSaida">OS ativa</label><select id="almoxOsSaida" class="input" name="os_id" required><option value="">Selecione a OS</option><% ordens.forEach(os=>{ %><option value="<%=os.id%>">OS #<%=os.id%> — <%=os.equipamento_nome||'Equipamento não informado'%></option><% }) %></select><div class="almox-stock-hint">Na retirada por solicitação, este vínculo é preenchido automaticamente quando a solicitação possui OS.</div></div>
+      <div class="almox-field"><label for="almoxOsSaida">OS ativa</label><select id="almoxOsSaida" class="input" name="os_id" required><option value="">Selecione a OS</option><% ordens.forEach(os=>{ %><option value="<%=os.id%>">OS #<%=os.id%> — <%=os.equipamento_nome||'Equipamento não informado'%></option><% }) %></select><div class="almox-stock-hint">Na retirada por solicitação, este vínculo vem automaticamente do pedido.</div></div>
       <div class="almox-field almox-field--full"><label for="almoxObsSaida">Destino / finalidade / observação</label><textarea id="almoxObsSaida" class="input" name="observacao" rows="3" placeholder="Ex.: troca de rolamento do mancal dianteiro, manutenção corretiva..."></textarea></div>
-      <div class="almox-field almox-field--full"><div class="almox-warning">Antes de confirmar, confira material, quantidade e OS. A saída reduz o saldo imediatamente e gera movimentação rastreável.</div></div>
+      <div class="almox-field almox-field--full"><div class="almox-warning">Antes de confirmar, confira material, quantidade e OS. A saída reduz apenas o saldo livre e gera movimentação rastreável.</div></div>
       <div class="almox-actions almox-field--full"><button class="btn btn-green" type="submit" data-pending-text="Registrando...">Registrar saída</button><a class="btn btn-ghost" href="<%=isAlmoxContext?'/almoxarifado/recebimentos':'/estoque'%>">Cancelar</a></div>
     </form>
   </section>

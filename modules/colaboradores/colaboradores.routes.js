@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const ctrl = require('./colaboradores.controller');
+const qrCtrl = require('./colaboradores.qr.controller');
 const storagePaths = require('../../config/storage');
 
 const router = express.Router();
@@ -32,8 +33,12 @@ router.use(requireLogin, (req, res, next) => {
 router.get('/instalacao', requireRole(['ADMIN', 'RH']), safe(ctrl.installationGuide));
 router.get('/', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'COLABORADOR']), safe(ctrl.index));
 router.post('/', requireRole(['ADMIN', 'RH']), uploadFoto.single('foto'), safe(ctrl.create));
-router.get('/:id', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'COLABORADOR']), safe(ctrl.show));
 
+router.get('/:id/cartao', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR']), safe(qrCtrl.cartao));
+router.post('/:id/cartao/emitir', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR']), safe(qrCtrl.emitir));
+router.post('/:id/cartao/revogar', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR']), safe(qrCtrl.revogar));
+
+router.get('/:id', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'COLABORADOR']), safe(ctrl.show));
 router.post('/:id/perfil', requireRole(['ADMIN', 'RH']), uploadFoto.single('foto'), safe(ctrl.savePerfil));
 
 router.post('/:id/ferramental', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR']), safe(ctrl.lancarFerramental));

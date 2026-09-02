@@ -20,12 +20,20 @@ const HAS_MOV_SOLICITACAO_ID = hasColumn("estoque_movimentos", "solicitacao_id")
 const HAS_MOV_SOLICITACAO_ITEM_ID = hasColumn("estoque_movimentos", "solicitacao_item_id");
 const HAS_MOV_SALDO_ANTERIOR = hasColumn("estoque_movimentos", "saldo_anterior");
 const HAS_MOV_SALDO_POSTERIOR = hasColumn("estoque_movimentos", "saldo_posterior");
+const HAS_MOV_RETIRADO_POR = hasColumn("estoque_movimentos", "retirado_por_colaborador_id");
+const HAS_MOV_ENTREGUE_POR = hasColumn("estoque_movimentos", "entregue_por_user_id");
+const HAS_MOV_IDENTIFICACAO_ORIGEM = hasColumn("estoque_movimentos", "identificacao_origem");
+const HAS_MOV_RESERVA_ID = hasColumn("estoque_movimentos", "reserva_id");
 
 function categoriaJoin() { return HAS_CATEGORIA_ID && tableExists("estoque_categorias") ? "LEFT JOIN estoque_categorias c ON c.id=i.categoria_id" : "LEFT JOIN (SELECT NULL id,NULL nome) c ON 1=0"; }
 function localJoin() { return HAS_LOCAL_ID && tableExists("estoque_locais") ? "LEFT JOIN estoque_locais l ON l.id=i.local_id" : "LEFT JOIN (SELECT NULL id,NULL nome) l ON 1=0"; }
 function saldoJoin() { return !HAS_SALDO_ATUAL && tableExists("vw_estoque_saldo") ? "LEFT JOIN vw_estoque_saldo v ON v.item_id=i.id" : "LEFT JOIN (SELECT NULL item_id,0 saldo) v ON 1=0"; }
 function dataMovExpr(alias = "m") { return HAS_DATA_MOV ? `COALESCE(${alias}.data_mov,${alias}.created_at)` : `${alias}.created_at`; }
 function usuarioJoin() { return HAS_USUARIO_ID && tableExists("users") ? "LEFT JOIN users u ON u.id=m.usuario_id" : "LEFT JOIN (SELECT NULL id,NULL name) u ON 1=0"; }
+function retiradoPorJoin() { return HAS_MOV_RETIRADO_POR && tableExists("colaboradores") ? "LEFT JOIN colaboradores rc ON rc.id=m.retirado_por_colaborador_id" : "LEFT JOIN (SELECT NULL id,NULL nome) rc ON 1=0"; }
+function entreguePorJoin() { return HAS_MOV_ENTREGUE_POR && tableExists("users") ? "LEFT JOIN users eu ON eu.id=m.entregue_por_user_id" : "LEFT JOIN (SELECT NULL id,NULL name) eu ON 1=0"; }
+function solicitacaoJoin() { return HAS_MOV_SOLICITACAO_ID && tableExists("solicitacoes") ? "LEFT JOIN solicitacoes s ON s.id=m.solicitacao_id" : "LEFT JOIN (SELECT NULL id,NULL numero) s ON 1=0"; }
+function equipamentoJoin() { return HAS_MOV_EQUIPAMENTO_ID && tableExists("equipamentos") ? "LEFT JOIN equipamentos eq ON eq.id=m.equipamento_id" : "LEFT JOIN (SELECT NULL id,NULL nome) eq ON 1=0"; }
 function saldoExpr() { return HAS_SALDO_ATUAL ? "COALESCE(i.saldo_atual,0)" : "COALESCE(v.saldo,0)"; }
 function minExpr() { return HAS_SALDO_MINIMO ? "COALESCE(i.saldo_minimo,0)" : (HAS_ESTOQUE_MIN ? "COALESCE(i.estoque_min,0)" : "0"); }
 function normalize(value) { return String(value || "").trim(); }
@@ -70,8 +78,16 @@ function listItens(filters = {}) {
 function listCategorias() { return tableExists("estoque_categorias") ? db.prepare("SELECT * FROM estoque_categorias WHERE ativo=1 ORDER BY nome").all() : []; }
 function listLocais() { return tableExists("estoque_locais") ? db.prepare("SELECT * FROM estoque_locais WHERE ativo=1 ORDER BY nome").all() : []; }
 function listMovimentos() {
-  return db.prepare(`SELECT m.*, ${dataMovExpr()} AS data_mov, i.nome item_nome, u.name usuario_nome
-    FROM estoque_movimentos m JOIN estoque_itens i ON i.id=m.item_id ${usuarioJoin()} ORDER BY m.id DESC LIMIT 300`).all();
+  const identificacaoExpr = HAS_MOV_IDENTIFICACAO_ORIGEM ? "m.identificacao_origem" : "NULL";
+  const reservaExpr = HAS_MOV_RESERVA_ID ? "m.reserva_id" : "NULL";
+  return db.prepare(`SELECT m.*, ${dataMovExpr()} AS data_mov, i.nome item_nome, i.unidade item_unidade,
+      u.name usuario_nome, rc.nome retirado_por_nome, eu.name entregue_por_nome,
+      s.numero solicitacao_numero, eq.nome equipamento_nome,
+      ${identificacaoExpr} identificacao_origem_exibicao, ${reservaExpr} reserva_id_exibicao
+    FROM estoque_movimentos m
+    JOIN estoque_itens i ON i.id=m.item_id
+    ${usuarioJoin()} ${retiradoPorJoin()} ${entreguePorJoin()} ${solicitacaoJoin()} ${equipamentoJoin()}
+    ORDER BY m.id DESC LIMIT 300`).all();
 }
 
 function createCategoria({ nome, parent_id }) { db.prepare("INSERT INTO estoque_categorias (nome,parent_id) VALUES (?,?)").run(nome, parent_id || null); }
@@ -124,6 +140,30 @@ function getContextoSolicitacao(solicitacaoId, solicitacaoItemId) {
   return { ...row, qtd_retirada: retirada, disponivel_retirada: Math.max(Number(row.qtd_recebida_total || 0) - retirada, 0) };
 }
 
+function atualizarReservaDaRetirada(contexto, quantidade) {
+  if (!contexto || !tableExists('estoque_reservas')) return null;
+  const reserva = db.prepare(`
+    SELECT id,quantidade_reservada,quantidade_retirada,status
+    FROM estoque_reservas
+    WHERE solicitacao_item_id=? AND status<>'CANCELADA'
+  `).get(Number(contexto.solicitacao_item_id));
+  if (!reserva) return null;
+
+  const qtd = Number(quantidade || 0);
+  const disponivel = Math.max(Number(reserva.quantidade_reservada || 0) - Number(reserva.quantidade_retirada || 0), 0);
+  if (qtd > disponivel) throw new Error(`Quantidade acima da reserva disponível. Máximo: ${disponivel}.`);
+
+  const retiradaNova = Number(reserva.quantidade_retirada || 0) + qtd;
+  const status = retiradaNova >= Number(reserva.quantidade_reservada || 0) ? 'RETIRADA' : 'PARCIAL';
+  const update = db.prepare(`
+    UPDATE estoque_reservas
+    SET quantidade_retirada=?,status=?,updated_at=datetime('now')
+    WHERE id=? AND quantidade_retirada=?
+  `).run(retiradaNova, status, reserva.id, Number(reserva.quantidade_retirada || 0));
+  if (!update.changes) throw new Error('Reserva alterada por outro usuário. Atualize a página e tente novamente.');
+  return { id: Number(reserva.id), quantidadeRetirada: retiradaNova, status };
+}
+
 function insertMovimento(data) {
   const cols = ["tipo", "item_id", "quantidade"];
   const vals = [data.tipo, data.item_id, data.quantidade];
@@ -131,7 +171,9 @@ function insertMovimento(data) {
     ["origem", data.origem], ["os_id", data.os_id], ["equipamento_id", data.equipamento_id],
     ["solicitacao_id", data.solicitacao_id], ["solicitacao_item_id", data.solicitacao_item_id],
     ["usuario_id", data.usuario_id], ["saldo_anterior", data.saldo_anterior], ["saldo_posterior", data.saldo_posterior],
-    ["observacao", data.observacao],
+    ["observacao", data.observacao], ["reserva_id", data.reserva_id],
+    ["retirado_por_colaborador_id", data.retirado_por_colaborador_id], ["entregue_por_user_id", data.entregue_por_user_id],
+    ["identificacao_origem", data.identificacao_origem],
   ];
   optional.forEach(([col, value]) => { if (hasColumn("estoque_movimentos", col)) { cols.push(col); vals.push(value ?? null); } });
   const info = db.prepare(`INSERT INTO estoque_movimentos (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(...vals);
@@ -160,6 +202,11 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
     throw new Error(`Quantidade acima do disponível nesta solicitação. Máximo: ${contexto.disponivel_retirada}.`);
   }
 
+  // Mantém compatibilidade com as rotas contextuais antigas. Se existir reserva,
+  // ela precisa ser reduzida ANTES do saldo físico para não disparar a proteção
+  // contra consumo de material reservado. Tudo ocorre dentro da mesma transação.
+  const reserva = contexto ? atualizarReservaDaRetirada(contexto, qtd) : null;
+
   const equipamentoId = contexto?.equipamento_id || os?.equipamento_id || null;
   const anterior = Number(item.saldo_atual || 0);
   const posterior = anterior - qtd;
@@ -174,8 +221,11 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
     solicitacao_item_id: contexto?.solicitacao_item_id || null, usuario_id: usuario_id || null,
     saldo_anterior: anterior, saldo_posterior: posterior,
     observacao: observacao || (contexto ? `Retirada da solicitação ${contexto.numero || `#${contexto.solicitacao_id}`}` : null),
+    reserva_id: reserva?.id || null,
+    entregue_por_user_id: contexto ? (usuario_id || null) : null,
+    identificacao_origem: contexto ? 'CONTEXTO_SEM_QR' : (String(origem).toUpperCase() === 'QR_CODE' ? 'QR_ITEM' : 'MANUAL'),
   });
-  return { movimentoId, itemId: resolvedItemId, saldoAnterior: anterior, saldoPosterior: posterior, osId: resolvedOsId, equipamentoId };
+  return { movimentoId, itemId: resolvedItemId, saldoAnterior: anterior, saldoPosterior: posterior, osId: resolvedOsId, equipamentoId, reservaId: reserva?.id || null };
 }
 
 function registrarSaida(data) {
