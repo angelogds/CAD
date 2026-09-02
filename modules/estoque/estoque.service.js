@@ -20,12 +20,20 @@ const HAS_MOV_SOLICITACAO_ID = hasColumn("estoque_movimentos", "solicitacao_id")
 const HAS_MOV_SOLICITACAO_ITEM_ID = hasColumn("estoque_movimentos", "solicitacao_item_id");
 const HAS_MOV_SALDO_ANTERIOR = hasColumn("estoque_movimentos", "saldo_anterior");
 const HAS_MOV_SALDO_POSTERIOR = hasColumn("estoque_movimentos", "saldo_posterior");
+const HAS_MOV_RETIRADO_POR = hasColumn("estoque_movimentos", "retirado_por_colaborador_id");
+const HAS_MOV_ENTREGUE_POR = hasColumn("estoque_movimentos", "entregue_por_user_id");
+const HAS_MOV_IDENTIFICACAO_ORIGEM = hasColumn("estoque_movimentos", "identificacao_origem");
+const HAS_MOV_RESERVA_ID = hasColumn("estoque_movimentos", "reserva_id");
 
 function categoriaJoin() { return HAS_CATEGORIA_ID && tableExists("estoque_categorias") ? "LEFT JOIN estoque_categorias c ON c.id=i.categoria_id" : "LEFT JOIN (SELECT NULL id,NULL nome) c ON 1=0"; }
 function localJoin() { return HAS_LOCAL_ID && tableExists("estoque_locais") ? "LEFT JOIN estoque_locais l ON l.id=i.local_id" : "LEFT JOIN (SELECT NULL id,NULL nome) l ON 1=0"; }
 function saldoJoin() { return !HAS_SALDO_ATUAL && tableExists("vw_estoque_saldo") ? "LEFT JOIN vw_estoque_saldo v ON v.item_id=i.id" : "LEFT JOIN (SELECT NULL item_id,0 saldo) v ON 1=0"; }
 function dataMovExpr(alias = "m") { return HAS_DATA_MOV ? `COALESCE(${alias}.data_mov,${alias}.created_at)` : `${alias}.created_at`; }
 function usuarioJoin() { return HAS_USUARIO_ID && tableExists("users") ? "LEFT JOIN users u ON u.id=m.usuario_id" : "LEFT JOIN (SELECT NULL id,NULL name) u ON 1=0"; }
+function retiradoPorJoin() { return HAS_MOV_RETIRADO_POR && tableExists("colaboradores") ? "LEFT JOIN colaboradores rc ON rc.id=m.retirado_por_colaborador_id" : "LEFT JOIN (SELECT NULL id,NULL nome) rc ON 1=0"; }
+function entreguePorJoin() { return HAS_MOV_ENTREGUE_POR && tableExists("users") ? "LEFT JOIN users eu ON eu.id=m.entregue_por_user_id" : "LEFT JOIN (SELECT NULL id,NULL name) eu ON 1=0"; }
+function solicitacaoJoin() { return HAS_MOV_SOLICITACAO_ID && tableExists("solicitacoes") ? "LEFT JOIN solicitacoes s ON s.id=m.solicitacao_id" : "LEFT JOIN (SELECT NULL id,NULL numero) s ON 1=0"; }
+function equipamentoJoin() { return HAS_MOV_EQUIPAMENTO_ID && tableExists("equipamentos") ? "LEFT JOIN equipamentos eq ON eq.id=m.equipamento_id" : "LEFT JOIN (SELECT NULL id,NULL nome) eq ON 1=0"; }
 function saldoExpr() { return HAS_SALDO_ATUAL ? "COALESCE(i.saldo_atual,0)" : "COALESCE(v.saldo,0)"; }
 function minExpr() { return HAS_SALDO_MINIMO ? "COALESCE(i.saldo_minimo,0)" : (HAS_ESTOQUE_MIN ? "COALESCE(i.estoque_min,0)" : "0"); }
 function normalize(value) { return String(value || "").trim(); }
@@ -70,8 +78,16 @@ function listItens(filters = {}) {
 function listCategorias() { return tableExists("estoque_categorias") ? db.prepare("SELECT * FROM estoque_categorias WHERE ativo=1 ORDER BY nome").all() : []; }
 function listLocais() { return tableExists("estoque_locais") ? db.prepare("SELECT * FROM estoque_locais WHERE ativo=1 ORDER BY nome").all() : []; }
 function listMovimentos() {
-  return db.prepare(`SELECT m.*, ${dataMovExpr()} AS data_mov, i.nome item_nome, u.name usuario_nome
-    FROM estoque_movimentos m JOIN estoque_itens i ON i.id=m.item_id ${usuarioJoin()} ORDER BY m.id DESC LIMIT 300`).all();
+  const identificacaoExpr = HAS_MOV_IDENTIFICACAO_ORIGEM ? "m.identificacao_origem" : "NULL";
+  const reservaExpr = HAS_MOV_RESERVA_ID ? "m.reserva_id" : "NULL";
+  return db.prepare(`SELECT m.*, ${dataMovExpr()} AS data_mov, i.nome item_nome, i.unidade item_unidade,
+      u.name usuario_nome, rc.nome retirado_por_nome, eu.name entregue_por_nome,
+      s.numero solicitacao_numero, eq.nome equipamento_nome,
+      ${identificacaoExpr} identificacao_origem_exibicao, ${reservaExpr} reserva_id_exibicao
+    FROM estoque_movimentos m
+    JOIN estoque_itens i ON i.id=m.item_id
+    ${usuarioJoin()} ${retiradoPorJoin()} ${entreguePorJoin()} ${solicitacaoJoin()} ${equipamentoJoin()}
+    ORDER BY m.id DESC LIMIT 300`).all();
 }
 
 function createCategoria({ nome, parent_id }) { db.prepare("INSERT INTO estoque_categorias (nome,parent_id) VALUES (?,?)").run(nome, parent_id || null); }
