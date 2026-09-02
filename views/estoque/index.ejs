@@ -1,45 +1,56 @@
 <% layout('layout') %>
+<link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-v1" />
+<%
+  const dateBR = (v) => { if(!v)return 'Sem movimento'; const d=String(v).slice(0,10).split('-'); return d.length===3?`${d[2]}/${d[1]}/${d[0]}`:String(v); };
+  const stockState = (item) => {
+    const saldo=Number(item.saldo_atual||0), minimo=Number(item.saldo_minimo||0);
+    if(saldo<=0)return ['Zerado','stock-state--zero'];
+    if(saldo<minimo)return ['Abaixo do mínimo','stock-state--low'];
+    return ['Disponível','stock-state--ok'];
+  };
+%>
 
-<div class="page-head">
-  <div>
-    <h1>Estoque</h1>
-    <p class="muted">Controle de itens, saldos, mínimos e estrutura de armazenamento.</p>
-  </div>
-</div>
+<div class="stock-flow-page">
+  <header class="stock-flow-head">
+    <div><span>ESTOQUE • ALMOXARIFADO DA MANUTENÇÃO</span><h1>Estoque</h1><p>Controle de materiais, saldo físico, mínimos e rastreabilidade das movimentações.</p></div>
+    <div class="stock-flow-actions"><a class="btn btn-ghost" href="/estoque/movimentos">Movimentações</a><a class="btn btn-green" href="/estoque/saidas/nova">Registrar saída</a></div>
+  </header>
 
-<%- include('_tabs', { tab: 'itens' }) %>
+  <%- include('_tabs', { tab: 'itens' }) %>
 
-<div class="grid-3" style="margin-bottom:14px;">
-  <div class="card"><div class="label">Itens ativos</div><div style="font-size:28px;font-weight:900;"><%= cards.itens %></div></div>
-  <div class="card"><div class="label">Abaixo do mínimo</div><div style="font-size:28px;font-weight:900;"><%= cards.baixo %></div></div>
-  <div class="card"><div class="label">Saldo total</div><div style="font-size:28px;font-weight:900;"><%= cards.saldo %></div></div>
-</div>
+  <section class="stock-flow-kpis">
+    <article><span>Itens ativos</span><strong><%= cards.itens %></strong><small>Materiais cadastrados</small></article>
+    <article><span>Saldo total</span><strong><%= cards.saldo %></strong><small>Somatório das unidades em estoque</small></article>
+    <article class="is-warning"><span>Abaixo do mínimo</span><strong><%= cards.baixo %></strong><small>Exigem atenção de reposição</small></article>
+    <article class="is-danger"><span>Estoque zerado</span><strong><%= cards.zerados %></strong><small>Sem saldo físico disponível</small></article>
+    <article class="is-info"><span>Movimentos hoje</span><strong><%= cards.movimentosHoje %></strong><small>Entradas e saídas registradas</small></article>
+  </section>
 
-<div class="card">
-  <div class="page-head" style="margin-top:0;">
-    <div>
-      <h2 style="margin:0;font-size:22px;">Itens cadastrados</h2>
-      <p class="muted">Visão consolidada do estoque atual.</p>
-    </div>
-  </div>
-  <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th>Código</th><th>Nome</th><th>Categoria</th><th>Local</th><th>Saldo</th><th>Mínimo</th></tr></thead>
-      <tbody>
-        <% if (!itens.length) { %>
-          <tr><td colspan="6" class="muted">Nenhum item ativo encontrado.</td></tr>
-        <% } %>
-        <% itens.forEach((item) => { %>
-          <tr>
-            <td><%= item.codigo || '-' %></td>
-            <td><strong><%= item.nome %></strong></td>
-            <td><%= item.categoria_nome || '-' %></td>
-            <td><%= item.local_nome || '-' %></td>
-            <td><%= item.saldo_atual %> <%= item.unidade %></td>
-            <td><%= item.saldo_minimo %> <%= item.unidade %></td>
-          </tr>
+  <form class="stock-flow-filters" method="GET" action="/estoque">
+    <label class="stock-search"><span>Busca</span><input class="input" name="q" value="<%= filtros.q %>" placeholder="Código ou nome do material" /></label>
+    <label><span>Categoria</span><select class="input" name="categoria_id"><option value="">Todas</option><% categorias.forEach(c=>{ %><option value="<%=c.id%>" <%=String(filtros.categoria_id)===String(c.id)?'selected':''%>><%=c.nome%></option><% }) %></select></label>
+    <label><span>Local</span><select class="input" name="local_id"><option value="">Todos</option><% locais.forEach(l=>{ %><option value="<%=l.id%>" <%=String(filtros.local_id)===String(l.id)?'selected':''%>><%=l.nome%></option><% }) %></select></label>
+    <label><span>Situação</span><select class="input" name="situacao"><option value="">Todas</option><option value="ok" <%=filtros.situacao==='ok'?'selected':''%>>Disponível</option><option value="baixo" <%=filtros.situacao==='baixo'?'selected':''%>>Abaixo do mínimo</option><option value="zerado" <%=filtros.situacao==='zerado'?'selected':''%>>Zerado</option></select></label>
+    <div class="stock-filter-actions"><button class="btn btn-green" type="submit">Aplicar</button><a class="btn btn-ghost" href="/estoque">Limpar</a></div>
+  </form>
+
+  <section class="card stock-table-card">
+    <div class="stock-table-head"><div><h2>Materiais em estoque</h2><p>Visão consolidada e operacional do almoxarifado.</p></div><span><%= itens.length %> item(ns) nesta visão</span></div>
+    <% if(!itens.length){ %><div class="almox-empty"><strong>Nenhum material encontrado.</strong><div class="almox-subline">Revise os filtros ou cadastre um novo item.</div></div><% } else { %>
+      <div class="stock-table-wrap">
+        <div class="stock-table-columns" aria-hidden="true"><span>Material</span><span>Categoria / Local</span><span>Saldo</span><span>Mínimo</span><span>Situação</span><span>Último movimento</span><span>Ações</span></div>
+        <% itens.forEach(item=>{ const state=stockState(item); %>
+          <article class="stock-table-row">
+            <div data-label="Material"><small><%= item.codigo || 'Sem código' %></small><strong><%= item.nome %></strong><span><%= item.unidade || 'UN' %></span></div>
+            <div data-label="Categoria / Local"><strong><%= item.categoria_nome || 'Sem categoria' %></strong><span><%= item.local_nome || 'Local não definido' %></span></div>
+            <div data-label="Saldo"><strong class="stock-balance"><%= Number(item.saldo_atual||0) %> <%= item.unidade||'UN' %></strong></div>
+            <div data-label="Mínimo"><strong><%= Number(item.saldo_minimo||0) %> <%= item.unidade||'UN' %></strong></div>
+            <div data-label="Situação"><span class="stock-state <%=state[1]%>"><%=state[0]%></span></div>
+            <div data-label="Último movimento"><strong><%=dateBR(item.ultima_movimentacao)%></strong></div>
+            <div data-label="Ações" class="stock-row-actions"><a class="btn btn-sm btn-ghost" href="/estoque/itens/<%=item.id%>">Abrir</a><% if(Number(item.saldo_atual||0)>0){ %><a class="btn btn-sm btn-green" href="/estoque/saidas/nova?item=<%=item.id%>">Retirar</a><% } %></div>
+          </article>
         <% }) %>
-      </tbody>
-    </table>
-  </div>
+      </div>
+    <% } %>
+  </section>
 </div>

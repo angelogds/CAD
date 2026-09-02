@@ -1,24 +1,28 @@
 const service = require("./almoxarifado.service");
 const estoqueService = require("../estoque/estoque.service");
-const { normalizeRole } = require("../../config/rbac");
+const { normalizeRole, ACCESS } = require("../../config/rbac");
 const { STATUS } = require("../solicitacoes/solicitacoes.service");
 
 function canManageAlmox(user) {
   return ["ADMIN", "ALMOXARIFADO"].includes(normalizeRole(user?.role));
 }
+function canWithdrawStock(user) {
+  return ACCESS.estoque_retirada.includes(normalizeRole(user?.role));
+}
 
 function recebimentos(req, res) {
-  const requestedStatus = String(req.query.status || STATUS.COMPRADA).trim().toUpperCase();
-  const status = service.RECEBIMENTO_STATUS.includes(requestedStatus) ? requestedStatus : STATUS.COMPRADA;
+  const requestedStatus = String(req.query.status || "TODAS").trim().toUpperCase();
+  const status = requestedStatus === "TODAS" || service.ALMOX_STATUS.includes(requestedStatus) ? requestedStatus : "TODAS";
   const q = String(req.query.q || "").trim();
   res.render("almoxarifado/recebimentos", {
-    title: "Recebimentos",
+    title: "Almoxarifado",
     activeMenu: "almoxarifado",
     lista: service.listRecebimentos({ status, query: q }),
     resumo: service.getResumoRecebimentos(q),
     status,
     q,
     canManage: canManageAlmox(req.session.user),
+    canWithdraw: canWithdrawStock(req.session.user),
   });
 }
 
@@ -36,12 +40,13 @@ function conferir(req, res) {
   const sol = service.getSolicitacao(Number(req.params.id));
   if (!sol) return res.status(404).send("Solicitação não encontrada");
   res.render("almoxarifado/conferir", {
-    title: `Conferir ${sol.numero || `#${sol.id}`}`,
+    title: `Solicitação ${sol.numero || `#${sol.id}`}`,
     activeMenu: "almoxarifado",
     sol,
     locais: estoqueService.listLocais(),
     historico: service.getHistoricoRecebimento(sol.id),
     canManage: canManageAlmox(req.session.user),
+    canWithdraw: canWithdrawStock(req.session.user),
   });
 }
 
@@ -55,11 +60,42 @@ function receberItem(req, res) {
       localId: req.body.local_id ? Number(req.body.local_id) : null,
       userId: req.session.user.id,
     });
-    req.flash("success", "Item recebido, movimentação registrada e estoque atualizado.");
+    req.flash("success", "Item recebido, entrada registrada e saldo do estoque atualizado.");
   } catch (e) {
     req.flash("error", e.message);
   }
   res.redirect(`/almoxarifado/solicitacoes/${req.params.id}/conferir`);
+}
+
+function retirarItem(req, res) {
+  try {
+    estoqueService.registrarSaida({
+      solicitacao_id: Number(req.params.id),
+      solicitacao_item_id: Number(req.params.itemId),
+      quantidade: Number(req.body.quantidade || 0),
+      usuario_id: req.session.user.id,
+      observacao: req.body.observacao || null,
+      origem: "SOLICITACAO",
+    });
+    req.flash("success", "Retirada registrada na solicitação e saldo do estoque atualizado.");
+  } catch (e) {
+    req.flash("error", e.message);
+  }
+  res.redirect(`/almoxarifado/solicitacoes/${req.params.id}/conferir#materiais`);
+}
+
+function retirarTodos(req, res) {
+  try {
+    const resultados = estoqueService.registrarSaidasSolicitacao({
+      solicitacao_id: Number(req.params.id),
+      usuario_id: req.session.user.id,
+      observacao: req.body.observacao || null,
+    });
+    req.flash("success", `${resultados.length} item(ns) disponível(is) retirado(s) da solicitação.`);
+  } catch (e) {
+    req.flash("error", e.message);
+  }
+  res.redirect(`/almoxarifado/solicitacoes/${req.params.id}/conferir#materiais`);
 }
 
 function finalizar(req, res) {
@@ -113,6 +149,8 @@ module.exports = {
   iniciarRecebimento,
   conferir,
   receberItem,
+  retirarItem,
+  retirarTodos,
   finalizar,
   fechar,
   reabrir,

@@ -6,7 +6,7 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 
-test('almoxarifado usa o fluxo real de retirada do estoque sem duplicar rota', () => {
+test('almoxarifado usa o fluxo real de retirada do estoque sem duplicar rota avulsa', () => {
   const tabs = read('views', 'almoxarifado', '_tabs.ejs');
   const estoqueRoutes = read('modules', 'estoque', 'estoque.routes.js');
   const almoxRoutes = read('modules', 'almoxarifado', 'almoxarifado.routes.js');
@@ -14,6 +14,7 @@ test('almoxarifado usa o fluxo real de retirada do estoque sem duplicar rota', (
   assert.match(tabs, /\/estoque\/saidas\/nova\?contexto=almoxarifado/);
   assert.match(estoqueRoutes, /router\.post\("\/saidas"[\s\S]*almoxCtrl\.registrarSaida/);
   assert.doesNotMatch(almoxRoutes, /post\("\/retiradas"/);
+  assert.match(almoxRoutes, /itens\/:itemId\/retirar/);
 });
 
 test('recebimentos apresenta indicadores, busca, progresso e status de recebimento total', () => {
@@ -60,7 +61,7 @@ test('reabertura preserva estoque e retorna o fluxo ao estado coerente', () => {
   assert.doesNotMatch(reabrirBody, /saldo_atual/);
 });
 
-test('retirada moderna mantém OS obrigatoria e baixa no estoque existente', () => {
+test('retirada avulsa mantém OS obrigatória e retirada por solicitação mantém a origem', () => {
   const view = read('views', 'estoque', 'saida_nova.ejs');
   const estoqueService = read('modules', 'estoque', 'estoque.service.js');
 
@@ -69,7 +70,9 @@ test('retirada moderna mantém OS obrigatoria e baixa no estoque existente', () 
   assert.match(view, /name="contexto" value="almoxarifado"/);
   assert.match(estoqueService, /Uma OS ativa é obrigatória/);
   assert.match(estoqueService, /SAIDA_REQUISICAO_INTERNA/);
-  assert.match(estoqueService, /saldoPosterior = anterior - qtd/);
+  assert.match(estoqueService, /const posterior = anterior - qtd/);
+  assert.match(estoqueService, /solicitacao_item_id/);
+  assert.match(estoqueService, /origem: contexto \? 'SOLICITACAO'/);
 });
 
 test('views do almoxarifado compartilham o novo pacote visual responsivo', () => {
@@ -81,5 +84,4 @@ test('views do almoxarifado compartilham o novo pacote visual responsivo', () =>
   const css = read('public', 'css', 'almoxarifado-modern.css');
   assert.match(css, /@media\(max-width:760px\)/);
   assert.match(css, /almox-mobile-list/);
-}
-);
+});
