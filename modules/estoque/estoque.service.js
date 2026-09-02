@@ -140,6 +140,30 @@ function getContextoSolicitacao(solicitacaoId, solicitacaoItemId) {
   return { ...row, qtd_retirada: retirada, disponivel_retirada: Math.max(Number(row.qtd_recebida_total || 0) - retirada, 0) };
 }
 
+function atualizarReservaDaRetirada(contexto, quantidade) {
+  if (!contexto || !tableExists('estoque_reservas')) return null;
+  const reserva = db.prepare(`
+    SELECT id,quantidade_reservada,quantidade_retirada,status
+    FROM estoque_reservas
+    WHERE solicitacao_item_id=? AND status<>'CANCELADA'
+  `).get(Number(contexto.solicitacao_item_id));
+  if (!reserva) return null;
+
+  const qtd = Number(quantidade || 0);
+  const disponivel = Math.max(Number(reserva.quantidade_reservada || 0) - Number(reserva.quantidade_retirada || 0), 0);
+  if (qtd > disponivel) throw new Error(`Quantidade acima da reserva disponível. Máximo: ${disponivel}.`);
+
+  const retiradaNova = Number(reserva.quantidade_retirada || 0) + qtd;
+  const status = retiradaNova >= Number(reserva.quantidade_reservada || 0) ? 'RETIRADA' : 'PARCIAL';
+  const update = db.prepare(`
+    UPDATE estoque_reservas
+    SET quantidade_retirada=?,status=?,updated_at=datetime('now')
+    WHERE id=? AND quantidade_retirada=?
+  `).run(retiradaNova, status, reserva.id, Number(reserva.quantidade_retirada || 0));
+  if (!update.changes) throw new Error('Reserva alterada por outro usuário. Atualize a página e tente novamente.');
+  return { id: Number(reserva.id), quantidadeRetirada: retiradaNova, status };
+}
+
 function insertMovimento(data) {
   const cols = ["tipo", "item_id", "quantidade"];
   const vals = [data.tipo, data.item_id, data.quantidade];
@@ -147,7 +171,9 @@ function insertMovimento(data) {
     ["origem", data.origem], ["os_id", data.os_id], ["equipamento_id", data.equipamento_id],
     ["solicitacao_id", data.solicitacao_id], ["solicitacao_item_id", data.solicitacao_item_id],
     ["usuario_id", data.usuario_id], ["saldo_anterior", data.saldo_anterior], ["saldo_posterior", data.saldo_posterior],
-    ["observacao", data.observacao],
+    ["observacao", data.observacao], ["reserva_id", data.reserva_id],
+    ["retirado_por_colaborador_id", data.retirado_por_colaborador_id], ["entregue_por_user_id", data.entregue_por_user_id],
+    ["identificacao_origem", data.identificacao_origem],
   ];
   optional.forEach(([col, value]) => { if (hasColumn("estoque_movimentos", col)) { cols.push(col); vals.push(value ?? null); } });
   const info = db.prepare(`INSERT INTO estoque_movimentos (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(...vals);
@@ -176,6 +202,11 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
     throw new Error(`Quantidade acima do disponível nesta solicitação. Máximo: ${contexto.disponivel_retirada}.`);
   }
 
+  // Mantém compatibilidade com as rotas contextuais antigas. Se existir reserva,
+  // ela precisa ser reduzida ANTES do saldo físico para não disparar a proteção
+  // contra consumo de material reservado. Tudo ocorre dentro da mesma transação.
+  const reserva = contexto ? atualizarReservaDaRetirada(contexto, qtd) : null;
+
   const equipamentoId = contexto?.equipamento_id || os?.equipamento_id || null;
   const anterior = Number(item.saldo_atual || 0);
   const posterior = anterior - qtd;
@@ -190,8 +221,11 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
     solicitacao_item_id: contexto?.solicitacao_item_id || null, usuario_id: usuario_id || null,
     saldo_anterior: anterior, saldo_posterior: posterior,
     observacao: observacao || (contexto ? `Retirada da solicitação ${contexto.numero || `#${contexto.solicitacao_id}`}` : null),
+    reserva_id: reserva?.id || null,
+    entregue_por_user_id: contexto ? (usuario_id || null) : null,
+    identificacao_origem: contexto ? 'CONTEXTO_SEM_QR' : (String(origem).toUpperCase() === 'QR_CODE' ? 'QR_ITEM' : 'MANUAL'),
   });
-  return { movimentoId, itemId: resolvedItemId, saldoAnterior: anterior, saldoPosterior: posterior, osId: resolvedOsId, equipamentoId };
+  return { movimentoId, itemId: resolvedItemId, saldoAnterior: anterior, saldoPosterior: posterior, osId: resolvedOsId, equipamentoId, reservaId: reserva?.id || null };
 }
 
 function registrarSaida(data) {
