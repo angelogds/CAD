@@ -31,7 +31,7 @@
 
   <%- include('_tabs', { tab: 'recebimentos' }) %>
 
-  <section class="almox-flow-kpis" aria-label="Indicadores do fluxo">
+  <section class="almox-flow-kpis almox-kpis" aria-label="Indicadores do fluxo">
     <a href="/almoxarifado/recebimentos?status=EM_COTACAO<%= querySuffix %>" class="almox-flow-kpi kpi-blue"><span>Em cotação</span><strong><%= resumo.em_cotacao %></strong><small>Acompanhamento, sem entrada</small></a>
     <a href="/almoxarifado/recebimentos?status=COMPRADA<%= querySuffix %>" class="almox-flow-kpi kpi-green"><span>Para receber</span><strong><%= resumo.para_receber %></strong><small>Compras liberadas</small></a>
     <a href="/almoxarifado/recebimentos?status=EM_RECEBIMENTO<%= querySuffix %>" class="almox-flow-kpi kpi-cyan"><span>Em recebimento</span><strong><%= resumo.em_recebimento %></strong><small>Conferência em andamento</small></a>
@@ -70,35 +70,17 @@
         </div>
         <% lista.forEach((s) => { const meta=statusMeta(s.status); const total=Number(s.itens_total||0); %>
           <article class="almox-request-row" data-href="/almoxarifado/solicitacoes/<%= s.id %>/conferir" tabindex="0" role="link">
-            <div data-label="Solicitação">
-              <span class="almox-request-number"><%= s.numero || ('#'+s.id) %></span>
-              <strong><%= s.titulo || 'Solicitação de materiais' %></strong>
-              <small><%= s.setor_origem ? ('Setor: '+s.setor_origem) : 'Setor não informado' %></small>
-            </div>
-            <div data-label="OS / Equipamento">
-              <small>OS / EQUIPAMENTO</small>
-              <strong><%= s.os_id ? ('OS #'+s.os_id) : 'Sem OS vinculada' %></strong>
-              <span><%= s.equipamento_nome || 'Equipamento não informado' %></span>
-            </div>
-            <div data-label="Solicitante">
-              <strong><%= s.solicitante_nome || '-' %></strong>
-              <span><%= total %> item(ns) solicitado(s)</span>
-            </div>
-            <div data-label="Fluxo dos itens" class="almox-flow-summary">
-              <div class="almox-flow-counts"><span><b><%= total %></b> solicitados</span><span><b><%= Number(s.itens_cotados||0) %></b> cotados</span><span><b><%= Number(s.itens_comprados||0) %></b> comprados</span><span><b><%= Number(s.qtd_recebida_total_agregada||0) %></b> recebidos</span></div>
-              <div class="almox-dual-progress"><i title="Cotação"><b style="width:<%= s.cotacao_pct %>%"></b></i><i class="is-receipt" title="Recebimento"><b style="width:<%= s.progresso_pct %>%"></b></i></div>
-              <small><%= s.status === 'EM_COTACAO' ? (s.cotacao_pct+'% da cotação') : (s.progresso_pct+'% do comprado recebido') %></small>
-            </div>
-            <div data-label="Fornecedor / Previsão">
-              <strong><%= s.fornecedor || 'Fornecedor a definir' %></strong>
-              <span><%= dateBR(s.previsao_entrega) %></span>
-            </div>
+            <div data-label="Solicitação"><span class="almox-request-number"><%= s.numero || ('#'+s.id) %></span><strong><%= s.titulo || 'Solicitação de materiais' %></strong><small><%= s.setor_origem ? ('Setor: '+s.setor_origem) : 'Setor não informado' %></small></div>
+            <div data-label="OS / Equipamento"><small>OS / EQUIPAMENTO</small><strong><%= s.os_id ? ('OS #'+s.os_id) : 'Sem OS vinculada' %></strong><span><%= s.equipamento_nome || 'Equipamento não informado' %></span></div>
+            <div data-label="Solicitante"><strong><%= s.solicitante_nome || '-' %></strong><span><%= total %> item(ns) solicitado(s)</span></div>
+            <div data-label="Fluxo dos itens" class="almox-flow-summary"><div class="almox-flow-counts"><span><b><%= total %></b> solicitados</span><span><b><%= Number(s.itens_cotados||0) %></b> cotados</span><span><b><%= Number(s.itens_comprados||0) %></b> comprados</span><span><b><%= Number(s.qtd_comprada_total||0) %></b> qtd comprada</span><span><b><%= Number(s.qtd_recebida_total_agregada||0) %></b> recebidos</span></div><div class="almox-dual-progress"><i title="Cotação"><b style="width:<%= s.cotacao_pct %>%"></b></i><i class="is-receipt" title="Recebimento"><b style="width:<%= s.progresso_pct %>%"></b></i></div><small><%= s.status === 'EM_COTACAO' ? (s.cotacao_pct+'% da cotação') : (s.progresso_pct+'% do comprado recebido') %></small></div>
+            <div data-label="Fornecedor / Previsão"><strong><%= s.fornecedor || 'Fornecedor a definir' %></strong><span><%= dateBR(s.previsao_entrega) %></span></div>
             <div data-label="Status"><span class="almox-status <%= meta.cls %>"><%= meta.label %></span><% if(Number(s.qtd_pendente_total||0)>0){ %><small><%= Number(s.qtd_pendente_total||0) %> pendente(s)</small><% } %></div>
             <div data-label="Ações" class="almox-actions" onclick="event.stopPropagation()">
-              <% if (canManage && s.status === 'COMPRADA') { %>
-                <form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/iniciar-recebimento" data-lock-submit><button class="btn btn-sm btn-green" type="submit" data-pending-text="Iniciando...">Iniciar recebimento</button></form>
-              <% } %>
+              <% if (canManage && s.status === 'COMPRADA') { %><form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/iniciar-recebimento" data-lock-submit><button class="btn btn-sm btn-green" type="submit" data-pending-text="Iniciando...">Iniciar recebimento</button></form><% } %>
               <a class="btn btn-sm btn-ghost" href="/almoxarifado/solicitacoes/<%= s.id %>/conferir"><%= s.status === 'EM_COTACAO' ? 'Acompanhar' : 'Abrir' %></a>
+              <% if (canManage && s.status === 'RECEBIDA_TOTAL') { %><form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/fechar" data-lock-submit><button class="btn btn-sm" type="submit">Fechar</button></form><% } %>
+              <% if (canManage && s.status === 'FECHADA') { %><form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/reabrir" data-lock-submit><button class="btn btn-sm btn-ghost" type="submit">Reabrir</button></form><% } %>
             </div>
           </article>
         <% }) %>
