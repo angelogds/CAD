@@ -63,10 +63,13 @@ test('Weekly scheduling is persisted and fake placeholders were removed', () => 
 
 test('PCM main view uses the new operational visual system', () => {
   const view = fs.readFileSync('views/pcm/index.ejs', 'utf8');
+  const sharedStyles = fs.readFileSync('views/pcm/partials/internal-styles.ejs', 'utf8');
   const css = fs.readFileSync('public/css/pcm-operational.css', 'utf8');
-  assert.ok(view.includes('/css/pcm-operational.css'));
+  assert.ok(view.includes("include('partials/internal-styles')"));
+  assert.ok(sharedStyles.includes('/css/pcm-operational.css'));
   assert.ok(view.includes('Acima do SLA interno'));
-  assert.ok(view.includes('Análise para decisão humana'));
+  assert.ok(view.includes('Prioridades para decisão'));
+  assert.ok(view.includes('Recomendações não executam alterações automaticamente'));
   assert.ok(css.includes('.pcm-op-kpis'));
   assert.ok(css.includes('.pcm-op-btn:hover'));
 });

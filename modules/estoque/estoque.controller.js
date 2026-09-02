@@ -86,4 +86,4 @@ async function qrItem(req, res, next) {
   } catch (error) { return next(error); }
 }
 
-module.exports = { index, itens, novoItem, criarItem, detalheItem, categorias, criarCategoria, locais, movimentos, saidaNova, qrItem };
+module.exports = { index, itens, novoItem, criarItem, detalheItem, categorias, criarCategoria, locais, criarLocal, movimentos, saidaNova, qrItem };
