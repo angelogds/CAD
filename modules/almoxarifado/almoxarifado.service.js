@@ -28,8 +28,9 @@ const HAS_ITEM_FORNECEDOR_ID = hasColumn("solicitacao_itens", "fornecedor_id");
 const HAS_ITEM_PREVISAO = hasColumn("solicitacao_itens", "previsao_entrega");
 const HAS_MOV_SOLICITACAO_ITEM = hasColumn("estoque_movimentos", "solicitacao_item_id");
 
-// Estados visíveis no Almoxarifado. EM_COTACAO é apenas acompanhamento:
-// nenhum item pode ser recebido antes de estar efetivamente COMPRADO.
+// O Almoxarifado acompanha a solicitação inteira, mas a autorização física de
+// recebimento é por ITEM. Assim, um item COMPRADO já pode ser conferido mesmo
+// que outros itens da mesma solicitação ainda estejam EM_COTACAO.
 const ALMOX_STATUS = [
   STATUS.EM_COTACAO,
   STATUS.COMPRADA,
@@ -45,6 +46,13 @@ const RECEBIMENTO_STATUS = [
   STATUS.RECEBIDA_TOTAL,
   STATUS.FECHADA,
 ];
+const STATUS_PERMITIDOS_RECEBIMENTO_ITEM = new Set([
+  STATUS.EM_COTACAO,
+  STATUS.COMPRADA,
+  STATUS.EM_RECEBIMENTO,
+  STATUS.RECEBIDA_PARCIAL,
+  STATUS.REABERTA,
+]);
 
 function normalizeStatus(status) {
   const value = String(status || "").trim().toUpperCase();
@@ -239,8 +247,13 @@ function getSolicitacao(id) {
   `).all(id).map((item) => {
     const retirada = Number(item.qtd_retirada_solicitacao || 0);
     const recebida = Number(item.qtd_recebida_calc || 0);
+    const comprada = Number(item.qtd_comprada_calc || 0);
+    const aReceber = Math.max(comprada - recebida, 0);
+    const comprado = String(item.status_compra || '').toUpperCase() === 'COMPRADO';
     return {
       ...item,
+      qtd_a_receber: aReceber,
+      divergencia_recebimento: comprado && recebida > 0 && aReceber > 0,
       fornecedor_exibicao: item.fornecedor_nome_item || sol.fornecedor || null,
       previsao_exibicao: (HAS_ITEM_PREVISAO ? item.previsao_entrega : null) || (HAS_SOL_PREVISAO ? sol.previsao_entrega : null) || null,
       disponivel_retirada: Math.max(recebida - retirada, 0),
@@ -250,10 +263,11 @@ function getSolicitacao(id) {
   const qtdSolicitada = itens.reduce((sum, item) => sum + Number(item.qtd_solicitada_calc || 0), 0);
   const qtdComprada = itens.reduce((sum, item) => sum + Number(item.qtd_comprada_calc || 0), 0);
   const qtdRecebida = itens.reduce((sum, item) => sum + Number(item.qtd_recebida_calc || 0), 0);
-  const pendente = itens.reduce((sum, item) => sum + Math.max(Number(item.pendente || 0), 0), 0);
+  const pendente = itens.reduce((sum, item) => sum + Math.max(Number(item.qtd_a_receber || item.pendente || 0), 0), 0);
   const itensCotados = itens.filter((item) => String(item.status_cotacao || '').toUpperCase() === 'COTADO').length;
   const itensComprados = itens.filter((item) => String(item.status_compra || '').toUpperCase() === 'COMPRADO').length;
   const itensComRetirada = itens.filter((item) => Number(item.disponivel_retirada || 0) > 0 && item.estoque_item_id).length;
+  const itensDivergentes = itens.filter((item) => item.divergencia_recebimento).length;
   return {
     ...sol,
     itens,
@@ -262,10 +276,12 @@ function getSolicitacao(id) {
       itens_cotados: itensCotados,
       itens_comprados: itensComprados,
       itens_disponiveis_retirada: itensComRetirada,
+      itens_divergentes_recebimento: itensDivergentes,
       qtd_solicitada: qtdSolicitada,
       qtd_comprada: qtdComprada,
       qtd_recebida: qtdRecebida,
       qtd_pendente: pendente,
+      qtd_a_receber: pendente,
       progresso_pct: qtdComprada > 0 ? Math.min(100, Math.round((qtdRecebida / qtdComprada) * 100)) : 0,
     },
   };
@@ -360,25 +376,42 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, use
   return db.transaction(() => {
     const solicitacao = db.prepare("SELECT * FROM solicitacoes WHERE id=?").get(solicitacaoId);
     if (!solicitacao) throw new Error("Solicitação não encontrada.");
-    if (![STATUS.EM_RECEBIMENTO, STATUS.RECEBIDA_PARCIAL].includes(solicitacao.status)) {
-      throw new Error("Inicie o recebimento antes de dar entrada nos materiais.");
+    const statusSolicitacao = String(solicitacao.status || '').toUpperCase();
+    if (!STATUS_PERMITIDOS_RECEBIMENTO_ITEM.has(statusSolicitacao)) {
+      throw new Error("Esta solicitação não está em uma etapa que permita recebimento de materiais.");
     }
 
     const item = db.prepare("SELECT * FROM solicitacao_itens WHERE id=? AND solicitacao_id=?").get(itemId, solicitacaoId);
     if (!item) throw new Error("Item não encontrado.");
-    if (String(item.status_compra || '').toUpperCase() !== "COMPRADO") throw new Error("Somente itens realmente comprados podem ser recebidos.");
+    if (String(item.status_compra || '').toUpperCase() !== "COMPRADO") {
+      throw new Error("Somente itens marcados como COMPRADO pelo setor de Compras podem ser recebidos.");
+    }
 
     const qtdComprada = Number(HAS_ITEM_QTD_COMPRADA ? item.qtd_comprada : (item.qtd_solicitada ?? item.quantidade) || 0);
     const recebidaAtual = Number(item.qtd_recebida_total || 0);
-    const pendente = Math.max(qtdComprada - recebidaAtual, 0);
-    if (!(pendente > 0)) throw new Error("Este item já foi recebido integralmente.");
-    if (quantidade > pendente) throw new Error(`Quantidade acima do saldo pendente. Máximo para este recebimento: ${pendente}.`);
+    const aReceber = Math.max(qtdComprada - recebidaAtual, 0);
+    if (!(aReceber > 0)) throw new Error("Este item já foi recebido integralmente.");
+    if (quantidade > aReceber) {
+      throw new Error(`Quantidade acima do que ainda falta receber. Máximo para este recebimento: ${aReceber}.`);
+    }
 
     const resolvedLocalId = resolveLocal(localId);
     const estoqueItemId = resolveEstoqueItem(item, solicitacaoId, resolvedLocalId);
     if (HAS_LOCAL_ID && resolvedLocalId) {
       db.prepare("UPDATE estoque_itens SET local_id=COALESCE(local_id,?), updated_at=datetime('now') WHERE id=?")
         .run(resolvedLocalId, estoqueItemId);
+    }
+
+    // Para solicitações totalmente liberadas para compra, o primeiro recebimento
+    // inicia a etapa automaticamente. Em solicitações mistas EM_COTACAO, o status
+    // geral é preservado para não retirar da fila os itens que ainda estão cotando.
+    if ([STATUS.COMPRADA, STATUS.REABERTA].includes(statusSolicitacao)) {
+      const updates = ["status=?", "updated_at=datetime('now')"];
+      const values = [STATUS.EM_RECEBIMENTO];
+      if (hasColumn("solicitacoes", "almox_user_id")) { updates.push("almox_user_id=COALESCE(almox_user_id,?)"); values.push(userId || null); }
+      if (hasColumn("solicitacoes", "recebimento_inicio_em")) updates.push("recebimento_inicio_em=COALESCE(recebimento_inicio_em,datetime('now'))");
+      values.push(solicitacaoId);
+      db.prepare(`UPDATE solicitacoes SET ${updates.join(",")} WHERE id=?`).run(...values);
     }
 
     const recebida = recebidaAtual + quantidade;
@@ -413,7 +446,15 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, use
       }
     }
 
-    return { estoqueItemId, saldoAnterior, saldoPosterior, pendenteApos: Math.max(qtdComprada - recebida, 0) };
+    const faltanteApos = Math.max(qtdComprada - recebida, 0);
+    return {
+      estoqueItemId,
+      saldoAnterior,
+      saldoPosterior,
+      pendenteApos: faltanteApos,
+      faltanteApos,
+      recebimentoParcial: recebida > 0 && faltanteApos > 0,
+    };
   })();
 }
 
@@ -434,7 +475,7 @@ function finalizarRecebimento(id) {
 function fechar(id) {
   const s = getSolicitacao(id);
   if (!s || s.status !== STATUS.RECEBIDA_TOTAL) throw new Error("Somente uma solicitação recebida integralmente pode ser fechada.");
-  if (s.resumo.qtd_pendente > 0) throw new Error("Ainda existem quantidades pendentes de recebimento.");
+  if (s.resumo.qtd_pendente > 0) throw new Error("Ainda existem quantidades a receber.");
   db.prepare("UPDATE solicitacoes SET status=?, fechada_em=datetime('now'), updated_at=datetime('now') WHERE id=?").run(STATUS.FECHADA, id);
 }
 

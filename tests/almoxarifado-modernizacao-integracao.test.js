@@ -30,17 +30,17 @@ test('recebimentos apresenta indicadores, busca, progresso e status de recebimen
   assert.doesNotMatch(view, /\['RECEBIDA_TOTAL', 'RECEBIDA_PARCIAL'\][\s\S]{0,100}fechar/);
 });
 
-test('conferencia limita quantidade ao saldo comprado e permite definir local de estoque', () => {
+test('conferencia limita quantidade ao que falta receber e permite definir local de estoque', () => {
   const view = read('views', 'almoxarifado', 'conferir.ejs');
   const service = read('modules', 'almoxarifado', 'almoxarifado.service.js');
 
-  assert.match(view, /max="<%= pendente %>"/);
+  assert.match(view, /max="<%= aReceber %>"/);
   assert.match(view, /name="local_id"/);
   assert.match(view, /data-fill-remaining/);
-  assert.match(service, /quantidade > pendente/);
+  assert.match(service, /quantidade > aReceber/);
   assert.match(service, /Local de estoque inválido ou inativo/);
   assert.match(service, /ENTRADA_COMPRA/);
-  assert.match(service, /origem[\s\S]{0,120}"COMPRA"/);
+  assert.match(service, /origem:[\s\S]{0,80}"COMPRA"/);
 });
 
 test('entrada de compra reaproveita item vinculado ou correspondencia exata unica antes de cadastrar outro', () => {

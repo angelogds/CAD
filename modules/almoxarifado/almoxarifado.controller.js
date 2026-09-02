@@ -52,7 +52,7 @@ function conferir(req, res) {
 
 function receberItem(req, res) {
   try {
-    service.receberItem({
+    const resultado = service.receberItem({
       solicitacaoId: Number(req.params.id),
       itemId: Number(req.params.itemId),
       qtdAgora: Number(req.body.qtd_recebida_agora || 0),
@@ -60,11 +60,15 @@ function receberItem(req, res) {
       localId: req.body.local_id ? Number(req.body.local_id) : null,
       userId: req.session.user.id,
     });
-    req.flash("success", "Item recebido, entrada registrada e saldo do estoque atualizado.");
+    if (resultado.recebimentoParcial) {
+      req.flash("success", `Recebimento parcial registrado e estoque atualizado. Faltam ${resultado.faltanteApos} unidade(s); Compras será sinalizada enquanto houver essa diferença.`);
+    } else {
+      req.flash("success", "Item recebido integralmente, entrada registrada e saldo do estoque atualizado.");
+    }
   } catch (e) {
     req.flash("error", e.message);
   }
-  res.redirect(`/almoxarifado/solicitacoes/${req.params.id}/conferir`);
+  res.redirect(`/almoxarifado/solicitacoes/${req.params.id}/conferir#materiais`);
 }
 
 function retirarItem(req, res) {
@@ -104,7 +108,7 @@ function finalizar(req, res) {
     statusFinal = service.finalizarRecebimento(Number(req.params.id));
     req.flash("success", statusFinal === STATUS.RECEBIDA_TOTAL
       ? "Recebimento concluído integralmente."
-      : "Etapa finalizada como recebimento parcial; os saldos pendentes permanecem abertos.");
+      : "Etapa finalizada como recebimento parcial; as quantidades ainda não recebidas continuam abertas.");
   } catch (e) {
     req.flash("error", e.message);
   }
