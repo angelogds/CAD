@@ -1,4 +1,8 @@
 module.exports = ({ db, tableExists, addColumnIfMissing }) => {
+  function hasColumn(table, name) {
+    try { return db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === name); } catch { return false; }
+  }
+
   if (tableExists('colaboradores')) {
     addColumnIfMissing('colaboradores', 'qr_token', 'qr_token TEXT');
     addColumnIfMissing('colaboradores', 'qr_ativo', 'qr_ativo INTEGER NOT NULL DEFAULT 0');
@@ -33,12 +37,23 @@ module.exports = ({ db, tableExists, addColumnIfMissing }) => {
   `);
 
   if (tableExists('solicitacao_itens') && tableExists('solicitacoes')) {
+    const hasLegacyMovements = tableExists('estoque_movimentos') && hasColumn('estoque_movimentos', 'solicitacao_item_id');
+    const retiradaHistorica = hasLegacyMovements
+      ? `(SELECT COALESCE(SUM(CASE WHEN UPPER(COALESCE(em.tipo,'')) LIKE 'SAIDA%' THEN ABS(em.quantidade) ELSE 0 END),0)
+          FROM estoque_movimentos em WHERE em.solicitacao_item_id=si.id)`
+      : '0';
+    const retiradaLimitada = `MIN(COALESCE(si.qtd_recebida_total,0), ${retiradaHistorica})`;
+
     db.exec(`
       INSERT OR IGNORE INTO estoque_reservas
         (solicitacao_id,solicitacao_item_id,estoque_item_id,os_id,equipamento_id,quantidade_reservada,quantidade_retirada,status,origem,created_at,updated_at)
       SELECT si.solicitacao_id,si.id,si.estoque_item_id,s.os_id,s.equipamento_id,
-             COALESCE(si.qtd_recebida_total,0),0,
-             CASE WHEN COALESCE(si.qtd_recebida_total,0)>0 THEN 'RESERVADA' ELSE 'AGUARDANDO' END,
+             COALESCE(si.qtd_recebida_total,0),${retiradaLimitada},
+             CASE
+               WHEN ${retiradaLimitada} >= COALESCE(si.qtd_recebida_total,0) THEN 'RETIRADA'
+               WHEN ${retiradaLimitada} > 0 THEN 'PARCIAL'
+               ELSE 'RESERVADA'
+             END,
              'MIGRACAO_RECEBIMENTO',datetime('now'),datetime('now')
       FROM solicitacao_itens si
       JOIN solicitacoes s ON s.id=si.solicitacao_id
@@ -79,6 +94,22 @@ module.exports = ({ db, tableExists, addColumnIfMissing }) => {
     addColumnIfMissing('estoque_movimentos', 'identificacao_origem', "identificacao_origem TEXT DEFAULT 'MANUAL'");
     db.exec('CREATE INDEX IF NOT EXISTS idx_estoque_mov_reserva ON estoque_movimentos(reserva_id);');
     db.exec('CREATE INDEX IF NOT EXISTS idx_estoque_mov_retirado_por ON estoque_movimentos(retirado_por_colaborador_id);');
+
+    if (hasColumn('estoque_movimentos', 'solicitacao_item_id') && hasColumn('estoque_movimentos', 'reserva_id')) {
+      db.exec(`
+        UPDATE estoque_movimentos
+        SET reserva_id=(
+          SELECT r.id FROM estoque_reservas r
+          WHERE r.solicitacao_item_id=estoque_movimentos.solicitacao_item_id
+        )
+        WHERE reserva_id IS NULL
+          AND solicitacao_item_id IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM estoque_reservas r
+            WHERE r.solicitacao_item_id=estoque_movimentos.solicitacao_item_id
+          );
+      `);
+    }
   }
 
   if (tableExists('estoque_itens')) {
