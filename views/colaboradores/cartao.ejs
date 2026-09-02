@@ -1,0 +1,57 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
+
+<div class="qr-card-page">
+  <header class="qr-card-toolbar no-print">
+    <div>
+      <span class="eyebrow">IDENTIFICAÇÃO • ALMOXARIFADO</span>
+      <h1>Cartão do colaborador</h1>
+      <p>Identificação para retirada rastreável de materiais. O QR contém somente um token aleatório, sem dados pessoais.</p>
+    </div>
+    <div class="qr-card-actions">
+      <a class="btn btn-ghost" href="/colaboradores/<%= colaborador.id %>">Voltar ao perfil</a>
+      <% if (qrDataUrl) { %><button class="btn btn-green" type="button" onclick="window.print()">Imprimir cartão</button><% } %>
+    </div>
+  </header>
+
+  <section class="employee-id-card">
+    <div class="employee-id-card__brand">
+      <strong>Campo do Gado</strong>
+      <span>Gestão Industrial • Manutenção Integrada</span>
+    </div>
+    <div class="employee-id-card__body">
+      <img class="employee-id-card__photo" src="<%= colaborador.foto_url || '/IMG/logo_menu.png.png' %>" alt="Foto de <%= colaborador.nome %>" />
+      <div class="employee-id-card__identity">
+        <small>COLABORADOR</small>
+        <h2><%= colaborador.nome %></h2>
+        <p><%= colaborador.funcao || 'Função não informada' %></p>
+        <p><%= colaborador.setor || 'Setor não informado' %></p>
+        <span class="employee-id-card__status"><%= colaborador.status || 'ATIVO' %></span>
+      </div>
+      <div class="employee-id-card__qr">
+        <% if (qrDataUrl) { %>
+          <img src="<%= qrDataUrl %>" alt="QR de identificação" />
+          <small>Apresente no Almoxarifado</small>
+        <% } else { %>
+          <div class="qr-card-empty">Cartão ainda não emitido</div>
+        <% } %>
+      </div>
+    </div>
+    <div class="employee-id-card__footer">Uso interno • Retirada de materiais registrada pelo sistema</div>
+  </section>
+
+  <section class="card qr-card-admin no-print">
+    <div>
+      <h3>Gerenciamento do cartão</h3>
+      <p class="muted"><%= colaborador.qr_ativo ? 'Cartão ativo. Emissão: ' + (colaborador.qr_emitido_em || '-') : 'Nenhum cartão ativo para este colaborador.' %></p>
+    </div>
+    <div class="qr-card-admin__actions">
+      <% if (!colaborador.qr_ativo) { %>
+        <form method="POST" action="/colaboradores/<%= colaborador.id %>/cartao/emitir"><button class="btn btn-green" type="submit">Emitir cartão</button></form>
+      <% } else { %>
+        <form method="POST" action="/colaboradores/<%= colaborador.id %>/cartao/emitir" onsubmit="return confirm('Gerar um novo QR invalidará o cartão anterior. Continuar?')"><input type="hidden" name="rotate" value="1"/><button class="btn btn-ghost" type="submit">Gerar novo QR</button></form>
+        <form method="POST" action="/colaboradores/<%= colaborador.id %>/cartao/revogar" onsubmit="return confirm('Revogar este cartão?')"><button class="btn btn-danger" type="submit">Revogar cartão</button></form>
+      <% } %>
+    </div>
+  </section>
+</div>
