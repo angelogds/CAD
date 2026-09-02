@@ -17,6 +17,16 @@ test('migration cria reservas e identificação QR sem destruir tabelas', () => 
   assert.doesNotMatch(migration, /DELETE FROM/i);
 });
 
+test('migration preserva retiradas históricas ao converter recebimentos em reservas', () => {
+  const migration = read('database/migrations/180_almox_estoque_reservas_qr_colaboradores.js');
+  assert.match(migration, /retiradaHistorica/);
+  assert.match(migration, /solicitacao_item_id=si\.id/);
+  assert.match(migration, /THEN ABS\(em\.quantidade\)/);
+  assert.match(migration, /retiradaLimitada/);
+  assert.match(migration, /WHEN \$\{retiradaLimitada\} >= COALESCE\(si\.qtd_recebida_total,0\) THEN 'RETIRADA'/);
+  assert.match(migration, /SET reserva_id=\(/);
+});
+
 test('recebimento cria ou atualiza reserva da mesma solicitação', () => {
   const migration = read('database/migrations/180_almox_estoque_reservas_qr_colaboradores.js');
   assert.match(migration, /trg_estoque_reserva_recebimento_solicitacao/);
@@ -106,6 +116,18 @@ test('reserva é atualizada antes da baixa física para respeitar proteção de 
   assert.ok(stockPos > reservePos, 'a reserva deve ser reduzida antes do saldo físico');
   assert.match(service, /AND quantidade_retirada=\?/);
   assert.match(service, /AND COALESCE\(saldo_atual,0\)=\?/);
+});
+
+test('retirada contextual antiga sincroniza a reserva antes do saldo e continua rastreável', () => {
+  const service = read('modules/estoque/estoque.service.js');
+  const helperPos = service.indexOf('function atualizarReservaDaRetirada');
+  const callPos = service.indexOf('atualizarReservaDaRetirada(contexto, qtd)');
+  const stockPos = service.indexOf('UPDATE estoque_itens SET saldo_atual', callPos);
+  assert.ok(helperPos > 0, 'deve existir compatibilidade com retirada contextual');
+  assert.ok(callPos > helperPos, 'deve sincronizar a reserva durante a retirada');
+  assert.ok(stockPos > callPos, 'deve reduzir a reserva antes do saldo físico');
+  assert.match(service, /reserva_id: reserva\?\.id/);
+  assert.match(service, /identificacao_origem: contexto \? 'CONTEXTO_SEM_QR'/);
 });
 
 test('scanner oferece câmera com fallback para leitor USB ou entrada manual', () => {
