@@ -42,7 +42,9 @@ module.exports = ({ db, tableExists, columnExists, addColumnIfMissing }) => {
       ['estoque_item_id', 'INTEGER'],
       ['estoque_movimento_id', 'INTEGER'],
       ['usuario_id', 'INTEGER'],
-      ['created_at', "TEXT DEFAULT (datetime('now'))"],
+      // Em ALTER TABLE do SQLite usamos TEXT simples; novos registros podem
+      // continuar sendo preenchidos pelo código quando necessário.
+      ['created_at', 'TEXT'],
     ];
     for (const [name, ddl] of required) {
       if (!columnExists('compras_recebimentos', name)) addColumnIfMissing('compras_recebimentos', name, `${name} ${ddl}`);
