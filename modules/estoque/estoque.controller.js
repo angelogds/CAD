@@ -1,4 +1,5 @@
 const service = require("./estoque.service");
+const reservaService = require("./estoque.reservas.service");
 const { normalizeRole } = require("../../config/rbac");
 
 function index(req, res) {
@@ -8,11 +9,17 @@ function index(req, res) {
     local_id: req.query.local_id || "",
     situacao: ["", "ok", "baixo", "zerado"].includes(req.query.situacao || "") ? (req.query.situacao || "") : "",
   };
+  const reservasPorItem = reservaService.resumoPorItem();
+  const itens = service.listItens(filtros).map((item) => {
+    const reservado = Number(reservasPorItem.get(Number(item.id)) || 0);
+    const saldoFisico = Number(item.saldo_atual || 0);
+    return { ...item, saldo_reservado: reservado, saldo_disponivel: Math.max(saldoFisico - reservado, 0) };
+  });
   res.render("estoque/index", {
     title: "Estoque",
     activeMenu: "estoque",
-    cards: service.dashboard(),
-    itens: service.listItens(filtros),
+    cards: { ...service.dashboard(), ...reservaService.dashboard() },
+    itens,
     categorias: service.listCategorias(),
     locais: service.listLocais(),
     filtros,
