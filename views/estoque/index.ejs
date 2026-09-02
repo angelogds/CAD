@@ -1,30 +1,41 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
 <%
   const dateBR = (v) => { if(!v)return 'Sem movimento'; const d=String(v).slice(0,10).split('-'); return d.length===3?`${d[2]}/${d[1]}/${d[0]}`:String(v); };
   const stockState = (item) => {
-    const saldo=Number(item.saldo_atual||0), minimo=Number(item.saldo_minimo||0);
-    if(saldo<=0)return ['Zerado','stock-state--zero'];
-    if(saldo<minimo)return ['Abaixo do mínimo','stock-state--low'];
+    const saldo=Number(item.saldo_disponivel||0), minimo=Number(item.saldo_minimo||0);
+    if(saldo<=0)return ['Sem saldo livre','stock-state--zero'];
+    if(saldo<minimo)return ['Livre abaixo do mínimo','stock-state--low'];
     return ['Disponível','stock-state--ok'];
   };
+  const saldoDisponivelTotal = itens.reduce((s,i)=>s+Number(i.saldo_disponivel||0),0);
 %>
 
 <div class="stock-flow-page">
   <header class="stock-flow-head">
-    <div><span>ESTOQUE • ALMOXARIFADO DA MANUTENÇÃO</span><h1>Estoque</h1><p>Controle de materiais, saldo físico, mínimos e rastreabilidade das movimentações.</p></div>
-    <div class="stock-flow-actions"><a class="btn btn-ghost" href="/estoque/movimentos">Movimentações</a><a class="btn btn-green" href="/estoque/saidas/nova">Registrar saída</a></div>
+    <div><span>ESTOQUE • ALMOXARIFADO DA MANUTENÇÃO</span><h1>Estoque</h1><p>Saldo físico, materiais reservados por solicitação e disponibilidade real para novas retiradas.</p></div>
+    <div class="stock-flow-actions">
+      <a class="btn btn-ghost" href="/estoque/reservas">Separados / Solicitações</a>
+      <a class="btn btn-ghost" href="/estoque/movimentos">Movimentações</a>
+      <a class="btn btn-green" href="/almoxarifado/retiradas/qr">Retirada por QR</a>
+    </div>
   </header>
 
   <%- include('_tabs', { tab: 'itens' }) %>
 
-  <section class="stock-flow-kpis">
+  <section class="stock-flow-kpis stock-flow-kpis--reservas">
     <article><span>Itens ativos</span><strong><%= cards.itens %></strong><small>Materiais cadastrados</small></article>
-    <article><span>Saldo total</span><strong><%= cards.saldo %></strong><small>Somatório das unidades em estoque</small></article>
+    <article><span>Saldo físico</span><strong><%= cards.saldo %></strong><small>Total existente no almoxarifado</small></article>
+    <article class="is-info"><span>Reservado</span><strong><%= Number(cards.reservado||0) %></strong><small>Comprometido com solicitações</small></article>
+    <article><span>Disponível livre</span><strong><%= saldoDisponivelTotal %></strong><small>Físico menos reservas</small></article>
     <article class="is-warning"><span>Abaixo do mínimo</span><strong><%= cards.baixo %></strong><small>Exigem atenção de reposição</small></article>
-    <article class="is-danger"><span>Estoque zerado</span><strong><%= cards.zerados %></strong><small>Sem saldo físico disponível</small></article>
-    <article class="is-info"><span>Movimentos hoje</span><strong><%= cards.movimentosHoje %></strong><small>Entradas e saídas registradas</small></article>
+    <article class="is-danger"><span>Estoque zerado</span><strong><%= cards.zerados %></strong><small>Sem saldo físico</small></article>
   </section>
+
+  <div class="stock-reserve-note">
+    <strong>Regra de disponibilidade:</strong> material recebido para uma solicitação permanece no saldo físico, mas fica reservado até ser retirado para aquela solicitação/OS. Retiradas avulsas não podem consumir esse saldo reservado.
+  </div>
 
   <form class="stock-flow-filters" method="GET" action="/estoque">
     <label class="stock-search"><span>Busca</span><input class="input" name="q" value="<%= filtros.q %>" placeholder="Código ou nome do material" /></label>
@@ -35,19 +46,24 @@
   </form>
 
   <section class="card stock-table-card">
-    <div class="stock-table-head"><div><h2>Materiais em estoque</h2><p>Visão consolidada e operacional do almoxarifado.</p></div><span><%= itens.length %> item(ns) nesta visão</span></div>
+    <div class="stock-table-head"><div><h2>Materiais em estoque</h2><p>Visão física e operacional, com separação entre saldo reservado e saldo livre.</p></div><span><%= itens.length %> item(ns) nesta visão</span></div>
     <% if(!itens.length){ %><div class="almox-empty"><strong>Nenhum material encontrado.</strong><div class="almox-subline">Revise os filtros ou cadastre um novo item.</div></div><% } else { %>
-      <div class="stock-table-wrap">
-        <div class="stock-table-columns" aria-hidden="true"><span>Material</span><span>Categoria / Local</span><span>Saldo</span><span>Mínimo</span><span>Situação</span><span>Último movimento</span><span>Ações</span></div>
+      <div class="stock-table-wrap stock-table-wrap--reservas">
+        <div class="stock-table-columns stock-table-columns--reservas" aria-hidden="true"><span>Material</span><span>Categoria / Local</span><span>Físico</span><span>Reservado</span><span>Disponível</span><span>Mínimo</span><span>Situação</span><span>Último movimento</span><span>Ações</span></div>
         <% itens.forEach(item=>{ const state=stockState(item); %>
-          <article class="stock-table-row">
+          <article class="stock-table-row stock-table-row--reservas">
             <div data-label="Material"><small><%= item.codigo || 'Sem código' %></small><strong><%= item.nome %></strong><span><%= item.unidade || 'UN' %></span></div>
             <div data-label="Categoria / Local"><strong><%= item.categoria_nome || 'Sem categoria' %></strong><span><%= item.local_nome || 'Local não definido' %></span></div>
-            <div data-label="Saldo"><strong class="stock-balance"><%= Number(item.saldo_atual||0) %> <%= item.unidade||'UN' %></strong></div>
+            <div data-label="Saldo físico"><strong class="stock-balance"><%= Number(item.saldo_atual||0) %> <%= item.unidade||'UN' %></strong></div>
+            <div data-label="Reservado"><strong class="stock-reserved"><%= Number(item.saldo_reservado||0) %> <%= item.unidade||'UN' %></strong><% if(Number(item.saldo_reservado||0)>0){ %><a class="stock-inline-link" href="/estoque/reservas?q=<%= encodeURIComponent(item.codigo || item.nome) %>">ver reservas</a><% } %></div>
+            <div data-label="Disponível"><strong class="stock-available"><%= Number(item.saldo_disponivel||0) %> <%= item.unidade||'UN' %></strong></div>
             <div data-label="Mínimo"><strong><%= Number(item.saldo_minimo||0) %> <%= item.unidade||'UN' %></strong></div>
             <div data-label="Situação"><span class="stock-state <%=state[1]%>"><%=state[0]%></span></div>
             <div data-label="Último movimento"><strong><%=dateBR(item.ultima_movimentacao)%></strong></div>
-            <div data-label="Ações" class="stock-row-actions"><a class="btn btn-sm btn-ghost" href="/estoque/itens/<%=item.id%>">Abrir</a><% if(Number(item.saldo_atual||0)>0){ %><a class="btn btn-sm btn-green" href="/estoque/saidas/nova?item=<%=item.id%>">Retirar</a><% } %></div>
+            <div data-label="Ações" class="stock-row-actions">
+              <a class="btn btn-sm btn-ghost" href="/estoque/itens/<%=item.id%>">Abrir</a>
+              <% if(Number(item.saldo_disponivel||0)>0){ %><a class="btn btn-sm btn-green" href="/estoque/saidas/nova?item=<%=item.id%>">Retirar livre</a><% } %>
+            </div>
           </article>
         <% }) %>
       </div>
