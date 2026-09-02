@@ -1,6 +1,7 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-v1" />
 <link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
+<link rel="stylesheet" href="/css/estoque-reservas.css?v=20260902-v1" />
 <%
   const dateBR = (v) => { if(!v)return 'Sem movimento'; const d=String(v).slice(0,10).split('-'); return d.length===3?`${d[2]}/${d[1]}/${d[0]}`:String(v); };
   const stockState = (item) => {
