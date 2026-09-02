@@ -2,9 +2,11 @@ const router = require("express").Router();
 const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
 const ctrl = require("./estoque.controller");
+const reservasCtrl = require("./estoque.reservas.controller");
 const almoxCtrl = require("../almoxarifado/almoxarifado.controller");
 
 router.get("/", requireLogin, requireRole(ACCESS.estoque_view), ctrl.index);
+router.get("/reservas", requireLogin, requireRole(ACCESS.estoque_view), reservasCtrl.index);
 router.get("/itens", requireLogin, requireRole(ACCESS.estoque_view), ctrl.itens);
 router.get("/itens/novo", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.novoItem);
 router.post("/itens", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.criarItem);
