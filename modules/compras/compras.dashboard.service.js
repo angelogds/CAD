@@ -113,6 +113,8 @@ function itemAggregateExpressions() {
       receivedQty: '0',
       receivedValue: '0',
       pricedReceivedItems: '0',
+      receiptShortageItems: '0',
+      receiptShortageQty: '0',
       hasPriceColumn: false,
     };
   }
@@ -138,6 +140,9 @@ function itemAggregateExpressions() {
       ? `COALESCE(si.${priceRealCol},0)`
       : '0';
   const hasPriceColumn = Boolean(priceCentsCol || priceRealCol);
+  const partialReceiptPredicate = buyStatusCol && receivedQtyCol
+    ? `UPPER(TRIM(COALESCE(si.${buyStatusCol},'')))='COMPRADO' AND ${receivedQty}>0 AND ${receivedQty}<${boughtQty}`
+    : null;
 
   return {
     join: 'LEFT JOIN solicitacao_itens si ON si.solicitacao_id=s.id',
@@ -156,6 +161,12 @@ function itemAggregateExpressions() {
     receivedValue: hasPriceColumn ? `SUM(${receivedQty} * ${price})` : '0',
     pricedReceivedItems: hasPriceColumn
       ? `SUM(CASE WHEN ${receivedQty}>0 AND ${price}>0 THEN 1 ELSE 0 END)`
+      : '0',
+    receiptShortageItems: partialReceiptPredicate
+      ? `SUM(CASE WHEN ${partialReceiptPredicate} THEN 1 ELSE 0 END)`
+      : '0',
+    receiptShortageQty: partialReceiptPredicate
+      ? `SUM(CASE WHEN ${partialReceiptPredicate} THEN ${boughtQty}-${receivedQty} ELSE 0 END)`
       : '0',
     hasPriceColumn,
   };
@@ -242,7 +253,9 @@ function loadRows(filters = {}) {
       ${items.boughtQty} AS qtd_comprada_total,
       ${items.receivedQty} AS qtd_recebida_total,
       ${items.receivedValue} AS valor_recebido_rastreado,
-      ${items.pricedReceivedItems} AS itens_recebidos_com_preco
+      ${items.pricedReceivedItems} AS itens_recebidos_com_preco,
+      ${items.receiptShortageItems} AS itens_divergentes_recebimento,
+      ${items.receiptShortageQty} AS qtd_faltante_recebimento
     FROM solicitacoes s
     ${equipmentJoin}
     ${items.join}
@@ -265,6 +278,8 @@ function loadRows(filters = {}) {
       status_label: STATUS_LABELS[status] || String(row.status || 'Não definido'),
       custo_total: Number(row.custo_total || 0),
       valor_recebido_rastreado: Number(row.valor_recebido_rastreado || 0),
+      itens_divergentes_recebimento: Number(row.itens_divergentes_recebimento || 0),
+      qtd_faltante_recebimento: Number(row.qtd_faltante_recebimento || 0),
       recebimento_pct: receivedPct,
       previsao_entrega_real: deadline,
       atrasado: Boolean(deadline && deadline < today && !CLOSED_RECEIPT_STATUSES.has(status)),
@@ -315,6 +330,16 @@ function getLowerDashboard(filters = {}) {
     .sort((a, b) => String(a.previsao_entrega_real).localeCompare(String(b.previsao_entrega_real)) || a.id - b.id)
     .slice(0, 6);
 
+  // Alerta derivado do dado físico: só existe depois que o Almoxarifado recebeu
+  // alguma quantidade e ela ficou abaixo do que Compras registrou como comprado.
+  // Quando o restante é recebido, a condição deixa de existir automaticamente.
+  const receiptShortages = rows
+    .filter((row) => row.status !== 'CANCELADA' && Number(row.itens_divergentes_recebimento || 0) > 0)
+    .sort((a, b) => Number(b.qtd_faltante_recebimento || 0) - Number(a.qtd_faltante_recebimento || 0) || Number(b.id) - Number(a.id))
+    .slice(0, 8);
+  const receiptShortageItems = rows.reduce((sum, row) => sum + Number(row.itens_divergentes_recebimento || 0), 0);
+  const receiptShortageQty = rows.reduce((sum, row) => sum + Number(row.qtd_faltante_recebimento || 0), 0);
+
   return {
     period,
     total,
@@ -330,6 +355,9 @@ function getLowerDashboard(filters = {}) {
     requestCosts,
     linkedOs,
     receipts,
+    receiptShortages,
+    receiptShortageItems,
+    receiptShortageQty,
   };
 }
 
