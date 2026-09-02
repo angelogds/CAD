@@ -21,7 +21,7 @@ test('Compras consulta saldo, calcula cobertura e exige confirmação de excesso
 test('Almoxarifado confere parcial/total atomicamente, cria item e bloqueia excesso', () => {
   const code = source('modules/almoxarifado/almoxarifado.service.js');
   assert.match(code, /db\.transaction/);
-  assert.match(code, /CMP-\$\{solicitacaoId\}-\$\{itemId\}/);
+  assert.match(code, /CMP-\$\{solicitacaoId\}-\$\{item\.id\}/);
   assert.match(code, /ENTRADA_COMPRA/);
   assert.match(code, /saldo_anterior/);
   assert.match(code, /compras_recebimentos/);
@@ -34,7 +34,7 @@ test('Retirada QR exige OS, herda equipamento e valida saldo', () => {
   assert.match(code, /Uma OS ativa é obrigatória/);
   assert.match(code, /Saldo insuficiente/);
   assert.match(code, /SAIDA_REQUISICAO_INTERNA/);
-  assert.match(code, /os\.equipamento_id/);
+  assert.match(code, /contexto\?\.equipamento_id \|\| os\?\.equipamento_id/);
   assert.match(code, /QR_CODE/);
   const { ACCESS, ROLE } = require('../config/rbac');
   assert.ok(ACCESS.estoque_retirada.includes(ROLE.MECANICO));
