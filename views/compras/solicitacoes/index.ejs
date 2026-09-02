@@ -6,10 +6,14 @@ const groupDefs=[['critical','Críticas'],['high','Alta prioridade'],['medium','
 const params=new URLSearchParams(); Object.entries(filters||{}).forEach(([k,v])=>{if(v&&k!=='query')params.set(k,v)}); if(filters?.query)params.set('q',filters.query);
 const url=(changes={})=>{const p=new URLSearchParams(params);Object.entries(changes).forEach(([k,v])=>v===null||v===''?p.delete(k):p.set(k,v));return '/compras/solicitacoes'+(p.toString()?'?'+p:'')};
 const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const dateBR=v=>{if(!v)return'-';const parts=String(v).slice(0,10).split('-');return parts.length===3?`${parts[2]}/${parts[1]}/${parts[0]}`:String(v)};
 const totalAnalytics=statusList.reduce((n,s)=>n+Number(resumo?.[s]||0),0); const received=Number(resumo?.RECEBIDA_TOTAL||0)+Number(resumo?.FECHADA||0); const completion=totalAnalytics?Math.round(received/totalAnalytics*100):0;
+const lower=lowerDashboard||{period:filters.period,total:0,status:[],financial:{committed:0,quoted:0,receivedTracked:0,hasTrackedReceivedValue:false,withValue:0},requestCosts:[],linkedOs:[],receipts:[]};
+const statusColors={ABERTA:'#16843a',EM_COTACAO:'#2563eb',COMPRADA:'#7c3aed',EM_RECEBIMENTO:'#f97316',RECEBIDA_PARCIAL:'#0ea5a4',RECEBIDA_TOTAL:'#15803d',FECHADA:'#64748b',REABERTA:'#a16207',CANCELADA:'#ef2938'};
 %>
 <link rel="stylesheet" href="/css/compras-dashboard.css?v=20260819-selection-artifacts-v2">
 <link rel="stylesheet" href="/css/compras-active-priority-fix.css?v=20260819-selection-artifacts-v2">
+<link rel="stylesheet" href="/css/compras-dashboard-lower.css?v=20260902-lower-real-v1">
 <div class="purchase-dashboard">
 <header class="dashboard-heading"><h1>Painel de Compras</h1><p>Fila operacional e indicadores do setor de Compras</p></header>
 <form class="dashboard-filters" method="get"><input type="hidden" name="tab" value="<%= filters.tab %>"><input type="hidden" name="card" value="<%= filters.card %>">
@@ -28,6 +32,83 @@ const totalAnalytics=statusList.reduce((n,s)=>n+Number(resumo?.[s]||0),0); const
 <% if(lista.length){ %><div class="request-list"><div class="request-columns" aria-hidden="true"><span>Solicitação</span><span>OS / Equipamento</span><span>Dados da compra</span><span>Prioridade / Andamento</span><span>Ações</span></div><% groupDefs.forEach(([group,label])=>{const rows=lista.filter(s=>s.priorityGroup===group);if(!rows.length)return;%><section class="priority-section priority-<%=group%>"><h3><span><%=label%></span><b><%=rows.length%></b></h3><%if(group==='undefined'){%><p class="data-warning">Prioridade não definida</p><%}%><%rows.forEach(s=>{const total=Number(s.itens_count||0),done=Number(s.itens_cotados||0),bought=Number(s.itens_comprados||0),receivedItems=Number(s.itens_recebidos||0),pct=total?Math.round(done/total*100):0;const priorityLabel=group==='critical'?'CRÍTICA':group==='high'?'ALTA':group==='medium'?'MÉDIA':group==='low'?'BAIXA':'NÃO DEFINIDA';%><article class="request-row <%=s.overdue?'is-overdue':''%>" data-href="/compras/solicitacoes/<%=s.id%>" tabindex="0" role="link" aria-label="Abrir solicitação <%=s.numero||s.id%>"><div class="request-main" data-label="Solicitação"><span class="request-title-line"><strong><%=s.numero||'#'+s.id%></strong><small class="tag tag-status"><%=String(labels[s.status]||s.status).toUpperCase()%></small></span><span><%=s.titulo||'Título não definido'%></span><small><%=s.setor_origem?'Setor: '+s.setor_origem:'Setor não informado'%></small></div><div class="request-os" data-label="OS / Equipamento"><small>OS / EQUIPAMENTO</small><b><%=s.os_id?'OS '+s.os_id+(s.equipamento_nome?' — '+s.equipamento_nome:''):'Sem OS vinculada'%></b></div><div class="purchase-data" data-label="Dados da compra"><span><b><%=total%></b> <%=total===1?'item':'itens'%> · <b><%=done%></b> cotado<%=done===1?'':'s'%> · <b><%=bought%></b> comprado<%=bought===1?'':'s'%></span><span><b><%=receivedItems%></b> recebido<%=receivedItems===1?'':'s'%> · <%=s.responsavel_nome?'Responsável: '+s.responsavel_nome:'Responsável não definido'%></span><span class="purchase-deadline <%=s.overdue?'is-late':''%>"><%=s.deadline?(s.overdue?'Atrasada: ':s.dueToday?'Vence hoje: ':'Prazo: ')+s.deadline:'Prazo a definir'%></span><%if(filters.tab==='history'){%><small>Fornecedor: <%=s.fornecedor_nome||s.fornecedor||'Não definido'%> · <%=money(s.valor_total)%></small><%}%></div><div class="request-flow" data-label="Prioridade / Andamento"><span class="tag tag-priority tag-<%=group%>"><%=priorityLabel%></span><span><%=done%> de <%=total%> <%=total===1?'item cotado':'itens cotados'%> — <%=pct%>%</span><i class="item-progress"><b style="width:<%=pct%>%"></b></i></div><div class="row-actions" data-label="Ações" onclick="event.stopPropagation()"><a class="ui-btn ui-btn--table" href="/compras/solicitacoes/<%=s.id%>">Abrir</a><details><summary class="ui-btn ui-btn--outline ui-btn--table">Mais ações</summary><div class="action-menu"><a href="/compras/solicitacoes/<%=s.id%>"><%=['ABERTA','REABERTA'].includes(s.status)?'Iniciar cotação':'Continuar cotação'%></a><a href="/compras/solicitacoes/<%=s.id%>/pdf" target="_blank">Gerar PDF</a></div></details></div></article><%})%></section><%})%></div><% } %>
 <%if(queue.pages>1){%><nav class="pagination" aria-label="Paginação"><%for(let p=1;p<=queue.pages;p++){%><a class="<%=p===queue.page?'active':''%>" href="<%=url({page:p})%>"><%=p%></a><%}%></nav><%}%></section>
 <section class="dashboard-card progress-overview"><div class="progress-main"><h2>ANDAMENTO GERAL DAS COMPRAS</h2><p>Indicadores dos últimos <%=filters.period%> dias</p><%[['Abertas',resumo.ABERTA],['Em cotação',resumo.EM_COTACAO],['Recebidas',received]].forEach(r=>{%><div class="progress-row"><span><%=r[0]%></span><i><b style="width:<%=totalAnalytics?Number(r[1]||0)/totalAnalytics*100:0%>%"></b></i><strong><%=r[1]||0%></strong></div><%})%></div><div class="completion"><div><span>Solicitações concluídas</span><strong><%=received%> de <%=totalAnalytics%></strong><small>No período dos indicadores</small></div><div class="completion-ring" style="--progress:<%=completion%>"><b><%=completion%>%</b></div></div></section>
-<div class="dashboard-columns"><section class="dashboard-card"><h2>SOLICITAÇÕES POR STATUS</h2><%statusList.forEach(s=>{%><p><%=labels[s]||s%>: <strong><%=resumo[s]||0%></strong></p><%})%></section><section class="dashboard-card cost-card"><h2>CUSTOS DO PERÍODO</h2><p>Valores calculados sobre os registros do período: <strong><%=money(lista.reduce((n,s)=>n+Number(s.valor_total||0),0))%></strong></p></section></div>
-<div class="dashboard-columns bottom-panels"><section class="dashboard-card"><h2>OS VINCULADAS ÀS COMPRAS</h2><p><%=queue.cards.os%> solicitações ativas vinculadas.</p></section><section class="dashboard-card"><h2>RECEBIMENTOS PREVISTOS</h2><p>Consulte prazos reais na fila operacional.</p></section></div>
+
+<div class="dashboard-lower-grid">
+  <section class="dashboard-card dashboard-lower-card" aria-labelledby="compras-status-title">
+    <div class="dashboard-lower-head">
+      <div><h2 id="compras-status-title">SOLICITAÇÕES POR STATUS</h2><p>Distribuição real das solicitações nos últimos <%= lower.period %> dias.</p></div>
+      <span class="dashboard-lower-badge"><%= lower.total %></span>
+    </div>
+    <% if(!lower.status.length || !lower.total){ %>
+      <div class="lower-empty">Sem solicitações no período e filtros selecionados.</div>
+    <% } else { %>
+      <div class="status-real-chart">
+        <% lower.status.forEach(row=>{ %>
+          <div class="status-real-row" style="--status-color:<%= statusColors[row.key] || '#16a34a' %>">
+            <div class="status-real-label"><span><%= row.label %></span><b><%= row.count %></b></div>
+            <div class="status-real-track" title="<%= row.percent %>% do período"><span style="width:<%= row.percent %>%"></span></div>
+            <div class="status-real-value"><strong><%= row.percent %>%</strong><span><%= row.value>0?money(row.value):'—' %></span></div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </section>
+
+  <section class="dashboard-card dashboard-lower-card" aria-labelledby="compras-cost-title">
+    <div class="dashboard-lower-head">
+      <div><h2 id="compras-cost-title">CUSTOS DO PERÍODO</h2><p>Valores registrados nas solicitações/cotações selecionadas. Sem valores fictícios.</p></div>
+      <span class="dashboard-lower-badge"><%= lower.financial.withValue %> com valor</span>
+    </div>
+    <div class="finance-kpis">
+      <div class="finance-kpi"><span>Custo comprometido</span><strong><%= money(lower.financial.committed) %></strong><small>Compradas, em recebimento e concluídas no período.</small></div>
+      <div class="finance-kpi"><span>Em cotação</span><strong><%= money(lower.financial.quoted) %></strong><small>Valor já registrado enquanto a compra ainda está em cotação.</small></div>
+      <div class="finance-kpi"><span>Recebido com preço rastreável</span><strong><%= lower.financial.hasTrackedReceivedValue?money(lower.financial.receivedTracked):'—' %></strong><small><%= lower.financial.hasTrackedReceivedValue?'Calculado por item recebido com preço unitário registrado.':'O banco ainda não possui preço por item suficiente para calcular esse valor com segurança.' %></small></div>
+      <div class="finance-kpi"><span>Solicitações com custo</span><strong><%= lower.financial.withValue %> de <%= lower.total %></strong><small>Registros do período com valor financeiro disponível.</small></div>
+    </div>
+    <% if(!lower.requestCosts.length){ %>
+      <div class="lower-empty">Nenhum custo ou recebimento registrado neste período.</div>
+    <% } else { %>
+      <div class="request-cost-list">
+        <% lower.requestCosts.forEach(row=>{ %>
+          <div class="request-cost-row">
+            <div class="request-cost-main"><a href="/compras/solicitacoes/<%= row.id %>"><%= row.numero || '#'+row.id %> — <%= row.titulo || 'Sem título' %></a><small><%= row.os_id?'OS '+row.os_id+(row.equipamento_nome?' · '+row.equipamento_nome:''):'Sem OS vinculada' %></small></div>
+            <div class="request-cost-money"><%= row.custo_total>0?money(row.custo_total):'Sem custo' %><% if(row.valor_recebido_rastreado>0){ %><small>Recebido: <%= money(row.valor_recebido_rastreado) %></small><% } %></div>
+            <div class="request-cost-progress"><i><b style="width:<%= row.recebimento_pct %>%"></b></i><span><%= row.recebimento_pct %>% recebido</span></div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+    <p class="financial-note"><strong>Regra financeira:</strong> o painel usa valores realmente registrados. Quando não há preço unitário confiável por item, o percentual recebido continua físico e o sistema não transforma esse percentual em dinheiro por estimativa.</p>
+  </section>
+</div>
+
+<div class="dashboard-lower-grid bottom-panels">
+  <section class="dashboard-card dashboard-lower-card" aria-labelledby="compras-os-title">
+    <div class="dashboard-lower-head">
+      <div><h2 id="compras-os-title">OS VINCULADAS ÀS COMPRAS</h2><p>Solicitações do período associadas a uma Ordem de Serviço.</p></div>
+      <span class="dashboard-lower-badge"><%= lower.linkedOs.length %> exibidas</span>
+    </div>
+    <% if(!lower.linkedOs.length){ %>
+      <div class="lower-empty">Nenhuma solicitação vinculada a OS no período selecionado.</div>
+    <% } else { %>
+      <div class="lower-scroll"><table class="lower-table"><thead><tr><th>Solicitação</th><th>OS / Equipamento</th><th>Status</th><th>Custo</th><th>Recebimento</th></tr></thead><tbody>
+      <% lower.linkedOs.forEach(row=>{ %><tr><td><a href="/compras/solicitacoes/<%=row.id%>"><%=row.numero||'#'+row.id%></a><small><%=row.titulo||'Sem título'%></small></td><td><strong>OS <%=row.os_id%></strong><small><%=row.equipamento_nome||'Equipamento não informado'%></small></td><td><span class="tag tag-neutral"><%=row.status_label%></span></td><td><strong><%=row.custo_total>0?money(row.custo_total):'—'%></strong></td><td><div class="lower-progress"><i><b style="width:<%=row.recebimento_pct%>%"></b></i><span><%=row.recebimento_pct%>%</span></div></td></tr><% }) %>
+      </tbody></table></div>
+    <% } %>
+  </section>
+
+  <section class="dashboard-card dashboard-lower-card" aria-labelledby="compras-recebimentos-title">
+    <div class="dashboard-lower-head">
+      <div><h2 id="compras-recebimentos-title">RECEBIMENTOS PREVISTOS</h2><p>Prazos reais registrados na solicitação ou na cotação selecionada.</p></div>
+      <span class="dashboard-lower-badge"><%= lower.receipts.length %> próximos</span>
+    </div>
+    <% if(!lower.receipts.length){ %>
+      <div class="lower-empty">Nenhuma previsão de recebimento registrada para as solicitações do período.</div>
+    <% } else { %>
+      <div class="receipt-list">
+        <% lower.receipts.forEach(row=>{ %><div class="receipt-row"><div class="receipt-date"><strong><%=dateBR(row.previsao_entrega_real)%></strong><span class="<%=row.atrasado?'is-late':row.vence_hoje?'is-today':''%>"><%=row.atrasado?'Atrasado':row.vence_hoje?'Hoje':'Programado'%></span></div><div class="receipt-main"><a href="/compras/solicitacoes/<%=row.id%>"><%=row.numero||'#'+row.id%> — <%=row.titulo||'Sem título'%></a><small><%=row.fornecedor_real||'Fornecedor não informado'%> · <%=row.status_label%></small></div><div class="receipt-value"><%=row.custo_total>0?money(row.custo_total):'Valor não informado'%></div></div><% }) %>
+      </div>
+    <% } %>
+  </section>
+</div>
 </div><script src="/js/compras-dashboard.js?v=20260819-selection-artifacts-v2" defer></script><script>document.querySelectorAll('.request-row[data-href]').forEach(row=>{const open=()=>location.href=row.dataset.href;row.addEventListener('click',event=>{if(!event.target.closest('a,button,details,summary,form'))open()});row.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.target.closest('a,button,details,summary'))open()})});</script>
