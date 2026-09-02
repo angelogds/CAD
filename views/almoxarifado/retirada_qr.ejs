@@ -1,0 +1,147 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
+
+<div class="qr-withdraw-page">
+  <header class="reserve-head">
+    <div>
+      <span class="eyebrow">ALMOXARIFADO • RETIRADA IDENTIFICADA</span>
+      <h1>Retirada por QR</h1>
+      <p>Leia o cartão do colaborador, confira a solicitação e entregue somente o material reservado.</p>
+    </div>
+    <div class="reserve-head__actions">
+      <a class="btn btn-ghost" href="/estoque/reservas">Materiais separados</a>
+      <a class="btn btn-ghost" href="/almoxarifado/recebimentos">Recebimentos</a>
+    </div>
+  </header>
+
+  <section class="qr-scan-layout">
+    <article class="card qr-scanner-card">
+      <div class="qr-scanner-card__head"><div><h2>1. Identificar colaborador</h2><p>Use a câmera do celular/computador ou um leitor USB.</p></div></div>
+      <div class="qr-reader-box"><video id="qrVideo" playsinline muted></video><div id="qrReaderPlaceholder">Câmera desligada</div></div>
+      <div class="qr-reader-actions">
+        <button class="btn btn-green" id="startQrCamera" type="button">Abrir câmera</button>
+        <button class="btn btn-ghost" id="stopQrCamera" type="button" disabled>Parar câmera</button>
+      </div>
+      <p class="muted" id="qrCameraStatus">A câmera só será solicitada quando você tocar em “Abrir câmera”.</p>
+      <form method="GET" action="/almoxarifado/retiradas/qr" class="qr-manual-form">
+        <% if (solicitacaoId) { %><input type="hidden" name="solicitacao_id" value="<%= solicitacaoId %>" /><% } %>
+        <label><span>Leitor USB / código manual</span><input class="input" id="qrManualCode" name="codigo" value="<%= codigo %>" placeholder="Leia o cartão ou informe o código" autocomplete="off" /></label>
+        <button class="btn btn-green" type="submit">Identificar</button>
+      </form>
+    </article>
+
+    <article class="card qr-identity-card">
+      <div><h2>2. Conferir identidade</h2><p class="muted">O QR identifica o cadastro; a entrega continua sendo confirmada pelo almoxarife logado.</p></div>
+      <% if (!codigo) { %>
+        <div class="qr-identity-empty">Aguardando leitura do cartão.</div>
+      <% } else if (!colaborador) { %>
+        <div class="qr-identity-error"><strong>Cartão inválido ou inativo.</strong><span>Confira o cartão ou gere um novo QR no cadastro do colaborador.</span></div>
+      <% } else { %>
+        <div class="qr-identity-person">
+          <img src="<%= colaborador.foto_url || '/IMG/logo_menu.png.png' %>" alt="Foto de <%= colaborador.nome %>" />
+          <div><small>COLABORADOR IDENTIFICADO</small><h3><%= colaborador.nome %></h3><p><%= colaborador.funcao || '-' %> • <%= colaborador.setor || '-' %></p><span class="stock-state stock-state--ok">ATIVO</span></div>
+        </div>
+      <% } %>
+    </article>
+  </section>
+
+  <section class="card qr-delivery-section">
+    <div class="qr-delivery-head">
+      <div><h2>3. Entregar material reservado</h2><p>Baixa vinculada à solicitação, OS, equipamento e colaborador que recebeu o material.</p></div>
+      <% if (solicitacaoId) { %><a class="btn btn-ghost" href="/almoxarifado/retiradas/qr<%= codigo ? ('?codigo='+encodeURIComponent(codigo)) : '' %>">Ver todas as solicitações</a><% } %>
+    </div>
+
+    <% if (!colaborador) { %>
+      <div class="reserve-empty"><strong>Identifique um colaborador para liberar a confirmação de retirada.</strong></div>
+    <% } else if (!grupos.length) { %>
+      <div class="reserve-empty"><strong>Nenhum material reservado disponível.</strong><p>O recebimento precisa estar registrado e vinculado à solicitação.</p></div>
+    <% } else { %>
+      <div class="qr-delivery-groups">
+        <% grupos.forEach((grupo) => { %>
+          <article class="qr-delivery-group">
+            <header><div><span class="reserve-number"><%= grupo.numero %></span><h3><%= grupo.titulo %></h3><p><%= grupo.os_numero ? ('OS #'+grupo.os_numero+' • ') : '' %><%= grupo.equipamento_nome || 'Equipamento não informado' %></p></div><strong><%= grupo.total_disponivel %> disponível</strong></header>
+            <% grupo.itens.filter(i=>Number(i.quantidade_disponivel||0)>0).forEach((item) => { %>
+              <form class="qr-delivery-item" method="POST" action="/almoxarifado/reservas/<%= item.id %>/retirar" data-lock-submit>
+                <input type="hidden" name="qr_code" value="<%= codigo %>" />
+                <input type="hidden" name="solicitacao_id" value="<%= grupo.solicitacao_id %>" />
+                <div><strong><%= item.item_nome %></strong><small>Saldo físico: <%= Number(item.saldo_fisico||0) %> <%= item.unidade||'UN' %> • Reservado disponível: <%= Number(item.quantidade_disponivel||0) %> <%= item.unidade||'UN' %></small></div>
+                <label><span>Quantidade</span><input class="input" type="number" name="quantidade" min="0.01" step="0.01" max="<%= Number(item.quantidade_disponivel||0) %>" value="<%= Number(item.quantidade_disponivel||0) %>" required /></label>
+                <label><span>Observação</span><input class="input" name="observacao" placeholder="Opcional" /></label>
+                <button class="btn btn-green" type="submit" data-pending-text="Registrando...">Confirmar entrega</button>
+              </form>
+            <% }) %>
+          </article>
+        <% }) %>
+      </div>
+    <% } %>
+  </section>
+</div>
+
+<script>
+(() => {
+  const startBtn = document.getElementById('startQrCamera');
+  const stopBtn = document.getElementById('stopQrCamera');
+  const video = document.getElementById('qrVideo');
+  const placeholder = document.getElementById('qrReaderPlaceholder');
+  const status = document.getElementById('qrCameraStatus');
+  let stream = null;
+  let timer = null;
+  let detector = null;
+
+  const currentSolicitacao = <%- JSON.stringify(solicitacaoId || null) %>;
+  function redirectWithCode(code) {
+    const params = new URLSearchParams();
+    params.set('codigo', code);
+    if (currentSolicitacao) params.set('solicitacao_id', String(currentSolicitacao));
+    window.location.href = '/almoxarifado/retiradas/qr?' + params.toString();
+  }
+  async function stopCamera() {
+    if (timer) { clearInterval(timer); timer = null; }
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    video.srcObject = null;
+    placeholder.style.display = 'grid';
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+  }
+  async function startCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      status.textContent = 'Este navegador não oferece acesso à câmera. Use o leitor USB ou informe o código manualmente.';
+      return;
+    }
+    if (!('BarcodeDetector' in window)) {
+      status.textContent = 'Leitura QR pela câmera não é suportada neste navegador. Use o leitor USB/código manual ou um navegador compatível.';
+      return;
+    }
+    try {
+      detector = new BarcodeDetector({ formats: ['qr_code'] });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+      video.srcObject = stream;
+      await video.play();
+      placeholder.style.display = 'none';
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      status.textContent = 'Aponte a câmera para o QR do cartão do colaborador.';
+      timer = setInterval(async () => {
+        if (!detector || video.readyState < 2) return;
+        try {
+          const codes = await detector.detect(video);
+          if (codes?.length && codes[0].rawValue) {
+            const value = codes[0].rawValue;
+            await stopCamera();
+            redirectWithCode(value);
+          }
+        } catch (_error) {}
+      }, 350);
+    } catch (error) {
+      status.textContent = 'Não foi possível abrir a câmera. Verifique a permissão do navegador ou use o leitor USB.';
+      await stopCamera();
+    }
+  }
+  startBtn?.addEventListener('click', startCamera);
+  stopBtn?.addEventListener('click', stopCamera);
+  window.addEventListener('beforeunload', stopCamera);
+
+  const manual = document.getElementById('qrManualCode');
+  manual?.focus();
+})();
+</script>
