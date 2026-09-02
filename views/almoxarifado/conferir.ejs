@@ -1,8 +1,10 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20260824-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-v1" />
 
 <%
   const statusConfig = {
+    EM_COTACAO: { label: 'Em cotação', cls: 'almox-status--cotacao' },
     COMPRADA: { label: 'Para receber', cls: 'almox-status--comprada' },
     EM_RECEBIMENTO: { label: 'Em recebimento', cls: 'almox-status--recebimento' },
     RECEBIDA_PARCIAL: { label: 'Recebida parcial', cls: 'almox-status--parcial' },
@@ -13,20 +15,38 @@
   const editableReceipt = ['EM_RECEBIMENTO', 'RECEBIDA_PARCIAL'].includes(sol.status);
   const hasPending = Number(sol.resumo.qtd_pendente || 0) > 0;
   const hasReceived = Number(sol.resumo.qtd_recebida || 0) > 0;
+  const canWithdrawAll = canWithdraw && Number(sol.resumo.itens_disponiveis_retirada || 0) > 0;
+  const dateBR = (v) => { if(!v)return 'A definir'; const p=String(v).slice(0,10).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:String(v); };
+  const itemStage = (item) => {
+    const bought=String(item.status_compra||'').toUpperCase()==='COMPRADO';
+    const quoted=String(item.status_cotacao||'').toUpperCase()==='COTADO';
+    const received=Number(item.qtd_recebida_calc||0);
+    const purchased=Number(item.qtd_comprada_calc||0);
+    if (purchased>0 && received>=purchased) return ['Recebido','almox-status--total'];
+    if (received>0) return ['Recebido parcial','almox-status--parcial'];
+    if (bought) return ['Comprado','almox-status--comprada'];
+    if (quoted) return ['Cotado','almox-status--cotacao'];
+    return ['Aguardando cotação','almox-status--fechada'];
+  };
 %>
 
-<div class="almox-page">
+<div class="almox-page almox-flow-page">
   <header class="almox-hero">
     <div>
-      <span class="almox-hero__eyebrow">CONFERÊNCIA DE RECEBIMENTO</span>
+      <span class="almox-hero__eyebrow">ALMOXARIFADO • SOLICITAÇÃO COMPLETA</span>
       <h1><%= sol.numero || ('Solicitação #' + sol.id) %></h1>
-      <p class="muted"><%= sol.titulo || 'Conferência física dos itens comprados e entrada no estoque.' %></p>
+      <p class="muted"><%= sol.titulo || 'Acompanhamento do material desde a cotação até a retirada.' %></p>
     </div>
     <div class="almox-hero__actions">
-      <a class="btn btn-ghost" href="/almoxarifado/recebimentos">← Voltar</a>
+      <a class="btn btn-ghost" href="/almoxarifado/recebimentos">← Voltar às solicitações</a>
       <% if (canManage && sol.status === 'COMPRADA') { %>
         <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/iniciar-recebimento" data-lock-submit>
           <button class="btn btn-green" type="submit" data-pending-text="Iniciando...">Iniciar recebimento</button>
+        </form>
+      <% } %>
+      <% if (canWithdrawAll) { %>
+        <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/retirar-todos" data-confirm-message="Retirar todo o saldo recebido e disponível desta solicitação?" data-lock-submit>
+          <button class="btn btn-green" type="submit" data-pending-text="Retirando...">Retirar todos disponíveis</button>
         </form>
       <% } %>
     </div>
@@ -34,171 +54,96 @@
 
   <%- include('_tabs', { tab: 'recebimentos' }) %>
 
-  <section class="almox-kpis">
-    <article class="almox-kpi">
-      <span class="almox-kpi__label">Itens comprados</span>
-      <strong class="almox-kpi__value"><%= sol.resumo.itens %></strong>
-      <span class="almox-kpi__meta">Itens liberados pelo setor de Compras</span>
-    </article>
-    <article class="almox-kpi almox-kpi--blue">
-      <span class="almox-kpi__label">Quantidade comprada</span>
-      <strong class="almox-kpi__value"><%= Number(sol.resumo.qtd_comprada || 0) %></strong>
-      <span class="almox-kpi__meta">Base usada para a conferência</span>
-    </article>
-    <article class="almox-kpi almox-kpi--amber">
-      <span class="almox-kpi__label">Quantidade pendente</span>
-      <strong class="almox-kpi__value"><%= Number(sol.resumo.qtd_pendente || 0) %></strong>
-      <span class="almox-kpi__meta"><%= hasPending ? 'Ainda precisa ser recebida' : 'Recebimento sem pendências' %></span>
-    </article>
-    <article class="almox-kpi almox-kpi--slate">
-      <span class="almox-kpi__label">Progresso</span>
-      <strong class="almox-kpi__value"><%= sol.resumo.progresso_pct %>%</strong>
-      <span class="almox-kpi__meta"><%= Number(sol.resumo.qtd_recebida || 0) %> recebido(s)</span>
-    </article>
+  <section class="almox-process-line" aria-label="Fluxo da solicitação">
+    <% [['EM_COTACAO','Cotação'],['COMPRADA','Compra'],['EM_RECEBIMENTO','Recebimento'],['RECEBIDA_TOTAL','Disponível'],['FECHADA','Concluído']].forEach(([key,label],idx)=>{ const map={EM_COTACAO:0,COMPRADA:1,EM_RECEBIMENTO:2,RECEBIDA_PARCIAL:2,RECEBIDA_TOTAL:3,FECHADA:4}; const active=(map[sol.status]??0)>=idx; %>
+      <div class="almox-process-step <%= active?'is-done':'' %>"><i><%= idx+1 %></i><span><%= label %></span></div>
+    <% }) %>
   </section>
 
-  <div class="almox-detail-grid">
-    <main class="almox-items">
-      <% if (!sol.itens.length) { %>
-        <div class="almox-summary-card almox-empty">Esta solicitação não possui itens marcados como comprados.</div>
-      <% } %>
+  <section class="almox-flow-kpis">
+    <article class="almox-flow-kpi"><span>Itens solicitados</span><strong><%= sol.resumo.itens %></strong><small>Quantidade total: <%= Number(sol.resumo.qtd_solicitada||0) %></small></article>
+    <article class="almox-flow-kpi kpi-blue"><span>Itens cotados</span><strong><%= sol.resumo.itens_cotados %></strong><small>Visíveis antes da compra</small></article>
+    <article class="almox-flow-kpi kpi-green"><span>Itens comprados</span><strong><%= sol.resumo.itens_comprados %></strong><small>Quantidade comprada: <%= Number(sol.resumo.qtd_comprada||0) %></small></article>
+    <article class="almox-flow-kpi kpi-cyan"><span>Recebimento</span><strong><%= sol.resumo.progresso_pct %>%</strong><small><%= Number(sol.resumo.qtd_recebida||0) %> recebido(s) • <%= Number(sol.resumo.qtd_pendente||0) %> pendente(s)</small></article>
+  </section>
 
+  <section class="almox-request-context">
+    <div><span>Solicitante</span><strong><%= sol.solicitante_nome || '-' %></strong></div>
+    <div><span>Setor</span><strong><%= sol.setor_origem || '-' %></strong></div>
+    <div><span>OS vinculada</span><strong><%= sol.os_numero ? ('OS #'+sol.os_numero) : 'Sem OS vinculada' %></strong></div>
+    <div><span>Equipamento</span><strong><%= sol.equipamento_nome || 'Não informado' %></strong></div>
+    <div><span>Status geral</span><strong><span class="almox-status <%= meta.cls %>"><%= meta.label %></span></strong></div>
+  </section>
+
+  <section id="materiais" class="card almox-materials-card">
+    <div class="almox-request-head">
+      <div><h2>Materiais da solicitação</h2><p>Cotação, compra, entrada e retirada permanecem dentro do mesmo pedido.</p></div>
+      <% if (sol.status === 'EM_COTACAO') { %><span class="almox-note-info">Consulta somente: o recebimento só é liberado após a compra.</span><% } %>
+    </div>
+
+    <% if (!sol.itens.length) { %><div class="almox-empty">Esta solicitação não possui itens.</div><% } %>
+    <div class="almox-material-list">
       <% sol.itens.forEach((item) => {
-        const comprado = Number(item.qtd_comprada || 0);
-        const recebido = Number(item.qtd_recebida_total || 0);
-        const pendente = Math.max(Number(item.pendente || 0), 0);
-        const pct = comprado > 0 ? Math.min(100, Math.round((recebido / comprado) * 100)) : 0;
-        const inputId = `qtdReceber${item.id}`;
+        const solicitado=Number(item.qtd_solicitada_calc||0);
+        const comprado=Number(item.qtd_comprada_calc||0);
+        const recebido=Number(item.qtd_recebida_calc||0);
+        const pendente=Math.max(Number(item.pendente||0),0);
+        const retirado=Number(item.qtd_retirada_solicitacao||0);
+        const disponivel=Math.max(Number(item.disponivel_retirada||0),0);
+        const saldoEstoque=Number(item.estoque_saldo_atual||0);
+        const maxRetirada=Math.min(disponivel,saldoEstoque);
+        const pct=comprado>0?Math.min(100,Math.round(recebido/comprado*100)):0;
+        const stage=itemStage(item);
+        const purchased=String(item.status_compra||'').toUpperCase()==='COMPRADO';
       %>
-        <article class="almox-item">
-          <div class="almox-item__head">
-            <div>
-              <div class="almox-item__name"><%= item.item_nome_exibicao || item.item_nome || ('Item #' + item.id) %></div>
-              <div class="almox-item__desc"><%= item.item_descricao || item.descricao || 'Sem especificação complementar.' %></div>
-              <% if (item.estoque_item_nome) { %><div class="almox-subline">Vinculado ao estoque: <strong><%= item.estoque_item_nome %></strong><%= item.estoque_local_nome ? (' • ' + item.estoque_local_nome) : '' %></div><% } %>
-            </div>
-            <span class="almox-status <%= pendente <= 0 ? 'almox-status--total' : (recebido > 0 ? 'almox-status--parcial' : 'almox-status--comprada') %>">
-              <%= pendente <= 0 ? 'Conferido' : (recebido > 0 ? 'Parcial' : 'Pendente') %>
-            </span>
+        <article class="almox-material-row">
+          <div class="almox-material-main">
+            <div class="almox-item__name"><%= item.item_nome_exibicao || item.item_nome || ('Item #'+item.id) %></div>
+            <div class="almox-item__desc"><%= item.item_descricao || item.descricao || 'Sem especificação complementar.' %></div>
+            <div class="almox-material-meta"><span>Fornecedor: <strong><%= item.fornecedor_exibicao || 'A definir' %></strong></span><span>Previsão: <strong><%= dateBR(item.previsao_exibicao) %></strong></span><% if(item.estoque_item_nome){ %><span>Estoque: <strong><%= item.estoque_item_nome %></strong><%= item.estoque_local_nome?(' • '+item.estoque_local_nome):'' %></span><% } %></div>
+          </div>
+          <div class="almox-material-stage"><span class="almox-status <%= stage[1] %>"><%= stage[0] %></span><div class="almox-progress"><div class="almox-progress__track"><div class="almox-progress__bar" style="width:<%= pct %>%"></div></div><small><%= pct %>% recebido do comprado</small></div></div>
+          <div class="almox-material-quantities">
+            <span><small>Solicitado</small><b><%= solicitado %> <%= item.unidade||'UN' %></b></span>
+            <span><small>Cotado</small><b><%= String(item.status_cotacao||'').toUpperCase()==='COTADO' ? 'Sim' : 'Não' %></b></span>
+            <span><small>Comprado</small><b><%= comprado %> <%= item.unidade||'UN' %></b></span>
+            <span><small>Recebido</small><b><%= recebido %> <%= item.unidade||'UN' %></b></span>
+            <span><small>Pendente</small><b><%= pendente %> <%= item.unidade||'UN' %></b></span>
+            <span><small>Retirado</small><b><%= retirado %> <%= item.unidade||'UN' %></b></span>
           </div>
 
-          <div class="almox-item__metrics">
-            <div class="almox-metric"><span>Comprado</span><strong><%= comprado %> <%= item.unidade || 'UN' %></strong></div>
-            <div class="almox-metric"><span>Recebido</span><strong><%= recebido %> <%= item.unidade || 'UN' %></strong></div>
-            <div class="almox-metric"><span>Pendente</span><strong><%= pendente %> <%= item.unidade || 'UN' %></strong></div>
-          </div>
-
-          <div class="almox-progress" style="margin-top:10px;max-width:none;">
-            <div class="almox-progress__top"><span>Progresso do item</span><strong><%= pct %>%</strong></div>
-            <div class="almox-progress__track"><div class="almox-progress__bar" style="width:<%= pct %>%"></div></div>
-          </div>
-
-          <% if (canManage && editableReceipt && pendente > 0) { %>
-            <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/itens/<%= item.id %>/receber" class="almox-receive-form" data-lock-submit>
-              <div class="almox-field">
-                <label for="<%= inputId %>">Receber agora</label>
-                <input id="<%= inputId %>" class="input" type="number" min="0.01" max="<%= pendente %>" step="0.01" name="qtd_recebida_agora" placeholder="Qtd" data-receive-quantity required />
-                <button type="button" class="btn btn-sm btn-ghost almox-quick-fill" data-fill-remaining="<%= inputId %>" data-remaining="<%= pendente %>" style="margin-top:6px;">Usar saldo <%= pendente %></button>
-              </div>
-              <div class="almox-field">
-                <label>Local de estoque</label>
-                <select class="input" name="local_id">
-                  <option value="">Manter / definir depois</option>
-                  <% locais.forEach((local) => { %>
-                    <option value="<%= local.id %>" <%= Number(item.estoque_local_id) === Number(local.id) ? 'selected' : '' %>><%= local.nome %></option>
-                  <% }) %>
-                </select>
-              </div>
-              <div class="almox-field almox-field--wide">
-                <label>Observação da conferência</label>
-                <input class="input" name="observacao_item" value="" placeholder="NF, avaria, diferença, lote ou observação" />
-              </div>
+          <% if (canManage && editableReceipt && purchased && pendente > 0) { %>
+            <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/itens/<%= item.id %>/receber" class="almox-inline-operation receive-operation" data-lock-submit>
+              <div><label>Receber agora</label><input class="input" type="number" min="0.01" max="<%= pendente %>" step="0.01" name="qtd_recebida_agora" required placeholder="Qtd" /></div>
+              <div><label>Local</label><select class="input" name="local_id"><option value="">Manter / definir depois</option><% locais.forEach(local=>{ %><option value="<%=local.id%>" <%=Number(item.estoque_local_id)===Number(local.id)?'selected':''%>><%=local.nome%></option><% }) %></select></div>
+              <div class="grow"><label>Observação</label><input class="input" name="observacao_item" placeholder="NF, lote, avaria ou diferença" /></div>
               <button class="btn btn-green" type="submit" data-pending-text="Registrando...">Dar entrada</button>
             </form>
-          <% } else if (!canManage && pendente > 0) { %>
-            <div class="almox-warning" style="margin-top:12px;">Seu perfil possui acesso de consulta. A confirmação de entrada exige permissão de Almoxarifado.</div>
+          <% } %>
+
+          <% if (canWithdraw && maxRetirada > 0) { %>
+            <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/itens/<%= item.id %>/retirar" class="almox-inline-operation withdraw-operation" data-lock-submit>
+              <div><label>Retirar agora</label><input class="input" type="number" min="0.01" max="<%= maxRetirada %>" step="0.01" name="quantidade" required value="<%= maxRetirada %>" /></div>
+              <div class="grow"><label>Finalidade / observação</label><input class="input" name="observacao" placeholder="Destino do material ou serviço executado" /></div>
+              <div class="almox-withdraw-balance"><small>Disponível nesta solicitação</small><strong><%= disponivel %> <%= item.unidade||'UN' %></strong><span>Saldo físico: <%= saldoEstoque %></span></div>
+              <button class="btn btn-green" type="submit" data-pending-text="Baixando...">Dar baixa / retirar</button>
+            </form>
+          <% } else if (disponivel > 0 && saldoEstoque <= 0) { %>
+            <div class="almox-warning">Há quantidade recebida vinculada a esta solicitação, mas o saldo físico atual do item está zerado. Consulte os movimentos antes de tentar nova baixa.</div>
           <% } %>
         </article>
       <% }) %>
-    </main>
-
-    <aside class="almox-summary-card">
-      <div class="almox-summary-card__head">
-        <div>
-          <div class="almox-summary-card__title">Resumo do processo</div>
-          <div class="almox-subline">Integração Compras → Almoxarifado → Estoque</div>
-        </div>
-        <span class="almox-status <%= meta.cls %>"><%= meta.label %></span>
-      </div>
-
-      <div class="almox-summary-list">
-        <div class="almox-summary-box"><span>Solicitante</span><strong><%= sol.solicitante_nome || '-' %></strong></div>
-        <div class="almox-summary-box"><span>OS vinculada</span><strong><%= sol.os_numero ? ('OS #' + sol.os_numero) : '-' %></strong></div>
-        <div class="almox-summary-box"><span>Equipamento</span><strong><%= sol.equipamento_nome || '-' %></strong></div>
-        <div class="almox-summary-box"><span>Status</span><strong><%= meta.label %></strong></div>
-      </div>
-
-      <% if (sol.status === 'COMPRADA') { %>
-        <div class="almox-warning" style="margin-top:14px;">O recebimento ainda não foi iniciado. Inicie a conferência antes de lançar quantidades no estoque.</div>
-      <% } else if (sol.status === 'RECEBIDA_TOTAL' || sol.status === 'FECHADA') { %>
-        <div class="almox-success" style="margin-top:14px;">Todos os itens comprados foram recebidos. As entradas permanecem registradas no histórico do estoque.</div>
-      <% } else if (hasPending) { %>
-        <div class="almox-warning" style="margin-top:14px;">Existem saldos pendentes. Você pode continuar recebendo ou finalizar esta etapa como parcial.</div>
-      <% } %>
-    </aside>
-  </div>
+    </div>
+  </section>
 
   <% if (historico && historico.length) { %>
-    <section class="card almox-history">
-      <h3>Histórico de entradas</h3>
-      <div class="table-wrap">
-        <table class="table">
-          <thead><tr><th>Item</th><th>Quantidade</th><th>Usuário</th><th>Estoque</th><th>Data</th></tr></thead>
-          <tbody>
-            <% historico.forEach((mov) => { %>
-              <tr>
-                <td><strong><%= mov.item_nome || ('Item #' + mov.solicitacao_item_id) %></strong></td>
-                <td><%= Number(mov.quantidade || 0) %> <%= mov.unidade || 'UN' %></td>
-                <td><%= mov.usuario_nome || '-' %></td>
-                <td><%= mov.estoque_item_nome || ('#' + mov.estoque_item_id) %></td>
-                <td><%= typeof fmtBR === 'function' && mov.created_at ? fmtBR(mov.created_at) : (mov.created_at || '-') %></td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <section class="card almox-history"><h3>Histórico de entradas desta solicitação</h3><div class="table-wrap"><table class="table"><thead><tr><th>Item</th><th>Quantidade</th><th>Usuário</th><th>Estoque</th><th>Data</th></tr></thead><tbody><% historico.forEach(mov=>{ %><tr><td><strong><%=mov.item_nome||('Item #'+mov.solicitacao_item_id)%></strong></td><td><%=Number(mov.quantidade||0)%> <%=mov.unidade||'UN'%></td><td><%=mov.usuario_nome||'-'%></td><td><%=mov.estoque_item_nome||('#'+mov.estoque_item_id)%></td><td><%=typeof fmtBR==='function'&&mov.created_at?fmtBR(mov.created_at):(mov.created_at||'-')%></td></tr><% }) %></tbody></table></div></section>
   <% } %>
 
   <% if (canManage) { %>
     <div class="almox-footer-actions">
-      <div>
-        <strong>Próxima ação</strong>
-        <div class="almox-subline">
-          <% if (sol.status === 'COMPRADA') { %>Inicie o recebimento para liberar a conferência.<% } %>
-          <% if (editableReceipt && hasPending) { %>Confira os itens e mantenha os saldos pendentes rastreáveis.<% } %>
-          <% if (editableReceipt && !hasPending) { %>Todos os itens foram recebidos; conclua o recebimento.<% } %>
-          <% if (sol.status === 'RECEBIDA_TOTAL') { %>O recebimento está integral; feche o processo quando a conferência estiver validada.<% } %>
-          <% if (sol.status === 'FECHADA') { %>Processo encerrado. Reabra apenas para revisão; o estoque não será revertido.<% } %>
-        </div>
-      </div>
-      <div class="almox-actions">
-        <% if (editableReceipt && hasReceived) { %>
-          <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/finalizar-recebimento" data-confirm-message="<%= hasPending ? 'Finalizar esta etapa como recebimento parcial? Os saldos pendentes continuarão registrados.' : 'Concluir este recebimento integralmente?' %>" data-lock-submit>
-            <button class="btn btn-green" type="submit" data-pending-text="Finalizando..."><%= hasPending ? 'Finalizar como parcial' : 'Concluir recebimento' %></button>
-          </form>
-        <% } %>
-        <% if (sol.status === 'RECEBIDA_TOTAL') { %>
-          <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/fechar" data-confirm-message="Fechar definitivamente esta etapa do Almoxarifado?" data-lock-submit>
-            <button class="btn btn-green" type="submit" data-pending-text="Fechando...">Fechar processo</button>
-          </form>
-        <% } %>
-        <% if (sol.status === 'FECHADA') { %>
-          <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/reabrir" data-confirm-message="Reabrir para revisão? As movimentações de estoque serão mantidas." data-lock-submit>
-            <button class="btn btn-ghost" type="submit" data-pending-text="Reabrindo...">Reabrir conferência</button>
-          </form>
-        <% } %>
-      </div>
+      <div><strong>Próxima ação</strong><div class="almox-subline"><% if(sol.status==='EM_COTACAO'){%>Acompanhe a cotação. A entrada permanece bloqueada até a confirmação de compra.<%}%><% if(sol.status==='COMPRADA'){%>Inicie o recebimento para liberar a conferência.<%}%><% if(editableReceipt&&hasPending){%>Continue recebendo os itens comprados que chegarem.<%}%><% if(editableReceipt&&!hasPending&&hasReceived){%>Todos os itens comprados foram recebidos; conclua a etapa.<%}%><% if(sol.status==='RECEBIDA_TOTAL'){%>Material recebido integralmente e disponível conforme saldo para retirada.<%}%></div></div>
+      <div class="almox-actions"><% if(editableReceipt&&hasReceived){%><form method="POST" action="/almoxarifado/solicitacoes/<%=sol.id%>/finalizar-recebimento" data-lock-submit><button class="btn btn-green" type="submit"><%=hasPending?'Finalizar como parcial':'Concluir recebimento'%></button></form><%}%><% if(sol.status==='RECEBIDA_TOTAL'){%><form method="POST" action="/almoxarifado/solicitacoes/<%=sol.id%>/fechar" data-lock-submit><button class="btn btn-green" type="submit">Fechar processo</button></form><%}%></div>
     </div>
   <% } %>
 </div>
