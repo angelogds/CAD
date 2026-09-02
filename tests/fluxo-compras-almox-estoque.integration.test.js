@@ -25,8 +25,9 @@ test('Almoxarifado confere parcial/total atomicamente, cria item e bloqueia exce
   assert.match(code, /ENTRADA_COMPRA/);
   assert.match(code, /saldo_anterior/);
   assert.match(code, /compras_recebimentos/);
-  assert.match(code, /excede a solicitada/);
-  assert.match(code, /RECEBIDA_TOTAL pode ser fechada/);
+  assert.match(code, /Quantidade acima do que ainda falta receber/);
+  assert.match(code, /s\.status !== STATUS\.RECEBIDA_TOTAL/);
+  assert.match(code, /Somente uma solicitação recebida integralmente pode ser fechada/);
 });
 
 test('Retirada QR exige OS, herda equipamento e valida saldo', () => {
