@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const service = require('./compras.service');
+const dashboardService = require('./compras.dashboard.service');
 const { applyMigrations } = require('../../database/migrate');
 const storagePaths = require('../../config/storage');
 
@@ -100,6 +101,25 @@ function getOperationalQueue(filters) {
   };
 }
 
+function emptyLowerDashboard(period) {
+  return {
+    period,
+    total: 0,
+    status: [],
+    financial: {
+      committed: 0,
+      quoted: 0,
+      receivedTracked: 0,
+      hasTrackedReceivedValue: false,
+      pricedReceivedItems: 0,
+      withValue: 0,
+    },
+    requestCosts: [],
+    linkedOs: [],
+    receipts: [],
+  };
+}
+
 function isSchemaError(error) {
   const msg = String(error?.message || error || '').toLowerCase();
   return msg.includes('no such table') || msg.includes('no such column') || msg.includes('sqlite_error');
@@ -130,6 +150,12 @@ function lista(req, res) {
 
   const queue = getOperationalQueue(filters);
   const lista = queue.rows;
+  let lowerDashboard = emptyLowerDashboard(filters.period);
+  try {
+    lowerDashboard = dashboardService.getLowerDashboard(filters);
+  } catch (error) {
+    console.error('❌ Erro nos indicadores inferiores de Compras:', error && error.stack ? error.stack : error);
+  }
 
   if (req.query.export === 'excel') {
     const escapeCsv = (value) => `"${String(value == null ? '' : value).replace(/"/g, '""')}"`;
@@ -160,6 +186,7 @@ function lista(req, res) {
     filters,
     statusList: service.STATUS_COMPRAS,
     resumo: service.getAnalytics(filters.period),
+    lowerDashboard,
   });
 }
 
