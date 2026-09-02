@@ -68,7 +68,8 @@ test('PCM main view uses the new operational visual system', () => {
   assert.ok(view.includes("include('partials/internal-styles')"));
   assert.ok(sharedStyles.includes('/css/pcm-operational.css'));
   assert.ok(view.includes('Acima do SLA interno'));
-  assert.ok(view.includes('Análise para decisão humana'));
+  assert.ok(view.includes('Prioridades para decisão'));
+  assert.ok(view.includes('Recomendações não executam alterações automaticamente'));
   assert.ok(css.includes('.pcm-op-kpis'));
   assert.ok(css.includes('.pcm-op-btn:hover'));
 });
