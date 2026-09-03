@@ -12,6 +12,7 @@ router.post('/:id/status', requireLogin, requireRole(ACCESS.demandas_manage), ct
 router.post('/:id/aprovacao', requireLogin, requireRole(ACCESS.demandas_approve), ctrl.updateApproval);
 router.post('/:id/update', requireLogin, requireRole(ACCESS.demandas_manage), ctrl.addUpdate);
 router.post('/:id/materiais', requireLogin, requireRole(ACCESS.demandas_materials), ctrl.addMaterials);
+router.post('/:id/solicitacoes/:solicitacaoId/materiais', requireLogin, requireRole(ACCESS.demandas_materials), ctrl.appendMaterials);
 router.post('/:id/convert-to-os', requireLogin, requireRole(ACCESS.demandas_convert), ctrl.convertToOS);
 
 module.exports = router;
