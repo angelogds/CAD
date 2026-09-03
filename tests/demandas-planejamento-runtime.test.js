@@ -146,7 +146,8 @@ test('RBAC real separa consulta, planejamento, conversão e aprovação de deman
   const expected = {
     ADMIN: { view: true, open: true, manage: true, materials: true, convert: true, approve: true },
     DIRETORIA: { view: true, open: true, manage: true, materials: false, convert: false, approve: true },
-    GESTAO: { view: true, open: false, manage: true, materials: false, convert: false, approve: true },
+    // GESTAO participa da origem/aprovação da demanda, mas não altera o planejamento técnico.
+    GESTAO: { view: true, open: true, manage: false, materials: false, convert: false, approve: true },
     RH: { view: true, open: true, manage: false, materials: false, convert: false, approve: false },
     ENCARREGADO_PRODUCAO: { view: true, open: true, manage: false, materials: false, convert: false, approve: false },
     MANUTENCAO_SUPERVISOR: { view: true, open: true, manage: true, materials: true, convert: true, approve: false },
