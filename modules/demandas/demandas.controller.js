@@ -137,9 +137,26 @@ function addMaterials(req, res) {
   return res.redirect(`/demandas/${id}`);
 }
 
+function assertDemandApprovedForNewOS(demanda) {
+  if (!demanda) throw new Error('Demanda não encontrada.');
+
+  const hasLinkedOrder = Array.isArray(demanda.ordens) && demanda.ordens.length > 0;
+  if (hasLinkedOrder) return;
+
+  const approval = String(demanda.aprovacao_status || 'PENDENTE').trim().toUpperCase();
+  if (approval !== 'APROVADA') {
+    const error = new Error('A Demanda precisa ser aprovada pela Diretoria/Gestão antes de gerar uma Ordem de Serviço. A pré-cotação pode continuar normalmente enquanto aguarda aprovação.');
+    error.code = 'DEMANDA_AGUARDANDO_APROVACAO';
+    throw error;
+  }
+}
+
 async function convertToOS(req, res) {
   const id = Number(req.params.id);
   try {
+    const demanda = service.getById(id);
+    assertDemandApprovedForNewOS(demanda);
+
     const osId = await service.convertToOS(id, req.session?.user?.id || null);
     req.flash('success', `Demanda vinculada à OS #${osId}. As solicitações existentes foram reaproveitadas sem duplicação.`);
     return res.redirect(`/os/${osId}`);
@@ -158,5 +175,6 @@ module.exports = {
   updateApproval,
   addUpdate,
   addMaterials,
+  assertDemandApprovedForNewOS,
   convertToOS,
 };
