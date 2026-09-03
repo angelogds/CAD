@@ -115,3 +115,27 @@ test('RBAC separa visualização materiais conversão e aprovação de demandas'
   assert.match(rbac, /ROLE\.ENCARREGADO_PRODUCAO/);
   assert.match(rbac, /ROLE\.RH/);
 });
+
+test('todos os perfis com demandas_view compartilham a mesma lista global de demandas', () => {
+  const service = read('modules/demandas/demandas.service.js');
+  const rbac = read('config/rbac.js');
+
+  assert.match(service, /canAccessModule\(role, 'demandas_view'\)/);
+  assert.match(service, /return \{ sql: '1=1', params: \{\} \}/);
+  assert.doesNotMatch(service, /VISIBILIDADE_AMPLA/);
+  assert.doesNotMatch(service, /created_by = @uid/);
+  assert.match(service, /O RH pode registrar demandas somente de NR, Segurança ou Auditoria/);
+
+  for (const role of [
+    'ROLE.ADMIN',
+    'ROLE.DIRETORIA',
+    'ROLE.GESTAO',
+    'ROLE.RH',
+    'ROLE.ENCARREGADO_PRODUCAO',
+    'ROLE.MANUTENCAO_SUPERVISOR',
+    'ROLE.ENCARREGADO_MANUTENCAO',
+    'ROLE.COMPRAS',
+  ]) {
+    assert.match(rbac, new RegExp(role.replace('.', '\\.')));
+  }
+});
