@@ -1,18 +1,72 @@
 <%- layout('layout') -%>
-<div class="page-head"><div><h1>Escala Completa</h1><p style="color:#64748b;font-weight:700;">Visualizar, editar e recalcular a escala antes da impressão.</p></div><div style="display:flex;gap:8px"><a class="btn btn-primary" href="/escala/folgas-sabado">Folgas e Plantão de Sábado</a><a class="btn" href="/escala">Voltar</a></div></div>
-<% if (canManageEscala) { %><div class="card" style="margin-top:12px;"><h3>Editar Escala Completa</h3><div style="display:flex;gap:10px;flex-wrap:wrap;"><a class="btn btn-primary" href="/escala/rodizio">Editar Rodízio da Escala</a><form method="POST" action="/escala/rodizio/recalcular" onsubmit="return confirm('Existem semanas com ajustes manuais. Deseja manter esses ajustes? Clique OK para manter; marque sobrescrever para apagar ajustes.');" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><input type="hidden" name="config_id" value="<%= rodizioAtivo?.id || '' %>"><label><input type="checkbox" name="sobrescreverTudo" value="1"> Sobrescrever tudo</label><button class="btn btn-green">Recalcular pelo Rodízio</button></form></div><p class="muted">Por padrão o recálculo mantém semanas com ajuste_manual = 1.</p></div><% } %>
-<div class="escala-card-grid" style="margin-top:12px;">
-  <% if (!semanas || semanas.length === 0) { %><div class="escala-empty" style="grid-column:1/-1;">Nenhuma semana encontrada.</div><% } %>
-  <% (semanas || []).forEach(s => { %>
-    <article class="card-padrao-escala">
-      <div class="card-padrao-header"><div><h3 class="card-padrao-title">Semana #<%= s.semana_numero %></h3><div class="card-padrao-subtitle"><%= s.data_inicio %> → <%= s.data_fim %></div></div><span class="card-padrao-badge <%= s.ajuste_manual?'is-warning':'is-info' %>"><%= s.ajuste_manual?'Ajuste manual':'Escala Completa' %></span></div>
-      <div class="card-padrao-body">
-        <div class="card-padrao-row"><span class="label-text">Período</span><span class="value-text"><%= s.data_inicio %> → <%= s.data_fim %></span></div>
-        <div class="card-padrao-row"><span class="label-text">Plantonista<%= (s.times.noturno || []).length > 1 ? 's' : '' %> da noite</span><span class="value-text"><%= (s.times.noturno || []).join(' e ') || '-' %></span></div>
-        <div class="card-padrao-row"><span class="label-text">Turno diurno</span><span class="value-text"><%= (s.times.diurno || []).join(', ') || '-' %></span></div>
-        <div class="card-padrao-row"><span class="label-text">Observação</span><span class="value-text"><%= s.ajuste_manual ? 'Semana ajustada manualmente pelo encarregado.' : (s.observacao || 'Todos como Mecânico Industrial') %></span></div>
-      </div>
-      <% if (canManageEscala) { %><div class="card-padrao-footer"><a class="btn btn-sm btn-green" href="/escala/editar/<%= s.id %>">Editar Semana</a><a class="btn btn-sm" href="/escala/editar/<%= s.id %>">Ajustar Colaboradores</a></div><% } %>
-    </article>
-  <% }) %>
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
+<%
+  const lista = semanas || [];
+  const manuais = lista.filter(s => Number(s.ajuste_manual || 0) === 1).length;
+%>
+<div class="escala-page">
+  <header class="escala-head">
+    <div><h1>Escala Completa</h1><p>Visão por período para conferência, ajustes e impressão da programação da equipe.</p></div>
+    <div class="escala-actions"><a class="btn" href="/escala/folgas-sabado">Folgas e Plantão de Sábado</a><a class="btn" href="/escala">← Voltar</a></div>
+  </header>
+
+  <nav class="escala-tabs">
+    <a class="escala-tab" href="/escala">Painel da Equipe</a>
+    <a class="escala-tab" href="/escala/semana">Escala da Semana</a>
+    <a class="escala-tab is-active" href="/escala/completa">Escala Completa</a>
+    <a class="escala-tab" href="/escala/ausencias">Folgas / Afastamentos</a>
+    <a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a>
+    <a class="escala-tab" href="/escala/relatorios">Relatórios</a>
+  </nav>
+
+  <section class="escala-kpis">
+    <div class="escala-kpi"><span>Semanas listadas</span><strong><%= lista.length %></strong><small>No período selecionado</small></div>
+    <div class="escala-kpi"><span>Ajustes manuais</span><strong><%= manuais %></strong><small>Semanas preservadas no recálculo</small></div>
+    <div class="escala-kpi"><span>Automáticas</span><strong><%= Math.max(0, lista.length - manuais) %></strong><small>Geradas pelo rodízio</small></div>
+    <div class="escala-kpi"><span>Início</span><strong style="font-size:1.1rem"><%= filtros?.dataInicio || '-' %></strong><small>Data inicial</small></div>
+    <div class="escala-kpi"><span>Fim</span><strong style="font-size:1.1rem"><%= filtros?.dataFim || '-' %></strong><small>Data final</small></div>
+  </section>
+
+  <section class="escala-section">
+    <div class="escala-section-head"><div><h2>Filtrar período</h2><p>Consulte apenas o intervalo necessário para facilitar a conferência.</p></div></div>
+    <form method="GET" action="/escala/completa" class="escala-toolbar">
+      <label class="escala-field"><span class="label">Data inicial</span><input class="input" type="date" name="data_inicio" value="<%= filtros?.dataInicio || '' %>"></label>
+      <label class="escala-field"><span class="label">Data final</span><input class="input" type="date" name="data_fim" value="<%= filtros?.dataFim || '' %>"></label>
+      <button class="btn btn-green" type="submit">Aplicar filtro</button>
+      <a class="btn" href="/escala/completa">Limpar</a>
+    </form>
+  </section>
+
+  <% if (canManageEscala) { %>
+  <section class="escala-section">
+    <div class="escala-section-head"><div><h2>Gestão do rodízio</h2><p>Altere somente quando necessário; ajustes manuais continuam preservados por padrão.</p></div><a class="btn btn-green" href="/escala/rodizio">Editar Rodízio</a></div>
+    <form method="POST" action="/escala/rodizio/recalcular" class="escala-actionbar" onsubmit="return confirm('Recalcular a escala com base no rodízio atual?');">
+      <input type="hidden" name="config_id" value="<%= rodizioAtivo?.id || '' %>">
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="sobrescreverTudo" value="1"> Sobrescrever também as semanas com ajuste manual</label>
+      <button class="btn btn-green" type="submit">Recalcular pelo Rodízio</button>
+    </form>
+  </section>
+  <% } %>
+
+  <section class="escala-section">
+    <div class="escala-section-head"><div><h2>Semanas programadas</h2><p>Resumo operacional por semana.</p></div></div>
+    <div class="escala-team-grid">
+      <% if (!lista.length) { %><div class="escala-empty">Nenhuma semana encontrada para o período informado.</div><% } %>
+      <% lista.forEach(s => { %>
+        <article class="escala-person">
+          <div class="escala-person-head">
+            <div class="escala-avatar"><%= String(s.semana_numero || 'S').slice(-2) %></div>
+            <div class="escala-person-name"><strong>Semana #<%= s.semana_numero %></strong><small><%= s.data_inicio %> → <%= s.data_fim %></small></div>
+            <span class="escala-status <%= s.ajuste_manual ? 'is-atestado' : '' %>"><%= s.ajuste_manual ? 'Ajuste manual' : 'Rodízio' %></span>
+          </div>
+          <div class="escala-person-meta">
+            <div class="escala-meta"><span>Plantão / noite</span><strong><%= (s.times?.noturno || []).join(' e ') || '-' %></strong></div>
+            <div class="escala-meta"><span>Turno dia</span><strong><%= (s.times?.diurno || []).join(', ') || '-' %></strong></div>
+          </div>
+          <div class="muted" style="margin-top:10px"><strong>Observação:</strong> <%= s.ajuste_manual ? 'Semana ajustada manualmente pelo encarregado.' : (s.observacao || 'Todos como Mecânico Industrial') %></div>
+          <% if (canManageEscala) { %><div class="escala-person-foot"><a class="btn btn-sm btn-green" href="/escala/editar/<%= s.id %>">Editar Semana</a></div><% } %>
+        </article>
+      <% }) %>
+    </div>
+  </section>
 </div>

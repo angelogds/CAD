@@ -1,19 +1,39 @@
 <%- layout('layout') -%>
-<h1>Editar Semana <%= semana.semana_numero %></h1>
-<p style="color:#64748b;font-weight:800;">Período: <%= semana.data_inicio %> até <%= semana.data_fim %> <% if(semana.ajuste_manual){ %>• Ajuste manual<% } %></p>
-<div class="card" style="margin-top:12px;">
-  <form method="POST" action="/escala/editar/<%= semana.id %>" style="display:grid;gap:12px;">
-    <input type="hidden" name="modo" value="semana">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;"><div><div class="label">Início</div><input class="input" type="date" name="data_inicio" value="<%= semana.data_inicio %>"></div><div><div class="label">Fim</div><input class="input" type="date" name="data_fim" value="<%= semana.data_fim %>"></div><div><div class="label">Status</div><input class="input" name="status" value="<%= semana.status || 'ATIVA' %>"></div></div>
-    <% const noturnosAtuais = (semana.alocacoes||[]).filter(a=>a.tipo_turno==='noturno').map(a=>Number(a.colaborador_id)); %>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
-      <div><div class="label">Plantonista Noite 1</div><select class="input" name="noturnos"><option value="">Sem noturno</option><% colaboradores.forEach(c=>{ const sel=Number(noturnosAtuais[0]||0)===Number(c.id); %><option value="<%= c.id %>" <%= sel?'selected':'' %>><%= c.nome %></option><% }) %></select></div>
-      <div><div class="label">Plantonista Noite 2</div><select class="input" name="noturnos"><option value="">Sem noturno</option><% colaboradores.forEach(c=>{ const sel=Number(noturnosAtuais[1]||0)===Number(c.id); %><option value="<%= c.id %>" <%= sel?'selected':'' %>><%= c.nome %></option><% }) %></select></div>
-    </div>
-    <div><div class="label">Mecânicos diurnos</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;"><% colaboradores.forEach(c=>{ const checked=(semana.alocacoes||[]).some(a=>(a.tipo_turno==='diurno'||a.tipo_turno==='apoio')&&Number(a.colaborador_id)===Number(c.id)); %><label class="card" style="padding:10px;"><input type="checkbox" name="diurnos" value="<%= c.id %>" <%= checked?'checked':'' %>> <%= c.nome %></label><% }) %></div></div>
-    <div><div class="label">Observação / função</div><textarea class="input" name="observacao" rows="3"><%= semana.observacao || '' %></textarea></div>
-    <button class="btn btn-green">Salvar como ajuste manual</button>
-  </form>
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
+<%
+  const alocacoes = semana?.alocacoes || [];
+  const noturnosAtuais = alocacoes.filter(a=>a.tipo_turno==='noturno').map(a=>Number(a.colaborador_id));
+  const diurnosAtuais = new Set(alocacoes.filter(a=>a.tipo_turno==='diurno'||a.tipo_turno==='apoio').map(a=>Number(a.colaborador_id)));
+%>
+<div class="escala-page">
+  <header class="escala-head">
+    <div><h1>Editar Semana <%= semana.semana_numero %></h1><p>Período <%= semana.data_inicio %> até <%= semana.data_fim %>. Ajustes feitos nesta tela continuam marcados como manuais.</p></div>
+    <div class="escala-actions"><a class="btn" href="/escala/completa">← Voltar</a><a class="btn" href="/escala/pdf/semana/<%= semana.id %>">PDF da Semana</a></div>
+  </header>
+
+  <nav class="escala-tabs"><a class="escala-tab" href="/escala">Painel da Equipe</a><a class="escala-tab" href="/escala/semana">Escala da Semana</a><a class="escala-tab is-active" href="/escala/completa">Escala Completa</a><a class="escala-tab" href="/escala/rodizio">Rodízio</a></nav>
+
+  <% if (semana.ajuste_manual) { %><div class="escala-notice is-warning">Esta semana possui ajuste manual. O recálculo do rodízio continuará preservando-a, salvo quando a opção de sobrescrever ajustes manuais for usada.</div><% } %>
+
+  <section class="escala-section">
+    <div class="escala-section-head"><div><h2>Configuração da semana</h2><p>Defina período, situação e composição dos turnos sem alterar o histórico das demais semanas.</p></div></div>
+    <form method="POST" action="/escala/editar/<%= semana.id %>" class="escala-form-grid">
+      <input type="hidden" name="modo" value="semana">
+      <label class="escala-field"><span class="label">Início</span><input class="input" type="date" name="data_inicio" value="<%= semana.data_inicio %>"></label>
+      <label class="escala-field"><span class="label">Fim</span><input class="input" type="date" name="data_fim" value="<%= semana.data_fim %>"></label>
+      <label class="escala-field full"><span class="label">Status</span><input class="input" name="status" value="<%= semana.status || 'ATIVA' %>"></label>
+
+      <div class="escala-field full"><span class="label">Plantão noturno</span><div class="escala-choice-grid">
+        <label class="escala-choice"><strong>Plantonista Noite 1</strong><select class="input" name="noturnos" style="margin-top:8px"><option value="">Sem noturno</option><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>" <%= Number(noturnosAtuais[0]||0)===Number(c.id)?'selected':'' %>><%= c.nome %></option><% }) %></select></label>
+        <label class="escala-choice"><strong>Plantonista Noite 2</strong><select class="input" name="noturnos" style="margin-top:8px"><option value="">Sem noturno</option><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>" <%= Number(noturnosAtuais[1]||0)===Number(c.id)?'selected':'' %>><%= c.nome %></option><% }) %></select></label>
+      </div></div>
+
+      <div class="escala-field full"><span class="label">Mecânicos do turno diurno</span><div class="escala-team-grid"><% colaboradores.forEach(c=>{ %><label class="escala-choice" style="display:flex;align-items:center;gap:9px"><input type="checkbox" name="diurnos" value="<%= c.id %>" <%= diurnosAtuais.has(Number(c.id))?'checked':'' %>><span><strong><%= c.nome %></strong><small><%= c.funcaoLabel || c.funcao || 'Mecânico Industrial' %></small></span></label><% }) %></div></div>
+
+      <label class="escala-field full"><span class="label">Observação / função</span><textarea class="input" name="observacao" rows="4"><%= semana.observacao || '' %></textarea></label>
+      <div class="escala-field full"><div class="escala-actionbar"><span class="muted">A alteração fica registrada como ajuste manual desta semana.</span><button class="btn btn-green" type="submit">Salvar como ajuste manual</button></div></div>
+    </form>
+  </section>
+
+  <section class="escala-section"><div class="escala-section-head"><div><h2>Alocações atuais</h2><p>Conferência rápida antes de salvar alterações.</p></div></div><div class="escala-team-grid"><% if(!alocacoes.length){ %><div class="escala-empty">Nenhuma alocação atual.</div><% } %><% alocacoes.forEach(a=>{ %><article class="escala-person"><div class="escala-person-head"><div class="escala-avatar"><%= String(a.nome||'M').charAt(0).toUpperCase() %></div><div class="escala-person-name"><strong><%= a.nome %></strong><small><%= a.funcaoLabel || a.funcao || 'Mecânico Industrial' %></small></div><span class="escala-status"><%= String(a.tipo_turno||'').replaceAll('_',' ') %></span></div></article><% }) %></div></section>
 </div>
-<div class="card" style="margin-top:12px;"><h3>Alocações atuais</h3><% (semana.alocacoes||[]).forEach(a=>{ %><p><strong><%= a.nome %></strong> — <%= a.tipo_turno %></p><% }) %></div>
-<div style="margin-top:12px;display:flex;gap:10px;"><a class="btn" href="/escala/completa">Voltar</a><a class="btn btn-primary" href="/escala/pdf/semana/<%= semana.id %>">PDF da Semana</a></div>

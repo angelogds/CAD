@@ -1,7 +1,40 @@
 <%- layout('layout') -%>
-<div class="page-head"><div><h1>Folgas e Plantão de Sábado</h1><p class="muted">Folga compensatória da sexta e cobertura mínima de dois mecânicos no sábado.</p></div><a class="btn" href="/escala/completa">Voltar</a></div>
-<div class="card" style="margin-top:12px;overflow:auto"><table class="table"><thead><tr><th>Semana</th><th>Sexta-feira</th><th>Colaborador de folga</th><th>Motivo</th><th>Sábado</th><th>Colaborador fixo</th><th>Parceiro de Diogo</th><th>Situação</th><th>Observação / responsável</th><% if(canManageEscala){ %><th>Ajustar</th><% } %></tr></thead><tbody>
-<% if(!registros.length){ %><tr><td colspan="10">Nenhuma cobertura gerada. Recalcule o rodízio a partir de 20/07/2026.</td></tr><% } %>
-<% registros.forEach(r=>{ const equipeFixa=r.substituto_diogo||r.colaborador_fixo; %><tr><td>#<%= r.semana_numero %><br><small><%= r.data_inicio %> a <%= r.data_fim %></small></td><td><%= r.data_sexta %></td><td><%= r.colaborador_folga %></td><td><%= r.motivo_folga %></td><td><%= r.data_sabado %></td><td><%= equipeFixa %></td><td><%= r.parceiro_diogo %></td><td><%= r.situacao %></td><td><%= r.observacao||'-' %><br><small><%= r.responsavel %></small></td>
-<% if(canManageEscala){ %><td><details><summary class="btn btn-sm">Editar</summary><form method="POST" action="/escala/folgas-sabado/<%= r.semana_id %>" style="display:grid;gap:6px;min-width:260px;margin-top:8px"><label>Folga na sexta<select class="input" name="colaborador_folga_id" required><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>" <%= Number(c.id)===Number(r.colaborador_folga_id)?'selected':'' %>><%= c.nome %></option><% }) %></select></label><label>Motivo<select class="input" name="motivo_folga"><option value="PLANTAO_NOTURNO">Compensação do plantão noturno</option><option value="TRABALHO_FIM_SEMANA">Trabalho no final de semana</option><option value="BANCO_HORAS">Banco de horas</option><option value="HORAS_EXTRAS">Horas extras</option><option value="AUTORIZADA_ENCARREGADO">Autorizada pelo encarregado</option><option value="OUTRO">Outro</option></select></label><label>Parceiro de Diogo<select class="input" name="parceiro_diogo_id" required><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>" <%= Number(c.id)===Number(r.parceiro_diogo_id)?'selected':'' %>><%= c.nome %></option><% }) %></select></label><label><input type="checkbox" name="diogo_folga" value="1"> Diogo terá folga</label><label>Substituto<select class="input" name="substituto_diogo_id"><option value="">Selecione</option><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>"><%= c.nome %></option><% }) %></select></label><label>Justificativa<textarea class="input" name="justificativa"></textarea></label><label>Observação<input class="input" name="observacao" value="<%= r.observacao||'' %>"></label><label><input type="checkbox" name="alterar_sequencia" value="1"> Recalcular sequência futura</label><button class="btn btn-primary">Salvar ajuste</button></form></details></td><% } %></tr><% }) %>
-</tbody></table></div>
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
+<% const lista = Array.isArray(registros) ? registros : []; const ajustaveis = lista.filter(r=>r.semana_id).length; %>
+<div class="escala-page">
+  <header class="escala-head">
+    <div><h1>Folgas e Plantão de Sábado</h1><p>Controle da folga compensatória da sexta-feira e da cobertura mínima prevista para o sábado.</p></div>
+    <div class="escala-actions"><a class="btn" href="/escala/completa">← Voltar</a></div>
+  </header>
+
+  <nav class="escala-tabs"><a class="escala-tab" href="/escala">Painel da Equipe</a><a class="escala-tab" href="/escala/semana">Escala da Semana</a><a class="escala-tab is-active" href="/escala/folgas-sabado">Folgas / Sábado</a><a class="escala-tab" href="/escala/rodizio">Rodízio</a><a class="escala-tab" href="/escala/ausencias">Ausências</a></nav>
+
+  <div class="escala-notice">A programação de sábado deve manter a cobertura operacional necessária sem apagar o histórico de folgas ou ajustes já registrados. Alterações continuam restritas à gestão da Manutenção.</div>
+
+  <section class="escala-kpis">
+    <div class="escala-kpi"><span>Semanas</span><strong><%= lista.length %></strong><small>Registros de cobertura</small></div>
+    <div class="escala-kpi"><span>Ajustáveis</span><strong><%= ajustaveis %></strong><small>Semanas com referência válida</small></div>
+    <div class="escala-kpi"><span>Folgas sexta</span><strong><%= lista.filter(r=>r.colaborador_folga).length %></strong><small>Compensações previstas</small></div>
+    <div class="escala-kpi"><span>Cobertura sábado</span><strong><%= lista.filter(r=>r.parceiro_diogo || r.substituto_diogo || r.colaborador_fixo).length %></strong><small>Semanas com equipe definida</small></div>
+  </section>
+
+  <section class="escala-section">
+    <div class="escala-section-head"><div><h2>Programação por semana</h2><p>Folga da sexta-feira, composição do sábado, situação e responsável pelo ajuste.</p></div></div>
+    <div class="escala-table-wrap"><table class="escala-table"><thead><tr><th>Semana</th><th>Sexta-feira</th><th>Colaborador de folga</th><th>Motivo</th><th>Sábado</th><th>Colaborador fixo</th><th>Parceiro de Diogo</th><th>Situação</th><th>Observação / responsável</th><% if(canManageEscala){ %><th>Ajustar</th><% } %></tr></thead><tbody>
+      <% if(!lista.length){ %><tr><td colspan="<%= canManageEscala ? 10 : 9 %>"><div class="escala-empty">Nenhuma cobertura gerada. Recalcule o rodízio a partir do período configurado.</div></td></tr><% } %>
+      <% lista.forEach(r=>{ const equipeFixa=r.substituto_diogo||r.colaborador_fixo; %><tr><td><strong>#<%= r.semana_numero %></strong><br><small><%= r.data_inicio %> a <%= r.data_fim %></small></td><td><%= r.data_sexta %></td><td><%= r.colaborador_folga || '-' %></td><td><%= String(r.motivo_folga||'-').replaceAll('_',' ') %></td><td><%= r.data_sabado %></td><td><%= equipeFixa || '-' %></td><td><%= r.parceiro_diogo || '-' %></td><td><span class="escala-status <%= /PEND|AJUST/i.test(String(r.situacao||''))?'is-atestado':'' %>"><%= r.situacao || '-' %></span></td><td><%= r.observacao||'-' %><br><small><%= r.responsavel || '' %></small></td>
+        <% if(canManageEscala){ %><td><details><summary class="btn btn-sm">Editar</summary><form method="POST" action="/escala/folgas-sabado/<%= r.semana_id %>" class="escala-form-grid" style="min-width:360px;margin-top:10px">
+          <label class="escala-field"><span class="label">Folga na sexta</span><select class="input" name="colaborador_folga_id" required><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>" <%= Number(c.id)===Number(r.colaborador_folga_id)?'selected':'' %>><%= c.nome %></option><% }) %></select></label>
+          <label class="escala-field"><span class="label">Motivo</span><select class="input" name="motivo_folga"><option value="PLANTAO_NOTURNO">Compensação do plantão noturno</option><option value="TRABALHO_FIM_SEMANA">Trabalho no final de semana</option><option value="BANCO_HORAS">Banco de horas</option><option value="HORAS_EXTRAS">Horas extras</option><option value="AUTORIZADA_ENCARREGADO">Autorizada pelo encarregado</option><option value="OUTRO">Outro</option></select></label>
+          <label class="escala-field"><span class="label">Parceiro de Diogo</span><select class="input" name="parceiro_diogo_id" required><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>" <%= Number(c.id)===Number(r.parceiro_diogo_id)?'selected':'' %>><%= c.nome %></option><% }) %></select></label>
+          <label class="escala-field"><span class="label">Substituto</span><select class="input" name="substituto_diogo_id"><option value="">Selecione</option><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>"><%= c.nome %></option><% }) %></select></label>
+          <label class="escala-field full" style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="diogo_folga" value="1"> <span>Diogo terá folga nesta programação</span></label>
+          <label class="escala-field full"><span class="label">Justificativa</span><textarea class="input" name="justificativa" rows="3"></textarea></label>
+          <label class="escala-field full"><span class="label">Observação</span><input class="input" name="observacao" value="<%= r.observacao||'' %>"></label>
+          <label class="escala-field full" style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="alterar_sequencia" value="1"> <span>Recalcular sequência futura após este ajuste</span></label>
+          <div class="escala-field full"><button class="btn btn-green" type="submit">Salvar ajuste</button></div>
+        </form></details></td><% } %>
+      </tr><% }) %>
+    </tbody></table></div>
+  </section>
+</div>

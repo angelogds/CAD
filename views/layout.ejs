@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/css/ui-maintenance-shell-2026.css" />
   <link rel="stylesheet" href="/css/ui-shell-modern-2026.css?v=20260819-shell-01" />
+  <% if (typeof activeMenu !== 'undefined' && activeMenu === 'escala') { %><link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b" /><% } %>
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><link rel="stylesheet" href="/css/compras-demandas-pre-cotacao.css?v=20260902-v1" /><% } %>
   <script>window.__VAPID_PUBLIC_KEY__ = "<%= VAPID_PUBLIC_KEY || "" %>";</script>
 </head>
