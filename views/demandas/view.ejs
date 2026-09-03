@@ -1,13 +1,13 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/demandas.css">
-<link rel="stylesheet" href="/css/demandas-planejamento.css?v=20260902-v1">
+<link rel="stylesheet" href="/css/demandas-planejamento.css?v=20260903-v2">
 <%
   const statusLabel = value => ({
     NOVA: 'Nova', EM_ANALISE: 'Em análise', PLANEJAMENTO: 'Planejamento',
     AGUARDANDO_APROVACAO: 'Aguardando aprovação', EM_ANDAMENTO: 'Em andamento',
     PARADA: 'Parada', CONCLUIDA: 'Concluída', CANCELADA: 'Cancelada'
-  }[value] || value);
-  const priorityLabel = value => ({ BAIXA: 'Baixa', NORMAL: 'Média', ALTA: 'Alta', URGENTE: 'Crítica' }[value] || value);
+  }[value] || value || 'Não informado');
+  const priorityLabel = value => ({ BAIXA: 'Baixa', NORMAL: 'Média', ALTA: 'Alta', URGENTE: 'Crítica' }[value] || value || 'Média');
   const categoryLabel = value => ({
     MANUTENCAO: 'Manutenção', PRODUCAO: 'Produção', NR: 'NR', SEGURANCA: 'Segurança',
     AUDITORIA: 'Auditoria', MELHORIA: 'Melhoria', PROJETO: 'Projeto', DIRETORIA: 'Diretoria'
@@ -15,6 +15,7 @@
   const approvalLabel = value => ({ PENDENTE: 'Pendente', APROVADA: 'Aprovada', REPROVADA: 'Reprovada' }[value] || value || 'Pendente');
   const slug = value => String(value || '').toLowerCase().replace(/_/g, '-');
   const isFinished = ['CONCLUIDA', 'CANCELADA'].includes(demanda.status);
+  const canOpen = canAccessModule(normalizeRole(user?.role), 'demandas_open');
   const canManage = canAccessModule(normalizeRole(user?.role), 'demandas_manage');
   const canMaterials = canAccessModule(normalizeRole(user?.role), 'demandas_materials');
   const canConvert = canAccessModule(normalizeRole(user?.role), 'demandas_convert');
@@ -31,10 +32,11 @@
   const linkedOrders = Array.isArray(demanda.ordens) ? demanda.ordens : [];
   const children = Array.isArray(demanda.subdemandas) ? demanda.subdemandas : [];
   const money = value => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const approvalReady = String(demanda.aprovacao_status || 'PENDENTE').toUpperCase() === 'APROVADA';
 %>
 
 <div class="demand-page demand-detail-page">
-  <header class="demand-detail-head">
+  <header class="demand-detail-head demand-detail-head-compact">
     <div>
       <a class="demand-back-link" href="/demandas">← Voltar para demandas</a>
       <div class="detail-title-line">
@@ -43,163 +45,253 @@
         <span class="demand-badge priority-<%= slug(demanda.prioridade) %>"><%= priorityLabel(demanda.prioridade) %></span>
       </div>
       <p><%= demanda.titulo %></p>
-      <% if (demanda.demanda_pai_id) { %><a class="planning-parent-link" href="/demandas/<%= demanda.demanda_pai_id %>">↳ Subdemanda de #<%= demanda.demanda_pai_id %> — <%= demanda.demanda_pai_titulo || 'demanda principal' %></a><% } %>
+      <% if (demanda.demanda_pai_id) { %>
+        <a class="planning-parent-link" href="/demandas/<%= demanda.demanda_pai_id %>">↳ Subdemanda de #<%= demanda.demanda_pai_id %> — <%= demanda.demanda_pai_titulo || 'demanda principal' %></a>
+      <% } %>
     </div>
     <div class="detail-head-actions planning-head-actions">
-      <% if (!isFinished && canAccessModule(normalizeRole(user?.role), 'demandas_open')) { %>
-        <a class="demand-btn demand-btn-secondary" href="/demandas/new?parent_id=<%= demanda.id %>">+ Subdemanda</a>
-      <% } %>
-      <% if (canConvert && !isFinished) { %>
-        <form method="POST" action="/demandas/<%= demanda.id %>/convert-to-os" onsubmit="return confirm('Converter esta demanda em Ordem de Serviço? As solicitações de materiais já criadas serão vinculadas à nova OS sem duplicação.')">
-          <button class="demand-btn demand-btn-primary" type="submit"><%= linkedOrders.length ? 'Abrir OS vinculada' : 'Converter em OS' %></button>
+      <% if (!isFinished && canOpen) { %><a class="demand-btn demand-btn-secondary" href="/demandas/new?parent_id=<%= demanda.id %>">+ Subdemanda</a><% } %>
+      <% if (linkedOrders.length) { %>
+        <a class="demand-btn demand-btn-primary" href="/os/<%= linkedOrders[0].id %>">Abrir OS #<%= linkedOrders[0].id %></a>
+      <% } else if (canConvert && !isFinished && approvalReady) { %>
+        <form method="POST" action="/demandas/<%= demanda.id %>/convert-to-os" onsubmit="return confirm('Gerar a Ordem de Serviço desta demanda? As solicitações de materiais existentes serão reaproveitadas sem duplicação.')">
+          <button class="demand-btn demand-btn-primary" type="submit">Gerar OS</button>
         </form>
+      <% } else if (canConvert && !isFinished) { %>
+        <button class="demand-btn demand-btn-muted" type="button" disabled title="A demanda precisa ser aprovada antes de gerar a OS.">Aguardando aprovação</button>
       <% } %>
     </div>
   </header>
 
-  <section class="demand-progress demand-progress-four" aria-label="Andamento da demanda">
-    <div class="progress-step done"><span>1</span><div><strong>Registrada</strong><small><%= fmtBR(demanda.created_at) %></small></div></div>
-    <i class="<%= ['PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA'].includes(demanda.status) ? 'done' : '' %>"></i>
-    <div class="progress-step <%= ['PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA'].includes(demanda.status) ? 'done' : '' %>"><span>2</span><div><strong>Planejamento</strong><small><%= materialRequests.length ? materialRequests.length + ' solicitação(ões) de material' : 'Materiais ainda não planejados' %></small></div></div>
-    <i class="<%= linkedOrders.length || demanda.started_at || isFinished ? 'done' : '' %>"></i>
-    <div class="progress-step <%= linkedOrders.length || demanda.started_at || isFinished ? 'done' : '' %>"><span>3</span><div><strong>Execução / OS</strong><small><%= linkedOrders.length ? linkedOrders.length + ' OS vinculada(s)' : 'Aguardando liberação' %></small></div></div>
-    <i class="<%= demanda.finished_at ? 'done' : '' %>"></i>
-    <div class="progress-step <%= demanda.finished_at ? 'done' : '' %>"><span>4</span><div><strong>Finalizada</strong><small><%= demanda.finished_at ? fmtBR(demanda.finished_at) : 'Aguardando conclusão' %></small></div></div>
-    <div class="progress-time"><small><%= isFinished ? 'Tempo total' : 'Tempo em aberto' %></small><strong><%= elapsed %></strong></div>
-  </section>
-
-  <section class="demand-detail-metrics planning-metrics">
+  <section class="demand-detail-metrics planning-metrics demand-summary-metrics">
     <article class="detail-metric metric-blue"><small>Status</small><strong><%= statusLabel(demanda.status) %></strong></article>
     <article class="detail-metric metric-orange"><small>Prioridade</small><strong><%= priorityLabel(demanda.prioridade) %></strong></article>
     <article class="detail-metric metric-green"><small>Responsável</small><strong><%= demanda.responsavel_nome || 'A definir' %></strong></article>
     <article class="detail-metric metric-slate"><small>Aprovação</small><strong><%= approvalLabel(demanda.aprovacao_status) %></strong></article>
   </section>
 
-  <section class="demand-card planning-context-card">
-    <div class="section-heading"><div><h2>Contexto do planejamento</h2><p>Origem, ativo e referências que acompanham a demanda até a execução.</p></div></div>
-    <div class="planning-context-grid">
-      <div><small>Categoria</small><strong><%= categoryLabel(demanda.categoria) %></strong></div>
-      <div><small>Setor de origem</small><strong><%= demanda.setor_origem || 'Não informado' %></strong></div>
-      <div><small>Equipamento</small><strong><%= demanda.equipamento_nome || 'Sem equipamento específico' %></strong></div>
-      <div><small>NR relacionada</small><strong><%= demanda.nr_referencia || 'Não se aplica' %></strong></div>
-      <div><small>Prazo previsto</small><strong><%= demanda.prazo_previsto ? fmtBR(demanda.prazo_previsto) : 'A definir' %></strong></div>
-      <div><small>Serviços estimados</small><strong><%= money(demanda.custo_servicos_estimado) %></strong></div>
-    </div>
-    <% if (canApprove && !isFinished) { %>
-      <form class="planning-approval-form" method="POST" action="/demandas/<%= demanda.id %>/aprovacao">
-        <label><span>Aprovação / priorização da Direção</span><select name="aprovacao_status"><% ['PENDENTE','APROVADA','REPROVADA'].forEach(st => { %><option value="<%= st %>" <%= String(demanda.aprovacao_status || 'PENDENTE') === st ? 'selected' : '' %>><%= approvalLabel(st) %></option><% }) %></select></label>
-        <button class="demand-btn demand-btn-secondary" type="submit">Salvar aprovação</button>
-      </form>
-    <% } %>
-  </section>
+  <nav class="demand-workspace-tabs" aria-label="Áreas da demanda" data-demand-tabs>
+    <button type="button" data-tab="resumo" class="active">Resumo</button>
+    <button type="button" data-tab="planejamento">Planejamento</button>
+    <button type="button" data-tab="materiais">Materiais <span><%= materialRequests.length %></span></button>
+    <button type="button" data-tab="subdemandas">Subdemandas <span><%= children.length %></span></button>
+    <button type="button" data-tab="os">OS vinculadas <span><%= linkedOrders.length %></span></button>
+    <button type="button" data-tab="historico">Histórico <span><%= demanda.logs?.length || 0 %></span></button>
+  </nav>
 
-  <div class="demand-detail-grid">
-    <section class="demand-card demand-description-card">
-      <div class="section-heading"><div><h2>Descrição da demanda</h2><p>Escopo informado no registro inicial.</p></div></div>
-      <div class="demand-description"><%= demanda.descricao || 'Nenhuma descrição informada.' %></div>
-      <% if (demanda.ultima_atualizacao) { %>
-        <div class="latest-update"><span>Última atualização</span><p><%= demanda.ultima_atualizacao %></p></div>
+  <div class="demand-workspace">
+    <section class="demand-workspace-panel" data-panel="resumo">
+      <section class="demand-card demand-overview-card">
+        <div class="section-heading">
+          <div><h2>Visão rápida</h2><p>Informações essenciais para decidir, planejar e acompanhar sem excesso de campos na tela.</p></div>
+          <span class="section-total"><%= elapsed %> em aberto</span>
+        </div>
+        <div class="demand-overview-grid">
+          <div><small>Categoria</small><strong><%= categoryLabel(demanda.categoria) %></strong></div>
+          <div><small>Setor</small><strong><%= demanda.setor_origem || 'Não informado' %></strong></div>
+          <div><small>Equipamento</small><strong><%= demanda.equipamento_nome || 'Sem equipamento específico' %></strong></div>
+          <div><small>Prazo</small><strong><%= demanda.prazo_previsto ? fmtBR(demanda.prazo_previsto) : 'A definir' %></strong></div>
+        </div>
+      </section>
+
+      <div class="demand-detail-grid demand-detail-grid-clean">
+        <section class="demand-card demand-description-card">
+          <div class="section-heading"><div><h2>Descrição da demanda</h2><p>Escopo registrado para execução futura.</p></div></div>
+          <div class="demand-description"><%= demanda.descricao || 'Nenhuma descrição informada.' %></div>
+          <% if (demanda.ultima_atualizacao) { %><div class="latest-update"><span>Última atualização</span><p><%= demanda.ultima_atualizacao %></p></div><% } %>
+        </section>
+
+        <section class="demand-card demand-control-card">
+          <div class="section-heading"><div><h2>Controle rápido</h2><p>Atualize apenas o necessário para manter a fila organizada.</p></div></div>
+          <% if (canManage) { %>
+            <form method="POST" action="/demandas/<%= demanda.id %>/status" class="demand-control-form">
+              <label><span>Status</span><select name="status"><% ['NOVA','EM_ANALISE','PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %><option value="<%= st %>" <%= demanda.status === st ? 'selected' : '' %>><%= statusLabel(st) %></option><% }) %></select></label>
+              <label><span>Responsável</span><select name="responsavel_user_id"><option value="">A definir</option><% (responsaveis || []).forEach(person => { %><option value="<%= person.id %>" <%= Number(demanda.responsavel_user_id || 0) === Number(person.id) ? 'selected' : '' %>><%= person.name %></option><% }) %></select></label>
+              <button class="demand-btn demand-btn-primary" type="submit">Salvar controle</button>
+            </form>
+          <% } else { %>
+            <div class="planning-empty">Consulta liberada. Alterações de controle ficam restritas aos perfis autorizados.</div>
+          <% } %>
+        </section>
+      </div>
+    </section>
+
+    <section class="demand-workspace-panel" data-panel="planejamento" hidden>
+      <div class="demand-section-title">
+        <div><h2>Planejamento</h2><p>Concentre contexto, aprovação e situação do serviço antes da execução.</p></div>
+      </div>
+
+      <section class="demand-card planning-context-card planning-context-card-clean">
+        <div class="planning-context-grid">
+          <div><small>Categoria</small><strong><%= categoryLabel(demanda.categoria) %></strong></div>
+          <div><small>Setor de origem</small><strong><%= demanda.setor_origem || 'Não informado' %></strong></div>
+          <div><small>Equipamento</small><strong><%= demanda.equipamento_nome || 'Sem equipamento específico' %></strong></div>
+          <div><small>NR relacionada</small><strong><%= demanda.nr_referencia || 'Não se aplica' %></strong></div>
+          <div><small>Prazo previsto</small><strong><%= demanda.prazo_previsto ? fmtBR(demanda.prazo_previsto) : 'A definir' %></strong></div>
+          <div><small>Serviços estimados</small><strong><%= money(demanda.custo_servicos_estimado) %></strong></div>
+        </div>
+        <% if (canApprove && !isFinished) { %>
+          <form class="planning-approval-form" method="POST" action="/demandas/<%= demanda.id %>/aprovacao">
+            <label><span>Aprovação / priorização</span><select name="aprovacao_status"><% ['PENDENTE','APROVADA','REPROVADA'].forEach(st => { %><option value="<%= st %>" <%= String(demanda.aprovacao_status || 'PENDENTE') === st ? 'selected' : '' %>><%= approvalLabel(st) %></option><% }) %></select></label>
+            <button class="demand-btn demand-btn-secondary" type="submit">Salvar aprovação</button>
+          </form>
+        <% } %>
+      </section>
+
+      <section class="demand-card demand-progress-card">
+        <div class="section-heading"><div><h2>Fluxo da demanda</h2><p>Da necessidade registrada até a conclusão do serviço.</p></div></div>
+        <div class="demand-progress demand-progress-four demand-progress-inline" aria-label="Andamento da demanda">
+          <div class="progress-step done"><span>1</span><div><strong>Registrada</strong><small><%= fmtBR(demanda.created_at) %></small></div></div>
+          <i class="<%= ['PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA'].includes(demanda.status) ? 'done' : '' %>"></i>
+          <div class="progress-step <%= ['PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA'].includes(demanda.status) ? 'done' : '' %>"><span>2</span><div><strong>Planejamento</strong><small><%= materialRequests.length ? materialRequests.length + ' solicitação(ões)' : 'Sem materiais' %></small></div></div>
+          <i class="<%= approvalReady || linkedOrders.length ? 'done' : '' %>"></i>
+          <div class="progress-step <%= approvalReady || linkedOrders.length ? 'done' : '' %>"><span>3</span><div><strong>Aprovação</strong><small><%= approvalLabel(demanda.aprovacao_status) %></small></div></div>
+          <i class="<%= linkedOrders.length || demanda.started_at || isFinished ? 'done' : '' %>"></i>
+          <div class="progress-step <%= linkedOrders.length || demanda.started_at || isFinished ? 'done' : '' %>"><span>4</span><div><strong>OS / execução</strong><small><%= linkedOrders.length ? linkedOrders.length + ' OS' : 'Aguardando' %></small></div></div>
+        </div>
+      </section>
+    </section>
+
+    <section class="demand-workspace-panel" data-panel="materiais" hidden>
+      <div class="demand-section-title demand-section-title-actions">
+        <div><h2>Materiais e pré-cotações</h2><p>Lista técnica enxuta, integrada a Solicitações e Compras sem duplicar cadastro.</p></div>
+        <% if (canMaterials && !isFinished) { %><button class="demand-btn demand-btn-primary" type="button" data-toggle-material-form>+ Planejar materiais</button><% } %>
+      </div>
+
+      <section class="demand-card demand-data-card">
+        <% if (!materialRequests.length) { %>
+          <div class="demand-empty demand-empty-compact"><span class="empty-icon">+</span><h3>Nenhum material planejado</h3><p>Adicione somente o que for necessário. A solicitação seguirá para pré-cotação e a compra continuará bloqueada até existir OS.</p></div>
+        <% } else { %>
+          <div class="demand-data-table demand-material-table" role="table" aria-label="Materiais e pré-cotações">
+            <div class="demand-data-row demand-data-head" role="row"><span>Solicitação</span><span>Status</span><span>Cotação</span><span>Vínculo</span><span>Ação</span></div>
+            <% materialRequests.forEach(sol => { const total = Number(sol.itens_count || 0); const quoted = Number(sol.itens_cotados || 0); const pct = total ? Math.round(quoted / total * 100) : 0; %>
+              <div class="demand-data-row" role="row">
+                <div data-label="Solicitação"><strong><%= sol.numero || '#'+sol.id %></strong><small><%= sol.titulo %></small></div>
+                <div data-label="Status"><span class="demand-badge status-<%= slug(sol.status) %>"><%= sol.status %></span></div>
+                <div data-label="Cotação" class="material-progress"><span><%= quoted %> de <%= total %> item(ns)</span><i><b style="width:<%= pct %>%"></b></i></div>
+                <div data-label="Vínculo"><strong><%= sol.os_id ? 'OS #' + sol.os_id : 'Pré-cotação' %></strong><small><%= sol.os_id ? 'Compra liberada pelo fluxo normal' : 'Compra aguardando OS' %></small></div>
+                <div data-label="Ação" class="demand-row-action"><a class="demand-btn demand-btn-secondary demand-btn-small" href="/compras/solicitacoes/<%= sol.id %>">Abrir</a></div>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+
+      <% if (canMaterials && !isFinished) { %>
+        <section class="demand-card demand-material-editor" data-material-form hidden>
+          <div class="section-heading"><div><h2>Adicionar materiais</h2><p>Cadastre apenas nome, quantidade e o detalhe técnico necessário. Os demais dados seguem o fluxo de Compras.</p></div><button type="button" class="demand-btn demand-btn-secondary demand-btn-small" data-toggle-material-form>Fechar</button></div>
+          <form method="POST" action="/demandas/<%= demanda.id %>/materiais" class="planning-material-form" id="demandMaterialsForm">
+            <div id="materialRows">
+              <div class="material-input-row material-input-row-light">
+                <label><span>Material *</span><input name="itens_nome[]" required placeholder="Ex.: Rolamento 22218"></label>
+                <label><span>Quantidade *</span><input type="number" name="itens_qtd[]" min="0.001" step="0.001" required value="1"></label>
+                <label><span>Unidade</span><input name="itens_un[]" value="UN" maxlength="10"></label>
+                <label><span>Especificação</span><input name="itens_especificacao[]" placeholder="Medida, marca ou norma, se necessário"></label>
+                <label><span>Estoque</span><select name="itens_item_id[]"><option value="">Não vincular</option><% (estoqueItens || []).forEach(item => { %><option value="<%= item.id %>"><%= item.codigo ? item.codigo + ' — ' : '' %><%= item.nome %></option><% }) %></select></label>
+                <button class="material-remove" type="button" aria-label="Remover material">×</button>
+              </div>
+            </div>
+            <div class="material-form-actions"><button class="demand-btn demand-btn-secondary" type="button" id="addMaterialRow">+ Outro material</button><button class="demand-btn demand-btn-primary" type="submit">Enviar para pré-cotação</button></div>
+          </form>
+        </section>
       <% } %>
     </section>
 
-    <% if (canManage) { %>
-      <section class="demand-card demand-control-card">
-        <div class="section-heading"><div><h2>Controle da demanda</h2><p>Defina responsável e etapa atual.</p></div></div>
-        <form method="POST" action="/demandas/<%= demanda.id %>/status" class="demand-control-form">
-          <label><span>Status</span><select name="status"><% ['NOVA','EM_ANALISE','PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %><option value="<%= st %>" <%= demanda.status === st ? 'selected' : '' %>><%= statusLabel(st) %></option><% }) %></select></label>
-          <label><span>Responsável</span><select name="responsavel_user_id"><option value="">A definir</option><% (responsaveis || []).forEach(person => { %><option value="<%= person.id %>" <%= Number(demanda.responsavel_user_id || 0) === Number(person.id) ? 'selected' : '' %>><%= person.name %></option><% }) %></select></label>
-          <button class="demand-btn demand-btn-primary" type="submit">Salvar controle</button>
-        </form>
-      </section>
-    <% } %>
-  </div>
-
-  <section class="demand-card planning-children-card">
-    <div class="section-heading">
-      <div><h2>Subdemandas / serviços do projeto</h2><p>Quebre uma necessidade maior em serviços específicos sem perder a visão centralizada.</p></div>
-      <% if (!isFinished && canAccessModule(normalizeRole(user?.role), 'demandas_open')) { %><a class="demand-btn demand-btn-secondary" href="/demandas/new?parent_id=<%= demanda.id %>">+ Adicionar subdemanda</a><% } %>
-    </div>
-    <% if (!children.length) { %><div class="planning-empty">Nenhuma subdemanda cadastrada. Use esta estrutura para separar fornalha, descarga, válvulas, tubos ou outros serviços de um mesmo equipamento/projeto.</div><% } %>
-    <% if (children.length) { %><div class="planning-list"><% children.forEach(child => { %>
-      <a class="planning-row" href="/demandas/<%= child.id %>"><div><strong>#<%= child.id %> — <%= child.titulo %></strong><small><%= child.equipamento_nome || categoryLabel(child.categoria) %></small></div><span class="demand-badge priority-<%= slug(child.prioridade) %>"><%= priorityLabel(child.prioridade) %></span><span class="demand-badge status-<%= slug(child.status) %>"><%= statusLabel(child.status) %></span></a>
-    <% }) %></div><% } %>
-  </section>
-
-  <section class="demand-card planning-material-card">
-    <div class="section-heading">
-      <div><h2>Materiais e pré-cotações</h2><p>Materiais planejados aqui ficam vinculados à demanda e são liberados para Compras cotar antes da OS. A compra permanece bloqueada até existir uma OS vinculada.</p></div>
-      <span class="section-total"><%= materialRequests.length %> solicitação(ões)</span>
-    </div>
-
-    <% if (materialRequests.length) { %>
-      <div class="planning-list material-request-list">
-        <% materialRequests.forEach(sol => { const total = Number(sol.itens_count || 0); const quoted = Number(sol.itens_cotados || 0); const pct = total ? Math.round(quoted / total * 100) : 0; %>
-          <a class="planning-row material-request-row" href="/compras/solicitacoes/<%= sol.id %>">
-            <div><strong><%= sol.numero || '#'+sol.id %> — <%= sol.titulo %></strong><small><%= sol.os_id ? 'Vinculada à OS #'+sol.os_id : 'PRÉ-COTAÇÃO • compra aguardando conversão em OS' %></small></div>
-            <div class="material-progress"><span><%= quoted %> de <%= total %> cotado(s)</span><i><b style="width:<%= pct %>%"></b></i></div>
-            <span class="demand-badge status-<%= slug(sol.status) %>"><%= sol.status %></span>
-          </a>
-        <% }) %>
+    <section class="demand-workspace-panel" data-panel="subdemandas" hidden>
+      <div class="demand-section-title demand-section-title-actions">
+        <div><h2>Subdemandas</h2><p>Divida projetos grandes em serviços executáveis sem perder o vínculo com a demanda principal.</p></div>
+        <% if (!isFinished && canOpen) { %><a class="demand-btn demand-btn-primary" href="/demandas/new?parent_id=<%= demanda.id %>">+ Nova subdemanda</a><% } %>
       </div>
-    <% } else { %>
-      <div class="planning-empty">Nenhum material planejado ainda. A demanda pode permanecer em planejamento enquanto a equipe prepara a lista técnica.</div>
-    <% } %>
 
-    <% if (canMaterials && !isFinished) { %>
-      <details class="planning-material-form-wrap">
-        <summary class="demand-btn demand-btn-primary">+ Planejar materiais</summary>
-        <form method="POST" action="/demandas/<%= demanda.id %>/materiais" class="planning-material-form" id="demandMaterialsForm">
-          <div class="planning-rule-note"><strong>Fluxo:</strong> ao salvar, a solicitação é disponibilizada imediatamente para o setor de Compras como pré-cotação. Nenhuma compra será liberada antes da conversão desta demanda em OS.</div>
-          <div id="materialRows">
-            <div class="material-input-row">
-              <label><span>Material *</span><input name="itens_nome[]" required placeholder="Ex.: Rolamento 22218"></label>
-              <label><span>Especificação</span><input name="itens_especificacao[]" placeholder="Marca, medida, norma ou detalhe técnico"></label>
-              <label><span>Unidade</span><input name="itens_un[]" value="UN" maxlength="10"></label>
-              <label><span>Quantidade *</span><input type="number" name="itens_qtd[]" min="0.001" step="0.001" required value="1"></label>
-              <label><span>Item já cadastrado no estoque</span><select name="itens_item_id[]"><option value="">Não vincular</option><% (estoqueItens || []).forEach(item => { %><option value="<%= item.id %>"><%= item.codigo ? item.codigo + ' — ' : '' %><%= item.nome %></option><% }) %></select></label>
-              <button class="material-remove" type="button" aria-label="Remover material">×</button>
-            </div>
+      <section class="demand-card demand-data-card">
+        <% if (!children.length) { %>
+          <div class="demand-empty demand-empty-compact"><span class="empty-icon">+</span><h3>Nenhuma subdemanda</h3><p>Use subdemandas somente quando o serviço realmente precisar ser dividido em etapas ou frentes independentes.</p></div>
+        <% } else { %>
+          <div class="demand-data-table demand-subdemand-table" role="table" aria-label="Subdemandas">
+            <div class="demand-data-row demand-data-head" role="row"><span>Serviço</span><span>Equipamento</span><span>Status</span><span>Prioridade</span><span>Responsável</span><span>Ação</span></div>
+            <% children.forEach(child => { %>
+              <div class="demand-data-row" role="row">
+                <div data-label="Serviço"><strong>#<%= child.id %> — <%= child.titulo %></strong><small><%= categoryLabel(child.categoria) %></small></div>
+                <div data-label="Equipamento"><strong><%= child.equipamento_nome || 'Sem equipamento' %></strong></div>
+                <div data-label="Status"><span class="demand-badge status-<%= slug(child.status) %>"><%= statusLabel(child.status) %></span></div>
+                <div data-label="Prioridade"><span class="demand-badge priority-<%= slug(child.prioridade) %>"><%= priorityLabel(child.prioridade) %></span></div>
+                <div data-label="Responsável"><strong><%= child.responsavel_nome || 'A definir' %></strong></div>
+                <div data-label="Ação" class="demand-row-action"><a class="demand-btn demand-btn-secondary demand-btn-small" href="/demandas/<%= child.id %>">Abrir</a></div>
+              </div>
+            <% }) %>
           </div>
-          <div class="material-form-actions"><button class="demand-btn demand-btn-secondary" type="button" id="addMaterialRow">+ Outro material</button><button class="demand-btn demand-btn-primary" type="submit">Enviar para pré-cotação</button></div>
-        </form>
-      </details>
-    <% } %>
-  </section>
-
-  <section class="demand-card planning-os-card">
-    <div class="section-heading"><div><h2>Ordens de Serviço vinculadas</h2><p>A OS formaliza a execução. As solicitações de materiais já existentes passam a apontar para ela sem serem recriadas.</p></div><span class="section-total"><%= linkedOrders.length %> OS</span></div>
-    <% if (!linkedOrders.length) { %><div class="planning-empty">Ainda não existe OS vinculada. As cotações podem ser preparadas enquanto a demanda aguarda priorização.</div><% } %>
-    <% if (linkedOrders.length) { %><div class="planning-list"><% linkedOrders.forEach(order => { %><a class="planning-row" href="/os/<%= order.id %>"><div><strong>OS #<%= order.id %></strong><small><%= String(order.descricao || '').slice(0, 120) %></small></div><span class="demand-badge status-<%= slug(order.status) %>"><%= order.status %></span></a><% }) %></div><% } %>
-  </section>
-
-  <div class="demand-activity-grid">
-    <% if (canManage) { %>
-      <section class="demand-card demand-update-card">
-        <div class="section-heading"><div><h2>Registrar atualização</h2><p>Adicione uma tratativa objetiva ao histórico.</p></div></div>
-        <form method="POST" action="/demandas/<%= demanda.id %>/update">
-          <textarea name="texto" rows="5" required placeholder="Informe andamento, decisão, impedimento ou próxima ação."></textarea>
-          <div class="update-actions"><small>A atualização ficará registrada com data e usuário.</small><button class="demand-btn demand-btn-secondary" type="submit">Salvar atualização</button></div>
-        </form>
+        <% } %>
       </section>
-    <% } %>
+    </section>
 
-    <section class="demand-card demand-history-card">
-      <div class="section-heading"><div><h2>Histórico e rastreabilidade</h2><p>Movimentações registradas nesta demanda.</p></div><span class="section-total"><%= demanda.logs?.length || 0 %> evento(s)</span></div>
-      <% if (!demanda.logs?.length) { %>
-        <div class="history-empty">Nenhuma atualização registrada.</div>
-      <% } else { %>
-        <ol class="demand-timeline">
-          <% demanda.logs.forEach(log => { %>
-            <li><span class="timeline-dot"></span><div><p><%= log.texto %></p><small><%= fmtBR(log.created_at) %> · <%= log.user_nome || 'Sistema' %></small></div></li>
-          <% }) %>
-        </ol>
-      <% } %>
+    <section class="demand-workspace-panel" data-panel="os" hidden>
+      <div class="demand-section-title"><div><h2>Ordens de Serviço vinculadas</h2><p>A OS representa a execução; o planejamento e as cotações anteriores continuam ligados à mesma demanda.</p></div></div>
+      <section class="demand-card demand-data-card">
+        <% if (!linkedOrders.length) { %>
+          <div class="demand-empty demand-empty-compact"><span class="empty-icon">OS</span><h3>Nenhuma OS vinculada</h3><p>Pré-cotações podem ser feitas antes. A OS será gerada somente após a aprovação da demanda.</p></div>
+        <% } else { %>
+          <div class="demand-data-table demand-os-table" role="table" aria-label="Ordens de Serviço">
+            <div class="demand-data-row demand-data-head" role="row"><span>OS</span><span>Status</span><span>Tipo</span><span>Abertura</span><span>Descrição</span><span>Ação</span></div>
+            <% linkedOrders.forEach(order => { %>
+              <div class="demand-data-row" role="row">
+                <div data-label="OS"><strong>#<%= order.id %></strong></div>
+                <div data-label="Status"><span class="demand-badge status-<%= slug(order.status) %>"><%= order.status %></span></div>
+                <div data-label="Tipo"><strong><%= order.tipo || 'OUTROS' %></strong></div>
+                <div data-label="Abertura"><strong><%= order.opened_at ? fmtBR(order.opened_at) : 'Não informado' %></strong></div>
+                <div data-label="Descrição"><small><%= String(order.descricao || '').slice(0, 140) || 'Sem descrição' %></small></div>
+                <div data-label="Ação" class="demand-row-action"><a class="demand-btn demand-btn-secondary demand-btn-small" href="/os/<%= order.id %>">Abrir OS</a></div>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+    </section>
+
+    <section class="demand-workspace-panel" data-panel="historico" hidden>
+      <div class="demand-activity-grid demand-history-layout">
+        <% if (canManage) { %>
+          <section class="demand-card demand-update-card">
+            <div class="section-heading"><div><h2>Registrar atualização</h2><p>Registre somente decisões, impedimentos ou próximos passos relevantes.</p></div></div>
+            <form method="POST" action="/demandas/<%= demanda.id %>/update">
+              <textarea name="texto" rows="5" required placeholder="Ex.: aguardando material, serviço programado para segunda-feira, cotação aprovada..."></textarea>
+              <div class="update-actions"><small>Data e usuário são registrados automaticamente.</small><button class="demand-btn demand-btn-secondary" type="submit">Salvar atualização</button></div>
+            </form>
+          </section>
+        <% } %>
+        <section class="demand-card demand-history-card">
+          <div class="section-heading"><div><h2>Histórico e rastreabilidade</h2><p>Movimentações registradas nesta demanda.</p></div><span class="section-total"><%= demanda.logs?.length || 0 %> evento(s)</span></div>
+          <% if (!demanda.logs?.length) { %><div class="history-empty">Nenhuma atualização registrada.</div><% } else { %>
+            <ol class="demand-timeline"><% demanda.logs.forEach(log => { %><li><span class="timeline-dot"></span><div><p><%= log.texto %></p><small><%= fmtBR(log.created_at) %> · <%= log.user_nome || 'Sistema' %></small></div></li><% }) %></ol>
+          <% } %>
+        </section>
+      </div>
     </section>
   </div>
 </div>
 
 <script>
 (() => {
+  const tabs = Array.from(document.querySelectorAll('[data-demand-tabs] [data-tab]'));
+  const panels = Array.from(document.querySelectorAll('[data-panel]'));
+  const allowed = new Set(tabs.map(tab => tab.dataset.tab));
+  const activate = (name, updateHash = true) => {
+    const target = allowed.has(name) ? name : 'resumo';
+    tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.tab === target));
+    panels.forEach(panel => { panel.hidden = panel.dataset.panel !== target; });
+    if (updateHash) history.replaceState(null, '', `#${target}`);
+  };
+  tabs.forEach(tab => tab.addEventListener('click', () => activate(tab.dataset.tab)));
+  activate(String(location.hash || '').replace('#', ''), false);
+
+  document.querySelectorAll('[data-toggle-material-form]').forEach(button => {
+    button.addEventListener('click', () => {
+      const editor = document.querySelector('[data-material-form]');
+      if (!editor) return;
+      editor.hidden = !editor.hidden;
+      if (!editor.hidden) editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
   const root = document.getElementById('materialRows');
   const add = document.getElementById('addMaterialRow');
   if (!root || !add) return;
@@ -208,12 +300,20 @@
     if (!button) return;
     button.onclick = () => {
       if (root.querySelectorAll('.material-input-row').length > 1) row.remove();
-      else row.querySelectorAll('input').forEach(input => { if (!['UN'].includes(input.value)) input.value = ''; });
+      else {
+        row.querySelectorAll('input').forEach(input => {
+          if (input.name === 'itens_un[]') input.value = 'UN';
+          else if (input.name === 'itens_qtd[]') input.value = '1';
+          else input.value = '';
+        });
+        row.querySelectorAll('select').forEach(select => { select.selectedIndex = 0; });
+      }
     };
   };
   root.querySelectorAll('.material-input-row').forEach(wireRemove);
   add.addEventListener('click', () => {
     const template = root.querySelector('.material-input-row');
+    if (!template) return;
     const row = template.cloneNode(true);
     row.querySelectorAll('input').forEach(input => {
       if (input.name === 'itens_un[]') input.value = 'UN';

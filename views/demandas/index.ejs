@@ -1,6 +1,6 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/demandas.css">
-<link rel="stylesheet" href="/css/demandas-planejamento.css?v=20260902-v1">
+<link rel="stylesheet" href="/css/demandas-planejamento.css?v=20260903-v2">
 <%
   const statusLabel = value => ({
     NOVA: 'Nova', EM_ANALISE: 'Em análise', PLANEJAMENTO: 'Planejamento',
@@ -37,12 +37,10 @@
   <header class="demand-head">
     <div>
       <h1>Demandas</h1>
-      <p>Banco de serviços planejados para acompanhamento, preparação de materiais, priorização e futura execução em OS.</p>
+      <p>Banco de serviços planejados para registrar necessidades rápido, priorizar e preparar a futura execução em OS.</p>
     </div>
     <% if (canAccessModule(normalizeRole(user?.role), 'demandas_open')) { %>
-      <a class="demand-btn demand-btn-primary" href="/demandas/new">
-        <span aria-hidden="true">＋</span> Nova demanda
-      </a>
+      <a class="demand-btn demand-btn-primary" href="/demandas/new"><span aria-hidden="true">＋</span> Nova demanda</a>
     <% } %>
   </header>
 
@@ -62,11 +60,7 @@
       <span class="attention-icon" aria-hidden="true">!</span>
       <div>
         <strong>Atenção à fila operacional</strong>
-        <p>
-          <% if (painel.paradas) { %><b><%= painel.paradas %></b> demanda(s) parada(s)<% } %>
-          <% if (painel.paradas && painel.prioritarias) { %> e <% } %>
-          <% if (painel.prioritarias) { %><b><%= painel.prioritarias %></b> demanda(s) crítica(s) ou alta(s)<% } %>.
-        </p>
+        <p><% if (painel.paradas) { %><b><%= painel.paradas %></b> demanda(s) parada(s)<% } %><% if (painel.paradas && painel.prioritarias) { %> e <% } %><% if (painel.prioritarias) { %><b><%= painel.prioritarias %></b> demanda(s) crítica(s) ou alta(s)<% } %>.</p>
       </div>
       <a href="/demandas?<%= query({ tab: 'ATIVAS', status: painel.paradas ? 'PARADA' : '', prioridade: painel.paradas ? '' : 'ELEVADA' }) %>">Ver demandas</a>
     </section>
@@ -81,99 +75,48 @@
 
     <form class="demand-filters" method="GET" action="/demandas">
       <input type="hidden" name="tab" value="<%= filters.tab %>">
-      <label class="filter-search">
-        <span>Buscar</span>
-        <input name="q" value="<%= filters.q %>" placeholder="Número, título, descrição, equipamento, NR ou pessoa">
-      </label>
-      <label>
-        <span>Status</span>
-        <select name="status">
-          <option value="">Todos</option>
-          <% ['NOVA','EM_ANALISE','PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %>
-            <option value="<%= st %>" <%= filters.status === st ? 'selected' : '' %>><%= statusLabel(st) %></option>
-          <% }) %>
-        </select>
-      </label>
-      <label>
-        <span>Prioridade</span>
-        <select name="prioridade">
-          <option value="">Todas</option>
-          <option value="ELEVADA" <%= filters.prioridade === 'ELEVADA' ? 'selected' : '' %>>Críticas e altas</option>
-          <% ['URGENTE','ALTA','NORMAL','BAIXA'].forEach(pr => { %>
-            <option value="<%= pr %>" <%= filters.prioridade === pr ? 'selected' : '' %>><%= priorityLabel(pr) %></option>
-          <% }) %>
-        </select>
-      </label>
-      <label>
-        <span>Responsável</span>
-        <select name="responsavel_user_id">
-          <option value="">Todos</option>
-          <% (responsaveis || []).forEach(person => { %>
-            <option value="<%= person.id %>" <%= String(filters.responsavel_user_id) === String(person.id) ? 'selected' : '' %>><%= person.name %></option>
-          <% }) %>
-        </select>
-      </label>
-      <label class="filter-limit">
-        <span>Exibir</span>
-        <select name="limit">
-          <% [10,20,50].forEach(value => { %><option value="<%= value %>" <%= Number(filters.limit) === value ? 'selected' : '' %>><%= value %></option><% }) %>
-        </select>
-      </label>
-      <div class="filter-actions">
-        <button class="demand-btn demand-btn-primary" type="submit">Aplicar filtros</button>
-        <a class="demand-btn demand-btn-secondary" href="/demandas?tab=<%= filters.tab %>">Limpar</a>
-      </div>
+      <label class="filter-search"><span>Buscar</span><input name="q" value="<%= filters.q %>" placeholder="Número, título, equipamento, NR ou pessoa"></label>
+      <label><span>Status</span><select name="status"><option value="">Todos</option><% ['NOVA','EM_ANALISE','PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %><option value="<%= st %>" <%= filters.status === st ? 'selected' : '' %>><%= statusLabel(st) %></option><% }) %></select></label>
+      <label><span>Prioridade</span><select name="prioridade"><option value="">Todas</option><option value="ELEVADA" <%= filters.prioridade === 'ELEVADA' ? 'selected' : '' %>>Críticas e altas</option><% ['URGENTE','ALTA','NORMAL','BAIXA'].forEach(pr => { %><option value="<%= pr %>" <%= filters.prioridade === pr ? 'selected' : '' %>><%= priorityLabel(pr) %></option><% }) %></select></label>
+      <label><span>Responsável</span><select name="responsavel_user_id"><option value="">Todos</option><% (responsaveis || []).forEach(person => { %><option value="<%= person.id %>" <%= String(filters.responsavel_user_id) === String(person.id) ? 'selected' : '' %>><%= person.name %></option><% }) %></select></label>
+      <label class="filter-limit"><span>Exibir</span><select name="limit"><% [10,20,50].forEach(value => { %><option value="<%= value %>" <%= Number(filters.limit) === value ? 'selected' : '' %>><%= value %></option><% }) %></select></label>
+      <div class="filter-actions"><button class="demand-btn demand-btn-primary" type="submit">Aplicar filtros</button><a class="demand-btn demand-btn-secondary" href="/demandas?tab=<%= filters.tab %>">Limpar</a></div>
     </form>
   </section>
 
   <section class="demand-card demand-list-card">
     <div class="section-heading">
-      <div>
-        <h2><%= filters.tab === 'HISTORICO' ? 'Histórico de demandas' : filters.tab === 'TODAS' ? 'Todas as demandas' : 'Demandas ativas' %></h2>
-        <p>Mostrando <strong><%= lista.length %></strong> registro(s), ordenados por prioridade e última atualização.</p>
-      </div>
+      <div><h2><%= filters.tab === 'HISTORICO' ? 'Histórico de demandas' : filters.tab === 'TODAS' ? 'Todas as demandas' : 'Demandas ativas' %></h2><p><strong><%= lista.length %></strong> registro(s), ordenados por prioridade e última movimentação.</p></div>
       <span class="section-total"><%= painel.ativas || 0 %> ativa(s)</span>
     </div>
 
     <% if (!lista.length) { %>
-      <div class="demand-empty">
-        <span class="empty-icon" aria-hidden="true">✓</span>
-        <h3>Nenhuma demanda encontrada</h3>
-        <p><%= Object.values(filters).some(value => value && value !== 'ATIVAS' && value !== 20) ? 'Ajuste os filtros para ampliar a pesquisa.' : 'A fila está livre. Novas demandas aparecerão aqui para acompanhamento.' %></p>
-        <% if (canAccessModule(normalizeRole(user?.role), 'demandas_open')) { %><a class="demand-btn demand-btn-secondary" href="/demandas/new">Criar demanda</a><% } %>
-      </div>
+      <div class="demand-empty"><span class="empty-icon" aria-hidden="true">✓</span><h3>Nenhuma demanda encontrada</h3><p><%= Object.values(filters).some(value => value && value !== 'ATIVAS' && value !== 20) ? 'Ajuste os filtros para ampliar a pesquisa.' : 'A fila está livre. Novas demandas aparecerão aqui para acompanhamento.' %></p><% if (canAccessModule(normalizeRole(user?.role), 'demandas_open')) { %><a class="demand-btn demand-btn-secondary" href="/demandas/new">Criar demanda</a><% } %></div>
     <% } else { %>
       <% groups.forEach(group => { if (group.items.length) { %>
         <section class="priority-group priority-<%= group.key %>">
-          <div class="priority-heading">
-            <div><h3><%= group.title %> <span><%= group.items.length %></span></h3><p><%= group.note %></p></div>
-          </div>
+          <div class="priority-heading"><div><h3><%= group.title %> <span><%= group.items.length %></span></h3><p><%= group.note %></p></div></div>
           <div class="demand-table" role="table" aria-label="<%= group.title %>">
-            <div class="demand-row demand-columns" role="row">
-              <span>Demanda</span><span>Status / prioridade</span><span>Responsáveis</span><span>Última movimentação</span><span>Ação</span>
-            </div>
+            <div class="demand-row demand-columns demand-columns-v2" role="row"><span>Demanda</span><span>Status</span><span>Planejamento</span><span>Responsável</span><span>Última movimentação</span><span>Ação</span></div>
             <% group.items.forEach(d => { %>
-              <article class="demand-row" role="row">
+              <article class="demand-row demand-row-v2" role="row">
                 <div class="demand-identity" data-label="Demanda">
                   <strong>#<%= d.id %> · <%= d.titulo %></strong>
                   <p><%= d.descricao || 'Descrição não informada.' %></p>
-                  <small><%= categoryLabel(d.categoria) %><%= d.equipamento_nome ? ' · ' + d.equipamento_nome : '' %><%= Number(d.subdemandas_count||0) ? ' · ' + d.subdemandas_count + ' subdemanda(s)' : '' %><%= Number(d.solicitacoes_count||0) ? ' · ' + d.solicitacoes_count + ' solicitação(ões)' : '' %></small>
+                  <small><%= categoryLabel(d.categoria) %><%= d.equipamento_nome ? ' · ' + d.equipamento_nome : '' %></small>
                 </div>
-                <div class="demand-badges" data-label="Status / prioridade">
-                  <span class="demand-badge priority-<%= slug(d.prioridade) %>"><%= priorityLabel(d.prioridade) %></span>
+                <div class="demand-badges" data-label="Status">
                   <span class="demand-badge status-<%= slug(d.status) %>"><%= statusLabel(d.status) %></span>
+                  <span class="demand-badge priority-<%= slug(d.prioridade) %>"><%= priorityLabel(d.prioridade) %></span>
                 </div>
-                <div class="demand-people" data-label="Responsáveis">
-                  <strong><%= d.responsavel_nome || 'A definir' %></strong>
-                  <small>Criada por <%= d.created_by_nome || 'Não informado' %></small>
+                <div class="demand-plan-summary" data-label="Planejamento">
+                  <span class="demand-plan-chip"><strong><%= Number(d.subdemandas_count || 0) %></strong> sub</span>
+                  <span class="demand-plan-chip"><strong><%= Number(d.solicitacoes_count || 0) %></strong> solic.</span>
+                  <span class="demand-plan-chip"><strong><%= Number(d.os_count || 0) %></strong> OS</span>
                 </div>
-                <div class="demand-update" data-label="Última movimentação">
-                  <strong><%= fmtBR(d.updated_at || d.created_at) %></strong>
-                  <small><%= d.ultima_atualizacao || 'Sem atualização registrada' %></small>
-                </div>
-                <div class="demand-row-action" data-label="Ação">
-                  <a class="demand-btn demand-btn-secondary demand-btn-small" href="/demandas/<%= d.id %>">Abrir demanda</a>
-                </div>
+                <div class="demand-people" data-label="Responsável"><strong><%= d.responsavel_nome || 'A definir' %></strong><small>Criada por <%= d.created_by_nome || 'Não informado' %></small></div>
+                <div class="demand-update" data-label="Última movimentação"><strong><%= fmtBR(d.updated_at || d.created_at) %></strong><small><%= d.ultima_atualizacao || 'Sem atualização registrada' %></small></div>
+                <div class="demand-row-action" data-label="Ação"><a class="demand-btn demand-btn-secondary demand-btn-small" href="/demandas/<%= d.id %>">Abrir</a></div>
               </article>
             <% }) %>
           </div>
@@ -187,22 +130,15 @@
       <div class="section-heading"><div><h2>Distribuição por status</h2><p>Visão rápida da situação atual.</p></div></div>
       <% const maxStatus = Math.max(1, ...(painel.distribution || []).map(item => Number(item.total || 0))); %>
       <% if (!(painel.distribution || []).length) { %><p class="compact-empty">Sem dados para comparar.</p><% } %>
-      <% (painel.distribution || []).forEach(item => { %>
-        <div class="status-bar">
-          <span><%= statusLabel(item.status) %></span>
-          <div><i style="width:<%= (Number(item.total || 0) / maxStatus) * 100 %>%"></i></div>
-          <strong><%= item.total %></strong>
-        </div>
-      <% }) %>
+      <% (painel.distribution || []).forEach(item => { %><div class="status-bar"><span><%= statusLabel(item.status) %></span><div><i style="width:<%= (Number(item.total || 0) / maxStatus) * 100 %>%"></i></div><strong><%= item.total %></strong></div><% }) %>
     </section>
     <section class="demand-card compact-card workflow-card">
-      <div class="section-heading"><div><h2>Fluxo da demanda</h2><p>Da necessidade até a execução e conclusão.</p></div></div>
+      <div class="section-heading"><div><h2>Fluxo da demanda</h2><p>Cadastro simples, planejamento sob demanda e execução rastreável.</p></div></div>
       <ol>
-        <li><span>1</span><div><strong>Nova / análise</strong><small>Necessidade registrada e escopo definido</small></div></li>
-        <li><span>2</span><div><strong>Planejamento</strong><small>Subdemandas, materiais e pré-cotações</small></div></li>
-        <li><span>3</span><div><strong>Aprovação</strong><small>Priorização para execução</small></div></li>
-        <li><span>4</span><div><strong>OS / execução</strong><small>Solicitações existentes vinculadas à OS</small></div></li>
-        <li><span>5</span><div><strong>Concluída</strong><small>Histórico preservado</small></div></li>
+        <li><span>1</span><div><strong>Registrar</strong><small>Necessidade e prioridade</small></div></li>
+        <li><span>2</span><div><strong>Planejar</strong><small>Materiais e subdemandas</small></div></li>
+        <li><span>3</span><div><strong>Aprovar</strong><small>Priorizar a execução</small></div></li>
+        <li><span>4</span><div><strong>Executar</strong><small>OS e histórico</small></div></li>
       </ol>
     </section>
   </div>

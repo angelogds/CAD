@@ -1,6 +1,6 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/demandas.css">
-<link rel="stylesheet" href="/css/demandas-planejamento.css?v=20260902-v1">
+<link rel="stylesheet" href="/css/demandas-planejamento.css?v=20260903-v2">
 <%
   const currentRole = normalizeRole(user?.role || '');
   const categoryLabels = {
@@ -11,117 +11,124 @@
   const allowedCategories = currentRole === 'RH'
     ? (categorias || []).filter(cat => ['NR','SEGURANCA','AUDITORIA'].includes(cat))
     : (categorias || []);
+  const selectedParent = parentId ? (parentCandidates || []).find(parent => Number(parent.id) === Number(parentId)) : null;
 %>
 
 <div class="demand-page demand-form-page">
-  <header class="demand-head">
+  <header class="demand-head demand-form-head">
     <div>
       <a class="demand-back-link" href="<%= parentId ? '/demandas/' + parentId : '/demandas' %>">← Voltar para demandas</a>
       <h1><%= parentId ? 'Nova subdemanda' : 'Nova demanda' %></h1>
-      <p>Registre a necessidade como serviço planejado, com contexto suficiente para preparar materiais e futura execução.</p>
+      <p>Cadastro rápido: registre o essencial agora e complemente o planejamento somente quando necessário.</p>
     </div>
   </header>
 
-  <div class="demand-form-layout">
+  <div class="demand-form-layout demand-form-layout-light">
     <section class="demand-card demand-form-card">
       <div class="section-heading">
-        <div><h2>Informações da demanda</h2><p>Os campos marcados com * são obrigatórios.</p></div>
-        <span class="form-step"><%= parentId ? 'Subdemanda' : 'Cadastro' %></span>
+        <div><h2>Cadastro essencial</h2><p>Título, prioridade e descrição são suficientes para colocar a demanda no fluxo.</p></div>
+        <span class="form-step"><%= parentId ? 'Subdemanda' : 'Demanda' %></span>
       </div>
 
-      <form method="POST" action="/demandas" class="modern-demand-form demand-planning-form">
+      <form method="POST" action="/demandas" class="modern-demand-form demand-quick-form">
+        <% if (parentId) { %>
+          <input type="hidden" name="demanda_pai_id" value="<%= parentId %>">
+          <div class="form-wide demand-parent-banner">
+            <span>Vinculada à demanda principal</span>
+            <strong>#<%= parentId %> — <%= selectedParent?.titulo || 'Demanda principal' %></strong>
+          </div>
+        <% } %>
+
         <label class="form-wide">
-          <span>Título da demanda *</span>
-          <input name="titulo" maxlength="160" required autofocus placeholder="Ex.: Reforma da fornalha da Caldeira 1">
-          <small>Use um título curto que facilite a localização e o acompanhamento.</small>
-        </label>
-
-        <label>
-          <span>Demanda principal</span>
-          <select name="demanda_pai_id">
-            <option value="">Demanda principal / sem vínculo</option>
-            <% (parentCandidates || []).forEach(parent => { %>
-              <option value="<%= parent.id %>" <%= Number(parentId || 0) === Number(parent.id) ? 'selected' : '' %>>#<%= parent.id %> — <%= parent.titulo %></option>
-            <% }) %>
-          </select>
-          <small>Use para organizar serviços menores dentro de um projeto maior.</small>
-        </label>
-
-        <label>
-          <span>Categoria *</span>
-          <select name="categoria" required>
-            <% allowedCategories.forEach(cat => { %><option value="<%= cat %>"><%= categoryLabels[cat] || cat %></option><% }) %>
-          </select>
+          <span>Título *</span>
+          <input name="titulo" maxlength="160" required autofocus placeholder="Ex.: Reforma do cilindro do triturador FAST">
+          <small>Use um título curto e fácil de localizar.</small>
         </label>
 
         <label>
           <span>Prioridade *</span>
           <select name="prioridade" required>
-            <option value="BAIXA">Baixa — pode ser programada</option>
             <option value="NORMAL" selected>Média — fluxo normal</option>
+            <option value="BAIXA">Baixa — pode ser programada</option>
             <option value="ALTA">Alta — requer prioridade</option>
             <option value="URGENTE">Crítica — ação imediata</option>
           </select>
         </label>
 
         <label>
-          <span>Setor de origem</span>
-          <input name="setor_origem" maxlength="100" placeholder="Ex.: Manutenção, Produção, Caldeira">
-        </label>
-
-        <label>
-          <span>Equipamento relacionado</span>
-          <select name="equipamento_id">
-            <option value="">Sem equipamento específico</option>
-            <% (equipamentos || []).forEach(eq => { %><option value="<%= eq.id %>"><%= eq.nome %></option><% }) %>
+          <span>Categoria</span>
+          <select name="categoria">
+            <% allowedCategories.forEach(cat => { %><option value="<%= cat %>" <%= cat === 'MANUTENCAO' ? 'selected' : '' %>><%= categoryLabels[cat] || cat %></option><% }) %>
           </select>
         </label>
 
-        <label>
-          <span>NR relacionada</span>
-          <input name="nr_referencia" maxlength="60" placeholder="Ex.: NR-12, NR-13">
-          <small>Preencha quando a demanda vier de norma, auditoria ou segurança.</small>
-        </label>
-
-        <label>
-          <span>Prazo previsto</span>
-          <input type="date" name="prazo_previsto">
-        </label>
-
-        <label>
-          <span>Custo estimado de serviços</span>
-          <input type="number" name="custo_servicos_estimado" min="0" step="0.01" placeholder="0,00">
-          <small>Materiais serão acompanhados separadamente pelas solicitações e cotações.</small>
-        </label>
-
-        <div class="priority-guide form-wide" aria-label="Planejamento da demanda">
-          <span class="demand-badge priority-normal">Planejamento</span>
-          <p>A demanda pode existir antes da OS. A Manutenção poderá listar materiais e Compras poderá pré-cotar sem liberar a compra até a conversão em Ordem de Serviço.</p>
-        </div>
-
         <label class="form-wide">
-          <span>Descrição detalhada *</span>
-          <textarea name="descricao" rows="8" required placeholder="Descreva o serviço, resultado esperado, local, condição encontrada e informações importantes para planejamento."></textarea>
-          <small>Uma descrição clara reduz retornos e ajuda a preparar mão de obra, materiais e custos.</small>
+          <span>Descrição *</span>
+          <textarea name="descricao" rows="5" required placeholder="Descreva o que precisa ser feito e o resultado esperado."></textarea>
+          <small>Evite burocracia: informe apenas o suficiente para a equipe entender a necessidade.</small>
         </label>
 
-        <div class="form-actions form-wide">
+        <details class="form-wide demand-advanced-fields">
+          <summary>+ Adicionar informações de planejamento</summary>
+          <div class="demand-advanced-grid">
+            <% if (!parentId) { %>
+              <label>
+                <span>Demanda principal</span>
+                <select name="demanda_pai_id">
+                  <option value="">Sem vínculo</option>
+                  <% (parentCandidates || []).forEach(parent => { %><option value="<%= parent.id %>">#<%= parent.id %> — <%= parent.titulo %></option><% }) %>
+                </select>
+              </label>
+            <% } %>
+
+            <label>
+              <span>Equipamento</span>
+              <select name="equipamento_id">
+                <option value="">Sem equipamento específico</option>
+                <% (equipamentos || []).forEach(eq => { %><option value="<%= eq.id %>"><%= eq.nome %></option><% }) %>
+              </select>
+            </label>
+
+            <label>
+              <span>Setor de origem</span>
+              <input name="setor_origem" maxlength="100" placeholder="Ex.: Manutenção, Produção, Caldeira">
+            </label>
+
+            <label>
+              <span>Prazo previsto</span>
+              <input type="date" name="prazo_previsto">
+            </label>
+
+            <label>
+              <span>NR relacionada</span>
+              <input name="nr_referencia" maxlength="60" placeholder="Ex.: NR-12, NR-13">
+            </label>
+
+            <label>
+              <span>Custo estimado de serviços</span>
+              <input type="number" name="custo_servicos_estimado" min="0" step="0.01" placeholder="0,00">
+            </label>
+          </div>
+        </details>
+
+        <div class="form-actions form-wide demand-form-actions-sticky">
           <a class="demand-btn demand-btn-secondary" href="<%= parentId ? '/demandas/' + parentId : '/demandas' %>">Cancelar</a>
           <button class="demand-btn demand-btn-primary" type="submit"><%= parentId ? 'Criar subdemanda' : 'Criar demanda' %></button>
         </div>
       </form>
     </section>
 
-    <aside class="demand-card demand-form-help">
+    <aside class="demand-card demand-form-help demand-form-help-light">
       <span class="help-icon" aria-hidden="true">i</span>
-      <h2>Banco de serviços planejados</h2>
-      <ul>
-        <li><strong>Demanda principal:</strong> centraliza um projeto ou necessidade maior.</li>
-        <li><strong>Subdemandas:</strong> quebram o escopo em serviços executáveis e rastreáveis.</li>
-        <li><strong>Materiais:</strong> podem ser preparados e pré-cotados antes da abertura da OS.</li>
-        <li><strong>Conversão em OS:</strong> reaproveita as solicitações já cotadas, sem duplicar material.</li>
-      </ul>
-      <div class="help-note">Exemplo: “Reforma Caldeira 1” pode reunir fornalha, descarga, válvulas de segurança e troca de tubos como subdemandas.</div>
+      <h2>Cadastro leve</h2>
+      <p>O objetivo é registrar a necessidade rápido. Materiais, cotações, aprovação e OS entram depois, conforme a demanda avança.</p>
+      <div class="quick-flow-list">
+        <div><span>1</span><strong>Registrar necessidade</strong></div>
+        <div><span>2</span><strong>Planejar se necessário</strong></div>
+        <div><span>3</span><strong>Pré-cotar materiais</strong></div>
+        <div><span>4</span><strong>Aprovar e gerar OS</strong></div>
+      </div>
+      <div class="help-note">Quanto menos campos obrigatórios, mais rápido o time registra as demandas sem perder rastreabilidade.</div>
     </aside>
   </div>
 </div>
