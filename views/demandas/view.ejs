@@ -1,6 +1,6 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/demandas.css">
-<link rel="stylesheet" href="/css/demandas-planejamento.css?v=20260903-v2">
+<link rel="stylesheet" href="/css/demandas-planejamento.css?v=20260903-v3">
 <%
   const statusLabel = value => ({
     NOVA: 'Nova', EM_ANALISE: 'Em análise', PLANEJAMENTO: 'Planejamento',
@@ -33,6 +33,7 @@
   const children = Array.isArray(demanda.subdemandas) ? demanda.subdemandas : [];
   const money = value => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const approvalReady = String(demanda.aprovacao_status || 'PENDENTE').toUpperCase() === 'APROVADA';
+  const canPlanMaterials = canMaterials && !isFinished && !linkedOrders.length;
 %>
 
 <div class="demand-page demand-detail-page">
@@ -155,8 +156,12 @@
     <section class="demand-workspace-panel" data-panel="materiais" hidden>
       <div class="demand-section-title demand-section-title-actions">
         <div><h2>Materiais e pré-cotações</h2><p>Lista técnica enxuta, integrada a Solicitações e Compras sem duplicar cadastro.</p></div>
-        <% if (canMaterials && !isFinished) { %><button class="demand-btn demand-btn-primary" type="button" data-toggle-material-form>+ Planejar materiais</button><% } %>
+        <% if (canPlanMaterials) { %><button class="demand-btn demand-btn-primary" type="button" data-new-material-request>+ Planejar materiais</button><% } %>
       </div>
+
+      <% if (linkedOrders.length) { %>
+        <div class="demand-material-lock-note"><strong>Edição encerrada pela OS.</strong><span>Depois da geração da Ordem de Serviço, novos materiais urgentes devem ser incluídos pelo fluxo já existente da própria OS.</span></div>
+      <% } %>
 
       <section class="demand-card demand-data-card">
         <% if (!materialRequests.length) { %>
@@ -170,17 +175,27 @@
                 <div data-label="Status"><span class="demand-badge status-<%= slug(sol.status) %>"><%= sol.status %></span></div>
                 <div data-label="Cotação" class="material-progress"><span><%= quoted %> de <%= total %> item(ns)</span><i><b style="width:<%= pct %>%"></b></i></div>
                 <div data-label="Vínculo"><strong><%= sol.os_id ? 'OS #' + sol.os_id : 'Pré-cotação' %></strong><small><%= sol.os_id ? 'Compra liberada pelo fluxo normal' : 'Compra aguardando OS' %></small></div>
-                <div data-label="Ação" class="demand-row-action"><a class="demand-btn demand-btn-secondary demand-btn-small" href="/compras/solicitacoes/<%= sol.id %>">Abrir</a></div>
+                <div data-label="Ação" class="demand-row-action demand-material-actions">
+                  <a class="demand-btn demand-btn-secondary demand-btn-small" href="/compras/solicitacoes/<%= sol.id %>">Abrir</a>
+                  <% if (canMaterials && sol.pode_editar_materiais_demanda) { %>
+                    <button class="demand-btn demand-btn-secondary demand-btn-small" type="button" data-edit-material-request data-solicitacao-id="<%= sol.id %>" data-solicitacao-numero="<%= sol.numero || '#'+sol.id %>">Editar</button>
+                  <% } else if (sol.os_id || linkedOrders.length) { %>
+                    <small class="demand-edit-locked">Edição encerrada</small>
+                  <% } %>
+                </div>
               </div>
             <% }) %>
           </div>
         <% } %>
       </section>
 
-      <% if (canMaterials && !isFinished) { %>
+      <% if (canPlanMaterials) { %>
         <section class="demand-card demand-material-editor" data-material-form hidden>
-          <div class="section-heading"><div><h2>Adicionar materiais</h2><p>Cadastre apenas nome, quantidade e o detalhe técnico necessário. Os demais dados seguem o fluxo de Compras.</p></div><button type="button" class="demand-btn demand-btn-secondary demand-btn-small" data-toggle-material-form>Fechar</button></div>
-          <form method="POST" action="/demandas/<%= demanda.id %>/materiais" class="planning-material-form" id="demandMaterialsForm">
+          <div class="section-heading">
+            <div><h2 data-material-editor-title>Planejar nova solicitação de materiais</h2><p data-material-editor-help>Cadastre apenas nome, quantidade e o detalhe técnico necessário. Os demais dados seguem o fluxo de Compras.</p></div>
+            <button type="button" class="demand-btn demand-btn-secondary demand-btn-small" data-close-material-form>Fechar</button>
+          </div>
+          <form method="POST" action="/demandas/<%= demanda.id %>/materiais" data-create-action="/demandas/<%= demanda.id %>/materiais" class="planning-material-form" id="demandMaterialsForm">
             <div id="materialRows">
               <div class="material-input-row material-input-row-light">
                 <label><span>Material *</span><input name="itens_nome[]" required placeholder="Ex.: Rolamento 22218"></label>
@@ -191,7 +206,7 @@
                 <button class="material-remove" type="button" aria-label="Remover material">×</button>
               </div>
             </div>
-            <div class="material-form-actions"><button class="demand-btn demand-btn-secondary" type="button" id="addMaterialRow">+ Outro material</button><button class="demand-btn demand-btn-primary" type="submit">Enviar para pré-cotação</button></div>
+            <div class="material-form-actions"><button class="demand-btn demand-btn-secondary" type="button" id="addMaterialRow">+ Outro material</button><button class="demand-btn demand-btn-primary" type="submit" data-material-submit>Criar solicitação e enviar para pré-cotação</button></div>
           </form>
         </section>
       <% } %>
@@ -283,31 +298,69 @@
   tabs.forEach(tab => tab.addEventListener('click', () => activate(tab.dataset.tab)));
   activate(String(location.hash || '').replace('#', ''), false);
 
-  document.querySelectorAll('[data-toggle-material-form]').forEach(button => {
-    button.addEventListener('click', () => {
-      const editor = document.querySelector('[data-material-form]');
-      if (!editor) return;
-      editor.hidden = !editor.hidden;
-      if (!editor.hidden) editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  });
-
+  const editor = document.querySelector('[data-material-form]');
+  const form = document.getElementById('demandMaterialsForm');
+  const editorTitle = document.querySelector('[data-material-editor-title]');
+  const editorHelp = document.querySelector('[data-material-editor-help]');
+  const submit = document.querySelector('[data-material-submit]');
   const root = document.getElementById('materialRows');
   const add = document.getElementById('addMaterialRow');
+
+  const clearRow = (row) => {
+    row.querySelectorAll('input').forEach(input => {
+      if (input.name === 'itens_un[]') input.value = 'UN';
+      else if (input.name === 'itens_qtd[]') input.value = '1';
+      else input.value = '';
+    });
+    row.querySelectorAll('select').forEach(select => { select.selectedIndex = 0; });
+  };
+
+  const resetRows = () => {
+    if (!root) return;
+    const rows = Array.from(root.querySelectorAll('.material-input-row'));
+    rows.slice(1).forEach(row => row.remove());
+    if (rows[0]) clearRow(rows[0]);
+  };
+
+  const openEditor = ({ solicitacaoId = null, numero = null } = {}) => {
+    if (!editor || !form) return;
+    resetRows();
+    if (solicitacaoId) {
+      form.action = `/demandas/<%= demanda.id %>/solicitacoes/${Number(solicitacaoId)}/materiais`;
+      if (editorTitle) editorTitle.textContent = `Adicionar itens à ${numero || 'solicitação'}`;
+      if (editorHelp) editorHelp.textContent = 'Somente os novos itens serão acrescentados. Itens, cotações, fornecedores e valores já registrados serão preservados.';
+      if (submit) submit.textContent = 'Adicionar itens à solicitação';
+    } else {
+      form.action = form.dataset.createAction;
+      if (editorTitle) editorTitle.textContent = 'Planejar nova solicitação de materiais';
+      if (editorHelp) editorHelp.textContent = 'Cadastre apenas nome, quantidade e o detalhe técnico necessário. Os demais dados seguem o fluxo de Compras.';
+      if (submit) submit.textContent = 'Criar solicitação e enviar para pré-cotação';
+    }
+    editor.hidden = false;
+    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    root?.querySelector('input')?.focus();
+  };
+
+  document.querySelectorAll('[data-new-material-request]').forEach(button => {
+    button.addEventListener('click', () => openEditor());
+  });
+  document.querySelectorAll('[data-edit-material-request]').forEach(button => {
+    button.addEventListener('click', () => openEditor({
+      solicitacaoId: button.dataset.solicitacaoId,
+      numero: button.dataset.solicitacaoNumero,
+    }));
+  });
+  document.querySelectorAll('[data-close-material-form]').forEach(button => {
+    button.addEventListener('click', () => { if (editor) editor.hidden = true; });
+  });
+
   if (!root || !add) return;
   const wireRemove = (row) => {
     const button = row.querySelector('.material-remove');
     if (!button) return;
     button.onclick = () => {
       if (root.querySelectorAll('.material-input-row').length > 1) row.remove();
-      else {
-        row.querySelectorAll('input').forEach(input => {
-          if (input.name === 'itens_un[]') input.value = 'UN';
-          else if (input.name === 'itens_qtd[]') input.value = '1';
-          else input.value = '';
-        });
-        row.querySelectorAll('select').forEach(select => { select.selectedIndex = 0; });
-      }
+      else clearRow(row);
     };
   };
   root.querySelectorAll('.material-input-row').forEach(wireRemove);
@@ -315,12 +368,7 @@
     const template = root.querySelector('.material-input-row');
     if (!template) return;
     const row = template.cloneNode(true);
-    row.querySelectorAll('input').forEach(input => {
-      if (input.name === 'itens_un[]') input.value = 'UN';
-      else if (input.name === 'itens_qtd[]') input.value = '1';
-      else input.value = '';
-    });
-    row.querySelectorAll('select').forEach(select => { select.selectedIndex = 0; });
+    clearRow(row);
     wireRemove(row);
     root.appendChild(row);
     row.querySelector('input')?.focus();

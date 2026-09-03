@@ -1,4 +1,5 @@
 const service = require('./demandas.service');
+const demandMaterialsService = require('./demandas.materials.service');
 const solicitacoesService = require('../solicitacoes/solicitacoes.service');
 
 function normalizeChoice(value) {
@@ -72,6 +73,12 @@ function show(req, res) {
     return res.redirect('/demandas');
   }
 
+  const linkedOrders = Array.isArray(demanda.ordens) ? demanda.ordens : [];
+  demanda.solicitacoes = (Array.isArray(demanda.solicitacoes) ? demanda.solicitacoes : []).map((solicitacao) => ({
+    ...solicitacao,
+    pode_editar_materiais_demanda: demandMaterialsService.canAppendToRequest(demanda, solicitacao, linkedOrders),
+  }));
+
   return res.render('demandas/view', {
     title: `Demanda #${id}`,
     activeMenu: 'demandas',
@@ -134,7 +141,26 @@ function addMaterials(req, res) {
   } catch (e) {
     req.flash('error', e.message || 'Erro ao criar planejamento de materiais.');
   }
-  return res.redirect(`/demandas/${id}`);
+  return res.redirect(`/demandas/${id}#materiais`);
+}
+
+function appendMaterials(req, res) {
+  const id = Number(req.params.id);
+  const solicitacaoId = Number(req.params.solicitacaoId);
+  try {
+    const itens = solicitacoesService.parseItensFromBody(req.body);
+    const result = demandMaterialsService.appendItems(id, solicitacaoId, itens);
+    const numero = result.solicitacao?.numero || `#${solicitacaoId}`;
+    service.addUpdate(
+      id,
+      `${result.totalAdicionado} novo(s) material(is) acrescentado(s) à solicitação ${numero} durante a pré-cotação. Itens e cotações anteriores foram preservados.`,
+      req.session?.user?.id || null
+    );
+    req.flash('success', `${result.totalAdicionado} item(ns) adicionado(s) à ${numero}. A mesma solicitação foi atualizada para o setor de Compras.`);
+  } catch (e) {
+    req.flash('error', e.message || 'Não foi possível adicionar materiais à solicitação.');
+  }
+  return res.redirect(`/demandas/${id}#materiais`);
 }
 
 function assertDemandApprovedForNewOS(demanda) {
@@ -175,6 +201,7 @@ module.exports = {
   updateApproval,
   addUpdate,
   addMaterials,
+  appendMaterials,
   assertDemandApprovedForNewOS,
   convertToOS,
 };
