@@ -31,6 +31,15 @@ test('conversão para OS reaproveita solicitações da demanda sem duplicar mate
   assert.match(service, /sem duplicação/i);
 });
 
+test('conversão para nova OS exige aprovação prévia da Diretoria ou Gestão', () => {
+  const controller = read('modules/demandas/demandas.controller.js');
+  assert.match(controller, /assertDemandApprovedForNewOS/);
+  assert.match(controller, /approval !== 'APROVADA'/);
+  assert.match(controller, /DEMANDA_AGUARDANDO_APROVACAO/);
+  assert.match(controller, /aprovada pela Diretoria\/Gestão antes de gerar uma Ordem de Serviço/);
+  assert.match(controller, /pré-cotação pode continuar normalmente enquanto aguarda aprovação/);
+});
+
 test('compras permite pré-cotação mas bloqueia compra antes da OS', () => {
   const gate = read('modules/compras/compras-demandas.service.js');
   const controller = read('modules/compras/compras.controller.js');
