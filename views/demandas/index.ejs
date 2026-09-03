@@ -1,11 +1,14 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/demandas.css">
+<link rel="stylesheet" href="/css/demandas-planejamento.css?v=20260902-v1">
 <%
   const statusLabel = value => ({
-    NOVA: 'Nova', EM_ANALISE: 'Em análise', EM_ANDAMENTO: 'Em andamento',
+    NOVA: 'Nova', EM_ANALISE: 'Em análise', PLANEJAMENTO: 'Planejamento',
+    AGUARDANDO_APROVACAO: 'Aguardando aprovação', EM_ANDAMENTO: 'Em andamento',
     PARADA: 'Parada', CONCLUIDA: 'Concluída', CANCELADA: 'Cancelada'
   }[value] || value || 'Não informado');
   const priorityLabel = value => ({ BAIXA: 'Baixa', NORMAL: 'Média', ALTA: 'Alta', URGENTE: 'Crítica' }[value] || value || 'Média');
+  const categoryLabel = value => ({ MANUTENCAO:'Manutenção', PRODUCAO:'Produção', NR:'NR', SEGURANCA:'Segurança', AUDITORIA:'Auditoria', MELHORIA:'Melhoria', PROJETO:'Projeto', DIRETORIA:'Diretoria' }[value] || value || 'Manutenção');
   const slug = value => String(value || '').toLowerCase().replace(/_/g, '-');
   const query = changes => {
     const values = { ...filters, ...changes };
@@ -23,7 +26,7 @@
   const metrics = [
     { label: 'Demandas ativas', value: painel.ativas, note: 'Fila operacional', tone: 'green', href: query({ tab: 'ATIVAS', status: '', prioridade: '' }) },
     { label: 'Novas', value: painel.novas, note: 'Aguardando análise', tone: 'blue', href: query({ tab: 'ATIVAS', status: 'NOVA' }) },
-    { label: 'Em análise', value: painel.em_analise, note: 'Em avaliação', tone: 'violet', href: query({ tab: 'ATIVAS', status: 'EM_ANALISE' }) },
+    { label: 'Em análise', value: painel.em_analise, note: painel.planejamento ? `${painel.planejamento} em planejamento` : 'Em avaliação', tone: 'violet', href: query({ tab: 'ATIVAS', status: 'EM_ANALISE' }) },
     { label: 'Em andamento', value: painel.em_andamento, note: 'Execução ativa', tone: 'teal', href: query({ tab: 'ATIVAS', status: 'EM_ANDAMENTO' }) },
     { label: 'Paradas', value: painel.paradas, note: painel.paradas ? 'Requer atenção' : 'Nenhuma no momento', tone: 'red', href: query({ tab: 'ATIVAS', status: 'PARADA' }) },
     { label: 'Críticas e altas', value: painel.prioritarias, note: 'Prioridade elevada', tone: 'orange', href: query({ tab: 'ATIVAS', status: '', prioridade: 'ELEVADA' }) },
@@ -34,7 +37,7 @@
   <header class="demand-head">
     <div>
       <h1>Demandas</h1>
-      <p>Fila operacional da Direção para acompanhamento, definição de responsáveis e execução.</p>
+      <p>Banco de serviços planejados para acompanhamento, preparação de materiais, priorização e futura execução em OS.</p>
     </div>
     <% if (canAccessModule(normalizeRole(user?.role), 'demandas_open')) { %>
       <a class="demand-btn demand-btn-primary" href="/demandas/new">
@@ -80,13 +83,13 @@
       <input type="hidden" name="tab" value="<%= filters.tab %>">
       <label class="filter-search">
         <span>Buscar</span>
-        <input name="q" value="<%= filters.q %>" placeholder="Número, título, descrição ou pessoa">
+        <input name="q" value="<%= filters.q %>" placeholder="Número, título, descrição, equipamento, NR ou pessoa">
       </label>
       <label>
         <span>Status</span>
         <select name="status">
           <option value="">Todos</option>
-          <% ['NOVA','EM_ANALISE','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %>
+          <% ['NOVA','EM_ANALISE','PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %>
             <option value="<%= st %>" <%= filters.status === st ? 'selected' : '' %>><%= statusLabel(st) %></option>
           <% }) %>
         </select>
@@ -154,6 +157,7 @@
                 <div class="demand-identity" data-label="Demanda">
                   <strong>#<%= d.id %> · <%= d.titulo %></strong>
                   <p><%= d.descricao || 'Descrição não informada.' %></p>
+                  <small><%= categoryLabel(d.categoria) %><%= d.equipamento_nome ? ' · ' + d.equipamento_nome : '' %><%= Number(d.subdemandas_count||0) ? ' · ' + d.subdemandas_count + ' subdemanda(s)' : '' %><%= Number(d.solicitacoes_count||0) ? ' · ' + d.solicitacoes_count + ' solicitação(ões)' : '' %></small>
                 </div>
                 <div class="demand-badges" data-label="Status / prioridade">
                   <span class="demand-badge priority-<%= slug(d.prioridade) %>"><%= priorityLabel(d.prioridade) %></span>
@@ -192,12 +196,13 @@
       <% }) %>
     </section>
     <section class="demand-card compact-card workflow-card">
-      <div class="section-heading"><div><h2>Fluxo da demanda</h2><p>Acompanhamento até a conclusão.</p></div></div>
+      <div class="section-heading"><div><h2>Fluxo da demanda</h2><p>Da necessidade até a execução e conclusão.</p></div></div>
       <ol>
-        <li><span>1</span><div><strong>Nova</strong><small>Registro recebido</small></div></li>
-        <li><span>2</span><div><strong>Em análise</strong><small>Responsável e ação definidos</small></div></li>
-        <li><span>3</span><div><strong>Em andamento</strong><small>Execução acompanhada</small></div></li>
-        <li><span>4</span><div><strong>Concluída</strong><small>Histórico preservado</small></div></li>
+        <li><span>1</span><div><strong>Nova / análise</strong><small>Necessidade registrada e escopo definido</small></div></li>
+        <li><span>2</span><div><strong>Planejamento</strong><small>Subdemandas, materiais e pré-cotações</small></div></li>
+        <li><span>3</span><div><strong>Aprovação</strong><small>Priorização para execução</small></div></li>
+        <li><span>4</span><div><strong>OS / execução</strong><small>Solicitações existentes vinculadas à OS</small></div></li>
+        <li><span>5</span><div><strong>Concluída</strong><small>Histórico preservado</small></div></li>
       </ol>
     </section>
   </div>
