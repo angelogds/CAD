@@ -1,0 +1,82 @@
+<%- layout('layout') -%>
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903a">
+<link rel="stylesheet" href="/css/escala-rh-self.css?v=20260903a">
+<%
+  const fmtMin = (value) => { const n=Number(value||0); const sign=n<0?'-':''; const m=Math.abs(n); return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; };
+%>
+<div class="escala-page escala-rh-page">
+  <header class="escala-head">
+    <div><h1>Escala • RH</h1><p>Consulta centralizada de disponibilidade, horas extras, banco de horas e histórico operacional da equipe.</p></div>
+    <div class="escala-actions"><a class="btn" href="/escala/semana">Escala da semana</a><a class="btn btn-green" href="/escala/relatorios">Relatórios PDF</a></div>
+  </header>
+
+  <div class="escala-notice">Painel de consulta do RH com dados já registrados pela Manutenção. A gestão técnica da escala e a aprovação das horas extras continuam sob responsabilidade dos perfis autorizados da Manutenção.</div>
+
+  <section class="escala-kpis rh-kpis">
+    <div class="escala-kpi"><span>Colaboradores no painel</span><strong><%= indicadores.total %></strong><small>Cadastros ativos na escala vigente</small></div>
+    <div class="escala-kpi"><span>Trabalhando</span><strong><%= indicadores.trabalhando %></strong><small>Situação atual identificada</small></div>
+    <div class="escala-kpi"><span>Folgas / afastamentos</span><strong><%= indicadores.indisponiveis %></strong><small>Folga, férias, atestado ou ausência</small></div>
+    <div class="escala-kpi"><span>Horas extras no mês</span><strong><%= fmtMin(indicadores.horasExtrasMesMinutos) %></strong><small><%= indicadores.pendentes %> lançamento(s) pendente(s)</small></div>
+    <div class="escala-kpi"><span>Banco de horas total</span><strong><%= fmtMin(indicadores.bancoHorasMinutos) %></strong><small><%= indicadores.saldosPositivos %> positivo(s) • <%= indicadores.saldosNegativos %> negativo(s)</small></div>
+  </section>
+
+  <section class="escala-section">
+    <div class="escala-section-head"><div><h2>Equipe</h2><div class="muted">Abra a ficha, o banco de horas ou o PDF individual sem depender de solicitação à Manutenção.</div></div></div>
+    <div class="escala-filterbar rh-filterbar">
+      <input id="rh-search" placeholder="Buscar colaborador ou função">
+      <select id="rh-turno"><option value="">Todos os turnos</option><option value="Dia">Dia</option><option value="Noite">Noite</option><option value="Folga">Folga</option></select>
+      <select id="rh-status"><option value="">Todas as situações</option><option value="Trabalhando">Trabalhando</option><option value="Hora extra">Hora extra</option><option value="Folga">Folga</option><option value="Férias">Férias</option><option value="Atestado">Atestado</option></select>
+      <button class="btn" type="button" id="rh-clear">Limpar filtros</button>
+    </div>
+
+    <div class="self-table-wrap">
+      <table class="self-table rh-table">
+        <thead><tr><th>Colaborador</th><th>Função</th><th>Situação</th><th>Turno</th><th>Banco</th><th>HE mês</th><th>Último serviço / HE</th><th>Ações</th></tr></thead>
+        <tbody>
+          <% colaboradores.forEach(c=>{ const search=`${c.nome||''} ${c.funcaoLabel||''}`.toLowerCase(); %>
+            <tr data-rh-row data-search="<%= search %>" data-turno="<%= c.turnoAtual || '' %>" data-status="<%= c.statusAtual || '' %>">
+              <td><div class="rh-person"><% if(c.foto_path){ %><img class="rh-avatar" src="<%= c.foto_path %>" alt="Foto de <%= c.nome %>"><% } else { %><div class="rh-avatar rh-avatar-fallback"><%= c.iniciais || String(c.nome||'C').charAt(0).toUpperCase() %></div><% } %><strong><%= c.nome %></strong></div></td>
+              <td><%= c.funcaoLabel || '-' %></td>
+              <td><span class="self-badge"><%= c.statusAtual || '-' %></span></td>
+              <td><%= c.turnoAtual || '-' %></td>
+              <td><strong><%= c.saldo?.horas || '0h00' %></strong></td>
+              <td><%= c.horasExtrasMes || '0h00' %></td>
+              <td><%= c.ultimaHoraExtra || 'Sem registro' %></td>
+              <td><div class="rh-actions"><a class="btn btn-sm" href="/colaboradores/<%= c.id %>">Ficha</a><a class="btn btn-sm" href="/escala/banco-horas/<%= c.id %>">Banco</a><a class="btn btn-sm" target="_blank" href="/escala/relatorios/funcionario/<%= c.id %>/pdf">PDF</a></div></td>
+            </tr>
+          <% }) %>
+          <% if(!colaboradores.length){ %><tr><td colspan="8" class="muted">Nenhum colaborador ativo encontrado na escala vigente.</td></tr><% } %>
+        </tbody>
+      </table>
+      <div id="rh-empty" class="escala-audit-note" hidden>Nenhum colaborador corresponde aos filtros informados.</div>
+    </div>
+  </section>
+
+  <section class="rh-summary-grid">
+    <article class="escala-section"><h3>O que o RH consulta aqui</h3><p class="muted">Situação da equipe, turno, saldo do banco, horas extras aprovadas do mês, histórico recente e ficha individual. Os dados são reaproveitados do próprio sistema, sem novo lançamento manual.</p></article>
+    <article class="escala-section"><h3>Responsabilidades preservadas</h3><p class="muted">O RH consulta e emite relatórios. A alteração da escala, rodízios e aprovação técnica das horas extras permanece restrita aos perfis de gestão da Manutenção.</p></article>
+  </section>
+</div>
+<script>
+(() => {
+  const search = document.getElementById('rh-search');
+  const turno = document.getElementById('rh-turno');
+  const status = document.getElementById('rh-status');
+  const clear = document.getElementById('rh-clear');
+  const empty = document.getElementById('rh-empty');
+  const rows = [...document.querySelectorAll('[data-rh-row]')];
+  const apply = () => {
+    const q = String(search?.value || '').trim().toLowerCase();
+    const t = String(turno?.value || '').toLowerCase();
+    const s = String(status?.value || '').toLowerCase();
+    let visible = 0;
+    rows.forEach(row => {
+      const ok = (!q || String(row.dataset.search||'').includes(q)) && (!t || String(row.dataset.turno||'').toLowerCase().includes(t)) && (!s || String(row.dataset.status||'').toLowerCase().includes(s));
+      row.hidden = !ok; if(ok) visible += 1;
+    });
+    if(empty) empty.hidden = visible > 0 || rows.length === 0;
+  };
+  [search, turno, status].forEach(el => el?.addEventListener(el?.tagName === 'INPUT' ? 'input' : 'change', apply));
+  clear?.addEventListener('click', () => { if(search) search.value=''; if(turno) turno.value=''; if(status) status.value=''; apply(); });
+})();
+</script>
