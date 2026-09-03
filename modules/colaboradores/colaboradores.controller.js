@@ -3,12 +3,13 @@ const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const service = require('./colaboradores.service');
 const perms = require('./colaboradores.permissions');
+const escalaService = require('../escala/escala.service');
 
 function actor(req) {
   return {
-    id: Number(req.session?.user?.id || 0) || null,
-    name: req.session?.user?.name || null,
-    role: req.session?.user?.role || null,
+    id: Number(req.session?.user?.id || req.user?.id || 0) || null,
+    name: req.session?.user?.name || req.user?.name || null,
+    role: req.session?.user?.role || req.user?.role || null,
   };
 }
 
@@ -39,6 +40,24 @@ function maskColaboradorContact(colaborador, canViewContactDetails) {
   };
 }
 
+function maskEmergencyDetails(colaborador, canViewEmergencyDetails) {
+  if (canViewEmergencyDetails) return colaborador;
+  return {
+    ...colaborador,
+    tipo_sanguineo: null,
+    contato_emergencia: null,
+  };
+}
+
+function safeScale(call, fallback) {
+  try {
+    return call();
+  } catch (error) {
+    console.warn('[colaboradores] Falha ao compor dados da Escala:', error?.message || error);
+    return fallback;
+  }
+}
+
 function index(req, res) {
   const role = perms.roleOf(req);
   const canViewContactDetails = perms.canViewContactDetails(req);
@@ -50,15 +69,40 @@ function index(req, res) {
 
   let lista = service.listColaboradores(filtros);
   if (role === 'COLABORADOR') {
-    const uid = Number(req.session?.user?.id || 0);
+    const uid = Number(req.session?.user?.id || req.user?.id || 0);
     lista = lista.filter((c) => Number(c.user_id || 0) === uid);
   }
-  lista = lista.map((c) => maskColaboradorContact(c, canViewContactDetails));
+
+  const painelEscala = safeScale(
+    () => escalaService.listarPainelEscala({ user: actor(req), canViewAll: role !== 'COLABORADOR' }),
+    { pendentes: 0, colaboradores: [] }
+  );
+  const operationalById = new Map((painelEscala.colaboradores || []).map((item) => [Number(item.id), item]));
+
+  lista = lista.map((c) => ({
+    ...maskColaboradorContact(c, canViewContactDetails),
+    operacional: operationalById.get(Number(c.id)) || null,
+  }));
+
+  const indicadores = {
+    total: lista.length,
+    ativos: lista.filter((c) => String(c.status || '').toUpperCase() === 'ATIVO').length,
+    inativos: lista.filter((c) => String(c.status || '').toUpperCase() !== 'ATIVO').length,
+    emEscala: lista.filter((c) => c.operacional).length,
+    indisponiveis: lista.filter((c) => /(folga|férias|ferias|atestado|ausente|falta)/i.test(String(c.operacional?.statusAtual || ''))).length,
+    horasExtrasMesMinutos: lista.reduce((total, c) => total + Number(c.operacional?.horasExtrasMesMinutos || 0), 0),
+    bancoHorasMinutos: lista.reduce((total, c) => total + Number(c.operacional?.saldo?.minutos || 0), 0),
+    pendentes: Number(painelEscala.pendentes || 0),
+  };
+
+  const setores = [...new Set(lista.map((c) => String(c.setor || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
   return res.render('colaboradores/index', {
     title: 'Colaboradores',
     lista,
     filtros,
+    indicadores,
+    setores,
     role,
     canManageProfiles: perms.canManageProfiles(req),
     canViewContactDetails,
@@ -69,13 +113,26 @@ function show(req, res) {
   const id = parseId(req.params.id);
   let colaborador = service.getColaboradorById(id);
   if (!ensureCanAccess(req, res, colaborador)) return;
+
   const canViewContactDetails = perms.canViewContactDetails(req);
+  const canViewEmergencyDetails = perms.canViewEmergencyDetails(req);
   colaborador = maskColaboradorContact(colaborador, canViewContactDetails);
+  colaborador = maskEmergencyDetails(colaborador, canViewEmergencyDetails);
 
   const tabs = service.getTabData(id);
   const dashboard = service.getDashboard(id);
   const historico = service.getTimeline(id);
-  const activeTab = String(req.query.tab || 'dados');
+  const activeTab = String(req.query.tab || 'resumo');
+
+  const painelEscala = safeScale(
+    () => escalaService.listarPainelEscala({ user: actor(req), canViewAll: false, colaboradorId: id }),
+    { pendentes: 0, colaboradores: [] }
+  );
+  const operational = (painelEscala.colaboradores || [])[0] || null;
+  const horasExtras = safeScale(() => escalaService.listarHorasExtras({ colaborador_id: id }).slice(0, 40), []);
+  const bancoHoras = safeScale(() => escalaService.calcularSaldoBancoHoras(id), { minutos: 0, horas: '0h00', creditos: 0, debitos: 0, diasFolga: 0 });
+  const bancoMovimentos = safeScale(() => escalaService.listarMovimentosBancoHoras(id).slice(0, 40), []);
+  const folgas = safeScale(() => escalaService.listarFolgas({ colaborador_id: id }).slice(0, 40), []);
 
   return res.render('colaboradores/show', {
     title: `Colaborador • ${colaborador.nome}`,
@@ -83,10 +140,16 @@ function show(req, res) {
     dashboard,
     tabs,
     historico,
+    operational,
+    horasExtras,
+    bancoHoras,
+    bancoMovimentos,
+    folgas,
     activeTab,
     role: perms.roleOf(req),
     canManageProfiles: perms.canManageProfiles(req),
     canViewContactDetails,
+    canViewEmergencyDetails,
     canManageFerramental: perms.canManageFerramental(req),
     canManageEPIAndMateriais: perms.canManageEPIAndMateriais(req),
     canValidateCertificados: perms.canValidateCertificados(req),

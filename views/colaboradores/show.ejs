@@ -1,356 +1,299 @@
+<% layout('layout') %>
 <link rel="stylesheet" href="/css/colaboradores.css" />
 <%
-function tempoEmpresa(dataAdmissao) {
-  if (!dataAdmissao) return '-';
-  const start = new Date(dataAdmissao);
-  const diff = Date.now() - start.getTime();
-  const years = Math.floor(diff / (1000*60*60*24*365.25));
-  const months = Math.floor((diff % (1000*60*60*24*365.25)) / (1000*60*60*24*30));
-  return `${years}a ${months}m`;
-}
+  const fmtMin = (value) => {
+    const n = Number(value || 0);
+    const sign = n < 0 ? '-' : '';
+    const abs = Math.abs(n);
+    return `${sign}${Math.floor(abs / 60)}h${String(abs % 60).padStart(2, '0')}`;
+  };
+  const fmtDate = (value) => {
+    const s = String(value || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return value || '-';
+    const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`;
+  };
+  const tempoEmpresa = (dataAdmissao) => {
+    if (!dataAdmissao) return '-';
+    const start = new Date(dataAdmissao);
+    const diff = Date.now() - start.getTime();
+    if (!Number.isFinite(diff) || diff < 0) return '-';
+    const years = Math.floor(diff / (1000*60*60*24*365.25));
+    const months = Math.floor((diff % (1000*60*60*24*365.25)) / (1000*60*60*24*30));
+    return `${years}a ${months}m`;
+  };
+  const statusAtual = operational?.statusAtual || colaborador.status || '-';
+  const turnoAtual = operational?.turnoAtual || '-';
+  const saldoAtual = operational?.saldo?.horas || bancoHoras?.horas || '0h00';
+  const heMes = operational?.horasExtrasMes || '0h00';
 %>
 
-<section class="colab-top card">
-  <img src="<%= (colaborador.foto_url && (typeof attachmentExists !== "function" || attachmentExists(colaborador.foto_url))) ? colaborador.foto_url : '/IMG/logo_menu.png.png' %>" alt="Foto" class="colab-avatar" />
-  <div>
-    <h1 style="margin:0"><%= colaborador.nome %></h1>
-    <p class="muted" style="margin:6px 0 0"><%= colaborador.funcao || '-' %> • <%= colaborador.setor || '-' %> • Tempo de empresa: <strong><%= tempoEmpresa(colaborador.data_admissao) %></strong></p>
-  </div>
-  <span class="pill-tag <%= colaborador.status==='ATIVO' ? 'pill-green':'pill-gray' %>"><%= colaborador.status || 'ATIVO' %></span>
-</section>
-
-<section class="cards-kpi">
-  <article class="card"><h4>EPIs ativos</h4><p><%= dashboard.episAtivos %></p></article>
-  <article class="card"><h4>Ferramentas ativas</h4><p><%= dashboard.ferramentasAtivas %></p></article>
-  <article class="card"><h4>Materiais no mês</h4><p><%= dashboard.materiaisMes %></p></article>
-  <article class="card"><h4>Pendências</h4><p><%= dashboard.pendencias %></p></article>
-  <article class="card"><h4>Cursos concluídos</h4><p><%= dashboard.cursosConcluidos %></p></article>
-</section>
-
-<div class="subtabs">
-  <a class="subtab <%= activeTab==='dados' ? 'active' : '' %>" href="?tab=dados">Dados Gerais</a>
-  <a class="subtab <%= activeTab==='ferramental' ? 'active' : '' %>" href="?tab=ferramental">Ferramental</a>
-  <a class="subtab <%= activeTab==='epis' ? 'active' : '' %>" href="?tab=epis">EPIs</a>
-  <a class="subtab <%= activeTab==='materiais' ? 'active' : '' %>" href="?tab=materiais">Materiais</a>
-  <a class="subtab <%= activeTab==='escala' ? 'active' : '' %>" href="?tab=escala">Escala</a>
-  <a class="subtab <%= activeTab==='cursos-internos' ? 'active' : '' %>" href="?tab=cursos-internos">Cursos Internos</a>
-  <a class="subtab <%= activeTab==='certificados-externos' ? 'active' : '' %>" href="?tab=certificados-externos">Certificados Externos</a>
-  <a class="subtab <%= activeTab==='documentos' ? 'active' : '' %>" href="?tab=documentos">Documentos</a>
-  <a class="subtab <%= activeTab==='historico' ? 'active' : '' %>" href="?tab=historico">Histórico</a>
-</div>
-
-<% if (canGenerateReports) { %>
-<div class="card" style="margin-bottom:14px">
-  <div class="row" style="align-items:center;justify-content:space-between;">
-    <strong>Relatórios (PDF)</strong>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <a class="btn btn-sm btn-outline" href="/colaboradores/<%= colaborador.id %>/relatorios/individual">Individual</a>
-      <a class="btn btn-sm btn-outline" href="/colaboradores/<%= colaborador.id %>/relatorios/ferramentas">Ferramentas</a>
-      <a class="btn btn-sm btn-outline" href="/colaboradores/<%= colaborador.id %>/relatorios/epis">EPIs</a>
-      <a class="btn btn-sm btn-outline" href="/colaboradores/<%= colaborador.id %>/relatorios/materiais">Materiais</a>
-      <a class="btn btn-sm btn-outline" href="/colaboradores/<%= colaborador.id %>/relatorios/custos">Custo total</a>
+<main class="colab-page colab-profile-page">
+  <header class="colab-profile-hero">
+    <div class="colab-profile-main">
+      <img src="<%= (colaborador.foto_url && (typeof attachmentExists !== 'function' || attachmentExists(colaborador.foto_url))) ? colaborador.foto_url : '/IMG/logo_menu.png.png' %>" alt="Foto de <%= colaborador.nome %>" class="colab-profile-avatar" />
+      <div>
+        <span class="colab-eyebrow">FICHA DO COLABORADOR</span>
+        <h1><%= colaborador.nome %></h1>
+        <p><%= colaborador.funcao || '-' %> • <%= colaborador.setor || '-' %> • <%= tempoEmpresa(colaborador.data_admissao) %> de empresa</p>
+        <div class="colab-inline-badges">
+          <span class="colab-status-badge <%= String(colaborador.status||'').toUpperCase()==='ATIVO' ? 'is-ok' : 'is-neutral' %>"><%= colaborador.status || 'ATIVO' %></span>
+          <span class="colab-status-badge <%= /trabalhando|hora extra/i.test(statusAtual) ? 'is-ok' : (/folga|férias|ferias|atestado|ausente|falta/i.test(statusAtual) ? 'is-warn' : 'is-neutral') %>"><%= statusAtual %></span>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
-<% } %>
+    <div class="colab-profile-actions">
+      <a class="btn btn-ghost" href="/colaboradores">Voltar</a>
+      <% if (!isColaboradorOnly) { %><a class="btn btn-outline" href="/colaboradores/<%= colaborador.id %>/cartao">Cartão QR</a><% } %>
+      <a class="btn btn-outline" href="/escala/banco-horas/<%= colaborador.id %>">Banco de horas</a>
+      <% if (canGenerateReports) { %><a class="btn btn-primary" href="/colaboradores/<%= colaborador.id %>/relatorios/individual" target="_blank">Relatório PDF</a><% } %>
+    </div>
+  </header>
 
-<% if (activeTab==='dados') { %>
-  <div class="card">
-    <h3 style="margin-top:0">Dados gerais e restrições</h3>
-    <% if (canManageProfiles) { %>
-    <form action="/colaboradores/<%= colaborador.id %>/perfil" method="POST" enctype="multipart/form-data" class="grid-3">
-      <input class="input" name="nome" value="<%= colaborador.nome %>" required />
-      <input class="input" name="apelido" value="<%= colaborador.apelido || '' %>" />
-      <input class="input" name="funcao" value="<%= colaborador.funcao || '' %>" />
-      <input class="input" name="setor" value="<%= colaborador.setor || '' %>" />
-      <input class="input" type="date" name="data_admissao" value="<%= colaborador.data_admissao || '' %>" />
-      <select name="status"><option <%= colaborador.status==='ATIVO'?'selected':'' %>>ATIVO</option><option <%= colaborador.status==='INATIVO'?'selected':'' %>>INATIVO</option></select>
-      <% if (canViewContactDetails) { %>
-        <input class="input" name="telefone" value="<%= colaborador.telefone || '' %>" placeholder="Telefone" />
-        <input class="input" name="telefone_whatsapp" inputmode="numeric" data-whatsapp-input value="<%= colaborador.telefone_whatsapp || '' %>" placeholder="WhatsApp: 5575999999999" />
-      <% } else { %>
-        <div class="muted">Telefone e WhatsApp restritos a Admin e Encarregado de Manutenção.</div>
-      <% } %>
-      <input class="input" type="number" name="lider_id" value="<%= colaborador.lider_id || '' %>" placeholder="ID Líder" />
-      <input class="input" type="number" name="user_id" value="<%= colaborador.user_id || '' %>" placeholder="ID Usuário" />
-      <input class="input" type="file" name="foto" accept="image/*" />
-      <input class="input" name="tipo_sanguineo" value="<%= colaborador.tipo_sanguineo || '' %>" placeholder="Tipo sanguíneo" />
-      <% if (canViewContactDetails) { %>
-        <input class="input" name="contato_emergencia" value="<%= colaborador.contato_emergencia || '' %>" placeholder="Contato de emergência" />
-      <% } %>
-      <textarea name="restricao_operacional" placeholder="Restrição operacional"><%= colaborador.restricao_operacional || '' %></textarea>
-      <textarea name="observacoes" placeholder="Observações"><%= colaborador.observacoes || '' %></textarea>
-      <button class="btn btn-primary" type="submit">Salvar</button>
-    </form>
-    <% } else { %>
-      <p><strong>Tipo sanguíneo:</strong> <%= colaborador.tipo_sanguineo || '-' %></p>
-      <% if (canViewContactDetails) { %>
-        <p><strong>Contato emergência:</strong> <%= colaborador.contato_emergencia || '-' %></p>
-        <p><strong>WhatsApp:</strong> <%= colaborador.telefone_whatsapp ? 'Cadastrado' : 'Sem WhatsApp' %></p>
-      <% } else { %>
-        <p><strong>Contato/WhatsApp:</strong> Restrito</p>
-      <% } %>
-      <p><strong>Restrição operacional:</strong> <%= colaborador.restricao_operacional || '-' %></p>
-      <p><strong>Observações:</strong> <%= colaborador.observacoes || '-' %></p>
-    <% } %>
-  </div>
-<% } %>
+  <section class="colab-kpi-grid colab-profile-kpis">
+    <article class="colab-kpi"><span>Situação</span><strong class="value-text"><%= statusAtual %></strong><small>Condição operacional atual</small></article>
+    <article class="colab-kpi"><span>Turno</span><strong class="value-text"><%= turnoAtual %></strong><small>Escala vigente</small></article>
+    <article class="colab-kpi"><span>Banco de horas</span><strong><%= saldoAtual %></strong><small><%= Number(bancoHoras?.minutos || 0) >= 0 ? 'Saldo positivo/zerado' : 'Saldo negativo' %></small></article>
+    <article class="colab-kpi"><span>HE no mês</span><strong><%= heMes %></strong><small>Horas extras aprovadas</small></article>
+    <article class="colab-kpi"><span>EPIs / Ferramentas</span><strong><%= dashboard.episAtivos %> / <%= dashboard.ferramentasAtivas %></strong><small>Itens ativos</small></article>
+    <article class="colab-kpi"><span>Pendências</span><strong><%= dashboard.pendencias %></strong><small>EPIs, ferramentas ou certificados</small></article>
+  </section>
 
-<% if (activeTab==='ferramental') { %>
-<div class="card">
-  <% if (canManageFerramental) { %>
-  <form action="/colaboradores/<%= colaborador.id %>/ferramental" method="POST" class="grid-3">
-    <input class="input" name="nome" placeholder="Ferramenta" required />
-    <input class="input" name="codigo_patrimonio" placeholder="Patrimônio" required />
-    <input class="input" name="categoria" placeholder="Categoria" />
-    <input class="input" type="number" step="0.01" name="valor" placeholder="Valor" />
-    <select name="tipo"><option value="entrega">Entrega</option><option value="transferencia">Transferência</option><option value="devolucao">Devolução</option><option value="extravio">Extravio</option></select>
-    <input class="input" name="observacao" placeholder="Observação" />
-    <button class="btn btn-primary" type="submit">Adicionar</button>
-  </form>
+  <nav class="colab-tabs" aria-label="Seções da ficha do colaborador">
+    <a class="<%= activeTab==='resumo'?'active':'' %>" href="?tab=resumo">Resumo</a>
+    <a class="<%= activeTab==='dados'?'active':'' %>" href="?tab=dados">Dados profissionais</a>
+    <a class="<%= activeTab==='escala'?'active':'' %>" href="?tab=escala">Escala</a>
+    <a class="<%= activeTab==='horas-extras'?'active':'' %>" href="?tab=horas-extras">Horas extras</a>
+    <a class="<%= activeTab==='banco-horas'?'active':'' %>" href="?tab=banco-horas">Banco de horas</a>
+    <a class="<%= activeTab==='ausencias'?'active':'' %>" href="?tab=ausencias">Folgas e ausências</a>
+    <a class="<%= activeTab==='ferramental'?'active':'' %>" href="?tab=ferramental">Ferramental</a>
+    <a class="<%= activeTab==='epis'?'active':'' %>" href="?tab=epis">EPIs</a>
+    <a class="<%= activeTab==='materiais'?'active':'' %>" href="?tab=materiais">Materiais</a>
+    <a class="<%= activeTab==='cursos-internos'?'active':'' %>" href="?tab=cursos-internos">Treinamentos</a>
+    <a class="<%= activeTab==='certificados-externos'?'active':'' %>" href="?tab=certificados-externos">Certificados</a>
+    <a class="<%= activeTab==='documentos'?'active':'' %>" href="?tab=documentos">Documentos</a>
+    <a class="<%= activeTab==='historico'?'active':'' %>" href="?tab=historico">Histórico</a>
+    <% if (canViewEmergencyDetails) { %><a class="<%= activeTab==='saude'?'active':'' %>" href="?tab=saude">Saúde e emergência</a><% } %>
+  </nav>
+
+  <% if (activeTab==='resumo') { %>
+    <section class="colab-summary-grid">
+      <article class="colab-panel">
+        <div class="colab-section-head"><div><h2>Resumo operacional</h2><p>Dados reaproveitados da Escala, sem lançamento paralelo.</p></div></div>
+        <div class="colab-info-grid">
+          <div><span>Situação atual</span><strong><%= statusAtual %></strong></div>
+          <div><span>Turno</span><strong><%= turnoAtual %></strong></div>
+          <div><span>Banco</span><strong><%= saldoAtual %></strong></div>
+          <div><span>HE no mês</span><strong><%= heMes %></strong></div>
+          <div><span>Último serviço/HE</span><strong><%= operational?.ultimaHoraExtra || 'Sem registro recente' %></strong></div>
+          <div><span>Materiais retirados no mês</span><strong><%= dashboard.materiaisMes || 0 %></strong></div>
+        </div>
+      </article>
+
+      <article class="colab-panel">
+        <div class="colab-section-head"><div><h2>Dados profissionais</h2><p>Cadastro mestre do colaborador.</p></div></div>
+        <div class="colab-profile-list">
+          <div><span>Função</span><strong><%= colaborador.funcao || '-' %></strong></div>
+          <div><span>Setor</span><strong><%= colaborador.setor || '-' %></strong></div>
+          <div><span>Admissão</span><strong><%= fmtDate(colaborador.data_admissao) %></strong></div>
+          <div><span>Líder</span><strong><%= colaborador.lider_nome || '-' %></strong></div>
+          <div><span>Usuário vinculado</span><strong><%= colaborador.user_id || 'Não vinculado' %></strong></div>
+          <% if (canViewContactDetails) { %><div><span>WhatsApp</span><strong><%= colaborador.telefone_whatsapp ? 'Cadastrado' : 'Não cadastrado' %></strong></div><% } %>
+        </div>
+      </article>
+
+      <article class="colab-panel colab-wide">
+        <div class="colab-section-head"><div><h2>Atalhos da ficha</h2><p>Acesse os controles já existentes sem duplicar módulos.</p></div></div>
+        <div class="colab-shortcuts">
+          <a href="?tab=horas-extras"><strong>Horas extras</strong><span><%= horasExtras.length %> registro(s) recentes</span></a>
+          <a href="?tab=banco-horas"><strong>Banco de horas</strong><span><%= saldoAtual %> de saldo</span></a>
+          <a href="?tab=ausencias"><strong>Folgas e ausências</strong><span><%= folgas.length %> registro(s) recentes</span></a>
+          <a href="?tab=epis"><strong>EPIs</strong><span><%= dashboard.episAtivos %> ativo(s)</span></a>
+          <a href="?tab=ferramental"><strong>Ferramental</strong><span><%= dashboard.ferramentasAtivas %> ativo(s)</span></a>
+          <a href="?tab=documentos"><strong>Documentos</strong><span><%= tabs.documentos.length %> arquivo(s)</span></a>
+        </div>
+      </article>
+    </section>
   <% } %>
 
-  <div class="table-wrap" style="margin-top:14px;">
-    <table class="table"><thead><tr><th>Ferramenta</th><th>Patrimônio</th><th>Data entrega</th><th>Status</th><th>Observação</th><th>Ações</th></tr></thead><tbody>
-      <% tabs.ferramental.forEach((row)=> { %>
-        <tr>
-          <td><%= row.ferramenta_nome %></td>
-          <td><%= row.codigo_patrimonio %></td>
-          <td><%= row.data %></td>
-          <td><span class="pill-tag pill-gray"><%= row.status %></span></td>
-          <td><%= row.observacao || '-' %></td>
-          <td>
-            <% if (canManageFerramental) { %>
-            <form action="/colaboradores/<%= colaborador.id %>/ferramental/<%= row.id %>/acao" method="POST" style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button class="btn btn-sm" name="acao" value="transferir">Transferir</button>
-              <button class="btn btn-sm" name="acao" value="devolver">Devolver</button>
-              <button class="btn btn-sm" name="acao" value="extravio">Extravio</button>
-            </form>
-            <% } %>
-          </td>
-        </tr>
-      <% }) %>
-    </tbody></table>
-  </div>
-</div>
-<% } %>
-
-<% if (activeTab==='epis') { %>
-<div class="card">
-  <% if (canManageEPIAndMateriais) { %>
-  <form action="/colaboradores/<%= colaborador.id %>/epis" method="POST" class="grid-3">
-    <input class="input" name="nome" placeholder="Tipo EPI" required />
-    <input class="input" name="ca" placeholder="CA" />
-    <input class="input" type="date" name="validade" />
-    <input class="input" type="number" step="0.01" name="quantidade" value="1" />
-    <input class="input" type="date" name="data_entrega" value="<%= today %>" />
-    <input class="input" name="categoria" placeholder="Categoria" />
-    <button class="btn btn-primary" type="submit">Lançar EPI</button>
-  </form>
-  <% } %>
-
-  <div class="table-wrap" style="margin-top:14px;">
-    <table class="table"><thead><tr><th>Tipo</th><th>CA</th><th>Validade</th><th>Qtd</th><th>Entrega</th><th>Status</th><th>Ações</th></tr></thead><tbody>
-      <% tabs.epis.forEach((row)=> { const vencendo = row.validade && row.validade <= today; %>
-        <tr>
-          <td><%= row.epi_nome %></td>
-          <td><%= row.ca || '-' %></td>
-          <td><%= row.validade || '-' %> <% if (vencendo) { %><span class="pill-tag pill-amber">Vencido</span><% } %></td>
-          <td><%= row.quantidade %></td>
-          <td><%= row.data_entrega %></td>
-          <td><span class="pill-tag pill-gray"><%= row.status %></span></td>
-          <td>
-            <% if (canManageEPIAndMateriais) { %>
-            <form action="/colaboradores/<%= colaborador.id %>/epis/<%= row.id %>/acao" method="POST" style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button class="btn btn-sm" name="acao" value="troca">Troca</button>
-              <button class="btn btn-sm" name="acao" value="devolucao">Devolução</button>
-              <button class="btn btn-sm" name="acao" value="vencer">Marcar vencido</button>
-            </form>
-            <% } %>
-          </td>
-        </tr>
-      <% }) %>
-    </tbody></table>
-  </div>
-</div>
-<% } %>
-
-<% if (activeTab==='materiais') { %>
-<div class="card">
-  <% if (canManageEPIAndMateriais) { %>
-  <form action="/colaboradores/<%= colaborador.id %>/materiais" method="POST" class="grid-3">
-    <input class="input" name="nome" placeholder="Material" required />
-    <input class="input" name="unidade" placeholder="Unidade" value="UN" />
-    <input class="input" type="number" step="0.01" name="quantidade" value="1" />
-    <input class="input" name="destino" placeholder="Destino (obrigatório)" required />
-    <input class="input" name="equipamento" placeholder="Equipamento" />
-    <input class="input" name="os_id" placeholder="OS" type="number" />
-    <input class="input" name="autorizado_por" placeholder="Autorizado por" />
-    <input class="input" name="entregue_por" placeholder="Entregue por" />
-    <button class="btn btn-primary" type="submit">Registrar retirada</button>
-  </form>
-  <% } %>
-
-  <div class="table-wrap" style="margin-top:14px;">
-    <table class="table"><thead><tr><th>Material</th><th>Qtd</th><th>Data</th><th>Destino</th><th>Equipamento</th><th>OS</th><th>Autorizado por</th></tr></thead><tbody>
-      <% tabs.materiais.forEach((row)=> { %>
-        <tr>
-          <td><%= row.material_nome %></td><td><%= row.quantidade %> <%= row.unidade %></td><td><%= row.data %></td><td><%= row.destino %></td><td><%= row.equipamento || '-' %></td><td><%= row.os_id || '-' %></td><td><%= row.autorizado_por || '-' %></td>
-        </tr>
-      <% }) %>
-    </tbody></table>
-  </div>
-</div>
-<% } %>
-
-<% if (activeTab==='escala') { %>
-<div class="card">
-  <div class="table-wrap">
-    <table class="table"><thead><tr><th>Semana</th><th>Período</th><th>Turno</th><th>Horário</th><th>Observação</th></tr></thead><tbody>
-      <% tabs.escala.forEach((row) => { %>
-        <tr><td><%= row.semana_numero %></td><td><%= row.data_inicio %> a <%= row.data_fim %></td><td><%= row.tipo_turno %></td><td><%= row.horario_inicio || '-' %> - <%= row.horario_fim || '-' %></td><td><%= row.observacao || '-' %></td></tr>
-      <% }) %>
-    </tbody></table>
-  </div>
-</div>
-<% } %>
-
-<% if (activeTab==='cursos-internos' || activeTab==='certificados-externos') { %>
-<div class="card">
-  <% if (!isColaboradorOnly) { %>
-  <form action="/colaboradores/<%= colaborador.id %>/certificados" method="POST" enctype="multipart/form-data" class="grid-3">
-    <select name="tipo"><option value="interno" <%= activeTab==='cursos-internos'?'selected':'' %>>Interno</option><option value="externo" <%= activeTab==='certificados-externos'?'selected':'' %>>Externo</option></select>
-    <input class="input" name="titulo" placeholder="Título" required />
-    <input class="input" name="instituicao" placeholder="Instituição" />
-    <input class="input" name="carga_horaria" type="number" step="0.5" placeholder="Carga horária" />
-    <input class="input" type="date" name="data_emissao" />
-    <input class="input" type="date" name="validade" />
-    <input class="input" type="file" name="arquivo" accept="application/pdf" />
-    <button class="btn btn-primary" type="submit">Registrar certificado</button>
-  </form>
-  <% } %>
-
-  <% const rows = activeTab==='cursos-internos' ? tabs.cursosInternos : tabs.certificadosExternos; %>
-  <div class="table-wrap" style="margin-top:14px;">
-    <table class="table"><thead><tr><th>Título</th><th>Instituição</th><th>Emissão</th><th>Validade</th><th>Status</th><th>Arquivo</th><th>Validação</th></tr></thead><tbody>
-      <% rows.forEach((row) => { %>
-        <tr>
-          <td><%= row.titulo %></td>
-          <td><%= row.instituicao || '-' %></td>
-          <td><%= row.data_emissao || '-' %></td>
-          <td><%= row.validade || '-' %></td>
-          <td><span class="pill-tag pill-gray"><%= row.status_validacao %></span></td>
-          <td><% if (row.arquivo_url) { %><a href="<%= row.arquivo_url %>" target="_blank">Abrir</a><% } else { %>-<% } %></td>
-          <td>
-            <% if (canValidateCertificados) { %>
-            <form action="/colaboradores/<%= colaborador.id %>/certificados/<%= row.id %>/validar" method="POST" style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button class="btn btn-sm" name="status_validacao" value="aprovado">Aprovar</button>
-              <button class="btn btn-sm" name="status_validacao" value="reprovado">Reprovar</button>
-              <button class="btn btn-sm" name="status_validacao" value="vencido">Vencido</button>
-            </form>
-            <% } %>
-          </td>
-        </tr>
-      <% }) %>
-    </tbody></table>
-  </div>
-</div>
-<% } %>
-
-<% if (activeTab==='documentos') { %>
-<div class="card">
-  <% if (!isColaboradorOnly) { %>
-  <form action="/colaboradores/<%= colaborador.id %>/documentos" method="POST" enctype="multipart/form-data" class="grid-2">
-    <input class="input" name="tipo" placeholder="Tipo (termo, contrato, etc.)" required />
-    <input class="input" type="file" name="arquivo" required />
-    <button class="btn btn-primary" type="submit">Upload</button>
-  </form>
-  <% } %>
-  <div class="table-wrap" style="margin-top:14px;">
-    <table class="table"><thead><tr><th>Tipo</th><th>Arquivo</th><th>Data</th><th>Ciência</th></tr></thead><tbody>
-      <% tabs.documentos.forEach((row) => { %>
-      <tr>
-        <td><%= row.tipo %></td>
-        <td><a href="<%= row.arquivo_url %>" target="_blank">Abrir</a></td>
-        <td><%= row.data %></td>
-        <td>
-          <%= row.confirmado_em ? `Confirmado em ${row.confirmado_em}` : 'Pendente' %>
-          <% if (!row.confirmado_em) { %>
-          <form action="/colaboradores/<%= colaborador.id %>/confirmar-ciencia" method="POST" style="display:inline;">
-            <input type="hidden" name="entidade" value="documentos_colaborador" />
-            <input type="hidden" name="entidade_id" value="<%= row.id %>" />
-            <input type="hidden" name="tab" value="documentos" />
-            <button class="btn btn-sm btn-outline" type="submit">Confirmar</button>
-          </form>
+  <% if (activeTab==='dados') { %>
+    <section class="colab-panel">
+      <div class="colab-section-head"><div><h2>Dados profissionais</h2><p>Identificação, função, setor, contato e vínculo com usuário do sistema.</p></div></div>
+      <% if (canManageProfiles) { %>
+        <form action="/colaboradores/<%= colaborador.id %>/perfil" method="POST" enctype="multipart/form-data" class="colab-form-grid">
+          <label><span>Nome completo</span><input class="input" name="nome" value="<%= colaborador.nome %>" required /></label>
+          <label><span>Apelido</span><input class="input" name="apelido" value="<%= colaborador.apelido || '' %>" /></label>
+          <label><span>Função</span><input class="input" name="funcao" value="<%= colaborador.funcao || '' %>" /></label>
+          <label><span>Setor</span><input class="input" name="setor" value="<%= colaborador.setor || '' %>" /></label>
+          <label><span>Data de admissão</span><input class="input" type="date" name="data_admissao" value="<%= colaborador.data_admissao || '' %>" /></label>
+          <label><span>Status</span><select class="input" name="status"><option <%= colaborador.status==='ATIVO'?'selected':'' %>>ATIVO</option><option <%= colaborador.status==='INATIVO'?'selected':'' %>>INATIVO</option></select></label>
+          <% if (canViewContactDetails) { %>
+            <label><span>Telefone</span><input class="input" name="telefone" value="<%= colaborador.telefone || '' %>" /></label>
+            <label><span>WhatsApp</span><input class="input" name="telefone_whatsapp" inputmode="numeric" data-whatsapp-input value="<%= colaborador.telefone_whatsapp || '' %>" placeholder="5575999999999" /></label>
           <% } %>
-        </td>
-      </tr>
-      <% }) %>
-    </tbody></table>
-  </div>
-</div>
-<% } %>
+          <label><span>ID do líder</span><input class="input" type="number" name="lider_id" value="<%= colaborador.lider_id || '' %>" /></label>
+          <label><span>ID do usuário</span><input class="input" type="number" name="user_id" value="<%= colaborador.user_id || '' %>" /></label>
+          <label><span>Foto</span><input class="input" type="file" name="foto" accept="image/*" /></label>
+          <% if (canViewEmergencyDetails) { %>
+            <label><span>Tipo sanguíneo</span><input class="input" name="tipo_sanguineo" value="<%= colaborador.tipo_sanguineo || '' %>" /></label>
+            <label><span>Contato de emergência</span><input class="input" name="contato_emergencia" value="<%= colaborador.contato_emergencia || '' %>" /></label>
+            <label class="colab-span-2"><span>Restrição operacional</span><textarea class="input" name="restricao_operacional"><%= colaborador.restricao_operacional || '' %></textarea></label>
+          <% } %>
+          <label class="colab-span-2"><span>Observações</span><textarea class="input" name="observacoes"><%= colaborador.observacoes || '' %></textarea></label>
+          <div class="colab-form-actions"><button class="btn btn-primary" type="submit">Salvar alterações</button></div>
+        </form>
+      <% } else { %>
+        <div class="colab-profile-list">
+          <div><span>Nome</span><strong><%= colaborador.nome %></strong></div><div><span>Apelido</span><strong><%= colaborador.apelido || '-' %></strong></div>
+          <div><span>Função</span><strong><%= colaborador.funcao || '-' %></strong></div><div><span>Setor</span><strong><%= colaborador.setor || '-' %></strong></div>
+          <div><span>Admissão</span><strong><%= fmtDate(colaborador.data_admissao) %></strong></div><div><span>Líder</span><strong><%= colaborador.lider_nome || '-' %></strong></div>
+          <% if (canViewContactDetails) { %><div><span>Telefone</span><strong><%= colaborador.telefone || '-' %></strong></div><div><span>WhatsApp</span><strong><%= colaborador.telefone_whatsapp || '-' %></strong></div><% } %>
+        </div>
+      <% } %>
+    </section>
+  <% } %>
 
-<% if (activeTab==='historico') { %>
-<div class="card">
-  <div class="table-wrap">
-    <table class="table"><thead><tr><th>Data</th><th>Entidade</th><th>Ação</th><th>Responsável</th><th>Confirmação Digital</th></tr></thead><tbody>
-      <% historico.forEach((row)=> { %>
-        <tr>
-          <td><%= row.created_at %></td><td><%= row.entidade %>#<%= row.entidade_id || '-' %></td><td><%= row.acao %></td><td><%= row.responsavel_nome || '-' %></td>
-          <td>
-            <% if (['movimentacoes_ferramentas','entregas_epi'].includes(row.entidade) && row.acao==='create') { %>
-              <form action="/colaboradores/<%= colaborador.id %>/confirmar-ciencia" method="POST">
-                <input type="hidden" name="entidade" value="<%= row.entidade %>" />
-                <input type="hidden" name="entidade_id" value="<%= row.entidade_id %>" />
-                <input type="hidden" name="tab" value="historico" />
-                <button class="btn btn-sm btn-outline" type="submit">Confirmar ciência</button>
-              </form>
-            <% } else { %>
-              -
-            <% } %>
-          </td>
-        </tr>
-      <% }) %>
-    </tbody></table>
-  </div>
-</div>
-<% } %>
+  <% if (activeTab==='escala') { %>
+    <section class="colab-panel">
+      <div class="colab-section-head"><div><h2>Escala e disponibilidade</h2><p>Histórico recente de alocação semanal.</p></div><a class="btn btn-outline" href="<%= isColaboradorOnly ? '/escala/meu-painel' : '/escala/semana' %>"><%= isColaboradorOnly ? 'Minha Escala' : 'Abrir Escala' %></a></div>
+      <div class="colab-operational-strip"><div><span>Situação atual</span><strong><%= statusAtual %></strong></div><div><span>Turno atual</span><strong><%= turnoAtual %></strong></div><div><span>Última HE/serviço</span><strong><%= operational?.ultimaHoraExtra || '-' %></strong></div></div>
+      <div class="colab-table-wrap"><table class="colab-table"><thead><tr><th>Semana</th><th>Período</th><th>Turno</th><th>Horário</th><th>Observação</th></tr></thead><tbody>
+        <% if (!tabs.escala.length) { %><tr><td colspan="5" class="colab-empty">Sem alocações recentes.</td></tr><% } %>
+        <% tabs.escala.forEach((row)=>{ %><tr><td>#<%= row.semana_numero %></td><td><%= fmtDate(row.data_inicio) %> a <%= fmtDate(row.data_fim) %></td><td><%= row.tipo_turno %></td><td><%= row.horario_inicio || '-' %> - <%= row.horario_fim || '-' %></td><td><%= row.observacao || '-' %></td></tr><% }) %>
+      </tbody></table></div>
+    </section>
+  <% } %>
+
+  <% if (activeTab==='horas-extras') { %>
+    <section class="colab-panel">
+      <div class="colab-section-head"><div><h2>Horas extras</h2><p>Registros reais do módulo de Escala, vinculados ao colaborador.</p></div></div>
+      <div class="colab-table-wrap"><table class="colab-table"><thead><tr><th>Data</th><th>OS / Equipamento</th><th>Descrição</th><th>Duração</th><th>Status</th><th>Aprovação</th></tr></thead><tbody>
+        <% if (!horasExtras.length) { %><tr><td colspan="6" class="colab-empty">Nenhuma hora extra registrada.</td></tr><% } %>
+        <% horasExtras.forEach((row)=>{ %><tr><td><%= fmtDate(row.data_servico) %></td><td><%= row.os_id ? `OS #${row.os_id}` : 'Sem OS' %><small><%= row.equipamento_nome || row.os_equipamento || '-' %></small></td><td><%= row.descricao_servico || '-' %></td><td><%= fmtMin(row.total_minutos) %></td><td><span class="colab-status-badge is-neutral"><%= row.status || '-' %></span></td><td><%= row.aprovado_por_nome || '-' %></td></tr><% }) %>
+      </tbody></table></div>
+    </section>
+  <% } %>
+
+  <% if (activeTab==='banco-horas') { %>
+    <section class="colab-panel">
+      <div class="colab-section-head"><div><h2>Banco de horas</h2><p>Créditos e débitos calculados pelo módulo oficial da Escala.</p></div><a class="btn btn-outline" href="/escala/banco-horas/<%= colaborador.id %>">Abrir painel completo</a></div>
+      <div class="colab-operational-strip"><div><span>Saldo</span><strong><%= bancoHoras?.horas || '0h00' %></strong></div><div><span>Créditos</span><strong><%= fmtMin(bancoHoras?.creditos) %></strong></div><div><span>Débitos</span><strong><%= fmtMin(bancoHoras?.debitos) %></strong></div></div>
+      <div class="colab-table-wrap"><table class="colab-table"><thead><tr><th>Data</th><th>Tipo</th><th>Minutos</th><th>Descrição</th></tr></thead><tbody>
+        <% if (!bancoMovimentos.length) { %><tr><td colspan="4" class="colab-empty">Nenhum movimento no banco de horas.</td></tr><% } %>
+        <% bancoMovimentos.forEach((row)=>{ %><tr><td><%= fmtDate(row.data_movimento) %></td><td><%= row.tipo || '-' %></td><td><strong><%= fmtMin(row.minutos) %></strong></td><td><%= row.descricao || '-' %></td></tr><% }) %>
+      </tbody></table></div>
+    </section>
+  <% } %>
+
+  <% if (activeTab==='ausencias') { %>
+    <section class="colab-panel">
+      <div class="colab-section-head"><div><h2>Folgas e ausências</h2><p>Registros programados no módulo de Escala, sem duplicação de cadastro.</p></div></div>
+      <div class="colab-table-wrap"><table class="colab-table"><thead><tr><th>Tipo</th><th>Início</th><th>Fim</th><th>Status</th><th>Débito</th><th>Motivo / serviço</th></tr></thead><tbody>
+        <% if (!folgas.length) { %><tr><td colspan="6" class="colab-empty">Nenhuma folga ou ausência registrada.</td></tr><% } %>
+        <% folgas.forEach((row)=>{ %><tr><td><%= row.tipo_lancamento || 'FOLGA_COMPENSATORIA' %></td><td><%= fmtDate(row.data_folga) %></td><td><%= fmtDate(row.data_fim || row.data_folga) %></td><td><span class="colab-status-badge is-neutral"><%= row.status || '-' %></span></td><td><%= fmtMin(row.minutos_descontados) %></td><td><%= row.motivo || row.descricao_servico || '-' %></td></tr><% }) %>
+      </tbody></table></div>
+    </section>
+  <% } %>
+
+  <% if (activeTab==='ferramental') { %>
+    <section class="colab-panel">
+      <div class="colab-section-head"><div><h2>Ferramental</h2><p>Ferramentas sob responsabilidade do colaborador.</p></div></div>
+      <% if (canManageFerramental) { %><form action="/colaboradores/<%= colaborador.id %>/ferramental" method="POST" class="colab-form-grid compact"><label><span>Ferramenta</span><input class="input" name="nome" required /></label><label><span>Patrimônio</span><input class="input" name="codigo_patrimonio" required /></label><label><span>Categoria</span><input class="input" name="categoria" /></label><label><span>Valor</span><input class="input" type="number" step="0.01" name="valor" /></label><label><span>Movimento</span><select class="input" name="tipo"><option value="entrega">Entrega</option><option value="transferencia">Transferência</option><option value="devolucao">Devolução</option><option value="extravio">Extravio</option></select></label><label><span>Observação</span><input class="input" name="observacao" /></label><div class="colab-form-actions"><button class="btn btn-primary" type="submit">Adicionar</button></div></form><% } %>
+      <div class="colab-table-wrap"><table class="colab-table"><thead><tr><th>Ferramenta</th><th>Patrimônio</th><th>Data</th><th>Status</th><th>Observação</th><th>Ações</th></tr></thead><tbody>
+        <% if (!tabs.ferramental.length) { %><tr><td colspan="6" class="colab-empty">Nenhuma ferramenta registrada.</td></tr><% } %>
+        <% tabs.ferramental.forEach((row)=>{ %><tr><td><%= row.ferramenta_nome %></td><td><%= row.codigo_patrimonio %></td><td><%= row.data %></td><td><span class="colab-status-badge is-neutral"><%= row.status %></span></td><td><%= row.observacao || '-' %></td><td><% if (canManageFerramental) { %><form action="/colaboradores/<%= colaborador.id %>/ferramental/<%= row.id %>/acao" method="POST" class="colab-inline-form"><button class="btn btn-sm" name="acao" value="transferir">Transferir</button><button class="btn btn-sm" name="acao" value="devolver">Devolver</button><button class="btn btn-sm" name="acao" value="extravio">Extravio</button></form><% } %></td></tr><% }) %>
+      </tbody></table></div>
+    </section>
+  <% } %>
+
+  <% if (activeTab==='epis') { %>
+    <section class="colab-panel">
+      <div class="colab-section-head"><div><h2>EPIs</h2><p>Entregas, validade e situação dos equipamentos de proteção.</p></div></div>
+      <% if (canManageEPIAndMateriais) { %><form action="/colaboradores/<%= colaborador.id %>/epis" method="POST" class="colab-form-grid compact"><label><span>Tipo EPI</span><input class="input" name="nome" required /></label><label><span>CA</span><input class="input" name="ca" /></label><label><span>Validade</span><input class="input" type="date" name="validade" /></label><label><span>Quantidade</span><input class="input" type="number" step="0.01" name="quantidade" value="1" /></label><label><span>Entrega</span><input class="input" type="date" name="data_entrega" value="<%= today %>" /></label><label><span>Categoria</span><input class="input" name="categoria" /></label><div class="colab-form-actions"><button class="btn btn-primary" type="submit">Lançar EPI</button></div></form><% } %>
+      <div class="colab-table-wrap"><table class="colab-table"><thead><tr><th>Tipo</th><th>CA</th><th>Validade</th><th>Qtd</th><th>Entrega</th><th>Status</th><th>Ações</th></tr></thead><tbody>
+        <% if (!tabs.epis.length) { %><tr><td colspan="7" class="colab-empty">Nenhum EPI registrado.</td></tr><% } %>
+        <% tabs.epis.forEach((row)=>{ const vencido = row.validade && String(row.validade).slice(0,10) <= today; %><tr><td><%= row.epi_nome %></td><td><%= row.ca || '-' %></td><td><%= fmtDate(row.validade) %> <% if (vencido) { %><span class="colab-status-badge is-warn">Vencido</span><% } %></td><td><%= row.quantidade %></td><td><%= fmtDate(row.data_entrega) %></td><td><span class="colab-status-badge is-neutral"><%= row.status %></span></td><td><% if (canManageEPIAndMateriais) { %><form action="/colaboradores/<%= colaborador.id %>/epis/<%= row.id %>/acao" method="POST" class="colab-inline-form"><button class="btn btn-sm" name="acao" value="troca">Troca</button><button class="btn btn-sm" name="acao" value="devolucao">Devolução</button><button class="btn btn-sm" name="acao" value="vencer">Vencido</button></form><% } %></td></tr><% }) %>
+      </tbody></table></div>
+    </section>
+  <% } %>
+
+  <% if (activeTab==='materiais') { %>
+    <section class="colab-panel">
+      <div class="colab-section-head"><div><h2>Materiais</h2><p>Retiradas registradas com destino e vínculo opcional com OS.</p></div></div>
+      <% if (canManageEPIAndMateriais) { %><form action="/colaboradores/<%= colaborador.id %>/materiais" method="POST" class="colab-form-grid compact"><label><span>Material</span><input class="input" name="nome" required /></label><label><span>Unidade</span><input class="input" name="unidade" value="UN" /></label><label><span>Quantidade</span><input class="input" type="number" step="0.01" name="quantidade" value="1" /></label><label><span>Destino *</span><input class="input" name="destino" required /></label><label><span>Equipamento</span><input class="input" name="equipamento" /></label><label><span>OS</span><input class="input" name="os_id" type="number" /></label><label><span>Autorizado por</span><input class="input" name="autorizado_por" /></label><label><span>Entregue por</span><input class="input" name="entregue_por" /></label><div class="colab-form-actions"><button class="btn btn-primary" type="submit">Registrar retirada</button></div></form><% } %>
+      <div class="colab-table-wrap"><table class="colab-table"><thead><tr><th>Material</th><th>Qtd</th><th>Data</th><th>Destino</th><th>Equipamento</th><th>OS</th><th>Autorizado por</th></tr></thead><tbody>
+        <% if (!tabs.materiais.length) { %><tr><td colspan="7" class="colab-empty">Nenhuma retirada registrada.</td></tr><% } %>
+        <% tabs.materiais.forEach((row)=>{ %><tr><td><%= row.material_nome %></td><td><%= row.quantidade %> <%= row.unidade %></td><td><%= row.data %></td><td><%= row.destino %></td><td><%= row.equipamento || '-' %></td><td><%= row.os_id || '-' %></td><td><%= row.autorizado_por || '-' %></td></tr><% }) %>
+      </tbody></table></div>
+    </section>
+  <% } %>
+
+  <% if (activeTab==='cursos-internos' || activeTab==='certificados-externos') { const rows = activeTab==='cursos-internos' ? tabs.cursosInternos : tabs.certificadosExternos; %>
+    <section class="colab-panel">
+      <div class="colab-section-head"><div><h2><%= activeTab==='cursos-internos' ? 'Treinamentos internos' : 'Certificados externos' %></h2><p>Capacitação, validade e validação documental.</p></div></div>
+      <% if (!isColaboradorOnly) { %><form action="/colaboradores/<%= colaborador.id %>/certificados" method="POST" enctype="multipart/form-data" class="colab-form-grid compact"><label><span>Tipo</span><select class="input" name="tipo"><option value="interno" <%= activeTab==='cursos-internos'?'selected':'' %>>Interno</option><option value="externo" <%= activeTab==='certificados-externos'?'selected':'' %>>Externo</option></select></label><label><span>Título</span><input class="input" name="titulo" required /></label><label><span>Instituição</span><input class="input" name="instituicao" /></label><label><span>Carga horária</span><input class="input" name="carga_horaria" type="number" step="0.5" /></label><label><span>Emissão</span><input class="input" type="date" name="data_emissao" /></label><label><span>Validade</span><input class="input" type="date" name="validade" /></label><label><span>PDF</span><input class="input" type="file" name="arquivo" accept="application/pdf" /></label><div class="colab-form-actions"><button class="btn btn-primary" type="submit">Registrar</button></div></form><% } %>
+      <div class="colab-table-wrap"><table class="colab-table"><thead><tr><th>Título</th><th>Instituição</th><th>Emissão</th><th>Validade</th><th>Status</th><th>Arquivo</th><th>Validação</th></tr></thead><tbody>
+        <% if (!rows.length) { %><tr><td colspan="7" class="colab-empty">Nenhum registro.</td></tr><% } %>
+        <% rows.forEach((row)=>{ %><tr><td><%= row.titulo %></td><td><%= row.instituicao || '-' %></td><td><%= fmtDate(row.data_emissao) %></td><td><%= fmtDate(row.validade) %></td><td><span class="colab-status-badge is-neutral"><%= row.status_validacao %></span></td><td><% if (row.arquivo_url) { %><a href="<%= row.arquivo_url %>" target="_blank">Abrir</a><% } else { %>-<% } %></td><td><% if (canValidateCertificados) { %><form action="/colaboradores/<%= colaborador.id %>/certificados/<%= row.id %>/validar" method="POST" class="colab-inline-form"><button class="btn btn-sm" name="status_validacao" value="aprovado">Aprovar</button><button class="btn btn-sm" name="status_validacao" value="reprovado">Reprovar</button><button class="btn btn-sm" name="status_validacao" value="vencido">Vencido</button></form><% } %></td></tr><% }) %>
+      </tbody></table></div>
+    </section>
+  <% } %>
+
+  <% if (activeTab==='documentos') { %>
+    <section class="colab-panel">
+      <div class="colab-section-head"><div><h2>Documentos</h2><p>Termos, comprovantes e documentos do colaborador.</p></div></div>
+      <% if (!isColaboradorOnly) { %><form action="/colaboradores/<%= colaborador.id %>/documentos" method="POST" enctype="multipart/form-data" class="colab-form-grid compact"><label><span>Tipo</span><input class="input" name="tipo" required /></label><label><span>Arquivo</span><input class="input" type="file" name="arquivo" required /></label><div class="colab-form-actions"><button class="btn btn-primary" type="submit">Enviar documento</button></div></form><% } %>
+      <div class="colab-table-wrap"><table class="colab-table"><thead><tr><th>Tipo</th><th>Arquivo</th><th>Data</th><th>Ciência</th></tr></thead><tbody>
+        <% if (!tabs.documentos.length) { %><tr><td colspan="4" class="colab-empty">Nenhum documento anexado.</td></tr><% } %>
+        <% tabs.documentos.forEach((row)=>{ %><tr><td><%= row.tipo %></td><td><a href="<%= row.arquivo_url %>" target="_blank">Abrir</a></td><td><%= row.data %></td><td><%= row.confirmado_em ? `Confirmado em ${row.confirmado_em}` : 'Pendente' %> <% if (!row.confirmado_em) { %><form action="/colaboradores/<%= colaborador.id %>/confirmar-ciencia" method="POST" class="colab-inline-form"><input type="hidden" name="entidade" value="documentos_colaborador" /><input type="hidden" name="entidade_id" value="<%= row.id %>" /><input type="hidden" name="tab" value="documentos" /><button class="btn btn-sm btn-outline" type="submit">Confirmar</button></form><% } %></td></tr><% }) %>
+      </tbody></table></div>
+    </section>
+  <% } %>
+
+  <% if (activeTab==='historico') { %>
+    <section class="colab-panel">
+      <div class="colab-section-head"><div><h2>Histórico</h2><p>Rastreabilidade das principais alterações e confirmações.</p></div></div>
+      <div class="colab-table-wrap"><table class="colab-table"><thead><tr><th>Data</th><th>Entidade</th><th>Ação</th><th>Responsável</th><th>Ciência</th></tr></thead><tbody>
+        <% if (!historico.length) { %><tr><td colspan="5" class="colab-empty">Sem histórico registrado.</td></tr><% } %>
+        <% historico.forEach((row)=>{ %><tr><td><%= row.created_at %></td><td><%= row.entidade %>#<%= row.entidade_id || '-' %></td><td><%= row.acao %></td><td><%= row.responsavel_nome || '-' %></td><td><% if (['movimentacoes_ferramentas','entregas_epi'].includes(row.entidade) && row.acao==='create') { %><form action="/colaboradores/<%= colaborador.id %>/confirmar-ciencia" method="POST" class="colab-inline-form"><input type="hidden" name="entidade" value="<%= row.entidade %>" /><input type="hidden" name="entidade_id" value="<%= row.entidade_id %>" /><input type="hidden" name="tab" value="historico" /><button class="btn btn-sm btn-outline" type="submit">Confirmar ciência</button></form><% } else { %>-<% } %></td></tr><% }) %>
+      </tbody></table></div>
+    </section>
+  <% } %>
+
+  <% if (activeTab==='saude' && canViewEmergencyDetails) { %>
+    <section class="colab-panel colab-sensitive-panel">
+      <div class="colab-section-head"><div><h2>Saúde e emergência</h2><p>Área restrita. Informações somente para resposta emergencial e restrição operacional.</p></div></div>
+      <div class="colab-sensitive-note">Estes dados não constituem prontuário médico e não devem ser usados como substituto dos registros oficiais de saúde ocupacional.</div>
+      <div class="colab-profile-list">
+        <div><span>Tipo sanguíneo</span><strong><%= colaborador.tipo_sanguineo || 'Não informado' %></strong></div>
+        <div><span>Contato de emergência</span><strong><%= colaborador.contato_emergencia || 'Não informado' %></strong></div>
+        <div class="colab-span-2"><span>Restrição operacional</span><strong><%= colaborador.restricao_operacional || 'Nenhuma informada' %></strong></div>
+      </div>
+      <% if (canManageProfiles) { %><p class="muted">A atualização desses campos permanece disponível em <a href="?tab=dados">Dados profissionais</a>, respeitando o fluxo atual de cadastro.</p><% } %>
+    </section>
+  <% } %>
+</main>
 
 <script>
-  (function () {
-    function normalizeWhatsappInputValue(value) {
-      const compact = String(value || '').replace(/[\s\-()+]/g, '').trim();
-      if (!compact) return '';
-      if (!/^\d+$/.test(compact)) {
-        throw new Error('WhatsApp deve conter somente números. Espaços, traços, parênteses e + são removidos automaticamente.');
-      }
-      let phone = compact;
-      if (!phone.startsWith('55') && /^\d{10,11}$/.test(phone)) phone = '55' + phone;
-      if (!/^55\d{10,11}$/.test(phone)) {
-        throw new Error('WhatsApp deve ter entre 12 e 13 dígitos no formato 55DDDNÚMERO.');
-      }
-      return phone;
-    }
-
-    document.querySelectorAll('form').forEach(function (form) {
-      form.addEventListener('submit', function (event) {
-        const input = form.querySelector('[data-whatsapp-input]');
-        if (!input || !String(input.value || '').trim()) return;
-        try {
-          const normalized = normalizeWhatsappInputValue(input.value);
-          if (normalized.length === 12 && !window.confirm('Este WhatsApp parece estar sem o 9º dígito após o DDD. Deseja salvar mesmo assim?')) {
-            event.preventDefault();
-            input.focus();
-            return;
-          }
-          input.value = normalized;
-        } catch (err) {
-          event.preventDefault();
-          alert(err.message || 'WhatsApp inválido.');
-          input.focus();
-        }
-      });
+(() => {
+  function normalizeWhatsappInputValue(value) {
+    const compact = String(value || '').replace(/[\s\-()+]/g, '').trim();
+    if (!compact) return '';
+    if (!/^\d+$/.test(compact)) throw new Error('WhatsApp deve conter somente números.');
+    let phone = compact;
+    if (!phone.startsWith('55') && /^\d{10,11}$/.test(phone)) phone = '55' + phone;
+    if (!/^55\d{10,11}$/.test(phone)) throw new Error('WhatsApp deve ter entre 12 e 13 dígitos no formato 55DDDNÚMERO.');
+    return phone;
+  }
+  document.querySelectorAll('form').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      const input = form.querySelector('[data-whatsapp-input]');
+      if (!input || !String(input.value || '').trim()) return;
+      try {
+        const normalized = normalizeWhatsappInputValue(input.value);
+        if (normalized.length === 12 && !window.confirm('Este WhatsApp parece estar sem o 9º dígito após o DDD. Deseja salvar mesmo assim?')) { event.preventDefault(); input.focus(); return; }
+        input.value = normalized;
+      } catch (err) { event.preventDefault(); alert(err.message || 'WhatsApp inválido.'); input.focus(); }
     });
-  })();
+  });
+})();
 </script>
