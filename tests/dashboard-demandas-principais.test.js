@@ -26,7 +26,7 @@ test('painel operacional carrega as principais demandas sem expor dados por HTML
   assert.match(view, /id="demandas"/);
   assert.match(view, /\/js\/operational-dashboard\.js/);
   assert.match(script, /fetch\('\/demandas\/dashboard-resumo\.json'/);
-  assert.match(script, /payload\?\.items\.slice\(0,\s*5\)/);
+  assert.match(script, /payload\.items\.slice\(0,\s*5\)/);
   assert.match(script, /textContent\s*=/);
   assert.doesNotMatch(script, /innerHTML\s*=/);
   assert.match(script, /response\.status\s*===\s*401\s*\|\|\s*response\.status\s*===\s*403/);
