@@ -99,6 +99,34 @@
   outline-offset:-2px;
 }
 
+/*
+ * A marcação atual da fila possui exatamente CINCO blocos por linha:
+ * Solicitação | OS/Equipamento | Dados da compra | Prioridade/Andamento | Ações.
+ * O CSS antigo ainda reservava sete colunas e deixava algumas linhas largas e
+ * outras comprimidas. Esta grade passa a seguir o mesmo princípio das tabelas
+ * operacionais: colunas estáveis, leitura compacta e ações sempre alinhadas.
+ */
+@media(min-width:981px){
+  .request-list{overflow-x:auto;border:1px solid #e2e9e4;border-radius:12px;background:#fff}
+  .request-columns,
+  .request-row{
+    grid-template-columns:minmax(225px,1.3fr) minmax(195px,1.05fr) minmax(255px,1.45fr) minmax(205px,1.1fr) minmax(124px,.62fr)!important;
+    min-width:1040px!important;
+    column-gap:12px!important;
+  }
+  .request-columns{padding:9px 12px!important;background:#f6faf7!important;border-bottom:1px solid #dfe8e2!important;color:#637184!important;font-size:10px!important;font-weight:900!important;letter-spacing:.035em!important;text-transform:uppercase!important}
+  .request-row{min-height:82px!important;padding:10px 12px!important;align-items:center!important;border-bottom:1px solid #e8eeea!important;border-radius:0!important;box-shadow:none!important}
+  .priority-section .request-row:last-child{border-bottom:0!important}
+  .request-row:hover{background:#f8fcf9!important}
+  .request-main,.request-os,.purchase-data,.request-flow{min-width:0!important}
+  .request-main>span:not(.request-title-line),.request-os>b,.purchase-data>span{overflow:hidden;text-overflow:ellipsis}
+  .request-os>b{display:block;white-space:normal;line-height:1.3}
+  .purchase-data{gap:3px!important}
+  .request-flow{gap:5px!important}
+  .row-actions{justify-self:end!important;display:flex!important;align-items:center!important;gap:6px!important;white-space:nowrap}
+  .row-actions .ui-btn--table{min-width:54px}
+}
+
 @media(max-width:980px){
   .priority-critical .request-row{border-left-color:#ef2938!important}
   .priority-high .request-row{border-left-color:#f97316!important}
