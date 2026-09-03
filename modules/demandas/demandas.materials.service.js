@@ -1,5 +1,4 @@
 const db = require('../../database/db');
-const solicitacoesService = require('../solicitacoes/solicitacoes.service');
 
 const BLOCKED_REQUEST_STATUS = new Set([
   'COMPRADA',
@@ -41,7 +40,13 @@ function validateEstoqueItemId(value) {
 }
 
 function getDemand(demandId) {
+  if (!tableExists('demandas')) return null;
   return db.prepare('SELECT * FROM demandas WHERE id=?').get(Number(demandId));
+}
+
+function getSolicitation(solicitationId) {
+  if (!tableExists('solicitacoes')) return null;
+  return db.prepare('SELECT * FROM solicitacoes WHERE id=?').get(Number(solicitationId));
 }
 
 function hasLinkedOrder(demandId) {
@@ -57,7 +62,7 @@ function assertEditable(demandId, solicitationId) {
     throw new Error('Não é possível alterar materiais de uma demanda concluída ou cancelada.');
   }
 
-  const solicitacao = solicitacoesService.getSolicitacaoById(Number(solicitationId));
+  const solicitacao = getSolicitation(solicitationId);
   if (!solicitacao) throw new Error('Solicitação de material não encontrada.');
   if (Number(solicitacao.demanda_id || 0) !== Number(demandId)) {
     throw new Error('Esta solicitação não pertence à demanda informada.');
