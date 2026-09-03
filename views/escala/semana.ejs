@@ -1,79 +1,85 @@
 <%- layout('layout') -%>
-
-<style>
-  .escala-table-wrap { width:100%; overflow:auto; -webkit-overflow-scrolling:touch; }
-  .escala-actions { display:inline-flex; flex-direction:column; gap:6px; align-items:stretch; }
-  .escala-action-btn { justify-content:center; min-width:58px; padding:5px 6px; line-height:1.1; }
-  .readonly-note{border-left:5px solid #94a3b8;background:#f8fafc;border-radius:14px;padding:12px;color:#334155;font-weight:800}
-  @media (max-width:760px){ .escala-table-wrap .table{min-width:720px}.escala-table-wrap .table th,.escala-table-wrap .table td{font-size:12px;padding:8px}.quick-add{display:grid!important;grid-template-columns:1fr!important}.quick-add .btn{width:100%;min-height:46px} }
-</style>
-
-<div class="page-head" style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
-  <div>
-    <h1 style="margin:0;">Escala da Semana</h1>
-    <p style="margin:6px 0 0;color:#64748b;font-weight:700;">Controle interno da manutenção • visualização semanal da equipe.</p>
-    <% if (!canManageEscala) { %><div class="readonly-note" style="margin-top:10px;">Escala somente leitura.</div><% } %>
-  </div>
-  <a class="btn" href="/escala">Voltar</a>
-</div>
-
-<div class="card" style="margin-top:14px;">
-  <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
+<%
+  const linhas = semana?.linhas || [];
+  const totalDia = linhas.filter(l => String(l.turnoLabel || '').toUpperCase().includes('DIA')).length;
+  const totalNoite = linhas.filter(l => String(l.turnoLabel || '').toUpperCase().includes('NOIT')).length;
+  const totalAusentes = linhas.filter(l => /FOLGA|ATEST|FERI/.test(String(l.statusLabel || '').toUpperCase())).length;
+%>
+<div class="escala-page">
+  <header class="escala-head">
     <div>
-      <h3 style="margin:0;">Semana do Sistema</h3>
-      <% if (semana) { %><div style="margin-top:6px;color:#334155;font-weight:800;">Período: <%= semana.data_inicio %> até <%= semana.data_fim %></div><% } else { %><div style="margin-top:6px;color:#b91c1c;font-weight:900;">Sem semana cadastrada para esta data.</div><% } %>
+      <h1>Escala da Semana</h1>
+      <p>Visualização operacional da equipe com período, turno, situação e ajustes da semana.</p>
     </div>
-    <form method="GET" action="/escala/semana" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      <input type="date" name="date" value="<%= alvo %>" class="input" style="height:38px;">
-      <button class="btn btn-sm" type="submit">Ir</button>
-      <a class="btn btn-sm" href="/escala/semana?date=<%= (new Date()).toISOString().slice(0,10) %>">Hoje</a>
-    </form>
-  </div>
+    <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a></div>
+  </header>
 
-  <div class="escala-card-grid" style="margin-top:12px;">
-    <% if (!semana || !semana.linhas || semana.linhas.length === 0) { %>
-      <div class="escala-empty" style="grid-column:1/-1;">Nenhum item cadastrado nesta semana.</div>
-    <% } else { %>
-      <% semana.linhas.forEach(l => { const turno = String(l.turnoLabel || '').toUpperCase(); const status = String(l.statusLabel || 'Trabalhando'); const statusUp = status.toUpperCase(); const statusClass = statusUp.includes('FOLGA') || statusUp.includes('TRABALH') ? 'is-success' : (statusUp.includes('ATEST') || statusUp.includes('FÉRI') || statusUp.includes('FERI') ? 'is-warning' : 'is-info'); %>
-        <article class="card-padrao-escala">
-          <div class="card-padrao-header">
-            <div class="card-padrao-person">
-              <span class="card-padrao-avatar"><%= String(l.nome || 'M').charAt(0).toUpperCase() %></span>
-              <div>
-                <h3 class="card-padrao-title"><%= l.nome %></h3>
-                <div class="card-padrao-subtitle"><%= l.funcaoLabel %></div>
-              </div>
-            </div>
-            <span class="card-padrao-badge is-info"><%= turno || 'TURNO' %></span>
+  <% if (!canManageEscala) { %><div class="escala-notice is-info">Escala em modo somente leitura. Alterações continuam restritas à gestão da Manutenção.</div><% } %>
+
+  <nav class="escala-tabs">
+    <a class="escala-tab" href="/escala">Painel da Equipe</a>
+    <a class="escala-tab is-active" href="/escala/semana">Escala da Semana</a>
+    <a class="escala-tab" href="/escala/completa">Escala Completa</a>
+    <a class="escala-tab" href="/escala/ausencias">Folgas / Afastamentos</a>
+    <a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a>
+    <a class="escala-tab" href="/escala/relatorios">Relatórios</a>
+  </nav>
+
+  <section class="escala-kpis">
+    <div class="escala-kpi"><span>Equipe na semana</span><strong><%= linhas.length %></strong><small>Colaboradores programados</small></div>
+    <div class="escala-kpi"><span>Turno dia</span><strong><%= totalDia %></strong><small>Alocações diurnas</small></div>
+    <div class="escala-kpi"><span>Turno noite</span><strong><%= totalNoite %></strong><small>Alocações noturnas</small></div>
+    <div class="escala-kpi"><span>Folgas / afastamentos</span><strong><%= totalAusentes %></strong><small>Indisponibilidades identificadas</small></div>
+    <div class="escala-kpi"><span>Semana</span><strong><%= semana?.semana_numero || '-' %></strong><small><%= semana ? `${semana.data_inicio} a ${semana.data_fim}` : 'Sem semana cadastrada' %></small></div>
+  </section>
+
+  <section class="escala-section">
+    <div class="escala-section-head">
+      <div><h2>Período consultado</h2><p>Selecione uma data para abrir automaticamente a semana correspondente.</p></div>
+      <form method="GET" action="/escala/semana" class="escala-toolbar">
+        <div class="escala-field"><span class="label">Data de referência</span><input type="date" name="date" value="<%= alvo %>" class="input"></div>
+        <button class="btn btn-green" type="submit">Consultar</button>
+        <a class="btn" href="/escala/semana?date=<%= (new Date()).toISOString().slice(0,10) %>">Hoje</a>
+      </form>
+    </div>
+    <% if (!semana) { %><div class="escala-empty">Não existe semana cadastrada para a data selecionada.</div><% } %>
+  </section>
+
+  <section class="escala-section">
+    <div class="escala-section-head"><div><h2>Equipe programada</h2><p><%= semana ? `Período ${semana.data_inicio} até ${semana.data_fim}` : 'Aguardando período válido' %></p></div></div>
+    <div class="escala-team-grid">
+      <% if (!linhas.length) { %><div class="escala-empty">Nenhum colaborador cadastrado nesta semana.</div><% } %>
+      <% linhas.forEach(l => { const turno = String(l.turnoLabel || '').toUpperCase(); const status = String(l.statusLabel || 'Trabalhando'); const statusUp = status.toUpperCase(); const statusClass = statusUp.includes('FOLGA') ? 'is-folga' : (statusUp.includes('ATEST') ? 'is-atestado' : (statusUp.includes('FERI') ? 'is-ferias' : '')); %>
+        <article class="escala-person">
+          <div class="escala-person-head">
+            <div class="escala-avatar"><%= String(l.nome || 'M').charAt(0).toUpperCase() %></div>
+            <div class="escala-person-name"><strong><%= l.nome %></strong><small><%= l.funcaoLabel || 'Mecânico Industrial' %></small></div>
+            <span class="escala-status"><%= turno || 'TURNO' %></span>
           </div>
-          <div class="card-padrao-body">
-            <div class="card-padrao-row"><span class="label-text">Período</span><span class="value-text"><%= semana.data_inicio %> até <%= semana.data_fim %></span></div>
-            <div class="card-padrao-row"><span class="label-text">Função</span><span class="value-text"><%= l.funcaoLabel %></span></div>
-            <div class="card-padrao-row"><span class="label-text">Status</span><span class="value-text"><span class="card-padrao-badge <%= statusClass %>"><%= status %></span></span></div>
-            <% if (l.observacao) { %><div class="card-padrao-row"><span class="label-text">Observação</span><span class="value-text"><%= l.observacao %></span></div><% } %>
+          <div class="escala-person-meta">
+            <div class="escala-meta"><span>Situação</span><strong><span class="escala-status <%= statusClass %>"><%= status %></span></strong></div>
+            <div class="escala-meta"><span>Período</span><strong><%= semana?.data_inicio || '-' %> → <%= semana?.data_fim || '-' %></strong></div>
           </div>
-          <% if (canManageEscala) { %>
-            <div class="card-padrao-footer">
-              <a class="btn btn-sm" href="/escala/editar/<%= semana.id %>">Editar</a>
-              <form method="POST" action="/escala/alocacao/<%= l.alocacao_id %>/delete" onsubmit="return confirm('Deseja excluir este registro?');" style="margin:0;flex:1 1 auto;"><input type="hidden" name="date" value="<%= alvo %>"><button class="btn btn-sm" type="submit">Excluir</button></form>
-            </div>
-          <% } %>
+          <% if (l.observacao) { %><div class="muted" style="margin-top:10px"><strong>Observação:</strong> <%= l.observacao %></div><% } %>
+          <% if (canManageEscala && semana) { %><div class="escala-person-foot" style="gap:6px"><a class="btn btn-sm btn-green" href="/escala/editar/<%= semana.id %>">Editar</a><form method="POST" action="/escala/alocacao/<%= l.alocacao_id %>/delete" onsubmit="return confirm('Deseja excluir este registro?');"><input type="hidden" name="date" value="<%= alvo %>"><button class="btn btn-sm" type="submit">Excluir</button></form></div><% } %>
         </article>
       <% }) %>
-    <% } %>
-  </div>
+    </div>
+  </section>
 
   <% if (canManageEscala) { %>
-    <hr style="margin:16px 0;border:0;border-top:1px solid #e5e7eb;">
-    <h4 style="margin:0 0 10px;">Adicionar rápido</h4>
-    <form class="quick-add" method="POST" action="/escala/adicionar" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+  <section class="escala-section">
+    <div class="escala-section-head"><div><h2>Adicionar à escala</h2><p>Inclua um colaborador sem alterar a lógica do rodízio existente.</p></div></div>
+    <form method="POST" action="/escala/adicionar" class="escala-form-grid is-3">
       <input type="hidden" name="date" value="<%= alvo %>">
-      <div style="min-width:180px;"><div class="label">DATA INÍCIO</div><input class="input" type="date" name="inicio" value="<%= alvo %>" required></div>
-      <div style="min-width:180px;"><div class="label">DATA FIM</div><input class="input" type="date" name="fim" value="<%= alvo %>" required></div>
-      <div style="flex:1;min-width:220px;"><div class="label">COLABORADOR</div><input class="input" name="nome" placeholder="Ex.: Emanuel" required></div>
-      <div style="min-width:160px;"><div class="label">TURNO</div><select class="input" name="turno" required><option value="">Selecione</option><option value="Dia">Dia</option><option value="Noite">Noite</option></select></div>
-      <div style="min-width:190px;"><div class="label">FUNÇÃO</div><select class="input" name="funcao" required><option value="Mecânico">Mecânico Industrial</option></select></div>
-      <button class="btn btn-primary" type="submit">Salvar</button>
+      <label class="escala-field"><span class="label">Data início</span><input class="input" type="date" name="inicio" value="<%= alvo %>" required></label>
+      <label class="escala-field"><span class="label">Data fim</span><input class="input" type="date" name="fim" value="<%= alvo %>" required></label>
+      <label class="escala-field"><span class="label">Colaborador</span><input class="input" name="nome" placeholder="Nome do colaborador" required></label>
+      <label class="escala-field"><span class="label">Turno</span><select class="input" name="turno" required><option value="">Selecione</option><option value="Dia">Dia</option><option value="Noite">Noite</option></select></label>
+      <label class="escala-field"><span class="label">Função</span><select class="input" name="funcao" required><option value="Mecânico">Mecânico Industrial</option></select></label>
+      <div class="escala-field" style="align-self:end"><button class="btn btn-green" type="submit">Salvar na escala</button></div>
     </form>
+  </section>
   <% } %>
 </div>
