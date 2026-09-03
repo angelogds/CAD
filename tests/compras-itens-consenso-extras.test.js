@@ -81,7 +81,17 @@ test('fila principal de Compras usa cinco colunas coerentes com a marcação atu
 test('contadores operacionais ignoram itens removidos por consenso', () => {
   const controller = read('modules/compras/compras.controller.js');
   assert.match(controller, /function applyActiveItemCounters/);
-  assert.match(controller, /status_compra,''\)<>\'CANCELADO\'/);
+
+  // A regra deve permanecer válida independentemente de a coluna SQL estar qualificada
+  // com alias de tabela (si.status_compra) ou não.
+  const activeOnlyFilters = controller.match(
+    /UPPER\(COALESCE\((?:si\.)?status_compra,''\)\)\s*<>\s*'CANCELADO'/g,
+  ) || [];
+  assert.ok(
+    activeOnlyFilters.length >= 3,
+    'contadores de itens ativos, cotados e recebidos devem excluir status CANCELADO',
+  );
+
   assert.match(controller, /itens_count/);
   assert.match(controller, /itens_cotados/);
   assert.match(controller, /itens_comprados/);
