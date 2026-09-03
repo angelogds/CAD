@@ -7,6 +7,7 @@
     const abs = Math.abs(n);
     return `${sign}${Math.floor(abs / 60)}h${String(abs % 60).padStart(2, '0')}`;
   };
+  const normalizedRole = String(role || '').toUpperCase();
 %>
 
 <main class="colab-page">
@@ -20,7 +21,13 @@
       <% if (canManageProfiles) { %>
         <button class="btn btn-primary" type="button" data-colab-create-toggle>+ Novo colaborador</button>
       <% } %>
-      <a class="btn btn-outline" href="/escala/rh">Escala • RH</a>
+      <% if (['ADMIN','RH','DIRETORIA'].includes(normalizedRole)) { %>
+        <a class="btn btn-outline" href="/escala/rh">Escala • RH</a>
+      <% } else if (normalizedRole === 'COLABORADOR') { %>
+        <a class="btn btn-outline" href="/escala/meu-painel">Minha Escala</a>
+      <% } else { %>
+        <a class="btn btn-outline" href="/escala/semana">Escala da semana</a>
+      <% } %>
     </div>
   </header>
 
