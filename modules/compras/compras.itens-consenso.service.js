@@ -49,8 +49,10 @@ function text(value, max = 500) {
 }
 
 function number(value) {
-  const normalized = String(value ?? '').trim().replace(/\./g, '').replace(',', '.');
-  const parsed = Number(normalized);
+  let raw = String(value ?? '').trim();
+  if (raw.includes(',') && raw.includes('.')) raw = raw.replace(/\./g, '').replace(',', '.');
+  else if (raw.includes(',')) raw = raw.replace(',', '.');
+  const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -139,7 +141,11 @@ function solicitarExclusao({ solicitacaoId, itemId, userId, motivo }) {
 
     const item = getItem(solicitacaoId, itemId);
     if (!item) throw new Error('Item não pertence à solicitação informada.');
-    if (String(item.status_compra || '').toUpperCase() === 'CANCELADO') throw new Error('Este item já foi removido do fluxo ativo.');
+    const statusCompra = String(item.status_compra || '').toUpperCase();
+    if (statusCompra === 'CANCELADO') throw new Error('Este item já foi removido do fluxo ativo.');
+    if (['COMPRADO', 'ATENDIDO_ESTOQUE'].includes(statusCompra)) {
+      throw new Error('Este item já foi comprometido por compra ou atendimento de estoque. A exclusão consensual só é permitida antes dessa etapa.');
+    }
     if (Number(item.qtd_recebida_total || 0) > 0) {
       throw new Error('Não é possível excluir um item que já possui recebimento físico. Use o fluxo de correção/devolução para preservar o estoque.');
     }
@@ -179,11 +185,9 @@ function cancelarPedidoExclusao({ solicitacaoId, itemId, userId }) {
       ORDER BY id DESC LIMIT 1
     `).get(Number(itemId));
     if (!pending) throw new Error('Pedido de exclusão pendente não encontrado.');
-    if (Number(pending.solicitada_por_user_id) !== Number(userId)) {
-      throw new Error('Somente quem solicitou a exclusão pode cancelar este pedido.');
-    }
 
-    db.prepare(`UPDATE solicitacao_item_exclusoes SET status='CANCELADA',updated_at=datetime('now') WHERE id=?`).run(pending.id);
+    db.prepare(`UPDATE solicitacao_item_exclusoes SET status='CANCELADA',respondida_por_user_id=?,respondida_em=datetime('now'),resposta_observacao='Pedido cancelado pelo setor de Compras.',updated_at=datetime('now') WHERE id=?`)
+      .run(Number(userId), pending.id);
     db.prepare(`
       UPDATE solicitacao_itens
       SET exclusao_status=?,exclusao_respondida_por_user_id=?,exclusao_respondida_em=datetime('now'),
@@ -218,6 +222,16 @@ function responderExclusao({ solicitacaoId, itemId, userId, aprovar, observacao 
     if (!pending) throw new Error('Pedido de exclusão pendente não encontrado.');
 
     const statusResposta = aprovar ? EXCLUSAO.APROVADA : EXCLUSAO.RECUSADA;
+    if (aprovar) {
+      const statusCompraAtual = String(item.status_compra || '').toUpperCase();
+      if (['COMPRADO', 'ATENDIDO_ESTOQUE'].includes(statusCompraAtual)) {
+        throw new Error('O item foi comprometido após o pedido de exclusão. A aprovação foi bloqueada para preservar o fluxo de compra/estoque.');
+      }
+      if (Number(item.qtd_recebida_total || 0) > 0) {
+        throw new Error('O item recebeu material após a solicitação de exclusão. A exclusão foi bloqueada para preservar o estoque.');
+      }
+    }
+
     db.prepare(`
       UPDATE solicitacao_item_exclusoes
       SET status=?,respondida_por_user_id=?,respondida_em=datetime('now'),resposta_observacao=?,updated_at=datetime('now')
@@ -225,9 +239,6 @@ function responderExclusao({ solicitacaoId, itemId, userId, aprovar, observacao 
     `).run(statusResposta, Number(userId), resposta || null, pending.id);
 
     if (aprovar) {
-      if (Number(item.qtd_recebida_total || 0) > 0) {
-        throw new Error('O item recebeu material após a solicitação de exclusão. A exclusão foi bloqueada para preservar o estoque.');
-      }
       db.prepare(`
         UPDATE solicitacao_itens
         SET status_compra='CANCELADO',status_cotacao='CANCELADO',status_item='CANCELADO',
