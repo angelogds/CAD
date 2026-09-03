@@ -1,21 +1,11 @@
 const db = require('../../database/db');
-const { normalizeRole } = require('../../config/rbac');
+const { normalizeRole, canAccessModule } = require('../../config/rbac');
 const solicitacoesService = require('../solicitacoes/solicitacoes.service');
 const osService = require('../os/os.service');
 
 const STATUS = ['NOVA', 'EM_ANALISE', 'PLANEJAMENTO', 'AGUARDANDO_APROVACAO', 'EM_ANDAMENTO', 'PARADA', 'CONCLUIDA', 'CANCELADA'];
 const CATEGORIAS = ['MANUTENCAO', 'PRODUCAO', 'NR', 'SEGURANCA', 'AUDITORIA', 'MELHORIA', 'PROJETO', 'DIRETORIA'];
 const RH_CATEGORIAS = new Set(['NR', 'SEGURANCA', 'AUDITORIA']);
-const VISIBILIDADE_AMPLA = new Set([
-  'ADMIN',
-  'DIRETORIA',
-  'GESTAO',
-  'ENCARREGADO_PRODUCAO',
-  'MANUTENCAO_SUPERVISOR',
-  'ENCARREGADO_MANUTENCAO',
-  'COMPRAS',
-  'INSPECAO_QUALIDADE',
-]);
 
 function tableExists(name) {
   try { return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name); } catch { return false; }
@@ -35,24 +25,15 @@ function normalizeCategory(value) {
   return CATEGORIAS.includes(categoria) ? categoria : 'MANUTENCAO';
 }
 
-function visibilityWhere(user, alias = 'd') {
+function visibilityWhere(user) {
   const role = normalizeRole(user?.role);
-  if (role === 'RH') {
-    return {
-      sql: `COALESCE(${alias}.categoria, 'MANUTENCAO') IN ('NR','SEGURANCA','AUDITORIA')`,
-      params: {},
-    };
-  }
-  if (VISIBILIDADE_AMPLA.has(role)) return { sql: '1=1', params: {} };
-  return { sql: `${alias}.created_by = @uid`, params: { uid: Number(user?.id || 0) } };
+  if (canAccessModule(role, 'demandas_view')) return { sql: '1=1', params: {} };
+  return { sql: '1=0', params: {} };
 }
 
 function canViewDemand(user, demanda) {
   if (!user || !demanda) return false;
-  const role = normalizeRole(user.role);
-  if (role === 'RH') return RH_CATEGORIAS.has(normalizeCategory(demanda.categoria));
-  if (VISIBILIDADE_AMPLA.has(role)) return true;
-  return Number(user.id || 0) === Number(demanda.created_by || 0);
+  return canAccessModule(normalizeRole(user.role), 'demandas_view');
 }
 
 function list(filters = {}, user) {
