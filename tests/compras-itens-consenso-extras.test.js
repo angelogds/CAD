@@ -25,6 +25,7 @@ test('Compras solicita exclusão mas não apaga o item antes do aceite do solici
   assert.match(code, /Somente o solicitante original pode responder/);
   assert.match(code, /status_compra='CANCELADO'/);
   assert.match(code, /qtd_recebida_total/);
+  assert.match(code, /COMPRADO.*ATENDIDO_ESTOQUE/s);
   assert.doesNotMatch(code, /DELETE FROM\s+solicitacao_itens/i);
 });
 
@@ -75,4 +76,14 @@ test('fila principal de Compras usa cinco colunas coerentes com a marcação atu
   assert.match(css, /CINCO blocos por linha/);
   assert.match(css, /grid-template-columns:minmax\(225px,1\.3fr\).*minmax\(124px,\.62fr\)/s);
   assert.match(css, /min-width:1040px/);
+});
+
+test('contadores operacionais ignoram itens removidos por consenso', () => {
+  const controller = read('modules/compras/compras.controller.js');
+  assert.match(controller, /function applyActiveItemCounters/);
+  assert.match(controller, /status_compra,''\)<>\'CANCELADO\'/);
+  assert.match(controller, /itens_count/);
+  assert.match(controller, /itens_cotados/);
+  assert.match(controller, /itens_comprados/);
+  assert.match(controller, /itens_recebidos/);
 });
