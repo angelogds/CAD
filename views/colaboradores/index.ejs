@@ -1,128 +1,153 @@
-<section class="page-head">
-  <div>
-    <h1>Colaboradores</h1>
-    <p class="muted">Gestão integrada de perfil, ferramental, EPI, materiais, certificados, escala, custos e identificação para o Almoxarifado.</p>
-  </div>
-  <a class="btn btn-outline" href="/colaboradores/instalacao">Instalação</a>
-</section>
-
+<% layout('layout') %>
 <link rel="stylesheet" href="/css/colaboradores.css" />
+<%
+  const fmtMin = (value) => {
+    const n = Number(value || 0);
+    const sign = n < 0 ? '-' : '';
+    const abs = Math.abs(n);
+    return `${sign}${Math.floor(abs / 60)}h${String(abs % 60).padStart(2, '0')}`;
+  };
+%>
 
-<div class="card">
-  <form method="GET" class="grid-3">
+<main class="colab-page">
+  <header class="colab-page-head">
     <div>
-      <div class="label">Busca</div>
-      <input class="input" type="text" name="search" value="<%= filtros.search %>" placeholder="Nome, função ou apelido" />
+      <span class="colab-eyebrow">GESTÃO DE PESSOAS • MANUTENÇÃO</span>
+      <h1>Colaboradores</h1>
+      <p>Cadastro mestre integrado a Escala, horas extras, banco de horas, EPIs, ferramental, documentos e histórico operacional.</p>
     </div>
-    <div>
-      <div class="label">Setor</div>
-      <input class="input" type="text" name="setor" value="<%= filtros.setor %>" placeholder="MANUTENCAO" />
+    <div class="colab-page-actions">
+      <% if (canManageProfiles) { %>
+        <button class="btn btn-primary" type="button" data-colab-create-toggle>+ Novo colaborador</button>
+      <% } %>
+      <a class="btn btn-outline" href="/escala/rh">Escala • RH</a>
     </div>
-    <div>
-      <div class="label">Status</div>
-      <select name="status">
-        <option value="">Todos</option>
-        <option value="ATIVO" <%= filtros.status==='ATIVO' ? 'selected' : '' %>>ATIVO</option>
-        <option value="INATIVO" <%= filtros.status==='INATIVO' ? 'selected' : '' %>>INATIVO</option>
-      </select>
-    </div>
-    <div><button class="btn btn-primary" type="submit">Filtrar</button></div>
-  </form>
-</div>
+  </header>
 
-<% if (canManageProfiles) { %>
-<div class="card" style="margin-top:14px;">
-  <h3 style="margin-top:0">Novo colaborador</h3>
-  <form action="/colaboradores" method="POST" enctype="multipart/form-data" class="grid-3">
-    <input class="input" name="nome" placeholder="Nome completo" required />
-    <input class="input" name="apelido" placeholder="Apelido" />
-    <input class="input" name="funcao" placeholder="Função" required />
-    <input class="input" name="setor" placeholder="Setor" value="MANUTENCAO" />
-    <input class="input" type="date" name="data_admissao" />
-    <select name="status"><option>ATIVO</option><option>INATIVO</option></select>
-    <% if (canViewContactDetails) { %>
-      <input class="input" name="telefone" placeholder="Telefone" />
-      <input class="input" name="telefone_whatsapp" inputmode="numeric" data-whatsapp-input placeholder="WhatsApp: 5575999999999" />
-    <% } %>
-    <input class="input" name="user_id" placeholder="ID do usuário (opcional)" type="number" />
-    <input class="input" type="file" name="foto" accept="image/*" />
-    <button class="btn btn-primary" type="submit">Cadastrar</button>
-  </form>
-</div>
-<% } %>
+  <section class="colab-kpi-grid" aria-label="Indicadores de colaboradores">
+    <article class="colab-kpi"><span>Exibidos</span><strong><%= indicadores.total || 0 %></strong><small>Registros conforme filtros</small></article>
+    <article class="colab-kpi"><span>Ativos</span><strong><%= indicadores.ativos || 0 %></strong><small>Cadastros operacionais</small></article>
+    <article class="colab-kpi"><span>Na escala atual</span><strong><%= indicadores.emEscala || 0 %></strong><small>Com alocação nesta semana</small></article>
+    <article class="colab-kpi"><span>Folgas / afastamentos</span><strong><%= indicadores.indisponiveis || 0 %></strong><small>Situação atual identificada</small></article>
+    <article class="colab-kpi"><span>HE no mês</span><strong><%= fmtMin(indicadores.horasExtrasMesMinutos) %></strong><small><%= indicadores.pendentes || 0 %> pendente(s) de aprovação</small></article>
+    <article class="colab-kpi"><span>Banco acumulado</span><strong><%= fmtMin(indicadores.bancoHorasMinutos) %></strong><small>Saldo somado dos exibidos</small></article>
+  </section>
 
-<div class="card" style="margin-top:14px;">
-  <div class="table-wrap">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Nome</th><th>Função</th><th>Setor</th><th>Status</th><th>WhatsApp</th><th>EPIs Ativos</th><th>Ferramentas</th><th>Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% if (!lista.length) { %>
-          <tr><td colspan="8">Nenhum colaborador encontrado.</td></tr>
+  <% if (canManageProfiles) { %>
+    <section class="colab-create-panel" data-colab-create-panel hidden>
+      <div class="colab-section-head">
+        <div>
+          <h2>Novo colaborador</h2>
+          <p>Cadastro rápido. Dados complementares podem ser preenchidos depois na ficha individual.</p>
+        </div>
+        <button class="btn btn-ghost" type="button" data-colab-create-close>Fechar</button>
+      </div>
+      <form action="/colaboradores" method="POST" enctype="multipart/form-data" class="colab-form-grid">
+        <label><span>Nome completo *</span><input class="input" name="nome" required /></label>
+        <label><span>Apelido</span><input class="input" name="apelido" /></label>
+        <label><span>Função *</span><input class="input" name="funcao" required /></label>
+        <label><span>Setor</span><input class="input" name="setor" value="MANUTENCAO" /></label>
+        <label><span>Data de admissão</span><input class="input" type="date" name="data_admissao" /></label>
+        <label><span>Status</span><select class="input" name="status"><option>ATIVO</option><option>INATIVO</option></select></label>
+        <% if (canViewContactDetails) { %>
+          <label><span>Telefone</span><input class="input" name="telefone" /></label>
+          <label><span>WhatsApp</span><input class="input" name="telefone_whatsapp" inputmode="numeric" data-whatsapp-input placeholder="5575999999999" /></label>
         <% } %>
-        <% lista.forEach((c) => { %>
+        <label><span>ID do usuário</span><input class="input" name="user_id" type="number" placeholder="Opcional" /></label>
+        <label><span>Foto</span><input class="input" type="file" name="foto" accept="image/*" /></label>
+        <div class="colab-form-actions"><button class="btn btn-primary" type="submit">Cadastrar colaborador</button></div>
+      </form>
+    </section>
+  <% } %>
+
+  <section class="colab-panel">
+    <div class="colab-section-head colab-filter-head">
+      <div><h2>Equipe</h2><p>Localize rapidamente o colaborador e abra a ficha completa.</p></div>
+      <span class="colab-result-count"><strong><%= lista.length %></strong> resultado(s)</span>
+    </div>
+
+    <form method="GET" class="colab-filterbar">
+      <label class="colab-search"><span>Busca</span><input class="input" type="search" name="search" value="<%= filtros.search %>" placeholder="Nome, apelido ou função" /></label>
+      <label><span>Setor</span><select class="input" name="setor"><option value="">Todos</option><% (setores || []).forEach((setor) => { %><option value="<%= setor %>" <%= filtros.setor===setor ? 'selected' : '' %>><%= setor %></option><% }) %></select></label>
+      <label><span>Status</span><select class="input" name="status"><option value="">Todos</option><option value="ATIVO" <%= filtros.status==='ATIVO' ? 'selected' : '' %>>ATIVO</option><option value="INATIVO" <%= filtros.status==='INATIVO' ? 'selected' : '' %>>INATIVO</option></select></label>
+      <div class="colab-filter-actions"><button class="btn btn-primary" type="submit">Filtrar</button><a class="btn btn-ghost" href="/colaboradores">Limpar</a></div>
+    </form>
+
+    <div class="colab-table-wrap">
+      <table class="colab-table">
+        <thead>
           <tr>
-            <td><strong><%= c.nome %></strong><br/><small><%= c.apelido || '-' %></small></td>
-            <td><%= c.funcao || '-' %></td>
-            <td><%= c.setor || '-' %></td>
-            <td><span class="pill-tag <%= c.status==='ATIVO' ? 'pill-green':'pill-gray' %>"><%= c.status || '-' %></span></td>
-            <td>
-              <% if (canViewContactDetails) { %>
-                <span class="pill-tag <%= c.telefone_whatsapp ? 'pill-green' : 'pill-gray' %>"><%= c.telefone_whatsapp ? '🟢 WhatsApp' : 'Sem WhatsApp' %></span>
-              <% } else { %>
-                <span class="pill-tag pill-gray">Restrito</span>
-              <% } %>
-            </td>
-            <td><%= c.epis_ativos || 0 %></td>
-            <td><%= c.ferramentas_ativas || 0 %></td>
-            <td style="display:flex;gap:6px;flex-wrap:wrap;">
-              <a class="btn btn-sm btn-outline" href="/colaboradores/<%= c.id %>">Abrir</a>
-              <% if (canManageProfiles) { %><a class="btn btn-sm btn-outline" href="/colaboradores/<%= c.id %>/cartao">Cartão QR</a><% } %>
-            </td>
+            <th>Colaborador</th>
+            <th>Função / setor</th>
+            <th>Situação atual</th>
+            <th>Turno</th>
+            <th>Banco</th>
+            <th>HE mês</th>
+            <th>EPIs</th>
+            <th>Ferramentas</th>
+            <th>Ações</th>
           </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  </div>
-</div>
+        </thead>
+        <tbody>
+          <% if (!lista.length) { %><tr><td colspan="9" class="colab-empty">Nenhum colaborador encontrado.</td></tr><% } %>
+          <% lista.forEach((c) => { const op = c.operacional || {}; %>
+            <tr>
+              <td data-label="Colaborador">
+                <div class="colab-person-cell">
+                  <% if (c.foto_url) { %><img src="<%= c.foto_url %>" alt="Foto de <%= c.nome %>" /><% } else { %><span class="colab-avatar-fallback"><%= String(c.nome || 'C').charAt(0).toUpperCase() %></span><% } %>
+                  <div><strong><%= c.nome %></strong><small><%= c.apelido || 'Sem apelido' %></small></div>
+                </div>
+              </td>
+              <td data-label="Função / setor"><strong><%= c.funcao || '-' %></strong><small><%= c.setor || '-' %></small></td>
+              <td data-label="Situação"><span class="colab-status-badge <%= /trabalhando|hora extra/i.test(op.statusAtual || '') ? 'is-ok' : (/folga|férias|ferias|atestado|ausente|falta/i.test(op.statusAtual || '') ? 'is-warn' : 'is-neutral') %>"><%= op.statusAtual || c.status || '-' %></span></td>
+              <td data-label="Turno"><%= op.turnoAtual || '-' %></td>
+              <td data-label="Banco"><strong><%= op.saldo?.horas || '0h00' %></strong></td>
+              <td data-label="HE mês"><%= op.horasExtrasMes || '0h00' %></td>
+              <td data-label="EPIs"><%= c.epis_ativos || 0 %></td>
+              <td data-label="Ferramentas"><%= c.ferramentas_ativas || 0 %></td>
+              <td data-label="Ações"><div class="colab-row-actions"><a class="btn btn-sm btn-primary" href="/colaboradores/<%= c.id %>">Abrir ficha</a><% if (canManageProfiles) { %><a class="btn btn-sm btn-outline" href="/colaboradores/<%= c.id %>/cartao">QR</a><% } %></div></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
 
 <script>
-  (function () {
-    function normalizeWhatsappInputValue(value) {
-      const compact = String(value || '').replace(/[\s\-()+]/g, '').trim();
-      if (!compact) return '';
-      if (!/^\d+$/.test(compact)) {
-        throw new Error('WhatsApp deve conter somente números. Espaços, traços, parênteses e + são removidos automaticamente.');
-      }
-      let phone = compact;
-      if (!phone.startsWith('55') && /^\d{10,11}$/.test(phone)) phone = '55' + phone;
-      if (!/^55\d{10,11}$/.test(phone)) {
-        throw new Error('WhatsApp deve ter entre 12 e 13 dígitos no formato 55DDDNÚMERO.');
-      }
-      return phone;
-    }
+(() => {
+  const panel = document.querySelector('[data-colab-create-panel]');
+  document.querySelector('[data-colab-create-toggle]')?.addEventListener('click', () => {
+    if (!panel) return;
+    panel.hidden = false;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  document.querySelector('[data-colab-create-close]')?.addEventListener('click', () => { if (panel) panel.hidden = true; });
 
-    document.querySelectorAll('form').forEach(function (form) {
-      form.addEventListener('submit', function (event) {
-        const input = form.querySelector('[data-whatsapp-input]');
-        if (!input || !String(input.value || '').trim()) return;
-        try {
-          const normalized = normalizeWhatsappInputValue(input.value);
-          if (normalized.length === 12 && !window.confirm('Este WhatsApp parece estar sem o 9º dígito após o DDD. Deseja salvar mesmo assim?')) {
-            event.preventDefault();
-            input.focus();
-            return;
-          }
-          input.value = normalized;
-        } catch (err) {
-          event.preventDefault();
-          alert(err.message || 'WhatsApp inválido.');
-          input.focus();
+  function normalizeWhatsappInputValue(value) {
+    const compact = String(value || '').replace(/[\s\-()+]/g, '').trim();
+    if (!compact) return '';
+    if (!/^\d+$/.test(compact)) throw new Error('WhatsApp deve conter somente números.');
+    let phone = compact;
+    if (!phone.startsWith('55') && /^\d{10,11}$/.test(phone)) phone = '55' + phone;
+    if (!/^55\d{10,11}$/.test(phone)) throw new Error('WhatsApp deve ter entre 12 e 13 dígitos no formato 55DDDNÚMERO.');
+    return phone;
+  }
+
+  document.querySelectorAll('form').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      const input = form.querySelector('[data-whatsapp-input]');
+      if (!input || !String(input.value || '').trim()) return;
+      try {
+        const normalized = normalizeWhatsappInputValue(input.value);
+        if (normalized.length === 12 && !window.confirm('Este WhatsApp parece estar sem o 9º dígito após o DDD. Deseja salvar mesmo assim?')) {
+          event.preventDefault(); input.focus(); return;
         }
-      });
+        input.value = normalized;
+      } catch (err) {
+        event.preventDefault(); alert(err.message || 'WhatsApp inválido.'); input.focus();
+      }
     });
-  })();
+  });
+})();
 </script>
