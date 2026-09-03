@@ -61,17 +61,50 @@ test('painel de compras carrega bloco real de pré-cotações de demandas', () =
   assert.match(script, /Compra aguardando OS/);
 });
 
-test('detalhe da demanda centraliza subdemandas materiais OS e rastreabilidade', () => {
+test('detalhe da demanda organiza resumo planejamento materiais subdemandas OS e histórico em abas', () => {
   const detail = read('views/demandas/view.ejs');
-  const form = read('views/demandas/new.ejs');
-  assert.match(detail, /Subdemandas \/ serviços do projeto/);
+  for (const tab of ['resumo', 'planejamento', 'materiais', 'subdemandas', 'os', 'historico']) {
+    assert.match(detail, new RegExp(`data-tab="${tab}"`));
+    assert.match(detail, new RegExp(`data-panel="${tab}"`));
+  }
   assert.match(detail, /Materiais e pré-cotações/);
   assert.match(detail, /Ordens de Serviço vinculadas/);
   assert.match(detail, /Histórico e rastreabilidade/);
+  assert.match(detail, /demand-data-table/);
+  assert.match(detail, /Aguardando aprovação/);
+});
+
+test('cadastro de demanda permanece leve e deixa planejamento avançado opcional', () => {
+  const form = read('views/demandas/new.ejs');
+  assert.match(form, /Cadastro rápido/);
+  assert.match(form, /Cadastro essencial/);
+  assert.match(form, /name="titulo"/);
+  assert.match(form, /name="prioridade"/);
+  assert.match(form, /name="descricao"/);
+  assert.match(form, /demand-advanced-fields/);
+  assert.match(form, /Adicionar informações de planejamento/);
   assert.match(form, /name="demanda_pai_id"/);
-  assert.match(form, /name="categoria"/);
   assert.match(form, /name="equipamento_id"/);
   assert.match(form, /name="nr_referencia"/);
+});
+
+test('lista de demandas mostra situação e resumo de planejamento sem sobrecarregar a tabela', () => {
+  const index = read('views/demandas/index.ejs');
+  assert.match(index, /Planejamento/);
+  assert.match(index, /demand-plan-summary/);
+  assert.match(index, /subdemandas_count/);
+  assert.match(index, /solicitacoes_count/);
+  assert.match(index, /os_count/);
+  assert.match(index, /demand-row-v2/);
+});
+
+test('CSS de demandas contempla abas tabelas responsivas e formulário leve', () => {
+  const css = read('public/css/demandas-planejamento.css');
+  assert.match(css, /demand-workspace-tabs/);
+  assert.match(css, /demand-data-table/);
+  assert.match(css, /demand-advanced-fields/);
+  assert.match(css, /demand-row-v2/);
+  assert.match(css, /@media\(max-width:760px\)/);
 });
 
 test('RBAC separa visualização materiais conversão e aprovação de demandas', () => {
