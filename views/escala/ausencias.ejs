@@ -1,5 +1,5 @@
 <%- layout('layout') -%>
-<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260819a">
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
 <%
   const lista = ausencias || [];
   const statusClass = (tipo) => { const s=String(tipo||'').toUpperCase(); if(s.includes('FERI')) return 'is-ferias'; if(s.includes('ATEST')) return 'is-atestado'; if(s.includes('FOLGA')) return 'is-folga'; return 'is-ausente'; };
