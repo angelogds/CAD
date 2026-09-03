@@ -18,8 +18,8 @@ module.exports = ({ db, tableExists, addColumnIfMissing }) => {
   db.exec(`
     CREATE TABLE IF NOT EXISTS solicitacao_item_exclusoes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      solicitacao_id INTEGER NOT NULL REFERENCES solicitacoes(id),
-      solicitacao_item_id INTEGER NOT NULL REFERENCES solicitacao_itens(id),
+      solicitacao_id INTEGER NOT NULL REFERENCES solicitacoes(id) ON DELETE CASCADE,
+      solicitacao_item_id INTEGER NOT NULL REFERENCES solicitacao_itens(id) ON DELETE CASCADE,
       solicitada_por_user_id INTEGER NOT NULL REFERENCES users(id),
       motivo TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'PENDENTE',
