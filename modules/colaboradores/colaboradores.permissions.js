@@ -9,7 +9,11 @@ function isColaboradorOnly(req) {
 }
 
 function canViewContactDetails(req) {
-  return ['ADMIN', 'ENCARREGADO_MANUTENCAO'].includes(roleOf(req));
+  return ['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO'].includes(roleOf(req));
+}
+
+function canViewEmergencyDetails(req) {
+  return ['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'COLABORADOR'].includes(roleOf(req));
 }
 
 function canManageProfiles(req) {
@@ -46,6 +50,7 @@ module.exports = {
   roleOf,
   isColaboradorOnly,
   canViewContactDetails,
+  canViewEmergencyDetails,
   canManageProfiles,
   canManageFerramental,
   canManageEPIAndMateriais,

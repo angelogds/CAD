@@ -1,0 +1,63 @@
+<%- layout('layout') -%>
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903a">
+<link rel="stylesheet" href="/css/escala-rh-self.css?v=20260903a">
+<%
+  const fmtMin = (value) => { const n=Number(value||0); const sign=n<0?'-':''; const m=Math.abs(n); return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; };
+  const fmtDate = (value) => { if(!value) return '-'; const raw=String(value).slice(0,10); const p=raw.split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : raw; };
+%>
+<div class="escala-page escala-self-page">
+  <header class="escala-head">
+    <div><h1>Minha Escala</h1><p>Consulta pessoal de escala, horas extras, banco de horas e folgas.</p></div>
+    <div class="escala-actions"><a class="btn" href="/escala/banco-horas">Meu banco de horas</a><% if(vinculado && canOpenProfile){ %><a class="btn btn-green" href="/colaboradores/<%= colaborador.id %>">Meu perfil</a><% } %></div>
+  </header>
+
+  <% if(!vinculado){ %>
+    <section class="escala-section self-empty-state">
+      <h2>Cadastro ainda não vinculado</h2>
+      <p class="muted">Seu usuário está ativo, mas ainda não está associado a um cadastro de colaborador. Solicite ao RH ou ao administrador que faça a vinculação para liberar sua escala, horas extras e banco de horas.</p>
+    </section>
+  <% } else { %>
+    <section class="self-profile-card">
+      <div class="self-profile-main">
+        <% if(card?.foto_path || colaborador.foto_url){ %><img class="self-avatar" src="<%= card?.foto_path || colaborador.foto_url %>" alt="Foto de <%= colaborador.nome %>"><% } else { %><div class="self-avatar self-avatar-fallback"><%= String(colaborador.nome||'C').charAt(0).toUpperCase() %></div><% } %>
+        <div><h2><%= colaborador.nome %></h2><p><%= card?.funcaoLabel || colaborador.funcao || '-' %> • <%= colaborador.setor || 'Manutenção' %></p></div>
+      </div>
+      <span class="self-status"><%= card?.statusAtual || 'Sem informação da escala atual' %></span>
+    </section>
+
+    <section class="escala-kpis self-kpis">
+      <div class="escala-kpi"><span>Situação atual</span><strong><%= card?.statusAtual || '-' %></strong><small>Status obtido da escala vigente</small></div>
+      <div class="escala-kpi"><span>Turno atual</span><strong><%= card?.turnoAtual || '-' %></strong><small>Programação da semana</small></div>
+      <div class="escala-kpi"><span>Banco de horas</span><strong><%= banco?.saldo?.horas || card?.saldo?.horas || '0h00' %></strong><small>Créditos e débitos aprovados</small></div>
+      <div class="escala-kpi"><span>Horas extras no mês</span><strong><%= card?.horasExtrasMes || '0h00' %></strong><small>Somente registros aprovados</small></div>
+    </section>
+
+    <section class="self-grid-2">
+      <article class="escala-section">
+        <div class="escala-section-head"><div><h2>Movimentos recentes do banco</h2><div class="muted">Créditos e débitos que formam seu saldo.</div></div><a class="btn btn-sm" href="/escala/banco-horas/<%= colaborador.id %>">Ver tudo</a></div>
+        <div class="self-table-wrap"><table class="self-table"><thead><tr><th>Data</th><th>Movimento</th><th>Horas</th><th>Descrição</th></tr></thead><tbody>
+          <% if(!movimentos.length){ %><tr><td colspan="4" class="muted">Nenhum movimento registrado.</td></tr><% } %>
+          <% movimentos.forEach(m=>{ const minutos=Number(m.minutos ?? m.total_minutos ?? 0); %><tr><td><%= fmtDate(m.data_movimento || m.created_at || m.data) %></td><td><%= m.tipo || m.movimento || '-' %></td><td><strong><%= fmtMin(minutos) %></strong></td><td><%= m.descricao || m.observacao || '-' %></td></tr><% }) %>
+        </tbody></table></div>
+      </article>
+
+      <article class="escala-section">
+        <div class="escala-section-head"><div><h2>Horas extras recentes</h2><div class="muted">Serviços adicionais registrados em seu nome.</div></div></div>
+        <div class="self-table-wrap"><table class="self-table"><thead><tr><th>Data</th><th>OS</th><th>Serviço</th><th>Tempo</th><th>Status</th></tr></thead><tbody>
+          <% if(!horasExtras.length){ %><tr><td colspan="5" class="muted">Nenhuma hora extra registrada.</td></tr><% } %>
+          <% horasExtras.forEach(h=>{ %><tr><td><%= fmtDate(h.data_servico) %></td><td><%= h.os_id ? '#'+h.os_id : '-' %></td><td><%= h.equipamento_nome || h.descricao_servico || h.os_descricao || '-' %></td><td><%= fmtMin(h.total_minutos) %></td><td><span class="self-badge"><%= h.status || '-' %></span></td></tr><% }) %>
+        </tbody></table></div>
+      </article>
+    </section>
+
+    <section class="escala-section">
+      <div class="escala-section-head"><div><h2>Folgas e ausências</h2><div class="muted">Consulta dos afastamentos e compensações vinculados ao seu cadastro.</div></div></div>
+      <div class="self-table-wrap"><table class="self-table"><thead><tr><th>Início</th><th>Fim</th><th>Tipo / Status</th><th>Motivo</th></tr></thead><tbody>
+        <% if(!folgas.length){ %><tr><td colspan="4" class="muted">Nenhuma folga ou ausência registrada.</td></tr><% } %>
+        <% folgas.forEach(f=>{ %><tr><td><%= fmtDate(f.data_inicio || f.inicio || f.data) %></td><td><%= fmtDate(f.data_fim || f.fim || f.data_inicio || f.inicio || f.data) %></td><td><%= f.tipo || f.status || 'Folga' %></td><td><%= f.motivo || f.observacao || '-' %></td></tr><% }) %>
+      </tbody></table></div>
+    </section>
+
+    <div class="escala-audit-note">Esta área é de consulta individual. Dados de outros colaboradores não são exibidos. A escala é um controle operacional interno e não substitui o registro oficial de jornada do RH.</div>
+  <% } %>
+</div>

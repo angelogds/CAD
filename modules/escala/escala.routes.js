@@ -7,6 +7,8 @@ const router = express.Router();
 const { requireLogin, requireRole, requireAdmin } = require("../auth/auth.middleware");
 const { ACCESS, ROLE } = require("../../config/rbac");
 const controller = require("./escala.controller");
+const rhController = require("./escala.rh.controller");
+const selfController = require("./escala.self.controller");
 
 const storagePaths = require("../../config/storage");
 const uploadDir = path.join(storagePaths.UPLOAD_DIR, "escala-horas");
@@ -30,8 +32,10 @@ const safe = (fn, name) =>
       }
     : (_req, res) => res.status(500).send(`Erro interno: handler ${name} indefinido.`);
 
-const escalaManage = [ROLE.ADMIN, ROLE.ENCARREGADO_MANUTENCAO, ROLE.MANUTENCAO_SUPERVISOR, ROLE.SUPERVISOR_MANUTENCAO];
+const escalaManage = ACCESS.escala_manage || [ROLE.ADMIN, ROLE.ENCARREGADO_MANUTENCAO, ROLE.MANUTENCAO_SUPERVISOR, ROLE.SUPERVISOR_MANUTENCAO];
 const escalaRead = ACCESS.escala;
+const escalaSelfRead = ACCESS.escala_self || escalaRead;
+const escalaRhRead = ACCESS.escala_rh || [ROLE.ADMIN, ROLE.RH, ROLE.DIRETORIA];
 
 function normalizeTextRole(value) {
   return String(value || '')
@@ -63,7 +67,16 @@ function requireHoraExtraAccess(req, res, next) {
   return res.status(403).json({ error: 'Apenas mecânicos podem registrar hora extra.' });
 }
 
-router.get("/", requireLogin, requireRole(escalaRead), safe(controller.index, "index"));
+function redirectRoleDashboard(req, res, next) {
+  const role = normalizeTextRole(req.session?.user?.role);
+  if (role === ROLE.RH) return res.redirect('/escala/rh');
+  if (role === ROLE.COLABORADOR) return res.redirect('/escala/meu-painel');
+  return next();
+}
+
+router.get("/", requireLogin, requireRole(escalaSelfRead), redirectRoleDashboard, safe(controller.index, "index"));
+router.get("/meu-painel", requireLogin, requireRole(escalaSelfRead), safe(selfController.index, "selfIndex"));
+router.get("/rh", requireLogin, requireRole(escalaRhRead), safe(rhController.index, "rhIndex"));
 router.get("/semana", requireLogin, requireRole(escalaRead), safe(controller.semana, "semana"));
 router.get("/completa", requireLogin, requireRole(escalaRead), safe(controller.completa, "completa"));
 router.get("/ausencias", requireLogin, requireRole(escalaRead), safe(controller.ausencias, "ausencias"));
@@ -86,8 +99,8 @@ router.post("/hora-extra/:id/ajustar", requireLogin, requireRole(escalaManage), 
 router.post("/hora-extra/:id/cancelar", requireLogin, requireRole(escalaManage), safe(controller.cancelarHoraExtra, "cancelarHoraExtra"));
 router.post("/hora-extra/:id/excluir", requireLogin, requireAdmin, safe(controller.apagarHoraExtra, "apagarHoraExtra"));
 
-router.get("/banco-horas", requireLogin, requireRole(escalaRead), safe(controller.bancoHoras, "bancoHoras"));
-router.get("/banco-horas/:colaboradorId", requireLogin, requireRole(escalaRead), safe(controller.bancoHorasFuncionario, "bancoHorasFuncionario"));
+router.get("/banco-horas", requireLogin, requireRole(escalaSelfRead), safe(controller.bancoHoras, "bancoHoras"));
+router.get("/banco-horas/:colaboradorId", requireLogin, requireRole(escalaSelfRead), safe(controller.bancoHorasFuncionario, "bancoHorasFuncionario"));
 router.get("/folgas", requireLogin, requireRole(escalaRead), safe(controller.folgas, "folgas"));
 router.get("/folgas-sabado", requireLogin, requireRole(escalaRead), safe(controller.folgasSabado, "folgasSabado"));
 router.post("/folgas-sabado/:semanaId", requireLogin, requireRole(escalaManage), safe(controller.salvarFolgaSabado, "salvarFolgaSabado"));
@@ -96,9 +109,9 @@ router.post("/folgas/:id/cancelar", requireLogin, requireRole(escalaManage), saf
 router.post("/folgas/:id/realizar", requireLogin, requireRole(escalaManage), safe(controller.realizarFolga, "realizarFolga"));
 
 router.get("/relatorios", requireLogin, requireRole(escalaRead), safe(controller.relatorios, "relatorios"));
-router.get("/relatorios/pdf", requireLogin, requireRole(escalaRead), safe(controller.relatorioPdf, "relatorioPdf"));
-router.get("/relatorios/funcionario/:colaboradorId/pdf", requireLogin, requireRole(escalaRead), safe(controller.relatorioFuncionarioPdf, "relatorioFuncionarioPdf"));
-router.get("/relatorios/os/:osId/pdf", requireLogin, requireRole(escalaRead), safe(controller.relatorioOsPdf, "relatorioOsPdf"));
+router.get("/relatorios/pdf", requireLogin, requireRole(ACCESS.escala_reports || escalaRead), safe(controller.relatorioPdf, "relatorioPdf"));
+router.get("/relatorios/funcionario/:colaboradorId/pdf", requireLogin, requireRole(ACCESS.escala_reports || escalaRead), safe(controller.relatorioFuncionarioPdf, "relatorioFuncionarioPdf"));
+router.get("/relatorios/os/:osId/pdf", requireLogin, requireRole(ACCESS.escala_reports || escalaRead), safe(controller.relatorioOsPdf, "relatorioOsPdf"));
 
 router.post("/adicionar", requireLogin, requireRole(escalaManage), safe(controller.adicionarRapido, "adicionarRapido"));
 router.post("/ausencia", requireLogin, requireRole(escalaManage), safe(controller.lancarAusencia, "lancarAusencia"));
@@ -109,9 +122,9 @@ router.post("/editar/:id", requireLogin, requireRole(escalaManage), safe(control
 router.post("/alocacao/:id/delete", requireLogin, requireRole(escalaManage), safe(controller.removerAlocacao, "removerAlocacao"));
 router.post("/completa/recalcular", requireLogin, requireRole(escalaManage), safe(controller.recalcularCompleta, "recalcularCompleta"));
 
-router.get("/pdf/semana", requireLogin, requireRole(escalaRead), safe(controller.pdfSemana, "pdfSemana"));
-router.get("/pdf/semana/:id", requireLogin, requireRole(escalaRead), safe(controller.pdfSemanaById, "pdfSemanaById"));
-router.get("/pdf/periodo", requireLogin, requireRole(escalaRead), safe(controller.pdfPeriodo, "pdfPeriodo"));
-router.get("/pdf", requireLogin, requireRole(escalaRead), safe(controller.pdfPeriodo, "pdfPeriodo"));
+router.get("/pdf/semana", requireLogin, requireRole(ACCESS.escala_reports || escalaRead), safe(controller.pdfSemana, "pdfSemana"));
+router.get("/pdf/semana/:id", requireLogin, requireRole(ACCESS.escala_reports || escalaRead), safe(controller.pdfSemanaById, "pdfSemanaById"));
+router.get("/pdf/periodo", requireLogin, requireRole(ACCESS.escala_reports || escalaRead), safe(controller.pdfPeriodo, "pdfPeriodo"));
+router.get("/pdf", requireLogin, requireRole(ACCESS.escala_reports || escalaRead), safe(controller.pdfPeriodo, "pdfPeriodo"));
 
 module.exports = router;
