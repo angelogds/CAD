@@ -2,6 +2,7 @@ const router = require("express").Router();
 const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const { ACCESS, normalizeRole } = require("../../config/rbac");
 const ctrl = require("./solicitacoes.controller");
+const flowCtrl = require("./solicitacoes.itens-consenso.controller");
 
 
 function requireAdminDeleteSolicitacao(req, res, next) {
@@ -20,7 +21,9 @@ router.post("/:id/cancelar", requireLogin, requireAdminDeleteSolicitacao, requir
 router.get("/:id/editar", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.editar);
 router.post("/:id/editar", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.atualizar);
 router.post("/:id/finalizar", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.finalizar);
-router.get("/:id", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.detalhe);
+router.post("/:id/itens/:itemId/exclusao/aprovar", requireLogin, requireRole(ACCESS.solicitacoes_read), flowCtrl.aprovarExclusao);
+router.post("/:id/itens/:itemId/exclusao/recusar", requireLogin, requireRole(ACCESS.solicitacoes_read), flowCtrl.recusarExclusao);
+router.get("/:id", requireLogin, requireRole(ACCESS.solicitacoes_read), flowCtrl.detalhe);
 router.get("/", (_req, res) => res.redirect("/solicitacoes/minhas"));
 
 module.exports = router;
