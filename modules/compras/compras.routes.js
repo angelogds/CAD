@@ -6,6 +6,7 @@ const router = require('express').Router();
 const { requireLogin, requireRole, requireAdmin } = require('../auth/auth.middleware');
 const { ACCESS } = require('../../config/rbac');
 const ctrl = require('./compras.controller');
+const flowCtrl = require('./compras.itens-consenso.controller');
 const storagePaths = require('../../config/storage');
 
 const uploadsDir = storagePaths.UPLOAD_DIR;
@@ -27,13 +28,16 @@ const upload = multer({
 router.get('/demandas/pre-cotacoes.json', requireLogin, requireRole(ACCESS.compras_read), ctrl.preCotacoesDemandasJson);
 router.get('/solicitacoes', requireLogin, requireRole(ACCESS.compras_read), ctrl.lista);
 router.get('/solicitacoes/:id/pdf', requireLogin, requireRole(ACCESS.compras_read), ctrl.pdf);
-router.get('/solicitacoes/:id', requireLogin, requireRole(ACCESS.compras_read), ctrl.detalhe);
+router.get('/solicitacoes/:id', requireLogin, requireRole(ACCESS.compras_read), flowCtrl.detalhe);
 
 router.post('/solicitacoes/:id/cotacoes', requireLogin, requireRole(ACCESS.compras_manage), ctrl.criarCotacao);
 router.post('/solicitacoes/:id/cotacoes/:cotacaoId/selecionar', requireLogin, requireRole(ACCESS.compras_manage), ctrl.selecionarCotacao);
 router.post('/solicitacoes/:id/atualizar-dados', requireLogin, requireRole(ACCESS.compras_manage), ctrl.atualizarDados);
 router.post('/solicitacoes/:id/marcar-comprada', requireLogin, requireRole(ACCESS.compras_manage), ctrl.marcarComprada);
 router.post('/solicitacoes/:id/painel-itens', requireLogin, requireRole(ACCESS.compras_manage), ctrl.salvarPainelItens);
+router.post('/solicitacoes/:id/itens/:itemId/exclusao', requireLogin, requireRole(ACCESS.compras_manage), flowCtrl.solicitarExclusao);
+router.post('/solicitacoes/:id/itens/:itemId/exclusao/cancelar', requireLogin, requireRole(ACCESS.compras_manage), flowCtrl.cancelarExclusao);
+router.post('/solicitacoes/:id/itens-excepcionais', requireLogin, requireRole(ACCESS.compras_manage), flowCtrl.adicionarItem);
 
 router.post('/solicitacoes/:id/anexos', requireLogin, requireRole(ACCESS.compras_manage), upload.single('arquivo'), ctrl.uploadAnexo);
 router.get('/anexos/:anexoId/download', requireLogin, requireRole(ACCESS.compras_read), ctrl.downloadAnexo);

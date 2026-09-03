@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const db = require('../../database/db');
 const service = require('./compras.service');
 const dashboardService = require('./compras.dashboard.service');
 const demandasComprasService = require('./compras-demandas.service');
@@ -45,13 +46,62 @@ function loadAllLegacyQueueRows(filters, tab) {
   return { queue: first, rows };
 }
 
+function hasColumn(table, column) {
+  try {
+    return db.prepare(`PRAGMA table_info(${table})`).all().some((item) => item.name === column);
+  } catch (_error) {
+    return false;
+  }
+}
+
+/**
+ * O serviço legado da fila contabiliza todas as linhas de solicitacao_itens.
+ * Itens aprovados para exclusão continuam fisicamente armazenados por auditoria
+ * (status_compra=CANCELADO), portanto a fila precisa recalcular SOMENTE os itens
+ * ativos para que quantidade e percentuais não exibam material já removido.
+ */
+function applyActiveItemCounters(rows) {
+  if (!Array.isArray(rows) || !rows.length) return rows || [];
+  if (!hasColumn('solicitacao_itens', 'status_compra')) return rows;
+
+  const ids = [...new Set(rows.map((row) => Number(row.id)).filter((id) => id > 0))];
+  if (!ids.length) return rows;
+  const placeholders = ids.map(() => '?').join(',');
+  const hasQtdComprada = hasColumn('solicitacao_itens', 'qtd_comprada');
+  const expected = hasQtdComprada ? 'COALESCE(si.qtd_comprada,si.qtd_solicitada,0)' : 'COALESCE(si.qtd_solicitada,0)';
+  const stats = db.prepare(`
+    SELECT si.solicitacao_id,
+      SUM(CASE WHEN UPPER(COALESCE(si.status_compra,''))<>'CANCELADO' THEN 1 ELSE 0 END) itens_count,
+      SUM(CASE WHEN UPPER(COALESCE(si.status_compra,''))<>'CANCELADO'
+        AND UPPER(COALESCE(si.status_cotacao,''))='COTADO' THEN 1 ELSE 0 END) itens_cotados,
+      SUM(CASE WHEN UPPER(COALESCE(si.status_compra,''))='COMPRADO' THEN 1 ELSE 0 END) itens_comprados,
+      SUM(CASE WHEN UPPER(COALESCE(si.status_compra,''))<>'CANCELADO'
+        AND COALESCE(si.qtd_recebida_total,0)>=${expected} AND ${expected}>0 THEN 1 ELSE 0 END) itens_recebidos
+    FROM solicitacao_itens si
+    WHERE si.solicitacao_id IN (${placeholders})
+    GROUP BY si.solicitacao_id
+  `).all(...ids);
+  const byId = new Map(stats.map((row) => [Number(row.solicitacao_id), row]));
+  return rows.map((row) => {
+    const stat = byId.get(Number(row.id));
+    if (!stat) return row;
+    return {
+      ...row,
+      itens_count: Number(stat.itens_count || 0),
+      itens_cotados: Number(stat.itens_cotados || 0),
+      itens_comprados: Number(stat.itens_comprados || 0),
+      itens_recebidos: Number(stat.itens_recebidos || 0),
+    };
+  });
+}
+
 function getOperationalQueue(filters) {
   const activeSource = loadAllLegacyQueueRows(filters, 'active');
   const historySource = loadAllLegacyQueueRows(filters, 'history');
   const unique = new Map();
   [...activeSource.rows, ...historySource.rows].forEach((row) => unique.set(String(row.id), row));
 
-  const allRows = [...unique.values()].map((row) => ({
+  const allRows = applyActiveItemCounters([...unique.values()]).map((row) => ({
     ...row,
     status: service.normalizeStatus(row.status),
     priorityGroup: queuePriorityGroup(row.prioridade),

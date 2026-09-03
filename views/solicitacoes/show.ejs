@@ -7,6 +7,8 @@ const statusLabels = {
   EM_RECEBIMENTO: 'Em recebimento',
   RECEBIDA_PARCIAL: 'Recebida parcial',
   RECEBIDA_TOTAL: 'Recebida total',
+  SEPARADA_PARA_RETIRADA: 'Separada para retirada',
+  ENTREGUE_SOLICITANTE: 'Entregue ao solicitante',
   FECHADA: 'Fechada',
   REABERTA: 'Reaberta',
   CANCELADA: 'Cancelada'
@@ -27,6 +29,8 @@ const stageIndexByStatus = {
   EM_RECEBIMENTO: 3,
   RECEBIDA_PARCIAL: 3,
   RECEBIDA_TOTAL: 3,
+  SEPARADA_PARA_RETIRADA: 3,
+  ENTREGUE_SOLICITANTE: 4,
   FECHADA: 4,
   CANCELADA: 0
 };
@@ -39,8 +43,15 @@ const stages = [
   { label: 'FECHADA', date: solicitacao.fechada_em }
 ];
 const anexosSeguros = Array.isArray(anexos) ? anexos : [];
+const allItems = Array.isArray(itens) ? itens : [];
+const activeItems = allItems.filter((item) => String(item.status_compra || '').toUpperCase() !== 'CANCELADO');
+const cancelledItems = allItems.filter((item) => String(item.status_compra || '').toUpperCase() === 'CANCELADO');
+const pendingExclusions = activeItems.filter((item) => String(item.exclusao_status || '').toUpperCase() === 'PENDENTE');
+const requesterCanAnswer = typeof isRequester !== 'undefined' && isRequester;
+const exclusionHistory = Array.isArray(historicoExclusoes) ? historicoExclusoes : [];
 %>
 <link rel="stylesheet" href="/css/solicitacao-detail-modern.css?v=20260819">
+<link rel="stylesheet" href="/css/solicitacao-itens-consenso.css?v=20260903-v1">
 
 <div class="sol-detail-page">
   <header class="sol-detail-hero">
@@ -74,6 +85,34 @@ const anexosSeguros = Array.isArray(anexos) ? anexos : [];
     </section>
   <% } %>
 
+  <% if (pendingExclusions.length) { %>
+    <section class="sol-card sol-consensus-card" aria-label="Pedidos de exclusão aguardando confirmação">
+      <div class="sol-card-head">
+        <div><h2>Compras solicitou exclusão de item</h2><small>Nenhum item é removido sem a confirmação do solicitante original.</small></div>
+        <span class="sol-item-state pending"><%= pendingExclusions.length %> pendente(s)</span>
+      </div>
+      <div class="sol-consensus-list">
+        <% pendingExclusions.forEach((item) => { %>
+          <div class="sol-consensus-item">
+            <div><strong><%= item.item_nome || 'Item sem nome' %></strong><small><%= item.qtd_solicitada ?? item.quantidade ?? 0 %> <%= item.unidade || 'UN' %></small></div>
+            <div><small>Motivo informado por Compras</small><span class="reason"><%= item.exclusao_motivo || 'Motivo não informado' %></span></div>
+            <% if (requesterCanAnswer) { %>
+              <form class="sol-consensus-form" method="POST" action="/solicitacoes/<%=solicitacao.id%>/itens/<%=item.id%>/exclusao/aprovar">
+                <input name="observacao" maxlength="1000" placeholder="Observação da decisão (opcional)">
+                <div class="sol-consensus-actions">
+                  <button class="reject" type="submit" formaction="/solicitacoes/<%=solicitacao.id%>/itens/<%=item.id%>/exclusao/recusar" onclick="return confirm('Manter este item na solicitação?')">Manter item</button>
+                  <button class="approve" type="submit" onclick="return confirm('Confirmar a exclusão deste item? O histórico será preservado.')">Confirmar exclusão</button>
+                </div>
+              </form>
+            <% } else { %>
+              <div class="sol-consensus-wait">Aguardando decisão do solicitante original.</div>
+            <% } %>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
+
   <section class="sol-card">
     <div class="sol-card-head">
       <h2>Dados principais</h2>
@@ -93,28 +132,38 @@ const anexosSeguros = Array.isArray(anexos) ? anexos : [];
 
   <section class="sol-card">
     <div class="sol-card-head">
-      <h2>Materiais solicitados</h2>
-      <small><%= itens.length %> item(ns)</small>
+      <h2>Materiais da solicitação</h2>
+      <small><%= activeItems.length %> ativo(s)<%= cancelledItems.length ? ` · ${cancelledItems.length} removido(s) com histórico` : '' %></small>
     </div>
     <div class="sol-material-table-wrap">
       <table class="sol-material-table">
         <thead>
-          <tr><th>Descrição do material</th><th>Quantidade</th><th>Unidade</th><th>Motivo / observação</th></tr>
+          <tr><th>Descrição do material</th><th>Quantidade</th><th>Unidade</th><th>Motivo / observação</th><th>Origem / situação</th></tr>
         </thead>
         <tbody>
-          <% if (!itens.length) { %><tr><td colspan="4" class="sol-muted">Sem itens cadastrados.</td></tr><% } %>
-          <% itens.forEach((item) => { %>
-            <tr>
-              <td data-label="Material"><%= item.item_nome || 'Não informado' %></td>
+          <% if (!allItems.length) { %><tr><td colspan="5" class="sol-muted">Sem itens cadastrados.</td></tr><% } %>
+          <% allItems.forEach((item) => { const cancelled=String(item.status_compra||'').toUpperCase()==='CANCELADO'; const pending=String(item.exclusao_status||'').toUpperCase()==='PENDENTE'; const extra=String(item.origem_item||'').toUpperCase()==='COMPRAS_EXTRA'; %>
+            <tr class="<%=cancelled?'is-cancelled':pending?'is-pending-delete':''%>">
+              <td data-label="Material"><%= item.item_nome || 'Não informado' %><div class="sol-item-meta"><% if(extra){%><span class="sol-origin-badge">Adicionado por Compras</span><small><%=item.adicao_justificativa||'Inclusão excepcional registrada pelo setor de Compras.'%></small><%}%></div></td>
               <td data-label="Quantidade"><%= item.qtd_solicitada ?? item.quantidade ?? 0 %></td>
               <td data-label="Unidade"><%= item.unidade || 'UN' %></td>
               <td data-label="Observação"><%= item.item_descricao || item.observacao_item || solicitacao.motivo || 'Não informado' %></td>
+              <td data-label="Situação"><% if(cancelled){%><span class="sol-item-state cancelled">Removido por consenso</span><small><%=item.exclusao_motivo||''%></small><%}else if(pending){%><span class="sol-item-state pending">Exclusão solicitada</span><%}else if(extra){%><span class="sol-origin-badge">Item extra</span><%}else{%><small>Solicitação original</small><%}%></td>
             </tr>
           <% }) %>
         </tbody>
       </table>
     </div>
   </section>
+
+  <% if (exclusionHistory.length) { %>
+    <details class="sol-card sol-consensus-history">
+      <summary>Histórico de decisões sobre exclusão de itens</summary>
+      <div class="sol-consensus-history-list">
+        <% exclusionHistory.forEach((row) => { %><div><span><strong><%=row.item_nome||'Item'%></strong><small><%=row.motivo%></small></span><span><strong><%=row.status%></strong><small>Solicitado por <%=row.solicitada_por_nome||'-'%><%=row.respondida_por_nome?' · respondido por '+row.respondida_por_nome:''%></small></span></div><% }) %>
+      </div>
+    </details>
+  <% } %>
 
   <div class="sol-two-column">
     <section class="sol-card">
@@ -142,7 +191,7 @@ const anexosSeguros = Array.isArray(anexos) ? anexos : [];
       <div class="sol-process-summary">
         <div class="sol-info-item"><small>Status atual</small><strong><%= statusLabels[statusKey] || solicitacao.status || 'Não informado' %></strong></div>
         <div class="sol-info-item"><small>Prioridade</small><strong><%= solicitacao.prioridade || 'Não informada' %></strong></div>
-        <div class="sol-info-item"><small>Itens solicitados</small><strong><%= itens.length %></strong></div>
+        <div class="sol-info-item"><small>Itens ativos</small><strong><%= activeItems.length %></strong></div>
         <div class="sol-info-item"><small>OS vinculada</small><strong><%= solicitacao.os_id ? ('OS ' + solicitacao.os_id) : 'Sem OS vinculada' %></strong></div>
       </div>
     </section>
