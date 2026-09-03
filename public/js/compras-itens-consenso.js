@@ -4,6 +4,10 @@
   const itemName = dialog?.querySelector('[data-delete-item-name]');
 
   document.querySelectorAll('.js-request-item-delete').forEach((button) => {
+    if (button.closest('.state-comprado')) {
+      button.disabled = true;
+      button.title = 'Item já marcado como comprado não pode entrar no fluxo de exclusão consensual.';
+    }
     button.addEventListener('click', () => {
       if (!dialog || !dialogForm || button.disabled) return;
       dialogForm.action = button.dataset.action || '';
