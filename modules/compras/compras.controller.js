@@ -2,11 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const service = require('./compras.service');
 const dashboardService = require('./compras.dashboard.service');
+const demandasComprasService = require('./compras-demandas.service');
 const { applyMigrations } = require('../../database/migrate');
 const storagePaths = require('../../config/storage');
 
 const UPLOADS_DIR = storagePaths.UPLOAD_DIR;
-
 
 const OPERATIONALLY_CLOSED = new Set(['RECEBIDA_TOTAL', 'ENTREGUE_SOLICITANTE', 'FECHADA', 'CANCELADA']);
 
@@ -46,9 +46,6 @@ function loadAllLegacyQueueRows(filters, tab) {
 }
 
 function getOperationalQueue(filters) {
-  // O service legado considerava RECEBIDA_TOTAL/ENTREGUE_SOLICITANTE como ativos e
-  // agrupava crítica + alta. A política abaixo corrige somente a apresentação da fila,
-  // preservando detalhes, banco, rotas e o restante do fluxo existente.
   const activeSource = loadAllLegacyQueueRows(filters, 'active');
   const historySource = loadAllLegacyQueueRows(filters, 'history');
   const unique = new Map();
@@ -190,6 +187,15 @@ function lista(req, res) {
   });
 }
 
+function preCotacoesDemandasJson(_req, res) {
+  try {
+    return res.json({ ok: true, rows: demandasComprasService.listPreCotacoesDemandas(12) });
+  } catch (error) {
+    console.error('❌ Erro ao carregar pré-cotações de demandas:', error && error.stack ? error.stack : error);
+    return res.status(500).json({ ok: false, rows: [] });
+  }
+}
+
 function detalhe(req, res) {
   const id = Number(req.params.id);
   try {
@@ -256,6 +262,7 @@ function atualizarDados(req, res) {
 
 function marcarComprada(req, res) {
   try {
+    demandasComprasService.assertCompraLiberada(Number(req.params.id));
     service.marcarComprada(Number(req.params.id), req.session.user.id, req.body);
     req.flash('success', 'Solicitação marcada como COMPRADA.');
   } catch (error) {
@@ -266,6 +273,11 @@ function marcarComprada(req, res) {
 
 function salvarPainelItens(req, res) {
   try {
+    const wantsPurchase = req.body.acao === 'comprar';
+    const estoqueValues = Array.isArray(req.body.atendido_estoque) ? req.body.atendido_estoque : [req.body.atendido_estoque];
+    const wantsStockFulfillment = estoqueValues.filter(Boolean).length > 0;
+    if (wantsPurchase || wantsStockFulfillment) demandasComprasService.assertCompraLiberada(Number(req.params.id));
+
     service.salvarPainelItens(Number(req.params.id), req.body, req.session.user.id);
     req.flash('success', req.body.acao === 'comprar'
       ? 'Itens selecionados marcados como comprados com segurança.'
@@ -318,6 +330,7 @@ function deleteAnexo(req, res) {
 
 module.exports = {
   lista,
+  preCotacoesDemandasJson,
   detalhe,
   pdf,
   criarCotacao,
