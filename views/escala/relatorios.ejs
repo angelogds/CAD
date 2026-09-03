@@ -1,1 +1,44 @@
-<%- layout('layout') -%><div class="page-head"><h1>Relatórios PDF</h1><a class="btn" href="/escala">Voltar</a></div><div class="card"><form method="GET" action="/escala/relatorios/pdf" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end"><div><div class="label">Tipo de relatório</div><select class="input" name="tipo"><option value="semana">Escala da Semana</option><option value="completa">Escala Completa</option><option value="ausencias">Folgas / Atestados / Férias</option><option value="banco" selected>Banco de Horas da Manutenção</option><option value="funcionario">Horas Extras por Funcionário</option><option value="os">Horas Extras por OS</option><option value="folgas">Folgas Programadas</option><option value="mensal">Relatório Mensal da Manutenção</option></select></div><div><div class="label">Funcionário</div><select class="input" name="colaborador_id"><option value="">Todos</option><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>"><%= c.nome %></option><% }) %></select></div><div><div class="label">Data inicial</div><input class="input" type="date" name="inicio"></div><div><div class="label">Data final</div><input class="input" type="date" name="fim"></div><div><div class="label">OS</div><select class="input" name="os_id"><option value="">Todas</option><% osDisponiveis.forEach(o=>{ %><option value="<%= o.id %>">OS <%= o.id %> — <%= o.equipamento_nome || o.equipamento %></option><% }) %></select></div><div><div class="label">Tipo de ausência</div><select class="input" name="tipo_ausencia"><option value="">Todos</option><option>Folga compensatória</option><option>Folga manual</option><option>Atestado</option><option>Férias</option><option>Falta justificada</option><option>Falta não justificada</option></select></div><div><div class="label">Status da hora extra</div><select class="input" name="status"><option value="">Todos</option><option>APROVADO</option><option>PENDENTE_APROVACAO</option><option>REPROVADO</option><option>CANCELADO</option></select></div><div><div class="label">Setor/equipamento</div><input class="input" name="equipamento"></div><button class="btn btn-green">Gerar PDF</button></form></div>
+<%- layout('layout') -%>
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
+<% const listaColaboradores = Array.isArray(colaboradores) ? colaboradores : []; const listaOs = Array.isArray(osDisponiveis) ? osDisponiveis : []; %>
+<div class="escala-page">
+  <header class="escala-head">
+    <div><h1>Relatórios da Escala</h1><p>Central de geração de PDFs para escala, horas extras, Banco de Horas, ausências e acompanhamento da equipe.</p></div>
+    <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a></div>
+  </header>
+
+  <nav class="escala-tabs">
+    <a class="escala-tab" href="/escala">Painel da Equipe</a>
+    <a class="escala-tab" href="/escala/semana">Escala da Semana</a>
+    <a class="escala-tab" href="/escala/completa">Escala Completa</a>
+    <a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a>
+    <a class="escala-tab is-active" href="/escala/relatorios">Relatórios PDF</a>
+  </nav>
+
+  <div class="escala-notice">Os relatórios utilizam os dados reais já registrados no módulo. Use os filtros somente quando forem aplicáveis ao tipo escolhido; os demais podem ficar em branco.</div>
+
+  <section class="escala-section">
+    <div class="escala-section-head"><div><h2>Escolha o relatório</h2><p>Selecione o objetivo e, em seguida, refine o período ou colaborador.</p></div></div>
+    <div class="escala-report-grid">
+      <div class="escala-report-card"><strong>Escala</strong><small>Semana atual ou visão completa por período.</small></div>
+      <div class="escala-report-card"><strong>Horas Extras</strong><small>Por funcionário, OS e status de aprovação.</small></div>
+      <div class="escala-report-card"><strong>Banco de Horas</strong><small>Saldo, créditos, débitos e rastreabilidade individual.</small></div>
+      <div class="escala-report-card"><strong>Ausências e Folgas</strong><small>Folgas, férias, atestados e demais afastamentos.</small></div>
+    </div>
+  </section>
+
+  <section class="escala-section">
+    <div class="escala-section-head"><div><h2>Gerar PDF</h2><p>Configure somente os filtros necessários para o relatório selecionado.</p></div></div>
+    <form method="GET" action="/escala/relatorios/pdf" class="escala-form-grid is-3">
+      <label class="escala-field"><span class="label">Tipo de relatório</span><select class="input" name="tipo"><option value="semana">Escala da Semana</option><option value="completa">Escala Completa</option><option value="ausencias">Folgas / Atestados / Férias</option><option value="banco" selected>Banco de Horas da Manutenção</option><option value="funcionario">Horas Extras por Funcionário</option><option value="os">Horas Extras por OS</option><option value="folgas">Folgas Programadas</option><option value="mensal">Relatório Mensal da Manutenção</option></select></label>
+      <label class="escala-field"><span class="label">Funcionário</span><select class="input" name="colaborador_id"><option value="">Todos</option><% listaColaboradores.forEach(c=>{ %><option value="<%= c.id %>"><%= c.nome %></option><% }) %></select></label>
+      <label class="escala-field"><span class="label">OS</span><select class="input" name="os_id"><option value="">Todas</option><% listaOs.forEach(o=>{ %><option value="<%= o.id %>">OS <%= o.id %> — <%= o.equipamento_nome || o.equipamento || 'Equipamento' %></option><% }) %></select></label>
+      <label class="escala-field"><span class="label">Data inicial</span><input class="input" type="date" name="inicio"></label>
+      <label class="escala-field"><span class="label">Data final</span><input class="input" type="date" name="fim"></label>
+      <label class="escala-field"><span class="label">Tipo de ausência</span><select class="input" name="tipo_ausencia"><option value="">Todos</option><option>Folga compensatória</option><option>Folga manual</option><option>Atestado</option><option>Férias</option><option>Falta justificada</option><option>Falta não justificada</option></select></label>
+      <label class="escala-field"><span class="label">Status da hora extra</span><select class="input" name="status"><option value="">Todos</option><option>APROVADO</option><option>PENDENTE_APROVACAO</option><option>REPROVADO</option><option>CANCELADO</option></select></label>
+      <label class="escala-field"><span class="label">Setor / equipamento</span><input class="input" name="equipamento" placeholder="Ex.: Caldeira 1"></label>
+      <div class="escala-field" style="align-self:end"><button class="btn btn-green" type="submit">Gerar PDF</button></div>
+    </form>
+  </section>
+</div>
