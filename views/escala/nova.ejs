@@ -1,65 +1,24 @@
-<% layout('layout') %>
+<%- layout('layout') -%>
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
+<div class="escala-page">
+  <header class="escala-head">
+    <div><h1>Lançar Escala</h1><p>Registro manual de colaborador no turno dia ou noite, mantendo a lógica existente do módulo.</p></div>
+    <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a></div>
+  </header>
 
-<style>
-  .card{ background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:14px; max-width:900px; }
-  .row{ display:flex; gap:12px; flex-wrap:wrap; }
-  label{ font-weight:900; font-size:12px; color:#6b7280; letter-spacing:.04em; display:block; margin-bottom:6px; }
-  input, select{
-    width:100%; padding:10px 12px; border-radius:12px;
-    border:1px solid #e5e7eb; outline:none;
-  }
-  input:focus, select:focus{ border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.15); }
-  .btn-sm{ padding:10px 12px; border-radius:12px; font-weight:900; border:1px solid #e5e7eb; background:#fff; cursor:pointer; text-decoration:none; display:inline-block; }
-  .btn-sm:hover{ border-color:#10b981; color:#065f46; background:#ecfdf5; }
-  .muted{ color:#6b7280; }
-</style>
+  <nav class="escala-tabs"><a class="escala-tab" href="/escala">Painel da Equipe</a><a class="escala-tab" href="/escala/semana">Escala da Semana</a><a class="escala-tab" href="/escala/completa">Escala Completa</a><a class="escala-tab is-active" href="/escala/nova">Novo lançamento</a></nav>
 
-<h1>Lançar escala</h1>
-<p class="muted" style="margin-top:-6px;">Registrar mecânicos industriais do dia/noite.</p>
+  <div class="escala-notice is-info">Use o lançamento manual somente para inclusão pontual. Para organização recorrente de plantões e turnos, utilize a configuração de rodízio.</div>
 
-<div class="card">
-  <form action="/escala" method="POST">
-    <div class="row">
-      <div style="flex:1; min-width:200px;">
-        <label>Data</label>
-        <input name="data" value="<%= today %>" placeholder="YYYY-MM-DD" required />
-      </div>
-
-      <div style="flex:1; min-width:200px;">
-        <label>Turno</label>
-        <select name="turno">
-          <option value="dia">dia</option>
-          <option value="noite">noite</option>
-        </select>
-      </div>
-
-      <div style="flex:1; min-width:200px;">
-        <label>Categoria</label>
-        <select name="categoria">
-          <option value="mecanico">mecânico industrial</option>
-        </select>
-      </div>
-    </div>
-
-    <div style="height:10px"></div>
-
-    <div class="row">
-      <div style="flex:2; min-width:260px;">
-        <label>Nome</label>
-        <input name="nome" placeholder="Ex.: Salviano / Luiz / Emanuel" required />
-      </div>
-
-      <div style="flex:3; min-width:260px;">
-        <label>Observação (opcional)</label>
-        <input name="observacao" placeholder="Ex.: plantão / substituição..." />
-      </div>
-    </div>
-
-    <div style="height:14px"></div>
-
-    <div class="row">
-      <button class="btn-sm" type="submit">Salvar</button>
-      <a class="btn-sm" href="/escala">Cancelar</a>
-    </div>
-  </form>
+  <section class="escala-section">
+    <div class="escala-section-head"><div><h2>Dados da alocação</h2><p>Informe data, turno e colaborador.</p></div></div>
+    <form action="/escala" method="POST" class="escala-form-grid">
+      <label class="escala-field"><span class="label">Data</span><input class="input" name="data" type="date" value="<%= today %>" required></label>
+      <label class="escala-field"><span class="label">Turno</span><select class="input" name="turno"><option value="dia">Dia</option><option value="noite">Noite</option></select></label>
+      <label class="escala-field"><span class="label">Categoria</span><select class="input" name="categoria"><option value="mecanico">Mecânico Industrial</option></select></label>
+      <label class="escala-field"><span class="label">Nome</span><input class="input" name="nome" placeholder="Nome do colaborador" required></label>
+      <label class="escala-field full"><span class="label">Observação</span><textarea class="input" name="observacao" rows="4" placeholder="Ex.: plantão, substituição, apoio temporário..."></textarea></label>
+      <div class="escala-field full"><div class="escala-actionbar"><span class="muted">A inclusão seguirá as mesmas regras e rotas já utilizadas pela Escala.</span><div class="escala-actions"><a class="btn" href="/escala">Cancelar</a><button class="btn btn-green" type="submit">Salvar lançamento</button></div></div></div>
+    </form>
+  </section>
 </div>
