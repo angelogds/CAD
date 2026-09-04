@@ -10,10 +10,24 @@
   const reproCount = lista.filter(h=>/REPROV|CANCEL/.test(String(h.status||''))).length;
   const pendMinutes = fila.reduce((s,h)=>s+Number(h.total_minutos||0),0);
   const statusLabel = (value) => String(value||'PENDENTE_APROVACAO').replaceAll('_',' ');
+  const geoInfo = (h, context) => {
+    const lat = Number(h && h['latitude_' + context]);
+    const lon = Number(h && h['longitude_' + context]);
+    const acc = Number(h && h['precisao_' + context]);
+    const ok = Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && !(lat === 0 && lon === 0);
+    if (!ok) return { ok:false, label:'Não capturada', coords:'', accuracy:'', maps:'' };
+    return {
+      ok:true,
+      label:'GPS capturado',
+      coords:`${lat.toFixed(5)}, ${lon.toFixed(5)}`,
+      accuracy:Number.isFinite(acc) && acc > 0 ? `±${Math.round(acc)} m` : '',
+      maps:`https://www.google.com/maps?q=${encodeURIComponent(lat + ',' + lon)}`,
+    };
+  };
 %>
 <div class="escala-page approval-page">
   <header class="escala-head">
-    <div><h1><%= canDeleteHorasExtras ? 'Horas Extras Lançadas' : 'Horas Extras Pendentes' %></h1><p>Aprovação rápida, rastreabilidade e horários exibidos no padrão brasileiro.</p></div>
+    <div><h1><%= canDeleteHorasExtras ? 'Horas Extras Lançadas' : 'Horas Extras Pendentes' %></h1><p>Aprovação rápida, rastreabilidade, localização e horários exibidos no padrão brasileiro.</p></div>
     <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a><a class="btn" href="/escala/banco-horas">Banco de Horas</a></div>
   </header>
 
@@ -32,13 +46,13 @@
     <a class="escala-tab" href="/escala/ausencias">Ausências</a>
   </nav>
 
-  <div class="escala-notice is-info"><strong>Horário de Brasília.</strong> Datas são exibidas em DD/MM/AAAA e horários em HH:mm. A aprovação credita o Banco de Horas uma única vez.</div>
+  <div class="escala-notice is-info"><strong>Horário de Brasília.</strong> Datas são exibidas em DD/MM/AAAA e horários em HH:mm. Quando o aparelho fornecer GPS, início e finalização aparecem abaixo para conferência. A localização é apoio de rastreabilidade e não reprova automaticamente um lançamento.</div>
 
   <section class="escala-section">
     <div class="escala-section-head"><div><h2>Fila de aprovação</h2><p>Somente o que precisa de decisão aparece em destaque.</p></div><span class="approval-counter"><%= fila.length %> pendente(s)</span></div>
     <% if(!fila.length){ %><div class="escala-empty">Nenhuma hora extra aguardando aprovação.</div><% } %>
     <div class="approval-grid">
-      <% fila.forEach(h=>{ %>
+      <% fila.forEach(h=>{ const geoInicio=geoInfo(h,'inicio'); const geoFim=geoInfo(h,'fim'); %>
         <article class="approval-card">
           <div class="approval-card-head">
             <div class="escala-avatar"><%= String(h.colaborador_nome||'M').charAt(0).toUpperCase() %></div>
@@ -54,7 +68,13 @@
           </div>
 
           <div class="approval-service"><span>Serviço</span><strong><%= h.descricao_servico || h.os_descricao || '-' %></strong></div>
-          <div class="approval-service"><span>Localização</span><strong><%= h.status_localizacao || h.localizacao_status || 'Não capturada' %></strong></div>
+          <div class="approval-service">
+            <span>Localização</span>
+            <strong>Início: <%= geoInicio.ok ? '✅ ' : '⚠ ' %><%= geoInicio.label %><%= geoInicio.accuracy ? (' • ' + geoInicio.accuracy) : '' %></strong>
+            <% if(geoInicio.ok){ %><small><%= geoInicio.coords %> • <a href="<%= geoInicio.maps %>" target="_blank" rel="noopener noreferrer">Abrir no mapa</a></small><% } %>
+            <strong style="margin-top:4px">Fim: <%= geoFim.ok ? '✅ ' : '⚠ ' %><%= geoFim.label %><%= geoFim.accuracy ? (' • ' + geoFim.accuracy) : '' %></strong>
+            <% if(geoFim.ok){ %><small><%= geoFim.coords %> • <a href="<%= geoFim.maps %>" target="_blank" rel="noopener noreferrer">Abrir no mapa</a></small><% } %>
+          </div>
 
           <div class="approval-primary-actions">
             <form method="POST" action="/escala/hora-extra/<%= h.id %>/aprovar" onsubmit="return confirm('Aprovar <%= h.colaborador_nome %> — <%= fmtMin(h.total_minutos) %> e creditar no Banco de Horas?');">
@@ -62,22 +82,12 @@
             </form>
             <details class="approval-details">
               <summary>Reprovar</summary>
-              <form method="POST" action="/escala/hora-extra/<%= h.id %>/reprovar">
-                <input class="input" name="motivo" placeholder="Motivo da reprovação" required>
-                <button class="btn btn-sm" type="submit">Confirmar reprovação</button>
-              </form>
+              <form method="POST" action="/escala/hora-extra/<%= h.id %>/reprovar"><input class="input" name="motivo" placeholder="Motivo da reprovação" required><button class="btn btn-sm" type="submit">Confirmar reprovação</button></form>
             </details>
             <details class="approval-details">
               <summary>Mais ações</summary>
-              <form method="POST" action="/escala/hora-extra/<%= h.id %>/cancelar">
-                <input class="input" name="motivo" placeholder="Motivo do cancelamento" required>
-                <button class="btn btn-sm" type="submit">Cancelar lançamento</button>
-              </form>
-              <% if(canDeleteHorasExtras){ %>
-                <form method="POST" action="/escala/hora-extra/<%= h.id %>/excluir" onsubmit="return confirm('Apagar definitivamente este lançamento?');">
-                  <button class="btn btn-sm btn-red" type="submit">Apagar</button>
-                </form>
-              <% } %>
+              <form method="POST" action="/escala/hora-extra/<%= h.id %>/cancelar"><input class="input" name="motivo" placeholder="Motivo do cancelamento" required><button class="btn btn-sm" type="submit">Cancelar lançamento</button></form>
+              <% if(canDeleteHorasExtras){ %><form method="POST" action="/escala/hora-extra/<%= h.id %>/excluir" onsubmit="return confirm('Apagar definitivamente este lançamento?');"><button class="btn btn-sm btn-red" type="submit">Apagar</button></form><% } %>
             </details>
           </div>
         </article>
