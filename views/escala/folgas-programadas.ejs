@@ -1,54 +1,99 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
-<% const listaFolgas = Array.isArray(folgas) ? folgas : []; %>
-<div class="escala-page">
+<link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260903a">
+<%
+  const listaFolgas = Array.isArray(folgas) ? folgas : [];
+  const listaSolicitacoes = Array.isArray(solicitacoes) ? solicitacoes : [];
+  const pendentesFolga = listaSolicitacoes.filter(s=>s.status==='PENDENTE_APROVACAO');
+  const historicoSolic = listaSolicitacoes.filter(s=>s.status!=='PENDENTE_APROVACAO').slice(0,40);
+  const fmtMin = (value) => { const n=Number(value||0); const sign=n<0?'-':''; const m=Math.abs(n); return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; };
+%>
+<div class="escala-page approval-page">
   <header class="escala-head">
-    <div><h1>Programar Folga / Afastamento</h1><p>Programação de folgas compensatórias, férias, atestados e demais ocorrências da equipe.</p></div>
-    <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a></div>
+    <div><h1>Folgas e Afastamentos</h1><p>Solicitações do Banco de Horas, aprovação da gestão e programação das demais ocorrências.</p></div>
+    <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a><a class="btn" href="/escala/banco-horas">Banco de Horas</a></div>
   </header>
 
   <nav class="escala-tabs">
     <a class="escala-tab" href="/escala">Painel da Equipe</a>
     <a class="escala-tab" href="/escala/semana">Escala da Semana</a>
     <a class="escala-tab" href="/escala/completa">Escala Completa</a>
-    <a class="escala-tab is-active" href="/escala/folgas">Programar Folga</a>
-    <a class="escala-tab" href="/escala/ausencias">Folgas / Afastamentos</a>
+    <a class="escala-tab is-active" href="/escala/folgas">Folgas</a>
+    <a class="escala-tab" href="/escala/ausencias">Afastamentos</a>
     <a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a>
   </nav>
 
-  <div class="escala-notice">Folga compensatória desconta exatamente o saldo informado. Atestado, férias e demais afastamentos permanecem separados do Banco de Horas, conforme a regra atual do módulo.</div>
+  <div class="escala-notice is-info"><strong>Regra operacional:</strong> folga eletiva pelo Banco de Horas nunca é liberada na segunda-feira e somente um colaborador pode reservar/usar a mesma data. Uma solicitação pendente já reserva o dia até aprovação, reprovação ou cancelamento.</div>
 
   <section class="escala-section">
-    <div class="escala-section-head"><div><h2>Novo registro</h2><p>Preencha os dados do colaborador e do período.</p></div></div>
-    <form method="post" action="/escala/folgas/programar" enctype="multipart/form-data" id="folga-form" class="escala-form-grid is-3">
-      <label class="escala-field"><span class="label">Funcionário</span><select class="input" name="colaborador_id" id="colaborador" required><option value="">Selecione</option><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>" data-saldo="<%= c.saldo.minutos %>"><%= c.nome %> — saldo <%= c.saldo.horas %></option><% }) %></select></label>
-      <label class="escala-field"><span class="label">Tipo</span><select class="input" name="tipo_lancamento" id="tipo" required><option value="FOLGA_COMPENSATORIA">Folga compensatória (desconta)</option><option value="FOLGA_MANUAL">Folga manual — não desconta</option><option value="ATESTADO">Atestado — não desconta</option><option value="FERIAS">Férias — não desconta</option><option value="FALTA_JUSTIFICADA">Falta justificada — não desconta</option><option value="FALTA_NAO_JUSTIFICADA">Falta não justificada — não desconta</option><option value="OUTRO">Outro afastamento — não desconta</option></select></label>
-      <label class="escala-field"><span class="label">Motivo</span><input class="input" name="motivo" required placeholder="Motivo / referência do afastamento"></label>
-      <label class="escala-field"><span class="label">Data inicial</span><input class="input" type="date" name="data_folga" required></label>
-      <label class="escala-field"><span class="label">Data final</span><input class="input" type="date" name="data_fim" required></label>
-      <label class="escala-field" id="horas-wrap"><span class="label">Horas a descontar</span><input class="input" type="number" min="0.01" step="0.01" name="horas" id="horas"></label>
-      <label class="escala-field"><span class="label">Data do serviço</span><input class="input" type="date" name="data_servico"></label>
-      <label class="escala-field"><span class="label">Início do serviço</span><input class="input" type="time" name="hora_inicio"></label>
-      <label class="escala-field"><span class="label">Fim do serviço</span><input class="input" type="time" name="hora_fim"></label>
-      <label class="escala-field"><span class="label">Equipamento / setor</span><input class="input" name="equipamento" placeholder="Ex.: Caldeira 1 / Reciclagem"></label>
-      <label class="escala-field"><span class="label">Descrição do serviço</span><input class="input" name="descricao_servico" placeholder="Serviço que originou a compensação"></label>
-      <label class="escala-field"><span class="label">Anexo</span><input class="input" type="file" name="anexo" accept="image/*,.pdf,application/pdf"><small>Imagem ou PDF.</small></label>
-      <label class="escala-field full"><span class="label">Justificativa ADMIN para saldo negativo</span><input class="input" name="justificativa_saldo_negativo" placeholder="Preencher somente quando necessário"></label>
-      <div class="escala-field full"><div class="escala-notice is-info"><strong id="saldo-info">Selecione o funcionário.</strong><br><span id="debito-info">Este tipo desconta o Banco de Horas.</span></div></div>
-      <div class="escala-field full"><div class="escala-actionbar"><span class="muted">Revise colaborador, período e impacto no saldo antes de confirmar.</span><button class="btn btn-green" type="submit">Programar ocorrência</button></div></div>
-    </form>
+    <div class="escala-section-head"><div><h2>Solicitações aguardando aprovação</h2><p>O saldo e a disponibilidade da data são revalidados no momento da aprovação.</p></div><span class="approval-counter"><%= pendentesFolga.length %> pendente(s)</span></div>
+    <% if(!pendentesFolga.length){ %><div class="escala-empty">Nenhuma solicitação de folga aguardando decisão.</div><% } %>
+    <div class="leave-request-grid">
+      <% pendentesFolga.forEach(s=>{ %>
+        <article class="leave-request-card">
+          <div class="approval-card-head"><div class="escala-avatar"><%= String(s.colaborador_nome||'C').charAt(0).toUpperCase() %></div><div class="approval-person"><strong><%= s.colaborador_nome %></strong><small>Solicitado em <%= dateBr.formatDateTimeBR(s.solicitado_em) %></small></div><span class="escala-status is-atestado">PENDENTE</span></div>
+          <div class="leave-date"><span>Data solicitada</span><strong><%= dateBr.formatDateBR(s.data_folga) %></strong></div>
+          <div class="approval-summary">
+            <div><span>Saldo atual</span><strong><%= fmtMin(s.saldo_atual_minutos) %></strong></div>
+            <div><span>Consumo</span><strong>-<%= fmtMin(s.minutos_solicitados) %></strong></div>
+            <div><span>Saldo previsto</span><strong><%= fmtMin(s.saldo_previsto_minutos) %></strong></div>
+            <div><span>Motivo</span><strong><%= s.motivo || 'Folga compensatória' %></strong></div>
+          </div>
+          <% if(canManageEscala){ %>
+            <div class="approval-primary-actions">
+              <form method="POST" action="/escala/folgas/solicitacoes/<%= s.id %>/aprovar" onsubmit="return confirm('Aprovar a folga de <%= s.colaborador_nome %> em <%= dateBr.formatDateBR(s.data_folga) %>?');"><button class="btn btn-green" type="submit">✓ Aprovar folga</button></form>
+              <details class="approval-details"><summary>Reprovar</summary><form method="POST" action="/escala/folgas/solicitacoes/<%= s.id %>/reprovar"><input class="input" name="motivo" placeholder="Motivo da reprovação" required><button class="btn btn-sm" type="submit">Confirmar reprovação</button></form></details>
+            </div>
+          <% } else { %><div class="muted">Consulta somente. A decisão pertence à gestão da Manutenção.</div><% } %>
+        </article>
+      <% }) %>
+    </div>
   </section>
 
+  <% if(canManageEscala){ %>
+    <section class="escala-section manual-leave-section">
+      <details class="approval-details-block">
+        <summary>+ Registrar afastamento manual / administrativo</summary>
+        <div class="manual-leave-content">
+          <p class="muted">Use para férias, atestado, falta ou lançamento administrativo. Solicitações normais de folga compensatória devem partir do próprio colaborador.</p>
+          <form method="post" action="/escala/folgas/programar" enctype="multipart/form-data" id="folga-form" class="escala-form-grid is-3">
+            <label class="escala-field"><span class="label">Funcionário</span><select class="input" name="colaborador_id" id="colaborador" required><option value="">Selecione</option><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>" data-saldo="<%= c.saldo.minutos %>"><%= c.nome %> — saldo <%= c.saldo.horas %></option><% }) %></select></label>
+            <label class="escala-field"><span class="label">Tipo</span><select class="input" name="tipo_lancamento" id="tipo" required><option value="FOLGA_COMPENSATORIA">Folga compensatória</option><option value="FOLGA_MANUAL">Folga manual</option><option value="ATESTADO">Atestado</option><option value="FERIAS">Férias</option><option value="FALTA_JUSTIFICADA">Falta justificada</option><option value="FALTA_NAO_JUSTIFICADA">Falta não justificada</option><option value="OUTRO">Outro afastamento</option></select></label>
+            <label class="escala-field"><span class="label">Motivo</span><input class="input" name="motivo" required placeholder="Motivo / referência"></label>
+            <label class="escala-field"><span class="label">Data inicial</span><input class="input" type="date" name="data_folga" required></label>
+            <label class="escala-field"><span class="label">Data final</span><input class="input" type="date" name="data_fim" required></label>
+            <label class="escala-field" id="horas-wrap"><span class="label">Horas a descontar</span><input class="input" type="number" min="0.01" step="0.01" name="horas" id="horas"></label>
+            <label class="escala-field"><span class="label">Data do serviço</span><input class="input" type="date" name="data_servico"></label>
+            <label class="escala-field"><span class="label">Início do serviço</span><input class="input" type="time" name="hora_inicio"></label>
+            <label class="escala-field"><span class="label">Fim do serviço</span><input class="input" type="time" name="hora_fim"></label>
+            <label class="escala-field"><span class="label">Equipamento / setor</span><input class="input" name="equipamento"></label>
+            <label class="escala-field"><span class="label">Descrição do serviço</span><input class="input" name="descricao_servico"></label>
+            <label class="escala-field"><span class="label">Anexo</span><input class="input" type="file" name="anexo" accept="image/*,.pdf,application/pdf"></label>
+            <label class="escala-field full"><span class="label">Justificativa ADMIN para saldo negativo</span><input class="input" name="justificativa_saldo_negativo" placeholder="Somente quando necessário"></label>
+            <div class="escala-field full"><div class="escala-notice is-info"><strong id="saldo-info">Selecione o funcionário.</strong><br><span id="debito-info">Folga compensatória debita o Banco de Horas.</span></div></div>
+            <div class="escala-field full"><div class="escala-actionbar"><span class="muted">Folgas eletivas também respeitam segunda-feira bloqueada e uma pessoa por data.</span><button class="btn btn-green" type="submit">Registrar ocorrência</button></div></div>
+          </form>
+        </div>
+      </details>
+    </section>
+  <% } %>
+
   <section class="escala-section">
-    <div class="escala-section-head"><div><h2>Registros programados</h2><p><%= listaFolgas.length %> registro(s) encontrado(s).</p></div></div>
+    <div class="escala-section-head"><div><h2>Folgas e afastamentos programados</h2><p><%= listaFolgas.length %> registro(s) encontrado(s).</p></div></div>
     <div class="escala-table-wrap"><table class="escala-table"><thead><tr><th>Funcionário</th><th>Tipo</th><th>Período</th><th>Saldo antes</th><th>Desconto</th><th>Saldo depois</th><th>Status</th><th>Ações</th></tr></thead><tbody>
       <% if(!listaFolgas.length){ %><tr><td colspan="8"><div class="escala-empty">Nenhuma folga ou afastamento programado.</div></td></tr><% } %>
-      <% listaFolgas.forEach(f=>{ %><tr><td><strong><%= f.colaborador_nome %></strong></td><td><%= String(f.tipo_lancamento||'').replaceAll('_',' ') %></td><td><%= f.data_folga %> a <%= f.data_fim || f.data_folga %></td><td><%= f.saldo_antes_minutos == null ? '-' : f.saldo_antes_minutos+' min' %></td><td><%= f.debita_banco ? f.minutos_descontados+' min' : 'Não desconta' %></td><td><%= f.saldo_depois_minutos == null ? '-' : f.saldo_depois_minutos+' min' %></td><td><span class="escala-status <%= f.status==='CANCELADA'?'is-ausente':(f.status==='REALIZADA'?'':'is-atestado') %>"><%= f.status %></span></td><td><% if(f.status==='PROGRAMADA'){ %><div style="display:flex;gap:5px;flex-wrap:wrap"><form method="post" action="/escala/folgas/<%= f.id %>/realizar"><button class="btn btn-sm btn-green" type="submit">Marcar realizada</button></form><form method="post" action="/escala/folgas/<%= f.id %>/cancelar"><input type="hidden" name="motivo" value="Cancelado pelo responsável"><button class="btn btn-sm" type="submit">Cancelar</button></form></div><% } %></td></tr><% }) %>
+      <% listaFolgas.forEach(f=>{ %><tr><td><strong><%= f.colaborador_nome %></strong></td><td><%= String(f.tipo_lancamento||'').replaceAll('_',' ') %></td><td><%= dateBr.formatDateBR(f.data_folga) %><%= (f.data_fim && f.data_fim!==f.data_folga) ? ' a '+dateBr.formatDateBR(f.data_fim) : '' %></td><td><%= f.saldo_antes_minutos == null ? '-' : fmtMin(f.saldo_antes_minutos) %></td><td><%= f.debita_banco ? '-'+fmtMin(f.minutos_descontados) : 'Não desconta' %></td><td><%= f.saldo_depois_minutos == null ? '-' : fmtMin(f.saldo_depois_minutos) %></td><td><span class="escala-status <%= f.status==='CANCELADA'?'is-ausente':(f.status==='REALIZADA'?'':'is-atestado') %>"><%= f.status %></span></td><td><% if(canManageEscala && f.status==='PROGRAMADA'){ %><div class="row-compact-actions"><form method="post" action="/escala/folgas/<%= f.id %>/realizar"><button class="btn btn-sm btn-green" type="submit">Realizada</button></form><form method="post" action="/escala/folgas/<%= f.id %>/cancelar"><input type="hidden" name="motivo" value="Cancelado pelo responsável"><button class="btn btn-sm" type="submit">Cancelar</button></form></div><% } else { %>-<% } %></td></tr><% }) %>
     </tbody></table></div>
   </section>
+
+  <% if(historicoSolic.length){ %>
+    <section class="escala-section"><div class="escala-section-head"><div><h2>Histórico de solicitações</h2><p>Decisões recentes do autoatendimento.</p></div></div><div class="escala-table-wrap"><table class="escala-table"><thead><tr><th>Data</th><th>Colaborador</th><th>Status</th><th>Solicitada em</th><th>Decisão</th><th>Observação</th></tr></thead><tbody>
+      <% historicoSolic.forEach(s=>{ %><tr><td><strong><%= dateBr.formatDateBR(s.data_folga) %></strong></td><td><%= s.colaborador_nome %></td><td><span class="escala-status <%= /REPROV|CANCEL/.test(s.status)?'is-ausente':'' %>"><%= String(s.status).replaceAll('_',' ') %></span></td><td><%= dateBr.formatDateTimeBR(s.solicitado_em) %></td><td><%= s.decidido_em ? dateBr.formatDateTimeBR(s.decidido_em) : '-' %></td><td><%= s.observacao_decisao || '-' %></td></tr><% }) %>
+    </tbody></table></div></section>
+  <% } %>
 </div>
 <script>
 const tipo=document.getElementById('tipo'),col=document.getElementById('colaborador'),horas=document.getElementById('horas');
-function update(){const debita=tipo.value==='FOLGA_COMPENSATORIA';document.getElementById('horas-wrap').style.display=debita?'grid':'none';horas.required=debita;document.getElementById('debito-info').textContent=debita?'A folga compensatória desconta exatamente as horas informadas.':'Este tipo não desconta do Banco de Horas.';const o=col.selectedOptions[0],saldo=Number(o?.dataset.saldo||0),min=debita?Math.round(Number(horas.value||0)*60):0;document.getElementById('saldo-info').textContent=o?.value?`Saldo atual: ${saldo} min • saldo previsto: ${saldo-min} min`:'Selecione o funcionário.'}
-tipo.addEventListener('change',update);col.addEventListener('change',update);horas.addEventListener('input',update);update();
+function update(){if(!tipo||!col||!horas)return;const debita=tipo.value==='FOLGA_COMPENSATORIA';document.getElementById('horas-wrap').style.display=debita?'grid':'none';horas.required=debita;document.getElementById('debito-info').textContent=debita?'A folga compensatória desconta exatamente as horas informadas.':'Este tipo não desconta do Banco de Horas.';const o=col.selectedOptions[0],saldo=Number(o?.dataset.saldo||0),min=debita?Math.round(Number(horas.value||0)*60):0;document.getElementById('saldo-info').textContent=o?.value?`Saldo atual: ${Math.floor(saldo/60)}h${String(saldo%60).padStart(2,'0')} • saldo previsto: ${Math.floor((saldo-min)/60)}h${String(Math.abs(saldo-min)%60).padStart(2,'0')}`:'Selecione o funcionário.'}
+if(tipo){tipo.addEventListener('change',update);col.addEventListener('change',update);horas.addEventListener('input',update);update();}
 </script>
