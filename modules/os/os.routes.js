@@ -9,6 +9,7 @@ const { requireLogin, requireRole, requireAdmin } = require("../auth/auth.middle
 const { ACCESS } = require("../../config/rbac");
 const { canSendWhatsappNotification } = require("../../middlewares/permissions.middleware");
 const ctrl = require("./os.controller");
+const fastCtrl = require("./os-fast.controller");
 const { OS_EXECUTION_ACCESS, OS_STATUS_ACCESS, OS_ANDAMENTO_ACCESS, OS_MANUAL_DISPONIBILIDADE_ACCESS, detailUnauthorizedRedirectPath, requireTeamRedistribution } = require("./os.permissions");
 
 const uploadDir = path.join(storagePaths.UPLOAD_DIR, "os");
@@ -87,7 +88,7 @@ router.post(
   requireLogin,
   requireRole(ACCESS.os_open),
   upload.fields([{ name: "abertura_fotos", maxCount: 10 }]),
-  wrap(ctrl.osCreate, "osCreate")
+  wrap(fastCtrl.osCreate, "osCreateFast")
 );
 
 router.post(
@@ -123,7 +124,7 @@ router.post(
   requireLogin,
   requireRole(OS_EXECUTION_ACCESS),
   fechamentoUpload,
-  wrap(ctrl.osClose, "osClose")
+  wrap(fastCtrl.osClose, "osCloseFast")
 );
 
 router.post(
@@ -131,7 +132,7 @@ router.post(
   requireLogin,
   requireRole(OS_EXECUTION_ACCESS),
   fechamentoUpload,
-  wrap(ctrl.osClose, "osClose")
+  wrap(fastCtrl.osClose, "osCloseFast")
 );
 
 router.post("/:id/status", requireLogin, requireRole(OS_STATUS_ACCESS), wrap(ctrl.osUpdateStatus, "osUpdateStatus"));
