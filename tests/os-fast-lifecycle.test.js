@@ -30,7 +30,7 @@ test('abertura rápida não aguarda IA, visão, push ou WhatsApp no request', ()
 });
 
 test('fechamento rápido confirma a OS antes do enriquecimento por IA', () => {
-  const body = functionBody(fastSource, 'osClose', 'module.exports');
+  const body = functionBody(fastSource, 'osClose');
   assert.doesNotMatch(body, /\bawait\b/);
   assert.match(body, /closeOSRecordFast\(id/);
   assert.match(body, /scheduleCloseEnrichment\(id/);
