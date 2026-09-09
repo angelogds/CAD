@@ -13,7 +13,7 @@ const detail = read('views/solicitacoes/acompanhamento-detalhe.ejs');
 const minhas = read('views/solicitacoes/minhas.ejs');
 const css = read('public/css/acompanhamento-compras-diretoria.css');
 
-test('acompanhamento executivo fica restrito a ADMIN e DIRETORIA em todas as rotas', () => {
+test('acompanhamento executivo mantém acesso técnico restrito a ADMIN e DIRETORIA em todas as rotas', () => {
   assert.match(routes, /ACOMPANHAMENTO_COMPRAS_EXECUTIVO\s*=\s*\[ROLE\.ADMIN, ROLE\.DIRETORIA\]/);
   assert.match(routes, /router\.get\("\/acompanhamento-compras", requireLogin, requireRole\(ACOMPANHAMENTO_COMPRAS_EXECUTIVO\)/);
   assert.match(routes, /router\.get\("\/acompanhamento-compras\/:id", requireLogin, requireRole\(ACOMPANHAMENTO_COMPRAS_EXECUTIVO\)/);
@@ -62,8 +62,9 @@ test('fila executiva calcula próxima ação e prioriza decisões', () => {
   assert.match(controller, /saldoReceber/);
 });
 
-test('interface possui andamento, histórico, sinalizadores e próxima ação', () => {
-  assert.match(view, /PAINEL EXECUTIVO · DIRETORIA \/ ADMIN/);
+test('interface mantém visão executiva da Diretoria e remove andamento percentual redundante da tabela', () => {
+  assert.match(view, /PAINEL EXECUTIVO · DIRETORIA/);
+  assert.doesNotMatch(view, /PAINEL EXECUTIVO · DIRETORIA \/ ADMIN/);
   assert.match(view, /EM ANDAMENTO/);
   assert.match(view, /HISTÓRICO/);
   assert.match(view, /executive-signals/);
@@ -72,22 +73,36 @@ test('interface possui andamento, histórico, sinalizadores e próxima ação', 
   assert.match(view, /Próxima ação/);
   assert.match(view, /management-row-history/);
   assert.match(view, /Concluída \/ atualizada em/);
-  assert.match(view, /Recebimento/);
-  assert.match(view, /Recebido/);
+  assert.doesNotMatch(view, /<th>Andamento<\/th>/);
+  assert.doesNotMatch(view, /data-label="Andamento"/);
+  assert.match(view, /system-compact-btn/);
 });
 
-test('aprovação progressiva por item da PR anterior permanece intacta', () => {
-  assert.match(controller, /compras\.aprovacao-itens\.service/);
-  assert.match(controller, /itemApprovalService\.getSummary/);
-  assert.match(controller, /itemApprovalService\.approveQuotedItems/);
-  assert.match(detail, /aprovar-itens-cotados/);
-  assert.match(detail, /Aprovar itens cotados/);
-  assert.doesNotMatch(detail, /diretor_user_id/);
+test('aprovação ocorre somente sobre itens explicitamente selecionados', () => {
+  assert.match(controller, /Selecione ao menos um item cotado para aprovação/);
+  assert.match(controller, /itemApprovalService\.approveQuotedItems\(id, ids/);
+  assert.match(detail, /type="checkbox" name="item_id"/);
+  assert.match(detail, /form="approval-selection-form"/);
+  assert.match(detail, /Aprovar selecionados/);
+  assert.match(detail, /approval-selected-count/);
+  assert.doesNotMatch(detail, /type="hidden" name="item_id"/);
+  assert.doesNotMatch(detail, /Aprovar itens cotados/);
 });
 
-test('novo css mantém painel executivo responsivo', () => {
+test('interface pública apresenta apenas Diretoria sem expor ADMIN como aprovador', () => {
+  assert.match(detail, /ANÁLISE GERENCIAL · DIRETORIA/);
+  assert.doesNotMatch(detail, /DIRETORIA \/ ADMIN/);
+  assert.doesNotMatch(detail, /ADMIN\/DIRETORIA/);
+  assert.doesNotMatch(detail, /Aguardando ADMIN/);
+  assert.match(view, /<small>DIRETORIA<\/small>/);
+  assert.doesNotMatch(view, /<small>ADMIN\/DIRETORIA<\/small>/);
+});
+
+test('novo css mantém painel executivo responsivo e botões compactos', () => {
   assert.match(css, /\.executive-view-tabs/);
   assert.match(css, /\.executive-signals/);
   assert.match(css, /\.next-action-chip/);
+  assert.match(css, /\.system-compact-btn/);
+  assert.match(css, /\.approval-select-input/);
   assert.match(css, /@media\(max-width:760px\)/);
 });
