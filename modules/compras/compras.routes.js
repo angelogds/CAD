@@ -7,7 +7,6 @@ const { requireLogin, requireRole, requireAdmin } = require('../auth/auth.middle
 const { ACCESS } = require('../../config/rbac');
 const ctrl = require('./compras.controller');
 const flowCtrl = require('./compras.itens-consenso.controller');
-const approvalCtrl = require('./compras.aprovacao.controller');
 const approvalGuard = require('./compras.aprovacao.middleware');
 const itemCorrecaoCtrl = require('./compras.item-correcao.controller');
 const storagePaths = require('../../config/storage');
@@ -36,8 +35,6 @@ router.get('/solicitacoes/:id', requireLogin, requireRole(ACCESS.compras_read), 
 router.post('/solicitacoes/:id/cotacoes', requireLogin, requireRole(ACCESS.compras_manage), ctrl.criarCotacao);
 router.post('/solicitacoes/:id/cotacoes/:cotacaoId/selecionar', requireLogin, requireRole(ACCESS.compras_manage), ctrl.selecionarCotacao);
 router.post('/solicitacoes/:id/atualizar-dados', requireLogin, requireRole(ACCESS.compras_manage), ctrl.atualizarDados);
-router.post('/solicitacoes/:id/aprovacao/enviar', requireLogin, requireRole(ACCESS.compras_manage), approvalCtrl.enviar);
-router.post('/solicitacoes/:id/aprovacao/manual', requireLogin, requireRole(ACCESS.compras_manage), approvalCtrl.registrarManual);
 router.post('/solicitacoes/:id/marcar-comprada', requireLogin, requireRole(ACCESS.compras_manage), approvalGuard.requireApprovedPurchase, ctrl.marcarComprada);
 router.post('/solicitacoes/:id/painel-itens', requireLogin, requireRole(ACCESS.compras_manage), approvalGuard.requireApprovedPurchaseIntent, ctrl.salvarPainelItens);
 router.post('/solicitacoes/:id/itens/:itemId/corrigir-compra', requireLogin, requireRole(ACCESS.compras_manage), itemCorrecaoCtrl.corrigirItemCompra);
