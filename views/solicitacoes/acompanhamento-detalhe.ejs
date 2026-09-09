@@ -2,7 +2,7 @@
 <link rel="stylesheet" href="/css/acompanhamento-compras.css?v=20260909-tabela-gerencial">
 <link rel="stylesheet" href="/css/acompanhamento-compras-gerencial.css?v=20260909-v1">
 <link rel="stylesheet" href="/css/aprovacao-itens-progressiva.css?v=20260909-v1">
-<link rel="stylesheet" href="/css/acompanhamento-compras-diretoria.css?v=20260909-v2">
+<link rel="stylesheet" href="/css/acompanhamento-compras-diretoria.css?v=20260909-v3">
 <%
 const d=detalheCompra||{};
 const itens=Array.isArray(d.itens)?d.itens:[];
@@ -16,17 +16,17 @@ const approvalLabel=value=>({AGUARDANDO_APROVACAO:'AGUARDANDO APROVAÇÃO',APROV
 <div class="watch-detail executive-buy-watch">
   <header class="detail-head executive-watch-head">
     <div>
-      <span class="readonly executive-badge">ANÁLISE GERENCIAL · DIRETORIA / ADMIN</span>
+      <span class="readonly executive-badge">ANÁLISE GERENCIAL · DIRETORIA</span>
       <h1><%=d.numero||('Solicitação #'+d.id)%></h1>
       <p><%=d.titulo||'Solicitação de material'%> · Solicitante: <strong><%=d.solicitante_nome||'-'%></strong> · Setor: <strong><%=d.setor_origem||'-'%></strong></p>
     </div>
     <div class="detail-actions">
-      <a class="btn btn-ghost" href="/solicitacoes/acompanhamento-compras">← Voltar ao acompanhamento</a>
-      <a class="btn btn-green" href="/solicitacoes/<%=d.id%>/pdf">Baixar PDF</a>
+      <a class="btn btn-sm btn-ghost system-compact-btn" href="/solicitacoes/acompanhamento-compras">← Voltar ao acompanhamento</a>
+      <a class="btn btn-sm btn-green system-compact-btn" href="/solicitacoes/<%=d.id%>/pdf">Baixar PDF</a>
     </div>
   </header>
 
-  <div class="readonly-note">Compras continua responsável por cotação, fornecedor e valores. ADMIN/DIRETORIA consultam o contexto e liberam digitalmente somente os itens que já possuem cotação válida.</div>
+  <div class="readonly-note">Compras continua responsável por cotação, fornecedor e valores. A Diretoria consulta o contexto e libera digitalmente somente os itens selecionados que já possuem cotação válida.</div>
 
   <section class="detail-summary compact-summary">
     <div><small>Status</small><strong><%=statusLabel(d.status)%></strong></div>
@@ -38,7 +38,7 @@ const approvalLabel=value=>({AGUARDANDO_APROVACAO:'AGUARDANDO APROVAÇÃO',APROV
   </section>
 
   <section class="detail-card compact-links-card">
-    <div class="detail-card-head"><div><h2>VÍNCULOS</h2><p>Rastreabilidade da solicitação.</p></div><% if(d.os_id){ %><a class="btn btn-ghost" href="/os/<%=d.os_id%>">Abrir OS <%=d.os_id%></a><% } %></div>
+    <div class="detail-card-head"><div><h2>VÍNCULOS</h2><p>Rastreabilidade da solicitação.</p></div><% if(d.os_id){ %><a class="btn btn-sm btn-ghost system-compact-btn" href="/os/<%=d.os_id%>">Abrir OS <%=d.os_id%></a><% } %></div>
     <div class="detail-summary compact-summary links-summary">
       <div><small>OS</small><strong><%=d.os_id?('OS '+d.os_id):'Sem OS vinculada'%></strong></div>
       <div><small>Equipamento</small><strong><%=d.equipamento_nome||'Não informado'%></strong></div>
@@ -49,17 +49,18 @@ const approvalLabel=value=>({AGUARDANDO_APROVACAO:'AGUARDANDO APROVAÇÃO',APROV
 
   <section class="detail-card approval-table-card">
     <div class="detail-card-head">
-      <div><h2>ITENS PARA ACOMPANHAMENTO E APROVAÇÃO</h2><p>Veja rapidamente o que está sem cotação, cotado, aprovado ou comprado.</p></div>
+      <div><h2>ITENS PARA ACOMPANHAMENTO E APROVAÇÃO</h2><p>Selecione somente os itens cotados que a Diretoria deseja liberar neste momento.</p></div>
       <% if(Number(ap.pendentesCount||0)>0){ %><span class="approval-alert-chip">● <%=ap.pendentesCount%> para aprovar · <%=money(ap.pendentesValorCentavos)%></span><% } else { %><span class="request-total">Sem aprovações pendentes</span><% } %>
     </div>
 
     <% if(!itens.length){ %><div class="detail-empty">Nenhum item ativo nesta solicitação.</div><% } else { %>
       <div class="detail-table-wrap">
         <table class="detail-table approval-simple-table">
-          <thead><tr><th>Material</th><th>Qtd.</th><th>Situação</th><th>Fornecedor</th><th>Valor cotado</th><th>Aprovação</th></tr></thead>
+          <thead><tr><th>Selecionar</th><th>Material</th><th>Qtd.</th><th>Situação</th><th>Fornecedor</th><th>Valor cotado</th><th>Aprovação</th></tr></thead>
           <tbody>
-            <% itens.forEach(it=>{ const quoted=String(it.status_cotacao||'').toUpperCase()==='COTADO'; const purchased=String(it.status_compra||'').toUpperCase()==='COMPRADO'; const state=String(it.approvalState||'SEM_COTACAO').toUpperCase(); const itemValue=Number(it.valorCotadoCentavos||it.cotadoCentavos||0); %>
+            <% itens.forEach(it=>{ const quoted=String(it.status_cotacao||'').toUpperCase()==='COTADO'; const purchased=String(it.status_compra||'').toUpperCase()==='COMPRADO'; const state=String(it.approvalState||'SEM_COTACAO').toUpperCase(); const itemValue=Number(it.valorCotadoCentavos||it.cotadoCentavos||0); const selectable=canApproveItems&&state==='AGUARDANDO_APROVACAO'; %>
               <tr class="<%=state==='AGUARDANDO_APROVACAO'?'approval-row-pending':''%>">
+                <td data-label="Selecionar" class="approval-select-cell"><% if(selectable){ %><input class="approval-select-input" type="checkbox" name="item_id" value="<%=it.id%>" data-value="<%=itemValue%>" form="approval-selection-form" aria-label="Selecionar <%=it.item_nome||('item '+it.id)%> para aprovação"><% } else { %><span class="selection-unavailable">—</span><% } %></td>
                 <td data-label="Material"><strong><%=it.item_nome||'-'%></strong><small><%=it.item_descricao||''%></small></td>
                 <td data-label="Qtd."><strong><%=it.qtdSolicitada||it.qtd_solicitada||0%> <%=it.unidade||'UN'%></strong></td>
                 <td data-label="Situação"><span class="stage-badge <%=purchased?'is-ok':quoted?'is-info':'is-warn'%>"><%=purchased?'COMPRADO':quoted?'COTADO':'SEM COTAÇÃO'%></span></td>
@@ -75,13 +76,12 @@ const approvalLabel=value=>({AGUARDANDO_APROVACAO:'AGUARDANDO APROVAÇÃO',APROV
 
     <% if(Number(ap.pendentesCount||0)>0){ %>
       <div class="approval-action-bar">
-        <div><span>ITENS COTADOS AGUARDANDO LIBERAÇÃO</span><strong><%=ap.pendentesCount%> item(ns) · <%=money(ap.pendentesValorCentavos)%></strong><small>A liberação vale somente para fornecedor, quantidade e valor exibidos agora. Se Compras alterar a cotação, o item volta automaticamente para aprovação.</small></div>
+        <div class="approval-selection-summary"><span>ITENS COTADOS AGUARDANDO LIBERAÇÃO</span><strong><span id="approval-selected-count">0</span> selecionado(s) · <span id="approval-selected-value"><%=money(0)%></span></strong><small>Marque na tabela somente os itens que deseja liberar agora. Os demais permanecem aguardando decisão, mesmo já estando cotados.</small></div>
         <% if(canApproveItems){ %>
-          <form method="POST" action="/solicitacoes/acompanhamento-compras/<%=d.id%>/aprovar-itens-cotados">
-            <% (ap.pendentes||[]).forEach(it=>{ %><input type="hidden" name="item_id" value="<%=it.id%>"><% }) %>
-            <button class="btn btn-green approval-main-button" type="submit" onclick="return confirm('Confirmar a liberação dos <%=ap.pendentesCount%> itens cotados no valor de <%=money(ap.pendentesValorCentavos)%>?')">✓ Aprovar itens cotados</button>
+          <form id="approval-selection-form" method="POST" action="/solicitacoes/acompanhamento-compras/<%=d.id%>/aprovar-itens-cotados">
+            <button id="approval-selected-submit" class="btn btn-sm btn-green system-compact-btn approval-main-button" type="submit" disabled>✓ Aprovar selecionados</button>
           </form>
-        <% } else { %><div class="approval-waiting-role">Aguardando ADMIN ou DIRETORIA.</div><% } %>
+        <% } else { %><div class="approval-waiting-role">Aguardando Diretoria.</div><% } %>
       </div>
     <% } %>
   </section>
@@ -93,3 +93,38 @@ const approvalLabel=value=>({AGUARDANDO_APROVACAO:'AGUARDANDO APROVAÇÃO',APROV
     <% } %>
   </section>
 </div>
+
+<script>
+(() => {
+  const form = document.getElementById('approval-selection-form');
+  if (!form) return;
+  const checkboxes = Array.from(document.querySelectorAll('.approval-select-input'));
+  const submit = document.getElementById('approval-selected-submit');
+  const count = document.getElementById('approval-selected-count');
+  const value = document.getElementById('approval-selected-value');
+  const money = (cents) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((Number(cents) || 0) / 100);
+
+  const selected = () => checkboxes.filter((checkbox) => checkbox.checked);
+  const refresh = () => {
+    const items = selected();
+    const total = items.reduce((sum, checkbox) => sum + Number(checkbox.dataset.value || 0), 0);
+    if (count) count.textContent = String(items.length);
+    if (value) value.textContent = money(total);
+    if (submit) submit.disabled = items.length === 0;
+  };
+
+  checkboxes.forEach((checkbox) => checkbox.addEventListener('change', refresh));
+  form.addEventListener('submit', (event) => {
+    const items = selected();
+    if (!items.length) {
+      event.preventDefault();
+      return;
+    }
+    const total = items.reduce((sum, checkbox) => sum + Number(checkbox.dataset.value || 0), 0);
+    if (!window.confirm(`Confirmar a liberação de ${items.length} item(ns) selecionado(s) no valor de ${money(total)}?`)) {
+      event.preventDefault();
+    }
+  });
+  refresh();
+})();
+</script>
