@@ -215,6 +215,60 @@ function assertItemsApprovedForPurchase(solicitacaoId, itemIds) {
   return true;
 }
 
+function parseMoneyToCents(value, fallback = 0) {
+  if (value === undefined || value === null || value === '') return Math.round(Number(fallback || 0));
+  if (typeof value === 'number') return Math.round(value * 100);
+  let text = String(value).trim().replace(/\s/g, '').replace(/R\$/gi, '');
+  if (!text) return Math.round(Number(fallback || 0));
+  if (text.includes(',') && text.includes('.')) text = text.replace(/\./g, '').replace(',', '.');
+  else if (text.includes(',')) text = text.replace(',', '.');
+  const number = Number(text);
+  return Number.isFinite(number) ? Math.round(number * 100) : Math.round(Number(fallback || 0));
+}
+
+function assertPurchasePayloadMatchesApprovedItems(solicitacaoId, payload = {}, selectedIds = []) {
+  const ids = (Array.isArray(selectedIds) ? selectedIds : [selectedIds]).filter(Boolean).map(Number);
+  assertItemsApprovedForPurchase(solicitacaoId, ids);
+  if (!ids.length) return true;
+
+  const rows = loadItems(solicitacaoId);
+  const byId = new Map(rows.map((item) => [Number(item.id), item]));
+  const payloadIds = (Array.isArray(payload.item_id) ? payload.item_id : [payload.item_id]).filter(Boolean).map(Number);
+  const suppliers = Array.isArray(payload.fornecedor_id) ? payload.fornecedor_id : [payload.fornecedor_id];
+  const prices = Array.isArray(payload.valor_unitario) ? payload.valor_unitario : [payload.valor_unitario];
+  const quotedIds = new Set((Array.isArray(payload.cotado) ? payload.cotado : [payload.cotado]).filter(Boolean).map(Number));
+  const payloadIndex = new Map(payloadIds.map((id, index) => [id, index]));
+
+  const divergent = [];
+  ids.forEach((id) => {
+    const current = byId.get(id);
+    if (!current || normalize(current.status_compra) === 'COMPRADO') return;
+    const index = payloadIndex.get(id);
+    if (index === undefined) {
+      divergent.push(current);
+      return;
+    }
+    const prospective = {
+      ...current,
+      fornecedor_id: Number(suppliers[index] || 0) || null,
+      valor_unitario_centavos: parseMoneyToCents(prices[index], Number(current.valor_unitario_centavos || 0)),
+      status_cotacao: quotedIds.has(id) ? 'COTADO' : 'PENDENTE',
+    };
+    const approvedSignature = String(current.aprovacao_item_assinatura || '');
+    if (!isQuoteReady(prospective) || !approvedSignature || itemSignature(prospective) !== approvedSignature) {
+      divergent.push(current);
+    }
+  });
+
+  if (divergent.length) {
+    const error = new Error('Fornecedor, quantidade ou valor de item aprovado foi alterado. Salve a nova cotação e obtenha nova aprovação antes da compra.');
+    error.code = 'COMPRA_DIVERGE_DA_APROVACAO_ITEM';
+    error.itemIds = divergent.map((item) => item.id);
+    throw error;
+  }
+  return true;
+}
+
 function assertAllQuotedApprovedForPurchase(solicitacaoId) {
   const summary = getSummary(solicitacaoId);
   const candidates = summary.itens.filter((item) => item.approvalState !== ITEM_APPROVAL.CANCELLED && item.approvalState !== ITEM_APPROVAL.PURCHASED);
@@ -234,6 +288,7 @@ module.exports = {
   getHistory,
   approveQuotedItems,
   assertItemsApprovedForPurchase,
+  assertPurchasePayloadMatchesApprovedItems,
   assertAllQuotedApprovedForPurchase,
   itemSignature,
 };
