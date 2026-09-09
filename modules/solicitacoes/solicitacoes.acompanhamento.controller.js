@@ -145,9 +145,17 @@ function detalhe(req, res) {
 function aprovarItensCotados(req, res) {
   const id = Number(req.params.id);
   try {
-    const ids = Array.isArray(req.body?.item_id) ? req.body.item_id : [req.body?.item_id].filter(Boolean);
-    const result = itemApprovalService.approveQuotedItems(id, ids, req.session?.user || {});
-    req.flash('success', `Aprovação registrada. ${result.aprovadosCount} item(ns) cotado(s) estão liberados para Compras.`);
+    const ids = (Array.isArray(req.body?.item_id) ? req.body.item_id : [req.body?.item_id])
+      .filter(Boolean)
+      .map(Number)
+      .filter(Number.isFinite);
+    if (!ids.length) {
+      const error = new Error('Selecione ao menos um item cotado para aprovação.');
+      error.code = 'APROVACAO_ITEM_SELECAO_OBRIGATORIA';
+      throw error;
+    }
+    itemApprovalService.approveQuotedItems(id, ids, req.session?.user || {});
+    req.flash('success', 'Itens selecionados aprovados e liberados para Compras.');
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível aprovar os itens cotados.');
   }
