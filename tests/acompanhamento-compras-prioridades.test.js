@@ -35,6 +35,14 @@ test('cada solicitação exibe percentuais de cotação, compra e recebimento se
   assert.doesNotMatch(view, /href="\/solicitacoes\/<%= s\.id %>/);
 });
 
+test('custo mensal por equipamento usa a coleção realmente entregue pelo service', () => {
+  assert.match(service, /custosMensaisEquipamentos:\s*getMonthlyEquipmentCosts\(\)/);
+  assert.match(view, /Array\.isArray\(p\.custosMensaisEquipamentos\)/);
+  assert.match(view, /x\.equipamento_nome/);
+  assert.match(view, /x\.compradoCentavos/);
+  assert.doesNotMatch(view, /p\.equipamentos\.map/);
+});
+
 test('css diferencia visualmente todos os grupos e mantém responsividade', () => {
   for (const token of ['priority-critical','priority-high','priority-medium','priority-low']) {
     assert.ok(css.includes(token), `classe ausente: ${token}`);
