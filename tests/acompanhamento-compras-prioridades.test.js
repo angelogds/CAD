@@ -30,13 +30,16 @@ test('service mantém prioridades e dados gerenciais por solicitação', () => {
   assert.match(service, /percentualRecebido/);
 });
 
-test('acompanhamento principal usa tabela larga e destaca solicitações com itens para aprovar', () => {
+test('acompanhamento principal usa tabela larga sem coluna percentual redundante', () => {
   assert.match(view, /management-table executive-management-table/);
   assert.match(view, /FILA DE ACOMPANHAMENTO/);
   assert.match(view, /OS \/ Equipamento/);
   assert.match(view, /AGUARDANDO APROVAÇÃO/);
   assert.match(view, /PARA APROVAR/);
-  assert.match(view, /Abrir e aprovar/);
+  assert.match(view, /system-compact-btn/);
+  assert.doesNotMatch(view, /Abrir e aprovar/);
+  assert.doesNotMatch(view, /<th>Andamento<\/th>/);
+  assert.doesNotMatch(view, /data-label="Andamento"/);
   assert.match(view, /management-row-needs-approval/);
   assert.match(view, /href="\/solicitacoes\/acompanhamento-compras\/<%=s\.id%>"/);
   assert.doesNotMatch(view, /class="request-watch priority-card-/);
@@ -49,9 +52,11 @@ test('controller enriquece cada solicitação com aprovação progressiva por it
   assert.match(controller, /solicitacoesPendentes/);
 });
 
-test('detalhe gerencial mostra apenas dados essenciais para decisão', () => {
-  assert.match(detailView, /ANÁLISE GERENCIAL · DIRETORIA \/ ADMIN/);
+test('detalhe gerencial mostra dados essenciais e seleção por item', () => {
+  assert.match(detailView, /ANÁLISE GERENCIAL · DIRETORIA/);
+  assert.doesNotMatch(detailView, /DIRETORIA \/ ADMIN/);
   assert.match(detailView, /ITENS PARA ACOMPANHAMENTO E APROVAÇÃO/);
+  assert.match(detailView, /<th>Selecionar<\/th>/);
   assert.match(detailView, /<th>Material<\/th>/);
   assert.match(detailView, /<th>Qtd\.<\/th>/);
   assert.match(detailView, /<th>Situação<\/th>/);
@@ -65,13 +70,16 @@ test('detalhe gerencial mostra apenas dados essenciais para decisão', () => {
   assert.doesNotMatch(detailView, /name="valor_unitario"/);
 });
 
-test('ADMIN ou DIRETORIA aprovam itens cotados por um botão simples', () => {
+test('Diretoria aprova apenas itens selecionados com proteção contra envio vazio', () => {
   assert.match(detailView, /if\(canApproveItems\)/);
   assert.match(detailView, /aprovar-itens-cotados/);
-  assert.match(detailView, /Aprovar itens cotados/);
+  assert.match(detailView, /type="checkbox" name="item_id"/);
+  assert.match(detailView, /Aprovar selecionados/);
   assert.match(detailView, /approval-main-button/);
+  assert.match(controller, /Selecione ao menos um item cotado para aprovação/);
   assert.doesNotMatch(detailView, /Reprovar \/ devolver/);
   assert.doesNotMatch(detailView, /diretor responsável/);
+  assert.doesNotMatch(detailView, /ADMIN\/DIRETORIA/);
 });
 
 test('quantidade comprada legada usa solicitado como fallback na visão gerencial', () => {
