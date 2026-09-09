@@ -8,6 +8,7 @@ const { ACCESS } = require('../../config/rbac');
 const ctrl = require('./compras.controller');
 const flowCtrl = require('./compras.itens-consenso.controller');
 const approvalGuard = require('./compras.aprovacao.middleware');
+const itemApprovalCtrl = require('./compras.aprovacao-itens.controller');
 const itemCorrecaoCtrl = require('./compras.item-correcao.controller');
 const storagePaths = require('../../config/storage');
 
@@ -30,6 +31,7 @@ const upload = multer({
 router.get('/demandas/pre-cotacoes.json', requireLogin, requireRole(ACCESS.compras_read), ctrl.preCotacoesDemandasJson);
 router.get('/solicitacoes', requireLogin, requireRole(ACCESS.compras_read), ctrl.lista);
 router.get('/solicitacoes/:id/pdf', requireLogin, requireRole(ACCESS.compras_read), ctrl.pdf);
+router.get('/solicitacoes/:id/aprovacao-itens.json', requireLogin, requireRole(ACCESS.compras_read), itemApprovalCtrl.statusJson);
 router.get('/solicitacoes/:id', requireLogin, requireRole(ACCESS.compras_read), flowCtrl.detalhe);
 
 router.post('/solicitacoes/:id/cotacoes', requireLogin, requireRole(ACCESS.compras_manage), ctrl.criarCotacao);
