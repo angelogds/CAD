@@ -17,7 +17,11 @@ function requireApprovedPurchase(req, res, next) {
 function requireApprovedPurchaseIntent(req, res, next) {
   if (String(req.body?.acao || '').toLowerCase() !== 'comprar') return next();
   try {
-    itemApprovalService.assertItemsApprovedForPurchase(Number(req.params.id), req.body?.comprar);
+    itemApprovalService.assertPurchasePayloadMatchesApprovedItems(
+      Number(req.params.id),
+      req.body || {},
+      req.body?.comprar,
+    );
     return next();
   } catch (error) {
     return rejectToPurchaseDetail(error, req, res);
