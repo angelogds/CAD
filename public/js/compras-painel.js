@@ -59,10 +59,101 @@
     syncSelectAll();
   }
 
+  let correctionDialog = null;
+  function ensureCorrectionDialog() {
+    if (correctionDialog) return correctionDialog;
+    correctionDialog = document.createElement('dialog');
+    correctionDialog.className = 'purchase-consensus-dialog';
+    correctionDialog.id = 'edit-purchased-item-dialog';
+    correctionDialog.innerHTML = `
+      <form method="POST" id="edit-purchased-item-form">
+        <div class="dialog-head">
+          <div><span class="section-kicker">CORREÇÃO DE COMPRA</span><h2>Editar item comprado</h2></div>
+          <button type="button" class="dialog-close" data-close-correction aria-label="Fechar">×</button>
+        </div>
+        <p>Corrija somente uma marcação feita por engano. O item <strong data-correction-item></strong> ainda não possui recebimento do Almoxarifado.</p>
+        <div class="consensus-inline">
+          <label class="check-label"><input type="checkbox" name="cotado" value="1" data-correction-quoted> <strong>Item cotado</strong></label>
+          <small>Desmarque para voltar o item a PENDENTE e limpar fornecedor e valor da cotação.</small>
+        </div>
+        <div class="consensus-inline">
+          <label class="check-label"><input type="checkbox" name="comprado" value="1" data-correction-purchased> <strong>Item comprado</strong></label>
+          <small>Desmarque para desfazer a compra e liberar a seleção do item correto.</small>
+        </div>
+        <input type="hidden" name="fornecedor_id" data-correction-supplier>
+        <input type="hidden" name="valor_unitario" data-correction-price>
+        <div class="dialog-actions">
+          <button type="button" class="ui-btn ui-btn--outline" data-close-correction>Cancelar</button>
+          <button type="submit" class="ui-btn">Salvar correção</button>
+        </div>
+      </form>`;
+    document.body.appendChild(correctionDialog);
+
+    const quoted = correctionDialog.querySelector('[data-correction-quoted]');
+    const purchased = correctionDialog.querySelector('[data-correction-purchased]');
+    quoted?.addEventListener('change', () => {
+      if (!quoted.checked && purchased) purchased.checked = false;
+    });
+    purchased?.addEventListener('change', () => {
+      if (purchased.checked && quoted) quoted.checked = true;
+    });
+    correctionDialog.querySelectorAll('[data-close-correction]').forEach((button) => {
+      button.addEventListener('click', () => correctionDialog.close());
+    });
+    return correctionDialog;
+  }
+
+  function receivedQuantity(row) {
+    const text = row.querySelector('.purchase-receipt-readonly strong')?.textContent || '0';
+    const match = text.match(/^\s*([\d.,]+)/);
+    const number = Number(String(match?.[1] || '0').replace(',', '.'));
+    return Number.isFinite(number) ? number : 0;
+  }
+
+  function editItem(row) {
+    if (!row.classList.contains('state-comprado')) {
+      row.querySelector('.unit-price')?.focus();
+      return;
+    }
+
+    if (receivedQuantity(row) > 0) {
+      alert('Este item já possui recebimento registrado pelo Almoxarifado e não pode ter a compra desfeita por aqui. Faça a correção pelo fluxo de recebimento.');
+      return;
+    }
+
+    const itemId = row.querySelector('input[name="item_id"]')?.value;
+    const solicitacaoId = location.pathname.match(/\/compras\/solicitacoes\/(\d+)/)?.[1];
+    if (!itemId || !solicitacaoId) {
+      alert('Não foi possível identificar o item para correção.');
+      return;
+    }
+
+    const dialog = ensureCorrectionDialog();
+    const correctionForm = dialog.querySelector('#edit-purchased-item-form');
+    const itemName = row.querySelector('td[data-label="Item"] strong')?.textContent?.trim() || `#${itemId}`;
+    const supplier = row.querySelector('.supplier')?.value || '';
+    const price = row.querySelector('.unit-price')?.value || '0';
+    const quoted = dialog.querySelector('[data-correction-quoted]');
+    const purchased = dialog.querySelector('[data-correction-purchased]');
+
+    correctionForm.action = `/compras/solicitacoes/${solicitacaoId}/itens/${itemId}/corrigir-compra`;
+    dialog.querySelector('[data-correction-item]').textContent = itemName;
+    dialog.querySelector('[data-correction-supplier]').value = supplier;
+    dialog.querySelector('[data-correction-price]').value = price;
+    if (quoted) quoted.checked = true;
+    if (purchased) purchased.checked = true;
+
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else if (confirm('Desfazer a compra deste item e mantê-lo somente como cotado?')) {
+      if (purchased) purchased.checked = false;
+      correctionForm.submit();
+    }
+  }
+
   form.addEventListener('input', update);
   rows.forEach((row) => {
     row.querySelector('.buy-check')?.addEventListener('change', syncSelectAll);
-    row.querySelector('.edit-item')?.addEventListener('click', () => row.querySelector('.unit-price')?.focus());
+    row.querySelector('.edit-item')?.addEventListener('click', () => editItem(row));
   });
   selectAll?.addEventListener('change', () => {
     rows.forEach((row) => {

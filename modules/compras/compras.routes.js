@@ -9,6 +9,7 @@ const ctrl = require('./compras.controller');
 const flowCtrl = require('./compras.itens-consenso.controller');
 const approvalCtrl = require('./compras.aprovacao.controller');
 const approvalGuard = require('./compras.aprovacao.middleware');
+const itemCorrecaoCtrl = require('./compras.item-correcao.controller');
 const storagePaths = require('../../config/storage');
 
 const uploadsDir = storagePaths.UPLOAD_DIR;
@@ -39,6 +40,7 @@ router.post('/solicitacoes/:id/aprovacao/enviar', requireLogin, requireRole(ACCE
 router.post('/solicitacoes/:id/aprovacao/manual', requireLogin, requireRole(ACCESS.compras_manage), approvalCtrl.registrarManual);
 router.post('/solicitacoes/:id/marcar-comprada', requireLogin, requireRole(ACCESS.compras_manage), approvalGuard.requireApprovedPurchase, ctrl.marcarComprada);
 router.post('/solicitacoes/:id/painel-itens', requireLogin, requireRole(ACCESS.compras_manage), approvalGuard.requireApprovedPurchaseIntent, ctrl.salvarPainelItens);
+router.post('/solicitacoes/:id/itens/:itemId/corrigir-compra', requireLogin, requireRole(ACCESS.compras_manage), itemCorrecaoCtrl.corrigirItemCompra);
 router.post('/solicitacoes/:id/itens/:itemId/exclusao', requireLogin, requireRole(ACCESS.compras_manage), flowCtrl.solicitarExclusao);
 router.post('/solicitacoes/:id/itens/:itemId/exclusao/cancelar', requireLogin, requireRole(ACCESS.compras_manage), flowCtrl.cancelarExclusao);
 router.post('/solicitacoes/:id/itens-excepcionais', requireLogin, requireRole(ACCESS.compras_manage), approvalGuard.blockExceptionalDirectPurchase, flowCtrl.adicionarItem);
