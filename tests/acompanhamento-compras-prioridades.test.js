@@ -5,10 +5,12 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const service = fs.readFileSync(path.join(root, 'modules/compras/acompanhamento.service.js'), 'utf8');
+const controller = fs.readFileSync(path.join(root, 'modules/solicitacoes/solicitacoes.acompanhamento.controller.js'), 'utf8');
 const view = fs.readFileSync(path.join(root, 'views/solicitacoes/acompanhamento-compras.ejs'), 'utf8');
 const detailView = fs.readFileSync(path.join(root, 'views/solicitacoes/acompanhamento-detalhe.ejs'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'public/css/acompanhamento-compras.css'), 'utf8');
 const gerencialCss = fs.readFileSync(path.join(root, 'public/css/acompanhamento-compras-gerencial.css'), 'utf8');
+const approvalCss = fs.readFileSync(path.join(root, 'public/css/aprovacao-itens-progressiva.css'), 'utf8');
 
 test('acompanhamento usa todos os períodos por padrão e não limita por disponivel_compras', () => {
   assert.match(service, /query\.periodo\) \? query\.periodo : 'todos'/);
@@ -26,44 +28,55 @@ test('service mantém prioridades e dados gerenciais por solicitação', () => {
   assert.match(service, /percentualCotado/);
   assert.match(service, /percentualComprado/);
   assert.match(service, /percentualRecebido/);
-  assert.match(service, /aprovacao_compra_status/);
-  assert.match(service, /diretor_aprovador_nome/);
 });
 
-test('acompanhamento principal usa tabela larga em vez de cards por solicitação', () => {
+test('acompanhamento principal usa tabela larga e destaca solicitações com itens para aprovar', () => {
   assert.match(view, /<table class="management-table">/);
   assert.match(view, /SOLICITAÇÕES E ANDAMENTO/);
   assert.match(view, /OS \/ Equipamento/);
-  assert.match(view, /Compra \/ Recebimento/);
-  assert.match(view, /Aprovação/);
+  assert.match(view, /COTAÇÕES AGUARDANDO LIBERAÇÃO/);
+  assert.match(view, /PARA APROVAR/);
+  assert.match(view, /Abrir e aprovar/);
+  assert.match(view, /management-row-needs-approval/);
   assert.match(view, /href="\/solicitacoes\/acompanhamento-compras\/<%=s\.id%>"/);
   assert.doesNotMatch(view, /class="request-watch priority-card-/);
 });
 
-test('tabela exibe cotado, sem cotação, comprado, recebido e valores reais', () => {
-  assert.match(view, /s\.cotados/);
-  assert.match(view, /s\.semCotacao/);
-  assert.match(view, /s\.comprados/);
-  assert.match(view, /s\.recebidos/);
-  assert.match(view, /s\.cotadoCentavos/);
-  assert.match(view, /s\.comprometidoCentavos/);
-  assert.match(view, /s\.recebidoCentavos/);
+test('controller enriquece cada solicitação com aprovação progressiva por item', () => {
+  assert.match(controller, /itemApprovalService\.getSummary\(row\.id\)/);
+  assert.match(controller, /itensPendentes/);
+  assert.match(controller, /valorPendente/);
+  assert.match(controller, /solicitacoesPendentes/);
 });
 
-test('detalhe gerencial é somente leitura para cotação e mostra itens completos', () => {
+test('detalhe gerencial mostra apenas dados essenciais para decisão', () => {
   assert.match(detailView, /CONSULTA GERENCIAL · SOMENTE LEITURA/);
-  assert.match(detailView, /ITENS DA SOLICITAÇÃO/);
-  assert.match(detailView, /Fornecedor/);
-  assert.match(detailView, /Valor unitário/);
-  assert.match(detailView, /A receber/);
-  assert.doesNotMatch(detailView, /\/compras\/solicitacoes\/<%=d\.id%>\/painel-itens/);
+  assert.match(detailView, /ITENS PARA ACOMPANHAMENTO E APROVAÇÃO/);
+  assert.match(detailView, /<th>Material<\/th>/);
+  assert.match(detailView, /<th>Qtd\.<\/th>/);
+  assert.match(detailView, /<th>Situação<\/th>/);
+  assert.match(detailView, /<th>Fornecedor<\/th>/);
+  assert.match(detailView, /<th>Valor cotado<\/th>/);
+  assert.match(detailView, /<th>Aprovação<\/th>/);
+  assert.doesNotMatch(detailView, /<th>Valor unitário<\/th>/);
+  assert.doesNotMatch(detailView, /<th>Recebimento<\/th>/);
+  assert.doesNotMatch(detailView, /<th>A receber<\/th>/);
+  assert.doesNotMatch(detailView, /<th>Valor comprado<\/th>/);
   assert.doesNotMatch(detailView, /name="valor_unitario"/);
 });
 
-test('detalhe permite apenas a decisão do diretor designado quando controller autoriza', () => {
-  assert.match(detailView, /if\(canDirectorApprove\)/);
-  assert.match(detailView, /\/solicitacoes\/acompanhamento-compras\/<%=d\.id%>\/aprovar/);
-  assert.match(detailView, /\/solicitacoes\/acompanhamento-compras\/<%=d\.id%>\/reprovar/);
+test('ADMIN ou DIRETORIA aprovam itens cotados por um botão simples', () => {
+  assert.match(detailView, /if\(canApproveItems\)/);
+  assert.match(detailView, /aprovar-itens-cotados/);
+  assert.match(detailView, /Aprovar itens cotados/);
+  assert.match(detailView, /approval-main-button/);
+  assert.doesNotMatch(detailView, /Reprovar \/ devolver/);
+  assert.doesNotMatch(detailView, /diretor responsável/);
+});
+
+test('quantidade comprada legada usa solicitado como fallback na visão gerencial', () => {
+  assert.match(controller, /purchased && Number\(item\.qtdComprada \|\| 0\) <= 0/);
+  assert.match(controller, /item\.qtdComprada = Number\(item\.qtdSolicitada \|\| 0\)/);
 });
 
 test('custo mensal por equipamento usa a coleção realmente entregue pelo service', () => {
@@ -74,11 +87,13 @@ test('custo mensal por equipamento usa a coleção realmente entregue pelo servi
   assert.doesNotMatch(view, /p\.equipamentos\.map/);
 });
 
-test('css mantém responsividade e tabela vira cartões de linha apenas no mobile', () => {
+test('css mantém responsividade e destaque de aprovação', () => {
   for (const token of ['priority-critical','priority-high','priority-medium','priority-low']) {
     assert.ok(css.includes(token), `classe ausente: ${token}`);
   }
   assert.match(gerencialCss, /\.management-table/);
   assert.match(gerencialCss, /@media\(max-width:760px\)/);
-  assert.match(gerencialCss, /\.management-table thead\{display:none\}/);
+  assert.match(approvalCss, /management-row-needs-approval/);
+  assert.match(approvalCss, /approval-row-pending/);
+  assert.match(approvalCss, /@media\(max-width:760px\)/);
 });
