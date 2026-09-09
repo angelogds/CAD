@@ -3,6 +3,7 @@ const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const { ACCESS, normalizeRole } = require("../../config/rbac");
 const ctrl = require("./solicitacoes.controller");
 const flowCtrl = require("./solicitacoes.itens-consenso.controller");
+const acompanhamentoCtrl = require("./solicitacoes.acompanhamento.controller");
 
 
 function requireAdminDeleteSolicitacao(req, res, next) {
@@ -14,6 +15,9 @@ function requireAdminDeleteSolicitacao(req, res, next) {
 router.get("/minhas", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.minhas);
 router.get("/nova", requireLogin, requireRole(ACCESS.solicitacoes_create), ctrl.nova);
 router.get("/acompanhamento-compras", requireLogin, requireRole(ACCESS.compras_read), ctrl.acompanhamentoCompras);
+router.get("/acompanhamento-compras/:id", requireLogin, requireRole(ACCESS.compras_read), acompanhamentoCtrl.detalhe);
+router.post("/acompanhamento-compras/:id/aprovar", requireLogin, requireRole(ACCESS.compras_read), acompanhamentoCtrl.aprovar);
+router.post("/acompanhamento-compras/:id/reprovar", requireLogin, requireRole(ACCESS.compras_read), acompanhamentoCtrl.reprovar);
 router.post("/", requireLogin, requireRole(ACCESS.solicitacoes_create), ctrl.criar);
 router.get("/:id/pdf", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.pdf);
 router.post("/:id/excluir", requireLogin, requireAdminDeleteSolicitacao, requireRole(ACCESS.solicitacoes_delete), ctrl.excluir);
