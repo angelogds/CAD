@@ -1,16 +1,16 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/acompanhamento-compras.css?v=20260909-tabela-gerencial">
 <link rel="stylesheet" href="/css/acompanhamento-compras-gerencial.css?v=20260909-v1">
+<link rel="stylesheet" href="/css/aprovacao-itens-progressiva.css?v=20260909-v1">
 <%
 const d=detalheCompra||{};
 const itens=Array.isArray(d.itens)?d.itens:[];
-const a=d.aprovacao||{};
 const r=d.resumoAcompanhamento||{};
+const ap=approvalSummary||{};
+const hist=Array.isArray(approvalHistory)?approvalHistory:[];
 const money=c=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(c)||0)/100);
 const statusLabel=value=>String(value||'-').replaceAll('_',' ');
-const approval=String(a.approvalStatus||d.aprovacao_compra_status||'NAO_SOLICITADA').toUpperCase();
-const approvalLabel=value=>({PENDENTE:'Aguardando Diretoria',APROVADA:'Aprovada',REPROVADA:'Reprovada',EXPIRADA:'Revalidar cotação',NAO_SOLICITADA:'Não solicitada'}[value]||statusLabel(value));
-const approvalClass=value=>'approval-'+String(value||'NAO_SOLICITADA').toLowerCase().replaceAll('_','-');
+const approvalLabel=value=>({AGUARDANDO_APROVACAO:'AGUARDANDO APROVAÇÃO',APROVADA:'APROVADO',COMPRADO:'COMPRADO',SEM_COTACAO:'SEM COTAÇÃO',CANCELADO:'CANCELADO'}[String(value||'').toUpperCase()]||statusLabel(value));
 %>
 <div class="watch-detail">
   <header class="detail-head">
@@ -25,102 +25,70 @@ const approvalClass=value=>'approval-'+String(value||'NAO_SOLICITADA').toLowerCa
     </div>
   </header>
 
-  <div class="readonly-note">Esta tela não altera cotação, fornecedor, quantidade ou compra. As informações comerciais continuam sendo administradas exclusivamente pelo setor de Compras. A única ação disponível aqui, quando aplicável, é a decisão do diretor responsável.</div>
+  <div class="readonly-note">Compras continua responsável por cotação, fornecedor e valores. ADMIN/DIRETORIA apenas visualizam e liberam digitalmente os itens que já possuem cotação válida.</div>
 
-  <section class="detail-summary">
-    <div><small>Status operacional</small><strong><%=statusLabel(d.status)%></strong></div>
+  <section class="detail-summary compact-summary">
+    <div><small>Status</small><strong><%=statusLabel(d.status)%></strong></div>
     <div><small>Itens ativos</small><strong><%=r.total||0%></strong></div>
-    <div><small>Itens cotados</small><strong><%=r.cotados||0%></strong></div>
-    <div><small>Itens comprados</small><strong><%=r.comprados||0%></strong></div>
-    <div><small>Itens recebidos</small><strong><%=r.recebidos||0%></strong></div>
+    <div><small>Cotados</small><strong><%=r.cotados||0%></strong></div>
+    <div><small>Comprados</small><strong><%=r.comprados||0%></strong></div>
+    <div class="approval-kpi <%=Number(ap.pendentesCount||0)>0?'has-pending':''%>"><small>Para aprovar</small><strong><%=ap.pendentesCount||0%></strong></div>
     <div><small>Valor cotado</small><strong><%=money(r.cotadoCentavos)%></strong></div>
   </section>
 
-  <section class="detail-card">
-    <div class="detail-card-head">
-      <div><h2>VÍNCULOS DA SOLICITAÇÃO</h2><p>Rastreabilidade entre a solicitação, a Ordem de Serviço e o equipamento.</p></div>
-      <div class="detail-linked">
-        <% if(d.os_id){ %><a class="btn btn-ghost" href="/os/<%=d.os_id%>">Abrir OS <%=d.os_id%></a><% } %>
-      </div>
-    </div>
-    <div class="detail-summary">
+  <section class="detail-card compact-links-card">
+    <div class="detail-card-head"><div><h2>VÍNCULOS</h2><p>Rastreabilidade da solicitação.</p></div><% if(d.os_id){ %><a class="btn btn-ghost" href="/os/<%=d.os_id%>">Abrir OS <%=d.os_id%></a><% } %></div>
+    <div class="detail-summary compact-summary links-summary">
       <div><small>OS</small><strong><%=d.os_id?('OS '+d.os_id):'Sem OS vinculada'%></strong></div>
       <div><small>Equipamento</small><strong><%=d.equipamento_nome||'Não informado'%></strong></div>
       <div><small>Prioridade</small><strong><%=d.prioridade||'Não definida'%></strong></div>
-      <div><small>Compras responsável</small><strong><%=d.compras_responsavel_nome||d.responsavel_nome||'Não atribuído'%></strong></div>
-      <div><small>Valor comprado</small><strong><%=money(r.compradoCentavos)%></strong></div>
-      <div><small>Valor recebido</small><strong><%=money(r.recebidoCentavos)%></strong></div>
+      <div><small>Compras</small><strong><%=d.compras_responsavel_nome||d.responsavel_nome||'Não atribuído'%></strong></div>
     </div>
   </section>
 
-  <section class="detail-card">
-    <div class="detail-card-head"><div><h2>ITENS DA SOLICITAÇÃO</h2><p>Cotação, fornecedor, compra e recebimento item a item.</p></div><span class="request-total"><%=itens.length%> itens</span></div>
+  <section class="detail-card approval-table-card">
+    <div class="detail-card-head">
+      <div><h2>ITENS PARA ACOMPANHAMENTO E APROVAÇÃO</h2><p>Veja rapidamente o que está sem cotação, cotado, aprovado ou comprado.</p></div>
+      <% if(Number(ap.pendentesCount||0)>0){ %><span class="approval-alert-chip">● <%=ap.pendentesCount%> para aprovar · <%=money(ap.pendentesValorCentavos)%></span><% } else { %><span class="request-total">Sem aprovações pendentes</span><% } %>
+    </div>
+
     <% if(!itens.length){ %><div class="detail-empty">Nenhum item ativo nesta solicitação.</div><% } else { %>
       <div class="detail-table-wrap">
-        <table class="detail-table">
-          <thead><tr><th>Material</th><th>Solicitado</th><th>Cotação</th><th>Fornecedor</th><th>Valor unitário</th><th>Valor cotado</th><th>Compra</th><th>Recebimento</th><th>A receber</th><th>Valor comprado</th></tr></thead>
+        <table class="detail-table approval-simple-table">
+          <thead><tr><th>Material</th><th>Qtd.</th><th>Situação</th><th>Fornecedor</th><th>Valor cotado</th><th>Aprovação</th></tr></thead>
           <tbody>
-            <% itens.forEach(it=>{ const quoted=String(it.status_cotacao||'').toUpperCase()==='COTADO'; const purchased=String(it.status_compra||'').toUpperCase()==='COMPRADO'; const complete=Number(it.qtdComprada||0)>0&&Number(it.qtdRecebida||0)>=Number(it.qtdComprada||0); %>
-              <tr>
+            <% itens.forEach(it=>{ const quoted=String(it.status_cotacao||'').toUpperCase()==='COTADO'; const purchased=String(it.status_compra||'').toUpperCase()==='COMPRADO'; const state=String(it.approvalState||'SEM_COTACAO').toUpperCase(); const itemValue=Number(it.valorCotadoCentavos||it.cotadoCentavos||0); %>
+              <tr class="<%=state==='AGUARDANDO_APROVACAO'?'approval-row-pending':''%>">
                 <td data-label="Material"><strong><%=it.item_nome||'-'%></strong><small><%=it.item_descricao||''%></small></td>
-                <td data-label="Solicitado"><strong><%=it.qtdSolicitada||0%> <%=it.unidade||'UN'%></strong></td>
-                <td data-label="Cotação"><span class="stage-badge <%=quoted?'is-ok':'is-warn'%>"><%=quoted?'COTADO':'SEM COTAÇÃO'%></span></td>
-                <td data-label="Fornecedor"><strong><%=it.fornecedor_nome||'Não definido'%></strong></td>
-                <td data-label="Valor unitário"><strong><%=money(it.valor_unitario_centavos)%></strong></td>
-                <td data-label="Valor cotado"><strong><%=money(it.cotadoCentavos)%></strong></td>
-                <td data-label="Compra"><span class="stage-badge <%=purchased?'is-ok':'is-warn'%>"><%=purchased?'COMPRADO':'NÃO COMPRADO'%></span><small><%=it.qtdComprada||0%> <%=it.unidade||'UN'%></small></td>
-                <td data-label="Recebimento"><span class="stage-badge <%=complete?'is-ok':(Number(it.qtdRecebida||0)>0?'is-warn':'')%>"><%=it.qtdRecebida||0%> de <%=it.qtdComprada||0%> <%=it.unidade||'UN'%></span></td>
-                <td data-label="A receber"><strong><%=it.qtdPendenteReceber||0%> <%=it.unidade||'UN'%></strong></td>
-                <td data-label="Valor comprado"><strong><%=money(it.compradoCentavos)%></strong></td>
+                <td data-label="Qtd."><strong><%=it.qtdSolicitada||it.qtd_solicitada||0%> <%=it.unidade||'UN'%></strong></td>
+                <td data-label="Situação"><span class="stage-badge <%=purchased?'is-ok':quoted?'is-info':'is-warn'%>"><%=purchased?'COMPRADO':quoted?'COTADO':'SEM COTAÇÃO'%></span></td>
+                <td data-label="Fornecedor"><strong><%=quoted?(it.fornecedor_nome||'Não definido'):'—'%></strong></td>
+                <td data-label="Valor cotado"><strong><%=quoted?money(itemValue):'—'%></strong></td>
+                <td data-label="Aprovação"><span class="item-approval-badge state-<%=state.toLowerCase().replaceAll('_','-')%>"><%=approvalLabel(state)%></span><% if(it.aprovacao_por_nome&&state==='APROVADA'){%><small>por <%=it.aprovacao_por_nome%></small><%}%></td>
               </tr>
             <% }) %>
           </tbody>
         </table>
       </div>
     <% } %>
+
+    <% if(Number(ap.pendentesCount||0)>0){ %>
+      <div class="approval-action-bar">
+        <div><span>ITENS COTADOS AGUARDANDO LIBERAÇÃO</span><strong><%=ap.pendentesCount%> item(ns) · <%=money(ap.pendentesValorCentavos)%></strong><small>A liberação vale somente para fornecedor, quantidade e valor exibidos agora. Se Compras alterar a cotação, o item volta automaticamente para aprovação.</small></div>
+        <% if(canApproveItems){ %>
+          <form method="POST" action="/solicitacoes/acompanhamento-compras/<%=d.id%>/aprovar-itens-cotados">
+            <% (ap.pendentes||[]).forEach(it=>{ %><input type="hidden" name="item_id" value="<%=it.id%>"><% }) %>
+            <button class="btn btn-green approval-main-button" type="submit" onclick="return confirm('Confirmar a liberação dos <%=ap.pendentesCount%> itens cotados no valor de <%=money(ap.pendentesValorCentavos)%>?')">✓ Aprovar itens cotados</button>
+          </form>
+        <% } else { %><div class="approval-waiting-role">Aguardando ADMIN ou DIRETORIA.</div><% } %>
+      </div>
+    <% } %>
   </section>
 
-  <section class="detail-card">
-    <div class="detail-card-head"><div><h2>APROVAÇÃO DA DIRETORIA</h2><p>Liberação da compra vinculada ao diretor responsável e à composição da cotação.</p></div><span class="approval-badge <%=approvalClass(approval)%>"><%=approvalLabel(approval)%></span></div>
-    <div class="approval-panel">
-      <div class="approval-state">
-        <div class="approval-state-row"><span>Diretor responsável</span><strong><%=a.diretor_aprovador_nome||'Ainda não definido pelo setor de Compras'%></strong></div>
-        <div class="approval-state-row"><span>Status</span><strong><%=approvalLabel(approval)%></strong></div>
-        <div class="approval-state-row"><span>Método</span><strong><%=a.aprovacao_compra_metodo||'-'%></strong></div>
-        <div class="approval-state-row"><span>Valor submetido</span><strong><%=money(a.aprovacao_valor_cotado_centavos||a.quote?.totalCentavos)%></strong></div>
-        <div class="approval-state-row"><span>Solicitada em</span><strong><%=a.aprovacao_compra_solicitada_em?fmtBR(a.aprovacao_compra_solicitada_em):'-'%></strong></div>
-        <div class="approval-state-row"><span>Decisão em</span><strong><%=a.aprovacao_compra_em?fmtBR(a.aprovacao_compra_em):(a.aprovacao_compra_reprovada_em?fmtBR(a.aprovacao_compra_reprovada_em):'-')%></strong></div>
-        <% if(a.aprovacao_compra_observacao){ %><div class="approval-state-row"><span>Observação</span><strong><%=a.aprovacao_compra_observacao%></strong></div><% } %>
-        <% if(a.aprovacao_compra_reprovacao_motivo){ %><div class="approval-state-row"><span>Motivo da reprovação</span><strong><%=a.aprovacao_compra_reprovacao_motivo%></strong></div><% } %>
-      </div>
-      <div class="director-decision">
-        <% if(canDirectorApprove){ %>
-          <strong>Decisão do diretor responsável</strong>
-          <form method="POST" action="/solicitacoes/acompanhamento-compras/<%=d.id%>/aprovar">
-            <label>Observação opcional</label>
-            <textarea name="observacao" maxlength="1000" placeholder="Observação da aprovação"></textarea>
-            <button class="btn btn-green" type="submit" onclick="return confirm('Confirmar a liberação desta compra?')">Aprovar compra</button>
-          </form>
-          <form method="POST" action="/solicitacoes/acompanhamento-compras/<%=d.id%>/reprovar">
-            <label>Motivo da reprovação</label>
-            <textarea name="motivo" minlength="5" maxlength="1000" required placeholder="Informe o motivo para devolver a cotação ao setor de Compras"></textarea>
-            <button class="btn btn-danger-soft" type="submit" onclick="return confirm('Reprovar/devolver esta cotação?')">Reprovar / devolver</button>
-          </form>
-        <% } else if(approval==='PENDENTE'){ %>
-          <strong>Aguardando decisão</strong><span>Somente o diretor definido como responsável por esta solicitação pode registrar a aprovação digital.</span>
-        <% } else if(approval==='APROVADA'){ %>
-          <strong>Compra liberada</strong><span>A aprovação está registrada e o setor de Compras pode prosseguir enquanto a composição da cotação permanecer a mesma.</span>
-        <% } else { %>
-          <strong>Aprovação ainda não disponível</strong><span>O setor de Compras deve finalizar a cotação e encaminhá-la ao diretor responsável.</span>
-        <% } %>
-      </div>
-    </div>
-  </section>
-
-  <section class="detail-card">
-    <div class="detail-card-head"><div><h2>HISTÓRICO DA APROVAÇÃO</h2><p>Registro de envio, aprovação, reprovação ou invalidação da cotação.</p></div></div>
-    <% if(!Array.isArray(a.historico)||!a.historico.length){ %><div class="detail-empty">Nenhum evento de aprovação registrado.</div><% } else { %>
-      <div class="approval-history"><% a.historico.forEach(h=>{ %><div class="approval-history-item"><strong><%=statusLabel(h.acao)%></strong><span><%=h.observacao||'-'%><small>Diretor: <%=h.diretor_nome||'-'%> · Executado por: <%=h.executado_por_nome||'-'%></small></span><small><%=h.created_at?fmtBR(h.created_at):'-'%></small></div><% }) %></div>
+  <section class="detail-card compact-history-card">
+    <div class="detail-card-head"><div><h2>HISTÓRICO DE LIBERAÇÕES</h2><p>Registro digital de quem aprovou, quando aprovou e o valor considerado.</p></div></div>
+    <% if(!hist.length){ %><div class="detail-empty">Nenhuma aprovação por item registrada.</div><% } else { %>
+      <div class="approval-history"><% hist.slice(0,20).forEach(h=>{ %><div class="approval-history-item"><strong><%=h.item_nome||('Item #'+h.solicitacao_item_id)%></strong><span><%=statusLabel(h.acao)%><small><%=h.executado_por_nome||'-'%> · <%=money(h.valor_centavos)%></small></span><small><%=h.created_at?fmtBR(h.created_at):'-'%></small></div><% }) %></div>
     <% } %>
   </section>
 </div>

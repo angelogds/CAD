@@ -46,8 +46,21 @@
       subtotalNode.textContent = brl(value);
       row.classList.toggle('state-cotado', quoted && !row.classList.contains('state-comprado'));
       row.classList.toggle('state-pendente', !quoted);
-      buy.disabled = !quoted || row.classList.contains('state-comprado');
+
+      // O backend continua sendo a autoridade final. Quando o status de aprovação
+      // já foi carregado, a interface também impede selecionar para compra um item
+      // que ainda está aguardando ADMIN/DIRETORIA. Se a consulta falhar, não travamos
+      // visualmente a tela, mas o middleware de compra continuará bloqueando a ação.
+      const approvalState = String(row.dataset.purchaseApproval || '');
+      const approvalKnown = Boolean(approvalState);
+      const approvalOk = !approvalKnown || approvalState === 'APROVADA' || approvalState === 'COMPRADO';
+      const waitingApproval = quoted && !row.classList.contains('state-comprado') && approvalKnown && !approvalOk;
+      buy.disabled = !quoted || row.classList.contains('state-comprado') || !approvalOk;
       if (buy.disabled) buy.checked = false;
+      row.classList.toggle('awaiting-purchase-approval', waitingApproval);
+      if (waitingApproval) row.title = 'Item cotado aguardando aprovação de ADMIN/DIRETORIA para compra.';
+      else if (row.title === 'Item cotado aguardando aprovação de ADMIN/DIRETORIA para compra.') row.removeAttribute('title');
+
       const badge = row.querySelector('.status-badge');
       if (badge && !row.classList.contains('state-comprado')) badge.textContent = quoted ? 'COTADO' : 'PENDENTE';
     });
@@ -57,6 +70,30 @@
     if (subtotalNode) subtotalNode.textContent = brl(subtotal);
     document.querySelectorAll('[data-total-geral]').forEach((element) => { element.textContent = brl(Math.max(0, subtotal + freight - discount)); });
     syncSelectAll();
+  }
+
+  async function loadApprovalStates() {
+    const solicitacaoId = location.pathname.match(/\/compras\/solicitacoes\/(\d+)/)?.[1];
+    if (!solicitacaoId) return;
+    try {
+      const response = await fetch(`/compras/solicitacoes/${solicitacaoId}/aprovacao-itens.json`, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      if (!payload?.ok || !Array.isArray(payload.itens)) return;
+      const byId = new Map(payload.itens.map((item) => [String(item.id), String(item.approvalState || '')]));
+      rows.forEach((row) => {
+        const itemId = row.querySelector('input[name="item_id"]')?.value;
+        if (!itemId || !byId.has(String(itemId))) return;
+        row.dataset.purchaseApproval = byId.get(String(itemId));
+      });
+      update();
+    } catch (_error) {
+      // O backend mantém a trava mesmo se o navegador não conseguir carregar
+      // o status visual da aprovação.
+    }
   }
 
   let correctionDialog = null;
@@ -187,10 +224,11 @@
     }
     if (action === 'comprar' && !rows.some((row) => row.querySelector('.buy-check')?.checked)) {
       event.preventDefault();
-      alert('Selecione ao menos um item cotado para marcar como comprado.');
+      alert('Selecione ao menos um item cotado e aprovado para marcar como comprado.');
     }
   });
   update();
+  loadApprovalStates();
 })();
 
 // Seletor pesquisável e retorno seguro do cadastro rápido. O rascunho fica apenas nesta aba.
