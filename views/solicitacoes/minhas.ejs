@@ -1,8 +1,8 @@
 <% layout('layout') %><link rel="stylesheet" href="/css/solicitacoes-lista.css">
 <%
 const labels={ABERTA:'Aberta',EM_COTACAO:'Em cotação',COMPRADA:'Comprada',EM_RECEBIMENTO:'Em recebimento',RECEBIDA_PARCIAL:'Recebida parcial',RECEBIDA_TOTAL:'Recebida total',FECHADA:'Fechada',REABERTA:'Reaberta',CANCELADA:'Cancelada'};
-const normalizePriority=(value='')=>String(value||'').trim().normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
-const currentRole=String(user?.role||user?.perfil||'').trim().normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[\s-]+/g,'_');
+const normalizePriority=(value='')=>String(value||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+const currentRole=String(user?.role||user?.perfil||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[\s-]+/g,'_');
 const canWatchExecutivePurchases=['ADMIN','ADMINISTRADOR','DIRETORIA','DIRECAO'].includes(currentRole);
 const groups=[
   {key:'critical',title:'CRÍTICAS',items:lista.filter(s=>['URGENTE','CRITICA','EMERGENCIAL'].includes(normalizePriority(s.prioridade)))} ,
