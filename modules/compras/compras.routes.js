@@ -7,6 +7,8 @@ const { requireLogin, requireRole, requireAdmin } = require('../auth/auth.middle
 const { ACCESS } = require('../../config/rbac');
 const ctrl = require('./compras.controller');
 const flowCtrl = require('./compras.itens-consenso.controller');
+const approvalCtrl = require('./compras.aprovacao.controller');
+const approvalGuard = require('./compras.aprovacao.middleware');
 const storagePaths = require('../../config/storage');
 
 const uploadsDir = storagePaths.UPLOAD_DIR;
@@ -33,11 +35,13 @@ router.get('/solicitacoes/:id', requireLogin, requireRole(ACCESS.compras_read), 
 router.post('/solicitacoes/:id/cotacoes', requireLogin, requireRole(ACCESS.compras_manage), ctrl.criarCotacao);
 router.post('/solicitacoes/:id/cotacoes/:cotacaoId/selecionar', requireLogin, requireRole(ACCESS.compras_manage), ctrl.selecionarCotacao);
 router.post('/solicitacoes/:id/atualizar-dados', requireLogin, requireRole(ACCESS.compras_manage), ctrl.atualizarDados);
-router.post('/solicitacoes/:id/marcar-comprada', requireLogin, requireRole(ACCESS.compras_manage), ctrl.marcarComprada);
-router.post('/solicitacoes/:id/painel-itens', requireLogin, requireRole(ACCESS.compras_manage), ctrl.salvarPainelItens);
+router.post('/solicitacoes/:id/aprovacao/enviar', requireLogin, requireRole(ACCESS.compras_manage), approvalCtrl.enviar);
+router.post('/solicitacoes/:id/aprovacao/manual', requireLogin, requireRole(ACCESS.compras_manage), approvalCtrl.registrarManual);
+router.post('/solicitacoes/:id/marcar-comprada', requireLogin, requireRole(ACCESS.compras_manage), approvalGuard.requireApprovedPurchase, ctrl.marcarComprada);
+router.post('/solicitacoes/:id/painel-itens', requireLogin, requireRole(ACCESS.compras_manage), approvalGuard.requireApprovedPurchaseIntent, ctrl.salvarPainelItens);
 router.post('/solicitacoes/:id/itens/:itemId/exclusao', requireLogin, requireRole(ACCESS.compras_manage), flowCtrl.solicitarExclusao);
 router.post('/solicitacoes/:id/itens/:itemId/exclusao/cancelar', requireLogin, requireRole(ACCESS.compras_manage), flowCtrl.cancelarExclusao);
-router.post('/solicitacoes/:id/itens-excepcionais', requireLogin, requireRole(ACCESS.compras_manage), flowCtrl.adicionarItem);
+router.post('/solicitacoes/:id/itens-excepcionais', requireLogin, requireRole(ACCESS.compras_manage), approvalGuard.blockExceptionalDirectPurchase, flowCtrl.adicionarItem);
 
 router.post('/solicitacoes/:id/anexos', requireLogin, requireRole(ACCESS.compras_manage), upload.single('arquivo'), ctrl.uploadAnexo);
 router.get('/anexos/:anexoId/download', requireLogin, requireRole(ACCESS.compras_read), ctrl.downloadAnexo);
