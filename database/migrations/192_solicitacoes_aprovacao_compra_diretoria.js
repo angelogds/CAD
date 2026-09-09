@@ -13,6 +13,7 @@ module.exports = ({ db, tableExists, columnExists, addColumnIfMissing }) => {
   addColumnIfMissing('solicitacoes', 'aprovacao_compra_reprovada_por', 'aprovacao_compra_reprovada_por INTEGER');
   addColumnIfMissing('solicitacoes', 'aprovacao_compra_reprovacao_motivo', 'aprovacao_compra_reprovacao_motivo TEXT');
   addColumnIfMissing('solicitacoes', 'aprovacao_valor_cotado_centavos', 'aprovacao_valor_cotado_centavos INTEGER');
+  addColumnIfMissing('solicitacoes', 'aprovacao_cotacao_assinatura', 'aprovacao_cotacao_assinatura TEXT');
   addColumnIfMissing('solicitacoes', 'aprovacao_manual_registrada_por', 'aprovacao_manual_registrada_por INTEGER');
   addColumnIfMissing('solicitacoes', 'aprovacao_evidencia_anexo_id', 'aprovacao_evidencia_anexo_id INTEGER');
 
@@ -29,6 +30,7 @@ module.exports = ({ db, tableExists, columnExists, addColumnIfMissing }) => {
       diretor_user_id INTEGER,
       executado_por_user_id INTEGER,
       valor_cotado_centavos INTEGER,
+      cotacao_assinatura TEXT,
       metodo TEXT,
       observacao TEXT,
       evidencia_anexo_id INTEGER,
@@ -42,8 +44,7 @@ module.exports = ({ db, tableExists, columnExists, addColumnIfMissing }) => {
   `);
 
   if (tableExists('compras_aprovacoes_historico')) {
-    if (!columnExists('compras_aprovacoes_historico', 'evidencia_anexo_id')) {
-      addColumnIfMissing('compras_aprovacoes_historico', 'evidencia_anexo_id', 'evidencia_anexo_id INTEGER');
-    }
+    addColumnIfMissing('compras_aprovacoes_historico', 'cotacao_assinatura', 'cotacao_assinatura TEXT');
+    addColumnIfMissing('compras_aprovacoes_historico', 'evidencia_anexo_id', 'evidencia_anexo_id INTEGER');
   }
 };
