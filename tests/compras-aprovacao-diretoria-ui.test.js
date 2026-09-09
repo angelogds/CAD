@@ -18,10 +18,13 @@ test('fluxo antigo de envio para diretor e aprovação manual deixa de ser opera
   assert.doesNotMatch(routes, /compras\.aprovacao\.controller/);
 });
 
-test('compra valida aprovação digital por item no backend', () => {
+test('compra valida aprovação digital por item e o payload aprovado no backend', () => {
   assert.match(routes, /requireApprovedPurchaseIntent/);
-  assert.match(middleware, /assertItemsApprovedForPurchase/);
+  assert.match(middleware, /assertPurchasePayloadMatchesApprovedItems/);
   assert.match(middleware, /assertAllQuotedApprovedForPurchase/);
+  assert.match(itemService, /assertItemsApprovedForPurchase/);
+  assert.match(itemService, /assertPurchasePayloadMatchesApprovedItems/);
+  assert.match(itemService, /COMPRA_DIVERGE_DA_APROVACAO_ITEM/);
   assert.match(itemService, /ROLE\.ADMIN/);
   assert.match(itemService, /ROLE\.DIRETORIA/);
   assert.match(itemService, /AGUARDANDO_APROVACAO/);
