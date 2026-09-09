@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const db = require('../../database/db');
 const { ROLE, normalizeRole } = require('../../config/rbac');
 
@@ -30,7 +31,7 @@ function tableColumns(name) {
 
 function requireApprovalSchema() {
   const cols = tableColumns('solicitacoes');
-  const required = ['diretor_aprovador_user_id', 'aprovacao_compra_status', 'aprovacao_valor_cotado_centavos'];
+  const required = ['diretor_aprovador_user_id', 'aprovacao_compra_status', 'aprovacao_valor_cotado_centavos', 'aprovacao_cotacao_assinatura'];
   if (!required.every((column) => cols.has(column))) {
     const error = new Error('Estrutura de aprovação da Diretoria indisponível. Execute as migrations do sistema.');
     error.code = 'APROVACAO_SCHEMA_INDISPONIVEL';
@@ -66,55 +67,117 @@ function getSolicitation(id) {
   return db.prepare('SELECT * FROM solicitacoes WHERE id=?').get(Number(id || 0)) || null;
 }
 
-function getQuoteSnapshot(solicitacaoId) {
-  const cols = tableColumns('solicitacao_itens');
-  if (!cols.size) return { totalCentavos: 0, totalItens: 0, cotados: 0, ready: false };
+function stableNumber(value) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? Number(number.toFixed(6)) : 0;
+}
 
+function buildSignature(items, frete, desconto) {
+  const canonical = [...items]
+    .sort((a, b) => Number(a.id) - Number(b.id))
+    .map((item) => [
+      Number(item.id),
+      stableNumber(item.qtd_solicitada),
+      String(item.status_cotacao || '').toUpperCase(),
+      Number(item.fornecedor_id || 0),
+      Math.round(Number(item.valor_unitario_centavos || 0)),
+    ]);
+  const payload = JSON.stringify({ itens: canonical, frete: Math.round(Number(frete || 0)), desconto: Math.round(Number(desconto || 0)) });
+  return crypto.createHash('sha256').update(payload).digest('hex');
+}
+
+function loadQuoteRows(solicitacaoId) {
+  const cols = tableColumns('solicitacao_itens');
+  if (!cols.size) return [];
   const qtdExpr = cols.has('qtd_solicitada') ? 'COALESCE(qtd_solicitada,0)' : (cols.has('quantidade') ? 'COALESCE(quantidade,0)' : '0');
   const priceExpr = cols.has('valor_unitario_centavos') ? 'valor_unitario_centavos' : '0';
   const statusCotacaoExpr = cols.has('status_cotacao') ? "UPPER(COALESCE(status_cotacao,''))" : "''";
   const statusCompraExpr = cols.has('status_compra') ? "UPPER(COALESCE(status_compra,''))" : "''";
   const supplierExpr = cols.has('fornecedor_id') ? 'fornecedor_id' : 'NULL';
-  const rows = db.prepare(`
+  const exclusionExpr = cols.has('exclusao_status') ? "UPPER(COALESCE(exclusao_status,''))" : "''";
+  return db.prepare(`
     SELECT id, ${qtdExpr} qtd_solicitada, ${priceExpr} valor_unitario_centavos,
       ${statusCotacaoExpr} status_cotacao, ${statusCompraExpr} status_compra,
-      ${supplierExpr} fornecedor_id
+      ${supplierExpr} fornecedor_id, ${exclusionExpr} exclusao_status
     FROM solicitacao_itens
     WHERE solicitacao_id=?
   `).all(Number(solicitacaoId));
+}
 
-  const active = rows.filter((item) => item.status_compra !== 'CANCELADO');
-  const cotados = active.filter((item) => item.status_cotacao === 'COTADO').length;
+function summarizeQuoteRows(solicitacaoId, rows, overrides = {}) {
+  const active = rows.filter((item) => String(item.status_compra || '').toUpperCase() !== 'CANCELADO');
+  const cotados = active.filter((item) => String(item.status_cotacao || '').toUpperCase() === 'COTADO').length;
   const allReady = active.length > 0 && active.every((item) => (
-    item.status_cotacao === 'COTADO'
+    String(item.status_cotacao || '').toUpperCase() === 'COTADO'
+    && String(item.exclusao_status || '').toUpperCase() !== 'PENDENTE'
     && Number(item.fornecedor_id || 0) > 0
     && item.valor_unitario_centavos !== null
     && Number.isFinite(Number(item.valor_unitario_centavos))
   ));
   const subtotal = active.reduce((sum, item) => sum + Math.round(Number(item.qtd_solicitada || 0) * Number(item.valor_unitario_centavos || 0)), 0);
   const sol = getSolicitation(solicitacaoId) || {};
-  const frete = Number(sol.frete_centavos || 0);
-  const desconto = Number(sol.desconto_centavos || 0);
+  const frete = overrides.freteCentavos == null ? Number(sol.frete_centavos || 0) : Number(overrides.freteCentavos || 0);
+  const desconto = overrides.descontoCentavos == null ? Number(sol.desconto_centavos || 0) : Number(overrides.descontoCentavos || 0);
   return {
     totalCentavos: Math.max(0, subtotal + frete - desconto),
     totalItens: active.length,
     cotados,
     ready: allReady,
+    signature: buildSignature(active, frete, desconto),
   };
 }
 
-function recordHistory({ solicitacaoId, acao, diretorUserId = null, executadoPorUserId = null, valorCotadoCentavos = null, metodo = null, observacao = null, evidenciaAnexoId = null }) {
+function getQuoteSnapshot(solicitacaoId) {
+  return summarizeQuoteRows(solicitacaoId, loadQuoteRows(solicitacaoId));
+}
+
+function parseMoneyToCents(value, fallback = 0) {
+  if (value === undefined || value === null || value === '') return Math.round(Number(fallback || 0) * 100);
+  if (typeof value === 'number') return Math.round(value * 100);
+  let text = String(value).trim().replace(/\s/g, '').replace(/R\$/gi, '');
+  if (!text) return Math.round(Number(fallback || 0) * 100);
+  if (text.includes(',') && text.includes('.')) text = text.replace(/\./g, '').replace(',', '.');
+  else if (text.includes(',')) text = text.replace(',', '.');
+  const number = Number(text);
+  if (!Number.isFinite(number)) return Math.round(Number(fallback || 0) * 100);
+  return Math.round(number * 100);
+}
+
+function getProspectiveQuoteSnapshot(solicitacaoId, payload = {}) {
+  const rows = loadQuoteRows(solicitacaoId).map((row) => ({ ...row }));
+  const ids = Array.isArray(payload.item_id) ? payload.item_id : [payload.item_id].filter(Boolean);
+  const values = (name) => Array.isArray(payload[name]) ? payload[name] : [payload[name]];
+  const quoted = new Set((Array.isArray(payload.cotado) ? payload.cotado : [payload.cotado]).filter(Boolean).map(Number));
+  const byId = new Map(rows.map((row) => [Number(row.id), row]));
+
+  ids.forEach((rawId, index) => {
+    const row = byId.get(Number(rawId));
+    if (!row) return;
+    row.fornecedor_id = Number(values('fornecedor_id')[index] || 0) || null;
+    row.valor_unitario_centavos = parseMoneyToCents(values('valor_unitario')[index], Number(row.valor_unitario_centavos || 0) / 100);
+    row.status_cotacao = quoted.has(Number(rawId)) ? 'COTADO' : 'PENDENTE';
+  });
+
+  const sol = getSolicitation(solicitacaoId) || {};
+  return summarizeQuoteRows(solicitacaoId, rows, {
+    freteCentavos: parseMoneyToCents(payload.frete, Number(sol.frete_centavos || 0) / 100),
+    descontoCentavos: parseMoneyToCents(payload.desconto, Number(sol.desconto_centavos || 0) / 100),
+  });
+}
+
+function recordHistory({ solicitacaoId, acao, diretorUserId = null, executadoPorUserId = null, valorCotadoCentavos = null, quoteSignature = null, metodo = null, observacao = null, evidenciaAnexoId = null }) {
   if (!tableExists('compras_aprovacoes_historico')) return;
   db.prepare(`
     INSERT INTO compras_aprovacoes_historico
-      (solicitacao_id, acao, diretor_user_id, executado_por_user_id, valor_cotado_centavos, metodo, observacao, evidencia_anexo_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      (solicitacao_id, acao, diretor_user_id, executado_por_user_id, valor_cotado_centavos, cotacao_assinatura, metodo, observacao, evidencia_anexo_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     Number(solicitacaoId),
     acao,
     diretorUserId ? Number(diretorUserId) : null,
     executadoPorUserId ? Number(executadoPorUserId) : null,
     valorCotadoCentavos == null ? null : Number(valorCotadoCentavos),
+    quoteSignature || null,
     metodo || null,
     observacao || null,
     evidenciaAnexoId ? Number(evidenciaAnexoId) : null,
@@ -168,9 +231,9 @@ function getContext(solicitacaoId) {
 
   const quote = getQuoteSnapshot(solicitacaoId);
   const approvalStatus = String(sol.aprovacao_compra_status || APPROVAL.NONE).toUpperCase();
-  const snapshot = Number(sol.aprovacao_valor_cotado_centavos || 0);
+  const approvedSignature = String(sol.aprovacao_cotacao_assinatura || '');
   const stale = [APPROVAL.PENDING, APPROVAL.APPROVED].includes(approvalStatus)
-    && snapshot !== Number(quote.totalCentavos || 0);
+    && (!approvedSignature || approvedSignature !== quote.signature);
   return {
     ...sol,
     approvalStatus,
@@ -217,17 +280,19 @@ function requestApproval(solicitacaoId, directorId, requestedByUserId) {
         aprovacao_compra_reprovada_por=NULL,
         aprovacao_compra_reprovacao_motivo=NULL,
         aprovacao_valor_cotado_centavos=?,
+        aprovacao_cotacao_assinatura=?,
         aprovacao_manual_registrada_por=NULL,
         aprovacao_evidencia_anexo_id=NULL,
         updated_at=datetime('now')
       WHERE id=?
-    `).run(Number(director.id), APPROVAL.PENDING, Number(requestedByUserId || 0) || null, quote.totalCentavos, Number(solicitacaoId));
+    `).run(Number(director.id), APPROVAL.PENDING, Number(requestedByUserId || 0) || null, quote.totalCentavos, quote.signature, Number(solicitacaoId));
     recordHistory({
       solicitacaoId,
       acao: 'ENVIADA_PARA_APROVACAO',
       diretorUserId: director.id,
       executadoPorUserId: requestedByUserId,
       valorCotadoCentavos: quote.totalCentavos,
+      quoteSignature: quote.signature,
       metodo: 'SISTEMA',
       observacao: `Cotação enviada para aprovação de ${director.name || 'Diretoria'}.`,
     });
@@ -277,6 +342,7 @@ function approve(solicitacaoId, sessionUser, observation = '') {
       diretorUserId: sessionUser.id,
       executadoPorUserId: sessionUser.id,
       valorCotadoCentavos: context.quote.totalCentavos,
+      quoteSignature: context.quote.signature,
       metodo: 'SISTEMA',
       observacao: String(observation || '').trim() || 'Compra aprovada digitalmente pela Diretoria.',
     });
@@ -310,6 +376,7 @@ function reject(solicitacaoId, sessionUser, reason) {
       diretorUserId: sessionUser.id,
       executadoPorUserId: sessionUser.id,
       valorCotadoCentavos: context.quote.totalCentavos,
+      quoteSignature: context.quote.signature,
       metodo: 'SISTEMA',
       observacao: motivo,
     });
@@ -342,6 +409,7 @@ function registerManual(solicitacaoId, { directorId, evidenceAttachmentId, obser
         aprovacao_compra_reprovada_por=NULL,
         aprovacao_compra_reprovacao_motivo=NULL,
         aprovacao_valor_cotado_centavos=?,
+        aprovacao_cotacao_assinatura=?,
         aprovacao_manual_registrada_por=?,
         aprovacao_evidencia_anexo_id=?,
         updated_at=datetime('now')
@@ -349,7 +417,7 @@ function registerManual(solicitacaoId, { directorId, evidenceAttachmentId, obser
     `).run(
       Number(director.id), APPROVAL.APPROVED, Number(recordedByUserId || 0) || null, Number(director.id),
       String(observation || '').trim() || 'Aprovação manual registrada a partir de documento assinado.',
-      quote.totalCentavos, Number(recordedByUserId || 0) || null, evidenceId, Number(solicitacaoId),
+      quote.totalCentavos, quote.signature, Number(recordedByUserId || 0) || null, evidenceId, Number(solicitacaoId),
     );
     recordHistory({
       solicitacaoId,
@@ -357,6 +425,7 @@ function registerManual(solicitacaoId, { directorId, evidenceAttachmentId, obser
       diretorUserId: director.id,
       executadoPorUserId: recordedByUserId,
       valorCotadoCentavos: quote.totalCentavos,
+      quoteSignature: quote.signature,
       metodo: 'MANUAL',
       observacao: String(observation || '').trim() || 'Documento assinado pela Diretoria registrado no sistema.',
       evidenciaAnexoId: evidenceId,
@@ -376,8 +445,9 @@ function invalidateIfQuoteChanged(solicitacaoId, userId = null) {
     diretorUserId: context.diretor_aprovador_user_id,
     executadoPorUserId: userId,
     valorCotadoCentavos: context.quote.totalCentavos,
+    quoteSignature: context.quote.signature,
     metodo: context.aprovacao_compra_metodo || 'SISTEMA',
-    observacao: 'Os valores/itens da cotação mudaram após o envio ou aprovação. Uma nova aprovação é obrigatória.',
+    observacao: 'Os valores, fornecedores, itens ou ajustes da cotação mudaram após o envio/aprovação. Uma nova aprovação é obrigatória.',
   });
   return getContext(solicitacaoId);
 }
@@ -398,6 +468,17 @@ function assertCompraAprovada(solicitacaoId) {
   return context;
 }
 
+function assertPayloadMatchesApprovedQuote(solicitacaoId, payload = {}) {
+  const context = assertCompraAprovada(solicitacaoId);
+  const prospective = getProspectiveQuoteSnapshot(solicitacaoId, payload);
+  if (!prospective.ready || prospective.signature !== String(context.aprovacao_cotacao_assinatura || '')) {
+    const error = new Error('Os dados enviados para compra diferem da cotação aprovada pela Diretoria. Salve a nova cotação e envie novamente para aprovação.');
+    error.code = 'COMPRA_DIVERGE_DA_COTACAO_APROVADA';
+    throw error;
+  }
+  return context;
+}
+
 function canCurrentDirectorDecide(context, sessionUser) {
   return Boolean(context)
     && context.approvalStatus === APPROVAL.PENDING
@@ -410,6 +491,7 @@ module.exports = {
   APPROVAL,
   listDirectors,
   getQuoteSnapshot,
+  getProspectiveQuoteSnapshot,
   getContext,
   getHistory,
   listManualEvidence,
@@ -419,6 +501,7 @@ module.exports = {
   registerManual,
   invalidateIfQuoteChanged,
   assertCompraAprovada,
+  assertPayloadMatchesApprovedQuote,
   canCurrentDirectorDecide,
   isDirector,
 };
