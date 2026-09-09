@@ -1,5 +1,6 @@
 const comprasService = require('./compras.service');
 const flowService = require('./compras.itens-consenso.service');
+const approvalService = require('./compras.aprovacao.service');
 
 function detalhe(req, res) {
   try {
@@ -9,12 +10,16 @@ function detalhe(req, res) {
     const sol = flowService.enrichSolicitacaoDetalhe(base);
     let historicoExclusoes = [];
     try { historicoExclusoes = flowService.getHistoricoExclusoes(id); } catch (_error) {}
+    let aprovacao = null;
+    try { aprovacao = approvalService.getContext(id); } catch (_error) {}
     return res.render('compras/solicitacoes/show', {
       title: `Compras ${sol.numero}`,
       activeMenu: 'compras',
       sol,
       fornecedores: comprasService.listFornecedoresAtivos(),
       historicoExclusoes,
+      aprovacao,
+      diretores: approvalService.listDirectors(),
       selectedSupplierId: Number(req.query?.fornecedor_selecionado) || null,
       selectedItemId: Number(req.query?.item_id) || null,
     });
