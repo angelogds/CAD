@@ -2,6 +2,7 @@
 <link rel="stylesheet" href="/css/acompanhamento-compras.css?v=20260909-tabela-gerencial">
 <link rel="stylesheet" href="/css/acompanhamento-compras-gerencial.css?v=20260909-v1">
 <link rel="stylesheet" href="/css/aprovacao-itens-progressiva.css?v=20260909-v1">
+<link rel="stylesheet" href="/css/acompanhamento-compras-diretoria.css?v=20260909-v2">
 <%
 const d=detalheCompra||{};
 const itens=Array.isArray(d.itens)?d.itens:[];
@@ -12,10 +13,10 @@ const money=c=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).
 const statusLabel=value=>String(value||'-').replaceAll('_',' ');
 const approvalLabel=value=>({AGUARDANDO_APROVACAO:'AGUARDANDO APROVAÇÃO',APROVADA:'APROVADO',COMPRADO:'COMPRADO',SEM_COTACAO:'SEM COTAÇÃO',CANCELADO:'CANCELADO'}[String(value||'').toUpperCase()]||statusLabel(value));
 %>
-<div class="watch-detail">
-  <header class="detail-head">
+<div class="watch-detail executive-buy-watch">
+  <header class="detail-head executive-watch-head">
     <div>
-      <span class="readonly">CONSULTA GERENCIAL · SOMENTE LEITURA</span>
+      <span class="readonly executive-badge">ANÁLISE GERENCIAL · DIRETORIA / ADMIN</span>
       <h1><%=d.numero||('Solicitação #'+d.id)%></h1>
       <p><%=d.titulo||'Solicitação de material'%> · Solicitante: <strong><%=d.solicitante_nome||'-'%></strong> · Setor: <strong><%=d.setor_origem||'-'%></strong></p>
     </div>
@@ -25,7 +26,7 @@ const approvalLabel=value=>({AGUARDANDO_APROVACAO:'AGUARDANDO APROVAÇÃO',APROV
     </div>
   </header>
 
-  <div class="readonly-note">Compras continua responsável por cotação, fornecedor e valores. ADMIN/DIRETORIA apenas visualizam e liberam digitalmente os itens que já possuem cotação válida.</div>
+  <div class="readonly-note">Compras continua responsável por cotação, fornecedor e valores. ADMIN/DIRETORIA consultam o contexto e liberam digitalmente somente os itens que já possuem cotação válida.</div>
 
   <section class="detail-summary compact-summary">
     <div><small>Status</small><strong><%=statusLabel(d.status)%></strong></div>

@@ -31,10 +31,10 @@ test('service mantém prioridades e dados gerenciais por solicitação', () => {
 });
 
 test('acompanhamento principal usa tabela larga e destaca solicitações com itens para aprovar', () => {
-  assert.match(view, /<table class="management-table">/);
-  assert.match(view, /SOLICITAÇÕES E ANDAMENTO/);
+  assert.match(view, /management-table executive-management-table/);
+  assert.match(view, /FILA DE ACOMPANHAMENTO/);
   assert.match(view, /OS \/ Equipamento/);
-  assert.match(view, /COTAÇÕES AGUARDANDO LIBERAÇÃO/);
+  assert.match(view, /AGUARDANDO APROVAÇÃO/);
   assert.match(view, /PARA APROVAR/);
   assert.match(view, /Abrir e aprovar/);
   assert.match(view, /management-row-needs-approval/);
@@ -50,7 +50,7 @@ test('controller enriquece cada solicitação com aprovação progressiva por it
 });
 
 test('detalhe gerencial mostra apenas dados essenciais para decisão', () => {
-  assert.match(detailView, /CONSULTA GERENCIAL · SOMENTE LEITURA/);
+  assert.match(detailView, /ANÁLISE GERENCIAL · DIRETORIA \/ ADMIN/);
   assert.match(detailView, /ITENS PARA ACOMPANHAMENTO E APROVAÇÃO/);
   assert.match(detailView, /<th>Material<\/th>/);
   assert.match(detailView, /<th>Qtd\.<\/th>/);

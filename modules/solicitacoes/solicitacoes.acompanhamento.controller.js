@@ -1,7 +1,42 @@
 const acompanhamentoService = require('../compras/acompanhamento.service');
 const itemApprovalService = require('../compras/compras.aprovacao-itens.service');
 
-function enrichDashboardWithApprovals(painel) {
+const HIGHLIGHTS = new Set(['aprovacao', 'cotacao', 'compra', 'recebimento', 'atrasadas']);
+
+function nextAction(row) {
+  if (row.concluidaFluxo) return 'CONCLUIDA';
+  const approvalItems = Array.isArray(row.aprovacaoItens?.itens) ? row.aprovacaoItens.itens : [];
+  const semCotacaoReal = approvalItems.filter((item) => String(item.approvalState || '').toUpperCase() === 'SEM_COTACAO').length;
+  if (Number(row.aprovacaoItens?.pendentesCount || 0) > 0) return 'AGUARDANDO_APROVACAO';
+  if (semCotacaoReal > 0 || (!approvalItems.length && Number(row.semCotacao || 0) > 0)) return 'COTACAO_NECESSARIA';
+  if (Number(row.aprovacaoItens?.aprovadosCount || 0) > 0) return 'EFETIVAR_COMPRA';
+  if (Number(row.comprados || 0) > Number(row.recebidos || 0)) {
+    return Number(row.recebidos || 0) > 0 ? 'RECEBIMENTO_PARCIAL' : 'AGUARDANDO_RECEBIMENTO';
+  }
+  return 'EM_ACOMPANHAMENTO';
+}
+
+function executiveRank(row) {
+  if (row.proximaAcao === 'AGUARDANDO_APROVACAO') return 0;
+  if (row.priorityGroup === 'critical') return 1;
+  if (row.atrasada) return 2;
+  if (row.proximaAcao === 'COTACAO_NECESSARIA') return 3;
+  if (row.proximaAcao === 'EFETIVAR_COMPRA') return 4;
+  if (['AGUARDANDO_RECEBIMENTO', 'RECEBIMENTO_PARCIAL'].includes(row.proximaAcao)) return 5;
+  return 6;
+}
+
+function matchesHighlight(row, highlight) {
+  if (!highlight) return true;
+  if (highlight === 'aprovacao') return row.proximaAcao === 'AGUARDANDO_APROVACAO';
+  if (highlight === 'cotacao') return row.proximaAcao === 'COTACAO_NECESSARIA';
+  if (highlight === 'compra') return row.proximaAcao === 'EFETIVAR_COMPRA';
+  if (highlight === 'recebimento') return ['AGUARDANDO_RECEBIMENTO', 'RECEBIMENTO_PARCIAL'].includes(row.proximaAcao);
+  if (highlight === 'atrasadas') return Boolean(row.atrasada);
+  return true;
+}
+
+function enrichDashboardWithApprovals(painel, query = {}) {
   const rows = Array.isArray(painel?.solicitacoes) ? painel.solicitacoes : [];
   let itensPendentes = 0;
   let valorPendente = 0;
@@ -16,15 +51,42 @@ function enrichDashboardWithApprovals(painel) {
     if (row.aprovacaoItens.temPendencias) solicitacoesPendentes += 1;
     itensPendentes += Number(row.aprovacaoItens.pendentesCount || 0);
     valorPendente += Number(row.aprovacaoItens.pendentesValorCentavos || 0);
+    row.proximaAcao = nextAction(row);
   });
 
   painel.aprovacaoItens = { solicitacoesPendentes, itensPendentes, valorPendente };
+  painel.executivo = {
+    semCotacaoItens: rows.reduce((sum, row) => {
+      const itens = Array.isArray(row.aprovacaoItens?.itens) ? row.aprovacaoItens.itens : [];
+      if (!itens.length) return sum + Number(row.semCotacao || 0);
+      return sum + itens.filter((item) => String(item.approvalState || '').toUpperCase() === 'SEM_COTACAO').length;
+    }, 0),
+    aprovadasAguardandoCompra: rows.filter((row) => row.proximaAcao === 'EFETIVAR_COMPRA').length,
+    aguardandoRecebimento: rows.filter((row) => ['AGUARDANDO_RECEBIMENTO', 'RECEBIMENTO_PARCIAL'].includes(row.proximaAcao)).length,
+    atrasadas: rows.filter((row) => row.atrasada).length,
+    valorAguardandoAprovacao: valorPendente,
+    valorComprado: rows.reduce((sum, row) => sum + Number(row.comprometidoCentavos || 0), 0),
+    saldoReceber: rows.reduce((sum, row) => sum + Math.max(0, Number(row.comprometidoCentavos || 0) - Number(row.recebidoCentavos || 0)), 0),
+  };
+
+  const highlight = HIGHLIGHTS.has(String(query.destaque || '').toLowerCase()) ? String(query.destaque).toLowerCase() : '';
+  painel.destaque = highlight;
+
+  if (painel.filters?.visao === 'historico') {
+    rows.sort((a, b) => String(b.dataReferencia || '').localeCompare(String(a.dataReferencia || '')) || Number(b.id) - Number(a.id));
+  } else {
+    rows.sort((a, b) => executiveRank(a) - executiveRank(b)
+      || String(b.created_at || '').localeCompare(String(a.created_at || ''))
+      || Number(b.id) - Number(a.id));
+  }
+
+  painel.solicitacoes = rows.filter((row) => matchesHighlight(row, highlight));
   return painel;
 }
 
 function lista(req, res) {
   try {
-    const painel = enrichDashboardWithApprovals(acompanhamentoService.getDashboard(req.query));
+    const painel = enrichDashboardWithApprovals(acompanhamentoService.getDashboard(req.query), req.query);
     return res.render('solicitacoes/acompanhamento-compras', {
       title: 'Acompanhamento de Compras',
       activeMenu: 'solicitacoes',
@@ -92,4 +154,4 @@ function aprovarItensCotados(req, res) {
   return res.redirect(`/solicitacoes/acompanhamento-compras/${id}`);
 }
 
-module.exports = { lista, detalhe, aprovarItensCotados };
+module.exports = { lista, detalhe, aprovarItensCotados, enrichDashboardWithApprovals, nextAction };

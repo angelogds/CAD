@@ -5,6 +5,8 @@ const ctrl = require("./solicitacoes.controller");
 const flowCtrl = require("./solicitacoes.itens-consenso.controller");
 const acompanhamentoCtrl = require("./solicitacoes.acompanhamento.controller");
 
+const ACOMPANHAMENTO_COMPRAS_EXECUTIVO = [ROLE.ADMIN, ROLE.DIRETORIA];
+
 function requireAdminDeleteSolicitacao(req, res, next) {
   if (normalizeRole(req.session?.user?.role || req.session?.user?.perfil) === "ADMIN") return next();
   req.flash("error", "Apenas administradores podem excluir solicitações.");
@@ -13,9 +15,9 @@ function requireAdminDeleteSolicitacao(req, res, next) {
 
 router.get("/minhas", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.minhas);
 router.get("/nova", requireLogin, requireRole(ACCESS.solicitacoes_create), ctrl.nova);
-router.get("/acompanhamento-compras", requireLogin, requireRole(ACCESS.compras_read), acompanhamentoCtrl.lista);
-router.get("/acompanhamento-compras/:id", requireLogin, requireRole(ACCESS.compras_read), acompanhamentoCtrl.detalhe);
-router.post("/acompanhamento-compras/:id/aprovar-itens-cotados", requireLogin, requireRole([ROLE.ADMIN, ROLE.DIRETORIA]), acompanhamentoCtrl.aprovarItensCotados);
+router.get("/acompanhamento-compras", requireLogin, requireRole(ACOMPANHAMENTO_COMPRAS_EXECUTIVO), acompanhamentoCtrl.lista);
+router.get("/acompanhamento-compras/:id", requireLogin, requireRole(ACOMPANHAMENTO_COMPRAS_EXECUTIVO), acompanhamentoCtrl.detalhe);
+router.post("/acompanhamento-compras/:id/aprovar-itens-cotados", requireLogin, requireRole(ACOMPANHAMENTO_COMPRAS_EXECUTIVO), acompanhamentoCtrl.aprovarItensCotados);
 router.post("/", requireLogin, requireRole(ACCESS.solicitacoes_create), ctrl.criar);
 router.get("/:id/pdf", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.pdf);
 router.post("/:id/excluir", requireLogin, requireAdminDeleteSolicitacao, requireRole(ACCESS.solicitacoes_delete), ctrl.excluir);
