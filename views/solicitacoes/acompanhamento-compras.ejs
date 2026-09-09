@@ -5,6 +5,7 @@ const p=painel;
 const money=c=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((c||0)/100);
 const round=n=>Math.round(n||0);
 const statusLabel=value=>String(value||'-').replaceAll('_',' ');
+const custosEquipamentos=Array.isArray(p.custosMensaisEquipamentos)?p.custosMensaisEquipamentos:[];
 %>
 <div class="buy-watch">
   <header class="watch-head">
@@ -95,7 +96,7 @@ const statusLabel=value=>String(value||'-').replaceAll('_',' ');
 
   <div class="bottom-grid">
     <section class="watch-section"><h2>VALORES POR ETAPA</h2><dl><dt>Cotado</dt><dd><%= money(p.valores.cotado) %></dd><dt>Comprado / comprometido</dt><dd><%= money(p.valores.comprometido) %></dd><dt>Recebido / realizado</dt><dd><%= money(p.valores.recebido) %></dd><dt>Saldo a receber</dt><dd><%= money(p.valores.saldo) %></dd></dl></section>
-    <section class="watch-section"><h2>CUSTO COTADO POR EQUIPAMENTO</h2><% const max=Math.max(1,...p.equipamentos.map(x=>x.valor)); p.equipamentos.slice(0,8).forEach(x=>{ %><div class="equipment"><span><%= x.nome %></span><i><em style="width:<%= x.valor/max*100 %>%"></em></i><b><%= money(x.valor) %></b></div><% }) %></section>
+    <section class="watch-section"><h2>CUSTO COMPRADO NO MÊS POR EQUIPAMENTO</h2><% if(!custosEquipamentos.length){ %><div class="watch-empty">Nenhuma compra vinculada a equipamento neste mês.</div><% } else { const max=Math.max(1,...custosEquipamentos.map(x=>Number(x.compradoCentavos||0))); custosEquipamentos.slice(0,8).forEach(x=>{ %><div class="equipment"><span><%= x.equipamento_nome||'Sem equipamento vinculado' %></span><i><em style="width:<%= Number(x.compradoCentavos||0)/max*100 %>%"></em></i><b><%= money(x.compradoCentavos) %></b></div><% }) } %></section>
     <section class="watch-section"><h2>RESUMO DAS PENDÊNCIAS</h2><div class="pending"><span><b><%= p.pendencias.semCotacao %></b><small>itens aguardando cotação</small></span><span><b><%= p.pendencias.atrasadas %></b><small>solicitações atrasadas</small></span><span><b><%= p.pendencias.vencemHoje %></b><small>vencem hoje</small></span><span><b><%= p.pendencias.semOs %></b><small>sem OS vinculada</small></span></div></section>
   </div>
 
