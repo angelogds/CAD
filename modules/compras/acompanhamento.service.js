@@ -32,7 +32,11 @@ function priorityGroup(value) {
 
 function buildFilters(query = {}) {
   const prioridade = String(query.prioridade || '').trim().toLowerCase();
+  const visao = ['andamento', 'historico', 'todos'].includes(String(query.visao || '').toLowerCase())
+    ? String(query.visao).toLowerCase()
+    : 'andamento';
   return {
+    visao,
     periodo: ['7','30','90','ano','todos','personalizado'].includes(query.periodo) ? query.periodo : 'todos',
     inicio: String(query.inicio || ''),
     fim: String(query.fim || ''),
@@ -41,6 +45,55 @@ function buildFilters(query = {}) {
     status: String(query.status || ''),
     prioridade: PRIORITY_GROUPS.some((group) => group.key === prioridade) ? prioridade : '',
   };
+}
+
+function getTodayBahia() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bahia' }).format(new Date());
+}
+
+function minusDaysIso(today, days) {
+  const date = new Date(`${today}T12:00:00-03:00`);
+  date.setUTCDate(date.getUTCDate() - Number(days || 0));
+  return date.toISOString().slice(0, 10);
+}
+
+function matchesPeriod(value, filters, today = getTodayBahia()) {
+  if (filters.periodo === 'todos') return true;
+  const ref = String(value || '').slice(0, 10);
+  if (!ref) return false;
+  if (['7', '30', '90'].includes(filters.periodo)) return ref >= minusDaysIso(today, Number(filters.periodo));
+  if (filters.periodo === 'ano') return ref.slice(0, 4) === today.slice(0, 4);
+  if (filters.periodo === 'personalizado') {
+    if (filters.inicio && ref < filters.inicio) return false;
+    if (filters.fim && ref > filters.fim) return false;
+    return true;
+  }
+  return true;
+}
+
+function isConcluida(solicitacao) {
+  const status = normalizeToken(solicitacao?.status);
+  if (TERMINAIS.has(status)) return true;
+  const total = Number(solicitacao?.total || 0);
+  return total > 0
+    && Number(solicitacao?.cotados || 0) >= total
+    && Number(solicitacao?.comprados || 0) >= total
+    && Number(solicitacao?.recebidos || 0) >= total;
+}
+
+function completionDateExpression(solCols) {
+  const candidates = [
+    'fechada_em',
+    'recebida_total_em',
+    'entregue_em',
+    'recebida_em',
+    'finalizada_em',
+    'updated_at',
+    'created_at',
+  ].filter((column) => solCols.has(column));
+  if (!candidates.length) return 'NULL';
+  if (candidates.length === 1) return `s.${candidates[0]}`;
+  return `COALESCE(${candidates.map((column) => `s.${column}`).join(',')})`;
 }
 
 function getMonthlyEquipmentCosts() {
@@ -109,19 +162,6 @@ function getDashboard(query = {}) {
   if (filters.responsavel) { where.push('s.compras_user_id=?'); params.push(Number(filters.responsavel)); }
   if (filters.status) { where.push('s.status=?'); params.push(filters.status); }
 
-  let periodClause = '';
-  if (['7','30','90'].includes(filters.periodo)) periodClause = `date(s.created_at)>=date('now','-${Number(filters.periodo)} days')`;
-  if (filters.periodo === 'ano') periodClause = "strftime('%Y',s.created_at)=strftime('%Y','now')";
-  if (filters.periodo === 'personalizado' && filters.inicio) {
-    periodClause = 'date(s.created_at)>=date(?)';
-    params.push(filters.inicio);
-  }
-  if (filters.periodo === 'personalizado' && filters.fim) {
-    periodClause += `${periodClause ? ' AND ' : ''}date(s.created_at)<=date(?)`;
-    params.push(filters.fim);
-  }
-  if (periodClause) where.push(`(${periodClause})`);
-
   const cancelled = ic.has('status_compra') ? "UPPER(COALESCE(si.status_compra,''))<>'CANCELADO'" : '1=1';
   const qtd = ic.has('qtd_solicitada') ? 'COALESCE(si.qtd_solicitada,0)' : 'COALESCE(si.quantidade,0)';
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -129,10 +169,12 @@ function getDashboard(query = {}) {
   const approvalDirector = sc.has('diretor_aprovador_user_id') ? 's.diretor_aprovador_user_id' : 'NULL';
   const approvalJoin = sc.has('diretor_aprovador_user_id') ? 'LEFT JOIN users d ON d.id=s.diretor_aprovador_user_id' : '';
   const approvalDirectorName = sc.has('diretor_aprovador_user_id') ? 'd.name' : 'NULL';
+  const completionDate = completionDateExpression(sc);
 
   const rows = db.prepare(`SELECT s.id,s.numero,s.titulo,s.status,s.os_id,s.setor_origem,s.prioridade,s.previsao_entrega,s.created_at,s.updated_at,
     e.nome equipamento_nome,u.name responsavel_nome, ${approvalStatus} aprovacao_compra_status,
     ${approvalDirector} diretor_aprovador_user_id, ${approvalDirectorName} diretor_aprovador_nome,
+    ${completionDate} data_conclusao_referencia,
     si.id item_id,${qtd} qtd_solicitada,
     ${ic.has('status_cotacao') ? 'si.status_cotacao' : "'PENDENTE'"} status_cotacao,
     ${ic.has('status_compra') ? 'si.status_compra' : "'PENDENTE'"} status_compra,
@@ -153,8 +195,8 @@ function getDashboard(query = {}) {
     if (row.item_id) map.get(row.id).itens.push(row);
   }
 
-  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bahia' }).format(new Date());
-  let solicitacoes = [...map.values()].map((s) => {
+  const hoje = getTodayBahia();
+  let base = [...map.values()].map((s) => {
     const total = s.itens.length;
     const cotados = s.itens.filter((i) => normalizeToken(i.status_cotacao) === 'COTADO').length;
     const comprados = s.itens.filter((i) => normalizeToken(i.status_compra) === 'COMPRADO').length;
@@ -164,12 +206,12 @@ function getDashboard(query = {}) {
     const recebidoCentavos = s.itens.reduce((a, i) => a + Math.round(Number(i.qtd_recebida) * Number(i.unitario)), 0);
     const atrasada = !!s.previsao_entrega && s.previsao_entrega.slice(0, 10) < hoje && !TERMINAIS.has(normalizeToken(s.status));
     const group = priorityGroup(s.prioridade);
-    return {
+    const calculated = {
       ...s,
       priorityGroup: group,
       total,
       cotados,
-      semCotacao: total - cotados,
+      semCotacao: Math.max(0, total - cotados),
       comprados,
       recebidos,
       percentualCotado: pct(cotados, total),
@@ -182,12 +224,26 @@ function getDashboard(query = {}) {
       atrasada,
       venceHoje: !!s.previsao_entrega && s.previsao_entrega.slice(0, 10) === hoje,
     };
+    calculated.concluidaFluxo = isConcluida(calculated);
+    calculated.dataReferencia = calculated.concluidaFluxo
+      ? (calculated.data_conclusao_referencia || calculated.updated_at || calculated.created_at)
+      : calculated.created_at;
+    return calculated;
   });
 
-  if (filters.prioridade) solicitacoes = solicitacoes.filter((s) => s.priorityGroup === filters.prioridade);
+  if (filters.prioridade) base = base.filter((s) => s.priorityGroup === filters.prioridade);
+
+  const andamento = base.filter((s) => !s.concluidaFluxo && matchesPeriod(s.created_at, filters, hoje));
+  const historico = base.filter((s) => s.concluidaFluxo && matchesPeriod(s.dataReferencia, filters, hoje));
+  const todos = [...andamento, ...historico];
+  let solicitacoes = filters.visao === 'historico' ? historico : (filters.visao === 'todos' ? todos : andamento);
 
   const rank = new Map(PRIORITY_GROUPS.map((group, index) => [group.key, index]));
-  solicitacoes.sort((a, b) => (rank.get(a.priorityGroup) - rank.get(b.priorityGroup)) || String(b.created_at || '').localeCompare(String(a.created_at || '')) || Number(b.id) - Number(a.id));
+  if (filters.visao === 'historico') {
+    solicitacoes.sort((a, b) => String(b.dataReferencia || '').localeCompare(String(a.dataReferencia || '')) || Number(b.id) - Number(a.id));
+  } else {
+    solicitacoes.sort((a, b) => (rank.get(a.priorityGroup) - rank.get(b.priorityGroup)) || String(b.created_at || '').localeCompare(String(a.created_at || '')) || Number(b.id) - Number(a.id));
+  }
 
   const sum = (key, list = solicitacoes) => list.reduce((a, s) => a + Number(s[key] || 0), 0);
   const total = sum('total');
@@ -200,7 +256,7 @@ function getDashboard(query = {}) {
     recebidos: sum('recebidos'),
     valorCotadoCentavos: sum('cotadoCentavos'),
   };
-  const concluida = solicitacoes.filter((s) => TERMINAIS.has(normalizeToken(s.status)) && normalizeToken(s.status) !== 'CANCELADA').length;
+  const concluida = solicitacoes.filter((s) => s.concluidaFluxo && normalizeToken(s.status) !== 'CANCELADA').length;
   const fluxo = {
     cotacao: pct(indicadores.cotados, total),
     compra: pct(indicadores.comprados, total),
@@ -228,6 +284,11 @@ function getDashboard(query = {}) {
   return {
     filters,
     solicitacoes,
+    totaisVisao: {
+      andamento: andamento.length,
+      historico: historico.length,
+      todos: todos.length,
+    },
     priorityOverview,
     priorityGroups,
     indicadores,
@@ -296,4 +357,14 @@ function getDetail(id) {
   };
 }
 
-module.exports = { getDashboard, getDetail, getMonthlyEquipmentCosts, buildFilters, pct, priorityGroup, PRIORITY_GROUPS };
+module.exports = {
+  getDashboard,
+  getDetail,
+  getMonthlyEquipmentCosts,
+  buildFilters,
+  pct,
+  priorityGroup,
+  PRIORITY_GROUPS,
+  matchesPeriod,
+  isConcluida,
+};
