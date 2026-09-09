@@ -7,10 +7,19 @@ const receiptShortages=activeItems.map(it=>{const expected=Number(it.qtd_comprad
 const pendingDeletionCount = activeItems.filter(it=>String(it.exclusao_status||'').toUpperCase()==='PENDENTE').length;
 const blockedExtraStatuses = ['RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SOLICITANTE','FECHADA','CANCELADA'];
 const canAddExtra = !blockedExtraStatuses.includes(String(sol.status||'').toUpperCase());
+const approvalCtx = aprovacao || null;
+const approvalStatus = String(approvalCtx?.approvalStatus || 'NAO_SOLICITADA').toUpperCase();
+const approvalLabel = ({PENDENTE:'AGUARDANDO DIRETORIA',APROVADA:'APROVADA',REPROVADA:'REPROVADA',EXPIRADA:'REVALIDAR COTAÇÃO',NAO_SOLICITADA:'NÃO SOLICITADA'}[approvalStatus] || approvalStatus.replaceAll('_',' '));
+const approvalCss = approvalStatus==='APROVADA'?'is-approved':approvalStatus==='PENDENTE'?'is-pending':approvalStatus==='REPROVADA'?'is-rejected':approvalStatus==='EXPIRADA'?'is-expired':'';
+const approvalEvidence = Array.isArray(approvalCtx?.evidenciasManuais) ? approvalCtx.evidenciasManuais : [];
+const approvalHistory = Array.isArray(approvalCtx?.historico) ? approvalCtx.historico : [];
+const quoteReady = Boolean(approvalCtx?.quote?.ready);
+const quoteValue = Number(approvalCtx?.quote?.totalCentavos || sol.resumoItens?.totalCentavos || 0);
 %>
 <link rel="stylesheet" href="/css/compras-recebimento-alertas.css?v=20260902-v1">
 <link rel="stylesheet" href="/css/compras-painel.css?v=20260903-consenso-v1">
 <link rel="stylesheet" href="/css/compras-itens-consenso.css?v=20260903-v1">
+<link rel="stylesheet" href="/css/compras-aprovacao-diretoria.css?v=20260909-v1">
 
 <div class="page-head quote-page-head"><div><h1><%= sol.numero || ('Solicitação #' + sol.id) %></h1><p class="muted">Solicitante: <%= sol.solicitante_nome || '-' %> • Setor: <%= sol.setor_origem || '-' %> • Status: <strong><%= String(sol.status).replaceAll('_',' ') %></strong></p></div><div class="quote-actions"><a class="ui-btn ui-btn--outline" href="/compras/solicitacoes">Voltar</a><a class="ui-btn" href="/compras/solicitacoes/<%= sol.id %>/pdf">Baixar cópia do PDF</a></div></div>
 <% if (sol.os_id) { %><div class="card linked-os"><div><strong>🔗 Vinculada à OS <%= sol.os_id %><%= sol.equipamento_nome ? (' — ' + sol.equipamento_nome) : '' %></strong></div><div class="linked-os-actions"><a class="ui-btn ui-btn--table" href="/chat-os/<%= sol.os_id %>">Abrir conversa da OS</a><a class="ui-btn ui-btn--outline ui-btn--table" href="/os/<%= sol.os_id %>">Abrir OS</a></div></div><% } %>
@@ -30,6 +39,54 @@ const canAddExtra = !blockedExtraStatuses.includes(String(sol.status||'').toUppe
 <% } %>
 
 <div class="card progress-card"><div class="section-title">ANDAMENTO DA COTAÇÃO</div><div class="progress-track" role="progressbar" aria-label="Itens cotados" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<%= sol.resumoItens.progresso %>"><span style="width:<%= sol.resumoItens.progresso %>%"><b><%= sol.resumoItens.progresso %>%</b></span></div><div class="progress-stats"><span><i class="progress-icon success">✓</i><strong><%= sol.resumoItens.cotados %> de <%= sol.resumoItens.total %> itens ativos cotados</strong></span><span><i class="progress-icon warning">□</i><strong><%= sol.resumoItens.comprados %> de <%= sol.resumoItens.total %> itens ativos comprados</strong></span><span><i class="progress-icon success">$</i><strong>Total ativo da solicitação: <b data-total-geral><%= money(sol.resumoItens.totalCentavos) %></b></strong></span></div></div>
+
+<section class="card purchase-approval-card" id="aprovacao-diretoria">
+  <div class="purchase-approval-head">
+    <div><span class="purchase-approval-kicker">LIBERAÇÃO DE COMPRA</span><h2>Aprovação da Diretoria</h2><p>Depois da cotação completa, selecione o diretor responsável. A compra só é liberada após o visto registrado no sistema ou por documento assinado.</p></div>
+    <span class="purchase-approval-status <%=approvalCss%>"><%=approvalLabel%></span>
+  </div>
+  <div class="purchase-approval-grid">
+    <div class="purchase-approval-summary">
+      <span><small>Diretor responsável</small><strong><%=approvalCtx?.diretor_aprovador_nome||'Ainda não definido'%></strong></span>
+      <span><small>Valor da cotação</small><strong><%=money(quoteValue)%></strong></span>
+      <span><small>Método</small><strong><%=approvalCtx?.aprovacao_compra_metodo||'-'%></strong></span>
+      <span><small>Solicitada em</small><strong><%=approvalCtx?.aprovacao_compra_solicitada_em?fmtBR(approvalCtx.aprovacao_compra_solicitada_em):'-'%></strong></span>
+      <span><small>Decisão em</small><strong><%=approvalCtx?.aprovacao_compra_em?fmtBR(approvalCtx.aprovacao_compra_em):(approvalCtx?.aprovacao_compra_reprovada_em?fmtBR(approvalCtx.aprovacao_compra_reprovada_em):'-')%></strong></span>
+      <span><small>Composição da cotação</small><strong><%=approvalCtx?.stale?'Alterada — nova aprovação obrigatória':'Atual'%></strong></span>
+    </div>
+    <div class="purchase-approval-actions">
+      <% if(approvalStatus==='APROVADA' && !approvalCtx?.stale){ %>
+        <div class="purchase-approval-message"><strong>Compra liberada.</strong><br>O setor de Compras pode efetivar os itens dentro da composição aprovada.</div>
+      <% } else if(approvalStatus==='PENDENTE' && !approvalCtx?.stale){ %>
+        <div class="purchase-approval-message is-warning"><strong>Aguardando <%=approvalCtx?.diretor_aprovador_nome||'Diretoria'%>.</strong><br>Enquanto não houver decisão, a efetivação da compra permanece bloqueada.</div>
+      <% } else if(quoteReady && Array.isArray(diretores) && diretores.length){ %>
+        <form method="POST" action="/compras/solicitacoes/<%=sol.id%>/aprovacao/enviar">
+          <label><span class="label">Diretor responsável</span><select class="input" name="diretor_user_id" required><option value="">Selecionar diretor</option><% diretores.forEach(d=>{ %><option value="<%=d.id%>" <%=Number(approvalCtx?.diretor_aprovador_user_id)===Number(d.id)?'selected':''%>><%=d.name||('Diretor #'+d.id)%></option><% }) %></select></label>
+          <button class="ui-btn" type="submit">Enviar cotação para aprovação</button>
+        </form>
+      <% } else if(!quoteReady){ %>
+        <div class="purchase-approval-message is-warning">Finalize a cotação de todos os itens ativos, com fornecedor e valor, antes de enviar para a Diretoria.</div>
+      <% } else { %>
+        <div class="purchase-approval-message is-danger">Nenhum usuário ativo com perfil DIRETORIA foi encontrado para receber esta aprovação.</div>
+      <% } %>
+      <% if(approvalStatus==='REPROVADA' && approvalCtx?.aprovacao_compra_reprovacao_motivo){ %><div class="purchase-approval-message is-danger"><strong>Motivo:</strong> <%=approvalCtx.aprovacao_compra_reprovacao_motivo%></div><% } %>
+      <% if(approvalStatus==='EXPIRADA' || approvalCtx?.stale){ %><div class="purchase-approval-message is-warning">A cotação foi alterada depois do envio/visto anterior. Revise os dados e envie novamente para aprovação.</div><% } %>
+    </div>
+  </div>
+  <details class="purchase-manual-details">
+    <summary>Aprovação manual por documento assinado</summary>
+    <p class="purchase-approval-note">Anexe primeiro o documento assinado usando o tipo <strong>APROVAÇÃO DIRETORIA</strong>. Depois registre abaixo qual diretor assinou.</p>
+    <% if(approvalEvidence.length && Array.isArray(diretores) && diretores.length){ %>
+      <form class="purchase-manual-form" method="POST" action="/compras/solicitacoes/<%=sol.id%>/aprovacao/manual">
+        <label><span class="label">Diretor que assinou</span><select class="input" name="diretor_user_id" required><option value="">Selecionar diretor</option><% diretores.forEach(d=>{ %><option value="<%=d.id%>"><%=d.name||('Diretor #'+d.id)%></option><% }) %></select></label>
+        <label><span class="label">Documento de aprovação</span><select class="input" name="evidencia_anexo_id" required><option value="">Selecionar documento</option><% approvalEvidence.forEach(e=>{ %><option value="<%=e.id%>"><%=e.original_name||e.filename||('Anexo #'+e.id)%></option><% }) %></select></label>
+        <label class="span-all"><span class="label">Observação</span><textarea class="input" name="observacao" maxlength="1000" placeholder="Informação complementar sobre a liberação manual"></textarea></label>
+        <div class="span-all"><button class="ui-btn ui-btn--outline" type="submit" onclick="return confirm('Registrar este documento como liberação manual da Diretoria?')">Registrar visto manual</button></div>
+      </form>
+    <% } else { %><div class="purchase-approval-message is-warning">Nenhum documento do tipo APROVAÇÃO DIRETORIA está anexado a esta solicitação.</div><% } %>
+  </details>
+  <% if(approvalHistory.length){ %><details class="purchase-manual-details"><summary>Histórico da aprovação</summary><div class="purchase-approval-history"><% approvalHistory.slice(0,8).forEach(h=>{ %><div><strong><%=String(h.acao||'-').replaceAll('_',' ')%></strong><span><%=h.observacao||'-'%></span><small><%=h.created_at?fmtBR(h.created_at):'-'%></small></div><% }) %></div></details><% } %>
+</section>
 
 <form id="quote-form" method="POST" action="/compras/solicitacoes/<%= sol.id %>/painel-itens">
 <div class="card quote-items-card" id="itens-cotacao"><div class="section-title">COTAÇÃO, COMPRA E ACOMPANHAMENTO DO RECEBIMENTO</div><p class="muted purchase-receipt-rule">Compras registra cotação e compra. A quantidade recebida é somente leitura aqui e é alimentada exclusivamente pela conferência do Almoxarifado.</p>
@@ -76,7 +133,7 @@ const canAddExtra = !blockedExtraStatuses.includes(String(sol.status||'').toUppe
 <details class="card consensus-history"><summary>Histórico de pedidos de exclusão</summary><div class="consensus-history-list"><% historicoExclusoes.forEach(row=>{ %><div><span><strong><%=row.item_nome||'Item'%></strong><small><%=row.motivo%></small></span><span><b><%=row.status%></b><small>Solicitado por <%=row.solicitada_por_nome||'-'%><%=row.respondida_por_nome?' · respondido por '+row.respondida_por_nome:''%></small></span></div><% }) %></div></details>
 <% } %>
 
-<div class="card attachments"><div class="section-title">ANEXAR COTAÇÃO / NOTA FISCAL</div><form method="POST" action="/compras/solicitacoes/<%= sol.id %>/anexos" enctype="multipart/form-data" class="attachment-form"><label><span class="label">Tipo</span><select class="input" name="tipo"><option>COTACAO</option><option>PEDIDO_COMPRA</option><option>NOTA_FISCAL</option><option>COMPROVANTE</option><option>OUTRO</option></select></label><label><span class="label">Arquivo (PDF/JPG/PNG/WEBP)</span><input class="input" type="file" name="arquivo" accept="application/pdf,image/jpeg,image/png,image/webp" required></label><button class="ui-btn ui-btn--outline" type="submit">Enviar anexo</button></form><div class="table-wrap"><table class="table"><thead><tr><th>Tipo</th><th>Nome original</th><th>Data</th><th>Usuário</th><th>Ações</th></tr></thead><tbody><% if(!sol.anexos.length){ %><tr><td colspan="5" class="empty-state">Sem anexos.</td></tr><% } sol.anexos.forEach(a=>{ %><tr><td><%= a.tipo %></td><td><%= a.original_name || a.filename %></td><td><%= fmtBR(a.created_at || a.uploaded_at) %></td><td><%= a.uploaded_by_nome || '-' %></td><td><a class="ui-btn ui-btn--outline ui-btn--table" href="/compras/anexos/<%= a.id %>/download">Visualizar / baixar</a></td></tr><% }) %></tbody></table></div></div>
+<div class="card attachments"><div class="section-title">ANEXAR COTAÇÃO / NOTA FISCAL</div><form method="POST" action="/compras/solicitacoes/<%= sol.id %>/anexos" enctype="multipart/form-data" class="attachment-form"><label><span class="label">Tipo</span><select class="input" name="tipo"><option>COTACAO</option><option>APROVACAO_DIRETORIA</option><option>PEDIDO_COMPRA</option><option>NOTA_FISCAL</option><option>COMPROVANTE</option><option>OUTRO</option></select></label><label><span class="label">Arquivo (PDF/JPG/PNG/WEBP)</span><input class="input" type="file" name="arquivo" accept="application/pdf,image/jpeg,image/png,image/webp" required></label><button class="ui-btn ui-btn--outline" type="submit">Enviar anexo</button></form><div class="table-wrap"><table class="table"><thead><tr><th>Tipo</th><th>Nome original</th><th>Data</th><th>Usuário</th><th>Ações</th></tr></thead><tbody><% if(!sol.anexos.length){ %><tr><td colspan="5" class="empty-state">Sem anexos.</td></tr><% } sol.anexos.forEach(a=>{ %><tr><td><%= a.tipo %></td><td><%= a.original_name || a.filename %></td><td><%= fmtBR(a.created_at || a.uploaded_at) %></td><td><%= a.uploaded_by_nome || '-' %></td><td><a class="ui-btn ui-btn--outline ui-btn--table" href="/compras/anexos/<%= a.id %>/download">Visualizar / baixar</a></td></tr><% }) %></tbody></table></div></div>
 
 <dialog class="purchase-consensus-dialog" id="delete-item-dialog">
   <form method="POST" id="delete-item-form">
