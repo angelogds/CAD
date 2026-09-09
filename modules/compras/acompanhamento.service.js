@@ -1,4 +1,6 @@
 const db = require('../../database/db');
+const comprasService = require('./compras.service');
+const approvalService = require('./compras.aprovacao.service');
 
 const TERMINAIS = new Set(['FECHADA', 'CANCELADA', 'RECEBIDA_TOTAL', 'ENTREGUE_SOLICITANTE']);
 const PRIORITY_GROUPS = Object.freeze([
@@ -9,7 +11,8 @@ const PRIORITY_GROUPS = Object.freeze([
   { key: 'undefined', label: 'Sem prioridade definida', tokens: new Set() },
 ]);
 const pct = (n, d) => d > 0 ? (n / d) * 100 : 0;
-const columns = (table) => new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+const tableExists = (table) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table));
+const columns = (table) => tableExists(table) ? new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name)) : new Set();
 
 function normalizeToken(value) {
   return String(value || '')
@@ -40,9 +43,65 @@ function buildFilters(query = {}) {
   };
 }
 
+function getMonthlyEquipmentCosts() {
+  const itemCols = columns('solicitacao_itens');
+  const solCols = columns('solicitacoes');
+  if (!itemCols.size || !solCols.size || !itemCols.has('status_compra')) return [];
+
+  const qtdSolicitada = itemCols.has('qtd_solicitada') ? 'COALESCE(si.qtd_solicitada,0)' : (itemCols.has('quantidade') ? 'COALESCE(si.quantidade,0)' : '0');
+  const qtdComprada = itemCols.has('qtd_comprada') ? `COALESCE(si.qtd_comprada,${qtdSolicitada})` : qtdSolicitada;
+  const qtdRecebida = itemCols.has('qtd_recebida_total') ? 'COALESCE(si.qtd_recebida_total,0)' : '0';
+  const unitario = itemCols.has('valor_unitario_centavos') ? 'COALESCE(si.valor_unitario_centavos,0)' : '0';
+  const purchaseDate = itemCols.has('comprado_em')
+    ? 'si.comprado_em'
+    : (solCols.has('comprada_em') ? 's.comprada_em' : 's.updated_at');
+  const equipamentoJoin = solCols.has('equipamento_id') && tableExists('equipamentos') ? 'LEFT JOIN equipamentos e ON e.id=s.equipamento_id' : '';
+  const equipamentoNome = solCols.has('equipamento_id') && tableExists('equipamentos') ? 'e.nome' : 'NULL';
+  const equipamentoId = solCols.has('equipamento_id') ? 's.equipamento_id' : 'NULL';
+
+  const rows = db.prepare(`
+    SELECT s.id solicitacao_id, s.numero, s.os_id,
+      ${equipamentoId} equipamento_id, ${equipamentoNome} equipamento_nome,
+      ${qtdSolicitada} qtd_solicitada, ${qtdComprada} qtd_comprada,
+      ${qtdRecebida} qtd_recebida, ${unitario} valor_unitario_centavos,
+      ${purchaseDate} data_compra
+    FROM solicitacoes s
+    JOIN solicitacao_itens si ON si.solicitacao_id=s.id
+    ${equipamentoJoin}
+    WHERE UPPER(COALESCE(si.status_compra,''))='COMPRADO'
+      AND strftime('%Y-%m', ${purchaseDate})=strftime('%Y-%m','now')
+  `).all();
+
+  const groups = new Map();
+  rows.forEach((row) => {
+    const key = row.equipamento_id ? `E:${row.equipamento_id}` : 'SEM_EQUIPAMENTO';
+    if (!groups.has(key)) groups.set(key, {
+      equipamento_id: row.equipamento_id || null,
+      equipamento_nome: row.equipamento_nome || 'Sem equipamento vinculado',
+      osIds: new Set(),
+      solicitacoesIds: new Set(),
+      compradoCentavos: 0,
+      recebidoCentavos: 0,
+    });
+    const group = groups.get(key);
+    if (row.os_id) group.osIds.add(Number(row.os_id));
+    group.solicitacoesIds.add(Number(row.solicitacao_id));
+    group.compradoCentavos += Math.round(Number(row.qtd_comprada || 0) * Number(row.valor_unitario_centavos || 0));
+    group.recebidoCentavos += Math.round(Math.min(Number(row.qtd_recebida || 0), Number(row.qtd_comprada || 0)) * Number(row.valor_unitario_centavos || 0));
+  });
+
+  return [...groups.values()].map((group) => ({
+    ...group,
+    osIds: [...group.osIds].sort((a, b) => a - b),
+    solicitacoes: group.solicitacoesIds.size,
+    saldoCentavos: Math.max(0, group.compradoCentavos - group.recebidoCentavos),
+  })).sort((a, b) => b.compradoCentavos - a.compradoCentavos);
+}
+
 function getDashboard(query = {}) {
   const filters = buildFilters(query);
   const ic = columns('solicitacao_itens');
+  const sc = columns('solicitacoes');
   const where = [];
   const params = [];
 
@@ -66,9 +125,15 @@ function getDashboard(query = {}) {
   const cancelled = ic.has('status_compra') ? "UPPER(COALESCE(si.status_compra,''))<>'CANCELADO'" : '1=1';
   const qtd = ic.has('qtd_solicitada') ? 'COALESCE(si.qtd_solicitada,0)' : 'COALESCE(si.quantidade,0)';
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const approvalStatus = sc.has('aprovacao_compra_status') ? 's.aprovacao_compra_status' : "'NAO_SOLICITADA'";
+  const approvalDirector = sc.has('diretor_aprovador_user_id') ? 's.diretor_aprovador_user_id' : 'NULL';
+  const approvalJoin = sc.has('diretor_aprovador_user_id') ? 'LEFT JOIN users d ON d.id=s.diretor_aprovador_user_id' : '';
+  const approvalDirectorName = sc.has('diretor_aprovador_user_id') ? 'd.name' : 'NULL';
 
   const rows = db.prepare(`SELECT s.id,s.numero,s.titulo,s.status,s.os_id,s.setor_origem,s.prioridade,s.previsao_entrega,s.created_at,s.updated_at,
-    e.nome equipamento_nome,u.name responsavel_nome,si.id item_id,${qtd} qtd_solicitada,
+    e.nome equipamento_nome,u.name responsavel_nome, ${approvalStatus} aprovacao_compra_status,
+    ${approvalDirector} diretor_aprovador_user_id, ${approvalDirectorName} diretor_aprovador_nome,
+    si.id item_id,${qtd} qtd_solicitada,
     ${ic.has('status_cotacao') ? 'si.status_cotacao' : "'PENDENTE'"} status_cotacao,
     ${ic.has('status_compra') ? 'si.status_compra' : "'PENDENTE'"} status_compra,
     ${ic.has('qtd_comprada') ? 'COALESCE(si.qtd_comprada,0)' : '0'} qtd_comprada,
@@ -78,6 +143,7 @@ function getDashboard(query = {}) {
     LEFT JOIN solicitacao_itens si ON si.solicitacao_id=s.id AND ${cancelled}
     LEFT JOIN equipamentos e ON e.id=s.equipamento_id
     LEFT JOIN users u ON u.id=s.compras_user_id
+    ${approvalJoin}
     ${whereSql}
     ORDER BY datetime(s.created_at) DESC,s.id DESC,si.id`).all(...params);
 
@@ -159,12 +225,6 @@ function getDashboard(query = {}) {
   });
   const priorityGroups = priorityOverview.filter((group) => group.totalSolicitacoes > 0);
 
-  const equipamentos = new Map();
-  for (const s of solicitacoes) {
-    const nome = s.os_id ? (s.equipamento_nome || `OS ${s.os_id} — equipamento não informado`) : 'Sem OS vinculada';
-    equipamentos.set(nome, (equipamentos.get(nome) || 0) + s.cotadoCentavos);
-  }
-
   return {
     filters,
     solicitacoes,
@@ -178,12 +238,13 @@ function getDashboard(query = {}) {
       recebido: sum('recebidoCentavos'),
       saldo: Math.max(0, sum('comprometidoCentavos') - sum('recebidoCentavos')),
     },
-    equipamentos: [...equipamentos].map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor),
+    custosMensaisEquipamentos: getMonthlyEquipmentCosts(),
     pendencias: {
       semCotacao: indicadores.semCotacao,
       atrasadas: solicitacoes.filter((s) => s.atrasada).length,
       vencemHoje: solicitacoes.filter((s) => s.venceHoje).length,
       semOs: solicitacoes.filter((s) => !s.os_id).length,
+      aguardandoAprovacao: solicitacoes.filter((s) => normalizeToken(s.aprovacao_compra_status) === 'PENDENTE').length,
     },
     setores: db.prepare('SELECT DISTINCT setor_origem nome FROM solicitacoes WHERE setor_origem IS NOT NULL ORDER BY 1').all(),
     responsaveis: db.prepare("SELECT id,name FROM users WHERE role IN ('COMPRAS','ADMIN') ORDER BY name").all(),
@@ -191,4 +252,48 @@ function getDashboard(query = {}) {
   };
 }
 
-module.exports = { getDashboard, buildFilters, pct, priorityGroup, PRIORITY_GROUPS };
+function getDetail(id) {
+  const sol = comprasService.getSolicitacaoDetalhe(Number(id));
+  if (!sol) return null;
+  const supplierRows = tableExists('fornecedores') ? db.prepare('SELECT id,nome FROM fornecedores').all() : [];
+  const suppliers = new Map(supplierRows.map((row) => [Number(row.id), row.nome]));
+  const active = (sol.itens || []).filter((item) => normalizeToken(item.status_compra) !== 'CANCELADO');
+  const itens = active.map((item) => {
+    const qtdSolicitada = Number(item.qtd_solicitada || item.quantidade || 0);
+    const qtdComprada = normalizeToken(item.status_compra) === 'COMPRADO' ? Number(item.qtd_comprada ?? qtdSolicitada) : 0;
+    const qtdRecebida = Number(item.qtd_recebida_total || 0);
+    const unitario = Number(item.valor_unitario_centavos || 0);
+    return {
+      ...item,
+      qtdSolicitada,
+      qtdComprada,
+      qtdRecebida,
+      qtdPendenteReceber: Math.max(0, qtdComprada - qtdRecebida),
+      fornecedor_nome: suppliers.get(Number(item.fornecedor_id)) || null,
+      cotadoCentavos: normalizeToken(item.status_cotacao) === 'COTADO' ? Math.round(qtdSolicitada * unitario) : 0,
+      compradoCentavos: normalizeToken(item.status_compra) === 'COMPRADO' ? Math.round(qtdComprada * unitario) : 0,
+      recebidoCentavos: Math.round(Math.min(qtdRecebida, qtdComprada || qtdSolicitada) * unitario),
+    };
+  });
+  const comprasUser = sol.compras_user_id ? db.prepare('SELECT id,name FROM users WHERE id=?').get(Number(sol.compras_user_id)) : null;
+  let aprovacao = null;
+  try { aprovacao = approvalService.getContext(Number(id)); } catch (_error) { aprovacao = null; }
+  const sum = (key) => itens.reduce((total, item) => total + Number(item[key] || 0), 0);
+  return {
+    ...sol,
+    itens,
+    compras_responsavel_nome: comprasUser?.name || null,
+    aprovacao,
+    resumoAcompanhamento: {
+      total: itens.length,
+      cotados: itens.filter((item) => normalizeToken(item.status_cotacao) === 'COTADO').length,
+      comprados: itens.filter((item) => normalizeToken(item.status_compra) === 'COMPRADO').length,
+      recebidos: itens.filter((item) => item.qtdComprada > 0 && item.qtdRecebida >= item.qtdComprada).length,
+      cotadoCentavos: sum('cotadoCentavos'),
+      compradoCentavos: sum('compradoCentavos'),
+      recebidoCentavos: sum('recebidoCentavos'),
+    },
+  };
+}
+
+module.exports = { getDashboard, getDetail, getMonthlyEquipmentCosts, buildFilters, pct, priorityGroup, PRIORITY_GROUPS };
