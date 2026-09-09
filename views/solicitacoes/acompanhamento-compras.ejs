@@ -1,6 +1,7 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/acompanhamento-compras.css?v=20260909-tabela-gerencial">
 <link rel="stylesheet" href="/css/acompanhamento-compras-gerencial.css?v=20260909-v1">
+<link rel="stylesheet" href="/css/aprovacao-itens-progressiva.css?v=20260909-v1">
 <%
 const p=painel;
 const money=c=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(c)||0)/100);
@@ -8,15 +9,14 @@ const round=n=>Math.round(Number(n)||0);
 const statusLabel=value=>String(value||'-').replaceAll('_',' ');
 const custosEquipamentos=Array.isArray(p.custosMensaisEquipamentos)?p.custosMensaisEquipamentos:[];
 const solicitacoes=Array.isArray(p.solicitacoes)?p.solicitacoes:[];
+const approvalStats=p.aprovacaoItens||{};
 const priorityLabel=value=>({critical:'Crítica',high:'Alta',medium:'Média',low:'Baixa',undefined:'Sem prioridade'}[value]||'Sem prioridade');
-const approvalLabel=value=>({PENDENTE:'Aguardando Diretoria',APROVADA:'Aprovada',REPROVADA:'Reprovada',EXPIRADA:'Revalidar cotação',NAO_SOLICITADA:'Não solicitada'}[String(value||'NAO_SOLICITADA').toUpperCase()]||statusLabel(value));
-const approvalClass=value=>'approval-'+String(value||'NAO_SOLICITADA').toLowerCase().replaceAll('_','-');
 %>
 <div class="buy-watch">
   <header class="watch-head">
     <div>
       <div class="title-line"><h1>Acompanhamento de Compras</h1><span class="readonly">PAINEL GERENCIAL · SOMENTE LEITURA</span></div>
-      <p>Visão consolidada das solicitações, OS, equipamentos, cotações, aprovações, compras e recebimentos.</p>
+      <p>Visão consolidada das solicitações, OS, equipamentos, cotações, aprovações e compras.</p>
     </div>
     <a class="btn btn-ghost" href="/solicitacoes/minhas">← Voltar às solicitações</a>
   </header>
@@ -36,6 +36,13 @@ const approvalClass=value=>'approval-'+String(value||'NAO_SOLICITADA').toLowerCa
     <% }) %>
   </section>
 
+  <% if(Number(approvalStats.itensPendentes||0)>0){ %>
+    <section class="approval-overview-alert">
+      <div><span>● COTAÇÕES AGUARDANDO LIBERAÇÃO</span><strong><%=approvalStats.itensPendentes%> item(ns) em <%=approvalStats.solicitacoesPendentes%> solicitação(ões)</strong><small>Valor atualmente aguardando aprovação: <%=money(approvalStats.valorPendente)%></small></div>
+      <span class="approval-overview-hint">As linhas destacadas abaixo possuem itens prontos para ADMIN/DIRETORIA aprovar.</span>
+    </section>
+  <% } %>
+
   <section class="watch-section flow-section">
     <div class="section-title-row"><div><h2>ANDAMENTO DO FLUXO DE COMPRAS</h2><p>Percentuais calculados com os dados reais das solicitações exibidas pelos filtros atuais.</p></div></div>
     <div class="flow-grid"><% [['Cotação',p.fluxo.cotacao],['Compra',p.fluxo.compra],['Recebimento',p.fluxo.recebimento],['Solicitações concluídas',p.fluxo.concluidas]].forEach(x=>{ %><div><b><%=x[0]%></b><span><%=round(x[1])%>%</span><i><em style="width:<%=Math.min(100,Number(x[1])||0)%>%"></em></i></div><% }) %></div>
@@ -44,7 +51,7 @@ const approvalClass=value=>'approval-'+String(value||'NAO_SOLICITADA').toLowerCa
 
   <section class="watch-section requests-section requests-table-section">
     <div class="section-title-row">
-      <div><h2>SOLICITAÇÕES E ANDAMENTO</h2><p>Clique em <strong>Abrir</strong> para consultar todos os itens, fornecedores, valores, compra e recebimento sem editar a cotação.</p></div>
+      <div><h2>SOLICITAÇÕES E ANDAMENTO</h2><p>Abra a solicitação para visualizar itens, fornecedor, valor cotado e liberar digitalmente o que estiver pronto.</p></div>
       <span class="request-total"><%=solicitacoes.length%> solicitações</span>
     </div>
 
@@ -53,73 +60,18 @@ const approvalClass=value=>'approval-'+String(value||'NAO_SOLICITADA').toLowerCa
     <% } else { %>
       <div class="requests-table-wrap">
         <table class="management-table">
-          <thead>
-            <tr>
-              <th>Solicitação</th>
-              <th>OS / Equipamento</th>
-              <th>Itens</th>
-              <th>Compra / Recebimento</th>
-              <th>Valores</th>
-              <th>Aprovação</th>
-              <th>Status / Prazo</th>
-              <th>Ação</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Solicitação</th><th>OS / Equipamento</th><th>Itens</th><th>Andamento</th><th>Valores</th><th>Aprovação</th><th>Status / Prazo</th><th>Ação</th></tr></thead>
           <tbody>
-            <% solicitacoes.forEach(s=>{ const approval=String(s.aprovacao_compra_status||'NAO_SOLICITADA').toUpperCase(); %>
-              <tr class="management-row priority-row-<%=s.priorityGroup%>">
-                <td data-label="Solicitação">
-                  <div class="request-identification">
-                    <span class="priority-badge priority-<%=s.priorityGroup%>"><%=priorityLabel(s.priorityGroup)%></span>
-                    <strong><%=s.numero||('#'+s.id)%></strong>
-                    <b><%=s.titulo||'Solicitação de material'%></b>
-                    <small>Setor: <%=s.setor_origem||'Não informado'%></small>
-                  </div>
-                </td>
-                <td data-label="OS / Equipamento">
-                  <div class="linked-data">
-                    <strong><%=s.os_id?('OS '+s.os_id):'Sem OS vinculada'%></strong>
-                    <span><%=s.equipamento_nome||'Equipamento não informado'%></span>
-                  </div>
-                </td>
-                <td data-label="Itens">
-                  <div class="item-counts">
-                    <span><small>Solicitados</small><b><%=s.total%></b></span>
-                    <span class="is-green"><small>Cotados</small><b><%=s.cotados%></b></span>
-                    <span class="is-warning"><small>Sem cotação</small><b><%=s.semCotacao%></b></span>
-                  </div>
-                </td>
-                <td data-label="Compra / Recebimento">
-                  <div class="flow-cell">
-                    <div><span>Cotação</span><b><%=round(s.percentualCotado)%>%</b><i><em class="bar-quote" style="width:<%=Math.min(100,Number(s.percentualCotado)||0)%>%"></em></i></div>
-                    <div><span>Compra</span><b><%=round(s.percentualComprado)%>%</b><i><em class="bar-buy" style="width:<%=Math.min(100,Number(s.percentualComprado)||0)%>%"></em></i></div>
-                    <div><span>Recebimento</span><b><%=round(s.percentualRecebido)%>%</b><i><em class="bar-receipt" style="width:<%=Math.min(100,Number(s.percentualRecebido)||0)%>%"></em></i></div>
-                    <small><%=s.comprados%> comprado(s) · <%=s.recebidos%> recebido(s)</small>
-                  </div>
-                </td>
-                <td data-label="Valores">
-                  <div class="money-stack">
-                    <span><small>Cotado</small><b><%=money(s.cotadoCentavos)%></b></span>
-                    <span><small>Comprado</small><b><%=money(s.comprometidoCentavos)%></b></span>
-                    <span><small>Recebido</small><b><%=money(s.recebidoCentavos)%></b></span>
-                  </div>
-                </td>
-                <td data-label="Aprovação">
-                  <div class="approval-cell">
-                    <span class="approval-badge <%=approvalClass(approval)%>"><%=approvalLabel(approval)%></span>
-                    <small><%=s.diretor_aprovador_nome?('Diretor: '+s.diretor_aprovador_nome):'Diretor ainda não definido'%></small>
-                  </div>
-                </td>
-                <td data-label="Status / Prazo">
-                  <div class="status-stack">
-                    <span class="status-chip"><%=statusLabel(s.status)%></span>
-                    <small><%=s.atrasada?'Atrasada':s.venceHoje?'Vence hoje':s.previsao_entrega?('Previsão '+fmtBR(s.previsao_entrega)):'Sem previsão de entrega'%></small>
-                    <small>Compras: <%=s.responsavel_nome||'Não atribuído'%></small>
-                  </div>
-                </td>
-                <td data-label="Ação" class="action-cell">
-                  <a class="btn btn-green btn-open-detail" href="/solicitacoes/acompanhamento-compras/<%=s.id%>">Abrir</a>
-                </td>
+            <% solicitacoes.forEach(s=>{ const itemApproval=s.aprovacaoItens||{}; const needsApproval=Number(itemApproval.pendentesCount||0)>0; %>
+              <tr class="management-row priority-row-<%=s.priorityGroup%> <%=needsApproval?'management-row-needs-approval':''%>">
+                <td data-label="Solicitação"><div class="request-identification"><span class="priority-badge priority-<%=s.priorityGroup%>"><%=priorityLabel(s.priorityGroup)%></span><strong><%=s.numero||('#'+s.id)%></strong><b><%=s.titulo||'Solicitação de material'%></b><small>Setor: <%=s.setor_origem||'Não informado'%></small></div></td>
+                <td data-label="OS / Equipamento"><div class="linked-data"><strong><%=s.os_id?('OS '+s.os_id):'Sem OS vinculada'%></strong><span><%=s.equipamento_nome||'Equipamento não informado'%></span></div></td>
+                <td data-label="Itens"><div class="item-counts"><span><small>Solicitados</small><b><%=s.total%></b></span><span class="is-green"><small>Cotados</small><b><%=s.cotados%></b></span><span class="is-warning"><small>Sem cotação</small><b><%=s.semCotacao%></b></span></div></td>
+                <td data-label="Andamento"><div class="flow-cell"><div><span>Cotação</span><b><%=round(s.percentualCotado)%>%</b><i><em class="bar-quote" style="width:<%=Math.min(100,Number(s.percentualCotado)||0)%>%"></em></i></div><div><span>Compra</span><b><%=round(s.percentualComprado)%>%</b><i><em class="bar-buy" style="width:<%=Math.min(100,Number(s.percentualComprado)||0)%>%"></em></i></div><small><%=s.comprados%> comprado(s) · <%=s.recebidos%> recebido(s)</small></div></td>
+                <td data-label="Valores"><div class="money-stack"><span><small>Cotado</small><b><%=money(s.cotadoCentavos)%></b></span><span><small>Comprado</small><b><%=money(s.comprometidoCentavos)%></b></span></div></td>
+                <td data-label="Aprovação"><div class="approval-cell item-approval-cell"><% if(needsApproval){ %><span class="approval-alert-chip">● <%=itemApproval.pendentesCount%> PARA APROVAR</span><strong><%=money(itemApproval.pendentesValorCentavos)%></strong><small>Clique em Abrir para liberar.</small><% } else if(Number(itemApproval.aprovadosCount||0)>0){ %><span class="item-approval-badge state-aprovada"><%=itemApproval.aprovadosCount%> APROVADO(S)</span><small>Sem novas cotações aguardando.</small><% } else { %><span class="item-approval-badge state-sem-cotacao">SEM APROVAÇÃO PENDENTE</span><small>A cotação pode continuar em Compras.</small><% } %></div></td>
+                <td data-label="Status / Prazo"><div class="status-stack"><span class="status-chip"><%=statusLabel(s.status)%></span><small><%=s.atrasada?'Atrasada':s.venceHoje?'Vence hoje':s.previsao_entrega?('Previsão '+fmtBR(s.previsao_entrega)):'Sem previsão de entrega'%></small><small>Compras: <%=s.responsavel_nome||'Não atribuído'%></small></div></td>
+                <td data-label="Ação" class="action-cell"><a class="btn <%=needsApproval?'btn-approval-open':'btn-green'%> btn-open-detail" href="/solicitacoes/acompanhamento-compras/<%=s.id%>"><%=needsApproval?'Abrir e aprovar':'Abrir'%></a></td>
               </tr>
             <% }) %>
           </tbody>
@@ -131,7 +83,7 @@ const approvalClass=value=>'approval-'+String(value||'NAO_SOLICITADA').toLowerCa
   <div class="bottom-grid">
     <section class="watch-section"><h2>VALORES POR ETAPA</h2><dl><dt>Cotado</dt><dd><%=money(p.valores.cotado)%></dd><dt>Comprado / comprometido</dt><dd><%=money(p.valores.comprometido)%></dd><dt>Recebido / realizado</dt><dd><%=money(p.valores.recebido)%></dd><dt>Saldo a receber</dt><dd><%=money(p.valores.saldo)%></dd></dl></section>
     <section class="watch-section"><h2>CUSTO COMPRADO NO MÊS POR EQUIPAMENTO</h2><% if(!custosEquipamentos.length){ %><div class="watch-empty">Nenhuma compra vinculada a equipamento neste mês.</div><% } else { const max=Math.max(1,...custosEquipamentos.map(x=>Number(x.compradoCentavos||0))); custosEquipamentos.slice(0,8).forEach(x=>{ %><div class="equipment"><span><%=x.equipamento_nome||'Sem equipamento vinculado'%></span><i><em style="width:<%=Number(x.compradoCentavos||0)/max*100%>%"></em></i><b><%=money(x.compradoCentavos)%></b></div><% }) } %></section>
-    <section class="watch-section"><h2>RESUMO DAS PENDÊNCIAS</h2><div class="pending"><span><b><%=p.pendencias.semCotacao%></b><small>itens aguardando cotação</small></span><span><b><%=p.pendencias.aguardandoAprovacao||0%></b><small>aguardando Diretoria</small></span><span><b><%=p.pendencias.atrasadas%></b><small>solicitações atrasadas</small></span><span><b><%=p.pendencias.semOs%></b><small>sem OS vinculada</small></span></div></section>
+    <section class="watch-section"><h2>RESUMO DAS PENDÊNCIAS</h2><div class="pending"><span><b><%=p.pendencias.semCotacao%></b><small>itens aguardando cotação</small></span><span><b><%=approvalStats.itensPendentes||0%></b><small>itens aguardando aprovação</small></span><span><b><%=p.pendencias.atrasadas%></b><small>solicitações atrasadas</small></span><span><b><%=p.pendencias.semOs%></b><small>sem OS vinculada</small></span></div></section>
   </div>
 
   <footer class="watch-foot">Painel gerencial para acompanhamento. Última atualização: <%=fmtBR(p.atualizadoEm)%></footer>
