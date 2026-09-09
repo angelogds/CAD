@@ -2,75 +2,109 @@
 <link rel="stylesheet" href="/css/acompanhamento-compras.css?v=20260909-tabela-gerencial">
 <link rel="stylesheet" href="/css/acompanhamento-compras-gerencial.css?v=20260909-v1">
 <link rel="stylesheet" href="/css/aprovacao-itens-progressiva.css?v=20260909-v1">
+<link rel="stylesheet" href="/css/acompanhamento-compras-diretoria.css?v=20260909-v2">
 <%
-const p=painel;
+const p=painel||{};
+const filters=p.filters||{};
+const solicitacoes=Array.isArray(p.solicitacoes)?p.solicitacoes:[];
+const custosEquipamentos=Array.isArray(p.custosMensaisEquipamentos)?p.custosMensaisEquipamentos:[];
+const approvalStats=p.aprovacaoItens||{};
+const exec=p.executivo||{};
+const totals=p.totaisVisao||{};
 const money=c=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(c)||0)/100);
 const round=n=>Math.round(Number(n)||0);
 const statusLabel=value=>String(value||'-').replaceAll('_',' ');
-const custosEquipamentos=Array.isArray(p.custosMensaisEquipamentos)?p.custosMensaisEquipamentos:[];
-const solicitacoes=Array.isArray(p.solicitacoes)?p.solicitacoes:[];
-const approvalStats=p.aprovacaoItens||{};
 const priorityLabel=value=>({critical:'Crítica',high:'Alta',medium:'Média',low:'Baixa',undefined:'Sem prioridade'}[value]||'Sem prioridade');
+const actionLabel=value=>({AGUARDANDO_APROVACAO:'Aguardando aprovação',COTACAO_NECESSARIA:'Cotação necessária',EFETIVAR_COMPRA:'Efetivar compra',AGUARDANDO_RECEBIMENTO:'Aguardando entrega',RECEBIMENTO_PARCIAL:'Recebimento parcial',CONCLUIDA:'Concluída',EM_ACOMPANHAMENTO:'Em acompanhamento'}[String(value||'')]||statusLabel(value));
+const queryHref=(overrides={})=>{
+  const values={
+    visao:filters.visao||'andamento',periodo:filters.periodo||'todos',inicio:filters.inicio||'',fim:filters.fim||'',
+    setor:filters.setor||'',responsavel:filters.responsavel||'',status:filters.status||'',prioridade:filters.prioridade||'',
+    destaque:p.destaque||'',...overrides,
+  };
+  const query=Object.entries(values).filter(([,v])=>v!==''&&v!==null&&v!==undefined).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+  return `/solicitacoes/acompanhamento-compras${query?'?'+query:''}`;
+};
 %>
-<div class="buy-watch">
-  <header class="watch-head">
+<div class="buy-watch executive-buy-watch">
+  <header class="watch-head executive-watch-head">
     <div>
-      <div class="title-line"><h1>Acompanhamento de Compras</h1><span class="readonly">PAINEL GERENCIAL · SOMENTE LEITURA</span></div>
-      <p>Visão consolidada das solicitações, OS, equipamentos, cotações, aprovações e compras.</p>
+      <div class="title-line"><h1>Acompanhamento de Compras</h1><span class="readonly executive-badge">PAINEL EXECUTIVO · DIRETORIA / ADMIN</span></div>
+      <p>Fila gerencial para acompanhar cotações, aprovações, compras, recebimentos e histórico sem duplicar o fluxo operacional de Compras.</p>
     </div>
     <a class="btn btn-ghost" href="/solicitacoes/minhas">← Voltar às solicitações</a>
   </header>
 
-  <form class="watch-filters" method="get">
-    <label><span>Período</span><select name="periodo" aria-label="Período"><% [['todos','Todos os períodos'],['7','Últimos 7 dias'],['30','Últimos 30 dias'],['90','Últimos 90 dias'],['ano','Ano atual'],['personalizado','Período personalizado']].forEach(x=>{ %><option value="<%=x[0]%>" <%=p.filters.periodo===x[0]?'selected':''%>><%=x[1]%></option><% }) %></select></label>
-    <label><span>Setor</span><select name="setor" aria-label="Setor"><option value="">Todos os setores</option><% (p.setores||[]).forEach(x=>{ %><option value="<%=x.nome%>" <%=p.filters.setor===x.nome?'selected':''%>><%=x.nome%></option><% }) %></select></label>
-    <label><span>Responsável</span><select name="responsavel" aria-label="Responsável"><option value="">Todos os responsáveis</option><% (p.responsaveis||[]).forEach(x=>{ %><option value="<%=x.id%>" <%=String(p.filters.responsavel)===String(x.id)?'selected':''%>><%=x.name%></option><% }) %></select></label>
-    <label><span>Status</span><select name="status" aria-label="Status"><option value="">Todos os status</option><% ['ABERTA','REABERTA','EM_COTACAO','COMPRADA','EM_RECEBIMENTO','RECEBIDA_PARCIAL','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE','FECHADA','CANCELADA'].forEach(x=>{ %><option value="<%=x%>" <%=p.filters.status===x?'selected':''%>><%=statusLabel(x)%></option><% }) %></select></label>
-    <label><span>Prioridade</span><select name="prioridade" aria-label="Prioridade"><option value="">Todas as prioridades</option><% [['critical','Críticas / imediatas'],['high','Alta'],['medium','Média'],['low','Baixa'],['undefined','Sem prioridade']].forEach(x=>{ %><option value="<%=x[0]%>" <%=p.filters.prioridade===x[0]?'selected':''%>><%=x[1]%></option><% }) %></select></label>
+  <nav class="executive-view-tabs" aria-label="Visão do acompanhamento">
+    <a class="<%=filters.visao==='andamento'?'active':''%>" href="<%=queryHref({visao:'andamento',destaque:''})%>"><span>EM ANDAMENTO</span><strong><%=totals.andamento||0%></strong><small>somente pendências e fluxo ativo</small></a>
+    <a class="<%=filters.visao==='historico'?'active':''%>" href="<%=queryHref({visao:'historico',periodo:filters.periodo==='todos'?'30':filters.periodo,destaque:''})%>"><span>HISTÓRICO</span><strong><%=totals.historico||0%></strong><small>concluídas / 100%</small></a>
+    <a class="<%=filters.visao==='todos'?'active':''%>" href="<%=queryHref({visao:'todos',destaque:''})%>"><span>TODAS</span><strong><%=totals.todos||0%></strong><small>consulta consolidada</small></a>
+  </nav>
+
+  <form class="watch-filters executive-filters" method="get">
+    <input type="hidden" name="visao" value="<%=filters.visao||'andamento'%>">
+    <% if(p.destaque){ %><input type="hidden" name="destaque" value="<%=p.destaque%>"><% } %>
+    <label><span>Período</span><select name="periodo" aria-label="Período"><% [['todos','Todos os períodos'],['7','Últimos 7 dias'],['30','Últimos 30 dias'],['90','Últimos 90 dias'],['ano','Ano atual'],['personalizado','Período personalizado']].forEach(x=>{ %><option value="<%=x[0]%>" <%=filters.periodo===x[0]?'selected':''%>><%=x[1]%></option><% }) %></select></label>
+    <% if(filters.periodo==='personalizado'){ %>
+      <label><span>De</span><input type="date" name="inicio" value="<%=filters.inicio||''%>"></label>
+      <label><span>Até</span><input type="date" name="fim" value="<%=filters.fim||''%>"></label>
+    <% } %>
+    <label><span>Setor</span><select name="setor" aria-label="Setor"><option value="">Todos os setores</option><% (p.setores||[]).forEach(x=>{ %><option value="<%=x.nome%>" <%=filters.setor===x.nome?'selected':''%>><%=x.nome%></option><% }) %></select></label>
+    <label><span>Responsável Compras</span><select name="responsavel" aria-label="Responsável"><option value="">Todos os responsáveis</option><% (p.responsaveis||[]).forEach(x=>{ %><option value="<%=x.id%>" <%=String(filters.responsavel)===String(x.id)?'selected':''%>><%=x.name%></option><% }) %></select></label>
+    <label><span>Status</span><select name="status" aria-label="Status"><option value="">Todos os status</option><% ['ABERTA','REABERTA','EM_COTACAO','COMPRADA','EM_RECEBIMENTO','RECEBIDA_PARCIAL','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE','FECHADA','CANCELADA'].forEach(x=>{ %><option value="<%=x%>" <%=filters.status===x?'selected':''%>><%=statusLabel(x)%></option><% }) %></select></label>
+    <label><span>Prioridade</span><select name="prioridade" aria-label="Prioridade"><option value="">Todas as prioridades</option><% [['critical','Críticas / imediatas'],['high','Alta'],['medium','Média'],['low','Baixa'],['undefined','Sem prioridade']].forEach(x=>{ %><option value="<%=x[0]%>" <%=filters.prioridade===x[0]?'selected':''%>><%=x[1]%></option><% }) %></select></label>
     <button class="btn btn-green">↻ Atualizar</button>
+    <% if(p.destaque){ %><a class="btn btn-ghost" href="<%=queryHref({destaque:''})%>">Limpar sinalizador</a><% } %>
   </form>
 
-  <section class="metrics">
-    <% [['Solicitações',p.indicadores.solicitacoes],['Itens solicitados',p.indicadores.total],['Itens cotados',p.indicadores.cotados],['Sem cotação',p.indicadores.semCotacao],['Itens comprados',p.indicadores.comprados],['Itens recebidos',p.indicadores.recebidos],['Valor cotado',money(p.indicadores.valorCotadoCentavos)]].forEach(x=>{ %>
-      <div><small><%=x[0]%></small><strong><%=x[1]%></strong></div>
-    <% }) %>
-  </section>
-
-  <% if(Number(approvalStats.itensPendentes||0)>0){ %>
-    <section class="approval-overview-alert">
-      <div><span>● COTAÇÕES AGUARDANDO LIBERAÇÃO</span><strong><%=approvalStats.itensPendentes%> item(ns) em <%=approvalStats.solicitacoesPendentes%> solicitação(ões)</strong><small>Valor atualmente aguardando aprovação: <%=money(approvalStats.valorPendente)%></small></div>
-      <span class="approval-overview-hint">As linhas destacadas abaixo possuem itens prontos para ADMIN/DIRETORIA aprovar.</span>
+  <% if(filters.visao!=='historico'){ %>
+    <section class="executive-signals" aria-label="Sinalizadores executivos">
+      <a class="signal-card signal-approval <%=p.destaque==='aprovacao'?'active':''%>" href="<%=queryHref({destaque:'aprovacao'})%>"><small>AGUARDANDO APROVAÇÃO</small><strong><%=approvalStats.itensPendentes||0%> itens</strong><span><%=money(exec.valorAguardandoAprovacao)%></span></a>
+      <a class="signal-card <%=p.destaque==='cotacao'?'active':''%>" href="<%=queryHref({destaque:'cotacao'})%>"><small>SEM COTAÇÃO</small><strong><%=exec.semCotacaoItens||0%> itens</strong><span>aguardando Compras</span></a>
+      <a class="signal-card <%=p.destaque==='compra'?'active':''%>" href="<%=queryHref({destaque:'compra'})%>"><small>LIBERADAS / A COMPRAR</small><strong><%=exec.aprovadasAguardandoCompra||0%></strong><span>solicitações</span></a>
+      <a class="signal-card <%=p.destaque==='recebimento'?'active':''%>" href="<%=queryHref({destaque:'recebimento'})%>"><small>AGUARDANDO RECEBIMENTO</small><strong><%=exec.aguardandoRecebimento||0%></strong><span>solicitações</span></a>
+      <a class="signal-card signal-delay <%=p.destaque==='atrasadas'?'active':''%>" href="<%=queryHref({destaque:'atrasadas'})%>"><small>ATRASADAS</small><strong><%=exec.atrasadas||0%></strong><span>com prazo vencido</span></a>
+      <div class="signal-card signal-value"><small>VALOR COMPRADO</small><strong><%=money(exec.valorComprado)%></strong><span>na visão atual</span></div>
+      <div class="signal-card signal-value"><small>SALDO A RECEBER</small><strong><%=money(exec.saldoReceber)%></strong><span>comprometido - recebido</span></div>
+    </section>
+  <% } else { %>
+    <section class="metrics history-metrics">
+      <% [['Solicitações concluídas',p.indicadores?.solicitacoes||0],['Itens',p.indicadores?.total||0],['Itens comprados',p.indicadores?.comprados||0],['Itens recebidos',p.indicadores?.recebidos||0],['Valor comprado',money(p.valores?.comprometido||0)],['Valor recebido',money(p.valores?.recebido||0)]].forEach(x=>{ %><div><small><%=x[0]%></small><strong><%=x[1]%></strong></div><% }) %>
     </section>
   <% } %>
 
   <section class="watch-section flow-section">
-    <div class="section-title-row"><div><h2>ANDAMENTO DO FLUXO DE COMPRAS</h2><p>Percentuais calculados com os dados reais das solicitações exibidas pelos filtros atuais.</p></div></div>
-    <div class="flow-grid"><% [['Cotação',p.fluxo.cotacao],['Compra',p.fluxo.compra],['Recebimento',p.fluxo.recebimento],['Solicitações concluídas',p.fluxo.concluidas]].forEach(x=>{ %><div><b><%=x[0]%></b><span><%=round(x[1])%>%</span><i><em style="width:<%=Math.min(100,Number(x[1])||0)%>%"></em></i></div><% }) %></div>
-    <div class="flow-steps">Solicitação <b>→</b> Cotação <b>→</b> Aprovação <b>→</b> Compra <b>→</b> Recebimento</div>
+    <div class="section-title-row"><div><h2>ANDAMENTO DO FLUXO DE COMPRAS</h2><p>Percentuais calculados somente com os registros da visão e filtros atuais.</p></div></div>
+    <div class="flow-grid"><% [['Cotação',p.fluxo?.cotacao],['Compra',p.fluxo?.compra],['Recebimento',p.fluxo?.recebimento],['Solicitações concluídas',p.fluxo?.concluidas]].forEach(x=>{ %><div><b><%=x[0]%></b><span><%=round(x[1])%>%</span><i><em style="width:<%=Math.min(100,Number(x[1])||0)%>%"></em></i></div><% }) %></div>
+    <div class="flow-steps">Solicitação <b>→</b> Cotação <b>→</b> Aprovação <b>→</b> Compra <b>→</b> Recebimento <b>→</b> Histórico</div>
   </section>
 
   <section class="watch-section requests-section requests-table-section">
     <div class="section-title-row">
-      <div><h2>SOLICITAÇÕES E ANDAMENTO</h2><p>Abra a solicitação para visualizar itens, fornecedor, valor cotado e liberar digitalmente o que estiver pronto.</p></div>
+      <div>
+        <h2><%=filters.visao==='historico'?'HISTÓRICO DE COMPRAS':'FILA DE ACOMPANHAMENTO'%></h2>
+        <p><%=filters.visao==='historico'?'Registros concluídos permanecem preservados e podem ser localizados por período.':'A fila prioriza aprovação, criticidade, atraso, cotação, compra e recebimento.'%></p>
+      </div>
       <span class="request-total"><%=solicitacoes.length%> solicitações</span>
     </div>
 
     <% if(!solicitacoes.length){ %>
-      <div class="watch-empty">Nenhuma solicitação encontrada para os filtros selecionados.</div>
+      <div class="watch-empty"><%=p.destaque?'Nenhuma solicitação corresponde ao sinalizador e aos filtros atuais.':'Nenhuma solicitação encontrada para os filtros selecionados.'%></div>
     <% } else { %>
       <div class="requests-table-wrap">
-        <table class="management-table">
-          <thead><tr><th>Solicitação</th><th>OS / Equipamento</th><th>Itens</th><th>Andamento</th><th>Valores</th><th>Aprovação</th><th>Status / Prazo</th><th>Ação</th></tr></thead>
+        <table class="management-table executive-management-table">
+          <thead><tr><th>Solicitação / Origem</th><th>OS / Equipamento</th><th>Itens</th><th>Andamento</th><th>Financeiro</th><th>Aprovação</th><th>Status / Prazo</th><th>Próxima ação</th><th>Ação</th></tr></thead>
           <tbody>
-            <% solicitacoes.forEach(s=>{ const itemApproval=s.aprovacaoItens||{}; const needsApproval=Number(itemApproval.pendentesCount||0)>0; %>
-              <tr class="management-row priority-row-<%=s.priorityGroup%> <%=needsApproval?'management-row-needs-approval':''%>">
-                <td data-label="Solicitação"><div class="request-identification"><span class="priority-badge priority-<%=s.priorityGroup%>"><%=priorityLabel(s.priorityGroup)%></span><strong><%=s.numero||('#'+s.id)%></strong><b><%=s.titulo||'Solicitação de material'%></b><small>Setor: <%=s.setor_origem||'Não informado'%></small></div></td>
+            <% solicitacoes.forEach(s=>{ const itemApproval=s.aprovacaoItens||{}; const needsApproval=Number(itemApproval.pendentesCount||0)>0; const isHistory=Boolean(s.concluidaFluxo); %>
+              <tr class="management-row priority-row-<%=s.priorityGroup%> <%=needsApproval?'management-row-needs-approval':''%> <%=isHistory?'management-row-history':''%>">
+                <td data-label="Solicitação / Origem"><div class="request-identification"><span class="priority-badge priority-<%=s.priorityGroup%>"><%=priorityLabel(s.priorityGroup)%></span><strong><%=s.numero||('#'+s.id)%></strong><b><%=s.titulo||'Solicitação de material'%></b><small>Setor: <%=s.setor_origem||'Não informado'%></small><% if(isHistory&&s.dataReferencia){ %><small>Concluída / atualizada em: <%=fmtBR(s.dataReferencia)%></small><% } %></div></td>
                 <td data-label="OS / Equipamento"><div class="linked-data"><strong><%=s.os_id?('OS '+s.os_id):'Sem OS vinculada'%></strong><span><%=s.equipamento_nome||'Equipamento não informado'%></span></div></td>
                 <td data-label="Itens"><div class="item-counts"><span><small>Solicitados</small><b><%=s.total%></b></span><span class="is-green"><small>Cotados</small><b><%=s.cotados%></b></span><span class="is-warning"><small>Sem cotação</small><b><%=s.semCotacao%></b></span></div></td>
-                <td data-label="Andamento"><div class="flow-cell"><div><span>Cotação</span><b><%=round(s.percentualCotado)%>%</b><i><em class="bar-quote" style="width:<%=Math.min(100,Number(s.percentualCotado)||0)%>%"></em></i></div><div><span>Compra</span><b><%=round(s.percentualComprado)%>%</b><i><em class="bar-buy" style="width:<%=Math.min(100,Number(s.percentualComprado)||0)%>%"></em></i></div><small><%=s.comprados%> comprado(s) · <%=s.recebidos%> recebido(s)</small></div></td>
-                <td data-label="Valores"><div class="money-stack"><span><small>Cotado</small><b><%=money(s.cotadoCentavos)%></b></span><span><small>Comprado</small><b><%=money(s.comprometidoCentavos)%></b></span></div></td>
-                <td data-label="Aprovação"><div class="approval-cell item-approval-cell"><% if(needsApproval){ %><span class="approval-alert-chip">● <%=itemApproval.pendentesCount%> PARA APROVAR</span><strong><%=money(itemApproval.pendentesValorCentavos)%></strong><small>Clique em Abrir para liberar.</small><% } else if(Number(itemApproval.aprovadosCount||0)>0){ %><span class="item-approval-badge state-aprovada"><%=itemApproval.aprovadosCount%> APROVADO(S)</span><small>Sem novas cotações aguardando.</small><% } else { %><span class="item-approval-badge state-sem-cotacao">SEM APROVAÇÃO PENDENTE</span><small>A cotação pode continuar em Compras.</small><% } %></div></td>
-                <td data-label="Status / Prazo"><div class="status-stack"><span class="status-chip"><%=statusLabel(s.status)%></span><small><%=s.atrasada?'Atrasada':s.venceHoje?'Vence hoje':s.previsao_entrega?('Previsão '+fmtBR(s.previsao_entrega)):'Sem previsão de entrega'%></small><small>Compras: <%=s.responsavel_nome||'Não atribuído'%></small></div></td>
+                <td data-label="Andamento"><div class="flow-cell"><div><span>Cotação</span><b><%=round(s.percentualCotado)%>%</b><i><em class="bar-quote" style="width:<%=Math.min(100,Number(s.percentualCotado)||0)%>%"></em></i></div><div><span>Compra</span><b><%=round(s.percentualComprado)%>%</b><i><em class="bar-buy" style="width:<%=Math.min(100,Number(s.percentualComprado)||0)%>%"></em></i></div><div><span>Recebimento</span><b><%=round(s.percentualRecebido)%>%</b><i><em class="bar-receipt" style="width:<%=Math.min(100,Number(s.percentualRecebido)||0)%>%"></em></i></div><small><%=s.comprados%> comprado(s) · <%=s.recebidos%> recebido(s)</small></div></td>
+                <td data-label="Financeiro"><div class="money-stack"><span><small>Cotado</small><b><%=money(s.cotadoCentavos)%></b></span><span><small>Comprado</small><b><%=money(s.comprometidoCentavos)%></b></span><span><small>Recebido</small><b><%=money(s.recebidoCentavos)%></b></span></div></td>
+                <td data-label="Aprovação"><div class="approval-cell item-approval-cell"><% if(needsApproval){ %><span class="approval-alert-chip">● <%=itemApproval.pendentesCount%> PARA APROVAR</span><strong><%=money(itemApproval.pendentesValorCentavos)%></strong><small>ADMIN/DIRETORIA</small><% } else if(Number(itemApproval.aprovadosCount||0)>0){ %><span class="item-approval-badge state-aprovada"><%=itemApproval.aprovadosCount%> APROVADO(S)</span><small>liberado para Compras</small><% } else if(isHistory){ %><span class="item-approval-badge state-aprovada">FLUXO CONCLUÍDO</span><small>registro preservado</small><% } else { %><span class="item-approval-badge state-sem-cotacao">SEM APROVAÇÃO PENDENTE</span><small>acompanhar próxima etapa</small><% } %></div></td>
+                <td data-label="Status / Prazo"><div class="status-stack"><span class="status-chip"><%=statusLabel(s.status)%></span><small><%=isHistory?'Concluída':s.atrasada?'Atrasada':s.venceHoje?'Vence hoje':s.previsao_entrega?('Previsão '+fmtBR(s.previsao_entrega)):'Sem previsão de entrega'%></small><small>Compras: <%=s.responsavel_nome||'Não atribuído'%></small></div></td>
+                <td data-label="Próxima ação"><span class="next-action-chip action-<%=String(s.proximaAcao||'EM_ACOMPANHAMENTO').toLowerCase().replaceAll('_','-')%>"><%=actionLabel(s.proximaAcao)%></span></td>
                 <td data-label="Ação" class="action-cell"><a class="btn <%=needsApproval?'btn-approval-open':'btn-green'%> btn-open-detail" href="/solicitacoes/acompanhamento-compras/<%=s.id%>"><%=needsApproval?'Abrir e aprovar':'Abrir'%></a></td>
               </tr>
             <% }) %>
@@ -81,10 +115,10 @@ const priorityLabel=value=>({critical:'Crítica',high:'Alta',medium:'Média',low
   </section>
 
   <div class="bottom-grid">
-    <section class="watch-section"><h2>VALORES POR ETAPA</h2><dl><dt>Cotado</dt><dd><%=money(p.valores.cotado)%></dd><dt>Comprado / comprometido</dt><dd><%=money(p.valores.comprometido)%></dd><dt>Recebido / realizado</dt><dd><%=money(p.valores.recebido)%></dd><dt>Saldo a receber</dt><dd><%=money(p.valores.saldo)%></dd></dl></section>
+    <section class="watch-section"><h2>VALORES POR ETAPA</h2><dl><dt>Cotado</dt><dd><%=money(p.valores?.cotado)%></dd><dt>Comprado / comprometido</dt><dd><%=money(p.valores?.comprometido)%></dd><dt>Recebido / realizado</dt><dd><%=money(p.valores?.recebido)%></dd><dt>Saldo a receber</dt><dd><%=money(p.valores?.saldo)%></dd></dl></section>
     <section class="watch-section"><h2>CUSTO COMPRADO NO MÊS POR EQUIPAMENTO</h2><% if(!custosEquipamentos.length){ %><div class="watch-empty">Nenhuma compra vinculada a equipamento neste mês.</div><% } else { const max=Math.max(1,...custosEquipamentos.map(x=>Number(x.compradoCentavos||0))); custosEquipamentos.slice(0,8).forEach(x=>{ %><div class="equipment"><span><%=x.equipamento_nome||'Sem equipamento vinculado'%></span><i><em style="width:<%=Number(x.compradoCentavos||0)/max*100%>%"></em></i><b><%=money(x.compradoCentavos)%></b></div><% }) } %></section>
-    <section class="watch-section"><h2>RESUMO DAS PENDÊNCIAS</h2><div class="pending"><span><b><%=p.pendencias.semCotacao%></b><small>itens aguardando cotação</small></span><span><b><%=approvalStats.itensPendentes||0%></b><small>itens aguardando aprovação</small></span><span><b><%=p.pendencias.atrasadas%></b><small>solicitações atrasadas</small></span><span><b><%=p.pendencias.semOs%></b><small>sem OS vinculada</small></span></div></section>
+    <section class="watch-section"><h2>RESUMO DA VISÃO</h2><div class="pending"><span><b><%=p.pendencias?.semCotacao||0%></b><small>itens sem cotação</small></span><span><b><%=approvalStats.itensPendentes||0%></b><small>itens para aprovação</small></span><span><b><%=p.pendencias?.atrasadas||0%></b><small>solicitações atrasadas</small></span><span><b><%=p.pendencias?.semOs||0%></b><small>sem OS vinculada</small></span></div></section>
   </div>
 
-  <footer class="watch-foot">Painel gerencial para acompanhamento. Última atualização: <%=fmtBR(p.atualizadoEm)%></footer>
+  <footer class="watch-foot">Painel executivo de acompanhamento. Última atualização: <%=fmtBR(p.atualizadoEm)%></footer>
 </div>
