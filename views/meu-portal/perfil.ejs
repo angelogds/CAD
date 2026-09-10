@@ -1,0 +1,44 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v3" />
+
+<%
+  const conta = portal.user;
+  const colaborador = portal.colaborador;
+  const foto = colaborador?.foto_url || conta.photo_path || '/IMG/logo_menu.png.png';
+%>
+
+<div class="my-portal-page my-personal-page">
+  <header class="my-section-head">
+    <div>
+      <span class="eyebrow">MEU PORTAL • IDENTIDADE</span>
+      <h1>Minha identidade</h1>
+      <p>Consulte seus dados de identificação e atualize somente a sua foto.</p>
+    </div>
+    <a class="btn btn-ghost" href="/meu-portal">Voltar ao portal</a>
+  </header>
+
+  <section class="card my-personal-card">
+    <div class="my-personal-profile">
+      <img class="my-personal-photo" src="<%= foto %>" alt="Foto de <%= colaborador?.nome || conta.name %>" />
+      <div class="my-personal-profile__data">
+        <span class="eyebrow">IDENTIFICAÇÃO PESSOAL</span>
+        <h2><%= colaborador?.nome || conta.name %></h2>
+        <span><strong>E-mail:</strong> <%= conta.email || '-' %></span>
+        <span><strong>Função:</strong> <%= colaborador?.funcao || 'Não cadastrada' %></span>
+        <span><strong>Setor:</strong> <%= colaborador?.setor || 'Não cadastrado' %></span>
+        <span><strong>Situação:</strong> <%= colaborador?.status || 'Vínculo pendente' %></span>
+      </div>
+    </div>
+
+    <form class="my-photo-form my-photo-form--dedicated" method="POST" action="/meu-portal/foto" enctype="multipart/form-data">
+      <label>
+        <span>Trocar minha foto</span>
+        <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required />
+        <small>JPG, PNG ou WEBP • máximo 5 MB.</small>
+      </label>
+      <button class="btn btn-green" type="submit">Atualizar foto</button>
+    </form>
+
+    <div class="my-personal-note">Nome, função, setor e situação profissional são dados oficiais. Alterações nesses campos permanecem sob gestão do RH/ADMIN.</div>
+  </section>
+</div>
