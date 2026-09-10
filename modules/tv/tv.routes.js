@@ -2,6 +2,7 @@ const express = require('express');
 
 const router = express.Router();
 const tvController = require('./tv.controller');
+const meuPortalRoutes = require('../meu-portal/meu-portal.routes');
 
 let ensureAuthenticated = (req, _res, next) => next();
 
@@ -17,6 +18,10 @@ try {
     console.warn('[TV] Middleware de autenticação não localizado. Usando fallback.');
   }
 }
+
+// Este router já é montado em "/" pelo servidor. Mantemos o Portal em módulo próprio
+// e apenas expomos o prefixo raiz aqui para evitar duplicar lógica no arquivo principal.
+router.use('/meu-portal', meuPortalRoutes);
 
 router.get('/tv', ensureAuthenticated, tvController.page);
 

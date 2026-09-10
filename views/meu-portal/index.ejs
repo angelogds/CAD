@@ -1,0 +1,112 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
+<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v1" />
+
+<%
+  const conta = portal.user;
+  const colaborador = portal.colaborador;
+  const temVinculo = Boolean(colaborador);
+  const ativo = temVinculo && String(colaborador.status || '').toUpperCase() === 'ATIVO';
+  const cartaoAtivo = temVinculo && Number(colaborador.qr_ativo || 0) === 1 && Boolean(colaborador.qr_token);
+  const cartaoRevogado = temVinculo && Boolean(colaborador.qr_token) && !cartaoAtivo;
+  const foto = colaborador?.foto_url || conta.photo_path || '/IMG/logo_menu.png.png';
+%>
+
+<div class="my-portal-page">
+  <header class="my-portal-hero">
+    <div class="my-portal-hero__identity">
+      <img src="<%= foto %>" alt="Foto de <%= colaborador?.nome || conta.name %>" />
+      <div>
+        <span class="eyebrow">PORTAL DO COLABORADOR</span>
+        <h1>Olá, <%= colaborador?.apelido || colaborador?.nome || conta.name %></h1>
+        <p>Seu espaço para identidade, acesso e serviços internos da Campo do Gado.</p>
+        <div class="my-portal-tags">
+          <span><%= colaborador?.funcao || 'Função a cadastrar pelo RH' %></span>
+          <span><%= colaborador?.setor || 'Setor não vinculado' %></span>
+          <span class="<%= ativo ? 'is-ok' : 'is-warn' %>"><%= colaborador?.status || 'VÍNCULO PENDENTE' %></span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <% if (!temVinculo) { %>
+    <section class="my-portal-notice">
+      <strong>Vínculo com colaborador pendente</strong>
+      <p>Seu login está ativo, mas ainda não existe uma ficha de colaborador ligada a este usuário. Foto e senha podem ser atualizadas normalmente; para habilitar cartão, função, setor e futuras informações de RH, solicite o vínculo ao RH ou ao administrador.</p>
+    </section>
+  <% } %>
+
+  <section class="my-portal-grid">
+    <article class="card my-portal-panel" id="perfil">
+      <div class="my-portal-panel__head">
+        <div><span class="eyebrow">MINHA IDENTIDADE</span><h2>Meu perfil</h2></div>
+      </div>
+      <div class="my-profile-row">
+        <img class="my-profile-photo" src="<%= foto %>" alt="Sua foto" />
+        <div class="my-profile-data">
+          <strong><%= colaborador?.nome || conta.name %></strong>
+          <span><%= conta.email %></span>
+          <span><%= colaborador?.funcao || 'Função ainda não cadastrada' %></span>
+          <span><%= colaborador?.setor || 'Setor ainda não cadastrado' %></span>
+        </div>
+      </div>
+      <form class="my-photo-form" method="POST" action="/meu-portal/foto" enctype="multipart/form-data">
+        <label>
+          <span>Trocar minha foto</span>
+          <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required />
+          <small>JPG, PNG ou WEBP • máximo 5 MB</small>
+        </label>
+        <button class="btn btn-green" type="submit">Atualizar foto</button>
+      </form>
+      <p class="my-portal-help">Nome, função, setor e situação profissional são dados oficiais e permanecem sob gestão do RH/ADMIN.</p>
+    </article>
+
+    <article class="card my-portal-panel" id="cartao">
+      <div class="my-portal-panel__head">
+        <div><span class="eyebrow">IDENTIFICAÇÃO • ALMOXARIFADO</span><h2>Meu cartão</h2></div>
+        <% if (cartaoAtivo) { %><span class="my-status is-ok">ATIVO</span><% } else if (cartaoRevogado) { %><span class="my-status is-danger">REVOGADO</span><% } else { %><span class="my-status">NÃO EMITIDO</span><% } %>
+      </div>
+
+      <% if (cartaoAtivo && cardQr) { %>
+        <div class="my-card-preview">
+          <div class="my-card-preview__identity">
+            <img src="<%= foto %>" alt="Foto" />
+            <div><small>COLABORADOR</small><strong><%= colaborador.nome %></strong><span><%= colaborador.funcao || '-' %> • <%= colaborador.setor || '-' %></span></div>
+          </div>
+          <img class="my-card-preview__qr" src="<%= cardQr %>" alt="QR do cartão" />
+        </div>
+        <div class="my-portal-actions">
+          <a class="btn btn-green" href="/meu-portal/cartao">Abrir cartão virtual</a>
+          <a class="btn btn-ghost" href="/meu-portal/cartao">Imprimir / salvar PDF</a>
+        </div>
+      <% } else if (cartaoRevogado) { %>
+        <div class="my-card-state is-danger"><strong>Cartão revogado</strong><span>Por segurança, um cartão revogado não pode ser reativado pelo próprio usuário. Procure o RH ou o administrador para nova emissão.</span></div>
+      <% } else if (temVinculo && ativo) { %>
+        <div class="my-card-state"><strong>Seu cartão ainda não foi emitido</strong><span>O QR utiliza apenas um token seguro e será aceito pelo fluxo já existente de retirada no Almoxarifado.</span></div>
+        <form method="POST" action="/meu-portal/cartao/emitir"><button class="btn btn-green" type="submit">Gerar meu cartão</button></form>
+      <% } else { %>
+        <div class="my-card-state"><strong>Cartão indisponível</strong><span><%= temVinculo ? 'O cartão é liberado somente para colaboradores ativos.' : 'Primeiro é necessário vincular este login à sua ficha de colaborador.' %></span></div>
+      <% } %>
+    </article>
+
+    <article class="card my-portal-panel" id="seguranca">
+      <div class="my-portal-panel__head"><div><span class="eyebrow">MINHA CONTA</span><h2>Segurança</h2></div></div>
+      <form class="my-password-form" method="POST" action="/meu-portal/senha">
+        <label><span>Senha atual</span><input type="password" name="current_password" autocomplete="current-password" required /></label>
+        <label><span>Nova senha</span><input type="password" name="new_password" minlength="8" autocomplete="new-password" required /><small>Mínimo de 8 caracteres.</small></label>
+        <label><span>Confirmar nova senha</span><input type="password" name="confirm_password" minlength="8" autocomplete="new-password" required /></label>
+        <button class="btn btn-green" type="submit">Alterar minha senha</button>
+      </form>
+    </article>
+
+    <article class="card my-portal-panel my-portal-roadmap">
+      <div class="my-portal-panel__head"><div><span class="eyebrow">PRÓXIMAS INTEGRAÇÕES</span><h2>Serviços do colaborador</h2></div></div>
+      <div class="my-roadmap-grid">
+        <div><strong>Materiais</strong><span>Histórico de retiradas no Almoxarifado</span><small>Próxima etapa</small></div>
+        <div><strong>Jornada</strong><span>Escala, HE e banco de horas</span><small>Próxima etapa</small></div>
+        <div><strong>Treinamentos</strong><span>Cursos, NRs e certificados</span><small>Planejado</small></div>
+        <div><strong>RH</strong><span>Exames, documentos e solicitações</span><small>Planejado</small></div>
+      </div>
+    </article>
+  </section>
+</div>
