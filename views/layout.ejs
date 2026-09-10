@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/css/ui-maintenance-shell-2026.css" />
   <link rel="stylesheet" href="/css/ui-shell-modern-2026.css?v=20260819-shell-01" />
+  <% if (typeof activeMenu !== 'undefined' && activeMenu === 'meu-portal') { %><link rel="stylesheet" href="/css/meu-portal-modernizacao.css?v=20260910-p4" /><% } %>
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'escala') { %><link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b" /><% } %>
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><link rel="stylesheet" href="/css/compras-demandas-pre-cotacao.css?v=20260902-v1" /><% } %>
   <script>window.__VAPID_PUBLIC_KEY__ = "<%= VAPID_PUBLIC_KEY || "" %>";</script>
@@ -85,6 +86,12 @@
                     <strong><%= user.name %></strong>
                     <span class="pill-role"><%= String(user.role || '').toUpperCase() %></span>
                   </div>
+                  <nav aria-label="Atalhos pessoais">
+                    <a class="topbar-notification-item" href="/meu-portal"><strong>Meu Portal</strong><br><span class="muted">Identidade e serviços pessoais</span></a>
+                    <a class="topbar-notification-item" href="/meu-portal/cartao"><strong>Meu Cartão</strong><br><span class="muted">Identificação e QR do colaborador</span></a>
+                    <a class="topbar-notification-item" href="/escala/meu-painel"><strong>Minha Jornada</strong><br><span class="muted">Escala, horas extras e banco</span></a>
+                    <a class="topbar-notification-item" href="/meu-portal#seguranca"><strong>Conta e segurança</strong><br><span class="muted">Foto e alteração de senha</span></a>
+                  </nav>
                   <form action="/auth/logout" method="POST">
                     <button class="btn btn-ghost user-menu-logout" type="submit">Sair</button>
                   </form>
@@ -110,7 +117,7 @@
         <%- include("partials/industrial-assistant-global") %>
         <script src="/js/ai-global.js" defer></script>
       <% } %>
-    <% } %>
+    }
 
     <script src="/js/app-layout.js" defer></script>
     <script src="/js/push.js" defer></script>
