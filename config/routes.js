@@ -12,6 +12,8 @@ const OFFICIAL_ROUTES = Object.freeze({
 
 const COMPATIBILITY_ALIASES = Object.freeze([
   { from: '/ordens-servico', to: OFFICIAL_ROUTES.os },
+  // Fase 3: entrada curta do módulo RH preservando a rota histórica da Escala.
+  { from: '/rh', to: '/escala/rh' },
 ]);
 
 function buildRedirectTarget(req, aliasFrom, aliasTo) {
