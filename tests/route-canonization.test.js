@@ -13,12 +13,19 @@ test('rotas oficiais expõem módulos críticos da estabilização', () => {
   assert.equal(OFFICIAL_ROUTES.almoxarifado, '/almoxarifado');
   assert.equal(OFFICIAL_ROUTES.estoque, '/estoque');
   assert.equal(OFFICIAL_ROUTES.pcm, '/pcm');
+  assert.equal(OFFICIAL_ROUTES.rh, '/rh');
 });
 
 test('alias legado de ordens de serviço permanece ativo', () => {
   const osAlias = COMPATIBILITY_ALIASES.find((entry) => entry.from === '/ordens-servico');
   assert.ok(osAlias, 'alias /ordens-servico deve existir');
   assert.equal(osAlias.to, '/os');
+});
+
+test('entrada histórica do RH na Escala aponta para a central canônica', () => {
+  const rhAlias = COMPATIBILITY_ALIASES.find((entry) => entry.from === '/escala/rh');
+  assert.ok(rhAlias, 'alias /escala/rh deve existir');
+  assert.equal(rhAlias.to, '/rh');
 });
 
 test('server usa registro centralizado de aliases de compatibilidade', () => {
