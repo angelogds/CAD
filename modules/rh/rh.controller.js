@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const service = require('./rh.service');
 const people = require('./rh.people');
+const rhDocuments = require('./rh.documents');
 const colaboradoresService = require('../colaboradores/colaboradores.service');
 const dateBr = require('../../utils/data-hora-br');
 
@@ -23,9 +24,15 @@ exports.index = (req, res, next) => {
     // nominal de pendências pessoais/sensíveis. Detalhes continuam exclusivos a RH/ADMIN.
     if (!dashboard.canManage) dashboard = { ...dashboard, pendencias: [] };
     const requestedId = Number(req.query.colaborador || 0);
-    const selected = requestedId && dashboard.canManage
+    let selected = requestedId && dashboard.canManage
       ? service.getCollaboratorDetail(requestedId, currentUser(req))
       : null;
+    if (selected?.colaborador?.id) {
+      selected = {
+        ...selected,
+        documentos: rhDocuments.listForCollaborator(selected.colaborador.id, { self: false }),
+      };
+    }
     return res.render('rh/index', {
       title: 'RH • Gestão de Pessoas',
       dashboard,
@@ -56,10 +63,13 @@ exports.criarDocumento = (req, res) => {
     if (!req.file) throw new Error('Selecione um arquivo para upload.');
     colaboradoresService.criarDocumento(colaboradorId, {
       ...req.body,
-      arquivo_url: `/uploads/colaboradores/documentos/${req.file.filename}`,
+      arquivo_url: rhDocuments.privateMarker(req.file.filename),
     }, currentUser(req));
     flash(req, 'success', 'Documento anexado à ficha do colaborador.');
   } catch (error) {
+    if (req.file?.path) {
+      try { fs.unlinkSync(req.file.path); } catch (_unlinkError) {}
+    }
     flash(req, 'error', error.message || 'Não foi possível anexar o documento.');
   }
   return res.redirect(`/escala/rh?colaborador=${colaboradorId}#documentos`);
@@ -72,5 +82,14 @@ exports.exameArquivo = (req, res, next) => {
     const downloadName = String(exame.arquivo_nome_original || path.basename(exame.filePath));
     res.setHeader('Cache-Control', 'private, no-store');
     return res.download(exame.filePath, downloadName);
+  } catch (error) { return next(error); }
+};
+
+exports.documentoArquivo = (req, res, next) => {
+  try {
+    const documento = rhDocuments.getPrivateDocumentForDownload(Number(req.params.documentoId), Number(req.params.id));
+    if (!documento || !fs.existsSync(documento.filePath)) return res.status(404).send('Documento não encontrado.');
+    res.setHeader('Cache-Control', 'private, no-store');
+    return res.download(documento.filePath, path.basename(documento.filePath));
   } catch (error) { return next(error); }
 };
