@@ -38,7 +38,9 @@ function canViewDemand(user, demanda) {
 
 function list(filters = {}, user) {
   const visibility = visibilityWhere(user);
-  let where = visibility.sql;
+  // A fila principal exibe somente demandas-raiz. As subdemandas permanecem
+  // consultáveis dentro da demanda principal, sem competir com a fila global.
+  let where = `${visibility.sql} AND d.demanda_pai_id IS NULL`;
   const params = { ...visibility.params };
 
   const status = String(filters.status || '').toUpperCase();
@@ -71,7 +73,17 @@ function list(filters = {}, user) {
     where += ` AND (
       d.titulo LIKE @q OR d.descricao LIKE @q OR
       u.name LIKE @q OR r.name LIKE @q OR CAST(d.id AS TEXT) LIKE @q OR
-      COALESCE(e.nome, '') LIKE @q OR COALESCE(d.nr_referencia, '') LIKE @q
+      COALESCE(e.nome, '') LIKE @q OR COALESCE(d.nr_referencia, '') LIKE @q OR
+      EXISTS (
+        SELECT 1
+        FROM demandas sd_busca
+        WHERE sd_busca.demanda_pai_id = d.id
+          AND (
+            sd_busca.titulo LIKE @q OR
+            COALESCE(sd_busca.descricao, '') LIKE @q OR
+            CAST(sd_busca.id AS TEXT) LIKE @q
+          )
+      )
     )`;
     params.q = `%${q}%`;
   }
@@ -111,13 +123,13 @@ function getPainel(user) {
       SUM(CASE WHEN status = 'CONCLUIDA' THEN 1 ELSE 0 END) AS concluidas,
       SUM(CASE WHEN prioridade IN ('URGENTE', 'ALTA') AND status NOT IN ('CONCLUIDA', 'CANCELADA') THEN 1 ELSE 0 END) AS prioritarias
     FROM demandas d
-    WHERE ${visibility.sql}
+    WHERE ${visibility.sql} AND d.demanda_pai_id IS NULL
   `).get(visibility.params) || {};
 
   const distribution = db.prepare(`
     SELECT status, COUNT(*) AS total
     FROM demandas d
-    WHERE ${visibility.sql}
+    WHERE ${visibility.sql} AND d.demanda_pai_id IS NULL
     GROUP BY status
   `).all(visibility.params);
 
@@ -154,7 +166,19 @@ function getById(id) {
     LEFT JOIN users r ON r.id = d.responsavel_user_id
     LEFT JOIN equipamentos e ON e.id = d.equipamento_id
     WHERE d.demanda_pai_id = ?
-    ORDER BY CASE d.prioridade WHEN 'URGENTE' THEN 0 WHEN 'ALTA' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END, d.id
+    ORDER BY
+      CASE UPPER(COALESCE(d.prioridade, 'NORMAL'))
+        WHEN 'URGENTE' THEN 0
+        WHEN 'CRITICA' THEN 0
+        WHEN 'CRÍTICA' THEN 0
+        WHEN 'ALTA' THEN 1
+        WHEN 'NORMAL' THEN 2
+        WHEN 'MEDIA' THEN 2
+        WHEN 'MÉDIA' THEN 2
+        WHEN 'BAIXA' THEN 3
+        ELSE 4
+      END,
+      d.id ASC
   `).all(id);
 
   let solicitacoes = [];
@@ -390,13 +414,15 @@ function getResumoDashboard() {
       SUM(CASE WHEN status='NOVA' THEN 1 ELSE 0 END) AS novas,
       SUM(CASE WHEN status='EM_ANDAMENTO' THEN 1 ELSE 0 END) AS em_andamento,
       SUM(CASE WHEN status='PARADA' THEN 1 ELSE 0 END) AS paradas
-    FROM demandas
+    FROM demandas d
+    WHERE d.demanda_pai_id IS NULL
   `).get() || {};
 
   const emTrabalhoAgora = db.prepare(`
     SELECT id, titulo, prioridade, updated_at
-    FROM demandas
-    WHERE status='EM_ANDAMENTO'
+    FROM demandas d
+    WHERE d.demanda_pai_id IS NULL
+      AND status='EM_ANDAMENTO'
     ORDER BY datetime(updated_at) DESC
     LIMIT 8
   `).all();
@@ -421,7 +447,7 @@ function listEquipamentos() {
 function listParentCandidates(user, excludeId = null) {
   const visibility = visibilityWhere(user);
   const params = { ...visibility.params };
-  let where = `${visibility.sql} AND d.status NOT IN ('CONCLUIDA','CANCELADA')`;
+  let where = `${visibility.sql} AND d.demanda_pai_id IS NULL AND d.status NOT IN ('CONCLUIDA','CANCELADA')`;
   if (excludeId) {
     where += ' AND d.id <> @excludeId';
     params.excludeId = Number(excludeId);
