@@ -70,8 +70,13 @@ function uploadSeguro(upload, area) {
   });
 }
 
-const uploadExameSeguro = uploadSeguro(uploadExame, 'exames');
-const uploadRhDocSeguro = uploadSeguro(uploadRhDoc, 'documentos');
+function uploadExameSeguro(req, res, next) {
+  return uploadSeguro(uploadExame, 'exames')(req, res, next);
+}
+
+function uploadRhDocSeguro(req, res, next) {
+  return uploadSeguro(uploadRhDoc, 'documentos')(req, res, next);
+}
 
 router.use(requireLogin, (req, res, next) => {
   res.locals.activeMenu = 'colaboradores';
