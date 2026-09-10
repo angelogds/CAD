@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const service = require('./rh.service');
 const people = require('./rh.people');
+const colaboradoresService = require('../colaboradores/colaboradores.service');
 const dateBr = require('../../utils/data-hora-br');
 
 function currentUser(req) { return req.user || req.session?.user || {}; }
@@ -44,6 +45,21 @@ exports.criarExame = (req, res) => {
     flash(req, 'error', error.message || 'Não foi possível registrar o exame.');
   }
   return res.redirect(`/escala/rh?colaborador=${colaboradorId}#exames`);
+};
+
+exports.criarDocumento = (req, res) => {
+  const colaboradorId = Number(req.params.id || 0);
+  try {
+    if (!req.file) throw new Error('Selecione um arquivo para upload.');
+    colaboradoresService.criarDocumento(colaboradorId, {
+      ...req.body,
+      arquivo_url: `/uploads/colaboradores/documentos/${req.file.filename}`,
+    }, currentUser(req));
+    flash(req, 'success', 'Documento anexado à ficha do colaborador.');
+  } catch (error) {
+    flash(req, 'error', error.message || 'Não foi possível anexar o documento.');
+  }
+  return res.redirect(`/escala/rh?colaborador=${colaboradorId}#documentos`);
 };
 
 exports.exameArquivo = (req, res, next) => {
