@@ -1,0 +1,85 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v3" />
+<link rel="stylesheet" href="/css/rh-portal.css?v=20260910-f3" />
+<%
+  const exames = Array.isArray(rh?.exames) ? rh.exames : [];
+  const documentos = Array.isArray(rh?.documentos) ? rh.documentos : [];
+  const solicitacoes = Array.isArray(rh?.solicitacoes) ? rh.solicitacoes : [];
+  const vencidos = exames.filter((e) => e.status_visual === 'VENCIDO').length;
+  const vencendo = exames.filter((e) => e.status_visual === 'VENCE_EM_BREVE').length;
+  const folgaPendente = solicitacoes.filter((s) => s.status === 'PENDENTE_APROVACAO').length;
+%>
+<div class="my-portal-page my-rh-page">
+  <header class="my-section-head">
+    <div>
+      <span class="eyebrow">MEU PORTAL • RH</span>
+      <h1>Meu RH</h1>
+      <p>Consulta pessoal de exames, documentos, solicitações de folga e saldo do Banco de Horas.</p>
+    </div>
+    <a class="btn btn-ghost" href="/meu-portal">Voltar ao portal</a>
+  </header>
+
+  <% if (!rh?.vinculado) { %>
+    <section class="card my-rh-card"><div class="rh-empty"><strong>Vínculo com colaborador necessário</strong><br>Seu usuário ainda não está associado a uma ficha profissional. Procure RH/ADMIN.</div></section>
+  <% } else { %>
+    <section class="my-rh-kpis">
+      <article class="card rh-kpi"><span>Banco de horas</span><strong><%= rh.saldo?.horas || formatMinutes(rh.saldo?.minutos || 0) %></strong><small>Saldo atual</small></article>
+      <article class="card rh-kpi"><span>Folgas pendentes</span><strong><%= folgaPendente %></strong><small>Aguardando decisão</small></article>
+      <article class="card rh-kpi"><span>Exames vencendo</span><strong><%= vencendo %></strong><small>Próximos 30 dias</small></article>
+      <article class="card rh-kpi"><span>Exames vencidos</span><strong><%= vencidos %></strong><small>Procure o RH para regularização</small></article>
+    </section>
+
+    <section class="my-rh-grid">
+      <article class="card my-rh-card">
+        <div class="my-material-history__head"><div><span class="eyebrow">SAÚDE OCUPACIONAL • STATUS ADMINISTRATIVO</span><h2>Meus exames</h2></div></div>
+        <div class="my-rh-list">
+          <% exames.slice(0, 20).forEach((e) => { %>
+            <div class="my-rh-item">
+              <strong><%= String(e.tipo || 'EXAME').replaceAll('_', ' ') %></strong>
+              <span><%= dateBr.formatDateBR(e.data_realizacao) %> → <%= dateBr.formatDateBR(e.validade_ate) %></span>
+              <small><%= e.status_label %></small>
+            </div>
+          <% }) %>
+          <% if (!exames.length) { %><div class="rh-empty">Nenhum exame ocupacional registrado para sua ficha.</div><% } %>
+        </div>
+        <p class="rh-privacy">Esta área mostra somente situação administrativa e validade. Diagnósticos e dados clínicos não fazem parte do Meu Portal.</p>
+      </article>
+
+      <article class="card my-rh-card">
+        <div class="my-material-history__head"><div><span class="eyebrow">DOCUMENTOS</span><h2>Meus documentos</h2></div></div>
+        <div class="my-rh-list">
+          <% documentos.slice(0, 20).forEach((doc) => { %>
+            <div class="my-rh-item">
+              <strong><%= doc.tipo || 'Documento' %></strong>
+              <span><%= doc.data ? dateBr.formatDateBR(String(doc.data).slice(0,10)) : '-' %></span>
+              <small><%= doc.confirmado_em ? 'Ciência registrada' : 'Disponível' %></small>
+              <% if (doc.arquivo_seguro) { %><a class="btn btn-sm" href="<%= doc.arquivo_seguro %>" target="_blank" rel="noopener">Abrir documento</a><% } %>
+            </div>
+          <% }) %>
+          <% if (!documentos.length) { %><div class="rh-empty">Nenhum documento disponibilizado para sua ficha.</div><% } %>
+        </div>
+      </article>
+
+      <article class="card my-rh-card">
+        <div class="my-material-history__head"><div><span class="eyebrow">FOLGAS</span><h2>Minhas solicitações</h2></div><a class="btn btn-sm" href="/escala/meu-painel#solicitar-folga">Solicitar folga</a></div>
+        <div class="my-rh-list">
+          <% solicitacoes.slice(0, 15).forEach((s) => { %>
+            <div class="my-rh-item"><strong><%= dateBr.formatDateBR(s.data_folga) %></strong><span><%= s.status || '-' %></span><small><%= s.observacao_decisao || s.motivo || 'Sem observação' %></small></div>
+          <% }) %>
+          <% if (!solicitacoes.length) { %><div class="rh-empty">Você ainda não possui solicitações de folga.</div><% } %>
+        </div>
+      </article>
+
+      <article class="card my-rh-card">
+        <span class="eyebrow">ATALHOS</span><h2>Serviços relacionados</h2>
+        <div class="my-rh-list">
+          <a class="btn btn-ghost" href="/escala/meu-painel">Minha Jornada e Banco de Horas</a>
+          <a class="btn btn-ghost" href="/meu-portal/treinamentos">Treinamentos e certificados</a>
+          <a class="btn btn-ghost" href="/meu-portal/dados-profissionais">Dados profissionais</a>
+        </div>
+      </article>
+    </section>
+
+    <div class="my-material-audit-note">Consulta estritamente pessoal. O Meu Portal não aceita seleção de outro colaborador e não permite editar dados oficiais de RH.</div>
+  <% } %>
+</div>
