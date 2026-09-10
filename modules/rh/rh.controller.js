@@ -18,7 +18,10 @@ function formatMinutes(value) {
 exports.index = (req, res, next) => {
   try {
     res.locals.activeMenu = 'rh';
-    const dashboard = people.enrichDashboard(service.buildDashboard(currentUser(req)), currentUser(req));
+    let dashboard = people.enrichDashboard(service.buildDashboard(currentUser(req)), currentUser(req));
+    // DIRETORIA recebe indicadores e visão operacional agregada, mas não a lista
+    // nominal de pendências pessoais/sensíveis. Detalhes continuam exclusivos a RH/ADMIN.
+    if (!dashboard.canManage) dashboard = { ...dashboard, pendencias: [] };
     const requestedId = Number(req.query.colaborador || 0);
     const selected = requestedId && dashboard.canManage
       ? service.getCollaboratorDetail(requestedId, currentUser(req))
