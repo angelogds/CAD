@@ -35,6 +35,7 @@ const upload = multer({
 
 router.use(requireLogin);
 router.get('/', ctrl.index);
+router.get('/materiais', ctrl.materiais);
 router.post('/vinculo', requireRole(LINK_MANAGER_ROLES), ctrl.linkColaborador);
 router.post('/foto', upload.single('photo'), ctrl.updatePhoto);
 router.post('/senha', ctrl.changePassword);

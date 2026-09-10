@@ -1,6 +1,7 @@
 const QRCode = require('qrcode');
 const service = require('./meu-portal.service');
 const qrService = require('../colaboradores/colaboradores.qr.service');
+const dateBr = require('../../utils/data-hora-br');
 
 async function qrDataUrl(colaborador) {
   const payload = qrService.encodePayload(colaborador);
@@ -28,6 +29,27 @@ async function index(req, res) {
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível carregar o Meu Portal.');
     return res.redirect('/dashboard');
+  }
+}
+
+function materiais(req, res) {
+  res.locals.activeMenu = 'meu-portal';
+  try {
+    const materiais = service.listOwnMaterialWithdrawals(req.session.user.id, {
+      q: req.query.q,
+      inicio: req.query.inicio,
+      fim: req.query.fim,
+    });
+
+    return res.render('meu-portal/materiais', {
+      title: 'Meus Materiais',
+      materiais,
+      dateBr,
+    });
+  } catch (error) {
+    const message = error.message || 'Não foi possível carregar seu histórico de materiais.';
+    req.flash('error', message);
+    return res.redirect(/^Período inválido:/i.test(message) ? '/meu-portal/materiais' : '/meu-portal');
   }
 }
 
@@ -129,4 +151,4 @@ async function card(req, res) {
   }
 }
 
-module.exports = { index, linkColaborador, updatePhoto, changePassword, emitCard, card };
+module.exports = { index, materiais, linkColaborador, updatePhoto, changePassword, emitCard, card };

@@ -1,0 +1,128 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v3" />
+
+<%
+  const resumo = materiais?.resumo || {};
+  const movimentos = Array.isArray(materiais?.movimentos) ? materiais.movimentos : [];
+  const filtros = materiais?.filtros || {};
+  const colaborador = materiais?.colaborador || null;
+%>
+
+<div class="my-portal-page my-material-page">
+  <header class="my-section-head">
+    <div>
+      <span class="eyebrow">MEU PORTAL • ALMOXARIFADO</span>
+      <h1>Meus materiais</h1>
+      <p>Histórico pessoal das retiradas registradas no Almoxarifado e baixadas no Estoque.</p>
+    </div>
+    <a class="btn btn-ghost" href="/meu-portal">Voltar ao portal</a>
+  </header>
+
+  <% if (!materiais?.vinculado) { %>
+    <section class="card my-material-empty">
+      <strong>Vínculo com colaborador necessário</strong>
+      <p>Seu login ainda não está ligado a uma ficha profissional. Após o vínculo pelo RH/ADMIN, suas retiradas passam a aparecer aqui automaticamente.</p>
+    </section>
+  <% } else if (!materiais?.disponivel) { %>
+    <section class="card my-material-empty">
+      <strong>Histórico ainda indisponível nesta instalação</strong>
+      <p>A estrutura de rastreabilidade das retiradas do Estoque não foi encontrada. Nenhum dado foi alterado; procure o administrador para verificar a implantação do módulo.</p>
+    </section>
+  <% } else { %>
+    <section class="my-material-kpis" aria-label="Resumo das retiradas">
+      <article class="card my-material-kpi">
+        <span>Retiradas</span>
+        <strong><%= Number(resumo.totalRetiradas || 0) %></strong>
+        <small>No período filtrado</small>
+      </article>
+      <article class="card my-material-kpi">
+        <span>Materiais diferentes</span>
+        <strong><%= Number(resumo.materiaisDiferentes || 0) %></strong>
+        <small>Itens distintos retirados</small>
+      </article>
+      <article class="card my-material-kpi">
+        <span>OS vinculadas</span>
+        <strong><%= Number(resumo.osVinculadas || 0) %></strong>
+        <small>Ordens relacionadas</small>
+      </article>
+      <article class="card my-material-kpi">
+        <span>Última retirada</span>
+        <strong class="is-date"><%= resumo.ultimaRetirada ? dateBr.formatDateTimeBR(resumo.ultimaRetirada) : '-' %></strong>
+        <small>Registro mais recente</small>
+      </article>
+    </section>
+
+    <form class="card my-material-filters" method="GET" action="/meu-portal/materiais">
+      <label>
+        <span>Material</span>
+        <input type="search" name="q" maxlength="80" value="<%= filtros.q || '' %>" placeholder="Ex.: rolamento, correia, óleo" />
+      </label>
+      <label>
+        <span>De</span>
+        <input type="date" name="inicio" value="<%= filtros.inicio || '' %>" />
+      </label>
+      <label>
+        <span>Até</span>
+        <input type="date" name="fim" value="<%= filtros.fim || '' %>" />
+      </label>
+      <div class="my-material-filter-actions">
+        <button class="btn btn-green" type="submit">Filtrar</button>
+        <a class="btn btn-ghost" href="/meu-portal/materiais">Limpar</a>
+      </div>
+    </form>
+
+    <section class="card my-material-history">
+      <div class="my-material-history__head">
+        <div>
+          <span class="eyebrow">RASTREABILIDADE PESSOAL</span>
+          <h2>Histórico de retiradas</h2>
+        </div>
+        <span class="my-status"><%= movimentos.length %> registro<%= movimentos.length === 1 ? '' : 's' %></span>
+      </div>
+
+      <% if (!movimentos.length) { %>
+        <div class="my-material-empty is-inline">
+          <strong>Nenhuma retirada encontrada</strong>
+          <p>Não existem registros para os filtros selecionados.</p>
+        </div>
+      <% } else { %>
+        <div class="my-material-table-wrap">
+          <table class="my-material-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Material</th>
+                <th>Quantidade</th>
+                <th>Solicitação</th>
+                <th>OS</th>
+                <th>Equipamento</th>
+                <th>Entregue por</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% movimentos.forEach((movimento) => { %>
+                <tr>
+                  <td><%= dateBr.formatDateTimeBR(movimento.data_mov) %></td>
+                  <td><strong><%= movimento.item_nome || '-' %></strong></td>
+                  <td><%= Number(movimento.quantidade || 0) %> <%= movimento.item_unidade || 'UN' %></td>
+                  <td><%= movimento.solicitacao_numero || (movimento.solicitacao_id ? `#${movimento.solicitacao_id}` : '-') %></td>
+                  <td><%= movimento.os_id ? `#${movimento.os_id}` : '-' %></td>
+                  <td><%= movimento.equipamento_nome || '-' %></td>
+                  <td><%= movimento.entregue_por_nome || '-' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      <% if (materiais?.limiteAtingido) { %>
+        <p class="my-material-limit-note">Exibindo os 300 registros mais recentes. Use os filtros por período ou material para refinar a consulta.</p>
+      <% } %>
+    </section>
+
+    <div class="my-material-audit-note">
+      Esta consulta é individual e somente leitura. Os dados são originados das baixas reais registradas pelo Almoxarifado/Estoque e não podem ser alterados pelo Meu Portal.
+    </div>
+  <% } %>
+</div>
