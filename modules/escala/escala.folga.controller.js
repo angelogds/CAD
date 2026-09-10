@@ -1,5 +1,6 @@
 const escala = require('./escala.service');
 const solicitacoes = require('./escala.folga-solicitacao.service');
+const rhNotifications = require('../rh/rh.notifications');
 const { normalizeRole, canAccessModule } = require('../../config/rbac');
 const dateBr = require('../../utils/data-hora-br');
 
@@ -53,7 +54,8 @@ exports.realizar = (req, res) => {
 
 exports.solicitar = (req, res) => {
   try {
-    solicitacoes.solicitarFolga({ user: currentUser(req), data_folga: req.body.data_folga, motivo: req.body.motivo });
+    const solicitacaoId = solicitacoes.solicitarFolga({ user: currentUser(req), data_folga: req.body.data_folga, motivo: req.body.motivo });
+    rhNotifications.notifyNewLeaveRequest(solicitacaoId);
     flash(req, 'success', 'Solicitação enviada. A data ficou reservada enquanto aguarda aprovação.');
   } catch (error) { flash(req, 'error', error.message); }
   return res.redirect('/escala/meu-painel#solicitar-folga');
@@ -69,7 +71,9 @@ exports.cancelarSolicitacao = (req, res) => {
 
 exports.aprovarSolicitacao = (req, res) => {
   try {
-    solicitacoes.aprovarSolicitacao(Number(req.params.id), currentUser(req), req.body.observacao);
+    const id = Number(req.params.id);
+    solicitacoes.aprovarSolicitacao(id, currentUser(req), req.body.observacao);
+    rhNotifications.notifyLeaveDecision(id, 'APROVADA');
     flash(req, 'success', 'Folga aprovada, lançada na Escala e debitada do Banco de Horas.');
   } catch (error) { flash(req, 'error', error.message); }
   return res.redirect('/escala/folgas');
@@ -77,7 +81,9 @@ exports.aprovarSolicitacao = (req, res) => {
 
 exports.reprovarSolicitacao = (req, res) => {
   try {
-    solicitacoes.reprovarSolicitacao(Number(req.params.id), currentUser(req), req.body.motivo);
+    const id = Number(req.params.id);
+    solicitacoes.reprovarSolicitacao(id, currentUser(req), req.body.motivo);
+    rhNotifications.notifyLeaveDecision(id, 'REPROVADA');
     flash(req, 'success', 'Solicitação reprovada e data liberada.');
   } catch (error) { flash(req, 'error', error.message); }
   return res.redirect('/escala/folgas');
