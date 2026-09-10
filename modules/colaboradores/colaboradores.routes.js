@@ -5,14 +5,19 @@ const fs = require('fs');
 const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const ctrl = require('./colaboradores.controller');
 const qrCtrl = require('./colaboradores.qr.controller');
+const rhCtrl = require('../rh/rh.controller');
 const storagePaths = require('../../config/storage');
 
 const router = express.Router();
 
 const fotosDir = path.join(storagePaths.IMAGE_DIR, 'colaboradores', 'fotos');
 const docsDir = path.join(storagePaths.UPLOAD_DIR, 'colaboradores', 'documentos');
+// Exames ocupacionais ficam fora de /uploads, pois /uploads é público.
+// O download é feito exclusivamente por rota autenticada ADMIN/RH.
+const examesDir = path.join(storagePaths.DATA_DIR, 'rh', 'exames');
 fs.mkdirSync(fotosDir, { recursive: true });
 fs.mkdirSync(docsDir, { recursive: true });
+fs.mkdirSync(examesDir, { recursive: true });
 
 function fileName(_req, file, cb) {
   cb(null, `${Date.now()}-${String(file.originalname || 'arquivo').replace(/\s+/g, '-')}`);
@@ -20,6 +25,23 @@ function fileName(_req, file, cb) {
 
 const uploadFoto = multer({ storage: multer.diskStorage({ destination: (_req, _f, cb) => cb(null, fotosDir), filename: fileName }) });
 const uploadDoc = multer({ storage: multer.diskStorage({ destination: (_req, _f, cb) => cb(null, docsDir), filename: fileName }) });
+const examAllowedMime = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
+const uploadExame = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _f, cb) => cb(null, examesDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase();
+      cb(null, `${Date.now()}-${Math.random().toString(16).slice(2)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!examAllowedMime.has(String(file.mimetype || '').toLowerCase())) {
+      return cb(new Error('Formato de exame inválido. Envie PDF, JPG, PNG ou WEBP.'));
+    }
+    return cb(null, true);
+  },
+});
 
 function safe(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -37,6 +59,10 @@ router.post('/', requireRole(['ADMIN', 'RH']), uploadFoto.single('foto'), safe(c
 router.get('/:id/cartao', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR']), safe(qrCtrl.cartao));
 router.post('/:id/cartao/emitir', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR']), safe(qrCtrl.emitir));
 router.post('/:id/cartao/revogar', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR']), safe(qrCtrl.revogar));
+
+// Fase 3 RH: exame sensível em storage privado e rota protegida.
+router.post('/:id/exames', requireRole(['ADMIN', 'RH']), uploadExame.single('arquivo'), safe(rhCtrl.criarExame));
+router.get('/:id/exames/:exameId/arquivo', requireRole(['ADMIN', 'RH']), safe(rhCtrl.exameArquivo));
 
 router.get('/:id', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'COLABORADOR']), safe(ctrl.show));
 router.post('/:id/perfil', requireRole(['ADMIN', 'RH']), uploadFoto.single('foto'), safe(ctrl.savePerfil));
