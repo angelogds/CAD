@@ -1,0 +1,175 @@
+<%- layout('layout') -%>
+<link rel="stylesheet" href="/css/rh-portal.css?v=20260910-f3" />
+<%
+  const d = dashboard || {};
+  const i = d.indicadores || {};
+  const pessoas = Array.isArray(d.colaboradores) ? d.colaboradores : [];
+  const pendencias = Array.isArray(d.pendencias) ? d.pendencias : [];
+  const person = selected?.colaborador || null;
+  const examList = selected?.exames || [];
+  const docs = selected?.documentos || [];
+  const certs = selected?.certificados || [];
+  const folgaReqs = selected?.solicitacoes || [];
+%>
+<div class="rh-page">
+  <header class="rh-head">
+    <div>
+      <span class="rh-eyebrow">GESTÃO DE PESSOAS • CAMPO DO GADO</span>
+      <h1>RH • Gestão de Pessoas</h1>
+      <p class="rh-muted">Central integrada de colaboradores, jornada, banco de horas, folgas, exames, documentos e treinamentos.</p>
+    </div>
+    <div><a class="btn btn-ghost" href="/escala/relatorios">Relatórios</a></div>
+  </header>
+
+  <nav class="card rh-nav" aria-label="Áreas do RH">
+    <a class="btn btn-sm" href="#visao-geral">Visão geral</a>
+    <a class="btn btn-sm" href="#colaboradores">Colaboradores</a>
+    <a class="btn btn-sm" href="#jornada">Jornada</a>
+    <a class="btn btn-sm" href="#folgas">Folgas</a>
+    <% if (d.canSensitive) { %><a class="btn btn-sm" href="#exames">Exames</a><% } %>
+    <% if (d.canManage) { %><a class="btn btn-sm" href="#documentos">Documentos</a><a class="btn btn-sm" href="#treinamentos">Treinamentos</a><% } %>
+  </nav>
+
+  <section class="rh-kpis" id="visao-geral" aria-label="Indicadores do RH">
+    <article class="card rh-kpi"><span>Colaboradores ativos</span><strong><%= Number(i.colaboradoresAtivos || 0) %></strong><small>Ficha profissional ativa</small></article>
+    <article class="card rh-kpi"><span>Folgas pendentes</span><strong><%= Number(i.folgasPendentes || 0) %></strong><small>Aguardando decisão operacional</small></article>
+    <article class="card rh-kpi"><span>HE no mês</span><strong><%= formatMinutes(i.horasExtrasMesMinutos || 0) %></strong><small>Dados reais da Escala</small></article>
+    <article class="card rh-kpi"><span>Banco de horas</span><strong><%= formatMinutes(i.bancoHorasMinutos || 0) %></strong><small>Saldo consolidado</small></article>
+    <article class="card rh-kpi"><span>Exames vencidos</span><strong><%= Number(i.examesVencidos || 0) %></strong><small>Requer acompanhamento</small></article>
+    <article class="card rh-kpi"><span>Exames vencendo</span><strong><%= Number(i.examesVencendo || 0) %></strong><small>Próximos 30 dias</small></article>
+    <article class="card rh-kpi"><span>Treinamentos</span><strong><%= Number(i.treinamentosPendentes || 0) %></strong><small>Vencidos, vencendo ou pendentes</small></article>
+  </section>
+
+  <section class="rh-layout">
+    <div class="rh-main-column">
+      <section class="card rh-section">
+        <div class="rh-section-head">
+          <div><span class="rh-eyebrow">ACOMPANHAMENTO</span><h2>Pendências do RH</h2></div>
+          <span class="rh-badge"><%= pendencias.length %> item<%= pendencias.length === 1 ? '' : 's' %></span>
+        </div>
+        <% if (!pendencias.length) { %>
+          <div class="rh-empty">Nenhuma pendência crítica encontrada nas fontes integradas.</div>
+        <% } else { %>
+          <div class="rh-pending-list">
+            <% pendencias.slice(0, 40).forEach((p) => { %>
+              <article class="rh-pending <%= p.nivel === 'critico' ? 'is-critical' : '' %>">
+                <span class="rh-pending-type"><%= p.tipo %></span>
+                <div><strong><%= p.colaborador || '-' %> • <%= p.titulo || '-' %></strong><small><%= p.detalhe || '' %></small></div>
+                <small><%= p.data ? dateBr.formatDateBR(String(p.data).slice(0,10)) : '' %></small>
+              </article>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+
+      <section class="card rh-section" id="colaboradores">
+        <div class="rh-section-head">
+          <div><span class="rh-eyebrow">CADASTRO + JORNADA</span><h2>Colaboradores</h2></div>
+          <span class="rh-muted">Clique em “Abrir RH” para consolidar a ficha.</span>
+        </div>
+        <div class="rh-filter"><input id="rhPeopleSearch" type="search" placeholder="Buscar por nome, função ou setor" /></div>
+        <div class="rh-table-wrap">
+          <table class="rh-table">
+            <thead><tr><th>Colaborador</th><th>Função</th><th>Setor</th><th>Situação</th><th>Turno</th><th>Banco</th><th>HE mês</th><th>Ação</th></tr></thead>
+            <tbody>
+              <% pessoas.forEach((c) => { const search = `${c.nome||''} ${c.funcao||c.funcaoLabel||''} ${c.setor||''}`.toLowerCase(); %>
+                <tr data-rh-person data-search="<%= search %>">
+                  <td><div class="rh-person"><% if (c.foto_path || c.foto_url) { %><img class="rh-avatar" src="<%= c.foto_path || c.foto_url %>" alt=""><% } else { %><span class="rh-avatar"></span><% } %><strong><%= c.nome %></strong></div></td>
+                  <td><%= c.funcaoLabel || c.funcao || '-' %></td>
+                  <td><%= c.setor || '-' %></td>
+                  <td><span class="rh-badge"><%= c.statusAtual || c.status || 'ATIVO' %></span></td>
+                  <td><%= c.turnoAtual || '-' %></td>
+                  <td><strong><%= c.saldo?.horas || formatMinutes(c.saldo?.minutos || 0) %></strong></td>
+                  <td><%= c.horasExtrasMes || formatMinutes(c.horasExtrasMesMinutos || 0) %></td>
+                  <td><% if (d.canManage) { %><a class="btn btn-sm" href="/escala/rh?colaborador=<%= c.id %>#jornada">Abrir RH</a><% } else { %><span class="rh-muted">Consulta</span><% } %></td>
+                </tr>
+              <% }) %>
+              <% if (!pessoas.length) { %><tr><td colspan="8" class="rh-muted">Nenhum colaborador ativo encontrado.</td></tr><% } %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <aside class="card rh-detail">
+      <% if (!d.canManage) { %>
+        <div><span class="rh-eyebrow">ACESSO DE CONSULTA</span><h2>Visão gerencial</h2><p class="rh-muted">Indicadores e dados operacionais não sensíveis. Exames, documentos e anexos pessoais permanecem restritos a RH/ADMIN.</p></div>
+      <% } else if (!person) { %>
+        <div><span class="rh-eyebrow">FICHA CONSOLIDADA</span><h2>Selecione um colaborador</h2><p class="rh-muted">Use a tabela ao lado para consultar Jornada, Folgas, Exames, Documentos e Treinamentos sem duplicar cadastros.</p></div>
+      <% } else { %>
+        <div>
+          <span class="rh-eyebrow">FICHA CONSOLIDADA</span>
+          <h2><%= person.nome %></h2>
+          <p class="rh-muted"><%= person.funcao || '-' %> • <%= person.setor || '-' %> • <%= person.status || '-' %></p>
+        </div>
+        <div class="rh-detail-summary" id="jornada">
+          <div class="rh-mini"><span>Banco</span><strong><%= selected.saldo?.horas || formatMinutes(selected.saldo?.minutos || 0) %></strong><small>Saldo atual</small></div>
+          <div class="rh-mini"><span>HE no mês</span><strong><%= selected.painelPessoa?.horasExtrasMes || formatMinutes(selected.painelPessoa?.horasExtrasMesMinutos || 0) %></strong><small>Escala</small></div>
+          <div class="rh-mini"><span>Turno</span><strong><%= selected.painelPessoa?.turnoAtual || '-' %></strong><small><%= selected.painelPessoa?.statusAtual || 'Sem situação' %></small></div>
+        </div>
+
+        <section class="rh-subsection" id="folgas">
+          <h3>Folgas e solicitações</h3>
+          <div class="rh-records">
+            <% folgaReqs.slice(0, 6).forEach((r) => { %><div class="rh-record"><div class="rh-record-head"><strong><%= dateBr.formatDateBR(r.data_folga) %></strong><span class="rh-badge <%= r.status==='REPROVADA' ? 'is-danger' : (r.status==='PENDENTE_APROVACAO' ? 'is-warning' : '') %>"><%= r.status %></span></div><small><%= r.motivo || 'Sem motivo informado' %></small></div><% }) %>
+            <% if (!folgaReqs.length) { %><div class="rh-empty">Sem solicitações de folga registradas.</div><% } %>
+          </div>
+          <p class="rh-privacy">A aprovação operacional continua na gestão autorizada da Manutenção. O RH acompanha o fluxo; não existe lançamento paralelo.</p>
+        </section>
+
+        <% if (selected.canSensitive) { %>
+          <section class="rh-subsection" id="exames">
+            <h3>Exames ocupacionais</h3>
+            <form class="rh-form" method="POST" action="/colaboradores/<%= person.id %>/exames" enctype="multipart/form-data">
+              <label><span>Tipo</span><select name="tipo" required><option value="PERIODICO">Periódico</option><option value="ADMISSIONAL">Admissional</option><option value="RETORNO_TRABALHO">Retorno ao trabalho</option><option value="MUDANCA_FUNCAO">Mudança de função</option><option value="DEMISSIONAL">Demissional</option><option value="OUTRO">Outro</option></select></label>
+              <label><span>Clínica / prestador</span><input name="clinica" maxlength="160" /></label>
+              <label><span>Realizado em</span><input type="date" name="data_realizacao" required /></label>
+              <label><span>Validade até</span><input type="date" name="validade_ate" required /></label>
+              <label class="is-wide"><span>Anexo do ASO (PDF/JPG/PNG/WEBP, até 10 MB)</span><input type="file" name="arquivo" accept=".pdf,.jpg,.jpeg,.png,.webp" /></label>
+              <label class="is-wide"><span>Observação administrativa</span><textarea name="observacao" maxlength="1000" rows="2"></textarea></label>
+              <div class="rh-form-actions"><button class="btn btn-green" type="submit">Registrar exame</button></div>
+            </form>
+            <div class="rh-records">
+              <% examList.slice(0, 12).forEach((e) => { %><div class="rh-record"><div class="rh-record-head"><strong><%= String(e.tipo||'EXAME').replaceAll('_',' ') %></strong><span class="rh-badge <%= e.status_visual==='VENCIDO' ? 'is-danger' : (e.status_visual==='VENCE_EM_BREVE' ? 'is-warning' : '') %>"><%= e.status_label %></span></div><small><%= dateBr.formatDateBR(e.data_realizacao) %> → <%= dateBr.formatDateBR(e.validade_ate) %><%= e.clinica ? ` • ${e.clinica}` : '' %></small><% if (e.arquivo_nome) { %><a class="btn btn-sm" href="/colaboradores/<%= person.id %>/exames/<%= e.id %>/arquivo">Abrir anexo protegido</a><% } %></div><% }) %>
+              <% if (!examList.length) { %><div class="rh-empty">Nenhum exame ocupacional registrado.</div><% } %>
+            </div>
+          </section>
+        <% } %>
+
+        <section class="rh-subsection" id="documentos">
+          <h3>Documentos</h3>
+          <form class="rh-form" method="POST" action="/colaboradores/<%= person.id %>/documentos" enctype="multipart/form-data">
+            <label><span>Tipo</span><input name="tipo" maxlength="80" required placeholder="Ex.: termo, declaração" /></label>
+            <label><span>Data</span><input type="date" name="data" /></label>
+            <label class="is-wide"><span>Arquivo</span><input type="file" name="arquivo" required /></label>
+            <div class="rh-form-actions"><button class="btn btn-green" type="submit">Anexar documento</button></div>
+          </form>
+          <div class="rh-records">
+            <% docs.slice(0, 10).forEach((doc) => { %><div class="rh-record"><div class="rh-record-head"><strong><%= doc.tipo || 'Documento' %></strong><span class="rh-badge"><%= doc.confirmado_em ? 'CIÊNCIA REGISTRADA' : 'REGISTRADO' %></span></div><small><%= doc.data ? dateBr.formatDateBR(String(doc.data).slice(0,10)) : '-' %></small><% if (doc.arquivo_seguro) { %><a class="btn btn-sm" href="<%= doc.arquivo_seguro %>" target="_blank" rel="noopener">Abrir arquivo</a><% } %></div><% }) %>
+            <% if (!docs.length) { %><div class="rh-empty">Sem documentos registrados.</div><% } %>
+          </div>
+        </section>
+
+        <section class="rh-subsection" id="treinamentos">
+          <h3>Treinamentos e certificados</h3>
+          <div class="rh-records">
+            <% certs.slice(0, 10).forEach((c) => { %><div class="rh-record"><strong><%= c.titulo || 'Certificado' %></strong><small><%= c.instituicao || '-' %> • validade <%= c.validade ? dateBr.formatDateBR(c.validade) : 'não informada' %></small></div><% }) %>
+            <% if (!certs.length) { %><div class="rh-empty">Sem treinamentos/certificados registrados.</div><% } %>
+          </div>
+        </section>
+      <% } %>
+    </aside>
+  </section>
+
+  <div class="rh-privacy">Exames ocupacionais são mantidos em armazenamento privado e só podem ser baixados por rota autenticada de RH/ADMIN. Não registrar CID, diagnóstico ou resultado clínico detalhado neste módulo.</div>
+</div>
+<script>
+(() => {
+  const input = document.getElementById('rhPeopleSearch');
+  const rows = [...document.querySelectorAll('[data-rh-person]')];
+  input?.addEventListener('input', () => {
+    const q = String(input.value || '').trim().toLowerCase();
+    rows.forEach((row) => { row.hidden = Boolean(q) && !String(row.dataset.search || '').includes(q); });
+  });
+})();
+</script>
