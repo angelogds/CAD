@@ -1,0 +1,46 @@
+<%- layout('layout') -%>
+<link rel="stylesheet" href="/css/rh-portal.css?v=20260910-rh-modular" />
+<%
+  const d = dashboard || {};
+  const certs = Array.isArray(d.certs) ? d.certs : [];
+  const pessoas = Array.isArray(d.colaboradores) ? d.colaboradores : [];
+  const person = selected?.colaborador || null;
+  const selectedCerts = Array.isArray(selected?.certificados) ? selected.certificados : [];
+%>
+<div class="rh-page">
+  <%- include('_header', { title, dashboard: d, activeRhSection }) %>
+
+  <section class="card rh-section">
+    <div class="rh-section-head"><div><span class="rh-eyebrow">CAPACITAÇÃO</span><h2>Treinamentos, NRs e certificados</h2><p class="rh-muted">Acompanhe validação e vencimentos usando a ficha já existente do colaborador.</p></div></div>
+    <form class="rh-toolbar" method="GET" action="/rh/treinamentos">
+      <label class="rh-grow"><span>Colaborador</span><select name="colaborador"><option value="">Todos os colaboradores</option><% pessoas.forEach((c) => { %><option value="<%= c.id %>" <%= Number(person?.id) === Number(c.id) ? 'selected' : '' %>><%= c.nome %> • <%= c.funcaoLabel || c.funcao || '-' %></option><% }) %></select></label>
+      <button class="btn btn-green" type="submit">Filtrar</button>
+    </form>
+  </section>
+
+  <% if (person) { %>
+    <section class="card rh-section">
+      <div class="rh-section-head"><div><span class="rh-eyebrow">FICHA SELECIONADA</span><h2><%= person.nome %></h2><p class="rh-muted"><%= person.funcao || '-' %> • <%= person.setor || '-' %></p></div><a class="btn btn-green" href="/colaboradores/<%= person.id %>">Gerenciar certificados na ficha mestre</a></div>
+      <div class="rh-records rh-records-grid">
+        <% selectedCerts.slice(0, 20).forEach((c) => { %><div class="rh-record"><div class="rh-record-head"><strong><%= c.titulo || 'Certificado' %></strong><span class="rh-badge"><%= c.status_visual || c.status_validacao || 'REGISTRADO' %></span></div><small><%= c.instituicao || '-' %><%= c.carga_horaria ? ` • ${c.carga_horaria}h` : '' %> • validade <%= c.validade ? dateBr.formatDateBR(String(c.validade).slice(0,10)) : 'não informada' %></small></div><% }) %>
+        <% if (!selectedCerts.length) { %><div class="rh-empty">Sem treinamentos ou certificados registrados para este colaborador.</div><% } %>
+      </div>
+    </section>
+  <% } %>
+
+  <section class="card rh-section">
+    <div class="rh-section-head"><div><span class="rh-eyebrow">CONTROLE GERAL</span><h2>Certificados e vencimentos</h2></div><span class="rh-badge"><%= certs.length %> registro<%= certs.length === 1 ? '' : 's' %></span></div>
+    <div class="rh-toolbar"><label><span>Status</span><select id="rhTrainingStatus"><option value="">Todos</option><option value="VENCIDO">Vencidos</option><option value="VENCE_EM_BREVE">Vencendo</option><option value="PENDENTE">Pendentes</option><option value="VALIDO">Válidos</option></select></label><label class="rh-search"><span>Buscar</span><input id="rhTrainingSearch" type="search" placeholder="Colaborador, curso ou instituição" /></label></div>
+    <div class="rh-table-wrap"><table class="rh-table"><thead><tr><th>Colaborador</th><th>Treinamento / certificado</th><th>Instituição</th><th>Emissão</th><th>Validade</th><th>Status</th><th>Ação</th></tr></thead><tbody>
+      <% certs.forEach((c) => { const status = String(c.status_visual || c.status_validacao || '').toUpperCase(); const search = `${c.colaborador_nome||''} ${c.titulo||''} ${c.instituicao||''}`.toLowerCase(); %><tr data-rh-training data-status="<%= status %>" data-search="<%= search %>"><td><strong><%= c.colaborador_nome || '-' %></strong></td><td><%= c.titulo || 'Certificado' %></td><td><%= c.instituicao || '-' %></td><td><%= c.data_emissao ? dateBr.formatDateBR(String(c.data_emissao).slice(0,10)) : '-' %></td><td><%= c.validade ? dateBr.formatDateBR(String(c.validade).slice(0,10)) : 'Sem validade' %></td><td><span class="rh-badge <%= status === 'VENCIDO' ? 'is-danger' : (status === 'VENCE_EM_BREVE' || status === 'PENDENTE' ? 'is-warning' : '') %>"><%= status || 'REGISTRADO' %></span></td><td><a class="btn btn-sm" href="/rh/treinamentos?colaborador=<%= c.colaborador_id %>">Abrir</a></td></tr><% }) %>
+      <% if (!certs.length) { %><tr><td colspan="7" class="rh-empty">Nenhum treinamento/certificado registrado.</td></tr><% } %>
+    </tbody></table></div>
+  </section>
+</div>
+<script>
+(() => {
+  const status = document.getElementById('rhTrainingStatus'); const search = document.getElementById('rhTrainingSearch');
+  const apply = () => { const st = String(status?.value || '').toUpperCase(); const q = String(search?.value || '').trim().toLowerCase(); document.querySelectorAll('[data-rh-training]').forEach((row) => { row.hidden = !((!st || row.dataset.status === st) && (!q || String(row.dataset.search || '').includes(q))); }); };
+  status?.addEventListener('change', apply); search?.addEventListener('input', apply);
+})();
+</script>
