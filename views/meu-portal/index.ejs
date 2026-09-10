@@ -1,6 +1,6 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
-<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v1" />
+<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v2" />
 
 <%
   const conta = portal.user;
@@ -10,6 +10,10 @@
   const cartaoAtivo = temVinculo && Number(colaborador.qr_ativo || 0) === 1 && Boolean(colaborador.qr_token);
   const cartaoRevogado = temVinculo && Boolean(colaborador.qr_token) && !cartaoAtivo;
   const foto = colaborador?.foto_url || conta.photo_path || '/IMG/logo_menu.png.png';
+  const podeGerenciarVinculo = typeof canManageLink !== 'undefined' && Boolean(canManageLink);
+  const colaboradoresDisponiveisLista = typeof availableColaboradores !== 'undefined' && Array.isArray(availableColaboradores)
+    ? availableColaboradores
+    : [];
 %>
 
 <div class="my-portal-page">
@@ -30,9 +34,37 @@
   </header>
 
   <% if (!temVinculo) { %>
-    <section class="my-portal-notice">
-      <strong>Vínculo com colaborador pendente</strong>
-      <p>Seu login está ativo, mas ainda não existe uma ficha de colaborador ligada a este usuário. Foto e senha podem ser atualizadas normalmente; para habilitar cartão, função, setor e futuras informações de RH, solicite o vínculo ao RH ou ao administrador.</p>
+    <section class="my-portal-notice <%= podeGerenciarVinculo ? 'has-action' : '' %>">
+      <div>
+        <strong>Vínculo com colaborador pendente</strong>
+        <p>Seu login está ativo, mas ainda não existe uma ficha de colaborador ligada a este usuário. Foto e senha podem ser atualizadas normalmente.</p>
+        <% if (!podeGerenciarVinculo) { %>
+          <small>Para liberar função, setor, cartão e futuras informações de RH, solicite o vínculo ao setor de RH.</small>
+        <% } %>
+      </div>
+
+      <% if (podeGerenciarVinculo) { %>
+        <% if (colaboradoresDisponiveisLista.length) { %>
+          <form class="my-link-form" method="POST" action="/meu-portal/vinculo" onsubmit="return confirm('Vincular este login à ficha selecionada? Essa associação define a identidade profissional usada pelo Portal e pelo Almoxarifado.')">
+            <label>
+              <span>Vincular minha ficha existente</span>
+              <select name="colaborador_id" required>
+                <option value="">Selecione o colaborador</option>
+                <% colaboradoresDisponiveisLista.forEach((item) => { %>
+                  <option value="<%= item.id %>"><%= item.nome %> — <%= item.funcao || 'Função não informada' %> — <%= item.setor || 'Setor não informado' %> — <%= item.status || 'Status não informado' %></option>
+                <% }) %>
+              </select>
+              <small>A lista contém somente fichas existentes ainda sem usuário vinculado.</small>
+            </label>
+            <button class="btn btn-green" type="submit">Vincular colaborador</button>
+          </form>
+        <% } else { %>
+          <div class="my-link-empty">
+            <strong>Nenhuma ficha disponível para vínculo</strong>
+            <span>Verifique o cadastro em Colaboradores antes de criar uma nova ficha.</span>
+          </div>
+        <% } %>
+      <% } %>
     </section>
   <% } %>
 
@@ -61,7 +93,7 @@
       <p class="my-portal-help">Nome, função, setor e situação profissional são dados oficiais e permanecem sob gestão do RH/ADMIN.</p>
     </article>
 
-    <article class="card my-portal-panel" id="cartao">
+    <article class="card my-portal-panel <%= !temVinculo ? 'my-portal-panel--compact' : '' %>" id="cartao">
       <div class="my-portal-panel__head">
         <div><span class="eyebrow">IDENTIFICAÇÃO • ALMOXARIFADO</span><h2>Meu cartão</h2></div>
         <% if (cartaoAtivo) { %><span class="my-status is-ok">ATIVO</span><% } else if (cartaoRevogado) { %><span class="my-status is-danger">REVOGADO</span><% } else { %><span class="my-status">NÃO EMITIDO</span><% } %>
@@ -85,7 +117,7 @@
         <div class="my-card-state"><strong>Seu cartão ainda não foi emitido</strong><span>O QR utiliza apenas um token seguro e será aceito pelo fluxo já existente de retirada no Almoxarifado.</span></div>
         <form method="POST" action="/meu-portal/cartao/emitir"><button class="btn btn-green" type="submit">Gerar meu cartão</button></form>
       <% } else { %>
-        <div class="my-card-state"><strong>Cartão indisponível</strong><span><%= temVinculo ? 'O cartão é liberado somente para colaboradores ativos.' : 'Primeiro é necessário vincular este login à sua ficha de colaborador.' %></span></div>
+        <div class="my-card-state my-card-state--compact"><strong>Vínculo necessário</strong><span><%= temVinculo ? 'O cartão é liberado somente para colaboradores ativos.' : 'Associe este login à ficha correta para liberar o cartão do Almoxarifado.' %></span></div>
       <% } %>
     </article>
 

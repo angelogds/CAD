@@ -13,15 +13,41 @@ async function index(req, res) {
   try {
     const portal = service.getPortalData(req.session.user.id);
     const cardQr = portal.colaborador ? await qrDataUrl(portal.colaborador) : null;
+    const canManageLink = service.canManageLink(req.session.user.role);
+    const availableColaboradores = !portal.colaborador && canManageLink
+      ? service.listAvailableColaboradores()
+      : [];
+
     return res.render('meu-portal/index', {
       title: 'Meu Portal',
       portal,
       cardQr,
+      canManageLink,
+      availableColaboradores,
     });
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível carregar o Meu Portal.');
     return res.redirect('/dashboard');
   }
+}
+
+function linkColaborador(req, res) {
+  const colaboradorId = Number(req.body.colaborador_id);
+
+  try {
+    const portal = service.linkOwnUserToColaborador(
+      req.session.user.id,
+      colaboradorId,
+      req.session.user.role
+    );
+
+    if (portal?.user?.photo_path) req.session.user.photo_path = portal.user.photo_path;
+    req.flash('success', 'Vínculo realizado com sucesso. Sua ficha profissional já está conectada ao Meu Portal.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível vincular a ficha de colaborador.');
+  }
+
+  return res.redirect('/meu-portal');
 }
 
 function updatePhoto(req, res) {
@@ -103,4 +129,4 @@ async function card(req, res) {
   }
 }
 
-module.exports = { index, updatePhoto, changePassword, emitCard, card };
+module.exports = { index, linkColaborador, updatePhoto, changePassword, emitCard, card };
