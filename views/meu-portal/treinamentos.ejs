@@ -1,0 +1,107 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v3" />
+<link rel="stylesheet" href="/css/meu-portal-fase2b.css?v=20260910-v1" />
+
+<%
+  const resumo = treinamentos?.resumo || {};
+  const certificados = Array.isArray(treinamentos?.certificados) ? treinamentos.certificados : [];
+  const statusLabel = {
+    VALIDO: 'VÁLIDO',
+    VENCE_EM_BREVE: 'VENCE EM BREVE',
+    VENCIDO: 'VENCIDO',
+    PENDENTE_VALIDACAO: 'PENDENTE',
+    REPROVADO: 'REPROVADO',
+  };
+  const statusClass = {
+    VALIDO: 'is-ok',
+    VENCE_EM_BREVE: 'is-warn',
+    VENCIDO: 'is-danger',
+    PENDENTE_VALIDACAO: 'is-neutral',
+    REPROVADO: 'is-danger',
+  };
+%>
+
+<div class="my-portal-page my-f2b-page">
+  <header class="my-section-head">
+    <div>
+      <span class="eyebrow">MEU PORTAL • CAPACITAÇÃO</span>
+      <h1>Meus treinamentos</h1>
+      <p>Consulta pessoal de cursos, NRs e certificados já registrados na sua ficha profissional.</p>
+    </div>
+    <a class="btn btn-ghost" href="/meu-portal">Voltar ao portal</a>
+  </header>
+
+  <% if (!treinamentos?.vinculado) { %>
+    <section class="card my-f2b-empty">
+      <strong>Vínculo com colaborador necessário</strong>
+      <p>Seu login ainda não está ligado a uma ficha profissional. O RH/ADMIN deve concluir o vínculo antes de liberar seus registros.</p>
+    </section>
+  <% } else if (!treinamentos?.disponivel) { %>
+    <section class="card my-f2b-empty">
+      <strong>Treinamentos ainda indisponíveis nesta instalação</strong>
+      <p>A estrutura de certificados não foi encontrada. Nenhum cadastro foi criado ou alterado pelo Meu Portal.</p>
+    </section>
+  <% } else { %>
+    <section class="my-f2b-kpis" aria-label="Resumo dos treinamentos">
+      <article class="card my-f2b-kpi"><span>Total</span><strong><%= Number(resumo.total || 0) %></strong><small>Registros na ficha</small></article>
+      <article class="card my-f2b-kpi"><span>Válidos</span><strong><%= Number(resumo.validos || 0) %></strong><small>Certificados liberados</small></article>
+      <article class="card my-f2b-kpi"><span>Vencendo</span><strong><%= Number(resumo.vencendo || 0) %></strong><small>Até 30 dias</small></article>
+      <article class="card my-f2b-kpi"><span>Vencidos</span><strong><%= Number(resumo.vencidos || 0) %></strong><small>Validade expirada</small></article>
+    </section>
+
+    <section class="card my-f2b-panel">
+      <div class="my-f2b-panel__head">
+        <div><span class="eyebrow">HISTÓRICO PESSOAL</span><h2>Cursos e certificados</h2></div>
+        <span class="my-status"><%= certificados.length %> registro<%= certificados.length === 1 ? '' : 's' %></span>
+      </div>
+
+      <% if (!certificados.length) { %>
+        <div class="my-f2b-empty is-inline">
+          <strong>Nenhum treinamento registrado</strong>
+          <p>Quando o RH/gestão registrar cursos ou certificados na sua ficha, eles aparecerão aqui automaticamente.</p>
+        </div>
+      <% } else { %>
+        <div class="my-f2b-table-wrap">
+          <table class="my-f2b-table">
+            <thead>
+              <tr>
+                <th>Treinamento</th>
+                <th>Tipo</th>
+                <th>Instituição</th>
+                <th>Carga horária</th>
+                <th>Emissão</th>
+                <th>Validade</th>
+                <th>Situação</th>
+                <th>Certificado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% certificados.forEach((certificado) => { %>
+                <tr>
+                  <td><strong><%= certificado.titulo || '-' %></strong></td>
+                  <td><%= String(certificado.tipo || '-').toUpperCase() %></td>
+                  <td><%= certificado.instituicao || '-' %></td>
+                  <td><%= certificado.carga_horaria ? `${Number(certificado.carga_horaria)} h` : '-' %></td>
+                  <td><%= dateBr.formatDateBR(certificado.data_emissao) %></td>
+                  <td><%= dateBr.formatDateBR(certificado.validade) %></td>
+                  <td><span class="my-f2b-status <%= statusClass[certificado.status_visual] || 'is-neutral' %>"><%= statusLabel[certificado.status_visual] || certificado.status_visual %></span></td>
+                  <td>
+                    <% if (certificado.arquivo_seguro) { %>
+                      <a class="my-f2b-link" href="<%= certificado.arquivo_seguro %>" target="_blank" rel="noopener noreferrer">Abrir</a>
+                    <% } else { %>
+                      <span class="my-f2b-muted">Sem arquivo</span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+
+    <div class="my-material-audit-note">
+      Consulta individual e somente leitura. O status visual considera a validação existente e a validade do certificado, sem alterar o cadastro oficial.
+    </div>
+  <% } %>
+</div>

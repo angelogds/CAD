@@ -1,0 +1,50 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v3" />
+<link rel="stylesheet" href="/css/meu-portal-fase2b.css?v=20260910-v1" />
+
+<% const c = profissional?.colaborador || null; %>
+
+<div class="my-portal-page my-f2b-page">
+  <header class="my-section-head">
+    <div>
+      <span class="eyebrow">MEU PORTAL • DADOS PROFISSIONAIS</span>
+      <h1>Meus dados profissionais</h1>
+      <p>Resumo dos dados oficiais vinculados à sua ficha de colaborador.</p>
+    </div>
+    <a class="btn btn-ghost" href="/meu-portal">Voltar ao portal</a>
+  </header>
+
+  <% if (!profissional?.vinculado) { %>
+    <section class="card my-f2b-empty">
+      <strong>Vínculo com colaborador necessário</strong>
+      <p>Seu login está ativo, mas ainda não existe uma ficha profissional associada. Solicite o vínculo ao RH/ADMIN.</p>
+    </section>
+  <% } else { %>
+    <section class="card my-f2b-panel">
+      <div class="my-f2b-panel__head">
+        <div><span class="eyebrow">FICHA PROFISSIONAL</span><h2><%= c.nome || 'Colaborador' %></h2></div>
+        <span class="my-status <%= String(c.status || '').toUpperCase() === 'ATIVO' ? 'is-ok' : '' %>"><%= c.status || '-' %></span>
+      </div>
+
+      <div class="my-f2b-data-grid">
+        <div><span>Nome</span><strong><%= c.nome || '-' %></strong></div>
+        <div><span>Apelido</span><strong><%= c.apelido || '-' %></strong></div>
+        <div><span>Função</span><strong><%= c.funcao || '-' %></strong></div>
+        <div><span>Setor</span><strong><%= c.setor || '-' %></strong></div>
+        <div><span>Admissão</span><strong><%= dateBr.formatDateBR(c.data_admissao) %></strong></div>
+        <div><span>Tempo de casa</span><strong><%= profissional.tempoCasa?.label || '-' %></strong></div>
+        <div><span>Líder / responsável</span><strong><%= profissional.liderNome || '-' %></strong></div>
+        <div><span>E-mail da conta</span><strong><%= profissional.contaEmail || '-' %></strong></div>
+      </div>
+    </section>
+
+    <section class="card my-f2b-info">
+      <strong>Dados controlados pelo RH/ADMIN</strong>
+      <p>Função, setor, admissão, liderança, status profissional e vínculos oficiais não podem ser alterados pelo colaborador nesta área. Correções devem ser solicitadas ao RH/ADMIN.</p>
+    </section>
+
+    <div class="my-material-audit-note">
+      Esta página não exibe dados de saúde, emergência, exames ou outros dados sensíveis. Esses conteúdos permanecem separados pelas permissões do sistema.
+    </div>
+  <% } %>
+</div>
