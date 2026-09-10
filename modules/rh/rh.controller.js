@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const service = require('./rh.service');
+const people = require('./rh.people');
 const dateBr = require('../../utils/data-hora-br');
 
 function currentUser(req) { return req.user || req.session?.user || {}; }
@@ -16,7 +17,7 @@ function formatMinutes(value) {
 exports.index = (req, res, next) => {
   try {
     res.locals.activeMenu = 'rh';
-    const dashboard = service.buildDashboard(currentUser(req));
+    const dashboard = people.enrichDashboard(service.buildDashboard(currentUser(req)), currentUser(req));
     const requestedId = Number(req.query.colaborador || 0);
     const selected = requestedId && dashboard.canManage
       ? service.getCollaboratorDetail(requestedId, currentUser(req))
