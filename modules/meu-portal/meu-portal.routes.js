@@ -42,6 +42,7 @@ router.get('/treinamentos', fase2bCtrl.treinamentos);
 router.get('/dados-profissionais', fase2bCtrl.dadosProfissionais);
 router.get('/servicos', fase2bCtrl.servicos);
 router.get('/rh', rhPortalCtrl.index);
+router.get('/rh/documentos/:documentoId/arquivo', rhPortalCtrl.documentoArquivo);
 router.post('/vinculo', requireRole(LINK_MANAGER_ROLES), ctrl.linkColaborador);
 router.post('/foto', upload.single('photo'), ctrl.updatePhoto);
 router.post('/senha', ctrl.changePassword);
