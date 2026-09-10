@@ -37,6 +37,8 @@ const upload = multer({
 
 router.use(requireLogin);
 router.get('/', ctrl.index);
+router.get('/perfil', ctrl.perfil);
+router.get('/conta', ctrl.conta);
 router.get('/materiais', ctrl.materiais);
 router.get('/treinamentos', fase2bCtrl.treinamentos);
 router.get('/dados-profissionais', fase2bCtrl.dadosProfissionais);
@@ -55,7 +57,7 @@ router.use((err, req, res, next) => {
       ? 'A foto deve ter no máximo 5 MB.'
       : (err.message || 'Não foi possível processar a foto.');
     req.flash('error', message);
-    return res.redirect('/meu-portal');
+    return res.redirect('/meu-portal/perfil');
   }
   return next(err);
 });
