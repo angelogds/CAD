@@ -101,7 +101,7 @@ test('Meus Serviços valida filtros, limita resultado e não inventa duração',
   assert.match(view, /somente leitura/i);
 });
 
-test('Home da Fase 2B ativa novos serviços e mantém RH na Fase 3', () => {
+test('Home mantém ativos os serviços entregues na Fase 2B durante a evolução das fases seguintes', () => {
   const view = read('views/meu-portal/index.ejs');
   const css = read('public/css/meu-portal-fase2b.css');
 
@@ -110,7 +110,6 @@ test('Home da Fase 2B ativa novos serviços e mantém RH na Fase 3', () => {
   assert.match(view, /href="\/meu-portal\/servicos"/);
   assert.match(view, /Treinamentos[\s\S]*DISPONÍVEL/);
   assert.match(view, /Meus serviços[\s\S]*DISPONÍVEL/);
-  assert.match(view, /RH[\s\S]*PLANEJADO • Fase 3/);
   assert.match(css, /\.my-roadmap-grid\{grid-template-columns:repeat\(auto-fit/);
   assert.match(css, /@media\(max-width:620px\)/);
 });

@@ -1,44 +1,76 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
-<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v1" />
+<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v3" />
 
-<div class="qr-card-page my-own-card-page">
+<%
+  const temVinculo = Boolean(colaborador);
+  const ativo = temVinculo && String(colaborador.status || '').toUpperCase() === 'ATIVO';
+  const cartaoAtivo = temVinculo && Number(colaborador.qr_ativo || 0) === 1 && Boolean(colaborador.qr_token) && Boolean(cardQr);
+  const cartaoRevogado = temVinculo && Boolean(colaborador.qr_token) && Number(colaborador.qr_ativo || 0) !== 1;
+%>
+
+<div class="qr-card-page my-own-card-page my-personal-page">
   <header class="qr-card-toolbar no-print">
     <div>
-      <span class="eyebrow">MEU PORTAL • IDENTIFICAÇÃO</span>
-      <h1>Meu cartão</h1>
-      <p>O mesmo cartão pode ser apresentado na tela do celular ou impresso em formato físico.</p>
+      <span class="eyebrow">MEU PORTAL • ALMOXARIFADO</span>
+      <h1>Identificação do Almoxarifado</h1>
+      <p>Seu cartão virtual e o QR de identificação ficam concentrados nesta área.</p>
     </div>
     <div class="qr-card-actions">
-      <a class="btn btn-ghost" href="/meu-portal#cartao">Voltar ao Meu Portal</a>
-      <button class="btn btn-green" type="button" onclick="window.print()">Imprimir / salvar PDF</button>
+      <a class="btn btn-ghost" href="/meu-portal">Voltar ao Meu Portal</a>
+      <% if (cartaoAtivo) { %><button class="btn btn-green" type="button" onclick="window.print()">Imprimir / salvar PDF</button><% } %>
     </div>
   </header>
 
-  <section class="employee-id-card">
-    <div class="employee-id-card__brand">
-      <strong>Campo do Gado</strong>
-      <span>Gestão Industrial • Manutenção Integrada</span>
-    </div>
-    <div class="employee-id-card__body">
-      <img class="employee-id-card__photo" src="<%= colaborador.foto_url || user.photo_path || '/IMG/logo_menu.png.png' %>" alt="Foto de <%= colaborador.nome %>" />
-      <div class="employee-id-card__identity">
-        <small>COLABORADOR</small>
-        <h2><%= colaborador.nome %></h2>
-        <p><%= colaborador.funcao || 'Função não informada' %></p>
-        <p><%= colaborador.setor || 'Setor não informado' %></p>
-        <span class="employee-id-card__status"><%= colaborador.status || 'ATIVO' %></span>
+  <% if (!temVinculo) { %>
+    <section class="card my-card-guidance no-print">
+      <strong>Vínculo com colaborador necessário</strong>
+      <p>Seu usuário ainda não está associado a uma ficha profissional. Procure RH/ADMIN para liberar o cartão do Almoxarifado.</p>
+    </section>
+  <% } else if (cartaoRevogado) { %>
+    <section class="card my-card-guidance no-print">
+      <strong>Cartão revogado</strong>
+      <p>Por segurança, um cartão revogado não pode ser reativado pelo próprio usuário. Procure o RH ou o administrador para uma nova emissão.</p>
+    </section>
+  <% } else if (!ativo) { %>
+    <section class="card my-card-guidance no-print">
+      <strong>Cartão indisponível</strong>
+      <p>O cartão é liberado somente para colaboradores com situação ativa na ficha profissional.</p>
+    </section>
+  <% } else if (!cartaoAtivo) { %>
+    <section class="card my-card-guidance no-print">
+      <strong>Seu cartão ainda não foi emitido</strong>
+      <p>O QR utiliza um token seguro e será aceito pelo fluxo existente de retirada de materiais no Almoxarifado.</p>
+      <form method="POST" action="/meu-portal/cartao/emitir">
+        <button class="btn btn-green" type="submit">Gerar meu cartão</button>
+      </form>
+    </section>
+  <% } else { %>
+    <section class="employee-id-card">
+      <div class="employee-id-card__brand">
+        <strong>Campo do Gado</strong>
+        <span>Gestão Industrial • Manutenção Integrada</span>
       </div>
-      <div class="employee-id-card__qr">
-        <img src="<%= cardQr %>" alt="QR de identificação" />
-        <small>Apresente no Almoxarifado</small>
+      <div class="employee-id-card__body">
+        <img class="employee-id-card__photo" src="<%= colaborador.foto_url || user.photo_path || '/IMG/logo_menu.png.png' %>" alt="Foto de <%= colaborador.nome %>" />
+        <div class="employee-id-card__identity">
+          <small>COLABORADOR</small>
+          <h2><%= colaborador.nome %></h2>
+          <p><%= colaborador.funcao || 'Função não informada' %></p>
+          <p><%= colaborador.setor || 'Setor não informado' %></p>
+          <span class="employee-id-card__status"><%= colaborador.status || 'ATIVO' %></span>
+        </div>
+        <div class="employee-id-card__qr">
+          <img src="<%= cardQr %>" alt="QR de identificação" />
+          <small>Apresente no Almoxarifado</small>
+        </div>
       </div>
-    </div>
-    <div class="employee-id-card__footer">Uso interno • QR sem dados pessoais • Retiradas registradas pelo sistema</div>
-  </section>
+      <div class="employee-id-card__footer">Uso interno • QR sem dados pessoais • Retiradas registradas pelo sistema</div>
+    </section>
 
-  <section class="card my-card-guidance no-print">
-    <strong>Cartão virtual e físico usam o mesmo QR</strong>
-    <p>Para o cartão físico, use “Imprimir / salvar PDF” e selecione impressão em tamanho real. Em caso de perda ou exposição do QR, solicite ao RH/ADMIN a revogação e uma nova emissão.</p>
-  </section>
+    <section class="card my-card-guidance no-print">
+      <strong>Cartão virtual e físico usam o mesmo QR</strong>
+      <p>Para o cartão físico, use “Imprimir / salvar PDF” e selecione impressão em tamanho real. Em caso de perda ou exposição do QR, solicite ao RH/ADMIN a revogação e uma nova emissão.</p>
+    </section>
+  <% } %>
 </div>

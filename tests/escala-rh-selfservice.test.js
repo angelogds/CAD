@@ -32,10 +32,13 @@ test('painel pessoal força consulta apenas do próprio colaborador', () => {
 });
 
 test('painel RH usa visão consolidada somente de leitura', () => {
-  const source = read('modules/escala/escala.rh.controller.js');
-  assert.match(source, /listarPainelEscala\(\{ user: currentUser\(req\), canViewAll: true \}\)/);
-  assert.match(source, /horasExtrasMesMinutos/);
-  assert.match(source, /bancoHorasMinutos/);
+  const compat = read('modules/escala/escala.rh.controller.js');
+  const source = read('modules/rh/rh.controller.js');
+
+  assert.match(compat, /module\.exports = require\('\.\.\/rh\/rh\.controller'\)/);
+  assert.match(source, /service\.buildDashboard\(currentUser\(req\)\)/);
+  assert.match(source, /people\.enrichDashboard\(service\.buildDashboard/);
+  assert.match(source, /if \(!dashboard\.canManage\) dashboard = \{ \.\.\.dashboard, pendencias: \[\] \}/);
   assert.doesNotMatch(source, /aprovarHoraExtra|salvarConfiguracaoRodizio|programarFolgaCompensatoria/);
 });
 

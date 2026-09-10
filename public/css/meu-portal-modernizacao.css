@@ -1,0 +1,238 @@
+/* Meu Portal — hub compacto pós Fase 3
+   Prioriza navegação por cartões e reduz repetição visual na home. */
+
+.my-portal-page{
+  width:100%;
+  max-width:1500px;
+  margin:0 auto;
+  gap:16px;
+}
+
+.my-portal-hero{
+  position:relative;
+  overflow:hidden;
+  padding:20px 22px;
+  border-color:#d5e6dc;
+  background:linear-gradient(135deg,#f9fcfa 0%,#eff8f3 58%,#e8f5ed 100%);
+  box-shadow:0 8px 24px rgba(15,81,50,.05);
+}
+.my-portal-hero--compact{padding-block:18px;}
+.my-portal-hero::after{
+  content:"";
+  position:absolute;
+  width:210px;
+  height:210px;
+  right:-80px;
+  top:-105px;
+  border-radius:999px;
+  background:rgba(21,128,61,.055);
+  pointer-events:none;
+}
+.my-portal-hero__content{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+}
+.my-portal-hero--compact .my-portal-hero__identity>img{
+  width:74px;
+  height:74px;
+  border-radius:16px;
+}
+.my-portal-hero--compact h1{font-size:28px;}
+.my-portal-hero--compact p{max-width:760px;}
+
+.my-portal-services{
+  padding:17px;
+  border:1px solid #dce9e1;
+  border-radius:17px;
+  background:#fff;
+  box-shadow:0 7px 22px rgba(15,23,42,.035);
+}
+.my-portal-services .my-portal-panel__head{margin-bottom:12px;}
+.my-portal-services .my-roadmap-grid{
+  grid-template-columns:repeat(6,minmax(150px,1fr));
+  gap:9px;
+}
+.my-access-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.my-portal-services .my-service-card{
+  position:relative;
+  min-height:116px;
+  padding:14px;
+  border-color:#dce9e1;
+  background:linear-gradient(180deg,#fff,#f8fcf9);
+  justify-content:space-between;
+}
+.my-portal-services .my-service-card::before{
+  content:"";
+  width:28px;
+  height:4px;
+  border-radius:999px;
+  background:#24a35a;
+  box-shadow:0 0 0 4px rgba(36,163,90,.08);
+}
+.my-portal-services .my-service-card strong{font-size:13px;color:#193326;}
+.my-portal-services .my-service-card span{min-height:0;line-height:1.35;}
+.my-portal-services .my-service-card small{margin-top:5px;}
+.my-portal-services--primary{
+  background:linear-gradient(180deg,#ffffff,#fbfefc);
+}
+.my-service-card--primary{
+  min-height:128px !important;
+  display:grid !important;
+  grid-template-columns:42px minmax(0,1fr);
+  grid-template-areas:
+    "icon title"
+    "icon desc"
+    "icon meta";
+  column-gap:12px;
+  align-content:center;
+}
+.my-service-card--primary::before{display:none;}
+.my-service-card--primary .my-service-card__icon{
+  grid-area:icon;
+  width:42px;
+  height:42px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  align-self:start;
+  background:#e9f7ee;
+  border:1px solid #cfe8d8;
+  color:#147347;
+  font-size:12px;
+  font-weight:950;
+  letter-spacing:.04em;
+}
+.my-service-card--primary strong{grid-area:title;font-size:14px !important;align-self:end;}
+.my-service-card--primary span{grid-area:desc;align-self:start;}
+.my-service-card--primary small{grid-area:meta;align-self:start;}
+
+/* Páginas dedicadas: perfil, conta e cartão */
+.my-personal-page{max-width:1150px;}
+.my-personal-card{
+  padding:18px;
+  border:1px solid #dfeae4;
+  border-radius:16px;
+  box-shadow:0 7px 20px rgba(15,23,42,.03);
+}
+.my-personal-card--narrow{max-width:780px;}
+.my-personal-card__head{margin-bottom:14px;}
+.my-personal-card__head h2{margin:2px 0 4px;font-size:20px;}
+.my-personal-card__head p{margin:0;color:#64748b;font-size:12px;line-height:1.45;}
+.my-personal-profile{
+  display:grid;
+  grid-template-columns:108px minmax(0,1fr);
+  gap:18px;
+  align-items:center;
+  padding:16px;
+  border:1px solid #e2ece6;
+  border-radius:15px;
+  background:#f9fcfa;
+}
+.my-personal-photo{
+  width:108px;
+  height:108px;
+  object-fit:cover;
+  border-radius:18px;
+  border:3px solid #fff;
+  box-shadow:0 6px 20px rgba(15,81,50,.08);
+}
+.my-personal-profile__data{display:flex;flex-direction:column;gap:4px;min-width:0;}
+.my-personal-profile__data h2{margin:0 0 4px;font-size:22px;color:#1b3024;}
+.my-personal-profile__data>span:not(.eyebrow){font-size:12px;color:#64748b;}
+.my-photo-form--dedicated{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;
+  align-items:end;
+  margin-top:14px;
+}
+.my-photo-form--dedicated .btn{white-space:nowrap;}
+.my-password-form--dedicated{max-width:620px;}
+.my-password-form--dedicated .btn{align-self:flex-start;}
+.my-personal-note{
+  margin-top:14px;
+  padding:10px 12px;
+  border:1px solid #dce9e1;
+  border-radius:11px;
+  background:#f8fbf9;
+  color:#64748b;
+  font-size:10px;
+  line-height:1.45;
+}
+
+/* Padronização das páginas internas do portal */
+.my-section-head{
+  padding:18px 20px;
+  border-color:#d5e6dc;
+  box-shadow:0 7px 22px rgba(15,81,50,.04);
+}
+.my-material-kpi,.my-f2b-kpi,.my-rh-kpis .rh-kpi{
+  border:1px solid #e1ebe5;
+  box-shadow:0 5px 16px rgba(15,23,42,.025);
+}
+.my-material-history,.my-f2b-panel,.my-rh-card{
+  border:1px solid #e1ebe5;
+  box-shadow:0 7px 20px rgba(15,23,42,.028);
+}
+.my-material-table-wrap,.my-f2b-table-wrap{
+  border-color:#dde8e2;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
+}
+.my-material-table th,.my-f2b-table th{
+  position:sticky;
+  top:0;
+  z-index:1;
+  background:#f3f8f5;
+  color:#41584b;
+}
+.my-material-table tbody tr:nth-child(even),.my-f2b-table tbody tr:nth-child(even){background:#fcfefd;}
+.my-material-table tbody tr:hover,.my-f2b-table tbody tr:hover{background:#f4faf6;}
+.my-material-filters,.my-f2b-filters{
+  border:1px solid #e1ebe5;
+  background:#fbfdfc;
+  box-shadow:0 5px 16px rgba(15,23,42,.02);
+}
+.my-material-filter-actions .btn,.my-f2b-filter-actions .btn{min-height:39px;}
+
+@media(max-width:1180px){
+  .my-portal-services .my-roadmap-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+}
+
+@media(max-width:900px){
+  .my-access-grid{grid-template-columns:1fr;}
+  .my-service-card--primary{min-height:108px !important;}
+  .my-photo-form--dedicated{grid-template-columns:1fr;}
+  .my-photo-form--dedicated .btn{width:100%;}
+}
+
+@media(max-width:620px){
+  .my-portal-page{gap:12px;}
+  .my-portal-hero{padding:15px;}
+  .my-portal-hero--compact .my-portal-hero__identity>img{width:62px;height:62px;border-radius:14px;}
+  .my-portal-hero--compact h1{font-size:23px;}
+  .my-portal-services{padding:13px;}
+  .my-portal-services .my-roadmap-grid{grid-template-columns:1fr 1fr;}
+  .my-portal-services .my-service-card{min-height:106px;padding:12px;}
+  .my-service-card--primary{grid-template-columns:38px minmax(0,1fr);column-gap:10px;}
+  .my-service-card--primary .my-service-card__icon{width:38px;height:38px;border-radius:10px;}
+  .my-personal-card{padding:14px;}
+  .my-personal-profile{grid-template-columns:78px minmax(0,1fr);gap:12px;padding:12px;}
+  .my-personal-photo{width:78px;height:78px;border-radius:14px;}
+  .my-personal-profile__data h2{font-size:18px;}
+  .my-material-table-wrap,.my-f2b-table-wrap{-webkit-overflow-scrolling:touch;}
+}
+
+@media(max-width:420px){
+  .my-portal-services .my-roadmap-grid{grid-template-columns:1fr;}
+  .my-personal-profile{grid-template-columns:1fr;}
+  .my-personal-photo{width:86px;height:86px;}
+}

@@ -87,6 +87,13 @@ const ACCESS = {
   escala_manage: [ROLE.ADMIN, ROLE.MANUTENCAO_SUPERVISOR, ROLE.SUPERVISOR_MANUTENCAO, ROLE.ENCARREGADO_MANUTENCAO],
   escala_reports: [ROLE.ADMIN, ROLE.RH, ROLE.DIRETORIA, ROLE.MANUTENCAO_SUPERVISOR, ROLE.SUPERVISOR_MANUTENCAO, ROLE.ENCARREGADO_MANUTENCAO, ROLE.MECANICO],
 
+  // RH integrado: Diretoria consulta visão geral; dados e anexos sensíveis
+  // permanecem restritos a RH/ADMIN. A aprovação operacional de folgas continua
+  // em escala_manage e não é ampliada por estas permissões.
+  rh_view: [ROLE.ADMIN, ROLE.RH, ROLE.DIRETORIA],
+  rh_manage: [ROLE.ADMIN, ROLE.RH],
+  rh_sensitive: [ROLE.ADMIN, ROLE.RH],
+
   inspecao_view: [
     ROLE.INSPECAO_QUALIDADE,
     ROLE.ADMIN,

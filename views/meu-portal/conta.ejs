@@ -1,0 +1,40 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v3" />
+
+<div class="my-portal-page my-personal-page">
+  <header class="my-section-head">
+    <div>
+      <span class="eyebrow">MEU PORTAL • CONTA</span>
+      <h1>Minha conta</h1>
+      <p>Gerencie a segurança do seu acesso sem misturar informações de perfil ou RH.</p>
+    </div>
+    <a class="btn btn-ghost" href="/meu-portal">Voltar ao portal</a>
+  </header>
+
+  <section class="card my-personal-card my-personal-card--narrow">
+    <div class="my-personal-card__head">
+      <span class="eyebrow">SEGURANÇA</span>
+      <h2>Alterar minha senha</h2>
+      <p>Use sua senha atual para confirmar a alteração. A nova senha deve ter pelo menos 8 caracteres.</p>
+    </div>
+
+    <form class="my-password-form my-password-form--dedicated" method="POST" action="/meu-portal/senha">
+      <label>
+        <span>Senha atual</span>
+        <input type="password" name="current_password" autocomplete="current-password" required />
+      </label>
+      <label>
+        <span>Nova senha</span>
+        <input type="password" name="new_password" minlength="8" autocomplete="new-password" required />
+        <small>Mínimo de 8 caracteres.</small>
+      </label>
+      <label>
+        <span>Confirmar nova senha</span>
+        <input type="password" name="confirm_password" minlength="8" autocomplete="new-password" required />
+      </label>
+      <button class="btn btn-green" type="submit">Alterar minha senha</button>
+    </form>
+
+    <div class="my-personal-note">Esta página altera somente a senha do usuário autenticado. Perfil, função, setor e permissões não são modificados aqui.</div>
+  </section>
+</div>

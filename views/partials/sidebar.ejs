@@ -25,6 +25,7 @@
   const canUsuarios = can('usuarios');
   const canArmazenamento = ['ADMIN','ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO'].includes(role);
   const canEscala = can('escala');
+  const canRH = can('rh_view');
   const canMeuPortal = Boolean(user?.id);
   const canInspecao = can('inspecao_view');
   const canTracagem = can('tracagem_view');
@@ -43,7 +44,7 @@
     `<a class="nav-item ${extraClass} ${isActive ? 'active' : ''}" href="${href}"><span class="nav-label">${label}</span>${suffix}</a>`;
 
   const hasOperationGroup = canPainel || canEquipamentos || canOS || canOSChat || canPreventivas || canDemandas || canSolicitacoes || canCompras || canFornecedores || canAlmoxarifado || canEstoque || canMotores;
-  const hasSupportGroup = canAvisos || canEscala || canMeuPortal || canInspecao || canTracagem || canDesenhoTecnico || canAcademia || canAI || canPCM;
+  const hasSupportGroup = canAvisos || canEscala || canRH || canMeuPortal || canInspecao || canTracagem || canDesenhoTecnico || canAcademia || canAI || canPCM;
 %>
 
 <aside class="sidebar">
@@ -73,6 +74,7 @@
     <% } %>
     <% if (canAvisos) { %><%- navItem('/avisos', 'Avisos', activeMenu === 'avisos') %><% } %>
     <% if (canEscala) { %><%- navItem('/escala', 'Escala', activeMenu === 'escala') %><% } %>
+    <% if (canRH) { %><%- navItem('/escala/rh', 'RH', activeMenu === 'rh') %><% } %>
     <% if (canMeuPortal) { %><%- navItem('/meu-portal', 'Meu Portal', activeMenu === 'meu-portal') %><% } %>
     <% if (canInspecao) { %><%- navItem('/inspecao', 'Inspeção', activeMenu === 'inspecao') %><% } %>
     <% if (canTracagem) { %><%- navItem('/tracagem', 'Traçagem', activeMenu === 'tracagem') %><% } %>

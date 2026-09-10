@@ -1,5 +1,4 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
 <link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v3" />
 <link rel="stylesheet" href="/css/meu-portal-fase2b.css?v=20260910-v1" />
 
@@ -15,20 +14,31 @@
   const colaboradoresDisponiveisLista = typeof availableColaboradores !== 'undefined' && Array.isArray(availableColaboradores)
     ? availableColaboradores
     : [];
+  const cartaoStatus = !temVinculo
+    ? 'VÍNCULO PENDENTE'
+    : cartaoAtivo
+      ? 'ATIVO'
+      : cartaoRevogado
+        ? 'REVOGADO'
+        : ativo
+          ? 'PRONTO PARA EMITIR'
+          : 'INDISPONÍVEL';
 %>
 
-<div class="my-portal-page">
-  <header class="my-portal-hero">
-    <div class="my-portal-hero__identity">
-      <img src="<%= foto %>" alt="Foto de <%= colaborador?.nome || conta.name %>" />
-      <div>
-        <span class="eyebrow">PORTAL DO COLABORADOR</span>
-        <h1>Olá, <%= colaborador?.apelido || colaborador?.nome || conta.name %></h1>
-        <p>Seu espaço para identidade, acesso e serviços internos da Campo do Gado.</p>
-        <div class="my-portal-tags">
-          <span><%= colaborador?.funcao || 'Função a cadastrar pelo RH' %></span>
-          <span><%= colaborador?.setor || 'Setor não vinculado' %></span>
-          <span class="<%= ativo ? 'is-ok' : 'is-warn' %>"><%= colaborador?.status || 'VÍNCULO PENDENTE' %></span>
+<div class="my-portal-page my-portal-hub">
+  <header class="my-portal-hero my-portal-hero--compact">
+    <div class="my-portal-hero__content">
+      <div class="my-portal-hero__identity">
+        <img src="<%= foto %>" alt="Foto de <%= colaborador?.nome || conta.name %>" />
+        <div>
+          <span class="eyebrow">PORTAL DO COLABORADOR</span>
+          <h1>Olá, <%= colaborador?.apelido || colaborador?.nome || conta.name %></h1>
+          <p>Escolha o serviço que deseja acessar. Seus dados pessoais, jornada, materiais e RH ficam organizados em áreas separadas.</p>
+          <div class="my-portal-tags">
+            <span><%= colaborador?.funcao || 'Função a cadastrar pelo RH' %></span>
+            <span><%= colaborador?.setor || 'Setor não vinculado' %></span>
+            <span class="<%= ativo ? 'is-ok' : 'is-warn' %>"><%= colaborador?.status || 'VÍNCULO PENDENTE' %></span>
+          </div>
         </div>
       </div>
     </div>
@@ -38,9 +48,9 @@
     <section class="my-portal-notice <%= podeGerenciarVinculo ? 'has-action' : '' %>">
       <div>
         <strong>Vínculo com colaborador pendente</strong>
-        <p>Seu login está ativo, mas ainda não existe uma ficha de colaborador ligada a este usuário. Foto e senha podem ser atualizadas normalmente.</p>
+        <p>Seu login está ativo, mas ainda não existe uma ficha de colaborador ligada a este usuário.</p>
         <% if (!podeGerenciarVinculo) { %>
-          <small>Para liberar função, setor, cartão e futuras informações de RH, solicite o vínculo ao setor de RH.</small>
+          <small>Para liberar função, setor, cartão, materiais e informações de RH, solicite o vínculo ao setor de RH.</small>
         <% } %>
       </div>
 
@@ -69,103 +79,71 @@
     </section>
   <% } %>
 
-  <section class="my-portal-grid">
-    <article class="card my-portal-panel" id="perfil">
-      <div class="my-portal-panel__head">
-        <div><span class="eyebrow">MINHA IDENTIDADE</span><h2>Meu perfil</h2></div>
-      </div>
-      <div class="my-profile-row">
-        <img class="my-profile-photo" src="<%= foto %>" alt="Sua foto" />
-        <div class="my-profile-data">
-          <strong><%= colaborador?.nome || conta.name %></strong>
-          <span><%= conta.email %></span>
-          <span><%= colaborador?.funcao || 'Função ainda não cadastrada' %></span>
-          <span><%= colaborador?.setor || 'Setor ainda não cadastrado' %></span>
-        </div>
-      </div>
-      <form class="my-photo-form" method="POST" action="/meu-portal/foto" enctype="multipart/form-data">
-        <label>
-          <span>Trocar minha foto</span>
-          <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required />
-          <small>JPG, PNG ou WEBP • máximo 5 MB</small>
-        </label>
-        <button class="btn btn-green" type="submit">Atualizar foto</button>
-      </form>
-      <p class="my-portal-help">Nome, função, setor e situação profissional são dados oficiais e permanecem sob gestão do RH/ADMIN.</p>
-    </article>
+  <section class="my-portal-services my-portal-services--primary" aria-labelledby="acessos-pessoais">
+    <div class="my-portal-panel__head">
+      <div><span class="eyebrow">MEU ACESSO</span><h2 id="acessos-pessoais">Identidade e conta</h2></div>
+      <span class="my-status">3 ÁREAS</span>
+    </div>
+    <div class="my-access-grid">
+      <a class="my-service-card my-service-card--primary is-available" href="/meu-portal/perfil">
+        <div class="my-service-card__icon" aria-hidden="true">ID</div>
+        <strong>Minha identidade</strong>
+        <span>Foto, nome, função, setor e dados de identificação.</span>
+        <small>ABRIR MEU PERFIL →</small>
+      </a>
 
-    <article class="card my-portal-panel <%= !temVinculo ? 'my-portal-panel--compact' : '' %>" id="cartao">
-      <div class="my-portal-panel__head">
-        <div><span class="eyebrow">IDENTIFICAÇÃO • ALMOXARIFADO</span><h2>Meu cartão</h2></div>
-        <% if (cartaoAtivo) { %><span class="my-status is-ok">ATIVO</span><% } else if (cartaoRevogado) { %><span class="my-status is-danger">REVOGADO</span><% } else { %><span class="my-status">NÃO EMITIDO</span><% } %>
-      </div>
+      <a class="my-service-card my-service-card--primary is-available" href="/meu-portal/cartao">
+        <div class="my-service-card__icon" aria-hidden="true">QR</div>
+        <strong>Identificação do Almoxarifado</strong>
+        <span>Cartão virtual, QR e identificação para retirada de materiais.</span>
+        <small><%= cartaoStatus %> • ABRIR →</small>
+      </a>
 
-      <% if (cartaoAtivo && cardQr) { %>
-        <div class="my-card-preview">
-          <div class="my-card-preview__identity">
-            <img src="<%= foto %>" alt="Foto" />
-            <div><small>COLABORADOR</small><strong><%= colaborador.nome %></strong><span><%= colaborador.funcao || '-' %> • <%= colaborador.setor || '-' %></span></div>
-          </div>
-          <img class="my-card-preview__qr" src="<%= cardQr %>" alt="QR do cartão" />
-        </div>
-        <div class="my-portal-actions">
-          <a class="btn btn-green" href="/meu-portal/cartao">Abrir cartão virtual</a>
-          <a class="btn btn-ghost" href="/meu-portal/cartao">Imprimir / salvar PDF</a>
-        </div>
-      <% } else if (cartaoRevogado) { %>
-        <div class="my-card-state is-danger"><strong>Cartão revogado</strong><span>Por segurança, um cartão revogado não pode ser reativado pelo próprio usuário. Procure o RH ou o administrador para nova emissão.</span></div>
-      <% } else if (temVinculo && ativo) { %>
-        <div class="my-card-state"><strong>Seu cartão ainda não foi emitido</strong><span>O QR utiliza apenas um token seguro e será aceito pelo fluxo já existente de retirada no Almoxarifado.</span></div>
-        <form method="POST" action="/meu-portal/cartao/emitir"><button class="btn btn-green" type="submit">Gerar meu cartão</button></form>
-      <% } else { %>
-        <div class="my-card-state my-card-state--compact"><strong>Vínculo necessário</strong><span><%= temVinculo ? 'O cartão é liberado somente para colaboradores ativos.' : 'Associe este login à ficha correta para liberar o cartão do Almoxarifado.' %></span></div>
-      <% } %>
-    </article>
+      <a class="my-service-card my-service-card--primary is-available" href="/meu-portal/conta">
+        <div class="my-service-card__icon" aria-hidden="true">•••</div>
+        <strong>Minha conta</strong>
+        <span>Segurança da conta e alteração de senha.</span>
+        <small>SEGURANÇA • ABRIR →</small>
+      </a>
+    </div>
+  </section>
 
-    <article class="card my-portal-panel" id="seguranca">
-      <div class="my-portal-panel__head"><div><span class="eyebrow">MINHA CONTA</span><h2>Segurança</h2></div></div>
-      <form class="my-password-form" method="POST" action="/meu-portal/senha">
-        <label><span>Senha atual</span><input type="password" name="current_password" autocomplete="current-password" required /></label>
-        <label><span>Nova senha</span><input type="password" name="new_password" minlength="8" autocomplete="new-password" required /><small>Mínimo de 8 caracteres.</small></label>
-        <label><span>Confirmar nova senha</span><input type="password" name="confirm_password" minlength="8" autocomplete="new-password" required /></label>
-        <button class="btn btn-green" type="submit">Alterar minha senha</button>
-      </form>
-    </article>
-
-    <article class="card my-portal-panel my-portal-roadmap">
-      <div class="my-portal-panel__head"><div><span class="eyebrow">SERVIÇOS INTEGRADOS</span><h2>Serviços do colaborador</h2></div></div>
-      <div class="my-roadmap-grid">
-        <a class="my-service-card is-available" href="/meu-portal/dados-profissionais">
-          <strong>Dados profissionais</strong>
-          <span>Admissão, função, setor, liderança e situação</span>
-          <small>DISPONÍVEL • Abrir →</small>
-        </a>
-        <a class="my-service-card is-available" href="/escala/meu-painel">
-          <strong>Jornada</strong>
-          <span>Escala, horas extras e banco de horas</span>
-          <small>DISPONÍVEL • Abrir →</small>
-        </a>
-        <a class="my-service-card is-available" href="/meu-portal/materiais">
-          <strong>Materiais</strong>
-          <span>Histórico das minhas retiradas no Almoxarifado</span>
-          <small>DISPONÍVEL • Abrir →</small>
-        </a>
-        <a class="my-service-card is-available" href="/meu-portal/treinamentos">
-          <strong>Treinamentos</strong>
-          <span>Cursos, NRs, certificados e vencimentos</span>
-          <small>DISPONÍVEL • Abrir →</small>
-        </a>
-        <a class="my-service-card is-available" href="/meu-portal/servicos">
-          <strong>Meus serviços</strong>
-          <span>Histórico das minhas participações em Ordens de Serviço</span>
-          <small>DISPONÍVEL • Abrir →</small>
-        </a>
-        <div class="my-service-card is-planned">
-          <strong>RH</strong>
-          <span>Exames, documentos e solicitações</span>
-          <small>PLANEJADO • Fase 3</small>
-        </div>
-      </div>
-    </article>
+  <section class="my-portal-services" aria-labelledby="servicos-colaborador">
+    <div class="my-portal-panel__head">
+      <div><span class="eyebrow">SERVIÇOS INTEGRADOS</span><h2 id="servicos-colaborador">Serviços do colaborador</h2></div>
+      <span class="my-status is-ok">6 SERVIÇOS</span>
+    </div>
+    <div class="my-roadmap-grid">
+      <a class="my-service-card is-available" href="/meu-portal/dados-profissionais">
+        <strong>Dados profissionais</strong>
+        <span>Admissão, função, setor, liderança e situação.</span>
+        <small>DISPONÍVEL • ABRIR →</small>
+      </a>
+      <a class="my-service-card is-available" href="/escala/meu-painel">
+        <strong>Jornada</strong>
+        <span>Escala, horas extras e banco de horas.</span>
+        <small>DISPONÍVEL • ABRIR →</small>
+      </a>
+      <a class="my-service-card is-available" href="/meu-portal/materiais">
+        <strong>Materiais</strong>
+        <span>Histórico das minhas retiradas no Almoxarifado.</span>
+        <small>DISPONÍVEL • ABRIR →</small>
+      </a>
+      <a class="my-service-card is-available" href="/meu-portal/treinamentos">
+        <strong>Treinamentos</strong>
+        <span>Cursos, NRs, certificados e vencimentos.</span>
+        <small>DISPONÍVEL • ABRIR →</small>
+      </a>
+      <a class="my-service-card is-available" href="/meu-portal/servicos">
+        <strong>Meus serviços</strong>
+        <span>Histórico das minhas participações em Ordens de Serviço.</span>
+        <small>DISPONÍVEL • ABRIR →</small>
+      </a>
+      <a class="my-service-card is-available" href="/meu-portal/rh">
+        <strong>Meu RH</strong>
+        <span>Exames, documentos, folgas e banco de horas.</span>
+        <small>FASE 3 • ABRIR →</small>
+      </a>
+    </div>
   </section>
 </div>

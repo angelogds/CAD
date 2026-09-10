@@ -6,6 +6,7 @@ const storagePaths = require('../../config/storage');
 const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const ctrl = require('./meu-portal.controller');
 const fase2bCtrl = require('./meu-portal-fase2b.controller');
+const rhPortalCtrl = require('../rh/rh.portal.controller');
 
 const router = express.Router();
 const LINK_MANAGER_ROLES = ['ADMIN', 'RH'];
@@ -36,10 +37,14 @@ const upload = multer({
 
 router.use(requireLogin);
 router.get('/', ctrl.index);
+router.get('/perfil', ctrl.perfil);
+router.get('/conta', ctrl.conta);
 router.get('/materiais', ctrl.materiais);
 router.get('/treinamentos', fase2bCtrl.treinamentos);
 router.get('/dados-profissionais', fase2bCtrl.dadosProfissionais);
 router.get('/servicos', fase2bCtrl.servicos);
+router.get('/rh', rhPortalCtrl.index);
+router.get('/rh/documentos/:documentoId/arquivo', rhPortalCtrl.documentoArquivo);
 router.post('/vinculo', requireRole(LINK_MANAGER_ROLES), ctrl.linkColaborador);
 router.post('/foto', upload.single('photo'), ctrl.updatePhoto);
 router.post('/senha', ctrl.changePassword);
@@ -52,7 +57,7 @@ router.use((err, req, res, next) => {
       ? 'A foto deve ter no máximo 5 MB.'
       : (err.message || 'Não foi possível processar a foto.');
     req.flash('error', message);
-    return res.redirect('/meu-portal');
+    return res.redirect('/meu-portal/perfil');
   }
   return next(err);
 });
