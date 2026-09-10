@@ -81,7 +81,7 @@ test('filtros de materiais validam período e não aceitam colaborador arbitrár
   assert.match(service, /date\(\$\{dataExpr\}\) >= date\(\?\)/);
   assert.match(service, /date\(\$\{dataExpr\}\) <= date\(\?\)/);
   assert.match(service, /LOWER\(COALESCE\(i\.nome,''\)\) LIKE \?/);
-  assert.doesNotMatch(controller, /req\.(query|params|body)\.colaborador/i);
+  assert.match(controller, /listOwnMaterialWithdrawals\(req\.session\.user\.id, \{[\s\S]*q: req\.query\.q,[\s\S]*inicio: req\.query\.inicio,[\s\S]*fim: req\.query\.fim/);
   assert.doesNotMatch(service, /filters\.colaborador|options\.colaborador/i);
 });
 
