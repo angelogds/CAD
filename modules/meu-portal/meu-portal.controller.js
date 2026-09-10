@@ -47,8 +47,9 @@ function materiais(req, res) {
       dateBr,
     });
   } catch (error) {
-    req.flash('error', error.message || 'Não foi possível carregar seu histórico de materiais.');
-    return res.redirect('/meu-portal/materiais');
+    const message = error.message || 'Não foi possível carregar seu histórico de materiais.';
+    req.flash('error', message);
+    return res.redirect(/^Período inválido:/i.test(message) ? '/meu-portal/materiais' : '/meu-portal');
   }
 }
 
