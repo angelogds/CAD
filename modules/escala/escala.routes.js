@@ -7,7 +7,6 @@ const router = express.Router();
 const { requireLogin, requireRole, requireAdmin } = require("../auth/auth.middleware");
 const { ACCESS, ROLE } = require("../../config/rbac");
 const controller = require("./escala.controller");
-const rhController = require("./escala.rh.controller");
 const selfController = require("./escala.self.controller");
 const folgaController = require("./escala.folga.controller");
 const dateBr = require("../../utils/data-hora-br");
@@ -67,14 +66,15 @@ function requireHoraExtraAccess(req, res, next) {
 
 function redirectRoleDashboard(req, res, next) {
   const role = normalizeTextRole(req.session?.user?.role);
-  if (role === ROLE.RH) return res.redirect('/escala/rh');
+  if (role === ROLE.RH) return res.redirect('/rh');
   if (role === ROLE.COLABORADOR) return res.redirect('/escala/meu-painel');
   return next();
 }
 
 router.get("/", requireLogin, requireRole(escalaSelfRead), redirectRoleDashboard, safe(controller.index, "index"));
 router.get("/meu-painel", requireLogin, requireRole(escalaSelfRead), safe(selfController.index, "selfIndex"));
-router.get("/rh", requireLogin, requireRole(escalaRhRead), safe(rhController.index, "rhIndex"));
+// Compatibilidade: a antiga entrada /escala/rh não renderiza mais uma tela própria.
+router.get("/rh", requireLogin, requireRole(escalaRhRead), (_req, res) => res.redirect(301, "/rh"));
 router.get("/semana", requireLogin, requireRole(escalaRead), safe(controller.semana, "semana"));
 router.get("/completa", requireLogin, requireRole(escalaRead), safe(controller.completa, "completa"));
 router.get("/ausencias", requireLogin, requireRole(escalaRead), safe(controller.ausencias, "ausencias"));
@@ -107,7 +107,7 @@ router.post("/folgas/solicitar", requireLogin, requireRole(escalaSelfRead), safe
 router.post("/folgas/solicitacoes/:id/cancelar", requireLogin, requireRole(escalaSelfRead), safe(folgaController.cancelarSolicitacao, "cancelarSolicitacaoFolga"));
 router.post("/folgas/solicitacoes/:id/aprovar", requireLogin, requireRole(escalaManage), safe(folgaController.aprovarSolicitacao, "aprovarSolicitacaoFolga"));
 router.post("/folgas/solicitacoes/:id/reprovar", requireLogin, requireRole(escalaManage), safe(folgaController.reprovarSolicitacao, "reprovarSolicitacaoFolga"));
-router.post("/folgas/programar", requireLogin, requireRole(escalaManage), upload.single("anexo"), safe(folgaController.programar, "programarFolga"));
+router.post("/folgas/programar", requireLogin, requireRole(escalaManage), upload.single("anexo"), safe(folgaController.programarFolga ? folgaController.programarFolga : folgaController.programar, "programarFolga"));
 router.post("/folgas/:id/cancelar", requireLogin, requireRole(escalaManage), safe(folgaController.cancelar, "cancelarFolga"));
 router.post("/folgas/:id/realizar", requireLogin, requireRole(escalaManage), safe(folgaController.realizar, "realizarFolga"));
 
