@@ -1,0 +1,46 @@
+<%- layout('layout') -%>
+<link rel="stylesheet" href="/css/rh-portal.css?v=20260910-rh-modular" />
+<%
+  const d = dashboard || {};
+  const pessoas = Array.isArray(d.colaboradores) ? d.colaboradores : [];
+  const person = selected?.colaborador || null;
+  const docs = Array.isArray(selected?.documentos) ? selected.documentos : [];
+%>
+<div class="rh-page">
+  <%- include('_header', { title, dashboard: d, activeRhSection }) %>
+
+  <section class="card rh-section">
+    <div class="rh-section-head"><div><span class="rh-eyebrow">ARQUIVO INDIVIDUAL • ACESSO RESTRITO</span><h2>Documentos do colaborador</h2><p class="rh-muted">Centralize termos, declarações e documentos sem criar cadastro paralelo.</p></div></div>
+    <form class="rh-toolbar" method="GET" action="/rh/documentos">
+      <label class="rh-grow"><span>Colaborador</span><select name="colaborador"><option value="">Selecione um colaborador</option><% pessoas.forEach((c) => { %><option value="<%= c.id %>" <%= Number(person?.id) === Number(c.id) ? 'selected' : '' %>><%= c.nome %> • <%= c.funcaoLabel || c.funcao || '-' %></option><% }) %></select></label>
+      <button class="btn btn-green" type="submit">Carregar documentos</button>
+    </form>
+  </section>
+
+  <% if (person) { %>
+    <section class="rh-two-column">
+      <article class="card rh-section">
+        <div class="rh-section-head"><div><span class="rh-eyebrow">NOVO DOCUMENTO</span><h2><%= person.nome %></h2></div><a class="btn btn-sm" href="/rh/colaboradores/<%= person.id %>">Ficha RH</a></div>
+        <form class="rh-form" method="POST" action="/colaboradores/<%= person.id %>/rh-documentos" enctype="multipart/form-data">
+          <label><span>Tipo</span><input name="tipo" maxlength="80" required placeholder="Ex.: termo, declaração" /></label>
+          <label><span>Data</span><input type="date" name="data" /></label>
+          <label class="is-wide"><span>Arquivo (PDF/JPG/PNG/WEBP, até 10 MB)</span><input type="file" name="arquivo" accept=".pdf,.jpg,.jpeg,.png,.webp" required /></label>
+          <div class="rh-form-actions"><button class="btn btn-green" type="submit">Anexar documento</button></div>
+        </form>
+        <p class="rh-privacy">Novos documentos do RH são mantidos fora do diretório público de uploads e acessados por rota protegida.</p>
+      </article>
+
+      <article class="card rh-section">
+        <div class="rh-section-head"><div><span class="rh-eyebrow">HISTÓRICO</span><h2>Documentos registrados</h2></div><span class="rh-badge"><%= docs.length %></span></div>
+        <div class="rh-records">
+          <% docs.slice(0, 30).forEach((doc) => { %>
+            <div class="rh-record"><div class="rh-record-head"><strong><%= doc.tipo || 'Documento' %></strong><span class="rh-badge"><%= doc.confirmado_em ? 'CIÊNCIA REGISTRADA' : 'REGISTRADO' %></span></div><small><%= doc.data ? dateBr.formatDateBR(String(doc.data).slice(0,10)) : '-' %></small><% if (doc.arquivo_seguro) { %><a class="btn btn-sm" href="<%= doc.arquivo_seguro %>" target="_blank" rel="noopener">Abrir arquivo protegido</a><% } %></div>
+          <% }) %>
+          <% if (!docs.length) { %><div class="rh-empty">Sem documentos registrados para este colaborador.</div><% } %>
+        </div>
+      </article>
+    </section>
+  <% } else { %>
+    <section class="card rh-empty rh-empty-large">Selecione um colaborador para consultar ou anexar documentos.</section>
+  <% } %>
+</div>
