@@ -1,0 +1,115 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v3" />
+<link rel="stylesheet" href="/css/meu-portal-fase2b.css?v=20260910-v1" />
+
+<%
+  const resumo = historico?.resumo || {};
+  const servicos = Array.isArray(historico?.servicos) ? historico.servicos : [];
+  const filtros = historico?.filtros || {};
+  const tipos = Array.isArray(historico?.tiposDisponiveis) ? historico.tiposDisponiveis : [];
+%>
+
+<div class="my-portal-page my-f2b-page">
+  <header class="my-section-head">
+    <div>
+      <span class="eyebrow">MEU PORTAL • HISTÓRICO TÉCNICO</span>
+      <h1>Meus serviços</h1>
+      <p>Ordens de serviço em que sua ficha aparece como executor, responsável ou auxiliar.</p>
+    </div>
+    <a class="btn btn-ghost" href="/meu-portal">Voltar ao portal</a>
+  </header>
+
+  <% if (!historico?.vinculado) { %>
+    <section class="card my-f2b-empty">
+      <strong>Vínculo com colaborador necessário</strong>
+      <p>O histórico técnico só é liberado após o login estar ligado à ficha correta do colaborador.</p>
+    </section>
+  <% } else if (!historico?.disponivel) { %>
+    <section class="card my-f2b-empty">
+      <strong>Histórico técnico ainda indisponível</strong>
+      <p>A estrutura de Ordens de Serviço não foi encontrada nesta instalação. Nenhum dado foi alterado.</p>
+    </section>
+  <% } else { %>
+    <section class="my-f2b-kpis" aria-label="Resumo do histórico técnico">
+      <article class="card my-f2b-kpi"><span>OS com participação</span><strong><%= Number(resumo.osParticipadas || 0) %></strong><small>No período filtrado</small></article>
+      <article class="card my-f2b-kpi"><span>Tempo registrado</span><strong class="is-time"><%= formatMinutes(resumo.minutosRegistrados || 0) %></strong><small>Somente execuções com início/fim</small></article>
+      <article class="card my-f2b-kpi"><span>Corretivas</span><strong><%= Number(resumo.corretivas || 0) %></strong><small>OS distintas</small></article>
+      <article class="card my-f2b-kpi"><span>Preventivas</span><strong><%= Number(resumo.preventivas || 0) %></strong><small>OS distintas</small></article>
+    </section>
+
+    <form class="card my-f2b-filters" method="GET" action="/meu-portal/servicos">
+      <label>
+        <span>Buscar</span>
+        <input type="search" name="q" maxlength="80" value="<%= filtros.q || '' %>" placeholder="OS, equipamento ou serviço" />
+      </label>
+      <label>
+        <span>Tipo</span>
+        <select name="tipo">
+          <option value="">Todos</option>
+          <% tipos.forEach((tipo) => { %><option value="<%= tipo %>" <%= filtros.tipo === tipo ? 'selected' : '' %>><%= tipo %></option><% }) %>
+        </select>
+      </label>
+      <label><span>De</span><input type="date" name="inicio" value="<%= filtros.inicio || '' %>" /></label>
+      <label><span>Até</span><input type="date" name="fim" value="<%= filtros.fim || '' %>" /></label>
+      <div class="my-f2b-filter-actions">
+        <button class="btn btn-green" type="submit">Filtrar</button>
+        <a class="btn btn-ghost" href="/meu-portal/servicos">Limpar</a>
+      </div>
+    </form>
+
+    <section class="card my-f2b-panel">
+      <div class="my-f2b-panel__head">
+        <div><span class="eyebrow">RASTREABILIDADE PESSOAL</span><h2>Histórico de participação</h2></div>
+        <span class="my-status"><%= servicos.length %> registro<%= servicos.length === 1 ? '' : 's' %></span>
+      </div>
+
+      <% if (!servicos.length) { %>
+        <div class="my-f2b-empty is-inline">
+          <strong>Nenhuma participação encontrada</strong>
+          <p>Não existem Ordens de Serviço associadas à sua ficha para os filtros selecionados.</p>
+        </div>
+      <% } else { %>
+        <div class="my-f2b-table-wrap">
+          <table class="my-f2b-table my-f2b-services-table">
+            <thead>
+              <tr>
+                <th>Início</th>
+                <th>OS</th>
+                <th>Equipamento</th>
+                <th>Tipo</th>
+                <th>Prioridade</th>
+                <th>Papel</th>
+                <th>Tempo</th>
+                <th>Status</th>
+                <th>Serviço</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% servicos.forEach((servico) => { %>
+                <tr>
+                  <td><%= dateBr.formatDateTimeBR(servico.participacao_inicio) %></td>
+                  <td><strong>#<%= servico.os_numero || servico.os_id %></strong></td>
+                  <td><%= servico.equipamento_nome || '-' %></td>
+                  <td><%= servico.tipo || '-' %></td>
+                  <td><%= servico.prioridade || '-' %></td>
+                  <td><span class="my-f2b-status <%= servico.papel === 'EXECUTOR' ? 'is-ok' : 'is-neutral' %>"><%= servico.papel || 'PARTICIPANTE' %></span></td>
+                  <td><%= servico.duracao_confiavel && servico.duracao_minutos !== null ? formatMinutes(servico.duracao_minutos) : '-' %></td>
+                  <td><%= servico.status || '-' %></td>
+                  <td class="my-f2b-description"><%= servico.descricao || '-' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      <% if (historico?.limiteAtingido) { %>
+        <p class="my-material-limit-note">Exibindo os 300 registros mais recentes. Refine o período ou a busca para consultar um intervalo menor.</p>
+      <% } %>
+    </section>
+
+    <div class="my-material-audit-note">
+      Consulta individual e somente leitura. O Portal reutiliza a rastreabilidade das OS e não cria lançamentos paralelos. O tempo é somado apenas quando existe execução com início e fim confiáveis.
+    </div>
+  <% } %>
+</div>

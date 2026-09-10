@@ -1,6 +1,7 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
 <link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v3" />
+<link rel="stylesheet" href="/css/meu-portal-fase2b.css?v=20260910-v1" />
 
 <%
   const conta = portal.user;
@@ -134,9 +135,9 @@
     <article class="card my-portal-panel my-portal-roadmap">
       <div class="my-portal-panel__head"><div><span class="eyebrow">SERVIÇOS INTEGRADOS</span><h2>Serviços do colaborador</h2></div></div>
       <div class="my-roadmap-grid">
-        <a class="my-service-card is-available" href="/meu-portal/materiais">
-          <strong>Materiais</strong>
-          <span>Histórico das minhas retiradas no Almoxarifado</span>
+        <a class="my-service-card is-available" href="/meu-portal/dados-profissionais">
+          <strong>Dados profissionais</strong>
+          <span>Admissão, função, setor, liderança e situação</span>
           <small>DISPONÍVEL • Abrir →</small>
         </a>
         <a class="my-service-card is-available" href="/escala/meu-painel">
@@ -144,15 +145,25 @@
           <span>Escala, horas extras e banco de horas</span>
           <small>DISPONÍVEL • Abrir →</small>
         </a>
-        <div class="my-service-card is-planned">
+        <a class="my-service-card is-available" href="/meu-portal/materiais">
+          <strong>Materiais</strong>
+          <span>Histórico das minhas retiradas no Almoxarifado</span>
+          <small>DISPONÍVEL • Abrir →</small>
+        </a>
+        <a class="my-service-card is-available" href="/meu-portal/treinamentos">
           <strong>Treinamentos</strong>
-          <span>Cursos, NRs e certificados</span>
-          <small>PLANEJADO</small>
-        </div>
+          <span>Cursos, NRs, certificados e vencimentos</span>
+          <small>DISPONÍVEL • Abrir →</small>
+        </a>
+        <a class="my-service-card is-available" href="/meu-portal/servicos">
+          <strong>Meus serviços</strong>
+          <span>Histórico das minhas participações em Ordens de Serviço</span>
+          <small>DISPONÍVEL • Abrir →</small>
+        </a>
         <div class="my-service-card is-planned">
           <strong>RH</strong>
           <span>Exames, documentos e solicitações</span>
-          <small>PLANEJADO</small>
+          <small>PLANEJADO • Fase 3</small>
         </div>
       </div>
     </article>

@@ -1,0 +1,66 @@
+/* Meu Portal - Fase 2B: treinamentos, dados profissionais e histórico técnico */
+.my-roadmap-grid{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.my-f2b-page{gap:12px}
+.my-f2b-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.my-f2b-kpi{display:flex;flex-direction:column;gap:5px;padding:14px;border-radius:14px;min-width:0}
+.my-f2b-kpi>span{font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.02em}
+.my-f2b-kpi>strong{font-size:24px;line-height:1.1;color:#15251c}
+.my-f2b-kpi>strong.is-time{font-size:19px}
+.my-f2b-kpi>small{font-size:10px;color:#7b8794}
+.my-f2b-panel{padding:16px;border-radius:16px}
+.my-f2b-panel__head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.my-f2b-panel__head h2{margin:0;font-size:20px}
+.my-f2b-empty{padding:18px;border-radius:15px}
+.my-f2b-empty strong{font-size:15px;color:#25362b}
+.my-f2b-empty p{margin:5px 0 0;color:#64748b;font-size:12px}
+.my-f2b-empty.is-inline{padding:24px 8px;border:0;background:transparent;text-align:center}
+.my-f2b-table-wrap{width:100%;overflow-x:auto;border:1px solid #e3ece7;border-radius:12px}
+.my-f2b-table{width:100%;min-width:920px;border-collapse:collapse;background:#fff}
+.my-f2b-table th,.my-f2b-table td{padding:10px 11px;border-bottom:1px solid #edf2ef;text-align:left;vertical-align:middle;font-size:11px}
+.my-f2b-table th{background:#f7faf8;color:#526258;font-size:10px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+.my-f2b-table tbody tr:last-child td{border-bottom:0}
+.my-f2b-table tbody tr:hover{background:#fbfdfc}
+.my-f2b-table td strong{font-size:12px;color:#26382d}
+.my-f2b-description{max-width:360px;white-space:normal;line-height:1.35}
+.my-f2b-status{display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;border-radius:999px;font-size:9px;font-weight:900;white-space:nowrap;background:#eef2f0;color:#536159}
+.my-f2b-status.is-ok{background:#e8f7ee;color:#147347}
+.my-f2b-status.is-warn{background:#fff6db;color:#946313}
+.my-f2b-status.is-danger{background:#fff0f0;color:#a22b2b}
+.my-f2b-status.is-neutral{background:#eef2f6;color:#526174}
+.my-f2b-link{display:inline-flex;align-items:center;justify-content:center;min-height:30px;padding:0 9px;border:1px solid #b9d7c5;border-radius:9px;color:#147347;font-size:10px;font-weight:800;text-decoration:none;background:#f8fcf9}
+.my-f2b-link:hover,.my-f2b-link:focus-visible{background:#eef8f2;border-color:#86bf9d;outline:none}
+.my-f2b-muted{font-size:10px;color:#8b97a0}
+.my-f2b-data-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.my-f2b-data-grid>div{display:flex;flex-direction:column;gap:4px;padding:13px;border:1px solid #e3ece7;border-radius:12px;background:#fbfdfc;min-width:0}
+.my-f2b-data-grid span{font-size:10px;font-weight:800;text-transform:uppercase;color:#64748b}
+.my-f2b-data-grid strong{font-size:13px;color:#25362b;overflow-wrap:anywhere}
+.my-f2b-info{padding:14px;border-radius:14px;border-left:4px solid #83ba98}
+.my-f2b-info strong{font-size:13px;color:#25362b}
+.my-f2b-info p{margin:5px 0 0;font-size:11px;line-height:1.5;color:#64748b}
+.my-f2b-filters{display:grid;grid-template-columns:minmax(210px,1.7fr) minmax(135px,.8fr) minmax(135px,.75fr) minmax(135px,.75fr) auto;gap:9px;align-items:end;padding:14px;border-radius:14px}
+.my-f2b-filters label{display:flex;flex-direction:column;gap:5px}
+.my-f2b-filters label>span{font-size:11px;font-weight:800;color:#334155}
+.my-f2b-filters input,.my-f2b-filters select{width:100%;min-height:39px;border:1px solid #d7e3dc;border-radius:10px;background:#fff;padding:0 10px;color:#25322b;font:inherit}
+.my-f2b-filters input:focus,.my-f2b-filters select:focus{outline:2px solid rgba(22,131,79,.13);border-color:#72b991}
+.my-f2b-filter-actions{display:flex;gap:7px;white-space:nowrap}
+@media(max-width:1000px){
+  .my-f2b-data-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .my-f2b-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .my-f2b-filter-actions{grid-column:1/-1}
+  .my-f2b-filter-actions .btn{flex:1;text-align:center}
+}
+@media(max-width:900px){
+  .my-f2b-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:620px){
+  .my-f2b-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .my-f2b-kpi{padding:12px}
+  .my-f2b-kpi>strong{font-size:20px}
+  .my-f2b-kpi>strong.is-time{font-size:16px}
+  .my-f2b-data-grid{grid-template-columns:1fr}
+  .my-f2b-filters{grid-template-columns:1fr}
+  .my-f2b-filter-actions{grid-column:auto}
+  .my-f2b-panel{padding:12px}
+  .my-f2b-panel__head{align-items:center}
+  .my-f2b-table th,.my-f2b-table td{padding:9px;font-size:10px}
+}
