@@ -1,0 +1,37 @@
+<%- layout('layout') -%>
+<link rel="stylesheet" href="/css/rh-portal.css?v=20260910-rh-modular" />
+<% const d = dashboard || {}; const i = d.indicadores || {}; const pessoas = Array.isArray(d.colaboradores) ? d.colaboradores : []; %>
+<div class="rh-page">
+  <%- include('_header', { title, dashboard: d, activeRhSection }) %>
+
+  <section class="rh-kpis rh-kpis-compact">
+    <article class="card rh-kpi"><span>HE no mês</span><strong><%= formatMinutes(i.horasExtrasMesMinutos || 0) %></strong><small>Consolidado da Escala</small></article>
+    <article class="card rh-kpi"><span>Banco de horas</span><strong><%= formatMinutes(i.bancoHorasMinutos || 0) %></strong><small>Saldo consolidado</small></article>
+    <article class="card rh-kpi"><span>Colaboradores</span><strong><%= pessoas.length %></strong><small>Com ficha ativa</small></article>
+  </section>
+
+  <section class="card rh-section">
+    <div class="rh-section-head">
+      <div><span class="rh-eyebrow">INTEGRAÇÃO COM ESCALA</span><h2>Jornada e Banco de Horas</h2><p class="rh-muted">Consulta de dados reais da Escala. O RH não mantém lançamentos paralelos.</p></div>
+      <a class="btn btn-ghost" href="/escala/banco-horas">Abrir Banco de Horas</a>
+    </div>
+    <div class="rh-table-wrap">
+      <table class="rh-table">
+        <thead><tr><th>Colaborador</th><th>Função</th><th>Turno atual</th><th>Situação</th><th>HE no mês</th><th>Banco atual</th><th>Detalhes</th></tr></thead>
+        <tbody>
+          <% pessoas.forEach((c) => { %>
+            <tr>
+              <td><strong><%= c.nome || '-' %></strong></td><td><%= c.funcaoLabel || c.funcao || '-' %></td>
+              <td><%= c.turnoAtual || '-' %></td><td><span class="rh-badge"><%= c.statusAtual || c.status || 'ATIVO' %></span></td>
+              <td><%= c.horasExtrasMes || formatMinutes(c.horasExtrasMesMinutos || 0) %></td>
+              <td><strong><%= c.saldo?.horas || formatMinutes(c.saldo?.minutos || 0) %></strong></td>
+              <td><% if (d.canManage) { %><a class="btn btn-sm" href="/rh/colaboradores/<%= c.id %>">Ficha RH</a><% } else { %><span class="rh-muted">Consulta</span><% } %></td>
+            </tr>
+          <% }) %>
+          <% if (!pessoas.length) { %><tr><td colspan="7" class="rh-empty">Nenhuma informação de jornada disponível.</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+    <p class="rh-privacy">Aprovação de hora extra, programação de folga e demais ações operacionais continuam nas permissões da Escala.</p>
+  </section>
+</div>
