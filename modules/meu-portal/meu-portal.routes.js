@@ -3,10 +3,11 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const storagePaths = require('../../config/storage');
-const { requireLogin } = require('../auth/auth.middleware');
+const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const ctrl = require('./meu-portal.controller');
 
 const router = express.Router();
+const LINK_MANAGER_ROLES = ['ADMIN', 'RH'];
 const uploadDir = path.join(storagePaths.IMAGE_DIR, 'users');
 fs.mkdirSync(uploadDir, { recursive: true });
 
@@ -34,6 +35,7 @@ const upload = multer({
 
 router.use(requireLogin);
 router.get('/', ctrl.index);
+router.post('/vinculo', requireRole(LINK_MANAGER_ROLES), ctrl.linkColaborador);
 router.post('/foto', upload.single('photo'), ctrl.updatePhoto);
 router.post('/senha', ctrl.changePassword);
 router.post('/cartao/emitir', ctrl.emitCard);
