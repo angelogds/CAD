@@ -1,0 +1,62 @@
+<%- layout('layout') -%>
+<link rel="stylesheet" href="/css/rh-portal.css?v=20260910-rh-modular" />
+<%
+  const d = dashboard || {};
+  const pessoas = Array.isArray(d.colaboradores) ? d.colaboradores : [];
+  const exames = Array.isArray(d.exams) ? d.exams : [];
+  const person = selected?.colaborador || null;
+  const selectedExams = Array.isArray(selected?.exames) ? selected.exames : [];
+%>
+<div class="rh-page">
+  <%- include('_header', { title, dashboard: d, activeRhSection }) %>
+
+  <section class="card rh-section">
+    <div class="rh-section-head">
+      <div><span class="rh-eyebrow">SAÚDE OCUPACIONAL • ACESSO RESTRITO</span><h2>Exames ocupacionais</h2><p class="rh-muted">Controle administrativo de ASO e validade. Não registrar dados clínicos detalhados.</p></div>
+    </div>
+    <form class="rh-toolbar" method="GET" action="/rh/exames">
+      <label class="rh-grow"><span>Colaborador</span><select name="colaborador"><option value="">Selecione para registrar ou consultar detalhes</option><% pessoas.forEach((c) => { %><option value="<%= c.id %>" <%= Number(person?.id) === Number(c.id) ? 'selected' : '' %>><%= c.nome %> • <%= c.funcaoLabel || c.funcao || '-' %></option><% }) %></select></label>
+      <button class="btn btn-green" type="submit">Carregar ficha</button>
+    </form>
+  </section>
+
+  <% if (person) { %>
+    <section class="rh-two-column">
+      <article class="card rh-section">
+        <div class="rh-section-head"><div><span class="rh-eyebrow">NOVO REGISTRO</span><h2><%= person.nome %></h2></div><a class="btn btn-sm" href="/rh/colaboradores/<%= person.id %>">Ficha RH</a></div>
+        <form class="rh-form" method="POST" action="/colaboradores/<%= person.id %>/exames" enctype="multipart/form-data">
+          <label><span>Tipo</span><select name="tipo" required><option value="PERIODICO">Periódico</option><option value="ADMISSIONAL">Admissional</option><option value="RETORNO_TRABALHO">Retorno ao trabalho</option><option value="MUDANCA_FUNCAO">Mudança de função</option><option value="DEMISSIONAL">Demissional</option><option value="OUTRO">Outro</option></select></label>
+          <label><span>Clínica / prestador</span><input name="clinica" maxlength="160" /></label>
+          <label><span>Realizado em</span><input type="date" name="data_realizacao" required /></label>
+          <label><span>Validade até</span><input type="date" name="validade_ate" required /></label>
+          <label class="is-wide"><span>Anexo do ASO (PDF/JPG/PNG/WEBP, até 10 MB)</span><input type="file" name="arquivo" accept=".pdf,.jpg,.jpeg,.png,.webp" /></label>
+          <label class="is-wide"><span>Observação administrativa</span><textarea name="observacao" maxlength="1000" rows="2"></textarea></label>
+          <div class="rh-form-actions"><button class="btn btn-green" type="submit">Registrar exame</button></div>
+        </form>
+        <p class="rh-privacy">Não registrar CID, diagnóstico ou resultado clínico detalhado. O anexo permanece em armazenamento privado.</p>
+      </article>
+
+      <article class="card rh-section">
+        <div class="rh-section-head"><div><span class="rh-eyebrow">HISTÓRICO</span><h2>Exames do colaborador</h2></div><span class="rh-badge"><%= selectedExams.length %></span></div>
+        <div class="rh-records">
+          <% selectedExams.slice(0, 20).forEach((e) => { %>
+            <div class="rh-record">
+              <div class="rh-record-head"><strong><%= String(e.tipo || 'EXAME').replaceAll('_',' ') %></strong><span class="rh-badge <%= e.status_visual === 'VENCIDO' ? 'is-danger' : (e.status_visual === 'VENCE_EM_BREVE' ? 'is-warning' : '') %>"><%= e.status_label || e.status_visual || '-' %></span></div>
+              <small><%= e.data_realizacao ? dateBr.formatDateBR(String(e.data_realizacao).slice(0,10)) : '-' %> → <%= e.validade_ate ? dateBr.formatDateBR(String(e.validade_ate).slice(0,10)) : '-' %><%= e.clinica ? ` • ${e.clinica}` : '' %></small>
+              <% if (e.arquivo_nome) { %><a class="btn btn-sm" href="/colaboradores/<%= person.id %>/exames/<%= e.id %>/arquivo">Abrir anexo protegido</a><% } %>
+            </div>
+          <% }) %>
+          <% if (!selectedExams.length) { %><div class="rh-empty">Nenhum exame cadastrado para este colaborador.</div><% } %>
+        </div>
+      </article>
+    </section>
+  <% } %>
+
+  <section class="card rh-section">
+    <div class="rh-section-head"><div><span class="rh-eyebrow">CONTROLE DE VALIDADE</span><h2>Todos os exames</h2></div><span class="rh-badge"><%= exames.length %> registro<%= exames.length === 1 ? '' : 's' %></span></div>
+    <div class="rh-table-wrap"><table class="rh-table"><thead><tr><th>Colaborador</th><th>Tipo</th><th>Realizado</th><th>Validade</th><th>Status</th><th>Ação</th></tr></thead><tbody>
+      <% exames.forEach((e) => { %><tr><td><strong><%= e.colaborador_nome || '-' %></strong></td><td><%= String(e.tipo || '-').replaceAll('_',' ') %></td><td><%= e.data_realizacao ? dateBr.formatDateBR(String(e.data_realizacao).slice(0,10)) : '-' %></td><td><%= e.validade_ate ? dateBr.formatDateBR(String(e.validade_ate).slice(0,10)) : '-' %></td><td><span class="rh-badge <%= e.status_visual === 'VENCIDO' ? 'is-danger' : (e.status_visual === 'VENCE_EM_BREVE' ? 'is-warning' : '') %>"><%= e.status_label || e.status_visual || '-' %></span></td><td><a class="btn btn-sm" href="/rh/exames?colaborador=<%= e.colaborador_id %>">Abrir</a></td></tr><% }) %>
+      <% if (!exames.length) { %><tr><td colspan="6" class="rh-empty">Nenhum exame ocupacional registrado.</td></tr><% } %>
+    </tbody></table></div>
+  </section>
+</div>
