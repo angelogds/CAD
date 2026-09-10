@@ -390,6 +390,7 @@ mount("/solicitacoes", "./modules/solicitacoes/solicitacoes.routes");
 mount(OFFICIAL_ROUTES.estoque, "./modules/estoque/estoque.routes");
 mount(OFFICIAL_ROUTES.almoxarifado, "./modules/almoxarifado/almoxarifado.routes");
 mount("/escala", "./modules/escala/escala.routes");
+mount(OFFICIAL_ROUTES.rh, "./modules/rh/rh.routes");
 mount("/avisos", "./modules/avisos/avisos.routes");
 mount("/usuarios", "./modules/usuarios/usuarios.routes");
 mount("/admin", "./modules/admin/storage.routes");
