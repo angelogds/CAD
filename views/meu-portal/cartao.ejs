@@ -1,0 +1,44 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
+<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v1" />
+
+<div class="qr-card-page my-own-card-page">
+  <header class="qr-card-toolbar no-print">
+    <div>
+      <span class="eyebrow">MEU PORTAL • IDENTIFICAÇÃO</span>
+      <h1>Meu cartão</h1>
+      <p>O mesmo cartão pode ser apresentado na tela do celular ou impresso em formato físico.</p>
+    </div>
+    <div class="qr-card-actions">
+      <a class="btn btn-ghost" href="/meu-portal#cartao">Voltar ao Meu Portal</a>
+      <button class="btn btn-green" type="button" onclick="window.print()">Imprimir / salvar PDF</button>
+    </div>
+  </header>
+
+  <section class="employee-id-card">
+    <div class="employee-id-card__brand">
+      <strong>Campo do Gado</strong>
+      <span>Gestão Industrial • Manutenção Integrada</span>
+    </div>
+    <div class="employee-id-card__body">
+      <img class="employee-id-card__photo" src="<%= colaborador.foto_url || user.photo_path || '/IMG/logo_menu.png.png' %>" alt="Foto de <%= colaborador.nome %>" />
+      <div class="employee-id-card__identity">
+        <small>COLABORADOR</small>
+        <h2><%= colaborador.nome %></h2>
+        <p><%= colaborador.funcao || 'Função não informada' %></p>
+        <p><%= colaborador.setor || 'Setor não informado' %></p>
+        <span class="employee-id-card__status"><%= colaborador.status || 'ATIVO' %></span>
+      </div>
+      <div class="employee-id-card__qr">
+        <img src="<%= cardQr %>" alt="QR de identificação" />
+        <small>Apresente no Almoxarifado</small>
+      </div>
+    </div>
+    <div class="employee-id-card__footer">Uso interno • QR sem dados pessoais • Retiradas registradas pelo sistema</div>
+  </section>
+
+  <section class="card my-card-guidance no-print">
+    <strong>Cartão virtual e físico usam o mesmo QR</strong>
+    <p>Para o cartão físico, use “Imprimir / salvar PDF” e selecione impressão em tamanho real. Em caso de perda ou exposição do QR, solicite ao RH/ADMIN a revogação e uma nova emissão.</p>
+  </section>
+</div>

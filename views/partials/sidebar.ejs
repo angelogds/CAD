@@ -95,6 +95,10 @@
       <% } %>
     <% } %>
 
+    <div class="nav-divider nav-divider-soft"></div>
+    <div class="nav-section nav-section-shell">MINHA CONTA</div>
+    <%- navItem('/meu-portal', 'Meu Portal', activeMenu === 'meu-portal') %>
+
     <% if (canUsuarios || canArmazenamento) { %>
       <div class="nav-divider"></div>
       <div class="nav-section">ADMIN</div>
