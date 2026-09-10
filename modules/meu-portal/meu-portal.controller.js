@@ -48,7 +48,7 @@ function materiais(req, res) {
     });
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível carregar seu histórico de materiais.');
-    return res.redirect('/meu-portal');
+    return res.redirect('/meu-portal/materiais');
   }
 }
 
