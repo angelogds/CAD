@@ -12,6 +12,43 @@ function canManageLink(role) {
   return LINK_MANAGER_ROLES.has(normalizeRole(role));
 }
 
+function tableExists(name) {
+  try {
+    return Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE (type='table' OR type='view') AND name=?").get(name));
+  } catch (_error) {
+    return false;
+  }
+}
+
+function hasColumn(table, name) {
+  try {
+    return db.prepare(`PRAGMA table_info(${table})`).all().some((column) => column.name === name);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function normalizeISODate(value) {
+  const raw = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return '';
+  const [year, month, day] = raw.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day, 12));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return '';
+  return raw;
+}
+
+function normalizeMaterialFilters(filters = {}) {
+  const normalized = {
+    q: String(filters.q || '').trim().slice(0, 80),
+    inicio: normalizeISODate(filters.inicio),
+    fim: normalizeISODate(filters.fim),
+  };
+  if (normalized.inicio && normalized.fim && normalized.inicio > normalized.fim) {
+    throw new Error('Período inválido: a data inicial não pode ser posterior à data final.');
+  }
+  return normalized;
+}
+
 function getUserById(userId, { includePassword = false } = {}) {
   const fields = includePassword
     ? 'id,name,email,role,photo_path,telefone_whatsapp,created_at,password_hash'
@@ -105,6 +142,121 @@ function getPortalData(userId) {
   return { user, colaborador: getLinkedColaborador(userId) };
 }
 
+function emptyMaterialHistory({ colaborador = null, filters = {}, available = true } = {}) {
+  return {
+    vinculado: Boolean(colaborador),
+    disponivel: Boolean(available),
+    colaborador,
+    filtros: filters,
+    resumo: {
+      totalRetiradas: 0,
+      materiaisDiferentes: 0,
+      osVinculadas: 0,
+      ultimaRetirada: null,
+    },
+    movimentos: [],
+    limiteAtingido: false,
+  };
+}
+
+function listOwnMaterialWithdrawals(userId, filters = {}) {
+  const normalizedFilters = normalizeMaterialFilters(filters);
+  const colaborador = getLinkedColaborador(userId);
+  if (!colaborador) return emptyMaterialHistory({ filters: normalizedFilters });
+
+  const schemaAvailable = tableExists('estoque_movimentos')
+    && tableExists('estoque_itens')
+    && hasColumn('estoque_movimentos', 'retirado_por_colaborador_id');
+  if (!schemaAvailable) {
+    return emptyMaterialHistory({ colaborador, filters: normalizedFilters, available: false });
+  }
+
+  const hasDataMov = hasColumn('estoque_movimentos', 'data_mov');
+  const hasOsId = hasColumn('estoque_movimentos', 'os_id');
+  const hasEquipamentoId = hasColumn('estoque_movimentos', 'equipamento_id');
+  const hasSolicitacaoId = hasColumn('estoque_movimentos', 'solicitacao_id');
+  const hasEntreguePor = hasColumn('estoque_movimentos', 'entregue_por_user_id');
+  const hasOrigem = hasColumn('estoque_movimentos', 'identificacao_origem');
+  const hasItemUnidade = hasColumn('estoque_itens', 'unidade');
+  const canJoinSolicitacao = hasSolicitacaoId && tableExists('solicitacoes') && hasColumn('solicitacoes', 'numero');
+  const canJoinEquipamento = hasEquipamentoId && tableExists('equipamentos') && hasColumn('equipamentos', 'nome');
+  const canJoinEntreguePor = hasEntreguePor && tableExists('users');
+  const dataExpr = hasDataMov ? 'COALESCE(m.data_mov,m.created_at)' : 'm.created_at';
+
+  const where = [
+    'm.retirado_por_colaborador_id = ?',
+    "UPPER(COALESCE(m.tipo,'')) LIKE 'SAIDA%'",
+  ];
+  const params = [Number(colaborador.id)];
+
+  if (normalizedFilters.inicio) {
+    where.push(`date(${dataExpr}) >= date(?)`);
+    params.push(normalizedFilters.inicio);
+  }
+  if (normalizedFilters.fim) {
+    where.push(`date(${dataExpr}) <= date(?)`);
+    params.push(normalizedFilters.fim);
+  }
+  if (normalizedFilters.q) {
+    where.push("LOWER(COALESCE(i.nome,'')) LIKE ?");
+    params.push(`%${normalizedFilters.q.toLowerCase()}%`);
+  }
+
+  const whereSql = where.join(' AND ');
+  const resumo = db.prepare(`
+    SELECT
+      COUNT(*) total_retiradas,
+      COUNT(DISTINCT m.item_id) materiais_diferentes,
+      ${hasOsId ? 'COUNT(DISTINCT m.os_id)' : '0'} os_vinculadas,
+      MAX(${dataExpr}) ultima_retirada
+    FROM estoque_movimentos m
+    JOIN estoque_itens i ON i.id = m.item_id
+    WHERE ${whereSql}
+  `).get(...params);
+
+  const solicitacaoJoin = canJoinSolicitacao ? 'LEFT JOIN solicitacoes s ON s.id=m.solicitacao_id' : '';
+  const equipamentoJoin = canJoinEquipamento ? 'LEFT JOIN equipamentos eq ON eq.id=m.equipamento_id' : '';
+  const entregueJoin = canJoinEntreguePor ? 'LEFT JOIN users eu ON eu.id=m.entregue_por_user_id' : '';
+  const movimentos = db.prepare(`
+    SELECT
+      m.id,
+      ${dataExpr} data_mov,
+      ABS(COALESCE(m.quantidade,0)) quantidade,
+      i.nome item_nome,
+      ${hasItemUnidade ? "COALESCE(i.unidade,'UN')" : "'UN'"} item_unidade,
+      ${hasOsId ? 'm.os_id' : 'NULL'} os_id,
+      ${hasSolicitacaoId ? 'm.solicitacao_id' : 'NULL'} solicitacao_id,
+      ${canJoinSolicitacao ? 's.numero' : 'NULL'} solicitacao_numero,
+      ${hasEquipamentoId ? 'm.equipamento_id' : 'NULL'} equipamento_id,
+      ${canJoinEquipamento ? 'eq.nome' : 'NULL'} equipamento_nome,
+      ${canJoinEntreguePor ? 'eu.name' : 'NULL'} entregue_por_nome,
+      ${hasOrigem ? 'm.identificacao_origem' : 'NULL'} identificacao_origem
+    FROM estoque_movimentos m
+    JOIN estoque_itens i ON i.id = m.item_id
+    ${solicitacaoJoin}
+    ${equipamentoJoin}
+    ${entregueJoin}
+    WHERE ${whereSql}
+    ORDER BY ${dataExpr} DESC, m.id DESC
+    LIMIT 300
+  `).all(...params);
+
+  return {
+    vinculado: true,
+    disponivel: true,
+    colaborador,
+    filtros: normalizedFilters,
+    resumo: {
+      totalRetiradas: Number(resumo?.total_retiradas || 0),
+      materiaisDiferentes: Number(resumo?.materiais_diferentes || 0),
+      osVinculadas: Number(resumo?.os_vinculadas || 0),
+      ultimaRetirada: resumo?.ultima_retirada || null,
+    },
+    movimentos,
+    limiteAtingido: movimentos.length >= 300,
+  };
+}
+
 function updateOwnPhoto(userId, photoPath) {
   const id = Number(userId);
   if (!id || !photoPath) throw new Error('Foto inválida.');
@@ -162,6 +314,7 @@ module.exports = {
   listAvailableColaboradores,
   linkOwnUserToColaborador,
   getPortalData,
+  listOwnMaterialWithdrawals,
   updateOwnPhoto,
   changeOwnPassword,
   ensureOwnCard,
