@@ -1,0 +1,52 @@
+<%- layout('layout') -%>
+<link rel="stylesheet" href="/css/rh-portal.css?v=20260910-rh-modular" />
+<% const d = dashboard || {}; const solicitacoes = Array.isArray(d.solicitacoes) ? d.solicitacoes : []; %>
+<div class="rh-page">
+  <%- include('_header', { title, dashboard: d, activeRhSection }) %>
+
+  <section class="card rh-section">
+    <div class="rh-section-head">
+      <div><span class="rh-eyebrow">ACOMPANHAMENTO</span><h2>Folgas e solicitações</h2><p class="rh-muted">O RH acompanha o ciclo. Aprovação e reprovação permanecem no fluxo operacional autorizado da Manutenção.</p></div>
+      <a class="btn btn-ghost" href="/escala/folgas">Abrir gestão operacional</a>
+    </div>
+    <div class="rh-toolbar">
+      <label><span>Status</span><select id="rhLeaveStatus"><option value="">Todos</option><option value="PENDENTE_APROVACAO">Aguardando aprovação</option><option value="APROVADA">Aprovada</option><option value="REPROVADA">Reprovada</option><option value="CANCELADA">Cancelada</option></select></label>
+      <label class="rh-search"><span>Buscar</span><input id="rhLeaveSearch" type="search" placeholder="Colaborador ou motivo" /></label>
+    </div>
+    <div class="rh-table-wrap">
+      <table class="rh-table">
+        <thead><tr><th>Colaborador</th><th>Data da folga</th><th>Status</th><th>Motivo</th><th>Solicitado em</th><th>Ficha</th></tr></thead>
+        <tbody>
+          <% solicitacoes.forEach((r) => { const status = String(r.status || '').toUpperCase(); const search = `${r.colaborador_nome||''} ${r.motivo||''}`.toLowerCase(); %>
+            <tr data-rh-leave data-status="<%= status %>" data-search="<%= search %>">
+              <td><strong><%= r.colaborador_nome || '-' %></strong></td>
+              <td><%= r.data_folga ? dateBr.formatDateBR(String(r.data_folga).slice(0,10)) : '-' %></td>
+              <td><span class="rh-badge <%= status === 'REPROVADA' ? 'is-danger' : (status === 'PENDENTE_APROVACAO' ? 'is-warning' : '') %>"><%= status || '-' %></span></td>
+              <td><%= r.motivo || 'Sem motivo informado' %></td>
+              <td><%= r.solicitado_em ? dateBr.formatDateBR(String(r.solicitado_em).slice(0,10)) : '-' %></td>
+              <td><% if (r.colaborador_id) { %><a class="btn btn-sm" href="/rh/colaboradores/<%= r.colaborador_id %>">Abrir</a><% } else { %>-<% } %></td>
+            </tr>
+          <% }) %>
+          <% if (!solicitacoes.length) { %><tr><td colspan="6" class="rh-empty">Nenhuma solicitação de folga registrada.</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+<script>
+(() => {
+  const status = document.getElementById('rhLeaveStatus');
+  const search = document.getElementById('rhLeaveSearch');
+  const apply = () => {
+    const st = String(status?.value || '').toUpperCase();
+    const q = String(search?.value || '').trim().toLowerCase();
+    document.querySelectorAll('[data-rh-leave]').forEach((row) => {
+      const statusOk = !st || row.dataset.status === st;
+      const searchOk = !q || String(row.dataset.search || '').includes(q);
+      row.hidden = !(statusOk && searchOk);
+    });
+  };
+  status?.addEventListener('change', apply);
+  search?.addEventListener('input', apply);
+})();
+</script>
