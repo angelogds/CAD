@@ -1,5 +1,5 @@
-/* Meu Portal — modernização pós Fase 3
-   Camada exclusivamente visual. Regras de negócio, formulários e RBAC permanecem nas estruturas existentes. */
+/* Meu Portal — hub compacto pós Fase 3
+   Prioriza navegação por cartões e reduz repetição visual na home. */
 
 .my-portal-page{
   width:100%;
@@ -16,6 +16,7 @@
   background:linear-gradient(135deg,#f9fcfa 0%,#eff8f3 58%,#e8f5ed 100%);
   box-shadow:0 8px 24px rgba(15,81,50,.05);
 }
+.my-portal-hero--compact{padding-block:18px;}
 .my-portal-hero::after{
   content:"";
   position:absolute;
@@ -35,13 +36,13 @@
   justify-content:space-between;
   gap:18px;
 }
-.my-portal-hero__actions{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
+.my-portal-hero--compact .my-portal-hero__identity>img{
+  width:74px;
+  height:74px;
+  border-radius:16px;
 }
-.my-portal-hero__actions .btn{white-space:nowrap;}
+.my-portal-hero--compact h1{font-size:28px;}
+.my-portal-hero--compact p{max-width:760px;}
 
 .my-portal-services{
   padding:17px;
@@ -55,9 +56,14 @@
   grid-template-columns:repeat(6,minmax(150px,1fr));
   gap:9px;
 }
+.my-access-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
 .my-portal-services .my-service-card{
   position:relative;
-  min-height:118px;
+  min-height:116px;
   padding:14px;
   border-color:#dce9e1;
   background:linear-gradient(180deg,#fff,#f8fcf9);
@@ -74,50 +80,93 @@
 .my-portal-services .my-service-card strong{font-size:13px;color:#193326;}
 .my-portal-services .my-service-card span{min-height:0;line-height:1.35;}
 .my-portal-services .my-service-card small{margin-top:5px;}
+.my-portal-services--primary{
+  background:linear-gradient(180deg,#ffffff,#fbfefc);
+}
+.my-service-card--primary{
+  min-height:128px !important;
+  display:grid !important;
+  grid-template-columns:42px minmax(0,1fr);
+  grid-template-areas:
+    "icon title"
+    "icon desc"
+    "icon meta";
+  column-gap:12px;
+  align-content:center;
+}
+.my-service-card--primary::before{display:none;}
+.my-service-card--primary .my-service-card__icon{
+  grid-area:icon;
+  width:42px;
+  height:42px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  align-self:start;
+  background:#e9f7ee;
+  border:1px solid #cfe8d8;
+  color:#147347;
+  font-size:12px;
+  font-weight:950;
+  letter-spacing:.04em;
+}
+.my-service-card--primary strong{grid-area:title;font-size:14px !important;align-self:end;}
+.my-service-card--primary span{grid-area:desc;align-self:start;}
+.my-service-card--primary small{grid-area:meta;align-self:start;}
 
-.my-portal-grid--identity{
-  grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);
-  align-items:stretch;
-}
-.my-portal-grid--identity>.my-portal-panel{
-  height:100%;
-  align-self:stretch;
-  border:1px solid #e0ebe5;
-  box-shadow:0 7px 20px rgba(15,23,42,.03);
-}
-.my-profile-row{border:1px solid #e5eee9;}
-.my-photo-form{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto;
-  align-items:end;
-}
-.my-photo-form label{min-width:0;}
-.my-photo-form .btn{white-space:nowrap;}
-
-.my-account-panel{
-  padding:16px 18px;
+/* Páginas dedicadas: perfil, conta e cartão */
+.my-personal-page{max-width:1150px;}
+.my-personal-card{
+  padding:18px;
   border:1px solid #dfeae4;
   border-radius:16px;
   box-shadow:0 7px 20px rgba(15,23,42,.03);
 }
-.my-account-panel__layout{
+.my-personal-card--narrow{max-width:780px;}
+.my-personal-card__head{margin-bottom:14px;}
+.my-personal-card__head h2{margin:2px 0 4px;font-size:20px;}
+.my-personal-card__head p{margin:0;color:#64748b;font-size:12px;line-height:1.45;}
+.my-personal-profile{
   display:grid;
-  grid-template-columns:minmax(180px,.6fr) minmax(0,1.8fr);
-  gap:22px;
-  align-items:end;
+  grid-template-columns:108px minmax(0,1fr);
+  gap:18px;
+  align-items:center;
+  padding:16px;
+  border:1px solid #e2ece6;
+  border-radius:15px;
+  background:#f9fcfa;
 }
-.my-account-panel__copy h2{margin:0;font-size:19px;}
-.my-account-panel__copy p{margin:5px 0 0;color:#64748b;font-size:11px;line-height:1.45;}
-.my-password-form--inline{
+.my-personal-photo{
+  width:108px;
+  height:108px;
+  object-fit:cover;
+  border-radius:18px;
+  border:3px solid #fff;
+  box-shadow:0 6px 20px rgba(15,81,50,.08);
+}
+.my-personal-profile__data{display:flex;flex-direction:column;gap:4px;min-width:0;}
+.my-personal-profile__data h2{margin:0 0 4px;font-size:22px;color:#1b3024;}
+.my-personal-profile__data>span:not(.eyebrow){font-size:12px;color:#64748b;}
+.my-photo-form--dedicated{
   display:grid;
-  grid-template-columns:repeat(3,minmax(130px,1fr)) auto;
-  gap:9px;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;
   align-items:end;
-  margin:0;
+  margin-top:14px;
 }
-.my-password-form--inline .btn{
-  min-height:39px;
-  white-space:nowrap;
+.my-photo-form--dedicated .btn{white-space:nowrap;}
+.my-password-form--dedicated{max-width:620px;}
+.my-password-form--dedicated .btn{align-self:flex-start;}
+.my-personal-note{
+  margin-top:14px;
+  padding:10px 12px;
+  border:1px solid #dce9e1;
+  border-radius:11px;
+  background:#f8fbf9;
+  color:#64748b;
+  font-size:10px;
+  line-height:1.45;
 }
 
 /* Padronização das páginas internas do portal */
@@ -156,33 +205,34 @@
 
 @media(max-width:1180px){
   .my-portal-services .my-roadmap-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
-  .my-password-form--inline{grid-template-columns:repeat(2,minmax(0,1fr));}
-  .my-password-form--inline .btn{width:100%;}
 }
 
 @media(max-width:900px){
-  .my-portal-hero__content{align-items:flex-start;flex-direction:column;}
-  .my-portal-hero__actions{width:100%;justify-content:flex-start;}
-  .my-portal-grid--identity{grid-template-columns:1fr;}
-  .my-account-panel__layout{grid-template-columns:1fr;gap:12px;}
-  .my-photo-form{grid-template-columns:1fr;}
-  .my-photo-form .btn{width:100%;}
+  .my-access-grid{grid-template-columns:1fr;}
+  .my-service-card--primary{min-height:108px !important;}
+  .my-photo-form--dedicated{grid-template-columns:1fr;}
+  .my-photo-form--dedicated .btn{width:100%;}
 }
 
 @media(max-width:620px){
   .my-portal-page{gap:12px;}
-  .my-portal-hero{padding:16px;}
-  .my-portal-hero__actions{display:grid;grid-template-columns:1fr 1fr;}
-  .my-portal-hero__actions .btn{text-align:center;}
+  .my-portal-hero{padding:15px;}
+  .my-portal-hero--compact .my-portal-hero__identity>img{width:62px;height:62px;border-radius:14px;}
+  .my-portal-hero--compact h1{font-size:23px;}
   .my-portal-services{padding:13px;}
   .my-portal-services .my-roadmap-grid{grid-template-columns:1fr 1fr;}
-  .my-portal-services .my-service-card{min-height:108px;padding:12px;}
-  .my-password-form--inline{grid-template-columns:1fr;}
-  .my-account-panel{padding:14px;}
+  .my-portal-services .my-service-card{min-height:106px;padding:12px;}
+  .my-service-card--primary{grid-template-columns:38px minmax(0,1fr);column-gap:10px;}
+  .my-service-card--primary .my-service-card__icon{width:38px;height:38px;border-radius:10px;}
+  .my-personal-card{padding:14px;}
+  .my-personal-profile{grid-template-columns:78px minmax(0,1fr);gap:12px;padding:12px;}
+  .my-personal-photo{width:78px;height:78px;border-radius:14px;}
+  .my-personal-profile__data h2{font-size:18px;}
   .my-material-table-wrap,.my-f2b-table-wrap{-webkit-overflow-scrolling:touch;}
 }
 
 @media(max-width:420px){
   .my-portal-services .my-roadmap-grid{grid-template-columns:1fr;}
-  .my-portal-hero__actions{grid-template-columns:1fr;}
+  .my-personal-profile{grid-template-columns:1fr;}
+  .my-personal-photo{width:86px;height:86px;}
 }
