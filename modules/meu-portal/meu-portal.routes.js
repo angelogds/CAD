@@ -6,6 +6,7 @@ const storagePaths = require('../../config/storage');
 const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const ctrl = require('./meu-portal.controller');
 const fase2bCtrl = require('./meu-portal-fase2b.controller');
+const rhPortalCtrl = require('../rh/rh.portal.controller');
 
 const router = express.Router();
 const LINK_MANAGER_ROLES = ['ADMIN', 'RH'];
@@ -40,6 +41,7 @@ router.get('/materiais', ctrl.materiais);
 router.get('/treinamentos', fase2bCtrl.treinamentos);
 router.get('/dados-profissionais', fase2bCtrl.dadosProfissionais);
 router.get('/servicos', fase2bCtrl.servicos);
+router.get('/rh', rhPortalCtrl.index);
 router.post('/vinculo', requireRole(LINK_MANAGER_ROLES), ctrl.linkColaborador);
 router.post('/foto', upload.single('photo'), ctrl.updatePhoto);
 router.post('/senha', ctrl.changePassword);
