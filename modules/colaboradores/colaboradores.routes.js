@@ -74,6 +74,7 @@ router.post('/:id/cartao/revogar', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANU
 // Fase 3 RH: exame sensível em storage privado e rota protegida.
 router.post('/:id/exames', requireRole(['ADMIN', 'RH']), uploadExameSeguro, safe(rhCtrl.criarExame));
 router.get('/:id/exames/:exameId/arquivo', requireRole(['ADMIN', 'RH']), safe(rhCtrl.exameArquivo));
+router.post('/:id/rh-documentos', requireRole(['ADMIN', 'RH']), uploadDoc.single('arquivo'), safe(rhCtrl.criarDocumento));
 
 router.get('/:id', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'COLABORADOR']), safe(ctrl.show));
 router.post('/:id/perfil', requireRole(['ADMIN', 'RH']), uploadFoto.single('foto'), safe(ctrl.savePerfil));
