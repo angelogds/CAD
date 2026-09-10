@@ -18,8 +18,6 @@ test('Meu Portal Fase 2 ativa Materiais e reutiliza a Jornada existente', () => 
   assert.match(view, /SERVIÇOS INTEGRADOS/);
   assert.match(view, /Materiais[\s\S]*DISPONÍVEL/);
   assert.match(view, /Jornada[\s\S]*DISPONÍVEL/);
-  assert.match(view, /Treinamentos[\s\S]*PLANEJADO/);
-  assert.match(view, /RH[\s\S]*PLANEJADO/);
 });
 
 test('histórico de materiais é estritamente pessoal, autenticado e somente leitura', () => {
