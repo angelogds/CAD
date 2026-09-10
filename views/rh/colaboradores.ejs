@@ -1,0 +1,47 @@
+<%- layout('layout') -%>
+<link rel="stylesheet" href="/css/rh-portal.css?v=20260910-rh-modular" />
+<% const d = dashboard || {}; const pessoas = Array.isArray(d.colaboradores) ? d.colaboradores : []; %>
+<div class="rh-page">
+  <%- include('_header', { title, dashboard: d, activeRhSection }) %>
+
+  <section class="card rh-section">
+    <div class="rh-section-head">
+      <div><span class="rh-eyebrow">CADASTRO MESTRE</span><h2>Colaboradores</h2><p class="rh-muted">Uma única ficha por colaborador, integrada à Escala e aos demais registros do sistema.</p></div>
+      <span class="rh-badge"><%= pessoas.length %> ativo<%= pessoas.length === 1 ? '' : 's' %></span>
+    </div>
+    <div class="rh-toolbar">
+      <label class="rh-search"><span>Buscar</span><input id="rhPeopleSearch" type="search" placeholder="Nome, função ou setor" autocomplete="off" /></label>
+      <% if (d.canManage) { %><a class="btn btn-green" href="/colaboradores">Gerenciar cadastro mestre</a><% } %>
+    </div>
+    <div class="rh-table-wrap">
+      <table class="rh-table">
+        <thead><tr><th>Colaborador</th><th>Função</th><th>Setor</th><th>Situação</th><th>Turno</th><th>Banco</th><th>HE mês</th><th>Ação</th></tr></thead>
+        <tbody>
+          <% pessoas.forEach((c) => { const search = `${c.nome||''} ${c.funcao||c.funcaoLabel||''} ${c.setor||''}`.toLowerCase(); %>
+            <tr data-rh-person data-search="<%= search %>">
+              <td><div class="rh-person"><% if (c.foto_path || c.foto_url) { %><img class="rh-avatar" src="<%= c.foto_path || c.foto_url %>" alt=""><% } else { %><span class="rh-avatar rh-avatar-empty"></span><% } %><strong><%= c.nome || '-' %></strong></div></td>
+              <td><%= c.funcaoLabel || c.funcao || '-' %></td><td><%= c.setor || '-' %></td>
+              <td><span class="rh-badge"><%= c.statusAtual || c.status || 'ATIVO' %></span></td>
+              <td><%= c.turnoAtual || '-' %></td><td><strong><%= c.saldo?.horas || formatMinutes(c.saldo?.minutos || 0) %></strong></td>
+              <td><%= c.horasExtrasMes || formatMinutes(c.horasExtrasMesMinutos || 0) %></td>
+              <td><% if (d.canManage) { %><a class="btn btn-sm" href="/rh/colaboradores/<%= c.id %>">Abrir ficha</a><% } else { %><span class="rh-muted">Consulta</span><% } %></td>
+            </tr>
+          <% }) %>
+          <% if (!pessoas.length) { %><tr><td colspan="8" class="rh-empty">Nenhum colaborador ativo encontrado.</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+<script>
+(() => {
+  const input = document.getElementById('rhPeopleSearch');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    document.querySelectorAll('[data-rh-person]').forEach((row) => {
+      row.hidden = q && !String(row.dataset.search || '').includes(q);
+    });
+  });
+})();
+</script>
