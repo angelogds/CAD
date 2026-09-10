@@ -47,6 +47,17 @@ function safe(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 }
 
+function uploadExameSeguro(req, res, next) {
+  return uploadExame.single('arquivo')(req, res, (err) => {
+    if (!err) return next();
+    const message = err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE'
+      ? 'O anexo do exame deve ter no máximo 10 MB.'
+      : (err.message || 'Não foi possível processar o anexo do exame.');
+    req.flash?.('error', message);
+    return res.redirect(`/escala/rh?colaborador=${Number(req.params.id || 0)}#exames`);
+  });
+}
+
 router.use(requireLogin, (req, res, next) => {
   res.locals.activeMenu = 'colaboradores';
   return next();
@@ -61,7 +72,7 @@ router.post('/:id/cartao/emitir', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUT
 router.post('/:id/cartao/revogar', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR']), safe(qrCtrl.revogar));
 
 // Fase 3 RH: exame sensível em storage privado e rota protegida.
-router.post('/:id/exames', requireRole(['ADMIN', 'RH']), uploadExame.single('arquivo'), safe(rhCtrl.criarExame));
+router.post('/:id/exames', requireRole(['ADMIN', 'RH']), uploadExameSeguro, safe(rhCtrl.criarExame));
 router.get('/:id/exames/:exameId/arquivo', requireRole(['ADMIN', 'RH']), safe(rhCtrl.exameArquivo));
 
 router.get('/:id', requireRole(['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'COLABORADOR']), safe(ctrl.show));
