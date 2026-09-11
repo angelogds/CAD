@@ -1,7 +1,7 @@
 (function dimensionPersistenceRuntime(globalScope) {
   'use strict';
 
-  const DIMENSION_TYPE = {
+  const DIMENSION_TYPE = Object.freeze({
     ROTATED: 0,
     ALIGNED: 1,
     ANGULAR: 2,
@@ -9,11 +9,11 @@
     RADIUS: 4,
     ANGULAR_3_POINT: 5,
     ORDINATE: 6,
-  };
+  });
 
-  function asNumber(value, fallback = null) {
+  function numberOrNull(value) {
     const number = Number(value);
-    return Number.isFinite(number) ? number : fallback;
+    return Number.isFinite(number) ? number : null;
   }
 
   function decodeBase64(base64) {
@@ -43,7 +43,6 @@
   }
 
   function readEntityRecords(dxfText) {
-    const pairs = parsePairs(dxfText);
     const records = [];
     let section = '';
     let enteringSection = false;
@@ -55,7 +54,7 @@
       current = null;
     };
 
-    for (const pair of pairs) {
+    for (const pair of parsePairs(dxfText)) {
       const token = pair.value.toUpperCase();
       if (pair.code === 0 && token === 'SECTION') {
         flush();
@@ -92,10 +91,9 @@
   }
 
   function point(record, xCode) {
-    const x = asNumber(first(record, xCode));
-    const y = asNumber(first(record, xCode + 10));
-    if (x == null || y == null) return null;
-    return { x, y };
+    const x = numberOrNull(first(record, xCode));
+    const y = numberOrNull(first(record, xCode + 10));
+    return x == null || y == null ? null : { x, y };
   }
 
   function distance(a, b) {
@@ -108,10 +106,9 @@
     return { x: (Number(a.x) + Number(b.x)) / 2, y: (Number(a.y) + Number(b.y)) / 2 };
   }
 
-  function formatNumber(value, decimals = 3) {
-    const number = asNumber(value);
-    if (number == null) return '';
-    return number.toFixed(decimals);
+  function formatted(value, decimals = 3) {
+    const number = numberOrNull(value);
+    return number == null ? '' : number.toFixed(decimals);
   }
 
   function explicitLabel(record) {
@@ -120,125 +117,106 @@
     return text.replace(/%%[cC]/g, 'Ø');
   }
 
-  function makeLinearDimension(record, id, layer, kind) {
+  function baseDimension(record, id, layer, kind, geometry) {
+    return {
+      id,
+      type: 'dimension',
+      layer,
+      visible: true,
+      geometry,
+      metadata: { source: 'mlightcad-dxf', dxfDimensionType: kind },
+    };
+  }
+
+  function linearDimension(record, id, layer, kind) {
     const p1 = point(record, 13);
     const p2 = point(record, 14);
     if (!p1 || !p2) return null;
-    const textPoint = point(record, 11) || point(record, 10) || midpoint(p1, p2);
-    const measured = distance(p1, p2);
-    const label = explicitLabel(record) || formatNumber(measured);
-    return {
-      id,
-      type: 'dimension',
-      layer,
-      visible: true,
-      geometry: {
-        mode: kind === DIMENSION_TYPE.ALIGNED ? 'aligned' : 'linear',
-        p1,
-        p2,
-        textPoint,
-        label,
-      },
-      metadata: { source: 'mlightcad-dxf', dxfDimensionType: kind },
-    };
+    return baseDimension(record, id, layer, kind, {
+      mode: kind === DIMENSION_TYPE.ALIGNED ? 'aligned' : 'linear',
+      p1,
+      p2,
+      textPoint: point(record, 11) || point(record, 10) || midpoint(p1, p2),
+      label: explicitLabel(record) || formatted(distance(p1, p2)),
+    });
   }
 
-  function makeRadialDimension(record, id, layer, kind) {
-    const firstPoint = point(record, 15);
-    const definitionPoint = point(record, 10);
-    if (!firstPoint || !definitionPoint) return null;
-    const textPoint = point(record, 11) || midpoint(firstPoint, definitionPoint);
-    const measured = distance(firstPoint, definitionPoint);
+  function radialDimension(record, id, layer, kind) {
+    const p1 = point(record, 10);
+    const p2 = point(record, 15);
+    if (!p1 || !p2) return null;
     const prefix = kind === DIMENSION_TYPE.DIAMETER ? 'Ø' : 'R';
-    const label = explicitLabel(record) || `${prefix}${formatNumber(measured)}`;
-    return {
-      id,
-      type: 'dimension',
-      layer,
-      visible: true,
-      geometry: {
-        mode: kind === DIMENSION_TYPE.DIAMETER ? 'diameter' : 'radial',
-        p1: definitionPoint,
-        p2: firstPoint,
-        textPoint,
-        label,
-      },
-      metadata: { source: 'mlightcad-dxf', dxfDimensionType: kind },
-    };
+    return baseDimension(record, id, layer, kind, {
+      mode: kind === DIMENSION_TYPE.DIAMETER ? 'diameter' : 'radial',
+      p1,
+      p2,
+      textPoint: point(record, 11) || midpoint(p1, p2),
+      label: explicitLabel(record) || `${prefix}${formatted(distance(p1, p2))}`,
+    });
   }
 
-  function normalizedAngularEnd(startAngle, endAngle) {
-    let end = endAngle;
-    while (end < startAngle) end += Math.PI * 2;
-    if (end - startAngle > Math.PI * 2) end = startAngle + Math.PI * 2;
-    return end;
-  }
-
-  function makeAngularDimension(record, id, layer, kind) {
+  function angularDimension(record, id, layer, kind) {
     const vertex = point(record, 15);
     const p1 = point(record, 13);
     const p2 = point(record, 14);
     if (!vertex || !p1 || !p2) return null;
-    const arcPoint = point(record, 10);
+
     const startAngle = Math.atan2(p1.y - vertex.y, p1.x - vertex.x);
-    const rawEnd = Math.atan2(p2.y - vertex.y, p2.x - vertex.x);
-    const endAngle = normalizedAngularEnd(startAngle, rawEnd);
-    const radius = distance(vertex, arcPoint) || Math.max(distance(vertex, p1) || 0, distance(vertex, p2) || 0, 1);
+    let endAngle = Math.atan2(p2.y - vertex.y, p2.x - vertex.x);
+    while (endAngle < startAngle) endAngle += Math.PI * 2;
+    const radius = distance(vertex, point(record, 10))
+      || Math.max(distance(vertex, p1) || 0, distance(vertex, p2) || 0, 1);
     const angleDegrees = (endAngle - startAngle) * 180 / Math.PI;
-    const label = explicitLabel(record) || `${formatNumber(angleDegrees, 2)}°`;
-    return {
-      id,
-      type: 'dimension',
-      layer,
-      visible: true,
-      geometry: {
-        mode: 'angular',
-        vertex,
-        p1,
-        p2,
-        radius,
-        startAngle,
-        endAngle,
-        textPoint: point(record, 11),
-        label,
-      },
-      metadata: { source: 'mlightcad-dxf', dxfDimensionType: kind },
-    };
+
+    return baseDimension(record, id, layer, kind, {
+      mode: 'angular',
+      vertex,
+      p1,
+      p2,
+      radius,
+      startAngle,
+      endAngle,
+      textPoint: point(record, 11),
+      label: explicitLabel(record) || `${formatted(angleDegrees, 2)}°`,
+    });
   }
 
   function dimensionFromRecord(record, index) {
     if (record.type !== 'DIMENSION') return null;
     const rawKind = Number.parseInt(first(record, 70) || '0', 10);
     const kind = rawKind & 7;
-    const handle = String(first(record, 5) || first(record, 2) || index + 1).replace(/[^a-zA-Z0-9_.-]/g, '-');
+    const handle = String(first(record, 5) || first(record, 2) || index + 1)
+      .replace(/[^a-zA-Z0-9_.-]/g, '-');
     const id = `mlight-dim-${handle}`;
     const layer = String(first(record, 8) || 'cotas').trim() || 'cotas';
 
     if (kind === DIMENSION_TYPE.ROTATED || kind === DIMENSION_TYPE.ALIGNED) {
-      return makeLinearDimension(record, id, layer, kind);
+      return linearDimension(record, id, layer, kind);
     }
     if (kind === DIMENSION_TYPE.DIAMETER || kind === DIMENSION_TYPE.RADIUS) {
-      return makeRadialDimension(record, id, layer, kind);
+      return radialDimension(record, id, layer, kind);
     }
     if (kind === DIMENSION_TYPE.ANGULAR || kind === DIMENSION_TYPE.ANGULAR_3_POINT) {
-      return makeAngularDimension(record, id, layer, kind);
+      return angularDimension(record, id, layer, kind);
     }
     return null;
   }
 
   function parseDxfDimensions(dxfText) {
     const { records, sawEntities } = readEntityRecords(dxfText);
-    const dimensions = records
-      .map((record, index) => dimensionFromRecord(record, index))
-      .filter(Boolean);
-    return { ok: sawEntities, dimensions };
+    return {
+      ok: sawEntities,
+      dimensions: records.map(dimensionFromRecord).filter(Boolean),
+    };
   }
 
   function latestMlightSnapshot(payload = {}) {
     const history = Array.isArray(payload.history) ? payload.history : [];
     for (let index = history.length - 1; index >= 0; index -= 1) {
       const item = history[index];
-      if (item && typeof item === 'object' && item.kind === 'mlightcad-document' && item.dxfBase64) return item;
+      if (item && typeof item === 'object' && item.kind === 'mlightcad-document' && item.dxfBase64) {
+        return item;
+      }
     }
     return null;
   }
@@ -246,10 +224,14 @@
   function recoverDimensions(payload = {}, previous = {}) {
     const fallback = Array.isArray(previous.dimensions) ? previous.dimensions : [];
     const snapshot = latestMlightSnapshot(payload);
-    if (!snapshot?.dxfBase64) return { dimensions: fallback, recovered: false, reason: 'snapshot-missing' };
+    if (!snapshot?.dxfBase64) {
+      return { dimensions: fallback, recovered: false, reason: 'snapshot-missing' };
+    }
     try {
       const parsed = parseDxfDimensions(decodeBase64(snapshot.dxfBase64));
-      if (!parsed.ok) return { dimensions: fallback, recovered: false, reason: 'entities-section-missing' };
+      if (!parsed.ok) {
+        return { dimensions: fallback, recovered: false, reason: 'entities-section-missing' };
+      }
       return { dimensions: parsed.dimensions, recovered: true, reason: null };
     } catch (error) {
       return { dimensions: fallback, recovered: false, reason: error?.message || String(error) };
@@ -257,7 +239,9 @@
   }
 
   function patchSerializer(app) {
-    if (!app || typeof app.serializeForSave !== 'function' || app.__dimensionPersistencePatched) return false;
+    if (!app || typeof app.serializeForSave !== 'function') return false;
+    if (app.__dimensionPersistencePatched) return true;
+
     const original = app.serializeForSave.bind(app);
     app.serializeForSave = function serializeWithNativeDimensions(baseCadData = {}) {
       const payload = original(baseCadData);
@@ -282,7 +266,9 @@
         const value = state?.dataset?.state || '';
         if (value === 'saved') return resolve(true);
         if (value === 'error') return reject(new Error(state?.textContent || 'Falha ao salvar antes do PDF.'));
-        if (Date.now() - startedAt >= timeoutMs) return reject(new Error('Tempo esgotado ao salvar o desenho antes do PDF.'));
+        if (Date.now() - startedAt >= timeoutMs) {
+          return reject(new Error('Tempo esgotado ao salvar o desenho antes do PDF.'));
+        }
         globalScope.setTimeout(check, 75);
       };
       globalScope.setTimeout(check, 25);
@@ -293,23 +279,30 @@
     const document = globalScope.document;
     if (!document || document.documentElement.dataset.cadPdfSaveGuard === '1') return false;
     document.documentElement.dataset.cadPdfSaveGuard = '1';
+
     document.addEventListener('click', async (event) => {
       const link = event.target?.closest?.('a[href*="/desenho-tecnico/cad/"][href*="/pdf"]');
       if (!link || link.dataset.cadPdfBypass === '1') return;
+
       event.preventDefault();
       event.stopImmediatePropagation();
       const href = link.href;
       const saveButton = document.getElementById('mlightSaveBtn');
       const status = document.getElementById('mlightCadStatus');
+
       try {
-        if (!patchSerializer(globalScope.CAD_MLIGHT_APP)) throw new Error('Motor CAD ainda não está pronto para salvar as cotas.');
+        if (!patchSerializer(globalScope.CAD_MLIGHT_APP)) {
+          throw new Error('Motor CAD ainda não está pronto para salvar as cotas.');
+        }
         if (!saveButton) throw new Error('Botão de salvamento do CAD não encontrado.');
+
         if (status) {
           status.textContent = 'Salvando desenho e cotas antes de gerar PDF…';
           status.dataset.state = 'loading';
         }
         saveButton.click();
         await waitForSaveState();
+
         if (status) {
           status.textContent = 'Cotas salvas. Gerando PDF…';
           status.dataset.state = 'ok';
