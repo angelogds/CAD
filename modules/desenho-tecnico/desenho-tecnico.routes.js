@@ -4,6 +4,7 @@ const router = express.Router();
 const ctrl = require('./desenho-tecnico.controller');
 const nestingCtrl = require('./nesting.controller');
 const archiveCtrl = require('./desenho-tecnico.archive.controller');
+const imageCtrl = require('./desenho-tecnico.image.controller');
 const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const { ACCESS, canAccessModule } = require('../../config/rbac');
 
@@ -14,6 +15,20 @@ const dxfUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
 });
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+});
+
+const imageUploadMiddleware = (req, res, next) => {
+  imageUpload.single('image')(req, res, (error) => {
+    if (!error) return next();
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ ok: false, error: 'A imagem excede o limite de 10 MB.' });
+    }
+    return res.status(400).json({ ok: false, error: error.message || 'Não foi possível receber a imagem.' });
+  });
+};
 
 const ensureCan = (req) => {
   if (typeof req.can === 'function') return;
@@ -48,6 +63,8 @@ router.get('/dashboard', requireLogin, requireRole(VIEW_ACCESS), withMenu(ctrl.d
 router.get('/cad/novo', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.novoCad));
 router.post('/cad', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.createCad));
 router.get('/cad/:id/editor', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.cadEditor));
+router.post('/cad/:id/images', requireLogin, requireRole(MANAGE_ACCESS), imageUploadMiddleware, withMenu(imageCtrl.upload));
+router.get('/cad/:id/images/:assetId', requireLogin, requireRole(VIEW_ACCESS), withMenu(imageCtrl.serve));
 router.get('/cad/:id/python/status', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.pythonStatus));
 router.post('/cad/:id/analisar', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.analyzeCadPython));
 router.post('/cad/:id/nesting', requireLogin, requireRole(MANAGE_ACCESS), withMenu(nestingCtrl.nestingCadPython));
