@@ -103,20 +103,6 @@
     else dashboard.append(section);
   }
 
-  function loadPurchaseConsensusScript() {
-    if (document.querySelector('script[data-compras-consenso-bilateral]')) return;
-    const script = document.createElement('script');
-    script.src = '/js/compras-consenso-bilateral.js?v=20260911-2';
-    script.defer = true;
-    script.dataset.comprasConsensoBilateral = '1';
-    document.head.append(script);
-  }
-
-  function init() {
-    loadDemandPrequotes();
-    loadPurchaseConsensusScript();
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadDemandPrequotes);
+  else loadDemandPrequotes();
 })();
