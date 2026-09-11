@@ -50,7 +50,8 @@ function modelToPdf(point, scale, offsetX, offsetY) {
 }
 
 function unitVector(a, b, rotation = null) {
-  if (Number.isFinite(Number(rotation))) {
+  const hasRotation = rotation != null && String(rotation).trim() !== '' && Number.isFinite(Number(rotation));
+  if (hasRotation) {
     const angle = Number(rotation);
     return { x: Math.cos(angle), y: Math.sin(angle) };
   }
@@ -72,7 +73,10 @@ function getLinearDimensionLayout(dim = {}) {
   const p2 = finitePoint(geometry.p2);
   if (!p1 || !p2) return null;
 
-  const useRotation = geometry.mode === 'linear' && Number.isFinite(Number(geometry.rotation));
+  const hasExplicitRotation = geometry.rotation != null
+    && String(geometry.rotation).trim() !== ''
+    && Number.isFinite(Number(geometry.rotation));
+  const useRotation = geometry.mode === 'linear' && hasExplicitRotation;
   const unit = unitVector(p1, p2, useRotation ? Number(geometry.rotation) : null);
   if (!unit) return null;
   const normal = { x: -unit.y, y: unit.x };
