@@ -30,6 +30,7 @@ const upload = multer({
 });
 
 router.get('/demandas/pre-cotacoes.json', requireLogin, requireRole(ACCESS.compras_read), ctrl.preCotacoesDemandasJson);
+router.get('/consenso-itens/pendentes.json', requireLogin, requireRole(ACCESS.compras_read), flowCtrl.notificacoesConsensoJson);
 router.get('/solicitacoes', requireLogin, requireRole(ACCESS.compras_read), ctrl.lista);
 router.get('/solicitacoes/:id/pdf', requireLogin, requireRole(ACCESS.compras_read), ctrl.pdf);
 router.get('/solicitacoes/:id/aprovacao-itens.json', requireLogin, requireRole(ACCESS.compras_read), itemApprovalCtrl.statusJson);
