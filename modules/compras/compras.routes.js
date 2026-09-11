@@ -8,6 +8,7 @@ const { ACCESS } = require('../../config/rbac');
 const ctrl = require('./compras.controller');
 const flowCtrl = require('./compras.itens-consenso.controller');
 const approvalGuard = require('./compras.aprovacao.middleware');
+const consensusGuard = require('./compras.consenso.middleware');
 const itemApprovalCtrl = require('./compras.aprovacao-itens.controller');
 const itemCorrecaoCtrl = require('./compras.item-correcao.controller');
 const storagePaths = require('../../config/storage');
@@ -32,14 +33,19 @@ router.get('/demandas/pre-cotacoes.json', requireLogin, requireRole(ACCESS.compr
 router.get('/solicitacoes', requireLogin, requireRole(ACCESS.compras_read), ctrl.lista);
 router.get('/solicitacoes/:id/pdf', requireLogin, requireRole(ACCESS.compras_read), ctrl.pdf);
 router.get('/solicitacoes/:id/aprovacao-itens.json', requireLogin, requireRole(ACCESS.compras_read), itemApprovalCtrl.statusJson);
+router.get('/solicitacoes/:id/consenso-itens.json', requireLogin, requireRole(ACCESS.compras_read), flowCtrl.consensoItensJson);
 router.get('/solicitacoes/:id', requireLogin, requireRole(ACCESS.compras_read), flowCtrl.detalhe);
 
 router.post('/solicitacoes/:id/cotacoes', requireLogin, requireRole(ACCESS.compras_manage), ctrl.criarCotacao);
 router.post('/solicitacoes/:id/cotacoes/:cotacaoId/selecionar', requireLogin, requireRole(ACCESS.compras_manage), ctrl.selecionarCotacao);
 router.post('/solicitacoes/:id/atualizar-dados', requireLogin, requireRole(ACCESS.compras_manage), ctrl.atualizarDados);
-router.post('/solicitacoes/:id/marcar-comprada', requireLogin, requireRole(ACCESS.compras_manage), approvalGuard.requireApprovedPurchase, ctrl.marcarComprada);
-router.post('/solicitacoes/:id/painel-itens', requireLogin, requireRole(ACCESS.compras_manage), approvalGuard.requireApprovedPurchaseIntent, ctrl.salvarPainelItens);
+router.post('/solicitacoes/:id/marcar-comprada', requireLogin, requireRole(ACCESS.compras_manage), consensusGuard.blockAnyPendingAlteration, approvalGuard.requireApprovedPurchase, ctrl.marcarComprada);
+router.post('/solicitacoes/:id/painel-itens', requireLogin, requireRole(ACCESS.compras_manage), consensusGuard.blockSelectedPendingAlteration, approvalGuard.requireApprovedPurchaseIntent, ctrl.salvarPainelItens);
 router.post('/solicitacoes/:id/itens/:itemId/corrigir-compra', requireLogin, requireRole(ACCESS.compras_manage), itemCorrecaoCtrl.corrigirItemCompra);
+
+router.post('/solicitacoes/:id/itens/:itemId/alteracao', requireLogin, requireRole(ACCESS.compras_manage), flowCtrl.solicitarAlteracao);
+router.post('/solicitacoes/:id/itens/:itemId/alteracao/aprovar', requireLogin, requireRole(ACCESS.compras_manage), flowCtrl.aprovarAlteracao);
+router.post('/solicitacoes/:id/itens/:itemId/alteracao/recusar', requireLogin, requireRole(ACCESS.compras_manage), flowCtrl.recusarAlteracao);
 router.post('/solicitacoes/:id/itens/:itemId/exclusao', requireLogin, requireRole(ACCESS.compras_manage), flowCtrl.solicitarExclusao);
 router.post('/solicitacoes/:id/itens/:itemId/exclusao/cancelar', requireLogin, requireRole(ACCESS.compras_manage), flowCtrl.cancelarExclusao);
 router.post('/solicitacoes/:id/itens-excepcionais', requireLogin, requireRole(ACCESS.compras_manage), approvalGuard.blockExceptionalDirectPurchase, flowCtrl.adicionarItem);
