@@ -1,5 +1,6 @@
 const solicitacoesService = require('./solicitacoes.service');
 const flowService = require('../compras/compras.itens-consenso.service');
+const bilateralService = require('./solicitacoes.itens-bilateral.service');
 const { fallback, normalizeSolicitacaoForView } = require('./solicitacoes.presenter');
 
 function normalizeItens(itens) {
@@ -12,18 +13,21 @@ function normalizeItens(itens) {
   }));
 }
 
+function getContext(id, user) {
+  const solicitacao = solicitacoesService.getSolicitacaoById(id);
+  if (!solicitacao) throw new Error('Solicitação não encontrada');
+  if (!solicitacoesService.canViewSolicitacao(solicitacao, user)) throw new Error('Sem permissão para esta solicitação.');
+  return solicitacao;
+}
+
 function detalhe(req, res) {
   const id = Number(req.params.id);
   try {
-    const solicitacao = solicitacoesService.getSolicitacaoById(id);
-    if (!solicitacao) return res.status(404).send('Solicitação não encontrada');
-    if (!solicitacoesService.canViewSolicitacao(solicitacao, req.session.user)) {
-      req.flash('error', 'Sem permissão para esta solicitação.');
-      return res.redirect('/solicitacoes/minhas');
-    }
-
+    const solicitacao = getContext(id, req.session.user);
     let historicoExclusoes = [];
+    let alteracoes = [];
     try { historicoExclusoes = flowService.getHistoricoExclusoes(id); } catch (_error) {}
+    try { alteracoes = bilateralService.getAlteracoes(id); } catch (_error) {}
     const itens = Array.isArray(solicitacao.itens) ? solicitacao.itens : [];
     const backUrl = req.query.from === 'compras' ? '/compras/solicitacoes' : '/solicitacoes/minhas';
     return res.render('solicitacoes/show', {
@@ -34,45 +38,81 @@ function detalhe(req, res) {
       anexos: Array.isArray(solicitacao.anexos) ? solicitacao.anexos : [],
       canEdit: solicitacoesService.canEditSolicitacao(solicitacao, req.session.user),
       isRequester: Number(solicitacao.solicitante_user_id) === Number(req.session.user.id),
+      canManageItems: !!bilateralService.actorSide(solicitacao, req.session.user),
+      currentUserId: Number(req.session.user.id),
+      alteracoes,
       historicoExclusoes,
       backUrl,
     });
   } catch (error) {
+    if (error.message === 'Solicitação não encontrada') return res.status(404).send(error.message);
+    if (error.message.startsWith('Sem permissão')) {
+      req.flash('error', error.message);
+      return res.redirect('/solicitacoes/minhas');
+    }
     console.error('[solicitacoes.itens-consenso.detalhe]', error);
     return res.status(500).send('Não foi possível abrir esta solicitação. Verifique os dados ou contate o suporte.');
   }
 }
 
-function aprovarExclusao(req, res) {
+function adicionarItem(req, res) {
   try {
-    flowService.responderExclusao({
-      solicitacaoId: Number(req.params.id),
-      itemId: Number(req.params.itemId),
-      userId: Number(req.session.user.id),
-      aprovar: true,
-      observacao: req.body.observacao,
-    });
-    req.flash('success', 'Exclusão confirmada. O item saiu do fluxo ativo de Compras, mas o histórico foi preservado.');
+    const solicitacao = getContext(Number(req.params.id), req.session.user);
+    bilateralService.adicionarItem({ solicitacaoId: solicitacao.id, user: req.session.user, payload: req.body });
+    req.flash('success', 'Material adicionado à mesma solicitação. O item entrou no fluxo individual de cotação sem alterar o andamento dos demais itens.');
   } catch (error) {
-    req.flash('error', error.message || 'Não foi possível confirmar a exclusão.');
+    req.flash('error', error.message || 'Não foi possível adicionar o material.');
   }
-  return res.redirect(`/solicitacoes/${req.params.id}`);
+  return res.redirect(`/solicitacoes/${req.params.id}#materiais-solicitacao`);
 }
 
-function recusarExclusao(req, res) {
+function solicitarAlteracao(req, res) {
   try {
-    flowService.responderExclusao({
-      solicitacaoId: Number(req.params.id),
-      itemId: Number(req.params.itemId),
-      userId: Number(req.session.user.id),
-      aprovar: false,
-      observacao: req.body.observacao,
-    });
-    req.flash('success', 'Pedido de exclusão recusado. O item continuará ativo na solicitação.');
+    getContext(Number(req.params.id), req.session.user);
+    bilateralService.solicitarAlteracao({ solicitacaoId: Number(req.params.id), itemId: Number(req.params.itemId), user: req.session.user, payload: req.body });
+    req.flash('success', 'Alteração enviada para confirmação da outra parte. O item original permanece válido até a decisão.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível solicitar a alteração.');
+  }
+  return res.redirect(`/solicitacoes/${req.params.id}#materiais-solicitacao`);
+}
+
+function responderAlteracao(req, res, aprovar) {
+  try {
+    getContext(Number(req.params.id), req.session.user);
+    bilateralService.responderAlteracao({ solicitacaoId: Number(req.params.id), itemId: Number(req.params.itemId), user: req.session.user, aprovar, observacao: req.body.observacao });
+    req.flash('success', aprovar ? 'Alteração aprovada e aplicada ao item.' : 'Alteração recusada. Os dados atuais foram preservados.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível responder à alteração.');
+  }
+  return res.redirect(`/solicitacoes/${req.params.id}#consenso-itens`);
+}
+
+function solicitarExclusao(req, res) {
+  try {
+    getContext(Number(req.params.id), req.session.user);
+    bilateralService.solicitarExclusao({ solicitacaoId: Number(req.params.id), itemId: Number(req.params.itemId), user: req.session.user, motivo: req.body.motivo });
+    req.flash('success', 'Pedido de exclusão enviado para confirmação da outra parte. O item continua ativo até a decisão.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível solicitar a exclusão.');
+  }
+  return res.redirect(`/solicitacoes/${req.params.id}#materiais-solicitacao`);
+}
+
+function responderExclusao(req, res, aprovar) {
+  try {
+    getContext(Number(req.params.id), req.session.user);
+    bilateralService.responderExclusao({ solicitacaoId: Number(req.params.id), itemId: Number(req.params.itemId), user: req.session.user, aprovar, observacao: req.body.observacao });
+    req.flash('success', aprovar ? 'Exclusão confirmada por consenso. O item saiu do fluxo ativo e o histórico foi preservado.' : 'Pedido de exclusão recusado. O item continua ativo.');
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível responder ao pedido de exclusão.');
   }
-  return res.redirect(`/solicitacoes/${req.params.id}`);
+  return res.redirect(`/solicitacoes/${req.params.id}#consenso-itens`);
 }
 
-module.exports = { detalhe, aprovarExclusao, recusarExclusao };
+function aprovarAlteracao(req, res) { return responderAlteracao(req, res, true); }
+function recusarAlteracao(req, res) { return responderAlteracao(req, res, false); }
+function aprovarExclusao(req, res) { return responderExclusao(req, res, true); }
+function recusarExclusao(req, res) { return responderExclusao(req, res, false); }
+
+module.exports = { detalhe, adicionarItem, solicitarAlteracao, aprovarAlteracao, recusarAlteracao, solicitarExclusao, aprovarExclusao, recusarExclusao };
