@@ -25,8 +25,15 @@ router.post("/:id/cancelar", requireLogin, requireAdminDeleteSolicitacao, requir
 router.get("/:id/editar", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.editar);
 router.post("/:id/editar", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.atualizar);
 router.post("/:id/finalizar", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.finalizar);
+
+router.post("/:id/itens/adicionar", requireLogin, requireRole(ACCESS.solicitacoes_read), flowCtrl.adicionarItem);
+router.post("/:id/itens/:itemId/alteracao", requireLogin, requireRole(ACCESS.solicitacoes_read), flowCtrl.solicitarAlteracao);
+router.post("/:id/itens/:itemId/alteracao/aprovar", requireLogin, requireRole(ACCESS.solicitacoes_read), flowCtrl.aprovarAlteracao);
+router.post("/:id/itens/:itemId/alteracao/recusar", requireLogin, requireRole(ACCESS.solicitacoes_read), flowCtrl.recusarAlteracao);
+router.post("/:id/itens/:itemId/exclusao/solicitar", requireLogin, requireRole(ACCESS.solicitacoes_read), flowCtrl.solicitarExclusao);
 router.post("/:id/itens/:itemId/exclusao/aprovar", requireLogin, requireRole(ACCESS.solicitacoes_read), flowCtrl.aprovarExclusao);
 router.post("/:id/itens/:itemId/exclusao/recusar", requireLogin, requireRole(ACCESS.solicitacoes_read), flowCtrl.recusarExclusao);
+
 router.get("/:id", requireLogin, requireRole(ACCESS.solicitacoes_read), flowCtrl.detalhe);
 router.get("/", (_req, res) => res.redirect("/solicitacoes/minhas"));
 
