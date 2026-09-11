@@ -91,7 +91,7 @@ function drawHeader(doc, desenho, margin) {
   doc.fontSize(10)
     .fillColor('#334155')
     .font('Helvetica')
-    .text(desenho.titulo || 'Sem título', margin + 200, margin + 35, {
+    .text(desenho.titulo || 'Sem título', margin + 200, margin + 29, {
       width: 400,
       align: 'center'
     });
@@ -155,7 +155,7 @@ function getEntityLayer(entity = {}, fallback = 'geometria_principal') {
 function isEntityVisible(entity, layers = {}, fallbackLayer) {
   if (!entity || entity.visible === false) return false;
   const layer = getEntityLayer(entity, fallbackLayer);
-  return layers[layer]?.visible !== false;
+  return layers[layer]?.visible !== false && layers[layer]?.plottable !== false;
 }
 
 function collectCadContent(cadData = {}) {
@@ -206,12 +206,17 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}) {
   const contentWidth = maxX - minX || 1;
   const contentHeight = maxY - minY || 1;
   
-  const scaleX = (area.width - 60) / contentWidth;
+  // Dimension text stays readable in paper units even when the model is reduced.
+  doc.font('Helvetica').fontSize(8);
+  const labelPadding = Math.max(30, ...visibleDimensions.map((dim) =>
+    doc.widthOfString(normalizeDimensionLabel(dim, dim.geometry || dim)) / 2 + 10));
+  const horizontalPadding = Math.min(labelPadding, area.width / 3);
+  const scaleX = (area.width - horizontalPadding * 2) / contentWidth;
   const scaleY = (area.height - 60) / contentHeight;
   const scale = Math.min(scaleX, scaleY, 1.5);
 
-  const offsetX = area.x + 30 - minX * scale;
-  const offsetY = area.y + 30 - minY * scale;
+  const offsetX = area.x + (area.width - contentWidth * scale) / 2 - minX * scale;
+  const offsetY = area.y + (area.height - contentHeight * scale) / 2 - minY * scale;
 
   // Cores para diferentes tipos
   const colors = {
@@ -314,6 +319,10 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}) {
   for (const dim of visibleDimensions) {
     renderDimensionToPdf(doc, dim, scale, offsetX, offsetY);
   }
+  if (!visibleDimensions.length) {
+    doc.font('Helvetica').fontSize(8).fillColor('#92400e')
+      .text('SEM COTAS - confira as medidas no editor antes de enviar para fabricação.', area.x + 10, area.y + area.height - 15, { lineBreak: false });
+  }
 }
 
 function renderShaftToPdf(doc, shaft, scale, offsetX, offsetY) {
@@ -370,7 +379,7 @@ function renderShaftToPdf(doc, shaft, scale, offsetX, offsetY) {
 }
 
 function normalizeDimensionLabel(dim, geometry) {
-  const label = geometry.label || dim.text || `${dim.value || ''}`;
+  const label = geometry.label ?? dim.text ?? `${dim.value ?? ''}`;
   return String(label || '').replace(/[⌀⌾]/g, 'Ø');
 }
 
@@ -449,7 +458,7 @@ function renderDimensionToPdf(doc, dim, scale, offsetX, offsetY) {
 
   const midX = (x1 + x2) / 2;
   const midY = (y1 + y2) / 2;
-  const textPoint = geometry.textPoint || {
+  const textPoint = geometry.textPoint || geometry.dimLinePoint || {
     x: (geometry.p1.x + geometry.p2.x) / 2,
     y: (geometry.p1.y + geometry.p2.y) / 2,
   };
@@ -463,9 +472,14 @@ function renderDimensionToPdf(doc, dim, scale, offsetX, offsetY) {
   const uy = dy / length;
   const nx = -uy;
   const ny = ux;
-  const dimensionOffset = (textX - midX) * nx + (textY - midY) * ny;
-  const dimensionStart = { x: x1 + nx * dimensionOffset, y: y1 + ny * dimensionOffset };
-  const dimensionEnd = { x: x2 + nx * dimensionOffset, y: y2 + ny * dimensionOffset };
+  const linePoint = geometry.dimLinePoint || textPoint;
+  const dimensionOffset = (linePoint.x * scale + offsetX - midX) * nx + (linePoint.y * scale + offsetY - midY) * ny;
+  const dimensionStart = geometry.dimensionStart
+    ? { x: geometry.dimensionStart.x * scale + offsetX, y: geometry.dimensionStart.y * scale + offsetY }
+    : { x: x1 + nx * dimensionOffset, y: y1 + ny * dimensionOffset };
+  const dimensionEnd = geometry.dimensionEnd
+    ? { x: geometry.dimensionEnd.x * scale + offsetX, y: geometry.dimensionEnd.y * scale + offsetY }
+    : { x: x2 + nx * dimensionOffset, y: y2 + ny * dimensionOffset };
 
   const drawExtension = (origin, end) => {
     const ex = end.x - origin.x;
@@ -484,9 +498,26 @@ function renderDimensionToPdf(doc, dim, scale, offsetX, offsetY) {
     .lineTo(dimensionEnd.x, dimensionEnd.y)
     .lineWidth(0.65)
     .stroke(color);
-  drawArrowHead(doc, dimensionStart.x, dimensionStart.y, ux, uy, color);
-  drawArrowHead(doc, dimensionEnd.x, dimensionEnd.y, -ux, -uy, color);
-  drawDimensionLabel(doc, label, textX, textY, color);
+  const lineDx = dimensionEnd.x - dimensionStart.x;
+  const lineDy = dimensionEnd.y - dimensionStart.y;
+  if (geometry.mode !== 'radius') drawArrowHead(doc, dimensionStart.x, dimensionStart.y, -lineDx, -lineDy, color);
+  const outside = ['radius', 'diameter'].includes(geometry.mode)
+    && (textX - dimensionEnd.x) * lineDx + (textY - dimensionEnd.y) * lineDy > 0;
+  drawArrowHead(doc, dimensionEnd.x, dimensionEnd.y, outside ? -lineDx : lineDx, outside ? -lineDy : lineDy, color);
+  if (['radius', 'diameter'].includes(geometry.mode)) {
+    doc.moveTo(dimensionEnd.x, dimensionEnd.y).lineTo(textX, textY).lineWidth(0.65).stroke(color);
+  }
+  doc.save().font('Helvetica').fontSize(8);
+  const labelWidth = doc.widthOfString(label) + 6;
+  doc.restore();
+  const lineLength = Math.hypot(lineDx, lineDy);
+  const nearLine = lineLength > 0 && Math.abs((textX - dimensionStart.x) * lineDy - (textY - dimensionStart.y) * lineDx) / lineLength < 6;
+  // A long label on a short dimension must not cover both arrowheads.
+  const crowded = nearLine && labelWidth + 12 > lineLength;
+  const vertical = Math.abs(lineDy) > Math.abs(lineDx);
+  drawDimensionLabel(doc, label,
+    textX + (crowded && vertical ? labelWidth / 2 + 8 : 0),
+    textY - (crowded && !vertical ? 12 : 0), color);
 }
 
 function getDimensionBounds(dim) {
@@ -505,7 +536,7 @@ function getDimensionBounds(dim) {
     return { minX: minX - 8, minY: minY - 8, maxX: maxX + 8, maxY: maxY + 8 };
   }
 
-  const points = [geometry.p1, geometry.p2, geometry.textPoint].filter(Boolean);
+  const points = [geometry.p1, geometry.p2, geometry.textPoint, geometry.dimLinePoint, geometry.dimensionStart, geometry.dimensionEnd].filter(Boolean);
   if (!points.length) return null;
   const minX = Math.min(...points.map((point) => Number(point.x)));
   const maxX = Math.max(...points.map((point) => Number(point.x)));
@@ -631,9 +662,10 @@ function drawLegend(doc, desenho, pageWidth, pageHeight, margin, options) {
   doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, col3, legendY + 34);
   doc.text(`Hora: ${new Date().toLocaleTimeString('pt-BR')}`, col3, legendY + 46);
   
-  const content = collectCadContent(options.cadData || {});
-  const objCount = content.objects.length;
-  const dimCount = content.dimensions.length;
+  const cadData = options.cadData || desenho.cad_data || {};
+  const content = collectCadContent(cadData);
+  const objCount = content.objects.filter((obj) => isEntityVisible(obj, cadData.layers)).length;
+  const dimCount = content.dimensions.filter((dim) => isEntityVisible(dim, cadData.layers, 'cotas')).length;
   doc.text(`Objetos: ${objCount} | Cotas: ${dimCount}`, col3, legendY + 58);
 
   // Coluna 4: Escala e observações
@@ -641,12 +673,12 @@ function drawLegend(doc, desenho, pageWidth, pageHeight, margin, options) {
     .fillColor('#0f172a')
     .font('Helvetica-Bold')
     .text('ESCALA', col4, legendY + 10);
-  doc.fontSize(14)
-    .text('1:1', col4, legendY + 25);
+  doc.fontSize(10)
+    .text('AJUSTADA À FOLHA', col4, legendY + 25);
   doc.fontSize(7)
     .fillColor('#64748b')
     .font('Helvetica')
-    .text('Unidade: mm', col4, legendY + 45);
+    .text(`Unidade: ${cadData.unidade || 'mm'}`, col4, legendY + 45);
   doc.text('Formato: A4 Paisagem', col4, legendY + 57);
 }
 

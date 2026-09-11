@@ -6,6 +6,7 @@ import {
   acedApplyUiTheme
 } from '@mlightcad/cad-simple-viewer';
 import { registerSimpleUiPlugin } from '@mlightcad/cad-simple-ui-plugin/register';
+import { mirrorDimension } from './mlightcad-dimension-mirror.mjs';
 import {
   AcDbArc,
   AcDbCircle,
@@ -232,14 +233,26 @@ function entityLayer(entity) {
 
 function mirrorDatabase(database) {
   const objects = [];
+  const dimensions = [];
+  const layers = {};
   const unsupported = {};
+  for (const layer of database.tables.layerTable.newIterator()) {
+    layers[cleanLayer(layer.name)] = {
+      visible: !layer.isOff && !layer.isFrozen,
+      locked: Boolean(layer.isLocked),
+      plottable: layer.isPlottable !== false
+    };
+  }
   const model = database.tables.blockTable.modelSpace;
   let index = 0;
   for (const entity of model.newIterator()) {
     index += 1;
-    const id = String(entity.handle || entity.objectId?.handle || `mlight-${index}`);
+    const id = String(entity.handle || (typeof entity.objectId === 'string' ? entity.objectId : entity.objectId?.handle) || `mlight-${index}`);
     const layer = entityLayer(entity);
-    if (entity instanceof AcDbLine) {
+    const dimension = mirrorDimension(entity);
+    if (dimension) {
+      dimensions.push({ id, type: 'dimension', layer, visible: entity.visibility !== false, geometry: dimension });
+    } else if (entity instanceof AcDbLine) {
       objects.push({ id, type: 'line', layer, x: entity.startPoint.x, y: entity.startPoint.y, x2: entity.endPoint.x, y2: entity.endPoint.y });
     } else if (entity instanceof AcDbCircle) {
       objects.push({ id, type: 'circle', layer, x: entity.center.x, y: entity.center.y, radius: entity.radius });
@@ -262,7 +275,7 @@ function mirrorDatabase(database) {
       unsupported[key] = (unsupported[key] || 0) + 1;
     }
   }
-  return { objects, unsupported, total: index };
+  return { objects, dimensions, layers, unsupported, total: index };
 }
 
 function createToolbarItems() {
@@ -387,7 +400,8 @@ export async function createMlightCadWorkbench({ container, host = container, ca
           ...baseCadData,
           schemaVersion: Math.max(3, Number(baseCadData.schemaVersion || 0)),
           objects: mirror.objects,
-          dimensions: [],
+          dimensions: mirror.dimensions,
+          layers: Object.fromEntries(Object.entries(mirror.layers).map(([name, layer]) => [name, { ...baseCadData.layers?.[name], ...layer }])),
           history: withMlightSnapshot(baseCadData, dxfBase64, stats)
         };
       },

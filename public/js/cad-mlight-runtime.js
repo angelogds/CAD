@@ -41,7 +41,7 @@ function createShell(initial) {
       <button id="mlightAutoDimBtn" class="cad-mlight-action primary" type="button" title="Gerar automaticamente as principais cotas de fabricação">↔ <span>AUTO COTAR</span></button>
       <button id="mlightDxfImportBtn" class="cad-mlight-action" type="button">⇧ <span>Abrir DXF</span></button>
       <button id="mlightDxfExportBtn" class="cad-mlight-action" type="button">⇩ <span>Exportar DXF</span></button>
-      <a class="cad-mlight-action" href="/desenho-tecnico/cad/${drawingId}/pdf">PDF</a>
+      <a id="mlightPdfExportBtn" class="cad-mlight-action" href="/desenho-tecnico/cad/${drawingId}/pdf" title="Salvar a versão atual e exportar com cotas">PDF com cotas</a>
       <span id="mlightSaveState" class="cad-mlight-save-state" data-state="saved">Tudo salvo</span>
       <button id="mlightSaveBtn" class="cad-mlight-action primary" type="button">Salvar desenho</button>
     </header>
@@ -148,34 +148,56 @@ async function boot() {
       }
     };
 
-    const save = async () => {
-      try {
-        setSaveState('Salvando…', 'saving');
-        const payload = app.serializeForSave(cadData);
-        if (cadData.manufacturing) payload.manufacturing = cadData.manufacturing;
-        const snapshot = [...(Array.isArray(payload.history) ? payload.history : [])].reverse()
-          .find((item) => item && typeof item === 'object' && item.kind === 'mlightcad-document');
-        if (String(snapshot?.dxfBase64 || '').length > 1_500_000) {
-          throw new Error('Desenho muito grande para o salvamento integrado desta versão. Exporte o DXF e reduza o arquivo antes de salvar.');
+    // Queue saves: a PDF requested during another save must include the latest model.
+    let saveQueue = Promise.resolve();
+    const save = () => {
+      const pending = saveQueue.then(async () => {
+        try {
+          setSaveState('Salvando…', 'saving');
+          const payload = app.serializeForSave(cadData);
+          if (cadData.manufacturing) payload.manufacturing = cadData.manufacturing;
+          const snapshot = [...(Array.isArray(payload.history) ? payload.history : [])].reverse()
+            .find((item) => item && typeof item === 'object' && item.kind === 'mlightcad-document');
+          if (String(snapshot?.dxfBase64 || '').length > 1_500_000) {
+            throw new Error('Desenho muito grande para o salvamento integrado desta versão. Exporte o DXF e reduza o arquivo antes de salvar.');
+          }
+          const response = await fetch(`/desenho-tecnico/cad/${drawingId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || result.ok !== true) throw new Error(result.error || `Salvamento não confirmado (HTTP ${response.status}). Verifique a conexão e a sessão.`);
+          Object.assign(cadData, payload);
+          setSaveState('Tudo salvo', 'saved');
+          setStatus('Desenho salvo no histórico técnico', 'ok');
+          return true;
+        } catch (error) {
+          console.error('[CAD][MLightCAD] save error', error);
+          setSaveState('Falha ao salvar', 'error');
+          setStatus(`Falha ao salvar: ${error.message || error}`, 'error');
+          return false;
         }
-        const response = await fetch(`/desenho-tecnico/cad/${drawingId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok || result.ok === false) throw new Error(result.error || `HTTP ${response.status}`);
-        Object.assign(cadData, payload);
-        setSaveState('Tudo salvo', 'saved');
-        setStatus('Desenho salvo no histórico técnico', 'ok');
-      } catch (error) {
-        console.error('[CAD][MLightCAD] save error', error);
-        setSaveState('Falha ao salvar', 'error');
-        setStatus(`Falha ao salvar: ${error.message || error}`, 'error');
-      }
+      });
+      saveQueue = pending;
+      return pending;
     };
 
     document.getElementById('mlightSaveBtn')?.addEventListener('click', save);
+    const pdfExport = document.getElementById('mlightPdfExportBtn');
+    let exportingPdf = false;
+    pdfExport?.addEventListener('click', async (event) => {
+      event.preventDefault();
+      if (exportingPdf) return;
+      exportingPdf = true;
+      pdfExport.setAttribute('aria-busy', 'true');
+      try {
+        if (await save()) window.location.assign(pdfExport.href);
+      } finally {
+        exportingPdf = false;
+        pdfExport.removeAttribute('aria-busy');
+      }
+    });
     document.getElementById('mlightDxfExportBtn')?.addEventListener('click', () => app.downloadDxf(cadData.codigo || `CAD-${drawingId}`));
     document.getElementById('mlightZoomExtentsBtn')?.addEventListener('click', () => app.zoomExtents());
     document.getElementById('mlightFlangeBtn')?.addEventListener('click', () => runTool(() => fabrication.createFlange()));

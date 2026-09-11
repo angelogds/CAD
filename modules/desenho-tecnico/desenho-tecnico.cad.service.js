@@ -111,7 +111,7 @@ function normalizeObject(obj = {}) {
   if (base.type === 'dimension') {
     const geometry = plainObject(obj.geometry);
     const normalized = { ...geometry };
-    ['p1', 'p2', 'textPoint', 'vertex'].forEach((key) => {
+    ['p1', 'p2', 'textPoint', 'vertex', 'dimLinePoint', 'dimensionStart', 'dimensionEnd'].forEach((key) => {
       if (geometry[key]) normalized[key] = normalizePoint(geometry[key]);
     });
     ['radius', 'startAngle', 'endAngle'].forEach((key) => {
