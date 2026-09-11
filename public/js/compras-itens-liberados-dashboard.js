@@ -40,22 +40,34 @@
     document.head.append(style);
   }
 
-  async function loadApproval(requestId) {
+  async function loadGlobalReleaseSummary() {
     try {
-      const response = await fetch(`/compras/solicitacoes/${requestId}/aprovacao-itens.json`, {
+      const response = await fetch('/compras/itens-liberados.json', {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
       });
       if (!response.ok) return null;
       const payload = await response.json();
       if (!payload?.ok) return null;
-      return {
-        approved: Number(payload.aprovados || 0),
-        pending: Number(payload.pendentes || 0),
-      };
+      return payload;
     } catch (error) {
-      console.warn('[compras-liberados] Falha ao consultar aprovação da solicitação', requestId, error?.message || error);
+      console.warn('[compras-liberados] Falha ao carregar resumo global:', error?.message || error);
       return null;
+    }
+  }
+
+  async function loadApprovalFallback(requestId) {
+    try {
+      const response = await fetch(`/compras/solicitacoes/${requestId}/aprovacao-itens.json`, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+      });
+      if (!response.ok) return { approved: 0, pending: 0 };
+      const payload = await response.json();
+      if (!payload?.ok) return { approved: 0, pending: 0 };
+      return { approved: Number(payload.aprovados || 0), pending: Number(payload.pendentes || 0) };
+    } catch (_error) {
+      return { approved: 0, pending: 0 };
     }
   }
 
@@ -109,7 +121,7 @@
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'metric-card director-release-metric';
-    card.setAttribute('aria-label', 'Mostrar solicitações com itens liberados para compra');
+    card.setAttribute('aria-label', 'Mostrar solicitações com itens liberados para compra nesta página');
 
     const label = document.createElement('span');
     label.textContent = 'LIBERADOS P/ COMPRA';
@@ -118,7 +130,7 @@
     const hint = document.createElement('small');
     hint.textContent = releasedItems > 0
       ? `${releasedItems} ${plural(releasedItems, 'item aguardando compra', 'itens aguardando compra')}`
-      : 'Nenhum item liberado visível';
+      : 'Nenhum item liberado';
     card.append(label, total, hint);
     card.addEventListener('click', () => toggleReleasedOnly(card));
     grid.append(card);
@@ -129,7 +141,7 @@
     const active = sourceButton.dataset.filterActive === '1';
     sourceButton.dataset.filterActive = active ? '0' : '1';
     sourceButton.classList.toggle('is-selected', !active);
-    sourceButton.querySelector('small').textContent = active ? 'Clique para ver os liberados' : 'Filtro visual ativo';
+    sourceButton.querySelector('small').textContent = active ? 'Clique para ver os liberados' : 'Filtro visual desta página';
 
     rows.forEach((row) => {
       row.classList.toggle('director-release-hidden', !active && Number(row.dataset.directorApproved || 0) <= 0);
@@ -155,11 +167,11 @@
     const title = document.createElement('h2');
     title.textContent = releasedItems > 0
       ? 'Itens aprovados pela Diretoria aguardando compra'
-      : 'Nenhum item liberado para compra nesta página';
+      : 'Nenhum item liberado para compra';
     const text = document.createElement('p');
     text.textContent = releasedItems > 0
-      ? `${releasedItems} ${plural(releasedItems, 'item aprovado', 'itens aprovados')} em ${releasedRequests} ${plural(releasedRequests, 'solicitação exibida', 'solicitações exibidas')} já podem ser comprados.${pendingItems > 0 ? ` Outros ${pendingItems} item(ns) ainda aguardam decisão da Diretoria.` : ''}`
-      : (pendingItems > 0 ? `${pendingItems} item(ns) das solicitações exibidas ainda aguardam decisão da Diretoria.` : 'As solicitações exibidas não possuem itens aguardando ação de compra por aprovação da Diretoria.');
+      ? `${releasedItems} ${plural(releasedItems, 'item aprovado', 'itens aprovados')} em ${releasedRequests} ${plural(releasedRequests, 'solicitação ativa', 'solicitações ativas')} já podem ser comprados.${pendingItems > 0 ? ` Outros ${pendingItems} item(ns) ainda aguardam decisão da Diretoria.` : ''}`
+      : (pendingItems > 0 ? `${pendingItems} item(ns) ainda aguardam decisão da Diretoria.` : 'Não existem itens aprovados aguardando ação de compra neste momento.');
     copy.append(kicker, title, text);
     section.append(copy);
 
@@ -174,7 +186,7 @@
       const only = document.createElement('button');
       only.type = 'button';
       only.className = 'ui-btn ui-btn--outline';
-      only.textContent = 'Ver somente liberados';
+      only.textContent = 'Ver liberados desta página';
       only.addEventListener('click', () => {
         const metric = document.querySelector('.director-release-metric');
         if (metric) toggleReleasedOnly(metric);
@@ -190,30 +202,42 @@
     if (!isDashboard()) return;
     ensureStyles();
 
-    const rows = [...document.querySelectorAll('.request-row')];
-    const requests = rows
+    const visibleRequests = [...document.querySelectorAll('.request-row')]
       .map((row) => ({ row, requestId: requestIdFromRow(row) }))
       .filter((item) => item.requestId);
-    if (!requests.length) return;
+    if (!visibleRequests.length) return;
 
-    const results = await Promise.all(requests.map(async ({ row, requestId }) => ({
-      row,
-      requestId,
-      state: await loadApproval(requestId),
-    })));
-
+    const global = await loadGlobalReleaseSummary();
+    let byRequest = new Map();
     let releasedRequests = 0;
     let releasedItems = 0;
     let pendingItems = 0;
-    results.forEach(({ row, state }) => {
-      if (!state) return;
-      decorateReleasedRow(row, state);
-      if (state.approved > 0) {
-        releasedRequests += 1;
-        releasedItems += state.approved;
-      }
-      pendingItems += state.pending;
-    });
+
+    if (global) {
+      byRequest = new Map((Array.isArray(global.rows) ? global.rows : []).map((row) => [
+        Number(row.solicitacao_id),
+        { approved: Number(row.liberados || 0), pending: Number(row.aguardando || 0) },
+      ]));
+      releasedRequests = Number(global.total_solicitacoes_liberadas || 0);
+      releasedItems = Number(global.total_itens_liberados || 0);
+      pendingItems = Number(global.total_itens_aguardando || 0);
+    }
+
+    for (const { row, requestId } of visibleRequests) {
+      let state = byRequest.get(requestId);
+      if (!state && !global) state = await loadApprovalFallback(requestId);
+      decorateReleasedRow(row, state || { approved: 0, pending: 0 });
+    }
+
+    if (!global) {
+      const visibleStates = visibleRequests.map(({ row }) => ({
+        approved: Number(row.dataset.directorApproved || 0),
+        pending: Number(row.dataset.directorPending || 0),
+      }));
+      releasedRequests = visibleStates.filter((state) => state.approved > 0).length;
+      releasedItems = visibleStates.reduce((sum, state) => sum + state.approved, 0);
+      pendingItems = visibleStates.reduce((sum, state) => sum + state.pending, 0);
+    }
 
     createMetric(releasedRequests, releasedItems);
     createActionPanel(releasedRequests, releasedItems, pendingItems);
