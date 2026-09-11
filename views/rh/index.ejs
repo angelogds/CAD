@@ -1,56 +1,123 @@
 <%- layout('layout') -%>
-<link rel="stylesheet" href="/css/rh-portal.css?v=20260910-rh-modular" />
+<link rel="stylesheet" href="/css/rh-portal.css?v=20260910-rh-modular-2" />
 <%
   const d = dashboard || {};
   const i = d.indicadores || {};
   const pendencias = Array.isArray(d.pendencias) ? d.pendencias : [];
+  const pessoas = Array.isArray(d.colaboradores) ? d.colaboradores : [];
+  const exams = Array.isArray(d.exams) ? d.exams : [];
+  const certs = Array.isArray(d.certs) ? d.certs : [];
+  const proximosVencimentos = [
+    ...exams
+      .filter((e) => e.status_visual === 'VENCE_EM_BREVE' && e.validade_ate)
+      .map((e) => ({
+        tipo: 'EXAME',
+        colaborador: e.colaborador_nome || '-',
+        titulo: String(e.tipo || 'Exame').replaceAll('_', ' '),
+        data: String(e.validade_ate).slice(0, 10),
+        href: `/rh/exames?colaborador=${e.colaborador_id}`,
+      })),
+    ...certs
+      .filter((c) => c.status_visual === 'VENCE_EM_BREVE' && c.validade)
+      .map((c) => ({
+        tipo: 'TREINAMENTO',
+        colaborador: c.colaborador_nome || '-',
+        titulo: c.titulo || 'Treinamento/certificado',
+        data: String(c.validade).slice(0, 10),
+        href: `/rh/treinamentos?colaborador=${c.colaborador_id}`,
+      })),
+  ].sort((a, b) => a.data.localeCompare(b.data)).slice(0, 5);
 %>
 <div class="rh-page">
   <%- include('_header', { title, dashboard: d, activeRhSection }) %>
 
   <section class="rh-kpis" aria-label="Indicadores do RH">
     <article class="card rh-kpi"><span>Colaboradores ativos</span><strong><%= Number(i.colaboradoresAtivos || 0) %></strong><small>Ficha profissional ativa</small></article>
-    <article class="card rh-kpi"><span>Folgas pendentes</span><strong><%= Number(i.folgasPendentes || 0) %></strong><small>Aguardando fluxo operacional</small></article>
+    <article class="card rh-kpi <%= Number(i.folgasPendentes || 0) > 0 ? 'is-warning' : 'is-ok' %>"><span>Folgas pendentes</span><strong><%= Number(i.folgasPendentes || 0) %></strong><small>Aguardando fluxo operacional</small></article>
     <article class="card rh-kpi"><span>HE no mês</span><strong><%= formatMinutes(i.horasExtrasMesMinutos || 0) %></strong><small>Fonte: Escala</small></article>
     <article class="card rh-kpi"><span>Banco de horas</span><strong><%= formatMinutes(i.bancoHorasMinutos || 0) %></strong><small>Saldo consolidado</small></article>
-    <article class="card rh-kpi"><span>Exames vencidos</span><strong><%= Number(i.examesVencidos || 0) %></strong><small>Requer acompanhamento</small></article>
-    <article class="card rh-kpi"><span>Exames vencendo</span><strong><%= Number(i.examesVencendo || 0) %></strong><small>Próximos 30 dias</small></article>
-    <article class="card rh-kpi"><span>Treinamentos</span><strong><%= Number(i.treinamentosPendentes || 0) %></strong><small>Vencidos, vencendo ou pendentes</small></article>
+    <article class="card rh-kpi <%= Number(i.examesVencidos || 0) > 0 ? 'is-danger' : 'is-ok' %>"><span>Exames vencidos</span><strong><%= Number(i.examesVencidos || 0) %></strong><small>Requer acompanhamento</small></article>
+    <article class="card rh-kpi <%= Number(i.examesVencendo || 0) > 0 ? 'is-warning' : 'is-ok' %>"><span>Exames vencendo</span><strong><%= Number(i.examesVencendo || 0) %></strong><small>Próximos 30 dias</small></article>
+    <article class="card rh-kpi <%= Number(i.treinamentosPendentes || 0) > 0 ? 'is-warning' : 'is-ok' %>"><span>Treinamentos</span><strong><%= Number(i.treinamentosPendentes || 0) %></strong><small>Vencidos, vencendo ou pendentes</small></article>
   </section>
 
-  <section class="rh-module-grid" aria-label="Módulos do RH">
+  <section class="rh-module-grid" aria-label="Resumo das áreas do RH">
     <a class="card rh-module-card" href="/rh/colaboradores">
-      <span class="rh-module-icon">👥</span><div><strong>Colaboradores</strong><small>Cadastro mestre, função, setor e ficha consolidada.</small></div><span aria-hidden="true">→</span>
+      <span class="rh-module-icon">👥</span><div><strong>Colaboradores</strong><small><%= Number(i.colaboradoresAtivos || 0) %> ativos • ficha profissional consolidada.</small></div><span aria-hidden="true">→</span>
     </a>
     <a class="card rh-module-card" href="/rh/jornada">
-      <span class="rh-module-icon">⏱</span><div><strong>Jornada e Banco de Horas</strong><small>Turnos, HE e saldos vindos da Escala.</small></div><span aria-hidden="true">→</span>
+      <span class="rh-module-icon">⏱</span><div><strong>Jornada e Banco de Horas</strong><small>HE <%= formatMinutes(i.horasExtrasMesMinutos || 0) %> • banco <%= formatMinutes(i.bancoHorasMinutos || 0) %>.</small></div><span aria-hidden="true">→</span>
     </a>
     <% if (d.canManage) { %>
-      <a class="card rh-module-card" href="/rh/folgas">
-        <span class="rh-module-icon">📅</span><div><strong>Folgas e solicitações</strong><small>Acompanhamento do fluxo sem duplicar a aprovação operacional.</small></div><span aria-hidden="true">→</span>
+      <a class="card rh-module-card <%= Number(i.folgasPendentes || 0) > 0 ? 'has-warning' : '' %>" href="/rh/folgas">
+        <span class="rh-module-icon">📅</span><div><strong>Folgas e solicitações</strong><small><%= Number(i.folgasPendentes || 0) %> aguardando fluxo operacional.</small></div><span aria-hidden="true">→</span>
       </a>
-      <a class="card rh-module-card" href="/rh/exames">
-        <span class="rh-module-icon">🩺</span><div><strong>Exames ocupacionais</strong><small>ASO, validade e anexos protegidos.</small></div><span aria-hidden="true">→</span>
+      <a class="card rh-module-card <%= Number(i.examesVencidos || 0) > 0 ? 'has-danger' : (Number(i.examesVencendo || 0) > 0 ? 'has-warning' : '') %>" href="/rh/exames">
+        <span class="rh-module-icon">🩺</span><div><strong>Exames ocupacionais</strong><small><%= Number(i.examesVencidos || 0) %> vencidos • <%= Number(i.examesVencendo || 0) %> vencendo.</small></div><span aria-hidden="true">→</span>
       </a>
       <a class="card rh-module-card" href="/rh/documentos">
-        <span class="rh-module-icon">📄</span><div><strong>Documentos</strong><small>Documentação individual com armazenamento privado.</small></div><span aria-hidden="true">→</span>
+        <span class="rh-module-icon">📄</span><div><strong>Documentos</strong><small>Arquivo individual protegido e organizado por colaborador.</small></div><span aria-hidden="true">→</span>
       </a>
-      <a class="card rh-module-card" href="/rh/treinamentos">
-        <span class="rh-module-icon">🎓</span><div><strong>Treinamentos e certificados</strong><small>NRs, cursos, certificados e vencimentos.</small></div><span aria-hidden="true">→</span>
+      <a class="card rh-module-card <%= Number(i.treinamentosPendentes || 0) > 0 ? 'has-warning' : '' %>" href="/rh/treinamentos">
+        <span class="rh-module-icon">🎓</span><div><strong>Treinamentos e certificados</strong><small><%= Number(i.treinamentosPendentes || 0) %> registro(s) pedindo atenção.</small></div><span aria-hidden="true">→</span>
       </a>
     <% } %>
   </section>
 
-  <section class="card rh-section">
-    <div class="rh-section-head">
-      <div><span class="rh-eyebrow">ACOMPANHAMENTO</span><h2>Pendências do RH</h2></div>
-      <% if (d.canManage) { %><span class="rh-badge"><%= pendencias.length %> item<%= pendencias.length === 1 ? '' : 's' %></span><% } %>
-    </div>
-    <% if (!d.canManage) { %>
+  <% if (d.canManage) { %>
+    <section class="rh-dashboard-grid">
+      <article class="card rh-section">
+        <div class="rh-section-head">
+          <div><span class="rh-eyebrow">ACESSO RÁPIDO</span><h2>Abrir ficha do colaborador</h2><p class="rh-muted">Acesse a ficha consolidada sem navegar por várias telas.</p></div>
+        </div>
+        <form id="rhQuickPersonForm" class="rh-quick-form">
+          <label class="rh-grow"><span>Colaborador</span>
+            <select id="rhQuickPerson" required>
+              <option value="">Selecione um colaborador</option>
+              <% pessoas.forEach((c) => { %><option value="<%= c.id %>"><%= c.nome %> • <%= c.funcaoLabel || c.funcao || '-' %></option><% }) %>
+            </select>
+          </label>
+          <button class="btn btn-green" type="submit">Abrir ficha</button>
+        </form>
+      </article>
+
+      <article class="card rh-section">
+        <div class="rh-section-head">
+          <div><span class="rh-eyebrow">PRÓXIMOS 30 DIAS</span><h2>Próximos vencimentos</h2><p class="rh-muted">Exames e treinamentos que exigem programação antecipada.</p></div>
+          <span class="rh-badge"><%= proximosVencimentos.length %> item<%= proximosVencimentos.length === 1 ? '' : 's' %></span>
+        </div>
+        <% if (!proximosVencimentos.length) { %>
+          <div class="rh-empty rh-empty-compact">Nenhum exame ou treinamento vencendo nos próximos 30 dias.</div>
+        <% } else { %>
+          <div class="rh-upcoming-list">
+            <% proximosVencimentos.forEach((v) => { %>
+              <a class="rh-upcoming-item" href="<%= v.href %>">
+                <span class="rh-badge is-warning"><%= v.tipo %></span>
+                <div><strong><%= v.colaborador %> • <%= v.titulo %></strong><small>Validade: <%= dateBr.formatDateBR(v.data) %></small></div>
+                <span aria-hidden="true">→</span>
+              </a>
+            <% }) %>
+          </div>
+        <% } %>
+      </article>
+    </section>
+  <% } %>
+
+  <% if (!d.canManage) { %>
+    <section class="card rh-section">
       <div class="rh-empty">A Diretoria visualiza indicadores consolidados e dados operacionais não sensíveis. Pendências nominais, exames e documentos permanecem restritos ao RH/ADMIN.</div>
-    <% } else if (!pendencias.length) { %>
-      <div class="rh-empty">Nenhuma pendência crítica encontrada nas fontes integradas.</div>
-    <% } else { %>
+    </section>
+  <% } else if (!pendencias.length) { %>
+    <section class="card rh-pending-ok" aria-label="Situação das pendências do RH">
+      <span class="rh-pending-ok-icon">✓</span>
+      <div><span class="rh-eyebrow">ACOMPANHAMENTO</span><strong>Nenhuma pendência crítica</strong><small>As fontes integradas não possuem itens que exijam ação imediata.</small></div>
+    </section>
+  <% } else { %>
+    <section class="card rh-section">
+      <div class="rh-section-head">
+        <div><span class="rh-eyebrow">ACOMPANHAMENTO</span><h2>Pendências do RH</h2></div>
+        <span class="rh-badge <%= pendencias.some((p) => p.nivel === 'critico') ? 'is-danger' : 'is-warning' %>"><%= pendencias.length %> item<%= pendencias.length === 1 ? '' : 's' %></span>
+      </div>
       <div class="rh-pending-list">
         <% pendencias.slice(0, 30).forEach((p) => { %>
           <article class="rh-pending <%= p.nivel === 'critico' ? 'is-critical' : '' %>">
@@ -60,8 +127,22 @@
           </article>
         <% }) %>
       </div>
-    <% } %>
-  </section>
+    </section>
+  <% } %>
 
   <div class="rh-privacy">Dados de saúde e anexos pessoais permanecem protegidos. Não registrar CID, diagnóstico ou resultado clínico detalhado no módulo.</div>
 </div>
+
+<% if (d.canManage) { %>
+<script>
+(() => {
+  const form = document.getElementById('rhQuickPersonForm');
+  const select = document.getElementById('rhQuickPerson');
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const id = Number(select?.value || 0);
+    if (id > 0) window.location.href = `/rh/colaboradores/${id}`;
+  });
+})();
+</script>
+<% } %>
