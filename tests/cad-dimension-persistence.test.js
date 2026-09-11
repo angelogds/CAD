@@ -12,13 +12,14 @@ function pair(code, value) {
   return `${code}\n${value}\n`;
 }
 
-function alignedDimension({ handle, x1, y1, x2, y2, textX, textY, dimX, dimY }) {
+function alignedDimension({ handle, x1, y1, x2, y2, textX, textY, dimX, dimY, label = '' }) {
   return [
     pair(0, 'DIMENSION'),
     pair(5, handle),
     pair(8, 'cotas'),
     pair(2, `*D${handle}`),
     pair(70, 33),
+    label ? pair(1, label) : '',
     pair(10, dimX), pair(20, dimY), pair(30, 0),
     pair(11, textX), pair(21, textY), pair(31, 0),
     pair(13, x1), pair(23, y1), pair(33, 0),
@@ -40,6 +41,32 @@ function sampleDxf() {
   ].join('');
 }
 
+function flangeDxf() {
+  return [
+    pair(0, 'SECTION'), pair(2, 'ENTITIES'),
+    pair(0, 'CIRCLE'), pair(8, 'geometria_principal'), pair(10, 0), pair(20, 0), pair(40, 200),
+    pair(0, 'CIRCLE'), pair(8, 'geometria_principal'), pair(10, 0), pair(20, 0), pair(40, 150),
+    alignedDimension({ handle: 'F1', x1: -200, y1: 0, x2: 200, y2: 0, textX: 0, textY: 245, dimX: 0, dimY: 240, label: '%%c400.000' }),
+    alignedDimension({ handle: 'F2', x1: -150, y1: 0, x2: 150, y2: 0, textX: 0, textY: 205, dimX: 0, dimY: 200, label: 'PCD %%c300.000' }),
+    alignedDimension({ handle: 'F3', x1: 140, y1: 0, x2: 160, y2: 0, textX: 150, textY: 35, dimX: 150, dimY: 30, label: '8x %%c20.000' }),
+    pair(0, 'ENDSEC'), pair(0, 'EOF'),
+  ].join('');
+}
+
+function shaftDxf() {
+  return [
+    pair(0, 'SECTION'), pair(2, 'ENTITIES'),
+    pair(0, 'LWPOLYLINE'), pair(8, 'geometria_principal'),
+    alignedDimension({ handle: 'S1', x1: 0, y1: -30, x2: 100, y2: -30, textX: 50, textY: -55, dimX: 50, dimY: -50, label: '100.000' }),
+    alignedDimension({ handle: 'S2', x1: 100, y1: -25, x2: 250, y2: -25, textX: 175, textY: -55, dimX: 175, dimY: -50, label: '150.000' }),
+    alignedDimension({ handle: 'S3', x1: 250, y1: -20, x2: 400, y2: -20, textX: 325, textY: -55, dimX: 325, dimY: -50, label: '150.000' }),
+    alignedDimension({ handle: 'S4', x1: 0, y1: -30, x2: 0, y2: 30, textX: -35, textY: 0, dimX: -30, dimY: 0, label: '%%c60.000' }),
+    alignedDimension({ handle: 'S5', x1: 100, y1: -25, x2: 100, y2: 25, textX: 65, textY: 0, dimX: 70, dimY: 0, label: '%%c50.000' }),
+    alignedDimension({ handle: 'S6', x1: 0, y1: -30, x2: 400, y2: -30, textX: 200, textY: -90, dimX: 200, dimY: -85, label: 'TOTAL 400.000' }),
+    pair(0, 'ENDSEC'), pair(0, 'EOF'),
+  ].join('');
+}
+
 test('extrai as quatro cotas nativas do MLightCAD/DXF para o JSON do PDF', () => {
   const parsed = parseDxfDimensions(sampleDxf());
   assert.equal(parsed.ok, true);
@@ -49,6 +76,31 @@ test('extrai as quatro cotas nativas do MLightCAD/DXF para o JSON do PDF', () =>
     '200.000',
     '20.000',
     '400.000',
+  ]);
+  assert.ok(parsed.dimensions.every((dimension) => dimension.layer === 'cotas'));
+});
+
+test('preserva cotas de fabricação de flange, incluindo diâmetro, PCD e furos', () => {
+  const parsed = parseDxfDimensions(flangeDxf());
+  assert.equal(parsed.ok, true);
+  assert.deepEqual(parsed.dimensions.map((dimension) => dimension.geometry.label), [
+    'Ø400.000',
+    'PCD Ø300.000',
+    '8x Ø20.000',
+  ]);
+  assert.ok(parsed.dimensions.every((dimension) => dimension.layer === 'cotas'));
+});
+
+test('preserva cotas de fabricação de eixo escalonado, comprimentos, diâmetros e total', () => {
+  const parsed = parseDxfDimensions(shaftDxf());
+  assert.equal(parsed.ok, true);
+  assert.deepEqual(parsed.dimensions.map((dimension) => dimension.geometry.label), [
+    '100.000',
+    '150.000',
+    '150.000',
+    'Ø60.000',
+    'Ø50.000',
+    'TOTAL 400.000',
   ]);
   assert.ok(parsed.dimensions.every((dimension) => dimension.layer === 'cotas'));
 });
