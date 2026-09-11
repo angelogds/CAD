@@ -1,0 +1,22 @@
+<header class="rh-head rh-head-compact">
+  <div>
+    <span class="rh-eyebrow">GESTÃO DE PESSOAS • CAMPO DO GADO</span>
+    <h1><%= title %></h1>
+    <p class="rh-muted">Central integrada de colaboradores, jornada, folgas, exames, documentos e treinamentos.</p>
+  </div>
+  <div class="rh-head-actions">
+    <a class="btn btn-ghost" href="/escala/relatorios">Relatórios da Escala</a>
+  </div>
+</header>
+
+<nav class="card rh-nav rh-route-nav" aria-label="Áreas do RH">
+  <a class="rh-nav-link <%= activeRhSection === 'dashboard' ? 'is-active' : '' %>" href="/rh">Visão geral</a>
+  <a class="rh-nav-link <%= activeRhSection === 'colaboradores' ? 'is-active' : '' %>" href="/rh/colaboradores">Colaboradores</a>
+  <a class="rh-nav-link <%= activeRhSection === 'jornada' ? 'is-active' : '' %>" href="/rh/jornada">Jornada</a>
+  <% if (dashboard?.canManage) { %>
+    <a class="rh-nav-link <%= activeRhSection === 'folgas' ? 'is-active' : '' %>" href="/rh/folgas">Folgas</a>
+    <a class="rh-nav-link <%= activeRhSection === 'exames' ? 'is-active' : '' %>" href="/rh/exames">Exames</a>
+    <a class="rh-nav-link <%= activeRhSection === 'documentos' ? 'is-active' : '' %>" href="/rh/documentos">Documentos</a>
+    <a class="rh-nav-link <%= activeRhSection === 'treinamentos' ? 'is-active' : '' %>" href="/rh/treinamentos">Treinamentos</a>
+  <% } %>
+</nav>

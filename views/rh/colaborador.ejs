@@ -1,0 +1,43 @@
+<%- layout('layout') -%>
+<link rel="stylesheet" href="/css/rh-portal.css?v=20260910-rh-modular" />
+<%
+  const d = dashboard || {};
+  const person = selected?.colaborador || {};
+  const exames = Array.isArray(selected?.exames) ? selected.exames : [];
+  const docs = Array.isArray(selected?.documentos) ? selected.documentos : [];
+  const certs = Array.isArray(selected?.certificados) ? selected.certificados : [];
+  const folgas = Array.isArray(selected?.solicitacoes) ? selected.solicitacoes : [];
+%>
+<div class="rh-page">
+  <%- include('_header', { title, dashboard: d, activeRhSection }) %>
+
+  <section class="card rh-profile-head">
+    <div class="rh-profile-main">
+      <% if (person.foto_path || person.foto_url) { %><img class="rh-profile-avatar" src="<%= person.foto_path || person.foto_url %>" alt=""><% } else { %><span class="rh-profile-avatar rh-avatar-empty"></span><% } %>
+      <div><span class="rh-eyebrow">FICHA CONSOLIDADA</span><h2><%= person.nome || '-' %></h2><p class="rh-muted"><%= person.funcao || '-' %> • <%= person.setor || '-' %> • <%= person.status || 'ATIVO' %></p></div>
+    </div>
+    <div class="rh-head-actions"><a class="btn btn-ghost" href="/colaboradores/<%= person.id %>">Cadastro mestre</a><a class="btn btn-ghost" href="/rh/colaboradores">Voltar</a></div>
+  </section>
+
+  <section class="rh-kpis rh-kpis-compact">
+    <article class="card rh-kpi"><span>Turno</span><strong><%= selected?.painelPessoa?.turnoAtual || '-' %></strong><small><%= selected?.painelPessoa?.statusAtual || 'Sem situação' %></small></article>
+    <article class="card rh-kpi"><span>Banco de horas</span><strong><%= selected?.saldo?.horas || formatMinutes(selected?.saldo?.minutos || 0) %></strong><small>Saldo atual</small></article>
+    <article class="card rh-kpi"><span>HE no mês</span><strong><%= selected?.painelPessoa?.horasExtrasMes || formatMinutes(selected?.painelPessoa?.horasExtrasMesMinutos || 0) %></strong><small>Fonte: Escala</small></article>
+    <article class="card rh-kpi"><span>Exames</span><strong><%= exames.length %></strong><small>Registros ocupacionais</small></article>
+    <article class="card rh-kpi"><span>Documentos</span><strong><%= docs.length %></strong><small>Arquivo individual</small></article>
+    <article class="card rh-kpi"><span>Treinamentos</span><strong><%= certs.length %></strong><small>Cursos e certificados</small></article>
+  </section>
+
+  <section class="rh-module-grid rh-module-grid-small">
+    <a class="card rh-module-card" href="/rh/jornada"><span class="rh-module-icon">⏱</span><div><strong>Jornada</strong><small>Consultar turno, HE e banco.</small></div><span>→</span></a>
+    <a class="card rh-module-card" href="/rh/folgas"><span class="rh-module-icon">📅</span><div><strong>Folgas</strong><small><%= folgas.length %> solicitação(ões) na ficha.</small></div><span>→</span></a>
+    <a class="card rh-module-card" href="/rh/exames?colaborador=<%= person.id %>"><span class="rh-module-icon">🩺</span><div><strong>Exames</strong><small>Consultar ou registrar ASO.</small></div><span>→</span></a>
+    <a class="card rh-module-card" href="/rh/documentos?colaborador=<%= person.id %>"><span class="rh-module-icon">📄</span><div><strong>Documentos</strong><small>Abrir arquivo individual.</small></div><span>→</span></a>
+    <a class="card rh-module-card" href="/rh/treinamentos?colaborador=<%= person.id %>"><span class="rh-module-icon">🎓</span><div><strong>Treinamentos</strong><small>NRs e certificados.</small></div><span>→</span></a>
+  </section>
+
+  <section class="rh-two-column">
+    <article class="card rh-section"><div class="rh-section-head"><div><span class="rh-eyebrow">ÚLTIMOS EXAMES</span><h2>Saúde ocupacional</h2></div></div><div class="rh-records"><% exames.slice(0,5).forEach((e) => { %><div class="rh-record"><div class="rh-record-head"><strong><%= String(e.tipo || 'EXAME').replaceAll('_',' ') %></strong><span class="rh-badge <%= e.status_visual === 'VENCIDO' ? 'is-danger' : (e.status_visual === 'VENCE_EM_BREVE' ? 'is-warning' : '') %>"><%= e.status_label || e.status_visual || '-' %></span></div><small>Validade: <%= e.validade_ate ? dateBr.formatDateBR(String(e.validade_ate).slice(0,10)) : '-' %></small></div><% }) %><% if (!exames.length) { %><div class="rh-empty">Sem exames registrados.</div><% } %></div></article>
+    <article class="card rh-section"><div class="rh-section-head"><div><span class="rh-eyebrow">TREINAMENTOS</span><h2>Capacitação</h2></div></div><div class="rh-records"><% certs.slice(0,5).forEach((c) => { %><div class="rh-record"><strong><%= c.titulo || 'Certificado' %></strong><small><%= c.instituicao || '-' %> • validade <%= c.validade ? dateBr.formatDateBR(String(c.validade).slice(0,10)) : 'não informada' %></small></div><% }) %><% if (!certs.length) { %><div class="rh-empty">Sem treinamentos/certificados registrados.</div><% } %></div></article>
+  </section>
+</div>

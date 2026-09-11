@@ -16,27 +16,136 @@ function formatMinutes(value) {
   return `${sign}${Math.floor(total / 60)}h${String(total % 60).padStart(2, '0')}`;
 }
 
-exports.index = (req, res, next) => {
+function loadDashboard(req) {
+  let dashboard = people.enrichDashboard(service.buildDashboard(currentUser(req)), currentUser(req));
+  // DIRETORIA recebe indicadores e visão operacional agregada, mas não a lista
+  // nominal de pendências pessoais/sensíveis. Detalhes continuam exclusivos a RH/ADMIN.
+  if (!dashboard.canManage) dashboard = { ...dashboard, pendencias: [] };
+  return dashboard;
+}
+
+function loadSelected(req, colaboradorId) {
+  const id = Number(colaboradorId || 0);
+  if (!id) return null;
+  let selected = service.getCollaboratorDetail(id, currentUser(req));
+  if (selected?.colaborador?.id) {
+    selected = {
+      ...selected,
+      documentos: rhDocuments.listForCollaborator(selected.colaborador.id, { self: false }),
+    };
+  }
+  return selected;
+}
+
+function renderArea(req, res, next, view, title, extra = {}) {
   try {
     res.locals.activeMenu = 'rh';
-    let dashboard = people.enrichDashboard(service.buildDashboard(currentUser(req)), currentUser(req));
-    // DIRETORIA recebe indicadores e visão operacional agregada, mas não a lista
-    // nominal de pendências pessoais/sensíveis. Detalhes continuam exclusivos a RH/ADMIN.
-    if (!dashboard.canManage) dashboard = { ...dashboard, pendencias: [] };
-    const requestedId = Number(req.query.colaborador || 0);
-    let selected = requestedId && dashboard.canManage
-      ? service.getCollaboratorDetail(requestedId, currentUser(req))
-      : null;
-    if (selected?.colaborador?.id) {
-      selected = {
-        ...selected,
-        documentos: rhDocuments.listForCollaborator(selected.colaborador.id, { self: false }),
-      };
-    }
-    return res.render('rh/index', {
-      title: 'RH • Gestão de Pessoas',
+    const dashboard = loadDashboard(req);
+    return res.render(view, {
+      title,
+      dashboard,
+      dateBr,
+      formatMinutes,
+      ...extra,
+    });
+  } catch (error) { return next(error); }
+}
+
+exports.index = (req, res, next) => renderArea(
+  req,
+  res,
+  next,
+  'rh/index',
+  'RH • Gestão de Pessoas',
+  { activeRhSection: 'dashboard' }
+);
+
+exports.colaboradores = (req, res, next) => renderArea(
+  req,
+  res,
+  next,
+  'rh/colaboradores',
+  'RH • Colaboradores',
+  { activeRhSection: 'colaboradores' }
+);
+
+exports.jornada = (req, res, next) => renderArea(
+  req,
+  res,
+  next,
+  'rh/jornada',
+  'RH • Jornada e Banco de Horas',
+  { activeRhSection: 'jornada' }
+);
+
+exports.colaborador = (req, res, next) => {
+  try {
+    const dashboard = loadDashboard(req);
+    const selected = loadSelected(req, req.params.id);
+    if (!selected?.colaborador) return res.status(404).send('Colaborador não encontrado.');
+    res.locals.activeMenu = 'rh';
+    return res.render('rh/colaborador', {
+      title: `RH • ${selected.colaborador.nome || 'Colaborador'}`,
       dashboard,
       selected,
+      activeRhSection: 'colaboradores',
+      dateBr,
+      formatMinutes,
+    });
+  } catch (error) { return next(error); }
+};
+
+exports.folgas = (req, res, next) => renderArea(
+  req,
+  res,
+  next,
+  'rh/folgas',
+  'RH • Folgas e Solicitações',
+  { activeRhSection: 'folgas' }
+);
+
+exports.exames = (req, res, next) => {
+  try {
+    const dashboard = loadDashboard(req);
+    const selected = loadSelected(req, req.query.colaborador);
+    res.locals.activeMenu = 'rh';
+    return res.render('rh/exames', {
+      title: 'RH • Exames Ocupacionais',
+      dashboard,
+      selected,
+      activeRhSection: 'exames',
+      dateBr,
+      formatMinutes,
+    });
+  } catch (error) { return next(error); }
+};
+
+exports.documentos = (req, res, next) => {
+  try {
+    const dashboard = loadDashboard(req);
+    const selected = loadSelected(req, req.query.colaborador);
+    res.locals.activeMenu = 'rh';
+    return res.render('rh/documentos', {
+      title: 'RH • Documentos',
+      dashboard,
+      selected,
+      activeRhSection: 'documentos',
+      dateBr,
+      formatMinutes,
+    });
+  } catch (error) { return next(error); }
+};
+
+exports.treinamentos = (req, res, next) => {
+  try {
+    const dashboard = loadDashboard(req);
+    const selected = loadSelected(req, req.query.colaborador);
+    res.locals.activeMenu = 'rh';
+    return res.render('rh/treinamentos', {
+      title: 'RH • Treinamentos e Certificados',
+      dashboard,
+      selected,
+      activeRhSection: 'treinamentos',
       dateBr,
       formatMinutes,
     });
@@ -54,7 +163,7 @@ exports.criarExame = (req, res) => {
     }
     flash(req, 'error', error.message || 'Não foi possível registrar o exame.');
   }
-  return res.redirect(`/escala/rh?colaborador=${colaboradorId}#exames`);
+  return res.redirect(`/rh/exames?colaborador=${colaboradorId}`);
 };
 
 exports.criarDocumento = (req, res) => {
@@ -72,7 +181,7 @@ exports.criarDocumento = (req, res) => {
     }
     flash(req, 'error', error.message || 'Não foi possível anexar o documento.');
   }
-  return res.redirect(`/escala/rh?colaborador=${colaboradorId}#documentos`);
+  return res.redirect(`/rh/documentos?colaborador=${colaboradorId}`);
 };
 
 exports.exameArquivo = (req, res, next) => {

@@ -66,7 +66,7 @@ function uploadSeguro(upload, area) {
       ? `O anexo do ${label} deve ter no máximo 10 MB.`
       : (err.message || `Não foi possível processar o anexo do ${label}.`);
     req.flash?.('error', message);
-    return res.redirect(`/escala/rh?colaborador=${Number(req.params.id || 0)}#${area}`);
+    return res.redirect(`/rh/${area}?colaborador=${Number(req.params.id || 0)}`);
   });
 }
 

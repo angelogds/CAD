@@ -8,12 +8,14 @@ const OFFICIAL_ROUTES = Object.freeze({
   almoxarifado: '/almoxarifado',
   estoque: '/estoque',
   pcm: '/pcm',
+  rh: '/rh',
 });
 
 const COMPATIBILITY_ALIASES = Object.freeze([
   { from: '/ordens-servico', to: OFFICIAL_ROUTES.os },
-  // Fase 3: entrada curta do módulo RH preservando a rota histórica da Escala.
-  { from: '/rh', to: '/escala/rh' },
+  // A central dedicada de RH passa a ser canônica; links históricos da Escala
+  // continuam válidos e são encaminhados para a nova estrutura.
+  { from: '/escala/rh', to: OFFICIAL_ROUTES.rh },
 ]);
 
 function buildRedirectTarget(req, aliasFrom, aliasTo) {

@@ -44,7 +44,7 @@ test('upload de exame limita tamanho e tipos e trata erro sem derrubar a página
   assert.match(routes, /image\/webp/);
   assert.match(routes, /function uploadExameSeguro/);
   assert.match(routes, /LIMIT_FILE_SIZE/);
-  assert.match(routes, /res\.redirect\(`\/escala\/rh\?colaborador=/);
+  assert.match(routes, /res\.redirect\(`\/rh\/\$\{area\}\?colaborador=/);
 });
 
 test('central RH reutiliza ficha mestre, Escala, Banco de Horas, folgas e certificados', () => {
@@ -93,7 +93,7 @@ test('interface ativa RH no Meu Portal e cria acesso dedicado no menu lateral', 
   assert.match(portal, /href="\/meu-portal\/rh"/);
   assert.match(portal, /RH[\s\S]*DISPONÍVEL • Abrir/);
   assert.match(sidebar, /const canRH = can\('rh_view'\)/);
-  assert.match(sidebar, /navItem\('\/escala\/rh', 'RH', activeMenu === 'rh'\)/);
+  assert.match(sidebar, /navItem\('\/rh', 'RH', activeMenu === 'rh'\)/);
   assert.match(rhView, /Pendências do RH/);
   assert.match(rhView, /Exames ocupacionais/);
   assert.match(rhView, /Documentos/);
