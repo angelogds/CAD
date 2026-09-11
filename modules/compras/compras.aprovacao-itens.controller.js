@@ -1,4 +1,5 @@
 const itemApprovalService = require('./compras.aprovacao-itens.service');
+const releasedDashboardService = require('./compras.liberados-dashboard.service');
 
 function statusJson(req, res) {
   try {
@@ -22,4 +23,20 @@ function statusJson(req, res) {
   }
 }
 
-module.exports = { statusJson };
+function liberadosDashboardJson(_req, res) {
+  try {
+    const summary = releasedDashboardService.listDashboardStatus();
+    return res.json({
+      ok: true,
+      rows: summary.rows,
+      total_solicitacoes_liberadas: summary.totalSolicitacoesLiberadas,
+      total_itens_liberados: summary.totalItensLiberados,
+      total_itens_aguardando: summary.totalItensAguardando,
+    });
+  } catch (error) {
+    console.error('[compras.aprovacao-itens.liberadosDashboardJson]', error);
+    return res.status(500).json({ ok: false, rows: [], error: error.message || 'Não foi possível consultar os itens liberados para compra.' });
+  }
+}
+
+module.exports = { statusJson, liberadosDashboardJson };
