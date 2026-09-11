@@ -1,5 +1,6 @@
 try {
   await import('./cad-mlight-runtime.js');
+  await import('./cad-dimension-persistence-runtime.js');
   await import('./cad-round3-runtime.js');
   await import('./cad-round4-runtime.js');
   await import('./cad-ui-stabilization.js');
