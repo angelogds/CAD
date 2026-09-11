@@ -93,20 +93,58 @@
   font-size:11px!important;
 }
 
+.purchase-consensus-notice-panel{
+  margin-bottom:14px;
+  border:1px solid #ead6a1!important;
+  border-left:4px solid #e1a51a!important;
+  background:#fffdf6!important;
+}
+.purchase-consensus-notice-head{
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  align-items:flex-start;
+  margin-bottom:10px;
+}
+.purchase-consensus-notice-head>div{display:grid;gap:3px}
+.purchase-consensus-notice-head h2{margin:2px 0;color:#302817;font-size:17px}
+.purchase-consensus-notice-head p{margin:0;color:#736542;font-size:12px;line-height:1.4}
+.purchase-consensus-notice-list{display:grid;gap:7px}
+.purchase-consensus-notice-list>a{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  padding:9px 11px;
+  border:1px solid #eadfbf;
+  border-radius:9px;
+  background:#fff;
+  text-decoration:none;
+  color:#223044;
+}
+.purchase-consensus-notice-list>a:hover{border-color:#d4b757;background:#fffaf0}
+.purchase-consensus-notice-list>a span{display:grid;gap:2px;min-width:0}
+.purchase-consensus-notice-list>a strong{overflow-wrap:anywhere}
+.purchase-consensus-notice-list>a small{color:#736b5b;font-size:10px;line-height:1.35}
+.purchase-consensus-notice-list>a b{color:#16743c;font-size:11px;white-space:nowrap}
+.purchase-consensus-notification{border-left:3px solid #e1a51a!important}
+
 @media(max-width:1100px){
   .purchase-change-row{grid-template-columns:1.2fr .6fr .6fr 1.2fr}
   .purchase-change-actions{grid-column:1/-1}
 }
 @media(max-width:720px){
-  .purchase-change-head{display:grid}
+  .purchase-change-head,.purchase-consensus-notice-head{display:grid}
   .purchase-change-count{justify-self:start}
   .purchase-change-row{grid-template-columns:1fr 1fr}
   .purchase-change-item,.purchase-change-info.is-reason,.purchase-change-actions{grid-column:1/-1}
   .purchase-quantity-grid{grid-template-columns:1fr}
   .purchase-change-buttons{display:grid;grid-template-columns:1fr 1fr}
+  .purchase-consensus-notice-list>a{align-items:flex-start}
 }
 @media(max-width:460px){
   .purchase-change-row{grid-template-columns:1fr}
   .purchase-change-item,.purchase-change-info,.purchase-change-info.is-reason,.purchase-change-actions{grid-column:auto}
   .purchase-change-buttons{grid-template-columns:1fr}
+  .purchase-consensus-notice-list>a{display:grid}
 }
