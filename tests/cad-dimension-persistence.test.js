@@ -12,11 +12,11 @@ function pair(code, value) {
   return `${code}\n${value}\n`;
 }
 
-function alignedDimension({ handle, x1, y1, x2, y2, textX, textY, dimX, dimY, label = '' }) {
+function alignedDimension({ handle, x1, y1, x2, y2, textX, textY, dimX, dimY, label = '', layer = 'cotas' }) {
   return [
     pair(0, 'DIMENSION'),
     pair(5, handle),
-    pair(8, 'cotas'),
+    pair(8, layer),
     pair(2, `*D${handle}`),
     pair(70, 33),
     label ? pair(1, label) : '',
@@ -37,6 +37,21 @@ function sampleDxf() {
     alignedDimension({ handle: 'A2', x1: 0, y1: 0, x2: 200, y2: 0, textX: 100, textY: 25, dimX: 100, dimY: 20 }),
     alignedDimension({ handle: 'A3', x1: 280, y1: 200, x2: 300, y2: 200, textX: 290, textY: 230, dimX: 290, dimY: 225 }),
     alignedDimension({ handle: 'A4', x1: 300, y1: -200, x2: 300, y2: 200, textX: 340, textY: 0, dimX: 335, dimY: 0 }),
+    pair(0, 'ENDSEC'), pair(0, 'EOF'),
+  ].join('');
+}
+
+function styledDimensionDxf() {
+  return [
+    pair(0, 'SECTION'), pair(2, 'TABLES'),
+    pair(0, 'TABLE'), pair(2, 'LAYER'), pair(70, 1),
+    pair(0, 'LAYER'), pair(2, 'FAB_COTAS'), pair(70, 0),
+    pair(420, 689407), // #0a84ff
+    pair(6, 'DASHDOT'),
+    pair(370, 35),
+    pair(0, 'ENDTAB'), pair(0, 'ENDSEC'),
+    pair(0, 'SECTION'), pair(2, 'ENTITIES'),
+    alignedDimension({ handle: 'C1', layer: 'FAB_COTAS', x1: -200, y1: 0, x2: 200, y2: 0, textX: 0, textY: 255, dimX: 0, dimY: 240, label: '%%c400.000' }),
     pair(0, 'ENDSEC'), pair(0, 'EOF'),
   ].join('');
 }
@@ -78,6 +93,54 @@ test('extrai as quatro cotas nativas do MLightCAD/DXF para o JSON do PDF', () =>
     '400.000',
   ]);
   assert.ok(parsed.dimensions.every((dimension) => dimension.layer === 'cotas'));
+});
+
+test('preserva posição real da linha e do texto de cada cota sem empilhar no PDF', () => {
+  const parsed = parseDxfDimensions(sampleDxf());
+  assert.deepEqual(parsed.dimensions.map((dimension) => dimension.geometry.dimensionLinePoint), [
+    { x: 0, y: 240 },
+    { x: 100, y: 20 },
+    { x: 290, y: 225 },
+    { x: 335, y: 0 },
+  ]);
+  assert.deepEqual(parsed.dimensions.map((dimension) => dimension.geometry.textPoint), [
+    { x: 0, y: 245 },
+    { x: 100, y: 25 },
+    { x: 290, y: 230 },
+    { x: 340, y: 0 },
+  ]);
+});
+
+test('preserva cor, traço-ponto e espessura configurados no layer de cotas', () => {
+  const parsed = parseDxfDimensions(styledDimensionDxf());
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.dimensions.length, 1);
+  assert.deepEqual(parsed.dimensions[0].style, {
+    color: '#0a84ff',
+    lineType: 'DASHDOT',
+    lineWeight: 35,
+    lineTypeScale: 1,
+  });
+});
+
+test('usa estilo de cotas salvo no editor como fallback quando o DXF não declara estilo', () => {
+  const payload = {
+    manufacturing: {
+      styleSettings: {
+        dimension: { color: '#ff3b30', lineType: 'DASHED', lineWeight: 18, lineTypeScale: 1.5 },
+      },
+    },
+    history: [{ kind: 'mlightcad-document', dxfBase64: encodeBase64(sampleDxf()), stats: {} }],
+    dimensions: [],
+  };
+  const result = recoverDimensions(payload, { dimensions: [] });
+  assert.equal(result.recovered, true);
+  assert.deepEqual(result.dimensions[0].style, {
+    color: '#ff3b30',
+    lineType: 'DASHED',
+    lineWeight: 18,
+    lineTypeScale: 1.5,
+  });
 });
 
 test('preserva cotas de fabricação de flange, incluindo diâmetro, PCD e furos', () => {
