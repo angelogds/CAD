@@ -45,6 +45,35 @@ test('dashboard do RH não concentra formulários de exames e documentos', () =>
   assert.match(documentos, /action="\/colaboradores\/<%= person\.id %>\/rh-documentos"/);
 });
 
+test('dashboard prioriza acesso rápido, alertas visuais e próximos vencimentos', () => {
+  const dashboard = read('views/rh/index.ejs');
+  assert.match(dashboard, /Abrir ficha do colaborador/);
+  assert.match(dashboard, /id="rhQuickPerson"/);
+  assert.match(dashboard, /window\.location\.href = `\/rh\/colaboradores\/\$\{id\}`/);
+  assert.match(dashboard, /Próximos vencimentos/);
+  assert.match(dashboard, /VENCE_EM_BREVE/);
+  assert.match(dashboard, /rh-pending-ok/);
+  assert.match(dashboard, /is-warning/);
+  assert.match(dashboard, /is-danger/);
+});
+
+test('relatórios da Escala ficam contextualizados em Jornada e não no cabeçalho global', () => {
+  const header = read('views/rh/_header.ejs');
+  const jornada = read('views/rh/jornada.ejs');
+  assert.doesNotMatch(header, /\/escala\/relatorios/);
+  assert.match(jornada, /href="\/escala\/relatorios"/);
+});
+
+test('layout do RH mantém navegação e ações utilizáveis no celular', () => {
+  const css = read('public/css/rh-portal.css');
+  assert.match(css, /@media\(max-width:760px\)/);
+  assert.match(css, /\.rh-kpis\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(css, /scroll-snap-type:x proximity/);
+  assert.match(css, /-webkit-overflow-scrolling:touch/);
+  assert.match(css, /\.rh-toolbar \.btn,\.rh-quick-form \.btn,\.rh-form-actions \.btn\{width:100%/);
+  assert.match(css, /\.rh-table\{min-width:640px\}/);
+});
+
 test('entrada histórica da Escala redireciona para RH sem duplicar implementação', () => {
   const escalaRoutes = read('modules/escala/escala.routes.js');
   const compat = read('modules/escala/escala.rh.controller.js');
