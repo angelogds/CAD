@@ -1,6 +1,7 @@
 const comprasService = require('./compras.service');
 const flowService = require('./compras.itens-consenso.service');
 const approvalService = require('./compras.aprovacao.service');
+const consensusNotificationService = require('./compras.consenso-notificacoes.service');
 const bilateralService = require('../solicitacoes/solicitacoes.itens-bilateral.service');
 
 function getSolicitacaoBase(id) {
@@ -34,6 +35,16 @@ function detalhe(req, res) {
     console.error('[compras.itens-consenso.detalhe]', error);
     req.flash('error', error.message || 'Não foi possível abrir a solicitação de Compras.');
     return res.redirect('/compras/solicitacoes');
+  }
+}
+
+function notificacoesConsensoJson(req, res) {
+  try {
+    const rows = consensusNotificationService.listPendingForPurchasing(req.session.user, 20);
+    return res.json({ ok: true, total: rows.length, rows });
+  } catch (error) {
+    console.error('[compras.notificacoesConsensoJson]', error);
+    return res.status(500).json({ ok: false, total: 0, rows: [] });
   }
 }
 
@@ -185,6 +196,7 @@ function adicionarItem(req, res) {
 
 module.exports = {
   detalhe,
+  notificacoesConsensoJson,
   consensoItensJson,
   solicitarAlteracao,
   aprovarAlteracao,
