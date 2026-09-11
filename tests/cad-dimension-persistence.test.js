@@ -80,6 +80,22 @@ test('extrai as quatro cotas nativas do MLightCAD/DXF para o JSON do PDF', () =>
   assert.ok(parsed.dimensions.every((dimension) => dimension.layer === 'cotas'));
 });
 
+test('usa a medição DXF em cotas rotacionadas cujas origens não estão alinhadas', () => {
+  const dxf = [
+    pair(0, 'SECTION'), pair(2, 'ENTITIES'),
+    pair(0, 'DIMENSION'), pair(5, 'R1'), pair(8, 'cotas'), pair(70, 32),
+    pair(10, 0), pair(20, 25), pair(11, 50), pair(21, 30),
+    pair(13, 0), pair(23, 0), pair(14, 100), pair(24, 100),
+    pair(42, 100), pair(50, 0),
+    pair(0, 'ENDSEC'), pair(0, 'EOF'),
+  ].join('');
+
+  const parsed = parseDxfDimensions(dxf);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.dimensions.length, 1);
+  assert.equal(parsed.dimensions[0].geometry.label, '100.000');
+});
+
 test('preserva cotas de fabricação de flange, incluindo diâmetro, PCD e furos', () => {
   const parsed = parseDxfDimensions(flangeDxf());
   assert.equal(parsed.ok, true);

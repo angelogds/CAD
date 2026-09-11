@@ -111,6 +111,11 @@
     return number == null ? '' : number.toFixed(decimals);
   }
 
+  function measuredValue(record, fallback) {
+    const measurement = numberOrNull(first(record, 42));
+    return measurement == null ? fallback : measurement;
+  }
+
   function explicitLabel(record) {
     const text = String(first(record, 1) || '').trim();
     if (!text || text === '<>') return '';
@@ -137,7 +142,10 @@
       p1,
       p2,
       textPoint: point(record, 11) || point(record, 10) || midpoint(p1, p2),
-      label: explicitLabel(record) || formatted(distance(p1, p2)),
+      // Group code 42 is the actual dimension measurement. In a rotated
+      // dimension, the extension-line origins are not necessarily aligned
+      // with the dimension axis, so their Euclidean distance can be wrong.
+      label: explicitLabel(record) || formatted(measuredValue(record, distance(p1, p2))),
     });
   }
 
@@ -151,7 +159,7 @@
       p1,
       p2,
       textPoint: point(record, 11) || midpoint(p1, p2),
-      label: explicitLabel(record) || `${prefix}${formatted(distance(p1, p2))}`,
+      label: explicitLabel(record) || `${prefix}${formatted(measuredValue(record, distance(p1, p2)))}`,
     });
   }
 
