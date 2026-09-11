@@ -83,6 +83,7 @@ test('serializer corrigido não zera mais dimensions antes de gerar o PDF', () =
   };
 
   assert.equal(patchSerializer(app), true);
+  assert.equal(patchSerializer(app), true, 'o patch deve ser idempotente quando o PDF força novo salvamento');
   const result = app.serializeForSave({ dimensions: [] });
   assert.equal(result.dimensions.length, 4);
   assert.equal(result.history[0].stats.nativeDimensions, 4);
