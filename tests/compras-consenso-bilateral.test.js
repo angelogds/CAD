@@ -9,7 +9,7 @@ const controller = fs.readFileSync(path.join(root, 'modules/compras/compras.iten
 const guard = fs.readFileSync(path.join(root, 'modules/compras/compras.consenso.middleware.js'), 'utf8');
 const notifications = fs.readFileSync(path.join(root, 'modules/compras/compras.consenso-notificacoes.service.js'), 'utf8');
 const bilateral = fs.readFileSync(path.join(root, 'modules/solicitacoes/solicitacoes.itens-bilateral.service.js'), 'utf8');
-const loader = fs.readFileSync(path.join(root, 'public/js/compras-demandas-pre-cotacao.js'), 'utf8');
+const layout = fs.readFileSync(path.join(root, 'views/layout.ejs'), 'utf8');
 const ui = fs.readFileSync(path.join(root, 'public/js/compras-consenso-bilateral.js'), 'utf8');
 
 test('Compras recebe e responde alterações criadas pelo solicitante', () => {
@@ -38,8 +38,9 @@ test('compra fica bloqueada no backend enquanto a quantidade aguarda consenso', 
   assert.match(guard, /Compra bloqueada: existe alteração de quantidade aguardando consenso/);
 });
 
-test('interface de Compras exibe notificação, decisão e ajuste de quantidade', () => {
-  assert.match(loader, /compras-consenso-bilateral\.js/);
+test('interface de Compras exibe notificação global, decisão e ajuste de quantidade', () => {
+  assert.match(layout, /\['ADMIN','COMPRAS'\]/);
+  assert.match(layout, /compras-consenso-bilateral\.js/);
   assert.match(ui, /Alterações aguardando confirmação/);
   assert.match(ui, /Aprovar alteração/);
   assert.match(ui, /Ajustar qtd\./);
