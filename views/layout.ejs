@@ -124,6 +124,7 @@
     <script src="/js/app-layout.js" defer></script>
     <script src="/js/push.js" defer></script>
     <script src="/js/mobile-bridge.js" defer></script>
+    <% if (user && ['ADMIN','COMPRAS'].includes(normalizeRole(user.role || user.perfil || ''))) { %><script src="/js/compras-consenso-bilateral.js?v=20260911-2" data-compras-consenso-bilateral defer></script><% } %>
     <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><script src="/js/compras-demandas-pre-cotacao.js?v=20260902-v1" defer></script><% } %>
   <% } %>
 </body>
