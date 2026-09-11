@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
 const storagePaths = require('../../config/storage');
+const imageService = require('./desenho-tecnico.image.service');
 
 const PDF_DIR = path.join(storagePaths.PDF_DIR, 'desenho-tecnico');
 if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
@@ -125,7 +126,7 @@ function drawDrawingArea(doc, area, desenho, svgMarkup, options) {
   const cadData = options.cadData || desenho.cad_data;
   if (cadData && Array.isArray(cadData.objects)) {
     const content = collectCadContent(cadData);
-    renderCadObjectsToPdf(doc, content.objects, content.dimensions, area, cadData.layers || {});
+    renderCadObjectsToPdf(doc, content.objects, content.dimensions, area, cadData.layers || {}, desenho.id);
   } else {
     // Fallback: mostrar informação textual
     doc.fontSize(11)
@@ -181,7 +182,7 @@ function collectCadContent(cadData = {}) {
   };
 }
 
-function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}) {
+function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}, drawingId = null) {
   const visibleObjects = objects.filter((object) => isEntityVisible(object, layers));
   const visibleDimensions = dimensions.filter((dimension) => isEntityVisible(dimension, layers, 'cotas'));
 
@@ -295,6 +296,41 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}) {
           if (index === 0) doc.moveTo(x, y); else doc.lineTo(x, y);
         }
         doc.lineWidth(1).stroke(color);
+        break;
+      }
+
+      case 'image': {
+        const assetId = obj.assetId || obj.metadata?.assetId || imageService.extractAssetId(obj.source, drawingId);
+        let stored = null;
+        try { if (assetId && drawingId) stored = imageService.resolveImage(drawingId, assetId); } catch (_error) { stored = null; }
+        const x = Number(obj.x || 0) * scale + offsetX;
+        const y = Number(obj.y || 0) * scale + offsetY;
+        const width = Math.max(1, Math.abs(Number(obj.width || 0) * scale));
+        const height = Math.max(1, Math.abs(Number(obj.height || 0) * scale));
+        const rotation = Number(obj.rotation || 0) * 180 / Math.PI;
+        if (!stored) {
+          doc.save()
+            .rect(x, y, width, height)
+            .lineWidth(0.6)
+            .dash(4, { space: 3 })
+            .stroke('#94a3b8')
+            .undash()
+            .fontSize(7)
+            .fillColor('#64748b')
+            .text('Imagem indisponível', x + 4, y + 4, { width: Math.max(20, width - 8) })
+            .restore();
+          break;
+        }
+        const opacity = Math.max(0.05, Math.min(1, Number(obj.style?.opacity ?? (1 - Number(obj.fade || 0) / 100))));
+        doc.save();
+        if (Math.abs(rotation) > 0.0001) doc.rotate(rotation, { origin: [x, y] });
+        doc.image(stored.absolutePath, x, y, {
+          fit: [width, height],
+          align: 'center',
+          valign: 'center',
+          opacity,
+        });
+        doc.restore();
         break;
       }
       
@@ -555,6 +591,26 @@ function getObjectBounds(obj) {
       maxX = geometry.cx + geometry.radius;
       minY = geometry.cy - geometry.radius;
       maxY = geometry.cy + geometry.radius;
+      break;
+    }
+    case 'image': {
+      const x = Number(obj.x || 0);
+      const y = Number(obj.y || 0);
+      const width = Math.abs(Number(obj.width || 0));
+      const height = Math.abs(Number(obj.height || 0));
+      const rotation = Number(obj.rotation || 0);
+      const cos = Math.cos(rotation);
+      const sin = Math.sin(rotation);
+      const points = [
+        { x, y },
+        { x: x + width * cos, y: y + width * sin },
+        { x: x - height * sin, y: y + height * cos },
+        { x: x + width * cos - height * sin, y: y + width * sin + height * cos },
+      ];
+      minX = Math.min(...points.map((point) => point.x));
+      maxX = Math.max(...points.map((point) => point.x));
+      minY = Math.min(...points.map((point) => point.y));
+      maxY = Math.max(...points.map((point) => point.y));
       break;
     }
     case 'shaft':

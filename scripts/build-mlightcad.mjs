@@ -27,7 +27,8 @@ try {
           'mlightcad-library-gdt': path.join(root, 'frontend/mlightcad-library-gdt.entry.js'),
           'mlightcad-styles': path.join(root, 'frontend/mlightcad-styles.entry.js'),
           'mlightcad-advanced-modify': path.join(root, 'frontend/mlightcad-advanced-modify.js'),
-          'mlightcad-precision-assist': path.join(root, 'frontend/mlightcad-precision-assist.entry.js')
+          'mlightcad-precision-assist': path.join(root, 'frontend/mlightcad-precision-assist.entry.js'),
+          'mlightcad-image': path.join(root, 'frontend/mlightcad-image.entry.js')
         },
         formats: ['es'],
         fileName: (_format, entryName) => `${entryName}.js`
@@ -40,7 +41,7 @@ try {
       }
     }
   });
-  console.log('[CAD][MLightCAD] bundles core, auto-cotas V2/V3, fabricacao, layout/analise, biblioteca/GD&T, estilos, modificadores avançados e precisão gerados em public/vendor/mlightcad');
+  console.log('[CAD][MLightCAD] bundles core, auto-cotas V2/V3, fabricacao, layout/analise, biblioteca/GD&T, estilos, modificadores avançados, precisão e imagens gerados em public/vendor/mlightcad');
 } catch (error) {
   console.error('[CAD][MLightCAD] falha ao gerar bundle:', error?.stack || error);
   process.exitCode = 1;

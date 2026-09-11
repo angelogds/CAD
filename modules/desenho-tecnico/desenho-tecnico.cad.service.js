@@ -108,6 +108,30 @@ function normalizeObject(obj = {}) {
     };
   }
 
+  if (base.type === 'image') {
+    const rawX = toFinite(obj.x);
+    const rawY = toFinite(obj.y);
+    const width = Math.abs(toFinite(obj.width));
+    const height = Math.abs(toFinite(obj.height));
+    return {
+      ...base,
+      x: rawX,
+      y: rawY,
+      width,
+      height,
+      rotation: toFinite(obj.rotation),
+      assetId: String(obj.assetId || obj.metadata?.assetId || ''),
+      source: String(obj.source || ''),
+      originalName: String(obj.originalName || obj.metadata?.originalName || '').slice(0, 255),
+      mimeType: String(obj.mimeType || obj.metadata?.mimeType || ''),
+      imageWidth: Math.max(0, toFinite(obj.imageWidth || obj.metadata?.imageWidth)),
+      imageHeight: Math.max(0, toFinite(obj.imageHeight || obj.metadata?.imageHeight)),
+      brightness: Math.max(0, Math.min(100, toFinite(obj.brightness, 50))),
+      contrast: Math.max(0, Math.min(100, toFinite(obj.contrast, 50))),
+      fade: Math.max(0, Math.min(100, toFinite(obj.fade, 0))),
+    };
+  }
+
   if (base.type === 'dimension') {
     const geometry = plainObject(obj.geometry);
     const normalized = { ...geometry };
