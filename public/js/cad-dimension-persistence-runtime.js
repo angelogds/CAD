@@ -11,7 +11,18 @@
     ORDINATE: 6,
   });
 
+  const ACI_COLORS = Object.freeze({
+    1: '#ff0000',
+    2: '#ffff00',
+    3: '#00ff00',
+    4: '#00ffff',
+    5: '#0000ff',
+    6: '#ff00ff',
+    7: '#ffffff',
+  });
+
   function numberOrNull(value) {
+    if (value == null || String(value).trim() === '') return null;
     const number = Number(value);
     return Number.isFinite(number) ? number : null;
   }
@@ -87,7 +98,7 @@
   }
 
   function first(record, code) {
-    return record.pairs.find((pair) => pair.code === code)?.value ?? null;
+    return record?.pairs?.find((pair) => pair.code === code)?.value ?? null;
   }
 
   function point(record, xCode) {
@@ -117,45 +128,182 @@
     return text.replace(/%%[cC]/g, 'Ø');
   }
 
-  function baseDimension(record, id, layer, kind, geometry) {
+  function rgbIntToHex(value) {
+    const number = Number.parseInt(String(value ?? ''), 10);
+    if (!Number.isFinite(number) || number < 0) return null;
+    return `#${(number & 0xffffff).toString(16).padStart(6, '0')}`;
+  }
+
+  function colorFromRecord(record) {
+    const trueColor = rgbIntToHex(first(record, 420));
+    if (trueColor) return trueColor;
+    const aci = Number.parseInt(first(record, 62), 10);
+    return ACI_COLORS[Math.abs(aci)] || null;
+  }
+
+  function normalizeFallbackStyle(style = {}) {
+    const source = style && typeof style === 'object' ? style : {};
+    const color = /^#[0-9a-f]{6}$/i.test(String(source.color || '')) ? String(source.color).toLowerCase() : null;
+    const lineType = String(source.lineType || '').trim() || null;
+    const lineWeight = numberOrNull(source.lineWeight);
+    const lineTypeScale = numberOrNull(source.lineTypeScale);
+    return {
+      ...(color ? { color } : {}),
+      ...(lineType ? { lineType } : {}),
+      ...(lineWeight != null ? { lineWeight } : {}),
+      ...(lineTypeScale != null && lineTypeScale > 0 ? { lineTypeScale } : {}),
+    };
+  }
+
+  function readLayerStyles(dxfText) {
+    const styles = {};
+    let section = '';
+    let enteringSection = false;
+    let table = '';
+    let enteringTable = false;
+    let current = null;
+
+    const flush = () => {
+      if (!current) return;
+      const name = String(first(current, 2) || '').trim();
+      if (name) {
+        const color = colorFromRecord(current);
+        const lineType = String(first(current, 6) || '').trim();
+        const lineWeight = numberOrNull(first(current, 370));
+        styles[name] = {
+          ...(color ? { color } : {}),
+          ...(lineType ? { lineType } : {}),
+          ...(lineWeight != null && lineWeight >= 0 ? { lineWeight } : {}),
+        };
+      }
+      current = null;
+    };
+
+    for (const pair of parsePairs(dxfText)) {
+      const token = pair.value.toUpperCase();
+      if (pair.code === 0 && token === 'SECTION') {
+        flush();
+        enteringSection = true;
+        section = '';
+        table = '';
+        continue;
+      }
+      if (enteringSection && pair.code === 2) {
+        section = token;
+        enteringSection = false;
+        continue;
+      }
+      if (pair.code === 0 && token === 'ENDSEC') {
+        flush();
+        section = '';
+        table = '';
+        enteringTable = false;
+        continue;
+      }
+      if (section !== 'TABLES') continue;
+      if (pair.code === 0 && token === 'TABLE') {
+        flush();
+        enteringTable = true;
+        table = '';
+        continue;
+      }
+      if (enteringTable && pair.code === 2) {
+        table = token;
+        enteringTable = false;
+        continue;
+      }
+      if (pair.code === 0 && token === 'ENDTAB') {
+        flush();
+        table = '';
+        continue;
+      }
+      if (table !== 'LAYER') continue;
+      if (pair.code === 0 && token === 'LAYER') {
+        flush();
+        current = { type: 'LAYER', pairs: [] };
+        continue;
+      }
+      if (pair.code === 0) {
+        flush();
+        continue;
+      }
+      if (current) current.pairs.push(pair);
+    }
+    flush();
+    return styles;
+  }
+
+  function resolveDimensionStyle(record, layer, layerStyles = {}, fallbackStyle = {}) {
+    const fallback = normalizeFallbackStyle(fallbackStyle);
+    const inherited = layerStyles[layer] || {};
+    const explicitColor = colorFromRecord(record);
+    const rawLineType = String(first(record, 6) || '').trim();
+    const explicitLineType = rawLineType && !/^BY(LAYER|BLOCK)$/i.test(rawLineType) ? rawLineType : null;
+    const rawWeight = numberOrNull(first(record, 370));
+    const explicitWeight = rawWeight != null && rawWeight >= 0 ? rawWeight : null;
+    const rawScale = numberOrNull(first(record, 48));
+
+    const color = explicitColor || inherited.color || fallback.color || null;
+    const lineType = explicitLineType || inherited.lineType || fallback.lineType || null;
+    const lineWeight = explicitWeight ?? inherited.lineWeight ?? fallback.lineWeight ?? null;
+    const lineTypeScale = rawScale && rawScale > 0 ? rawScale : (fallback.lineTypeScale || 1);
+
+    return {
+      ...(color ? { color } : {}),
+      ...(lineType ? { lineType } : {}),
+      ...(lineWeight != null ? { lineWeight } : {}),
+      lineTypeScale,
+    };
+  }
+
+  function baseDimension(record, id, layer, kind, geometry, style) {
     return {
       id,
       type: 'dimension',
       layer,
       visible: true,
       geometry,
+      ...(style && Object.keys(style).length ? { style } : {}),
       metadata: { source: 'mlightcad-dxf', dxfDimensionType: kind },
     };
   }
 
-  function linearDimension(record, id, layer, kind) {
+  function linearDimension(record, id, layer, kind, style) {
     const p1 = point(record, 13);
     const p2 = point(record, 14);
     if (!p1 || !p2) return null;
+    const measured = numberOrNull(first(record, 42));
+    const rotationDegrees = numberOrNull(first(record, 50));
+    const textRotationDegrees = numberOrNull(first(record, 53));
     return baseDimension(record, id, layer, kind, {
       mode: kind === DIMENSION_TYPE.ALIGNED ? 'aligned' : 'linear',
       p1,
       p2,
+      dimensionLinePoint: point(record, 10),
       textPoint: point(record, 11) || point(record, 10) || midpoint(p1, p2),
-      label: explicitLabel(record) || formatted(distance(p1, p2)),
-    });
+      ...(rotationDegrees != null ? { rotation: rotationDegrees * Math.PI / 180 } : {}),
+      ...(textRotationDegrees != null ? { textRotation: textRotationDegrees * Math.PI / 180 } : {}),
+      label: explicitLabel(record) || formatted(measured ?? distance(p1, p2)),
+    }, style);
   }
 
-  function radialDimension(record, id, layer, kind) {
+  function radialDimension(record, id, layer, kind, style) {
     const p1 = point(record, 10);
     const p2 = point(record, 15);
     if (!p1 || !p2) return null;
     const prefix = kind === DIMENSION_TYPE.DIAMETER ? 'Ø' : 'R';
+    const measured = numberOrNull(first(record, 42));
     return baseDimension(record, id, layer, kind, {
       mode: kind === DIMENSION_TYPE.DIAMETER ? 'diameter' : 'radial',
       p1,
       p2,
+      dimensionLinePoint: point(record, 10),
       textPoint: point(record, 11) || midpoint(p1, p2),
-      label: explicitLabel(record) || `${prefix}${formatted(distance(p1, p2))}`,
-    });
+      label: explicitLabel(record) || `${prefix}${formatted(measured ?? distance(p1, p2))}`,
+    }, style);
   }
 
-  function angularDimension(record, id, layer, kind) {
+  function angularDimension(record, id, layer, kind, style) {
     const vertex = point(record, 15);
     const p1 = point(record, 13);
     const p2 = point(record, 14);
@@ -164,7 +312,8 @@
     const startAngle = Math.atan2(p1.y - vertex.y, p1.x - vertex.x);
     let endAngle = Math.atan2(p2.y - vertex.y, p2.x - vertex.x);
     while (endAngle < startAngle) endAngle += Math.PI * 2;
-    const radius = distance(vertex, point(record, 10))
+    const definitionPoint = point(record, 10);
+    const radius = distance(vertex, definitionPoint)
       || Math.max(distance(vertex, p1) || 0, distance(vertex, p2) || 0, 1);
     const angleDegrees = (endAngle - startAngle) * 180 / Math.PI;
 
@@ -174,14 +323,15 @@
       p1,
       p2,
       radius,
+      dimensionLinePoint: definitionPoint,
       startAngle,
       endAngle,
       textPoint: point(record, 11),
       label: explicitLabel(record) || `${formatted(angleDegrees, 2)}°`,
-    });
+    }, style);
   }
 
-  function dimensionFromRecord(record, index) {
+  function dimensionFromRecord(record, index, layerStyles = {}, fallbackStyle = {}) {
     if (record.type !== 'DIMENSION') return null;
     const rawKind = Number.parseInt(first(record, 70) || '0', 10);
     const kind = rawKind & 7;
@@ -189,24 +339,27 @@
       .replace(/[^a-zA-Z0-9_.-]/g, '-');
     const id = `mlight-dim-${handle}`;
     const layer = String(first(record, 8) || 'cotas').trim() || 'cotas';
+    const style = resolveDimensionStyle(record, layer, layerStyles, fallbackStyle);
 
     if (kind === DIMENSION_TYPE.ROTATED || kind === DIMENSION_TYPE.ALIGNED) {
-      return linearDimension(record, id, layer, kind);
+      return linearDimension(record, id, layer, kind, style);
     }
     if (kind === DIMENSION_TYPE.DIAMETER || kind === DIMENSION_TYPE.RADIUS) {
-      return radialDimension(record, id, layer, kind);
+      return radialDimension(record, id, layer, kind, style);
     }
     if (kind === DIMENSION_TYPE.ANGULAR || kind === DIMENSION_TYPE.ANGULAR_3_POINT) {
-      return angularDimension(record, id, layer, kind);
+      return angularDimension(record, id, layer, kind, style);
     }
     return null;
   }
 
-  function parseDxfDimensions(dxfText) {
+  function parseDxfDimensions(dxfText, options = {}) {
     const { records, sawEntities } = readEntityRecords(dxfText);
+    const layerStyles = readLayerStyles(dxfText);
+    const fallbackStyle = options.dimensionStyle || {};
     return {
       ok: sawEntities,
-      dimensions: records.map(dimensionFromRecord).filter(Boolean),
+      dimensions: records.map((record, index) => dimensionFromRecord(record, index, layerStyles, fallbackStyle)).filter(Boolean),
     };
   }
 
@@ -221,6 +374,12 @@
     return null;
   }
 
+  function dimensionStyleFromCadData(payload = {}, previous = {}) {
+    return payload?.manufacturing?.styleSettings?.dimension
+      || previous?.manufacturing?.styleSettings?.dimension
+      || {};
+  }
+
   function recoverDimensions(payload = {}, previous = {}) {
     const fallback = Array.isArray(previous.dimensions) ? previous.dimensions : [];
     const snapshot = latestMlightSnapshot(payload);
@@ -228,7 +387,9 @@
       return { dimensions: fallback, recovered: false, reason: 'snapshot-missing' };
     }
     try {
-      const parsed = parseDxfDimensions(decodeBase64(snapshot.dxfBase64));
+      const parsed = parseDxfDimensions(decodeBase64(snapshot.dxfBase64), {
+        dimensionStyle: dimensionStyleFromCadData(payload, previous),
+      });
       if (!parsed.ok) {
         return { dimensions: fallback, recovered: false, reason: 'entities-section-missing' };
       }

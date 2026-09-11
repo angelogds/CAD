@@ -116,15 +116,17 @@ test('carregamento do editor deduplica entidades pelo identificador', () => {
 
 test('exportações PDF e SVG suportam arcos, polilinhas, eixos e cotas do schema v2', () => {
   const pdf = read('modules/desenho-tecnico/desenho-tecnico.pdf.service.js');
+  const dimensionPdf = read('modules/desenho-tecnico/desenho-tecnico.dimension-pdf.js');
   const svg = read('modules/desenho-tecnico/desenho-tecnico.svg.service.js');
   assert.match(pdf, /case 'arc'/);
   assert.match(pdf, /case 'polyline'/);
   assert.match(pdf, /const geometry = shaft\.geometry \|\| shaft/);
-  assert.match(pdf, /const geometry = dim\.geometry \|\| dim/);
+  assert.match(pdf, /dimensionPdf\.renderDimensionToPdf/);
   assert.match(pdf, /function collectCadContent/);
-  assert.match(pdf, /function getDimensionBounds/);
-  assert.match(pdf, /geometry\.textPoint/);
-  assert.match(pdf, /drawArrowHead/);
+  assert.match(pdf, /dimensionPdf\.getDimensionBounds/);
+  assert.match(dimensionPdf, /const geometry = dim\.geometry \|\| dim/);
+  assert.match(dimensionPdf, /geometry\.textPoint/);
+  assert.match(dimensionPdf, /function drawArrowHead/);
   assert.match(svg, /const arcPath = \(obj\)/);
   assert.match(svg, /const shaftSvg = \(obj\)/);
   assert.match(svg, /const dimensionSvg = dimensions\.map/);
