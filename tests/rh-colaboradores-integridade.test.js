@@ -65,14 +65,14 @@ test('migration preserva duplicidades com histórico para revisão', () => {
   ctx.db.close();
 });
 
-test('trigger impede novo colaborador ativo com nome equivalente por acento', () => {
+test('indice impede novo colaborador ativo com nome equivalente por acento', () => {
   const ctx = setupDb();
   ctx.db.prepare('INSERT INTO colaboradores (nome) VALUES (?)').run('Júnior');
   migration(ctx);
 
   assert.throws(
     () => ctx.db.prepare('INSERT INTO colaboradores (nome) VALUES (?)').run('Junior'),
-    /COLABORADOR_DUPLICADO_NOME/
+    /UNIQUE constraint failed: colaboradores\.nome_integridade/
   );
 
   assert.doesNotThrow(() => {
