@@ -12,27 +12,6 @@ function quoteIdentifier(value) {
   return `"${String(value || '').replace(/"/g, '""')}"`;
 }
 
-function normalizedSql(expr) {
-  // Mantém a expressão curta para não ultrapassar a profundidade do parser
-  // do SQLite. Cobre os acentos usuais em nomes pt-BR e normaliza espaços.
-  const replacements = [
-    ['Á', 'A'], ['À', 'A'], ['Â', 'A'], ['Ã', 'A'],
-    ['É', 'E'], ['Ê', 'E'], ['Í', 'I'],
-    ['Ó', 'O'], ['Ô', 'O'], ['Õ', 'O'], ['Ú', 'U'], ['Ç', 'C'],
-    ['á', 'a'], ['à', 'a'], ['â', 'a'], ['ã', 'a'],
-    ['é', 'e'], ['ê', 'e'], ['í', 'i'],
-    ['ó', 'o'], ['ô', 'o'], ['õ', 'o'], ['ú', 'u'], ['ç', 'c'],
-  ];
-
-  let sql = `trim(COALESCE(${expr}, ''))`;
-  for (const [from, to] of replacements) {
-    sql = `replace(${sql}, '${from}', '${to}')`;
-  }
-  sql = `lower(${sql})`;
-  sql = `replace(replace(${sql}, '  ', ' '), '  ', ' ')`;
-  return sql;
-}
-
 function activeSql(alias) {
   return `COALESCE(${alias}.ativo, 1) = 1
     AND COALESCE(${alias}.deleted_at, '') = ''
@@ -68,9 +47,72 @@ function countReferences(db, refs, colaboradorId) {
   return total;
 }
 
+function ensureIntegrityColumns(db, columnExists) {
+  if (!columnExists('colaboradores', 'nome_integridade')) {
+    db.exec('ALTER TABLE colaboradores ADD COLUMN nome_integridade TEXT');
+  }
+  if (!columnExists('colaboradores', 'integridade_pendente')) {
+    db.exec('ALTER TABLE colaboradores ADD COLUMN integridade_pendente INTEGER NOT NULL DEFAULT 0');
+  }
+}
+
+function createNormalizationTriggers(db) {
+  // A normalização é feita em vários UPDATEs simples de propósito. Evita
+  // expressões aninhadas profundas, que estouram o parser do better-sqlite3.
+  const normalizeStatements = [
+    "UPDATE colaboradores SET nome_integridade = lower(trim(COALESCE(nome, ''))) WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'Á', 'A') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'À', 'A') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'Â', 'A') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'Ã', 'A') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'É', 'E') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'Ê', 'E') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'Í', 'I') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'Ó', 'O') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'Ô', 'O') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'Õ', 'O') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'Ú', 'U') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'Ç', 'C') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'á', 'a') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'à', 'a') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'â', 'a') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'ã', 'a') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'é', 'e') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'ê', 'e') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'í', 'i') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'ó', 'o') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'ô', 'o') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'õ', 'o') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'ú', 'u') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, 'ç', 'c') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(replace(replace(nome_integridade, '-', ' '), '.', ' '), '''', ' ') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, '  ', ' ') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = replace(nome_integridade, '  ', ' ') WHERE id = NEW.id;",
+    "UPDATE colaboradores SET nome_integridade = trim(nome_integridade) WHERE id = NEW.id;",
+  ].join('\n      ');
+
+  db.exec(`
+    DROP TRIGGER IF EXISTS trg_colaboradores_nome_integridade_insert;
+    CREATE TRIGGER trg_colaboradores_nome_integridade_insert
+    AFTER INSERT ON colaboradores
+    BEGIN
+      ${normalizeStatements}
+    END;
+
+    DROP TRIGGER IF EXISTS trg_colaboradores_nome_integridade_update;
+    CREATE TRIGGER trg_colaboradores_nome_integridade_update
+    AFTER UPDATE OF nome ON colaboradores
+    BEGIN
+      ${normalizeStatements}
+    END;
+  `);
+}
+
 module.exports = function up({ db, tableExists, columnExists }) {
   if (!tableExists('colaboradores')) return;
   if (!columnExists('colaboradores', 'ativo') || !columnExists('colaboradores', 'status') || !columnExists('colaboradores', 'deleted_at')) return;
+
+  ensureIntegrityColumns(db, columnExists);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS colaboradores_integridade_alertas (
@@ -113,6 +155,13 @@ module.exports = function up({ db, tableExists, columnExists }) {
     SET ativo = 0,
         status = 'INATIVO',
         deleted_at = COALESCE(NULLIF(deleted_at, ''), datetime('now')),
+        integridade_pendente = 0,
+        updated_at = datetime('now')
+    WHERE id = ?
+  `);
+  const markPending = db.prepare(`
+    UPDATE colaboradores
+    SET integridade_pendente = 1,
         updated_at = datetime('now')
     WHERE id = ?
   `);
@@ -147,6 +196,7 @@ module.exports = function up({ db, tableExists, columnExists }) {
           new Date().toISOString()
         );
       } else {
+        markPending.run(Number(duplicate.id));
         insertAlert.run(
           key,
           Number(canonical.id),
@@ -159,48 +209,19 @@ module.exports = function up({ db, tableExists, columnExists }) {
     }
   }
 
-  const newKey = normalizedSql('NEW.nome');
-  const existingKey = normalizedSql('c.nome');
-  const oldKey = normalizedSql('OLD.nome');
+  const updateKey = db.prepare('UPDATE colaboradores SET nome_integridade = ? WHERE id = ?');
+  const allRows = db.prepare('SELECT id, nome FROM colaboradores').all();
+  for (const row of allRows) updateKey.run(normalizeName(row.nome), Number(row.id));
 
   db.exec(`
-    DROP TRIGGER IF EXISTS trg_colaboradores_nome_duplicado_insert;
-    CREATE TRIGGER trg_colaboradores_nome_duplicado_insert
-    BEFORE INSERT ON colaboradores
-    WHEN COALESCE(NEW.ativo, 1) = 1
-      AND COALESCE(NEW.deleted_at, '') = ''
-      AND upper(COALESCE(NEW.status, 'ATIVO')) NOT IN ('INATIVO','DESLIGADO','EXCLUIDO','REMOVIDO','APAGADO')
-      AND EXISTS (
-        SELECT 1
-        FROM colaboradores c
-        WHERE ${activeSql('c')}
-          AND ${existingKey} = ${newKey}
-      )
-    BEGIN
-      SELECT RAISE(ABORT, 'COLABORADOR_DUPLICADO_NOME: já existe um colaborador ativo com este nome. Use o cadastro existente.');
-    END;
-
-    DROP TRIGGER IF EXISTS trg_colaboradores_nome_duplicado_update;
-    CREATE TRIGGER trg_colaboradores_nome_duplicado_update
-    BEFORE UPDATE OF nome, ativo, status, deleted_at ON colaboradores
-    WHEN COALESCE(NEW.ativo, 1) = 1
-      AND COALESCE(NEW.deleted_at, '') = ''
-      AND upper(COALESCE(NEW.status, 'ATIVO')) NOT IN ('INATIVO','DESLIGADO','EXCLUIDO','REMOVIDO','APAGADO')
-      AND (
-        ${newKey} <> ${oldKey}
-        OR COALESCE(OLD.ativo, 1) <> 1
-        OR COALESCE(OLD.deleted_at, '') <> ''
-        OR upper(COALESCE(OLD.status, 'ATIVO')) IN ('INATIVO','DESLIGADO','EXCLUIDO','REMOVIDO','APAGADO')
-      )
-      AND EXISTS (
-        SELECT 1
-        FROM colaboradores c
-        WHERE c.id <> OLD.id
-          AND ${activeSql('c')}
-          AND ${existingKey} = ${newKey}
-      )
-    BEGIN
-      SELECT RAISE(ABORT, 'COLABORADOR_DUPLICADO_NOME: já existe um colaborador ativo com este nome. Use o cadastro existente.');
-    END;
+    CREATE UNIQUE INDEX IF NOT EXISTS uidx_colaboradores_nome_integridade_ativo
+      ON colaboradores(nome_integridade)
+      WHERE COALESCE(ativo, 1) = 1
+        AND COALESCE(deleted_at, '') = ''
+        AND upper(COALESCE(status, 'ATIVO')) NOT IN ('INATIVO','DESLIGADO','EXCLUIDO','REMOVIDO','APAGADO')
+        AND COALESCE(integridade_pendente, 0) = 0
+        AND COALESCE(nome_integridade, '') <> '';
   `);
+
+  createNormalizationTriggers(db);
 };
