@@ -5,8 +5,7 @@ function normalizeName(value = '') {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
-    .replace(/\s+/g, ' ')
-    .replace(/\bluis\b/g, 'luiz');
+    .replace(/\s+/g, ' ');
 }
 
 function quoteIdentifier(value) {
@@ -14,18 +13,15 @@ function quoteIdentifier(value) {
 }
 
 function normalizedSql(expr) {
+  // Mantém a expressão curta para não ultrapassar a profundidade do parser
+  // do SQLite. Cobre os acentos usuais em nomes pt-BR e normaliza espaços.
   const replacements = [
-    ['Á', 'A'], ['À', 'A'], ['Â', 'A'], ['Ã', 'A'], ['Ä', 'A'],
-    ['á', 'a'], ['à', 'a'], ['â', 'a'], ['ã', 'a'], ['ä', 'a'],
-    ['É', 'E'], ['È', 'E'], ['Ê', 'E'], ['Ë', 'E'],
-    ['é', 'e'], ['è', 'e'], ['ê', 'e'], ['ë', 'e'],
-    ['Í', 'I'], ['Ì', 'I'], ['Î', 'I'], ['Ï', 'I'],
-    ['í', 'i'], ['ì', 'i'], ['î', 'i'], ['ï', 'i'],
-    ['Ó', 'O'], ['Ò', 'O'], ['Ô', 'O'], ['Õ', 'O'], ['Ö', 'O'],
-    ['ó', 'o'], ['ò', 'o'], ['ô', 'o'], ['õ', 'o'], ['ö', 'o'],
-    ['Ú', 'U'], ['Ù', 'U'], ['Û', 'U'], ['Ü', 'U'],
-    ['ú', 'u'], ['ù', 'u'], ['û', 'u'], ['ü', 'u'],
-    ['Ç', 'C'], ['ç', 'c'], ['Ñ', 'N'], ['ñ', 'n'],
+    ['Á', 'A'], ['À', 'A'], ['Â', 'A'], ['Ã', 'A'],
+    ['É', 'E'], ['Ê', 'E'], ['Í', 'I'],
+    ['Ó', 'O'], ['Ô', 'O'], ['Õ', 'O'], ['Ú', 'U'], ['Ç', 'C'],
+    ['á', 'a'], ['à', 'a'], ['â', 'a'], ['ã', 'a'],
+    ['é', 'e'], ['ê', 'e'], ['í', 'i'],
+    ['ó', 'o'], ['ô', 'o'], ['õ', 'o'], ['ú', 'u'], ['ç', 'c'],
   ];
 
   let sql = `trim(COALESCE(${expr}, ''))`;
@@ -33,7 +29,7 @@ function normalizedSql(expr) {
     sql = `replace(${sql}, '${from}', '${to}')`;
   }
   sql = `lower(${sql})`;
-  sql = `replace(replace(replace(${sql}, '  ', ' '), '  ', ' '), '  ', ' ')`;
+  sql = `replace(replace(${sql}, '  ', ' '), '  ', ' ')`;
   return sql;
 }
 
@@ -128,11 +124,14 @@ module.exports = function up({ db, tableExists, columnExists }) {
 
   for (const [key, group] of groups.entries()) {
     if (group.length < 2) continue;
-    const scored = group.map((row) => ({
-      ...row,
-      refs: countReferences(db, refs, row.id),
-      score: (row.user_id ? 100000 : 0) + (countReferences(db, refs, row.id) * 100) - Number(row.id || 0),
-    })).sort((a, b) => b.score - a.score || Number(a.id) - Number(b.id));
+    const scored = group.map((row) => {
+      const referenceCount = countReferences(db, refs, row.id);
+      return {
+        ...row,
+        refs: referenceCount,
+        score: (row.user_id ? 100000 : 0) + (referenceCount * 100) - Number(row.id || 0),
+      };
+    }).sort((a, b) => b.score - a.score || Number(a.id) - Number(b.id));
 
     const canonical = scored[0];
     for (const duplicate of scored.slice(1)) {
