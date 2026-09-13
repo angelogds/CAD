@@ -29,6 +29,7 @@ exports.index = (req, res, next) => {
         folgas: [],
         solicitacoesFolga: [],
         minutosFolga: folgaSolicitacao.MINUTOS_DIA_FOLGA,
+        periodosFolga: folgaSolicitacao.PERIODOS_FOLGA,
         todayISO: dateBr.todayISO(),
         canOpenProfile: false,
       });
@@ -50,6 +51,7 @@ exports.index = (req, res, next) => {
       folgas: service.listarFolgas({ colaborador_id: colaborador.id }).slice(0, 20),
       solicitacoesFolga: folgaSolicitacao.listarSolicitacoes({ colaborador_id: colaborador.id, limit: 20 }),
       minutosFolga: folgaSolicitacao.MINUTOS_DIA_FOLGA,
+      periodosFolga: folgaSolicitacao.PERIODOS_FOLGA,
       todayISO: dateBr.todayISO(),
       canOpenProfile: ['ADMIN', 'RH', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'COLABORADOR'].includes(roleOf(req)),
     });

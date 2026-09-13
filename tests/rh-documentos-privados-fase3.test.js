@@ -12,7 +12,7 @@ test('novos documentos do portal RH usam storage privado e downloads protegidos'
   const controller = read('modules/rh/rh.controller.js');
   const portalRoutes = read('modules/meu-portal/meu-portal.routes.js');
   const portalController = read('modules/rh/rh.portal.controller.js');
-  const view = read('views/rh/index.ejs');
+  const view = read('views/rh/documentos.ejs');
 
   assert.match(documents, /path\.join\(storage\.DATA_DIR, 'rh', 'documentos'\)/);
   assert.match(documents, /PRIVATE_PREFIX = 'rh-private:\/\/'/);
@@ -29,7 +29,7 @@ test('Diretoria recebe apenas indicadores e não recebe pendências nominais nem
   const view = read('views/rh/index.ejs');
 
   assert.match(controller, /if \(!dashboard\.canManage\) dashboard = \{ \.\.\.dashboard, pendencias: \[\] \}/);
-  assert.match(controller, /requestedId && dashboard\.canManage/);
-  assert.match(view, /Pendências nominais e dados pessoais permanecem restritos ao RH\/ADMIN/);
+  assert.match(controller, /loadSelected\(req, req\.query\.colaborador\)/);
+  assert.match(view, /Pendências nominais, exames e documentos permanecem restritos ao RH/);
   assert.match(view, /if \(!d\.canManage\)/);
 });

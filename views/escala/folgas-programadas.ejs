@@ -1,6 +1,6 @@
 <%- layout('layout') -%>
-<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
-<link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260903a">
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260913-rh">
+<link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260913-rh">
 <%
   const listaFolgas = Array.isArray(folgas) ? folgas : [];
   const listaSolicitacoes = Array.isArray(solicitacoes) ? solicitacoes : [];
@@ -8,7 +8,8 @@
   const historicoSolic = listaSolicitacoes.filter(s=>s.status!=='PENDENTE_APROVACAO').slice(0,40);
   const fmtMin = (value) => { const n=Number(value||0); const sign=n<0?'-':''; const m=Math.abs(n); return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; };
 %>
-<div class="escala-page approval-page">
+<div class="escala-page">
+  <div class="approval-page">
   <header class="escala-head">
     <div><h1>Folgas e Afastamentos</h1><p>Solicitações do Banco de Horas, aprovação da gestão e programação das demais ocorrências.</p></div>
     <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a><a class="btn" href="/escala/banco-horas">Banco de Horas</a></div>
@@ -23,7 +24,7 @@
     <a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a>
   </nav>
 
-  <div class="escala-notice is-info"><strong>Regra operacional:</strong> folga eletiva pelo Banco de Horas nunca é liberada na segunda-feira e somente um colaborador pode reservar/usar a mesma data. Uma solicitação pendente já reserva o dia até aprovação, reprovação ou cancelamento.</div>
+  <div class="escala-notice is-info"><strong>Regra operacional:</strong> folga eletiva pelo Banco de Horas nunca é liberada na segunda-feira e somente um colaborador pode reservar/usar a mesma data. Meio período consome 4h; com 3h30 ou mais, a liderança pode aprovar e o saldo fica até -0h30.</div>
 
   <section class="escala-section">
     <div class="escala-section-head"><div><h2>Solicitações aguardando aprovação</h2><p>O saldo e a disponibilidade da data são revalidados no momento da aprovação.</p></div><span class="approval-counter"><%= pendentesFolga.length %> pendente(s)</span></div>
@@ -69,9 +70,9 @@
             <label class="escala-field"><span class="label">Equipamento / setor</span><input class="input" name="equipamento"></label>
             <label class="escala-field"><span class="label">Descrição do serviço</span><input class="input" name="descricao_servico"></label>
             <label class="escala-field"><span class="label">Anexo</span><input class="input" type="file" name="anexo" accept="image/*,.pdf,application/pdf"></label>
-            <label class="escala-field full"><span class="label">Justificativa ADMIN para saldo negativo</span><input class="input" name="justificativa_saldo_negativo" placeholder="Somente quando necessário"></label>
+            <label class="escala-field full"><span class="label">Justificativa da liderança para saldo negativo</span><input class="input" name="justificativa_saldo_negativo" placeholder="Somente quando necessário"></label>
             <div class="escala-field full"><div class="escala-notice is-info"><strong id="saldo-info">Selecione o funcionário.</strong><br><span id="debito-info">Folga compensatória debita o Banco de Horas.</span></div></div>
-            <div class="escala-field full"><div class="escala-actionbar"><span class="muted">Folgas eletivas também respeitam segunda-feira bloqueada e uma pessoa por data.</span><button class="btn btn-green" type="submit">Registrar ocorrência</button></div></div>
+            <div class="escala-field full"><div class="escala-actionbar"><span class="muted">Folgas eletivas também respeitam segunda-feira bloqueada e uma pessoa por data.</span><button class="btn btn-green" type="submit">Programar ocorrência</button></div></div>
           </form>
         </div>
       </details>
@@ -91,6 +92,7 @@
       <% historicoSolic.forEach(s=>{ %><tr><td><strong><%= dateBr.formatDateBR(s.data_folga) %></strong></td><td><%= s.colaborador_nome %></td><td><span class="escala-status <%= /REPROV|CANCEL/.test(s.status)?'is-ausente':'' %>"><%= String(s.status).replaceAll('_',' ') %></span></td><td><%= dateBr.formatDateTimeBR(s.solicitado_em) %></td><td><%= s.decidido_em ? dateBr.formatDateTimeBR(s.decidido_em) : '-' %></td><td><%= s.observacao_decisao || '-' %></td></tr><% }) %>
     </tbody></table></div></section>
   <% } %>
+  </div>
 </div>
 <script>
 const tipo=document.getElementById('tipo'),col=document.getElementById('colaborador'),horas=document.getElementById('horas');

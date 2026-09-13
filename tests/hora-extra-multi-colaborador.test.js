@@ -1,10 +1,7 @@
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const test = require('node:test');
-const { execFileSync } = require('node:child_process');
-const { mkdtempSync, rmSync } = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+const { DatabaseSync } = require('node:sqlite');
 
 const service = readFileSync('modules/escala/escala.service.js', 'utf8');
 const controller = readFileSync('modules/escala/escala.controller.js', 'utf8');
@@ -40,10 +37,9 @@ test('migration remove índice único exclusivo por OS e mantém unicidade por c
 });
 
 test('banco permite vários mecânicos ativos na mesma OS e bloqueia só duplicidade do colaborador', () => {
-  const tmp = mkdtempSync(path.join(os.tmpdir(), 'hora-extra-os-'));
-  const dbFile = path.join(tmp, 'test.db');
+  const db = new DatabaseSync(':memory:');
   try {
-    execFileSync('sqlite3', [dbFile], { input: `
+    db.exec(`
       CREATE TABLE escala_horas_extras (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         colaborador_id INTEGER NOT NULL,
@@ -59,12 +55,16 @@ test('banco permite vários mecânicos ativos na mesma OS e bloqueia só duplici
       INSERT INTO escala_horas_extras (colaborador_id, os_id, status) VALUES (2, 145, 'EM_ANDAMENTO');
       INSERT INTO escala_horas_extras (colaborador_id, os_id, status) VALUES (3, 145, 'EM_ANDAMENTO');
       INSERT INTO escala_horas_extras (colaborador_id, os_id, status) VALUES (4, 145, 'EM_ANDAMENTO');
-    ` });
-    const total = execFileSync('sqlite3', [dbFile, "SELECT COUNT(*) FROM escala_horas_extras WHERE os_id=145 AND status='EM_ANDAMENTO';"], { encoding: 'utf8' }).trim();
-    assert.equal(total, '4');
-    assert.throws(() => execFileSync('sqlite3', [dbFile], { input: "INSERT INTO escala_horas_extras (colaborador_id, os_id, status) VALUES (1, 146, 'EM_ANDAMENTO');", stdio: ['pipe', 'pipe', 'pipe'] }), /UNIQUE/);
+    `);
+    const total = db
+      .prepare("SELECT COUNT(*) AS total FROM escala_horas_extras WHERE os_id=145 AND status='EM_ANDAMENTO'")
+      .get();
+    assert.equal(Number(total.total), 4);
+    assert.throws(() => {
+      db.exec("INSERT INTO escala_horas_extras (colaborador_id, os_id, status) VALUES (1, 146, 'EM_ANDAMENTO');");
+    }, /UNIQUE/);
   } finally {
-    rmSync(tmp, { recursive: true, force: true });
+    db.close();
   }
 });
 

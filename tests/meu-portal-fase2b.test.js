@@ -52,7 +52,7 @@ test('Treinamentos mostra validade, status e arquivo em modo somente leitura', (
   assert.match(view, /somente leitura/);
 });
 
-test('Dados profissionais vêm da ficha mestre e permanecem sob RH ADMIN', () => {
+test('Dados profissionais vêm da ficha mestre e permanecem sob gestão do RH', () => {
   const service = read('modules/meu-portal/meu-portal-fase2b.service.js');
   const view = read('views/meu-portal/dados-profissionais.ejs');
 
@@ -62,7 +62,7 @@ test('Dados profissionais vêm da ficha mestre e permanecem sob RH ADMIN', () =>
   assert.match(view, /Admissão/);
   assert.match(view, /Tempo de casa/);
   assert.match(view, /Líder \/ responsável/);
-  assert.match(view, /Dados controlados pelo RH\/ADMIN/);
+  assert.match(view, /Dados controlados pelo RH/);
   assert.match(view, /não exibe dados de saúde, emergência, exames/);
   assert.doesNotMatch(view, /method="POST"/i);
 });

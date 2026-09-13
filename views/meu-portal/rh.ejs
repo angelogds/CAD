@@ -20,7 +20,7 @@
   </header>
 
   <% if (!rh?.vinculado) { %>
-    <section class="card my-rh-card"><div class="rh-empty"><strong>Vínculo com colaborador necessário</strong><br>Seu usuário ainda não está associado a uma ficha profissional. Procure RH/ADMIN.</div></section>
+    <section class="card my-rh-card"><div class="rh-empty"><strong>Vínculo com colaborador necessário</strong><br>Seu usuário ainda não está associado a uma ficha profissional. Procure o RH.</div></section>
   <% } else { %>
     <section class="my-rh-kpis">
       <article class="card rh-kpi"><span>Banco de horas</span><strong><%= rh.saldo?.horas || formatMinutes(rh.saldo?.minutos || 0) %></strong><small>Saldo atual</small></article>

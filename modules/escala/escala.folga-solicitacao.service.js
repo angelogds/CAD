@@ -4,6 +4,13 @@ const { normalizeRole, canAccessModule } = require('../../config/rbac');
 const dateBr = require('../../utils/data-hora-br');
 
 const MINUTOS_DIA_FOLGA = 480;
+const MINUTOS_MEIO_PERIODO_FOLGA = 240;
+const MINUTOS_MINIMOS_MEIO_PERIODO = 210;
+const PERIODOS_FOLGA = {
+  MANHA: { value: 'MANHA', label: 'manhã', minutos: MINUTOS_MEIO_PERIODO_FOLGA, minimo: MINUTOS_MINIMOS_MEIO_PERIODO },
+  TARDE: { value: 'TARDE', label: 'tarde', minutos: MINUTOS_MEIO_PERIODO_FOLGA, minimo: MINUTOS_MINIMOS_MEIO_PERIODO },
+  DIA_TODO: { value: 'DIA_TODO', label: 'dia todo', minutos: MINUTOS_DIA_FOLGA, minimo: MINUTOS_DIA_FOLGA },
+};
 const STATUS_PENDENTE = 'PENDENTE_APROVACAO';
 
 function tableExists(tableName) {
@@ -19,6 +26,39 @@ function assertManage(user) {
   if (!canAccessModule(normalizeRole(user?.role), 'escala_manage')) {
     throw new Error('Perfil sem permissão para aprovar ou reprovar solicitação de folga.');
   }
+}
+
+function normalizarPeriodoFolga(value) {
+  const raw = String(value || 'DIA_TODO')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[\s/-]+/g, '_');
+  if (['MANHA', 'MANHÃ', 'MEIO_PERIODO_MANHA', 'MEIO_PERIODO'].includes(raw)) return PERIODOS_FOLGA.MANHA;
+  if (['TARDE', 'MEIO_PERIODO_TARDE'].includes(raw)) return PERIODOS_FOLGA.TARDE;
+  return PERIODOS_FOLGA.DIA_TODO;
+}
+
+function saldoPermiteFolga(saldoMinutos, minutosSolicitados) {
+  const saldo = Number(saldoMinutos || 0);
+  const minutos = Number(minutosSolicitados || MINUTOS_DIA_FOLGA);
+  if (minutos === MINUTOS_MEIO_PERIODO_FOLGA) return saldo >= MINUTOS_MINIMOS_MEIO_PERIODO;
+  return saldo >= minutos;
+}
+
+function assertSaldoPermiteFolga(saldoMinutos, minutosSolicitados) {
+  if (saldoPermiteFolga(saldoMinutos, minutosSolicitados)) return true;
+  if (Number(minutosSolicitados || 0) === MINUTOS_MEIO_PERIODO_FOLGA) {
+    throw new Error('Saldo insuficiente. Para folga de meio período, é necessário possuir pelo menos 3h30 no Banco de Horas.');
+  }
+  throw new Error('Saldo insuficiente. Para folga de dia todo, é necessário possuir pelo menos 8h00 no Banco de Horas.');
+}
+
+function montarMotivoFolga(periodo, motivo = '') {
+  const texto = String(motivo || '').trim();
+  const prefixo = `Período: ${periodo.label}`;
+  return texto ? `${prefixo}. ${texto}` : prefixo;
 }
 
 function getSolicitacao(id) {
@@ -118,7 +158,7 @@ function assertDataFolgaDisponivel(dataISO, { ignoreSolicitacaoId = null } = {})
   return true;
 }
 
-function solicitarFolga({ user, data_folga, motivo = '' }) {
+function solicitarFolga({ user, data_folga, periodo_folga = 'DIA_TODO', motivo = '' }) {
   if (!tableExists('escala_folga_solicitacoes')) throw new Error('Atualização do Banco de Horas ainda não foi aplicada.');
   const colaborador = escala.buscarColaboradorDoUsuario(userId(user));
   if (!colaborador?.id) throw new Error('Seu usuário ainda não está vinculado a um colaborador ativo.');
@@ -133,14 +173,15 @@ function solicitarFolga({ user, data_folga, motivo = '' }) {
   const dataISO = String(data_folga || '').slice(0, 10);
   assertDataFolgaDisponivel(dataISO);
   const saldo = escala.calcularSaldoBancoHoras(colaborador.id).minutos;
-  if (saldo < MINUTOS_DIA_FOLGA) throw new Error('Saldo insuficiente. É necessário possuir pelo menos 8h00 no Banco de Horas.');
+  const periodo = normalizarPeriodoFolga(periodo_folga);
+  assertSaldoPermiteFolga(saldo, periodo.minutos);
 
   try {
     const info = db.prepare(`
       INSERT INTO escala_folga_solicitacoes
         (user_id, colaborador_id, data_folga, minutos_solicitados, motivo, status, solicitado_em)
       VALUES (?, ?, ?, ?, ?, '${STATUS_PENDENTE}', datetime('now'))
-    `).run(userId(user), Number(colaborador.id), dataISO, MINUTOS_DIA_FOLGA, String(motivo || '').trim() || null);
+    `).run(userId(user), Number(colaborador.id), dataISO, periodo.minutos, montarMotivoFolga(periodo, motivo));
     return Number(info.lastInsertRowid);
   } catch (error) {
     if (/UNIQUE constraint failed|uidx_escala_folga_solic_data_pendente/i.test(String(error?.message || ''))) {
@@ -169,7 +210,8 @@ function aprovarSolicitacao(id, user, observacao = '') {
 
   assertDataFolgaDisponivel(solicitacao.data_folga, { ignoreSolicitacaoId: solicitacao.id });
   const saldo = escala.calcularSaldoBancoHoras(solicitacao.colaborador_id).minutos;
-  if (saldo < MINUTOS_DIA_FOLGA) throw new Error('O colaborador não possui mais saldo suficiente para esta folga.');
+  const minutosSolicitados = Number(solicitacao.minutos_solicitados || MINUTOS_DIA_FOLGA);
+  assertSaldoPermiteFolga(saldo, minutosSolicitados);
 
   return db.transaction(() => {
     const folgaId = escala.programarFolgaCompensatoria({
@@ -178,7 +220,7 @@ function aprovarSolicitacao(id, user, observacao = '') {
       tipo_lancamento: 'FOLGA_COMPENSATORIA',
       data_folga: solicitacao.data_folga,
       data_fim: solicitacao.data_folga,
-      minutos_descontados: MINUTOS_DIA_FOLGA,
+      minutos_descontados: minutosSolicitados,
       motivo: solicitacao.motivo || 'Folga solicitada pelo colaborador via Banco de Horas',
       usuario: user,
     });
@@ -227,7 +269,12 @@ function validarProgramacaoManual(dados = {}) {
 
 module.exports = {
   MINUTOS_DIA_FOLGA,
+  MINUTOS_MEIO_PERIODO_FOLGA,
+  MINUTOS_MINIMOS_MEIO_PERIODO,
   STATUS_PENDENTE,
+  PERIODOS_FOLGA,
+  normalizarPeriodoFolga,
+  saldoPermiteFolga,
   getSolicitacao,
   listarSolicitacoes,
   assertDataFolgaDisponivel,

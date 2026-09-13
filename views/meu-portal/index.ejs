@@ -45,7 +45,7 @@
   </header>
 
   <% if (!temVinculo) { %>
-    <section class="my-portal-notice <%= podeGerenciarVinculo ? 'has-action' : '' %>">
+    <section class="my-portal-notice my-portal-panel--compact my-card-state--compact <%= podeGerenciarVinculo ? 'has-action' : '' %>">
       <div>
         <strong>Vínculo com colaborador pendente</strong>
         <p>Seu login está ativo, mas ainda não existe uma ficha de colaborador ligada a este usuário.</p>
@@ -142,7 +142,7 @@
       <a class="my-service-card is-available" href="/meu-portal/rh">
         <strong>Meu RH</strong>
         <span>Exames, documentos, folgas e banco de horas.</span>
-        <small>FASE 3 • ABRIR →</small>
+        <small>DISPONÍVEL • Abrir →</small>
       </a>
     </div>
   </section>
