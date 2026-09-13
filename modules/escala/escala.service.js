@@ -1,6 +1,7 @@
 const db = require("../../database/db");
 const { classificarLocalizacao, STATUS_LOCALIZACAO } = require("./escala.geo");
 const { getAgoraSaoPauloParts, getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
+const dateBr = require("../../utils/data-hora-br");
 
 
 function tableExists(tableName) {
@@ -1449,6 +1450,64 @@ function listarHorasExtras(filtros={}) {
     WHERE ${where} ORDER BY he.data_servico DESC, he.id DESC ${filtros.semLimite ? '' : 'LIMIT 500'}`).all(...params);
 }
 
+function formatarHoraServico(value) {
+  const raw = String(value || '').trim();
+  if (/^\d{2}:\d{2}/.test(raw)) return raw.slice(0, 5);
+  const formatado = raw ? dateBr.formatTimeBR(raw) : '';
+  return formatado === '-' ? '' : formatado;
+}
+
+function listarHorasExtrasParaCompensacao(filtros = {}) {
+  const colaboradorId = Number(filtros.colaborador_id || 0);
+  const dataServico = String(filtros.data_servico || '').slice(0, 10);
+  if (!colaboradorId || !/^\d{4}-\d{2}-\d{2}$/.test(dataServico)) {
+    return { colaborador_id: colaboradorId || null, data_servico: dataServico || null, total_minutos: 0, total_horas: 0, total_formatado: minutosToHoras(0), itens: [] };
+  }
+  const itens = listarHorasExtras({
+    colaborador_id: colaboradorId,
+    inicio: dataServico,
+    fim: dataServico,
+    status: 'APROVADO',
+    semLimite: true,
+  }).sort((a, b) => String(a.inicio_extra || '').localeCompare(String(b.inicio_extra || '')));
+  const totalMinutos = itens.reduce((sum, item) => sum + Number(item.total_minutos || 0), 0);
+  const locais = [...new Set(itens.map((item) => item.equipamento_nome || item.os_equipamento || (item.os_id ? `OS ${item.os_id}` : '')).filter(Boolean))];
+  const descricoes = itens.map((item) => {
+    const osLabel = item.os_id ? `OS ${item.os_id}` : 'Sem OS';
+    const local = item.equipamento_nome || item.os_equipamento || 'local não informado';
+    const servico = item.descricao_servico || item.os_descricao || 'serviço sem descrição';
+    return `${osLabel} - ${local}: ${servico}`;
+  });
+  const primeiroInicio = itens.find((item) => item.inicio_extra)?.inicio_extra || '';
+  const ultimoFim = [...itens].reverse().find((item) => item.fim_extra)?.fim_extra || '';
+  return {
+    colaborador_id: colaboradorId,
+    data_servico: dataServico,
+    total_minutos: totalMinutos,
+    total_horas: Number((totalMinutos / 60).toFixed(2)),
+    total_formatado: minutosToHoras(totalMinutos),
+    hora_inicio: formatarHoraServico(primeiroInicio),
+    hora_fim: formatarHoraServico(ultimoFim),
+    equipamento: locais.join(' / '),
+    descricao_servico: descricoes.join(' | '),
+    motivo: totalMinutos ? `Folga compensatória referente às horas extras de ${dateBr.formatDateBR(dataServico)}` : '',
+    itens: itens.map((item) => ({
+      id: item.id,
+      os_id: item.os_id || null,
+      data_servico: item.data_servico,
+      inicio_extra: item.inicio_extra,
+      fim_extra: item.fim_extra,
+      hora_inicio: formatarHoraServico(item.inicio_extra),
+      hora_fim: formatarHoraServico(item.fim_extra),
+      total_minutos: Number(item.total_minutos || 0),
+      total_formatado: minutosToHoras(item.total_minutos || 0),
+      equipamento: item.equipamento_nome || item.os_equipamento || '',
+      descricao_servico: item.descricao_servico || item.os_descricao || '',
+      status: item.status || '',
+    })),
+  };
+}
+
 
 function registrarAuditoriaHoraExtra(acao, registro, usuario, detalhes = {}) {
   if (!tableExists('escala_auditoria') || !registro) return;
@@ -1856,4 +1915,4 @@ function recalcularEscalaCompleta({ quantidade = 3 } = {}) {
   return { semanas: semanas.length, alocacoes, quantidade: qtd };
 }
 
-Object.assign(module.exports, { listarFolgasSabado, salvarFolgaSabadoManual, sincronizarFolgaSabado, sincronizarAdicionalNoturno, MOTIVOS_FOLGA_SABADO, listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, MINUTOS_MEIO_PERIODO_FOLGA, MINUTOS_MINIMOS_MEIO_PERIODO, minutosToHoras, saldoResumo, saldoPermiteDebitoFolga, listarPainelEscala, listarColaboradoresManutencao, listarColaboradoresMecanicosHoraExtra, isMecanicoUser, isColaboradorMecanico, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, buscarHoraExtraPorId, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtrasEmAndamentoPorOs, listarTodasHorasExtras, listarHorasExtras, apagarHoraExtra, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });
+Object.assign(module.exports, { listarFolgasSabado, salvarFolgaSabadoManual, sincronizarFolgaSabado, sincronizarAdicionalNoturno, MOTIVOS_FOLGA_SABADO, listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, MINUTOS_MEIO_PERIODO_FOLGA, MINUTOS_MINIMOS_MEIO_PERIODO, minutosToHoras, saldoResumo, saldoPermiteDebitoFolga, listarPainelEscala, listarColaboradoresManutencao, listarColaboradoresMecanicosHoraExtra, isMecanicoUser, isColaboradorMecanico, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, buscarHoraExtraPorId, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtrasEmAndamentoPorOs, listarTodasHorasExtras, listarHorasExtras, listarHorasExtrasParaCompensacao, apagarHoraExtra, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });

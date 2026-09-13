@@ -36,6 +36,17 @@ exports.programar = (req, res) => {
   return res.redirect('/escala/folgas');
 };
 
+exports.horasExtrasServico = (req, res) => {
+  try {
+    return res.json(escala.listarHorasExtrasParaCompensacao({
+      colaborador_id: req.query.colaborador_id,
+      data_servico: req.query.data_servico,
+    }));
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+};
+
 exports.cancelar = (req, res) => {
   try {
     escala.cancelarFolgaCompensatoria(Number(req.params.id), currentUser(req), req.body.motivo);

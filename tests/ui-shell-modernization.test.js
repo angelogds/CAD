@@ -16,12 +16,13 @@ test('topbar usa shell moderno e mantém logout somente no menu do usuário', ()
   assert.match(layout, /class="btn btn-green topbar-extra-btn"/);
 });
 
-test('sidebar preserva permissões e ganha hierarquia visual por grupos', () => {
+test('sidebar preserva permissões e mantém administração sem exposição nominal', () => {
   assert.match(sidebar, /canAccessModule/);
   assert.match(sidebar, /sidebar-brand-subtitle">Manutenção Integrada/);
   assert.match(sidebar, />OPERAÇÃO</);
   assert.match(sidebar, />GESTÃO E APOIO</);
-  assert.match(sidebar, />ADMIN</);
+  assert.match(sidebar, /canArmazenamento/);
+  assert.doesNotMatch(sidebar, />ADMIN</);
   assert.match(sidebar, /sidebar-tv-link/);
   assert.match(sidebar, /currentPcmSection === 'engenharia' \? 'active' : ''/);
 });
