@@ -41,4 +41,6 @@ test('lista de demandas possui padrão visual responsivo próprio', () => {
   assert.match(css, /\.dashboard-demand-tag\.priority/);
   assert.match(css, /\.dashboard-demand-tag\.stopped/);
   assert.match(css, /@media\(max-width:560px\)/);
+  assert.match(css, /\.dashboard-demand-list,\.dashboard-demand-row,\.dashboard-demand-main,\.dashboard-demand-flow\{min-width:0;max-width:100%\}/);
+  assert.match(css, /\.dashboard-demand-action\{width:100%;min-height:29px/);
 });

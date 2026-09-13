@@ -34,4 +34,6 @@ test('shell moderno é responsivo e não altera conteúdo das páginas', () => {
   assert.match(css, /@media \(max-width:980px\)/);
   assert.match(css, /@media \(max-width:768px\)/);
   assert.match(css, /\.app\.mobile-sidebar-open \.sidebar\{transform:translateX\(0\);\}/);
+  assert.match(css, /\.content>\*,\s*\.content section,\s*\.content article,\s*\.content form,\s*\.content fieldset,\s*\.content header,\s*\.content footer,\s*\.content div\{[\s\S]*min-width:0;[\s\S]*max-width:100%;/);
+  assert.match(css, /@media \(max-width:420px\)\{[\s\S]*\.content\{[\s\S]*padding:8px 6px;/);
 });
