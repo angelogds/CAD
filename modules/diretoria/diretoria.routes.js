@@ -8,9 +8,10 @@ const pcmCtrl = require('../pcm/pcm.controller');
 const DIRETORIA_ACCESS = ACCESS.diretoria_dashboard;
 const DIRETORIA_COMPRAS = ACCESS.diretoria_compras || DIRETORIA_ACCESS;
 const DIRETORIA_MANUTENCAO = ACCESS.diretoria_manutencao || DIRETORIA_ACCESS;
+const DIRETORIA_BASE_PATH = '/dashboard/diretoria';
 
 function comprasContext(req, res, next) {
-  req.executivePurchasesBasePath = '/diretoria/compras';
+  req.executivePurchasesBasePath = `${DIRETORIA_BASE_PATH}/compras`;
   req.executivePurchasesActiveMenu = 'diretoria';
   res.locals.activeMenu = 'diretoria';
   return next();
