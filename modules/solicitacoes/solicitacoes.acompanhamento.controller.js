@@ -3,6 +3,16 @@ const itemApprovalService = require('../compras/compras.aprovacao-itens.service'
 
 const HIGHLIGHTS = new Set(['aprovacao', 'cotacao', 'compra', 'recebimento', 'atrasadas']);
 
+function executiveContext(req) {
+  const basePath = String(req.executivePurchasesBasePath || '/solicitacoes/acompanhamento-compras');
+  const activeMenu = String(req.executivePurchasesActiveMenu || 'solicitacoes');
+  return {
+    basePath,
+    activeMenu,
+    backHref: activeMenu === 'diretoria' ? '/diretoria' : '/solicitacoes/minhas',
+  };
+}
+
 function nextAction(row) {
   if (row.concluidaFluxo) return 'CONCLUIDA';
   const approvalItems = Array.isArray(row.aprovacaoItens?.itens) ? row.aprovacaoItens.itens : [];
@@ -85,17 +95,20 @@ function enrichDashboardWithApprovals(painel, query = {}) {
 }
 
 function lista(req, res) {
+  const context = executiveContext(req);
   try {
     const painel = enrichDashboardWithApprovals(acompanhamentoService.getDashboard(req.query), req.query);
     return res.render('solicitacoes/acompanhamento-compras', {
       title: 'Acompanhamento de Compras',
-      activeMenu: 'solicitacoes',
+      activeMenu: context.activeMenu,
       painel,
+      acompanhamentoBasePath: context.basePath,
+      acompanhamentoBackHref: context.backHref,
     });
   } catch (error) {
     console.error('[solicitacoes.acompanhamento.lista]', error);
     req.flash('error', error.message || 'Não foi possível carregar o acompanhamento de compras.');
-    return res.redirect('/solicitacoes/minhas');
+    return res.redirect(context.backHref);
   }
 }
 
@@ -116,6 +129,7 @@ function normalizeLegacyPurchasedQuantities(detalheCompra) {
 }
 
 function detalhe(req, res) {
+  const context = executiveContext(req);
   try {
     const id = Number(req.params.id);
     const detalheCompra = normalizeLegacyPurchasedQuantities(acompanhamentoService.getDetail(id));
@@ -129,20 +143,23 @@ function detalhe(req, res) {
 
     return res.render('solicitacoes/acompanhamento-detalhe', {
       title: `Acompanhamento ${detalheCompra.numero || '#' + detalheCompra.id}`,
-      activeMenu: 'solicitacoes',
+      activeMenu: context.activeMenu,
       detalheCompra,
       approvalSummary,
       approvalHistory: itemApprovalService.getHistory(id),
       canApproveItems: itemApprovalService.canApprove(req.session?.user),
+      acompanhamentoBasePath: context.basePath,
+      acompanhamentoBackHref: context.backHref,
     });
   } catch (error) {
     console.error('[solicitacoes.acompanhamento.detalhe]', error);
     req.flash('error', error.message || 'Não foi possível abrir o acompanhamento desta solicitação.');
-    return res.redirect('/solicitacoes/acompanhamento-compras');
+    return res.redirect(context.basePath);
   }
 }
 
 function aprovarItensCotados(req, res) {
+  const context = executiveContext(req);
   const id = Number(req.params.id);
   try {
     const ids = (Array.isArray(req.body?.item_id) ? req.body.item_id : [req.body?.item_id])
@@ -159,7 +176,14 @@ function aprovarItensCotados(req, res) {
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível aprovar os itens cotados.');
   }
-  return res.redirect(`/solicitacoes/acompanhamento-compras/${id}`);
+  return res.redirect(`${context.basePath}/${id}`);
 }
 
-module.exports = { lista, detalhe, aprovarItensCotados, enrichDashboardWithApprovals, nextAction };
+module.exports = {
+  lista,
+  detalhe,
+  aprovarItensCotados,
+  enrichDashboardWithApprovals,
+  nextAction,
+  normalizeLegacyPurchasedQuantities,
+};
