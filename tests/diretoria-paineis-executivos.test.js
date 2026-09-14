@@ -51,6 +51,14 @@ test('home executiva oferece os três painéis solicitados', () => {
   assert.match(view, /diretoriaBase%>\/manutencao/);
 });
 
+test('Solicitações fica focado no solicitante e não exibe mais o acompanhamento executivo', () => {
+  const view = read('views/solicitacoes/minhas.ejs');
+  assert.match(view, /Solicitações de Material/);
+  assert.match(view, /\+ Nova Solicitação/);
+  assert.doesNotMatch(view, /Acompanhar compras/);
+  assert.doesNotMatch(view, /acompanhamento-compras/);
+});
+
 test('Acompanhamento de Compras reutiliza os serviços existentes e aprovação por item', () => {
   const controller = read('modules/diretoria/diretoria.controller.js');
   const routes = read('modules/diretoria/diretoria.routes.js');
