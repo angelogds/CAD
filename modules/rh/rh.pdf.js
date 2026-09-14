@@ -65,13 +65,20 @@ function drawProfile(doc, meta, colab = {}) {
   pdf.ensureSpace(doc, 70, meta);
   const x = pdf.PAGE.margins.left;
   const y = doc.y;
+  let saved = false;
   try {
     doc.save();
+    saved = true;
     doc.roundedRect(x, y, 58, 58, 6).strokeColor(pdf.COLORS.border).stroke();
     doc.image(photo, x + 3, y + 3, { fit: [52, 52], align: 'center', valign: 'center' });
-    doc.restore();
     doc.y = y + 66;
-  } catch (_error) {}
+  } catch (_error) {
+    doc.y = y;
+  } finally {
+    if (saved) {
+      try { doc.restore(); } catch (_error) {}
+    }
+  }
 }
 
 function generateLeavePdf({ requestId }) {
