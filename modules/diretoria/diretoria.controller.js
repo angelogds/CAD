@@ -1,51 +1,11 @@
-const comprasAcompanhamentoService = require('../compras/acompanhamento.service');
-const comprasAcompanhamentoController = require('../solicitacoes/solicitacoes.acompanhamento.controller');
 const pcmService = require('../pcm/pcm.service');
 const manutencaoExecutivaService = require('./diretoria.manutencao.service');
+const pdfStandard = require('../../utils/pdf-standard');
 
 const DIRETORIA_BASE_PATH = '/dashboard/diretoria';
 
-function safeComprasSummary() {
-  try {
-    const painel = comprasAcompanhamentoController.enrichDashboardWithApprovals(
-      comprasAcompanhamentoService.getDashboard({ visao: 'andamento', periodo: '30' }),
-      {}
-    );
-    return {
-      aguardandoAprovacao: Number(painel?.aprovacaoItens?.itensPendentes || 0),
-      valorAguardandoAprovacao: Number(painel?.executivo?.valorAguardandoAprovacao || 0),
-      atrasadas: Number(painel?.executivo?.atrasadas || 0),
-      aguardandoRecebimento: Number(painel?.executivo?.aguardandoRecebimento || 0),
-    };
-  } catch (error) {
-    console.error('[diretoria] Falha ao montar resumo de compras:', error?.message || error);
-    return { aguardandoAprovacao: 0, valorAguardandoAprovacao: 0, atrasadas: 0, aguardandoRecebimento: 0 };
-  }
-}
-
-function safeMaintenanceSummary(userId) {
-  try {
-    const painel = manutencaoExecutivaService.getDashboard({ periodo: 'mes_atual' }, userId || null);
-    return {
-      totalOs: Number(painel?.cards?.total_os || 0),
-      backlog: Number(painel?.cards?.backlog_os_atual || painel?.cards?.backlog_manutencao || 0),
-      atrasadas: Number(painel?.cards?.os_atrasadas || 0),
-      equipamentosCriticos: Number(painel?.cards?.equipamentos_criticos || 0),
-    };
-  } catch (error) {
-    console.error('[diretoria] Falha ao montar resumo da manutenção:', error?.message || error);
-    return { totalOs: 0, backlog: 0, atrasadas: 0, equipamentosCriticos: 0 };
-  }
-}
-
-function index(req, res) {
-  res.locals.activeMenu = 'diretoria';
-  return res.render('diretoria/index', {
-    title: 'Painel da Diretoria',
-    activeMenu: 'diretoria',
-    compras: safeComprasSummary(),
-    manutencao: safeMaintenanceSummary(req.session?.user?.id),
-  });
+function index(_req, res) {
+  return res.redirect(301, '/dashboard');
 }
 
 function fallbackMaintenanceDashboard() {
@@ -76,7 +36,7 @@ function manutencao(req, res) {
 
   return res.render('pcm/dashboard-gerencial', {
     title: 'Desempenho da Manutenção',
-    activeMenu: 'diretoria',
+    activeMenu: 'diretoria-manutencao',
     activePcmSection: '',
     opcoes: pcmService.listFiltros(),
     canManagePcm: false,
@@ -84,7 +44,7 @@ function manutencao(req, res) {
     dashboardBasePath: `${DIRETORIA_BASE_PATH}/manutencao`,
     dashboardTitle: 'Desempenho da Manutenção',
     dashboardSubtitle: 'Indicadores executivos de manutenção para acompanhamento da Diretoria.',
-    dashboardEyebrow: 'Painel da Diretoria · Manutenção',
+    dashboardEyebrow: 'Operação · Desempenho da Manutenção',
     showPcmNav: false,
   });
 }
@@ -99,4 +59,165 @@ function manutencaoDados(req, res) {
   }
 }
 
-module.exports = { index, manutencao, manutencaoDados, DIRETORIA_BASE_PATH };
+function dateBr(value) {
+  const raw = String(value || '').slice(0, 10);
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : (raw || '-');
+}
+
+function metric(value, suffix = '') {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return 'Dados insuficientes';
+  return `${value}${suffix}`;
+}
+
+function equipmentName(filters, options) {
+  if (!filters?.equipamento_id) return 'Todos os equipamentos';
+  const found = (options?.equipamentos || []).find((item) => Number(item.id) === Number(filters.equipamento_id));
+  return found?.nome || `Equipamento #${filters.equipamento_id}`;
+}
+
+function manutencaoPdf(req, res, next) {
+  try {
+    const dashboard = manutencaoExecutivaService.getDashboard(req.query, req.session?.user?.id || null);
+    const options = pcmService.listFiltros();
+    const filtros = dashboard.filtros || {};
+    const cards = dashboard.cards || {};
+    const quality = dashboard.qualidade_dados || {};
+    const graphs = dashboard.graficos || {};
+
+    pcmService.logDashboardReport(req.session?.user?.id || null, 'PDF_DIRETORIA', filtros);
+
+    const report = pdfStandard.createReport({
+      title: 'Desempenho da Manutenção',
+      subtitle: 'Indicadores executivos para acompanhamento da Diretoria',
+      issuedAt: dateBr(new Date().toISOString().slice(0, 10)),
+      sector: 'DIRETORIA / MANUTENÇÃO',
+      headerContext: 'Desempenho da manutenção | Diretoria',
+      footerText: 'Campo do Gado - Desempenho da Manutenção - Relatório executivo.',
+      subject: 'Indicadores executivos de manutenção',
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="desempenho-manutencao.pdf"');
+    report.doc.pipe(res);
+
+    process.nextTick(() => {
+      try {
+        report.start();
+        report.identification([
+          ['Período analisado', `${dateBr(filtros.data_inicial)} a ${dateBr(filtros.data_final)}`, 'Setor', filtros.setor || 'Todos os setores'],
+          ['Equipamento', equipmentName(filtros, options), 'Situação da base', quality.status_label || 'Sem dados suficientes'],
+          ['Origem dos dados', 'Ordens de Serviço e PCM', 'Emissão', dateBr(new Date().toISOString().slice(0, 10))],
+        ]);
+
+        report.summary([
+          { label: 'OS NO PERÍODO', value: String(cards.total_os || 0) },
+          { label: 'BACKLOG DE OS', value: String(cards.backlog_os_atual || 0) },
+          { label: 'BACKLOG > 30 DIAS', value: String(cards.backlog_acima_30_dias || 0) },
+          { label: 'CUMPRIMENTO DA PROGRAMAÇÃO', value: metric(cards.cumprimento_programacao, '%') },
+        ]);
+
+        report.table({
+          title: 'Indicadores executivos',
+          columns: [
+            { key: 'indicador', label: 'Indicador', width: 170 },
+            { key: 'valor', label: 'Valor', width: 95, align: 'center' },
+            { key: 'leitura', label: 'Leitura executiva', width: 285 },
+          ],
+          rows: [
+            { indicador: 'OS fora do SLA', valor: String(cards.os_atrasadas || 0), leitura: 'Ordens abertas há mais de 7 dias dentro dos critérios atuais do painel.' },
+            { indicador: 'Tempo médio de conclusão', valor: metric(cards.tempo_medio_conclusao, ' h'), leitura: 'Tempo médio entre abertura e fechamento das OS concluídas com data válida.' },
+            { indicador: 'Manutenção planejada', valor: metric(cards.percentual_manutencao_planejada, '%'), leitura: 'Participação das intervenções planejadas no período.' },
+            { indicador: 'Reincidência corretiva', valor: metric(cards.reincidencia_corretiva_pct, '%'), leitura: 'Repetições de corretivas após a primeira ocorrência por equipamento no período.' },
+            { indicador: 'Equipamentos reincidentes', valor: String(cards.equipamentos_reincidentes || 0), leitura: 'Equipamentos com duas ou mais corretivas no período.' },
+            { indicador: 'Equipamentos críticos', valor: String(cards.equipamentos_criticos || 0), leitura: 'Ativos classificados em alta criticidade/crítica na base atual.' },
+            { indicador: 'Qualidade dos dados', valor: metric(cards.qualidade_dados_pct, '%'), leitura: quality.status_label || 'Base ainda em avaliação.' },
+          ],
+        });
+
+        report.table({
+          title: 'Backlog de OS por idade',
+          columns: [
+            { key: 'faixa', label: 'Faixa de idade', width: 210 },
+            { key: 'total', label: 'OS pendentes', width: 110, align: 'center' },
+            { key: 'observacao', label: 'Interpretação', width: 230 },
+          ],
+          rows: (graphs.backlog_idade || []).map((item) => ({
+            faixa: item.faixa,
+            total: String(item.total || 0),
+            observacao: item.faixa === 'Acima de 60 dias' ? 'Backlog antigo que exige priorização e decisão.' : 'Pendências ainda abertas até a data final selecionada.',
+          })),
+          emptyText: 'Nenhuma OS pendente para os filtros atuais.',
+        });
+
+        report.table({
+          title: 'Equipamentos com corretivas reincidentes',
+          columns: [
+            { key: 'equipamento', label: 'Equipamento', width: 185 },
+            { key: 'setor', label: 'Setor', width: 105 },
+            { key: 'corretivas', label: 'Corretivas', width: 75, align: 'center' },
+            { key: 'repeticoes', label: 'Repetições', width: 75, align: 'center' },
+            { key: 'criticidade', label: 'Criticidade', width: 90, align: 'center' },
+          ],
+          rows: (graphs.reincidencia_corretiva || []).slice(0, 12).map((item) => ({
+            equipamento: item.nome || item.equipamento || '-',
+            setor: item.setor || '-',
+            corretivas: String(item.falhas || 0),
+            repeticoes: String(item.repeticoes_apos_primeira || 0),
+            criticidade: item.criticidade || '-',
+          })),
+          emptyText: 'Nenhum equipamento com duas ou mais corretivas no período.',
+        });
+
+        report.table({
+          title: 'Qualidade dos dados para confiabilidade',
+          columns: [
+            { key: 'campo', label: 'Critério de rastreabilidade', width: 310 },
+            { key: 'valor', label: 'Cobertura', width: 120, align: 'center' },
+            { key: 'meta', label: 'Referência', width: 120, align: 'center' },
+          ],
+          rows: [
+            { campo: 'OS com equipamento vinculado', valor: metric(quality.os_com_equipamento_pct, '%'), meta: '95% ou mais' },
+            { campo: 'OS concluídas com data real de fechamento', valor: metric(quality.encerramento_com_data_pct, '%'), meta: '95% ou mais' },
+            { campo: 'Corretivas classificadas no PCM', valor: metric(quality.corretivas_classificadas_pct, '%'), meta: '85% ou mais' },
+            { campo: 'Corretivas com início e fim de parada', valor: metric(quality.paradas_com_intervalo_pct, '%'), meta: '85% ou mais' },
+          ],
+        });
+
+        const pendencias = Array.isArray(quality.campos_pendentes) && quality.campos_pendentes.length
+          ? quality.campos_pendentes.join('; ')
+          : 'A base mínima avaliada atende aos critérios atuais.';
+        report.note(`Governança dos indicadores: ${pendencias}. MTBF, MTTR e disponibilidade permanecem como “dados insuficientes” enquanto a rastreabilidade de início da parada, retorno à operação e classificação de falha não estiver confiável.`);
+
+        report.table({
+          title: 'Equipamentos que exigem atenção',
+          columns: [
+            { key: 'equipamento', label: 'Equipamento', width: 180 },
+            { key: 'setor', label: 'Setor', width: 100 },
+            { key: 'falhas', label: 'Falhas', width: 60, align: 'center' },
+            { key: 'criticidade', label: 'Criticidade', width: 80, align: 'center' },
+            { key: 'motivo', label: 'Motivo da atenção', width: 130 },
+          ],
+          rows: (dashboard.equipamentos_atencao || []).slice(0, 12).map((item) => ({
+            equipamento: item.nome || item.equipamento || '-',
+            setor: item.setor || '-',
+            falhas: String(item.falhas || 0),
+            criticidade: item.criticidade || '-',
+            motivo: (item.motivos || []).join('; ') || 'Necessita avaliação técnica.',
+          })),
+          emptyText: 'Nenhum equipamento excedeu os limites atuais de atenção.',
+        });
+
+        report.end();
+      } catch (error) {
+        report.doc.destroy(error);
+      }
+    });
+
+    return report.doc;
+  } catch (error) {
+    return next(error);
+  }
+}
+
+module.exports = { index, manutencao, manutencaoDados, manutencaoPdf, DIRETORIA_BASE_PATH };
