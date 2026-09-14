@@ -9,6 +9,7 @@ const itens=Array.isArray(d.itens)?d.itens:[];
 const r=d.resumoAcompanhamento||{};
 const ap=approvalSummary||{};
 const hist=Array.isArray(approvalHistory)?approvalHistory:[];
+const acompanhamentoPath=typeof acompanhamentoBasePath!=='undefined'&&acompanhamentoBasePath?acompanhamentoBasePath:'/solicitacoes/acompanhamento-compras';
 const money=c=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(c)||0)/100);
 const statusLabel=value=>String(value||'-').replaceAll('_',' ');
 const approvalLabel=value=>({AGUARDANDO_APROVACAO:'AGUARDANDO APROVAÇÃO',APROVADA:'APROVADO',COMPRADO:'COMPRADO',SEM_COTACAO:'SEM COTAÇÃO',CANCELADO:'CANCELADO'}[String(value||'').toUpperCase()]||statusLabel(value));
@@ -21,7 +22,7 @@ const approvalLabel=value=>({AGUARDANDO_APROVACAO:'AGUARDANDO APROVAÇÃO',APROV
       <p><%=d.titulo||'Solicitação de material'%> · Solicitante: <strong><%=d.solicitante_nome||'-'%></strong> · Setor: <strong><%=d.setor_origem||'-'%></strong></p>
     </div>
     <div class="detail-actions">
-      <a class="btn btn-sm btn-ghost system-compact-btn" href="/solicitacoes/acompanhamento-compras">← Voltar ao acompanhamento</a>
+      <a class="btn btn-sm btn-ghost system-compact-btn" href="<%=acompanhamentoPath%>">← Voltar ao acompanhamento</a>
       <a class="btn btn-sm btn-green system-compact-btn" href="/solicitacoes/<%=d.id%>/pdf">Baixar PDF</a>
     </div>
   </header>
@@ -78,7 +79,7 @@ const approvalLabel=value=>({AGUARDANDO_APROVACAO:'AGUARDANDO APROVAÇÃO',APROV
       <div class="approval-action-bar">
         <div class="approval-selection-summary"><span>ITENS COTADOS AGUARDANDO LIBERAÇÃO</span><strong><span id="approval-selected-count">0</span> selecionado(s) · <span id="approval-selected-value"><%=money(0)%></span></strong><small>Marque na tabela somente os itens que deseja liberar agora. Os demais permanecem aguardando decisão, mesmo já estando cotados.</small></div>
         <% if(canApproveItems){ %>
-          <form id="approval-selection-form" method="POST" action="/solicitacoes/acompanhamento-compras/<%=d.id%>/aprovar-itens-cotados">
+          <form id="approval-selection-form" method="POST" action="<%=acompanhamentoPath%>/<%=d.id%>/aprovar-itens-cotados">
             <button id="approval-selected-submit" class="btn btn-sm btn-green system-compact-btn approval-main-button" type="submit" disabled>✓ Aprovar selecionados</button>
           </form>
         <% } else { %><div class="approval-waiting-role">Aguardando Diretoria.</div><% } %>
