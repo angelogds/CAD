@@ -19,9 +19,14 @@ router.get('/', requireRole(rhRead), controller.index);
 router.get('/colaboradores', requireRole(rhRead), controller.colaboradores);
 router.get('/jornada', requireRole(rhRead), controller.jornada);
 
-// Fluxos nominais/pessoais e anexos permanecem exclusivos do RH.
+// Fluxos nominais/pessoais e anexos permanecem exclusivos do RH/ADMIN.
 router.get('/colaboradores/:id', requireRole(rhManage), controller.colaborador);
 router.get('/folgas', requireRole(rhManage), controller.folgas);
+router.get('/folgas/pdf', requireRole(rhManage), controller.folgasPdf);
+router.get('/folgas/:id/pdf', requireRole(rhManage), controller.folgaPdf);
+router.get('/atestados', requireRole(rhSensitive), controller.atestados);
+router.get('/atestados/:id/arquivo', requireRole(rhSensitive), controller.atestadoArquivo);
+router.post('/atestados/:id/status', requireRole(rhManage), controller.atestadoStatus);
 router.get('/exames', requireRole(rhSensitive), controller.exames);
 router.get('/documentos', requireRole(rhManage), controller.documentos);
 router.get('/treinamentos', requireRole(rhManage), controller.treinamentos);

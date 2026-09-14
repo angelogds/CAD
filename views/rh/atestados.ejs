@@ -1,0 +1,79 @@
+<%- layout('layout') -%>
+<link rel="stylesheet" href="/css/rh-portal.css?v=20260913-atestados" />
+<%
+  const d = dashboard || {};
+  const rows = Array.isArray(registros) ? registros : [];
+  const colaboradores = Array.isArray(d.colaboradores) ? d.colaboradores : [];
+  const filtroStatus = String(filtros?.status || '');
+  const filtroColaborador = String(filtros?.colaborador_id || '');
+%>
+<div class="rh-page">
+  <%- include('_header', { title, dashboard: d, activeRhSection }) %>
+
+  <section class="card rh-section">
+    <div class="rh-section-head">
+      <div>
+        <span class="rh-eyebrow">DOCUMENTO SENSÍVEL • ACESSO RH/ADMIN</span>
+        <h2>Atestados enviados pelos colaboradores</h2>
+        <p class="rh-muted">A liderança recebe apenas a informação operacional da ausência. O arquivo do atestado permanece restrito ao colaborador, RH e ADMIN.</p>
+      </div>
+      <span class="rh-badge"><%= rows.length %> registro(s)</span>
+    </div>
+
+    <form class="rh-toolbar" method="get" action="/rh/atestados">
+      <label><span>Status</span><select name="status">
+        <option value="">Todos</option>
+        <option value="ENVIADO" <%= filtroStatus === 'ENVIADO' ? 'selected' : '' %>>Novo / enviado</option>
+        <option value="RECEBIDO" <%= filtroStatus === 'RECEBIDO' ? 'selected' : '' %>>Recebido</option>
+        <option value="ARQUIVADO" <%= filtroStatus === 'ARQUIVADO' ? 'selected' : '' %>>Arquivado</option>
+      </select></label>
+      <label><span>Colaborador</span><select name="colaborador_id">
+        <option value="">Todos</option>
+        <% colaboradores.forEach((c) => { %><option value="<%= c.id %>" <%= filtroColaborador === String(c.id) ? 'selected' : '' %>><%= c.nome %></option><% }) %>
+      </select></label>
+      <label><span>Início</span><input type="date" name="inicio" value="<%= filtros?.inicio || '' %>" /></label>
+      <label><span>Fim</span><input type="date" name="fim" value="<%= filtros?.fim || '' %>" /></label>
+      <button class="btn btn-primary" type="submit">Filtrar</button>
+      <a class="btn btn-ghost" href="/rh/atestados">Limpar</a>
+    </form>
+
+    <div class="rh-table-wrap">
+      <table class="rh-table">
+        <thead><tr><th>Colaborador</th><th>Período</th><th>Enviado em</th><th>Status</th><th>Arquivo</th><th>Tratamento RH</th></tr></thead>
+        <tbody>
+          <% rows.forEach((r) => { const status = String(r.status || 'ENVIADO').toUpperCase(); %>
+            <tr>
+              <td>
+                <strong><%= r.colaborador_nome || '-' %></strong><br>
+                <small><%= r.funcao || '-' %> • <%= r.setor || '-' %></small><br>
+                <a class="btn btn-sm btn-ghost" href="/rh/colaboradores/<%= r.colaborador_id %>">Abrir ficha</a>
+              </td>
+              <td>
+                <%= dateBr.formatDateBR(r.data_inicio) %><%= r.data_fim && r.data_fim !== r.data_inicio ? ` a ${dateBr.formatDateBR(r.data_fim)}` : '' %>
+                <% if (r.observacao) { %><br><small><%= r.observacao %></small><% } %>
+              </td>
+              <td><%= r.created_at ? String(r.created_at).replace('T',' ').slice(0,16) : '-' %></td>
+              <td><span class="rh-badge <%= status === 'ENVIADO' ? 'is-warning' : '' %>"><%= status %></span></td>
+              <td><a class="btn btn-sm" href="/rh/atestados/<%= r.id %>/arquivo">Baixar</a></td>
+              <td>
+                <div class="rh-actions-inline">
+                  <% if (status === 'ENVIADO') { %>
+                    <form method="post" action="/rh/atestados/<%= r.id %>/status"><input type="hidden" name="status" value="RECEBIDO"><button class="btn btn-sm" type="submit">Confirmar recebimento</button></form>
+                  <% } %>
+                  <% if (status !== 'ARQUIVADO') { %>
+                    <form method="post" action="/rh/atestados/<%= r.id %>/status"><input type="hidden" name="status" value="ARQUIVADO"><button class="btn btn-sm btn-ghost" type="submit">Arquivar</button></form>
+                  <% } else { %>
+                    <small>Arquivado em <%= r.arquivado_em ? String(r.arquivado_em).replace('T',' ').slice(0,16) : '-' %></small>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+          <% if (!rows.length) { %><tr><td colspan="6" class="rh-empty">Nenhum atestado encontrado para os filtros informados.</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="rh-privacy">Não registrar CID, diagnóstico ou informação clínica nesta tela. O módulo controla somente período de afastamento, arquivo enviado e situação administrativa do recebimento.</p>
+  </section>
+</div>

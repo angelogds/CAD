@@ -3,6 +3,9 @@ const path = require('node:path');
 const service = require('./rh.service');
 const people = require('./rh.people');
 const rhDocuments = require('./rh.documents');
+const atestados = require('./rh.atestados');
+const rhNotifications = require('./rh.notifications');
+const rhPdf = require('./rh.pdf');
 const colaboradoresService = require('../colaboradores/colaboradores.service');
 const dateBr = require('../../utils/data-hora-br');
 
@@ -104,6 +107,29 @@ exports.folgas = (req, res, next) => renderArea(
   { activeRhSection: 'folgas' }
 );
 
+exports.atestados = (req, res, next) => {
+  try {
+    const dashboard = loadDashboard(req);
+    const registros = atestados.listAll({
+      status: req.query.status,
+      colaborador_id: req.query.colaborador_id,
+      inicio: req.query.inicio,
+      fim: req.query.fim,
+      limit: 500,
+    });
+    res.locals.activeMenu = 'rh';
+    return res.render('rh/atestados', {
+      title: 'RH • Atestados',
+      dashboard,
+      registros,
+      filtros: req.query || {},
+      activeRhSection: 'atestados',
+      dateBr,
+      formatMinutes,
+    });
+  } catch (error) { return next(error); }
+};
+
 exports.exames = (req, res, next) => {
   try {
     const dashboard = loadDashboard(req);
@@ -201,4 +227,61 @@ exports.documentoArquivo = (req, res, next) => {
     res.setHeader('Cache-Control', 'private, no-store');
     return res.download(documento.filePath, path.basename(documento.filePath));
   } catch (error) { return next(error); }
+};
+
+exports.atestadoArquivo = (req, res, next) => {
+  try {
+    const item = atestados.getPrivateFile(Number(req.params.id));
+    if (!item) return res.status(404).send('Atestado não encontrado.');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.download(item.filePath, item.arquivo_nome_original || path.basename(item.filePath));
+  } catch (error) { return next(error); }
+};
+
+exports.atestadoStatus = (req, res) => {
+  try {
+    const item = atestados.updateStatus(Number(req.params.id), req.body.status, currentUser(req));
+    rhNotifications.notifyAtestadoStatus(item.id);
+    flash(req, 'success', item.status === 'ARQUIVADO' ? 'Atestado arquivado.' : 'Recebimento do atestado confirmado.');
+  } catch (error) {
+    flash(req, 'error', error.message || 'Não foi possível atualizar o atestado.');
+  }
+  return res.redirect('/rh/atestados');
+};
+
+exports.folgaPdf = (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const doc = rhPdf.generateLeavePdf({ requestId: id });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=folga_${id}.pdf`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    doc.pipe(res);
+    return undefined;
+  } catch (error) {
+    flash(req, 'error', error.message || 'Não foi possível gerar o PDF da folga.');
+    return res.redirect('/rh/folgas');
+  }
+};
+
+exports.folgasPdf = (req, res) => {
+  try {
+    const doc = rhPdf.generateConsolidatedLeavePdf({
+      inicio: req.query.inicio,
+      fim: req.query.fim,
+      status: req.query.status || 'APROVADA',
+      colaborador_id: req.query.colaborador_id,
+    });
+    const inicio = String(req.query.inicio || 'todos').replace(/[^0-9a-z_-]/gi, '_');
+    const fim = String(req.query.fim || 'todos').replace(/[^0-9a-z_-]/gi, '_');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=folgas_rh_${inicio}_${fim}.pdf`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    doc.pipe(res);
+    return undefined;
+  } catch (error) {
+    flash(req, 'error', error.message || 'Não foi possível gerar o PDF consolidado.');
+    return res.redirect('/rh/folgas');
+  }
 };
