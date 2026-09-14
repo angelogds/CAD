@@ -1,5 +1,5 @@
 <%- layout('layout') -%>
-<link rel="stylesheet" href="/css/rh-portal.css?v=20260910-rh-modular" />
+<link rel="stylesheet" href="/css/rh-portal.css?v=20260913-pdf" />
 <% const d = dashboard || {}; const solicitacoes = Array.isArray(d.solicitacoes) ? d.solicitacoes : []; %>
 <div class="rh-page">
   <%- include('_header', { title, dashboard: d, activeRhSection }) %>
@@ -7,15 +7,26 @@
   <section class="card rh-section">
     <div class="rh-section-head">
       <div><span class="rh-eyebrow">ACOMPANHAMENTO</span><h2>Folgas e solicitações</h2><p class="rh-muted">O RH acompanha o ciclo. Aprovação e reprovação permanecem no fluxo operacional autorizado da Manutenção.</p></div>
-      <a class="btn btn-ghost" href="/escala/folgas">Abrir gestão operacional</a>
+      <div class="rh-actions-inline">
+        <a class="btn btn-ghost" href="/escala/folgas">Abrir gestão operacional</a>
+      </div>
     </div>
+
+    <form class="rh-toolbar" method="get" action="/rh/folgas/pdf">
+      <label><span>PDF consolidado • início</span><input type="date" name="inicio" /></label>
+      <label><span>Fim</span><input type="date" name="fim" /></label>
+      <input type="hidden" name="status" value="APROVADA" />
+      <button class="btn btn-primary" type="submit">Baixar PDF consolidado</button>
+    </form>
+    <p class="rh-privacy">O PDF consolidado usa somente folgas aprovadas e dados reais do Banco de Horas. Quando não existir vínculo confiável com uma OS/serviço, será exibido “Origem não informada”.</p>
+
     <div class="rh-toolbar">
       <label><span>Status</span><select id="rhLeaveStatus"><option value="">Todos</option><option value="PENDENTE_APROVACAO">Aguardando aprovação</option><option value="APROVADA">Aprovada</option><option value="REPROVADA">Reprovada</option><option value="CANCELADA">Cancelada</option></select></label>
       <label class="rh-search"><span>Buscar</span><input id="rhLeaveSearch" type="search" placeholder="Colaborador ou motivo" /></label>
     </div>
     <div class="rh-table-wrap">
       <table class="rh-table">
-        <thead><tr><th>Colaborador</th><th>Data da folga</th><th>Status</th><th>Motivo</th><th>Solicitado em</th><th>Ficha</th></tr></thead>
+        <thead><tr><th>Colaborador</th><th>Data da folga</th><th>Status</th><th>Motivo</th><th>Solicitado em</th><th>Ações</th></tr></thead>
         <tbody>
           <% solicitacoes.forEach((r) => { const status = String(r.status || '').toUpperCase(); const search = `${r.colaborador_nome||''} ${r.motivo||''}`.toLowerCase(); %>
             <tr data-rh-leave data-status="<%= status %>" data-search="<%= search %>">
@@ -24,7 +35,12 @@
               <td><span class="rh-badge <%= status === 'REPROVADA' ? 'is-danger' : (status === 'PENDENTE_APROVACAO' ? 'is-warning' : '') %>"><%= status || '-' %></span></td>
               <td><%= r.motivo || 'Sem motivo informado' %></td>
               <td><%= r.solicitado_em ? dateBr.formatDateBR(String(r.solicitado_em).slice(0,10)) : '-' %></td>
-              <td><% if (r.colaborador_id) { %><a class="btn btn-sm" href="/rh/colaboradores/<%= r.colaborador_id %>">Abrir</a><% } else { %>-<% } %></td>
+              <td>
+                <div class="rh-actions-inline">
+                  <% if (r.colaborador_id) { %><a class="btn btn-sm" href="/rh/colaboradores/<%= r.colaborador_id %>">Ficha</a><% } %>
+                  <% if (status === 'APROVADA') { %><a class="btn btn-sm btn-ghost" href="/rh/folgas/<%= r.id %>/pdf">PDF</a><% } %>
+                </div>
+              </td>
             </tr>
           <% }) %>
           <% if (!solicitacoes.length) { %><tr><td colspan="6" class="rh-empty">Nenhuma solicitação de folga registrada.</td></tr><% } %>
