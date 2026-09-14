@@ -3,6 +3,7 @@
 <%
   const comprasResumo = compras || {};
   const manutencaoResumo = manutencao || {};
+  const diretoriaBase = '/dashboard/diretoria';
   const money = (centavos) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((Number(centavos) || 0) / 100);
 %>
 
@@ -28,7 +29,7 @@
       <strong class="director-open">Abrir painel →</strong>
     </a>
 
-    <a class="director-panel-card is-purchase" href="/diretoria/compras">
+    <a class="director-panel-card is-purchase" href="<%=diretoriaBase%>/compras">
       <div class="director-card-head"><span>02</span><b>COMPRAS</b></div>
       <h2>Acompanhamento de Compras</h2>
       <p>Cotações, itens aguardando aprovação, valores liberados, compras realizadas, recebimentos e atrasos.</p>
@@ -41,7 +42,7 @@
       <strong class="director-open">Acompanhar compras →</strong>
     </a>
 
-    <a class="director-panel-card is-maintenance" href="/diretoria/manutencao">
+    <a class="director-panel-card is-maintenance" href="<%=diretoriaBase%>/manutencao">
       <div class="director-card-head"><span>03</span><b>MANUTENÇÃO</b></div>
       <h2>Desempenho da Manutenção</h2>
       <p>Indicadores executivos do PCM sem expor à Diretoria as telas operacionais de planejamento e engenharia.</p>
