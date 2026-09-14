@@ -1,20 +1,22 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v3" />
-<link rel="stylesheet" href="/css/rh-portal.css?v=20260910-f3" />
+<link rel="stylesheet" href="/css/rh-portal.css?v=20260913-atestados" />
 <%
   const exames = Array.isArray(rh?.exames) ? rh.exames : [];
   const documentos = Array.isArray(rh?.documentos) ? rh.documentos : [];
   const solicitacoes = Array.isArray(rh?.solicitacoes) ? rh.solicitacoes : [];
+  const atestados = Array.isArray(rh?.atestados) ? rh.atestados : [];
   const vencidos = exames.filter((e) => e.status_visual === 'VENCIDO').length;
   const vencendo = exames.filter((e) => e.status_visual === 'VENCE_EM_BREVE').length;
   const folgaPendente = solicitacoes.filter((s) => s.status === 'PENDENTE_APROVACAO').length;
+  const atestadoPendente = atestados.filter((a) => String(a.status || '').toUpperCase() === 'ENVIADO').length;
 %>
 <div class="my-portal-page my-rh-page">
   <header class="my-section-head">
     <div>
       <span class="eyebrow">MEU PORTAL • RH</span>
       <h1>Meu RH</h1>
-      <p>Consulta pessoal de exames, documentos, solicitações de folga e saldo do Banco de Horas.</p>
+      <p>Consulta pessoal de exames, documentos, atestados, solicitações de folga e saldo do Banco de Horas.</p>
     </div>
     <a class="btn btn-ghost" href="/meu-portal">Voltar ao portal</a>
   </header>
@@ -25,8 +27,35 @@
     <section class="my-rh-kpis">
       <article class="card rh-kpi"><span>Banco de horas</span><strong><%= rh.saldo?.horas || formatMinutes(rh.saldo?.minutos || 0) %></strong><small>Saldo atual</small></article>
       <article class="card rh-kpi"><span>Folgas pendentes</span><strong><%= folgaPendente %></strong><small>Aguardando decisão</small></article>
+      <article class="card rh-kpi"><span>Atestados novos</span><strong><%= atestadoPendente %></strong><small>Aguardando recebimento do RH</small></article>
       <article class="card rh-kpi"><span>Exames vencendo</span><strong><%= vencendo %></strong><small>Próximos 30 dias</small></article>
       <article class="card rh-kpi"><span>Exames vencidos</span><strong><%= vencidos %></strong><small>Procure o RH para regularização</small></article>
+    </section>
+
+    <section class="card my-rh-card" id="atestados">
+      <div class="my-material-history__head">
+        <div><span class="eyebrow">ATESTADO MÉDICO • ENVIO SEGURO</span><h2>Enviar atestado ao RH</h2></div>
+      </div>
+      <form action="/meu-portal/rh/atestados" method="post" enctype="multipart/form-data" class="rh-form-grid">
+        <label><span>Data inicial do afastamento</span><input type="date" name="data_inicio" required /></label>
+        <label><span>Data final</span><input type="date" name="data_fim" required /></label>
+        <label class="rh-field-wide"><span>Arquivo do atestado</span><input type="file" name="arquivo" accept="application/pdf,image/jpeg,image/png,image/webp" required /><small>PDF, JPG, PNG ou WEBP • máximo 10 MB.</small></label>
+        <label class="rh-field-wide"><span>Observação administrativa (opcional)</span><textarea name="observacao" rows="2" maxlength="500" placeholder="Ex.: entregue após atendimento. Não informe CID, diagnóstico ou detalhes clínicos."></textarea></label>
+        <div class="rh-field-wide"><button class="btn btn-primary" type="submit">Enviar atestado</button></div>
+      </form>
+      <p class="rh-privacy">Ao enviar, o período é registrado automaticamente como <strong>ATESTADO</strong> na Escala, sem desconto do Banco de Horas. RH e ADMIN recebem acesso ao arquivo; a liderança da Manutenção recebe somente a informação operacional da ausência.</p>
+
+      <div class="my-rh-list" style="margin-top:1rem">
+        <% atestados.slice(0, 20).forEach((a) => { const st = String(a.status || 'ENVIADO').toUpperCase(); %>
+          <div class="my-rh-item">
+            <strong><%= dateBr.formatDateBR(a.data_inicio) %><%= a.data_fim && a.data_fim !== a.data_inicio ? ` a ${dateBr.formatDateBR(a.data_fim)}` : '' %></strong>
+            <span><%= st %></span>
+            <small><%= a.recebido_em ? `Recebido pelo RH em ${String(a.recebido_em).replace('T',' ').slice(0,16)}` : 'Enviado ao RH' %></small>
+            <a class="btn btn-sm" href="/meu-portal/rh/atestados/<%= a.id %>/arquivo">Baixar meu atestado</a>
+          </div>
+        <% }) %>
+        <% if (!atestados.length) { %><div class="rh-empty">Você ainda não enviou atestados pelo Meu RH.</div><% } %>
+      </div>
     </section>
 
     <section class="my-rh-grid">
@@ -60,11 +89,16 @@
         </div>
       </article>
 
-      <article class="card my-rh-card">
+      <article class="card my-rh-card" id="folgas">
         <div class="my-material-history__head"><div><span class="eyebrow">FOLGAS</span><h2>Minhas solicitações</h2></div><a class="btn btn-sm" href="/escala/meu-painel#solicitar-folga">Solicitar folga</a></div>
         <div class="my-rh-list">
-          <% solicitacoes.slice(0, 15).forEach((s) => { %>
-            <div class="my-rh-item"><strong><%= dateBr.formatDateBR(s.data_folga) %></strong><span><%= s.status || '-' %></span><small><%= s.observacao_decisao || s.motivo || 'Sem observação' %></small></div>
+          <% solicitacoes.slice(0, 15).forEach((s) => { const st = String(s.status || '').toUpperCase(); %>
+            <div class="my-rh-item">
+              <strong><%= dateBr.formatDateBR(s.data_folga) %></strong>
+              <span><%= s.status || '-' %></span>
+              <small><%= s.observacao_decisao || s.motivo || 'Sem observação' %></small>
+              <% if (st === 'APROVADA') { %><a class="btn btn-sm" href="/meu-portal/rh/folgas/<%= s.id %>/pdf">Baixar PDF</a><% } %>
+            </div>
           <% }) %>
           <% if (!solicitacoes.length) { %><div class="rh-empty">Você ainda não possui solicitações de folga.</div><% } %>
         </div>
