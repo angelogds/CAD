@@ -43,13 +43,20 @@
         <tbody>
           <% rows.forEach((r) => { const status = String(r.status || 'ENVIADO').toUpperCase(); %>
             <tr>
-              <td><strong><%= r.colaborador_nome || '-' %></strong><br><small><%= r.funcao || '-' %> • <%= r.setor || 'Manutenção' %></small></td>
-              <td><%= dateBr.formatDateBR(r.data_inicio) %><%= r.data_fim && r.data_fim !== r.data_inicio ? ` a ${dateBr.formatDateBR(r.data_fim)}` : '' %></td>
+              <td>
+                <strong><%= r.colaborador_nome || '-' %></strong><br>
+                <small><%= r.funcao || '-' %> • <%= r.setor || 'Manutenção' %></small><br>
+                <a class="btn btn-sm btn-ghost" href="/rh/colaboradores/<%= r.colaborador_id %>">Abrir ficha</a>
+              </td>
+              <td>
+                <%= dateBr.formatDateBR(r.data_inicio) %><%= r.data_fim && r.data_fim !== r.data_inicio ? ` a ${dateBr.formatDateBR(r.data_fim)}` : '' %>
+                <% if (r.observacao) { %><br><small><%= r.observacao %></small><% } %>
+              </td>
               <td><%= r.created_at ? String(r.created_at).replace('T',' ').slice(0,16) : '-' %></td>
               <td><span class="rh-badge <%= status === 'ENVIADO' ? 'is-warning' : '' %>"><%= status %></span></td>
               <td><a class="btn btn-sm" href="/rh/atestados/<%= r.id %>/arquivo">Baixar</a></td>
               <td>
-                <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+                <div class="rh-actions-inline">
                   <% if (status === 'ENVIADO') { %>
                     <form method="post" action="/rh/atestados/<%= r.id %>/status"><input type="hidden" name="status" value="RECEBIDO"><button class="btn btn-sm" type="submit">Confirmar recebimento</button></form>
                   <% } %>
