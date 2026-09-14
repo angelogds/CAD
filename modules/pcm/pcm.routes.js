@@ -7,6 +7,7 @@ const ctrl = require("./pcm.controller");
 const PCM_ACCESS = ACCESS.pcm;
 const PCM_MANAGE = ACCESS.pcm_manage;
 const DIRETORIA_MANUTENCAO = ACCESS.diretoria_manutencao || [];
+const DIRETORIA_MANUTENCAO_PATH = "/dashboard/diretoria/manutencao";
 
 function redirectWithQuery(target) {
   return (req, res) => {
@@ -19,11 +20,11 @@ router.get("/", requireLogin, requireRole(PCM_ACCESS), ctrl.index);
 
 // Compatibilidade: o painel executivo saiu do PCM operacional e passou a ser
 // parte do Painel da Diretoria. Favoritos antigos continuam funcionando.
-router.get("/dashboard-gerencial", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery("/diretoria/manutencao"));
-router.get("/dashboard-gerencial/dados", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery("/diretoria/manutencao/dados"));
-router.get("/dashboard-gerencial/pdf", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery("/diretoria/manutencao/pdf"));
-router.get("/dashboard-gerencial/excel", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery("/diretoria/manutencao/excel"));
-router.get("/dashboard-gerencial/configurar", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery("/diretoria/manutencao"));
+router.get("/dashboard-gerencial", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery(DIRETORIA_MANUTENCAO_PATH));
+router.get("/dashboard-gerencial/dados", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery(`${DIRETORIA_MANUTENCAO_PATH}/dados`));
+router.get("/dashboard-gerencial/pdf", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery(`${DIRETORIA_MANUTENCAO_PATH}/pdf`));
+router.get("/dashboard-gerencial/excel", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery(`${DIRETORIA_MANUTENCAO_PATH}/excel`));
+router.get("/dashboard-gerencial/configurar", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery(DIRETORIA_MANUTENCAO_PATH));
 
 router.get("/planejamento", requireLogin, requireRole(PCM_ACCESS), ctrl.planejamento);
 router.get("/planejamento/pdf", requireLogin, requireRole(PCM_ACCESS), ctrl.planejamentoPdf);
