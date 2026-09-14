@@ -97,7 +97,7 @@ function generateLeavePdf({ requestId }) {
     pdf.infoBox(doc, [
       { label: 'Colaborador', value: request.colaborador_nome || colab.nome || '-' },
       { label: 'Função', value: colab.funcao || request.funcao || '-' },
-      { label: 'Setor', value: colab.setor || 'Manutenção' },
+      { label: 'Setor', value: colab.setor || '-' },
       { label: 'Status', value: 'APROVADA' },
       { label: 'Data da folga', value: pdf.formatDate(request.data_folga) },
       { label: 'Horas compensadas', value: pdf.formatMinutes(request.minutos_solicitados || folga.minutos_descontados || 0) },
@@ -174,7 +174,7 @@ function generateConsolidatedLeavePdf(filters = {}) {
       drawProfile(doc, meta, colab);
       pdf.infoBox(doc, [
         { label: 'Função', value: colab.funcao || leaves[0]?.funcao || '-' },
-        { label: 'Setor', value: colab.setor || 'Manutenção' },
+        { label: 'Setor', value: colab.setor || '-' },
         { label: 'Saldo atual', value: pdf.formatMinutes(saldo.minutos || 0) },
         { label: 'Folgas no relatório', value: String(leaves.length) },
       ], meta, { columns: 2 });
