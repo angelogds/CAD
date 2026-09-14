@@ -1,6 +1,7 @@
 const comprasAcompanhamentoService = require('../compras/acompanhamento.service');
 const comprasAcompanhamentoController = require('../solicitacoes/solicitacoes.acompanhamento.controller');
 const pcmService = require('../pcm/pcm.service');
+const manutencaoExecutivaService = require('./diretoria.manutencao.service');
 
 const DIRETORIA_BASE_PATH = '/dashboard/diretoria';
 
@@ -24,10 +25,10 @@ function safeComprasSummary() {
 
 function safeMaintenanceSummary(userId) {
   try {
-    const painel = pcmService.getDashboardGerencial({ periodo: 'mes_atual' }, userId || null);
+    const painel = manutencaoExecutivaService.getDashboard({ periodo: 'mes_atual' }, userId || null);
     return {
       totalOs: Number(painel?.cards?.total_os || 0),
-      backlog: Number(painel?.cards?.backlog_manutencao || 0),
+      backlog: Number(painel?.cards?.backlog_os_atual || painel?.cards?.backlog_manutencao || 0),
       atrasadas: Number(painel?.cards?.os_atrasadas || 0),
       equipamentosCriticos: Number(painel?.cards?.equipamentos_criticos || 0),
     };
@@ -47,20 +48,30 @@ function index(req, res) {
   });
 }
 
+function fallbackMaintenanceDashboard() {
+  return {
+    filtros: {},
+    cards: {},
+    graficos: {},
+    tabelas: { ordens: [] },
+    equipamentos_atencao: [],
+    qualidade_dados: {
+      score: null,
+      status: 'SEM_DADOS',
+      status_label: 'Sem dados suficientes',
+      campos_pendentes: [],
+    },
+    erros: ['Não foi possível carregar todos os indicadores da manutenção.'],
+  };
+}
+
 function manutencao(req, res) {
   let dashboard;
   try {
-    dashboard = pcmService.getDashboardGerencial(req.query, req.session?.user?.id || null);
+    dashboard = manutencaoExecutivaService.getDashboard(req.query, req.session?.user?.id || null);
   } catch (error) {
     console.error('[diretoria] Falha ao abrir desempenho da manutenção:', error);
-    dashboard = {
-      filtros: {},
-      cards: {},
-      graficos: {},
-      tabelas: { ordens: [] },
-      equipamentos_atencao: [],
-      erros: ['Não foi possível carregar todos os indicadores da manutenção.'],
-    };
+    dashboard = fallbackMaintenanceDashboard();
   }
 
   return res.render('pcm/dashboard-gerencial', {
@@ -78,4 +89,14 @@ function manutencao(req, res) {
   });
 }
 
-module.exports = { index, manutencao, DIRETORIA_BASE_PATH };
+function manutencaoDados(req, res) {
+  try {
+    const dashboard = manutencaoExecutivaService.getDashboard(req.query, req.session?.user?.id || null);
+    return res.json({ ok: true, dashboard });
+  } catch (error) {
+    console.error('[diretoria] Falha ao atualizar indicadores executivos da manutenção:', error?.message || error);
+    return res.status(500).json({ ok: false, message: 'Não foi possível atualizar os indicadores da manutenção.' });
+  }
+}
+
+module.exports = { index, manutencao, manutencaoDados, DIRETORIA_BASE_PATH };

@@ -24,7 +24,7 @@ router.get('/compras/:id', requireLogin, requireRole(DIRETORIA_COMPRAS), compras
 router.post('/compras/:id/aprovar-itens-cotados', requireLogin, requireRole(DIRETORIA_COMPRAS), comprasContext, comprasCtrl.aprovarItensCotados);
 
 router.get('/manutencao', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencao);
-router.get('/manutencao/dados', requireLogin, requireRole(DIRETORIA_MANUTENCAO), pcmCtrl.dashboardDados);
+router.get('/manutencao/dados', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencaoDados);
 router.get('/manutencao/pdf', requireLogin, requireRole(DIRETORIA_MANUTENCAO), pcmCtrl.dashboardPdf);
 router.get('/manutencao/excel', requireLogin, requireRole(DIRETORIA_MANUTENCAO), pcmCtrl.dashboardExcel);
 
