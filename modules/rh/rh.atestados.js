@@ -7,6 +7,14 @@ const escala = require('../escala/escala.service');
 
 const ATESTADO_DIR = path.join(storage.DATA_DIR, 'rh', 'atestados');
 const STATUS = new Set(['ENVIADO', 'RECEBIDO', 'ARQUIVADO']);
+const FILE_SIGNATURES = Object.freeze({
+  'application/pdf': (buffer) => buffer.subarray(0, 4).toString('ascii') === '%PDF',
+  'image/jpeg': (buffer) => buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff,
+  'image/png': (buffer) => buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+  'image/webp': (buffer) => buffer.length >= 12
+    && buffer.subarray(0, 4).toString('ascii') === 'RIFF'
+    && buffer.subarray(8, 12).toString('ascii') === 'WEBP',
+});
 fs.mkdirSync(ATESTADO_DIR, { recursive: true });
 
 function tableExists(name) {
@@ -17,6 +25,29 @@ function tableExists(name) {
 function normalizeDate(value) {
   const raw = String(value || '').slice(0, 10);
   return dateBr.isValidISODate(raw) ? raw : null;
+}
+
+function validateUploadedFile(file) {
+  const mime = String(file?.mimetype || '').toLowerCase();
+  const checker = FILE_SIGNATURES[mime];
+  if (!checker || !file?.path) throw new Error('Arquivo de atestado inválido.');
+
+  let descriptor = null;
+  try {
+    descriptor = fs.openSync(file.path, 'r');
+    const header = Buffer.alloc(12);
+    const bytesRead = fs.readSync(descriptor, header, 0, header.length, 0);
+    if (!checker(header.subarray(0, bytesRead))) {
+      throw new Error('O conteúdo do arquivo não corresponde ao formato informado.');
+    }
+  } catch (error) {
+    if (/não corresponde ao formato|Arquivo de atestado inválido/i.test(String(error?.message || ''))) throw error;
+    throw new Error('Não foi possível validar o arquivo do atestado.');
+  } finally {
+    if (descriptor !== null) {
+      try { fs.closeSync(descriptor); } catch (_error) {}
+    }
+  }
 }
 
 function getById(id) {
@@ -84,6 +115,7 @@ function listAll(filters = {}) {
 function createFromPortal({ userId, payload = {}, file = null }) {
   if (!tableExists('rh_atestados')) throw new Error('Estrutura de atestados ainda não está disponível. Execute as migrations.');
   if (!file?.filename) throw new Error('Selecione o arquivo do atestado.');
+  validateUploadedFile(file);
 
   const colaborador = escala.buscarColaboradorDoUsuario(Number(userId));
   if (!colaborador?.id) throw new Error('Seu usuário ainda não está vinculado a um colaborador ativo.');
