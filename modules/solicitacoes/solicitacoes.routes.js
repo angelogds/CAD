@@ -1,11 +1,11 @@
 const router = require("express").Router();
 const { requireLogin, requireRole } = require("../auth/auth.middleware");
-const { ACCESS, ROLE, normalizeRole } = require("../../config/rbac");
+const { ACCESS, normalizeRole } = require("../../config/rbac");
 const ctrl = require("./solicitacoes.controller");
 const flowCtrl = require("./solicitacoes.itens-consenso.controller");
-const acompanhamentoCtrl = require("./solicitacoes.acompanhamento.controller");
 
-const ACOMPANHAMENTO_COMPRAS_EXECUTIVO = [ROLE.ADMIN, ROLE.DIRETORIA];
+const DIRETORIA_COMPRAS = ACCESS.diretoria_compras || [];
+const DIRETORIA_COMPRAS_PATH = "/dashboard/diretoria/compras";
 
 function requireAdminDeleteSolicitacao(req, res, next) {
   if (normalizeRole(req.session?.user?.role || req.session?.user?.perfil) === "ADMIN") return next();
@@ -13,11 +13,27 @@ function requireAdminDeleteSolicitacao(req, res, next) {
   return res.redirect("/solicitacoes/minhas");
 }
 
+function redirectAcompanhamentoCompras(req, res) {
+  const suffix = req.params?.id ? `/${encodeURIComponent(req.params.id)}` : "";
+  const query = new URLSearchParams(req.query || {}).toString();
+  const target = `${DIRETORIA_COMPRAS_PATH}${suffix}${query ? `?${query}` : ""}`;
+  return res.redirect(["GET", "HEAD"].includes(req.method) ? 301 : 307, target);
+}
+
+function redirectAprovacaoCompras(req, res) {
+  const id = encodeURIComponent(req.params.id);
+  return res.redirect(307, `${DIRETORIA_COMPRAS_PATH}/${id}/aprovar-itens-cotados`);
+}
+
 router.get("/minhas", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.minhas);
 router.get("/nova", requireLogin, requireRole(ACCESS.solicitacoes_create), ctrl.nova);
-router.get("/acompanhamento-compras", requireLogin, requireRole(ACOMPANHAMENTO_COMPRAS_EXECUTIVO), acompanhamentoCtrl.lista);
-router.get("/acompanhamento-compras/:id", requireLogin, requireRole(ACOMPANHAMENTO_COMPRAS_EXECUTIVO), acompanhamentoCtrl.detalhe);
-router.post("/acompanhamento-compras/:id/aprovar-itens-cotados", requireLogin, requireRole(ACOMPANHAMENTO_COMPRAS_EXECUTIVO), acompanhamentoCtrl.aprovarItensCotados);
+
+// Compatibilidade: o acompanhamento executivo saiu de Solicitações. URLs antigas
+// continuam válidas para favoritos e notificações existentes.
+router.get("/acompanhamento-compras", requireLogin, requireRole(DIRETORIA_COMPRAS), redirectAcompanhamentoCompras);
+router.get("/acompanhamento-compras/:id", requireLogin, requireRole(DIRETORIA_COMPRAS), redirectAcompanhamentoCompras);
+router.post("/acompanhamento-compras/:id/aprovar-itens-cotados", requireLogin, requireRole(DIRETORIA_COMPRAS), redirectAprovacaoCompras);
+
 router.post("/", requireLogin, requireRole(ACCESS.solicitacoes_create), ctrl.criar);
 router.get("/:id/pdf", requireLogin, requireRole(ACCESS.solicitacoes_read), ctrl.pdf);
 router.post("/:id/excluir", requireLogin, requireAdminDeleteSolicitacao, requireRole(ACCESS.solicitacoes_delete), ctrl.excluir);
