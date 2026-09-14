@@ -25,10 +25,10 @@ const PAGE = Object.freeze({
 });
 
 function logoPath() {
+  // Marca oficial dos relatórios da Manutenção. Não usar o logo da Reciclagem
+  // como identidade principal dos PDFs individuais/consolidados do RH/Manutenção.
   return [
-    'public/IMG/logopdf_campo_do_gado.png.png',
     'public/IMG/logo_menu.png.png',
-    'public/IMG/login_campo_do_gado.png.png.png',
     'public/img/logo_menu_256.png',
     'public/img/logo.png',
   ].map((p) => path.join(process.cwd(), p)).find((p) => fs.existsSync(p)) || null;
@@ -65,7 +65,7 @@ function drawHeader(doc, { title, subtitle = 'Campo do Gado • Manutenção Ind
       doc.image(logo, left + 8, 9, { fit: [70, 58], align: 'center', valign: 'center' });
     } catch (_error) {
       doc.fillColor(COLORS.white).font('Helvetica-Bold').fontSize(7)
-        .text('CAMPO\nDO GADO', left + 10, 27, { width: 62, align: 'center' });
+        .text('MANUTENÇÃO', left + 10, 30, { width: 62, align: 'center' });
     }
   }
 
