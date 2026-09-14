@@ -145,7 +145,7 @@ function updateStatus(id, status, actor = {}) {
     UPDATE rh_atestados
     SET status=?,
         recebido_por_user_id=COALESCE(recebido_por_user_id, ?),
-        recebido_em=CASE WHEN ?='RECEBIDO' AND recebido_em IS NULL THEN datetime('now') ELSE recebido_em END,
+        recebido_em=CASE WHEN ? IN ('RECEBIDO','ARQUIVADO') AND recebido_em IS NULL THEN datetime('now') ELSE recebido_em END,
         arquivado_em=CASE WHEN ?='ARQUIVADO' THEN datetime('now') ELSE arquivado_em END,
         updated_at=datetime('now')
     WHERE id=?
