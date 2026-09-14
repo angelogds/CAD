@@ -17,6 +17,8 @@ test('atestado usa armazenamento privado e integra ausência existente sem debit
   assert.match(service, /tipo_lancamento:\s*'ATESTADO'/);
   assert.match(service, /minutos_descontados:\s*0/);
   assert.match(service, /anexo_path:\s*null/);
+  assert.match(service, /const persist = db\.transaction\(\(\) =>/);
+  assert.match(service, /return getById\(persist\(\)\)/);
   assert.match(service, /getOwnPrivateFile/);
 });
 
