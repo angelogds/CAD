@@ -2,6 +2,8 @@ const comprasAcompanhamentoService = require('../compras/acompanhamento.service'
 const comprasAcompanhamentoController = require('../solicitacoes/solicitacoes.acompanhamento.controller');
 const pcmService = require('../pcm/pcm.service');
 
+const DIRETORIA_BASE_PATH = '/dashboard/diretoria';
+
 function safeComprasSummary() {
   try {
     const painel = comprasAcompanhamentoController.enrichDashboardWithApprovals(
@@ -68,7 +70,7 @@ function manutencao(req, res) {
     opcoes: pcmService.listFiltros(),
     canManagePcm: false,
     dashboard,
-    dashboardBasePath: '/diretoria/manutencao',
+    dashboardBasePath: `${DIRETORIA_BASE_PATH}/manutencao`,
     dashboardTitle: 'Desempenho da Manutenção',
     dashboardSubtitle: 'Indicadores executivos de manutenção para acompanhamento da Diretoria.',
     dashboardEyebrow: 'Painel da Diretoria · Manutenção',
@@ -76,4 +78,4 @@ function manutencao(req, res) {
   });
 }
 
-module.exports = { index, manutencao };
+module.exports = { index, manutencao, DIRETORIA_BASE_PATH };
