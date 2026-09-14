@@ -10,7 +10,7 @@ function accessBody(source, key) {
   return source.match(new RegExp(`${key}:\\s*\\[([^\\]]+)\\]`, 's'))?.[1] || '';
 }
 
-test('RBAC cria Painel da Diretoria sem devolver acesso ao PCM operacional', () => {
+test('RBAC mantém módulos executivos da Diretoria sem devolver acesso ao PCM operacional', () => {
   const rbac = read('config/rbac.js');
 
   assert.match(accessBody(rbac, 'diretoria_dashboard'), /ROLE\.DIRETORIA/);
@@ -27,7 +27,7 @@ test('Diretoria continua podendo consultar e criar Solicitações', () => {
   assert.match(accessBody(rbac, 'solicitacoes_create'), /ROLE\.DIRETORIA/);
 });
 
-test('Painel da Diretoria é montado dentro do dashboard e protegido por perfil', () => {
+test('rotas executivas permanecem protegidas e montadas no dashboard', () => {
   const dashboardRoutes = read('modules/dashboard/dashboard.routes.js');
   const routes = read('modules/diretoria/diretoria.routes.js');
 
@@ -35,23 +35,29 @@ test('Painel da Diretoria é montado dentro do dashboard e protegido por perfil'
   assert.match(routes, /ACCESS\.diretoria_dashboard/);
   assert.match(routes, /ACCESS\.diretoria_compras/);
   assert.match(routes, /ACCESS\.diretoria_manutencao/);
-  assert.match(routes, /router\.get\('\/', requireLogin, requireRole\(DIRETORIA_ACCESS\)/);
   assert.match(routes, /router\.get\('\/compras'/);
   assert.match(routes, /router\.get\('\/manutencao'/);
 });
 
-test('home executiva oferece os três painéis solicitados', () => {
-  const view = read('views/diretoria/index.ejs');
-  assert.match(view, /Painel da Diretoria/);
-  assert.match(view, /Painel Gerencial Geral/);
-  assert.match(view, /Acompanhamento de Compras/);
-  assert.match(view, /Desempenho da Manutenção/);
-  assert.match(view, /href="\/dashboard"/);
-  assert.match(view, /diretoriaBase%>\/compras/);
-  assert.match(view, /diretoriaBase%>\/manutencao/);
+test('entrada antiga do Painel da Diretoria não renderiza mais hub e redireciona ao Painel Principal', () => {
+  const controller = read('modules/diretoria/diretoria.controller.js');
+  assert.match(controller, /function index\(_req, res\) \{\s*return res\.redirect\(301, '\/dashboard'\);\s*\}/s);
+  assert.doesNotMatch(controller, /res\.render\('diretoria\/index'/);
 });
 
-test('Solicitações fica focado no solicitante e não exibe mais o acompanhamento executivo', () => {
+test('menu coloca Desempenho da Manutenção e Acompanhamento de Compras logo após Painel Principal', () => {
+  const sidebar = read('views/partials/sidebar.ejs');
+  assert.match(sidebar, /canDiretoriaManutencao = can\('diretoria_manutencao'\)/);
+  assert.match(sidebar, /canDiretoriaCompras = can\('diretoria_compras'\)/);
+  const painel = sidebar.indexOf("navItem('/dashboard', 'Painel Principal'");
+  const manutencao = sidebar.indexOf("navItem('/dashboard/diretoria/manutencao', 'Desempenho da Manutenção'");
+  const compras = sidebar.indexOf("navItem('/dashboard/diretoria/compras', 'Acompanhamento de Compras'");
+  const equipamentos = sidebar.indexOf("navItem('/equipamentos', 'Equipamentos'");
+  assert.ok(painel >= 0 && manutencao > painel && compras > manutencao && equipamentos > compras);
+  assert.doesNotMatch(sidebar, /navItem\('\/dashboard\/diretoria', 'Painel da Diretoria'/);
+});
+
+test('Solicitações fica focado no solicitante e não exibe acompanhamento executivo', () => {
   const view = read('views/solicitacoes/minhas.ejs');
   assert.match(view, /Solicitações de Material/);
   assert.match(view, /\+ Nova Solicitação/);
@@ -59,18 +65,15 @@ test('Solicitações fica focado no solicitante e não exibe mais o acompanhamen
   assert.doesNotMatch(view, /acompanhamento-compras/);
 });
 
-test('Acompanhamento de Compras reutiliza os serviços existentes e aprovação por item', () => {
-  const controller = read('modules/diretoria/diretoria.controller.js');
+test('Acompanhamento de Compras reutiliza controller e aprovação por item existentes', () => {
   const routes = read('modules/diretoria/diretoria.routes.js');
   const tracking = read('modules/solicitacoes/solicitacoes.acompanhamento.controller.js');
 
-  assert.match(controller, /require\('\.\.\/compras\/acompanhamento\.service'\)/);
-  assert.match(controller, /enrichDashboardWithApprovals/);
   assert.match(routes, /comprasCtrl\.lista/);
   assert.match(routes, /comprasCtrl\.detalhe/);
   assert.match(routes, /comprasCtrl\.aprovarItensCotados/);
+  assert.match(routes, /executivePurchasesActiveMenu = 'diretoria-compras'/);
   assert.match(tracking, /itemApprovalService\.approveQuotedItems/);
-  assert.doesNotMatch(controller, /INSERT\s|UPDATE\s|DELETE\s|CREATE TABLE/i);
 });
 
 test('Desempenho da Manutenção reutiliza o dashboard gerencial do PCM em modo somente leitura', () => {
@@ -84,12 +87,13 @@ test('Desempenho da Manutenção reutiliza o dashboard gerencial do PCM em modo 
   assert.match(controller, /pcmService\.listFiltros\(\)/);
   assert.match(controller, /canManagePcm:\s*false/);
   assert.match(controller, /showPcmNav:\s*false/);
+  assert.match(controller, /activeMenu:\s*'diretoria-manutencao'/);
   assert.match(controller, /dashboardBasePath:\s*`\$\{DIRETORIA_BASE_PATH\}\/manutencao`/);
   assert.match(view, /PCM_DASHBOARD_ENDPOINTS/);
   assert.match(script, /window\.PCM_DASHBOARD_ENDPOINTS/);
 });
 
-test('URLs antigas continuam funcionando por redirecionamento para o Painel da Diretoria', () => {
+test('URLs antigas continuam funcionando por redirecionamento para os módulos executivos', () => {
   const solicitacoesRoutes = read('modules/solicitacoes/solicitacoes.routes.js');
   const pcmRoutes = read('modules/pcm/pcm.routes.js');
 
@@ -101,20 +105,11 @@ test('URLs antigas continuam funcionando por redirecionamento para o Painel da D
   assert.match(pcmRoutes, /redirectWithQuery\(DIRETORIA_MANUTENCAO_PATH\)/);
 });
 
-test('menus separam visão executiva da operação do PCM e desenho técnico', () => {
+test('menus continuam separando visão executiva do PCM operacional e desenho técnico', () => {
   const sidebar = read('views/partials/sidebar.ejs');
   const pcmNav = read('views/pcm/partials/internal-nav.ejs');
 
-  assert.match(sidebar, /canDiretoria = can\('diretoria_dashboard'\)/);
-  assert.match(sidebar, /navItem\('\/dashboard\/diretoria', 'Painel da Diretoria'/);
+  assert.match(sidebar, /activeMenu === 'diretoria-manutencao'/);
+  assert.match(sidebar, /activeMenu === 'diretoria-compras'/);
   assert.doesNotMatch(pcmNav, /Painel da Diretoria/);
-});
-
-test('novo painel executivo possui layout responsivo próprio', () => {
-  const css = read('public/css/diretoria.css');
-  assert.match(css, /\.director-panels/);
-  assert.match(css, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
-  assert.match(css, /@media\(max-width:1100px\)/);
-  assert.match(css, /@media\(max-width:760px\)/);
-  assert.match(css, /@media\(max-width:420px\)/);
 });

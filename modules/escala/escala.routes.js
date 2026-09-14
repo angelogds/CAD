@@ -7,6 +7,7 @@ const router = express.Router();
 const { requireLogin, requireRole, requireAdmin } = require("../auth/auth.middleware");
 const { ACCESS, ROLE } = require("../../config/rbac");
 const controller = require("./escala.controller");
+const weeklyPdfController = require("./escala.weekly-pdf.controller");
 const selfController = require("./escala.self.controller");
 const folgaController = require("./escala.folga.controller");
 const dateBr = require("../../utils/data-hora-br");
@@ -123,8 +124,8 @@ router.get("/editar/:id", requireLogin, requireRole(escalaManage), safe(controll
 router.post("/editar/:id", requireLogin, requireRole(escalaManage), safe(controller.salvarEdicao, "salvarEdicao"));
 router.post("/alocacao/:id/delete", requireLogin, requireRole(escalaManage), safe(controller.removerAlocacao, "removerAlocacao"));
 router.post("/completa/recalcular", requireLogin, requireRole(escalaManage), safe(controller.recalcularCompleta, "recalcularCompleta"));
-router.get("/pdf/semana", requireLogin, requireRole(ACCESS.escala_reports || escalaRead), safe(controller.pdfSemana, "pdfSemana"));
-router.get("/pdf/semana/:id", requireLogin, requireRole(ACCESS.escala_reports || escalaRead), safe(controller.pdfSemanaById, "pdfSemanaById"));
+router.get("/pdf/semana", requireLogin, requireRole(ACCESS.escala_reports || escalaRead), safe(weeklyPdfController.pdfSemana, "pdfSemana"));
+router.get("/pdf/semana/:id", requireLogin, requireRole(ACCESS.escala_reports || escalaRead), safe(weeklyPdfController.pdfSemanaById, "pdfSemanaById"));
 router.get("/pdf/periodo", requireLogin, requireRole(ACCESS.escala_reports || escalaRead), safe(controller.pdfPeriodo, "pdfPeriodo"));
 router.get("/pdf", requireLogin, requireRole(ACCESS.escala_reports || escalaRead), safe(controller.pdfPeriodo, "pdfPeriodo"));
 

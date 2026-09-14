@@ -53,7 +53,7 @@ test('rota de atualização da Diretoria usa a camada executiva e preserva RBAC'
   const controller = read('modules/diretoria/diretoria.controller.js');
   assert.match(routes, /router\.get\('\/manutencao\/dados', requireLogin, requireRole\(DIRETORIA_MANUTENCAO\), ctrl\.manutencaoDados\)/);
   assert.match(controller, /manutencaoExecutivaService\.getDashboard\(req\.query/);
-  assert.match(controller, /manutencaoExecutivaService\.getDashboard\(\{ periodo: 'mes_atual' \}/);
+  assert.doesNotMatch(controller, /safeMaintenanceSummary|periodo: 'mes_atual'/);
 });
 
 test('interface executiva mostra aging reincidência e qualidade com atualização dinâmica', () => {

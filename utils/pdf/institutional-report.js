@@ -2,9 +2,23 @@ const PDFDocument = require('pdfkit');
 
 // Geometria do documento de Solicitações (compras.service.js#gerarPdf).
 // O cursor é explícito: textos, tabelas e rodapés nunca abrem páginas implicitamente.
-function createInstitutionalReport({ title, subtitle, issuedAt, logoPath, colors, sector = 'MANUTENÇÃO / RH' }) {
-  const doc = new PDFDocument({ size: 'A4', margins: { top: 0, bottom: 0, left: 0, right: 0 }, bufferPages: true,
-    info: { Title: title, Author: 'Manutenção Campo do Gado', Subject: 'Controle interno de banco de horas' } });
+function createInstitutionalReport({
+  title,
+  subtitle,
+  issuedAt,
+  logoPath,
+  colors,
+  sector = 'MANUTENÇÃO / RH',
+  headerContext = 'Banco de horas | Manutenção Campo do Gado',
+  footerText = 'Manutenção Campo do Gado - Documento para controle interno de banco de horas e folgas.',
+  subject = 'Controle interno de banco de horas',
+} = {}) {
+  const doc = new PDFDocument({
+    size: 'A4',
+    margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    bufferPages: true,
+    info: { Title: title, Author: 'Manutenção Campo do Gado', Subject: subject || title || 'Documento interno' },
+  });
   const left = 40;
   const width = doc.page.width - left * 2;
   const bottom = doc.page.height - 70;
@@ -56,7 +70,7 @@ function createInstitutionalReport({ title, subtitle, issuedAt, logoPath, colors
     }
     if (!hasLogo) write(['MANUTENÇÃO', 'CAMPO DO GADO'], left + 8, 28, 70, { size: 7, font: 'Helvetica-Bold', color: colors.white, align: 'center' });
     write(['RECICLAGEM CAMPO DO GADO'], left + 100, 22, 270, { size: 14, font: 'Helvetica-Bold', color: colors.white });
-    write(['Banco de horas | Manutenção Campo do Gado'], left + 100, 43, 280, { size: 8.5, color: colors.white });
+    write([headerContext || 'Manutenção Campo do Gado'], left + 100, 43, 280, { size: 8.5, color: colors.white });
     write([sector], left + width - 110, 22, 110, { size: 7.2, font: 'Helvetica-Bold', color: colors.white, align: 'right' });
     write([`Data: ${issuedAt || '-'}`], left + width - 110, 43, 110, { size: 7.8, color: colors.white, align: 'right' });
     y = top;
@@ -70,7 +84,7 @@ function createInstitutionalReport({ title, subtitle, issuedAt, logoPath, colors
     const titleLines = lines(String(title).toUpperCase(), width, 'Helvetica-Bold', 18);
     write(titleLines, left, y, width, { size: 18, font: 'Helvetica-Bold', color: colors.greenDark, align: 'center', lineHeight: 23 });
     y += titleLines.length * 23 + 3;
-    const subLines = lines(subtitle || 'Controle interno de horas extras e folgas compensatórias', width, 'Helvetica', 9);
+    const subLines = lines(subtitle || 'Documento interno da Manutenção Industrial', width, 'Helvetica', 9);
     write(subLines, left, y, width, { size: 9, color: colors.muted, align: 'center', lineHeight: 12 });
     y += subLines.length * 12 + 18;
   }
@@ -205,7 +219,7 @@ function createInstitutionalReport({ title, subtitle, issuedAt, logoPath, colors
       doc.switchToPage(i);
       const fy = doc.page.height - 42;
       doc.moveTo(left, fy - 9).lineTo(left + width, fy - 9).lineWidth(0.8).stroke(colors.border);
-      write(['Manutenção Campo do Gado - Documento para controle interno de banco de horas e folgas.'], left, fy, width - 78, { size: 7.2, color: colors.muted });
+      write([footerText || 'Manutenção Campo do Gado - Documento interno.'], left, fy, width - 78, { size: 7.2, color: colors.muted });
       write([`Página ${i + 1} de ${range.count}`], left + width - 78, fy, 78, { size: 7.2, color: colors.muted, align: 'right' });
     }
     doc.end();
