@@ -75,10 +75,12 @@ test('Acompanhamento de Compras reutiliza os serviços existentes e aprovação 
 
 test('Desempenho da Manutenção reutiliza o dashboard gerencial do PCM em modo somente leitura', () => {
   const controller = read('modules/diretoria/diretoria.controller.js');
+  const executiveService = read('modules/diretoria/diretoria.manutencao.service.js');
   const view = read('views/pcm/dashboard-gerencial.ejs');
   const script = read('public/js/pcm-dashboard.js');
 
-  assert.match(controller, /pcmService\.getDashboardGerencial/);
+  assert.match(controller, /manutencaoExecutivaService\.getDashboard/);
+  assert.match(executiveService, /pcmService\.getDashboardGerencial\(query, userId\)/);
   assert.match(controller, /pcmService\.listFiltros\(\)/);
   assert.match(controller, /canManagePcm:\s*false/);
   assert.match(controller, /showPcmNav:\s*false/);
