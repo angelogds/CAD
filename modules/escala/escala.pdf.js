@@ -442,68 +442,123 @@ function generatePeriodPDF({ start, end, periodoTexto, baseServicos = [], apurac
 
 function fmtMin(min) { const m = Math.abs(Number(min) || 0); return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; }
 
-function gerarPdfBancoHorasGeral(dados = {}) {
-  const doc = createDoc();
-  const meta = { title: dados.reportTitle || "Campo do Gado\nBanco de Horas da Manutenção", subtitle: dados.reportSubtitle || "Controle Interno de Horas Extras e Folgas Compensatórias", logoPath: logoPath() };
-  process.nextTick(() => {
-    setupPage(doc, meta, false);
-    doc.font("Helvetica-Bold").fontSize(11).fillColor(COLORS.greenDark).text("Relatório Consolidado do Banco de Horas", PAGE.margins.left, doc.y);
-    doc.moveDown(.4).font("Helvetica").fontSize(9).fillColor(COLORS.muted).text(`Emissão: ${formatDateBr(String(dados.emitidoEm || '').slice(0,10))}`);
-    drawTable(doc, { meta, columns: [
-      {key:'funcionario', label:'Funcionário', width:150}, {key:'creditos', label:'Créditos', width:75, align:'center'}, {key:'debitos', label:'Débitos', width:75, align:'center'}, {key:'saldo', label:'Saldo', width:75, align:'center'}, {key:'dias', label:'Dias', width:55, align:'center'}, {key:'obs', label:'Observações', width:119}
-    ], rows: (dados.banco || []).map(b => ({ funcionario:b.nome, creditos:fmtMin(b.saldo?.creditos), debitos:fmtMin(b.saldo?.debitos), saldo:b.saldo?.horas, dias:String(b.saldo?.diasFolgaDecimal ?? 0), obs:'Controle interno da manutenção' })), emptyRow:{funcionario:'Sem dados',creditos:'-',debitos:'-',saldo:'-',dias:'-',obs:'-'} });
+// Os três relatórios usam o mesmo layout institucional e o mesmo contrato de dados.
+const pdfStandard = require('../../utils/pdf-standard');
 
-    ensureSpace(doc, 44, meta);
-    doc.moveDown(1).font("Helvetica-Bold").fontSize(11).fillColor(COLORS.greenDark)
-      .text("Detalhamento por funcionário / OS", PAGE.margins.left, doc.y);
-    doc.moveDown(.4).font("Helvetica").fontSize(8.4).fillColor(COLORS.muted)
-      .text("A OS é exibida somente quando existe vínculo real no lançamento da hora extra. Registros sem vínculo permanecem identificados com “-”.", PAGE.margins.left, doc.y, { width: 520 });
-    doc.moveDown(.5);
-    drawTable(doc, { meta, columns: [
-      {key:'funcionario',label:'Funcionário',width:100},
-      {key:'os',label:'OS',width:40,align:'center'},
-      {key:'data',label:'Data',width:57,align:'center'},
-      {key:'total',label:'Horas',width:48,align:'center'},
-      {key:'local',label:'Equipamento / local',width:105},
-      {key:'servico',label:'Serviço executado',width:173}
-    ], rows: (dados.horasExtras || []).map(h=>({funcionario:h.colaborador_nome,os:h.os_id || '-',data:formatDateBr(h.data_servico),total:fmtMin(h.total_minutos),local:h.equipamento_nome || h.os_equipamento || '-',servico:h.descricao_servico || h.os_descricao || '-'})), emptyRow:{funcionario:'Sem registros',os:'-',data:'-',total:'-',local:'-',servico:'Nenhuma hora extra encontrada para os filtros selecionados.'} });
-
-    doc.moveDown().font("Helvetica").fontSize(8.5).fillColor(COLORS.muted).text("Este relatório é um controle interno da manutenção, utilizado para organização das horas extras, banco de horas e programação de folgas compensatórias da equipe.", PAGE.margins.left, doc.y, { width: 520 });
-    ensureSpace(doc, 42, meta);
-    doc.moveDown(2).font("Helvetica").fontSize(9).fillColor(COLORS.text).text("Assinaturas: Encarregado de manutenção __________________  Funcionário __________________  Direção/RH __________________");
-    doc.end();
+function bancoReport(dados, title, render, { individual = false } = {}) {
+  const filtros = dados.filtros || {};
+  const periodo = filtros.inicio || filtros.fim
+    ? `${filtros.inicio ? formatDateBr(filtros.inicio) : 'Sem início definido'} a ${filtros.fim ? formatDateBr(filtros.fim) : 'Sem fim definido'}`
+    : 'Todos os períodos';
+  const report = pdfStandard.createReport({
+    title,
+    subtitle: dados.reportSubtitle || 'Controle interno de horas extras e folgas compensatórias',
+    issuedAt: formatDateBr(String(dados.emitidoEm || '').slice(0, 10)),
   });
-  return doc;
+  process.nextTick(() => {
+    try {
+      report.start();
+      report.identification([
+        ['Empresa / Unidade', 'Reciclagem Campo do Gado', 'Setor', 'Manutenção'],
+        ['Destinatário', 'Recursos Humanos', 'Emissão', formatDateBr(String(dados.emitidoEm || '').slice(0, 10))],
+        ['Período do detalhamento', periodo, 'Status dos lançamentos', filtros.status ? String(filtros.status).replaceAll('_', ' ') : 'Todos'],
+        ['Colaborador / Cadastro', filtros.colaborador_id ? `Cadastro #${filtros.colaborador_id}` : 'Todos os colaboradores', 'Filtro de OS', filtros.os_id ? `OS ${filtros.os_id}` : 'Todas'],
+      ]);
+      render(report);
+      report.signatures(individual);
+      report.end();
+    } catch (error) {
+      report.doc.destroy(error);
+    }
+  });
+  return report.doc;
+}
+
+function bancoSummary(report, banco, dados) {
+  const total = key => banco.reduce((sum, b) => sum + Number(b.saldo?.[key] || 0), 0);
+  report.summary([
+    { label: 'COLABORADORES', value: String(banco.length) },
+    { label: 'CRÉDITOS ACUMULADOS', value: pdfStandard.formatMinutes(total('creditos')) },
+    { label: 'DÉBITOS ACUMULADOS', value: pdfStandard.formatMinutes(total('debitos')) },
+    { label: 'SALDO ATUAL DA EQUIPE', value: pdfStandard.formatMinutes(total('minutos')) },
+  ]);
+  const base = Number(dados.minutosDiaFolga);
+  report.note(`Créditos, débitos e saldos são acumulados até a emissão. O período e os filtros de OS/status aplicam-se ao detalhamento dos lançamentos, sem recalcular o saldo acumulado.${base > 0 ? ` Dias equivalentes: saldo dividido pela jornada de referência de ${pdfStandard.formatMinutes(base)} do sistema.` : ' Dias equivalentes: conforme jornada de referência cadastrada no sistema.'}`);
+}
+
+function bancoDetailRows(dados) {
+  return (dados.horasExtras || []).map(h => ({
+    funcionario:h.colaborador_nome ? `${h.colaborador_nome}${h.colaborador_id ? `\nCadastro #${h.colaborador_id}` : ''}` : '-',
+    os:h.os_id || '-', data:formatDateBr(h.data_servico), total:pdfStandard.formatMinutes(h.total_minutos),
+    local:h.equipamento_nome || h.os_equipamento || '-',
+    servico:[h.descricao_servico || h.os_descricao || '-',
+      `Horário: ${h.inicio_extra || '-'} até ${h.fim_extra || '-'}`,
+      `Status: ${String(h.status || 'Não informado').replaceAll('_', ' ')}`].join('\n'),
+  }));
+}
+
+function bancoDetails(report, dados, title = '2. Detalhamento por funcionário / OS') {
+  report.table({ title, columns: [
+    {key:'funcionario',label:'Colaborador / Cadastro',width:92,repeatOnSplit:true},
+    {key:'os',label:'OS',width:30,align:'center',repeatOnSplit:true},
+    {key:'data',label:'Data',width:58,align:'center',repeatOnSplit:true},
+    {key:'total',label:'Horas',width:42,align:'center'},
+    {key:'local',label:'Equipamento / local',width:104},
+    {key:'servico',label:'Serviço executado / Situação',width:189},
+  ], rows:bancoDetailRows(dados), emptyText:'Nenhuma hora extra encontrada para os filtros selecionados.' });
+  report.note('A OS é exibida somente quando existe vínculo real na hora extra. O sinal "-" indica ausência de vínculo. Lançamentos pendentes, reprovados ou cancelados no detalhamento não representam créditos aprovados do banco.', { keepWithNext:78 });
+}
+
+function gerarPdfBancoHorasGeral(dados = {}) {
+  return bancoReport(dados, dados.reportTitle || 'Banco de Horas da Manutenção', report => {
+    const banco = dados.banco || [];
+    bancoSummary(report, banco, dados);
+    report.table({ title:'1. Consolidado do banco de horas', columns:[
+      {key:'funcionario',label:'Colaborador / Cadastro',width:205,repeatOnSplit:true},
+      {key:'creditos',label:'Créditos',width:75,align:'center'},
+      {key:'debitos',label:'Débitos',width:75,align:'center'},
+      {key:'saldo',label:'Saldo atual',width:85,align:'center'},
+      {key:'dias',label:'Dias equiv.',width:75,align:'center'},
+    ], rows:banco.map(b => ({
+      funcionario:[b.nome || '-', b.id ? `Cadastro #${b.id}${b.funcaoLabel ? ` | ${b.funcaoLabel}` : ''}` : b.funcaoLabel].filter(Boolean).join('\n'),
+      creditos:pdfStandard.formatMinutes(b.saldo?.creditos), debitos:pdfStandard.formatMinutes(b.saldo?.debitos),
+      saldo:b.saldo?.horas ?? pdfStandard.formatMinutes(b.saldo?.minutos),
+      dias:b.saldo?.diasFolgaDecimal == null ? '-' : Number(b.saldo.diasFolgaDecimal).toLocaleString('pt-BR', { maximumFractionDigits:2 }),
+    })), emptyText:'Nenhum colaborador encontrado para os filtros selecionados.' });
+    bancoDetails(report, dados);
+    const folgas = (dados.folgas || []).filter(f => f.tipo_lancamento === 'FOLGA_COMPENSATORIA');
+    if (folgas.length) {
+      report.table({ title:'3. Folgas compensatórias', columns:[
+        {key:'nome',label:'Colaborador / Cadastro',width:180,repeatOnSplit:true},
+        {key:'periodo',label:'Período da folga',width:135},
+        {key:'horas',label:'Horas registradas',width:85,align:'center'},
+        {key:'status',label:'Situação',width:115},
+      ], rows:folgas.map(f => ({nome:`${f.colaborador_nome || '-'}${f.colaborador_id ? `\nCadastro #${f.colaborador_id}` : ''}`,periodo:`${formatDateBr(f.data_folga)} a ${formatDateBr(f.data_fim || f.data_folga)}`,horas:pdfStandard.formatMinutes(f.minutos_descontados),status:f.status || '-'})) });
+      report.note('As horas das folgas são apresentadas por registro. Folgas canceladas não representam débito vigente.', { keepWithNext:78 });
+    }
+  });
 }
 
 function gerarPdfBancoHorasFuncionario(dados = {}) {
-  const doc = createDoc();
-  const meta = { title: "Banco de Horas da Manutenção", subtitle: "Relatório Individual do Funcionário", logoPath: logoPath() };
-  process.nextTick(() => {
-    setupPage(doc, meta, false);
-    const nome = dados.horasExtras?.[0]?.colaborador_nome || dados.banco?.find(b => String(b.id) === String(dados.filtros?.colaborador_id))?.nome || "Funcionário";
-    doc.font("Helvetica-Bold").fontSize(12).fillColor(COLORS.greenDark).text(nome);
-    drawTable(doc, { meta, columns: [
-      {key:'data',label:'Data',width:62},{key:'hora',label:'Horário',width:110},{key:'total',label:'Total',width:55},{key:'os',label:'OS',width:45},{key:'servico',label:'Serviço executado',width:210},{key:'status',label:'Status',width:67}
-    ], rows: (dados.horasExtras || []).map(h=>({data:formatDateBr(h.data_servico),hora:`${h.inicio_extra || '-'} até ${h.fim_extra || '-'}`,total:fmtMin(h.total_minutos),os:h.os_id || '-',servico:h.descricao_servico,status:h.status})), emptyRow:{data:'-',hora:'-',total:'-',os:'-',servico:'Sem horas extras no período.',status:'-'} });
-    doc.end();
-  });
-  return doc;
+  return bancoReport(dados, 'Banco de Horas da Manutenção', report => {
+    const banco = (dados.banco || []).filter(b => !dados.filtros?.colaborador_id || String(b.id) === String(dados.filtros.colaborador_id));
+    const pessoa = banco[0];
+    report.identification([['Colaborador', pessoa?.nome || dados.horasExtras?.[0]?.colaborador_nome || 'Não informado', 'Função', pessoa?.funcaoLabel || pessoa?.funcao || 'Não informada']]);
+    if (pessoa) bancoSummary(report, banco, dados);
+    bancoDetails(report, dados, '1. Horas extras do colaborador / OS');
+  }, { individual:true });
 }
 
 function gerarPdfBancoHorasPorOs(dados = {}) {
-  const doc = createDoc();
-  const meta = { title: "Banco de Horas da Manutenção", subtitle: "Relatório por OS", logoPath: logoPath() };
-  process.nextTick(() => {
-    setupPage(doc, meta, false);
-    drawTable(doc, { meta, columns: [
-      {key:'os',label:'OS',width:38},{key:'funcionario',label:'Funcionário',width:95},{key:'data',label:'Data',width:57},{key:'horario',label:'Horário',width:95},{key:'total',label:'Horas',width:45},{key:'local',label:'Onde foi prestada',width:105},{key:'servico',label:'Serviço',width:114}
-    ], rows: (dados.horasExtras || []).map(h=>({os:h.os_id || '-', funcionario:h.colaborador_nome, data:formatDateBr(h.data_servico), horario:`${h.inicio_extra || '-'} até ${h.fim_extra || '-'}`, total:fmtMin(h.total_minutos), local:h.equipamento_nome || h.os_equipamento || '-', servico:h.descricao_servico || h.os_descricao || '-'})), emptyRow:{os:'-',funcionario:'-',data:'-',horario:'-',total:'-',local:'-',servico:'Sem horas extras vinculadas.'} });
-    const total = (dados.horasExtras || []).reduce((s,h)=>s+Number(h.total_minutos||0),0);
-    doc.moveDown().font("Helvetica-Bold").fontSize(10).fillColor(COLORS.greenDark).text(`Total geral da OS: ${fmtMin(total)}`);
-    doc.end();
+  return bancoReport(dados, 'Banco de Horas por OS', report => {
+    const total = (dados.horasExtras || []).reduce((sum, h) => sum + Number(h.total_minutos || 0), 0);
+    report.summary([
+      {label:'LANÇAMENTOS EXIBIDOS',value:String((dados.horasExtras || []).length)},
+      {label:'HORAS DOS LANÇAMENTOS',value:pdfStandard.formatMinutes(total)},
+    ]);
+    // Onde foi prestada: equipamento/local vem do lançamento ou da OS realmente vinculada.
+    bancoDetails(report, dados, '1. Horas extras por OS');
   });
-  return doc;
 }
 
 function gerarPdfEscalaCompleta({ semanas = [], filtros = {} } = {}) {

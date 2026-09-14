@@ -1624,7 +1624,7 @@ function cancelarFolgaCompensatoria(id, usuarioResponsavel, motivo) {
   })();
 }
 function realizarFolgaCompensatoria(id, usuarioResponsavel) { if(!canManageBancoHoras(usuarioResponsavel)) throw new Error('Perfil sem permissão.'); db.prepare("UPDATE escala_folgas_programadas SET status='REALIZADA', realizado_em=datetime('now'), atualizado_em=datetime('now') WHERE id=? AND status='PROGRAMADA'").run(id); }
-function gerarDadosRelatorioBancoHoras(filtros={}) { return { filtros, emitidoEm:new Date().toISOString(), banco:listarBancoHoras(filtros), horasExtras:listarHorasExtras(filtros), folgas:listarFolgas(filtros) }; }
+function gerarDadosRelatorioBancoHoras(filtros={}) { return { filtros, emitidoEm:new Date().toISOString(), minutosDiaFolga:MINUTOS_DIA_FOLGA, banco:listarBancoHoras(filtros), horasExtras:listarHorasExtras(filtros), folgas:listarFolgas(filtros) }; }
 
 function parseIds(value) {
   if (Array.isArray(value)) return value.map(Number).filter(Boolean);
