@@ -1,3 +1,5 @@
+const { sanitizeManufacturing } = require('./desenho-tecnico.layout');
+
 const TECH_LAYERS = ['geometria_principal', 'contorno', 'centro', 'linhas_de_centro', 'cotas', 'eixos', 'furacao', 'furos', 'construcao', 'observacoes', 'textos'];
 const TECH_LAYER_COLORS = {
   geometria_principal: '#e5edf6',
@@ -223,6 +225,7 @@ function sanitizeCadData(payload = {}) {
     dimensions: Array.from(dimensionMap.values()),
     viewport,
     history: Array.isArray(payload.history) ? payload.history.slice(-100) : [],
+    manufacturing: sanitizeManufacturing(payload.manufacturing),
   };
 }
 
