@@ -12,8 +12,8 @@ const DIRETORIA_BASE_PATH = '/dashboard/diretoria';
 
 function comprasContext(req, res, next) {
   req.executivePurchasesBasePath = `${DIRETORIA_BASE_PATH}/compras`;
-  req.executivePurchasesActiveMenu = 'diretoria';
-  res.locals.activeMenu = 'diretoria';
+  req.executivePurchasesActiveMenu = 'diretoria-compras';
+  res.locals.activeMenu = 'diretoria-compras';
   return next();
 }
 
@@ -25,7 +25,7 @@ router.post('/compras/:id/aprovar-itens-cotados', requireLogin, requireRole(DIRE
 
 router.get('/manutencao', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencao);
 router.get('/manutencao/dados', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencaoDados);
-router.get('/manutencao/pdf', requireLogin, requireRole(DIRETORIA_MANUTENCAO), pcmCtrl.dashboardPdf);
+router.get('/manutencao/pdf', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencaoPdf);
 router.get('/manutencao/excel', requireLogin, requireRole(DIRETORIA_MANUTENCAO), pcmCtrl.dashboardExcel);
 
 module.exports = router;
