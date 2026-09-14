@@ -10,15 +10,16 @@ const views = [
   'views/pcm/relatorios-avancados.ejs',
 ];
 const keptTargets = [
-  '/pcm', '/pcm/dashboard-gerencial', '/pcm/planejamento',
-  '/pcm/programacao-semanal', '/pcm/lubrificacao', '/pcm/engenharia',
-  '/pcm/falhas', '/pcm/pecas-criticas', '/pcm/relatorios-avancados',
+  '/pcm', '/pcm/planejamento', '/pcm/programacao-semanal',
+  '/pcm/lubrificacao', '/pcm/engenharia', '/pcm/falhas',
+  '/pcm/pecas-criticas', '/pcm/relatorios-avancados',
 ];
 const removedViews = ['backlog.ejs','criticidade.ejs','rotas-inspecao.ejs','dashboard-config.ejs'];
 
-test('navegação do PCM contém somente os nove destinos consolidados', () => {
+test('navegação do PCM contém somente os destinos operacionais consolidados', () => {
   const nav = fs.readFileSync('views/pcm/partials/internal-nav.ejs', 'utf8');
   keptTargets.forEach((target) => assert.ok(nav.includes(`href="${target}"`), `destino ausente: ${target}`));
+  assert.ok(!nav.includes('/pcm/dashboard-gerencial'));
   assert.ok(!nav.includes('/pcm/backlog'));
   assert.ok(!nav.includes('/pcm/criticidade'));
   assert.ok(!nav.includes('/pcm/rotas-inspecao'));
@@ -38,6 +39,7 @@ test('interfaces redundantes foram removidas e URLs antigas redirecionam', () =>
   assert.match(routes, /router\.get\("\/backlog"[\s\S]*\/pcm\/programacao-semanal/);
   assert.match(routes, /router\.get\("\/rotas-inspecao"[\s\S]*\/inspecao/);
   assert.match(routes, /router\.get\("\/criticidade"[\s\S]*\/pcm\/engenharia/);
+  assert.match(routes, /router\.get\("\/dashboard-gerencial"[\s\S]*DIRETORIA_MANUTENCAO_PATH/);
 });
 
 test('telas mantidas não exibem marcações de trabalho incompleto', () => {
