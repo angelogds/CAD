@@ -21,6 +21,7 @@ function fallbackMaintenanceDashboard() {
       status_label: 'Sem dados suficientes',
       campos_pendentes: [],
     },
+    custos: { totals: {}, byEquipment: [], byMonth: [] },
     erros: ['Não foi possível carregar todos os indicadores da manutenção.'],
   };
 }
@@ -70,6 +71,10 @@ function metric(value, suffix = '') {
   return `${value}${suffix}`;
 }
 
+function moneyCents(value) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0) / 100);
+}
+
 function equipmentName(filters, options) {
   if (!filters?.equipamento_id) return 'Todos os equipamentos';
   const found = (options?.equipamentos || []).find((item) => Number(item.id) === Number(filters.equipamento_id));
@@ -84,6 +89,7 @@ function manutencaoPdf(req, res, next) {
     const cards = dashboard.cards || {};
     const quality = dashboard.qualidade_dados || {};
     const graphs = dashboard.graficos || {};
+    const custos = dashboard.custos || { totals: {}, byEquipment: [], byMonth: [] };
 
     pcmService.logDashboardReport(req.session?.user?.id || null, 'PDF_DIRETORIA', filtros);
 
@@ -107,7 +113,7 @@ function manutencaoPdf(req, res, next) {
         report.identification([
           ['Período analisado', `${dateBr(filtros.data_inicial)} a ${dateBr(filtros.data_final)}`, 'Setor', filtros.setor || 'Todos os setores'],
           ['Equipamento', equipmentName(filtros, options), 'Situação da base', quality.status_label || 'Sem dados suficientes'],
-          ['Origem dos dados', 'Ordens de Serviço e PCM', 'Emissão', dateBr(new Date().toISOString().slice(0, 10))],
+          ['Origem dos dados', 'OS, PCM, Solicitações e Compras', 'Emissão', dateBr(new Date().toISOString().slice(0, 10))],
         ]);
 
         report.summary([
@@ -133,6 +139,50 @@ function manutencaoPdf(req, res, next) {
             { indicador: 'Equipamentos críticos', valor: String(cards.equipamentos_criticos || 0), leitura: 'Ativos classificados em alta criticidade/crítica na base atual.' },
             { indicador: 'Qualidade dos dados', valor: metric(cards.qualidade_dados_pct, '%'), leitura: quality.status_label || 'Base ainda em avaliação.' },
           ],
+        });
+
+        report.summary([
+          { label: 'COMPRADO NO PERÍODO', value: moneyCents(cards.custo_comprado_centavos) },
+          { label: 'MATERIAIS RECEBIDOS', value: moneyCents(cards.custo_recebido_centavos) },
+          { label: 'A RECEBER', value: moneyCents(cards.custo_pendente_recebimento_centavos) },
+          { label: 'EQUIPAMENTOS COM CUSTO', value: String(cards.equipamentos_com_custo || 0) },
+        ]);
+        report.note('Custos calculados somente com itens marcados como COMPRADO nas Solicitações vinculadas ao equipamento: quantidade comprada × valor unitário. O valor recebido representa apenas a parcela já recebida; o saldo a receber não é contabilizado novamente.');
+
+        report.table({
+          title: 'Custos por equipamento',
+          columns: [
+            { key: 'equipamento', label: 'Equipamento', width: 180 },
+            { key: 'setor', label: 'Setor', width: 95 },
+            { key: 'comprado', label: 'Comprado', width: 95, align: 'right' },
+            { key: 'recebido', label: 'Recebido', width: 95, align: 'right' },
+            { key: 'pendente', label: 'A receber', width: 85, align: 'right' },
+          ],
+          rows: (custos.byEquipment || []).slice(0, 15).map((item) => ({
+            equipamento: item.equipamento_nome || '-',
+            setor: item.setor || '-',
+            comprado: moneyCents(item.comprado_centavos),
+            recebido: moneyCents(item.recebido_centavos),
+            pendente: moneyCents(item.pendente_centavos),
+          })),
+          emptyText: 'Nenhuma compra vinculada a equipamento no período selecionado.',
+        });
+
+        report.table({
+          title: 'Evolução mensal dos custos',
+          columns: [
+            { key: 'mes', label: 'Mês', width: 130, align: 'center' },
+            { key: 'comprado', label: 'Comprado', width: 140, align: 'right' },
+            { key: 'recebido', label: 'Recebido', width: 140, align: 'right' },
+            { key: 'pendente', label: 'A receber', width: 140, align: 'right' },
+          ],
+          rows: (custos.byMonth || []).slice(-12).map((item) => ({
+            mes: item.mes || '-',
+            comprado: moneyCents(item.comprado_centavos),
+            recebido: moneyCents(item.recebido_centavos),
+            pendente: moneyCents(item.pendente_centavos),
+          })),
+          emptyText: 'Sem histórico mensal de custos para os filtros atuais.',
         });
 
         report.table({
