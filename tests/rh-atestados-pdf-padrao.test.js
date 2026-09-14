@@ -77,11 +77,12 @@ test('notificações separam documento sensível da informação operacional', (
   assert.match(notifications, /A ausência já foi lançada na Escala/);
 });
 
-test('PDFs de RH usam padrão compartilhado da Solicitação e o símbolo oficial da manutenção', () => {
+test('PDFs de RH usam padrão compartilhado e o logo oficial da manutenção', () => {
   const standard = read('utils/pdf-standard.js');
   const rhPdf = read('modules/rh/rh.pdf.js');
 
-  assert.match(standard, /public\/IMG\/logopdf_campo_do_gado\.png\.png/);
+  assert.match(standard, /public\/IMG\/logo_menu\.png\.png/);
+  assert.doesNotMatch(standard, /public\/IMG\/logopdf_campo_do_gado\.png\.png/);
   assert.match(standard, /green:\s*'#16A34A'/);
   assert.match(standard, /greenDark:\s*'#166534'/);
   assert.match(standard, /greenHeader:\s*'#159947'/);
