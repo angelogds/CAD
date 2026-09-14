@@ -43,10 +43,10 @@ test('solicitação é própria, aceita meio período com 3h30, bloqueia segunda
   assert.match(service, /programarFolgaCompensatoria/);
 });
 
-test('rotas separam autoatendimento de aprovação da gestão', () => {
+test('rotas separam autoatendimento da Manutenção de aprovação da gestão', () => {
   const routes = read('modules/escala/escala.routes.js');
-  assert.match(routes, /\/folgas\/solicitar[^\n]+escalaSelfRead/);
-  assert.match(routes, /\/folgas\/solicitacoes\/:id\/cancelar[^\n]+escalaSelfRead/);
+  assert.match(routes, /\/folgas\/solicitar[^\n]+maintenanceSelfRead/);
+  assert.match(routes, /\/folgas\/solicitacoes\/:id\/cancelar[^\n]+maintenanceSelfRead/);
   assert.match(routes, /\/folgas\/solicitacoes\/:id\/aprovar[^\n]+escalaManage/);
   assert.match(routes, /\/folgas\/solicitacoes\/:id\/reprovar[^\n]+escalaManage/);
   assert.match(routes, /res\.locals\.dateBr = dateBr/);

@@ -36,7 +36,7 @@ const safe = (fn, name) =>
 
 const escalaManage = ACCESS.escala_manage || [ROLE.ADMIN, ROLE.ENCARREGADO_MANUTENCAO, ROLE.MANUTENCAO_SUPERVISOR, ROLE.SUPERVISOR_MANUTENCAO];
 const escalaRead = ACCESS.escala;
-const escalaSelfRead = ACCESS.escala_self || escalaRead;
+const maintenanceSelfRead = [ROLE.MECANICO, ROLE.MANUTENCAO_SUPERVISOR, ROLE.SUPERVISOR_MANUTENCAO, ROLE.ENCARREGADO_MANUTENCAO];
 const escalaRhRead = ACCESS.escala_rh || [ROLE.ADMIN, ROLE.RH, ROLE.DIRETORIA];
 
 function normalizeTextRole(value) {
@@ -48,31 +48,30 @@ function normalizeTextRole(value) {
     .replace(/[\s-]+/g, '_');
 }
 
-function isMecanicoProfile(user = {}) {
-  const values = [user.role, user.funcao, user.cargo, user.perfil];
-  return values.some((value) => normalizeTextRole(value).includes('MECANICO'));
+function isMaintenanceSelfServiceProfile(user = {}) {
+  const role = normalizeTextRole(user.role);
+  if (role === 'MANUTENCAO' || role === 'ENCARREGADO' || role === 'ENCARREGADO_DE_MANUTENCAO') return true;
+  return maintenanceSelfRead.includes(role);
 }
 
 function requireHoraExtraAccess(req, res, next) {
   const user = req.session?.user || {};
-  const role = normalizeTextRole(user.role);
-  if (role === ROLE.ADMIN || isMecanicoProfile(user)) return next();
-  req.flash?.('error', 'Apenas mecânicos podem registrar hora extra.');
+  if (isMaintenanceSelfServiceProfile(user)) return next();
+  req.flash?.('error', 'Apenas a equipe de Manutenção pode registrar hora extra.');
   if (req.accepts('html')) {
-    return res.status(403).render('errors/403', { layout: 'layout', title: 'Sem permissão', message: 'Apenas mecânicos podem registrar hora extra.' });
+    return res.status(403).render('errors/403', { layout: 'layout', title: 'Sem permissão', message: 'Apenas a equipe de Manutenção pode registrar hora extra.' });
   }
-  return res.status(403).json({ error: 'Apenas mecânicos podem registrar hora extra.' });
+  return res.status(403).json({ error: 'Apenas a equipe de Manutenção pode registrar hora extra.' });
 }
 
 function redirectRoleDashboard(req, res, next) {
   const role = normalizeTextRole(req.session?.user?.role);
   if (role === ROLE.RH) return res.redirect('/rh');
-  if (role === ROLE.COLABORADOR) return res.redirect('/escala/meu-painel');
   return next();
 }
 
-router.get("/", requireLogin, requireRole(escalaSelfRead), redirectRoleDashboard, safe(controller.index, "index"));
-router.get("/meu-painel", requireLogin, requireRole(escalaSelfRead), safe(selfController.index, "selfIndex"));
+router.get("/", requireLogin, requireRole(escalaRead), redirectRoleDashboard, safe(controller.index, "index"));
+router.get("/meu-painel", requireLogin, requireRole(maintenanceSelfRead), safe(selfController.index, "selfIndex"));
 // Compatibilidade: a antiga entrada /escala/rh não renderiza mais uma tela própria.
 router.get("/rh", requireLogin, requireRole(escalaRhRead), (_req, res) => res.redirect(301, "/rh"));
 router.get("/semana", requireLogin, requireRole(escalaRead), safe(controller.semana, "semana"));
@@ -97,14 +96,14 @@ router.post("/hora-extra/:id/ajustar", requireLogin, requireRole(escalaManage), 
 router.post("/hora-extra/:id/cancelar", requireLogin, requireRole(escalaManage), safe(controller.cancelarHoraExtra, "cancelarHoraExtra"));
 router.post("/hora-extra/:id/excluir", requireLogin, requireAdmin, safe(controller.apagarHoraExtra, "apagarHoraExtra"));
 
-router.get("/banco-horas", requireLogin, requireRole(escalaSelfRead), safe(controller.bancoHoras, "bancoHoras"));
-router.get("/banco-horas/:colaboradorId", requireLogin, requireRole(escalaSelfRead), safe(controller.bancoHorasFuncionario, "bancoHorasFuncionario"));
+router.get("/banco-horas", requireLogin, requireRole(escalaRead), safe(controller.bancoHoras, "bancoHoras"));
+router.get("/banco-horas/:colaboradorId", requireLogin, requireRole(escalaRead), safe(controller.bancoHorasFuncionario, "bancoHorasFuncionario"));
 router.get("/folgas", requireLogin, requireRole(escalaRead), safe(folgaController.index, "folgas"));
 router.get("/folgas-sabado", requireLogin, requireRole(escalaRead), safe(controller.folgasSabado, "folgasSabado"));
 router.post("/folgas-sabado/:semanaId", requireLogin, requireRole(escalaManage), safe(controller.salvarFolgaSabado, "salvarFolgaSabado"));
 
-router.post("/folgas/solicitar", requireLogin, requireRole(escalaSelfRead), safe(folgaController.solicitar, "solicitarFolga"));
-router.post("/folgas/solicitacoes/:id/cancelar", requireLogin, requireRole(escalaSelfRead), safe(folgaController.cancelarSolicitacao, "cancelarSolicitacaoFolga"));
+router.post("/folgas/solicitar", requireLogin, requireRole(maintenanceSelfRead), safe(folgaController.solicitar, "solicitarFolga"));
+router.post("/folgas/solicitacoes/:id/cancelar", requireLogin, requireRole(maintenanceSelfRead), safe(folgaController.cancelarSolicitacao, "cancelarSolicitacaoFolga"));
 router.post("/folgas/solicitacoes/:id/aprovar", requireLogin, requireRole(escalaManage), safe(folgaController.aprovarSolicitacao, "aprovarSolicitacaoFolga"));
 router.post("/folgas/solicitacoes/:id/reprovar", requireLogin, requireRole(escalaManage), safe(folgaController.reprovarSolicitacao, "reprovarSolicitacaoFolga"));
 router.get("/folgas/horas-extras-servico", requireLogin, requireRole(escalaManage), safe(folgaController.horasExtrasServico, "horasExtrasServicoFolga"));

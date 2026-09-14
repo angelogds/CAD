@@ -8,6 +8,7 @@ const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const ctrl = require('./meu-portal.controller');
 const fase2bCtrl = require('./meu-portal-fase2b.controller');
 const rhPortalCtrl = require('../rh/rh.portal.controller');
+const vinculo = require('./meu-portal.vinculo');
 
 const router = express.Router();
 const LINK_MANAGER_ROLES = ['ADMIN', 'RH'];
@@ -63,23 +64,29 @@ const atestadoUpload = multer({
 });
 
 router.use(requireLogin);
+router.use(vinculo.attachAutomaticMaintenanceLink);
+
 router.get('/', ctrl.index);
 router.get('/perfil', ctrl.perfil);
 router.get('/conta', ctrl.conta);
-router.get('/materiais', ctrl.materiais);
-router.get('/treinamentos', fase2bCtrl.treinamentos);
-router.get('/dados-profissionais', fase2bCtrl.dadosProfissionais);
-router.get('/servicos', fase2bCtrl.servicos);
-router.get('/rh', rhPortalCtrl.index);
-router.get('/rh/documentos/:documentoId/arquivo', rhPortalCtrl.documentoArquivo);
-router.get('/rh/atestados/:atestadoId/arquivo', rhPortalCtrl.atestadoArquivo);
-router.get('/rh/folgas/:solicitacaoId/pdf', rhPortalCtrl.folgaPdf);
-router.post('/rh/atestados', atestadoUpload.single('arquivo'), rhPortalCtrl.enviarAtestado);
+
+// Autoatendimento profissional: liberado inicialmente somente para a equipe de Manutenção.
+router.get('/materiais', vinculo.requireMaintenanceSelfService, ctrl.materiais);
+router.get('/treinamentos', vinculo.requireMaintenanceSelfService, fase2bCtrl.treinamentos);
+router.get('/dados-profissionais', vinculo.requireMaintenanceSelfService, fase2bCtrl.dadosProfissionais);
+router.get('/servicos', vinculo.requireMaintenanceSelfService, fase2bCtrl.servicos);
+router.get('/rh', vinculo.requireMaintenanceSelfService, rhPortalCtrl.index);
+router.get('/rh/documentos/:documentoId/arquivo', vinculo.requireMaintenanceSelfService, rhPortalCtrl.documentoArquivo);
+router.get('/rh/atestados/:atestadoId/arquivo', vinculo.requireMaintenanceSelfService, rhPortalCtrl.atestadoArquivo);
+router.get('/rh/folgas/:solicitacaoId/pdf', vinculo.requireMaintenanceSelfService, rhPortalCtrl.folgaPdf);
+router.post('/rh/atestados', vinculo.requireMaintenanceSelfService, atestadoUpload.single('arquivo'), rhPortalCtrl.enviarAtestado);
+
+// O vínculo manual permanece como contingência administrativa para casos ambíguos.
 router.post('/vinculo', requireRole(LINK_MANAGER_ROLES), ctrl.linkColaborador);
 router.post('/foto', upload.single('photo'), ctrl.updatePhoto);
 router.post('/senha', ctrl.changePassword);
-router.post('/cartao/emitir', ctrl.emitCard);
-router.get('/cartao', ctrl.card);
+router.post('/cartao/emitir', vinculo.requireMaintenanceSelfService, ctrl.emitCard);
+router.get('/cartao', vinculo.requireMaintenanceSelfService, ctrl.card);
 
 router.use((err, req, res, next) => {
   const uploadError = err instanceof multer.MulterError || /Formato .*inválido|Formato inválido/i.test(String(err?.message || ''));
