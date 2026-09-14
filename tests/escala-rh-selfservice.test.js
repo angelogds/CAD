@@ -14,13 +14,14 @@ test('RBAC separa escala geral, RH, gestão e autoatendimento', () => {
   assert.match(source, /escala_reports:/);
 });
 
-test('rotas expõem painéis específicos sem liberar a escala completa ao colaborador', () => {
+test('rotas expõem autoatendimento somente à Manutenção e preservam leitura gerencial', () => {
   const source = read('modules/escala/escala.routes.js');
-  assert.match(source, /router\.get\("\/meu-painel"[^\n]*escalaSelfRead/);
+  assert.match(source, /const maintenanceSelfRead = \[ROLE\.MECANICO, ROLE\.MANUTENCAO_SUPERVISOR, ROLE\.SUPERVISOR_MANUTENCAO, ROLE\.ENCARREGADO_MANUTENCAO\]/);
+  assert.match(source, /router\.get\("\/meu-painel"[^\n]*maintenanceSelfRead/);
   assert.match(source, /router\.get\("\/rh"[^\n]*escalaRhRead/);
   assert.match(source, /router\.get\("\/semana"[^\n]*escalaRead/);
-  assert.match(source, /router\.get\("\/banco-horas"[^\n]*escalaSelfRead/);
-  assert.match(source, /role === ROLE\.COLABORADOR[^\n]*\/escala\/meu-painel/);
+  assert.match(source, /router\.get\("\/banco-horas"[^\n]*escalaRead/);
+  assert.doesNotMatch(source, /role === ROLE\.COLABORADOR[^\n]*\/escala\/meu-painel/);
 });
 
 test('painel pessoal força consulta apenas do próprio colaborador', () => {
