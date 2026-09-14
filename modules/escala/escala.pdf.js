@@ -7,9 +7,10 @@ const PAGE = {
   margins: { left: 36, right: 36, top: 28, bottom: 32 },
 };
 
+// Mesma identidade visual oficial usada no PDF de Solicitações.
 const COLORS = {
-  green: "#2E8B57",
-  greenDark: "#1F6F43",
+  green: "#16A34A",
+  greenDark: "#166534",
   text: "#0f172a",
   muted: "#475569",
   border: "#d1d5db",
@@ -36,6 +37,7 @@ function createDoc() {
 
 function logoPath() {
   const options = [
+    path.resolve(process.cwd(), "public/IMG/logopdf_campo_do_gado.png.png"),
     path.resolve(process.cwd(), "public/IMG/login_campo_do_gado.png.png.png"),
     path.resolve(process.cwd(), "public/IMG/logo_menu.png.png"),
   ];
