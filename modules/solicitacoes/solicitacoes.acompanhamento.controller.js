@@ -9,7 +9,7 @@ function executiveContext(req) {
   return {
     basePath,
     activeMenu,
-    backHref: activeMenu === 'diretoria' ? '/diretoria' : '/solicitacoes/minhas',
+    backHref: activeMenu === 'diretoria' ? '/dashboard/diretoria' : '/solicitacoes/minhas',
   };
 }
 
