@@ -2,7 +2,7 @@
   <div>
     <span class="rh-eyebrow">GESTÃO DE PESSOAS • CAMPO DO GADO</span>
     <h1><%= title %></h1>
-    <p class="rh-muted">Central integrada de colaboradores, jornada, folgas, exames, documentos e treinamentos.</p>
+    <p class="rh-muted">Central integrada de colaboradores, jornada, folgas, atestados, exames, documentos e treinamentos.</p>
   </div>
 </header>
 
@@ -12,6 +12,7 @@
   <a class="rh-nav-link <%= activeRhSection === 'jornada' ? 'is-active' : '' %>" href="/rh/jornada">Jornada</a>
   <% if (dashboard?.canManage) { %>
     <a class="rh-nav-link <%= activeRhSection === 'folgas' ? 'is-active' : '' %>" href="/rh/folgas">Folgas</a>
+    <a class="rh-nav-link <%= activeRhSection === 'atestados' ? 'is-active' : '' %>" href="/rh/atestados">Atestados</a>
     <a class="rh-nav-link <%= activeRhSection === 'exames' ? 'is-active' : '' %>" href="/rh/exames">Exames</a>
     <a class="rh-nav-link <%= activeRhSection === 'documentos' ? 'is-active' : '' %>" href="/rh/documentos">Documentos</a>
     <a class="rh-nav-link <%= activeRhSection === 'treinamentos' ? 'is-active' : '' %>" href="/rh/treinamentos">Treinamentos</a>
