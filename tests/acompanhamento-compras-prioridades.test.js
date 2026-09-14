@@ -41,7 +41,7 @@ test('acompanhamento principal usa tabela larga sem coluna percentual redundante
   assert.doesNotMatch(view, /<th>Andamento<\/th>/);
   assert.doesNotMatch(view, /data-label="Andamento"/);
   assert.match(view, /management-row-needs-approval/);
-  assert.match(view, /href="\/solicitacoes\/acompanhamento-compras\/<%=s\.id%>"/);
+  assert.match(view, /href="<%=acompanhamentoPath%>\/<%=s\.id%>"/);
   assert.doesNotMatch(view, /class="request-watch priority-card-/);
 });
 
