@@ -126,26 +126,26 @@ function createFromPortal({ userId, payload = {}, file = null }) {
   if (fim < inicio) throw new Error('A data final não pode ser anterior à data inicial.');
 
   const observacao = String(payload.observacao || '').trim().slice(0, 500) || null;
-  const info = db.prepare(`
-    INSERT INTO rh_atestados
-      (colaborador_id, user_id, data_inicio, data_fim, observacao,
-       arquivo_nome, arquivo_nome_original, arquivo_mime, arquivo_tamanho,
-       status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ENVIADO', datetime('now'), datetime('now'))
-  `).run(
-    Number(colaborador.id),
-    Number(userId),
-    inicio,
-    fim,
-    observacao,
-    path.basename(String(file.filename)),
-    String(file.originalname || '').slice(0, 255) || null,
-    String(file.mimetype || '').slice(0, 120),
-    Number(file.size || 0) || null,
-  );
-  const atestadoId = Number(info.lastInsertRowid);
+  const persist = db.transaction(() => {
+    const info = db.prepare(`
+      INSERT INTO rh_atestados
+        (colaborador_id, user_id, data_inicio, data_fim, observacao,
+         arquivo_nome, arquivo_nome_original, arquivo_mime, arquivo_tamanho,
+         status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ENVIADO', datetime('now'), datetime('now'))
+    `).run(
+      Number(colaborador.id),
+      Number(userId),
+      inicio,
+      fim,
+      observacao,
+      path.basename(String(file.filename)),
+      String(file.originalname || '').slice(0, 255) || null,
+      String(file.mimetype || '').slice(0, 120),
+      Number(file.size || 0) || null,
+    );
+    const atestadoId = Number(info.lastInsertRowid);
 
-  try {
     const folgaId = escala.programarFolgaCompensatoria({
       user_id: Number(userId),
       colaborador_id: Number(colaborador.id),
@@ -159,12 +159,11 @@ function createFromPortal({ userId, payload = {}, file = null }) {
     });
     db.prepare('UPDATE rh_atestados SET folga_id=?, updated_at=datetime(\'now\') WHERE id=?')
       .run(Number(folgaId), atestadoId);
-  } catch (error) {
-    db.prepare('DELETE FROM rh_atestados WHERE id=?').run(atestadoId);
-    throw error;
-  }
 
-  return getById(atestadoId);
+    return atestadoId;
+  });
+
+  return getById(persist());
 }
 
 function updateStatus(id, status, actor = {}) {
