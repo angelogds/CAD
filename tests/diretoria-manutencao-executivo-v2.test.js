@@ -67,5 +67,6 @@ test('interface executiva mostra aging reincidência e qualidade com atualizaç�
   assert.match(js, /rows\('reincidencia_corretiva'\)/);
   assert.match(js, /function renderQuality/);
   assert.match(css, /\.pcm-quality-grid/);
-  assert.match(css, /@media\(max-width:560px\)[\s\S]*\.pcm-quality-grid\{grid-template-columns:1fr\}/);
+  const mobile560 = css.slice(css.indexOf('@media(max-width:560px)'));
+  assert.match(mobile560, /\.pcm-quality-grid(?:,[^{]+)?\{grid-template-columns:1fr\}/);
 });

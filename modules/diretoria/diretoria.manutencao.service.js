@@ -1,5 +1,6 @@
 const db = require('../../database/db');
 const pcmService = require('../pcm/pcm.service');
+const custosEquipamentosService = require('../compras/custos-equipamentos.service');
 
 const CLOSED_STATUSES = "('CONCLUIDA','FINALIZADA','FECHADA')";
 const CANCELLED_STATUSES = "('CANCELADA','CANCELADO')";
@@ -164,6 +165,17 @@ function getDashboard(query = {}, userId = null) {
   const repeticoes = recorrentes.reduce((sum, item) => sum + Number(item.repeticoes_apos_primeira || 0), 0);
   const reincidenciaPct = corretivas ? Math.round((repeticoes * 1000) / corretivas) / 10 : 0;
   const qualidade = getDataQuality(filtros);
+  let custos = { totals: { comprado_centavos: 0, recebido_centavos: 0, pendente_centavos: 0, equipamentos: 0 }, byEquipment: [], byMonth: [] };
+  try {
+    custos = custosEquipamentosService.getAnalytics({
+      data_inicial: filtros.data_inicial,
+      data_final: filtros.data_final,
+      equipamento_id: filtros.equipamento_id,
+      setor: filtros.setor,
+    });
+  } catch (error) {
+    console.error('[diretoria][manutencao] Falha ao consolidar custos por equipamento:', error?.message || error);
+  }
 
   dashboard.cards = {
     ...(dashboard.cards || {}),
@@ -173,6 +185,10 @@ function getDashboard(query = {}, userId = null) {
     reincidencia_corretiva_pct: reincidenciaPct,
     equipamentos_reincidentes: recorrentes.length,
     qualidade_dados_pct: qualidade.score,
+    custo_comprado_centavos: Number(custos.totals?.comprado_centavos || 0),
+    custo_recebido_centavos: Number(custos.totals?.recebido_centavos || 0),
+    custo_pendente_recebimento_centavos: Number(custos.totals?.pendente_centavos || 0),
+    equipamentos_com_custo: Number(custos.totals?.equipamentos || 0),
   };
   dashboard.graficos = {
     ...(dashboard.graficos || {}),
@@ -183,8 +199,11 @@ function getDashboard(query = {}, userId = null) {
       { faixa: 'Acima de 60 dias', total: Number(backlog.acima_60 || 0) },
     ],
     reincidencia_corretiva: recorrentes,
+    custos_equipamento: custos.byEquipment || [],
+    custos_mes: custos.byMonth || [],
   };
   dashboard.qualidade_dados = qualidade;
+  dashboard.custos = custos;
   dashboard.confiabilidade = {
     ...(dashboard.confiabilidade || {}),
     qualidade_dados_pct: qualidade.score,

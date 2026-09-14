@@ -8,6 +8,7 @@ const storagePaths = require("../../config/storage");
 const { requireLogin, requireRole, requireAdmin } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
 const ctrl = require("./equipamentos.controller");
+const custosEquipamentosService = require("../compras/custos-equipamentos.service");
 
 const fotoDir = path.join(storagePaths.IMAGE_DIR, "equipamentos", "fotos");
 const docsDir = path.join(storagePaths.UPLOAD_DIR, "equipamentos", "documentos");
@@ -78,7 +79,6 @@ const docsUpload = multer({
     filename: (_req, file, cb) => cb(null, safeUploadFileName(file)),
   }),
   limits: {
-    // Limite alto para suportar manuais grandes; pode ser ajustado por variável de ambiente.
     fileSize: Number(process.env.EQUIPAMENTOS_DOC_MAX_BYTES || 1024 * 1024 * 1024),
   },
   fileFilter: (_req, file, cb) => {
@@ -122,6 +122,17 @@ const safe = (fn) => (req, res, next) => {
   }
 };
 
+function loadEquipmentCosts(req, res, next) {
+  try {
+    const equipamentoId = Number(req.params.id);
+    res.locals.custosEquipamento = custosEquipamentosService.getEquipmentLifetime(equipamentoId);
+  } catch (error) {
+    console.error('[equipamentos] Falha ao carregar custos vinculados:', error?.message || error);
+    res.locals.custosEquipamento = { totals: {}, byMonth: [], items: [] };
+  }
+  return next();
+}
+
 router.get("/qrcode/:token", safe(ctrl.qrPublicPage));
 
 router.get("/", requireLogin, requireRole(ACCESS.equipamentos), safe(ctrl.equipIndex));
@@ -129,7 +140,7 @@ router.get("/pdf/lista", requireLogin, requireRole(ACCESS.equipamentos), safe(ct
 router.get("/novo", requireLogin, requireRole(ACCESS.equipamentos_manage), safe(ctrl.equipNewForm));
 router.post("/", requireLogin, requireRole(ACCESS.equipamentos_manage), equipmentUpload, safe(ctrl.equipCreate));
 
-router.get("/:id", requireLogin, requireRole(ACCESS.equipamentos), safe(ctrl.equipShow));
+router.get("/:id", requireLogin, requireRole(ACCESS.equipamentos), loadEquipmentCosts, safe(ctrl.equipShow));
 router.get("/:id/pdf", requireLogin, requireRole(ACCESS.equipamentos), safe(ctrl.exportEquipamentoPdf));
 router.get("/:id/editar", requireLogin, requireRole(ACCESS.equipamentos_manage), safe(ctrl.equipEditForm));
 router.post("/:id/editar", requireLogin, requireRole(ACCESS.equipamentos_manage), equipmentUpload, safe(ctrl.equipUpdate));
