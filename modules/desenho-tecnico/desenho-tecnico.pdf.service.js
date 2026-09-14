@@ -4,6 +4,7 @@ const PDFDocument = require('pdfkit');
 const storagePaths = require('../../config/storage');
 const imageService = require('./desenho-tecnico.image.service');
 const dimensionPdf = require('./desenho-tecnico.dimension-pdf');
+const layoutUtils = require('./desenho-tecnico.layout');
 
 const PDF_DIR = path.join(storagePaths.PDF_DIR, 'desenho-tecnico');
 if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
@@ -15,11 +16,12 @@ function generateTechnicalPdf(desenho, svgMarkup, options = {}) {
   const filename = `${String(desenho.codigo || 'desenho').replace(/[^a-zA-Z0-9_-]+/g, '-')}-rev${desenho.revisao || 0}-${Date.now()}.pdf`;
   const fullPath = path.join(PDF_DIR, filename);
   const relPath = `/pdfs/desenho-tecnico/${filename}`;
+  const cadData = options.cadData || desenho.cad_data || {};
+  const paperConfig = layoutUtils.resolvePaperConfig(cadData);
 
-  // Usar formato landscape para desenhos técnicos
   const doc = new PDFDocument({
-    size: 'A4',
-    layout: 'landscape',
+    size: paperConfig.pdfSize,
+    layout: paperConfig.orientation,
     margin: 20
   });
   const stream = fs.createWriteStream(fullPath);
@@ -43,10 +45,11 @@ function generateTechnicalPdf(desenho, svgMarkup, options = {}) {
     height: pageHeight - 180
   };
 
-  drawDrawingArea(doc, drawArea, desenho, svgMarkup, options);
+  const renderOptions = { ...options, cadData, paperConfig };
+  drawDrawingArea(doc, drawArea, desenho, svgMarkup, renderOptions);
 
   // Legenda/Carimbo
-  drawLegend(doc, desenho, pageWidth, pageHeight, margin, options);
+  drawLegend(doc, desenho, pageWidth, pageHeight, margin, renderOptions);
 
   doc.end();
 
@@ -85,7 +88,7 @@ function drawHeader(doc, desenho, margin) {
     .fillColor('#0f172a')
     .font('Helvetica-Bold')
     .text(desenho.codigo || 'S/C', margin + 200, margin + 15, {
-      width: 400,
+      width: Math.max(250, doc.page.width - margin * 2 - 400),
       align: 'center'
     });
 
@@ -94,7 +97,7 @@ function drawHeader(doc, desenho, margin) {
     .fillColor('#334155')
     .font('Helvetica')
     .text(desenho.titulo || 'Sem título', margin + 200, margin + 35, {
-      width: 400,
+      width: Math.max(250, doc.page.width - margin * 2 - 400),
       align: 'center'
     });
 
@@ -106,28 +109,39 @@ function drawHeader(doc, desenho, margin) {
 }
 
 function drawDrawingArea(doc, area, desenho, svgMarkup, options) {
-  // Fundo da área de desenho (simulando área de trabalho CAD)
+  const cadData = options.cadData || desenho.cad_data || {};
+  const paperConfig = options.paperConfig || layoutUtils.resolvePaperConfig(cadData);
+
+  // Fundo da área de desenho
   doc.rect(area.x, area.y, area.width, area.height)
-    .fillAndStroke('#f8fafc', '#e2e8f0');
+    .fillAndStroke('#ffffff', '#e2e8f0');
 
-  // Grid pontilhado na área de desenho
-  doc.save();
-  doc.strokeColor('#e2e8f0').lineWidth(0.3);
-
-  const gridStep = 20;
-  for (let x = area.x + gridStep; x < area.x + area.width; x += gridStep) {
-    doc.moveTo(x, area.y).lineTo(x, area.y + area.height).stroke();
+  // Compatibilidade: desenhos antigos, sem Paper Space salvo, mantêm o grid e o auto-fit.
+  if (!paperConfig.trueScale) {
+    doc.save();
+    doc.strokeColor('#e2e8f0').lineWidth(0.3);
+    const gridStep = 20;
+    for (let x = area.x + gridStep; x < area.x + area.width; x += gridStep) {
+      doc.moveTo(x, area.y).lineTo(x, area.y + area.height).stroke();
+    }
+    for (let y = area.y + gridStep; y < area.y + area.height; y += gridStep) {
+      doc.moveTo(area.x, y).lineTo(area.x + area.width, y).stroke();
+    }
+    doc.restore();
   }
-  for (let y = area.y + gridStep; y < area.y + area.height; y += gridStep) {
-    doc.moveTo(area.x, y).lineTo(area.x + area.width, y).stroke();
-  }
-  doc.restore();
 
   // Processar objetos do CAD e renderizar no PDF
-  const cadData = options.cadData || desenho.cad_data;
   if (cadData && Array.isArray(cadData.objects)) {
     const content = collectCadContent(cadData);
-    renderCadObjectsToPdf(doc, content.objects, content.dimensions, area, cadData.layers || {}, desenho.id);
+    renderCadObjectsToPdf(
+      doc,
+      content.objects,
+      content.dimensions,
+      area,
+      cadData.layers || {},
+      desenho.id,
+      paperConfig.paperLayout,
+    );
   } else {
     // Fallback: mostrar informação textual
     doc.fontSize(11)
@@ -183,7 +197,7 @@ function collectCadContent(cadData = {}) {
   };
 }
 
-function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}, drawingId = null) {
+function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}, drawingId = null, paperLayout = null) {
   const visibleObjects = objects.filter((object) => isEntityVisible(object, layers));
   const visibleDimensions = dimensions.filter((dimension) => isEntityVisible(dimension, layers, 'cotas'));
 
@@ -201,19 +215,15 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}, draw
   }
 
   if (!isFinite(minX)) {
-    // Sem objetos, usar valores padrão
     return;
   }
 
-  const contentWidth = maxX - minX || 1;
-  const contentHeight = maxY - minY || 1;
+  const transform = layoutUtils.computePlotTransform({ minX, minY, maxX, maxY }, area, paperLayout);
+  if (!transform) return;
+  const { scale, offsetX, offsetY } = transform;
 
-  const scaleX = (area.width - 60) / contentWidth;
-  const scaleY = (area.height - 60) / contentHeight;
-  const scale = Math.min(scaleX, scaleY, 1.5);
-
-  const offsetX = area.x + 30 - minX * scale;
-  const offsetY = area.y + 30 - minY * scale;
+  // Restringe a plotagem à viewport da prancha para não invadir cabeçalho/carimbo.
+  doc.save().rect(area.x, area.y, area.width, area.height).clip();
 
   // Cores para diferentes tipos
   const colors = {
@@ -349,8 +359,9 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}, draw
 
   // Renderizar cotas preservando posição, cor, espessura e tipo de linha do CAD.
   for (const dim of visibleDimensions) {
-    dimensionPdf.renderDimensionToPdf(doc, dim, scale, offsetX, offsetY, { background: '#f8fafc' });
+    dimensionPdf.renderDimensionToPdf(doc, dim, scale, offsetX, offsetY, { background: '#ffffff' });
   }
+  doc.restore();
 }
 
 function renderShaftToPdf(doc, shaft, scale, offsetX, offsetY) {
@@ -542,23 +553,29 @@ function drawLegend(doc, desenho, pageWidth, pageHeight, margin, options) {
   doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, col3, legendY + 34);
   doc.text(`Hora: ${new Date().toLocaleTimeString('pt-BR')}`, col3, legendY + 46);
 
-  const content = collectCadContent(options.cadData || {});
+  const cadData = options.cadData || desenho.cad_data || {};
+  const paperConfig = options.paperConfig || layoutUtils.resolvePaperConfig(cadData);
+  const content = collectCadContent(cadData);
   const objCount = content.objects.length;
   const dimCount = content.dimensions.length;
   doc.text(`Objetos: ${objCount} | Cotas: ${dimCount}`, col3, legendY + 58);
 
-  // Coluna 4: Escala e observações
+  // Coluna 4: Escala e formato reais da prancha
   doc.fontSize(9)
     .fillColor('#0f172a')
     .font('Helvetica-Bold')
     .text('ESCALA', col4, legendY + 10);
   doc.fontSize(14)
-    .text('1:1', col4, legendY + 25);
+    .text(paperConfig.scaleLabel, col4, legendY + 25);
   doc.fontSize(7)
     .fillColor('#64748b')
     .font('Helvetica')
-    .text('Unidade: mm', col4, legendY + 45);
-  doc.text('Formato: A4 Paisagem', col4, legendY + 57);
+    .text(`Unidade: ${paperConfig.unit}`, col4, legendY + 45);
+  doc.text(`Formato: ${paperConfig.format} Paisagem`, col4, legendY + 57);
 }
 
-module.exports = { generateTechnicalPdf };
+module.exports = {
+  generateTechnicalPdf,
+  resolvePaperConfig: layoutUtils.resolvePaperConfig,
+  computePlotTransform: layoutUtils.computePlotTransform,
+};
