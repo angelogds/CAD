@@ -1,5 +1,5 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v3" />
+<link rel="stylesheet" href="/css/meu-portal.css?v=20260914-v4" />
 <link rel="stylesheet" href="/css/meu-portal-fase2b.css?v=20260910-v1" />
 
 <%
@@ -7,13 +7,10 @@
   const colaborador = portal.colaborador;
   const temVinculo = Boolean(colaborador);
   const ativo = temVinculo && String(colaborador.status || '').toUpperCase() === 'ATIVO';
+  const acessoManutencao = typeof maintenanceSelfService !== 'undefined' && Boolean(maintenanceSelfService);
   const cartaoAtivo = temVinculo && Number(colaborador.qr_ativo || 0) === 1 && Boolean(colaborador.qr_token);
   const cartaoRevogado = temVinculo && Boolean(colaborador.qr_token) && !cartaoAtivo;
   const foto = colaborador?.foto_url || conta.photo_path || '/IMG/logo_menu.png.png';
-  const podeGerenciarVinculo = typeof canManageLink !== 'undefined' && Boolean(canManageLink);
-  const colaboradoresDisponiveisLista = typeof availableColaboradores !== 'undefined' && Array.isArray(availableColaboradores)
-    ? availableColaboradores
-    : [];
   const cartaoStatus = !temVinculo
     ? 'VÍNCULO PENDENTE'
     : cartaoAtivo
@@ -31,73 +28,58 @@
       <div class="my-portal-hero__identity">
         <img src="<%= foto %>" alt="Foto de <%= colaborador?.nome || conta.name %>" />
         <div>
-          <span class="eyebrow">PORTAL DO COLABORADOR</span>
+          <span class="eyebrow">MEU PORTAL</span>
           <h1>Olá, <%= colaborador?.apelido || colaborador?.nome || conta.name %></h1>
-          <p>Escolha o serviço que deseja acessar. Seus dados pessoais, jornada, materiais e RH ficam organizados em áreas separadas.</p>
+          <% if (acessoManutencao) { %>
+            <p>Seu perfil da Manutenção está integrado à ficha de colaborador, jornada, materiais e RH.</p>
+          <% } else { %>
+            <p>Gerencie sua identidade de acesso, foto e segurança da conta.</p>
+          <% } %>
           <div class="my-portal-tags">
-            <span><%= colaborador?.funcao || 'Função a cadastrar pelo RH' %></span>
-            <span><%= colaborador?.setor || 'Setor não vinculado' %></span>
-            <span class="<%= ativo ? 'is-ok' : 'is-warn' %>"><%= colaborador?.status || 'VÍNCULO PENDENTE' %></span>
+            <span><%= colaborador?.funcao || conta.role || 'Perfil do sistema' %></span>
+            <% if (acessoManutencao) { %>
+              <span><%= colaborador?.setor || 'Manutenção' %></span>
+              <span class="<%= ativo ? 'is-ok' : 'is-warn' %>"><%= colaborador?.status || 'VÍNCULO PENDENTE' %></span>
+            <% } else { %>
+              <span class="is-ok">CONTA ATIVA</span>
+            <% } %>
           </div>
         </div>
       </div>
     </div>
   </header>
 
-  <% if (!temVinculo) { %>
-    <section class="my-portal-notice my-portal-panel--compact my-card-state--compact <%= podeGerenciarVinculo ? 'has-action' : '' %>">
+  <% if (acessoManutencao && !temVinculo) { %>
+    <section class="my-portal-notice my-portal-panel--compact my-card-state--compact">
       <div>
-        <strong>Vínculo com colaborador pendente</strong>
-        <p>Seu login está ativo, mas ainda não existe uma ficha de colaborador ligada a este usuário.</p>
-        <% if (!podeGerenciarVinculo) { %>
-          <small>Para liberar função, setor, cartão, materiais e informações de RH, solicite o vínculo ao setor de RH.</small>
-        <% } %>
+        <strong>Vínculo profissional pendente</strong>
+        <p>Seu login é da equipe de Manutenção, mas ainda não foi possível localizar com segurança uma única ficha ativa com o mesmo nome.</p>
+        <small>O sistema não cria uma segunda ficha nem adivinha vínculos. O RH deve revisar nome, situação e possíveis duplicidades no cadastro de colaboradores.</small>
       </div>
-
-      <% if (podeGerenciarVinculo) { %>
-        <% if (colaboradoresDisponiveisLista.length) { %>
-          <form class="my-link-form" method="POST" action="/meu-portal/vinculo" onsubmit="return confirm('Vincular este login à ficha selecionada? Essa associação define a identidade profissional usada pelo Portal e pelo Almoxarifado.')">
-            <label>
-              <span>Vincular minha ficha existente</span>
-              <select name="colaborador_id" required>
-                <option value="">Selecione o colaborador</option>
-                <% colaboradoresDisponiveisLista.forEach((item) => { %>
-                  <option value="<%= item.id %>"><%= item.nome %> — <%= item.funcao || 'Função não informada' %> — <%= item.setor || 'Setor não informado' %> — <%= item.status || 'Status não informado' %></option>
-                <% }) %>
-              </select>
-              <small>A lista contém somente fichas existentes ainda sem usuário vinculado.</small>
-            </label>
-            <button class="btn btn-green" type="submit">Vincular colaborador</button>
-          </form>
-        <% } else { %>
-          <div class="my-link-empty">
-            <strong>Nenhuma ficha disponível para vínculo</strong>
-            <span>Verifique o cadastro em Colaboradores antes de criar uma nova ficha.</span>
-          </div>
-        <% } %>
-      <% } %>
     </section>
   <% } %>
 
   <section class="my-portal-services my-portal-services--primary" aria-labelledby="acessos-pessoais">
     <div class="my-portal-panel__head">
       <div><span class="eyebrow">MEU ACESSO</span><h2 id="acessos-pessoais">Identidade e conta</h2></div>
-      <span class="my-status">3 ÁREAS</span>
+      <span class="my-status"><%= acessoManutencao ? '3 ÁREAS' : '2 ÁREAS' %></span>
     </div>
     <div class="my-access-grid">
       <a class="my-service-card my-service-card--primary is-available" href="/meu-portal/perfil">
         <div class="my-service-card__icon" aria-hidden="true">ID</div>
         <strong>Minha identidade</strong>
-        <span>Foto, nome, função, setor e dados de identificação.</span>
+        <span>Foto, nome e informações básicas do seu acesso.</span>
         <small>ABRIR MEU PERFIL →</small>
       </a>
 
-      <a class="my-service-card my-service-card--primary is-available" href="/meu-portal/cartao">
-        <div class="my-service-card__icon" aria-hidden="true">QR</div>
-        <strong>Identificação do Almoxarifado</strong>
-        <span>Cartão virtual, QR e identificação para retirada de materiais.</span>
-        <small><%= cartaoStatus %> • ABRIR →</small>
-      </a>
+      <% if (acessoManutencao) { %>
+        <a class="my-service-card my-service-card--primary is-available" href="/meu-portal/cartao">
+          <div class="my-service-card__icon" aria-hidden="true">QR</div>
+          <strong>Identificação do Almoxarifado</strong>
+          <span>Cartão virtual, QR e identificação para retirada de materiais.</span>
+          <small><%= cartaoStatus %> • ABRIR →</small>
+        </a>
+      <% } %>
 
       <a class="my-service-card my-service-card--primary is-available" href="/meu-portal/conta">
         <div class="my-service-card__icon" aria-hidden="true">•••</div>
@@ -108,42 +90,44 @@
     </div>
   </section>
 
-  <section class="my-portal-services" aria-labelledby="servicos-colaborador">
-    <div class="my-portal-panel__head">
-      <div><span class="eyebrow">SERVIÇOS INTEGRADOS</span><h2 id="servicos-colaborador">Serviços do colaborador</h2></div>
-      <span class="my-status is-ok">6 SERVIÇOS</span>
-    </div>
-    <div class="my-roadmap-grid">
-      <a class="my-service-card is-available" href="/meu-portal/dados-profissionais">
-        <strong>Dados profissionais</strong>
-        <span>Admissão, função, setor, liderança e situação.</span>
-        <small>DISPONÍVEL • ABRIR →</small>
-      </a>
-      <a class="my-service-card is-available" href="/escala/meu-painel">
-        <strong>Jornada</strong>
-        <span>Escala, horas extras e banco de horas.</span>
-        <small>DISPONÍVEL • ABRIR →</small>
-      </a>
-      <a class="my-service-card is-available" href="/meu-portal/materiais">
-        <strong>Materiais</strong>
-        <span>Histórico das minhas retiradas no Almoxarifado.</span>
-        <small>DISPONÍVEL • ABRIR →</small>
-      </a>
-      <a class="my-service-card is-available" href="/meu-portal/treinamentos">
-        <strong>Treinamentos</strong>
-        <span>Cursos, NRs, certificados e vencimentos.</span>
-        <small>DISPONÍVEL • ABRIR →</small>
-      </a>
-      <a class="my-service-card is-available" href="/meu-portal/servicos">
-        <strong>Meus serviços</strong>
-        <span>Histórico das minhas participações em Ordens de Serviço.</span>
-        <small>DISPONÍVEL • ABRIR →</small>
-      </a>
-      <a class="my-service-card is-available" href="/meu-portal/rh">
-        <strong>Meu RH</strong>
-        <span>Exames, documentos, folgas e banco de horas.</span>
-        <small>DISPONÍVEL • Abrir →</small>
-      </a>
-    </div>
-  </section>
+  <% if (acessoManutencao) { %>
+    <section class="my-portal-services" aria-labelledby="servicos-colaborador">
+      <div class="my-portal-panel__head">
+        <div><span class="eyebrow">MANUTENÇÃO</span><h2 id="servicos-colaborador">Serviços do colaborador</h2></div>
+        <span class="my-status is-ok">6 SERVIÇOS</span>
+      </div>
+      <div class="my-roadmap-grid">
+        <a class="my-service-card is-available" href="/meu-portal/dados-profissionais">
+          <strong>Dados profissionais</strong>
+          <span>Admissão, função, setor, liderança e situação.</span>
+          <small>DISPONÍVEL • ABRIR →</small>
+        </a>
+        <a class="my-service-card is-available" href="/escala/meu-painel">
+          <strong>Jornada</strong>
+          <span>Escala, horas extras e banco de horas.</span>
+          <small>DISPONÍVEL • ABRIR →</small>
+        </a>
+        <a class="my-service-card is-available" href="/meu-portal/materiais">
+          <strong>Materiais</strong>
+          <span>Histórico das minhas retiradas no Almoxarifado.</span>
+          <small>DISPONÍVEL • ABRIR →</small>
+        </a>
+        <a class="my-service-card is-available" href="/meu-portal/treinamentos">
+          <strong>Treinamentos</strong>
+          <span>Cursos, NRs, certificados e vencimentos.</span>
+          <small>DISPONÍVEL • ABRIR →</small>
+        </a>
+        <a class="my-service-card is-available" href="/meu-portal/servicos">
+          <strong>Meus serviços</strong>
+          <span>Histórico das minhas participações em Ordens de Serviço.</span>
+          <small>DISPONÍVEL • ABRIR →</small>
+        </a>
+        <a class="my-service-card is-available" href="/meu-portal/rh">
+          <strong>Meu RH</strong>
+          <span>Exames, documentos, folgas e banco de horas.</span>
+          <small>DISPONÍVEL • ABRIR →</small>
+        </a>
+      </div>
+    </section>
+  <% } %>
 </div>
