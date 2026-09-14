@@ -36,12 +36,12 @@
       <div class="my-material-history__head">
         <div><span class="eyebrow">ATESTADO MÉDICO • ENVIO SEGURO</span><h2>Enviar atestado ao RH</h2></div>
       </div>
-      <form action="/meu-portal/rh/atestados" method="post" enctype="multipart/form-data" class="rh-form-grid">
+      <form action="/meu-portal/rh/atestados" method="post" enctype="multipart/form-data" class="rh-form">
         <label><span>Data inicial do afastamento</span><input type="date" name="data_inicio" required /></label>
         <label><span>Data final</span><input type="date" name="data_fim" required /></label>
-        <label class="rh-field-wide"><span>Arquivo do atestado</span><input type="file" name="arquivo" accept="application/pdf,image/jpeg,image/png,image/webp" required /><small>PDF, JPG, PNG ou WEBP • máximo 10 MB.</small></label>
-        <label class="rh-field-wide"><span>Observação administrativa (opcional)</span><textarea name="observacao" rows="2" maxlength="500" placeholder="Ex.: entregue após atendimento. Não informe CID, diagnóstico ou detalhes clínicos."></textarea></label>
-        <div class="rh-field-wide"><button class="btn btn-primary" type="submit">Enviar atestado</button></div>
+        <label class="is-wide"><span>Arquivo do atestado</span><input type="file" name="arquivo" accept="application/pdf,image/jpeg,image/png,image/webp" required /><small>PDF, JPG, PNG ou WEBP • máximo 10 MB.</small></label>
+        <label class="is-wide"><span>Observação administrativa (opcional)</span><textarea name="observacao" rows="2" maxlength="500" placeholder="Ex.: entregue após atendimento. Não informe CID, diagnóstico ou detalhes clínicos."></textarea></label>
+        <div class="rh-form-actions"><button class="btn btn-primary" type="submit">Enviar atestado</button></div>
       </form>
       <p class="rh-privacy">Ao enviar, o período é registrado automaticamente como <strong>ATESTADO</strong> na Escala, sem desconto do Banco de Horas. RH e ADMIN recebem acesso ao arquivo; a liderança da Manutenção recebe somente a informação operacional da ausência.</p>
 
