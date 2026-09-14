@@ -52,6 +52,18 @@ test('Meu RH permite upload controlado e download apenas pelo vínculo do colabo
   assert.match(view, /Não informe CID, diagnóstico ou detalhes clínicos/);
 });
 
+test('RBAC mantém arquivo médico somente em RH e ADMIN', () => {
+  const rbac = read('config/rbac.js');
+  const rhRoutes = read('modules/rh/rh.routes.js');
+
+  assert.match(rbac, /rh_sensitive:\s*\[ROLE\.ADMIN, ROLE\.RH\]/);
+  assert.match(rhRoutes, /const rhSensitive = ACCESS\.rh_sensitive/);
+  assert.match(rhRoutes, /router\.get\('\/atestados', requireRole\(rhSensitive\)/);
+  assert.match(rhRoutes, /router\.get\('\/atestados\/:id\/arquivo', requireRole\(rhSensitive\)/);
+  assert.doesNotMatch(rbac, /rh_sensitive:\s*\[[^\]]*ROLE\.DIRETORIA/);
+  assert.doesNotMatch(rbac, /rh_sensitive:\s*\[[^\]]*ROLE\.ENCARREGADO_MANUTENCAO/);
+});
+
 test('notificações separam documento sensível da informação operacional', () => {
   const notifications = read('modules/rh/rh.notifications.js');
 
