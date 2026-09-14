@@ -20,6 +20,20 @@ test('atestado usa armazenamento privado e integra ausência existente sem debit
   assert.match(service, /getOwnPrivateFile/);
 });
 
+test('upload de atestado valida conteúdo real além do MIME informado pelo navegador', () => {
+  const service = read('modules/rh/rh.atestados.js');
+
+  assert.match(service, /function validateUploadedFile/);
+  assert.match(service, /fs\.readSync/);
+  assert.match(service, /%PDF/);
+  assert.match(service, /0xff.*0xd8.*0xff/s);
+  assert.match(service, /0x89.*0x50.*0x4e.*0x47/s);
+  assert.match(service, /RIFF/);
+  assert.match(service, /WEBP/);
+  assert.match(service, /O conteúdo do arquivo não corresponde ao formato informado/);
+  assert.match(service, /validateUploadedFile\(file\)/);
+});
+
 test('Meu RH permite upload controlado e download apenas pelo vínculo do colaborador', () => {
   const routes = read('modules/meu-portal/meu-portal.routes.js');
   const controller = read('modules/rh/rh.portal.controller.js');
