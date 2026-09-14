@@ -37,9 +37,9 @@ function createDoc() {
 
 function logoPath() {
   const options = [
-    path.resolve(process.cwd(), "public/IMG/logopdf_campo_do_gado.png.png"),
-    path.resolve(process.cwd(), "public/IMG/login_campo_do_gado.png.png.png"),
     path.resolve(process.cwd(), "public/IMG/logo_menu.png.png"),
+    path.resolve(process.cwd(), "public/img/logo_menu_256.png"),
+    path.resolve(process.cwd(), "public/img/logo.png"),
   ];
 
   return options.find((target) => fs.existsSync(target)) || null;
@@ -259,7 +259,6 @@ function generateWeeklyPDF({ rows = [], coberturas = [] } = {}) {
   return doc;
 }
 
-
 function formatGeoStatus(status) {
   const labels = {
     DENTRO_DA_UNIDADE: 'Dentro da unidade',
@@ -448,12 +447,29 @@ function gerarPdfBancoHorasGeral(dados = {}) {
   const meta = { title: dados.reportTitle || "Campo do Gado\nBanco de Horas da Manutenção", subtitle: dados.reportSubtitle || "Controle Interno de Horas Extras e Folgas Compensatórias", logoPath: logoPath() };
   process.nextTick(() => {
     setupPage(doc, meta, false);
-    doc.font("Helvetica-Bold").fontSize(11).fillColor(COLORS.greenDark).text("Relatório Geral do Banco de Horas", PAGE.margins.left, doc.y);
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(COLORS.greenDark).text("Relatório Consolidado do Banco de Horas", PAGE.margins.left, doc.y);
     doc.moveDown(.4).font("Helvetica").fontSize(9).fillColor(COLORS.muted).text(`Emissão: ${formatDateBr(String(dados.emitidoEm || '').slice(0,10))}`);
     drawTable(doc, { meta, columns: [
       {key:'funcionario', label:'Funcionário', width:150}, {key:'creditos', label:'Créditos', width:75, align:'center'}, {key:'debitos', label:'Débitos', width:75, align:'center'}, {key:'saldo', label:'Saldo', width:75, align:'center'}, {key:'dias', label:'Dias', width:55, align:'center'}, {key:'obs', label:'Observações', width:119}
     ], rows: (dados.banco || []).map(b => ({ funcionario:b.nome, creditos:fmtMin(b.saldo?.creditos), debitos:fmtMin(b.saldo?.debitos), saldo:b.saldo?.horas, dias:String(b.saldo?.diasFolgaDecimal ?? 0), obs:'Controle interno da manutenção' })), emptyRow:{funcionario:'Sem dados',creditos:'-',debitos:'-',saldo:'-',dias:'-',obs:'-'} });
+
+    ensureSpace(doc, 44, meta);
+    doc.moveDown(1).font("Helvetica-Bold").fontSize(11).fillColor(COLORS.greenDark)
+      .text("Detalhamento por funcionário / OS", PAGE.margins.left, doc.y);
+    doc.moveDown(.4).font("Helvetica").fontSize(8.4).fillColor(COLORS.muted)
+      .text("A OS é exibida somente quando existe vínculo real no lançamento da hora extra. Registros sem vínculo permanecem identificados com “-”.", PAGE.margins.left, doc.y, { width: 520 });
+    doc.moveDown(.5);
+    drawTable(doc, { meta, columns: [
+      {key:'funcionario',label:'Funcionário',width:100},
+      {key:'os',label:'OS',width:40,align:'center'},
+      {key:'data',label:'Data',width:57,align:'center'},
+      {key:'total',label:'Horas',width:48,align:'center'},
+      {key:'local',label:'Equipamento / local',width:105},
+      {key:'servico',label:'Serviço executado',width:173}
+    ], rows: (dados.horasExtras || []).map(h=>({funcionario:h.colaborador_nome,os:h.os_id || '-',data:formatDateBr(h.data_servico),total:fmtMin(h.total_minutos),local:h.equipamento_nome || h.os_equipamento || '-',servico:h.descricao_servico || h.os_descricao || '-'})), emptyRow:{funcionario:'Sem registros',os:'-',data:'-',total:'-',local:'-',servico:'Nenhuma hora extra encontrada para os filtros selecionados.'} });
+
     doc.moveDown().font("Helvetica").fontSize(8.5).fillColor(COLORS.muted).text("Este relatório é um controle interno da manutenção, utilizado para organização das horas extras, banco de horas e programação de folgas compensatórias da equipe.", PAGE.margins.left, doc.y, { width: 520 });
+    ensureSpace(doc, 42, meta);
     doc.moveDown(2).font("Helvetica").fontSize(9).fillColor(COLORS.text).text("Assinaturas: Encarregado de manutenção __________________  Funcionário __________________  Direção/RH __________________");
     doc.end();
   });
@@ -490,7 +506,6 @@ function gerarPdfBancoHorasPorOs(dados = {}) {
   return doc;
 }
 
-
 function gerarPdfEscalaCompleta({ semanas = [], filtros = {} } = {}) {
   const doc = createDoc();
   const meta = { title: "ESCALA COMPLETA", subtitle: "Campo do Gado – Manutenção Industrial", logoPath: logoPath() };
@@ -524,7 +539,6 @@ function gerarPdfFolgasProgramadas(dados = {}) {
   const doc=createDoc(); const meta={title:dados.reportTitle||'FOLGAS E AFASTAMENTOS',subtitle:'Campo do Gado – Manutenção Industrial',logoPath:logoPath()};
   process.nextTick(()=>{setupPage(doc,meta,false);drawTable(doc,{meta,columns:[{key:'funcionario',label:'Funcionário',width:125},{key:'tipo',label:'Tipo',width:110},{key:'periodo',label:'Período',width:120},{key:'debito',label:'Banco',width:75},{key:'status',label:'Status',width:80}],rows:(dados.folgas||[]).map(f=>({funcionario:f.colaborador_nome,tipo:f.tipo_lancamento,periodo:`${formatDateBr(f.data_folga)} a ${formatDateBr(f.data_fim||f.data_folga)}`,debito:f.debita_banco?`${fmtMin(f.minutos_descontados)} (${f.saldo_antes_minutos}→${f.saldo_depois_minutos})`:'Não desconta',status:f.status})),emptyRow:{funcionario:'Sem registros',tipo:'-',periodo:'-',debito:'-',status:'-'}});doc.end();}); return doc;
 }
-
 
 module.exports = {
   drawHeader,
