@@ -11,6 +11,8 @@ const custosEquipamentos=Array.isArray(p.custosMensaisEquipamentos)?p.custosMens
 const approvalStats=p.aprovacaoItens||{};
 const exec=p.executivo||{};
 const totals=p.totaisVisao||{};
+const acompanhamentoPath=typeof acompanhamentoBasePath!=='undefined'&&acompanhamentoBasePath?acompanhamentoBasePath:'/solicitacoes/acompanhamento-compras';
+const voltarHref=typeof acompanhamentoBackHref!=='undefined'&&acompanhamentoBackHref?acompanhamentoBackHref:'/solicitacoes/minhas';
 const money=c=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(c)||0)/100);
 const round=n=>Math.round(Number(n)||0);
 const statusLabel=value=>String(value||'-').replaceAll('_',' ');
@@ -23,7 +25,7 @@ const queryHref=(overrides={})=>{
     destaque:p.destaque||'',...overrides,
   };
   const query=Object.entries(values).filter(([,v])=>v!==''&&v!==null&&v!==undefined).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
-  return `/solicitacoes/acompanhamento-compras${query?'?'+query:''}`;
+  return `${acompanhamentoPath}${query?'?'+query:''}`;
 };
 %>
 <div class="buy-watch executive-buy-watch">
@@ -32,7 +34,7 @@ const queryHref=(overrides={})=>{
       <div class="title-line"><h1>Acompanhamento de Compras</h1><span class="readonly executive-badge">PAINEL EXECUTIVO · DIRETORIA</span></div>
       <p>Fila gerencial para acompanhar cotações, aprovações, compras, recebimentos e histórico sem duplicar o fluxo operacional de Compras.</p>
     </div>
-    <a class="btn btn-sm btn-ghost system-compact-btn" href="/solicitacoes/minhas">← Voltar às solicitações</a>
+    <a class="btn btn-sm btn-ghost system-compact-btn" href="<%=voltarHref%>">← Voltar</a>
   </header>
 
   <nav class="executive-view-tabs" aria-label="Visão do acompanhamento">
@@ -104,7 +106,7 @@ const queryHref=(overrides={})=>{
                 <td data-label="Aprovação"><div class="approval-cell item-approval-cell"><% if(needsApproval){ %><span class="approval-alert-chip">● <%=itemApproval.pendentesCount%> PARA APROVAR</span><strong><%=money(itemApproval.pendentesValorCentavos)%></strong><small>DIRETORIA</small><% } else if(Number(itemApproval.aprovadosCount||0)>0){ %><span class="item-approval-badge state-aprovada"><%=itemApproval.aprovadosCount%> APROVADO(S)</span><small>liberado para Compras</small><% } else if(isHistory){ %><span class="item-approval-badge state-aprovada">FLUXO CONCLUÍDO</span><small>registro preservado</small><% } else { %><span class="item-approval-badge state-sem-cotacao">SEM APROVAÇÃO PENDENTE</span><small>acompanhar próxima etapa</small><% } %></div></td>
                 <td data-label="Status / Prazo"><div class="status-stack"><span class="status-chip"><%=statusLabel(s.status)%></span><small><%=isHistory?'Concluída':s.atrasada?'Atrasada':s.venceHoje?'Vence hoje':s.previsao_entrega?('Previsão '+fmtBR(s.previsao_entrega)):'Sem previsão de entrega'%></small><small>Compras: <%=s.responsavel_nome||'Não atribuído'%></small></div></td>
                 <td data-label="Próxima ação"><span class="next-action-chip action-<%=String(s.proximaAcao||'EM_ACOMPANHAMENTO').toLowerCase().replaceAll('_','-')%>"><%=actionLabel(s.proximaAcao)%></span></td>
-                <td data-label="Ação" class="action-cell"><a class="btn btn-sm btn-ghost system-compact-btn" href="/solicitacoes/acompanhamento-compras/<%=s.id%>">Abrir</a></td>
+                <td data-label="Ação" class="action-cell"><a class="btn btn-sm btn-ghost system-compact-btn" href="<%=acompanhamentoPath%>/<%=s.id%>">Abrir</a></td>
               </tr>
             <% }) %>
           </tbody>

@@ -24,7 +24,7 @@
 <div class="pcm-op-page">
   <header class="pcm-op-head">
     <div><span class="pcm-op-eyebrow">PCM operacional</span><h1>Planejamento e Controle da Manutenção</h1><p>Fila de trabalho, confiabilidade, preventivas, custos e decisões em uma única visão.</p></div>
-    <div class="pcm-op-head-actions"><a class="pcm-op-btn" href="/pcm/dashboard-gerencial">Painel gerencial</a><a class="pcm-op-btn" href="/pcm/programacao-semanal">Programação semanal</a></div>
+    <div class="pcm-op-head-actions"><a class="pcm-op-btn" href="/pcm/programacao-semanal">Programação semanal</a></div>
   </header>
 
   <div class="pcm-shell">
@@ -47,7 +47,7 @@
           <form method="POST" action="/pcm/atualizar-indicadores" data-pcm-loading><input type="hidden" name="periodo_dias" value="<%= p.filtros.periodo_dias %>"><input type="hidden" name="setor" value="<%= p.filtros.setor || '' %>"><input type="hidden" name="prioridade" value="<%= p.filtros.prioridade || '' %>"><input type="hidden" name="sla_dias" value="<%= p.filtros.sla_dias %>"><button class="pcm-op-btn" type="submit">Atualizar indicadores</button></form>
           <form method="POST" action="/pcm/executar-automacao" data-pcm-confirm="Executar agora as regras automáticas de preventivas e risco?" data-pcm-loading><input type="hidden" name="periodo_dias" value="<%= p.filtros.periodo_dias %>"><input type="hidden" name="setor" value="<%= p.filtros.setor || '' %>"><input type="hidden" name="prioridade" value="<%= p.filtros.prioridade || '' %>"><input type="hidden" name="sla_dias" value="<%= p.filtros.sla_dias %>"><button class="pcm-op-btn" type="submit">Executar automação</button></form>
           <form method="POST" action="/pcm/analisar-ia" data-pcm-loading><input type="hidden" name="periodo_dias" value="<%= p.filtros.periodo_dias %>"><input type="hidden" name="setor" value="<%= p.filtros.setor || '' %>"><input type="hidden" name="prioridade" value="<%= p.filtros.prioridade || '' %>"><input type="hidden" name="sla_dias" value="<%= p.filtros.sla_dias %>"><button class="pcm-op-btn pcm-op-btn-ai" type="submit">Gerar análise com IA</button></form>
-          <% } else { %><span class="pcm-readonly">Modo consulta da Diretoria</span><% } %>
+          <% } else { %><span class="pcm-readonly">Modo consulta</span><% } %>
         </div>
       </section>
 
@@ -87,7 +87,6 @@
           <article class="pcm-op-panel"><div class="pcm-op-panel-head"><div><span class="pcm-op-section-label">Plano mestre</span><h2>Próximas atividades</h2></div><a class="pcm-op-link" href="/pcm/planejamento">Abrir planejamento</a></div><div class="pcm-op-plan-list"><% if (!(p.planos || []).length) { %><div class="pcm-op-empty">Nenhum plano mestre ativo.</div><% } %><% (p.planos || []).slice(0,6).forEach(function(item){ %><div><span class="pcm-op-plan-date <%= String(item.situacao||'').toLowerCase() %>"><%= date(item.proxima_data_prevista) %></span><span><strong><%= item.equipamento %></strong><small><%= item.atividade_descricao %></small></span></div><% }) %></div></article>
         </div>
       </section>
-
       <section class="pcm-op-panel"><div class="pcm-op-panel-head"><div><span class="pcm-op-section-label">Exceções</span><h2>Alertas operacionais prioritários</h2><p>Exibindo os cinco alertas não lidos mais recentes, gerados por regras rastreáveis.</p></div><a class="pcm-op-btn" href="/pcm/programacao-semanal">Tratar na programação</a></div><div class="pcm-op-alert-list"><% if (!visibleAlerts.length) { %><div class="pcm-op-empty-state compact"><strong>Nenhum alerta operacional pendente.</strong><span>O painel permanece monitorando as regras cadastradas.</span></div><% } %><% visibleAlerts.forEach(function(item){ %><div><span class="pcm-op-badge priority-<%= String(item.severidade||'MEDIA').toLowerCase() %>"><%= item.severidade %></span><span><strong><%= item.tipo %></strong><small><%= item.mensagem %></small></span><time><%= dateTime(item.created_at) %></time><% if (item.entidade_tipo==='OS' && item.entidade_id) { %><a class="pcm-op-btn pcm-op-btn-small" href="/os/<%= item.entidade_id %>">Abrir OS</a><% } %></div><% }) %><% if ((p.alertas || []).length > visibleAlerts.length) { %><div class="pcm-op-alert-count">Exibindo <%= visibleAlerts.length %> de <%= (p.alertas || []).length %> alertas. Use a programação semanal para tratar a fila completa.</div><% } %></div></section>
       <footer class="pcm-op-footer">Dados calculados diretamente dos registros do sistema · Atualizado em <%= dateTime(p.atualizado_em) %></footer>
     </main>

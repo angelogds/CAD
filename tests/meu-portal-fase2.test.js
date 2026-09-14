@@ -6,16 +6,17 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('Meu Portal Fase 2 ativa Materiais e reutiliza a Jornada existente', () => {
+test('Meu Portal Fase 2 ativa Materiais e reutiliza a Jornada existente somente para Manutenção', () => {
   const routes = read('modules/meu-portal/meu-portal.routes.js');
   const controller = read('modules/meu-portal/meu-portal.controller.js');
   const view = read('views/meu-portal/index.ejs');
 
-  assert.match(routes, /router\.get\('\/materiais', ctrl\.materiais\)/);
+  assert.match(routes, /router\.get\('\/materiais', vinculo\.requireMaintenanceSelfService, ctrl\.materiais\)/);
   assert.match(controller, /service\.listOwnMaterialWithdrawals\(req\.session\.user\.id/);
+  assert.match(view, /if \(acessoManutencao\)/);
   assert.match(view, /href="\/meu-portal\/materiais"/);
   assert.match(view, /href="\/escala\/meu-painel"/);
-  assert.match(view, /SERVIÇOS INTEGRADOS/);
+  assert.match(view, /MANUTENÇÃO/);
   assert.match(view, /Materiais[\s\S]*DISPONÍVEL/);
   assert.match(view, /Jornada[\s\S]*DISPONÍVEL/);
 });
@@ -83,15 +84,15 @@ test('filtros de materiais validam período e não aceitam colaborador arbitrár
   assert.doesNotMatch(service, /filters\.colaborador|options\.colaborador/i);
 });
 
-test('Jornada da Fase 2 amplia somente o autoatendimento e continua isolando dados pessoais', () => {
-  const rbac = read('config/rbac.js');
+test('Jornada da Fase 2 fica restrita à Manutenção e continua isolando dados pessoais', () => {
   const routes = read('modules/escala/escala.routes.js');
   const selfController = read('modules/escala/escala.self.controller.js');
   const controller = read('modules/escala/escala.controller.js');
 
-  assert.match(rbac, /escala_self:\s*\[[^\]]*ROLE\.COMPRAS[^\]]*ROLE\.PCM[^\]]*ROLE\.INSPECAO_QUALIDADE/s);
-  assert.match(routes, /router\.get\("\/meu-painel"[^\n]*escalaSelfRead/);
+  assert.match(routes, /const maintenanceSelfRead = \[ROLE\.MECANICO, ROLE\.MANUTENCAO_SUPERVISOR, ROLE\.SUPERVISOR_MANUTENCAO, ROLE\.ENCARREGADO_MANUTENCAO\]/);
+  assert.match(routes, /router\.get\("\/meu-painel"[^\n]*maintenanceSelfRead/);
   assert.match(routes, /router\.get\("\/semana"[^\n]*escalaRead/);
+  assert.doesNotMatch(routes, /router\.get\("\/meu-painel"[^\n]*escalaSelfRead/);
   assert.match(selfController, /buscarColaboradorDoUsuario\(user\.id\)/);
   assert.match(selfController, /canViewAll:\s*false/);
   assert.match(controller, /if\(!all && own\?\.id !== id\) return res\.status\(403\)/);

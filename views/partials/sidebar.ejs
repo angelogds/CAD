@@ -9,6 +9,7 @@
   };
 
   const canPainel = can('painel_operacional');
+  const canDiretoria = can('diretoria_dashboard');
   const canPCM = can('pcm');
   const canEquipamentos = can('equipamentos');
   const canOS = can('os_view');
@@ -44,7 +45,7 @@
     `<a class="nav-item ${extraClass} ${isActive ? 'active' : ''}" href="${href}"><span class="nav-label">${label}</span>${suffix}</a>`;
 
   const hasOperationGroup = canPainel || canEquipamentos || canOS || canOSChat || canPreventivas || canDemandas || canSolicitacoes || canCompras || canFornecedores || canAlmoxarifado || canEstoque || canMotores;
-  const hasSupportGroup = canAvisos || canEscala || canRH || canMeuPortal || canInspecao || canTracagem || canDesenhoTecnico || canAcademia || canAI || canPCM;
+  const hasSupportGroup = canDiretoria || canAvisos || canEscala || canRH || canMeuPortal || canInspecao || canTracagem || canDesenhoTecnico || canAcademia || canAI || canPCM;
 %>
 
 <aside class="sidebar">
@@ -72,6 +73,7 @@
       <div class="nav-divider nav-divider-soft"></div>
       <div class="nav-section nav-section-shell">GESTÃO E APOIO</div>
     <% } %>
+    <% if (canDiretoria) { %><%- navItem('/dashboard/diretoria', 'Painel da Diretoria', activeMenu === 'diretoria') %><% } %>
     <% if (canAvisos) { %><%- navItem('/avisos', 'Avisos', activeMenu === 'avisos') %><% } %>
     <% if (canEscala) { %><%- navItem('/escala', 'Escala', activeMenu === 'escala') %><% } %>
     <% if (canRH) { %><%- navItem('/rh', 'RH', activeMenu === 'rh') %><% } %>
@@ -87,7 +89,6 @@
       <% if (activeMenu === 'pcm') { %>
         <div class="nav-submenu">
           <a class="nav-item nav-subitem <%= currentPcmSection === 'visao-geral' ? 'active' : '' %>" href="/pcm"><span class="nav-label">Visão Geral</span></a>
-          <a class="nav-item nav-subitem <%= currentPcmSection === 'dashboard-gerencial' ? 'active' : '' %>" href="/pcm/dashboard-gerencial"><span class="nav-label">Painel da Diretoria</span></a>
           <a class="nav-item nav-subitem <%= currentPcmSection === 'planejamento' ? 'active' : '' %>" href="/pcm/planejamento"><span class="nav-label">Plano Mestre</span></a>
           <a class="nav-item nav-subitem <%= currentPcmSection === 'programacao-semanal' ? 'active' : '' %>" href="/pcm/programacao-semanal"><span class="nav-label">Programação Semanal</span></a>
           <a class="nav-item nav-subitem <%= currentPcmSection === 'lubrificacao' ? 'active' : '' %>" href="/pcm/lubrificacao"><span class="nav-label">Plano de Lubrificação</span></a>

@@ -78,24 +78,25 @@ test('solicitação de folga mantém aprovação operacional, alerta liderança 
   assert.match(notifications, /UPPER\(COALESCE\(role,''\)\)='RH'/);
 });
 
-test('Meu RH é autenticado, estritamente pessoal e não aceita colaborador arbitrário', () => {
+test('Meu RH é autenticado, estritamente pessoal e protegido pelo vínculo da Manutenção', () => {
   const routes = read('modules/meu-portal/meu-portal.routes.js');
   const portalController = read('modules/rh/rh.portal.controller.js');
   const service = read('modules/rh/rh.service.js');
   assert.match(routes, /router\.use\(requireLogin\)/);
-  assert.match(routes, /router\.get\('\/rh', rhPortalCtrl\.index\)/);
+  assert.match(routes, /router\.get\('\/rh', vinculo\.requireMaintenanceSelfService, rhPortalCtrl\.index\)/);
   assert.match(portalController, /service\.getOwnPortalData\(req\.session\.user\.id\)/);
   assert.match(service, /WHERE user_id=\?/);
   assert.doesNotMatch(portalController, /req\.params\.colaborador|req\.query\.colaborador|req\.body\.colaborador/);
 });
 
-test('interface ativa RH no Meu Portal e cria acesso dedicado no menu lateral', () => {
+test('interface ativa RH apenas na área profissional da Manutenção e cria acesso dedicado no menu lateral', () => {
   const portal = read('views/meu-portal/index.ejs');
   const sidebar = read('views/partials/sidebar.ejs');
   const rhView = read('views/rh/index.ejs');
   const css = read('public/css/rh-portal.css');
+  assert.match(portal, /if \(acessoManutencao\)/);
   assert.match(portal, /href="\/meu-portal\/rh"/);
-  assert.match(portal, /RH[\s\S]*DISPONÍVEL • Abrir/);
+  assert.match(portal, /Meu RH[\s\S]*DISPONÍVEL • ABRIR/);
   assert.match(sidebar, /const canRH = can\('rh_view'\)/);
   assert.match(sidebar, /navItem\('\/rh', 'RH', activeMenu === 'rh'\)/);
   assert.match(rhView, /Pendências do RH/);

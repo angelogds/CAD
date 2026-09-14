@@ -12,32 +12,35 @@ test('Meu Portal é autoatendimento autenticado e não reaproveita a permissão 
   assert.doesNotMatch(routes, /ACCESS\.usuarios|requireAdmin/);
   assert.match(routes, /router\.post\('\/senha'/);
   assert.match(routes, /router\.post\('\/foto'/);
-  assert.match(routes, /router\.get\('\/cartao'/);
+  assert.match(routes, /router\.get\('\/cartao', vinculo\.requireMaintenanceSelfService/);
 });
 
-test('portal resolve colaborador exclusivamente pelo user_id e não cria cadastro paralelo', () => {
+test('portal resolve colaborador pelo user_id e não cria cadastro paralelo', () => {
   const service = read('modules/meu-portal/meu-portal.service.js');
   assert.match(service, /WHERE user_id = \? AND COALESCE\(deleted_at, ''\) = ''/);
   assert.doesNotMatch(service, /INSERT INTO colaboradores/i);
   assert.doesNotMatch(service, /normalizePersonName|LIKE.*nome/i);
 });
 
-test('vínculo é explícito, limitado a RH e ADMIN e usa somente ficha existente sem login', () => {
+test('auto-vínculo é seguro e vínculo manual fica como contingência limitada a RH e ADMIN', () => {
   const routes = read('modules/meu-portal/meu-portal.routes.js');
   const service = read('modules/meu-portal/meu-portal.service.js');
   const controller = read('modules/meu-portal/meu-portal.controller.js');
+  const vinculo = read('modules/meu-portal/meu-portal.vinculo.js');
   const view = read('views/meu-portal/index.ejs');
 
   assert.match(routes, /LINK_MANAGER_ROLES = \['ADMIN', 'RH'\]/);
   assert.match(routes, /router\.post\('\/vinculo', requireRole\(LINK_MANAGER_ROLES\), ctrl\.linkColaborador\)/);
+  assert.match(routes, /router\.use\(vinculo\.attachAutomaticMaintenanceLink\)/);
   assert.match(service, /\(user_id IS NULL OR user_id = 0\)/);
   assert.match(service, /UPDATE colaboradores[\s\S]*SET user_id = \?/);
-  assert.match(service, /Somente o RH pode realizar o vínculo/);
   assert.doesNotMatch(service, /INSERT INTO colaboradores/i);
-  assert.doesNotMatch(service, /normalizePersonName|LIKE.*nome/i);
+  assert.match(vinculo, /candidates\.length !== 1/);
+  assert.match(vinculo, /ALREADY_LINKED_TO_OTHER_USER/);
+  assert.match(vinculo, /UPDATE colaboradores[\s\S]*SET user_id = \?/);
+  assert.doesNotMatch(vinculo, /INSERT\s+INTO\s+colaboradores/i);
   assert.match(controller, /linkOwnUserToColaborador/);
-  assert.match(view, /Vincular colaborador/);
-  assert.match(view, /A lista contém somente fichas existentes ainda sem usuário vinculado/);
+  assert.doesNotMatch(view, /Vincular colaborador/);
 });
 
 test('alteração de senha exige conferência da senha atual e grava hash somente do próprio usuário', () => {

@@ -36,9 +36,15 @@ function normalizeRole(role) {
 const ACCESS = {
   dashboard_criticidade: [ROLE.ADMIN, ROLE.DIRETORIA, ROLE.PCM, ROLE.MANUTENCAO_SUPERVISOR, ROLE.ENCARREGADO_MANUTENCAO, ROLE.MECANICO],
   painel_operacional: [ROLE.INSPECAO_QUALIDADE, ROLE.ADMIN, ROLE.DIRETORIA, ROLE.RH, ROLE.ENCARREGADO_PRODUCAO, ROLE.PRODUCAO, ROLE.MECANICO, ROLE.MANUTENCAO_SUPERVISOR],
-  pcm: [ROLE.ADMIN, ROLE.DIRETORIA, ROLE.PCM, ROLE.MANUTENCAO_SUPERVISOR],
-  // A Diretoria consulta o PCM e o painel gerencial, mas não altera planos,
-  // criticidade, programação, falhas ou automações operacionais.
+
+  // Painel da Diretoria: área executiva separada dos módulos operacionais.
+  diretoria_dashboard: [ROLE.ADMIN, ROLE.DIRETORIA],
+  diretoria_compras: [ROLE.ADMIN, ROLE.DIRETORIA],
+  diretoria_manutencao: [ROLE.ADMIN, ROLE.DIRETORIA],
+
+  // PCM operacional: Diretoria deixa de navegar por planejamento, engenharia,
+  // lubrificação e demais telas técnicas. Seus indicadores ficam em /diretoria.
+  pcm: [ROLE.ADMIN, ROLE.PCM, ROLE.MANUTENCAO_SUPERVISOR],
   pcm_manage: [ROLE.ADMIN, ROLE.PCM, ROLE.MANUTENCAO_SUPERVISOR],
   equipamentos: [ROLE.INSPECAO_QUALIDADE, ROLE.ADMIN, ROLE.DIRETORIA, ROLE.MECANICO, ROLE.MANUTENCAO_SUPERVISOR],
   equipamentos_manage: [ROLE.ADMIN, ROLE.MECANICO, ROLE.MANUTENCAO_SUPERVISOR],
@@ -118,7 +124,6 @@ const ACCESS = {
     ROLE.MANUTENCAO_SUPERVISOR,
     ROLE.ENCARREGADO_MANUTENCAO,
     ROLE.MECANICO,
-    ROLE.DIRETORIA,
     ROLE.ALMOXARIFADO,
   ],
   desenho_tecnico_manage: [ROLE.ADMIN, ROLE.MANUTENCAO_SUPERVISOR, ROLE.ENCARREGADO_MANUTENCAO, ROLE.MECANICO],

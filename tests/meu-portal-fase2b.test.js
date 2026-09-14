@@ -6,15 +6,15 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('Meu Portal Fase 2B publica somente consultas pessoais autenticadas', () => {
+test('Meu Portal Fase 2B publica somente consultas pessoais autenticadas da Manutenção', () => {
   const routes = read('modules/meu-portal/meu-portal.routes.js');
   const controller = read('modules/meu-portal/meu-portal-fase2b.controller.js');
   const service = read('modules/meu-portal/meu-portal-fase2b.service.js');
 
   assert.match(routes, /router\.use\(requireLogin\)/);
-  assert.match(routes, /router\.get\('\/treinamentos', fase2bCtrl\.treinamentos\)/);
-  assert.match(routes, /router\.get\('\/dados-profissionais', fase2bCtrl\.dadosProfissionais\)/);
-  assert.match(routes, /router\.get\('\/servicos', fase2bCtrl\.servicos\)/);
+  assert.match(routes, /router\.get\('\/treinamentos', vinculo\.requireMaintenanceSelfService, fase2bCtrl\.treinamentos\)/);
+  assert.match(routes, /router\.get\('\/dados-profissionais', vinculo\.requireMaintenanceSelfService, fase2bCtrl\.dadosProfissionais\)/);
+  assert.match(routes, /router\.get\('\/servicos', vinculo\.requireMaintenanceSelfService, fase2bCtrl\.servicos\)/);
   assert.match(controller, /getOwnTrainings\(req\.session\.user\.id\)/);
   assert.match(controller, /getOwnProfessionalData\(req\.session\.user\.id\)/);
   assert.match(controller, /getOwnServiceHistory\(req\.session\.user\.id/);
@@ -101,10 +101,11 @@ test('Meus Serviços valida filtros, limita resultado e não inventa duração',
   assert.match(view, /somente leitura/i);
 });
 
-test('Home mantém ativos os serviços entregues na Fase 2B durante a evolução das fases seguintes', () => {
+test('Home mantém ativos os serviços entregues na Fase 2B para perfis da Manutenção', () => {
   const view = read('views/meu-portal/index.ejs');
   const css = read('public/css/meu-portal-fase2b.css');
 
+  assert.match(view, /if \(acessoManutencao\)/);
   assert.match(view, /href="\/meu-portal\/dados-profissionais"/);
   assert.match(view, /href="\/meu-portal\/treinamentos"/);
   assert.match(view, /href="\/meu-portal\/servicos"/);

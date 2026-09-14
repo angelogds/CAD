@@ -20,7 +20,7 @@ test('novos documentos do portal RH usam storage privado e downloads protegidos'
   assert.match(routes, /router\.get\('\/:id\/rh-documentos\/:documentoId\/arquivo', requireRole\(\['ADMIN', 'RH'\]\)/);
   assert.match(controller, /rhDocuments\.privateMarker\(req\.file\.filename\)/);
   assert.match(view, /action="\/colaboradores\/<%= person\.id %>\/rh-documentos"/);
-  assert.match(portalRoutes, /router\.get\('\/rh\/documentos\/:documentoId\/arquivo', rhPortalCtrl\.documentoArquivo\)/);
+  assert.match(portalRoutes, /router\.get\('\/rh\/documentos\/:documentoId\/arquivo', vinculo\.requireMaintenanceSelfService, rhPortalCtrl\.documentoArquivo\)/);
   assert.match(portalController, /getPrivateDocumentForDownload\(Number\(req\.params\.documentoId\), Number\(rh\.colaborador\.id\)\)/);
 });
 

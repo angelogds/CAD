@@ -6,12 +6,26 @@ const ctrl = require("./pcm.controller");
 
 const PCM_ACCESS = ACCESS.pcm;
 const PCM_MANAGE = ACCESS.pcm_manage;
+const DIRETORIA_MANUTENCAO = ACCESS.diretoria_manutencao || [];
+const DIRETORIA_MANUTENCAO_PATH = "/dashboard/diretoria/manutencao";
+
+function redirectWithQuery(target) {
+  return (req, res) => {
+    const query = new URLSearchParams(req.query || {}).toString();
+    return res.redirect(301, `${target}${query ? `?${query}` : ''}`);
+  };
+}
 
 router.get("/", requireLogin, requireRole(PCM_ACCESS), ctrl.index);
-router.get("/dashboard-gerencial", requireLogin, requireRole(PCM_ACCESS), ctrl.dashboardGerencial);
-router.get("/dashboard-gerencial/dados", requireLogin, requireRole(PCM_ACCESS), ctrl.dashboardDados);
-router.get("/dashboard-gerencial/pdf", requireLogin, requireRole(PCM_ACCESS), ctrl.dashboardPdf);
-router.get("/dashboard-gerencial/excel", requireLogin, requireRole(PCM_ACCESS), ctrl.dashboardExcel);
+
+// Compatibilidade: o painel executivo saiu do PCM operacional e passou a ser
+// parte do Painel da Diretoria. Favoritos antigos continuam funcionando.
+router.get("/dashboard-gerencial", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery(DIRETORIA_MANUTENCAO_PATH));
+router.get("/dashboard-gerencial/dados", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery(`${DIRETORIA_MANUTENCAO_PATH}/dados`));
+router.get("/dashboard-gerencial/pdf", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery(`${DIRETORIA_MANUTENCAO_PATH}/pdf`));
+router.get("/dashboard-gerencial/excel", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery(`${DIRETORIA_MANUTENCAO_PATH}/excel`));
+router.get("/dashboard-gerencial/configurar", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery(DIRETORIA_MANUTENCAO_PATH));
+
 router.get("/planejamento", requireLogin, requireRole(PCM_ACCESS), ctrl.planejamento);
 router.get("/planejamento/pdf", requireLogin, requireRole(PCM_ACCESS), ctrl.planejamentoPdf);
 router.get("/falhas", requireLogin, requireRole(PCM_ACCESS), ctrl.falhas);
@@ -26,14 +40,12 @@ router.get("/relatorios-avancados/excel", requireLogin, requireRole(PCM_ACCESS),
 
 // Compatibilidade de URLs antigas: as telas duplicadas foram consolidadas,
 // mas favoritos e links históricos continuam chegando ao destino correto.
-router.get("/dashboard-gerencial/configurar", requireLogin, requireRole(PCM_ACCESS), (_req, res) => res.redirect(301, "/pcm/dashboard-gerencial"));
 router.get("/backlog", requireLogin, requireRole(PCM_ACCESS), (_req, res) => res.redirect(301, "/pcm/programacao-semanal"));
 router.get("/rotas-inspecao", requireLogin, requireRole(PCM_ACCESS), (_req, res) => res.redirect(301, "/inspecao"));
 router.get("/criticidade", requireLogin, requireRole(PCM_ACCESS), (req, res) => {
   const equipamento = req.query.equipamento_id ? `?equipamento_id=${encodeURIComponent(req.query.equipamento_id)}` : "";
   return res.redirect(301, `/pcm/engenharia${equipamento}#criticidade`);
 });
-
 
 router.post("/atualizar-indicadores", requireLogin, requireRole(PCM_MANAGE), ctrl.atualizarIndicadores);
 router.post("/executar-automacao", requireLogin, requireRole(PCM_MANAGE), ctrl.executarAutomacao);

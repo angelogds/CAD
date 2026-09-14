@@ -76,10 +76,12 @@ test('telas exibem contador individual e totais separados por colaborador na OS'
   assert.match(osView, /Total por colaborador/);
 });
 
-
-test('rotas do painel de hora extra aceitam perfil/cargo/função de mecânico', () => {
+test('rotas de hora extra exigem perfil operacional da Manutenção', () => {
   assert.match(routes, /function requireHoraExtraAccess/);
-  assert.match(routes, /user\.funcao, user\.cargo, user\.perfil/);
-  assert.match(routes, /role === ROLE\.ADMIN \|\| isMecanicoProfile\(user\)/);
-  assert.doesNotMatch(routes, /hora-extra\/nova", requireLogin, requireRole\(escalaRead\)/);
+  assert.match(routes, /function isMaintenanceSelfServiceProfile/);
+  assert.match(routes, /const maintenanceSelfRead = \[ROLE\.MECANICO, ROLE\.MANUTENCAO_SUPERVISOR, ROLE\.SUPERVISOR_MANUTENCAO, ROLE\.ENCARREGADO_MANUTENCAO\]/);
+  assert.match(routes, /if \(isMaintenanceSelfServiceProfile\(user\)\) return next\(\)/);
+  assert.match(routes, /hora-extra\/nova", requireLogin, requireHoraExtraAccess/);
+  assert.doesNotMatch(routes, /role === ROLE\.ADMIN \|\|/);
+  assert.doesNotMatch(routes, /user\.funcao, user\.cargo, user\.perfil/);
 });

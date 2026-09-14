@@ -8,6 +8,7 @@ const migration = fs.readFileSync(path.join(root, 'database/migrations/193_compr
 const service = fs.readFileSync(path.join(root, 'modules/compras/compras.aprovacao-itens.service.js'), 'utf8');
 const middleware = fs.readFileSync(path.join(root, 'modules/compras/compras.aprovacao.middleware.js'), 'utf8');
 const solicitacoesRoutes = fs.readFileSync(path.join(root, 'modules/solicitacoes/solicitacoes.routes.js'), 'utf8');
+const diretoriaRoutes = fs.readFileSync(path.join(root, 'modules/diretoria/diretoria.routes.js'), 'utf8');
 const comprasRoutes = fs.readFileSync(path.join(root, 'modules/compras/compras.routes.js'), 'utf8');
 
 test('migration de aprovação por item é aditiva e mantém histórico', () => {
@@ -31,14 +32,15 @@ test('item cotado válido entra automaticamente como aguardando aprovação', ()
   assert.doesNotMatch(service, /Finalize a cotação de todos os itens ativos/);
 });
 
-test('aprovação é individual, auditada e aceita ADMIN ou DIRETORIA', () => {
+test('aprovação é individual, auditada e aceita ADMIN ou DIRETORIA no painel executivo', () => {
   assert.match(service, /role === ROLE\.ADMIN \|\| role === ROLE\.DIRETORIA/);
   assert.match(service, /approveQuotedItems/);
   assert.match(service, /aprovacao_item_por_user_id/);
   assert.match(service, /aprovacao_item_em=datetime\('now'\)/);
   assert.match(service, /compras_aprovacoes_itens_historico/);
-  assert.match(solicitacoesRoutes, /ACOMPANHAMENTO_COMPRAS_EXECUTIVO\s*=\s*\[ROLE\.ADMIN, ROLE\.DIRETORIA\]/);
-  assert.match(solicitacoesRoutes, /requireRole\(ACOMPANHAMENTO_COMPRAS_EXECUTIVO\)/);
+  assert.match(diretoriaRoutes, /const DIRETORIA_COMPRAS = ACCESS\.diretoria_compras/);
+  assert.match(diretoriaRoutes, /router\.post\('\/compras\/:id\/aprovar-itens-cotados', requireLogin, requireRole\(DIRETORIA_COMPRAS\)/);
+  assert.match(solicitacoesRoutes, /redirectAprovacaoCompras/);
 });
 
 test('mudança em quantidade fornecedor ou valor invalida somente a assinatura do item', () => {
