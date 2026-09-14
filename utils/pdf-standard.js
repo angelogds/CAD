@@ -168,6 +168,16 @@ function formatMinutes(value) {
   return `${sign}${Math.floor(abs / 60)}h${String(abs % 60).padStart(2, '0')}`;
 }
 
+// Layout tabular de Solicitações para relatórios de Banco de Horas.
+// A API antiga de RH permanece compatível; migrações adotam esta composição.
+function createReport(options = {}) {
+  return require('./pdf/institutional-report').createInstitutionalReport({
+    ...options,
+    logoPath: logoPath(),
+    colors: { ...COLORS, text: '#374151', muted: '#6B7280', border: '#DDE5DE', row: '#F8FBF9' },
+  });
+}
+
 module.exports = {
   COLORS,
   PAGE,
@@ -180,4 +190,5 @@ module.exports = {
   textBox,
   formatDate,
   formatMinutes,
+  createReport,
 };
