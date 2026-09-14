@@ -3,9 +3,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { ACCESS, ROLE, normalizeRole } = require('../config/rbac');
 
-test('Diretoria consulta o PCM, mas não executa mutações operacionais', () => {
+test('Diretoria consulta desempenho da manutenção sem acessar o PCM operacional', () => {
   assert.equal(normalizeRole('DIRECAO'), ROLE.DIRETORIA);
-  assert.ok(ACCESS.pcm.includes(ROLE.DIRETORIA));
+  assert.ok(ACCESS.diretoria_manutencao.includes(ROLE.DIRETORIA));
+  assert.ok(!ACCESS.pcm.includes(ROLE.DIRETORIA));
   assert.ok(!ACCESS.pcm_manage.includes(ROLE.DIRETORIA));
   assert.ok(ACCESS.pcm_manage.includes(ROLE.PCM));
   assert.ok(ACCESS.pcm_manage.includes(ROLE.MANUTENCAO_SUPERVISOR));
@@ -22,11 +23,15 @@ test('painel da Diretoria é fixo, apresentável e possui exportações', () => 
   assert.match(service, /periodo_padrao: 'mes_atual'/);
 });
 
-test('rotas de leitura usam PCM_ACCESS e mutações usam PCM_MANAGE', () => {
-  const routes = fs.readFileSync('modules/pcm/pcm.routes.js', 'utf8');
-  assert.match(routes, /router\.get\("\/dashboard-gerencial"[\s\S]*requireRole\(PCM_ACCESS\)/);
-  assert.match(routes, /router\.post\("\/planos"[\s\S]*requireRole\(PCM_MANAGE\)/);
-  for (const target of ['/dashboard-gerencial/pdf','/dashboard-gerencial/excel','/relatorios-avancados/pdf','/relatorios-avancados/excel']) {
-    assert.ok(routes.includes(target), `rota ausente: ${target}`);
+test('rotas antigas redirecionam e novo Painel da Diretoria mantém exportações em somente leitura', () => {
+  const pcmRoutes = fs.readFileSync('modules/pcm/pcm.routes.js', 'utf8');
+  const diretoriaRoutes = fs.readFileSync('modules/diretoria/diretoria.routes.js', 'utf8');
+
+  assert.match(pcmRoutes, /DIRETORIA_MANUTENCAO_PATH = "\/dashboard\/diretoria\/manutencao"/);
+  assert.match(pcmRoutes, /router\.get\("\/dashboard-gerencial"[\s\S]*redirectWithQuery\(DIRETORIA_MANUTENCAO_PATH\)/);
+  assert.match(diretoriaRoutes, /router\.get\('\/manutencao', requireLogin, requireRole\(DIRETORIA_MANUTENCAO\), ctrl\.manutencao\)/);
+  for (const target of ['/manutencao/dados','/manutencao/pdf','/manutencao/excel']) {
+    assert.ok(diretoriaRoutes.includes(target), `rota executiva ausente: ${target}`);
   }
+  assert.match(pcmRoutes, /router\.post\("\/planos"[\s\S]*requireRole\(PCM_MANAGE\)/);
 });
