@@ -27,7 +27,7 @@ test('item cotado válido entra automaticamente como aguardando aprovação', ()
   assert.match(service, /status_cotacao.*COTADO/s);
   assert.match(service, /Number\(item\.fornecedor_id \|\| 0\) > 0/);
   assert.match(service, /Number\(item\.valor_unitario_centavos \|\| 0\) > 0/);
-  assert.match(service, /return ITEM_APPROVAL\.PENDING/);
+  assert.match(service, /return approved \? ITEM_APPROVAL\.APPROVED : ITEM_APPROVAL\.PENDING/);
   assert.doesNotMatch(service, /Finalize a cotação de todos os itens ativos/);
 });
 
@@ -37,7 +37,8 @@ test('aprovação é individual, auditada e aceita ADMIN ou DIRETORIA', () => {
   assert.match(service, /aprovacao_item_por_user_id/);
   assert.match(service, /aprovacao_item_em=datetime\('now'\)/);
   assert.match(service, /compras_aprovacoes_itens_historico/);
-  assert.match(solicitacoesRoutes, /requireRole\(\[ROLE\.ADMIN, ROLE\.DIRETORIA\]\)/);
+  assert.match(solicitacoesRoutes, /ACOMPANHAMENTO_COMPRAS_EXECUTIVO\s*=\s*\[ROLE\.ADMIN, ROLE\.DIRETORIA\]/);
+  assert.match(solicitacoesRoutes, /requireRole\(ACOMPANHAMENTO_COMPRAS_EXECUTIVO\)/);
 });
 
 test('mudança em quantidade fornecedor ou valor invalida somente a assinatura do item', () => {
