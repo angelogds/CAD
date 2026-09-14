@@ -1,6 +1,6 @@
 <%- layout('layout') -%>
-<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
-<link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260903a">
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260913-rh">
+<link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260913-rh">
 <%
   const listaFolgas = Array.isArray(folgas) ? folgas : [];
   const listaSolicitacoes = Array.isArray(solicitacoes) ? solicitacoes : [];
@@ -8,7 +8,8 @@
   const historicoSolic = listaSolicitacoes.filter(s=>s.status!=='PENDENTE_APROVACAO').slice(0,40);
   const fmtMin = (value) => { const n=Number(value||0); const sign=n<0?'-':''; const m=Math.abs(n); return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; };
 %>
-<div class="escala-page approval-page">
+<div class="escala-page">
+  <div class="approval-page">
   <header class="escala-head">
     <div><h1>Folgas e Afastamentos</h1><p>Solicitações do Banco de Horas, aprovação da gestão e programação das demais ocorrências.</p></div>
     <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a><a class="btn" href="/escala/banco-horas">Banco de Horas</a></div>
@@ -23,7 +24,7 @@
     <a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a>
   </nav>
 
-  <div class="escala-notice is-info"><strong>Regra operacional:</strong> folga eletiva pelo Banco de Horas nunca é liberada na segunda-feira e somente um colaborador pode reservar/usar a mesma data. Uma solicitação pendente já reserva o dia até aprovação, reprovação ou cancelamento.</div>
+  <div class="escala-notice is-info"><strong>Regra operacional:</strong> folga eletiva pelo Banco de Horas nunca é liberada na segunda-feira e somente um colaborador pode reservar/usar a mesma data. Meio período consome 4h; com 3h30 ou mais, a liderança pode aprovar e o saldo fica até -0h30.</div>
 
   <section class="escala-section">
     <div class="escala-section-head"><div><h2>Solicitações aguardando aprovação</h2><p>O saldo e a disponibilidade da data são revalidados no momento da aprovação.</p></div><span class="approval-counter"><%= pendentesFolga.length %> pendente(s)</span></div>
@@ -56,22 +57,23 @@
         <summary>+ Registrar afastamento manual / administrativo</summary>
         <div class="manual-leave-content">
           <p class="muted">Use para férias, atestado, falta ou lançamento administrativo. Solicitações normais de folga compensatória devem partir do próprio colaborador.</p>
-          <form method="post" action="/escala/folgas/programar" enctype="multipart/form-data" id="folga-form" class="escala-form-grid is-3">
+          <form method="post" action="/escala/folgas/programar" enctype="multipart/form-data" id="folga-form" class="escala-form-grid is-3" data-compensacao-url="/escala/folgas/horas-extras-servico">
             <label class="escala-field"><span class="label">Funcionário</span><select class="input" name="colaborador_id" id="colaborador" required><option value="">Selecione</option><% colaboradores.forEach(c=>{ %><option value="<%= c.id %>" data-saldo="<%= c.saldo.minutos %>"><%= c.nome %> — saldo <%= c.saldo.horas %></option><% }) %></select></label>
             <label class="escala-field"><span class="label">Tipo</span><select class="input" name="tipo_lancamento" id="tipo" required><option value="FOLGA_COMPENSATORIA">Folga compensatória</option><option value="FOLGA_MANUAL">Folga manual</option><option value="ATESTADO">Atestado</option><option value="FERIAS">Férias</option><option value="FALTA_JUSTIFICADA">Falta justificada</option><option value="FALTA_NAO_JUSTIFICADA">Falta não justificada</option><option value="OUTRO">Outro afastamento</option></select></label>
-            <label class="escala-field"><span class="label">Motivo</span><input class="input" name="motivo" required placeholder="Motivo / referência"></label>
-            <label class="escala-field"><span class="label">Data inicial</span><input class="input" type="date" name="data_folga" required></label>
-            <label class="escala-field"><span class="label">Data final</span><input class="input" type="date" name="data_fim" required></label>
+            <label class="escala-field"><span class="label">Motivo</span><input class="input" name="motivo" id="motivoFolga" required placeholder="Motivo / referência"></label>
+            <label class="escala-field"><span class="label">Data inicial</span><input class="input" type="date" name="data_folga" id="dataFolga" required></label>
+            <label class="escala-field"><span class="label">Data final</span><input class="input" type="date" name="data_fim" id="dataFim" required></label>
             <label class="escala-field" id="horas-wrap"><span class="label">Horas a descontar</span><input class="input" type="number" min="0.01" step="0.01" name="horas" id="horas"></label>
-            <label class="escala-field"><span class="label">Data do serviço</span><input class="input" type="date" name="data_servico"></label>
-            <label class="escala-field"><span class="label">Início do serviço</span><input class="input" type="time" name="hora_inicio"></label>
-            <label class="escala-field"><span class="label">Fim do serviço</span><input class="input" type="time" name="hora_fim"></label>
-            <label class="escala-field"><span class="label">Equipamento / setor</span><input class="input" name="equipamento"></label>
-            <label class="escala-field"><span class="label">Descrição do serviço</span><input class="input" name="descricao_servico"></label>
+            <label class="escala-field"><span class="label">Data do serviço</span><input class="input" type="date" name="data_servico" id="dataServico"></label>
+            <label class="escala-field"><span class="label">Início do serviço</span><input class="input" type="time" name="hora_inicio" id="horaInicio"></label>
+            <label class="escala-field"><span class="label">Fim do serviço</span><input class="input" type="time" name="hora_fim" id="horaFim"></label>
+            <label class="escala-field"><span class="label">Equipamento / setor</span><input class="input" name="equipamento" id="equipamentoServico"></label>
+            <label class="escala-field"><span class="label">Descrição do serviço</span><input class="input" name="descricao_servico" id="descricaoServico"></label>
             <label class="escala-field"><span class="label">Anexo</span><input class="input" type="file" name="anexo" accept="image/*,.pdf,application/pdf"></label>
-            <label class="escala-field full"><span class="label">Justificativa ADMIN para saldo negativo</span><input class="input" name="justificativa_saldo_negativo" placeholder="Somente quando necessário"></label>
+            <label class="escala-field full"><span class="label">Justificativa da liderança para saldo negativo</span><input class="input" name="justificativa_saldo_negativo" placeholder="Somente quando necessário"></label>
+            <div class="escala-field full" id="compensacao-os-wrap" hidden><div class="compensacao-os-panel"><div class="compensacao-os-head"><div><strong id="compensacao-os-title">OS da data do serviço</strong><small id="compensacao-os-help">Selecione funcionário e data do serviço para buscar as horas extras aprovadas.</small></div><span id="compensacao-os-total">0h00</span></div><div id="compensacao-os-list" class="compensacao-os-list"></div></div></div>
             <div class="escala-field full"><div class="escala-notice is-info"><strong id="saldo-info">Selecione o funcionário.</strong><br><span id="debito-info">Folga compensatória debita o Banco de Horas.</span></div></div>
-            <div class="escala-field full"><div class="escala-actionbar"><span class="muted">Folgas eletivas também respeitam segunda-feira bloqueada e uma pessoa por data.</span><button class="btn btn-green" type="submit">Registrar ocorrência</button></div></div>
+            <div class="escala-field full"><div class="escala-actionbar"><span class="muted">Folgas eletivas também respeitam segunda-feira bloqueada e uma pessoa por data.</span><button class="btn btn-green" type="submit">Programar ocorrência</button></div></div>
           </form>
         </div>
       </details>
@@ -91,9 +93,28 @@
       <% historicoSolic.forEach(s=>{ %><tr><td><strong><%= dateBr.formatDateBR(s.data_folga) %></strong></td><td><%= s.colaborador_nome %></td><td><span class="escala-status <%= /REPROV|CANCEL/.test(s.status)?'is-ausente':'' %>"><%= String(s.status).replaceAll('_',' ') %></span></td><td><%= dateBr.formatDateTimeBR(s.solicitado_em) %></td><td><%= s.decidido_em ? dateBr.formatDateTimeBR(s.decidido_em) : '-' %></td><td><%= s.observacao_decisao || '-' %></td></tr><% }) %>
     </tbody></table></div></section>
   <% } %>
+  </div>
 </div>
 <script>
-const tipo=document.getElementById('tipo'),col=document.getElementById('colaborador'),horas=document.getElementById('horas');
-function update(){if(!tipo||!col||!horas)return;const debita=tipo.value==='FOLGA_COMPENSATORIA';document.getElementById('horas-wrap').style.display=debita?'grid':'none';horas.required=debita;document.getElementById('debito-info').textContent=debita?'A folga compensatória desconta exatamente as horas informadas.':'Este tipo não desconta do Banco de Horas.';const o=col.selectedOptions[0],saldo=Number(o?.dataset.saldo||0),min=debita?Math.round(Number(horas.value||0)*60):0;document.getElementById('saldo-info').textContent=o?.value?`Saldo atual: ${Math.floor(saldo/60)}h${String(saldo%60).padStart(2,'0')} • saldo previsto: ${Math.floor((saldo-min)/60)}h${String(Math.abs(saldo-min)%60).padStart(2,'0')}`:'Selecione o funcionário.'}
-if(tipo){tipo.addEventListener('change',update);col.addEventListener('change',update);horas.addEventListener('input',update);update();}
+(() => {
+  const form=document.getElementById('folga-form'),tipo=document.getElementById('tipo'),col=document.getElementById('colaborador'),horas=document.getElementById('horas');
+  const dataServico=document.getElementById('dataServico'),dataFolga=document.getElementById('dataFolga'),dataFim=document.getElementById('dataFim');
+  const horaInicio=document.getElementById('horaInicio'),horaFim=document.getElementById('horaFim'),equipamento=document.getElementById('equipamentoServico'),descricao=document.getElementById('descricaoServico'),motivo=document.getElementById('motivoFolga');
+  const wrap=document.getElementById('compensacao-os-wrap'),lista=document.getElementById('compensacao-os-list'),titulo=document.getElementById('compensacao-os-title'),ajuda=document.getElementById('compensacao-os-help'),totalEl=document.getElementById('compensacao-os-total');
+  const saldoInfo=document.getElementById('saldo-info'),debitoInfo=document.getElementById('debito-info'),horasWrap=document.getElementById('horas-wrap');
+  const endpoint=form?.dataset.compensacaoUrl;
+  let consultaAtual=0;
+  const esc=(value)=>String(value||'').replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const fmtMin=(value)=>{const n=Math.round(Number(value||0)),sign=n<0?'-':'',m=Math.abs(n);return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`;};
+  const horasDecimal=(minutos)=>{const value=Number(minutos||0)/60;return Number.isInteger(value)?String(value):value.toFixed(2);};
+  function updateSaldo(){if(!tipo||!col||!horas)return;const debita=tipo.value==='FOLGA_COMPENSATORIA';if(horasWrap)horasWrap.style.display=debita?'grid':'none';horas.required=debita;if(debitoInfo)debitoInfo.textContent=debita?'Folga compensatória desconta as horas aprovadas selecionadas pela data do serviço.':'Este tipo não desconta do Banco de Horas.';const o=col.selectedOptions[0],saldo=Number(o?.dataset.saldo||0),min=debita?Math.round(Number(horas.value||0)*60):0;if(saldoInfo)saldoInfo.textContent=o?.value?`Saldo atual: ${fmtMin(saldo)} • saldo previsto: ${fmtMin(saldo-min)}`:'Selecione o funcionário.'}
+  function limparPainel(mensagem='Selecione funcionário e data do serviço para buscar as horas extras aprovadas.'){if(!wrap)return;wrap.hidden=tipo?.value!=='FOLGA_COMPENSATORIA';if(titulo)titulo.textContent='OS da data do serviço';if(ajuda)ajuda.textContent=mensagem;if(totalEl)totalEl.textContent='0h00';if(lista)lista.innerHTML='';}
+  function aplicarResumo(data){if(!wrap||!lista)return;wrap.hidden=false;const itens=Array.isArray(data.itens)?data.itens:[];if(totalEl)totalEl.textContent=data.total_formatado||'0h00';if(!itens.length){if(titulo)titulo.textContent='Nenhuma hora extra aprovada encontrada';if(ajuda)ajuda.textContent='Confira se a data do serviço está correta ou se a hora extra já foi aprovada.';lista.innerHTML='';return;}if(titulo)titulo.textContent=`${itens.length} OS/lançamento(s) para compensação`;if(ajuda)ajuda.textContent='Os campos abaixo foram preenchidos com as horas extras aprovadas desse funcionário nessa data.';horas.value=horasDecimal(data.total_minutos);if(horaInicio)horaInicio.value=data.hora_inicio||'';if(horaFim)horaFim.value=data.hora_fim||'';if(equipamento)equipamento.value=data.equipamento||'';if(descricao)descricao.value=data.descricao_servico||'';if(motivo)motivo.value=data.motivo||motivo.value;lista.innerHTML=itens.map((item)=>`<article class="compensacao-os-card"><strong>${item.os_id?`OS ${esc(item.os_id)}`:'Sem OS'}</strong><span>${esc(item.total_formatado)} • ${esc(item.hora_inicio||'-')} até ${esc(item.hora_fim||'-')}</span><small>${esc(item.equipamento||'Local não informado')}</small><small>${esc(item.descricao_servico||'Serviço sem descrição')}</small></article>`).join('');updateSaldo();}
+  async function buscarCompensacao(){updateSaldo();if(tipo?.value!=='FOLGA_COMPENSATORIA'){limparPainel();return;}if(!col?.value||!dataServico?.value||!endpoint){limparPainel();return;}const token=++consultaAtual;limparPainel('Buscando OS e horas extras aprovadas...');const url=`${endpoint}?colaborador_id=${encodeURIComponent(col.value)}&data_servico=${encodeURIComponent(dataServico.value)}`;try{const res=await fetch(url,{headers:{Accept:'application/json'}});const data=await res.json();if(token!==consultaAtual)return;if(!res.ok)throw new Error(data.error||'Falha ao buscar horas extras.');aplicarResumo(data);}catch(error){if(token!==consultaAtual)return;if(wrap)wrap.hidden=false;if(titulo)titulo.textContent='Não foi possível buscar as OS';if(ajuda)ajuda.textContent=error.message||'Tente novamente.';if(totalEl)totalEl.textContent='0h00';if(lista)lista.innerHTML='';}}
+  dataFolga?.addEventListener('change',()=>{if(dataFolga.value&&!dataFim.value)dataFim.value=dataFolga.value;});
+  [tipo,col,dataServico].forEach((el)=>el?.addEventListener('change',buscarCompensacao));
+  horas?.addEventListener('input',updateSaldo);
+  limparPainel();
+  updateSaldo();
+})();
 </script>

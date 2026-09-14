@@ -7,8 +7,8 @@ const controller = readFileSync('modules/escala/escala.controller.js', 'utf8');
 const routes = readFileSync('modules/escala/escala.routes.js', 'utf8');
 const view = readFileSync('views/escala/hora-extra-pendentes.ejs', 'utf8');
 
-test('exclusão de hora extra é validada como ADMIN no backend e remove movimento do banco', () => {
-  assert.match(service, /Apenas administradores podem apagar lançamentos de hora extra\./);
+test('exclusão de hora extra é validada no backend e remove movimento do banco', () => {
+  assert.match(service, /Perfil sem permissão para apagar lançamentos de hora extra\./);
   assert.match(service, /function apagarHoraExtra\(id, usuarioAdmin\)/);
   assert.match(service, /DELETE FROM escala_banco_horas_movimentos WHERE hora_extra_id=\?/);
   assert.match(service, /DELETE FROM escala_horas_extras WHERE id=\?/);
@@ -29,11 +29,11 @@ test('rotas e controller expõem exclusão individual e aprovação de hora extr
 });
 
 test('frontend mostra aprovação para pendentes e apagar somente quando permitido', () => {
-  assert.match(view, /const st=String\(h\.status\|\|''\)/);
-  assert.match(view, /if\(st==='PENDENTE_APROVACAO'\)/);
+  assert.match(view, /const fila = lista\.filter/);
+  assert.match(view, /PENDENTE_APROVACAO/);
   assert.match(view, /Aprovar/);
-  assert.match(view, /creditar no banco de horas do colaborador/);
+  assert.match(view, /creditar no Banco de Horas/);
   assert.match(view, /if\(canDeleteHorasExtras\)/);
   assert.match(view, /Apagar/);
-  assert.match(view, /Apagar este lançamento\? A exclusão continua restrita ao ADMIN\./);
+  assert.match(view, /Apagar definitivamente este lançamento\?/);
 });

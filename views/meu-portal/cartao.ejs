@@ -25,12 +25,12 @@
   <% if (!temVinculo) { %>
     <section class="card my-card-guidance no-print">
       <strong>Vínculo com colaborador necessário</strong>
-      <p>Seu usuário ainda não está associado a uma ficha profissional. Procure RH/ADMIN para liberar o cartão do Almoxarifado.</p>
+      <p>Seu usuário ainda não está associado a uma ficha profissional. Procure o RH para liberar o cartão do Almoxarifado.</p>
     </section>
   <% } else if (cartaoRevogado) { %>
     <section class="card my-card-guidance no-print">
       <strong>Cartão revogado</strong>
-      <p>Por segurança, um cartão revogado não pode ser reativado pelo próprio usuário. Procure o RH ou o administrador para uma nova emissão.</p>
+      <p>Por segurança, um cartão revogado não pode ser reativado pelo próprio usuário. Procure o RH para uma nova emissão.</p>
     </section>
   <% } else if (!ativo) { %>
     <section class="card my-card-guidance no-print">
@@ -70,7 +70,7 @@
 
     <section class="card my-card-guidance no-print">
       <strong>Cartão virtual e físico usam o mesmo QR</strong>
-      <p>Para o cartão físico, use “Imprimir / salvar PDF” e selecione impressão em tamanho real. Em caso de perda ou exposição do QR, solicite ao RH/ADMIN a revogação e uma nova emissão.</p>
+      <p>Para o cartão físico, use “Imprimir / salvar PDF” e selecione impressão em tamanho real. Em caso de perda ou exposição do QR, solicite ao RH a revogação e uma nova emissão.</p>
     </section>
   <% } %>
 </div>

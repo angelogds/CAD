@@ -17,7 +17,7 @@
       <div class="escala-form-grid is-3">
         <label class="escala-field"><span class="label">Nome</span><input class="input" name="nome" value="<%= config?.nome || 'Rodízio da Escala' %>"></label>
         <label class="escala-field"><span class="label">Semanas no ciclo</span><input class="input" type="number" min="1" name="tamanho_ciclo" value="<%= config?.tamanho_ciclo || 3 %>"></label>
-        <label class="escala-field"><span class="label">Modo do plantão noturno</span><select class="input" name="modoNoturno" id="modoNoturno"><option value="individual" <%= modoAtual==='individual'?'selected':'' %>>Individual — 1 por semana</option><option value="dupla" <%= modoAtual==='dupla'?'selected':'' %>>Equipe dupla — 2 por semana</option></select></label>
+        <label class="escala-field"><span class="label">Modo do plantão noturno</span><select class="input" name="modoNoturno" id="modoNoturno"><option value="individual" <%= modoAtual==='individual'?'selected':'' %>>Individual: 1 colaborador por semana</option><option value="dupla" <%= modoAtual==='dupla'?'selected':'' %>>Equipe dupla: 2 colaboradores por semana</option></select></label>
         <label class="escala-field"><span class="label">Data inicial de aplicação</span><input class="input" type="date" name="data_inicio" value="<%= config?.data_inicio || '' %>" required></label>
         <label class="escala-field"><span class="label">Data final de aplicação</span><input class="input" type="date" name="data_fim" value="<%= config?.data_fim || '' %>"></label>
       </div>

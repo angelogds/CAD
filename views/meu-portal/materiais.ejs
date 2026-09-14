@@ -21,12 +21,12 @@
   <% if (!materiais?.vinculado) { %>
     <section class="card my-material-empty">
       <strong>Vínculo com colaborador necessário</strong>
-      <p>Seu login ainda não está ligado a uma ficha profissional. Após o vínculo pelo RH/ADMIN, suas retiradas passam a aparecer aqui automaticamente.</p>
+      <p>Seu login ainda não está ligado a uma ficha profissional. Após o vínculo pelo RH, suas retiradas passam a aparecer aqui automaticamente.</p>
     </section>
   <% } else if (!materiais?.disponivel) { %>
     <section class="card my-material-empty">
       <strong>Histórico ainda indisponível nesta instalação</strong>
-      <p>A estrutura de rastreabilidade das retiradas do Estoque não foi encontrada. Nenhum dado foi alterado; procure o administrador para verificar a implantação do módulo.</p>
+      <p>A estrutura de rastreabilidade das retiradas do Estoque não foi encontrada. Nenhum dado foi alterado; procure o suporte técnico para verificar a implantação do módulo.</p>
     </section>
   <% } else { %>
     <section class="my-material-kpis" aria-label="Resumo das retiradas">

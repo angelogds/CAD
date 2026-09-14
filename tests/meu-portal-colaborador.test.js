@@ -32,7 +32,7 @@ test('vínculo é explícito, limitado a RH e ADMIN e usa somente ficha existent
   assert.match(routes, /router\.post\('\/vinculo', requireRole\(LINK_MANAGER_ROLES\), ctrl\.linkColaborador\)/);
   assert.match(service, /\(user_id IS NULL OR user_id = 0\)/);
   assert.match(service, /UPDATE colaboradores[\s\S]*SET user_id = \?/);
-  assert.match(service, /Somente RH ou ADMIN pode realizar o vínculo/);
+  assert.match(service, /Somente o RH pode realizar o vínculo/);
   assert.doesNotMatch(service, /INSERT INTO colaboradores/i);
   assert.doesNotMatch(service, /normalizePersonName|LIKE.*nome/i);
   assert.match(controller, /linkOwnUserToColaborador/);

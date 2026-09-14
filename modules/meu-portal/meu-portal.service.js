@@ -82,7 +82,7 @@ function linkOwnUserToColaborador(userId, colaboradorId, actorRole) {
   const collaboratorId = Number(colaboradorId);
 
   if (!id || !collaboratorId) throw new Error('Selecione uma ficha de colaborador válida.');
-  if (!canManageLink(actorRole)) throw new Error('Somente RH ou ADMIN pode realizar o vínculo.');
+  if (!canManageLink(actorRole)) throw new Error('Somente o RH pode realizar o vínculo.');
 
   const tx = db.transaction(() => {
     const user = getUserById(id);
@@ -289,14 +289,14 @@ function changeOwnPassword(userId, currentPassword, newPassword) {
 
 function ensureOwnCard(userId) {
   const colaborador = getLinkedColaborador(userId);
-  if (!colaborador) throw new Error('Seu usuário ainda não está vinculado a um colaborador. Procure o RH ou o administrador.');
+  if (!colaborador) throw new Error('Seu usuário ainda não está vinculado a um colaborador. Procure o RH.');
 
   if (String(colaborador.status || '').toUpperCase() !== 'ATIVO') {
     throw new Error('O cartão está disponível somente para colaboradores ativos.');
   }
 
   if (colaborador.qr_token && Number(colaborador.qr_ativo || 0) !== 1) {
-    throw new Error('Seu cartão foi revogado. Procure o RH ou o administrador para uma nova emissão.');
+    throw new Error('Seu cartão foi revogado. Procure o RH para uma nova emissão.');
   }
 
   if (colaborador.qr_token && Number(colaborador.qr_ativo || 0) === 1) return colaborador;

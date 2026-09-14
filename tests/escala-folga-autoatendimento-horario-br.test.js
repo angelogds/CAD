@@ -25,13 +25,19 @@ test('migration cria fila de solicitação, reserva única e data operacional de
   assert.match(migration, /date\(NEW\.inicio_extra, '-3 hours'\)/);
 });
 
-test('solicitação é própria, exige 8h, bloqueia segunda e revalida na aprovação', () => {
+test('solicitação é própria, aceita meio período com 3h30, bloqueia segunda e revalida na aprovação', () => {
   const service = read('modules/escala/escala.folga-solicitacao.service.js');
   assert.match(service, /MINUTOS_DIA_FOLGA = 480/);
+  assert.match(service, /MINUTOS_MEIO_PERIODO_FOLGA = 240/);
+  assert.match(service, /MINUTOS_MINIMOS_MEIO_PERIODO = 210/);
+  assert.match(service, /function normalizarPeriodoFolga/);
+  assert.match(service, /function saldoPermiteFolga/);
   assert.match(service, /buscarColaboradorDoUsuario\(userId\(user\)\)/);
   assert.match(service, /isMondayISO/);
   assert.match(service, /conflitoProgramadoNaData/);
   assert.match(service, /conflitoSolicitacaoNaData/);
+  assert.match(service, /periodo_folga = 'DIA_TODO'/);
+  assert.match(service, /assertSaldoPermiteFolga\(saldo, periodo\.minutos\)/);
   assert.match(service, /assertDataFolgaDisponivel\(solicitacao\.data_folga/);
   assert.match(service, /calcularSaldoBancoHoras\(solicitacao\.colaborador_id\)/);
   assert.match(service, /programarFolgaCompensatoria/);
@@ -57,9 +63,33 @@ test('views simplificam aprovação e exibem datas formatadas', () => {
   assert.match(he, /Fila de aprovação/);
   assert.match(he, /<details class="approval-details">/);
   assert.match(self, /Solicitar folga pelo Banco de Horas/);
+  assert.match(self, /name="periodo_folga"/);
+  assert.match(self, /Meio período libera com <strong>3h30<\/strong>/);
+  assert.match(self, /self-leave-form--compact/);
   assert.match(self, /Segunda-feira/);
   assert.match(self, /Apenas 1 colaborador por dia|1 colaborador por dia/);
   assert.match(folgas, /Solicitações aguardando aprovação/);
+  assert.match(folgas, /saldo fica até -0h30/);
   assert.match(folgas, /\/folgas\/solicitacoes\/<%= s\.id %>\/aprovar/);
   assert.match(nova, /dateBr\.formatDateTimeBR\(emAndamento\.inicio_extra\)/);
+  assert.match(nova, /quick-os-grid/);
+  assert.match(nova, /js-quick-os/);
+});
+
+test('interfaces públicas do RH e colaborador não expõem ADMIN como fluxo nominal', () => {
+  const files = [
+    'views/escala/meu-painel.ejs',
+    'views/escala/folgas-programadas.ejs',
+    'views/rh/index.ejs',
+    'views/meu-portal/cartao.ejs',
+    'views/meu-portal/dados-profissionais.ejs',
+    'views/meu-portal/perfil.ejs',
+    'views/meu-portal/rh.ejs',
+    'views/meu-portal/treinamentos.ejs',
+    'views/meu-portal/materiais.ejs',
+  ];
+  for (const file of files) {
+    const source = read(file);
+    assert.doesNotMatch(source, /RH\/ADMIN|administrador|administradores|Justificativa ADMIN|Aguardando ADMIN/);
+  }
 });

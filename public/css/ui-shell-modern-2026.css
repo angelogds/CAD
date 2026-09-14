@@ -499,6 +499,70 @@
   .topbar-extra-btn{padding-inline:7px !important;}
 }
 
+/* Global mobile guard: modules may scroll internally, but the page shell stays compact. */
+@media (max-width:768px){
+  html,
+  body,
+  .app,
+  .main,
+  .content{
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;
+  }
+
+  .content{
+    padding:10px 8px;
+  }
+
+  .content>*,
+  .content section,
+  .content article,
+  .content form,
+  .content fieldset,
+  .content header,
+  .content footer,
+  .content div{
+    min-width:0;
+    max-width:100%;
+  }
+
+  .content img,
+  .content svg,
+  .content canvas,
+  .content video{
+    max-width:100%;
+  }
+
+  .topbar-title{
+    max-width:clamp(112px,42vw,190px);
+  }
+
+  .topbar-extra-btn{
+    min-width:0;
+    white-space:nowrap;
+  }
+}
+
+@media (max-width:420px){
+  .content{
+    padding:8px 6px;
+  }
+
+  .topbar{
+    gap:4px;
+  }
+
+  .topbar-title{
+    max-width:clamp(96px,38vw,150px);
+  }
+
+  .topbar-extra-btn{
+    padding-inline:6px !important;
+    font-size:10px !important;
+  }
+}
+
 @media (prefers-reduced-motion:reduce){
   .nav-item,
   .sidebar,

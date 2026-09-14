@@ -1,6 +1,7 @@
 const db = require("../../database/db");
 const { classificarLocalizacao, STATUS_LOCALIZACAO } = require("./escala.geo");
 const { getAgoraSaoPauloParts, getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
+const dateBr = require("../../utils/data-hora-br");
 
 
 function tableExists(tableName) {
@@ -1187,6 +1188,8 @@ module.exports = {
 
 // ===== Banco de Horas da Manutenção =====
 const MINUTOS_DIA_FOLGA = 480;
+const MINUTOS_MEIO_PERIODO_FOLGA = 240;
+const MINUTOS_MINIMOS_MEIO_PERIODO = 210;
 
 function hasColumn(table, column) {
   try { return db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column); } catch (_e) { return false; }
@@ -1207,6 +1210,12 @@ function canManageBancoHoras(user) { return ['ADMIN','ENCARREGADO_MANUTENCAO','M
 function canReadBancoHoras(user) { return canManageBancoHoras(user) || ['RH','DIRETORIA'].includes(userRole(user)); }
 function minutosToHoras(minutos) { const m = Math.abs(Number(minutos)||0); const sign = Number(minutos)<0 ? '-' : ''; return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; }
 function saldoResumo(minutos) { return { minutos, horas: minutosToHoras(minutos), diasFolga: Math.floor(minutos / MINUTOS_DIA_FOLGA), diasFolgaDecimal: Math.round((minutos / MINUTOS_DIA_FOLGA) * 100) / 100 }; }
+function saldoPermiteDebitoFolga(saldo, minutos) {
+  const saldoAtual = Number(saldo || 0);
+  const debito = Number(minutos || 0);
+  if (debito === MINUTOS_MEIO_PERIODO_FOLGA) return saldoAtual >= MINUTOS_MINIMOS_MEIO_PERIODO;
+  return saldoAtual >= debito;
+}
 
 function getAusenciaPrioritaria(colaboradorId, inicio, fim, hoje) {
   if (!tableExists('escala_ausencias')) return null;
@@ -1441,6 +1450,64 @@ function listarHorasExtras(filtros={}) {
     WHERE ${where} ORDER BY he.data_servico DESC, he.id DESC ${filtros.semLimite ? '' : 'LIMIT 500'}`).all(...params);
 }
 
+function formatarHoraServico(value) {
+  const raw = String(value || '').trim();
+  if (/^\d{2}:\d{2}/.test(raw)) return raw.slice(0, 5);
+  const formatado = raw ? dateBr.formatTimeBR(raw) : '';
+  return formatado === '-' ? '' : formatado;
+}
+
+function listarHorasExtrasParaCompensacao(filtros = {}) {
+  const colaboradorId = Number(filtros.colaborador_id || 0);
+  const dataServico = String(filtros.data_servico || '').slice(0, 10);
+  if (!colaboradorId || !/^\d{4}-\d{2}-\d{2}$/.test(dataServico)) {
+    return { colaborador_id: colaboradorId || null, data_servico: dataServico || null, total_minutos: 0, total_horas: 0, total_formatado: minutosToHoras(0), itens: [] };
+  }
+  const itens = listarHorasExtras({
+    colaborador_id: colaboradorId,
+    inicio: dataServico,
+    fim: dataServico,
+    status: 'APROVADO',
+    semLimite: true,
+  }).sort((a, b) => String(a.inicio_extra || '').localeCompare(String(b.inicio_extra || '')));
+  const totalMinutos = itens.reduce((sum, item) => sum + Number(item.total_minutos || 0), 0);
+  const locais = [...new Set(itens.map((item) => item.equipamento_nome || item.os_equipamento || (item.os_id ? `OS ${item.os_id}` : '')).filter(Boolean))];
+  const descricoes = itens.map((item) => {
+    const osLabel = item.os_id ? `OS ${item.os_id}` : 'Sem OS';
+    const local = item.equipamento_nome || item.os_equipamento || 'local não informado';
+    const servico = item.descricao_servico || item.os_descricao || 'serviço sem descrição';
+    return `${osLabel} - ${local}: ${servico}`;
+  });
+  const primeiroInicio = itens.find((item) => item.inicio_extra)?.inicio_extra || '';
+  const ultimoFim = [...itens].reverse().find((item) => item.fim_extra)?.fim_extra || '';
+  return {
+    colaborador_id: colaboradorId,
+    data_servico: dataServico,
+    total_minutos: totalMinutos,
+    total_horas: Number((totalMinutos / 60).toFixed(2)),
+    total_formatado: minutosToHoras(totalMinutos),
+    hora_inicio: formatarHoraServico(primeiroInicio),
+    hora_fim: formatarHoraServico(ultimoFim),
+    equipamento: locais.join(' / '),
+    descricao_servico: descricoes.join(' | '),
+    motivo: totalMinutos ? `Folga compensatória referente às horas extras de ${dateBr.formatDateBR(dataServico)}` : '',
+    itens: itens.map((item) => ({
+      id: item.id,
+      os_id: item.os_id || null,
+      data_servico: item.data_servico,
+      inicio_extra: item.inicio_extra,
+      fim_extra: item.fim_extra,
+      hora_inicio: formatarHoraServico(item.inicio_extra),
+      hora_fim: formatarHoraServico(item.fim_extra),
+      total_minutos: Number(item.total_minutos || 0),
+      total_formatado: minutosToHoras(item.total_minutos || 0),
+      equipamento: item.equipamento_nome || item.os_equipamento || '',
+      descricao_servico: item.descricao_servico || item.os_descricao || '',
+      status: item.status || '',
+    })),
+  };
+}
+
 
 function registrarAuditoriaHoraExtra(acao, registro, usuario, detalhes = {}) {
   if (!tableExists('escala_auditoria') || !registro) return;
@@ -1452,7 +1519,7 @@ function registrarAuditoriaHoraExtra(acao, registro, usuario, detalhes = {}) {
 }
 
 function assertAdminHoraExtra(usuario) {
-  if (!isAdminUser(usuario)) throw new Error('Apenas administradores podem apagar lançamentos de hora extra.');
+  if (!isAdminUser(usuario)) throw new Error('Perfil sem permissão para apagar lançamentos de hora extra.');
 }
 
 function apagarHoraExtra(id, usuarioAdmin) {
@@ -1533,9 +1600,11 @@ function programarFolgaCompensatoria(dados) {
   if(conflito) throw new Error('O colaborador já possui afastamento ativo sobreposto neste período.');
   const saldo=calcularSaldoBancoHoras(col).minutos;
   const justificativa=String(dados.justificativa_saldo_negativo||'').trim();
-  if(debita && saldo<minutos && !(isAdminUser(dados.usuario)&&justificativa)) throw new Error('Saldo insuficiente. ADMIN deve autorizar e informar justificativa específica.');
+  const debitoMeioPeriodoPermitido = debita && saldo < minutos && saldoPermiteDebitoFolga(saldo, minutos);
+  if(debita && saldo<minutos && !debitoMeioPeriodoPermitido && !(canManageBancoHoras(dados.usuario)&&justificativa)) throw new Error('Saldo insuficiente. A liderança deve informar justificativa específica.');
+  const justificativaFinal = debitoMeioPeriodoPermitido && !justificativa ? 'Débito autorizado pela regra operacional de meio período com tolerância de 30 minutos.' : justificativa;
   return db.transaction(()=>{
-    const info=db.prepare(`INSERT INTO escala_folgas_programadas (user_id,colaborador_id,data_folga,data_fim,tipo_lancamento,minutos_descontados,motivo,status,aprovado_por,data_servico,hora_inicio,hora_fim,equipamento,descricao_servico,anexo_path,debita_banco,saldo_antes_minutos,saldo_depois_minutos,justificativa_saldo_negativo,criado_em,atualizado_em) VALUES (?,?,?,?,?,?,?,'PROGRAMADA',?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`).run(dados.user_id||null,col,inicio,fim,tipo,minutos,motivo,userIdFrom(dados.usuario),dados.data_servico||null,dados.hora_inicio||null,dados.hora_fim||null,dados.equipamento||null,dados.descricao_servico||null,dados.anexo_path||null,debita?1:0,saldo,saldo-minutos,justificativa||null);
+    const info=db.prepare(`INSERT INTO escala_folgas_programadas (user_id,colaborador_id,data_folga,data_fim,tipo_lancamento,minutos_descontados,motivo,status,aprovado_por,data_servico,hora_inicio,hora_fim,equipamento,descricao_servico,anexo_path,debita_banco,saldo_antes_minutos,saldo_depois_minutos,justificativa_saldo_negativo,criado_em,atualizado_em) VALUES (?,?,?,?,?,?,?,'PROGRAMADA',?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`).run(dados.user_id||null,col,inicio,fim,tipo,minutos,motivo,userIdFrom(dados.usuario),dados.data_servico||null,dados.hora_inicio||null,dados.hora_fim||null,dados.equipamento||null,dados.descricao_servico||null,dados.anexo_path||null,debita?1:0,saldo,saldo-minutos,justificativaFinal||null);
     if(debita) db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,folga_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(dados.user_id||null,col,info.lastInsertRowid,'DEBITO_FOLGA',minutos,`Folga compensatória de ${inicio} a ${fim}; saldo ${saldo} → ${saldo-minutos} min`,userIdFrom(dados.usuario));
     let ausenciaId=null;
     if(tableExists('escala_ausencias')) { const legacy=tipo==='ATESTADO'?'atestado':'folga'; ausenciaId=db.prepare(`INSERT INTO escala_ausencias (colaborador_id,tipo,tipo_lancamento,data_inicio,data_fim,motivo,created_at) VALUES (?,?,?,?,?,?,datetime('now'))`).run(col,legacy,tipo,inicio,fim,motivo).lastInsertRowid; db.prepare('UPDATE escala_folgas_programadas SET ausencia_id=? WHERE id=?').run(ausenciaId,info.lastInsertRowid); }
@@ -1846,4 +1915,4 @@ function recalcularEscalaCompleta({ quantidade = 3 } = {}) {
   return { semanas: semanas.length, alocacoes, quantidade: qtd };
 }
 
-Object.assign(module.exports, { listarFolgasSabado, salvarFolgaSabadoManual, sincronizarFolgaSabado, sincronizarAdicionalNoturno, MOTIVOS_FOLGA_SABADO, listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, minutosToHoras, saldoResumo, listarPainelEscala, listarColaboradoresManutencao, listarColaboradoresMecanicosHoraExtra, isMecanicoUser, isColaboradorMecanico, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, buscarHoraExtraPorId, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtrasEmAndamentoPorOs, listarTodasHorasExtras, listarHorasExtras, apagarHoraExtra, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });
+Object.assign(module.exports, { listarFolgasSabado, salvarFolgaSabadoManual, sincronizarFolgaSabado, sincronizarAdicionalNoturno, MOTIVOS_FOLGA_SABADO, listarConfiguracoesRodizio, buscarRodizioAtivo, normalizarDataFormulario, listarEscalaCompleta, buscarDadosPdfEscalaCompleta, salvarConfiguracaoRodizio, gerarPreviewRodizio, aplicarRodizioNaEscala, recalcularEscalaPorRodizio, montarSemanaRodizio, buscarIndisponibilidadesNoPeriodo, detectarConflitosRodizio, desativarRodizio, salvarSemanaManual, recalcularEscalaCompleta, MINUTOS_DIA_FOLGA, MINUTOS_MEIO_PERIODO_FOLGA, MINUTOS_MINIMOS_MEIO_PERIODO, minutosToHoras, saldoResumo, saldoPermiteDebitoFolga, listarPainelEscala, listarColaboradoresManutencao, listarColaboradoresMecanicosHoraExtra, isMecanicoUser, isColaboradorMecanico, listarOsDisponiveisParaHoraExtra, buscarColaboradorDoUsuario, iniciarHoraExtra, buscarHoraExtraEmAndamento, buscarHoraExtraPorId, finalizarHoraExtra, listarHorasExtrasPendentes, listarHorasExtrasEmAndamentoPorOs, listarTodasHorasExtras, listarHorasExtras, listarHorasExtrasParaCompensacao, apagarHoraExtra, aprovarHoraExtra, reprovarHoraExtra, ajustarHoraExtra, cancelarHoraExtra, calcularSaldoBancoHoras, listarBancoHoras, listarMovimentosBancoHoras, listarFolgas, programarFolgaCompensatoria, cancelarFolgaCompensatoria, realizarFolgaCompensatoria, gerarDadosRelatorioBancoHoras, canManageBancoHoras, canReadBancoHoras, filePath });

@@ -1,6 +1,6 @@
 <%- layout('layout') -%>
-<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b">
-<link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260903a">
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260913-rh">
+<link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260913-rh">
 <%
   const listaColaboradores = Array.isArray(colaboradores) ? colaboradores : (colaborador ? [colaborador] : []);
   const ativasOS = Array.isArray(horasExtrasAtivasOS) ? horasExtrasAtivasOS : [];
@@ -9,6 +9,7 @@
   const fmtMin = (value) => { const n=Math.max(0,Number(value||0)); return `${Math.floor(n/60)}h${String(n%60).padStart(2,'0')}`; };
 %>
 <div class="escala-page">
+  <div class="escala-hour-page">
   <header class="escala-head">
     <div>
       <h1>Registrar Hora Extra</h1>
@@ -73,7 +74,19 @@
             <div class="escala-choice"><strong>2. Serviço sem OS • exceção</strong><small>Use somente quando nenhuma OS aberta corresponder ao serviço. A descrição manual será obrigatória.</small></div>
           </div>
           <div class="escala-form-grid" style="margin-top:12px">
-            <label class="escala-field full"><span class="label">OS vinculada</span><select class="input" name="os_id" id="horaExtraOs"><option value="">Sem OS — justificar abaixo</option><% listaOs.forEach(os=>{ %><option value="<%= os.id %>" <%= Number(osSelecionadaId) === Number(os.id) ? 'selected' : '' %>>OS <%= os.id %> — <%= os.equipamento_nome || os.equipamento || 'Equipamento' %> — <%= os.descricao %></option><% }) %></select><small><%= listaOs.length %> OS aberta(s) disponível(is) para consulta. A mesma OS pode ter horas extras de mais de um mecânico.</small></label>
+            <% if(listaOs.length){ %>
+              <div class="escala-field full">
+                <span class="label">Atalhos de OS</span>
+                <div class="quick-os-grid">
+                  <% listaOs.slice(0,6).forEach(os=>{ %>
+                    <button class="quick-os-pill js-quick-os" type="button" data-os-id="<%= os.id %>" title="Selecionar OS <%= os.id %>">
+                      <strong>OS <%= os.id %></strong><small><%= os.equipamento_nome || os.equipamento || 'Equipamento' %></small>
+                    </button>
+                  <% }) %>
+                </div>
+              </div>
+            <% } %>
+            <label class="escala-field full"><span class="label">OS vinculada</span><select class="input" name="os_id" id="horaExtraOs"><option value="">Sem OS — justificar abaixo</option><% listaOs.forEach(os=>{ %><option value="<%= os.id %>" <%= Number(osSelecionadaId) === Number(os.id) ? 'selected' : '' %>>OS <%= os.id %> — <%= os.equipamento_nome || os.equipamento || 'Equipamento' %> — <%= os.descricao %></option><% }) %></select><small><%= listaOs.length %> OS aberta(s) disponível(is) para consulta. A mesma OS pode ter horas extras de mais de um mecânico; não bloqueia outros mecânicos.</small></label>
             <label class="escala-field full"><span class="label">Descrição do serviço / justificativa</span><textarea class="input" name="descricao_servico" id="horaExtraDescricao" rows="4" placeholder="Ex.: apoio emergencial no triturador FAST; troca de rolamento; solda de reforço..."></textarea><small id="horaExtraDescricaoAjuda">Obrigatória quando não houver OS. Com OS, pode ser usada como complemento.</small></label>
             <div class="escala-choice full">
               <strong>📍 Localização do início</strong>
@@ -93,6 +106,7 @@
   <% } %>
 
   <section class="escala-section"><div class="escala-section-head"><div><h2>Últimas horas extras</h2><p>Histórico recente do colaborador selecionado.</p></div><span class="muted">Horário de Brasília</span></div><div class="escala-table-wrap"><table class="escala-table"><thead><tr><th>Data</th><th>OS</th><th>Serviço</th><th>Início</th><th>Fim</th><th>Total</th><th>Status</th></tr></thead><tbody><% if(!listaHistorico.length){ %><tr><td colspan="7"><div class="escala-empty">Nenhum registro de hora extra.</div></td></tr><% } %><% listaHistorico.forEach(h=>{ const st=String(h.status||''); const stClass=st.includes('APROV')?'':(st.includes('REPROV')||st.includes('CANCEL')?'is-ausente':'is-atestado'); %><tr><td><strong><%= dateBr.formatDateBR(h.data_servico) %></strong></td><td><%= h.os_id ? ('OS '+h.os_id) : 'Sem OS' %></td><td><%= h.descricao_servico || '-' %></td><td><%= dateBr.formatTimeBR(h.inicio_extra) %></td><td><%= h.fim_extra ? dateBr.formatTimeBR(h.fim_extra) : '-' %></td><td><%= fmtMin(h.total_minutos) %></td><td><span class="escala-status <%= stClass %>"><%= String(h.status || '-').replaceAll('_',' ') %></span></td></tr><% }) %></tbody></table></div></section>
+  </div>
 </div>
 
 <script>
@@ -111,6 +125,12 @@
     if(ajuda)ajuda.textContent=semOs?'Obrigatória: informe onde e qual serviço foi executado.':'Opcional: use como complemento técnico da OS.';
   }
   os?.addEventListener('change',atualizarObrigatoriedade);
+  document.querySelectorAll('.js-quick-os').forEach(btn=>btn.addEventListener('click',()=>{
+    if(!os)return;
+    os.value=btn.dataset.osId||'';
+    document.querySelectorAll('.js-quick-os').forEach(item=>item.classList.toggle('is-active',item===btn));
+    atualizarObrigatoriedade();
+  }));
   atualizarObrigatoriedade();
 
   function geoStatus(context,text){

@@ -122,6 +122,11 @@
     return number == null ? '' : number.toFixed(decimals);
   }
 
+  function measuredValue(record, fallback) {
+    const measurement = numberOrNull(first(record, 42));
+    return measurement == null ? fallback : measurement;
+  }
+
   function explicitLabel(record) {
     const text = String(first(record, 1) || '').trim();
     if (!text || text === '<>') return '';

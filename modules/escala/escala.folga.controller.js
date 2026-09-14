@@ -36,6 +36,17 @@ exports.programar = (req, res) => {
   return res.redirect('/escala/folgas');
 };
 
+exports.horasExtrasServico = (req, res) => {
+  try {
+    return res.json(escala.listarHorasExtrasParaCompensacao({
+      colaborador_id: req.query.colaborador_id,
+      data_servico: req.query.data_servico,
+    }));
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+};
+
 exports.cancelar = (req, res) => {
   try {
     escala.cancelarFolgaCompensatoria(Number(req.params.id), currentUser(req), req.body.motivo);
@@ -54,7 +65,12 @@ exports.realizar = (req, res) => {
 
 exports.solicitar = (req, res) => {
   try {
-    const solicitacaoId = solicitacoes.solicitarFolga({ user: currentUser(req), data_folga: req.body.data_folga, motivo: req.body.motivo });
+    const solicitacaoId = solicitacoes.solicitarFolga({
+      user: currentUser(req),
+      data_folga: req.body.data_folga,
+      periodo_folga: req.body.periodo_folga,
+      motivo: req.body.motivo,
+    });
     rhNotifications.notifyNewLeaveRequest(solicitacaoId);
     flash(req, 'success', 'Solicitação enviada. A data ficou reservada enquanto aguarda aprovação.');
   } catch (error) { flash(req, 'error', error.message); }

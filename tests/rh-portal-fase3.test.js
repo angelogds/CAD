@@ -61,7 +61,7 @@ test('central RH reutiliza ficha mestre, Escala, Banco de Horas, folgas e certif
   assert.doesNotMatch(service, /CREATE TABLE|ALTER TABLE|DROP TABLE/i);
 });
 
-test('solicitação de folga mantém aprovação operacional e notifica RH em best effort', () => {
+test('solicitação de folga mantém aprovação operacional, alerta liderança e notifica RH em best effort', () => {
   const folgaController = read('modules/escala/escala.folga.controller.js');
   const folgaService = read('modules/escala/escala.folga-solicitacao.service.js');
   const notifications = read('modules/rh/rh.notifications.js');
@@ -71,6 +71,10 @@ test('solicitação de folga mantém aprovação operacional e notifica RH em be
   assert.match(folgaService, /canAccessModule\(normalizeRole\(user\?\.role\), 'escala_manage'\)/);
   assert.match(notifications, /setImmediate/);
   assert.match(notifications, /push\.sendToUser/);
+  assert.match(notifications, /operationalApproverUserIds/);
+  assert.match(notifications, /ROLE\.ENCARREGADO_MANUTENCAO/);
+  assert.match(notifications, /type: 'ESCALA_FOLGA_SOLICITADA'/);
+  assert.match(notifications, /url: '\/escala\/folgas'/);
   assert.match(notifications, /UPPER\(COALESCE\(role,''\)\)='RH'/);
 });
 

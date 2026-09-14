@@ -19,7 +19,7 @@ function formatMinutes(value) {
 function loadDashboard(req) {
   let dashboard = people.enrichDashboard(service.buildDashboard(currentUser(req)), currentUser(req));
   // DIRETORIA recebe indicadores e visão operacional agregada, mas não a lista
-  // nominal de pendências pessoais/sensíveis. Detalhes continuam exclusivos a RH/ADMIN.
+  // nominal de pendências pessoais/sensíveis. Detalhes continuam exclusivos ao RH.
   if (!dashboard.canManage) dashboard = { ...dashboard, pendencias: [] };
   return dashboard;
 }

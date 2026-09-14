@@ -107,6 +107,7 @@ router.post("/folgas/solicitar", requireLogin, requireRole(escalaSelfRead), safe
 router.post("/folgas/solicitacoes/:id/cancelar", requireLogin, requireRole(escalaSelfRead), safe(folgaController.cancelarSolicitacao, "cancelarSolicitacaoFolga"));
 router.post("/folgas/solicitacoes/:id/aprovar", requireLogin, requireRole(escalaManage), safe(folgaController.aprovarSolicitacao, "aprovarSolicitacaoFolga"));
 router.post("/folgas/solicitacoes/:id/reprovar", requireLogin, requireRole(escalaManage), safe(folgaController.reprovarSolicitacao, "reprovarSolicitacaoFolga"));
+router.get("/folgas/horas-extras-servico", requireLogin, requireRole(escalaManage), safe(folgaController.horasExtrasServico, "horasExtrasServicoFolga"));
 router.post("/folgas/programar", requireLogin, requireRole(escalaManage), upload.single("anexo"), safe(folgaController.programar, "programarFolga"));
 router.post("/folgas/:id/cancelar", requireLogin, requireRole(escalaManage), safe(folgaController.cancelar, "cancelarFolga"));
 router.post("/folgas/:id/realizar", requireLogin, requireRole(escalaManage), safe(folgaController.realizar, "realizarFolga"));

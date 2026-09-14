@@ -61,3 +61,13 @@ test('view mantém ordem, ações, filtros, estados vazios e modo TV', () => {
   assert.match(js,/setInterval\(\(\) => location\.reload\(\), 60000\)/);
   assert.match(css,/@media\(max-width:700px\)/); assert.match(css,/grid-template-columns:repeat\(2,1fr\)/);
 });
+
+test('painel operacional permanece compacto em celulares estreitos', () => {
+  const css=fs.readFileSync('public/css/operational-dashboard.css','utf8');
+  assert.match(css,/\.operational-dashboard\{width:100%;max-width:100%;overflow-wrap:anywhere\}/);
+  assert.match(css,/\.operational-dashboard,\s*\.operational-dashboard \*\{min-width:0\}/);
+  assert.match(css,/@media\(max-width:420px\)/);
+  assert.match(css,/\.op-controls\{grid-template-columns:1fr 1fr\}/);
+  assert.match(css,/\.card-heading\{align-items:stretch;flex-direction:column\}/);
+  assert.match(css,/\.op-table td\{grid-template-columns:78px minmax\(0,1fr\)\}/);
+});

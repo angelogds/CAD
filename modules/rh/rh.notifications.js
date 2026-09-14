@@ -1,5 +1,6 @@
 const db = require('../../database/db');
 const push = require('../push/push.service');
+const { normalizeRole, ROLE } = require('../../config/rbac');
 
 function tableExists(name) {
   try { return Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name)); }
@@ -17,6 +18,31 @@ function rhUserIds() {
   } catch (_error) {
     return [];
   }
+}
+
+function userIdsByRoles(roles = []) {
+  if (!tableExists('users')) return [];
+  const allowed = new Set(roles.map(normalizeRole));
+  try {
+    return db.prepare(`
+      SELECT id, role FROM users
+      ORDER BY id
+    `).all()
+      .filter((row) => allowed.has(normalizeRole(row.role)))
+      .map((row) => Number(row.id))
+      .filter(Boolean);
+  } catch (_error) {
+    return [];
+  }
+}
+
+function operationalApproverUserIds() {
+  return userIdsByRoles([
+    ROLE.ADMIN,
+    ROLE.ENCARREGADO_MANUTENCAO,
+    ROLE.MANUTENCAO_SUPERVISOR,
+    ROLE.SUPERVISOR_MANUTENCAO,
+  ]);
 }
 
 function leaveRequest(id) {
@@ -45,13 +71,23 @@ function notifyNewLeaveRequest(requestId) {
   background('nova solicitação de folga', async () => {
     const request = leaveRequest(requestId);
     if (!request) return;
-    const users = rhUserIds();
-    for (const id of users) {
+    for (const id of operationalApproverUserIds()) {
       await push.sendToUser(id, {
-        title: '🗓️ Nova solicitação de folga',
+        title: 'Nova solicitação de folga',
+        body: `${request.colaborador_nome} solicitou folga para ${request.data_folga}.`,
+        type: 'ESCALA_FOLGA_SOLICITADA',
+        url: '/escala/folgas',
+        tag: `escala-folga-${request.id}`,
+        data: { solicitacaoId: request.id, colaboradorId: request.colaborador_id, type: 'ESCALA_FOLGA_SOLICITADA' },
+      });
+    }
+
+    for (const id of rhUserIds()) {
+      await push.sendToUser(id, {
+        title: 'Folga solicitada',
         body: `${request.colaborador_nome} solicitou folga para ${request.data_folga}.`,
         type: 'RH_FOLGA_SOLICITADA',
-        url: '/escala/rh',
+        url: '/rh/folgas',
         tag: `rh-folga-${request.id}`,
         data: { solicitacaoId: request.id, colaboradorId: request.colaborador_id, type: 'RH_FOLGA_SOLICITADA' },
       });
@@ -83,7 +119,7 @@ function notifyLeaveDecision(requestId, status) {
         title: approved ? '✅ Folga aprovada pela gestão' : 'ℹ️ Folga analisada pela gestão',
         body: `${request.colaborador_nome}: ${request.data_folga} • ${normalized}.`,
         type: 'RH_FOLGA_DECISAO',
-        url: '/escala/rh',
+        url: '/rh/folgas',
         tag: `rh-folga-rh-${request.id}`,
         data: { solicitacaoId: request.id, colaboradorId: request.colaborador_id, status: normalized, type: 'RH_FOLGA_DECISAO' },
       });

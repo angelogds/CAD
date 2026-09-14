@@ -479,8 +479,8 @@ function gerarPdfBancoHorasPorOs(dados = {}) {
   process.nextTick(() => {
     setupPage(doc, meta, false);
     drawTable(doc, { meta, columns: [
-      {key:'os',label:'OS',width:45},{key:'funcionario',label:'Funcionário',width:125},{key:'data',label:'Data',width:62},{key:'horario',label:'Horário',width:112},{key:'total',label:'Total',width:55},{key:'servico',label:'Serviço',width:150}
-    ], rows: (dados.horasExtras || []).map(h=>({os:h.os_id || '-', funcionario:h.colaborador_nome, data:formatDateBr(h.data_servico), horario:`${h.inicio_extra || '-'} até ${h.fim_extra || '-'}`, total:fmtMin(h.total_minutos), servico:h.descricao_servico})), emptyRow:{os:'-',funcionario:'-',data:'-',horario:'-',total:'-',servico:'Sem horas extras vinculadas.'} });
+      {key:'os',label:'OS',width:38},{key:'funcionario',label:'Funcionário',width:95},{key:'data',label:'Data',width:57},{key:'horario',label:'Horário',width:95},{key:'total',label:'Horas',width:45},{key:'local',label:'Onde foi prestada',width:105},{key:'servico',label:'Serviço',width:114}
+    ], rows: (dados.horasExtras || []).map(h=>({os:h.os_id || '-', funcionario:h.colaborador_nome, data:formatDateBr(h.data_servico), horario:`${h.inicio_extra || '-'} até ${h.fim_extra || '-'}`, total:fmtMin(h.total_minutos), local:h.equipamento_nome || h.os_equipamento || '-', servico:h.descricao_servico || h.os_descricao || '-'})), emptyRow:{os:'-',funcionario:'-',data:'-',horario:'-',total:'-',local:'-',servico:'Sem horas extras vinculadas.'} });
     const total = (dados.horasExtras || []).reduce((s,h)=>s+Number(h.total_minutos||0),0);
     doc.moveDown().font("Helvetica-Bold").fontSize(10).fillColor(COLORS.greenDark).text(`Total geral da OS: ${fmtMin(total)}`);
     doc.end();

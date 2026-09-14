@@ -279,7 +279,7 @@
       <% horasExtrasDaOS.forEach((he) => { %>
         <li style="margin-top:6px;">
           <b><%= he.colaborador_nome || 'Mecânico' %></b> — <%= he.data_servico || '-' %> — <%= he.inicio_extra || '-' %> até <%= he.fim_extra || '-' %> — <%= he.total_minutos || 0 %> min — <%= he.status || '-' %><br>
-          <span class="muted"><%= he.descricao_servico || 'Sem descrição complementar.' %></span>
+          <span class="muted">Onde foi prestada: <%= he.equipamento_nome || he.os_equipamento || 'Local não informado' %>. Serviço: <%= he.descricao_servico || he.os_descricao || 'Sem descrição complementar.' %></span>
           <% if (he.foto_inicio_path || he.foto_fim_path) { %><br><span class="muted">Anexos: <%= he.foto_inicio_path ? 'foto inicial' : '' %><%= he.foto_inicio_path && he.foto_fim_path ? ' / ' : '' %><%= he.foto_fim_path ? 'foto final' : '' %></span><% } %>
         </li>
       <% }) %>
@@ -445,10 +445,10 @@
     <div class="card-head">
       <div>
         <h3 style="margin:0;">Notificação WhatsApp</h3>
-        <div class="muted">Notificações disponíveis apenas para Admin e Encarregado de Manutenção.</div>
+        <div class="muted">Notificações disponíveis apenas para a Gestão de Manutenção.</div>
       </div>
     </div>
-    <p class="muted" style="margin-bottom:0;">Acesso restrito. Apenas Admin e Encarregado de Manutenção podem enviar notificações via WhatsApp ou visualizar dados de contato dos colaboradores.</p>
+    <p class="muted" style="margin-bottom:0;">Acesso restrito. Apenas a Gestão de Manutenção pode enviar notificações via WhatsApp ou visualizar dados de contato dos colaboradores.</p>
   </div>
 <% } %>
 

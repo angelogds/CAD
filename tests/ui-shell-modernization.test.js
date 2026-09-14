@@ -16,12 +16,13 @@ test('topbar usa shell moderno e mantém logout somente no menu do usuário', ()
   assert.match(layout, /class="btn btn-green topbar-extra-btn"/);
 });
 
-test('sidebar preserva permissões e ganha hierarquia visual por grupos', () => {
+test('sidebar preserva permissões e mantém administração sem exposição nominal', () => {
   assert.match(sidebar, /canAccessModule/);
   assert.match(sidebar, /sidebar-brand-subtitle">Manutenção Integrada/);
   assert.match(sidebar, />OPERAÇÃO</);
   assert.match(sidebar, />GESTÃO E APOIO</);
-  assert.match(sidebar, />ADMIN</);
+  assert.match(sidebar, /canArmazenamento/);
+  assert.doesNotMatch(sidebar, />ADMIN</);
   assert.match(sidebar, /sidebar-tv-link/);
   assert.match(sidebar, /currentPcmSection === 'engenharia' \? 'active' : ''/);
 });
@@ -34,4 +35,6 @@ test('shell moderno é responsivo e não altera conteúdo das páginas', () => {
   assert.match(css, /@media \(max-width:980px\)/);
   assert.match(css, /@media \(max-width:768px\)/);
   assert.match(css, /\.app\.mobile-sidebar-open \.sidebar\{transform:translateX\(0\);\}/);
+  assert.match(css, /\.content>\*,\s*\.content section,\s*\.content article,\s*\.content form,\s*\.content fieldset,\s*\.content header,\s*\.content footer,\s*\.content div\{[\s\S]*min-width:0;[\s\S]*max-width:100%;/);
+  assert.match(css, /@media \(max-width:420px\)\{[\s\S]*\.content\{[\s\S]*padding:8px 6px;/);
 });
