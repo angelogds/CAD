@@ -1,0 +1,62 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/diretoria.css?v=20260914-v1">
+<%
+  const comprasResumo = compras || {};
+  const manutencaoResumo = manutencao || {};
+  const money = (centavos) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((Number(centavos) || 0) / 100);
+%>
+
+<div class="director-page">
+  <header class="director-hero">
+    <div>
+      <span class="director-eyebrow">GESTÃO EXECUTIVA</span>
+      <h1>Painel da Diretoria</h1>
+      <p>Visões gerenciais separadas da operação para acompanhamento, decisão e aprovação, usando os dados reais do sistema.</p>
+    </div>
+    <span class="director-badge">DIRETORIA</span>
+  </header>
+
+  <section class="director-panels" aria-label="Painéis gerenciais">
+    <a class="director-panel-card" href="/dashboard">
+      <div class="director-card-head"><span>01</span><b>GERAL</b></div>
+      <h2>Painel Gerencial Geral</h2>
+      <p>Visão padrão da operação com OS, preventivas, demandas, escala e indicadores do dia a dia.</p>
+      <div class="director-mini-grid">
+        <span><small>Escopo</small><strong>Operação</strong></span>
+        <span><small>Uso</small><strong>Visão geral</strong></span>
+      </div>
+      <strong class="director-open">Abrir painel →</strong>
+    </a>
+
+    <a class="director-panel-card is-purchase" href="/diretoria/compras">
+      <div class="director-card-head"><span>02</span><b>COMPRAS</b></div>
+      <h2>Acompanhamento de Compras</h2>
+      <p>Cotações, itens aguardando aprovação, valores liberados, compras realizadas, recebimentos e atrasos.</p>
+      <div class="director-mini-grid">
+        <span><small>Para aprovar</small><strong><%= comprasResumo.aguardandoAprovacao || 0 %> item(ns)</strong></span>
+        <span><small>Valor pendente</small><strong><%= money(comprasResumo.valorAguardandoAprovacao) %></strong></span>
+        <span><small>Atrasadas</small><strong><%= comprasResumo.atrasadas || 0 %></strong></span>
+        <span><small>Recebimento</small><strong><%= comprasResumo.aguardandoRecebimento || 0 %></strong></span>
+      </div>
+      <strong class="director-open">Acompanhar compras →</strong>
+    </a>
+
+    <a class="director-panel-card is-maintenance" href="/diretoria/manutencao">
+      <div class="director-card-head"><span>03</span><b>MANUTENÇÃO</b></div>
+      <h2>Desempenho da Manutenção</h2>
+      <p>Indicadores executivos do PCM sem expor à Diretoria as telas operacionais de planejamento e engenharia.</p>
+      <div class="director-mini-grid">
+        <span><small>OS no mês</small><strong><%= manutencaoResumo.totalOs || 0 %></strong></span>
+        <span><small>Backlog</small><strong><%= manutencaoResumo.backlog || 0 %></strong></span>
+        <span><small>Fora do SLA</small><strong><%= manutencaoResumo.atrasadas || 0 %></strong></span>
+        <span><small>Ativos críticos</small><strong><%= manutencaoResumo.equipamentosCriticos || 0 %></strong></span>
+      </div>
+      <strong class="director-open">Ver desempenho →</strong>
+    </a>
+  </section>
+
+  <section class="director-note">
+    <strong>Separação de responsabilidades</strong>
+    <p>Solicitações continuam sendo usadas por quem solicita materiais. Compras continua operando cotações e aquisições. O Painel da Diretoria concentra apenas acompanhamento executivo, aprovação e indicadores.</p>
+  </section>
+</div>
