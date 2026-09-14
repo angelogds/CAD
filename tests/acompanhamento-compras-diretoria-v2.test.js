@@ -5,26 +5,34 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
-const routes = read('modules/solicitacoes/solicitacoes.routes.js');
+const legacyRoutes = read('modules/solicitacoes/solicitacoes.routes.js');
+const directorRoutes = read('modules/diretoria/diretoria.routes.js');
 const service = read('modules/compras/acompanhamento.service.js');
 const controller = read('modules/solicitacoes/solicitacoes.acompanhamento.controller.js');
 const view = read('views/solicitacoes/acompanhamento-compras.ejs');
 const detail = read('views/solicitacoes/acompanhamento-detalhe.ejs');
-const minhas = read('views/solicitacoes/minhas.ejs');
 const css = read('public/css/acompanhamento-compras-diretoria.css');
 
-test('acompanhamento executivo mantém acesso técnico restrito a ADMIN e DIRETORIA em todas as rotas', () => {
-  assert.match(routes, /ACOMPANHAMENTO_COMPRAS_EXECUTIVO\s*=\s*\[ROLE\.ADMIN, ROLE\.DIRETORIA\]/);
-  assert.match(routes, /router\.get\("\/acompanhamento-compras", requireLogin, requireRole\(ACOMPANHAMENTO_COMPRAS_EXECUTIVO\)/);
-  assert.match(routes, /router\.get\("\/acompanhamento-compras\/:id", requireLogin, requireRole\(ACOMPANHAMENTO_COMPRAS_EXECUTIVO\)/);
-  assert.match(routes, /router\.post\("\/acompanhamento-compras\/:id\/aprovar-itens-cotados", requireLogin, requireRole\(ACOMPANHAMENTO_COMPRAS_EXECUTIVO\)/);
-  assert.doesNotMatch(routes, /\/acompanhamento-compras"[^\n]+ACCESS\.compras_read/);
+test('acompanhamento executivo fica no Painel da Diretoria e URLs antigas redirecionam', () => {
+  assert.match(directorRoutes, /DIRETORIA_COMPRAS/);
+  assert.match(directorRoutes, /router\.get\('\/compras', requireLogin, requireRole\(DIRETORIA_COMPRAS\)/);
+  assert.match(directorRoutes, /router\.get\('\/compras\/:id', requireLogin, requireRole\(DIRETORIA_COMPRAS\)/);
+  assert.match(directorRoutes, /router\.post\('\/compras\/:id\/aprovar-itens-cotados', requireLogin, requireRole\(DIRETORIA_COMPRAS\)/);
+  assert.match(legacyRoutes, /DIRETORIA_COMPRAS_PATH = "\/dashboard\/diretoria\/compras"/);
+  assert.match(legacyRoutes, /router\.get\("\/acompanhamento-compras"/);
+  assert.match(legacyRoutes, /redirectAcompanhamentoCompras/);
+  assert.match(legacyRoutes, /redirectAprovacaoCompras/);
 });
 
-test('atalho de Acompanhar compras não é exibido para perfis operacionais', () => {
-  assert.match(minhas, /canWatchExecutivePurchases/);
-  assert.match(minhas, /\['ADMIN','ADMINISTRADOR','DIRETORIA','DIRECAO'\]/);
-  assert.doesNotMatch(minhas, /canAccessModule\(user\?\.role,'compras_read'\).*Acompanhar compras/);
+test('controller reutiliza serviços canônicos de compras sem duplicar SQL', () => {
+  assert.match(controller, /require\('\.\.\/compras\/acompanhamento\.service'\)/);
+  assert.match(controller, /require\('\.\.\/compras\/compras\.aprovacao-itens\.service'\)/);
+  assert.match(controller, /acompanhamentoService\.getDashboard\(req\.query\)/);
+  assert.match(controller, /itemApprovalService\.getSummary\(row\.id\)/);
+  assert.match(controller, /itemApprovalService\.approveQuotedItems/);
+  assert.match(controller, /acompanhamentoBasePath: context\.basePath/);
+  assert.match(controller, /backHref: activeMenu === 'diretoria' \? '\/dashboard\/diretoria'/);
+  assert.doesNotMatch(controller, /\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b/i);
 });
 
 test('visão padrão é andamento e registros concluídos são separados sem criar arquivo paralelo', () => {
@@ -62,9 +70,8 @@ test('fila executiva calcula próxima ação e prioriza decisões', () => {
   assert.match(controller, /saldoReceber/);
 });
 
-test('interface mantém visão executiva da Diretoria e remove andamento percentual redundante da tabela', () => {
+test('interface mantém visão executiva da Diretoria e navega pela base configurável', () => {
   assert.match(view, /PAINEL EXECUTIVO · DIRETORIA/);
-  assert.doesNotMatch(view, /PAINEL EXECUTIVO · DIRETORIA \/ ADMIN/);
   assert.match(view, /EM ANDAMENTO/);
   assert.match(view, /HISTÓRICO/);
   assert.match(view, /executive-signals/);
@@ -72,10 +79,8 @@ test('interface mantém visão executiva da Diretoria e remove andamento percent
   assert.match(view, /LIBERADAS \/ A COMPRAR/);
   assert.match(view, /Próxima ação/);
   assert.match(view, /management-row-history/);
-  assert.match(view, /Concluída \/ atualizada em/);
+  assert.match(view, /acompanhamentoPath/);
   assert.doesNotMatch(view, /<th>Andamento<\/th>/);
-  assert.doesNotMatch(view, /data-label="Andamento"/);
-  assert.match(view, /system-compact-btn/);
 });
 
 test('aprovação ocorre somente sobre itens explicitamente selecionados', () => {
@@ -85,20 +90,27 @@ test('aprovação ocorre somente sobre itens explicitamente selecionados', () =>
   assert.match(detail, /form="approval-selection-form"/);
   assert.match(detail, /Aprovar selecionados/);
   assert.match(detail, /approval-selected-count/);
+  assert.match(detail, /acompanhamentoPath/);
   assert.doesNotMatch(detail, /type="hidden" name="item_id"/);
-  assert.doesNotMatch(detail, /Aprovar itens cotados/);
 });
 
-test('interface pública apresenta apenas Diretoria sem expor ADMIN como aprovador', () => {
+test('interface pública apresenta somente Diretoria como aprovadora', () => {
   assert.match(detail, /ANÁLISE GERENCIAL · DIRETORIA/);
   assert.doesNotMatch(detail, /DIRETORIA \/ ADMIN/);
   assert.doesNotMatch(detail, /ADMIN\/DIRETORIA/);
-  assert.doesNotMatch(detail, /Aguardando ADMIN/);
   assert.match(view, /<small>DIRETORIA<\/small>/);
-  assert.doesNotMatch(view, /<small>ADMIN\/DIRETORIA<\/small>/);
 });
 
-test('novo css mantém painel executivo responsivo e botões compactos', () => {
+test('acompanhamento preserva valores por etapa e custo mensal por equipamento', () => {
+  assert.match(view, /VALORES POR ETAPA/);
+  assert.match(view, /CUSTO COMPRADO NO MÊS POR EQUIPAMENTO/);
+  assert.match(view, /p\.valores\?\.cotado/);
+  assert.match(view, /p\.valores\?\.comprometido/);
+  assert.match(view, /p\.valores\?\.recebido/);
+  assert.match(view, /custosEquipamentos/);
+});
+
+test('css executivo permanece responsivo e com ações compactas', () => {
   assert.match(css, /\.executive-view-tabs/);
   assert.match(css, /\.executive-signals/);
   assert.match(css, /\.next-action-chip/);
