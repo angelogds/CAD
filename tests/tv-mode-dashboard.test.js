@@ -18,8 +18,8 @@ test('rota oficial /tv, redirect legado e stream pertencem ao módulo oficial', 
 test('tela oficial possui seis seções, ticker e não possui ações operacionais', () => {
   assert.equal((view().match(/data-tv-screen=/g) || []).length, 6);
   assert.match(view(), /id="tvTickerTrack"/);
-  assert.match(view(), /Para receber os chamados com aviso sonoro/);
-  assert.match(view(), /Ativar som e tela cheia/);
+  assert.match(view(), /Para receber os chamados com voz, aviso sonoro/);
+  assert.match(view(), /Ativar Modo TV/);
   assert.doesNotMatch(view(), />\s*(Abrir|Iniciar|Editar|Fechar)\s*</);
 });
 
@@ -33,11 +33,12 @@ test('painel inicia imediatamente e ativação libera somente recursos do navega
   assert.doesNotMatch(css(), /\.tv-activation,\.tv-alert\{/);
 });
 
-test('rotação, atualização, fallback e alerta usam os intervalos especificados', () => {
-  assert.match(view(), /rotationMs:30000/);
-  assert.match(view(), /fastRefreshMs:15000/);
-  assert.match(view(), /refreshMs:60000/);
-  assert.match(view(), /alertMs:60000/);
+test('rotação, atualização, fallback e alertas usam os intervalos especificados', () => {
+  assert.match(view(), /rotationMs:\s*30000/);
+  assert.match(view(), /fastRefreshMs:\s*15000/);
+  assert.match(view(), /refreshMs:\s*60000/);
+  assert.match(view(), /alertMs:\s*15000/);
+  assert.match(view(), /criticalAlertMs:\s*25000/);
   assert.match(source(), /new EventSource/);
   assert.match(source(), /startFastPolling/);
   assert.match(source(), /pauseRotation\(\)/);
