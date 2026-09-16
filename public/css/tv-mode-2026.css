@@ -1,0 +1,330 @@
+/*
+ * Refinamento visual do Modo TV — Oficina.
+ * Mantém a identidade do Painel Operacional e aumenta a legibilidade em TV Full HD.
+ * Carregado depois de tv-mode.css para concentrar somente os ajustes desta fase.
+ */
+
+:root{
+  --ticker-h:82px;
+}
+
+.tv-content{
+  padding:16px 22px;
+}
+
+.metric,.panel,.tv-assistant-strip{
+  border-color:#dfe8e3;
+  box-shadow:0 5px 18px rgba(28,60,45,.065);
+}
+
+.panel{
+  border-radius:16px;
+  padding:15px 17px;
+}
+
+.panel h2{
+  color:var(--text);
+  font-size:clamp(18px,1.22vw,26px);
+  letter-spacing:-.015em;
+}
+
+.panel-heading{
+  min-height:42px;
+  margin:-2px 0 10px;
+  padding:0 2px 10px;
+  border-bottom:1px solid var(--line);
+}
+
+.panel-heading h2{
+  font-weight:900;
+}
+
+.panel-heading>span{
+  font-size:clamp(12px,.82vw,16px);
+}
+
+/* Tabela principal de OS: padrão visual próximo ao painel operacional, ampliado para TV. */
+.os-panel{
+  padding:13px 15px 14px;
+}
+
+.os-panel .table-wrap{
+  border:1px solid var(--line);
+  border-radius:13px;
+  background:var(--card);
+  overflow:hidden;
+}
+
+.os-table{
+  border-collapse:separate;
+  border-spacing:0;
+  font-size:clamp(15px,1vw,20px);
+}
+
+.os-table thead th{
+  height:44px;
+  padding:10px 12px;
+  background:#f0f6f3;
+  border-bottom:1px solid #d9e6df;
+  color:#52665c;
+  font-size:clamp(11px,.72vw,14px);
+  font-weight:900;
+  letter-spacing:.035em;
+}
+
+.tv-theme-dark .os-table thead th{
+  background:#20332a;
+}
+
+.os-table tbody tr{
+  height:66px;
+  border-left-width:6px;
+  transition:background .2s ease;
+}
+
+.os-table tbody tr:nth-child(even){
+  background:rgba(8,116,67,.018);
+}
+
+.tv-theme-dark .os-table tbody tr:nth-child(even){
+  background:rgba(255,255,255,.018);
+}
+
+.os-table td{
+  padding:11px 12px;
+  border-bottom:1px solid #e5ece8;
+  font-size:1em;
+}
+
+.os-table tbody tr:last-child td{
+  border-bottom:0;
+}
+
+.os-table td:first-child strong{
+  font-size:1.08em;
+  letter-spacing:-.015em;
+}
+
+.equipment-cell{
+  gap:4px;
+}
+
+.equipment-cell strong{
+  font-size:1.02em;
+  font-weight:900;
+}
+
+.equipment-cell small{
+  font-size:.8em;
+}
+
+.responsible-cell{
+  gap:9px;
+}
+
+.responsible-cell i{
+  width:34px;
+  height:34px;
+  font-size:.74em;
+}
+
+.badge{
+  padding:6px 10px;
+  font-size:.76em;
+  letter-spacing:.01em;
+}
+
+/* As demais telas usam o mesmo ritmo visual de linhas e cards do painel principal. */
+.person,.list-row,.rank-row,.material-row,.demand-row{
+  min-height:55px;
+  margin:5px 0;
+  padding:10px 12px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fbfdfc;
+}
+
+.tv-theme-dark .person,
+.tv-theme-dark .list-row,
+.tv-theme-dark .rank-row,
+.tv-theme-dark .material-row,
+.tv-theme-dark .demand-row{
+  background:#1b2a23;
+}
+
+.person strong,.list-row strong,.rank-row strong,.material-row strong,.demand-row strong{
+  font-weight:850;
+}
+
+.cards-list{
+  gap:5px;
+}
+
+.bar-row{
+  min-height:42px;
+  margin:10px 0;
+  padding:0 4px;
+}
+
+.material-layout{
+  gap:14px;
+}
+
+.material-panel{
+  padding:14px 15px;
+}
+
+.material-row,.demand-row{
+  margin:4px 0;
+  border-left-width:5px;
+}
+
+/* Faixa da assistente: mais clara e com leitura do texto sem parecer um bloco comprimido. */
+.tv-assistant-strip{
+  min-height:84px;
+  grid-template-columns:auto minmax(0,1fr) minmax(260px,.38fr);
+  padding:12px 18px;
+  border-radius:16px;
+}
+
+.assistant-copy span{
+  white-space:normal;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  line-clamp:2;
+  overflow:hidden;
+  line-height:1.28;
+}
+
+/* Barra inferior: passa a funcionar como faixa operacional permanente e legível à distância. */
+.tv-ticker{
+  min-height:var(--ticker-h);
+  border-top:3px solid #0b9660;
+  box-shadow:0 -6px 18px rgba(4,45,32,.15);
+}
+
+.tv-ticker>strong{
+  min-width:142px;
+  padding:0 20px;
+  font-size:clamp(16px,1.05vw,21px);
+  line-height:1.05;
+  letter-spacing:.07em;
+  text-align:center;
+}
+
+.tv-ticker>strong::after{
+  content:"TEMPO REAL";
+  display:block;
+  margin-top:5px;
+  color:#61d8a3;
+  font-size:.54em;
+  letter-spacing:.14em;
+}
+
+.tv-ticker-track{
+  animation-duration:52s;
+}
+
+.tv-ticker-track span{
+  display:flex;
+  align-items:center;
+  min-height:var(--ticker-h);
+  padding:0 38px;
+  font-size:clamp(19px,1.35vw,27px);
+  font-weight:900;
+  letter-spacing:.005em;
+}
+
+.tv-ticker-track span::after{
+  margin-left:38px;
+  font-size:.72em;
+}
+
+/* Alerta de nova OS: mantém o acerto da fase anterior e melhora a leitura da voz completa. */
+.tv-alert-card{
+  width:min(1160px,92vw);
+  padding:42px 46px 36px;
+  border-radius:26px;
+}
+
+.tv-alert-card>span{
+  font-size:clamp(16px,1.15vw,22px);
+}
+
+.tv-alert-card>strong{
+  margin:16px 0 12px;
+  font-size:clamp(72px,7.4vw,118px);
+}
+
+.tv-alert-card h2{
+  margin:8px 0 12px;
+  font-size:clamp(31px,3vw,52px);
+  line-height:1.08;
+}
+
+.tv-alert-card p{
+  max-width:980px;
+  margin:12px auto 22px;
+  color:var(--text);
+  font-size:clamp(20px,1.55vw,29px);
+  line-height:1.35;
+}
+
+.tv-alert-card dl{
+  gap:12px;
+}
+
+.tv-alert-card dl>div{
+  padding:11px 10px;
+}
+
+.tv-alert-card dt{
+  font-size:clamp(11px,.72vw,14px);
+  font-weight:800;
+}
+
+.tv-alert-card dd{
+  font-size:clamp(15px,1vw,20px);
+}
+
+#tvVoiceReadingStatus{
+  display:block;
+  margin-top:18px;
+  color:var(--muted);
+  font-size:clamp(13px,.85vw,17px);
+  line-height:1.35;
+}
+
+.tv-alert.is-speaking #tvVoiceReadingStatus{
+  color:var(--green);
+  font-weight:800;
+}
+
+.tv-alert.is-speaking #tvVoiceReadingStatus::before{
+  content:"● ";
+  color:var(--green2);
+}
+
+@media(max-width:1450px){
+  :root{--ticker-h:72px}
+  .tv-content{padding:11px 15px}
+  .tv-ticker>strong{min-width:124px;padding:0 14px}
+  .tv-ticker-track span{padding:0 30px;font-size:clamp(17px,1.3vw,23px)}
+  .tv-ticker-track span::after{margin-left:30px}
+  .os-table tbody tr{height:58px}
+  .os-table td{padding:8px 9px}
+  .tv-assistant-strip{min-height:70px}
+}
+
+@media(max-width:1180px){
+  :root{--ticker-h:68px}
+  .tv-ticker>strong{min-width:112px;font-size:15px}
+  .tv-ticker-track span{font-size:17px;padding:0 24px}
+  .tv-ticker-track span::after{margin-left:24px}
+}
+
+@media(max-width:1050px){
+  .tv-assistant-strip{grid-template-columns:auto 1fr}
+  .os-table{font-size:14px}
+}
