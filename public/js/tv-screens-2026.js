@@ -1,16 +1,18 @@
 (() => {
   'use strict';
 
-  const VERSION = '2026.09-v3';
+  const VERSION = '2026.09-v3.1';
   const $screen = (name) => document.querySelector(`[data-tv-screen="${name}"]`);
   const items = (value) => Array.isArray(value) ? value : [];
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
   }[char]));
   const plain = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
+  const normalizedKey = (value) => plain(value).replace(/[\s-]+/g, '_');
   const numberBR = (value) => Number(value || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
   const dateBR = (value) => value ? new Date(`${String(value).slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : 'Não informada';
-  const initials = (name) => String(name || '?').split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+  const initials = (name) => String(name || '?').trim().split(/\s+/).slice(0, 2).map((part) => part[0] || '').join('').toUpperCase() || '?';
+  const clampPercent = (value) => Math.max(0, Math.min(100, Number(value ?? 0)));
 
   let scheduled = false;
 
@@ -23,11 +25,17 @@
   }
 
   function priorityTone(value) {
-    const p = plain(value);
-    if (p.includes('CRIT') || p.includes('URG')) return 'danger';
-    if (p.includes('ALT')) return 'warning';
-    if (p.includes('MED')) return 'info';
+    const p = normalizedKey(value);
+    if (!p || p === 'NAO_INFORMADA' || p.startsWith('NAO_CRIT')) return 'neutral';
+    if (['CRITICA', 'CRITICO', 'URGENTE', 'EMERGENCIAL'].includes(p)) return 'danger';
+    if (['ALTA', 'ALTO'].includes(p) || p.includes('ALTA')) return 'warning';
+    if (['MEDIA', 'MEDIO'].includes(p) || p.includes('MEDIA')) return 'info';
     return 'success';
+  }
+
+  function isHighCriticality(value) {
+    const p = normalizedKey(value);
+    return ['CRITICA', 'CRITICO', 'ALTA', 'ALTO', 'CRITICIDADE_ALTA'].includes(p);
   }
 
   function preventiveState(value) {
@@ -43,17 +51,17 @@
   function renderPreventivas(data) {
     const m = data?.operacao?.preventivas || {};
     const preventive = items(data?.preventivas).slice(0, 7);
-    const pctPreventive = Math.max(0, Math.min(100, Number(m.percentualPreventivas || 0)));
-    const pctCorrective = Math.max(0, Math.min(100, Number(m.percentualCorretivas || (100 - pctPreventive))));
+    const pctPreventive = clampPercent(m.percentualPreventivas ?? 0);
+    const pctCorrective = clampPercent(m.percentualCorretivas ?? (100 - pctPreventive));
     const rows = preventive.map((p) => {
       const state = preventiveState(p.dataPrevista);
       return `<tr>
         <td><div class="tv-v3-equipment"><strong>${esc(p.equipamento || 'Equipamento não informado')}</strong><small>${esc(p.setor || p.local || 'Local não informado')}</small></div></td>
         <td class="tv-v3-task">${esc(p.tarefa || 'Tarefa não informada')}</td>
-        <td><span class="tv-v3-person-inline"><i>${initials(p.responsavel)}</i><b>${esc(p.responsavel || 'A definir')}</b></span></td>
-        <td><strong>${dateBR(p.dataPrevista)}</strong></td>
+        <td><span class="tv-v3-person-inline"><i>${esc(initials(p.responsavel))}</i><b>${esc(p.responsavel || 'A definir')}</b></span></td>
+        <td><strong>${esc(dateBR(p.dataPrevista))}</strong></td>
         <td><span class="badge ${priorityTone(p.criticidade)}">${esc(p.criticidade || 'NÃO INFORMADA')}</span></td>
-        <td><span class="tv-v3-state ${state.cls}">${state.label}</span></td>
+        <td><span class="tv-v3-state ${state.cls}">${esc(state.label)}</span></td>
       </tr>`;
     }).join('');
 
@@ -69,14 +77,14 @@
       <div class="tv-v3-layout tv-v3-preventive-layout">
         <article class="panel tv-v3-overview-panel">
           <div class="panel-heading"><h2>Preventiva × corretiva</h2><span>Composição da manutenção</span></div>
-          <div class="tv-v3-donut" style="--preventive:${pctPreventive}deg;--preventive-pct:${pctPreventive * 3.6}deg">
+          <div class="tv-v3-donut" style="--preventive-pct:${pctPreventive * 3.6}deg">
             <div><strong>${numberBR(pctPreventive)}%</strong><span>preventivas</span></div>
           </div>
           <div class="tv-v3-legend"><span><i class="is-preventive"></i>${numberBR(pctPreventive)}% Preventivas</span><span><i class="is-corrective"></i>${numberBR(pctCorrective)}% Corretivas</span></div>
           <div class="tv-v3-alert-stack">
-            <div class="tv-v3-alert-item danger"><strong>${m.vencidas || 0}</strong><span>preventivas vencidas</span></div>
-            <div class="tv-v3-alert-item warning"><strong>${m.hoje || 0}</strong><span>programadas para hoje</span></div>
-            <div class="tv-v3-alert-item info"><strong>${m.semana || 0}</strong><span>previstas nesta semana</span></div>
+            <div class="tv-v3-alert-item danger"><strong>${Number(m.vencidas || 0)}</strong><span>preventivas vencidas</span></div>
+            <div class="tv-v3-alert-item warning"><strong>${Number(m.hoje || 0)}</strong><span>programadas para hoje</span></div>
+            <div class="tv-v3-alert-item info"><strong>${Number(m.semana || 0)}</strong><span>previstas nesta semana</span></div>
           </div>
         </article>
         <article class="panel tv-v3-table-panel">
@@ -100,21 +108,40 @@
   }
 
   function personStatus(p) {
-    const situation = plain(p?.situacao);
+    const situation = normalizedKey(p?.situacao);
     if (situation === 'OCUPADO') return { label: p.osAtual ? `EM ${p.osAtual}` : 'EM ATENDIMENTO', cls: 'busy' };
     if (situation === 'DISPONIVEL') return { label: 'DISPONÍVEL', cls: 'available' };
-    if (situation.includes('AFAST') || situation.includes('FOLGA')) return { label: p.situacao, cls: 'off' };
+    if (situation.includes('AFAST') || situation.includes('FOLGA') || situation === 'INDISPONIVEL') return { label: p.situacao || 'INDISPONÍVEL', cls: 'off' };
     return { label: p?.situacao || 'ESCALA', cls: 'neutral' };
+  }
+
+  function personPhoto(p) {
+    const fallback = esc(initials(p?.nome));
+    if (!p?.foto) return `<span>${fallback}</span>`;
+    return `<img src="${esc(p.foto)}" alt="" data-tv-fallback="${fallback}">`;
   }
 
   function teamRow(p, shift) {
     const s = personStatus(p);
     return `<div class="tv-v3-team-row">
-      <div class="tv-v3-person-photo">${p.foto ? `<img src="${esc(p.foto)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'${initials(p.nome)}'}))">` : `<span>${initials(p.nome)}</span>`}</div>
+      <div class="tv-v3-person-photo">${personPhoto(p)}</div>
       <div class="tv-v3-team-main"><strong>${esc(p.nome || 'Não informado')}</strong><small>${esc(p.funcao || 'Função não informada')} · ${esc(shift)}</small></div>
       <div class="tv-v3-team-current"><strong>${esc(p.osAtual || (s.cls === 'available' ? 'Livre para atendimento' : 'Sem OS vinculada'))}</strong><small>${s.cls === 'busy' ? 'Atendimento atual' : 'Situação operacional'}</small></div>
       <span class="tv-v3-state ${s.cls}">${esc(s.label)}</span>
     </div>`;
+  }
+
+  function bindImageFallbacks(root) {
+    if (!root?.querySelectorAll) return;
+    root.querySelectorAll('.tv-v3-person-photo img[data-tv-fallback]').forEach((img) => {
+      if (img.dataset.tvFallbackBound === '1') return;
+      img.dataset.tvFallbackBound = '1';
+      img.addEventListener('error', () => {
+        const span = document.createElement('span');
+        span.textContent = img.dataset.tvFallback || '?';
+        img.replaceWith(span);
+      }, { once: true });
+    });
   }
 
   function simpleNameRows(values, emptyText) {
@@ -122,7 +149,7 @@
     if (!list.length) return `<div class="empty">${esc(emptyText)}</div>`;
     return list.map((value) => {
       const person = typeof value === 'string' ? { nome: value } : value;
-      return `<div class="tv-v3-mini-row"><span class="tv-v3-mini-avatar">${initials(person.nome)}</span><div><strong>${esc(person.nome || value)}</strong><small>${esc(person.motivo || person.funcao || 'Programação vigente')}</small></div></div>`;
+      return `<div class="tv-v3-mini-row"><span class="tv-v3-mini-avatar">${esc(initials(person.nome))}</span><div><strong>${esc(person.nome || value)}</strong><small>${esc(person.motivo || person.funcao || 'Programação vigente')}</small></div></div>`;
     }).join('');
   }
 
@@ -132,14 +159,11 @@
     const day = normalizePeople(e.dia);
     const night = normalizePeople(e.noite);
     const active = normalizePeople([...day, ...night]);
-    const available = active.filter((p) => plain(p.situacao) === 'DISPONIVEL').length;
-    const busy = active.filter((p) => plain(p.situacao) === 'OCUPADO').length;
+    const available = active.filter((p) => normalizedKey(p.situacao) === 'DISPONIVEL').length;
+    const busy = active.filter((p) => normalizedKey(p.situacao) === 'OCUPADO').length;
     const absent = items(e.afastados).length + items(e.foraEscala).length;
     const weekend = items(e.finalSemana).length;
-    const rows = [
-      ...day.map((p) => teamRow(p, 'Turno dia')),
-      ...night.map((p) => teamRow(p, 'Turno noite')),
-    ].join('');
+    const rows = [...day.map((p) => teamRow(p, 'Turno dia')), ...night.map((p) => teamRow(p, 'Turno noite'))].join('');
 
     return `<div class="screen tv-v3-root tv-v3-screen section-stack">
       ${metrics([
@@ -174,7 +198,7 @@
     const leader = ranking[0] || {};
     const rows = ranking.map((r) => `<tr>
       <td><span class="tv-v3-rank-position">#${Number(r.posicao || 0)}</span></td>
-      <td><span class="tv-v3-person-inline"><i>${initials(r.nome)}</i><b>${esc(r.nome || 'Não informado')}</b></span></td>
+      <td><span class="tv-v3-person-inline"><i>${esc(initials(r.nome))}</i><b>${esc(r.nome || 'Não informado')}</b></span></td>
       <td><strong>${Number(r.os_finalizadas || 0)}</strong></td>
       <td>${Number(r.criticas || 0)}</td>
       <td>${Number(r.altas || 0)}</td>
@@ -208,7 +232,7 @@
     const equipment = items(data?.operacao?.equipamentos).slice(0, 8);
     const totalFailures = equipment.reduce((sum, e) => sum + Number(e.falhas || 0), 0);
     const totalRecurrences = equipment.reduce((sum, e) => sum + Number(e.reincidencias || 0), 0);
-    const critical = equipment.filter((e) => plain(e.criticidade).includes('CRIT')).length;
+    const critical = equipment.filter((e) => isHighCriticality(e.criticidade)).length;
     const stopped = equipment.filter((e) => /PARAD|INDISPON/i.test(String(e.situacao || ''))).length;
     const maxFailures = Math.max(1, ...equipment.map((e) => Number(e.falhas || 0)));
     const top = [...equipment].sort((a, b) => Number(b.falhas || 0) - Number(a.falhas || 0)).slice(0, 5);
@@ -263,7 +287,6 @@
   }
 
   function modernize() {
-    scheduled = false;
     const data = window.CGTVTest?.state?.data;
     if (!data) return;
 
@@ -274,13 +297,17 @@
       if (el.querySelector('.tv-v3-root') && el.dataset.tvV3Signature === sig) return;
       el.dataset.tvV3Signature = sig;
       el.innerHTML = renderer(data);
+      bindImageFallbacks(el);
     });
   }
 
   function scheduleModernize() {
     if (scheduled) return;
     scheduled = true;
-    requestAnimationFrame(modernize);
+    requestAnimationFrame(() => {
+      scheduled = false;
+      modernize();
+    });
   }
 
   function init() {
