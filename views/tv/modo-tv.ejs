@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#087443">
   <title><%= title || 'Modo TV — Oficina' %></title>
   <link rel="stylesheet" href="/css/tv-mode.css">
+  <link rel="stylesheet" href="/css/tv-mode-2026.css">
 </head>
 <body>
 <div id="tvApp" class="tv-shell">
@@ -60,7 +61,7 @@
       <h2 id="tvAlertEquipment"></h2>
       <p id="tvAlertDescription"></p>
       <dl id="tvAlertDetails"></dl>
-      <small>A assistente anunciará o chamado e o painel retornará automaticamente.</small>
+      <small id="tvVoiceReadingStatus">A assistente lerá responsável, OS, equipamento, local, prioridade, abertura e a descrição completa do chamado.</small>
     </div>
   </section>
 
@@ -79,5 +80,6 @@
   };
 </script>
 <script src="/js/tv-mode.js"></script>
+<script src="/js/tv-voice-assistant.js"></script>
 </body>
 </html>
