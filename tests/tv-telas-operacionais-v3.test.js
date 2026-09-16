@@ -65,6 +65,21 @@ test('extensão de telas reutiliza o snapshot já carregado e não cria rede par
   assert.doesNotMatch(js, /\/api\/tv\//);
 });
 
+test('correções da revisão preservam zero corretivo, criticidade exata e fallback de foto seguro', () => {
+  const js = screens();
+  assert.match(js, /m\.percentualCorretivas \?\? \(100 - pctPreventive\)/);
+  assert.match(js, /function isHighCriticality/);
+  assert.match(js, /\['CRITICA', 'CRITICO', 'ALTA', 'ALTO', 'CRITICIDADE_ALTA'\]\.includes\(p\)/);
+  assert.doesNotMatch(js, /onerror=/i);
+  assert.match(js, /addEventListener\('error'/);
+  assert.match(js, /span\.textContent = img\.dataset\.tvFallback/);
+});
+
+test('agendamento libera o latch antes da modernização para não travar novas renderizações', () => {
+  const js = screens();
+  assert.match(js, /requestAnimationFrame\(\(\) => \{\s*scheduled = false;\s*modernize\(\);/);
+});
+
 test('extensão da fase 3 é JavaScript válido e pode aguardar DOMContentLoaded', () => {
   const js = screens();
   assert.doesNotThrow(() => new vm.Script(js));
@@ -75,6 +90,7 @@ test('extensão da fase 3 é JavaScript válido e pode aguardar DOMContentLoaded
       addEventListener() {},
       querySelector() { return null; },
       getElementById() { return null; },
+      createElement() { return { textContent: '' }; },
     },
     requestAnimationFrame(fn) { return fn(); },
     MutationObserver: class { observe() {} },
