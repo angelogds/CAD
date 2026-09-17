@@ -1,3 +1,4 @@
+const { randomUUID } = require("node:crypto");
 const service = require("./almoxarifado.service");
 const estoqueService = require("../estoque/estoque.service");
 const alertsHub = require("../alerts/alerts.hub");
@@ -20,7 +21,7 @@ function publicarMaterialDisponivel({ solicitacaoId, itemId, quantidadeRecebida,
     if (!item) return false;
 
     const totalRecebido = Number(item.qtd_recebida_calc || item.qtd_recebida_total || 0);
-    const eventId = `almox-${solicitacaoId}-${itemId}-${totalRecebido}`;
+    const eventId = `almox-${randomUUID()}`;
     alertsHub.publish("material_disponivel", {
       event_id: eventId,
       origem: "ALMOXARIFADO_RECEBIMENTO",
