@@ -12,6 +12,7 @@
   const state = {
     source: null,
     queue: [],
+    pending: new Set(),
     showing: false,
     current: null,
     timer: null,
@@ -187,16 +188,27 @@
     }[char]));
   }
 
+  function markShown(material) {
+    const key = material?._eventKey || eventKey(material);
+    if (!key) return;
+    state.pending.delete(key);
+    state.processed.set(key, Date.now());
+    persistProcessed();
+  }
+
   function showNextMaterialAlert() {
     if (state.showing || !state.queue.length || osAlertVisible()) return;
     state.current = state.queue.shift();
     state.showing = true;
     if (!renderMaterialAlert(state.current)) {
+      state.pending.delete(state.current?._eventKey || eventKey(state.current));
       state.showing = false;
       state.current = null;
       return;
     }
 
+    // Só persiste a deduplicação depois que o alerta realmente entrou na tela.
+    markShown(state.current);
     clearTimeout(state.timer);
     state.timer = setTimeout(finishMaterialAlert, ALERT_MS);
     const spoken = speakMaterial(state.current);
@@ -230,31 +242,47 @@
 
   function enqueue(material) {
     const key = eventKey(material);
-    if (!key || state.processed.has(key)) return false;
-    state.processed.set(key, Date.now());
-    persistProcessed();
-    state.queue.push(material);
+    if (!key || state.processed.has(key) || state.pending.has(key)) return false;
+    state.pending.add(key);
+    state.queue.push({ ...material, _eventKey: key });
     showNextMaterialAlert();
     return true;
   }
 
   async function handlePayload(raw) {
     const key = eventKey(raw);
-    if (!raw?.os_id || !key || state.processed.has(key)) return false;
+    if (!raw?.os_id || !key || state.processed.has(key) || state.pending.has(key)) return false;
 
-    const core = window.CGTVTest;
-    if (!core?.fetchSnapshot || !core?.findSnapshotOS) return false;
-    const data = await core.fetchSnapshot({ detectNew: false });
-    const os = core.findSnapshotOS(raw.os_id, data);
-    if (!os) return false;
+    // Reserva a chave apenas em memória durante o enriquecimento para impedir
+    // duas entregas simultâneas do mesmo evento sem marcá-lo como processado.
+    state.pending.add(key);
+    try {
+      const core = window.CGTVTest;
+      if (!core?.fetchSnapshot || !core?.findSnapshotOS) {
+        state.pending.delete(key);
+        return false;
+      }
+      const data = await core.fetchSnapshot({ detectNew: false });
+      const os = core.findSnapshotOS(raw.os_id, data);
+      if (!os) {
+        state.pending.delete(key);
+        return false;
+      }
 
-    return enqueue({
-      ...raw,
-      numero: os.numero || `OS #${raw.os_id}`,
-      equipamento: os.equipamento || 'Equipamento não informado',
-      responsavel: os.responsavel || 'A definir',
-      local_os: os.local || os.setor || null,
-    });
+      state.queue.push({
+        ...raw,
+        _eventKey: key,
+        numero: os.numero || `OS #${raw.os_id}`,
+        equipamento: os.equipamento || 'Equipamento não informado',
+        responsavel: os.responsavel || 'A definir',
+        local_os: os.local || os.setor || null,
+      });
+      showNextMaterialAlert();
+      return true;
+    } catch (error) {
+      state.pending.delete(key);
+      throw error;
+    }
   }
 
   function onMaterialEvent(event) {
@@ -266,6 +294,9 @@
   function attachToCoreStream() {
     const source = window.CGTVTest?.state?.stream;
     if (!source || source === state.source) return;
+    if (state.source) {
+      try { state.source.removeEventListener('material_disponivel', onMaterialEvent); } catch (_error) {}
+    }
     source.addEventListener('material_disponivel', onMaterialEvent);
     state.source = source;
   }
