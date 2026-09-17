@@ -9,8 +9,10 @@ const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 test('almoxarifado publica material_disponivel somente para solicitação vinculada a OS', () => {
   const controller = read('modules/almoxarifado/almoxarifado.controller.js');
 
+  assert.match(controller, /require\("node:crypto"\)/);
   assert.match(controller, /require\("\.\.\/alerts\/alerts\.hub"\)/);
   assert.match(controller, /if \(!sol\?\.os_id\) return false/);
+  assert.match(controller, /const eventId = `almox-\$\{randomUUID\(\)\}`/);
   assert.match(controller, /alertsHub\.publish\("material_disponivel"/);
   assert.match(controller, /os_id: Number\(sol\.os_id\)/);
   assert.match(controller, /material: item\.item_nome_exibicao/);
@@ -40,11 +42,38 @@ test('Modo TV reutiliza o EventSource existente e não cria rede paralela', () =
   assert.doesNotMatch(script, /\/api\/tv\//);
 });
 
+test('reconexão troca o listener para o EventSource atual sem manter o anterior preso', () => {
+  const script = read('public/js/tv-material-alerts.js');
+
+  assert.match(script, /state\.source\.removeEventListener\('material_disponivel', onMaterialEvent\)/);
+  assert.match(script, /source\.addEventListener\('material_disponivel', onMaterialEvent\)/);
+  assert.ok(script.indexOf("removeEventListener('material_disponivel'") < script.indexOf("source.addEventListener('material_disponivel'"));
+});
+
+test('alerta de material separa fila pendente de eventos realmente exibidos', () => {
+  const script = read('public/js/tv-material-alerts.js');
+  const enqueueAt = script.indexOf('function enqueue(material)');
+  const markShownAt = script.indexOf('function markShown(material)');
+  const showAt = script.indexOf('function showNextMaterialAlert()');
+  const processedAt = script.indexOf('state.processed.set(key, Date.now())', markShownAt);
+
+  assert.match(script, /pending: new Set\(\)/);
+  assert.match(script, /state\.pending\.add\(key\)/);
+  assert.match(script, /state\.pending\.delete\(key\)/);
+  assert.ok(enqueueAt >= 0);
+  assert.ok(markShownAt >= 0);
+  assert.ok(showAt >= 0);
+  assert.ok(processedAt > markShownAt);
+  assert.ok(markShownAt < showAt);
+  assert.match(script, /markShown\(state\.current\)/);
+});
+
 test('alerta de material possui deduplicação e prioridade para alerta de nova OS', () => {
   const script = read('public/js/tv-material-alerts.js');
 
   assert.match(script, /cgTvProcessedMaterials/);
   assert.match(script, /state\.processed\.has\(key\)/);
+  assert.match(script, /state\.pending\.has\(key\)/);
   assert.match(script, /function interruptForOS\(\)/);
   assert.match(script, /state\.queue\.unshift\(interrupted\)/);
   assert.match(script, /MutationObserver/);
