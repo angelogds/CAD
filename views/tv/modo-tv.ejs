@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/css/tv-mode.css">
   <link rel="stylesheet" href="/css/tv-mode-2026.css">
   <link rel="stylesheet" href="/css/tv-screens-2026.css">
+  <link rel="stylesheet" href="/css/tv-material-alerts.css">
 </head>
 <body>
 <div id="tvApp" class="tv-shell">
@@ -66,6 +67,17 @@
     </div>
   </section>
 
+  <section id="tvMaterialAlert" class="tv-alert tv-material-alert" hidden aria-live="assertive">
+    <div class="tv-alert-card">
+      <span>MATERIAL DISPONÍVEL NO ALMOXARIFADO</span>
+      <strong id="tvMaterialOS"></strong>
+      <h2 id="tvMaterialName"></h2>
+      <p id="tvMaterialEquipment"></p>
+      <dl id="tvMaterialDetails"></dl>
+      <small id="tvMaterialReadingStatus">Material recebido e liberado para retirada no almoxarifado.</small>
+    </div>
+  </section>
+
   <audio id="tvAudioNew" preload="auto" src="/audio/os-nova.mp3"></audio>
   <audio id="tvAudioCritical" preload="auto" src="/audio/os-critica.mp3"></audio>
 </div>
@@ -82,6 +94,7 @@
 </script>
 <script src="/js/tv-mode.js"></script>
 <script src="/js/tv-voice-assistant.js"></script>
+<script src="/js/tv-material-alerts.js"></script>
 <script src="/js/tv-screens-2026.js"></script>
 </body>
 </html>
