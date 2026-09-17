@@ -1,0 +1,94 @@
+.tv-material-alert {
+  background: rgba(3, 33, 22, 0.84);
+  backdrop-filter: blur(10px);
+}
+
+.tv-material-alert .tv-alert-card {
+  width: min(1080px, 92vw);
+  border: 2px solid rgba(34, 197, 94, 0.42);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  background:
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.18), transparent 42%),
+    linear-gradient(145deg, rgba(7, 73, 48, 0.98), rgba(3, 43, 30, 0.98));
+}
+
+.tv-material-alert .tv-alert-card > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: clamp(16px, 1.15vw, 22px);
+  letter-spacing: 0.08em;
+  color: #bbf7d0;
+}
+
+.tv-material-alert .tv-alert-card > span:first-child::before {
+  content: '✓';
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(134, 239, 172, 0.5);
+  color: #dcfce7;
+}
+
+.tv-material-alert #tvMaterialOS {
+  display: block;
+  margin-top: 12px;
+  font-size: clamp(28px, 2.5vw, 46px);
+  color: #dcfce7;
+}
+
+.tv-material-alert #tvMaterialName {
+  margin: 8px 0 0;
+  font-size: clamp(30px, 3vw, 54px);
+  line-height: 1.05;
+  color: #ffffff;
+}
+
+.tv-material-alert #tvMaterialEquipment {
+  margin: 14px 0 0;
+  font-size: clamp(18px, 1.55vw, 28px);
+  color: #d1fae5;
+}
+
+.tv-material-alert #tvMaterialDetails {
+  margin-top: 24px;
+}
+
+.tv-material-alert #tvMaterialDetails > div {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.tv-material-alert #tvMaterialDetails dt {
+  color: #a7f3d0;
+}
+
+.tv-material-alert #tvMaterialDetails dd {
+  color: #ffffff;
+}
+
+.tv-material-alert #tvMaterialReadingStatus {
+  display: block;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: #bbf7d0;
+  font-size: clamp(15px, 1.05vw, 20px);
+}
+
+.tv-theme-light .tv-material-alert {
+  background: rgba(4, 47, 31, 0.78);
+}
+
+@media (max-width: 1180px) {
+  .tv-material-alert .tv-alert-card {
+    width: 94vw;
+  }
+
+  .tv-material-alert #tvMaterialDetails {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
