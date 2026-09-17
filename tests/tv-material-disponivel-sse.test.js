@@ -22,7 +22,7 @@ test('almoxarifado publica material_disponivel somente para solicitação vincul
 test('evento é publicado depois do recebimento e não pode desfazer a entrada física', () => {
   const controller = read('modules/almoxarifado/almoxarifado.controller.js');
   const receiveAt = controller.indexOf('const resultado = service.receberItem');
-  const publishAt = controller.indexOf('publicarMaterialDisponivel({ solicitacaoId');
+  const publishAt = controller.indexOf('publicarMaterialDisponivel({ solicitacaoId', receiveAt);
 
   assert.ok(receiveAt >= 0);
   assert.ok(publishAt > receiveAt);
