@@ -57,12 +57,13 @@ test('menu coloca Desempenho da Manutenção e Acompanhamento de Compras logo ap
   assert.doesNotMatch(sidebar, /navItem\('\/dashboard\/diretoria', 'Painel da Diretoria'/);
 });
 
-test('Solicitações fica focado no solicitante e não exibe acompanhamento executivo', () => {
+test('Solicitações concentra o acompanhamento operacional de compras no próprio módulo', () => {
   const view = read('views/solicitacoes/minhas.ejs');
   assert.match(view, /Acompanhamento das Solicitações/);
   assert.match(view, /\+ Nova Solicitação/);
-  assert.doesNotMatch(view, /Acompanhar compras/);
-  assert.doesNotMatch(view, /acompanhamento-compras/);
+  assert.match(view, /href="\/acompanhamento-compras"/);
+  assert.match(view, /Acompanhamento de Compras/);
+  assert.match(view, /canAccessModule\(user\?\.role,'acompanhamento_compras'\)/);
 });
 
 test('Acompanhamento de Compras reutiliza controller e aprovação por item existentes', () => {

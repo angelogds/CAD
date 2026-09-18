@@ -18,7 +18,6 @@
   const canPreventivas = can('preventivas_view');
   const canDemandas = can('demandas_view');
   const canSolicitacoes = can('solicitacoes_read');
-  const canAcompanhamentoCompras = can('acompanhamento_compras');
   const canCompras = can('compras');
   const canFornecedores = can('fornecedores');
   const canAlmoxarifado = can('almoxarifado_read');
@@ -46,7 +45,7 @@
   const navItem = (href, label, isActive, extraClass = '', suffix = '') =>
     `<a class="nav-item ${extraClass} ${isActive ? 'active' : ''}" href="${href}"><span class="nav-label">${label}</span>${suffix}</a>`;
 
-  const hasOperationGroup = canPainel || canDiretoriaManutencao || canDiretoriaCompras || canEquipamentos || canOS || canOSChat || canPreventivas || canDemandas || canSolicitacoes || canAcompanhamentoCompras || canCompras || canFornecedores || canAlmoxarifado || canEstoque || canMotores;
+  const hasOperationGroup = canPainel || canDiretoriaManutencao || canDiretoriaCompras || canEquipamentos || canOS || canOSChat || canPreventivas || canDemandas || canSolicitacoes || canCompras || canFornecedores || canAlmoxarifado || canEstoque || canMotores;
   const hasSupportGroup = canAvisos || canEscala || canRH || canMeuPortal || canInspecao || canTracagem || canDesenhoTecnico || canAcademia || canAI || canPCM;
 %>
 
@@ -67,7 +66,6 @@
     <% if (canPreventivas) { %><%- navItem('/preventivas', 'Preventivas', activeMenu === 'preventivas', '', badge(counters.preventivasHoje, 'blue')) %><% } %>
     <% if (canDemandas) { %><%- navItem('/demandas', 'Demandas', activeMenu === 'demandas') %><% } %>
     <% if (canSolicitacoes && !isCompras) { %><%- navItem('/solicitacoes/minhas', 'Solicitações', activeMenu === 'solicitacoes') %><% } %>
-    <% if (canAcompanhamentoCompras) { %><%- navItem('/acompanhamento-compras', 'Acompanhamento de Compras', activeMenu === 'acompanhamento-compras') %><% } %>
     <% if (canCompras) { %><%- navItem('/compras/solicitacoes', 'Compras', activeMenu === 'compras') %><% } %>
     <% if (canFornecedores) { %><%- navItem('/fornecedores', 'Fornecedores', activeMenu === 'fornecedores') %><% } %>
     <% if (canAlmoxarifado) { %><%- navItem('/almoxarifado/recebimentos', 'Almoxarifado', activeMenu === 'almoxarifado') %><% } %>
