@@ -1,0 +1,180 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/acompanhamento-compras-encarregados.css?v=20260918-v1" />
+<%
+  const p = painel || {};
+  const filters = p.filters || {};
+  const rows = Array.isArray(p.solicitacoes) ? p.solicitacoes : [];
+  const scope = p.scope || {};
+  const money = (cents) => new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' }).format((Number(cents)||0)/100);
+  const pct = (value) => Math.max(0, Math.min(100, Math.round(Number(value)||0)));
+  const statusLabel = (value) => String(value || '-').replaceAll('_',' ');
+  const etapaLabel = (value) => ({
+    SOLICITADO:'Solicitado',
+    EM_COTACAO:'Em cotação',
+    AGUARDANDO_APROVACAO:'Aguardando aprovação',
+    COMPRADO:'Comprado',
+    AGUARDANDO_RECEBIMENTO:'Aguardando recebimento',
+    RECEBIMENTO_PARCIAL:'Recebimento parcial',
+    CONCLUIDA:'Concluída',
+    CANCELADA:'Cancelada',
+  }[String(value || '')] || statusLabel(value));
+  const priorityLabel = (value) => ({critical:'Crítica',high:'Alta',medium:'Média',low:'Baixa',undefined:'Sem prioridade'}[value] || 'Sem prioridade');
+  const queryHref = (overrides={}) => {
+    const params = {
+      visao: filters.visao || 'andamento',
+      periodo: filters.periodo || 'todos',
+      inicio: filters.inicio || '',
+      fim: filters.fim || '',
+      status: filters.status || '',
+      prioridade: filters.prioridade || '',
+      setor: scope.isGlobal ? (filters.setor || '') : '',
+      ...overrides,
+    };
+    const q = Object.entries(params).filter(([,v]) => v !== '' && v != null)
+      .map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+    return `/acompanhamento-compras${q ? '?' + q : ''}`;
+  };
+%>
+
+<div class="purchase-monitor">
+  <header class="purchase-monitor__head">
+    <div>
+      <span class="eyebrow">GESTÃO • SOMENTE LEITURA</span>
+      <div class="purchase-monitor__title">
+        <h1>Acompanhamento de Compras</h1>
+        <span class="readonly-badge">SEM AÇÕES OPERACIONAIS</span>
+      </div>
+      <p>Acompanhe solicitação, cotação, aprovação, compra, recebimento e retirada sem interferir no fluxo de Compras ou Almoxarifado.</p>
+    </div>
+    <div class="scope-badge">
+      <small>VISÃO AUTORIZADA</small>
+      <strong><%= scope.setor || scope.label || 'Todos os setores' %></strong>
+    </div>
+  </header>
+
+  <nav class="monitor-tabs" aria-label="Visão das solicitações">
+    <a class="<%= filters.visao === 'andamento' ? 'active' : '' %>" href="<%= queryHref({visao:'andamento'}) %>">Em andamento <strong><%= p.totaisVisao?.andamento || 0 %></strong></a>
+    <a class="<%= filters.visao === 'historico' ? 'active' : '' %>" href="<%= queryHref({visao:'historico'}) %>">Histórico <strong><%= p.totaisVisao?.historico || 0 %></strong></a>
+    <a class="<%= filters.visao === 'todos' ? 'active' : '' %>" href="<%= queryHref({visao:'todos'}) %>">Todas <strong><%= p.totaisVisao?.todos || 0 %></strong></a>
+  </nav>
+
+  <form class="monitor-filters card" method="GET" action="/acompanhamento-compras">
+    <input type="hidden" name="visao" value="<%= filters.visao || 'andamento' %>" />
+    <label>
+      <span>Período</span>
+      <select name="periodo">
+        <% [['todos','Todos'],['7','7 dias'],['30','30 dias'],['90','90 dias'],['ano','Ano atual'],['personalizado','Personalizado']].forEach(([value,label]) => { %>
+          <option value="<%= value %>" <%= filters.periodo === value ? 'selected' : '' %>><%= label %></option>
+        <% }) %>
+      </select>
+    </label>
+    <% if (filters.periodo === 'personalizado') { %>
+      <label><span>De</span><input type="date" name="inicio" value="<%= filters.inicio || '' %>" /></label>
+      <label><span>Até</span><input type="date" name="fim" value="<%= filters.fim || '' %>" /></label>
+    <% } %>
+    <% if (scope.isGlobal) { %>
+      <label>
+        <span>Setor</span>
+        <select name="setor">
+          <option value="">Todos</option>
+          <% (p.setoresCorporativos || []).forEach((setor) => { %>
+            <option value="<%= setor %>" <%= filters.setor === setor ? 'selected' : '' %>><%= setor %></option>
+          <% }) %>
+        </select>
+      </label>
+    <% } %>
+    <label>
+      <span>Status</span>
+      <select name="status">
+        <option value="">Todos</option>
+        <% ['ABERTA','AGUARDANDO_APROVACAO','EM_COTACAO','COMPRADA','EM_RECEBIMENTO','RECEBIDA_PARCIAL','RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SOLICITANTE','FECHADA','CANCELADA'].forEach((value) => { %>
+          <option value="<%= value %>" <%= filters.status === value ? 'selected' : '' %>><%= statusLabel(value) %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label>
+      <span>Prioridade</span>
+      <select name="prioridade">
+        <option value="">Todas</option>
+        <% [['critical','Crítica'],['high','Alta'],['medium','Média'],['low','Baixa'],['undefined','Sem prioridade']].forEach(([value,label]) => { %>
+          <option value="<%= value %>" <%= filters.prioridade === value ? 'selected' : '' %>><%= label %></option>
+        <% }) %>
+      </select>
+    </label>
+    <button class="btn btn-green" type="submit">Atualizar</button>
+    <a class="btn btn-ghost" href="/acompanhamento-compras">Limpar</a>
+  </form>
+
+  <section class="monitor-kpis" aria-label="Resumo do acompanhamento">
+    <article><small>Solicitações</small><strong><%= p.indicadores?.solicitacoes || 0 %></strong><span>na visão atual</span></article>
+    <article><small>Itens cotados</small><strong><%= p.indicadores?.cotados || 0 %></strong><span><%= pct(p.fluxo?.cotacao) %>% do fluxo</span></article>
+    <article><small>Itens comprados</small><strong><%= p.indicadores?.comprados || 0 %></strong><span><%= pct(p.fluxo?.compra) %>% do fluxo</span></article>
+    <article><small>Itens recebidos</small><strong><%= p.indicadores?.recebidos || 0 %></strong><span><%= pct(p.fluxo?.recebimento) %>% do fluxo</span></article>
+    <article class="is-value"><small>Valor comprado</small><strong><%= money(p.valores?.comprometido || 0) %></strong><span>informação gerencial</span></article>
+    <article class="is-value"><small>Saldo a receber</small><strong><%= money(p.valores?.saldo || 0) %></strong><span>comprado − recebido</span></article>
+  </section>
+
+  <section class="flow-card card">
+    <div class="section-head">
+      <div><span class="eyebrow">ANDAMENTO</span><h2>Fluxo consolidado</h2></div>
+      <span class="muted">Dados reais do módulo de Compras</span>
+    </div>
+    <div class="flow-bars">
+      <% [['Cotação',p.fluxo?.cotacao],['Compra',p.fluxo?.compra],['Recebimento',p.fluxo?.recebimento],['Concluídas',p.fluxo?.concluidas]].forEach(([label,value]) => { %>
+        <div class="flow-bar"><div><strong><%= label %></strong><span><%= pct(value) %>%</span></div><i><em style="width:<%= pct(value) %>%"></em></i></div>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="requests-card card">
+    <div class="section-head">
+      <div><span class="eyebrow">FISCALIZAÇÃO</span><h2>Solicitações do setor</h2></div>
+      <span class="muted"><%= rows.length %> registro(s)</span>
+    </div>
+
+    <% if (!rows.length) { %>
+      <div class="monitor-empty">Nenhuma solicitação encontrada para os filtros atuais.</div>
+    <% } else { %>
+      <div class="monitor-table-wrap">
+        <table class="monitor-table">
+          <thead>
+            <tr>
+              <th>Solicitação</th>
+              <th>Prioridade</th>
+              <th>Etapa atual</th>
+              <th>Itens</th>
+              <th>Recebimento</th>
+              <th>Valor comprado</th>
+              <th>Prazo</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach((row) => { %>
+              <tr>
+                <td data-label="Solicitação">
+                  <strong><%= row.numero || '#' + row.id %></strong>
+                  <span><%= row.titulo || 'Solicitação de material' %></span>
+                  <small><%= row.setor_canonico || row.setor_origem || '-' %> · <%= row.created_at ? fmtBR(row.created_at) : '-' %></small>
+                </td>
+                <td data-label="Prioridade"><span class="priority-badge is-<%= row.priorityGroup || 'undefined' %>"><%= priorityLabel(row.priorityGroup) %></span></td>
+                <td data-label="Etapa atual"><span class="stage-badge"><%= etapaLabel(row.etapaAtual) %></span><small><%= statusLabel(row.status) %></small></td>
+                <td data-label="Itens"><strong><%= row.total || 0 %></strong><small><%= row.cotados || 0 %> cotado(s) · <%= row.comprados || 0 %> comprado(s)</small></td>
+                <td data-label="Recebimento">
+                  <strong><%= pct(row.recebimentoPercentual) %>%</strong>
+                  <div class="mini-progress"><i style="width:<%= pct(row.recebimentoPercentual) %>%"></i></div>
+                  <small><%= row.recebidos || 0 %> item(ns) completo(s)</small>
+                </td>
+                <td data-label="Valor comprado"><strong><%= money(row.comprometidoCentavos || 0) %></strong><small>recebido: <%= money(row.recebidoCentavos || 0) %></small></td>
+                <td data-label="Prazo"><strong><%= row.previsao_entrega ? fmtBR(row.previsao_entrega) : '-' %></strong><small class="<%= row.atrasada ? 'is-danger' : '' %>"><%= row.atrasada ? 'ATRASADA' : 'Acompanhamento normal' %></small></td>
+                <td class="row-action"><a class="btn btn-sm btn-ghost" href="/acompanhamento-compras/<%= row.id %>">Ver detalhes</a></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+
+  <p class="readonly-note">Este módulo é exclusivamente de consulta. Aprovação, cotação, compra, recebimento e baixa de estoque continuam nos módulos responsáveis.</p>
+</div>
