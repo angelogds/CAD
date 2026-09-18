@@ -1,7 +1,7 @@
 const service = require('./acompanhamento-compras.service');
 
 function index(req, res) {
-  res.locals.activeMenu = 'acompanhamento-compras';
+  res.locals.activeMenu = 'solicitacoes';
   try {
     const painel = service.getDashboard(req.session?.user || {}, req.query || {});
     return res.render('acompanhamento-compras/index', {
@@ -17,7 +17,7 @@ function index(req, res) {
 }
 
 function detalhe(req, res) {
-  res.locals.activeMenu = 'acompanhamento-compras';
+  res.locals.activeMenu = 'solicitacoes';
   try {
     const detalheCompra = service.getDetail(req.session?.user || {}, Number(req.params.id));
     if (!detalheCompra) return res.status(404).send('Solicitação não encontrada.');
