@@ -68,6 +68,42 @@ function getFallbackItemId() {
 }
 
 
+const SETORES = Object.freeze({
+  RECICLAGEM: "RECICLAGEM",
+  LOGISTICA: "LOGÍSTICA",
+  FRIGORIFICO: "FRIGORÍFICO",
+  ADMINISTRATIVO: "ADMINISTRATIVO",
+});
+
+function normalizeSetor(value) {
+  const token = String(value || "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  if (["MANUTENCAO", "PRODUCAO", "RECICLAGEM"].includes(token)) return SETORES.RECICLAGEM;
+  if (["LOGISTICA", "TRANSPORTE", "FROTA"].includes(token)) return SETORES.LOGISTICA;
+  if (["FRIGORIFICO", "FRIGORÍFICO"].includes(String(value || "").trim().toUpperCase()) || token === "FRIGORIFICO") return SETORES.FRIGORIFICO;
+  if (["ADMINISTRATIVO", "ADMINISTRACAO", "ADMINISTRATIVA", "RH"].includes(token)) return SETORES.ADMINISTRATIVO;
+  return String(value || "").trim() || SETORES.RECICLAGEM;
+}
+
+function setorForRole(role) {
+  const r = normalizeRole(role);
+  if (r === "ENCARREGADO_LOGISTICA") return SETORES.LOGISTICA;
+  if (r === "ENCARREGADO_FRIGORIFICO") return SETORES.FRIGORIFICO;
+  if (r === "RH") return SETORES.ADMINISTRATIVO;
+  if (["ENCARREGADO_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "SUPERVISOR_MANUTENCAO"].includes(r)) return SETORES.RECICLAGEM;
+  return null;
+}
+
+function resolveSetorOrigem(user, requestedSetor, { osId = null, currentSetor = null } = {}) {
+  const role = normalizeRole(user?.role);
+  if (role === "ADMIN" || ["DIRETORIA", "GESTAO"].includes(role)) {
+    return normalizeSetor(requestedSetor || currentSetor || (osId ? SETORES.RECICLAGEM : SETORES.RECICLAGEM));
+  }
+  const fixed = setorForRole(role);
+  if (fixed) return fixed;
+  if (osId) return SETORES.RECICLAGEM;
+  return normalizeSetor(requestedSetor || currentSetor || SETORES.RECICLAGEM);
+}
+
 function canManageByRole(role) {
   const r = normalizeRole(role);
   return {
@@ -75,27 +111,28 @@ function canManageByRole(role) {
     isCompras: r === "COMPRAS",
     isAlmox: r === "ALMOXARIFADO",
     isDiretoria: ["DIRETORIA", "GESTAO"].includes(r),
-    isSolicitante: ["ENCARREGADO_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_PRODUCAO", "INSPECAO_QUALIDADE"].includes(r),
+    isSolicitante: ["ENCARREGADO_MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_PRODUCAO", "INSPECAO_QUALIDADE", "ENCARREGADO_LOGISTICA", "ENCARREGADO_FRIGORIFICO", "RH"].includes(r),
   };
 }
 
 function canViewSolicitacao(solicitacao, user) {
   if (!solicitacao || !user) return false;
   const roleInfo = canManageByRole(user.role);
-  return roleInfo.isAdmin
-    || roleInfo.isCompras
-    || roleInfo.isAlmox
-    || roleInfo.isDiretoria
-    || Number(solicitacao.solicitante_user_id) === Number(user.id);
+  if (roleInfo.isAdmin || roleInfo.isCompras || roleInfo.isAlmox || roleInfo.isDiretoria) return true;
+  const fixed = setorForRole(user.role);
+  if (fixed) return normalizeSetor(solicitacao.setor_origem) === fixed;
+  return Number(solicitacao.solicitante_user_id) === Number(user.id);
 }
 
 function canEditSolicitacao(solicitacao, user) {
   if (!solicitacao || !user) return false;
   const role = normalizeRole(user.role);
   const editableStatuses = [STATUS.ABERTA, STATUS.DEVOLVIDA_REVISAO];
-  const isOwner = Number(solicitacao.solicitante_user_id) === Number(user.id);
-  const isManager = ["ADMIN", "ENCARREGADO_MANUTENCAO", "MANUTENCAO_SUPERVISOR"].includes(role);
-  return editableStatuses.includes(solicitacao.status) && (isOwner || isManager);
+  if (!editableStatuses.includes(solicitacao.status)) return false;
+  if (role === "ADMIN") return true;
+  const fixed = setorForRole(role);
+  if (fixed) return normalizeSetor(solicitacao.setor_origem) === fixed;
+  return Number(solicitacao.solicitante_user_id) === Number(user.id);
 }
 
 function nextNumero() {
@@ -137,14 +174,14 @@ function normalizeAplicacaoInput({ os_id, tipo_aplicacao, equipamento_id, destin
   throw new Error("Informe onde o material será utilizado: em um equipamento ou em outra aplicação.");
 }
 
-function createSolicitacao({ userId, setor_origem, prioridade, titulo, descricao, equipamento_id, destino_uso, tipo_aplicacao, preventiva_id, os_id, demanda_id, itens }) {
+function createSolicitacao({ userId, user, setor_origem, prioridade, titulo, descricao, equipamento_id, destino_uso, tipo_aplicacao, preventiva_id, os_id, demanda_id, itens }) {
   const fallbackItemId = ITEM_HAS_ITEM_ID ? getFallbackItemId() : null;
   const solColumns = tableColumns("solicitacoes");
   const aplicacao = normalizeAplicacaoInput({ os_id, tipo_aplicacao, equipamento_id, destino_uso });
   const solPayload = {
     numero: nextNumero(),
     solicitante_user_id: sanitizePositiveId(userId),
-    setor_origem: setor_origem || "Manutenção",
+    setor_origem: resolveSetorOrigem(user, setor_origem, { osId: os_id }),
     prioridade: prioridade || "MEDIA",
     titulo: titulo || "Solicitação de material",
     descricao: descricao || null,
@@ -247,7 +284,7 @@ function insertSolicitacaoItens(solicitacaoId, itens) {
   }
 }
 
-function updateSolicitacao(id, data = {}) {
+function updateSolicitacao(id, data = {}, user = null) {
   const itens = data.itens || parseItensFromBody(data);
   if (!itens.length) throw new Error("Informe ao menos um item válido.");
 
@@ -255,7 +292,7 @@ function updateSolicitacao(id, data = {}) {
   const aplicacao = normalizeAplicacaoInput({ ...data, os_id: atual?.os_id });
   return db.transaction(() => {
     const columns = ["setor_origem = ?", "prioridade = ?", "titulo = ?", "descricao = ?", "equipamento_id = ?"];
-    const values = [data.setor_origem || "Manutenção", data.prioridade || "MEDIA", data.titulo, data.descricao || null, aplicacao.equipamentoId];
+    const values = [resolveSetorOrigem(user, data.setor_origem, { osId: atual?.os_id, currentSetor: atual?.setor_origem }), data.prioridade || "MEDIA", data.titulo, data.descricao || null, aplicacao.equipamentoId];
     if (hasColumn("solicitacoes", "destino_uso")) { columns.push("destino_uso = ?"); values.push(aplicacao.destinoUso); }
     values.push(id);
     db.prepare(`UPDATE solicitacoes SET ${columns.join(", ")}, updated_at = datetime('now') WHERE id = ?`).run(...values);
@@ -553,15 +590,24 @@ function finalizarElaboracao(id, userId) {
 
 function canListAllSolicitacoes(user) {
   const role = normalizeRole(user?.role);
-  return ["ADMIN", "COMPRAS", "ALMOXARIFADO", "DIRETORIA", "GESTAO", "ENCARREGADO_MANUTENCAO", "MANUTENCAO_SUPERVISOR"].includes(role);
+  return ["ADMIN", "COMPRAS", "ALMOXARIFADO", "DIRETORIA", "GESTAO"].includes(role);
 }
 
 function listMinhasSolicitacoes(userId, filters = {}, user = null) {
   const where = [];
   const params = [];
   if (!canListAllSolicitacoes(user)) {
-    where.push("s.solicitante_user_id = ?");
-    params.push(userId);
+    const fixedSetor = setorForRole(user?.role);
+    if (fixedSetor) {
+      where.push("UPPER(REPLACE(REPLACE(REPLACE(COALESCE(s.setor_origem,''),'Ã','A'),'Í','I'),'Ó','O')) IN (" +
+        (fixedSetor === SETORES.RECICLAGEM ? "'MANUTENCAO','MANUTENÇÃO','PRODUCAO','PRODUÇÃO','RECICLAGEM'" :
+          fixedSetor === SETORES.LOGISTICA ? "'LOGISTICA','LOGÍSTICA','TRANSPORTE','FROTA'" :
+          fixedSetor === SETORES.FRIGORIFICO ? "'FRIGORIFICO','FRIGORÍFICO'" :
+          "'ADMINISTRATIVO','ADMINISTRACAO','ADMINISTRAÇÃO','ADMINISTRATIVA','RH'") + ")");
+    } else {
+      where.push("s.solicitante_user_id = ?");
+      params.push(userId);
+    }
   }
 
   if (Object.values(STATUS).includes(filters.status)) {
@@ -611,8 +657,24 @@ function listMinhasSolicitacoes(userId, filters = {}, user = null) {
 }
 
 function getCountersForUser(userId, user = null) {
-  const where = canListAllSolicitacoes(user) ? "" : "WHERE solicitante_user_id = ?";
-  const rows = db.prepare(`SELECT status, COUNT(*) AS total FROM solicitacoes ${where} GROUP BY status`).all(...(where ? [userId] : []));
+  let where = "";
+  let params = [];
+  if (!canListAllSolicitacoes(user)) {
+    const fixedSetor = setorForRole(user?.role);
+    if (fixedSetor) {
+      where = "WHERE setor_origem IS NOT NULL";
+      const allowed = fixedSetor === SETORES.RECICLAGEM ? ["Manutenção","Manutencao","Produção","Producao","RECICLAGEM"]
+        : fixedSetor === SETORES.LOGISTICA ? ["LOGÍSTICA","LOGISTICA","TRANSPORTE","FROTA"]
+        : fixedSetor === SETORES.FRIGORIFICO ? ["FRIGORÍFICO","FRIGORIFICO"]
+        : ["ADMINISTRATIVO","ADMINISTRAÇÃO","ADMINISTRACAO","ADMINISTRATIVA","RH"];
+      where += ` AND setor_origem IN (${allowed.map(() => "?").join(",")})`;
+      params = allowed;
+    } else {
+      where = "WHERE solicitante_user_id = ?";
+      params = [userId];
+    }
+  }
+  const rows = db.prepare(`SELECT status, COUNT(*) AS total FROM solicitacoes ${where} GROUP BY status`).all(...params);
   const counters = LIST_STATUS.reduce((acc, st) => ({ ...acc, [st]: 0 }), {});
   rows.forEach((r) => { if (Object.prototype.hasOwnProperty.call(counters, r.status)) counters[r.status] = r.total; });
   return counters;
@@ -733,4 +795,4 @@ function listEstoqueItens() {
   return db.prepare("SELECT id, codigo, nome, unidade FROM estoque_itens WHERE ativo = 1 ORDER BY nome").all();
 }
 
-module.exports = { STATUS, LIST_STATUS, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, normalizeAplicacaoInput, createSolicitacao, updateSolicitacao, avaliarExclusaoFisica, excluirSolicitacao, cancelarSolicitacao, finalizarElaboracao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };
+module.exports = { STATUS, LIST_STATUS, SETORES, normalizeSetor, setorForRole, resolveSetorOrigem, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, normalizeAplicacaoInput, createSolicitacao, updateSolicitacao, avaliarExclusaoFisica, excluirSolicitacao, cancelarSolicitacao, finalizarElaboracao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };
