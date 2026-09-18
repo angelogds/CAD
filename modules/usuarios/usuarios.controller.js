@@ -36,14 +36,16 @@ function list(req, res) {
 
   const q = (req.query.q || "").trim();
   const role = (req.query.role || "").trim().toUpperCase();
+  const status = String(req.query.status || "ativos").toLowerCase() === "arquivados" ? "arquivados" : "ativos";
 
-  const lista = service.list({ q, role });
+  const lista = service.list({ q, role, status });
 
   return res.render("usuarios/index", {
     title: "Usuários",
     lista,
     q,
     role,
+    status,
     ROLES,
   });
 }
@@ -140,13 +142,30 @@ function remove(req, res) {
   const id = Number(req.params.id);
 
   try {
-    service.remove(id, req.session?.user?.id || null);
-    req.flash("success", "Usuário apagado com sucesso.");
+    const result = service.remove(id, req.session?.user?.id || null);
+    if (result?.action === "archived") {
+      req.flash("success", "Usuário arquivado porque possui histórico vinculado. O acesso foi bloqueado e os registros foram preservados.");
+    } else {
+      req.flash("success", "Usuário apagado com sucesso.");
+    }
     return res.redirect("/usuarios");
   } catch (e) {
-    req.flash("error", e.message || "Erro ao apagar usuário.");
+    req.flash("error", e.message || "Erro ao remover usuário.");
     return res.redirect("/usuarios");
   }
 }
 
-module.exports = { list, newForm, create, editForm, update, resetPassword, remove };
+function restore(req, res) {
+  const id = Number(req.params.id);
+
+  try {
+    service.restore(id);
+    req.flash("success", "Usuário restaurado e liberado para acesso novamente.");
+    return res.redirect("/usuarios?status=arquivados");
+  } catch (e) {
+    req.flash("error", e.message || "Erro ao restaurar usuário.");
+    return res.redirect("/usuarios?status=arquivados");
+  }
+}
+
+module.exports = { list, newForm, create, editForm, update, resetPassword, remove, restore };

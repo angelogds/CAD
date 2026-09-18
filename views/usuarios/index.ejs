@@ -3,7 +3,7 @@
 <div class="page-head">
   <div>
     <h1>Usuários</h1>
-    <p class="muted">Cadastre perfis: Direção, RH, Compras e Manutenção.</p>
+    <p class="muted">Gerencie os acessos do sistema por perfil e setor. Usuários com histórico vinculado são arquivados, não destruídos.</p>
   </div>
 
   <a class="btn btn-green" href="/usuarios/novo">+ Novo Usuário</a>
@@ -26,11 +26,20 @@
           <% }) %>
         </select>
       </div>
+
+      <div>
+        <div class="label">Situação</div>
+        <select class="input" name="status">
+          <option value="ativos" <%= status !== 'arquivados' ? 'selected' : '' %>>Usuários ativos</option>
+          <option value="arquivados" <%= status === 'arquivados' ? 'selected' : '' %>>Usuários arquivados</option>
+        </select>
+      </div>
     </div>
 
     <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
       <button class="btn btn-green btn-sm" type="submit">Filtrar</button>
-      <a class="btn btn-ghost btn-sm" href="/usuarios">Limpar</a>
+      <a class="btn btn-ghost btn-sm" href="/usuarios">Ativos</a>
+      <a class="btn btn-ghost btn-sm" href="/usuarios?status=arquivados">Arquivados</a>
     </div>
   </form>
 </div>
@@ -44,27 +53,36 @@
           <th>Nome</th>
           <th>E-mail</th>
           <th style="width:180px;">Perfil</th>
+          <th style="width:120px;">Situação</th>
           <th style="width:170px;">WhatsApp</th>
           <th style="width:180px;">Criado</th>
-          <th style="width:140px; text-align:right;">Ações</th>
+          <th style="width:150px; text-align:right;">Ações</th>
         </tr>
       </thead>
 
       <tbody>
         <% if (!lista || !lista.length) { %>
           <tr>
-            <td colspan="7" class="muted" style="text-align:center; padding:18px;">
+            <td colspan="8" class="muted" style="text-align:center; padding:18px;">
               Nenhum usuário encontrado.
             </td>
           </tr>
         <% } else { %>
           <% (lista || []).forEach(u => { %>
+            <% const arquivado = Number(u.ativo ?? 1) === 0 || !!u.deleted_at; %>
             <tr>
               <td><%= u.id %></td>
               <td><%= u.name %></td>
               <td><%= u.email %></td>
               <td>
                 <span class="pill-tag pill-gray"><%= (u.role || '').toUpperCase() %></span>
+              </td>
+              <td>
+                <% if (arquivado) { %>
+                  <span class="pill-tag pill-gray">Arquivado</span>
+                <% } else { %>
+                  <span class="pill-tag pill-green">Ativo</span>
+                <% } %>
               </td>
               <td>
                 <% if (u.telefone_whatsapp) { %>
@@ -78,9 +96,15 @@
                 <div class="user-actions">
                   <a class="btn btn-sm user-action-btn user-action-edit" href="/usuarios/<%= u.id %>/editar">Editar</a>
                   <% if (isAdmin) { %>
-                    <form method="POST" action="/usuarios/<%= u.id %>/excluir" onsubmit="return confirm('Confirma apagar o usuário <%= u.name %>?');">
-                      <button class="btn btn-sm user-action-btn user-action-delete" type="submit">Apagar</button>
-                    </form>
+                    <% if (arquivado) { %>
+                      <form method="POST" action="/usuarios/<%= u.id %>/restaurar" onsubmit="return confirm('Restaurar o acesso de <%= u.name %>?');">
+                        <button class="btn btn-sm user-action-btn user-action-restore" type="submit">Restaurar</button>
+                      </form>
+                    <% } else { %>
+                      <form method="POST" action="/usuarios/<%= u.id %>/excluir" onsubmit="return confirm('Remover o usuário <%= u.name %>? Se houver histórico vinculado, ele será arquivado para preservar os registros.');">
+                        <button class="btn btn-sm user-action-btn user-action-delete" type="submit">Remover</button>
+                      </form>
+                    <% } %>
                   <% } %>
                 </div>
               </td>
@@ -101,7 +125,7 @@
   }
   .user-actions form{ margin:0; }
   .user-action-btn{
-    min-width:78px;
+    min-width:88px;
     font-weight:900;
     transition:all .15s ease;
   }
@@ -124,5 +148,15 @@
     background:#fff1f2;
     border-color:#ef4444;
     color:#b91c1c;
+  }
+  .user-action-restore{
+    background:#fff;
+    border-color:#d1d5db;
+    color:#0f172a;
+  }
+  .user-action-restore:hover{
+    background:#eff6ff;
+    border-color:#2563eb;
+    color:#1d4ed8;
   }
 </style>
