@@ -3,8 +3,17 @@ const bcrypt = require("bcryptjs");
 const db = require("../../database/db");
 const { normalizeWhatsapp } = require("../../utils/whatsapp-phone");
 const { removeOrArchiveUser, restoreUser } = require("./usuarios-lifecycle");
+const { deriveUserFunctionSector, isDirectUserIdentityRole } = require("./usuarios.perfil");
 
 // compatível com seu CHECK do SQLite
+
+function hasColumn(table, column) {
+  try {
+    return db.prepare(`PRAGMA table_info(${table})`).all().some((item) => item.name === column);
+  } catch (_error) {
+    return false;
+  }
+}
 
 function normalizePersonName(value = "") {
   return String(value || "")
@@ -16,7 +25,8 @@ function normalizePersonName(value = "") {
     .replace(/\bluis\b/g, "luiz");
 }
 
-function syncColaboradorWhatsappFromUser({ userId, name, telefone }) {
+function syncColaboradorWhatsappFromUser({ userId, name, telefone, role }) {
+  if (isDirectUserIdentityRole(role)) return;
   const normalizedPhone = normalizeWhatsapp(telefone) || null;
 
   const linked = db.prepare("SELECT id FROM colaboradores WHERE user_id = ? LIMIT 1").get(Number(userId));
@@ -35,7 +45,7 @@ function syncColaboradorWhatsappFromUser({ userId, name, telefone }) {
   db.prepare("UPDATE colaboradores SET user_id = ?, telefone_whatsapp = ?, updated_at = datetime('now') WHERE id = ?").run(Number(userId), normalizedPhone, Number(match.id));
 }
 
-const VALID_ROLES = new Set(["ADMIN", "DIRECAO", "DIRETORIA", "RH", "COMPRAS", "ENCARREGADO_PRODUCAO", "PRODUCAO", "MECANICO", "ALMOXARIFE", "ALMOXARIFADO", "MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_LOGISTICA", "ENCARREGADO_FRIGORIFICO", "INSPECAO_QUALIDADE"]);
+const VALID_ROLES = new Set(["ADMIN", "DIRECAO", "DIRETORIA", "RH", "COMPRAS", "ENCARREGADO_PRODUCAO", "PRODUCAO", "MECANICO", "ALMOXARIFE", "ALMOXARIFADO", "MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO", "ENCARREGADO_LOGISTICA", "ENCARREGADO_FRIGORIFICO", "INSPECAO_QUALIDADE"]);
 
 function list({ q = "", role = "", status = "ativos" } = {}) {
   const where = [];
@@ -57,9 +67,15 @@ function list({ q = "", role = "", status = "ativos" } = {}) {
     params.role = String(role).toUpperCase();
   }
 
+  const extraIdentityFields = [
+    hasColumn("users", "funcao") ? "funcao" : "NULL AS funcao",
+    hasColumn("users", "setor") ? "setor" : "NULL AS setor",
+  ].join(", ");
+
   const sql = `
     SELECT id, name, email, role, photo_path, telefone_whatsapp, created_at,
-           COALESCE(ativo, 1) AS ativo, deleted_at
+           COALESCE(ativo, 1) AS ativo, deleted_at,
+           ${extraIdentityFields}
     FROM users
     ${where.length ? "WHERE " + where.join(" AND ") : ""}
     ORDER BY id DESC
@@ -69,12 +85,24 @@ function list({ q = "", role = "", status = "ativos" } = {}) {
 }
 
 function getById(id) {
-  return db.prepare(`
+  const extraIdentityFields = [
+    hasColumn("users", "funcao") ? "funcao" : "NULL AS funcao",
+    hasColumn("users", "setor") ? "setor" : "NULL AS setor",
+  ].join(", ");
+
+  const user = db.prepare(`
     SELECT id, name, email, role, photo_path, telefone_whatsapp, created_at,
-           COALESCE(ativo, 1) AS ativo, deleted_at
+           COALESCE(ativo, 1) AS ativo, deleted_at,
+           ${extraIdentityFields}
     FROM users
     WHERE id = ?
   `).get(id);
+
+  if (!user) return null;
+  const derived = deriveUserFunctionSector(user.role);
+  user.funcao = user.funcao || derived.funcao || null;
+  user.setor = user.setor || derived.setor || null;
+  return user;
 }
 
 function getByEmail(email) {
@@ -98,10 +126,17 @@ function create({ name, email, role, password, photo_path, telefone_whatsapp }) 
   const telefone = normalizeWhatsapp(telefone_whatsapp);
   const password_hash = bcrypt.hashSync(password, 10);
   const created_at = new Date().toISOString();
+  const identity = deriveUserFunctionSector(r);
 
-  db.prepare(
-    "INSERT INTO users (name, email, password_hash, role, photo_path, telefone_whatsapp, created_at, ativo, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, NULL)"
-  ).run(name, email, password_hash, r, photo_path || null, telefone, created_at);
+  if (hasColumn("users", "funcao") && hasColumn("users", "setor")) {
+    db.prepare(
+      "INSERT INTO users (name, email, password_hash, role, photo_path, telefone_whatsapp, created_at, ativo, deleted_at, funcao, setor) VALUES (?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?)"
+    ).run(name, email, password_hash, r, photo_path || null, telefone, created_at, identity.funcao, identity.setor);
+  } else {
+    db.prepare(
+      "INSERT INTO users (name, email, password_hash, role, photo_path, telefone_whatsapp, created_at, ativo, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, NULL)"
+    ).run(name, email, password_hash, r, photo_path || null, telefone, created_at);
+  }
 }
 
 function update(id, { name, email, role, photo_path, telefone_whatsapp }) {
@@ -117,15 +152,29 @@ function update(id, { name, email, role, photo_path, telefone_whatsapp }) {
   if (other) throw new Error("Este e-mail já está sendo usado por outro usuário.");
 
   const telefone = normalizeWhatsapp(telefone_whatsapp);
+  const identity = deriveUserFunctionSector(r);
+  const hasIdentityColumns = hasColumn("users", "funcao") && hasColumn("users", "setor");
 
   if (photo_path) {
-    db.prepare("UPDATE users SET name = ?, email = ?, role = ?, photo_path = ?, telefone_whatsapp = ? WHERE id = ?").run(name, email, r, photo_path, telefone, id);
-    syncColaboradorWhatsappFromUser({ userId: id, name, telefone });
+    if (hasIdentityColumns) {
+      db.prepare("UPDATE users SET name = ?, email = ?, role = ?, photo_path = ?, telefone_whatsapp = ?, funcao = ?, setor = ? WHERE id = ?")
+        .run(name, email, r, photo_path, telefone, identity.funcao, identity.setor, id);
+    } else {
+      db.prepare("UPDATE users SET name = ?, email = ?, role = ?, photo_path = ?, telefone_whatsapp = ? WHERE id = ?")
+        .run(name, email, r, photo_path, telefone, id);
+    }
+    syncColaboradorWhatsappFromUser({ userId: id, name, telefone, role: r });
     return;
   }
 
-  db.prepare("UPDATE users SET name = ?, email = ?, role = ?, telefone_whatsapp = ? WHERE id = ?").run(name, email, r, telefone, id);
-  syncColaboradorWhatsappFromUser({ userId: id, name, telefone });
+  if (hasIdentityColumns) {
+    db.prepare("UPDATE users SET name = ?, email = ?, role = ?, telefone_whatsapp = ?, funcao = ?, setor = ? WHERE id = ?")
+      .run(name, email, r, telefone, identity.funcao, identity.setor, id);
+  } else {
+    db.prepare("UPDATE users SET name = ?, email = ?, role = ?, telefone_whatsapp = ? WHERE id = ?")
+      .run(name, email, r, telefone, id);
+  }
+  syncColaboradorWhatsappFromUser({ userId: id, name, telefone, role: r });
 }
 
 function resetPassword(id, password) {
