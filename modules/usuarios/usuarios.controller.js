@@ -14,6 +14,8 @@ const ROLES = [
   { key: "ALMOXARIFADO", label: "almoxarifado" },
   { key: "COMPRAS", label: "compras" },
   { key: "MANUTENCAO_SUPERVISOR", label: "manutencao_supervisor" },
+  { key: "ENCARREGADO_LOGISTICA", label: "Encarregado de Logística" },
+  { key: "ENCARREGADO_FRIGORIFICO", label: "Encarregado do Frigorífico" },
   { key: "INSPECAO_QUALIDADE", label: "Inspeção e Qualidade" },
 ];
 
