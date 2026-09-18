@@ -12,7 +12,7 @@ test('Meu Portal é autoatendimento autenticado e não reaproveita a permissão 
   assert.doesNotMatch(routes, /ACCESS\.usuarios|requireAdmin/);
   assert.match(routes, /router\.post\('\/senha'/);
   assert.match(routes, /router\.post\('\/foto'/);
-  assert.match(routes, /router\.get\('\/cartao', vinculo\.requireMaintenanceSelfService/);
+  assert.match(routes, /router\.get\('\/cartao', vinculo\.requireMaterialSelfService/);
 });
 
 test('portal resolve colaborador pelo user_id e não cria cadastro paralelo', () => {
