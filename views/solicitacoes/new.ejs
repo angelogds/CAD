@@ -4,7 +4,7 @@
 <div class="page-head">
   <div>
     <h1><%= editing ? "Editar Solicitação" : "Nova Solicitação" %></h1>
-    <p class="muted"><%= editing ? "Atualize os dados e itens enquanto a solicitação ainda permite revisão." : "Registre a necessidade de material para manutenção ou produção." %></p>
+    <p class="muted"><%= editing ? "Atualize os dados e itens enquanto a solicitação ainda permite revisão." : "Registre a necessidade de material do seu setor e acompanhe todo o fluxo até a entrega." %></p>
   </div>
 </div>
 
@@ -52,12 +52,10 @@
       </div>
       <div>
         <div class="label">Setor origem</div>
-        <select class="input" name="setor_origem">
-          <% const setorOrigemAtual = fd.setor_origem || "Manutenção"; %>
-          <% if (!["Manutenção", "Produção"].includes(setorOrigemAtual)) { %><option value="<%= setorOrigemAtual %>" selected><%= setorOrigemAtual %></option><% } %>
-          <option value="Manutenção" <%= setorOrigemAtual === "Manutenção" ? "selected" : "" %>>Manutenção</option>
-          <option value="Produção" <%= setorOrigemAtual === "Produção" ? "selected" : "" %>>Produção</option>
-        </select>
+        <% const setorOrigemAtual = fd.setor_origem || "RECICLAGEM"; %>
+        <input class="input" value="<%= setorOrigemAtual %>" readonly />
+        <input type="hidden" name="setor_origem" value="<%= setorOrigemAtual %>" />
+        <div class="muted" style="margin-top:5px;">Definido automaticamente pelo perfil do usuário.</div>
       </div>
       <div>
         <div class="label">Prioridade</div>
