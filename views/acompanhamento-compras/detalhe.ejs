@@ -1,0 +1,125 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/acompanhamento-compras-encarregados.css?v=20260918-v1" />
+<%
+  const d = detalheCompra || {};
+  const itens = Array.isArray(d.itens) ? d.itens : [];
+  const timeline = Array.isArray(d.timeline) ? d.timeline : [];
+  const reservations = Array.isArray(d.reservations) ? d.reservations : [];
+  const withdrawals = Array.isArray(d.withdrawals) ? d.withdrawals : [];
+  const approval = d.approvalSummary || {};
+  const money = (cents) => new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' }).format((Number(cents)||0)/100);
+  const statusLabel = (value) => String(value || '-').replaceAll('_',' ');
+  const approvalLabel = (value) => ({
+    AGUARDANDO_APROVACAO:'Aguardando aprovação',
+    APROVADA:'Aprovada',
+    APROVADA_DIRETORIA:'Aprovada',
+    REPROVADA:'Reprovada',
+    SEM_COTACAO:'Sem cotação',
+  }[String(value || '').toUpperCase()] || statusLabel(value));
+%>
+
+<div class="purchase-monitor purchase-detail">
+  <header class="purchase-monitor__head">
+    <div>
+      <a class="back-link" href="/acompanhamento-compras">← Voltar ao acompanhamento</a>
+      <span class="eyebrow">SOLICITAÇÃO • SOMENTE LEITURA</span>
+      <div class="purchase-monitor__title">
+        <h1><%= d.numero || '#' + d.id %></h1>
+        <span class="readonly-badge"><%= d.setor_canonico || d.setor_origem || '-' %></span>
+      </div>
+      <p><%= d.titulo || d.descricao || 'Acompanhamento detalhado da solicitação.' %></p>
+    </div>
+    <div class="scope-badge">
+      <small>STATUS ATUAL</small>
+      <strong><%= statusLabel(d.status) %></strong>
+    </div>
+  </header>
+
+  <section class="timeline-card card">
+    <div class="section-head"><div><span class="eyebrow">RASTREABILIDADE</span><h2>Linha do tempo</h2></div><span class="muted">Solicitação → compra → retirada</span></div>
+    <div class="purchase-timeline">
+      <% timeline.forEach((stage) => { %>
+        <article class="timeline-step is-<%= stage.state %>">
+          <span class="timeline-dot"><%= stage.state === 'done' ? '✓' : stage.state === 'current' ? '●' : '○' %></span>
+          <div><strong><%= stage.label %></strong><small><%= stage.detail %></small></div>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="detail-kpis">
+    <article class="card"><small>Itens solicitados</small><strong><%= d.resumoAcompanhamento?.total || itens.length %></strong></article>
+    <article class="card"><small>Itens comprados</small><strong><%= d.resumoAcompanhamento?.comprados || 0 %></strong></article>
+    <article class="card"><small>Itens recebidos</small><strong><%= d.resumoAcompanhamento?.recebidos || 0 %></strong></article>
+    <article class="card"><small>Valor comprado</small><strong><%= money(d.resumoAcompanhamento?.compradoCentavos || 0) %></strong></article>
+    <article class="card"><small>Reservado</small><strong><%= d.retiradaResumo?.quantidadeReservada || 0 %></strong></article>
+    <article class="card"><small>Retirado</small><strong><%= d.retiradaResumo?.quantidadeRetirada || 0 %></strong></article>
+  </section>
+
+  <section class="card detail-section">
+    <div class="section-head">
+      <div><span class="eyebrow">ITENS</span><h2>Situação item a item</h2></div>
+      <span class="muted"><%= approval.pendentesCount || 0 %> aguardando aprovação</span>
+    </div>
+    <div class="monitor-table-wrap">
+      <table class="monitor-table detail-items-table">
+        <thead><tr><th>Material</th><th>Solicitado</th><th>Cotação</th><th>Aprovação</th><th>Comprado</th><th>Recebido</th><th>Pendente</th><th>Fornecedor</th><th>Valor</th></tr></thead>
+        <tbody>
+          <% itens.forEach((item) => { %>
+            <tr>
+              <td data-label="Material"><strong><%= item.item_nome || item.nome || '-' %></strong><small><%= item.item_descricao || '' %></small></td>
+              <td data-label="Solicitado"><strong><%= item.qtdSolicitada ?? item.qtd_solicitada ?? item.quantidade ?? 0 %> <%= item.unidade || 'UN' %></strong></td>
+              <td data-label="Cotação"><span class="stage-badge"><%= statusLabel(item.status_cotacao || 'PENDENTE') %></span></td>
+              <td data-label="Aprovação"><span class="stage-badge"><%= approvalLabel(item.approvalState || item.aprovacao_status || 'PENDENTE') %></span></td>
+              <td data-label="Comprado"><strong><%= item.qtdComprada || 0 %> <%= item.unidade || 'UN' %></strong></td>
+              <td data-label="Recebido"><strong><%= item.qtdRecebida || 0 %> <%= item.unidade || 'UN' %></strong></td>
+              <td data-label="Pendente"><strong><%= item.qtdPendenteReceber || 0 %> <%= item.unidade || 'UN' %></strong></td>
+              <td data-label="Fornecedor"><%= item.fornecedor_nome || '-' %></td>
+              <td data-label="Valor"><strong><%= money(item.compradoCentavos || 0) %></strong><small><%= item.valor_unitario_centavos ? money(item.valor_unitario_centavos) + '/un' : '' %></small></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="audit-grid">
+    <article class="card detail-section">
+      <div class="section-head"><div><span class="eyebrow">ALMOXARIFADO</span><h2>Reservas para retirada</h2></div><span class="muted"><%= reservations.length %> registro(s)</span></div>
+      <% if (!reservations.length) { %>
+        <div class="monitor-empty">Ainda não há material reservado para retirada nesta solicitação.</div>
+      <% } else { %>
+        <div class="audit-list">
+          <% reservations.forEach((row) => { const saldo = Math.max(0, Number(row.quantidade_reservada||0) - Number(row.quantidade_retirada||0)); %>
+            <div class="audit-row">
+              <div><strong><%= row.estoque_item_nome || row.solicitacao_item_nome || 'Material' %></strong><small><%= statusLabel(row.status) %></small></div>
+              <div><span>Reservado</span><strong><%= row.quantidade_reservada || 0 %></strong></div>
+              <div><span>Retirado</span><strong><%= row.quantidade_retirada || 0 %></strong></div>
+              <div><span>Saldo</span><strong><%= saldo %></strong></div>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </article>
+
+    <article class="card detail-section">
+      <div class="section-head"><div><span class="eyebrow">AUDITORIA</span><h2>Histórico de retiradas</h2></div><span class="muted"><%= withdrawals.length %> movimento(s)</span></div>
+      <% if (!withdrawals.length) { %>
+        <div class="monitor-empty">Nenhuma retirada registrada até o momento.</div>
+      <% } else { %>
+        <div class="audit-list">
+          <% withdrawals.forEach((row) => { %>
+            <div class="audit-row withdrawal-row">
+              <div><strong><%= row.item_nome || 'Material' %></strong><small><%= row.data_mov ? fmtBR(row.data_mov) : '-' %></small></div>
+              <div><span>Quantidade</span><strong><%= row.quantidade || 0 %></strong></div>
+              <div><span>Retirado por</span><strong><%= row.retirado_por_nome || '-' %></strong></div>
+              <div><span>Entregue por</span><strong><%= row.entregue_por_nome || '-' %></strong></div>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </article>
+  </section>
+
+  <p class="readonly-note">Consulta gerencial e de auditoria. Nenhuma informação pode ser alterada por esta tela.</p>
+</div>
