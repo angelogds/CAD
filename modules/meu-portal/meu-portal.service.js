@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const db = require('../../database/db');
 const qrService = require('../colaboradores/colaboradores.qr.service');
+const userQrService = require('../usuarios/usuarios.qr.service');
+const { isDirectUserIdentityRole, deriveUserFunctionSector } = require('../usuarios/usuarios.perfil');
 
 const LINK_MANAGER_ROLES = new Set(['ADMIN', 'RH']);
 
@@ -50,10 +52,25 @@ function normalizeMaterialFilters(filters = {}) {
 }
 
 function getUserById(userId, { includePassword = false } = {}) {
-  const fields = includePassword
-    ? 'id,name,email,role,photo_path,telefone_whatsapp,created_at,password_hash'
-    : 'id,name,email,role,photo_path,telefone_whatsapp,created_at';
-  return db.prepare(`SELECT ${fields} FROM users WHERE id = ? LIMIT 1`).get(Number(userId));
+  const fields = [
+    'id','name','email','role','photo_path','telefone_whatsapp','created_at',
+    includePassword ? 'password_hash' : null,
+    hasColumn('users','funcao') ? 'funcao' : 'NULL AS funcao',
+    hasColumn('users','setor') ? 'setor' : 'NULL AS setor',
+    hasColumn('users','qr_token') ? 'qr_token' : 'NULL AS qr_token',
+    hasColumn('users','qr_ativo') ? 'qr_ativo' : '0 AS qr_ativo',
+    hasColumn('users','qr_emitido_em') ? 'qr_emitido_em' : 'NULL AS qr_emitido_em',
+    hasColumn('users','qr_revogado_em') ? 'qr_revogado_em' : 'NULL AS qr_revogado_em',
+    'COALESCE(ativo,1) AS ativo',
+    'deleted_at',
+  ].filter(Boolean).join(',');
+
+  const user = db.prepare(`SELECT ${fields} FROM users WHERE id = ? LIMIT 1`).get(Number(userId));
+  if (!user) return null;
+  const derived = deriveUserFunctionSector(user.role);
+  user.funcao = user.funcao || derived.funcao || null;
+  user.setor = user.setor || derived.setor || null;
+  return user;
 }
 
 function getLinkedColaborador(userId) {
@@ -139,14 +156,61 @@ function linkOwnUserToColaborador(userId, colaboradorId, actorRole) {
 function getPortalData(userId) {
   const user = getUserById(userId);
   if (!user) throw new Error('Usuário não encontrado.');
-  return { user, colaborador: getLinkedColaborador(userId) };
+
+  if (isDirectUserIdentityRole(user.role)) {
+    return {
+      user,
+      colaborador: null,
+      directUserIdentity: true,
+      identidade: {
+        identity_type: 'USUARIO',
+        id: Number(user.id),
+        user_id: Number(user.id),
+        colaborador_id: null,
+        nome: user.name,
+        apelido: null,
+        funcao: user.funcao || user.role,
+        setor: user.setor || null,
+        status: Number(user.ativo ?? 1) === 1 && !user.deleted_at ? 'ATIVO' : 'INATIVO',
+        foto_url: user.photo_path || null,
+        qr_token: user.qr_token || null,
+        qr_ativo: Number(user.qr_ativo || 0),
+        qr_emitido_em: user.qr_emitido_em || null,
+        qr_revogado_em: user.qr_revogado_em || null,
+      },
+    };
+  }
+
+  const colaborador = getLinkedColaborador(userId);
+  return {
+    user,
+    colaborador,
+    directUserIdentity: false,
+    identidade: colaborador ? {
+      identity_type: 'COLABORADOR',
+      id: Number(colaborador.id),
+      user_id: Number(user.id),
+      colaborador_id: Number(colaborador.id),
+      nome: colaborador.nome,
+      apelido: colaborador.apelido,
+      funcao: colaborador.funcao,
+      setor: colaborador.setor,
+      status: colaborador.status,
+      foto_url: colaborador.foto_url,
+      qr_token: colaborador.qr_token,
+      qr_ativo: colaborador.qr_ativo,
+      qr_emitido_em: colaborador.qr_emitido_em,
+      qr_revogado_em: colaborador.qr_revogado_em,
+    } : null,
+  };
 }
 
-function emptyMaterialHistory({ colaborador = null, filters = {}, available = true } = {}) {
+function emptyMaterialHistory({ colaborador = null, identidade = null, filters = {}, available = true } = {}) {
   return {
-    vinculado: Boolean(colaborador),
+    vinculado: Boolean(colaborador || identidade),
     disponivel: Boolean(available),
     colaborador,
+    identidade,
     filtros: filters,
     resumo: {
       totalRetiradas: 0,
@@ -161,14 +225,20 @@ function emptyMaterialHistory({ colaborador = null, filters = {}, available = tr
 
 function listOwnMaterialWithdrawals(userId, filters = {}) {
   const normalizedFilters = normalizeMaterialFilters(filters);
-  const colaborador = getLinkedColaborador(userId);
-  if (!colaborador) return emptyMaterialHistory({ filters: normalizedFilters });
+  const portal = getPortalData(userId);
+  const user = portal.user;
+  const direct = Boolean(portal.directUserIdentity);
+  const colaborador = portal.colaborador;
+  const identidade = portal.identidade;
 
+  if (!direct && !colaborador) return emptyMaterialHistory({ filters: normalizedFilters });
+
+  const identityColumn = direct ? 'retirado_por_user_id' : 'retirado_por_colaborador_id';
   const schemaAvailable = tableExists('estoque_movimentos')
     && tableExists('estoque_itens')
-    && hasColumn('estoque_movimentos', 'retirado_por_colaborador_id');
+    && hasColumn('estoque_movimentos', identityColumn);
   if (!schemaAvailable) {
-    return emptyMaterialHistory({ colaborador, filters: normalizedFilters, available: false });
+    return emptyMaterialHistory({ colaborador, identidade, filters: normalizedFilters, available: false });
   }
 
   const hasDataMov = hasColumn('estoque_movimentos', 'data_mov');
@@ -184,10 +254,10 @@ function listOwnMaterialWithdrawals(userId, filters = {}) {
   const dataExpr = hasDataMov ? 'COALESCE(m.data_mov,m.created_at)' : 'm.created_at';
 
   const where = [
-    'm.retirado_por_colaborador_id = ?',
+    `m.${identityColumn} = ?`,
     "UPPER(COALESCE(m.tipo,'')) LIKE 'SAIDA%'",
   ];
-  const params = [Number(colaborador.id)];
+  const params = [direct ? Number(user.id) : Number(colaborador.id)];
 
   if (normalizedFilters.inicio) {
     where.push(`date(${dataExpr}) >= date(?)`);
@@ -245,6 +315,7 @@ function listOwnMaterialWithdrawals(userId, filters = {}) {
     vinculado: true,
     disponivel: true,
     colaborador,
+    identidade,
     filtros: normalizedFilters,
     resumo: {
       totalRetiradas: Number(resumo?.total_retiradas || 0),
@@ -288,25 +359,38 @@ function changeOwnPassword(userId, currentPassword, newPassword) {
 }
 
 function ensureOwnCard(userId) {
-  const colaborador = getLinkedColaborador(userId);
-  if (!colaborador) throw new Error('Seu usuário ainda não está vinculado a um colaborador. Procure o RH.');
+  const portal = getPortalData(userId);
 
+  if (portal.directUserIdentity) {
+    const identity = portal.identidade;
+    if (String(identity?.status || '').toUpperCase() !== 'ATIVO') {
+      throw new Error('O cartão está disponível somente para usuário ativo.');
+    }
+    if (identity.qr_token && Number(identity.qr_ativo || 0) !== 1) {
+      throw new Error('Seu cartão foi revogado. Procure o administrador para uma nova emissão.');
+    }
+    if (identity.qr_token && Number(identity.qr_ativo || 0) === 1) return userQrService.getById(userId);
+    return userQrService.emitToken(userId, { rotate: false });
+  }
+
+  const colaborador = portal.colaborador;
+  if (!colaborador) throw new Error('Seu usuário ainda não está vinculado a um colaborador. Procure o RH.');
   if (String(colaborador.status || '').toUpperCase() !== 'ATIVO') {
     throw new Error('O cartão está disponível somente para colaboradores ativos.');
   }
-
   if (colaborador.qr_token && Number(colaborador.qr_ativo || 0) !== 1) {
     throw new Error('Seu cartão foi revogado. Procure o RH para uma nova emissão.');
   }
-
   if (colaborador.qr_token && Number(colaborador.qr_ativo || 0) === 1) return colaborador;
   return qrService.emitToken(colaborador.id, { rotate: false });
 }
 
 function getOwnCard(userId) {
-  const { user, colaborador } = getPortalData(userId);
-  if (!colaborador) throw new Error('Seu usuário ainda não está vinculado a um colaborador.');
-  return { user, colaborador };
+  const portal = getPortalData(userId);
+  if (!portal.identidade) {
+    throw new Error('Seu usuário ainda não possui uma identidade habilitada para o Almoxarifado.');
+  }
+  return portal;
 }
 
 module.exports = {
