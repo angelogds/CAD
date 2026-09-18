@@ -3,6 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const service = require("./usuarios.service");
 const storagePaths = require("../../config/storage");
+const { deriveUserFunctionSector } = require("./usuarios.perfil");
 
 const ROLES = [
   { key: "ADMIN", label: "admin" },
@@ -13,11 +14,17 @@ const ROLES = [
   { key: "MECANICO", label: "mecanico" },
   { key: "ALMOXARIFADO", label: "almoxarifado" },
   { key: "COMPRAS", label: "compras" },
-  { key: "MANUTENCAO_SUPERVISOR", label: "manutencao_supervisor" },
+  { key: "MANUTENCAO_SUPERVISOR", label: "Supervisor de Manutenção" },
+  { key: "ENCARREGADO_MANUTENCAO", label: "Encarregado de Manutenção" },
   { key: "ENCARREGADO_LOGISTICA", label: "Encarregado de Logística" },
   { key: "ENCARREGADO_FRIGORIFICO", label: "Encarregado do Frigorífico" },
   { key: "INSPECAO_QUALIDADE", label: "Inspeção e Qualidade" },
 ];
+
+const ROLES_WITH_CONTEXT = ROLES.map((role) => ({
+  ...role,
+  ...deriveUserFunctionSector(role.key),
+}));
 
 function ensureUploadDir() {
   const dir = path.join(storagePaths.IMAGE_DIR, "users");
@@ -46,7 +53,7 @@ function list(req, res) {
     q,
     role,
     status,
-    ROLES,
+    ROLES: ROLES_WITH_CONTEXT,
   });
 }
 
@@ -55,7 +62,7 @@ function newForm(req, res) {
 
   return res.render("usuarios/novo", {
     title: "Novo Usuário",
-    ROLES,
+    ROLES: ROLES_WITH_CONTEXT,
   });
 }
 
@@ -92,7 +99,7 @@ function editForm(req, res) {
   return res.render("usuarios/edit", {
     title: `Editar Usuário #${id}`,
     user,
-    ROLES,
+    ROLES: ROLES_WITH_CONTEXT,
   });
 }
 
