@@ -1,10 +1,13 @@
 const QRCode = require('qrcode');
 const service = require('./meu-portal.service');
 const qrService = require('../colaboradores/colaboradores.qr.service');
+const userQrService = require('../usuarios/usuarios.qr.service');
 const dateBr = require('../../utils/data-hora-br');
 
-async function qrDataUrl(colaborador) {
-  const payload = qrService.encodePayload(colaborador);
+async function qrDataUrl(identidade) {
+  const payload = identidade?.identity_type === 'USUARIO'
+    ? userQrService.encodePayload(identidade)
+    : qrService.encodePayload(identidade);
   if (!payload) return null;
   return QRCode.toDataURL(payload, { width: 420, margin: 1, errorCorrectionLevel: 'H' });
 }
@@ -18,7 +21,7 @@ async function index(req, res) {
   try {
     const portal = getPortalShell(req.session.user.id);
     const canManageLink = service.canManageLink(req.session.user.role);
-    const availableColaboradores = !portal.colaborador && canManageLink
+    const availableColaboradores = !portal.directUserIdentity && !portal.colaborador && canManageLink
       ? service.listAvailableColaboradores()
       : [];
 
@@ -161,15 +164,18 @@ function emitCard(req, res) {
 async function card(req, res) {
   res.locals.activeMenu = 'meu-portal';
   try {
-    const { user, colaborador } = getPortalShell(req.session.user.id);
-    const cardQr = colaborador && Number(colaborador.qr_ativo || 0) === 1
-      ? await qrDataUrl(colaborador)
+    const portal = service.getOwnCard(req.session.user.id);
+    const { user, colaborador, identidade, directUserIdentity } = portal;
+    const cardQr = identidade && Number(identidade.qr_ativo || 0) === 1
+      ? await qrDataUrl(identidade)
       : null;
 
     return res.render('meu-portal/cartao', {
       title: 'Meu Cartão',
       user,
       colaborador,
+      identidade,
+      directUserIdentity,
       cardQr,
     });
   } catch (error) {
