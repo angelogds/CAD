@@ -79,11 +79,12 @@ function nova(req, res) {
     const acaoNecessaria = os?.acao_corretiva || os?.acao_preventiva || os?.resumo_tecnico || os?.acao_executada || '';
     const prioridade = os?.prioridade || os?.grau || os?.criticidade || 'MEDIA';
     const solicitante = req.session?.user?.name || req.session?.user?.email || '';
+    const fixedSetor = service.setorForRole(req.session?.user?.role);
     const formData = os ? {
       os_id: os.id,
       equipamento_id: os.equipamento_id || '',
       equipamento_nome: equipamento,
-      setor_origem: os.setor_solicitante || os.setor_destinatario || 'Manutenção',
+      setor_origem: service.SETORES.RECICLAGEM,
       setor_os: os.setor_solicitante || os.setor_destinatario || '',
       prioridade,
       solicitante_nome: solicitante,
@@ -102,7 +103,7 @@ function nova(req, res) {
         `Prioridade: ${prioridade || '-'}`,
         `Usuário solicitante: ${solicitante || '-'}`,
       ].join('\n'),
-    } : {};
+    } : { setor_origem: fixedSetor || service.SETORES.RECICLAGEM };
     res.render("solicitacoes/new", {
       title: "Nova Solicitação",
       activeMenu: "solicitacoes",
@@ -130,7 +131,7 @@ function criar(req, res) {
       return res.redirect(osId ? `/solicitacoes/nova?os_id=${osId}` : "/solicitacoes/nova");
     }
 
-    const id = service.createSolicitacao({ ...req.body, userId: req.session.user.id, itens });
+    const id = service.createSolicitacao({ ...req.body, userId: req.session.user.id, user: req.session.user, itens });
     if (osId) {
       osChatService.criarVinculoSolicitacaoOS(osId, id, req.session.user.id);
     }
@@ -179,7 +180,7 @@ function atualizar(req, res) {
       return res.redirect(`/solicitacoes/${id}/editar`);
     }
 
-    service.updateSolicitacao(id, { ...req.body, itens });
+    service.updateSolicitacao(id, { ...req.body, itens }, req.session.user);
     req.flash("success", "Solicitação atualizada com sucesso.");
     return res.redirect(`/solicitacoes/${id}`);
   } catch (error) {

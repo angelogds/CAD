@@ -59,7 +59,7 @@ test('menu coloca Desempenho da Manutenção e Acompanhamento de Compras logo ap
 
 test('Solicitações fica focado no solicitante e não exibe acompanhamento executivo', () => {
   const view = read('views/solicitacoes/minhas.ejs');
-  assert.match(view, /Solicitações de Material/);
+  assert.match(view, /Acompanhamento das Solicitações/);
   assert.match(view, /\+ Nova Solicitação/);
   assert.doesNotMatch(view, /Acompanhar compras/);
   assert.doesNotMatch(view, /acompanhamento-compras/);
