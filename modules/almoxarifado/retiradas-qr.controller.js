@@ -3,14 +3,15 @@ const reservaService = require('../estoque/estoque.reservas.service');
 function scanner(req, res) {
   const codigo = String(req.query.codigo || '').trim();
   const solicitacaoId = Number(req.query.solicitacao_id || 0) || null;
-  const colaborador = codigo ? reservaService.getColaboradorByQr(codigo) : null;
+  const pessoa = codigo ? reservaService.getPessoaByQr(codigo) : null;
   const grupos = reservaService.listSolicitacoes(solicitacaoId ? { solicitacao_id: solicitacaoId } : {});
   return res.render('almoxarifado/retirada_qr', {
     title: 'Retirada por QR',
     activeMenu: 'almoxarifado',
     codigo,
     solicitacaoId,
-    colaborador,
+    pessoa,
+    colaborador: pessoa,
     grupos,
   });
 }
@@ -27,7 +28,7 @@ function retirar(req, res) {
       entreguePorUserId: req.session.user.id,
       observacao: req.body.observacao || null,
     });
-    req.flash('success', `${resultado.quantidade} unidade(s) entregues a ${resultado.colaborador.nome}. Estoque e reserva atualizados.`);
+    req.flash('success', `${resultado.quantidade} unidade(s) entregues a ${resultado.pessoa?.nome || resultado.colaborador?.nome}. Estoque e reserva atualizados.`);
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível registrar a retirada.');
   }
