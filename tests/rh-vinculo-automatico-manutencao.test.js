@@ -6,14 +6,20 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('vínculo automático usa somente perfis operacionais da Manutenção', () => {
+test('vínculo automático separa autoatendimento técnico da Manutenção e materiais setoriais', () => {
   const vinculo = read('modules/meu-portal/meu-portal.vinculo.js');
+  const maintenanceBlock = vinculo.match(/const MAINTENANCE_SELF_SERVICE_ROLES = new Set\(\[([\s\S]*?)\]\);/)?.[1] || '';
+  const materialBlock = vinculo.match(/const MATERIAL_SELF_SERVICE_ROLES = new Set\(\[([\s\S]*?)\]\);/)?.[1] || '';
 
-  assert.match(vinculo, /'MECANICO'/);
-  assert.match(vinculo, /'MANUTENCAO_SUPERVISOR'/);
-  assert.match(vinculo, /'ENCARREGADO_MANUTENCAO'/);
-  assert.doesNotMatch(vinculo, /MAINTENANCE_SELF_SERVICE_ROLES[\s\S]{0,200}'ADMIN'/);
-  assert.doesNotMatch(vinculo, /MAINTENANCE_SELF_SERVICE_ROLES[\s\S]{0,200}'RH'/);
+  assert.match(maintenanceBlock, /'MECANICO'/);
+  assert.match(maintenanceBlock, /'MANUTENCAO_SUPERVISOR'/);
+  assert.match(maintenanceBlock, /'ENCARREGADO_MANUTENCAO'/);
+  assert.doesNotMatch(maintenanceBlock, /'ADMIN'|'RH'|'ENCARREGADO_LOGISTICA'|'ENCARREGADO_FRIGORIFICO'/);
+
+  assert.match(materialBlock, /\.\.\.MAINTENANCE_SELF_SERVICE_ROLES/);
+  assert.match(materialBlock, /'ENCARREGADO_LOGISTICA'/);
+  assert.match(materialBlock, /'ENCARREGADO_FRIGORIFICO'/);
+  assert.match(materialBlock, /'RH'/);
 });
 
 test('auto-link preserva a ficha existente e nunca adivinha nome duplicado', () => {
@@ -52,10 +58,12 @@ test('Meu Portal mantém foto e senha gerais, mas restringe dados profissionais 
   assert.match(routes, /post\('\/senha', ctrl\.changePassword\)/);
   assert.match(routes, /get\('\/rh', vinculo\.requireMaintenanceSelfService, rhPortalCtrl\.index\)/);
   assert.match(routes, /get\('\/dados-profissionais', vinculo\.requireMaintenanceSelfService/);
-  assert.match(routes, /get\('\/materiais', vinculo\.requireMaintenanceSelfService/);
-  assert.match(routes, /get\('\/cartao', vinculo\.requireMaintenanceSelfService/);
+  assert.match(routes, /get\('\/materiais', vinculo\.requireMaterialSelfService/);
+  assert.match(routes, /get\('\/cartao', vinculo\.requireMaterialSelfService/);
   assert.match(view, /const acessoManutencao =/);
+  assert.match(view, /const acessoMateriais =/);
   assert.match(view, /if \(acessoManutencao\)/);
+  assert.match(view, /acessoMateriais && !acessoManutencao/);
 });
 
 test('escala pessoal e lançamento de hora extra ficam operacionais, não administrativos', () => {
