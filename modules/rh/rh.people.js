@@ -5,24 +5,30 @@ function enrichDashboard(dashboard = {}, user = {}) {
   const master = colaboradoresService.listColaboradores({ status: 'ATIVO' }) || [];
   let escalaRows = [];
   try { escalaRows = escala.listarPainelEscala({ user, canViewAll: true })?.colaboradores || []; } catch (_error) {}
-  const byId = new Map(escalaRows.map((row) => [Number(row.id), row]));
+
+  // A Escala é a fonte oficial da equipe operacional atual.
+  // O cadastro mestre apenas complementa os dados das pessoas que continuam
+  // presentes na escala. Assim, ex-colaboradores preservam o histórico no banco,
+  // mas não reaparecem nas listas/seletoras ativas do RH.
+  const masterById = new Map(master.map((row) => [Number(row.id), row]));
   const zeroSaldo = { minutos: 0, horas: '0h00', creditos: 0, debitos: 0 };
-  const colaboradores = master.map((base) => {
-    const jornada = byId.get(Number(base.id)) || {};
+  const colaboradores = escalaRows.map((jornada) => {
+    const base = masterById.get(Number(jornada.id));
+    if (!base) return null;
     return {
-      ...jornada,
       ...base,
-      nome: base.nome,
-      funcao: base.funcao,
-      setor: base.setor,
-      status: base.status,
+      ...jornada,
+      nome: base.nome || jornada.nome,
+      funcao: base.funcao || jornada.funcao,
+      setor: base.setor || jornada.setor,
+      status: base.status || jornada.status || 'ATIVO',
       saldo: jornada.saldo || zeroSaldo,
       horasExtrasMesMinutos: Number(jornada.horasExtrasMesMinutos || 0),
       horasExtrasMes: jornada.horasExtrasMes || '0h00',
       turnoAtual: jornada.turnoAtual || '-',
       statusAtual: jornada.statusAtual || base.status || 'ATIVO',
     };
-  });
+  }).filter(Boolean);
 
   const indicadores = {
     ...(dashboard.indicadores || {}),
