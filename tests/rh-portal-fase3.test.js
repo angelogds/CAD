@@ -58,7 +58,26 @@ test('central RH reutiliza ficha mestre, Escala, Banco de Horas, folgas e certif
   assert.match(service, /folgaSolicitacoes\.listarSolicitacoes/);
   assert.match(people, /colaboradoresService\.listColaboradores\(\{ status: 'ATIVO' \}\)/);
   assert.match(people, /escala\.listarPainelEscala/);
+  assert.match(people, /const masterById = new Map\(master\.map/);
+  assert.match(people, /const colaboradores = escalaRows\.map/);
+  assert.match(people, /if \(!base\) return null/);
+  assert.doesNotMatch(people, /const colaboradores = master\.map/);
   assert.doesNotMatch(service, /CREATE TABLE|ALTER TABLE|DROP TABLE/i);
+});
+
+test('lista ativa do RH usa a Escala como fonte e não reexibe ex-colaboradores', () => {
+  const people = read('modules/rh/rh.people.js');
+  const views = [
+    read('views/rh/exames.ejs'),
+    read('views/rh/documentos.ejs'),
+    read('views/rh/atestados.ejs'),
+  ].join('\n');
+
+  assert.match(people, /const colaboradores = escalaRows\.map/);
+  assert.match(people, /const base = masterById\.get\(Number\(jornada\.id\)\)/);
+  assert.match(people, /\.filter\(Boolean\)/);
+  assert.doesNotMatch(people, /const colaboradores = master\.map/);
+  assert.match(views, /d\.colaboradores/);
 });
 
 test('solicitação de folga mantém aprovação operacional, alerta liderança e notifica RH em best effort', () => {
