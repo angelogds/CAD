@@ -49,7 +49,7 @@ test('novo módulo de acompanhamento é somente leitura', () => {
   assert.doesNotMatch(routes, /router\.(post|put|patch|delete)\(/i);
 
   const controller = read('modules/acompanhamento-compras/acompanhamento-compras.controller.js');
-  assert.match(controller, /activeMenu = 'acompanhamento-compras'/);
+  assert.match(controller, /activeMenu = 'solicitacoes'/);
 });
 
 test('RBAC e menu liberam acompanhamento sem conceder Compras operacional', () => {
@@ -65,7 +65,10 @@ test('RBAC e menu liberam acompanhamento sem conceder Compras operacional', () =
   const comprasReadLine = rbac.split('\n').find((line) => line.includes('compras_read:')) || '';
   assert.doesNotMatch(comprasReadLine, /ENCARREGADO_LOGISTICA|ENCARREGADO_FRIGORIFICO|ROLE\.RH/);
 
-  assert.match(sidebar, /\/acompanhamento-compras/);
+  assert.doesNotMatch(sidebar, /navItem\('\/acompanhamento-compras'/);
+  const minhas = read('views/solicitacoes/minhas.ejs');
+  assert.match(minhas, /href="\/acompanhamento-compras"/);
+  assert.match(minhas, /Acompanhamento de Compras/);
   assert.match(server, /mount\("\/acompanhamento-compras"/);
 });
 
