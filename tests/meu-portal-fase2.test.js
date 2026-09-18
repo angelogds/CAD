@@ -6,14 +6,16 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('Meu Portal Fase 2 ativa Materiais e reutiliza a Jornada existente somente para Manutenção', () => {
+test('Meu Portal libera Materiais aos perfis autorizados e mantém Jornada somente para Manutenção', () => {
   const routes = read('modules/meu-portal/meu-portal.routes.js');
   const controller = read('modules/meu-portal/meu-portal.controller.js');
   const view = read('views/meu-portal/index.ejs');
 
-  assert.match(routes, /router\.get\('\/materiais', vinculo\.requireMaintenanceSelfService, ctrl\.materiais\)/);
+  assert.match(routes, /router\.get\('\/materiais', vinculo\.requireMaterialSelfService, ctrl\.materiais\)/);
   assert.match(controller, /service\.listOwnMaterialWithdrawals\(req\.session\.user\.id/);
+  assert.match(view, /const acessoMateriais =/);
   assert.match(view, /if \(acessoManutencao\)/);
+  assert.match(view, /acessoMateriais && !acessoManutencao/);
   assert.match(view, /href="\/meu-portal\/materiais"/);
   assert.match(view, /href="\/escala\/meu-painel"/);
   assert.match(view, /MANUTENÇÃO/);
