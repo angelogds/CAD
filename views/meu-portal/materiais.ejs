@@ -6,6 +6,7 @@
   const movimentos = Array.isArray(materiais?.movimentos) ? materiais.movimentos : [];
   const filtros = materiais?.filtros || {};
   const colaborador = materiais?.colaborador || null;
+  const identidade = materiais?.identidade || colaborador || null;
 %>
 
 <div class="my-portal-page my-material-page">
@@ -20,8 +21,8 @@
 
   <% if (!materiais?.vinculado) { %>
     <section class="card my-material-empty">
-      <strong>Vínculo com colaborador necessário</strong>
-      <p>Seu login ainda não está ligado a uma ficha profissional. Após o vínculo pelo RH, suas retiradas passam a aparecer aqui automaticamente.</p>
+      <strong>Identidade profissional necessária</strong>
+      <p>Não foi possível carregar a identidade usada nas retiradas. Perfis encarregados usam o próprio login; apenas o perfil operacional de mecânico utiliza ficha de colaborador.</p>
     </section>
   <% } else if (!materiais?.disponivel) { %>
     <section class="card my-material-empty">
