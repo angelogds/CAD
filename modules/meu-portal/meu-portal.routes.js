@@ -71,7 +71,7 @@ router.get('/perfil', ctrl.perfil);
 router.get('/conta', ctrl.conta);
 
 // Autoatendimento profissional: liberado inicialmente somente para a equipe de Manutenção.
-router.get('/materiais', vinculo.requireMaintenanceSelfService, ctrl.materiais);
+router.get('/materiais', vinculo.requireMaterialSelfService, ctrl.materiais);
 router.get('/treinamentos', vinculo.requireMaintenanceSelfService, fase2bCtrl.treinamentos);
 router.get('/dados-profissionais', vinculo.requireMaintenanceSelfService, fase2bCtrl.dadosProfissionais);
 router.get('/servicos', vinculo.requireMaintenanceSelfService, fase2bCtrl.servicos);
@@ -85,8 +85,8 @@ router.post('/rh/atestados', vinculo.requireMaintenanceSelfService, atestadoUplo
 router.post('/vinculo', requireRole(LINK_MANAGER_ROLES), ctrl.linkColaborador);
 router.post('/foto', upload.single('photo'), ctrl.updatePhoto);
 router.post('/senha', ctrl.changePassword);
-router.post('/cartao/emitir', vinculo.requireMaintenanceSelfService, ctrl.emitCard);
-router.get('/cartao', vinculo.requireMaintenanceSelfService, ctrl.card);
+router.post('/cartao/emitir', vinculo.requireMaterialSelfService, ctrl.emitCard);
+router.get('/cartao', vinculo.requireMaterialSelfService, ctrl.card);
 
 router.use((err, req, res, next) => {
   const uploadError = err instanceof multer.MulterError || /Formato .*inválido|Formato inválido/i.test(String(err?.message || ''));
