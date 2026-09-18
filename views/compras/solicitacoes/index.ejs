@@ -17,6 +17,11 @@ const statusColors={ABERTA:'#16843a',EM_COTACAO:'#2563eb',COMPRADA:'#7c3aed',EM_
 <link rel="stylesheet" href="/css/compras-recebimento-alertas.css?v=20260902-v1">
 <div class="purchase-dashboard">
 <header class="dashboard-heading"><h1>Painel de Compras</h1><p>Fila operacional e indicadores do setor de Compras</p></header>
+<nav class="queue-tabs" aria-label="Filtro rápido por setor" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
+  <% [['','TODAS'],['RECICLAGEM','RECICLAGEM'],['LOGÍSTICA','LOGÍSTICA'],['FRIGORÍFICO','FRIGORÍFICO'],['ADMINISTRATIVO','ADMINISTRATIVO']].forEach(([value,label])=>{ %>
+    <a class="ui-btn ui-btn--soft <%= filters.setor===value?'active':'' %>" href="<%= url({setor:value,page:null}) %>"><%= label %></a>
+  <% }) %>
+</nav>
 <form class="dashboard-filters" method="get"><input type="hidden" name="tab" value="<%= filters.tab %>"><input type="hidden" name="card" value="<%= filters.card %>">
 <label><span>Período dos indicadores</span><select name="period"><option value="7" <%= filters.period===7?'selected':'' %>>Últimos 7 dias</option><option value="30" <%= filters.period===30?'selected':'' %>>Últimos 30 dias</option><option value="90" <%= filters.period===90?'selected':'' %>>Últimos 90 dias</option></select></label>
 <label class="dashboard-search"><span>Busca</span><input name="q" placeholder="Número, título, setor ou solicitante, OS, equipamento..." value="<%= filters.query %>"></label>
