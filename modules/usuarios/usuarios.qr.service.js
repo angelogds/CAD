@@ -107,7 +107,9 @@ function getByQr(value) {
     LIMIT 1
   `).get(token.trim());
 
-  return user ? getById(user.id) : null;
+  if (!user) return null;
+  const identity = getById(user.id);
+  return identity && isDirectUserIdentityRole(identity.role) ? identity : null;
 }
 
 module.exports = { getById, emitToken, revoke, encodePayload, getByQr };
