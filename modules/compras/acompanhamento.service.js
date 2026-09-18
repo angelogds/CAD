@@ -1,6 +1,7 @@
 const db = require('../../database/db');
 const comprasService = require('./compras.service');
 const approvalService = require('./compras.aprovacao.service');
+const { dbAliasesForSetor, normalizeSetorCorporativo } = require('./compras-setores');
 
 const TERMINAIS = new Set(['FECHADA', 'CANCELADA', 'RECEBIDA_TOTAL', 'ENTREGUE_SOLICITANTE']);
 const PRIORITY_GROUPS = Object.freeze([
@@ -158,7 +159,18 @@ function getDashboard(query = {}) {
   const where = [];
   const params = [];
 
-  if (filters.setor) { where.push('s.setor_origem=?'); params.push(filters.setor); }
+  if (filters.setor) {
+    const aliases = dbAliasesForSetor(filters.setor);
+    const clauses = [];
+    if (aliases.length) {
+      clauses.push(`s.setor_origem IN (${aliases.map(() => '?').join(',')})`);
+      params.push(...aliases);
+    }
+    if (normalizeSetorCorporativo(filters.setor) === 'RECICLAGEM') {
+      clauses.push("TRIM(COALESCE(s.setor_origem,''))=''");
+    }
+    if (clauses.length) where.push(`(${clauses.join(' OR ')})`);
+  }
   if (filters.responsavel) { where.push('s.compras_user_id=?'); params.push(Number(filters.responsavel)); }
   if (filters.status) { where.push('s.status=?'); params.push(filters.status); }
 

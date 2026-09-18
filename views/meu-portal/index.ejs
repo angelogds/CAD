@@ -8,6 +8,7 @@
   const temVinculo = Boolean(colaborador);
   const ativo = temVinculo && String(colaborador.status || '').toUpperCase() === 'ATIVO';
   const acessoManutencao = typeof maintenanceSelfService !== 'undefined' && Boolean(maintenanceSelfService);
+  const acessoMateriais = typeof materialSelfService !== 'undefined' && Boolean(materialSelfService);
   const cartaoAtivo = temVinculo && Number(colaborador.qr_ativo || 0) === 1 && Boolean(colaborador.qr_token);
   const cartaoRevogado = temVinculo && Boolean(colaborador.qr_token) && !cartaoAtivo;
   const foto = colaborador?.foto_url || conta.photo_path || '/IMG/logo_menu.png.png';
@@ -32,13 +33,15 @@
           <h1>Olá, <%= colaborador?.apelido || colaborador?.nome || conta.name %></h1>
           <% if (acessoManutencao) { %>
             <p>Seu perfil da Manutenção está integrado à ficha de colaborador, jornada, materiais e RH.</p>
+          <% } else if (acessoMateriais) { %>
+            <p>Seu perfil possui acesso à identificação do Almoxarifado e ao histórico das retiradas registradas em seu nome.</p>
           <% } else { %>
             <p>Gerencie sua identidade de acesso, foto e segurança da conta.</p>
           <% } %>
           <div class="my-portal-tags">
             <span><%= colaborador?.funcao || conta.role || 'Perfil do sistema' %></span>
-            <% if (acessoManutencao) { %>
-              <span><%= colaborador?.setor || 'Manutenção' %></span>
+            <% if (acessoManutencao || acessoMateriais) { %>
+              <span><%= colaborador?.setor || (acessoManutencao ? 'Manutenção' : 'Setor vinculado') %></span>
               <span class="<%= ativo ? 'is-ok' : 'is-warn' %>"><%= colaborador?.status || 'VÍNCULO PENDENTE' %></span>
             <% } else { %>
               <span class="is-ok">CONTA ATIVA</span>
@@ -49,11 +52,11 @@
     </div>
   </header>
 
-  <% if (acessoManutencao && !temVinculo) { %>
+  <% if ((acessoManutencao || acessoMateriais) && !temVinculo) { %>
     <section class="my-portal-notice my-portal-panel--compact my-card-state--compact">
       <div>
         <strong>Vínculo profissional pendente</strong>
-        <p>Seu login é da equipe de Manutenção, mas ainda não foi possível localizar com segurança uma única ficha ativa com o mesmo nome.</p>
+        <p>Seu perfil utiliza identificação profissional, mas ainda não foi possível localizar com segurança uma única ficha ativa com o mesmo nome.</p>
         <small>O sistema não cria uma segunda ficha nem adivinha vínculos. O RH deve revisar nome, situação e possíveis duplicidades no cadastro de colaboradores.</small>
       </div>
     </section>
@@ -62,7 +65,7 @@
   <section class="my-portal-services my-portal-services--primary" aria-labelledby="acessos-pessoais">
     <div class="my-portal-panel__head">
       <div><span class="eyebrow">MEU ACESSO</span><h2 id="acessos-pessoais">Identidade e conta</h2></div>
-      <span class="my-status"><%= acessoManutencao ? '3 ÁREAS' : '2 ÁREAS' %></span>
+      <span class="my-status"><%= acessoMateriais ? '3 ÁREAS' : '2 ÁREAS' %></span>
     </div>
     <div class="my-access-grid">
       <a class="my-service-card my-service-card--primary is-available" href="/meu-portal/perfil">
@@ -72,7 +75,7 @@
         <small>ABRIR MEU PERFIL →</small>
       </a>
 
-      <% if (acessoManutencao) { %>
+      <% if (acessoMateriais) { %>
         <a class="my-service-card my-service-card--primary is-available" href="/meu-portal/cartao">
           <div class="my-service-card__icon" aria-hidden="true">QR</div>
           <strong>Identificação do Almoxarifado</strong>
@@ -126,6 +129,22 @@
           <strong>Meu RH</strong>
           <span>Exames, documentos, folgas e banco de horas.</span>
           <small>DISPONÍVEL • ABRIR →</small>
+        </a>
+      </div>
+    </section>
+  <% } %>
+
+  <% if (acessoMateriais && !acessoManutencao) { %>
+    <section class="my-portal-services" aria-labelledby="servicos-almoxarifado">
+      <div class="my-portal-panel__head">
+        <div><span class="eyebrow">ALMOXARIFADO</span><h2 id="servicos-almoxarifado">Retiradas e rastreabilidade</h2></div>
+        <span class="my-status is-ok">1 SERVIÇO</span>
+      </div>
+      <div class="my-roadmap-grid">
+        <a class="my-service-card is-available" href="/meu-portal/materiais">
+          <strong>Retiradas de material</strong>
+          <span>Consulte o histórico das baixas registradas pelo Almoxarifado em seu nome.</span>
+          <small>HISTÓRICO • AUDITORIA • ABRIR →</small>
         </a>
       </div>
     </section>
