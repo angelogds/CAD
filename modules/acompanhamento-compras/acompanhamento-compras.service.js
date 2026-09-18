@@ -260,10 +260,29 @@ function getDetail(user, id) {
 
   const approvalSummary = safeApprovalSummary(id);
   const approvalByItem = new Map((approvalSummary.itens || []).map((item) => [Number(item.id), item]));
-  detail.itens = (detail.itens || []).map((item) => ({
-    ...item,
-    ...(approvalByItem.get(Number(item.id)) || {}),
-  }));
+  detail.itens = (detail.itens || []).map((item) => {
+    const merged = {
+      ...item,
+      ...(approvalByItem.get(Number(item.id)) || {}),
+    };
+    const purchased = token(merged.status_compra) === 'COMPRADO';
+    if (purchased && Number(merged.qtdComprada || 0) <= 0) {
+      merged.qtdComprada = Number(merged.qtdSolicitada || merged.qtd_solicitada || merged.quantidade || 0);
+      merged.qtdPendenteReceber = Math.max(0, merged.qtdComprada - Number(merged.qtdRecebida || 0));
+      merged.compradoCentavos = Math.round(merged.qtdComprada * Number(merged.valor_unitario_centavos || 0));
+    }
+    return merged;
+  });
+
+  detail.resumoAcompanhamento = {
+    ...(detail.resumoAcompanhamento || {}),
+    total: detail.itens.length,
+    cotados: detail.itens.filter((item) => token(item.status_cotacao) === 'COTADO').length,
+    comprados: detail.itens.filter((item) => token(item.status_compra) === 'COMPRADO').length,
+    recebidos: detail.itens.filter((item) => Number(item.qtdComprada || 0) > 0 && Number(item.qtdRecebida || 0) >= Number(item.qtdComprada || 0)).length,
+    compradoCentavos: detail.itens.reduce((sum, item) => sum + Number(item.compradoCentavos || 0), 0),
+    recebidoCentavos: detail.itens.reduce((sum, item) => sum + Number(item.recebidoCentavos || 0), 0),
+  };
 
   const reservations = listReservations(id);
   const withdrawals = listWithdrawals(id);
