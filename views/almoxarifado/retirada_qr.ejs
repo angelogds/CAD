@@ -6,7 +6,7 @@
     <div>
       <span class="eyebrow">ALMOXARIFADO • RETIRADA IDENTIFICADA</span>
       <h1>Retirada por QR</h1>
-      <p>Leia o cartão do colaborador, confira a solicitação e entregue somente o material reservado.</p>
+      <p>Leia o cartão do responsável ou colaborador, confira a solicitação e entregue somente o material reservado.</p>
     </div>
     <div class="reserve-head__actions">
       <a class="btn btn-ghost" href="/estoque/reservas">Materiais separados</a>
@@ -16,7 +16,7 @@
 
   <section class="qr-scan-layout">
     <article class="card qr-scanner-card">
-      <div class="qr-scanner-card__head"><div><h2>1. Identificar colaborador</h2><p>Use a câmera do celular/computador ou um leitor USB.</p></div></div>
+      <div class="qr-scanner-card__head"><div><h2>1. Identificar responsável</h2><p>Use a câmera do celular/computador ou um leitor USB.</p></div></div>
       <div class="qr-reader-box"><video id="qrVideo" playsinline muted></video><div id="qrReaderPlaceholder">Câmera desligada</div></div>
       <div class="qr-reader-actions">
         <button class="btn btn-green" id="startQrCamera" type="button">Abrir câmera</button>
@@ -35,11 +35,11 @@
       <% if (!codigo) { %>
         <div class="qr-identity-empty">Aguardando leitura do cartão.</div>
       <% } else if (!colaborador) { %>
-        <div class="qr-identity-error"><strong>Cartão inválido ou inativo.</strong><span>Confira o cartão ou gere um novo QR no cadastro do colaborador.</span></div>
+        <div class="qr-identity-error"><strong>Cartão inválido ou inativo.</strong><span>Confira o cartão ou gere um novo QR no Meu Portal.</span></div>
       <% } else { %>
         <div class="qr-identity-person">
           <img src="<%= colaborador.foto_url || '/IMG/logo_menu.png.png' %>" alt="Foto de <%= colaborador.nome %>" />
-          <div><small>COLABORADOR IDENTIFICADO</small><h3><%= colaborador.nome %></h3><p><%= colaborador.funcao || '-' %> • <%= colaborador.setor || '-' %></p><span class="stock-state stock-state--ok">ATIVO</span></div>
+          <div><small><%= colaborador.identity_type === 'USUARIO' ? 'RESPONSÁVEL IDENTIFICADO' : 'COLABORADOR IDENTIFICADO' %></small><h3><%= colaborador.nome %></h3><p><%= colaborador.funcao || '-' %> • <%= colaborador.setor || '-' %></p><span class="stock-state stock-state--ok">ATIVO</span></div>
         </div>
       <% } %>
     </article>
@@ -47,12 +47,12 @@
 
   <section class="card qr-delivery-section">
     <div class="qr-delivery-head">
-      <div><h2>3. Entregar material reservado</h2><p>Baixa vinculada à solicitação, OS, equipamento e colaborador que recebeu o material.</p></div>
+      <div><h2>3. Entregar material reservado</h2><p>Baixa vinculada à solicitação, OS, equipamento e identidade de quem recebeu o material.</p></div>
       <% if (solicitacaoId) { %><a class="btn btn-ghost" href="/almoxarifado/retiradas/qr<%= codigo ? ('?codigo='+encodeURIComponent(codigo)) : '' %>">Ver todas as solicitações</a><% } %>
     </div>
 
     <% if (!colaborador) { %>
-      <div class="reserve-empty"><strong>Identifique um colaborador para liberar a confirmação de retirada.</strong></div>
+      <div class="reserve-empty"><strong>Identifique o responsável para liberar a confirmação de retirada.</strong></div>
     <% } else if (!grupos.length) { %>
       <div class="reserve-empty"><strong>Nenhum material reservado disponível.</strong><p>O recebimento precisa estar registrado e vinculado à solicitação.</p></div>
     <% } else { %>
@@ -120,7 +120,7 @@
       placeholder.style.display = 'none';
       startBtn.disabled = true;
       stopBtn.disabled = false;
-      status.textContent = 'Aponte a câmera para o QR do cartão do colaborador.';
+      status.textContent = 'Aponte a câmera para o QR do cartão do responsável.';
       timer = setInterval(async () => {
         if (!detector || video.readyState < 2) return;
         try {
