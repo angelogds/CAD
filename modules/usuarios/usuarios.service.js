@@ -2,6 +2,7 @@
 const bcrypt = require("bcryptjs");
 const db = require("../../database/db");
 const { normalizeWhatsapp } = require("../../utils/whatsapp-phone");
+const { removeOrArchiveUser, restoreUser } = require("./usuarios-lifecycle");
 
 // compatível com seu CHECK do SQLite
 
@@ -36,9 +37,16 @@ function syncColaboradorWhatsappFromUser({ userId, name, telefone }) {
 
 const VALID_ROLES = new Set(["ADMIN", "DIRECAO", "DIRETORIA", "RH", "COMPRAS", "ENCARREGADO_PRODUCAO", "PRODUCAO", "MECANICO", "ALMOXARIFE", "ALMOXARIFADO", "MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_LOGISTICA", "ENCARREGADO_FRIGORIFICO", "INSPECAO_QUALIDADE"]);
 
-function list({ q = "", role = "" } = {}) {
+function list({ q = "", role = "", status = "ativos" } = {}) {
   const where = [];
   const params = {};
+
+  if (status === "arquivados") {
+    where.push("(COALESCE(ativo, 1) = 0 OR COALESCE(deleted_at, '') <> '')");
+  } else {
+    where.push("COALESCE(ativo, 1) = 1");
+    where.push("COALESCE(deleted_at, '') = ''");
+  }
 
   if (q) {
     where.push("(name LIKE @q OR email LIKE @q)");
@@ -50,7 +58,8 @@ function list({ q = "", role = "" } = {}) {
   }
 
   const sql = `
-    SELECT id, name, email, role, photo_path, telefone_whatsapp, created_at
+    SELECT id, name, email, role, photo_path, telefone_whatsapp, created_at,
+           COALESCE(ativo, 1) AS ativo, deleted_at
     FROM users
     ${where.length ? "WHERE " + where.join(" AND ") : ""}
     ORDER BY id DESC
@@ -60,7 +69,12 @@ function list({ q = "", role = "" } = {}) {
 }
 
 function getById(id) {
-  return db.prepare("SELECT id, name, email, role, photo_path, telefone_whatsapp, created_at FROM users WHERE id = ?").get(id);
+  return db.prepare(`
+    SELECT id, name, email, role, photo_path, telefone_whatsapp, created_at,
+           COALESCE(ativo, 1) AS ativo, deleted_at
+    FROM users
+    WHERE id = ?
+  `).get(id);
 }
 
 function getByEmail(email) {
@@ -74,14 +88,19 @@ function create({ name, email, role, password, photo_path, telefone_whatsapp }) 
   }
 
   const exists = getByEmail(email);
-  if (exists) throw new Error("Já existe usuário com esse e-mail.");
+  if (exists) {
+    if (Number(exists.ativo ?? 1) === 0 || exists.deleted_at) {
+      throw new Error("Já existe um usuário arquivado com esse e-mail. Restaure ou edite o cadastro existente.");
+    }
+    throw new Error("Já existe usuário com esse e-mail.");
+  }
 
   const telefone = normalizeWhatsapp(telefone_whatsapp);
   const password_hash = bcrypt.hashSync(password, 10);
   const created_at = new Date().toISOString();
 
   db.prepare(
-    "INSERT INTO users (name, email, password_hash, role, photo_path, telefone_whatsapp, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO users (name, email, password_hash, role, photo_path, telefone_whatsapp, created_at, ativo, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, NULL)"
   ).run(name, email, password_hash, r, photo_path || null, telefone, created_at);
 }
 
@@ -118,14 +137,11 @@ function resetPassword(id, password) {
 }
 
 function remove(id, actorUserId = null) {
-  const user = db.prepare("SELECT id, name FROM users WHERE id = ?").get(id);
-  if (!user) throw new Error("Usuário não encontrado.");
-
-  if (Number(actorUserId || 0) === Number(id)) {
-    throw new Error("Você não pode apagar o próprio usuário logado.");
-  }
-
-  db.prepare("DELETE FROM users WHERE id = ?").run(id);
+  return removeOrArchiveUser(db, id, actorUserId);
 }
 
-module.exports = { list, getById, create, update, resetPassword, remove };
+function restore(id) {
+  return restoreUser(db, id);
+}
+
+module.exports = { list, getById, create, update, resetPassword, remove, restore };
