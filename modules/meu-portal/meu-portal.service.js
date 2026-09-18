@@ -237,6 +237,7 @@ function listOwnMaterialWithdrawals(userId, filters = {}) {
   if (!direct && !colaborador) return emptyMaterialHistory({ filters: normalizedFilters });
 
   const identityColumn = direct ? 'retirado_por_user_id' : 'retirado_por_colaborador_id';
+  const legacyLinked = direct ? getLinkedColaborador(userId) : null;
   const schemaAvailable = tableExists('estoque_movimentos')
     && tableExists('estoque_itens')
     && hasColumn('estoque_movimentos', identityColumn);
@@ -256,11 +257,17 @@ function listOwnMaterialWithdrawals(userId, filters = {}) {
   const canJoinEntreguePor = hasEntreguePor && tableExists('users');
   const dataExpr = hasDataMov ? 'COALESCE(m.data_mov,m.created_at)' : 'm.created_at';
 
+  const identityWhere = direct && legacyLinked && hasColumn('estoque_movimentos', 'retirado_por_colaborador_id')
+    ? '(m.retirado_por_user_id = ? OR m.retirado_por_colaborador_id = ?)'
+    : `m.${identityColumn} = ?`;
+
   const where = [
-    `m.${identityColumn} = ?`,
+    identityWhere,
     "UPPER(COALESCE(m.tipo,'')) LIKE 'SAIDA%'",
   ];
-  const params = [direct ? Number(user.id) : Number(colaborador.id)];
+  const params = direct && legacyLinked && hasColumn('estoque_movimentos', 'retirado_por_colaborador_id')
+    ? [Number(user.id), Number(legacyLinked.id)]
+    : [direct ? Number(user.id) : Number(colaborador.id)];
 
   if (normalizedFilters.inicio) {
     where.push(`date(${dataExpr}) >= date(?)`);
