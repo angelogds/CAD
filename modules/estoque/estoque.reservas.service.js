@@ -1,4 +1,5 @@
 const db = require('../../database/db');
+const userQrService = require('../usuarios/usuarios.qr.service');
 
 function tableExists(name) {
   try { return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name); } catch { return false; }
@@ -37,6 +38,38 @@ function getColaboradorByQr(codigo) {
     WHERE qr_token=? AND COALESCE(qr_ativo,0)=1 ${deletedFilter}
       AND UPPER(COALESCE(status,'ATIVO'))='ATIVO'
   `).get(token) || null;
+}
+
+function getPessoaByQr(codigo) {
+  const raw = String(codigo || '').trim();
+  if (!raw) return null;
+
+  if (/^CGUSR:/i.test(raw)) {
+    const user = userQrService.getByQr(raw);
+    if (!user) return null;
+    return {
+      identity_type: 'USUARIO',
+      id: Number(user.id),
+      user_id: Number(user.id),
+      colaborador_id: null,
+      nome: user.name,
+      apelido: null,
+      funcao: user.funcao || user.role,
+      setor: user.setor || null,
+      status: 'ATIVO',
+      foto_url: user.photo_path || null,
+      qr_emitido_em: user.qr_emitido_em || null,
+    };
+  }
+
+  const colaborador = getColaboradorByQr(raw);
+  if (!colaborador) return null;
+  return {
+    ...colaborador,
+    identity_type: 'COLABORADOR',
+    user_id: Number(colaborador.user_id || 0) || null,
+    colaborador_id: Number(colaborador.id),
+  };
 }
 
 function dashboard() {
@@ -145,7 +178,9 @@ function insertMovimento(data) {
     ['solicitacao_id', data.solicitacao_id], ['solicitacao_item_id', data.solicitacao_item_id],
     ['usuario_id', data.usuario_id], ['saldo_anterior', data.saldo_anterior], ['saldo_posterior', data.saldo_posterior],
     ['observacao', data.observacao], ['reserva_id', data.reserva_id],
-    ['retirado_por_colaborador_id', data.retirado_por_colaborador_id], ['entregue_por_user_id', data.entregue_por_user_id],
+    ['retirado_por_colaborador_id', data.retirado_por_colaborador_id],
+    ['retirado_por_user_id', data.retirado_por_user_id],
+    ['entregue_por_user_id', data.entregue_por_user_id],
     ['identificacao_origem', data.identificacao_origem],
   ];
   for (const [column, value] of optional) {
@@ -157,8 +192,8 @@ function insertMovimento(data) {
 function retirarReserva({ reservaId, quantidade, qrCode, entreguePorUserId, observacao }) {
   const qtd = Number(quantidade || 0);
   if (!(qtd > 0)) throw new Error('Quantidade inválida para retirada.');
-  const colaborador = getColaboradorByQr(qrCode);
-  if (!colaborador) throw new Error('Cartão/QR do colaborador inválido, inativo ou revogado.');
+  const pessoa = getPessoaByQr(qrCode);
+  if (!pessoa) throw new Error('Cartão/QR inválido, inativo ou revogado.');
 
   return db.transaction(() => {
     const reserva = db.prepare(`
@@ -206,20 +241,30 @@ function retirarReserva({ reservaId, quantidade, qrCode, entreguePorUserId, obse
       usuario_id: entreguePorUserId || null,
       saldo_anterior: anterior,
       saldo_posterior: posterior,
-      observacao: observacao || `Retirada ${reserva.numero || `#${reserva.solicitacao_id}`} por ${colaborador.nome}`,
+      observacao: observacao || `Retirada ${reserva.numero || `#${reserva.solicitacao_id}`} por ${pessoa.nome}`,
       reserva_id: reserva.id,
-      retirado_por_colaborador_id: colaborador.id,
+      retirado_por_colaborador_id: pessoa.identity_type === 'COLABORADOR' ? pessoa.colaborador_id : null,
+      retirado_por_user_id: pessoa.identity_type === 'USUARIO' ? pessoa.user_id : null,
       entregue_por_user_id: entreguePorUserId || null,
-      identificacao_origem: 'QR_COLABORADOR',
+      identificacao_origem: pessoa.identity_type === 'USUARIO' ? 'QR_USUARIO' : 'QR_COLABORADOR',
     });
 
-    return { reservaId: reserva.id, movimentoId, colaborador, quantidade: qtd, saldoPosterior: posterior, status };
+    return {
+      reservaId: reserva.id,
+      movimentoId,
+      pessoa,
+      colaborador: pessoa,
+      quantidade: qtd,
+      saldoPosterior: posterior,
+      status,
+    };
   })();
 }
 
 module.exports = {
   normalizeQr,
   getColaboradorByQr,
+  getPessoaByQr,
   dashboard,
   resumoPorItem,
   listReservas,
