@@ -60,18 +60,21 @@ test('foto própria sincroniza users e ficha vinculada sem alterar função, set
   assert.doesNotMatch(service, /SET role|SET funcao|SET setor/i);
 });
 
-test('cartão próprio reutiliza o QR seguro existente e não permite rotação/revogação pelo colaborador', () => {
+test('cartão próprio preserva CGCOL para mecânico e usa CGUSR para identidade direta', () => {
   const service = read('modules/meu-portal/meu-portal.service.js');
   const routes = read('modules/meu-portal/meu-portal.routes.js');
   assert.match(service, /colaboradores\.qr\.service/);
+  assert.match(service, /usuarios\.qr\.service/);
   assert.match(service, /emitToken\(colaborador\.id, \{ rotate: false \}\)/);
+  assert.match(service, /userQrService\.emitToken\(userId, \{ rotate: false \}\)/);
   assert.doesNotMatch(routes, /revogar|rotate/);
   assert.match(read('modules/colaboradores/colaboradores.qr.service.js'), /CGCOL:\$\{colaborador\.qr_token\}/);
+  assert.match(read('modules/usuarios/usuarios.qr.service.js'), /CGUSR:\$\{user\.qr_token\}/);
 });
 
 test('integração preserva leitura do QR no Almoxarifado e mantém Meu Portal visível em Gestão e Apoio', () => {
   const sidebar = read('views/partials/sidebar.ejs');
-  assert.match(read('modules/almoxarifado/retiradas-qr.controller.js'), /getColaboradorByQr\(codigo\)/);
+  assert.match(read('modules/almoxarifado/retiradas-qr.controller.js'), /getPessoaByQr\(codigo\)/);
   assert.match(read('modules/tv/tv.routes.js'), /router\.use\('\/meu-portal', meuPortalRoutes\)/);
   assert.match(sidebar, /const canMeuPortal = Boolean\(user\?\.id\)/);
   assert.match(sidebar, /hasSupportGroup = [^;]*canMeuPortal/);

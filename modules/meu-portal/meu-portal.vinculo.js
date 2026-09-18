@@ -1,4 +1,5 @@
 const db = require('../../database/db');
+const { isDirectUserIdentityRole } = require('../usuarios/usuarios.perfil');
 
 const MAINTENANCE_SELF_SERVICE_ROLES = new Set([
   'MECANICO',
@@ -127,6 +128,10 @@ function ensureAutomaticMaintenanceLink(userId) {
     return { status: 'NOT_ELIGIBLE', colaboradorId: null };
   }
 
+  if (isDirectUserIdentityRole(user.role)) {
+    return { status: 'DIRECT_USER', userId: id, colaboradorId: null };
+  }
+
   const existing = findExistingLink(id);
   if (existing?.id) {
     return { status: 'LINKED', colaboradorId: Number(existing.id) };
@@ -176,12 +181,20 @@ function ensureAutomaticMaintenanceLink(userId) {
 
 function attachAutomaticMaintenanceLink(req, res, next) {
   const user = req.session?.user || {};
-  const maintenanceEligible = canUseMaintenanceSelfService(user.role);
+  const directUserIdentity = isDirectUserIdentityRole(user.role);
+  const maintenanceEligible = canUseMaintenanceSelfService(user.role) && !directUserIdentity;
   const materialEligible = canUseMaterialSelfService(user.role);
+
   res.locals.maintenanceSelfService = maintenanceEligible;
   res.locals.materialSelfService = materialEligible;
+  res.locals.directUserIdentity = directUserIdentity;
 
   if (!materialEligible) return next();
+  if (directUserIdentity) {
+    res.locals.maintenanceLink = { status: 'DIRECT_USER', userId: Number(user.id), colaboradorId: null };
+    return next();
+  }
+
   try {
     res.locals.maintenanceLink = ensureAutomaticMaintenanceLink(user.id);
     return next();
@@ -196,6 +209,8 @@ function requireMaterialSelfService(req, res, next) {
     req.flash?.('error', 'Seu perfil não possui acesso ao cartão e ao histórico de retiradas do Almoxarifado.');
     return res.redirect('/meu-portal');
   }
+
+  if (isDirectUserIdentityRole(user.role)) return next();
 
   try {
     const result = ensureAutomaticMaintenanceLink(user.id);
@@ -216,8 +231,8 @@ function requireMaterialSelfService(req, res, next) {
 
 function requireMaintenanceSelfService(req, res, next) {
   const user = req.session?.user || {};
-  if (!canUseMaintenanceSelfService(user.role)) {
-    req.flash?.('error', 'Este autoatendimento está liberado inicialmente apenas para a equipe de Manutenção.');
+  if (!canUseMaintenanceSelfService(user.role) || isDirectUserIdentityRole(user.role)) {
+    req.flash?.('error', 'Este serviço utiliza ficha individual de colaborador e permanece disponível apenas para o perfil operacional de mecânico.');
     return res.redirect('/meu-portal');
   }
 
@@ -245,6 +260,7 @@ module.exports = {
   normalizeName,
   canUseMaintenanceSelfService,
   canUseMaterialSelfService,
+  isDirectUserIdentityRole,
   ensureAutomaticMaintenanceLink,
   attachAutomaticMaintenanceLink,
   requireMaterialSelfService,

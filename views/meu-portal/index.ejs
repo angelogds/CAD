@@ -5,15 +5,18 @@
 <%
   const conta = portal.user;
   const colaborador = portal.colaborador;
+  const identidade = portal.identidade || colaborador;
+  const identidadeDireta = Boolean(portal.directUserIdentity);
   const temVinculo = Boolean(colaborador);
-  const ativo = temVinculo && String(colaborador.status || '').toUpperCase() === 'ATIVO';
+  const temIdentidade = Boolean(identidade);
+  const ativo = temIdentidade && String(identidade.status || '').toUpperCase() === 'ATIVO';
   const acessoManutencao = typeof maintenanceSelfService !== 'undefined' && Boolean(maintenanceSelfService);
   const acessoMateriais = typeof materialSelfService !== 'undefined' && Boolean(materialSelfService);
-  const cartaoAtivo = temVinculo && Number(colaborador.qr_ativo || 0) === 1 && Boolean(colaborador.qr_token);
-  const cartaoRevogado = temVinculo && Boolean(colaborador.qr_token) && !cartaoAtivo;
-  const foto = colaborador?.foto_url || conta.photo_path || '/IMG/logo_menu.png.png';
-  const cartaoStatus = !temVinculo
-    ? 'VÍNCULO PENDENTE'
+  const cartaoAtivo = temIdentidade && Number(identidade.qr_ativo || 0) === 1 && Boolean(identidade.qr_token);
+  const cartaoRevogado = temIdentidade && Boolean(identidade.qr_token) && !cartaoAtivo;
+  const foto = identidade?.foto_url || conta.photo_path || '/IMG/logo_menu.png.png';
+  const cartaoStatus = !temIdentidade
+    ? 'IDENTIDADE PENDENTE'
     : cartaoAtivo
       ? 'ATIVO'
       : cartaoRevogado
@@ -27,10 +30,10 @@
   <header class="my-portal-hero my-portal-hero--compact">
     <div class="my-portal-hero__content">
       <div class="my-portal-hero__identity">
-        <img src="<%= foto %>" alt="Foto de <%= colaborador?.nome || conta.name %>" />
+        <img src="<%= foto %>" alt="Foto de <%= identidade?.nome || conta.name %>" />
         <div>
           <span class="eyebrow">MEU PORTAL</span>
-          <h1>Olá, <%= colaborador?.apelido || colaborador?.nome || conta.name %></h1>
+          <h1>Olá, <%= identidade?.apelido || identidade?.nome || conta.name %></h1>
           <% if (acessoManutencao) { %>
             <p>Seu perfil da Manutenção está integrado à ficha de colaborador, jornada, materiais e RH.</p>
           <% } else if (acessoMateriais) { %>
@@ -39,10 +42,10 @@
             <p>Gerencie sua identidade de acesso, foto e segurança da conta.</p>
           <% } %>
           <div class="my-portal-tags">
-            <span><%= colaborador?.funcao || conta.role || 'Perfil do sistema' %></span>
+            <span><%= identidade?.funcao || conta.funcao || conta.role || 'Perfil do sistema' %></span>
             <% if (acessoManutencao || acessoMateriais) { %>
-              <span><%= colaborador?.setor || (acessoManutencao ? 'Manutenção' : 'Setor vinculado') %></span>
-              <span class="<%= ativo ? 'is-ok' : 'is-warn' %>"><%= colaborador?.status || 'VÍNCULO PENDENTE' %></span>
+              <span><%= identidade?.setor || conta.setor || (acessoManutencao ? 'Manutenção' : 'Setor do perfil') %></span>
+              <span class="<%= ativo ? 'is-ok' : 'is-warn' %>"><%= identidade?.status || 'IDENTIDADE PENDENTE' %></span>
             <% } else { %>
               <span class="is-ok">CONTA ATIVA</span>
             <% } %>
@@ -52,12 +55,12 @@
     </div>
   </header>
 
-  <% if ((acessoManutencao || acessoMateriais) && !temVinculo) { %>
+  <% if (acessoMateriais && !temIdentidade) { %>
     <section class="my-portal-notice my-portal-panel--compact my-card-state--compact">
       <div>
-        <strong>Vínculo profissional pendente</strong>
-        <p>Seu perfil utiliza identificação profissional, mas ainda não foi possível localizar com segurança uma única ficha ativa com o mesmo nome.</p>
-        <small>O sistema não cria uma segunda ficha nem adivinha vínculos. O RH deve revisar nome, situação e possíveis duplicidades no cadastro de colaboradores.</small>
+        <strong>Identidade profissional indisponível</strong>
+        <p>Não foi possível carregar a identidade necessária para o Almoxarifado.</p>
+        <small>Perfis encarregados usam o próprio cadastro de usuário; somente o perfil operacional de mecânico utiliza ficha de colaborador.</small>
       </div>
     </section>
   <% } %>

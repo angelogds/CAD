@@ -70,7 +70,7 @@ test('cartão possui página dedicada para emissão, estado revogado e QR ativo'
   assert.match(card, /method="POST" action="\/meu-portal\/cartao\/emitir"/);
   assert.match(card, /employee-id-card/);
   assert.match(card, /Imprimir \/ salvar PDF/);
-  assert.match(controller, /Number\(colaborador\.qr_ativo \|\| 0\) === 1[\s\S]*qrDataUrl\(colaborador\)/);
+  assert.match(controller, /Number\(identidade\.qr_ativo \|\| 0\) === 1[\s\S]*qrDataUrl\(identidade\)/);
 });
 
 test('hub compacto é responsivo e mantém padronização das páginas internas', () => {

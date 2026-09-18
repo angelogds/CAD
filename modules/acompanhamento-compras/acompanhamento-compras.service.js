@@ -166,6 +166,9 @@ function listWithdrawals(solicitacaoId) {
   const joinColaborador = mc.has('retirado_por_colaborador_id') && tableExists('colaboradores')
     ? 'LEFT JOIN colaboradores c ON c.id=m.retirado_por_colaborador_id'
     : '';
+  const joinRetiradoUser = mc.has('retirado_por_user_id') && tableExists('users')
+    ? 'LEFT JOIN users ru ON ru.id=m.retirado_por_user_id'
+    : '';
   const joinEntregador = mc.has('entregue_por_user_id') && tableExists('users')
     ? 'LEFT JOIN users eu ON eu.id=m.entregue_por_user_id'
     : '';
@@ -186,7 +189,7 @@ function listWithdrawals(solicitacaoId) {
       ${mc.has('solicitacao_item_id') ? 'm.solicitacao_item_id' : 'NULL'} solicitacao_item_id,
       ${mc.has('os_id') ? 'm.os_id' : 'NULL'} os_id,
       ${mc.has('equipamento_id') ? 'm.equipamento_id' : 'NULL'} equipamento_id,
-      ${joinColaborador ? 'c.nome' : 'NULL'} retirado_por_nome,
+      ${joinColaborador && joinRetiradoUser ? 'COALESCE(c.nome,ru.name)' : joinColaborador ? 'c.nome' : joinRetiradoUser ? 'ru.name' : 'NULL'} retirado_por_nome,
       ${joinEntregador ? 'eu.name' : 'NULL'} entregue_por_nome,
       ${mc.has('identificacao_origem') ? 'm.identificacao_origem' : 'NULL'} identificacao_origem,
       ${mc.has('observacao') ? 'm.observacao' : 'NULL'} observacao
@@ -194,6 +197,7 @@ function listWithdrawals(solicitacaoId) {
     ${joinReserva}
     ${joinItem}
     ${joinColaborador}
+    ${joinRetiradoUser}
     ${joinEntregador}
     WHERE ${solicitationExpr}=?
       AND UPPER(COALESCE(m.tipo,'')) LIKE 'SAIDA%'

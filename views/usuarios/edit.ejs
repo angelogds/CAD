@@ -35,9 +35,21 @@
         <label>Perfil</label>
         <select class="input" name="role" required>
           <% ROLES.forEach(r => { %>
-            <option value="<%= r.key %>" <%= (String(user.role||'').toUpperCase() === r.key) ? "selected" : "" %>><%= r.label %></option>
+            <option value="<%= r.key %>" data-funcao="<%= r.funcao || '' %>" data-setor="<%= r.setor || '' %>" <%= (String(user.role||'').toUpperCase() === r.key) ? "selected" : "" %>><%= r.label %></option>
           <% }) %>
         </select>
+      </div>
+
+      <div>
+        <label>Função</label>
+        <input class="input" id="roleFunction" value="<%= user.funcao || '' %>" readonly />
+        <div class="muted">Derivada automaticamente do perfil.</div>
+      </div>
+
+      <div>
+        <label>Setor</label>
+        <input class="input" id="roleSector" value="<%= user.setor || '' %>" readonly />
+        <div class="muted">O perfil é a própria identidade do encarregado.</div>
       </div>
 
       <div>
@@ -93,6 +105,19 @@
 
 <script>
   (function () {
+    const roleSelect = document.querySelector('select[name="role"]');
+    const functionInput = document.getElementById('roleFunction');
+    const sectorInput = document.getElementById('roleSector');
+
+    function syncRoleContext() {
+      const option = roleSelect?.selectedOptions?.[0];
+      if (functionInput) functionInput.value = option?.dataset?.funcao || '';
+      if (sectorInput) sectorInput.value = option?.dataset?.setor || '';
+    }
+
+    roleSelect?.addEventListener('change', syncRoleContext);
+    syncRoleContext();
+
     function normalizeWhatsappInputValue(value) {
       const compact = String(value || '').replace(/[\s\-()+]/g, '').trim();
       if (!compact) return '';

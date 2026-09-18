@@ -3,10 +3,11 @@
 <link rel="stylesheet" href="/css/meu-portal.css?v=20260910-v3" />
 
 <%
-  const temVinculo = Boolean(colaborador);
-  const ativo = temVinculo && String(colaborador.status || '').toUpperCase() === 'ATIVO';
-  const cartaoAtivo = temVinculo && Number(colaborador.qr_ativo || 0) === 1 && Boolean(colaborador.qr_token) && Boolean(cardQr);
-  const cartaoRevogado = temVinculo && Boolean(colaborador.qr_token) && Number(colaborador.qr_ativo || 0) !== 1;
+  const pessoa = identidade || colaborador;
+  const temIdentidade = Boolean(pessoa);
+  const ativo = temIdentidade && String(pessoa.status || '').toUpperCase() === 'ATIVO';
+  const cartaoAtivo = temIdentidade && Number(pessoa.qr_ativo || 0) === 1 && Boolean(pessoa.qr_token) && Boolean(cardQr);
+  const cartaoRevogado = temIdentidade && Boolean(pessoa.qr_token) && Number(pessoa.qr_ativo || 0) !== 1;
 %>
 
 <div class="qr-card-page my-own-card-page my-personal-page">
@@ -22,10 +23,10 @@
     </div>
   </header>
 
-  <% if (!temVinculo) { %>
+  <% if (!temIdentidade) { %>
     <section class="card my-card-guidance no-print">
-      <strong>Vínculo com colaborador necessário</strong>
-      <p>Seu usuário ainda não está associado a uma ficha profissional. Procure o RH para liberar o cartão do Almoxarifado.</p>
+      <strong>Identidade indisponível</strong>
+      <p>Não foi possível carregar a identidade necessária para o cartão do Almoxarifado.</p>
     </section>
   <% } else if (cartaoRevogado) { %>
     <section class="card my-card-guidance no-print">
@@ -35,7 +36,7 @@
   <% } else if (!ativo) { %>
     <section class="card my-card-guidance no-print">
       <strong>Cartão indisponível</strong>
-      <p>O cartão é liberado somente para colaboradores com situação ativa na ficha profissional.</p>
+      <p>O cartão é liberado somente para identidades ativas no sistema.</p>
     </section>
   <% } else if (!cartaoAtivo) { %>
     <section class="card my-card-guidance no-print">
@@ -52,13 +53,13 @@
         <span>Gestão Industrial • Manutenção Integrada</span>
       </div>
       <div class="employee-id-card__body">
-        <img class="employee-id-card__photo" src="<%= colaborador.foto_url || user.photo_path || '/IMG/logo_menu.png.png' %>" alt="Foto de <%= colaborador.nome %>" />
+        <img class="employee-id-card__photo" src="<%= pessoa.foto_url || user.photo_path || '/IMG/logo_menu.png.png' %>" alt="Foto de <%= pessoa.nome %>" />
         <div class="employee-id-card__identity">
-          <small>COLABORADOR</small>
-          <h2><%= colaborador.nome %></h2>
-          <p><%= colaborador.funcao || 'Função não informada' %></p>
-          <p><%= colaborador.setor || 'Setor não informado' %></p>
-          <span class="employee-id-card__status"><%= colaborador.status || 'ATIVO' %></span>
+          <small><%= pessoa.identity_type === 'USUARIO' ? 'USUÁRIO RESPONSÁVEL' : 'COLABORADOR' %></small>
+          <h2><%= pessoa.nome %></h2>
+          <p><%= pessoa.funcao || 'Função não informada' %></p>
+          <p><%= pessoa.setor || 'Setor não informado' %></p>
+          <span class="employee-id-card__status"><%= pessoa.status || 'ATIVO' %></span>
         </div>
         <div class="employee-id-card__qr">
           <img src="<%= cardQr %>" alt="QR de identificação" />
