@@ -61,11 +61,12 @@ function safeApprovalSummary(id) {
 }
 
 function receiptPercent(row) {
-  const bought = Number(row?.itens || 0)
-    ? (row.itens || []).reduce((sum, item) => sum + Number(item.qtdComprada || 0), 0)
+  const itens = Array.isArray(row?.itens) ? row.itens : [];
+  const bought = itens.length
+    ? itens.reduce((sum, item) => sum + Number(item.qtdComprada || 0), 0)
     : Number(row?.comprados || 0);
-  const received = Number(row?.itens || 0)
-    ? (row.itens || []).reduce((sum, item) => sum + Number(item.qtdRecebida || 0), 0)
+  const received = itens.length
+    ? itens.reduce((sum, item) => sum + Number(item.qtdRecebida || 0), 0)
     : Number(row?.recebidos || 0);
   if (bought <= 0) return 0;
   return Math.min(100, Math.round((received / bought) * 100));
@@ -116,9 +117,19 @@ function listReservations(solicitacaoId) {
   const itemJoin = tableExists('estoque_itens') && cols.has('estoque_item_id')
     ? 'LEFT JOIN estoque_itens ei ON ei.id=r.estoque_item_id'
     : '';
-  const solItemJoin = tableExists('solicitacao_itens') && cols.has('solicitacao_item_id')
+  const solItemCols = columns('solicitacao_itens');
+  const solItemJoin = solItemCols.size && cols.has('solicitacao_item_id')
     ? 'LEFT JOIN solicitacao_itens si ON si.id=r.solicitacao_item_id'
     : '';
+  const solicitacaoItemName = solItemJoin
+    ? (solItemCols.has('item_nome') && solItemCols.has('item_descricao')
+      ? "COALESCE(si.item_nome, si.item_descricao)"
+      : solItemCols.has('item_nome')
+        ? 'si.item_nome'
+        : solItemCols.has('item_descricao')
+          ? 'si.item_descricao'
+          : 'NULL')
+    : 'NULL';
 
   return db.prepare(`
     SELECT
@@ -134,7 +145,7 @@ function listReservations(solicitacaoId) {
       r.created_at,
       r.updated_at,
       ${itemJoin ? "ei.nome" : "NULL"} estoque_item_nome,
-      ${solItemJoin ? "COALESCE(si.item_nome, si.item_descricao)" : "NULL"} solicitacao_item_nome
+      ${solicitacaoItemName} solicitacao_item_nome
     FROM estoque_reservas r
     ${itemJoin}
     ${solItemJoin}
