@@ -1,4 +1,5 @@
 const db = require('../../database/db');
+const { dbAliasesForSetor } = require('./compras-setores');
 
 function tableExists(name) {
   try { return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name); } catch { return false; }
@@ -12,6 +13,8 @@ function listPreCotacoesDemandas(limit = 12) {
   if (!tableExists('solicitacoes') || !tableExists('demandas') || !hasColumn('solicitacoes', 'demanda_id')) return [];
 
   const availabilityWhere = hasColumn('solicitacoes', 'disponivel_compras') ? 'AND COALESCE(s.disponivel_compras, 0) = 1' : '';
+  const setorAliases = hasColumn('solicitacoes', 'setor_origem') ? dbAliasesForSetor('RECICLAGEM') : [];
+  const setorWhere = setorAliases.length ? `AND s.setor_origem IN (${setorAliases.map(() => '?').join(',')})` : '';
   const quoteExpr = tableExists('solicitacao_itens') && hasColumn('solicitacao_itens', 'status_cotacao')
     ? "SUM(CASE WHEN COALESCE(si.status_cotacao, 'PENDENTE') <> 'PENDENTE' THEN 1 ELSE 0 END)"
     : '0';
@@ -36,6 +39,7 @@ function listPreCotacoesDemandas(limit = 12) {
     WHERE s.demanda_id IS NOT NULL
       AND COALESCE(s.os_id, 0) = 0
       ${availabilityWhere}
+      ${setorWhere}
       AND UPPER(COALESCE(s.status, 'ABERTA')) NOT IN ('CANCELADA','FECHADA','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE')
     GROUP BY s.id
     ORDER BY
@@ -43,7 +47,7 @@ function listPreCotacoesDemandas(limit = 12) {
       datetime(COALESCE(s.updated_at, s.created_at)) DESC,
       s.id DESC
     LIMIT ?
-  `).all(Math.min(50, Math.max(1, Number(limit) || 12)));
+  `).all(...setorAliases, Math.min(50, Math.max(1, Number(limit) || 12)));
 }
 
 function getDemandGate(solicitacaoId) {

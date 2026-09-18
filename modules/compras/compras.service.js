@@ -3,6 +3,7 @@ const path = require('path');
 const db = require('../../database/db');
 const osChatService = require('../os-chat/os-chat.service');
 const calculos = require('./compras.calculos');
+const { normalizeSetorCorporativo, setorMatches, dbAliasesForSetor } = require('./compras-setores');
 
 const STATUS = Object.freeze({
   ABERTA: 'ABERTA',
@@ -206,7 +207,13 @@ function listSolicitacoesPorStatus(filters = {}) {
     where.push("date(s.created_at) >= date('now', ?)");
     params.push(`-${Number(filters.period)} days`);
   }
-  if (filters.setor) { where.push('s.setor_origem = ?'); params.push(filters.setor); }
+  if (filters.setor) {
+    const aliases = dbAliasesForSetor(filters.setor);
+    if (aliases.length) {
+      where.push(`s.setor_origem IN (${aliases.map(() => '?').join(',')})`);
+      params.push(...aliases);
+    }
+  }
   if (filters.vinculadasOs) where.push('s.os_id IS NOT NULL');
   if (filters.urgentes) where.push("UPPER(COALESCE(s.prioridade, '')) IN ('ALTA', 'URGENTE', 'CRITICA', 'CRÍTICA', 'EMERGENCIAL')");
 
@@ -258,7 +265,7 @@ function getOperationalQueue(filters = {}) {
   const q = normalizeToken(filters.query);
   if (q) filtered = filtered.filter((row) => [row.numero, row.titulo, row.os_id, row.equipamento_nome, row.setor_origem,
     row.fornecedor_nome || row.fornecedor, row.responsavel_nome || row.solicitante_nome].some((value) => normalizeToken(value).includes(q)));
-  if (filters.setor) filtered = filtered.filter((row) => normalizeToken(row.setor_origem) === normalizeToken(filters.setor));
+  if (filters.setor) filtered = filtered.filter((row) => setorMatches(row.setor_origem, filters.setor));
   if (filters.responsavel) filtered = filtered.filter((row) => String(row.compras_user_id || '') === String(filters.responsavel));
   if (filters.prioridade) filtered = filtered.filter((row) => row.priorityGroup === filters.prioridade);
   if (tab === 'active' && filters.card) filtered = filtered.filter((row) => matchesCard(row, filters.card));
@@ -272,7 +279,7 @@ function getOperationalQueue(filters = {}) {
   const total = filtered.length; const limit = [10, 20, 50].includes(Number(filters.limit)) ? Number(filters.limit) : 20;
   const pages = Math.max(1, Math.ceil(total / limit)); const page = Math.min(Math.max(1, Number(filters.page) || 1), pages);
   return { rows: filtered.slice((page - 1) * limit, page * limit), total, limit, page, pages, cards,
-    groups: ['high', 'medium', 'low', 'undefined'], setores: [...new Set(rows.map(r => r.setor_origem).filter(Boolean))].sort(),
+    groups: ['high', 'medium', 'low', 'undefined'], setores: [...new Set(rows.map(r => normalizeSetorCorporativo(r.setor_origem)).filter(Boolean))].sort(),
     responsaveis: [...new Map(rows.filter(r => r.compras_user_id).map(r => [String(r.compras_user_id), { id: r.compras_user_id, nome: r.responsavel_nome || 'Não definido' }])).values()] };
 }
 

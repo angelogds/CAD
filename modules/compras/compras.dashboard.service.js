@@ -1,4 +1,5 @@
 const db = require('../../database/db');
+const { dbAliasesForSetor } = require('./compras-setores');
 
 const STATUS_ORDER = [
   'ABERTA',
@@ -177,8 +178,11 @@ function buildFilters(filters, params) {
   params.push(`-${normalizePeriod(filters.period)} days`);
 
   if (filters.setor) {
-    where.push('s.setor_origem = ?');
-    params.push(filters.setor);
+    const aliases = dbAliasesForSetor(filters.setor);
+    if (aliases.length) {
+      where.push(`s.setor_origem IN (${aliases.map(() => '?').join(',')})`);
+      params.push(...aliases);
+    }
   }
 
   if (filters.responsavel) {

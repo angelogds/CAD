@@ -1,5 +1,21 @@
 (() => {
+  function normalizeToken(value) {
+    return String(value || '')
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_|_$/g, '');
+  }
+
+  function isReciclagemSelecionada() {
+    const setor = new URLSearchParams(window.location.search).get('setor');
+    return ['RECICLAGEM', 'MANUTENCAO', 'PRODUCAO'].includes(normalizeToken(setor));
+  }
+
   async function loadDemandPrequotes() {
+    if (!isReciclagemSelecionada()) return;
     const dashboard = document.querySelector('.purchase-dashboard');
     if (!dashboard || document.querySelector('.demand-prequote-panel')) return;
 

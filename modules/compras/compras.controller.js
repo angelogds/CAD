@@ -6,6 +6,7 @@ const dashboardService = require('./compras.dashboard.service');
 const demandasComprasService = require('./compras-demandas.service');
 const { applyMigrations } = require('../../database/migrate');
 const storagePaths = require('../../config/storage');
+const { normalizeSetorCorporativo } = require('./compras-setores');
 
 const UPLOADS_DIR = storagePaths.UPLOAD_DIR;
 
@@ -105,6 +106,7 @@ function getOperationalQueue(filters) {
     ...row,
     status: service.normalizeStatus(row.status),
     priorityGroup: queuePriorityGroup(row.prioridade),
+    setor_origem_exibicao: normalizeSetorCorporativo(row.setor_origem),
   }));
   const activeRows = allRows.filter((row) => !OPERATIONALLY_CLOSED.has(row.status));
   const historyRows = allRows.filter((row) => OPERATIONALLY_CLOSED.has(row.status));
@@ -128,7 +130,7 @@ function getOperationalQueue(filters) {
   const pages = Math.max(1, Math.ceil(total / limit));
   const page = Math.min(Math.max(1, Number(filters.page) || 1), pages);
   const rows = filtered.slice((page - 1) * limit, page * limit);
-  const setores = [...new Set(allRows.map((row) => row.setor_origem).filter(Boolean))].sort();
+  const setores = [...new Set(allRows.map((row) => normalizeSetorCorporativo(row.setor_origem)).filter(Boolean))].sort();
   const responsaveis = [...new Map(allRows.filter((row) => row.compras_user_id).map((row) => [
     String(row.compras_user_id),
     { id: row.compras_user_id, nome: row.responsavel_nome || 'Não definido' },
@@ -215,7 +217,7 @@ function lista(req, res) {
           escapeCsv(s.status || "-"),
           escapeCsv(s.fornecedor_nome || s.fornecedor || "-"),
           escapeCsv(s.solicitante_nome || "-"),
-          escapeCsv(s.setor_origem || "-"),
+          escapeCsv(s.setor_origem_exibicao || normalizeSetorCorporativo(s.setor_origem) || "-"),
           escapeCsv(s.created_at || "-"),
         ].join(",")
       ),
