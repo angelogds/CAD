@@ -92,15 +92,17 @@ test('rotas de cartão têm gestão restrita e colaborador ativo é obrigatório
   assert.match(qrService, /qr_ativo=0/);
 });
 
-test('retirada QR resolve identidade no servidor e audita colaborador e almoxarife', () => {
+test('retirada QR resolve identidade no servidor e audita colaborador ou usuário e almoxarife', () => {
   const service = read('modules/estoque/estoque.reservas.service.js');
   const controller = read('modules/almoxarifado/retiradas-qr.controller.js');
   const routes = read('modules/almoxarifado/almoxarifado.routes.js');
 
-  assert.match(service, /getColaboradorByQr\(qrCode\)/);
+  assert.match(service, /getPessoaByQr\(qrCode\)/);
   assert.match(service, /retirado_por_colaborador_id/);
+  assert.match(service, /retirado_por_user_id/);
   assert.match(service, /entregue_por_user_id/);
-  assert.match(service, /identificacao_origem: 'QR_COLABORADOR'/);
+  assert.match(service, /QR_COLABORADOR/);
+  assert.match(service, /QR_USUARIO/);
   assert.match(service, /qtd > disponivelReserva/);
   assert.match(service, /qtd > Number\(reserva\.saldo_fisico/);
   assert.match(controller, /entreguePorUserId: req\.session\.user\.id/);
@@ -135,6 +137,6 @@ test('scanner oferece câmera com fallback para leitor USB ou entrada manual', (
   assert.match(view, /getUserMedia/);
   assert.match(view, /BarcodeDetector/);
   assert.match(view, /Leitor USB \/ código manual/);
-  assert.match(view, /QR do cartão do colaborador/);
-  assert.match(view, /Identifique um colaborador/);
+  assert.match(view, /QR do cartão do responsável ou colaborador/);
+  assert.match(view, /Identifique um responsável ou colaborador/);
 });
