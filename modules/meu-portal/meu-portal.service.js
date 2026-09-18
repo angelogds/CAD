@@ -104,6 +104,9 @@ function linkOwnUserToColaborador(userId, colaboradorId, actorRole) {
   const tx = db.transaction(() => {
     const user = getUserById(id);
     if (!user) throw new Error('Usuário não encontrado.');
+    if (isDirectUserIdentityRole(user.role)) {
+      throw new Error('Este perfil usa o próprio cadastro de usuário como identidade e não deve ser vinculado a uma ficha de colaborador.');
+    }
 
     const existingLink = db.prepare(`
       SELECT id, nome
