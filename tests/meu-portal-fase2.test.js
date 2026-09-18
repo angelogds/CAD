@@ -28,9 +28,10 @@ test('histórico de materiais é estritamente pessoal, autenticado e somente lei
   const service = read('modules/meu-portal/meu-portal.service.js');
 
   assert.match(routes, /router\.use\(requireLogin\)/);
-  assert.match(service, /const colaborador = getLinkedColaborador\(userId\)/);
+  assert.match(service, /const portal = getPortalData\(userId\)/);
+  assert.match(service, /const identityColumn = direct \? 'retirado_por_user_id' : 'retirado_por_colaborador_id'/);
+  assert.match(service, /m\.retirado_por_user_id = \?/);
   assert.match(service, /m\.retirado_por_colaborador_id = \?/);
-  assert.match(service, /params = \[Number\(colaborador\.id\)\]/);
   assert.match(service, /UPPER\(COALESCE\(m\.tipo,''\)\) LIKE 'SAIDA%'/);
   assert.doesNotMatch(routes, /router\.post\('\/materiais'/);
   assert.doesNotMatch(service, /UPDATE\s+estoque_movimentos|DELETE\s+FROM\s+estoque_movimentos|INSERT\s+INTO\s+estoque_movimentos/i);
@@ -46,9 +47,11 @@ test('materiais reutiliza rastreabilidade real de Estoque, Solicitação, OS e E
   assert.match(service, /LEFT JOIN users eu ON eu\.id=m\.entregue_por_user_id/);
   assert.match(service, /COUNT\(DISTINCT m\.item_id\) materiais_diferentes/);
   assert.match(service, /LIMIT 300/);
-  assert.match(estoque, /retirado_por_colaborador_id: colaborador\.id/);
+  assert.match(estoque, /retirado_por_colaborador_id:/);
+  assert.match(estoque, /retirado_por_user_id:/);
   assert.match(estoque, /entregue_por_user_id: entreguePorUserId/);
-  assert.match(estoque, /identificacao_origem: 'QR_COLABORADOR'/);
+  assert.match(estoque, /QR_COLABORADOR/);
+  assert.match(estoque, /QR_USUARIO/);
 });
 
 test('tela Meus Materiais oferece filtros, indicadores e rastreabilidade sem edição', () => {
