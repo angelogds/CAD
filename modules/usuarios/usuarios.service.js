@@ -74,7 +74,7 @@ function list({ q = "", role = "", status = "ativos" } = {}) {
 
   const sql = `
     SELECT id, name, email, role, photo_path, telefone_whatsapp, created_at,
-           COALESCE(ativo, 1) AS ativo, deleted_at,
+           funcao, setor, COALESCE(ativo, 1) AS ativo, deleted_at,
            ${extraIdentityFields}
     FROM users
     ${where.length ? "WHERE " + where.join(" AND ") : ""}
@@ -92,7 +92,7 @@ function getById(id) {
 
   const user = db.prepare(`
     SELECT id, name, email, role, photo_path, telefone_whatsapp, created_at,
-           COALESCE(ativo, 1) AS ativo, deleted_at,
+           funcao, setor, COALESCE(ativo, 1) AS ativo, deleted_at,
            ${extraIdentityFields}
     FROM users
     WHERE id = ?
