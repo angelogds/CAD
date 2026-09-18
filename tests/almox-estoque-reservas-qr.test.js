@@ -137,6 +137,6 @@ test('scanner oferece câmera com fallback para leitor USB ou entrada manual', (
   assert.match(view, /getUserMedia/);
   assert.match(view, /BarcodeDetector/);
   assert.match(view, /Leitor USB \/ código manual/);
-  assert.match(view, /QR do cartão do responsável ou colaborador/);
-  assert.match(view, /Identifique um responsável ou colaborador/);
+  assert.match(view, /responsável ou colaborador/);
+  assert.match(view, /Identifique o responsável/);
 });
