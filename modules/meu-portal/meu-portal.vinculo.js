@@ -6,6 +6,13 @@ const MAINTENANCE_SELF_SERVICE_ROLES = new Set([
   'ENCARREGADO_MANUTENCAO',
 ]);
 
+const MATERIAL_SELF_SERVICE_ROLES = new Set([
+  ...MAINTENANCE_SELF_SERVICE_ROLES,
+  'ENCARREGADO_LOGISTICA',
+  'ENCARREGADO_FRIGORIFICO',
+  'RH',
+]);
+
 function normalizeRole(value) {
   const role = String(value || '')
     .trim()
@@ -39,6 +46,10 @@ function hasColumn(table, column) {
 
 function canUseMaintenanceSelfService(role) {
   return MAINTENANCE_SELF_SERVICE_ROLES.has(normalizeRole(role));
+}
+
+function canUseMaterialSelfService(role) {
+  return MATERIAL_SELF_SERVICE_ROLES.has(normalizeRole(role));
 }
 
 function currentCollaboratorWhere(alias = 'c') {
@@ -112,7 +123,7 @@ function ensureAutomaticMaintenanceLink(userId) {
     LIMIT 1
   `).get(id);
 
-  if (!user || !canUseMaintenanceSelfService(user.role)) {
+  if (!user || !canUseMaterialSelfService(user.role)) {
     return { status: 'NOT_ELIGIBLE', colaboradorId: null };
   }
 
@@ -165,13 +176,39 @@ function ensureAutomaticMaintenanceLink(userId) {
 
 function attachAutomaticMaintenanceLink(req, res, next) {
   const user = req.session?.user || {};
-  const eligible = canUseMaintenanceSelfService(user.role);
-  res.locals.maintenanceSelfService = eligible;
+  const maintenanceEligible = canUseMaintenanceSelfService(user.role);
+  const materialEligible = canUseMaterialSelfService(user.role);
+  res.locals.maintenanceSelfService = maintenanceEligible;
+  res.locals.materialSelfService = materialEligible;
 
-  if (!eligible) return next();
+  if (!materialEligible) return next();
   try {
     res.locals.maintenanceLink = ensureAutomaticMaintenanceLink(user.id);
     return next();
+  } catch (error) {
+    return next(error);
+  }
+}
+
+function requireMaterialSelfService(req, res, next) {
+  const user = req.session?.user || {};
+  if (!canUseMaterialSelfService(user.role)) {
+    req.flash?.('error', 'Seu perfil não possui acesso ao cartão e ao histórico de retiradas do Almoxarifado.');
+    return res.redirect('/meu-portal');
+  }
+
+  try {
+    const result = ensureAutomaticMaintenanceLink(user.id);
+    if (['LINKED', 'AUTO_LINKED'].includes(result.status)) return next();
+
+    const messages = {
+      AMBIGUOUS: 'Há mais de uma ficha compatível com seu nome. O RH deve revisar o cadastro antes do vínculo.',
+      INACTIVE_LINK: 'Seu usuário possui um vínculo antigo/inativo. O RH deve revisar a ficha antes de liberar o autoatendimento.',
+      ALREADY_LINKED_TO_OTHER_USER: 'A ficha encontrada já está vinculada a outro usuário. O RH deve revisar o cadastro.',
+      NOT_FOUND: 'Não encontramos uma ficha ativa de colaborador com o mesmo nome do seu usuário.',
+    };
+    req.flash?.('error', messages[result.status] || 'Não foi possível confirmar seu vínculo com a ficha de colaborador.');
+    return res.redirect('/meu-portal');
   } catch (error) {
     return next(error);
   }
@@ -203,10 +240,13 @@ function requireMaintenanceSelfService(req, res, next) {
 
 module.exports = {
   MAINTENANCE_SELF_SERVICE_ROLES,
+  MATERIAL_SELF_SERVICE_ROLES,
   normalizeRole,
   normalizeName,
   canUseMaintenanceSelfService,
+  canUseMaterialSelfService,
   ensureAutomaticMaintenanceLink,
   attachAutomaticMaintenanceLink,
+  requireMaterialSelfService,
   requireMaintenanceSelfService,
 };
