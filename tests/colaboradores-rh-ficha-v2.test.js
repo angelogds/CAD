@@ -29,6 +29,9 @@ test('central de colaboradores possui KPIs, cadastro rápido e situação operac
   assert.match(source, /operacional/);
   assert.match(source, /\/escala\/rh/);
   assert.match(source, /Abrir ficha/);
+  assert.match(source, /ui-btn--primary/);
+  assert.match(source, /ui-btn--outline/);
+  assert.match(source, /href="\/rh">Central RH<\/a>/);
 });
 
 test('ficha individual consolida Escala, HE, banco e folgas sem remover fluxos existentes', () => {
@@ -56,6 +59,9 @@ test('ficha individual consolida Escala, HE, banco e folgas sem remover fluxos e
   assert.match(source, /horasExtras/);
   assert.match(source, /bancoMovimentos/);
   assert.match(source, /folgas/);
+  assert.match(source, /ui-btn--primary/);
+  assert.match(source, /ui-btn--danger-soft/);
+  assert.match(source, /href="\/rh">Central RH<\/a>/);
 
   for (const action of [
     '/perfil',

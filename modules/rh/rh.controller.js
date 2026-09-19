@@ -81,21 +81,10 @@ exports.jornada = (req, res, next) => renderArea(
   { activeRhSection: 'jornada' }
 );
 
-exports.colaborador = (req, res, next) => {
-  try {
-    const dashboard = loadDashboard(req);
-    const selected = loadSelected(req, req.params.id);
-    if (!selected?.colaborador) return res.status(404).send('Colaborador não encontrado.');
-    res.locals.activeMenu = 'rh';
-    return res.render('rh/colaborador', {
-      title: `RH • ${selected.colaborador.nome || 'Colaborador'}`,
-      dashboard,
-      selected,
-      activeRhSection: 'colaboradores',
-      dateBr,
-      formatMinutes,
-    });
-  } catch (error) { return next(error); }
+exports.colaborador = (req, res) => {
+  const id = Number(req.params.id || 0);
+  if (!id) return res.status(404).send('Colaborador não encontrado.');
+  return res.redirect(302, `/colaboradores/${id}`);
 };
 
 exports.folgas = (req, res, next) => renderArea(
