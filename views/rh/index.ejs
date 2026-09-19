@@ -77,7 +77,7 @@
               <% pessoas.forEach((c) => { %><option value="<%= c.id %>"><%= c.nome %> • <%= c.funcaoLabel || c.funcao || '-' %></option><% }) %>
             </select>
           </label>
-          <button class="btn btn-green" type="submit">Abrir ficha</button>
+          <button class="btn ui-btn ui-btn--primary" type="submit">Abrir ficha</button>
         </form>
       </article>
 
@@ -141,7 +141,7 @@
   form?.addEventListener('submit', (event) => {
     event.preventDefault();
     const id = Number(select?.value || 0);
-    if (id > 0) window.location.href = `/rh/colaboradores/${id}`;
+    if (id > 0) window.location.href = `/colaboradores/${id}`;
   });
 })();
 </script>
