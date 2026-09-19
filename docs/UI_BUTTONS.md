@@ -47,7 +47,7 @@ Base `btn`/`ui-btn`, cabeçalho, Solicitações (lista e detalhe), Compras (fila
 cotação e consenso), acompanhamento da Diretoria e formulário de nova Preventiva.
 O formulário de Preventivas tem seletores restritos à própria página.
 
-OS, Equipamentos, Demandas, Fornecedores e PCM também usam a base compartilhada.
+OS, Equipamentos, Demandas, Fornecedores, PCM e Motores também usam a base compartilhada.
 Colaboradores/RH passa a usar a mesma base nas ações da listagem, cadastro rápido
 e ficha mestre; o RH direciona a abertura nominal para a ficha canônica
 `/colaboradores/:id`, mantendo a rota histórica apenas como compatibilidade.
