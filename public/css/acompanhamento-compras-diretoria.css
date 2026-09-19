@@ -1,11 +1,7 @@
 .executive-buy-watch{--exec-border:#dbe7df;--exec-muted:#66766d;--exec-soft:#f5faf6;--exec-danger:#b42318;--exec-warning:#a15c00}
 .executive-watch-head .executive-badge{background:#eef8f1;border-color:#b9dec4;color:#176331}
-.executive-buy-watch .system-compact-btn{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:6px 10px;border-radius:8px;font-size:11px;font-weight:800;line-height:1;box-shadow:none;white-space:nowrap}
-.executive-buy-watch .system-compact-btn.btn-ghost{background:#fff;color:#294236;border:1px solid #d6e1da}
-.executive-buy-watch .system-compact-btn.btn-ghost:hover{background:#f1f7f3;border-color:#b8cdbf;color:#176331}
-.executive-buy-watch .system-compact-btn.btn-green{background:#19884a;border-color:#19884a;color:#fff}
-.executive-buy-watch .system-compact-btn.btn-green:hover{background:#14753f;border-color:#14753f}
-.executive-buy-watch .action-cell .system-compact-btn{min-width:64px}
+
+.executive-buy-watch .action-cell .system-compact-btn{min-width:86px}
 .executive-view-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
 .executive-view-tabs a{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;text-decoration:none;color:inherit;background:#fff;border:1px solid var(--exec-border);border-radius:12px;padding:12px 14px;box-shadow:0 2px 10px rgba(22,69,38,.04)}
 .executive-view-tabs a span{font-size:12px;font-weight:800;letter-spacing:.04em}.executive-view-tabs a strong{font-size:22px}.executive-view-tabs a small{grid-column:1/-1;color:var(--exec-muted)}
@@ -27,4 +23,4 @@ a.signal-card:hover,a.signal-card.active{border-color:#2f8f50;background:#f3fbf5
 .approval-main-button[disabled]{opacity:.45;cursor:not-allowed;box-shadow:none}
 @media(max-width:1280px){.executive-signals{grid-template-columns:repeat(4,minmax(150px,1fr))}}
 @media(max-width:900px){.executive-view-tabs{grid-template-columns:1fr}.executive-signals{grid-template-columns:repeat(2,minmax(0,1fr))}.next-action-chip{min-width:0}}
-@media(max-width:760px){.executive-signals{grid-template-columns:1fr}.executive-management-table td[data-label="Próxima ação"]{display:flex;justify-content:space-between;align-items:center;gap:10px}.executive-management-table td[data-label="Próxima ação"]:before{content:"PRÓXIMA AÇÃO";font-size:10px;font-weight:800;color:#607168}.executive-view-tabs a{padding:10px 12px}.approval-select-cell{width:auto}.approval-action-bar{align-items:flex-start}.executive-buy-watch .system-compact-btn{min-height:30px;padding:6px 9px}}
+@media(max-width:760px){.executive-signals{grid-template-columns:1fr}.executive-management-table td[data-label="Próxima ação"]{display:flex;justify-content:space-between;align-items:center;gap:10px}.executive-management-table td[data-label="Próxima ação"]:before{content:"PRÓXIMA AÇÃO";font-size:10px;font-weight:800;color:#607168}.executive-view-tabs a{padding:10px 12px}.approval-select-cell{width:auto}.approval-action-bar{align-items:flex-start}}

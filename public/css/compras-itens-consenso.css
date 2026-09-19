@@ -1,43 +1,6 @@
 /* Compras — organização da tabela e fluxo consensual de itens (03/09/2026). */
 
-.quote-page-head .ui-btn,
-.linked-os .ui-btn,
-.quote-items-card .ui-btn,
-.form-actions .ui-btn,
-.attachments .ui-btn,
-.exceptional-item-card .ui-btn,
-.purchase-consensus-dialog .ui-btn{
-  min-height:36px;
-  border:1px solid #b8d9c4;
-  border-radius:9px;
-  background:#159447;
-  color:#fff;
-  padding:8px 13px;
-  font:inherit;
-  font-size:12px;
-  font-weight:800;
-  line-height:1.15;
-  text-decoration:none;
-  cursor:pointer;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:6px;
-  transition:.16s ease;
-}
-.quote-page-head .ui-btn:hover,
-.linked-os .ui-btn:hover,
-.quote-items-card .ui-btn:hover,
-.form-actions .ui-btn:hover,
-.attachments .ui-btn:hover,
-.exceptional-item-card .ui-btn:hover,
-.purchase-consensus-dialog .ui-btn:hover{background:#117a3b;border-color:#117a3b}
-.ui-btn.ui-btn--outline{background:#fff;color:#18753d;border-color:#b9d5c4}
-.ui-btn.ui-btn--outline:hover{background:#f0f8f3;color:#126335;border-color:#81b894}
-.ui-btn.ui-btn--table{min-height:32px;padding:6px 10px;font-size:11px;white-space:nowrap}
-.ui-btn.ui-btn--danger-soft{background:#fff5f5;color:#ad3131;border-color:#efc4c4}
-.ui-btn.ui-btn--danger-soft:hover{background:#fee8e8;color:#8f2424;border-color:#eaa6a6}
-.ui-btn:disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
+/* Botões e estados definidos em ui-buttons.css. */
 
 .purchase-table-organized{border:1px solid #dfe9e2;border-radius:12px;background:#fff;overflow:auto}
 .purchase-table-organized .quote-table{width:100%;min-width:1120px;table-layout:fixed;border-collapse:separate;border-spacing:0}

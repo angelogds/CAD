@@ -35,7 +35,8 @@ test('painel de compras acompanha todos os estados gerenciais da solicitação',
 
 test('painel força a atualização coordenada dos recursos que impedem seleção azul na fila', () => {
   const view = fs.readFileSync(viewPath, 'utf8');
-  const version = '20260819-selection-artifacts-v2';
+  const version = view.match(/compras-dashboard\.css\?v=([^"\s]+)/)?.[1];
+  assert.ok(version, 'a folha principal deve ter uma versão de cache');
 
   assert.match(view, new RegExp(`compras-dashboard\\.css\\?v=${version}`));
   assert.match(view, new RegExp(`compras-active-priority-fix\\.css\\?v=${version}`));

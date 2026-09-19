@@ -71,7 +71,7 @@
       reject.textContent = 'Recusar';
       const approve = document.createElement('button');
       approve.type = 'submit';
-      approve.className = 'ui-btn ui-btn--table';
+      approve.className = 'ui-btn ui-btn--primary ui-btn--table';
       approve.textContent = 'Aprovar alteração';
       approve.addEventListener('click', (event) => {
         if (!window.confirm(`Confirmar a alteração de ${currentQty} para ${proposedQty}?`)) event.preventDefault();
@@ -206,7 +206,7 @@
     cancel.addEventListener('click', () => dialog.close());
     const submit = document.createElement('button');
     submit.type = 'submit';
-    submit.className = 'ui-btn';
+    submit.className = 'ui-btn ui-btn--primary';
     submit.textContent = 'Enviar para confirmação';
     actions.append(cancel, submit);
 

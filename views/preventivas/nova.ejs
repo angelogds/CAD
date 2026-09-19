@@ -1,17 +1,8 @@
 <% layout("layout") %>
 
-<style>
-  .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;max-width:900px}
-  .muted{color:#6b7280}
-  .btn{display:inline-block;padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;font-weight:800;cursor:pointer}
-  .btn:hover{border-color:#16a34a;color:#16a34a}
-  .btn-primary{background:#16a34a;color:#fff;border-color:#16a34a}
-  .btn-primary:hover{filter:brightness(.95);color:#fff}
-  .field{margin-top:10px}
-  input,select,textarea{width:100%;height:40px;border-radius:10px;border:1px solid #e5e7eb;padding:0 10px}
-  textarea{height:90px;padding:10px}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-</style>
+<link rel="stylesheet" href="/css/preventivas-form.css?v=20260919-1">
+
+<div class="preventive-form-page">
 
 <h1>Nova Preventiva Manual</h1>
 <p class="muted" style="margin-top:-6px;">Criar preventiva pendente com origem MANUAL.</p>
@@ -19,8 +10,8 @@
 <div class="card">
   <form method="POST" action="/preventivas">
     <div class="field">
-      <label class="muted" style="font-size:12px;font-weight:800;">Equipamento</label>
-      <select name="equipamento_id" required>
+      <label for="equipamento_id" class="muted" style="font-size:12px;font-weight:800;">Equipamento</label>
+      <select id="equipamento_id" name="equipamento_id" required>
         <option value="">— Selecione —</option>
         <% (equipamentos || []).forEach(e => { %>
           <option value="<%= e.id %>"><%= (e.codigo ? e.codigo + " • " : "") + e.nome %></option>
@@ -29,14 +20,14 @@
     </div>
 
     <div class="field">
-      <label class="muted" style="font-size:12px;font-weight:800;">Título</label>
-      <input name="titulo" required placeholder="Ex: Lubrificação dos mancais do Digestor Laranja" />
+      <label for="titulo" class="muted" style="font-size:12px;font-weight:800;">Título</label>
+      <input id="titulo" name="titulo" required placeholder="Ex: Lubrificação dos mancais do Digestor Laranja" />
     </div>
 
     <div class="grid field">
       <div>
-        <label class="muted" style="font-size:12px;font-weight:800;">Tipo da preventiva</label>
-        <select name="tipo_preventiva">
+        <label for="tipo_preventiva" class="muted" style="font-size:12px;font-weight:800;">Tipo da preventiva</label>
+        <select id="tipo_preventiva" name="tipo_preventiva">
           <option value="preventiva" selected>Preventiva</option>
           <option value="preventiva_reforcada">Preventiva reforçada</option>
           <option value="reforma">Reforma</option>
@@ -44,8 +35,8 @@
         </select>
       </div>
       <div>
-        <label class="muted" style="font-size:12px;font-weight:800;">Criticidade</label>
-        <select name="criticidade">
+        <label for="criticidade" class="muted" style="font-size:12px;font-weight:800;">Criticidade</label>
+        <select id="criticidade" name="criticidade">
           <option value="BAIXA">BAIXA</option>
           <option value="MEDIA" selected>MÉDIA</option>
           <option value="ALTA">ALTA</option>
@@ -56,12 +47,12 @@
 
     <div class="grid field">
       <div>
-        <label class="muted" style="font-size:12px;font-weight:800;">Data prevista</label>
-        <input name="data_prevista" type="date" required />
+        <label for="data_prevista" class="muted" style="font-size:12px;font-weight:800;">Data prevista</label>
+        <input id="data_prevista" name="data_prevista" type="date" required />
       </div>
       <div>
-        <label class="muted" style="font-size:12px;font-weight:800;">Frequência</label>
-        <select name="frequencia_tipo">
+        <label for="frequencia_tipo" class="muted" style="font-size:12px;font-weight:800;">Frequência</label>
+        <select id="frequencia_tipo" name="frequencia_tipo">
           <option value="diario">Diário</option>
           <option value="semanal">Semanal</option>
           <option value="mensal" selected>Mensal</option>
@@ -71,17 +62,18 @@
     </div>
 
     <div class="field">
-      <label class="muted" style="font-size:12px;font-weight:800;">Observação</label>
-      <textarea name="observacao" placeholder="Observações técnicas (opcional)"></textarea>
+      <label for="observacao" class="muted" style="font-size:12px;font-weight:800;">Observação</label>
+      <textarea id="observacao" name="observacao" placeholder="Observações técnicas (opcional)"></textarea>
     </div>
 
     <div class="muted" style="margin-top:8px;font-size:12px;">
       Status inicial da execução: <strong>PENDENTE</strong>. Os responsáveis serão escalados automaticamente conforme a escala vigente.
     </div>
 
-    <div class="field" style="display:flex;gap:10px;justify-content:flex-end;">
-      <a class="btn" href="/preventivas">Voltar</a>
+    <div class="field preventive-form-actions">
+      <a class="btn btn-secondary" href="/preventivas">Voltar</a>
       <button class="btn btn-primary" type="submit">Salvar preventiva manual</button>
     </div>
   </form>
+</div>
 </div>

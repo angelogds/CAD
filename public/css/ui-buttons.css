@@ -1,0 +1,153 @@
+/* Componentes de ação compartilhados.
+   .btn é o alias de compatibilidade; .ui-btn é a API para novas telas.
+   As folhas dos módulos cuidam apenas do posicionamento dos controles. */
+:root {
+  --ui-action: var(--action-700, #15803d);
+  --ui-action-hover: #166534;
+  --ui-action-soft: #f0fdf4;
+  --ui-button-text: #166534;
+  --ui-button-border: #8bb89a;
+  --ui-danger: #b91c1c;
+  --ui-danger-hover: #991b1b;
+  --ui-danger-soft: #fff1f2;
+  --ui-focus: #2563eb;
+  --ui-button-radius: 8px;
+  --ui-button-gap: 8px;
+}
+
+.btn,
+.ui-btn {
+  --button-height: 38px;
+  --button-padding-x: 14px;
+  --button-font-size: 13px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-button-gap);
+  min-height: var(--button-height);
+  height: auto;
+  max-width: 100%;
+  padding: 7px var(--button-padding-x);
+  border: 1px solid var(--button-border, var(--ui-button-border));
+  border-radius: var(--ui-button-radius);
+  background: var(--button-bg, #fff);
+  color: var(--button-text, var(--ui-button-text));
+  font-family: inherit;
+  font-size: var(--button-font-size);
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+
+:is(.btn, .ui-btn):not(:disabled):not([aria-disabled="true"]):hover,
+details[open] > summary:is(.btn, .ui-btn) {
+  background: var(--button-hover-bg, var(--ui-action-soft));
+  border-color: var(--button-hover-border, var(--ui-action));
+  color: var(--button-hover-text, var(--button-text, var(--ui-button-text)));
+}
+
+:is(.btn, .ui-btn):focus-visible {
+  outline: 3px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+.btn-primary,
+.btn-green,
+.ui-btn--primary {
+  --button-bg: var(--ui-action);
+  --button-border: var(--ui-action);
+  --button-text: #fff;
+  --button-hover-bg: var(--ui-action-hover);
+  --button-hover-border: var(--ui-action-hover);
+}
+
+.btn-outline,
+.ui-btn--outline {
+  --button-bg: #fff;
+  --button-border: var(--ui-button-border);
+  --button-text: var(--ui-button-text);
+}
+
+.btn-secondary,
+.btn-ghost,
+.ui-btn--secondary {
+  --button-bg: #fff;
+  --button-border: #cbd5e1;
+  --button-text: #334155;
+  --button-hover-bg: #f1f5f9;
+  --button-hover-border: #94a3b8;
+}
+
+.ui-btn--soft {
+  --button-bg: var(--ui-action-soft);
+}
+
+.btn-red,
+.btn-danger,
+.ui-btn--danger,
+.ui-btn--danger-soft {
+  --button-bg: var(--ui-danger-soft);
+  --button-border: #e7a1a7;
+  --button-text: var(--ui-danger);
+  --button-hover-bg: #ffe4e6;
+  --button-hover-border: var(--ui-danger);
+  --button-hover-text: var(--ui-danger-hover);
+}
+
+.btn-dark {
+  --button-bg: #0f172a;
+  --button-border: #0f172a;
+  --button-text: #fff;
+  --button-hover-bg: #1e293b;
+  --button-hover-border: #1e293b;
+}
+
+.btn-sm,
+.ui-btn--table,
+.ui-btn--compact {
+  --button-height: 34px;
+  --button-padding-x: 10px;
+  --button-font-size: 12px;
+}
+
+.ui-btn--table { min-width: 86px; }
+.ui-btn--large { --button-height: 42px; --button-padding-x: 18px; }
+.btn-icon,
+.ui-btn--icon { min-width: var(--button-height); --button-padding-x: 8px; }
+:is(.btn, .ui-btn) > :is(svg, img) { width: 16px; height: 16px; flex-shrink: 0; }
+
+summary:is(.btn, .ui-btn) { list-style: none; }
+summary:is(.btn, .ui-btn)::-webkit-details-marker { display: none; }
+
+:is(.btn, .ui-btn):disabled,
+:is(.btn, .ui-btn)[aria-disabled="true"] {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* aria-disabled em links exige também href/ativação tratados pela própria tela. */
+:is(.btn, .ui-btn)[aria-disabled="true"] { pointer-events: none; }
+:is(.btn, .ui-btn)[aria-busy="true"] { cursor: progress; }
+
+@media (max-width: 768px), (pointer: coarse) {
+  .btn,
+  .ui-btn {
+    --button-height: 44px;
+    min-height: var(--button-height);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .ui-btn { transition: none; }
+}

@@ -49,13 +49,6 @@
 }
 
 @media (min-width:769px){
-  .topbar .btn{
-    min-height:34px;
-    padding:6px 10px;
-    border-radius:9px;
-    font-size:12px;
-  }
-
   .topbar .pill{
     gap:7px;
     padding:5px 8px;
