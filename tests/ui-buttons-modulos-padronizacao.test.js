@@ -54,7 +54,8 @@ test('folhas locais não redefinem a raiz visual das famílias migradas', () => 
   ];
   for (const [file, selector] of cssFiles) {
     const css = fs.readFileSync(file, 'utf8');
-    const escaped = selector.replace('.', '\\.');
-    assert.doesNotMatch(css, new RegExp(`${escaped}\\s*\\{`), file);
+    const selectors = [...css.matchAll(/(?:^|})\\s*([^{}]+)\\{/g)]
+      .flatMap((match) => match[1].split(',').map((item) => item.trim()));
+    assert.equal(selectors.includes(selector), false, `${file}: ${selector}`);
   }
 });
