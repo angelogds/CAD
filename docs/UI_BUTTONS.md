@@ -48,7 +48,10 @@ cotação e consenso), acompanhamento da Diretoria e formulário de nova Prevent
 O formulário de Preventivas tem seletores restritos à própria página.
 
 OS, Equipamentos, Demandas, Fornecedores e PCM também usam a base compartilhada.
-As classes históricas desses módulos permanecem apenas como hooks locais de layout
+Colaboradores/RH passa a usar a mesma base nas ações da listagem, cadastro rápido
+e ficha mestre; o RH direciona a abertura nominal para a ficha canônica
+`/colaboradores/:id`, mantendo a rota histórica apenas como compatibilidade.
+As classes históricas dos módulos permanecem apenas como hooks locais de layout
 e compatibilidade, enquanto cor, tipografia, altura, raio, foco e estados ficam sob
 responsabilidade de `ui-btn` e suas variantes. Preservar identificadores usados
 pelo JavaScript e permissões existentes. Os mesmos tokens e variantes orientam a
