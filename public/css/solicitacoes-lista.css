@@ -181,7 +181,7 @@
   .sol-list-head { align-items: stretch; flex-direction: column; }
   .sol-list-head h1 { font-size: clamp(1.35rem, 6vw, 1.65rem); }
   .sol-list-head > div:last-child { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
-  .sol-list-head .btn { width: 100%; padding-inline: 8px; white-space: normal; text-align: center; }
+  .sol-list-head .btn { width: 100%; }
   .sol-filter-box { padding: 10px; }
   .sol-filter-box nav {
     overflow-x: auto;
@@ -213,7 +213,6 @@
     justify-content: flex-end;
     gap: 8px;
   }
-  .row-actions .btn { min-height: 34px; padding: 6px 10px; }
 }
 
 @media (max-width: 380px) {

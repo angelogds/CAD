@@ -231,8 +231,6 @@
 }
 
 .sidebar-toggle,
-.topbar-right .btn,
-.topbar-notification,
 .user-menu-summary{
   min-height:36px;
   height:36px;
@@ -258,21 +256,6 @@
   flex-wrap:nowrap;
   justify-content:flex-end;
 }
-.topbar-right .btn{
-  padding:0 10px;
-  font-size:11.5px;
-  font-weight:850;
-}
-.topbar-extra-btn{
-  color:#fff !important;
-  background:var(--shell-green) !important;
-  border-color:var(--shell-green) !important;
-  box-shadow:0 5px 13px rgba(21,128,61,.14) !important;
-}
-.topbar-extra-btn:hover{
-  background:var(--shell-green-dark) !important;
-  border-color:var(--shell-green-dark) !important;
-}
 
 .topbar-notification-wrap,
 .user-menu{
@@ -281,7 +264,6 @@
 }
 .topbar-notification{
   min-width:50px;
-  padding:0 9px !important;
   list-style:none;
   cursor:pointer;
   gap:5px;
@@ -289,7 +271,6 @@
 }
 .topbar-notification::-webkit-details-marker,
 .user-menu-summary::-webkit-details-marker{display:none;}
-.topbar-notification:hover,
 .user-menu-summary:hover{
   border-color:#bdd7c7;
   background:#f8fcf9;
@@ -457,20 +438,14 @@
   }
   .topbar-logos img{height:19px;}
   .topbar-right{gap:5px;}
-  .topbar-right .btn,
-  .topbar-notification,
   .user-menu-summary{
     height:34px;
     min-height:34px;
     border-radius:9px;
   }
-  .topbar-extra-btn{
-    padding:0 8px !important;
-    font-size:10.5px !important;
-  }
+
   .topbar-notification{
     min-width:42px;
-    padding:0 7px !important;
   }
   .user-menu-summary{
     width:34px !important;
@@ -496,7 +471,7 @@
 @media (max-width:390px){
   .topbar-title{max-width:132px;}
   .topbar-sub{display:none;}
-  .topbar-extra-btn{padding-inline:7px !important;}
+
 }
 
 /* Global mobile guard: modules may scroll internally, but the page shell stays compact. */
@@ -542,6 +517,7 @@
     min-width:0;
     white-space:nowrap;
   }
+
 }
 
 @media (max-width:420px){
@@ -557,16 +533,11 @@
     max-width:clamp(96px,38vw,150px);
   }
 
-  .topbar-extra-btn{
-    padding-inline:6px !important;
-    font-size:10px !important;
-  }
 }
 
 @media (prefers-reduced-motion:reduce){
   .nav-item,
   .sidebar,
   .sidebar-toggle,
-  .topbar-right .btn,
   .user-menu-summary{transition:none !important;}
 }

@@ -2,7 +2,8 @@ const CACHE_NAME = 'campo-do-gado-v2-mobile';
 const STATIC_ASSETS = [
   '/',
   '/dashboard',
-  '/css/app.css',
+  '/css/app.css?v=20260919-1',
+  '/css/ui-buttons.css?v=20260919-1',
   '/js/app-layout.js',
   '/js/push.js',
   '/manifest.webmanifest',

@@ -18,10 +18,10 @@ const quoteValue = Number(approvalCtx?.quote?.totalCentavos || sol.resumoItens?.
 %>
 <link rel="stylesheet" href="/css/compras-recebimento-alertas.css?v=20260902-v1">
 <link rel="stylesheet" href="/css/compras-painel.css?v=20260903-consenso-v1">
-<link rel="stylesheet" href="/css/compras-itens-consenso.css?v=20260903-v1">
+<link rel="stylesheet" href="/css/compras-itens-consenso.css?v=20260919-1">
 <link rel="stylesheet" href="/css/compras-aprovacao-diretoria.css?v=20260909-v1">
 
-<div class="page-head quote-page-head"><div><h1><%= sol.numero || ('Solicitação #' + sol.id) %></h1><p class="muted">Solicitante: <%= sol.solicitante_nome || '-' %> • Setor: <%= sol.setor_origem || '-' %> • Status: <strong><%= String(sol.status).replaceAll('_',' ') %></strong></p></div><div class="quote-actions"><a class="ui-btn ui-btn--outline" href="/compras/solicitacoes">Voltar</a><a class="ui-btn" href="/compras/solicitacoes/<%= sol.id %>/pdf">Baixar cópia do PDF</a></div></div>
+<div class="page-head quote-page-head"><div><h1><%= sol.numero || ('Solicitação #' + sol.id) %></h1><p class="muted">Solicitante: <%= sol.solicitante_nome || '-' %> • Setor: <%= sol.setor_origem || '-' %> • Status: <strong><%= String(sol.status).replaceAll('_',' ') %></strong></p></div><div class="quote-actions"><a class="ui-btn ui-btn--outline" href="/compras/solicitacoes">Voltar</a><a class="ui-btn ui-btn--secondary" href="/compras/solicitacoes/<%= sol.id %>/pdf">Baixar cópia do PDF</a></div></div>
 <% if (sol.os_id) { %><div class="card linked-os"><div><strong>🔗 Vinculada à OS <%= sol.os_id %><%= sol.equipamento_nome ? (' — ' + sol.equipamento_nome) : '' %></strong></div><div class="linked-os-actions"><a class="ui-btn ui-btn--table" href="/chat-os/<%= sol.os_id %>">Abrir conversa da OS</a><a class="ui-btn ui-btn--outline ui-btn--table" href="/os/<%= sol.os_id %>">Abrir OS</a></div></div><% } %>
 
 <% if(pendingDeletionCount){ %>
@@ -62,7 +62,7 @@ const quoteValue = Number(approvalCtx?.quote?.totalCentavos || sol.resumoItens?.
       <% } else if(quoteReady && Array.isArray(diretores) && diretores.length){ %>
         <form method="POST" action="/compras/solicitacoes/<%=sol.id%>/aprovacao/enviar">
           <label><span class="label">Diretor responsável</span><select class="input" name="diretor_user_id" required><option value="">Selecionar diretor</option><% diretores.forEach(d=>{ %><option value="<%=d.id%>" <%=Number(approvalCtx?.diretor_aprovador_user_id)===Number(d.id)?'selected':''%>><%=d.name||('Diretor #'+d.id)%></option><% }) %></select></label>
-          <button class="ui-btn" type="submit">Enviar cotação para aprovação</button>
+          <button class="ui-btn ui-btn--primary" type="submit">Enviar cotação para aprovação</button>
         </form>
       <% } else if(!quoteReady){ %>
         <div class="purchase-approval-message is-warning">Finalize a cotação de todos os itens ativos, com fornecedor e valor, antes de enviar para a Diretoria.</div>
@@ -106,7 +106,7 @@ const quoteValue = Number(approvalCtx?.quote?.totalCentavos || sol.resumoItens?.
 <div><label class="label">Condição de pagamento</label><input class="input" name="condicao_pagamento" value="<%= sol.condicao_pagamento || '' %>"></div><div><label class="label">Validade da cotação</label><input class="input" type="date" name="validade_cotacao" value="<%= sol.validade_cotacao ? String(sol.validade_cotacao).slice(0,10):'' %>"></div>
 <div><label class="label">Previsão de entrega</label><input class="input" type="date" name="previsao_entrega" value="<%= sol.previsao_entrega ? String(sol.previsao_entrega).slice(0,10):'' %>"></div><div><label class="label">Número do pedido</label><input class="input" name="numero_pedido" value="<%= sol.numero_pedido || '' %>"></div><div><label class="label">Número da nota fiscal</label><input class="input" name="numero_nota_fiscal" value="<%= sol.numero_nota_fiscal || '' %>"></div><div class="span-all"><label class="label">Observações de Compras</label><textarea class="input" name="observacoes_compras"><%= sol.observacoes_compras || '' %></textarea></div></div></div>
 <div class="card financial"><div class="section-title">RESUMO FINANCEIRO</div><div><span>Subtotal dos itens ativos</span><strong data-subtotal><%= money(sol.resumoItens.subtotalCentavos) %></strong></div><label><span>Frete</span><input class="input adjustment" name="frete" value="<%= (sol.resumoItens.freteCentavos/100).toFixed(2).replace('.',',') %>"></label><label><span>Desconto</span><input class="input adjustment" name="desconto" value="<%= (sol.resumoItens.descontoCentavos/100).toFixed(2).replace('.',',') %>"></label><div class="grand-total"><span>Total geral</span><strong data-total-geral><%= money(sol.resumoItens.totalCentavos) %></strong></div></div></div>
-<div class="form-actions"><button class="ui-btn ui-btn--outline" type="submit" name="acao" value="salvar">Salvar rascunho</button><button class="ui-btn" type="submit" name="acao" value="comprar">Marcar itens selecionados como COMPRADOS</button></div></form>
+<div class="form-actions"><button class="ui-btn ui-btn--outline" type="submit" name="acao" value="salvar">Salvar rascunho</button><button class="ui-btn ui-btn--primary" type="submit" name="acao" value="comprar">Marcar itens selecionados como COMPRADOS</button></div></form>
 
 <section class="card exceptional-item-card" id="item-excepcional">
   <div class="exceptional-item-head"><div><span class="section-kicker">EXCEÇÃO CONTROLADA</span><h2>Adicionar item fora da solicitação original</h2><p>Use quando Compras precisar incluir um material adquirido ou cotado depois da abertura. O item passa a integrar esta mesma solicitação e seguirá normalmente para o Almoxarifado e Estoque.</p></div><span class="origin-badge">AUDITADO</span></div>
@@ -120,7 +120,7 @@ const quoteValue = Number(approvalCtx?.quote?.totalCentavos || sol.resumoItens?.
     <label><span class="label">Fornecedor</span><select class="input" name="fornecedor_id"><option value="">Selecionar quando aplicável</option><% fornecedores.forEach(f=>{ %><option value="<%=f.id%>"><%=f.nome%></option><% }) %></select></label>
     <label><span class="label">Valor unitário</span><input class="input" name="valor_unitario" inputmode="decimal" placeholder="0,00"></label>
     <label class="span-3"><span class="label">Justificativa obrigatória</span><textarea class="input" name="adicao_justificativa" maxlength="1200" required placeholder="Explique por que este item está sendo incluído após a solicitação original."></textarea></label>
-    <div class="span-3 exceptional-item-actions"><small>Se “Já foi comprado” for selecionado, fornecedor e valor unitário tornam-se obrigatórios.</small><button class="ui-btn" type="submit">Adicionar à solicitação</button></div>
+    <div class="span-3 exceptional-item-actions"><small>Se “Já foi comprado” for selecionado, fornecedor e valor unitário tornam-se obrigatórios.</small><button class="ui-btn ui-btn--primary" type="submit">Adicionar à solicitação</button></div>
   </form>
   <% } else { %><div class="exceptional-item-blocked">A solicitação já está em uma etapa encerrada para inclusão de novos itens.</div><% } %>
 </section>

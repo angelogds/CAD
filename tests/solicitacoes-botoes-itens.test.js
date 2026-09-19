@@ -5,8 +5,8 @@ const fs = require('node:fs');
 const view = fs.readFileSync('views/solicitacoes/show.ejs', 'utf8');
 
 test('ações dos itens usam rótulos simples e padronizados', () => {
-  assert.match(view, /<summary>Editar<\/summary>/);
-  assert.match(view, /<summary>Excluir<\/summary>/);
+  assert.match(view, /<summary(?:\s[^>]*)?>Editar<\/summary>/);
+  assert.match(view, /<summary(?:\s[^>]*)?>Excluir<\/summary>/);
   assert.doesNotMatch(view, /Editar \/ propor alteração/);
   assert.doesNotMatch(view, /Solicitar exclusão/);
 });

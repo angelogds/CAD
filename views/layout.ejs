@@ -12,9 +12,10 @@
   <link rel="icon" type="image/png" sizes="1024x1024" href="/images/pwa/icon.png" />
   <link rel="apple-touch-icon" sizes="1024x1024" href="/images/pwa/icon.png" />
   <title><%= title || "Manutenção Campo do Gado" %></title>
-  <link rel="stylesheet" href="/css/app.css" />
-  <link rel="stylesheet" href="/css/ui-maintenance-shell-2026.css" />
-  <link rel="stylesheet" href="/css/ui-shell-modern-2026.css?v=20260819-shell-01" />
+  <link rel="stylesheet" href="/css/app.css?v=20260919-1" />
+  <link rel="stylesheet" href="/css/ui-maintenance-shell-2026.css?v=20260919-1" />
+  <link rel="stylesheet" href="/css/ui-shell-modern-2026.css?v=20260919-1" />
+  <link rel="stylesheet" href="/css/ui-buttons.css?v=20260919-1" />
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'meu-portal') { %><link rel="stylesheet" href="/css/meu-portal-modernizacao.css?v=20260910-p5" /><% } %>
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'escala') { %><link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b" /><% } %>
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><link rel="stylesheet" href="/css/compras-demandas-pre-cotacao.css?v=20260902-v1" /><% } %>
@@ -124,8 +125,8 @@
     <script src="/js/app-layout.js" defer></script>
     <script src="/js/push.js" defer></script>
     <script src="/js/mobile-bridge.js" defer></script>
-    <% if (user) { %><script src="/js/consenso-botoes-confirmacao.js?v=20260911-1" defer></script><% } %>
-    <% if (user && ['ADMIN','COMPRAS'].includes(normalizeRole(user.role || user.perfil || ''))) { %><script src="/js/compras-consenso-bilateral.js?v=20260911-2" data-compras-consenso-bilateral defer></script><% } %>
+    <% if (user) { %><script src="/js/consenso-botoes-confirmacao.js?v=20260919-1" defer></script><% } %>
+    <% if (user && ['ADMIN','COMPRAS'].includes(normalizeRole(user.role || user.perfil || ''))) { %><script src="/js/compras-consenso-bilateral.js?v=20260919-1" data-compras-consenso-bilateral defer></script><% } %>
     <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><script src="/js/compras-itens-liberados-dashboard.js?v=20260911-v1" defer></script><% } %>
     <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><script src="/js/compras-demandas-pre-cotacao.js?v=20260902-v1" defer></script><% } %>
   <% } %>

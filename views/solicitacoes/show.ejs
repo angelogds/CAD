@@ -46,11 +46,9 @@ const pendingChanges = itemChanges.filter((row) => String(row.status || '').toUp
 const pendingChangeByItem = new Map(pendingChanges.map((row) => [Number(row.solicitacao_item_id), row]));
 const terminalForItems = ['RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SOLICITANTE','FECHADA','CANCELADA'].includes(statusKey);
 %>
-<link rel="stylesheet" href="/css/solicitacao-detail-modern.css?v=20260819">
-<link rel="stylesheet" href="/css/solicitacao-itens-consenso.css?v=20260911-v2">
-<style>
-.sol-material-tools{display:flex;gap:.65rem;align-items:center;flex-wrap:wrap}.sol-inline-details{border:1px solid #dfe8e2;border-radius:10px;padding:.6rem .75rem;background:#fff}.sol-inline-details>summary{cursor:pointer;font-weight:700;color:#146c43}.sol-item-actions-compact{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.5rem}.sol-item-action{position:relative}.sol-item-action>summary{list-style:none;min-width:76px;text-align:center;border:1px solid #d1d5db!important;border-radius:8px!important;padding:.48rem .72rem!important;background:#fff!important;color:#172033!important;font-size:.78rem;font-weight:800;cursor:pointer;transition:all .15s ease}.sol-item-action>summary::-webkit-details-marker{display:none}.sol-item-action.is-edit>summary:hover,.sol-item-action.is-edit[open]>summary{background:#e9f9ef!important;border-color:#16a34a!important;color:#166534!important}.sol-item-action.is-delete>summary:hover,.sol-item-action.is-delete[open]>summary{background:#fff1f2!important;border-color:#ef4444!important;color:#b91c1c!important}.sol-item-action[open]{flex-basis:100%}.sol-item-action-panel{margin-top:.55rem;padding:.75rem;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}.sol-item-form-grid{display:grid;grid-template-columns:2fr .7fr .7fr;gap:.65rem;margin-top:.75rem}.sol-item-form-grid .wide{grid-column:1/-1}.sol-item-form-grid input,.sol-item-form-grid textarea,.sol-item-form-grid select,.sol-consensus-form input{width:100%;border:1px solid #d6dfda;border-radius:8px;padding:.62rem .7rem;background:#fff}.sol-item-actions{display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.45rem}.sol-item-actions button,.sol-item-actions summary,.sol-add-material button{border:0;border-radius:8px;padding:.5rem .75rem;font-weight:700;cursor:pointer}.sol-item-actions .edit{background:#e8f5ee;color:#146c43}.sol-item-actions .danger{background:#fff0f0;color:#a42828}.sol-add-material{margin-top:.8rem;padding:1rem;border:1px dashed #9fcbb2;border-radius:12px;background:#f7fcf9}.sol-add-material h3{margin:0 0 .35rem}.sol-change-oldnew{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}.sol-change-oldnew>div{padding:.65rem;border-radius:9px;background:#f7f9f8}.sol-change-history{margin-top:.8rem}.sol-origin-badge.requester{background:#eef7ff;color:#1d5f91}.sol-consensus-card+.sol-consensus-card{margin-top:.75rem}@media(max-width:760px){.sol-item-form-grid,.sol-change-oldnew{grid-template-columns:1fr}.sol-item-form-grid .wide{grid-column:auto}.sol-material-table th:last-child,.sol-material-table td:last-child{min-width:220px}}
-</style>
+<link rel="stylesheet" href="/css/solicitacao-detail-modern.css?v=20260919-1">
+<link rel="stylesheet" href="/css/solicitacao-itens-consenso.css?v=20260919-1">
+
 
 <div class="sol-detail-page">
   <header class="sol-detail-hero">
@@ -81,7 +79,7 @@ const terminalForItems = ['RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SO
   <% } %>
 
   <% if (pendingChanges.length) { %>
-    <section id="consenso-itens" class="sol-card sol-consensus-card" aria-label="Alterações de itens aguardando confirmação">
+    <section id="consenso-itens" class="sol-card sol-consensus-card" data-consensus-kind="alteracao" aria-label="Alterações de itens aguardando confirmação">
       <div class="sol-card-head"><div><h2>Alterações aguardando consenso</h2><small>O valor atual continua valendo até a outra parte aprovar.</small></div><span class="sol-item-state pending"><%= pendingChanges.length %> pendente(s)</span></div>
       <div class="sol-consensus-list">
         <% pendingChanges.forEach((row) => { const canAnswer = Number(row.solicitada_por_user_id) !== Number(currentUserId) && canManageItems; %>
@@ -96,8 +94,8 @@ const terminalForItems = ['RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SO
               <form class="sol-consensus-form" method="POST" action="/solicitacoes/<%=solicitacao.id%>/itens/<%=row.solicitacao_item_id%>/alteracao/aprovar">
                 <input name="observacao" maxlength="1200" placeholder="Observação da decisão (opcional)">
                 <div class="sol-consensus-actions">
-                  <button class="reject" type="submit" formaction="/solicitacoes/<%=solicitacao.id%>/itens/<%=row.solicitacao_item_id%>/alteracao/recusar">Recusar</button>
-                  <button class="approve" type="submit" onclick="return confirm('Aprovar e aplicar esta alteração?')">Aprovar alteração</button>
+                  <button class="reject ui-btn ui-btn--danger-soft ui-btn--compact" type="submit" formaction="/solicitacoes/<%=solicitacao.id%>/itens/<%=row.solicitacao_item_id%>/alteracao/recusar">Recusar</button>
+                  <button class="approve ui-btn ui-btn--primary ui-btn--compact" type="submit" onclick="return confirm('Aprovar e aplicar esta alteração?')">Aprovar alteração</button>
                 </div>
               </form>
             <% } else { %><div class="sol-consensus-wait">Aguardando confirmação da outra parte.</div><% } %>
@@ -108,7 +106,7 @@ const terminalForItems = ['RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SO
   <% } %>
 
   <% if (pendingExclusions.length) { %>
-    <section class="sol-card sol-consensus-card" aria-label="Pedidos de exclusão aguardando confirmação">
+    <section class="sol-card sol-consensus-card" data-consensus-kind="exclusao" aria-label="Pedidos de exclusão aguardando confirmação">
       <div class="sol-card-head"><div><h2>Exclusões aguardando consenso</h2><small>Nenhum item é removido sem confirmação da outra parte.</small></div><span class="sol-item-state pending"><%= pendingExclusions.length %> pendente(s)</span></div>
       <div class="sol-consensus-list">
         <% pendingExclusions.forEach((item) => { const canAnswer = Number(item.exclusao_solicitada_por_user_id) !== Number(currentUserId) && canManageItems; %>
@@ -118,7 +116,7 @@ const terminalForItems = ['RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SO
             <% if (canAnswer) { %>
               <form class="sol-consensus-form" method="POST" action="/solicitacoes/<%=solicitacao.id%>/itens/<%=item.id%>/exclusao/aprovar">
                 <input name="observacao" maxlength="1000" placeholder="Observação da decisão (opcional)">
-                <div class="sol-consensus-actions"><button class="reject" type="submit" formaction="/solicitacoes/<%=solicitacao.id%>/itens/<%=item.id%>/exclusao/recusar">Manter item</button><button class="approve" type="submit" onclick="return confirm('Confirmar a exclusão deste item? O histórico será preservado.')">Confirmar exclusão</button></div>
+                <div class="sol-consensus-actions"><button class="reject ui-btn ui-btn--secondary ui-btn--compact" type="submit" formaction="/solicitacoes/<%=solicitacao.id%>/itens/<%=item.id%>/exclusao/recusar">Manter item</button><button class="approve ui-btn ui-btn--danger-soft ui-btn--compact" type="submit" onclick="return confirm('Confirmar a exclusão deste item? O histórico será preservado.')">Confirmar exclusão</button></div>
               </form>
             <% } else { %><div class="sol-consensus-wait">Aguardando confirmação da outra parte.</div><% } %>
           </div>
@@ -158,7 +156,7 @@ const terminalForItems = ['RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SO
             <textarea class="wide" name="item_descricao" maxlength="1200" rows="2" placeholder="Descrição / especificação"></textarea>
             <textarea class="wide" name="adicao_justificativa" maxlength="1200" rows="2" required placeholder="Motivo da inclusão (ex.: complemento necessário para a mesma OS/equipamento)"></textarea>
           </div>
-          <div class="sol-item-actions"><button class="edit" type="submit">Adicionar sem criar nova solicitação</button></div>
+          <div class="sol-item-actions"><button class="edit ui-btn ui-btn--primary" type="submit">Adicionar sem criar nova solicitação</button></div>
         </form>
       </details>
     <% } %>
@@ -191,7 +189,7 @@ const terminalForItems = ['RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SO
                 <% if (canManageItems && !terminalForItems && !cancelled && !pending && !pendingChange) { %>
                   <div class="sol-item-actions-compact" aria-label="Ações do item">
                     <details class="sol-item-action is-edit">
-                      <summary>Editar</summary>
+                      <summary class="ui-btn ui-btn--outline ui-btn--table">Editar</summary>
                       <div class="sol-item-action-panel">
                         <form method="POST" action="/solicitacoes/<%=solicitacao.id%>/itens/<%=item.id%>/alteracao">
                           <div class="sol-item-form-grid">
@@ -201,16 +199,16 @@ const terminalForItems = ['RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SO
                             <textarea class="wide" name="item_descricao" maxlength="1200" rows="2"><%= item.item_descricao || item.observacao_item || '' %></textarea>
                             <textarea class="wide" name="motivo" maxlength="1200" required rows="2" placeholder="Informe o motivo da alteração"></textarea>
                           </div>
-                          <div class="sol-item-actions"><button class="edit" type="submit">Salvar alteração</button></div>
+                          <div class="sol-item-actions"><button class="edit ui-btn ui-btn--primary" type="submit">Salvar alteração</button></div>
                         </form>
                       </div>
                     </details>
                     <details class="sol-item-action is-delete">
-                      <summary>Excluir</summary>
+                      <summary class="ui-btn ui-btn--danger-soft ui-btn--table">Excluir</summary>
                       <div class="sol-item-action-panel">
                         <form method="POST" action="/solicitacoes/<%=solicitacao.id%>/itens/<%=item.id%>/exclusao/solicitar">
                           <textarea name="motivo" maxlength="1200" required rows="2" placeholder="Informe o motivo da exclusão"></textarea>
-                          <div class="sol-item-actions"><button class="danger" type="submit" onclick="return confirm('Confirmar solicitação de exclusão deste item?')">Confirmar exclusão</button></div>
+                          <div class="sol-item-actions"><button class="danger ui-btn ui-btn--danger-soft" type="submit" onclick="return confirm('Confirmar solicitação de exclusão deste item?')">Confirmar exclusão</button></div>
                         </form>
                       </div>
                     </details>

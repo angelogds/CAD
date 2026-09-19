@@ -5,7 +5,6 @@
     style.dataset.consensoConfirmacaoUi = '1';
     style.textContent = `
       .consensus-decision-buttons{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;margin-top:7px}
-      .consensus-decision-buttons button:disabled{opacity:.55;cursor:not-allowed;filter:grayscale(.15)}
       .consensus-decision-hint{display:block;margin-top:5px;color:#806514;font-size:10px;font-weight:700;line-height:1.35}
       .sol-consensus-wait .consensus-decision-buttons{justify-content:flex-start}
       @media(max-width:620px){.consensus-decision-buttons{display:grid;grid-template-columns:1fr 1fr}.consensus-decision-buttons button{width:100%}}
@@ -14,26 +13,24 @@
   }
 
   function renameActiveButtons() {
-    document.querySelectorAll('.purchase-change-actions form').forEach((form) => {
+    document.querySelectorAll('.purchase-change-actions form, .sol-consensus-form').forEach((form) => {
       const buttons = [...form.querySelectorAll('button[type="submit"]')];
       buttons.forEach((button) => {
-        const target = String(button.formAction || button.getAttribute('formaction') || form.action || '');
-        if (target.includes('/recusar')) button.textContent = 'Recusar alteração';
-        else if (target.includes('/aprovar')) button.textContent = 'Confirmar alteração';
-      });
-    });
-
-    document.querySelectorAll('.sol-consensus-form').forEach((form) => {
-      const buttons = [...form.querySelectorAll('button[type="submit"]')];
-      buttons.forEach((button) => {
-        const target = String(button.formAction || button.getAttribute('formaction') || form.action || '');
-        if (target.includes('/recusar')) button.textContent = 'Recusar alteração';
-        else if (target.includes('/aprovar')) button.textContent = 'Confirmar alteração';
+        // Sem formaction explícita, a ação pertence ao formulário.
+        const target = String(button.getAttribute('formaction') || form.action || '');
+        const decision = target.match(/\/(alteracao|exclusao)\/(aprovar|recusar)(?:[/?#]|$)/);
+        if (!decision) return;
+        const isExclusion = decision[1] === 'exclusao';
+        const label = decision[2] === 'recusar'
+          ? (isExclusion ? 'Manter item' : 'Recusar alteração')
+          : (isExclusion ? 'Confirmar exclusão' : 'Confirmar alteração');
+        // O observer também vê mudanças de texto: não gerar mutações repetidas.
+        if (button.textContent !== label) button.textContent = label;
       });
     });
   }
 
-  function addDisabledDecisionButtons(container, message) {
+  function addDisabledDecisionButtons(container, message, isExclusion = false) {
     if (!container || container.querySelector('.consensus-decision-buttons')) return;
 
     const actions = document.createElement('div');
@@ -42,15 +39,15 @@
     const reject = document.createElement('button');
     reject.type = 'button';
     reject.disabled = true;
-    reject.className = 'ui-btn ui-btn--danger-soft ui-btn--table';
-    reject.textContent = 'Recusar alteração';
+    reject.className = isExclusion ? 'ui-btn ui-btn--secondary ui-btn--table' : 'ui-btn ui-btn--danger-soft ui-btn--table';
+    reject.textContent = isExclusion ? 'Manter item' : 'Recusar alteração';
     reject.title = message;
 
     const approve = document.createElement('button');
     approve.type = 'button';
     approve.disabled = true;
-    approve.className = 'ui-btn ui-btn--table';
-    approve.textContent = 'Confirmar alteração';
+    approve.className = isExclusion ? 'ui-btn ui-btn--danger-soft ui-btn--table' : 'ui-btn ui-btn--primary ui-btn--table';
+    approve.textContent = isExclusion ? 'Confirmar exclusão' : 'Confirmar alteração';
     approve.title = message;
 
     const hint = document.createElement('small');
@@ -77,7 +74,8 @@
   function enhanceSolicitationWaitStates() {
     document.querySelectorAll('.sol-consensus-wait').forEach((wait) => {
       const message = 'Você criou esta proposta ou não é a contraparte responsável. O outro lado do consenso deve confirmar ou recusar.';
-      addDisabledDecisionButtons(wait, message);
+      const isExclusion = wait.closest('[data-consensus-kind]')?.dataset.consensusKind === 'exclusao';
+      addDisabledDecisionButtons(wait, message, isExclusion);
     });
   }
 

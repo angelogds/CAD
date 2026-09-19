@@ -1,0 +1,12 @@
+/* Estilos restritos ao formulário, sem alterar o cabeçalho do sistema. */
+.preventive-form-page .card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:14px; max-width:900px; }
+.preventive-form-page .muted { color:#6b7280; }
+.preventive-form-page .field { margin-top:10px; }
+.preventive-form-page :is(input, select, textarea) { box-sizing:border-box; width:100%; min-height:40px; border-radius:10px; border:1px solid #e5e7eb; padding:8px 10px; }
+.preventive-form-page textarea { min-height:90px; resize:vertical; }
+.preventive-form-page .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.preventive-form-actions { display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; }
+@media (max-width:600px) {
+  .preventive-form-page .grid { grid-template-columns:1fr; }
+  .preventive-form-actions .btn { width:100%; }
+}

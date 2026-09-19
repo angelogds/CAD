@@ -9,7 +9,7 @@ const sidebar = fs.readFileSync(path.join(root, 'views/partials/sidebar.ejs'), '
 const css = fs.readFileSync(path.join(root, 'public/css/ui-shell-modern-2026.css'), 'utf8');
 
 test('topbar usa shell moderno e mantém logout somente no menu do usuário', () => {
-  assert.match(layout, /ui-shell-modern-2026\.css\?v=20260819-shell-01/);
+  assert.match(layout, /ui-shell-modern-2026\.css\?v=[^"\s]+/);
   assert.equal(layout.includes('class="desktop-logout"'), false);
   assert.equal((layout.match(/action="\/auth\/logout"/g) || []).length, 1);
   assert.match(layout, /class="btn btn-ghost user-menu-logout"/);
