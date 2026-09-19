@@ -33,6 +33,6 @@ test('javascript limpa ranges residuais somente na fila operacional', () => {
 
 test('view força nova versão de cache dos assets de compras', () => {
   const view = read('views/compras/solicitacoes/index.ejs');
-  assert.match(view, /compras-active-priority-fix\.css\?v=20260819-selection-artifacts-v2/);
-  assert.match(view, /compras-dashboard\.js\?v=20260819-selection-artifacts-v2/);
+  assert.match(view, /compras-active-priority-fix\.css\?v=20260919-1/);
+  assert.match(view, /compras-dashboard\.js\?v=20260919-1/);
 });
