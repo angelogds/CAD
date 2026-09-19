@@ -35,7 +35,7 @@
       <p>Cadastro, seleção e histórico dos parceiros de compra</p>
     </div>
     <% if (canManage) { %>
-      <a class="supplier-btn supplier-btn-primary" href="/fornecedores/novo<%= qs.toString() ? '?' + qs : '' %>"><%- icon('plus') %> Novo fornecedor</a>
+      <a class="supplier-btn supplier-btn-primary ui-btn ui-btn--primary" href="/fornecedores/novo<%= qs.toString() ? '?' + qs : '' %>"><%- icon('plus') %> Novo fornecedor</a>
     <% } %>
   </header>
 
@@ -54,7 +54,7 @@
       <label class="filter-field"><span>Categoria</span><select class="supplier-input" name="categoria"><option value="">Todas</option><% categories.forEach(c => { %><option value="<%= c.id %>" <%= String(filters.categoria) === String(c.id) ? 'selected' : '' %>><%= c.nome %></option><% }) %></select></label>
       <label class="filter-field"><span>Cidade / UF</span><input class="supplier-input" name="local" value="<%= filters.local %>" placeholder="Cidade ou UF"></label>
       <label class="filter-field"><span>Situação</span><select class="supplier-input" name="situacao"><option value="">Todas</option><option value="ATIVO" <%= filters.situacao === 'ATIVO' ? 'selected' : '' %>>Ativos</option><option value="INATIVO" <%= filters.situacao === 'INATIVO' ? 'selected' : '' %>>Inativos</option></select></label>
-      <div class="filter-actions"><button class="supplier-btn supplier-btn-primary" type="submit">Filtrar</button><a class="supplier-btn supplier-btn-quiet" href="/fornecedores<%= qs.toString() ? '?' + qs : '' %>">Limpar filtros</a></div>
+      <div class="filter-actions"><button class="supplier-btn supplier-btn-primary ui-btn ui-btn--primary" type="submit">Filtrar</button><a class="supplier-btn supplier-btn-quiet ui-btn ui-btn--secondary" href="/fornecedores<%= qs.toString() ? '?' + qs : '' %>">Limpar filtros</a></div>
       <fieldset class="filter-secondary"><legend>Filtros adicionais</legend><label><input type="checkbox" name="favorito" value="1" <%= filters.favorito === '1' ? 'checked' : '' %>> Somente favoritos</label><label><input type="checkbox" name="pendencia" value="1" <%= filters.pendencia === '1' ? 'checked' : '' %>> Com pendências cadastrais</label></fieldset>
     </form>
     <div class="quick-filters"><strong>Busca rápida:</strong><div><% quickLabels.forEach(label => { const active = String(filters.q || '').toLocaleLowerCase('pt-BR') === label.toLocaleLowerCase('pt-BR'); %><a class="quick-chip <%= active ? 'is-selected' : '' %>" href="<%= withContext('?q=' + encodeURIComponent(label)) %>"><%= label %></a><% }) %></div></div>
@@ -62,13 +62,13 @@
 
   <section class="supplier-card supplier-list">
     <nav class="supplier-tabs" aria-label="Visualizações da lista">
-      <a class="<%= filters.situacao === 'ATIVO' && !filters.favorito && !filters.pendencia ? 'is-active' : '' %>" href="<%= withContext('?situacao=ATIVO') %>">Fornecedores ativos</a>
+      <a class="<%= filters.situacao === 'ATIVO' && !filters.favorito !filters.pendencia ? 'is-active' : '' %>" href="<%= withContext('?situacao=ATIVO') %>">Fornecedores ativos</a>
       <a class="<%= filters.favorito === '1' ? 'is-active' : '' %>" href="<%= withContext('?favorito=1') %>">Favoritos</a>
       <a class="<%= filters.situacao === 'INATIVO' ? 'is-active' : '' %>" href="<%= withContext('?situacao=INATIVO') %>">Inativos</a>
       <a class="<%= filters.pendencia === '1' ? 'is-active' : '' %>" href="<%= withContext('?pendencia=1') %>">Pendências cadastrais</a>
     </nav>
     <% if (!fornecedores.length) { %>
-      <div class="supplier-empty"><span class="empty-icon"><%- icon('users') %></span><h3><%= hasFilters ? 'Nenhum fornecedor encontrado' : 'Comece seu cadastro de parceiros' %></h3><p><%= hasFilters ? 'Revise os critérios ou limpe os filtros para visualizar outros parceiros.' : 'Cadastre contatos, produtos e serviços para agilizar as próximas cotações.' %></p><div><% if (hasFilters) { %><a class="supplier-btn supplier-btn-secondary" href="/fornecedores<%= qs.toString() ? '?' + qs : '' %>">Limpar filtros</a><% } %><% if (canManage) { %><a class="supplier-btn supplier-btn-primary" href="/fornecedores/novo<%= qs.toString() ? '?' + qs : '' %>"><%- icon('plus') %> Cadastrar <%= hasFilters ? 'novo fornecedor' : 'primeiro fornecedor' %></a><% } %></div></div>
+      <div class="supplier-empty"><span class="empty-icon"><%- icon('users') %></span><h3><%= hasFilters ? 'Nenhum fornecedor encontrado' : 'Comece seu cadastro de parceiros' %></h3><p><%= hasFilters ? 'Revise os critérios ou limpe os filtros para visualizar outros parceiros.' : 'Cadastre contatos, produtos e serviços para agilizar as próximas cotações.' %></p><div><% if (hasFilters) { %><a class="supplier-btn supplier-btn-secondary ui-btn ui-btn--outline" href="/fornecedores<%= qs.toString() ? '?' + qs : '' %>">Limpar filtros</a><% } %><% if (canManage) { %><a class="supplier-btn supplier-btn-primary ui-btn ui-btn--primary" href="/fornecedores/novo<%= qs.toString() ? '?' + qs : '' %>"><%- icon('plus') %> Cadastrar <%= hasFilters ? 'novo fornecedor' : 'primeiro fornecedor' %></a><% } %></div></div>
     <% } else { %>
       <div class="supplier-table">
         <div class="supplier-row supplier-columns"><span>Fornecedor</span><span>Produtos e serviços</span><span>Local / contato</span><span>Desempenho</span><span>Última compra</span><span>Ações</span></div>
@@ -79,7 +79,7 @@
             <div data-label="Local / contato"><b><%= f.cidade || 'Local não informado' %><%= f.uf ? ' • ' + f.uf : '' %></b><small><%= f.responsavel_comercial || 'Contato não informado' %><%= f.whatsapp ? ' • WhatsApp' : (f.telefone ? ' • Telefone' : '') %></small></div>
             <div data-label="Desempenho"><% if (Number(f.total_cotacoes) + Number(f.total_compras)) { %><b><%= f.total_cotacoes %> cotações • <%= f.total_compras %> compras</b><small><%= f.lead_time_medio_dias ? `Prazo cadastrado: ${f.lead_time_medio_dias} dias` : 'Prazo não informado' %></small><small>Total comprado: <%= money(f.valor_total_centavos) %></small><% } else { %><span class="muted">Sem histórico suficiente</span><% } %></div>
             <div data-label="Última compra"><b><%= f.ultima_compra_item || 'Sem compras' %></b><small><%= f.ultima_compra_em ? new Date(f.ultima_compra_em).toLocaleDateString('pt-BR') : '—' %></small></div>
-            <div data-label="Ações" class="supplier-actions"><% if (selectionContext) { %><a class="supplier-btn supplier-btn-primary supplier-btn-small" href="<%= selectionContext.returnTo %>?fornecedor_selecionado=<%= f.id %><%= selectionContext.itemId ? '&item_id=' + selectionContext.itemId : '' %>">Selecionar</a><a class="supplier-link" href="/fornecedores/<%= f.id %>">Ver perfil</a><% } else { %><a class="supplier-btn supplier-btn-secondary supplier-btn-small" href="/fornecedores/<%= f.id %>">Ver perfil</a><% } %><% if (canManage) { %><div class="supplier-icon-actions"><a href="/fornecedores/<%= f.id %>/editar" title="Editar fornecedor" aria-label="Editar fornecedor"><%- icon('edit') %></a><form method="post" action="/fornecedores/<%= f.id %>/favorito"><button type="submit" title="Alternar favorito" aria-label="Alternar favorito"><%- icon('star', f.favorito ? 'is-filled' : '') %></button></form></div><% } %></div>
+            <div data-label="Ações" class="supplier-actions"><% if (selectionContext) { %><a class="supplier-btn supplier-btn-primary supplier-btn-small ui-btn ui-btn--primary ui-btn--compact" href="<%= selectionContext.returnTo %>?fornecedor_selecionado=<%= f.id %><%= selectionContext.itemId ? '&item_id=' + selectionContext.itemId : '' %>">Selecionar</a><a class="supplier-link" href="/fornecedores/<%= f.id %>">Ver perfil</a><% } else { %><a class="supplier-btn supplier-btn-secondary supplier-btn-small ui-btn ui-btn--outline ui-btn--compact" href="/fornecedores/<%= f.id %>">Ver perfil</a><% } %><% if (canManage) { %><div class="supplier-icon-actions"><a href="/fornecedores/<%= f.id %>/editar" title="Editar fornecedor" aria-label="Editar fornecedor"><%- icon('edit') %></a><form method="post" action="/fornecedores/<%= f.id %>/favorito"><button type="submit" title="Alternar favorito" aria-label="Alternar favorito"><%- icon('star', f.favorito ? 'is-filled' : '') %></button></form></div><% } %></div>
           </article>
         <% }) %>
       </div>
