@@ -1,164 +1,151 @@
 <% layout('layout') %>
+<link rel="stylesheet" href="/css/motores.css?v=20260919-motores-v2" />
+<%
+  const statusClass = ({
+    EM_USO: 'is-use',
+    ENVIADO_REBOB: 'is-rebob',
+    RETORNOU: 'is-return',
+    RESERVA: 'is-reserve',
+  }[String(motor.status || '').toUpperCase()] || '');
+  const statusLabel = String(motor.status || '-').replaceAll('_', ' ');
+  const isRebob = motor.status === 'ENVIADO_REBOB';
+%>
 
-<div class="page">
-
-  <div class="page-head">
-    <div>
-      <h1>Motor #<%= motor.id %></h1>
-      <p class="muted">Detalhes e movimentações</p>
+<main class="mot-page">
+  <header class="mot-hero mot-profile-head">
+    <div class="mot-profile-title">
+      <div class="mot-icon">M</div>
+      <div>
+        <span class="mot-eyebrow">FICHA TÉCNICA DO MOTOR</span>
+        <h1><%= motor.codigo || `Motor #${motor.id}` %></h1>
+        <p><%= motor.descricao || '-' %></p>
+        <div class="mot-inline-badges">
+          <span class="mot-status <%= statusClass %>"><%= statusLabel %></span>
+          <span class="mot-status"><%= motor.origem_unidade || '-' %></span>
+          <% if (motor.prazo_status === 'ATRASADO') { %><span class="mot-status is-danger">Retorno atrasado</span><% } %>
+          <% if (motor.prazo_status === 'PROXIMO') { %><span class="mot-status is-warning">Prazo próximo</span><% } %>
+        </div>
+      </div>
     </div>
-    <a class="btn btn-ghost" href="/motores">Voltar</a>
-  </div>
+    <div class="mot-actions">
+      <a class="ui-btn ui-btn--secondary" href="/motores">Voltar</a>
+    </div>
+  </header>
 
-  <!-- DADOS -->
-  <div class="card">
+  <section class="mot-panel">
+    <div class="mot-section-head">
+      <div><h2>Dados técnicos</h2><p>Identificação e condição atual do motor.</p></div>
+    </div>
+    <div class="mot-spec-grid">
+      <div class="mot-spec"><span>Potência</span><strong><%= motor.potencia_cv != null ? `${motor.potencia_cv} CV` : '-' %></strong></div>
+      <div class="mot-spec"><span>Rotação</span><strong><%= motor.rpm != null ? `${motor.rpm} RPM` : '-' %></strong></div>
+      <div class="mot-spec"><span>Local de instalação</span><strong><%= motor.local_instalacao || 'Não informado' %></strong></div>
+      <div class="mot-spec"><span>Situação</span><strong><%= statusLabel %></strong></div>
+      <div class="mot-spec"><span>Empresa de rebobinamento</span><strong><%= motor.empresa_rebob || '-' %></strong></div>
+      <div class="mot-spec"><span>Saída</span><strong><%= motor.data_saida ? dateBr.formatDateTimeBR(motor.data_saida) : '-' %></strong></div>
+      <div class="mot-spec"><span>Previsão de retorno</span><strong><%= motor.previsao_retorno ? dateBr.formatDateBR(motor.previsao_retorno) : '-' %></strong></div>
+      <div class="mot-spec"><span>Retorno realizado</span><strong><%= motor.data_retorno ? dateBr.formatDateTimeBR(motor.data_retorno) : '-' %></strong></div>
+      <div class="mot-spec"><span>Motorista saída</span><strong><%= motor.motorista_saida || '-' %></strong></div>
+      <div class="mot-spec"><span>Motorista retorno</span><strong><%= motor.motorista_retorno || '-' %></strong></div>
+      <div class="mot-spec"><span>Tempo em rebobinamento</span><strong><%= isRebob && motor.dias_em_rebob != null ? `${motor.dias_em_rebob} dia(s)` : '-' %></strong></div>
+      <div class="mot-spec"><span>Observação atual</span><strong><%= motor.observacao || '-' %></strong></div>
+    </div>
+  </section>
 
-    <div class="grid-2">
-
-      <div>
-        <div class="label">Código</div>
-        <div><%= motor.codigo || '-' %></div>
-      </div>
-
-      <div>
-        <div class="label">Descrição</div>
-        <div><%= motor.descricao %></div>
-      </div>
-
-      <div>
-        <div class="label">Potência (CV)</div>
-        <div><%= motor.potencia_cv ?? '-' %></div>
-      </div>
-
-      <div>
-        <div class="label">RPM</div>
-        <div><%= motor.rpm ?? '-' %></div>
-      </div>
-
-      <div>
-        <div class="label">Origem</div>
-        <div><%= motor.origem_unidade %></div>
-      </div>
-
-      <div>
-        <div class="label">Status</div>
-        <div>
-          <% if (motor.status === 'EM_USO') { %>
-            <span class="pill-tag pill-green">EM_USO</span>
-          <% } else if (motor.status === 'ENVIADO_REBOB') { %>
-            <span class="pill-tag pill-amber">ENVIADO_REBOB</span>
-          <% } else if (motor.status === 'RETORNOU') { %>
-            <span class="pill-tag pill-blue">RETORNOU</span>
-          <% } else { %>
-            <span class="pill-tag pill-gray"><%= motor.status %></span>
-          <% } %>
+  <section class="mot-grid-2">
+    <% if (!isRebob) { %>
+      <article class="mot-action-card is-rebob">
+        <h3>Enviar para rebobinamento</h3>
+        <p>Registre a saída, a empresa responsável e uma previsão para acompanhamento do PCM.</p>
+        <form method="POST" action="/motores/<%= motor.id %>/enviar" class="mot-form">
+          <div class="mot-form-grid">
+            <label>
+              <span>Empresa *</span>
+              <input class="input" name="empresa_rebob" required placeholder="Empresa responsável">
+            </label>
+            <label>
+              <span>Previsão de retorno *</span>
+              <input class="input" name="previsao_retorno" type="date" min="<%= dateBr.todayISO() %>" required>
+            </label>
+            <label>
+              <span>Motorista</span>
+              <input class="input" name="motorista_saida" placeholder="Responsável pelo transporte">
+            </label>
+            <label>
+              <span>Observação</span>
+              <input class="input" name="observacao" placeholder="Defeito, serviço solicitado ou referência">
+            </label>
+          </div>
+          <div class="mot-form-actions">
+            <button class="ui-btn ui-btn--primary" type="submit">Registrar saída</button>
+          </div>
+        </form>
+      </article>
+    <% } else { %>
+      <article class="mot-action-card is-rebob">
+        <h3>Rebobinamento em andamento</h3>
+        <p>O motor está fora da planta. Confirme os dados antes de registrar o retorno.</p>
+        <div class="mot-spec-grid">
+          <div class="mot-spec"><span>Empresa</span><strong><%= motor.empresa_rebob || '-' %></strong></div>
+          <div class="mot-spec"><span>Previsão</span><strong><%= motor.previsao_retorno ? dateBr.formatDateBR(motor.previsao_retorno) : 'Sem previsão' %></strong></div>
+          <div class="mot-spec"><span>Tempo fora</span><strong><%= motor.dias_em_rebob != null ? `${motor.dias_em_rebob} dia(s)` : '-' %></strong></div>
+          <div class="mot-spec"><span>Prazo</span><strong><%= motor.prazo_status === 'ATRASADO' ? 'Atrasado' : (motor.prazo_status === 'PROXIMO' ? 'Próximo' : 'Dentro do previsto') %></strong></div>
         </div>
-      </div>
+      </article>
 
-      <div style="grid-column: 1 / -1;">
-        <div class="label">Local de Instalação</div>
-        <div><%= motor.local_instalacao || '-' %></div>
-      </div>
+      <article class="mot-action-card">
+        <h3>Registrar retorno</h3>
+        <p>Finalize o ciclo de rebobinamento e mantenha o histórico técnico do motor.</p>
+        <form method="POST" action="/motores/<%= motor.id %>/retorno" class="mot-form">
+          <div class="mot-form-grid">
+            <label>
+              <span>Motorista</span>
+              <input class="input" name="motorista_retorno" placeholder="Responsável pelo transporte">
+            </label>
+            <label>
+              <span>Observação</span>
+              <input class="input" name="observacao" placeholder="Condição de retorno, teste ou garantia">
+            </label>
+          </div>
+          <div class="mot-form-actions">
+            <button class="ui-btn ui-btn--primary" type="submit">Registrar retorno</button>
+          </div>
+        </form>
+      </article>
+    <% } %>
+  </section>
 
-      <div style="grid-column: 1 / -1;">
-        <div class="label">Observação</div>
-        <div><%= motor.observacao || '-' %></div>
+  <section class="mot-panel">
+    <div class="mot-section-head">
+      <div>
+        <h2>Histórico técnico</h2>
+        <p>Timeline de movimentações registradas para este motor.</p>
       </div>
-
+      <span class="mot-status"><%= eventos?.length || 0 %> evento(s)</span>
     </div>
 
-  </div>
-
-  <!-- AÇÕES -->
-  <div class="grid-2" style="margin-top:16px;">
-
-    <div class="card">
-      <h3>Enviar para Rebobinamento</h3>
-
-      <form method="POST" action="/motores/<%= motor.id %>/enviar" class="grid-2">
-
-        <div>
-          <div class="label">Empresa *</div>
-          <input class="input" name="empresa_rebob" required>
-        </div>
-
-        <div>
-          <div class="label">Motorista</div>
-          <input class="input" name="motorista_saida">
-        </div>
-
-        <div style="grid-column: 1 / -1;">
-          <div class="label">Observação</div>
-          <input class="input" name="observacao">
-        </div>
-
-        <div style="grid-column: 1 / -1; text-align:right;">
-          <button class="btn btn-primary" type="submit">Registrar Saída</button>
-        </div>
-
-      </form>
-    </div>
-
-    <div class="card">
-      <h3>Registrar Retorno</h3>
-
-      <form method="POST" action="/motores/<%= motor.id %>/retorno" class="grid-2">
-
-        <div>
-          <div class="label">Motorista</div>
-          <input class="input" name="motorista_retorno">
-        </div>
-
-        <div style="grid-column: 1 / -1;">
-          <div class="label">Observação</div>
-          <input class="input" name="observacao">
-        </div>
-
-        <div style="grid-column: 1 / -1; text-align:right;">
-          <button class="btn btn-primary" type="submit">Registrar Retorno</button>
-        </div>
-
-      </form>
-    </div>
-
-  </div>
-
-  <!-- HISTÓRICO -->
-  <div class="card" style="margin-top:16px;">
-    <h3>Histórico</h3>
-
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Tipo</th>
-            <th>Data</th>
-            <th>Detalhes</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% if (!eventos || !eventos.length) { %>
-            <tr>
-              <td colspan="4" style="text-align:center; color:var(--muted);">
-                Sem histórico.
-              </td>
-            </tr>
-          <% } %>
-
-          <% eventos.forEach(e => { %>
-            <tr>
-              <td><%= e.id %></td>
-              <td><%= e.tipo %></td>
-              <td><%= e.created_at %></td>
-              <td class="td-clip">
-                <%= e.payloadObj ? JSON.stringify(e.payloadObj) : '-' %>
-              </td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-</div>
+    <% if (!eventos || !eventos.length) { %>
+      <div class="mot-empty">Ainda não há movimentações registradas para este motor.</div>
+    <% } else { %>
+      <div class="mot-timeline">
+        <% eventos.forEach((e) => { const isReturn = e.tipo === 'RETORNO'; %>
+          <article class="mot-event <%= isReturn ? 'is-return' : '' %>">
+            <div class="mot-event-dot"><%= isReturn ? '↩' : '→' %></div>
+            <div class="mot-event-card">
+              <div class="mot-event-head">
+                <strong><%= isReturn ? 'Retorno do rebobinamento' : (e.tipo === 'ENVIAR' ? 'Envio para rebobinamento' : String(e.tipo || 'Evento').replaceAll('_',' ')) %></strong>
+                <time><%= dateBr.formatDateTimeBR(e.created_at) %></time>
+              </div>
+              <div class="mot-event-details">
+                <% if (e.empresa_rebob) { %><span><strong>Empresa:</strong> <%= e.empresa_rebob %></span><% } %>
+                <% if (e.motorista) { %><span><strong>Motorista:</strong> <%= e.motorista %></span><% } %>
+                <% if (e.previsao_retorno) { %><span><strong>Previsão:</strong> <%= dateBr.formatDateBR(e.previsao_retorno) %></span><% } %>
+              </div>
+              <% if (e.observacao) { %><div class="mot-event-note"><%= e.observacao %></div><% } %>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    <% } %>
+  </section>
+</main>
