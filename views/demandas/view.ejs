@@ -51,15 +51,15 @@
       <% } %>
     </div>
     <div class="detail-head-actions planning-head-actions">
-      <% if (!isFinished && canOpen) { %><a class="demand-btn demand-btn-secondary" href="/demandas/new?parent_id=<%= demanda.id %>">+ Subdemanda</a><% } %>
+      <% if (!isFinished && canOpen) { %><a class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" href="/demandas/new?parent_id=<%= demanda.id %>">+ Subdemanda</a><% } %>
       <% if (linkedOrders.length) { %>
-        <a class="demand-btn demand-btn-primary" href="/os/<%= linkedOrders[0].id %>">Abrir OS #<%= linkedOrders[0].id %></a>
+        <a class="demand-btn demand-btn-primary ui-btn ui-btn--primary" href="/os/<%= linkedOrders[0].id %>">Abrir OS #<%= linkedOrders[0].id %></a>
       <% } else if (canConvert && !isFinished && approvalReady) { %>
         <form method="POST" action="/demandas/<%= demanda.id %>/convert-to-os" onsubmit="return confirm('Gerar a Ordem de Serviço desta demanda? As solicitações de materiais existentes serão reaproveitadas sem duplicação.')">
-          <button class="demand-btn demand-btn-primary" type="submit">Gerar OS</button>
+          <button class="demand-btn demand-btn-primary ui-btn ui-btn--primary" type="submit">Gerar OS</button>
         </form>
       <% } else if (canConvert && !isFinished) { %>
-        <button class="demand-btn demand-btn-muted" type="button" disabled title="A demanda precisa ser aprovada antes de gerar a OS.">Aguardando aprovação</button>
+        <button class="demand-btn demand-btn-muted ui-btn ui-btn--secondary" type="button" disabled title="A demanda precisa ser aprovada antes de gerar a OS.">Aguardando aprovação</button>
       <% } %>
     </div>
   </header>
@@ -108,7 +108,7 @@
             <form method="POST" action="/demandas/<%= demanda.id %>/status" class="demand-control-form">
               <label><span>Status</span><select name="status"><% ['NOVA','EM_ANALISE','PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %><option value="<%= st %>" <%= demanda.status === st ? 'selected' : '' %>><%= statusLabel(st) %></option><% }) %></select></label>
               <label><span>Responsável</span><select name="responsavel_user_id"><option value="">A definir</option><% (responsaveis || []).forEach(person => { %><option value="<%= person.id %>" <%= Number(demanda.responsavel_user_id || 0) === Number(person.id) ? 'selected' : '' %>><%= person.name %></option><% }) %></select></label>
-              <button class="demand-btn demand-btn-primary" type="submit">Salvar controle</button>
+              <button class="demand-btn demand-btn-primary ui-btn ui-btn--primary" type="submit">Salvar controle</button>
             </form>
           <% } else { %>
             <div class="planning-empty">Consulta liberada. Alterações de controle ficam restritas aos perfis autorizados.</div>
@@ -134,7 +134,7 @@
         <% if (canApprove && !isFinished) { %>
           <form class="planning-approval-form" method="POST" action="/demandas/<%= demanda.id %>/aprovacao">
             <label><span>Aprovação / priorização</span><select name="aprovacao_status"><% ['PENDENTE','APROVADA','REPROVADA'].forEach(st => { %><option value="<%= st %>" <%= String(demanda.aprovacao_status || 'PENDENTE') === st ? 'selected' : '' %>><%= approvalLabel(st) %></option><% }) %></select></label>
-            <button class="demand-btn demand-btn-secondary" type="submit">Salvar aprovação</button>
+            <button class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" type="submit">Salvar aprovação</button>
           </form>
         <% } %>
       </section>
@@ -147,8 +147,8 @@
           <div class="progress-step <%= ['PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA'].includes(demanda.status) ? 'done' : '' %>"><span>2</span><div><strong>Planejamento</strong><small><%= materialRequests.length ? materialRequests.length + ' solicitação(ões)' : 'Sem materiais' %></small></div></div>
           <i class="<%= approvalReady || linkedOrders.length ? 'done' : '' %>"></i>
           <div class="progress-step <%= approvalReady || linkedOrders.length ? 'done' : '' %>"><span>3</span><div><strong>Aprovação</strong><small><%= approvalLabel(demanda.aprovacao_status) %></small></div></div>
-          <i class="<%= linkedOrders.length || demanda.started_at || isFinished ? 'done' : '' %>"></i>
-          <div class="progress-step <%= linkedOrders.length || demanda.started_at || isFinished ? 'done' : '' %>"><span>4</span><div><strong>OS / execução</strong><small><%= linkedOrders.length ? linkedOrders.length + ' OS' : 'Aguardando' %></small></div></div>
+          <i class="<%= linkedOrders.length || demanda.started_at isFinished ? 'done' : '' %>"></i>
+          <div class="progress-step <%= linkedOrders.length || demanda.started_at isFinished ? 'done' : '' %>"><span>4</span><div><strong>OS / execução</strong><small><%= linkedOrders.length ? linkedOrders.length + ' OS' : 'Aguardando' %></small></div></div>
         </div>
       </section>
     </section>
@@ -156,7 +156,7 @@
     <section class="demand-workspace-panel" data-panel="materiais" hidden>
       <div class="demand-section-title demand-section-title-actions">
         <div><h2>Materiais e pré-cotações</h2><p>Lista técnica enxuta, integrada a Solicitações e Compras sem duplicar cadastro.</p></div>
-        <% if (canPlanMaterials) { %><button class="demand-btn demand-btn-primary" type="button" data-new-material-request>+ Planejar materiais</button><% } %>
+        <% if (canPlanMaterials) { %><button class="demand-btn demand-btn-primary ui-btn ui-btn--primary" type="button" data-new-material-request>+ Planejar materiais</button><% } %>
       </div>
 
       <% if (linkedOrders.length) { %>
@@ -176,9 +176,9 @@
                 <div data-label="Cotação" class="material-progress"><span><%= quoted %> de <%= total %> item(ns)</span><i><b style="width:<%= pct %>%"></b></i></div>
                 <div data-label="Vínculo"><strong><%= sol.os_id ? 'OS #' + sol.os_id : 'Pré-cotação' %></strong><small><%= sol.os_id ? 'Compra liberada pelo fluxo normal' : 'Compra aguardando OS' %></small></div>
                 <div data-label="Ação" class="demand-row-action demand-material-actions">
-                  <a class="demand-btn demand-btn-secondary demand-btn-small" href="/compras/solicitacoes/<%= sol.id %>">Abrir</a>
+                  <a class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" href="/compras/solicitacoes/<%= sol.id %>">Abrir</a>
                   <% if (canMaterials && sol.pode_editar_materiais_demanda) { %>
-                    <button class="demand-btn demand-btn-secondary demand-btn-small" type="button" data-edit-material-request data-solicitacao-id="<%= sol.id %>" data-solicitacao-numero="<%= sol.numero || '#'+sol.id %>">Editar</button>
+                    <button class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" type="button" data-edit-material-request data-solicitacao-id="<%= sol.id %>" data-solicitacao-numero="<%= sol.numero || '#'+sol.id %>">Editar</button>
                   <% } else if (sol.os_id || linkedOrders.length) { %>
                     <small class="demand-edit-locked">Edição encerrada</small>
                   <% } %>
@@ -193,7 +193,7 @@
         <section class="demand-card demand-material-editor" data-material-form hidden>
           <div class="section-heading">
             <div><h2 data-material-editor-title>Planejar nova solicitação de materiais</h2><p data-material-editor-help>Cadastre apenas nome, quantidade e o detalhe técnico necessário. Os demais dados seguem o fluxo de Compras.</p></div>
-            <button type="button" class="demand-btn demand-btn-secondary demand-btn-small" data-close-material-form>Fechar</button>
+            <button type="button" class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" data-close-material-form>Fechar</button>
           </div>
           <form method="POST" action="/demandas/<%= demanda.id %>/materiais" data-create-action="/demandas/<%= demanda.id %>/materiais" class="planning-material-form" id="demandMaterialsForm">
             <div id="materialRows">
@@ -206,7 +206,7 @@
                 <button class="material-remove" type="button" aria-label="Remover material">×</button>
               </div>
             </div>
-            <div class="material-form-actions"><button class="demand-btn demand-btn-secondary" type="button" id="addMaterialRow">+ Outro material</button><button class="demand-btn demand-btn-primary" type="submit" data-material-submit>Criar solicitação e enviar para pré-cotação</button></div>
+            <div class="material-form-actions"><button class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" type="button" id="addMaterialRow">+ Outro material</button><button class="demand-btn demand-btn-primary ui-btn ui-btn--primary" type="submit" data-material-submit>Criar solicitação e enviar para pré-cotação</button></div>
           </form>
         </section>
       <% } %>
@@ -215,7 +215,7 @@
     <section class="demand-workspace-panel" data-panel="subdemandas" hidden>
       <div class="demand-section-title demand-section-title-actions">
         <div><h2>Subdemandas</h2><p>Divida projetos grandes em serviços executáveis sem perder o vínculo com a demanda principal.</p></div>
-        <% if (!isFinished && canOpen) { %><a class="demand-btn demand-btn-primary" href="/demandas/new?parent_id=<%= demanda.id %>">+ Nova subdemanda</a><% } %>
+        <% if (!isFinished && canOpen) { %><a class="demand-btn demand-btn-primary ui-btn ui-btn--primary" href="/demandas/new?parent_id=<%= demanda.id %>">+ Nova subdemanda</a><% } %>
       </div>
 
       <section class="demand-card demand-data-card">
@@ -231,7 +231,7 @@
                 <div data-label="Status"><span class="demand-badge status-<%= slug(child.status) %>"><%= statusLabel(child.status) %></span></div>
                 <div data-label="Prioridade"><span class="demand-badge priority-<%= slug(child.prioridade) %>"><%= priorityLabel(child.prioridade) %></span></div>
                 <div data-label="Responsável"><strong><%= child.responsavel_nome || 'A definir' %></strong></div>
-                <div data-label="Ação" class="demand-row-action"><a class="demand-btn demand-btn-secondary demand-btn-small" href="/demandas/<%= child.id %>">Abrir</a></div>
+                <div data-label="Ação" class="demand-row-action"><a class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" href="/demandas/<%= child.id %>">Abrir</a></div>
               </div>
             <% }) %>
           </div>
@@ -254,7 +254,7 @@
                 <div data-label="Tipo"><strong><%= order.tipo || 'OUTROS' %></strong></div>
                 <div data-label="Abertura"><strong><%= order.opened_at ? fmtBR(order.opened_at) : 'Não informado' %></strong></div>
                 <div data-label="Descrição"><small><%= String(order.descricao || '').slice(0, 140) || 'Sem descrição' %></small></div>
-                <div data-label="Ação" class="demand-row-action"><a class="demand-btn demand-btn-secondary demand-btn-small" href="/os/<%= order.id %>">Abrir OS</a></div>
+                <div data-label="Ação" class="demand-row-action"><a class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" href="/os/<%= order.id %>">Abrir OS</a></div>
               </div>
             <% }) %>
           </div>
@@ -269,7 +269,7 @@
             <div class="section-heading"><div><h2>Registrar atualização</h2><p>Registre somente decisões, impedimentos ou próximos passos relevantes.</p></div></div>
             <form method="POST" action="/demandas/<%= demanda.id %>/update">
               <textarea name="texto" rows="5" required placeholder="Ex.: aguardando material, serviço programado para segunda-feira, cotação aprovada..."></textarea>
-              <div class="update-actions"><small>Data e usuário são registrados automaticamente.</small><button class="demand-btn demand-btn-secondary" type="submit">Salvar atualização</button></div>
+              <div class="update-actions"><small>Data e usuário são registrados automaticamente.</small><button class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" type="submit">Salvar atualização</button></div>
             </form>
           </section>
         <% } %>
