@@ -27,6 +27,16 @@ test('áreas nominais e sensíveis continuam restritas a RH e ADMIN', () => {
   assert.match(routes, /router\.get\('\/colaboradores\/:id', requireRole\(rhManage\)/);
 });
 
+test('ficha nominal do RH converge para o cadastro mestre sem quebrar a rota histórica', () => {
+  const controller = read('modules/rh/rh.controller.js');
+  const dashboard = read('views/rh/index.ejs');
+  const colaboradores = read('views/rh/colaboradores.ejs');
+
+  assert.match(controller, /res\.redirect\(302, `\/colaboradores\/\$\{id\}`\)/);
+  assert.match(dashboard, /window\.location\.href = `\/colaboradores\/\$\{id\}`/);
+  assert.match(colaboradores, /href="\/colaboradores\/<%= c\.id %>">Abrir ficha/);
+});
+
 test('navegação do RH usa páginas reais em vez de âncoras da tela única', () => {
   const header = read('views/rh/_header.ejs');
   for (const href of ['/rh', '/rh/colaboradores', '/rh/jornada', '/rh/folgas', '/rh/exames', '/rh/documentos', '/rh/treinamentos']) {
@@ -49,7 +59,7 @@ test('dashboard prioriza acesso rápido, alertas visuais e próximos vencimentos
   const dashboard = read('views/rh/index.ejs');
   assert.match(dashboard, /Abrir ficha do colaborador/);
   assert.match(dashboard, /id="rhQuickPerson"/);
-  assert.match(dashboard, /window\.location\.href = `\/rh\/colaboradores\/\$\{id\}`/);
+  assert.match(dashboard, /window\.location\.href = `\/colaboradores\/\$\{id\}`/);
   assert.match(dashboard, /Próximos vencimentos/);
   assert.match(dashboard, /VENCE_EM_BREVE/);
   assert.match(dashboard, /rh-pending-ok/);
