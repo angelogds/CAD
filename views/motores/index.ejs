@@ -1,134 +1,137 @@
 <% layout('layout') %>
+<link rel="stylesheet" href="/css/motores.css?v=20260919-motores-v2" />
+<%
+  const kpi = indicadores || {};
+  const statusClass = (status) => ({
+    EM_USO: 'is-use',
+    ENVIADO_REBOB: 'is-rebob',
+    RETORNOU: 'is-return',
+    RESERVA: 'is-reserve',
+  }[String(status || '').toUpperCase()] || '');
+  const statusLabel = (status) => String(status || '-').replaceAll('_', ' ');
+%>
 
-<div class="page">
-
-  <div class="page-head">
+<main class="mot-page">
+  <header class="mot-hero">
     <div>
+      <span class="mot-eyebrow">MANUTENÇÃO • ATIVOS ELÉTRICOS</span>
       <h1>Motores</h1>
-      <p class="muted">Controle de motores da planta</p>
+      <p>Controle técnico de motores em uso, reserva e rebobinamento, com acompanhamento de prazo e histórico real.</p>
     </div>
-    <a class="btn btn-primary" href="/motores/new">
-      + Cadastrar Motor
-    </a>
-  </div>
+    <div class="mot-actions">
+      <a class="ui-btn ui-btn--primary" href="/motores/new">+ Cadastrar motor</a>
+    </div>
+  </header>
 
-  <% if (rebobCount && rebobCount > 0) { %>
-    <div class="card" style="margin-bottom:16px; border-color:#fed7aa; background:#fff7ed;">
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-        <div>
-          <div style="font-weight:900;">
-            Atenção: <%= rebobCount %> motor(es) enviado(s) para rebobinamento
-            <span class="pill-tag pill-amber" style="margin-left:8px;">ENVIADO_REBOB</span>
-          </div>
-          <div class="muted" style="margin-top:4px;">
-            Verifique empresa e prazo de retorno.
-          </div>
-        </div>
+  <section class="mot-kpis" aria-label="Indicadores de motores">
+    <article class="mot-kpi"><span>Total</span><strong><%= kpi.total || 0 %></strong><small>Motores cadastrados</small></article>
+    <article class="mot-kpi"><span>Em uso</span><strong><%= kpi.emUso || 0 %></strong><small>Instalados em operação</small></article>
+    <article class="mot-kpi"><span>Reserva</span><strong><%= kpi.reserva || 0 %></strong><small>Disponíveis para substituição</small></article>
+    <article class="mot-kpi"><span>Rebobinamento</span><strong><%= kpi.emRebob || 0 %></strong><small>Fora da planta / assistência</small></article>
+    <article class="mot-kpi <%= Number(kpi.prazoAtrasado || 0) > 0 ? 'is-alert' : '' %>"><span>Prazo atrasado</span><strong><%= kpi.prazoAtrasado || 0 %></strong><small><%= kpi.semPrazo || 0 %> sem previsão cadastrada</small></article>
+    <article class="mot-kpi"><span>Histórico</span><strong><%= kpi.eventos || 0 %></strong><small>Eventos técnicos registrados</small></article>
+  </section>
 
-        <a class="btn btn-primary" href="/motores?status=ENVIADO_REBOB">
-          Ver enviados
-        </a>
+  <% if (Number(kpi.emRebob || 0) > 0) { %>
+    <section class="mot-alert">
+      <div>
+        <strong><%= kpi.emRebob %> motor(es) em rebobinamento</strong>
+        <small>Acompanhe empresa responsável, tempo fora e previsão de retorno.</small>
       </div>
-    </div>
+      <a class="ui-btn ui-btn--soft" href="/motores?status=ENVIADO_REBOB">Ver enviados</a>
+    </section>
   <% } %>
 
-  <!-- FILTROS -->
-  <div class="card" style="margin-bottom:16px;">
-    <form method="GET" action="/motores" class="grid-2">
-
+  <section class="mot-panel">
+    <div class="mot-section-head">
       <div>
-        <div class="label">Buscar</div>
-        <input class="input"
-               name="q"
-               placeholder="Buscar (código, descrição, local)"
-               value="<%= filtros.q %>">
+        <h2>Localizar motores</h2>
+        <p>Filtre por identificação, localização, empresa, origem ou situação atual.</p>
       </div>
+      <span class="mot-status"><%= lista?.length || 0 %> resultado(s)</span>
+    </div>
 
-      <div>
-        <div class="label">Origem</div>
-        <select name="origem">
-          <option value="">Origem (todas)</option>
-          <option value="RECICLAGEM" <%= filtros.origem==='RECICLAGEM'?'selected':'' %>>RECICLAGEM</option>
-          <option value="FRIGORIFICO" <%= filtros.origem==='FRIGORIFICO'?'selected':'' %>>FRIGORÍFICO</option>
+    <form method="GET" action="/motores" class="mot-filter">
+      <label>
+        <span>Buscar</span>
+        <input class="input" name="q" placeholder="Código, descrição, local ou empresa" value="<%= filtros.q %>">
+      </label>
+      <label>
+        <span>Origem</span>
+        <select class="input" name="origem">
+          <option value="">Todas</option>
+          <option value="RECICLAGEM" <%= filtros.origem==='RECICLAGEM'?'selected':'' %>>Reciclagem</option>
+          <option value="FRIGORIFICO" <%= filtros.origem==='FRIGORIFICO'?'selected':'' %>>Frigorífico</option>
         </select>
-      </div>
-
-      <div>
-        <div class="label">Status</div>
-        <select name="status">
-          <option value="">Status (todos)</option>
-          <option value="EM_USO">EM_USO</option>
-          <option value="ENVIADO_REBOB">ENVIADO_REBOB</option>
-          <option value="RETORNOU">RETORNOU</option>
-          <option value="RESERVA">RESERVA</option>
+      </label>
+      <label>
+        <span>Status</span>
+        <select class="input" name="status">
+          <option value="">Todos</option>
+          <% ['EM_USO','RESERVA','ENVIADO_REBOB','RETORNOU'].forEach((status) => { %>
+            <option value="<%= status %>" <%= filtros.status===status ? 'selected' : '' %>><%= statusLabel(status) %></option>
+          <% }) %>
         </select>
+      </label>
+      <div class="mot-filter-actions">
+        <button class="ui-btn ui-btn--primary" type="submit">Filtrar</button>
+        <a class="ui-btn ui-btn--secondary" href="/motores">Limpar</a>
       </div>
-
-      <div style="display:flex; align-items:end; gap:10px;">
-        <button class="btn btn-primary" type="submit">Filtrar</button>
-        <a class="btn btn-ghost" href="/motores">Limpar</a>
-      </div>
-
     </form>
-  </div>
+  </section>
 
-  <!-- LISTA -->
-  <div class="card">
-    <div class="table-wrap">
-      <table class="table">
+  <section class="mot-panel">
+    <div class="mot-section-head">
+      <div><h2>Parque de motores</h2><p>Visão operacional e de disponibilidade dos motores cadastrados.</p></div>
+    </div>
+
+    <div class="mot-table-wrap">
+      <table class="mot-table">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Código</th>
-            <th>Descrição</th>
-            <th>Potência</th>
-            <th>RPM</th>
-            <th>Origem</th>
+            <th>Motor</th>
+            <th>Especificação</th>
+            <th>Local / origem</th>
             <th>Status</th>
-            <th style="text-align:right;">Ações</th>
+            <th>Prazo / tempo fora</th>
+            <th>Ação</th>
           </tr>
         </thead>
-
         <tbody>
           <% if (!lista || !lista.length) { %>
-            <tr>
-              <td colspan="8" style="text-align:center; color:var(--muted);">
-                Nenhum motor encontrado.
-              </td>
-            </tr>
+            <tr><td colspan="6" class="mot-empty">Nenhum motor encontrado com os filtros selecionados.</td></tr>
           <% } %>
 
-          <% lista.forEach(m => { %>
+          <% (lista || []).forEach((m) => { %>
             <tr>
-              <td><%= m.id %></td>
-              <td><%= m.codigo || '-' %></td>
-              <td class="td-clip"><%= m.descricao %></td>
-              <td><%= m.potencia_cv ?? '-' %></td>
-              <td><%= m.rpm ?? '-' %></td>
-              <td><%= m.origem_unidade %></td>
-
-              <td>
-                <% if (m.status === 'EM_USO') { %>
-                  <span class="pill-tag pill-green">EM_USO</span>
-                <% } else if (m.status === 'ENVIADO_REBOB') { %>
-                  <span class="pill-tag pill-amber">ENVIADO_REBOB</span>
-                <% } else if (m.status === 'RETORNOU') { %>
-                  <span class="pill-tag pill-blue">RETORNOU</span>
+              <td data-label="Motor">
+                <span class="mot-code"><%= m.codigo || `Motor #${m.id}` %></span>
+                <small><%= m.descricao || '-' %></small>
+              </td>
+              <td data-label="Especificação">
+                <strong><%= m.potencia_cv != null ? `${m.potencia_cv} CV` : '-' %></strong>
+                <small><%= m.rpm != null ? `${m.rpm} RPM` : 'RPM não informado' %></small>
+              </td>
+              <td data-label="Local / origem">
+                <strong><%= m.local_instalacao || 'Sem local definido' %></strong>
+                <small><%= m.origem_unidade || '-' %></small>
+              </td>
+              <td data-label="Status"><span class="mot-status <%= statusClass(m.status) %>"><%= statusLabel(m.status) %></span></td>
+              <td data-label="Prazo">
+                <% if (m.status === 'ENVIADO_REBOB') { %>
+                  <% if (m.previsao_retorno) { %><strong><%= dateBr.formatDateBR(m.previsao_retorno) %></strong><% } else { %><strong>Sem previsão</strong><% } %>
+                  <small><%= m.dias_em_rebob != null ? `${m.dias_em_rebob} dia(s) fora` : 'Tempo não calculado' %></small>
+                  <% if (m.prazo_status === 'ATRASADO') { %><span class="mot-status is-danger">Atrasado</span><% } %>
+                  <% if (m.prazo_status === 'PROXIMO') { %><span class="mot-status is-warning">Prazo próximo</span><% } %>
                 <% } else { %>
-                  <span class="pill-tag pill-gray"><%= m.status %></span>
+                  <span>-</span>
                 <% } %>
               </td>
-
-              <td style="text-align:right;">
-                <a class="btn btn-sm btn-primary" href="/motores/<%= m.id %>">
-                  Ver
-                </a>
-              </td>
+              <td data-label="Ação"><a class="ui-btn ui-btn--outline ui-btn--compact" href="/motores/<%= m.id %>">Abrir ficha</a></td>
             </tr>
           <% }) %>
         </tbody>
       </table>
     </div>
-  </div>
-
-</div>
+  </section>
+</main>
