@@ -17,9 +17,9 @@
   <header class="os-heading">
     <div><h1>Ordens de Serviço</h1><p>Fila operacional, acompanhamento das equipes e histórico de manutenção</p></div>
     <div class="os-heading-actions">
-      <a class="os-btn secondary" href="/painel-operacional">Painel operacional</a>
-      <button class="os-btn secondary" type="button" data-print>PDF das OS</button>
-      <a class="os-btn primary" href="/os/novo">+ Nova OS</a>
+      <a class="os-btn secondary ui-btn ui-btn--secondary" href="/painel-operacional">Painel operacional</a>
+      <button class="os-btn secondary ui-btn ui-btn--secondary" type="button" data-print>PDF das OS</button>
+      <a class="os-btn primary ui-btn ui-btn--primary" href="/os/novo">+ Nova OS</a>
     </div>
   </header>
 
@@ -32,7 +32,7 @@
       ['urgent','Críticas e altas',d.metrics.urgent,'Prioridade operacional','danger'],
       ['', 'Fechadas no período',d.metrics.closed,f.period==='today'?'Hoje':`Últimos ${f.period} dias`,'neutral']
     ].forEach(k => { const active=f.quick===k[0]; %>
-      <a class="os-kpi <%= k[4] %> <%= active?'active':'' %>" href="<%= query({quick:active?'':k[0],page:1}) %>" aria-pressed="<%= active %>">
+      <a class="os-kpi <%= k[4] %> active?'active':''" href="<%= query({quick:active?'':k[0],page:1}) %>" aria-pressed="<%= active %>">
         <span class="os-kpi-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6zM9 7h6M9 11h6M9 15h4"/></svg></span>
         <span><small><%= k[1] %></small><strong><%= k[2] %></strong><em><%= k[3] %></em></span><b aria-hidden="true">›</b>
       </a>
@@ -63,13 +63,13 @@
           <label><span><%= opt[1] %></span><select name="<%= opt[0] %>"><option value="">Todos</option><% opt[2].forEach(v=>{ %><option value="<%= v %>" <%= String(f[opt[0]]||'')===String(v)?'selected':'' %>><%= v %></option><% }) %></select></label>
         <% }) %>
         <label><span>Período</span><select name="period"><option value="today" <%= f.period==='today'?'selected':'' %>>Hoje</option><% [['7','Últimos 7 dias'],['30','Últimos 30 dias'],['90','Últimos 90 dias']].forEach(x=>{ %><option value="<%= x[0] %>" <%= f.period===x[0]?'selected':'' %>><%= x[1] %></option><% }) %></select></label>
-        <div class="filter-actions"><button class="os-btn secondary" type="submit">Filtrar</button><a href="/os?tab=<%= f.tab %>">Limpar filtros</a></div>
+        <div class="filter-actions"><button class="os-btn secondary ui-btn ui-btn--secondary" type="submit">Filtrar</button><a href="/os?tab=<%= f.tab %>">Limpar filtros</a></div>
       </form>
     </details>
 
     <div class="queue-heading"><div><h2>Fila de ordens de serviço</h2><p><%= f.tab==='active'?'OS ativas organizadas por prioridade. As concluídas ficam disponíveis no histórico.':'Ordens organizadas por condição operacional e data.' %></p></div><div><span>Mostrando <%= d.items.length %> de <%= d.pagination.total %> OS</span><form method="get"><% Object.entries(f).forEach(([k,v])=>{if(v && k!=='perPage'){%><input type="hidden" name="<%= k==='perPage'?'per_page':k %>" value="<%= v %>"><%}})%><label>Exibir <select name="per_page" data-auto-submit><% [10,20,50,100].forEach(n=>{ %><option <%= d.pagination.perPage===n?'selected':'' %>><%= n %></option><% }) %></select></label></form></div></div>
 
-    <% if (!d.items.length) { %><div class="os-empty"><h3>Nenhuma ordem de serviço <%= f.tab==='active'?'ativa':'' %>.</h3><p>As novas ordens aparecerão aqui após a abertura.</p><a class="os-btn primary" href="/os/novo">+ Nova OS</a></div><% } %>
+    <% if (!d.items.length) { %><div class="os-empty"><h3>Nenhuma ordem de serviço <%= f.tab==='active'?'ativa':'' %>.</h3><p>As novas ordens aparecerão aqui após a abertura.</p><a class="os-btn primary ui-btn ui-btn--primary" href="/os/novo">+ Nova OS</a></div><% } %>
     <% d.groups.forEach(group => { %><section class="priority-group <%= group.key %>"><h3><%= group.label %> — <%= group.items.length %></h3>
       <div class="os-table-wrap"><table><thead><tr><th>OS / Equipamento</th><th>Serviço</th><th>Tipo / Prioridade</th><th>Equipe</th><th>Status / Andamento</th><th>Prazo / Tempo aberto</th><th>Ação</th></tr></thead><tbody>
       <% group.items.forEach(o=>{ const team=o.equipe.length?o.equipe.join(' e '):'Sem responsável'; %><tr class="<%= o.overdue?'overdue':'' %>">
@@ -79,7 +79,7 @@
         <td data-label="Equipe"><span class="truncate" title="<%= team %>"><%= team %></span></td>
         <td data-label="Status / Andamento"><span class="os-badge <%= statusClass(o.status) %>"><%= o.status %></span><small><%= o.ultimo_motivo_andamento||'' %></small></td>
         <td data-label="Prazo / Tempo aberto"><strong class="<%= o.overdue?'text-danger':'' %>"><%= o.deadlineLabel %></strong><small><%= o.ageLabel %></small></td>
-        <td data-label="Ação"><div class="row-actions"><a class="os-btn compact" href="/os/<%= o.id %>">Abrir OS</a><details><summary aria-label="Mais ações da OS <%= o.id %>">⋮</summary><div><a href="/os/<%= o.id %>">Visualizar</a><% if(canDeleteOS){%><form method="post" action="/os/<%= o.id %>/excluir" onsubmit="return confirm('Confirma excluir esta OS?')"><button>Excluir</button></form><%}%></div></details></div></td>
+        <td data-label="Ação"><div class="row-actions"><a class="os-btn compact ui-btn ui-btn--outline ui-btn--compact" href="/os/<%= o.id %>">Abrir OS</a><details><summary aria-label="Mais ações da OS <%= o.id %>">⋮</summary><div><a href="/os/<%= o.id %>">Visualizar</a><% if(canDeleteOS){%><form method="post" action="/os/<%= o.id %>/excluir" onsubmit="return confirm('Confirma excluir esta OS?')"><button>Excluir</button></form><%}%></div></details></div></td>
       </tr><% }) %></tbody></table></div>
     </section><% }) %>
 
@@ -90,6 +90,6 @@
     <section class="os-panel"><h2>Carga da equipe</h2><% if(!d.teamLoad.length){%><p class="subtle">Nenhuma equipe atribuída às OS ativas.</p><%}%><% d.teamLoad.forEach(x=>{%><div class="bar-row"><span title="<%= x.name %>"><%= x.name %></span><i><b class="team" style="--value:<%= Math.round(x.count/maxLoad*100) %>%"></b></i><strong><%= x.count %> OS</strong></div><%})%><a class="insight-link" href="/escala">Ver escala da equipe →</a></section>
   </div>
 
-  <details class="os-panel whatsapp-panel"><summary>Mais ações e WhatsApp</summary><% if(canSendWhatsapp){%><form id="bulkWhatsappForm"><label>Colaborador<select id="colaboradorWhatsAppSelect" required><option value="">Selecione</option><% (colaboradores||[]).forEach(c=>{%><option value="<%= c.id %>" data-nome="<%= c.name %>" data-telefone="<%= c.telefone_whatsapp||'' %>"><%= c.name %></option><%})%></select></label><button class="os-btn secondary" type="submit">Enviar OS ativas pelo WhatsApp</button></form><%}else{%><p class="subtle">Notificações disponíveis conforme as permissões do seu perfil.</p><%}%></details>
+  <details class="os-panel whatsapp-panel"><summary>Mais ações e WhatsApp</summary><% if(canSendWhatsapp){%><form id="bulkWhatsappForm"><label>Colaborador<select id="colaboradorWhatsAppSelect" required><option value="">Selecione</option><% (colaboradores||[]).forEach(c=>{%><option value="<%= c.id %>" data-nome="<%= c.name %>" data-telefone="<%= c.telefone_whatsapp||'' %>"><%= c.name %></option><%})%></select></label><button class="os-btn secondary ui-btn ui-btn--secondary" type="submit">Enviar OS ativas pelo WhatsApp</button></form><%}else{%><p class="subtle">Notificações disponíveis conforme as permissões do seu perfil.</p><%}%></details>
 </section>
 <script src="/js/os-index.js" defer></script>
