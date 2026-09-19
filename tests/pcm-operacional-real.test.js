@@ -70,6 +70,9 @@ test('PCM main view uses the new operational visual system', () => {
   assert.ok(view.includes('Acima do SLA interno'));
   assert.ok(view.includes('Prioridades para decisão'));
   assert.ok(view.includes('Recomendações não executam alterações automaticamente'));
+  const sharedButtons = fs.readFileSync('public/css/ui-buttons.css', 'utf8');
   assert.ok(css.includes('.pcm-op-kpis'));
-  assert.ok(css.includes('.pcm-op-btn:hover'));
+  assert.ok(view.includes('pcm-op-btn ui-btn'));
+  assert.ok(sharedButtons.includes(':is(.btn, .ui-btn):not(:disabled):not([aria-disabled="true"]):hover'));
+  assert.ok(!/(?:^|})\s*\.pcm-op-btn\s*\{/.test(css));
 });

@@ -40,7 +40,7 @@
       <p>Banco de serviços planejados para registrar necessidades rápido, priorizar e preparar a futura execução em OS.</p>
     </div>
     <% if (canAccessModule(normalizeRole(user?.role), 'demandas_open')) { %>
-      <a class="demand-btn demand-btn-primary" href="/demandas/new"><span aria-hidden="true">＋</span> Nova demanda</a>
+      <a class="demand-btn demand-btn-primary ui-btn ui-btn--primary" href="/demandas/new"><span aria-hidden="true">＋</span> Nova demanda</a>
     <% } %>
   </header>
 
@@ -80,7 +80,7 @@
       <label><span>Prioridade</span><select name="prioridade"><option value="">Todas</option><option value="ELEVADA" <%= filters.prioridade === 'ELEVADA' ? 'selected' : '' %>>Críticas e altas</option><% ['URGENTE','ALTA','NORMAL','BAIXA'].forEach(pr => { %><option value="<%= pr %>" <%= filters.prioridade === pr ? 'selected' : '' %>><%= priorityLabel(pr) %></option><% }) %></select></label>
       <label><span>Responsável</span><select name="responsavel_user_id"><option value="">Todos</option><% (responsaveis || []).forEach(person => { %><option value="<%= person.id %>" <%= String(filters.responsavel_user_id) === String(person.id) ? 'selected' : '' %>><%= person.name %></option><% }) %></select></label>
       <label class="filter-limit"><span>Exibir</span><select name="limit"><% [10,20,50].forEach(value => { %><option value="<%= value %>" <%= Number(filters.limit) === value ? 'selected' : '' %>><%= value %></option><% }) %></select></label>
-      <div class="filter-actions"><button class="demand-btn demand-btn-primary" type="submit">Aplicar filtros</button><a class="demand-btn demand-btn-secondary" href="/demandas?tab=<%= filters.tab %>">Limpar</a></div>
+      <div class="filter-actions"><button class="demand-btn demand-btn-primary ui-btn ui-btn--primary" type="submit">Aplicar filtros</button><a class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" href="/demandas?tab=<%= filters.tab %>">Limpar</a></div>
     </form>
   </section>
 
@@ -91,7 +91,7 @@
     </div>
 
     <% if (!lista.length) { %>
-      <div class="demand-empty"><span class="empty-icon" aria-hidden="true">✓</span><h3>Nenhuma demanda encontrada</h3><p><%= Object.values(filters).some(value => value && value !== 'ATIVAS' && value !== 20) ? 'Ajuste os filtros para ampliar a pesquisa.' : 'A fila está livre. Novas demandas aparecerão aqui para acompanhamento.' %></p><% if (canAccessModule(normalizeRole(user?.role), 'demandas_open')) { %><a class="demand-btn demand-btn-secondary" href="/demandas/new">Criar demanda</a><% } %></div>
+      <div class="demand-empty"><span class="empty-icon" aria-hidden="true">✓</span><h3>Nenhuma demanda encontrada</h3><p><%= Object.values(filters).some(value => value && value !== 'ATIVAS' && value !== 20) ? 'Ajuste os filtros para ampliar a pesquisa.' : 'A fila está livre. Novas demandas aparecerão aqui para acompanhamento.' %></p><% if (canAccessModule(normalizeRole(user?.role), 'demandas_open')) { %><a class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" href="/demandas/new">Criar demanda</a><% } %></div>
     <% } else { %>
       <% groups.forEach(group => { if (group.items.length) { %>
         <section class="priority-group priority-<%= group.key %>">
@@ -116,7 +116,7 @@
                 </div>
                 <div class="demand-people" data-label="Responsável"><strong><%= d.responsavel_nome || 'A definir' %></strong><small>Criada por <%= d.created_by_nome || 'Não informado' %></small></div>
                 <div class="demand-update" data-label="Última movimentação"><strong><%= fmtBR(d.updated_at || d.created_at) %></strong><small><%= d.ultima_atualizacao || 'Sem atualização registrada' %></small></div>
-                <div class="demand-row-action" data-label="Ação"><a class="demand-btn demand-btn-secondary demand-btn-small" href="/demandas/<%= d.id %>">Abrir</a></div>
+                <div class="demand-row-action" data-label="Ação"><a class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" href="/demandas/<%= d.id %>">Abrir</a></div>
               </article>
             <% }) %>
           </div>

@@ -35,6 +35,10 @@ test('detalhe e cadastro usam o mesmo padrão visual', () => {
   assert.match(form, /modern-demand-form/);
   assert.match(detail, /demand-progress/);
   assert.match(detail, /Histórico e rastreabilidade/);
-  assert.match(css, /\.demand-btn:hover/);
+  const sharedButtons = read('public/css/ui-buttons.css');
+  assert.match(form, /demand-btn[^\"]*ui-btn/);
+  assert.match(detail, /demand-btn[^\"]*ui-btn/);
+  assert.match(sharedButtons, /:is\(\.btn, \.ui-btn\).*:hover/);
+  assert.doesNotMatch(css, /(?:^|})\s*\.demand-btn\s*\{/);
   assert.match(css, /@media \(max-width:720px\)/);
 });

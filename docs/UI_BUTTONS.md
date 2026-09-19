@@ -47,10 +47,12 @@ Base `btn`/`ui-btn`, cabeçalho, Solicitações (lista e detalhe), Compras (fila
 cotação e consenso), acompanhamento da Diretoria e formulário de nova Preventiva.
 O formulário de Preventivas tem seletores restritos à própria página.
 
-As famílias específicas de OS, Equipamentos, Demandas, Fornecedores e PCM ainda
-precisam de migração das regras locais. Não redefinir a base para acomodá-las;
-migrar cada ação para uma variante e preservar os identificadores usados pelo JS.
-Os tokens e variantes acima também podem orientar a futura biblioteca do Figma.
+OS, Equipamentos, Demandas, Fornecedores e PCM também usam a base compartilhada.
+As classes históricas desses módulos permanecem apenas como hooks locais de layout
+e compatibilidade, enquanto cor, tipografia, altura, raio, foco e estados ficam sob
+responsabilidade de `ui-btn` e suas variantes. Preservar identificadores usados
+pelo JavaScript e permissões existentes. Os mesmos tokens e variantes orientam a
+biblioteca de componentes no Figma.
 
 Ao mudar a base ou os módulos, atualizar a versão nos links dos templates e nos
 recursos correspondentes do service worker para evitar CSS antigo em cache.

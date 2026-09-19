@@ -23,7 +23,7 @@
 <div class="supplier-page supplier-form-page">
   <header class="supplier-head form-head">
     <div><div class="title-with-badge"><h1><%= fornecedor ? 'Editar fornecedor' : 'Novo fornecedor' %></h1><span>Cadastro rápido</span></div><p>Cadastre os dados essenciais para cotações e histórico de compras</p></div>
-    <a class="supplier-btn supplier-btn-quiet" href="<%= backUrl %>"><%- icon('arrowLeft') %> Voltar</a>
+    <a class="supplier-btn supplier-btn-quiet ui-btn ui-btn--secondary" href="<%= backUrl %>"><%- icon('arrowLeft') %> Voltar</a>
   </header>
 
   <ol class="supplier-steps" aria-label="Etapas do cadastro">
@@ -53,7 +53,7 @@
       <section class="supplier-card form-section" data-form-section="products">
         <div class="section-heading"><span><%- icon('boxes') %></span><div><h2>Produtos e serviços</h2><p>Adicione itens e selecione as categorias que facilitam a busca.</p></div></div>
         <label class="item-entry-label">Adicionar produto, serviço ou marca</label>
-        <div class="item-entry"><input class="supplier-input" type="text" data-item-entry placeholder="Digite para buscar ou adicionar" aria-label="Produto ou serviço"><button class="supplier-btn supplier-btn-secondary" type="button" data-add-item><%- icon('plus') %> Adicionar</button></div>
+        <div class="item-entry"><input class="supplier-input" type="text" data-item-entry placeholder="Digite para buscar ou adicionar" aria-label="Produto ou serviço"><button class="supplier-btn supplier-btn-secondary ui-btn ui-btn--outline" type="button" data-add-item><%- icon('plus') %> Adicionar</button></div>
         <input type="hidden" name="produtos_servicos" value="<%= productItems.join(', ') %>" data-products-value>
         <div class="category-picker"><h3>Categorias <em>*</em></h3><div><% categories.forEach(c => { %><label><input type="checkbox" name="categorias" value="<%= c.nome %>" <%= selected.includes(c.nome) ? 'checked' : '' %>><span><%= c.nome %></span></label><% }) %></div></div>
         <div class="selected-items"><h3>Selecionados</h3><div data-selected-items aria-live="polite"></div><p data-no-items>Nenhum produto adicionado.</p></div>
@@ -83,6 +83,6 @@
       <section class="supplier-card summary"><h2>Resumo do cadastro</h2><ul><li data-check="id"><span><%- icon('check') %></span>Identificação</li><li data-check="contact"><span><%- icon('check') %></span>Contato</li><li data-check="products"><span><%- icon('check') %></span>Produtos e serviços</li><li data-check="commercial"><span><%- icon('check') %></span>Condições comerciais</li></ul><div class="summary-usage"><h3>Como será usado</h3><p><%- icon('check') %> Disponível na seleção de fornecedores da cotação</p><p><%- icon('check') %> Histórico de preços e compras centralizado</p><p><%- icon('check') %> Busca por materiais fornecidos</p></div></section>
     </aside>
 
-    <footer class="supplier-form-actions"><a class="supplier-btn supplier-btn-quiet" href="<%= backUrl %>">Cancelar</a><div><button class="supplier-btn supplier-btn-secondary" name="acao" value="salvar">Salvar fornecedor</button><% if (context) { %><button class="supplier-btn supplier-btn-primary" name="acao" value="salvar_selecionar">Salvar e selecionar na cotação</button><% } %></div></footer>
+    <footer class="supplier-form-actions"><a class="supplier-btn supplier-btn-quiet ui-btn ui-btn--secondary" href="<%= backUrl %>">Cancelar</a><div><button class="supplier-btn supplier-btn-secondary ui-btn ui-btn--outline" name="acao" value="salvar">Salvar fornecedor</button><% if (context) { %><button class="supplier-btn supplier-btn-primary ui-btn ui-btn--primary" name="acao" value="salvar_selecionar">Salvar e selecionar na cotação</button><% } %></div></footer>
   </form>
 </div>
