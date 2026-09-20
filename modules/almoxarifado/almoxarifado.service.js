@@ -487,7 +487,7 @@ function finalizarRecebimento(id) {
 function fechar(id) {
   const s = getSolicitacao(id);
   if (!s || (s.status !== STATUS.RECEBIDA_TOTAL && s.status !== STATUS.ENTREGUE_SOLICITANTE)) {
-    throw new Error("Somente uma solicitação integralmente recebida e entregue pode ser fechada.");
+    throw new Error("Somente uma solicitação recebida integralmente pode ser fechada. Quando houver reserva, a entrega ao solicitante também deve estar concluída.");
   }
   if (s.resumo.qtd_pendente > 0) throw new Error("Ainda existem quantidades a receber.");
 
