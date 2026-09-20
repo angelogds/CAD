@@ -285,6 +285,7 @@ function osShow(req, res) {
     canManualEditEquipe: canManageEquipe,
     canManageDisponibilidade: canManageEquipe,
     canExecuteOS: canAccessModule(role, "os_execute"),
+    canWithdrawMaterial: canAccessModule(role, "estoque_retirada"),
     canRegisterAndamento: canRegisterOSAndamento(role),
     equipeUsuarios,
     tracagens,
