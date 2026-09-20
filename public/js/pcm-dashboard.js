@@ -36,6 +36,21 @@
     meta.innerHTML=`<span class="pcm-chart-badge${interactive?' is-interactive':''}"><i></i>${interactive?'Interativo':'Visão executiva'}</span><span class="pcm-chart-summary">${tr(summary)}</span>`;
   }
   const chartTotal=(values)=>values.reduce((sum,value)=>sum+(Number(value)||0),0);
+  function ensureChartRuntime(){
+    if(typeof Chart!=='undefined')return true;
+    let alert=$('#pcmChartRuntimeAlert');
+    if(!alert){
+      alert=document.createElement('div');
+      alert.id='pcmChartRuntimeAlert';
+      alert.className='pcm-alert-box';
+      alert.setAttribute('role','alert');
+      alert.textContent='Os gráficos não puderam ser carregados. Atualize a página; se o problema persistir, a biblioteca gráfica está indisponível.';
+      const intro=$('.pcm-analytics-intro');
+      (intro?.parentNode||document.body).insertBefore(alert,intro||null);
+    }
+    console.error('[PCM Dashboard] Chart.js indisponível.');
+    return false;
+  }
   const centerTextPlugin={
     id:'pcmCenterText',
     afterDraw(chart,args,options){
@@ -90,6 +105,7 @@
   function renderQuality(){const q=state.data?.qualidade_dados||{};$('[data-quality]').forEach(el=>{el.textContent=fmt(q[el.dataset.quality],'%');});const status=$('[data-quality-status]');if(status)status.textContent=q.status_label||'Sem dados suficientes';const list=$('#qualityPendencias');if(list)list.innerHTML=(q.campos_pendentes||[]).map(item=>`<li>${tr(item)}</li>`).join('')||'<li>Base mínima atendida para os campos avaliados.</li>';}
   function renderReliability(){const r=state.data?.confiabilidade||{};const status=$('[data-reliability-status]');if(status)status.textContent=r.status_label||'Dados insuficientes';}
   function renderCharts(){
+    if(!ensureChartRuntime())return;
     const falhas=rows('falhas_equipamento').slice(0,6);
     bar('chartTopFalhas',falhas.map(x=>x.nome),falhas.map(x=>x.falhas),{horizontal:true,label:'Falhas',from:'#fde8e7',to:COLORS.red,labelMax:34,links:falhas.map(x=>x.equipamento_id?dashboardHref({equipamento_id:x.equipamento_id}):null)});
     const tipos=rows('tipos_manutencao');doughnut('chartCorPrev',tipos.map(x=>x.tipo),tipos.map(x=>x.total),{label:'Intervenções',colors:[COLORS.green,COLORS.orange,COLORS.blue,COLORS.teal],links:tipos.map(x=>x.tipo?dashboardHref({tipo_manutencao:String(x.tipo).toUpperCase()}):null)});
