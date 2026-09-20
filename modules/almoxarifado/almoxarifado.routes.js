@@ -4,8 +4,10 @@ const { ACCESS } = require("../../config/rbac");
 const ctrl = require("./almoxarifado.controller");
 const qrCtrl = require("./retiradas-qr.controller");
 
+const RETIRADA_QR_ACCESS = Array.from(new Set([...(ACCESS.almoxarifado_read || []), ...(ACCESS.estoque_retirada || [])]));
+
 router.get("/recebimentos", requireLogin, requireRole(ACCESS.almoxarifado_read), ctrl.recebimentos);
-router.get("/retiradas/qr", requireLogin, requireRole(ACCESS.almoxarifado_read), qrCtrl.scanner);
+router.get("/retiradas/qr", requireLogin, requireRole(RETIRADA_QR_ACCESS), qrCtrl.scanner);
 router.post("/reservas/:reservaId/retirar", requireLogin, requireRole(ACCESS.estoque_retirada), qrCtrl.retirar);
 router.post("/solicitacoes/:id/iniciar-recebimento", requireLogin, requireRole(ACCESS.almoxarifado_manage), ctrl.iniciarRecebimento);
 router.get("/solicitacoes/:id/conferir", requireLogin, requireRole(ACCESS.almoxarifado_read), ctrl.conferir);

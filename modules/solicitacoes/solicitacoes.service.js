@@ -699,6 +699,8 @@ function getSolicitacaoById(id) {
   const hasEstoqueItemId = hasColumn("solicitacao_itens", "estoque_item_id");
   const hasItemId = hasColumn("solicitacao_itens", "item_id");
   const hasEstoqueItens = tableExists("estoque_itens");
+  const hasEstoqueMovimentos = tableExists("estoque_movimentos");
+  const hasMovSolicitacaoItem = hasEstoqueMovimentos && hasColumn("estoque_movimentos", "solicitacao_item_id");
   const estoqueCodigoExpr = hasEstoqueItens && hasColumn("estoque_itens", "codigo") ? "ei.codigo" : "NULL";
   const userJoin = usersTable ? `LEFT JOIN ${usersTable} u ON u.id = s.solicitante_user_id` : "";
   const comprasJoin = usersTable && hasComprasUserId ? `LEFT JOIN ${usersTable} cu ON cu.id = s.compras_user_id` : "";
@@ -740,6 +742,10 @@ function getSolicitacaoById(id) {
         ? "COALESCE(si.quantidade, 0)"
         : "0";
   const qtdRecebidaExpr = hasQtdRecebidaTotal ? "COALESCE(si.qtd_recebida_total, 0)" : "0";
+  const qtdUtilizadaExpr = hasMovSolicitacaoItem
+    ? `COALESCE((SELECT SUM(CASE WHEN UPPER(COALESCE(em.tipo,'')) LIKE 'SAIDA%' THEN ABS(em.quantidade) ELSE 0 END)
+        FROM estoque_movimentos em WHERE em.solicitacao_item_id=si.id),0)`
+    : "0";
   const itemJoinExpr = hasEstoqueItemId && hasItemId
     ? "COALESCE(si.estoque_item_id, si.item_id)"
     : hasEstoqueItemId
@@ -752,6 +758,8 @@ function getSolicitacaoById(id) {
   const itens = hasSolicitacaoItens ? db.prepare(`
     SELECT si.*, ${itemNomeExpr} AS item_nome, ${itemDescricaoExpr} AS item_descricao,
            ${qtdSolicitadaExpr} AS qtd_solicitada, ${qtdRecebidaExpr} AS qtd_recebida_total,
+           ${qtdUtilizadaExpr} AS qtd_utilizada,
+           MAX(${qtdRecebidaExpr} - ${qtdUtilizadaExpr}, 0) AS qtd_disponivel_retirada,
            (${qtdSolicitadaExpr} - ${qtdRecebidaExpr}) AS qtd_pendente, ${estoqueCodigoExpr} AS estoque_codigo
     FROM solicitacao_itens si
     ${estoqueJoin}
