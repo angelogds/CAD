@@ -347,6 +347,7 @@ function listConsumoMateriais(equipamentoId, filtros = {}) {
   const hasUsuarioId = columnExists("estoque_movimentos", "usuario_id");
   const hasRetiradoPorColaborador = columnExists("estoque_movimentos", "retirado_por_colaborador_id");
   const hasEntreguePor = columnExists("estoque_movimentos", "entregue_por_user_id");
+  const hasValorUnitario = columnExists("solicitacao_itens", "valor_unitario_centavos");
   const dataExpr = hasDataMov ? "COALESCE(m.data_mov,m.created_at)" : "m.created_at";
   const where = ["m.equipamento_id=@equipamento_id", "UPPER(COALESCE(m.tipo,'')) LIKE 'SAIDA%'"];
   const params = { equipamento_id: Number(equipamentoId) };
@@ -375,6 +376,7 @@ function listConsumoMateriais(equipamentoId, filtros = {}) {
   const entregadorJoin = hasEntreguePor && tableExists("users")
     ? "LEFT JOIN users eu ON eu.id=m.entregue_por_user_id"
     : "LEFT JOIN (SELECT NULL id,NULL name) eu ON 1=0";
+  const valorUnitarioExpr = hasSolicitacaoItemId && hasValorUnitario ? "COALESCE(si.valor_unitario_centavos,0)" : "0";
 
   return db.prepare(`
     SELECT m.id,m.tipo,m.quantidade,m.os_id,m.solicitacao_id,m.solicitacao_item_id,m.observacao,
