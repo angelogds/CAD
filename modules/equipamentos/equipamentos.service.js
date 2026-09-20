@@ -338,6 +338,65 @@ function listHistoricoOS(equipamentoId, filtros = {}) {
     .all(params);
 }
 
+function listConsumoMateriais(equipamentoId, filtros = {}) {
+  if (!tableExists("estoque_movimentos") || !columnExists("estoque_movimentos", "equipamento_id")) return [];
+
+  const hasDataMov = columnExists("estoque_movimentos", "data_mov");
+  const hasSolicitacaoId = columnExists("estoque_movimentos", "solicitacao_id");
+  const hasSolicitacaoItemId = columnExists("estoque_movimentos", "solicitacao_item_id");
+  const hasUsuarioId = columnExists("estoque_movimentos", "usuario_id");
+  const hasRetiradoPorColaborador = columnExists("estoque_movimentos", "retirado_por_colaborador_id");
+  const hasEntreguePor = columnExists("estoque_movimentos", "entregue_por_user_id");
+  const dataExpr = hasDataMov ? "COALESCE(m.data_mov,m.created_at)" : "m.created_at";
+  const where = ["m.equipamento_id=@equipamento_id", "UPPER(COALESCE(m.tipo,'')) LIKE 'SAIDA%'"];
+  const params = { equipamento_id: Number(equipamentoId) };
+
+  if (filtros.data_inicio) {
+    where.push(`date(${dataExpr}) >= date(@data_inicio)`);
+    params.data_inicio = filtros.data_inicio;
+  }
+  if (filtros.data_fim) {
+    where.push(`date(${dataExpr}) <= date(@data_fim)`);
+    params.data_fim = filtros.data_fim;
+  }
+
+  const solicitacaoJoin = hasSolicitacaoId && tableExists("solicitacoes")
+    ? "LEFT JOIN solicitacoes s ON s.id=m.solicitacao_id"
+    : "LEFT JOIN (SELECT NULL id,NULL numero) s ON 1=0";
+  const solicitacaoItemJoin = hasSolicitacaoItemId && tableExists("solicitacao_itens")
+    ? "LEFT JOIN solicitacao_itens si ON si.id=m.solicitacao_item_id"
+    : "LEFT JOIN (SELECT NULL id,NULL item_nome,NULL item_descricao,NULL unidade) si ON 1=0";
+  const userJoin = hasUsuarioId && tableExists("users")
+    ? "LEFT JOIN users u ON u.id=m.usuario_id"
+    : "LEFT JOIN (SELECT NULL id,NULL name) u ON 1=0";
+  const retiranteJoin = hasRetiradoPorColaborador && tableExists("colaboradores")
+    ? "LEFT JOIN colaboradores rc ON rc.id=m.retirado_por_colaborador_id"
+    : "LEFT JOIN (SELECT NULL id,NULL nome) rc ON 1=0";
+  const entregadorJoin = hasEntreguePor && tableExists("users")
+    ? "LEFT JOIN users eu ON eu.id=m.entregue_por_user_id"
+    : "LEFT JOIN (SELECT NULL id,NULL name) eu ON 1=0";
+
+  return db.prepare(`
+    SELECT m.id,m.tipo,m.quantidade,m.os_id,m.solicitacao_id,m.solicitacao_item_id,m.observacao,
+           ${dataExpr} AS data_mov,
+           ei.codigo AS estoque_codigo,ei.nome AS estoque_item_nome,ei.unidade AS estoque_unidade,
+           COALESCE(si.item_nome,si.item_descricao,ei.nome) AS item_nome,
+           COALESCE(si.unidade,ei.unidade,'UN') AS unidade,
+           s.numero AS solicitacao_numero,
+           u.name AS usuario_nome,rc.nome AS retirado_por_nome,eu.name AS entregue_por_nome
+    FROM estoque_movimentos m
+    JOIN estoque_itens ei ON ei.id=m.item_id
+    ${solicitacaoJoin}
+    ${solicitacaoItemJoin}
+    ${userJoin}
+    ${retiranteJoin}
+    ${entregadorJoin}
+    WHERE ${where.join(" AND ")}
+    ORDER BY datetime(${dataExpr}) DESC,m.id DESC
+    LIMIT 300
+  `).all(params);
+}
+
 /** Dados gerenciais confiáveis usados pela ficha do ativo. */
 function getEquipmentDashboard(equipamentoId) {
   const id = Number(equipamentoId);
@@ -566,6 +625,7 @@ module.exports = {
   update,
   remove,
   listHistoricoOS,
+  listConsumoMateriais,
   listHistoricoPreventivas,
   getEquipmentDashboard,
   listPecasCatalogo,
