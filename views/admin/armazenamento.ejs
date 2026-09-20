@@ -1,42 +1,129 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/admin-console.css?v=20260919-p5" />
+<link rel="stylesheet" href="/css/admin-console.css?v=20260920-health" />
+<%
+  const healthClass = health.overall === 'good' ? 'good' : (health.overall === 'warn' ? 'warn' : 'danger');
+  const healthLabel = health.overall === 'good' ? 'Sistema saudável' : (health.overall === 'warn' ? 'Atenção necessária' : 'Ação necessária');
+  const volumeClass = health.volume.level === 'good' ? 'good' : (health.volume.level === 'warn' ? 'warn' : 'danger');
+  const backupClass = health.backups.status === 'good' ? 'good' : (health.backups.status === 'warn' ? 'warn' : 'danger');
+  const usedPct = Number(diagnostic.usedPct || 0);
+  const freePct = Number(diagnostic.freePct || 0);
+  const uptimeHours = Math.floor(Number(health.runtime.uptimeSeconds || 0) / 3600);
+%>
 
 <main class="admin-console">
   <header class="admin-hero">
     <div>
       <span class="admin-eyebrow">ADMINISTRAÇÃO • SAÚDE DO SISTEMA</span>
-      <h1>Armazenamento</h1>
-      <p>Diagnóstico do volume, SQLite, sessões, arquivos temporários e rotina de limpeza de mídia.</p>
+      <h1>Saúde do Sistema</h1>
+      <p>Diagnóstico central do volume persistente, SQLite, backups, sessões e rotinas de manutenção do sistema.</p>
     </div>
     <div class="admin-actions">
+      <span class="admin-badge <%= healthClass %>"><%= healthLabel %></span>
       <% if (isAdmin) { %><a class="ui-btn ui-btn--outline" href="/admin/limpeza-volume">Limpeza de volume</a><% } %>
     </div>
   </header>
 
-  <section class="admin-metrics" aria-label="Diagnóstico de armazenamento">
-    <article class="admin-metric"><span>Espaço livre</span><strong><%= formatBytes(diagnostic.free) %></strong></article>
-    <article class="admin-metric"><span>SQLite</span><strong><%= formatBytes(diagnostic.db) %></strong></article>
-    <article class="admin-metric"><span>Uploads</span><strong><%= formatBytes(diagnostic.uploads) %></strong></article>
-    <article class="admin-metric"><span>Sessões expiradas</span><strong><%= diagnostic.sessions.expired %></strong></article>
+  <section class="admin-metrics" aria-label="Resumo da saúde do sistema">
+    <article class="admin-metric">
+      <span>Espaço livre</span>
+      <strong><%= formatBytes(diagnostic.free) %></strong>
+      <small><%= freePct.toFixed(1) %>% disponível</small>
+    </article>
+    <article class="admin-metric">
+      <span>SQLite</span>
+      <strong><%= formatBytes(diagnostic.db) %></strong>
+      <small><%= health.sqlite.journalMode || 'modo desconhecido' %></small>
+    </article>
+    <article class="admin-metric">
+      <span>Integridade</span>
+      <strong><%= health.sqlite.ok ? 'OK' : 'Atenção' %></strong>
+      <small><%= health.sqlite.label %></small>
+    </article>
+    <article class="admin-metric">
+      <span>Último backup</span>
+      <strong><%= health.backups.latest ? formatBytes(health.backups.latest.size) : 'Nenhum' %></strong>
+      <small><%= health.backups.label %></small>
+    </article>
   </section>
 
   <section class="admin-panel">
     <div class="admin-section-head">
-      <div><h2>Diagnóstico geral</h2><p>Visão rápida dos principais componentes persistidos no volume.</p></div>
-      <span class="admin-badge info">WAL: <%= formatBytes(diagnostic.wal) %></span>
+      <div>
+        <h2>Diagnóstico central</h2>
+        <p>Leituras de saúde executadas somente nesta tela administrativa para não pesar nas demais rotas do sistema.</p>
+      </div>
+      <span class="admin-badge <%= healthClass %>"><%= healthLabel %></span>
+    </div>
+
+    <div class="admin-storage-grid">
+      <article class="admin-metric">
+        <span>Volume persistente</span>
+        <strong><%= health.volume.label %></strong>
+        <small><%= usedPct.toFixed(1) %>% usado • <%= formatBytes(diagnostic.used) %></small>
+      </article>
+      <article class="admin-metric">
+        <span>SQLite quick_check</span>
+        <strong><%= health.sqlite.ok ? 'Íntegro' : 'Falha' %></strong>
+        <small>FK: <%= health.sqlite.foreignKeys ? 'ON' : 'OFF' %> • timeout <%= health.sqlite.busyTimeout || 0 %> ms</small>
+      </article>
+      <article class="admin-metric">
+        <span>Backups locais</span>
+        <strong><%= health.backups.count %></strong>
+        <small><%= formatBytes(health.backups.totalBytes) %> armazenados</small>
+      </article>
+      <article class="admin-metric">
+        <span>Runtime</span>
+        <strong><%= health.runtime.node %></strong>
+        <small>Uptime: <%= uptimeHours %> h • RSS <%= formatBytes(health.runtime.rss) %></small>
+      </article>
+      <article class="admin-metric">
+        <span>WAL / SHM</span>
+        <strong><%= formatBytes(diagnostic.wal) %></strong>
+        <small>SHM: <%= formatBytes(diagnostic.shm) %></small>
+      </article>
+      <article class="admin-metric">
+        <span>Sessões</span>
+        <strong><%= diagnostic.sessions.total %></strong>
+        <small><%= diagnostic.sessions.expired %> expirada(s)</small>
+      </article>
+    </div>
+
+    <% if (!health.sqlite.ok) { %>
+      <div class="admin-note danger" style="margin-top:12px">
+        O SQLite não retornou <strong>quick_check = ok</strong>. Evite operações pesadas e investigue antes de executar VACUUM.
+      </div>
+    <% } %>
+
+    <% if (health.backups.status !== 'good') { %>
+      <div class="admin-note warning" style="margin-top:12px">
+        <strong><%= health.backups.label %>.</strong> Recomenda-se criar um backup atualizado antes de manutenção pesada no banco.
+      </div>
+    <% } %>
+  </section>
+
+  <section class="admin-panel">
+    <div class="admin-section-head">
+      <div><h2>Armazenamento persistente</h2><p>Distribuição dos principais componentes armazenados no volume.</p></div>
+      <span class="admin-badge <%= volumeClass %>">Livre: <%= freePct.toFixed(1) %>%</span>
     </div>
 
     <div class="admin-storage-grid">
       <article class="admin-metric"><span>Capacidade total</span><strong><%= formatBytes(diagnostic.total) %></strong></article>
+      <article class="admin-metric"><span>Em uso</span><strong><%= formatBytes(diagnostic.used) %></strong></article>
+      <article class="admin-metric"><span>Uploads</span><strong><%= formatBytes(diagnostic.uploads) %></strong></article>
       <article class="admin-metric"><span>Logs</span><strong><%= formatBytes(diagnostic.logs) %></strong></article>
       <article class="admin-metric"><span>Temporários</span><strong><%= formatBytes(diagnostic.tmp) %></strong></article>
-      <article class="admin-metric"><span>PDFs temporários</span><strong><%= formatBytes(diagnostic.pdfs) %></strong></article>
-      <article class="admin-metric"><span>Sessões</span><strong><%= diagnostic.sessions.total %></strong></article>
+      <article class="admin-metric"><span>PDFs</span><strong><%= formatBytes(diagnostic.pdfs) %></strong></article>
+      <article class="admin-metric"><span>Mídias</span><strong><%= formatBytes(diagnostic.media) %></strong></article>
       <article class="admin-metric"><span>Uploads OS</span><strong><%= (volumeBytes / 1024 / 1024).toFixed(2) %> MB</strong></article>
+      <article class="admin-metric"><span>Sessões expiradas</span><strong><%= diagnostic.sessions.expired %></strong></article>
     </div>
 
     <% if (isAdmin) { %>
-      <div class="admin-cleanup-actions">
+      <div class="admin-cleanup-actions" style="margin-top:12px">
+        <form method="post" action="/admin/armazenamento/backup" onsubmit="return confirm('Criar um backup consistente do SQLite agora?');">
+          <button class="ui-btn ui-btn--primary" type="submit">Criar backup SQLite</button>
+        </form>
         <form method="post" action="/admin/armazenamento/limpar-sessoes" onsubmit="return confirm('Remover somente sessões expiradas?');">
           <button class="ui-btn ui-btn--outline" type="submit">Limpar sessões expiradas</button>
         </form>
@@ -47,11 +134,58 @@
           <button class="ui-btn ui-btn--outline" type="submit">Checkpoint WAL</button>
         </form>
         <form method="post" action="/admin/armazenamento/otimizar" onsubmit="return confirm('Executar VACUUM somente se houver espaço suficiente. Confirmar?');">
-          <button class="ui-btn ui-btn--primary" type="submit">Otimizar SQLite</button>
+          <button class="ui-btn ui-btn--outline" type="submit">Otimizar SQLite</button>
         </form>
       </div>
     <% } %>
   </section>
+
+  <section class="admin-panel">
+    <div class="admin-section-head">
+      <div><h2>Backups do SQLite</h2><p>Inventário local dos backups consistentes armazenados no volume persistente.</p></div>
+      <span class="admin-badge <%= backupClass %>"><%= health.backups.label %></span>
+    </div>
+
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Arquivo</th><th>Tamanho</th><th>Criado / modificado</th></tr></thead>
+        <tbody>
+          <% if (!health.backups.recent.length) { %>
+            <tr><td colspan="3" class="admin-empty">Nenhum backup local encontrado.</td></tr>
+          <% } %>
+          <% health.backups.recent.forEach((backup) => { %>
+            <tr>
+              <td data-label="Arquivo"><code><%= backup.name %></code></td>
+              <td data-label="Tamanho"><%= formatBytes(backup.size) %></td>
+              <td data-label="Data"><%= backup.mtime ? new Date(backup.mtime).toLocaleString('pt-BR') : '-' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <% if (isAdmin) { %>
+    <section class="admin-panel">
+      <div class="admin-section-head">
+        <div><h2>Maiores arquivos do volume</h2><p>Ajuda a localizar rapidamente o que está ocupando espaço antes de qualquer limpeza.</p></div>
+        <span class="admin-badge"><%= diagnostic.topFiles.length %> item(ns)</span>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Arquivo</th><th>Tamanho</th></tr></thead>
+          <tbody>
+            <% diagnostic.topFiles.forEach((file) => { %>
+              <tr>
+                <td data-label="Arquivo"><code><%= file.path %></code></td>
+                <td data-label="Tamanho"><%= formatBytes(file.size) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% } %>
 
   <section class="admin-panel">
     <div class="admin-section-head">
