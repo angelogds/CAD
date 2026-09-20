@@ -1,79 +1,103 @@
 <% layout("layout") %>
+<link rel="stylesheet" href="/css/preventivas-form.css?v=20260919-p3">
 
-<link rel="stylesheet" href="/css/preventivas-form.css?v=20260919-1">
-
-<div class="preventive-form-page">
-
-<h1>Nova Preventiva Manual</h1>
-<p class="muted" style="margin-top:-6px;">Criar preventiva pendente com origem MANUAL.</p>
-
-<div class="card">
-  <form method="POST" action="/preventivas">
-    <div class="field">
-      <label for="equipamento_id" class="muted" style="font-size:12px;font-weight:800;">Equipamento</label>
-      <select id="equipamento_id" name="equipamento_id" required>
-        <option value="">— Selecione —</option>
-        <% (equipamentos || []).forEach(e => { %>
-          <option value="<%= e.id %>"><%= (e.codigo ? e.codigo + " • " : "") + e.nome %></option>
-        <% }) %>
-      </select>
+<main class="preventive-secondary-page">
+  <header class="preventive-secondary-hero">
+    <div>
+      <span class="preventive-secondary-eyebrow">PREVENTIVAS • CADASTRO MANUAL</span>
+      <h1>Nova Preventiva Manual</h1>
+      <p>Crie uma preventiva pendente vinculada a um equipamento. A equipe responsável continuará sendo definida pelas regras atuais de escala e configuração do módulo.</p>
     </div>
-
-    <div class="field">
-      <label for="titulo" class="muted" style="font-size:12px;font-weight:800;">Título</label>
-      <input id="titulo" name="titulo" required placeholder="Ex: Lubrificação dos mancais do Digestor Laranja" />
+    <div class="preventive-secondary-actions">
+      <a class="ui-btn ui-btn--secondary" href="/preventivas">Voltar ao painel</a>
     </div>
+  </header>
 
-    <div class="grid field">
+  <section class="preventive-secondary-panel">
+    <div class="preventive-secondary-head">
       <div>
-        <label for="tipo_preventiva" class="muted" style="font-size:12px;font-weight:800;">Tipo da preventiva</label>
+        <h2>Dados do plano</h2>
+        <p>Defina equipamento, atividade, criticidade e frequência sem alterar o fluxo automático de execução.</p>
+      </div>
+      <span class="preventive-secondary-badge info">Origem: MANUAL</span>
+    </div>
+
+    <form method="POST" action="/preventivas" class="preventive-secondary-grid">
+      <label class="preventive-secondary-field is-wide" for="equipamento_id">
+        <span>Equipamento *</span>
+        <select id="equipamento_id" name="equipamento_id" required>
+          <option value="">— Selecione o equipamento —</option>
+          <% (equipamentos || []).forEach(e => { %>
+            <option value="<%= e.id %>" <%= Number(equipamentoSelecionadoId || 0) === Number(e.id) ? 'selected' : '' %>>
+              <%= (e.codigo ? e.codigo + " • " : "") + e.nome %><%= e.criticidade ? (' • ' + e.criticidade) : '' %>
+            </option>
+          <% }) %>
+        </select>
+      </label>
+
+      <label class="preventive-secondary-field is-wide" for="titulo">
+        <span>Título da atividade *</span>
+        <input id="titulo" name="titulo" required placeholder="Ex.: Lubrificação dos mancais do Digestor 3">
+      </label>
+
+      <label class="preventive-secondary-field" for="tipo_preventiva">
+        <span>Tipo da preventiva</span>
         <select id="tipo_preventiva" name="tipo_preventiva">
           <option value="preventiva" selected>Preventiva</option>
           <option value="preventiva_reforcada">Preventiva reforçada</option>
           <option value="reforma">Reforma</option>
           <option value="inspecao">Inspeção</option>
         </select>
-      </div>
-      <div>
-        <label for="criticidade" class="muted" style="font-size:12px;font-weight:800;">Criticidade</label>
-        <select id="criticidade" name="criticidade">
-          <option value="BAIXA">BAIXA</option>
-          <option value="MEDIA" selected>MÉDIA</option>
-          <option value="ALTA">ALTA</option>
-          <option value="CRITICA">CRÍTICA</option>
-        </select>
-      </div>
-    </div>
+      </label>
 
-    <div class="grid field">
-      <div>
-        <label for="data_prevista" class="muted" style="font-size:12px;font-weight:800;">Data prevista</label>
-        <input id="data_prevista" name="data_prevista" type="date" required />
-      </div>
-      <div>
-        <label for="frequencia_tipo" class="muted" style="font-size:12px;font-weight:800;">Frequência</label>
+      <label class="preventive-secondary-field" for="criticidade">
+        <span>Criticidade</span>
+        <select id="criticidade" name="criticidade">
+          <option value="BAIXA">Baixa</option>
+          <option value="MEDIA" selected>Média</option>
+          <option value="ALTA">Alta</option>
+          <option value="CRITICA">Crítica</option>
+        </select>
+      </label>
+
+      <label class="preventive-secondary-field" for="data_prevista">
+        <span>Data prevista *</span>
+        <input id="data_prevista" name="data_prevista" type="date" min="<%= hojeISO || '' %>" required>
+      </label>
+
+      <label class="preventive-secondary-field" for="frequencia_tipo">
+        <span>Frequência</span>
         <select id="frequencia_tipo" name="frequencia_tipo">
           <option value="diario">Diário</option>
           <option value="semanal">Semanal</option>
           <option value="mensal" selected>Mensal</option>
           <option value="anual">Anual</option>
         </select>
+      </label>
+
+      <label class="preventive-secondary-field" for="frequencia_valor">
+        <span>Intervalo</span>
+        <input id="frequencia_valor" name="frequencia_valor" type="number" min="1" step="1" value="1">
+      </label>
+
+      <div class="preventive-secondary-field">
+        <span>Status inicial</span>
+        <div class="preventive-secondary-note"><strong>PENDENTE</strong><br>Após o cadastro, a execução entra no painel e segue as regras atuais de alocação.</div>
       </div>
-    </div>
 
-    <div class="field">
-      <label for="observacao" class="muted" style="font-size:12px;font-weight:800;">Observação</label>
-      <textarea id="observacao" name="observacao" placeholder="Observações técnicas (opcional)"></textarea>
-    </div>
+      <label class="preventive-secondary-field is-wide" for="observacao">
+        <span>Observação técnica</span>
+        <textarea id="observacao" name="observacao" placeholder="Procedimento, ponto de atenção, material previsto ou orientação técnica..."></textarea>
+      </label>
 
-    <div class="muted" style="margin-top:8px;font-size:12px;">
-      Status inicial da execução: <strong>PENDENTE</strong>. Os responsáveis serão escalados automaticamente conforme a escala vigente.
-    </div>
+      <div class="preventive-secondary-note is-wide">
+        Os responsáveis não são definidos manualmente nesta tela. O sistema continuará usando a <strong>escala vigente</strong> e a configuração de responsáveis das preventivas.
+      </div>
 
-    <div class="field preventive-form-actions">
-      <a class="btn btn-secondary" href="/preventivas">Voltar</a>
-      <button class="btn btn-primary" type="submit">Salvar preventiva manual</button>
-    </div>
-  </form>
-</div>
-</div>
+      <div class="preventive-secondary-form-actions is-wide">
+        <a class="ui-btn ui-btn--secondary" href="/preventivas">Cancelar</a>
+        <button class="ui-btn ui-btn--primary" type="submit">Salvar preventiva manual</button>
+      </div>
+    </form>
+  </section>
+</main>
