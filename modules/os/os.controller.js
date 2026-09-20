@@ -11,6 +11,7 @@ const whatsappService = require("../whatsapp/whatsapp.service");
 const osDocumentService = require("./os-document.service");
 const osChatService = require("../os-chat/os-chat.service");
 const solicitacoesService = require("../solicitacoes/solicitacoes.service");
+const solicitacoesItensService = require("../solicitacoes/solicitacoes.itens-bilateral.service");
 const escalaService = require("../escala/escala.service");
 const { canSendWhatsappNotificationRole } = require("../../middlewares/permissions.middleware");
 
@@ -260,10 +261,17 @@ function osShow(req, res) {
   let chatResumo = null;
   try { chatResumo = osChatService.buscarConversaPorOS(id, req.session?.user || {}); } catch (_e) { chatResumo = null; }
   let materialRequest = null;
+  let canManageMaterialRequest = false;
   try {
     const solicitacaoId = Number(chatResumo?.solicitacao?.id || 0);
     materialRequest = solicitacaoId ? solicitacoesService.getSolicitacaoById(solicitacaoId) : null;
-  } catch (_e) { materialRequest = null; }
+    canManageMaterialRequest = materialRequest
+      ? solicitacoesItensService.canManageItems(materialRequest, req.session?.user || {})
+      : false;
+  } catch (_e) {
+    materialRequest = null;
+    canManageMaterialRequest = false;
+  }
 
   return res.render("os/show", {
     title: `OS #${id}`,
@@ -295,6 +303,7 @@ function osShow(req, res) {
     disponibilidadeResponsavel,
     chatResumo,
     materialRequest,
+    canManageMaterialRequest,
     user: req.session?.user || null,
   });
 }
