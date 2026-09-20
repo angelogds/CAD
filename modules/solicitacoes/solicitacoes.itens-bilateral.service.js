@@ -53,6 +53,14 @@ function actorSide(sol, user) {
   return null;
 }
 
+function isOpenForItemChanges(sol) {
+  return !!sol && !FINAL_STATUS.has(String(sol.status || '').toUpperCase());
+}
+
+function canManageItems(sol, user) {
+  return isOpenForItemChanges(sol) && !!actorSide(sol, user);
+}
+
 function assertActor(sol, user) {
   const side = actorSide(sol, user);
   if (!side) throw new Error('Somente o solicitante original ou o setor de Compras pode alterar os itens desta solicitação.');
@@ -273,4 +281,6 @@ module.exports = {
   getAlteracoes,
   canAnswer,
   actorSide,
+  canManageItems,
+  isOpenForItemChanges,
 };
