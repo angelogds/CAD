@@ -46,7 +46,7 @@
       <div class="pcm-reliability-kpis">
         <div><span>MTBF</span><strong data-card="mtbf_horas" data-suffix=" h"><%= metric(d.cards.mtbf_horas,' h') %></strong><small><%= reliability.mtbf_amostras||0 %> intervalo(s) entre falhas</small></div>
         <div><span>MTTR</span><strong data-card="mttr_horas" data-suffix=" h"><%= metric(d.cards.mttr_horas,' h') %></strong><small><%= reliability.mttr_amostras||0 %> parada(s) com início/fim</small></div>
-        <div><span>Disponibilidade</span><strong data-card="disponibilidade_pct" data-suffix="%"><%= metric(d.cards.disponibilidade_pct,'%') %></strong><small>MTBF / (MTBF + MTTR)</small></div>
+        <div><span>Disponibilidade estimada</span><strong data-card="disponibilidade_pct" data-suffix="%"><%= metric(d.cards.disponibilidade_pct,'%') %></strong><small>MTBF / (MTBF + MTTR)</small></div>
         <div><span>Tempo total de parada</span><strong data-card="tempo_parada_horas" data-suffix=" h"><%= metric(d.cards.tempo_parada_horas,' h') %></strong><small>Somatório dos intervalos válidos</small></div>
       </div>
       <div class="pcm-reliability-note <%= reliability.publicado ? 'ok' : 'pending' %>">
@@ -71,6 +71,7 @@
 
     <section class="pcm-directors-grid">
       <article class="pcm-director-panel wide"><span class="pcm-section-label">Confiabilidade</span><h2>Equipamentos com mais falhas</h2><p>Somente ocorrências corretivas no período.</p><div class="pcm-chart"><canvas id="chartTopFalhas"></canvas><div class="pcm-empty">Sem falhas nos filtros atuais.</div></div></article>
+      <article class="pcm-director-panel"><span class="pcm-section-label">Impacto operacional</span><h2>Horas de parada por equipamento</h2><p>Somente intervalos válidos registrados no PCM.</p><div class="pcm-chart"><canvas id="chartParadasEquipamentos"></canvas><div class="pcm-empty">Sem paradas válidas no período.</div></div></article>
       <article class="pcm-director-panel"><span class="pcm-section-label">Estratégia</span><h2>Tipos de manutenção</h2><p>Distribuição das intervenções.</p><div class="pcm-chart"><canvas id="chartCorPrev"></canvas><div class="pcm-empty">Sem intervenções.</div></div></article>
       <article class="pcm-director-panel"><span class="pcm-section-label">Tendência</span><h2>OS por mês</h2><p>Evolução do volume de trabalho.</p><div class="pcm-chart"><canvas id="chartOsMes"></canvas><div class="pcm-empty">Sem histórico no período.</div></div></article>
       <article class="pcm-director-panel"><span class="pcm-section-label">Fluxo</span><h2>Situação das OS</h2><p>Distribuição por status real.</p><div class="pcm-chart"><canvas id="chartStatus"></canvas><div class="pcm-empty">Sem ordens no período.</div></div></article>
