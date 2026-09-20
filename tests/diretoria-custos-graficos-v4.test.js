@@ -30,7 +30,7 @@ test('painel executivo reaproveita filtros e publica custos para cards e gráfic
   assert.match(source, /data_final:\s*filtros\.data_final/);
   assert.match(source, /equipamento_id:\s*filtros\.equipamento_id/);
   assert.match(source, /setor:\s*filtros\.setor/);
-  for (const key of ['custo_comprado_centavos','custo_recebido_centavos','custo_pendente_recebimento_centavos','equipamentos_com_custo','custos_equipamento','custos_mes']) {
+  for (const key of ['custo_consumido_centavos','custo_comprado_centavos','custo_recebido_centavos','custo_pendente_recebimento_centavos','consumo_movimentos','equipamentos_com_custo','custos_equipamento','custos_mes']) {
     assert.ok(source.includes(key), `indicador de custo ausente: ${key}`);
   }
 });
@@ -38,12 +38,13 @@ test('painel executivo reaproveita filtros e publica custos para cards e gráfic
 test('interface da Diretoria exibe custos e novos gráficos mantendo filtro por equipamento', () => {
   const view = read('views/pcm/dashboard-gerencial.ejs');
   assert.match(view, /name="equipamento_id"/);
+  assert.match(view, /Consumido na manutenção/);
   assert.match(view, /Comprado no período/);
   assert.match(view, /Já recebido/);
   assert.match(view, /A receber/);
   assert.match(view, /chartCustosEquipamentos/);
   assert.match(view, /chartCustosMes/);
-  assert.match(view, /Custo comprado por equipamento/);
+  assert.match(view, /Custo real consumido por equipamento/);
   assert.match(view, /Evolução mensal/);
   assert.match(view, /Abrir acompanhamento de compras/);
 });
@@ -58,6 +59,8 @@ test('gráficos usam apresentação moderna e links para a ficha do equipamento'
   assert.match(js, /compactMoney/);
   assert.match(js, /chartCustosEquipamentos/);
   assert.match(js, /chartCustosMes/);
+  assert.match(js, /consumido_centavos/);
+  assert.match(js, /Custo consumido/);
   assert.match(js, /\/equipamentos\/\$\{x\.equipamento_id\}/);
 });
 
@@ -84,20 +87,23 @@ test('ficha técnica carrega custos de compra e custo real consumido sem consult
 test('layout de custos permanece responsivo no painel e na ficha', () => {
   const pcmCss = read('public/css/pcm-dashboard.css');
   const equipCss = read('public/css/equipamentos-show.css');
-  assert.match(pcmCss, /\.pcm-cost-kpis\{display:grid;grid-template-columns:repeat\(4/);
-  assert.match(pcmCss, /@media\(max-width:560px\)[\s\S]*\.pcm-quality-grid,\.pcm-cost-kpis\{grid-template-columns:1fr\}/);
+  assert.match(pcmCss, /\.pcm-cost-kpis\{display:grid;grid-template-columns:repeat\(5/);
+  assert.match(pcmCss, /\.pcm-reliability-kpis\{display:grid;grid-template-columns:repeat\(4/);
+  assert.match(pcmCss, /@media\(max-width:560px\)[\s\S]*\.pcm-quality-grid,\.pcm-cost-kpis,\.pcm-reliability-kpis\{grid-template-columns:1fr\}/);
   assert.match(equipCss, /\.equipment-cost-grid\{display:grid;grid-template-columns:repeat\(5/);
   assert.match(equipCss, /@media\(max-width:420px\)[\s\S]*\.equipment-cost-grid/);
 });
 
-test('PDF executivo inclui custos reais e deixa claro o critério de cálculo', () => {
+test('PDF executivo prioriza consumo real e mantém compras separadas', () => {
   const source = read('modules/diretoria/diretoria.controller.js');
   assert.match(source, /moneyCents/);
+  assert.match(source, /CONSUMIDO NA MANUTENÇÃO/);
   assert.match(source, /COMPRADO NO PERÍODO/);
   assert.match(source, /MATERIAIS RECEBIDOS/);
   assert.match(source, /A RECEBER/);
   assert.match(source, /title: 'Custos por equipamento'/);
   assert.match(source, /title: 'Evolução mensal dos custos'/);
-  assert.match(source, /quantidade comprada × valor unitário/);
+  assert.match(source, /baixas físicas do estoque/);
+  assert.match(source, /consumido: moneyCents\(item\.consumido_centavos\)/);
   assert.match(source, /dashboard\.custos/);
 });
