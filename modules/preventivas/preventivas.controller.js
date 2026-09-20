@@ -1,5 +1,6 @@
 const service = require("./preventivas.service");
 const PDFDocument = require("pdfkit");
+const dateBr = require("../../utils/data-hora-br");
 
 function isAdminOrEncarregado(user = null) {
   const role = String(user?.role || "").toUpperCase();
@@ -47,11 +48,14 @@ function exportPdf(req, res) {
 
 function newForm(req, res) {
   const equipamentos = service.listEquipamentosAtivos();
+  const equipamentoSelecionadoId = Number(req.query?.equipamento_id || 0) || null;
   return res.render("preventivas/nova", {
     layout: "layout",
     title: "Nova Preventiva",
     activeMenu: "preventivas",
     equipamentos,
+    equipamentoSelecionadoId,
+    hojeISO: dateBr.todayISO(),
   });
 }
 
@@ -183,6 +187,7 @@ function programadasIndex(req, res) {
     activeMenu: "preventivas",
     resumo,
     canAdminPreventivas: isAdminOrEncarregado(user),
+    dateBr,
   });
 }
 
@@ -261,13 +266,21 @@ function elegerMecanicoForm(req, res) {
     return res.redirect("/preventivas");
   }
 
+  const colaboradores = service.listColaboradoresParaPreventiva();
+  const disponiveis = colaboradores.filter((item) => item.disponivel);
   return res.render("preventivas/eleger-mecanico", {
     layout: "layout",
     title: "Eleger Mecânico da Preventiva",
     activeMenu: "preventivas",
-    colaboradores: service.listColaboradoresParaPreventiva(),
+    colaboradores,
     config: service.getConfiguracaoResponsaveisPreventiva(),
     canAdminPreventivas: true,
+    resumoDisponibilidade: {
+      total: colaboradores.length,
+      disponiveis: disponiveis.length,
+      indisponiveis: colaboradores.length - disponiveis.length,
+    },
+    dateBr,
   });
 }
 
