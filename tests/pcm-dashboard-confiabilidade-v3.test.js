@@ -15,6 +15,7 @@ test('período da confiabilidade aceita datas ISO reais e não regex escapada em
   assert.ok(!service.includes("const end = /^\\\\d{4}"));
   assert.ok(service.includes("const totalPossibleHours = bounds.hours * equipmentCount"));
   assert.ok(service.includes("availabilityAllowed = mttrAllowed && totalPossibleHours > 0"));
+  assert.match(service, /_test: \{ parseSqlDate, periodBounds, periodHours \}/);
 });
 
 test('timezone explícito é reconhecido sem duplicar sufixo UTC', () => {
