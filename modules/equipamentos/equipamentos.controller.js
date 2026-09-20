@@ -1,6 +1,7 @@
 const QRCode = require("qrcode");
 const PDFDocument = require("pdfkit");
 const service = require("./equipamentos.service");
+const custosEquipamentosService = require("../compras/custos-equipamentos.service");
 const { renderSectionTitle, renderTable, renderTextBlock, sanitizePdfText } = require("../../utils/pdf/pdfTable");
 let tracagemService = null;
 let desenhoTecnicoService = null;
@@ -97,6 +98,10 @@ async function equipShow(req, res) {
   const desenhosTecnicos = desenhoTecnicoService ? desenhoTecnicoService.listByEquipamento(id) : [];
   const riscoFalha = pcmIntelligenceService ? pcmIntelligenceService.calcularScoreRiscoEquipamento(id) : null;
   const dashboard = service.getEquipmentDashboard(id);
+  const custosEquipamento = custosEquipamentosService.getEquipmentDetail(id, {
+    data_inicio: filtros.data_inicio,
+    data_fim: filtros.data_fim,
+  });
 
   return res.render("equipamentos/show", {
     title: equip.nome,
@@ -118,6 +123,7 @@ async function equipShow(req, res) {
     desenhosTecnicos,
     riscoFalha,
     dashboard,
+    custosEquipamento,
   });
 }
 
