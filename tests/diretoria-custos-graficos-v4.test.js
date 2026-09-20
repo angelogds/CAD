@@ -6,7 +6,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('custos de equipamento usam apenas compras reais vinculadas às Solicitações', () => {
+test('custos de equipamento separam compras de consumo real do estoque', () => {
   const source = read('modules/compras/custos-equipamentos.service.js');
   assert.match(source, /solicitacoes s/);
   assert.match(source, /solicitacao_itens si/);
@@ -20,6 +20,9 @@ test('custos de equipamento usam apenas compras reais vinculadas às Solicitaç�
   assert.match(source, /data_final/);
   assert.match(source, /equipamento_id/);
   assert.match(source, /getEquipmentLifetime/);
+  assert.match(source, /estoque_movimentos m/);
+  assert.match(source, /UPPER\(COALESCE\(m\.tipo,''\)\) LIKE 'SAIDA%'/);
+  assert.match(source, /consumido_centavos/);
   assert.doesNotMatch(source, /INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|DROP\s+TABLE|ALTER\s+TABLE/i);
 });
 
