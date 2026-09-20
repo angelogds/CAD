@@ -1,1 +1,46 @@
-const test = require('node:test');\nconst assert = require('node:assert/strict');\nconst fs = require('node:fs');\nconst path = require('node:path');\n\nconst root = path.resolve(__dirname, '..');\nconst read = (file) => fs.readFileSync(path.join(root, file), 'utf8');\n\ntest('inicialização busca dados antes de renderizar fallback', () => {\n  const js = read('public/js/pcm-dashboard.js');\n  const init = js.slice(js.indexOf('async function init()'));\n  assert.match(init, /const loaded=await load\(params,\{silent:true,replaceHistory:false\}\)/);\n  assert.match(init, /if\(!loaded\)renderAll\(\)/);\n  assert.ok(init.indexOf('await load') < init.indexOf('renderAll()'));\n});\n\ntest('renderização é isolada por seção e por gráfico', () => {\n  const js = read('public/js/pcm-dashboard.js');\n  assert.match(js, /function safeRenderSection\(label,fn\)/);\n  assert.match(js, /function safeChart\(id,draw\)/);\n  assert.match(js, /chartFailure\(id,error\)/);\n  assert.match(js, /safeChart\('chartTopFalhas'/);\n  assert.match(js, /safeChart\('chartCorPrev'/);\n  assert.match(js, /safeChart\('chartOsMes'/);\n});\n\ntest('gráficos aguardam layout do navegador antes de desenhar', () => {\n  const js = read('public/js/pcm-dashboard.js');\n  assert.match(js, /requestAnimationFrame\(\(\)=>requestAnimationFrame\(run\)\)/);\n  assert.match(js, /cancelAnimationFrame/);\n});\n\ntest('hotfix força versão nova do asset no navegador', () => {\n  const view = read('views/pcm/dashboard-gerencial.ejs');\n  assert.match(view, /pcm-dashboard\.js\?v=20260920-v9/);\n});\n\ntest('javascript permanece sintaticamente válido', () => {\n  assert.doesNotThrow(() => new Function(read('public/js/pcm-dashboard.js')));\n});\n
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const root = path.resolve(__dirname, '..');
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+
+test('inicialização busca dados antes de renderizar fallback', () => {
+  const js = read('public/js/pcm-dashboard.js');
+  const init = js.slice(js.indexOf('async function init()'));
+  assert.match(init, /const loaded=await load\(params,\{silent:true,replaceHistory:false\}\)/);
+  assert.match(init, /if\(!loaded\)renderAll\(\)/);
+  assert.ok(init.indexOf('await load') < init.indexOf('renderAll()'));
+});
+
+test('renderização é isolada por seção e por gráfico', () => {
+  const js = read('public/js/pcm-dashboard.js');
+  assert.match(js, /function safeRenderSection\(label,fn\)/);
+  assert.match(js, /function safeChart\(id,draw\)/);
+  assert.match(js, /chartFailure\(id,error\)/);
+  assert.match(js, /safeChart\('chartTopFalhas'/);
+  assert.match(js, /safeChart\('chartCorPrev'/);
+  assert.match(js, /safeChart\('chartOsMes'/);
+});
+
+test('gráficos aguardam layout do navegador antes de desenhar', () => {
+  const js = read('public/js/pcm-dashboard.js');
+  assert.match(js, /requestAnimationFrame\(\(\)=>requestAnimationFrame\(run\)\)/);
+  assert.match(js, /cancelAnimationFrame/);
+});
+
+test('render agendado mantém guard do Chart.js e fallback visual', () => {
+  const js = read('public/js/pcm-dashboard.js');
+  assert.match(js, /function renderCharts\(\)\{\s*if\(!ensureChartRuntime\(\)\)return;/);
+  assert.match(js, /function renderChartsNow\(\)\{\s*if\(!ensureChartRuntime\(\)\)return;/);
+});
+
+test('hotfix força versão nova do asset no navegador', () => {
+  const view = read('views/pcm/dashboard-gerencial.ejs');
+  assert.match(view, /pcm-dashboard\.js\?v=20260920-v9/);
+});
+
+test('javascript permanece sintaticamente válido', () => {
+  assert.doesNotThrow(() => new Function(read('public/js/pcm-dashboard.js')));
+});
