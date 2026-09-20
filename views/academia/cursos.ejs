@@ -1,57 +1,63 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/academia.css" />
+<link rel="stylesheet" href="/css/academia.css?v=20260919-p4" />
 
-<div class="page-head"><div><h1>Cursos técnicos</h1><p class="muted">Cursos internos e externos organizados por trilha.</p></div></div>
-<%- include(incluir('_menu')) %>
+<main class="academy-workspace">
+  <header class="academy-hero">
+    <div><span class="academy-eyebrow">ACADEMIA • CURSOS</span><h1>Cursos técnicos</h1><p>Cursos internos e externos organizados por trilha, nível e plataforma.</p></div>
+    <div class="academy-hero-actions"><a class="ui-btn ui-btn--secondary" href="/academia">Visão geral</a></div>
+  </header>
+  <%- include(incluir('_menu')) %>
 
-<form class="card" method="GET" action="/academia/cursos" style="margin-bottom:12px;">
-  <div class="grid cols-4">
-    <input type="text" name="busca" placeholder="Buscar curso" value="<%= filtros.busca %>" />
-    <select name="trilha_id"><option value="">Todas as trilhas</option><% trilhas.forEach(function(t){ %><option value="<%= t.id %>" <%= String(filtros.trilha_id)===String(t.id)?'selected':'' %>><%= t.nome %></option><% }) %></select>
-    <select name="nivel"><option value="">Todos os níveis</option><option <%= filtros.nivel==='BÁSICO'?'selected':'' %>>BÁSICO</option><option <%= filtros.nivel==='INTERMEDIÁRIO'?'selected':'' %>>INTERMEDIÁRIO</option><option <%= filtros.nivel==='AVANÇADO'?'selected':'' %>>AVANÇADO</option></select>
-    <button class="btn" type="submit">Filtrar</button>
-  </div>
-</form>
-
-<div class="academia-grid">
-  <% cursos.forEach(function(c){ %>
-    <div class="academia-card">
-      <img src="<%= c.imagem || '/IMG/login_campo_do_gado.png.png.png' %>" alt="<%= c.titulo %>" />
-      <h3><a href="/academia/curso/<%= c.id %>"><%= c.titulo %></a></h3>
-      <p class="muted"><%= c.descricao || 'Sem descrição' %></p>
-      <div class="muted-xs"><%= c.trilha_nome || 'Sem trilha' %> • <%= c.carga_horaria || 0 %>h • <%= c.pontos || 0 %> pts • <%= c.plataforma %></div>
-      <div style="margin-top:6px;"><span class="badge-status <%= c.meu_status %>"><%= c.meu_status %></span></div>
-      <div class="academia-actions">
-        <% if (c.meu_status === 'EM_ANDAMENTO') { %>
-          <form method="POST" action="/academia/continuar/<%= c.id %>"><button class="btn" type="submit">CONTINUAR CURSO</button></form>
-        <% } else { %>
-          <form method="POST" action="/academia/iniciar/<%= c.id %>"><button class="btn" type="submit">INICIAR CURSO</button></form>
-        <% } %>
-        <% if (c.plataforma !== 'INTERNO' && c.link_externo) { %>
-          <button class="btn btn-outline" type="button" data-open-external="<%= c.link_externo %>">Abrir plataforma</button>
-        <% } %>
-      </div>
-    </div>
-  <% }) %>
-</div>
-
-<% if (canAccessModule(normalizeRole(user?.role), 'academia_manage')) { %>
-  <div class="card" style="margin-top:16px;">
-    <div class="label">Administração • Novo curso</div>
-    <form method="POST" action="/academia/cursos/criar" class="grid cols-3" style="margin-top:8px;">
-      <input name="titulo" placeholder="Título" required />
-      <input name="descricao" placeholder="Descrição" />
-      <select name="trilha_id"><option value="">Sem trilha</option><% trilhas.forEach(function(t){ %><option value="<%= t.id %>"><%= t.nome %></option><% }) %></select>
-      <select name="tipo"><option>INTERNO</option><option>EXTERNO</option></select>
-      <select name="plataforma"><option>INTERNO</option><option>CURSA</option><option>YOUTUBE</option><option>PDF</option><option>OUTRO</option></select>
-      <input name="link_externo" placeholder="Link externo" />
-      <input name="imagem" placeholder="URL da imagem" />
-      <input type="number" name="carga_horaria" placeholder="Carga horária" min="0" />
-      <input type="number" name="pontos" placeholder="Pontos" min="0" value="10" />
-      <input name="nivel" placeholder="Nível" value="BÁSICO" />
-      <button class="btn" type="submit">Criar</button>
+  <section class="academy-panel">
+    <div class="academy-section-head"><div><h2>Localizar cursos</h2><p>Use os filtros para encontrar o conteúdo certo.</p></div><span class="academy-badge"><%= cursos.length %> curso(s)</span></div>
+    <form method="GET" action="/academia/cursos" class="academy-filter">
+      <label class="academy-field"><span>Buscar</span><input type="text" name="busca" placeholder="Título ou conteúdo" value="<%= filtros.busca %>"></label>
+      <label class="academy-field"><span>Trilha</span><select name="trilha_id"><option value="">Todas as trilhas</option><% trilhas.forEach(function(t){ %><option value="<%= t.id %>" <%= String(filtros.trilha_id)===String(t.id)?'selected':'' %>><%= t.nome %></option><% }) %></select></label>
+      <label class="academy-field"><span>Nível</span><select name="nivel"><option value="">Todos os níveis</option><option <%= filtros.nivel==='BÁSICO'?'selected':'' %>>BÁSICO</option><option <%= filtros.nivel==='INTERMEDIÁRIO'?'selected':'' %>>INTERMEDIÁRIO</option><option <%= filtros.nivel==='AVANÇADO'?'selected':'' %>>AVANÇADO</option></select></label>
+      <div class="academy-filter-actions academy-actions"><button class="ui-btn ui-btn--primary" type="submit">Filtrar</button><a class="ui-btn ui-btn--secondary" href="/academia/cursos">Limpar</a></div>
     </form>
-  </div>
-<% } %>
+  </section>
 
+  <section class="academy-course-grid">
+    <% if (!cursos.length) { %><div class="academy-empty">Nenhum curso encontrado.</div><% } %>
+    <% cursos.forEach(function(c){ %>
+      <article class="academy-course-card">
+        <img class="academy-course-cover" src="<%= c.imagem || '/IMG/login_campo_do_gado.png.png.png' %>" alt="<%= c.titulo %>">
+        <div class="academy-course-meta"><span class="academy-badge"><%= c.trilha_nome || 'Sem trilha' %></span><span class="academy-badge"><%= c.carga_horaria || 0 %>h</span><span class="academy-badge"><%= c.pontos || 0 %> pts</span></div>
+        <h3><a href="/academia/curso/<%= c.id %>"><%= c.titulo %></a></h3>
+        <p><%= c.descricao || 'Sem descrição' %></p>
+        <div class="academy-card-footer">
+          <span class="badge-status <%= c.meu_status %>"><%= String(c.meu_status || '').replaceAll('_',' ') %></span>
+          <div class="academia-actions">
+            <% if (c.meu_status === 'EM_ANDAMENTO') { %>
+              <form method="POST" action="/academia/continuar/<%= c.id %>"><button class="ui-btn ui-btn--primary ui-btn--compact" type="submit">Continuar</button></form>
+            <% } else { %>
+              <form method="POST" action="/academia/iniciar/<%= c.id %>"><button class="ui-btn ui-btn--primary ui-btn--compact" type="submit">Iniciar</button></form>
+            <% } %>
+            <% if (c.plataforma !== 'INTERNO' && c.link_externo) { %><button class="ui-btn ui-btn--outline ui-btn--compact" type="button" data-open-external="<%= c.link_externo %>">Plataforma</button><% } %>
+          </div>
+        </div>
+      </article>
+    <% }) %>
+  </section>
+
+  <% if (canAccessModule(normalizeRole(user?.role), 'academia_manage')) { %>
+    <section class="academy-panel academy-admin-panel">
+      <div class="academy-section-head"><div><h2>Administração • Novo curso</h2><p>Cadastre cursos sem alterar as regras de trilha, progresso e certificação.</p></div></div>
+      <form method="POST" action="/academia/cursos/criar" class="academy-admin-grid">
+        <label class="academy-field"><span>Título *</span><input name="titulo" placeholder="Título" required></label>
+        <label class="academy-field"><span>Descrição</span><input name="descricao" placeholder="Descrição"></label>
+        <label class="academy-field"><span>Trilha</span><select name="trilha_id"><option value="">Sem trilha</option><% trilhas.forEach(function(t){ %><option value="<%= t.id %>"><%= t.nome %></option><% }) %></select></label>
+        <label class="academy-field"><span>Tipo</span><select name="tipo"><option>INTERNO</option><option>EXTERNO</option></select></label>
+        <label class="academy-field"><span>Plataforma</span><select name="plataforma"><option>INTERNO</option><option>CURSA</option><option>YOUTUBE</option><option>PDF</option><option>OUTRO</option></select></label>
+        <label class="academy-field"><span>Link externo</span><input name="link_externo" placeholder="Link externo"></label>
+        <label class="academy-field"><span>Imagem</span><input name="imagem" placeholder="URL da imagem"></label>
+        <label class="academy-field"><span>Carga horária</span><input type="number" name="carga_horaria" min="0"></label>
+        <label class="academy-field"><span>Pontos</span><input type="number" name="pontos" min="0" value="10"></label>
+        <label class="academy-field"><span>Nível</span><input name="nivel" value="BÁSICO"></label>
+        <div class="academy-actions"><button class="ui-btn ui-btn--primary" type="submit">Criar curso</button></div>
+      </form>
+    </section>
+  <% } %>
+</main>
 <script src="/js/academia.js"></script>
