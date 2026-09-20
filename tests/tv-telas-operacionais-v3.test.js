@@ -7,9 +7,9 @@ const view = () => fs.readFileSync('views/tv/modo-tv.ejs', 'utf8');
 const screens = () => fs.readFileSync('public/js/tv-screens-2026.js', 'utf8');
 const css = () => fs.readFileSync('public/css/tv-screens-2026.css', 'utf8');
 
-test('Modo TV mantém 6 telas e carrega a modernização estrutural depois da base', () => {
+test('Modo TV mantém 7 telas e carrega a modernização estrutural depois da base', () => {
   const html = view();
-  assert.equal((html.match(/data-tv-screen=/g) || []).length, 6);
+  assert.equal((html.match(/data-tv-screen=/g) || []).length, 7);
   assert.ok(html.indexOf('/css/tv-screens-2026.css') > html.indexOf('/css/tv-mode-2026.css'));
   assert.ok(html.indexOf('/js/tv-screens-2026.js') > html.indexOf('/js/tv-mode.js'));
 });
