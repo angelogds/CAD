@@ -14,6 +14,13 @@ function normalizeDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
 }
 
+function dateFilters(filters = {}) {
+  return {
+    inicio: normalizeDate(filters.data_inicial || filters.data_inicio || filters.inicio),
+    fim: normalizeDate(filters.data_final || filters.data_fim || filters.fim),
+  };
+}
+
 function expressions() {
   const itemCols = columns('solicitacao_itens');
   const solCols = columns('solicitacoes');
@@ -40,11 +47,19 @@ function expressions() {
   return { qtdSolicitada, qtdComprada, qtdRecebida, unitario, compraData, itemNome, unidade, fornecedorJoin, fornecedorNome };
 }
 
+function consumptionExpressions() {
+  const movCols = columns('estoque_movimentos');
+  const itemCols = columns('solicitacao_itens');
+  if (!movCols.size || !itemCols.size || !movCols.has('equipamento_id') || !movCols.has('solicitacao_item_id')) return null;
+  const dataMov = movCols.has('data_mov') ? 'COALESCE(m.data_mov,m.created_at)' : 'm.created_at';
+  const unitario = itemCols.has('valor_unitario_centavos') ? 'COALESCE(si.valor_unitario_centavos,0)' : '0';
+  return { dataMov, unitario };
+}
+
 function buildWhere(filters = {}, { requireEquipment = true } = {}) {
   const where = ["UPPER(COALESCE(si.status_compra,''))='COMPRADO'"];
   const params = {};
-  const inicio = normalizeDate(filters.data_inicial || filters.inicio);
-  const fim = normalizeDate(filters.data_final || filters.fim);
+  const { inicio, fim } = dateFilters(filters);
   if (requireEquipment) where.push('s.equipamento_id IS NOT NULL');
   if (inicio) { where.push('date(COMPRA_DATA) >= date(@data_inicial)'); params.data_inicial = inicio; }
   if (fim) { where.push('date(COMPRA_DATA) <= date(@data_final)'); params.data_final = fim; }
@@ -53,17 +68,114 @@ function buildWhere(filters = {}, { requireEquipment = true } = {}) {
   return { where, params };
 }
 
+function buildConsumptionWhere(filters = {}) {
+  const where = ["UPPER(COALESCE(m.tipo,'')) LIKE 'SAIDA%'", 'm.equipamento_id IS NOT NULL'];
+  const params = {};
+  const { inicio, fim } = dateFilters(filters);
+  if (inicio) { where.push('date(CONSUMO_DATA) >= date(@consumo_data_inicial)'); params.consumo_data_inicial = inicio; }
+  if (fim) { where.push('date(CONSUMO_DATA) <= date(@consumo_data_final)'); params.consumo_data_final = fim; }
+  if (filters.equipamento_id) { where.push('m.equipamento_id=@consumo_equipamento_id'); params.consumo_equipamento_id = Number(filters.equipamento_id); }
+  if (filters.setor) { where.push("COALESCE(NULLIF(TRIM(e.setor),''),'Setor não informado')=@consumo_setor"); params.consumo_setor = String(filters.setor); }
+  return { where, params };
+}
+
 function sqlWithPurchaseDate(sql, compraData) {
   return sql.replaceAll('COMPRA_DATA', compraData);
 }
 
+function sqlWithConsumptionDate(sql, dataMov) {
+  return sql.replaceAll('CONSUMO_DATA', dataMov);
+}
+
+function consumptionAnalytics(filters = {}) {
+  const exp = consumptionExpressions();
+  if (!exp || !tableExists('equipamentos')) return { byEquipment: [], byMonth: [] };
+  const scope = buildConsumptionWhere(filters);
+  const baseWhere = sqlWithConsumptionDate(scope.where.join(' AND '), exp.dataMov);
+
+  const byEquipment = db.prepare(sqlWithConsumptionDate(`
+    SELECT e.id equipamento_id,e.nome equipamento_nome,e.setor,
+      ROUND(SUM(ABS(COALESCE(m.quantidade,0)) * ${exp.unitario})) consumido_centavos
+    FROM estoque_movimentos m
+    JOIN equipamentos e ON e.id=m.equipamento_id
+    LEFT JOIN solicitacao_itens si ON si.id=m.solicitacao_item_id
+    WHERE ${baseWhere}
+    GROUP BY e.id,e.nome,e.setor
+    ORDER BY consumido_centavos DESC,e.nome COLLATE NOCASE
+  `, exp.dataMov)).all(scope.params).map((row) => ({
+    ...row,
+    consumido_centavos: Number(row.consumido_centavos || 0),
+  }));
+
+  const byMonth = db.prepare(sqlWithConsumptionDate(`
+    SELECT strftime('%Y-%m',CONSUMO_DATA) mes,
+      ROUND(SUM(ABS(COALESCE(m.quantidade,0)) * ${exp.unitario})) consumido_centavos
+    FROM estoque_movimentos m
+    JOIN equipamentos e ON e.id=m.equipamento_id
+    LEFT JOIN solicitacao_itens si ON si.id=m.solicitacao_item_id
+    WHERE ${baseWhere}
+    GROUP BY strftime('%Y-%m',CONSUMO_DATA)
+    HAVING mes IS NOT NULL
+    ORDER BY mes
+  `, exp.dataMov)).all(scope.params).map((row) => ({
+    mes: row.mes,
+    consumido_centavos: Number(row.consumido_centavos || 0),
+  }));
+
+  return { byEquipment, byMonth };
+}
+
+function mergeEquipmentCosts(purchaseRows = [], consumptionRows = []) {
+  const rows = new Map();
+  for (const row of purchaseRows) rows.set(Number(row.equipamento_id), { ...row, consumido_centavos: 0 });
+  for (const row of consumptionRows) {
+    const id = Number(row.equipamento_id);
+    const current = rows.get(id) || {
+      equipamento_id: id,
+      equipamento_nome: row.equipamento_nome,
+      setor: row.setor,
+      solicitacoes: 0,
+      ordens: 0,
+      comprado_centavos: 0,
+      recebido_centavos: 0,
+      pendente_centavos: 0,
+      ultima_compra: null,
+    };
+    current.consumido_centavos = Number(row.consumido_centavos || 0);
+    rows.set(id, current);
+  }
+  return [...rows.values()].sort((a, b) => Number(b.comprado_centavos || b.consumido_centavos || 0) - Number(a.comprado_centavos || a.consumido_centavos || 0));
+}
+
+function mergeMonthlyCosts(purchaseRows = [], consumptionRows = []) {
+  const rows = new Map();
+  for (const row of purchaseRows) rows.set(row.mes, { ...row, consumido_centavos: 0 });
+  for (const row of consumptionRows) {
+    const current = rows.get(row.mes) || { mes: row.mes, comprado_centavos: 0, recebido_centavos: 0, pendente_centavos: 0 };
+    current.consumido_centavos = Number(row.consumido_centavos || 0);
+    rows.set(row.mes, current);
+  }
+  return [...rows.values()].sort((a, b) => String(a.mes).localeCompare(String(b.mes)));
+}
+
 function getAnalytics(filters = {}) {
   const exp = expressions();
-  if (!exp || !tableExists('equipamentos')) return { totals: emptyTotals(), byEquipment: [], byMonth: [] };
+  const consumption = consumptionAnalytics(filters);
+  if (!exp || !tableExists('equipamentos')) {
+    const byEquipment = mergeEquipmentCosts([], consumption.byEquipment);
+    const byMonth = mergeMonthlyCosts([], consumption.byMonth);
+    const totals = byEquipment.reduce((acc, row) => {
+      acc.consumido_centavos += Number(row.consumido_centavos || 0);
+      return acc;
+    }, emptyTotals());
+    totals.equipamentos = byEquipment.length;
+    return { totals, byEquipment, byMonth };
+  }
+
   const scope = buildWhere(filters);
   const baseWhere = sqlWithPurchaseDate(scope.where.join(' AND '), exp.compraData);
 
-  const byEquipment = db.prepare(sqlWithPurchaseDate(`
+  const purchaseByEquipment = db.prepare(sqlWithPurchaseDate(`
     SELECT e.id equipamento_id,e.nome equipamento_nome,e.setor,
       COUNT(DISTINCT s.id) solicitacoes,
       COUNT(DISTINCT CASE WHEN s.os_id IS NOT NULL THEN s.os_id END) ordens,
@@ -83,7 +195,7 @@ function getAnalytics(filters = {}) {
     pendente_centavos: Math.max(0, Number(row.comprado_centavos || 0) - Number(row.recebido_centavos || 0)),
   }));
 
-  const byMonth = db.prepare(sqlWithPurchaseDate(`
+  const purchaseByMonth = db.prepare(sqlWithPurchaseDate(`
     SELECT strftime('%Y-%m',COMPRA_DATA) mes,
       ROUND(SUM(${exp.qtdComprada} * ${exp.unitario})) comprado_centavos,
       ROUND(SUM(MIN(${exp.qtdRecebida},${exp.qtdComprada}) * ${exp.unitario})) recebido_centavos
@@ -101,9 +213,13 @@ function getAnalytics(filters = {}) {
     pendente_centavos: Math.max(0, Number(row.comprado_centavos || 0) - Number(row.recebido_centavos || 0)),
   }));
 
+  const byEquipment = mergeEquipmentCosts(purchaseByEquipment, consumption.byEquipment);
+  const byMonth = mergeMonthlyCosts(purchaseByMonth, consumption.byMonth);
+
   const totals = byEquipment.reduce((acc, row) => {
     acc.comprado_centavos += Number(row.comprado_centavos || 0);
     acc.recebido_centavos += Number(row.recebido_centavos || 0);
+    acc.consumido_centavos += Number(row.consumido_centavos || 0);
     acc.solicitacoes += Number(row.solicitacoes || 0);
     acc.ordens += Number(row.ordens || 0);
     return acc;
@@ -115,17 +231,18 @@ function getAnalytics(filters = {}) {
 }
 
 function emptyTotals() {
-  return { comprado_centavos: 0, recebido_centavos: 0, pendente_centavos: 0, solicitacoes: 0, ordens: 0, equipamentos: 0 };
+  return { comprado_centavos: 0, recebido_centavos: 0, consumido_centavos: 0, pendente_centavos: 0, solicitacoes: 0, ordens: 0, equipamentos: 0 };
 }
 
 function getEquipmentDetail(equipamentoId, filters = {}) {
   const id = Number(equipamentoId);
   if (!id) return { totals: emptyTotals(), byMonth: [], items: [] };
   const exp = expressions();
-  if (!exp || !tableExists('equipamentos')) return { totals: emptyTotals(), byMonth: [], items: [] };
 
   const scoped = { ...filters, equipamento_id: id };
   const analytics = getAnalytics(scoped);
+  if (!exp || !tableExists('equipamentos')) return { totals: analytics.totals, byMonth: analytics.byMonth, items: [] };
+
   const scope = buildWhere(scoped);
   const baseWhere = sqlWithPurchaseDate(scope.where.join(' AND '), exp.compraData);
 
