@@ -25,6 +25,9 @@ const HAS_MOV_RETIRADO_POR = hasColumn("estoque_movimentos", "retirado_por_colab
 const HAS_MOV_ENTREGUE_POR = hasColumn("estoque_movimentos", "entregue_por_user_id");
 const HAS_MOV_IDENTIFICACAO_ORIGEM = hasColumn("estoque_movimentos", "identificacao_origem");
 const HAS_MOV_RESERVA_ID = hasColumn("estoque_movimentos", "reserva_id");
+const HAS_ESTOQUE_CUSTO_UNIT = hasColumn("estoque_itens", "custo_unit");
+const HAS_MOV_CUSTO_UNIT = hasColumn("estoque_movimentos", "custo_unit");
+const HAS_SOL_ITEM_VALOR_UNITARIO = hasColumn("solicitacao_itens", "valor_unitario_centavos");
 
 function categoriaJoin() { return HAS_CATEGORIA_ID && tableExists("estoque_categorias") ? "LEFT JOIN estoque_categorias c ON c.id=i.categoria_id" : "LEFT JOIN (SELECT NULL id,NULL nome) c ON 1=0"; }
 function localJoin() { return HAS_LOCAL_ID && tableExists("estoque_locais") ? "LEFT JOIN estoque_locais l ON l.id=i.local_id" : "LEFT JOIN (SELECT NULL id,NULL nome) l ON 1=0"; }
@@ -131,8 +134,10 @@ function qtdRetiradaSolicitacaoItem(itemId) {
 function getContextoSolicitacao(solicitacaoId, solicitacaoItemId) {
   if (!solicitacaoId) return null;
   if (!solicitacaoItemId) throw new Error('Selecione o item da solicitação para registrar a retirada.');
+  const valorUnitarioExpr = HAS_SOL_ITEM_VALOR_UNITARIO ? "si.valor_unitario_centavos" : "NULL";
   const row = db.prepare(`SELECT s.id solicitacao_id,s.numero,s.os_id,s.equipamento_id,s.status,
-      si.id solicitacao_item_id,si.estoque_item_id,COALESCE(si.qtd_recebida_total,0) qtd_recebida_total
+      si.id solicitacao_item_id,si.estoque_item_id,COALESCE(si.qtd_recebida_total,0) qtd_recebida_total,
+      ${valorUnitarioExpr} valor_unitario_centavos
     FROM solicitacoes s JOIN solicitacao_itens si ON si.solicitacao_id=s.id
     WHERE s.id=? AND si.id=?`).get(Number(solicitacaoId), Number(solicitacaoItemId));
   if (!row) throw new Error('Item não pertence à solicitação informada.');
@@ -172,7 +177,7 @@ function insertMovimento(data) {
     ["origem", data.origem], ["os_id", data.os_id], ["equipamento_id", data.equipamento_id],
     ["solicitacao_id", data.solicitacao_id], ["solicitacao_item_id", data.solicitacao_item_id],
     ["usuario_id", data.usuario_id], ["saldo_anterior", data.saldo_anterior], ["saldo_posterior", data.saldo_posterior],
-    ["observacao", data.observacao], ["reserva_id", data.reserva_id],
+    ["custo_unit", data.custo_unit], ["observacao", data.observacao], ["reserva_id", data.reserva_id],
     ["retirado_por_colaborador_id", data.retirado_por_colaborador_id], ["entregue_por_user_id", data.entregue_por_user_id],
     ["identificacao_origem", data.identificacao_origem],
   ];
@@ -215,12 +220,16 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
     const result = db.prepare("UPDATE estoque_itens SET saldo_atual=?,updated_at=datetime('now') WHERE id=? AND saldo_atual>=?").run(posterior, resolvedItemId, qtd);
     if (!result.changes) throw new Error('Saldo alterado por outro usuário. Atualize a página e tente novamente.');
   }
+  const custoUnit = contexto && Number(contexto.valor_unitario_centavos || 0) > 0
+    ? Number(contexto.valor_unitario_centavos) / 100
+    : (HAS_ESTOQUE_CUSTO_UNIT ? Number(item.custo_unit || 0) : 0);
   const movimentoId = insertMovimento({
     tipo: 'SAIDA_REQUISICAO_INTERNA', item_id: resolvedItemId, quantidade: qtd,
     origem: contexto ? 'SOLICITACAO' : (String(origem).toUpperCase() === 'QR_CODE' ? 'QR_CODE' : 'MANUAL'),
     os_id: resolvedOsId, equipamento_id: equipamentoId, solicitacao_id: contexto?.solicitacao_id || null,
     solicitacao_item_id: contexto?.solicitacao_item_id || null, usuario_id: usuario_id || null,
     saldo_anterior: anterior, saldo_posterior: posterior,
+    custo_unit: HAS_MOV_CUSTO_UNIT ? (custoUnit || null) : null,
     observacao: observacao || (contexto ? `Retirada da solicitação ${contexto.numero || `#${contexto.solicitacao_id}`}` : null),
     reserva_id: reserva?.id || null,
     entregue_por_user_id: contexto ? (usuario_id || null) : null,
