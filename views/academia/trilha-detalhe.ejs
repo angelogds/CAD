@@ -1,15 +1,21 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/academia.css" />
-<div class="page-head"><div><h1><%= trilha.icone || '📘' %> <%= trilha.nome %></h1><p class="muted"><%= trilha.descricao %></p></div></div>
-<%- include(incluir('_menu')) %>
-<div class="card" style="margin-bottom:12px;"><p><strong><%= trilha.total_cursos %></strong> cursos • <strong><%= trilha.concluidos %></strong> concluídos • <strong><%= trilha.progresso_percentual %>%</strong> progresso</p></div>
-<div class="academia-grid">
-  <% trilha.cursos.forEach(function(c){ %>
-    <div class="academia-card">
-      <h3><a href="/academia/curso/<%= c.id %>"><%= c.titulo %></a></h3>
-      <p class="muted"><%= c.descricao %></p>
-      <p class="muted-xs"><%= c.nivel %> • <%= c.carga_horaria %>h • <%= c.plataforma %></p>
-      <span class="badge-status <%= c.meu_status %>"><%= c.meu_status %></span>
-    </div>
-  <% }) %>
-</div>
+<link rel="stylesheet" href="/css/academia.css?v=20260919-p4" />
+<main class="academy-workspace">
+  <header class="academy-hero"><div><span class="academy-eyebrow">ACADEMIA • TRILHA</span><h1><%= trilha.icone || '📘' %> <%= trilha.nome %></h1><p><%= trilha.descricao || 'Trilha técnica da Academia da Manutenção.' %></p></div><div class="academy-hero-actions"><a class="ui-btn ui-btn--secondary" href="/academia/trilhas">Voltar às trilhas</a></div></header>
+  <%- include(incluir('_menu')) %>
+  <section class="academy-stat-grid">
+    <article class="academy-stat"><span>Cursos</span><strong><%= trilha.total_cursos %></strong></article>
+    <article class="academy-stat"><span>Concluídos</span><strong><%= trilha.concluidos %></strong></article>
+    <article class="academy-stat"><span>Progresso</span><strong><%= trilha.progresso_percentual %>%</strong></article>
+  </section>
+  <section class="academy-course-grid">
+    <% trilha.cursos.forEach(function(c){ %>
+      <article class="academy-course-card">
+        <div class="academy-course-meta"><span class="academy-badge"><%= c.nivel %></span><span class="academy-badge"><%= c.carga_horaria %>h</span><span class="academy-badge"><%= c.plataforma %></span></div>
+        <h3><a href="/academia/curso/<%= c.id %>"><%= c.titulo %></a></h3>
+        <p><%= c.descricao || 'Sem descrição.' %></p>
+        <div class="academy-card-footer"><span class="badge-status <%= c.meu_status %>"><%= String(c.meu_status || '').replaceAll('_',' ') %></span><a class="ui-btn ui-btn--outline ui-btn--compact" href="/academia/curso/<%= c.id %>">Abrir curso</a></div>
+      </article>
+    <% }) %>
+  </section>
+</main>
