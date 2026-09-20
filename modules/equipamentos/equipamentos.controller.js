@@ -1,6 +1,7 @@
 const QRCode = require("qrcode");
 const PDFDocument = require("pdfkit");
 const service = require("./equipamentos.service");
+const custosEquipamentosService = require("../compras/custos-equipamentos.service");
 const { renderSectionTitle, renderTable, renderTextBlock, sanitizePdfText } = require("../../utils/pdf/pdfTable");
 let tracagemService = null;
 let desenhoTecnicoService = null;
@@ -85,6 +86,10 @@ async function equipShow(req, res) {
 
   const historicoOS = service.listHistoricoOS(id, filtros);
   const consumoMateriais = service.listConsumoMateriais(id, filtros);
+  const custosEquipamento = custosEquipamentosService.getEquipmentDetail(id, {
+    data_inicial: filtros.data_inicio,
+    data_final: filtros.data_fim,
+  });
   const historicoPreventivas = service.listHistoricoPreventivas(id, filtros);
   const pecas = service.listPecasByEquipamento(id);
   const catalogoPecas = service.listPecasCatalogo();
@@ -106,6 +111,7 @@ async function equipShow(req, res) {
     filtros,
     historicoOS,
     consumoMateriais,
+    custosEquipamento,
     historicoPreventivas,
     pecas,
     catalogoPecas,
