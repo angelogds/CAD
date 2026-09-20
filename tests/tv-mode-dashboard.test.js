@@ -15,11 +15,13 @@ test('rota oficial /tv, redirect legado e stream pertencem ao módulo oficial', 
   assert.match(routes, /router\.get\('\/api\/tv\/stream'/);
 });
 
-test('tela oficial possui seis seções, ticker e não possui ações operacionais', () => {
-  assert.equal((view().match(/data-tv-screen=/g) || []).length, 6);
+test('tela oficial possui sete seções, ticker e não possui ações operacionais', () => {
+  assert.equal((view().match(/data-tv-screen=/g) || []).length, 7);
   assert.match(view(), /id="tvTickerTrack"/);
   assert.match(view(), /Para receber os chamados com voz, aviso sonoro/);
   assert.match(view(), /Ativar Modo TV/);
+  assert.match(view(), /data-tv-screen="gerencial"/);
+  assert.match(view(), /Tela 1 de 7/);
   assert.doesNotMatch(view(), />\s*(Abrir|Iniciar|Editar|Fechar)\s*</);
 });
 
@@ -142,4 +144,7 @@ test('snapshot real preserva contrato mesmo quando tabelas opcionais não existe
   assert.ok(snapshot.operacao.os);
   assert.ok(snapshot.operacao.preventivas);
   assert.ok(snapshot.performance && Object.hasOwn(snapshot.performance, 'mecanicosDisponiveis'));
+  assert.ok(snapshot.gerencial);
+  assert.ok(snapshot.gerencial.cards);
+  assert.ok(snapshot.gerencial.confiabilidade);
 });
