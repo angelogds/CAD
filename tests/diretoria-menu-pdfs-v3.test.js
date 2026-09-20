@@ -48,7 +48,10 @@ test('PDF de Desempenho da Manutenção usa a camada executiva e os novos indica
   assert.match(controller, /title: 'Backlog de OS por idade'/);
   assert.match(controller, /title: 'Equipamentos com corretivas reincidentes'/);
   assert.match(controller, /title: 'Qualidade dos dados para confiabilidade'/);
-  assert.match(controller, /MTBF, MTTR e disponibilidade permanecem/);
+  assert.match(controller, /indicador: 'MTBF'/);
+  assert.match(controller, /indicador: 'MTTR'/);
+  assert.match(controller, /indicador: 'Disponibilidade'/);
+  assert.match(controller, /MTBF, MTTR e disponibilidade são liberados automaticamente/);
   assert.match(controller, /desempenho-manutencao\.pdf/);
   assert.match(routes, /router\.get\('\/manutencao\/pdf',[\s\S]*ctrl\.manutencaoPdf\)/);
 });
