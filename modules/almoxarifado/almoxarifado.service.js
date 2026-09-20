@@ -486,7 +486,7 @@ function finalizarRecebimento(id) {
 
 function fechar(id) {
   const s = getSolicitacao(id);
-  if (!s || ![STATUS.RECEBIDA_TOTAL, STATUS.ENTREGUE_SOLICITANTE].includes(s.status)) {
+  if (!s || (s.status !== STATUS.RECEBIDA_TOTAL && s.status !== STATUS.ENTREGUE_SOLICITANTE)) {
     throw new Error("Somente uma solicitação integralmente recebida e entregue pode ser fechada.");
   }
   if (s.resumo.qtd_pendente > 0) throw new Error("Ainda existem quantidades a receber.");
@@ -504,12 +504,13 @@ function reabrir(id) {
   if (!s || ![STATUS.FECHADA, STATUS.RECEBIDA_PARCIAL].includes(s.status)) {
     throw new Error("Somente recebimentos fechados ou parciais podem ser reabertos.");
   }
-  let novoStatus = STATUS.EM_RECEBIMENTO;
+  const legacyStatus = s.status === STATUS.FECHADA ? STATUS.RECEBIDA_TOTAL : STATUS.EM_RECEBIMENTO;
+  let novoStatus = legacyStatus;
   if (s.status === STATUS.FECHADA) {
     const resumoReserva = fluxoEstoqueService.getResumoReservas(id);
     novoStatus = resumoReserva.reservado > 0
       ? (resumoReserva.pendente > 0 ? STATUS.SEPARADA_PARA_RETIRADA : STATUS.ENTREGUE_SOLICITANTE)
-      : STATUS.RECEBIDA_TOTAL;
+      : legacyStatus;
   }
   db.prepare("UPDATE solicitacoes SET status=?, reaberta_em=datetime('now'), updated_at=datetime('now') WHERE id=?").run(novoStatus, id);
   return novoStatus;
