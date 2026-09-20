@@ -88,6 +88,7 @@ function manutencaoPdf(req, res, next) {
     const filtros = dashboard.filtros || {};
     const cards = dashboard.cards || {};
     const quality = dashboard.qualidade_dados || {};
+    const reliability = dashboard.confiabilidade || {};
     const graphs = dashboard.graficos || {};
     const custos = dashboard.custos || { totals: {}, byEquipment: [], byMonth: [] };
 
@@ -113,7 +114,7 @@ function manutencaoPdf(req, res, next) {
         report.identification([
           ['Período analisado', `${dateBr(filtros.data_inicial)} a ${dateBr(filtros.data_final)}`, 'Setor', filtros.setor || 'Todos os setores'],
           ['Equipamento', equipmentName(filtros, options), 'Situação da base', quality.status_label || 'Sem dados suficientes'],
-          ['Origem dos dados', 'OS, PCM, Solicitações e Compras', 'Emissão', dateBr(new Date().toISOString().slice(0, 10))],
+          ['Origem dos dados', 'OS, PCM, Estoque, Solicitações e Compras', 'Emissão', dateBr(new Date().toISOString().slice(0, 10))],
         ]);
 
         report.summary([
@@ -137,50 +138,56 @@ function manutencaoPdf(req, res, next) {
             { indicador: 'Reincidência corretiva', valor: metric(cards.reincidencia_corretiva_pct, '%'), leitura: 'Repetições de corretivas após a primeira ocorrência por equipamento no período.' },
             { indicador: 'Equipamentos reincidentes', valor: String(cards.equipamentos_reincidentes || 0), leitura: 'Equipamentos com duas ou mais corretivas no período.' },
             { indicador: 'Equipamentos críticos', valor: String(cards.equipamentos_criticos || 0), leitura: 'Ativos classificados em alta criticidade/crítica na base atual.' },
+            { indicador: 'MTBF', valor: metric(cards.mtbf_horas, ' h'), leitura: reliability.publicado ? 'Tempo médio entre falhas calculado com eventos classificados e rastreáveis.' : 'Aguardando cobertura mínima de rastreabilidade.' },
+            { indicador: 'MTTR', valor: metric(cards.mttr_horas, ' h'), leitura: reliability.publicado ? 'Tempo médio de reparo baseado nos intervalos reais de parada e retorno.' : 'Aguardando cobertura mínima de rastreabilidade.' },
+            { indicador: 'Disponibilidade', valor: metric(cards.disponibilidade_pct, '%'), leitura: reliability.publicado ? 'Disponibilidade estimada pela relação MTBF / (MTBF + MTTR).' : 'Não publicada enquanto a base estiver incompleta.' },
+            { indicador: 'Tempo total de parada', valor: metric(cards.tempo_parada_horas, ' h'), leitura: 'Somatório dos intervalos válidos de parada registrados no PCM.' },
             { indicador: 'Qualidade dos dados', valor: metric(cards.qualidade_dados_pct, '%'), leitura: quality.status_label || 'Base ainda em avaliação.' },
           ],
         });
 
         report.summary([
+          { label: 'CONSUMIDO NA MANUTENÇÃO', value: moneyCents(cards.custo_consumido_centavos) },
           { label: 'COMPRADO NO PERÍODO', value: moneyCents(cards.custo_comprado_centavos) },
           { label: 'MATERIAIS RECEBIDOS', value: moneyCents(cards.custo_recebido_centavos) },
           { label: 'A RECEBER', value: moneyCents(cards.custo_pendente_recebimento_centavos) },
-          { label: 'EQUIPAMENTOS COM CUSTO', value: String(cards.equipamentos_com_custo || 0) },
         ]);
-        report.note('Custos calculados somente com itens marcados como COMPRADO nas Solicitações vinculadas ao equipamento: quantidade comprada × valor unitário. O valor recebido representa apenas a parcela já recebida; o saldo a receber não é contabilizado novamente.');
+        report.note('Custo real consumido considera somente baixas físicas do estoque vinculadas à manutenção. Comprado, recebido e a receber permanecem separados para não tratar estoque parado como custo já aplicado.');
 
         report.table({
           title: 'Custos por equipamento',
           columns: [
-            { key: 'equipamento', label: 'Equipamento', width: 180 },
-            { key: 'setor', label: 'Setor', width: 95 },
-            { key: 'comprado', label: 'Comprado', width: 95, align: 'right' },
-            { key: 'recebido', label: 'Recebido', width: 95, align: 'right' },
-            { key: 'pendente', label: 'A receber', width: 85, align: 'right' },
+            { key: 'equipamento', label: 'Equipamento', width: 150 },
+            { key: 'setor', label: 'Setor', width: 80 },
+            { key: 'consumido', label: 'Consumido', width: 90, align: 'right' },
+            { key: 'comprado', label: 'Comprado', width: 85, align: 'right' },
+            { key: 'recebido', label: 'Recebido', width: 80, align: 'right' },
+            { key: 'pendente', label: 'A receber', width: 75, align: 'right' },
           ],
           rows: (custos.byEquipment || []).slice(0, 15).map((item) => ({
             equipamento: item.equipamento_nome || '-',
             setor: item.setor || '-',
+            consumido: moneyCents(item.consumido_centavos),
             comprado: moneyCents(item.comprado_centavos),
             recebido: moneyCents(item.recebido_centavos),
             pendente: moneyCents(item.pendente_centavos),
           })),
-          emptyText: 'Nenhuma compra vinculada a equipamento no período selecionado.',
+          emptyText: 'Nenhum custo de manutenção vinculado a equipamento no período selecionado.',
         });
 
         report.table({
           title: 'Evolução mensal dos custos',
           columns: [
-            { key: 'mes', label: 'Mês', width: 130, align: 'center' },
-            { key: 'comprado', label: 'Comprado', width: 140, align: 'right' },
-            { key: 'recebido', label: 'Recebido', width: 140, align: 'right' },
-            { key: 'pendente', label: 'A receber', width: 140, align: 'right' },
+            { key: 'mes', label: 'Mês', width: 120, align: 'center' },
+            { key: 'consumido', label: 'Consumido', width: 145, align: 'right' },
+            { key: 'comprado', label: 'Comprado', width: 145, align: 'right' },
+            { key: 'recebido', label: 'Recebido', width: 145, align: 'right' },
           ],
           rows: (custos.byMonth || []).slice(-12).map((item) => ({
             mes: item.mes || '-',
+            consumido: moneyCents(item.consumido_centavos),
             comprado: moneyCents(item.comprado_centavos),
             recebido: moneyCents(item.recebido_centavos),
-            pendente: moneyCents(item.pendente_centavos),
           })),
           emptyText: 'Sem histórico mensal de custos para os filtros atuais.',
         });
@@ -237,7 +244,30 @@ function manutencaoPdf(req, res, next) {
         const pendencias = Array.isArray(quality.campos_pendentes) && quality.campos_pendentes.length
           ? quality.campos_pendentes.join('; ')
           : 'A base mínima avaliada atende aos critérios atuais.';
-        report.note(`Governança dos indicadores: ${pendencias}. MTBF, MTTR e disponibilidade permanecem como “dados insuficientes” enquanto a rastreabilidade de início da parada, retorno à operação e classificação de falha não estiver confiável.`);
+        report.note(reliability.publicado
+          ? `Governança dos indicadores: ${pendencias}. MTBF, MTTR e disponibilidade estão liberados para o período com ${reliability.mtbf_amostras || 0} intervalo(s) entre falhas e ${reliability.mttr_amostras || 0} parada(s) válida(s).`
+          : `Governança dos indicadores: ${pendencias}. MTBF, MTTR e disponibilidade permanecem como “dados insuficientes” até a cobertura mínima de rastreabilidade ser atendida.`);
+
+        report.table({
+          title: 'Confiabilidade por equipamento',
+          columns: [
+            { key: 'equipamento', label: 'Equipamento', width: 180 },
+            { key: 'setor', label: 'Setor', width: 100 },
+            { key: 'falhas', label: 'Falhas', width: 60, align: 'center' },
+            { key: 'parada', label: 'Parada (h)', width: 75, align: 'right' },
+            { key: 'mtbf', label: 'MTBF (h)', width: 75, align: 'right' },
+            { key: 'mttr', label: 'MTTR (h)', width: 75, align: 'right' },
+          ],
+          rows: (reliability.byEquipment || []).slice(0, 15).map((item) => ({
+            equipamento: item.equipamento_nome || '-',
+            setor: item.setor || '-',
+            falhas: String(item.falhas || 0),
+            parada: metric(item.tempo_parada_horas),
+            mtbf: metric(item.mtbf_horas),
+            mttr: metric(item.mttr_horas),
+          })),
+          emptyText: 'Sem falhas classificadas suficientes para detalhar confiabilidade.',
+        });
 
         report.table({
           title: 'Equipamentos que exigem atenção',
@@ -270,4 +300,34 @@ function manutencaoPdf(req, res, next) {
   }
 }
 
-module.exports = { index, manutencao, manutencaoDados, manutencaoPdf, DIRETORIA_BASE_PATH };
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+}
+
+function tableHtml(title, rows = []) {
+  const list = Array.isArray(rows) ? rows : [];
+  const keys = list.length ? Object.keys(list[0]).filter((key) => !key.startsWith('_')) : [];
+  if (!keys.length) return `<h2>${escapeHtml(title)}</h2><p>Sem dados.</p>`;
+  const head = keys.map((key) => `<th>${escapeHtml(key)}</th>`).join('');
+  const body = list.map((row) => `<tr>${keys.map((key) => `<td>${escapeHtml(row[key])}</td>`).join('')}</tr>`).join('');
+  return `<h2>${escapeHtml(title)}</h2><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function manutencaoExcel(req, res) {
+  const data = manutencaoExecutivaService.getDashboard(req.query, req.session?.user?.id || null);
+  pcmService.logDashboardReport(req.session?.user?.id || null, 'EXCEL_DIRETORIA', data.filtros);
+  const sheets = [
+    tableHtml('Resumo', [data.cards || {}]),
+    tableHtml('Confiabilidade', [data.confiabilidade || {}]),
+    tableHtml('Confiabilidade por equipamento', data.confiabilidade?.byEquipment || []),
+    tableHtml('Custos por equipamento', data.custos?.byEquipment || []),
+    tableHtml('Custos por mês', data.custos?.byMonth || []),
+    tableHtml('Ordens de serviço', data.tabelas?.ordens || []),
+    tableHtml('Equipamentos que exigem atenção', data.equipamentos_atencao || []),
+  ];
+  res.setHeader('Content-Type', 'application/vnd.ms-excel; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="desempenho-manutencao.xls"');
+  return res.send(`<!doctype html><html><head><meta charset="utf-8"><style>table{border-collapse:collapse}th{background:#166534;color:#fff}td,th{padding:5px}</style></head><body>${sheets.join('<br style="page-break-after:always">')}</body></html>`);
+}
+
+module.exports = { index, manutencao, manutencaoDados, manutencaoPdf, manutencaoExcel, DIRETORIA_BASE_PATH };
