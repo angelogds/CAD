@@ -2777,7 +2777,7 @@ async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, fechamento
   const acao = String(acaoExecutada || fechamentoIA.descricao_servico_executado || "").trim() || null;
 
   const tx = db.transaction(() => {
-    const sets = ["status = 'FECHADA'", "closed_at = datetime('now')", "closed_by = ?"];
+    const sets = ["status = 'FECHADA'", "closed_at = COALESCE(closed_at, datetime('now'))", "closed_by = COALESCE(closed_by, ?)"];
     const args = [closedBy || null];
 
     if (cols.includes("data_conclusao")) sets.push("data_conclusao = COALESCE(data_conclusao, datetime('now'))");
