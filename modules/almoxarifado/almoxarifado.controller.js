@@ -152,9 +152,13 @@ function finalizar(req, res) {
   let statusFinal = STATUS.COMPRADA;
   try {
     statusFinal = service.finalizarRecebimento(Number(req.params.id));
-    req.flash("success", statusFinal === STATUS.RECEBIDA_TOTAL
-      ? "Recebimento concluído integralmente."
-      : "Etapa finalizada como recebimento parcial; as quantidades ainda não recebidas continuam abertas.");
+    const mensagens = {
+      [STATUS.RECEBIDA_TOTAL]: "Recebimento concluído integralmente.",
+      [STATUS.SEPARADA_PARA_RETIRADA]: "Recebimento concluído. Materiais reservados e separados para retirada.",
+      [STATUS.ENTREGUE_SOLICITANTE]: "Recebimento concluído e todos os materiais já constam como entregues ao solicitante.",
+    };
+    req.flash("success", mensagens[statusFinal]
+      || "Etapa finalizada como recebimento parcial; as quantidades ainda não recebidas continuam abertas.");
   } catch (e) {
     req.flash("error", e.message);
   }
@@ -176,7 +180,11 @@ function reabrir(req, res) {
     const status = service.reabrir(Number(req.params.id));
     req.flash("success", status === STATUS.EM_RECEBIMENTO
       ? "Recebimento parcial reaberto para continuidade."
-      : "Recebimento fechado reaberto para conferência.");
+      : status === STATUS.SEPARADA_PARA_RETIRADA
+        ? "Processo reaberto mantendo os materiais separados para retirada."
+        : status === STATUS.ENTREGUE_SOLICITANTE
+          ? "Processo reaberto mantendo o registro de entrega ao solicitante."
+          : "Recebimento fechado reaberto para conferência.");
   } catch (e) {
     req.flash("error", e.message);
   }
