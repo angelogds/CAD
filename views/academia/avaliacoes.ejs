@@ -1,15 +1,18 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/academia.css" />
-<div class="page-head"><div><h1>Avaliações</h1><p class="muted">Resultados de quiz, perguntas objetivas e avaliações finais.</p></div></div>
-<%- include(incluir('_menu')) %>
-
-<div class="card">
-  <% if (!avaliacoes.length) { %><p class="muted">Nenhuma avaliação registrada até o momento.</p><% } %>
-  <% avaliacoes.forEach(function(a){ %>
-    <div class="academia-row" style="margin-bottom:8px;">
-      <div><strong><%= a.curso_titulo %></strong><div class="muted-xs"><%= a.curso_nivel %> • <%= a.curso_tipo %></div></div>
-      <div class="muted-xs">Nota: <strong><%= a.nota %></strong> • <%= a.percentual %>% • <span class="badge-status <%= a.status==='APROVADO'?'CONCLUIDO':'EM_ANDAMENTO' %>"><%= a.status %></span></div>
+<link rel="stylesheet" href="/css/academia.css?v=20260919-p4" />
+<main class="academy-workspace">
+  <header class="academy-hero"><div><span class="academy-eyebrow">ACADEMIA • AVALIAÇÕES</span><h1>Avaliações</h1><p>Resultados de quizzes, perguntas objetivas e avaliações finais dos cursos.</p></div></header>
+  <%- include(incluir('_menu')) %>
+  <section class="academy-panel">
+    <div class="academy-section-head"><div><h2>Histórico de avaliações</h2><p>Acompanhe nota, percentual e situação por curso.</p></div><span class="academy-badge"><%= avaliacoes.length %> registro(s)</span></div>
+    <% if (!avaliacoes.length) { %><div class="academy-empty">Nenhuma avaliação registrada até o momento.</div><% } %>
+    <div class="academy-list">
+      <% avaliacoes.forEach(function(a){ %>
+        <article class="academy-list-item">
+          <div><strong><%= a.curso_titulo %></strong><p><%= a.curso_nivel %> • <%= a.curso_tipo %></p><% if (a.feedback) { %><div class="academy-note"><%= a.feedback %></div><% } %></div>
+          <div class="academy-ranking-metrics"><span><strong><%= a.nota %></strong> nota</span><span><strong><%= a.percentual %>%</strong> acerto</span><span class="badge-status <%= a.status==='APROVADO'?'CONCLUIDO':'EM_ANDAMENTO' %>"><%= a.status %></span></div>
+        </article>
+      <% }) %>
     </div>
-    <% if (a.feedback) { %><p class="muted" style="margin:0 0 10px 0;"><%= a.feedback %></p><% } %>
-  <% }) %>
-</div>
+  </section>
+</main>

@@ -1,15 +1,19 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/academia.css" />
-<div class="page-head"><div><h1>Ranking técnico</h1><p class="muted">Pontuação por cursos, avaliações, certificações e constância.</p></div></div>
-<%- include(incluir('_menu')) %>
-
-<% if (minhaPosicao) { %><div class="card" style="margin-bottom:12px;">Sua posição atual: <strong><%= minhaPosicao.posicao %>º</strong> com <strong><%= minhaPosicao.pontos %> pontos</strong>.</div><% } %>
-<div class="card">
-  <% if (!ranking.length) { %><p class="muted">Ainda não há pontuações registradas.</p><% } %>
-  <% ranking.forEach(function(r, idx){ %>
-    <div class="academia-row" style="margin-bottom:8px;">
-      <div style="display:flex;align-items:center;gap:10px;"><div class="ranking-pos"><%= idx + 1 %>°</div><div><strong><%= r.funcionario %></strong><div class="muted-xs"><%= r.role %></div></div></div>
-      <div class="muted-xs"><strong><%= r.pontos %></strong> pts • <%= r.cursos_concluidos %> cursos • <%= r.horas_estudadas %>h • <%= r.trilhas_concluidas %> trilhas • <%= r.certificados %> certificados</div>
+<link rel="stylesheet" href="/css/academia.css?v=20260919-p4" />
+<main class="academy-workspace">
+  <header class="academy-hero"><div><span class="academy-eyebrow">ACADEMIA • EVOLUÇÃO TÉCNICA</span><h1>Ranking técnico</h1><p>Pontuação por cursos, avaliações, certificações e constância na capacitação.</p></div></header>
+  <%- include(incluir('_menu')) %>
+  <% if (minhaPosicao) { %><section class="academy-note">Sua posição atual é <strong><%= minhaPosicao.posicao %>º</strong>, com <strong><%= minhaPosicao.pontos %> pontos</strong>.</section><% } %>
+  <section class="academy-panel">
+    <div class="academy-section-head"><div><h2>Classificação</h2><p>Indicador de engajamento e evolução dentro da Academia.</p></div><span class="academy-badge"><%= ranking.length %> participante(s)</span></div>
+    <% if (!ranking.length) { %><div class="academy-empty">Ainda não há pontuações registradas.</div><% } %>
+    <div class="academy-list">
+      <% ranking.forEach(function(r, idx){ %>
+        <article class="academy-list-item">
+          <div class="academy-ranking-main"><div class="ranking-pos"><%= idx + 1 %>º</div><div><strong><%= r.funcionario %></strong><p><%= r.role %></p></div></div>
+          <div class="academy-ranking-metrics"><span><strong><%= r.pontos %></strong> pts</span><span><strong><%= r.cursos_concluidos %></strong> cursos</span><span><strong><%= r.horas_estudadas %>h</strong></span><span><strong><%= r.trilhas_concluidas %></strong> trilhas</span><span><strong><%= r.certificados %></strong> certificados</span></div>
+        </article>
+      <% }) %>
     </div>
-  <% }) %>
-</div>
+  </section>
+</main>
