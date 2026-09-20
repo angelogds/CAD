@@ -50,6 +50,34 @@ function manutencao(req, res) {
   });
 }
 
+function escHtml(value) {
+  return String(value ?? '').replace(/[&<>]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[char]));
+}
+
+function tableHtml(title, rows) {
+  const body = Array.isArray(rows) && rows.length ? rows : [{ mensagem: 'Sem dados' }];
+  const keys = body[0] ? Object.keys(body[0]) : ['mensagem'];
+  return `<h2>${escHtml(title)}</h2><table border="1"><tr>${keys.map((key) => `<th>${escHtml(key)}</th>`).join('')}</tr>${body.map((row) => `<tr>${keys.map((key) => `<td>${escHtml(row[key])}</td>`).join('')}</tr>`).join('')}</table>`;
+}
+
+function manutencaoExcel(req, res) {
+  const dashboard = manutencaoExecutivaService.getDashboard(req.query, req.session?.user?.id || null);
+  pcmService.logDashboardReport(req.session?.user?.id || null, 'EXCEL_DIRETORIA', dashboard.filtros || {});
+  const sheets = [
+    tableHtml('Indicadores executivos', [dashboard.cards || {}]),
+    tableHtml('Confiabilidade', [dashboard.confiabilidade || {}]),
+    tableHtml('Qualidade dos dados', [dashboard.qualidade_dados || {}]),
+    tableHtml('Custos por equipamento', dashboard.custos?.byEquipment || []),
+    tableHtml('Custos por mês', dashboard.custos?.byMonth || []),
+    tableHtml('Ordens de serviço', dashboard.tabelas?.ordens || []),
+    tableHtml('Falhas por equipamento', dashboard.graficos?.falhas_equipamento || []),
+    tableHtml('Equipamentos que exigem atenção', dashboard.equipamentos_atencao || []),
+  ];
+  res.setHeader('Content-Type', 'application/vnd.ms-excel; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="desempenho-manutencao.xls"');
+  return res.send(`<!doctype html><html><head><meta charset="utf-8"><style>table{border-collapse:collapse}th{background:#166534;color:#fff}</style></head><body>${sheets.join('<br style="page-break-after:always">')}</body></html>`);
+}
+
 function manutencaoDados(req, res) {
   try {
     const dashboard = manutencaoExecutivaService.getDashboard(req.query, req.session?.user?.id || null);
