@@ -1,72 +1,126 @@
 <% layout('layout') %>
+<link rel="stylesheet" href="/css/preventivas-form.css?v=20260919-p3">
 
-<div class="page-head" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;">
-  <div>
-    <h1>Eleger Mecânico da Preventiva</h1>
-    <p class="muted" style="margin-top:6px;">Defina os responsáveis padrão para preventivas novas, programadas, pendentes, abertas e lançadas no painel.</p>
-  </div>
-  <a class="btn" href="/preventivas">Voltar</a>
-</div>
+<main class="preventive-secondary-page">
+  <header class="preventive-secondary-hero">
+    <div>
+      <span class="preventive-secondary-eyebrow">PREVENTIVAS • EQUIPE PADRÃO</span>
+      <h1>Eleger Mecânicos da Preventiva</h1>
+      <p>Defina os responsáveis padrão das preventivas respeitando a disponibilidade da escala atual. Colaboradores indisponíveis permanecem visíveis, porém bloqueados.</p>
+    </div>
+    <div class="preventive-secondary-actions">
+      <a class="ui-btn ui-btn--secondary" href="/preventivas">Voltar ao painel</a>
+    </div>
+  </header>
 
-<div class="card" style="margin-top:12px;max-width:860px;">
-  <div class="alert alert-info" style="margin-bottom:14px;">
-    Somente colaboradores disponíveis na escala atual podem ser selecionados. Férias, atestado, folga, ausência e colaboradores fora da escala ficam bloqueados.
-  </div>
+  <section class="preventive-secondary-kpis" aria-label="Disponibilidade da equipe">
+    <article class="preventive-secondary-kpi">
+      <span>Colaboradores</span>
+      <strong><%= resumoDisponibilidade?.total || 0 %></strong>
+      <small>Ativos no cadastro</small>
+    </article>
+    <article class="preventive-secondary-kpi">
+      <span>Disponíveis</span>
+      <strong><%= resumoDisponibilidade?.disponiveis || 0 %></strong>
+      <small>Liberados pela escala atual</small>
+    </article>
+    <article class="preventive-secondary-kpi <%= Number(resumoDisponibilidade?.indisponiveis || 0) > 0 ? 'is-alert' : '' %>">
+      <span>Indisponíveis</span>
+      <strong><%= resumoDisponibilidade?.indisponiveis || 0 %></strong>
+      <small>Férias, atestado, folga ou fora da escala</small>
+    </article>
+    <article class="preventive-secondary-kpi">
+      <span>Equipe padrão</span>
+      <strong><%= config?.mecanico_1_id ? (config?.mecanico_2_id ? '2' : '1') : '0' %></strong>
+      <small>Responsável(is) configurado(s)</small>
+    </article>
+  </section>
 
-  <form method="POST" action="/preventivas/eleger-mecanico" id="formResponsaveisPreventiva">
-    <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
+  <section class="preventive-secondary-panel is-soft">
+    <div class="preventive-secondary-head">
       <div>
-        <label class="label" for="mecanico_1_id">Mecânico 1</label>
-        <select class="input" id="mecanico_1_id" name="mecanico_1_id" required>
-          <option value="">Selecione</option>
-          <% (colaboradores || []).forEach(function(c){ %>
-            <option
-              value="<%= c.id %>"
-              <%= Number(config?.mecanico_1_id || 0) === Number(c.id) ? 'selected' : '' %>
-              <%= c.disponivel ? '' : 'disabled' %>
-              data-disponivel="<%= c.disponivel ? '1' : '0' %>"
-              data-motivo="<%= c.indisponibilidade_motivo || '' %>"
-            >
-              <%= c.nome %> <%= c.funcao ? ('• ' + c.funcao) : '' %><%= c.disponivel ? '' : (' — indisponível: ' + (c.indisponibilidade_motivo || 'fora da escala')) %>
-            </option>
-          <% }) %>
-        </select>
+        <h2>Responsáveis padrão</h2>
+        <p>A alteração será aplicada às preventivas pendentes/em andamento e às OS preventivas abertas conforme a lógica já existente do módulo.</p>
       </div>
-
-      <div>
-        <label class="label" for="mecanico_2_id">Mecânico 2</label>
-        <select class="input" id="mecanico_2_id" name="mecanico_2_id">
-          <option value="">Sem mecânico 2</option>
-          <% (colaboradores || []).forEach(function(c){ %>
-            <option
-              value="<%= c.id %>"
-              <%= Number(config?.mecanico_2_id || 0) === Number(c.id) ? 'selected' : '' %>
-              <%= c.disponivel ? '' : 'disabled' %>
-              data-disponivel="<%= c.disponivel ? '1' : '0' %>"
-              data-motivo="<%= c.indisponibilidade_motivo || '' %>"
-            >
-              <%= c.nome %> <%= c.funcao ? ('• ' + c.funcao) : '' %><%= c.disponivel ? '' : (' — indisponível: ' + (c.indisponibilidade_motivo || 'fora da escala')) %>
-            </option>
-          <% }) %>
-        </select>
-      </div>
+      <span class="preventive-secondary-badge info">Escala vigente</span>
     </div>
 
-    <div id="avisoResponsaveis" class="alert alert-warning" style="display:none;margin-top:14px;"></div>
-
-    <% if (config?.mecanico_1_id) { %>
-      <div class="muted" style="margin-top:14px;">
-        Configuração atual: <strong><%= config.mecanico_1_nome || '-' %></strong><%= config.mecanico_2_nome ? (' e ' + config.mecanico_2_nome) : '' %>
-        <% if (config.atualizado_em) { %> • atualizada em <%= config.atualizado_em %><% } %>
-      </div>
-    <% } %>
-
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;">
-      <button class="btn btn-primary" type="submit">Salvar responsáveis</button>
-      <a class="btn btn-outline" href="/preventivas">Cancelar</a>
+    <div class="preventive-secondary-note">
+      Somente colaboradores <strong>disponíveis na escala atual</strong> podem ser selecionados. Férias, atestado, folga, ausência e colaboradores fora da escala ficam bloqueados automaticamente.
     </div>
-  </form>
-</div>
+
+    <form method="POST" action="/preventivas/eleger-mecanico" id="formResponsaveisPreventiva" style="margin-top:14px;">
+      <div class="preventive-secondary-team">
+        <section class="preventive-secondary-person">
+          <h3>Mecânico 1</h3>
+          <p>Responsável principal. Campo obrigatório para manter a distribuição padrão das preventivas.</p>
+          <label class="preventive-secondary-field" for="mecanico_1_id">
+            <span>Colaborador *</span>
+            <select id="mecanico_1_id" name="mecanico_1_id" required>
+              <option value="">Selecione</option>
+              <% (colaboradores || []).forEach(function(c){ %>
+                <option
+                  value="<%= c.id %>"
+                  <%= Number(config?.mecanico_1_id || 0) === Number(c.id) ? 'selected' : '' %>
+                  <%= c.disponivel ? '' : 'disabled' %>
+                  data-disponivel="<%= c.disponivel ? '1' : '0' %>"
+                  data-motivo="<%= c.indisponibilidade_motivo || '' %>"
+                >
+                  <%= c.nome %><%= c.funcao ? (' • ' + c.funcao) : '' %><%= c.disponivel ? '' : (' — indisponível: ' + (c.indisponibilidade_motivo || 'fora da escala')) %>
+                </option>
+              <% }) %>
+            </select>
+          </label>
+        </section>
+
+        <section class="preventive-secondary-person">
+          <h3>Mecânico 2</h3>
+          <p>Segundo responsável opcional para composição da equipe preventiva padrão.</p>
+          <label class="preventive-secondary-field" for="mecanico_2_id">
+            <span>Colaborador</span>
+            <select id="mecanico_2_id" name="mecanico_2_id">
+              <option value="">Sem mecânico 2</option>
+              <% (colaboradores || []).forEach(function(c){ %>
+                <option
+                  value="<%= c.id %>"
+                  <%= Number(config?.mecanico_2_id || 0) === Number(c.id) ? 'selected' : '' %>
+                  <%= c.disponivel ? '' : 'disabled' %>
+                  data-disponivel="<%= c.disponivel ? '1' : '0' %>"
+                  data-motivo="<%= c.indisponibilidade_motivo || '' %>"
+                >
+                  <%= c.nome %><%= c.funcao ? (' • ' + c.funcao) : '' %><%= c.disponivel ? '' : (' — indisponível: ' + (c.indisponibilidade_motivo || 'fora da escala')) %>
+                </option>
+              <% }) %>
+            </select>
+          </label>
+        </section>
+      </div>
+
+      <div id="avisoResponsaveis" class="preventive-secondary-warning" role="alert"></div>
+
+      <% if (config?.mecanico_1_id) { %>
+        <div class="preventive-secondary-current">
+          <span class="preventive-secondary-badge good">Configuração atual</span>
+          <span>
+            <strong><%= config.mecanico_1_nome || '-' %></strong><%= config.mecanico_2_nome ? (' e ' + config.mecanico_2_nome) : '' %>
+            <% if (config.atualizado_em) { %> • atualizada em <%= dateBr.formatDateTimeBR(config.atualizado_em) %><% } %>
+            <% if (config.atualizado_por_nome) { %> • por <%= config.atualizado_por_nome %><% } %>
+          </span>
+        </div>
+      <% } else { %>
+        <div class="preventive-secondary-current">
+          <span class="preventive-secondary-badge warn">Sem configuração</span>
+          <span>Nenhuma equipe padrão foi definida ainda.</span>
+        </div>
+      <% } %>
+
+      <div class="preventive-secondary-form-actions" style="margin-top:16px;">
+        <a class="ui-btn ui-btn--secondary" href="/preventivas">Cancelar</a>
+        <button class="ui-btn ui-btn--primary" type="submit">Salvar responsáveis</button>
+      </div>
+    </form>
+  </section>
+</main>
 
 <script>
   (function(){
