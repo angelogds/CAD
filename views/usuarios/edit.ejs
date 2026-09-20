@@ -1,155 +1,105 @@
 <% layout('layout') %>
+<link rel="stylesheet" href="/css/admin-console.css?v=20260919-p5" />
 
-<style>
-  .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:14px;margin-top:12px;}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-  .input{padding:10px;border-radius:12px;border:1px solid #e5e7eb;width:100%;}
-  .btn{padding:10px 12px;border-radius:12px;border:1px solid #e5e7eb;background:#fff;}
-  .btn:hover{border-color:#16a34a;color:#16a34a;}
-  .muted{color:#6b7280;}
-  @media(max-width:900px){.grid{grid-template-columns:1fr;}}
-</style>
-
-<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
-  <div>
-    <h1>Editar Usuário #<%= user.id %></h1>
-    <div class="muted"><%= user.email %></div>
-  </div>
-  <a class="btn" href="/usuarios">Voltar</a>
-</div>
-
-<div class="card">
-  <form method="POST" action="/usuarios/<%= user.id %>" enctype="multipart/form-data">
-    <div class="grid">
+<main class="admin-console">
+  <header class="admin-hero">
+    <div class="admin-identity">
+      <% if (user.photo_path && (typeof attachmentExists !== "function" || attachmentExists(user.photo_path))) { %>
+        <img class="admin-photo" src="<%= user.photo_path %>" alt="Foto de <%= user.name %>">
+      <% } else { %>
+        <div class="admin-user-avatar admin-photo"><span><%= String(user.name || '?').trim().slice(0,1).toUpperCase() %></span></div>
+      <% } %>
       <div>
-        <label>Nome</label>
-        <input class="input" name="name" value="<%= user.name %>" required />
-      </div>
-
-      <div>
-        <label>E-mail</label>
-        <input class="input" name="email" type="email" value="<%= user.email %>" required />
-      </div>
-
-      <div>
-        <label>Perfil</label>
-        <select class="input" name="role" required>
-          <% ROLES.forEach(r => { %>
-            <option value="<%= r.key %>" data-funcao="<%= r.funcao || '' %>" data-setor="<%= r.setor || '' %>" <%= (String(user.role||'').toUpperCase() === r.key) ? "selected" : "" %>><%= r.label %></option>
-          <% }) %>
-        </select>
-      </div>
-
-      <div>
-        <label>Função</label>
-        <input class="input" id="roleFunction" value="<%= user.funcao || '' %>" readonly />
-        <div class="muted">Derivada automaticamente do perfil.</div>
-      </div>
-
-      <div>
-        <label>Setor</label>
-        <input class="input" id="roleSector" value="<%= user.setor || '' %>" readonly />
-        <div class="muted">O perfil é a própria identidade do encarregado.</div>
-      </div>
-
-      <div>
-        <label>WhatsApp</label>
-        <input class="input" name="telefone_whatsapp" inputmode="numeric" data-whatsapp-input value="<%= user.telefone_whatsapp || '' %>" placeholder="5575999999999" />
-        <div class="muted">Somente números (DDI + DDD + número). Se ficar vazio, não receberá notificações.</div>
-      </div>
-
-      <div>
-        <label>Criado em</label>
-        <input class="input" value="<%= user.created_at ? fmtBR(user.created_at) : '-' %>" disabled />
-      </div>
-
-      <div>
-        <label>Foto do rosto</label>
-        <input class="input" name="photo" type="file" accept="image/*" capture="user" />
-      </div>
-
-      <div>
-        <label>Foto atual</label>
-        <% if (user.photo_path && (typeof attachmentExists !== "function" || attachmentExists(user.photo_path))) { %>
-          <img src="<%= user.photo_path %>" alt="Foto usuário" style="width:72px;height:72px;border-radius:999px;object-fit:cover;border:1px solid #e5e7eb;" />
-        <% } else { %>
-          <div class="muted">Sem foto cadastrada</div>
-        <% } %>
+        <span class="admin-eyebrow">ADMINISTRAÇÃO • USUÁRIO #<%= user.id %></span>
+        <h1>Editar acesso</h1>
+        <p><%= user.name %> • <%= user.email %></p>
       </div>
     </div>
-
-    <div style="margin-top:12px;display:flex;gap:10px;">
-      <button class="btn" type="submit">Salvar alterações</button>
+    <div class="admin-actions">
+      <a class="ui-btn ui-btn--secondary" href="/usuarios">Voltar</a>
     </div>
-  </form>
-</div>
+  </header>
 
-<div class="card">
-  <h3>Resetar senha</h3>
-  <p class="muted">Defina uma nova senha para este usuário.</p>
+  <section class="admin-panel">
+    <div class="admin-section-head">
+      <div><h2>Dados do usuário</h2><p>Atualize perfil, contato e foto sem alterar o histórico já vinculado.</p></div>
+      <span class="admin-badge good">Acesso cadastrado</span>
+    </div>
 
-  <form method="POST" action="/usuarios/<%= user.id %>/reset-senha">
-    <div class="grid">
-      <div>
-        <label>Nova senha</label>
-        <input class="input" name="password" type="password" required />
+    <form method="POST" action="/usuarios/<%= user.id %>" enctype="multipart/form-data" class="admin-form" data-user-form>
+      <div class="admin-form-grid">
+        <label class="admin-field">
+          <span>Nome *</span>
+          <input name="name" value="<%= user.name %>" required autocomplete="name">
+        </label>
+
+        <label class="admin-field">
+          <span>E-mail *</span>
+          <input name="email" type="email" value="<%= user.email %>" required autocomplete="email">
+        </label>
+
+        <label class="admin-field">
+          <span>Perfil *</span>
+          <select name="role" required>
+            <% ROLES.forEach(r => { %>
+              <option value="<%= r.key %>" data-funcao="<%= r.funcao || '' %>" data-setor="<%= r.setor || '' %>" <%= (String(user.role||'').toUpperCase() === r.key) ? "selected" : "" %>><%= r.label %></option>
+            <% }) %>
+          </select>
+        </label>
+
+        <label class="admin-field">
+          <span>Criado em</span>
+          <input value="<%= user.created_at ? fmtBR(user.created_at) : '-' %>" disabled>
+        </label>
+
+        <label class="admin-field">
+          <span>Função</span>
+          <input data-role-function value="<%= user.funcao || '' %>" readonly>
+          <small class="muted-xs">Derivada automaticamente do perfil.</small>
+        </label>
+
+        <label class="admin-field">
+          <span>Setor</span>
+          <input data-role-sector value="<%= user.setor || '' %>" readonly>
+          <small class="muted-xs">Identidade operacional derivada do perfil.</small>
+        </label>
+
+        <label class="admin-field">
+          <span>WhatsApp</span>
+          <input name="telefone_whatsapp" inputmode="numeric" data-whatsapp-input value="<%= user.telefone_whatsapp || '' %>" placeholder="5575999999999">
+          <small class="muted-xs">Se ficar vazio, o usuário não receberá notificações de OS.</small>
+        </label>
+
+        <label class="admin-field">
+          <span>Nova foto</span>
+          <input name="photo" type="file" accept="image/*" capture="user">
+          <small class="muted-xs">Deixe vazio para manter a foto atual.</small>
+        </label>
       </div>
-      <div></div>
+
+      <div class="admin-form-actions">
+        <button class="ui-btn ui-btn--primary" type="submit">Salvar alterações</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="admin-panel is-warning">
+    <div class="admin-section-head">
+      <div><h2>Resetar senha</h2><p>Defina uma nova senha para este usuário. A alteração é imediata.</p></div>
     </div>
 
-    <div style="margin-top:12px;">
-      <button class="btn" type="submit">Resetar senha</button>
-    </div>
-  </form>
-</div>
+    <form method="POST" action="/usuarios/<%= user.id %>/reset-senha" class="admin-form">
+      <div class="admin-form-grid">
+        <label class="admin-field">
+          <span>Nova senha *</span>
+          <input name="password" type="password" required autocomplete="new-password">
+        </label>
+      </div>
+      <div class="admin-form-actions">
+        <button class="ui-btn ui-btn--outline" type="submit" onclick="return confirm('Confirmar redefinição da senha deste usuário?');">Resetar senha</button>
+      </div>
+    </form>
+  </section>
+</main>
 
-<script>
-  (function () {
-    const roleSelect = document.querySelector('select[name="role"]');
-    const functionInput = document.getElementById('roleFunction');
-    const sectorInput = document.getElementById('roleSector');
-
-    function syncRoleContext() {
-      const option = roleSelect?.selectedOptions?.[0];
-      if (functionInput) functionInput.value = option?.dataset?.funcao || '';
-      if (sectorInput) sectorInput.value = option?.dataset?.setor || '';
-    }
-
-    roleSelect?.addEventListener('change', syncRoleContext);
-    syncRoleContext();
-
-    function normalizeWhatsappInputValue(value) {
-      const compact = String(value || '').replace(/[\s\-()+]/g, '').trim();
-      if (!compact) return '';
-      if (!/^\d+$/.test(compact)) {
-        throw new Error('WhatsApp deve conter somente números. Espaços, traços, parênteses e + são removidos automaticamente.');
-      }
-      let phone = compact;
-      if (!phone.startsWith('55') && /^\d{10,11}$/.test(phone)) phone = '55' + phone;
-      if (!/^55\d{10,11}$/.test(phone)) {
-        throw new Error('WhatsApp deve ter entre 12 e 13 dígitos no formato 55DDDNÚMERO.');
-      }
-      return phone;
-    }
-
-    document.querySelectorAll('form').forEach(function (form) {
-      form.addEventListener('submit', function (event) {
-        const input = form.querySelector('[data-whatsapp-input]');
-        if (!input || !String(input.value || '').trim()) return;
-        try {
-          const normalized = normalizeWhatsappInputValue(input.value);
-          if (normalized.length === 12 && !window.confirm('Este WhatsApp parece estar sem o 9º dígito após o DDD. Deseja salvar mesmo assim?')) {
-            event.preventDefault();
-            input.focus();
-            return;
-          }
-          input.value = normalized;
-        } catch (err) {
-          event.preventDefault();
-          alert(err.message || 'WhatsApp inválido.');
-          input.focus();
-        }
-      });
-    });
-  })();
-</script>
+<script src="/js/usuarios-form.js?v=20260919-p5"></script>
