@@ -12,6 +12,7 @@ const osDocumentService = require("./os-document.service");
 const osChatService = require("../os-chat/os-chat.service");
 const solicitacoesService = require("../solicitacoes/solicitacoes.service");
 const solicitacoesItensService = require("../solicitacoes/solicitacoes.itens-bilateral.service");
+const custosEquipamentosService = require("../compras/custos-equipamentos.service");
 const escalaService = require("../escala/escala.service");
 const { canSendWhatsappNotificationRole } = require("../../middlewares/permissions.middleware");
 
@@ -288,6 +289,8 @@ function osShow(req, res) {
     materialItemChanges = [];
   }
 
+  const custosOS = custosEquipamentosService.getOSConsumption(id);
+
   return res.render("os/show", {
     title: `OS #${id}`,
     os: osAtual,
@@ -322,6 +325,7 @@ function osShow(req, res) {
     materialRequest,
     canManageMaterialRequest,
     materialItemChanges,
+    custosOS,
     user: req.session?.user || null,
   });
 }
