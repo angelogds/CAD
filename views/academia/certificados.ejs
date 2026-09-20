@@ -1,17 +1,18 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/academia.css" />
-<div class="page-head"><div><h1>Certificados</h1><p class="muted">Certificados internos e externos com rastreabilidade.</p></div></div>
-<%- include(incluir('_menu')) %>
-
-<div class="academia-grid">
-  <% if (!certificados.length) { %><p class="muted">Você ainda não possui certificados.</p><% } %>
-  <% certificados.forEach(function(c){ %>
-    <div class="academia-card">
-      <div class="muted-xs"><strong><%= c.tipo %></strong> • Emitido em <%= c.emitido_em %></div>
-      <h3><%= c.curso_titulo %></h3>
-      <p class="muted-xs">Carga horária: <%= c.carga_horaria %>h</p>
-      <p class="muted-xs">Código: <%= c.codigo_validacao %></p>
-      <a class="btn btn-outline" href="<%= c.arquivo_url %>" target="_blank" rel="noopener">Abrir certificado</a>
-    </div>
-  <% }) %>
-</div>
+<link rel="stylesheet" href="/css/academia.css?v=20260919-p4" />
+<main class="academy-workspace">
+  <header class="academy-hero"><div><span class="academy-eyebrow">ACADEMIA • CERTIFICAÇÃO</span><h1>Certificados</h1><p>Certificados internos e externos com rastreabilidade por curso e código de validação.</p></div></header>
+  <%- include(incluir('_menu')) %>
+  <section class="academy-course-grid">
+    <% if (!certificados.length) { %><div class="academy-empty">Você ainda não possui certificados.</div><% } %>
+    <% certificados.forEach(function(c){ %>
+      <article class="academy-course-card academy-doc-card">
+        <div class="academy-doc-meta"><span class="academy-badge"><%= c.tipo %></span><span class="academy-badge">Emitido em <%= c.emitido_em %></span></div>
+        <h3><%= c.curso_titulo %></h3>
+        <p>Carga horária: <strong><%= c.carga_horaria %>h</strong></p>
+        <div class="academy-note">Código de validação: <strong><%= c.codigo_validacao %></strong></div>
+        <div class="academy-card-footer"><a class="ui-btn ui-btn--outline" href="<%= c.arquivo_url %>" target="_blank" rel="noopener">Abrir certificado</a></div>
+      </article>
+    <% }) %>
+  </section>
+</main>
