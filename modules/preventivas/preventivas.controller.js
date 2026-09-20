@@ -55,7 +55,6 @@ function newForm(req, res) {
     activeMenu: "preventivas",
     equipamentos,
     equipamentoSelecionadoId,
-    hojeISO: dateBr.todayISO(),
   });
 }
 
