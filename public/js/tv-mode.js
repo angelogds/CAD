@@ -16,6 +16,7 @@
     ['desempenho', 'Desempenho da equipe'],
     ['criticidade', 'Criticidade dos equipamentos'],
     ['materiais', 'Materiais e próximas demandas'],
+    ['gerencial', 'Indicadores gerenciais'],
   ];
   const state = {
     data: null,
@@ -70,6 +71,8 @@
   const initials = (name) => String(name || '?').split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
   const dateBR = (value) => value ? new Date(`${String(value).slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : 'Não informada';
   const numberBR = (value) => Number(value || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+  const moneyBR = (cents) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(Number(cents || 0) / 100);
+  const metricBR = (value, suffix = '') => value === null || value === undefined || Number.isNaN(Number(value)) ? 'Dados insuficientes' : `${numberBR(value)}${suffix}`;
   const labelStatus = (value) => status(value).replaceAll('_', ' ');
   const timeBR = (value) => value ? new Date(value).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-';
 
@@ -528,6 +531,66 @@
     </div>`;
   }
 
+  function renderGerencial() {
+    const g = state.data?.gerencial || {};
+    const cards = g.cards || {};
+    const reliability = g.confiabilidade || {};
+    const costs = items(g.custos_equipamento).slice(0, 5);
+    const failures = items(g.falhas_equipamento).slice(0, 5);
+    const maxCost = Math.max(1, ...costs.map((item) => Number(item.consumido_centavos || 0)));
+    const maxFailures = Math.max(1, ...failures.map((item) => Number(item.falhas || 0)));
+    const reliabilityTone = reliability.status === 'CONFIAVEL' ? 'success' : reliability.status === 'PARCIAL' ? 'warning' : 'danger';
+
+    const costRows = costs.map((item, index) => `
+      <div class="tv-management-row">
+        <span class="tv-management-rank">#${index + 1}</span>
+        <div><strong>${esc(item.equipamento_nome || 'Equipamento')}</strong><small>Custo real consumido</small></div>
+        <i><b style="width:${Math.max(3, Number(item.consumido_centavos || 0) / maxCost * 100)}%"></b></i>
+        <strong>${esc(moneyBR(item.consumido_centavos))}</strong>
+      </div>`).join('');
+
+    const failureRows = failures.map((item, index) => `
+      <div class="tv-management-row tv-management-row--failure">
+        <span class="tv-management-rank">#${index + 1}</span>
+        <div><strong>${esc(item.nome || 'Equipamento')}</strong><small>${Number(item.reincidencias || 0)} reincidência(s) · ${esc(item.criticidade || 'N/D')}</small></div>
+        <i><b style="width:${Math.max(3, Number(item.falhas || 0) / maxFailures * 100)}%"></b></i>
+        <strong>${Number(item.falhas || 0)} falha(s)</strong>
+      </div>`).join('');
+
+    return `<div class="screen management-screen section-stack">
+      ${metrics([
+        ['Backlog de OS', cards.backlog_os_atual || 0, 'warning', 'Pendências atuais'],
+        ['Backlog > 30 dias', cards.backlog_acima_30_dias || 0, 'danger', 'Envelhecimento crítico'],
+        ['Preventivas', `${numberBR(cards.percentual_preventiva || 0)}%`, 'success', 'Participação no período'],
+        ['Corretivas', `${numberBR(cards.percentual_corretiva || 0)}%`, 'warning', 'Participação no período'],
+        ['Custo consumido', moneyBR(cards.custo_consumido_centavos), 'info', 'Baixas reais do estoque'],
+        ['Qualidade dos dados', cards.qualidade_dados_pct == null ? 'Dados insuficientes' : `${numberBR(cards.qualidade_dados_pct)}%`, reliabilityTone, reliability.status_label || 'Base de confiabilidade'],
+      ])}
+      <div class="management-layout">
+        <article class="panel management-reliability">
+          <div class="panel-heading"><h2>Confiabilidade da manutenção</h2><span>${esc(g.periodo?.label || 'Período gerencial')} · ${esc(reliability.status_label || 'Dados insuficientes')}</span></div>
+          <div class="management-reliability-grid">
+            <div><span>MTBF</span><strong>${esc(reliability.mtbf_dias == null ? 'Dados insuficientes' : metricBR(reliability.mtbf_dias, ' dias'))}</strong><small>${Number(reliability.mtbf_amostras || 0)} intervalo(s) válido(s)</small></div>
+            <div><span>MTTR</span><strong>${esc(reliability.mttr_horas == null ? 'Dados insuficientes' : metricBR(reliability.mttr_horas, ' h'))}</strong><small>${Number(reliability.mttr_amostras || 0)} parada(s) válida(s)</small></div>
+            <div><span>Disponibilidade</span><strong>${esc(reliability.disponibilidade_pct == null ? 'Dados insuficientes' : metricBR(reliability.disponibilidade_pct, '%'))}</strong><small>${Number(reliability.equipamentos_base || 0)} equipamento(s) na base</small></div>
+            <div><span>Horas de parada</span><strong>${esc(reliability.horas_parada == null ? 'Dados insuficientes' : metricBR(reliability.horas_parada, ' h'))}</strong><small>Somente paradas rastreadas</small></div>
+          </div>
+          <div class="management-reliability-status ${reliabilityTone}"><strong>${esc(reliability.status_label || 'Dados insuficientes')}</strong><span>Os indicadores só aparecem quando a cobertura mínima de dados é atendida.</span></div>
+        </article>
+        <div class="management-rankings">
+          <article class="panel">
+            <div class="panel-heading"><h2>Maior custo real</h2><span>Materiais efetivamente consumidos</span></div>
+            <div class="management-list">${costRows || empty('Sem consumo real registrado no período.')}</div>
+          </article>
+          <article class="panel">
+            <div class="panel-heading"><h2>Maior incidência de falhas</h2><span>Corretivas registradas</span></div>
+            <div class="management-list">${failureRows || empty('Sem falhas corretivas no período.')}</div>
+          </article>
+        </div>
+      </div>
+    </div>`;
+  }
+
   function renderTicker() {
     const ticker = items(state.data?.ticker).filter((item) => sortedActiveOS().some((os) => `os-${os.id}` === item.id));
     const messages = ticker.length ? ticker.map((x) => x.texto) : ['Nenhuma OS ativa no momento.'];
@@ -543,7 +606,7 @@
 
   function renderAll() {
     if (!state.data) return;
-    const renderers = [renderOS, renderPreventivas, renderEscala, renderRanking, renderCriticidade, renderMateriais];
+    const renderers = [renderOS, renderPreventivas, renderEscala, renderRanking, renderCriticidade, renderMateriais, renderGerencial];
     document.querySelectorAll('[data-tv-screen]').forEach((el, index) => {
       el.innerHTML = renderers[index]();
       el.classList.toggle('is-active', index === state.index);
