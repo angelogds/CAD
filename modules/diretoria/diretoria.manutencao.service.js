@@ -165,7 +165,7 @@ function getDashboard(query = {}, userId = null) {
   const repeticoes = recorrentes.reduce((sum, item) => sum + Number(item.repeticoes_apos_primeira || 0), 0);
   const reincidenciaPct = corretivas ? Math.round((repeticoes * 1000) / corretivas) / 10 : 0;
   const qualidade = getDataQuality(filtros);
-  let custos = { totals: { comprado_centavos: 0, recebido_centavos: 0, pendente_centavos: 0, equipamentos: 0 }, byEquipment: [], byMonth: [] };
+  let custos = { totals: { comprado_centavos: 0, recebido_centavos: 0, consumido_centavos: 0, pendente_centavos: 0, equipamentos: 0 }, byEquipment: [], byMonth: [] };
   try {
     custos = custosEquipamentosService.getAnalytics({
       data_inicial: filtros.data_inicial,
@@ -187,6 +187,7 @@ function getDashboard(query = {}, userId = null) {
     qualidade_dados_pct: qualidade.score,
     custo_comprado_centavos: Number(custos.totals?.comprado_centavos || 0),
     custo_recebido_centavos: Number(custos.totals?.recebido_centavos || 0),
+    custo_consumido_centavos: Number(custos.totals?.consumido_centavos || 0),
     custo_pendente_recebimento_centavos: Number(custos.totals?.pendente_centavos || 0),
     equipamentos_com_custo: Number(custos.totals?.equipamentos || 0),
   };
