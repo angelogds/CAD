@@ -39,28 +39,19 @@ const safe = (fn, name) =>
 
 const USERS_ACCESS = ACCESS.usuarios;
 
-router.get("/", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.list, "list"));
-router.get("/usuarios", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.list, "list"));
+// Rotas canônicas vivem sob /usuarios. Os caminhos /usuarios/* abaixo são
+// aliases históricos do router antes de sua montagem em /usuarios no server.
+// Eles permanecem no mesmo handler para compatibilidade, sem duplicar lógica.
+router.get(["/", "/usuarios"], requireLogin, requireRole(USERS_ACCESS), safe(ctrl.list, "list"));
+router.get(["/novo", "/usuarios/novo"], requireLogin, requireRole(USERS_ACCESS), safe(ctrl.newForm, "newForm"));
 
-router.get("/novo", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.newForm, "newForm"));
-router.get("/usuarios/novo", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.newForm, "newForm"));
+router.post(["/", "/usuarios"], requireLogin, requireRole(USERS_ACCESS), upload.single("photo"), safe(ctrl.create, "create"));
 
-router.post("/", requireLogin, requireRole(USERS_ACCESS), upload.single("photo"), safe(ctrl.create, "create"));
-router.post("/usuarios", requireLogin, requireRole(USERS_ACCESS), upload.single("photo"), safe(ctrl.create, "create"));
+router.get(["/:id/editar", "/usuarios/:id/editar"], requireLogin, requireRole(USERS_ACCESS), safe(ctrl.editForm, "editForm"));
+router.post(["/:id", "/usuarios/:id"], requireLogin, requireRole(USERS_ACCESS), upload.single("photo"), safe(ctrl.update, "update"));
 
-router.get("/:id/editar", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.editForm, "editForm"));
-router.get("/usuarios/:id/editar", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.editForm, "editForm"));
-
-router.post("/:id", requireLogin, requireRole(USERS_ACCESS), upload.single("photo"), safe(ctrl.update, "update"));
-router.post("/usuarios/:id", requireLogin, requireRole(USERS_ACCESS), upload.single("photo"), safe(ctrl.update, "update"));
-
-router.post("/:id/reset-senha", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.resetPassword, "resetPassword"));
-router.post("/usuarios/:id/reset-senha", requireLogin, requireRole(USERS_ACCESS), safe(ctrl.resetPassword, "resetPassword"));
-
-router.post("/:id/excluir", requireLogin, requireAdmin, safe(ctrl.remove, "remove"));
-router.post("/usuarios/:id/excluir", requireLogin, requireAdmin, safe(ctrl.remove, "remove"));
-
-router.post("/:id/restaurar", requireLogin, requireAdmin, safe(ctrl.restore, "restore"));
-router.post("/usuarios/:id/restaurar", requireLogin, requireAdmin, safe(ctrl.restore, "restore"));
+router.post(["/:id/reset-senha", "/usuarios/:id/reset-senha"], requireLogin, requireRole(USERS_ACCESS), safe(ctrl.resetPassword, "resetPassword"));
+router.post(["/:id/excluir", "/usuarios/:id/excluir"], requireLogin, requireAdmin, safe(ctrl.remove, "remove"));
+router.post(["/:id/restaurar", "/usuarios/:id/restaurar"], requireLogin, requireAdmin, safe(ctrl.restore, "restore"));
 
 module.exports = router;
