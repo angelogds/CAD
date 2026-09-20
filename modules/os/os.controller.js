@@ -265,7 +265,11 @@ function osShow(req, res) {
   const documentoInstitucional = osDocumentService.getLatestInstitutionalDocument(id);
   const disponibilidadeResponsavel = service.calcularDisponibilidadeResponsavelOS(osAtual);
   let chatResumo = null;
-  try { chatResumo = osChatService.buscarConversaPorOS(id, req.session?.user || {}); } catch (_e) { chatResumo = null; }
+  try {
+    chatResumo = typeof osChatService.buscarResumoConversaPorOS === "function"
+      ? osChatService.buscarResumoConversaPorOS(id, req.session?.user || {})
+      : osChatService.buscarConversaPorOS(id, req.session?.user || {});
+  } catch (_e) { chatResumo = null; }
   let materialRequest = null;
   let canManageMaterialRequest = false;
   let materialItemChanges = [];
