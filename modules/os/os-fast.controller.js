@@ -52,6 +52,14 @@ function getColumns(table) {
   catch (_e) { return []; }
 }
 
+function getOSCore(id) {
+  try {
+    return db.prepare("SELECT id, status FROM os WHERE id = ?").get(Number(id)) || null;
+  } catch (_e) {
+    return null;
+  }
+}
+
 function runDetached(label, task) {
   setImmediate(() => {
     Promise.resolve()
@@ -332,7 +340,7 @@ function osCreate(req, res) {
 }
 
 function closeOSRecordFast(id, { closedBy, diagnostico, acaoExecutada, fechamentoPayload = {} }) {
-  const os = service.getOSById(id);
+  const os = getOSCore(id);
   if (!os) throw new Error("OS não encontrada.");
 
   const cols = getColumns("os");
@@ -385,7 +393,7 @@ function osAddEvidence(req, res) {
   const userId = req.session?.user?.id || null;
 
   try {
-    const osAtual = service.getOSById(id);
+    const osAtual = getOSCore(id);
     if (!osAtual) {
       req.flash("error", "OS não encontrada.");
       return res.redirect("/os");
@@ -419,7 +427,7 @@ function osClose(req, res) {
   const redirectAfterClose = postCloseRedirectPath(user) || `/os/${id}`;
 
   try {
-    const osAtual = service.getOSById(id);
+    const osAtual = getOSCore(id);
     if (!osAtual) {
       req.flash("error", "OS não encontrada.");
       return res.redirect("/os");
@@ -465,15 +473,24 @@ function osClose(req, res) {
       }));
     }
 
-    service.persistirRascunhoFechamento(id, {
-      transcricaoBruta: transcricaoAudio,
-      versaoTecnicaSugerida,
-      versaoFinalAprovada,
-      fonteDescricao,
-      textoDigitado,
-      fotosMetadados,
-      userId: user?.id || null,
-    });
+    const hasDraftContent = Boolean(
+      transcricaoAudio
+      || versaoTecnicaSugerida
+      || versaoFinalAprovada
+      || textoDigitado
+      || fotosMetadados.length
+    );
+    if (hasDraftContent) {
+      service.persistirRascunhoFechamento(id, {
+        transcricaoBruta: transcricaoAudio,
+        versaoTecnicaSugerida,
+        versaoFinalAprovada,
+        fonteDescricao,
+        textoDigitado,
+        fotosMetadados,
+        userId: user?.id || null,
+      });
+    }
 
     const fechamentoPayload = {
       fonte_descricao: fonteDescricao,
