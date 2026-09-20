@@ -56,16 +56,45 @@
       <article class="os-panel communication"><h2>Solicitação e comunicação</h2><div class="communication-grid"><p><span>Solicitação de material vinculada<small><%= linkedRequest ? ((linkedRequest.numero || '#' + linkedRequest.id) + ' — ' + (linkedRequest.status || 'status não informado')) : 'Nenhuma solicitação vinculada' %></small></span></p><p><span>Mensagens não lidas<small><%= chatResumo ? chatResumo.naoLidas : 0 %> mensagens não lidas</small><% const ultimaMensagem = chatResumo?.mensagens?.length ? chatResumo.mensagens[chatResumo.mensagens.length - 1] : null; %><small>Última mensagem: <%= ultimaMensagem?.mensagem || 'Nenhuma mensagem' %></small><small><%= ultimaMensagem?.created_at ? fmtBR(ultimaMensagem.created_at) : 'Sem interação registrada' %></small></span></p></div><div class="actions"><a class="btn btn-green" href="/chat-os/<%= os.id %>">Abrir conversa</a><% if (linkedRequest) { %><a class="btn btn-outline" href="/solicitacoes/<%= linkedRequest.id %>">Abrir solicitação</a><% } else if (!isOSFechada && canExecuteOS) { %><a class="btn btn-outline" href="/solicitacoes/nova?os_id=<%= os.id %>">Criar solicitação</a><% } %></div></article></div>
   </div>
 
-  <article class="os-panel os-evidence-card" aria-labelledby="evidence-title">
+  <article class="os-panel os-evidence-card" id="evidencias" aria-labelledby="evidence-title">
     <h2 id="evidence-title"><%= isOSFechada ? 'Evidências da OS' : 'Evidências e fechamento da OS' %></h2>
     <div class="os-media-grid">
-      <section><div class="media-heading"><h3>Evidência de abertura</h3><span><%= (os.fotos_abertura || []).length %> arquivo(s)</span></div>
+      <section>
+        <div class="media-heading"><h3>Evidência de abertura</h3><span><%= (os.fotos_abertura || []).length %> arquivo(s)</span></div>
         <p><%= openedAt ? ('Registrada em ' + fmtBR(openedAt)) : 'Data não registrada' %><%= os.opened_by_nome ? (' por ' + os.opened_by_nome) : '' %></p>
         <div class="os-gallery"><% if (!(os.fotos_abertura || []).length) { %><span class="muted">Nenhuma mídia de abertura registrada.</span><% } %><% (os.fotos_abertura || []).forEach((f, idx) => { const src=f.pathPublic||f.path||f.filepath; if(src){ const video=/\.(mp4|mov|webm|ogg|m4v|avi)$/i.test(src); %><a href="<%= src %>" target="_blank" rel="noopener" aria-label="Abrir mídia de abertura <%= idx+1 %>"><% if(video){ %><video src="<%= src %>" muted playsinline preload="metadata"></video><% }else{ %><img src="<%= src %>" alt="Mídia de abertura <%= idx+1 %>"><% } %></a><% } }); %></div>
       </section>
-      <section><div class="media-heading"><h3>Evidência de fechamento</h3><span><%= (os.fotos_fechamento || []).length %> arquivo(s)</span></div>
-        <% if (canConcluir) { %><p>A evidência é obrigatória. Fotos ou vídeos de até 1 minuto; limite de <%= process.env.OS_UPLOAD_FILE_SIZE_MB || 200 %> MB por arquivo.</p><form method="POST" action="/os/<%= os.id %>/concluir" enctype="multipart/form-data" id="form-concluir"><label class="os-upload-zone" for="fechamento_fotos">Selecionar ou substituir foto/vídeo<small>Você poderá revisar e remover arquivos antes de concluir.</small></label><input id="fechamento_fotos" type="file" name="fechamento_fotos" accept="image/*,video/*" multiple required hidden><div id="upload-message" class="muted" aria-live="polite">Adicione uma foto ou vídeo de fechamento para concluir.</div><div class="thumbs" id="preview-fechamento"></div></form><div class="os-conclusion"><div><strong>Conclusão da OS</strong><small>A OS somente será concluída após o envio da mídia válida.</small></div><button id="btn-concluir-os" class="btn btn-green" type="submit" form="form-concluir" disabled>Concluir OS</button></div>
-        <% } else { %><p><%= isOSFechada && closedAt ? ('Fechada em ' + fmtBR(closedAt) + (os.closed_by_nome ? ' por ' + os.closed_by_nome : '')) : 'O fechamento estará disponível quando a OS estiver em execução.' %></p><div class="os-gallery"><% if (!(os.fotos_fechamento || []).length) { %><span class="muted">Nenhuma mídia de fechamento registrada.</span><% } %><% (os.fotos_fechamento || []).forEach((f,idx)=>{ const src=f.pathPublic||f.path||f.filepath; if(src){ const video=/\.(mp4|mov|webm|ogg|m4v|avi)$/i.test(src); %><a href="<%= src %>" target="_blank" rel="noopener" download><% if(video){ %><video src="<%= src %>" muted controls preload="metadata"></video><% }else{ %><img src="<%= src %>" alt="Mídia de fechamento <%= idx+1 %>"><% } %></a><% } }); %></div><% } %>
+
+      <section>
+        <div class="media-heading"><h3>Evidência de fechamento</h3><span><%= (os.fotos_fechamento || []).length %> arquivo(s)</span></div>
+        <p><%= isOSFechada && closedAt ? ('Fechada em ' + fmtBR(closedAt) + (os.closed_by_nome ? ' por ' + os.closed_by_nome : '')) : 'A mídia é opcional e não bloqueia a conclusão operacional da OS.' %></p>
+
+        <div class="os-gallery"><% if (!(os.fotos_fechamento || []).length) { %><span class="muted">Nenhuma mídia de fechamento registrada.</span><% } %><% (os.fotos_fechamento || []).forEach((f,idx)=>{ const src=f.pathPublic||f.path||f.filepath; if(src){ const video=/\.(mp4|mov|webm|ogg|m4v|avi)$/i.test(src); %><a href="<%= src %>" target="_blank" rel="noopener" download><% if(video){ %><video src="<%= src %>" muted controls preload="metadata"></video><% }else{ %><img src="<%= src %>" alt="Mídia de fechamento <%= idx+1 %>"><% } %></a><% } }); %></div>
+
+        <% if (canConcluir) { %>
+          <div class="os-conclusion">
+            <div>
+              <strong>Conclusão rápida</strong>
+              <small>Conclui a OS imediatamente. Fotos e vídeos podem ser anexados separadamente antes ou depois.</small>
+            </div>
+            <form method="POST" action="/os/<%= os.id %>/concluir" id="form-concluir">
+              <button id="btn-concluir-os" class="btn btn-green" type="submit">Concluir OS</button>
+            </form>
+          </div>
+        <% } %>
+
+        <% if ((canConcluir || isOSFechada) && canExecuteOS) { %>
+          <form method="POST" action="/os/<%= os.id %>/evidencias-fechamento" enctype="multipart/form-data" class="os-evidence-upload">
+            <label class="os-upload-zone" for="evidencia_fechamento_upload">
+              Anexar foto ou vídeo
+              <small>Envio separado do fechamento; use quando a evidência visual for necessária.</small>
+            </label>
+            <input id="evidencia_fechamento_upload" type="file" name="fechamento_fotos" accept="image/*,video/*" multiple required hidden>
+            <div class="actions" style="margin-top:8px;">
+              <button class="btn btn-outline" type="submit">Enviar evidência</button>
+            </div>
+          </form>
+        <% } %>
       </section>
     </div>
   </article>
