@@ -80,7 +80,7 @@ test('painel do Almoxarifado mostra separado, entregue e só fecha após entrega
   assert.match(list, /Separadas/);
   assert.match(list, /Entregues/);
   assert.match(list, /s\.status === 'ENTREGUE_SOLICITANTE'/);
-  assert.doesNotMatch(list, /s\.status === 'RECEBIDA_TOTAL'.*\/fechar/s);
+  assert.match(list, /s\.status === 'ENTREGUE_SOLICITANTE'.*\/fechar/s);
 
   assert.match(detail, /\['SEPARADA_PARA_RETIRADA','Separado'\]/);
   assert.match(detail, /\['ENTREGUE_SOLICITANTE','Entregue'\]/);
