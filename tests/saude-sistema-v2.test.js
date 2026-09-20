@@ -64,6 +64,13 @@ test('tela mostra saúde, backup, runtime e mantém manutenção existente', () 
   assert.match(view, /action="\/admin\/armazenamento\/otimizar"/);
 });
 
+test('menu lateral expõe Saúde do Sistema sem criar rota duplicada', () => {
+  const sidebar = read('views/partials/sidebar.ejs');
+
+  assert.match(sidebar, /navItem\('\/admin\/armazenamento', 'Saúde do Sistema'/);
+  assert.match(sidebar, /activeMenu === 'admin-armazenamento'/);
+});
+
 test('view de saúde continua compilando como EJS', () => {
   assert.doesNotThrow(() => ejs.compile(read('views/admin/armazenamento.ejs')));
 });
