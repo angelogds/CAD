@@ -52,6 +52,8 @@
   function renderCharts(){
     const falhas=rows('falhas_equipamento').slice(0,6);
     bar('chartTopFalhas',falhas.map(x=>x.nome),falhas.map(x=>x.falhas),{horizontal:true,label:'Falhas',from:'#fde8e7',to:COLORS.red,labelMax:34,links:falhas.map(x=>x.equipamento_id?`/equipamentos/${x.equipamento_id}`:null)});
+    const paradas=rows('confiabilidade_equipamento').filter(x=>Number(x.tempo_parada_horas||0)>0).slice(0,7);
+    bar('chartParadasEquipamentos',paradas.map(x=>x.equipamento_nome),paradas.map(x=>x.tempo_parada_horas),{horizontal:true,label:'Horas de parada',from:'#fff0df',to:COLORS.orange,labelMax:32,links:paradas.map(x=>x.equipamento_id?`/equipamentos/${x.equipamento_id}`:null)});
     const tipos=rows('tipos_manutencao');doughnut('chartCorPrev',tipos.map(x=>x.tipo),tipos.map(x=>x.total),{label:'Intervenções',colors:[COLORS.green,COLORS.orange,COLORS.blue,COLORS.teal]});
     const osMes=rows('os_mes');line('chartOsMes',osMes.map(x=>x.mes),[{label:'Ordens de serviço',data:osMes.map(x=>x.total),color:COLORS.green}],{});
     const status=rows('os_status');doughnut('chartStatus',status.map(x=>String(x.status||'-').replaceAll('_',' ')),status.map(x=>x.total),{label:'OS',colors:[COLORS.green,COLORS.teal,COLORS.orange,COLORS.red,COLORS.blue,COLORS.slate]});
