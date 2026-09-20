@@ -3,7 +3,6 @@ const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const { ACCESS } = require('../../config/rbac');
 const ctrl = require('./diretoria.controller');
 const comprasCtrl = require('../solicitacoes/solicitacoes.acompanhamento.controller');
-const pcmCtrl = require('../pcm/pcm.controller');
 
 const DIRETORIA_ACCESS = ACCESS.diretoria_dashboard;
 const DIRETORIA_COMPRAS = ACCESS.diretoria_compras || DIRETORIA_ACCESS;
