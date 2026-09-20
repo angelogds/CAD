@@ -51,7 +51,28 @@ router.get('/armazenamento', requireLogin, requireRole(ACCESS), (req, res) => {
   const last = cleanup.getLastCleanupLog();
   const history = cleanup.getCleanupHistory(100);
   const nextRun = `Dia ${env.dayOfMonth} às 02:00 (${env.timezone || 'America/Bahia'})`;
-  return res.render('admin/armazenamento', { title: 'Armazenamento', env, last, history, nextRun, volumeBytes: volumeUsage(storage.UPLOAD_DIR), diagnostic: maintenance.diagnostic(), formatBytes: maintenance.formatBytes });
+  const health = maintenance.healthSnapshot();
+  return res.render('admin/armazenamento', {
+    title: 'Saúde do Sistema',
+    env,
+    last,
+    history,
+    nextRun,
+    volumeBytes: volumeUsage(storage.UPLOAD_DIR),
+    diagnostic: health.storage,
+    health,
+    formatBytes: maintenance.formatBytes,
+  });
+});
+
+router.post('/armazenamento/backup', requireLogin, requireRole(ADMIN), (req, res) => {
+  try {
+    const backup = maintenance.createBackup();
+    req.flash('success', `Backup SQLite criado com segurança: ${backup.name} (${maintenance.formatBytes(backup.size)}).`);
+  } catch (e) {
+    req.flash('error', e.message || String(e));
+  }
+  return res.redirect('/admin/armazenamento');
 });
 
 router.post('/armazenamento/limpar-sessoes', requireLogin, requireRole(ADMIN), (req, res) => { const r = maintenance.ensureSessionMaintenance(); req.flash('success', `Sessões expiradas removidas: ${r.deleted || 0}.`); res.redirect('/admin/armazenamento'); });
