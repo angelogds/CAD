@@ -1,33 +1,78 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/academia.css" />
+<link rel="stylesheet" href="/css/academia.css?v=20260919-p4" />
 
-<div class="page-head"><div><h1>Academia da Manutenção</h1><p class="muted">Centro técnico de capacitação, certificação e evolução profissional.</p></div></div>
-<%- include(incluir('_menu')) %>
+<main class="academy-workspace">
+  <header class="academy-hero">
+    <div>
+      <span class="academy-eyebrow">ACADEMIA DA MANUTENÇÃO</span>
+      <h1>Centro de Capacitação Técnica</h1>
+      <p>Acompanhe sua evolução, continue cursos, consulte trilhas, documentos e certificações em um único ambiente.</p>
+    </div>
+    <div class="academy-hero-actions">
+      <a class="ui-btn ui-btn--primary" href="/academia/minhas-aulas">Continuar estudando</a>
+      <a class="ui-btn ui-btn--outline" href="/academia/professor-ia">Professor IA</a>
+    </div>
+  </header>
 
-<div class="academia-grid academia-kpis">
-  <div class="academia-kpi"><div class="muted-xs">Cursos em andamento</div><div class="valor"><%= indicadores.cursos_em_andamento || 0 %></div></div>
-  <div class="academia-kpi"><div class="muted-xs">Cursos concluídos</div><div class="valor"><%= indicadores.cursos_concluidos || 0 %></div></div>
-  <div class="academia-kpi"><div class="muted-xs">Certificados obtidos</div><div class="valor"><%= indicadores.certificados || 0 %></div></div>
-  <div class="academia-kpi"><div class="muted-xs">Horas de treinamento</div><div class="valor"><%= indicadores.horas_treinamento || 0 %>h</div></div>
-  <div class="academia-kpi"><div class="muted-xs">Posição no ranking</div><div class="valor"><%= minhaPosicao ? `${minhaPosicao.posicao}º` : '-' %></div></div>
-  <div class="academia-kpi"><div class="muted-xs">Próxima trilha recomendada</div><div class="valor valor-sm"><%= trilhaRecomendada?.nome || 'Conhecimento da Fábrica' %></div></div>
-</div>
+  <%- include(incluir('_menu')) %>
 
-<div class="academia-grid academia-layout-2">
-  <section class="academia-card"><h3>Continuar estudando</h3>
-    <% if (!continuarEstudando.length) { %><p class="muted">Nenhum curso em andamento.</p><% } %>
-    <% continuarEstudando.forEach(function(c){ %><a class="academia-row" href="/academia/curso/<%= c.id %>"><strong><%= c.titulo %></strong><span><%= c.progresso_percentual %>%</span></a><% }) %>
+  <section class="academia-kpis" aria-label="Indicadores da Academia">
+    <article class="academia-kpi"><span class="academy-kpi-label">Em andamento</span><strong class="valor"><%= indicadores.cursos_em_andamento || 0 %></strong></article>
+    <article class="academia-kpi"><span class="academy-kpi-label">Concluídos</span><strong class="valor"><%= indicadores.cursos_concluidos || 0 %></strong></article>
+    <article class="academia-kpi"><span class="academy-kpi-label">Certificados</span><strong class="valor"><%= indicadores.certificados || 0 %></strong></article>
+    <article class="academia-kpi"><span class="academy-kpi-label">Horas de treinamento</span><strong class="valor"><%= indicadores.horas_treinamento || 0 %>h</strong></article>
+    <article class="academia-kpi"><span class="academy-kpi-label">Ranking</span><strong class="valor"><%= minhaPosicao ? `${minhaPosicao.posicao}º` : '-' %></strong></article>
+    <article class="academia-kpi"><span class="academy-kpi-label">Próxima trilha</span><strong class="valor valor-sm"><%= trilhaRecomendada?.nome || 'Conhecimento da Fábrica' %></strong></article>
   </section>
-  <section class="academia-card"><h3>Avisos da Academia</h3>
-    <% avisosAcademia.forEach(function(a){ %><p><strong><%= a.titulo %></strong><br><span class="muted-xs"><%= a.descricao %></span></p><% }) %>
+
+  <section class="academia-grid academia-layout-2">
+    <article class="academy-panel">
+      <div class="academy-section-head"><div><h2>Continuar estudando</h2><p>Retome os cursos já iniciados.</p></div><a class="ui-btn ui-btn--outline ui-btn--compact" href="/academia/minhas-aulas">Ver minhas aulas</a></div>
+      <% if (!continuarEstudando.length) { %><div class="academy-empty">Nenhum curso em andamento.</div><% } %>
+      <div class="academy-list">
+        <% continuarEstudando.forEach(function(c){ %>
+          <a class="academy-row" href="/academia/curso/<%= c.id %>">
+            <div><strong><%= c.titulo %></strong><div class="academy-progress-meta"><span>Progresso</span><span><%= c.progresso_percentual %>%</span></div></div>
+            <span class="academy-badge"><%= c.progresso_percentual %>%</span>
+          </a>
+        <% }) %>
+      </div>
+    </article>
+
+    <article class="academy-panel">
+      <div class="academy-section-head"><div><h2>Avisos da Academia</h2><p>Comunicados sobre capacitação e conteúdo.</p></div></div>
+      <% if (!avisosAcademia.length) { %><div class="academy-empty">Nenhum aviso disponível.</div><% } %>
+      <div class="academy-list">
+        <% avisosAcademia.forEach(function(a){ %>
+          <div class="academy-list-item"><div><strong><%= a.titulo %></strong><p><%= a.descricao %></p></div></div>
+        <% }) %>
+      </div>
+    </article>
   </section>
-</div>
 
-<div class="academia-grid academia-layout-3" style="margin-top:12px;">
-  <section class="academia-card"><h3>Cursos em destaque</h3><% cursosDestaque.forEach(function(c){ %><a class="academia-row" href="/academia/curso/<%= c.id %>"><span><%= c.titulo %><div class="muted-xs"><%= c.trilha_nome || 'Sem trilha' %></div></span><span class="muted-xs"><%= c.carga_horaria %>h</span></a><% }) %></section>
-  <section class="academia-card"><h3>Trilhas disponíveis</h3><% trilhas.slice(0,7).forEach(function(t){ %><a class="academia-row" href="/academia/trilha/<%= t.id %>"><span><%= t.nome %><div class="muted-xs"><%= t.total_cursos %> cursos</div></span><span class="muted-xs"><%= t.progresso_percentual %>%</span></a><% }) %></section>
-  <section class="academia-card"><h3>Últimos certificados</h3><% if (!ultimosCertificados.length) { %><p class="muted">Sem certificados ainda.</p><% } %><% ultimosCertificados.forEach(function(c){ %><a class="academia-row" href="/academia/certificados"><span><%= c.curso_titulo %></span><span class="muted-xs"><%= c.tipo %></span></a><% }) %></section>
-</div>
+  <section class="academia-grid academia-layout-3">
+    <article class="academy-panel">
+      <div class="academy-section-head"><div><h3>Cursos em destaque</h3><p>Conteúdos para evolução técnica.</p></div><a class="ui-btn ui-btn--outline ui-btn--compact" href="/academia/cursos">Ver cursos</a></div>
+      <% if (!cursosDestaque.length) { %><div class="academy-empty">Nenhum curso em destaque.</div><% } %>
+      <% cursosDestaque.forEach(function(c){ %><a class="academy-row" href="/academia/curso/<%= c.id %>"><span><strong><%= c.titulo %></strong><small class="muted-xs"><%= c.trilha_nome || 'Sem trilha' %></small></span><span class="academy-badge"><%= c.carga_horaria %>h</span></a><% }) %>
+    </article>
 
-<div class="card" style="margin-top:12px;"><div class="label">Recomendação da IA</div><p class="muted" style="margin-top:8px;"><%= recomendacaoIA %></p></div>
+    <article class="academy-panel">
+      <div class="academy-section-head"><div><h3>Trilhas disponíveis</h3><p>Organização do aprendizado por área.</p></div><a class="ui-btn ui-btn--outline ui-btn--compact" href="/academia/trilhas">Ver trilhas</a></div>
+      <% if (!trilhas.length) { %><div class="academy-empty">Nenhuma trilha disponível.</div><% } %>
+      <% trilhas.slice(0,7).forEach(function(t){ %><a class="academy-row" href="/academia/trilha/<%= t.id %>"><span><strong><%= t.nome %></strong><small class="muted-xs"><%= t.total_cursos %> cursos</small></span><span class="academy-badge"><%= t.progresso_percentual %>%</span></a><% }) %>
+    </article>
+
+    <article class="academy-panel">
+      <div class="academy-section-head"><div><h3>Últimos certificados</h3><p>Conquistas recentes registradas.</p></div><a class="ui-btn ui-btn--outline ui-btn--compact" href="/academia/certificados">Ver certificados</a></div>
+      <% if (!ultimosCertificados.length) { %><div class="academy-empty">Sem certificados ainda.</div><% } %>
+      <% ultimosCertificados.forEach(function(c){ %><a class="academy-row" href="/academia/certificados"><span><strong><%= c.curso_titulo %></strong></span><span class="academy-badge"><%= c.tipo %></span></a><% }) %>
+    </article>
+  </section>
+
+  <section class="academy-panel">
+    <div class="academy-section-head"><div><h2>Recomendação da IA</h2><p>Próximo passo sugerido a partir do seu progresso atual.</p></div></div>
+    <div class="academy-note"><%= recomendacaoIA %></div>
+  </section>
+</main>
 <script src="/js/academia.js"></script>
