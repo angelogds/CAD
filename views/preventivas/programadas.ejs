@@ -1,79 +1,135 @@
 <% layout('layout') %>
+<link rel="stylesheet" href="/css/preventivas-form.css?v=20260919-p3">
+<%
+  const proximaSegunda = resumo?.proximaSegunda ? dateBr.formatDateBR(resumo.proximaSegunda) : '-';
+  const totalExecucoes = Number(resumo?.totalExecucoesProxima || 0);
+%>
 
-<div class="page-head" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;">
-  <div>
-    <h1>Preventivas Programadas</h1>
-    <p class="muted" style="margin-top:6px;">Geração semanal para iniciar manutenção na segunda-feira.</p>
-  </div>
-  <div style="display:flex;gap:8px;">
-    <% if (canAdminPreventivas) { %>
-      <form method="POST" action="/preventivas/programadas/gerar" onsubmit="return confirm('Gerar preventivas programadas para a próxima segunda-feira?');">
-        <button class="btn btn-primary" type="submit">Gerar preventivas programadas</button>
-      </form>
-      <form method="POST" action="/preventivas/programadas/lancar-os-segunda" onsubmit="return confirm('Lançar todas as preventivas programadas da segunda-feira como OS agora?');">
-        <button class="btn btn-outline" type="submit">Lançar OS da segunda-feira</button>
-      </form>
-    <% } %>
-    <a class="btn" href="/preventivas">Voltar</a>
-  </div>
-</div>
+<main class="preventive-secondary-page">
+  <header class="preventive-secondary-hero">
+    <div>
+      <span class="preventive-secondary-eyebrow">PREVENTIVAS • PROGRAMAÇÃO SEMANAL</span>
+      <h1>Preventivas Programadas</h1>
+      <p>Prepare a manutenção preventiva da próxima segunda-feira e acompanhe templates, planos e execuções antes de gerar Ordens de Serviço.</p>
+    </div>
+    <div class="preventive-secondary-actions">
+      <a class="ui-btn ui-btn--secondary" href="/preventivas">Voltar ao painel</a>
+    </div>
+  </header>
 
-<div class="card" style="margin-top:12px;">
-  <div class="label">Resumo</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-    <span class="pill">Próxima segunda: <strong><%= resumo?.proximaSegunda || '-' %></strong></span>
-    <span class="pill">Templates: <strong><%= resumo?.totalTemplates || 0 %></strong></span>
-    <span class="pill">Planos programados: <strong><%= resumo?.totalPlanos || 0 %></strong></span>
-    <span class="pill">Execuções pendentes (próxima segunda): <strong><%= resumo?.totalExecucoesProxima || 0 %></strong></span>
-  </div>
-</div>
+  <section class="preventive-secondary-kpis" aria-label="Resumo da programação preventiva">
+    <article class="preventive-secondary-kpi">
+      <span>Próxima segunda</span>
+      <strong><%= proximaSegunda %></strong>
+      <small>Data de referência da programação</small>
+    </article>
+    <article class="preventive-secondary-kpi">
+      <span>Templates</span>
+      <strong><%= resumo?.totalTemplates || 0 %></strong>
+      <small>Modelos padrão disponíveis</small>
+    </article>
+    <article class="preventive-secondary-kpi">
+      <span>Planos programados</span>
+      <strong><%= resumo?.totalPlanos || 0 %></strong>
+      <small>Planos semanais já cadastrados</small>
+    </article>
+    <article class="preventive-secondary-kpi <%= totalExecucoes > 0 ? 'is-alert' : '' %>">
+      <span>Execuções pendentes</span>
+      <strong><%= totalExecucoes %></strong>
+      <small>Programadas para a próxima segunda</small>
+    </article>
+  </section>
 
-<div class="card" style="margin-top:12px;">
-  <div class="label">Templates padrão</div>
-  <div class="table-wrap" style="margin-top:8px;">
-    <table class="table">
-      <thead><tr><th>Template</th><th>Frequência</th><th>Checklist base</th></tr></thead>
-      <tbody>
-        <% if (!resumo?.templates?.length) { %>
-          <tr><td colspan="3">Nenhum template configurado.</td></tr>
-        <% } %>
-        <% (resumo?.templates || []).forEach(function(t){ %>
-          <tr>
-            <td><strong><%= t.titulo %></strong></td>
-            <td><%= (t.frequencia_tipo || '-').toUpperCase() %> x<%= t.frequencia_valor || 1 %></td>
-            <td>
-              <ul style="margin:0;padding-left:16px;">
+  <% if (canAdminPreventivas) { %>
+    <section class="preventive-secondary-panel is-warning">
+      <div class="preventive-secondary-head">
+        <div>
+          <h2>Ações da programação</h2>
+          <p>Execute primeiro a geração semanal. O lançamento em OS deve ocorrer somente após conferir a programação.</p>
+        </div>
+      </div>
+      <div class="preventive-secondary-danger-zone">
+        <form method="POST" action="/preventivas/programadas/gerar" onsubmit="return confirm('Gerar as preventivas programadas para a próxima segunda-feira?');">
+          <button class="ui-btn ui-btn--primary" type="submit">Gerar programação semanal</button>
+        </form>
+        <form method="POST" action="/preventivas/programadas/lancar-os-segunda" onsubmit="return confirm('Confirmar o lançamento das preventivas programadas da segunda-feira como Ordens de Serviço?');">
+          <button class="ui-btn ui-btn--outline" type="submit">Lançar OS da segunda-feira</button>
+        </form>
+      </div>
+    </section>
+  <% } %>
+
+  <section class="preventive-secondary-panel">
+    <div class="preventive-secondary-head">
+      <div>
+        <h2>Templates padrão</h2>
+        <p>Modelos utilizados pela geração automática das preventivas programadas.</p>
+      </div>
+      <span class="preventive-secondary-badge info"><%= resumo?.templates?.length || 0 %> modelo(s)</span>
+    </div>
+
+    <% if (!resumo?.templates?.length) { %>
+      <div class="preventive-secondary-empty">Nenhum template configurado.</div>
+    <% } else { %>
+      <div class="preventive-secondary-template-list">
+        <% (resumo.templates || []).forEach(function(t){ %>
+          <article class="preventive-secondary-template">
+            <h4><%= t.titulo %></h4>
+            <div class="meta">
+              <span class="preventive-secondary-badge"><%= (t.frequencia_tipo || '-').toUpperCase() %> x<%= t.frequencia_valor || 1 %></span>
+              <span class="preventive-secondary-badge good"><%= (t.checklist || []).length %> item(ns) no checklist</span>
+            </div>
+            <% if ((t.checklist || []).length) { %>
+              <ul>
                 <% (t.checklist || []).forEach(function(item){ %>
                   <li><%= item %></li>
                 <% }) %>
               </ul>
-            </td>
-          </tr>
+            <% } %>
+          </article>
         <% }) %>
-      </tbody>
-    </table>
-  </div>
-</div>
+      </div>
+    <% } %>
+  </section>
 
-<div class="card" style="margin-top:12px;">
-  <div class="label">Planos já criados</div>
-  <div class="table-wrap" style="margin-top:8px;">
-    <table class="table">
-      <thead><tr><th>ID</th><th>Título</th><th>Equipamento</th><th>Frequência</th><th>Ação</th></tr></thead>
-      <tbody>
-        <% if (!resumo?.planos?.length) { %>
-          <tr><td colspan="5">Nenhuma preventiva programada criada ainda.</td></tr>
-        <% } %>
-        <% (resumo?.planos || []).forEach(function(p){ %>
+  <section class="preventive-secondary-panel">
+    <div class="preventive-secondary-head">
+      <div>
+        <h2>Planos já criados</h2>
+        <p>Planos de origem programada semanal atualmente cadastrados no sistema.</p>
+      </div>
+      <span class="preventive-secondary-badge"><%= resumo?.planos?.length || 0 %> plano(s)</span>
+    </div>
+
+    <div class="preventive-secondary-table-wrap">
+      <table class="preventive-secondary-table">
+        <thead>
           <tr>
-            <td>#<%= p.id %></td>
-            <td><%= p.titulo %></td>
-            <td><%= p.equipamento_nome || '-' %> <span class="muted"><%= p.equipamento_tipo || '' %></span></td>
-            <td><%= (p.frequencia_tipo || '-').toUpperCase() %> x<%= p.frequencia_valor || 1 %></td>
-            <td><a class="btn btn-outline" href="/preventivas/<%= p.id %>">Abrir</a></td>
+            <th>Plano</th>
+            <th>Atividade</th>
+            <th>Equipamento</th>
+            <th>Frequência</th>
+            <th>Ação</th>
           </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  </div>
-</div>
+        </thead>
+        <tbody>
+          <% if (!resumo?.planos?.length) { %>
+            <tr><td colspan="5" class="preventive-secondary-empty">Nenhuma preventiva programada criada ainda.</td></tr>
+          <% } %>
+          <% (resumo?.planos || []).forEach(function(p){ %>
+            <tr>
+              <td data-label="Plano"><strong>#<%= p.id %></strong></td>
+              <td data-label="Atividade"><strong><%= p.titulo %></strong></td>
+              <td data-label="Equipamento">
+                <strong><%= p.equipamento_nome || '-' %></strong>
+                <% if (p.equipamento_tipo) { %><small><%= p.equipamento_tipo %></small><% } %>
+              </td>
+              <td data-label="Frequência"><span class="preventive-secondary-badge"><%= (p.frequencia_tipo || '-').toUpperCase() %> x<%= p.frequencia_valor || 1 %></span></td>
+              <td data-label="Ação"><a class="ui-btn ui-btn--outline ui-btn--compact" href="/preventivas/<%= p.id %>">Abrir plano</a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
