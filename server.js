@@ -107,10 +107,11 @@ app.set("trust proxy", 1);
 try {
   storage.ensurePersistentDirs();
   console.log(`✅ Storage pronto: DATA_DIR=${storage.DATA_DIR}`);
-  const usage = storageMaintenance.diagnostic();
+  const usage = storageMaintenance.capacity();
+  const usageStatus = storageMaintenance.capacityStatus(usage);
   console.log(`📦 Espaço livre em ${storage.DATA_DIR}: ${storageMaintenance.formatBytes(usage.free)} de ${storageMaintenance.formatBytes(usage.total)}`);
-  if (usage.free && usage.free < 25 * storageMaintenance.MB) console.error(`🚨 Armazenamento crítico em ${storage.DATA_DIR}: ${storageMaintenance.formatBytes(usage.free)} livres. Seeds/rotinas pesadas devem ser evitadas.`);
-  else if (usage.free && usage.free < 100 * storageMaintenance.MB) console.warn(`⚠️ Atenção: pouco espaço livre em ${storage.DATA_DIR}: ${storageMaintenance.formatBytes(usage.free)} livres.`);
+  if (usageStatus.level === 'critical') console.error(`🚨 Armazenamento crítico em ${storage.DATA_DIR}: ${storageMaintenance.formatBytes(usage.free)} livres (${Number(usage.freePct || 0).toFixed(1)}%). Seeds/rotinas pesadas devem ser evitadas.`);
+  else if (usageStatus.level === 'warn') console.warn(`⚠️ Atenção: pouco espaço livre em ${storage.DATA_DIR}: ${storageMaintenance.formatBytes(usage.free)} livres (${Number(usage.freePct || 0).toFixed(1)}%).`);
   const sessionCleanup = storageMaintenance.ensureSessionMaintenance();
   if (sessionCleanup.table) console.log(`🧹 Sessões expiradas removidas na inicialização: ${sessionCleanup.deleted}`);
 } catch (err) {
@@ -286,10 +287,17 @@ app.use((req, res, next) => {
   res.locals.normalizeRole = normalizeRole;
   res.locals.isAdmin = normalizeRole(req.session?.user?.role || "") === "ADMIN";
   try {
-    const diag = storageMaintenance.diagnostic();
+    // Apenas statfs aqui: evita varredura síncrona de todo o volume em cada requisição.
+    const diag = storageMaintenance.capacity();
+    const capacityState = storageMaintenance.capacityStatus(diag);
     const role = normalizeRole(req.session?.user?.role || "").toUpperCase();
-    res.locals.storageAlert = ["ADMIN", "DIRETORIA", "ENCARREGADO_MANUTENCAO"].includes(role) && diag.free && diag.free < 100 * storageMaintenance.MB
-      ? { critical: diag.free < 25 * storageMaintenance.MB, freeLabel: storageMaintenance.formatBytes(diag.free), dataDir: storage.DATA_DIR }
+    res.locals.storageAlert = ["ADMIN", "DIRETORIA", "ENCARREGADO_MANUTENCAO"].includes(role) && capacityState.level !== 'good' && capacityState.level !== 'unknown'
+      ? {
+          critical: capacityState.level === 'critical',
+          freeLabel: storageMaintenance.formatBytes(diag.free),
+          freePct: diag.freePct,
+          dataDir: storage.DATA_DIR,
+        }
       : null;
   } catch (_storageAlertErr) { res.locals.storageAlert = null; }
 
