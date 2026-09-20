@@ -1,125 +1,83 @@
 <% layout('layout') %>
+<link rel="stylesheet" href="/css/admin-console.css?v=20260919-p5" />
 
-<div class="page-head">
-  <div>
-    <h1>Novo Usuário</h1>
-    <p class="muted">Use o e-mail pessoal/corporativo do colaborador.</p>
-  </div>
-</div>
+<main class="admin-console">
+  <header class="admin-hero">
+    <div>
+      <span class="admin-eyebrow">ADMINISTRAÇÃO • NOVO ACESSO</span>
+      <h1>Novo usuário</h1>
+      <p>Cadastre o acesso com perfil, contato e foto. Função e setor são derivados automaticamente do perfil selecionado.</p>
+    </div>
+    <div class="admin-actions">
+      <a class="ui-btn ui-btn--secondary" href="/usuarios">Voltar</a>
+    </div>
+  </header>
 
-<div class="card" style="max-width:900px;">
-  <form method="POST" action="/usuarios" enctype="multipart/form-data">
-    
-    <div class="grid-2">
-      <div>
-        <div class="label">Nome</div>
-        <input class="input" name="name" required />
-      </div>
-
-      <div>
-        <div class="label">E-mail</div>
-        <input class="input" name="email" type="email" required />
-      </div>
-
-      <div>
-        <div class="label">Perfil</div>
-        <select class="input" name="role" required>
-          <option value="">Selecione</option>
-          <% (ROLES || []).forEach(r => { %>
-            <option value="<%= r.key %>" data-funcao="<%= r.funcao || '' %>" data-setor="<%= r.setor || '' %>"><%= r.label %></option>
-          <% }) %>
-        </select>
-      </div>
-
-      <div>
-        <div class="label">Função</div>
-        <input class="input" id="roleFunction" value="" placeholder="Definida pelo perfil" readonly />
-        <div class="muted">Preenchida automaticamente pelo perfil selecionado.</div>
-      </div>
-
-      <div>
-        <div class="label">Setor</div>
-        <input class="input" id="roleSector" value="" placeholder="Definido pelo perfil" readonly />
-        <div class="muted">Não exige vínculo com outro cadastro para os perfis encarregados.</div>
-      </div>
-
-      <div>
-        <div class="label">Senha</div>
-        <input class="input" name="password" type="password" required />
-      </div>
-
-      <div>
-        <div class="label">WhatsApp</div>
-        <input class="input" name="telefone_whatsapp" inputmode="numeric" data-whatsapp-input placeholder="5575999999999" />
-        <div class="muted">Somente números (DDI + DDD + número). Se ficar vazio, não receberá notificações.</div>
-      </div>
-
-      <div>
-        <div class="label">Foto do rosto</div>
-        <input class="input" name="photo" type="file" accept="image/*" capture="user" />
-      </div>
+  <section class="admin-panel">
+    <div class="admin-section-head">
+      <div><h2>Dados do acesso</h2><p>Use o e-mail pessoal ou corporativo do colaborador.</p></div>
     </div>
 
-    <div style="margin-top:16px; display:flex; gap:10px;">
-      <button class="btn btn-green" type="submit">
-        Salvar Usuário
-      </button>
+    <form method="POST" action="/usuarios" enctype="multipart/form-data" class="admin-form" data-user-form>
+      <div class="admin-form-grid">
+        <label class="admin-field">
+          <span>Nome *</span>
+          <input name="name" required autocomplete="name">
+        </label>
 
-      <a class="btn btn-ghost btn-sm" href="/usuarios">
-        Cancelar
-      </a>
-    </div>
+        <label class="admin-field">
+          <span>E-mail *</span>
+          <input name="email" type="email" required autocomplete="email">
+        </label>
 
-  </form>
-</div>
+        <label class="admin-field">
+          <span>Perfil *</span>
+          <select name="role" required>
+            <option value="">Selecione</option>
+            <% (ROLES || []).forEach(r => { %>
+              <option value="<%= r.key %>" data-funcao="<%= r.funcao || '' %>" data-setor="<%= r.setor || '' %>"><%= r.label %></option>
+            <% }) %>
+          </select>
+        </label>
 
-<script>
-  (function () {
-    const roleSelect = document.querySelector('select[name="role"]');
-    const functionInput = document.getElementById('roleFunction');
-    const sectorInput = document.getElementById('roleSector');
+        <label class="admin-field">
+          <span>Senha inicial *</span>
+          <input name="password" type="password" required autocomplete="new-password">
+        </label>
 
-    function syncRoleContext() {
-      const option = roleSelect?.selectedOptions?.[0];
-      if (functionInput) functionInput.value = option?.dataset?.funcao || '';
-      if (sectorInput) sectorInput.value = option?.dataset?.setor || '';
-    }
+        <label class="admin-field">
+          <span>Função</span>
+          <input data-role-function value="" placeholder="Definida pelo perfil" readonly>
+          <small class="muted-xs">Preenchida automaticamente.</small>
+        </label>
 
-    roleSelect?.addEventListener('change', syncRoleContext);
-    syncRoleContext();
+        <label class="admin-field">
+          <span>Setor</span>
+          <input data-role-sector value="" placeholder="Definido pelo perfil" readonly>
+          <small class="muted-xs">Identidade operacional derivada do perfil.</small>
+        </label>
 
-    function normalizeWhatsappInputValue(value) {
-      const compact = String(value || '').replace(/[\s\-()+]/g, '').trim();
-      if (!compact) return '';
-      if (!/^\d+$/.test(compact)) {
-        throw new Error('WhatsApp deve conter somente números. Espaços, traços, parênteses e + são removidos automaticamente.');
-      }
-      let phone = compact;
-      if (!phone.startsWith('55') && /^\d{10,11}$/.test(phone)) phone = '55' + phone;
-      if (!/^55\d{10,11}$/.test(phone)) {
-        throw new Error('WhatsApp deve ter entre 12 e 13 dígitos no formato 55DDDNÚMERO.');
-      }
-      return phone;
-    }
+        <label class="admin-field">
+          <span>WhatsApp</span>
+          <input name="telefone_whatsapp" inputmode="numeric" data-whatsapp-input placeholder="5575999999999">
+          <small class="muted-xs">DDI + DDD + número. Se ficar vazio, não receberá notificações.</small>
+        </label>
 
-    document.querySelectorAll('form').forEach(function (form) {
-      form.addEventListener('submit', function (event) {
-        const input = form.querySelector('[data-whatsapp-input]');
-        if (!input || !String(input.value || '').trim()) return;
-        try {
-          const normalized = normalizeWhatsappInputValue(input.value);
-          if (normalized.length === 12 && !window.confirm('Este WhatsApp parece estar sem o 9º dígito após o DDD. Deseja salvar mesmo assim?')) {
-            event.preventDefault();
-            input.focus();
-            return;
-          }
-          input.value = normalized;
-        } catch (err) {
-          event.preventDefault();
-          alert(err.message || 'WhatsApp inválido.');
-          input.focus();
-        }
-      });
-    });
-  })();
-</script>
+        <label class="admin-field">
+          <span>Foto do rosto</span>
+          <input name="photo" type="file" accept="image/*" capture="user">
+          <small class="muted-xs">Opcional. Usada na identificação visual do usuário.</small>
+        </label>
+      </div>
+
+      <div class="admin-note">O cadastro de usuário controla <strong>acesso ao sistema</strong>. Informações de jornada, banco de horas, treinamentos e documentos pessoais permanecem na ficha canônica do colaborador/RH.</div>
+
+      <div class="admin-form-actions">
+        <a class="ui-btn ui-btn--secondary" href="/usuarios">Cancelar</a>
+        <button class="ui-btn ui-btn--primary" type="submit">Salvar usuário</button>
+      </div>
+    </form>
+  </section>
+</main>
+
+<script src="/js/usuarios-form.js?v=20260919-p5"></script>
