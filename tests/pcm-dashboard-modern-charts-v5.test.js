@@ -49,7 +49,7 @@ test('view publica a área gráfica executiva e atualiza cache dos assets', () =
   assert.match(view, /Indicadores em gráficos interativos/);
   assert.match(view, /pcm-analytics-chip/);
   assert.match(view, /pcm-dashboard\.css\?v=20260920-v6/);
-  assert.match(view, /pcm-dashboard\.js\?v=20260920-v7/);
+  assert.match(view, /pcm-dashboard\.js\?v=20260920-v8/);
   assert.doesNotThrow(() => ejs.compile(view));
 });
 

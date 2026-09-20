@@ -117,6 +117,41 @@
     const meses=rows('custos_mes');line('chartCustosMes',meses.map(x=>x.mes),[{label:'Consumido',data:meses.map(x=>x.consumido_centavos),color:COLORS.green,fillFrom:'rgba(21,153,71,.03)',fillTo:'rgba(21,153,71,.20)'},{label:'Comprado',data:meses.map(x=>x.comprado_centavos),color:COLORS.orange,fill:false},{label:'Recebido',data:meses.map(x=>x.recebido_centavos),color:COLORS.blue,fill:false}],{currency:true});
   }
   function renderAll(){if(!state.data)return;renderCards();renderTables();renderQuality();renderReliability();renderCharts();const period=$('#periodoResumo');if(period)period.textContent=`Período analisado: ${state.data.filtros.data_inicial} a ${state.data.filtros.data_final}`;const last=$('#lastUpdate');if(last)last.textContent=new Date().toLocaleString('pt-BR');}
-  async function load(params){$('.pcm-loading')?.classList.add('active');try{const res=await fetch(endpoints.data+'?'+params.toString(),{headers:{Accept:'application/json'}});const json=await res.json();if(!res.ok||!json.ok)throw new Error(json.message||'Falha ao carregar dados');state.data=json.dashboard;state.lastQuery=params;history.replaceState(null,'','?'+params.toString());renderAll();}catch(e){alert('Não foi possível atualizar o painel. Verifique os filtros e tente novamente.');console.error('[PCM Dashboard]',e);}finally{$('.pcm-loading')?.classList.remove('active');}}
-  const form=$('#pcmFilters');$('[name="periodo"]',form)?.addEventListener('change',e=>{if(e.currentTarget.value!=='personalizado'){const ini=$('[name="data_inicial"]',form),fim=$('[name="data_final"]',form);if(ini)ini.value='';if(fim)fim.value='';}});form?.addEventListener('submit',e=>{e.preventDefault();load(new URLSearchParams(new FormData(e.currentTarget)));});$('#btnAtualizar')?.addEventListener('click',()=>load(new URLSearchParams(new FormData(form))));$('#btnLimpar')?.addEventListener('click',()=>{location.href=endpoints.base;});$('#btnMobileFilters')?.addEventListener('click',()=>$('.pcm-filters')?.classList.toggle('open'));$('#btnFull')?.addEventListener('click',()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen?.();else document.exitFullscreen?.();});$('#btnPdf')?.addEventListener('click',()=>{location.href=endpoints.pdf+'?'+new URLSearchParams(new FormData(form)).toString();});document.addEventListener('DOMContentLoaded',renderAll);if(document.readyState!=='loading')renderAll();
+  async function load(params,{silent=false,replaceHistory=true}={}){
+    $('.pcm-loading')?.classList.add('active');
+    try{
+      const query=params.toString();
+      const res=await fetch(endpoints.data+(query?'?'+query:''),{headers:{Accept:'application/json'},cache:'no-store'});
+      const json=await res.json();
+      if(!res.ok||!json.ok||!json.dashboard)throw new Error(json.message||'Falha ao carregar dados');
+      state.data=json.dashboard;
+      state.lastQuery=new URLSearchParams(params);
+      if(replaceHistory)history.replaceState(null,'',query?'?'+query:location.pathname);
+      renderAll();
+      return true;
+    }catch(e){
+      console.error('[PCM Dashboard]',e);
+      if(!silent)alert('Não foi possível atualizar o painel. Verifique os filtros e tente novamente.');
+      else {
+        let alertBox=$('#pcmDataRuntimeAlert');
+        if(!alertBox){
+          alertBox=document.createElement('div');
+          alertBox.id='pcmDataRuntimeAlert';
+          alertBox.className='pcm-alert-box';
+          alertBox.setAttribute('role','alert');
+          const content=$('.pcm-directors-content');
+          if(content)content.insertBefore(alertBox,content.firstChild);
+        }
+        if(alertBox)alertBox.textContent='Os dados do painel não puderam ser atualizados agora. Exibindo a última informação disponível.';
+      }
+      return false;
+    }finally{$('.pcm-loading')?.classList.remove('active');}
+  }
+  const form=$('#pcmFilters');$('[name="periodo"]',form)?.addEventListener('change',e=>{if(e.currentTarget.value!=='personalizado'){const ini=$('[name="data_inicial"]',form),fim=$('[name="data_final"]',form);if(ini)ini.value='';if(fim)fim.value='';}});form?.addEventListener('submit',e=>{e.preventDefault();load(new URLSearchParams(new FormData(e.currentTarget)));});$('#btnAtualizar')?.addEventListener('click',()=>load(new URLSearchParams(new FormData(form))));$('#btnLimpar')?.addEventListener('click',()=>{location.href=endpoints.base;});$('#btnMobileFilters')?.addEventListener('click',()=>$('.pcm-filters')?.classList.toggle('open'));$('#btnFull')?.addEventListener('click',()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen?.();else document.exitFullscreen?.();});$('#btnPdf')?.addEventListener('click',()=>{location.href=endpoints.pdf+'?'+new URLSearchParams(new FormData(form)).toString();});
+  async function init(){
+    renderAll();
+    const params=form?new URLSearchParams(new FormData(form)):new URLSearchParams(location.search);
+    await load(params,{silent:true,replaceHistory:false});
+  }
+  document.addEventListener('DOMContentLoaded',init);if(document.readyState!=='loading')init();
 })();
