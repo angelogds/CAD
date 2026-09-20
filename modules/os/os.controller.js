@@ -241,15 +241,21 @@ function osShow(req, res) {
 
   const equipeUsuarios = canManageEquipe ? service.listUsuariosEquipe() : [];
   const tracagens = tracagemService ? tracagemService.listByOS(id) : [];
-  const whatsappHistoricoCompleto = String(req.query.whatsapp_historico || "").toLowerCase() === "completo";
   const canSendWhatsappNotification = canSendWhatsappNotificationRole(role);
-  const canSendWhatsapp = whatsappService.getProvider() !== "disabled" && canSendWhatsappNotification;
-  const whatsappHistoricoCompletoSeguro = canSendWhatsappNotification && whatsappHistoricoCompleto;
-  const whatsappLogs = canSendWhatsappNotification ? whatsappService.listOsNotificationLogs(id, { limit: whatsappHistoricoCompletoSeguro ? 500 : 10 }) : [];
-  const whatsappLast = canSendWhatsappNotification ? (whatsappService.listOsNotificationLogs(id, { limit: 1 })[0] || null) : null;
-  const whatsappEventos = canSendWhatsappNotification && whatsappService.listWhatsappStatusEvents ? whatsappService.listWhatsappStatusEvents(id, { limit: whatsappHistoricoCompletoSeguro ? 500 : 10 }) : [];
   const whatsappProvider = canSendWhatsappNotification ? whatsappService.getProvider() : null;
-  const whatsappDiagnostico = canSendWhatsappNotification ? whatsappService.getWhatsappOsDiagnostic(id, osAtual) : {};
+  const canSendWhatsapp = whatsappProvider !== "disabled" && canSendWhatsappNotification;
+  const whatsappDiagnosticsLoaded = canSendWhatsappNotification
+    && ["1", "true", "sim", "completo"].includes(String(req.query.whatsapp_diagnostico || "").toLowerCase());
+  const whatsappHistoricoCompleto = whatsappDiagnosticsLoaded
+    && String(req.query.whatsapp_historico || "").toLowerCase() === "completo";
+  const whatsappLogs = whatsappDiagnosticsLoaded
+    ? whatsappService.listOsNotificationLogs(id, { limit: whatsappHistoricoCompleto ? 500 : 10 })
+    : [];
+  const whatsappLast = whatsappDiagnosticsLoaded ? (whatsappService.listOsNotificationLogs(id, { limit: 1 })[0] || null) : null;
+  const whatsappEventos = whatsappDiagnosticsLoaded && whatsappService.listWhatsappStatusEvents
+    ? whatsappService.listWhatsappStatusEvents(id, { limit: whatsappHistoricoCompleto ? 500 : 10 })
+    : [];
+  const whatsappDiagnostico = whatsappDiagnosticsLoaded ? whatsappService.getWhatsappOsDiagnostic(id, osAtual) : {};
   const whatsappResponsavel = whatsappDiagnostico.responsavel_resolvido || null;
   const whatsappDestinatarios = whatsappDiagnostico.destinatarios || [];
   const historicoAndamento = service.getHistoricoAndamentoOS(id);
@@ -290,6 +296,7 @@ function osShow(req, res) {
     equipeUsuarios,
     tracagens,
     whatsappLogs,
+    whatsappDiagnosticsLoaded,
     whatsappHistoricoCompleto: canSendWhatsappNotification && whatsappHistoricoCompleto,
     whatsappLast,
     whatsappEventos,
