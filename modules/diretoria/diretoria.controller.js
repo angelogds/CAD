@@ -309,4 +309,4 @@ function manutencaoPdf(req, res, next) {
   }
 }
 
-module.exports = { index, manutencao, manutencaoDados, manutencaoPdf, DIRETORIA_BASE_PATH };
+module.exports = { index, manutencao, manutencaoDados, manutencaoExcel, manutencaoPdf, DIRETORIA_BASE_PATH };
