@@ -1,6 +1,6 @@
 (function(){
   const endpoints=window.PCM_DASHBOARD_ENDPOINTS||{base:'/pcm/dashboard-gerencial',data:'/pcm/dashboard-gerencial/dados',pdf:'/pcm/dashboard-gerencial/pdf'};
-  const state={charts:{},data:window.PCM_DASHBOARD_INITIAL||null,lastQuery:new URLSearchParams(location.search)};
+  const state={charts:{},data:window.PCM_DASHBOARD_INITIAL||null,lastQuery:new URLSearchParams(location.search),chartFrame:null};
   const $=(s,root=document)=>root.querySelector(s); const $$=(s,root=document)=>Array.from(root.querySelectorAll(s));
   const COLORS={green:'#159947',greenDark:'#107136',teal:'#15989a',blue:'#2788ca',red:'#d94b47',orange:'#ed941e',amber:'#e5a50a',slate:'#718096',ink:'#10233e',muted:'#68778a',grid:'rgba(82,98,115,.10)'};
   if(typeof Chart!=='undefined'){
@@ -104,19 +104,62 @@
   }
   function renderQuality(){const q=state.data?.qualidade_dados||{};$('[data-quality]').forEach(el=>{el.textContent=fmt(q[el.dataset.quality],'%');});const status=$('[data-quality-status]');if(status)status.textContent=q.status_label||'Sem dados suficientes';const list=$('#qualityPendencias');if(list)list.innerHTML=(q.campos_pendentes||[]).map(item=>`<li>${tr(item)}</li>`).join('')||'<li>Base mínima atendida para os campos avaliados.</li>';}
   function renderReliability(){const r=state.data?.confiabilidade||{};const status=$('[data-reliability-status]');if(status)status.textContent=r.status_label||'Dados insuficientes';}
-  function renderCharts(){
+  function chartFailure(id,error){
+    console.error('[PCM Dashboard][chart]',id,error);
+    destroy(id);
+    const canvas=$(`#${id}`);
+    const empty=canvas?.closest('.pcm-director-panel, .pcm-card')?.querySelector('.pcm-empty');
+    if(empty){
+      empty.textContent='Não foi possível renderizar este gráfico. Os demais indicadores continuam disponíveis.';
+      empty.style.display='grid';
+    }
+  }
+  function safeChart(id,draw){
+    try{draw();return true;}catch(error){chartFailure(id,error);return false;}
+  }
+  function renderChartsNow(){
     if(!ensureChartRuntime())return;
     const falhas=rows('falhas_equipamento').slice(0,6);
-    bar('chartTopFalhas',falhas.map(x=>x.nome),falhas.map(x=>x.falhas),{horizontal:true,label:'Falhas',from:'#fde8e7',to:COLORS.red,labelMax:34,links:falhas.map(x=>x.equipamento_id?dashboardHref({equipamento_id:x.equipamento_id}):null)});
-    const tipos=rows('tipos_manutencao');doughnut('chartCorPrev',tipos.map(x=>x.tipo),tipos.map(x=>x.total),{label:'Intervenções',colors:[COLORS.green,COLORS.orange,COLORS.blue,COLORS.teal],links:tipos.map(x=>x.tipo?dashboardHref({tipo_manutencao:String(x.tipo).toUpperCase()}):null)});
-    const osMes=rows('os_mes');line('chartOsMes',osMes.map(x=>x.mes),[{label:'Ordens de serviço',data:osMes.map(x=>x.total),color:COLORS.green}],{});
-    const status=rows('os_status');doughnut('chartStatus',status.map(x=>String(x.status||'-').replaceAll('_',' ')),status.map(x=>x.total),{label:'OS',colors:[COLORS.green,COLORS.teal,COLORS.orange,COLORS.red,COLORS.blue,COLORS.slate],links:status.map(x=>x.status?dashboardHref({status:String(x.status).toUpperCase()}):null)});
-    const backlog=rows('backlog_idade');bar('chartBacklogIdade',backlog.map(x=>x.faixa),backlog.map(x=>x.total),{label:'OS pendentes',colors:['#7cc99a','#e7bd54','#ef9441','#d94b47'],legend:false});
-    const reinc=rows('reincidencia_corretiva').slice(0,7);bar('chartReincidencia',reinc.map(x=>x.nome),reinc.map(x=>x.repeticoes_apos_primeira),{horizontal:true,label:'Repetições',from:'#fff0df',to:COLORS.orange,labelMax:32,links:reinc.map(x=>x.equipamento_id?dashboardHref({equipamento_id:x.equipamento_id}):null)});
-    const custos=rows('custos_equipamento').slice(0,8);bar('chartCustosEquipamentos',custos.map(x=>x.equipamento_nome),custos.map(x=>x.consumido_centavos),{horizontal:true,label:'Custo consumido',from:'#dff5e7',to:COLORS.green,currency:true,labelMax:34,links:custos.map(x=>x.equipamento_id?dashboardHref({equipamento_id:x.equipamento_id}):null)});
-    const meses=rows('custos_mes');line('chartCustosMes',meses.map(x=>x.mes),[{label:'Consumido',data:meses.map(x=>x.consumido_centavos),color:COLORS.green,fillFrom:'rgba(21,153,71,.03)',fillTo:'rgba(21,153,71,.20)'},{label:'Comprado',data:meses.map(x=>x.comprado_centavos),color:COLORS.orange,fill:false},{label:'Recebido',data:meses.map(x=>x.recebido_centavos),color:COLORS.blue,fill:false}],{currency:true});
+    safeChart('chartTopFalhas',()=>bar('chartTopFalhas',falhas.map(x=>x.nome),falhas.map(x=>x.falhas),{horizontal:true,label:'Falhas',from:'#fde8e7',to:COLORS.red,labelMax:34,links:falhas.map(x=>x.equipamento_id?dashboardHref({equipamento_id:x.equipamento_id}):null)}));
+    const tipos=rows('tipos_manutencao');
+    safeChart('chartCorPrev',()=>doughnut('chartCorPrev',tipos.map(x=>x.tipo),tipos.map(x=>x.total),{label:'Intervenções',colors:[COLORS.green,COLORS.orange,COLORS.blue,COLORS.teal],links:tipos.map(x=>x.tipo?dashboardHref({tipo_manutencao:String(x.tipo).toUpperCase()}):null)}));
+    const osMes=rows('os_mes');
+    safeChart('chartOsMes',()=>line('chartOsMes',osMes.map(x=>x.mes),[{label:'Ordens de serviço',data:osMes.map(x=>x.total),color:COLORS.green}],{}));
+    const status=rows('os_status');
+    safeChart('chartStatus',()=>doughnut('chartStatus',status.map(x=>String(x.status||'-').split('_').join(' ')),status.map(x=>x.total),{label:'OS',colors:[COLORS.green,COLORS.teal,COLORS.orange,COLORS.red,COLORS.blue,COLORS.slate],links:status.map(x=>x.status?dashboardHref({status:String(x.status).toUpperCase()}):null)}));
+    const backlog=rows('backlog_idade');
+    safeChart('chartBacklogIdade',()=>bar('chartBacklogIdade',backlog.map(x=>x.faixa),backlog.map(x=>x.total),{label:'OS pendentes',colors:['#7cc99a','#e7bd54','#ef9441','#d94b47'],legend:false}));
+    const reinc=rows('reincidencia_corretiva').slice(0,7);
+    safeChart('chartReincidencia',()=>bar('chartReincidencia',reinc.map(x=>x.nome),reinc.map(x=>x.repeticoes_apos_primeira),{horizontal:true,label:'Repetições',from:'#fff0df',to:COLORS.orange,labelMax:32,links:reinc.map(x=>x.equipamento_id?dashboardHref({equipamento_id:x.equipamento_id}):null)}));
+    const custos=rows('custos_equipamento').slice(0,8);
+    safeChart('chartCustosEquipamentos',()=>bar('chartCustosEquipamentos',custos.map(x=>x.equipamento_nome),custos.map(x=>x.consumido_centavos),{horizontal:true,label:'Custo consumido',from:'#dff5e7',to:COLORS.green,currency:true,labelMax:34,links:custos.map(x=>x.equipamento_id?dashboardHref({equipamento_id:x.equipamento_id}):null)}));
+    const meses=rows('custos_mes');
+    safeChart('chartCustosMes',()=>line('chartCustosMes',meses.map(x=>x.mes),[{label:'Consumido',data:meses.map(x=>x.consumido_centavos),color:COLORS.green,fillFrom:'rgba(21,153,71,.03)',fillTo:'rgba(21,153,71,.20)'},{label:'Comprado',data:meses.map(x=>x.comprado_centavos),color:COLORS.orange,fill:false},{label:'Recebido',data:meses.map(x=>x.recebido_centavos),color:COLORS.blue,fill:false}],{currency:true}));
   }
-  function renderAll(){if(!state.data)return;renderCards();renderTables();renderQuality();renderReliability();renderCharts();const period=$('#periodoResumo');if(period)period.textContent=`Período analisado: ${state.data.filtros.data_inicial} a ${state.data.filtros.data_final}`;const last=$('#lastUpdate');if(last)last.textContent=new Date().toLocaleString('pt-BR');}
+  function renderCharts(){
+    if(state.chartFrame&&typeof cancelAnimationFrame==='function')cancelAnimationFrame(state.chartFrame);
+    const run=()=>{state.chartFrame=null;renderChartsNow();};
+    if(typeof requestAnimationFrame==='function')state.chartFrame=requestAnimationFrame(()=>requestAnimationFrame(run));
+    else setTimeout(run,0);
+  }
+  function safeRenderSection(label,fn){
+    try{fn();return true;}catch(error){console.error('[PCM Dashboard][render]',label,error);return false;}
+  }
+  function renderAll(){
+    if(!state.data)return;
+    safeRenderSection('cards',renderCards);
+    safeRenderSection('tables',renderTables);
+    safeRenderSection('quality',renderQuality);
+    safeRenderSection('reliability',renderReliability);
+    safeRenderSection('charts',renderCharts);
+    safeRenderSection('metadata',()=>{
+      const period=$('#periodoResumo');
+      const filtros=state.data?.filtros||{};
+      if(period)period.textContent=`Período analisado: ${filtros.data_inicial||'-'} a ${filtros.data_final||'-'}`;
+      const last=$('#lastUpdate');
+      if(last)last.textContent=new Date().toLocaleString('pt-BR');
+    });
+  }
   async function load(params,{silent=false,replaceHistory=true}={}){
     $('.pcm-loading')?.classList.add('active');
     try{
@@ -148,10 +191,14 @@
     }finally{$('.pcm-loading')?.classList.remove('active');}
   }
   const form=$('#pcmFilters');$('[name="periodo"]',form)?.addEventListener('change',e=>{if(e.currentTarget.value!=='personalizado'){const ini=$('[name="data_inicial"]',form),fim=$('[name="data_final"]',form);if(ini)ini.value='';if(fim)fim.value='';}});form?.addEventListener('submit',e=>{e.preventDefault();load(new URLSearchParams(new FormData(e.currentTarget)));});$('#btnAtualizar')?.addEventListener('click',()=>load(new URLSearchParams(new FormData(form))));$('#btnLimpar')?.addEventListener('click',()=>{location.href=endpoints.base;});$('#btnMobileFilters')?.addEventListener('click',()=>$('.pcm-filters')?.classList.toggle('open'));$('#btnFull')?.addEventListener('click',()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen?.();else document.exitFullscreen?.();});$('#btnPdf')?.addEventListener('click',()=>{location.href=endpoints.pdf+'?'+new URLSearchParams(new FormData(form)).toString();});
+  let initialized=false;
   async function init(){
-    renderAll();
+    if(initialized)return;
+    initialized=true;
     const params=form?new URLSearchParams(new FormData(form)):new URLSearchParams(location.search);
-    await load(params,{silent:true,replaceHistory:false});
+    const loaded=await load(params,{silent:true,replaceHistory:false});
+    if(!loaded)renderAll();
   }
-  document.addEventListener('DOMContentLoaded',init);if(document.readyState!=='loading')init();
+  document.addEventListener('DOMContentLoaded',init);
+  if(document.readyState!=='loading')init();
 })();
