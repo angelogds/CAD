@@ -1,115 +1,146 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/academia.css" />
+<link rel="stylesheet" href="/css/academia.css?v=20260919-p4" />
 
-<div class="page-head"><div><h1><%= curso.titulo %></h1><p class="muted"><%= curso.descricao || 'Curso institucional da Academia da Manutenção.' %></p></div></div>
-<%- include(incluir('_menu')) %>
-
-<div class="academia-grid academia-layout-2" style="align-items:start;">
-  <div class="academia-card">
-    <div class="muted-xs">Trilha: <strong><%= curso.trilha_nome || 'Sem trilha' %></strong> • Plataforma: <strong><%= curso.plataforma %></strong></div>
-    <p style="margin-top:10px;">Carga horária: <strong><%= curso.carga_horaria || 0 %>h</strong> • Nota mínima final: <strong>70%</strong></p>
-    <p>Status do curso: <span class="badge-status <%= curso.meu_status %>"><%= curso.meu_status %></span> • Progresso geral: <strong><%= curso.progresso_percentual %>%</strong></p>
-    <% if (curso.avaliacaoFinal) { %>
-      <p>Avaliação final: <strong><%= curso.avaliacaoFinal.percentual %>%</strong> (<%= curso.avaliacaoFinal.status %>)</p>
-    <% } %>
-    <div class="academia-actions">
-      <% if (curso.meu_status === 'EM_ANDAMENTO') { %>
-        <form method="POST" action="/academia/continuar/<%= curso.id %>"><button class="btn" type="submit">Continuar curso</button></form>
-      <% } else { %>
-        <form method="POST" action="/academia/iniciar/<%= curso.id %>"><button class="btn" type="submit">Iniciar curso</button></form>
-      <% } %>
-      <a class="btn btn-outline" href="#ebooks">Ver e-book</a>
-      <a class="btn btn-outline" href="#avaliacao-final">Avaliação final</a>
-      <a class="btn btn-outline" href="#etapa-externa">Etapa externa</a>
-      <a class="btn btn-outline" href="/academia/documentos-internos">Documento interno</a>
+<main class="academy-workspace">
+  <header class="academy-hero">
+    <div>
+      <span class="academy-eyebrow">ACADEMIA • CURSO</span>
+      <h1><%= curso.titulo %></h1>
+      <p><%= curso.descricao || 'Curso institucional da Academia da Manutenção.' %></p>
     </div>
-  </div>
+    <div class="academy-hero-actions">
+      <a class="ui-btn ui-btn--secondary" href="/academia/cursos">Voltar aos cursos</a>
+    </div>
+  </header>
 
-  <div class="academia-card">
-    <div class="label">Progresso dos blocos</div>
-    <ul style="margin-top:10px;">
-      <% (curso.blocos || []).forEach(function(b){ %>
-        <li>
-          Bloco <strong><%= b.ordem %></strong> - <%= b.titulo %>
-          <span class="badge-status <%= b.status %>"><%= b.status %></span>
-          <% if (b.percentual != null) { %><span class="muted-xs"> • <%= b.percentual %>%</span><% } %>
-        </li>
-      <% }) %>
-    </ul>
-  </div>
-</div>
+  <%- include(incluir('_menu')) %>
 
-<div class="card" style="margin-top:12px;">
-  <div class="label">Bloco atual</div>
-  <% if (curso.blocoAtual) { %>
-    <div class="academia-card" id="bloco-<%= curso.blocoAtual.id %>" style="margin-top:10px;">
-      <h3><%= curso.blocoAtual.ordem %>. <%= curso.blocoAtual.titulo %></h3>
-      <p class="muted"><%= curso.blocoAtual.descricao || 'Sem descrição' %></p>
-      <p><strong>Resumo:</strong> <%= curso.blocoAtual.resumo || 'Sem resumo.' %></p>
-      <p><%= curso.blocoAtual.conteudo_texto || 'Conteúdo em atualização.' %></p>
-      <% if (curso.blocoAtual.checklist?.length) { %>
-        <div class="muted-xs">Checklist</div>
-        <ul>
-          <% curso.blocoAtual.checklist.forEach(function(item){ %><li><%= item %></li><% }) %>
-        </ul>
+  <section class="academy-course-hero">
+    <article class="academy-panel">
+      <div class="academy-section-head">
+        <div><h2>Visão geral do curso</h2><p>Trilha, carga horária, plataforma e situação atual.</p></div>
+        <span class="badge-status <%= curso.meu_status %>"><%= String(curso.meu_status || '').replaceAll('_',' ') %></span>
+      </div>
+
+      <div class="academy-doc-meta">
+        <span class="academy-badge">Trilha: <%= curso.trilha_nome || 'Sem trilha' %></span>
+        <span class="academy-badge">Plataforma: <%= curso.plataforma %></span>
+        <span class="academy-badge"><%= curso.carga_horaria || 0 %>h</span>
+        <span class="academy-badge">Nota mínima final: 70%</span>
+      </div>
+
+      <div class="academy-course-progress">
+        <div class="academy-progress-meta"><span>Progresso geral</span><strong><%= curso.progresso_percentual %>%</strong></div>
+        <div class="progress"><span style="width:<%= curso.progresso_percentual %>%"></span></div>
+      </div>
+
+      <% if (curso.avaliacaoFinal) { %>
+        <div class="academy-note">Avaliação final: <strong><%= curso.avaliacaoFinal.percentual %>%</strong> • <%= curso.avaliacaoFinal.status %></div>
       <% } %>
+
       <div class="academia-actions">
-        <form method="POST" action="/academia/curso/<%= curso.id %>/bloco/<%= curso.blocoAtual.id %>/concluir">
-          <button class="btn btn-outline" type="submit">Concluir leitura</button>
-        </form>
+        <% if (curso.meu_status === 'EM_ANDAMENTO') { %>
+          <form method="POST" action="/academia/continuar/<%= curso.id %>"><button class="ui-btn ui-btn--primary" type="submit">Continuar curso</button></form>
+        <% } else { %>
+          <form method="POST" action="/academia/iniciar/<%= curso.id %>"><button class="ui-btn ui-btn--primary" type="submit">Iniciar curso</button></form>
+        <% } %>
+        <a class="ui-btn ui-btn--outline" href="#ebooks">E-book</a>
+        <a class="ui-btn ui-btn--outline" href="#avaliacao-final">Avaliação final</a>
+        <a class="ui-btn ui-btn--outline" href="#etapa-externa">Etapa externa</a>
+        <a class="ui-btn ui-btn--outline" href="/academia/documentos-internos">Documentos</a>
       </div>
-      <% if (curso.perguntasBlocoAtual?.length) { %>
-        <form method="POST" action="/academia/curso/<%= curso.id %>/bloco/<%= curso.blocoAtual.id %>/avaliar" class="academia-form-stack" style="margin-top:10px;">
-          <div class="muted-xs">Avaliação do bloco (mínimo 50%)</div>
-          <% curso.perguntasBlocoAtual.forEach(function(p, idx){ %>
-            <label><strong><%= idx + 1 %>.</strong> <%= p.pergunta %></label>
-            <select name="resposta_<%= p.id %>" required>
-              <option value="">Selecione</option>
-              <% ['A','B','C','D'].forEach(function(alt){ %>
-                <% const txt = p['alternativa_' + alt.toLowerCase()]; %>
-                <% if (txt) { %><option value="<%= alt %>"><%= alt %>) <%= txt %></option><% } %>
-              <% }) %>
-            </select>
-          <% }) %>
-          <button class="btn" type="submit">Responder avaliação do bloco</button>
-        </form>
-      <% } %>
+    </article>
+
+    <aside class="academy-panel">
+      <div class="academy-section-head"><div><h3>Progresso dos blocos</h3><p>Acompanhe leitura e avaliação por etapa.</p></div></div>
+      <% if (!(curso.blocos || []).length) { %><div class="academy-empty">Nenhum bloco cadastrado.</div><% } %>
+      <ul class="academy-block-list">
+        <% (curso.blocos || []).forEach(function(b){ %>
+          <li>
+            <span><strong><%= b.ordem %>.</strong> <%= b.titulo %></span>
+            <span class="badge-status <%= b.status %>"><%= String(b.status || '').replaceAll('_',' ') %><% if (b.percentual != null) { %> • <%= b.percentual %>%<% } %></span>
+          </li>
+        <% }) %>
+      </ul>
+    </aside>
+  </section>
+
+  <section class="academy-panel">
+    <div class="academy-section-head"><div><h2>Bloco atual</h2><p>Conteúdo de estudo e avaliação intermediária.</p></div></div>
+    <% if (curso.blocoAtual) { %>
+      <article id="bloco-<%= curso.blocoAtual.id %>" class="academy-content">
+        <h3><%= curso.blocoAtual.ordem %>. <%= curso.blocoAtual.titulo %></h3>
+        <p class="muted"><%= curso.blocoAtual.descricao || 'Sem descrição' %></p>
+        <div class="academy-note"><strong>Resumo:</strong> <%= curso.blocoAtual.resumo || 'Sem resumo.' %></div>
+        <p><%= curso.blocoAtual.conteudo_texto || 'Conteúdo em atualização.' %></p>
+
+        <% if (curso.blocoAtual.checklist?.length) { %>
+          <h3>Checklist</h3>
+          <ul class="academy-checklist"><% curso.blocoAtual.checklist.forEach(function(item){ %><li><%= item %></li><% }) %></ul>
+        <% } %>
+
+        <div class="academia-actions">
+          <form method="POST" action="/academia/curso/<%= curso.id %>/bloco/<%= curso.blocoAtual.id %>/concluir">
+            <button class="ui-btn ui-btn--outline" type="submit">Concluir leitura</button>
+          </form>
+        </div>
+
+        <% if (curso.perguntasBlocoAtual?.length) { %>
+          <form method="POST" action="/academia/curso/<%= curso.id %>/bloco/<%= curso.blocoAtual.id %>/avaliar" class="academia-form-stack">
+            <div class="academy-note">Avaliação do bloco • mínimo de 50% para aprovação.</div>
+            <% curso.perguntasBlocoAtual.forEach(function(p, idx){ %>
+              <div class="academy-evaluation-question">
+                <label for="resposta_<%= p.id %>"><strong><%= idx + 1 %>.</strong> <%= p.pergunta %></label>
+                <select id="resposta_<%= p.id %>" name="resposta_<%= p.id %>" required>
+                  <option value="">Selecione</option>
+                  <% ['A','B','C','D'].forEach(function(alt){ %>
+                    <% const txt = p['alternativa_' + alt.toLowerCase()]; %>
+                    <% if (txt) { %><option value="<%= alt %>"><%= alt %>) <%= txt %></option><% } %>
+                  <% }) %>
+                </select>
+              </div>
+            <% }) %>
+            <div class="academia-actions"><button class="ui-btn ui-btn--primary" type="submit">Responder avaliação do bloco</button></div>
+          </form>
+        <% } %>
+      </article>
+    <% } else { %>
+      <div class="academy-note">Todos os blocos foram concluídos. Faça a avaliação final de 10 questões.</div>
+    <% } %>
+  </section>
+
+  <section class="academy-panel" id="avaliacao-final">
+    <div class="academy-section-head"><div><h2>Avaliação final</h2><p>Liberada após conclusão dos 4 blocos. Aprovação mínima: 70%.</p></div></div>
+    <form method="POST" action="/academia/avaliacoes/<%= curso.id %>/final" class="academy-admin-grid">
+      <label class="academy-field"><span>Nota final *</span><input type="number" step="0.1" min="0" max="100" name="nota" placeholder="Nota final" required></label>
+      <label class="academy-field"><span>Percentual final *</span><input type="number" step="0.1" min="0" max="100" name="percentual" placeholder="Percentual final" required></label>
+      <div class="academia-actions"><button class="ui-btn ui-btn--primary" type="submit" <%= curso.blocoAtual ? 'disabled' : '' %>>Registrar avaliação final</button></div>
+    </form>
+  </section>
+
+  <section class="academy-panel" id="ebooks">
+    <div class="academy-section-head"><div><h2>E-book do curso</h2><p>Materiais de apoio vinculados ao conteúdo.</p></div><span class="academy-badge"><%= curso.ebooks?.length || 0 %> item(ns)</span></div>
+    <% if (!(curso.ebooks || []).length) { %><div class="academy-empty">Nenhum e-book disponível.</div><% } %>
+    <div class="academy-course-grid">
+      <% (curso.ebooks || []).forEach(function(e){ %>
+        <article class="academy-course-card academy-doc-card">
+          <h3><%= e.titulo %></h3>
+          <p><%= e.resumo || 'Sem resumo.' %></p>
+          <% if (e.arquivo_url) { %><div class="academy-card-footer"><a class="ui-btn ui-btn--outline" href="<%= e.arquivo_url %>" target="_blank" rel="noopener">Abrir PDF</a></div><% } %>
+        </article>
+      <% }) %>
     </div>
-  <% } else { %>
-    <p class="muted" style="margin-top:10px;">Todos os blocos foram concluídos. Faça a avaliação final de 10 questões.</p>
-  <% } %>
-</div>
+  </section>
 
-<div class="card" id="avaliacao-final" style="margin-top:12px;">
-  <div class="label">Avaliação final</div>
-  <p class="muted">Liberada após conclusão dos 4 blocos. Aprovação mínima: 70%.</p>
-  <form method="POST" action="/academia/avaliacoes/<%= curso.id %>/final" class="academia-form-stack">
-    <input type="number" step="0.1" min="0" max="100" name="nota" placeholder="Nota final" required />
-    <input type="number" step="0.1" min="0" max="100" name="percentual" placeholder="Percentual final" required />
-    <button class="btn" type="submit" <%= curso.blocoAtual ? 'disabled' : '' %>>Registrar avaliação final</button>
-  </form>
-</div>
-
-<div class="card" id="ebooks" style="margin-top:12px;">
-  <div class="label">E-book do curso</div>
-  <div class="academia-grid" style="margin-top:8px;">
-    <% (curso.ebooks || []).forEach(function(e){ %>
-      <div class="academia-card">
-        <h3><%= e.titulo %></h3>
-        <p class="muted"><%= e.resumo || 'Sem resumo.' %></p>
-        <% if (e.arquivo_url) { %><a class="btn btn-outline" href="<%= e.arquivo_url %>" target="_blank" rel="noopener">Abrir PDF</a><% } %>
-      </div>
-    <% }) %>
-  </div>
-</div>
-
-<div class="card" id="etapa-externa" style="margin-top:12px;">
-  <div class="label">Etapa externa complementar</div>
-  <% if (curso.podeLiberarEtapaExterna) { %>
-    <p>Etapa externa liberada.</p>
-  <% } else { %>
-    <p class="muted">A etapa externa só libera após aprovação da avaliação final.</p>
-  <% } %>
-</div>
+  <section class="academy-panel" id="etapa-externa">
+    <div class="academy-section-head"><div><h2>Etapa externa complementar</h2><p>Complemento externo liberado de acordo com a aprovação final.</p></div></div>
+    <% if (curso.podeLiberarEtapaExterna) { %>
+      <div class="academy-note"><strong>Etapa externa liberada.</strong> Consulte a área de Certificados Externos para acompanhar o comprovante.</div>
+      <div class="academia-actions"><a class="ui-btn ui-btn--outline" href="/academia/certificados-externos">Abrir certificados externos</a></div>
+    <% } else { %>
+      <div class="academy-note warning">A etapa externa só será liberada após aprovação da avaliação final.</div>
+    <% } %>
+  </section>
+</main>
 
 <script src="/js/academia.js"></script>
