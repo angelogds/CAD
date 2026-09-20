@@ -175,7 +175,7 @@ function updateLayoutPreview(cadData = {}) {
     : 'Nenhuma prancha salva';
 }
 
-function openLayoutPanel(cadData = {}) {
+function openLayoutPanel(cadData = {}, preferredFormat = '') {
   const panel = document.getElementById('cadRound3LayoutPanel');
   const format = document.getElementById('cadRound3PaperFormat');
   const scale = document.getElementById('cadRound3PaperScale');
@@ -183,9 +183,10 @@ function openLayoutPanel(cadData = {}) {
   if (!panel || !format || !scale || !custom) return;
 
   const previous = cadData?.manufacturing?.paperLayout || {};
-  format.value = ['A3', 'A4'].includes(String(previous.format || '').toUpperCase())
-    ? String(previous.format).toUpperCase()
-    : 'A3';
+  const requestedFormat = String(preferredFormat || '').toUpperCase();
+  format.value = ['A3', 'A4'].includes(requestedFormat)
+    ? requestedFormat
+    : (['A3', 'A4'].includes(String(previous.format || '').toUpperCase()) ? String(previous.format).toUpperCase() : 'A3');
 
   const denominator = Number(previous.denominator);
   const token = Number.isFinite(denominator) && denominator > 0 ? String(denominator) : 'AUTO';
@@ -362,6 +363,10 @@ async function initRound3() {
 
   document.querySelectorAll('[data-layout-tab]').forEach((button) => button.addEventListener('click', () => {
     const target = button.dataset.layoutTab;
+    if (target !== 'Model' && !layouts.hasLayout(target)) {
+      openLayoutPanel(cadData, target);
+      return;
+    }
     const ok = target === 'Model' ? layouts.switchModel() : (target === 'A4' ? layouts.switchA4() : layouts.switchA3());
     if (ok) setLayoutTab(target);
   }));
