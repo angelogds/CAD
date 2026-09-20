@@ -13,6 +13,14 @@ function normalizeItens(itens) {
   }));
 }
 
+function safeReturnTo(req, fallback) {
+  const target = String(req.body?.return_to || req.query?.return_to || '').trim();
+  if (!target || target.startsWith('//')) return fallback;
+  if (/^\/os\/\d+(?:[?#][A-Za-z0-9_=&.-]+)?$/.test(target)) return target;
+  if (/^\/solicitacoes\/\d+(?:[?#][A-Za-z0-9_=&.-]+)?$/.test(target)) return target;
+  return fallback;
+}
+
 function getContext(id, user) {
   const solicitacao = solicitacoesService.getSolicitacaoById(id);
   if (!solicitacao) throw new Error('Solicitação não encontrada');
@@ -63,7 +71,7 @@ function adicionarItem(req, res) {
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível adicionar o material.');
   }
-  return res.redirect(`/solicitacoes/${req.params.id}#materiais-solicitacao`);
+  return res.redirect(safeReturnTo(req, `/solicitacoes/${req.params.id}#materiais-solicitacao`));
 }
 
 function solicitarAlteracao(req, res) {
@@ -74,7 +82,7 @@ function solicitarAlteracao(req, res) {
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível solicitar a alteração.');
   }
-  return res.redirect(`/solicitacoes/${req.params.id}#materiais-solicitacao`);
+  return res.redirect(safeReturnTo(req, `/solicitacoes/${req.params.id}#materiais-solicitacao`));
 }
 
 function responderAlteracao(req, res, aprovar) {
@@ -85,7 +93,7 @@ function responderAlteracao(req, res, aprovar) {
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível responder à alteração.');
   }
-  return res.redirect(`/solicitacoes/${req.params.id}#consenso-itens`);
+  return res.redirect(safeReturnTo(req, `/solicitacoes/${req.params.id}#consenso-itens`));
 }
 
 function solicitarExclusao(req, res) {
@@ -96,7 +104,7 @@ function solicitarExclusao(req, res) {
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível solicitar a exclusão.');
   }
-  return res.redirect(`/solicitacoes/${req.params.id}#materiais-solicitacao`);
+  return res.redirect(safeReturnTo(req, `/solicitacoes/${req.params.id}#materiais-solicitacao`));
 }
 
 function responderExclusao(req, res, aprovar) {
@@ -107,7 +115,7 @@ function responderExclusao(req, res, aprovar) {
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível responder ao pedido de exclusão.');
   }
-  return res.redirect(`/solicitacoes/${req.params.id}#consenso-itens`);
+  return res.redirect(safeReturnTo(req, `/solicitacoes/${req.params.id}#consenso-itens`));
 }
 
 function aprovarAlteracao(req, res) { return responderAlteracao(req, res, true); }

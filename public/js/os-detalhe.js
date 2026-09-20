@@ -95,6 +95,29 @@
     more.textContent = expanded ? 'Ver mais' : 'Ver menos';
   });
 
+  const materialPanels = Array.from(document.querySelectorAll('[data-material-panel]'));
+  function setMaterialPanel(name, open) {
+    const target = materialPanels.find((panel) => panel.dataset.materialPanel === name);
+    if (!target) return;
+    materialPanels.forEach((panel) => {
+      if (panel !== target) panel.hidden = true;
+    });
+    target.hidden = !open;
+    if (open) target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  document.querySelectorAll('[data-material-toggle]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const name = button.dataset.materialToggle;
+      const target = materialPanels.find((panel) => panel.dataset.materialPanel === name);
+      setMaterialPanel(name, target ? target.hidden : false);
+    });
+  });
+
+  document.querySelectorAll('[data-material-close]').forEach((button) => {
+    button.addEventListener('click', () => setMaterialPanel(button.dataset.materialClose, false));
+  });
+
   const elapsed = document.getElementById('os-elapsed');
   function parseDate(value) {
     if (!value) return null;
