@@ -86,7 +86,7 @@ test('layout de custos permanece responsivo no painel e na ficha', () => {
   const pcmCss = read('public/css/pcm-dashboard.css');
   const equipCss = read('public/css/equipamentos-show.css');
   assert.match(pcmCss, /\.pcm-cost-kpis\{display:grid;grid-template-columns:repeat\(5/);
-  assert.match(pcmCss, /@media\(max-width:560px\)[\s\S]*\.pcm-quality-grid,\.pcm-cost-kpis\{grid-template-columns:1fr\}/);
+  assert.match(pcmCss, /@media\(max-width:560px\)[\s\S]*\.pcm-quality-grid,\.pcm-cost-kpis,\.pcm-reliability-kpis\{grid-template-columns:1fr\}/);
   assert.match(equipCss, /\.equipment-cost-grid\{display:grid;grid-template-columns:repeat\(5/);
   assert.match(equipCss, /@media\(max-width:420px\)[\s\S]*\.equipment-cost-grid/);
 });
