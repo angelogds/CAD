@@ -144,10 +144,11 @@ function manutencaoPdf(req, res, next) {
         report.summary([
           { label: 'COMPRADO NO PERÍODO', value: moneyCents(cards.custo_comprado_centavos) },
           { label: 'MATERIAIS RECEBIDOS', value: moneyCents(cards.custo_recebido_centavos) },
+          { label: 'CONSUMIDO NAS OS', value: moneyCents(cards.custo_consumido_centavos) },
           { label: 'A RECEBER', value: moneyCents(cards.custo_pendente_recebimento_centavos) },
           { label: 'EQUIPAMENTOS COM CUSTO', value: String(cards.equipamentos_com_custo || 0) },
         ]);
-        report.note('Custos calculados somente com itens marcados como COMPRADO nas Solicitações vinculadas ao equipamento: quantidade comprada × valor unitário. O valor recebido representa apenas a parcela já recebida; o saldo a receber não é contabilizado novamente.');
+        report.note('Comprado e recebido são derivados das Solicitações. Consumido usa somente baixas reais do estoque vinculadas a OS/equipamento e a um item de solicitação com valor unitário rastreável. Retiradas sem preço vinculado não são estimadas.');
 
         report.table({
           title: 'Custos por equipamento',
@@ -155,14 +156,16 @@ function manutencaoPdf(req, res, next) {
             { key: 'equipamento', label: 'Equipamento', width: 180 },
             { key: 'setor', label: 'Setor', width: 95 },
             { key: 'comprado', label: 'Comprado', width: 95, align: 'right' },
-            { key: 'recebido', label: 'Recebido', width: 95, align: 'right' },
-            { key: 'pendente', label: 'A receber', width: 85, align: 'right' },
+            { key: 'recebido', label: 'Recebido', width: 85, align: 'right' },
+            { key: 'consumido', label: 'Consumido', width: 85, align: 'right' },
+            { key: 'pendente', label: 'A receber', width: 80, align: 'right' },
           ],
           rows: (custos.byEquipment || []).slice(0, 15).map((item) => ({
             equipamento: item.equipamento_nome || '-',
             setor: item.setor || '-',
             comprado: moneyCents(item.comprado_centavos),
             recebido: moneyCents(item.recebido_centavos),
+            consumido: moneyCents(item.consumido_centavos),
             pendente: moneyCents(item.pendente_centavos),
           })),
           emptyText: 'Nenhuma compra vinculada a equipamento no período selecionado.',
@@ -173,13 +176,15 @@ function manutencaoPdf(req, res, next) {
           columns: [
             { key: 'mes', label: 'Mês', width: 130, align: 'center' },
             { key: 'comprado', label: 'Comprado', width: 140, align: 'right' },
-            { key: 'recebido', label: 'Recebido', width: 140, align: 'right' },
-            { key: 'pendente', label: 'A receber', width: 140, align: 'right' },
+            { key: 'recebido', label: 'Recebido', width: 120, align: 'right' },
+            { key: 'consumido', label: 'Consumido', width: 120, align: 'right' },
+            { key: 'pendente', label: 'A receber', width: 120, align: 'right' },
           ],
           rows: (custos.byMonth || []).slice(-12).map((item) => ({
             mes: item.mes || '-',
             comprado: moneyCents(item.comprado_centavos),
             recebido: moneyCents(item.recebido_centavos),
+            consumido: moneyCents(item.consumido_centavos),
             pendente: moneyCents(item.pendente_centavos),
           })),
           emptyText: 'Sem histórico mensal de custos para os filtros atuais.',
