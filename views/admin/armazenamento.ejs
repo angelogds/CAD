@@ -1,72 +1,104 @@
-<section class="container">
-  <h1>Armazenamento</h1>
-  
-  <div class="card" style="margin:14px 0;">
-    <h3>Diagnóstico geral</h3>
-    <ul>
-      <li>Espaço livre: <strong><%= formatBytes(diagnostic.free) %></strong> de <%= formatBytes(diagnostic.total) %></li>
-      <li>Banco SQLite: <strong><%= formatBytes(diagnostic.db) %></strong> (WAL <%= formatBytes(diagnostic.wal) %>)</li>
-      <li>Uploads: <strong><%= formatBytes(diagnostic.uploads) %></strong></li>
-      <li>Logs: <strong><%= formatBytes(diagnostic.logs) %></strong></li>
-      <li>Tmp: <strong><%= formatBytes(diagnostic.tmp) %></strong></li>
-      <li>PDFs: <strong><%= formatBytes(diagnostic.pdfs) %></strong></li>
-      <li>Sessões: <strong><%= diagnostic.sessions.total %></strong> total; <strong><%= diagnostic.sessions.expired %></strong> expiradas</li>
-    </ul>
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/admin-console.css?v=20260919-p5" />
+
+<main class="admin-console">
+  <header class="admin-hero">
+    <div>
+      <span class="admin-eyebrow">ADMINISTRAÇÃO • SAÚDE DO SISTEMA</span>
+      <h1>Armazenamento</h1>
+      <p>Diagnóstico do volume, SQLite, sessões, arquivos temporários e rotina de limpeza de mídia.</p>
+    </div>
+    <div class="admin-actions">
+      <% if (isAdmin) { %><a class="ui-btn ui-btn--outline" href="/admin/limpeza-volume">Limpeza de volume</a><% } %>
+    </div>
+  </header>
+
+  <section class="admin-metrics" aria-label="Diagnóstico de armazenamento">
+    <article class="admin-metric"><span>Espaço livre</span><strong><%= formatBytes(diagnostic.free) %></strong></article>
+    <article class="admin-metric"><span>SQLite</span><strong><%= formatBytes(diagnostic.db) %></strong></article>
+    <article class="admin-metric"><span>Uploads</span><strong><%= formatBytes(diagnostic.uploads) %></strong></article>
+    <article class="admin-metric"><span>Sessões expiradas</span><strong><%= diagnostic.sessions.expired %></strong></article>
+  </section>
+
+  <section class="admin-panel">
+    <div class="admin-section-head">
+      <div><h2>Diagnóstico geral</h2><p>Visão rápida dos principais componentes persistidos no volume.</p></div>
+      <span class="admin-badge info">WAL: <%= formatBytes(diagnostic.wal) %></span>
+    </div>
+
+    <div class="admin-storage-grid">
+      <article class="admin-metric"><span>Capacidade total</span><strong><%= formatBytes(diagnostic.total) %></strong></article>
+      <article class="admin-metric"><span>Logs</span><strong><%= formatBytes(diagnostic.logs) %></strong></article>
+      <article class="admin-metric"><span>Temporários</span><strong><%= formatBytes(diagnostic.tmp) %></strong></article>
+      <article class="admin-metric"><span>PDFs temporários</span><strong><%= formatBytes(diagnostic.pdfs) %></strong></article>
+      <article class="admin-metric"><span>Sessões</span><strong><%= diagnostic.sessions.total %></strong></article>
+      <article class="admin-metric"><span>Uploads OS</span><strong><%= (volumeBytes / 1024 / 1024).toFixed(2) %> MB</strong></article>
+    </div>
+
     <% if (isAdmin) { %>
-      <form method="post" action="/admin/armazenamento/limpar-sessoes" style="display:inline"><button class="btn">Limpar sessões expiradas</button></form>
-      <form method="post" action="/admin/armazenamento/limpar-temporarios" style="display:inline"><button class="btn">Limpar temporários/logs/PDFs</button></form>
-      <form method="post" action="/admin/armazenamento/checkpoint-wal" style="display:inline"><button class="btn">Checkpoint WAL</button></form>
-      <form method="post" action="/admin/armazenamento/otimizar" style="display:inline" onsubmit="return confirm('Executar VACUUM somente se houver espaço suficiente. Confirmar?')"><button class="btn btn-primary">Otimizar SQLite</button></form>
+      <div class="admin-cleanup-actions">
+        <form method="post" action="/admin/armazenamento/limpar-sessoes" onsubmit="return confirm('Remover somente sessões expiradas?');">
+          <button class="ui-btn ui-btn--outline" type="submit">Limpar sessões expiradas</button>
+        </form>
+        <form method="post" action="/admin/armazenamento/limpar-temporarios" onsubmit="return confirm('Limpar temporários, logs e PDFs temporários?');">
+          <button class="ui-btn ui-btn--outline" type="submit">Limpar temporários</button>
+        </form>
+        <form method="post" action="/admin/armazenamento/checkpoint-wal" onsubmit="return confirm('Executar checkpoint WAL agora?');">
+          <button class="ui-btn ui-btn--outline" type="submit">Checkpoint WAL</button>
+        </form>
+        <form method="post" action="/admin/armazenamento/otimizar" onsubmit="return confirm('Executar VACUUM somente se houver espaço suficiente. Confirmar?');">
+          <button class="ui-btn ui-btn--primary" type="submit">Otimizar SQLite</button>
+        </form>
+      </div>
     <% } %>
-  </div>
+  </section>
 
-  <p>Fotos e vídeos de OS com mais de <%= env.retentionDays %> dias são removidos automaticamente todo dia <%= env.dayOfMonth %> do mês. As informações escritas das ordens de serviço permanecem preservadas.</p>
-  <ul>
-    <li>Uso atual de volume (uploads OS): <strong><%= (volumeBytes / 1024 / 1024).toFixed(2) %> MB</strong></li>
-    <li>Última limpeza: <strong><%= last ? last.data_execucao : 'Nunca' %></strong></li>
-    <li>Arquivos removidos (última): <strong><%= last ? last.arquivos_removidos : 0 %></strong></li>
-    <li>Espaço liberado (última): <strong><%= last ? (last.espaco_liberado_bytes / 1024 / 1024).toFixed(2) : '0.00' %> MB</strong></li>
-    <li>Próximo agendamento: <strong><%= nextRun %></strong></li>
-  </ul>
+  <section class="admin-panel">
+    <div class="admin-section-head">
+      <div><h2>Limpeza automática de mídia</h2><p>Fotos e vídeos antigos de OS podem ser removidos sem apagar textos ou o banco de dados.</p></div>
+      <span class="admin-badge">Retenção: <%= env.retentionDays %> dias</span>
+    </div>
 
-  <form method="post" action="/admin/armazenamento/limpeza-midia" onsubmit="return confirm('Confirmar execução da limpeza de mídia agora?');" style="margin-bottom:20px;">
-    <button type="submit" class="btn btn-primary">Executar limpeza de mídia agora</button>
-  </form>
+    <div class="admin-storage-grid">
+      <article class="admin-metric"><span>Última limpeza</span><strong><%= last ? last.data_execucao : 'Nunca' %></strong></article>
+      <article class="admin-metric"><span>Arquivos removidos</span><strong><%= last ? last.arquivos_removidos : 0 %></strong></article>
+      <article class="admin-metric"><span>Espaço liberado</span><strong><%= last ? (last.espaco_liberado_bytes / 1024 / 1024).toFixed(2) : '0.00' %> MB</strong></article>
+      <article class="admin-metric"><span>Próximo agendamento</span><strong><%= nextRun %></strong></article>
+    </div>
 
-  <h3>Histórico de limpezas</h3>
-  <table class="table" style="width:100%; border-collapse:collapse;">
-    <thead>
-      <tr>
-        <th>Mês</th>
-        <th>Data da execução</th>
-        <th>Tipo</th>
-        <th>Arquivos removidos</th>
-        <th>Espaço liberado</th>
-        <th>Status</th>
-        <th>PDF</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% if (!history.length) { %>
-        <tr><td colspan="7">Sem registros.</td></tr>
-      <% } %>
-      <% history.forEach((h) => { %>
-        <tr>
-          <td><%= h.mes_referencia %></td>
-          <td><%= h.data_execucao %></td>
-          <td><%= h.tipo_execucao || 'AUTOMATICA_MENSAL' %></td>
-          <td><%= h.arquivos_removidos %></td>
-          <td><%= (Number(h.espaco_liberado_bytes || 0) / 1024 / 1024).toFixed(2) %> MB</td>
-          <td><%= h.status %></td>
-          <td>
-            <% if (h.caminho_pdf) { %>
-              <a class="btn" href="/admin/armazenamento/limpeza-midia/<%= h.id %>/pdf">Baixar relatório PDF</a>
-            <% } else { %>
-              -
-            <% } %>
-          </td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
-</section>
+    <div class="admin-note">A rotina remove apenas mídia elegível conforme retenção. As informações escritas das Ordens de Serviço permanecem preservadas.</div>
+
+    <div class="admin-cleanup-actions">
+      <form method="post" action="/admin/armazenamento/limpeza-midia" onsubmit="return confirm('Confirmar execução da limpeza de mídia agora?');">
+        <button type="submit" class="ui-btn ui-btn--primary">Executar limpeza agora</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="admin-panel">
+    <div class="admin-section-head">
+      <div><h2>Histórico de limpezas</h2><p>Registro operacional com relatório PDF quando disponível.</p></div>
+      <span class="admin-badge"><%= history.length %> registro(s)</span>
+    </div>
+
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Mês</th><th>Execução</th><th>Tipo</th><th>Removidos</th><th>Espaço</th><th>Status</th><th>PDF</th></tr></thead>
+        <tbody>
+          <% if (!history.length) { %><tr><td colspan="7" class="admin-empty">Sem registros.</td></tr><% } %>
+          <% history.forEach((h) => { %>
+            <tr>
+              <td data-label="Mês"><%= h.mes_referencia %></td>
+              <td data-label="Execução"><%= h.data_execucao %></td>
+              <td data-label="Tipo"><%= h.tipo_execucao || 'AUTOMATICA_MENSAL' %></td>
+              <td data-label="Removidos"><%= h.arquivos_removidos %></td>
+              <td data-label="Espaço"><%= (Number(h.espaco_liberado_bytes || 0) / 1024 / 1024).toFixed(2) %> MB</td>
+              <td data-label="Status"><span class="admin-badge <%= String(h.status || '').toUpperCase()==='SUCESSO' ? 'good' : '' %>"><%= h.status %></span></td>
+              <td data-label="PDF"><% if (h.caminho_pdf) { %><a class="ui-btn ui-btn--outline ui-btn--compact" href="/admin/armazenamento/limpeza-midia/<%= h.id %>/pdf">Baixar PDF</a><% } else { %>-<% } %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>

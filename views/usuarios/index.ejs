@@ -1,162 +1,136 @@
 <% layout('layout') %>
+<link rel="stylesheet" href="/css/admin-console.css?v=20260919-p5" />
+<%
+  const kpi = indicadores || {};
+  const statusAtual = String(status || 'ativos');
+%>
 
-<div class="page-head">
-  <div>
-    <h1>Usuários</h1>
-    <p class="muted">Gerencie os acessos do sistema por perfil e setor. Usuários com histórico vinculado são arquivados, não destruídos.</p>
-  </div>
+<main class="admin-console">
+  <header class="admin-hero">
+    <div>
+      <span class="admin-eyebrow">ADMINISTRAÇÃO • ACESSOS</span>
+      <h1>Usuários do sistema</h1>
+      <p>Gerencie acessos por perfil e setor. Usuários com histórico vinculado são arquivados para preservar rastreabilidade.</p>
+    </div>
+    <div class="admin-actions">
+      <a class="ui-btn ui-btn--primary" href="/usuarios/novo">+ Novo usuário</a>
+    </div>
+  </header>
 
-  <a class="btn btn-green" href="/usuarios/novo">+ Novo Usuário</a>
-</div>
+  <section class="admin-kpis" aria-label="Indicadores de usuários">
+    <article class="admin-kpi"><span>Usuários ativos</span><strong><%= kpi.ativos || 0 %></strong><small>Acesso liberado ao sistema</small></article>
+    <article class="admin-kpi"><span>Arquivados</span><strong><%= kpi.arquivados || 0 %></strong><small>Histórico preservado</small></article>
+    <article class="admin-kpi"><span>Com WhatsApp</span><strong><%= kpi.comWhatsapp || 0 %></strong><small>Podem receber notificações</small></article>
+    <article class="admin-kpi <%= Number(kpi.semWhatsapp || 0) > 0 ? 'is-alert' : '' %>"><span>Sem WhatsApp</span><strong><%= kpi.semWhatsapp || 0 %></strong><small>Sem canal de notificação</small></article>
+    <article class="admin-kpi"><span>Perfis ativos</span><strong><%= kpi.perfisAtivos || 0 %></strong><small>Tipos de acesso em uso</small></article>
+  </section>
 
-<div class="card" style="max-width: 1100px;">
-  <form method="GET" action="/usuarios">
-    <div class="grid-2">
-      <div>
-        <div class="label">Buscar</div>
-        <input class="input" name="q" value="<%= q || '' %>" placeholder="Buscar por nome ou e-mail" />
-      </div>
+  <section class="admin-panel">
+    <div class="admin-section-head">
+      <div><h2>Localizar usuários</h2><p>Filtre por nome, e-mail, perfil ou situação do acesso.</p></div>
+      <span class="admin-badge"><%= lista?.length || 0 %> resultado(s)</span>
+    </div>
 
-      <div>
-        <div class="label">Perfil</div>
-        <select class="input" name="role">
+    <form method="GET" action="/usuarios" class="admin-filter">
+      <label class="admin-field">
+        <span>Buscar</span>
+        <input name="q" value="<%= q || '' %>" placeholder="Nome ou e-mail">
+      </label>
+      <label class="admin-field">
+        <span>Perfil</span>
+        <select name="role">
           <option value="">Todos os perfis</option>
           <% (ROLES || []).forEach(r => { %>
             <option value="<%= r.key %>" <%= (role === r.key) ? "selected" : "" %>><%= r.label %></option>
           <% }) %>
         </select>
-      </div>
-
-      <div>
-        <div class="label">Situação</div>
-        <select class="input" name="status">
-          <option value="ativos" <%= status !== 'arquivados' ? 'selected' : '' %>>Usuários ativos</option>
-          <option value="arquivados" <%= status === 'arquivados' ? 'selected' : '' %>>Usuários arquivados</option>
+      </label>
+      <label class="admin-field">
+        <span>Situação</span>
+        <select name="status">
+          <option value="ativos" <%= statusAtual !== 'arquivados' ? 'selected' : '' %>>Usuários ativos</option>
+          <option value="arquivados" <%= statusAtual === 'arquivados' ? 'selected' : '' %>>Usuários arquivados</option>
         </select>
+      </label>
+      <div class="admin-actions">
+        <button class="ui-btn ui-btn--primary" type="submit">Filtrar</button>
+        <a class="ui-btn ui-btn--secondary" href="/usuarios">Limpar</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="admin-panel">
+    <div class="admin-section-head">
+      <div>
+        <h2><%= statusAtual === 'arquivados' ? 'Usuários arquivados' : 'Usuários ativos' %></h2>
+        <p><%= statusAtual === 'arquivados' ? 'Cadastros preservados por vínculo histórico.' : 'Cadastros com acesso ativo ao sistema.' %></p>
+      </div>
+      <div class="admin-actions">
+        <a class="ui-btn ui-btn--soft ui-btn--compact" href="/usuarios">Ativos</a>
+        <a class="ui-btn ui-btn--outline ui-btn--compact" href="/usuarios?status=arquivados">Arquivados</a>
       </div>
     </div>
 
-    <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-      <button class="btn btn-green btn-sm" type="submit">Filtrar</button>
-      <a class="btn btn-ghost btn-sm" href="/usuarios">Ativos</a>
-      <a class="btn btn-ghost btn-sm" href="/usuarios?status=arquivados">Arquivados</a>
-    </div>
-  </form>
-</div>
-
-<div class="card" style="margin-top:12px;">
-  <div class="table-wrap">
-    <table class="table">
-      <thead>
-        <tr>
-          <th style="width:80px;">#</th>
-          <th>Nome</th>
-          <th>E-mail</th>
-          <th style="width:180px;">Perfil</th>
-          <th style="width:120px;">Situação</th>
-          <th style="width:170px;">WhatsApp</th>
-          <th style="width:180px;">Criado</th>
-          <th style="width:150px; text-align:right;">Ações</th>
-        </tr>
-      </thead>
-
-      <tbody>
-        <% if (!lista || !lista.length) { %>
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
           <tr>
-            <td colspan="8" class="muted" style="text-align:center; padding:18px;">
-              Nenhum usuário encontrado.
-            </td>
+            <th>Usuário</th>
+            <th>E-mail</th>
+            <th>Perfil</th>
+            <th>Situação</th>
+            <th>WhatsApp</th>
+            <th>Criado</th>
+            <th>Ações</th>
           </tr>
-        <% } else { %>
-          <% (lista || []).forEach(u => { %>
-            <% const arquivado = Number(u.ativo ?? 1) === 0 || !!u.deleted_at; %>
-            <tr>
-              <td><%= u.id %></td>
-              <td><%= u.name %></td>
-              <td><%= u.email %></td>
-              <td>
-                <span class="pill-tag pill-gray"><%= (u.role || '').toUpperCase() %></span>
-              </td>
-              <td>
-                <% if (arquivado) { %>
-                  <span class="pill-tag pill-gray">Arquivado</span>
-                <% } else { %>
-                  <span class="pill-tag pill-green">Ativo</span>
-                <% } %>
-              </td>
-              <td>
-                <% if (u.telefone_whatsapp) { %>
-                  <span class="pill-tag pill-green">🟢 WhatsApp</span>
-                <% } else { %>
-                  <span class="pill-tag pill-gray">Sem WhatsApp</span>
-                <% } %>
-              </td>
-              <td><%= u.created_at ? fmtBR(u.created_at) : '-' %></td>
-              <td style="text-align:right;">
-                <div class="user-actions">
-                  <a class="btn btn-sm user-action-btn user-action-edit" href="/usuarios/<%= u.id %>/editar">Editar</a>
-                  <% if (isAdmin) { %>
-                    <% if (arquivado) { %>
-                      <form method="POST" action="/usuarios/<%= u.id %>/restaurar" onsubmit="return confirm('Restaurar o acesso de <%= u.name %>?');">
-                        <button class="btn btn-sm user-action-btn user-action-restore" type="submit">Restaurar</button>
-                      </form>
-                    <% } else { %>
-                      <form method="POST" action="/usuarios/<%= u.id %>/excluir" onsubmit="return confirm('Remover o usuário <%= u.name %>? Se houver histórico vinculado, ele será arquivado para preservar os registros.');">
-                        <button class="btn btn-sm user-action-btn user-action-delete" type="submit">Remover</button>
-                      </form>
+        </thead>
+        <tbody>
+          <% if (!lista || !lista.length) { %>
+            <tr><td colspan="7" class="admin-empty">Nenhum usuário encontrado.</td></tr>
+          <% } else { %>
+            <% (lista || []).forEach(u => { %>
+              <% const arquivado = Number(u.ativo ?? 1) === 0 || !!u.deleted_at; %>
+              <tr>
+                <td data-label="Usuário">
+                  <div class="admin-user-cell">
+                    <div class="admin-user-avatar">
+                      <% if (u.photo_path && (typeof attachmentExists !== "function" || attachmentExists(u.photo_path))) { %>
+                        <img src="<%= u.photo_path %>" alt="">
+                      <% } else { %>
+                        <span><%= String(u.name || '?').trim().slice(0,1).toUpperCase() %></span>
+                      <% } %>
+                    </div>
+                    <div><strong><%= u.name %></strong><small>#<%= u.id %></small></div>
+                  </div>
+                </td>
+                <td data-label="E-mail"><%= u.email %></td>
+                <td data-label="Perfil"><span class="admin-badge info"><%= (u.role || '').toUpperCase() %></span></td>
+                <td data-label="Situação"><span class="admin-badge <%= arquivado ? '' : 'good' %>"><%= arquivado ? 'Arquivado' : 'Ativo' %></span></td>
+                <td data-label="WhatsApp">
+                  <% if (u.telefone_whatsapp) { %><span class="admin-badge good">Configurado</span><small><%= u.telefone_whatsapp %></small><% } else { %><span class="admin-badge warn">Não informado</span><% } %>
+                </td>
+                <td data-label="Criado"><%= u.created_at ? fmtBR(u.created_at) : '-' %></td>
+                <td data-label="Ações">
+                  <div class="admin-user-actions">
+                    <a class="ui-btn ui-btn--outline ui-btn--compact" href="/usuarios/<%= u.id %>/editar">Editar</a>
+                    <% if (isAdmin) { %>
+                      <% if (arquivado) { %>
+                        <form method="POST" action="/usuarios/<%= u.id %>/restaurar" onsubmit="return confirm('Restaurar o acesso de <%= u.name %>?');">
+                          <button class="ui-btn ui-btn--soft ui-btn--compact" type="submit">Restaurar</button>
+                        </form>
+                      <% } else { %>
+                        <form method="POST" action="/usuarios/<%= u.id %>/excluir" onsubmit="return confirm('Remover o usuário <%= u.name %>? Se houver histórico vinculado, ele será arquivado para preservar os registros.');">
+                          <button class="ui-btn ui-btn--danger-soft ui-btn--compact" type="submit">Remover</button>
+                        </form>
+                      <% } %>
                     <% } %>
-                  <% } %>
-                </div>
-              </td>
-            </tr>
-          <% }) %>
-        <% } %>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<style>
-  .user-actions{
-    display:flex;
-    flex-direction:column;
-    align-items:flex-end;
-    gap:6px;
-  }
-  .user-actions form{ margin:0; }
-  .user-action-btn{
-    min-width:88px;
-    font-weight:900;
-    transition:all .15s ease;
-  }
-  .user-action-edit{
-    background:#fff;
-    border-color:#d1d5db;
-    color:#0f172a;
-  }
-  .user-action-edit:hover{
-    background:#e9f9ef;
-    border-color:#16a34a;
-    color:#166534;
-  }
-  .user-action-delete{
-    background:#fff;
-    border-color:#d1d5db;
-    color:#0f172a;
-  }
-  .user-action-delete:hover{
-    background:#fff1f2;
-    border-color:#ef4444;
-    color:#b91c1c;
-  }
-  .user-action-restore{
-    background:#fff;
-    border-color:#d1d5db;
-    color:#0f172a;
-  }
-  .user-action-restore:hover{
-    background:#eff6ff;
-    border-color:#2563eb;
-    color:#1d4ed8;
-  }
-</style>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>

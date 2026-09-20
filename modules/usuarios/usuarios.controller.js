@@ -46,6 +46,7 @@ function list(req, res) {
   const status = String(req.query.status || "ativos").toLowerCase() === "arquivados" ? "arquivados" : "ativos";
 
   const lista = service.list({ q, role, status });
+  const indicadores = service.getSummary();
 
   return res.render("usuarios/index", {
     title: "Usuários",
@@ -54,6 +55,7 @@ function list(req, res) {
     role,
     status,
     ROLES: ROLES_WITH_CONTEXT,
+    indicadores,
   });
 }
 
