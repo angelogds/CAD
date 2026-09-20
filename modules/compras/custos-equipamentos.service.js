@@ -364,12 +364,44 @@ function getEquipmentDetail(equipamentoId, filters = {}) {
 
 function getOSConsumption(osId, filters = {}) {
   const id = Number(osId);
-  if (!id) return { total_centavos: 0, movimentos: 0, items: [] };
-  const consumo = getConsumptionAnalytics({ ...filters, os_id: id });
+  const exp = movementExpressions();
+  const movCols = columns('estoque_movimentos');
+  if (!id || !exp || !movCols.has('os_id')) return { total_centavos: 0, movimentos: 0, items: [] };
+
+  const where = ["UPPER(COALESCE(m.tipo,'')) LIKE 'SAIDA%'", 'm.os_id=@os_id'];
+  const params = { os_id: id };
+  const inicio = normalizeDate(filters.data_inicial || filters.inicio || filters.data_inicio);
+  const fim = normalizeDate(filters.data_final || filters.fim || filters.data_fim);
+  if (inicio) { where.push(`date(${exp.dataMov}) >= date(@data_inicial)`); params.data_inicial = inicio; }
+  if (fim) { where.push(`date(${exp.dataMov}) <= date(@data_final)`); params.data_final = fim; }
+
+  const items = db.prepare(`
+    SELECT m.id movimento_id,m.os_id,m.equipamento_id,m.solicitacao_id,m.solicitacao_item_id,
+      ${exp.dataMov} data_mov,ABS(COALESCE(m.quantidade,0)) quantidade,
+      ei.codigo estoque_codigo,ei.nome item_nome,ei.unidade,
+      (${exp.custoUnitCentavos}) valor_unitario_centavos,
+      ROUND(ABS(COALESCE(m.quantidade,0)) * (${exp.custoUnitCentavos})) total_centavos,
+      (${exp.custoOrigem}) custo_origem,
+      s.numero solicitacao_numero,${exp.fornecedorNome} fornecedor_nome
+    FROM estoque_movimentos m
+    JOIN estoque_itens ei ON ei.id=m.item_id
+    ${exp.solicitacaoItemJoin}
+    ${exp.solicitacaoJoin}
+    ${exp.fornecedorJoin}
+    WHERE ${where.join(' AND ')}
+    ORDER BY datetime(${exp.dataMov}) DESC,m.id DESC
+    LIMIT 300
+  `).all(params).map((row) => ({
+    ...row,
+    quantidade: Number(row.quantidade || 0),
+    valor_unitario_centavos: Number(row.valor_unitario_centavos || 0),
+    total_centavos: Number(row.total_centavos || 0),
+  }));
+
   return {
-    total_centavos: Number(consumo.totals.consumido_centavos || 0),
-    movimentos: Number(consumo.totals.consumo_movimentos || 0),
-    items: consumo.items,
+    total_centavos: items.reduce((sum, row) => sum + Number(row.total_centavos || 0), 0),
+    movimentos: items.length,
+    items,
   };
 }
 
