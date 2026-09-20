@@ -380,6 +380,39 @@ function scheduleCloseEnrichment(id, payload) {
   });
 }
 
+function osAddEvidence(req, res) {
+  const id = Number(req.params.id);
+  const userId = req.session?.user?.id || null;
+
+  try {
+    const osAtual = service.getOSById(id);
+    if (!osAtual) {
+      req.flash("error", "OS não encontrada.");
+      return res.redirect("/os");
+    }
+
+    const files = mapFilesToPublic(req.files?.fechamento_fotos || []);
+    if (!files.length) {
+      req.flash("error", "Selecione pelo menos uma foto ou vídeo para anexar.");
+      return res.redirect(`/os/${id}#evidencias`);
+    }
+
+    service.addFotosAberturaFechamento({
+      osId: id,
+      files,
+      tipo: "FECHAMENTO",
+      userId,
+    });
+
+    req.flash("success", `Evidência anexada com sucesso (${files.length} arquivo(s)).`);
+    return res.redirect(`/os/${id}#evidencias`);
+  } catch (err) {
+    console.error("[OS_FAST][EVIDENCE_ERROR]", err?.stack || err);
+    req.flash("error", err?.message || "Não foi possível anexar a evidência.");
+    return res.redirect(`/os/${id}#evidencias`);
+  }
+}
+
 function osClose(req, res) {
   const id = Number(req.params.id);
   const user = req.session?.user || null;
@@ -404,17 +437,14 @@ function osClose(req, res) {
     }
 
     const fotosFechamento = mapFilesToPublic(req.files?.fechamento_fotos || []);
-    if (!fotosFechamento.length) {
-      req.flash("error", "Adicione pelo menos uma mídia (foto ou vídeo) de fechamento para concluir a OS.");
-      return res.redirect(`/os/${id}`);
+    if (fotosFechamento.length) {
+      service.addFotosAberturaFechamento({
+        osId: id,
+        files: fotosFechamento,
+        tipo: "FECHAMENTO",
+        userId: user?.id || null,
+      });
     }
-
-    service.addFotosAberturaFechamento({
-      osId: id,
-      files: fotosFechamento,
-      tipo: "FECHAMENTO",
-      userId: user?.id || null,
-    });
 
     const textoDigitado = normalizeText(req.body?.texto_digitado);
     const transcricaoAudio = normalizeText(req.body?.transcricao_audio);
@@ -488,6 +518,7 @@ function osClose(req, res) {
 module.exports = {
   osCreate,
   osClose,
+  osAddEvidence,
   _test: {
     normalizeGrau,
     normalizeTipoOS,
