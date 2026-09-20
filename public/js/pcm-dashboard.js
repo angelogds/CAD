@@ -137,6 +137,7 @@
     safeChart('chartCustosMes',()=>line('chartCustosMes',meses.map(x=>x.mes),[{label:'Consumido',data:meses.map(x=>x.consumido_centavos),color:COLORS.green,fillFrom:'rgba(21,153,71,.03)',fillTo:'rgba(21,153,71,.20)'},{label:'Comprado',data:meses.map(x=>x.comprado_centavos),color:COLORS.orange,fill:false},{label:'Recebido',data:meses.map(x=>x.recebido_centavos),color:COLORS.blue,fill:false}],{currency:true}));
   }
   function renderCharts(){
+    if(!ensureChartRuntime())return;
     if(state.chartFrame&&typeof cancelAnimationFrame==='function')cancelAnimationFrame(state.chartFrame);
     const run=()=>{state.chartFrame=null;renderChartsNow();};
     if(typeof requestAnimationFrame==='function')state.chartFrame=requestAnimationFrame(()=>requestAnimationFrame(run));
