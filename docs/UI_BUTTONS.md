@@ -48,7 +48,7 @@ cotação e consenso), acompanhamento da Diretoria e telas secundárias de Preve
 Nova Preventiva, Preventivas Programadas e Eleger Mecânicos compartilham o mesmo
 layout secundário responsivo, isolado do dashboard principal.
 
-OS, Equipamentos, Demandas, Fornecedores, PCM, Motores e Academia da Manutenção também usam a base compartilhada.
+OS, Equipamentos, Demandas, Fornecedores, PCM, Motores, Academia da Manutenção e Administração/Usuários também usam a base compartilhada.
 Colaboradores/RH passa a usar a mesma base nas ações da listagem, cadastro rápido
 e ficha mestre; o RH direciona a abertura nominal para a ficha canônica
 `/colaboradores/:id`, mantendo a rota histórica apenas como compatibilidade.
