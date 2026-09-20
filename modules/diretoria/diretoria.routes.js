@@ -26,6 +26,6 @@ router.post('/compras/:id/aprovar-itens-cotados', requireLogin, requireRole(DIRE
 router.get('/manutencao', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencao);
 router.get('/manutencao/dados', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencaoDados);
 router.get('/manutencao/pdf', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencaoPdf);
-router.get('/manutencao/excel', requireLogin, requireRole(DIRETORIA_MANUTENCAO), pcmCtrl.dashboardExcel);
+router.get('/manutencao/excel', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencaoExcel);
 
 module.exports = router;
