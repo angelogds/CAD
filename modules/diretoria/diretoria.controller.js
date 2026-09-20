@@ -22,6 +22,7 @@ function fallbackMaintenanceDashboard() {
       campos_pendentes: [],
     },
     custos: { totals: {}, byEquipment: [], byMonth: [] },
+    confiabilidade: { status: 'SEM_DADOS', status_label: 'Dados insuficientes', publicado: false, byEquipment: [] },
     erros: ['Não foi possível carregar todos os indicadores da manutenção.'],
   };
 }
@@ -316,9 +317,11 @@ function tableHtml(title, rows = []) {
 function manutencaoExcel(req, res) {
   const data = manutencaoExecutivaService.getDashboard(req.query, req.session?.user?.id || null);
   pcmService.logDashboardReport(req.session?.user?.id || null, 'EXCEL_DIRETORIA', data.filtros);
+  const reliabilitySummary = { ...(data.confiabilidade || {}) };
+  delete reliabilitySummary.byEquipment;
   const sheets = [
     tableHtml('Resumo', [data.cards || {}]),
-    tableHtml('Confiabilidade', [data.confiabilidade || {}]),
+    tableHtml('Confiabilidade', [reliabilitySummary]),
     tableHtml('Confiabilidade por equipamento', data.confiabilidade?.byEquipment || []),
     tableHtml('Custos por equipamento', data.custos?.byEquipment || []),
     tableHtml('Custos por mês', data.custos?.byMonth || []),
