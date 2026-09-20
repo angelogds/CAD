@@ -74,10 +74,174 @@
     <section id="panel-justificativa" class="os-tab-panel" role="tabpanel" aria-labelledby="tab-justificativa"><div data-module-slot="justificativa-andamento"></div></section>
     <% if (canAutoAssign && !isOSFechada) { %><section id="panel-redistribuicao" class="os-tab-panel" role="tabpanel" aria-labelledby="tab-redistribuicao" hidden><div data-module-slot="redistribuicao-equipe"></div></section><% } %>
     <section id="panel-materiais" class="os-tab-panel" role="tabpanel" aria-labelledby="tab-materiais" hidden>
-      <% if (!isOSFechada && canRegisterAndamento && statusMeta.phase === 'material') { %><form method="POST" action="/os/<%= os.id %>/material-chegou" class="material-arrived"><button class="btn btn-green" type="submit">Material chegou</button></form><% } %><% if (!materialRequest) { %><div class="empty-state"><strong>Nenhuma solicitação de material vinculada a esta OS.</strong><% if (!isOSFechada && canExecuteOS) { %><a class="btn btn-green" href="/solicitacoes/nova?os_id=<%= os.id %>">Criar solicitação de material</a><% } %></div><% } else { const itensMaterial = materialRequest.itens || []; %>
-      <div class="material-head"><div><h3>Solicitação <%= materialRequest.numero || '#' + materialRequest.id %></h3><p><%= materialRequest.descricao || materialRequest.justificativa || 'Não registrado' %></p></div><a class="btn btn-outline" href="/solicitacoes/<%= materialRequest.id %>">Abrir solicitação</a></div>
-      <div class="material-meta"><span><b>Status</b><%= materialRequest.status || 'Não registrado' %></span><span><b>Data</b><%= materialRequest.created_at ? fmtBR(materialRequest.created_at) : 'Não registrado' %></span><span><b>Solicitante</b><%= materialRequest.solicitante_nome || 'Não registrado' %></span><span><b>Itens</b><%= itensMaterial.length %></span></div>
-      <div class="material-table-wrap"><table class="tabela-compacta material-table"><thead><tr><th>Item / descrição</th><th>Un.</th><th>Solicitada</th><th>Cotada</th><th>Comprada</th><th>Recebida</th><th>Utilizada</th><th>Valor unit.</th><th>Valor total</th><th>Fornecedor</th><th>Situação</th></tr></thead><tbody><% itensMaterial.forEach((item)=>{ const hasPrice=item.valor_unitario_centavos!==null&&item.valor_unitario_centavos!==undefined; const qtd=Number(item.qtd_comprada ?? item.qtd_solicitada); %><tr><td data-label="Item"><b><%= item.item_nome || ('#'+item.id) %></b><br><small><%= item.item_descricao || 'Não registrado' %></small></td><td data-label="Un."><%= item.unidade || '—' %></td><td data-label="Solicitada"><%= item.qtd_solicitada ?? '—' %></td><td data-label="Cotada"><%= item.status_cotacao === 'COTADO' ? (item.qtd_solicitada ?? '—') : '—' %></td><td data-label="Comprada"><%= item.qtd_comprada ?? '—' %></td><td data-label="Recebida"><%= item.qtd_recebida_total ?? '—' %></td><td data-label="Utilizada"><%= item.qtd_utilizada ?? '—' %></td><td data-label="Valor unit."><%= hasPrice ? (Number(item.valor_unitario_centavos)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—' %></td><td data-label="Valor total"><%= hasPrice && Number.isFinite(qtd) ? (Number(item.valor_unitario_centavos)*qtd/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—' %></td><td data-label="Fornecedor"><%= item.fornecedor_nome || '—' %></td><td data-label="Situação"><%= item.status_compra || item.status_cotacao || item.status_item || 'Não registrado' %></td></tr><% }) %></tbody></table></div><% } %>
+      <% if (!isOSFechada && canRegisterAndamento && statusMeta.phase === 'material') { %>
+        <form method="POST" action="/os/<%= os.id %>/material-chegou" class="material-arrived">
+          <button class="ui-btn ui-btn--primary" type="submit">Material chegou</button>
+        </form>
+      <% } %>
+
+      <% if (!materialRequest) { %>
+        <div class="empty-state">
+          <div>
+            <strong>Nenhuma solicitação de material vinculada a esta OS.</strong>
+            <small>Crie a solicitação a partir da própria OS para manter equipamento, histórico e compras no mesmo fluxo.</small>
+          </div>
+          <% if (!isOSFechada && canExecuteOS) { %>
+            <a class="ui-btn ui-btn--primary" href="/solicitacoes/nova?os_id=<%= os.id %>">Criar solicitação de material</a>
+          <% } %>
+        </div>
+      <% } else { %>
+        <%
+          const itensMaterial = materialRequest.itens || [];
+          const pendingMaterialChanges = new Set(
+            (materialItemChanges || [])
+              .filter((change) => String(change.status || '').toUpperCase() === 'PENDENTE')
+              .map((change) => Number(change.solicitacao_item_id))
+          );
+        %>
+
+        <div class="material-head">
+          <div>
+            <h3>Solicitação <%= materialRequest.numero || '#' + materialRequest.id %></h3>
+            <p><%= materialRequest.descricao || materialRequest.justificativa || 'Não registrado' %></p>
+          </div>
+          <div class="material-head-actions">
+            <% if (canManageMaterialRequest && !isOSFechada) { %>
+              <button class="ui-btn ui-btn--primary ui-btn--compact" type="button" data-material-toggle="novo">+ Adicionar material</button>
+            <% } %>
+            <a class="ui-btn ui-btn--outline ui-btn--compact" href="/solicitacoes/<%= materialRequest.id %>">Abrir solicitação</a>
+          </div>
+        </div>
+
+        <div class="material-meta">
+          <span><b>Status</b><%= materialRequest.status || 'Não registrado' %></span>
+          <span><b>Data</b><%= materialRequest.created_at ? fmtBR(materialRequest.created_at) : 'Não registrado' %></span>
+          <span><b>Solicitante</b><%= materialRequest.solicitante_nome || 'Não registrado' %></span>
+          <span><b>Itens</b><%= itensMaterial.length %></span>
+        </div>
+
+        <% if (canManageMaterialRequest && !isOSFechada) { %>
+          <div class="material-quick-panel" data-material-panel="novo" hidden>
+            <div class="material-quick-head">
+              <div>
+                <strong>Adicionar material na mesma solicitação</strong>
+                <small>O novo item entra individualmente em cotação sem regredir o status dos itens já comprados.</small>
+              </div>
+            </div>
+            <form method="POST" action="/solicitacoes/<%= materialRequest.id %>/itens/adicionar" class="material-quick-form">
+              <input type="hidden" name="return_to" value="/os/<%= os.id %>#materiais">
+              <label><span>Material *</span><input name="item_nome" maxlength="180" required placeholder="Ex.: Rolamento 22218"></label>
+              <label><span>Quantidade *</span><input name="qtd_solicitada" inputmode="decimal" required placeholder="Ex.: 2"></label>
+              <label><span>Unidade *</span><input name="unidade" maxlength="20" required value="UN"></label>
+              <label class="wide"><span>Descrição / especificação</span><textarea name="item_descricao" maxlength="1200" rows="2" placeholder="Medida, modelo, aplicação, referência..."></textarea></label>
+              <label class="wide"><span>Motivo da inclusão *</span><textarea name="adicao_justificativa" maxlength="1200" rows="2" required placeholder="Explique por que este material está sendo acrescentado à solicitação existente."></textarea></label>
+              <div class="material-quick-actions wide">
+                <button class="ui-btn ui-btn--secondary" type="button" data-material-close="novo">Cancelar</button>
+                <button class="ui-btn ui-btn--primary" type="submit">Adicionar à solicitação</button>
+              </div>
+            </form>
+          </div>
+        <% } %>
+
+        <div class="material-table-wrap">
+          <table class="tabela-compacta material-table">
+            <thead>
+              <tr>
+                <th>Item / descrição</th>
+                <th>Un.</th>
+                <th>Solicitada</th>
+                <th>Cotada</th>
+                <th>Comprada</th>
+                <th>Recebida</th>
+                <th>Utilizada</th>
+                <th>Valor unit.</th>
+                <th>Valor total</th>
+                <th>Fornecedor</th>
+                <th>Situação</th>
+                <% if (canManageMaterialRequest && !isOSFechada) { %><th>Ação</th><% } %>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!itensMaterial.length) { %>
+                <tr><td colspan="<%= canManageMaterialRequest && !isOSFechada ? 12 : 11 %>" class="muted">Nenhum item cadastrado nesta solicitação.</td></tr>
+              <% } %>
+              <% itensMaterial.forEach((item)=> {
+                const hasPrice=item.valor_unitario_centavos!==null&&item.valor_unitario_centavos!==undefined;
+                const qtd=Number(item.qtd_comprada ?? item.qtd_solicitada);
+                const statusCompra=String(item.status_compra||'').toUpperCase();
+                const received=Number(item.qtd_recebida_total||0)>0;
+                const exclusionPending=String(item.exclusao_status||'').toUpperCase()==='PENDENTE';
+                const changePending=pendingMaterialChanges.has(Number(item.id));
+                const cancelled=statusCompra==='CANCELADO';
+                const canAdjustQty=canManageMaterialRequest && !isOSFechada && !received && !exclusionPending && !changePending && !cancelled;
+              %>
+                <tr>
+                  <td data-label="Item"><b><%= item.item_nome || ('#'+item.id) %></b><br><small><%= item.item_descricao || 'Não registrado' %></small></td>
+                  <td data-label="Un."><%= item.unidade || '—' %></td>
+                  <td data-label="Solicitada"><%= item.qtd_solicitada ?? '—' %></td>
+                  <td data-label="Cotada"><%= item.status_cotacao === 'COTADO' ? (item.qtd_solicitada ?? '—') : '—' %></td>
+                  <td data-label="Comprada"><%= item.qtd_comprada ?? '—' %></td>
+                  <td data-label="Recebida"><%= item.qtd_recebida_total ?? '—' %></td>
+                  <td data-label="Utilizada"><%= item.qtd_utilizada ?? '—' %></td>
+                  <td data-label="Valor unit."><%= hasPrice ? (Number(item.valor_unitario_centavos)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—' %></td>
+                  <td data-label="Valor total"><%= hasPrice && Number.isFinite(qtd) ? (Number(item.valor_unitario_centavos)*qtd/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—' %></td>
+                  <td data-label="Fornecedor"><%= item.fornecedor_nome || '—' %></td>
+                  <td data-label="Situação">
+                    <%= item.status_compra || item.status_cotacao || item.status_item || 'Não registrado' %>
+                    <% if (changePending) { %><small class="material-state-note">Alteração aguardando consenso</small><% } %>
+                    <% if (exclusionPending) { %><small class="material-state-note">Exclusão aguardando consenso</small><% } %>
+                  </td>
+                  <% if (canManageMaterialRequest && !isOSFechada) { %>
+                    <td data-label="Ação">
+                      <% if (canAdjustQty) { %>
+                        <button class="ui-btn ui-btn--outline ui-btn--table" type="button" data-material-toggle="qtd-<%= item.id %>">Ajustar quantidade</button>
+                      <% } else if (received) { %>
+                        <small>Recebimento iniciado; alteração bloqueada.</small>
+                      <% } else if (changePending || exclusionPending) { %>
+                        <small>Aguardando consenso.</small>
+                      <% } else if (cancelled) { %>
+                        <small>Item cancelado.</small>
+                      <% } %>
+                    </td>
+                  <% } %>
+                </tr>
+
+                <% if (canAdjustQty) { %>
+                  <tr class="material-adjust-row" data-material-panel="qtd-<%= item.id %>" hidden>
+                    <td colspan="12">
+                      <form method="POST" action="/solicitacoes/<%= materialRequest.id %>/itens/<%= item.id %>/alteracao" class="material-quick-form material-qty-form">
+                        <input type="hidden" name="return_to" value="/os/<%= os.id %>#materiais">
+                        <input type="hidden" name="item_nome" value="<%= item.item_nome || '' %>">
+                        <input type="hidden" name="item_descricao" value="<%= item.item_descricao || '' %>">
+                        <input type="hidden" name="unidade" value="<%= item.unidade || 'UN' %>">
+                        <label>
+                          <span>Quantidade solicitada atual</span>
+                          <input value="<%= item.qtd_solicitada ?? 0 %>" disabled>
+                        </label>
+                        <label>
+                          <span>Nova quantidade *</span>
+                          <input name="qtd_solicitada" inputmode="decimal" required value="<%= item.qtd_solicitada ?? 0 %>">
+                        </label>
+                        <label class="wide">
+                          <span>Motivo da alteração *</span>
+                          <textarea name="motivo" maxlength="1200" rows="2" required placeholder="Ex.: fornecedor encontrou apenas 2 unidades / necessidade ampliada durante a manutenção."></textarea>
+                        </label>
+                        <div class="material-quick-note wide">
+                          A alteração só será aplicada após confirmação da outra parte. Se já houver quantidade comprada, a nova quantidade não pode ficar abaixo do comprado.
+                        </div>
+                        <div class="material-quick-actions wide">
+                          <button class="ui-btn ui-btn--secondary" type="button" data-material-close="qtd-<%= item.id %>">Cancelar</button>
+                          <button class="ui-btn ui-btn--primary" type="submit">Enviar para consenso</button>
+                        </div>
+                      </form>
+                    </td>
+                  </tr>
+                <% } %>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
     </section>
     <section id="panel-historico" class="os-tab-panel" role="tabpanel" aria-labelledby="tab-historico" hidden><h3>Histórico completo da OS</h3><p class="muted">Eventos operacionais em ordem do mais recente para o mais antigo.</p><ol class="os-timeline">
       <% if (isOSFechada) { %><li><time><%= closedAt ? fmtBR(closedAt) : 'Data não registrada' %></time><div><strong>OS concluída</strong><span><%= os.closed_by_nome ? ('Responsável: ' + os.closed_by_nome + '. ') : '' %>Status alterado para concluída.</span></div></li><% } %>
