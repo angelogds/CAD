@@ -61,17 +61,21 @@ test('gráficos usam apresentação moderna e links para a ficha do equipamento'
   assert.match(js, /\/equipamentos\/\$\{x\.equipamento_id\}/);
 });
 
-test('ficha técnica carrega custo consolidado e permite aprofundar a origem', () => {
+test('ficha técnica carrega custos de compra e custo real consumido sem consulta duplicada', () => {
   const routes = read('modules/equipamentos/equipamentos.routes.js');
+  const controller = read('modules/equipamentos/equipamentos.controller.js');
   const view = read('views/equipamentos/show.ejs');
   assert.match(routes, /custos-equipamentos\.service/);
   assert.match(routes, /getEquipmentLifetime\(equipamentoId\)/);
   assert.match(routes, /router\.get\("\/:id", requireLogin, requireRole\(ACCESS\.equipamentos\), loadEquipmentCosts, safe\(ctrl\.equipShow\)\)/);
-  assert.match(view, /Custo comprado acumulado/);
-  assert.match(view, /\['custos','Custos',custos\.items\.length\]/);
-  assert.match(view, /Custos vinculados ao equipamento/);
+  assert.match(controller, /res\.locals\.custosEquipamento/);
+  assert.doesNotMatch(controller, /getEquipmentDetail\(id/);
+  assert.match(view, /Custo real consumido/);
+  assert.match(view, /Math\.max\(custos\.consumos\?\.length \|\| 0,custos\.items\.length\)/);
+  assert.match(view, /Custos reais do equipamento/);
+  assert.match(view, /Consumido na manutenção/);
   assert.match(view, /Comprado acumulado/);
-  assert.match(view, /Solicitações com compra/);
+  assert.match(view, /Consumo real por baixa de estoque/);
   assert.match(view, /\/solicitacoes\/<%= item\.solicitacao_id %>/);
   assert.match(view, /\/os\/<%= item\.os_id %>/);
   assert.match(view, /\/dashboard\/diretoria\/manutencao\?equipamento_id=<%= equip\.id %>/);
@@ -82,7 +86,7 @@ test('layout de custos permanece responsivo no painel e na ficha', () => {
   const equipCss = read('public/css/equipamentos-show.css');
   assert.match(pcmCss, /\.pcm-cost-kpis\{display:grid;grid-template-columns:repeat\(4/);
   assert.match(pcmCss, /@media\(max-width:560px\)[\s\S]*\.pcm-quality-grid,\.pcm-cost-kpis\{grid-template-columns:1fr\}/);
-  assert.match(equipCss, /\.equipment-cost-grid\{display:grid;grid-template-columns:repeat\(4/);
+  assert.match(equipCss, /\.equipment-cost-grid\{display:grid;grid-template-columns:repeat\(5/);
   assert.match(equipCss, /@media\(max-width:420px\)[\s\S]*\.equipment-cost-grid/);
 });
 
