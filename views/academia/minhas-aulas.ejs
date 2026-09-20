@@ -1,24 +1,23 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/academia.css" />
-<div class="page-head"><div><h1>Minhas aulas</h1><p class="muted">Acompanhe andamento, notas e progresso por trilha.</p></div></div>
-<%- include(incluir('_menu')) %>
-
-<div class="academia-grid academia-layout-3">
-  <div class="academia-card"><h3>Em andamento</h3><div class="valor"><%= minhasAulas.emAndamento.length %></div></div>
-  <div class="academia-card"><h3>Concluídos</h3><div class="valor"><%= minhasAulas.concluidos.length %></div></div>
-  <div class="academia-card"><h3>Pendentes</h3><div class="valor"><%= minhasAulas.pendentes.length %></div></div>
-</div>
-
-<div class="academia-grid academia-layout-2" style="margin-top:12px;">
-  <div class="academia-card"><h3>Cursos recentes</h3>
-    <% if (!minhasAulas.recentes.length) { %><p class="muted">Você ainda não iniciou cursos.</p><% } %>
-    <% minhasAulas.recentes.forEach(function(a){ %>
-      <a class="academia-row" href="/academia/curso/<%= a.curso_id %>"><span><%= a.titulo %></span><span class="muted-xs"><%= a.progresso_percentual %>%</span></a>
-    <% }) %>
-  </div>
-  <div class="academia-card"><h3>Progresso por trilha</h3>
-    <% minhasAulas.progressoTrilhas.forEach(function(t){ %>
-      <div style="margin-bottom:8px;"><div class="muted-xs"><%= t.nome %> • <%= t.percentual %>%</div><div class="progress"><span style="width:<%= t.percentual %>%"></span></div></div>
-    <% }) %>
-  </div>
-</div>
+<link rel="stylesheet" href="/css/academia.css?v=20260919-p4" />
+<main class="academy-workspace">
+  <header class="academy-hero"><div><span class="academy-eyebrow">ACADEMIA • MEU PROGRESSO</span><h1>Minhas aulas</h1><p>Acompanhe cursos em andamento, concluídos, pendentes e evolução por trilha.</p></div><div class="academy-hero-actions"><a class="ui-btn ui-btn--outline" href="/academia/cursos">Explorar cursos</a></div></header>
+  <%- include(incluir('_menu')) %>
+  <section class="academy-stat-grid">
+    <article class="academy-stat"><span>Em andamento</span><strong><%= minhasAulas.emAndamento.length %></strong></article>
+    <article class="academy-stat"><span>Concluídos</span><strong><%= minhasAulas.concluidos.length %></strong></article>
+    <article class="academy-stat"><span>Pendentes</span><strong><%= minhasAulas.pendentes.length %></strong></article>
+  </section>
+  <section class="academia-grid academia-layout-2">
+    <article class="academy-panel">
+      <div class="academy-section-head"><div><h2>Cursos recentes</h2><p>Retome de onde parou.</p></div></div>
+      <% if (!minhasAulas.recentes.length) { %><div class="academy-empty">Você ainda não iniciou cursos.</div><% } %>
+      <% minhasAulas.recentes.forEach(function(a){ %><a class="academy-row" href="/academia/curso/<%= a.curso_id %>"><span><strong><%= a.titulo %></strong></span><span class="academy-badge"><%= a.progresso_percentual %>%</span></a><% }) %>
+    </article>
+    <article class="academy-panel">
+      <div class="academy-section-head"><div><h2>Progresso por trilha</h2><p>Visão consolidada da evolução técnica.</p></div></div>
+      <% if (!minhasAulas.progressoTrilhas.length) { %><div class="academy-empty">Sem progresso por trilha ainda.</div><% } %>
+      <% minhasAulas.progressoTrilhas.forEach(function(t){ %><div class="academy-list-item"><div style="width:100%"><div class="academy-progress-meta"><strong><%= t.nome %></strong><span><%= t.percentual %>%</span></div><div class="progress"><span style="width:<%= t.percentual %>%"></span></div></div></div><% }) %>
+    </article>
+  </section>
+</main>
