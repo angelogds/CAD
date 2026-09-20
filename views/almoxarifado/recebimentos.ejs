@@ -10,6 +10,8 @@
     EM_RECEBIMENTO: { label: 'Em recebimento', cls: 'almox-status--recebimento' },
     RECEBIDA_PARCIAL: { label: 'Recebida parcial', cls: 'almox-status--parcial' },
     RECEBIDA_TOTAL: { label: 'Recebida total', cls: 'almox-status--total' },
+    SEPARADA_PARA_RETIRADA: { label: 'Separada para retirada', cls: 'almox-status--total' },
+    ENTREGUE_SOLICITANTE: { label: 'Entregue ao solicitante', cls: 'almox-status--fechada' },
     FECHADA: { label: 'Fechada', cls: 'almox-status--fechada' }
   };
   const statusMeta = (value) => statusConfig[value] || { label: value || '-', cls: '' };
@@ -39,7 +41,8 @@
     <a href="/almoxarifado/recebimentos?status=COMPRADA<%= querySuffix %>" class="almox-flow-kpi kpi-green"><span>Para receber</span><strong><%= resumo.para_receber %></strong><small>Compras liberadas</small></a>
     <a href="/almoxarifado/recebimentos?status=EM_RECEBIMENTO<%= querySuffix %>" class="almox-flow-kpi kpi-cyan"><span>Em recebimento</span><strong><%= resumo.em_recebimento %></strong><small>Conferência em andamento</small></a>
     <a href="/almoxarifado/recebimentos?status=RECEBIDA_PARCIAL<%= querySuffix %>" class="almox-flow-kpi kpi-amber"><span>Parciais</span><strong><%= resumo.parciais %></strong><small>Há material pendente</small></a>
-    <a href="/almoxarifado/recebimentos?status=RECEBIDA_TOTAL<%= querySuffix %>" class="almox-flow-kpi kpi-slate"><span>Recebidas</span><strong><%= resumo.recebidas %></strong><small>Conferência integral</small></a>
+    <a href="/almoxarifado/recebimentos?status=SEPARADA_PARA_RETIRADA<%= querySuffix %>" class="almox-flow-kpi kpi-slate"><span>Separadas</span><strong><%= resumo.separadas %></strong><small>Reservadas para retirada</small></a>
+    <a href="/almoxarifado/recebimentos?status=ENTREGUE_SOLICITANTE<%= querySuffix %>" class="almox-flow-kpi kpi-green"><span>Entregues</span><strong><%= resumo.entregues %></strong><small>Baixa concluída ao solicitante</small></a>
   </section>
 
   <section class="almox-flow-toolbar">
@@ -48,6 +51,8 @@
       <a class="almox-chip <%= status === 'EM_COTACAO' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=EM_COTACAO<%= querySuffix %>">Em cotação <span class="almox-chip__count"><%= resumo.em_cotacao %></span></a>
       <a class="almox-chip <%= status === 'COMPRADA' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=COMPRADA<%= querySuffix %>">Para receber <span class="almox-chip__count"><%= resumo.para_receber %></span></a>
       <a class="almox-chip <%= status === 'RECEBIDA_PARCIAL' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=RECEBIDA_PARCIAL<%= querySuffix %>">Parciais <span class="almox-chip__count"><%= resumo.parciais %></span></a>
+      <a class="almox-chip <%= status === 'SEPARADA_PARA_RETIRADA' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=SEPARADA_PARA_RETIRADA<%= querySuffix %>">Separadas <span class="almox-chip__count"><%= resumo.separadas %></span></a>
+      <a class="almox-chip <%= status === 'ENTREGUE_SOLICITANTE' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=ENTREGUE_SOLICITANTE<%= querySuffix %>">Entregues <span class="almox-chip__count"><%= resumo.entregues %></span></a>
       <a class="almox-chip <%= status === 'FECHADA' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=FECHADA<%= querySuffix %>">Histórico <span class="almox-chip__count"><%= resumo.fechadas %></span></a>
     </div>
     <form class="almox-search" method="GET" action="/almoxarifado/recebimentos">
@@ -82,7 +87,7 @@
             <div data-label="Ações" class="almox-actions" onclick="event.stopPropagation()">
               <% if (canManage && s.status === 'COMPRADA') { %><form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/iniciar-recebimento" data-lock-submit><button class="btn btn-sm btn-green" type="submit" data-pending-text="Iniciando...">Iniciar recebimento</button></form><% } %>
               <a class="btn btn-sm btn-ghost" href="/almoxarifado/solicitacoes/<%= s.id %>/conferir"><%= s.status === 'EM_COTACAO' ? 'Acompanhar' : 'Abrir' %></a>
-              <% if (canManage && s.status === 'RECEBIDA_TOTAL') { %><form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/fechar" data-lock-submit><button class="btn btn-sm" type="submit">Fechar</button></form><% } %>
+              <% if (canManage && s.status === 'ENTREGUE_SOLICITANTE') { %><form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/fechar" data-lock-submit><button class="btn btn-sm" type="submit">Fechar</button></form><% } %>
               <% if (canManage && s.status === 'FECHADA') { %><form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/reabrir" data-lock-submit><button class="btn btn-sm btn-ghost" type="submit">Reabrir</button></form><% } %>
             </div>
           </article>
