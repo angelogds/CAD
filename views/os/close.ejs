@@ -4,7 +4,7 @@
   <div class="page-head" style="margin-top:0;">
     <div>
       <h1 style="font-size:28px;">Concluir OS #<%= os.id %></h1>
-      <p class="muted">Fluxo simplificado: anexe pelo menos uma foto final para concluir a ordem.</p>
+      <p class="muted">Fluxo simplificado: conclua a ordem primeiro. Evidências visuais podem ser anexadas separadamente depois.</p>
     </div>
   </div>
 
@@ -13,7 +13,7 @@
     <%= os.descricao || '-' %>
   </div>
 
-  <form method="POST" action="/os/<%= os.id %>/fechar" enctype="multipart/form-data" id="form-fechar-os">
+  <form method="POST" action="/os/<%= os.id %>/fechar" id="form-fechar-os">
     <div style="margin-bottom:12px;">
       <label class="label" for="descricao_assistida">Descrição assistida (editável)</label>
       <div class="row" style="justify-content:flex-start; gap:8px; margin-bottom:8px;">
@@ -38,10 +38,8 @@
       ></textarea>
     </div>
 
-    <div>
-      <label class="label">Mídias de fechamento (foto ou vídeo) *</label>
-      <input id="fechamento_fotos" class="input" type="file" name="fechamento_fotos" accept="image/*,video/*" capture="environment" multiple required />
-      <div class="muted" style="margin-top:6px;">Adicione evidências visuais do serviço executado. Vídeos curtos: até 1 minuto.</div>
+    <div class="note" style="margin-bottom:12px;">
+      <b>Evidência visual opcional.</b> A foto ou vídeo não bloqueia mais a conclusão. Depois de fechar a OS, use a área “Evidências da OS” para anexar o registro visual quando necessário.
     </div>
 
     <input type="hidden" name="fotos_metadados_json" id="fotos_metadados_json" value="[]" />
