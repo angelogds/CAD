@@ -1,4 +1,8 @@
 const db = require('../../database/db');
+const manutencaoExecutivaService = require('../diretoria/diretoria.manutencao.service');
+
+const MANAGEMENT_CACHE_TTL_MS = 60000;
+let managementCache = { at: 0, data: null };
 
 const CLOSED = new Set(['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CANCELADA', 'CANCELADO']);
 const DEADLINE_COLUMNS = ['prazo', 'data_prazo', 'data_prevista', 'previsao_conclusao'];
@@ -386,6 +390,99 @@ async function getWeather() {
   try { return await require('./weather.service').getWeather(); }
   catch (error) { warn('clima indisponível', error); return { available: false, city: 'Feira de Santana - Campo do Gado', week: [] }; }
 }
+function getManagementSnapshot({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && managementCache.data && (now - managementCache.at) < MANAGEMENT_CACHE_TTL_MS) {
+    return managementCache.data;
+  }
+
+  const fallback = {
+    periodo: { label: 'Últimos 6 meses', data_inicial: null, data_final: null },
+    cards: {
+      total_os: 0,
+      backlog_os_atual: 0,
+      backlog_acima_30_dias: 0,
+      equipamentos_criticos: 0,
+      percentual_corretiva: 0,
+      percentual_preventiva: 0,
+      cumprimento_programacao: 0,
+      custo_consumido_centavos: 0,
+      qualidade_dados_pct: null,
+    },
+    confiabilidade: {
+      mtbf_horas: null,
+      mtbf_dias: null,
+      mtbf_amostras: 0,
+      mttr_horas: null,
+      mttr_amostras: 0,
+      disponibilidade_pct: null,
+      horas_parada: null,
+      equipamentos_base: 0,
+      status: 'DADOS_INSUFICIENTES',
+      status_label: 'Dados insuficientes',
+    },
+    custos_equipamento: [],
+    falhas_equipamento: [],
+    atualizado_em: new Date().toISOString(),
+  };
+
+  try {
+    const dashboard = manutencaoExecutivaService.getDashboard({ periodo: 'ultimos_6_meses' }, null);
+    const cards = dashboard?.cards || {};
+    const confiabilidade = dashboard?.confiabilidade || {};
+    const data = {
+      periodo: {
+        label: 'Últimos 6 meses',
+        data_inicial: dashboard?.filtros?.data_inicial || null,
+        data_final: dashboard?.filtros?.data_final || null,
+      },
+      cards: {
+        total_os: Number(cards.total_os || 0),
+        backlog_os_atual: Number(cards.backlog_os_atual || 0),
+        backlog_acima_30_dias: Number(cards.backlog_acima_30_dias || 0),
+        equipamentos_criticos: Number(cards.equipamentos_criticos || 0),
+        percentual_corretiva: Number(cards.percentual_corretiva || 0),
+        percentual_preventiva: Number(cards.percentual_preventiva || 0),
+        cumprimento_programacao: Number(cards.cumprimento_programacao || 0),
+        custo_consumido_centavos: Number(cards.custo_consumido_centavos || 0),
+        qualidade_dados_pct: cards.qualidade_dados_pct == null ? null : Number(cards.qualidade_dados_pct),
+      },
+      confiabilidade: {
+        mtbf_horas: confiabilidade.mtbf_horas == null ? null : Number(confiabilidade.mtbf_horas),
+        mtbf_dias: confiabilidade.mtbf_dias == null ? null : Number(confiabilidade.mtbf_dias),
+        mtbf_amostras: Number(confiabilidade.mtbf_amostras || 0),
+        mttr_horas: confiabilidade.mttr_horas == null ? null : Number(confiabilidade.mttr_horas),
+        mttr_amostras: Number(confiabilidade.mttr_amostras || 0),
+        disponibilidade_pct: confiabilidade.disponibilidade_pct == null ? null : Number(confiabilidade.disponibilidade_pct),
+        horas_parada: confiabilidade.horas_parada == null ? null : Number(confiabilidade.horas_parada),
+        equipamentos_base: Number(confiabilidade.equipamentos_base || 0),
+        status: confiabilidade.status || 'DADOS_INSUFICIENTES',
+        status_label: confiabilidade.status_label || 'Dados insuficientes',
+      },
+      custos_equipamento: (dashboard?.graficos?.custos_equipamento || []).slice(0, 5).map((item) => ({
+        equipamento_id: item.equipamento_id || null,
+        equipamento_nome: item.equipamento_nome || 'Equipamento não informado',
+        consumido_centavos: Number(item.consumido_centavos || 0),
+      })),
+      falhas_equipamento: (dashboard?.graficos?.falhas_equipamento || []).slice(0, 5).map((item) => ({
+        equipamento_id: item.equipamento_id || null,
+        nome: item.nome || 'Equipamento não informado',
+        falhas: Number(item.falhas || 0),
+        reincidencias: Number(item.reincidencias || 0),
+        criticidade: item.criticidade || 'NÃO INFORMADA',
+      })),
+      atualizado_em: new Date().toISOString(),
+    };
+    managementCache = { at: now, data };
+    return data;
+  } catch (error) {
+    warn('indicadores gerenciais indisponíveis', error);
+    if (managementCache.data) return managementCache.data;
+    managementCache = { at: now, data: fallback };
+    return fallback;
+  }
+}
+
 async function getSnapshot(user) {
   const result = getOS();
   const os = result.items;
@@ -402,6 +499,7 @@ async function getSnapshot(user) {
     escalaVigente: team.escalaVigente,
     rankingEquipe: team.rankingEquipe,
     preventivas,
+    gerencial: getManagementSnapshot(),
     weather: await getWeather(),
     alertas: active.filter((o) => o.prioridade === 'CRITICA'),
     performance: {
@@ -436,4 +534,6 @@ module.exports = {
   resolveResponsaveis,
   classificarMateriaisOS,
   getProximasDemandas,
+  getManagementSnapshot,
+  MANAGEMENT_CACHE_TTL_MS,
 };
