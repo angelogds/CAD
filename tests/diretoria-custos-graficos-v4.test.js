@@ -49,7 +49,7 @@ test('interface da Diretoria exibe custos e novos gráficos mantendo filtro por 
   assert.match(view, /Abrir acompanhamento de compras/);
 });
 
-test('gráficos usam apresentação moderna e links para a ficha do equipamento', () => {
+test('gráficos usam apresentação moderna e drill-down gerencial por equipamento', () => {
   const js = read('public/js/pcm-dashboard.js');
   new Function(js);
   assert.match(js, /borderRadius:9/);
@@ -59,7 +59,7 @@ test('gráficos usam apresentação moderna e links para a ficha do equipamento'
   assert.match(js, /compactMoney/);
   assert.match(js, /chartCustosEquipamentos/);
   assert.match(js, /chartCustosMes/);
-  assert.match(js, /\/equipamentos\/\$\{x\.equipamento_id\}/);
+  assert.match(js, /dashboardHref\(\{equipamento_id:x\.equipamento_id\}\)/);
 });
 
 test('ficha técnica carrega custos de compra e custo real consumido sem consulta duplicada', () => {
