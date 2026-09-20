@@ -34,6 +34,15 @@ function safeGet(label, sql, params = {}) {
   }
 }
 
+function safeAll(label, sql, params = {}) {
+  try {
+    return db.prepare(sql).all(params) || [];
+  } catch (error) {
+    console.error('[diretoria][manutencao] Falha na consulta:', label, error?.message || error);
+    return [];
+  }
+}
+
 function percentage(part, total) {
   const denominator = Number(total || 0);
   if (!denominator) return null;
@@ -152,6 +161,167 @@ function getDataQuality(filtros = {}) {
   };
 }
 
+function getReliabilityMetrics(filtros = {}, qualidade = {}) {
+  const empty = {
+    status: 'SEM_DADOS',
+    status_label: 'Dados insuficientes',
+    publicado: false,
+    mtbf_horas: null,
+    mttr_horas: null,
+    disponibilidade_pct: null,
+    tempo_parada_horas: 0,
+    falhas_classificadas: 0,
+    paradas_validas: 0,
+    mtbf_amostras: 0,
+    mttr_amostras: 0,
+    equipamentos_com_mtbf: 0,
+    byEquipment: [],
+    criterio: 'MTBF e MTTR usam registros de falha do PCM com início/fim de parada válidos.',
+  };
+
+  if (
+    !hasTable('pcm_falhas')
+    || !hasColumn('pcm_falhas', 'os_id')
+    || !hasColumn('pcm_falhas', 'equipamento_id')
+    || !hasColumn('pcm_falhas', 'inicio_parada_em')
+    || !hasColumn('pcm_falhas', 'fim_parada_em')
+  ) return empty;
+
+  const scope = dashboardWhere(filtros);
+  const rows = safeAll('confiabilidade_eventos', `
+    SELECT
+      pf.id falha_id,
+      pf.equipamento_id,
+      pf.inicio_parada_em,
+      pf.fim_parada_em,
+      o.id os_id,
+      o.opened_at,
+      COALESCE(e.nome, o.equipamento, 'Sem equipamento') equipamento_nome,
+      COALESCE(NULLIF(TRIM(e.setor),''),'Setor não informado') setor
+    FROM pcm_falhas pf
+    JOIN os o ON o.id=pf.os_id
+    LEFT JOIN equipamentos e ON e.id=pf.equipamento_id
+    WHERE ${scope.sql}
+      AND UPPER(COALESCE(o.tipo,''))='CORRETIVA'
+      AND UPPER(COALESCE(o.status,'')) NOT IN ${CANCELLED_STATUSES}
+    ORDER BY pf.equipamento_id, datetime(COALESCE(pf.inicio_parada_em,o.opened_at)), pf.id
+  `, scope.params);
+
+  if (!rows.length) return empty;
+
+  const byEquipmentMap = new Map();
+  let totalDowntime = 0;
+  let mttrSum = 0;
+  let mttrSamples = 0;
+  let mtbfSum = 0;
+  let mtbfSamples = 0;
+
+  for (const row of rows) {
+    const equipamentoId = Number(row.equipamento_id || 0);
+    if (!equipamentoId) continue;
+    if (!byEquipmentMap.has(equipamentoId)) {
+      byEquipmentMap.set(equipamentoId, {
+        equipamento_id: equipamentoId,
+        equipamento_nome: row.equipamento_nome || `Equipamento #${equipamentoId}`,
+        setor: row.setor || 'Setor não informado',
+        falhas: 0,
+        paradas_validas: 0,
+        tempo_parada_horas: 0,
+        mttr_horas: null,
+        mtbf_horas: null,
+        mtbf_amostras: 0,
+        _mttr_sum: 0,
+        _last_failure_start: null,
+        _mtbf_sum: 0,
+      });
+    }
+
+    const eq = byEquipmentMap.get(equipamentoId);
+    eq.falhas += 1;
+
+    const inicio = row.inicio_parada_em ? new Date(row.inicio_parada_em) : null;
+    const fim = row.fim_parada_em ? new Date(row.fim_parada_em) : null;
+    const inicioValido = inicio && !Number.isNaN(inicio.getTime());
+    const fimValido = fim && !Number.isNaN(fim.getTime());
+
+    if (inicioValido) {
+      if (eq._last_failure_start) {
+        const gapHoras = (inicio.getTime() - eq._last_failure_start.getTime()) / 3600000;
+        if (Number.isFinite(gapHoras) && gapHoras > 0) {
+          eq._mtbf_sum += gapHoras;
+          eq.mtbf_amostras += 1;
+          mtbfSum += gapHoras;
+          mtbfSamples += 1;
+        }
+      }
+      eq._last_failure_start = inicio;
+    }
+
+    if (inicioValido && fimValido && fim.getTime() >= inicio.getTime()) {
+      const horas = (fim.getTime() - inicio.getTime()) / 3600000;
+      if (Number.isFinite(horas) && horas >= 0) {
+        eq.paradas_validas += 1;
+        eq.tempo_parada_horas += horas;
+        eq._mttr_sum += horas;
+        totalDowntime += horas;
+        mttrSum += horas;
+        mttrSamples += 1;
+      }
+    }
+  }
+
+  const byEquipment = [...byEquipmentMap.values()].map((eq) => ({
+    equipamento_id: eq.equipamento_id,
+    equipamento_nome: eq.equipamento_nome,
+    setor: eq.setor,
+    falhas: eq.falhas,
+    paradas_validas: eq.paradas_validas,
+    tempo_parada_horas: Math.round(eq.tempo_parada_horas * 10) / 10,
+    mttr_horas: eq.paradas_validas ? Math.round((eq._mttr_sum / eq.paradas_validas) * 10) / 10 : null,
+    mtbf_horas: eq.mtbf_amostras ? Math.round((eq._mtbf_sum / eq.mtbf_amostras) * 10) / 10 : null,
+    mtbf_amostras: eq.mtbf_amostras,
+  })).sort((a, b) => Number(b.tempo_parada_horas || 0) - Number(a.tempo_parada_horas || 0));
+
+  const mtbf = mtbfSamples ? Math.round((mtbfSum / mtbfSamples) * 10) / 10 : null;
+  const mttr = mttrSamples ? Math.round((mttrSum / mttrSamples) * 10) / 10 : null;
+  const disponibilidade = mtbf !== null && mttr !== null && (mtbf + mttr) > 0
+    ? Math.round((mtbf / (mtbf + mttr)) * 1000) / 10
+    : null;
+
+  const classificacaoOk = Number(qualidade.corretivas_classificadas_pct || 0) >= 85;
+  const paradaOk = Number(qualidade.paradas_com_intervalo_pct || 0) >= 85;
+  const equipamentoOk = Number(qualidade.os_com_equipamento_pct || 0) >= 95;
+  const amostraOk = mtbfSamples >= 1 && mttrSamples >= 1;
+  const publicado = classificacaoOk && paradaOk && equipamentoOk && amostraOk;
+
+  let status = 'EM_FORMACAO';
+  let statusLabel = 'Base em formação';
+  if (publicado) {
+    status = 'CONFIAVEL';
+    statusLabel = 'Indicadores liberados';
+  } else if (!mttrSamples && !mtbfSamples) {
+    status = 'SEM_DADOS';
+    statusLabel = 'Dados insuficientes';
+  }
+
+  return {
+    status,
+    status_label: statusLabel,
+    publicado,
+    mtbf_horas: publicado ? mtbf : null,
+    mttr_horas: publicado ? mttr : null,
+    disponibilidade_pct: publicado ? disponibilidade : null,
+    tempo_parada_horas: Math.round(totalDowntime * 10) / 10,
+    falhas_classificadas: rows.length,
+    paradas_validas: mttrSamples,
+    mtbf_amostras: mtbfSamples,
+    mttr_amostras: mttrSamples,
+    equipamentos_com_mtbf: byEquipment.filter((row) => row.mtbf_horas !== null).length,
+    byEquipment,
+    criterio: 'Disponibilidade = MTBF / (MTBF + MTTR). Os indicadores são publicados apenas com cobertura mínima de rastreabilidade.',
+  };
+}
+
 function getDashboard(query = {}, userId = null) {
   const dashboard = pcmService.getDashboardGerencial(query, userId);
   const filtros = dashboard.filtros || pcmService.buildDashboardFilters(query);
@@ -165,7 +335,8 @@ function getDashboard(query = {}, userId = null) {
   const repeticoes = recorrentes.reduce((sum, item) => sum + Number(item.repeticoes_apos_primeira || 0), 0);
   const reincidenciaPct = corretivas ? Math.round((repeticoes * 1000) / corretivas) / 10 : 0;
   const qualidade = getDataQuality(filtros);
-  let custos = { totals: { comprado_centavos: 0, recebido_centavos: 0, pendente_centavos: 0, equipamentos: 0 }, byEquipment: [], byMonth: [] };
+  const confiabilidade = getReliabilityMetrics(filtros, qualidade);
+  let custos = { totals: { comprado_centavos: 0, recebido_centavos: 0, pendente_centavos: 0, consumido_centavos: 0, consumo_movimentos: 0, equipamentos: 0 }, byEquipment: [], byMonth: [] };
   try {
     custos = custosEquipamentosService.getAnalytics({
       data_inicial: filtros.data_inicial,
@@ -185,10 +356,18 @@ function getDashboard(query = {}, userId = null) {
     reincidencia_corretiva_pct: reincidenciaPct,
     equipamentos_reincidentes: recorrentes.length,
     qualidade_dados_pct: qualidade.score,
+    custo_consumido_centavos: Number(custos.totals?.consumido_centavos || 0),
     custo_comprado_centavos: Number(custos.totals?.comprado_centavos || 0),
     custo_recebido_centavos: Number(custos.totals?.recebido_centavos || 0),
     custo_pendente_recebimento_centavos: Number(custos.totals?.pendente_centavos || 0),
+    consumo_movimentos: Number(custos.totals?.consumo_movimentos || 0),
     equipamentos_com_custo: Number(custos.totals?.equipamentos || 0),
+    mtbf_horas: confiabilidade.mtbf_horas,
+    mttr_horas: confiabilidade.mttr_horas,
+    disponibilidade_pct: confiabilidade.disponibilidade_pct,
+    tempo_parada_horas: confiabilidade.tempo_parada_horas,
+    mtbf_amostras: confiabilidade.mtbf_amostras,
+    mttr_amostras: confiabilidade.mttr_amostras,
   };
   dashboard.graficos = {
     ...(dashboard.graficos || {}),
@@ -201,11 +380,13 @@ function getDashboard(query = {}, userId = null) {
     reincidencia_corretiva: recorrentes,
     custos_equipamento: custos.byEquipment || [],
     custos_mes: custos.byMonth || [],
+    confiabilidade_equipamento: confiabilidade.byEquipment || [],
   };
   dashboard.qualidade_dados = qualidade;
   dashboard.custos = custos;
   dashboard.confiabilidade = {
     ...(dashboard.confiabilidade || {}),
+    ...confiabilidade,
     qualidade_dados_pct: qualidade.score,
     status_qualidade: qualidade.status,
   };
@@ -216,4 +397,5 @@ module.exports = {
   getDashboard,
   getBacklogAging,
   getDataQuality,
+  getReliabilityMetrics,
 };
