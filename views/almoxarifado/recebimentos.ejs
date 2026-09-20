@@ -76,7 +76,7 @@
         <div class="almox-request-columns" aria-hidden="true">
           <span>Solicitação</span><span>OS / Equipamento</span><span>Solicitante</span><span>Fluxo dos itens</span><span>Fornecedor / Previsão</span><span>Status</span><span>Ações</span>
         </div>
-        <% lista.forEach((s) => { const meta=statusMeta(s.status); const total=Number(s.itens_total||0); %>
+        <% lista.forEach((s) => { const meta=statusMeta(s.status); const total=Number(s.itens_total||0); const isLegacyReceived = s.status === 'RECEBIDA_TOTAL'; %>
           <article class="almox-request-row" data-href="/almoxarifado/solicitacoes/<%= s.id %>/conferir" tabindex="0" role="link">
             <div data-label="Solicitação"><span class="almox-request-number"><%= s.numero || ('#'+s.id) %></span><strong><%= s.titulo || 'Solicitação de materiais' %></strong><small><%= s.setor_origem ? ('Setor: '+s.setor_origem) : 'Setor não informado' %></small></div>
             <div data-label="OS / Equipamento"><small>OS / EQUIPAMENTO</small><strong><%= s.os_id ? ('OS #'+s.os_id) : 'Sem OS vinculada' %></strong><span><%= s.equipamento_nome || 'Equipamento não informado' %></span></div>
