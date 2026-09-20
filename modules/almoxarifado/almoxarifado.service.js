@@ -1,5 +1,6 @@
 const db = require("../../database/db");
 const { STATUS } = require("../solicitacoes/solicitacoes.service");
+const fluxoEstoqueService = require("../estoque/estoque.solicitacao-fluxo.service");
 
 function hasColumn(table, name) {
   try { return db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === name); } catch { return false; }
@@ -37,6 +38,8 @@ const ALMOX_STATUS = [
   STATUS.EM_RECEBIMENTO,
   STATUS.RECEBIDA_PARCIAL,
   STATUS.RECEBIDA_TOTAL,
+  STATUS.SEPARADA_PARA_RETIRADA,
+  STATUS.ENTREGUE_SOLICITANTE,
   STATUS.FECHADA,
 ];
 const RECEBIMENTO_STATUS = [
@@ -44,6 +47,8 @@ const RECEBIMENTO_STATUS = [
   STATUS.EM_RECEBIMENTO,
   STATUS.RECEBIDA_PARCIAL,
   STATUS.RECEBIDA_TOTAL,
+  STATUS.SEPARADA_PARA_RETIRADA,
+  STATUS.ENTREGUE_SOLICITANTE,
   STATUS.FECHADA,
 ];
 const STATUS_PERMITIDOS_RECEBIMENTO_ITEM = new Set([
@@ -179,6 +184,8 @@ function getResumoRecebimentos(query = "") {
     em_recebimento: 0,
     parciais: 0,
     recebidas: 0,
+    separadas: 0,
+    entregues: 0,
     fechadas: 0,
     total_fluxo: 0,
     pendencias_quantidade: 0,
@@ -190,6 +197,8 @@ function getResumoRecebimentos(query = "") {
     if (status === STATUS.EM_RECEBIMENTO) result.em_recebimento = rows.length;
     if (status === STATUS.RECEBIDA_PARCIAL) result.parciais = rows.length;
     if (status === STATUS.RECEBIDA_TOTAL) result.recebidas = rows.length;
+    if (status === STATUS.SEPARADA_PARA_RETIRADA) result.separadas = rows.length;
+    if (status === STATUS.ENTREGUE_SOLICITANTE) result.entregues = rows.length;
     if (status === STATUS.FECHADA) result.fechadas = rows.length;
     result.total_fluxo += rows.length;
     result.pendencias_quantidade += rows.reduce((sum, row) => sum + Number(row.qtd_pendente_total || 0), 0);
@@ -469,13 +478,24 @@ function finalizarRecebimento(id) {
   const incompletos = itens.some((item) => Number(item.qtd_recebida_calc || 0) < Number(item.qtd_comprada_calc || 0));
   const status = incompletos ? STATUS.RECEBIDA_PARCIAL : STATUS.RECEBIDA_TOTAL;
   db.prepare("UPDATE solicitacoes SET status=?, recebida_em=datetime('now'), updated_at=datetime('now') WHERE id=?").run(status, id);
+  if (status === STATUS.RECEBIDA_TOTAL) {
+    return fluxoEstoqueService.syncSolicitacaoEntregaStatus(id).status || status;
+  }
   return status;
 }
 
 function fechar(id) {
   const s = getSolicitacao(id);
-  if (!s || s.status !== STATUS.RECEBIDA_TOTAL) throw new Error("Somente uma solicitação recebida integralmente pode ser fechada.");
+  if (!s || (s.status !== STATUS.RECEBIDA_TOTAL && s.status !== STATUS.ENTREGUE_SOLICITANTE)) {
+    throw new Error("Somente uma solicitação recebida integralmente pode ser fechada. Quando houver reserva, a entrega ao solicitante também deve estar concluída.");
+  }
   if (s.resumo.qtd_pendente > 0) throw new Error("Ainda existem quantidades a receber.");
+
+  const reservas = fluxoEstoqueService.getResumoReservas(id);
+  if (s.status === STATUS.RECEBIDA_TOTAL && reservas.reservado > 0 && reservas.pendente > 0) {
+    throw new Error("Ainda existem materiais reservados aguardando entrega ao solicitante.");
+  }
+
   db.prepare("UPDATE solicitacoes SET status=?, fechada_em=datetime('now'), updated_at=datetime('now') WHERE id=?").run(STATUS.FECHADA, id);
 }
 
@@ -484,7 +504,14 @@ function reabrir(id) {
   if (!s || ![STATUS.FECHADA, STATUS.RECEBIDA_PARCIAL].includes(s.status)) {
     throw new Error("Somente recebimentos fechados ou parciais podem ser reabertos.");
   }
-  const novoStatus = s.status === STATUS.FECHADA ? STATUS.RECEBIDA_TOTAL : STATUS.EM_RECEBIMENTO;
+  const legacyStatus = s.status === STATUS.FECHADA ? STATUS.RECEBIDA_TOTAL : STATUS.EM_RECEBIMENTO;
+  let novoStatus = legacyStatus;
+  if (s.status === STATUS.FECHADA) {
+    const resumoReserva = fluxoEstoqueService.getResumoReservas(id);
+    novoStatus = resumoReserva.reservado > 0
+      ? (resumoReserva.pendente > 0 ? STATUS.SEPARADA_PARA_RETIRADA : STATUS.ENTREGUE_SOLICITANTE)
+      : legacyStatus;
+  }
   db.prepare("UPDATE solicitacoes SET status=?, reaberta_em=datetime('now'), updated_at=datetime('now') WHERE id=?").run(novoStatus, id);
   return novoStatus;
 }

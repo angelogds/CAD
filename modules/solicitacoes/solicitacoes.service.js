@@ -26,6 +26,8 @@ const LIST_STATUS = [
   STATUS.EM_RECEBIMENTO,
   STATUS.RECEBIDA_PARCIAL,
   STATUS.RECEBIDA_TOTAL,
+  STATUS.SEPARADA_PARA_RETIRADA,
+  STATUS.ENTREGUE_SOLICITANTE,
   STATUS.FECHADA,
   STATUS.REABERTA,
   STATUS.CANCELADA,
@@ -642,7 +644,7 @@ function listMinhasSolicitacoes(userId, filters = {}, user = null) {
     ${equipJoin}
     ${whereSql}
     ORDER BY
-      CASE WHEN s.previsao_entrega IS NOT NULL AND date(s.previsao_entrega)<date('now') AND s.status NOT IN ('FECHADA','CANCELADA','RECEBIDA_TOTAL') THEN 0 ELSE 1 END,
+      CASE WHEN s.previsao_entrega IS NOT NULL AND date(s.previsao_entrega)<date('now') AND s.status NOT IN ('FECHADA','CANCELADA','RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SOLICITANTE') THEN 0 ELSE 1 END,
       CASE WHEN s.previsao_entrega IS NULL THEN 1 ELSE 0 END, date(s.previsao_entrega), datetime(s.created_at), s.numero
   `).all(...params);
 

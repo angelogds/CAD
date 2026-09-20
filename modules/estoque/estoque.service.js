@@ -1,4 +1,5 @@
 const db = require("../../database/db");
+const fluxoSolicitacaoService = require("./estoque.solicitacao-fluxo.service");
 
 function tableExists(name) {
   try { return !!db.prepare("SELECT 1 FROM sqlite_master WHERE (type='table' OR type='view') AND name=?").get(name); } catch { return false; }
@@ -229,7 +230,12 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
 }
 
 function registrarSaida(data) {
-  return db.transaction(() => registrarSaidaCore(data))();
+  const resultado = db.transaction(() => registrarSaidaCore(data))();
+  if (data.solicitacao_id) {
+    const fluxo = fluxoSolicitacaoService.syncSolicitacaoEntregaStatus(data.solicitacao_id, { userId: data.usuario_id });
+    return { ...resultado, solicitacaoStatus: fluxo.status };
+  }
+  return resultado;
 }
 
 function registrarSaidasSolicitacao({ solicitacao_id, usuario_id, observacao }) {
@@ -237,7 +243,7 @@ function registrarSaidasSolicitacao({ solicitacao_id, usuario_id, observacao }) 
     FROM solicitacao_itens WHERE solicitacao_id=? AND COALESCE(qtd_recebida_total,0)>0 ORDER BY id`).all(Number(solicitacao_id));
   if (!itens.length) throw new Error('Esta solicitação ainda não possui material recebido para retirada.');
 
-  return db.transaction(() => {
+  const resultados = db.transaction(() => {
     const resultados = [];
     for (const item of itens) {
       if (!item.estoque_item_id) continue;
@@ -258,6 +264,8 @@ function registrarSaidasSolicitacao({ solicitacao_id, usuario_id, observacao }) 
     if (!resultados.length) throw new Error('Não há saldo recebido e disponível para retirada nesta solicitação.');
     return resultados;
   })();
+  const fluxo = fluxoSolicitacaoService.syncSolicitacaoEntregaStatus(solicitacao_id, { userId: usuario_id });
+  return Object.assign(resultados, { solicitacaoStatus: fluxo.status });
 }
 
 module.exports = {

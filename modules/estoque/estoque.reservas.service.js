@@ -1,5 +1,6 @@
 const db = require('../../database/db');
 const userQrService = require('../usuarios/usuarios.qr.service');
+const fluxoSolicitacaoService = require('./estoque.solicitacao-fluxo.service');
 
 function tableExists(name) {
   try { return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name); } catch { return false; }
@@ -195,7 +196,7 @@ function retirarReserva({ reservaId, quantidade, qrCode, entreguePorUserId, obse
   const pessoa = getPessoaByQr(qrCode);
   if (!pessoa) throw new Error('Cartão/QR inválido, inativo ou revogado.');
 
-  return db.transaction(() => {
+  const resultado = db.transaction(() => {
     const reserva = db.prepare(`
       SELECT r.*,s.numero,si.unidade,${itemNameExpr('si')} item_nome,
         COALESCE(ei.saldo_atual,0) saldo_fisico
@@ -257,8 +258,13 @@ function retirarReserva({ reservaId, quantidade, qrCode, entreguePorUserId, obse
       quantidade: qtd,
       saldoPosterior: posterior,
       status,
+      solicitacaoId: Number(reserva.solicitacao_id),
+      solicitacaoItemId: Number(reserva.solicitacao_item_id),
     };
   })();
+
+  const fluxo = fluxoSolicitacaoService.syncSolicitacaoEntregaStatus(resultado.solicitacaoId || resultado.solicitacao_id, { userId: entreguePorUserId });
+  return { ...resultado, solicitacaoStatus: fluxo.status };
 }
 
 module.exports = {
