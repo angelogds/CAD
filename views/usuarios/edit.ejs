@@ -54,14 +54,14 @@
 
         <label class="admin-field">
           <span>Função</span>
-          <input data-role-function value="<%= user.funcao || '' %>" readonly>
+          <input id="roleFunction" data-role-function value="<%= user.funcao || '' %>" readonly>
           <small class="muted-xs">Derivada automaticamente do perfil.</small>
         </label>
 
         <label class="admin-field">
           <span>Setor</span>
-          <input data-role-sector value="<%= user.setor || '' %>" readonly>
-          <small class="muted-xs">Identidade operacional derivada do perfil.</small>
+          <input id="roleSector" data-role-sector value="<%= user.setor || '' %>" readonly>
+          <small class="muted-xs">O perfil é a própria identidade do encarregado.</small>
         </label>
 
         <label class="admin-field">
