@@ -99,6 +99,7 @@
               .map((change) => Number(change.solicitacao_item_id))
           );
           const totalMaterialDisponivel = itensMaterial.reduce((sum, item) => sum + Number(item.qtd_disponivel_retirada || 0), 0);
+          const totalMaterialCustoConsumido = itensMaterial.reduce((sum, item) => sum + (Number(item.qtd_utilizada || 0) * Number(item.valor_unitario_centavos || 0)), 0);
         %>
 
         <div class="material-head">
@@ -123,6 +124,7 @@
           <span><b>Solicitante</b><%= materialRequest.solicitante_nome || 'Não registrado' %></span>
           <span><b>Itens</b><%= itensMaterial.length %></span>
           <span><b>Disponível para retirada</b><%= totalMaterialDisponivel %></span>
+          <span><b>Custo consumido</b><%= (totalMaterialCustoConsumido/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) %></span>
         </div>
 
         <% if (canManageMaterialRequest && !isOSFechada) { %>
@@ -162,6 +164,7 @@
                 <th>Utilizada</th>
                 <th>Valor unit.</th>
                 <th>Valor total</th>
+                <th>Custo utilizado</th>
                 <th>Fornecedor</th>
                 <th>Situação</th>
                 <% if (canManageMaterialRequest && !isOSFechada) { %><th>Ação</th><% } %>
@@ -169,7 +172,7 @@
             </thead>
             <tbody>
               <% if (!itensMaterial.length) { %>
-                <tr><td colspan="<%= canManageMaterialRequest && !isOSFechada ? 13 : 12 %>" class="muted">Nenhum item cadastrado nesta solicitação.</td></tr>
+                <tr><td colspan="<%= canManageMaterialRequest && !isOSFechada ? 14 : 13 %>" class="muted">Nenhum item cadastrado nesta solicitação.</td></tr>
               <% } %>
               <% itensMaterial.forEach((item)=> {
                 const hasPrice=item.valor_unitario_centavos!==null&&item.valor_unitario_centavos!==undefined;
@@ -192,6 +195,7 @@
                   <td data-label="Utilizada"><%= item.qtd_utilizada ?? 0 %></td>
                   <td data-label="Valor unit."><%= hasPrice ? (Number(item.valor_unitario_centavos)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—' %></td>
                   <td data-label="Valor total"><%= hasPrice && Number.isFinite(qtd) ? (Number(item.valor_unitario_centavos)*qtd/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—' %></td>
+                  <td data-label="Custo utilizado"><strong><%= hasPrice && Number(item.qtd_utilizada||0)>0 ? (Number(item.valor_unitario_centavos)*Number(item.qtd_utilizada||0)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—' %></strong></td>
                   <td data-label="Fornecedor"><%= item.fornecedor_nome || '—' %></td>
                   <td data-label="Situação">
                     <%= item.status_compra || item.status_cotacao || item.status_item || 'Não registrado' %>
@@ -215,7 +219,7 @@
 
                 <% if (canAdjustQty) { %>
                   <tr class="material-adjust-row" data-material-panel="qtd-<%= item.id %>" hidden>
-                    <td colspan="13">
+                    <td colspan="14">
                       <form method="POST" action="/solicitacoes/<%= materialRequest.id %>/itens/<%= item.id %>/alteracao" class="material-quick-form material-qty-form">
                         <input type="hidden" name="return_to" value="/os/<%= os.id %>#materiais">
                         <input type="hidden" name="item_nome" value="<%= item.item_nome || '' %>">
