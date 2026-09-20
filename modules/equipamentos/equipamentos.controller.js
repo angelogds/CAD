@@ -102,6 +102,10 @@ async function equipShow(req, res) {
     data_inicio: filtros.data_inicio,
     data_fim: filtros.data_fim,
   });
+  const custoRealPorOS = new Map((custosEquipamento.consumoByOS || []).map((row) => [Number(row.os_id), Number(row.consumido_centavos || 0)]));
+  historicoOS.forEach((ordem) => {
+    ordem.custo_real_centavos = custoRealPorOS.get(Number(ordem.id)) || 0;
+  });
 
   return res.render("equipamentos/show", {
     title: equip.nome,
