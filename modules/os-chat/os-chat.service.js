@@ -266,6 +266,41 @@ function getDashboard(user, filtros = {}) {
   };
 }
 
+function buscarResumoConversaPorOS(osId, user) {
+  const os = getOs(osId);
+  if (!os) return null;
+
+  const historico = getUltimoHistorico(osId);
+  const solicitacoes = buscarSolicitacoesVinculadas(osId) || [];
+  const solicitacao = solicitacoes[0] || null;
+  let ultimaMensagem = null;
+
+  if (tableExists('os_chat_mensagens')) {
+    ultimaMensagem = db.prepare(`
+      SELECT * FROM os_chat_mensagens
+      WHERE os_id = ? AND deleted_at IS NULL
+      ORDER BY datetime(created_at) DESC, id DESC
+      LIMIT 1
+    `).get(Number(osId)) || null;
+  }
+
+  return {
+    os: {
+      ...os,
+      equipamento_resolvido: os.equipamento_nome || os.equipamento_manual || os.equipamento || '-',
+      setor_resolvido: os.setor_equipamento || '-',
+      dias_aberta: diasEmAberto(os.opened_at, os.closed_at),
+      motivo_atual: os.ultimo_motivo_andamento || historico?.motivo_nome || null,
+      acao_necessaria: getAcaoNecessaria(historico?.motivo_codigo),
+    },
+    mensagens: ultimaMensagem ? [ultimaMensagem] : [],
+    solicitacao,
+    solicitacoes,
+    historico: [],
+    naoLidas: contarNaoLidasPorOS(osId, user?.id),
+  };
+}
+
 function buscarConversaPorOS(osId, user) {
   const os = getOs(osId);
   if (!os) return null;
@@ -384,4 +419,4 @@ function criarVinculoSolicitacaoOS(osId, solicitacaoId, userId) {
   }
   return buscarSolicitacaoVinculada(osIdNum) || { ...solicitacao, os_id: osIdNum };
 }
-module.exports = { listarConversasOS, getDashboard, listarMotivos, buscarConversaPorOS, listarMensagens, enviarMensagem, registrarMensagemSistema, arquivarConversaOS, marcarComoLida, contarNaoLidas, contarNaoLidasPorOS, listarNotificacoesChat, criarVinculoSolicitacaoOS, buscarSolicitacaoVinculada, buscarSolicitacoesVinculadas, ACTIVE_OS_STATUSES, CLOSED_OS_STATUSES };
+module.exports = { listarConversasOS, getDashboard, listarMotivos, buscarConversaPorOS, buscarResumoConversaPorOS, listarMensagens, enviarMensagem, registrarMensagemSistema, arquivarConversaOS, marcarComoLida, contarNaoLidas, contarNaoLidasPorOS, listarNotificacoesChat, criarVinculoSolicitacaoOS, buscarSolicitacaoVinculada, buscarSolicitacoesVinculadas, ACTIVE_OS_STATUSES, CLOSED_OS_STATUSES };

@@ -52,6 +52,14 @@ function getColumns(table) {
   catch (_e) { return []; }
 }
 
+function getOSCore(id) {
+  try {
+    return db.prepare("SELECT id, status FROM os WHERE id = ?").get(Number(id)) || null;
+  } catch (_e) {
+    return null;
+  }
+}
+
 function runDetached(label, task) {
   setImmediate(() => {
     Promise.resolve()
@@ -332,7 +340,7 @@ function osCreate(req, res) {
 }
 
 function closeOSRecordFast(id, { closedBy, diagnostico, acaoExecutada, fechamentoPayload = {} }) {
-  const os = service.getOSById(id);
+  const os = getOSCore(id);
   if (!os) throw new Error("OS não encontrada.");
 
   const cols = getColumns("os");
@@ -380,13 +388,46 @@ function scheduleCloseEnrichment(id, payload) {
   });
 }
 
+function osAddEvidence(req, res) {
+  const id = Number(req.params.id);
+  const userId = req.session?.user?.id || null;
+
+  try {
+    const osAtual = getOSCore(id);
+    if (!osAtual) {
+      req.flash("error", "OS não encontrada.");
+      return res.redirect("/os");
+    }
+
+    const files = mapFilesToPublic(req.files?.fechamento_fotos || []);
+    if (!files.length) {
+      req.flash("error", "Selecione pelo menos uma foto ou vídeo para anexar.");
+      return res.redirect(`/os/${id}#evidencias`);
+    }
+
+    service.addFotosAberturaFechamento({
+      osId: id,
+      files,
+      tipo: "FECHAMENTO",
+      userId,
+    });
+
+    req.flash("success", `Evidência anexada com sucesso (${files.length} arquivo(s)).`);
+    return res.redirect(`/os/${id}#evidencias`);
+  } catch (err) {
+    console.error("[OS_FAST][EVIDENCE_ERROR]", err?.stack || err);
+    req.flash("error", err?.message || "Não foi possível anexar a evidência.");
+    return res.redirect(`/os/${id}#evidencias`);
+  }
+}
+
 function osClose(req, res) {
   const id = Number(req.params.id);
   const user = req.session?.user || null;
   const redirectAfterClose = postCloseRedirectPath(user) || `/os/${id}`;
 
   try {
-    const osAtual = service.getOSById(id);
+    const osAtual = getOSCore(id);
     if (!osAtual) {
       req.flash("error", "OS não encontrada.");
       return res.redirect("/os");
@@ -404,17 +445,14 @@ function osClose(req, res) {
     }
 
     const fotosFechamento = mapFilesToPublic(req.files?.fechamento_fotos || []);
-    if (!fotosFechamento.length) {
-      req.flash("error", "Adicione pelo menos uma mídia (foto ou vídeo) de fechamento para concluir a OS.");
-      return res.redirect(`/os/${id}`);
+    if (fotosFechamento.length) {
+      service.addFotosAberturaFechamento({
+        osId: id,
+        files: fotosFechamento,
+        tipo: "FECHAMENTO",
+        userId: user?.id || null,
+      });
     }
-
-    service.addFotosAberturaFechamento({
-      osId: id,
-      files: fotosFechamento,
-      tipo: "FECHAMENTO",
-      userId: user?.id || null,
-    });
 
     const textoDigitado = normalizeText(req.body?.texto_digitado);
     const transcricaoAudio = normalizeText(req.body?.transcricao_audio);
@@ -435,15 +473,24 @@ function osClose(req, res) {
       }));
     }
 
-    service.persistirRascunhoFechamento(id, {
-      transcricaoBruta: transcricaoAudio,
-      versaoTecnicaSugerida,
-      versaoFinalAprovada,
-      fonteDescricao,
-      textoDigitado,
-      fotosMetadados,
-      userId: user?.id || null,
-    });
+    const hasDraftContent = Boolean(
+      transcricaoAudio
+      || versaoTecnicaSugerida
+      || versaoFinalAprovada
+      || textoDigitado
+      || fotosMetadados.length
+    );
+    if (hasDraftContent) {
+      service.persistirRascunhoFechamento(id, {
+        transcricaoBruta: transcricaoAudio,
+        versaoTecnicaSugerida,
+        versaoFinalAprovada,
+        fonteDescricao,
+        textoDigitado,
+        fotosMetadados,
+        userId: user?.id || null,
+      });
+    }
 
     const fechamentoPayload = {
       fonte_descricao: fonteDescricao,
@@ -488,6 +535,7 @@ function osClose(req, res) {
 module.exports = {
   osCreate,
   osClose,
+  osAddEvidence,
   _test: {
     normalizeGrau,
     normalizeTipoOS,

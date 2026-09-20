@@ -135,6 +135,14 @@ router.post(
   wrap(fastCtrl.osClose, "osCloseFast")
 );
 
+router.post(
+  "/:id/evidencias-fechamento",
+  requireLogin,
+  requireRole(OS_EXECUTION_ACCESS),
+  fechamentoUpload,
+  wrap(fastCtrl.osAddEvidence, "osAddEvidenceFast")
+);
+
 router.post("/:id/status", requireLogin, requireRole(OS_STATUS_ACCESS), wrap(ctrl.osUpdateStatus, "osUpdateStatus"));
 router.post("/:id/excluir", requireLogin, requireAdmin, wrap(ctrl.osDelete, "osDelete"));
 router.post("/:id/auto-alocar", requireLogin, requireTeamRedistribution, wrap(ctrl.osAutoAssign, "osAutoAssign"));
