@@ -4,6 +4,7 @@
   const d=dashboard||{filtros:{},cards:{},graficos:{},tabelas:{ordens:[]},equipamentos_atencao:[],opcoesExtras:{}};
   const extras=d.opcoesExtras||{tipos:[],status:[],criticidades:[]};
   const quality=d.qualidade_dados||{score:null,status:'SEM_DADOS',status_label:'Sem dados suficientes',campos_pendentes:[]};
+  const reliability=d.confiabilidade||{mtbf_dias:null,mttr_horas:null,disponibilidade_pct:null,horas_parada:null,status:'DADOS_INSUFICIENTES',status_label:'Dados insuficientes'};
   const qp=new URLSearchParams(d.filtros||{}).toString();
   const basePath=typeof dashboardBasePath!=='undefined'&&dashboardBasePath?dashboardBasePath:'/pcm/dashboard-gerencial';
   const executiveTitle=typeof dashboardTitle!=='undefined'&&dashboardTitle?dashboardTitle:'Situação da manutenção';
@@ -14,7 +15,7 @@
   function selected(a,b){return String(a||'')===String(b||'')?'selected':''}
   function metric(value,suffix=''){return value===null||typeof value==='undefined'?'Dados insuficientes':`${value}${suffix}`}
 %>
-<link rel="stylesheet" href="/css/pcm-dashboard.css?v=20260914-v3">
+<link rel="stylesheet" href="/css/pcm-dashboard.css?v=20260920-v4">
 <div class="pcm-directors-page">
   <div class="pcm-loading"><div class="pcm-spinner" aria-label="Carregando"></div></div>
   <header class="pcm-directors-head"><div><span class="pcm-section-label"><%= executiveEyebrow %></span><h1><%= executiveTitle %></h1><p><%= executiveSubtitle %></p><span class="pcm-period-chip" id="periodoResumo">Período analisado: <%= d.filtros.data_inicial||'-' %> a <%= d.filtros.data_final||'-' %></span></div><div class="pcm-module-actions"><button class="pcm-button primary ui-btn ui-btn--primary" id="btnAtualizar" type="button">Atualizar dados</button><button class="pcm-button ui-btn ui-btn--outline" id="btnFull" type="button">Modo apresentação</button><button class="pcm-button ui-btn ui-btn--outline" id="btnPdf" type="button">PDF</button><a class="pcm-button ui-btn ui-btn--outline" href="<%= basePath %>/excel?<%= qp %>">Excel</a></div></header>
@@ -33,13 +34,28 @@
       <a class="pcm-director-kpi <%= quality.status==='BOM'?'':quality.status==='ATENCAO'?'danger':'warn' %>" href="#qualidade-dados" data-card="qualidade_dados_pct" data-suffix="%"><span>Qualidade dos dados</span><strong class="pcm-kpi-value"><%= metric(d.cards.qualidade_dados_pct,'%') %></strong><small>Base para indicadores confiáveis</small></a>
     </section>
 
-    <section class="pcm-cost-strip" id="custos" aria-label="Custos de manutenção vinculados às compras">
-      <div class="pcm-cost-head"><div><span class="pcm-section-label">Custos por equipamento</span><h2>Compras vinculadas à manutenção</h2><p>Valores reais dos itens marcados como comprados nas Solicitações vinculadas aos equipamentos.</p></div><a class="pcm-button small ui-btn ui-btn--outline ui-btn--compact" href="/dashboard/diretoria/compras">Abrir acompanhamento de compras</a></div>
+    <section class="pcm-reliability-strip" id="confiabilidade" aria-label="Indicadores de confiabilidade da manutenção">
+      <div class="pcm-cost-head">
+        <div><span class="pcm-section-label">Confiabilidade operacional</span><h2>MTBF, MTTR e disponibilidade</h2><p>Indicadores calculados somente quando a rastreabilidade de falhas e paradas atinge a cobertura mínima definida pelo sistema.</p></div>
+        <span class="pcm-quality-status" data-reliability-status><%= reliability.status_label || 'Dados insuficientes' %></span>
+      </div>
+      <div class="pcm-reliability-kpis">
+        <div><span>MTBF</span><strong data-card="mtbf_dias" data-suffix=" d"><%= metric(d.cards.mtbf_dias,' d') %></strong><small><%= reliability.mtbf_amostras||0 %> intervalo(s) entre falhas</small></div>
+        <div><span>MTTR</span><strong data-card="mttr_horas" data-suffix=" h"><%= metric(d.cards.mttr_horas,' h') %></strong><small><%= reliability.mttr_amostras||0 %> parada(s) com duração válida</small></div>
+        <div><span>Disponibilidade</span><strong data-card="disponibilidade_pct" data-suffix="%"><%= metric(d.cards.disponibilidade_pct,'%') %></strong><small>Base: <%= reliability.equipamentos_base||0 %> equipamento(s)</small></div>
+        <div><span>Horas de parada</span><strong data-card="horas_parada_registrada" data-suffix=" h"><%= metric(d.cards.horas_parada_registrada,' h') %></strong><small>Somente intervalos de parada rastreados</small></div>
+      </div>
+      <div class="pcm-reliability-note">MTBF usa o intervalo médio entre falhas corretivas classificadas do mesmo equipamento. MTTR usa início e fim reais da parada. Disponibilidade considera as horas registradas de parada frente às horas possíveis dos equipamentos filtrados.</div>
+    </section>
+
+    <section class="pcm-cost-strip" id="custos" aria-label="Custos reais da manutenção">
+      <div class="pcm-cost-head"><div><span class="pcm-section-label">Custos por equipamento</span><h2>Custo real consumido na manutenção</h2><p>O custo principal considera somente materiais efetivamente baixados do estoque para OS/equipamentos. Comprado e recebido ficam como contexto financeiro.</p></div><a class="pcm-button small ui-btn ui-btn--outline ui-btn--compact" href="/dashboard/diretoria/compras">Abrir acompanhamento de compras</a></div>
       <div class="pcm-cost-kpis">
-        <div><span>Comprado no período</span><strong data-card-money="custo_comprado_centavos"><%= money(d.cards.custo_comprado_centavos) %></strong><small>Quantidade comprada × valor unitário</small></div>
-        <div><span>Já recebido</span><strong data-card-money="custo_recebido_centavos"><%= money(d.cards.custo_recebido_centavos) %></strong><small>Parcela dos materiais recebidos</small></div>
+        <div><span>Consumido no período</span><strong data-card-money="custo_consumido_centavos"><%= money(d.cards.custo_consumido_centavos) %></strong><small>Baixas reais do estoque × custo unitário</small></div>
+        <div><span>Comprado</span><strong data-card-money="custo_comprado_centavos"><%= money(d.cards.custo_comprado_centavos) %></strong><small>Valor comprometido em compras</small></div>
+        <div><span>Já recebido</span><strong data-card-money="custo_recebido_centavos"><%= money(d.cards.custo_recebido_centavos) %></strong><small>Parcela fisicamente recebida</small></div>
         <div><span>A receber</span><strong data-card-money="custo_pendente_recebimento_centavos"><%= money(d.cards.custo_pendente_recebimento_centavos) %></strong><small>Compra ainda não recebida integralmente</small></div>
-        <div><span>Equipamentos com custo</span><strong data-card="equipamentos_com_custo" class="pcm-kpi-value"><%= d.cards.equipamentos_com_custo??0 %></strong><small>Ativos com compras no filtro atual</small></div>
+        <div><span>Equipamentos com custo</span><strong data-card="equipamentos_com_custo" class="pcm-kpi-value"><%= d.cards.equipamentos_com_custo??0 %></strong><small>Ativos com compra ou consumo no filtro</small></div>
       </div>
     </section>
 
@@ -48,8 +64,8 @@
       <article class="pcm-director-panel"><span class="pcm-section-label">Estratégia</span><h2>Tipos de manutenção</h2><p>Distribuição das intervenções.</p><div class="pcm-chart"><canvas id="chartCorPrev"></canvas><div class="pcm-empty">Sem intervenções.</div></div></article>
       <article class="pcm-director-panel"><span class="pcm-section-label">Tendência</span><h2>OS por mês</h2><p>Evolução do volume de trabalho.</p><div class="pcm-chart"><canvas id="chartOsMes"></canvas><div class="pcm-empty">Sem histórico no período.</div></div></article>
       <article class="pcm-director-panel"><span class="pcm-section-label">Fluxo</span><h2>Situação das OS</h2><p>Distribuição por status real.</p><div class="pcm-chart"><canvas id="chartStatus"></canvas><div class="pcm-empty">Sem ordens no período.</div></div></article>
-      <article class="pcm-director-panel wide pcm-cost-chart-panel"><span class="pcm-section-label">Custo de manutenção</span><h2>Custo comprado por equipamento</h2><p>Ranking das compras vinculadas aos ativos no período selecionado. Clique no equipamento pela ficha técnica para aprofundar o histórico.</p><div class="pcm-chart pcm-chart-tall"><canvas id="chartCustosEquipamentos"></canvas><div class="pcm-empty">Sem compras vinculadas a equipamentos neste período.</div></div></article>
-      <article class="pcm-director-panel pcm-cost-chart-panel"><span class="pcm-section-label">Tendência de custos</span><h2>Evolução mensal</h2><p>Compara o valor comprado com a parcela já recebida.</p><div class="pcm-chart"><canvas id="chartCustosMes"></canvas><div class="pcm-empty">Sem histórico de custos no período.</div></div></article>
+      <article class="pcm-director-panel wide pcm-cost-chart-panel"><span class="pcm-section-label">Custo de manutenção</span><h2>Custo real consumido por equipamento</h2><p>Ranking das baixas físicas de materiais aplicadas nos ativos no período. Compras não consumidas não entram neste ranking.</p><div class="pcm-chart pcm-chart-tall"><canvas id="chartCustosEquipamentos"></canvas><div class="pcm-empty">Sem compras vinculadas a equipamentos neste período.</div></div></article>
+      <article class="pcm-director-panel pcm-cost-chart-panel"><span class="pcm-section-label">Tendência de custos</span><h2>Evolução mensal</h2><p>Compara consumo real, compras e materiais recebidos.</p><div class="pcm-chart"><canvas id="chartCustosMes"></canvas><div class="pcm-empty">Sem histórico de custos no período.</div></div></article>
       <article class="pcm-director-panel wide" id="backlog"><span class="pcm-section-label">Backlog</span><h2>Idade das OS pendentes</h2><p>Mostra o estoque real de OS ainda abertas até a data final, inclusive as abertas antes do início do filtro.</p><div class="pcm-chart"><canvas id="chartBacklogIdade"></canvas><div class="pcm-empty">Sem backlog para os filtros atuais.</div></div></article>
       <article class="pcm-director-panel" id="reincidencia"><span class="pcm-section-label">Reincidência</span><h2>Corretivas repetidas por equipamento</h2><p>Equipamentos com duas ou mais corretivas no período. Não substitui análise de modo de falha.</p><div class="pcm-chart"><canvas id="chartReincidencia"></canvas><div class="pcm-empty">Sem equipamentos reincidentes.</div></div></article>
     </section>
@@ -62,7 +78,7 @@
         <div><span>Corretivas classificadas no PCM</span><strong data-quality="corretivas_classificadas_pct"><%= metric(quality.corretivas_classificadas_pct,'%') %></strong></div>
         <div><span>Corretivas com início/fim de parada</span><strong data-quality="paradas_com_intervalo_pct"><%= metric(quality.paradas_com_intervalo_pct,'%') %></strong></div>
       </div>
-      <div class="pcm-quality-note"><strong>MTBF, MTTR e disponibilidade:</strong> continuam como “dados insuficientes” enquanto a rastreabilidade de parada e retorno à operação não atingir nível confiável.</div>
+      <div class="pcm-quality-note"><strong>MTBF, MTTR e disponibilidade:</strong> são liberados automaticamente quando a cobertura mínima de equipamento, classificação de falha e intervalos de parada for atendida. Quando a base não atingir o mínimo, o painel mantém “Dados insuficientes”.</div>
       <div class="pcm-quality-actions"><strong>Para amadurecer a base:</strong><ul id="qualityPendencias"><% (quality.campos_pendentes||[]).forEach(function(item){ %><li><%= item %></li><% }) %></ul></div>
     </section>
 
@@ -71,4 +87,4 @@
     <table hidden><tbody id="rankingFalhas"></tbody></table>
   </main></div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script><script>window.PCM_DASHBOARD_INITIAL=<%- JSON.stringify(d) %>;window.PCM_DASHBOARD_ENDPOINTS={base:<%- JSON.stringify(basePath) %>,data:<%- JSON.stringify(basePath+'/dados') %>,pdf:<%- JSON.stringify(basePath+'/pdf') %>};</script><script src="/js/pcm-dashboard.js?v=20260914-v3" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script><script>window.PCM_DASHBOARD_INITIAL=<%- JSON.stringify(d) %>;window.PCM_DASHBOARD_ENDPOINTS={base:<%- JSON.stringify(basePath) %>,data:<%- JSON.stringify(basePath+'/dados') %>,pdf:<%- JSON.stringify(basePath+'/pdf') %>};</script><script src="/js/pcm-dashboard.js?v=20260920-v4" defer></script>

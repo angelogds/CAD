@@ -3,7 +3,6 @@ const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const { ACCESS } = require('../../config/rbac');
 const ctrl = require('./diretoria.controller');
 const comprasCtrl = require('../solicitacoes/solicitacoes.acompanhamento.controller');
-const pcmCtrl = require('../pcm/pcm.controller');
 
 const DIRETORIA_ACCESS = ACCESS.diretoria_dashboard;
 const DIRETORIA_COMPRAS = ACCESS.diretoria_compras || DIRETORIA_ACCESS;
@@ -26,6 +25,6 @@ router.post('/compras/:id/aprovar-itens-cotados', requireLogin, requireRole(DIRE
 router.get('/manutencao', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencao);
 router.get('/manutencao/dados', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencaoDados);
 router.get('/manutencao/pdf', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencaoPdf);
-router.get('/manutencao/excel', requireLogin, requireRole(DIRETORIA_MANUTENCAO), pcmCtrl.dashboardExcel);
+router.get('/manutencao/excel', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencaoExcel);
 
 module.exports = router;

@@ -34,6 +34,15 @@ function safeGet(label, sql, params = {}) {
   }
 }
 
+function safeAll(label, sql, params = {}) {
+  try {
+    return db.prepare(sql).all(params) || [];
+  } catch (error) {
+    console.error('[diretoria][manutencao] Falha na consulta:', label, error?.message || error);
+    return [];
+  }
+}
+
 function percentage(part, total) {
   const denominator = Number(total || 0);
   if (!denominator) return null;
@@ -152,6 +161,141 @@ function getDataQuality(filtros = {}) {
   };
 }
 
+function periodHours(filtros = {}) {
+  const start = new Date(`${String(filtros.data_inicial || '')}T00:00:00Z`);
+  const end = new Date(`${String(filtros.data_final || '')}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
+  return Math.max(24, ((end.getTime() - start.getTime()) / 3600000) + 24);
+}
+
+function getReliabilityIndicators(filtros = {}, qualidade = {}) {
+  const empty = {
+    mtbf_horas: null,
+    mtbf_dias: null,
+    mtbf_amostras: 0,
+    mttr_horas: null,
+    mttr_amostras: 0,
+    disponibilidade_pct: null,
+    horas_parada: null,
+    equipamentos_base: 0,
+    falhas_classificadas: 0,
+    paradas_validas: 0,
+    status: 'DADOS_INSUFICIENTES',
+    status_label: 'Dados insuficientes',
+  };
+
+  if (!hasTable('pcm_falhas') || !hasTable('os') || !hasTable('equipamentos')) return empty;
+  if (!hasColumn('pcm_falhas', 'inicio_parada_em') || !hasColumn('pcm_falhas', 'fim_parada_em')) return empty;
+
+  const scope = dashboardWhere(filtros);
+  const falhas = safeAll('confiabilidade_falhas', `
+    SELECT o.id os_id,o.equipamento_id,
+      COALESCE(pf.inicio_parada_em,o.opened_at) falha_em,
+      pf.inicio_parada_em,pf.fim_parada_em
+    FROM os o
+    JOIN pcm_falhas pf ON pf.os_id=o.id
+    LEFT JOIN equipamentos e ON e.id=o.equipamento_id
+    WHERE ${scope.sql}
+      AND o.equipamento_id IS NOT NULL
+      AND UPPER(COALESCE(o.tipo,''))='CORRETIVA'
+      AND UPPER(COALESCE(o.status,'')) NOT IN ${CANCELLED_STATUSES}
+    ORDER BY o.equipamento_id,datetime(COALESCE(pf.inicio_parada_em,o.opened_at)),o.id
+  `, scope.params);
+
+  const intervals = [];
+  const lastFailureByEquipment = new Map();
+  let downtimeHours = 0;
+  let mttrSamples = 0;
+  let validStops = 0;
+
+  for (const row of falhas) {
+    const failureAt = row.falha_em ? new Date(String(row.falha_em).replace(' ', 'T') + (String(row.falha_em).includes('Z') ? '' : 'Z')) : null;
+    if (failureAt && !Number.isNaN(failureAt.getTime())) {
+      const key = Number(row.equipamento_id);
+      const previous = lastFailureByEquipment.get(key);
+      if (previous) {
+        const diffHours = (failureAt.getTime() - previous.getTime()) / 3600000;
+        if (Number.isFinite(diffHours) && diffHours >= 0) intervals.push(diffHours);
+      }
+      lastFailureByEquipment.set(key, failureAt);
+    }
+
+    const start = row.inicio_parada_em ? new Date(String(row.inicio_parada_em).replace(' ', 'T') + (String(row.inicio_parada_em).includes('Z') ? '' : 'Z')) : null;
+    const end = row.fim_parada_em ? new Date(String(row.fim_parada_em).replace(' ', 'T') + (String(row.fim_parada_em).includes('Z') ? '' : 'Z')) : null;
+    if (start && end && !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && end >= start) {
+      const hours = (end.getTime() - start.getTime()) / 3600000;
+      downtimeHours += hours;
+      mttrSamples += 1;
+      validStops += 1;
+    }
+  }
+
+  const equipmentWhere = ['1=1'];
+  const equipmentParams = {};
+  if (filtros.setor && hasColumn('equipamentos', 'setor')) {
+    equipmentWhere.push("COALESCE(NULLIF(TRIM(e.setor),''),'Setor não informado')=@setor");
+    equipmentParams.setor = filtros.setor;
+  }
+  if (filtros.equipamento_id) {
+    equipmentWhere.push('e.id=@equipamento_id');
+    equipmentParams.equipamento_id = Number(filtros.equipamento_id);
+  }
+  if (filtros.criticidade && hasColumn('equipamentos', 'criticidade')) {
+    equipmentWhere.push("UPPER(COALESCE(e.criticidade,''))=@criticidade");
+    equipmentParams.criticidade = filtros.criticidade;
+  }
+  if (filtros.ativo !== '' && hasColumn('equipamentos', 'ativo')) {
+    equipmentWhere.push('COALESCE(e.ativo,1)=@ativo');
+    equipmentParams.ativo = Number(filtros.ativo);
+  } else if (hasColumn('equipamentos', 'ativo')) {
+    equipmentWhere.push('COALESCE(e.ativo,1)=1');
+  }
+
+  const equipmentRow = safeGet('confiabilidade_equipamentos_base',
+    `SELECT COUNT(*) total FROM equipamentos e WHERE ${equipmentWhere.join(' AND ')}`,
+    equipmentParams
+  );
+  const equipmentCount = Number(equipmentRow.total || 0);
+  const totalPossibleHours = periodHours(filtros) * equipmentCount;
+
+  const equipamentoCoverage = Number(qualidade.os_com_equipamento_pct || 0);
+  const classificationCoverage = Number(qualidade.corretivas_classificadas_pct || 0);
+  const stopCoverage = Number(qualidade.paradas_com_intervalo_pct || 0);
+
+  const mtbfAllowed = equipamentoCoverage >= 95 && classificationCoverage >= 85 && intervals.length > 0;
+  const mttrAllowed = equipamentoCoverage >= 95 && stopCoverage >= 85 && mttrSamples > 0;
+  const availabilityAllowed = mttrAllowed && totalPossibleHours > 0;
+
+  const mtbfHours = mtbfAllowed ? intervals.reduce((sum, value) => sum + value, 0) / intervals.length : null;
+  const mttrHours = mttrAllowed ? downtimeHours / mttrSamples : null;
+  const availability = availabilityAllowed
+    ? Math.max(0, Math.min(100, ((totalPossibleHours - Math.min(downtimeHours, totalPossibleHours)) / totalPossibleHours) * 100))
+    : null;
+
+  const availableCount = [mtbfHours, mttrHours, availability].filter((value) => value !== null).length;
+  const status = availableCount === 3 ? 'CONFIAVEL' : availableCount > 0 ? 'PARCIAL' : 'DADOS_INSUFICIENTES';
+  const statusLabel = status === 'CONFIAVEL'
+    ? 'Indicadores liberados'
+    : status === 'PARCIAL'
+      ? 'Indicadores parcialmente disponíveis'
+      : 'Dados insuficientes';
+
+  return {
+    mtbf_horas: mtbfHours === null ? null : Math.round(mtbfHours * 10) / 10,
+    mtbf_dias: mtbfHours === null ? null : Math.round((mtbfHours / 24) * 10) / 10,
+    mtbf_amostras: intervals.length,
+    mttr_horas: mttrHours === null ? null : Math.round(mttrHours * 10) / 10,
+    mttr_amostras: mttrSamples,
+    disponibilidade_pct: availability === null ? null : Math.round(availability * 10) / 10,
+    horas_parada: mttrAllowed ? Math.round(downtimeHours * 10) / 10 : null,
+    equipamentos_base: equipmentCount,
+    falhas_classificadas: falhas.length,
+    paradas_validas: validStops,
+    status,
+    status_label: statusLabel,
+  };
+}
+
 function getDashboard(query = {}, userId = null) {
   const dashboard = pcmService.getDashboardGerencial(query, userId);
   const filtros = dashboard.filtros || pcmService.buildDashboardFilters(query);
@@ -165,7 +309,8 @@ function getDashboard(query = {}, userId = null) {
   const repeticoes = recorrentes.reduce((sum, item) => sum + Number(item.repeticoes_apos_primeira || 0), 0);
   const reincidenciaPct = corretivas ? Math.round((repeticoes * 1000) / corretivas) / 10 : 0;
   const qualidade = getDataQuality(filtros);
-  let custos = { totals: { comprado_centavos: 0, recebido_centavos: 0, pendente_centavos: 0, equipamentos: 0 }, byEquipment: [], byMonth: [] };
+  const confiabilidade = getReliabilityIndicators(filtros, qualidade);
+  let custos = { totals: { comprado_centavos: 0, recebido_centavos: 0, pendente_centavos: 0, consumido_centavos: 0, equipamentos: 0 }, byEquipment: [], byMonth: [] };
   try {
     custos = custosEquipamentosService.getAnalytics({
       data_inicial: filtros.data_inicial,
@@ -185,10 +330,16 @@ function getDashboard(query = {}, userId = null) {
     reincidencia_corretiva_pct: reincidenciaPct,
     equipamentos_reincidentes: recorrentes.length,
     qualidade_dados_pct: qualidade.score,
+    custo_consumido_centavos: Number(custos.totals?.consumido_centavos || 0),
     custo_comprado_centavos: Number(custos.totals?.comprado_centavos || 0),
     custo_recebido_centavos: Number(custos.totals?.recebido_centavos || 0),
     custo_pendente_recebimento_centavos: Number(custos.totals?.pendente_centavos || 0),
     equipamentos_com_custo: Number(custos.totals?.equipamentos || 0),
+    mtbf_horas: confiabilidade.mtbf_horas,
+    mtbf_dias: confiabilidade.mtbf_dias,
+    mttr_horas: confiabilidade.mttr_horas,
+    disponibilidade_pct: confiabilidade.disponibilidade_pct,
+    horas_parada_registrada: confiabilidade.horas_parada,
   };
   dashboard.graficos = {
     ...(dashboard.graficos || {}),
@@ -206,6 +357,7 @@ function getDashboard(query = {}, userId = null) {
   dashboard.custos = custos;
   dashboard.confiabilidade = {
     ...(dashboard.confiabilidade || {}),
+    ...confiabilidade,
     qualidade_dados_pct: qualidade.score,
     status_qualidade: qualidade.status,
   };
@@ -216,4 +368,5 @@ module.exports = {
   getDashboard,
   getBacklogAging,
   getDataQuality,
+  getReliabilityIndicators,
 };

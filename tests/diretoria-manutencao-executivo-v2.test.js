@@ -34,18 +34,20 @@ test('reincidência usa duas ou mais corretivas por equipamento sem fingir modo 
   assert.match(view, /Não substitui análise de modo de falha/);
 });
 
-test('qualidade dos dados mede rastreabilidade antes de liberar confiabilidade oficial', () => {
+test('qualidade dos dados controla a liberação dos indicadores de confiabilidade', () => {
   const service = read('modules/diretoria/diretoria.manutencao.service.js');
   const view = read('views/pcm/dashboard-gerencial.ejs');
   assert.match(service, /pcm_falhas/);
   assert.match(service, /inicio_parada_em/);
   assert.match(service, /fim_parada_em/);
   assert.match(service, /os_com_equipamento_pct/);
-  assert.match(service, /encerramento_com_data_pct/);
   assert.match(service, /corretivas_classificadas_pct/);
   assert.match(service, /paradas_com_intervalo_pct/);
+  assert.match(service, /function getReliabilityIndicators/);
+  assert.match(service, /mtbfAllowed/);
+  assert.match(service, /mttrAllowed/);
   assert.match(view, /MTBF, MTTR e disponibilidade/);
-  assert.match(view, /continuam como “dados insuficientes”/);
+  assert.match(view, /são liberados automaticamente/);
 });
 
 test('rota de atualização da Diretoria usa a camada executiva e preserva RBAC', () => {
