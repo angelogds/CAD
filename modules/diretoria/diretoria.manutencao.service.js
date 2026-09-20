@@ -111,7 +111,7 @@ function getDataQuality(filtros = {}) {
     ? "EXISTS (SELECT 1 FROM pcm_falhas pf WHERE pf.os_id=o.id)"
     : '0';
   const paradaExpr = hasFalhas && hasColumn('pcm_falhas', 'inicio_parada_em') && hasColumn('pcm_falhas', 'fim_parada_em')
-    ? "EXISTS (SELECT 1 FROM pcm_falhas pf WHERE pf.os_id=o.id AND pf.inicio_parada_em IS NOT NULL AND pf.fim_parada_em IS NOT NULL)"
+    ? "EXISTS (SELECT 1 FROM pcm_falhas pf WHERE pf.os_id=o.id AND pf.inicio_parada_em IS NOT NULL AND pf.fim_parada_em IS NOT NULL AND julianday(pf.inicio_parada_em) IS NOT NULL AND julianday(pf.fim_parada_em) IS NOT NULL AND julianday(pf.fim_parada_em) >= julianday(pf.inicio_parada_em))"
     : '0';
 
   const row = safeGet('qualidade_dados', `
@@ -161,11 +161,29 @@ function getDataQuality(filtros = {}) {
   };
 }
 
+function parseSqlDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+  const withZone = /(?:Z|[+-]\\d{2}:?\\d{2})$/.test(normalized) ? normalized : `${normalized}Z`;
+  const date = new Date(withZone);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function periodBounds(filtros = {}) {
+  const startRaw = String(filtros.data_inicial || '');
+  const endRaw = String(filtros.data_final || '');
+  const start = /^\\d{4}-\\d{2}-\\d{2}$/.test(startRaw) ? new Date(`${startRaw}T00:00:00Z`) : null;
+  const end = /^\\d{4}-\\d{2}-\\d{2}$/.test(endRaw) ? new Date(`${endRaw}T00:00:00Z`) : null;
+  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return { start: null, endExclusive: null, hours: 0 };
+  }
+  const endExclusive = new Date(end.getTime() + 86400000);
+  return { start, endExclusive, hours: (endExclusive.getTime() - start.getTime()) / 3600000 };
+}
+
 function periodHours(filtros = {}) {
-  const start = new Date(`${String(filtros.data_inicial || '')}T00:00:00Z`);
-  const end = new Date(`${String(filtros.data_final || '')}T00:00:00Z`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
-  return Math.max(24, ((end.getTime() - start.getTime()) / 3600000) + 24);
+  return periodBounds(filtros).hours;
 }
 
 function getReliabilityIndicators(filtros = {}, qualidade = {}) {
@@ -202,15 +220,17 @@ function getReliabilityIndicators(filtros = {}, qualidade = {}) {
     ORDER BY o.equipamento_id,datetime(COALESCE(pf.inicio_parada_em,o.opened_at)),o.id
   `, scope.params);
 
+  const bounds = periodBounds(filtros);
   const intervals = [];
   const lastFailureByEquipment = new Map();
-  let downtimeHours = 0;
+  const stopIntervalsByEquipment = new Map();
+  let repairHours = 0;
   let mttrSamples = 0;
   let validStops = 0;
 
   for (const row of falhas) {
-    const failureAt = row.falha_em ? new Date(String(row.falha_em).replace(' ', 'T') + (String(row.falha_em).includes('Z') ? '' : 'Z')) : null;
-    if (failureAt && !Number.isNaN(failureAt.getTime())) {
+    const failureAt = parseSqlDate(row.falha_em);
+    if (failureAt) {
       const key = Number(row.equipamento_id);
       const previous = lastFailureByEquipment.get(key);
       if (previous) {
@@ -220,14 +240,49 @@ function getReliabilityIndicators(filtros = {}, qualidade = {}) {
       lastFailureByEquipment.set(key, failureAt);
     }
 
-    const start = row.inicio_parada_em ? new Date(String(row.inicio_parada_em).replace(' ', 'T') + (String(row.inicio_parada_em).includes('Z') ? '' : 'Z')) : null;
-    const end = row.fim_parada_em ? new Date(String(row.fim_parada_em).replace(' ', 'T') + (String(row.fim_parada_em).includes('Z') ? '' : 'Z')) : null;
-    if (start && end && !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && end >= start) {
-      const hours = (end.getTime() - start.getTime()) / 3600000;
-      downtimeHours += hours;
-      mttrSamples += 1;
-      validStops += 1;
+    const start = parseSqlDate(row.inicio_parada_em);
+    const end = parseSqlDate(row.fim_parada_em);
+    if (!start || !end || end < start) continue;
+
+    const fullRepairHours = (end.getTime() - start.getTime()) / 3600000;
+    if (!Number.isFinite(fullRepairHours) || fullRepairHours < 0) continue;
+
+    repairHours += fullRepairHours;
+    mttrSamples += 1;
+    validStops += 1;
+
+    let effectiveStart = start;
+    let effectiveEnd = end;
+    if (bounds.start && effectiveStart < bounds.start) effectiveStart = bounds.start;
+    if (bounds.endExclusive && effectiveEnd > bounds.endExclusive) effectiveEnd = bounds.endExclusive;
+    if (effectiveEnd <= effectiveStart) continue;
+
+    const key = Number(row.equipamento_id);
+    const equipmentIntervals = stopIntervalsByEquipment.get(key) || [];
+    equipmentIntervals.push([effectiveStart.getTime(), effectiveEnd.getTime()]);
+    stopIntervalsByEquipment.set(key, equipmentIntervals);
+  }
+
+  let downtimeHours = 0;
+  for (const equipmentIntervals of stopIntervalsByEquipment.values()) {
+    equipmentIntervals.sort((a, b) => a[0] - b[0]);
+    let current = null;
+
+    for (const interval of equipmentIntervals) {
+      if (!current) {
+        current = [...interval];
+        continue;
+      }
+
+      if (interval[0] <= current[1]) {
+        current[1] = Math.max(current[1], interval[1]);
+      } else {
+        downtimeHours += (current[1] - current[0]) / 3600000;
+        current = [...interval];
+      }
     }
+
+    if (current) downtimeHours += (current[1] - current[0]) / 3600000;
   }
 
   const equipmentWhere = ['1=1'];
@@ -251,12 +306,13 @@ function getReliabilityIndicators(filtros = {}, qualidade = {}) {
     equipmentWhere.push('COALESCE(e.ativo,1)=1');
   }
 
-  const equipmentRow = safeGet('confiabilidade_equipamentos_base',
+  const equipmentRow = safeGet(
+    'confiabilidade_equipamentos_base',
     `SELECT COUNT(*) total FROM equipamentos e WHERE ${equipmentWhere.join(' AND ')}`,
     equipmentParams
   );
   const equipmentCount = Number(equipmentRow.total || 0);
-  const totalPossibleHours = periodHours(filtros) * equipmentCount;
+  const totalPossibleHours = bounds.hours * equipmentCount;
 
   const equipamentoCoverage = Number(qualidade.os_com_equipamento_pct || 0);
   const classificationCoverage = Number(qualidade.corretivas_classificadas_pct || 0);
@@ -267,7 +323,7 @@ function getReliabilityIndicators(filtros = {}, qualidade = {}) {
   const availabilityAllowed = mttrAllowed && totalPossibleHours > 0;
 
   const mtbfHours = mtbfAllowed ? intervals.reduce((sum, value) => sum + value, 0) / intervals.length : null;
-  const mttrHours = mttrAllowed ? downtimeHours / mttrSamples : null;
+  const mttrHours = mttrAllowed ? repairHours / mttrSamples : null;
   const availability = availabilityAllowed
     ? Math.max(0, Math.min(100, ((totalPossibleHours - Math.min(downtimeHours, totalPossibleHours)) / totalPossibleHours) * 100))
     : null;
@@ -287,7 +343,7 @@ function getReliabilityIndicators(filtros = {}, qualidade = {}) {
     mttr_horas: mttrHours === null ? null : Math.round(mttrHours * 10) / 10,
     mttr_amostras: mttrSamples,
     disponibilidade_pct: availability === null ? null : Math.round(availability * 10) / 10,
-    horas_parada: mttrAllowed ? Math.round(downtimeHours * 10) / 10 : null,
+    horas_parada: validStops ? Math.round(downtimeHours * 10) / 10 : 0,
     equipamentos_base: equipmentCount,
     falhas_classificadas: falhas.length,
     paradas_validas: validStops,

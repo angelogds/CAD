@@ -19,6 +19,20 @@ test('confiabilidade executiva usa somente falhas e paradas rastreadas', () => {
   assert.match(service, /availabilityAllowed = mttrAllowed && totalPossibleHours > 0/);
 });
 
+test('disponibilidade usa somente paradas válidas, recortadas no período e sem dupla contagem', () => {
+  const service = read('modules/diretoria/diretoria.manutencao.service.js');
+
+  assert.match(service, /julianday\(pf\.fim_parada_em\) >= julianday\(pf\.inicio_parada_em\)/);
+  assert.match(service, /function periodBounds/);
+  assert.match(service, /stopIntervalsByEquipment/);
+  assert.match(service, /effectiveStart/);
+  assert.match(service, /effectiveEnd/);
+  assert.match(service, /equipmentIntervals\.sort/);
+  assert.match(service, /interval\[0\] <= current\[1\]/);
+  assert.match(service, /repairHours \+= fullRepairHours/);
+  assert.match(service, /downtimeHours \+= \(current\[1\] - current\[0\]\) \/ 3600000/);
+});
+
 test('MTBF, MTTR e disponibilidade não recebem valor quando a base é insuficiente', () => {
   const service = read('modules/diretoria/diretoria.manutencao.service.js');
 
