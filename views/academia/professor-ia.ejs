@@ -1,48 +1,22 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/academia.css" />
-<div class="page-head"><div><h1>Professor IA da Manutenção</h1><p class="muted">Chat técnico com respostas didáticas por tópicos, como um professor para dúvidas do curso.</p></div></div>
-<%- include(incluir('_menu')) %>
-
-<div class="academia-chat-wrap academia-card">
-  <% if (!iaConfigured) { %>
-    <p class="muted-xs" style="color:#b45309;margin-bottom:10px;">IA ainda não ativada. Configure OPENAI_API_KEY (compatível com OPENAI_APIKEY/OPENAI_KEY) para habilitar o Professor IA.</p>
-  <% } %>
-
-  <div id="iaChatLog" class="ia-chat-log" aria-live="polite">
-    <div class="ia-msg ia-msg-assistant">
-      <div class="ia-msg-role">Professora IA</div>
-      <div class="ia-msg-body">Olá! Pode perguntar sobre conteúdos do curso, aplicação em <strong>EF (teste final)</strong> ou cenário de <strong>preventiva</strong>. Vou responder em tópicos organizados.</div>
+<link rel="stylesheet" href="/css/academia.css?v=20260919-p4" />
+<main class="academy-workspace">
+  <header class="academy-hero"><div><span class="academy-eyebrow">ACADEMIA • PROFESSOR IA</span><h1>Professor IA da Manutenção</h1><p>Chat técnico didático para dúvidas do curso, preparação para EF e aplicação em manutenção preventiva.</p></div><div class="academy-hero-actions"><a class="ui-btn ui-btn--secondary" href="/academia">Visão geral</a></div></header>
+  <%- include(incluir('_menu')) %>
+  <section class="academy-chat-wrap academy-panel">
+    <% if (!iaConfigured) { %><div class="academy-note warning">IA ainda não ativada. Configure OPENAI_API_KEY (compatível com OPENAI_APIKEY/OPENAI_KEY) para habilitar o Professor IA.</div><% } %>
+    <div class="academy-section-head"><div><h2>Sala do Professor IA</h2><p>Escolha o contexto e faça uma pergunta técnica.</p></div><span class="academy-badge info">Assistente didático</span></div>
+    <div id="iaChatLog" class="ia-chat-log" aria-live="polite">
+      <div class="ia-msg ia-msg-assistant"><div class="ia-msg-role">Professora IA</div><div class="ia-msg-body">Olá! Pode perguntar sobre conteúdos do curso, aplicação em <strong>EF (teste final)</strong> ou cenário de <strong>preventiva</strong>. Vou responder em tópicos organizados.</div></div>
     </div>
-  </div>
-
-  <div class="ia-chat-compose">
-    <div class="academia-grid" style="grid-template-columns:1fr 220px;gap:8px;">
-      <div>
-        <label class="muted-xs">Curso de contexto (opcional)</label>
-        <select id="iaCursoId">
-          <option value="">Sem curso específico</option>
-          <% (cursos || []).forEach(function(c){ %>
-            <option value="<%= c.id %>"><%= c.titulo %></option>
-          <% }) %>
-        </select>
+    <div class="ia-chat-compose">
+      <div class="academy-chat-context">
+        <label class="academy-field"><span>Curso de contexto (opcional)</span><select id="iaCursoId"><option value="">Sem curso específico</option><% (cursos || []).forEach(function(c){ %><option value="<%= c.id %>"><%= c.titulo %></option><% }) %></select></label>
+        <label class="academy-field"><span>Modo da resposta</span><select id="iaModo"><option value="curso">Professor do curso</option><option value="ef">Preparar para EF</option><option value="preventiva">Aplicar na preventiva</option></select></label>
       </div>
-      <div>
-        <label class="muted-xs">Modo da resposta</label>
-        <select id="iaModo">
-          <option value="curso">Professor do curso</option>
-          <option value="ef">Preparar para EF</option>
-          <option value="preventiva">Aplicar na preventiva</option>
-        </select>
-      </div>
+      <textarea id="iaPergunta" rows="4" placeholder="Ex.: Como aplicar metrologia industrial na inspeção preventiva de redutor?"></textarea>
+      <div class="academy-chat-footer"><p id="iaWarning" class="academy-warning-text"></p><button class="ui-btn ui-btn--primary" type="button" data-ia-action="perguntar">Enviar pergunta</button></div>
     </div>
-
-    <textarea id="iaPergunta" rows="4" placeholder="Ex.: Como aplicar metrologia industrial na inspeção preventiva de redutor?"></textarea>
-
-    <div class="academia-actions" style="margin-top:8px;justify-content:space-between;">
-      <p id="iaWarning" class="muted-xs" style="color:#b45309;margin:0;"></p>
-      <button class="btn" type="button" data-ia-action="perguntar">Enviar pergunta</button>
-    </div>
-  </div>
-</div>
-
+  </section>
+</main>
 <script src="/js/academia.js"></script>
