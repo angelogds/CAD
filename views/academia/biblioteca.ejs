@@ -1,24 +1,25 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/academia.css" />
-<div class="page-head"><div><h1>Biblioteca técnica</h1><p class="muted">Manuais, procedimentos e conteúdos por categoria/equipamento.</p></div></div>
-<%- include(incluir('_menu')) %>
-
-<form class="card" method="GET" action="/academia/biblioteca" style="margin-bottom:12px;">
-  <div class="grid cols-3">
-    <input type="text" name="busca" placeholder="Buscar material" value="<%= filtros.busca %>" />
-    <select name="categoria"><option value="">Todas as categorias</option><% categorias.forEach(function(cat){ %><option value="<%= cat %>" <%= filtros.categoria===cat?'selected':'' %>><%= cat %></option><% }) %></select>
-    <button class="btn" type="submit">Filtrar</button>
-  </div>
-</form>
-
-<div class="academia-grid">
-  <% if (!itens.length) { %><p class="muted">Nenhum item disponível.</p><% } %>
-  <% itens.forEach(function(item){ %>
-    <div class="academia-card">
-      <div class="muted-xs"><strong><%= item.tipo %></strong> • <%= item.categoria || 'Sem categoria' %></div>
-      <h3><%= item.titulo %></h3>
-      <p class="muted"><%= item.descricao || 'Sem descrição' %></p>
-      <a class="btn btn-outline" href="<%= item.arquivo_url %>" target="_blank" rel="noopener">Abrir material</a>
-    </div>
-  <% }) %>
-</div>
+<link rel="stylesheet" href="/css/academia.css?v=20260919-p4" />
+<main class="academy-workspace">
+  <header class="academy-hero"><div><span class="academy-eyebrow">ACADEMIA • BIBLIOTECA</span><h1>Biblioteca técnica</h1><p>Manuais, procedimentos e conteúdos técnicos organizados por categoria e equipamento.</p></div></header>
+  <%- include(incluir('_menu')) %>
+  <section class="academy-panel">
+    <div class="academy-section-head"><div><h2>Localizar material</h2><p>Pesquise por título, descrição ou categoria.</p></div><span class="academy-badge"><%= itens.length %> item(ns)</span></div>
+    <form method="GET" action="/academia/biblioteca" class="academy-filter cols-3">
+      <label class="academy-field"><span>Buscar</span><input type="text" name="busca" placeholder="Buscar material" value="<%= filtros.busca %>"></label>
+      <label class="academy-field"><span>Categoria</span><select name="categoria"><option value="">Todas as categorias</option><% categorias.forEach(function(cat){ %><option value="<%= cat %>" <%= filtros.categoria===cat?'selected':'' %>><%= cat %></option><% }) %></select></label>
+      <div class="academy-filter-actions academy-actions"><button class="ui-btn ui-btn--primary" type="submit">Filtrar</button><a class="ui-btn ui-btn--secondary" href="/academia/biblioteca">Limpar</a></div>
+    </form>
+  </section>
+  <section class="academy-course-grid">
+    <% if (!itens.length) { %><div class="academy-empty">Nenhum item disponível.</div><% } %>
+    <% itens.forEach(function(item){ %>
+      <article class="academy-course-card academy-doc-card">
+        <div class="academy-doc-meta"><span class="academy-badge"><%= item.tipo %></span><span class="academy-badge"><%= item.categoria || 'Sem categoria' %></span></div>
+        <h3><%= item.titulo %></h3>
+        <p><%= item.descricao || 'Sem descrição' %></p>
+        <div class="academy-card-footer"><a class="ui-btn ui-btn--outline" href="<%= item.arquivo_url %>" target="_blank" rel="noopener">Abrir material</a></div>
+      </article>
+    <% }) %>
+  </section>
+</main>
