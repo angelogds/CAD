@@ -258,6 +258,8 @@ function retirarReserva({ reservaId, quantidade, qrCode, entreguePorUserId, obse
       quantidade: qtd,
       saldoPosterior: posterior,
       status,
+      solicitacaoId: Number(reserva.solicitacao_id),
+      solicitacaoItemId: Number(reserva.solicitacao_item_id),
     };
   })();
 
