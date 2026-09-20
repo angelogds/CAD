@@ -178,7 +178,7 @@ function insertMovimento(data) {
     ['origem', data.origem], ['os_id', data.os_id], ['equipamento_id', data.equipamento_id],
     ['solicitacao_id', data.solicitacao_id], ['solicitacao_item_id', data.solicitacao_item_id],
     ['usuario_id', data.usuario_id], ['saldo_anterior', data.saldo_anterior], ['saldo_posterior', data.saldo_posterior],
-    ['observacao', data.observacao], ['reserva_id', data.reserva_id],
+    ['custo_unit', data.custo_unit], ['observacao', data.observacao], ['reserva_id', data.reserva_id],
     ['retirado_por_colaborador_id', data.retirado_por_colaborador_id],
     ['retirado_por_user_id', data.retirado_por_user_id],
     ['entregue_por_user_id', data.entregue_por_user_id],
@@ -199,7 +199,9 @@ function retirarReserva({ reservaId, quantidade, qrCode, entreguePorUserId, obse
   const resultado = db.transaction(() => {
     const reserva = db.prepare(`
       SELECT r.*,s.numero,si.unidade,${itemNameExpr('si')} item_nome,
-        COALESCE(ei.saldo_atual,0) saldo_fisico
+        COALESCE(ei.saldo_atual,0) saldo_fisico,
+        ${hasColumn('solicitacao_itens', 'valor_unitario_centavos') ? 'si.valor_unitario_centavos' : 'NULL'} valor_unitario_centavos,
+        ${hasColumn('estoque_itens', 'custo_unit') ? 'ei.custo_unit' : 'NULL'} estoque_custo_unit
       FROM estoque_reservas r
       JOIN solicitacoes s ON s.id=r.solicitacao_id
       JOIN solicitacao_itens si ON si.id=r.solicitacao_item_id
@@ -230,6 +232,9 @@ function retirarReserva({ reservaId, quantidade, qrCode, entreguePorUserId, obse
     `).run(posterior, reserva.estoque_item_id, anterior);
     if (!stockUpdate.changes) throw new Error('Saldo foi alterado por outro usuário. Atualize e tente novamente.');
 
+    const custoUnit = Number(reserva.valor_unitario_centavos || 0) > 0
+      ? Number(reserva.valor_unitario_centavos) / 100
+      : Number(reserva.estoque_custo_unit || 0);
     const movimentoId = insertMovimento({
       tipo: 'SAIDA_REQUISICAO_INTERNA',
       item_id: reserva.estoque_item_id,
@@ -242,6 +247,7 @@ function retirarReserva({ reservaId, quantidade, qrCode, entreguePorUserId, obse
       usuario_id: entreguePorUserId || null,
       saldo_anterior: anterior,
       saldo_posterior: posterior,
+      custo_unit: custoUnit || null,
       observacao: observacao || `Retirada ${reserva.numero || `#${reserva.solicitacao_id}`} por ${pessoa.nome}`,
       reserva_id: reserva.id,
       retirado_por_colaborador_id: pessoa.identity_type === 'COLABORADOR' ? pessoa.colaborador_id : null,

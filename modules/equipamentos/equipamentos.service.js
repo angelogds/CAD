@@ -375,6 +375,17 @@ function listConsumoMateriais(equipamentoId, filtros = {}) {
   const entregadorJoin = hasEntreguePor && tableExists("users")
     ? "LEFT JOIN users eu ON eu.id=m.entregue_por_user_id"
     : "LEFT JOIN (SELECT NULL id,NULL name) eu ON 1=0";
+  const hasMovCusto = columnExists("estoque_movimentos", "custo_unit");
+  const hasItemValor = columnExists("solicitacao_itens", "valor_unitario_centavos");
+  const hasEstoqueCusto = columnExists("estoque_itens", "custo_unit");
+  const custoUnitCentavosExpr = `CASE
+    WHEN ${hasMovCusto ? "m.custo_unit" : "NULL"} IS NOT NULL AND ${hasMovCusto ? "m.custo_unit" : "NULL"} > 0
+      THEN ROUND(${hasMovCusto ? "m.custo_unit" : "0"} * 100)
+    WHEN ${hasItemValor ? "si.valor_unitario_centavos" : "NULL"} IS NOT NULL AND ${hasItemValor ? "si.valor_unitario_centavos" : "NULL"} > 0
+      THEN ${hasItemValor ? "si.valor_unitario_centavos" : "0"}
+    WHEN ${hasEstoqueCusto ? "ei.custo_unit" : "NULL"} IS NOT NULL AND ${hasEstoqueCusto ? "ei.custo_unit" : "NULL"} > 0
+      THEN ROUND(${hasEstoqueCusto ? "ei.custo_unit" : "0"} * 100)
+    ELSE 0 END`;
 
   return db.prepare(`
     SELECT m.id,m.tipo,m.quantidade,m.os_id,m.solicitacao_id,m.solicitacao_item_id,m.observacao,
@@ -382,6 +393,8 @@ function listConsumoMateriais(equipamentoId, filtros = {}) {
            ei.codigo AS estoque_codigo,ei.nome AS estoque_item_nome,ei.unidade AS estoque_unidade,
            COALESCE(si.item_nome,si.item_descricao,ei.nome) AS item_nome,
            COALESCE(si.unidade,ei.unidade,'UN') AS unidade,
+           (${custoUnitCentavosExpr}) AS valor_unitario_centavos,
+           ROUND(ABS(COALESCE(m.quantidade,0)) * (${custoUnitCentavosExpr})) AS total_centavos,
            s.numero AS solicitacao_numero,
            u.name AS usuario_nome,rc.nome AS retirado_por_nome,eu.name AS entregue_por_nome
     FROM estoque_movimentos m

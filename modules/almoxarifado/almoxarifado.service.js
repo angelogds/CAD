@@ -28,6 +28,9 @@ const HAS_ITEM_STATUS_COMPRA = hasColumn("solicitacao_itens", "status_compra");
 const HAS_ITEM_FORNECEDOR_ID = hasColumn("solicitacao_itens", "fornecedor_id");
 const HAS_ITEM_PREVISAO = hasColumn("solicitacao_itens", "previsao_entrega");
 const HAS_MOV_SOLICITACAO_ITEM = hasColumn("estoque_movimentos", "solicitacao_item_id");
+const HAS_ESTOQUE_CUSTO_UNIT = hasColumn("estoque_itens", "custo_unit");
+const HAS_MOV_CUSTO_UNIT = hasColumn("estoque_movimentos", "custo_unit");
+const HAS_ITEM_VALOR_UNITARIO = hasColumn("solicitacao_itens", "valor_unitario_centavos");
 
 // O Almoxarifado acompanha a solicitação inteira, mas a autorização física de
 // recebimento é por ITEM. Assim, um item COMPRADO já pode ser conferido mesmo
@@ -371,7 +374,7 @@ function insertEstoqueMovimento(data) {
     ["origem", data.origem], ["os_id", data.os_id], ["equipamento_id", data.equipamento_id],
     ["solicitacao_id", data.solicitacao_id], ["solicitacao_item_id", data.solicitacao_item_id],
     ["usuario_id", data.usuario_id], ["saldo_anterior", data.saldo_anterior], ["saldo_posterior", data.saldo_posterior],
-    ["observacao", data.observacao],
+    ["custo_unit", data.custo_unit], ["observacao", data.observacao],
   ];
   optional.forEach(([col, value]) => { if (hasColumn("estoque_movimentos", col)) { cols.push(col); vals.push(value ?? null); } });
   const info = db.prepare(`INSERT INTO estoque_movimentos (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(...vals);
@@ -434,9 +437,27 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, use
 
     const saldoAnterior = getSaldoEstoqueItem(estoqueItemId);
     const saldoPosterior = saldoAnterior + quantidade;
-    if (HAS_SALDO_ATUAL) {
+    const custoCompraUnit = HAS_ITEM_VALOR_UNITARIO && Number(item.valor_unitario_centavos || 0) > 0
+      ? Number(item.valor_unitario_centavos) / 100
+      : 0;
+    const custoAnterior = HAS_ESTOQUE_CUSTO_UNIT
+      ? Number(db.prepare("SELECT COALESCE(custo_unit,0) FROM estoque_itens WHERE id=?").pluck().get(estoqueItemId) || 0)
+      : 0;
+    const custoMedioPosterior = custoCompraUnit > 0
+      ? (custoAnterior > 0 && saldoAnterior > 0
+        ? ((saldoAnterior * custoAnterior) + (quantidade * custoCompraUnit)) / saldoPosterior
+        : custoCompraUnit)
+      : custoAnterior;
+
+    if (HAS_SALDO_ATUAL && HAS_ESTOQUE_CUSTO_UNIT) {
+      db.prepare("UPDATE estoque_itens SET saldo_atual=COALESCE(saldo_atual,0)+?, custo_unit=?, updated_at=datetime('now') WHERE id=?")
+        .run(quantidade, custoMedioPosterior, estoqueItemId);
+    } else if (HAS_SALDO_ATUAL) {
       db.prepare("UPDATE estoque_itens SET saldo_atual=COALESCE(saldo_atual,0)+?, updated_at=datetime('now') WHERE id=?")
         .run(quantidade, estoqueItemId);
+    } else if (HAS_ESTOQUE_CUSTO_UNIT && custoMedioPosterior > 0) {
+      db.prepare("UPDATE estoque_itens SET custo_unit=?, updated_at=datetime('now') WHERE id=?")
+        .run(custoMedioPosterior, estoqueItemId);
     }
 
     const movimentoId = insertEstoqueMovimento({
@@ -444,6 +465,7 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, use
       os_id: solicitacao.os_id || null, equipamento_id: solicitacao.equipamento_id || null,
       solicitacao_id: solicitacaoId, solicitacao_item_id: itemId, usuario_id: userId || null,
       saldo_anterior: saldoAnterior, saldo_posterior: saldoPosterior,
+      custo_unit: HAS_MOV_CUSTO_UNIT ? (custoCompraUnit || custoMedioPosterior || null) : null,
       observacao: observacao || `Recebimento ${solicitacao.numero || `#${solicitacaoId}`}`,
     });
 

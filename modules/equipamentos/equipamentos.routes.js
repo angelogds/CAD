@@ -128,7 +128,7 @@ function loadEquipmentCosts(req, res, next) {
     res.locals.custosEquipamento = custosEquipamentosService.getEquipmentLifetime(equipamentoId);
   } catch (error) {
     console.error('[equipamentos] Falha ao carregar custos vinculados:', error?.message || error);
-    res.locals.custosEquipamento = { totals: {}, byMonth: [], items: [] };
+    res.locals.custosEquipamento = { totals: {}, byMonth: [], items: [], consumos: [], consumoByOS: [] };
   }
   return next();
 }

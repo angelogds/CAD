@@ -97,6 +97,11 @@ async function equipShow(req, res) {
   const desenhosTecnicos = desenhoTecnicoService ? desenhoTecnicoService.listByEquipamento(id) : [];
   const riscoFalha = pcmIntelligenceService ? pcmIntelligenceService.calcularScoreRiscoEquipamento(id) : null;
   const dashboard = service.getEquipmentDashboard(id);
+  const custosEquipamento = res.locals.custosEquipamento || { totals: {}, byMonth: [], items: [], consumos: [], consumoByOS: [] };
+  const custoRealPorOS = new Map((custosEquipamento.consumoByOS || []).map((row) => [Number(row.os_id), Number(row.consumido_centavos || 0)]));
+  historicoOS.forEach((ordem) => {
+    ordem.custo_real_centavos = custoRealPorOS.get(Number(ordem.id)) || 0;
+  });
 
   return res.render("equipamentos/show", {
     title: equip.nome,
@@ -118,6 +123,7 @@ async function equipShow(req, res) {
     desenhosTecnicos,
     riscoFalha,
     dashboard,
+    custosEquipamento,
   });
 }
 
