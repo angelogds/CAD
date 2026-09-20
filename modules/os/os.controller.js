@@ -267,7 +267,7 @@ function osShow(req, res) {
     const solicitacaoId = Number(chatResumo?.solicitacao?.id || 0);
     materialRequest = solicitacaoId ? solicitacoesService.getSolicitacaoById(solicitacaoId) : null;
     canManageMaterialRequest = materialRequest
-      ? solicitacoesItensService.canManageItems(materialRequest, req.session?.user || {})
+      ? canAccessModule(role, "solicitacoes_read") && solicitacoesItensService.canManageItems(materialRequest, req.session?.user || {})
       : false;
     if (materialRequest) {
       try { materialItemChanges = solicitacoesItensService.getAlteracoes(materialRequest.id); } catch (_error) { materialItemChanges = []; }
