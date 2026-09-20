@@ -289,9 +289,10 @@ function getReliabilityMetrics(filtros = {}, qualidade = {}) {
     : null;
 
   const classificacaoOk = Number(qualidade.corretivas_classificadas_pct || 0) >= 85;
-  const paradaOk = Number(qualidade.paradas_com_intervalo_pct || 0) >= 85;
+  const intervalosValidosPct = percentage(mttrSamples, rows.length);
+  const paradaOk = Number(intervalosValidosPct || 0) >= 85;
   const equipamentoOk = Number(qualidade.os_com_equipamento_pct || 0) >= 95;
-  const amostraOk = mtbfSamples >= 1 && mttrSamples >= 1;
+  const amostraOk = mtbfSamples >= 2 && mttrSamples >= 2;
   const publicado = classificacaoOk && paradaOk && equipamentoOk && amostraOk;
 
   let status = 'EM_FORMACAO';
@@ -316,9 +317,10 @@ function getReliabilityMetrics(filtros = {}, qualidade = {}) {
     paradas_validas: mttrSamples,
     mtbf_amostras: mtbfSamples,
     mttr_amostras: mttrSamples,
+    intervalos_validos_pct: intervalosValidosPct,
     equipamentos_com_mtbf: byEquipment.filter((row) => row.mtbf_horas !== null).length,
     byEquipment,
-    criterio: 'Disponibilidade = MTBF / (MTBF + MTTR). Os indicadores são publicados apenas com cobertura mínima de rastreabilidade.',
+    criterio: 'Disponibilidade estimada = MTBF / (MTBF + MTTR). Publicação exige ≥85% de intervalos válidos e amostra mínima de 2 intervalos MTBF e 2 reparos MTTR.',
   };
 }
 
