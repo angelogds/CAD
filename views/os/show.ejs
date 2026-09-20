@@ -23,6 +23,8 @@
   const openedAt = os.opened_at || os.data_abertura || os.created_at || '';
   const startedAt = os.data_inicio || os.execucao_iniciada_em || '';
   const closedAt = os.data_conclusao || os.closed_at || os.data_fim || '';
+  const custosOSResumo = typeof custosOS !== 'undefined' && custosOS ? custosOS : { total_centavos:0, movimentos:0, items:[] };
+  const moneyOS = cents => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(cents||0)/100);
 %>
 <section class="os-page" data-os-status="<%= statusKey %>">
   <header class="os-hero">
@@ -108,6 +110,12 @@
           <button class="ui-btn ui-btn--primary" type="submit">Material chegou</button>
         </form>
       <% } %>
+
+      <div class="material-meta os-cost-real-summary">
+        <span><b>Custo real consumido</b><strong><%= moneyOS(custosOSResumo.total_centavos) %></strong></span>
+        <span><b>Baixas vinculadas</b><%= custosOSResumo.movimentos || 0 %></span>
+        <span><b>Fonte</b>Movimentações reais do estoque</span>
+      </div>
 
       <% if (!materialRequest) { %>
         <div class="empty-state">
@@ -273,6 +281,32 @@
                     </td>
                   </tr>
                 <% } %>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      <% if ((custosOSResumo.items || []).length) { %>
+        <div class="material-head" style="margin-top:16px;">
+          <div>
+            <h3>Materiais efetivamente consumidos nesta OS</h3>
+            <p>Somente baixas físicas do estoque entram no custo real da ordem.</p>
+          </div>
+        </div>
+        <div class="material-table-wrap">
+          <table class="tabela-compacta material-table">
+            <thead><tr><th>Data</th><th>Material</th><th>Qtd.</th><th>Custo unit.</th><th>Custo real</th><th>Solicitação</th></tr></thead>
+            <tbody>
+              <% (custosOSResumo.items || []).forEach((mov)=>{ %>
+                <tr>
+                  <td><%= fmtBR(mov.data_mov) %></td>
+                  <td><strong><%= mov.item_nome || '-' %></strong><% if(mov.estoque_codigo){ %><br><small><%= mov.estoque_codigo %></small><% } %></td>
+                  <td><%= mov.quantidade || 0 %> <%= mov.unidade || '' %></td>
+                  <td><%= moneyOS(mov.valor_unitario_centavos) %></td>
+                  <td><strong><%= moneyOS(mov.total_centavos) %></strong></td>
+                  <td><% if(mov.solicitacao_id){ %><a href="/solicitacoes/<%= mov.solicitacao_id %>"><%= mov.solicitacao_numero || '#'+mov.solicitacao_id %></a><% } else { %>-<% } %></td>
+                </tr>
               <% }) %>
             </tbody>
           </table>
