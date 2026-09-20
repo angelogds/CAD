@@ -130,7 +130,7 @@ function emptyTotals() {
 function getConsumptionAnalytics(filters = {}) {
   const exp = movementExpressions();
   if (!exp || !tableExists('equipamentos')) {
-    return { totals: emptyTotals(), byEquipment: [], byMonth: [], items: [] };
+    return { totals: emptyTotals(), byEquipment: [], byMonth: [], byOS: [], items: [] };
   }
 
   const scope = buildConsumptionWhere(filters);
@@ -174,6 +174,25 @@ function getConsumptionAnalytics(filters = {}) {
     consumo_movimentos: Number(row.consumo_movimentos || 0),
   }));
 
+  const byOS = db.prepare(`
+    SELECT m.os_id,
+      COUNT(m.id) consumo_movimentos,
+      ROUND(SUM(ABS(COALESCE(m.quantidade,0)) * (${exp.custoUnitCentavos}))) consumido_centavos,
+      MAX(${exp.dataMov}) ultima_saida
+    FROM estoque_movimentos m
+    JOIN estoque_itens ei ON ei.id=m.item_id
+    JOIN equipamentos e ON e.id=m.equipamento_id
+    ${exp.solicitacaoItemJoin}
+    WHERE ${where} AND m.os_id IS NOT NULL
+    GROUP BY m.os_id
+    ORDER BY consumido_centavos DESC,m.os_id DESC
+  `).all(scope.params).map((row) => ({
+    ...row,
+    os_id: Number(row.os_id || 0),
+    consumido_centavos: Number(row.consumido_centavos || 0),
+    consumo_movimentos: Number(row.consumo_movimentos || 0),
+  }));
+
   const items = db.prepare(`
     SELECT m.id movimento_id,m.os_id,m.equipamento_id,m.solicitacao_id,m.solicitacao_item_id,
       ${exp.dataMov} data_mov,ABS(COALESCE(m.quantidade,0)) quantidade,
@@ -206,7 +225,7 @@ function getConsumptionAnalytics(filters = {}) {
   }, emptyTotals());
   totals.equipamentos = byEquipment.length;
 
-  return { totals, byEquipment, byMonth, items };
+  return { totals, byEquipment, byMonth, byOS, items };
 }
 
 function mergeMonths(purchaseMonths = [], consumptionMonths = []) {
@@ -314,7 +333,7 @@ function getEquipmentDetail(equipamentoId, filters = {}) {
   const analytics = getAnalytics(scoped);
   const consumo = getConsumptionAnalytics(scoped);
   if (!exp || !tableExists('equipamentos')) {
-    return { totals: analytics.totals, byMonth: analytics.byMonth, items: [], consumos: consumo.items };
+    return { totals: analytics.totals, byMonth: analytics.byMonth, items: [], consumos: consumo.items, consumoByOS: consumo.byOS || [] };
   }
 
   const scope = buildWhere(scoped);
@@ -340,7 +359,7 @@ function getEquipmentDetail(equipamentoId, filters = {}) {
     total_centavos: Number(row.total_centavos || 0),
   }));
 
-  return { totals: analytics.totals, byMonth: analytics.byMonth, items, consumos: consumo.items };
+  return { totals: analytics.totals, byMonth: analytics.byMonth, items, consumos: consumo.items, consumoByOS: consumo.byOS || [] };
 }
 
 function getOSConsumption(osId, filters = {}) {
