@@ -168,6 +168,7 @@ app.use("/webhooks/whatsapp", require("./modules/whatsapp/whatsapp.routes"));
 
 // ===== Arquivos estáticos =====
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/vendor/chart.js", express.static(path.join(__dirname, "node_modules", "chart.js", "dist"), { maxAge: "7d", immutable: true }));
 app.use("/uploads", express.static(storage.UPLOAD_DIR));
 app.use("/pdfs", express.static(storage.PDF_DIR));
 app.use("/imagens", express.static(storage.IMAGE_DIR));
