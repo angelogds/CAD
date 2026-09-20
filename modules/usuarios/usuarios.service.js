@@ -84,6 +84,28 @@ function list({ q = "", role = "", status = "ativos" } = {}) {
   return db.prepare(sql).all(params);
 }
 
+function getSummary() {
+  const row = db.prepare(`
+    SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN COALESCE(ativo, 1) = 1 AND COALESCE(deleted_at, '') = '' THEN 1 ELSE 0 END) AS ativos,
+      SUM(CASE WHEN COALESCE(ativo, 1) = 0 OR COALESCE(deleted_at, '') <> '' THEN 1 ELSE 0 END) AS arquivados,
+      SUM(CASE WHEN COALESCE(ativo, 1) = 1 AND COALESCE(deleted_at, '') = '' AND COALESCE(telefone_whatsapp, '') <> '' THEN 1 ELSE 0 END) AS com_whatsapp,
+      SUM(CASE WHEN COALESCE(ativo, 1) = 1 AND COALESCE(deleted_at, '') = '' AND COALESCE(telefone_whatsapp, '') = '' THEN 1 ELSE 0 END) AS sem_whatsapp,
+      COUNT(DISTINCT CASE WHEN COALESCE(ativo, 1) = 1 AND COALESCE(deleted_at, '') = '' THEN role END) AS perfis_ativos
+    FROM users
+  `).get() || {};
+
+  return {
+    total: Number(row.total || 0),
+    ativos: Number(row.ativos || 0),
+    arquivados: Number(row.arquivados || 0),
+    comWhatsapp: Number(row.com_whatsapp || 0),
+    semWhatsapp: Number(row.sem_whatsapp || 0),
+    perfisAtivos: Number(row.perfis_ativos || 0),
+  };
+}
+
 function getById(id) {
   const extraIdentityFields = [
     hasColumn("users", "funcao") ? "funcao" : "NULL AS funcao",
@@ -193,4 +215,4 @@ function restore(id) {
   return restoreUser(db, id);
 }
 
-module.exports = { list, getById, create, update, resetPassword, remove, restore };
+module.exports = { list, getSummary, getById, create, update, resetPassword, remove, restore };
