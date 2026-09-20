@@ -34,18 +34,21 @@ test('reincidência usa duas ou mais corretivas por equipamento sem fingir modo 
   assert.match(view, /Não substitui análise de modo de falha/);
 });
 
-test('qualidade dos dados mede rastreabilidade antes de liberar confiabilidade oficial', () => {
+test('qualidade dos dados controla a liberação de MTBF MTTR e disponibilidade', () => {
   const service = read('modules/diretoria/diretoria.manutencao.service.js');
   const view = read('views/pcm/dashboard-gerencial.ejs');
   assert.match(service, /pcm_falhas/);
   assert.match(service, /inicio_parada_em/);
   assert.match(service, /fim_parada_em/);
   assert.match(service, /os_com_equipamento_pct/);
-  assert.match(service, /encerramento_com_data_pct/);
   assert.match(service, /corretivas_classificadas_pct/);
   assert.match(service, /paradas_com_intervalo_pct/);
+  assert.match(service, /function getReliabilityMetrics/);
+  assert.match(service, /const publicado = classificacaoOk && paradaOk && equipamentoOk && amostraOk/);
+  assert.match(service, /mtbf \/ \(mtbf \+ mttr\)/);
   assert.match(view, /MTBF, MTTR e disponibilidade/);
-  assert.match(view, /continuam como “dados insuficientes”/);
+  assert.match(view, /Indicadores em formação/);
+  assert.match(view, /Indicadores liberados/);
 });
 
 test('rota de atualização da Diretoria usa a camada executiva e preserva RBAC', () => {
@@ -67,6 +70,7 @@ test('interface executiva mostra aging reincidência e qualidade com atualizaç�
   assert.match(js, /rows\('reincidencia_corretiva'\)/);
   assert.match(js, /function renderQuality/);
   assert.match(css, /\.pcm-quality-grid/);
+  assert.match(css, /\.pcm-reliability-kpis/);
   const mobile560 = css.slice(css.indexOf('@media(max-width:560px)'));
   assert.match(mobile560, /\.pcm-quality-grid(?:,[^{]+)?\{grid-template-columns:1fr\}/);
 });
