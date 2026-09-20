@@ -14,7 +14,7 @@ test('Modo TV mantém a folha base e carrega o refinamento visual depois dela', 
   const refinement = html.indexOf('/css/tv-mode-2026.css');
   assert.ok(base >= 0);
   assert.ok(refinement > base);
-  assert.equal((html.match(/data-tv-screen=/g) || []).length, 6);
+  assert.equal((html.match(/data-tv-screen=/g) || []).length, 7);
 });
 
 test('ticker inferior é ampliado para leitura em TV e não volta ao tamanho antigo nos breakpoints principais', () => {
