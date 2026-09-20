@@ -486,8 +486,16 @@ function finalizarRecebimento(id) {
 
 function fechar(id) {
   const s = getSolicitacao(id);
-  if (!s || ![STATUS.RECEBIDA_TOTAL, STATUS.ENTREGUE_SOLICITANTE].includes(s.status)) throw new Error("Somente uma solicitação recebida integralmente e entregue pode ser fechada.");
+  if (!s || ![STATUS.RECEBIDA_TOTAL, STATUS.ENTREGUE_SOLICITANTE].includes(s.status)) {
+    throw new Error("Somente uma solicitação integralmente recebida e entregue pode ser fechada.");
+  }
   if (s.resumo.qtd_pendente > 0) throw new Error("Ainda existem quantidades a receber.");
+
+  const reservas = fluxoEstoqueService.getResumoReservas(id);
+  if (s.status === STATUS.RECEBIDA_TOTAL && reservas.reservado > 0 && reservas.pendente > 0) {
+    throw new Error("Ainda existem materiais reservados aguardando entrega ao solicitante.");
+  }
+
   db.prepare("UPDATE solicitacoes SET status=?, fechada_em=datetime('now'), updated_at=datetime('now') WHERE id=?").run(STATUS.FECHADA, id);
 }
 
