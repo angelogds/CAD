@@ -47,11 +47,14 @@ test('baixas manuais, contextuais e QR congelam custo no movimento', () => {
   assert.match(reservas, /custo_unit: custoUnit \|\| null/);
 });
 
-test('ficha do equipamento recebe custos reais e associa custo às OS', () => {
+test('ficha do equipamento reutiliza o custo carregado pela rota e associa custo às OS', () => {
+  const routes = read('modules/equipamentos/equipamentos.routes.js');
   const controller = read('modules/equipamentos/equipamentos.controller.js');
   const view = read('views/equipamentos/show.ejs');
 
-  assert.match(controller, /custosEquipamentosService\.getEquipmentDetail/);
+  assert.match(routes, /custosEquipamentosService\.getEquipmentLifetime\(equipamentoId\)/);
+  assert.match(controller, /res\.locals\.custosEquipamento/);
+  assert.doesNotMatch(controller, /getEquipmentDetail\(id/);
   assert.match(controller, /custo_real_centavos/);
   assert.match(controller, /custosEquipamento,/);
   assert.match(view, /Custos reais do equipamento/);
