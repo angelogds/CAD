@@ -74,6 +74,201 @@
   box-shadow: 0 24px 80px rgba(0,0,0,.58);
 }
 .cad-round3-analysis-panel[hidden] { display: none; }
+
+.cad-round3-layout-panel {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  z-index: 145;
+  width: min(720px, calc(100% - 32px));
+  max-height: min(760px, calc(100% - 40px));
+  overflow: auto;
+  transform: translate(-50%, -50%);
+  border: 1px solid #566775;
+  border-radius: 9px;
+  background: #202b34;
+  color: #e8eff5;
+  box-shadow: 0 28px 90px rgba(0,0,0,.62);
+}
+.cad-round3-layout-panel[hidden] { display: none; }
+.cad-round3-layout-panel form { margin: 0; }
+.cad-round3-layout-panel header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 17px;
+  border-bottom: 1px solid #3e4e5b;
+  background: #27333d;
+}
+.cad-round3-layout-panel header small {
+  display: block;
+  margin-bottom: 3px;
+  color: #7ed7ff;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+.cad-round3-layout-panel h2 { margin: 0; font-size: 18px; }
+.cad-round3-layout-panel header button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #566775;
+  border-radius: 4px;
+  background: #313f4a;
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+}
+.cad-round3-layout-body { padding: 18px; }
+.cad-round3-layout-intro {
+  margin: 0 0 14px;
+  color: #b7c5d0;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.cad-round3-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 10px;
+}
+.cad-round3-layout-grid label {
+  display: grid;
+  gap: 6px;
+  color: #98a9b7;
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.cad-round3-layout-grid select,
+.cad-round3-layout-grid input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #4b5c69;
+  border-radius: 5px;
+  outline: none;
+  background: #172129;
+  color: #f4f8fb;
+  padding: 8px 10px;
+  font: 700 12px/1.2 system-ui, sans-serif;
+}
+.cad-round3-layout-grid select:focus,
+.cad-round3-layout-grid input:focus {
+  border-color: #36a6dc;
+  box-shadow: 0 0 0 2px rgba(54,166,220,.15);
+}
+.cad-round3-scale-input {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: center;
+  gap: 7px;
+}
+.cad-round3-scale-input b {
+  min-height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #4b5c69;
+  border-radius: 5px;
+  background: #26333d;
+  color: #d9e4eb;
+}
+.cad-round3-sheet-preview {
+  display: grid;
+  grid-template-columns: minmax(220px, .9fr) 1fr;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #3f5260;
+  border-radius: 7px;
+  background: #18232b;
+}
+.cad-round3-sheet-visual {
+  aspect-ratio: 1.414 / 1;
+  min-height: 145px;
+  position: relative;
+  display: grid;
+  place-content: center;
+  border: 2px solid #d6e0e7;
+  background:
+    linear-gradient(90deg, transparent 0 72%, rgba(18,34,44,.08) 72% 72.5%, transparent 72.5%),
+    #f4f7f9;
+  color: #1d2d38;
+  box-shadow: inset 0 0 0 5px #f4f7f9, inset 0 0 0 6px #82929d;
+}
+.cad-round3-sheet-visual:after {
+  content: "";
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 26%;
+  height: 24%;
+  border: 1px solid #82929d;
+}
+.cad-round3-sheet-visual span,
+.cad-round3-sheet-visual strong,
+.cad-round3-sheet-visual small { position: relative; z-index: 1; text-align: center; }
+.cad-round3-sheet-visual span { font-size: 11px; font-weight: 900; letter-spacing: .08em; }
+.cad-round3-sheet-visual strong { margin-top: 6px; font-size: 24px; }
+.cad-round3-sheet-visual small { margin-top: 4px; font-size: 8px; font-weight: 800; color: #536673; }
+.cad-round3-sheet-summary {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  align-content: center;
+  gap: 8px 12px;
+}
+.cad-round3-sheet-summary span {
+  color: #8295a5;
+  font-size: 9px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.cad-round3-sheet-summary strong {
+  color: #f2f7fa;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.cad-round3-layout-note {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-left: 4px solid #249cd1;
+  border-radius: 5px;
+  background: #1d3441;
+  color: #c4d6e0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.cad-round3-layout-panel footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 13px 17px;
+  border-top: 1px solid #3e4e5b;
+  background: #27333d;
+}
+.cad-round3-layout-panel footer button {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 5px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.cad-round3-layout-secondary {
+  border: 1px solid #5b6a76;
+  background: #313f4a;
+  color: #e7eef3;
+}
+.cad-round3-layout-primary {
+  border: 1px solid #258ebf;
+  background: #1f87b8;
+  color: #fff;
+}
+.cad-round3-layout-primary:hover { background: #2499cf; }
+.cad-round3-layout-primary:disabled { opacity: .55; cursor: progress; }
 .cad-round3-analysis-panel > header {
   position: sticky;
   top: 0;
@@ -166,5 +361,10 @@
   .cad-round3-layout-tabs { left: 8px; bottom: 6px; }
   .cad-round3-layout-tabs button { padding-inline: 7px; font-size: 9px; }
   .cad-round3-metrics { grid-template-columns: repeat(2, minmax(110px, 1fr)); }
-  .cad-round3-analysis-panel { width: calc(100% - 16px); max-height: calc(100% - 16px); }
+  .cad-round3-analysis-panel,
+  .cad-round3-layout-panel { width: calc(100% - 16px); max-height: calc(100% - 16px); }
+  .cad-round3-layout-grid,
+  .cad-round3-sheet-preview { grid-template-columns: 1fr; }
+  .cad-round3-sheet-visual { max-width: 360px; width: 100%; justify-self: center; }
+  .cad-round3-layout-panel footer { display: grid; grid-template-columns: 1fr 1.4fr; }
 }
