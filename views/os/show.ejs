@@ -37,7 +37,7 @@
       <% if (canRegisterAndamento && statusMeta.phase === 'material') { %><form method="POST" action="/os/<%= os.id %>/material-chegou"><button class="btn btn-primary" type="submit">Registrar chegada do material</button></form><% } %>
       <a class="btn btn-outline" href="/chat-os/<%= os.id %>">Abrir conversa</a>
       <% if (canExecuteOS) { %><form method="POST" action="/os/<%= os.id %>/pdf-institucional"><button class="btn btn-outline" type="submit">PDF da OS</button></form><% } %>
-      <div class="os-menu-wrap" id="os-menu-wrap"><button class="btn btn-outline os-menu-btn" type="button" id="os-menu-btn" aria-expanded="false" aria-controls="os-menu-panel">Mais ações</button><div class="os-menu-panel" id="os-menu-panel"><div class="os-menu-list"><% if (!isOSFechada && os.equipamento_id) { %><a class="btn btn-outline" href="/tracagem?os_id=<%= os.id %>&amp;equipamento_id=<%= os.equipamento_id %>">Criar traçagem vinculada</a><% } %><% if (canAutoAssign && !isOSFechada) { %><button class="btn btn-outline" type="button" data-os-module="redistribuicao-equipe">Redistribuição da equipe</button><% } %><% if (canSendWhatsappNotification) { %><button class="btn btn-outline" type="button" data-os-module="whatsapp-os">Diagnóstico da integração WhatsApp</button><% } %><% if (!isOSFechada) { %><button class="btn btn-outline" type="button" data-os-module="justificativa-andamento">Justificativa técnica</button><% } %><% if (documentoInstitucional && documentoInstitucional.pdf_url) { %><a class="btn btn-outline" href="<%= documentoInstitucional.pdf_url %>" target="_blank" rel="noopener">Baixar PDF OS</a><% } %></div></div></div>
+      <div class="os-menu-wrap" id="os-menu-wrap"><button class="btn btn-outline os-menu-btn" type="button" id="os-menu-btn" aria-expanded="false" aria-controls="os-menu-panel">Mais ações</button><div class="os-menu-panel" id="os-menu-panel"><div class="os-menu-list"><% if (!isOSFechada && os.equipamento_id) { %><a class="btn btn-outline" href="/tracagem?os_id=<%= os.id %>&amp;equipamento_id=<%= os.equipamento_id %>">Criar traçagem vinculada</a><% } %><% if (canAutoAssign && !isOSFechada) { %><button class="btn btn-outline" type="button" data-os-module="redistribuicao-equipe">Redistribuição da equipe</button><% } %><% if (canSendWhatsappNotification) { %><a class="btn btn-outline" href="/os/<%= os.id %>?whatsapp_diagnostico=1#whatsapp-os">Diagnóstico da integração WhatsApp</a><% } %><% if (!isOSFechada) { %><button class="btn btn-outline" type="button" data-os-module="justificativa-andamento">Justificativa técnica</button><% } %><% if (documentoInstitucional && documentoInstitucional.pdf_url) { %><a class="btn btn-outline" href="<%= documentoInstitucional.pdf_url %>" target="_blank" rel="noopener">Baixar PDF OS</a><% } %></div></div></div>
       <a class="btn btn-outline" href="/os">Voltar</a>
     </div>
   </header>
@@ -490,6 +490,18 @@
 </div>
 
 <% if (canSendWhatsappNotification) { %>
+  <% if (!whatsappDiagnosticsLoaded) { %>
+    <div class="card os-module" style="margin-top:12px;" id="whatsapp-os">
+      <div class="card-head">
+        <div>
+          <h3 style="margin:0;">Notificação WhatsApp</h3>
+          <div class="muted">Diagnóstico detalhado carregado somente quando necessário para manter a ficha da OS rápida.</div>
+        </div>
+        <a class="btn btn-outline" href="/os/<%= os.id %>?whatsapp_diagnostico=1#whatsapp-os">Carregar diagnóstico</a>
+      </div>
+      <p class="muted" style="margin-bottom:0;">A abertura da ficha não consulta contatos, logs ou eventos do WhatsApp. Use o botão acima quando precisar investigar ou reenviar uma notificação.</p>
+    </div>
+  <% } else { %>
 <div class="card os-module" style="margin-top:12px;" id="whatsapp-os">
   <% const whatsappEquipe = whatsappDestinatarios || []; %>
   <% const whatsPhone = whatsappResponsavel ? (whatsappResponsavel.telefone_normalizado || whatsappResponsavel.colaborador_telefone_whatsapp || whatsappResponsavel.telefone_whatsapp || whatsappResponsavel.user_telefone_whatsapp || whatsappResponsavel.colaborador_telefone || whatsappResponsavel.telefone || '') : ''; %>
@@ -503,7 +515,7 @@
     <% if (canSendWhatsapp && (os.executor_nome || os.execucao_ativa?.executor_nome || whatsappResponsavel?.nome)) { %>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
         <a class="btn btn-green whatsapp-btn" href="/os/<%= os.id %>/whatsapp" target="_blank" rel="noopener"><span class="wa-icon" aria-hidden="true"></span> Reenviar template</a>
-        <a class="btn btn-outline whatsapp-btn" href="/os/<%= os.id %>?whatsapp_historico=completo#whatsapp-eventos"><span class="wa-icon" aria-hidden="true"></span> Ver eventos do WhatsApp</a>
+        <a class="btn btn-outline whatsapp-btn" href="/os/<%= os.id %>?whatsapp_diagnostico=1&amp;whatsapp_historico=completo#whatsapp-eventos"><span class="wa-icon" aria-hidden="true"></span> Ver eventos do WhatsApp</a>
       </div>
     <% } %>
   </div>
@@ -572,9 +584,9 @@
   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:14px;">
     <h4 style="margin:0;">Histórico de envio na OS</h4>
     <% if (!whatsappHistoricoCompleto) { %>
-      <a class="btn btn-sm btn-outline" href="/os/<%= os.id %>?whatsapp_historico=completo#whatsapp-historico">Ver histórico completo</a>
+      <a class="btn btn-sm btn-outline" href="/os/<%= os.id %>?whatsapp_diagnostico=1&amp;whatsapp_historico=completo#whatsapp-historico">Ver histórico completo</a>
     <% } else { %>
-      <a class="btn btn-sm btn-outline" href="/os/<%= os.id %>#whatsapp-historico">Mostrar últimos 10</a>
+      <a class="btn btn-sm btn-outline" href="/os/<%= os.id %>?whatsapp_diagnostico=1#whatsapp-historico">Mostrar últimos 10</a>
     <% } %>
   </div>
   <% if (!whatsappHistoricoCompleto) { %>
@@ -640,6 +652,7 @@
   </table>
 
 </div>
+  <% } %>
 <% } else { %>
   <div class="card os-module" style="margin-top:12px;" id="whatsapp-os">
     <div class="card-head">
