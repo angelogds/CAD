@@ -15,7 +15,7 @@
   function selected(a,b){return String(a||'')===String(b||'')?'selected':''}
   function metric(value,suffix=''){return value===null||typeof value==='undefined'?'Dados insuficientes':`${value}${suffix}`}
 %>
-<link rel="stylesheet" href="/css/pcm-dashboard.css?v=20260914-v3">
+<link rel="stylesheet" href="/css/pcm-dashboard.css?v=20260920-v4">
 <div class="pcm-directors-page">
   <div class="pcm-loading"><div class="pcm-spinner" aria-label="Carregando"></div></div>
   <header class="pcm-directors-head"><div><span class="pcm-section-label"><%= executiveEyebrow %></span><h1><%= executiveTitle %></h1><p><%= executiveSubtitle %></p><span class="pcm-period-chip" id="periodoResumo">Período analisado: <%= d.filtros.data_inicial||'-' %> a <%= d.filtros.data_final||'-' %></span></div><div class="pcm-module-actions"><button class="pcm-button primary ui-btn ui-btn--primary" id="btnAtualizar" type="button">Atualizar dados</button><button class="pcm-button ui-btn ui-btn--outline" id="btnFull" type="button">Modo apresentação</button><button class="pcm-button ui-btn ui-btn--outline" id="btnPdf" type="button">PDF</button><a class="pcm-button ui-btn ui-btn--outline" href="<%= basePath %>/excel?<%= qp %>">Excel</a></div></header>
