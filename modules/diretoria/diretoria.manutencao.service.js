@@ -165,7 +165,7 @@ function parseSqlDate(value) {
   const raw = String(value || '').trim();
   if (!raw) return null;
   const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
-  const withZone = /(?:Z|[+-]\\d{2}:?\\d{2})$/.test(normalized) ? normalized : `${normalized}Z`;
+  const withZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized) ? normalized : `${normalized}Z`;
   const date = new Date(withZone);
   return Number.isNaN(date.getTime()) ? null : date;
 }
@@ -173,8 +173,8 @@ function parseSqlDate(value) {
 function periodBounds(filtros = {}) {
   const startRaw = String(filtros.data_inicial || '');
   const endRaw = String(filtros.data_final || '');
-  const start = /^\\d{4}-\\d{2}-\\d{2}$/.test(startRaw) ? new Date(`${startRaw}T00:00:00Z`) : null;
-  const end = /^\\d{4}-\\d{2}-\\d{2}$/.test(endRaw) ? new Date(`${endRaw}T00:00:00Z`) : null;
+  const start = /^\d{4}-\d{2}-\d{2}$/.test(startRaw) ? new Date(`${startRaw}T00:00:00Z`) : null;
+  const end = /^\d{4}-\d{2}-\d{2}$/.test(endRaw) ? new Date(`${endRaw}T00:00:00Z`) : null;
   if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
     return { start: null, endExclusive: null, hours: 0 };
   }
@@ -425,4 +425,5 @@ module.exports = {
   getBacklogAging,
   getDataQuality,
   getReliabilityIndicators,
+  _test: { parseSqlDate, periodBounds, periodHours },
 };
