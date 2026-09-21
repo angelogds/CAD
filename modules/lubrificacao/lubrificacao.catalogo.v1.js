@@ -111,6 +111,27 @@ const RULES = [
     pontos: [common.bearingDE, common.bearingNDE, common.reducer, common.motorDE, common.motorNDE],
   },
   {
+    familia: 'BOMBAS',
+    rota: ROUTES.SEPARACAO,
+    ordem: 42,
+    match: ['BOMBA'],
+    pontos: [common.bearingDE, common.bearingNDE, common.motorDE, common.motorNDE],
+  },
+  {
+    familia: 'VALVULAS_ROTATIVAS',
+    rota: ROUTES.TRANSPORTE,
+    ordem: 43,
+    match: ['VALVULA ROTATIVA'],
+    pontos: [common.bearingDE, common.bearingNDE, common.reducer, common.motorDE, common.motorNDE],
+  },
+  {
+    familia: 'ENSACADEIRAS',
+    rota: ROUTES.TRANSPORTE,
+    ordem: 44,
+    match: ['ENSACADEIRA'],
+    pontos: [common.bearingDE, common.bearingNDE, common.motorDE, common.motorNDE],
+  },
+  {
     familia: 'DECANTER',
     rota: ROUTES.SEPARACAO,
     ordem: 45,
