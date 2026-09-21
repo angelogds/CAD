@@ -24,7 +24,7 @@ test('carregamento inicial usa endpoint JSON sem cache e preserva fallback rende
 
 test('cache do dashboard foi atualizado após correção de hidratação', () => {
   const view = read('views/pcm/dashboard-gerencial.ejs');
-  assert.match(view, /pcm-dashboard\.js\?v=20260920-v10/);
+  assert.match(view, /pcm-dashboard\.js\?v=20260921-v11/);
 });
 
 test('javascript permanece sintaticamente válido', () => {

@@ -42,8 +42,8 @@ test('view e CSS publicam legenda responsiva de criticidade', () => {
   const css = read('public/css/pcm-dashboard.css');
   assert.match(view, /pcm-criticality-scale/);
   assert.match(view, /4\+ ou crítica/);
-  assert.match(view, /pcm-dashboard\.css\?v=20260920-v7/);
-  assert.match(view, /pcm-dashboard\.js\?v=20260920-v10/);
+  assert.match(view, /pcm-dashboard\.css\?v=20260921-v8/);
+  assert.match(view, /pcm-dashboard\.js\?v=20260921-v11/);
   assert.match(css, /\.pcm-criticality-scale/);
   assert.match(css, /\.risk-4\{background:#d94b47\}/);
 });

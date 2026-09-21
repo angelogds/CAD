@@ -28,7 +28,9 @@ test('donuts exibem total central e percentual no tooltip', () => {
 test('linhas e barras usam acabamento visual moderno sem perder drill-down', () => {
   const js = read('public/js/pcm-dashboard.js');
   assert.match(js, /cubicInterpolationMode:'monotone'/);
-  assert.match(js, /pointRadius:0/);
+  assert.match(js, /const singlePeriod=labels\.length===1/);
+  assert.match(js, /showLine:!singlePeriod/);
+  assert.match(js, /pointRadius:singlePeriod\?6:2/);
   assert.match(js, /borderRadius:9/);
   assert.match(js, /decorateChartPanel\(id/);
   assert.match(js, /interactive:Boolean\(opts\.links\?\.some\(Boolean\)\)/);
@@ -48,8 +50,8 @@ test('view publica a área gráfica executiva e atualiza cache dos assets', () =
   const view = read('views/pcm/dashboard-gerencial.ejs');
   assert.match(view, /Indicadores em gráficos interativos/);
   assert.match(view, /pcm-analytics-chip/);
-  assert.match(view, /pcm-dashboard\.css\?v=20260920-v7/);
-  assert.match(view, /pcm-dashboard\.js\?v=20260920-v10/);
+  assert.match(view, /pcm-dashboard\.css\?v=20260921-v8/);
+  assert.match(view, /pcm-dashboard\.js\?v=20260921-v11/);
   assert.doesNotThrow(() => ejs.compile(view));
 });
 
