@@ -26,6 +26,14 @@ const STATUS_OS_FINALIZADA = new Set(['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CON
 const STATUS_OS_EXECUCAO_POTENCIAL = new Set(['ANDAMENTO', 'EM_ANDAMENTO', 'EXECUTANDO', 'EM_EXECUCAO', 'EM EXECUÇÃO']);
 const STATUS_OS_PAUSADA = new Set(['PAUSADA', 'PAUSADO', 'AGUARDANDO']);
 
+function runOSLifecycleDetached(label, task) {
+  setImmediate(() => {
+    Promise.resolve()
+      .then(task)
+      .catch((err) => console.error(`[OS_LIFECYCLE][${label}]`, err?.stack || err?.message || err));
+  });
+}
+
 const MOTIVOS_ANDAMENTO_DISPONIBILIDADE = Object.freeze({
   FALTA_MATERIAL: { libera_mecanico: true },
   AGUARDANDO_COMPRA: { libera_mecanico: true },
@@ -2557,11 +2565,19 @@ function updateInstitutionalMetadata(osId, metadata = {}) {
 }
 
 function iniciarOS(id, userId) {
-  const os = getOSById(id);
+  const cols = getOSColumns();
+  const select = [
+    "id",
+    cols.includes("status") ? "status" : "NULL AS status",
+    cols.includes("mecanico_user_id") ? "mecanico_user_id" : "NULL AS mecanico_user_id",
+    cols.includes("executor_colaborador_id") ? "executor_colaborador_id" : "NULL AS executor_colaborador_id",
+    cols.includes("auxiliar_user_id") ? "auxiliar_user_id" : "NULL AS auxiliar_user_id",
+    cols.includes("turno_alocado") ? "turno_alocado" : "NULL AS turno_alocado",
+  ];
+  const os = db.prepare(`SELECT ${select.join(", ")} FROM os WHERE id = ?`).get(Number(id));
   if (!os) throw new Error("OS não encontrada.");
 
   const responsavelUserId = getResponsavelExecucaoUserId(os);
-  const cols = getOSColumns();
   const sets = ["status = 'ANDAMENTO'"];
   const args = [];
 
@@ -2576,28 +2592,49 @@ function iniciarOS(id, userId) {
     sets.push("data_inicio = COALESCE(data_inicio, datetime('now'))");
   }
 
-  args.push(id);
+  args.push(Number(id));
   db.transaction(() => {
     db.prepare(`UPDATE os SET ${sets.join(", ")} WHERE id = ?`).run(...args);
     if (tableExists("os_execucoes") && responsavelUserId && !getExecucaoAtiva(id)) {
-      createExecucao(Number(id), Number(responsavelUserId), os.auxiliar_user_id ? Number(os.auxiliar_user_id) : null, userId || null, "Retomada/início confirmado da OS.", os.turno_alocado || getTurnoAtual());
+      createExecucao(
+        Number(id),
+        Number(responsavelUserId),
+        os.auxiliar_user_id ? Number(os.auxiliar_user_id) : null,
+        userId || null,
+        "Retomada/início confirmado da OS.",
+        os.turno_alocado || getTurnoAtual()
+      );
     }
   })();
-  try { osChatService?.registrarMensagemSistema(id, 'STATUS_OS_ALTERADO', `OS #${id} iniciada e colocada em andamento. Mecânico mantido em atendimento porque houve retomada confirmada da OS.`, { user_id: userId }); } catch (_e) {}
 
-  emitOSEvents(id, "status");
-  pushService
-    .sendPushToAll({
+  // Tudo que não é necessário para confirmar o início fica fora do request.
+  runOSLifecycleDetached("START_SIDE_EFFECTS", async () => {
+    try {
+      osChatService?.registrarMensagemSistema(
+        id,
+        "STATUS_OS_ALTERADO",
+        `OS #${id} iniciada e colocada em andamento. Mecânico mantido em atendimento porque houve retomada confirmada da OS.`,
+        { user_id: userId }
+      );
+    } catch (_e) {}
+
+    try { emitOSEvents(id, "status"); } catch (_e) {}
+
+    await pushService.sendToAll({
       title: "OS em andamento",
       body: `OS #${id} entrou em andamento.`,
+      type: "MUDANCA_STATUS",
       url: `/os/${id}`,
-    })
-    .catch(() => {});
-  if (inspecaoService?.syncFromOS) {
-    try {
-      inspecaoService.syncFromOS(id);
-    } catch (_e) {}
-  }
+      sound: "/audio/os-status.mp3",
+      data: { osId: Number(id), type: "STATUS_CHANGE", newStatus: "ANDAMENTO" },
+    }).catch(() => {});
+
+    if (inspecaoService?.syncFromOS) {
+      try { inspecaoService.syncFromOS(id); } catch (_e) {}
+    }
+  });
+
+  return { id: Number(id), status: "ANDAMENTO" };
 }
 
 function pausarOS(id) {
@@ -2631,7 +2668,7 @@ function persistirRascunhoFechamento(
   id,
   { transcricaoBruta, versaoTecnicaSugerida, versaoFinalAprovada, fonteDescricao, textoDigitado, fotosMetadados, userId }
 ) {
-  const os = getOSById(id);
+  const os = db.prepare("SELECT id FROM os WHERE id = ?").get(Number(id));
   if (!os) throw new Error("OS não encontrada.");
   const cols = getOSColumns();
 
