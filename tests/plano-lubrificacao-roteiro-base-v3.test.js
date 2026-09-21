@@ -88,7 +88,7 @@ test('catálogo classifica famílias industriais do roteiro', () => {
   assert.equal(catalogo.classificarEquipamento({ nome:'Prensa P46', tipo:'Prensa' }).familia, 'PRENSAS');
   assert.equal(catalogo.classificarEquipamento({ nome:'Rosca inferior', tipo:'Rosca' }).familia, 'ROSCAS');
   assert.equal(catalogo.classificarEquipamento({ nome:'Moinho 2', tipo:'Moinho' }).familia, 'MOINHOS');
-  assert.equal(catalogo.classificarEquipamento({ nome:'Triturador FAST', tipo:'Triturador' }).familia, 'TRITURADORES');
+  assert.equal(catalogo.classificarEquipamento({ nome:'Triturador FAST', tipo:'Triturador' }).familia, 'TRITURADOR_FAST');
   assert.equal(catalogo.classificarEquipamento({ nome:'Bomba de sebo', tipo:'Bomba' }).familia, 'BOMBAS');
   assert.equal(catalogo.classificarEquipamento({ nome:'Painel principal', tipo:'Painel' }), null);
 });
@@ -123,8 +123,10 @@ test('migration 205 gera rascunhos sem inventar produto, quantidade ou frequênc
   const painel = db.prepare("SELECT COUNT(*) total FROM pcm_lubrificacao_planos WHERE equipamento_id=9").get().total;
   assert.equal(painel, 0);
 
+  // A migration 205 apenas cria o roteiro-base. A partir da V4,
+  // pontos de motor são criados somente pela regra específica >=20 CV da migration 206.
   const linked = db.prepare("SELECT COUNT(*) total FROM pcm_lubrificacao_planos WHERE motor_id=10").get().total;
-  assert.ok(linked >= 1);
+  assert.equal(linked, 0);
 
   const smallMotor = db.prepare("SELECT COUNT(*) total FROM pcm_lubrificacao_planos WHERE motor_id=11").get().total;
   assert.equal(smallMotor, 0);
