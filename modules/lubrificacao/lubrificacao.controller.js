@@ -4,10 +4,12 @@ function index(req, res) {
   res.locals.activeMenu = 'lubrificacao';
   const status = String(req.query.status || 'TODOS').toUpperCase();
   try {
+    const roteiro = service.listRoteiro(req.session.user.id, status);
     return res.render('lubrificacao/index', {
       title: 'Roteiro de Lubrificação',
       status,
-      roteiro: service.listRoteiro(req.session.user.id, status),
+      roteiro,
+      rotas: service.agruparRoteiro(roteiro),
       resumo: service.resumoRoteiro(req.session.user.id),
       historico: service.listHistorico(req.session.user.id, 12),
     });
@@ -17,7 +19,8 @@ function index(req, res) {
       title: 'Roteiro de Lubrificação',
       status,
       roteiro: [],
-      resumo: { total: 0, atrasados: 0, hoje: 0, proximos: 0, executados_hoje: 0 },
+      rotas: [],
+      resumo: { total: 0, rotas: 0, atrasados: 0, hoje: 0, proximos: 0, executados_hoje: 0 },
       historico: [],
     });
   }

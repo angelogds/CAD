@@ -1,6 +1,7 @@
 const db = require("../../database/db");
 const intelligenceService = require("./pcm.intelligence.service");
 const aiService = require("../ai/ai.service");
+const lubricationCatalog = require("../lubrificacao/lubrificacao.catalogo.v1");
 
 function toNum(v, d = 0) {
   const n = Number(v);
@@ -297,6 +298,18 @@ function ensurePcmTables() {
       frequencia_horas_operacao INTEGER,
       observacao TEXT,
       proxima_execucao_em TEXT,
+      metodo_aplicacao TEXT,
+      responsavel_user_id INTEGER,
+      estoque_item_id INTEGER,
+      ativo INTEGER NOT NULL DEFAULT 1,
+      ultima_execucao_em TEXT,
+      familia_lubrificacao TEXT,
+      rota_lubrificacao TEXT,
+      ordem_rota INTEGER,
+      validado_tecnicamente INTEGER NOT NULL DEFAULT 1,
+      origem_cadastro TEXT NOT NULL DEFAULT 'LEGADO',
+      instrucoes_execucao TEXT,
+      motor_id INTEGER,
       created_by INTEGER,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -502,11 +515,15 @@ function listBom({ equipamento_id, categoria, busca } = {}) {
   `, params);
 }
 
-function listLubrificacao({ equipamento_id, setor } = {}) {
+function listLubrificacao({ equipamento_id, setor, validacao, rota } = {}) {
   let where = '1=1';
   const params = {};
   if (equipamento_id) { where += ' AND l.equipamento_id=@equipamento_id'; params.equipamento_id = Number(equipamento_id); }
   if (setor) { where += ' AND COALESCE(e.setor,"")=@setor'; params.setor = String(setor); }
+  if (validacao === 'PENDENTE') where += ' AND COALESCE(l.validado_tecnicamente,1)=0';
+  if (validacao === 'VALIDADO') where += ' AND COALESCE(l.validado_tecnicamente,1)=1';
+  if (rota) { where += ' AND COALESCE(l.rota_lubrificacao,"")=@rota'; params.rota = String(rota); }
+
   const rows = safeAll(`
     SELECT l.*, e.nome AS equipamento_nome, e.setor,
            COALESCE(u.name, u.email, '') AS responsavel_nome
@@ -514,22 +531,32 @@ function listLubrificacao({ equipamento_id, setor } = {}) {
     JOIN equipamentos e ON e.id = l.equipamento_id
     LEFT JOIN users u ON u.id = l.responsavel_user_id
     WHERE ${where}
-    ORDER BY datetime(l.proxima_execucao_em) ASC, l.id DESC
+    ORDER BY
+      COALESCE(l.validado_tecnicamente,1) ASC,
+      COALESCE(l.rota_lubrificacao,'ZZZ') ASC,
+      COALESCE(l.ordem_rota,999999) ASC,
+      datetime(l.proxima_execucao_em) ASC,
+      l.id DESC
   `, params);
+
   return rows.map((r) => {
     const dias = Number(r.frequencia_dias || 0);
     const sem = Number(r.frequencia_semanas || 0);
     const mes = Number(r.frequencia_meses || 0);
     const horas = Number(r.frequencia_horas_operacao || 0);
     const freq = dias ? `${dias}d` : sem ? `${sem} sem` : mes ? `${mes} mês` : horas ? `${horas}h op.` : '-';
-    let situacao = 'NO_PRAZO';
-    if (r.proxima_execucao_em) {
+    let situacao = COALESCE_BOOL(r.validado_tecnicamente, 1) ? 'NO_PRAZO' : 'PENDENTE_VALIDACAO';
+    if (COALESCE_BOOL(r.validado_tecnicamente, 1) && r.proxima_execucao_em) {
       const diff = (new Date(r.proxima_execucao_em) - new Date()) / 86400000;
       if (diff < 0) situacao = 'ATRASADO';
       else if (diff <= 7) situacao = 'EM_BREVE';
     }
     return { ...r, frequencia_label: freq, situacao };
   });
+}
+
+function COALESCE_BOOL(value, fallback = 1) {
+  return Number(value == null ? fallback : value) === 1;
 }
 
 function listPecasCriticas({ tipo, busca, abaixo_minimo } = {}) {
@@ -757,27 +784,220 @@ function listMecanicosLubrificacao() {
   `);
 }
 
-function addPontoLubrificacao({ equipamento_id, ponto_lubrificacao, tipo_lubrificante_texto, quantidade, unidade, frequencia_dias, observacao, metodo_aplicacao, responsavel_user_id }, userId) {
+function listEquipamentosRoteiroBase() {
+  if (!tableExistsLocal('equipamentos')) return [];
+  const cols = new Set(db.prepare("PRAGMA table_info(equipamentos)").all().map((row) => row.name));
+  const expr = (name, fallback = "NULL") => cols.has(name) ? name : fallback;
+  return safeAll(`
+    SELECT
+      id,
+      ${expr('codigo')} AS codigo,
+      ${expr('tag')} AS tag,
+      nome,
+      ${expr('setor')} AS setor,
+      ${expr('tipo')} AS tipo
+    FROM equipamentos
+    WHERE ${cols.has('ativo') ? 'COALESCE(ativo,1)=1 AND' : ''} COALESCE(nome,'') <> ''
+    ORDER BY COALESCE(${expr('setor', "''")},''), nome
+  `);
+}
+
+function insertDraftLubrificacao(equipamento, point, userId = null) {
+  const existentes = safeAll(`
+    SELECT id, ponto_lubrificacao
+    FROM pcm_lubrificacao_planos
+    WHERE equipamento_id=?
+  `, [Number(equipamento.id)]);
+
+  if (existentes.some((row) => lubricationCatalog.equivalentPoint(row.ponto_lubrificacao, point))) {
+    return { inserted: false, duplicate: true };
+  }
+
+  const info = db.prepare(`
+    INSERT INTO pcm_lubrificacao_planos (
+      equipamento_id, ponto_lubrificacao, tipo_lubrificante_texto,
+      quantidade, unidade, frequencia_dias, frequencia_semanas, frequencia_meses,
+      frequencia_horas_operacao, observacao, proxima_execucao_em,
+      metodo_aplicacao, responsavel_user_id, ativo,
+      familia_lubrificacao, rota_lubrificacao, ordem_rota,
+      validado_tecnicamente, origem_cadastro, instrucoes_execucao,
+      created_by, created_at, updated_at
+    )
+    VALUES (?, ?, 'A DEFINIR PELO PCM', NULL, NULL, NULL, NULL, NULL, NULL,
+      ?, NULL, ?, NULL, 1, ?, ?, ?, 0, 'ROTEIRO_BASE_V1', ?, ?, datetime('now'), datetime('now'))
+  `).run(
+    Number(equipamento.id),
+    point.ponto,
+    'Rascunho automático criado pela família do equipamento. Validar produto, quantidade, frequência, ponto físico e responsável antes de liberar para execução.',
+    point.metodo || null,
+    point.familia_lubrificacao || null,
+    point.rota_lubrificacao || null,
+    Number(point.ordem_rota || 0) || null,
+    point.instrucoes || null,
+    userId || null
+  );
+
+  return { inserted: true, id: Number(info.lastInsertRowid) };
+}
+
+function vincularMotoresRoteiroBase(equipamentos = []) {
+  if (!tableExistsLocal('motores') || !hasColumn('pcm_lubrificacao_planos','motor_id')) {
+    return { total: 0, vinculados: 0, sem_vinculo: 0 };
+  }
+  const motores = safeAll(`
+    SELECT id,codigo,descricao,potencia_cv,local_instalacao
+    FROM motores
+    WHERE UPPER(COALESCE(status,'EM_USO'))='EM_USO'
+      AND COALESCE(potencia_cv,0) >= 20
+    ORDER BY potencia_cv DESC, descricao
+  `);
+
+  let vinculados = 0;
+  let semVinculo = 0;
+
+  for (const motor of motores) {
+    const equipamento = lubricationCatalog.encontrarEquipamentoDoMotor(motor, equipamentos);
+    if (!equipamento) {
+      semVinculo += 1;
+      continue;
+    }
+
+    const pontosMotor = safeAll(`
+      SELECT id
+      FROM pcm_lubrificacao_planos
+      WHERE equipamento_id=?
+        AND UPPER(COALESCE(ponto_lubrificacao,'')) LIKE 'MOTOR%'
+    `, [Number(equipamento.id)]);
+
+    if (!pontosMotor.length) {
+      semVinculo += 1;
+      continue;
+    }
+
+    pontosMotor.forEach((ponto) => {
+      db.prepare(`
+        UPDATE pcm_lubrificacao_planos
+        SET motor_id=?,
+            updated_at=datetime('now')
+        WHERE id=?
+          AND (motor_id IS NULL OR motor_id=?)
+      `).run(Number(motor.id), Number(ponto.id), Number(motor.id));
+    });
+    vinculados += 1;
+  }
+
+  return { total: motores.length, vinculados, sem_vinculo: semVinculo };
+}
+
+function gerarRoteiroBaseLubrificacao(userId = null) {
+  ensurePcmTables();
+  const equipamentos = listEquipamentosRoteiroBase();
+  const result = {
+    equipamentos_ativos: equipamentos.length,
+    equipamentos_classificados: 0,
+    pontos_criados: 0,
+    pontos_ignorados_existentes: 0,
+    familias: {},
+    motores_20cv: { total: 0, vinculados: 0, sem_vinculo: 0 },
+  };
+
+  db.transaction(() => {
+    for (const equipamento of equipamentos) {
+      const pontos = lubricationCatalog.gerarPontosBase(equipamento);
+      if (!pontos.length) continue;
+
+      result.equipamentos_classificados += 1;
+      const familia = pontos[0]?.familia_lubrificacao || 'OUTROS';
+      result.familias[familia] = (result.familias[familia] || 0) + 1;
+
+      for (const point of pontos) {
+        const inserted = insertDraftLubrificacao(equipamento, point, userId);
+        if (inserted.inserted) result.pontos_criados += 1;
+        if (inserted.duplicate) result.pontos_ignorados_existentes += 1;
+      }
+    }
+
+    result.motores_20cv = vincularMotoresRoteiroBase(equipamentos);
+  })();
+
+  return result;
+}
+
+function listMotoresLubrificacaoPendentes() {
+  if (!tableExistsLocal('motores')) return [];
+  const motorLink = hasColumn('pcm_lubrificacao_planos','motor_id')
+    ? 'AND NOT EXISTS (SELECT 1 FROM pcm_lubrificacao_planos l WHERE l.motor_id=m.id)'
+    : '';
+
+  return safeAll(`
+    SELECT m.id,m.codigo,m.descricao,m.potencia_cv,m.rpm,m.local_instalacao,m.status
+    FROM motores m
+    WHERE UPPER(COALESCE(m.status,'EM_USO'))='EM_USO'
+      AND COALESCE(m.potencia_cv,0) >= 20
+      ${motorLink}
+    ORDER BY m.potencia_cv DESC, m.descricao
+  `);
+}
+
+function listRotasLubrificacao() {
+  if (!hasColumn('pcm_lubrificacao_planos','rota_lubrificacao')) return [];
+  return safeAll(`
+    SELECT COALESCE(rota_lubrificacao,'Sem rota') AS rota,
+           COUNT(*) AS pontos,
+           SUM(CASE WHEN COALESCE(validado_tecnicamente,1)=0 THEN 1 ELSE 0 END) AS pendentes,
+           COUNT(DISTINCT equipamento_id) AS equipamentos
+    FROM pcm_lubrificacao_planos
+    WHERE COALESCE(ativo,1)=1
+    GROUP BY COALESCE(rota_lubrificacao,'Sem rota')
+    ORDER BY CASE WHEN rota_lubrificacao IS NULL THEN 1 ELSE 0 END, rota_lubrificacao
+  `);
+}
+
+function listEquipamentosSemRoteiroLubrificacao() {
+  const equipamentos = listEquipamentosRoteiroBase();
+  const comPlano = new Set(
+    safeAll("SELECT DISTINCT equipamento_id FROM pcm_lubrificacao_planos")
+      .map((row) => Number(row.equipamento_id))
+      .filter(Boolean)
+  );
+  return equipamentos
+    .filter((eq) => !comPlano.has(Number(eq.id)))
+    .map((eq) => ({
+      ...eq,
+      classificacao_sugerida: lubricationCatalog.classificarEquipamento(eq)?.familia || null,
+    }));
+}
+
+function addPontoLubrificacao({
+  equipamento_id, ponto_lubrificacao, tipo_lubrificante_texto, quantidade, unidade,
+  frequencia_dias, observacao, metodo_aplicacao, responsavel_user_id,
+  familia_lubrificacao, rota_lubrificacao, instrucoes_execucao
+}, userId) {
   ensurePcmTables();
   const equipamentoId = Number(equipamento_id);
   if (!equipamentoId) throw new Error("Selecione um equipamento para adicionar um ponto de lubrificação.");
   if (!String(ponto_lubrificacao || "").trim()) throw new Error("Informe o ponto de lubrificação.");
+  if (!String(tipo_lubrificante_texto || "").trim()) throw new Error("Informe o lubrificante validado tecnicamente.");
+
+  const dias = Number(frequencia_dias || 0);
+  if (!Number.isFinite(dias) || dias < 1) throw new Error("Informe uma frequência em dias válida.");
 
   const responsavelId = validarMecanicoLubrificacao(responsavel_user_id);
-  const dias = Math.max(1, Number(frequencia_dias) || 30);
   const prox = db.prepare(`SELECT datetime('now', '+' || ? || ' day') AS dt`).get(dias)?.dt || null;
 
   const info = db.prepare(`
     INSERT INTO pcm_lubrificacao_planos (
       equipamento_id, ponto_lubrificacao, tipo_lubrificante_texto, quantidade, unidade,
       frequencia_dias, observacao, proxima_execucao_em, metodo_aplicacao,
-      responsavel_user_id, ativo, created_by, created_at, updated_at
+      responsavel_user_id, ativo, familia_lubrificacao, rota_lubrificacao,
+      validado_tecnicamente, origem_cadastro, instrucoes_execucao,
+      created_by, created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, datetime('now'), datetime('now'))
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 1, 'MANUAL_PCM', ?, ?, datetime('now'), datetime('now'))
   `).run(
     equipamentoId,
     String(ponto_lubrificacao).trim(),
-    (tipo_lubrificante_texto || "").trim() || null,
+    String(tipo_lubrificante_texto).trim(),
     quantidade === '' || quantidade == null ? null : Number(quantidade),
     (unidade || "").trim() || null,
     dias,
@@ -785,10 +1005,100 @@ function addPontoLubrificacao({ equipamento_id, ponto_lubrificacao, tipo_lubrifi
     prox,
     String(metodo_aplicacao || "").trim() || null,
     responsavelId,
+    String(familia_lubrificacao || "MANUAL").trim(),
+    String(rota_lubrificacao || "Rota manual - PCM").trim(),
+    String(instrucoes_execucao || "").trim() || null,
     userId || null
   );
 
   return Number(info.lastInsertRowid);
+}
+
+function calcularProximaValidacao(payload = {}) {
+  const dias = Math.max(0, Number(payload.frequencia_dias || 0));
+  const semanas = Math.max(0, Number(payload.frequencia_semanas || 0));
+  const meses = Math.max(0, Number(payload.frequencia_meses || 0));
+  const horas = Math.max(0, Number(payload.frequencia_horas_operacao || 0));
+
+  if (!(dias || semanas || meses || horas)) {
+    throw new Error("Defina pelo menos uma frequência antes de liberar o ponto.");
+  }
+
+  let modifier = null;
+  if (dias > 0) modifier = `+${dias} day`;
+  else if (semanas > 0) modifier = `+${semanas * 7} day`;
+  else if (meses > 0) modifier = `+${meses} month`;
+
+  const proxima = modifier ? db.prepare("SELECT datetime('now', ?) AS dt").get(modifier)?.dt || null : null;
+  return { dias, semanas, meses, horas, proxima };
+}
+
+function validarPontoLubrificacao(planoId, payload = {}, userId = null) {
+  ensurePcmTables();
+  const id = Number(planoId);
+  if (!id) throw new Error("Ponto de lubrificação inválido.");
+
+  const atual = db.prepare("SELECT * FROM pcm_lubrificacao_planos WHERE id=?").get(id);
+  if (!atual) throw new Error("Ponto de lubrificação não encontrado.");
+
+  const produto = String(payload.tipo_lubrificante_texto || atual.tipo_lubrificante_texto || "").trim();
+  if (!produto || /A DEFINIR|VALIDAR NO MANUAL|PENDENTE/i.test(produto)) {
+    throw new Error("Informe o lubrificante/especificação técnica antes de liberar para o mecânico.");
+  }
+
+  const metodo = String(payload.metodo_aplicacao || atual.metodo_aplicacao || "").trim();
+  if (!metodo) throw new Error("Informe o método de aplicação.");
+
+  const quantidadeRaw = payload.quantidade;
+  const quantidade = quantidadeRaw === '' || quantidadeRaw == null ? null : Number(quantidadeRaw);
+  if (quantidade != null && (!Number.isFinite(quantidade) || quantidade < 0)) throw new Error("Quantidade inválida.");
+
+  const unidade = String(payload.unidade || "").trim() || null;
+  if (quantidade != null && !unidade) throw new Error("Informe a unidade da quantidade.");
+
+  if (String(payload.confirmacao_tecnica || '') !== '1') {
+    throw new Error("Confirme a validação técnica do ponto antes de liberar.");
+  }
+
+  const freq = calcularProximaValidacao(payload);
+  const responsavelId = validarMecanicoLubrificacao(payload.responsavel_user_id);
+
+  db.prepare(`
+    UPDATE pcm_lubrificacao_planos
+    SET tipo_lubrificante_texto=?,
+        quantidade=?,
+        unidade=?,
+        frequencia_dias=?,
+        frequencia_semanas=?,
+        frequencia_meses=?,
+        frequencia_horas_operacao=?,
+        metodo_aplicacao=?,
+        responsavel_user_id=?,
+        rota_lubrificacao=?,
+        instrucoes_execucao=?,
+        ativo=?,
+        validado_tecnicamente=1,
+        proxima_execucao_em=?,
+        updated_at=datetime('now')
+    WHERE id=?
+  `).run(
+    produto,
+    quantidade,
+    unidade,
+    freq.dias || null,
+    freq.semanas || null,
+    freq.meses || null,
+    freq.horas || null,
+    metodo,
+    responsavelId,
+    String(payload.rota_lubrificacao || atual.rota_lubrificacao || "Rota manual - PCM").trim(),
+    String(payload.instrucoes_execucao || atual.instrucoes_execucao || "").trim() || null,
+    String(payload.ativo || '1') === '0' ? 0 : 1,
+    freq.proxima,
+    id
+  );
+
+  return { id, validated: true, updated_by: userId || null };
 }
 
 function distribuirPontoLubrificacao(planoId, payload = {}, userId = null) {
@@ -1183,6 +1493,11 @@ module.exports = {
   addComponenteBOM,
   addPontoLubrificacao,
   listMecanicosLubrificacao,
+  gerarRoteiroBaseLubrificacao,
+  listMotoresLubrificacaoPendentes,
+  listRotasLubrificacao,
+  listEquipamentosSemRoteiroLubrificacao,
+  validarPontoLubrificacao,
   distribuirPontoLubrificacao,
   gerarSugestaoPlanoLubrificacao,
   aplicarSugestaoPlanoLubrificacao,

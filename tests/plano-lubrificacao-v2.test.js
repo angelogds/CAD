@@ -60,10 +60,11 @@ test('módulo operacional é separado do PCM e protegido por RBAC próprio', () 
 test('tela do mecânico não oferece edição administrativa do plano', () => {
   const view = read('views/lubrificacao/index.ejs');
   assert.match(view, /Meu roteiro de lubrificação/);
-  assert.match(view, /Executar lubrificação/);
+  assert.match(view, /Executar este ponto/);
   assert.match(view, /Quantidade utilizada/);
   assert.match(view, /Encontrei uma anomalia/);
-  assert.doesNotMatch(view, /frequencia_dias/);
+  assert.match(view, /p\.frequencia_dias/);
+  assert.doesNotMatch(view, /name=["']frequencia_dias["']/);
   assert.doesNotMatch(view, /tipo_lubrificante_texto"[^>]*name=/);
   assert.doesNotThrow(() => ejs.compile(view));
 });

@@ -4,6 +4,11 @@ function tableExists(name) {
   return !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name);
 }
 
+function hasColumn(table, column) {
+  try { return db.prepare(`PRAGMA table_info(${table})`).all().some((row) => row.name === column); }
+  catch (_e) { return false; }
+}
+
 function ensureReady() {
   if (!tableExists('pcm_lubrificacao_planos') || !tableExists('pcm_lubrificacao_execucoes')) {
     throw new Error('Estrutura do Plano de Lubrificação V2 ainda não foi aplicada. Execute as migrations.');
@@ -12,7 +17,13 @@ function ensureReady() {
 
 function listRoteiro(userId, status = '') {
   ensureReady();
-  const params = { userId: Number(userId) };
+  const hasValidation = hasColumn('pcm_lubrificacao_planos','validado_tecnicamente');
+  const hasRoute = hasColumn('pcm_lubrificacao_planos','rota_lubrificacao');
+  const hasOrder = hasColumn('pcm_lubrificacao_planos','ordem_rota');
+  const hasFamily = hasColumn('pcm_lubrificacao_planos','familia_lubrificacao');
+  const hasInstruction = hasColumn('pcm_lubrificacao_planos','instrucoes_execucao');
+  const validationWhere = hasValidation ? 'AND COALESCE(l.validado_tecnicamente,1)=1' : '';
+
   const rows = db.prepare(`
     SELECT
       l.id,
@@ -29,6 +40,10 @@ function listRoteiro(userId, status = '') {
       l.proxima_execucao_em,
       l.ultima_execucao_em,
       l.metodo_aplicacao,
+      ${hasRoute ? "COALESCE(l.rota_lubrificacao,'Rota não definida')" : "'Rota não definida'"} AS rota_lubrificacao,
+      ${hasOrder ? 'COALESCE(l.ordem_rota,999999)' : '999999'} AS ordem_rota,
+      ${hasFamily ? "COALESCE(l.familia_lubrificacao,'OUTROS')" : "'OUTROS'"} AS familia_lubrificacao,
+      ${hasInstruction ? "COALESCE(l.instrucoes_execucao,'')" : "''"} AS instrucoes_execucao,
       e.nome AS equipamento_nome,
       COALESCE(e.setor, '') AS setor,
       CASE
@@ -42,22 +57,38 @@ function listRoteiro(userId, status = '') {
     JOIN equipamentos e ON e.id = l.equipamento_id
     WHERE COALESCE(l.ativo, 1) = 1
       AND l.responsavel_user_id = @userId
+      ${validationWhere}
     ORDER BY
       CASE
+        WHEN l.proxima_execucao_em IS NOT NULL AND date(l.proxima_execucao_em) < date('now') THEN 0
+        WHEN l.proxima_execucao_em IS NOT NULL AND date(l.proxima_execucao_em) = date('now') THEN 1
+        WHEN l.proxima_execucao_em IS NOT NULL AND date(l.proxima_execucao_em) <= date('now', '+7 day') THEN 2
         WHEN l.proxima_execucao_em IS NULL THEN 4
-        WHEN date(l.proxima_execucao_em) < date('now') THEN 0
-        WHEN date(l.proxima_execucao_em) = date('now') THEN 1
-        WHEN date(l.proxima_execucao_em) <= date('now', '+7 day') THEN 2
         ELSE 3
       END,
-      datetime(l.proxima_execucao_em) ASC,
+      rota_lubrificacao ASC,
+      ordem_rota ASC,
       e.nome ASC,
       l.ponto_lubrificacao ASC
-  `).all(params);
+  `).all({ userId: Number(userId) });
 
   const wanted = String(status || '').trim().toUpperCase();
   if (!wanted || wanted === 'TODOS') return rows;
   return rows.filter((row) => row.situacao === wanted);
+}
+
+function agruparRoteiro(rows = []) {
+  const groups = new Map();
+  rows.forEach((row) => {
+    const rota = row.rota_lubrificacao || 'Rota não definida';
+    if (!groups.has(rota)) groups.set(rota, { rota, pontos: [], atrasados: 0, hoje: 0, proximos: 0 });
+    const group = groups.get(rota);
+    group.pontos.push(row);
+    if (row.situacao === 'ATRASADO') group.atrasados += 1;
+    if (row.situacao === 'HOJE') group.hoje += 1;
+    if (row.situacao === 'PROXIMO') group.proximos += 1;
+  });
+  return Array.from(groups.values());
 }
 
 function resumoRoteiro(userId) {
@@ -72,6 +103,7 @@ function resumoRoteiro(userId) {
 
   return {
     total: rows.length,
+    rotas: new Set(rows.map((row) => row.rota_lubrificacao).filter(Boolean)).size,
     atrasados: count('ATRASADO'),
     hoje: count('HOJE'),
     proximos: count('PROXIMO'),
@@ -82,6 +114,9 @@ function resumoRoteiro(userId) {
 function listHistorico(userId, limit = 12) {
   ensureReady();
   const safeLimit = Math.max(1, Math.min(50, Number(limit) || 12));
+  const routeExpr = hasColumn('pcm_lubrificacao_planos','rota_lubrificacao')
+    ? "COALESCE(l.rota_lubrificacao,'Rota não definida')"
+    : "'Rota não definida'";
   return db.prepare(`
     SELECT
       x.id,
@@ -98,7 +133,8 @@ function listHistorico(userId, limit = 12) {
       COALESCE(e.setor, '') AS setor,
       l.ponto_lubrificacao,
       l.tipo_lubrificante_texto,
-      l.metodo_aplicacao
+      l.metodo_aplicacao,
+      ${routeExpr} AS rota_lubrificacao
     FROM pcm_lubrificacao_execucoes x
     JOIN pcm_lubrificacao_planos l ON l.id = x.plano_id
     JOIN equipamentos e ON e.id = x.equipamento_id
@@ -128,17 +164,22 @@ function registrarExecucao(planoId, userId, payload = {}) {
   const executorId = Number(userId);
   if (!id || !executorId) throw new Error('Execução de lubrificação inválida.');
 
+  const validationWhere = hasColumn('pcm_lubrificacao_planos','validado_tecnicamente')
+    ? 'AND COALESCE(validado_tecnicamente,1)=1'
+    : '';
+
   const plano = db.prepare(`
     SELECT *
     FROM pcm_lubrificacao_planos
     WHERE id = ?
       AND COALESCE(ativo, 1) = 1
       AND responsavel_user_id = ?
+      ${validationWhere}
     LIMIT 1
   `).get(id, executorId);
 
   if (!plano) {
-    throw new Error('Este ponto não pertence ao seu roteiro de lubrificação ou está inativo.');
+    throw new Error('Este ponto não pertence ao seu roteiro, está inativo ou ainda não foi validado pelo PCM.');
   }
 
   const rawQuantidade = payload.quantidade_utilizada;
@@ -197,6 +238,7 @@ function registrarExecucao(planoId, userId, payload = {}) {
 
 module.exports = {
   listRoteiro,
+  agruparRoteiro,
   resumoRoteiro,
   listHistorico,
   registrarExecucao,
