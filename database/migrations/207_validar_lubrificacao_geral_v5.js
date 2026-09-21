@@ -2,9 +2,11 @@ function hasTable(db, name) {
   return !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name);
 }
 
-function appendNote(existing, note) {
+function appendNoteOnce(existing, note) {
   const base = String(existing || '').trim();
-  return base ? `${base} ${note}` : note;
+  if (!base) return note;
+  if (base.includes(note)) return base;
+  return `${base} ${note}`;
 }
 
 module.exports = function up({ db, tableExists }) {
@@ -31,7 +33,8 @@ module.exports = function up({ db, tableExists }) {
 
   let mancais = 0;
   let redutores = 0;
-  let decanterIgnorados = 0;
+  let decanterMancaisPreparados = 0;
+  let decanterRedutoresPreparados = 0;
   let outrosPendentes = 0;
 
   const tx = db.transaction(() => {
@@ -39,12 +42,6 @@ module.exports = function up({ db, tableExists }) {
       const familia = String(item.familia_lubrificacao || '').toUpperCase();
       const nomeEquip = String(item.equipamento_nome || '').toUpperCase();
       const ponto = String(item.ponto_lubrificacao || '').toUpperCase();
-
-      const isDecanter = familia === 'DECANTER' || nomeEquip.includes('DECANTER');
-      if (isDecanter) {
-        decanterIgnorados += 1;
-        continue;
-      }
 
       const isReducer =
         ponto.includes('REDUTOR') ||
@@ -56,11 +53,57 @@ module.exports = function up({ db, tableExists }) {
         ponto.includes('ROLAMENTO') ||
         ponto.includes('RELUBRIFICA');
 
-      if (isReducer) {
-        const note = 'Validação V5: verificar/completar somente o nível com Óleo ISO VG 680. Troca total de óleo ficará para uma etapa futura do plano.';
+      const isDecanter = familia === 'DECANTER' || nomeEquip.includes('DECANTER');
+
+      if (isDecanter && isReducer) {
+        const note = 'Produto do Decanter FAST confirmado: TotalEnergies Carter SH 680, óleo sintético ISO VG 680 para redutor/engrenagem, incolor, com proteção para micropitting. Quantidade e frequência permanecem pendentes de validação final.';
         db.prepare(`
           UPDATE pcm_lubrificacao_planos
-          SET tipo_lubrificante_texto='Óleo ISO VG 680',
+          SET tipo_lubrificante_texto='TotalEnergies Carter SH 680 - Óleo Sintético ISO VG 680 - Redutor/Engrenagem - Micropitting - Incolor',
+              quantidade=NULL,
+              unidade=NULL,
+              frequencia_dias=NULL,
+              frequencia_semanas=NULL,
+              frequencia_meses=NULL,
+              frequencia_horas_operacao=NULL,
+              metodo_aplicacao='Verificar / completar nível',
+              proxima_execucao_em=NULL,
+              observacao=?,
+              updated_at=datetime('now')
+          WHERE id=?
+            AND COALESCE(validado_tecnicamente,0)=0
+        `).run(appendNoteOnce(item.observacao, note), Number(item.id));
+        decanterRedutoresPreparados += 1;
+        continue;
+      }
+
+      if (isDecanter && isBearing) {
+        const note = 'Produto do Decanter FAST confirmado: SKF LGWA 2. Quantidade e frequência permanecem pendentes de validação final.';
+        db.prepare(`
+          UPDATE pcm_lubrificacao_planos
+          SET tipo_lubrificante_texto='SKF LGWA 2',
+              quantidade=NULL,
+              unidade=NULL,
+              frequencia_dias=NULL,
+              frequencia_semanas=NULL,
+              frequencia_meses=NULL,
+              frequencia_horas_operacao=NULL,
+              metodo_aplicacao='Engraxar',
+              proxima_execucao_em=NULL,
+              observacao=?,
+              updated_at=datetime('now')
+          WHERE id=?
+            AND COALESCE(validado_tecnicamente,0)=0
+        `).run(appendNoteOnce(item.observacao, note), Number(item.id));
+        decanterMancaisPreparados += 1;
+        continue;
+      }
+
+      if (isReducer) {
+        const note = 'Validação V5: usar Lubrax Gear 680 (óleo para engrenagens/redutores, ISO VG 680). Nesta etapa, verificar/completar somente o nível. Troca total de óleo ficará para uma etapa futura do plano.';
+        db.prepare(`
+          UPDATE pcm_lubrificacao_planos
+          SET tipo_lubrificante_texto='Lubrax Gear 680 - Óleo para Engrenagens/Redutores - ISO VG 680',
               quantidade=NULL,
               unidade=NULL,
               frequencia_dias=7,
@@ -74,16 +117,16 @@ module.exports = function up({ db, tableExists }) {
               updated_at=datetime('now')
           WHERE id=?
             AND COALESCE(validado_tecnicamente,0)=0
-        `).run(appendNote(item.observacao, note), Number(item.id));
+        `).run(appendNoteOnce(item.observacao, note), Number(item.id));
         redutores += 1;
         continue;
       }
 
       if (isBearing) {
-        const note = 'Validação V5: padrão inicial 150 g por ponto. Mancais pequenos podem ser ajustados pelo PCM dentro da faixa de 100 a 150 g conforme o conjunto real.';
+        const note = 'Validação V5: usar Graxa de Lítio EP2. Padrão inicial 150 g por ponto; mancais pequenos podem ser ajustados pelo PCM dentro da faixa de 100 a 150 g conforme o conjunto real.';
         db.prepare(`
           UPDATE pcm_lubrificacao_planos
-          SET tipo_lubrificante_texto='Graxa de alta temperatura vermelha - padrão Manutenção',
+          SET tipo_lubrificante_texto='Graxa de Lítio EP2',
               quantidade=150,
               unidade='g',
               frequencia_dias=7,
@@ -97,7 +140,7 @@ module.exports = function up({ db, tableExists }) {
               updated_at=datetime('now')
           WHERE id=?
             AND COALESCE(validado_tecnicamente,0)=0
-        `).run(appendNote(item.observacao, note), Number(item.id));
+        `).run(appendNoteOnce(item.observacao, note), Number(item.id));
         mancais += 1;
         continue;
       }
@@ -109,6 +152,6 @@ module.exports = function up({ db, tableExists }) {
   tx();
 
   console.log(
-    `[LUBRIFICACAO V5] mancais validados=${mancais}; redutores validados=${redutores}; decanter mantidos pendentes=${decanterIgnorados}; outros pendentes=${outrosPendentes}`
+    `[LUBRIFICACAO V5] mancais validados=${mancais}; redutores validados=${redutores}; decanter mancais preparados=${decanterMancaisPreparados}; decanter redutores preparados=${decanterRedutoresPreparados}; outros pendentes=${outrosPendentes}`
   );
 };
