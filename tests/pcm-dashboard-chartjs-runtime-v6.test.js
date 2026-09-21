@@ -22,7 +22,7 @@ test('dashboard usa Chart.js local com fallback externo', () => {
   const view = read('views/pcm/dashboard-gerencial.ejs');
   assert.match(view, /\/vendor\/chart\.js\/chart\.umd\.js\?v=4\.4\.7/);
   assert.match(view, /cdn\.jsdelivr\.net\/npm\/chart\.js@4\.4\.7\/dist\/chart\.umd\.min\.js/);
-  assert.match(view, /pcm-dashboard\.js\?v=20260920-v10/);
+  assert.match(view, /pcm-dashboard\.js\?v=20260921-v11/);
   assert.doesNotThrow(() => ejs.compile(view));
 });
 
