@@ -1,6 +1,6 @@
 (function(){
   const endpoints=window.PCM_DASHBOARD_ENDPOINTS||{base:'/pcm/dashboard-gerencial',data:'/pcm/dashboard-gerencial/dados',pdf:'/pcm/dashboard-gerencial/pdf'};
-  const state={charts:{},data:window.PCM_DASHBOARD_INITIAL||null,lastQuery:new URLSearchParams(location.search),chartFrame:null};
+  const state={charts:{},data:window.PCM_DASHBOARD_INITIAL||null,lastQuery:new URLSearchParams(location.search),chartFrame:null,ordersPage:1,ordersPageSize:15};
   const $=(s,root=document)=>root.querySelector(s); const $$=(s,root=document)=>Array.from(root.querySelectorAll(s));
   const COLORS={green:'#159947',greenDark:'#107136',teal:'#15989a',blue:'#2788ca',red:'#d94b47',orange:'#ed941e',amber:'#e5a50a',slate:'#718096',ink:'#10233e',muted:'#68778a',grid:'rgba(82,98,115,.10)',risk1:'#f8e7a1',risk2:'#f4c84e',risk3:'#f39a3e',risk4:'#d94b47'};
   if(typeof Chart!=='undefined'){
@@ -124,7 +124,7 @@
   function gradient(chart,from,to,horizontal=false){const area=chart.chartArea;if(!area)return from;const g=horizontal?chart.ctx.createLinearGradient(area.left,0,area.right,0):chart.ctx.createLinearGradient(0,area.bottom,0,area.top);g.addColorStop(0,from);g.addColorStop(1,to);return g;}
   function baseOptions({horizontal=false,currency=false,legend=false,links=null}={}){
     return {
-      responsive:true,maintainAspectRatio:false,animation:{duration:620,easing:'easeOutQuart'},
+      responsive:true,maintainAspectRatio:false,indexAxis:horizontal?'y':'x',animation:{duration:620,easing:'easeOutQuart'},
       interaction:{mode:horizontal?'nearest':'index',intersect:false},
       layout:{padding:{top:12,right:10,bottom:4,left:4}},
       onClick:links?(event,elements)=>{const point=elements?.[0];if(!point)return;const href=links[point.index];if(href)location.href=href;}:undefined,
@@ -152,7 +152,8 @@
   }
   function line(id,labels,datasets,{currency=false}={}){
     const el=$(`#${id}`);if(!el||typeof Chart==='undefined')return;destroy(id);const has=labels?.length&&datasets.some(ds=>ds.data.some(v=>Number(v)>0));noData(id,!has);if(!has)return;
-    state.charts[id]=new Chart(el,{type:'line',data:{labels:labels.map(x=>compact(x,18)),datasets:datasets.map((ds,index)=>({label:ds.label,data:ds.data.map(Number),borderColor:ds.color||[COLORS.green,COLORS.blue,COLORS.orange][index%3],backgroundColor:(ctx)=>gradient(ctx.chart,ds.fillFrom||'rgba(21,153,71,.03)',ds.fillTo||'rgba(21,153,71,.18)'),borderWidth:2.6,tension:.4,cubicInterpolationMode:'monotone',fill:ds.fill!==false,pointRadius:0,pointHoverRadius:5,pointHitRadius:16,pointBackgroundColor:'#fff',pointBorderColor:ds.color||COLORS.green,pointBorderWidth:2}))},options:baseOptions({currency,legend:datasets.length>1})});
+    const singlePeriod=labels.length===1;
+    state.charts[id]=new Chart(el,{type:'line',data:{labels:labels.map(x=>compact(x,18)),datasets:datasets.map((ds,index)=>{const color=ds.color||[COLORS.green,COLORS.blue,COLORS.orange][index%3];return {label:ds.label,data:ds.data.map(Number),borderColor:color,backgroundColor:(ctx)=>gradient(ctx.chart,ds.fillFrom||'rgba(21,153,71,.03)',ds.fillTo||'rgba(21,153,71,.18)'),borderWidth:2.6,tension:.4,cubicInterpolationMode:'monotone',fill:singlePeriod?false:ds.fill!==false,showLine:!singlePeriod,pointRadius:singlePeriod?6:2,pointHoverRadius:singlePeriod?8:5,pointHitRadius:16,pointBackgroundColor:singlePeriod?color:'#fff',pointBorderColor:singlePeriod?'#fff':color,pointBorderWidth:2};})},options:baseOptions({currency,legend:datasets.length>1})});
     decorateChartPanel(id,{summary:`${labels.length} ${labels.length===1?'período':'períodos'}`});
   }
   function doughnut(id,labels,data,opts={}){
@@ -163,9 +164,27 @@
     decorateChartPanel(id,{interactive:Boolean(links?.some(Boolean)),summary:`${labels.length} ${labels.length===1?'categoria':'categorias'}`});
   }
   function renderCards(){const cards=state.data?.cards||{};$$('[data-card]').forEach(el=>{const key=el.dataset.card;const suffix=el.dataset.suffix||'';const target=$('.pcm-kpi-value',el)||el;if(target)target.textContent=fmt(cards[key],suffix);});$$('[data-card-money]').forEach(el=>{el.textContent=money(cards[el.dataset.cardMoney]);});}
+  function formatDashboardDate(value){
+    const raw=String(value||'').trim();
+    if(!raw)return '-';
+    return raw.replace('T',' ').slice(0,16);
+  }
+  function renderOrdersTable(){
+    const orders=Array.isArray(state.data?.tabelas?.ordens)?state.data.tabelas.ordens:[];
+    const body=$('#ordensBody');if(!body)return;
+    const totalPages=Math.max(1,Math.ceil(orders.length/state.ordersPageSize));
+    state.ordersPage=Math.min(Math.max(1,state.ordersPage),totalPages);
+    const start=(state.ordersPage-1)*state.ordersPageSize;
+    const pageRows=orders.slice(start,start+state.ordersPageSize);
+    body.innerHTML=pageRows.map(o=>`<tr><td><a href="/os/${tr(o.id)}">#${tr(o.id)}</a></td><td>${tr(formatDashboardDate(o.opened_at))}</td><td>${tr(o.tipo||'-')}</td><td>${tr(o.status||'-')}</td><td>${tr(o.equipamento||'-')}</td><td>${tr(o.setor||'-')}</td><td>${tr(o.solicitante||'-')}</td></tr>`).join('')||'<tr><td colspan="7" class="pcm-empty-row">Nenhuma ordem encontrada.</td></tr>';
+    const info=$('#ordensPageInfo');if(info)info.textContent=orders.length?`Exibindo ${start+1}–${Math.min(start+state.ordersPageSize,orders.length)} de ${orders.length} OS • página ${state.ordersPage} de ${totalPages}`:'Nenhuma OS para os filtros atuais';
+    const prev=$('#ordensPrev');if(prev)prev.disabled=state.ordersPage<=1;
+    const next=$('#ordensNext');if(next)next.disabled=state.ordersPage>=totalPages;
+  }
   function renderTables(){
     const falhas=rows('falhas_equipamento');const ranking=$('#rankingFalhas');if(ranking)ranking.innerHTML=falhas.slice(0,5).map((e,i)=>`<tr><td>${i+1}</td><td><a href="/equipamentos/${tr(e.equipamento_id)}">${tr(e.nome)}</a></td><td>${tr(e.setor)}</td><td>${tr(e.falhas)}</td><td>${tr(e.falhas_criticas||0)}</td><td>${tr(e.reincidencias||0)}</td><td>${tr(e.media_dias_entre_falhas||'Dados insuficientes')}</td><td>${tr((e.ultima_ocorrencia||'').slice(0,10))}</td><td><span class="pcm-pill ${String(e.criticidade).toUpperCase().includes('ALTA')?'red':''}">${tr(e.criticidade||'Normal')}</span></td><td><a class="pcm-btn pcm-btn-ghost" href="/equipamentos/${tr(e.equipamento_id)}">Histórico</a></td></tr>`).join('')||'<tr><td colspan="10">Não foram encontrados dados para os filtros selecionados.</td></tr>';
     const crit=state.data?.equipamentos_atencao||[];const table=$('#equipAtencao');if(table)table.innerHTML=crit.slice(0,8).map(e=>{const equipamentoId=e.equipamento_id||e.id;return `<tr><td><a href="/equipamentos/${tr(equipamentoId)}">${tr(e.nome)}</a></td><td>${tr(e.setor)}</td><td><span class="pcm-pill red">${tr(e.criticidade||'Atenção')}</span></td><td>${tr((e.motivos||[]).join('; '))}<br><small>Sugestão do sistema — requer avaliação da Manutenção/PCM.</small></td><td>${tr(e.falhas)}</td><td>${tr((e.ultima_ocorrencia||'').slice(0,10))}</td><td>${tr(e.situacao||'Necessita avaliação')}</td><td>${tr(e.responsavel||'-')}</td><td><a class="pcm-btn pcm-btn-ghost" href="${tr(dashboardHref({equipamento_id:equipamentoId}))}">Analisar</a></td></tr>`}).join('')||'<tr><td colspan="9">Nenhum equipamento excedeu os limites configurados.</td></tr>';
+    renderOrdersTable();
   }
   function renderQuality(){const q=state.data?.qualidade_dados||{};$('[data-quality]').forEach(el=>{el.textContent=fmt(q[el.dataset.quality],'%');});const status=$('[data-quality-status]');if(status)status.textContent=q.status_label||'Sem dados suficientes';const list=$('#qualityPendencias');if(list)list.innerHTML=(q.campos_pendentes||[]).map(item=>`<li>${tr(item)}</li>`).join('')||'<li>Base mínima atendida para os campos avaliados.</li>';}
   function renderReliability(){const r=state.data?.confiabilidade||{};const status=$('[data-reliability-status]');if(status)status.textContent=r.status_label||'Dados insuficientes';}
@@ -195,7 +214,7 @@
     const status=rows('os_status');
     safeChart('chartStatus',()=>doughnut('chartStatus',status.map(x=>String(x.status||'-').split('_').join(' ')),status.map(x=>x.total),{label:'OS',colors:[COLORS.green,COLORS.teal,COLORS.orange,COLORS.red,COLORS.blue,COLORS.slate],links:status.map(x=>x.status?dashboardHref({status:String(x.status).toUpperCase()}):null)}));
     const backlog=rows('backlog_idade');
-    safeChart('chartBacklogIdade',()=>bar('chartBacklogIdade',backlog.map(x=>x.faixa),backlog.map(x=>x.total),{label:'OS pendentes',colors:['#7cc99a','#e7bd54','#ef9441','#d94b47'],legend:false}));
+    safeChart('chartBacklogIdade',()=>bar('chartBacklogIdade',backlog.map(x=>x.faixa),backlog.map(x=>x.total),{horizontal:true,label:'OS pendentes',colors:['#7cc99a','#e7bd54','#ef9441','#d94b47'],legend:false,labelMax:24}));
     const reinc=rows('reincidencia_corretiva').slice(0,7);
     const reincColors=reinc.map(x=>criticalityBarColor(x.repeticoes_apos_primeira,false));
     const reincTextColors=reincColors.map(color=>color===COLORS.risk1||color===COLORS.risk2?COLORS.ink:'#fff');
@@ -238,6 +257,7 @@
       const json=await res.json();
       if(!res.ok||!json.ok||!json.dashboard)throw new Error(json.message||'Falha ao carregar dados');
       state.data=json.dashboard;
+      state.ordersPage=1;
       state.lastQuery=new URLSearchParams(params);
       if(replaceHistory)history.replaceState(null,'',query?'?'+query:location.pathname);
       renderAll();
@@ -261,6 +281,8 @@
     }finally{$('.pcm-loading')?.classList.remove('active');}
   }
   const form=$('#pcmFilters');$('[name="periodo"]',form)?.addEventListener('change',e=>{if(e.currentTarget.value!=='personalizado'){const ini=$('[name="data_inicial"]',form),fim=$('[name="data_final"]',form);if(ini)ini.value='';if(fim)fim.value='';}});form?.addEventListener('submit',e=>{e.preventDefault();load(new URLSearchParams(new FormData(e.currentTarget)));});$('#btnAtualizar')?.addEventListener('click',()=>load(new URLSearchParams(new FormData(form))));$('#btnLimpar')?.addEventListener('click',()=>{location.href=endpoints.base;});$('#btnMobileFilters')?.addEventListener('click',()=>$('.pcm-filters')?.classList.toggle('open'));$('#btnFull')?.addEventListener('click',()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen?.();else document.exitFullscreen?.();});$('#btnPdf')?.addEventListener('click',()=>{location.href=endpoints.pdf+'?'+new URLSearchParams(new FormData(form)).toString();});
+  $('#ordensPrev')?.addEventListener('click',()=>{if(state.ordersPage>1){state.ordersPage-=1;renderOrdersTable();}});
+  $('#ordensNext')?.addEventListener('click',()=>{const total=Array.isArray(state.data?.tabelas?.ordens)?state.data.tabelas.ordens.length:0;const pages=Math.max(1,Math.ceil(total/state.ordersPageSize));if(state.ordersPage<pages){state.ordersPage+=1;renderOrdersTable();}});
   let initialized=false;
   async function init(){
     if(initialized)return;
