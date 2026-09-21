@@ -123,8 +123,8 @@ test('catálogo de motivos controla disponibilidade do mecânico sem comparaçã
 
 test('mecânico pode iniciar novas OSs mesmo quando já possui outro atendimento ativo', () => {
   const service = read('modules/os/os.service.js');
-  const iniciar = service.match(/function iniciarOS[\\s\\S]*?\\n}\\n\\nfunction pausarOS/)?.[0] || '';
-  const manter = service.match(/function manterMecanicoVinculadoExecucao[\\s\\S]*?\\n}\\n\\nfunction patchAIFields/)?.[0] || '';
+  const iniciar = service.match(/function iniciarOS[\s\S]*?\n}\n\nfunction pausarOS/)?.[0] || '';
+  const manter = service.match(/function manterMecanicoVinculadoExecucao[\s\S]*?\n}\n\nfunction patchAIFields/)?.[0] || '';
 
   assert.match(iniciar, /getResponsavelExecucaoUserId/);
   assert.match(iniciar, /createExecucao/);
