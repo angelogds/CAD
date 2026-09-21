@@ -10,6 +10,22 @@
     <a class="lub-btn ghost" href="/dashboard">Voltar ao painel</a>
   </header>
 
+  <section class="lub-week-banner <%= semana?.responsavel_user_id && !isResponsavelSemana ? 'blocked' : '' %>">
+    <div>
+      <span class="lub-eyebrow">Responsabilidade da semana</span>
+      <strong><%= semana?.responsavel_nome || 'Responsável semanal ainda não definido pelo PCM' %></strong>
+      <% if (semana) { %><small><%= semana.semana_inicio %> a <%= semana.semana_fim %></small><% } %>
+    </div>
+    <a class="lub-btn ghost" href="/lubrificacao/relatorio-semanal.pdf">Relatório semanal PDF</a>
+  </section>
+
+  <% if (semana?.responsavel_user_id && !isResponsavelSemana) { %>
+    <div class="lub-empty" style="margin-bottom:14px">
+      <strong>O roteiro desta semana está com <%= semana.responsavel_nome %>.</strong>
+      <span>Você continua com acesso ao módulo, mas não recebe pontos enquanto outro mecânico for o responsável semanal.</span>
+    </div>
+  <% } %>
+
   <section class="lub-how" aria-label="Como funciona o roteiro">
     <div class="lub-how-item"><b>1</b><span><strong>PCM valida</strong><small>produto, quantidade e frequência</small></span></div>
     <div class="lub-how-item"><b>2</b><span><strong>Você segue a rota</strong><small>na sequência dos equipamentos</small></span></div>
