@@ -544,7 +544,13 @@ function listLubrificacao({ equipamento_id, setor, validacao, rota } = {}) {
     const sem = Number(r.frequencia_semanas || 0);
     const mes = Number(r.frequencia_meses || 0);
     const horas = Number(r.frequencia_horas_operacao || 0);
-    const freq = dias ? `${dias}d` : sem ? `${sem} sem` : mes ? `${mes} mês` : horas ? `${horas}h op.` : '-';
+    const diasSemanaMap = { '0':'Dom', '1':'Seg', '2':'Ter', '3':'Qua', '4':'Qui', '5':'Sex', '6':'Sáb' };
+    const diasSemana = String(r.dias_semana_lubrificacao || '')
+      .split(',')
+      .map((d) => diasSemanaMap[String(d).trim()])
+      .filter(Boolean)
+      .join(' / ');
+    const freq = diasSemana || (dias ? `${dias}d` : sem ? `${sem} sem` : mes ? `${mes} mês` : horas ? `${horas}h op.` : '-');
     let situacao = COALESCE_BOOL(r.validado_tecnicamente, 1) ? 'NO_PRAZO' : 'PENDENTE_VALIDACAO';
     if (COALESCE_BOOL(r.validado_tecnicamente, 1) && r.proxima_execucao_em) {
       const diff = (new Date(r.proxima_execucao_em) - new Date()) / 86400000;
