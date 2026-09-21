@@ -393,6 +393,7 @@ app.get("/admin/whatsapp/status", requireLogin, requireRole(["ADMIN"]), (req, re
   return res.render("admin/whatsapp-status", { title: "Status WhatsApp", status, user: req.session?.user || null });
 });
 mount("/preventivas", "./modules/preventivas/preventivas.routes");
+mount("/lubrificacao", "./modules/lubrificacao/lubrificacao.routes");
 mount(OFFICIAL_ROUTES.compras, "./modules/compras/compras.routes");
 mount("/fornecedores", "./modules/fornecedores/fornecedores.routes");
 mount("/solicitacoes", "./modules/solicitacoes/solicitacoes.routes");
