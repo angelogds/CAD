@@ -1,0 +1,105 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/lubrificacao.css?v=20260921-v1">
+<div class="lub-page">
+  <header class="lub-head">
+    <div>
+      <span class="lub-eyebrow">Execução operacional</span>
+      <h1>Meu roteiro de lubrificação</h1>
+      <p>Execute somente os pontos distribuídos pelo PCM. Alterações de produto, frequência e planejamento permanecem na administração do plano.</p>
+    </div>
+    <a class="lub-btn ghost" href="/dashboard">Voltar ao painel</a>
+  </header>
+
+  <section class="lub-kpis" aria-label="Resumo do roteiro">
+    <a href="/lubrificacao?status=ATRASADO" class="lub-kpi danger"><span>Atrasados</span><strong><%= resumo.atrasados %></strong><small>prioridade imediata</small></a>
+    <a href="/lubrificacao?status=HOJE" class="lub-kpi today"><span>Hoje</span><strong><%= resumo.hoje %></strong><small>programados para hoje</small></a>
+    <a href="/lubrificacao?status=PROXIMO" class="lub-kpi warn"><span>Próximos</span><strong><%= resumo.proximos %></strong><small>até 7 dias</small></a>
+    <div class="lub-kpi success"><span>Executados hoje</span><strong><%= resumo.executados_hoje %></strong><small>registrados no histórico</small></div>
+  </section>
+
+  <nav class="lub-tabs" aria-label="Filtro do roteiro">
+    <% [['TODOS','Todos'],['ATRASADO','Atrasados'],['HOJE','Hoje'],['PROXIMO','Próximos'],['FUTURO','Futuros']].forEach(function(item){ %>
+      <a href="/lubrificacao?status=<%= item[0] %>" class="<%= status===item[0]?'active':'' %>"><%= item[1] %></a>
+    <% }) %>
+  </nav>
+
+  <section class="lub-list">
+    <% if (!roteiro.length) { %>
+      <div class="lub-empty">
+        <strong>Nenhum ponto neste filtro.</strong>
+        <span>O PCM precisa distribuir pontos de lubrificação para o seu usuário antes de eles aparecerem aqui.</span>
+      </div>
+    <% } %>
+
+    <% roteiro.forEach(function(p){ %>
+      <article class="lub-card <%= String(p.situacao).toLowerCase() %>">
+        <div class="lub-card-top">
+          <div>
+            <span class="lub-sector"><%= p.setor || 'Setor não informado' %></span>
+            <h2><%= p.equipamento_nome %></h2>
+            <p><strong><%= p.ponto_lubrificacao %></strong></p>
+          </div>
+          <span class="lub-status <%= String(p.situacao).toLowerCase() %>"><%= String(p.situacao).replaceAll('_',' ') %></span>
+        </div>
+
+        <div class="lub-spec-grid">
+          <div><span>Lubrificante</span><strong><%= p.tipo_lubrificante_texto || '-' %></strong></div>
+          <div><span>Quantidade prevista</span><strong><%= p.quantidade ?? '-' %> <%= p.unidade || '' %></strong></div>
+          <div><span>Método</span><strong><%= p.metodo_aplicacao || 'Aplicação conforme plano' %></strong></div>
+          <div><span>Próxima execução</span><strong><%= p.proxima_execucao_em || 'Sem data' %></strong></div>
+        </div>
+
+        <% if (p.observacao) { %><p class="lub-note"><%= p.observacao %></p><% } %>
+
+        <details class="lub-execute">
+          <summary>Executar lubrificação</summary>
+          <form method="POST" action="/lubrificacao/<%= p.id %>/executar">
+            <label>Quantidade utilizada
+              <div class="lub-inline">
+                <input type="number" min="0" step="0.01" name="quantidade_utilizada" value="<%= p.quantidade ?? '' %>" placeholder="Quantidade">
+                <span><%= p.unidade || '' %></span>
+              </div>
+            </label>
+            <label>Observação
+              <textarea name="observacao" rows="3" placeholder="Condição do ponto, limpeza, nível, vazamento etc."></textarea>
+            </label>
+            <label class="lub-check"><input type="checkbox" name="anomalia" value="1" data-anomalia-toggle> Encontrei uma anomalia</label>
+            <label class="lub-anomaly-field">Descrição da anomalia
+              <textarea name="anomalia_descricao" rows="3" placeholder="Descreva vazamento, aquecimento, folga, contaminação ou outra condição encontrada."></textarea>
+            </label>
+            <button type="submit" class="lub-btn primary">Concluir lubrificação</button>
+          </form>
+        </details>
+      </article>
+    <% }) %>
+  </section>
+
+  <section class="lub-history">
+    <div class="lub-section-head">
+      <div><span class="lub-eyebrow">Rastreabilidade</span><h2>Minhas últimas execuções</h2></div>
+    </div>
+    <% if (!historico.length) { %><p class="lub-muted">Nenhuma execução registrada ainda.</p><% } %>
+    <div class="lub-history-list">
+      <% historico.forEach(function(h){ %>
+        <div class="lub-history-row <%= Number(h.anomalia)===1?'has-anomaly':'' %>">
+          <div><strong><%= h.equipamento_nome %></strong><span><%= h.ponto_lubrificacao %></span></div>
+          <div><span>Utilizado</span><strong><%= h.quantidade_utilizada ?? '-' %> <%= h.unidade || '' %></strong></div>
+          <div><span>Executado em</span><strong><%= h.executed_at || '-' %></strong></div>
+          <div><span>Status</span><strong><%= Number(h.anomalia)===1?'ANOMALIA':'CONCLUÍDO' %></strong></div>
+          <% if (h.anomalia_descricao) { %><p><%= h.anomalia_descricao %></p><% } %>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+</div>
+<script>
+(function(){
+  document.querySelectorAll('[data-anomalia-toggle]').forEach(function(toggle){
+    const form=toggle.closest('form');
+    const field=form?.querySelector('.lub-anomaly-field');
+    if(!field)return;
+    function sync(){field.classList.toggle('show',toggle.checked)}
+    toggle.addEventListener('change',sync);sync();
+  });
+})();
+</script>
