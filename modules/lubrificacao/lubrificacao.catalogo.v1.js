@@ -85,13 +85,6 @@ const RULES = [
     ],
   },
   {
-    familia: 'MOTORREDUTORES',
-    rota: ROUTES.ACIONAMENTOS,
-    ordem: 60,
-    match: ['MOTORREDUTOR', 'MOTO REDUTOR'],
-    pontos: [common.reducer],
-  },
-  {
     familia: 'DIGESTORES',
     rota: ROUTES.DIGESTORES_PRENSAS,
     ordem: 10,
@@ -247,6 +240,13 @@ const RULES = [
     ordem: 75,
     match: ['EXAUSTOR'],
     pontos: [common.bearingDE, common.bearingNDE],
+  },
+  {
+    familia: 'MOTORREDUTORES',
+    rota: ROUTES.ACIONAMENTOS,
+    ordem: 60,
+    match: ['MOTORREDUTOR', 'MOTO REDUTOR'],
+    pontos: [common.reducer],
   },
 ];
 
