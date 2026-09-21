@@ -63,7 +63,8 @@ test('tela do mecânico não oferece edição administrativa do plano', () => {
   assert.match(view, /Executar lubrificação/);
   assert.match(view, /Quantidade utilizada/);
   assert.match(view, /Encontrei uma anomalia/);
-  assert.match(view, /p\.frequencia_dias/);\n  assert.doesNotMatch(view, /name=[\"']frequencia_dias[\"']/);
+  assert.match(view, /p\.frequencia_dias/);
+  assert.doesNotMatch(view, /name=["']frequencia_dias["']/);
   assert.doesNotMatch(view, /tipo_lubrificante_texto"[^>]*name=/);
   assert.doesNotThrow(() => ejs.compile(view));
 });
