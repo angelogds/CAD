@@ -31,6 +31,54 @@
       <section class="pcm-card">
         <div class="pcm-card-head">
           <div>
+            <span class="pcm-section-label">Responsável semanal</span>
+            <h2>Roteiro de lubrificação da semana</h2>
+            <p>O mecânico selecionado assume o roteiro completo da semana. Moinhos e exaustores das caldeiras geram OS automática somente nos dias programados.</p>
+          </div>
+          <% if (semanaLubrificacao?.responsavel_nome) { %>
+            <span class="pcm-badge"><%= semanaLubrificacao.responsavel_nome %></span>
+          <% } else { %>
+            <span class="pcm-badge danger">SEM RESPONSÁVEL</span>
+          <% } %>
+        </div>
+
+        <div class="pcm-split">
+          <form method="POST" action="/pcm/lubrificacao/semana/responsavel" class="pcm-form">
+            <label class="pcm-field">Semana de referência
+              <input class="pcm-input" type="date" name="semana_referencia" value="<%= semanaReferencia.inicio %>" required>
+            </label>
+            <label class="pcm-field">Mecânico responsável
+              <select class="pcm-input" name="responsavel_user_id" required>
+                <option value="">Selecione</option>
+                <% mecanicos.forEach(function(m){ %>
+                  <option value="<%= m.id %>" <%= String(semanaLubrificacao?.responsavel_user_id||'')===String(m.id)?'selected':'' %>><%= m.nome %></option>
+                <% }) %>
+              </select>
+            </label>
+            <button class="pcm-button primary ui-btn ui-btn--primary" type="submit">Definir responsável da semana</button>
+          </form>
+
+          <div class="pcm-form">
+            <div class="pcm-note <%= resumoSemanaLubrificacao.sem_responsavel ? 'warn' : '' %>">
+              <strong>Semana:</strong> <%= semanaReferencia.inicio %> a <%= semanaReferencia.fim %><br>
+              <strong>Responsável:</strong> <%= resumoSemanaLubrificacao.responsavel_nome || 'Não definido' %><br>
+              <strong>Execuções na semana:</strong> <%= resumoSemanaLubrificacao.executados_semana %><br>
+              <strong>Atrasados:</strong> <%= resumoSemanaLubrificacao.atrasados %><br>
+              <strong>OS automáticas hoje:</strong> <%= resumoSemanaLubrificacao.os_hoje %>
+            </div>
+            <% if (canManagePcm) { %>
+              <form method="POST" action="/pcm/lubrificacao/semana/gerar-os-hoje">
+                <input type="hidden" name="data_referencia" value="<%= semanaReferencia.referencia %>">
+                <button class="pcm-button ui-btn ui-btn--outline" type="submit">Gerar / conferir OS de hoje</button>
+              </form>
+            <% } %>
+          </div>
+        </div>
+      </section>
+
+      <section class="pcm-card">
+        <div class="pcm-card-head">
+          <div>
             <span class="pcm-section-label">Regra de segurança</span>
             <h2>Como o roteiro-base funciona</h2>
           </div>
