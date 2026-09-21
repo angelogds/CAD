@@ -574,35 +574,16 @@ async function osClose(req, res) {
   return res.redirect(redirectAfterClose);
 }
 
-async function osUpdateStatus(req, res) {
+function osUpdateStatus(req, res) {
   const id = Number(req.params.id);
   const { status } = req.body;
 
   try {
+    // O service persiste o status e agenda os efeitos complementares.
+    // Não aguardar Web Push neste request.
     service.updateStatus(id, status, req.session?.user?.id || null);
 
     const st = String(status || '').toUpperCase();
-    if (st === 'ANDAMENTO' || st === 'EM_ANDAMENTO') {
-      await pushService.sendToAll({
-        title: "OS em andamento",
-        body: `OS #${id} entrou em andamento.`,
-        type: "MUDANCA_STATUS",
-        url: `/os/${id}`,
-        sound: "/audio/os-status.mp3",
-        data: { osId: id, type: "STATUS_CHANGE", newStatus: st },
-      }).catch(() => {});
-    }
-    if (['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA'].includes(st)) {
-      await pushService.sendToAll({
-        title: "OS finalizada",
-        body: `OS #${id} foi finalizada.`,
-        type: "MUDANCA_STATUS",
-        url: `/os/${id}`,
-        sound: "/audio/os-finalizada.mp3",
-        data: { osId: id, type: "OS_FINALIZADA", newStatus: st },
-      }).catch(() => {});
-    }
-
     const isCloseStatus = ['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA'].includes(st);
     if (isCloseStatus && !canViewOSDetails(req.session?.user)) {
       req.flash("success", "Status atualizado. Retornando ao painel.");
@@ -617,6 +598,7 @@ async function osUpdateStatus(req, res) {
     return res.redirect(`/os/${id}`);
   }
 }
+
 
 async function osAutoAssign(req, res) {
   const id = Number(req.params.id);
