@@ -102,9 +102,11 @@ module.exports = function up({ db, tableExists, addColumnIfMissing }) {
         ponto.includes('ROLAMENTO') ||
         ponto.includes('RELUBRIFICA');
 
+      const setorEquip = String(item.equipamento_setor || '').toUpperCase();
       const isDecanter = familia === 'DECANTER' || nomeEquip.includes('DECANTER');
       const isMoinho = familia === 'MOINHOS' || nomeEquip.includes('MOINHO');
       const isExaustor = familia === 'EXAUSTORES' || nomeEquip.includes('EXAUSTOR');
+      const isExaustorCaldeira = isExaustor && (nomeEquip.includes('CALDEIRA') || setorEquip.includes('CALDEIRA'));
 
       if (isDecanter && isReducer) {
         const note = 'Produto do Decanter FAST confirmado: TotalEnergies Carter SH 680, óleo sintético ISO VG 680 para redutor/engrenagem, incolor, com proteção para micropitting. Quantidade e frequência permanecem pendentes de validação final.';
@@ -188,7 +190,7 @@ module.exports = function up({ db, tableExists, addColumnIfMissing }) {
           proxima = nextScheduledDate(db, diasSemana, true);
           scheduleNote = ' Programação especial do moinho: segunda, quarta e sexta.';
           moinhosProgramados += 1;
-        } else if (isExaustor) {
+        } else if (isExaustorCaldeira) {
           frequenciaDias = null;
           diasSemana = '1,4';
           proxima = nextScheduledDate(db, diasSemana, true);
