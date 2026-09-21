@@ -27,11 +27,13 @@ const STATUS_OS_EXECUCAO_POTENCIAL = new Set(['ANDAMENTO', 'EM_ANDAMENTO', 'EXEC
 const STATUS_OS_PAUSADA = new Set(['PAUSADA', 'PAUSADO', 'AGUARDANDO']);
 
 function runOSLifecycleDetached(label, task) {
-  setImmediate(() => {
+  // Dá prioridade à resposta HTTP e ao carregamento da tela seguinte.
+  // Processamentos complementares começam depois, fora da janela do clique.
+  setTimeout(() => {
     Promise.resolve()
       .then(task)
       .catch((err) => console.error(`[OS_LIFECYCLE][${label}]`, err?.stack || err?.message || err));
-  });
+  }, 1000);
 }
 
 const MOTIVOS_ANDAMENTO_DISPONIBILIDADE = Object.freeze({
@@ -2642,9 +2644,8 @@ function iniciarOS(id, userId) {
       data: { osId: Number(id), type: "STATUS_CHANGE", newStatus: "ANDAMENTO" },
     }).catch(() => {});
 
-    if (inspecaoService?.syncFromOS) {
-      try { inspecaoService.syncFromOS(id); } catch (_e) {}
-    }
+    // A inspeção recalcula a matriz ao abrir o próprio módulo.
+    // Evitar recálculo mensal completo aqui mantém o ciclo da OS responsivo.
   });
 
   return { id: Number(id), status: "ANDAMENTO" };
@@ -2666,11 +2667,6 @@ function pausarOS(id) {
     : 'Mecânico mantido em atendimento porque a justificativa indica continuidade do serviço.';
   try { osChatService?.registrarMensagemSistema(id, 'STATUS_OS_ALTERADO', `OS #${id} pausada. ${mensagemDisponibilidade}`, {}); } catch (_e) {}
   emitOSEvents(id, "status");
-  if (inspecaoService?.syncFromOS) {
-    try {
-      inspecaoService.syncFromOS(id);
-    } catch (_e) {}
-  }
 }
 
 function pickFirstAvailableColumn(cols, options = []) {
@@ -2885,24 +2881,10 @@ async function concluirOS(id, { closedBy, diagnostico, acaoExecutada, fechamento
       url: `/os/${id}`,
     })
     .catch(() => {});
-  let syncResult = null;
-  if (inspecaoService?.syncFromClosedOS) {
-    try {
-      console.log("[INSPECAO_SYNC] chamando syncFromClosedOS:", id);
-      syncResult = inspecaoService.syncFromClosedOS(id);
-      console.log("[INSPECAO_SYNC] syncFromClosedOS retorno", { osId: id, syncResult });
-    } catch (err) {
-      console.error("[INSPECAO_SYNC][ERROR]", err);
-    }
-  } else if (inspecaoService?.syncFromOS) {
-    try {
-      console.log("[INSPECAO_SYNC] fallback syncFromOS disparado", { osId: id });
-      syncResult = inspecaoService.syncFromOS(id);
-      console.log("[INSPECAO_SYNC] fallback syncFromOS retorno", { osId: id, syncResult });
-    } catch (err) {
-      console.error("[INSPECAO_SYNC][ERROR]", err);
-    }
-  }
+  // Não recalcular a matriz mensal de inspeção no pós-fechamento da OS.
+  // O módulo de inspeção executa recalculate() ao ser aberto, preservando os dados
+  // sem bloquear o processo Node/SQLite logo após a ação operacional.
+  const syncResult = null;
   osIAService.registrarLogIA({
     usuarioId: closedBy || null,
     osId: id,
@@ -2978,11 +2960,7 @@ function updateStatus(id, status, userId = null) {
       .catch(() => {});
   }
 
-  if (inspecaoService?.syncFromOS) {
-    try {
-      inspecaoService.syncFromOS(id);
-    } catch (_e) {}
-  }
+  // A inspeção é recalculada sob demanda no módulo de inspeção.
 }
 
 function calcularDisponibilidadeResponsavelOS(osId) {
