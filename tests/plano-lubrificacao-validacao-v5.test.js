@@ -66,7 +66,7 @@ function buildDb() {
   return db;
 }
 
-test('V5 valida mancais e redutores gerais e deixa Decanter pendente', () => {
+test('V5 valida mancais e redutores gerais e prepara produtos específicos do Decanter', () => {
   const db = buildDb();
   const h = helpers(db);
   require('../database/migrations/205_roteiro_lubrificacao_base')(h);
@@ -87,7 +87,7 @@ test('V5 valida mancais e redutores gerais e deixa Decanter pendente', () => {
   assert.ok(bearings.length >= 1);
   for (const row of bearings) {
     assert.equal(Number(row.validado_tecnicamente), 1);
-    assert.equal(row.tipo_lubrificante_texto, 'Graxa de alta temperatura vermelha - padrão Manutenção');
+    assert.equal(row.tipo_lubrificante_texto, 'Graxa de Lítio EP2');
     assert.equal(Number(row.quantidade), 150);
     assert.equal(row.unidade, 'g');
     assert.equal(Number(row.frequencia_dias), 7);
@@ -98,7 +98,7 @@ test('V5 valida mancais e redutores gerais e deixa Decanter pendente', () => {
   assert.ok(reducers.length >= 1);
   for (const row of reducers) {
     assert.equal(Number(row.validado_tecnicamente), 1);
-    assert.equal(row.tipo_lubrificante_texto, 'Óleo ISO VG 680');
+    assert.equal(row.tipo_lubrificante_texto, 'Lubrax Gear 680 - Óleo para Engrenagens/Redutores - ISO VG 680');
     assert.equal(row.quantidade, null);
     assert.equal(row.unidade, null);
     assert.equal(Number(row.frequencia_dias), 7);
@@ -119,7 +119,7 @@ test('V5 valida mancais e redutores gerais e deixa Decanter pendente', () => {
   const motor30 = db.prepare("SELECT * FROM pcm_lubrificacao_planos WHERE motor_id=20").get();
   assert.ok(motor30);
   assert.equal(Number(motor30.validado_tecnicamente), 1);
-  assert.equal(motor30.tipo_lubrificante_texto, 'Graxa de alta temperatura vermelha - padrão Manutenção');
+  assert.equal(motor30.tipo_lubrificante_texto, 'Graxa de Lítio EP2');
   assert.equal(Number(motor30.quantidade), 150);
   assert.equal(Number(motor30.frequencia_dias), 7);
 
