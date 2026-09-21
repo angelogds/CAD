@@ -36,11 +36,12 @@ function failureSummary(falhas = []) {
 }
 
 function lubricationSummary(planos = [], totalEquipamentos = 0) {
-  const cobertos = new Set(planos.map((item) => Number(item.equipamento_id)).filter(Boolean)).size;
+  const ativos = planos.filter((item) => Number(item.ativo ?? 1) === 1);
+  const cobertos = new Set(ativos.map((item) => Number(item.equipamento_id)).filter(Boolean)).size;
   return {
-    pontos: planos.length,
-    atrasados: countBy(planos, (item) => item.situacao === "ATRASADO"),
-    em_breve: countBy(planos, (item) => item.situacao === "EM_BREVE"),
+    pontos: ativos.length,
+    atrasados: countBy(ativos, (item) => item.situacao === "ATRASADO"),
+    em_breve: countBy(ativos, (item) => item.situacao === "EM_BREVE"),
     cobertura: totalEquipamentos ? Math.round((cobertos * 1000) / totalEquipamentos) / 10 : 0,
   };
 }
