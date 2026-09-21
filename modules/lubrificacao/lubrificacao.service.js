@@ -22,6 +22,7 @@ function listRoteiro(userId, status = '') {
   const hasOrder = hasColumn('pcm_lubrificacao_planos','ordem_rota');
   const hasFamily = hasColumn('pcm_lubrificacao_planos','familia_lubrificacao');
   const hasInstruction = hasColumn('pcm_lubrificacao_planos','instrucoes_execucao');
+  const hasWeekdays = hasColumn('pcm_lubrificacao_planos','dias_semana_lubrificacao');
   const validationWhere = hasValidation ? 'AND COALESCE(l.validado_tecnicamente,1)=1' : '';
 
   const rows = db.prepare(`
@@ -36,6 +37,7 @@ function listRoteiro(userId, status = '') {
       l.frequencia_semanas,
       l.frequencia_meses,
       l.frequencia_horas_operacao,
+      ${hasWeekdays ? "COALESCE(l.dias_semana_lubrificacao,'')" : "''"} AS dias_semana_lubrificacao,
       l.observacao,
       l.proxima_execucao_em,
       l.ultima_execucao_em,
@@ -144,7 +146,36 @@ function listHistorico(userId, limit = 12) {
   `).all(Number(userId), safeLimit);
 }
 
+function normalizeWeekdays(value) {
+  return [...new Set(
+    String(value || '')
+      .split(',')
+      .map((v) => Number(String(v).trim()))
+      .filter((v) => Number.isInteger(v) && v >= 0 && v <= 6)
+  )].sort((a, b) => a - b);
+}
+
+function calcularProximaPorDiasSemana(value) {
+  const dias = normalizeWeekdays(value);
+  if (!dias.length) return null;
+  return db.prepare(`
+    WITH RECURSIVE seq(n) AS (
+      SELECT 1
+      UNION ALL
+      SELECT n + 1 FROM seq WHERE n < 7
+    )
+    SELECT datetime('now', '+' || n || ' day') AS dt
+    FROM seq
+    WHERE instr(',' || ? || ',', ',' || strftime('%w', datetime('now', '+' || n || ' day')) || ',') > 0
+    ORDER BY n
+    LIMIT 1
+  `).get(dias.join(','))?.dt || null;
+}
+
 function calcularProximaExecucao(plano) {
+  const porSemana = calcularProximaPorDiasSemana(plano.dias_semana_lubrificacao);
+  if (porSemana) return porSemana;
+
   const dias = Number(plano.frequencia_dias || 0);
   const semanas = Number(plano.frequencia_semanas || 0);
   const meses = Number(plano.frequencia_meses || 0);
