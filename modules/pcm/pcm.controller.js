@@ -1,5 +1,6 @@
 const service = require("./pcm.service");
 const operationalService = require("./pcm.operational.service");
+const lubrificacaoSemanaService = require("../lubrificacao/lubrificacao-semana.service");
 const PDFDocument = require("pdfkit");
 const { canAccessModule } = require("../../config/rbac");
 
@@ -169,6 +170,9 @@ function lubrificacao(req, res) {
     rotas: service.listRotasLubrificacao(),
     motoresPendentes: service.listMotoresLubrificacaoPendentes(),
     equipamentosSemRoteiro: service.listEquipamentosSemRoteiroLubrificacao(),
+    semanaLubrificacao: lubrificacaoSemanaService.getSemanaPorReferencia(req.query.semana || null),
+    semanaReferencia: lubrificacaoSemanaService.getWeekBounds(req.query.semana || null),
+    resumoSemanaLubrificacao: lubrificacaoSemanaService.getDashboardResumo(req.query.semana || null),
     resumo: {
       ...resumoBase,
       pendentes_validacao: countBy(todasLubrificacoes, (item) => Number(item.validado_tecnicamente ?? 1) === 0),
@@ -349,6 +353,40 @@ function adicionarComponente(req, res) {
   }
   const eid = encodeURIComponent(req.body.equipamento_id || '');
   return res.redirect(`/pcm/engenharia?equipamento_id=${eid}`);
+}
+
+function salvarResponsavelSemanaLubrificacao(req, res) {
+  try {
+    const semana = lubrificacaoSemanaService.salvarResponsavelSemana(
+      {
+        semana_referencia: req.body.semana_referencia,
+        responsavel_user_id: req.body.responsavel_user_id,
+      },
+      req.session?.user?.id || null
+    );
+    req.flash('success', `Responsável da semana ${semana.semana_inicio} a ${semana.semana_fim}: ${semana.responsavel_nome}.`);
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível definir o responsável semanal da lubrificação.');
+  }
+  return res.redirect('/pcm/lubrificacao');
+}
+
+function gerarOSLubrificacaoHoje(req, res) {
+  try {
+    const result = lubrificacaoSemanaService.processarOSAutomaticas({
+      refDate: req.body.data_referencia || null,
+      actorUserId: req.session?.user?.id || null,
+      automatico: false,
+    });
+    if (result.skipped && result.reason === 'sem_responsavel_semana') {
+      req.flash('error', 'Defina primeiro o mecânico responsável pela semana.');
+    } else {
+      req.flash('success', `OS de lubrificação: ${result.geradas} gerada(s), ${result.existentes} já existente(s), ${result.equipamentos} equipamento(s) programado(s) para o dia.`);
+    }
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível gerar as OS de lubrificação do dia.');
+  }
+  return res.redirect('/pcm/lubrificacao');
 }
 
 function adicionarLubrificacao(req, res) {
@@ -630,6 +668,8 @@ module.exports = {
   classificarFalha,
   adicionarComponente,
   adicionarLubrificacao,
+  salvarResponsavelSemanaLubrificacao,
+  gerarOSLubrificacaoHoje,
   gerarRoteiroBaseLubrificacao,
   validarLubrificacao,
   distribuirLubrificacao,

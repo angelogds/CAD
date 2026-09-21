@@ -12,3 +12,8 @@
 .lub-instruction{display:grid;gap:4px;margin-top:11px;border:1px solid #cfe6d6;border-radius:11px;background:#f4fbf6;padding:10px 11px}.lub-instruction strong{color:var(--green-dark);font-size:10px;text-transform:uppercase;letter-spacing:.04em}.lub-instruction span{color:#42564a;font-size:11px;line-height:1.45}
 @media(max-width:900px){.lub-how{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.lub-how{grid-template-columns:1fr}.lub-route-head{align-items:flex-start;flex-direction:column}.lub-route-counts{width:100%}.lub-route-counts>span{flex:1;text-align:center}}
+
+.lub-week-banner{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--line);border-radius:16px;background:#fff;padding:14px 15px;margin-bottom:13px;box-shadow:0 8px 22px rgba(22,101,52,.05)}
+.lub-week-banner>div{display:grid;gap:3px}.lub-week-banner strong{font-size:15px}.lub-week-banner small{color:var(--muted);font-size:10px}
+.lub-week-banner.blocked{border-color:#efc3c6;background:#fff8f8}
+@media(max-width:620px){.lub-week-banner{align-items:stretch;flex-direction:column}.lub-week-banner .lub-btn{width:100%}}
