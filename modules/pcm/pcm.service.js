@@ -953,6 +953,21 @@ function listRotasLubrificacao() {
   `);
 }
 
+function listEquipamentosSemRoteiroLubrificacao() {
+  const equipamentos = listEquipamentosRoteiroBase();
+  const comPlano = new Set(
+    safeAll("SELECT DISTINCT equipamento_id FROM pcm_lubrificacao_planos")
+      .map((row) => Number(row.equipamento_id))
+      .filter(Boolean)
+  );
+  return equipamentos
+    .filter((eq) => !comPlano.has(Number(eq.id)))
+    .map((eq) => ({
+      ...eq,
+      classificacao_sugerida: lubricationCatalog.classificarEquipamento(eq)?.familia || null,
+    }));
+}
+
 function addPontoLubrificacao({
   equipamento_id, ponto_lubrificacao, tipo_lubrificante_texto, quantidade, unidade,
   frequencia_dias, observacao, metodo_aplicacao, responsavel_user_id,
@@ -1481,6 +1496,7 @@ module.exports = {
   gerarRoteiroBaseLubrificacao,
   listMotoresLubrificacaoPendentes,
   listRotasLubrificacao,
+  listEquipamentosSemRoteiroLubrificacao,
   validarPontoLubrificacao,
   distribuirPontoLubrificacao,
   gerarSugestaoPlanoLubrificacao,
