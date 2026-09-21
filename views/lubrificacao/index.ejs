@@ -55,7 +55,14 @@
 
       <div class="lub-list">
         <% grupo.pontos.forEach(function(p, pointIndex){ 
-          const freq = Number(p.frequencia_dias||0) ? (p.frequencia_dias+' dias')
+          const diasSemanaMap = { '0':'Dom', '1':'Seg', '2':'Ter', '3':'Qua', '4':'Qui', '5':'Sex', '6':'Sáb' };
+          const diasSemana = String(p.dias_semana_lubrificacao || '')
+            .split(',')
+            .map(function(d){ return diasSemanaMap[String(d).trim()]; })
+            .filter(Boolean)
+            .join(' / ');
+          const freq = diasSemana ? diasSemana
+            : Number(p.frequencia_dias||0) ? (p.frequencia_dias+' dias')
             : Number(p.frequencia_semanas||0) ? (p.frequencia_semanas+' semana(s)')
             : Number(p.frequencia_meses||0) ? (p.frequencia_meses+' mês(es)')
             : Number(p.frequencia_horas_operacao||0) ? (p.frequencia_horas_operacao+' h operação')
