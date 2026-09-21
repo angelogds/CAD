@@ -223,19 +223,19 @@ function equivalentPoint(existingName, proposed = {}) {
 
   const hasAny = (text, terms) => terms.some((term) => text.includes(term));
   if (proposed.key === 'REDUCER_OIL') {
-    return hasAny(existing, ['REDUTOR', 'MOTORREDUTOR']) && hasAny(existing, ['OLEO', 'NIVEL', 'LUBR']);
+    // Um ponto legado chamado apenas "Redutor" é tratado como equivalente para
+    // evitar duplicidade. O PCM pode detalhar depois se houver mais de um redutor.
+    return hasAny(existing, ['REDUTOR', 'MOTORREDUTOR']);
   }
-  if (proposed.key === 'MOTOR_DE') {
-    return existing.includes('MOTOR') && hasAny(existing, ['ROLAMENTO', 'MANCAL']) && hasAny(existing, ['ACOPLAMENTO', 'DIANTEIRO', ' LA ', 'LADO A']);
+  if (proposed.key === 'MOTOR_DE' || proposed.key === 'MOTOR_NDE') {
+    // Cadastro legado frequentemente registra um único ponto "Rolamento do motor".
+    // Na dúvida, não criamos pontos automáticos adicionais sobre ele.
+    return existing.includes('MOTOR') && hasAny(existing, ['ROLAMENTO', 'MANCAL', 'GRAXEIRA']);
   }
-  if (proposed.key === 'MOTOR_NDE') {
-    return existing.includes('MOTOR') && hasAny(existing, ['ROLAMENTO', 'MANCAL']) && hasAny(existing, ['OPOSTO', 'TRASEIRO', ' LOA ', 'LADO OPOSTO']);
-  }
-  if (proposed.key === 'BEARING_DE') {
-    return hasAny(existing, ['MANCAL', 'ROLAMENTO']) && hasAny(existing, ['ACIONAMENTO', 'DIANTEIRO', 'ENTRADA']);
-  }
-  if (proposed.key === 'BEARING_NDE') {
-    return hasAny(existing, ['MANCAL', 'ROLAMENTO']) && hasAny(existing, ['OPOSTO', 'TRASEIRO', 'SAIDA']);
+  if (proposed.key === 'BEARING_DE' || proposed.key === 'BEARING_NDE') {
+    // "Mancal principal" / "Rolamento principal" já representa um ponto existente.
+    // Preferimos não duplicar automaticamente; o PCM pode desdobrar LA/LOA depois.
+    return !existing.includes('MOTOR') && hasAny(existing, ['MANCAL', 'ROLAMENTO', 'GRAXEIRA']);
   }
   return false;
 }
