@@ -61,11 +61,13 @@ function getOSCore(id) {
 }
 
 function runDetached(label, task) {
-  setImmediate(() => {
+  // Evita iniciar tarefas complementares enquanto o navegador ainda segue
+  // o redirect da OS. Isso reduz contenção no event loop e no SQLite.
+  setTimeout(() => {
     Promise.resolve()
       .then(task)
       .catch((err) => console.error(`[OS_FAST][${label}]`, err?.stack || err?.message || err));
-  });
+  }, 1000);
 }
 
 function updateAIColumns(osId, ai = {}) {
@@ -226,7 +228,7 @@ function scheduleCreateEnrichment(created) {
 
     try { service.setupPairsIfEmpty(); } catch (_e) {}
     try { await embeddingsService.updateOSEmbedding(created.id); } catch (_e) {}
-    try { inspecaoService?.syncFromOS?.(created.id); } catch (_e) {}
+    // A matriz mensal de inspeção é recalculada ao abrir o módulo de inspeção.
   });
 }
 
