@@ -2561,13 +2561,6 @@ function iniciarOS(id, userId) {
   if (!os) throw new Error("OS não encontrada.");
 
   const responsavelUserId = getResponsavelExecucaoUserId(os);
-  if (responsavelUserId) {
-    const disponibilidade = calcularDisponibilidadeMecanico(responsavelUserId, null, { ignorarOsId: id });
-    if (!disponibilidade.disponivel) {
-      throw new Error("Mecânico responsável já está em outro atendimento ativo. Encaminhe ao encarregado para manter o mesmo mecânico, transferir a OS ou programar retomada posterior.");
-    }
-  }
-
   const cols = getOSColumns();
   const sets = ["status = 'ANDAMENTO'"];
   const args = [];
@@ -2986,10 +2979,6 @@ function manterMecanicoVinculadoExecucao(osId, { usuario_id = null, motivo = '',
   if (!motivoLimpo) throw new Error('Informe o motivo para manter o mecânico vinculado.');
   const responsavelUserId = getResponsavelExecucaoUserId(os);
   if (!responsavelUserId) throw new Error('OS sem mecânico responsável para vincular à execução.');
-  const disponibilidade = calcularDisponibilidadeMecanico(responsavelUserId, null, { ignorarOsId: id });
-  if (!disponibilidade.disponivel) {
-    throw new Error('Mecânico responsável já está em outro atendimento ativo. Decida se a OS será transferida ou reprogramada.');
-  }
   if (tableExists('os_execucoes') && !getExecucaoAtiva(id)) {
     createExecucao(id, responsavelUserId, os.auxiliar_user_id ? Number(os.auxiliar_user_id) : null, usuario_id || null, motivoLimpo, os.turno_alocado || getTurnoAtual());
   }
