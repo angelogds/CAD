@@ -38,7 +38,7 @@ test('render agendado mantém guard do Chart.js e fallback visual', () => {
 
 test('hotfix força versão nova do asset no navegador', () => {
   const view = read('views/pcm/dashboard-gerencial.ejs');
-  assert.match(view, /pcm-dashboard\.js\?v=20260920-v10/);
+  assert.match(view, /pcm-dashboard\.js\?v=20260921-v11/);
 });
 
 test('javascript permanece sintaticamente válido', () => {
