@@ -3,12 +3,17 @@
 <div class="pcm-module-page">
   <header class="pcm-module-head">
     <div>
-      <span class="pcm-section-label">Administração do plano</span>
+      <span class="pcm-section-label">Administração e logística</span>
       <h1>Plano de lubrificação</h1>
-      <p>PCM define pontos, produto, quantidade, frequência, método e distribuição. O mecânico recebe somente o roteiro atribuído a ele.</p>
+      <p>O PCM monta, valida e distribui o roteiro. Pontos automáticos entram como rascunho e só chegam ao mecânico depois da validação técnica.</p>
     </div>
     <div class="pcm-module-actions">
-      <% if (!canManagePcm) { %><span class="pcm-readonly">Modo consulta</span><% } %>
+      <% if (canManagePcm) { %>
+        <form method="POST" action="/pcm/lubrificacao/gerar-roteiro-base">
+          <button class="pcm-button primary ui-btn ui-btn--primary" type="submit">Gerar / atualizar roteiro-base</button>
+        </form>
+      <% } %>
+      <a class="pcm-button ui-btn ui-btn--outline" href="/pcm/lubrificacao/pdf?<%= new URLSearchParams(filtros).toString() %>">PDF do plano</a>
       <a class="pcm-button ui-btn ui-btn--outline" href="/pcm/planejamento">Plano mestre</a>
     </div>
   </header>
@@ -17,10 +22,24 @@
     <%- include('partials/internal-nav', { activePcmSection }) %>
     <main class="pcm-module-content">
       <section class="pcm-stat-grid">
-        <div class="pcm-stat"><span>Pontos ativos</span><strong><%= resumo.pontos %></strong><small>no filtro</small></div>
-        <div class="pcm-stat danger"><span>Atrasados</span><strong><%= resumo.atrasados %></strong><small>executar/reprogramar</small></div>
-        <div class="pcm-stat warn"><span>Próximos 7 dias</span><strong><%= resumo.em_breve %></strong><small>preparar material</small></div>
-        <div class="pcm-stat info"><span>Cobertura</span><strong><%= resumo.cobertura %>%</strong><small>equipamentos com plano</small></div>
+        <div class="pcm-stat"><span>Pontos ativos</span><strong><%= resumo.pontos %></strong><small>plano completo</small></div>
+        <div class="pcm-stat warn"><span>Pendentes de validação</span><strong><%= resumo.pendentes_validacao %></strong><small>não aparecem ao mecânico</small></div>
+        <div class="pcm-stat info"><span>Liberados</span><strong><%= resumo.liberados %></strong><small>prontos para distribuição</small></div>
+        <div class="pcm-stat"><span>Cobertura</span><strong><%= resumo.cobertura %>%</strong><small>equipamentos com plano</small></div>
+      </section>
+
+      <section class="pcm-card">
+        <div class="pcm-card-head">
+          <div>
+            <span class="pcm-section-label">Regra de segurança</span>
+            <h2>Como o roteiro-base funciona</h2>
+          </div>
+        </div>
+        <div class="pcm-note warn">
+          O sistema identifica a família do equipamento e cria somente os <strong>pontos prováveis</strong>.
+          Lubrificante, quantidade e frequência não são inventados: devem ser confirmados pelo PCM usando placa, manual,
+          condição real do equipamento e padrão adotado pela manutenção. Só depois de validar e distribuir o ponto ele aparece em <strong>Roteiro de Lubrificação</strong> para o mecânico.
+        </div>
       </section>
 
       <section class="pcm-card">
@@ -33,11 +52,43 @@
               <% }) %>
             </select>
           </label>
-          <label class="pcm-field">Setor<input class="pcm-input" id="setor-filtro" name="setor" value="<%= filtros.setor %>" readonly></label>
-          <span></span><span></span>
+          <label class="pcm-field">Setor
+            <input class="pcm-input" id="setor-filtro" name="setor" value="<%= filtros.setor %>" placeholder="Todos os setores">
+          </label>
+          <label class="pcm-field">Validação
+            <select class="pcm-input" name="validacao">
+              <option value="">Todos</option>
+              <option value="PENDENTE" <%= filtros.validacao==='PENDENTE'?'selected':'' %>>Pendentes</option>
+              <option value="VALIDADO" <%= filtros.validacao==='VALIDADO'?'selected':'' %>>Validados</option>
+            </select>
+          </label>
+          <label class="pcm-field">Rota
+            <select class="pcm-input" name="rota">
+              <option value="">Todas</option>
+              <% rotas.forEach(function(r){ %>
+                <option value="<%= r.rota %>" <%= String(filtros.rota)===String(r.rota)?'selected':'' %>><%= r.rota %></option>
+              <% }) %>
+            </select>
+          </label>
           <button class="pcm-button primary ui-btn ui-btn--primary">Aplicar filtros</button>
+          <a class="pcm-button ui-btn ui-btn--outline" href="/pcm/lubrificacao">Limpar</a>
         </form>
       </section>
+
+      <% if (rotas.length) { %>
+        <section class="pcm-card">
+          <div class="pcm-card-head"><div><span class="pcm-section-label">Rotas planejadas</span><h2>Distribuição do roteiro</h2></div></div>
+          <div class="pcm-stat-grid">
+            <% rotas.forEach(function(r){ %>
+              <a class="pcm-stat" href="/pcm/lubrificacao?rota=<%= encodeURIComponent(r.rota) %>">
+                <span><%= r.rota %></span>
+                <strong><%= r.pontos %></strong>
+                <small><%= r.equipamentos %> equipamento(s) • <%= r.pendentes %> pendente(s)</small>
+              </a>
+            <% }) %>
+          </div>
+        </section>
+      <% } %>
 
       <% if (canManagePcm && filtros.equipamento_id) { %>
         <section class="pcm-split">
@@ -46,29 +97,31 @@
             <form method="POST" action="/pcm/lubrificacao/pontos" class="pcm-form">
               <input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id %>">
               <input class="pcm-input" name="ponto_lubrificacao" placeholder="Ponto de lubrificação" required>
-              <input class="pcm-input" name="tipo_lubrificante_texto" placeholder="Lubrificante especificado tecnicamente" required>
+              <input class="pcm-input" name="tipo_lubrificante_texto" placeholder="Lubrificante / especificação validada" required>
               <div class="pcm-split">
-                <input class="pcm-input" type="number" step="0.1" min="0" name="quantidade" placeholder="Quantidade">
+                <input class="pcm-input" type="number" step="0.01" min="0" name="quantidade" placeholder="Quantidade">
                 <input class="pcm-input" name="unidade" placeholder="g, ml, L">
               </div>
               <select class="pcm-input" name="metodo_aplicacao">
                 <option value="">Método de aplicação</option>
-                <option>Engraxar</option><option>Completar nível</option><option>Troca de óleo</option><option>Pulverizar</option><option>Outro</option>
+                <option>Engraxar</option><option>Verificar / completar nível</option><option>Troca de óleo</option><option>Pulverizar</option><option>Outro</option>
               </select>
               <select class="pcm-input" name="responsavel_user_id">
                 <option value="">Não distribuir agora</option>
                 <% mecanicos.forEach(function(m){ %><option value="<%= m.id %>"><%= m.nome %></option><% }) %>
               </select>
+              <input class="pcm-input" name="rota_lubrificacao" placeholder="Rota" value="Rota manual - PCM">
               <input class="pcm-input" type="number" min="1" name="frequencia_dias" placeholder="Frequência em dias" required>
-              <input class="pcm-input" name="observacao" placeholder="Observações">
-              <button class="pcm-button primary ui-btn ui-btn--primary">Salvar ponto</button>
+              <textarea class="pcm-input" name="instrucoes_execucao" rows="3" placeholder="Instrução operacional para o mecânico"></textarea>
+              <input class="pcm-input" name="observacao" placeholder="Observações do PCM">
+              <button class="pcm-button primary ui-btn ui-btn--primary">Salvar ponto validado</button>
             </form>
           </details>
 
           <article class="pcm-card">
-            <span class="pcm-section-label">Assistente técnico</span>
-            <h2>Rascunho de plano</h2>
-            <p>A IA usa somente os dados cadastrados e não substitui manual do fabricante, inspeção ou validação da manutenção.</p>
+            <span class="pcm-section-label">Assistente técnico opcional</span>
+            <h2>Rascunho assistido</h2>
+            <p>A sugestão é apenas apoio. Manual do fabricante, placa e condição real do equipamento prevalecem.</p>
             <form method="POST" action="/pcm/lubrificacao/sugerir-ia">
               <input type="hidden" name="equipamento_id" value="<%= filtros.equipamento_id %>">
               <button class="pcm-button ui-btn ui-btn--outline" type="submit">Gerar rascunho assistido</button>
@@ -79,13 +132,13 @@
 
       <% if (sugestaoIA && sugestaoIA.plano?.length) { %>
         <section class="pcm-card">
-          <div class="pcm-card-head"><div><span class="pcm-section-label">Rascunho <%= sugestaoIA.origem === 'OPENAI' ? 'OpenAI' : 'local' %></span><h2><%= sugestaoIA.equipamento_nome %></h2><p><%= sugestaoIA.alerta || 'Revise todos os valores antes de cadastrar.' %></p></div></div>
+          <div class="pcm-card-head"><div><span class="pcm-section-label">Rascunho <%= sugestaoIA.origem === 'OPENAI' ? 'OpenAI' : 'local' %></span><h2><%= sugestaoIA.equipamento_nome %></h2><p><%= sugestaoIA.alerta || sugestaoIA.aviso || 'Revise todos os valores antes de cadastrar.' %></p></div></div>
           <ul class="pcm-list"><% sugestaoIA.plano.forEach(function(p){ %><li><strong><%= p.ponto_lubrificacao %></strong> — <%= p.tipo_lubrificante_texto %>; <%= p.quantidade %> <%= p.unidade %>; a cada <%= p.frequencia_dias %> dias.</li><% }) %></ul>
           <% if (canManagePcm) { %>
             <form method="POST" action="/pcm/lubrificacao/aplicar-sugestao-ia" class="pcm-form" style="margin-top:14px">
               <input type="hidden" name="equipamento_id" value="<%= sugestaoIA.equipamento_id || filtros.equipamento_id %>">
-              <label class="pcm-note warn"><input type="checkbox" name="confirmacao_tecnica" value="1" required> Confirmo que conferi o manual, os pontos, o produto, a quantidade e a frequência.</label>
-              <div class="pcm-inline-actions"><button class="pcm-button primary ui-btn ui-btn--primary">Cadastrar pontos revisados</button></div>
+              <label class="pcm-note warn"><input type="checkbox" name="confirmacao_tecnica" value="1" required> Confirmo que conferi manual, pontos, produto, quantidade e frequência.</label>
+              <button class="pcm-button primary ui-btn ui-btn--primary">Cadastrar pontos revisados</button>
             </form>
           <% } %>
         </section>
@@ -93,31 +146,75 @@
 
       <section class="pcm-card">
         <div class="pcm-card-head">
-          <div><span class="pcm-section-label">Logística do plano</span><h2>Pontos e distribuição</h2><p>O PCM controla o plano. O mecânico executa apenas os pontos atribuídos ao usuário dele.</p></div>
+          <div><span class="pcm-section-label">Plano técnico</span><h2>Pontos de lubrificação</h2><p>Os rascunhos automáticos devem ser validados individualmente antes da execução.</p></div>
         </div>
         <div class="pcm-table-wrap">
           <table class="pcm-table">
-            <thead><tr><th>Equipamento</th><th>Ponto</th><th>Lubrificante</th><th>Frequência</th><th>Quantidade</th><th>Próxima</th><th>Responsável</th><th>Administração</th></tr></thead>
+            <thead><tr><th>Equipamento / rota</th><th>Ponto</th><th>Produto / frequência</th><th>Situação</th><th>Responsável</th><th>Administração</th></tr></thead>
             <tbody>
-              <% if (!lubrificacoes.length) { %><tr><td colspan="8" class="pcm-empty-row">Nenhum ponto encontrado.</td></tr><% } %>
-              <% lubrificacoes.forEach(function(p){ const tone=p.situacao==='ATRASADO'?'danger':(p.situacao==='EM_BREVE'?'warn':''); %>
+              <% if (!lubrificacoes.length) { %><tr><td colspan="6" class="pcm-empty-row">Nenhum ponto encontrado.</td></tr><% } %>
+              <% lubrificacoes.forEach(function(p){ const validado=Number(p.validado_tecnicamente ?? 1)===1; const tone=!validado?'warn':(p.situacao==='ATRASADO'?'danger':(p.situacao==='EM_BREVE'?'warn':'')); %>
                 <tr>
-                  <td><%= p.equipamento_nome %><small><%= p.setor || '-' %></small></td>
-                  <td><strong><%= p.ponto_lubrificacao %></strong><small><%= p.metodo_aplicacao || 'Método não definido' %></small></td>
-                  <td><%= p.tipo_lubrificante_texto || '-' %></td>
-                  <td><%= p.frequencia_label %></td>
-                  <td><%= p.quantidade ?? '-' %> <%= p.unidade || '' %></td>
-                  <td><%= p.proxima_execucao_em || '-' %><small><span class="pcm-badge <%= tone %>"><%= String(p.situacao).replaceAll('_',' ') %></span></small></td>
+                  <td>
+                    <strong><%= p.equipamento_nome %></strong>
+                    <small><%= p.setor || '-' %></small>
+                    <small><%= p.rota_lubrificacao || 'Sem rota' %></small>
+                    <% if (p.familia_lubrificacao) { %><small>Família: <%= p.familia_lubrificacao %></small><% } %>
+                  </td>
+                  <td><strong><%= p.ponto_lubrificacao %></strong><small><%= p.metodo_aplicacao || 'Método a validar' %></small></td>
+                  <td>
+                    <%= p.tipo_lubrificante_texto || '-' %>
+                    <small><%= p.quantidade ?? '-' %> <%= p.unidade || '' %> • <%= p.frequencia_label %></small>
+                  </td>
+                  <td>
+                    <span class="pcm-badge <%= tone %>"><%= validado ? String(p.situacao).split('_').join(' ') : 'PENDENTE DE VALIDAÇÃO' %></span>
+                    <% if (p.origem_cadastro) { %><small><%= p.origem_cadastro %></small><% } %>
+                  </td>
                   <td><strong><%= p.responsavel_nome || 'Não distribuído' %></strong><small><%= Number(p.ativo ?? 1)===1?'Ativo':'Inativo' %></small></td>
                   <td>
-                    <% if (canManagePcm) { %>
+                    <% if (canManagePcm && !validado) { %>
+                      <details>
+                        <summary>Validar e liberar</summary>
+                        <form method="POST" action="/pcm/lubrificacao/<%= p.id %>/validar" class="pcm-form" style="min-width:290px;margin-top:8px">
+                          <input type="hidden" name="equipamento_id" value="<%= p.equipamento_id %>">
+                          <input class="pcm-input" name="tipo_lubrificante_texto" value="<%= /A DEFINIR/i.test(p.tipo_lubrificante_texto||'') ? '' : (p.tipo_lubrificante_texto||'') %>" placeholder="Lubrificante / especificação" required>
+                          <div class="pcm-split">
+                            <input class="pcm-input" type="number" step="0.01" min="0" name="quantidade" value="<%= p.quantidade ?? '' %>" placeholder="Quantidade">
+                            <input class="pcm-input" name="unidade" value="<%= p.unidade || '' %>" placeholder="g, ml, L">
+                          </div>
+                          <select class="pcm-input" name="metodo_aplicacao" required>
+                            <option value="">Método</option>
+                            <% ['Engraxar','Verificar / completar nível','Troca de óleo','Pulverizar','Outro'].forEach(function(met){ %>
+                              <option <%= String(p.metodo_aplicacao||'')===met?'selected':'' %>><%= met %></option>
+                            <% }) %>
+                          </select>
+                          <div class="pcm-split">
+                            <input class="pcm-input" type="number" min="0" name="frequencia_dias" placeholder="Dias">
+                            <input class="pcm-input" type="number" min="0" name="frequencia_semanas" placeholder="Semanas">
+                          </div>
+                          <div class="pcm-split">
+                            <input class="pcm-input" type="number" min="0" name="frequencia_meses" placeholder="Meses">
+                            <input class="pcm-input" type="number" min="0" name="frequencia_horas_operacao" placeholder="Horas operação">
+                          </div>
+                          <input class="pcm-input" name="rota_lubrificacao" value="<%= p.rota_lubrificacao || '' %>" placeholder="Rota">
+                          <select class="pcm-input" name="responsavel_user_id">
+                            <option value="">Distribuir depois</option>
+                            <% mecanicos.forEach(function(m){ %><option value="<%= m.id %>"><%= m.nome %></option><% }) %>
+                          </select>
+                          <textarea class="pcm-input" name="instrucoes_execucao" rows="3"><%= p.instrucoes_execucao || '' %></textarea>
+                          <select class="pcm-input" name="ativo"><option value="1">Ativo</option><option value="0">Inativo</option></select>
+                          <label class="pcm-note warn"><input type="checkbox" name="confirmacao_tecnica" value="1" required> Produto, quantidade, frequência e método foram conferidos tecnicamente.</label>
+                          <button class="pcm-button primary ui-btn ui-btn--primary" type="submit">Validar e liberar</button>
+                        </form>
+                      </details>
+                    <% } else if (canManagePcm) { %>
                       <form method="POST" action="/pcm/lubrificacao/<%= p.id %>/distribuir" class="pcm-form" style="min-width:230px">
                         <input type="hidden" name="equipamento_id" value="<%= p.equipamento_id %>">
                         <select class="pcm-input" name="responsavel_user_id">
                           <option value="">Não distribuído</option>
                           <% mecanicos.forEach(function(m){ %><option value="<%= m.id %>" <%= String(p.responsavel_user_id||'')===String(m.id)?'selected':'' %>><%= m.nome %></option><% }) %>
                         </select>
-                        <input class="pcm-input" name="metodo_aplicacao" value="<%= p.metodo_aplicacao || '' %>" placeholder="Método de aplicação">
+                        <input class="pcm-input" name="metodo_aplicacao" value="<%= p.metodo_aplicacao || '' %>" placeholder="Método">
                         <select class="pcm-input" name="ativo"><option value="1" <%= Number(p.ativo ?? 1)===1?'selected':'' %>>Ativo</option><option value="0" <%= Number(p.ativo ?? 1)===0?'selected':'' %>>Inativo</option></select>
                         <button class="pcm-button ui-btn ui-btn--outline" type="submit">Salvar distribuição</button>
                       </form>
@@ -129,7 +226,47 @@
           </table>
         </div>
       </section>
+
+      <% if (motoresPendentes.length || equipamentosSemRoteiro.length) { %>
+        <section class="pcm-split">
+          <article class="pcm-card">
+            <span class="pcm-section-label">Motores >= 20 CV</span>
+            <h2>Pendentes de vínculo</h2>
+            <p>O local de instalação não casou com segurança a um equipamento cadastrado. O PCM deve corrigir o vínculo/cadastro antes de liberar a relubrificação.</p>
+            <div class="pcm-table-wrap">
+              <table class="pcm-table">
+                <thead><tr><th>Motor</th><th>Potência</th><th>Local cadastrado</th></tr></thead>
+                <tbody>
+                  <% if (!motoresPendentes.length) { %><tr><td colspan="3" class="pcm-empty-row">Nenhum motor >=20 CV pendente.</td></tr><% } %>
+                  <% motoresPendentes.forEach(function(m){ %><tr><td><strong><%= m.codigo || ('#'+m.id) %></strong><small><%= m.descricao %></small></td><td><%= m.potencia_cv %> CV</td><td><%= m.local_instalacao || 'Não informado' %></td></tr><% }) %>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="pcm-card">
+            <span class="pcm-section-label">Cobertura do cadastro</span>
+            <h2>Equipamentos sem roteiro classificado</h2>
+            <p>Ativos que ainda não possuem nenhum ponto de lubrificação. Podem não exigir lubrificação ou precisar de classificação manual.</p>
+            <div class="pcm-table-wrap">
+              <table class="pcm-table">
+                <thead><tr><th>Equipamento</th><th>Setor</th><th>Tipo</th></tr></thead>
+                <tbody>
+                  <% if (!equipamentosSemRoteiro.length) { %><tr><td colspan="3" class="pcm-empty-row">Todos os ativos aplicáveis já possuem roteiro.</td></tr><% } %>
+                  <% equipamentosSemRoteiro.forEach(function(e){ %><tr><td><strong><%= e.nome %></strong><small><%= e.codigo || e.tag || '-' %></small></td><td><%= e.setor || '-' %></td><td><%= e.tipo || 'Não classificado' %></td></tr><% }) %>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      <% } %>
     </main>
   </div>
 </div>
-<script>(function(){const e=document.getElementById('equipamento-filtro'),s=document.getElementById('setor-filtro');if(!e||!s)return;function sync(){const o=e.options[e.selectedIndex];s.value=o?.dataset?.setor||''}e.addEventListener('change',sync);if(!s.value)sync()})();</script>
+<script>
+(function(){
+  const e=document.getElementById('equipamento-filtro'),s=document.getElementById('setor-filtro');
+  if(!e||!s)return;
+  e.addEventListener('change',function(){const o=e.options[e.selectedIndex];if(o&&o.dataset.setor)s.value=o.dataset.setor;});
+})();
+</script>
