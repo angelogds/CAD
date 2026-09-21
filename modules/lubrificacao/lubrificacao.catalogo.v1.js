@@ -20,43 +20,69 @@ const ROUTES = {
 const common = {
   bearingDE: {
     key: 'BEARING_DE',
-    ponto: 'Mancal / rolamento lado acionamento',
+    ponto: 'Mancal dianteiro / lado acionamento',
     metodo: 'Engraxar',
     instrucoes: 'Limpar a graxeira antes da aplicação. Aplicar somente o produto e a quantidade validados pelo PCM. Observar ruído, aquecimento, folga, vedação e vazamento.',
   },
   bearingNDE: {
     key: 'BEARING_NDE',
-    ponto: 'Mancal / rolamento lado oposto',
+    ponto: 'Mancal traseiro / lado oposto',
     metodo: 'Engraxar',
     instrucoes: 'Limpar a graxeira antes da aplicação. Aplicar somente o produto e a quantidade validados pelo PCM. Observar ruído, aquecimento, folga, vedação e vazamento.',
   },
   reducer: {
     key: 'REDUCER_OIL',
-    ponto: 'Redutor / motorredutor - nível e condição do óleo',
+    ponto: 'Redutor / motorredutor - verificar nível e condição do óleo',
     metodo: 'Verificar / completar nível',
-    instrucoes: 'Verificar vazamentos, nível e condição do óleo. Completar ou trocar somente com o lubrificante especificado pelo PCM e com o equipamento em condição segura.',
-  },
-  motorDE: {
-    key: 'MOTOR_DE',
-    ponto: 'Motor - rolamento lado acoplamento (LA)',
-    metodo: 'Engraxar',
-    instrucoes: 'Confirmar que o motor possui ponto de relubrificação. Limpar a graxeira e aplicar somente a graxa e a quantidade definidas na placa/manual e validadas pelo PCM. Não misturar graxas.',
-  },
-  motorNDE: {
-    key: 'MOTOR_NDE',
-    ponto: 'Motor - rolamento lado oposto (LOA)',
-    metodo: 'Engraxar',
-    instrucoes: 'Confirmar que o motor possui ponto de relubrificação. Limpar a graxeira e aplicar somente a graxa e a quantidade definidas na placa/manual e validadas pelo PCM. Não misturar graxas.',
+    instrucoes: 'Verificar vazamentos, nível e condição do óleo. Completar ou trocar somente com o óleo especificado pelo PCM e com o equipamento em condição segura.',
   },
 };
 
+function twoBearings(prefix = '') {
+  const label = String(prefix || '').trim();
+  return [
+    { ...common.bearingDE, ponto: label ? `Mancal dianteiro ${label}` : common.bearingDE.ponto },
+    { ...common.bearingNDE, ponto: label ? `Mancal traseiro ${label}` : common.bearingNDE.ponto },
+  ];
+}
+
 const RULES = [
   {
-    familia: 'MOTORREDUTORES',
-    rota: ROUTES.ACIONAMENTOS,
-    ordem: 60,
-    match: ['MOTORREDUTOR', 'MOTO REDUTOR'],
-    pontos: [common.reducer, common.motorDE, common.motorNDE],
+    familia: 'TANQUE_SERVICO_SECO',
+    rota: ROUTES.TRANSPORTE,
+    ordem: 26,
+    match: ['TANQUE DE SERVICO SECO', 'TANQUE SERVICO SECO', 'TANQUE SECO'],
+    pontos: [
+      {
+        ...common.bearingDE,
+        key: 'BEARING_EXTERNAL',
+        ponto: 'Mancal externo do tanque de serviço seco',
+        instrucoes: 'Lubrificar somente o mancal externo. O mancal interno não entra no roteiro de engraxamento porque é lubrificado pelo próprio óleo do tanque. Aplicar somente produto e quantidade validados pelo PCM.',
+      },
+      {
+        ...common.reducer,
+        ponto: 'Redutor do tanque de serviço seco - verificar nível e condição do óleo',
+      },
+    ],
+  },
+  {
+    familia: 'TRITURADOR_JULIANO',
+    rota: ROUTES.MOAGEM,
+    ordem: 56,
+    match: ['TRITURADOR JULIANO', 'TRITURADOR JULIA', 'TRITURADOR JULIANA'],
+    pontos: [
+      ...twoBearings('do Triturador Juliano'),
+      { ...common.reducer, ponto: 'Redutor do Triturador Juliano - verificar nível e condição do óleo' },
+    ],
+  },
+  {
+    familia: 'TRITURADOR_FAST',
+    rota: ROUTES.MOAGEM,
+    ordem: 57,
+    match: ['TRITURADOR FAST'],
+    pontos: [
+      ...twoBearings('do Triturador FAST'),
+    ],
   },
   {
     familia: 'DIGESTORES',
@@ -66,9 +92,7 @@ const RULES = [
     pontos: [
       { ...common.bearingDE, ponto: 'Mancal dianteiro do digestor' },
       { ...common.bearingNDE, ponto: 'Mancal traseiro do digestor' },
-      { ...common.reducer, ponto: 'Redutor principal do digestor - nível e condição do óleo' },
-      common.motorDE,
-      common.motorNDE,
+      { ...common.reducer, ponto: 'Redutor principal do digestor - verificar nível e condição do óleo' },
     ],
   },
   {
@@ -77,10 +101,19 @@ const RULES = [
     ordem: 20,
     match: ['PRENSA', 'P50', 'P46'],
     pontos: [
-      { ...common.bearingDE, ponto: 'Mancal / rolamento principal da prensa' },
-      { ...common.reducer, ponto: 'Redutor principal da prensa - nível e condição do óleo' },
-      common.motorDE,
-      common.motorNDE,
+      { ...common.bearingDE, ponto: 'Mancal dianteiro da prensa' },
+      { ...common.bearingNDE, ponto: 'Mancal traseiro da prensa' },
+      { ...common.reducer, ponto: 'Redutor principal da prensa - verificar nível e condição do óleo' },
+    ],
+  },
+  {
+    familia: 'TACHOS',
+    rota: ROUTES.TRANSPORTE,
+    ordem: 25,
+    match: ['TACHO'],
+    pontos: [
+      ...twoBearings('do tacho'),
+      { ...common.reducer, ponto: 'Redutor do tacho - verificar nível e condição do óleo' },
     ],
   },
   {
@@ -88,19 +121,21 @@ const RULES = [
     rota: ROUTES.TRANSPORTE,
     ordem: 30,
     match: ['ROSCA', 'TRANSPORTADOR HELICOIDAL', 'SEM FIM'],
-    pontos: [common.bearingDE, common.bearingNDE, common.reducer, common.motorDE, common.motorNDE],
+    pontos: [
+      { ...common.bearingDE, ponto: 'Mancal dianteiro da rosca' },
+      { ...common.bearingNDE, ponto: 'Mancal traseiro da rosca' },
+      { ...common.reducer, ponto: 'Redutor / motorredutor da rosca - verificar nível e condição do óleo' },
+    ],
   },
   {
     familia: 'TOLVAS',
     rota: ROUTES.TRANSPORTE,
     ordem: 35,
-    match: ['TOLVA'],
+    match: ['TOLVA', 'MOEGA', 'AMOEGA'],
     pontos: [
-      { ...common.bearingDE, ponto: 'Mancal da rosca da tolva - lado acionamento' },
-      { ...common.bearingNDE, ponto: 'Mancal da rosca da tolva - lado oposto' },
-      common.reducer,
-      common.motorDE,
-      common.motorNDE,
+      { ...common.bearingDE, ponto: 'Mancal dianteiro da rosca da tolva / moega' },
+      { ...common.bearingNDE, ponto: 'Mancal traseiro da rosca da tolva / moega' },
+      { ...common.reducer, ponto: 'Redutor / motorredutor da tolva / moega - verificar nível e condição do óleo' },
     ],
   },
   {
@@ -108,56 +143,85 @@ const RULES = [
     rota: ROUTES.TRANSPORTE,
     ordem: 40,
     match: ['ESTEIRA', 'ELEVADOR', 'TRANSPORTADOR'],
-    pontos: [common.bearingDE, common.bearingNDE, common.reducer, common.motorDE, common.motorNDE],
+    pontos: [common.bearingDE, common.bearingNDE, common.reducer],
   },
   {
     familia: 'BOMBAS',
     rota: ROUTES.SEPARACAO,
     ordem: 42,
     match: ['BOMBA'],
-    pontos: [common.bearingDE, common.bearingNDE, common.motorDE, common.motorNDE],
+    pontos: [common.bearingDE, common.bearingNDE],
   },
   {
     familia: 'VALVULAS_ROTATIVAS',
     rota: ROUTES.TRANSPORTE,
     ordem: 43,
     match: ['VALVULA ROTATIVA'],
-    pontos: [common.bearingDE, common.bearingNDE, common.reducer, common.motorDE, common.motorNDE],
+    pontos: [common.bearingDE, common.bearingNDE, common.reducer],
   },
   {
     familia: 'ENSACADEIRAS',
     rota: ROUTES.TRANSPORTE,
     ordem: 44,
     match: ['ENSACADEIRA'],
-    pontos: [common.bearingDE, common.bearingNDE, common.motorDE, common.motorNDE],
+    pontos: [
+      { ...common.bearingDE, ponto: 'Mancal dianteiro da ensacadeira' },
+      { ...common.bearingNDE, ponto: 'Mancal traseiro da ensacadeira' },
+    ],
   },
   {
     familia: 'DECANTER',
     rota: ROUTES.SEPARACAO,
     ordem: 45,
     match: ['DECANTER'],
-    pontos: [common.bearingDE, common.bearingNDE, common.motorDE, common.motorNDE],
+    pontos: [
+      {
+        ...common.bearingDE,
+        ponto: 'Mancal dianteiro do Decanter - graxa especial',
+        instrucoes: 'Usar exclusivamente a graxa especial validada para o Decanter. Não substituir nem misturar com graxa de uso geral. Limpar a graxeira e registrar qualquer vazamento, aquecimento, ruído ou contaminação.',
+      },
+      {
+        ...common.bearingNDE,
+        ponto: 'Mancal traseiro do Decanter - graxa especial',
+        instrucoes: 'Usar exclusivamente a graxa especial validada para o Decanter. Não substituir nem misturar com graxa de uso geral. Limpar a graxeira e registrar qualquer vazamento, aquecimento, ruído ou contaminação.',
+      },
+      {
+        ...common.reducer,
+        ponto: 'Caixa redutora do Decanter - verificar nível do óleo especial',
+        instrucoes: 'Verificar nível, vazamentos e condição do óleo da caixa redutora. Usar exclusivamente o óleo especial validado para o Decanter. Não completar com óleo de outra especificação.',
+      },
+    ],
   },
   {
     familia: 'PERCOLADORA',
     rota: ROUTES.SEPARACAO,
     ordem: 50,
     match: ['PERCOLADORA', 'PERCULADORA'],
-    pontos: [common.bearingDE, common.bearingNDE, common.reducer, common.motorDE, common.motorNDE],
+    pontos: [common.bearingDE, common.bearingNDE, common.reducer],
+  },
+  {
+    familia: 'ESTERILIZADORES',
+    rota: ROUTES.SEPARACAO,
+    ordem: 52,
+    match: ['ESTERILIZADOR'],
+    pontos: [
+      ...twoBearings('do esterilizador'),
+      { ...common.reducer, ponto: 'Redutor do esterilizador - verificar nível e condição do óleo' },
+    ],
   },
   {
     familia: 'MOINHOS',
     rota: ROUTES.MOAGEM,
     ordem: 55,
     match: ['MOINHO'],
-    pontos: [common.bearingDE, common.bearingNDE, common.motorDE, common.motorNDE],
+    pontos: [common.bearingDE, common.bearingNDE],
   },
   {
     familia: 'TRITURADORES',
     rota: ROUTES.MOAGEM,
-    ordem: 56,
+    ordem: 58,
     match: ['TRITURADOR'],
-    pontos: [common.bearingDE, common.bearingNDE, common.motorDE, common.motorNDE],
+    pontos: [common.bearingDE, common.bearingNDE],
   },
   {
     familia: 'FORNALHAS',
@@ -165,11 +229,9 @@ const RULES = [
     ordem: 70,
     match: ['FORNALHA'],
     pontos: [
-      { ...common.bearingDE, ponto: 'Mancais do conjunto da fornalha - lado acionamento' },
-      { ...common.bearingNDE, ponto: 'Mancais do conjunto da fornalha - lado oposto' },
-      common.reducer,
-      common.motorDE,
-      common.motorNDE,
+      { ...common.bearingDE, ponto: 'Mancal dianteiro do conjunto da fornalha' },
+      { ...common.bearingNDE, ponto: 'Mancal traseiro do conjunto da fornalha' },
+      { ...common.reducer, ponto: 'Redutor / motorredutor da fornalha - verificar nível e condição do óleo' },
     ],
   },
   {
@@ -177,14 +239,14 @@ const RULES = [
     rota: ROUTES.UTILIDADES,
     ordem: 75,
     match: ['EXAUSTOR'],
-    pontos: [common.bearingDE, common.bearingNDE, common.motorDE, common.motorNDE],
+    pontos: [common.bearingDE, common.bearingNDE],
   },
   {
-    familia: 'MOTORES',
+    familia: 'MOTORREDUTORES',
     rota: ROUTES.ACIONAMENTOS,
-    ordem: 80,
-    match: ['MOTOR'],
-    pontos: [common.motorDE, common.motorNDE],
+    ordem: 60,
+    match: ['MOTORREDUTOR', 'MOTO REDUTOR'],
+    pontos: [common.reducer],
   },
 ];
 
@@ -222,20 +284,28 @@ function equivalentPoint(existingName, proposed = {}) {
   if (existing === proposedName) return true;
 
   const hasAny = (text, terms) => terms.some((term) => text.includes(term));
+  const isBearing = hasAny(existing, ['MANCAL', 'ROLAMENTO', 'GRAXEIRA']);
+  const isMotorBearing = existing.includes('MOTOR') && isBearing;
+  const isFront = hasAny(existing, ['DIANTEIRO', 'ACIONAMENTO', 'ENTRADA', 'EXTERNO']);
+  const isRear = hasAny(existing, ['TRASEIRO', 'OPOSTO', 'SAIDA', 'INTERNO']);
+
   if (proposed.key === 'REDUCER_OIL') {
-    // Um ponto legado chamado apenas "Redutor" é tratado como equivalente para
-    // evitar duplicidade. O PCM pode detalhar depois se houver mais de um redutor.
-    return hasAny(existing, ['REDUTOR', 'MOTORREDUTOR']);
+    return hasAny(existing, ['REDUTOR', 'MOTORREDUTOR', 'CAIXA REDUTORA']);
   }
-  if (proposed.key === 'MOTOR_DE' || proposed.key === 'MOTOR_NDE') {
-    // Cadastro legado frequentemente registra um único ponto "Rolamento do motor".
-    // Na dúvida, não criamos pontos automáticos adicionais sobre ele.
-    return existing.includes('MOTOR') && hasAny(existing, ['ROLAMENTO', 'MANCAL', 'GRAXEIRA']);
+  if (proposed.key === 'BEARING_EXTERNAL') {
+    return isBearing && hasAny(existing, ['EXTERNO', 'DIANTEIRO', 'ACIONAMENTO']);
   }
-  if (proposed.key === 'BEARING_DE' || proposed.key === 'BEARING_NDE') {
-    // "Mancal principal" / "Rolamento principal" já representa um ponto existente.
-    // Preferimos não duplicar automaticamente; o PCM pode desdobrar LA/LOA depois.
-    return !existing.includes('MOTOR') && hasAny(existing, ['MANCAL', 'ROLAMENTO', 'GRAXEIRA']);
+  if (proposed.key === 'BEARING_DE') {
+    // Um ponto legado genérico de mancal conta como o primeiro mancal.
+    return !isMotorBearing && isBearing && (isFront || (!isFront && !isRear));
+  }
+  if (proposed.key === 'BEARING_NDE') {
+    // Para famílias com eixo e dois mancais, um ponto genérico não pode bloquear
+    // a criação do segundo mancal.
+    return !isMotorBearing && isBearing && isRear;
+  }
+  if (proposed.key === 'MOTOR_RELUB') {
+    return isMotorBearing || (existing.includes('MOTOR') && existing.includes('LUBR'));
   }
   return false;
 }
@@ -266,6 +336,19 @@ function encontrarEquipamentoDoMotor(motor = {}, equipamentos = []) {
   return scored[0].equipamento;
 }
 
+function pontoMotor20Cv(motor = {}) {
+  const codigo = String(motor.codigo || motor.descricao || `#${motor.id || ''}`).trim();
+  return {
+    key: 'MOTOR_RELUB',
+    ponto: `Motor ${codigo} - ponto de relubrificação do(s) rolamento(s)`,
+    metodo: 'Engraxar',
+    familia_lubrificacao: 'MOTORES_20CV',
+    rota_lubrificacao: ROUTES.ACIONAMENTOS,
+    ordem_rota: 8001,
+    instrucoes: 'Aplicável a motor em uso com potência cadastrada a partir de 20 CV. Confirmar no motor quais rolamentos possuem ponto de relubrificação, a graxa correta, a quantidade e o intervalo antes de liberar para execução.',
+  };
+}
+
 module.exports = {
   ROUTES,
   RULES,
@@ -274,4 +357,5 @@ module.exports = {
   gerarPontosBase,
   equivalentPoint,
   encontrarEquipamentoDoMotor,
+  pontoMotor20Cv,
 };

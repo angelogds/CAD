@@ -840,10 +840,11 @@ function insertDraftLubrificacao(equipamento, point, userId = null) {
   return { inserted: true, id: Number(info.lastInsertRowid) };
 }
 
-function vincularMotoresRoteiroBase(equipamentos = []) {
+function vincularMotoresRoteiroBase(equipamentos = [], userId = null) {
   if (!tableExistsLocal('motores') || !hasColumn('pcm_lubrificacao_planos','motor_id')) {
-    return { total: 0, vinculados: 0, sem_vinculo: 0 };
+    return { total: 0, vinculados: 0, sem_vinculo: 0, pontos_criados: 0 };
   }
+
   const motores = safeAll(`
     SELECT id,codigo,descricao,potencia_cv,local_instalacao
     FROM motores
@@ -854,6 +855,7 @@ function vincularMotoresRoteiroBase(equipamentos = []) {
 
   let vinculados = 0;
   let semVinculo = 0;
+  let pontosCriados = 0;
 
   for (const motor of motores) {
     const equipamento = lubricationCatalog.encontrarEquipamentoDoMotor(motor, equipamentos);
@@ -862,31 +864,67 @@ function vincularMotoresRoteiroBase(equipamentos = []) {
       continue;
     }
 
-    const pontosMotor = safeAll(`
+    let ponto = safeGet(`
       SELECT id
       FROM pcm_lubrificacao_planos
-      WHERE equipamento_id=?
-        AND UPPER(COALESCE(ponto_lubrificacao,'')) LIKE 'MOTOR%'
-    `, [Number(equipamento.id)]);
+      WHERE motor_id=?
+      LIMIT 1
+    `, [Number(motor.id)]);
 
-    if (!pontosMotor.length) {
-      semVinculo += 1;
-      continue;
+    if (!ponto) {
+      const draft = lubricationCatalog.pontoMotor20Cv(motor);
+      const existente = safeAll(`
+        SELECT id,ponto_lubrificacao
+        FROM pcm_lubrificacao_planos
+        WHERE equipamento_id=?
+      `, [Number(equipamento.id)]).find((row) =>
+        lubricationCatalog.equivalentPoint(row.ponto_lubrificacao, draft)
+      );
+
+      if (existente) {
+        ponto = existente;
+        db.prepare(`
+          UPDATE pcm_lubrificacao_planos
+          SET motor_id=?,
+              familia_lubrificacao='MOTORES_20CV',
+              rota_lubrificacao=?,
+              updated_at=datetime('now')
+          WHERE id=?
+        `).run(Number(motor.id), draft.rota_lubrificacao, Number(existente.id));
+      } else {
+        const info = db.prepare(`
+          INSERT INTO pcm_lubrificacao_planos (
+            equipamento_id, ponto_lubrificacao, tipo_lubrificante_texto,
+            quantidade, unidade, frequencia_dias, frequencia_semanas, frequencia_meses,
+            frequencia_horas_operacao, observacao, proxima_execucao_em,
+            metodo_aplicacao, responsavel_user_id, ativo,
+            familia_lubrificacao, rota_lubrificacao, ordem_rota,
+            validado_tecnicamente, origem_cadastro, instrucoes_execucao,
+            motor_id, created_by, created_at, updated_at
+          )
+          VALUES (?, ?, 'A DEFINIR PELO PCM', NULL, NULL, NULL, NULL, NULL, NULL,
+            ?, NULL, ?, NULL, 1, ?, ?, ?, 0, 'ROTEIRO_MOTOR_20CV', ?, ?, ?, datetime('now'), datetime('now'))
+        `).run(
+          Number(equipamento.id),
+          draft.ponto,
+          'Motor em uso com potência cadastrada a partir de 20 CV. Confirmar ponto físico, graxa, quantidade e intervalo antes de liberar.',
+          draft.metodo,
+          draft.familia_lubrificacao,
+          draft.rota_lubrificacao,
+          draft.ordem_rota,
+          draft.instrucoes,
+          Number(motor.id),
+          userId || null
+        );
+        ponto = { id: Number(info.lastInsertRowid) };
+        pontosCriados += 1;
+      }
     }
 
-    pontosMotor.forEach((ponto) => {
-      db.prepare(`
-        UPDATE pcm_lubrificacao_planos
-        SET motor_id=?,
-            updated_at=datetime('now')
-        WHERE id=?
-          AND (motor_id IS NULL OR motor_id=?)
-      `).run(Number(motor.id), Number(ponto.id), Number(motor.id));
-    });
     vinculados += 1;
   }
 
-  return { total: motores.length, vinculados, sem_vinculo: semVinculo };
+  return { total: motores.length, vinculados, sem_vinculo: semVinculo, pontos_criados: pontosCriados };
 }
 
 function gerarRoteiroBaseLubrificacao(userId = null) {
@@ -917,7 +955,7 @@ function gerarRoteiroBaseLubrificacao(userId = null) {
       }
     }
 
-    result.motores_20cv = vincularMotoresRoteiroBase(equipamentos);
+    result.motores_20cv = vincularMotoresRoteiroBase(equipamentos, userId);
   })();
 
   return result;
