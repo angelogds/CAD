@@ -28,7 +28,9 @@ test('donuts exibem total central e percentual no tooltip', () => {
 test('linhas e barras usam acabamento visual moderno sem perder drill-down', () => {
   const js = read('public/js/pcm-dashboard.js');
   assert.match(js, /cubicInterpolationMode:'monotone'/);
-  assert.match(js, /pointRadius:0/);
+  assert.match(js, /const singlePeriod=labels\.length===1/);
+  assert.match(js, /showLine:!singlePeriod/);
+  assert.match(js, /pointRadius:singlePeriod\?6:2/);
   assert.match(js, /borderRadius:9/);
   assert.match(js, /decorateChartPanel\(id/);
   assert.match(js, /interactive:Boolean\(opts\.links\?\.some\(Boolean\)\)/);
