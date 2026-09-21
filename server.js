@@ -471,6 +471,30 @@ try {
   console.warn("⚠️ Serviço de preventivas não carregado para lançamento automático de OS:", err.message || err);
 }
 
+try {
+  const lubrificacaoSemanaService = require("./modules/lubrificacao/lubrificacao-semana.service");
+  if (typeof lubrificacaoSemanaService?.processarOSAutomaticas === "function") {
+    const runLubrificacaoProgramada = () => {
+      try {
+        const result = lubrificacaoSemanaService.processarOSAutomaticas({
+          refDate: null,
+          actorUserId: null,
+          automatico: true,
+        });
+        if (Number(result?.geradas || 0) > 0) {
+          console.log(`🛢️ Lubrificação: ${result.geradas} OS automática(s) gerada(s) para ${result.data}.`);
+        }
+      } catch (err) {
+        console.warn("⚠️ Falha na geração automática das OS de lubrificação:", err.message || err);
+      }
+    };
+    runLubrificacaoProgramada();
+    trackInterval(setInterval(runLubrificacaoProgramada, 15 * 60 * 1000));
+  }
+} catch (err) {
+  console.warn("⚠️ Serviço semanal de lubrificação não carregado:", err.message || err);
+}
+
 // ===== Home =====
 app.get("/", (req, res) => {
   if (req.session?.user) return res.redirect("/dashboard");
