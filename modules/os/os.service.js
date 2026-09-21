@@ -1217,9 +1217,17 @@ function autoAlocarOS(osId, { force = false } = {}) {
   }
 
   const turno = getTurnoAtual();
+  // A lista de ocupados é calculada uma única vez. Antes, cada candidato
+  // refazia consultas de escala + OS ativas durante a própria abertura.
+  const ocupados = listarOcupados();
+  const disponivelNoTurno = (colab) => !ocupados.has(Number(colab?.id || colab?.colaborador_id || 0));
 
   if (turno === "NOITE") {
-    const equipeNoite = resolverEquipePorCriticidade({ grau: os.grau, turno: "NOITE" });
+    const equipeNoite = resolverEquipePorCriticidade({
+      grau: os.grau,
+      turno: "NOITE",
+      predicateDisponivel: disponivelNoTurno,
+    });
     if (equipeNoite.executor?.id) {
       persistirAlocacaoOS(Number(osId), equipeNoite.executor, equipeNoite.auxiliar || null, "NOITE", "AUTO");
       return buildAssignmentResult(beforeAssignment, Number(osId), { aguardando: false, turno: "NOITE", executor: equipeNoite.executor, auxiliar: equipeNoite.auxiliar || null });
@@ -1228,7 +1236,12 @@ function autoAlocarOS(osId, { force = false } = {}) {
   }
 
   const ranking = rankMechanicsForOS(os);
-  const equipe = resolverEquipePorCriticidade({ grau: os.grau, turno: "DIA", mecanicos: ranking });
+  const equipe = resolverEquipePorCriticidade({
+    grau: os.grau,
+    turno: "DIA",
+    mecanicos: ranking,
+    predicateDisponivel: disponivelNoTurno,
+  });
   const executor = equipe.executor || ranking[0] || null;
   if (!executor) return marcarAguardandoEquipe(Number(osId), "DIA", "Sem executor disponível no turno: OS aguardando alocação.");
   const auxiliar = equipe.auxiliar || null;
