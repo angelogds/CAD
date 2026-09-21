@@ -168,6 +168,7 @@ function lubrificacao(req, res) {
     mecanicos: service.listMecanicosLubrificacao(),
     rotas: service.listRotasLubrificacao(),
     motoresPendentes: service.listMotoresLubrificacaoPendentes(),
+    equipamentosSemRoteiro: service.listEquipamentosSemRoteiroLubrificacao(),
     resumo: {
       ...resumoBase,
       pendentes_validacao: countBy(todasLubrificacoes, (item) => Number(item.validado_tecnicamente ?? 1) === 0),
