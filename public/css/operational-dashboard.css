@@ -54,3 +54,17 @@
   .op-table td{grid-template-columns:78px minmax(0,1fr)}
   .tag{white-space:normal;text-align:left}
 }
+
+.lubrication-week-card{border-top:4px solid var(--green)}
+.lubrication-week-card.warning{border-top-color:var(--orange)}
+.lubrication-week-card.danger{border-top-color:var(--red)}
+.lubrication-week-card.ok{border-top-color:var(--green)}
+.lub-dashboard-owner{display:grid;gap:2px;padding:9px 10px;border-radius:9px;background:#f7faf8;margin-bottom:9px}
+.lub-dashboard-owner>span,.lub-dashboard-owner>small{color:var(--muted);font-size:9px}
+.lub-dashboard-owner>strong{font-size:14px}
+.lub-dashboard-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.lub-dashboard-grid>span{display:grid;gap:2px;text-align:center;border:1px solid #e4ebe7;border-radius:8px;padding:7px 5px;background:#fff}
+.lub-dashboard-grid strong{font-size:18px}.lub-dashboard-grid small{font-size:8px;color:var(--muted)}
+.lub-dashboard-alert,.lub-dashboard-ok{margin:9px 0 0;border-radius:8px;padding:7px 8px;font-size:9px;line-height:1.35}
+.lub-dashboard-alert{background:#fff4e5;color:#9a5700}.lubrication-week-card.danger .lub-dashboard-alert{background:#fff0f2;color:#b42332}
+.lub-dashboard-ok{background:#eef8f1;color:#16723e}
