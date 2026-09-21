@@ -309,12 +309,14 @@ function osCreate(req, res) {
     catch (err) { console.error("[OS_FAST][AUTO_ASSIGN]", err?.stack || err); }
 
     const fotosAbertura = mapFilesToPublic(req.files?.abertura_fotos || []);
-    service.addFotosAberturaFechamento({
-      osId: created.id,
-      files: fotosAbertura,
-      tipo: "ABERTURA",
-      userId,
-    });
+    if (fotosAbertura.length) {
+      service.addFotosAberturaFechamento({
+        osId: created.id,
+        files: fotosAbertura,
+        tipo: "ABERTURA",
+        userId,
+      });
+    }
 
     // IA, embeddings, integração com inspeção e notificações são complementares.
     // Nenhuma delas deve segurar a resposta de abertura da OS.
