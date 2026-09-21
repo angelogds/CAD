@@ -520,6 +520,31 @@ function dashboardPdf(req, res) {
   doc.end();
 }
 
+function lubrificacaoPdf(req, res) {
+  const itens = service.listLubrificacao(req.query || {});
+  const pendentes = itens.filter((item) => Number(item.validado_tecnicamente ?? 1) === 0).length;
+  const doc = pdfHeader(
+    req, res, 'plano-lubrificacao-pcm.pdf', 'Plano e Roteiro de Lubrificação',
+    `Pontos: ${itens.length} | Pendentes de validação: ${pendentes}`
+  );
+  pdfSection(doc, 'Regra do documento');
+  doc.text('Pontos marcados como PENDENTE DE VALIDACAO sao rascunhos administrativos e nao devem ser executados. Produto, quantidade e frequencia precisam ser confirmados pelo PCM antes da liberacao.');
+  const grupos = new Map();
+  itens.forEach((item) => {
+    const rota = item.rota_lubrificacao || 'Sem rota';
+    if (!grupos.has(rota)) grupos.set(rota, []);
+    grupos.get(rota).push(item);
+  });
+  grupos.forEach((rows, rota) => {
+    pdfSection(doc, rota);
+    pdfLines(doc, rows, (item) => {
+      const validado = Number(item.validado_tecnicamente ?? 1) === 1;
+      return `${item.equipamento_nome} | ${item.ponto_lubrificacao} | ${item.tipo_lubrificante_texto || '-'} | ${item.quantidade ?? '-'} ${item.unidade || ''} | ${item.frequencia_label || '-'} | ${item.responsavel_nome || 'Nao distribuido'} | ${validado ? 'VALIDADO' : 'PENDENTE DE VALIDACAO'}`;
+    });
+  });
+  doc.end();
+}
+
 function planejamentoPdf(req, res) {
   const planos = service.listPlanos(req.query || {});
   const resumo = planningSummary(planos);
@@ -586,6 +611,7 @@ module.exports = {
   dashboardPdf,
   dashboardExcel,
   planejamentoPdf,
+  lubrificacaoPdf,
   pecasCriticasPdf,
   relatoriosAvancadosPdf,
   relatoriosAvancadosExcel,
