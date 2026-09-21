@@ -58,7 +58,9 @@ function buildDb() {
       (1,'PR-50','Prensa P50','Prensagem','Prensa'),
       (2,'RS-01','Rosca Transporte 1','Produção','Rosca'),
       (3,'DC-01','Decanter FAST Saturn 3','Separação','Decanter'),
-      (4,'DG-03','Digestor 3','Produção','Digestor');
+      (4,'DG-03','Digestor 3','Produção','Digestor'),
+      (5,'MN-01','Moinho 1','Moagem','Moinho'),
+      (6,'EX-01','Exaustor Caldeira 1','Caldeira','Exaustor');
 
     INSERT INTO motores(id,codigo,descricao,potencia_cv,rpm,local_instalacao,status)
       VALUES (20,'M-030','Motor Digestor 3',30,1750,'Digestor 3','EM_USO');
@@ -90,8 +92,22 @@ test('V5 valida mancais e redutores gerais e prepara produtos específicos do De
     assert.equal(row.tipo_lubrificante_texto, 'Graxa de Lítio EP2');
     assert.equal(Number(row.quantidade), 150);
     assert.equal(row.unidade, 'g');
-    assert.equal(Number(row.frequencia_dias), 7);
     assert.equal(row.metodo_aplicacao, 'Engraxar');
+
+    if (/MOINHO/i.test(row.equipamento_nome)) {
+      assert.equal(row.dias_semana_lubrificacao, '1,3,5');
+      assert.equal(row.frequencia_dias, null);
+      const weekday = Number(db.prepare("SELECT strftime('%w', ?) AS d").get(row.proxima_execucao_em).d);
+      assert.ok([1,3,5].includes(weekday));
+    } else if (/EXAUSTOR/i.test(row.equipamento_nome)) {
+      assert.equal(row.dias_semana_lubrificacao, '1,4');
+      assert.equal(row.frequencia_dias, null);
+      const weekday = Number(db.prepare("SELECT strftime('%w', ?) AS d").get(row.proxima_execucao_em).d);
+      assert.ok([1,4].includes(weekday));
+    } else {
+      assert.equal(Number(row.frequencia_dias), 7);
+      assert.equal(row.dias_semana_lubrificacao, null);
+    }
   }
 
   const reducers = geral.filter((r) => /REDUTOR|MOTORREDUTOR|CAIXA REDUTORA/i.test(String(r.ponto_lubrificacao || '')));
@@ -113,8 +129,18 @@ test('V5 valida mancais e redutores gerais e prepara produtos específicos do De
   `).all();
   assert.ok(decanter.length >= 1);
   assert.ok(decanter.every((r) => Number(r.validado_tecnicamente) === 0));
-  assert.ok(decanter.every((r) => !String(r.tipo_lubrificante_texto || '').includes('padrão Manutenção')));
-  assert.ok(decanter.every((r) => !String(r.tipo_lubrificante_texto || '').includes('ISO VG 680')));
+
+  const decanterBearings = decanter.filter((r) => /MANCAL|ROLAMENTO/i.test(String(r.ponto_lubrificacao || '')));
+  assert.ok(decanterBearings.length >= 2);
+  assert.ok(decanterBearings.every((r) => r.tipo_lubrificante_texto === 'SKF LGWA 2'));
+  assert.ok(decanterBearings.every((r) => r.quantidade == null && r.frequencia_dias == null));
+
+  const decanterReducer = decanter.find((r) => /REDUTOR|CAIXA REDUTORA/i.test(String(r.ponto_lubrificacao || '')));
+  assert.ok(decanterReducer);
+  assert.equal(decanterReducer.tipo_lubrificante_texto, 'TotalEnergies Carter SH 680 - Óleo Sintético ISO VG 680 - Redutor/Engrenagem - Micropitting - Incolor');
+  assert.equal(decanterReducer.quantidade, null);
+  assert.equal(decanterReducer.frequencia_dias, null);
+  assert.equal(decanterReducer.metodo_aplicacao, 'Verificar / completar nível');
 
   const motor30 = db.prepare("SELECT * FROM pcm_lubrificacao_planos WHERE motor_id=20").get();
   assert.ok(motor30);
@@ -129,6 +155,19 @@ test('V5 valida mancais e redutores gerais e prepara produtos específicos do De
   assert.equal(after, before);
 
   db.close();
+});
+
+test('serviço operacional mantém programação fixa de segunda/quarta/sexta e segunda/quinta', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const service = fs.readFileSync(path.resolve(__dirname, '../modules/lubrificacao/lubrificacao.service.js'), 'utf8');
+  const view = fs.readFileSync(path.resolve(__dirname, '../views/lubrificacao/index.ejs'), 'utf8');
+  assert.match(service, /dias_semana_lubrificacao/);
+  assert.match(service, /calcularProximaPorDiasSemana/);
+  assert.match(view, /Seg/);
+  assert.match(view, /Qua/);
+  assert.match(view, /Qui/);
+  assert.match(view, /Sex/);
 });
 
 test('V5 não sobrescreve ponto já validado manualmente', () => {
