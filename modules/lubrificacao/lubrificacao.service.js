@@ -1,4 +1,5 @@
 const db = require('../../database/db');
+const semanaService = require('./lubrificacao-semana.service');
 
 function tableExists(name) {
   return !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name);
@@ -25,6 +26,13 @@ function listRoteiro(userId, status = '') {
   const hasWeekdays = hasColumn('pcm_lubrificacao_planos','dias_semana_lubrificacao');
   const validationWhere = hasValidation ? 'AND COALESCE(l.validado_tecnicamente,1)=1' : '';
 
+  const semana = semanaService.getSemanaPorReferencia();
+  const executorId = Number(userId || 0);
+  if (semana?.responsavel_user_id && Number(semana.responsavel_user_id) !== executorId) {
+    return [];
+  }
+  const ownerWhere = semana?.responsavel_user_id ? '' : 'AND l.responsavel_user_id = @userId';
+
   const rows = db.prepare(`
     SELECT
       l.id,
@@ -50,21 +58,21 @@ function listRoteiro(userId, status = '') {
       COALESCE(e.setor, '') AS setor,
       CASE
         WHEN l.proxima_execucao_em IS NULL THEN 'SEM_DATA'
-        WHEN date(l.proxima_execucao_em) < date('now') THEN 'ATRASADO'
-        WHEN date(l.proxima_execucao_em) = date('now') THEN 'HOJE'
-        WHEN date(l.proxima_execucao_em) <= date('now', '+7 day') THEN 'PROXIMO'
+        WHEN date(l.proxima_execucao_em) < date('now','localtime') THEN 'ATRASADO'
+        WHEN date(l.proxima_execucao_em) = date('now','localtime') THEN 'HOJE'
+        WHEN date(l.proxima_execucao_em) <= date('now','localtime','+7 day') THEN 'PROXIMO'
         ELSE 'FUTURO'
       END AS situacao
     FROM pcm_lubrificacao_planos l
     JOIN equipamentos e ON e.id = l.equipamento_id
     WHERE COALESCE(l.ativo, 1) = 1
-      AND l.responsavel_user_id = @userId
+      ${ownerWhere}
       ${validationWhere}
     ORDER BY
       CASE
-        WHEN l.proxima_execucao_em IS NOT NULL AND date(l.proxima_execucao_em) < date('now') THEN 0
-        WHEN l.proxima_execucao_em IS NOT NULL AND date(l.proxima_execucao_em) = date('now') THEN 1
-        WHEN l.proxima_execucao_em IS NOT NULL AND date(l.proxima_execucao_em) <= date('now', '+7 day') THEN 2
+        WHEN l.proxima_execucao_em IS NOT NULL AND date(l.proxima_execucao_em) < date('now','localtime') THEN 0
+        WHEN l.proxima_execucao_em IS NOT NULL AND date(l.proxima_execucao_em) = date('now','localtime') THEN 1
+        WHEN l.proxima_execucao_em IS NOT NULL AND date(l.proxima_execucao_em) <= date('now','localtime','+7 day') THEN 2
         WHEN l.proxima_execucao_em IS NULL THEN 4
         ELSE 3
       END,
@@ -72,7 +80,7 @@ function listRoteiro(userId, status = '') {
       ordem_rota ASC,
       e.nome ASC,
       l.ponto_lubrificacao ASC
-  `).all({ userId: Number(userId) });
+  `).all({ userId: executorId });
 
   const wanted = String(status || '').trim().toUpperCase();
   if (!wanted || wanted === 'TODOS') return rows;
@@ -199,15 +207,31 @@ function registrarExecucao(planoId, userId, payload = {}) {
     ? 'AND COALESCE(validado_tecnicamente,1)=1'
     : '';
 
-  const plano = db.prepare(`
-    SELECT *
-    FROM pcm_lubrificacao_planos
-    WHERE id = ?
-      AND COALESCE(ativo, 1) = 1
-      AND responsavel_user_id = ?
-      ${validationWhere}
-    LIMIT 1
-  `).get(id, executorId);
+  const semana = semanaService.getSemanaPorReferencia();
+  let plano = null;
+  if (semana?.responsavel_user_id) {
+    if (Number(semana.responsavel_user_id) !== executorId) {
+      throw new Error('O roteiro desta semana está atribuído a outro mecânico.');
+    }
+    plano = db.prepare(`
+      SELECT *
+      FROM pcm_lubrificacao_planos
+      WHERE id = ?
+        AND COALESCE(ativo, 1) = 1
+        ${validationWhere}
+      LIMIT 1
+    `).get(id);
+  } else {
+    plano = db.prepare(`
+      SELECT *
+      FROM pcm_lubrificacao_planos
+      WHERE id = ?
+        AND COALESCE(ativo, 1) = 1
+        AND responsavel_user_id = ?
+        ${validationWhere}
+      LIMIT 1
+    `).get(id, executorId);
+  }
 
   if (!plano) {
     throw new Error('Este ponto não pertence ao seu roteiro, está inativo ou ainda não foi validado pelo PCM.');
@@ -230,17 +254,17 @@ function registrarExecucao(planoId, userId, payload = {}) {
   }
 
   const proxima = calcularProximaExecucao(plano);
+  const osProgramada = semanaService.getOSProgramada(null, plano.equipamento_id);
+  const hasSemanaExec = hasColumn('pcm_lubrificacao_execucoes','semana_id');
+  const hasOsExec = hasColumn('pcm_lubrificacao_execucoes','os_id');
 
   const tx = db.transaction(() => {
-    const info = db.prepare(`
-      INSERT INTO pcm_lubrificacao_execucoes (
-        plano_id, equipamento_id, executor_user_id,
-        quantidade_prevista, quantidade_utilizada, unidade,
-        observacao, anomalia, anomalia_descricao,
-        proxima_execucao_em, executed_at, created_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-    `).run(
+    const fields = [
+      'plano_id','equipamento_id','executor_user_id',
+      'quantidade_prevista','quantidade_utilizada','unidade',
+      'observacao','anomalia','anomalia_descricao','proxima_execucao_em'
+    ];
+    const values = [
       plano.id,
       plano.equipamento_id,
       executorId,
@@ -251,7 +275,23 @@ function registrarExecucao(planoId, userId, payload = {}) {
       anomalia,
       anomaliaDescricao,
       proxima
-    );
+    ];
+    if (hasSemanaExec) {
+      fields.push('semana_id');
+      values.push(semana?.id ? Number(semana.id) : null);
+    }
+    if (hasOsExec) {
+      fields.push('os_id');
+      values.push(osProgramada?.os_id ? Number(osProgramada.os_id) : null);
+    }
+
+    const placeholders = fields.map(() => '?').join(',');
+    const info = db.prepare(`
+      INSERT INTO pcm_lubrificacao_execucoes (
+        ${fields.join(',')}, executed_at, created_at
+      )
+      VALUES (${placeholders}, datetime('now'), datetime('now'))
+    `).run(...values);
 
     db.prepare(`
       UPDATE pcm_lubrificacao_planos
@@ -264,7 +304,20 @@ function registrarExecucao(planoId, userId, payload = {}) {
     return Number(info.lastInsertRowid);
   });
 
-  return { execucao_id: tx(), proxima_execucao_em: proxima, anomalia: Boolean(anomalia) };
+  const execucaoId = tx();
+  const osSync = osProgramada?.os_id
+    ? semanaService.sincronizarStatusOSProgramada(plano.equipamento_id, executorId)
+    : { vinculada:false, concluida:false };
+
+  return {
+    execucao_id: execucaoId,
+    proxima_execucao_em: proxima,
+    anomalia: Boolean(anomalia),
+    semana_id: semana?.id || null,
+    os_id: osProgramada?.os_id || null,
+    os_concluida: Boolean(osSync?.concluida),
+    os_progresso: osSync?.vinculada ? { executados:osSync.executados, total:osSync.total } : null,
+  };
 }
 
 module.exports = {
@@ -274,4 +327,5 @@ module.exports = {
   listHistorico,
   registrarExecucao,
   calcularProximaExecucao,
+  getSemanaAtual: semanaService.getSemanaPorReferencia,
 };
