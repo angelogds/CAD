@@ -160,6 +160,7 @@ function lubrificacao(req, res) {
     filtros,
     equipamentos,
     lubrificacoes,
+    mecanicos: service.listMecanicosLubrificacao(),
     resumo: lubricationSummary(lubrificacoes, equipamentos.length),
     sugestaoIA,
   });
@@ -347,6 +348,17 @@ function adicionarLubrificacao(req, res) {
   }
   const eid = encodeURIComponent(req.body.equipamento_id || '');
   return res.redirect(`/pcm/lubrificacao?equipamento_id=${eid}`);
+}
+
+function distribuirLubrificacao(req, res) {
+  try {
+    service.distribuirPontoLubrificacao(req.params.id, req.body || {}, req.session?.user?.id || null);
+    req.flash('success', 'Distribuição do ponto de lubrificação atualizada.');
+  } catch (e) {
+    req.flash('error', e.message || 'Falha ao distribuir o ponto de lubrificação.');
+  }
+  const eid = encodeURIComponent(req.body.equipamento_id || '');
+  return res.redirect(`/pcm/lubrificacao${eid ? `?equipamento_id=${eid}` : ''}`);
 }
 
 async function sugerirPlanoLubrificacaoIA(req, res) {
@@ -556,6 +568,7 @@ module.exports = {
   classificarFalha,
   adicionarComponente,
   adicionarLubrificacao,
+  distribuirLubrificacao,
   sugerirPlanoLubrificacaoIA,
   aplicarSugestaoLubrificacaoIA,
   salvarProgramacao,
