@@ -150,11 +150,15 @@ function lubrificacao(req, res) {
   const filtros = {
     equipamento_id: req.query.equipamento_id || "",
     setor: req.query.setor || "",
+    validacao: String(req.query.validacao || "").toUpperCase(),
+    rota: req.query.rota || "",
   };
   const sugestaoIA = req.session?.pcmLubrificacaoSugestao || null;
   if (req.session) req.session.pcmLubrificacaoSugestao = null;
   const equipamentos = service.getEquipamentos();
   const lubrificacoes = service.listLubrificacao(filtros);
+  const todasLubrificacoes = service.listLubrificacao({});
+  const resumoBase = lubricationSummary(todasLubrificacoes, equipamentos.length);
   return res.render("pcm/lubrificacao", {
     ...baseView(req),
     activePcmSection: "lubrificacao",
@@ -162,7 +166,13 @@ function lubrificacao(req, res) {
     equipamentos,
     lubrificacoes,
     mecanicos: service.listMecanicosLubrificacao(),
-    resumo: lubricationSummary(lubrificacoes, equipamentos.length),
+    rotas: service.listRotasLubrificacao(),
+    motoresPendentes: service.listMotoresLubrificacaoPendentes(),
+    resumo: {
+      ...resumoBase,
+      pendentes_validacao: countBy(todasLubrificacoes, (item) => Number(item.validado_tecnicamente ?? 1) === 0),
+      liberados: countBy(todasLubrificacoes, (item) => Number(item.validado_tecnicamente ?? 1) === 1 && Number(item.ativo ?? 1) === 1),
+    },
     sugestaoIA,
   });
 }
@@ -360,6 +370,30 @@ function distribuirLubrificacao(req, res) {
   }
   const eid = encodeURIComponent(req.body.equipamento_id || '');
   return res.redirect(`/pcm/lubrificacao${eid ? `?equipamento_id=${eid}` : ''}`);
+}
+
+function gerarRoteiroBaseLubrificacao(req, res) {
+  try {
+    const result = service.gerarRoteiroBaseLubrificacao(req.session?.user?.id || null);
+    req.flash(
+      'success',
+      `Roteiro-base atualizado: ${result.pontos_criados} novo(s) ponto(s), ${result.pontos_ignorados_existentes} já existente(s), ${result.motores_20cv.vinculados} motor(es) >=20 CV vinculado(s) e ${result.motores_20cv.sem_vinculo} pendente(s) de vínculo.`
+    );
+  } catch (e) {
+    req.flash('error', e.message || 'Falha ao gerar o roteiro-base de lubrificação.');
+  }
+  return res.redirect('/pcm/lubrificacao?validacao=PENDENTE');
+}
+
+function validarLubrificacao(req, res) {
+  try {
+    service.validarPontoLubrificacao(req.params.id, req.body || {}, req.session?.user?.id || null);
+    req.flash('success', 'Ponto validado tecnicamente e liberado conforme a distribuição definida.');
+  } catch (e) {
+    req.flash('error', e.message || 'Falha ao validar o ponto de lubrificação.');
+  }
+  const eid = encodeURIComponent(req.body.equipamento_id || '');
+  return res.redirect(`/pcm/lubrificacao${eid ? `?equipamento_id=${eid}` : '?validacao=PENDENTE'}`);
 }
 
 async function sugerirPlanoLubrificacaoIA(req, res) {
@@ -569,6 +603,8 @@ module.exports = {
   classificarFalha,
   adicionarComponente,
   adicionarLubrificacao,
+  gerarRoteiroBaseLubrificacao,
+  validarLubrificacao,
   distribuirLubrificacao,
   sugerirPlanoLubrificacaoIA,
   aplicarSugestaoLubrificacaoIA,
