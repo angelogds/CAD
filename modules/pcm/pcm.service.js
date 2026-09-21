@@ -508,9 +508,11 @@ function listLubrificacao({ equipamento_id, setor } = {}) {
   if (equipamento_id) { where += ' AND l.equipamento_id=@equipamento_id'; params.equipamento_id = Number(equipamento_id); }
   if (setor) { where += ' AND COALESCE(e.setor,"")=@setor'; params.setor = String(setor); }
   const rows = safeAll(`
-    SELECT l.*, e.nome AS equipamento_nome, e.setor
+    SELECT l.*, e.nome AS equipamento_nome, e.setor,
+           COALESCE(u.name, u.email, '') AS responsavel_nome
     FROM pcm_lubrificacao_planos l
     JOIN equipamentos e ON e.id = l.equipamento_id
+    LEFT JOIN users u ON u.id = l.responsavel_user_id
     WHERE ${where}
     ORDER BY datetime(l.proxima_execucao_em) ASC, l.id DESC
   `, params);
@@ -729,34 +731,88 @@ function addComponenteBOM({ equipamento_id, categoria, modelo_comercial, descric
   return bomId;
 }
 
-function addPontoLubrificacao({ equipamento_id, ponto_lubrificacao, tipo_lubrificante_texto, quantidade, unidade, frequencia_dias, observacao }, userId) {
+function validarMecanicoLubrificacao(userId) {
+  const id = Number(userId || 0);
+  if (!id) return null;
+  const user = db.prepare(`
+    SELECT id
+    FROM users
+    WHERE id = ?
+      AND UPPER(COALESCE(role,'')) = 'MECANICO'
+    LIMIT 1
+  `).get(id);
+  if (!user) throw new Error("O responsável selecionado precisa possuir perfil MECANICO.");
+  return id;
+}
+
+function listMecanicosLubrificacao() {
+  if (!tableExistsLocal('users')) return [];
+  const archived = hasColumn('users', 'archived_at') ? "AND archived_at IS NULL" : "";
+  return safeAll(`
+    SELECT id, COALESCE(name,email,'Mecânico #' || id) AS nome
+    FROM users
+    WHERE UPPER(COALESCE(role,''))='MECANICO'
+      ${archived}
+    ORDER BY nome
+  `);
+}
+
+function addPontoLubrificacao({ equipamento_id, ponto_lubrificacao, tipo_lubrificante_texto, quantidade, unidade, frequencia_dias, observacao, metodo_aplicacao, responsavel_user_id }, userId) {
   ensurePcmTables();
   const equipamentoId = Number(equipamento_id);
   if (!equipamentoId) throw new Error("Selecione um equipamento para adicionar um ponto de lubrificação.");
   if (!String(ponto_lubrificacao || "").trim()) throw new Error("Informe o ponto de lubrificação.");
 
+  const responsavelId = validarMecanicoLubrificacao(responsavel_user_id);
   const dias = Math.max(1, Number(frequencia_dias) || 30);
   const prox = db.prepare(`SELECT datetime('now', '+' || ? || ' day') AS dt`).get(dias)?.dt || null;
 
   const info = db.prepare(`
     INSERT INTO pcm_lubrificacao_planos (
       equipamento_id, ponto_lubrificacao, tipo_lubrificante_texto, quantidade, unidade,
-      frequencia_dias, observacao, proxima_execucao_em, created_by, created_at, updated_at
+      frequencia_dias, observacao, proxima_execucao_em, metodo_aplicacao,
+      responsavel_user_id, ativo, created_by, created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, datetime('now'), datetime('now'))
   `).run(
     equipamentoId,
     String(ponto_lubrificacao).trim(),
     (tipo_lubrificante_texto || "").trim() || null,
-    quantidade ? Number(quantidade) : null,
+    quantidade === '' || quantidade == null ? null : Number(quantidade),
     (unidade || "").trim() || null,
     dias,
     (observacao || "").trim() || null,
     prox,
+    String(metodo_aplicacao || "").trim() || null,
+    responsavelId,
     userId || null
   );
 
   return Number(info.lastInsertRowid);
+}
+
+function distribuirPontoLubrificacao(planoId, payload = {}, userId = null) {
+  ensurePcmTables();
+  const id = Number(planoId);
+  if (!id) throw new Error("Ponto de lubrificação inválido.");
+
+  const atual = db.prepare("SELECT id, metodo_aplicacao FROM pcm_lubrificacao_planos WHERE id=?").get(id);
+  if (!atual) throw new Error("Ponto de lubrificação não encontrado.");
+
+  const responsavelId = validarMecanicoLubrificacao(payload.responsavel_user_id);
+  const metodo = String(payload.metodo_aplicacao || atual.metodo_aplicacao || "").trim() || null;
+  const ativo = String(payload.ativo || '1') === '0' ? 0 : 1;
+
+  db.prepare(`
+    UPDATE pcm_lubrificacao_planos
+    SET responsavel_user_id = ?,
+        metodo_aplicacao = ?,
+        ativo = ?,
+        updated_at = datetime('now')
+    WHERE id = ?
+  `).run(responsavelId, metodo, ativo, id);
+
+  return { id, responsavel_user_id: responsavelId, metodo_aplicacao: metodo, ativo, updated_by: userId || null };
 }
 
 function gerarSugestaoPlanoLubrificacaoLocal(equipamentoId) {
@@ -1126,6 +1182,8 @@ module.exports = {
   classificarFalhaOS,
   addComponenteBOM,
   addPontoLubrificacao,
+  listMecanicosLubrificacao,
+  distribuirPontoLubrificacao,
   gerarSugestaoPlanoLubrificacao,
   aplicarSugestaoPlanoLubrificacao,
   atualizarScoresRiscoEquipamentos: intelligenceService.atualizarScoresRiscoEquipamentos,

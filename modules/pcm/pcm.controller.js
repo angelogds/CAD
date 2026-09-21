@@ -36,11 +36,12 @@ function failureSummary(falhas = []) {
 }
 
 function lubricationSummary(planos = [], totalEquipamentos = 0) {
-  const cobertos = new Set(planos.map((item) => Number(item.equipamento_id)).filter(Boolean)).size;
+  const ativos = planos.filter((item) => Number(item.ativo ?? 1) === 1);
+  const cobertos = new Set(ativos.map((item) => Number(item.equipamento_id)).filter(Boolean)).size;
   return {
-    pontos: planos.length,
-    atrasados: countBy(planos, (item) => item.situacao === "ATRASADO"),
-    em_breve: countBy(planos, (item) => item.situacao === "EM_BREVE"),
+    pontos: ativos.length,
+    atrasados: countBy(ativos, (item) => item.situacao === "ATRASADO"),
+    em_breve: countBy(ativos, (item) => item.situacao === "EM_BREVE"),
     cobertura: totalEquipamentos ? Math.round((cobertos * 1000) / totalEquipamentos) / 10 : 0,
   };
 }
@@ -160,6 +161,7 @@ function lubrificacao(req, res) {
     filtros,
     equipamentos,
     lubrificacoes,
+    mecanicos: service.listMecanicosLubrificacao(),
     resumo: lubricationSummary(lubrificacoes, equipamentos.length),
     sugestaoIA,
   });
@@ -347,6 +349,17 @@ function adicionarLubrificacao(req, res) {
   }
   const eid = encodeURIComponent(req.body.equipamento_id || '');
   return res.redirect(`/pcm/lubrificacao?equipamento_id=${eid}`);
+}
+
+function distribuirLubrificacao(req, res) {
+  try {
+    service.distribuirPontoLubrificacao(req.params.id, req.body || {}, req.session?.user?.id || null);
+    req.flash('success', 'Distribuição do ponto de lubrificação atualizada.');
+  } catch (e) {
+    req.flash('error', e.message || 'Falha ao distribuir o ponto de lubrificação.');
+  }
+  const eid = encodeURIComponent(req.body.equipamento_id || '');
+  return res.redirect(`/pcm/lubrificacao${eid ? `?equipamento_id=${eid}` : ''}`);
 }
 
 async function sugerirPlanoLubrificacaoIA(req, res) {
@@ -556,6 +569,7 @@ module.exports = {
   classificarFalha,
   adicionarComponente,
   adicionarLubrificacao,
+  distribuirLubrificacao,
   sugerirPlanoLubrificacaoIA,
   aplicarSugestaoLubrificacaoIA,
   salvarProgramacao,
