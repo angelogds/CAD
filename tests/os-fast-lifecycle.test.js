@@ -37,10 +37,11 @@ test('fechamento rápido confirma a OS antes do enriquecimento por IA', () => {
   assert.match(body, /return res\.redirect\(redirectAfterClose\)/);
 });
 
-test('processamento complementar usa setImmediate e reutiliza concluirOS existente', () => {
+test('processamento complementar prioriza o redirect e reutiliza concluirOS existente', () => {
   const detached = functionBody(fastSource, 'runDetached', 'updateAIColumns');
   const closeEnrichment = functionBody(fastSource, 'scheduleCloseEnrichment', 'osClose');
-  assert.match(detached, /setImmediate\(/);
+  assert.match(detached, /setTimeout\(/);
+  assert.match(detached, /1000/);
   assert.match(closeEnrichment, /runDetached\("CLOSE_ENRICHMENT"/);
   assert.match(closeEnrichment, /service\.concluirOS\(id, payload\)/);
 });
