@@ -15,7 +15,7 @@
   function selected(a,b){return String(a||'')===String(b||'')?'selected':''}
   function metric(value,suffix=''){return value===null||typeof value==='undefined'?'Dados insuficientes':`${value}${suffix}`}
 %>
-<link rel="stylesheet" href="/css/pcm-dashboard.css?v=20260920-v6">
+<link rel="stylesheet" href="/css/pcm-dashboard.css?v=20260920-v7">
 <div class="pcm-directors-page">
   <div class="pcm-loading"><div class="pcm-spinner" aria-label="Carregando"></div></div>
   <header class="pcm-directors-head"><div><span class="pcm-section-label"><%= executiveEyebrow %></span><h1><%= executiveTitle %></h1><p><%= executiveSubtitle %></p><span class="pcm-period-chip" id="periodoResumo">Período analisado: <%= d.filtros.data_inicial||'-' %> a <%= d.filtros.data_final||'-' %></span></div><div class="pcm-module-actions"><button class="pcm-button primary ui-btn ui-btn--primary" id="btnAtualizar" type="button">Atualizar dados</button><button class="pcm-button ui-btn ui-btn--outline" id="btnFull" type="button">Modo apresentação</button><button class="pcm-button ui-btn ui-btn--outline" id="btnPdf" type="button">PDF</button><a class="pcm-button ui-btn ui-btn--outline" href="<%= basePath %>/excel?<%= qp %>">Excel</a></div></header>
@@ -65,7 +65,7 @@
     </section>
 
     <section class="pcm-directors-grid">
-      <article class="pcm-director-panel wide"><span class="pcm-section-label">Confiabilidade</span><h2>Equipamentos com mais falhas</h2><p>Somente ocorrências corretivas no período. Clique em uma barra para analisar o equipamento com os mesmos filtros.</p><div class="pcm-chart"><canvas id="chartTopFalhas"></canvas><div class="pcm-empty">Sem falhas nos filtros atuais.</div></div></article>
+      <article class="pcm-director-panel wide"><span class="pcm-section-label">Confiabilidade</span><h2>Equipamentos com mais falhas</h2><p>Somente ocorrências corretivas no período. O nome e a quantidade aparecem diretamente nas barras; a cor evolui conforme recorrência e criticidade. Clique em uma barra para analisar o equipamento com os mesmos filtros.</p><div class="pcm-criticality-scale" aria-label="Escala visual de criticidade"><span><i class="risk-1"></i>1 ocorrência</span><span><i class="risk-2"></i>2 ocorrências</span><span><i class="risk-3"></i>3 ocorrências</span><span><i class="risk-4"></i>4+ ou crítica</span></div><div class="pcm-chart"><canvas id="chartTopFalhas"></canvas><div class="pcm-empty">Sem falhas nos filtros atuais.</div></div></article>
       <article class="pcm-director-panel"><span class="pcm-section-label">Estratégia</span><h2>Tipos de manutenção</h2><p>Distribuição das intervenções. Clique em uma fatia para filtrar o painel pelo tipo.</p><div class="pcm-chart"><canvas id="chartCorPrev"></canvas><div class="pcm-empty">Sem intervenções.</div></div></article>
       <article class="pcm-director-panel"><span class="pcm-section-label">Tendência</span><h2>OS por mês</h2><p>Evolução do volume de trabalho.</p><div class="pcm-chart"><canvas id="chartOsMes"></canvas><div class="pcm-empty">Sem histórico no período.</div></div></article>
       <article class="pcm-director-panel"><span class="pcm-section-label">Fluxo</span><h2>Situação das OS</h2><p>Distribuição por status real.</p><div class="pcm-chart"><canvas id="chartStatus"></canvas><div class="pcm-empty">Sem ordens no período.</div></div></article>
@@ -92,4 +92,4 @@
     <table hidden><tbody id="rankingFalhas"></tbody></table>
   </main></div>
 </div>
-<script src="/vendor/chart.js/chart.umd.js?v=4.4.7"></script><script>if(typeof Chart==="undefined"){document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"><\\/script>');}</script><script>window.PCM_DASHBOARD_INITIAL=<%- JSON.stringify(d) %>;window.PCM_DASHBOARD_ENDPOINTS={base:<%- JSON.stringify(basePath) %>,data:<%- JSON.stringify(basePath+'/dados') %>,pdf:<%- JSON.stringify(basePath+'/pdf') %>};</script><script src="/js/pcm-dashboard.js?v=20260920-v9" defer></script>
+<script src="/vendor/chart.js/chart.umd.js?v=4.4.7"></script><script>if(typeof Chart==="undefined"){document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"><\\/script>');}</script><script>window.PCM_DASHBOARD_INITIAL=<%- JSON.stringify(d) %>;window.PCM_DASHBOARD_ENDPOINTS={base:<%- JSON.stringify(basePath) %>,data:<%- JSON.stringify(basePath+'/dados') %>,pdf:<%- JSON.stringify(basePath+'/pdf') %>};</script><script src="/js/pcm-dashboard.js?v=20260920-v10" defer></script>
