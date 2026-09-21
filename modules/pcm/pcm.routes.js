@@ -55,6 +55,7 @@ router.post("/falhas/:osId/classificar", requireLogin, requireRole(PCM_MANAGE), 
 router.post("/engenharia/componentes", requireLogin, requireRole(PCM_MANAGE), ctrl.adicionarComponente);
 router.post("/engenharia/criticidade", requireLogin, requireRole(PCM_MANAGE), ctrl.salvarCriticidade);
 router.post("/lubrificacao/pontos", requireLogin, requireRole(PCM_MANAGE), ctrl.adicionarLubrificacao);
+router.post("/lubrificacao/:id/distribuir", requireLogin, requireRole(PCM_MANAGE), ctrl.distribuirLubrificacao);
 router.post("/lubrificacao/sugerir-ia", requireLogin, requireRole(PCM_MANAGE), ctrl.sugerirPlanoLubrificacaoIA);
 router.post("/lubrificacao/aplicar-sugestao-ia", requireLogin, requireRole(PCM_MANAGE), ctrl.aplicarSugestaoLubrificacaoIA);
 router.post("/programacao-semanal/salvar", requireLogin, requireRole(PCM_MANAGE), ctrl.salvarProgramacao);
