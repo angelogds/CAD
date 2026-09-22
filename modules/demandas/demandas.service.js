@@ -282,11 +282,25 @@ function updateStatus(id, { status, responsavel_user_id, user_id }) {
   `).run(id, user_id || null, `Status atualizado para ${st}`);
 }
 
+function materiaisDisponiveisParaExecucao(demanda) {
+  const requests = Array.isArray(demanda?.solicitacoes) ? demanda.solicitacoes : [];
+  const relevantes = requests.filter((item) => !['CANCELADA'].includes(String(item.status || '').toUpperCase()));
+  if (!relevantes.length) return true;
+  const readyStatuses = new Set(['RECEBIDA_TOTAL', 'SEPARADA_PARA_RETIRADA', 'ENTREGUE_SOLICITANTE', 'FECHADA']);
+  return relevantes.every((item) => readyStatuses.has(String(item.status || '').toUpperCase()));
+}
+
 function updateApproval(id, { aprovacao_status, user_id }) {
   const status = String(aprovacao_status || '').trim().toUpperCase();
   if (!['PENDENTE', 'APROVADA', 'REPROVADA'].includes(status)) throw new Error('Situação de aprovação inválida.');
   const current = getById(id);
   if (!current) throw new Error('Demanda não encontrada');
+
+  if (status === 'APROVADA' && !materiaisDisponiveisParaExecucao(current)) {
+    const error = new Error('Os materiais desta Demanda ainda não estão disponíveis na empresa. Conclua o recebimento ou a separação pelo estoque antes de aprovar a execução do serviço.');
+    error.code = 'DEMANDA_MATERIAIS_NAO_DISPONIVEIS';
+    throw error;
+  }
 
   db.transaction(() => {
     db.prepare('UPDATE demandas SET aprovacao_status=?, updated_at=datetime(\'now\') WHERE id=?').run(status, id);
@@ -522,6 +536,7 @@ module.exports = {
   create,
   updateStatus,
   updateApproval,
+  materiaisDisponiveisParaExecucao,
   updatePurchaseRelease,
   addUpdate,
   createMaterialPlanning,
