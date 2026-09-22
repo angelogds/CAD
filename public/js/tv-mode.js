@@ -538,8 +538,6 @@
     const lubrication = g.lubrificacao_semana || {};
     const lubricationSummary = lubrication.resumo || {};
     const lubricationDays = items(lubrication.dias).slice(0, 7);
-    const failures = items(g.falhas_equipamento).slice(0, 5);
-    const maxFailures = Math.max(1, ...failures.map((item) => Number(item.falhas || 0)));
     const reliabilityTone = reliability.status === 'CONFIAVEL' ? 'success' : reliability.status === 'PARCIAL' ? 'warning' : 'danger';
     const lubricationProgress = Number(lubricationSummary.programadas || 0)
       ? `${Number(lubricationSummary.concluidas || 0)}/${Number(lubricationSummary.programadas || 0)}`
@@ -578,14 +576,6 @@
         </tr>`;
     }).join('');
 
-    const failureRows = failures.map((item, index) => `
-      <div class="tv-management-row tv-management-row--failure">
-        <span class="tv-management-rank">#${index + 1}</span>
-        <div><strong>${esc(item.nome || 'Equipamento')}</strong><small>${Number(item.reincidencias || 0)} reincidência(s) · ${esc(item.criticidade || 'N/D')}</small></div>
-        <i><b style="width:${Math.max(3, Number(item.falhas || 0) / maxFailures * 100)}%"></b></i>
-        <strong>${Number(item.falhas || 0)} falha(s)</strong>
-      </div>`).join('');
-
     return `<div class="screen management-screen section-stack">
       ${metrics([
         ['Backlog de OS', cards.backlog_os_atual || 0, 'warning', 'Pendências atuais'],
@@ -606,8 +596,8 @@
           </div>
           <div class="management-reliability-status ${reliabilityTone}"><strong>${esc(reliability.status_label || 'Dados insuficientes')}</strong><span>Os indicadores só aparecem quando a cobertura mínima de dados é atendida.</span></div>
         </article>
-        <div class="management-rankings">
-          <article class="panel management-lubrication">
+        <div class="management-rankings management-rankings--lubrication-only">
+          <article class="panel management-lubrication management-lubrication--expanded">
             <div class="panel-heading">
               <h2>Lubrificação da semana</h2>
               <span>${esc(lubrication.responsavel_nome ? `Responsável: ${lubrication.responsavel_nome}` : 'Responsável ainda não definido')} · ${esc(dateBR(lubrication.inicio))} a ${esc(dateBR(lubrication.fim))}</span>
@@ -618,10 +608,6 @@
                 <tbody>${lubricationRows || `<tr><td colspan="4">${empty('Nenhuma lubrificação programada para esta semana.')}</td></tr>`}</tbody>
               </table>
             </div>
-          </article>
-          <article class="panel">
-            <div class="panel-heading"><h2>Maior incidência de falhas</h2><span>Corretivas registradas</span></div>
-            <div class="management-list">${failureRows || empty('Sem falhas corretivas no período.')}</div>
           </article>
         </div>
       </div>
