@@ -38,7 +38,7 @@
   const purchaseReleaseStatus = String(demanda.liberacao_compras_status || 'PENDENTE').toUpperCase();
   const purchaseReleased = purchaseReleaseStatus === 'LIBERADA';
   const defaultMaterialPriority = ({ URGENTE: 'CRITICA', ALTA: 'ALTA', BAIXA: 'BAIXA' }[String(demanda.prioridade || '').toUpperCase()] || 'MEDIA');
-  const materialReadyStatuses = new Set(['RECEBIDA_TOTAL', 'ENTREGUE_SOLICITANTE', 'FECHADA']);
+  const materialReadyStatuses = new Set(['RECEBIDA_TOTAL', 'SEPARADA_PARA_RETIRADA', 'ENTREGUE_SOLICITANTE', 'FECHADA']);
   const materialsReady = materialRequests.length > 0 && materialRequests.every(item => materialReadyStatuses.has(String(item.status || '').toUpperCase()));
   const materialSituation = !materialRequests.length
     ? 'Sem materiais planejados'
@@ -47,6 +47,8 @@
       : purchaseReleased
         ? 'Compra / recebimento em andamento'
         : 'Aguardando liberação da compra';
+  const serviceReadyForOS = approvalReady && materialsReady;
+  const canApproveExecution = canApprove && !isFinished && materialsReady;
   const canPlanMaterials = canMaterials && !isFinished && !linkedOrders.length;
 %>
 
@@ -68,10 +70,12 @@
       <% if (!isFinished && canOpen) { %><a class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" href="/demandas/new?parent_id=<%= demanda.id %>">+ Subdemanda</a><% } %>
       <% if (linkedOrders.length) { %>
         <a class="demand-btn demand-btn-primary ui-btn ui-btn--primary" href="/os/<%= linkedOrders[0].id %>">Abrir OS #<%= linkedOrders[0].id %></a>
-      <% } else if (canConvert && !isFinished && approvalReady) { %>
-        <form method="POST" action="/demandas/<%= demanda.id %>/convert-to-os" onsubmit="return confirm('Gerar a Ordem de Serviço desta demanda? As solicitações de materiais existentes serão reaproveitadas sem duplicação.')">
+      <% } else if (canConvert && !isFinished && serviceReadyForOS) { %>
+        <form method="POST" action="/demandas/<%= demanda.id %>/convert-to-os" onsubmit="return confirm('Gerar a Ordem de Serviço desta demanda? Os materiais estão disponíveis e as solicitações existentes serão reaproveitadas sem duplicação.')">
           <button class="demand-btn demand-btn-primary ui-btn ui-btn--primary" type="submit">Gerar OS</button>
         </form>
+      <% } else if (canConvert && !isFinished && approvalReady && !materialsReady) { %>
+        <button class="demand-btn demand-btn-muted ui-btn ui-btn--secondary" type="button" disabled title="A OS será liberada quando os materiais planejados estiverem disponíveis.">Aguardando materiais</button>
       <% } else if (canConvert && !isFinished) { %>
         <button class="demand-btn demand-btn-muted ui-btn ui-btn--secondary" type="button" disabled title="A demanda precisa ser aprovada antes de gerar a OS.">Aguardando aprovação</button>
       <% } %>
@@ -152,11 +156,13 @@
               <strong>Aprovação / priorização</strong>
               <p>Esta decisão libera a futura geração da OS. Ela não interfere na compra dos materiais. <strong class="planning-inline-state"><%= materialSituation %>.</strong></p>
             </div>
-            <% if (canApprove && !isFinished) { %>
+            <% if (canApproveExecution) { %>
               <form class="planning-approval-form" method="POST" action="/demandas/<%= demanda.id %>/aprovacao">
                 <label><span>Situação</span><select name="aprovacao_status"><% ['PENDENTE','APROVADA','REPROVADA'].forEach(st => { %><option value="<%= st %>" <%= String(demanda.aprovacao_status || 'PENDENTE') === st ? 'selected' : '' %>><%= approvalLabel(st) %></option><% }) %></select></label>
                 <button class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" type="submit">Salvar aprovação</button>
               </form>
+            <% } else if (canApprove && !isFinished && !materialsReady) { %>
+              <span class="planning-decision-status warning">Aguardando materiais</span>
             <% } else { %>
               <span class="planning-decision-status"><%= approvalLabel(demanda.aprovacao_status) %></span>
             <% } %>
