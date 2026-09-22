@@ -38,6 +38,15 @@
   const purchaseReleaseStatus = String(demanda.liberacao_compras_status || 'PENDENTE').toUpperCase();
   const purchaseReleased = purchaseReleaseStatus === 'LIBERADA';
   const defaultMaterialPriority = ({ URGENTE: 'CRITICA', ALTA: 'ALTA', BAIXA: 'BAIXA' }[String(demanda.prioridade || '').toUpperCase()] || 'MEDIA');
+  const materialReadyStatuses = new Set(['RECEBIDA_TOTAL', 'ENTREGUE_SOLICITANTE', 'FECHADA']);
+  const materialsReady = materialRequests.length > 0 && materialRequests.every(item => materialReadyStatuses.has(String(item.status || '').toUpperCase()));
+  const materialSituation = !materialRequests.length
+    ? 'Sem materiais planejados'
+    : materialsReady
+      ? 'Materiais disponíveis na empresa'
+      : purchaseReleased
+        ? 'Compra / recebimento em andamento'
+        : 'Aguardando liberação da compra';
   const canPlanMaterials = canMaterials && !isFinished && !linkedOrders.length;
 %>
 
@@ -141,7 +150,7 @@
             <div class="planning-decision-copy">
               <small>Execução do serviço</small>
               <strong>Aprovação / priorização</strong>
-              <p>Esta decisão libera a futura geração da OS. Ela não interfere na compra dos materiais.</p>
+              <p>Esta decisão libera a futura geração da OS. Ela não interfere na compra dos materiais. <strong class="planning-inline-state"><%= materialSituation %>.</strong></p>
             </div>
             <% if (canApprove && !isFinished) { %>
               <form class="planning-approval-form" method="POST" action="/demandas/<%= demanda.id %>/aprovacao">
