@@ -16,7 +16,7 @@
     ['desempenho', 'Desempenho da equipe'],
     ['criticidade', 'Criticidade dos equipamentos'],
     ['materiais', 'Materiais e próximas demandas'],
-    ['gerencial', 'Indicadores gerenciais'],
+    ['gerencial', 'Indicadores e lubrificação'],
   ];
   const state = {
     data: null,
@@ -535,19 +535,48 @@
     const g = state.data?.gerencial || {};
     const cards = g.cards || {};
     const reliability = g.confiabilidade || {};
-    const costs = items(g.custos_equipamento).slice(0, 5);
+    const lubrication = g.lubrificacao_semana || {};
+    const lubricationSummary = lubrication.resumo || {};
+    const lubricationDays = items(lubrication.dias).slice(0, 7);
     const failures = items(g.falhas_equipamento).slice(0, 5);
-    const maxCost = Math.max(1, ...costs.map((item) => Number(item.consumido_centavos || 0)));
     const maxFailures = Math.max(1, ...failures.map((item) => Number(item.falhas || 0)));
     const reliabilityTone = reliability.status === 'CONFIAVEL' ? 'success' : reliability.status === 'PARCIAL' ? 'warning' : 'danger';
+    const lubricationProgress = Number(lubricationSummary.programadas || 0)
+      ? `${Number(lubricationSummary.concluidas || 0)}/${Number(lubricationSummary.programadas || 0)}`
+      : '0';
 
-    const costRows = costs.map((item, index) => `
-      <div class="tv-management-row">
-        <span class="tv-management-rank">#${index + 1}</span>
-        <div><strong>${esc(item.equipamento_nome || 'Equipamento')}</strong><small>Custo real consumido</small></div>
-        <i><b style="width:${Math.max(3, Number(item.consumido_centavos || 0) / maxCost * 100)}%"></b></i>
-        <strong>${esc(moneyBR(item.consumido_centavos))}</strong>
-      </div>`).join('');
+    const lubricationStatus = (value) => {
+      const key = plain(value).replace(/[\s-]+/g, '_');
+      const map = {
+        CONCLUIDA: ['Concluída', 'success'],
+        EM_ANDAMENTO: ['Em andamento', 'info'],
+        PENDENTE: ['Pendente', 'warning'],
+        ATRASADA: ['Atrasada', 'danger'],
+        ATENCAO: ['Atenção', 'danger'],
+        PROGRAMADA: ['Programada', 'neutral'],
+      };
+      return map[key] || [key.replaceAll('_', ' ') || 'Programada', 'neutral'];
+    };
+
+    const lubricationRows = lubricationDays.map((day) => {
+      const [statusLabel, statusTone] = lubricationStatus(day.status);
+      const dayLabel = day.data
+        ? new Date(`${String(day.data).slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })
+        : '-';
+      const equipamentos = items(day.equipamentos);
+      const equipmentLabel = equipamentos.slice(0, 2).join(' • ');
+      const extra = equipamentos.length > 2 ? ` +${equipamentos.length - 2}` : '';
+      return `
+        <tr>
+          <td><strong>${esc(dayLabel)}</strong></td>
+          <td>
+            <strong>${esc((equipmentLabel || 'Sem equipamento') + extra)}</strong>
+            <small>${Number(day.total_equipamentos || 0)} equipamento(s) · ${Number(day.total_pontos || 0)} ponto(s)</small>
+          </td>
+          <td>${esc(lubrication.responsavel_nome || 'A definir')}</td>
+          <td><span class="tv-lubrication-status ${statusTone}">${esc(statusLabel)}</span></td>
+        </tr>`;
+    }).join('');
 
     const failureRows = failures.map((item, index) => `
       <div class="tv-management-row tv-management-row--failure">
@@ -563,7 +592,7 @@
         ['Backlog > 30 dias', cards.backlog_acima_30_dias || 0, 'danger', 'Envelhecimento crítico'],
         ['Preventivas', `${numberBR(cards.percentual_preventiva || 0)}%`, 'success', 'Participação no período'],
         ['Corretivas', `${numberBR(cards.percentual_corretiva || 0)}%`, 'warning', 'Participação no período'],
-        ['Custo consumido', moneyBR(cards.custo_consumido_centavos), 'info', 'Baixas reais do estoque'],
+        ['Lubrificação semana', lubricationProgress, 'info', 'Concluídas / programadas'],
         ['Qualidade dos dados', cards.qualidade_dados_pct == null ? 'Dados insuficientes' : `${numberBR(cards.qualidade_dados_pct)}%`, reliabilityTone, reliability.status_label || 'Base de confiabilidade'],
       ])}
       <div class="management-layout">
@@ -578,9 +607,17 @@
           <div class="management-reliability-status ${reliabilityTone}"><strong>${esc(reliability.status_label || 'Dados insuficientes')}</strong><span>Os indicadores só aparecem quando a cobertura mínima de dados é atendida.</span></div>
         </article>
         <div class="management-rankings">
-          <article class="panel">
-            <div class="panel-heading"><h2>Maior custo real</h2><span>Materiais efetivamente consumidos</span></div>
-            <div class="management-list">${costRows || empty('Sem consumo real registrado no período.')}</div>
+          <article class="panel management-lubrication">
+            <div class="panel-heading">
+              <h2>Lubrificação da semana</h2>
+              <span>${esc(lubrication.responsavel_nome ? `Responsável: ${lubrication.responsavel_nome}` : 'Responsável ainda não definido')} · ${esc(dateBR(lubrication.inicio))} a ${esc(dateBR(lubrication.fim))}</span>
+            </div>
+            <div class="tv-lubrication-table-wrap">
+              <table class="tv-lubrication-table">
+                <thead><tr><th>Dia</th><th>Programação</th><th>Responsável</th><th>Status</th></tr></thead>
+                <tbody>${lubricationRows || `<tr><td colspan="4">${empty('Nenhuma lubrificação programada para esta semana.')}</td></tr>`}</tbody>
+              </table>
+            </div>
           </article>
           <article class="panel">
             <div class="panel-heading"><h2>Maior incidência de falhas</h2><span>Corretivas registradas</span></div>
