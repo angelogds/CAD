@@ -82,7 +82,7 @@
         demandLink.className = 'demand-prequote-demand-link';
         demandLink.textContent = `Demanda #${row.demanda_id} — ${row.demanda_titulo || 'Abrir demanda'}`;
         const meta = document.createElement('small');
-        const details = [row.equipamento_nome || '', row.nr_referencia ? `NR: ${row.nr_referencia}` : '', row.aprovacao_status ? `Aprovação: ${row.aprovacao_status}` : ''].filter(Boolean);
+        const details = [row.prioridade ? `Criticidade: ${row.prioridade}` : '', row.equipamento_nome || '', row.nr_referencia ? `NR: ${row.nr_referencia}` : '', row.aprovacao_status ? `Execução: ${row.aprovacao_status}` : ''].filter(Boolean);
         meta.textContent = details.join(' • ') || 'Demanda em planejamento';
         main.append(requestLink, demandLink, meta);
 
