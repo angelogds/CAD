@@ -48,7 +48,11 @@ function listPreCotacoesDemandas(limit = 12) {
       AND UPPER(COALESCE(s.status, 'ABERTA')) NOT IN ('CANCELADA','FECHADA','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE')
     GROUP BY s.id
     ORDER BY
-      CASE UPPER(COALESCE(d.prioridade, 'NORMAL')) WHEN 'URGENTE' THEN 0 WHEN 'ALTA' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END,
+      CASE UPPER(COALESCE(s.prioridade, d.prioridade, 'MEDIA'))
+        WHEN 'CRITICA' THEN 0 WHEN 'CRÍTICA' THEN 0 WHEN 'URGENTE' THEN 0
+        WHEN 'ALTA' THEN 1 WHEN 'MEDIA' THEN 2 WHEN 'MÉDIA' THEN 2 WHEN 'NORMAL' THEN 2
+        WHEN 'BAIXA' THEN 3 ELSE 4
+      END,
       datetime(COALESCE(s.updated_at, s.created_at)) DESC,
       s.id DESC
     LIMIT ?
