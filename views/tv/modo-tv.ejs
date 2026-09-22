@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#087443">
   <title><%= title || 'Modo TV — Oficina' %></title>
   <link rel="stylesheet" href="/css/tv-mode.css">
-  <link rel="stylesheet" href="/css/tv-mode-2026.css">
+  <link rel="stylesheet" href="/css/tv-mode-2026.css?v=20260922-mascote-v7">
   <link rel="stylesheet" href="/css/tv-screens-2026.css?v=20260922-lubrificacao-tv-v6">
   <link rel="stylesheet" href="/css/tv-material-alerts.css">
 </head>
@@ -79,6 +79,17 @@
     </div>
   </section>
 
+  <section id="tvMascotBreak" class="tv-mascot-break" hidden aria-hidden="true">
+    <div class="tv-mascot-break-card">
+      <video id="tvMascotVideo" muted playsinline preload="auto"></video>
+      <div class="tv-mascot-break-copy">
+        <span>MANUTENÇÃO INDUSTRIAL</span>
+        <strong id="tvMascotTitle">Manutenção Campo do Gado</strong>
+        <p id="tvMascotSubtitle">Segurança, disponibilidade e confiabilidade para a operação.</p>
+      </div>
+    </div>
+  </section>
+
   <audio id="tvAudioNew" preload="auto" src="/audio/os-nova.mp3"></audio>
   <audio id="tvAudioCritical" preload="auto" src="/audio/os-critica.mp3"></audio>
 </div>
@@ -93,7 +104,7 @@
     criticalAlertMs: 25000
   };
 </script>
-<script src="/js/tv-mode.js?v=20260922-lubrificacao-tv-v6"></script>
+<script src="/js/tv-mode.js?v=20260922-mascote-v7"></script>
 <script src="/js/tv-voice-assistant.js"></script>
 <script src="/js/tv-material-alerts.js"></script>
 <script src="/js/tv-screens-2026.js?v=20260922-lubrificacao-tv-v6"></script>
