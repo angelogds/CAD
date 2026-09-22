@@ -339,11 +339,11 @@ function updatePurchaseRelease(id, { liberacao_compras_status, user_id }) {
   const values = [status];
 
   if (hasColumn('demandas', 'liberacao_compras_em')) {
-    sets.push("liberacao_compras_em=CASE WHEN ?='LIBERADA' THEN datetime('now') ELSE liberacao_compras_em END");
+    sets.push("liberacao_compras_em=CASE WHEN ?='LIBERADA' THEN datetime('now') ELSE NULL END");
     values.push(status);
   }
   if (hasColumn('demandas', 'liberacao_compras_por')) {
-    sets.push("liberacao_compras_por=CASE WHEN ?='LIBERADA' THEN ? ELSE liberacao_compras_por END");
+    sets.push("liberacao_compras_por=CASE WHEN ?='LIBERADA' THEN ? ELSE NULL END");
     values.push(status, user_id || null);
   }
 
