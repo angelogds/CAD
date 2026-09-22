@@ -187,8 +187,11 @@ function getById(id) {
     const quotedExpr = tableExists('solicitacao_itens') && hasColumn('solicitacao_itens', 'status_cotacao')
       ? "SUM(CASE WHEN COALESCE(si.status_cotacao,'PENDENTE') <> 'PENDENTE' THEN 1 ELSE 0 END)"
       : '0';
+    const solicitationPriorityExpr = hasColumn('solicitacoes', 'prioridade')
+      ? "s.prioridade"
+      : "'MEDIA' AS prioridade";
     solicitacoes = db.prepare(`
-      SELECT s.id, s.numero, s.titulo, s.status, s.prioridade, s.os_id, s.created_at,
+      SELECT s.id, s.numero, s.titulo, s.status, ${solicitationPriorityExpr}, s.os_id, s.created_at,
              COUNT(si.id) AS itens_count,
              ${quotedExpr} AS itens_cotados
       FROM solicitacoes s
