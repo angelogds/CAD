@@ -118,6 +118,28 @@ function updateApproval(req, res) {
   return res.redirect(`/demandas/${id}`);
 }
 
+function updatePurchaseRelease(req, res) {
+  const id = Number(req.params.id);
+  try {
+    const result = service.updatePurchaseRelease(id, {
+      liberacao_compras_status: req.body.liberacao_compras_status,
+      user_id: req.session?.user?.id || null,
+    });
+    const status = String(result?.liberacao_compras_status || 'PENDENTE').toUpperCase();
+    req.flash(
+      'success',
+      status === 'LIBERADA'
+        ? 'Compra dos materiais liberada. As solicitações saíram da pré-cotação e podem seguir o fluxo normal de Compras.'
+        : status === 'BLOQUEADA'
+          ? 'Compra dos materiais bloqueada no Planejamento.'
+          : 'Liberação de compras mantida pendente.'
+    );
+  } catch (e) {
+    req.flash('error', e.message || 'Erro ao atualizar liberação de compras.');
+  }
+  return res.redirect(`/demandas/${id}#planejamento`);
+}
+
 function addUpdate(req, res) {
   const id = Number(req.params.id);
   try {
@@ -136,6 +158,7 @@ function addMaterials(req, res) {
     const solicitacaoId = service.createMaterialPlanning(id, {
       user: req.session?.user || {},
       itens,
+      prioridade: req.body.prioridade_solicitacao,
     });
     req.flash('success', `Planejamento de materiais criado na solicitação #${solicitacaoId} e enviado para pré-cotação em Compras.`);
   } catch (e) {
@@ -199,6 +222,7 @@ module.exports = {
   show,
   updateStatus,
   updateApproval,
+  updatePurchaseRelease,
   addUpdate,
   addMaterials,
   appendMaterials,
