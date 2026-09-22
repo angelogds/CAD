@@ -7,6 +7,7 @@ const service = require('../modules/tv/tv.service');
 const view = () => fs.readFileSync('views/tv/modo-tv.ejs', 'utf8');
 const source = () => fs.readFileSync('public/js/tv-mode.js', 'utf8');
 const css = () => fs.readFileSync('public/css/tv-mode.css', 'utf8');
+const css2026 = () => fs.readFileSync('public/css/tv-mode-2026.css', 'utf8');
 
 test('rota oficial /tv, redirect legado e stream pertencem ao módulo oficial', () => {
   const routes = fs.readFileSync('modules/tv/tv.routes.js', 'utf8');
@@ -27,7 +28,7 @@ test('tela oficial possui sete seções, ticker e não possui ações operaciona
 
 test('painel inicia imediatamente e ativação libera somente recursos do navegador', () => {
   const js = source();
-  assert.match(js, /state\.active = true;[\s\S]*fetchSnapshot\(\{ detectNew: false \}\);[\s\S]*scheduleRotation\(ROTATION_MS\);[\s\S]*startSnapshotPolling\(\);[\s\S]*connectStream\(\);/);
+  assert.match(js, /state\.active = true;[\s\S]*fetchSnapshot\(\{ detectNew: false \}\);[\s\S]*playMascotBreak\(0,[\s\S]*scheduleRotation\(ROTATION_MS\);[\s\S]*startSnapshotPolling\(\);[\s\S]*connectStream\(\);/);
   assert.match(js, /localStorage\.setItem\('cgTvSound', 'on'\)/);
   assert.match(js, /requestFullscreen/);
   assert.match(js, /requestWakeLock\(\)/);
@@ -45,6 +46,20 @@ test('rotação, atualização, fallback e alertas usam os intervalos especifica
   assert.match(source(), /startFastPolling/);
   assert.match(source(), /pauseRotation\(\)/);
   assert.match(source(), /resumeRotation\(\)/);
+});
+
+test('mascote aparece somente como intervalo antes da Tela 1 e depois da Tela 2', () => {
+  const html = view();
+  const js = source();
+  assert.match(html, /id="tvMascotBreak"/);
+  assert.match(html, /id="tvMascotVideo"/);
+  assert.match(js, /\/media\/mascote\/mascote-tv-01\.mp4/);
+  assert.match(js, /\/media\/mascote\/mascote-tv-02\.mp4/);
+  assert.match(js, /if \(state\.index === 1\)[\s\S]*playMascotBreak\(1,[\s\S]*state\.index = 2/);
+  assert.match(js, /if \(state\.index === screens\.length - 1\)[\s\S]*playMascotBreak\(0,[\s\S]*state\.index = 0/);
+  assert.match(js, /Abertura do ciclo: vídeo do mascote antes da Tela 1/);
+  assert.match(css2026(), /\.tv-mascot-break\{/);
+  assert.equal((html.match(/data-tv-screen=/g) || []).length, 7);
 });
 
 test('normalização central trata encerradas, canceladas, emergencial e urgente', () => {
