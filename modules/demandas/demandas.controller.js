@@ -194,8 +194,14 @@ function assertDemandApprovedForNewOS(demanda) {
 
   const approval = String(demanda.aprovacao_status || 'PENDENTE').trim().toUpperCase();
   if (approval !== 'APROVADA') {
-    const error = new Error('A Demanda precisa ser aprovada pela Diretoria/Gestão antes de gerar uma Ordem de Serviço. A pré-cotação pode continuar normalmente enquanto aguarda aprovação.');
+    const error = new Error('A Demanda precisa ser aprovada pela Diretoria/Gestão antes de gerar uma Ordem de Serviço. A compra dos materiais pode continuar normalmente enquanto aguarda aprovação.');
     error.code = 'DEMANDA_AGUARDANDO_APROVACAO';
+    throw error;
+  }
+
+  if (!service.materiaisDisponiveisParaExecucao(demanda)) {
+    const error = new Error('A Ordem de Serviço só pode ser gerada quando os materiais planejados estiverem disponíveis na empresa.');
+    error.code = 'DEMANDA_MATERIAIS_NAO_DISPONIVEIS';
     throw error;
   }
 }
