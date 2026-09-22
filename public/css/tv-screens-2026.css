@@ -518,7 +518,8 @@
 /* Modo TV v4 — tela gerencial integrada ao PCM */
 .management-screen{gap:10px}
 .management-layout{display:grid;grid-template-columns:1.15fr .85fr;gap:10px;min-height:0}
-.management-rankings{display:grid;grid-template-rows:1.18fr .82fr;gap:10px;min-height:0}
+.management-rankings{display:grid;grid-template-rows:1fr;gap:10px;min-height:0}
+.management-rankings--lubrication-only{height:100%}
 .management-reliability{display:grid;grid-template-rows:auto auto auto;gap:10px;min-height:0}
 .management-reliability-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .management-reliability-grid>div{display:grid;gap:4px;padding:13px;border:1px solid var(--line);border-radius:12px;background:#fbfdfc}
@@ -542,6 +543,14 @@
 .tv-management-row--failure>i b{background:linear-gradient(90deg,var(--orange),#d92d20)}
 .tv-management-row>strong{white-space:nowrap;font-size:.9em}
 .management-lubrication{min-height:0;overflow:hidden}
+.management-lubrication--expanded{height:100%;display:grid;grid-template-rows:auto 1fr}
+.management-lubrication--expanded .tv-lubrication-table-wrap{height:100%}
+.management-lubrication--expanded .tv-lubrication-table{height:100%;font-size:.86em}
+.management-lubrication--expanded .tv-lubrication-table thead{height:42px}
+.management-lubrication--expanded .tv-lubrication-table tbody tr{height:clamp(62px,8vh,88px)}
+.management-lubrication--expanded .tv-lubrication-table td{padding:12px 10px}
+.management-lubrication--expanded .tv-lubrication-table td>strong{font-size:1.05em}
+.management-lubrication--expanded .tv-lubrication-table td>small{font-size:.9em}
 .tv-lubrication-table-wrap{min-height:0;overflow:hidden;border:1px solid var(--line);border-radius:12px}
 .tv-lubrication-table{width:100%;border-collapse:collapse;font-size:.77em}
 .tv-lubrication-table th{padding:7px 8px;text-align:left;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-size:.78em;background:#f5f8f6;border-bottom:1px solid var(--line)}
@@ -562,5 +571,5 @@
 
 @media(max-width:1180px){
   .management-layout{grid-template-columns:1fr}
-  .management-rankings{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto}
+  .management-rankings{grid-template-columns:1fr;grid-template-rows:auto}
 }
