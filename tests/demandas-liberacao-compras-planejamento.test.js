@@ -53,3 +53,27 @@ test('solicitação criada pela Demanda recebe criticidade explícita', () => {
   assert.match(service, /\['CRITICA', 'ALTA', 'MEDIA', 'BAIXA'\]/);
   assert.match(prequoteJs, /Criticidade:/);
 });
+
+
+test('execução da Demanda aguarda materiais quando existe solicitação ativa', () => {
+  const service = read('modules/demandas/demandas.service.js');
+  const controller = read('modules/demandas/demandas.controller.js');
+  const view = read('views/demandas/view.ejs');
+
+  assert.match(service, /function materiaisDisponiveisParaExecucao/);
+  assert.match(service, /RECEBIDA_TOTAL/);
+  assert.match(service, /SEPARADA_PARA_RETIRADA/);
+  assert.match(service, /ENTREGUE_SOLICITANTE/);
+  assert.match(service, /DEMANDA_MATERIAIS_NAO_DISPONIVEIS/);
+  assert.match(controller, /A Ordem de Serviço só pode ser gerada quando os materiais planejados estiverem disponíveis na empresa/);
+  assert.match(view, /Aguardando materiais/);
+  assert.match(view, /serviceReadyForOS/);
+});
+
+test('Demanda sem solicitação de material continua podendo seguir para execução', () => {
+  const service = read('modules/demandas/demandas.service.js');
+  const view = read('views/demandas/view.ejs');
+
+  assert.match(service, /if \(!relevantes\.length\) return true/);
+  assert.match(view, /materialRequestsForExecution\.length === 0/);
+});
