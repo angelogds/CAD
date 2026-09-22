@@ -644,12 +644,91 @@
     $('tvScreenIndicator').textContent = `Tela ${state.index + 1} de ${screens.length}`;
   }
 
+  const mascotBreaks = [
+    {
+      src: '/media/mascote/mascote-tv-01.mp4',
+      title: 'Manutenção Campo do Gado',
+      subtitle: 'Segurança, disponibilidade e confiabilidade para a operação.',
+    },
+    {
+      src: '/media/mascote/mascote-tv-02.mp4',
+      title: 'Manutenção Campo do Gado',
+      subtitle: 'Manutenção presente. Produção disponível. Trabalho seguro.',
+    },
+  ];
+
+  function playMascotBreak(index, onDone) {
+    const panel = $('tvMascotBreak');
+    const video = $('tvMascotVideo');
+    const item = mascotBreaks[index];
+    if (!panel || !video || !item) {
+      onDone?.();
+      return;
+    }
+
+    let finished = false;
+    let fallbackTimer = null;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(fallbackTimer);
+      video.onended = null;
+      video.onerror = null;
+      video.pause();
+      panel.classList.remove('is-visible');
+      panel.hidden = true;
+      panel.setAttribute('aria-hidden', 'true');
+      onDone?.();
+    };
+
+    $('tvMascotTitle').textContent = item.title;
+    $('tvMascotSubtitle').textContent = item.subtitle;
+    panel.hidden = false;
+    panel.setAttribute('aria-hidden', 'false');
+    panel.classList.add('is-visible');
+    video.muted = true;
+    video.defaultMuted = true;
+    video.src = item.src;
+    video.currentTime = 0;
+    video.onended = finish;
+    video.onerror = finish;
+    video.load();
+
+    const attempt = video.play();
+    if (attempt && typeof attempt.catch === 'function') attempt.catch(() => {});
+    fallbackTimer = setTimeout(finish, 12000);
+  }
+
   function scheduleRotation(delay = state.rotationRemaining || ROTATION_MS) {
     clearTimeout(state.rotationTimer);
     state.rotationRemaining = delay;
     state.rotationStarted = Date.now();
     state.rotationTimer = setTimeout(() => {
-      state.index = (state.index + 1) % screens.length;
+      state.rotationTimer = null;
+
+      // Depois da Tela 2, entra o segundo vídeo antes de seguir para a Tela 3.
+      if (state.index === 1) {
+        playMascotBreak(1, () => {
+          state.index = 2;
+          state.rotationRemaining = ROTATION_MS;
+          renderAll();
+          scheduleRotation(ROTATION_MS);
+        });
+        return;
+      }
+
+      // Ao finalizar a Tela 7, o primeiro vídeo abre o próximo ciclo antes da Tela 1.
+      if (state.index === screens.length - 1) {
+        playMascotBreak(0, () => {
+          state.index = 0;
+          state.rotationRemaining = ROTATION_MS;
+          renderAll();
+          scheduleRotation(ROTATION_MS);
+        });
+        return;
+      }
+
+      state.index += 1;
       state.rotationRemaining = ROTATION_MS;
       renderAll();
       scheduleRotation(ROTATION_MS);
@@ -765,7 +844,14 @@
 
     state.active = true;
     fetchSnapshot({ detectNew: false });
-    scheduleRotation(ROTATION_MS);
+
+    // Abertura do ciclo: vídeo do mascote antes da Tela 1.
+    playMascotBreak(0, () => {
+      state.index = 0;
+      state.rotationRemaining = ROTATION_MS;
+      renderAll();
+      scheduleRotation(ROTATION_MS);
+    });
     startProgress();
     startSnapshotPolling();
     connectStream();
