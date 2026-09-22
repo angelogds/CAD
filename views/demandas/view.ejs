@@ -147,8 +147,8 @@
           <div class="progress-step <%= ['PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA'].includes(demanda.status) ? 'done' : '' %>"><span>2</span><div><strong>Planejamento</strong><small><%= materialRequests.length ? materialRequests.length + ' solicitação(ões)' : 'Sem materiais' %></small></div></div>
           <i class="<%= approvalReady || linkedOrders.length ? 'done' : '' %>"></i>
           <div class="progress-step <%= approvalReady || linkedOrders.length ? 'done' : '' %>"><span>3</span><div><strong>Aprovação</strong><small><%= approvalLabel(demanda.aprovacao_status) %></small></div></div>
-          <i class="<%= linkedOrders.length || demanda.started_at isFinished ? 'done' : '' %>"></i>
-          <div class="progress-step <%= linkedOrders.length || demanda.started_at isFinished ? 'done' : '' %>"><span>4</span><div><strong>OS / execução</strong><small><%= linkedOrders.length ? linkedOrders.length + ' OS' : 'Aguardando' %></small></div></div>
+          <i class="<%= linkedOrders.length || demanda.started_at || isFinished ? 'done' : '' %>"></i>
+          <div class="progress-step <%= linkedOrders.length || demanda.started_at || isFinished ? 'done' : '' %>"><span>4</span><div><strong>OS / execução</strong><small><%= linkedOrders.length ? linkedOrders.length + ' OS' : 'Aguardando' %></small></div></div>
         </div>
       </section>
     </section>
