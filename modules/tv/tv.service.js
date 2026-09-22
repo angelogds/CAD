@@ -1,5 +1,6 @@
 const db = require('../../database/db');
 const manutencaoExecutivaService = require('../diretoria/diretoria.manutencao.service');
+const lubrificacaoSemanaService = require('../lubrificacao/lubrificacao-semana.service');
 
 const MANAGEMENT_CACHE_TTL_MS = 60000;
 let managementCache = { at: 0, data: null };
@@ -390,6 +391,120 @@ async function getWeather() {
   try { return await require('./weather.service').getWeather(); }
   catch (error) { warn('clima indisponível', error); return { available: false, city: 'Feira de Santana - Campo do Gado', week: [] }; }
 }
+function addDaysIso(dateIso, days) {
+  const date = new Date(`${dateIso}T12:00:00`);
+  date.setDate(date.getDate() + Number(days || 0));
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeLubricationStatus(value, data, hoje) {
+  const raw = semAcentos(value).replace(/[\s-]+/g, '_');
+  if (['FECHADA', 'FINALIZADA', 'CONCLUIDA', 'CONCLUÍDA'].includes(raw)) return 'CONCLUIDA';
+  if (['ANDAMENTO', 'EM_ANDAMENTO', 'EM_EXECUCAO', 'EXECUTANDO'].includes(raw)) return 'EM_ANDAMENTO';
+  if (['ERRO', 'ERRO_ATRIBUICAO'].includes(raw)) return 'ATENCAO';
+  if (raw && !['PROCESSANDO', 'GERADA'].includes(raw)) return raw;
+  if (data < hoje) return 'ATRASADA';
+  if (data === hoje) return 'PENDENTE';
+  return 'PROGRAMADA';
+}
+
+function getLubrificacaoSemanaTV() {
+  const fallback = {
+    inicio: null,
+    fim: null,
+    responsavel_nome: null,
+    resumo: { programadas: 0, concluidas: 0, andamento: 0, atrasadas: 0, executadas_semana: 0 },
+    dias: [],
+  };
+
+  try {
+    const relatorio = lubrificacaoSemanaService.getRelatorioSemana();
+    const inicio = relatorio?.inicio || relatorio?.resumo?.semana_inicio || null;
+    const fim = relatorio?.fim || relatorio?.resumo?.semana_fim || null;
+    const hoje = relatorio?.resumo?.semana_inicio
+      ? lubrificacaoSemanaService.getWeekBounds().referencia
+      : new Date().toISOString().slice(0, 10);
+    if (!inicio) return fallback;
+
+    const programadas = new Map(
+      (relatorio.osProgramadas || []).map((item) => [
+        `${item.data_programada}:${Number(item.equipamento_id || 0)}`,
+        item,
+      ])
+    );
+
+    const dias = [];
+    const atividades = [];
+
+    for (let offset = 0; offset < 7; offset += 1) {
+      const data = addDaysIso(inicio, offset);
+      const grupos = lubrificacaoSemanaService.groupedOSDoDia(data);
+      if (!grupos.length) continue;
+
+      const itensDia = grupos.map((grupo) => {
+        const programada = programadas.get(`${data}:${Number(grupo.equipamento_id || 0)}`) || null;
+        const status = normalizeLubricationStatus(
+          programada?.os_status || programada?.status || '',
+          data,
+          hoje
+        );
+        const pontos = (grupo.pontos || []).map((ponto) => ponto.ponto_lubrificacao).filter(Boolean);
+        const item = {
+          data,
+          equipamento_id: Number(grupo.equipamento_id || 0),
+          equipamento_nome: grupo.equipamento_nome || 'Equipamento não informado',
+          setor: grupo.setor || '',
+          total_pontos: pontos.length,
+          pontos: pontos.slice(0, 4),
+          os_id: programada?.os_id ? Number(programada.os_id) : null,
+          status,
+        };
+        atividades.push(item);
+        return item;
+      });
+
+      const statuses = itensDia.map((item) => item.status);
+      const statusDia = statuses.length && statuses.every((value) => value === 'CONCLUIDA')
+        ? 'CONCLUIDA'
+        : statuses.includes('ATENCAO')
+          ? 'ATENCAO'
+          : statuses.includes('ATRASADA')
+            ? 'ATRASADA'
+            : statuses.includes('EM_ANDAMENTO')
+              ? 'EM_ANDAMENTO'
+              : statuses.includes('PENDENTE')
+                ? 'PENDENTE'
+                : 'PROGRAMADA';
+
+      dias.push({
+        data,
+        total_equipamentos: itensDia.length,
+        total_pontos: itensDia.reduce((sum, item) => sum + Number(item.total_pontos || 0), 0),
+        equipamentos: itensDia.map((item) => item.equipamento_nome),
+        atividades: itensDia,
+        status: statusDia,
+      });
+    }
+
+    return {
+      inicio,
+      fim,
+      responsavel_nome: relatorio?.semana?.responsavel_nome || null,
+      resumo: {
+        programadas: atividades.length,
+        concluidas: atividades.filter((item) => item.status === 'CONCLUIDA').length,
+        andamento: atividades.filter((item) => item.status === 'EM_ANDAMENTO').length,
+        atrasadas: atividades.filter((item) => item.status === 'ATRASADA').length,
+        executadas_semana: Number(relatorio?.resumo?.executados_semana || 0),
+      },
+      dias,
+    };
+  } catch (error) {
+    warn('programação semanal de lubrificação indisponível', error);
+    return fallback;
+  }
+}
+
 function getManagementSnapshot({ force = false } = {}) {
   const now = Date.now();
   if (!force && managementCache.data && (now - managementCache.at) < MANAGEMENT_CACHE_TTL_MS) {
@@ -406,7 +521,6 @@ function getManagementSnapshot({ force = false } = {}) {
       percentual_corretiva: 0,
       percentual_preventiva: 0,
       cumprimento_programacao: 0,
-      custo_consumido_centavos: 0,
       qualidade_dados_pct: null,
     },
     confiabilidade: {
@@ -421,8 +535,8 @@ function getManagementSnapshot({ force = false } = {}) {
       status: 'DADOS_INSUFICIENTES',
       status_label: 'Dados insuficientes',
     },
-    custos_equipamento: [],
     falhas_equipamento: [],
+    lubrificacao_semana: getLubrificacaoSemanaTV(),
     atualizado_em: new Date().toISOString(),
   };
 
@@ -444,7 +558,6 @@ function getManagementSnapshot({ force = false } = {}) {
         percentual_corretiva: Number(cards.percentual_corretiva || 0),
         percentual_preventiva: Number(cards.percentual_preventiva || 0),
         cumprimento_programacao: Number(cards.cumprimento_programacao || 0),
-        custo_consumido_centavos: Number(cards.custo_consumido_centavos || 0),
         qualidade_dados_pct: cards.qualidade_dados_pct == null ? null : Number(cards.qualidade_dados_pct),
       },
       confiabilidade: {
@@ -459,11 +572,7 @@ function getManagementSnapshot({ force = false } = {}) {
         status: confiabilidade.status || 'DADOS_INSUFICIENTES',
         status_label: confiabilidade.status_label || 'Dados insuficientes',
       },
-      custos_equipamento: (dashboard?.graficos?.custos_equipamento || []).slice(0, 5).map((item) => ({
-        equipamento_id: item.equipamento_id || null,
-        equipamento_nome: item.equipamento_nome || 'Equipamento não informado',
-        consumido_centavos: Number(item.consumido_centavos || 0),
-      })),
+      lubrificacao_semana: getLubrificacaoSemanaTV(),
       falhas_equipamento: (dashboard?.graficos?.falhas_equipamento || []).slice(0, 5).map((item) => ({
         equipamento_id: item.equipamento_id || null,
         nome: item.nome || 'Equipamento não informado',
@@ -535,5 +644,6 @@ module.exports = {
   classificarMateriaisOS,
   getProximasDemandas,
   getManagementSnapshot,
+  getLubrificacaoSemanaTV,
   MANAGEMENT_CACHE_TTL_MS,
 };
