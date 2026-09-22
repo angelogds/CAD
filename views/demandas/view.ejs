@@ -1,13 +1,14 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/demandas.css">
-<link rel="stylesheet" href="/css/demandas-planejamento.css?v=20260903-v3">
+<link rel="stylesheet" href="/css/demandas-planejamento.css?v=20260922-compra-v4">
 <%
   const statusLabel = value => ({
     NOVA: 'Nova', EM_ANALISE: 'Em análise', PLANEJAMENTO: 'Planejamento',
     AGUARDANDO_APROVACAO: 'Aguardando aprovação', EM_ANDAMENTO: 'Em andamento',
     PARADA: 'Parada', CONCLUIDA: 'Concluída', CANCELADA: 'Cancelada'
   }[value] || value || 'Não informado');
-  const priorityLabel = value => ({ BAIXA: 'Baixa', NORMAL: 'Média', ALTA: 'Alta', URGENTE: 'Crítica' }[value] || value || 'Média');
+  const priorityLabel = value => ({ BAIXA: 'Baixa', NORMAL: 'Média', MEDIA: 'Média', ALTA: 'Alta', URGENTE: 'Crítica', CRITICA: 'Crítica' }[value] || value || 'Média');
+  const purchaseReleaseLabel = value => ({ PENDENTE: 'Pendente', LIBERADA: 'Liberada', BLOQUEADA: 'Bloqueada' }[value] || value || 'Pendente');
   const categoryLabel = value => ({
     MANUTENCAO: 'Manutenção', PRODUCAO: 'Produção', NR: 'NR', SEGURANCA: 'Segurança',
     AUDITORIA: 'Auditoria', MELHORIA: 'Melhoria', PROJETO: 'Projeto', DIRETORIA: 'Diretoria'
@@ -20,6 +21,7 @@
   const canMaterials = canAccessModule(normalizeRole(user?.role), 'demandas_materials');
   const canConvert = canAccessModule(normalizeRole(user?.role), 'demandas_convert');
   const canApprove = canAccessModule(normalizeRole(user?.role), 'demandas_approve');
+  const canReleasePurchase = canApprove;
   const elapsed = (() => {
     const start = new Date(demanda.created_at);
     const end = demanda.finished_at ? new Date(demanda.finished_at) : new Date();
@@ -33,6 +35,22 @@
   const children = Array.isArray(demanda.subdemandas) ? demanda.subdemandas : [];
   const money = value => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const approvalReady = String(demanda.aprovacao_status || 'PENDENTE').toUpperCase() === 'APROVADA';
+  const purchaseReleaseStatus = String(demanda.liberacao_compras_status || 'PENDENTE').toUpperCase();
+  const purchaseReleased = purchaseReleaseStatus === 'LIBERADA';
+  const defaultMaterialPriority = ({ URGENTE: 'CRITICA', ALTA: 'ALTA', BAIXA: 'BAIXA' }[String(demanda.prioridade || '').toUpperCase()] || 'MEDIA');
+  const materialReadyStatuses = new Set(['RECEBIDA_TOTAL', 'SEPARADA_PARA_RETIRADA', 'ENTREGUE_SOLICITANTE', 'FECHADA']);
+  const materialRequestsForExecution = materialRequests.filter(item => String(item.status || '').toUpperCase() !== 'CANCELADA');
+  const materialsReady = materialRequestsForExecution.length === 0
+    || materialRequestsForExecution.every(item => materialReadyStatuses.has(String(item.status || '').toUpperCase()));
+  const materialSituation = !materialRequests.length
+    ? 'Sem materiais planejados'
+    : materialsReady
+      ? 'Materiais disponíveis na empresa'
+      : purchaseReleased
+        ? 'Compra / recebimento em andamento'
+        : 'Aguardando liberação da compra';
+  const serviceReadyForOS = approvalReady && materialsReady;
+  const canApproveExecution = canApprove && !isFinished && materialsReady;
   const canPlanMaterials = canMaterials && !isFinished && !linkedOrders.length;
 %>
 
@@ -54,10 +72,12 @@
       <% if (!isFinished && canOpen) { %><a class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" href="/demandas/new?parent_id=<%= demanda.id %>">+ Subdemanda</a><% } %>
       <% if (linkedOrders.length) { %>
         <a class="demand-btn demand-btn-primary ui-btn ui-btn--primary" href="/os/<%= linkedOrders[0].id %>">Abrir OS #<%= linkedOrders[0].id %></a>
-      <% } else if (canConvert && !isFinished && approvalReady) { %>
-        <form method="POST" action="/demandas/<%= demanda.id %>/convert-to-os" onsubmit="return confirm('Gerar a Ordem de Serviço desta demanda? As solicitações de materiais existentes serão reaproveitadas sem duplicação.')">
+      <% } else if (canConvert && !isFinished && serviceReadyForOS) { %>
+        <form method="POST" action="/demandas/<%= demanda.id %>/convert-to-os" onsubmit="return confirm('Gerar a Ordem de Serviço desta demanda? Os materiais estão disponíveis e as solicitações existentes serão reaproveitadas sem duplicação.')">
           <button class="demand-btn demand-btn-primary ui-btn ui-btn--primary" type="submit">Gerar OS</button>
         </form>
+      <% } else if (canConvert && !isFinished && approvalReady && !materialsReady) { %>
+        <button class="demand-btn demand-btn-muted ui-btn ui-btn--secondary" type="button" disabled title="A OS será liberada quando os materiais planejados estiverem disponíveis.">Aguardando materiais</button>
       <% } else if (canConvert && !isFinished) { %>
         <button class="demand-btn demand-btn-muted ui-btn ui-btn--secondary" type="button" disabled title="A demanda precisa ser aprovada antes de gerar a OS.">Aguardando aprovação</button>
       <% } %>
@@ -131,12 +151,41 @@
           <div><small>Prazo previsto</small><strong><%= demanda.prazo_previsto ? fmtBR(demanda.prazo_previsto) : 'A definir' %></strong></div>
           <div><small>Serviços estimados</small><strong><%= money(demanda.custo_servicos_estimado) %></strong></div>
         </div>
-        <% if (canApprove && !isFinished) { %>
-          <form class="planning-approval-form" method="POST" action="/demandas/<%= demanda.id %>/aprovacao">
-            <label><span>Aprovação / priorização</span><select name="aprovacao_status"><% ['PENDENTE','APROVADA','REPROVADA'].forEach(st => { %><option value="<%= st %>" <%= String(demanda.aprovacao_status || 'PENDENTE') === st ? 'selected' : '' %>><%= approvalLabel(st) %></option><% }) %></select></label>
-            <button class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" type="submit">Salvar aprovação</button>
-          </form>
-        <% } %>
+        <div class="planning-decision-grid">
+          <div class="planning-decision-card">
+            <div class="planning-decision-copy">
+              <small>Execução do serviço</small>
+              <strong>Aprovação / priorização</strong>
+              <p>Esta decisão libera a futura geração da OS. Ela não interfere na compra dos materiais. <strong class="planning-inline-state"><%= materialSituation %>.</strong></p>
+            </div>
+            <% if (canApproveExecution) { %>
+              <form class="planning-approval-form" method="POST" action="/demandas/<%= demanda.id %>/aprovacao">
+                <label><span>Situação</span><select name="aprovacao_status"><% ['PENDENTE','APROVADA','REPROVADA'].forEach(st => { %><option value="<%= st %>" <%= String(demanda.aprovacao_status || 'PENDENTE') === st ? 'selected' : '' %>><%= approvalLabel(st) %></option><% }) %></select></label>
+                <button class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" type="submit">Salvar aprovação</button>
+              </form>
+            <% } else if (canApprove && !isFinished && !materialsReady) { %>
+              <span class="planning-decision-status warning">Aguardando materiais</span>
+            <% } else { %>
+              <span class="planning-decision-status"><%= approvalLabel(demanda.aprovacao_status) %></span>
+            <% } %>
+          </div>
+
+          <div class="planning-decision-card purchase-release-card <%= purchaseReleased ? 'is-released' : '' %>">
+            <div class="planning-decision-copy">
+              <small>Materiais / Compras</small>
+              <strong>Liberação da compra</strong>
+              <p><%= materialRequests.length ? 'Libere a solicitação para sair da pré-cotação e entrar na fila normal de Compras. Não é necessário gerar OS.' : 'Planeje os materiais primeiro. Depois a compra poderá ser liberada por aqui.' %></p>
+            </div>
+            <% if (canReleasePurchase && !isFinished && materialRequests.length) { %>
+              <form class="planning-approval-form purchase-release-form" method="POST" action="/demandas/<%= demanda.id %>/liberacao-compras">
+                <label><span>Situação</span><select name="liberacao_compras_status"><% ['PENDENTE','LIBERADA','BLOQUEADA'].forEach(st => { %><option value="<%= st %>" <%= purchaseReleaseStatus === st ? 'selected' : '' %>><%= purchaseReleaseLabel(st) %></option><% }) %></select></label>
+                <button class="demand-btn <%= purchaseReleased ? 'demand-btn-secondary ui-btn ui-btn--secondary' : 'demand-btn-primary ui-btn ui-btn--primary' %>" type="submit"><%= purchaseReleased ? 'Atualizar liberação' : 'Liberar para Compras' %></button>
+              </form>
+            <% } else { %>
+              <span class="planning-decision-status <%= purchaseReleased ? 'success' : '' %>"><%= purchaseReleaseLabel(purchaseReleaseStatus) %></span>
+            <% } %>
+          </div>
+        </div>
       </section>
 
       <section class="demand-card demand-progress-card">
@@ -165,16 +214,17 @@
 
       <section class="demand-card demand-data-card">
         <% if (!materialRequests.length) { %>
-          <div class="demand-empty demand-empty-compact"><span class="empty-icon">+</span><h3>Nenhum material planejado</h3><p>Adicione somente o que for necessário. A solicitação seguirá para pré-cotação e a compra continuará bloqueada até existir OS.</p></div>
+          <div class="demand-empty demand-empty-compact"><span class="empty-icon">+</span><h3>Nenhum material planejado</h3><p>Adicione somente o que for necessário. A solicitação seguirá para pré-cotação e aguardará a liberação de compra na aba Planejamento.</p></div>
         <% } else { %>
           <div class="demand-data-table demand-material-table" role="table" aria-label="Materiais e pré-cotações">
-            <div class="demand-data-row demand-data-head" role="row"><span>Solicitação</span><span>Status</span><span>Cotação</span><span>Vínculo</span><span>Ação</span></div>
+            <div class="demand-data-row demand-data-head" role="row"><span>Solicitação</span><span>Criticidade</span><span>Status</span><span>Cotação</span><span>Liberação</span><span>Ação</span></div>
             <% materialRequests.forEach(sol => { const total = Number(sol.itens_count || 0); const quoted = Number(sol.itens_cotados || 0); const pct = total ? Math.round(quoted / total * 100) : 0; %>
               <div class="demand-data-row" role="row">
                 <div data-label="Solicitação"><strong><%= sol.numero || '#'+sol.id %></strong><small><%= sol.titulo %></small></div>
+                <div data-label="Criticidade"><span class="demand-badge priority-<%= slug(sol.prioridade || 'MEDIA') %>"><%= priorityLabel(sol.prioridade || 'MEDIA') %></span></div>
                 <div data-label="Status"><span class="demand-badge status-<%= slug(sol.status) %>"><%= sol.status %></span></div>
                 <div data-label="Cotação" class="material-progress"><span><%= quoted %> de <%= total %> item(ns)</span><i><b style="width:<%= pct %>%"></b></i></div>
-                <div data-label="Vínculo"><strong><%= sol.os_id ? 'OS #' + sol.os_id : 'Pré-cotação' %></strong><small><%= sol.os_id ? 'Compra liberada pelo fluxo normal' : 'Compra aguardando OS' %></small></div>
+                <div data-label="Liberação"><strong><%= sol.os_id ? 'OS #' + sol.os_id : (purchaseReleased ? 'Compra liberada' : 'Pré-cotação') %></strong><small><%= sol.os_id ? 'Fluxo normal vinculado à OS' : (purchaseReleased ? 'Fila normal de Compras' : 'Aguardando liberação em Planejamento') %></small></div>
                 <div data-label="Ação" class="demand-row-action demand-material-actions">
                   <a class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" href="/compras/solicitacoes/<%= sol.id %>">Abrir</a>
                   <% if (canMaterials && sol.pode_editar_materiais_demanda) { %>
@@ -196,6 +246,15 @@
             <button type="button" class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" data-close-material-form>Fechar</button>
           </div>
           <form method="POST" action="/demandas/<%= demanda.id %>/materiais" data-create-action="/demandas/<%= demanda.id %>/materiais" class="planning-material-form" id="demandMaterialsForm">
+            <label class="material-request-priority" data-material-priority-field>
+              <span>Criticidade da solicitação *</span>
+              <select name="prioridade_solicitacao" required>
+                <% ['BAIXA','MEDIA','ALTA','CRITICA'].forEach(priority => { %>
+                  <option value="<%= priority %>" <%= defaultMaterialPriority === priority ? 'selected' : '' %>><%= priorityLabel(priority) %></option>
+                <% }) %>
+              </select>
+              <small>Define a prioridade desta compra, independente da prioridade geral da Demanda.</small>
+            </label>
             <div id="materialRows">
               <div class="material-input-row material-input-row-light">
                 <label><span>Material *</span><input name="itens_nome[]" required placeholder="Ex.: Rolamento 22218"></label>
@@ -303,6 +362,7 @@
   const editorTitle = document.querySelector('[data-material-editor-title]');
   const editorHelp = document.querySelector('[data-material-editor-help]');
   const submit = document.querySelector('[data-material-submit]');
+  const priorityField = document.querySelector('[data-material-priority-field]');
   const root = document.getElementById('materialRows');
   const add = document.getElementById('addMaterialRow');
 
@@ -326,11 +386,13 @@
     if (!editor || !form) return;
     resetRows();
     if (solicitacaoId) {
+      if (priorityField) priorityField.hidden = true;
       form.action = `/demandas/<%= demanda.id %>/solicitacoes/${Number(solicitacaoId)}/materiais`;
       if (editorTitle) editorTitle.textContent = `Adicionar itens à ${numero || 'solicitação'}`;
       if (editorHelp) editorHelp.textContent = 'Somente os novos itens serão acrescentados. Itens, cotações, fornecedores e valores já registrados serão preservados.';
       if (submit) submit.textContent = 'Adicionar itens à solicitação';
     } else {
+      if (priorityField) priorityField.hidden = false;
       form.action = form.dataset.createAction;
       if (editorTitle) editorTitle.textContent = 'Planejar nova solicitação de materiais';
       if (editorHelp) editorHelp.textContent = 'Cadastre apenas nome, quantidade e o detalhe técnico necessário. Os demais dados seguem o fluxo de Compras.';

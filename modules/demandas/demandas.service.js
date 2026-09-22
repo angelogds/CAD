@@ -6,6 +6,7 @@ const osService = require('../os/os.service');
 const STATUS = ['NOVA', 'EM_ANALISE', 'PLANEJAMENTO', 'AGUARDANDO_APROVACAO', 'EM_ANDAMENTO', 'PARADA', 'CONCLUIDA', 'CANCELADA'];
 const CATEGORIAS = ['MANUTENCAO', 'PRODUCAO', 'NR', 'SEGURANCA', 'AUDITORIA', 'MELHORIA', 'PROJETO', 'DIRETORIA'];
 const RH_CATEGORIAS = new Set(['NR', 'SEGURANCA', 'AUDITORIA']);
+const LIBERACAO_COMPRAS_STATUS = ['PENDENTE', 'LIBERADA', 'BLOQUEADA'];
 
 function tableExists(name) {
   try { return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name); } catch { return false; }
@@ -186,8 +187,11 @@ function getById(id) {
     const quotedExpr = tableExists('solicitacao_itens') && hasColumn('solicitacao_itens', 'status_cotacao')
       ? "SUM(CASE WHEN COALESCE(si.status_cotacao,'PENDENTE') <> 'PENDENTE' THEN 1 ELSE 0 END)"
       : '0';
+    const solicitationPriorityExpr = hasColumn('solicitacoes', 'prioridade')
+      ? "s.prioridade"
+      : "'MEDIA' AS prioridade";
     solicitacoes = db.prepare(`
-      SELECT s.id, s.numero, s.titulo, s.status, s.os_id, s.created_at,
+      SELECT s.id, s.numero, s.titulo, s.status, ${solicitationPriorityExpr}, s.os_id, s.created_at,
              COUNT(si.id) AS itens_count,
              ${quotedExpr} AS itens_cotados
       FROM solicitacoes s
@@ -281,17 +285,84 @@ function updateStatus(id, { status, responsavel_user_id, user_id }) {
   `).run(id, user_id || null, `Status atualizado para ${st}`);
 }
 
+function materiaisDisponiveisParaExecucao(demanda) {
+  const requests = Array.isArray(demanda?.solicitacoes) ? demanda.solicitacoes : [];
+  const relevantes = requests.filter((item) => !['CANCELADA'].includes(String(item.status || '').toUpperCase()));
+  if (!relevantes.length) return true;
+  const readyStatuses = new Set(['RECEBIDA_TOTAL', 'SEPARADA_PARA_RETIRADA', 'ENTREGUE_SOLICITANTE', 'FECHADA']);
+  return relevantes.every((item) => readyStatuses.has(String(item.status || '').toUpperCase()));
+}
+
 function updateApproval(id, { aprovacao_status, user_id }) {
   const status = String(aprovacao_status || '').trim().toUpperCase();
   if (!['PENDENTE', 'APROVADA', 'REPROVADA'].includes(status)) throw new Error('Situação de aprovação inválida.');
   const current = getById(id);
   if (!current) throw new Error('Demanda não encontrada');
 
+  if (status === 'APROVADA' && !materiaisDisponiveisParaExecucao(current)) {
+    const error = new Error('Os materiais desta Demanda ainda não estão disponíveis na empresa. Conclua o recebimento ou a separação pelo estoque antes de aprovar a execução do serviço.');
+    error.code = 'DEMANDA_MATERIAIS_NAO_DISPONIVEIS';
+    throw error;
+  }
+
   db.transaction(() => {
     db.prepare('UPDATE demandas SET aprovacao_status=?, updated_at=datetime(\'now\') WHERE id=?').run(status, id);
     db.prepare(`INSERT INTO demanda_logs (demanda_id, user_id, texto, created_at) VALUES (?, ?, ?, datetime('now'))`)
       .run(id, user_id || null, `Aprovação atualizada para ${status}`);
   })();
+}
+
+function updatePurchaseRelease(id, { liberacao_compras_status, user_id }) {
+  const status = String(liberacao_compras_status || '').trim().toUpperCase();
+  if (!LIBERACAO_COMPRAS_STATUS.includes(status)) throw new Error('Situação de liberação de compras inválida.');
+
+  const current = getById(id);
+  if (!current) throw new Error('Demanda não encontrada.');
+  if (['CONCLUIDA', 'CANCELADA'].includes(String(current.status || '').toUpperCase())) {
+    throw new Error('Não é possível alterar a liberação de compras de uma demanda concluída ou cancelada.');
+  }
+  if (!hasColumn('demandas', 'liberacao_compras_status')) {
+    throw new Error('Estrutura de liberação de compras indisponível. Execute as migrations do sistema.');
+  }
+
+  const requests = Array.isArray(current.solicitacoes) ? current.solicitacoes : [];
+  if (status === 'LIBERADA' && !requests.length) {
+    throw new Error('Planeje ao menos uma solicitação de materiais antes de liberar a compra.');
+  }
+
+  const advancedStatuses = new Set([
+    'COMPRADA', 'EM_RECEBIMENTO', 'RECEBIDA_PARCIAL', 'RECEBIDA_TOTAL',
+    'SEPARADA_PARA_RETIRADA', 'ENTREGUE_SOLICITANTE', 'FECHADA',
+  ]);
+  if (status !== 'LIBERADA' && requests.some((item) => advancedStatuses.has(String(item.status || '').toUpperCase()))) {
+    throw new Error('A compra já avançou para compra/recebimento e não pode voltar para pré-cotação.');
+  }
+
+  const sets = ["liberacao_compras_status=?", "updated_at=datetime('now')"];
+  const values = [status];
+
+  if (hasColumn('demandas', 'liberacao_compras_em')) {
+    sets.push("liberacao_compras_em=CASE WHEN ?='LIBERADA' THEN datetime('now') ELSE NULL END");
+    values.push(status);
+  }
+  if (hasColumn('demandas', 'liberacao_compras_por')) {
+    sets.push("liberacao_compras_por=CASE WHEN ?='LIBERADA' THEN ? ELSE NULL END");
+    values.push(status, user_id || null);
+  }
+
+  values.push(id);
+  db.transaction(() => {
+    db.prepare(`UPDATE demandas SET ${sets.join(', ')} WHERE id=?`).run(...values);
+    const texto = status === 'LIBERADA'
+      ? 'Compra dos materiais liberada no Planejamento. As solicitações da demanda podem seguir o fluxo normal de Compras sem necessidade de OS.'
+      : status === 'BLOQUEADA'
+        ? 'Compra dos materiais bloqueada no Planejamento. Solicitações retornam ao estágio de pré-cotação enquanto não houver OS.'
+        : 'Liberação de compras retornada para PENDENTE no Planejamento.';
+    db.prepare(`INSERT INTO demanda_logs (demanda_id, user_id, texto, created_at) VALUES (?, ?, ?, datetime('now'))`)
+      .run(id, user_id || null, texto);
+  })();
+
+  return getById(id);
 }
 
 function addUpdate(id, texto, user_id) {
@@ -319,7 +390,7 @@ function priorityForSolicitacao(prioridade) {
   return 'MEDIA';
 }
 
-function createMaterialPlanning(id, { user, itens }) {
+function createMaterialPlanning(id, { user, itens, prioridade }) {
   const demanda = getById(id);
   if (!demanda) throw new Error('Demanda não encontrada.');
   if (!Array.isArray(itens) || !itens.length) throw new Error('Informe ao menos um material válido.');
@@ -327,9 +398,11 @@ function createMaterialPlanning(id, { user, itens }) {
   const solicitacaoId = solicitacoesService.createSolicitacao({
     userId: user?.id,
     setor_origem: demanda.setor_origem || 'Manutenção',
-    prioridade: priorityForSolicitacao(demanda.prioridade),
+    prioridade: ['CRITICA', 'ALTA', 'MEDIA', 'BAIXA'].includes(String(prioridade || '').trim().toUpperCase())
+      ? String(prioridade).trim().toUpperCase()
+      : priorityForSolicitacao(demanda.prioridade),
     titulo: `Materiais • Demanda #${demanda.id} - ${demanda.titulo}`,
-    descricao: `Planejamento antecipado de materiais da Demanda #${demanda.id}. Cotação permitida antes da OS; compra liberada somente após a conversão da demanda em Ordem de Serviço.`,
+    descricao: `Planejamento antecipado de materiais da Demanda #${demanda.id}. A cotação pode ser preparada antes da OS e a compra é liberada no Planejamento da própria Demanda.`,
     equipamento_id: demanda.equipamento_id || null,
     destino_uso: demanda.equipamento_id ? null : `Demanda #${demanda.id} - ${demanda.titulo}`,
     tipo_aplicacao: demanda.equipamento_id ? 'EQUIPAMENTO' : 'OUTRO',
@@ -458,6 +531,7 @@ function listParentCandidates(user, excludeId = null) {
 module.exports = {
   STATUS,
   CATEGORIAS,
+  LIBERACAO_COMPRAS_STATUS,
   list,
   getPainel,
   getById,
@@ -465,6 +539,8 @@ module.exports = {
   create,
   updateStatus,
   updateApproval,
+  materiaisDisponiveisParaExecucao,
+  updatePurchaseRelease,
   addUpdate,
   createMaterialPlanning,
   convertToOS,

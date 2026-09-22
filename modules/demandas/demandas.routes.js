@@ -94,6 +94,7 @@ router.post('/', requireLogin, requireRole(ACCESS.demandas_open), ctrl.create);
 router.get('/:id', requireLogin, requireRole(ACCESS.demandas_view), ctrl.show);
 router.post('/:id/status', requireLogin, requireRole(ACCESS.demandas_manage), ctrl.updateStatus);
 router.post('/:id/aprovacao', requireLogin, requireRole(ACCESS.demandas_approve), ctrl.updateApproval);
+router.post('/:id/liberacao-compras', requireLogin, requireRole(ACCESS.demandas_approve), ctrl.updatePurchaseRelease);
 router.post('/:id/update', requireLogin, requireRole(ACCESS.demandas_manage), ctrl.addUpdate);
 router.post('/:id/materiais', requireLogin, requireRole(ACCESS.demandas_materials), ctrl.addMaterials);
 router.post('/:id/solicitacoes/:solicitacaoId/materiais', requireLogin, requireRole(ACCESS.demandas_materials), ctrl.appendMaterials);

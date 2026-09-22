@@ -191,6 +191,25 @@ function listSolicitacoesPorStatus(filters = {}) {
   const where = [];
   const params = [];
   if (columnExists('solicitacoes', 'disponivel_compras')) where.push('COALESCE(s.disponivel_compras, 0) = 1');
+  // Solicitações originadas de Demanda permanecem somente no painel de
+  // pré-cotações até serem liberadas no Planejamento. Depois disso passam a
+  // integrar a fila normal de Compras mesmo sem OS.
+  if (
+    columnExists('solicitacoes', 'demanda_id')
+    && tableExists('demandas')
+    && columnExists('demandas', 'liberacao_compras_status')
+  ) {
+    where.push(`(
+      s.demanda_id IS NULL
+      OR s.os_id IS NOT NULL
+      OR EXISTS (
+        SELECT 1
+        FROM demandas dg
+        WHERE dg.id=s.demanda_id
+          AND UPPER(COALESCE(dg.liberacao_compras_status,'PENDENTE'))='LIBERADA'
+      )
+    )`);
+  }
   const status = normalizeStatus(filters.status);
   if (status) { where.push('s.status = ?'); params.push(status); }
   if (filters.query) {
