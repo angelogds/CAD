@@ -69,7 +69,7 @@ test('tela da oficina substitui custos por tabela semanal de lubrificação', ()
   assert.match(js, /Programação/);
   assert.match(js, /Responsável/);
   assert.match(js, /tv-lubrication-table/);
-  assert.match(js, /Maior incidência de falhas/);
+  assert.doesNotMatch(js, /Maior incidência de falhas/);
   assert.doesNotMatch(js, /Custo consumido/);
   assert.doesNotMatch(js, /Baixas reais do estoque/);
   assert.doesNotMatch(js, /Maior custo real/);
@@ -89,12 +89,14 @@ test('layout gerencial permanece legível e responsivo para TV com tabela de lub
   assert.match(css, /\.management-reliability-grid\{display:grid;grid-template-columns:repeat\(2/);
   assert.match(css, /\.tv-lubrication-table\{/);
   assert.match(css, /\.tv-lubrication-status\.success/);
+  assert.match(css, /\.management-rankings--lubrication-only\{height:100%\}/);
+  assert.match(css, /\.management-lubrication--expanded\{height:100%;display:grid;grid-template-rows:auto 1fr\}/);
   assert.match(css, /@media\(max-width:1180px\)[\s\S]*\.management-layout\{grid-template-columns:1fr\}/);
 });
 
 test('assets alterados recebem nova versão para evitar cache antigo na TV', () => {
   const view = read('views/tv/modo-tv.ejs');
-  assert.match(view, /tv-mode\.js\?v=20260921-lubrificacao-tv-v5/);
-  assert.match(view, /tv-screens-2026\.css\?v=20260921-lubrificacao-tv-v5/);
-  assert.match(view, /tv-screens-2026\.js\?v=20260921-lubrificacao-tv-v5/);
+  assert.match(view, /tv-mode\.js\?v=20260922-lubrificacao-tv-v6/);
+  assert.match(view, /tv-screens-2026\.css\?v=20260922-lubrificacao-tv-v6/);
+  assert.match(view, /tv-screens-2026\.js\?v=20260922-lubrificacao-tv-v6/);
 });
