@@ -301,8 +301,24 @@ function updatePurchaseRelease(id, { liberacao_compras_status, user_id }) {
 
   const current = getById(id);
   if (!current) throw new Error('Demanda não encontrada.');
+  if (['CONCLUIDA', 'CANCELADA'].includes(String(current.status || '').toUpperCase())) {
+    throw new Error('Não é possível alterar a liberação de compras de uma demanda concluída ou cancelada.');
+  }
   if (!hasColumn('demandas', 'liberacao_compras_status')) {
     throw new Error('Estrutura de liberação de compras indisponível. Execute as migrations do sistema.');
+  }
+
+  const requests = Array.isArray(current.solicitacoes) ? current.solicitacoes : [];
+  if (status === 'LIBERADA' && !requests.length) {
+    throw new Error('Planeje ao menos uma solicitação de materiais antes de liberar a compra.');
+  }
+
+  const advancedStatuses = new Set([
+    'COMPRADA', 'EM_RECEBIMENTO', 'RECEBIDA_PARCIAL', 'RECEBIDA_TOTAL',
+    'SEPARADA_PARA_RETIRADA', 'ENTREGUE_SOLICITANTE', 'FECHADA',
+  ]);
+  if (status !== 'LIBERADA' && requests.some((item) => advancedStatuses.has(String(item.status || '').toUpperCase()))) {
+    throw new Error('A compra já avançou para compra/recebimento e não pode voltar para pré-cotação.');
   }
 
   const sets = ["liberacao_compras_status=?", "updated_at=datetime('now')"];
