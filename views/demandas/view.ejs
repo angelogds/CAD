@@ -39,7 +39,9 @@
   const purchaseReleased = purchaseReleaseStatus === 'LIBERADA';
   const defaultMaterialPriority = ({ URGENTE: 'CRITICA', ALTA: 'ALTA', BAIXA: 'BAIXA' }[String(demanda.prioridade || '').toUpperCase()] || 'MEDIA');
   const materialReadyStatuses = new Set(['RECEBIDA_TOTAL', 'SEPARADA_PARA_RETIRADA', 'ENTREGUE_SOLICITANTE', 'FECHADA']);
-  const materialsReady = materialRequests.length > 0 && materialRequests.every(item => materialReadyStatuses.has(String(item.status || '').toUpperCase()));
+  const materialRequestsForExecution = materialRequests.filter(item => String(item.status || '').toUpperCase() !== 'CANCELADA');
+  const materialsReady = materialRequestsForExecution.length === 0
+    || materialRequestsForExecution.every(item => materialReadyStatuses.has(String(item.status || '').toUpperCase()));
   const materialSituation = !materialRequests.length
     ? 'Sem materiais planejados'
     : materialsReady
