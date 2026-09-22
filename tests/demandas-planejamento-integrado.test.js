@@ -41,7 +41,7 @@ test('conversão para nova OS exige aprovação prévia da Diretoria ou Gestão'
   assert.match(controller, /approval !== 'APROVADA'/);
   assert.match(controller, /DEMANDA_AGUARDANDO_APROVACAO/);
   assert.match(controller, /aprovada pela Diretoria\/Gestão antes de gerar uma Ordem de Serviço/);
-  assert.match(controller, /a compra dos materiais pode continuar normalmente enquanto aguarda aprovação/);
+  assert.match(controller, /A compra dos materiais pode continuar normalmente enquanto aguarda aprovação/);
 });
 
 test('compras permite pré-cotação e libera compra pela Demanda sem exigir OS', () => {
