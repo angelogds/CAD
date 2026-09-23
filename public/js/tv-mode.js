@@ -345,9 +345,9 @@
       <div><dt>Responsável</dt><dd>${esc(os.responsavel || 'A definir')}</dd></div>
       <div><dt>Local</dt><dd>${esc(os.local || os.setor || 'Não informado')}</dd></div>
       <div><dt>Prioridade</dt><dd>${esc(os.prioridade)}</dd></div>
-      <div><dt>Abertura</dt><dd>${esc(timeBR(os.abertura))}</dd></div>
+      <div><dt>Abertura</dt><dd>${esc(timeBR(os.abertura))}</dd></div>`;
 
-    startAlertMascot();`;
+    startAlertMascot();
 
     const audio = os.prioridade === 'CRITICA' ? $('tvAudioCritical') : $('tvAudioNew');
     const soundEnabled = localStorage.getItem('cgTvSound') !== 'off';
