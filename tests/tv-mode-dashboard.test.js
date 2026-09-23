@@ -28,7 +28,7 @@ test('tela oficial possui sete seções, ticker e não possui ações operaciona
 
 test('painel inicia imediatamente e ativação libera somente recursos do navegador', () => {
   const js = source();
-  assert.match(js, /state\.active = true;[\s\S]*fetchSnapshot\(\{ detectNew: false \}\);[\s\S]*playMascotBreak\(0,[\s\S]*scheduleRotation\(ROTATION_MS\);[\s\S]*startSnapshotPolling\(\);[\s\S]*connectStream\(\);/);
+  assert.match(js, /state\.active = true;[\s\S]*fetchSnapshot\(\{ detectNew: false \}\);[\s\S]*runInterstitialSlot\(0, startScreens\);[\s\S]*startSnapshotPolling\(\);[\s\S]*connectStream\(\);/);
   assert.match(js, /localStorage\.setItem\('cgTvSound', 'on'\)/);
   assert.match(js, /requestFullscreen/);
   assert.match(js, /requestWakeLock\(\)/);
@@ -48,18 +48,29 @@ test('rotação, atualização, fallback e alertas usam os intervalos especifica
   assert.match(source(), /resumeRotation\(\)/);
 });
 
-test('mascote aparece somente como intervalo antes da Tela 1 e depois da Tela 2', () => {
+test('mascote sai da rotação fixa e passa para o card de chamada de OS', () => {
   const html = view();
   const js = source();
-  assert.match(html, /id="tvMascotBreak"/);
-  assert.match(html, /id="tvMascotVideo"/);
-  assert.match(js, /\/media\/mascote\/mascote-tv-01\.mp4/);
-  assert.match(js, /\/media\/mascote\/mascote-tv-02\.mp4/);
-  assert.match(js, /if \(state\.index === 1\)[\s\S]*playMascotBreak\(1,[\s\S]*state\.index = 2/);
-  assert.match(js, /if \(state\.index === screens\.length - 1\)[\s\S]*playMascotBreak\(0,[\s\S]*state\.index = 0/);
-  assert.match(js, /Abertura do ciclo: vídeo do mascote antes da Tela 1/);
-  assert.match(css2026(), /\.tv-mascot-break\{/);
+  assert.doesNotMatch(html, /id="tvMascotBreak"/);
+  assert.doesNotMatch(js, /playMascotBreak/);
+  assert.match(html, /id="tvAlertMascot"/);
+  assert.match(html, /id="tvAlertMascotVideo"/);
+  assert.match(js, /function startAlertMascot\(\)/);
+  assert.match(js, /startAlertMascot\(\);/);
+  assert.match(js, /stopAlertMascot\(\);/);
+  assert.match(css2026(), /\.tv-alert-mascot\{/);
   assert.equal((html.match(/data-tv-screen=/g) || []).length, 7);
+});
+
+test('mídias entre telas são dirigidas por configuração e não por vídeos fixos no código', () => {
+  const html = view();
+  const js = source();
+  assert.match(html, /window\.CG_TV_MEDIA_CONFIG/);
+  assert.match(html, /id="tvInterstitial"/);
+  assert.match(js, /mediaConfig\.interstitialsEnabled/);
+  assert.match(js, /function runInterstitialSlot\(position, onDone\)/);
+  assert.doesNotMatch(js, /mascote-tv-01\.mp4/);
+  assert.doesNotMatch(js, /mascote-tv-02\.mp4/);
 });
 
 test('normalização central trata encerradas, canceladas, emergencial e urgente', () => {
