@@ -1,12 +1,18 @@
 const tvService = require('./tv.service');
+const tvConfigService = require('./tv-config.service');
+const { normalizeRole } = require('../../config/rbac');
 const alertsHub = require('../alerts/alerts.hub');
 
 exports.page = async (req, res, next) => {
   try {
+    const user = req.session?.user || req.user || null;
+    const role = normalizeRole(user?.role || '');
     res.render('tv/modo-tv', {
       title: 'Modo TV — Campo do Gado',
       layout: false,
-      user: req.session?.user || req.user || null,
+      user,
+      canConfigureTv: ['ADMIN', 'ENCARREGADO_MANUTENCAO'].includes(role),
+      tvMediaConfig: tvConfigService.getPublicConfig(),
     });
   } catch (err) {
     next(err);
