@@ -96,7 +96,7 @@ test('layout gerencial permanece legível e responsivo para TV com tabela de lub
 
 test('assets alterados recebem nova versão para evitar cache antigo na TV', () => {
   const view = read('views/tv/modo-tv.ejs');
-  assert.match(view, /tv-mode\.js\?v=20260922-lubrificacao-tv-v6/);
+  assert.match(view, /tv-mode\.js\?v=20260923-tv-config-v1/);
   assert.match(view, /tv-screens-2026\.css\?v=20260922-lubrificacao-tv-v6/);
   assert.match(view, /tv-screens-2026\.js\?v=20260922-lubrificacao-tv-v6/);
 });
