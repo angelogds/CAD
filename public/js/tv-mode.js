@@ -2,6 +2,7 @@
   'use strict';
 
   const config = window.CG_TV_CONFIG || {};
+  const mediaConfig = window.CG_TV_MEDIA_CONFIG || {};
   const ROTATION_MS = Number(config.rotationMs) || 30000;
   const SNAPSHOT_MS = Number(config.refreshMs) || 60000;
   const FAST_MS = Number(config.fastRefreshMs) || 15000;
@@ -43,6 +44,9 @@
     processed: new Map(),
     pendingEvents: new Map(),
     wakeLock: null,
+    interstitialActive: false,
+    interstitialTimer: null,
+    interstitialToken: 0,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -282,10 +286,52 @@
     return true;
   }
 
+  function startAlertMascot() {
+    const panel = $('tvAlertMascot');
+    const video = $('tvAlertMascotVideo');
+    const mascot = mediaConfig.mascotAlert || {};
+    if (!panel || !video || !mascot.enabled || !mascot.src) {
+      if (panel) panel.hidden = true;
+      return;
+    }
+
+    panel.hidden = false;
+    panel.setAttribute('aria-hidden', 'false');
+    video.muted = true;
+    video.defaultMuted = true;
+    if (video.getAttribute('src') !== mascot.src) video.setAttribute('src', mascot.src);
+    video.currentTime = 0;
+    video.onerror = () => {
+      panel.hidden = true;
+      panel.setAttribute('aria-hidden', 'true');
+    };
+    const play = video.play();
+    if (play && typeof play.catch === 'function') {
+      play.catch(() => {
+        panel.hidden = true;
+        panel.setAttribute('aria-hidden', 'true');
+      });
+    }
+  }
+
+  function stopAlertMascot() {
+    const panel = $('tvAlertMascot');
+    const video = $('tvAlertMascotVideo');
+    if (video) {
+      video.pause();
+      try { video.currentTime = 0; } catch (_error) {}
+    }
+    if (panel) {
+      panel.hidden = true;
+      panel.setAttribute('aria-hidden', 'true');
+    }
+  }
+
   function showNextAlert() {
     if (state.alertShowing || !state.active || !state.alertQueue.length) return;
     state.alertShowing = true;
     state.currentAlert = state.alertQueue.shift();
+    cancelInterstitial();
     pauseRotation();
 
     const os = state.currentAlert;
@@ -299,7 +345,9 @@
       <div><dt>Responsável</dt><dd>${esc(os.responsavel || 'A definir')}</dd></div>
       <div><dt>Local</dt><dd>${esc(os.local || os.setor || 'Não informado')}</dd></div>
       <div><dt>Prioridade</dt><dd>${esc(os.prioridade)}</dd></div>
-      <div><dt>Abertura</dt><dd>${esc(timeBR(os.abertura))}</dd></div>`;
+      <div><dt>Abertura</dt><dd>${esc(timeBR(os.abertura))}</dd></div>
+
+    startAlertMascot();`;
 
     const audio = os.prioridade === 'CRITICA' ? $('tvAudioCritical') : $('tvAudioNew');
     const soundEnabled = localStorage.getItem('cgTvSound') !== 'off';
@@ -322,6 +370,7 @@
   function finishAlert() {
     clearTimeout(state.alertTimer);
     clearTimeout(state.voiceTimer);
+    stopAlertMascot();
     $('tvNewOSAlert').hidden = true;
     state.alertShowing = false;
     state.currentAlert = null;
@@ -644,59 +693,117 @@
     $('tvScreenIndicator').textContent = `Tela ${state.index + 1} de ${screens.length}`;
   }
 
-  const mascotBreaks = [
-    {
-      src: '/media/mascote/mascote-tv-01.mp4',
-      title: 'Manutenção Campo do Gado',
-      subtitle: 'Segurança, disponibilidade e confiabilidade para a operação.',
-    },
-    {
-      src: '/media/mascote/mascote-tv-02.mp4',
-      title: 'Manutenção Campo do Gado',
-      subtitle: 'Manutenção presente. Produção disponível. Trabalho seguro.',
-    },
-  ];
+  const configuredInterstitials = Array.isArray(mediaConfig.interstitials)
+    ? mediaConfig.interstitials
+        .filter((item) => item && item.src)
+        .sort((a, b) => Number(a.afterScreen || 0) - Number(b.afterScreen || 0) || Number(a.order || 0) - Number(b.order || 0))
+    : [];
 
-  function playMascotBreak(index, onDone) {
-    const panel = $('tvMascotBreak');
-    const video = $('tvMascotVideo');
-    const item = mascotBreaks[index];
-    if (!panel || !video || !item) {
+  function interstitialsFor(position) {
+    if (!mediaConfig.interstitialsEnabled) return [];
+    return configuredInterstitials.filter((item) => Number(item.afterScreen || 0) === Number(position));
+  }
+
+  function hideInterstitial() {
+    const panel = $('tvInterstitial');
+    const video = $('tvInterstitialVideo');
+    const image = $('tvInterstitialImage');
+    clearTimeout(state.interstitialTimer);
+    state.interstitialTimer = null;
+    if (video) {
+      video.onended = null;
+      video.onerror = null;
+      video.pause();
+      video.removeAttribute('src');
+      video.hidden = true;
+      video.load();
+    }
+    if (image) {
+      image.onerror = null;
+      image.removeAttribute('src');
+      image.hidden = true;
+    }
+    if (panel) {
+      panel.hidden = true;
+      panel.setAttribute('aria-hidden', 'true');
+    }
+    state.interstitialActive = false;
+  }
+
+  function cancelInterstitial() {
+    state.interstitialToken += 1;
+    hideInterstitial();
+  }
+
+  function playInterstitialItem(item, token, onDone) {
+    const panel = $('tvInterstitial');
+    const video = $('tvInterstitialVideo');
+    const image = $('tvInterstitialImage');
+    const label = $('tvInterstitialLabel');
+    if (!panel || !video || !image || !item || token !== state.interstitialToken) {
       onDone?.();
       return;
     }
 
+    state.interstitialActive = true;
+    panel.hidden = false;
+    panel.setAttribute('aria-hidden', 'false');
+    label.textContent = item.name || '';
+    video.hidden = true;
+    image.hidden = true;
+
     let finished = false;
-    let fallbackTimer = null;
     const finish = () => {
-      if (finished) return;
+      if (finished || token !== state.interstitialToken) return;
       finished = true;
-      clearTimeout(fallbackTimer);
-      video.onended = null;
-      video.onerror = null;
-      video.pause();
-      panel.classList.remove('is-visible');
-      panel.hidden = true;
-      panel.setAttribute('aria-hidden', 'true');
+      clearTimeout(state.interstitialTimer);
+      state.interstitialTimer = null;
       onDone?.();
     };
 
-    $('tvMascotTitle').textContent = item.title;
-    $('tvMascotSubtitle').textContent = item.subtitle;
-    panel.hidden = false;
-    panel.setAttribute('aria-hidden', 'false');
-    panel.classList.add('is-visible');
-    video.muted = true;
-    video.defaultMuted = true;
-    video.src = item.src;
-    video.currentTime = 0;
-    video.onended = finish;
-    video.onerror = finish;
-    video.load();
+    const maxDuration = Math.max(3000, Number(item.durationMs || 8000));
 
-    const attempt = video.play();
-    if (attempt && typeof attempt.catch === 'function') attempt.catch(() => {});
-    fallbackTimer = setTimeout(finish, 12000);
+    if (String(item.type || '').toUpperCase() === 'VIDEO') {
+      video.hidden = false;
+      video.muted = true;
+      video.defaultMuted = true;
+      video.src = item.src;
+      video.currentTime = 0;
+      video.onended = finish;
+      video.onerror = finish;
+      video.load();
+      const play = video.play();
+      if (play && typeof play.catch === 'function') play.catch(finish);
+      state.interstitialTimer = setTimeout(finish, maxDuration);
+      return;
+    }
+
+    image.hidden = false;
+    image.onerror = finish;
+    image.src = item.src;
+    state.interstitialTimer = setTimeout(finish, maxDuration);
+  }
+
+  function runInterstitialSlot(position, onDone) {
+    const itemsAtPosition = interstitialsFor(position);
+    if (!itemsAtPosition.length || state.alertShowing) {
+      onDone?.();
+      return;
+    }
+
+    const token = ++state.interstitialToken;
+    let index = 0;
+    const next = () => {
+      if (token !== state.interstitialToken || state.alertShowing) return;
+      if (index >= itemsAtPosition.length) {
+        hideInterstitial();
+        onDone?.();
+        return;
+      }
+      const item = itemsAtPosition[index++];
+      playInterstitialItem(item, token, next);
+    };
+    next();
   }
 
   function scheduleRotation(delay = state.rotationRemaining || ROTATION_MS) {
@@ -705,33 +812,20 @@
     state.rotationStarted = Date.now();
     state.rotationTimer = setTimeout(() => {
       state.rotationTimer = null;
+      const currentScreenNumber = state.index + 1;
+      const nextIndex = (state.index + 1) % screens.length;
 
-      // Depois da Tela 2, entra o segundo vídeo antes de seguir para a Tela 3.
-      if (state.index === 1) {
-        playMascotBreak(1, () => {
-          state.index = 2;
-          state.rotationRemaining = ROTATION_MS;
-          renderAll();
-          scheduleRotation(ROTATION_MS);
-        });
-        return;
-      }
+      const advance = () => {
+        state.index = nextIndex;
+        state.rotationRemaining = ROTATION_MS;
+        renderAll();
+        scheduleRotation(ROTATION_MS);
+      };
 
-      // Ao finalizar a Tela 7, o primeiro vídeo abre o próximo ciclo antes da Tela 1.
-      if (state.index === screens.length - 1) {
-        playMascotBreak(0, () => {
-          state.index = 0;
-          state.rotationRemaining = ROTATION_MS;
-          renderAll();
-          scheduleRotation(ROTATION_MS);
-        });
-        return;
-      }
-
-      state.index += 1;
-      state.rotationRemaining = ROTATION_MS;
-      renderAll();
-      scheduleRotation(ROTATION_MS);
+      runInterstitialSlot(currentScreenNumber, () => {
+        if (nextIndex === 0) runInterstitialSlot(0, advance);
+        else advance();
+      });
     }, delay);
   }
 
@@ -845,13 +939,13 @@
     state.active = true;
     fetchSnapshot({ detectNew: false });
 
-    // Abertura do ciclo: vídeo do mascote antes da Tela 1.
-    playMascotBreak(0, () => {
+    const startScreens = () => {
       state.index = 0;
       state.rotationRemaining = ROTATION_MS;
       renderAll();
       scheduleRotation(ROTATION_MS);
-    });
+    };
+    runInterstitialSlot(0, startScreens);
     startProgress();
     startSnapshotPolling();
     connectStream();
