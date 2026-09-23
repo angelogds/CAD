@@ -88,7 +88,7 @@ function updateMainConfig({ mascoteOsAtivo, midiasIntervaloAtivas, userId }) {
 }
 
 function setMascotPath(filePath, userId) {
-  ensureRow();
+  const previous = ensureRow();
   db.prepare(`
     UPDATE tv_configuracoes
     SET mascote_os_path=?,
@@ -97,6 +97,13 @@ function setMascotPath(filePath, userId) {
         atualizado_em=CURRENT_TIMESTAMP
     WHERE id=1
   `).run(filePath, userId || null);
+
+  const previousAbsolute = publicPathToAbsolute(previous?.mascote_os_path);
+  const nextAbsolute = publicPathToAbsolute(filePath);
+  if (previousAbsolute && previousAbsolute !== nextAbsolute && previousAbsolute.startsWith(TV_UPLOAD_DIR + path.sep)) {
+    try { if (fs.existsSync(previousAbsolute)) fs.unlinkSync(previousAbsolute); } catch (_error) {}
+  }
+
   return getConfig();
 }
 
