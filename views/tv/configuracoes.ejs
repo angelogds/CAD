@@ -1,0 +1,205 @@
+<% layout('layout') -%>
+<style>
+  .tv-config-wrap{max-width:1180px;margin:0 auto;padding:8px 0 32px}
+  .tv-config-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px}
+  .tv-config-head h1{margin:0 0 6px}
+  .tv-config-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .tv-config-card{background:#fff;border:1px solid #dbe4de;border-radius:16px;padding:18px;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+  .tv-config-card h2{margin:0 0 6px;font-size:20px}
+  .tv-config-card p{color:#64748b;margin:0 0 16px}
+  .tv-field{display:grid;gap:6px;margin-bottom:14px}
+  .tv-field label{font-weight:800}
+  .tv-field input,.tv-field select{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff}
+  .tv-check{display:flex;gap:10px;align-items:center;margin:10px 0 14px;font-weight:800}
+  .tv-check input{width:18px;height:18px}
+  .tv-actions{display:flex;gap:10px;flex-wrap:wrap}
+  .tv-btn{border:0;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;background:#087443;color:#fff}
+  .tv-btn.secondary{background:#0f172a}
+  .tv-btn.danger{background:#b42318}
+  .tv-btn.light{background:#eef6f1;color:#087443;border:1px solid #cfe4d7}
+  .tv-preview{border:1px solid #dbe4de;border-radius:12px;padding:10px;background:#0b1510;overflow:hidden;margin:12px 0}
+  .tv-preview video,.tv-preview img{width:100%;max-height:280px;display:block;object-fit:contain;border-radius:8px;background:#0b1510}
+  .tv-media-list{display:grid;gap:10px}
+  .tv-media-row{display:grid;grid-template-columns:100px 1fr auto;gap:12px;align-items:center;border:1px solid #e2e8f0;border-radius:12px;padding:10px}
+  .tv-media-thumb{width:100px;height:66px;background:#0b1510;border-radius:8px;overflow:hidden;display:grid;place-items:center}
+  .tv-media-thumb img,.tv-media-thumb video{width:100%;height:100%;object-fit:cover}
+  .tv-media-meta strong{display:block}
+  .tv-media-meta small{display:block;color:#64748b;margin-top:4px}
+  .tv-note{padding:10px 12px;border-radius:10px;background:#f8fafc;color:#475569;font-size:13px}
+  .tv-status-pill{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:900;background:#ecfdf5;color:#047857}
+  .tv-status-pill.off{background:#f1f5f9;color:#64748b}
+  @media(max-width:900px){.tv-config-grid{grid-template-columns:1fr}.tv-media-row{grid-template-columns:80px 1fr}.tv-media-row>.tv-actions{grid-column:1/-1}}
+</style>
+
+<div class="tv-config-wrap">
+  <div class="tv-config-head">
+    <div>
+      <h1>Configurações do Modo TV</h1>
+      <p class="muted">Controle o mascote das chamadas de OS e a biblioteca de imagens/vídeos exibidos entre telas.</p>
+    </div>
+    <a class="tv-btn secondary" href="/tv" target="_blank" rel="noopener">Abrir Modo TV</a>
+  </div>
+
+  <div class="tv-config-grid">
+    <section class="tv-config-card">
+      <h2>Chamada de nova OS</h2>
+      <p>O mascote aparece ao lado das informações da OS enquanto a assistente faz a leitura.</p>
+
+      <form method="post" action="/tv/configuracoes">
+        <label class="tv-check">
+          <input type="checkbox" name="mascote_os_ativo" value="1" <%= Number(config?.mascote_os_ativo) ? 'checked' : '' %>>
+          Exibir mascote nas chamadas de OS
+        </label>
+        <label class="tv-check">
+          <input type="checkbox" name="midias_intervalo_ativas" value="1" <%= Number(config?.midias_intervalo_ativas) ? 'checked' : '' %>>
+          Habilitar mídias entre telas
+        </label>
+        <div class="tv-actions"><button class="tv-btn" type="submit">Salvar configurações</button></div>
+      </form>
+
+      <% if (config?.mascote_os_path) { %>
+        <div class="tv-preview">
+          <video muted autoplay loop playsinline src="<%= config.mascote_os_path %>"></video>
+        </div>
+      <% } %>
+
+      <form id="mascotUploadForm" method="post" action="/tv/configuracoes/mascote-os" enctype="multipart/form-data">
+        <div class="tv-field">
+          <label for="mascote_os">Trocar vídeo do mascote</label>
+          <input id="mascote_os" name="mascote_os" type="file" accept="video/mp4,video/webm" required>
+        </div>
+        <div id="mascotValidation" class="tv-note">
+          Recomendado: MP4 H.264, 1280×720 ou superior. O vídeo será exibido em um card menor ao lado da OS.
+        </div>
+        <div class="tv-actions"><button class="tv-btn" type="submit">Enviar vídeo</button></div>
+      </form>
+    </section>
+
+    <section class="tv-config-card">
+      <h2>Biblioteca entre telas</h2>
+      <p>Cadastre imagens ou vídeos e escolha exatamente em qual intervalo eles poderão aparecer.</p>
+
+      <form id="mediaUploadForm" method="post" action="/tv/configuracoes/midias" enctype="multipart/form-data">
+        <div class="tv-field">
+          <label for="nome">Nome da mídia</label>
+          <input id="nome" name="nome" type="text" maxlength="100" placeholder="Ex.: Campanha de segurança">
+        </div>
+        <div class="tv-field">
+          <label for="midia">Imagem ou vídeo</label>
+          <input id="midia" name="midia" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" required>
+        </div>
+        <div class="tv-field">
+          <label for="posicao_depois_tela">Posição</label>
+          <select id="posicao_depois_tela" name="posicao_depois_tela">
+            <option value="0">Antes da Tela 1</option>
+            <% for (let i = 1; i <= 7; i += 1) { %>
+              <option value="<%= i %>">Depois da Tela <%= i %></option>
+            <% } %>
+          </select>
+        </div>
+        <div class="tv-field">
+          <label for="duracao_segundos">Duração máxima</label>
+          <input id="duracao_segundos" name="duracao_segundos" type="number" min="3" max="60" value="8">
+        </div>
+        <div class="tv-field">
+          <label for="ordem">Ordem no mesmo intervalo</label>
+          <input id="ordem" name="ordem" type="number" min="0" value="0">
+        </div>
+        <div id="mediaValidation" class="tv-note">
+          Para TV de 43": use 16:9 e pelo menos 1280×720. Mídias ficam desativadas na rotação enquanto “Habilitar mídias entre telas” estiver desligado.
+        </div>
+        <div class="tv-actions"><button class="tv-btn" type="submit">Adicionar à biblioteca</button></div>
+      </form>
+    </section>
+  </div>
+
+  <section class="tv-config-card" style="margin-top:18px">
+    <h2>Mídias cadastradas</h2>
+    <p>Ative, desative ou remova itens sem alterar código.</p>
+
+    <div class="tv-media-list">
+      <% if (!midias?.length) { %>
+        <div class="tv-note">Nenhuma mídia cadastrada.</div>
+      <% } %>
+
+      <% for (const item of (midias || [])) { %>
+        <div class="tv-media-row">
+          <div class="tv-media-thumb">
+            <% if (item.tipo === 'VIDEO') { %>
+              <video muted playsinline preload="metadata" src="<%= item.caminho %>"></video>
+            <% } else { %>
+              <img src="<%= item.caminho %>" alt="">
+            <% } %>
+          </div>
+          <div class="tv-media-meta">
+            <strong><%= item.nome %></strong>
+            <small><%= item.tipo %> • <%= Number(item.posicao_depois_tela) === 0 ? 'Antes da Tela 1' : 'Depois da Tela ' + item.posicao_depois_tela %> • <%= item.duracao_segundos %> s</small>
+            <span class="tv-status-pill <%= Number(item.ativo) ? '' : 'off' %>"><%= Number(item.ativo) ? 'ATIVA' : 'DESATIVADA' %></span>
+          </div>
+          <div class="tv-actions">
+            <form method="post" action="/tv/configuracoes/midias/<%= item.id %>/toggle">
+              <input type="hidden" name="ativo" value="<%= Number(item.ativo) ? '0' : '1' %>">
+              <button class="tv-btn light" type="submit"><%= Number(item.ativo) ? 'Desativar' : 'Ativar' %></button>
+            </form>
+            <form method="post" action="/tv/configuracoes/midias/<%= item.id %>/excluir" onsubmit="return confirm('Remover esta mídia do Modo TV?')">
+              <button class="tv-btn danger" type="submit">Excluir</button>
+            </form>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  function validateVisualFile(input, note, form, videoOnly) {
+    if (!input || !form) return;
+    input.addEventListener('change', function(){
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      const isVideo = file.type.startsWith('video/');
+      const finish = function(width, height) {
+        const ok = width >= 1280 && height >= 720;
+        note.textContent = ok
+          ? 'Qualidade validada: ' + width + '×' + height + '.'
+          : 'Atenção: ' + width + '×' + height + ' é abaixo de 1280×720. Escolha um arquivo de maior resolução para manter qualidade profissional.';
+        note.dataset.qualityOk = ok ? '1' : '0';
+        URL.revokeObjectURL(url);
+      };
+      if (isVideo) {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.onloadedmetadata = function(){ finish(video.videoWidth, video.videoHeight); };
+        video.onerror = function(){ note.textContent = 'Não foi possível validar a resolução do vídeo.'; URL.revokeObjectURL(url); };
+        video.src = url;
+      } else if (!videoOnly) {
+        const img = new Image();
+        img.onload = function(){ finish(img.naturalWidth, img.naturalHeight); };
+        img.onerror = function(){ note.textContent = 'Não foi possível validar a resolução da imagem.'; URL.revokeObjectURL(url); };
+        img.src = url;
+      }
+    });
+    form.addEventListener('submit', function(event){
+      if (note.dataset.qualityOk === '0') {
+        event.preventDefault();
+        alert('Use uma mídia de pelo menos 1280×720 para manter a qualidade do Modo TV.');
+      }
+    });
+  }
+
+  validateVisualFile(
+    document.getElementById('mascote_os'),
+    document.getElementById('mascotValidation'),
+    document.getElementById('mascotUploadForm'),
+    true
+  );
+  validateVisualFile(
+    document.getElementById('midia'),
+    document.getElementById('mediaValidation'),
+    document.getElementById('mediaUploadForm'),
+    false
+  );
+})();
+</script>
