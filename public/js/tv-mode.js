@@ -749,7 +749,15 @@
     panel.hidden = false;
     panel.setAttribute('aria-hidden', 'false');
     label.textContent = item.name || '';
+
+    video.onended = null;
+    video.onerror = null;
+    video.pause();
+    video.removeAttribute('src');
     video.hidden = true;
+    video.load();
+    image.onerror = null;
+    image.removeAttribute('src');
     image.hidden = true;
 
     let finished = false;
