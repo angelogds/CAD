@@ -1,4 +1,5 @@
 const db = require('../../database/db');
+const exaustorRadialService = require('./exaustor-radial.service');
 
 const TIPOS = {
   ROSCA_HELICOIDAL: 'rosca-helicoidal',
@@ -12,6 +13,7 @@ const TIPOS = {
   BOCA_DE_LOBO_45: 'boca-de-lobo-45',
   BOCA_DE_LOBO_90: 'boca-de-lobo-90',
   MAO_FRANCESA: 'mao-francesa',
+  EXAUSTOR_RADIAL: 'exaustor-radial',
 };
 
 function n2(v) { return Number(Number(v).toFixed(2)); }
@@ -559,6 +561,7 @@ function calcularPorTipo(tipo, params) {
     case TIPOS.BOCA_DE_LOBO_EXCENTRICA: return calcBocaLoboExcentrica(params);
     case TIPOS.BOCA_DE_LOBO_45: return calcBocaLobo45(params);
     case TIPOS.BOCA_DE_LOBO_90: return calcBocaLobo90(params);
+    case TIPOS.EXAUSTOR_RADIAL: return exaustorRadialService.calcExaustorRadial(params);
     case TIPOS.MAO_FRANCESA:
     case 'pao-francesa': return calcMaoFrancesa(params);
     case 'boca-de-lobo-45-graus': return calcBocaLobo45(params);
@@ -805,6 +808,7 @@ module.exports = {
   calcBocaLobo45,
   calcBocaLobo90,
   calcMaoFrancesa,
+  calcExaustorRadial: exaustorRadialService.calcExaustorRadial,
   calcularPorTipo,
   salvar,
   salvarComPdf,
