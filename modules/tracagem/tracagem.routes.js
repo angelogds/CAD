@@ -50,6 +50,8 @@ router.get('/boca-de-lobo-90-graus', requireLogin, requireRole(VIEW_ACCESS), (_r
 router.post('/boca-de-lobo-90-graus/calcular', requireLogin, requireRole(MANAGE_ACCESS), (_req, res) => res.redirect('/tracagem/boca-de-lobo-90'));
 router.get('/mao-francesa', requireLogin, requireRole(VIEW_ACCESS), withMenu(ctrl.maoFrancesaForm));
 router.post('/mao-francesa/calcular', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.maoFrancesaCalcular));
+router.get('/exaustor-radial', requireLogin, requireRole(VIEW_ACCESS), withMenu(ctrl.exaustorRadialForm));
+router.post('/exaustor-radial/calcular', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.exaustorRadialCalcular));
 router.get('/pao-francesa', requireLogin, requireRole(VIEW_ACCESS), (_req, res) => res.redirect('/tracagem/mao-francesa'));
 router.post('/pao-francesa/calcular', requireLogin, requireRole(MANAGE_ACCESS), (_req, res) => res.redirect('/tracagem/mao-francesa'));
 
