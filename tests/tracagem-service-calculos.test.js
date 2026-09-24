@@ -83,3 +83,37 @@ test('campos de compatibilidade para telas de traçagem', () => {
   assert.equal(Number.isFinite(qpr.resultado.C1), true);
   assert.equal(Number.isFinite(qpr.resultado.C4), true);
 });
+
+
+test('exaustor radial: método prático, espiral e palhetas 90 graus', () => {
+  const out = service.calcExaustorRadial({
+    D: 660,
+    largura: 180,
+    dCubo: 160,
+    dEixo: 60,
+    N: 12,
+    pct10: 10,
+    pct90: 90,
+    pct6: 6,
+    divisoesVoluta: 12,
+    unidade: 'mm',
+  });
+
+  assert.equal(out.resultado.referencia10, 66);
+  assert.equal(out.resultado.referencia90, 594);
+  assert.equal(out.resultado.referencia6, 39.6);
+  assert.equal(out.resultado.passoAngular, 30);
+  assert.equal(out.resultado.palhetas.length, 12);
+  assert.equal(out.resultado.pontosVoluta.length, 13);
+  assert.equal(out.resultado.pontosVoluta[0].raio, 330);
+  assert.equal(out.resultado.pontosVoluta.at(-1).raio, 396);
+  out.resultado.pontosVoluta.forEach((p) => assert.equal(Number.isFinite(p.raio), true));
+});
+
+test('exaustor radial: converte cm para mm e valida cubo/eixo', () => {
+  const out = service.calcExaustorRadial({ D: 66, largura: 18, dCubo: 16, dEixo: 6, N: 10, unidade: 'cm' });
+  assert.equal(out.entrada.D, 660);
+  assert.equal(out.entrada.largura, 180);
+  assert.throws(() => service.calcExaustorRadial({ D: 500, largura: 100, dCubo: 500, N: 8 }), /cubo deve ser menor/);
+  assert.throws(() => service.calcExaustorRadial({ D: 500, largura: 100, dCubo: 150, dEixo: 160, N: 8 }), /eixo deve ser menor/);
+});
