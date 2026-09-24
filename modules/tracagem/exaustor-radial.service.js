@@ -58,11 +58,9 @@ function calcExaustorRadial(params = {}) {
     entrada: {
       D: n2(D),
       dInterno: n2(dInterno),
-      dCubo: n2(dInterno), // compatibilidade com registros gerados na primeira versão
       N,
       unidadeEntrada: unidade,
       unidadeInterna: 'mm',
-      anguloPalheta: 90,
     },
     resultado: {
       raioExterno: n2(raioExterno),
