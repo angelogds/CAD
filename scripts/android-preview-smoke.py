@@ -28,17 +28,25 @@ def find(root, label):
 
 def wait_for(label):
     for _ in range(12):
-        root = screen()
-        node = find(root, label)
-        if node is not None:
-            return node
+        try:
+            root = screen()
+            node = find(root, label)
+            if node is not None:
+                return node
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ET.ParseError):
+            # Immediately after boot or Activity transitions, UiAutomator can
+            # return no root node even though the app has launched correctly.
+            pass
         time.sleep(2)
+    (out / 'android-falha.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+    (out / 'android-logcat.txt').write_bytes(adb('logcat', '-d', '-s', 'Capacitor', 'AndroidRuntime', 'chromium'))
     raise AssertionError(f'Android UI missing: {label}')
 
 
 adb('install', '-r', 'android/app/build/outputs/apk/debug/app-debug.apk')
-adb('shell', 'am', 'start', '-W', '-n',
-    'br.com.campodogado.manutencao.debug/br.com.campodogado.manutencao.MainActivity')
+launch = adb('shell', 'am', 'start', '-W', '-n',
+             'br.com.campodogado.manutencao.debug/br.com.campodogado.manutencao.MainActivity')
+(out / 'launch.txt').write_bytes(launch)
 node = wait_for('Abrir menu')
 (out / 'android-inicio.png').write_bytes(adb('exec-out', 'screencap', '-p'))
 x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds')))
