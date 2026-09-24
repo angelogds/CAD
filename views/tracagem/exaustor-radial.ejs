@@ -1,0 +1,102 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/tracagem.css?v=20260923">
+<script src="/js/tracagem.js?v=20260819" defer></script>
+<%
+  const entrada = calculo?.resultado?.entrada || {};
+  const resultado = calculo?.resultado?.resultado || {};
+  const pontos = resultado.pontosVoluta || [];
+  const palhetas = resultado.palhetas || [];
+  const maxRaio = resultado.raioFinalVoluta || ((entrada.D || 600) * .6);
+  const escala = maxRaio > 0 ? 220 / maxRaio : 1;
+  const cx = 260, cy = 260;
+  const spiralPath = pontos.length ? pontos.map((p, i) => (i ? 'L' : 'M') + ' ' + (cx + p.x * escala).toFixed(1) + ' ' + (cy - p.y * escala).toFixed(1)).join(' ') : '';
+%>
+<div class="tr-page">
+  <%- include('partials/calculadora-header', { titulo: 'Exaustor radial', tipo: 'exaustor-radial' }) %>
+
+  <div class="tracagem-note">
+    <strong>Projeto geométrico para fabricação</strong><br>
+    Método prático Campo do Gado (10% / 90% / 6%) + voluta por espiral de Arquimedes + rotor radial com palhetas a 90°.
+  </div>
+
+  <div class="tr-card">
+    <form class="exaustor-layout" method="POST" action="/tracagem/exaustor-radial/calcular">
+      <section class="exaustor-form">
+        <h3>Dados do rotor</h3>
+        <div class="tr-grid">
+          <div><label>D — Diâmetro externo do rotor</label><input class="input" name="D" type="number" min="0.01" step="0.01" required value="<%= calculo?.parametros?.D || '' %>"></div>
+          <div><label>Largura do rotor</label><input class="input" name="largura" type="number" min="0.01" step="0.01" required value="<%= calculo?.parametros?.largura || '' %>"></div>
+          <div><label>Diâmetro do cubo</label><input class="input" name="dCubo" type="number" min="0.01" step="0.01" required value="<%= calculo?.parametros?.dCubo || '' %>"></div>
+          <div><label>Diâmetro do eixo</label><input class="input" name="dEixo" type="number" min="0" step="0.01" value="<%= calculo?.parametros?.dEixo || '' %>"></div>
+          <div><label>Quantidade de palhetas</label><input class="input" name="N" type="number" min="3" step="1" required value="<%= calculo?.parametros?.N || 12 %>"></div>
+          <div><label>Espessura da chapa</label><input class="input" name="E" type="number" min="0" step="0.01" value="<%= calculo?.parametros?.E || '' %>"></div>
+          <div><label>Unidade</label><select class="input" name="unidade"><option value="mm" <%= (calculo?.parametros?.unidade || 'mm') === 'mm' ? 'selected' : '' %>>mm</option><option value="cm" <%= calculo?.parametros?.unidade === 'cm' ? 'selected' : '' %>>cm</option></select></div>
+          <div><label>Divisões da voluta</label><input class="input" name="divisoesVoluta" type="number" min="4" step="1" value="<%= calculo?.parametros?.divisoesVoluta || 12 %>"></div>
+        </div>
+
+        <h3 style="margin-top:16px">Método prático Campo do Gado</h3>
+        <div class="tr-grid">
+          <div><label>Referência 10%</label><input class="input" name="pct10" type="number" min="0.01" step="0.01" value="<%= calculo?.parametros?.pct10 || 10 %>"></div>
+          <div><label>Referência 90%</label><input class="input" name="pct90" type="number" min="0.01" step="0.01" value="<%= calculo?.parametros?.pct90 || 90 %>"></div>
+          <div><label>Referência 6%</label><input class="input" name="pct6" type="number" min="0.01" step="0.01" value="<%= calculo?.parametros?.pct6 || 6 %>"></div>
+          <div><label>Abertura máxima da voluta</label><input class="input" name="aberturaVoluta" type="number" min="0.01" step="0.01" placeholder="Padrão: valor dos 10%" value="<%= calculo?.parametros?.aberturaVoluta || '' %>"></div>
+        </div>
+        <div class="tr-actions" style="margin-top:14px"><button class="btn btn-green" type="submit">CALCULAR</button></div>
+      </section>
+
+      <section class="exaustor-preview">
+        <h3>Pré-visualização técnica</h3>
+        <% if (calculo?.resultado) { %>
+        <svg viewBox="0 0 620 540" class="exaustor-svg" role="img" aria-label="Voluta e rotor radial calculados">
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L6,3 z" fill="#64748b"/></marker>
+          </defs>
+          <circle cx="<%= cx %>" cy="<%= cy %>" r="<%= (resultado.raioRotor * escala).toFixed(1) %>" fill="none" stroke="#15803d" stroke-width="2"/>
+          <circle cx="<%= cx %>" cy="<%= cy %>" r="<%= (resultado.raioCubo * escala).toFixed(1) %>" fill="#f1f5f9" stroke="#475569" stroke-width="2"/>
+          <% palhetas.forEach((p) => { %>
+            <line x1="<%= (cx + p.x1 * escala).toFixed(1) %>" y1="<%= (cy - p.y1 * escala).toFixed(1) %>" x2="<%= (cx + p.x2 * escala).toFixed(1) %>" y2="<%= (cy - p.y2 * escala).toFixed(1) %>" stroke="#0f172a" stroke-width="3"/>
+          <% }) %>
+          <path d="<%= spiralPath %>" fill="none" stroke="#dc2626" stroke-width="3"/>
+          <line x1="40" y1="500" x2="580" y2="500" stroke="#94a3b8" stroke-width="1"/>
+          <text x="40" y="525" fill="#475569" font-size="14">Rotor radial 90° • Voluta por espiral de Arquimedes • desenho esquemático cotado pelos resultados</text>
+        </svg>
+        <% } else { %>
+          <div class="tracagem-result-empty">Informe as medidas e clique em <strong>CALCULAR</strong> para gerar a voluta, o rotor e a tabela de fabricação.</div>
+        <% } %>
+      </section>
+    </form>
+  </div>
+
+  <% if (calculo?.resultado) { %>
+    <div class="tr-card">
+      <h3>Resultados principais</h3>
+      <div class="resultado">
+        <div>10% de D = <%= resultado.referencia10.toFixed(2) %> mm</div>
+        <div>90% de D = <%= resultado.referencia90.toFixed(2) %> mm</div>
+        <div>6% de D = <%= resultado.referencia6.toFixed(2) %> mm</div>
+        <div>Passo angular = <%= resultado.passoAngular.toFixed(2) %>°</div>
+        <div>Altura radial da palheta = <%= resultado.alturaRadialPalheta.toFixed(2) %> mm</div>
+        <div>Raio final da voluta = <%= resultado.raioFinalVoluta.toFixed(2) %> mm</div>
+      </div>
+    </div>
+
+    <div class="tracagem-data-grid">
+      <div class="tr-card">
+        <h3>Pontos da voluta</h3>
+        <div class="table-wrap"><table class="tr-table"><thead><tr><th>Ponto</th><th>Ângulo</th><th>Raio</th><th>Abertura</th></tr></thead><tbody>
+        <% pontos.forEach((p) => { %><tr><td>V<%= p.indice %></td><td><%= p.angulo.toFixed(2) %>°</td><td><%= p.raio.toFixed(2) %> mm</td><td><%= p.abertura.toFixed(2) %> mm</td></tr><% }) %>
+        </tbody></table></div>
+      </div>
+      <div class="tr-card">
+        <h3>Posição das palhetas</h3>
+        <div class="table-wrap"><table class="tr-table"><thead><tr><th>Palheta</th><th>Ângulo</th><th>Tipo</th></tr></thead><tbody>
+        <% palhetas.forEach((p) => { %><tr><td>P<%= p.indice %></td><td><%= p.angulo.toFixed(2) %>°</td><td>Radial 90°</td></tr><% }) %>
+        </tbody></table></div>
+      </div>
+    </div>
+
+    <div class="tr-card">
+      <%- include('partials/relacionar-equipamento', { tipo: 'exaustor-radial', calculo, equipamentos, tituloPadrao: 'Exaustor radial' }) %>
+    </div>
+  <% } %>
+</div>
