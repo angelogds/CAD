@@ -11,6 +11,7 @@ on:
       - 'public/js/native-menu.js'
       - 'scripts/*mobile*'
       - 'scripts/android-preview.cjs'
+      - 'scripts/android-preview-smoke.py'
       - 'capacitor.config.ts'
       - 'package*.json'
       - '.github/workflows/android-preview.yml'
@@ -44,4 +45,26 @@ jobs:
           name: CAD-previa-android
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 7
+      - name: Preparar aceleracao do emulador
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Instalar e testar no Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: python3 scripts/android-preview-smoke.py
+      - name: Capturas e validacao Android
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: CAD-validacao-android
+          path: android-smoke/
+          if-no-files-found: warn
           retention-days: 7
