@@ -397,6 +397,15 @@ function buildFormattedData(tracagem) {
       { medida: 'FS', legenda: 'Folga para solda', valor: formatMeasure(resultado.FS ?? entrada.folgaSolda, unidade) },
       { medida: 'Comprimento final', legenda: 'Medida final para corte (A + FS)', valor: formatMeasure(resultado.medidaFinalCorte ?? resultado.comprimentoComFolga, unidade) },
     );
+  } else if (tracagem.tipo === 'exaustor-radial') {
+    medidasPlanificacaoFormatadas.push(
+      { medida: 'Corda ext.', legenda: 'Distância reta entre palhetas no diâmetro externo', valor: formatMeasure(resultado.cordaExterna, unidade) },
+      { medida: 'Corda int.', legenda: 'Distância reta entre palhetas no diâmetro interno', valor: formatMeasure(resultado.cordaInterna, unidade) },
+      { medida: 'Ângulo', legenda: 'Divisão angular entre palhetas', valor: `${formatNumber(Number(resultado.passoAngular))}°` },
+      { medida: 'Palheta', legenda: 'Comprimento radial entre os dois diâmetros', valor: formatMeasure(resultado.comprimentoRadialPalheta, unidade) },
+      { medida: 'Arco ext.', legenda: 'Passo no perímetro externo (referência)', valor: formatMeasure(resultado.passoArcoExterno, unidade) },
+      { medida: 'Arco int.', legenda: 'Passo no perímetro interno (referência)', valor: formatMeasure(resultado.passoArcoInterno, unidade) },
+    );
   } else {
   const medidasMapeadas = new Map([
       ['R1', resultado.R1_dev ?? resultado.R1],
