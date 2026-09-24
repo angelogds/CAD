@@ -1,0 +1,47 @@
+name: Android - APK de previa
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/android-card-menu]
+    paths:
+      - 'android/**'
+      - 'mobile/**'
+      - 'public/css/native-menu.css'
+      - 'public/js/native-menu.js'
+      - 'scripts/*mobile*'
+      - 'scripts/android-preview.cjs'
+      - 'capacitor.config.ts'
+      - 'package*.json'
+      - '.github/workflows/android-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Dependencias para a previa
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Gerar e sincronizar a previa offline
+        run: node scripts/android-preview.cjs
+      - name: Compilar APK de teste
+        working-directory: android
+        run: bash gradlew assembleDebug --no-daemon --console=plain
+      - uses: actions/upload-artifact@v7
+        with:
+          name: CAD-previa-android
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
