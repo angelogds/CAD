@@ -57,7 +57,7 @@ const LABELS = {
   'boca-de-lobo-90-graus': 'Boca de lobo 90 graus',
   'mao-francesa': 'Mão francesa',
   'pao-francesa': 'Mão francesa',
-  'exaustor-radial': 'Exaustor radial',
+  'exaustor-radial': 'Traçagem do rotor radial',
 };
 
 const PDF_STYLE = {
@@ -110,13 +110,8 @@ const PARAM_DESCRIPTIONS = {
   C2: 'C2 = trecho entre divisões',
   C3: 'C3 = trecho entre divisões',
   C4: 'C4 = trecho entre divisões',
-  largura: 'Largura do rotor',
-  dCubo: 'Diâmetro do cubo',
-  dEixo: 'Diâmetro do eixo',
-  pct10: 'Coeficiente prático 10%',
-  pct90: 'Coeficiente prático 90%',
-  pct6: 'Coeficiente prático 6%',
-  aberturaVoluta: 'Abertura máxima da voluta',
+  dInterno: 'Diâmetro interno do rotor',
+  dCubo: 'Diâmetro interno do rotor',
 };
 
 const PLAN_LEGENDS = {
@@ -401,6 +396,15 @@ function buildFormattedData(tracagem) {
       { medida: 'B', legenda: 'Altura útil da chapa', valor: formatMeasure(resultado.B, unidade) },
       { medida: 'FS', legenda: 'Folga para solda', valor: formatMeasure(resultado.FS ?? entrada.folgaSolda, unidade) },
       { medida: 'Comprimento final', legenda: 'Medida final para corte (A + FS)', valor: formatMeasure(resultado.medidaFinalCorte ?? resultado.comprimentoComFolga, unidade) },
+    );
+  } else if (tracagem.tipo === 'exaustor-radial') {
+    medidasPlanificacaoFormatadas.push(
+      { medida: 'Corda ext.', legenda: 'Distância reta entre palhetas no diâmetro externo', valor: formatMeasure(resultado.cordaExterna, unidade) },
+      { medida: 'Corda int.', legenda: 'Distância reta entre palhetas no diâmetro interno', valor: formatMeasure(resultado.cordaInterna, unidade) },
+      { medida: 'Ângulo', legenda: 'Divisão angular entre palhetas', valor: `${formatNumber(Number(resultado.passoAngular))}°` },
+      { medida: 'Palheta', legenda: 'Comprimento radial entre os dois diâmetros', valor: formatMeasure(resultado.comprimentoRadialPalheta, unidade) },
+      { medida: 'Arco ext.', legenda: 'Passo no perímetro externo (referência)', valor: formatMeasure(resultado.passoArcoExterno, unidade) },
+      { medida: 'Arco int.', legenda: 'Passo no perímetro interno (referência)', valor: formatMeasure(resultado.passoArcoInterno, unidade) },
     );
   } else {
   const medidasMapeadas = new Map([
@@ -846,8 +850,8 @@ module.exports = {
   bocaLobo90Calcular: calcular('boca-de-lobo-90', 'boca-lobo-90', 'Boca de lobo 90 graus'),
   maoFrancesaForm: renderCalc('mao-francesa', 'mao-francesa', 'Mão francesa'),
   maoFrancesaCalcular: calcular('mao-francesa', 'mao-francesa', 'Mão francesa'),
-  exaustorRadialForm: renderCalc('exaustor-radial', 'exaustor-radial', 'Exaustor radial'),
-  exaustorRadialCalcular: calcular('exaustor-radial', 'exaustor-radial', 'Exaustor radial'),
+  exaustorRadialForm: renderCalc('exaustor-radial', 'exaustor-radial', 'Traçagem do rotor radial'),
+  exaustorRadialCalcular: calcular('exaustor-radial', 'exaustor-radial', 'Traçagem do rotor radial'),
   salvar,
   gerarPdf,
   gerarPdfCalculo,

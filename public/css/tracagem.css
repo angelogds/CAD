@@ -32,9 +32,14 @@
 @media(max-width:520px){.tracagem-summary-grid,.tracagem-tool-grid,.tracagem-save-grid,.tracagem-meta-grid,.tracagem-filter-grid,.tracagem-data-list{grid-template-columns:1fr}.tracagem-tool-visual{height:175px}.tracagem-header-actions{width:100%}.tracagem-header-actions .btn{flex:1}.resultado{grid-template-columns:1fr!important}}
 @media print{.tracagem-header-actions,.tr-actions,.tr-favorite,.tracagem-zoom-btn,.sidebar,.topbar,.footer{display:none!important}.tracagem-tool-card,.tr-card,.tracagem-card{box-shadow:none}.content{padding:0!important}}
 
-/* Exaustor radial */
+/* Rotor radial */
 .exaustor-layout{display:grid;grid-template-columns:minmax(320px,.92fr) minmax(420px,1.08fr);gap:18px;align-items:start}
 .exaustor-form,.exaustor-preview{min-width:0}
 .exaustor-preview{border:1px solid #e1ebe5;border-radius:12px;background:linear-gradient(180deg,#fff,#f8fbf9);padding:14px}
 .exaustor-svg{display:block;width:100%;max-height:580px;background:#fff;border:1px solid #e5ece8;border-radius:10px}
 @media(max-width:1050px){.exaustor-layout{grid-template-columns:1fr}}
+
+.rotor-medida-principal{margin-top:18px;border:2px solid #86cfa5;background:#ecfdf3;border-radius:12px;padding:15px}
+.rotor-medida-principal small{display:block;color:#166534;font-size:.72rem;font-weight:900;letter-spacing:.05em}
+.rotor-medida-principal strong{display:block;margin-top:4px;color:#14532d;font-size:2rem}
+.rotor-medida-principal span{display:block;margin-top:3px;color:#475569;font-size:.82rem}

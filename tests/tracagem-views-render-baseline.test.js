@@ -15,7 +15,6 @@ const views = [
   'boca-lobo-45.ejs',
   'boca-lobo-90.ejs',
   'mao-francesa.ejs',
-  'exaustor-radial.ejs',
 ];
 
 test('views principais possuem formulário POST e seletor de unidade', () => {
@@ -36,11 +35,25 @@ test('curva de gomos e quadrado-redondo possuem campos de divisões', () => {
   assert.match(fs.readFileSync(path.join(root, 'quadrado-redondo.ejs'), 'utf8'), /name="N"/);
 });
 
-test('exaustor radial possui campos de rotor, voluta e método prático', () => {
+test('rotor radial possui somente os três dados de entrada de fabricação', () => {
   const file = path.join(__dirname, '..', 'views', 'tracagem', 'exaustor-radial.ejs');
   const content = fs.readFileSync(file, 'utf8');
-  ['name="D"', 'name="largura"', 'name="dCubo"', 'name="N"', 'name="pct10"', 'name="pct90"', 'name="pct6"', 'name="aberturaVoluta"']
+
+  ['name="D"', 'name="dInterno"', 'name="N"']
     .forEach((field) => assert.match(content, new RegExp(field)));
-  assert.match(content, /Pontos da voluta/);
-  assert.match(content, /Posição das palhetas/);
+
+  ['name="largura"', 'name="dEixo"', 'name="E"', 'name="pct10"', 'name="pct90"', 'name="pct6"', 'name="aberturaVoluta"', 'name="divisoesVoluta"']
+    .forEach((field) => assert.doesNotMatch(content, new RegExp(field)));
+
+  assert.match(content, /MEDIDA PRINCIPAL PARA MARCAÇÃO/);
+  assert.match(content, /Distância externa/);
+  assert.match(content, /Distância interna/);
+  assert.doesNotMatch(content, /Pontos da voluta/);
+});
+
+test('rotor radial possui rota nova e mantém compatibilidade com a antiga', () => {
+  const file = path.join(__dirname, '..', 'modules', 'tracagem', 'tracagem.routes.js');
+  const content = fs.readFileSync(file, 'utf8');
+  assert.match(content, /\/rotor-radial/);
+  assert.match(content, /\/exaustor-radial/);
 });
