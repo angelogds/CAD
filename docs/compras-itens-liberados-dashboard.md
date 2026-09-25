@@ -22,3 +22,14 @@ Solicitações com itens liberados recebem destaque verde suave e o botão princ
 O painel também cria um indicador `LIBERADOS P/ COMPRA` e um alerta operacional com atalho para os itens liberados atualmente exibidos.
 
 A sinalização reutiliza o endpoint de aprovação por item já existente e não cria novos status, tabelas ou migrations.
+
+
+## Semáforo visual da fila
+
+A fila operacional também diferencia solicitações que ainda não iniciaram cotação:
+
+- **vermelho suave:** solicitação em `ABERTA` ou `REABERTA`; indica que ainda precisa entrar em cotação;
+- **verde suave:** existe item efetivamente liberado pela Diretoria e aguardando compra;
+- **sem destaque de pendência:** a solicitação já avançou para `EM_COTACAO` ou outra etapa posterior.
+
+O verde de liberação para compra tem prioridade visual sobre o vermelho de abertura. A regra é derivada do status atual, portanto vale automaticamente para solicitações antigas ainda abertas e para novas solicitações que chegarem à fila. Nenhum status é alterado apenas por causa da sinalização visual.
