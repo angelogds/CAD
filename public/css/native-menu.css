@@ -1,0 +1,121 @@
+.native-menu-icon, .native-menu-close, .native-menu-backdrop { display: none; }
+
+@media (max-width: 980px) {
+  .native-android .sidebar {
+    width: min(88vw, 380px);
+    max-width: 88vw;
+    height: 100dvh;
+    min-height: 0;
+    padding: max(20px, env(safe-area-inset-top)) 16px max(14px, env(safe-area-inset-bottom));
+    border-radius: 0 24px 24px 0;
+    background: #f4f8f5;
+    border-right: 1px solid #d9e6de;
+    box-shadow: 12px 0 48px #102c2533;
+    z-index: 1001;
+    visibility: hidden;
+  }
+  .native-android .mobile-sidebar-open .sidebar { visibility: visible; }
+  .native-android .sidebar-title {
+    position: relative;
+    padding: 8px 46px 20px 4px;
+    border-bottom: 1px solid #dce7df;
+  }
+  .native-android .sidebar-brand-title { color: #123d2a; font-size: 19px; line-height: 1.25; }
+  .native-android .sidebar-brand-subtitle { color: #52695c; font-size: 10px; margin-top: 5px; }
+  .native-android .native-menu-close {
+    display: grid;
+    place-items: center;
+    position: absolute;
+    right: 0;
+    top: 2px;
+    width: 44px;
+    height: 44px;
+    border: 1px solid #d9e6de;
+    border-radius: 14px;
+    background: #fff;
+    color: #174d33;
+    font-size: 28px;
+    cursor: pointer;
+  }
+  .native-android .sidebar .nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: max-content;
+    align-content: start;
+    gap: 10px;
+    padding: 6px 2px 12px;
+    scrollbar-color: #b2ccbc transparent;
+  }
+  .native-android .sidebar .nav-section,
+  .native-android .sidebar .nav-divider,
+  .native-android .sidebar .nav-submenu { grid-column: 1 / -1; }
+  .native-android .sidebar .nav-section { color: #52695c; font-size: 10px; padding: 16px 2px 3px; }
+  .native-android .sidebar .nav-divider { display: none; }
+  .native-android .sidebar .nav > .nav-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    height: auto;
+    align-self: start;
+    min-height: 110px;
+    padding: 14px 8px;
+    border: 1px solid #dce8df;
+    border-radius: 19px;
+    background: #fff;
+    color: #264535;
+    box-shadow: 0 3px 8px #173f2810;
+    text-align: center;
+    white-space: normal;
+    transform: none;
+  }
+  .native-android .sidebar .nav > .nav-item::before { display: none; }
+  .native-android .sidebar .nav > .nav-item.active {
+    background: #176c43;
+    border-color: #176c43;
+    color: #fff;
+    box-shadow: 0 6px 14px #176c4330;
+  }
+  .native-android .sidebar .nav > .nav-item:hover { border-color: #176c43; }
+  .native-android .native-menu-icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+    background: #eaf4ed;
+    color: #176c43;
+    font-size: 27px;
+    line-height: 1;
+  }
+  .native-android .active > .native-menu-icon { background: #ffffff26; color: #fff; }
+  .native-android .sidebar .nav-label {
+    display: block;
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+    line-height: 1.3;
+  }
+  .native-android .sidebar .nav > .nav-item .pill-tag { position: absolute; right: 6px; top: 6px; }
+  .native-android .sidebar .nav-subitem { color: #264535; min-height: 44px; }
+  .native-android .sidebar .nav-subitem.active { background: #dcefe3; }
+  .native-android .sidebar-footer { border-top: 1px solid #dce7df; }
+  .native-android .sidebar-footer .nav-item { color: #264535; min-height: 44px; }
+  .native-android .sidebar-footer small { color: #52695c; }
+  .native-android .native-menu-backdrop:not([hidden]) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    border: 0;
+    background: #0a211b80;
+    backdrop-filter: blur(2px);
+  }
+  .native-android .sidebar :focus-visible { outline: 3px solid #c88b13; outline-offset: 2px; }
+  .native-android .sidebar-toggle { min-width: 44px; min-height: 44px; }
+}
