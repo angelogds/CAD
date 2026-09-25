@@ -42,3 +42,16 @@ test('painel força a atualização coordenada dos recursos que impedem seleçã
   assert.match(view, new RegExp(`compras-active-priority-fix\\.css\\?v=${version}`));
   assert.match(view, new RegExp(`compras-dashboard\\.js\\?v=${version}`));
 });
+
+
+test('fila sinaliza ABERTA e REABERTA em vermelho até entrar em cotação', () => {
+  const view = fs.readFileSync(viewPath, 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'compras-dashboard.css'), 'utf8');
+  const releasedScript = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'compras-itens-liberados-dashboard.js'), 'utf8');
+
+  assert.match(view, /\['ABERTA','REABERTA'\]\.includes\(s\.status\).*is-awaiting-quotation/);
+  assert.match(css, /\.request-row\.is-awaiting-quotation\{/);
+  assert.match(css, /#fff1f2/);
+  assert.match(releasedScript, /\.request-row\.is-director-released/);
+  assert.match(releasedScript, /#f0fdf4/);
+});
