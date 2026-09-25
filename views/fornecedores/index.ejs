@@ -62,7 +62,7 @@
 
   <section class="supplier-card supplier-list">
     <nav class="supplier-tabs" aria-label="Visualizações da lista">
-      <a class="<%= filters.situacao === 'ATIVO' && !filters.favorito !filters.pendencia ? 'is-active' : '' %>" href="<%= withContext('?situacao=ATIVO') %>">Fornecedores ativos</a>
+      <a class="<%= filters.situacao === 'ATIVO' && !filters.favorito && !filters.pendencia ? 'is-active' : '' %>" href="<%= withContext('?situacao=ATIVO') %>">Fornecedores ativos</a>
       <a class="<%= filters.favorito === '1' ? 'is-active' : '' %>" href="<%= withContext('?favorito=1') %>">Favoritos</a>
       <a class="<%= filters.situacao === 'INATIVO' ? 'is-active' : '' %>" href="<%= withContext('?situacao=INATIVO') %>">Inativos</a>
       <a class="<%= filters.pendencia === '1' ? 'is-active' : '' %>" href="<%= withContext('?pendencia=1') %>">Pendências cadastrais</a>
