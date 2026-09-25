@@ -6,13 +6,17 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('migration de demandas é aditiva e preserva dados existentes', () => {
+test('migrations de demandas são aditivas e preservam dados existentes', () => {
   const migration = read('database/migrations/188_demandas_planejamento_integrado.js');
+  const purchaseReleaseMigration = read('database/migrations/209_demandas_liberacao_compras.js');
   assert.match(migration, /demanda_pai_id/);
   assert.match(migration, /equipamento_id/);
   assert.match(migration, /aprovacao_status/);
   assert.match(migration, /addColumnIfMissing\('os', 'demanda_id'/);
-  assert.doesNotMatch(migration, /DROP\s+TABLE|DELETE\s+FROM\s+demandas/i);
+  assert.match(purchaseReleaseMigration, /liberacao_compras_status/);
+  assert.match(purchaseReleaseMigration, /liberacao_compras_em/);
+  assert.match(purchaseReleaseMigration, /liberacao_compras_por/);
+  assert.doesNotMatch(migration + purchaseReleaseMigration, /DROP\s+TABLE|DELETE\s+FROM\s+demandas/i);
 });
 
 test('demanda reutiliza solicitações existentes para planejamento antecipado de materiais', () => {
@@ -37,15 +41,19 @@ test('conversão para nova OS exige aprovação prévia da Diretoria ou Gestão'
   assert.match(controller, /approval !== 'APROVADA'/);
   assert.match(controller, /DEMANDA_AGUARDANDO_APROVACAO/);
   assert.match(controller, /aprovada pela Diretoria\/Gestão antes de gerar uma Ordem de Serviço/);
-  assert.match(controller, /pré-cotação pode continuar normalmente enquanto aguarda aprovação/);
+  assert.match(controller, /A compra dos materiais pode continuar normalmente enquanto aguarda aprovação/);
 });
 
-test('compras permite pré-cotação mas bloqueia compra antes da OS', () => {
+test('compras permite pré-cotação e libera compra pela Demanda sem exigir OS', () => {
   const gate = read('modules/compras/compras-demandas.service.js');
+  const purchaseQueue = read('modules/compras/compras.service.js');
   const controller = read('modules/compras/compras.controller.js');
   assert.match(gate, /s\.demanda_id IS NOT NULL/);
-  assert.match(gate, /COALESCE\(s\.os_id, 0\) = 0/);
-  assert.match(gate, /assertCompraLiberada/);
+  assert.match(gate, /liberacao_compras_status/);
+  assert.match(gate, /DEMANDA_COMPRA_AGUARDANDO_LIBERACAO/);
+  assert.match(gate, /A geração de OS não é necessária para comprar o material/);
+  assert.match(purchaseQueue, /liberacao_compras_status/);
+  assert.match(purchaseQueue, /s\.demanda_id IS NULL/);
   assert.match(controller, /demandasComprasService\.assertCompraLiberada/);
   assert.match(controller, /req\.body\.acao === 'comprar'/);
   assert.match(controller, /atendido_estoque/);
@@ -57,8 +65,25 @@ test('painel de compras carrega bloco real de pré-cotações de demandas', () =
   const script = read('public/js/compras-demandas-pre-cotacao.js');
   assert.match(routes, /\/demandas\/pre-cotacoes\.json/);
   assert.match(layout, /compras-demandas-pre-cotacao\.js/);
-  assert.match(script, /Pré-cotações de Demandas/);
-  assert.match(script, /Compra aguardando OS/);
+  assert.match(script, /Pré-solicitações de Demandas/);
+  assert.match(script, /Compra aguardando liberação/);
+});
+
+test('planejamento separa liberação de compras da aprovação da execução e permite criticidade da solicitação', () => {
+  const service = read('modules/demandas/demandas.service.js');
+  const controller = read('modules/demandas/demandas.controller.js');
+  const routes = read('modules/demandas/demandas.routes.js');
+  const detail = read('views/demandas/view.ejs');
+
+  assert.match(service, /function updatePurchaseRelease/);
+  assert.match(service, /LIBERACAO_COMPRAS_STATUS/);
+  assert.match(service, /prioridade: \['CRITICA', 'ALTA', 'MEDIA', 'BAIXA'\]/);
+  assert.match(controller, /prioridade_solicitacao/);
+  assert.match(routes, /\/liberacao-compras/);
+  assert.match(detail, /Liberação da compra/);
+  assert.match(detail, /Não é necessário gerar OS/);
+  assert.match(detail, /name="prioridade_solicitacao"/);
+  assert.match(detail, /Criticidade da solicitação/);
 });
 
 test('detalhe da demanda organiza resumo planejamento materiais subdemandas OS e histórico em abas', () => {

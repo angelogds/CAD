@@ -513,3 +513,63 @@
   }
   .tv-v3-overview-panel{display:none}
 }
+
+
+/* Modo TV v4 — tela gerencial integrada ao PCM */
+.management-screen{gap:10px}
+.management-layout{display:grid;grid-template-columns:1.15fr .85fr;gap:10px;min-height:0}
+.management-rankings{display:grid;grid-template-rows:1fr;gap:10px;min-height:0}
+.management-rankings--lubrication-only{height:100%}
+.management-reliability{display:grid;grid-template-rows:auto auto auto;gap:10px;min-height:0}
+.management-reliability-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.management-reliability-grid>div{display:grid;gap:4px;padding:13px;border:1px solid var(--line);border-radius:12px;background:#fbfdfc}
+.tv-theme-dark .management-reliability-grid>div{background:#1b2a23}
+.management-reliability-grid span{font-size:.72em;font-weight:900;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.management-reliability-grid strong{font-size:clamp(22px,2vw,36px);line-height:1.05}
+.management-reliability-grid small{font-size:.72em;color:var(--muted)}
+.management-reliability-status{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:11px;border:1px solid var(--line);background:#f6faf7}
+.management-reliability-status.success{border-left:5px solid var(--green2)}
+.management-reliability-status.warning{border-left:5px solid var(--orange)}
+.management-reliability-status.danger{border-left:5px solid #d92d20}
+.management-reliability-status span{font-size:.76em;color:var(--muted);text-align:right}
+.management-list{display:grid;gap:7px}
+.tv-management-row{display:grid;grid-template-columns:36px minmax(130px,.9fr) 1fr minmax(100px,auto);align-items:center;gap:9px;min-height:46px}
+.tv-management-rank{display:grid;place-items:center;min-width:34px;height:28px;border-radius:999px;background:#e8f4ee;color:var(--green);font-weight:900;font-size:.78em}
+.tv-management-row>div{display:flex;flex-direction:column;min-width:0}
+.tv-management-row>div strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tv-management-row>div small{color:var(--muted);font-size:.7em}
+.tv-management-row>i{display:block;height:8px;overflow:hidden;border-radius:999px;background:#e5ece8}
+.tv-management-row>i b{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--green2),#0f8a4b)}
+.tv-management-row--failure>i b{background:linear-gradient(90deg,var(--orange),#d92d20)}
+.tv-management-row>strong{white-space:nowrap;font-size:.9em}
+.management-lubrication{min-height:0;overflow:hidden}
+.management-lubrication--expanded{height:100%;display:grid;grid-template-rows:auto 1fr}
+.management-lubrication--expanded .tv-lubrication-table-wrap{height:100%}
+.management-lubrication--expanded .tv-lubrication-table{height:100%;font-size:.86em}
+.management-lubrication--expanded .tv-lubrication-table thead{height:42px}
+.management-lubrication--expanded .tv-lubrication-table tbody tr{height:clamp(62px,8vh,88px)}
+.management-lubrication--expanded .tv-lubrication-table td{padding:12px 10px}
+.management-lubrication--expanded .tv-lubrication-table td>strong{font-size:1.05em}
+.management-lubrication--expanded .tv-lubrication-table td>small{font-size:.9em}
+.tv-lubrication-table-wrap{min-height:0;overflow:hidden;border:1px solid var(--line);border-radius:12px}
+.tv-lubrication-table{width:100%;border-collapse:collapse;font-size:.77em}
+.tv-lubrication-table th{padding:7px 8px;text-align:left;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-size:.78em;background:#f5f8f6;border-bottom:1px solid var(--line)}
+.tv-theme-dark .tv-lubrication-table th{background:#1b2a23}
+.tv-lubrication-table td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tv-lubrication-table tr:last-child td{border-bottom:0}
+.tv-lubrication-table td:nth-child(1){width:88px;white-space:nowrap}
+.tv-lubrication-table td:nth-child(3){width:120px}
+.tv-lubrication-table td:nth-child(4){width:108px}
+.tv-lubrication-table td>strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tv-lubrication-table td>small{display:block;margin-top:2px;color:var(--muted);font-size:.82em}
+.tv-lubrication-status{display:inline-flex;align-items:center;justify-content:center;min-width:88px;padding:5px 8px;border-radius:999px;font-size:.78em;font-weight:900;text-transform:uppercase;letter-spacing:.03em;background:#eef2ef;color:#52615a}
+.tv-lubrication-status.success{background:#e7f6ee;color:#087443}
+.tv-lubrication-status.info{background:#e8f2ff;color:#1f5f9f}
+.tv-lubrication-status.warning{background:#fff4dd;color:#9a6200}
+.tv-lubrication-status.danger{background:#fdecec;color:#b42318}
+.tv-lubrication-status.neutral{background:#eef2ef;color:#52615a}
+
+@media(max-width:1180px){
+  .management-layout{grid-template-columns:1fr}
+  .management-rankings{grid-template-columns:1fr;grid-template-rows:auto}
+}

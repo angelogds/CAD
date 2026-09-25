@@ -1,0 +1,164 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/lubrificacao.css?v=20260921-v2">
+<div class="lub-page">
+  <header class="lub-head">
+    <div>
+      <span class="lub-eyebrow">Execução operacional</span>
+      <h1>Meu roteiro de lubrificação</h1>
+      <p>Siga as rotas liberadas pelo PCM, execute cada ponto conforme a instrução e registre qualquer anomalia encontrada.</p>
+    </div>
+    <a class="lub-btn ghost" href="/dashboard">Voltar ao painel</a>
+  </header>
+
+  <section class="lub-week-banner <%= semana?.responsavel_user_id && !isResponsavelSemana ? 'blocked' : '' %>">
+    <div>
+      <span class="lub-eyebrow">Responsabilidade da semana</span>
+      <strong><%= semana?.responsavel_nome || 'Responsável semanal ainda não definido pelo PCM' %></strong>
+      <% if (semana) { %><small><%= semana.semana_inicio %> a <%= semana.semana_fim %></small><% } %>
+    </div>
+    <a class="lub-btn ghost" href="/lubrificacao/relatorio-semanal.pdf">Relatório semanal PDF</a>
+  </section>
+
+  <% if (semana?.responsavel_user_id && !isResponsavelSemana) { %>
+    <div class="lub-empty" style="margin-bottom:14px">
+      <strong>O roteiro desta semana está com <%= semana.responsavel_nome %>.</strong>
+      <span>Você continua com acesso ao módulo, mas não recebe pontos enquanto outro mecânico for o responsável semanal.</span>
+    </div>
+  <% } %>
+
+  <section class="lub-how" aria-label="Como funciona o roteiro">
+    <div class="lub-how-item"><b>1</b><span><strong>PCM valida</strong><small>produto, quantidade e frequência</small></span></div>
+    <div class="lub-how-item"><b>2</b><span><strong>Você segue a rota</strong><small>na sequência dos equipamentos</small></span></div>
+    <div class="lub-how-item"><b>3</b><span><strong>Executa e registra</strong><small>quantidade e condição encontrada</small></span></div>
+    <div class="lub-how-item"><b>4</b><span><strong>Anomalia volta ao PCM</strong><small>para análise e possível OS</small></span></div>
+  </section>
+
+  <section class="lub-kpis" aria-label="Resumo do roteiro">
+    <a href="/lubrificacao?status=ATRASADO" class="lub-kpi danger"><span>Atrasados</span><strong><%= resumo.atrasados %></strong><small>prioridade imediata</small></a>
+    <a href="/lubrificacao?status=HOJE" class="lub-kpi today"><span>Hoje</span><strong><%= resumo.hoje %></strong><small>programados para hoje</small></a>
+    <a href="/lubrificacao?status=PROXIMO" class="lub-kpi warn"><span>Próximos</span><strong><%= resumo.proximos %></strong><small>até 7 dias</small></a>
+    <div class="lub-kpi success"><span>Executados hoje</span><strong><%= resumo.executados_hoje %></strong><small><%= resumo.rotas %> rota(s) liberada(s)</small></div>
+  </section>
+
+  <nav class="lub-tabs" aria-label="Filtro do roteiro">
+    <% [['TODOS','Todos'],['ATRASADO','Atrasados'],['HOJE','Hoje'],['PROXIMO','Próximos'],['FUTURO','Futuros'],['SEM_DATA','Sem data']].forEach(function(item){ %>
+      <a href="/lubrificacao?status=<%= item[0] %>" class="<%= status===item[0]?'active':'' %>"><%= item[1] %></a>
+    <% }) %>
+  </nav>
+
+  <% if (!rotas.length) { %>
+    <section class="lub-list">
+      <div class="lub-empty">
+        <strong>Nenhuma atividade liberada neste filtro.</strong>
+        <span>O PCM precisa validar tecnicamente e distribuir os pontos para o seu usuário antes de eles aparecerem no roteiro.</span>
+      </div>
+    </section>
+  <% } %>
+
+  <% rotas.forEach(function(grupo, rotaIndex){ %>
+    <section class="lub-route">
+      <header class="lub-route-head">
+        <div>
+          <span class="lub-route-index">ROTA <%= String(rotaIndex + 1).padStart(2,'0') %></span>
+          <h2><%= grupo.rota %></h2>
+        </div>
+        <div class="lub-route-counts">
+          <span><strong><%= grupo.pontos.length %></strong> pontos</span>
+          <% if (grupo.atrasados) { %><span class="danger"><strong><%= grupo.atrasados %></strong> atrasados</span><% } %>
+          <% if (grupo.hoje) { %><span class="today"><strong><%= grupo.hoje %></strong> hoje</span><% } %>
+        </div>
+      </header>
+
+      <div class="lub-list">
+        <% grupo.pontos.forEach(function(p, pointIndex){ 
+          const diasSemanaMap = { '0':'Dom', '1':'Seg', '2':'Ter', '3':'Qua', '4':'Qui', '5':'Sex', '6':'Sáb' };
+          const diasSemana = String(p.dias_semana_lubrificacao || '')
+            .split(',')
+            .map(function(d){ return diasSemanaMap[String(d).trim()]; })
+            .filter(Boolean)
+            .join(' / ');
+          const freq = diasSemana ? diasSemana
+            : Number(p.frequencia_dias||0) ? (p.frequencia_dias+' dias')
+            : Number(p.frequencia_semanas||0) ? (p.frequencia_semanas+' semana(s)')
+            : Number(p.frequencia_meses||0) ? (p.frequencia_meses+' mês(es)')
+            : Number(p.frequencia_horas_operacao||0) ? (p.frequencia_horas_operacao+' h operação')
+            : 'Acompanhamento pelo PCM';
+        %>
+          <article class="lub-card <%= String(p.situacao).toLowerCase() %>">
+            <div class="lub-card-top">
+              <div>
+                <span class="lub-sector"><%= p.setor || 'Setor não informado' %> • PONTO <%= pointIndex + 1 %></span>
+                <h2><%= p.equipamento_nome %></h2>
+                <p><strong><%= p.ponto_lubrificacao %></strong></p>
+              </div>
+              <span class="lub-status <%= String(p.situacao).toLowerCase() %>"><%= String(p.situacao).split('_').join(' ') %></span>
+            </div>
+
+            <div class="lub-spec-grid">
+              <div><span>Lubrificante</span><strong><%= p.tipo_lubrificante_texto || '-' %></strong></div>
+              <div><span>Quantidade prevista</span><strong><%= p.quantidade ?? '-' %> <%= p.unidade || '' %></strong></div>
+              <div><span>Método</span><strong><%= p.metodo_aplicacao || 'Conforme plano PCM' %></strong></div>
+              <div><span>Frequência</span><strong><%= freq %></strong></div>
+              <div><span>Próxima execução</span><strong><%= p.proxima_execucao_em || 'Conforme horas de operação' %></strong></div>
+              <div><span>Família</span><strong><%= p.familia_lubrificacao || 'Equipamento rotativo' %></strong></div>
+            </div>
+
+            <% if (p.instrucoes_execucao) { %>
+              <div class="lub-instruction"><strong>Como executar</strong><span><%= p.instrucoes_execucao %></span></div>
+            <% } %>
+            <% if (p.observacao) { %><p class="lub-note"><%= p.observacao %></p><% } %>
+
+            <details class="lub-execute">
+              <summary>Executar este ponto</summary>
+              <form method="POST" action="/lubrificacao/<%= p.id %>/executar">
+                <label>Quantidade utilizada
+                  <div class="lub-inline">
+                    <input type="number" min="0" step="0.01" name="quantidade_utilizada" value="<%= p.quantidade ?? '' %>" placeholder="Quantidade">
+                    <span><%= p.unidade || '' %></span>
+                  </div>
+                </label>
+                <label>Condição / observação
+                  <textarea name="observacao" rows="3" placeholder="Nível, ruído, temperatura, vazamento, contaminação, limpeza ou outra condição observada."></textarea>
+                </label>
+                <label class="lub-check"><input type="checkbox" name="anomalia" value="1" data-anomalia-toggle> Encontrei uma anomalia</label>
+                <label class="lub-anomaly-field">Descrição da anomalia
+                  <textarea name="anomalia_descricao" rows="3" placeholder="Descreva o problema para o PCM avaliar e gerar OS quando necessário."></textarea>
+                </label>
+                <button type="submit" class="lub-btn primary">Concluir ponto de lubrificação</button>
+              </form>
+            </details>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+  <% }) %>
+
+  <section class="lub-history">
+    <div class="lub-section-head">
+      <div><span class="lub-eyebrow">Rastreabilidade</span><h2>Minhas últimas execuções</h2></div>
+    </div>
+    <% if (!historico.length) { %><p class="lub-muted">Nenhuma execução registrada ainda.</p><% } %>
+    <div class="lub-history-list">
+      <% historico.forEach(function(h){ %>
+        <div class="lub-history-row <%= Number(h.anomalia)===1?'has-anomaly':'' %>">
+          <div><strong><%= h.equipamento_nome %></strong><span><%= h.rota_lubrificacao %> • <%= h.ponto_lubrificacao %></span></div>
+          <div><span>Utilizado</span><strong><%= h.quantidade_utilizada ?? '-' %> <%= h.unidade || '' %></strong></div>
+          <div><span>Executado em</span><strong><%= h.executed_at || '-' %></strong></div>
+          <div><span>Status</span><strong><%= Number(h.anomalia)===1?'ANOMALIA':'CONCLUÍDO' %></strong></div>
+          <% if (h.anomalia_descricao) { %><p><%= h.anomalia_descricao %></p><% } %>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+</div>
+<script>
+(function(){
+  document.querySelectorAll('[data-anomalia-toggle]').forEach(function(toggle){
+    const form=toggle.closest('form');
+    const field=form && form.querySelector('.lub-anomaly-field');
+    if(!field)return;
+    function sync(){field.classList.toggle('show',toggle.checked)}
+    toggle.addEventListener('change',sync);sync();
+  });
+})();
+</script>

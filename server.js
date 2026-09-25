@@ -168,6 +168,7 @@ app.use("/webhooks/whatsapp", require("./modules/whatsapp/whatsapp.routes"));
 
 // ===== Arquivos estáticos =====
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/vendor/chart.js", express.static(path.join(__dirname, "node_modules", "chart.js", "dist"), { maxAge: "7d", immutable: true }));
 app.use("/uploads", express.static(storage.UPLOAD_DIR));
 app.use("/pdfs", express.static(storage.PDF_DIR));
 app.use("/imagens", express.static(storage.IMAGE_DIR));
@@ -392,6 +393,7 @@ app.get("/admin/whatsapp/status", requireLogin, requireRole(["ADMIN"]), (req, re
   return res.render("admin/whatsapp-status", { title: "Status WhatsApp", status, user: req.session?.user || null });
 });
 mount("/preventivas", "./modules/preventivas/preventivas.routes");
+mount("/lubrificacao", "./modules/lubrificacao/lubrificacao.routes");
 mount(OFFICIAL_ROUTES.compras, "./modules/compras/compras.routes");
 mount("/fornecedores", "./modules/fornecedores/fornecedores.routes");
 mount("/solicitacoes", "./modules/solicitacoes/solicitacoes.routes");
@@ -467,6 +469,30 @@ try {
   }
 } catch (err) {
   console.warn("⚠️ Serviço de preventivas não carregado para lançamento automático de OS:", err.message || err);
+}
+
+try {
+  const lubrificacaoSemanaService = require("./modules/lubrificacao/lubrificacao-semana.service");
+  if (typeof lubrificacaoSemanaService?.processarOSAutomaticas === "function") {
+    const runLubrificacaoProgramada = () => {
+      try {
+        const result = lubrificacaoSemanaService.processarOSAutomaticas({
+          refDate: null,
+          actorUserId: null,
+          automatico: true,
+        });
+        if (Number(result?.geradas || 0) > 0) {
+          console.log(`🛢️ Lubrificação: ${result.geradas} OS automática(s) gerada(s) para ${result.data}.`);
+        }
+      } catch (err) {
+        console.warn("⚠️ Falha na geração automática das OS de lubrificação:", err.message || err);
+      }
+    };
+    runLubrificacaoProgramada();
+    trackInterval(setInterval(runLubrificacaoProgramada, 15 * 60 * 1000));
+  }
+} catch (err) {
+  console.warn("⚠️ Serviço semanal de lubrificação não carregado:", err.message || err);
 }
 
 // ===== Home =====

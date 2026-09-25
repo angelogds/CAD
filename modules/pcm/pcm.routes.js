@@ -31,6 +31,7 @@ router.get("/planejamento/pdf", requireLogin, requireRole(PCM_ACCESS), ctrl.plan
 router.get("/falhas", requireLogin, requireRole(PCM_ACCESS), ctrl.falhas);
 router.get("/engenharia", requireLogin, requireRole(PCM_ACCESS), ctrl.engenharia);
 router.get("/lubrificacao", requireLogin, requireRole(PCM_ACCESS), ctrl.lubrificacao);
+router.get("/lubrificacao/pdf", requireLogin, requireRole(PCM_ACCESS), ctrl.lubrificacaoPdf);
 router.get("/pecas-criticas", requireLogin, requireRole(PCM_ACCESS), ctrl.pecasCriticas);
 router.get("/pecas-criticas/pdf", requireLogin, requireRole(PCM_ACCESS), ctrl.pecasCriticasPdf);
 router.get("/programacao-semanal", requireLogin, requireRole(PCM_ACCESS), ctrl.programacaoSemanal);
@@ -55,6 +56,11 @@ router.post("/falhas/:osId/classificar", requireLogin, requireRole(PCM_MANAGE), 
 router.post("/engenharia/componentes", requireLogin, requireRole(PCM_MANAGE), ctrl.adicionarComponente);
 router.post("/engenharia/criticidade", requireLogin, requireRole(PCM_MANAGE), ctrl.salvarCriticidade);
 router.post("/lubrificacao/pontos", requireLogin, requireRole(PCM_MANAGE), ctrl.adicionarLubrificacao);
+router.post("/lubrificacao/semana/responsavel", requireLogin, requireRole(PCM_MANAGE), ctrl.salvarResponsavelSemanaLubrificacao);
+router.post("/lubrificacao/semana/gerar-os-hoje", requireLogin, requireRole(PCM_MANAGE), ctrl.gerarOSLubrificacaoHoje);
+router.post("/lubrificacao/gerar-roteiro-base", requireLogin, requireRole(PCM_MANAGE), ctrl.gerarRoteiroBaseLubrificacao);
+router.post("/lubrificacao/:id/validar", requireLogin, requireRole(PCM_MANAGE), ctrl.validarLubrificacao);
+router.post("/lubrificacao/:id/distribuir", requireLogin, requireRole(PCM_MANAGE), ctrl.distribuirLubrificacao);
 router.post("/lubrificacao/sugerir-ia", requireLogin, requireRole(PCM_MANAGE), ctrl.sugerirPlanoLubrificacaoIA);
 router.post("/lubrificacao/aplicar-sugestao-ia", requireLogin, requireRole(PCM_MANAGE), ctrl.aplicarSugestaoLubrificacaoIA);
 router.post("/programacao-semanal/salvar", requireLogin, requireRole(PCM_MANAGE), ctrl.salvarProgramacao);

@@ -14,6 +14,10 @@ const prevCounts={ abertas:(prev.items||[]).filter(p=>['PENDENTE','ABERTA'].incl
 const dist=op.os.distribution||[], distColors=['#149557','#149ca0','#f2a11f']; let distCursor=0;
 const donutStops=dist.map((d,i)=>{const start=distCursor;distCursor+=Number(d.percent||0);return `${distColors[i]} ${start}% ${distCursor}%`;}).join(',');
 const scores=(op.critical||[]).map(i=>Number(i.pontuacao_risco??i.risco??(i.total_falhas||0)*2+(i.reincidencias||0)*3)); const maxScore=Math.max(1,...scores);
+const lubSemana=lubrificacaoSemana||{sem_responsavel:true,atrasados:0,executados_semana:0,os_hoje:0};
+const canPcmLub=canAccessModule(roleNorm,'pcm');
+const canExecLub=canAccessModule(roleNorm,'lubrificacao_execucao');
+const lubLink=canPcmLub?'/pcm/lubrificacao':(canExecLub?'/lubrificacao':'');
 %>
 <div class="operational-dashboard <%= tvMode?'tv-mode':'' %>" data-tv-mode="<%= tvMode?'true':'false' %>">
 <header class="op-head"><div class="op-title"><h1>Painel Operacional Reciclagem</h1><p>Visão em tempo real da manutenção, OS, preventivas, equipe e equipamentos</p><small>Olá, <%= user?.name||user?.nome||'equipe' %>. Acompanhe as prioridades da operação.</small></div>
@@ -33,6 +37,29 @@ const scores=(op.critical||[]).map(i=>Number(i.pontuacao_risco??i.risco??(i.tota
 <% if(canPreventivas){%><section class="op-card" id="preventivas"><div class="card-heading"><div><h2>PREVENTIVAS PROGRAMADAS</h2><p>Programação de manutenção preventiva</p></div><a href="/preventivas?<%= qs %>">Ver todas as preventivas →</a></div><div class="status-summary"><span>Abertas<strong><%= prevCounts.abertas %></strong></span><span>Em andamento<strong><%= prevCounts.andamento %></strong></span><span>Concluídas<strong><%= prevCounts.concluidas %></strong></span><span>Vencendo nesta semana<strong><%= prev.deadlines.semana||0 %></strong></span></div><div class="crit-summary"><% [['BAIXA','#43b86b'],['MEDIA','#eab438'],['ALTA','#ee7c30'],['CRITICA','#dc3447']].forEach(c=>{ %><span style="--crit:<%= c[1] %>"><i></i><%= c[0] %><strong><%= prev.criticidade?.[c[0]]||0 %></strong></span><% }) %></div><div class="responsive-table"><table class="op-table"><thead><tr><th>Número</th><th>Equipamento</th><th>Responsáveis</th><th>Data prevista</th><th>Criticidade</th><th>Status</th><th>Ação</th></tr></thead><tbody><% if(!prev.items.length){%><tr class="empty"><td colspan="7">Nenhuma preventiva programada no período.</td></tr><%}(prev.items||[]).slice(0,6).forEach(p=>{%><tr><td data-label="Número"><b>#<%= p.id %></b></td><td data-label="Equipamento"><%= p.equipamento_nome||'-' %></td><td data-label="Responsáveis"><%= p.responsavel_exibicao||'-' %></td><td data-label="Data prevista"><%= p.data_prevista?fmtBR(p.data_prevista):'-' %></td><td data-label="Criticidade"><span class="tag"><%= p.criticidade||'-' %></span></td><td data-label="Status"><span class="tag <%= p.vencida?'danger':'' %>"><%= p.status||'-' %></span></td><td data-label="Ação"><%if(canOperatePreventivas&&statusNorm(p.status)==='PENDENTE'){%><form method="post" action="/dashboard/preventivas/<%= p.id %>/iniciar"><button class="table-action" type="submit">Iniciar</button></form><%}else{%><a class="table-action" href="/preventivas">Ver</a><%}%></td></tr><%})%></tbody></table></div></section><%}%>
 <section class="op-card compact-card" id="demandas"><div class="card-heading"><h2>DEMANDAS</h2><a href="/demandas">Abrir demandas →</a></div><div class="demand-summary"><span>Novas<strong><%= demandas.novas||0 %></strong></span><span>Em andamento<strong><%= demandas.em_andamento||0 %></strong></span><span>Paradas<strong><%= demandas.paradas||0 %></strong></span></div><%if(!activeDemands){%><p class="empty-state">Nenhuma demanda em andamento.</p><%}%></section>
 </main><aside class="op-side">
+<section class="op-card lubrication-week-card <%= lubSemana.sem_responsavel?'warning':(Number(lubSemana.atrasados||0)>0?'danger':'ok') %>">
+  <div class="side-heading">
+    <h2>LUBRIFICAÇÃO DA SEMANA</h2>
+    <% if(lubLink){ %><a href="<%= lubLink %>">Abrir →</a><% } %>
+  </div>
+  <div class="lub-dashboard-owner">
+    <small><%= lubSemana.semana_inicio||'-' %> a <%= lubSemana.semana_fim||'-' %></small>
+    <span>Responsável</span>
+    <strong><%= lubSemana.responsavel_nome||'Não definido' %></strong>
+  </div>
+  <div class="lub-dashboard-grid">
+    <span><strong><%= lubSemana.executados_semana||0 %></strong><small>Executados</small></span>
+    <span><strong><%= lubSemana.atrasados||0 %></strong><small>Atrasados</small></span>
+    <span><strong><%= lubSemana.os_hoje||0 %></strong><small>OS hoje</small></span>
+  </div>
+  <% if(lubSemana.sem_responsavel){ %>
+    <p class="lub-dashboard-alert">Definir o mecânico responsável no PCM antes da execução semanal.</p>
+  <% } else if(Number(lubSemana.atrasados||0)>0){ %>
+    <p class="lub-dashboard-alert"><%= lubSemana.atrasados %> ponto(s) precisam de atenção.</p>
+  <% } else { %>
+    <p class="lub-dashboard-ok">Plano semanal acompanhado pelo sistema.</p>
+  <% } %>
+</section>
 <section class="op-card"><div class="side-heading"><h2>ESCALA DA SEMANA</h2><small>Semana atual</small></div><% const day=escala?.diurno_mecanicos||[],night=escala?.noturno||[],weekend=escala?.final_semana_responsavel||night; [['Equipe do dia',day],['Equipe da noite',night],['Fim de semana',weekend]].forEach(g=>{%><div class="team-row"><span class="avatar"><%= g[1].map(p=>String(p.nome||'?')[0]).join('').slice(0,2)||'–' %></span><div><strong><%= g[0] %></strong><small><%= g[1].map(p=>p.nome).join(', ')||'Não informado' %></small></div></div><%})%><p class="absence"><strong>Folgas e atestados</strong><span><%= (escala?.folgas_afastamentos||[]).map(i=>i.nome).join(', ')||'Nenhum registro' %></span></p></section>
 <section class="op-card"><h2>DESEMPENHO DA EQUIPE</h2><% const ranking=rankingMecanicos?.itemsMecanicos||rankingMecanicos?.items||[],maxRank=Math.max(1,...ranking.slice(0,5).map(i=>Number(i.score||i.pontos||0))); if(!ranking.length){%><p class="empty-state">Dados insuficientes para o ranking.</p><%}ranking.slice(0,5).forEach((i,index)=>{const score=Number(i.score||i.pontos||0);%><div class="rank-row"><b><%= index+1 %></b><span><strong><%= i.nome %></strong><small><%= i.os_finalizadas||i.os_total||0 %> OS finalizadas</small><i><u style="width:<%= score/maxRank*100 %>%"></u></i></span><em><%= score.toFixed(1) %></em></div><%})%><a class="download-link" href="/dashboard/ranking/relatorios/ultimo/pdf">⇩ Baixar PDF mensal</a></section>
 <section class="op-card compact-card"><h2>AVISOS</h2><%if(!(avisos||[]).length){%><p class="empty-state">Nenhum aviso ativo no momento.</p><%}else (avisos||[]).slice(0,3).forEach(a=>{%><p class="notice"><strong><%= a.titulo||'Aviso' %></strong><small><%= a.mensagem||'-' %></small></p><%})%></section>

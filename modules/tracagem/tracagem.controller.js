@@ -57,6 +57,7 @@ const LABELS = {
   'boca-de-lobo-90-graus': 'Boca de lobo 90 graus',
   'mao-francesa': 'Mão francesa',
   'pao-francesa': 'Mão francesa',
+  'exaustor-radial': 'Exaustor radial',
 };
 
 const PDF_STYLE = {
@@ -109,6 +110,13 @@ const PARAM_DESCRIPTIONS = {
   C2: 'C2 = trecho entre divisões',
   C3: 'C3 = trecho entre divisões',
   C4: 'C4 = trecho entre divisões',
+  largura: 'Largura do rotor',
+  dCubo: 'Diâmetro do cubo',
+  dEixo: 'Diâmetro do eixo',
+  pct10: 'Coeficiente prático 10%',
+  pct90: 'Coeficiente prático 90%',
+  pct6: 'Coeficiente prático 6%',
+  aberturaVoluta: 'Abertura máxima da voluta',
 };
 
 const PLAN_LEGENDS = {
@@ -838,6 +846,8 @@ module.exports = {
   bocaLobo90Calcular: calcular('boca-de-lobo-90', 'boca-lobo-90', 'Boca de lobo 90 graus'),
   maoFrancesaForm: renderCalc('mao-francesa', 'mao-francesa', 'Mão francesa'),
   maoFrancesaCalcular: calcular('mao-francesa', 'mao-francesa', 'Mão francesa'),
+  exaustorRadialForm: renderCalc('exaustor-radial', 'exaustor-radial', 'Exaustor radial'),
+  exaustorRadialCalcular: calcular('exaustor-radial', 'exaustor-radial', 'Exaustor radial'),
   salvar,
   gerarPdf,
   gerarPdfCalculo,

@@ -1,5 +1,6 @@
 const service = require("./pcm.service");
 const operationalService = require("./pcm.operational.service");
+const lubrificacaoSemanaService = require("../lubrificacao/lubrificacao-semana.service");
 const PDFDocument = require("pdfkit");
 const { canAccessModule } = require("../../config/rbac");
 
@@ -36,11 +37,12 @@ function failureSummary(falhas = []) {
 }
 
 function lubricationSummary(planos = [], totalEquipamentos = 0) {
-  const cobertos = new Set(planos.map((item) => Number(item.equipamento_id)).filter(Boolean)).size;
+  const ativos = planos.filter((item) => Number(item.ativo ?? 1) === 1);
+  const cobertos = new Set(ativos.map((item) => Number(item.equipamento_id)).filter(Boolean)).size;
   return {
-    pontos: planos.length,
-    atrasados: countBy(planos, (item) => item.situacao === "ATRASADO"),
-    em_breve: countBy(planos, (item) => item.situacao === "EM_BREVE"),
+    pontos: ativos.length,
+    atrasados: countBy(ativos, (item) => item.situacao === "ATRASADO"),
+    em_breve: countBy(ativos, (item) => item.situacao === "EM_BREVE"),
     cobertura: totalEquipamentos ? Math.round((cobertos * 1000) / totalEquipamentos) / 10 : 0,
   };
 }
@@ -149,18 +151,33 @@ function lubrificacao(req, res) {
   const filtros = {
     equipamento_id: req.query.equipamento_id || "",
     setor: req.query.setor || "",
+    validacao: String(req.query.validacao || "").toUpperCase(),
+    rota: req.query.rota || "",
   };
   const sugestaoIA = req.session?.pcmLubrificacaoSugestao || null;
   if (req.session) req.session.pcmLubrificacaoSugestao = null;
   const equipamentos = service.getEquipamentos();
   const lubrificacoes = service.listLubrificacao(filtros);
+  const todasLubrificacoes = service.listLubrificacao({});
+  const resumoBase = lubricationSummary(todasLubrificacoes, equipamentos.length);
   return res.render("pcm/lubrificacao", {
     ...baseView(req),
     activePcmSection: "lubrificacao",
     filtros,
     equipamentos,
     lubrificacoes,
-    resumo: lubricationSummary(lubrificacoes, equipamentos.length),
+    mecanicos: service.listMecanicosLubrificacao(),
+    rotas: service.listRotasLubrificacao(),
+    motoresPendentes: service.listMotoresLubrificacaoPendentes(),
+    equipamentosSemRoteiro: service.listEquipamentosSemRoteiroLubrificacao(),
+    semanaLubrificacao: lubrificacaoSemanaService.getSemanaPorReferencia(req.query.semana || null),
+    semanaReferencia: lubrificacaoSemanaService.getWeekBounds(req.query.semana || null),
+    resumoSemanaLubrificacao: lubrificacaoSemanaService.getDashboardResumo(req.query.semana || null),
+    resumo: {
+      ...resumoBase,
+      pendentes_validacao: countBy(todasLubrificacoes, (item) => Number(item.validado_tecnicamente ?? 1) === 0),
+      liberados: countBy(todasLubrificacoes, (item) => Number(item.validado_tecnicamente ?? 1) === 1 && Number(item.ativo ?? 1) === 1),
+    },
     sugestaoIA,
   });
 }
@@ -338,6 +355,40 @@ function adicionarComponente(req, res) {
   return res.redirect(`/pcm/engenharia?equipamento_id=${eid}`);
 }
 
+function salvarResponsavelSemanaLubrificacao(req, res) {
+  try {
+    const semana = lubrificacaoSemanaService.salvarResponsavelSemana(
+      {
+        semana_referencia: req.body.semana_referencia,
+        responsavel_user_id: req.body.responsavel_user_id,
+      },
+      req.session?.user?.id || null
+    );
+    req.flash('success', `Responsável da semana ${semana.semana_inicio} a ${semana.semana_fim}: ${semana.responsavel_nome}.`);
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível definir o responsável semanal da lubrificação.');
+  }
+  return res.redirect('/pcm/lubrificacao');
+}
+
+function gerarOSLubrificacaoHoje(req, res) {
+  try {
+    const result = lubrificacaoSemanaService.processarOSAutomaticas({
+      refDate: req.body.data_referencia || null,
+      actorUserId: req.session?.user?.id || null,
+      automatico: false,
+    });
+    if (result.skipped && result.reason === 'sem_responsavel_semana') {
+      req.flash('error', 'Defina primeiro o mecânico responsável pela semana.');
+    } else {
+      req.flash('success', `OS de lubrificação: ${result.geradas} gerada(s), ${result.existentes} já existente(s), ${result.equipamentos} equipamento(s) programado(s) para o dia.`);
+    }
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível gerar as OS de lubrificação do dia.');
+  }
+  return res.redirect('/pcm/lubrificacao');
+}
+
 function adicionarLubrificacao(req, res) {
   try {
     const id = service.addPontoLubrificacao(req.body, req.session?.user?.id || null);
@@ -347,6 +398,41 @@ function adicionarLubrificacao(req, res) {
   }
   const eid = encodeURIComponent(req.body.equipamento_id || '');
   return res.redirect(`/pcm/lubrificacao?equipamento_id=${eid}`);
+}
+
+function distribuirLubrificacao(req, res) {
+  try {
+    service.distribuirPontoLubrificacao(req.params.id, req.body || {}, req.session?.user?.id || null);
+    req.flash('success', 'Distribuição do ponto de lubrificação atualizada.');
+  } catch (e) {
+    req.flash('error', e.message || 'Falha ao distribuir o ponto de lubrificação.');
+  }
+  const eid = encodeURIComponent(req.body.equipamento_id || '');
+  return res.redirect(`/pcm/lubrificacao${eid ? `?equipamento_id=${eid}` : ''}`);
+}
+
+function gerarRoteiroBaseLubrificacao(req, res) {
+  try {
+    const result = service.gerarRoteiroBaseLubrificacao(req.session?.user?.id || null);
+    req.flash(
+      'success',
+      `Roteiro-base atualizado: ${result.pontos_criados} novo(s) ponto(s), ${result.pontos_ignorados_existentes} já existente(s), ${result.motores_20cv.vinculados} motor(es) >=20 CV vinculado(s) e ${result.motores_20cv.sem_vinculo} pendente(s) de vínculo.`
+    );
+  } catch (e) {
+    req.flash('error', e.message || 'Falha ao gerar o roteiro-base de lubrificação.');
+  }
+  return res.redirect('/pcm/lubrificacao?validacao=PENDENTE');
+}
+
+function validarLubrificacao(req, res) {
+  try {
+    service.validarPontoLubrificacao(req.params.id, req.body || {}, req.session?.user?.id || null);
+    req.flash('success', 'Ponto validado tecnicamente e liberado conforme a distribuição definida.');
+  } catch (e) {
+    req.flash('error', e.message || 'Falha ao validar o ponto de lubrificação.');
+  }
+  const eid = encodeURIComponent(req.body.equipamento_id || '');
+  return res.redirect(`/pcm/lubrificacao${eid ? `?equipamento_id=${eid}` : '?validacao=PENDENTE'}`);
 }
 
 async function sugerirPlanoLubrificacaoIA(req, res) {
@@ -472,6 +558,31 @@ function dashboardPdf(req, res) {
   doc.end();
 }
 
+function lubrificacaoPdf(req, res) {
+  const itens = service.listLubrificacao(req.query || {});
+  const pendentes = itens.filter((item) => Number(item.validado_tecnicamente ?? 1) === 0).length;
+  const doc = pdfHeader(
+    req, res, 'plano-lubrificacao-pcm.pdf', 'Plano e Roteiro de Lubrificação',
+    `Pontos: ${itens.length} | Pendentes de validação: ${pendentes}`
+  );
+  pdfSection(doc, 'Regra do documento');
+  doc.text('Pontos marcados como PENDENTE DE VALIDACAO sao rascunhos administrativos e nao devem ser executados. Produto, quantidade e frequencia precisam ser confirmados pelo PCM antes da liberacao.');
+  const grupos = new Map();
+  itens.forEach((item) => {
+    const rota = item.rota_lubrificacao || 'Sem rota';
+    if (!grupos.has(rota)) grupos.set(rota, []);
+    grupos.get(rota).push(item);
+  });
+  grupos.forEach((rows, rota) => {
+    pdfSection(doc, rota);
+    pdfLines(doc, rows, (item) => {
+      const validado = Number(item.validado_tecnicamente ?? 1) === 1;
+      return `${item.equipamento_nome} | ${item.ponto_lubrificacao} | ${item.tipo_lubrificante_texto || '-'} | ${item.quantidade ?? '-'} ${item.unidade || ''} | ${item.frequencia_label || '-'} | ${item.responsavel_nome || 'Nao distribuido'} | ${validado ? 'VALIDADO' : 'PENDENTE DE VALIDACAO'}`;
+    });
+  });
+  doc.end();
+}
+
 function planejamentoPdf(req, res) {
   const planos = service.listPlanos(req.query || {});
   const resumo = planningSummary(planos);
@@ -538,6 +649,7 @@ module.exports = {
   dashboardPdf,
   dashboardExcel,
   planejamentoPdf,
+  lubrificacaoPdf,
   pecasCriticasPdf,
   relatoriosAvancadosPdf,
   relatoriosAvancadosExcel,
@@ -556,6 +668,11 @@ module.exports = {
   classificarFalha,
   adicionarComponente,
   adicionarLubrificacao,
+  salvarResponsavelSemanaLubrificacao,
+  gerarOSLubrificacaoHoje,
+  gerarRoteiroBaseLubrificacao,
+  validarLubrificacao,
+  distribuirLubrificacao,
   sugerirPlanoLubrificacaoIA,
   aplicarSugestaoLubrificacaoIA,
   salvarProgramacao,

@@ -6,6 +6,7 @@ const webPushService = require('../notifications/webpush.service');
 const db = require('../../database/db');
 const criticalityService = require('./operational-criticality.service');
 const operationalDashboardService = require('./operational-dashboard.service');
+const lubrificacaoSemanaService = require('../lubrificacao/lubrificacao-semana.service');
 
 function isMecanicoLikeRole(role = '') {
   const norm = String(role || '').toUpperCase();
@@ -92,6 +93,7 @@ function buildDashboardPayload({ tvMode = false, query = {} } = {}) {
     estoqueResumo: service.getEstoqueResumoDashboard(),
     demandasResumo,
     preventivas,
+    lubrificacaoSemana: lubrificacaoSemanaService.getDashboardResumo(),
     escala: service.getEscalaPainelSemana() || service.getEscalaSemana(),
     rankingMecanicos: ranking,
     rankingPeriodoMensal: service.getCurrentMonthlyPeriod(),
@@ -144,6 +146,7 @@ function getTVData(req, res) {
   const avisos = service.getAvisosDashboard(10);
   const alertaAtivo = alertsService.getAlertaAtivo();
   const mecanicosOnline = listMecanicosOnline(12);
+  const lubrificacaoSemana = lubrificacaoSemanaService.getDashboardResumo();
 
   const ranking = (rankingRaw.itemsMecanicos || rankingRaw.items || [])
     .slice(0, 5)
@@ -167,6 +170,12 @@ function getTVData(req, res) {
   const equipeSerie = ranking.map((r) => ({ nome: r.nome, concluidas: r.pontuacao }));
 
   const alertas = [
+    ...(lubrificacaoSemana.sem_responsavel
+      ? [{ tipo: 'LUBRIFICACAO_SEM_RESPONSAVEL', mensagem: 'Plano de lubrificação da semana sem mecânico responsável definido.' }]
+      : []),
+    ...((lubrificacaoSemana.atrasados || 0) > 0
+      ? [{ tipo: 'LUBRIFICACAO_ATRASADA', mensagem: `${lubrificacaoSemana.atrasados} ponto(s) de lubrificação atrasado(s) na semana.` }]
+      : []),
     ...(alertaAtivo ? [{ tipo: 'OS_CRITICA', mensagem: `OS crítica ativa no equipamento ${alertaAtivo.equipamento || '-'}.` }] : []),
     ...((demandasResumo.paradas || 0) > 0 ? [{ tipo: 'OS_PARADAS', mensagem: `${demandasResumo.paradas || 0} demanda(s) parada(s) aguardando ação.` }] : []),
     ...avisos.slice(0, 3).map((a) => ({ tipo: 'FALHA_RECENTE', mensagem: `${a.titulo || 'Aviso'}: ${String(a.mensagem || '').slice(0, 100)}` })),
@@ -201,6 +210,7 @@ function getTVData(req, res) {
     ranking,
     mecanicosOnline,
     escala: { dia, noite, apoio },
+    lubrificacao: lubrificacaoSemana,
     alertas,
     charts: {
       osStatus: {

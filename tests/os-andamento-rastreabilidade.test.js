@@ -121,6 +121,23 @@ test('catálogo de motivos controla disponibilidade do mecânico sem comparaçã
   assert.doesNotMatch(service, /motivo\s*===\s*['"]Falta de material['"]/);
 });
 
+test('mecânico pode iniciar novas OSs mesmo quando já possui outro atendimento ativo', () => {
+  const service = read('modules/os/os.service.js');
+  const iniciar = service.match(/function iniciarOS[\s\S]*?\n}\n\nfunction pausarOS/)?.[0] || '';
+  const manter = service.match(/function manterMecanicoVinculadoExecucao[\s\S]*?\n}\n\nfunction patchAIFields/)?.[0] || '';
+
+  assert.match(iniciar, /getResponsavelExecucaoUserId/);
+  assert.match(iniciar, /createExecucao/);
+  assert.doesNotMatch(iniciar, /calcularDisponibilidadeMecanico/);
+  assert.doesNotMatch(iniciar, /outro atendimento ativo/);
+
+  assert.match(manter, /createExecucao/);
+  assert.doesNotMatch(manter, /calcularDisponibilidadeMecanico/);
+  assert.doesNotMatch(manter, /outro atendimento ativo/);
+
+  assert.match(service, /function calcularDisponibilidadeMecanico/);
+});
+
 test('rota manual de disponibilidade fica restrita a encarregado ou admin', () => {
   const routes = read('modules/os/os.routes.js');
   const permissions = read('modules/os/os.permissions.js');

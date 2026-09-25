@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#087443">
   <title><%= title || 'Modo TV — Oficina' %></title>
   <link rel="stylesheet" href="/css/tv-mode.css">
-  <link rel="stylesheet" href="/css/tv-mode-2026.css">
-  <link rel="stylesheet" href="/css/tv-screens-2026.css">
+  <link rel="stylesheet" href="/css/tv-mode-2026.css?v=20260923-tv-config-v1">
+  <link rel="stylesheet" href="/css/tv-screens-2026.css?v=20260922-lubrificacao-tv-v6">
   <link rel="stylesheet" href="/css/tv-material-alerts.css">
 </head>
 <body>
@@ -20,7 +20,7 @@
     <div id="tvMechanics" class="tv-mechanics" aria-label="Mecânicos da escala atual"></div>
     <div class="tv-screen-meta">
       <strong id="tvScreenLabel">Ordens de Serviço ativas</strong>
-      <span id="tvScreenIndicator">Tela 1 de 6</span>
+      <span id="tvScreenIndicator">Tela 1 de 7</span>
     </div>
     <div class="tv-status">
       <strong id="tvClock">--:--:--</strong>
@@ -32,6 +32,7 @@
       <button id="tvSoundBtn" type="button" aria-label="Ativar ou desativar alertas sonoros">Som ativo</button>
       <button id="tvVoiceBtn" type="button" aria-label="Ativar ou desativar assistente por voz">Assistente ativa</button>
       <button id="tvThemeToggle" type="button" aria-label="Alternar tema">◐</button>
+      <% if (canConfigureTv) { %><a class="tv-config-btn" href="/tv/configuracoes" aria-label="Configurações do Modo TV" title="Configurações do Modo TV">⚙</a><% } %>
       <button id="tvFullscreenBtn" type="button" aria-label="Tela cheia">⛶</button>
     </div>
     <div class="tv-progress-line"><i id="tvProgress"></i></div>
@@ -44,6 +45,7 @@
     <section class="tv-slide" data-tv-screen="desempenho" aria-label="Desempenho da equipe"></section>
     <section class="tv-slide" data-tv-screen="criticidade" aria-label="Criticidade dos equipamentos"></section>
     <section class="tv-slide" data-tv-screen="materiais" aria-label="Materiais e próximas demandas"></section>
+    <section class="tv-slide" data-tv-screen="gerencial" aria-label="Indicadores operacionais e lubrificação da semana"></section>
   </main>
 
   <footer class="tv-ticker" aria-label="Ordens de Serviço ativas">
@@ -57,13 +59,19 @@
   </aside>
 
   <section id="tvNewOSAlert" class="tv-alert" hidden aria-live="assertive">
-    <div class="tv-alert-card">
-      <span>NOVA ORDEM DE SERVIÇO</span>
-      <strong id="tvAlertNumber"></strong>
-      <h2 id="tvAlertEquipment"></h2>
-      <p id="tvAlertDescription"></p>
-      <dl id="tvAlertDetails"></dl>
-      <small id="tvVoiceReadingStatus">A assistente lerá responsável, OS, equipamento, local, prioridade, abertura e a descrição completa do chamado.</small>
+    <div class="tv-alert-card tv-alert-card-os">
+      <div class="tv-alert-main">
+        <span>NOVA ORDEM DE SERVIÇO</span>
+        <strong id="tvAlertNumber"></strong>
+        <h2 id="tvAlertEquipment"></h2>
+        <p id="tvAlertDescription"></p>
+        <dl id="tvAlertDetails"></dl>
+        <small id="tvVoiceReadingStatus">A assistente lerá responsável, OS, equipamento, local, prioridade, abertura e a descrição completa do chamado.</small>
+      </div>
+      <aside id="tvAlertMascot" class="tv-alert-mascot" hidden aria-hidden="true">
+        <video id="tvAlertMascotVideo" muted loop playsinline preload="metadata"></video>
+        <div class="tv-alert-mascot-label">MANUTENÇÃO CAMPO DO GADO</div>
+      </aside>
     </div>
   </section>
 
@@ -78,10 +86,19 @@
     </div>
   </section>
 
+  <section id="tvInterstitial" class="tv-interstitial" hidden aria-hidden="true">
+    <div class="tv-interstitial-card">
+      <video id="tvInterstitialVideo" muted playsinline preload="metadata" hidden></video>
+      <img id="tvInterstitialImage" alt="" hidden>
+      <div id="tvInterstitialLabel" class="tv-interstitial-label"></div>
+    </div>
+  </section>
+
   <audio id="tvAudioNew" preload="auto" src="/audio/os-nova.mp3"></audio>
   <audio id="tvAudioCritical" preload="auto" src="/audio/os-critica.mp3"></audio>
 </div>
 <script>
+  window.CG_TV_MEDIA_CONFIG = <%- JSON.stringify(tvMediaConfig || {}) %>;
   window.CG_TV_CONFIG = {
     snapshotUrl: '/api/tv/snapshot',
     streamUrl: '/api/tv/stream',
@@ -92,9 +109,9 @@
     criticalAlertMs: 25000
   };
 </script>
-<script src="/js/tv-mode.js"></script>
+<script src="/js/tv-mode.js?v=20260923-tv-config-v1"></script>
 <script src="/js/tv-voice-assistant.js"></script>
 <script src="/js/tv-material-alerts.js"></script>
-<script src="/js/tv-screens-2026.js"></script>
+<script src="/js/tv-screens-2026.js?v=20260922-lubrificacao-tv-v6"></script>
 </body>
 </html>

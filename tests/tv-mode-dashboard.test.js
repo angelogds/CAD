@@ -7,6 +7,7 @@ const service = require('../modules/tv/tv.service');
 const view = () => fs.readFileSync('views/tv/modo-tv.ejs', 'utf8');
 const source = () => fs.readFileSync('public/js/tv-mode.js', 'utf8');
 const css = () => fs.readFileSync('public/css/tv-mode.css', 'utf8');
+const css2026 = () => fs.readFileSync('public/css/tv-mode-2026.css', 'utf8');
 
 test('rota oficial /tv, redirect legado e stream pertencem ao módulo oficial', () => {
   const routes = fs.readFileSync('modules/tv/tv.routes.js', 'utf8');
@@ -15,17 +16,19 @@ test('rota oficial /tv, redirect legado e stream pertencem ao módulo oficial', 
   assert.match(routes, /router\.get\('\/api\/tv\/stream'/);
 });
 
-test('tela oficial possui seis seções, ticker e não possui ações operacionais', () => {
-  assert.equal((view().match(/data-tv-screen=/g) || []).length, 6);
+test('tela oficial possui sete seções, ticker e não possui ações operacionais', () => {
+  assert.equal((view().match(/data-tv-screen=/g) || []).length, 7);
   assert.match(view(), /id="tvTickerTrack"/);
   assert.match(view(), /Para receber os chamados com voz, aviso sonoro/);
   assert.match(view(), /Ativar Modo TV/);
+  assert.match(view(), /data-tv-screen="gerencial"/);
+  assert.match(view(), /Tela 1 de 7/);
   assert.doesNotMatch(view(), />\s*(Abrir|Iniciar|Editar|Fechar)\s*</);
 });
 
 test('painel inicia imediatamente e ativação libera somente recursos do navegador', () => {
   const js = source();
-  assert.match(js, /state\.active = true;[\s\S]*fetchSnapshot\(\{ detectNew: false \}\);[\s\S]*scheduleRotation\(ROTATION_MS\);[\s\S]*startSnapshotPolling\(\);[\s\S]*connectStream\(\);/);
+  assert.match(js, /state\.active = true;[\s\S]*fetchSnapshot\(\{ detectNew: false \}\);[\s\S]*runInterstitialSlot\(0, startScreens\);[\s\S]*startSnapshotPolling\(\);[\s\S]*connectStream\(\);/);
   assert.match(js, /localStorage\.setItem\('cgTvSound', 'on'\)/);
   assert.match(js, /requestFullscreen/);
   assert.match(js, /requestWakeLock\(\)/);
@@ -43,6 +46,31 @@ test('rotação, atualização, fallback e alertas usam os intervalos especifica
   assert.match(source(), /startFastPolling/);
   assert.match(source(), /pauseRotation\(\)/);
   assert.match(source(), /resumeRotation\(\)/);
+});
+
+test('mascote sai da rotação fixa e passa para o card de chamada de OS', () => {
+  const html = view();
+  const js = source();
+  assert.doesNotMatch(html, /id="tvMascotBreak"/);
+  assert.doesNotMatch(js, /playMascotBreak/);
+  assert.match(html, /id="tvAlertMascot"/);
+  assert.match(html, /id="tvAlertMascotVideo"/);
+  assert.match(js, /function startAlertMascot\(\)/);
+  assert.match(js, /startAlertMascot\(\);/);
+  assert.match(js, /stopAlertMascot\(\);/);
+  assert.match(css2026(), /\.tv-alert-mascot\{/);
+  assert.equal((html.match(/data-tv-screen=/g) || []).length, 7);
+});
+
+test('mídias entre telas são dirigidas por configuração e não por vídeos fixos no código', () => {
+  const html = view();
+  const js = source();
+  assert.match(html, /window\.CG_TV_MEDIA_CONFIG/);
+  assert.match(html, /id="tvInterstitial"/);
+  assert.match(js, /mediaConfig\.interstitialsEnabled/);
+  assert.match(js, /function runInterstitialSlot\(position, onDone\)/);
+  assert.doesNotMatch(js, /mascote-tv-01\.mp4/);
+  assert.doesNotMatch(js, /mascote-tv-02\.mp4/);
 });
 
 test('normalização central trata encerradas, canceladas, emergencial e urgente', () => {
@@ -142,4 +170,7 @@ test('snapshot real preserva contrato mesmo quando tabelas opcionais não existe
   assert.ok(snapshot.operacao.os);
   assert.ok(snapshot.operacao.preventivas);
   assert.ok(snapshot.performance && Object.hasOwn(snapshot.performance, 'mecanicosDisponiveis'));
+  assert.ok(snapshot.gerencial);
+  assert.ok(snapshot.gerencial.cards);
+  assert.ok(snapshot.gerencial.confiabilidade);
 });

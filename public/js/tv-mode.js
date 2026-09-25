@@ -2,6 +2,7 @@
   'use strict';
 
   const config = window.CG_TV_CONFIG || {};
+  const mediaConfig = window.CG_TV_MEDIA_CONFIG || {};
   const ROTATION_MS = Number(config.rotationMs) || 30000;
   const SNAPSHOT_MS = Number(config.refreshMs) || 60000;
   const FAST_MS = Number(config.fastRefreshMs) || 15000;
@@ -16,6 +17,7 @@
     ['desempenho', 'Desempenho da equipe'],
     ['criticidade', 'Criticidade dos equipamentos'],
     ['materiais', 'Materiais e próximas demandas'],
+    ['gerencial', 'Indicadores e lubrificação'],
   ];
   const state = {
     data: null,
@@ -42,6 +44,9 @@
     processed: new Map(),
     pendingEvents: new Map(),
     wakeLock: null,
+    interstitialActive: false,
+    interstitialTimer: null,
+    interstitialToken: 0,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -70,6 +75,8 @@
   const initials = (name) => String(name || '?').split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
   const dateBR = (value) => value ? new Date(`${String(value).slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : 'Não informada';
   const numberBR = (value) => Number(value || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+  const moneyBR = (cents) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(Number(cents || 0) / 100);
+  const metricBR = (value, suffix = '') => value === null || value === undefined || Number.isNaN(Number(value)) ? 'Dados insuficientes' : `${numberBR(value)}${suffix}`;
   const labelStatus = (value) => status(value).replaceAll('_', ' ');
   const timeBR = (value) => value ? new Date(value).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-';
 
@@ -279,10 +286,52 @@
     return true;
   }
 
+  function startAlertMascot() {
+    const panel = $('tvAlertMascot');
+    const video = $('tvAlertMascotVideo');
+    const mascot = mediaConfig.mascotAlert || {};
+    if (!panel || !video || !mascot.enabled || !mascot.src) {
+      if (panel) panel.hidden = true;
+      return;
+    }
+
+    panel.hidden = false;
+    panel.setAttribute('aria-hidden', 'false');
+    video.muted = true;
+    video.defaultMuted = true;
+    if (video.getAttribute('src') !== mascot.src) video.setAttribute('src', mascot.src);
+    video.currentTime = 0;
+    video.onerror = () => {
+      panel.hidden = true;
+      panel.setAttribute('aria-hidden', 'true');
+    };
+    const play = video.play();
+    if (play && typeof play.catch === 'function') {
+      play.catch(() => {
+        panel.hidden = true;
+        panel.setAttribute('aria-hidden', 'true');
+      });
+    }
+  }
+
+  function stopAlertMascot() {
+    const panel = $('tvAlertMascot');
+    const video = $('tvAlertMascotVideo');
+    if (video) {
+      video.pause();
+      try { video.currentTime = 0; } catch (_error) {}
+    }
+    if (panel) {
+      panel.hidden = true;
+      panel.setAttribute('aria-hidden', 'true');
+    }
+  }
+
   function showNextAlert() {
     if (state.alertShowing || !state.active || !state.alertQueue.length) return;
     state.alertShowing = true;
     state.currentAlert = state.alertQueue.shift();
+    cancelInterstitial();
     pauseRotation();
 
     const os = state.currentAlert;
@@ -297,6 +346,8 @@
       <div><dt>Local</dt><dd>${esc(os.local || os.setor || 'Não informado')}</dd></div>
       <div><dt>Prioridade</dt><dd>${esc(os.prioridade)}</dd></div>
       <div><dt>Abertura</dt><dd>${esc(timeBR(os.abertura))}</dd></div>`;
+
+    startAlertMascot();
 
     const audio = os.prioridade === 'CRITICA' ? $('tvAudioCritical') : $('tvAudioNew');
     const soundEnabled = localStorage.getItem('cgTvSound') !== 'off';
@@ -319,6 +370,7 @@
   function finishAlert() {
     clearTimeout(state.alertTimer);
     clearTimeout(state.voiceTimer);
+    stopAlertMascot();
     $('tvNewOSAlert').hidden = true;
     state.alertShowing = false;
     state.currentAlert = null;
@@ -528,6 +580,89 @@
     </div>`;
   }
 
+  function renderGerencial() {
+    const g = state.data?.gerencial || {};
+    const cards = g.cards || {};
+    const reliability = g.confiabilidade || {};
+    const lubrication = g.lubrificacao_semana || {};
+    const lubricationSummary = lubrication.resumo || {};
+    const lubricationDays = items(lubrication.dias).slice(0, 7);
+    const reliabilityTone = reliability.status === 'CONFIAVEL' ? 'success' : reliability.status === 'PARCIAL' ? 'warning' : 'danger';
+    const lubricationProgress = Number(lubricationSummary.programadas || 0)
+      ? `${Number(lubricationSummary.concluidas || 0)}/${Number(lubricationSummary.programadas || 0)}`
+      : '0';
+
+    const lubricationStatus = (value) => {
+      const key = plain(value).replace(/[\s-]+/g, '_');
+      const map = {
+        CONCLUIDA: ['Concluída', 'success'],
+        EM_ANDAMENTO: ['Em andamento', 'info'],
+        PENDENTE: ['Pendente', 'warning'],
+        ATRASADA: ['Atrasada', 'danger'],
+        ATENCAO: ['Atenção', 'danger'],
+        PROGRAMADA: ['Programada', 'neutral'],
+      };
+      return map[key] || [key.replaceAll('_', ' ') || 'Programada', 'neutral'];
+    };
+
+    const lubricationRows = lubricationDays.map((day) => {
+      const [statusLabel, statusTone] = lubricationStatus(day.status);
+      const dayLabel = day.data
+        ? new Date(`${String(day.data).slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })
+        : '-';
+      const equipamentos = items(day.equipamentos);
+      const equipmentLabel = equipamentos.slice(0, 2).join(' • ');
+      const extra = equipamentos.length > 2 ? ` +${equipamentos.length - 2}` : '';
+      return `
+        <tr>
+          <td><strong>${esc(dayLabel)}</strong></td>
+          <td>
+            <strong>${esc((equipmentLabel || 'Sem equipamento') + extra)}</strong>
+            <small>${Number(day.total_equipamentos || 0)} equipamento(s) · ${Number(day.total_pontos || 0)} ponto(s)</small>
+          </td>
+          <td>${esc(lubrication.responsavel_nome || 'A definir')}</td>
+          <td><span class="tv-lubrication-status ${statusTone}">${esc(statusLabel)}</span></td>
+        </tr>`;
+    }).join('');
+
+    return `<div class="screen management-screen section-stack">
+      ${metrics([
+        ['Backlog de OS', cards.backlog_os_atual || 0, 'warning', 'Pendências atuais'],
+        ['Backlog > 30 dias', cards.backlog_acima_30_dias || 0, 'danger', 'Envelhecimento crítico'],
+        ['Preventivas', `${numberBR(cards.percentual_preventiva || 0)}%`, 'success', 'Participação no período'],
+        ['Corretivas', `${numberBR(cards.percentual_corretiva || 0)}%`, 'warning', 'Participação no período'],
+        ['Lubrificação semana', lubricationProgress, 'info', 'Concluídas / programadas'],
+        ['Qualidade dos dados', cards.qualidade_dados_pct == null ? 'Dados insuficientes' : `${numberBR(cards.qualidade_dados_pct)}%`, reliabilityTone, reliability.status_label || 'Base de confiabilidade'],
+      ])}
+      <div class="management-layout">
+        <article class="panel management-reliability">
+          <div class="panel-heading"><h2>Confiabilidade da manutenção</h2><span>${esc(g.periodo?.label || 'Período gerencial')} · ${esc(reliability.status_label || 'Dados insuficientes')}</span></div>
+          <div class="management-reliability-grid">
+            <div><span>MTBF</span><strong>${esc(reliability.mtbf_dias == null ? 'Dados insuficientes' : metricBR(reliability.mtbf_dias, ' dias'))}</strong><small>${Number(reliability.mtbf_amostras || 0)} intervalo(s) válido(s)</small></div>
+            <div><span>MTTR</span><strong>${esc(reliability.mttr_horas == null ? 'Dados insuficientes' : metricBR(reliability.mttr_horas, ' h'))}</strong><small>${Number(reliability.mttr_amostras || 0)} parada(s) válida(s)</small></div>
+            <div><span>Disponibilidade</span><strong>${esc(reliability.disponibilidade_pct == null ? 'Dados insuficientes' : metricBR(reliability.disponibilidade_pct, '%'))}</strong><small>${Number(reliability.equipamentos_base || 0)} equipamento(s) na base</small></div>
+            <div><span>Horas de parada</span><strong>${esc(reliability.horas_parada == null ? 'Dados insuficientes' : metricBR(reliability.horas_parada, ' h'))}</strong><small>Somente paradas rastreadas</small></div>
+          </div>
+          <div class="management-reliability-status ${reliabilityTone}"><strong>${esc(reliability.status_label || 'Dados insuficientes')}</strong><span>Os indicadores só aparecem quando a cobertura mínima de dados é atendida.</span></div>
+        </article>
+        <div class="management-rankings management-rankings--lubrication-only">
+          <article class="panel management-lubrication management-lubrication--expanded">
+            <div class="panel-heading">
+              <h2>Lubrificação da semana</h2>
+              <span>${esc(lubrication.responsavel_nome ? `Responsável: ${lubrication.responsavel_nome}` : 'Responsável ainda não definido')} · ${esc(dateBR(lubrication.inicio))} a ${esc(dateBR(lubrication.fim))}</span>
+            </div>
+            <div class="tv-lubrication-table-wrap">
+              <table class="tv-lubrication-table">
+                <thead><tr><th>Dia</th><th>Programação</th><th>Responsável</th><th>Status</th></tr></thead>
+                <tbody>${lubricationRows || `<tr><td colspan="4">${empty('Nenhuma lubrificação programada para esta semana.')}</td></tr>`}</tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </div>
+    </div>`;
+  }
+
   function renderTicker() {
     const ticker = items(state.data?.ticker).filter((item) => sortedActiveOS().some((os) => `os-${os.id}` === item.id));
     const messages = ticker.length ? ticker.map((x) => x.texto) : ['Nenhuma OS ativa no momento.'];
@@ -543,7 +678,7 @@
 
   function renderAll() {
     if (!state.data) return;
-    const renderers = [renderOS, renderPreventivas, renderEscala, renderRanking, renderCriticidade, renderMateriais];
+    const renderers = [renderOS, renderPreventivas, renderEscala, renderRanking, renderCriticidade, renderMateriais, renderGerencial];
     document.querySelectorAll('[data-tv-screen]').forEach((el, index) => {
       el.innerHTML = renderers[index]();
       el.classList.toggle('is-active', index === state.index);
@@ -558,15 +693,147 @@
     $('tvScreenIndicator').textContent = `Tela ${state.index + 1} de ${screens.length}`;
   }
 
+  const configuredInterstitials = Array.isArray(mediaConfig.interstitials)
+    ? mediaConfig.interstitials
+        .filter((item) => item && item.src)
+        .sort((a, b) => Number(a.afterScreen || 0) - Number(b.afterScreen || 0) || Number(a.order || 0) - Number(b.order || 0))
+    : [];
+
+  function interstitialsFor(position) {
+    if (!mediaConfig.interstitialsEnabled) return [];
+    return configuredInterstitials.filter((item) => Number(item.afterScreen || 0) === Number(position));
+  }
+
+  function hideInterstitial() {
+    const panel = $('tvInterstitial');
+    const video = $('tvInterstitialVideo');
+    const image = $('tvInterstitialImage');
+    clearTimeout(state.interstitialTimer);
+    state.interstitialTimer = null;
+    if (video) {
+      video.onended = null;
+      video.onerror = null;
+      video.pause();
+      video.removeAttribute('src');
+      video.hidden = true;
+      video.load();
+    }
+    if (image) {
+      image.onerror = null;
+      image.removeAttribute('src');
+      image.hidden = true;
+    }
+    if (panel) {
+      panel.hidden = true;
+      panel.setAttribute('aria-hidden', 'true');
+    }
+    state.interstitialActive = false;
+  }
+
+  function cancelInterstitial() {
+    state.interstitialToken += 1;
+    hideInterstitial();
+  }
+
+  function playInterstitialItem(item, token, onDone) {
+    const panel = $('tvInterstitial');
+    const video = $('tvInterstitialVideo');
+    const image = $('tvInterstitialImage');
+    const label = $('tvInterstitialLabel');
+    if (!panel || !video || !image || !item || token !== state.interstitialToken) {
+      onDone?.();
+      return;
+    }
+
+    state.interstitialActive = true;
+    panel.hidden = false;
+    panel.setAttribute('aria-hidden', 'false');
+    label.textContent = item.name || '';
+
+    video.onended = null;
+    video.onerror = null;
+    video.pause();
+    video.removeAttribute('src');
+    video.hidden = true;
+    video.load();
+    image.onerror = null;
+    image.removeAttribute('src');
+    image.hidden = true;
+
+    let finished = false;
+    const finish = () => {
+      if (finished || token !== state.interstitialToken) return;
+      finished = true;
+      clearTimeout(state.interstitialTimer);
+      state.interstitialTimer = null;
+      onDone?.();
+    };
+
+    const maxDuration = Math.max(3000, Number(item.durationMs || 8000));
+
+    if (String(item.type || '').toUpperCase() === 'VIDEO') {
+      video.hidden = false;
+      video.muted = true;
+      video.defaultMuted = true;
+      video.src = item.src;
+      video.currentTime = 0;
+      video.onended = finish;
+      video.onerror = finish;
+      video.load();
+      const play = video.play();
+      if (play && typeof play.catch === 'function') play.catch(finish);
+      state.interstitialTimer = setTimeout(finish, maxDuration);
+      return;
+    }
+
+    image.hidden = false;
+    image.onerror = finish;
+    image.src = item.src;
+    state.interstitialTimer = setTimeout(finish, maxDuration);
+  }
+
+  function runInterstitialSlot(position, onDone) {
+    const itemsAtPosition = interstitialsFor(position);
+    if (!itemsAtPosition.length || state.alertShowing) {
+      onDone?.();
+      return;
+    }
+
+    const token = ++state.interstitialToken;
+    let index = 0;
+    const next = () => {
+      if (token !== state.interstitialToken || state.alertShowing) return;
+      if (index >= itemsAtPosition.length) {
+        hideInterstitial();
+        onDone?.();
+        return;
+      }
+      const item = itemsAtPosition[index++];
+      playInterstitialItem(item, token, next);
+    };
+    next();
+  }
+
   function scheduleRotation(delay = state.rotationRemaining || ROTATION_MS) {
     clearTimeout(state.rotationTimer);
     state.rotationRemaining = delay;
     state.rotationStarted = Date.now();
     state.rotationTimer = setTimeout(() => {
-      state.index = (state.index + 1) % screens.length;
-      state.rotationRemaining = ROTATION_MS;
-      renderAll();
-      scheduleRotation(ROTATION_MS);
+      state.rotationTimer = null;
+      const currentScreenNumber = state.index + 1;
+      const nextIndex = (state.index + 1) % screens.length;
+
+      const advance = () => {
+        state.index = nextIndex;
+        state.rotationRemaining = ROTATION_MS;
+        renderAll();
+        scheduleRotation(ROTATION_MS);
+      };
+
+      runInterstitialSlot(currentScreenNumber, () => {
+        if (nextIndex === 0) runInterstitialSlot(0, advance);
+        else advance();
+      });
     }, delay);
   }
 
@@ -679,7 +946,14 @@
 
     state.active = true;
     fetchSnapshot({ detectNew: false });
-    scheduleRotation(ROTATION_MS);
+
+    const startScreens = () => {
+      state.index = 0;
+      state.rotationRemaining = ROTATION_MS;
+      renderAll();
+      scheduleRotation(ROTATION_MS);
+    };
+    runInterstitialSlot(0, startScreens);
     startProgress();
     startSnapshotPolling();
     connectStream();

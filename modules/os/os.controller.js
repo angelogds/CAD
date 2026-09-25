@@ -413,18 +413,13 @@ async function osGerarDescricaoTecnica(req, res) {
   }
 }
 
-async function osIniciar(req, res) {
+function osIniciar(req, res) {
   const id = Number(req.params.id);
   try {
+    // O caminho crítico encerra assim que o estado da OS é persistido.
+    // Push, inspeção, chat e eventos são disparados fora da resposta HTTP
+    // pelo service.iniciarOS(), evitando bloquear o clique em "Iniciar OS".
     service.iniciarOS(id, req.session?.user?.id || null);
-    await pushService.sendToAll({
-      title: "OS em andamento",
-      body: `OS #${id} entrou em andamento.`,
-      type: "MUDANCA_STATUS",
-      url: `/os/${id}`,
-      sound: "/audio/os-status.mp3",
-      data: { osId: id, type: "STATUS_CHANGE", newStatus: "ANDAMENTO" },
-    }).catch(() => {});
     req.flash("success", "OS iniciada e enviada para andamento.");
   } catch (err) {
     req.flash("error", err.message || "Não foi possível iniciar a OS.");

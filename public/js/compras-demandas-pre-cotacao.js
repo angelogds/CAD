@@ -41,9 +41,9 @@
     kicker.textContent = 'PLANEJAMENTO ANTECIPADO';
     const title = document.createElement('h2');
     title.id = 'demand-prequote-title';
-    title.textContent = 'Pré-cotações de Demandas';
+    title.textContent = 'Pré-solicitações de Demandas';
     const description = document.createElement('p');
-    description.textContent = 'Materiais de serviços ainda não convertidos em OS. Compras pode levantar preços e fornecedores, mas a compra fica bloqueada até a demanda virar Ordem de Serviço.';
+    description.textContent = 'Materiais ainda em planejamento. Compras pode levantar preços e fornecedores; a solicitação entra na fila normal assim que a compra for liberada na própria Demanda.';
     copy.append(kicker, title, description);
 
     const count = document.createElement('div');
@@ -82,7 +82,7 @@
         demandLink.className = 'demand-prequote-demand-link';
         demandLink.textContent = `Demanda #${row.demanda_id} — ${row.demanda_titulo || 'Abrir demanda'}`;
         const meta = document.createElement('small');
-        const details = [row.equipamento_nome || '', row.nr_referencia ? `NR: ${row.nr_referencia}` : '', row.aprovacao_status ? `Aprovação: ${row.aprovacao_status}` : ''].filter(Boolean);
+        const details = [row.prioridade ? `Criticidade: ${row.prioridade}` : '', row.equipamento_nome || '', row.nr_referencia ? `NR: ${row.nr_referencia}` : '', row.aprovacao_status ? `Execução: ${row.aprovacao_status}` : ''].filter(Boolean);
         meta.textContent = details.join(' • ') || 'Demanda em planejamento';
         main.append(requestLink, demandLink, meta);
 
@@ -101,11 +101,11 @@
         const gateStatus = document.createElement('strong');
         gateStatus.textContent = 'Cotação liberada';
         const gatePurchase = document.createElement('small');
-        gatePurchase.textContent = 'Compra aguardando OS';
+        gatePurchase.textContent = 'Compra aguardando liberação';
         const action = document.createElement('a');
         action.href = `/compras/solicitacoes/${row.id}`;
         action.className = 'ui-btn ui-btn--table';
-        action.textContent = 'Abrir pré-cotação';
+        action.textContent = 'Abrir pré-solicitação';
         gate.append(gateStatus, gatePurchase, action);
 
         article.append(main, progress, gate);

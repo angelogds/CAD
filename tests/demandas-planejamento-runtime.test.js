@@ -59,7 +59,43 @@ test('migration 188 executa sobre SQLite real sem perder demandas existentes', (
   assert.ok(indexes.includes('idx_os_demanda_id'));
 });
 
-test('pré-cotação usa dados reais e bloqueia compra até existir OS', () => {
+test('migration 209 adiciona liberação de compras sem perder dados existentes', () => {
+  const { DatabaseSync } = require('node:sqlite');
+  const db = new DatabaseSync(':memory:');
+
+  db.exec(`
+    CREATE TABLE demandas (
+      id INTEGER PRIMARY KEY,
+      titulo TEXT NOT NULL,
+      status TEXT
+    );
+    INSERT INTO demandas (id, titulo, status) VALUES (7, 'Reforma Caldeira 1', 'PLANEJAMENTO');
+  `);
+
+  const tableExists = name => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name));
+  const columnExists = (table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some(row => row.name === column);
+  const addColumnIfMissing = (table, column, definition) => {
+    if (!columnExists(table, column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+  };
+
+  require('../database/migrations/209_demandas_liberacao_compras')({
+    db,
+    tableExists,
+    addColumnIfMissing,
+  });
+
+  const row = db.prepare('SELECT * FROM demandas WHERE id=7').get();
+  assert.equal(row.titulo, 'Reforma Caldeira 1');
+  assert.equal(row.liberacao_compras_status, 'PENDENTE');
+  assert.equal(row.liberacao_compras_em, null);
+  assert.equal(row.liberacao_compras_por, null);
+
+  for (const column of ['liberacao_compras_status', 'liberacao_compras_em', 'liberacao_compras_por']) {
+    assert.equal(columnExists('demandas', column), true, `coluna ${column} deveria existir`);
+  }
+});
+
+test('pré-cotação usa dados reais e bloqueia compra até liberação no Planejamento', () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cad-demandas-gate-'));
   const dbPath = path.join(tempDir, 'runtime.db');
   const script = String.raw`
@@ -75,7 +111,8 @@ test('pré-cotação usa dados reais e bloqueia compra até existir OS', () => {
         aprovacao_status TEXT,
         prazo_previsto TEXT,
         nr_referencia TEXT,
-        equipamento_id INTEGER
+        equipamento_id INTEGER,
+        liberacao_compras_status TEXT NOT NULL DEFAULT 'PENDENTE'
       );
       CREATE TABLE equipamentos (id INTEGER PRIMARY KEY, nome TEXT);
       CREATE TABLE solicitacoes (
@@ -98,8 +135,8 @@ test('pré-cotação usa dados reais e bloqueia compra até existir OS', () => {
       );
 
       INSERT INTO equipamentos (id, nome) VALUES (3, 'Caldeira 1');
-      INSERT INTO demandas (id, titulo, status, prioridade, aprovacao_status, prazo_previsto, nr_referencia, equipamento_id)
-      VALUES (11, 'Reforma da Caldeira 1', 'PLANEJAMENTO', 'ALTA', 'PENDENTE', '2026-09-10', 'NR-13', 3);
+      INSERT INTO demandas (id, titulo, status, prioridade, aprovacao_status, prazo_previsto, nr_referencia, equipamento_id, liberacao_compras_status)
+      VALUES (11, 'Reforma da Caldeira 1', 'PLANEJAMENTO', 'ALTA', 'PENDENTE', '2026-09-10', 'NR-13', 3, 'PENDENTE');
       INSERT INTO solicitacoes (id, numero, titulo, status, prioridade, created_at, updated_at, demanda_id, os_id, disponivel_compras)
       VALUES (21, 'SOL-2026-000021', 'Materiais da reforma', 'ABERTA', 'ALTA', datetime('now'), datetime('now'), 11, NULL, 1);
       INSERT INTO solicitacao_itens (id, solicitacao_id, status_cotacao, status_compra) VALUES
@@ -118,12 +155,21 @@ test('pré-cotação usa dados reais e bloqueia compra até existir OS', () => {
 
     assert.throws(
       () => service.assertCompraLiberada(21),
-      error => error && error.code === 'DEMANDA_PRE_COTACAO_AGUARDANDO_OS'
+      error => error && error.code === 'DEMANDA_COMPRA_AGUARDANDO_LIBERACAO'
+    );
+
+    db.prepare("UPDATE demandas SET liberacao_compras_status='LIBERADA' WHERE id=11").run();
+    assert.doesNotThrow(() => service.assertCompraLiberada(21));
+    assert.equal(service.listPreCotacoesDemandas(12).length, 0);
+
+    db.prepare("UPDATE demandas SET liberacao_compras_status='BLOQUEADA' WHERE id=11").run();
+    assert.throws(
+      () => service.assertCompraLiberada(21),
+      error => error && error.code === 'DEMANDA_COMPRA_AGUARDANDO_LIBERACAO'
     );
 
     db.prepare('UPDATE solicitacoes SET os_id = ? WHERE id = ?').run(900, 21);
     assert.doesNotThrow(() => service.assertCompraLiberada(21));
-    assert.equal(service.listPreCotacoesDemandas(12).length, 0);
     process.stdout.write('ok');
   `;
 

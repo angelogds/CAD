@@ -55,6 +55,29 @@ test('interface expoe Layout, Vistas Auto e Analise tecnica com degradacao do Py
   assert.match(runtime, /persistCurrent/);
 });
 
+test('plotagem usa painel técnico em vez de prompts e salva a prancha configurada', () => {
+  const runtime = read('public/js/cad-round3-runtime.js');
+  const css = read('public/css/cad-round3.css');
+
+  assert.match(runtime, /id="cadRound3LayoutPanel"/);
+  assert.match(runtime, /id="cadRound3PaperFormat"/);
+  assert.match(runtime, /id="cadRound3PaperScale"/);
+  assert.match(runtime, /id="cadRound3CustomScale"/);
+  assert.match(runtime, /Gerar e salvar prancha/);
+  assert.match(runtime, /Automática — melhor enquadramento/);
+  assert.match(runtime, /1:100/);
+  assert.match(runtime, /await persistCurrent\(drawingId, cadData\)/);
+  assert.match(runtime, /layouts\.createPaperLayout\(\{ format, scale \}\)/);
+  assert.match(runtime, /!layouts\.hasLayout\(target\)/);
+  assert.doesNotMatch(runtime, /prompt\('Formato do Layout/);
+  assert.doesNotMatch(runtime, /prompt\('Escala:/);
+
+  assert.match(css, /\.cad-round3-layout-panel/);
+  assert.match(css, /\.cad-round3-sheet-preview/);
+  assert.match(css, /\.cad-round3-layout-grid/);
+  assert.match(css, /@media \(max-width: 760px\)[\s\S]*\.cad-round3-layout-panel/);
+});
+
 test('Python avançado 1.2 ignora camadas FAB e calcula sólidos de revolução', () => {
   const metrics = read('services/cad-python/app/manufacturing_metrics.py');
   const main = read('services/cad-python/app/main.py');

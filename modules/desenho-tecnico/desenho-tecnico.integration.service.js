@@ -6,6 +6,7 @@ const ORIGIN_MAP = {
   'curva-gomos': { categoria: 'CHAPARIA', subtipo: 'CHAPA_DOBRADA' },
   'furacao-flange': { categoria: 'FLANGES', subtipo: 'FLANGE_FURACAO' },
   'mao-francesa': { categoria: 'ESTRUTURAS', subtipo: 'MAO_FRANCESA' },
+  'exaustor-radial': { categoria: 'CHAPARIA', subtipo: 'EXAUSTOR_RADIAL' },
 };
 
 function ensureMinData(tracagem) {
