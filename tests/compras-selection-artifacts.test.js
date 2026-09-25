@@ -31,8 +31,10 @@ test('javascript limpa ranges residuais somente na fila operacional', () => {
   assert.match(js, /pageshow/);
 });
 
-test('view força nova versão de cache dos assets de compras', () => {
+test('view força versão coordenada de cache dos assets de compras', () => {
   const view = read('views/compras/solicitacoes/index.ejs');
-  assert.match(view, /compras-active-priority-fix\.css\?v=20260919-1/);
-  assert.match(view, /compras-dashboard\.js\?v=20260919-1/);
+  const version = view.match(/compras-dashboard\.css\?v=([^"\\s]+)/)?.[1];
+  assert.ok(version, 'a folha principal deve possuir versão de cache');
+  assert.match(view, new RegExp(`compras-active-priority-fix\\.css\\?v=${version}`));
+  assert.match(view, new RegExp(`compras-dashboard\\.js\\?v=${version}`));
 });
