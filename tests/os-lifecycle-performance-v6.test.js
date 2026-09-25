@@ -29,7 +29,7 @@ test('início usa leitura mínima e efeitos colaterais fora do request', () => {
   assert.match(body, /SELECT \$\{select\.join\(", "\)\} FROM os WHERE id = \?/);
   assert.match(body, /runOSLifecycleDetached\("START_SIDE_EFFECTS"/);
   assert.match(body, /pushService\.sendToAll/);
-  assert.match(body, /inspecaoService\.syncFromOS/);
+  assert.doesNotMatch(body, /inspecaoService\.syncFromOS/);
 });
 
 test('autoalocação reutiliza snapshot de ocupação durante abertura', () => {
