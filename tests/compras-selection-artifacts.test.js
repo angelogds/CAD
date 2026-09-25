@@ -35,6 +35,6 @@ test('view força versão coordenada de cache dos assets de compras', () => {
   const view = read('views/compras/solicitacoes/index.ejs');
   const version = view.match(/compras-dashboard\.css\?v=([^"\\s]+)/)?.[1];
   assert.ok(version, 'a folha principal deve possuir versão de cache');
-  assert.match(view, new RegExp(`compras-active-priority-fix\\\\.css\\\\?v=${version}`));
-  assert.match(view, new RegExp(`compras-dashboard\\\\.js\\\\?v=${version}`));
+  assert.match(view, new RegExp(`compras-active-priority-fix\\.css\\?v=${version}`));
+  assert.match(view, new RegExp(`compras-dashboard\\.js\\?v=${version}`));
 });
