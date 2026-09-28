@@ -1,0 +1,63 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/pre-solicitacoes.css?v=20260928-1">
+
+<div class="pre-page">
+  <div class="pre-hero">
+    <div>
+      <span class="pre-kicker">ALMOXARIFADO • PEDIDOS SEMANAIS</span>
+      <h1>Pré-Solicitações</h1>
+      <p>Materiais separados por setor, com aprovação item a item antes de chegar ao Compras.</p>
+    </div>
+    <% if (canCreate) { %><a class="ui-btn ui-btn--primary" href="/pre-solicitacoes/nova">Nova pré-solicitação</a><% } %>
+  </div>
+
+  <div class="pre-kpis">
+    <a href="/pre-solicitacoes" class="pre-kpi"><span>Total</span><strong><%= counters.total %></strong></a>
+    <a href="/pre-solicitacoes?status=RASCUNHO" class="pre-kpi"><span>Rascunhos</span><strong><%= counters.rascunho %></strong></a>
+    <a href="/pre-solicitacoes?status=AGUARDANDO_APROVACAO" class="pre-kpi warn"><span>Aguardando setor</span><strong><%= counters.aguardando %></strong></a>
+    <a href="/pre-solicitacoes?status=EM_ANALISE" class="pre-kpi amber"><span>Em análise</span><strong><%= counters.analise %></strong></a>
+    <a href="/pre-solicitacoes?status=ENVIADA_COMPRAS" class="pre-kpi ok"><span>Enviadas para Compras</span><strong><%= counters.enviadas %></strong></a>
+  </div>
+
+  <section class="pre-card">
+    <form class="pre-filters" method="GET">
+      <label>Setor
+        <select name="setor">
+          <option value="">Todos</option>
+          <% setorOptions.forEach(function(s){ %><option value="<%= s.value %>" <%= filters.setor===s.value?'selected':'' %>><%= s.label %></option><% }) %>
+        </select>
+      </label>
+      <label>Status
+        <select name="status">
+          <option value="">Todos</option>
+          <% Object.values(preStatus).forEach(function(st){ %><option value="<%=st%>" <%= filters.status===st?'selected':'' %>><%= st.replaceAll('_',' ') %></option><% }) %>
+        </select>
+      </label>
+      <label>Semana
+        <input type="week" name="semana" value="<%= filters.semana || '' %>">
+      </label>
+      <div class="pre-filter-actions"><button class="ui-btn ui-btn--secondary" type="submit">Filtrar</button><a class="ui-btn ui-btn--outline" href="/pre-solicitacoes">Limpar</a></div>
+    </form>
+  </section>
+
+  <section class="pre-list">
+    <% if (!rows.length) { %><div class="pre-empty">Nenhuma pré-solicitação encontrada para este filtro.</div><% } %>
+    <% rows.forEach(function(row){ 
+      const st=String(row.pre_status||'RASCUNHO');
+      const cls=st==='ENVIADA_COMPRAS'?'ok':st==='REPROVADA'?'danger':st==='EM_ANALISE'?'amber':st==='AGUARDANDO_APROVACAO'?'warn':'draft';
+    %>
+      <a class="pre-request <%=cls%>" href="/pre-solicitacoes/<%=row.id%>">
+        <div class="pre-request-main">
+          <div class="pre-request-title"><strong><%= row.numero || ('Pré #'+row.id) %></strong><span class="pre-status <%=cls%>"><%=st.replaceAll('_',' ')%></span></div>
+          <h3><%=row.setor_origem%> <small>• <%=row.subarea_destino||'Subárea não informada'%></small></h3>
+          <p>Semana <strong><%=row.semana_referencia||'-'%></strong> • criado por <%=row.solicitante_nome||'-'%><%=row.aprovador_nome?' • responsável: '+row.aprovador_nome:''%></p>
+        </div>
+        <div class="pre-progress-box">
+          <strong><%=row.progresso_analise%>%</strong>
+          <span><%=row.itens_analisados||0%>/<%=row.itens_total||0%> itens analisados</span>
+          <div class="pre-track"><i style="width:<%=row.progresso_analise%>%"></i></div>
+        </div>
+      </a>
+    <% }) %>
+  </section>
+</div>
