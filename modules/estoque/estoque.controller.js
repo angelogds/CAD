@@ -1,6 +1,6 @@
 const service = require("./estoque.service");
 const reservaService = require("./estoque.reservas.service");
-const { normalizeRole } = require("../../config/rbac");
+const { normalizeRole, canAccessModule } = require("../../config/rbac");
 
 function withReserva(itens) {
   const reservasPorItem = reservaService.resumoPorItem();
@@ -39,8 +39,22 @@ function index(req, res) {
     cards: { ...service.dashboard(), ...reservaService.dashboard() },
     itens, categorias: service.listCategorias(), locais: service.listLocais(),
     centrosCusto: service.listCentrosCusto(), setoresEstoque: service.SETORES_ESTOQUE,
-    inteligencia, filtros,
+    inteligencia, filtros, canManage: canAccessModule(req.session?.user?.role, "estoque_manage"),
   });
+}
+function atualizarClassificacao(req, res) {
+  try {
+    const ids = req.body.item_ids;
+    const total = service.atualizarClassificacaoItens({
+      item_ids: ids,
+      setor_utilizacao: req.body.setor_utilizacao,
+      subarea_centro_custo: req.body.subarea_centro_custo,
+    });
+    req.flash("success", `${total} material(is) classificado(s) com sucesso.`);
+  } catch (e) {
+    req.flash("error", e.message);
+  }
+  return res.redirect(req.get("referer") || "/estoque");
 }
 function itens(req, res) { res.render("estoque/itens", { title: "Itens", activeMenu: "estoque", itens: withReserva(service.listItens()) }); }
 function novoItem(req, res) {
@@ -89,4 +103,4 @@ async function qrItem(req, res, next) {
     return res.render('estoque/qr_item', { title: `QR - ${item.nome}`, activeMenu: 'estoque', item, url, qrDataUrl });
   } catch (error) { return next(error); }
 }
-module.exports = { index, itens, novoItem, criarItem, detalheItem, categorias, criarCategoria, locais, criarLocal, movimentos, saidaNova, qrItem };
+module.exports = { index, atualizarClassificacao, itens, novoItem, criarItem, detalheItem, categorias, criarCategoria, locais, criarLocal, movimentos, saidaNova, qrItem };
