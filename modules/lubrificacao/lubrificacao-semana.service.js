@@ -1,5 +1,6 @@
 const db = require('../../database/db');
 const osService = require('../os/os.service');
+const catalogo = require('./lubrificacao.catalogo.v1');
 
 function tableExists(name) {
   return !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name);
@@ -512,6 +513,142 @@ function getDashboardResumo(refDate = null) {
   };
 }
 
+function getAcompanhamentoPCM(refDate = null) {
+  const bounds = getWeekBounds(refDate);
+  const semana = getSemanaPorReferencia(bounds.inicio);
+  if (!tableExists('pcm_lubrificacao_planos') || !tableExists('equipamentos')) {
+    return {
+      ...bounds, semana, total_pontos:0, pontos_concluidos:0, pontos_pendentes:0,
+      percentual:0, execucoes_semana:0, ultima_atividade:null, areas:[], equipamentos:[]
+    };
+  }
+
+  const planos = db.prepare(`
+    SELECT l.id AS plano_id,l.equipamento_id,l.ponto_lubrificacao,
+           e.nome AS equipamento_nome,COALESCE(e.setor,'') AS setor
+    FROM pcm_lubrificacao_planos l
+    JOIN equipamentos e ON e.id=l.equipamento_id
+    WHERE COALESCE(l.ativo,1)=1
+      AND COALESCE(l.validado_tecnicamente,1)=1
+    ORDER BY e.nome,l.id
+  `).all();
+
+  const execRows = tableExists('pcm_lubrificacao_execucoes')
+    ? db.prepare(`
+        SELECT x.plano_id,x.equipamento_id,MAX(x.executed_at) AS ultima_execucao,
+               COUNT(*) AS execucoes
+        FROM pcm_lubrificacao_execucoes x
+        WHERE date(x.executed_at) BETWEEN date(?) AND date(?)
+        GROUP BY x.plano_id,x.equipamento_id
+      `).all(bounds.inicio,bounds.fim)
+    : [];
+
+  const execByPlan = new Map(execRows.map((row) => [Number(row.plano_id), row]));
+  const execucoesSemana = tableExists('pcm_lubrificacao_execucoes')
+    ? Number(db.prepare(`
+        SELECT COUNT(*) AS total
+        FROM pcm_lubrificacao_execucoes
+        WHERE date(executed_at) BETWEEN date(?) AND date(?)
+      `).get(bounds.inicio,bounds.fim)?.total || 0)
+    : 0;
+
+  const ultimaAtividade = tableExists('pcm_lubrificacao_execucoes')
+    ? db.prepare(`
+        SELECT x.executed_at,x.plano_id,x.equipamento_id,
+               e.nome AS equipamento_nome,COALESCE(e.setor,'') AS setor,
+               l.ponto_lubrificacao,
+               COALESCE(u.name,u.email,'') AS executor_nome
+        FROM pcm_lubrificacao_execucoes x
+        JOIN pcm_lubrificacao_planos l ON l.id=x.plano_id
+        JOIN equipamentos e ON e.id=x.equipamento_id
+        LEFT JOIN users u ON u.id=x.executor_user_id
+        WHERE date(x.executed_at) BETWEEN date(?) AND date(?)
+        ORDER BY datetime(x.executed_at) DESC,x.id DESC
+        LIMIT 1
+      `).get(bounds.inicio,bounds.fim)
+    : null;
+
+  const equipamentosMap = new Map();
+  for (const plano of planos) {
+    const eid = Number(plano.equipamento_id);
+    if (!equipamentosMap.has(eid)) {
+      const area = catalogo.classificarAreaOperacional({ setor:plano.setor });
+      equipamentosMap.set(eid,{
+        equipamento_id:eid,
+        equipamento_nome:plano.equipamento_nome,
+        setor:plano.setor,
+        area_operacional:area.codigo,
+        area_operacional_label:area.label,
+        total_pontos:0,
+        pontos_concluidos:0,
+        ultima_execucao:null,
+      });
+    }
+    const item = equipamentosMap.get(eid);
+    item.total_pontos += 1;
+    const exec = execByPlan.get(Number(plano.plano_id));
+    if (exec) {
+      item.pontos_concluidos += 1;
+      if (!item.ultima_execucao || String(exec.ultima_execucao) > String(item.ultima_execucao)) {
+        item.ultima_execucao = exec.ultima_execucao;
+      }
+    }
+  }
+
+  const areaMap = new Map();
+  const equipamentos = Array.from(equipamentosMap.values()).map((item) => {
+    const percentual = item.total_pontos ? Math.round((item.pontos_concluidos / item.total_pontos) * 100) : 0;
+    const status = percentual >= 100 ? 'CONCLUIDO' : item.pontos_concluidos > 0 ? 'ANDAMENTO' : 'PENDENTE';
+    const row = { ...item, pontos_pendentes:Math.max(0,item.total_pontos-item.pontos_concluidos), percentual, status };
+    if (!areaMap.has(row.area_operacional)) {
+      areaMap.set(row.area_operacional,{
+        codigo:row.area_operacional,label:row.area_operacional_label,
+        total_pontos:0,pontos_concluidos:0,equipamentos:0
+      });
+    }
+    const area = areaMap.get(row.area_operacional);
+    area.total_pontos += row.total_pontos;
+    area.pontos_concluidos += row.pontos_concluidos;
+    area.equipamentos += 1;
+    return row;
+  });
+
+  const order = { AREA_SUJA:1, AREA_LIMPA:2, CASA_CALDEIRA:3, OUTRAS_AREAS:4 };
+  equipamentos.sort((a,b) =>
+    (order[a.area_operacional] || 99) - (order[b.area_operacional] || 99)
+    || (a.status === 'ANDAMENTO' ? -1 : a.status === 'PENDENTE' ? 0 : 1)
+      - (b.status === 'ANDAMENTO' ? -1 : b.status === 'PENDENTE' ? 0 : 1)
+    || a.equipamento_nome.localeCompare(b.equipamento_nome)
+  );
+
+  const areas = Array.from(areaMap.values()).map((area) => ({
+    ...area,
+    pontos_pendentes:Math.max(0,area.total_pontos-area.pontos_concluidos),
+    percentual:area.total_pontos ? Math.round((area.pontos_concluidos/area.total_pontos)*100) : 0,
+  })).sort((a,b) => (order[a.codigo] || 99) - (order[b.codigo] || 99));
+
+  const concluidos = execByPlan.size;
+  const total = planos.length;
+  return {
+    ...bounds,
+    semana,
+    responsavel_user_id:semana?.responsavel_user_id || null,
+    responsavel_nome:semana?.responsavel_nome || null,
+    total_pontos:total,
+    pontos_concluidos:concluidos,
+    pontos_pendentes:Math.max(0,total-concluidos),
+    percentual:total ? Math.round((concluidos/total)*100) : 0,
+    execucoes_semana:execucoesSemana,
+    ultima_atividade:ultimaAtividade ? {
+      ...ultimaAtividade,
+      area_operacional:catalogo.classificarAreaOperacional({setor:ultimaAtividade.setor}).codigo,
+      area_operacional_label:catalogo.classificarAreaOperacional({setor:ultimaAtividade.setor}).label,
+    } : null,
+    areas,
+    equipamentos,
+  };
+}
+
 function getRelatorioSemana(refDate = null) {
   const bounds = getWeekBounds(refDate);
   const semana = getSemanaPorReferencia(bounds.inicio);
@@ -551,5 +688,6 @@ module.exports = {
   sincronizarStatusOSProgramada,
   getOSProgramada,
   getDashboardResumo,
+  getAcompanhamentoPCM,
   getRelatorioSemana,
 };
