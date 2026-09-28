@@ -260,10 +260,55 @@ function equipmentHaystack(equipamento = {}) {
   ].filter(Boolean).join(' '));
 }
 
+function fieldMatchScore(value, term, weights) {
+  const text = normalize(value);
+  const needle = normalize(term);
+  if (!text || !needle) return 0;
+  if (text === needle) return weights.exact;
+  if (text.startsWith(`${needle} `)) return weights.starts;
+  if (text.includes(needle)) return weights.contains;
+  return 0;
+}
+
+function scoreRule(equipamento = {}, rule) {
+  let best = 0;
+  for (const term of rule.match || []) {
+    // Tipo e nome descrevem o ativo. Setor é apenas contexto e nunca pode
+    // fazer "Rosca Alimentação Digestores" virar DIGESTORES, por exemplo.
+    best = Math.max(best,
+      fieldMatchScore(equipamento.tipo, term, { exact: 1000, starts: 920, contains: 850 }),
+      fieldMatchScore(equipamento.nome, term, { exact: 900, starts: 820, contains: 700 }),
+      fieldMatchScore(equipamento.codigo, term, { exact: 500, starts: 450, contains: 400 }),
+      fieldMatchScore(equipamento.tag, term, { exact: 500, starts: 450, contains: 400 }),
+      fieldMatchScore(equipamento.setor, term, { exact: 90, starts: 70, contains: 50 })
+    );
+  }
+  return best;
+}
+
 function classificarEquipamento(equipamento = {}) {
   const hay = equipmentHaystack(equipamento);
   if (!hay) return null;
-  return RULES.find((rule) => rule.match.some((term) => hay.includes(normalize(term)))) || null;
+
+  const ranked = RULES
+    .map((rule, index) => ({ rule, index, score: scoreRule(equipamento, rule) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+
+  return ranked[0]?.rule || null;
+}
+
+function classificarAreaOperacional(equipamento = {}) {
+  const setor = normalize(typeof equipamento === 'string' ? equipamento : equipamento.setor);
+  if (!setor) return { codigo: 'OUTRAS_AREAS', label: 'Outras áreas / revisar cadastro' };
+  if (setor.includes('CALDEIRA')) return { codigo: 'CASA_CALDEIRA', label: 'Casa da Caldeira' };
+  if (setor.includes('AREA LIMPA') || setor === 'LIMPA' || setor.includes(' LIMPA')) {
+    return { codigo: 'AREA_LIMPA', label: 'Área Limpa' };
+  }
+  if (setor.includes('AREA SUJA') || setor === 'SUJA' || setor.includes(' SUJA')) {
+    return { codigo: 'AREA_SUJA', label: 'Área Suja' };
+  }
+  return { codigo: 'OUTRAS_AREAS', label: 'Outras áreas / revisar cadastro' };
 }
 
 function gerarPontosBase(equipamento = {}) {
@@ -354,6 +399,7 @@ module.exports = {
   RULES,
   normalize,
   classificarEquipamento,
+  classificarAreaOperacional,
   gerarPontosBase,
   equivalentPoint,
   encontrarEquipamentoDoMotor,
