@@ -609,9 +609,21 @@ function lubrificacaoPdf(req, res) {
       pdfSection(doc, area.label);
       area.rotas.forEach((rows, rota) => {
         doc.fillColor('#137a3a').fontSize(10).text(rota);
-        pdfLines(doc, rows, (item) => {
-          const validado = Number(item.validado_tecnicamente ?? 1) === 1;
-          return `${item.equipamento_nome} | ${item.ponto_lubrificacao} | ${item.tipo_lubrificante_texto || '-'} | ${item.quantidade ?? '-'} ${item.unidade || ''} | ${item.frequencia_label || '-'} | ${item.responsavel_nome || 'Nao distribuido'} | ${validado ? 'VALIDADO' : 'PENDENTE DE VALIDACAO'}`;
+        const porEquipamento = new Map();
+        rows.forEach((item) => {
+          const key = Number(item.equipamento_id);
+          if (!porEquipamento.has(key)) porEquipamento.set(key, []);
+          porEquipamento.get(key).push(item);
+        });
+        porEquipamento.forEach((points) => {
+          const first = points[0];
+          doc.fillColor('#10233e').fontSize(9).text(
+            `${first.equipamento_nome} — ${first.setor || 'Setor nao informado'}`
+          );
+          pdfLines(doc, points, (item) => {
+            const validado = Number(item.validado_tecnicamente ?? 1) === 1;
+            return `  • ${item.ponto_lubrificacao} | ${item.tipo_lubrificante_texto || '-'} | ${item.quantidade ?? '-'} ${item.unidade || ''} | ${item.frequencia_label || '-'} | ${item.responsavel_nome || 'Nao distribuido'} | ${validado ? 'VALIDADO' : 'PENDENTE DE VALIDACAO'}`;
+          });
         });
       });
     });
