@@ -1,5 +1,5 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/pre-solicitacoes.css?v=20260928-1">
+<link rel="stylesheet" href="/css/pre-solicitacoes.css?v=20260928-2">
 <div class="pre-page">
   <div class="pre-hero">
     <div><span class="pre-kicker">ALMOXARIFADO</span><h1><%= editMode ? 'Editar pré-solicitação' : 'Nova pré-solicitação' %></h1><p>Monte o pedido semanal do setor. Compras só receberá os itens depois da aprovação.</p></div>
@@ -7,7 +7,7 @@
   </div>
 
   <form method="POST" action="<%=actionUrl%>" id="pre-form">
-    <section class="pre-card">
+    <section class="pre-card pre-card-compact">
       <div class="pre-section-head"><div><span>1</span><h2>Destino do pedido</h2></div><small>Escolha o setor e a subárea responsável pelo consumo.</small></div>
       <div class="pre-sector-grid" data-sector-grid>
         <% setores.forEach(function(s){ %>
@@ -27,45 +27,52 @@
         <label>Prioridade
           <select name="prioridade"><option value="BAIXA" <%=formData.prioridade==='BAIXA'?'selected':''%>>Baixa</option><option value="MEDIA" <%=!formData.prioridade||formData.prioridade==='MEDIA'?'selected':''%>>Média</option><option value="ALTA" <%=formData.prioridade==='ALTA'?'selected':''%>>Alta</option></select>
         </label>
-        <label class="wide">Observação<textarea name="observacao" rows="3" placeholder="Contexto do pedido, faltas percebidas ou observações para o encarregado"><%=formData.observacao||''%></textarea></label>
+        <label class="wide pre-observation">Observação<textarea name="observacao" rows="2" placeholder="Contexto do pedido, faltas percebidas ou observações para o encarregado"><%=formData.observacao||''%></textarea></label>
       </div>
     </section>
 
-    <section class="pre-card">
-      <div class="pre-section-head"><div><span>2</span><h2>Materiais da semana</h2></div><button class="ui-btn ui-btn--secondary" type="button" data-add-item>+ Adicionar item</button></div>
+    <section class="pre-card pre-materials-card">
+      <div class="pre-section-head">
+        <div><span>2</span><h2>Materiais da semana</h2></div>
+        <div class="pre-section-actions"><small>Cadastro compacto: material, quantidade, unidade e estoque na mesma linha.</small><button class="ui-btn ui-btn--secondary" type="button" data-add-item>+ Adicionar item</button></div>
+      </div>
       <div class="pre-items" data-items>
-        <% const initialItems=formItens.length?formItens:[{item_nome:'',item_descricao:'',unidade:'UN',qtd_solicitada:'',estoque_item_id:''}]; initialItems.forEach(function(item){ %>
+        <% const initialItems=formItens.length?formItens:[{item_nome:'',item_descricao:'',unidade:'UN',qtd_solicitada:'',estoque_item_id:''}]; initialItems.forEach(function(item,index){ %>
           <div class="pre-item-row">
-            <label>Material<input name="itens_nome[]" value="<%=item.item_nome||''%>" required placeholder="Ex.: Disco de corte 7&quot;"></label>
-            <label>Quantidade<input name="itens_qtd[]" value="<%=item.qtd_solicitada??item.quantidade??''%>" inputmode="decimal" required></label>
-            <label>Unidade<input name="itens_un[]" value="<%=item.unidade||'UN'%>" required></label>
-            <label class="pre-stock-link">Item de estoque
-              <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>" <%=Number(item.estoque_item_id||item.item_id)===Number(e.id)?'selected':''%>><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
-            </label>
-            <label class="wide">Especificação<textarea name="itens_especificacao[]" rows="2" placeholder="Marca, medida, aplicação ou detalhe técnico"><%=item.item_descricao||item.descricao||''%></textarea></label>
-            <button class="pre-remove" type="button" data-remove-item aria-label="Remover item">Remover</button>
+            <div class="pre-item-head"><strong>Item <span data-item-number><%=index+1%></span></strong><button class="pre-remove" type="button" data-remove-item aria-label="Remover item">Remover</button></div>
+            <div class="pre-item-fields">
+              <label class="pre-material-name">Material<input name="itens_nome[]" value="<%=item.item_nome||''%>" required placeholder="Ex.: Disco de corte 7&quot;"></label>
+              <label>Quantidade<input name="itens_qtd[]" value="<%=item.qtd_solicitada??item.quantidade??''%>" inputmode="decimal" required></label>
+              <label>Unidade<input name="itens_un[]" value="<%=item.unidade||'UN'%>" required></label>
+              <label class="pre-stock-link">Item de estoque
+                <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>" <%=Number(item.estoque_item_id||item.item_id)===Number(e.id)?'selected':''%>><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
+              </label>
+            </div>
+            <label class="pre-item-spec">Especificação<textarea name="itens_especificacao[]" rows="1" placeholder="Marca, medida, aplicação ou detalhe técnico"><%=item.item_descricao||item.descricao||''%></textarea></label>
           </div>
         <% }) %>
       </div>
     </section>
 
-    <div class="pre-form-actions">
-      <button class="ui-btn ui-btn--outline" type="submit" name="acao" value="rascunho">Salvar rascunho</button>
-      <button class="ui-btn ui-btn--primary" type="submit" name="acao" value="enviar" onclick="return confirm('Enviar esta pré-solicitação para análise do responsável pelo setor?')">Enviar para aprovação</button>
+    <div class="pre-form-actions pre-action-bar">
+      <span class="pre-action-hint">Salve como rascunho ou envie ao responsável do setor.</span>
+      <div><button class="ui-btn ui-btn--outline" type="submit" name="acao" value="rascunho">Salvar rascunho</button><button class="ui-btn ui-btn--primary" type="submit" name="acao" value="enviar" onclick="return confirm('Enviar esta pré-solicitação para análise do responsável pelo setor?')">Enviar para aprovação</button></div>
     </div>
   </form>
 </div>
 
 <template id="pre-item-template">
   <div class="pre-item-row">
-    <label>Material<input name="itens_nome[]" required placeholder="Material"></label>
-    <label>Quantidade<input name="itens_qtd[]" inputmode="decimal" required></label>
-    <label>Unidade<input name="itens_un[]" value="UN" required></label>
-    <label class="pre-stock-link">Item de estoque
-      <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>"><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
-    </label>
-    <label class="wide">Especificação<textarea name="itens_especificacao[]" rows="2"></textarea></label>
-    <button class="pre-remove" type="button" data-remove-item>Remover</button>
+    <div class="pre-item-head"><strong>Item <span data-item-number></span></strong><button class="pre-remove" type="button" data-remove-item>Remover</button></div>
+    <div class="pre-item-fields">
+      <label class="pre-material-name">Material<input name="itens_nome[]" required placeholder="Material"></label>
+      <label>Quantidade<input name="itens_qtd[]" inputmode="decimal" required></label>
+      <label>Unidade<input name="itens_un[]" value="UN" required></label>
+      <label class="pre-stock-link">Item de estoque
+        <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>"><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
+      </label>
+    </div>
+    <label class="pre-item-spec">Especificação<textarea name="itens_especificacao[]" rows="1" placeholder="Marca, medida, aplicação ou detalhe técnico"></textarea></label>
   </div>
 </template>
 <script>
@@ -73,6 +80,7 @@
   const subareas=<%- JSON.stringify(subareas) %>;
   const current=<%- JSON.stringify(formData.subarea_destino||'') %>;
   const select=document.querySelector('[data-subarea]');
+  const renumber=()=>document.querySelectorAll('[data-item-number]').forEach((el,index)=>{el.textContent=String(index+1);});
   const render=()=>{
     const sector=document.querySelector('input[name="setor_origem"]:checked')?.value||'';
     const options=subareas[sector]||[];
@@ -81,9 +89,11 @@
   };
   document.querySelectorAll('input[name="setor_origem"]').forEach(el=>el.addEventListener('change',render));
   render();
+  renumber();
   document.querySelector('[data-add-item]')?.addEventListener('click',()=>{
     const tpl=document.querySelector('#pre-item-template');
     document.querySelector('[data-items]').appendChild(tpl.content.cloneNode(true));
+    renumber();
   });
   document.addEventListener('click',(e)=>{
     const btn=e.target.closest('[data-remove-item]');
@@ -91,6 +101,7 @@
     const rows=document.querySelectorAll('.pre-item-row');
     if(rows.length<=1) return;
     btn.closest('.pre-item-row')?.remove();
+    renumber();
   });
 })();
 </script>
