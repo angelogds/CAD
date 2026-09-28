@@ -515,7 +515,7 @@ function listBom({ equipamento_id, categoria, busca } = {}) {
   `, params);
 }
 
-function listLubrificacao({ equipamento_id, setor, validacao, rota } = {}) {
+function listLubrificacao({ equipamento_id, setor, validacao, rota, area, ativos = '1' } = {}) {
   let where = '1=1';
   const params = {};
   if (equipamento_id) { where += ' AND l.equipamento_id=@equipamento_id'; params.equipamento_id = Number(equipamento_id); }
@@ -523,6 +523,8 @@ function listLubrificacao({ equipamento_id, setor, validacao, rota } = {}) {
   if (validacao === 'PENDENTE') where += ' AND COALESCE(l.validado_tecnicamente,1)=0';
   if (validacao === 'VALIDADO') where += ' AND COALESCE(l.validado_tecnicamente,1)=1';
   if (rota) { where += ' AND COALESCE(l.rota_lubrificacao,"")=@rota'; params.rota = String(rota); }
+  if (String(ativos) === '0') where += ' AND COALESCE(l.ativo,1)=0';
+  else if (String(ativos).toUpperCase() !== 'TODOS') where += ' AND COALESCE(l.ativo,1)=1';
 
   const rows = safeAll(`
     SELECT l.*, e.nome AS equipamento_nome, e.setor,
@@ -539,7 +541,7 @@ function listLubrificacao({ equipamento_id, setor, validacao, rota } = {}) {
       l.id DESC
   `, params);
 
-  return rows.map((r) => {
+  const mapped = rows.map((r) => {
     const dias = Number(r.frequencia_dias || 0);
     const sem = Number(r.frequencia_semanas || 0);
     const mes = Number(r.frequencia_meses || 0);
@@ -557,8 +559,39 @@ function listLubrificacao({ equipamento_id, setor, validacao, rota } = {}) {
       if (diff < 0) situacao = 'ATRASADO';
       else if (diff <= 7) situacao = 'EM_BREVE';
     }
-    return { ...r, frequencia_label: freq, situacao };
+    const areaInfo = lubricationCatalog.classificarAreaOperacional({ setor:r.setor });
+    return {
+      ...r,
+      frequencia_label: freq,
+      situacao,
+      area_operacional: areaInfo.codigo,
+      area_operacional_label: areaInfo.label,
+    };
   });
+
+  const wantedArea = String(area || '').trim().toUpperCase();
+  return wantedArea ? mapped.filter((row) => row.area_operacional === wantedArea) : mapped;
+}
+
+function listAreasLubrificacao() {
+  const map = new Map();
+  listLubrificacao({ ativos:'1' }).forEach((row) => {
+    if (!map.has(row.area_operacional)) {
+      map.set(row.area_operacional, {
+        codigo:row.area_operacional,
+        label:row.area_operacional_label,
+        pontos:0,
+        equipamentos:new Set(),
+      });
+    }
+    const item = map.get(row.area_operacional);
+    item.pontos += 1;
+    item.equipamentos.add(Number(row.equipamento_id));
+  });
+  const order = { AREA_SUJA:1, AREA_LIMPA:2, CASA_CALDEIRA:3, OUTRAS_AREAS:4 };
+  return Array.from(map.values())
+    .map((item) => ({ ...item, equipamentos:item.equipamentos.size }))
+    .sort((a,b) => (order[a.codigo] || 99) - (order[b.codigo] || 99) || a.label.localeCompare(b.label));
 }
 
 function COALESCE_BOOL(value, fallback = 1) {
@@ -1529,6 +1562,7 @@ module.exports = {
   saveCriticidade,
   listBom,
   listLubrificacao,
+  listAreasLubrificacao,
   listPecasCriticas,
   listBacklogSimples,
   listOSFalhasPreview,
