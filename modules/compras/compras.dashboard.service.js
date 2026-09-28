@@ -229,6 +229,9 @@ function loadRows(filters = {}) {
   const equipmentJoin = hasEquipments ? 'LEFT JOIN equipamentos e ON e.id=s.equipamento_id' : 'LEFT JOIN (SELECT NULL id, NULL nome) e ON 1=0';
   const params = [];
   const where = buildFilters(filters, params);
+  if (solCols.has('tipo_origem') && solCols.has('disponivel_compras')) {
+    where.push("(UPPER(COALESCE(s.tipo_origem,'')) <> 'PRE_SOLICITACAO_ALMOX' OR COALESCE(s.disponivel_compras,0)=1)");
+  }
 
   const solValue = solCols.has('valor_total') ? 'COALESCE(s.valor_total,0)' : '0';
   const solDeadline = solCols.has('previsao_entrega') ? "COALESCE(s.previsao_entrega,'')" : "''";

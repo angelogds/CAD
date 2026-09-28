@@ -177,6 +177,10 @@ function isSchemaError(error) {
 function tryRenderDetalhe(id, res, req) {
   const sol = service.getSolicitacaoDetalhe(id);
   if (!sol) return res.status(404).send('Solicitação não encontrada');
+  if (String(sol.tipo_origem || '').toUpperCase() === 'PRE_SOLICITACAO_ALMOX' && Number(sol.disponivel_compras || 0) !== 1) {
+    req?.flash?.('error', 'Esta pré-solicitação ainda está em análise do setor e não foi liberada para Compras.');
+    return res.redirect('/compras/solicitacoes');
+  }
   const fornecedores = service.listFornecedoresAtivos();
   return res.render('compras/solicitacoes/show', { title: `Compras ${sol.numero}`, activeMenu: 'compras', sol, fornecedores,
     selectedSupplierId:Number(req?.query?.fornecedor_selecionado)||null,selectedItemId:Number(req?.query?.item_id)||null });

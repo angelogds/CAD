@@ -397,6 +397,7 @@ mount("/lubrificacao", "./modules/lubrificacao/lubrificacao.routes");
 mount(OFFICIAL_ROUTES.compras, "./modules/compras/compras.routes");
 mount("/fornecedores", "./modules/fornecedores/fornecedores.routes");
 mount("/solicitacoes", "./modules/solicitacoes/solicitacoes.routes");
+mount("/pre-solicitacoes", "./modules/pre-solicitacoes/pre-solicitacoes.routes");
 mount("/acompanhamento-compras", "./modules/acompanhamento-compras/acompanhamento-compras.routes");
 mount(OFFICIAL_ROUTES.estoque, "./modules/estoque/estoque.routes");
 mount(OFFICIAL_ROUTES.almoxarifado, "./modules/almoxarifado/almoxarifado.routes");
