@@ -10,7 +10,6 @@ function withReserva(itens) {
     return { ...item, saldo_reservado: reservado, saldo_disponivel: Math.max(saldoFisico - reservado, 0) };
   });
 }
-
 function filtrarSituacaoLivre(itens, situacao) {
   if (!situacao) return itens;
   return itens.filter((item) => {
@@ -28,22 +27,28 @@ function index(req, res) {
     q: String(req.query.q || "").trim(),
     categoria_id: req.query.categoria_id || "",
     local_id: req.query.local_id || "",
+    setor_utilizacao: req.query.setor_utilizacao || "",
+    centro_custo: String(req.query.centro_custo || "").trim(),
     situacao: ["", "ok", "baixo", "zerado"].includes(req.query.situacao || "") ? (req.query.situacao || "") : "",
   };
   const baseFilters = { ...filtros, situacao: "" };
   const itens = filtrarSituacaoLivre(withReserva(service.listItens(baseFilters)), filtros.situacao);
+  const inteligencia = service.getInteligenciaReposicao(baseFilters);
   res.render("estoque/index", {
-    title: "Estoque",
-    activeMenu: "estoque",
+    title: "Estoque", activeMenu: "estoque",
     cards: { ...service.dashboard(), ...reservaService.dashboard() },
-    itens,
-    categorias: service.listCategorias(),
-    locais: service.listLocais(),
-    filtros,
+    itens, categorias: service.listCategorias(), locais: service.listLocais(),
+    centrosCusto: service.listCentrosCusto(), setoresEstoque: service.SETORES_ESTOQUE,
+    inteligencia, filtros,
   });
 }
 function itens(req, res) { res.render("estoque/itens", { title: "Itens", activeMenu: "estoque", itens: withReserva(service.listItens()) }); }
-function novoItem(req, res) { res.render("estoque/novo_item", { title: "Novo Item", activeMenu: "estoque", categorias: service.listCategorias(), locais: service.listLocais() }); }
+function novoItem(req, res) {
+  res.render("estoque/novo_item", {
+    title: "Novo Item", activeMenu: "estoque", categorias: service.listCategorias(), locais: service.listLocais(),
+    setoresEstoque: service.SETORES_ESTOQUE, centrosCusto: service.listCentrosCusto()
+  });
+}
 function criarItem(req, res) { try { const id = service.createItem(req.body); req.flash("success", "Item criado."); return res.redirect(`/estoque/itens/${id}`);} catch (e) { req.flash("error", e.message); return res.redirect("/estoque/itens/novo"); } }
 function detalheItem(req, res) {
   const itemBase = service.getItem(Number(req.params.id));
@@ -72,8 +77,7 @@ function saidaNova(req, res) {
     ordens: service.listOrdensAtivas(),
     itemSelecionado: Number(req.query.item) || null,
     origem: req.query.origem === "QR_CODE" ? "QR_CODE" : "MANUAL",
-    contextoAlmox,
-    canAlmoxRead,
+    contextoAlmox, canAlmoxRead,
   });
 }
 async function qrItem(req, res, next) {
@@ -85,5 +89,4 @@ async function qrItem(req, res, next) {
     return res.render('estoque/qr_item', { title: `QR - ${item.nome}`, activeMenu: 'estoque', item, url, qrDataUrl });
   } catch (error) { return next(error); }
 }
-
 module.exports = { index, itens, novoItem, criarItem, detalheItem, categorias, criarCategoria, locais, criarLocal, movimentos, saidaNova, qrItem };

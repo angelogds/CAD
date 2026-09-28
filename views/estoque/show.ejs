@@ -10,6 +10,9 @@
 <div class="card" style="margin-bottom:14px;">
   <div class="grid-3">
     <div><div class="label">Saldo atual</div><div><strong><%= item.saldo_atual %> <%= item.unidade %></strong></div></div>
+    <div><div class="label">Utilização</div><div><strong><%= item.setor_utilizacao_exibicao || 'COMUM' %></strong></div></div>
+    <div><div class="label">Centro de custo / Subárea</div><div><strong><%= item.centro_custo_exibicao || '-' %></strong></div></div>
+    <div><div class="label">Consumo 90 dias</div><div><strong><%= Number(item.consumo_90d||0).toFixed(2) %> <%= item.unidade %></strong></div></div>
     <div><div class="label">Movimentos</div><div><strong><%= movimentos.length %></strong></div></div>
     <div><div class="label">Item ID</div><div><strong>#<%= item.id %></strong></div></div>
   </div>

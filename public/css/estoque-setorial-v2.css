@@ -1,0 +1,14 @@
+.stock-sector-cards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:14px 0}
+.stock-sector-card{display:flex;flex-direction:column;gap:4px;padding:14px;border:1px solid #dfe8df;background:#fff;border-radius:14px;text-decoration:none;color:inherit}
+.stock-sector-card:hover,.stock-sector-card.is-active{border-color:#79a87c;box-shadow:0 8px 22px rgba(25,75,34,.08)}
+.stock-sector-card span{font-size:12px;font-weight:800;letter-spacing:.03em;color:#4e6651}.stock-sector-card strong{font-size:26px}.stock-sector-card small{color:#738075}
+.stock-flow-filters--sector{grid-template-columns:1.4fr repeat(5,minmax(130px,1fr)) auto}
+.stock-intelligence-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.stock-ranking{display:grid;gap:8px}.stock-ranking>div{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;padding:10px 0;border-bottom:1px solid #edf1ed}
+.stock-ranking>div:last-child{border-bottom:0}.stock-ranking span{grid-row:1/3;font-weight:800;color:#5d725f}.stock-ranking strong{font-size:14px}.stock-ranking small{font-size:12px;color:#738075}
+.stock-reorder-badge{grid-row:auto!important;align-self:start;border-radius:999px;padding:4px 8px;background:#fff1cf;color:#7c5b00;font-size:11px}
+.stock-table-columns--sector,.stock-table-row--sector{grid-template-columns:1.45fr 1fr 1.1fr .9fr .75fr .8fr .7fr .95fr auto}
+.stock-rotation{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:800;background:#edf2ed;color:#506251}.stock-rotation--alta{background:#ffe2de;color:#8b2b20}.stock-rotation--media{background:#fff1cf;color:#7c5b00}.stock-rotation--baixa{background:#e4f2e4;color:#2f6b34}
+.stock-form-hint{grid-column:1/-1;padding:12px 14px;border-radius:12px;background:#f4f8f4;display:flex;gap:8px}
+@media(max-width:1180px){.stock-sector-cards{grid-template-columns:repeat(3,1fr)}.stock-flow-filters--sector{grid-template-columns:repeat(3,1fr)}.stock-intelligence-grid{grid-template-columns:1fr}}
+@media(max-width:760px){.stock-sector-cards{grid-template-columns:1fr 1fr}.stock-flow-filters--sector{grid-template-columns:1fr}.stock-table-columns--sector{display:none}.stock-table-row--sector{display:grid;grid-template-columns:1fr;padding:14px}.stock-intelligence-grid{grid-template-columns:1fr}}
