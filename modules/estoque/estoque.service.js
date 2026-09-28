@@ -1,5 +1,9 @@
 const db = require("../../database/db");
 const fluxoSolicitacaoService = require("./estoque.solicitacao-fluxo.service");
+const { SETORES, normalizeSetorCorporativo } = require("../compras/compras-setores");
+
+const SETOR_COMUM = 'COMUM';
+const SETORES_ESTOQUE = [SETORES.RECICLAGEM, SETORES.FRIGORIFICO, SETORES.LOGISTICA, SETORES.ADMINISTRATIVO, SETOR_COMUM];
 
 function tableExists(name) {
   try { return !!db.prepare("SELECT 1 FROM sqlite_master WHERE (type='table' OR type='view') AND name=?").get(name); } catch { return false; }
@@ -13,6 +17,8 @@ const HAS_SALDO_MINIMO = hasColumn("estoque_itens", "saldo_minimo");
 const HAS_ESTOQUE_MIN = hasColumn("estoque_itens", "estoque_min");
 const HAS_CATEGORIA_ID = hasColumn("estoque_itens", "categoria_id");
 const HAS_LOCAL_ID = hasColumn("estoque_itens", "local_id");
+const HAS_SETOR_UTILIZACAO = hasColumn("estoque_itens", "setor_utilizacao");
+const HAS_CENTRO_CUSTO = hasColumn("estoque_itens", "subarea_centro_custo");
 const HAS_DATA_MOV = hasColumn("estoque_movimentos", "data_mov");
 const HAS_USUARIO_ID = hasColumn("estoque_movimentos", "usuario_id");
 const HAS_MOV_OS_ID = hasColumn("estoque_movimentos", "os_id");
@@ -25,6 +31,8 @@ const HAS_MOV_RETIRADO_POR = hasColumn("estoque_movimentos", "retirado_por_colab
 const HAS_MOV_ENTREGUE_POR = hasColumn("estoque_movimentos", "entregue_por_user_id");
 const HAS_MOV_IDENTIFICACAO_ORIGEM = hasColumn("estoque_movimentos", "identificacao_origem");
 const HAS_MOV_RESERVA_ID = hasColumn("estoque_movimentos", "reserva_id");
+const HAS_MOV_SETOR_UTILIZACAO = hasColumn("estoque_movimentos", "setor_utilizacao");
+const HAS_MOV_CENTRO_CUSTO = hasColumn("estoque_movimentos", "subarea_centro_custo");
 const HAS_ESTOQUE_CUSTO_UNIT = hasColumn("estoque_itens", "custo_unit");
 const HAS_MOV_CUSTO_UNIT = hasColumn("estoque_movimentos", "custo_unit");
 const HAS_SOL_ITEM_VALOR_UNITARIO = hasColumn("solicitacao_itens", "valor_unitario_centavos");
@@ -43,6 +51,30 @@ function minExpr() { return HAS_SALDO_MINIMO ? "COALESCE(i.saldo_minimo,0)" : (H
 function normalize(value) { return String(value || "").trim(); }
 function isClosedStatus(status) {
   return ['CANCELADA','CANCELADO','CONCLUIDA','CONCLUÍDA','CONCLUIDO','FECHADA','FECHADO'].includes(String(status || '').toUpperCase());
+}
+function normalizeSetorEstoque(value) {
+  const raw = normalize(value);
+  if (!raw) return '';
+  if (raw.toUpperCase() === SETOR_COMUM) return SETOR_COMUM;
+  const canonical = normalizeSetorCorporativo(raw);
+  return SETORES_ESTOQUE.includes(canonical) ? canonical : '';
+}
+function setorItemExpr(alias = 'i') {
+  return HAS_SETOR_UTILIZACAO ? `COALESCE(NULLIF(TRIM(${alias}.setor_utilizacao),''),'COMUM')` : "'COMUM'";
+}
+function centroCustoItemExpr(alias = 'i') {
+  return HAS_CENTRO_CUSTO ? `${alias}.subarea_centro_custo` : 'NULL';
+}
+
+function consumoExpr(days = 90) {
+  if (!tableExists('estoque_movimentos')) return '0';
+  return `COALESCE((
+    SELECT SUM(ABS(em.quantidade))
+    FROM estoque_movimentos em
+    WHERE em.item_id=i.id
+      AND UPPER(COALESCE(em.tipo,'')) LIKE 'SAIDA%'
+      AND datetime(${dataMovExpr('em')}) >= datetime('now','-${Number(days)} days')
+  ),0)`;
 }
 
 function dashboard() {
@@ -67,6 +99,12 @@ function listItens(filters = {}) {
   }
   if (filters.categoria_id && HAS_CATEGORIA_ID) { where.push("i.categoria_id=?"); params.push(Number(filters.categoria_id)); }
   if (filters.local_id && HAS_LOCAL_ID) { where.push("i.local_id=?"); params.push(Number(filters.local_id)); }
+  const setor = normalizeSetorEstoque(filters.setor_utilizacao);
+  if (setor && HAS_SETOR_UTILIZACAO) { where.push(`${setorItemExpr()}=?`); params.push(setor); }
+  if (filters.centro_custo && HAS_CENTRO_CUSTO) {
+    where.push("LOWER(COALESCE(i.subarea_centro_custo,'')) LIKE ?");
+    params.push(`%${String(filters.centro_custo).trim().toLowerCase()}%`);
+  }
   if (filters.situacao === "zerado") where.push(`${saldoExpr()} <= 0`);
   if (filters.situacao === "baixo") where.push(`${saldoExpr()} > 0 AND ${saldoExpr()} < ${minExpr()}`);
   if (filters.situacao === "ok") where.push(`${saldoExpr()} >= ${minExpr()} AND ${saldoExpr()} > 0`);
@@ -74,20 +112,59 @@ function listItens(filters = {}) {
   const lastMove = tableExists("estoque_movimentos")
     ? `(SELECT MAX(${dataMovExpr("lm")}) FROM estoque_movimentos lm WHERE lm.item_id=i.id)`
     : "NULL";
+  const consumo90 = consumoExpr(90);
+  const consumo30 = consumoExpr(30);
   return db.prepare(`SELECT i.*, c.nome categoria_nome, l.nome local_nome,
-      ${saldoExpr()} AS saldo_atual, ${minExpr()} AS saldo_minimo, ${lastMove} AS ultima_movimentacao
+      ${saldoExpr()} AS saldo_atual, ${minExpr()} AS saldo_minimo, ${lastMove} AS ultima_movimentacao,
+      ${setorItemExpr()} AS setor_utilizacao_exibicao,
+      ${centroCustoItemExpr()} AS centro_custo_exibicao,
+      ${consumo30} AS consumo_30d, ${consumo90} AS consumo_90d
     FROM estoque_itens i ${categoriaJoin()} ${localJoin()} ${saldoJoin()}
-    WHERE ${where.join(" AND ")} ORDER BY i.nome`).all(...params);
+    WHERE ${where.join(" AND ")} ORDER BY i.nome`).all(...params).map((row) => {
+      const consumo90d = Number(row.consumo_90d || 0);
+      const mediaMensal = consumo90d / 3;
+      const mediaDiaria = consumo90d / 90;
+      const saldo = Number(row.saldo_atual || 0);
+      const minimo = Number(row.saldo_minimo || 0);
+      const coberturaDias = mediaDiaria > 0 ? saldo / mediaDiaria : null;
+      const rotacao = consumo90d >= 20 ? 'ALTA' : consumo90d >= 5 ? 'MEDIA' : consumo90d > 0 ? 'BAIXA' : 'SEM_CONSUMO';
+      const sugestao = saldo <= 0
+        ? 'REPOR_URGENTE'
+        : saldo < minimo
+          ? 'REPOR'
+          : (coberturaDias !== null && coberturaDias < 30 ? 'PROGRAMAR_REPOSICAO' : 'OK');
+      return { ...row, consumo_medio_mensal_calc: mediaMensal, cobertura_dias_calc: coberturaDias, rotacao, reposicao_status: sugestao };
+    });
 }
 function listCategorias() { return tableExists("estoque_categorias") ? db.prepare("SELECT * FROM estoque_categorias WHERE ativo=1 ORDER BY nome").all() : []; }
 function listLocais() { return tableExists("estoque_locais") ? db.prepare("SELECT * FROM estoque_locais WHERE ativo=1 ORDER BY nome").all() : []; }
+function listCentrosCusto() {
+  if (!HAS_CENTRO_CUSTO) return [];
+  return db.prepare(`SELECT DISTINCT TRIM(subarea_centro_custo) nome FROM estoque_itens
+    WHERE ativo=1 AND TRIM(COALESCE(subarea_centro_custo,''))<>'' ORDER BY nome`).all();
+}
+function getInteligenciaReposicao(filters = {}) {
+  const itens = listItens(filters);
+  return {
+    criticos: itens.filter((i) => ['REPOR_URGENTE','REPOR'].includes(i.reposicao_status)),
+    programar: itens.filter((i) => i.reposicao_status === 'PROGRAMAR_REPOSICAO'),
+    maisRotacionados: [...itens].sort((a,b) => Number(b.consumo_90d||0)-Number(a.consumo_90d||0)).slice(0,10),
+    consumoSetorial: SETORES_ESTOQUE.map((setor) => ({
+      setor,
+      consumo_90d: itens.filter((i) => i.setor_utilizacao_exibicao === setor).reduce((s,i) => s + Number(i.consumo_90d||0), 0)
+    }))
+  };
+}
 function listMovimentos() {
   const identificacaoExpr = HAS_MOV_IDENTIFICACAO_ORIGEM ? "m.identificacao_origem" : "NULL";
   const reservaExpr = HAS_MOV_RESERVA_ID ? "m.reserva_id" : "NULL";
+  const setorExpr = HAS_MOV_SETOR_UTILIZACAO ? "COALESCE(m.setor_utilizacao, i.setor_utilizacao, 'COMUM')" : setorItemExpr('i');
+  const centroExpr = HAS_MOV_CENTRO_CUSTO ? "COALESCE(m.subarea_centro_custo, i.subarea_centro_custo)" : centroCustoItemExpr('i');
   return db.prepare(`SELECT m.*, ${dataMovExpr()} AS data_mov, i.nome item_nome, i.unidade item_unidade,
       u.name usuario_nome, rc.nome retirado_por_nome, eu.name entregue_por_nome,
       s.numero solicitacao_numero, eq.nome equipamento_nome,
-      ${identificacaoExpr} identificacao_origem_exibicao, ${reservaExpr} reserva_id_exibicao
+      ${identificacaoExpr} identificacao_origem_exibicao, ${reservaExpr} reserva_id_exibicao,
+      ${setorExpr} setor_utilizacao_exibicao, ${centroExpr} centro_custo_exibicao
     FROM estoque_movimentos m
     JOIN estoque_itens i ON i.id=m.item_id
     ${usuarioJoin()} ${retiradoPorJoin()} ${entreguePorJoin()} ${solicitacaoJoin()} ${equipamentoJoin()}
@@ -102,13 +179,18 @@ function createItem(data) {
   const values = [data.codigo || null, data.nome, data.unidade || "UN"];
   if (HAS_CATEGORIA_ID) { cols.push("categoria_id"); values.push(data.categoria_id || null); }
   if (HAS_LOCAL_ID) { cols.push("local_id"); values.push(data.local_id || null); }
+  if (HAS_SETOR_UTILIZACAO) { cols.push("setor_utilizacao"); values.push(normalizeSetorEstoque(data.setor_utilizacao) || SETOR_COMUM); }
+  if (HAS_CENTRO_CUSTO) { cols.push("subarea_centro_custo"); values.push(normalize(data.subarea_centro_custo) || null); }
   cols.push(minColumn);
   values.push(Number(data.saldo_minimo || 0));
   const placeholders = cols.map(() => "?").join(",");
   return Number(db.prepare(`INSERT INTO estoque_itens (${cols.join(",")}) VALUES (${placeholders})`).run(...values).lastInsertRowid);
 }
 function getItem(id) {
-  return db.prepare(`SELECT i.*, ${saldoExpr()} AS saldo_atual, ${minExpr()} AS saldo_minimo
+  const consumo90 = consumoExpr(90);
+  return db.prepare(`SELECT i.*, ${saldoExpr()} AS saldo_atual, ${minExpr()} AS saldo_minimo,
+      ${setorItemExpr()} AS setor_utilizacao_exibicao, ${centroCustoItemExpr()} AS centro_custo_exibicao,
+      ${consumo90} AS consumo_90d
     FROM estoque_itens i ${saldoJoin()} WHERE i.id=?`).get(id);
 }
 
@@ -135,9 +217,12 @@ function getContextoSolicitacao(solicitacaoId, solicitacaoItemId) {
   if (!solicitacaoId) return null;
   if (!solicitacaoItemId) throw new Error('Selecione o item da solicitação para registrar a retirada.');
   const valorUnitarioExpr = HAS_SOL_ITEM_VALOR_UNITARIO ? "si.valor_unitario_centavos" : "NULL";
+  const setorSolicitacaoExpr = hasColumn('solicitacoes','setor_origem') ? "s.setor_origem" : "NULL";
+  const centroSolicitacaoExpr = hasColumn('solicitacoes','subarea_destino') ? "s.subarea_destino" : "NULL";
   const row = db.prepare(`SELECT s.id solicitacao_id,s.numero,s.os_id,s.equipamento_id,s.status,
       si.id solicitacao_item_id,si.estoque_item_id,COALESCE(si.qtd_recebida_total,0) qtd_recebida_total,
-      ${valorUnitarioExpr} valor_unitario_centavos
+      ${valorUnitarioExpr} valor_unitario_centavos,
+      ${setorSolicitacaoExpr} setor_origem, ${centroSolicitacaoExpr} subarea_destino
     FROM solicitacoes s JOIN solicitacao_itens si ON si.solicitacao_id=s.id
     WHERE s.id=? AND si.id=?`).get(Number(solicitacaoId), Number(solicitacaoItemId));
   if (!row) throw new Error('Item não pertence à solicitação informada.');
@@ -154,16 +239,13 @@ function atualizarReservaDaRetirada(contexto, quantidade) {
     WHERE solicitacao_item_id=? AND status<>'CANCELADA'
   `).get(Number(contexto.solicitacao_item_id));
   if (!reserva) return null;
-
   const qtd = Number(quantidade || 0);
   const disponivel = Math.max(Number(reserva.quantidade_reservada || 0) - Number(reserva.quantidade_retirada || 0), 0);
   if (qtd > disponivel) throw new Error(`Quantidade acima da reserva disponível. Máximo: ${disponivel}.`);
-
   const retiradaNova = Number(reserva.quantidade_retirada || 0) + qtd;
   const status = retiradaNova >= Number(reserva.quantidade_reservada || 0) ? 'RETIRADA' : 'PARCIAL';
   const update = db.prepare(`
-    UPDATE estoque_reservas
-    SET quantidade_retirada=?,status=?,updated_at=datetime('now')
+    UPDATE estoque_reservas SET quantidade_retirada=?,status=?,updated_at=datetime('now')
     WHERE id=? AND quantidade_retirada=?
   `).run(retiradaNova, status, reserva.id, Number(reserva.quantidade_retirada || 0));
   if (!update.changes) throw new Error('Reserva alterada por outro usuário. Atualize a página e tente novamente.');
@@ -179,7 +261,8 @@ function insertMovimento(data) {
     ["usuario_id", data.usuario_id], ["saldo_anterior", data.saldo_anterior], ["saldo_posterior", data.saldo_posterior],
     ["custo_unit", data.custo_unit], ["observacao", data.observacao], ["reserva_id", data.reserva_id],
     ["retirado_por_colaborador_id", data.retirado_por_colaborador_id], ["entregue_por_user_id", data.entregue_por_user_id],
-    ["identificacao_origem", data.identificacao_origem],
+    ["identificacao_origem", data.identificacao_origem], ["setor_utilizacao", data.setor_utilizacao],
+    ["subarea_centro_custo", data.subarea_centro_custo],
   ];
   optional.forEach(([col, value]) => { if (hasColumn("estoque_movimentos", col)) { cols.push(col); vals.push(value ?? null); } });
   const info = db.prepare(`INSERT INTO estoque_movimentos (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(...vals);
@@ -200,19 +283,12 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
   let resolvedOsId = contexto?.os_id ? Number(contexto.os_id) : (os_id ? Number(os_id) : null);
   if (contexto?.os_id && os_id && Number(os_id) !== Number(contexto.os_id)) throw new Error('A OS informada não corresponde à solicitação.');
   const os = resolvedOsId ? validarOsAtiva(resolvedOsId) : null;
-
-  // Retiradas manuais continuam exigindo OS ativa. Quando a retirada nasce de uma
-  // solicitação, a própria solicitação mantém a rastreabilidade mesmo sem OS.
   if (!contexto && !os) throw new Error('Uma OS ativa é obrigatória para registrar uma retirada manual.');
   if (contexto && qtd > Number(contexto.disponivel_retirada || 0)) {
     throw new Error(`Quantidade acima do disponível nesta solicitação. Máximo: ${contexto.disponivel_retirada}.`);
   }
 
-  // Mantém compatibilidade com as rotas contextuais antigas. Se existir reserva,
-  // ela precisa ser reduzida ANTES do saldo físico para não disparar a proteção
-  // contra consumo de material reservado. Tudo ocorre dentro da mesma transação.
   const reserva = contexto ? atualizarReservaDaRetirada(contexto, qtd) : null;
-
   const equipamentoId = contexto?.equipamento_id || os?.equipamento_id || null;
   const anterior = Number(item.saldo_atual || 0);
   const posterior = anterior - qtd;
@@ -223,6 +299,8 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
   const custoUnit = contexto && Number(contexto.valor_unitario_centavos || 0) > 0
     ? Number(contexto.valor_unitario_centavos) / 100
     : (HAS_ESTOQUE_CUSTO_UNIT ? Number(item.custo_unit || 0) : 0);
+  const setorMov = normalizeSetorEstoque(contexto?.setor_origem) || item.setor_utilizacao_exibicao || SETOR_COMUM;
+  const centroMov = normalize(contexto?.subarea_destino) || item.centro_custo_exibicao || null;
   const movimentoId = insertMovimento({
     tipo: 'SAIDA_REQUISICAO_INTERNA', item_id: resolvedItemId, quantidade: qtd,
     origem: contexto ? 'SOLICITACAO' : (String(origem).toUpperCase() === 'QR_CODE' ? 'QR_CODE' : 'MANUAL'),
@@ -234,6 +312,7 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
     reserva_id: reserva?.id || null,
     entregue_por_user_id: contexto ? (usuario_id || null) : null,
     identificacao_origem: contexto ? 'CONTEXTO_SEM_QR' : (String(origem).toUpperCase() === 'QR_CODE' ? 'QR_ITEM' : 'MANUAL'),
+    setor_utilizacao: setorMov, subarea_centro_custo: centroMov,
   });
   return { movimentoId, itemId: resolvedItemId, saldoAnterior: anterior, saldoPosterior: posterior, osId: resolvedOsId, equipamentoId, reservaId: reserva?.id || null };
 }
@@ -251,7 +330,6 @@ function registrarSaidasSolicitacao({ solicitacao_id, usuario_id, observacao }) 
   const itens = db.prepare(`SELECT id,estoque_item_id,COALESCE(qtd_recebida_total,0) qtd_recebida_total
     FROM solicitacao_itens WHERE solicitacao_id=? AND COALESCE(qtd_recebida_total,0)>0 ORDER BY id`).all(Number(solicitacao_id));
   if (!itens.length) throw new Error('Esta solicitação ainda não possui material recebido para retirada.');
-
   const resultados = db.transaction(() => {
     const resultados = [];
     for (const item of itens) {
@@ -261,13 +339,8 @@ function registrarSaidasSolicitacao({ solicitacao_id, usuario_id, observacao }) 
       const quantidade = Math.min(Number(contexto.disponivel_retirada || 0), Number(estoqueItem?.saldo_atual || 0));
       if (!(quantidade > 0)) continue;
       resultados.push(registrarSaidaCore({
-        item_id: item.estoque_item_id,
-        quantidade,
-        usuario_id,
-        observacao,
-        solicitacao_id,
-        solicitacao_item_id: item.id,
-        origem: 'SOLICITACAO',
+        item_id: item.estoque_item_id, quantidade, usuario_id, observacao,
+        solicitacao_id, solicitacao_item_id: item.id, origem: 'SOLICITACAO',
       }));
     }
     if (!resultados.length) throw new Error('Não há saldo recebido e disponível para retirada nesta solicitação.');
@@ -278,6 +351,7 @@ function registrarSaidasSolicitacao({ solicitacao_id, usuario_id, observacao }) 
 }
 
 module.exports = {
-  dashboard, listItens, listCategorias, listLocais, listMovimentos, createCategoria, createLocal, createItem, getItem,
+  SETORES_ESTOQUE, SETOR_COMUM, dashboard, listItens, listCategorias, listLocais, listCentrosCusto, getInteligenciaReposicao,
+  listMovimentos, createCategoria, createLocal, createItem, getItem,
   listOrdensAtivas, registrarSaida, registrarSaidasSolicitacao, getContextoSolicitacao,
 };
