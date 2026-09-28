@@ -1046,12 +1046,13 @@ function listEquipamentosSemRoteiroLubrificacao() {
 }
 
 function findEquivalentActiveLubrificacao(equipamentoId, pontoNome, excludeId = null) {
-  const equipamento = safeGet(`
+  const equipamento = safeAll(`
     SELECT id,nome,COALESCE(tipo,'') AS tipo,COALESCE(setor,'') AS setor,
            COALESCE(codigo,'') AS codigo,COALESCE(tag,'') AS tag
     FROM equipamentos
     WHERE id=?
-  `, [Number(equipamentoId)]);
+    LIMIT 1
+  `, [Number(equipamentoId)])[0] || null;
   if (!equipamento) return null;
 
   const rows = safeAll(`
