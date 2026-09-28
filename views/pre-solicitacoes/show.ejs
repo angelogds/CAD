@@ -1,5 +1,5 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/pre-solicitacoes.css?v=20260928-1">
+<link rel="stylesheet" href="/css/pre-solicitacoes.css?v=20260928-2">
 <%
 const st=String(sol.pre_status||'RASCUNHO');
 const statusClass=st==='ENVIADA_COMPRAS'?'ok':st==='REPROVADA'?'danger':st==='EM_ANALISE'?'amber':st==='AGUARDANDO_APROVACAO'?'warn':'draft';
@@ -15,43 +15,44 @@ const done=sol.itens_analisados||0,total=sol.itens_total||0;
     <div class="pre-head-actions"><span class="pre-status <%=statusClass%>"><%=st.replaceAll('_',' ')%></span><a class="ui-btn ui-btn--outline" href="/pre-solicitacoes">Voltar</a><% if(canEdit){%><a class="ui-btn ui-btn--secondary" href="/pre-solicitacoes/<%=sol.id%>/editar">Editar rascunho</a><%}%></div>
   </div>
 
-  <div class="pre-summary-grid">
-    <div class="pre-card pre-summary"><span>Criada por</span><strong><%=sol.solicitante_nome||'-'%></strong></div>
-    <div class="pre-card pre-summary"><span>Responsável pela análise</span><strong><%=sol.aprovador_nome||'Aguardando responsável ativo'%></strong></div>
-    <div class="pre-card pre-summary"><span>Itens</span><strong><%=total%></strong></div>
-    <div class="pre-card pre-summary"><span>Andamento</span><strong><%=sol.progresso_analise%>%</strong></div>
-  </div>
-
-  <section class="pre-card">
-    <div class="pre-section-head"><div><span>✓</span><h2>Análise do pedido</h2></div><small><%=done%> de <%=total%> item(ns) analisado(s)</small></div>
-    <div class="pre-big-track"><i style="width:<%=sol.progresso_analise%>%"></i></div>
-    <% if (sol.pre_observacao_aprovacao) { %><div class="pre-note"><strong>Observação final</strong><%=sol.pre_observacao_aprovacao%></div><% } %>
+  <section class="pre-card pre-summary-strip">
+    <div><span>Criada por</span><strong><%=sol.solicitante_nome||'-'%></strong></div>
+    <div><span>Responsável</span><strong><%=sol.aprovador_nome||'Aguardando responsável ativo'%></strong></div>
+    <div><span>Setor / subárea</span><strong><%=sol.setor_origem||'-'%> • <%=sol.subarea_destino||'-'%></strong></div>
+    <div><span>Itens</span><strong><%=done%> / <%=total%> analisados</strong></div>
+    <div class="pre-summary-progress"><span>Andamento</span><strong><%=sol.progresso_analise%>%</strong><div class="pre-track"><i style="width:<%=sol.progresso_analise%>%"></i></div></div>
   </section>
 
-  <section class="pre-card" id="itens">
-    <div class="pre-section-head"><div><span>2</span><h2>Itens</h2></div><small>A quantidade original do Almoxarifado permanece registrada para histórico.</small></div>
+  <% if (sol.pre_observacao_aprovacao) { %><div class="pre-note"><strong>Observação final</strong><%=sol.pre_observacao_aprovacao%></div><% } %>
+
+  <section class="pre-card pre-review-card" id="itens">
+    <div class="pre-section-head"><div><span>2</span><h2>Análise dos itens</h2></div><small>A quantidade original do Almoxarifado sempre fica registrada no histórico.</small></div>
     <div class="pre-review-list">
-      <% sol.itens.forEach(function(item){
+      <% sol.itens.forEach(function(item,index){
         const ist=String(item.pre_aprovacao_item_status||'PENDENTE');
         const suggested=Number(item.qtd_sugerida_almox??item.qtd_solicitada??item.quantidade??0);
         const approved=item.qtd_aprovada_setor==null?suggested:Number(item.qtd_aprovada_setor);
       %>
         <article class="pre-review-item <%=ist.toLowerCase()%>">
           <div class="pre-review-copy">
-            <div><strong><%=item.item_nome||item.descricao||'Item'%></strong><span class="pre-item-status <%=ist.toLowerCase()%>"><%=ist%></span></div>
-            <p><%=item.item_descricao||item.descricao||'Sem especificação complementar'%></p>
-            <small>Almoxarifado solicitou <strong><%=suggested%> <%=item.unidade||'UN'%></strong><% if(item.estoque_codigo){%> • Estoque: <%=item.estoque_codigo%><%}%></small>
+            <div class="pre-review-title"><span class="pre-review-number"><%=index+1%></span><strong><%=item.item_nome||item.descricao||'Item'%></strong><span class="pre-item-status <%=ist.toLowerCase()%>"><%=ist%></span></div>
+            <% if(item.item_descricao||item.descricao){ %><p><%=item.item_descricao||item.descricao%></p><% } %>
+            <div class="pre-item-metrics">
+              <span><small>Solicitado</small><strong><%=suggested%> <%=item.unidade||'UN'%></strong></span>
+              <% if(item.pre_aprovacao_item_status && item.pre_aprovacao_item_status!=='PENDENTE'){ %><span><small>Aprovado</small><strong><%=item.pre_aprovacao_item_status==='REPROVADO'?'0':approved%> <%=item.unidade||'UN'%></strong></span><% } %>
+              <% if(item.estoque_codigo){%><span><small>Estoque</small><strong><%=item.estoque_codigo%></strong></span><%}%>
+            </div>
             <% if(item.pre_aprovacao_item_observacao){%><div class="pre-item-note"><%=item.pre_aprovacao_item_observacao%></div><%}%>
           </div>
           <% if(canReview && ['AGUARDANDO_APROVACAO','EM_ANALISE'].includes(st)){ %>
             <form method="POST" action="/pre-solicitacoes/<%=sol.id%>/itens/<%=item.id%>/decisao" class="pre-decision-form">
               <label>Quantidade aprovada<input name="qtd_aprovada_setor" value="<%=approved%>" inputmode="decimal"></label>
               <label>Decisão<select name="decisao" required><option value="">Selecionar</option><option value="APROVADO" <%=ist==='APROVADO'?'selected':''%>>Aprovar</option><option value="AJUSTADO" <%=ist==='AJUSTADO'?'selected':''%>>Aprovar com ajuste</option><option value="REPROVADO" <%=ist==='REPROVADO'?'selected':''%>>Reprovar</option></select></label>
-              <label class="wide">Motivo / observação<textarea name="observacao" rows="2" placeholder="Obrigatório em ajuste ou reprovação"><%=item.pre_aprovacao_item_observacao||''%></textarea></label>
+              <label class="wide">Motivo / observação<textarea name="observacao" rows="1" placeholder="Obrigatório somente em ajuste ou reprovação"><%=item.pre_aprovacao_item_observacao||''%></textarea></label>
               <button class="ui-btn ui-btn--secondary" type="submit">Salvar decisão</button>
             </form>
           <% } else { %>
-            <div class="pre-approved-qty"><span>Quantidade aprovada</span><strong><%=item.pre_aprovacao_item_status==='REPROVADO'?'0':approved%> <%=item.unidade||'UN'%></strong></div>
+            <div class="pre-approved-qty"><span>Quantidade final</span><strong><%=item.pre_aprovacao_item_status==='REPROVADO'?'0':approved%> <%=item.unidade||'UN'%></strong></div>
           <% } %>
         </article>
       <% }) %>
@@ -60,9 +61,9 @@ const done=sol.itens_analisados||0,total=sol.itens_total||0;
 
   <% if(canReview && ['AGUARDANDO_APROVACAO','EM_ANALISE'].includes(st)){ %>
     <section class="pre-card pre-final-card">
-      <div><h2>Concluir análise</h2><p>O botão só libera para Compras quando todos os itens estiverem decididos e houver pelo menos um aprovado.</p></div>
+      <div><h2>Concluir análise</h2><p>Todos os itens precisam estar decididos. Somente os aprovados ou ajustados seguirão para Compras.</p></div>
       <form method="POST" action="/pre-solicitacoes/<%=sol.id%>/finalizar">
-        <textarea name="observacao_final" rows="2" placeholder="Observação final para Compras (opcional)"></textarea>
+        <textarea name="observacao_final" rows="1" placeholder="Observação final para Compras (opcional)"></textarea>
         <button class="ui-btn ui-btn--primary" type="submit" <%=done<total?'disabled':''%> onclick="return confirm('Finalizar a análise desta pré-solicitação?')">Aprovar e enviar para Compras</button>
       </form>
     </section>
