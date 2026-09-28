@@ -325,7 +325,7 @@
                     </div>
                   </td>
                   <td>
-                    <span class="pcm-badge <%= tone %>"><%= groupPending ? (g.pendentes_validacao+' PENDENTE(S)') : String(g.situacao).split('_').join(' ') %></span>
+                    <span class="pcm-badge <%= tone %>"><%= groupPending ? (g.pendentes_validacao+' PENDENTE(S) DE VALIDAÇÃO') : String(g.situacao).split('_').join(' ') %></span>
                     <small><%= g.total_pontos %> ponto(s) ativo(s)</small>
                   </td>
                   <td>
