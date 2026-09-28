@@ -1,5 +1,6 @@
 <% layout('layout') %>
 <%- include('partials/internal-styles') %>
+<link rel="stylesheet" href="/css/pcm-lubrificacao-v7.css?v=20260928-1">
 <div class="pcm-module-page">
   <header class="pcm-module-head">
     <div>
@@ -76,6 +77,79 @@
         </div>
       </section>
 
+      <section class="pcm-card lub-monitor" data-lub-monitor data-url="/pcm/lubrificacao/acompanhamento?semana=<%= encodeURIComponent(semanaReferencia.inicio) %>">
+        <div class="pcm-card-head">
+          <div>
+            <span class="pcm-section-label">Acompanhamento PCM</span>
+            <h2>Andamento do roteiro de lubrificação</h2>
+            <p>Visão do PCM baseada nas execuções que o mecânico fecha no roteiro. O setor exibido representa a <strong>última atividade registrada</strong>, não localização por GPS.</p>
+          </div>
+          <span class="pcm-badge <%= acompanhamentoLubrificacao.percentual>=100?'':'warn' %>" data-lub-status>
+            <%= acompanhamentoLubrificacao.percentual>=100?'ROTEIRO CONCLUÍDO':(acompanhamentoLubrificacao.pontos_concluidos>0?'EM ANDAMENTO':'NÃO INICIADO') %>
+          </span>
+        </div>
+
+        <div class="lub-overview">
+          <div class="lub-progress-card">
+            <div class="lub-progress-number"><strong data-lub-percent><%= acompanhamentoLubrificacao.percentual %>%</strong><span>pontos visitados na semana</span></div>
+            <div class="lub-route-track" aria-label="Progresso do roteiro: <%= acompanhamentoLubrificacao.percentual %>%">
+              <div class="lub-route-fill" data-lub-fill style="width:<%= acompanhamentoLubrificacao.percentual %>%"></div>
+              <span class="lub-walker" data-lub-walker style="left:<%= Math.max(2,Math.min(98,acompanhamentoLubrificacao.percentual)) %>%" aria-hidden="true">🧑‍🔧</span>
+            </div>
+            <div class="lub-progress-meta">
+              <span><strong data-lub-done><%= acompanhamentoLubrificacao.pontos_concluidos %></strong> concluídos</span>
+              <span><strong data-lub-pending><%= acompanhamentoLubrificacao.pontos_pendentes %></strong> faltam</span>
+              <span><strong data-lub-events><%= acompanhamentoLubrificacao.execucoes_semana %></strong> execuções registradas</span>
+            </div>
+          </div>
+
+          <div class="lub-current-card">
+            <span>Última atividade registrada</span>
+            <strong data-lub-current-eq><%= acompanhamentoLubrificacao.ultima_atividade?.equipamento_nome || 'Roteiro ainda não iniciado' %></strong>
+            <small data-lub-current-location>
+              <% if (acompanhamentoLubrificacao.ultima_atividade) { %>
+                <%= acompanhamentoLubrificacao.ultima_atividade.area_operacional_label %> • <%= acompanhamentoLubrificacao.ultima_atividade.setor || 'Setor não informado' %>
+              <% } else { %>
+                Aguardando primeira execução da semana
+              <% } %>
+            </small>
+            <small data-lub-current-user><%= acompanhamentoLubrificacao.ultima_atividade?.executor_nome || acompanhamentoLubrificacao.responsavel_nome || 'Responsável não definido' %></small>
+          </div>
+        </div>
+
+        <div class="lub-area-grid" data-lub-areas>
+          <% acompanhamentoLubrificacao.areas.forEach(function(area){ %>
+            <article class="lub-area-card">
+              <span><%= area.label %></span>
+              <strong><%= area.percentual %>%</strong>
+              <div class="lub-mini-track"><i style="width:<%= area.percentual %>%"></i></div>
+              <small><%= area.pontos_concluidos %>/<%= area.total_pontos %> pontos • <%= area.equipamentos %> equipamento(s)</small>
+            </article>
+          <% }) %>
+          <% if (!acompanhamentoLubrificacao.areas.length) { %>
+            <div class="pcm-empty-row">Ainda não há pontos ativos e validados para acompanhar.</div>
+          <% } %>
+        </div>
+
+        <div class="pcm-table-wrap lub-equipment-scroll">
+          <table class="pcm-table lub-progress-table">
+            <thead><tr><th>Área / equipamento</th><th>Setor</th><th>Pontos</th><th>Andamento</th><th>Última execução</th></tr></thead>
+            <tbody data-lub-equipment-body>
+              <% acompanhamentoLubrificacao.equipamentos.forEach(function(item){ %>
+                <tr class="lub-row-<%= item.status.toLowerCase() %>">
+                  <td><strong><%= item.area_operacional_label %></strong><small><%= item.equipamento_nome %></small></td>
+                  <td><%= item.setor || 'Não informado' %></td>
+                  <td><%= item.pontos_concluidos %>/<%= item.total_pontos %></td>
+                  <td><span class="lub-state <%= item.status.toLowerCase() %>"><%= item.status==='CONCLUIDO'?'Concluído':(item.status==='ANDAMENTO'?'Em andamento':'Pendente') %></span><small><%= item.percentual %>%</small></td>
+                  <td><%= item.ultima_execucao || '-' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <div class="lub-monitor-foot">Atualização automática a cada 45 segundos. O painel não altera OS, plano ou execução.</div>
+      </section>
+
       <section class="pcm-card">
         <div class="pcm-card-head">
           <div>
@@ -116,6 +190,21 @@
               <% rotas.forEach(function(r){ %>
                 <option value="<%= r.rota %>" <%= String(filtros.rota)===String(r.rota)?'selected':'' %>><%= r.rota %></option>
               <% }) %>
+            </select>
+          </label>
+          <label class="pcm-field">Área operacional
+            <select class="pcm-input" name="area">
+              <option value="">Todas</option>
+              <% areasLubrificacao.forEach(function(a){ %>
+                <option value="<%= a.codigo %>" <%= String(filtros.area)===String(a.codigo)?'selected':'' %>><%= a.label %> (<%= a.equipamentos %>)</option>
+              <% }) %>
+            </select>
+          </label>
+          <label class="pcm-field">Situação do ponto
+            <select class="pcm-input" name="ativos">
+              <option value="1" <%= String(filtros.ativos)!=='0' && String(filtros.ativos).toUpperCase()!=='TODOS'?'selected':'' %>>Ativos</option>
+              <option value="0" <%= String(filtros.ativos)==='0'?'selected':'' %>>Inativos</option>
+              <option value="TODOS" <%= String(filtros.ativos).toUpperCase()==='TODOS'?'selected':'' %>>Todos</option>
             </select>
           </label>
           <button class="pcm-button primary ui-btn ui-btn--primary">Aplicar filtros</button>
@@ -205,7 +294,7 @@
                 <tr>
                   <td>
                     <strong><%= p.equipamento_nome %></strong>
-                    <small><%= p.setor || '-' %></small>
+                    <small><%= p.area_operacional_label || 'Área não classificada' %> • <%= p.setor || '-' %></small>
                     <small><%= p.rota_lubrificacao || 'Sem rota' %></small>
                     <% if (p.familia_lubrificacao) { %><small>Família: <%= p.familia_lubrificacao %></small><% } %>
                   </td>
@@ -318,3 +407,4 @@
   e.addEventListener('change',function(){const o=e.options[e.selectedIndex];if(o&&o.dataset.setor)s.value=o.dataset.setor;});
 })();
 </script>
+<script src="/js/pcm-lubrificacao-v7.js?v=20260928-1" defer></script>
