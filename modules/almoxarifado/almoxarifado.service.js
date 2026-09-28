@@ -1,6 +1,7 @@
 const db = require("../../database/db");
 const { STATUS } = require("../solicitacoes/solicitacoes.service");
 const fluxoEstoqueService = require("../estoque/estoque.solicitacao-fluxo.service");
+const { normalizeSetorCorporativo } = require("../compras/compras-setores");
 
 function hasColumn(table, name) {
   try { return db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === name); } catch { return false; }
@@ -31,6 +32,10 @@ const HAS_MOV_SOLICITACAO_ITEM = hasColumn("estoque_movimentos", "solicitacao_it
 const HAS_ESTOQUE_CUSTO_UNIT = hasColumn("estoque_itens", "custo_unit");
 const HAS_MOV_CUSTO_UNIT = hasColumn("estoque_movimentos", "custo_unit");
 const HAS_ITEM_VALOR_UNITARIO = hasColumn("solicitacao_itens", "valor_unitario_centavos");
+const HAS_ESTOQUE_SETOR = hasColumn("estoque_itens", "setor_utilizacao");
+const HAS_ESTOQUE_CENTRO_CUSTO = hasColumn("estoque_itens", "subarea_centro_custo");
+const HAS_MOV_SETOR = hasColumn("estoque_movimentos", "setor_utilizacao");
+const HAS_MOV_CENTRO_CUSTO = hasColumn("estoque_movimentos", "subarea_centro_custo");
 
 // O Almoxarifado acompanha a solicitação inteira, mas a autorização física de
 // recebimento é por ITEM. Assim, um item COMPRADO já pode ser conferido mesmo
@@ -338,10 +343,24 @@ function resolveLocal(localId) {
   return Number(row.id);
 }
 
-function resolveEstoqueItem(item, solicitacaoId, localId) {
+function normalizeSetorEstoque(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return 'COMUM';
+  if (raw.toUpperCase() === 'COMUM') return 'COMUM';
+  return normalizeSetorCorporativo(raw) || 'COMUM';
+}
+
+function resolveEstoqueItem(item, solicitacaoId, localId, contexto = {}) {
   if (item.estoque_item_id) {
     const linked = db.prepare("SELECT id FROM estoque_itens WHERE id=? AND ativo=1").get(Number(item.estoque_item_id));
-    if (linked) return Number(linked.id);
+    if (linked) {
+      const updates = [];
+      const vals = [];
+      if (HAS_ESTOQUE_SETOR && contexto.setor) { updates.push("setor_utilizacao=CASE WHEN setor_utilizacao IS NULL OR TRIM(setor_utilizacao)='' OR setor_utilizacao='COMUM' THEN ? ELSE setor_utilizacao END"); vals.push(normalizeSetorEstoque(contexto.setor)); }
+      if (HAS_ESTOQUE_CENTRO_CUSTO && contexto.centroCusto) { updates.push("subarea_centro_custo=COALESCE(NULLIF(TRIM(subarea_centro_custo),''),?)"); vals.push(String(contexto.centroCusto).trim()); }
+      if (updates.length) { vals.push(Number(item.estoque_item_id)); db.prepare(`UPDATE estoque_itens SET ${updates.join(',')},updated_at=datetime('now') WHERE id=?`).run(...vals); }
+      return Number(item.estoque_item_id);
+    }
   }
 
   const nome = String(item.item_nome || item.item_descricao || item.descricao || `Item ${item.id}`).trim();
@@ -360,6 +379,8 @@ function resolveEstoqueItem(item, solicitacaoId, localId) {
   const vals = [`CMP-${solicitacaoId}-${item.id}`, nome, unidade];
   if (HAS_SALDO_ATUAL) { cols.push("saldo_atual"); vals.push(0); }
   if (HAS_LOCAL_ID && localId) { cols.push("local_id"); vals.push(localId); }
+  if (HAS_ESTOQUE_SETOR) { cols.push("setor_utilizacao"); vals.push(normalizeSetorEstoque(contexto.setor)); }
+  if (HAS_ESTOQUE_CENTRO_CUSTO && contexto.centroCusto) { cols.push("subarea_centro_custo"); vals.push(String(contexto.centroCusto).trim()); }
   if (hasColumn("estoque_itens", "ativo")) { cols.push("ativo"); vals.push(1); }
   const info = db.prepare(`INSERT INTO estoque_itens (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(...vals);
   const estoqueItemId = Number(info.lastInsertRowid);
@@ -375,6 +396,7 @@ function insertEstoqueMovimento(data) {
     ["solicitacao_id", data.solicitacao_id], ["solicitacao_item_id", data.solicitacao_item_id],
     ["usuario_id", data.usuario_id], ["saldo_anterior", data.saldo_anterior], ["saldo_posterior", data.saldo_posterior],
     ["custo_unit", data.custo_unit], ["observacao", data.observacao],
+    ["setor_utilizacao", data.setor_utilizacao], ["subarea_centro_custo", data.subarea_centro_custo],
   ];
   optional.forEach(([col, value]) => { if (hasColumn("estoque_movimentos", col)) { cols.push(col); vals.push(value ?? null); } });
   const info = db.prepare(`INSERT INTO estoque_movimentos (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(...vals);
@@ -408,7 +430,9 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, use
     }
 
     const resolvedLocalId = resolveLocal(localId);
-    const estoqueItemId = resolveEstoqueItem(item, solicitacaoId, resolvedLocalId);
+    const setorDestino = hasColumn('solicitacoes','setor_origem') ? normalizeSetorEstoque(solicitacao.setor_origem) : 'COMUM';
+    const centroCustoDestino = hasColumn('solicitacoes','subarea_destino') ? solicitacao.subarea_destino : null;
+    const estoqueItemId = resolveEstoqueItem(item, solicitacaoId, resolvedLocalId, { setor: setorDestino, centroCusto: centroCustoDestino });
     if (HAS_LOCAL_ID && resolvedLocalId) {
       db.prepare("UPDATE estoque_itens SET local_id=COALESCE(local_id,?), updated_at=datetime('now') WHERE id=?")
         .run(resolvedLocalId, estoqueItemId);
@@ -467,6 +491,8 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, use
       saldo_anterior: saldoAnterior, saldo_posterior: saldoPosterior,
       custo_unit: HAS_MOV_CUSTO_UNIT ? (custoCompraUnit || custoMedioPosterior || null) : null,
       observacao: observacao || `Recebimento ${solicitacao.numero || `#${solicitacaoId}`}`,
+      setor_utilizacao: HAS_MOV_SETOR ? setorDestino : null,
+      subarea_centro_custo: HAS_MOV_CENTRO_CUSTO ? (centroCustoDestino || null) : null,
     });
 
     if (tableExists("compras_recebimentos")) {
