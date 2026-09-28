@@ -25,6 +25,12 @@ function getContext(id, user) {
   const solicitacao = solicitacoesService.getSolicitacaoById(id);
   if (!solicitacao) throw new Error('Solicitação não encontrada');
   if (!solicitacoesService.canViewSolicitacao(solicitacao, user)) throw new Error('Sem permissão para esta solicitação.');
+  if (String(solicitacao.tipo_origem || '').toUpperCase() === 'PRE_SOLICITACAO_ALMOX'
+      && Number(solicitacao.disponivel_compras || 0) !== 1) {
+    const error = new Error('Esta pré-solicitação ainda está na triagem do setor. Use a tela de Pré-Solicitações.');
+    error.code = 'PRE_SOLICITACAO_EM_TRIAGEM';
+    throw error;
+  }
   return solicitacao;
 }
 
@@ -53,6 +59,7 @@ function detalhe(req, res) {
       backUrl,
     });
   } catch (error) {
+    if (error.code === 'PRE_SOLICITACAO_EM_TRIAGEM') return res.redirect(`/pre-solicitacoes/${id}`);
     if (error.message === 'Solicitação não encontrada') return res.status(404).send(error.message);
     if (error.message.startsWith('Sem permissão')) {
       req.flash('error', error.message);
