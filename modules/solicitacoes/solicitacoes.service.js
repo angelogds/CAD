@@ -598,6 +598,9 @@ function canListAllSolicitacoes(user) {
 function listMinhasSolicitacoes(userId, filters = {}, user = null) {
   const where = [];
   const params = [];
+  if (hasColumn('solicitacoes','tipo_origem') && hasColumn('solicitacoes','disponivel_compras')) {
+    where.push("(UPPER(COALESCE(s.tipo_origem,'')) <> 'PRE_SOLICITACAO_ALMOX' OR COALESCE(s.disponivel_compras,0)=1)");
+  }
   if (!canListAllSolicitacoes(user)) {
     const fixedSetor = setorForRole(user?.role);
     if (fixedSetor) {
