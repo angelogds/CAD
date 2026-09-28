@@ -128,6 +128,8 @@ function canViewSolicitacao(solicitacao, user) {
 
 function canEditSolicitacao(solicitacao, user) {
   if (!solicitacao || !user) return false;
+  if (String(solicitacao.tipo_origem || '').toUpperCase() === 'PRE_SOLICITACAO_ALMOX'
+      && Number(solicitacao.disponivel_compras || 0) !== 1) return false;
   const role = normalizeRole(user.role);
   const editableStatuses = [STATUS.ABERTA, STATUS.DEVOLVIDA_REVISAO];
   if (!editableStatuses.includes(solicitacao.status)) return false;
@@ -678,6 +680,12 @@ function getCountersForUser(userId, user = null) {
       where = "WHERE solicitante_user_id = ?";
       params = [userId];
     }
+  }
+  const preFilter = hasColumn('solicitacoes','tipo_origem') && hasColumn('solicitacoes','disponivel_compras')
+    ? "(UPPER(COALESCE(tipo_origem,'')) <> 'PRE_SOLICITACAO_ALMOX' OR COALESCE(disponivel_compras,0)=1)"
+    : "";
+  if (preFilter) {
+    where = where ? `${where} AND ${preFilter}` : `WHERE ${preFilter}`;
   }
   const rows = db.prepare(`SELECT status, COUNT(*) AS total FROM solicitacoes ${where} GROUP BY status`).all(...params);
   const counters = LIST_STATUS.reduce((acc, st) => ({ ...acc, [st]: 0 }), {});
