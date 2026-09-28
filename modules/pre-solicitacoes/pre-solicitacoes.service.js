@@ -35,7 +35,7 @@ const SUBAREAS = Object.freeze({
 });
 
 const APPROVER_ROLES = Object.freeze({
-  [SETORES.RECICLAGEM]: ['ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR'],
+  [SETORES.RECICLAGEM]: ['ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'SUPERVISOR_MANUTENCAO'],
   [SETORES.LOGISTICA]: ['ENCARREGADO_LOGISTICA'],
   [SETORES.FRIGORIFICO]: ['ENCARREGADO_FRIGORIFICO'],
   [SETORES.ADMINISTRATIVO]: ['RH'],
@@ -310,7 +310,13 @@ function setHeader(id, fields) {
 function initializeItems(solicitacaoId) {
   const itemCols = columns('solicitacao_itens');
   const sets = [];
-  if (itemCols.has('qtd_sugerida_almox')) sets.push('qtd_sugerida_almox=COALESCE(qtd_solicitada,quantidade,0)');
+  if (itemCols.has('qtd_sugerida_almox')) {
+    const qtyExpr = itemCols.has('qtd_solicitada') && itemCols.has('quantidade')
+      ? 'COALESCE(qtd_solicitada,quantidade,0)'
+      : itemCols.has('qtd_solicitada') ? 'COALESCE(qtd_solicitada,0)'
+      : itemCols.has('quantidade') ? 'COALESCE(quantidade,0)' : '0';
+    sets.push(`qtd_sugerida_almox=${qtyExpr}`);
+  }
   if (itemCols.has('qtd_aprovada_setor')) sets.push('qtd_aprovada_setor=NULL');
   if (itemCols.has('pre_aprovacao_item_status')) sets.push("pre_aprovacao_item_status='PENDENTE'");
   if (itemCols.has('pre_aprovacao_item_por')) sets.push('pre_aprovacao_item_por=NULL');
