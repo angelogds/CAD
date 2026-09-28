@@ -1,0 +1,96 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/pre-solicitacoes.css?v=20260928-1">
+<div class="pre-page">
+  <div class="pre-hero">
+    <div><span class="pre-kicker">ALMOXARIFADO</span><h1><%= editMode ? 'Editar pré-solicitação' : 'Nova pré-solicitação' %></h1><p>Monte o pedido semanal do setor. Compras só receberá os itens depois da aprovação.</p></div>
+    <a class="ui-btn ui-btn--outline" href="/pre-solicitacoes">Voltar</a>
+  </div>
+
+  <form method="POST" action="<%=actionUrl%>" id="pre-form">
+    <section class="pre-card">
+      <div class="pre-section-head"><div><span>1</span><h2>Destino do pedido</h2></div><small>Escolha o setor e a subárea responsável pelo consumo.</small></div>
+      <div class="pre-sector-grid" data-sector-grid>
+        <% setores.forEach(function(s){ %>
+          <label class="pre-sector-card">
+            <input type="radio" name="setor_origem" value="<%=s.value%>" <%=formData.setor_origem===s.value?'checked':''%> required>
+            <strong><%=s.label%></strong><small><%=s.hint%></small>
+          </label>
+        <% }) %>
+      </div>
+      <div class="pre-form-grid">
+        <label>Semana de referência<input type="week" name="semana_referencia" value="<%=formData.semana_referencia||''%>" required></label>
+        <label>Subárea
+          <select name="subarea_destino" required data-subarea>
+            <option value="">Selecione o setor primeiro</option>
+          </select>
+        </label>
+        <label>Prioridade
+          <select name="prioridade"><option value="BAIXA" <%=formData.prioridade==='BAIXA'?'selected':''%>>Baixa</option><option value="MEDIA" <%=!formData.prioridade||formData.prioridade==='MEDIA'?'selected':''%>>Média</option><option value="ALTA" <%=formData.prioridade==='ALTA'?'selected':''%>>Alta</option></select>
+        </label>
+        <label class="wide">Observação<textarea name="observacao" rows="3" placeholder="Contexto do pedido, faltas percebidas ou observações para o encarregado"><%=formData.observacao||''%></textarea></label>
+      </div>
+    </section>
+
+    <section class="pre-card">
+      <div class="pre-section-head"><div><span>2</span><h2>Materiais da semana</h2></div><button class="ui-btn ui-btn--secondary" type="button" data-add-item>+ Adicionar item</button></div>
+      <div class="pre-items" data-items>
+        <% const initialItems=formItens.length?formItens:[{item_nome:'',item_descricao:'',unidade:'UN',qtd_solicitada:'',estoque_item_id:''}]; initialItems.forEach(function(item){ %>
+          <div class="pre-item-row">
+            <label>Material<input name="itens_nome[]" value="<%=item.item_nome||''%>" required placeholder="Ex.: Disco de corte 7&quot;"></label>
+            <label>Quantidade<input name="itens_qtd[]" value="<%=item.qtd_solicitada??item.quantidade??''%>" inputmode="decimal" required></label>
+            <label>Unidade<input name="itens_un[]" value="<%=item.unidade||'UN'%>" required></label>
+            <label class="pre-stock-link">Item de estoque
+              <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>" <%=Number(item.estoque_item_id||item.item_id)===Number(e.id)?'selected':''%>><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
+            </label>
+            <label class="wide">Especificação<textarea name="itens_especificacao[]" rows="2" placeholder="Marca, medida, aplicação ou detalhe técnico"><%=item.item_descricao||item.descricao||''%></textarea></label>
+            <button class="pre-remove" type="button" data-remove-item aria-label="Remover item">Remover</button>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+
+    <div class="pre-form-actions">
+      <button class="ui-btn ui-btn--outline" type="submit" name="acao" value="rascunho">Salvar rascunho</button>
+      <button class="ui-btn ui-btn--primary" type="submit" name="acao" value="enviar" onclick="return confirm('Enviar esta pré-solicitação para análise do responsável pelo setor?')">Enviar para aprovação</button>
+    </div>
+  </form>
+</div>
+
+<template id="pre-item-template">
+  <div class="pre-item-row">
+    <label>Material<input name="itens_nome[]" required placeholder="Material"></label>
+    <label>Quantidade<input name="itens_qtd[]" inputmode="decimal" required></label>
+    <label>Unidade<input name="itens_un[]" value="UN" required></label>
+    <label class="pre-stock-link">Item de estoque
+      <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>"><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
+    </label>
+    <label class="wide">Especificação<textarea name="itens_especificacao[]" rows="2"></textarea></label>
+    <button class="pre-remove" type="button" data-remove-item>Remover</button>
+  </div>
+</template>
+<script>
+(() => {
+  const subareas=<%- JSON.stringify(subareas) %>;
+  const current=<%- JSON.stringify(formData.subarea_destino||'') %>;
+  const select=document.querySelector('[data-subarea]');
+  const render=()=>{
+    const sector=document.querySelector('input[name="setor_origem"]:checked')?.value||'';
+    const options=subareas[sector]||[];
+    select.innerHTML='<option value="">Selecionar subárea</option>'+options.map(v=>'<option value="'+v.replace(/"/g,'&quot;')+'">'+v+'</option>').join('');
+    if(options.includes(current)) select.value=current;
+  };
+  document.querySelectorAll('input[name="setor_origem"]').forEach(el=>el.addEventListener('change',render));
+  render();
+  document.querySelector('[data-add-item]')?.addEventListener('click',()=>{
+    const tpl=document.querySelector('#pre-item-template');
+    document.querySelector('[data-items]').appendChild(tpl.content.cloneNode(true));
+  });
+  document.addEventListener('click',(e)=>{
+    const btn=e.target.closest('[data-remove-item]');
+    if(!btn) return;
+    const rows=document.querySelectorAll('.pre-item-row');
+    if(rows.length<=1) return;
+    btn.closest('.pre-item-row')?.remove();
+  });
+})();
+</script>
