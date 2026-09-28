@@ -1,6 +1,6 @@
 <% layout('layout') %>
 <%- include('partials/internal-styles') %>
-<link rel="stylesheet" href="/css/pcm-lubrificacao-v7.css?v=20260928-1">
+<link rel="stylesheet" href="/css/pcm-lubrificacao-v7.css?v=20260928-2">
 <div class="pcm-module-page">
   <header class="pcm-module-head">
     <div>
@@ -283,78 +283,117 @@
 
       <section class="pcm-card">
         <div class="pcm-card-head">
-          <div><span class="pcm-section-label">Plano técnico</span><h2>Pontos de lubrificação</h2><p>Os rascunhos automáticos devem ser validados individualmente antes da execução.</p></div>
+          <div>
+            <span class="pcm-section-label">Plano técnico</span>
+            <h2>Equipamentos e pontos de lubrificação</h2>
+            <p>Cada equipamento aparece uma única vez. Os mancais, redutores e demais pontos ficam agrupados dentro do próprio equipamento.</p>
+          </div>
         </div>
         <div class="pcm-table-wrap">
-          <table class="pcm-table">
-            <thead><tr><th>Equipamento / rota</th><th>Ponto</th><th>Produto / frequência</th><th>Situação</th><th>Responsável</th><th>Administração</th></tr></thead>
+          <table class="pcm-table lub-equipment-plan-table">
+            <thead><tr><th>Equipamento / área</th><th>Pontos</th><th>Produto / frequência</th><th>Situação</th><th>Responsável</th><th>Administração</th></tr></thead>
             <tbody>
-              <% if (!lubrificacoes.length) { %><tr><td colspan="6" class="pcm-empty-row">Nenhum ponto encontrado.</td></tr><% } %>
-              <% lubrificacoes.forEach(function(p){ const validado=Number(p.validado_tecnicamente ?? 1)===1; const tone=!validado?'warn':(p.situacao==='ATRASADO'?'danger':(p.situacao==='EM_BREVE'?'warn':'')); %>
+              <% if (!equipamentosLubrificacao.length) { %><tr><td colspan="6" class="pcm-empty-row">Nenhum equipamento encontrado.</td></tr><% } %>
+              <% equipamentosLubrificacao.forEach(function(g){
+                   const groupPending=Number(g.pendentes_validacao||0)>0;
+                   const tone=groupPending?'warn':(g.situacao==='ATRASADO'?'danger':(g.situacao==='EM_BREVE'?'warn':''));
+              %>
                 <tr>
                   <td>
-                    <strong><%= p.equipamento_nome %></strong>
-                    <small><%= p.area_operacional_label || 'Área não classificada' %> • <%= p.setor || '-' %></small>
-                    <small><%= p.rota_lubrificacao || 'Sem rota' %></small>
-                    <% if (p.familia_lubrificacao) { %><small>Família: <%= p.familia_lubrificacao %></small><% } %>
-                  </td>
-                  <td><strong><%= p.ponto_lubrificacao %></strong><small><%= p.metodo_aplicacao || 'Método a validar' %></small></td>
-                  <td>
-                    <%= p.tipo_lubrificante_texto || '-' %>
-                    <small><%= p.quantidade ?? '-' %> <%= p.unidade || '' %> • <%= p.frequencia_label %></small>
+                    <strong><%= g.equipamento_nome %></strong>
+                    <small><%= g.area_operacional_label || 'Área não classificada' %> • <%= g.setor || '-' %></small>
+                    <% g.rotas.forEach(function(rota){ %><small><%= rota %></small><% }) %>
                   </td>
                   <td>
-                    <span class="pcm-badge <%= tone %>"><%= validado ? String(p.situacao).split('_').join(' ') : 'PENDENTE DE VALIDAÇÃO' %></span>
-                    <% if (p.origem_cadastro) { %><small><%= p.origem_cadastro %></small><% } %>
+                    <div class="lub-compact-list">
+                      <% g.pontos.forEach(function(p){ %>
+                        <div class="lub-compact-point">
+                          <strong><%= p.ponto_lubrificacao %></strong>
+                          <small><%= p.metodo_aplicacao || 'Método a validar' %></small>
+                        </div>
+                      <% }) %>
+                    </div>
                   </td>
-                  <td><strong><%= p.responsavel_nome || 'Não distribuído' %></strong><small><%= Number(p.ativo ?? 1)===1?'Ativo':'Inativo' %></small></td>
                   <td>
-                    <% if (canManagePcm && !validado) { %>
-                      <details>
-                        <summary>Validar e liberar</summary>
-                        <form method="POST" action="/pcm/lubrificacao/<%= p.id %>/validar" class="pcm-form" style="min-width:290px;margin-top:8px">
-                          <input type="hidden" name="equipamento_id" value="<%= p.equipamento_id %>">
-                          <input class="pcm-input" name="tipo_lubrificante_texto" value="<%= /A DEFINIR/i.test(p.tipo_lubrificante_texto||'') ? '' : (p.tipo_lubrificante_texto||'') %>" placeholder="Lubrificante / especificação" required>
-                          <div class="pcm-split">
-                            <input class="pcm-input" type="number" step="0.01" min="0" name="quantidade" value="<%= p.quantidade ?? '' %>" placeholder="Quantidade">
-                            <input class="pcm-input" name="unidade" value="<%= p.unidade || '' %>" placeholder="g, ml, L">
-                          </div>
-                          <select class="pcm-input" name="metodo_aplicacao" required>
-                            <option value="">Método</option>
-                            <% ['Engraxar','Verificar / completar nível','Troca de óleo','Pulverizar','Outro'].forEach(function(met){ %>
-                              <option <%= String(p.metodo_aplicacao||'')===met?'selected':'' %>><%= met %></option>
-                            <% }) %>
-                          </select>
-                          <div class="pcm-split">
-                            <input class="pcm-input" type="number" min="0" name="frequencia_dias" placeholder="Dias">
-                            <input class="pcm-input" type="number" min="0" name="frequencia_semanas" placeholder="Semanas">
-                          </div>
-                          <div class="pcm-split">
-                            <input class="pcm-input" type="number" min="0" name="frequencia_meses" placeholder="Meses">
-                            <input class="pcm-input" type="number" min="0" name="frequencia_horas_operacao" placeholder="Horas operação">
-                          </div>
-                          <input class="pcm-input" name="rota_lubrificacao" value="<%= p.rota_lubrificacao || '' %>" placeholder="Rota">
-                          <select class="pcm-input" name="responsavel_user_id">
-                            <option value="">Distribuir depois</option>
-                            <% mecanicos.forEach(function(m){ %><option value="<%= m.id %>"><%= m.nome %></option><% }) %>
-                          </select>
-                          <textarea class="pcm-input" name="instrucoes_execucao" rows="3"><%= p.instrucoes_execucao || '' %></textarea>
-                          <select class="pcm-input" name="ativo"><option value="1">Ativo</option><option value="0">Inativo</option></select>
-                          <label class="pcm-note warn"><input type="checkbox" name="confirmacao_tecnica" value="1" required> Produto, quantidade, frequência e método foram conferidos tecnicamente.</label>
-                          <button class="pcm-button primary ui-btn ui-btn--primary" type="submit">Validar e liberar</button>
-                        </form>
+                    <div class="lub-compact-list">
+                      <% g.pontos.forEach(function(p){ %>
+                        <div class="lub-compact-point">
+                          <strong><%= p.tipo_lubrificante_texto || '-' %></strong>
+                          <small><%= p.quantidade ?? '-' %> <%= p.unidade || '' %> • <%= p.frequencia_label %></small>
+                        </div>
+                      <% }) %>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="pcm-badge <%= tone %>"><%= groupPending ? (g.pendentes_validacao+' PENDENTE(S)') : String(g.situacao).split('_').join(' ') %></span>
+                    <small><%= g.total_pontos %> ponto(s) ativo(s)</small>
+                  </td>
+                  <td>
+                    <% if (g.responsaveis.length) { %>
+                      <% g.responsaveis.forEach(function(nome){ %><strong class="lub-responsavel-line"><%= nome %></strong><% }) %>
+                    <% } else { %>
+                      <strong>Não distribuído</strong>
+                    <% } %>
+                  </td>
+                  <td>
+                    <% if (canManagePcm) { %>
+                      <details class="lub-equipment-manage">
+                        <summary>Gerenciar <%= g.total_pontos %> ponto(s)</summary>
+                        <div class="lub-equipment-manage-body">
+                          <% g.pontos.forEach(function(p){ const validado=Number(p.validado_tecnicamente ?? 1)===1; %>
+                            <article class="lub-point-admin">
+                              <div class="lub-point-admin-head">
+                                <strong><%= p.ponto_lubrificacao %></strong>
+                                <span class="pcm-badge <%= validado?'':'warn' %>"><%= validado?'VALIDADO':'PENDENTE' %></span>
+                              </div>
+                              <% if (!validado) { %>
+                                <form method="POST" action="/pcm/lubrificacao/<%= p.id %>/validar" class="pcm-form">
+                                  <input type="hidden" name="equipamento_id" value="<%= p.equipamento_id %>">
+                                  <input class="pcm-input" name="tipo_lubrificante_texto" value="<%= /A DEFINIR/i.test(p.tipo_lubrificante_texto||'') ? '' : (p.tipo_lubrificante_texto||'') %>" placeholder="Lubrificante / especificação" required>
+                                  <div class="pcm-split">
+                                    <input class="pcm-input" type="number" step="0.01" min="0" name="quantidade" value="<%= p.quantidade ?? '' %>" placeholder="Quantidade">
+                                    <input class="pcm-input" name="unidade" value="<%= p.unidade || '' %>" placeholder="g, ml, L">
+                                  </div>
+                                  <select class="pcm-input" name="metodo_aplicacao" required>
+                                    <option value="">Método</option>
+                                    <% ['Engraxar','Verificar / completar nível','Troca de óleo','Pulverizar','Outro'].forEach(function(met){ %>
+                                      <option <%= String(p.metodo_aplicacao||'')===met?'selected':'' %>><%= met %></option>
+                                    <% }) %>
+                                  </select>
+                                  <div class="pcm-split">
+                                    <input class="pcm-input" type="number" min="0" name="frequencia_dias" value="<%= p.frequencia_dias ?? '' %>" placeholder="Dias">
+                                    <input class="pcm-input" type="number" min="0" name="frequencia_semanas" value="<%= p.frequencia_semanas ?? '' %>" placeholder="Semanas">
+                                  </div>
+                                  <div class="pcm-split">
+                                    <input class="pcm-input" type="number" min="0" name="frequencia_meses" value="<%= p.frequencia_meses ?? '' %>" placeholder="Meses">
+                                    <input class="pcm-input" type="number" min="0" name="frequencia_horas_operacao" value="<%= p.frequencia_horas_operacao ?? '' %>" placeholder="Horas operação">
+                                  </div>
+                                  <input class="pcm-input" name="rota_lubrificacao" value="<%= p.rota_lubrificacao || '' %>" placeholder="Rota">
+                                  <select class="pcm-input" name="responsavel_user_id">
+                                    <option value="">Distribuir depois</option>
+                                    <% mecanicos.forEach(function(m){ %><option value="<%= m.id %>" <%= String(p.responsavel_user_id||'')===String(m.id)?'selected':'' %>><%= m.nome %></option><% }) %>
+                                  </select>
+                                  <textarea class="pcm-input" name="instrucoes_execucao" rows="3"><%= p.instrucoes_execucao || '' %></textarea>
+                                  <select class="pcm-input" name="ativo"><option value="1">Ativo</option><option value="0">Inativo</option></select>
+                                  <label class="pcm-note warn"><input type="checkbox" name="confirmacao_tecnica" value="1" required> Produto, quantidade, frequência e método foram conferidos tecnicamente.</label>
+                                  <button class="pcm-button primary ui-btn ui-btn--primary" type="submit">Validar e liberar</button>
+                                </form>
+                              <% } else { %>
+                                <form method="POST" action="/pcm/lubrificacao/<%= p.id %>/distribuir" class="pcm-form">
+                                  <input type="hidden" name="equipamento_id" value="<%= p.equipamento_id %>">
+                                  <select class="pcm-input" name="responsavel_user_id">
+                                    <option value="">Não distribuído</option>
+                                    <% mecanicos.forEach(function(m){ %><option value="<%= m.id %>" <%= String(p.responsavel_user_id||'')===String(m.id)?'selected':'' %>><%= m.nome %></option><% }) %>
+                                  </select>
+                                  <input class="pcm-input" name="metodo_aplicacao" value="<%= p.metodo_aplicacao || '' %>" placeholder="Método">
+                                  <select class="pcm-input" name="ativo"><option value="1" <%= Number(p.ativo ?? 1)===1?'selected':'' %>>Ativo</option><option value="0" <%= Number(p.ativo ?? 1)===0?'selected':'' %>>Inativo</option></select>
+                                  <button class="pcm-button ui-btn ui-btn--outline" type="submit">Salvar distribuição</button>
+                                </form>
+                              <% } %>
+                            </article>
+                          <% }) %>
+                        </div>
                       </details>
-                    <% } else if (canManagePcm) { %>
-                      <form method="POST" action="/pcm/lubrificacao/<%= p.id %>/distribuir" class="pcm-form" style="min-width:230px">
-                        <input type="hidden" name="equipamento_id" value="<%= p.equipamento_id %>">
-                        <select class="pcm-input" name="responsavel_user_id">
-                          <option value="">Não distribuído</option>
-                          <% mecanicos.forEach(function(m){ %><option value="<%= m.id %>" <%= String(p.responsavel_user_id||'')===String(m.id)?'selected':'' %>><%= m.nome %></option><% }) %>
-                        </select>
-                        <input class="pcm-input" name="metodo_aplicacao" value="<%= p.metodo_aplicacao || '' %>" placeholder="Método">
-                        <select class="pcm-input" name="ativo"><option value="1" <%= Number(p.ativo ?? 1)===1?'selected':'' %>>Ativo</option><option value="0" <%= Number(p.ativo ?? 1)===0?'selected':'' %>>Inativo</option></select>
-                        <button class="pcm-button ui-btn ui-btn--outline" type="submit">Salvar distribuição</button>
-                      </form>
                     <% } else { %><span class="pcm-readonly">Consulta</span><% } %>
                   </td>
                 </tr>
@@ -407,4 +446,4 @@
   e.addEventListener('change',function(){const o=e.options[e.selectedIndex];if(o&&o.dataset.setor)s.value=o.dataset.setor;});
 })();
 </script>
-<script src="/js/pcm-lubrificacao-v7.js?v=20260928-1" defer></script>
+<script src="/js/pcm-lubrificacao-v7.js?v=20260928-2" defer></script>
