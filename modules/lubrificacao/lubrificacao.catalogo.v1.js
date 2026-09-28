@@ -203,7 +203,7 @@ const RULES = [
     familia: 'ESTERILIZADORES',
     rota: ROUTES.SEPARACAO,
     ordem: 52,
-    match: ['ESTERILIZADOR'],
+    match: ['ESTERILIZADOR', 'ESTERELIZADOR'],
     pontos: [
       ...twoBearings('do esterilizador'),
       { ...common.reducer, ponto: 'Redutor do esterilizador - verificar nível e condição do óleo' },
@@ -276,8 +276,10 @@ function scoreRule(equipamento = {}, rule) {
     // Tipo e nome descrevem o ativo. Setor é apenas contexto e nunca pode
     // fazer "Rosca Alimentação Digestores" virar DIGESTORES, por exemplo.
     best = Math.max(best,
-      fieldMatchScore(equipamento.tipo, term, { exact: 1000, starts: 920, contains: 850 }),
-      fieldMatchScore(equipamento.nome, term, { exact: 900, starts: 820, contains: 700 }),
+      // O nome específico precisa vencer um tipo genérico. Ex.: tipo "Triturador"
+      // + nome "Triturador FAST" deve resultar em TRITURADOR_FAST.
+      fieldMatchScore(equipamento.tipo, term, { exact: 1150, starts: 1060, contains: 980 }),
+      fieldMatchScore(equipamento.nome, term, { exact: 1200, starts: 1120, contains: 1000 }),
       fieldMatchScore(equipamento.codigo, term, { exact: 500, starts: 450, contains: 400 }),
       fieldMatchScore(equipamento.tag, term, { exact: 500, starts: 450, contains: 400 }),
       fieldMatchScore(equipamento.setor, term, { exact: 90, starts: 70, contains: 50 })

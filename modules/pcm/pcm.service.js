@@ -1045,6 +1045,76 @@ function listEquipamentosSemRoteiroLubrificacao() {
     }));
 }
 
+function findEquivalentActiveLubrificacao(equipamentoId, pontoNome, excludeId = null) {
+  const equipamento = safeAll(`
+    SELECT id,nome,COALESCE(tipo,'') AS tipo,COALESCE(setor,'') AS setor,
+           COALESCE(codigo,'') AS codigo,COALESCE(tag,'') AS tag
+    FROM equipamentos
+    WHERE id=?
+    LIMIT 1
+  `, [Number(equipamentoId)])[0] || null;
+  if (!equipamento) return null;
+
+  const rows = safeAll(`
+    SELECT *
+    FROM pcm_lubrificacao_planos
+    WHERE equipamento_id=?
+      AND COALESCE(ativo,1)=1
+      ${excludeId ? 'AND id<>?' : ''}
+    ORDER BY id
+  `, excludeId ? [Number(equipamentoId),Number(excludeId)] : [Number(equipamentoId)]);
+
+  const normalized = lubricationCatalog.normalize(pontoNome);
+  const expected = lubricationCatalog.gerarPontosBase(equipamento);
+  const proposedCanonical = expected.find((point) => lubricationCatalog.equivalentPoint(pontoNome, point)) || null;
+
+  return rows.find((row) => {
+    if (lubricationCatalog.normalize(row.ponto_lubrificacao) === normalized) return true;
+    if (!proposedCanonical) return false;
+    return lubricationCatalog.equivalentPoint(row.ponto_lubrificacao, proposedCanonical);
+  }) || null;
+}
+
+function agruparLubrificacaoPorEquipamento(rows = []) {
+  const map = new Map();
+  const priority = { PENDENTE_VALIDACAO:4, ATRASADO:3, EM_BREVE:2, NO_PRAZO:1 };
+
+  rows.forEach((row) => {
+    const id = Number(row.equipamento_id);
+    if (!map.has(id)) {
+      map.set(id, {
+        equipamento_id:id,
+        equipamento_nome:row.equipamento_nome,
+        setor:row.setor,
+        area_operacional:row.area_operacional,
+        area_operacional_label:row.area_operacional_label,
+        rotas:new Set(),
+        responsaveis:new Set(),
+        pontos:[],
+        situacao:'NO_PRAZO',
+      });
+    }
+    const group = map.get(id);
+    group.pontos.push(row);
+    if (row.rota_lubrificacao) group.rotas.add(row.rota_lubrificacao);
+    if (row.responsavel_nome) group.responsaveis.add(row.responsavel_nome);
+    if ((priority[row.situacao] || 0) > (priority[group.situacao] || 0)) group.situacao = row.situacao;
+  });
+
+  return Array.from(map.values()).map((group) => ({
+    ...group,
+    rotas:Array.from(group.rotas),
+    responsaveis:Array.from(group.responsaveis),
+    total_pontos:group.pontos.length,
+    pendentes_validacao:group.pontos.filter((p) => Number(p.validado_tecnicamente ?? 1)===0).length,
+    ativos:group.pontos.filter((p) => Number(p.ativo ?? 1)===1).length,
+  })).sort((a,b) =>
+    String(a.area_operacional_label || '').localeCompare(String(b.area_operacional_label || ''))
+    || String(a.setor || '').localeCompare(String(b.setor || ''))
+    || String(a.equipamento_nome || '').localeCompare(String(b.equipamento_nome || ''))
+  );
+}
+
 function addPontoLubrificacao({
   equipamento_id, ponto_lubrificacao, tipo_lubrificante_texto, quantidade, unidade,
   frequencia_dias, observacao, metodo_aplicacao, responsavel_user_id,
@@ -1055,6 +1125,11 @@ function addPontoLubrificacao({
   if (!equipamentoId) throw new Error("Selecione um equipamento para adicionar um ponto de lubrificação.");
   if (!String(ponto_lubrificacao || "").trim()) throw new Error("Informe o ponto de lubrificação.");
   if (!String(tipo_lubrificante_texto || "").trim()) throw new Error("Informe o lubrificante validado tecnicamente.");
+
+  const duplicado = findEquivalentActiveLubrificacao(equipamentoId, ponto_lubrificacao);
+  if (duplicado) {
+    throw new Error(`Já existe um ponto ativo equivalente neste equipamento: "${duplicado.ponto_lubrificacao}". Edite o ponto existente em vez de cadastrar outro.`);
+  }
 
   const dias = Number(frequencia_dias || 0);
   if (!Number.isFinite(dias) || dias < 1) throw new Error("Informe uma frequência em dias válida.");
@@ -1562,6 +1637,7 @@ module.exports = {
   saveCriticidade,
   listBom,
   listLubrificacao,
+  agruparLubrificacaoPorEquipamento,
   listAreasLubrificacao,
   listPecasCriticas,
   listBacklogSimples,

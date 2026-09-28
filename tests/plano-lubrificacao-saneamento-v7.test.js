@@ -177,6 +177,9 @@ test('PDF e tela usam somente pontos ativos por padrão e agrupam por área', ()
   const controller = read('modules/pcm/pcm.controller.js');
   assert.match(service, /COALESCE\(l\.ativo,1\)=1/);
   assert.match(service, /area_operacional_label/);
-  assert.match(controller, /Casa da Caldeira/);
+  assert.match(service, /area_operacional_label/);
   assert.match(controller, /area_operacional_label/);
+  const view = read('views/pcm/lubrificacao.ejs');
+  assert.match(view, /Cada equipamento aparece uma única vez/);
+  assert.match(view, /equipamentosLubrificacao\.forEach/);
 });

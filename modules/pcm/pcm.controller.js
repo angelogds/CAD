@@ -168,6 +168,7 @@ function lubrificacao(req, res) {
     filtros,
     equipamentos,
     lubrificacoes,
+    equipamentosLubrificacao: service.agruparLubrificacaoPorEquipamento(lubrificacoes),
     mecanicos: service.listMecanicosLubrificacao(),
     rotas: service.listRotasLubrificacao(),
     areasLubrificacao: service.listAreasLubrificacao(),
