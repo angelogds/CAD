@@ -65,7 +65,7 @@
     <div class="stock-table-head"><div><h2>Materiais em estoque</h2><p>Catálogo por utilização, saldo e histórico real de consumo.</p></div><span><%= itens.length %> item(ns)</span></div>
     <% if(!itens.length){ %><div class="almox-empty"><strong>Nenhum material encontrado.</strong><div class="almox-subline">Revise os filtros ou cadastre um novo item.</div></div><% } else { %>
       <div class="stock-table-wrap stock-table-wrap--sector">
-        <div class="stock-table-columns stock-table-columns--sector" aria-hidden="true"><span>Material</span><span>Utilização</span><span>Categoria / Local</span><span>Disponível</span><span>Mínimo</span><span>Consumo 90d</span><span>Rotação</span><span>Reposição</span><span>Ações</span></div>
+        <div class="stock-table-columns stock-table-columns--sector" aria-hidden="true"><span>Material</span><span>Utilização</span><span>Categoria / Local</span><span>Disponível</span><span>Mínimo</span><span>Consumo 90d</span><span>Rotação</span><span>Último movimento</span><span>Reposição</span><span>Ações</span></div>
         <% itens.forEach(item=>{ const state=stockState(item); %>
           <article class="stock-table-row stock-table-row--sector">
             <div data-label="Material"><small><%= item.codigo || 'Sem código' %></small><strong><%= item.nome %></strong><span><%= item.unidade || 'UN' %></span></div>
@@ -75,6 +75,7 @@
             <div data-label="Mínimo"><strong><%= Number(item.saldo_minimo||0) %> <%= item.unidade||'UN' %></strong></div>
             <div data-label="Consumo 90d"><strong><%= Number(item.consumo_90d||0).toFixed(2) %></strong><small>Média/mês: <%=Number(item.consumo_medio_mensal_calc||0).toFixed(2)%></small></div>
             <div data-label="Rotação"><span class="stock-rotation stock-rotation--<%=String(item.rotacao||'SEM_CONSUMO').toLowerCase()%>"><%=item.rotacao%></span></div>
+            <div data-label="Último movimento"><strong><%=dateBR(item.ultima_movimentacao)%></strong></div>
             <div data-label="Reposição"><span class="stock-state <%=state[1]%>"><%=reposicaoLabel(item.reposicao_status)%></span></div>
             <div data-label="Ações" class="stock-row-actions"><a class="btn btn-sm btn-ghost" href="/estoque/itens/<%=item.id%>">Abrir</a><% if(Number(item.saldo_disponivel||0)>0){ %><a class="btn btn-sm btn-green" href="/estoque/saidas/nova?item=<%=item.id%>">Retirar</a><% } %></div>
           </article>
