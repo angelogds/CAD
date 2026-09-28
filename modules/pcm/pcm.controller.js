@@ -153,6 +153,8 @@ function lubrificacao(req, res) {
     setor: req.query.setor || "",
     validacao: String(req.query.validacao || "").toUpperCase(),
     rota: req.query.rota || "",
+    area: String(req.query.area || "").toUpperCase(),
+    ativos: String(req.query.ativos || "1"),
   };
   const sugestaoIA = req.session?.pcmLubrificacaoSugestao || null;
   if (req.session) req.session.pcmLubrificacaoSugestao = null;
@@ -168,11 +170,13 @@ function lubrificacao(req, res) {
     lubrificacoes,
     mecanicos: service.listMecanicosLubrificacao(),
     rotas: service.listRotasLubrificacao(),
+    areasLubrificacao: service.listAreasLubrificacao(),
     motoresPendentes: service.listMotoresLubrificacaoPendentes(),
     equipamentosSemRoteiro: service.listEquipamentosSemRoteiroLubrificacao(),
     semanaLubrificacao: lubrificacaoSemanaService.getSemanaPorReferencia(req.query.semana || null),
     semanaReferencia: lubrificacaoSemanaService.getWeekBounds(req.query.semana || null),
     resumoSemanaLubrificacao: lubrificacaoSemanaService.getDashboardResumo(req.query.semana || null),
+    acompanhamentoLubrificacao: lubrificacaoSemanaService.getAcompanhamentoPCM(req.query.semana || null),
     resumo: {
       ...resumoBase,
       pendentes_validacao: countBy(todasLubrificacoes, (item) => Number(item.validado_tecnicamente ?? 1) === 0),
@@ -180,6 +184,17 @@ function lubrificacao(req, res) {
     },
     sugestaoIA,
   });
+}
+
+function lubrificacaoAcompanhamento(req, res) {
+  try {
+    return res.json(lubrificacaoSemanaService.getAcompanhamentoPCM(req.query.semana || null));
+  } catch (error) {
+    return res.status(500).json({
+      ok:false,
+      error:error.message || 'Não foi possível carregar o andamento da lubrificação.',
+    });
+  }
 }
 
 function pecasCriticas(req, res) {
@@ -559,27 +574,59 @@ function dashboardPdf(req, res) {
 }
 
 function lubrificacaoPdf(req, res) {
-  const itens = service.listLubrificacao(req.query || {});
+  const filtros = {
+    ...req.query,
+    ativos: req.query.ativos || '1',
+    area: String(req.query.area || '').toUpperCase(),
+  };
+  const itens = service.listLubrificacao(filtros);
   const pendentes = itens.filter((item) => Number(item.validado_tecnicamente ?? 1) === 0).length;
   const doc = pdfHeader(
     req, res, 'plano-lubrificacao-pcm.pdf', 'Plano e Roteiro de Lubrificação',
-    `Pontos: ${itens.length} | Pendentes de validação: ${pendentes}`
+    `Pontos ativos: ${itens.length} | Pendentes de validação: ${pendentes}`
   );
   pdfSection(doc, 'Regra do documento');
-  doc.text('Pontos marcados como PENDENTE DE VALIDACAO sao rascunhos administrativos e nao devem ser executados. Produto, quantidade e frequencia precisam ser confirmados pelo PCM antes da liberacao.');
-  const grupos = new Map();
+  doc.text('O plano operacional exibe somente pontos ativos. Pontos PENDENTE DE VALIDACAO sao rascunhos administrativos e nao devem ser executados ate a liberacao do PCM.');
+
+  const areaOrder = { AREA_SUJA:1, AREA_LIMPA:2, CASA_CALDEIRA:3, OUTRAS_AREAS:4 };
+  const areas = new Map();
   itens.forEach((item) => {
-    const rota = item.rota_lubrificacao || 'Sem rota';
-    if (!grupos.has(rota)) grupos.set(rota, []);
-    grupos.get(rota).push(item);
-  });
-  grupos.forEach((rows, rota) => {
-    pdfSection(doc, rota);
-    pdfLines(doc, rows, (item) => {
-      const validado = Number(item.validado_tecnicamente ?? 1) === 1;
-      return `${item.equipamento_nome} | ${item.ponto_lubrificacao} | ${item.tipo_lubrificante_texto || '-'} | ${item.quantidade ?? '-'} ${item.unidade || ''} | ${item.frequencia_label || '-'} | ${item.responsavel_nome || 'Nao distribuido'} | ${validado ? 'VALIDADO' : 'PENDENTE DE VALIDACAO'}`;
+    const key = item.area_operacional || 'OUTRAS_AREAS';
+    if (!areas.has(key)) areas.set(key, {
+      codigo:key,
+      label:item.area_operacional_label || 'Outras áreas / revisar cadastro',
+      rotas:new Map(),
     });
+    const area = areas.get(key);
+    const rota = item.rota_lubrificacao || 'Sem rota';
+    if (!area.rotas.has(rota)) area.rotas.set(rota, []);
+    area.rotas.get(rota).push(item);
   });
+
+  Array.from(areas.values())
+    .sort((a,b) => (areaOrder[a.codigo] || 99) - (areaOrder[b.codigo] || 99))
+    .forEach((area) => {
+      pdfSection(doc, area.label);
+      area.rotas.forEach((rows, rota) => {
+        doc.fillColor('#137a3a').fontSize(10).text(rota);
+        const porEquipamento = new Map();
+        rows.forEach((item) => {
+          const key = Number(item.equipamento_id);
+          if (!porEquipamento.has(key)) porEquipamento.set(key, []);
+          porEquipamento.get(key).push(item);
+        });
+        porEquipamento.forEach((points) => {
+          const first = points[0];
+          doc.fillColor('#10233e').fontSize(9).text(
+            `${first.equipamento_nome} — ${first.setor || 'Setor nao informado'}`
+          );
+          pdfLines(doc, points, (item) => {
+            const validado = Number(item.validado_tecnicamente ?? 1) === 1;
+            return `  • ${item.ponto_lubrificacao} | ${item.tipo_lubrificante_texto || '-'} | ${item.quantidade ?? '-'} ${item.unidade || ''} | ${item.frequencia_label || '-'} | ${item.responsavel_nome || 'Nao distribuido'} | ${validado ? 'VALIDADO' : 'PENDENTE DE VALIDACAO'}`;
+          });
+        });
+      });
+    });
   doc.end();
 }
 
@@ -658,6 +705,7 @@ module.exports = {
   engenharia,
   salvarCriticidade,
   lubrificacao,
+  lubrificacaoAcompanhamento,
   pecasCriticas,
   programacaoSemanal,
   relatoriosAvancados,
