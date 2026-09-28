@@ -22,6 +22,12 @@ const quoteValue = Number(approvalCtx?.quote?.totalCentavos || sol.resumoItens?.
 <link rel="stylesheet" href="/css/compras-aprovacao-diretoria.css?v=20260909-v1">
 
 <div class="page-head quote-page-head"><div><h1><%= sol.numero || ('Solicitação #' + sol.id) %></h1><p class="muted">Solicitante: <%= sol.solicitante_nome || '-' %> • Setor: <%= sol.setor_origem || '-' %> • Status: <strong><%= String(sol.status).replaceAll('_',' ') %></strong></p></div><div class="quote-actions"><a class="ui-btn ui-btn--outline" href="/compras/solicitacoes">Voltar</a><a class="ui-btn ui-btn--secondary" href="/compras/solicitacoes/<%= sol.id %>/pdf">Baixar cópia do PDF</a></div></div>
+<% if (String(sol.tipo_origem || '').toUpperCase() === 'PRE_SOLICITACAO_ALMOX') { %>
+<div class="card" style="border-left:4px solid #16a34a;background:#f0fdf4">
+  <strong>📦 Origem: Pré-Solicitação do Almoxarifado</strong>
+  <p class="muted" style="margin:4px 0 0">Pedido revisado pelo responsável do setor antes da liberação para Compras.</p>
+</div>
+<% } %>
 <% if (sol.os_id) { %><div class="card linked-os"><div><strong>🔗 Vinculada à OS <%= sol.os_id %><%= sol.equipamento_nome ? (' — ' + sol.equipamento_nome) : '' %></strong></div><div class="linked-os-actions"><a class="ui-btn ui-btn--table" href="/chat-os/<%= sol.os_id %>">Abrir conversa da OS</a><a class="ui-btn ui-btn--outline ui-btn--table" href="/os/<%= sol.os_id %>">Abrir OS</a></div></div><% } %>
 
 <% if(pendingDeletionCount){ %>
