@@ -31,6 +31,7 @@ router.get("/planejamento/pdf", requireLogin, requireRole(PCM_ACCESS), ctrl.plan
 router.get("/falhas", requireLogin, requireRole(PCM_ACCESS), ctrl.falhas);
 router.get("/engenharia", requireLogin, requireRole(PCM_ACCESS), ctrl.engenharia);
 router.get("/lubrificacao", requireLogin, requireRole(PCM_ACCESS), ctrl.lubrificacao);
+router.get("/lubrificacao/acompanhamento", requireLogin, requireRole(PCM_ACCESS), ctrl.lubrificacaoAcompanhamento);
 router.get("/lubrificacao/pdf", requireLogin, requireRole(PCM_ACCESS), ctrl.lubrificacaoPdf);
 router.get("/pecas-criticas", requireLogin, requireRole(PCM_ACCESS), ctrl.pecasCriticas);
 router.get("/pecas-criticas/pdf", requireLogin, requireRole(PCM_ACCESS), ctrl.pecasCriticasPdf);
