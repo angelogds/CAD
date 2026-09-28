@@ -266,6 +266,9 @@ function getOperationalQueue(filters = {}) {
   const quoted = itemCols.has('status_cotacao') ? "SUM(CASE WHEN UPPER(TRIM(COALESCE(si.status_cotacao,'')))='COTADO' THEN 1 ELSE 0 END)" : '0';
   const bought = itemCols.has('status_compra') ? "SUM(CASE WHEN UPPER(TRIM(COALESCE(si.status_compra,'')))='COMPRADO' THEN 1 ELSE 0 END)" : '0';
   const received = itemCols.has('qtd_recebida_total') ? `SUM(CASE WHEN COALESCE(si.qtd_recebida_total,0) >= COALESCE(${itemCols.has('qtd_comprada') ? 'si.qtd_comprada' : itemCols.has('qtd_solicitada') ? 'si.qtd_solicitada' : 'si.quantidade'},0) AND COALESCE(${itemCols.has('qtd_comprada') ? 'si.qtd_comprada' : itemCols.has('qtd_solicitada') ? 'si.qtd_solicitada' : 'si.quantidade'},0)>0 THEN 1 ELSE 0 END)` : '0';
+  const preVisibility = columnExists('solicitacoes','tipo_origem') && columnExists('solicitacoes','disponivel_compras')
+    ? "WHERE (UPPER(COALESCE(s.tipo_origem,'')) <> 'PRE_SOLICITACAO_ALMOX' OR COALESCE(s.disponivel_compras,0)=1)"
+    : '';
   const rows = db.prepare(`SELECT s.*, req.${usersRef.nameCol} solicitante_nome,
       resp.${usersRef.nameCol} responsavel_nome, ${hasEquip ? 'e.nome' : 'NULL'} equipamento_nome,
       ${hasSupplier ? 'f.nome' : 'NULL'} fornecedor_nome, COUNT(si.id) itens_count,
@@ -277,6 +280,7 @@ function getOperationalQueue(filters = {}) {
     ${hasEquip ? 'LEFT JOIN equipamentos e ON e.id=s.equipamento_id' : ''}
     ${hasSupplier ? 'LEFT JOIN fornecedores f ON f.id=s.fornecedor_id' : ''}
     LEFT JOIN solicitacao_itens si ON si.solicitacao_id=s.id
+    ${preVisibility}
     GROUP BY s.id`).all().map((row) => enrichOperational(row));
 
   const tab = filters.tab === 'history' ? 'history' : 'active';
@@ -304,7 +308,10 @@ function getOperationalQueue(filters = {}) {
 
 function getAnalytics(period = 30) {
   const days = [7, 30, 90].includes(Number(period)) ? Number(period) : 30;
-  const rows = db.prepare("SELECT status, COUNT(*) total FROM solicitacoes WHERE date(created_at)>=date('now', ?) GROUP BY status").all(`-${days} days`);
+  const visibility = columnExists('solicitacoes','tipo_origem') && columnExists('solicitacoes','disponivel_compras')
+    ? " AND (UPPER(COALESCE(tipo_origem,'')) <> 'PRE_SOLICITACAO_ALMOX' OR COALESCE(disponivel_compras,0)=1)"
+    : "";
+  const rows = db.prepare(`SELECT status, COUNT(*) total FROM solicitacoes WHERE date(created_at)>=date('now', ?)${visibility} GROUP BY status`).all(`-${days} days`);
   const resumo = Object.fromEntries(STATUS_COMPRAS.map(status => [status, 0]));
   rows.forEach(row => { const status = normalizeStatus(row.status); if (status in resumo) resumo[status] += row.total; });
   return resumo;
