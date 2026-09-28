@@ -55,10 +55,30 @@ test('telas compilam e possuem fluxo responsivo de criação e aprovação',()=>
   assert.match(form,/Enviar para aprovação/);
   assert.match(show,/Aprovar e enviar para Compras/);
   assert.match(show,/Quantidade aprovada/);
+  assert.match(form,/pre-item-fields/);
+  assert.match(form,/pre-action-bar/);
+  assert.match(show,/pre-summary-strip/);
+  assert.match(show,/pre-item-metrics/);
+  const css=read('public/css/pre-solicitacoes.css');
+  assert.match(css,/\.pre-item-spec textarea\{min-height:48px/);
+  assert.match(css,/\.pre-form-grid textarea\{min-height:62px/);
+  assert.match(css,/\.pre-summary-strip\{/);
 });
 
 test('Compras identifica origem do Almoxarifado e lista normal separa triagem',()=>{
   assert.match(read('views/compras/solicitacoes/show.ejs'),/Origem: Pré-Solicitação do Almoxarifado/);
   assert.match(read('views/compras/solicitacoes/index.ejs'),/PRE_SOLICITACAO_ALMOX/);
   assert.match(read('modules/solicitacoes/solicitacoes.service.js'),/PRE_SOLICITACAO_ALMOX/);
+});
+
+
+test('matriz operacional cobre Almoxarifado e responsáveis dos quatro setores',()=>{
+  const rbac=read('config/rbac.js');
+  const service=read('modules/pre-solicitacoes/pre-solicitacoes.service.js');
+  assert.match(rbac,/pre_solicitacao_almox_create:\s*\[ROLE\.ADMIN, ROLE\.ALMOXARIFADO\]/);
+  assert.match(service,/\[SETORES\.RECICLAGEM\]:\s*\['ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'SUPERVISOR_MANUTENCAO'\]/);
+  assert.match(service,/\[SETORES\.LOGISTICA\]:\s*\['ENCARREGADO_LOGISTICA'\]/);
+  assert.match(service,/\[SETORES\.FRIGORIFICO\]:\s*\['ENCARREGADO_FRIGORIFICO'\]/);
+  assert.match(service,/\[SETORES\.ADMINISTRATIVO\]:\s*\['RH'\]/);
+  assert.match(service,/role === 'ALMOXARIFADO' \|\| role === 'COMPRAS'/);
 });
