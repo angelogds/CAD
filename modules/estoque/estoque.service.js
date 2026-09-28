@@ -186,6 +186,23 @@ function createItem(data) {
   const placeholders = cols.map(() => "?").join(",");
   return Number(db.prepare(`INSERT INTO estoque_itens (${cols.join(",")}) VALUES (${placeholders})`).run(...values).lastInsertRowid);
 }
+function atualizarClassificacaoItens({ item_ids, setor_utilizacao, subarea_centro_custo }) {
+  if (!HAS_SETOR_UTILIZACAO) throw new Error('Classificação setorial indisponível neste banco.');
+  const ids = [...new Set((Array.isArray(item_ids) ? item_ids : [item_ids]).map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+  if (!ids.length) throw new Error('Selecione ao menos um material.');
+  if (ids.length > 500) throw new Error('Limite de 500 materiais por atualização.');
+  const setor = normalizeSetorEstoque(setor_utilizacao);
+  if (!setor) throw new Error('Selecione um setor de utilização válido.');
+  const centro = normalize(subarea_centro_custo) || null;
+  const setCentro = HAS_CENTRO_CUSTO ? ', subarea_centro_custo=?' : '';
+  const placeholders = ids.map(() => '?').join(',');
+  const params = HAS_CENTRO_CUSTO ? [setor, centro, ...ids] : [setor, ...ids];
+  return db.transaction(() => {
+    const result = db.prepare(`UPDATE estoque_itens SET setor_utilizacao=?${setCentro}, updated_at=datetime('now') WHERE ativo=1 AND id IN (${placeholders})`).run(...params);
+    return Number(result.changes || 0);
+  })();
+}
+
 function getItem(id) {
   const consumo90 = consumoExpr(90);
   return db.prepare(`SELECT i.*, ${saldoExpr()} AS saldo_atual, ${minExpr()} AS saldo_minimo,
@@ -352,6 +369,6 @@ function registrarSaidasSolicitacao({ solicitacao_id, usuario_id, observacao }) 
 
 module.exports = {
   SETORES_ESTOQUE, SETOR_COMUM, dashboard, listItens, listCategorias, listLocais, listCentrosCusto, getInteligenciaReposicao,
-  listMovimentos, createCategoria, createLocal, createItem, getItem,
+  listMovimentos, createCategoria, createLocal, createItem, atualizarClassificacaoItens, getItem,
   listOrdensAtivas, registrarSaida, registrarSaidasSolicitacao, getContextoSolicitacao,
 };
