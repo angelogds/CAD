@@ -13,7 +13,7 @@
       <p>Prepare a manutenção preventiva da próxima segunda-feira e acompanhe templates, planos e execuções antes de gerar Ordens de Serviço.</p>
     </div>
     <div class="preventive-secondary-actions">
-      <a class="ui-btn ui-btn--secondary" href="/preventivas">Voltar ao painel</a>
+      <a class="ui-btn ui-btn--secondary" href="<%= typeof backUrl !== 'undefined' ? backUrl : '/preventivas' %>">Voltar ao painel</a>
     </div>
   </header>
 
@@ -49,10 +49,10 @@
         </div>
       </div>
       <div class="preventive-secondary-danger-zone">
-        <form method="POST" action="/preventivas/programadas/gerar" onsubmit="return confirm('Gerar as preventivas programadas para a próxima segunda-feira?');">
+        <form method="POST" action="/pcm/preventivas/programadas/gerar" onsubmit="return confirm('Gerar as preventivas programadas para a próxima segunda-feira?');">
           <button class="ui-btn ui-btn--primary" type="submit">Gerar programação semanal</button>
         </form>
-        <form method="POST" action="/preventivas/programadas/lancar-os-segunda" onsubmit="return confirm('Confirmar o lançamento das preventivas programadas da segunda-feira como Ordens de Serviço?');">
+        <form method="POST" action="/pcm/preventivas/programadas/lancar-os-segunda" onsubmit="return confirm('Confirmar o lançamento das preventivas programadas da segunda-feira como Ordens de Serviço?');">
           <button class="ui-btn ui-btn--outline" type="submit">Lançar OS da segunda-feira</button>
         </form>
       </div>
