@@ -131,7 +131,7 @@
               <td><span class="pill"><%= (ex.origem || "AUTOMATICA").toUpperCase() %></span></td>
               <td class="muted"><%= ex.responsaveis || ex.responsavel_exibicao || ex.responsavel || "-" %></td>
               <td>
-                <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/status" class="row" style="margin:0;">
+                <% if (canExecutePreventivas) { %><form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/status" class="row" style="margin:0;">
                   <select name="status" style="width:160px">
                     <option value="pendente" <%= String(ex.status||"").toUpperCase() === "PENDENTE" ? "selected" : "" %>>pendente</option>
                     <option value="executada" <%= String(ex.status||"").toUpperCase() === "EXECUTADA" ? "selected" : "" %>>executada</option>
@@ -146,7 +146,7 @@
                     <textarea name="observacoes_tecnicas" placeholder="Observações técnicas"><%= ex.observacoes_tecnicas || ex.observacao || '' %></textarea><input name="evidencias" value="<%= ex.evidencias || '' %>" placeholder="Links ou referências de evidências" /><label><input type="checkbox" name="gerar_os_corretiva" value="1" /> Abrir OS corretiva vinculada</label>
                   </div></details>
                   <button class="btn" type="submit" style="height:40px">Salvar</button>
-                </form>
+                </form><% } else { %><span class="muted">Somente o responsável atribuído pode registrar a execução.</span><% } %>
                 <% if (isAdmin && canAdminPreventivas) { const stat = String(ex.status||'').toUpperCase(); const reforco = stat === 'EM_ANDAMENTO' ? '\nEsta preventiva está EM_ANDAMENTO e exigirá confirmação reforçada.' : ''; %>
                   <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/apagar" style="display:inline;" onsubmit="return confirm('Confirmar exclusão da preventiva #<%= ex.id %>?'+ '<%- reforco %>');">
                     <% if (stat === 'EM_ANDAMENTO' || stat === 'ANDAMENTO' || stat === 'FINALIZADA' || stat === 'EXECUTADA' || stat === 'CONCLUIDA') { %>
@@ -203,7 +203,7 @@
           <% } %>
 
           <div class="exec-actions">
-            <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/status" class="status-form">
+            <% if (canExecutePreventivas) { %><form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/status" class="status-form">
               <select name="status">
                 <option value="pendente" <%= stat === "PENDENTE" ? "selected" : "" %>>pendente</option>
                 <option value="executada" <%= stat === "EXECUTADA" ? "selected" : "" %>>executada</option>
@@ -229,7 +229,7 @@
                 </div>
               </details>
               <button class="btn" type="submit">Salvar</button>
-            </form>
+            </form><% } else { %><div class="muted">Somente o responsável atribuído pode registrar a execução.</div><% } %>
 
             <% if (isAdmin && canAdminPreventivas) { const reforco = stat === 'EM_ANDAMENTO' ? '\nEsta preventiva está EM_ANDAMENTO e exigirá confirmação reforçada.' : ''; %>
               <form method="POST" action="/preventivas/<%= plano.id %>/execucoes/<%= ex.id %>/apagar" onsubmit="return confirm('Confirmar exclusão da preventiva #<%= ex.id %>?'+ '<%- reforco %>');">
@@ -247,28 +247,13 @@
 
   <!-- COLUNA DIREITA -->
   <div class="card">
-    <h3 style="margin:0 0 6px;">Adicionar Execução</h3>
-    <p class="muted" style="margin-top:-6px;">Cria uma execução pendente para este plano.</p>
-
-    <form method="POST" action="/preventivas/<%= plano.id %>/execucoes">
-      <div style="margin-top:10px;">
-        <div class="muted" style="font-size:12px;font-weight:900;">Data prevista</div>
-        <input name="data_prevista" type="date" />
-      </div>
-
-      <div class="muted" style="margin-top:10px;font-size:12px;">
-        Responsáveis serão escalados automaticamente pelo sistema (OS): dia = mecânicos industriais conforme criticidade, noite = mecânico plantonista.
-      </div>
-
-      <div style="margin-top:10px;">
-        <div class="muted" style="font-size:12px;font-weight:900;">Observação</div>
-        <textarea name="observacao" placeholder="Ex: lubrificar, reapertar, limpar, medir folga..."></textarea>
-      </div>
-
-      <div class="row" style="margin-top:12px;justify-content:space-between;">
-        <a class="btn" href="/preventivas">Voltar</a>
-        <button class="btn btn-primary" type="submit">Adicionar</button>
-      </div>
-    </form>
+    <h3 style="margin:0 0 6px;">Orientação operacional</h3>
+    <p class="muted">A programação, criação de execuções e definição de responsáveis agora são realizadas pelo PCM.</p>
+    <div class="plan-meta" style="margin-top:12px;">
+      <div class="meta-item"><div class="meta-label">Sua ação</div><div class="meta-value">Executar a rotina, registrar os itens verificados e finalizar tecnicamente.</div></div>
+      <div class="meta-item"><div class="meta-label">Não conformidade</div><div class="meta-value">Registre a ocorrência e, quando necessário, gere a OS corretiva vinculada.</div></div>
+    </div>
+    <div class="row" style="margin-top:12px;"><a class="btn" href="/preventivas">Voltar às preventivas</a></div>
   </div>
+</div>
 </div>
