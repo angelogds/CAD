@@ -1,10 +1,115 @@
 <% layout('layout') %>
+<link rel="stylesheet" href="/css/operational-dashboard.css?v=20260928-v1">
 <% var data = (typeof criticidadeOperacional !== 'undefined' && criticidadeOperacional) ? criticidadeOperacional : {}; var ranking = data.ranking || []; var osr = data.osResumo || {}; var interv = data.intervencoes || []; var f = data.filters || {}; var opts = data.options || {}; %>
+<%
+  const maxFalhas = Math.max(1,...ranking.map(i=>Number(i.total_falhas||0)));
+  const statusCards=[
+    {label:'OS abertas',value:osr.abertas||0,meta:'Aguardando execução',tone:'',href:'/os?status=ABERTA'},
+    {label:'Aguardando equipe',value:osr.aguardando_equipe||0,meta:'Sem equipe definida',tone:'warning',href:'/os?status=AGUARDANDO_EQUIPE'},
+    {label:'Em andamento',value:osr.andamento||0,meta:'Equipe em atividade',tone:'progress',href:'/os?status=ANDAMENTO'},
+    {label:'Pausadas',value:osr.pausadas||0,meta:'Intervenção interrompida',tone:'warning',href:'/os?status=PAUSADA'},
+    {label:'Críticas / emergenciais',value:osr.criticas_emergenciais||0,meta:'Requer prioridade',tone:'danger',href:'/os?criticidade=CRITICA'},
+    {label:'Finalizadas no período',value:osr.finalizadas_periodo||0,meta:'Concluídas no recorte',tone:'',href:'/os?status=CONCLUIDA'},
+    {label:'Vencidas / antigas',value:osr.vencidas||0,meta:'Fora da janela operacional',tone:'danger',href:'/os?vencidas=1'},
+    {label:'Tempo médio fechamento',value:osr.tempo_medio_fechamento_horas == null ? '—' : Number(osr.tempo_medio_fechamento_horas).toFixed(1)+'h',meta:'Média das OS encerradas',tone:'neutral',href:''}
+  ];
+  const critBadge=(i)=>i.os_criticas>0?'danger':(i.reincidencias>0?'warning':'ok');
+%>
+<div class="operational-dashboard criticality-page">
+  <header class="op-head">
+    <div class="op-title">
+      <h1>Painel operacional de criticidade</h1>
+      <p>Falhas corretivas reais por equipamento, reincidência, situação das OS e indicações para avaliação técnica.</p>
+      <small>Preventivas e OS canceladas não entram como falha. A priorização visual apoia a decisão da Manutenção/PCM.</small>
+    </div>
+    <div class="op-controls criticality-actions">
+      <a class="op-button ghost" href="/dashboard">← Voltar ao painel</a>
+      <a class="op-button ghost" href="/pcm/dashboard">Dashboard gerencial</a>
+    </div>
+  </header>
+
+  <form class="op-card criticality-filter-card" method="GET" action="/dashboard/criticidade">
+    <div class="card-heading"><div><h2>FILTROS</h2><p>Refine o período e o contexto operacional.</p></div></div>
+    <div class="criticality-filter-grid">
+      <label><span>Período</span><select name="periodo"><% [7,30,60,90,180].forEach(function(d){ %><option value="<%= d %>" <%= Number(f.days)===d?'selected':'' %>><%= d %> dias</option><% }) %></select></label>
+      <label><span>Início</span><input type="date" name="inicio" value="<%= f.start || '' %>"></label>
+      <label><span>Fim</span><input type="date" name="fim" value="<%= f.end || '' %>"></label>
+      <label><span>Setor</span><select name="setor"><option value="">Todos</option><% (opts.setores||[]).forEach(function(s){ %><option <%= f.setor===s?'selected':'' %>><%= s %></option><% }) %></select></label>
+      <label><span>Equipamento</span><select name="equipamento_id"><option value="">Todos</option><% (opts.equipamentos||[]).forEach(function(e){ %><option value="<%= e.id %>" <%= String(f.equipamento_id)===String(e.id)?'selected':'' %>><%= e.nome %></option><% }) %></select></label>
+      <label><span>Criticidade</span><select name="criticidade"><option value="">Todas</option><% ['BAIXA','MEDIA','ALTA','CRITICA','EMERGENCIAL'].forEach(function(c){ %><option <%= f.criticidade===c?'selected':'' %>><%= c %></option><% }) %></select></label>
+      <label><span>Tipo manutenção</span><input name="tipo" value="<%= f.tipo || '' %>" placeholder="CORRETIVA"></label>
+      <label><span>Situação OS</span><input name="status" value="<%= f.status || '' %>" placeholder="ABERTA"></label>
+      <label><span>Ativo</span><select name="ativo"><option value="">Todos</option><option value="1" <%= String(f.ativo)==='1'?'selected':'' %>>Ativo</option><option value="0" <%= String(f.ativo)==='0'?'selected':'' %>>Inativo</option></select></label>
+    </div>
+    <div class="criticality-filter-actions"><button class="op-button" type="submit">Aplicar filtros</button><a class="op-button ghost" href="/dashboard/criticidade">Limpar</a></div>
+  </form>
+
+  <section class="metric-grid criticality-kpi-grid" aria-label="Situação das ordens de serviço">
+    <% statusCards.forEach(function(card){ %>
+      <% if(card.href){ %><a class="metric-card <%= card.tone %>" href="<%= card.href %>"><strong><%= card.value %></strong><span><%= card.label %></span><small><%= card.meta %></small></a>
+      <% } else { %><div class="metric-card <%= card.tone %>"><strong><%= card.value %></strong><span><%= card.label %></span><small><%= card.meta %></small></div><% } %>
+    <% }) %>
+  </section>
+
+  <div class="criticality-main-grid">
+    <section class="op-card criticality-ranking-card">
+      <div class="card-heading"><div><h2>EQUIPAMENTOS COM MAIS FALHAS</h2><p>Top 5 no período selecionado, com reincidência e intervalo médio entre falhas.</p></div><span class="criticality-count"><%= ranking.length %> equipamento(s)</span></div>
+      <% if(!ranking.length){ %><p class="empty-state">Nenhuma falha corretiva registrada no período.</p><% } %>
+      <div class="criticality-ranking-list">
+        <% ranking.forEach(function(i,index){ const pct=Math.max(7,Math.round(Number(i.total_falhas||0)/maxFalhas*100)); %>
+          <a class="criticality-rank-row" href="<%= i.historico_url || ('/dashboard/criticidade/equipamentos/'+i.equipamento_id) %>">
+            <b><%= index+1 %></b>
+            <div class="criticality-rank-info">
+              <div class="criticality-rank-title"><strong><%= i.equipamento_nome %></strong><span class="tag <%= critBadge(i) %>"><%= i.situacao_atual || '-' %></span></div>
+              <small><%= i.setor %> • Última falha: <%= i.ultima_falha ? fmtBR(i.ultima_falha) : '-' %></small>
+              <div class="criticality-bar"><i style="width:<%= pct %>%"></i></div>
+              <small><%= i.total_falhas %> falhas • <%= i.reincidencias %> reincidências • Média entre falhas: <%= i.frequencia_media %> • Tendência: <%= i.intervalo.tendencia %></small>
+            </div>
+            <strong class="criticality-rank-value"><%= i.total_falhas %></strong>
+          </a>
+        <% }) %>
+      </div>
+      <div class="criticality-legend"><span><i class="legend-danger"></i>Crítica/emergencial</span><span><i class="legend-warning"></i>Reincidência</span><span><i class="legend-ok"></i>Operando sem nova corretiva</span><span><i class="legend-neutral"></i>Dados insuficientes</span></div>
+    </section>
+
+    <section class="op-card criticality-summary-card">
+      <div class="card-heading"><div><h2>LEITURA RÁPIDA</h2><p>Resumo para priorização operacional.</p></div></div>
+      <div class="criticality-summary-list">
+        <div><span>Equipamentos no ranking</span><strong><%= ranking.length %></strong></div>
+        <div><span>Com reincidência</span><strong><%= ranking.filter(i=>Number(i.reincidencias||0)>0).length %></strong></div>
+        <div><span>Com crítica/emergencial</span><strong><%= ranking.filter(i=>Number(i.os_criticas||0)>0).length %></strong></div>
+        <div><span>Intervenções sugeridas</span><strong><%= interv.length %></strong></div>
+      </div>
+      <p class="criticality-note">As sugestões abaixo não criam parada automática. A avaliação e decisão continuam com Manutenção/PCM.</p>
+    </section>
+  </div>
+
+  <section class="op-card">
+    <div class="card-heading"><div><h2>REFORMA E PARADA PROGRAMADA</h2><p>Indicações geradas pelas ocorrências do período para análise técnica.</p></div><span class="criticality-count"><%= interv.length %> indicação(ões)</span></div>
+    <div class="responsive-table">
+      <table class="op-table criticality-table"><thead><tr><th>Classificação</th><th>Equipamento</th><th>Setor</th><th>Motivo</th><th>Falhas</th><th>Reinc.</th><th>Última falha</th><th>Criticidade</th><th>Situação</th><th>Responsável</th><th>Ação</th></tr></thead>
+      <tbody>
+        <% if(!interv.length){ %><tr class="empty"><td colspan="11">Nenhuma indicação ou sugestão no período.</td></tr><% } %>
+        <% interv.forEach(function(i){ %><tr>
+          <td data-label="Classificação"><span class="tag <%= i.os_criticas>0?'danger':'warning' %>"><%= i.classificacao %></span></td>
+          <td data-label="Equipamento"><strong><%= i.equipamento_nome %></strong></td>
+          <td data-label="Setor"><%= i.setor %></td>
+          <td data-label="Motivo"><%= i.motivo %></td>
+          <td data-label="Falhas"><strong><%= i.total_falhas %></strong></td>
+          <td data-label="Reinc."><%= i.reincidencias %></td>
+          <td data-label="Última falha"><%= i.ultima_falha ? fmtBR(i.ultima_falha) : '-' %></td>
+          <td data-label="Criticidade"><span class="tag <%= i.os_criticas>0?'danger':'warning' %>"><%= i.criticidade || '-' %></span></td>
+          <td data-label="Situação"><%= i.situacao_solicitacao %></td>
+          <td data-label="Responsável"><%= i.responsavel %></td>
+          <td data-label="Ação"><a class="table-action" href="<%= i.historico_url || ('/dashboard/criticidade/equipamentos/'+i.equipamento_id) %>">Abrir histórico</a></td>
+        </tr><% }) %>
+      </tbody></table>
+    </div>
+  </section>
+</div>
 <style>
-.crit-card{background:#fff;border:1px solid #dbe7df;border-radius:16px;padding:14px;box-shadow:0 1px 3px rgba(21,128,61,.08);margin-bottom:14px}.crit-title{font-weight:900;color:#166534;text-transform:uppercase;letter-spacing:.04em;font-size:13px;margin-bottom:10px}.crit-filters{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:8px}.crit-filters label{font-size:12px;font-weight:800;color:#475569}.crit-filters input,.crit-filters select{width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:10px}.crit-kpis{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px}.crit-kpi{display:block;text-decoration:none;color:inherit;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px}.crit-kpi strong{display:block;font-size:26px;color:#14532d}.bar-row{display:grid;grid-template-columns:minmax(150px,260px) 1fr;gap:10px;align-items:center;margin:10px 0}.bar-label{font-weight:900;color:#0f172a;overflow:hidden;text-overflow:ellipsis}.bar-track{background:#f1f5f9;border-radius:999px;overflow:hidden}.bar-fill{background:#dc2626;color:#fff;font-weight:900;padding:8px 10px;min-width:42px;text-align:right}.crit-meta{font-size:12px;color:#64748b;margin-top:4px}.crit-table{width:100%;border-collapse:collapse}.crit-table th,.crit-table td{padding:9px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:13px}.crit-badge{border-radius:999px;padding:3px 8px;font-size:11px;font-weight:900}.red{background:#fee2e2;color:#991b1b}.orange{background:#ffedd5;color:#9a3412}.green{background:#dcfce7;color:#166534}.gray{background:#f1f5f9;color:#475569}@media(max-width:800px){.crit-filters,.crit-kpis{grid-template-columns:1fr}.bar-row{grid-template-columns:1fr}.crit-table{min-width:860px}.crit-scroll{overflow:auto}}@media(min-width:1400px){.crit-card{font-size:1.1rem}.crit-kpi strong{font-size:36px}}
+.criticality-page{padding-bottom:8px}.criticality-actions{max-width:none}.criticality-filter-card{padding:14px 15px}.criticality-filter-grid{display:grid;grid-template-columns:repeat(5,minmax(140px,1fr));gap:10px}.criticality-filter-grid label{display:grid;gap:5px;color:#667085;font-size:10px;font-weight:800}.criticality-filter-grid select,.criticality-filter-grid input{height:36px;border:1px solid #d9e2de;border-radius:9px;background:#fff;padding:0 10px;color:#202a3b;font-weight:700;min-width:0}.criticality-filter-actions{display:flex;gap:8px;margin-top:12px}.criticality-kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.criticality-kpi-grid .metric-card{text-decoration:none;text-align:left;min-height:104px}.criticality-kpi-grid .metric-card strong{margin-top:0}.criticality-main-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,.7fr);gap:14px}.criticality-count{font-size:10px;color:#687386;font-weight:800}.criticality-ranking-list{display:grid}.criticality-rank-row{display:grid;grid-template-columns:28px minmax(0,1fr) 44px;gap:10px;align-items:center;text-decoration:none;color:inherit;padding:11px 0;border-bottom:1px solid #e8ecea}.criticality-rank-row>b{width:26px;height:26px;border-radius:50%;background:#edf8f1;color:#118b4d;display:grid;place-items:center}.criticality-rank-info{display:grid;gap:5px;min-width:0}.criticality-rank-title{display:flex;align-items:center;gap:8px;justify-content:space-between}.criticality-rank-title strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.criticality-rank-info small{color:#687386;font-size:10px}.criticality-bar{height:7px;background:#edf0ef;border-radius:999px;overflow:hidden}.criticality-bar i{display:block;height:100%;background:linear-gradient(90deg,#f0aa26,#d93443);border-radius:999px}.criticality-rank-value{text-align:right;font-size:18px;color:#202a3b}.criticality-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid #e8ecea;color:#687386;font-size:9px}.criticality-legend span{display:flex;align-items:center;gap:5px}.criticality-legend i{width:8px;height:8px;border-radius:50%}.legend-danger{background:#d93243}.legend-warning{background:#ed941e}.legend-ok{background:#118b4d}.legend-neutral{background:#9aa3af}.criticality-summary-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}.criticality-summary-list>div{background:#f7faf8;border-radius:10px;padding:11px}.criticality-summary-list span{display:block;color:#687386;font-size:10px}.criticality-summary-list strong{display:block;font-size:22px;margin-top:3px;color:#202a3b}.criticality-note{margin:10px 0 0;padding:10px;background:#fff8e8;border:1px solid #f5df9a;border-radius:9px;color:#7d6516;font-size:10px;line-height:1.4}.criticality-table td{max-width:260px}.tag.ok{color:#08783a;background:#edf8f1}.tag.warning{color:#a15c00;background:#fff5e9}.tag.danger{color:#be2332;background:#fff0f2}
+@media(max-width:1180px){.criticality-filter-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.criticality-main-grid{grid-template-columns:1fr}.criticality-kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:760px){.criticality-filter-grid{grid-template-columns:1fr 1fr}.criticality-filter-actions{display:grid;grid-template-columns:1fr 1fr}.criticality-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.criticality-summary-list{grid-template-columns:1fr 1fr}.criticality-rank-row{grid-template-columns:24px minmax(0,1fr) 34px}.criticality-rank-title{align-items:flex-start;flex-direction:column}.criticality-legend{display:grid;grid-template-columns:1fr 1fr}}
+@media(max-width:430px){.criticality-filter-grid{grid-template-columns:1fr}.criticality-summary-list{grid-template-columns:1fr 1fr}.criticality-kpi-grid .metric-card{min-height:84px}.criticality-kpi-grid .metric-card strong{font-size:23px}}
 </style>
-<div class="page-head"><div><h1>Painel operacional de criticidade</h1><p class="muted">Equipamentos com maior incidência de falhas reais no período selecionado. Preventivas e OS canceladas não entram como falha.</p></div><a class="btn btn-green" href="/dashboard">Voltar ao painel</a></div>
-<form class="crit-card" method="GET" action="/dashboard/criticidade"><div class="crit-title">Filtros</div><div class="crit-filters"><label>Período<select name="periodo"><% [7,30,60,90,180].forEach(function(d){ %><option value="<%= d %>" <%= Number(f.days)===d?'selected':'' %>><%= d %> dias</option><% }) %></select></label><label>Início<input type="date" name="inicio" value="<%= f.start || '' %>"></label><label>Fim<input type="date" name="fim" value="<%= f.end || '' %>"></label><label>Setor<select name="setor"><option value="">Todos</option><% (opts.setores||[]).forEach(function(s){ %><option <%= f.setor===s?'selected':'' %>><%= s %></option><% }) %></select></label><label>Equipamento<select name="equipamento_id"><option value="">Todos</option><% (opts.equipamentos||[]).forEach(function(e){ %><option value="<%= e.id %>" <%= String(f.equipamento_id)===String(e.id)?'selected':'' %>><%= e.nome %></option><% }) %></select></label><label>Criticidade<select name="criticidade"><option value="">Todas</option><% ['BAIXA','MEDIA','ALTA','CRITICA','EMERGENCIAL'].forEach(function(c){ %><option <%= f.criticidade===c?'selected':'' %>><%= c %></option><% }) %></select></label><label>Tipo manutenção<input name="tipo" value="<%= f.tipo || '' %>" placeholder="CORRETIVA"></label><label>Situação OS<input name="status" value="<%= f.status || '' %>" placeholder="ABERTA"></label><label>Ativo<select name="ativo"><option value="">Todos</option><option value="1" <%= String(f.ativo)==='1'?'selected':'' %>>Ativo</option><option value="0" <%= String(f.ativo)==='0'?'selected':'' %>>Inativo</option></select></label></div><button class="btn btn-green" style="margin-top:10px">Aplicar filtros</button></form>
-<section class="crit-card"><div class="crit-title">Top 5 equipamentos com mais falhas</div><% if (!ranking.length) { %><p class="muted">Nenhuma falha corretiva registrada no período.</p><% } %><% var max = Math.max.apply(null, ranking.map(function(i){return i.total_falhas;})); ranking.forEach(function(i){ var pct = max ? Math.max(8, Math.round(i.total_falhas/max*100)) : 0; var color = i.os_criticas>0?'red':(i.reincidencias>0?'orange':'green'); %><a class="bar-row" href="<%= i.historico_url || ('/dashboard/criticidade/equipamentos/'+i.equipamento_id) %>"><div><div class="bar-label"><%= i.equipamento_nome %></div><div class="crit-meta"><%= i.setor %> • Última falha: <%= i.ultima_falha ? fmtBR(i.ultima_falha) : '-' %> • <span class="crit-badge <%= color %>"><%= i.situacao_atual || '-' %></span></div></div><div><div class="bar-track"><div class="bar-fill" style="width:<%= pct %>%"><%= i.total_falhas %></div></div><div class="crit-meta">Críticas/emergenciais: <%= i.os_criticas %> • Reincidências: <%= i.reincidencias %> • Média entre falhas: <%= i.frequencia_media %> • Tendência: <%= i.intervalo.tendencia %></div></div></a><% }) %><div class="crit-meta">Legenda: vermelho = falhas críticas/emergenciais; laranja = observação/reincidência; verde = operando sem nova ocorrência corretiva; cinza = dados insuficientes.</div></section>
-<section class="crit-card"><div class="crit-title">Situação das ordens de serviço</div><div class="crit-kpis"><a class="crit-kpi" href="/os?status=ABERTA"><span>OS abertas</span><strong><%= osr.abertas || 0 %></strong></a><a class="crit-kpi" href="/os?status=AGUARDANDO_EQUIPE"><span>Aguardando equipe</span><strong><%= osr.aguardando_equipe || 0 %></strong></a><a class="crit-kpi" href="/os?status=ANDAMENTO"><span>Em andamento</span><strong><%= osr.andamento || 0 %></strong></a><a class="crit-kpi" href="/os?status=PAUSADA"><span>Pausadas</span><strong><%= osr.pausadas || 0 %></strong></a><a class="crit-kpi" href="/os?criticidade=CRITICA"><span>Críticas/emergenciais</span><strong><%= osr.criticas_emergenciais || 0 %></strong></a><a class="crit-kpi" href="/os?status=CONCLUIDA"><span>Finalizadas no período</span><strong><%= osr.finalizadas_periodo || 0 %></strong></a><a class="crit-kpi" href="/os?vencidas=1"><span>Vencidas/antigas</span><strong><%= osr.vencidas || 0 %></strong></a><div class="crit-kpi"><span>Tempo médio fechamento</span><strong><%= osr.tempo_medio_fechamento_horas == null ? '-' : Number(osr.tempo_medio_fechamento_horas).toFixed(1)+'h' %></strong></div></div></section>
-<section class="crit-card"><div class="crit-title">Reforma e parada programada</div><div class="crit-scroll"><table class="crit-table"><thead><tr><th>Classificação</th><th>Equipamento</th><th>Setor</th><th>Motivo</th><th>Falhas</th><th>Reinc.</th><th>Última falha</th><th>Criticidade</th><th>Situação</th><th>Prevista</th><th>Responsável</th></tr></thead><tbody><% if(!interv.length){ %><tr><td colspan="11">Nenhuma indicação ou sugestão no período.</td></tr><% } %><% interv.forEach(function(i){ %><tr><td><%= i.classificacao %></td><td><%= i.equipamento_nome %></td><td><%= i.setor %></td><td><%= i.motivo %></td><td><%= i.total_falhas %></td><td><%= i.reincidencias %></td><td><%= i.ultima_falha ? fmtBR(i.ultima_falha) : '-' %></td><td><span class="crit-badge <%= i.os_criticas>0?'red':'orange' %>"><%= i.criticidade || '-' %></span></td><td><%= i.situacao_solicitacao %></td><td>-</td><td><%= i.responsavel %></td></tr><% }) %></tbody></table></div></section>
