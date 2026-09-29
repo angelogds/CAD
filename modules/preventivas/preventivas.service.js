@@ -2812,11 +2812,12 @@ function getPreventiveDashboard(filters = {}, refDate = new Date()) {
   const codigo = eqCols.includes("codigo") ? "e.codigo" : "NULL";
   const setor = eqCols.includes("setor") ? "e.setor" : "NULL";
   const critEq = eqCols.includes("criticidade") ? "e.criticidade" : "NULL";
+  const fotoEq = eqCols.includes("foto_url") ? "e.foto_url" : "NULL";
   const critEx = exCols.includes("criticidade") ? "pe.criticidade" : "NULL";
   const resp1 = exCols.includes("responsavel_1_id") && users ? `u1.${users.nameCol}` : "NULL";
   const resp2 = exCols.includes("responsavel_2_id") && users ? `u2.${users.nameCol}` : "NULL";
   const joins = `${exCols.includes("responsavel_1_id") && users ? `LEFT JOIN ${users.table} u1 ON u1.${users.idCol}=pe.responsavel_1_id` : ""} ${exCols.includes("responsavel_2_id") && users ? `LEFT JOIN ${users.table} u2 ON u2.${users.idCol}=pe.responsavel_2_id` : ""}`;
-  const baseSql = `SELECT pe.*, p.titulo, p.frequencia_tipo, p.frequencia_valor, p.ativo AS plano_ativo, p.equipamento_id, e.nome AS equipamento_nome, ${codigo} AS equipamento_codigo, ${setor} AS setor, COALESCE(NULLIF(${critEx},''), ${critEq}, 'MEDIA') AS criticidade_exibicao, ${resp1} AS responsavel_1_nome, ${resp2} AS responsavel_2_nome FROM preventiva_execucoes pe JOIN preventiva_planos p ON p.id=pe.plano_id LEFT JOIN equipamentos e ON e.id=p.equipamento_id ${joins}`;
+  const baseSql = `SELECT pe.*, p.titulo, p.frequencia_tipo, p.frequencia_valor, p.ativo AS plano_ativo, p.equipamento_id, e.nome AS equipamento_nome, ${codigo} AS equipamento_codigo, ${setor} AS setor, ${fotoEq} AS equipamento_foto_url, COALESCE(NULLIF(${critEx},''), ${critEq}, 'MEDIA') AS criticidade_exibicao, ${resp1} AS responsavel_1_nome, ${resp2} AS responsavel_2_nome FROM preventiva_execucoes pe JOIN preventiva_planos p ON p.id=pe.plano_id LEFT JOIN equipamentos e ON e.id=p.equipamento_id ${joins}`;
   const all = db.prepare(baseSql).all().map((row) => ({ ...row, prazo: classificarVencimento(row.data_prevista, row.status, refDate), responsaveis: formatarResponsaveis([row.responsavel_1_nome, row.responsavel_2_nome], row.responsavel), criticidade_exibicao: String(row.criticidade_exibicao || "MEDIA").toUpperCase() }));
   const ativos = db.prepare(`SELECT id, ${critEq.replaceAll("e.", "")} AS criticidade FROM equipamentos e WHERE IFNULL(ativo,1)=1`).all();
   const planos = db.prepare(`SELECT id, equipamento_id, frequencia_tipo FROM preventiva_planos WHERE IFNULL(ativo,1)=1`).all();

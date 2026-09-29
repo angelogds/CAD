@@ -36,6 +36,14 @@
       <% rows.forEach(r=>{ %>
         <article class="pv-task-card pv-task-<%= String(r.prazo||'').toLowerCase() %>">
           <div class="pv-task-head"><span class="badge status-<%= String(r.prazo||'').toLowerCase() %>"><%= prazoLabel[r.prazo]||r.status %></span><span class="badge crit-<%= String(r.criticidade_exibicao||'media').toLowerCase() %>"><%= r.criticidade_exibicao||'MEDIA' %></span></div>
+          <div class="pv-task-image">
+            <% if (r.equipamento_foto_url) { %>
+              <img src="<%= r.equipamento_foto_url %>" alt="<%= r.equipamento_nome||'Equipamento' %>" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='grid';">
+              <div class="pv-task-image-fallback" style="display:none"><span>⚙</span><small>SEM IMAGEM</small></div>
+            <% } else { %>
+              <div class="pv-task-image-fallback"><span>⚙</span><small>SEM IMAGEM</small></div>
+            <% } %>
+          </div>
           <div class="pv-task-equipment"><small><%= r.equipamento_codigo||('PREV #'+r.id) %></small><h3><%= r.equipamento_nome||'Equipamento não informado' %></h3><span><%= r.setor||'Setor não informado' %></span></div>
           <div class="pv-task-activity"><strong><%= r.titulo||'Rotina preventiva' %></strong><p><%= r.observacao||'Consulte o plano para os detalhes da atividade.' %></p></div>
           <div class="pv-task-meta"><div><span>Frequência</span><strong><%= r.frequencia_tipo||'-' %></strong></div><div><span>Data prevista</span><strong><%= r.data_prevista?String(r.data_prevista).slice(0,10).split('-').reverse().join('/'):'-' %></strong></div><div class="wide"><span>Responsável</span><strong><%= r.responsaveis||'A definir' %></strong></div></div>
