@@ -9,7 +9,7 @@
       <p>Crie uma preventiva pendente vinculada a um equipamento. A equipe responsável continuará sendo definida pelas regras atuais de escala e configuração do módulo.</p>
     </div>
     <div class="preventive-secondary-actions">
-      <a class="ui-btn ui-btn--secondary" href="/preventivas">Voltar ao painel</a>
+      <a class="ui-btn ui-btn--secondary" href="<%= typeof backUrl !== 'undefined' ? backUrl : '/preventivas' %>">Voltar ao painel</a>
     </div>
   </header>
 
@@ -22,7 +22,7 @@
       <span class="preventive-secondary-badge info">Origem: MANUAL</span>
     </div>
 
-    <form method="POST" action="/preventivas" class="preventive-secondary-grid">
+    <form method="POST" action="<%= typeof formAction !== 'undefined' ? formAction : '/preventivas' %>" class="preventive-secondary-grid">
       <label class="preventive-secondary-field is-wide" for="equipamento_id">
         <span>Equipamento *</span>
         <select id="equipamento_id" name="equipamento_id" required>
@@ -95,7 +95,7 @@
       </div>
 
       <div class="preventive-secondary-form-actions is-wide">
-        <a class="ui-btn ui-btn--secondary" href="/preventivas">Cancelar</a>
+        <a class="ui-btn ui-btn--secondary" href="<%= typeof backUrl !== 'undefined' ? backUrl : '/preventivas' %>">Cancelar</a>
         <button class="ui-btn ui-btn--primary" type="submit">Salvar preventiva manual</button>
       </div>
     </form>
