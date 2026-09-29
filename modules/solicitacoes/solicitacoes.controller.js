@@ -230,7 +230,7 @@ function registrarCancelamentoNoChatOs(resultado, req) {
       osChatService.registrarMensagemSistema(
         osId,
         "SOLICITACAO_CANCELADA",
-        `Solicitação de material ${numero} cancelada pelo administrador.`,
+        `Solicitação de material ${numero} cancelada por usuário autorizado.`,
         { solicitacao_id: Number(req.params.id), user_id: req.session.user.id }
       );
     } catch (chatError) {
