@@ -9,7 +9,7 @@
       <p>Defina os responsáveis padrão das preventivas respeitando a disponibilidade da escala atual. Colaboradores indisponíveis permanecem visíveis, porém bloqueados.</p>
     </div>
     <div class="preventive-secondary-actions">
-      <a class="ui-btn ui-btn--secondary" href="/preventivas">Voltar ao painel</a>
+      <a class="ui-btn ui-btn--secondary" href="<%= typeof backUrl !== 'undefined' ? backUrl : '/preventivas' %>">Voltar ao painel</a>
     </div>
   </header>
 
@@ -49,7 +49,7 @@
       Somente colaboradores <strong>disponíveis na escala atual</strong> podem ser selecionados. Férias, atestado, folga, ausência e colaboradores fora da escala ficam bloqueados automaticamente.
     </div>
 
-    <form method="POST" action="/preventivas/eleger-mecanico" id="formResponsaveisPreventiva" class="preventive-secondary-config-form">
+    <form method="POST" action="<%= typeof formAction !== 'undefined' ? formAction : '/preventivas/eleger-mecanico' %>" id="formResponsaveisPreventiva" class="preventive-secondary-config-form">
       <div class="preventive-secondary-team">
         <section class="preventive-secondary-person">
           <h3>Mecânico 1</h3>
@@ -115,7 +115,7 @@
       <% } %>
 
       <div class="preventive-secondary-form-actions preventive-secondary-form-actions-spaced">
-        <a class="ui-btn ui-btn--secondary" href="/preventivas">Cancelar</a>
+        <a class="ui-btn ui-btn--secondary" href="<%= typeof backUrl !== 'undefined' ? backUrl : '/preventivas' %>">Cancelar</a>
         <button class="ui-btn ui-btn--primary" type="submit">Salvar responsáveis</button>
       </div>
     </form>
