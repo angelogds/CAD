@@ -7,6 +7,7 @@ const reciclagemScope = require("../compras/compras.reciclagem-scope.middleware"
 
 const SOLICITACOES_READ_ACCESS = [...new Set([...(ACCESS.solicitacoes_read || []), ...(ACCESS.solicitacoes_reciclagem_read || [])])];
 const SOLICITACOES_CREATE_ACCESS = [...new Set([...(ACCESS.solicitacoes_create || []), ...(ACCESS.solicitacoes_reciclagem_create || [])])];
+const SOLICITACOES_MANAGE_ACCESS = [...new Set([...(ACCESS.solicitacoes_read || []), ...(ACCESS.solicitacoes_reciclagem_manage || [])])];
 const SOLICITACOES_DELETE_ACCESS = [...new Set([...(ACCESS.solicitacoes_delete || []), ...(ACCESS.solicitacoes_reciclagem_delete || [])])];
 
 const DIRETORIA_COMPRAS = ACCESS.diretoria_compras || [];
@@ -38,16 +39,16 @@ router.get("/:id/pdf", requireLogin, requireRole(SOLICITACOES_READ_ACCESS), reci
 router.post("/:id/excluir", requireLogin, requireRole(SOLICITACOES_DELETE_ACCESS), reciclagemScope.requireSolicitacaoScope, ctrl.excluir);
 router.post("/:id/cancelar", requireLogin, requireRole(SOLICITACOES_DELETE_ACCESS), reciclagemScope.requireSolicitacaoScope, ctrl.cancelar);
 router.get("/:id/editar", requireLogin, requireRole(SOLICITACOES_READ_ACCESS), reciclagemScope.requireSolicitacaoScope, ctrl.editar);
-router.post("/:id/editar", requireLogin, requireRole(SOLICITACOES_READ_ACCESS), reciclagemScope.requireSolicitacaoScope, ctrl.atualizar);
-router.post("/:id/finalizar", requireLogin, requireRole(SOLICITACOES_READ_ACCESS), reciclagemScope.requireSolicitacaoScope, ctrl.finalizar);
+router.post("/:id/editar", requireLogin, requireRole(SOLICITACOES_MANAGE_ACCESS), reciclagemScope.requireSolicitacaoScope, ctrl.atualizar);
+router.post("/:id/finalizar", requireLogin, requireRole(SOLICITACOES_MANAGE_ACCESS), reciclagemScope.requireSolicitacaoScope, ctrl.finalizar);
 
-router.post("/:id/itens/adicionar", requireLogin, requireRole(SOLICITACOES_READ_ACCESS), reciclagemScope.requireSolicitacaoScope, flowCtrl.adicionarItem);
-router.post("/:id/itens/:itemId/alteracao", requireLogin, requireRole(SOLICITACOES_READ_ACCESS), reciclagemScope.requireSolicitacaoScope, reciclagemScope.requireItemScope, flowCtrl.solicitarAlteracao);
-router.post("/:id/itens/:itemId/alteracao/aprovar", requireLogin, requireRole(SOLICITACOES_READ_ACCESS), reciclagemScope.requireSolicitacaoScope, reciclagemScope.requireItemScope, flowCtrl.aprovarAlteracao);
-router.post("/:id/itens/:itemId/alteracao/recusar", requireLogin, requireRole(SOLICITACOES_READ_ACCESS), reciclagemScope.requireSolicitacaoScope, reciclagemScope.requireItemScope, flowCtrl.recusarAlteracao);
-router.post("/:id/itens/:itemId/exclusao/solicitar", requireLogin, requireRole(SOLICITACOES_READ_ACCESS), reciclagemScope.requireSolicitacaoScope, reciclagemScope.requireItemScope, flowCtrl.solicitarExclusao);
-router.post("/:id/itens/:itemId/exclusao/aprovar", requireLogin, requireRole(SOLICITACOES_READ_ACCESS), reciclagemScope.requireSolicitacaoScope, reciclagemScope.requireItemScope, flowCtrl.aprovarExclusao);
-router.post("/:id/itens/:itemId/exclusao/recusar", requireLogin, requireRole(SOLICITACOES_READ_ACCESS), reciclagemScope.requireSolicitacaoScope, reciclagemScope.requireItemScope, flowCtrl.recusarExclusao);
+router.post("/:id/itens/adicionar", requireLogin, requireRole(SOLICITACOES_MANAGE_ACCESS), reciclagemScope.requireSolicitacaoScope, flowCtrl.adicionarItem);
+router.post("/:id/itens/:itemId/alteracao", requireLogin, requireRole(SOLICITACOES_MANAGE_ACCESS), reciclagemScope.requireSolicitacaoScope, reciclagemScope.requireItemScope, flowCtrl.solicitarAlteracao);
+router.post("/:id/itens/:itemId/alteracao/aprovar", requireLogin, requireRole(SOLICITACOES_MANAGE_ACCESS), reciclagemScope.requireSolicitacaoScope, reciclagemScope.requireItemScope, flowCtrl.aprovarAlteracao);
+router.post("/:id/itens/:itemId/alteracao/recusar", requireLogin, requireRole(SOLICITACOES_MANAGE_ACCESS), reciclagemScope.requireSolicitacaoScope, reciclagemScope.requireItemScope, flowCtrl.recusarAlteracao);
+router.post("/:id/itens/:itemId/exclusao/solicitar", requireLogin, requireRole(SOLICITACOES_MANAGE_ACCESS), reciclagemScope.requireSolicitacaoScope, reciclagemScope.requireItemScope, flowCtrl.solicitarExclusao);
+router.post("/:id/itens/:itemId/exclusao/aprovar", requireLogin, requireRole(SOLICITACOES_MANAGE_ACCESS), reciclagemScope.requireSolicitacaoScope, reciclagemScope.requireItemScope, flowCtrl.aprovarExclusao);
+router.post("/:id/itens/:itemId/exclusao/recusar", requireLogin, requireRole(SOLICITACOES_MANAGE_ACCESS), reciclagemScope.requireSolicitacaoScope, reciclagemScope.requireItemScope, flowCtrl.recusarExclusao);
 
 router.get("/:id", requireLogin, requireRole(SOLICITACOES_READ_ACCESS), reciclagemScope.requireSolicitacaoScope, flowCtrl.detalhe);
 router.get("/", (_req, res) => res.redirect("/solicitacoes/minhas"));
