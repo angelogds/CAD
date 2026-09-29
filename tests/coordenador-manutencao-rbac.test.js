@@ -5,20 +5,20 @@ const path=require('node:path');
 const root=path.resolve(__dirname,'..');
 const read=p=>fs.readFileSync(path.join(root,p),'utf8');
 
-test('perfil Coordenador de Manutenção existe no RBAC e cadastro',()=>{
+test('perfil Coordenador da Reciclagem existe no RBAC e cadastro',()=>{
  const rbac=read('config/rbac.js');
  const controller=read('modules/usuarios/usuarios.controller.js');
  const service=read('modules/usuarios/usuarios.service.js');
- assert.match(rbac,/COORDENADOR_MANUTENCAO/);
- assert.match(controller,/Coordenador de Manutenção/);
- assert.match(service,/COORDENADOR_MANUTENCAO/);
+ assert.match(rbac,/COORDENADOR_RECICLAGEM/);
+ assert.match(controller,/Coordenador da Reciclagem/);
+ assert.match(service,/COORDENADOR_RECICLAGEM/);
 });
 
 test('coordenador acessa novas funcionalidades de gestão da manutenção',()=>{
  const rbac=read('config/rbac.js');
  ['pcm','pcm_manage','preventivas_view','preventivas_manage','equipamentos','os_view','os_open','demandas_view','solicitacoes_read','acompanhamento_compras'].forEach(key=>{
    const line=rbac.split('\n').find(l=>l.includes(key+':'));
-   assert.ok(line && line.includes('ROLE.COORDENADOR_MANUTENCAO'),key+' deve liberar coordenador');
+   assert.ok(line && line.includes('ROLE.COORDENADOR_RECICLAGEM'),key+' deve liberar coordenador');
  });
 });
 
@@ -26,7 +26,7 @@ test('coordenador não recebe privilégios administrativos sensíveis',()=>{
  const rbac=read('config/rbac.js');
  ['usuarios','usuarios_delete','rh_sensitive','compras_manage','almoxarifado_manage','estoque_manage'].forEach(key=>{
    const line=rbac.split('\n').find(l=>l.includes(key+':'));
-   assert.ok(line && !line.includes('ROLE.COORDENADOR_MANUTENCAO'),key+' deve permanecer restrito');
+   assert.ok(line && !line.includes('ROLE.COORDENADOR_RECICLAGEM'),key+' deve permanecer restrito');
  });
 });
 
@@ -39,5 +39,5 @@ test('migração preserva usuários e valida foreign keys',()=>{
 
 test('perfil deriva função e setor corretos',()=>{
  const perfil=read('modules/usuarios/usuarios.perfil.js');
- assert.match(perfil,/COORDENADOR_MANUTENCAO: \{ funcao: 'Coordenador de Manutenção', setor: 'RECICLAGEM'/);
+ assert.match(perfil,/COORDENADOR_RECICLAGEM: \{ funcao: 'Coordenador da Reciclagem', setor: 'RECICLAGEM'/);
 });
