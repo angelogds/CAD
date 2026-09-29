@@ -3,6 +3,7 @@ const router = express.Router();
 const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
 const ctrl = require("./pcm.controller");
+const preventivasCtrl = require("../preventivas/preventivas.controller");
 
 const PCM_ACCESS = ACCESS.pcm;
 const PCM_MANAGE = ACCESS.pcm_manage;
@@ -27,6 +28,15 @@ router.get("/dashboard-gerencial/excel", requireLogin, requireRole(DIRETORIA_MAN
 router.get("/dashboard-gerencial/configurar", requireLogin, requireRole(DIRETORIA_MANUTENCAO), redirectWithQuery(DIRETORIA_MANUTENCAO_PATH));
 
 router.get("/planejamento", requireLogin, requireRole(PCM_ACCESS), ctrl.planejamento);
+router.get("/preventivas", requireLogin, requireRole(PCM_ACCESS), ctrl.preventivas);
+router.get("/preventivas/nova", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.newForm);
+router.post("/preventivas", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.create);
+router.get("/preventivas/eleger-mecanico", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.elegerMecanicoForm);
+router.post("/preventivas/eleger-mecanico", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.salvarElegerMecanico);
+router.get("/preventivas/programadas", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.programadasIndex);
+router.post("/preventivas/programadas/gerar", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.gerarProgramadas);
+router.post("/preventivas/programadas/lancar-os-segunda", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.gerarOSProgramadasSegunda);
+router.post("/preventivas/programadas/lancar-os-lote-dia", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.lancarLoteDiarioPreventivas);
 router.get("/planejamento/pdf", requireLogin, requireRole(PCM_ACCESS), ctrl.planejamentoPdf);
 router.get("/falhas", requireLogin, requireRole(PCM_ACCESS), ctrl.falhas);
 router.get("/engenharia", requireLogin, requireRole(PCM_ACCESS), ctrl.engenharia);
