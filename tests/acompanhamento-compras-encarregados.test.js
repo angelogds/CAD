@@ -65,7 +65,8 @@ test('RBAC e menu liberam acompanhamento sem conceder Compras operacional', () =
   const comprasReadLine = rbac.split('\n').find((line) => line.includes('compras_read:')) || '';
   assert.doesNotMatch(comprasReadLine, /ENCARREGADO_LOGISTICA|ENCARREGADO_FRIGORIFICO|ROLE\.RH/);
 
-  assert.doesNotMatch(sidebar, /navItem\('\/acompanhamento-compras'/);
+  assert.match(sidebar, /if \(canAcompanhamentoOnly\)/);
+  assert.match(sidebar, /can\('acompanhamento_compras'\) && !canSolicitacoes/);
   const minhas = read('views/solicitacoes/minhas.ejs');
   assert.match(minhas, /href="\/acompanhamento-compras"/);
   assert.match(minhas, /Acompanhamento de Compras/);
