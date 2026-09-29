@@ -10,6 +10,7 @@ function normalizeRole(value) {
 const ROLE_PROFILE = Object.freeze({
   ENCARREGADO_MANUTENCAO: { funcao: 'Encarregado de Manutenção', setor: 'RECICLAGEM', directUserIdentity: true },
   MANUTENCAO_SUPERVISOR: { funcao: 'Supervisor de Manutenção', setor: 'RECICLAGEM', directUserIdentity: true },
+  COORDENADOR_MANUTENCAO: { funcao: 'Coordenador de Manutenção', setor: 'RECICLAGEM', directUserIdentity: true },
   ENCARREGADO_LOGISTICA: { funcao: 'Encarregado de Logística', setor: 'LOGÍSTICA', directUserIdentity: true },
   ENCARREGADO_FRIGORIFICO: { funcao: 'Encarregado do Frigorífico', setor: 'FRIGORÍFICO', directUserIdentity: true },
   RH: { funcao: 'Responsável Administrativo / RH', setor: 'ADMINISTRATIVO', directUserIdentity: true },
