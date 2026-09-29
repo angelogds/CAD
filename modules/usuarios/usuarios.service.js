@@ -45,7 +45,7 @@ function syncColaboradorWhatsappFromUser({ userId, name, telefone, role }) {
   db.prepare("UPDATE colaboradores SET user_id = ?, telefone_whatsapp = ?, updated_at = datetime('now') WHERE id = ?").run(Number(userId), normalizedPhone, Number(match.id));
 }
 
-const VALID_ROLES = new Set(["ADMIN", "DIRECAO", "DIRETORIA", "RH", "COMPRAS", "ENCARREGADO_PRODUCAO", "PRODUCAO", "MECANICO", "ALMOXARIFE", "ALMOXARIFADO", "MANUTENCAO", "MANUTENCAO_SUPERVISOR", "ENCARREGADO_MANUTENCAO", "ENCARREGADO_LOGISTICA", "ENCARREGADO_FRIGORIFICO", "INSPECAO_QUALIDADE"]);
+const VALID_ROLES = new Set(["ADMIN", "DIRECAO", "DIRETORIA", "RH", "COMPRAS", "ENCARREGADO_PRODUCAO", "PRODUCAO", "MECANICO", "ALMOXARIFE", "ALMOXARIFADO", "MANUTENCAO", "MANUTENCAO_SUPERVISOR", "COORDENADOR_RECICLAGEM", "ENCARREGADO_MANUTENCAO", "ENCARREGADO_LOGISTICA", "ENCARREGADO_FRIGORIFICO", "INSPECAO_QUALIDADE"]);
 
 function list({ q = "", role = "", status = "ativos" } = {}) {
   const where = [];
