@@ -15,6 +15,7 @@ const ROLES = [
   { key: "ALMOXARIFADO", label: "almoxarifado" },
   { key: "COMPRAS", label: "compras" },
   { key: "MANUTENCAO_SUPERVISOR", label: "Supervisor de Manutenção" },
+  { key: "COORDENADOR_MANUTENCAO", label: "Coordenador de Manutenção" },
   { key: "ENCARREGADO_MANUTENCAO", label: "Encarregado de Manutenção" },
   { key: "ENCARREGADO_LOGISTICA", label: "Encarregado de Logística" },
   { key: "ENCARREGADO_FRIGORIFICO", label: "Encarregado do Frigorífico" },
