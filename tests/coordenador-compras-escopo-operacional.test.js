@@ -150,3 +150,29 @@ test('guard não altera o comportamento dos perfis globais já autorizados', () 
     db.close();
   }
 });
+
+
+test('rotas sensíveis aplicam o escopo antes das operações e do upload', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const root = path.resolve(__dirname, '..');
+  const comprasRoutes = fs.readFileSync(path.join(root, 'modules/compras/compras.routes.js'), 'utf8');
+  const solicitacoesRoutes = fs.readFileSync(path.join(root, 'modules/solicitacoes/solicitacoes.routes.js'), 'utf8');
+  const comprasController = fs.readFileSync(path.join(root, 'modules/compras/compras.controller.js'), 'utf8');
+
+  assert.match(comprasRoutes, /COMPRAS_READ_ACCESS/);
+  assert.match(comprasRoutes, /COMPRAS_MANAGE_ACCESS/);
+  assert.match(comprasRoutes, /cotacoes\/:cotacaoId\/selecionar'.*requireCotacaoScope/s);
+  assert.match(comprasRoutes, /itens\/:itemId\/alteracao'.*requireItemScope/s);
+  assert.match(comprasRoutes, /painel-itens'.*requireBodyItemsScope/s);
+  assert.match(comprasRoutes, /\/solicitacoes\/:id\/anexos'.*requireSolicitacaoScope, upload\.single/s);
+  assert.match(comprasRoutes, /\/anexos\/:anexoId\/download'.*requireAnexoScope/s);
+
+  assert.match(solicitacoesRoutes, /SOLICITACOES_READ_ACCESS/);
+  assert.match(solicitacoesRoutes, /SOLICITACOES_CREATE_ACCESS/);
+  assert.match(solicitacoesRoutes, /SOLICITACOES_DELETE_ACCESS/);
+  assert.match(solicitacoesRoutes, /itens\/:itemId\/exclusao\/aprovar".*requireItemScope/s);
+
+  assert.match(comprasController, /isCoordenadorReciclagem/);
+  assert.match(comprasController, /filters\.setor = SETORES\.RECICLAGEM/);
+});
