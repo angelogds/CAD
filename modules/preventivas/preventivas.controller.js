@@ -161,6 +161,10 @@ function execCreate(req, res) {
 function execUpdateStatus(req, res) {
   const planoId = Number(req.params.id);
   const execId = Number(req.params.execId);
+  if (!service.userCanExecutePreventiva(execId, req.session?.user || null)) {
+    req.flash("error", "Esta preventiva está atribuída a outro responsável.");
+    return res.status(403).render("errors/403", { layout: "layout", title: "Sem permissão", message: "Você só pode executar preventivas atribuídas à sua equipe." });
+  }
   const { status, data_executada } = req.body;
   const statusNorm = service.normalizePreventivaStatus(status);
 
