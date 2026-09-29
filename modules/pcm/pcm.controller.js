@@ -1,6 +1,7 @@
 const service = require("./pcm.service");
 const operationalService = require("./pcm.operational.service");
 const lubrificacaoSemanaService = require("../lubrificacao/lubrificacao-semana.service");
+const preventivasService = require("../preventivas/preventivas.service");
 const PDFDocument = require("pdfkit");
 const { canAccessModule } = require("../../config/rbac");
 
@@ -73,6 +74,21 @@ function index(req, res) {
     ...baseView(req),
     activePcmSection: "visao-geral",
     painel,
+  });
+}
+
+
+function preventivas(req, res) {
+  const filtros = { ...(req.query || {}), pageSize: req.query.pageSize || 20 };
+  const dashboard = preventivasService.getPreventiveDashboard(filtros);
+  const colaboradores = preventivasService.listColaboradoresParaPreventiva();
+  const configResponsaveis = preventivasService.getConfiguracaoResponsaveisPreventiva();
+  return res.render("pcm/preventivas", {
+    ...baseView(req),
+    activePcmSection: "preventivas",
+    dashboard,
+    colaboradores,
+    configResponsaveis,
   });
 }
 
@@ -702,6 +718,7 @@ module.exports = {
   relatoriosAvancadosPdf,
   relatoriosAvancadosExcel,
   planejamento,
+  preventivas,
   falhas,
   engenharia,
   salvarCriticidade,

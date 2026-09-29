@@ -49,7 +49,7 @@ router.get("/pdf", requireLogin, requireRole(PREV_ACCESS), safe(ctrl.exportPdf, 
 router.get(
   "/nova",
   requireLogin,
-  requireRole(ACCESS.preventivas_manage),
+  requireRole(ACCESS.pcm_manage),
   safe(ctrl.newForm, "newForm")
 );
 
@@ -57,7 +57,7 @@ router.get(
 router.post(
   "/",
   requireLogin,
-  requireRole(ACCESS.preventivas_manage),
+  requireRole(ACCESS.pcm_manage),
   safe(ctrl.create, "create")
 );
 
@@ -67,7 +67,7 @@ router.post(
 router.get(
   "/eleger-mecanico",
   requireLogin,
-  requireRole(ACCESS.preventivas_manage),
+  requireRole(ACCESS.pcm_manage),
   safe(ctrl.elegerMecanicoForm, "elegerMecanicoForm")
 );
 
@@ -75,7 +75,7 @@ router.get(
 router.post(
   "/eleger-mecanico",
   requireLogin,
-  requireRole(ACCESS.preventivas_manage),
+  requireRole(ACCESS.pcm_manage),
   safe(ctrl.salvarElegerMecanico, "salvarElegerMecanico")
 );
 
@@ -83,7 +83,7 @@ router.post(
 router.get(
   "/programadas",
   requireLogin,
-  requireRole(ACCESS.preventivas_manage),
+  requireRole(ACCESS.pcm_manage),
   safe(ctrl.programadasIndex, "programadasIndex")
 );
 
@@ -91,7 +91,7 @@ router.get(
 router.post(
   "/programadas/gerar",
   requireLogin,
-  requireRole(ACCESS.preventivas_manage),
+  requireRole(ACCESS.pcm_manage),
   safe(ctrl.gerarProgramadas, "gerarProgramadas")
 );
 
@@ -99,7 +99,7 @@ router.post(
 router.post(
   "/programadas/lancar-os-segunda",
   requireLogin,
-  requireRole(ACCESS.preventivas_manage),
+  requireRole(ACCESS.pcm_manage),
   safe(ctrl.gerarOSProgramadasSegunda, "gerarOSProgramadasSegunda")
 );
 
@@ -107,7 +107,7 @@ router.post(
 router.post(
   "/programadas/lancar-os-lote-dia",
   requireLogin,
-  requireRole(ACCESS.preventivas_manage),
+  requireRole(ACCESS.pcm_manage),
   safe(ctrl.lancarLoteDiarioPreventivas, "lancarLoteDiarioPreventivas")
 );
 
@@ -115,7 +115,7 @@ router.post(
 router.post(
   "/programadas/lancar-os-bombas-dia",
   requireLogin,
-  requireRole(ACCESS.preventivas_manage),
+  requireRole(ACCESS.pcm_manage),
   safe(ctrl.lancarLoteDiarioPreventivas, "lancarLoteDiarioPreventivas")
 );
 
@@ -131,7 +131,7 @@ router.get(
 router.post(
   "/:id/execucoes",
   requireLogin,
-  requireRole(ACCESS.preventivas_manage),
+  requireRole(ACCESS.pcm_manage),
   safe(ctrl.execCreate, "execCreate")
 );
 
@@ -139,7 +139,7 @@ router.post(
 router.post(
   "/:id/execucoes/:execId/status",
   requireLogin,
-  requireRole(ACCESS.preventivas_manage),
+  requireRole(ACCESS.preventivas_execute),
   safe(ctrl.execUpdateStatus, "execUpdateStatus")
 );
 

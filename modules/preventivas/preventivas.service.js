@@ -2829,6 +2829,7 @@ function getPreventiveDashboard(filters = {}, refDate = new Date()) {
   const tab = ["programacao", "planos", "execucao", "historico", "sem_plano"].includes(filters.tab) ? filters.tab : "programacao";
   let rows = tab === "historico" ? all.filter((r) => STATUS_CONCLUIDOS.includes(normalizePreventivaStatus(r.status))) : tab === "execucao" ? all.filter((r) => STATUS_ANDAMENTO.includes(normalizePreventivaStatus(r.status))) : pendentes;
   const q = String(filters.q || "").trim().toLowerCase(); if (q) rows = rows.filter((r) => [r.id, r.plano_id, r.titulo, r.equipamento_nome, r.equipamento_codigo, r.observacao, r.responsaveis].some((v) => String(v || "").toLowerCase().includes(q)));
+  const responsavel = String(filters.responsavel || "").trim().toLowerCase(); if (responsavel) rows = rows.filter((r) => String(r.responsaveis || "").toLowerCase().includes(responsavel));
   if (filters.setor) rows = rows.filter((r) => String(r.setor || "") === filters.setor);
   if (filters.frequencia) rows = rows.filter((r) => String(r.frequencia_tipo || "") === filters.frequencia);
   if (filters.criticidade) rows = rows.filter((r) => r.criticidade_exibicao === String(filters.criticidade).toUpperCase());
@@ -2839,6 +2840,25 @@ function getPreventiveDashboard(filters = {}, refDate = new Date()) {
   const freqMap = new Map(); planos.forEach((p) => freqMap.set(p.frequencia_tipo || "Sem frequência", (freqMap.get(p.frequencia_tipo || "Sem frequência") || 0)+1));
   const periodoRows = all.filter((r) => { const d=String(r.data_executada || r.data_prevista || "").slice(0,10); return !filters.data_inicio || d >= filters.data_inicio; }).filter((r) => !filters.data_fim || String(r.data_executada || r.data_prevista || "").slice(0,10) <= filters.data_fim);
   return { metrics, coverage: { covered: cobertos.size, eligible: ativos.length, percent: ativos.length ? Math.round(cobertos.size*100/ativos.length) : 0, byCriticality }, weeklyPriorities: pendentes.slice().sort((a,b)=>(peso[a.prazo]??9)-(peso[b.prazo]??9)||(critPeso[a.criticidade_exibicao]??9)-(critPeso[b.criticidade_exibicao]??9)).slice(0,5), programming: rows.slice((page-1)*pageSize,page*pageSize), planos: tab === "planos" ? listPlanos().filter((p)=>Number(p.ativo||0)===1) : [], semPlano: tab === "sem_plano" ? ativos.filter((e)=>!cobertos.has(Number(e.id))) : [], pagination: { page,pageSize,total,pages }, frequencyDistribution: [...freqMap].map(([label,total])=>({label,total})).sort((a,b)=>b.total-a.total), executionSummary: { noPrazo: periodoRows.filter((r)=>STATUS_CONCLUIDOS.includes(normalizePreventivaStatus(r.status)) && r.data_executada && r.data_prevista && r.data_executada <= r.data_prevista).length, comAtraso: periodoRows.filter((r)=>STATUS_CONCLUIDOS.includes(normalizePreventivaStatus(r.status)) && r.data_executada && r.data_prevista && r.data_executada > r.data_prevista).length, pendentes: periodoRows.filter((r)=>normalizePreventivaStatus(r.status)==="PENDENTE" || normalizePreventivaStatus(r.status)==="ATRASADA").length, emAndamento: periodoRows.filter((r)=>STATUS_ANDAMENTO.includes(normalizePreventivaStatus(r.status))).length }, filterOptions: { setores: [...new Set(all.map((r)=>r.setor).filter(Boolean))].sort(), frequencias: [...new Set(planos.map((p)=>p.frequencia_tipo).filter(Boolean))].sort(), criticidades: [...new Set(all.map((r)=>r.criticidade_exibicao).filter(Boolean))], statuses: [...new Set(all.map((r)=>normalizePreventivaStatus(r.status)).filter(Boolean))] }, activeTab: tab, filters };
+}
+
+function getExecucaoById(execucaoId) {
+  if (!tableExists("preventiva_execucoes")) return null;
+  return db.prepare("SELECT * FROM preventiva_execucoes WHERE id = ? LIMIT 1").get(Number(execucaoId)) || null;
+}
+
+function userCanExecutePreventiva(execucaoId, user = null) {
+  const role = String(user?.role || "").trim().toUpperCase();
+  if (["ADMIN", "MANUTENCAO_SUPERVISOR", "SUPERVISOR_MANUTENCAO"].includes(role)) return true;
+  if (role !== "MECANICO" || !Number(user?.id)) return false;
+  const exec = getExecucaoById(execucaoId);
+  if (!exec) return false;
+  const userId = Number(user.id);
+  const colaborador = getColaboradorByUserId(userId);
+  const ids = [exec.responsavel_1_id, exec.responsavel_2_id].map(Number).filter(Boolean);
+  if (ids.includes(userId) || (colaborador?.id && ids.includes(Number(colaborador.id)))) return true;
+  const nome = normalizarNomePessoa(user?.name || user?.nome || colaborador?.nome || "");
+  return Boolean(nome && normalizarNomePessoa(exec.responsavel || "").includes(nome));
 }
 
 module.exports = {
@@ -2896,4 +2916,6 @@ module.exports = {
   classificarVencimento,
   formatarResponsaveis,
   getPreventiveDashboard,
+  getExecucaoById,
+  userCanExecutePreventiva,
 };

@@ -1,0 +1,71 @@
+<% layout('layout') %>
+<%- include('partials/internal-styles') %>
+<%
+  const d=dashboard||{}; const m=d.metrics||{}; const cov=d.coverage||{}; const f=d.filters||{};
+  const qs=(extra={})=>{const p=new URLSearchParams();Object.entries({...f,...extra}).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=='')p.set(k,v)});return p.toString()};
+  const prazoLabel={ATRASADA:'Atrasada',VENCE_HOJE:'Vence hoje',NA_SEMANA:'Na semana',PROGRAMADA:'Programada',EM_EXECUCAO:'Em execução',CONCLUIDA:'Concluída',CANCELADA:'Cancelada'};
+%>
+<div class="pcm-module-page">
+  <header class="pcm-module-head">
+    <div><span class="pcm-section-label">Preventivas</span><h1>Gestão de manutenção preventiva</h1><p>Planejamento, programação, responsáveis e cobertura do plano preventivo. A execução do mecânico permanece no módulo Preventivas.</p></div>
+    <div class="pcm-module-actions">
+      <a class="pcm-button ui-btn ui-btn--outline" href="/preventivas">Ver operação</a>
+      <a class="pcm-button ui-btn ui-btn--outline" href="/pcm/preventivas/programadas">Programação</a>
+      <a class="pcm-button ui-btn ui-btn--outline" href="/pcm/preventivas/eleger-mecanico">Responsáveis</a>
+      <a class="pcm-button primary ui-btn ui-btn--primary" href="/pcm/preventivas/nova">+ Nova preventiva</a>
+    </div>
+  </header>
+  <div class="pcm-shell">
+    <%- include('partials/internal-nav', { activePcmSection }) %>
+    <main class="pcm-module-content">
+      <section class="pcm-stat-grid">
+        <div class="pcm-stat"><span>Planos ativos</span><strong><%= m.planosAtivos||0 %></strong><small>rotinas cadastradas</small></div>
+        <div class="pcm-stat warn"><span>Sem plano</span><strong><%= m.semPlano||0 %></strong><small>equipamentos a planejar</small></div>
+        <div class="pcm-stat danger"><span>Pendentes</span><strong><%= m.pendentes||0 %></strong><small>aguardando execução</small></div>
+        <div class="pcm-stat info"><span>Cobertura</span><strong><%= cov.percent||0 %>%</strong><small><%= cov.covered||0 %> de <%= cov.eligible||0 %> equipamentos</small></div>
+      </section>
+
+      <section class="pcm-card">
+        <div class="pcm-card-head"><div><span class="pcm-section-label">Planejamento</span><h2>Filtrar programação preventiva</h2><p>Pesquise por equipamento, atividade, responsável, criticidade ou situação.</p></div></div>
+        <form method="GET" action="/pcm/preventivas" class="pcm-form-grid">
+          <label class="pcm-field pcm-span-2">Busca<input class="pcm-input" name="q" value="<%= f.q||'' %>" placeholder="Equipamento, código ou atividade"></label>
+          <label class="pcm-field">Responsável<input class="pcm-input" name="responsavel" value="<%= f.responsavel||'' %>" placeholder="Nome do mecânico"></label>
+          <label class="pcm-field">Situação<select class="pcm-input" name="situacao"><option value="">Todas</option><% Object.entries(prazoLabel).forEach(([v,l])=>{ %><option value="<%= v %>" <%= f.situacao===v?'selected':'' %>><%= l %></option><% }) %></select></label>
+          <label class="pcm-field">Setor<select class="pcm-input" name="setor"><option value="">Todos</option><% (d.filterOptions?.setores||[]).forEach(v=>{ %><option <%= f.setor===v?'selected':'' %>><%= v %></option><% }) %></select></label>
+          <label class="pcm-field">Frequência<select class="pcm-input" name="frequencia"><option value="">Todas</option><% (d.filterOptions?.frequencias||[]).forEach(v=>{ %><option <%= f.frequencia===v?'selected':'' %>><%= v %></option><% }) %></select></label>
+          <label class="pcm-field">Criticidade<select class="pcm-input" name="criticidade"><option value="">Todas</option><% (d.filterOptions?.criticidades||[]).forEach(v=>{ %><option <%= f.criticidade===v?'selected':'' %>><%= v %></option><% }) %></select></label>
+          <label class="pcm-field">Visão<select class="pcm-input" name="tab"><option value="programacao" <%= d.activeTab==='programacao'?'selected':'' %>>Programação</option><option value="planos" <%= d.activeTab==='planos'?'selected':'' %>>Planos ativos</option><option value="sem_plano" <%= d.activeTab==='sem_plano'?'selected':'' %>>Equipamentos sem plano</option><option value="execucao" <%= d.activeTab==='execucao'?'selected':'' %>>Em execução</option><option value="historico" <%= d.activeTab==='historico'?'selected':'' %>>Histórico</option></select></label>
+          <div class="pcm-span-4 pcm-inline-actions"><a class="pcm-button ui-btn ui-btn--outline" href="/pcm/preventivas">Limpar</a><button class="pcm-button primary ui-btn ui-btn--primary" type="submit">Aplicar filtros</button></div>
+        </form>
+      </section>
+
+      <section class="pcm-card">
+        <div class="pcm-card-head"><div><span class="pcm-section-label">Cobertura</span><h2>Plano preventivo do parque</h2><p><strong><%= cov.covered||0 %> de <%= cov.eligible||0 %></strong> equipamentos cobertos.</p></div><span class="pcm-badge info"><%= cov.percent||0 %>% coberto</span></div>
+        <div class="pcm-preventive-progress"><i style="width:<%= cov.percent||0 %>%"></i></div>
+        <div class="pcm-preventive-criticality"><% (cov.byCriticality||[]).forEach(c=>{ %><div><span><%= c.label %></span><strong><%= c.covered %> / <%= c.total %></strong></div><% }) %></div>
+      </section>
+
+      <% if(d.activeTab==='sem_plano'){ %>
+      <section class="pcm-card"><div class="pcm-card-head"><div><span class="pcm-section-label">Pendência de planejamento</span><h2>Equipamentos sem plano</h2></div></div><div class="pcm-table-wrap"><table class="pcm-table"><thead><tr><th>Equipamento</th><th>Criticidade</th><th>Ação</th></tr></thead><tbody><% (d.semPlano||[]).forEach(e=>{ %><tr><td><strong><%= e.nome||('Equipamento #'+e.id) %></strong></td><td><span class="pcm-badge"><%= e.criticidade||'Não informada' %></span></td><td><a class="pcm-button small ui-btn ui-btn--outline ui-btn--compact" href="/pcm/preventivas/nova?equipamento_id=<%= e.id %>">Criar plano</a></td></tr><% }) %><% if(!(d.semPlano||[]).length){ %><tr><td colspan="3" class="pcm-empty-row">Todos os equipamentos elegíveis possuem plano ativo.</td></tr><% } %></tbody></table></div></section>
+      <% } else if(d.activeTab==='planos'){ %>
+      <section class="pcm-card"><div class="pcm-card-head"><div><span class="pcm-section-label">Planos</span><h2>Planos preventivos ativos</h2></div></div><div class="pcm-table-wrap"><table class="pcm-table"><thead><tr><th>ID</th><th>Equipamento</th><th>Atividade</th><th>Frequência</th></tr></thead><tbody><% (d.planos||[]).forEach(p=>{ %><tr><td>#<%= p.id %></td><td><strong><%= p.equipamento_nome||'-' %></strong></td><td><%= p.titulo||'-' %></td><td><span class="pcm-badge"><%= p.frequencia_tipo||'-' %></span></td></tr><% }) %><% if(!(d.planos||[]).length){ %><tr><td colspan="4" class="pcm-empty-row">Nenhum plano ativo encontrado.</td></tr><% } %></tbody></table></div></section>
+      <% } else { %>
+      <section class="pcm-card">
+        <div class="pcm-card-head"><div><span class="pcm-section-label"><%= d.activeTab==='historico'?'Histórico':d.activeTab==='execucao'?'Execução':'Programação' %></span><h2>Preventivas <%= d.activeTab==='historico'?'concluídas':d.activeTab==='execucao'?'em execução':'programadas' %></h2></div><span class="pcm-badge"><%= d.pagination?.total||0 %> registro(s)</span></div>
+        <div class="pcm-table-wrap"><table class="pcm-table"><thead><tr><th>ID / Equipamento</th><th>Atividade</th><th>Frequência</th><th>Criticidade</th><th>Responsáveis</th><th>Prevista</th><th>Situação</th></tr></thead><tbody>
+          <% (d.programming||[]).forEach(r=>{ %><tr><td><strong>#<%= r.id %> • <%= r.equipamento_codigo||r.equipamento_nome||'-' %></strong><small><%= r.equipamento_codigo?r.equipamento_nome:'' %></small></td><td><%= r.titulo||r.observacao||'-' %></td><td><span class="pcm-badge"><%= r.frequencia_tipo||'-' %></span></td><td><span class="pcm-badge <%= r.criticidade_exibicao==='CRITICA'?'danger':r.criticidade_exibicao==='ALTA'?'warn':'info' %>"><%= r.criticidade_exibicao %></span></td><td><%= r.responsaveis %></td><td><%= r.data_prevista?String(r.data_prevista).slice(0,10).split('-').reverse().join('/'):'-' %></td><td><span class="pcm-badge <%= ['ATRASADA','VENCE_HOJE'].includes(r.prazo)?'danger':r.prazo==='NA_SEMANA'?'warn':'info' %>"><%= prazoLabel[r.prazo]||r.status %></span></td></tr><% }) %>
+          <% if(!(d.programming||[]).length){ %><tr><td colspan="7" class="pcm-empty-row">Nenhuma preventiva encontrada no filtro atual.</td></tr><% } %>
+        </tbody></table></div>
+      </section>
+      <% } %>
+
+      <section class="pcm-split">
+        <article class="pcm-card"><div class="pcm-card-head"><div><span class="pcm-section-label">Equipe padrão</span><h2>Responsáveis das preventivas</h2></div></div><p><%= configResponsaveis?.mecanico_1_nome || 'Não definido' %><%= configResponsaveis?.mecanico_2_nome ? (' e '+configResponsaveis.mecanico_2_nome) : '' %></p><div class="pcm-inline-actions"><a class="pcm-button small ui-btn ui-btn--outline ui-btn--compact" href="/pcm/preventivas/eleger-mecanico">Configurar equipe</a></div></article>
+        <article class="pcm-card"><div class="pcm-card-head"><div><span class="pcm-section-label">Execução</span><h2>Central do mecânico</h2></div></div><p>A baixa e o fechamento técnico são feitos no módulo operacional, somente pelo responsável atribuído.</p><div class="pcm-inline-actions"><a class="pcm-button small ui-btn ui-btn--outline ui-btn--compact" href="/preventivas">Abrir Preventivas</a></div></article>
+      </section>
+    </main>
+  </div>
+</div>
+<style>
+.pcm-preventive-progress{height:10px;border-radius:999px;background:#e8eee9;overflow:hidden}.pcm-preventive-progress i{display:block;height:100%;border-radius:999px;background:#159947}.pcm-preventive-criticality{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}.pcm-preventive-criticality>div{border:1px solid #e0e9e3;border-radius:10px;padding:10px;background:#f8fbf9}.pcm-preventive-criticality span{display:block;color:#718092;font-size:11px}.pcm-preventive-criticality strong{display:block;margin-top:3px;color:#14243a}@media(max-width:700px){.pcm-preventive-criticality{grid-template-columns:1fr 1fr}}
+</style>

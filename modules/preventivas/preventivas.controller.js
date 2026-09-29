@@ -7,6 +7,15 @@ function isAdminOrEncarregado(user = null) {
   return ["ADMIN", "MANUTENCAO_SUPERVISOR", "SUPERVISOR_MANUTENCAO", "ENCARREGADO_MANUTENCAO"].includes(role);
 }
 
+function isPcmManager(user = null) {
+  const role = String(user?.role || "").toUpperCase();
+  return ["ADMIN", "PCM", "MANUTENCAO_SUPERVISOR", "SUPERVISOR_MANUTENCAO"].includes(role);
+}
+
+function redirectGestaoPreventiva(res, suffix = "") {
+  return res.redirect(`/pcm/preventivas${suffix}`);
+}
+
 function index(req, res) {
   let dashboard;
   try {
@@ -23,7 +32,8 @@ function index(req, res) {
     activeMenu: "preventivas",
     dashboard,
     tvMode: ["1", "true", "tv"].includes(String(req.query.tv || "").toLowerCase()),
-    canAdminPreventivas: isAdminOrEncarregado(req.session?.user || null),
+    canAdminPreventivas: false,
+    canExecutePreventivas: ["ADMIN", "MECANICO", "MANUTENCAO_SUPERVISOR", "SUPERVISOR_MANUTENCAO"].includes(String(req.session?.user?.role || "").toUpperCase()),
   });
 }
 
@@ -47,18 +57,22 @@ function exportPdf(req, res) {
 }
 
 function newForm(req, res) {
+  if (!isPcmManager(req.session?.user || null)) return redirectGestaoPreventiva(res);
   const equipamentos = service.listEquipamentosAtivos();
   const equipamentoSelecionadoId = Number(req.query?.equipamento_id || 0) || null;
   return res.render("preventivas/nova", {
     layout: "layout",
     title: "Nova Preventiva",
-    activeMenu: "preventivas",
+    activeMenu: "pcm",
+    backUrl: "/pcm/preventivas",
+    formAction: "/pcm/preventivas",
     equipamentos,
     equipamentoSelecionadoId,
   });
 }
 
 function create(req, res) {
+  if (!isPcmManager(req.session?.user || null)) return res.status(403).render("errors/403", { layout: "layout", title: "Sem permissão", message: "A gestão de preventivas é exclusiva do PCM." });
   const {
     equipamento_id,
     titulo,
@@ -72,15 +86,15 @@ function create(req, res) {
 
   if (!equipamento_id || !Number(equipamento_id)) {
     req.flash("error", "Selecione o equipamento da preventiva manual.");
-    return res.redirect("/preventivas/nova");
+    return res.redirect("/pcm/preventivas/nova");
   }
   if (!titulo || !titulo.trim()) {
     req.flash("error", "Informe o título da preventiva.");
-    return res.redirect("/preventivas/nova");
+    return res.redirect("/pcm/preventivas/nova");
   }
   if (!data_prevista || !String(data_prevista).trim()) {
     req.flash("error", "Informe a data prevista da preventiva.");
-    return res.redirect("/preventivas/nova");
+    return res.redirect("/pcm/preventivas/nova");
   }
 
   const result = service.criarPreventivaManual({
@@ -96,7 +110,7 @@ function create(req, res) {
   });
 
   req.flash("success", `Preventiva manual criada com sucesso (execução #${result.execucaoId}).`);
-  return res.redirect(`/preventivas/${result.planoId}`);
+  return res.redirect(`/pcm/preventivas?plano_id=${result.planoId}`);
 }
 
 function show(req, res) {
@@ -115,7 +129,8 @@ function show(req, res) {
     activeMenu: "preventivas",
     plano,
     execucoes,
-    canAdminPreventivas: isAdminOrEncarregado(req.session?.user || null),
+    canAdminPreventivas: isPcmManager(req.session?.user || null),
+    canExecutePreventivas: ["ADMIN", "MECANICO", "MANUTENCAO_SUPERVISOR", "SUPERVISOR_MANUTENCAO"].includes(String(req.session?.user?.role || "").toUpperCase()),
   });
 }
 
@@ -146,6 +161,10 @@ function execCreate(req, res) {
 function execUpdateStatus(req, res) {
   const planoId = Number(req.params.id);
   const execId = Number(req.params.execId);
+  if (!service.userCanExecutePreventiva(execId, req.session?.user || null)) {
+    req.flash("error", "Esta preventiva está atribuída a outro responsável.");
+    return res.status(403).render("errors/403", { layout: "layout", title: "Sem permissão", message: "Você só pode executar preventivas atribuídas à sua equipe." });
+  }
   const { status, data_executada } = req.body;
   const statusNorm = service.normalizePreventivaStatus(status);
 
@@ -174,27 +193,28 @@ function execUpdateStatus(req, res) {
 
 function programadasIndex(req, res) {
   const user = req.session?.user || null;
-  if (!isAdminOrEncarregado(user)) {
+  if (!isPcmManager(user)) {
     req.flash("error", "Sem permissão para acessar preventivas programadas.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   }
 
   const resumo = service.listarResumoPreventivasProgramadas();
   return res.render("preventivas/programadas", {
     layout: "layout",
     title: "Preventivas Programadas",
-    activeMenu: "preventivas",
+    activeMenu: "pcm",
+    backUrl: "/pcm/preventivas",
     resumo,
-    canAdminPreventivas: isAdminOrEncarregado(user),
+    canAdminPreventivas: true,
     dateBr,
   });
 }
 
 function gerarProgramadas(req, res) {
   const user = req.session?.user || null;
-  if (!isAdminOrEncarregado(user)) {
+  if (!isPcmManager(user)) {
     req.flash("error", "Sem permissão para gerar preventivas programadas.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   }
 
   try {
@@ -208,14 +228,14 @@ function gerarProgramadas(req, res) {
     req.flash("error", "Erro ao gerar preventivas programadas.");
   }
 
-  return res.redirect("/preventivas/programadas");
+  return res.redirect("/pcm/preventivas/programadas");
 }
 
 function gerarOSProgramadasSegunda(req, res) {
   const user = req.session?.user || null;
-  if (!isAdminOrEncarregado(user)) {
+  if (!isPcmManager(user)) {
     req.flash("error", "Sem permissão para lançar OS das preventivas programadas.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   }
 
   try {
@@ -232,14 +252,14 @@ function gerarOSProgramadasSegunda(req, res) {
     console.error("[PREVENTIVAS][PROGRAMADAS_OS] erro ao lançar OS programadas:", err?.stack || err);
     req.flash("error", "Erro ao lançar OS das preventivas programadas.");
   }
-  return res.redirect("/preventivas/programadas");
+  return res.redirect("/pcm/preventivas/programadas");
 }
 
 function lancarLoteDiarioPreventivas(req, res) {
   const user = req.session?.user || null;
-  if (!isAdminOrEncarregado(user)) {
+  if (!isPcmManager(user)) {
     req.flash("error", "Sem permissão para lançar lote diário de preventivas.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   }
 
   try {
@@ -256,13 +276,13 @@ function lancarLoteDiarioPreventivas(req, res) {
     console.error("[PREVENTIVAS][LOTE_DIARIO_OS] erro ao lançar lote diário:", err?.stack || err);
     req.flash("error", "Erro ao lançar lote diário de preventivas.");
   }
-  return res.redirect("/preventivas");
+  return res.redirect("/pcm/preventivas");
 }
 function elegerMecanicoForm(req, res) {
   const user = req.session?.user || null;
-  if (!isAdminOrEncarregado(user)) {
+  if (!isPcmManager(user)) {
     req.flash("error", "Sem permissão para eleger mecânicos da preventiva.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   }
 
   const colaboradores = service.listColaboradoresParaPreventiva();
@@ -270,7 +290,9 @@ function elegerMecanicoForm(req, res) {
   return res.render("preventivas/eleger-mecanico", {
     layout: "layout",
     title: "Eleger Mecânico da Preventiva",
-    activeMenu: "preventivas",
+    activeMenu: "pcm",
+    backUrl: "/pcm/preventivas",
+    formAction: "/pcm/preventivas/eleger-mecanico",
     colaboradores,
     config: service.getConfiguracaoResponsaveisPreventiva(),
     canAdminPreventivas: true,
@@ -285,9 +307,9 @@ function elegerMecanicoForm(req, res) {
 
 function salvarElegerMecanico(req, res) {
   const user = req.session?.user || null;
-  if (!isAdminOrEncarregado(user)) {
+  if (!isPcmManager(user)) {
     req.flash("error", "Sem permissão para eleger mecânicos da preventiva.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   }
 
   try {
@@ -297,10 +319,10 @@ function salvarElegerMecanico(req, res) {
       user,
     });
     req.flash("success", "Responsáveis das preventivas atualizados com sucesso.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   } catch (err) {
     req.flash("error", err?.message || "Não foi possível salvar os responsáveis das preventivas.");
-    return res.redirect("/preventivas/eleger-mecanico");
+    return res.redirect("/pcm/preventivas/eleger-mecanico");
   }
 }
 
@@ -308,7 +330,7 @@ function apagarExecucao(req, res) {
   const user = req.session?.user || null;
   if (!isAdminOrEncarregado(user)) {
     req.flash("error", "Sem permissão para apagar preventiva.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   }
 
   const planoId = Number(req.params.id);
