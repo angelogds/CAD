@@ -1,5 +1,5 @@
-const NEW_ROLE = "COORDENADOR_MANUTENCAO";
-const TEMP_TABLE = "users_coordenador_manutencao_tmp";
+const NEW_ROLE = "COORDENADOR_RECICLAGEM";
+const TEMP_TABLE = "users_coordenador_reciclagem_tmp";
 
 function quoteIdentifier(value) {
   return `"${String(value).replace(/"/g, '""')}"`;
@@ -41,5 +41,5 @@ module.exports = function up({ db, tableExists }) {
   }
 
   const errors = db.prepare("PRAGMA foreign_key_check").all();
-  if (errors.length) throw new Error(`Falha de integridade ao adicionar COORDENADOR_MANUTENCAO: ${JSON.stringify(errors)}`);
+  if (errors.length) throw new Error(`Falha de integridade ao adicionar COORDENADOR_RECICLAGEM: ${JSON.stringify(errors)}`);
 };
