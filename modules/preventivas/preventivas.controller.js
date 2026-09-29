@@ -29,8 +29,7 @@ function index(req, res) {
   return res.render("preventivas/index", {
     layout: "layout",
     title: "Preventivas",
-    activeMenu: "pcm",
-    backUrl: "/pcm/preventivas",
+    activeMenu: "preventivas",
     dashboard,
     tvMode: ["1", "true", "tv"].includes(String(req.query.tv || "").toLowerCase()),
     canAdminPreventivas: false,
@@ -91,11 +90,11 @@ function create(req, res) {
   }
   if (!titulo || !titulo.trim()) {
     req.flash("error", "Informe o título da preventiva.");
-    return res.redirect("/preventivas/nova");
+    return res.redirect("/pcm/preventivas/nova");
   }
   if (!data_prevista || !String(data_prevista).trim()) {
     req.flash("error", "Informe a data prevista da preventiva.");
-    return res.redirect("/preventivas/nova");
+    return res.redirect("/pcm/preventivas/nova");
   }
 
   const result = service.criarPreventivaManual({
@@ -127,9 +126,7 @@ function show(req, res) {
   return res.render("preventivas/show", {
     layout: "layout",
     title: `Preventiva #${id}`,
-    activeMenu: "pcm",
-    backUrl: "/pcm/preventivas",
-    formAction: "/pcm/preventivas/eleger-mecanico",
+    activeMenu: "preventivas",
     plano,
     execucoes,
     canAdminPreventivas: isPcmManager(req.session?.user || null),
