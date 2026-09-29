@@ -170,9 +170,13 @@ test('rotas sensíveis aplicam o escopo antes das operações e do upload', () =
 
   assert.match(solicitacoesRoutes, /SOLICITACOES_READ_ACCESS/);
   assert.match(solicitacoesRoutes, /SOLICITACOES_CREATE_ACCESS/);
+  assert.match(solicitacoesRoutes, /SOLICITACOES_MANAGE_ACCESS/);
   assert.match(solicitacoesRoutes, /SOLICITACOES_DELETE_ACCESS/);
   assert.match(solicitacoesRoutes, /itens\/:itemId\/exclusao\/aprovar".*requireItemScope/s);
 
   assert.match(comprasController, /isCoordenadorReciclagem/);
   assert.match(comprasController, /filters\.setor = SETORES\.RECICLAGEM/);
+
+  const bilateralService = fs.readFileSync(path.join(root, 'modules/solicitacoes/solicitacoes.itens-bilateral.service.js'), 'utf8');
+  assert.match(bilateralService, /ROLE\.COORDENADOR_RECICLAGEM/);
 });
