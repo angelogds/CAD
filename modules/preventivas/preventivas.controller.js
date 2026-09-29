@@ -202,18 +202,19 @@ function programadasIndex(req, res) {
   return res.render("preventivas/programadas", {
     layout: "layout",
     title: "Preventivas Programadas",
-    activeMenu: "preventivas",
+    activeMenu: "pcm",
+    backUrl: "/pcm/preventivas",
     resumo,
-    canAdminPreventivas: isAdminOrEncarregado(user),
+    canAdminPreventivas: true,
     dateBr,
   });
 }
 
 function gerarProgramadas(req, res) {
   const user = req.session?.user || null;
-  if (!isAdminOrEncarregado(user)) {
+  if (!isPcmManager(user)) {
     req.flash("error", "Sem permissão para gerar preventivas programadas.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   }
 
   try {
@@ -232,9 +233,9 @@ function gerarProgramadas(req, res) {
 
 function gerarOSProgramadasSegunda(req, res) {
   const user = req.session?.user || null;
-  if (!isAdminOrEncarregado(user)) {
+  if (!isPcmManager(user)) {
     req.flash("error", "Sem permissão para lançar OS das preventivas programadas.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   }
 
   try {
@@ -256,9 +257,9 @@ function gerarOSProgramadasSegunda(req, res) {
 
 function lancarLoteDiarioPreventivas(req, res) {
   const user = req.session?.user || null;
-  if (!isAdminOrEncarregado(user)) {
+  if (!isPcmManager(user)) {
     req.flash("error", "Sem permissão para lançar lote diário de preventivas.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   }
 
   try {
@@ -275,13 +276,13 @@ function lancarLoteDiarioPreventivas(req, res) {
     console.error("[PREVENTIVAS][LOTE_DIARIO_OS] erro ao lançar lote diário:", err?.stack || err);
     req.flash("error", "Erro ao lançar lote diário de preventivas.");
   }
-  return res.redirect("/preventivas");
+  return res.redirect("/pcm/preventivas");
 }
 function elegerMecanicoForm(req, res) {
   const user = req.session?.user || null;
   if (!isPcmManager(user)) {
     req.flash("error", "Sem permissão para eleger mecânicos da preventiva.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   }
 
   const colaboradores = service.listColaboradoresParaPreventiva();
@@ -289,7 +290,9 @@ function elegerMecanicoForm(req, res) {
   return res.render("preventivas/eleger-mecanico", {
     layout: "layout",
     title: "Eleger Mecânico da Preventiva",
-    activeMenu: "preventivas",
+    activeMenu: "pcm",
+    backUrl: "/pcm/preventivas",
+    formAction: "/pcm/preventivas/eleger-mecanico",
     colaboradores,
     config: service.getConfiguracaoResponsaveisPreventiva(),
     canAdminPreventivas: true,
@@ -306,7 +309,7 @@ function salvarElegerMecanico(req, res) {
   const user = req.session?.user || null;
   if (!isPcmManager(user)) {
     req.flash("error", "Sem permissão para eleger mecânicos da preventiva.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   }
 
   try {
@@ -316,7 +319,7 @@ function salvarElegerMecanico(req, res) {
       user,
     });
     req.flash("success", "Responsáveis das preventivas atualizados com sucesso.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   } catch (err) {
     req.flash("error", err?.message || "Não foi possível salvar os responsáveis das preventivas.");
     return res.redirect("/pcm/preventivas/eleger-mecanico");
@@ -327,7 +330,7 @@ function apagarExecucao(req, res) {
   const user = req.session?.user || null;
   if (!isAdminOrEncarregado(user)) {
     req.flash("error", "Sem permissão para apagar preventiva.");
-    return res.redirect("/preventivas");
+    return res.redirect("/pcm/preventivas");
   }
 
   const planoId = Number(req.params.id);
