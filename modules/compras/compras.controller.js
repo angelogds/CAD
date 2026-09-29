@@ -6,7 +6,8 @@ const dashboardService = require('./compras.dashboard.service');
 const demandasComprasService = require('./compras-demandas.service');
 const { applyMigrations } = require('../../database/migrate');
 const storagePaths = require('../../config/storage');
-const { normalizeSetorCorporativo } = require('./compras-setores');
+const { normalizeRole } = require('../../config/rbac');
+const { SETORES, normalizeSetorCorporativo } = require('./compras-setores');
 
 const UPLOADS_DIR = storagePaths.UPLOAD_DIR;
 
@@ -201,6 +202,10 @@ function lista(req, res) {
     page: Math.max(1, Number(req.query.page) || 1),
   };
 
+  const userRole = normalizeRole(req.session?.user?.role || req.session?.user?.perfil || '');
+  const isCoordenadorReciclagem = userRole === 'COORDENADOR_RECICLAGEM';
+  if (isCoordenadorReciclagem) filters.setor = SETORES.RECICLAGEM;
+
   const queue = getOperationalQueue(filters);
   const lista = queue.rows;
   let lowerDashboard = emptyLowerDashboard(filters.period);
@@ -238,7 +243,7 @@ function lista(req, res) {
     queue,
     filters,
     statusList: service.STATUS_COMPRAS,
-    resumo: service.getAnalytics(filters.period),
+    resumo: service.getAnalytics(filters.period, isCoordenadorReciclagem ? SETORES.RECICLAGEM : ''),
     lowerDashboard,
   });
 }
