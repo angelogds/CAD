@@ -119,11 +119,19 @@ function canManageByRole(role) {
 
 function canViewSolicitacao(solicitacao, user) {
   if (!solicitacao || !user) return false;
-  const roleInfo = canManageByRole(user.role);
-  if (roleInfo.isAdmin || roleInfo.isCompras || roleInfo.isAlmox || roleInfo.isDiretoria) return true;
-  const fixed = setorForRole(user.role);
-  if (fixed) return normalizeSetor(solicitacao.setor_origem) === fixed;
-  return Number(solicitacao.solicitante_user_id) === Number(user.id);
+  const role = normalizeRole(user.role);
+  if (Number(solicitacao.solicitante_user_id) === Number(user.id)) return true;
+
+  // Exceção operacional: ADMIN e ENCARREGADO_MANUTENCAO compartilham
+  // as solicitações entre si para evitar troca constante de perfil.
+  if (["ADMIN", "ENCARREGADO_MANUTENCAO"].includes(role)) {
+    const solicitanteRole = normalizeRole(solicitacao.solicitante_role);
+    return ["ADMIN", "ENCARREGADO_MANUTENCAO"].includes(solicitanteRole);
+  }
+
+  // Compras/Almoxarifado/Diretoria/Coordenador acompanham por seus painéis,
+  // não pela área pessoal do solicitante.
+  return false;
 }
 
 function canEditSolicitacao(solicitacao, user) {
@@ -592,9 +600,10 @@ function finalizarElaboracao(id, userId) {
   })();
 }
 
-function canListAllSolicitacoes(user) {
-  const role = normalizeRole(user?.role);
-  return ["ADMIN", "COMPRAS", "ALMOXARIFADO", "DIRETORIA", "GESTAO"].includes(role);
+function canListAllSolicitacoes(_user) {
+  // A página "Minhas Solicitações" nunca é uma visão global.
+  // Compras/Diretoria/Coordenação usam seus painéis próprios de acompanhamento.
+  return false;
 }
 
 function listMinhasSolicitacoes(userId, filters = {}, user = null) {
@@ -604,13 +613,13 @@ function listMinhasSolicitacoes(userId, filters = {}, user = null) {
     where.push("(UPPER(COALESCE(s.tipo_origem,'')) <> 'PRE_SOLICITACAO_ALMOX' OR COALESCE(s.disponivel_compras,0)=1)");
   }
   if (!canListAllSolicitacoes(user)) {
-    const fixedSetor = setorForRole(user?.role);
-    if (fixedSetor) {
-      where.push("UPPER(REPLACE(REPLACE(REPLACE(COALESCE(s.setor_origem,''),'Ã','A'),'Í','I'),'Ó','O')) IN (" +
-        (fixedSetor === SETORES.RECICLAGEM ? "'MANUTENCAO','MANUTENÇÃO','PRODUCAO','PRODUÇÃO','RECICLAGEM'" :
-          fixedSetor === SETORES.LOGISTICA ? "'LOGISTICA','LOGÍSTICA','TRANSPORTE','FROTA'" :
-          fixedSetor === SETORES.FRIGORIFICO ? "'FRIGORIFICO','FRIGORÍFICO'" :
-          "'ADMINISTRATIVO','ADMINISTRACAO','ADMINISTRAÇÃO','ADMINISTRATIVA','RH'") + ")");
+    const role = normalizeRole(user?.role);
+    if (["ADMIN", "ENCARREGADO_MANUTENCAO"].includes(role)) {
+      where.push(`s.solicitante_user_id IN (
+        SELECT id FROM users
+        WHERE id = ? OR role IN ('ADMIN','ENCARREGADO_MANUTENCAO')
+      )`);
+      params.push(userId);
     } else {
       where.push("s.solicitante_user_id = ?");
       params.push(userId);
@@ -667,15 +676,10 @@ function getCountersForUser(userId, user = null) {
   let where = "";
   let params = [];
   if (!canListAllSolicitacoes(user)) {
-    const fixedSetor = setorForRole(user?.role);
-    if (fixedSetor) {
-      where = "WHERE setor_origem IS NOT NULL";
-      const allowed = fixedSetor === SETORES.RECICLAGEM ? ["Manutenção","Manutencao","Produção","Producao","RECICLAGEM"]
-        : fixedSetor === SETORES.LOGISTICA ? ["LOGÍSTICA","LOGISTICA","TRANSPORTE","FROTA"]
-        : fixedSetor === SETORES.FRIGORIFICO ? ["FRIGORÍFICO","FRIGORIFICO"]
-        : ["ADMINISTRATIVO","ADMINISTRAÇÃO","ADMINISTRACAO","ADMINISTRATIVA","RH"];
-      where += ` AND setor_origem IN (${allowed.map(() => "?").join(",")})`;
-      params = allowed;
+    const role = normalizeRole(user?.role);
+    if (["ADMIN", "ENCARREGADO_MANUTENCAO"].includes(role)) {
+      where = "WHERE solicitante_user_id IN (SELECT id FROM users WHERE id = ? OR role IN ('ADMIN','ENCARREGADO_MANUTENCAO'))";
+      params = [userId];
     } else {
       where = "WHERE solicitante_user_id = ?";
       params = [userId];
