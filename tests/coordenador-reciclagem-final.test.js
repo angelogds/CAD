@@ -56,3 +56,19 @@ test('migration remove CHECK legado de funcao sem perder usuários',()=>{
  assert.equal(db.prepare("PRAGMA foreign_key_check").all().length,0);
  db.close();
 });
+
+test('Minhas Solicitações é pessoal, com exceção ADMIN e Encarregado da Manutenção',()=>{
+ const service=read('modules/solicitacoes/solicitacoes.service.js');
+ assert.match(service,/function canListAllSolicitacoes\(_user\)[\s\S]*return false/);
+ assert.match(service,/\["ADMIN", "ENCARREGADO_MANUTENCAO"\]\.includes\(role\)[\s\S]*solicitante_user_id IN/);
+ assert.match(service,/s\.solicitante_user_id = \?/);
+ assert.match(service,/solicitante_user_id = \?/);
+});
+
+test('detalhe pessoal não vira acesso por setor',()=>{
+ const service=read('modules/solicitacoes/solicitacoes.service.js');
+ const block=service.match(/function canViewSolicitacao[\s\S]*?\n}/)?.[0] || '';
+ assert.match(block,/solicitante_user_id/);
+ assert.match(block,/ENCARREGADO_MANUTENCAO/);
+ assert.doesNotMatch(block,/normalizeSetor\(solicitacao\.setor_origem\)/);
+});
