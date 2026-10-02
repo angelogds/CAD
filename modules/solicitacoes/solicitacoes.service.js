@@ -119,11 +119,19 @@ function canManageByRole(role) {
 
 function canViewSolicitacao(solicitacao, user) {
   if (!solicitacao || !user) return false;
-  const roleInfo = canManageByRole(user.role);
-  if (roleInfo.isAdmin || roleInfo.isCompras || roleInfo.isAlmox || roleInfo.isDiretoria) return true;
-  const fixed = setorForRole(user.role);
-  if (fixed) return normalizeSetor(solicitacao.setor_origem) === fixed;
-  return Number(solicitacao.solicitante_user_id) === Number(user.id);
+  const role = normalizeRole(user.role);
+  if (Number(solicitacao.solicitante_user_id) === Number(user.id)) return true;
+
+  // Exceção operacional: ADMIN e ENCARREGADO_MANUTENCAO compartilham
+  // as solicitações entre si para evitar troca constante de perfil.
+  if (["ADMIN", "ENCARREGADO_MANUTENCAO"].includes(role)) {
+    const solicitanteRole = normalizeRole(solicitacao.solicitante_role);
+    return ["ADMIN", "ENCARREGADO_MANUTENCAO"].includes(solicitanteRole);
+  }
+
+  // Compras/Almoxarifado/Diretoria/Coordenador acompanham por seus painéis,
+  // não pela área pessoal do solicitante.
+  return false;
 }
 
 function canEditSolicitacao(solicitacao, user) {
