@@ -35,11 +35,16 @@ try {
       },
       rollupOptions: {
         output: {
-          // O MLightCAD possui dependências circulares internas. Em produção,
-          // dividir essas dependências em chunks diferentes pode quebrar a
-          // ordem de inicialização no navegador. Geramos um bundle estável
-          // por entrypoint para preservar a execução do editor.
-          inlineDynamicImports: true,
+          // Mantém os entrypoints múltiplos do MLightCAD compatíveis com Rollup.
+          // As dependências centrais ficam juntas para evitar ordem circular
+          // de inicialização sem usar inlineDynamicImports (incompatível com
+          // múltiplas entradas).
+          manualChunks(id) {
+            if (id.includes('@mlightcad/geometry-engine') || id.includes('@mlightcad/data-model')) return 'mlightcad-model-core';
+            if (id.includes('@mlightcad/cad-simple-viewer') || id.includes('@mlightcad/cad-simple-ui-plugin')) return 'mlightcad-viewer-core';
+            return undefined;
+          },
+          chunkFileNames: 'chunks/[name]-[hash].js',
           assetFileNames: 'assets/[name]-[hash][extname]'
         }
       }
