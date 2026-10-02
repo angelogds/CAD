@@ -2,7 +2,7 @@ function ensureStyles() {
   if (document.querySelector('link[data-cad-mlight-style]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = '/css/cad-mlight.css?v=20260821-fabricacao-v1';
+  link.href = '/css/cad-mlight.css?v=20261002-workspace-v2';
   link.dataset.cadMlightStyle = '1';
   document.head.appendChild(link);
 }
@@ -35,29 +35,36 @@ function createShell(initial) {
       </div>
       <span id="mlightCadStatus" class="cad-mlight-engine" data-state="loading">Inicializando motor…</span>
       <div class="cad-mlight-spacer"></div>
-      <button id="mlightFlangeBtn" class="cad-mlight-action accent" type="button">◎ <span>Flange</span></button>
-      <button id="mlightDiscBtn" class="cad-mlight-action accent" type="button">◉ <span>Disco</span></button>
-      <button id="mlightShaftBtn" class="cad-mlight-action accent" type="button">⇥ <span>Eixo</span></button>
-      <button id="mlightAutoDimBtn" class="cad-mlight-action primary" type="button" title="Gerar automaticamente as principais cotas de fabricação">↔ <span>AUTO COTAR</span></button>
-      <button id="mlightDxfImportBtn" class="cad-mlight-action" type="button">⇧ <span>Abrir DXF</span></button>
-      <button id="mlightDxfExportBtn" class="cad-mlight-action" type="button">⇩ <span>Exportar DXF</span></button>
-      <a class="cad-mlight-action" href="/desenho-tecnico/cad/${drawingId}/pdf">PDF</a>
-      <span id="mlightSaveState" class="cad-mlight-save-state" data-state="saved">Tudo salvo</span>
-      <button id="mlightSaveBtn" class="cad-mlight-action primary" type="button">Salvar desenho</button>
+      <div class="cad-mlight-top-actions" aria-label="Ações do arquivo">
+        <button id="mlightDxfImportBtn" class="cad-mlight-action" type="button">⇧ <span>Abrir DXF</span></button>
+        <button id="mlightDxfExportBtn" class="cad-mlight-action" type="button">⇩ <span>Exportar DXF</span></button>
+        <a class="cad-mlight-action" href="/desenho-tecnico/cad/${drawingId}/pdf">PDF</a>
+        <span id="mlightSaveState" class="cad-mlight-save-state" data-state="saved">Tudo salvo</span>
+        <button id="mlightSaveBtn" class="cad-mlight-action primary" type="button">Salvar desenho</button>
+      </div>
     </header>
     <main class="cad-mlight-main">
       <div id="mlightCadHost"><div id="mlightCadCanvas"></div></div>
-      <div class="cad-mlight-fabbar" aria-label="Ferramentas de fabricação">
-        <span class="cad-mlight-fabbar-title">FABRICAÇÃO</span>
-        <button id="mlightSheetBtn" class="cad-mlight-action" type="button" title="Gerar folha técnica A3/A4">▤ <span>Folha A3/A4</span></button>
-        <button id="mlightCenterMarksBtn" class="cad-mlight-action" type="button" title="Criar marcas de centro nos círculos">⊕ <span>Centros</span></button>
-        <button id="mlightSurfaceBtn" class="cad-mlight-action" type="button" title="Adicionar rugosidade">⌁ <span>Rugosidade</span></button>
-        <button id="mlightToleranceBtn" class="cad-mlight-action" type="button" title="Adicionar tolerância ou ajuste">± <span>Tolerância</span></button>
-        <button id="mlightThreadBtn" class="cad-mlight-action" type="button" title="Adicionar especificação de rosca">M <span>Rosca</span></button>
-        <button id="mlightKeywayBtn" class="cad-mlight-action" type="button" title="Criar rasgo de chaveta">▭ <span>Chaveta</span></button>
-        <button id="mlightSectionBtn" class="cad-mlight-action" type="button" title="Adicionar linha de corte">A-A <span>Corte</span></button>
-        <button id="mlightChamferBtn" class="cad-mlight-action" type="button" title="Adicionar chanfro ou raio">◩ <span>Chanfro/Raio</span></button>
-      </div>
+      <nav class="cad-mlight-ribbon" aria-label="Ferramentas do desenho técnico">
+        <div class="cad-mlight-ribbon-group"><span class="cad-mlight-ribbon-label">CRIAR</span>
+          <button id="mlightFlangeBtn" class="cad-mlight-action accent" type="button">◎ <span>Flange</span></button>
+          <button id="mlightDiscBtn" class="cad-mlight-action accent" type="button">◉ <span>Disco</span></button>
+          <button id="mlightShaftBtn" class="cad-mlight-action accent" type="button">⇥ <span>Eixo</span></button>
+        </div>
+        <div class="cad-mlight-ribbon-group"><span class="cad-mlight-ribbon-label">COTAR</span>
+          <button id="mlightAutoDimBtn" class="cad-mlight-action primary" type="button" title="Gerar automaticamente as principais cotas de fabricação">↔ <span>Auto cotar</span></button>
+          <button id="mlightCenterMarksBtn" class="cad-mlight-action" type="button" title="Criar marcas de centro nos círculos">⊕ <span>Centros</span></button>
+        </div>
+        <div class="cad-mlight-ribbon-group"><span class="cad-mlight-ribbon-label">FABRICAÇÃO</span>
+          <button id="mlightSheetBtn" class="cad-mlight-action" type="button" title="Gerar folha técnica A3/A4">▤ <span>Folha A3/A4</span></button>
+          <button id="mlightSurfaceBtn" class="cad-mlight-action" type="button" title="Adicionar rugosidade">⌁ <span>Rugosidade</span></button>
+          <button id="mlightToleranceBtn" class="cad-mlight-action" type="button" title="Adicionar tolerância ou ajuste">± <span>Tolerância</span></button>
+          <button id="mlightThreadBtn" class="cad-mlight-action" type="button" title="Adicionar especificação de rosca">M <span>Rosca</span></button>
+          <button id="mlightKeywayBtn" class="cad-mlight-action" type="button" title="Criar rasgo de chaveta">▭ <span>Chaveta</span></button>
+          <button id="mlightSectionBtn" class="cad-mlight-action" type="button" title="Adicionar linha de corte">A-A <span>Corte</span></button>
+          <button id="mlightChamferBtn" class="cad-mlight-action" type="button" title="Adicionar chanfro ou raio">◩ <span>Chanfro/Raio</span></button>
+        </div>
+      </nav>
       <div class="cad-mlight-floating-tools" aria-label="Ações de visualização">
         <button id="mlightZoomExtentsBtn" class="cad-mlight-action" type="button">Enquadrar tudo</button>
       </div>
