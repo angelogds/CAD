@@ -19,7 +19,7 @@
   const canLubrificacaoExecucao = role === 'MECANICO' && can('lubrificacao_execucao');
   const canDemandas = can('demandas_view');
   const canSolicitacoes = can('solicitacoes_read');
-  const canAcompanhamentoCompras = can('acompanhamento_compras');
+  const canAcompanhamentoOnly = can('acompanhamento_compras') && !canSolicitacoes;
   const canPreSolicitacoes = can('pre_solicitacao_almox_read');
   const canCompras = can('compras');
   const canFornecedores = can('fornecedores');
@@ -48,7 +48,7 @@
   const navItem = (href, label, isActive, extraClass = '', suffix = '') =>
     `<a class="nav-item ${extraClass} ${isActive ? 'active' : ''}" href="${href}"><span class="nav-label">${label}</span>${suffix}</a>`;
 
-  const hasOperationGroup = canPainel || canDiretoriaManutencao || canDiretoriaCompras || canEquipamentos || canOS || canOSChat || canPreventivas || canLubrificacaoExecucao || canDemandas || canSolicitacoes || canAcompanhamentoCompras || canPreSolicitacoes || canCompras || canFornecedores || canAlmoxarifado || canEstoque || canMotores;
+  const hasOperationGroup = canPainel || canDiretoriaManutencao || canDiretoriaCompras || canEquipamentos || canOS || canOSChat || canPreventivas || canLubrificacaoExecucao || canDemandas || canSolicitacoes || canAcompanhamentoOnly || canPreSolicitacoes || canCompras || canFornecedores || canAlmoxarifado || canEstoque || canMotores;
   const hasSupportGroup = canAvisos || canEscala || canRH || canMeuPortal || canInspecao || canTracagem || canDesenhoTecnico || canAcademia || canAI || canPCM;
 %>
 
@@ -70,7 +70,7 @@
     <% if (canLubrificacaoExecucao) { %><%- navItem('/lubrificacao', 'Roteiro de Lubrificação', activeMenu === 'lubrificacao') %><% } %>
     <% if (canDemandas) { %><%- navItem('/demandas', 'Demandas', activeMenu === 'demandas') %><% } %>
     <% if (canSolicitacoes && !isCompras) { %><%- navItem('/solicitacoes/minhas', 'Solicitações', activeMenu === 'solicitacoes') %><% } %>
-    <% if (canAcompanhamentoCompras) { %><%- navItem('/acompanhamento-compras', 'Acompanhamento de Compras', activeMenu === 'acompanhamento-compras') %><% } %>
+    <% if (canAcompanhamentoOnly) { %><%- navItem('/acompanhamento-compras', 'Acompanhamento de Compras', activeMenu === 'solicitacoes') %><% } %>
     <% if (canPreSolicitacoes) { %><%- navItem('/pre-solicitacoes', 'Pré-Solicitações', activeMenu === 'pre-solicitacoes') %><% } %>
     <% if (canCompras) { %><%- navItem('/compras/solicitacoes', 'Compras', activeMenu === 'compras') %><% } %>
     <% if (canFornecedores) { %><%- navItem('/fornecedores', 'Fornecedores', activeMenu === 'fornecedores') %><% } %>
