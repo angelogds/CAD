@@ -35,7 +35,11 @@ try {
       },
       rollupOptions: {
         output: {
-          chunkFileNames: 'chunks/[name]-[hash].js',
+          // O MLightCAD possui dependências circulares internas. Em produção,
+          // dividir essas dependências em chunks diferentes pode quebrar a
+          // ordem de inicialização no navegador. Geramos um bundle estável
+          // por entrypoint para preservar a execução do editor.
+          inlineDynamicImports: true,
           assetFileNames: 'assets/[name]-[hash][extname]'
         }
       }
