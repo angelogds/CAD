@@ -668,15 +668,10 @@ function getCountersForUser(userId, user = null) {
   let where = "";
   let params = [];
   if (!canListAllSolicitacoes(user)) {
-    const fixedSetor = setorForRole(user?.role);
-    if (fixedSetor) {
-      where = "WHERE setor_origem IS NOT NULL";
-      const allowed = fixedSetor === SETORES.RECICLAGEM ? ["Manutenção","Manutencao","Produção","Producao","RECICLAGEM"]
-        : fixedSetor === SETORES.LOGISTICA ? ["LOGÍSTICA","LOGISTICA","TRANSPORTE","FROTA"]
-        : fixedSetor === SETORES.FRIGORIFICO ? ["FRIGORÍFICO","FRIGORIFICO"]
-        : ["ADMINISTRATIVO","ADMINISTRAÇÃO","ADMINISTRACAO","ADMINISTRATIVA","RH"];
-      where += ` AND setor_origem IN (${allowed.map(() => "?").join(",")})`;
-      params = allowed;
+    const role = normalizeRole(user?.role);
+    if (["ADMIN", "ENCARREGADO_MANUTENCAO"].includes(role)) {
+      where = "WHERE solicitante_user_id IN (SELECT id FROM users WHERE id = ? OR role IN ('ADMIN','ENCARREGADO_MANUTENCAO'))";
+      params = [userId];
     } else {
       where = "WHERE solicitante_user_id = ?";
       params = [userId];
