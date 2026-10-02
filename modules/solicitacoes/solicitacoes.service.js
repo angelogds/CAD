@@ -592,9 +592,10 @@ function finalizarElaboracao(id, userId) {
   })();
 }
 
-function canListAllSolicitacoes(user) {
-  const role = normalizeRole(user?.role);
-  return ["ADMIN", "COMPRAS", "ALMOXARIFADO", "DIRETORIA", "GESTAO"].includes(role);
+function canListAllSolicitacoes(_user) {
+  // A página "Minhas Solicitações" nunca é uma visão global.
+  // Compras/Diretoria/Coordenação usam seus painéis próprios de acompanhamento.
+  return false;
 }
 
 function listMinhasSolicitacoes(userId, filters = {}, user = null) {
@@ -604,13 +605,13 @@ function listMinhasSolicitacoes(userId, filters = {}, user = null) {
     where.push("(UPPER(COALESCE(s.tipo_origem,'')) <> 'PRE_SOLICITACAO_ALMOX' OR COALESCE(s.disponivel_compras,0)=1)");
   }
   if (!canListAllSolicitacoes(user)) {
-    const fixedSetor = setorForRole(user?.role);
-    if (fixedSetor) {
-      where.push("UPPER(REPLACE(REPLACE(REPLACE(COALESCE(s.setor_origem,''),'Ã','A'),'Í','I'),'Ó','O')) IN (" +
-        (fixedSetor === SETORES.RECICLAGEM ? "'MANUTENCAO','MANUTENÇÃO','PRODUCAO','PRODUÇÃO','RECICLAGEM'" :
-          fixedSetor === SETORES.LOGISTICA ? "'LOGISTICA','LOGÍSTICA','TRANSPORTE','FROTA'" :
-          fixedSetor === SETORES.FRIGORIFICO ? "'FRIGORIFICO','FRIGORÍFICO'" :
-          "'ADMINISTRATIVO','ADMINISTRACAO','ADMINISTRAÇÃO','ADMINISTRATIVA','RH'") + ")");
+    const role = normalizeRole(user?.role);
+    if (["ADMIN", "ENCARREGADO_MANUTENCAO"].includes(role)) {
+      where.push(`s.solicitante_user_id IN (
+        SELECT id FROM users
+        WHERE id = ? OR role IN ('ADMIN','ENCARREGADO_MANUTENCAO')
+      )`);
+      params.push(userId);
     } else {
       where.push("s.solicitante_user_id = ?");
       params.push(userId);
