@@ -1,5 +1,18 @@
 const acompanhamentoService = require('../compras/acompanhamento.service');
 const itemApprovalService = require('../compras/compras.aprovacao-itens.service');
+const { normalizeRole } = require('../../config/rbac');
+
+function scopedQuery(req) {
+  const query = { ...(req.query || {}) };
+  if (normalizeRole(req.session?.user?.role) === 'COORDENADOR_RECICLAGEM') query.setor = 'RECICLAGEM';
+  return query;
+}
+
+function coordinatorCanView(row, req) {
+  if (normalizeRole(req.session?.user?.role) !== 'COORDENADOR_RECICLAGEM') return true;
+  const setor = String(row?.setor_origem || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  return ['', 'RECICLAGEM', 'MANUTENCAO', 'PRODUCAO'].includes(setor);
+}
 
 const HIGHLIGHTS = new Set(['aprovacao', 'cotacao', 'compra', 'recebimento', 'atrasadas']);
 
@@ -97,7 +110,7 @@ function enrichDashboardWithApprovals(painel, query = {}) {
 function lista(req, res) {
   const context = executiveContext(req);
   try {
-    const painel = enrichDashboardWithApprovals(acompanhamentoService.getDashboard(req.query), req.query);
+    const painel = enrichDashboardWithApprovals(acompanhamentoService.getDashboard(scopedQuery(req)), scopedQuery(req));
     return res.render('solicitacoes/acompanhamento-compras', {
       title: 'Acompanhamento de Compras',
       activeMenu: context.activeMenu,
@@ -134,6 +147,7 @@ function detalhe(req, res) {
     const id = Number(req.params.id);
     const detalheCompra = normalizeLegacyPurchasedQuantities(acompanhamentoService.getDetail(id));
     if (!detalheCompra) return res.status(404).send('Solicitação não encontrada.');
+    if (!coordinatorCanView(detalheCompra, req)) return res.status(403).send('Acesso restrito às compras da Reciclagem.');
 
     let approvalSummary;
     try { approvalSummary = itemApprovalService.getSummary(id); }
