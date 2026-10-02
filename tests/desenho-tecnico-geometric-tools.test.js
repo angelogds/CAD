@@ -137,21 +137,17 @@ test('CHAMFER rejeita distância maior que o segmento disponível', async () => 
   assert.match(result.error, /maior que o comprimento disponível/i);
 });
 
-test('MLightCAD expõe comandos principais atuais e preserva os algoritmos avançados para adaptação', () => {
+test('editor ativo usa motor 2D estável e preserva algoritmos geométricos avançados', () => {
   const entry = fs.readFileSync(path.join(process.cwd(), 'public/js/cad-engine-v2.js'), 'utf8');
-  const core = fs.readFileSync(path.join(process.cwd(), 'frontend/mlightcad-core.entry.js'), 'utf8');
+  const legacy = fs.readFileSync(path.join(process.cwd(), 'public/js/cad-legacy-engine.js'), 'utf8');
   const geometry = fs.readFileSync(path.join(process.cwd(), 'public/js/modules/desenho-tecnico/core/modify.geometry.mjs'), 'utf8');
 
-  assert.match(entry, /cad-mlight-runtime\.js/);
-  assert.match(core, /preset: 'select'/);
-  assert.match(core, /preset: 'pan'/);
-  assert.match(core, /preset: 'zoom-extent'/);
-  assert.match(core, /item\('move', 'Mover', 'move'\)/);
-  assert.match(core, /item\('copy', 'Copiar', 'copy'\)/);
-  assert.match(core, /item\('rotate', 'Rotacionar', 'rotate'\)/);
-  assert.match(core, /item\('offset', 'Offset', 'offset'\)/);
-  assert.match(core, /item\('erase', 'Apagar', 'erase'\)/);
-  assert.match(core, /item\('dimlinear', 'Cota linear', 'dimlinear'\)/);
+  assert.match(entry, /cad-legacy-engine\.js/);
+  assert.doesNotMatch(entry, /cad-mlight-runtime\.js/);
+  assert.match(legacy, /bootstrapDesenhoTecnico/);
+  assert.match(legacy, /RotateTool/);
+  assert.match(legacy, /FilletTool/);
+  assert.match(legacy, /ChamferTool/);
   assert.match(geometry, /export function solveFillet/);
   assert.match(geometry, /export function solveChamfer/);
   assert.match(geometry, /export function rotateEntitySnapshot/);

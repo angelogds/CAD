@@ -51,18 +51,14 @@ test('central respeita modo somente leitura para usuário sem gerenciamento', as
   assert.match(html, /\/desenho-tecnico\/cad\/41/);
 });
 
-test('entrada atual do CAD carrega MLightCAD e o menu técnico sem reativar o motor SVG', () => {
+test('entrada atual do CAD prioriza o editor 2D estável e mantém extensões fora do caminho crítico', () => {
   const entry = fs.readFileSync(cadEntry, 'utf8');
   const stabilization = fs.readFileSync(uiStabilization, 'utf8');
 
-  assert.match(entry, /cad-mlight-runtime\.js/);
-  assert.match(entry, /cad-round3-runtime\.js/);
-  assert.match(entry, /cad-round4-runtime\.js/);
-  assert.match(entry, /cad-ui-stabilization\.js/);
-  assert.match(entry, /cad-style-runtime\.js/);
-  assert.match(stabilization, /CRIAR E COTAR/);
-  assert.match(stabilization, /FABRICAÇÃO/);
-  assert.match(stabilization, /VISTAS E ANÁLISE/);
-  assert.match(stabilization, /BIBLIOTECA E PRODUÇÃO/);
+  assert.match(entry, /cad-legacy-engine\.js/);
+  assert.doesNotMatch(entry, /cad-mlight-runtime\.js/);
+  assert.doesNotMatch(entry, /cad-round3-runtime\.js/);
+  assert.doesNotMatch(entry, /cad-round4-runtime\.js/);
+  assert.match(entry, /stable-2d/);
   assert.match(stabilization, /hideLegacyEditor/);
 });

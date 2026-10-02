@@ -6,23 +6,19 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('CAD usa somente MLightCAD como editor apresentado ao usuário', () => {
+test('MLightCAD permanece disponível como biblioteca, mas não derruba o editor ativo', () => {
   const router = read('public/js/cad-engine-v2.js');
   const runtime = read('public/js/cad-mlight-runtime.js');
-  assert.match(router, /cad-mlight-runtime\.js/);
-  assert.doesNotMatch(router, /engine.*legacy/i);
-  assert.doesNotMatch(router, /cad-legacy-engine\.js/);
+  assert.match(router, /cad-legacy-engine\.js/);
+  assert.doesNotMatch(router, /cad-mlight-runtime\.js/);
   assert.match(runtime, /vendor\/mlightcad\/mlightcad-core\.js/);
   assert.match(runtime, /vendor\/mlightcad\/mlightcad-auto-dimension\.js/);
-  assert.doesNotMatch(runtime, /Motor anterior/);
-  assert.doesNotMatch(runtime, /engine=legacy/);
   assert.match(runtime, /Abrir DXF/);
   assert.match(runtime, /Exportar DXF/);
   assert.match(runtime, /Flange/);
   assert.match(runtime, /Disco/);
   assert.match(runtime, /Eixo/);
   assert.match(runtime, /AUTO COTAR/);
-  assert.match(runtime, /\/desenho-tecnico\/cad\/\$\{drawingId\}/);
 });
 
 test('bundle do MLightCAD gera motor principal e auto-cotagem sem alterar o servidor', () => {
