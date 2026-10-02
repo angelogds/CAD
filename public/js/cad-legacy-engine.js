@@ -176,13 +176,17 @@ function enhanceCadWorkspace(cad) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  document.documentElement.dataset.cadEngine = 'stable-2d';
   const cad = bootstrapDesenhoTecnico();
   if (!cad) {
     const s = document.getElementById('cadStatusMessage');
     if (s) s.textContent = 'Falha ao inicializar editor técnico.';
+    document.documentElement.dataset.cadEngine = 'stable-2d-error';
     return;
   }
 
   installAdvancedTools(cad);
   enhanceCadWorkspace(cad);
+  const s = document.getElementById('cadStatusMessage');
+  if (s) s.textContent = 'Editor CAD 2D pronto • mm • salvamento automático ativo';
 });
