@@ -7,6 +7,7 @@ const comprasCtrl = require('../solicitacoes/solicitacoes.acompanhamento.control
 const DIRETORIA_ACCESS = ACCESS.diretoria_dashboard;
 const DIRETORIA_COMPRAS = ACCESS.diretoria_compras || DIRETORIA_ACCESS;
 const DIRETORIA_MANUTENCAO = ACCESS.diretoria_manutencao || DIRETORIA_ACCESS;
+const DIRETORIA_APROVACAO = ACCESS.diretoria_aprovacao || DIRETORIA_ACCESS;
 const DIRETORIA_BASE_PATH = '/dashboard/diretoria';
 
 function comprasContext(req, res, next) {
@@ -20,7 +21,7 @@ router.get('/', requireLogin, requireRole(DIRETORIA_ACCESS), ctrl.index);
 
 router.get('/compras', requireLogin, requireRole(DIRETORIA_COMPRAS), comprasContext, comprasCtrl.lista);
 router.get('/compras/:id', requireLogin, requireRole(DIRETORIA_COMPRAS), comprasContext, comprasCtrl.detalhe);
-router.post('/compras/:id/aprovar-itens-cotados', requireLogin, requireRole(DIRETORIA_COMPRAS), comprasContext, comprasCtrl.aprovarItensCotados);
+router.post('/compras/:id/aprovar-itens-cotados', requireLogin, requireRole(DIRETORIA_APROVACAO), comprasContext, comprasCtrl.aprovarItensCotados);
 
 router.get('/manutencao', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencao);
 router.get('/manutencao/dados', requireLogin, requireRole(DIRETORIA_MANUTENCAO), ctrl.manutencaoDados);
