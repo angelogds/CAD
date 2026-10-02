@@ -28,7 +28,9 @@ function getRoleProfile(role) {
 }
 
 function isDirectUserIdentityRole(role) {
-  return Boolean(getRoleProfile(role)?.directUserIdentity);
+  const normalized = normalizeRole(role);
+  if (normalized === 'ADMIN') return true;
+  return Boolean(getRoleProfile(normalized)?.directUserIdentity);
 }
 
 function deriveUserFunctionSector(role) {
