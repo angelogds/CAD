@@ -1,0 +1,444 @@
+/* Desenho Técnico 2D — identidade visual do Manutenção Campo do Gado V2
+   Camada visual apenas. Preserva motor CAD, IDs, data-actions, rotas e persistência. */
+
+.cad-fullscreen{
+  --cad-system-green:var(--action-700,#15803d);
+  --cad-system-green-dark:#116b34;
+  --cad-system-green-soft:#ecfdf3;
+  --cad-system-bg:var(--bg,#f3faf6);
+  --cad-system-card:var(--card,#fff);
+  --cad-system-line:#e4ebe7;
+  --cad-system-text:var(--text,#0f172a);
+  --cad-system-muted:var(--muted,#64748b);
+  --cad-system-shadow:0 10px 30px rgba(15,81,50,.08);
+  background:var(--cad-system-bg);
+  color:var(--cad-system-text);
+}
+
+/* Cabeçalho no mesmo padrão da topbar principal. */
+.cad-fullscreen .cad-toolbar{
+  border-bottom:1px solid var(--cad-system-line);
+  background:#fff;
+  box-shadow:0 5px 20px rgba(15,23,42,.05);
+}
+.cad-fullscreen .cad-appbar{
+  min-height:58px;
+  padding:8px 14px;
+  gap:10px;
+  border-bottom:1px solid var(--cad-system-line);
+  background:rgba(255,255,255,.98);
+}
+.cad-fullscreen .cad-brand-mark{
+  border-radius:10px;
+  background:linear-gradient(180deg,#16a34a,#15803d);
+  box-shadow:0 7px 18px rgba(21,128,61,.18);
+  color:#fff;
+}
+.cad-fullscreen .cad-document-eyebrow{
+  color:#7a8799;
+}
+.cad-fullscreen .cad-document-title strong{
+  color:var(--cad-system-text);
+}
+.cad-fullscreen .cad-document-title span{
+  color:var(--cad-system-muted);
+}
+.cad-fullscreen .cad-save-summary{
+  border:1px solid #dde6e1;
+  background:#fbfdfc;
+  color:#475569;
+  box-shadow:0 1px 2px rgba(15,23,42,.03);
+}
+.cad-fullscreen .cad-save-dot{
+  background:var(--cad-system-green);
+  box-shadow:0 0 0 3px rgba(21,128,61,.12);
+}
+.cad-fullscreen .cad-icon-btn{
+  border-color:#dde6e1;
+  background:#fff;
+  color:#334155;
+}
+.cad-fullscreen .cad-icon-btn:hover{
+  border-color:#bbd7c6;
+  background:#f1faf4;
+  color:#14532d;
+}
+.cad-fullscreen .cad-btn{
+  min-height:36px;
+  border-radius:8px;
+  font-size:12px;
+  font-weight:700;
+}
+.cad-fullscreen .cad-btn-primary{
+  border-color:var(--cad-system-green);
+  background:var(--cad-system-green);
+  color:#fff;
+  box-shadow:none;
+}
+.cad-fullscreen .cad-btn-primary:hover{
+  border-color:var(--cad-system-green-dark);
+  background:var(--cad-system-green-dark);
+  color:#fff;
+}
+.cad-fullscreen .cad-btn-secondary{
+  border-color:#cbd5e1;
+  background:#fff;
+  color:#334155;
+}
+.cad-fullscreen .cad-btn-secondary:hover{
+  border-color:#94a3b8;
+  background:#f1f5f9;
+}
+
+/* Ribbon claro, compacto e hierárquico. */
+.cad-fullscreen .cad-ribbon{
+  min-height:62px;
+  padding:5px 12px 7px;
+  gap:4px;
+  border-bottom:1px solid var(--cad-system-line);
+  background:#fbfdfc;
+}
+.cad-fullscreen .cad-ribbon-group{
+  min-height:50px;
+  padding:16px 9px 3px;
+  border-right-color:#e6ede9;
+}
+.cad-fullscreen .cad-ribbon-label{
+  top:3px;
+  color:#7a8799;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.1em;
+}
+.cad-fullscreen .cad-ribbon-btn{
+  min-height:31px;
+  border:1px solid transparent;
+  border-radius:8px;
+  color:#475569;
+  background:transparent;
+}
+.cad-fullscreen .cad-ribbon-btn:hover{
+  border-color:#dce9e1;
+  background:#f0fdf4;
+  color:#166534;
+}
+.cad-fullscreen .cad-ribbon-btn.active,
+.cad-fullscreen .cad-ribbon-btn.featured{
+  border-color:#bbd7c6;
+  background:#ecfdf3;
+  color:#15803d;
+}
+.cad-fullscreen .cad-ribbon-btn.danger:hover{
+  border-color:#fecaca;
+  background:#fff1f2;
+  color:#b91c1c;
+}
+.cad-fullscreen .cad-chip{
+  min-height:29px;
+  border-color:#d8e2dc;
+  border-radius:8px;
+  background:#fff;
+  color:#64748b;
+}
+.cad-fullscreen .cad-chip:hover{
+  border-color:#bbd7c6;
+  background:#f8fcf9;
+  color:#166534;
+}
+.cad-fullscreen .cad-chip.active{
+  border-color:var(--cad-system-green);
+  background:#e8f7ee;
+  color:#15803d;
+}
+
+/* Workspace: painéis no padrão de cards do sistema; canvas permanece técnico e escuro. */
+.cad-fullscreen .cad-workspace{
+  grid-template-columns:74px minmax(0,1fr) minmax(290px,320px);
+  background:var(--cad-system-bg);
+}
+.cad-fullscreen .cad-panel-left,
+.cad-fullscreen .cad-panel-right{
+  border-color:var(--cad-system-line);
+  background:#fff;
+  color:var(--cad-system-text);
+}
+.cad-fullscreen .cad-panel-left{
+  padding-top:8px;
+  box-shadow:6px 0 22px rgba(15,23,42,.035);
+}
+.cad-fullscreen .cad-tool-group{
+  border-bottom-color:#eef3f0;
+}
+.cad-fullscreen .cad-tool-group-label{
+  color:#94a3b8;
+}
+.cad-fullscreen .cad-tool-btn{
+  color:#64748b;
+  border-radius:10px;
+}
+.cad-fullscreen .cad-tool-btn:hover{
+  background:#f1faf4;
+  color:#166534;
+}
+.cad-fullscreen .cad-tool-btn.active{
+  border-color:#bbd7c6;
+  background:#ecfdf3;
+  color:#15803d;
+  box-shadow:inset 3px 0 0 var(--cad-system-green);
+}
+.cad-fullscreen .cad-tool-icon{
+  color:#15803d;
+}
+
+.cad-fullscreen .cad-canvas-container{
+  background:#0a0f14;
+  box-shadow:inset 0 0 0 1px rgba(15,23,42,.06);
+}
+.cad-fullscreen #cadCanvas{
+  background:#0a0f14;
+}
+.cad-fullscreen .cad-canvas-context > div:first-child{
+  border-color:rgba(255,255,255,.12);
+  background:rgba(15,23,42,.82);
+  color:#f8fafc;
+  box-shadow:0 8px 24px rgba(0,0,0,.18);
+}
+.cad-fullscreen .cad-context-label,
+.cad-fullscreen .cad-context-meta{
+  color:#94a3b8;
+}
+
+/* Boas-vindas menor e com linguagem visual do sistema. */
+.cad-fullscreen .cad-empty-state{
+  width:min(560px,calc(100% - 56px));
+  padding:22px;
+  border:1px solid #dce8e0;
+  border-radius:16px;
+  background:rgba(255,255,255,.97);
+  box-shadow:0 18px 48px rgba(2,6,23,.22);
+  color:var(--cad-system-text);
+  backdrop-filter:blur(10px);
+}
+.cad-fullscreen .cad-empty-kicker{
+  color:var(--cad-system-green);
+}
+.cad-fullscreen .cad-empty-state h2{
+  color:var(--cad-system-text);
+}
+.cad-fullscreen .cad-empty-state > p,
+.cad-fullscreen .cad-start-card small,
+.cad-fullscreen .cad-empty-tip{
+  color:var(--cad-system-muted);
+}
+.cad-fullscreen .cad-empty-actions{
+  gap:8px;
+  margin:16px 0 12px;
+}
+.cad-fullscreen .cad-start-card{
+  min-height:94px;
+  border-color:#dde6e1;
+  border-radius:12px;
+  background:#fff;
+  color:var(--cad-system-text);
+  box-shadow:0 2px 8px rgba(15,23,42,.04);
+}
+.cad-fullscreen .cad-start-card:hover{
+  border-color:#8bb89a;
+  background:#f0fdf4;
+  color:#14532d;
+  transform:translateY(-1px);
+}
+.cad-fullscreen .cad-start-card > span{
+  color:var(--cad-system-green);
+}
+.cad-fullscreen kbd{
+  border-color:#d9e4dd;
+  background:#f8faf9;
+  color:#334155;
+}
+
+/* Inspetor no padrão de painéis/cards do sistema. */
+.cad-fullscreen .cad-inspector-head{
+  min-height:58px;
+  border-bottom-color:var(--cad-system-line);
+  background:rgba(255,255,255,.97);
+}
+.cad-fullscreen .cad-inspector-head span{
+  color:#94a3b8;
+}
+.cad-fullscreen .cad-inspector-head strong{
+  color:var(--cad-system-text);
+}
+.cad-fullscreen .cad-equipment-card{
+  border-color:#cde8d6;
+  background:#ecfdf3;
+}
+.cad-fullscreen .cad-equipment-icon{
+  background:#d7f6e1;
+  color:#15803d;
+}
+.cad-fullscreen .cad-equipment-card small{
+  color:#15803d;
+}
+.cad-fullscreen .cad-equipment-card strong{
+  color:#14532d;
+}
+.cad-fullscreen .cad-equipment-card > div > span{
+  color:#64748b;
+}
+.cad-fullscreen .cad-inspector-section{
+  border-color:#edf2ef;
+}
+.cad-fullscreen .cad-inspector-section > summary{
+  min-height:42px;
+  background:#fff;
+  color:#172033;
+}
+.cad-fullscreen .cad-inspector-section > summary:hover{
+  background:#f8fcf9;
+}
+.cad-fullscreen .cad-inspector-section > summary > span{
+  color:#94a3b8;
+}
+.cad-fullscreen .cad-panel-content{
+  background:#fff;
+}
+.cad-fullscreen .cad-muted,
+.cad-fullscreen .cad-field,
+.cad-fullscreen .cad-snap-options,
+.cad-fullscreen .cad-precision-help{
+  color:#64748b;
+}
+.cad-fullscreen .cad-input,
+.cad-fullscreen .cad-select{
+  min-height:36px;
+  border-color:#dbe5df;
+  background:#fbfdfc;
+  color:#0f172a;
+}
+.cad-fullscreen .cad-input:focus,
+.cad-fullscreen .cad-select:focus{
+  border-color:#8bb89a;
+  box-shadow:0 0 0 3px rgba(21,128,61,.10);
+}
+.cad-fullscreen .cad-precision-help code{
+  color:#15803d;
+}
+.cad-fullscreen .cad-layer-row{
+  border-color:#e5ece8;
+  background:#fbfdfc;
+}
+.cad-fullscreen .cad-layer-row-main{
+  color:#172033;
+}
+
+/* Status inferior alinhado ao shell principal. */
+.cad-fullscreen .cad-statusbar{
+  min-height:42px;
+  border-top-color:var(--cad-system-line);
+  background:rgba(255,255,255,.98);
+  color:#64748b;
+  box-shadow:0 -4px 18px rgba(15,23,42,.035);
+}
+.cad-fullscreen .cad-command-wrap{
+  border-color:#dbe5df;
+  background:#f8faf9;
+}
+.cad-fullscreen .cad-command-symbol{
+  color:#15803d;
+}
+.cad-fullscreen .cad-command-input,
+.cad-fullscreen #cadStatusMessage{
+  color:#172033;
+}
+.cad-fullscreen .cad-status-toggle{
+  border-color:#dbe5df;
+  background:#fff;
+  color:#64748b;
+}
+.cad-fullscreen .cad-status-toggle.active{
+  border-color:#8bb89a;
+  background:#ecfdf3;
+  color:#15803d;
+}
+.cad-fullscreen .cad-panel-handle{
+  border-color:#dbe5df;
+  background:#fff;
+  color:#64748b;
+}
+.cad-fullscreen .cad-panel-handle:hover{
+  color:#15803d;
+}
+
+/* Modais no mesmo padrão dos cards do sistema. */
+.cad-fullscreen .cad-modal-overlay{
+  background:rgba(15,23,42,.48);
+}
+.cad-fullscreen .cad-modal{
+  border-color:#dde6e1;
+  background:#fff;
+  color:#0f172a;
+  box-shadow:0 28px 80px rgba(15,23,42,.22);
+}
+.cad-fullscreen .cad-modal-header{
+  border-bottom-color:#e4ebe7;
+}
+.cad-fullscreen .cad-modal-header h2{
+  color:#0f172a;
+}
+.cad-fullscreen .cad-modal-kicker{
+  color:#15803d;
+}
+.cad-fullscreen .cad-modal-close{
+  background:#f8faf9;
+  color:#64748b;
+}
+.cad-fullscreen .cad-modal-close:hover{
+  background:#f0fdf4;
+  color:#166534;
+}
+.cad-fullscreen .cad-modal-intro,
+.cad-fullscreen .cad-shaft-segments td{
+  border-color:#e5ece8;
+  background:#fbfdfc;
+}
+.cad-fullscreen .cad-modal-intro p{
+  color:#64748b;
+}
+.cad-fullscreen .cad-part-preview,
+.cad-fullscreen .cad-segment-index{
+  background:#ecfdf3;
+  color:#15803d;
+}
+.cad-fullscreen .cad-modal-footer{
+  border-top-color:#e4ebe7;
+  background:#fbfdfc;
+}
+.cad-fullscreen .cad-shaft-add{
+  border-color:#8bb89a;
+  background:#ecfdf3;
+  color:#15803d;
+}
+
+/* Responsividade mantendo o canvas como prioridade. */
+@media (max-width:1180px){
+  .cad-fullscreen .cad-workspace{grid-template-columns:68px minmax(0,1fr) minmax(270px,292px);}
+}
+@media (max-width:960px){
+  .cad-fullscreen .cad-workspace,
+  .cad-fullscreen.cad-right-collapsed .cad-workspace{grid-template-columns:60px minmax(0,1fr);}
+  .cad-fullscreen .cad-panel-right{
+    width:min(330px,88vw);
+    border-left:1px solid var(--cad-system-line);
+    box-shadow:-12px 0 34px rgba(15,23,42,.14);
+  }
+}
+@media (max-width:640px){
+  .cad-fullscreen .cad-appbar{min-height:54px;padding:7px 8px;}
+  .cad-fullscreen .cad-ribbon{min-height:58px;padding-inline:6px;}
+  .cad-fullscreen .cad-empty-state{width:calc(100% - 28px);padding:16px;}
+  .cad-fullscreen .cad-empty-actions{grid-template-columns:1fr;}
+}
+@media (prefers-reduced-motion:reduce){
+  .cad-fullscreen *{transition:none!important;}
+}
