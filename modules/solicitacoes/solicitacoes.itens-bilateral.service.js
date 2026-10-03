@@ -44,7 +44,7 @@ function isRequester(sol, user) {
 
 function isPurchasing(user) {
   const role = normalizeRole(user?.role || user?.perfil);
-  return role === ROLE.COMPRAS || role === ROLE.ADMIN;
+  return [ROLE.COMPRAS, ROLE.ADMIN, ROLE.COORDENADOR_RECICLAGEM].includes(role);
 }
 
 function actorSide(sol, user) {

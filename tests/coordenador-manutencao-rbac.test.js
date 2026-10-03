@@ -14,9 +14,11 @@ test('perfil Coordenador da Reciclagem existe no RBAC e cadastro',()=>{
  assert.match(service,/COORDENADOR_RECICLAGEM/);
 });
 
-test('coordenador consulta compras sem receber ações operacionais',()=>{
+test('coordenador recebe operações escopadas sem ganhar privilégios globais',()=>{
  const { canAccessModule } = require('../config/rbac');
- assert.equal(canAccessModule('COORDENADOR_RECICLAGEM', 'acompanhamento_compras'), true);
+ ['acompanhamento_compras','compras_reciclagem_read','compras_reciclagem_manage','solicitacoes_reciclagem_read','solicitacoes_reciclagem_create','solicitacoes_reciclagem_manage','solicitacoes_reciclagem_delete'].forEach(key=>{
+   assert.equal(canAccessModule('COORDENADOR_RECICLAGEM',key),true,key);
+ });
  ['compras','compras_read','compras_manage','compras_delete','solicitacoes_read','solicitacoes_create','solicitacoes_manage','solicitacoes_delete','diretoria_aprovacao','pre_solicitacao_setor_approve','almoxarifado_manage','pcm_manage','preventivas_manage','os_open'].forEach(key=>{
    assert.equal(canAccessModule('COORDENADOR_RECICLAGEM',key),false,key);
  });
@@ -24,7 +26,7 @@ test('coordenador consulta compras sem receber ações operacionais',()=>{
 
 test('coordenador não recebe privilégios administrativos sensíveis',()=>{
  const rbac=read('config/rbac.js');
- ['usuarios','usuarios_delete','rh_sensitive','compras_manage','almoxarifado_manage','estoque_manage'].forEach(key=>{
+ ['usuarios','usuarios_delete','rh_sensitive','compras_manage','compras_delete','diretoria_aprovacao','almoxarifado_manage','estoque_manage'].forEach(key=>{
    const line=rbac.split('\n').find(l=>l.includes(key+':'));
    assert.ok(line && !line.includes('ROLE.COORDENADOR_RECICLAGEM'),key+' deve permanecer restrito');
  });

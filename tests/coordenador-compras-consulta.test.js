@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { getAcompanhamentoScope, canViewSetor } = require('../modules/acompanhamento-compras/acompanhamento-compras.scope');
 const { ACCESS, canAccessModule, normalizeRole } = require('../config/rbac');
+
 const user = { id: 10, role: 'COORDENADOR_RECICLAGEM', setor: 'LOGÍSTICA' };
 
 test('setor do coordenador é imposto pelo perfil, inclusive para aliases', () => {
@@ -14,7 +15,7 @@ test('setor do coordenador é imposto pelo perfil, inclusive para aliases', () =
   }
 });
 
-test('serviço força filtro de Reciclagem e bloqueia detalhe de outro setor', () => {
+test('serviço de acompanhamento força Reciclagem e bloqueia detalhe de outro setor', () => {
   const servicePath = require.resolve('../modules/acompanhamento-compras/acompanhamento-compras.service');
   const replacements = [
     ['../database/db', { prepare: () => ({ get: () => undefined }) }],
@@ -44,26 +45,45 @@ test('serviço força filtro de Reciclagem e bloqueia detalhe de outro setor', (
   }
 });
 
-test('middleware libera leitura e recusa permissões de escrita', () => {
-  const { requireRole } = require('../modules/auth/auth.middleware');
-  const req = { session: { user }, flash() {}, accepts: () => false };
-  const res = { status(code) { this.code = code; return this; }, json() {} };
-  let passed = false;
-  requireRole(ACCESS.acompanhamento_compras)(req, res, () => { passed = true; });
-  assert.equal(passed, true);
-  for (const key of ['compras_manage', 'compras_delete', 'solicitacoes_create', 'solicitacoes_manage', 'diretoria_aprovacao', 'almoxarifado_manage']) {
-    requireRole(ACCESS[key])(req, res, () => assert.fail(key));
-    assert.equal(res.code, 403);
+test('RBAC concede ações somente pelas chaves escopadas da Reciclagem', () => {
+  for (const key of [
+    'acompanhamento_compras',
+    'compras_reciclagem_read',
+    'compras_reciclagem_manage',
+    'solicitacoes_reciclagem_read',
+    'solicitacoes_reciclagem_create',
+    'solicitacoes_reciclagem_manage',
+    'solicitacoes_reciclagem_delete',
+  ]) {
+    assert.equal(canAccessModule(user.role, key), true, key);
   }
+
+  for (const key of [
+    'compras',
+    'compras_read',
+    'compras_manage',
+    'compras_delete',
+    'solicitacoes_delete',
+    'diretoria_aprovacao',
+    'pre_solicitacao_setor_approve',
+    'almoxarifado_manage',
+    'estoque_manage',
+  ]) {
+    assert.equal(canAccessModule(user.role, key), false, key);
+  }
+
+  assert.ok(Array.isArray(ACCESS.compras_reciclagem_manage));
 });
 
-test('menu oferece acompanhamento diretamente sem abrir compras operacionais', () => {
+test('menu oferece Solicitações e Compras operacionais sem conceder módulos globais', () => {
   const fs = require('node:fs');
   const ejs = require('ejs');
   const html = ejs.render(fs.readFileSync(require.resolve('../views/partials/sidebar.ejs'), 'utf8'), {
     user, normalizeRole, canAccessModule, activeMenu: 'solicitacoes', operationalCounters: {},
   });
-  assert.match(html, /href="\/acompanhamento-compras"/);
-  assert.doesNotMatch(html, /href="\/compras\/solicitacoes"/);
-  assert.doesNotMatch(html, /href="\/solicitacoes\/minhas"/);
+
+  assert.match(html, /href="\/solicitacoes\/minhas"/);
+  assert.match(html, /href="\/compras\/solicitacoes"/);
+  assert.doesNotMatch(html, /href="\/almoxarifado\/recebimentos"/);
+  assert.doesNotMatch(html, /href="\/fornecedores"/);
 });

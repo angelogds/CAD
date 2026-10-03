@@ -288,7 +288,13 @@ function getOperationalQueue(filters = {}) {
   const q = normalizeToken(filters.query);
   if (q) filtered = filtered.filter((row) => [row.numero, row.titulo, row.os_id, row.equipamento_nome, row.setor_origem,
     row.fornecedor_nome || row.fornecedor, row.responsavel_nome || row.solicitante_nome].some((value) => normalizeToken(value).includes(q)));
-  if (filters.setor) filtered = filtered.filter((row) => setorMatches(row.setor_origem, filters.setor));
+  if (filters.setor) {
+    const setorFiltro = normalizeSetorCorporativo(filters.setor);
+    filtered = filtered.filter((row) => {
+      const setorRow = normalizeSetorCorporativo(row.setor_origem);
+      return setorMatches(row.setor_origem, filters.setor) || (setorFiltro === 'RECICLAGEM' && !setorRow);
+    });
+  }
   if (filters.responsavel) filtered = filtered.filter((row) => String(row.compras_user_id || '') === String(filters.responsavel));
   if (filters.prioridade) filtered = filtered.filter((row) => row.priorityGroup === filters.prioridade);
   if (tab === 'active' && filters.card) filtered = filtered.filter((row) => matchesCard(row, filters.card));
@@ -306,12 +312,27 @@ function getOperationalQueue(filters = {}) {
     responsaveis: [...new Map(rows.filter(r => r.compras_user_id).map(r => [String(r.compras_user_id), { id: r.compras_user_id, nome: r.responsavel_nome || 'Não definido' }])).values()] };
 }
 
-function getAnalytics(period = 30) {
+function getAnalytics(period = 30, setor = '') {
   const days = [7, 30, 90].includes(Number(period)) ? Number(period) : 30;
   const visibility = columnExists('solicitacoes','tipo_origem') && columnExists('solicitacoes','disponivel_compras')
     ? " AND (UPPER(COALESCE(tipo_origem,'')) <> 'PRE_SOLICITACAO_ALMOX' OR COALESCE(disponivel_compras,0)=1)"
     : "";
-  const rows = db.prepare(`SELECT status, COUNT(*) total FROM solicitacoes WHERE date(created_at)>=date('now', ?)${visibility} GROUP BY status`).all(`-${days} days`);
+  const where = ["date(created_at)>=date('now', ?)"];
+  const params = [`-${days} days`];
+
+  if (setor) {
+    const aliases = dbAliasesForSetor(setor);
+    const setorCanonical = normalizeSetorCorporativo(setor);
+    if (aliases.length) {
+      const clause = `setor_origem IN (${aliases.map(() => '?').join(',')})`;
+      where.push(setorCanonical === 'RECICLAGEM'
+        ? `(${clause} OR setor_origem IS NULL OR TRIM(COALESCE(setor_origem,''))='')`
+        : clause);
+      params.push(...aliases);
+    }
+  }
+
+  const rows = db.prepare(`SELECT status, COUNT(*) total FROM solicitacoes WHERE ${where.join(' AND ')}${visibility} GROUP BY status`).all(...params);
   const resumo = Object.fromEntries(STATUS_COMPRAS.map(status => [status, 0]));
   rows.forEach(row => { const status = normalizeStatus(row.status); if (status in resumo) resumo[status] += row.total; });
   return resumo;

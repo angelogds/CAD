@@ -74,6 +74,14 @@ const ACCESS = {
 
   compras_read: [ROLE.ADMIN, ROLE.COMPRAS, ROLE.DIRETORIA, ROLE.GESTAO, ROLE.PCM, ROLE.MANUTENCAO_SUPERVISOR, ROLE.ENCARREGADO_MANUTENCAO],
   compras_manage: [ROLE.ADMIN, ROLE.COMPRAS],
+  // Coordenador da Reciclagem opera somente registros do próprio setor.
+  // As rotas que usam estas chaves DEVEM aplicar o guard de escopo da Reciclagem.
+  compras_reciclagem_read: [ROLE.COORDENADOR_RECICLAGEM],
+  compras_reciclagem_manage: [ROLE.COORDENADOR_RECICLAGEM],
+  solicitacoes_reciclagem_read: [ROLE.COORDENADOR_RECICLAGEM],
+  solicitacoes_reciclagem_create: [ROLE.COORDENADOR_RECICLAGEM],
+  solicitacoes_reciclagem_manage: [ROLE.COORDENADOR_RECICLAGEM],
+  solicitacoes_reciclagem_delete: [ROLE.COORDENADOR_RECICLAGEM],
   // Acompanhamento gerencial: consulta por setor, sem ações de compra/recebimento.
   acompanhamento_compras: [ROLE.ADMIN, ROLE.RH, ROLE.MANUTENCAO_SUPERVISOR, ROLE.ENCARREGADO_MANUTENCAO, ROLE.ENCARREGADO_LOGISTICA, ROLE.ENCARREGADO_FRIGORIFICO],
   solicitacoes_read: [ROLE.INSPECAO_QUALIDADE, ROLE.ADMIN, ROLE.DIRETORIA, ROLE.COMPRAS, ROLE.ALMOXARIFADO, ROLE.RH, ROLE.ENCARREGADO_PRODUCAO, ROLE.ENCARREGADO_MANUTENCAO, ROLE.MANUTENCAO_SUPERVISOR, ROLE.ENCARREGADO_LOGISTICA, ROLE.ENCARREGADO_FRIGORIFICO, ROLE.COORDENADOR_RECICLAGEM],
