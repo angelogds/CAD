@@ -283,3 +283,83 @@ export function solveChamfer(line1, pick1, line2, pick2, distance1, distance2 = 
     chamfer: { x1: point1.x, y1: point1.y, x2: point2.x, y2: point2.y },
   };
 }
+
+
+export function solveCircularRecess(targetGeometry, cutterGeometry, targetPick) {
+  const target = clone(targetGeometry);
+  const cutter = clone(cutterGeometry);
+  const tCenter = { x: Number(target.cx), y: Number(target.cy) };
+  const cCenter = { x: Number(cutter.cx), y: Number(cutter.cy) };
+  const r1 = Math.abs(Number(target.radius));
+  const r2 = Math.abs(Number(cutter.radius));
+
+  if (![tCenter.x, tCenter.y, cCenter.x, cCenter.y, r1, r2].every(Number.isFinite) || r1 <= EPS || r2 <= EPS) {
+    return { ok: false, error: 'Geometria circular inválida.' };
+  }
+
+  const dx = cCenter.x - tCenter.x;
+  const dy = cCenter.y - tCenter.y;
+  const d = Math.hypot(dx, dy);
+  if (d <= EPS || d > r1 + r2 + EPS || d < Math.abs(r1 - r2) - EPS) {
+    return { ok: false, error: 'Os círculos precisam se cruzar em dois pontos.' };
+  }
+
+  const a = ((r1 * r1) - (r2 * r2) + (d * d)) / (2 * d);
+  const h2 = (r1 * r1) - (a * a);
+  if (h2 <= EPS) return { ok: false, error: 'O aparo circular exige duas interseções distintas.' };
+
+  const h = Math.sqrt(Math.max(0, h2));
+  const x0 = tCenter.x + (a * dx) / d;
+  const y0 = tCenter.y + (a * dy) / d;
+  const rx = -(dy * h) / d;
+  const ry = (dx * h) / d;
+  const intersections = [
+    { x: x0 + rx, y: y0 + ry },
+    { x: x0 - rx, y: y0 - ry },
+  ];
+
+  const angle = (center, point) => normalizeAngleRad(Math.atan2(point.y - center.y, point.x - center.x));
+  const p1Target = angle(tCenter, intersections[0]);
+  const p2Target = angle(tCenter, intersections[1]);
+  const pickAngle = angle(tCenter, targetPick || intersections[0]);
+
+  const ccwSweep = normalizeAngleRad(p2Target - p1Target);
+  const pickSweep = normalizeAngleRad(pickAngle - p1Target);
+  const removedIsCcw = pickSweep <= ccwSweep + 1e-8;
+
+  const targetArc = {
+    ...target,
+    startAngle: p1Target,
+    endAngle: p2Target,
+    ccw: !removedIsCcw,
+  };
+
+  const p1Cutter = angle(cCenter, intersections[0]);
+  const p2Cutter = angle(cCenter, intersections[1]);
+
+  const midpoint = (ccw) => {
+    const sweep = ccw
+      ? normalizeAngleRad(p2Cutter - p1Cutter)
+      : normalizeAngleRad(p1Cutter - p2Cutter);
+    const midAngle = normalizeAngleRad(p1Cutter + (ccw ? 1 : -1) * (sweep / 2));
+    return {
+      x: cCenter.x + Math.cos(midAngle) * r2,
+      y: cCenter.y + Math.sin(midAngle) * r2,
+    };
+  };
+
+  const midCcw = midpoint(true);
+  const midCw = midpoint(false);
+  const distCcw = distance(midCcw, tCenter);
+  const distCw = distance(midCw, tCenter);
+  const recessIsCcw = distCcw <= distCw;
+
+  const recessArc = {
+    ...cutter,
+    startAngle: p1Cutter,
+    endAngle: p2Cutter,
+    ccw: recessIsCcw,
+  };
+
+  return { ok: true, intersections, targetArc, recessArc };
+}
