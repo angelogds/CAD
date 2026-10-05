@@ -150,6 +150,7 @@ export class DesenhoTecnicoController {
     this.commandHistory = [];
     this.commandHistoryIndex = 0;
     this.lastCommand = '';
+    this.emptyStateDismissed = false;
     this.ctx = {
       state: this.state,
       viewport: this.viewport,
@@ -535,7 +536,7 @@ export class DesenhoTecnicoController {
     this.updateStatus();
     this.syncToolbarState();
     const emptyState = document.getElementById('cadEmptyState');
-    if (emptyState) emptyState.hidden = this.state.entities.length > 0;
+    if (emptyState) emptyState.hidden = this.state.entities.length > 0 || this.emptyStateDismissed;
     const entityCount = document.getElementById('cadEntityCount');
     if (entityCount) entityCount.textContent = `${this.state.entities.length} objeto${this.state.entities.length === 1 ? '' : 's'}`;
   }
@@ -717,10 +718,17 @@ export class DesenhoTecnicoController {
 
   }
 
+  dismissEmptyState() {
+    this.emptyStateDismissed = true;
+    const emptyState = document.getElementById('cadEmptyState');
+    if (emptyState) emptyState.hidden = true;
+  }
+
   executeAction(action, source) {
     if (!action) return;
     if (action.startsWith('tool-')) {
       const tool = source?.dataset?.tool || action.slice(5).replaceAll('-', '_');
+      this.dismissEmptyState();
       this.toolManager.set(tool);
       this.eventBus.emit('tool:changed', this.toolManager.name);
       this.state.statusMessage = `Ferramenta ativa: ${this.getToolLabel(tool)}`;
@@ -729,6 +737,11 @@ export class DesenhoTecnicoController {
     }
 
     const actions = {
+      'dismiss-empty-state': () => {
+        this.dismissEmptyState();
+        this.state.statusMessage = 'Área de desenho liberada';
+        this.render();
+      },
       'zoom-extents': () => this.viewport.zoomExtents(this.renderer.getGlobalBounds()),
       'reset-view': () => { this.viewport.resetView(); this.fitInitial(); },
       'toggle-grid': () => { this.state.gridConfig.visible = !this.state.gridConfig.visible; this.markDirty('Grade atualizada'); this.render(); },

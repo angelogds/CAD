@@ -507,3 +507,33 @@
     grid-template-columns:60px minmax(0,1fr);
   }
 }
+
+
+/* A introdução nunca pode bloquear o trabalho no canvas. */
+.cad-fullscreen .cad-empty-state{
+  position:absolute;
+}
+.cad-fullscreen .cad-empty-state[hidden]{
+  display:none !important;
+}
+.cad-fullscreen .cad-empty-dismiss{
+  position:absolute;
+  top:10px;
+  right:10px;
+  width:30px;
+  height:30px;
+  display:grid;
+  place-items:center;
+  border:1px solid #dbe5df;
+  border-radius:8px;
+  background:#fff;
+  color:#64748b;
+  font-size:18px;
+  line-height:1;
+  cursor:pointer;
+}
+.cad-fullscreen .cad-empty-dismiss:hover{
+  border-color:#8bb89a;
+  background:#ecfdf3;
+  color:#15803d;
+}
