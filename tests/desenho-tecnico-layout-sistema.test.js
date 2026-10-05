@@ -1,11 +1,12 @@
 const fs=require('fs');const path=require('path');const test=require('node:test');const assert=require('node:assert/strict');
 const root=path.join(__dirname,'..');const read=p=>fs.readFileSync(path.join(root,p),'utf8');
 
-test('editor carrega a camada visual do sistema após a base CAD',()=>{
+test('editor carrega a identidade visual do sistema após a base CAD',()=>{
   const view=read('views/desenho-tecnico/cad-editor-v2.ejs');
-  const base=view.indexOf('/css/cad-workspace-definitive.css');
+  const base=view.indexOf('/css/cad-autocad.css');
   const shell=view.indexOf('/css/cad-system-shell.css');
   assert.ok(base>=0 && shell>base);
+  assert.doesNotMatch(view,/cad-workspace-definitive\.css/);
 });
 
 test('tema do CAD reutiliza identidade verde e preserva canvas técnico',()=>{
