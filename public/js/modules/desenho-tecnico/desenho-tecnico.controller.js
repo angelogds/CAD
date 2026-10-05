@@ -756,6 +756,12 @@ export class DesenhoTecnicoController {
         localStorage.setItem('cad-theme', useLight ? 'light' : 'dark');
         this.render();
       },
+      'toggle-left-panel': () => {
+        const root = document.querySelector('.cad-fullscreen');
+        if (!root) return;
+        root.classList.toggle('cad-left-collapsed');
+        setTimeout(() => this.eventBus.emit('layout:changed'), 230);
+      },
       'toggle-right-panel': () => {
         const root = document.querySelector('.cad-fullscreen');
         if (!root) return;
@@ -1050,14 +1056,27 @@ export class DesenhoTecnicoController {
 
   setupLayoutControls() {
     const root = document.querySelector('.cad-fullscreen');
+    const leftToggle = document.getElementById('cadLeftToggle');
     const rightToggle = document.getElementById('cadRightToggle');
-    if (!root || !rightToggle) return;
+    if (!root) return;
 
     const syncToggle = () => {
-      const collapsed = root.classList.contains('cad-right-collapsed');
-      rightToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-      rightToggle.setAttribute('aria-label', collapsed ? 'Expandir painel direito' : 'Recolher painel direito');
-      rightToggle.setAttribute('title', collapsed ? 'Expandir painel direito' : 'Recolher painel direito');
+      const leftCollapsed = root.classList.contains('cad-left-collapsed');
+      const rightCollapsed = root.classList.contains('cad-right-collapsed');
+
+      document.querySelectorAll('[data-action="toggle-left-panel"]').forEach((button) => {
+        button.setAttribute('aria-expanded', leftCollapsed ? 'false' : 'true');
+        button.setAttribute('aria-label', leftCollapsed ? 'Expandir painel esquerdo' : 'Recolher painel esquerdo');
+        button.setAttribute('title', leftCollapsed ? 'Expandir painel esquerdo' : 'Recolher painel esquerdo');
+      });
+      document.querySelectorAll('[data-action="toggle-right-panel"]').forEach((button) => {
+        button.setAttribute('aria-expanded', rightCollapsed ? 'false' : 'true');
+        button.setAttribute('aria-label', rightCollapsed ? 'Expandir painel direito' : 'Recolher painel direito');
+        button.setAttribute('title', rightCollapsed ? 'Expandir painel direito' : 'Recolher painel direito');
+      });
+
+      if (leftToggle) leftToggle.textContent = leftCollapsed ? '›' : '‹';
+      if (rightToggle) rightToggle.textContent = rightCollapsed ? '‹' : '›';
     };
 
     syncToggle();

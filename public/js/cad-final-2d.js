@@ -130,12 +130,12 @@ function addGroup(ribbon, className, label, items, before = null) {
 function ensureStyleSheet() {
   const existing = document.querySelector('link[data-cad-final2d-style]');
   if (existing) {
-    existing.href = '/css/cad-solidworks-workbench.css?v=20260822-autocad-icons-v3';
+    existing.href = '/css/cad-solidworks-workbench.css?v=20261005-panels-v1';
     return;
   }
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = '/css/cad-solidworks-workbench.css?v=20260822-autocad-icons-v3';
+  link.href = '/css/cad-solidworks-workbench.css?v=20261005-panels-v1';
   link.dataset.cadFinal2dStyle = '1';
   document.head.appendChild(link);
 }
@@ -168,7 +168,7 @@ function installTechnicalShell(cad) {
   if (left && !left.querySelector('.cad-feature-manager-head')) {
     const head = document.createElement('div');
     head.className = 'cad-feature-manager-head';
-    head.innerHTML = '<strong>FeatureManager</strong><span>Árvore e ferramentas do desenho</span>';
+    head.innerHTML = '<div class="cad-feature-manager-copy"><strong>FeatureManager</strong><span>Árvore e ferramentas do desenho</span></div><button class="cad-side-header-toggle" data-action="toggle-left-panel" type="button" aria-label="Recolher painel esquerdo" title="Recolher painel esquerdo">‹</button>';
     left.prepend(head);
   } else if (left?.querySelector('.cad-feature-manager-head span')) {
     left.querySelector('.cad-feature-manager-head span').textContent = 'Árvore e ferramentas do desenho';

@@ -1135,3 +1135,162 @@ body.cad-technical-mode {
   .cad-drawing-tab small { display: none; }
   .cad-view-system span { display: none; }
 }
+
+
+/* =========================================================
+   PAINÉIS LATERAIS RECOLHÍVEIS — WORKSPACE AMPLIADO
+   ========================================================= */
+.cad-technical-shell .cad-panel-left,
+.cad-technical-shell .cad-panel-right {
+  transition: transform 180ms ease, opacity 160ms ease !important;
+}
+
+.cad-technical-shell.cad-left-collapsed .cad-workspace {
+  grid-template-columns: 0 minmax(0, 1fr) 292px !important;
+}
+.cad-technical-shell.cad-right-collapsed .cad-workspace {
+  grid-template-columns: 218px minmax(0, 1fr) 0 !important;
+}
+.cad-technical-shell.cad-left-collapsed.cad-right-collapsed .cad-workspace {
+  grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+}
+
+.cad-technical-shell.cad-left-collapsed .cad-panel-left {
+  transform: translateX(-100%) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.cad-technical-shell.cad-right-collapsed .cad-panel-right {
+  transform: translateX(100%) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Os controles de recolhimento acompanham a borda dos painéis. */
+.cad-technical-shell .cad-panel-handle {
+  top: 58px !important;
+  z-index: 45 !important;
+  width: 24px !important;
+  height: 34px !important;
+  border: 1px solid #4d5862 !important;
+  background: #30383f !important;
+  color: #d8dde1 !important;
+  box-shadow: 0 3px 10px rgba(0,0,0,.22) !important;
+}
+.cad-technical-shell .cad-panel-handle:hover {
+  background: #3b454e !important;
+  border-color: #66737d !important;
+  color: #fff !important;
+}
+.cad-technical-shell .cad-panel-handle-left {
+  left: 218px !important;
+  right: auto !important;
+  border-left: 0 !important;
+  border-right: 1px solid #4d5862 !important;
+  border-radius: 0 5px 5px 0 !important;
+}
+.cad-technical-shell .cad-panel-handle-right {
+  right: 292px !important;
+  left: auto !important;
+  border-right: 0 !important;
+  border-radius: 5px 0 0 5px !important;
+}
+.cad-technical-shell.cad-left-collapsed .cad-panel-handle-left {
+  left: 0 !important;
+}
+.cad-technical-shell.cad-right-collapsed .cad-panel-handle-right {
+  right: 0 !important;
+  transform: none !important;
+}
+
+/* FeatureManager com botão no cabeçalho, no mesmo acabamento do CAD. */
+.cad-technical-shell .cad-feature-manager-head {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+.cad-technical-shell .cad-feature-manager-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cad-technical-shell .cad-side-header-toggle,
+.cad-technical-shell .cad-inspector-head [data-action="toggle-right-panel"] {
+  flex: 0 0 28px;
+  width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border: 1px solid #4d5862 !important;
+  border-radius: 3px !important;
+  background: #30383f !important;
+  color: #d8dde1 !important;
+  cursor: pointer;
+}
+.cad-technical-shell .cad-side-header-toggle:hover,
+.cad-technical-shell .cad-inspector-head [data-action="toggle-right-panel"]:hover {
+  background: #3b454e !important;
+  border-color: #66737d !important;
+  color: #fff !important;
+}
+
+/* PropertyManager sem blocos brancos: mesma tonalidade cinza do restante. */
+.cad-technical-shell .cad-panel-right,
+.cad-technical-shell .cad-panel-content,
+.cad-technical-shell .cad-inspector-section,
+.cad-technical-shell .cad-inspector-section[open],
+.cad-technical-shell .cad-props-grid {
+  background: var(--cad-panel) !important;
+}
+.cad-technical-shell .cad-panel-content {
+  border-color: #3d464e !important;
+}
+.cad-technical-shell .cad-muted,
+.cad-technical-shell .cad-snap-options,
+.cad-technical-shell .cad-field,
+.cad-technical-shell .cad-field span,
+.cad-technical-shell .cad-precision-help {
+  color: #adb7bf !important;
+}
+.cad-technical-shell .cad-input,
+.cad-technical-shell .cad-select,
+.cad-technical-shell textarea.cad-input {
+  background: #1f262c !important;
+  color: #edf1f4 !important;
+  border-color: #4e5a64 !important;
+}
+
+/* O canvas ocupa imediatamente o espaço liberado. */
+.cad-technical-shell .cad-canvas-container,
+.cad-technical-shell #cadCanvas {
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+@media (max-width: 1180px) {
+  .cad-technical-shell.cad-left-collapsed .cad-workspace {
+    grid-template-columns: 0 minmax(0, 1fr) 284px !important;
+  }
+  .cad-technical-shell.cad-right-collapsed .cad-workspace {
+    grid-template-columns: 214px minmax(0, 1fr) 0 !important;
+  }
+  .cad-technical-shell.cad-left-collapsed.cad-right-collapsed .cad-workspace {
+    grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+  }
+  .cad-technical-shell .cad-panel-handle-left { left: 214px !important; }
+  .cad-technical-shell .cad-panel-handle-right { right: 284px !important; }
+  .cad-technical-shell.cad-left-collapsed .cad-panel-handle-left { left: 0 !important; }
+  .cad-technical-shell.cad-right-collapsed .cad-panel-handle-right { right: 0 !important; }
+}
+
+@media (max-width: 900px) {
+  .cad-technical-shell.cad-left-collapsed .cad-workspace,
+  .cad-technical-shell.cad-right-collapsed .cad-workspace,
+  .cad-technical-shell.cad-left-collapsed.cad-right-collapsed .cad-workspace {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
