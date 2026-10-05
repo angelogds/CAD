@@ -73,7 +73,7 @@
   </div>
 
   <div class="cad-workspace" id="cadWorkspace">
-    <aside class="cad-panel-left" aria-label="Ferramentas CAD">
+    <aside class="cad-panel-left" id="cadLeftPanel" aria-label="Ferramentas CAD">
       <div class="cad-tool-group">
         <span class="cad-tool-group-label">Criar</span>
         <button class="cad-tool-btn" data-action="tool-select" data-tool="select" type="button"><span class="cad-tool-icon">⌁</span><span>Selecionar</span></button>
@@ -98,6 +98,7 @@
         <button class="cad-tool-btn" data-action="tool-zoom-window" data-tool="zoom-window" type="button"><span class="cad-tool-icon">⌗</span><span>Zoom janela</span></button>
       </div>
     </aside>
+    <button class="cad-panel-handle cad-panel-handle-left" id="cadLeftToggle" data-action="toggle-left-panel" type="button" aria-label="Recolher painel esquerdo" aria-expanded="true" title="Recolher painel esquerdo">‹</button>
 
     <main class="cad-canvas-container">
       <div class="cad-canvas-context">
@@ -190,7 +191,7 @@
         </div>
       </details>
     </aside>
-    <button class="cad-panel-handle" id="cadRightToggle" data-action="toggle-right-panel" type="button" aria-label="Recolher painel direito" aria-expanded="true" title="Recolher painel direito">→</button>
+    <button class="cad-panel-handle cad-panel-handle-right" id="cadRightToggle" data-action="toggle-right-panel" type="button" aria-label="Recolher painel direito" aria-expanded="true" title="Recolher painel direito">→</button>
   </div>
 
   <footer class="cad-statusbar" id="cadStatusBar">
