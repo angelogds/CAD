@@ -175,18 +175,25 @@ function enhanceCadWorkspace(cad) {
   cad?.render?.();
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+export function startCadEditor() {
+  if (window.CAD_APP) {
+    document.documentElement.dataset.cadEngine = 'stable-2d';
+    return window.CAD_APP;
+  }
+
   document.documentElement.dataset.cadEngine = 'stable-2d';
   const cad = bootstrapDesenhoTecnico();
   if (!cad) {
     const s = document.getElementById('cadStatusMessage');
     if (s) s.textContent = 'Falha ao inicializar editor técnico.';
     document.documentElement.dataset.cadEngine = 'stable-2d-error';
-    return;
+    return null;
   }
 
   installAdvancedTools(cad);
   enhanceCadWorkspace(cad);
   const s = document.getElementById('cadStatusMessage');
   if (s) s.textContent = 'Editor CAD 2D pronto • mm • salvamento automático ativo';
-});
+  document.documentElement.dataset.cadInteractive = 'true';
+  return cad;
+}
