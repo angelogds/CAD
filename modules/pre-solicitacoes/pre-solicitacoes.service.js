@@ -19,6 +19,34 @@ const ITEM_STATUS = Object.freeze({
   REPROVADO: 'REPROVADO',
 });
 
+const UNIT_OPTIONS = Object.freeze([
+  { value: 'UN', label: 'Unidade' },
+  { value: 'KG', label: 'Quilograma' },
+  { value: 'G', label: 'Grama' },
+  { value: 'L', label: 'Litro' },
+  { value: 'ML', label: 'Mililitro' },
+  { value: 'M', label: 'Metro' },
+  { value: 'CM', label: 'Centímetro' },
+  { value: 'MM', label: 'Milímetro' },
+  { value: 'M2', label: 'Metro quadrado' },
+  { value: 'M3', label: 'Metro cúbico' },
+  { value: 'PC', label: 'Peça' },
+  { value: 'PAR', label: 'Par' },
+  { value: 'JG', label: 'Jogo' },
+  { value: 'KIT', label: 'Kit' },
+  { value: 'CX', label: 'Caixa' },
+  { value: 'PCT', label: 'Pacote' },
+  { value: 'SC', label: 'Saco' },
+  { value: 'RL', label: 'Rolo' },
+  { value: 'BD', label: 'Balde' },
+  { value: 'GL', label: 'Galão' },
+  { value: 'FR', label: 'Frasco' },
+  { value: 'TB', label: 'Tubo' },
+  { value: 'BR', label: 'Barra' },
+  { value: 'CH', label: 'Chapa' },
+  { value: 'TAMB', label: 'Tambor' },
+]);
+
 const SETORES = solicitacoesService.SETORES;
 const SETOR_OPTIONS = Object.freeze([
   { value: SETORES.RECICLAGEM, label: 'Reciclagem', hint: 'Manutenção e produção' },
@@ -575,6 +603,7 @@ function formOptions() {
   return {
     setores: SETOR_OPTIONS,
     subareas: SUBAREAS,
+    unidades: UNIT_OPTIONS,
     estoqueItens: solicitacoesService.listEstoqueItens(),
   };
 }
@@ -583,6 +612,7 @@ module.exports = {
   ORIGIN,
   PRE_STATUS,
   ITEM_STATUS,
+  UNIT_OPTIONS,
   SETOR_OPTIONS,
   SUBAREAS,
   APPROVER_ROLES,
