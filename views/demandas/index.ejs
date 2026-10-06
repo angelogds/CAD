@@ -10,6 +10,8 @@
   const priorityLabel = value => ({ BAIXA: 'Baixa', NORMAL: 'Média', ALTA: 'Alta', URGENTE: 'Crítica' }[value] || value || 'Média');
   const categoryLabel = value => ({ MANUTENCAO:'Manutenção', PRODUCAO:'Produção', NR:'NR', SEGURANCA:'Segurança', AUDITORIA:'Auditoria', MELHORIA:'Melhoria', PROJETO:'Projeto', DIRETORIA:'Diretoria' }[value] || value || 'Manutenção');
   const slug = value => String(value || '').toLowerCase().replace(/_/g, '-');
+  const canManageDemand = canAccessModule(normalizeRole(user?.role), 'demandas_manage');
+  const canDeleteDemand = canAccessModule(normalizeRole(user?.role), 'demandas_delete');
   const query = changes => {
     const values = { ...filters, ...changes };
     const params = new URLSearchParams();
@@ -147,7 +149,17 @@
                     <% } %>
                   </div>
                 </div>
-                <div class="demand-row-action" data-label="Ação"><a class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" href="/demandas/<%= d.id %>">Abrir</a></div>
+                <div class="demand-row-action demand-row-actions" data-label="Ação">
+                  <a class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" href="/demandas/<%= d.id %>">Abrir</a>
+                  <% if (canManageDemand && !['CONCLUIDA','CANCELADA'].includes(d.status)) { %>
+                    <a class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" href="/demandas/<%= d.id %>/edit">Editar</a>
+                  <% } %>
+                  <% if (canDeleteDemand) { %>
+                    <form method="POST" action="/demandas/<%= d.id %>/delete" onsubmit="return confirm('Apagar a Demanda #<%= d.id %>? Esta ação só será concluída se não houver OS, solicitação de material ou subdemanda vinculada.')">
+                      <button class="demand-btn demand-btn-small ui-btn ui-btn--danger ui-btn--compact" type="submit">Apagar</button>
+                    </form>
+                  <% } %>
+                </div>
               </article>
             <% }) %>
           </div>
