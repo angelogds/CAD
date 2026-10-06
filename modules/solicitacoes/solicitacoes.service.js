@@ -251,6 +251,15 @@ function parseItensFromBody(body = {}) {
     if (value === undefined || value === null || value === "") return [];
     return [value];
   };
+  const parseQuantidade = (value) => {
+    const raw = String(value ?? "").trim();
+    if (!raw) return 0;
+    const normalized = raw.includes(",")
+      ? raw.replace(/\./g, "").replace(",", ".")
+      : raw;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
 
   const nomes = toArray(body.itens_nome ?? body['itens_nome[]'] ?? body.item_nome);
   const especificacoes = toArray(body.itens_especificacao ?? body['itens_especificacao[]'] ?? body.item_descricao);
@@ -263,7 +272,7 @@ function parseItensFromBody(body = {}) {
     item_nome: String(nomes[i] || "").trim(),
     item_descricao: String(especificacoes[i] || "").trim(),
     unidade: String(unidades[i] || "UN").trim() || "UN",
-    qtd_solicitada: Number(quantidades[i] || 0),
+    qtd_solicitada: parseQuantidade(quantidades[i]),
     estoque_item_id: itemIds[i] ? Number(itemIds[i]) : null,
   })).filter((item) => item.item_nome && item.qtd_solicitada > 0);
 }
