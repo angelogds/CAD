@@ -7,7 +7,7 @@
  * depois desse evento e deixar a interface visível, porém sem eventos.
  */
 
-import { startCadEditor } from './cad-legacy-engine.js?v=20261006-trim-v6';
+import { startCadEditor } from './cad-legacy-engine.js?v=20261006-trim-v7';
 
 function setBootStatus(message, isError = false) {
   const status = document.getElementById('cadStatusMessage');
