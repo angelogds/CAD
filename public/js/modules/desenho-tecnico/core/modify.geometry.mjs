@@ -285,7 +285,7 @@ export function solveChamfer(line1, pick1, line2, pick2, distance1, distance2 = 
 }
 
 
-export function solveCircularRecess(targetGeometry, cutterGeometry, targetPick) {
+export function solveCircularRecess(targetGeometry, cutterGeometry, targetPick = null) {
   const target = clone(targetGeometry);
   const cutter = clone(cutterGeometry);
   const tCenter = { x: Number(target.cx), y: Number(target.cy) };
@@ -332,6 +332,15 @@ export function solveCircularRecess(targetGeometry, cutterGeometry, targetPick) 
     if (sweep <= EPS) sweep = TWO_PI;
     return orientedDelta(startAngle, candidateAngle, ccw) <= sweep + 1e-7;
   };
+  const pointOnCircle = (center, radius, candidateAngle) => ({
+    x: center.x + Math.cos(candidateAngle) * radius,
+    y: center.y + Math.sin(candidateAngle) * radius,
+  });
+  const midpointAngle = (startAngle, endAngle, ccw = true) => {
+    const sweep = orientedDelta(startAngle, endAngle, ccw);
+    return normalizeAngleRad(startAngle + (ccw ? 1 : -1) * (sweep / 2));
+  };
+  const insideCutter = (point) => distance(point, cCenter) <= r2 + 1e-7;
 
   const intersections = rawIntersections.filter((point) => (
     containsAngle(target, angle(tCenter, point))
@@ -341,8 +350,8 @@ export function solveCircularRecess(targetGeometry, cutterGeometry, targetPick) 
     return { ok: false, error: 'As duas interseções precisam pertencer ao trecho circular selecionado.' };
   }
 
-  const pickAngle = angle(tCenter, targetPick || intersections[0]);
   const targetArcs = [];
+  let removedTargetArc = null;
 
   if (isArcGeometry(target)) {
     const ccw = target.ccw !== false;
@@ -356,10 +365,23 @@ export function solveCircularRecess(targetGeometry, cutterGeometry, targetPick) 
       .map((item) => ({ ...item, t: orientedDelta(startAngle, item.angle, ccw) }))
       .sort((left, right) => left.t - right.t);
 
-    const pickT = orientedDelta(startAngle, pickAngle, ccw);
-    if (pickT < cuts[0].t - 1e-7 || pickT > cuts[1].t + 1e-7) {
-      return { ok: false, error: 'Clique no trecho do arco entre os dois pontos marcados.' };
+    const middleSweep = cuts[1].t - cuts[0].t;
+    const middleAngle = normalizeAngleRad(cuts[0].angle + (ccw ? 1 : -1) * (middleSweep / 2));
+    const middlePoint = pointOnCircle(tCenter, r1, middleAngle);
+
+    // Para rebaixo, o trecho removido é sempre o pedaço do contorno que fica
+    // dentro do círculo auxiliar. Nunca usamos o clique para escolher o lado,
+    // evitando apagar o arco externo errado.
+    if (!insideCutter(middlePoint)) {
+      return { ok: false, error: 'O círculo auxiliar não envolve o trecho do contorno que deve ser rebaixado.' };
     }
+
+    removedTargetArc = {
+      ...target,
+      startAngle: cuts[0].angle,
+      endAngle: cuts[1].angle,
+      ccw,
+    };
 
     if (cuts[0].t > 1e-7) {
       targetArcs.push({
@@ -380,14 +402,50 @@ export function solveCircularRecess(targetGeometry, cutterGeometry, targetPick) 
   } else {
     const p1Target = angle(tCenter, intersections[0]);
     const p2Target = angle(tCenter, intersections[1]);
-    const betweenSweep = orientedDelta(p1Target, p2Target, true);
-    const pickSweep = orientedDelta(p1Target, pickAngle, true);
-    const removeBetween = pickSweep <= betweenSweep + 1e-7;
+
+    const targetCandidates = [
+      {
+        startAngle: p1Target,
+        endAngle: p2Target,
+        ccw: true,
+      },
+      {
+        startAngle: p2Target,
+        endAngle: p1Target,
+        ccw: true,
+      },
+    ].map((candidate) => {
+      const mid = midpointAngle(candidate.startAngle, candidate.endAngle, candidate.ccw);
+      const point = pointOnCircle(tCenter, r1, mid);
+      return {
+        ...candidate,
+        point,
+        inside: insideCutter(point),
+        cutterDistance: distance(point, cCenter),
+      };
+    }).sort((left, right) => (
+      Number(right.inside) - Number(left.inside)
+      || left.cutterDistance - right.cutterDistance
+    ));
+
+    const removeCandidate = targetCandidates[0];
+    const keepCandidate = targetCandidates[1];
+
+    if (!removeCandidate.inside) {
+      return { ok: false, error: 'Não foi possível identificar o trecho externo que está dentro do círculo auxiliar.' };
+    }
+
+    removedTargetArc = {
+      ...target,
+      startAngle: removeCandidate.startAngle,
+      endAngle: removeCandidate.endAngle,
+      ccw: true,
+    };
 
     targetArcs.push({
       ...target,
-      startAngle: removeBetween ? p2Target : p1Target,
-      endAngle: removeBetween ? p1Target : p2Target,
+      startAngle: keepCandidate.startAngle,
+      endAngle: keepCandidate.endAngle,
       ccw: true,
     });
   }
@@ -399,12 +457,8 @@ export function solveCircularRecess(targetGeometry, cutterGeometry, targetPick) 
   const p1Cutter = angle(cCenter, intersections[0]);
   const p2Cutter = angle(cCenter, intersections[1]);
   const midpoint = (ccw) => {
-    const sweep = orientedDelta(p1Cutter, p2Cutter, ccw);
-    const midAngle = normalizeAngleRad(p1Cutter + (ccw ? 1 : -1) * (sweep / 2));
-    return {
-      x: cCenter.x + Math.cos(midAngle) * r2,
-      y: cCenter.y + Math.sin(midAngle) * r2,
-    };
+    const midAngle = midpointAngle(p1Cutter, p2Cutter, ccw);
+    return pointOnCircle(cCenter, r2, midAngle);
   };
 
   const candidates = [true, false]
@@ -427,6 +481,137 @@ export function solveCircularRecess(targetGeometry, cutterGeometry, targetPick) 
     intersections,
     targetArcs,
     targetArc: targetArcs[0],
+    removedTargetArc,
     recessArc,
+    automatic: targetPick == null,
+  };
+}
+
+
+export function solveCircularTrimSegment(entityGeometry, cutPointA, cutPointB, pickPoint) {
+  const geometry = clone(entityGeometry);
+  const center = { x: Number(geometry.cx), y: Number(geometry.cy) };
+  const radius = Math.abs(Number(geometry.radius));
+
+  if (![center.x, center.y, radius].every(Number.isFinite) || radius <= EPS) {
+    return { ok: false, error: 'Geometria circular inválida.' };
+  }
+  if (![cutPointA, cutPointB, pickPoint].every((point) => (
+    point && Number.isFinite(Number(point.x)) && Number.isFinite(Number(point.y))
+  ))) {
+    return { ok: false, error: 'Defina os dois limites e clique no trecho que deseja apagar.' };
+  }
+
+  const angle = (point) => normalizeAngleRad(Math.atan2(
+    Number(point.y) - center.y,
+    Number(point.x) - center.x,
+  ));
+  const orientedDelta = (from, to, ccw = true) => (
+    ccw ? normalizeAngleRad(to - from) : normalizeAngleRad(from - to)
+  );
+  const pointOnCircle = (candidateAngle) => ({
+    x: center.x + Math.cos(candidateAngle) * radius,
+    y: center.y + Math.sin(candidateAngle) * radius,
+  });
+  const midpointPoint = (startAngle, endAngle, ccw = true) => {
+    const sweep = orientedDelta(startAngle, endAngle, ccw);
+    const midAngle = normalizeAngleRad(startAngle + (ccw ? 1 : -1) * (sweep / 2));
+    return pointOnCircle(midAngle);
+  };
+
+  const a1 = angle(cutPointA);
+  const a2 = angle(cutPointB);
+  const pickAngle = angle(pickPoint);
+  const isArc = Number.isFinite(Number(geometry.startAngle))
+    && Number.isFinite(Number(geometry.endAngle));
+
+  if (!isArc) {
+    const firstSweep = orientedDelta(a1, a2, true);
+    if (firstSweep <= 1e-7 || TWO_PI - firstSweep <= 1e-7) {
+      return { ok: false, error: 'Os dois limites precisam ser pontos diferentes do círculo.' };
+    }
+
+    const pickOnFirst = orientedDelta(a1, pickAngle, true) <= firstSweep + 1e-7;
+    const removedArc = {
+      ...geometry,
+      startAngle: pickOnFirst ? a1 : a2,
+      endAngle: pickOnFirst ? a2 : a1,
+      ccw: true,
+    };
+    const keptArcs = [{
+      ...geometry,
+      startAngle: pickOnFirst ? a2 : a1,
+      endAngle: pickOnFirst ? a1 : a2,
+      ccw: true,
+    }];
+
+    return {
+      ok: true,
+      keptArcs,
+      removedArc,
+      removedMidpoint: midpointPoint(removedArc.startAngle, removedArc.endAngle, true),
+    };
+  }
+
+  const ccw = geometry.ccw !== false;
+  const startAngle = normalizeAngleRad(Number(geometry.startAngle));
+  const endAngle = normalizeAngleRad(Number(geometry.endAngle));
+  let totalSweep = orientedDelta(startAngle, endAngle, ccw);
+  if (totalSweep <= EPS) totalSweep = TWO_PI;
+
+  const tFor = (candidateAngle) => orientedDelta(startAngle, candidateAngle, ccw);
+  const cutTs = [
+    { t: tFor(a1), angle: a1 },
+    { t: tFor(a2), angle: a2 },
+  ].sort((left, right) => left.t - right.t);
+
+  if (cutTs[0].t > totalSweep + 1e-7 || cutTs[1].t > totalSweep + 1e-7) {
+    return { ok: false, error: 'Os limites escolhidos não pertencem ao arco selecionado.' };
+  }
+
+  const pickT = tFor(pickAngle);
+  if (pickT > totalSweep + 1e-7) {
+    return { ok: false, error: 'Clique diretamente em um trecho do arco selecionado.' };
+  }
+
+  const rawSegments = [
+    { t0: 0, t1: cutTs[0].t, startAngle, endAngle: cutTs[0].angle },
+    { t0: cutTs[0].t, t1: cutTs[1].t, startAngle: cutTs[0].angle, endAngle: cutTs[1].angle },
+    { t0: cutTs[1].t, t1: totalSweep, startAngle: cutTs[1].angle, endAngle },
+  ].filter((segment) => segment.t1 - segment.t0 > 1e-7);
+
+  let removeIndex = rawSegments.findIndex((segment) => (
+    pickT > segment.t0 + 1e-7 && pickT < segment.t1 - 1e-7
+  ));
+  if (removeIndex < 0) {
+    removeIndex = rawSegments.findIndex((segment) => (
+      pickT >= segment.t0 - 1e-7 && pickT <= segment.t1 + 1e-7
+    ));
+  }
+  if (removeIndex < 0) {
+    return { ok: false, error: 'Clique no trecho exato que deseja apagar.' };
+  }
+
+  const removedSegment = rawSegments[removeIndex];
+  const removedArc = {
+    ...geometry,
+    startAngle: removedSegment.startAngle,
+    endAngle: removedSegment.endAngle,
+    ccw,
+  };
+  const keptArcs = rawSegments
+    .filter((_, index) => index !== removeIndex)
+    .map((segment) => ({
+      ...geometry,
+      startAngle: segment.startAngle,
+      endAngle: segment.endAngle,
+      ccw,
+    }));
+
+  return {
+    ok: true,
+    keptArcs,
+    removedArc,
+    removedMidpoint: midpointPoint(removedArc.startAngle, removedArc.endAngle, ccw),
   };
 }

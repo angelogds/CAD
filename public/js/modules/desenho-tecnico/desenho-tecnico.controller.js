@@ -19,7 +19,7 @@ import { TextTool } from './tools/text.tool.js';
 import { CenterlineTool } from './tools/centerline.tool.js';
 import { ShaftTool } from './tools/shaft.tool.js';
 import { ArcTool } from './tools/arc.tool.js';
-import { TrimTool } from './tools/trim.tool.js?v=20261006-trim-v5';
+import { TrimTool } from './tools/trim.tool.js?v=20261006-trim-v7';
 import { ExtendTool } from './tools/extend.tool.js';
 import { OffsetTool } from './tools/offset.tool.js';
 import { MirrorTool } from './tools/mirror.tool.js';
