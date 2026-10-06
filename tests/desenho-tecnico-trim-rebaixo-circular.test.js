@@ -82,13 +82,13 @@ test('ferramenta Aparar aceita arco existente como contorno para novos rebaixos'
 });
 
 
-test('APARAR aceita clique direto no trecho azul dentro do círculo auxiliar',()=>{
+test('APARAR mantém o clique direto como fallback sem contrariar o fluxo automático',()=>{
   const src=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/tools/trim.tool.js'),'utf8');
   assert.match(src,/findDirectCircularRecess/);
-  assert.match(src,/clique diretamente no trecho azul/);
   assert.match(src,/distanceToCenter > cutterRadius \+ tolerance/);
   assert.match(src,/this\.smartPair = \[direct\.target, direct\.cutter\]/);
   assert.match(src,/this\.commitCircularRecess\(evt\)/);
+  assert.match(src,/selecione o círculo auxiliar do rebaixo/);
 });
 
 test('cadeia do editor força versão nova do módulo Aparar',()=>{
