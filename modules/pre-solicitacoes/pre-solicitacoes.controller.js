@@ -104,9 +104,21 @@ function detalhe(req, res) {
     sol,
     canReview: service.canReview(sol, req.session.user),
     canEdit: service.canEditDraft(sol, req.session.user),
+    canAddItems: service.canAddItems(sol, req.session.user),
+    estoqueItens: service.formOptions().estoqueItens,
     itemStatus: service.ITEM_STATUS,
     preStatus: service.PRE_STATUS,
   });
+}
+
+function adicionarItens(req, res) {
+  try {
+    const result = service.addItems(Number(req.params.id), req.body, req.session.user);
+    req.flash('success', `${result.adicionados} material(is) adicionado(s) à pré-solicitação.`);
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível adicionar os materiais.');
+  }
+  return res.redirect(`/pre-solicitacoes/${Number(req.params.id)}#adicionar-materiais`);
 }
 
 function decidirItem(req, res) {
@@ -131,4 +143,4 @@ function finalizar(req, res) {
   return res.redirect(`/pre-solicitacoes/${Number(req.params.id)}`);
 }
 
-module.exports = { list, nova, criar, editar, atualizar, detalhe, decidirItem, finalizar };
+module.exports = { list, nova, criar, editar, atualizar, detalhe, adicionarItens, decidirItem, finalizar };
