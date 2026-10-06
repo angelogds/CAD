@@ -37,6 +37,31 @@ function canViewDemand(user, demanda) {
   return canAccessModule(normalizeRole(user.role), 'demandas_view');
 }
 
+function isDemandCreator(user, demanda) {
+  return Boolean(
+    user &&
+    demanda &&
+    Number(user.id || 0) > 0 &&
+    Number(demanda.created_by || 0) === Number(user.id)
+  );
+}
+
+function canEditDemand(user, demanda) {
+  if (!user || !demanda) return false;
+  const role = normalizeRole(user.role);
+  if (role === 'ADMIN') return true;
+  if (isDemandCreator(user, demanda)) return true;
+  return canAccessModule(role, 'demandas_manage');
+}
+
+function canDeleteDemand(user, demanda) {
+  if (!user || !demanda) return false;
+  const role = normalizeRole(user.role);
+  if (role === 'ADMIN') return true;
+  if (isDemandCreator(user, demanda)) return true;
+  return canAccessModule(role, 'demandas_delete');
+}
+
 function list(filters = {}, user) {
   const visibility = visibilityWhere(user);
   // A fila principal exibe somente demandas-raiz. As subdemandas permanecem
@@ -340,7 +365,13 @@ function create(data = {}, user = {}) {
 function updateDetails(id, data = {}) {
   const current = getById(id);
   if (!current) throw new Error('Demanda não encontrada.');
-  if (['CONCLUIDA', 'CANCELADA'].includes(String(current.status || '').toUpperCase())) {
+
+  const actor = { id: data.user_id || null, role: data.user_role || null };
+  if (!canEditDemand(actor, current)) {
+    throw new Error('Você não tem permissão para editar esta demanda.');
+  }
+
+  if (normalizeRole(actor.role) !== 'ADMIN' && ['CONCLUIDA', 'CANCELADA'].includes(String(current.status || '').toUpperCase())) {
     throw new Error('Demandas concluídas ou canceladas não podem ser editadas. Reabra a demanda antes de alterar seus dados.');
   }
 
@@ -390,9 +421,14 @@ function updateDetails(id, data = {}) {
   return getById(id);
 }
 
-function remove(id, { user_id = null } = {}) {
+function remove(id, { user_id = null, user_role = null } = {}) {
   const current = getById(id);
   if (!current) throw new Error('Demanda não encontrada.');
+
+  const actor = { id: user_id, role: user_role };
+  if (!canDeleteDemand(actor, current)) {
+    throw new Error('Você não tem permissão para excluir esta demanda.');
+  }
 
   if (Array.isArray(current.subdemandas) && current.subdemandas.length) {
     throw new Error('Não é possível apagar esta demanda enquanto existirem subdemandas vinculadas. Apague ou reorganize as subdemandas primeiro.');
@@ -406,8 +442,8 @@ function remove(id, { user_id = null } = {}) {
   if (String(current.status || '').toUpperCase() === 'EM_ANDAMENTO') {
     throw new Error('Não é possível apagar uma demanda em andamento. Interrompa ou cancele o fluxo antes de excluir.');
   }
-  if (String(current.status || '').toUpperCase() === 'CONCLUIDA') {
-    throw new Error('Demandas concluídas permanecem no histórico e não podem ser apagadas.');
+  if (normalizeRole(actor.role) !== 'ADMIN' && String(current.status || '').toUpperCase() === 'CONCLUIDA') {
+    throw new Error('Demandas concluídas permanecem no histórico e não podem ser excluídas.');
   }
 
   const parentId = sanitizePositiveId(current.demanda_pai_id);
@@ -698,6 +734,8 @@ module.exports = {
   getPainel,
   getById,
   canViewDemand,
+  canEditDemand,
+  canDeleteDemand,
   create,
   updateDetails,
   remove,
