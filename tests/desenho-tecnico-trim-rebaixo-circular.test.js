@@ -106,3 +106,12 @@ test('cadeia do editor força versão nova do módulo Aparar',()=>{
   assert.match(controller,new RegExp('trim\\.tool\\.js\\?v='+version));
   assert.match(trim,new RegExp('modify\\.geometry\\.mjs\\?v='+version));
 });
+
+
+test('APARAR permite selecionar círculo auxiliar e depois o contorno externo',()=>{
+  const src=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/tools/trim.tool.js'),'utf8');
+  assert.match(src,/APARAR 2\/2: círculo auxiliar selecionado/);
+  assert.match(src,/hasLargerTarget/);
+  assert.match(src,/this\.smartPair = \[target, this\.boundary\]/);
+  assert.match(src,/o círculo auxiliar precisa cruzar o contorno em dois pontos/);
+});
