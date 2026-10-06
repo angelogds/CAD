@@ -313,34 +313,93 @@ export function solveCircularRecess(targetGeometry, cutterGeometry, targetPick) 
   const y0 = tCenter.y + (a * dy) / d;
   const rx = -(dy * h) / d;
   const ry = (dx * h) / d;
-  const intersections = [
+  const rawIntersections = [
     { x: x0 + rx, y: y0 + ry },
     { x: x0 - rx, y: y0 - ry },
   ];
 
   const angle = (center, point) => normalizeAngleRad(Math.atan2(point.y - center.y, point.x - center.x));
-  const p1Target = angle(tCenter, intersections[0]);
-  const p2Target = angle(tCenter, intersections[1]);
-  const pickAngle = angle(tCenter, targetPick || intersections[0]);
-
-  const ccwSweep = normalizeAngleRad(p2Target - p1Target);
-  const pickSweep = normalizeAngleRad(pickAngle - p1Target);
-  const removedIsCcw = pickSweep <= ccwSweep + 1e-8;
-
-  const targetArc = {
-    ...target,
-    startAngle: p1Target,
-    endAngle: p2Target,
-    ccw: !removedIsCcw,
+  const orientedDelta = (from, to, ccw = true) => (
+    ccw ? normalizeAngleRad(to - from) : normalizeAngleRad(from - to)
+  );
+  const isArcGeometry = (geometry) => Number.isFinite(Number(geometry.startAngle)) && Number.isFinite(Number(geometry.endAngle));
+  const containsAngle = (geometry, candidateAngle) => {
+    if (!isArcGeometry(geometry)) return true;
+    const ccw = geometry.ccw !== false;
+    const startAngle = normalizeAngleRad(Number(geometry.startAngle));
+    const endAngle = normalizeAngleRad(Number(geometry.endAngle));
+    let sweep = orientedDelta(startAngle, endAngle, ccw);
+    if (sweep <= EPS) sweep = TWO_PI;
+    return orientedDelta(startAngle, candidateAngle, ccw) <= sweep + 1e-7;
   };
+
+  const intersections = rawIntersections.filter((point) => (
+    containsAngle(target, angle(tCenter, point))
+    && containsAngle(cutter, angle(cCenter, point))
+  ));
+  if (intersections.length !== 2) {
+    return { ok: false, error: 'As duas interseções precisam pertencer ao trecho circular selecionado.' };
+  }
+
+  const pickAngle = angle(tCenter, targetPick || intersections[0]);
+  const targetArcs = [];
+
+  if (isArcGeometry(target)) {
+    const ccw = target.ccw !== false;
+    const startAngle = normalizeAngleRad(Number(target.startAngle));
+    const endAngle = normalizeAngleRad(Number(target.endAngle));
+    let sweep = orientedDelta(startAngle, endAngle, ccw);
+    if (sweep <= EPS) sweep = TWO_PI;
+
+    const cuts = intersections
+      .map((point) => ({ point, angle: angle(tCenter, point) }))
+      .map((item) => ({ ...item, t: orientedDelta(startAngle, item.angle, ccw) }))
+      .sort((left, right) => left.t - right.t);
+
+    const pickT = orientedDelta(startAngle, pickAngle, ccw);
+    if (pickT < cuts[0].t - 1e-7 || pickT > cuts[1].t + 1e-7) {
+      return { ok: false, error: 'Clique no trecho do arco entre os dois pontos marcados.' };
+    }
+
+    if (cuts[0].t > 1e-7) {
+      targetArcs.push({
+        ...target,
+        startAngle,
+        endAngle: cuts[0].angle,
+        ccw,
+      });
+    }
+    if (sweep - cuts[1].t > 1e-7) {
+      targetArcs.push({
+        ...target,
+        startAngle: cuts[1].angle,
+        endAngle,
+        ccw,
+      });
+    }
+  } else {
+    const p1Target = angle(tCenter, intersections[0]);
+    const p2Target = angle(tCenter, intersections[1]);
+    const betweenSweep = orientedDelta(p1Target, p2Target, true);
+    const pickSweep = orientedDelta(p1Target, pickAngle, true);
+    const removeBetween = pickSweep <= betweenSweep + 1e-7;
+
+    targetArcs.push({
+      ...target,
+      startAngle: removeBetween ? p2Target : p1Target,
+      endAngle: removeBetween ? p1Target : p2Target,
+      ccw: true,
+    });
+  }
+
+  if (!targetArcs.length) {
+    return { ok: false, error: 'O aparo removeria todo o trecho circular selecionado.' };
+  }
 
   const p1Cutter = angle(cCenter, intersections[0]);
   const p2Cutter = angle(cCenter, intersections[1]);
-
   const midpoint = (ccw) => {
-    const sweep = ccw
-      ? normalizeAngleRad(p2Cutter - p1Cutter)
-      : normalizeAngleRad(p1Cutter - p2Cutter);
+    const sweep = orientedDelta(p1Cutter, p2Cutter, ccw);
     const midAngle = normalizeAngleRad(p1Cutter + (ccw ? 1 : -1) * (sweep / 2));
     return {
       x: cCenter.x + Math.cos(midAngle) * r2,
@@ -348,18 +407,26 @@ export function solveCircularRecess(targetGeometry, cutterGeometry, targetPick) 
     };
   };
 
-  const midCcw = midpoint(true);
-  const midCw = midpoint(false);
-  const distCcw = distance(midCcw, tCenter);
-  const distCw = distance(midCw, tCenter);
-  const recessIsCcw = distCcw <= distCw;
+  const candidates = [true, false]
+    .map((ccw) => ({ ccw, point: midpoint(ccw) }))
+    .filter((candidate) => containsAngle(cutter, angle(cCenter, candidate.point)))
+    .map((candidate) => ({ ...candidate, dist: distance(candidate.point, tCenter) }))
+    .sort((left, right) => left.dist - right.dist);
+
+  if (!candidates.length) return { ok: false, error: 'Não foi possível determinar o arco interno do rebaixo.' };
 
   const recessArc = {
     ...cutter,
     startAngle: p1Cutter,
     endAngle: p2Cutter,
-    ccw: recessIsCcw,
+    ccw: candidates[0].ccw,
   };
 
-  return { ok: true, intersections, targetArc, recessArc };
+  return {
+    ok: true,
+    intersections,
+    targetArcs,
+    targetArc: targetArcs[0],
+    recessArc,
+  };
 }
