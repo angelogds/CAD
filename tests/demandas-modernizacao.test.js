@@ -99,3 +99,39 @@ test('faixa lateral de cada demanda segue exclusivamente a prioridade', () => {
   assert.doesNotMatch(css, /\.demand-row-v2\.is-stale\{box-shadow:/);
   assert.doesNotMatch(css, /\.demand-row-v2\.is-aging\{box-shadow:/);
 });
+
+
+test('demandas e subdemandas oferecem abrir editar e apagar com RBAC existente', () => {
+  const index = read('views/demandas/index.ejs');
+  const detail = read('views/demandas/view.ejs');
+  const form = read('views/demandas/new.ejs');
+  const routes = read('modules/demandas/demandas.routes.js');
+  const controller = read('modules/demandas/demandas.controller.js');
+  const service = read('modules/demandas/demandas.service.js');
+  const rbac = read('config/rbac.js');
+  const css = read('public/css/demandas.css');
+
+  assert.match(index, />Abrir<\/a>/);
+  assert.match(index, />Editar<\/a>/);
+  assert.match(index, />Apagar<\/button>/);
+  assert.match(detail, /demand-row-actions/);
+  assert.match(detail, /\/demandas\/<%= child\.id %>\/edit/);
+  assert.match(detail, /\/demandas\/<%= child\.id %>\/delete/);
+
+  assert.match(routes, /\/:id\/edit'.*ACCESS\.demandas_manage/);
+  assert.match(routes, /\/:id\/delete'.*ACCESS\.demandas_delete/);
+  assert.match(controller, /function editForm/);
+  assert.match(controller, /function updateDetails/);
+  assert.match(controller, /function remove/);
+  assert.match(service, /function updateDetails/);
+  assert.match(service, /function remove/);
+  assert.match(service, /subdemandas vinculadas/);
+  assert.match(service, /solicitações de materiais vinculadas/);
+  assert.match(service, /Ordem de Serviço vinculada/);
+
+  assert.match(rbac, /demandas_delete:\s*\[ROLE\.ADMIN\]/);
+  assert.match(form, /editMode/);
+  assert.match(form, /Salvar alterações/);
+  assert.match(css, /\.demand-row-actions/);
+  assert.match(index, /ui-btn--danger/);
+});

@@ -337,6 +337,92 @@ function create(data = {}, user = {}) {
   return id;
 }
 
+function updateDetails(id, data = {}) {
+  const current = getById(id);
+  if (!current) throw new Error('Demanda não encontrada.');
+  if (['CONCLUIDA', 'CANCELADA'].includes(String(current.status || '').toUpperCase())) {
+    throw new Error('Demandas concluídas ou canceladas não podem ser editadas. Reabra a demanda antes de alterar seus dados.');
+  }
+
+  const title = String(data.titulo || '').trim();
+  if (!title) throw new Error('Informe o título da demanda.');
+
+  const prioridade = String(data.prioridade || 'NORMAL').trim().toUpperCase();
+  if (!['BAIXA', 'NORMAL', 'ALTA', 'URGENTE'].includes(prioridade)) {
+    throw new Error('Prioridade inválida.');
+  }
+
+  const categoria = normalizeCategory(data.categoria);
+  const role = normalizeRole(data.user_role);
+  if (role === 'RH' && !RH_CATEGORIAS.has(categoria)) {
+    throw new Error('O RH pode registrar demandas somente de NR, Segurança ou Auditoria.');
+  }
+
+  const equipamentoId = sanitizePositiveId(data.equipamento_id);
+  if (equipamentoId && !db.prepare('SELECT 1 FROM equipamentos WHERE id=?').get(equipamentoId)) {
+    throw new Error('Equipamento selecionado não foi encontrado.');
+  }
+
+  db.transaction(() => {
+    db.prepare(`
+      UPDATE demandas
+      SET titulo=?, descricao=?, prioridade=?, equipamento_id=?, categoria=?,
+          setor_origem=?, nr_referencia=?, prazo_previsto=?, custo_servicos_estimado=?,
+          updated_at=datetime('now')
+      WHERE id=?
+    `).run(
+      title,
+      String(data.descricao || '').trim() || null,
+      prioridade,
+      equipamentoId,
+      categoria,
+      String(data.setor_origem || '').trim() || null,
+      String(data.nr_referencia || '').trim() || null,
+      String(data.prazo_previsto || '').trim() || null,
+      Math.max(0, Number(data.custo_servicos_estimado || 0)),
+      id
+    );
+
+    db.prepare(`INSERT INTO demanda_logs (demanda_id, user_id, texto, created_at) VALUES (?, ?, ?, datetime('now'))`)
+      .run(id, data.user_id || null, 'Dados principais da demanda atualizados');
+  })();
+
+  return getById(id);
+}
+
+function remove(id, { user_id = null } = {}) {
+  const current = getById(id);
+  if (!current) throw new Error('Demanda não encontrada.');
+
+  if (Array.isArray(current.subdemandas) && current.subdemandas.length) {
+    throw new Error('Não é possível apagar esta demanda enquanto existirem subdemandas vinculadas. Apague ou reorganize as subdemandas primeiro.');
+  }
+  if (Array.isArray(current.solicitacoes) && current.solicitacoes.length) {
+    throw new Error('Não é possível apagar esta demanda porque já existem solicitações de materiais vinculadas.');
+  }
+  if (Array.isArray(current.ordens) && current.ordens.length) {
+    throw new Error('Não é possível apagar esta demanda porque já existe Ordem de Serviço vinculada.');
+  }
+  if (String(current.status || '').toUpperCase() === 'EM_ANDAMENTO') {
+    throw new Error('Não é possível apagar uma demanda em andamento. Interrompa ou cancele o fluxo antes de excluir.');
+  }
+  if (String(current.status || '').toUpperCase() === 'CONCLUIDA') {
+    throw new Error('Demandas concluídas permanecem no histórico e não podem ser apagadas.');
+  }
+
+  const parentId = sanitizePositiveId(current.demanda_pai_id);
+  const wasSubdemand = Boolean(parentId);
+
+  db.transaction(() => {
+    if (tableExists('demanda_logs')) {
+      db.prepare('DELETE FROM demanda_logs WHERE demanda_id=?').run(id);
+    }
+    db.prepare('DELETE FROM demandas WHERE id=?').run(id);
+  })();
+
+  return { id: Number(id), parentId, wasSubdemand, deletedBy: user_id || null };
+}
+
 function updateStatus(id, { status, responsavel_user_id, user_id }) {
   const st = String(status || '').toUpperCase();
   if (!STATUS.includes(st)) throw new Error('Status inválido');
@@ -613,6 +699,8 @@ module.exports = {
   getById,
   canViewDemand,
   create,
+  updateDetails,
+  remove,
   updateStatus,
   updateApproval,
   materiaisDisponiveisParaExecucao,

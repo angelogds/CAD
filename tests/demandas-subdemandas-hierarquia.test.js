@@ -123,6 +123,33 @@ test('painel lista somente demandas principais e mantém subdemandas dentro do p
     assert.equal(resumo.em_andamento, 0);
     assert.equal(resumo.paradas, 0);
 
+    const childEdited = service.updateDetails(11, {
+      titulo: 'Trocar dentes do rotor',
+      descricao: 'Subdemanda crítica revisada',
+      prioridade: 'URGENTE',
+      equipamento_id: 1,
+      categoria: 'MANUTENCAO',
+      setor_origem: 'Manutenção',
+      nr_referencia: '',
+      prazo_previsto: '',
+      custo_servicos_estimado: 0,
+      user_id: 1,
+      user_role: 'ADMIN',
+    });
+    assert.equal(childEdited.titulo, 'Trocar dentes do rotor');
+    assert.equal(Number(childEdited.demanda_pai_id), 10, 'edição não pode quebrar o vínculo pai-filho');
+
+    assert.throws(
+      () => service.remove(10, { user_id: 1 }),
+      /subdemandas vinculadas/,
+      'demanda pai não pode ser apagada enquanto tiver subdemandas'
+    );
+
+    const removedChild = service.remove(11, { user_id: 1 });
+    assert.equal(removedChild.wasSubdemand, true);
+    assert.equal(Number(removedChild.parentId), 10);
+    assert.equal(service.getById(11), null);
+
     process.stdout.write('ok');
   `;
 

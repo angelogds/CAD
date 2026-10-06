@@ -3,6 +3,12 @@
 <link rel="stylesheet" href="/css/demandas-planejamento.css?v=20260903-v2">
 <%
   const currentRole = normalizeRole(user?.role || '');
+  const isEdit = Boolean(typeof editMode !== 'undefined' && editMode && demanda);
+  const currentDemand = isEdit ? demanda : {};
+  const effectiveParentId = isEdit ? (currentDemand.demanda_pai_id || null) : parentId;
+  const returnHref = isEdit
+    ? '/demandas/' + currentDemand.id
+    : (effectiveParentId ? '/demandas/' + effectiveParentId : '/demandas');
   const categoryLabels = {
     MANUTENCAO: 'Manutenção', PRODUCAO: 'Produção', NR: 'Norma Regulamentadora (NR)',
     SEGURANCA: 'Segurança', AUDITORIA: 'Auditoria', MELHORIA: 'Melhoria',
@@ -11,67 +17,69 @@
   const allowedCategories = currentRole === 'RH'
     ? (categorias || []).filter(cat => ['NR','SEGURANCA','AUDITORIA'].includes(cat))
     : (categorias || []);
-  const selectedParent = parentId ? (parentCandidates || []).find(parent => Number(parent.id) === Number(parentId)) : null;
+  const selectedParent = effectiveParentId ? (parentCandidates || []).find(parent => Number(parent.id) === Number(effectiveParentId)) : null;
 %>
 
 <div class="demand-page demand-form-page">
   <header class="demand-head demand-form-head">
     <div>
-      <a class="demand-back-link" href="<%= parentId ? '/demandas/' + parentId : '/demandas' %>">← Voltar para demandas</a>
-      <h1><%= parentId ? 'Nova subdemanda' : 'Nova demanda' %></h1>
-      <p>Cadastro rápido: registre o essencial agora e complemente o planejamento somente quando necessário.</p>
+      <a class="demand-back-link" href="<%= returnHref %>">← Voltar para demandas</a>
+      <h1><%= isEdit ? (effectiveParentId ? 'Editar subdemanda' : 'Editar demanda') : (effectiveParentId ? 'Nova subdemanda' : 'Nova demanda') %></h1>
+      <p><%= isEdit ? 'Atualize os dados principais sem alterar o vínculo histórico da demanda.' : 'Cadastro rápido: registre o essencial agora e complemente o planejamento somente quando necessário.' %></p>
     </div>
   </header>
 
   <div class="demand-form-layout demand-form-layout-light">
     <section class="demand-card demand-form-card">
       <div class="section-heading">
-        <div><h2>Cadastro essencial</h2><p>Título, prioridade e descrição são suficientes para colocar a demanda no fluxo.</p></div>
-        <span class="form-step"><%= parentId ? 'Subdemanda' : 'Demanda' %></span>
+        <div><h2><%= isEdit ? 'Dados da demanda' : 'Cadastro essencial' %></h2><p><%= isEdit ? 'Edite somente as informações necessárias; status e responsável continuam no controle da demanda.' : 'Título, prioridade e descrição são suficientes para colocar a demanda no fluxo.' %></p></div>
+        <span class="form-step"><%= effectiveParentId ? 'Subdemanda' : 'Demanda' %></span>
       </div>
 
-      <form method="POST" action="/demandas" class="modern-demand-form demand-quick-form">
-        <% if (parentId) { %>
-          <input type="hidden" name="demanda_pai_id" value="<%= parentId %>">
+      <form method="POST" action="<%= isEdit ? '/demandas/' + currentDemand.id + '/edit' : '/demandas' %>" class="modern-demand-form demand-quick-form">
+        <% if (!isEdit && effectiveParentId) { %>
+          <input type="hidden" name="demanda_pai_id" value="<%= effectiveParentId %>">
+        <% } %>
+        <% if (effectiveParentId) { %>
           <div class="form-wide demand-parent-banner">
             <span>Vinculada à demanda principal</span>
-            <strong>#<%= parentId %> — <%= selectedParent?.titulo || 'Demanda principal' %></strong>
+            <strong>#<%= effectiveParentId %> — <%= currentDemand.demanda_pai_titulo || selectedParent?.titulo || 'Demanda principal' %></strong>
           </div>
         <% } %>
 
         <label class="form-wide">
           <span>Título *</span>
-          <input name="titulo" maxlength="160" required autofocus placeholder="Ex.: Reforma do cilindro do triturador FAST">
+          <input name="titulo" maxlength="160" required autofocus value="<%= currentDemand.titulo || '' %>" placeholder="Ex.: Reforma do cilindro do triturador FAST">
           <small>Use um título curto e fácil de localizar.</small>
         </label>
 
         <label>
           <span>Prioridade *</span>
           <select name="prioridade" required>
-            <option value="NORMAL" selected>Média — fluxo normal</option>
-            <option value="BAIXA">Baixa — pode ser programada</option>
-            <option value="ALTA">Alta — requer prioridade</option>
-            <option value="URGENTE">Crítica — ação imediata</option>
+            <option value="NORMAL" <%= !currentDemand.prioridade || currentDemand.prioridade === 'NORMAL' ? 'selected' : '' %>>Média — fluxo normal</option>
+            <option value="BAIXA" <%= currentDemand.prioridade === 'BAIXA' ? 'selected' : '' %>>Baixa — pode ser programada</option>
+            <option value="ALTA" <%= currentDemand.prioridade === 'ALTA' ? 'selected' : '' %>>Alta — requer prioridade</option>
+            <option value="URGENTE" <%= currentDemand.prioridade === 'URGENTE' ? 'selected' : '' %>>Crítica — ação imediata</option>
           </select>
         </label>
 
         <label>
           <span>Categoria</span>
           <select name="categoria">
-            <% allowedCategories.forEach(cat => { %><option value="<%= cat %>" <%= cat === 'MANUTENCAO' ? 'selected' : '' %>><%= categoryLabels[cat] || cat %></option><% }) %>
+            <% allowedCategories.forEach(cat => { %><option value="<%= cat %>" <%= (currentDemand.categoria || 'MANUTENCAO') === cat ? 'selected' : '' %>><%= categoryLabels[cat] || cat %></option><% }) %>
           </select>
         </label>
 
         <label class="form-wide">
           <span>Descrição *</span>
-          <textarea name="descricao" rows="5" required placeholder="Descreva o que precisa ser feito e o resultado esperado."></textarea>
+          <textarea name="descricao" rows="5" required placeholder="Descreva o que precisa ser feito e o resultado esperado."><%= currentDemand.descricao || '' %></textarea>
           <small>Evite burocracia: informe apenas o suficiente para a equipe entender a necessidade.</small>
         </label>
 
-        <details class="form-wide demand-advanced-fields">
+        <details class="form-wide demand-advanced-fields" <%= isEdit ? 'open' : '' %>>
           <summary>+ Adicionar informações de planejamento</summary>
           <div class="demand-advanced-grid">
-            <% if (!parentId) { %>
+            <% if (!isEdit && !effectiveParentId) { %>
               <label>
                 <span>Demanda principal</span>
                 <select name="demanda_pai_id">
@@ -85,43 +93,43 @@
               <span>Equipamento</span>
               <select name="equipamento_id">
                 <option value="">Sem equipamento específico</option>
-                <% (equipamentos || []).forEach(eq => { %><option value="<%= eq.id %>"><%= eq.nome %></option><% }) %>
+                <% (equipamentos || []).forEach(eq => { %><option value="<%= eq.id %>" <%= Number(currentDemand.equipamento_id || 0) === Number(eq.id) ? 'selected' : '' %>><%= eq.nome %></option><% }) %>
               </select>
             </label>
 
             <label>
               <span>Setor de origem</span>
-              <input name="setor_origem" maxlength="100" placeholder="Ex.: Manutenção, Produção, Caldeira">
+              <input name="setor_origem" maxlength="100" value="<%= currentDemand.setor_origem || '' %>" placeholder="Ex.: Manutenção, Produção, Caldeira">
             </label>
 
             <label>
               <span>Prazo previsto</span>
-              <input type="date" name="prazo_previsto">
+              <input type="date" name="prazo_previsto" value="<%= currentDemand.prazo_previsto ? String(currentDemand.prazo_previsto).slice(0, 10) : '' %>">
             </label>
 
             <label>
               <span>NR relacionada</span>
-              <input name="nr_referencia" maxlength="60" placeholder="Ex.: NR-12, NR-13">
+              <input name="nr_referencia" maxlength="60" value="<%= currentDemand.nr_referencia || '' %>" placeholder="Ex.: NR-12, NR-13">
             </label>
 
             <label>
               <span>Custo estimado de serviços</span>
-              <input type="number" name="custo_servicos_estimado" min="0" step="0.01" placeholder="0,00">
+              <input type="number" name="custo_servicos_estimado" min="0" step="0.01" value="<%= Number(currentDemand.custo_servicos_estimado || 0) || '' %>" placeholder="0,00">
             </label>
           </div>
         </details>
 
         <div class="form-actions form-wide demand-form-actions-sticky">
-          <a class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" href="<%= parentId ? '/demandas/' + parentId : '/demandas' %>">Cancelar</a>
-          <button class="demand-btn demand-btn-primary ui-btn ui-btn--primary" type="submit"><%= parentId ? 'Criar subdemanda' : 'Criar demanda' %></button>
+          <a class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" href="<%= returnHref %>">Cancelar</a>
+          <button class="demand-btn demand-btn-primary ui-btn ui-btn--primary" type="submit"><%= isEdit ? 'Salvar alterações' : (effectiveParentId ? 'Criar subdemanda' : 'Criar demanda') %></button>
         </div>
       </form>
     </section>
 
     <aside class="demand-card demand-form-help demand-form-help-light">
       <span class="help-icon" aria-hidden="true">i</span>
-      <h2>Cadastro leve</h2>
-      <p>O objetivo é registrar a necessidade rápido. Materiais, cotações, aprovação e OS entram depois, conforme a demanda avança.</p>
+      <h2><%= isEdit ? 'Edição segura' : 'Cadastro leve' %></h2>
+      <p><%= isEdit ? 'A edição altera os dados principais e registra a atualização no histórico. O vínculo entre demanda, subdemanda, materiais e OS é preservado.' : 'O objetivo é registrar a necessidade rápido. Materiais, cotações, aprovação e OS entram depois, conforme a demanda avança.' %></p>
       <div class="quick-flow-list">
         <div><span>1</span><strong>Registrar necessidade</strong></div>
         <div><span>2</span><strong>Planejar se necessário</strong></div>

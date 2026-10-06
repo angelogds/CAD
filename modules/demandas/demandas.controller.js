@@ -63,6 +63,61 @@ function create(req, res) {
   }
 }
 
+function editForm(req, res) {
+  const id = Number(req.params.id);
+  const demanda = service.getById(id);
+  if (!demanda) return res.status(404).render('errors/404', { title: 'Não encontrado' });
+
+  return res.render('demandas/new', {
+    title: demanda.demanda_pai_id ? `Editar Subdemanda #${id}` : `Editar Demanda #${id}`,
+    activeMenu: 'demandas',
+    equipamentos: service.listEquipamentos(),
+    parentCandidates: service.listParentCandidates(req.session?.user, id),
+    categorias: service.CATEGORIAS,
+    parentId: demanda.demanda_pai_id || null,
+    demanda,
+    editMode: true,
+  });
+}
+
+function updateDetails(req, res) {
+  const id = Number(req.params.id);
+  try {
+    service.updateDetails(id, {
+      titulo: req.body.titulo,
+      descricao: req.body.descricao,
+      prioridade: req.body.prioridade,
+      equipamento_id: req.body.equipamento_id,
+      categoria: req.body.categoria,
+      setor_origem: req.body.setor_origem,
+      nr_referencia: req.body.nr_referencia,
+      prazo_previsto: req.body.prazo_previsto,
+      custo_servicos_estimado: req.body.custo_servicos_estimado,
+      user_id: req.session?.user?.id || null,
+      user_role: req.session?.user?.role || null,
+    });
+    req.flash('success', 'Demanda atualizada com sucesso.');
+  } catch (e) {
+    req.flash('error', e.message || 'Erro ao editar demanda.');
+    return res.redirect(`/demandas/${id}/edit`);
+  }
+  return res.redirect(`/demandas/${id}`);
+}
+
+function remove(req, res) {
+  const id = Number(req.params.id);
+  try {
+    const result = service.remove(id, {
+      user_id: req.session?.user?.id || null,
+    });
+    req.flash('success', result.wasSubdemand ? 'Subdemanda apagada com sucesso.' : 'Demanda apagada com sucesso.');
+    return res.redirect(result.parentId ? `/demandas/${result.parentId}` : '/demandas');
+  } catch (e) {
+    req.flash('error', e.message || 'Não foi possível apagar a demanda.');
+    return res.redirect(`/demandas/${id}`);
+  }
+}
+
 function show(req, res) {
   const id = Number(req.params.id);
   const demanda = service.getById(id);
@@ -225,6 +280,9 @@ module.exports = {
   index,
   newForm,
   create,
+  editForm,
+  updateDetails,
+  remove,
   show,
   updateStatus,
   updateApproval,
