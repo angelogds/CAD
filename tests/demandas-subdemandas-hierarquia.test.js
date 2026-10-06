@@ -123,6 +123,28 @@ test('painel lista somente demandas principais e mantém subdemandas dentro do p
     assert.equal(resumo.em_andamento, 0);
     assert.equal(resumo.paradas, 0);
 
+    const childBeforeEdit = service.getById(11);
+    assert.equal(
+      service.canEditDemand({ id: 1, role: 'RH' }, childBeforeEdit),
+      true,
+      'o autor pode editar sua própria subdemanda mesmo sem demandas_manage'
+    );
+    assert.equal(
+      service.canDeleteDemand({ id: 1, role: 'RH' }, childBeforeEdit),
+      true,
+      'o autor pode excluir sua própria subdemanda mesmo sem demandas_delete'
+    );
+    assert.equal(
+      service.canEditDemand({ id: 999, role: 'ADMIN' }, childBeforeEdit),
+      true,
+      'ADMIN sempre pode editar independentemente da autoria'
+    );
+    assert.equal(
+      service.canDeleteDemand({ id: 999, role: 'ADMIN' }, childBeforeEdit),
+      true,
+      'ADMIN sempre pode excluir independentemente da autoria'
+    );
+
     const childEdited = service.updateDetails(11, {
       titulo: 'Trocar dentes do rotor',
       descricao: 'Subdemanda crítica revisada',

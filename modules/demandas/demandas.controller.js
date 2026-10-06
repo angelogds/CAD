@@ -68,6 +68,11 @@ function editForm(req, res) {
   const demanda = service.getById(id);
   if (!demanda) return res.status(404).render('errors/404', { title: 'Não encontrado' });
 
+  if (!service.canEditDemand(req.session?.user, demanda)) {
+    req.flash('error', 'Você não tem permissão para editar esta demanda.');
+    return res.redirect(`/demandas/${id}`);
+  }
+
   return res.render('demandas/new', {
     title: demanda.demanda_pai_id ? `Editar Subdemanda #${id}` : `Editar Demanda #${id}`,
     activeMenu: 'demandas',
@@ -109,6 +114,7 @@ function remove(req, res) {
   try {
     const result = service.remove(id, {
       user_id: req.session?.user?.id || null,
+      user_role: req.session?.user?.role || null,
     });
     req.flash('success', result.wasSubdemand ? 'Subdemanda apagada com sucesso.' : 'Demanda apagada com sucesso.');
     return res.redirect(result.parentId ? `/demandas/${result.parentId}` : '/demandas');

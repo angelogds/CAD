@@ -20,8 +20,14 @@
   const canManage = canAccessModule(normalizeRole(user?.role), 'demandas_manage');
   const canMaterials = canAccessModule(normalizeRole(user?.role), 'demandas_materials');
   const canConvert = canAccessModule(normalizeRole(user?.role), 'demandas_convert');
-  const canApprove = canAccessModule(normalizeRole(user?.role), 'demandas_approve');
-  const canDelete = canAccessModule(normalizeRole(user?.role), 'demandas_delete');
+  const normalizedRole = normalizeRole(user?.role);
+  const isAdmin = normalizedRole === 'ADMIN';
+  const canApprove = canAccessModule(normalizedRole, 'demandas_approve');
+  const canDelete = canAccessModule(normalizedRole, 'demandas_delete');
+  const isCreator = record => Number(record?.created_by || 0) === Number(user?.id || 0);
+  const canEditRecord = record => (isAdmin || canManage || isCreator(record))
+    && (isAdmin || !['CONCLUIDA','CANCELADA'].includes(record?.status));
+  const canDeleteRecord = record => isAdmin || canDelete || isCreator(record);
   const canReleasePurchase = canApprove;
   const elapsed = (() => {
     const start = new Date(demanda.created_at);
@@ -70,10 +76,10 @@
       <% } %>
     </div>
     <div class="detail-head-actions planning-head-actions">
-      <% if (canManage && !isFinished) { %><a class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" href="/demandas/<%= demanda.id %>/edit">Editar</a><% } %>
-      <% if (canDelete) { %>
-        <form method="POST" action="/demandas/<%= demanda.id %>/delete" onsubmit="return confirm('Apagar a <%= demanda.demanda_pai_id ? 'subdemanda' : 'demanda' %> #<%= demanda.id %>? A exclusão será bloqueada se houver vínculos operacionais.')">
-          <button class="demand-btn ui-btn ui-btn--danger" type="submit">Apagar</button>
+      <% if (canEditRecord(demanda)) { %><a class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" href="/demandas/<%= demanda.id %>/edit">Editar</a><% } %>
+      <% if (canDeleteRecord(demanda)) { %>
+        <form method="POST" action="/demandas/<%= demanda.id %>/delete" onsubmit="return confirm('Excluir a <%= demanda.demanda_pai_id ? 'subdemanda' : 'demanda' %> #<%= demanda.id %>? A exclusão será bloqueada se houver vínculos operacionais.')">
+          <button class="demand-btn ui-btn ui-btn--danger" type="submit">Excluir</button>
         </form>
       <% } %>
       <% if (!isFinished && canOpen) { %><a class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" href="/demandas/new?parent_id=<%= demanda.id %>">+ Subdemanda</a><% } %>
@@ -299,12 +305,12 @@
                 <div data-label="Responsável"><strong><%= child.responsavel_nome || 'A definir' %></strong></div>
                 <div data-label="Ação" class="demand-row-action demand-row-actions">
                   <a class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" href="/demandas/<%= child.id %>">Abrir</a>
-                  <% if (canManage && !['CONCLUIDA','CANCELADA'].includes(child.status)) { %>
+                  <% if (canEditRecord(child)) { %>
                     <a class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" href="/demandas/<%= child.id %>/edit">Editar</a>
                   <% } %>
-                  <% if (canDelete) { %>
-                    <form method="POST" action="/demandas/<%= child.id %>/delete" onsubmit="return confirm('Apagar a Subdemanda #<%= child.id %>? A exclusão será bloqueada se houver vínculos operacionais.')">
-                      <button class="demand-btn demand-btn-small ui-btn ui-btn--danger ui-btn--compact" type="submit">Apagar</button>
+                  <% if (canDeleteRecord(child)) { %>
+                    <form method="POST" action="/demandas/<%= child.id %>/delete" onsubmit="return confirm('Excluir a Subdemanda #<%= child.id %>? A exclusão será bloqueada se houver vínculos operacionais.')">
+                      <button class="demand-btn demand-btn-small ui-btn ui-btn--danger ui-btn--compact" type="submit">Excluir</button>
                     </form>
                   <% } %>
                 </div>
