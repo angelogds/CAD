@@ -1,4 +1,5 @@
 const db = require('../../database/db');
+const aceiteService = require('./ferramental.aceite.service');
 
 const ACTIVE_MAINTENANCE_ROLES = [
   'MECANICO',
@@ -280,6 +281,7 @@ function assignTool({ ferramenta_id, equipe_id, compartimento_id, observacao }, 
     `).get(toolId);
 
     if (previous) {
+      aceiteService.cancelPendingForCustody(previous.id);
       db.prepare(`
         UPDATE ferramental_custodias
         SET ativo=0, data_fim=datetime('now')
@@ -292,6 +294,8 @@ function assignTool({ ferramenta_id, equipe_id, compartimento_id, observacao }, 
         ferramenta_id,equipe_id,compartimento_id,entregue_por_user_id,observacao
       ) VALUES (?,?,?,?,?)
     `).run(toolId, teamId, compartmentId, int(actorUserId), clean(observacao, 600) || null);
+
+    aceiteService.createPendingForCustody(result.lastInsertRowid, teamId);
 
     db.prepare(`
       UPDATE ferramental_itens
@@ -348,6 +352,7 @@ function listOwnTools(userId) {
   const rows = db.prepare(`
     SELECT DISTINCT
       f.*,
+      c.id AS custodia_id,
       c.equipe_id,
       e.codigo AS equipe_codigo,
       e.nome AS equipe_nome,
