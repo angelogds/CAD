@@ -93,6 +93,33 @@ function list(filters = {}, user) {
   return db.prepare(`
     SELECT d.*, u.name AS created_by_nome, r.name AS responsavel_nome,
            e.nome AS equipamento_nome,
+           MAX(
+             COALESCE(datetime(d.updated_at), datetime(d.created_at)),
+             COALESCE(datetime(activity.last_log_at), datetime(d.created_at))
+           ) AS ultima_movimentacao_em,
+           CAST(MAX(0, julianday('now') - julianday(d.created_at)) AS INTEGER) AS dias_aberta,
+           CAST(MAX(
+             0,
+             julianday('now') - julianday(
+               MAX(
+                 COALESCE(datetime(d.updated_at), datetime(d.created_at)),
+                 COALESCE(datetime(activity.last_log_at), datetime(d.created_at))
+               )
+             )
+           ) AS INTEGER) AS dias_sem_movimento,
+           CASE
+             WHEN TRIM(COALESCE(d.prazo_previsto, '')) <> ''
+              AND date(d.prazo_previsto) < date('now')
+              AND d.status NOT IN ('CONCLUIDA', 'CANCELADA')
+             THEN 1 ELSE 0
+           END AS prazo_atrasado,
+           CASE
+             WHEN TRIM(COALESCE(d.prazo_previsto, '')) <> ''
+              AND date(d.prazo_previsto) < date('now')
+              AND d.status NOT IN ('CONCLUIDA', 'CANCELADA')
+             THEN CAST(julianday(date('now')) - julianday(date(d.prazo_previsto)) AS INTEGER)
+             ELSE 0
+           END AS dias_atraso,
            (SELECT COUNT(*) FROM demandas sd WHERE sd.demanda_pai_id = d.id) AS subdemandas_count,
            (SELECT COUNT(*) FROM solicitacoes s WHERE s.demanda_id = d.id) AS solicitacoes_count,
            (SELECT COUNT(*) FROM os o WHERE o.demanda_id = d.id) AS os_count
@@ -100,11 +127,37 @@ function list(filters = {}, user) {
     LEFT JOIN users u ON u.id = d.created_by
     LEFT JOIN users r ON r.id = d.responsavel_user_id
     LEFT JOIN equipamentos e ON e.id = d.equipamento_id
+    LEFT JOIN (
+      SELECT demanda_id, MAX(created_at) AS last_log_at
+      FROM demanda_logs
+      GROUP BY demanda_id
+    ) activity ON activity.demanda_id = d.id
     WHERE ${where}
     ORDER BY
       CASE d.prioridade WHEN 'URGENTE' THEN 0 WHEN 'ALTA' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END,
+      CASE
+        WHEN TRIM(COALESCE(d.prazo_previsto, '')) <> ''
+         AND date(d.prazo_previsto) < date('now')
+         AND d.status NOT IN ('CONCLUIDA', 'CANCELADA')
+        THEN 0 ELSE 1
+      END,
+      CASE
+        WHEN julianday('now') - julianday(
+          MAX(
+            COALESCE(datetime(d.updated_at), datetime(d.created_at)),
+            COALESCE(datetime(activity.last_log_at), datetime(d.created_at))
+          )
+        ) >= 7 THEN 0
+        WHEN julianday('now') - julianday(
+          MAX(
+            COALESCE(datetime(d.updated_at), datetime(d.created_at)),
+            COALESCE(datetime(activity.last_log_at), datetime(d.created_at))
+          )
+        ) >= 3 THEN 1
+        ELSE 2
+      END,
       CASE d.status WHEN 'PARADA' THEN 0 WHEN 'EM_ANDAMENTO' THEN 1 WHEN 'AGUARDANDO_APROVACAO' THEN 2 WHEN 'PLANEJAMENTO' THEN 3 WHEN 'EM_ANALISE' THEN 4 ELSE 5 END,
-      datetime(COALESCE(d.updated_at, d.created_at)) DESC,
+      datetime(ultima_movimentacao_em) ASC,
       d.id DESC
     LIMIT @limit
   `).all(params);
@@ -122,8 +175,31 @@ function getPainel(user) {
       SUM(CASE WHEN status = 'EM_ANDAMENTO' THEN 1 ELSE 0 END) AS em_andamento,
       SUM(CASE WHEN status = 'PARADA' THEN 1 ELSE 0 END) AS paradas,
       SUM(CASE WHEN status = 'CONCLUIDA' THEN 1 ELSE 0 END) AS concluidas,
-      SUM(CASE WHEN prioridade IN ('URGENTE', 'ALTA') AND status NOT IN ('CONCLUIDA', 'CANCELADA') THEN 1 ELSE 0 END) AS prioritarias
+      SUM(CASE WHEN prioridade = 'URGENTE' AND status NOT IN ('CONCLUIDA', 'CANCELADA') THEN 1 ELSE 0 END) AS criticas,
+      SUM(CASE WHEN prioridade = 'ALTA' AND status NOT IN ('CONCLUIDA', 'CANCELADA') THEN 1 ELSE 0 END) AS altas,
+      SUM(CASE WHEN prioridade IN ('URGENTE', 'ALTA') AND status NOT IN ('CONCLUIDA', 'CANCELADA') THEN 1 ELSE 0 END) AS prioritarias,
+      SUM(CASE
+        WHEN status NOT IN ('CONCLUIDA', 'CANCELADA')
+         AND TRIM(COALESCE(prazo_previsto, '')) <> ''
+         AND date(prazo_previsto) < date('now')
+        THEN 1 ELSE 0
+      END) AS prazos_atrasados,
+      SUM(CASE
+        WHEN status NOT IN ('CONCLUIDA', 'CANCELADA')
+         AND julianday('now') - julianday(
+           MAX(
+             COALESCE(datetime(d.updated_at), datetime(d.created_at)),
+             COALESCE(datetime(activity.last_log_at), datetime(d.created_at))
+           )
+         ) >= 7
+        THEN 1 ELSE 0
+      END) AS sem_atualizacao
     FROM demandas d
+    LEFT JOIN (
+      SELECT demanda_id, MAX(created_at) AS last_log_at
+      FROM demanda_logs
+      GROUP BY demanda_id
+    ) activity ON activity.demanda_id = d.id
     WHERE ${visibility.sql} AND d.demanda_pai_id IS NULL
   `).get(visibility.params) || {};
 
