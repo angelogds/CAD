@@ -19,7 +19,8 @@
     return params.toString();
   };
   const groups = [
-    { key: 'alta', title: 'Críticas e altas', note: 'Demandas que exigem resposta prioritária', items: lista.filter(d => ['URGENTE', 'ALTA'].includes(d.prioridade)) },
+    { key: 'critica', title: 'Demandas críticas', note: 'Tratamento imediato e acompanhamento próximo', items: lista.filter(d => d.prioridade === 'URGENTE') },
+    { key: 'alta', title: 'Prioridade alta', note: 'Demandas importantes que exigem resposta rápida', items: lista.filter(d => d.prioridade === 'ALTA') },
     { key: 'media', title: 'Prioridade média', note: 'Demandas do fluxo operacional', items: lista.filter(d => d.prioridade === 'NORMAL') },
     { key: 'baixa', title: 'Prioridade baixa', note: 'Demandas programáveis', items: lista.filter(d => d.prioridade === 'BAIXA') },
   ];
@@ -29,7 +30,9 @@
     { label: 'Em análise', value: painel.em_analise, note: painel.planejamento ? `${painel.planejamento} em planejamento` : 'Em avaliação', tone: 'violet', href: query({ tab: 'ATIVAS', status: 'EM_ANALISE' }) },
     { label: 'Em andamento', value: painel.em_andamento, note: 'Execução ativa', tone: 'teal', href: query({ tab: 'ATIVAS', status: 'EM_ANDAMENTO' }) },
     { label: 'Paradas', value: painel.paradas, note: painel.paradas ? 'Requer atenção' : 'Nenhuma no momento', tone: 'red', href: query({ tab: 'ATIVAS', status: 'PARADA' }) },
-    { label: 'Críticas e altas', value: painel.prioritarias, note: 'Prioridade elevada', tone: 'orange', href: query({ tab: 'ATIVAS', status: '', prioridade: 'ELEVADA' }) },
+    { label: 'Críticas', value: painel.criticas, note: 'Ação imediata', tone: 'red', href: query({ tab: 'ATIVAS', status: '', prioridade: 'URGENTE' }) },
+    { label: 'Altas', value: painel.altas, note: 'Resposta rápida', tone: 'orange', href: query({ tab: 'ATIVAS', status: '', prioridade: 'ALTA' }) },
+    { label: 'Prazo vencido', value: painel.prazos_atrasados, note: 'Demandas fora do prazo', tone: 'red', href: query({ tab: 'ATIVAS', status: '', prioridade: '' }) },
   ];
 %>
 
@@ -55,14 +58,21 @@
     <% }) %>
   </section>
 
-  <% if (painel.paradas || painel.prioritarias) { %>
+  <% if (painel.paradas || painel.criticas || painel.prazos_atrasados || painel.sem_atualizacao) { %>
     <section class="demand-attention" aria-label="Atenções da fila">
       <span class="attention-icon" aria-hidden="true">!</span>
       <div>
         <strong>Atenção à fila operacional</strong>
-        <p><% if (painel.paradas) { %><b><%= painel.paradas %></b> demanda(s) parada(s)<% } %><% if (painel.paradas && painel.prioritarias) { %> e <% } %><% if (painel.prioritarias) { %><b><%= painel.prioritarias %></b> demanda(s) crítica(s) ou alta(s)<% } %>.</p>
+        <p>
+          <% const alerts = []; %>
+          <% if (painel.paradas) alerts.push(`${painel.paradas} parada(s)`); %>
+          <% if (painel.criticas) alerts.push(`${painel.criticas} crítica(s)`); %>
+          <% if (painel.prazos_atrasados) alerts.push(`${painel.prazos_atrasados} com prazo vencido`); %>
+          <% if (painel.sem_atualizacao) alerts.push(`${painel.sem_atualizacao} sem movimentação há 7 dias ou mais`); %>
+          <%= alerts.join(' · ') %>.
+        </p>
       </div>
-      <a href="/demandas?<%= query({ tab: 'ATIVAS', status: painel.paradas ? 'PARADA' : '', prioridade: painel.paradas ? '' : 'ELEVADA' }) %>">Ver demandas</a>
+      <a href="/demandas?<%= query({ tab: 'ATIVAS', status: '', prioridade: '' }) %>">Ver fila</a>
     </section>
   <% } %>
 
@@ -77,7 +87,7 @@
       <input type="hidden" name="tab" value="<%= filters.tab %>">
       <label class="filter-search"><span>Buscar</span><input name="q" value="<%= filters.q %>" placeholder="Número, título, equipamento, NR ou pessoa"></label>
       <label><span>Status</span><select name="status"><option value="">Todos</option><% ['NOVA','EM_ANALISE','PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %><option value="<%= st %>" <%= filters.status === st ? 'selected' : '' %>><%= statusLabel(st) %></option><% }) %></select></label>
-      <label><span>Prioridade</span><select name="prioridade"><option value="">Todas</option><option value="ELEVADA" <%= filters.prioridade === 'ELEVADA' ? 'selected' : '' %>>Críticas e altas</option><% ['URGENTE','ALTA','NORMAL','BAIXA'].forEach(pr => { %><option value="<%= pr %>" <%= filters.prioridade === pr ? 'selected' : '' %>><%= priorityLabel(pr) %></option><% }) %></select></label>
+      <label><span>Prioridade</span><select name="prioridade"><option value="">Todas</option><% ['URGENTE','ALTA','NORMAL','BAIXA'].forEach(pr => { %><option value="<%= pr %>" <%= filters.prioridade === pr ? 'selected' : '' %>><%= priorityLabel(pr) %></option><% }) %></select></label>
       <label><span>Responsável</span><select name="responsavel_user_id"><option value="">Todos</option><% (responsaveis || []).forEach(person => { %><option value="<%= person.id %>" <%= String(filters.responsavel_user_id) === String(person.id) ? 'selected' : '' %>><%= person.name %></option><% }) %></select></label>
       <label class="filter-limit"><span>Exibir</span><select name="limit"><% [10,20,50].forEach(value => { %><option value="<%= value %>" <%= Number(filters.limit) === value ? 'selected' : '' %>><%= value %></option><% }) %></select></label>
       <div class="filter-actions"><button class="demand-btn demand-btn-primary ui-btn ui-btn--primary" type="submit">Aplicar filtros</button><a class="demand-btn demand-btn-secondary ui-btn ui-btn--secondary" href="/demandas?tab=<%= filters.tab %>">Limpar</a></div>
@@ -97,9 +107,13 @@
         <section class="priority-group priority-<%= group.key %>">
           <div class="priority-heading"><div><h3><%= group.title %> <span><%= group.items.length %></span></h3><p><%= group.note %></p></div></div>
           <div class="demand-table" role="table" aria-label="<%= group.title %>">
-            <div class="demand-row demand-columns demand-columns-v2" role="row"><span>Demanda</span><span>Status</span><span>Planejamento</span><span>Responsável</span><span>Última movimentação</span><span>Ação</span></div>
+            <div class="demand-row demand-columns demand-columns-v2" role="row"><span>Demanda</span><span>Status</span><span>Planejamento</span><span>Responsável</span><span>Tempo / atualização</span><span>Ação</span></div>
             <% group.items.forEach(d => { %>
-              <article class="demand-row demand-row-v2" role="row">
+              <% const staleDays = Number(d.dias_sem_movimento || 0); %>
+              <% const ageDays = Number(d.dias_aberta || 0); %>
+              <% const overdueDays = Number(d.dias_atraso || 0); %>
+              <% const rowAlertClass = Number(d.prazo_atrasado || 0) ? 'is-overdue' : staleDays >= 7 ? 'is-stale' : staleDays >= 3 ? 'is-aging' : ''; %>
+              <article class="demand-row demand-row-v2 <%= rowAlertClass %>" role="row">
                 <div class="demand-identity" data-label="Demanda">
                   <strong>#<%= d.id %> · <%= d.titulo %></strong>
                   <p><%= d.descricao || 'Descrição não informada.' %></p>
@@ -115,7 +129,24 @@
                   <span class="demand-plan-chip"><strong><%= Number(d.os_count || 0) %></strong> OS</span>
                 </div>
                 <div class="demand-people" data-label="Responsável"><strong><%= d.responsavel_nome || 'A definir' %></strong><small>Criada por <%= d.created_by_nome || 'Não informado' %></small></div>
-                <div class="demand-update" data-label="Última movimentação"><strong><%= fmtBR(d.updated_at || d.created_at) %></strong><small><%= d.ultima_atualizacao || 'Sem atualização registrada' %></small></div>
+                <div class="demand-update" data-label="Tempo / atualização">
+                  <strong><%= fmtBR(d.ultima_movimentacao_em || d.updated_at || d.created_at) %></strong>
+                  <small><%= d.ultima_atualizacao || 'Sem atualização textual registrada' %></small>
+                  <div class="demand-time-flags">
+                    <span class="demand-time-chip age">Aberta há <%= ageDays %> dia(s)</span>
+                    <% if (Number(d.prazo_atrasado || 0)) { %>
+                      <span class="demand-time-chip danger">Prazo vencido há <%= overdueDays %> dia(s)</span>
+                    <% } else if (staleDays >= 7) { %>
+                      <span class="demand-time-chip danger">Sem atualização há <%= staleDays %> dia(s)</span>
+                    <% } else if (staleDays >= 3) { %>
+                      <span class="demand-time-chip warning">Atenção: <%= staleDays %> dia(s) sem movimentação</span>
+                    <% } else if (staleDays === 0) { %>
+                      <span class="demand-time-chip ok">Atualizada hoje</span>
+                    <% } else { %>
+                      <span class="demand-time-chip ok">Atualizada há <%= staleDays %> dia(s)</span>
+                    <% } %>
+                  </div>
+                </div>
                 <div class="demand-row-action" data-label="Ação"><a class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" href="/demandas/<%= d.id %>">Abrir</a></div>
               </article>
             <% }) %>

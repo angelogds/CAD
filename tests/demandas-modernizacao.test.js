@@ -10,7 +10,11 @@ test('painel de demandas possui indicadores, filtros e agrupamento operacional',
   const view = read('views/demandas/index.ejs');
   assert.match(view, /demand-metrics/);
   assert.match(view, /Concluídas e histórico/);
-  assert.match(view, /Críticas e altas/);
+  assert.match(view, /Demandas críticas/);
+  assert.match(view, /Prioridade alta/);
+  assert.match(view, /Prioridade média/);
+  assert.match(view, /Prioridade baixa/);
+  assert.doesNotMatch(view, /title: 'Críticas e altas'/);
   assert.match(view, /name="responsavel_user_id"/);
   assert.match(view, /Nenhuma demanda encontrada/);
 });
@@ -41,4 +45,38 @@ test('detalhe e cadastro usam o mesmo padrão visual', () => {
   assert.match(sharedButtons, /:is\(\.btn, \.ui-btn\).*:hover/);
   assert.doesNotMatch(css, /(?:^|})\s*\.demand-btn\s*\{/);
   assert.match(css, /@media \(max-width:720px\)/);
+});
+
+
+test('fila de demandas sinaliza tempo aberto atraso e ausência de atualização', () => {
+  const view = read('views/demandas/index.ejs');
+  const service = read('modules/demandas/demandas.service.js');
+  const css = read('public/css/demandas.css');
+
+  assert.match(service, /AS dias_aberta/);
+  assert.match(service, /AS dias_sem_movimento/);
+  assert.match(service, /AS prazo_atrasado/);
+  assert.match(service, /AS dias_atraso/);
+  assert.match(service, /AS criticas/);
+  assert.match(service, /AS altas/);
+  assert.match(service, /AS prazos_atrasados/);
+  assert.match(service, /AS sem_atualizacao/);
+
+  assert.match(view, /Aberta há/);
+  assert.match(view, /Prazo vencido há/);
+  assert.match(view, /Sem atualização há/);
+  assert.match(view, /Atualizada hoje/);
+  assert.match(view, /demand-time-chip/);
+
+  assert.match(css, /\.demand-row-v2\.is-overdue/);
+  assert.match(css, /\.demand-row-v2\.is-stale/);
+  assert.match(css, /\.demand-time-chip\.danger/);
+  assert.match(css, /\.priority-critica \.priority-heading/);
+  assert.match(css, /\.priority-alta \.priority-heading/);
+});
+
+test('filtro visual de prioridade mantém crítica alta média e baixa independentes', () => {
+  const view = read('views/demandas/index.ejs');
+  assert.match(view, /\['URGENTE','ALTA','NORMAL','BAIXA'\]/);
+  assert.doesNotMatch(view, /option value="ELEVADA"/);
 });
