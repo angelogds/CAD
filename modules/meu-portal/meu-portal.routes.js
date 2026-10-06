@@ -8,6 +8,7 @@ const { requireLogin, requireRole } = require('../auth/auth.middleware');
 const ctrl = require('./meu-portal.controller');
 const fase2bCtrl = require('./meu-portal-fase2b.controller');
 const rhPortalCtrl = require('../rh/rh.portal.controller');
+const ferramentalCtrl = require('../ferramental/ferramental.controller');
 const vinculo = require('./meu-portal.vinculo');
 
 const router = express.Router();
@@ -72,6 +73,8 @@ router.get('/conta', ctrl.conta);
 
 // Autoatendimento profissional: liberado inicialmente somente para a equipe de Manutenção.
 router.get('/materiais', vinculo.requireMaterialSelfService, ctrl.materiais);
+router.get('/ferramental', vinculo.requireMaintenanceSelfService, ferramentalCtrl.ownTools);
+router.get('/ferramental/pdf', vinculo.requireMaintenanceSelfService, ferramentalCtrl.ownPdf);
 router.get('/treinamentos', vinculo.requireMaintenanceSelfService, fase2bCtrl.treinamentos);
 router.get('/dados-profissionais', vinculo.requireMaintenanceSelfService, fase2bCtrl.dadosProfissionais);
 router.get('/servicos', vinculo.requireMaintenanceSelfService, fase2bCtrl.servicos);
