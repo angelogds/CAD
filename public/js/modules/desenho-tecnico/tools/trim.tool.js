@@ -154,8 +154,8 @@ export class TrimTool extends BaseTool {
       return;
     }
     const cutter = this.smartPair.find((entity) => entity.id !== target.id);
-    if (!target || !cutter || target.type !== 'circle' || cutter.type !== 'circle') {
-      this.ctx.statusMessage = 'APARAR: o rebaixo automático está disponível para dois círculos que se cruzam.';
+    if (!target || !cutter || !isCircular(target) || cutter.type !== 'circle') {
+      this.ctx.statusMessage = 'APARAR: selecione o contorno circular/arcado e um círculo auxiliar de rebaixo.';
       this.ctx.render?.();
       return;
     }
@@ -167,13 +167,13 @@ export class TrimTool extends BaseTool {
       return;
     }
 
-    const targetArc = new ArcEntity({
-      id: target.id,
-      geometry: solved.targetArc,
+    const targetArcs = solved.targetArcs.map((geometry, index) => new ArcEntity({
+      ...(index === 0 ? { id: target.id } : {}),
+      geometry,
       style: { ...(target.style || {}) },
       metadata: { ...(target.metadata || {}) },
       visible: target.visible !== false,
-    });
+    }));
     const recessArc = new ArcEntity({
       id: cutter.id,
       geometry: solved.recessArc,
@@ -189,8 +189,8 @@ export class TrimTool extends BaseTool {
 
     const removeIds = new Set([String(target.id), String(cutter.id)]);
     this.ctx.state.entities = this.ctx.state.entities.filter((entity) => !removeIds.has(String(entity.id)));
-    this.ctx.state.entities.push(targetArc, recessArc);
-    this.ctx.selection.set([targetArc.id, recessArc.id]);
+    this.ctx.state.entities.push(...targetArcs, recessArc);
+    this.ctx.selection.set([...targetArcs.map((entity) => entity.id), recessArc.id]);
     this.ctx.pushHistory();
     this.ctx.markDirty('Aparar: rebaixo circular criado');
     this.ctx.preview.clear();
@@ -216,12 +216,15 @@ export class TrimTool extends BaseTool {
         { type: 'snap', point: this.smartFirst.point, kind: 'intersection' },
         { type: 'snap', point: this.smartSecond.point, kind: 'intersection' },
       ];
-      if (target?.type === 'circle' && cutter?.type === 'circle') {
+      if (isCircular(target) && cutter?.type === 'circle') {
         const solved = solveCircularRecess(target.geometry, cutter.geometry, evt.world);
         if (solved.ok) {
-          const a = new ArcEntity({ geometry: solved.targetArc, style: target.style, metadata: target.metadata });
-          const b = new ArcEntity({ geometry: solved.recessArc, style: target.style, metadata: target.metadata });
-          this.setPreview([...base, { type: 'ghost-entity', entity: a }, { type: 'ghost-entity', entity: b }]);
+          const targetGhosts = solved.targetArcs.map((geometry) => ({
+            type: 'ghost-entity',
+            entity: new ArcEntity({ geometry, style: target.style, metadata: target.metadata }),
+          }));
+          const recessGhost = new ArcEntity({ geometry: solved.recessArc, style: target.style, metadata: target.metadata });
+          this.setPreview([...base, ...targetGhosts, { type: 'ghost-entity', entity: recessGhost }]);
           return;
         }
       }
