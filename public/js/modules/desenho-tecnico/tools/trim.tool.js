@@ -2,7 +2,7 @@ import { BaseTool } from './base.tool.js';
 import { lineIntersection } from './modify.utils.js';
 import { ArcEntity } from '../entities/arc.entity.js';
 import { angle2D, circleCircleIntersections, isAngleBetween } from '../core/geometry.js';
-import { solveCircularRecess } from '../core/modify.geometry.mjs?v=20261006-trim-v5';
+import { solveCircularRecess } from '../core/modify.geometry.mjs?v=20261006-trim-v6';
 
 function isCircular(entity) {
   return Boolean(entity && ['circle', 'arc'].includes(entity.type));
@@ -31,9 +31,9 @@ export class TrimTool extends BaseTool {
   activate() {
     this.reset(false);
     this.ctx.prompt.set({
-      message: 'APARAR: clique diretamente no trecho azul que deseja remover. Se preferir, use os dois pontos de interseção e depois o trecho.',
+      message: 'APARAR: selecione o círculo auxiliar do rebaixo. Ao selecionar, o sistema fecha automaticamente o rebaixo entre os dois pontos de interseção.',
     });
-    this.ctx.statusMessage = 'APARAR pronto: clique no trecho azul dentro do círculo auxiliar.';
+    this.ctx.statusMessage = 'APARAR pronto: selecione o círculo auxiliar menor.';
     this.ctx.render?.();
   }
 
@@ -89,6 +89,72 @@ export class TrimTool extends BaseTool {
     return hits.sort((a, b) => Math.abs(Number(b.geometry?.radius || 0)) - Math.abs(Number(a.geometry?.radius || 0)))[0];
   }
 
+  findTargetForCutter(cutter) {
+    if (!cutter || cutter.type !== 'circle') return null;
+    const cutterRadius = Math.abs(Number(cutter.geometry?.radius || 0));
+    if (!cutterRadius) return null;
+
+    const candidates = this.getCircularEntities()
+      .filter((entity) => (
+        String(entity.id) !== String(cutter.id)
+        && Math.abs(Number(entity.geometry?.radius || 0)) > cutterRadius
+        && this.intersectionsForPair(entity, cutter).length === 2
+      ))
+      .sort((a, b) => (
+        Math.abs(Number(b.geometry?.radius || 0))
+        - Math.abs(Number(a.geometry?.radius || 0))
+      ));
+
+    return candidates[0] || null;
+  }
+
+  applyCircularRecess(target, cutter, targetPick = null) {
+    if (!target || !cutter || !isCircular(target) || cutter.type !== 'circle') {
+      this.ctx.statusMessage = 'APARAR: selecione um círculo auxiliar que cruze o contorno externo em dois pontos.';
+      this.ctx.render?.();
+      return false;
+    }
+
+    const solved = solveCircularRecess(target.geometry, cutter.geometry, targetPick);
+    if (!solved.ok) {
+      this.ctx.statusMessage = `APARAR: ${solved.error}`;
+      this.ctx.render?.();
+      return false;
+    }
+
+    const targetArcs = solved.targetArcs.map((geometry, index) => new ArcEntity({
+      ...(index === 0 ? { id: target.id } : {}),
+      geometry,
+      style: { ...(target.style || {}) },
+      metadata: { ...(target.metadata || {}) },
+      visible: target.visible !== false,
+    }));
+    const recessArc = new ArcEntity({
+      id: cutter.id,
+      geometry: solved.recessArc,
+      style: { ...(target.style || {}) },
+      metadata: {
+        ...(cutter.metadata || {}),
+        ...(target.metadata || {}),
+        layer: target.metadata?.layer || this.ctx.state.activeLayer,
+        trimSource: cutter.id,
+      },
+      visible: true,
+    });
+
+    const removeIds = new Set([String(target.id), String(cutter.id)]);
+    this.ctx.state.entities = this.ctx.state.entities.filter((entity) => !removeIds.has(String(entity.id)));
+    this.ctx.state.entities.push(...targetArcs, recessArc);
+    this.ctx.pushHistory();
+    this.ctx.markDirty('Aparar: rebaixo circular criado');
+    this.ctx.preview.clear();
+    this.reset(false);
+    this.ctx.prompt.set({ message: 'APARAR concluído. Selecione outro círculo auxiliar para criar o próximo rebaixo.' });
+    this.ctx.statusMessage = 'APARAR concluído: contorno externo preservado e arco interno unido automaticamente.';
+    this.ctx.render();
+    return true;
+  }
+
   findDirectCircularRecess(world) {
     const entities = this.getCircularEntities();
     const zoom = Math.max(0.05, Number(this.ctx.viewport?.getViewState?.().zoom || 1));
@@ -124,6 +190,18 @@ export class TrimTool extends BaseTool {
   }
 
   onMouseDown(evt) {
+    if (!this.smartFirst && !this.smartSecond && !this.smartPair && !this.boundary) {
+      const selected = this.ctx.findEntityAt(evt.world);
+      if (selected?.type === 'circle' && this.ctx.isEntityEditable(selected)) {
+        const target = this.findTargetForCutter(selected);
+        if (target) {
+          this.ctx.selection.set([selected.id]);
+          this.applyCircularRecess(target, selected, null);
+          return;
+        }
+      }
+    }
+
     if (this.smartFirst && this.smartSecond && this.smartPair) {
       this.commitCircularRecess(evt);
       return;
@@ -248,50 +326,7 @@ export class TrimTool extends BaseTool {
       return;
     }
     const cutter = this.smartPair.find((entity) => entity.id !== target.id);
-    if (!target || !cutter || !isCircular(target) || cutter.type !== 'circle') {
-      this.ctx.statusMessage = 'APARAR: selecione o contorno circular/arcado e um círculo auxiliar de rebaixo.';
-      this.ctx.render?.();
-      return;
-    }
-
-    const solved = solveCircularRecess(target.geometry, cutter.geometry, evt.world);
-    if (!solved.ok) {
-      this.ctx.statusMessage = `APARAR: ${solved.error}`;
-      this.ctx.render?.();
-      return;
-    }
-
-    const targetArcs = solved.targetArcs.map((geometry, index) => new ArcEntity({
-      ...(index === 0 ? { id: target.id } : {}),
-      geometry,
-      style: { ...(target.style || {}) },
-      metadata: { ...(target.metadata || {}) },
-      visible: target.visible !== false,
-    }));
-    const recessArc = new ArcEntity({
-      id: cutter.id,
-      geometry: solved.recessArc,
-      style: { ...(target.style || {}) },
-      metadata: {
-        ...(cutter.metadata || {}),
-        ...(target.metadata || {}),
-        layer: target.metadata?.layer || this.ctx.state.activeLayer,
-        trimSource: cutter.id,
-      },
-      visible: true,
-    });
-
-    const removeIds = new Set([String(target.id), String(cutter.id)]);
-    this.ctx.state.entities = this.ctx.state.entities.filter((entity) => !removeIds.has(String(entity.id)));
-    this.ctx.state.entities.push(...targetArcs, recessArc);
-    this.ctx.selection.set([...targetArcs.map((entity) => entity.id), recessArc.id]);
-    this.ctx.pushHistory();
-    this.ctx.markDirty('Aparar: rebaixo circular criado');
-    this.ctx.preview.clear();
-    this.ctx.statusMessage = 'APARAR concluído: trecho externo removido e arco do rebaixo incorporado ao contorno.';
-    this.reset(false);
-    this.ctx.prompt.set({ message: 'APARAR concluído. Clique no 1º ponto de outra interseção ou pressione ESC.' });
-    this.ctx.render();
+    this.applyCircularRecess(target, cutter, evt.world);
   }
 
   onMouseMove(evt) {
