@@ -155,8 +155,8 @@
                     <a class="demand-btn demand-btn-secondary demand-btn-small ui-btn ui-btn--secondary ui-btn--compact" href="/demandas/<%= d.id %>/edit">Editar</a>
                   <% } %>
                   <% if (canDeleteDemand) { %>
-                    <form method="POST" action="/demandas/<%= d.id %>/delete" onsubmit="return confirm('Apagar a Demanda #<%= d.id %>? Esta ação só será concluída se não houver OS, solicitação de material ou subdemanda vinculada.')">
-                      <button class="demand-btn demand-btn-small ui-btn ui-btn--danger ui-btn--compact" type="submit">Apagar</button>
+                    <form method="POST" action="/demandas/<%= d.id %>/delete" onsubmit="return confirm('Excluir a Demanda #<%= d.id %>? Esta ação só será concluída se não houver OS, solicitação de material ou subdemanda vinculada.')">
+                      <button class="demand-btn demand-btn-small ui-btn ui-btn--danger ui-btn--compact" type="submit">Excluir</button>
                     </form>
                   <% } %>
                 </div>
