@@ -41,7 +41,11 @@ const done=sol.itens_analisados||0,total=sol.itens_total||0;
             <div class="pre-item-fields">
               <label class="pre-material-name">Material<input name="itens_nome[]" required placeholder="Ex.: Rolamento 6205"></label>
               <label>Quantidade<input name="itens_qtd[]" inputmode="decimal" required placeholder="1"></label>
-              <label>Unidade<input name="itens_un[]" value="UN" required></label>
+              <label>Unidade
+                <select name="itens_un[]" required>
+                  <% unidades.forEach(function(u){ %><option value="<%=u.value%>" <%=u.value==='UN'?'selected':''%>><%=u.value%> • <%=u.label%></option><% }) %>
+                </select>
+              </label>
               <label class="pre-stock-link">Item de estoque
                 <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>"><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
               </label>
@@ -62,7 +66,11 @@ const done=sol.itens_analisados||0,total=sol.itens_total||0;
         <div class="pre-item-fields">
           <label class="pre-material-name">Material<input name="itens_nome[]" required placeholder="Material"></label>
           <label>Quantidade<input name="itens_qtd[]" inputmode="decimal" required></label>
-          <label>Unidade<input name="itens_un[]" value="UN" required></label>
+          <label>Unidade
+            <select name="itens_un[]" required>
+              <% unidades.forEach(function(u){ %><option value="<%=u.value%>" <%=u.value==='UN'?'selected':''%>><%=u.value%> • <%=u.label%></option><% }) %>
+            </select>
+          </label>
           <label class="pre-stock-link">Item de estoque
             <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>"><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
           </label>

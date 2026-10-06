@@ -105,6 +105,7 @@ function detalhe(req, res) {
     canReview: service.canReview(sol, req.session.user),
     canEdit: service.canEditDraft(sol, req.session.user),
     canAddItems: service.canAddItems(sol, req.session.user),
+    unidades: service.UNIT_OPTIONS,
     estoqueItens: service.formOptions().estoqueItens,
     itemStatus: service.ITEM_STATUS,
     preStatus: service.PRE_STATUS,

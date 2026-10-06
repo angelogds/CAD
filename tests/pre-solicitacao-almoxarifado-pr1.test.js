@@ -112,3 +112,21 @@ test('Almoxarifado pode adicionar novos materiais antes da análise sem recriar 
   assert.match(show,/Adicionar à pré-solicitação/);
   assert.match(show,/data-add-pending-item/);
 });
+
+
+test('pré-solicitação usa seleção padronizada de unidades de medida',()=>{
+  const service=read('modules/pre-solicitacoes/pre-solicitacoes.service.js');
+  const controller=read('modules/pre-solicitacoes/pre-solicitacoes.controller.js');
+  const form=read('views/pre-solicitacoes/form.ejs');
+  const show=read('views/pre-solicitacoes/show.ejs');
+
+  for(const value of ['UN','KG','L','M','M2','M3','PC','CX','PCT','RL','BD','GL','BR','CH']){
+    assert.match(service,new RegExp(`value: '${value}'`));
+  }
+  assert.match(service,/unidades:\s*UNIT_OPTIONS/);
+  assert.match(controller,/unidades:\s*service\.UNIT_OPTIONS/);
+  assert.match(form,/<select name="itens_un\[\]" required>/);
+  assert.match(show,/<select name="itens_un\[\]" required>/);
+  assert.doesNotMatch(form,/<input name="itens_un\[\]"/);
+  assert.doesNotMatch(show,/<input name="itens_un\[\]"/);
+});

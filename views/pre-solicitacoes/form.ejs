@@ -43,7 +43,13 @@
             <div class="pre-item-fields">
               <label class="pre-material-name">Material<input name="itens_nome[]" value="<%=item.item_nome||''%>" required placeholder="Ex.: Disco de corte 7&quot;"></label>
               <label>Quantidade<input name="itens_qtd[]" value="<%=item.qtd_solicitada??item.quantidade??''%>" inputmode="decimal" required></label>
-              <label>Unidade<input name="itens_un[]" value="<%=item.unidade||'UN'%>" required></label>
+              <label>Unidade
+                <% const currentUnit=String(item.unidade||'UN').trim().toUpperCase(); %>
+                <select name="itens_un[]" required>
+                  <% if(!unidades.some(function(u){ return u.value===currentUnit; })){ %><option value="<%=currentUnit%>" selected><%=currentUnit%> • Unidade existente</option><% } %>
+                  <% unidades.forEach(function(u){ %><option value="<%=u.value%>" <%=currentUnit===u.value?'selected':''%>><%=u.value%> • <%=u.label%></option><% }) %>
+                </select>
+              </label>
               <label class="pre-stock-link">Item de estoque
                 <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>" <%=Number(item.estoque_item_id||item.item_id)===Number(e.id)?'selected':''%>><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
               </label>
@@ -67,7 +73,11 @@
     <div class="pre-item-fields">
       <label class="pre-material-name">Material<input name="itens_nome[]" required placeholder="Material"></label>
       <label>Quantidade<input name="itens_qtd[]" inputmode="decimal" required></label>
-      <label>Unidade<input name="itens_un[]" value="UN" required></label>
+      <label>Unidade
+        <select name="itens_un[]" required>
+          <% unidades.forEach(function(u){ %><option value="<%=u.value%>" <%=u.value==='UN'?'selected':''%>><%=u.value%> • <%=u.label%></option><% }) %>
+        </select>
+      </label>
       <label class="pre-stock-link">Item de estoque
         <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>"><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
       </label>
