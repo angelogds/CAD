@@ -279,6 +279,7 @@ function parseItensFromBody(body = {}) {
 
 function insertSolicitacaoItens(solicitacaoId, itens) {
   const fallbackItemId = ITEM_HAS_ITEM_ID ? getFallbackItemId() : null;
+  const insertedIds = [];
   const itemColumns = ["solicitacao_id"];
   if (ITEM_HAS_ITEM_NOME) itemColumns.push("item_nome");
   if (ITEM_HAS_ITEM_DESCRICAO) itemColumns.push("item_descricao");
@@ -301,8 +302,17 @@ function insertSolicitacaoItens(solicitacaoId, itens) {
     if (ITEM_HAS_ITEM_ID) row.push(estoqueItemId || fallbackItemId || null);
     if (ITEM_HAS_DESCRICAO) row.push(item.item_descricao || item.item_nome);
     if (ITEM_HAS_QUANTIDADE) row.push(Number(item.qtd_solicitada || 0));
-    insertItem.run(...row);
+    const info = insertItem.run(...row);
+    insertedIds.push(Number(info.lastInsertRowid));
   }
+  return insertedIds;
+}
+
+function appendSolicitacaoItens(solicitacaoId, itens) {
+  const id = sanitizePositiveId(solicitacaoId);
+  if (!id || !getSolicitacaoById(id)) throw new Error("Solicitação não encontrada.");
+  if (!Array.isArray(itens) || !itens.length) throw new Error("Informe ao menos um item válido.");
+  return db.transaction(() => insertSolicitacaoItens(id, itens))();
 }
 
 function updateSolicitacao(id, data = {}, user = null) {
@@ -829,4 +839,4 @@ function listEstoqueItens() {
   return db.prepare("SELECT id, codigo, nome, unidade FROM estoque_itens WHERE ativo = 1 ORDER BY nome").all();
 }
 
-module.exports = { STATUS, LIST_STATUS, SETORES, normalizeSetor, setorForRole, resolveSetorOrigem, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, normalizeAplicacaoInput, createSolicitacao, updateSolicitacao, avaliarExclusaoFisica, excluirSolicitacao, cancelarSolicitacao, finalizarElaboracao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };
+module.exports = { STATUS, LIST_STATUS, SETORES, normalizeSetor, setorForRole, resolveSetorOrigem, canManageByRole, canViewSolicitacao, canEditSolicitacao, parseItensFromBody, normalizeAplicacaoInput, createSolicitacao, appendSolicitacaoItens, updateSolicitacao, avaliarExclusaoFisica, excluirSolicitacao, cancelarSolicitacao, finalizarElaboracao, listMinhasSolicitacoes, getCountersForUser, getSolicitacaoById, listEquipamentos, listEstoqueItens };
