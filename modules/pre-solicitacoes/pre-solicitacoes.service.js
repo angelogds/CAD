@@ -355,6 +355,7 @@ function create(data, user) {
       titulo: `Pedido semanal do Almoxarifado • ${payload.setor} • ${payload.semana}`,
       descricao: payload.observacao || 'Pré-solicitação semanal de materiais do Almoxarifado.',
       destino_uso: payload.subarea,
+      tipo_aplicacao: 'OUTRO',
       itens: payload.itens,
     });
 
@@ -392,6 +393,7 @@ function updateDraft(id, data, user) {
       titulo: `Pedido semanal do Almoxarifado • ${payload.setor} • ${payload.semana}`,
       descricao: payload.observacao || current.descricao || null,
       destino_uso: payload.subarea,
+      tipo_aplicacao: 'OUTRO',
       itens: payload.itens,
     }, user);
 
