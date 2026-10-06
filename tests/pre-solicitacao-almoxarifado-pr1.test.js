@@ -82,3 +82,13 @@ test('matriz operacional cobre Almoxarifado e responsáveis dos quatro setores',
   assert.match(service,/\[SETORES\.ADMINISTRATIVO\]:\s*\['RH'\]/);
   assert.match(service,/role === 'ALMOXARIFADO' \|\| role === 'COMPRAS'/);
 });
+
+
+test('envio da pré-solicitação informa aplicação e aceita quantidade com vírgula',()=>{
+  const pre=read('modules/pre-solicitacoes/pre-solicitacoes.service.js');
+  const solicitacoes=read('modules/solicitacoes/solicitacoes.service.js');
+  assert.equal((pre.match(/tipo_aplicacao:\s*'OUTRO'/g)||[]).length,2);
+  assert.match(solicitacoes,/const parseQuantidade = \(value\) =>/);
+  assert.match(solicitacoes,/raw\.includes\(","\)/);
+  assert.match(solicitacoes,/qtd_solicitada:\s*parseQuantidade\(quantidades\[i\]\)/);
+});
