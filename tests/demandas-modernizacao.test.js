@@ -118,11 +118,14 @@ test('demandas e subdemandas oferecem abrir editar e apagar com RBAC existente',
   assert.match(detail, /\/demandas\/<%= child\.id %>\/edit/);
   assert.match(detail, /\/demandas\/<%= child\.id %>\/delete/);
 
-  assert.match(routes, /\/:id\/edit'.*ACCESS\.demandas_manage/);
-  assert.match(routes, /\/:id\/delete'.*ACCESS\.demandas_delete/);
+  assert.match(routes, /router\.get\('\/:id\/edit', requireLogin, ctrl\.editForm\)/);
+  assert.match(routes, /router\.post\('\/:id\/delete', requireLogin, ctrl\.remove\)/);
   assert.match(controller, /function editForm/);
   assert.match(controller, /function updateDetails/);
   assert.match(controller, /function remove/);
+  assert.match(service, /function canEditDemand/);
+  assert.match(service, /function canDeleteDemand/);
+  assert.match(service, /isDemandCreator/);
   assert.match(service, /function updateDetails/);
   assert.match(service, /function remove/);
   assert.match(service, /subdemandas vinculadas/);
@@ -130,6 +133,8 @@ test('demandas e subdemandas oferecem abrir editar e apagar com RBAC existente',
   assert.match(service, /Ordem de Serviço vinculada/);
 
   assert.match(rbac, /demandas_delete:\s*\[ROLE\.ADMIN, ROLE\.DIRETORIA, ROLE\.MANUTENCAO_SUPERVISOR, ROLE\.ENCARREGADO_MANUTENCAO, ROLE\.COORDENADOR_RECICLAGEM\]/);
+  assert.match(index, /isDemandCreator/);
+  assert.match(detail, /isCreator = record/);
   assert.match(form, /editMode/);
   assert.match(form, /Salvar alterações/);
   assert.match(css, /\.demand-row-actions/);
