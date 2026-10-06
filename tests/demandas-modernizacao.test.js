@@ -113,7 +113,7 @@ test('demandas e subdemandas oferecem abrir editar e apagar com RBAC existente',
 
   assert.match(index, />Abrir<\/a>/);
   assert.match(index, />Editar<\/a>/);
-  assert.match(index, />Apagar<\/button>/);
+  assert.match(index, />Excluir<\/button>/);
   assert.match(detail, /demand-row-actions/);
   assert.match(detail, /\/demandas\/<%= child\.id %>\/edit/);
   assert.match(detail, /\/demandas\/<%= child\.id %>\/delete/);
@@ -129,7 +129,7 @@ test('demandas e subdemandas oferecem abrir editar e apagar com RBAC existente',
   assert.match(service, /solicitações de materiais vinculadas/);
   assert.match(service, /Ordem de Serviço vinculada/);
 
-  assert.match(rbac, /demandas_delete:\s*\[ROLE\.ADMIN\]/);
+  assert.match(rbac, /demandas_delete:\s*\[ROLE\.ADMIN, ROLE\.DIRETORIA, ROLE\.MANUTENCAO_SUPERVISOR, ROLE\.ENCARREGADO_MANUTENCAO, ROLE\.COORDENADOR_RECICLAGEM\]/);
   assert.match(form, /editMode/);
   assert.match(form, /Salvar alterações/);
   assert.match(css, /\.demand-row-actions/);
