@@ -1,4 +1,4 @@
-import { DesenhoTecnicoController } from './desenho-tecnico.controller.js';
+import { DesenhoTecnicoController } from './desenho-tecnico.controller.js?v=20261006-trim-v5';
 import { installCadFinal2D } from '../../cad-final-2d.js';
 import { installCadProfessionalWorkspace } from './cad-professional-workspace.js';
 

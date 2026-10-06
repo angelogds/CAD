@@ -80,3 +80,38 @@ test('ferramenta Aparar aceita arco existente como contorno para novos rebaixos'
   assert.match(src,/solved\.targetArcs\.map/);
   assert.match(src,/\.\.\.targetArcs/);
 });
+
+
+test('APARAR aceita clique direto no trecho azul dentro do círculo auxiliar',()=>{
+  const src=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/tools/trim.tool.js'),'utf8');
+  assert.match(src,/findDirectCircularRecess/);
+  assert.match(src,/clique diretamente no trecho azul/);
+  assert.match(src,/distanceToCenter > cutterRadius \+ tolerance/);
+  assert.match(src,/this\.smartPair = \[direct\.target, direct\.cutter\]/);
+  assert.match(src,/this\.commitCircularRecess\(evt\)/);
+});
+
+test('cadeia do editor força versão nova do módulo Aparar',()=>{
+  const version='20261006-trim-v5';
+  const view=fs.readFileSync(path.join(root,'views/desenho-tecnico/cad-editor-v2.ejs'),'utf8');
+  const engine=fs.readFileSync(path.join(root,'public/js/cad-engine-v2.js'),'utf8');
+  const legacy=fs.readFileSync(path.join(root,'public/js/cad-legacy-engine.js'),'utf8');
+  const service=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/desenho-tecnico.service.js'),'utf8');
+  const controller=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/desenho-tecnico.controller.js'),'utf8');
+  const trim=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/tools/trim.tool.js'),'utf8');
+  assert.match(view,new RegExp('cad-engine-v2\\.js\\?v='+version));
+  assert.match(engine,new RegExp('cad-legacy-engine\\.js\\?v='+version));
+  assert.match(legacy,new RegExp('desenho-tecnico\\.service\\.js\\?v='+version));
+  assert.match(service,new RegExp('desenho-tecnico\\.controller\\.js\\?v='+version));
+  assert.match(controller,new RegExp('trim\\.tool\\.js\\?v='+version));
+  assert.match(trim,new RegExp('modify\\.geometry\\.mjs\\?v='+version));
+});
+
+
+test('APARAR permite selecionar círculo auxiliar e depois o contorno externo',()=>{
+  const src=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/tools/trim.tool.js'),'utf8');
+  assert.match(src,/APARAR 2\/2: círculo auxiliar selecionado/);
+  assert.match(src,/hasLargerTarget/);
+  assert.match(src,/this\.smartPair = \[target, this\.boundary\]/);
+  assert.match(src,/o círculo auxiliar precisa cruzar o contorno em dois pontos/);
+});

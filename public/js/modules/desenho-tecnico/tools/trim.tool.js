@@ -2,7 +2,7 @@ import { BaseTool } from './base.tool.js';
 import { lineIntersection } from './modify.utils.js';
 import { ArcEntity } from '../entities/arc.entity.js';
 import { angle2D, circleCircleIntersections, isAngleBetween } from '../core/geometry.js';
-import { solveCircularRecess } from '../core/modify.geometry.mjs';
+import { solveCircularRecess } from '../core/modify.geometry.mjs?v=20261006-trim-v5';
 
 function isCircular(entity) {
   return Boolean(entity && ['circle', 'arc'].includes(entity.type));
@@ -31,8 +31,10 @@ export class TrimTool extends BaseTool {
   activate() {
     this.reset(false);
     this.ctx.prompt.set({
-      message: 'APARAR: clique no 1º ponto de interseção do rebaixo, ou selecione uma linha limite para o trim simples.',
+      message: 'APARAR: clique diretamente no trecho azul que deseja remover. Se preferir, use os dois pontos de interseção e depois o trecho.',
     });
+    this.ctx.statusMessage = 'APARAR pronto: clique no trecho azul dentro do círculo auxiliar.';
+    this.ctx.render?.();
   }
 
   getCircularEntities() {
@@ -57,7 +59,7 @@ export class TrimTool extends BaseTool {
     const entities = this.getCircularEntities();
     const candidates = [];
     const zoom = Math.max(0.05, Number(this.ctx.viewport?.getViewState?.().zoom || 1));
-    const tolerance = 14 / zoom;
+    const tolerance = 18 / zoom;
 
     for (let i = 0; i < entities.length; i += 1) {
       for (let j = i + 1; j < entities.length; j += 1) {
@@ -81,7 +83,44 @@ export class TrimTool extends BaseTool {
 
   getTargetFromPair(world) {
     const pair = this.smartPair || [];
-    return pair.find((entity) => entity.hitTest?.(world, 8 / Math.max(0.05, Number(this.ctx.viewport?.getViewState?.().zoom || 1)))) || null;
+    const tolerance = 14 / Math.max(0.05, Number(this.ctx.viewport?.getViewState?.().zoom || 1));
+    const hits = pair.filter((entity) => entity.hitTest?.(world, tolerance));
+    if (!hits.length) return null;
+    return hits.sort((a, b) => Math.abs(Number(b.geometry?.radius || 0)) - Math.abs(Number(a.geometry?.radius || 0)))[0];
+  }
+
+  findDirectCircularRecess(world) {
+    const entities = this.getCircularEntities();
+    const zoom = Math.max(0.05, Number(this.ctx.viewport?.getViewState?.().zoom || 1));
+    const tolerance = 16 / zoom;
+    const targets = entities
+      .filter((entity) => entity.hitTest?.(world, tolerance))
+      .sort((a, b) => Math.abs(Number(b.geometry?.radius || 0)) - Math.abs(Number(a.geometry?.radius || 0)));
+
+    for (const target of targets) {
+      const targetRadius = Math.abs(Number(target.geometry?.radius || 0));
+      if (!targetRadius) continue;
+      for (const cutter of entities) {
+        if (String(cutter.id) === String(target.id) || cutter.type !== 'circle') continue;
+        const cutterRadius = Math.abs(Number(cutter.geometry?.radius || 0));
+        if (!cutterRadius || targetRadius <= cutterRadius) continue;
+
+        const intersections = this.intersectionsForPair(target, cutter);
+        if (intersections.length !== 2) continue;
+        if (intersections.some((point) => Math.hypot(point.x - world.x, point.y - world.y) <= tolerance * 1.35)) continue;
+
+        const distanceToCenter = Math.hypot(
+          world.x - Number(cutter.geometry.cx),
+          world.y - Number(cutter.geometry.cy),
+        );
+        if (distanceToCenter > cutterRadius + tolerance) continue;
+
+        const solved = solveCircularRecess(target.geometry, cutter.geometry, world);
+        if (!solved.ok) continue;
+        return { target, cutter, intersections };
+      }
+    }
+    return null;
   }
 
   onMouseDown(evt) {
@@ -109,7 +148,42 @@ export class TrimTool extends BaseTool {
       return;
     }
 
+    if (this.boundary && isCircular(this.boundary)) {
+      const target = this.ctx.findEntityAt(evt.world);
+      if (!target || !isCircular(target) || String(target.id) === String(this.boundary.id)) {
+        this.ctx.statusMessage = 'APARAR: agora clique no trecho do contorno externo maior.';
+        this.ctx.render?.();
+        return;
+      }
+      if (Math.abs(Number(target.geometry?.radius || 0)) <= Math.abs(Number(this.boundary.geometry?.radius || 0))) {
+        this.ctx.statusMessage = 'APARAR: o contorno externo precisa ser maior que o círculo auxiliar.';
+        this.ctx.render?.();
+        return;
+      }
+      const intersections = this.intersectionsForPair(target, this.boundary);
+      if (intersections.length !== 2) {
+        this.ctx.statusMessage = 'APARAR: o círculo auxiliar precisa cruzar o contorno em dois pontos.';
+        this.ctx.render?.();
+        return;
+      }
+      this.smartPair = [target, this.boundary];
+      this.smartFirst = { point: intersections[0] };
+      this.smartSecond = { point: intersections[1] };
+      this.boundary = null;
+      this.commitCircularRecess(evt);
+      return;
+    }
+
     if (!this.boundary) {
+      const direct = this.findDirectCircularRecess(evt.world);
+      if (direct) {
+        this.smartPair = [direct.target, direct.cutter];
+        this.smartFirst = { point: direct.intersections[0] };
+        this.smartSecond = { point: direct.intersections[1] };
+        this.commitCircularRecess(evt);
+        return;
+      }
+
       const smart = this.findCircularIntersection(evt.world);
       if (smart) {
         this.smartFirst = smart;
@@ -123,8 +197,28 @@ export class TrimTool extends BaseTool {
       }
 
       const hit = this.ctx.findEntityAt(evt.world);
-      if (!hit || !this.ctx.isEntityEditable(hit) || !['line', 'centerline'].includes(hit.type)) {
-        this.ctx.statusMessage = 'APARAR: selecione uma interseção circular ou uma linha limite.';
+      if (!hit || !this.ctx.isEntityEditable(hit)) {
+        this.ctx.statusMessage = 'APARAR: clique no trecho azul, numa interseção ou no círculo auxiliar.';
+        this.ctx.render?.();
+        return;
+      }
+      if (hit.type === 'circle') {
+        const hasLargerTarget = this.getCircularEntities().some((entity) => (
+          String(entity.id) !== String(hit.id)
+          && Math.abs(Number(entity.geometry?.radius || 0)) > Math.abs(Number(hit.geometry?.radius || 0))
+          && this.intersectionsForPair(entity, hit).length === 2
+        ));
+        if (hasLargerTarget) {
+          this.boundary = hit;
+          this.ctx.selection.set([hit.id]);
+          this.ctx.prompt.set({ message: 'APARAR 2/2: círculo auxiliar selecionado. Clique no trecho do contorno externo que deve desaparecer.' });
+          this.ctx.statusMessage = 'APARAR: círculo auxiliar selecionado; agora clique no trecho azul.';
+          this.ctx.render?.();
+          return;
+        }
+      }
+      if (!['line', 'centerline'].includes(hit.type)) {
+        this.ctx.statusMessage = 'APARAR: para rebaixo, selecione o círculo auxiliar menor ou clique direto no trecho azul.';
         this.ctx.render?.();
         return;
       }

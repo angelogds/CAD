@@ -1,5 +1,5 @@
 import './cad-python-integration.js';
-import { bootstrapDesenhoTecnico } from './modules/desenho-tecnico/desenho-tecnico.service.js';
+import { bootstrapDesenhoTecnico } from './modules/desenho-tecnico/desenho-tecnico.service.js?v=20261006-trim-v5';
 import { RotateTool } from './modules/desenho-tecnico/tools/rotate.tool.js';
 import { FilletTool } from './modules/desenho-tecnico/tools/fillet.tool.js';
 import { ChamferTool } from './modules/desenho-tecnico/tools/chamfer.tool.js';
