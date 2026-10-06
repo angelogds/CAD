@@ -4,6 +4,7 @@ const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
 const ctrl = require("./pcm.controller");
 const preventivasCtrl = require("../preventivas/preventivas.controller");
+const ferramentalCtrl = require("../ferramental/ferramental.controller");
 
 const PCM_ACCESS = ACCESS.pcm;
 const PCM_MANAGE = ACCESS.pcm_manage;
@@ -18,6 +19,13 @@ function redirectWithQuery(target) {
 }
 
 router.get("/", requireLogin, requireRole(PCM_ACCESS), ctrl.index);
+
+router.get("/ferramental", requireLogin, requireRole(PCM_ACCESS), ferramentalCtrl.index);
+router.post("/ferramental/equipes", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.createTeam);
+router.post("/ferramental/armarios", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.createLocker);
+router.post("/ferramental/ferramentas", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.createTool);
+router.post("/ferramental/custodias", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.assignTool);
+router.get("/ferramental/equipes/:equipeId/pdf", requireLogin, requireRole(PCM_ACCESS), ferramentalCtrl.teamPdf);
 
 // Compatibilidade: o painel executivo saiu do PCM operacional e passou a ser
 // parte do Painel da Diretoria. Favoritos antigos continuam funcionando.

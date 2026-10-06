@@ -1,0 +1,68 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/meu-portal.css?v=20260914-v4" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261006-v1" />
+
+<%
+  const data = ferramental || { usuario: {}, resumo: {}, equipes: [], ferramentas: [] };
+%>
+
+<div class="my-portal-page tool-self-page">
+  <header class="my-section-head">
+    <div>
+      <span class="eyebrow">MEU PORTAL • RESPONSABILIDADE</span>
+      <h1>Meu Ferramental</h1>
+      <p>Consulte as ferramentas registradas em seu nome ou compartilhadas com sua equipe.</p>
+    </div>
+    <div class="tool-head-actions">
+      <a class="btn btn-outline" href="/meu-portal">Voltar</a>
+      <a class="btn btn-primary" href="/meu-portal/ferramental/pdf" target="_blank">Baixar ficha PDF</a>
+    </div>
+  </header>
+
+  <section class="tool-kpis tool-kpis--self">
+    <article><span>Ferramentas</span><strong><%= data.resumo.total || 0 %></strong><small>Sob sua responsabilidade</small></article>
+    <article><span>Compartilhadas</span><strong><%= data.resumo.compartilhadas || 0 %></strong><small>Responsabilidade conjunta</small></article>
+    <article><span>Grupos</span><strong><%= data.resumo.grupos || 0 %></strong><small>Vínculos ativos</small></article>
+  </section>
+
+  <% if (!data.equipes.length) { %>
+    <section class="my-material-empty card">
+      <strong>Nenhuma ferramenta vinculada no momento.</strong>
+      <p>Quando o PCM registrar uma ferramenta sob sua responsabilidade, ela aparecerá aqui automaticamente.</p>
+    </section>
+  <% } %>
+
+  <% data.equipes.forEach(function(team){ %>
+    <section class="tool-panel tool-self-group">
+      <div class="tool-panel-head">
+        <div>
+          <span><%= team.codigo %></span>
+          <h2><%= team.nome %></h2>
+          <p>Responsáveis: <strong><%= team.membros.map(function(m){return m.name;}).join(' + ') %></strong></p>
+        </div>
+        <small><%= team.ferramentas.length %> ferramenta(s)</small>
+      </div>
+      <div class="tool-table-wrap">
+        <table class="tool-table">
+          <thead><tr><th>Ferramenta</th><th>ID</th><th>Série / patrimônio</th><th>Condição</th><th>Local de guarda</th></tr></thead>
+          <tbody>
+            <% team.ferramentas.forEach(function(item){ %>
+              <tr>
+                <td><strong><%= item.descricao %></strong><small><%= [item.marca,item.modelo].filter(Boolean).join(' • ') || item.categoria || '-' %></small></td>
+                <td><%= item.codigo_interno %></td>
+                <td><%= item.numero_serie || '-' %><small><%= item.patrimonio ? 'Patrimônio: ' + item.patrimonio : '' %></small></td>
+                <td><%= String(item.condicao || '').replaceAll('_',' ') %></td>
+                <td><strong><%= item.armario_codigo %> / C<%= item.compartimento_numero %></strong><small>Armário de <%= item.armario_responsavel %></small></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% }) %>
+
+  <section class="tool-self-note">
+    <strong>V1 — consulta e rastreabilidade</strong>
+    <span>Nesta primeira versão, o PCM registra a entrega e a localização. Confirmação com foto, selfie e assinatura digital serão evoluções posteriores.</span>
+  </section>
+</div>
