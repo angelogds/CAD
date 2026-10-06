@@ -1,9 +1,15 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/meu-portal.css?v=20260914-v4" />
-<link rel="stylesheet" href="/css/ferramental.css?v=20261006-v1" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261006-v11" />
 
 <%
-  const data = ferramental || { usuario: {}, resumo: {}, equipes: [], ferramentas: [] };
+  const data = ferramental || { usuario: {}, resumo: {}, equipes: [], ferramentas: [], aceites: [] };
+  const aceites = data.aceites || [];
+  const pendentes = aceites.filter(function(a){ return a.status === 'PENDENTE'; });
+  const aceitos = aceites.filter(function(a){ return a.status === 'ACEITO'; });
+  const recusados = aceites.filter(function(a){ return a.status === 'RECUSADO'; });
+  const formatDateTime = (value) => value ? new Date(value).toLocaleString('pt-BR') : '-';
+  const aceitePorCustodia = new Map(aceites.map(function(a){ return [Number(a.custodia_id), a]; }));
 %>
 
 <div class="my-portal-page tool-self-page">
@@ -11,7 +17,7 @@
     <div>
       <span class="eyebrow">MEU PORTAL • RESPONSABILIDADE</span>
       <h1>Meu Ferramental</h1>
-      <p>Consulte as ferramentas registradas em seu nome ou compartilhadas com sua equipe.</p>
+      <p>Consulte, confirme ou informe divergência nas ferramentas registradas sob sua responsabilidade.</p>
     </div>
     <div class="tool-head-actions">
       <a class="btn btn-outline" href="/meu-portal">Voltar</a>
@@ -21,9 +27,81 @@
 
   <section class="tool-kpis tool-kpis--self">
     <article><span>Ferramentas</span><strong><%= data.resumo.total || 0 %></strong><small>Sob sua responsabilidade</small></article>
-    <article><span>Compartilhadas</span><strong><%= data.resumo.compartilhadas || 0 %></strong><small>Responsabilidade conjunta</small></article>
-    <article><span>Grupos</span><strong><%= data.resumo.grupos || 0 %></strong><small>Vínculos ativos</small></article>
+    <article><span>Pendentes</span><strong><%= pendentes.length %></strong><small>Aguardando seu aceite</small></article>
+    <article><span>Confirmadas</span><strong><%= aceitos.length %></strong><small>Selfie + assinatura</small></article>
+    <article><span>Divergências</span><strong><%= recusados.length %></strong><small>Aguardando revisão do PCM</small></article>
   </section>
+
+  <% if (pendentes.length) { %>
+    <section class="tool-panel tool-accept-section">
+      <div class="tool-panel-head">
+        <div><span>V1.1</span><h2>Confirmações pendentes</h2><p>Cada responsável confirma individualmente o recebimento.</p></div>
+        <small><%= pendentes.length %> pendente(s)</small>
+      </div>
+
+      <div class="tool-accept-grid">
+        <% pendentes.forEach(function(item){ %>
+          <article class="tool-accept-card">
+            <div class="tool-accept-card__head">
+              <div>
+                <span><%= item.codigo_interno %></span>
+                <h3><%= item.descricao %></h3>
+                <small><%= item.equipe_codigo %> • <%= item.armario_codigo %> / C<%= item.compartimento_numero %></small>
+              </div>
+              <span class="tool-badge tool-badge--pending">PENDENTE</span>
+            </div>
+
+            <form
+              method="POST"
+              action="/meu-portal/ferramental/custodias/<%= item.custodia_id %>/aceitar"
+              enctype="multipart/form-data"
+              class="tool-accept-form"
+              data-tool-accept-form
+            >
+              <label>
+                Selfie de confirmação
+                <input type="file" name="selfie" accept="image/jpeg,image/png,image/webp" capture="user" required />
+                <small>Tire a foto no momento da confirmação ou selecione uma imagem recente.</small>
+              </label>
+
+              <label>
+                Assinatura
+                <canvas class="tool-signature-canvas" width="520" height="150" tabindex="0" data-signature-canvas></canvas>
+                <input type="hidden" name="assinatura_data" data-signature-data />
+              </label>
+              <div class="tool-signature-actions">
+                <small data-signature-status>Assine no quadro acima</small>
+                <button class="btn btn-outline btn-sm" type="button" data-signature-clear>Limpar assinatura</button>
+              </div>
+
+              <label>
+                Observação
+                <textarea name="observacao" maxlength="800" rows="2" placeholder="Opcional: condição observada no recebimento"></textarea>
+              </label>
+
+              <label class="tool-term-check">
+                <input type="checkbox" name="termo_aceito" value="1" required />
+                <span>Confirmo que recebi esta ferramenta, conferi sua identificação e reconheço minha responsabilidade de guarda e uso.</span>
+              </label>
+
+              <button class="btn btn-primary" type="submit">Confirmar recebimento</button>
+            </form>
+
+            <details class="tool-divergence">
+              <summary>Há alguma divergência?</summary>
+              <form method="POST" action="/meu-portal/ferramental/custodias/<%= item.custodia_id %>/divergencia">
+                <label>
+                  Informe o problema
+                  <textarea name="motivo" maxlength="800" rows="3" required placeholder="Ex.: ferramenta não recebida, identificação diferente, condição divergente..."></textarea>
+                </label>
+                <button class="btn btn-outline" type="submit">Registrar divergência</button>
+              </form>
+            </details>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
 
   <% if (!data.equipes.length) { %>
     <section class="my-material-empty card">
@@ -44,15 +122,31 @@
       </div>
       <div class="tool-table-wrap">
         <table class="tool-table">
-          <thead><tr><th>Ferramenta</th><th>ID</th><th>Série / patrimônio</th><th>Condição</th><th>Local de guarda</th></tr></thead>
+          <thead><tr><th>Ferramenta</th><th>ID</th><th>Condição</th><th>Local de guarda</th><th>Meu aceite</th></tr></thead>
           <tbody>
-            <% team.ferramentas.forEach(function(item){ %>
+            <% team.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); %>
               <tr>
                 <td><strong><%= item.descricao %></strong><small><%= [item.marca,item.modelo].filter(Boolean).join(' • ') || item.categoria || '-' %></small></td>
-                <td><%= item.codigo_interno %></td>
-                <td><%= item.numero_serie || '-' %><small><%= item.patrimonio ? 'Patrimônio: ' + item.patrimonio : '' %></small></td>
+                <td><%= item.codigo_interno %><small><%= item.numero_serie ? 'Série: ' + item.numero_serie : (item.patrimonio ? 'Patrimônio: ' + item.patrimonio : '') %></small></td>
                 <td><%= String(item.condicao || '').replaceAll('_',' ') %></td>
                 <td><strong><%= item.armario_codigo %> / C<%= item.compartimento_numero %></strong><small>Armário de <%= item.armario_responsavel %></small></td>
+                <td>
+                  <% if (!aceite) { %>
+                    <span class="tool-badge">Sem registro</span>
+                  <% } else if (aceite.status === 'ACEITO') { %>
+                    <span class="tool-badge tool-badge--accepted">CONFIRMADO</span>
+                    <small><%= formatDateTime(aceite.confirmado_em) %></small>
+                    <div class="tool-evidence-links">
+                      <a href="/meu-portal/ferramental/aceites/<%= aceite.id %>/evidencia/selfie" target="_blank">Selfie</a>
+                      <a href="/meu-portal/ferramental/aceites/<%= aceite.id %>/evidencia/assinatura" target="_blank">Assinatura</a>
+                    </div>
+                  <% } else if (aceite.status === 'RECUSADO') { %>
+                    <span class="tool-badge tool-badge--rejected">DIVERGÊNCIA</span>
+                    <small><%= aceite.observacao || 'Aguardando revisão do PCM.' %></small>
+                  <% } else { %>
+                    <span class="tool-badge tool-badge--pending">PENDENTE</span>
+                  <% } %>
+                </td>
               </tr>
             <% }) %>
           </tbody>
@@ -62,7 +156,9 @@
   <% }) %>
 
   <section class="tool-self-note">
-    <strong>V1 — consulta e rastreabilidade</strong>
-    <span>Nesta primeira versão, o PCM registra a entrega e a localização. Confirmação com foto, selfie e assinatura digital serão evoluções posteriores.</span>
+    <strong>V1.1 — aceite individual e evidência</strong>
+    <span>Selfie e assinatura ficam armazenadas em área privada. Em ferramenta compartilhada, cada responsável registra seu próprio aceite.</span>
   </section>
 </div>
+
+<script src="/js/ferramental-aceite.js?v=20261006-v11" defer></script>

@@ -39,5 +39,5 @@ test('V1 expõe telas e ficha PDF', () => {
   assert.match(portal, /Meu Ferramental/);
   assert.match(nav, />Ferramental</);
   assert.match(pdf, /Ficha de Responsabilidade de Ferramental/);
-  assert.match(pdf, /assinatura manual/i);
+  assert.match(pdf, /assinatura (manual|digital|eletrônica)/i);
 });

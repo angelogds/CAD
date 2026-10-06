@@ -26,6 +26,7 @@ router.post("/ferramental/armarios", requireLogin, requireRole(PCM_MANAGE), ferr
 router.post("/ferramental/ferramentas", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.createTool);
 router.post("/ferramental/custodias", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.assignTool);
 router.get("/ferramental/equipes/:equipeId/pdf", requireLogin, requireRole(PCM_ACCESS), ferramentalCtrl.teamPdf);
+router.get("/ferramental/aceites/:aceiteId/evidencia/:tipo", requireLogin, requireRole(PCM_ACCESS), ferramentalCtrl.pcmEvidence);
 
 // Compatibilidade: o painel executivo saiu do PCM operacional e passou a ser
 // parte do Painel da Diretoria. Favoritos antigos continuam funcionando.

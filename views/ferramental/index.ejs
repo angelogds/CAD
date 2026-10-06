@@ -5,6 +5,10 @@
 <%
   const data = ferramental || { resumo: {}, usuarios: [], equipes: [], armarios: [], ferramentas: [] };
   const r = data.resumo || {};
+  const aceiteData = data.aceites || { resumo: {}, porCustodia: [], recentes: [] };
+  const aceiteResumo = aceiteData.resumo || {};
+  const aceitePorCustodia = new Map((aceiteData.porCustodia || []).map(function(a){ return [Number(a.custodia_id), a]; }));
+  const formatDateTime = (value) => value ? new Date(value).toLocaleString('pt-BR') : '-';
   const fmtStatus = (value) => ({
     DISPONIVEL: 'Disponível',
     EM_RESPONSABILIDADE: 'Em responsabilidade',
@@ -34,6 +38,8 @@
         <article><span>Disponíveis</span><strong><%= r.disponiveis || 0 %></strong><small>Sem custódia ativa</small></article>
         <article><span>Grupos</span><strong><%= r.equipes || 0 %></strong><small>1 ou 2 responsáveis</small></article>
         <article><span>Armários</span><strong><%= r.armarios || 0 %></strong><small>8 compartimentos cada</small></article>
+        <article><span>Aceites pendentes</span><strong><%= aceiteResumo.pendentes || 0 %></strong><small>Aguardando responsáveis</small></article>
+        <article><span>Divergências</span><strong><%= aceiteResumo.recusados || 0 %></strong><small>Revisar no PCM</small></article>
       </section>
 
       <section class="tool-grid">
@@ -105,7 +111,7 @@
             <label>Ferramenta
               <select name="ferramenta_id" required>
                 <option value="">Selecione</option>
-                <% data.ferramentas.forEach(function(item){ %><option value="<%= item.id %>"><%= item.codigo_interno %> — <%= item.descricao %></option><% }) %>
+                <% data.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); %><option value="<%= item.id %>"><%= item.codigo_interno %> — <%= item.descricao %></option><% }) %>
               </select>
             </label>
             <label>Responsáveis
@@ -145,13 +151,46 @@
         <% } %>
       </section>
 
+
+      <section class="tool-panel" id="aceites">
+        <div class="tool-panel-head">
+          <div><span>V1.1</span><h2>Aceites e divergências</h2><p>Acompanhamento individual por responsável.</p></div>
+          <small><%= aceiteResumo.total || 0 %> registro(s) ativos</small>
+        </div>
+        <% if (!(aceiteData.recentes || []).length) { %>
+          <div class="tool-empty">Nenhum aceite registrado para custódias ativas.</div>
+        <% } else { %>
+          <div class="tool-accept-admin-list">
+            <% aceiteData.recentes.forEach(function(item){ %>
+              <article class="tool-accept-admin-row">
+                <div>
+                  <strong><%= item.codigo_interno %> — <%= item.descricao %></strong>
+                  <span><%= item.usuario_nome %></span>
+                  <% if (item.observacao) { %><small><%= item.observacao %></small><% } %>
+                </div>
+                <div class="tool-accept-admin-status">
+                  <span class="tool-badge <%= item.status === 'ACEITO' ? 'tool-badge--accepted' : item.status === 'RECUSADO' ? 'tool-badge--rejected' : 'tool-badge--pending' %>"><%= item.status %></span>
+                  <small><%= formatDateTime(item.confirmado_em || item.recusado_em) %></small>
+                  <% if (item.status === 'ACEITO') { %>
+                    <div class="tool-evidence-links">
+                      <a href="/pcm/ferramental/aceites/<%= item.id %>/evidencia/selfie" target="_blank">Selfie</a>
+                      <a href="/pcm/ferramental/aceites/<%= item.id %>/evidencia/assinatura" target="_blank">Assinatura</a>
+                    </div>
+                  <% } %>
+                </div>
+              </article>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+
       <section class="tool-panel">
         <div class="tool-panel-head"><div><span>INVENTÁRIO</span><h2>Ferramentas cadastradas</h2></div><small>Uma ferramenta física = um cadastro</small></div>
         <div class="tool-table-wrap">
           <table class="tool-table">
-            <thead><tr><th>ID interno</th><th>Ferramenta</th><th>Série / patrimônio</th><th>Condição</th><th>Status</th><th>Responsáveis</th><th>Local de guarda</th></tr></thead>
+            <thead><tr><th>ID interno</th><th>Ferramenta</th><th>Série / patrimônio</th><th>Condição</th><th>Status</th><th>Responsáveis</th><th>Local de guarda</th><th>Aceite</th></tr></thead>
             <tbody>
-              <% if (!data.ferramentas.length) { %><tr><td colspan="7" class="tool-empty">Nenhuma ferramenta cadastrada.</td></tr><% } %>
+              <% if (!data.ferramentas.length) { %><tr><td colspan="8" class="tool-empty">Nenhuma ferramenta cadastrada.</td></tr><% } %>
               <% data.ferramentas.forEach(function(item){ %>
                 <tr>
                   <td><strong><%= item.codigo_interno %></strong></td>
@@ -161,6 +200,22 @@
                   <td><span class="tool-badge"><%= fmtStatus(item.status) %></span></td>
                   <td><%= item.responsaveis.length ? item.responsaveis.map(function(m){return m.name;}).join(' + ') : 'Disponível' %></td>
                   <td><%= item.armario_codigo ? item.armario_codigo + ' / C' + item.compartimento_numero : '-' %><small><%= item.armario_responsavel || '' %></small></td>
+                  <td>
+                    <% if (!item.custodia_id) { %>
+                      <span class="tool-badge">Sem custódia</span>
+                    <% } else if (aceite && Number(aceite.recusados || 0) > 0) { %>
+                      <span class="tool-badge tool-badge--rejected">DIVERGÊNCIA</span>
+                      <small><%= aceite.aceitos || 0 %>/<%= aceite.total || 0 %> confirmado(s)</small>
+                    <% } else if (aceite && Number(aceite.pendentes || 0) > 0) { %>
+                      <span class="tool-badge tool-badge--pending">PENDENTE</span>
+                      <small><%= aceite.aceitos || 0 %>/<%= aceite.total || 0 %> confirmado(s)</small>
+                    <% } else if (aceite && Number(aceite.total || 0) > 0) { %>
+                      <span class="tool-badge tool-badge--accepted">CONFIRMADO</span>
+                      <small><%= aceite.aceitos || 0 %>/<%= aceite.total || 0 %> responsável(is)</small>
+                    <% } else { %>
+                      <span class="tool-badge">Sem aceite</span>
+                    <% } %>
+                  </td>
                 </tr>
               <% }) %>
             </tbody>

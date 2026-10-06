@@ -9,6 +9,7 @@ const ctrl = require('./meu-portal.controller');
 const fase2bCtrl = require('./meu-portal-fase2b.controller');
 const rhPortalCtrl = require('../rh/rh.portal.controller');
 const ferramentalCtrl = require('../ferramental/ferramental.controller');
+const ferramentalEvidence = require('../ferramental/ferramental.evidence');
 const vinculo = require('./meu-portal.vinculo');
 
 const router = express.Router();
@@ -17,6 +18,7 @@ const uploadDir = path.join(storagePaths.IMAGE_DIR, 'users');
 const atestadoDir = path.join(storagePaths.DATA_DIR, 'rh', 'atestados');
 fs.mkdirSync(uploadDir, { recursive: true });
 fs.mkdirSync(atestadoDir, { recursive: true });
+fs.mkdirSync(ferramentalEvidence.EVIDENCE_DIR, { recursive: true });
 
 const extByMime = {
   'image/jpeg': '.jpg',
@@ -41,6 +43,24 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     const mime = String(file.mimetype || '').toLowerCase();
     if (!extByMime[mime]) return cb(new Error('Formato inválido. Use JPG, PNG ou WEBP.'));
+    return cb(null, true);
+  },
+});
+
+
+const ferramentalUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, ferramentalEvidence.EVIDENCE_DIR),
+    filename: (req, file, cb) => {
+      const mime = String(file.mimetype || '').toLowerCase();
+      const ext = extByMime[mime] || '.jpg';
+      cb(null, `selfie-u${Number(req.session?.user?.id || 0)}-c${Number(req.params?.custodiaId || 0)}-${Date.now()}-${crypto.randomUUID()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const mime = String(file.mimetype || '').toLowerCase();
+    if (!extByMime[mime]) return cb(new Error('Formato de selfie inválido. Use JPG, PNG ou WEBP.'));
     return cb(null, true);
   },
 });
@@ -75,6 +95,9 @@ router.get('/conta', ctrl.conta);
 router.get('/materiais', vinculo.requireMaterialSelfService, ctrl.materiais);
 router.get('/ferramental', vinculo.requireMaintenanceSelfService, ferramentalCtrl.ownTools);
 router.get('/ferramental/pdf', vinculo.requireMaintenanceSelfService, ferramentalCtrl.ownPdf);
+router.post('/ferramental/custodias/:custodiaId/aceitar', vinculo.requireMaintenanceSelfService, ferramentalUpload.single('selfie'), ferramentalCtrl.acceptOwnTool);
+router.post('/ferramental/custodias/:custodiaId/divergencia', vinculo.requireMaintenanceSelfService, ferramentalCtrl.rejectOwnTool);
+router.get('/ferramental/aceites/:aceiteId/evidencia/:tipo', vinculo.requireMaintenanceSelfService, ferramentalCtrl.ownEvidence);
 router.get('/treinamentos', vinculo.requireMaintenanceSelfService, fase2bCtrl.treinamentos);
 router.get('/dados-profissionais', vinculo.requireMaintenanceSelfService, fase2bCtrl.dadosProfissionais);
 router.get('/servicos', vinculo.requireMaintenanceSelfService, fase2bCtrl.servicos);
@@ -95,11 +118,12 @@ router.use((err, req, res, next) => {
   const uploadError = err instanceof multer.MulterError || /Formato .*inválido|Formato inválido/i.test(String(err?.message || ''));
   if (uploadError) {
     const isAtestado = String(req.originalUrl || '').includes('/rh/atestados');
+    const isFerramental = String(req.originalUrl || '').includes('/ferramental/custodias/');
     const message = err?.code === 'LIMIT_FILE_SIZE'
-      ? (isAtestado ? 'O atestado deve ter no máximo 10 MB.' : 'A foto deve ter no máximo 5 MB.')
+      ? (isAtestado ? 'O atestado deve ter no máximo 10 MB.' : isFerramental ? 'A selfie deve ter no máximo 5 MB.' : 'A foto deve ter no máximo 5 MB.')
       : (err.message || 'Não foi possível processar o arquivo.');
     req.flash('error', message);
-    return res.redirect(isAtestado ? '/meu-portal/rh#atestados' : '/meu-portal/perfil');
+    return res.redirect(isAtestado ? '/meu-portal/rh#atestados' : isFerramental ? '/meu-portal/ferramental' : '/meu-portal/perfil');
   }
   return next(err);
 });
