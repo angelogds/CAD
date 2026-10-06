@@ -92,7 +92,7 @@ test('APARAR aceita clique direto no trecho azul dentro do círculo auxiliar',()
 });
 
 test('cadeia do editor força versão nova do módulo Aparar',()=>{
-  const version='20261006-trim-v5';
+  const version='20261006-trim-v6';
   const view=fs.readFileSync(path.join(root,'views/desenho-tecnico/cad-editor-v2.ejs'),'utf8');
   const engine=fs.readFileSync(path.join(root,'public/js/cad-engine-v2.js'),'utf8');
   const legacy=fs.readFileSync(path.join(root,'public/js/cad-legacy-engine.js'),'utf8');
@@ -114,4 +114,27 @@ test('APARAR permite selecionar círculo auxiliar e depois o contorno externo',(
   assert.match(src,/hasLargerTarget/);
   assert.match(src,/this\.smartPair = \[target, this\.boundary\]/);
   assert.match(src,/o círculo auxiliar precisa cruzar o contorno em dois pontos/);
+});
+
+
+test('APARAR automatico preserva o arco externo e remove apenas o trecho dentro do circulo auxiliar',async()=>{
+  const {solveCircularRecess}=await import(geometryUrl);
+  const target={cx:0,cy:0,radius:100};
+  const cutter={cx:80,cy:0,radius:40};
+  const result=solveCircularRecess(target,cutter);
+  assert.equal(result.ok,true);
+  assert.equal(result.automatic,true);
+  assert.equal(result.targetArcs.length,1);
+  const keptMid=pointAt(result.targetArcs[0],result.targetArcs[0].ccw!==false);
+  assert.ok(Math.hypot(keptMid.x-cutter.cx,keptMid.y-cutter.cy)>cutter.radius,'o contorno externo mantido deve ficar fora do circulo auxiliar');
+  const removedMid=pointAt(result.removedTargetArc,result.removedTargetArc.ccw!==false);
+  assert.ok(Math.hypot(removedMid.x-cutter.cx,removedMid.y-cutter.cy)<cutter.radius,'somente o trecho sobreposto deve ser removido');
+});
+
+test('APARAR aplica o rebaixo assim que o circulo auxiliar e selecionado',()=>{
+  const src=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/tools/trim.tool.js'),'utf8');
+  assert.match(src,/findTargetForCutter/);
+  assert.match(src,/selected\?\.type === 'circle'/);
+  assert.match(src,/this\.applyCircularRecess\(target, selected, null\)/);
+  assert.match(src,/contorno externo preservado e arco interno unido automaticamente/);
 });
