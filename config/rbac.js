@@ -153,7 +153,7 @@ const ACCESS = {
   equipamentos_delete: [ROLE.ADMIN],
   os_delete: [ROLE.ADMIN],
   preventivas_delete: [ROLE.ADMIN],
-  demandas_delete: [ROLE.ADMIN],
+  demandas_delete: [ROLE.ADMIN, ROLE.DIRETORIA, ROLE.MANUTENCAO_SUPERVISOR, ROLE.ENCARREGADO_MANUTENCAO, ROLE.COORDENADOR_RECICLAGEM],
   solicitacoes_delete: [ROLE.ADMIN],
   compras_delete: [ROLE.ADMIN],
   fornecedores_delete: [ROLE.ADMIN],
