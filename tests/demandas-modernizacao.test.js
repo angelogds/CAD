@@ -80,3 +80,19 @@ test('filtro visual de prioridade mantém crítica alta média e baixa independe
   assert.match(view, /\['URGENTE','ALTA','NORMAL','BAIXA'\]/);
   assert.doesNotMatch(view, /option value="ELEVADA"/);
 });
+
+
+test('faixa lateral de cada demanda segue exclusivamente a prioridade', () => {
+  const view = read('views/demandas/index.ejs');
+  const css = read('public/css/demandas.css');
+
+  assert.match(view, /demand-priority-<%= slug\(d\.prioridade\) %>/);
+  assert.match(css, /\.demand-row-v2\.demand-priority-urgente:before\{background:#c3222a\}/);
+  assert.match(css, /\.demand-row-v2\.demand-priority-alta:before\{background:#e9791a\}/);
+  assert.match(css, /\.demand-row-v2\.demand-priority-normal:before\{background:#287bd7\}/);
+  assert.match(css, /\.demand-row-v2\.demand-priority-baixa:before\{background:#168a4b\}/);
+
+  assert.doesNotMatch(css, /\.demand-row-v2\.is-overdue\{box-shadow:/);
+  assert.doesNotMatch(css, /\.demand-row-v2\.is-stale\{box-shadow:/);
+  assert.doesNotMatch(css, /\.demand-row-v2\.is-aging\{box-shadow:/);
+});

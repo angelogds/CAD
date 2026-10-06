@@ -113,7 +113,7 @@
               <% const ageDays = Number(d.dias_aberta || 0); %>
               <% const overdueDays = Number(d.dias_atraso || 0); %>
               <% const rowAlertClass = Number(d.prazo_atrasado || 0) ? 'is-overdue' : staleDays >= 7 ? 'is-stale' : staleDays >= 3 ? 'is-aging' : ''; %>
-              <article class="demand-row demand-row-v2 <%= rowAlertClass %>" role="row">
+              <article class="demand-row demand-row-v2 demand-priority-<%= slug(d.prioridade) %> <%= rowAlertClass %>" role="row">
                 <div class="demand-identity" data-label="Demanda">
                   <strong>#<%= d.id %> · <%= d.titulo %></strong>
                   <p><%= d.descricao || 'Descrição não informada.' %></p>
