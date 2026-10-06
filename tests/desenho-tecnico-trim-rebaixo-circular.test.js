@@ -7,134 +7,110 @@ const { pathToFileURL }=require('node:url');
 const root=process.cwd();
 const geometryUrl=pathToFileURL(path.join(root,'public/js/modules/desenho-tecnico/core/modify.geometry.mjs')).href;
 
-function pointAt(geometry, ccw){
-  let sweep=ccw
-    ? ((geometry.endAngle-geometry.startAngle)%(Math.PI*2)+(Math.PI*2))%(Math.PI*2)
-    : ((geometry.startAngle-geometry.endAngle)%(Math.PI*2)+(Math.PI*2))%(Math.PI*2);
-  const angle=geometry.startAngle+(ccw?1:-1)*(sweep/2);
-  return {x:geometry.cx+Math.cos(angle)*geometry.radius,y:geometry.cy+Math.sin(angle)*geometry.radius};
+function midpoint(geometry){
+  const two=Math.PI*2;
+  const sweep=geometry.ccw!==false
+    ? ((geometry.endAngle-geometry.startAngle)%two+two)%two
+    : ((geometry.startAngle-geometry.endAngle)%two+two)%two;
+  const angle=geometry.startAngle+(geometry.ccw!==false?1:-1)*(sweep/2);
+  return {
+    x:geometry.cx+Math.cos(angle)*geometry.radius,
+    y:geometry.cy+Math.sin(angle)*geometry.radius,
+  };
 }
 
-test('APARAR circular cria rebaixo interno e remove o trecho externo escolhido',async()=>{
-  const {solveCircularRecess}=await import(geometryUrl);
-  const target={cx:0,cy:0,radius:100};
-  const cutter={cx:80,cy:0,radius:40};
-  const result=solveCircularRecess(target,cutter,{x:100,y:0});
-  assert.equal(result.ok,true);
-  assert.equal(result.intersections.length,2);
-  const recessMid=pointAt(result.recessArc,result.recessArc.ccw!==false);
-  assert.ok(Math.hypot(recessMid.x,recessMid.y)<100,'o arco do rebaixo deve ficar para dentro do contorno principal');
-  assert.equal(result.targetArcs.length,1);
-  const keptMid=pointAt(result.targetArcs[0],result.targetArcs[0].ccw!==false);
-  assert.ok(keptMid.x<95,'o arco externo clicado deve ser removido do contorno principal');
-});
+const cutA={x:92.5,y:Math.sqrt(10000-(92.5*92.5))};
+const cutB={x:92.5,y:-Math.sqrt(10000-(92.5*92.5))};
 
-test('APARAR circular rejeita círculos sem duas interseções',async()=>{
-  const {solveCircularRecess}=await import(geometryUrl);
-  const result=solveCircularRecess(
+test('APARAR usa o terceiro clique para escolher exatamente o trecho do círculo externo que some',async()=>{
+  const {solveCircularTrimSegment}=await import(geometryUrl);
+  const result=solveCircularTrimSegment(
     {cx:0,cy:0,radius:100},
-    {cx:250,cy:0,radius:20},
-    {x:100,y:0}
+    cutA,
+    cutB,
+    {x:100,y:0},
   );
-  assert.equal(result.ok,false);
-  assert.match(result.error,/cruzar|interse/i);
+
+  assert.equal(result.ok,true);
+  assert.equal(result.keptArcs.length,1);
+  const removedMid=midpoint(result.removedArc);
+  const keptMid=midpoint(result.keptArcs[0]);
+
+  assert.ok(removedMid.x>95,'o trecho do lado do terceiro clique deve ser o removido');
+  assert.ok(keptMid.x<0,'o lado oposto do círculo deve permanecer');
 });
 
-test('ferramenta Aparar usa fluxo de três cliques e incorpora o arco ao contorno',()=>{
+test('APARAR não apaga o círculo inteiro quando o terceiro clique é no círculo do rebaixo',async()=>{
+  const {solveCircularTrimSegment}=await import(geometryUrl);
+  const result=solveCircularTrimSegment(
+    {cx:80,cy:0,radius:40},
+    cutA,
+    cutB,
+    {x:120,y:0},
+  );
+
+  assert.equal(result.ok,true);
+  assert.equal(result.keptArcs.length,1,'o círculo deve virar arco, não desaparecer por inteiro');
+  const removedMid=midpoint(result.removedArc);
+  const keptMid=midpoint(result.keptArcs[0]);
+
+  assert.ok(removedMid.x>110,'somente o lado clicado do círculo do rebaixo deve sumir');
+  assert.ok(keptMid.x<80,'o arco oposto do rebaixo deve permanecer');
+});
+
+test('APARAR permite inverter a escolha no terceiro clique sem inverter os dois limites',async()=>{
+  const {solveCircularTrimSegment}=await import(geometryUrl);
+  const result=solveCircularTrimSegment(
+    {cx:0,cy:0,radius:100},
+    cutA,
+    cutB,
+    {x:-100,y:0},
+  );
+
+  assert.equal(result.ok,true);
+  const removedMid=midpoint(result.removedArc);
+  const keptMid=midpoint(result.keptArcs[0]);
+
+  assert.ok(removedMid.x<0,'o trecho do lado esquerdo deve ser removido quando ele recebe o terceiro clique');
+  assert.ok(keptMid.x>95,'o pequeno trecho do lado direito deve permanecer');
+});
+
+test('ferramenta Aparar segue estritamente o fluxo 1/3, 2/3 e 3/3',()=>{
   const src=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/tools/trim.tool.js'),'utf8');
+  assert.match(src,/APARAR 1\/3/);
   assert.match(src,/APARAR 2\/3/);
   assert.match(src,/APARAR 3\/3/);
-  assert.match(src,/solveCircularRecess/);
-  assert.match(src,/style: \{ \.\.\.\(target\.style \|\| \{\}\) \}/);
-  assert.match(src,/layer: target\.metadata\?\.layer/);
-  assert.match(src,/new ArcEntity/);
+  assert.match(src,/commitCircularTrim/);
+  assert.match(src,/solveCircularTrimSegment/);
+  assert.match(src,/terceiro clique escolhe somente o pedaço que será apagado/);
 });
 
-
-test('APARAR permite um segundo rebaixo depois que o contorno principal virou arco',async()=>{
-  const {solveCircularRecess}=await import(geometryUrl);
-  const first=solveCircularRecess(
-    {cx:0,cy:0,radius:100},
-    {cx:80,cy:0,radius:40},
-    {x:100,y:0}
-  );
-  assert.equal(first.ok,true);
-  assert.equal(first.targetArcs.length,1);
-
-  const second=solveCircularRecess(
-    first.targetArcs[0],
-    {cx:0,cy:80,radius:40},
-    {x:0,y:100}
-  );
-  assert.equal(second.ok,true);
-  assert.equal(second.targetArcs.length,2,'um rebaixo intermediário em arco deve preservar os dois lados restantes');
-  second.targetArcs.forEach((arc)=>{
-    assert.ok(Number.isFinite(arc.startAngle));
-    assert.ok(Number.isFinite(arc.endAngle));
-  });
-});
-
-test('ferramenta Aparar aceita arco existente como contorno para novos rebaixos',()=>{
+test('APARAR circular remove somente a entidade clicada e preserva a outra geometria do par',()=>{
   const src=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/tools/trim.tool.js'),'utf8');
-  assert.match(src,/!isCircular\(target\)/);
-  assert.match(src,/solved\.targetArcs\.map/);
-  assert.match(src,/\.\.\.targetArcs/);
+  assert.match(src,/filter\(\(entity\) => String\(entity\.id\) !== String\(target\.id\)\)/);
+  assert.doesNotMatch(src,/removeIds = new Set\(\[String\(target\.id\), String\(cutter\.id\)\]\)/);
+  assert.match(src,/this\.ctx\.state\.entities\.push\(\.\.\.keptArcs\)/);
 });
 
-
-test('APARAR mantém o clique direto como fallback sem contrariar o fluxo automático',()=>{
+test('pré-visualização mostra o que vai ficar antes do terceiro clique',()=>{
   const src=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/tools/trim.tool.js'),'utf8');
-  assert.match(src,/findDirectCircularRecess/);
-  assert.match(src,/distanceToCenter > cutterRadius \+ tolerance/);
-  assert.match(src,/this\.smartPair = \[direct\.target, direct\.cutter\]/);
-  assert.match(src,/this\.commitCircularRecess\(evt\)/);
-  assert.match(src,/selecione o círculo auxiliar do rebaixo/);
+  assert.match(src,/solved\.keptArcs\.map/);
+  assert.match(src,/ghost-entity/);
 });
 
-test('cadeia do editor força versão nova do módulo Aparar',()=>{
-  const version='20261006-trim-v6';
+test('cadeia do editor força versão nova do Aparar de três cliques',()=>{
+  const version='20261006-trim-v7';
   const view=fs.readFileSync(path.join(root,'views/desenho-tecnico/cad-editor-v2.ejs'),'utf8');
   const engine=fs.readFileSync(path.join(root,'public/js/cad-engine-v2.js'),'utf8');
   const legacy=fs.readFileSync(path.join(root,'public/js/cad-legacy-engine.js'),'utf8');
   const service=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/desenho-tecnico.service.js'),'utf8');
   const controller=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/desenho-tecnico.controller.js'),'utf8');
   const trim=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/tools/trim.tool.js'),'utf8');
+
   assert.match(view,new RegExp('cad-engine-v2\\.js\\?v='+version));
   assert.match(engine,new RegExp('cad-legacy-engine\\.js\\?v='+version));
   assert.match(legacy,new RegExp('desenho-tecnico\\.service\\.js\\?v='+version));
   assert.match(service,new RegExp('desenho-tecnico\\.controller\\.js\\?v='+version));
   assert.match(controller,new RegExp('trim\\.tool\\.js\\?v='+version));
   assert.match(trim,new RegExp('modify\\.geometry\\.mjs\\?v='+version));
-});
-
-
-test('APARAR permite selecionar círculo auxiliar e depois o contorno externo',()=>{
-  const src=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/tools/trim.tool.js'),'utf8');
-  assert.match(src,/APARAR 2\/2: círculo auxiliar selecionado/);
-  assert.match(src,/hasLargerTarget/);
-  assert.match(src,/this\.smartPair = \[target, this\.boundary\]/);
-  assert.match(src,/o círculo auxiliar precisa cruzar o contorno em dois pontos/);
-});
-
-
-test('APARAR automatico preserva o arco externo e remove apenas o trecho dentro do circulo auxiliar',async()=>{
-  const {solveCircularRecess}=await import(geometryUrl);
-  const target={cx:0,cy:0,radius:100};
-  const cutter={cx:80,cy:0,radius:40};
-  const result=solveCircularRecess(target,cutter);
-  assert.equal(result.ok,true);
-  assert.equal(result.automatic,true);
-  assert.equal(result.targetArcs.length,1);
-  const keptMid=pointAt(result.targetArcs[0],result.targetArcs[0].ccw!==false);
-  assert.ok(Math.hypot(keptMid.x-cutter.cx,keptMid.y-cutter.cy)>cutter.radius,'o contorno externo mantido deve ficar fora do circulo auxiliar');
-  const removedMid=pointAt(result.removedTargetArc,result.removedTargetArc.ccw!==false);
-  assert.ok(Math.hypot(removedMid.x-cutter.cx,removedMid.y-cutter.cy)<cutter.radius,'somente o trecho sobreposto deve ser removido');
-});
-
-test('APARAR aplica o rebaixo assim que o circulo auxiliar e selecionado',()=>{
-  const src=fs.readFileSync(path.join(root,'public/js/modules/desenho-tecnico/tools/trim.tool.js'),'utf8');
-  assert.match(src,/findTargetForCutter/);
-  assert.match(src,/selected\?\.type === 'circle'/);
-  assert.match(src,/this\.applyCircularRecess\(target, selected, null\)/);
-  assert.match(src,/contorno externo preservado e arco interno unido automaticamente/);
 });
