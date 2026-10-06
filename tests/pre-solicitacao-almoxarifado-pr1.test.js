@@ -92,3 +92,23 @@ test('envio da pré-solicitação informa aplicação e aceita quantidade com v�
   assert.match(solicitacoes,/raw\.includes\(","\)/);
   assert.match(solicitacoes,/qtd_solicitada:\s*parseQuantidade\(quantidades\[i\]\)/);
 });
+
+
+test('Almoxarifado pode adicionar novos materiais antes da análise sem recriar os existentes',()=>{
+  const service=read('modules/pre-solicitacoes/pre-solicitacoes.service.js');
+  const solicitacoes=read('modules/solicitacoes/solicitacoes.service.js');
+  const routes=read('modules/pre-solicitacoes/pre-solicitacoes.routes.js');
+  const controller=read('modules/pre-solicitacoes/pre-solicitacoes.controller.js');
+  const show=read('views/pre-solicitacoes/show.ejs');
+
+  assert.match(service,/function canAddItems\(solicitacao, user\)/);
+  assert.match(service,/PRE_STATUS\.RASCUNHO, PRE_STATUS\.AGUARDANDO_APROVACAO/);
+  assert.match(service,/appendSolicitacaoItens\(Number\(solicitacaoId\), itens\)/);
+  assert.match(service,/initializeItems\(Number\(solicitacaoId\), insertedIds\)/);
+  assert.match(solicitacoes,/function appendSolicitacaoItens\(solicitacaoId, itens\)/);
+  assert.match(routes,/\/:id\/itens\/adicionar/);
+  assert.match(controller,/service\.addItems\(Number\(req\.params\.id\), req\.body, req\.session\.user\)/);
+  assert.match(show,/Adicionar materiais/);
+  assert.match(show,/Adicionar à pré-solicitação/);
+  assert.match(show,/data-add-pending-item/);
+});

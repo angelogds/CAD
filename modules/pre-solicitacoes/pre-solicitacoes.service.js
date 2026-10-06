@@ -120,6 +120,12 @@ function canEditDraft(solicitacao, user) {
     && Number(solicitacao.pre_criada_por_user_id || solicitacao.solicitante_user_id) === Number(user.id);
 }
 
+function canAddItems(solicitacao, user) {
+  if (!solicitacao || !user) return false;
+  if (![PRE_STATUS.RASCUNHO, PRE_STATUS.AGUARDANDO_APROVACAO].includes(String(solicitacao.pre_status))) return false;
+  return ['ADMIN', 'ALMOXARIFADO'].includes(normalizeRole(user.role));
+}
+
 function activeUserWhere(alias = 'u') {
   const userCols = columns('users');
   const clauses = [];
@@ -307,7 +313,7 @@ function setHeader(id, fields) {
     .run(...entries.map(([,value]) => value), Number(id));
 }
 
-function initializeItems(solicitacaoId) {
+function initializeItems(solicitacaoId, itemIds = []) {
   const itemCols = columns('solicitacao_itens');
   const sets = [];
   if (itemCols.has('qtd_sugerida_almox')) {
@@ -322,7 +328,11 @@ function initializeItems(solicitacaoId) {
   if (itemCols.has('pre_aprovacao_item_por')) sets.push('pre_aprovacao_item_por=NULL');
   if (itemCols.has('pre_aprovacao_item_em')) sets.push('pre_aprovacao_item_em=NULL');
   if (itemCols.has('pre_aprovacao_item_observacao')) sets.push('pre_aprovacao_item_observacao=NULL');
-  if (sets.length) db.prepare(`UPDATE solicitacao_itens SET ${sets.join(',')} WHERE solicitacao_id=?`).run(Number(solicitacaoId));
+  if (!sets.length) return;
+  const ids = (itemIds || []).map(Number).filter(Boolean);
+  const whereIds = ids.length ? ` AND id IN (${ids.map(() => '?').join(',')})` : '';
+  db.prepare(`UPDATE solicitacao_itens SET ${sets.join(',')} WHERE solicitacao_id=?${whereIds}`)
+    .run(Number(solicitacaoId), ...ids);
 }
 
 function preparePayload(data, user) {
@@ -411,6 +421,27 @@ function updateDraft(id, data, user) {
     const updated = getById(id);
     if (actionStatus === PRE_STATUS.AGUARDANDO_APROVACAO) notifyApprovers(updated);
     return updated;
+  })();
+}
+
+function addItems(solicitacaoId, data, user) {
+  const solicitacao = getById(solicitacaoId);
+  if (!solicitacao) throw new Error('Pré-solicitação não encontrada.');
+  if (!canAddItems(solicitacao, user)) {
+    throw new Error('Novos materiais só podem ser adicionados pelo Almoxarifado antes do início da análise.');
+  }
+
+  const itens = solicitacoesService.parseItensFromBody(data);
+  if (!itens.length) throw new Error('Inclua ao menos um material com quantidade maior que zero.');
+
+  return db.transaction(() => {
+    const insertedIds = solicitacoesService.appendSolicitacaoItens(Number(solicitacaoId), itens);
+    initializeItems(Number(solicitacaoId), insertedIds);
+    setHeader(solicitacaoId, { disponivel_compras: 0 });
+
+    const updated = getById(solicitacaoId);
+    if (String(updated.pre_status) === PRE_STATUS.AGUARDANDO_APROVACAO) notifyApprovers(updated);
+    return { solicitacao: updated, adicionados: insertedIds.length };
   })();
 }
 
@@ -559,6 +590,7 @@ module.exports = {
   canReview,
   canView,
   canEditDraft,
+  canAddItems,
   isAlmoxUser,
   listApprovers,
   listForUser,
@@ -566,6 +598,7 @@ module.exports = {
   getById,
   create,
   updateDraft,
+  addItems,
   decideItem,
   finalizeReview,
   formOptions,

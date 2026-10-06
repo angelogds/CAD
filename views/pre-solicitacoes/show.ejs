@@ -25,6 +25,53 @@ const done=sol.itens_analisados||0,total=sol.itens_total||0;
 
   <% if (sol.pre_observacao_aprovacao) { %><div class="pre-note"><strong>Observação final</strong><%=sol.pre_observacao_aprovacao%></div><% } %>
 
+  <% if(canAddItems){ %>
+    <section class="pre-card pre-materials-card" id="adicionar-materiais">
+      <div class="pre-section-head">
+        <div><span>+</span><h2>Adicionar materiais</h2></div>
+        <div class="pre-section-actions">
+          <small>Disponível enquanto a pré-solicitação ainda não entrou em análise.</small>
+          <button class="ui-btn ui-btn--secondary" type="button" data-add-pending-item>+ Outro item</button>
+        </div>
+      </div>
+      <form method="POST" action="/pre-solicitacoes/<%=sol.id%>/itens/adicionar" id="pre-add-items-form">
+        <div class="pre-items" data-pending-items>
+          <div class="pre-item-row">
+            <div class="pre-item-head"><strong>Novo item <span data-pending-item-number>1</span></strong><button class="pre-remove" type="button" data-remove-pending-item>Remover</button></div>
+            <div class="pre-item-fields">
+              <label class="pre-material-name">Material<input name="itens_nome[]" required placeholder="Ex.: Rolamento 6205"></label>
+              <label>Quantidade<input name="itens_qtd[]" inputmode="decimal" required placeholder="1"></label>
+              <label>Unidade<input name="itens_un[]" value="UN" required></label>
+              <label class="pre-stock-link">Item de estoque
+                <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>"><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
+              </label>
+            </div>
+            <label class="pre-item-spec">Especificação<textarea name="itens_especificacao[]" rows="1" placeholder="Marca, medida, aplicação ou detalhe técnico"></textarea></label>
+          </div>
+        </div>
+        <div class="pre-form-actions pre-action-bar">
+          <span class="pre-action-hint">Os novos materiais serão incluídos como PENDENTE e seguirão para análise do responsável do setor.</span>
+          <button class="ui-btn ui-btn--primary" type="submit" onclick="return confirm('Adicionar estes materiais à pré-solicitação?')">Adicionar à pré-solicitação</button>
+        </div>
+      </form>
+    </section>
+
+    <template id="pre-pending-item-template">
+      <div class="pre-item-row">
+        <div class="pre-item-head"><strong>Novo item <span data-pending-item-number></span></strong><button class="pre-remove" type="button" data-remove-pending-item>Remover</button></div>
+        <div class="pre-item-fields">
+          <label class="pre-material-name">Material<input name="itens_nome[]" required placeholder="Material"></label>
+          <label>Quantidade<input name="itens_qtd[]" inputmode="decimal" required></label>
+          <label>Unidade<input name="itens_un[]" value="UN" required></label>
+          <label class="pre-stock-link">Item de estoque
+            <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>"><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
+          </label>
+        </div>
+        <label class="pre-item-spec">Especificação<textarea name="itens_especificacao[]" rows="1" placeholder="Marca, medida, aplicação ou detalhe técnico"></textarea></label>
+      </div>
+    </template>
+  <% } %>
+
   <section class="pre-card pre-review-card" id="itens">
     <div class="pre-section-head"><div><span>2</span><h2>Análise dos itens</h2></div><small>A quantidade original do Almoxarifado sempre fica registrada no histórico.</small></div>
     <div class="pre-review-list">
@@ -73,3 +120,24 @@ const done=sol.itens_analisados||0,total=sol.itens_total||0;
     <div class="pre-release-banner"><strong>Pedido liberado para Compras.</strong><span>Os itens aprovados já estão disponíveis no fluxo normal de cotação. Os reprovados permanecem somente no histórico.</span><a href="/compras/solicitacoes?setor=<%=encodeURIComponent(sol.setor_origem)%>">Abrir Compras</a></div>
   <% } %>
 </div>
+
+<script>
+(() => {
+  const list=document.querySelector('[data-pending-items]');
+  const tpl=document.querySelector('#pre-pending-item-template');
+  if(!list || !tpl) return;
+  const renumber=()=>list.querySelectorAll('[data-pending-item-number]').forEach((el,index)=>{el.textContent=String(index+1);});
+  document.querySelector('[data-add-pending-item]')?.addEventListener('click',()=>{
+    list.appendChild(tpl.content.cloneNode(true));
+    renumber();
+  });
+  list.addEventListener('click',(e)=>{
+    const btn=e.target.closest('[data-remove-pending-item]');
+    if(!btn) return;
+    const rows=list.querySelectorAll('.pre-item-row');
+    if(rows.length<=1) return;
+    btn.closest('.pre-item-row')?.remove();
+    renumber();
+  });
+})();
+</script>
