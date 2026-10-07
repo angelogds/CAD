@@ -21,6 +21,7 @@ module.exports = function up({ db, tableExists, addColumnIfMissing }) {
   }
 
   if (tableExists('preventiva_planos')) {
+    addColumnIfMissing('preventiva_planos', 'tipo_plano', "tipo_plano TEXT DEFAULT 'preventiva'");
     addColumnIfMissing('preventiva_planos', 'estoque_item_id', 'estoque_item_id INTEGER REFERENCES estoque_itens(id)');
     addColumnIfMissing('preventiva_planos', 'quantidade_material', 'quantidade_material REAL');
     addColumnIfMissing('preventiva_planos', 'estoque_minimo_conjuntos', 'estoque_minimo_conjuntos REAL NOT NULL DEFAULT 1');
