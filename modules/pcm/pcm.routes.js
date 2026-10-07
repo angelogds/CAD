@@ -34,6 +34,12 @@ router.get("/ferramental/ferramentas/:ferramentaId/etiqueta-pdf", requireLogin, 
 router.get("/ferramental/ferramentas/:ferramentaId/historico", requireLogin, requireRole(PCM_ACCESS), ferramentalCtrl.toolHistory);
 router.post("/ferramental/ferramentas/:ferramentaId/ocorrencias", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.createPcmOccurrence);
 router.post("/ferramental/ocorrencias/:ocorrenciaId/resolver", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.resolveOccurrence);
+router.post("/ferramental/inspecao-config", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.configureInspection);
+router.post("/ferramental/ferramentas/:ferramentaId/inspecao-config", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.configureInspection);
+router.post("/ferramental/inspecoes", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.scheduleInspection);
+router.post("/ferramental/ferramentas/:ferramentaId/inspecoes", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.scheduleInspection);
+router.get("/ferramental/inspecoes/:inspecaoId", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.inspectionForm);
+router.post("/ferramental/inspecoes/:inspecaoId/executar", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.executeInspection);
 
 // Compatibilidade: o painel executivo saiu do PCM operacional e passou a ser
 // parte do Painel da Diretoria. Favoritos antigos continuam funcionando.

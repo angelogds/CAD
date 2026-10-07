@@ -1,11 +1,14 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/meu-portal.css?v=20260914-v4" />
-<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v13" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v14" />
 
 <%
   const data = ferramental || { usuario: {}, resumo: {}, equipes: [], ferramentas: [], aceites: [] };
   const aceites = data.aceites || [];
   const inventarios = data.inventarios || [];
+  const inspecoes = data.inspecoes || [];
+  const inspecaoPorFerramenta = new Map(inspecoes.map(function(t){ return [Number(t.id), t.inspecao]; }));
+  const inspecoesCriticas = inspecoes.filter(function(t){ return ['BLOQUEADA','VENCIDA','A_VENCER'].includes(t.inspecao?.situation); });
   const ocorrencias = data.ocorrencias || [];
   const ocorrenciasAbertas = ocorrencias.filter(function(o){ return ['ABERTA','EM_ANALISE','EM_ACOMPANHAMENTO'].includes(o.status); });
   const ocorrenciaPorFerramenta = new Map(ocorrenciasAbertas.map(function(o){ return [Number(o.ferramenta_id), o]; }));
@@ -37,6 +40,7 @@
     <article><span>Divergências</span><strong><%= recusados.length %></strong><small>Aguardando revisão do PCM</small></article>
     <article><span>Conferências</span><strong><%= inventariosPendentes.length %></strong><small>Pendentes no inventário</small></article>
     <article><span>Ocorrências</span><strong><%= ocorrenciasAbertas.length %></strong><small>Em tratamento pelo PCM</small></article>
+    <article><span>Inspeções</span><strong><%= inspecoesCriticas.length %></strong><small>Alertas de segurança</small></article>
   </section>
 
   <% if (pendentes.length) { %>
@@ -175,6 +179,28 @@
     </section>
   <% } %>
 
+
+  <% if (inspecoesCriticas.length) { %>
+    <section class="tool-panel tool-self-inspection-alerts" id="inspecoes">
+      <div class="tool-panel-head">
+        <div><span>V1.4</span><h2>Alertas de inspeção</h2><p>Ferramentas bloqueadas ou com inspeção vencida não devem ser utilizadas.</p></div>
+        <small><%= inspecoesCriticas.length %> alerta(s)</small>
+      </div>
+      <div class="tool-self-inspection-list">
+        <% inspecoesCriticas.forEach(function(t){ %>
+          <article class="is-<%= String(t.inspecao.situation || '').toLowerCase().replaceAll('_','-') %>">
+            <div>
+              <span><%= String(t.inspecao.situation || '-').replaceAll('_',' ') %></span>
+              <strong><%= t.codigo_interno %> — <%= t.descricao %></strong>
+              <small><%= t.inspecao.block ? t.inspecao.block.motivo : (t.inspecao.next ? 'Próxima inspeção: ' + new Date(t.inspecao.next.data_programada + 'T12:00:00').toLocaleDateString('pt-BR') : 'Sem agendamento') %></small>
+            </div>
+            <% if (t.inspecao.situation === 'BLOQUEADA') { %><b>NÃO USAR</b><% } %>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
+
   <% if (!data.equipes.length) { %>
     <section class="my-material-empty card">
       <strong>Nenhuma ferramenta vinculada no momento.</strong>
@@ -194,13 +220,20 @@
       </div>
       <div class="tool-table-wrap">
         <table class="tool-table">
-          <thead><tr><th>Ferramenta</th><th>ID</th><th>Condição</th><th>Local de guarda</th><th>Meu aceite</th><th>QR</th><th>Ocorrência</th></tr></thead>
+          <thead><tr><th>Ferramenta</th><th>ID</th><th>Condição</th><th>Inspeção</th><th>Local de guarda</th><th>Meu aceite</th><th>QR</th><th>Ocorrência</th></tr></thead>
           <tbody>
-            <% team.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); const ocorrencia = ocorrenciaPorFerramenta.get(Number(item.id)); %>
+            <% team.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); const ocorrencia = ocorrenciaPorFerramenta.get(Number(item.id)); const inspecao = inspecaoPorFerramenta.get(Number(item.id)); %>
               <tr>
                 <td><strong><%= item.descricao %></strong><small><%= [item.marca,item.modelo].filter(Boolean).join(' • ') || item.categoria || '-' %></small></td>
                 <td><%= item.codigo_interno %><small><%= item.numero_serie ? 'Série: ' + item.numero_serie : (item.patrimonio ? 'Patrimônio: ' + item.patrimonio : '') %></small></td>
                 <td><%= String(item.condicao || '').replaceAll('_',' ') %></td>
+                <td>
+                  <% if (!inspecao) { %><span class="tool-badge">SEM PLANO</span>
+                  <% } else { %>
+                    <span class="tool-badge <%= inspecao.situation === 'BLOQUEADA' || inspecao.situation === 'VENCIDA' ? 'tool-badge--rejected' : inspecao.situation === 'A_VENCER' ? 'tool-badge--pending' : inspecao.situation === 'EM_DIA' ? 'tool-badge--accepted' : '' %>"><%= String(inspecao.situation || '-').replaceAll('_',' ') %></span>
+                    <% if (inspecao.next) { %><small><%= new Date(inspecao.next.data_programada + 'T12:00:00').toLocaleDateString('pt-BR') %></small><% } %>
+                  <% } %>
+                </td>
                 <td><strong><%= item.armario_codigo %> / C<%= item.compartimento_numero %></strong><small>Armário de <%= item.armario_responsavel %></small></td>
                 <td>
                   <% if (!aceite) { %>
@@ -253,8 +286,8 @@
   <% }) %>
 
   <section class="tool-self-note">
-    <strong>V1.3 — ciclo de vida e ocorrências</strong>
-    <span>Além do aceite, QR e conferência, agora o responsável comunica devolução, manutenção, dano ou extravio sem retirar sozinho a própria responsabilidade. O PCM trata a ocorrência e toda movimentação permanece no histórico.</span>
+    <strong>V1.4 — inspeção e bloqueio de segurança</strong>
+    <span>O responsável continua acompanhando aceite, QR, conferência e ocorrências, e agora também visualiza inspeções vencidas, próximas do vencimento e bloqueios de uso por reprovação técnica.</span>
   </section>
 </div>
 

@@ -1,6 +1,6 @@
 <% layout('layout') %>
 <%- include('../pcm/partials/internal-styles') %>
-<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v13" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v14" />
 
 <%
   const data = ferramental || { resumo: {}, usuarios: [], equipes: [], armarios: [], ferramentas: [] };
@@ -10,6 +10,9 @@
   const inventarioResumo = inventarioData.resumo || {};
   const ocorrenciaData = data.ocorrencias || { resumo: {}, abertas: [], recentes: [] };
   const ocorrenciaResumo = ocorrenciaData.resumo || {};
+  const inspecaoData = data.inspecoes || { resumo: {}, tools: [], scheduled: [], recent: [], profiles: [] };
+  const inspecaoResumo = inspecaoData.resumo || {};
+  const inspecaoPorFerramenta = new Map((inspecaoData.tools || []).map(function(t){ return [Number(t.id), t.inspecao]; }));
   const aceiteResumo = aceiteData.resumo || {};
   const aceitePorCustodia = new Map((aceiteData.porCustodia || []).map(function(a){ return [Number(a.custodia_id), a]; }));
   const formatDateTime = (value) => value ? new Date(value).toLocaleString('pt-BR') : '-';
@@ -47,6 +50,9 @@
         <article><span>Conferências abertas</span><strong><%= inventarioResumo.abertos || 0 %></strong><small>Inventário periódico</small></article>
         <article><span>Ocorrências</span><strong><%= ocorrenciaResumo.pendentes || 0 %></strong><small>Aguardando PCM</small></article>
         <article><span>Em manutenção</span><strong><%= ocorrenciaResumo.acompanhamento || 0 %></strong><small>Ocorrências acompanhadas</small></article>
+        <article><span>Inspeções vencidas</span><strong><%= inspecaoResumo.vencidas || 0 %></strong><small>Exigem atenção</small></article>
+        <article><span>A vencer</span><strong><%= inspecaoResumo.aVencer || 0 %></strong><small>Dentro do alerta</small></article>
+        <article><span>Bloqueadas</span><strong><%= inspecaoResumo.bloqueadas || 0 %></strong><small>Não usar / não transferir</small></article>
       </section>
 
       <section class="tool-grid">
@@ -118,7 +124,7 @@
             <label>Ferramenta
               <select name="ferramenta_id" required>
                 <option value="">Selecione</option>
-                <% data.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); %><option value="<%= item.id %>"><%= item.codigo_interno %> — <%= item.descricao %></option><% }) %>
+                <% data.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); const inspecao = inspecaoPorFerramenta.get(Number(item.id)); %><option value="<%= item.id %>"><%= item.codigo_interno %> — <%= item.descricao %></option><% }) %>
               </select>
             </label>
             <label>Responsáveis
@@ -197,6 +203,102 @@
             <strong>Divergências encontradas nas conferências</strong>
             <% inventarioData.divergencias.forEach(function(item){ %>
               <div><span><%= item.inventario_codigo %> • <%= item.codigo_interno %> — <%= item.descricao %></span><b><%= item.situacao.replaceAll('_',' ') %></b><small><%= item.usuario_nome %><%= item.observacao ? ' • ' + item.observacao : '' %></small></div>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+
+
+      <section class="tool-panel tool-inspection-panel" id="inspecoes">
+        <div class="tool-panel-head">
+          <div><span>V1.4</span><h2>Inspeção periódica e segurança</h2><p>Configure a periodicidade, execute checklists e bloqueie automaticamente ferramentas reprovadas.</p></div>
+          <small><%= inspecaoResumo.configuradas || 0 %> plano(s)</small>
+        </div>
+
+        <div class="tool-grid tool-grid--inspection-config">
+          <form method="POST" action="/pcm/ferramental/inspecao-config" class="tool-form tool-inspection-config">
+            <strong>Plano periódico</strong>
+            <label>Ferramenta
+              <select name="ferramenta_id" required>
+                <option value="">Selecione</option>
+                <% data.ferramentas.forEach(function(item){ %><option value="<%= item.id %>"><%= item.codigo_interno %> — <%= item.descricao %></option><% }) %>
+              </select>
+            </label>
+            <div class="tool-form--two">
+              <label>Periodicidade (dias)<input type="number" name="periodicidade_dias" min="1" max="3650" value="30" required /></label>
+              <label>Alertar antes (dias)<input type="number" name="alerta_dias" min="0" max="365" value="7" required /></label>
+            </div>
+            <label>Perfil do checklist
+              <select name="perfil_checklist" required>
+                <option value="PADRAO">Padrão</option>
+                <option value="ELETRICA">Ferramenta elétrica</option>
+                <option value="SOLDA">Máquina/equipamento de solda</option>
+                <option value="ABRASIVA">Lixadeira / esmerilhadeira</option>
+                <option value="MANUAL">Ferramenta manual</option>
+              </select>
+            </label>
+            <label>Próxima inspeção <input type="date" name="proxima_data" /></label>
+            <input type="hidden" name="obrigatoria" value="1" />
+            <button class="ui-btn ui-btn--primary" type="submit">Salvar plano e agendar</button>
+          </form>
+
+          <form method="POST" action="/pcm/ferramental/inspecoes" class="tool-form tool-inspection-config">
+            <strong>Inspeção extraordinária</strong>
+            <label>Ferramenta
+              <select name="ferramenta_id" required>
+                <option value="">Selecione</option>
+                <% data.ferramentas.forEach(function(item){ %><option value="<%= item.id %>"><%= item.codigo_interno %> — <%= item.descricao %></option><% }) %>
+              </select>
+            </label>
+            <label>Tipo
+              <select name="tipo" required>
+                <option value="EXTRAORDINARIA">Extraordinária</option>
+                <option value="RETORNO_MANUTENCAO">Retorno de manutenção</option>
+                <option value="PERIODICA">Periódica</option>
+              </select>
+            </label>
+            <label>Data programada <input type="date" name="data_programada" required /></label>
+            <label>Perfil do checklist
+              <select name="perfil_checklist">
+                <option value="">Usar perfil configurado</option>
+                <option value="PADRAO">Padrão</option>
+                <option value="ELETRICA">Ferramenta elétrica</option>
+                <option value="SOLDA">Máquina/equipamento de solda</option>
+                <option value="ABRASIVA">Lixadeira / esmerilhadeira</option>
+                <option value="MANUAL">Ferramenta manual</option>
+              </select>
+            </label>
+            <label>Observação <textarea name="observacao" maxlength="1000" rows="2"></textarea></label>
+            <button class="ui-btn ui-btn--outline" type="submit">Agendar inspeção</button>
+          </form>
+        </div>
+
+        <div class="tool-inspection-scheduled">
+          <div class="tool-panel-head tool-panel-head--sub">
+            <div><span>AGENDA</span><h3>Inspeções pendentes</h3></div>
+            <small><%= (inspecaoData.scheduled || []).length %> agendada(s)</small>
+          </div>
+          <% if (!(inspecaoData.scheduled || []).length) { %>
+            <div class="tool-empty">Nenhuma inspeção pendente.</div>
+          <% } else { %>
+            <div class="tool-inspection-cards">
+              <% (inspecaoData.scheduled || []).forEach(function(insp){ const atrasada = insp.data_programada < new Date().toISOString().slice(0,10); %>
+                <article class="<%= atrasada ? 'is-overdue' : '' %>">
+                  <div><span><%= insp.codigo %> • <%= String(insp.tipo || '').replaceAll('_',' ') %></span><strong><%= insp.codigo_interno %> — <%= insp.descricao %></strong><small>Programada: <%= new Date(insp.data_programada + 'T12:00:00').toLocaleDateString('pt-BR') %> • <%= String(insp.perfil_checklist || '').replaceAll('_',' ') %></small></div>
+                  <a class="ui-btn ui-btn--primary ui-btn--compact" href="/pcm/ferramental/inspecoes/<%= insp.id %>"><%= atrasada ? 'Executar vencida' : 'Executar' %></a>
+                </article>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+
+        <% if ((inspecaoData.tools || []).some(function(t){ return ['BLOQUEADA','VENCIDA','A_VENCER'].includes(t.inspecao?.situation); })) { %>
+          <div class="tool-inspection-alert-list">
+            <% (inspecaoData.tools || []).filter(function(t){ return ['BLOQUEADA','VENCIDA','A_VENCER'].includes(t.inspecao?.situation); }).forEach(function(t){ %>
+              <article class="is-<%= String(t.inspecao.situation || '').toLowerCase().replaceAll('_','-') %>">
+                <div><span><%= t.inspecao.situation.replaceAll('_',' ') %></span><strong><%= t.codigo_interno %> — <%= t.descricao %></strong><small><%= t.inspecao.block ? t.inspecao.block.motivo : (t.inspecao.next ? 'Próxima: ' + new Date(t.inspecao.next.data_programada + 'T12:00:00').toLocaleDateString('pt-BR') : 'Sem agendamento') %></small></div>
+                <% if (t.inspecao.next) { %><a class="tool-qr-link" href="/pcm/ferramental/inspecoes/<%= t.inspecao.next.id %>">Abrir inspeção</a><% } %>
+              </article>
             <% }) %>
           </div>
         <% } %>
@@ -358,16 +460,23 @@
         <div class="tool-panel-head"><div><span>INVENTÁRIO</span><h2>Ferramentas cadastradas</h2></div><small>Uma ferramenta física = um cadastro</small></div>
         <div class="tool-table-wrap">
           <table class="tool-table">
-            <thead><tr><th>ID interno</th><th>Ferramenta</th><th>Série / patrimônio</th><th>Condição</th><th>Status</th><th>Responsáveis</th><th>Local de guarda</th><th>Aceite</th><th>QR / histórico</th></tr></thead>
+            <thead><tr><th>ID interno</th><th>Ferramenta</th><th>Série / patrimônio</th><th>Condição</th><th>Status</th><th>Inspeção</th><th>Responsáveis</th><th>Local de guarda</th><th>Aceite</th><th>QR / histórico</th></tr></thead>
             <tbody>
-              <% if (!data.ferramentas.length) { %><tr><td colspan="9" class="tool-empty">Nenhuma ferramenta cadastrada.</td></tr><% } %>
-              <% data.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); %>
+              <% if (!data.ferramentas.length) { %><tr><td colspan="10" class="tool-empty">Nenhuma ferramenta cadastrada.</td></tr><% } %>
+              <% data.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); const inspecao = inspecaoPorFerramenta.get(Number(item.id)); %>
                 <tr>
                   <td><strong><%= item.codigo_interno %></strong></td>
                   <td><strong><%= item.descricao %></strong><small><%= [item.marca,item.modelo].filter(Boolean).join(' • ') || item.categoria || '-' %></small></td>
                   <td><%= item.numero_serie || '-' %><small><%= item.patrimonio ? 'Patrimônio: ' + item.patrimonio : '' %></small></td>
                   <td><%= String(item.condicao || '').replaceAll('_',' ') %></td>
                   <td><span class="tool-badge"><%= fmtStatus(item.status) %></span></td>
+                  <td>
+                    <% if (!inspecao) { %><span class="tool-badge">SEM PLANO</span>
+                    <% } else { %>
+                      <span class="tool-badge <%= inspecao.situation === 'BLOQUEADA' || inspecao.situation === 'VENCIDA' ? 'tool-badge--rejected' : inspecao.situation === 'A_VENCER' ? 'tool-badge--pending' : inspecao.situation === 'EM_DIA' ? 'tool-badge--accepted' : '' %>"><%= String(inspecao.situation || '-').replaceAll('_',' ') %></span>
+                      <% if (inspecao.next) { %><small>Próxima: <%= new Date(inspecao.next.data_programada + 'T12:00:00').toLocaleDateString('pt-BR') %></small><% } %>
+                    <% } %>
+                  </td>
                   <td><%= item.responsaveis.length ? item.responsaveis.map(function(m){return m.name;}).join(' + ') : 'Disponível' %></td>
                   <td><%= item.armario_codigo ? item.armario_codigo + ' / C' + item.compartimento_numero : '-' %><small><%= item.armario_responsavel || '' %></small></td>
                   <td>

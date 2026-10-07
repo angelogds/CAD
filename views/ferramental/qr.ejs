@@ -1,5 +1,5 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v13" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v14" />
 
 <%
   const item = ferramenta || {};
@@ -9,6 +9,7 @@
   const hist = historico || { movimentacoes: [], ocorrencias: [] };
   const formatDateTime = (value) => value ? new Date(value).toLocaleString('pt-BR') : '-';
   const ocorrenciaAtiva = hist.ocorrencias.find(function(o){ return ['ABERTA','EM_ANALISE','EM_ACOMPANHAMENTO'].includes(o.status); });
+  const insp = inspecao || { situation: 'SEM_PLANO', block: null, next: null, last: null };
 %>
 
 <div class="tool-qr-page">
@@ -33,6 +34,14 @@
       <article><span>Patrimônio</span><strong><%= item.patrimonio || '-' %></strong></article>
       <article><span>Marca / modelo</span><strong><%= [item.marca,item.modelo].filter(Boolean).join(' • ') || '-' %></strong></article>
       <article><span>Local de guarda</span><strong><%= item.armario_codigo ? item.armario_codigo + ' / C' + item.compartimento_numero : '-' %></strong></article>
+    </div>
+
+    <div class="tool-qr-inspection <%= insp.situation === 'BLOQUEADA' || insp.situation === 'VENCIDA' ? 'is-danger' : insp.situation === 'A_VENCER' ? 'is-warning' : 'is-ok' %>">
+      <span>Inspeção de segurança</span>
+      <strong><%= String(insp.situation || 'SEM_PLANO').replaceAll('_',' ') %></strong>
+      <% if (insp.block) { %><small><%= insp.block.motivo %> • NÃO USAR</small><% } %>
+      <% if (!insp.block && insp.next) { %><small>Próxima inspeção: <%= new Date(insp.next.data_programada + 'T12:00:00').toLocaleDateString('pt-BR') %></small><% } %>
+      <% if (insp.last) { %><small>Última: <%= insp.last.codigo %> • <%= String(insp.last.status || '').replaceAll('_',' ') %></small><% } %>
     </div>
 
     <div class="tool-qr-responsibility">

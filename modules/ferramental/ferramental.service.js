@@ -1,6 +1,7 @@
 const db = require('../../database/db');
 const aceiteService = require('./ferramental.aceite.service');
 const ocorrenciaService = require('./ferramental.ocorrencia.service');
+const inspecaoService = require('./ferramental.inspecao.service');
 
 const ACTIVE_MAINTENANCE_ROLES = [
   'MECANICO',
@@ -287,6 +288,7 @@ function assignTool({ ferramenta_id, equipe_id, compartimento_id, observacao }, 
   const tool = db.prepare('SELECT * FROM ferramental_itens WHERE id=? AND ativo=1 LIMIT 1').get(toolId);
   if (!tool) throw new Error('Ferramenta não encontrada.');
   if (String(tool.status) === 'BAIXADA') throw new Error('Ferramenta baixada não pode receber nova responsabilidade.');
+  inspecaoService.assertToolUnblocked(toolId);
 
   const team = db.prepare('SELECT * FROM ferramental_equipes WHERE id=? AND ativo=1 LIMIT 1').get(teamId);
   if (!team) throw new Error('Grupo de responsabilidade não encontrado.');

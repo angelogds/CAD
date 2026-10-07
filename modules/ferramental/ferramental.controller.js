@@ -6,6 +6,7 @@ const inventarioService = require('./ferramental.inventario.service');
 const QRCode = require('qrcode');
 const PDFDocument = require('pdfkit');
 const ocorrenciaService = require('./ferramental.ocorrencia.service');
+const inspecaoService = require('./ferramental.inspecao.service');
 
 function pcmBase(res) {
   res.locals.activeMenu = 'pcm';
@@ -19,6 +20,7 @@ function index(req, res) {
     ferramental.aceites = aceiteService.dashboard();
     ferramental.inventarios = inventarioService.listDashboard();
     ferramental.ocorrencias = ocorrenciaService.dashboard();
+    ferramental.inspecoes = inspecaoService.dashboard();
     return res.render('ferramental/index', {
       title: 'PCM - Gestão de Ferramental',
       ferramental,
@@ -94,6 +96,7 @@ function ownTools(req, res) {
     ferramental.aceites = aceiteService.listOwnAcceptances(req.session.user.id);
     ferramental.inventarios = inventarioService.listOwn(req.session.user.id);
     ferramental.ocorrencias = ocorrenciaService.listOwn(req.session.user.id);
+    ferramental.inspecoes = inspecaoService.ownStatus(req.session.user.id);
     return res.render('meu-portal/ferramental', {
       title: 'Meu Ferramental',
       ferramental,
@@ -231,10 +234,12 @@ function qrLookup(req, res) {
     const ferramenta = service.getToolByQrToken(req.params.token);
     if (!ferramenta) return res.status(404).send('Ferramenta não encontrada.');
     const historico = ocorrenciaService.history(ferramenta.id);
+    const inspecao = inspecaoService.toolInspectionStatus(ferramenta.id);
     return res.render('ferramental/qr', {
       title: `Ferramental - ${ferramenta.codigo_interno}`,
       ferramenta,
       historico,
+      inspecao,
     });
   } catch (error) {
     return res.status(500).send(error.message || 'Não foi possível consultar a ferramenta.');
@@ -334,15 +339,64 @@ function toolHistory(req, res) {
     const ferramenta = service.getToolById(req.params.ferramentaId);
     if (!ferramenta) return res.status(404).send('Ferramenta não encontrada.');
     const historico = ocorrenciaService.history(ferramenta.id);
+    const inspecao = inspecaoService.toolInspectionStatus(ferramenta.id);
     return res.render('ferramental/historico', {
       title: `Histórico - ${ferramenta.codigo_interno}`,
       ferramenta,
       historico,
+      inspecao,
     });
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível carregar o histórico.');
     return res.redirect('/pcm/ferramental');
   }
+}
+
+
+function configureInspection(req, res) {
+  try {
+    inspecaoService.configure(req.params.ferramentaId || req.body.ferramenta_id, req.body, req.session.user.id);
+    req.flash('success', 'Plano de inspeção atualizado. A próxima inspeção foi agendada.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível configurar a inspeção.');
+  }
+  return res.redirect('/pcm/ferramental#inspecoes');
+}
+
+function scheduleInspection(req, res) {
+  try {
+    inspecaoService.scheduleInspection(req.params.ferramentaId || req.body.ferramenta_id, req.body, req.session.user.id);
+    req.flash('success', 'Inspeção extraordinária agendada.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível agendar a inspeção.');
+  }
+  return res.redirect('/pcm/ferramental#inspecoes');
+}
+
+function inspectionForm(req, res) {
+  pcmBase(res);
+  try {
+    const detalhe = inspecaoService.inspectionDetail(req.params.inspecaoId);
+    if (!detalhe) return res.status(404).send('Inspeção não encontrada.');
+    return res.render('ferramental/inspecao', {
+      title: `Inspeção - ${detalhe.inspection.codigo}`,
+      detalhe,
+    });
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível carregar a inspeção.');
+    return res.redirect('/pcm/ferramental#inspecoes');
+  }
+}
+
+function executeInspection(req, res) {
+  try {
+    inspecaoService.executeInspection(req.params.inspecaoId, req.body, req.session.user.id);
+    req.flash('success', 'Inspeção concluída e situação de uso atualizada.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível concluir a inspeção.');
+    return res.redirect(`/pcm/ferramental/inspecoes/${Number(req.params.inspecaoId) || ''}`);
+  }
+  return res.redirect('/pcm/ferramental#inspecoes');
 }
 
 module.exports = {
@@ -368,4 +422,8 @@ module.exports = {
   createPcmOccurrence,
   resolveOccurrence,
   toolHistory,
+  configureInspection,
+  scheduleInspection,
+  inspectionForm,
+  executeInspection,
 };

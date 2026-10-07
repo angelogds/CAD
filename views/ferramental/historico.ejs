@@ -1,10 +1,11 @@
 <% layout('layout') %>
 <%- include('../pcm/partials/internal-styles') %>
-<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v13" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v14" />
 
 <%
   const item = ferramenta || {};
   const hist = historico || { movimentacoes: [], ocorrencias: [] };
+  const insp = inspecao || { situation: 'SEM_PLANO', block: null, next: null, last: null };
   const formatDateTime = (value) => value ? new Date(value).toLocaleString('pt-BR') : '-';
 %>
 
@@ -29,6 +30,23 @@
         <article><span>Condição</span><strong class="tool-kpi-text"><%= String(item.condicao || '-').replaceAll('_',' ') %></strong><small>Condição registrada</small></article>
         <article><span>Responsáveis</span><strong class="tool-kpi-text"><%= item.responsaveis?.length ? item.responsaveis.map(function(m){return m.name;}).join(' + ') : 'Sem custódia' %></strong><small>Responsabilidade atual</small></article>
         <article><span>Local</span><strong class="tool-kpi-text"><%= item.armario_codigo ? item.armario_codigo + ' / C' + item.compartimento_numero : '-' %></strong><small>Guarda atual</small></article>
+      </section>
+
+      <section class="tool-panel tool-history-inspection">
+        <div class="tool-panel-head">
+          <div><span>V1.4</span><h2>Inspeção e liberação de uso</h2><p>Situação técnica atual do ferramental.</p></div>
+          <span class="tool-badge <%= insp.situation === 'BLOQUEADA' || insp.situation === 'VENCIDA' ? 'tool-badge--rejected' : insp.situation === 'A_VENCER' ? 'tool-badge--pending' : insp.situation === 'EM_DIA' ? 'tool-badge--accepted' : '' %>"><%= String(insp.situation || 'SEM_PLANO').replaceAll('_',' ') %></span>
+        </div>
+        <% if (insp.block) { %>
+          <div class="tool-inspection-block-alert"><strong>BLOQUEADA — NÃO USAR</strong><span><%= insp.block.motivo %></span></div>
+        <% } else if (insp.next) { %>
+          <div class="tool-inspection-result">
+            <p><strong>Próxima inspeção:</strong> <%= new Date(insp.next.data_programada + 'T12:00:00').toLocaleDateString('pt-BR') %></p>
+            <% if (insp.last) { %><p><strong>Última inspeção:</strong> <%= insp.last.codigo %> • <%= String(insp.last.status || '').replaceAll('_',' ') %></p><% } %>
+          </div>
+        <% } else { %>
+          <div class="tool-empty">Sem plano de inspeção ativo para esta ferramenta.</div>
+        <% } %>
       </section>
 
       <section class="tool-panel">
