@@ -46,7 +46,7 @@
     ? `<span class="pill-tag pill-${kind}" style="margin-left:auto; font-size:10px; padding:2px 7px;">${value}</span>`
     : '';
   const navItem = (href, label, isActive, extraClass = '', suffix = '') =>
-    `<a class="nav-item ${extraClass} ${isActive ? 'active' : ''}" href="${href}"><span class="nav-label">${label}</span>${suffix}</a>`;
+    `<a class="nav-item ${extraClass} ${isActive ? 'active' : ''}" href="${href}" data-nav-label="${label}" title="${label}"><span class="nav-label">${label}</span>${suffix}</a>`;
 
   const hasOperationGroup = canPainel || canDiretoriaManutencao || canDiretoriaCompras || canEquipamentos || canOS || canOSChat || canPreventivas || canLubrificacaoExecucao || canDemandas || canSolicitacoes || canAcompanhamentoOnly || canPreSolicitacoes || canCompras || canFornecedores || canAlmoxarifado || canEstoque || canMotores;
   const hasSupportGroup = canAvisos || canEscala || canRH || canMeuPortal || canInspecao || canTracagem || canDesenhoTecnico || canAcademia || canAI || canPCM;
@@ -54,6 +54,7 @@
 
 <aside class="sidebar">
   <div class="sidebar-title">
+    <span class="sidebar-compact-mark" aria-hidden="true">GI</span>
     <span class="sidebar-brand-title">Gestão Industrial</span>
     <small class="sidebar-brand-subtitle">Manutenção Integrada</small>
   </div>
@@ -117,7 +118,7 @@
   </nav>
 
   <div class="sidebar-footer">
-    <a href="/tv" target="_blank" rel="noopener" class="nav-item sidebar-tv-link">
+    <a href="/tv" target="_blank" rel="noopener" class="nav-item sidebar-tv-link" data-nav-label="Modo TV" title="Modo TV">
       <span class="nav-label">Modo TV</span>
     </a>
     <small>© <%= new Date().getFullYear() %> Campo do Gado</small>
