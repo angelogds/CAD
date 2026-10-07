@@ -54,8 +54,9 @@ export class SelectTool extends BaseTool {
         grips.push({ entityId: entity.id, role: 'position', x: g.x, y: g.y });
       } else if (entity.type === 'shaft') {
         grips.push({ entityId: entity.id, role: 'origin', x: g.origin?.x || 0, y: g.origin?.y || 0 });
-      } else if (entity.type === 'dimension' && g.textPoint) {
-        grips.push({ entityId: entity.id, role: 'textPoint', x: g.textPoint.x, y: g.textPoint.y });
+      } else if (entity.type === 'dimension') {
+        if (g.dimensionLinePoint) grips.push({ entityId: entity.id, role: 'dimensionLinePoint', x: g.dimensionLinePoint.x, y: g.dimensionLinePoint.y });
+        if (g.textPoint) grips.push({ entityId: entity.id, role: 'textPoint', x: g.textPoint.x, y: g.textPoint.y });
       }
     });
     return grips;
@@ -97,7 +98,24 @@ export class SelectTool extends BaseTool {
     }
     if (entity.type === 'text') { g.x = p.x; g.y = p.y; return; }
     if (entity.type === 'shaft' && g.origin) { g.origin.x = p.x; g.origin.y = p.y; return; }
-    if (entity.type === 'dimension' && g.textPoint) { g.textPoint.x = p.x; g.textPoint.y = p.y; }
+    if (entity.type === 'dimension') {
+      if (grip.role === 'dimensionLinePoint') {
+        const previous = g.dimensionLinePoint || g.textPoint || p;
+        const dx = p.x - previous.x;
+        const dy = p.y - previous.y;
+        g.dimensionLinePoint = { x: p.x, y: p.y };
+        if (g.textPoint) {
+          g.textPoint.x += dx;
+          g.textPoint.y += dy;
+        } else {
+          g.textPoint = { x: p.x, y: p.y };
+        }
+        return;
+      }
+      if (grip.role === 'textPoint') {
+        g.textPoint = { x: p.x, y: p.y };
+      }
+    }
   }
 
   visibleSelectableIds() {
