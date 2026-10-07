@@ -6,19 +6,19 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('menu do usuário oferece Meu Portal, Perfil, RH e Conta sem remover logout seguro', () => {
+test('menu do usuário fica enxuto e concentra serviços detalhados no Meu Portal', () => {
   const layout = read('views/layout.ejs');
 
   assert.match(layout, /href="\/meu-portal"[^>]*>[\s\S]*Meu Portal/);
-  assert.match(layout, /href="\/meu-portal\/perfil"[^>]*>[\s\S]*Meu Perfil/);
-  assert.match(layout, /href="\/meu-portal\/cartao"[^>]*>[\s\S]*Meu Cartão/);
-  assert.match(layout, /href="\/escala\/meu-painel"[^>]*>[\s\S]*Minha Jornada/);
-  assert.match(layout, /href="\/meu-portal\/rh"[^>]*>[\s\S]*Meu RH/);
-  assert.match(layout, /href="\/meu-portal\/conta"[^>]*>[\s\S]*Conta e segurança/);
+  assert.match(layout, /href="\/meu-portal\/cartao"[^>]*>[\s\S]*Cartão do Almoxarifado/);
+  assert.match(layout, /href="\/meu-portal\/configuracoes"[^>]*>[\s\S]*Configurações do sistema/);
+  assert.doesNotMatch(layout, /href="\/meu-portal\/perfil"[^>]*>[\s\S]*Meu Perfil/);
+  assert.doesNotMatch(layout, /href="\/escala\/meu-painel"[^>]*>[\s\S]*Minha Jornada/);
+  assert.doesNotMatch(layout, /href="\/meu-portal\/rh"[^>]*>[\s\S]*Meu RH/);
+  assert.doesNotMatch(layout, /href="\/meu-portal\/conta"[^>]*>[\s\S]*Conta e segurança/);
   assert.match(layout, /<form action="\/auth\/logout" method="POST">/);
   assert.match(layout, /activeMenu === 'meu-portal'[\s\S]*meu-portal-modernizacao\.css/);
 });
-
 test('home vira hub compacto e não repete formulários nem QR na tela inicial', () => {
   const view = read('views/meu-portal/index.ejs');
   const controller = read('modules/meu-portal/meu-portal.controller.js');
