@@ -67,6 +67,26 @@
             <div><span>Saldo físico</span><strong><%=Number(item.saldo_atual||0)%> <%=item.unidade||'UN'%></strong></div>
             <div><span>Reservado</span><strong><%=reservado%> <%=item.unidade||'UN'%></strong></div>
           </div>
+          <% if(canManage){ %>
+            <details class="almox-stock-organize">
+              <summary class="btn btn-ghost">Organizar prateleira</summary>
+              <form method="POST" action="/almoxarifado/estoque/<%=item.id%>/classificar" class="almox-stock-organize-form" data-stock-classifier>
+                <input type="hidden" name="retorno_q" value="<%=filtros.q%>">
+                <input type="hidden" name="retorno_categoria_id" value="<%=filtros.categoria_id%>">
+                <label><span>Categoria</span><select class="input" name="categoria_id" data-category-select><option value="">Sem categoria</option><% categorias.forEach(c=>{ %><option value="<%=c.id%>" <%=Number(item.categoria_id)===Number(c.id)?'selected':''%>><%=c.nome%></option><% }) %></select></label>
+                <label><span>Subcategoria</span><select class="input" name="subcategoria_id" data-subcategory-select><option value="">Sem subcategoria</option><% subcategorias.forEach(sc=>{ %><option value="<%=sc.id%>" data-parent="<%=sc.parent_id||''%>" <%=Number(item.subcategoria_id)===Number(sc.id)?'selected':''%>><%=sc.nome%></option><% }) %></select></label>
+                <label><span>Local / área</span><select class="input" name="local_id"><option value="">Sem local</option><% locais.forEach(l=>{ %><option value="<%=l.id%>" <%=Number(item.local_id)===Number(l.id)?'selected':''%>><%=l.nome%></option><% }) %></select></label>
+                <label><span>Equipamento dedicado</span><select class="input" name="equipamento_id"><option value="">Estoque geral</option><% equipamentos.forEach(e=>{ %><option value="<%=e.id%>" <%=Number(item.equipamento_id)===Number(e.id)?'selected':''%>><%=e.nome%></option><% }) %></select></label>
+                <div class="almox-address-grid almox-address-grid--organize">
+                  <label><span>Zona</span><input class="input" name="endereco_zona" value="<%=item.endereco_zona||''%>" placeholder="A"></label>
+                  <label><span>Estante</span><input class="input" name="endereco_estante" value="<%=item.endereco_estante||''%>" placeholder="03"></label>
+                  <label><span>Prateleira</span><input class="input" name="endereco_prateleira" value="<%=item.endereco_prateleira||''%>" placeholder="02"></label>
+                  <label><span>Posição</span><input class="input" name="endereco_posicao" value="<%=item.endereco_posicao||''%>" placeholder="B"></label>
+                </div>
+                <button class="btn btn-green" type="submit" data-pending-text="Salvando...">Salvar organização</button>
+              </form>
+            </details>
+          <% } %>
           <div class="almox-product__actions">
             <a class="btn btn-ghost" href="/estoque/itens/<%=item.id%>">Detalhes</a>
             <% if(canWithdraw && livre>0){ %><a class="btn btn-green" href="/estoque/saidas/nova?contexto=almoxarifado&item=<%=item.id%>">Retirar</a><% } %>
@@ -76,3 +96,22 @@
     </section>
   <% } %>
 </div>
+
+<script>
+document.querySelectorAll('[data-stock-classifier]').forEach((form)=>{
+  const category=form.querySelector('[data-category-select]');
+  const subcategory=form.querySelector('[data-subcategory-select]');
+  if(!category||!subcategory)return;
+  const refresh=()=>{
+    const value=String(category.value||'');
+    [...subcategory.options].forEach((option)=>{
+      if(!option.value){option.hidden=false;return;}
+      option.hidden=Boolean(value)&&String(option.dataset.parent||'')!==value;
+    });
+    const selected=subcategory.options[subcategory.selectedIndex];
+    if(selected&&selected.hidden)subcategory.value='';
+  };
+  category.addEventListener('change',refresh);
+  refresh();
+});
+</script>
