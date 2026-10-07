@@ -5,6 +5,7 @@ const evidence = require('./ferramental.evidence');
 const inventarioService = require('./ferramental.inventario.service');
 const QRCode = require('qrcode');
 const PDFDocument = require('pdfkit');
+const ocorrenciaService = require('./ferramental.ocorrencia.service');
 
 function pcmBase(res) {
   res.locals.activeMenu = 'pcm';
@@ -17,6 +18,7 @@ function index(req, res) {
     const ferramental = service.dashboard();
     ferramental.aceites = aceiteService.dashboard();
     ferramental.inventarios = inventarioService.listDashboard();
+    ferramental.ocorrencias = ocorrenciaService.dashboard();
     return res.render('ferramental/index', {
       title: 'PCM - Gestão de Ferramental',
       ferramental,
@@ -91,6 +93,7 @@ function ownTools(req, res) {
     const ferramental = service.listOwnTools(req.session.user.id);
     ferramental.aceites = aceiteService.listOwnAcceptances(req.session.user.id);
     ferramental.inventarios = inventarioService.listOwn(req.session.user.id);
+    ferramental.ocorrencias = ocorrenciaService.listOwn(req.session.user.id);
     return res.render('meu-portal/ferramental', {
       title: 'Meu Ferramental',
       ferramental,
@@ -227,9 +230,11 @@ function qrLookup(req, res) {
   try {
     const ferramenta = service.getToolByQrToken(req.params.token);
     if (!ferramenta) return res.status(404).send('Ferramenta não encontrada.');
+    const historico = ocorrenciaService.history(ferramenta.id);
     return res.render('ferramental/qr', {
       title: `Ferramental - ${ferramenta.codigo_interno}`,
       ferramenta,
+      historico,
     });
   } catch (error) {
     return res.status(500).send(error.message || 'Não foi possível consultar a ferramenta.');
@@ -280,6 +285,66 @@ async function qrImage(req, res, next) {
   }
 }
 
+
+function createOwnOccurrence(req, res) {
+  try {
+    ocorrenciaService.createOwnOccurrence(
+      req.session.user.id,
+      req.params.ferramentaId,
+      req.body
+    );
+    req.flash('success', 'Ocorrência registrada. O PCM foi acionado para tratamento.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível registrar a ocorrência.');
+  }
+  return res.redirect('/meu-portal/ferramental#ocorrencias');
+}
+
+function createPcmOccurrence(req, res) {
+  try {
+    ocorrenciaService.createPcmOccurrence(
+      req.session.user.id,
+      req.params.ferramentaId,
+      req.body
+    );
+    req.flash('success', 'Ocorrência aberta pelo PCM.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível abrir a ocorrência.');
+  }
+  return res.redirect('/pcm/ferramental#ocorrencias');
+}
+
+function resolveOccurrence(req, res) {
+  try {
+    ocorrenciaService.resolveOccurrence(
+      req.params.ocorrenciaId,
+      req.session.user.id,
+      req.body
+    );
+    req.flash('success', 'Ocorrência tratada e movimentação registrada no histórico.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível tratar a ocorrência.');
+  }
+  return res.redirect('/pcm/ferramental#ocorrencias');
+}
+
+function toolHistory(req, res) {
+  pcmBase(res);
+  try {
+    const ferramenta = service.getToolById(req.params.ferramentaId);
+    if (!ferramenta) return res.status(404).send('Ferramenta não encontrada.');
+    const historico = ocorrenciaService.history(ferramenta.id);
+    return res.render('ferramental/historico', {
+      title: `Histórico - ${ferramenta.codigo_interno}`,
+      ferramenta,
+      historico,
+    });
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível carregar o histórico.');
+    return res.redirect('/pcm/ferramental');
+  }
+}
+
 module.exports = {
   index,
   createTeam,
@@ -299,4 +364,8 @@ module.exports = {
   qrLookup,
   qrImage,
   toolLabelPdf,
+  createOwnOccurrence,
+  createPcmOccurrence,
+  resolveOccurrence,
+  toolHistory,
 };
