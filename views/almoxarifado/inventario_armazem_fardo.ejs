@@ -1,0 +1,171 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20261007-v3" />
+<link rel="stylesheet" href="/css/almoxarifado-operacional-v3.css?v=20261007-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-refino-v4.css?v=20261007-inventario-v1" />
+
+<%
+  const fardoId = Number(localFardo?.id || 0);
+%>
+
+<div class="almox-page almox-inventory-page">
+  <header class="almox-store-head">
+    <div>
+      <span class="almox-hero__eyebrow">ALMOXARIFADO • INVENTÁRIO FÍSICO</span>
+      <h1 style="margin:0">Cadastrar material existente</h1>
+      <p class="muted">Use esta tela para registrar o que já existe fisicamente no Armazém Fardo sem criar uma compra fictícia.</p>
+    </div>
+    <div class="almox-hero__actions">
+      <a class="btn btn-ghost" href="/almoxarifado/estoque">Voltar às prateleiras</a>
+    </div>
+  </header>
+
+  <%- include('_tabs', { tab: 'estoque' }) %>
+
+  <section class="almox-inventory-guide">
+    <article><span>1</span><div><strong>Identifique o material</strong><p>Selecione um item já cadastrado ou crie um novo.</p></div></article>
+    <article><span>2</span><div><strong>Enderece a prateleira</strong><p>Defina Armazém Fardo, estante, prateleira e posição.</p></div></article>
+    <article><span>3</span><div><strong>Conte o saldo físico</strong><p>Informe a quantidade que realmente existe hoje.</p></div></article>
+  </section>
+
+  <form method="POST" action="/almoxarifado/estoque/inventario" class="almox-inventory-form card" data-inventory-form>
+    <section class="almox-inventory-section">
+      <div class="almox-inventory-section__head">
+        <div><span>ETAPA 1</span><h2>Material</h2><p>Evite duplicidade: se o item já existe, selecione-o e apenas ajuste a contagem.</p></div>
+      </div>
+
+      <label class="almox-inventory-existing">
+        <span>Item já cadastrado no estoque</span>
+        <select class="input" name="estoque_item_id" data-existing-item>
+          <option value="">Cadastrar novo material</option>
+          <% itens.forEach(item => { %>
+            <option value="<%= item.id %>">#<%= item.id %> • <%= item.codigo || 'SEM CÓDIGO' %> • <%= item.nome %> • saldo <%= Number(item.saldo_atual || 0) %> <%= item.unidade || 'UN' %></option>
+          <% }) %>
+        </select>
+      </label>
+
+      <div class="almox-inventory-new-grid" data-new-item-fields>
+        <label><span>Código</span><input class="input" name="codigo" placeholder="Ex.: SOL-001 / DIS-115X1"></label>
+        <label><span>Nome do material *</span><input class="input" name="nome" data-new-required placeholder="Ex.: Disco de corte 115 x 1 mm"></label>
+        <label><span>Unidade</span>
+          <select class="input" name="unidade">
+            <option value="UN">UNIDADE</option>
+            <option value="KG">KG</option>
+            <option value="M">METRO</option>
+            <option value="L">LITRO</option>
+            <option value="CX">CAIXA</option>
+            <option value="PCT">PACOTE</option>
+            <option value="RL">ROLO</option>
+            <option value="PAR">PAR</option>
+          </select>
+        </label>
+        <label><span>Saldo mínimo</span><input class="input" type="number" min="0" step="0.01" name="saldo_minimo" value="0"></label>
+        <label><span>Setor de utilização</span>
+          <select class="input" name="setor_utilizacao">
+            <% setoresEstoque.forEach(setor => { %><option value="<%= setor %>" <%= setor === 'RECICLAGEM' ? 'selected' : '' %>><%= setor %></option><% }) %>
+          </select>
+        </label>
+        <label><span>Centro de custo / subárea</span><input class="input" name="subarea_centro_custo" placeholder="Ex.: Manutenção / Oficina"></label>
+      </div>
+    </section>
+
+    <section class="almox-inventory-section">
+      <div class="almox-inventory-section__head">
+        <div><span>ETAPA 2</span><h2>Classificação e endereço físico</h2><p>Organize como uma prateleira de supermercado para facilitar localização e reposição.</p></div>
+      </div>
+
+      <div class="almox-inventory-classification-grid">
+        <label><span>Categoria</span>
+          <select class="input" name="categoria_id" data-category-select>
+            <option value="">Sem categoria</option>
+            <% categorias.forEach(cat => { %><option value="<%= cat.id %>"><%= cat.nome %></option><% }) %>
+          </select>
+        </label>
+        <label><span>Subcategoria</span>
+          <select class="input" name="subcategoria_id" data-subcategory-select>
+            <option value="">Sem subcategoria</option>
+            <% subcategorias.forEach(sc => { %><option value="<%= sc.id %>" data-parent="<%= sc.parent_id || '' %>"><%= sc.categoria_pai_nome ? sc.categoria_pai_nome + ' • ' : '' %><%= sc.nome %></option><% }) %>
+          </select>
+        </label>
+        <label><span>Local físico</span>
+          <select class="input" name="local_id">
+            <option value="">Selecione</option>
+            <% locais.forEach(local => { %><option value="<%= local.id %>" <%= Number(local.id) === fardoId ? 'selected' : '' %>><%= local.nome %></option><% }) %>
+          </select>
+        </label>
+        <label><span>Equipamento dedicado</span>
+          <select class="input" name="equipamento_id">
+            <option value="">Estoque geral</option>
+            <% equipamentos.forEach(eq => { %><option value="<%= eq.id %>"><%= eq.nome %></option><% }) %>
+          </select>
+        </label>
+      </div>
+
+      <div class="almox-address-grid almox-inventory-address">
+        <label><span>Zona</span><input class="input" name="endereco_zona" placeholder="A"></label>
+        <label><span>Estante</span><input class="input" name="endereco_estante" placeholder="03"></label>
+        <label><span>Prateleira</span><input class="input" name="endereco_prateleira" placeholder="02"></label>
+        <label><span>Posição</span><input class="input" name="endereco_posicao" placeholder="B"></label>
+      </div>
+
+      <div class="almox-inventory-address-example">
+        <strong>Padrão sugerido:</strong> ARMAZÉM FARDO • ZONA A • ESTANTE 03 • PRATELEIRA 02 • POSIÇÃO B
+      </div>
+    </section>
+
+    <section class="almox-inventory-section almox-inventory-count">
+      <div class="almox-inventory-section__head">
+        <div><span>ETAPA 3</span><h2>Contagem física</h2><p>Digite o saldo que foi contado na prateleira. Se o item já existe, o sistema ajustará apenas a diferença.</p></div>
+      </div>
+
+      <div class="almox-inventory-count-grid">
+        <label class="almox-inventory-quantity"><span>Quantidade contada *</span><input class="input" type="number" min="0" step="0.01" name="quantidade_contada" required placeholder="0"></label>
+        <label><span>Custo unitário opcional</span><input class="input" type="number" min="0" step="0.01" name="custo_unit" placeholder="0,00"></label>
+        <label class="almox-inventory-observation"><span>Observação</span><input class="input" name="observacao" placeholder="Ex.: Contagem inicial realizada na prateleira do Armazém Fardo"></label>
+      </div>
+
+      <div class="almox-inventory-audit">
+        <strong>Rastreabilidade:</strong> este lançamento será registrado como inventário físico do Armazém Fardo. Ele não cria compra, solicitação ou recebimento fictício.
+      </div>
+    </section>
+
+    <div class="almox-inventory-actions">
+      <a class="btn btn-ghost" href="/almoxarifado/estoque">Cancelar</a>
+      <button class="btn btn-green" type="submit" data-pending-text="Registrando...">Registrar inventário</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(() => {
+  const form = document.querySelector('[data-inventory-form]');
+  if (!form) return;
+
+  const existing = form.querySelector('[data-existing-item]');
+  const newFields = form.querySelector('[data-new-item-fields]');
+  const required = form.querySelector('[data-new-required]');
+  const category = form.querySelector('[data-category-select]');
+  const subcategory = form.querySelector('[data-subcategory-select]');
+
+  const refreshMode = () => {
+    const usingExisting = Boolean(existing?.value);
+    newFields?.classList.toggle('is-muted', usingExisting);
+    if (required) required.required = !usingExisting;
+  };
+
+  const refreshSubcategories = () => {
+    const parent = String(category?.value || '');
+    if (!subcategory) return;
+    [...subcategory.options].forEach((option) => {
+      if (!option.value) { option.hidden = false; return; }
+      option.hidden = Boolean(parent) && String(option.dataset.parent || '') !== parent;
+    });
+    const selected = subcategory.options[subcategory.selectedIndex];
+    if (selected?.hidden) subcategory.value = '';
+  };
+
+  existing?.addEventListener('change', refreshMode);
+  category?.addEventListener('change', refreshSubcategories);
+  refreshMode();
+  refreshSubcategories();
+})();
+</script>
