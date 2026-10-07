@@ -44,6 +44,27 @@
   </section>
 
 
+  <section class="almox-v4-search-card" aria-label="Gráfico do andamento das compras" style="padding:18px;margin-bottom:18px;">
+    <h2 style="margin:0 0 5px;">Situação dos recebimentos</h2>
+    <p class="muted" style="margin:0 0 14px;">Visão dos pedidos comprados, atualizada a cada abertura do painel.</p>
+    <% const faixas = [
+      ['Totalmente recebidos', Math.max(0, painelGerencial.pedidosComprados-painelGerencial.aguardandoRecebimento)],
+      ['Parcialmente recebidos', painelGerencial.recebidosParcialmente],
+      ['Aguardando chegada', Math.max(0,painelGerencial.aguardandoRecebimento-painelGerencial.recebidosParcialmente)]
+    ]; const escala = Math.max(1,...faixas.map(r=>r[1])); %>
+    <div style="display:grid;gap:12px;">
+      <% faixas.forEach(([rotulo,total])=>{ %>
+        <div style="display:grid;grid-template-columns:minmax(130px,190px) 1fr 44px;gap:10px;align-items:center;">
+          <span style="font-size:.88rem;"><%=rotulo%></span>
+          <div role="img" aria-label="<%=rotulo%>: <%=total%> pedidos" style="background:#e6ede9;border-radius:8px;height:16px;overflow:hidden;">
+            <div style="height:100%;width:<%=(total/escala*100).toFixed(2)%>%;background:#278357;border-radius:8px;"></div>
+          </div>
+          <strong style="text-align:right;"><%=total%></strong>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+
   <section class="almox-v4-search-grid">
     <article class="almox-v4-search-card">
       <div class="almox-v4-search-head">
