@@ -8,6 +8,8 @@ const RETIRADA_QR_ACCESS = Array.from(new Set([...(ACCESS.almoxarifado_read || [
 
 router.get("/", requireLogin, requireRole(ACCESS.almoxarifado_read), ctrl.index);
 router.get("/estoque", requireLogin, requireRole(ACCESS.almoxarifado_read), ctrl.estoqueOperacional);
+router.get("/estoque/inventario", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.inventarioArmazemFardo);
+router.post("/estoque/inventario", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.salvarInventarioArmazemFardo);
 router.post("/estoque/:itemId/classificar", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.classificarEstoqueItem);
 router.get("/recebimentos", requireLogin, requireRole(ACCESS.almoxarifado_read), ctrl.recebimentos);
 router.get("/retiradas/qr", requireLogin, requireRole(RETIRADA_QR_ACCESS), qrCtrl.scanner);
