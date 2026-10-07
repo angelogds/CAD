@@ -35,7 +35,7 @@
     <div class="pv-task-grid">
       <% rows.forEach(r=>{ %>
         <article class="pv-task-card pv-task-<%= String(r.prazo||'').toLowerCase() %>">
-          <div class="pv-task-head"><span class="badge status-<%= String(r.prazo||'').toLowerCase() %>"><%= prazoLabel[r.prazo]||r.status %></span><span class="badge crit-<%= String(r.criticidade_exibicao||'media').toLowerCase() %>"><%= r.criticidade_exibicao||'MEDIA' %></span></div>
+          <div class="pv-task-head"><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="badge status-<%= String(r.prazo||'').toLowerCase() %>"><%= prazoLabel[r.prazo]||r.status %></span><% if(String(r.tipo_plano||'').toUpperCase()==='TROCA_CORREIA'){ %><span class="badge" style="background:#eef7f1;color:#147a41;border-color:#bbf7d0">TROCA DE CORREIA</span><% } %></div><span class="badge crit-<%= String(r.criticidade_exibicao||'media').toLowerCase() %>"><%= r.criticidade_exibicao||'MEDIA' %></span></div>
           <div class="pv-task-image">
             <% if (r.equipamento_foto_url) { %>
               <img src="<%= r.equipamento_foto_url %>" alt="<%= r.equipamento_nome||'Equipamento' %>" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='grid';">
