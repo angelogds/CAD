@@ -3,6 +3,7 @@ const service = require('./meu-portal.service');
 const qrService = require('../colaboradores/colaboradores.qr.service');
 const userQrService = require('../usuarios/usuarios.qr.service');
 const dateBr = require('../../utils/data-hora-br');
+const { getGuideForRole } = require('./system-guide');
 
 async function qrDataUrl(identidade) {
   const payload = identidade?.identity_type === 'USUARIO'
@@ -71,6 +72,7 @@ function configuracoes(req, res) {
       title: 'Configurações do Sistema',
       portal,
       sidebarMode: service.normalizeSidebarMode(portal?.user?.sidebar_mode),
+      systemGuide: getGuideForRole(req.session.user.role),
     });
   } catch (error) {
     req.flash('error', error.message || 'Não foi possível carregar as configurações do sistema.');
