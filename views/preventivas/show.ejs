@@ -95,7 +95,7 @@
           <span class="pill <%= crit ? 'pill-gray' : 'pill-green' %>"><%= crit ? 'ESTOQUE ABAIXO DO MÍNIMO' : 'ESTOQUE COBERTO' %></span>
         </div>
         <div class="plan-meta" style="margin-top:10px;">
-          <div class="meta-item"><div class="meta-label">Saldo atual</div><div class="meta-value"><%= Number(correiaContext.saldo_atual||0) %> <%= correiaContext.unidade||'UN' %></div></div>
+          <div class="meta-item"><div class="meta-label">Saldo livre</div><div class="meta-value"><%= Number(correiaContext.saldo_livre ?? correiaContext.saldo_atual ?? 0) %> <%= correiaContext.unidade||'UN' %></div><div class="muted" style="font-size:11px;"><%=Number(correiaContext.saldo_reservado||0)%> reservado</div></div>
           <div class="meta-item"><div class="meta-label">Por troca</div><div class="meta-value"><%= Number(correiaContext.quantidade_material||0) %> <%= correiaContext.unidade||'UN' %></div></div>
           <div class="meta-item"><div class="meta-label">Mínimo calculado</div><div class="meta-value"><%= Number(correiaContext.estoque_minimo_calculado||0) %> <%= correiaContext.unidade||'UN' %></div></div>
         </div>
