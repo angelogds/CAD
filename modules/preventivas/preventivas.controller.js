@@ -1,4 +1,5 @@
 const service = require("./preventivas.service");
+const correiasService = require("../correias/correias.service");
 const PDFDocument = require("pdfkit");
 const dateBr = require("../../utils/data-hora-br");
 
@@ -129,6 +130,7 @@ function show(req, res) {
     activeMenu: "preventivas",
     plano,
     execucoes,
+    correiaContext: correiasService.getPlanoContext(id),
     canAdminPreventivas: isPcmManager(req.session?.user || null),
     canExecutePreventivas: ["ADMIN", "MECANICO", "MANUTENCAO_SUPERVISOR", "SUPERVISOR_MANUTENCAO"].includes(String(req.session?.user?.role || "").toUpperCase()),
   });
@@ -176,7 +178,13 @@ function execUpdateStatus(req, res) {
   }
 
   const userId = req.session?.user?.id || null;
-  const ok = service.updateExecucaoStatus(planoId, execId, statusNorm, data_executada, userId, req.body || {});
+  let ok = false;
+  try {
+    ok = service.updateExecucaoStatus(planoId, execId, statusNorm, data_executada, userId, req.body || {});
+  } catch (error) {
+    req.flash("error", error.message || "Não foi possível concluir a preventiva.");
+    return res.redirect(`/preventivas/${planoId}`);
+  }
   let osCorretivaId = null;
   if (ok && ["FINALIZADA", "EXECUTADA", "CONCLUIDA"].includes(statusNorm) && req.body.gerar_os_corretiva === "1") {
     osCorretivaId = service.abrirOSCorretivaVinculada(execId, userId);
