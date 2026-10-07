@@ -3,98 +3,135 @@
 <link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-v1" />
 <link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
 <link rel="stylesheet" href="/css/almoxarifado-operacional-v3.css?v=20261007-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-compact-v5.css?v=20261007-v1" />
 
 <%
   const statusConfig = {
     EM_COTACAO: { label: 'Em cotação', cls: 'almox-status--cotacao' },
     COMPRADA: { label: 'Para receber', cls: 'almox-status--comprada' },
     EM_RECEBIMENTO: { label: 'Em recebimento', cls: 'almox-status--recebimento' },
-    RECEBIDA_PARCIAL: { label: 'Recebida parcial', cls: 'almox-status--parcial' },
-    RECEBIDA_TOTAL: { label: 'Recebida total', cls: 'almox-status--total' },
-    SEPARADA_PARA_RETIRADA: { label: 'Separada para retirada', cls: 'almox-status--total' },
-    ENTREGUE_SOLICITANTE: { label: 'Entregue ao solicitante', cls: 'almox-status--fechada' },
+    RECEBIDA_PARCIAL: { label: 'Parcial', cls: 'almox-status--parcial' },
+    RECEBIDA_TOTAL: { label: 'Recebida', cls: 'almox-status--total' },
+    SEPARADA_PARA_RETIRADA: { label: 'Separada', cls: 'almox-status--total' },
+    ENTREGUE_SOLICITANTE: { label: 'Entregue', cls: 'almox-status--fechada' },
     FECHADA: { label: 'Fechada', cls: 'almox-status--fechada' }
   };
   const statusMeta = (value) => statusConfig[value] || { label: value || '-', cls: '' };
   const querySuffix = q ? `&q=${encodeURIComponent(q)}` : '';
-  const dateBR = (v) => { if (!v) return 'A definir'; const p=String(v).slice(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(v); };
+  const dateBR = (v) => { if (!v) return ''; const p=String(v).slice(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(v); };
   const isCompraView = status === 'EM_COTACAO';
-  const pageTitle = isCompraView ? 'Compras a caminho' : (status === 'COMPRADA' ? 'Materiais para receber' : 'Fluxo de recebimentos');
-  const pageText = isCompraView
-    ? 'Acompanhe o que está em cotação para o Almoxarifado saber o que deverá chegar, sem misturar esta fila com a conferência física.'
-    : 'Confira materiais comprados, registre entradas e acompanhe os recebimentos sem perder a origem da solicitação.';
+  const pageTitle = isCompraView ? 'Compras a caminho' : (status === 'COMPRADA' ? 'Materiais para receber' : 'Recebimentos');
+  const currentCount = lista.length;
 %>
 
-<div class="almox-page almox-flow-page">
-  <header class="almox-hero">
-    <div>
-      <span class="almox-hero__eyebrow">ALMOXARIFADO • <%= isCompraView ? 'ACOMPANHAMENTO DE COMPRAS' : 'RECEBIMENTO DE MATERIAIS' %></span>
-      <h1><%= pageTitle %></h1>
-      <p class="muted"><%= pageText %></p>
+<div class="almox-page almox-flow-page almox-compact-page">
+  <header class="almox-compact-head">
+    <div class="almox-compact-title">
+      <span class="almox-hero__eyebrow">ALMOXARIFADO</span>
+      <div class="almox-compact-titleline">
+        <h1><%= pageTitle %></h1>
+        <span class="almox-compact-count"><%= currentCount %></span>
+      </div>
     </div>
-    <div class="almox-hero__actions">
-      <a class="btn btn-ghost" href="/almoxarifado/estoque">Consultar estoque</a>
-      <a class="btn btn-ghost" href="/estoque/reservas">Materiais separados</a>
-      <a class="btn btn-green" href="/almoxarifado/retiradas/qr">Retirada por QR</a>
-      <a class="btn btn-ghost" href="/estoque/saidas/nova?contexto=almoxarifado">Retirada avulsa</a>
+    <div class="almox-compact-actions">
+      <a class="btn btn-sm btn-green" href="/almoxarifado/retiradas/qr">Entrega por QR</a>
+      <a class="btn btn-sm btn-ghost" href="/estoque/saidas/nova?contexto=almoxarifado">Saída avulsa</a>
     </div>
   </header>
 
   <%- include('_tabs', { tab: isCompraView ? 'compras' : 'recebimentos' }) %>
 
-  <section class="almox-flow-kpis almox-kpis" aria-label="Indicadores do fluxo">
-    <a href="/almoxarifado/recebimentos?status=EM_COTACAO<%= querySuffix %>" class="almox-flow-kpi kpi-blue"><span>Em cotação</span><strong><%= resumo.em_cotacao %></strong><small>Acompanhamento, sem entrada</small></a>
-    <a href="/almoxarifado/recebimentos?status=COMPRADA<%= querySuffix %>" class="almox-flow-kpi kpi-green"><span>Para receber</span><strong><%= resumo.para_receber %></strong><small>Compras liberadas</small></a>
-    <a href="/almoxarifado/recebimentos?status=EM_RECEBIMENTO<%= querySuffix %>" class="almox-flow-kpi kpi-cyan"><span>Em recebimento</span><strong><%= resumo.em_recebimento %></strong><small>Conferência em andamento</small></a>
-    <a href="/almoxarifado/recebimentos?status=RECEBIDA_PARCIAL<%= querySuffix %>" class="almox-flow-kpi kpi-amber"><span>Parciais</span><strong><%= resumo.parciais %></strong><small>Há material pendente</small></a>
-    <a href="/almoxarifado/recebimentos?status=SEPARADA_PARA_RETIRADA<%= querySuffix %>" class="almox-flow-kpi kpi-slate"><span>Separadas</span><strong><%= resumo.separadas %></strong><small>Reservadas para retirada</small></a>
-    <a href="/almoxarifado/recebimentos?status=ENTREGUE_SOLICITANTE<%= querySuffix %>" class="almox-flow-kpi kpi-green"><span>Entregues</span><strong><%= resumo.entregues %></strong><small>Baixa concluída ao solicitante</small></a>
-  </section>
-
-  <section class="almox-flow-toolbar">
+  <section class="almox-flow-toolbar almox-compact-toolbar almox-kpis-compact">
     <div class="almox-filter-chips" aria-label="Filtrar solicitações do Almoxarifado">
       <a class="almox-chip <%= status === 'TODAS' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=TODAS<%= querySuffix %>">Todas <span class="almox-chip__count"><%= resumo.total_fluxo %></span></a>
-      <a class="almox-chip <%= status === 'EM_COTACAO' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=EM_COTACAO<%= querySuffix %>">Em cotação <span class="almox-chip__count"><%= resumo.em_cotacao %></span></a>
-      <a class="almox-chip <%= status === 'COMPRADA' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=COMPRADA<%= querySuffix %>">Para receber <span class="almox-chip__count"><%= resumo.para_receber %></span></a>
+      <a class="almox-chip <%= status === 'EM_COTACAO' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=EM_COTACAO<%= querySuffix %>">Cotação <span class="almox-chip__count"><%= resumo.em_cotacao %></span></a>
+      <a class="almox-chip <%= status === 'COMPRADA' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=COMPRADA<%= querySuffix %>">Receber <span class="almox-chip__count"><%= resumo.para_receber %></span></a>
       <a class="almox-chip <%= status === 'RECEBIDA_PARCIAL' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=RECEBIDA_PARCIAL<%= querySuffix %>">Parciais <span class="almox-chip__count"><%= resumo.parciais %></span></a>
       <a class="almox-chip <%= status === 'SEPARADA_PARA_RETIRADA' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=SEPARADA_PARA_RETIRADA<%= querySuffix %>">Separadas <span class="almox-chip__count"><%= resumo.separadas %></span></a>
       <a class="almox-chip <%= status === 'ENTREGUE_SOLICITANTE' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=ENTREGUE_SOLICITANTE<%= querySuffix %>">Entregues <span class="almox-chip__count"><%= resumo.entregues %></span></a>
       <a class="almox-chip <%= status === 'FECHADA' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=FECHADA<%= querySuffix %>">Histórico <span class="almox-chip__count"><%= resumo.fechadas %></span></a>
     </div>
-    <form class="almox-search" method="GET" action="/almoxarifado/recebimentos">
+
+    <form class="almox-search almox-compact-search" method="GET" action="/almoxarifado/recebimentos">
       <input type="hidden" name="status" value="<%= status %>" />
-      <input class="input" type="search" name="q" value="<%= q %>" placeholder="Número, título, solicitante, fornecedor ou OS" aria-label="Buscar solicitações" />
-      <button class="btn btn-ghost" type="submit">Buscar</button>
-      <% if (q) { %><a class="btn btn-ghost" href="/almoxarifado/recebimentos?status=<%= status %>">Limpar</a><% } %>
+      <input class="input" type="search" name="q" value="<%= q %>" placeholder="Buscar solicitação, material, equipamento ou fornecedor" aria-label="Buscar solicitações" />
+      <button class="btn btn-sm btn-ghost" type="submit">Buscar</button>
+      <% if (q) { %><a class="btn btn-sm btn-ghost" href="/almoxarifado/recebimentos?status=<%= status %>">Limpar</a><% } %>
     </form>
   </section>
 
-  <section class="card almox-request-card">
-    <div class="almox-request-head">
-      <div><h2>Solicitações no Almoxarifado</h2><p>Mesma solicitação da origem e de Compras, sem duplicar pedido ou material.</p></div>
-      <span><%= lista.length %> registro(s) nesta visão</span>
-    </div>
-
+  <section class="card almox-request-card almox-compact-card" aria-label="Solicitações no Almoxarifado">
     <% if (!lista.length) { %>
-      <div class="almox-empty"><strong>Nenhuma solicitação encontrada.</strong><div class="almox-subline">Ajuste o filtro ou aguarde o setor de Compras avançar o fluxo.</div></div>
+      <div class="almox-empty"><strong>Nenhuma solicitação encontrada.</strong><div class="almox-subline">Ajuste o filtro ou a pesquisa.</div></div>
     <% } else { %>
       <div class="almox-request-table-wrap">
-        <div class="almox-request-columns" aria-hidden="true">
-          <span>Solicitação</span><span>OS / Equipamento</span><span>Solicitante</span><span>Fluxo dos itens</span><span>Fornecedor / Previsão</span><span>Status</span><span>Ações</span>
+        <div class="almox-compact-columns" aria-hidden="true">
+          <span>Solicitação</span>
+          <span>Aplicação</span>
+          <span>Andamento</span>
+          <span>Fornecedor / previsão</span>
+          <span>Ação</span>
         </div>
-        <% lista.forEach((s) => { const meta=statusMeta(s.status); const total=Number(s.itens_total||0); const isLegacyReceived = s.status === 'RECEBIDA_TOTAL'; %>
-          <article class="almox-request-row" data-href="/almoxarifado/solicitacoes/<%= s.id %>/conferir" tabindex="0" role="link">
-            <div data-label="Solicitação"><span class="almox-request-number"><%= s.numero || ('#'+s.id) %></span><strong><%= s.titulo || 'Solicitação de materiais' %></strong><small><%= s.setor_origem ? ('Setor: '+s.setor_origem) : 'Setor não informado' %></small></div>
-            <div data-label="OS / Equipamento"><small>OS / EQUIPAMENTO</small><strong><%= s.os_id ? ('OS #'+s.os_id) : 'Sem OS vinculada' %></strong><span><%= s.equipamento_nome || 'Equipamento não informado' %></span></div>
-            <div data-label="Solicitante"><strong><%= s.solicitante_nome || '-' %></strong><span><%= total %> item(ns) solicitado(s)</span></div>
-            <div data-label="Fluxo dos itens" class="almox-flow-summary"><div class="almox-flow-counts"><span><b><%= total %></b> solicitados</span><span><b><%= Number(s.itens_cotados||0) %></b> cotados</span><span><b><%= Number(s.itens_comprados||0) %></b> comprados</span><span><b><%= Number(s.qtd_comprada_total||0) %></b> qtd comprada</span><span><b><%= Number(s.qtd_recebida_total_agregada||0) %></b> recebidos</span></div><div class="almox-dual-progress"><i title="Cotação"><b style="width:<%= s.cotacao_pct %>%"></b></i><i class="is-receipt" title="Recebimento"><b style="width:<%= s.progresso_pct %>%"></b></i></div><small><%= s.status === 'EM_COTACAO' ? (s.cotacao_pct+'% da cotação') : (s.progresso_pct+'% do comprado recebido') %></small></div>
-            <div data-label="Fornecedor / Previsão"><strong><%= s.fornecedor || 'Fornecedor a definir' %></strong><span><%= dateBR(s.previsao_entrega) %></span></div>
-            <div data-label="Status"><span class="almox-status <%= meta.cls %>"><%= meta.label %></span><% if(Number(s.qtd_pendente_total||0)>0){ %><small><%= Number(s.qtd_pendente_total||0) %> pendente(s)</small><% } %></div>
-            <div data-label="Ações" class="almox-actions" onclick="event.stopPropagation()">
-              <% if (canManage && s.status === 'COMPRADA') { %><form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/iniciar-recebimento" data-lock-submit><button class="btn btn-sm btn-green" type="submit" data-pending-text="Iniciando...">Iniciar recebimento</button></form><% } %>
-              <a class="btn btn-sm btn-ghost" href="/almoxarifado/solicitacoes/<%= s.id %>/conferir"><%= s.status === 'EM_COTACAO' ? 'Acompanhar' : 'Abrir' %></a>
-              <% if (canManage && s.status === 'ENTREGUE_SOLICITANTE') { %><form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/fechar" data-lock-submit><button class="btn btn-sm" type="submit">Fechar</button></form><% } %>
-              <% if (canManage && s.status === 'FECHADA') { %><form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/reabrir" data-lock-submit><button class="btn btn-sm btn-ghost" type="submit">Reabrir</button></form><% } %>
+
+        <% lista.forEach((s) => {
+          const meta=statusMeta(s.status);
+          const total=Number(s.itens_total||0);
+          const cotados=Number(s.itens_cotados||0);
+          const comprados=Number(s.qtd_comprada_total||0);
+          const recebidos=Number(s.qtd_recebida_total_agregada||0);
+          const isCotacao=s.status === 'EM_COTACAO';
+          const receivedComplete=s.status === 'RECEBIDA_TOTAL';
+          const pct=isCotacao ? Number(s.cotacao_pct||0) : Number(s.progresso_pct||0);
+          const andamento=isCotacao
+            ? `${cotados}/${total} cotado(s)`
+            : `${recebidos}/${comprados} recebido(s)`;
+          const showStatus=status === 'TODAS';
+        %>
+          <article class="almox-compact-row" data-href="/almoxarifado/solicitacoes/<%= s.id %>/conferir" tabindex="0" role="link">
+            <div class="almox-compact-request" data-label="Solicitação">
+              <div class="almox-compact-request__top">
+                <span class="almox-request-number"><%= s.numero || ('#'+s.id) %></span>
+                <% if(showStatus){ %><span class="almox-status almox-status--mini <%= meta.cls %>"><%= meta.label %></span><% } %>
+              </div>
+              <strong><%= s.titulo || 'Solicitação de materiais' %></strong>
+              <small><%= s.solicitante_nome || '-' %><% if(s.setor_origem){ %> • <%= s.setor_origem %><% } %></small>
+            </div>
+
+            <div class="almox-compact-application" data-label="Aplicação">
+              <strong><%= s.equipamento_nome || 'Sem equipamento' %></strong>
+              <% if(s.os_id){ %><small>OS #<%= s.os_id %></small><% } %>
+            </div>
+
+            <div class="almox-compact-progress" data-label="Andamento">
+              <div class="almox-compact-progress__top">
+                <strong><%= andamento %></strong>
+                <span><%= pct %>%</span>
+              </div>
+              <div class="almox-compact-progress__track <%= receivedComplete ? 'is-complete' : '' %>" title="<%= total %> solicitados • <%= cotados %> cotados • <%= Number(s.itens_comprados||0) %> comprados • <%= recebidos %> recebidos"><i style="width:<%= pct %>%"></i></div>
+              <% if(Number(s.qtd_pendente_total||0)>0 && !isCotacao){ %><small><%= Number(s.qtd_pendente_total||0) %> pendente(s)</small><% } %>
+            </div>
+
+            <div class="almox-compact-supplier" data-label="Fornecedor / previsão">
+              <strong><%= s.fornecedor || '—' %></strong>
+              <% if(s.previsao_entrega){ %><small><%= dateBR(s.previsao_entrega) %></small><% } %>
+            </div>
+
+            <div data-label="Ação" class="almox-compact-row-actions" onclick="event.stopPropagation()">
+              <% if (canManage && s.status === 'COMPRADA') { %>
+                <form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/iniciar-recebimento" data-lock-submit>
+                  <button class="btn btn-sm btn-green" type="submit" data-pending-text="Abrindo...">Receber</button>
+                </form>
+              <% } else if (canManage && s.status === 'ENTREGUE_SOLICITANTE') { %>
+                <form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/fechar" data-lock-submit>
+                  <button class="btn btn-sm" type="submit">Fechar</button>
+                </form>
+              <% } else if (canManage && s.status === 'FECHADA') { %>
+                <form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/reabrir" data-lock-submit>
+                  <button class="btn btn-sm btn-ghost" type="submit">Reabrir</button>
+                </form>
+              <% } else { %>
+                <a class="almox-compact-open" href="/almoxarifado/solicitacoes/<%= s.id %>/conferir"><%= isCotacao ? 'Acompanhar' : 'Abrir' %> →</a>
+              <% } %>
             </div>
           </article>
         <% }) %>
@@ -104,4 +141,10 @@
 </div>
 
 <script src="/js/almoxarifado-modern.js?v=20260824-v1" defer></script>
-<script>document.querySelectorAll('.almox-request-row[data-href]').forEach(row=>{const open=()=>location.href=row.dataset.href;row.addEventListener('click',e=>{if(!e.target.closest('a,button,form,select,input'))open()});row.addEventListener('keydown',e=>{if(e.key==='Enter')open()})});</script>
+<script>
+document.querySelectorAll('.almox-compact-row[data-href]').forEach(row=>{
+  const open=()=>location.href=row.dataset.href;
+  row.addEventListener('click',e=>{if(!e.target.closest('a,button,form,select,input'))open()});
+  row.addEventListener('keydown',e=>{if(e.key==='Enter')open()});
+});
+</script>
