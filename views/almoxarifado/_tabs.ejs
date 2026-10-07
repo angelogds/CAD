@@ -1,11 +1,23 @@
 <%
   const currentTab = tab || almoxTab || '';
 %>
-<nav class="almox-tabs" aria-label="Navegação do Almoxarifado">
-  <a class="almox-tab <%= currentTab === 'retiradas' ? 'active' : '' %>" href="/estoque/saidas/nova?contexto=almoxarifado">
-    <span aria-hidden="true">↗</span> Retiradas
+<nav class="almox-tabs almox-tabs--operacional" aria-label="Navegação do Almoxarifado">
+  <a class="almox-tab <%= currentTab === 'painel' ? 'active' : '' %>" href="/almoxarifado">
+    <span aria-hidden="true">⌂</span> Painel
   </a>
-  <a class="almox-tab <%= currentTab === 'recebimentos' ? 'active' : '' %>" href="/almoxarifado/recebimentos">
-    <span aria-hidden="true">↘</span> Recebimentos
+  <a class="almox-tab <%= currentTab === 'compras' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=EM_COTACAO">
+    <span aria-hidden="true">◷</span> Compras a caminho
+  </a>
+  <a class="almox-tab <%= currentTab === 'recebimentos' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=COMPRADA">
+    <span aria-hidden="true">↘</span> Receber
+  </a>
+  <a class="almox-tab <%= currentTab === 'separados' ? 'active' : '' %>" href="/estoque/reservas">
+    <span aria-hidden="true">▣</span> Para entregar
+  </a>
+  <a class="almox-tab <%= currentTab === 'estoque' ? 'active' : '' %>" href="/almoxarifado/estoque">
+    <span aria-hidden="true">▦</span> Estoque
+  </a>
+  <a class="almox-tab <%= currentTab === 'retiradas' ? 'active' : '' %>" href="/almoxarifado/retiradas/qr">
+    <span aria-hidden="true">↗</span> Retirada
   </a>
 </nav>
