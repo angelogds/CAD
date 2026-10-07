@@ -224,6 +224,41 @@ function createItem(data) {
   const placeholders = cols.map(() => "?").join(",");
   return Number(db.prepare(`INSERT INTO estoque_itens (${cols.join(",")}) VALUES (${placeholders})`).run(...values).lastInsertRowid);
 }
+function updateItemClassification(itemId, data = {}) {
+  const id = Number(itemId || 0);
+  if (!id) throw new Error("Item de estoque inválido.");
+  const item = db.prepare("SELECT id FROM estoque_itens WHERE id=? AND ativo=1").get(id);
+  if (!item) throw new Error("Item de estoque não encontrado.");
+
+  const categoriaId = data.categoria_id ? Number(data.categoria_id) : null;
+  const subcategoriaId = data.subcategoria_id ? Number(data.subcategoria_id) : null;
+  if (categoriaId && HAS_CATEGORIA_ID && tableExists("estoque_categorias")) {
+    const cat = db.prepare("SELECT id FROM estoque_categorias WHERE id=? AND ativo=1").get(categoriaId);
+    if (!cat) throw new Error("Categoria inválida ou inativa.");
+  }
+  if (subcategoriaId && HAS_SUBCATEGORIA_ID && tableExists("estoque_categorias")) {
+    const sub = db.prepare("SELECT id,parent_id FROM estoque_categorias WHERE id=? AND ativo=1").get(subcategoriaId);
+    if (!sub) throw new Error("Subcategoria inválida ou inativa.");
+    if (categoriaId && Number(sub.parent_id || 0) !== categoriaId) throw new Error("A subcategoria não pertence à categoria selecionada.");
+  }
+
+  const updates = [];
+  const values = [];
+  if (HAS_CATEGORIA_ID) { updates.push("categoria_id=?"); values.push(categoriaId); }
+  if (HAS_SUBCATEGORIA_ID) { updates.push("subcategoria_id=?"); values.push(subcategoriaId); }
+  if (HAS_LOCAL_ID) { updates.push("local_id=?"); values.push(data.local_id ? Number(data.local_id) : null); }
+  if (HAS_ESTOQUE_EQUIPAMENTO_ID) { updates.push("equipamento_id=?"); values.push(data.equipamento_id ? Number(data.equipamento_id) : null); }
+  if (HAS_ENDERECO_ZONA) { updates.push("endereco_zona=?"); values.push(normalize(data.endereco_zona).toUpperCase() || null); }
+  if (HAS_ENDERECO_ESTANTE) { updates.push("endereco_estante=?"); values.push(normalize(data.endereco_estante).toUpperCase() || null); }
+  if (HAS_ENDERECO_PRATELEIRA) { updates.push("endereco_prateleira=?"); values.push(normalize(data.endereco_prateleira).toUpperCase() || null); }
+  if (HAS_ENDERECO_POSICAO) { updates.push("endereco_posicao=?"); values.push(normalize(data.endereco_posicao).toUpperCase() || null); }
+  if (!updates.length) return getItem(id);
+  updates.push("updated_at=datetime('now')");
+  values.push(id);
+  db.prepare(`UPDATE estoque_itens SET ${updates.join(",")} WHERE id=?`).run(...values);
+  return getItem(id);
+}
+
 function getItem(id) {
   const consumo90 = consumoExpr(90);
   return db.prepare(`SELECT i.*, c.nome categoria_nome, sc.nome subcategoria_nome, ieq.nome equipamento_estoque_nome, ${saldoExpr()} AS saldo_atual, ${minExpr()} AS saldo_minimo,
@@ -390,6 +425,6 @@ function registrarSaidasSolicitacao({ solicitacao_id, usuario_id, observacao }) 
 
 module.exports = {
   SETORES_ESTOQUE, SETOR_COMUM, dashboard, listItens, listCategorias, listSubcategorias, listLocais, listCentrosCusto, listEquipamentosEstoque, getInteligenciaReposicao,
-  listMovimentos, createCategoria, createLocal, createItem, getItem,
+  listMovimentos, createCategoria, createLocal, createItem, updateItemClassification, getItem,
   listOrdensAtivas, registrarSaida, registrarSaidasSolicitacao, getContextoSolicitacao,
 };
