@@ -38,8 +38,8 @@ test('V5 evita status repetido quando a tela já está filtrada', () => {
 
 test('V5 mantém as ações críticas da operação', () => {
   const view = read('views','almoxarifado','recebimentos.ejs');
-  assert.match(view, /Entrega por QR/);
-  assert.match(view, /Saída avulsa/);
+  assert.match(view, />Retirada<\/a>/);
+  assert.doesNotMatch(view, /Saída avulsa/);
   assert.match(view, /iniciar-recebimento/);
   assert.match(view, />Receber<\/button>/);
   assert.match(view, /\/fechar/);

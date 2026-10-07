@@ -157,7 +157,9 @@ function listItens(filters = {}) {
 function listCategorias() { return tableExists("estoque_categorias") ? db.prepare("SELECT * FROM estoque_categorias WHERE ativo=1 AND COALESCE(parent_id,0)=0 ORDER BY nome").all() : []; }
 function listSubcategorias(parentId = null) {
   if (!tableExists("estoque_categorias")) return [];
-  const where = parentId ? "WHERE ativo=1 AND parent_id=?" : "WHERE ativo=1 AND COALESCE(parent_id,0)<>0";
+  const where = parentId
+    ? "WHERE sc.ativo=1 AND sc.parent_id=?"
+    : "WHERE sc.ativo=1 AND COALESCE(sc.parent_id,0)<>0";
   return db.prepare(`SELECT sc.*, p.nome categoria_pai_nome
     FROM estoque_categorias sc
     LEFT JOIN estoque_categorias p ON p.id=sc.parent_id
