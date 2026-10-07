@@ -1,6 +1,6 @@
 <% layout('layout') %>
 <%- include('../pcm/partials/internal-styles') %>
-<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v2" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-review1" />
 
 <%
   const data = ferramental || { resumo: {}, usuarios: [], equipes: [], armarios: [], ferramentas: [] };
@@ -41,119 +41,178 @@
   <div class="pcm-shell">
     <%- include('../pcm/partials/internal-nav', { activePcmSection: 'ferramental' }) %>
     <main class="pcm-content tool-content">
-      <section class="tool-kpis" aria-label="Resumo do ferramental">
+      <section class="tool-kpis tool-kpis--primary" aria-label="Resumo principal do ferramental">
         <article><span>Ferramentas</span><strong><%= r.ferramentas || 0 %></strong><small>Total cadastrado</small></article>
-        <article><span>Sob responsabilidade</span><strong><%= r.sobResponsabilidade || 0 %></strong><small>Custódia ativa</small></article>
-        <article><span>Disponíveis</span><strong><%= r.disponiveis || 0 %></strong><small>Sem custódia ativa</small></article>
-        <article><span>Grupos</span><strong><%= r.equipes || 0 %></strong><small>1 ou 2 responsáveis</small></article>
-        <article><span>Armários</span><strong><%= r.armarios || 0 %></strong><small>8 compartimentos cada</small></article>
-        <article><span>Aceites pendentes</span><strong><%= aceiteResumo.pendentes || 0 %></strong><small>Aguardando responsáveis</small></article>
-        <article><span>Divergências</span><strong><%= aceiteResumo.recusados || 0 %></strong><small>Revisar no PCM</small></article>
-        <article><span>Conferências abertas</span><strong><%= inventarioResumo.abertos || 0 %></strong><small>Inventário periódico</small></article>
-        <article><span>Ocorrências</span><strong><%= ocorrenciaResumo.pendentes || 0 %></strong><small>Aguardando PCM</small></article>
-        <article><span>Em manutenção</span><strong><%= ocorrenciaResumo.acompanhamento || 0 %></strong><small>Ocorrências acompanhadas</small></article>
-        <article><span>Inspeções vencidas</span><strong><%= inspecaoResumo.vencidas || 0 %></strong><small>Exigem atenção</small></article>
-        <article><span>A vencer</span><strong><%= inspecaoResumo.aVencer || 0 %></strong><small>Dentro do alerta</small></article>
-        <article><span>Bloqueadas</span><strong><%= inspecaoResumo.bloqueadas || 0 %></strong><small>Não usar / não transferir</small></article>
         <article><span>Em uso agora</span><strong><%= v2Resumo.emUso || 0 %></strong><small>Retiradas por QR</small></article>
+        <article><span>Disponíveis</span><strong><%= r.disponiveis || 0 %></strong><small>Sem custódia ativa</small></article>
+        <article><span>Aceites pendentes</span><strong><%= aceiteResumo.pendentes || 0 %></strong><small>Aguardando responsáveis</small></article>
         <article><span>Uso atrasado</span><strong><%= v2Resumo.atrasados || 0 %></strong><small>Previsão vencida</small></article>
+        <article><span>Bloqueadas</span><strong><%= inspecaoResumo.bloqueadas || 0 %></strong><small>Não usar / não transferir</small></article>
+        <article><span>Ocorrências</span><strong><%= ocorrenciaResumo.pendentes || 0 %></strong><small>Aguardando PCM</small></article>
         <article><span>Não localizadas</span><strong><%= v2Resumo.naoLocalizados || 0 %></strong><small>Inventário QR</small></article>
-        <article><span>Devoluções danificadas</span><strong><%= v2Resumo.devolucoesDanificadas30d || 0 %></strong><small>Últimos 30 dias</small></article>
       </section>
 
-      <section class="tool-grid">
-        <article class="tool-panel" id="responsaveis">
-          <div class="tool-panel-head"><div><span>01</span><h2>Responsáveis</h2></div><small>Um ou dois colaboradores</small></div>
-          <form method="POST" action="/pcm/ferramental/equipes" class="tool-form">
-            <label>Nome do grupo <input name="nome" maxlength="120" placeholder="Ex.: Equipe Diogo + Emanuel" /></label>
-            <label>Responsável 1
-              <select name="responsavel_1" required>
-                <option value="">Selecione</option>
-                <% data.usuarios.forEach(function(user){ %><option value="<%= user.id %>"><%= user.name %></option><% }) %>
-              </select>
-            </label>
-            <label>Responsável 2
-              <select name="responsavel_2">
-                <option value="">Sem segundo responsável</option>
-                <% data.usuarios.forEach(function(user){ %><option value="<%= user.id %>"><%= user.name %></option><% }) %>
-              </select>
-            </label>
-            <button class="ui-btn ui-btn--primary" type="submit">Criar responsabilidade</button>
-          </form>
-        </article>
+      <details class="tool-kpi-more">
+        <summary>Ver indicadores complementares</summary>
+        <section class="tool-kpis tool-kpis--secondary">
+          <article><span>Sob responsabilidade</span><strong><%= r.sobResponsabilidade || 0 %></strong><small>Custódia ativa</small></article>
+          <article><span>Grupos</span><strong><%= r.equipes || 0 %></strong><small>1 ou 2 responsáveis</small></article>
+          <article><span>Armários</span><strong><%= r.armarios || 0 %></strong><small>8 compartimentos cada</small></article>
+          <article><span>Divergências</span><strong><%= aceiteResumo.recusados || 0 %></strong><small>Revisar no PCM</small></article>
+          <article><span>Conferências abertas</span><strong><%= inventarioResumo.abertos || 0 %></strong><small>Inventário periódico</small></article>
+          <article><span>Em manutenção</span><strong><%= ocorrenciaResumo.acompanhamento || 0 %></strong><small>Ocorrências acompanhadas</small></article>
+          <article><span>Inspeções vencidas</span><strong><%= inspecaoResumo.vencidas || 0 %></strong><small>Exigem atenção</small></article>
+          <article><span>A vencer</span><strong><%= inspecaoResumo.aVencer || 0 %></strong><small>Dentro do alerta</small></article>
+          <article><span>Devoluções danificadas</span><strong><%= v2Resumo.devolucoesDanificadas30d || 0 %></strong><small>Últimos 30 dias</small></article>
+        </section>
+      </details>
 
-        <article class="tool-panel" id="armarios">
-          <div class="tool-panel-head"><div><span>02</span><h2>Armários</h2></div><small>8 compartimentos</small></div>
-          <form method="POST" action="/pcm/ferramental/armarios" class="tool-form">
-            <label>Colaborador
-              <select name="owner_user_id" required>
-                <option value="">Selecione</option>
-                <% data.usuarios.forEach(function(user){ %><option value="<%= user.id %>"><%= user.name %></option><% }) %>
-              </select>
-            </label>
-            <label>Código <input name="codigo" maxlength="40" placeholder="Automático: ARM-001" /></label>
-            <label>Nome <input name="nome" maxlength="120" placeholder="Ex.: Armário Diogo" /></label>
-            <p class="tool-help">Compartimentos 1–4: pessoal. Compartimentos 5–8: ferramental.</p>
-            <button class="ui-btn ui-btn--primary" type="submit">Cadastrar armário</button>
-          </form>
-        </article>
+      <nav class="tool-section-nav" aria-label="Atalhos do ferramental">
+        <a href="#cadastro">Cadastro</a>
+        <a href="#v2">Operação QR</a>
+        <a href="#conferencias">Conferências</a>
+        <a href="#inspecoes">Inspeções</a>
+        <a href="#ocorrencias">Ocorrências</a>
+        <a href="#inventario-geral">Inventário</a>
+      </nav>
+
+      <section class="tool-panel tool-registration-hub" id="cadastro">
+        <div class="tool-panel-head">
+          <div><span>CADASTRO</span><h2>Ações de cadastro e responsabilidade</h2><p>Abra somente a ação que precisa executar. Os demais formulários permanecem recolhidos.</p></div>
+          <small>Fluxo compacto</small>
+        </div>
+
+        <div class="tool-compact-actions">
+          <details class="tool-compact-action" id="responsaveis">
+            <summary>
+              <span class="tool-compact-action__number">01</span>
+              <span><strong>Responsáveis</strong><small>Criar grupo com 1 ou 2 colaboradores</small></span>
+              <b>Adicionar</b>
+            </summary>
+            <form method="POST" action="/pcm/ferramental/equipes" class="tool-form tool-form--compact">
+              <label>Nome do grupo <input name="nome" maxlength="120" placeholder="Ex.: Equipe Diogo + Emanuel" /></label>
+              <div class="tool-form--two">
+                <label>Responsável 1
+                  <select name="responsavel_1" required>
+                    <option value="">Selecione</option>
+                    <% data.usuarios.forEach(function(user){ %><option value="<%= user.id %>"><%= user.name %></option><% }) %>
+                  </select>
+                </label>
+                <label>Responsável 2
+                  <select name="responsavel_2">
+                    <option value="">Sem segundo responsável</option>
+                    <% data.usuarios.forEach(function(user){ %><option value="<%= user.id %>"><%= user.name %></option><% }) %>
+                  </select>
+                </label>
+              </div>
+              <p class="tool-help">Em ferramenta compartilhada, os dois colaboradores visualizam o mesmo ativo e confirmam a responsabilidade individualmente.</p>
+              <button class="ui-btn ui-btn--primary" type="submit">Criar responsabilidade</button>
+            </form>
+          </details>
+
+          <details class="tool-compact-action" id="armarios">
+            <summary>
+              <span class="tool-compact-action__number">02</span>
+              <span><strong>Armário</strong><small>Vincular armário e compartimentos ao colaborador</small></span>
+              <b>Adicionar</b>
+            </summary>
+            <form method="POST" action="/pcm/ferramental/armarios" class="tool-form tool-form--compact">
+              <label>Colaborador
+                <select name="owner_user_id" required>
+                  <option value="">Selecione</option>
+                  <% data.usuarios.forEach(function(user){ %><option value="<%= user.id %>"><%= user.name %></option><% }) %>
+                </select>
+              </label>
+              <div class="tool-form--two">
+                <label>Código <input name="codigo" maxlength="40" placeholder="Automático: ARM-001" /></label>
+                <label>Nome <input name="nome" maxlength="120" placeholder="Ex.: Armário Diogo" /></label>
+              </div>
+              <p class="tool-help">Compartimentos 1–4: pessoal. Compartimentos 5–8: ferramental.</p>
+              <button class="ui-btn ui-btn--primary" type="submit">Cadastrar armário</button>
+            </form>
+          </details>
+
+          <details class="tool-compact-action" id="ferramentas">
+            <summary>
+              <span class="tool-compact-action__number">03</span>
+              <span><strong>Ferramenta</strong><small>Cadastrar identificação, série e condição</small></span>
+              <b>Adicionar</b>
+            </summary>
+            <form method="POST" action="/pcm/ferramental/ferramentas" class="tool-form tool-form--two tool-form--compact">
+              <label class="tool-span-2">Descrição <input name="descricao" maxlength="180" required placeholder="Ex.: Lixadeira 4½ pol." /></label>
+              <label>Categoria <input name="categoria" maxlength="80" placeholder="Elétrica, manual..." /></label>
+              <label>Código interno <input name="codigo_interno" maxlength="50" placeholder="Automático: MNT-FER-0001" /></label>
+              <label>Marca <input name="marca" maxlength="80" /></label>
+              <label>Modelo <input name="modelo" maxlength="100" /></label>
+              <label>Nº de série <input name="numero_serie" maxlength="120" /></label>
+              <label>Patrimônio <input name="patrimonio" maxlength="80" /></label>
+              <label>Condição
+                <select name="condicao">
+                  <option value="BOA">Boa</option>
+                  <option value="NOVA">Nova</option>
+                  <option value="USADA">Usada</option>
+                  <option value="COM_DESGASTE">Com desgaste</option>
+                  <option value="DANIFICADA">Danificada</option>
+                </select>
+              </label>
+              <label class="tool-span-2">Observação <textarea name="observacao" maxlength="600" rows="2"></textarea></label>
+              <button class="ui-btn ui-btn--primary tool-span-2" type="submit">Cadastrar ferramenta</button>
+            </form>
+          </details>
+
+          <details class="tool-compact-action" id="custodia">
+            <summary>
+              <span class="tool-compact-action__number">04</span>
+              <span><strong>Entregar / vincular</strong><small>Definir responsáveis e local de guarda</small></span>
+              <b>Registrar</b>
+            </summary>
+            <form method="POST" action="/pcm/ferramental/custodias" class="tool-form tool-form--compact">
+              <label>Ferramenta
+                <select name="ferramenta_id" required>
+                  <option value="">Selecione</option>
+                  <% data.ferramentas.forEach(function(item){ %><option value="<%= item.id %>"><%= item.codigo_interno %> — <%= item.descricao %></option><% }) %>
+                </select>
+              </label>
+              <div class="tool-form--two">
+                <label>Responsáveis
+                  <select name="equipe_id" required>
+                    <option value="">Selecione</option>
+                    <% data.equipes.forEach(function(team){ %><option value="<%= team.id %>"><%= team.codigo %> — <%= team.membros.map(function(m){return m.name;}).join(' + ') %></option><% }) %>
+                  </select>
+                </label>
+                <label>Armário / compartimento
+                  <select name="compartimento_id" required>
+                    <option value="">Selecione</option>
+                    <% data.armarios.forEach(function(locker){ locker.compartimentos.filter(function(c){ return c.finalidade === 'FERRAMENTAL'; }).forEach(function(c){ %>
+                      <option value="<%= c.id %>"><%= locker.codigo %> — <%= locker.responsavel_nome %> — C<%= c.numero %></option>
+                    <% }); }); %>
+                  </select>
+                </label>
+              </div>
+              <label>Observação <textarea name="observacao" maxlength="600" rows="2" placeholder="Estado da entrega ou referência adicional"></textarea></label>
+              <div class="tool-responsibility-preview">
+                <strong>Ao registrar a entrega</strong>
+                <span>O sistema gera um aceite individual para cada responsável. Cada colaborador deverá conferir a ferramenta, registrar selfie e assinatura e declarar ciência das regras de guarda e uso.</span>
+              </div>
+              <button class="ui-btn ui-btn--primary" type="submit">Registrar responsabilidade</button>
+            </form>
+          </details>
+        </div>
       </section>
 
-      <section class="tool-grid">
-        <article class="tool-panel" id="ferramentas">
-          <div class="tool-panel-head"><div><span>03</span><h2>Nova ferramenta</h2></div><small>Identificação única</small></div>
-          <form method="POST" action="/pcm/ferramental/ferramentas" class="tool-form tool-form--two">
-            <label class="tool-span-2">Descrição <input name="descricao" maxlength="180" required placeholder="Ex.: Lixadeira 4½ pol." /></label>
-            <label>Categoria <input name="categoria" maxlength="80" placeholder="Elétrica, manual..." /></label>
-            <label>Código interno <input name="codigo_interno" maxlength="50" placeholder="Automático: MNT-FER-0001" /></label>
-            <label>Marca <input name="marca" maxlength="80" /></label>
-            <label>Modelo <input name="modelo" maxlength="100" /></label>
-            <label>Nº de série <input name="numero_serie" maxlength="120" /></label>
-            <label>Patrimônio <input name="patrimonio" maxlength="80" /></label>
-            <label>Condição
-              <select name="condicao">
-                <option value="BOA">Boa</option>
-                <option value="NOVA">Nova</option>
-                <option value="USADA">Usada</option>
-                <option value="COM_DESGASTE">Com desgaste</option>
-                <option value="DANIFICADA">Danificada</option>
-              </select>
-            </label>
-            <label class="tool-span-2">Observação <textarea name="observacao" maxlength="600" rows="3"></textarea></label>
-            <button class="ui-btn ui-btn--primary tool-span-2" type="submit">Cadastrar ferramenta</button>
-          </form>
-        </article>
-
-        <article class="tool-panel" id="custodia">
-          <div class="tool-panel-head"><div><span>04</span><h2>Entregar / vincular</h2></div><small>Custódia + local</small></div>
-          <form method="POST" action="/pcm/ferramental/custodias" class="tool-form">
-            <label>Ferramenta
-              <select name="ferramenta_id" required>
-                <option value="">Selecione</option>
-                <% data.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); const inspecao = inspecaoPorFerramenta.get(Number(item.id)); %><option value="<%= item.id %>"><%= item.codigo_interno %> — <%= item.descricao %></option><% }) %>
-              </select>
-            </label>
-            <label>Responsáveis
-              <select name="equipe_id" required>
-                <option value="">Selecione</option>
-                <% data.equipes.forEach(function(team){ %><option value="<%= team.id %>"><%= team.codigo %> — <%= team.membros.map(function(m){return m.name;}).join(' + ') %></option><% }) %>
-              </select>
-            </label>
-            <label>Armário / compartimento inferior
-              <select name="compartimento_id" required>
-                <option value="">Selecione</option>
-                <% data.armarios.forEach(function(locker){ locker.compartimentos.filter(function(c){ return c.finalidade === 'FERRAMENTAL'; }).forEach(function(c){ %>
-                  <option value="<%= c.id %>"><%= locker.codigo %> — <%= locker.responsavel_nome %> — Compartimento <%= c.numero %></option>
-                <% }); }); %>
-              </select>
-            </label>
-            <label>Observação <textarea name="observacao" maxlength="600" rows="3" placeholder="Estado da entrega ou referência adicional"></textarea></label>
-            <p class="tool-help">Para ferramenta compartilhada, o armário escolhido precisa pertencer a um dos responsáveis do grupo.</p>
-            <button class="ui-btn ui-btn--primary" type="submit">Registrar responsabilidade</button>
-          </form>
-        </article>
-      </section>
-
+      <details class="tool-policy-guidance">
+        <summary>Responsabilidade, perda/dano e eventual ressarcimento</summary>
+        <div class="tool-policy-guidance__body">
+          <strong>Procedimento recomendado para a gestão</strong>
+          <ol>
+            <li>Registre a ocorrência e preserve evidências: ferramenta, QR, custódia, histórico de uso, fotos e relato.</li>
+            <li>Ouça os responsáveis e identifique as circunstâncias do fato antes de atribuir culpa.</li>
+            <li>Em item compartilhado, não presuma divisão automática do prejuízo entre os responsáveis.</li>
+            <li>Encaminhe eventual ressarcimento/desconto para validação de RH/jurídico, conforme a apuração e a legislação aplicável.</li>
+          </ol>
+          <p>O termo de responsabilidade ajuda a comprovar entrega, ciência e dever de guarda, mas não substitui a apuração do caso concreto.</p>
+        </div>
+      </details>
 
       <section class="tool-panel" id="conferencias">
         <div class="tool-panel-head">
@@ -553,7 +612,7 @@
         </div>
       </section>
 
-      <section class="tool-panel">
+      <section class="tool-panel" id="inventario-geral">
         <div class="tool-panel-head"><div><span>INVENTÁRIO</span><h2>Ferramentas cadastradas</h2></div><small>Uma ferramenta física = um cadastro</small></div>
         <div class="tool-table-wrap">
           <table class="tool-table">

@@ -4,7 +4,26 @@
     const hidden = form.querySelector('[data-signature-data]');
     const clear = form.querySelector('[data-signature-clear]');
     const status = form.querySelector('[data-signature-status]');
+    const selfieInput = form.querySelector('[data-selfie-input]');
+    const selfiePreview = form.querySelector('[data-selfie-preview]');
+    const selfieWrap = form.querySelector('[data-selfie-preview-wrap]');
     if (!canvas || !hidden) return;
+
+    let selfieObjectUrl = null;
+    selfieInput?.addEventListener('change', () => {
+      const file = selfieInput.files?.[0];
+      if (selfieObjectUrl) {
+        URL.revokeObjectURL(selfieObjectUrl);
+        selfieObjectUrl = null;
+      }
+      if (!file || !selfiePreview || !selfieWrap) {
+        if (selfieWrap) selfieWrap.hidden = true;
+        return;
+      }
+      selfieObjectUrl = URL.createObjectURL(file);
+      selfiePreview.src = selfieObjectUrl;
+      selfieWrap.hidden = false;
+    });
 
     const ctx = canvas.getContext('2d');
     let drawing = false;
@@ -67,6 +86,11 @@
     });
 
     form.addEventListener('submit', (event) => {
+      if (!selfieInput?.files?.length) {
+        event.preventDefault();
+        selfieInput?.focus();
+        return;
+      }
       if (!hasInk) {
         event.preventDefault();
         if (status) status.textContent = 'A assinatura é obrigatória para confirmar.';
@@ -74,6 +98,11 @@
         return;
       }
       hidden.value = canvas.toDataURL('image/png');
+      const submit = form.querySelector('button[type="submit"]');
+      if (submit) {
+        submit.disabled = true;
+        submit.textContent = 'Registrando aceite...';
+      }
     });
 
     resize();
