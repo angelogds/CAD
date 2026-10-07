@@ -1,0 +1,77 @@
+<% layout('layout') %>
+<%- include('partials/internal-styles') %>
+<style>
+  .belt-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:14px}
+  .belt-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .belt-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .belt-plan{border:1px solid #e2e8f0;border-radius:15px;padding:13px;background:#fff;display:grid;gap:10px}
+  .belt-plan-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .belt-plan h3{margin:0;font-size:.98rem}.belt-plan p{margin:3px 0 0;color:#64748b;font-size:.76rem}
+  .belt-stock{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+  .belt-stock div{padding:9px;border-radius:10px;background:#f8fafc}
+  .belt-stock span{display:block;font-size:.64rem;color:#64748b;font-weight:800;text-transform:uppercase}
+  .belt-stock strong{display:block;margin-top:3px;font-size:.83rem}
+  .belt-stock-status{display:inline-flex;padding:5px 8px;border-radius:999px;font-size:.7rem;font-weight:900}
+  .belt-stock-status.ok{background:#eaf7ef;color:#147a41}.belt-stock-status.critico{background:#fff0ec;color:#b42318}
+  @media(max-width:1000px){.belt-grid{grid-template-columns:1fr}.belt-card-grid{grid-template-columns:1fr}}
+  @media(max-width:700px){.belt-form-grid,.belt-stock{grid-template-columns:1fr}.pcm-module-actions{width:100%}.pcm-module-actions .pcm-button{flex:1}}
+</style>
+<div class="pcm-module-page">
+  <header class="pcm-module-head">
+    <div><span class="pcm-section-label">Manutenção preventiva + estoque</span><h1>Plano de Correias</h1><p>Controle quais correias cada equipamento usa, programe a troca preventiva e garanta pelo menos um conjunto de reserva no estoque.</p></div>
+    <div class="pcm-module-actions"><a class="pcm-button ui-btn ui-btn--outline" href="/almoxarifado/estoque?q=correia">Prateleira de correias</a><a class="pcm-button ui-btn ui-btn--outline" href="/preventivas">Preventivas do técnico</a></div>
+  </header>
+  <div class="pcm-shell"><%- include('partials/internal-nav', { activePcmSection }) %><main class="pcm-module-content">
+    <section class="pcm-stat-grid">
+      <div class="pcm-stat"><span>Planos ativos</span><strong><%=resumo.planos%></strong><small>trocas controladas</small></div>
+      <div class="pcm-stat info"><span>Equipamentos</span><strong><%=resumo.equipamentos%></strong><small>com correia vinculada</small></div>
+      <div class="pcm-stat danger"><span>Abaixo do mínimo</span><strong><%=resumo.criticos%></strong><small>exigem reposição</small></div>
+      <div class="pcm-stat warn"><span>Estoque zerado</span><strong><%=resumo.sem_estoque%></strong><small>sem conjunto disponível</small></div>
+    </section>
+
+    <section class="belt-grid">
+      <article class="pcm-card">
+        <div class="pcm-card-head"><div><span class="pcm-section-label">Configuração PCM</span><h2>Novo plano de troca</h2><p>A quantidade por troca define o tamanho do conjunto. O mínimo é calculado automaticamente.</p></div></div>
+        <% if(canManagePcm){ %>
+        <form method="POST" action="/pcm/correias/planos" class="belt-form-grid" data-lock-submit>
+          <label class="pcm-field"><span>Equipamento</span><select class="pcm-input" name="equipamento_id" required><option value="">Selecione</option><% equipamentos.forEach(e=>{ %><option value="<%=e.id%>"><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select></label>
+          <label class="pcm-field"><span>Correia do estoque</span><select class="pcm-input" name="estoque_item_id" required><option value="">Selecione</option><% correias.forEach(i=>{ %><option value="<%=i.id%>"><%=i.codigo?i.codigo+' • ':''%><%=i.nome%> — livre <%=Number(i.saldo_livre ?? i.saldo_atual ?? 0)%></option><% }) %></select></label>
+          <label class="pcm-field"><span>Quantidade por troca</span><input class="pcm-input" type="number" min="0.01" step="0.01" name="quantidade_material" value="2" required><small>Ex.: par de correias = 2 unidades.</small></label>
+          <label class="pcm-field"><span>Conjuntos mínimos em reserva</span><input class="pcm-input" type="number" min="1" step="1" name="estoque_minimo_conjuntos" value="1" required><small>Padrão: pelo menos 1 conjunto por equipamento.</small></label>
+          <label class="pcm-field"><span>Frequência</span><select class="pcm-input" name="frequencia_tipo"><option value="mensal">Mensal</option><option value="semanal">Semanal</option><option value="diario">Em dias</option><option value="anual">Anual</option></select></label>
+          <label class="pcm-field"><span>Intervalo</span><input class="pcm-input" type="number" min="1" step="1" name="frequencia_valor" value="6" required></label>
+          <label class="pcm-field"><span>Primeira troca prevista</span><input class="pcm-input" type="date" name="data_prevista"></label>
+          <label class="pcm-field"><span>Título opcional</span><input class="pcm-input" name="titulo" placeholder="Troca correias do motor principal"></label>
+          <label class="pcm-field" style="grid-column:1/-1"><span>Observação técnica</span><textarea class="pcm-input" name="observacao" rows="3" placeholder="Condição das polias, tensão, aplicação..."></textarea></label>
+          <div style="grid-column:1/-1"><button class="pcm-button primary ui-btn ui-btn--primary" type="submit" data-pending-text="Salvando...">Criar plano e programar primeira troca</button></div>
+        </form>
+        <% } else { %><div class="pcm-empty-row">Seu perfil possui acesso de consulta.</div><% } %>
+      </article>
+
+      <article class="pcm-card">
+        <div class="pcm-card-head"><div><span class="pcm-section-label">Pesquisa</span><h2>Planos cadastrados</h2></div></div>
+        <form class="pcm-filter" method="GET" action="/pcm/correias">
+          <label class="pcm-field"><span>Equipamento ou correia</span><input class="pcm-input" name="q" value="<%=filtros.q%>" placeholder="P50, 3VX, B57..."></label>
+          <label class="pcm-field"><span>Situação do estoque</span><select class="pcm-input" name="status"><option value="">Todos</option><option value="CRITICO" <%=filtros.status==='CRITICO'?'selected':''%>>Abaixo do mínimo</option><option value="OK" <%=filtros.status==='OK'?'selected':''%>>Coberto</option></select></label>
+          <button class="pcm-button primary ui-btn ui-btn--primary">Pesquisar</button><a class="pcm-button ui-btn ui-btn--outline" href="/pcm/correias">Limpar</a>
+        </form>
+      </article>
+    </section>
+
+    <section class="pcm-card">
+      <div class="pcm-card-head"><div><span class="pcm-section-label">Cobertura preventiva</span><h2>Equipamentos e conjuntos de correias</h2><p>O estoque mínimo considera a quantidade necessária em cada troca multiplicada pelos conjuntos de reserva configurados.</p></div><strong><%=planos.length%> plano(s)</strong></div>
+      <div class="belt-card-grid">
+        <% if(!planos.length){ %><div class="pcm-empty-row">Nenhum plano de correia encontrado.</div><% } %>
+        <% planos.forEach(p=>{ const crit=p.estoque_status==='CRITICO'; %>
+          <article class="belt-plan">
+            <div class="belt-plan-head"><div><small><%=p.equipamento_codigo||('PLANO #'+p.id)%></small><h3><%=p.equipamento_nome%></h3><p><%=p.setor||'Setor não informado'%></p></div><span class="belt-stock-status <%=crit?'critico':'ok'%>"><%=crit?'REPOR':'COBERTO'%></span></div>
+            <div><strong><%=p.correia_codigo?p.correia_codigo+' • ':''%><%=p.correia_nome||'Correia não vinculada'%></strong><p><%=Number(p.quantidade_material||0)%> <%=p.unidade||'UN'%> por troca • mínimo de <%=Number(p.estoque_minimo_conjuntos||1)%> conjunto(s)</p></div>
+            <div class="belt-stock"><div><span>Saldo livre</span><strong><%=Number(p.saldo_livre ?? p.saldo_atual ?? 0)%> <%=p.unidade||'UN'%></strong><small><%=Number(p.saldo_reservado||0)%> reservado</small></div><div><span>Mínimo calculado</span><strong><%=Number(p.estoque_minimo_calculado||0)%> <%=p.unidade||'UN'%></strong></div><div><span>Conjuntos disponíveis</span><strong><%=Number(p.conjuntos_disponiveis||0)%></strong></div></div>
+            <div class="belt-stock"><div><span>Próxima troca</span><strong><%=p.proxima_execucao?String(p.proxima_execucao).slice(0,10).split('-').reverse().join('/'):'A programar'%></strong></div><div><span>Última troca</span><strong><%=p.ultima_troca?String(p.ultima_troca).slice(0,10).split('-').reverse().join('/'):'Sem histórico'%></strong></div><div><span>Frequência</span><strong><%=p.frequencia_valor%> <%=p.frequencia_tipo%></strong></div></div>
+            <div class="pcm-inline-actions"><a class="pcm-button small ui-btn ui-btn--outline ui-btn--compact" href="/preventivas/<%=p.id%>">Abrir preventiva</a><a class="pcm-button small ui-btn ui-btn--outline ui-btn--compact" href="/almoxarifado/estoque?q=<%=encodeURIComponent(p.correia_codigo||p.correia_nome||'correia')%>">Ver estoque</a></div>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+  </main></div>
+</div>

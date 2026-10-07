@@ -1,0 +1,38 @@
+.almox-v4{gap:16px}
+.almox-v4-hero{padding-bottom:4px}
+.almox-v4-search-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.almox-v4-search-card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:16px;box-shadow:0 8px 24px rgba(15,23,42,.04);min-width:0}
+.almox-v4-search-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:13px}
+.almox-v4-search-head>div{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.almox-v4-step{display:grid;place-items:center;flex:0 0 34px;height:34px;border-radius:11px;background:#eaf7ef;color:#147a41;font-weight:900}
+.almox-v4-search-head h2{margin:0;font-size:1.02rem}
+.almox-v4-search-head p{margin:3px 0 0;color:#64748b;font-size:.78rem;line-height:1.35}
+.almox-v4-search-form{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:8px;align-items:end;padding:11px;border-radius:14px;background:#f8fafc;border:1px solid #edf1f5}
+.almox-v4-search-form label>span{display:block;margin-bottom:5px;color:#64748b;font-size:.68rem;font-weight:900;text-transform:uppercase}
+.almox-v4-results{display:grid;gap:7px;margin-top:10px;max-height:480px;overflow:auto}
+.almox-v4-result{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 12px;border:1px solid #edf1f5;border-radius:13px;background:#fff;color:#172033;text-decoration:none}
+.almox-v4-result:hover{border-color:#95cfaa;background:#fbfefc}
+.almox-v4-result small,.almox-v4-result span{display:block;color:#64748b;font-size:.72rem}
+.almox-v4-result strong{display:block;margin:3px 0;font-size:.86rem;line-height:1.25}
+.almox-v4-result-status{text-align:right;min-width:105px}
+.almox-v4-result-status b{display:inline-flex;padding:5px 8px;border-radius:999px;font-size:.68rem;white-space:nowrap}
+.almox-v4-result-status b.is-ok{background:#eaf7ef;color:#147a41}
+.almox-v4-result-status b.is-wait{background:#fff4df;color:#a15c00}
+.almox-address{display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:9px;background:#eef7f1;color:#147a41;font-size:.72rem;font-weight:900}
+.almox-address-empty{background:#f1f5f9;color:#64748b}
+.almox-subcategory{display:inline-flex;margin-top:4px;color:#475569;font-size:.72rem;font-weight:800}
+.almox-address-grid{display:grid;grid-template-columns:repeat(4,minmax(82px,1fr));gap:6px}
+.almox-address-grid label span{font-size:.64rem!important}
+.almox-classify-grid-v4{grid-template-columns:minmax(100px,.55fr) minmax(150px,.9fr) minmax(150px,.9fr) minmax(140px,.8fr) minmax(140px,.8fr) minmax(180px,1.1fr) auto}
+@media(max-width:1100px){.almox-v4-search-grid{grid-template-columns:1fr}.almox-classify-grid-v4{grid-template-columns:repeat(3,minmax(0,1fr))}.almox-address-grid{grid-column:1/-1}}
+@media(max-width:760px){.almox-v4-search-head{flex-direction:column}.almox-v4-search-form{grid-template-columns:1fr 1fr}.almox-v4-search-main{grid-column:1/-1}.almox-v4-search-form .btn{min-height:46px}.almox-v4-result{grid-template-columns:1fr}.almox-v4-result-status{text-align:left}.almox-classify-grid-v4{grid-template-columns:1fr 1fr}.almox-address-grid{grid-template-columns:1fr 1fr}.almox-classify-grid-v4>button{grid-column:1/-1;min-height:48px}}
+@media(max-width:480px){.almox-v4-search-form,.almox-classify-grid-v4,.almox-address-grid{grid-template-columns:1fr}.almox-v4-search-main,.almox-classify-grid-v4>button{grid-column:auto}}
+
+.almox-stock-organize{border-top:1px dashed #dbe3e8;padding-top:10px}
+.almox-stock-organize>summary{list-style:none;cursor:pointer;justify-content:center}
+.almox-stock-organize>summary::-webkit-details-marker{display:none}
+.almox-stock-organize-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px;padding:10px;border-radius:13px;background:#f8fafc;border:1px solid #edf1f5}
+.almox-stock-organize-form label>span{display:block;margin-bottom:4px;color:#64748b;font-size:.64rem;font-weight:900;text-transform:uppercase}
+.almox-stock-organize-form .almox-address-grid{grid-column:1/-1}
+.almox-stock-organize-form>button{grid-column:1/-1;min-height:42px}
+@media(max-width:560px){.almox-stock-organize-form{grid-template-columns:1fr}.almox-stock-organize-form .almox-address-grid,.almox-stock-organize-form>button{grid-column:auto}}

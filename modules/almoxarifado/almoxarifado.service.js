@@ -35,6 +35,11 @@ const HAS_ITEM_VALOR_UNITARIO = hasColumn("solicitacao_itens", "valor_unitario_c
 const HAS_ESTOQUE_SETOR = hasColumn("estoque_itens", "setor_utilizacao");
 const HAS_ESTOQUE_CENTRO_CUSTO = hasColumn("estoque_itens", "subarea_centro_custo");
 const HAS_ESTOQUE_CATEGORIA_ID = hasColumn("estoque_itens", "categoria_id");
+const HAS_ESTOQUE_SUBCATEGORIA_ID = hasColumn("estoque_itens", "subcategoria_id");
+const HAS_ENDERECO_ZONA = hasColumn("estoque_itens", "endereco_zona");
+const HAS_ENDERECO_ESTANTE = hasColumn("estoque_itens", "endereco_estante");
+const HAS_ENDERECO_PRATELEIRA = hasColumn("estoque_itens", "endereco_prateleira");
+const HAS_ENDERECO_POSICAO = hasColumn("estoque_itens", "endereco_posicao");
 const HAS_ESTOQUE_EQUIPAMENTO_ID = hasColumn("estoque_itens", "equipamento_id");
 const HAS_MOV_SETOR = hasColumn("estoque_movimentos", "setor_utilizacao");
 const HAS_MOV_CENTRO_CUSTO = hasColumn("estoque_movimentos", "subarea_centro_custo");
@@ -236,6 +241,13 @@ function getSolicitacao(id) {
     : "NULL AS estoque_local_id, NULL AS estoque_local_nome";
   const localJoin = HAS_LOCAL_ID ? "LEFT JOIN estoque_locais el ON el.id=ei.local_id" : "LEFT JOIN estoque_locais el ON 1=0";
   const categoriaSelect = HAS_ESTOQUE_CATEGORIA_ID ? "ei.categoria_id AS estoque_categoria_id" : "NULL AS estoque_categoria_id";
+  const subcategoriaSelect = HAS_ESTOQUE_SUBCATEGORIA_ID ? "ei.subcategoria_id AS estoque_subcategoria_id" : "NULL AS estoque_subcategoria_id";
+  const enderecoSelect = [
+    HAS_ENDERECO_ZONA ? "ei.endereco_zona AS estoque_endereco_zona" : "NULL AS estoque_endereco_zona",
+    HAS_ENDERECO_ESTANTE ? "ei.endereco_estante AS estoque_endereco_estante" : "NULL AS estoque_endereco_estante",
+    HAS_ENDERECO_PRATELEIRA ? "ei.endereco_prateleira AS estoque_endereco_prateleira" : "NULL AS estoque_endereco_prateleira",
+    HAS_ENDERECO_POSICAO ? "ei.endereco_posicao AS estoque_endereco_posicao" : "NULL AS estoque_endereco_posicao",
+  ].join(", ");
   const equipamentoEstoqueSelect = HAS_ESTOQUE_EQUIPAMENTO_ID ? "ei.equipamento_id AS estoque_equipamento_id" : "NULL AS estoque_equipamento_id";
   const supplierJoin = HAS_ITEM_FORNECEDOR_ID && tableExists("fornecedores")
     ? "LEFT JOIN fornecedores fi ON fi.id=si.fornecedor_id" : "LEFT JOIN fornecedores fi ON 1=0";
@@ -259,6 +271,8 @@ function getSolicitacao(id) {
       ${HAS_SALDO_ATUAL ? "COALESCE(ei.saldo_atual,0)" : "0"} AS estoque_saldo_atual,
       ${localSelect},
       ${categoriaSelect},
+      ${subcategoriaSelect},
+      ${enderecoSelect},
       ${equipamentoEstoqueSelect},
       ${fornecedorNomeColumn("fi")} AS fornecedor_nome_item
     FROM solicitacao_itens si
@@ -358,6 +372,22 @@ function resolveCategoria(categoriaId) {
   return Number(row.id);
 }
 
+function resolveSubcategoria(subcategoriaId, categoriaId = null) {
+  const id = Number(subcategoriaId || 0);
+  if (!id || !HAS_ESTOQUE_SUBCATEGORIA_ID || !tableExists("estoque_categorias")) return null;
+  const ativoFilter = hasColumn("estoque_categorias", "ativo") ? "AND ativo=1" : "";
+  const row = db.prepare(`SELECT id,parent_id FROM estoque_categorias WHERE id=? ${ativoFilter}`).get(id);
+  if (!row) throw new Error("Subcategoria de estoque inválida ou inativa.");
+  if (categoriaId && Number(row.parent_id || 0) !== Number(categoriaId)) {
+    throw new Error("A subcategoria selecionada não pertence à categoria informada.");
+  }
+  return Number(row.id);
+}
+
+function normalizeEndereco(value) {
+  return String(value || "").trim().toUpperCase().slice(0, 30) || null;
+}
+
 function normalizeSetorEstoque(value) {
   const raw = String(value || '').trim();
   if (!raw) return 'COMUM';
@@ -370,6 +400,7 @@ function resolveEstoqueItem(item, solicitacaoId, localId, contexto = {}) {
     ? Number(contexto.equipamentoId || 0) || null
     : null;
   const categoriaId = contexto.categoriaId ? Number(contexto.categoriaId) : null;
+  const subcategoriaId = contexto.subcategoriaId ? Number(contexto.subcategoriaId) : null;
 
   function updateClassification(estoqueItemId) {
     const updates = [];
@@ -386,6 +417,14 @@ function resolveEstoqueItem(item, solicitacaoId, localId, contexto = {}) {
       updates.push("categoria_id=?");
       vals.push(categoriaId);
     }
+    if (HAS_ESTOQUE_SUBCATEGORIA_ID && subcategoriaId) {
+      updates.push("subcategoria_id=?");
+      vals.push(subcategoriaId);
+    }
+    if (HAS_ENDERECO_ZONA && contexto.enderecoZona) { updates.push("endereco_zona=?"); vals.push(normalizeEndereco(contexto.enderecoZona)); }
+    if (HAS_ENDERECO_ESTANTE && contexto.enderecoEstante) { updates.push("endereco_estante=?"); vals.push(normalizeEndereco(contexto.enderecoEstante)); }
+    if (HAS_ENDERECO_PRATELEIRA && contexto.enderecoPrateleira) { updates.push("endereco_prateleira=?"); vals.push(normalizeEndereco(contexto.enderecoPrateleira)); }
+    if (HAS_ENDERECO_POSICAO && contexto.enderecoPosicao) { updates.push("endereco_posicao=?"); vals.push(normalizeEndereco(contexto.enderecoPosicao)); }
     if (HAS_LOCAL_ID && localId) {
       updates.push("local_id=COALESCE(local_id,?)");
       vals.push(localId);
@@ -444,6 +483,11 @@ function resolveEstoqueItem(item, solicitacaoId, localId, contexto = {}) {
   if (HAS_SALDO_ATUAL) { cols.push("saldo_atual"); vals.push(0); }
   if (HAS_LOCAL_ID && localId) { cols.push("local_id"); vals.push(localId); }
   if (HAS_ESTOQUE_CATEGORIA_ID && categoriaId) { cols.push("categoria_id"); vals.push(categoriaId); }
+  if (HAS_ESTOQUE_SUBCATEGORIA_ID && subcategoriaId) { cols.push("subcategoria_id"); vals.push(subcategoriaId); }
+  if (HAS_ENDERECO_ZONA && contexto.enderecoZona) { cols.push("endereco_zona"); vals.push(normalizeEndereco(contexto.enderecoZona)); }
+  if (HAS_ENDERECO_ESTANTE && contexto.enderecoEstante) { cols.push("endereco_estante"); vals.push(normalizeEndereco(contexto.enderecoEstante)); }
+  if (HAS_ENDERECO_PRATELEIRA && contexto.enderecoPrateleira) { cols.push("endereco_prateleira"); vals.push(normalizeEndereco(contexto.enderecoPrateleira)); }
+  if (HAS_ENDERECO_POSICAO && contexto.enderecoPosicao) { cols.push("endereco_posicao"); vals.push(normalizeEndereco(contexto.enderecoPosicao)); }
   if (HAS_ESTOQUE_SETOR) { cols.push("setor_utilizacao"); vals.push(normalizeSetorEstoque(contexto.setor)); }
   if (HAS_ESTOQUE_CENTRO_CUSTO && contexto.centroCusto) { cols.push("subarea_centro_custo"); vals.push(String(contexto.centroCusto).trim()); }
   if (HAS_ESTOQUE_EQUIPAMENTO_ID) { cols.push("equipamento_id"); vals.push(dedicatedEquipmentId); }
@@ -469,7 +513,7 @@ function insertEstoqueMovimento(data) {
   return Number(info.lastInsertRowid);
 }
 
-function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, categoriaId, destinoEstoque = 'GERAL', userId }) {
+function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, categoriaId, subcategoriaId, enderecoZona, enderecoEstante, enderecoPrateleira, enderecoPosicao, destinoEstoque = 'GERAL', userId }) {
   const quantidade = Number(qtdAgora || 0);
   if (!(quantidade > 0)) throw new Error("Quantidade deve ser maior que zero.");
 
@@ -497,6 +541,7 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, cat
 
     const resolvedLocalId = resolveLocal(localId);
     const resolvedCategoriaId = resolveCategoria(categoriaId);
+    const resolvedSubcategoriaId = resolveSubcategoria(subcategoriaId, resolvedCategoriaId);
     const resolvedDestinoEstoque = String(destinoEstoque || 'GERAL').trim().toUpperCase() === 'EQUIPAMENTO' ? 'EQUIPAMENTO' : 'GERAL';
     if (resolvedDestinoEstoque === 'EQUIPAMENTO' && !Number(solicitacao.equipamento_id || 0)) {
       throw new Error("Para estoque dedicado, a solicitação precisa estar vinculada a um equipamento.");
@@ -507,6 +552,11 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, cat
       setor: setorDestino,
       centroCusto: centroCustoDestino,
       categoriaId: resolvedCategoriaId,
+      subcategoriaId: resolvedSubcategoriaId,
+      enderecoZona,
+      enderecoEstante,
+      enderecoPrateleira,
+      enderecoPosicao,
       destinoEstoque: resolvedDestinoEstoque,
       equipamentoId: solicitacao.equipamento_id || null,
     });

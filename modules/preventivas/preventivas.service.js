@@ -1,6 +1,7 @@
 const db = require("../../database/db");
 const { getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
 const aiEmbeddingsService = require("../ai/ai.embeddings.service");
+const correiasService = require("../correias/correias.service");
 let osServiceCache = null;
 
 function getOSService() {
@@ -488,6 +489,9 @@ function updateExecucaoStatus(planoId, execId, status, dataExecutada, userId = n
 
   const finalizada = ["CONCLUIDA", "EXECUTADA", "FINALIZADA"].includes(statusNorm);
   if (finalizada) {
+    // Planos de correias fazem a baixa física antes de marcar a preventiva como concluída.
+    // Se faltar saldo, a execução permanece aberta e o técnico recebe o erro.
+    correiasService.baixarEstoquePreventiva({ planoId, execId, userId });
     const defaults = {
       descricao_preventiva: "Preventiva executada conforme programação.",
       itens_verificados: "Itens do plano preventivo verificados durante a execução.",
@@ -518,6 +522,7 @@ function updateExecucaoStatus(planoId, execId, status, dataExecutada, userId = n
     Number(planoId)
   );
 
+  if (finalizada) correiasService.agendarProximaExecucao(planoId, execId);
   return true;
 }
 
@@ -2817,7 +2822,7 @@ function getPreventiveDashboard(filters = {}, refDate = new Date()) {
   const resp1 = exCols.includes("responsavel_1_id") && users ? `u1.${users.nameCol}` : "NULL";
   const resp2 = exCols.includes("responsavel_2_id") && users ? `u2.${users.nameCol}` : "NULL";
   const joins = `${exCols.includes("responsavel_1_id") && users ? `LEFT JOIN ${users.table} u1 ON u1.${users.idCol}=pe.responsavel_1_id` : ""} ${exCols.includes("responsavel_2_id") && users ? `LEFT JOIN ${users.table} u2 ON u2.${users.idCol}=pe.responsavel_2_id` : ""}`;
-  const baseSql = `SELECT pe.*, p.titulo, p.frequencia_tipo, p.frequencia_valor, p.ativo AS plano_ativo, p.equipamento_id, e.nome AS equipamento_nome, ${codigo} AS equipamento_codigo, ${setor} AS setor, ${fotoEq} AS equipamento_foto_url, COALESCE(NULLIF(${critEx},''), ${critEq}, 'MEDIA') AS criticidade_exibicao, ${resp1} AS responsavel_1_nome, ${resp2} AS responsavel_2_nome FROM preventiva_execucoes pe JOIN preventiva_planos p ON p.id=pe.plano_id LEFT JOIN equipamentos e ON e.id=p.equipamento_id ${joins}`;
+  const baseSql = `SELECT pe.*, p.titulo, p.tipo_plano, p.frequencia_tipo, p.frequencia_valor, p.ativo AS plano_ativo, p.equipamento_id, e.nome AS equipamento_nome, ${codigo} AS equipamento_codigo, ${setor} AS setor, ${fotoEq} AS equipamento_foto_url, COALESCE(NULLIF(${critEx},''), ${critEq}, 'MEDIA') AS criticidade_exibicao, ${resp1} AS responsavel_1_nome, ${resp2} AS responsavel_2_nome FROM preventiva_execucoes pe JOIN preventiva_planos p ON p.id=pe.plano_id LEFT JOIN equipamentos e ON e.id=p.equipamento_id ${joins}`;
   const all = db.prepare(baseSql).all().map((row) => ({ ...row, prazo: classificarVencimento(row.data_prevista, row.status, refDate), responsaveis: formatarResponsaveis([row.responsavel_1_nome, row.responsavel_2_nome], row.responsavel), criticidade_exibicao: String(row.criticidade_exibicao || "MEDIA").toUpperCase() }));
   const ativos = db.prepare(`SELECT id, ${critEq.replaceAll("e.", "")} AS criticidade FROM equipamentos e WHERE IFNULL(ativo,1)=1`).all();
   const planos = db.prepare(`SELECT id, equipamento_id, frequencia_tipo FROM preventiva_planos WHERE IFNULL(ativo,1)=1`).all();

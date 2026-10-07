@@ -2,6 +2,8 @@
 <link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20260824-v1" />
 <link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-recebimento-item-v2" />
 <link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-operacional-v3.css?v=20261007-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-refino-v4.css?v=20261007-v1" />
 
 <%
   const statusConfig = {
@@ -90,12 +92,19 @@
           <% if (canReceiveItem) { %>
             <details class="almox-receive-disclosure" <%= partialReceipt ? 'open' : '' %>>
               <summary class="btn btn-green"><%= partialReceipt ? 'Receber quantidade restante' : 'Receber material' %></summary>
-              <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/itens/<%= item.id %>/receber" class="almox-inline-operation receive-operation almox-classify-grid" data-lock-submit>
+              <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/itens/<%= item.id %>/receber" class="almox-inline-operation receive-operation almox-classify-grid almox-classify-grid-v4" data-lock-submit data-stock-classifier>
                 <div><label for="<%= inputId %>"><span>Quantidade recebida agora</span></label><input id="<%= inputId %>" class="input" type="number" min="0.01" max="<%= aReceber %>" step="0.01" name="qtd_recebida_agora" required placeholder="Qtd" /><button type="button" class="btn btn-sm btn-ghost almox-quick-fill" data-fill-remaining="<%= inputId %>" data-remaining="<%= aReceber %>" style="margin-top:5px">Tudo: <%= aReceber %></button></div>
-                <label><span>Categoria / prateleira</span><select class="input" name="categoria_id"><option value="">Definir depois</option><% categorias.forEach(categoria=>{ %><option value="<%=categoria.id%>" <%=Number(item.estoque_categoria_id)===Number(categoria.id)?'selected':''%>><%=categoria.nome%></option><% }) %></select></label>
-                <label><span>Local físico</span><select class="input" name="local_id"><option value="">Manter / definir depois</option><% locais.forEach(local=>{ %><option value="<%=local.id%>" <%=Number(item.estoque_local_id)===Number(local.id)?'selected':''%>><%=local.nome%></option><% }) %></select></label>
-                <label><span>Destino no estoque</span><select class="input" name="destino_estoque"><option value="GERAL" <%=!item.estoque_equipamento_id?'selected':''%>>Estoque geral</option><option value="EQUIPAMENTO" <%=item.estoque_equipamento_id?'selected':''%> <%=!sol.equipamento_id?'disabled':''%>>Dedicado ao equipamento</option></select><small class="almox-subline"><%=sol.equipamento_id ? ('Equipamento da solicitação: '+(sol.equipamento_nome||('#'+sol.equipamento_id))) : 'Sem equipamento vinculado; somente estoque geral.'%></small></label>
-                <label class="grow"><span>Observação da conferência</span><input class="input" name="observacao_item" placeholder="NF, lote, avaria, diferença ou observação" /></label>
+                <label><span>Categoria</span><select class="input" name="categoria_id" data-category-select><option value="">Definir depois</option><% categorias.forEach(categoria=>{ %><option value="<%=categoria.id%>" <%=Number(item.estoque_categoria_id)===Number(categoria.id)?'selected':''%>><%=categoria.nome%></option><% }) %></select></label>
+                <label><span>Subcategoria</span><select class="input" name="subcategoria_id" data-subcategory-select><option value="">Definir depois</option><% subcategorias.forEach(sc=>{ %><option value="<%=sc.id%>" data-parent="<%=sc.parent_id||''%>" <%=Number(item.estoque_subcategoria_id)===Number(sc.id)?'selected':''%>><%=sc.nome%></option><% }) %></select></label>
+                <label><span>Local / área</span><select class="input" name="local_id"><option value="">Manter / definir depois</option><% locais.forEach(local=>{ %><option value="<%=local.id%>" <%=Number(item.estoque_local_id)===Number(local.id)?'selected':''%>><%=local.nome%></option><% }) %></select></label>
+                <label><span>Destino no estoque</span><select class="input" name="destino_estoque"><option value="GERAL" <%=!item.estoque_equipamento_id?'selected':''%>>Estoque geral</option><option value="EQUIPAMENTO" <%=item.estoque_equipamento_id?'selected':''%> <%=!sol.equipamento_id?'disabled':''%>>Dedicado ao equipamento</option></select><small class="almox-subline"><%=sol.equipamento_id ? ('Equipamento: '+(sol.equipamento_nome||('#'+sol.equipamento_id))) : 'Sem equipamento vinculado.'%></small></label>
+                <div class="almox-address-grid">
+                  <label><span>Zona</span><input class="input" name="endereco_zona" value="<%=item.estoque_endereco_zona||''%>" placeholder="A"></label>
+                  <label><span>Estante</span><input class="input" name="endereco_estante" value="<%=item.estoque_endereco_estante||''%>" placeholder="03"></label>
+                  <label><span>Prateleira</span><input class="input" name="endereco_prateleira" value="<%=item.estoque_endereco_prateleira||''%>" placeholder="02"></label>
+                  <label><span>Posição</span><input class="input" name="endereco_posicao" value="<%=item.estoque_endereco_posicao||''%>" placeholder="B"></label>
+                </div>
+                <label class="grow"><span>Observação</span><input class="input" name="observacao_item" placeholder="NF, lote, avaria, diferença ou observação" /></label>
                 <button class="btn btn-green" type="submit" data-pending-text="Registrando...">Confirmar recebimento</button>
               </form>
             </details>
@@ -121,3 +130,21 @@
 </div>
 
 <script src="/js/almoxarifado-modern.js?v=20260824-v1" defer></script>
+<script>
+document.querySelectorAll('[data-stock-classifier]').forEach((form)=>{
+  const cat=form.querySelector('[data-category-select]');
+  const sub=form.querySelector('[data-subcategory-select]');
+  if(!cat||!sub)return;
+  const refresh=()=>{
+    const selected=String(cat.value||'');
+    [...sub.options].forEach((opt)=>{
+      if(!opt.value){opt.hidden=false;return;}
+      opt.hidden=selected && String(opt.dataset.parent||'')!==selected;
+    });
+    const current=sub.options[sub.selectedIndex];
+    if(current && current.hidden) sub.value='';
+  };
+  cat.addEventListener('change',refresh);
+  refresh();
+});
+</script>

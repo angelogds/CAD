@@ -84,6 +84,25 @@
       </div>
     </div>
 
+    <% if (correiaContext) { const crit = correiaContext.estoque_status === 'CRITICO'; %>
+      <div style="margin-top:12px;border:1px solid <%= crit ? '#fecaca' : '#bbf7d0' %>;background:<%= crit ? '#fff7f7' : '#f4fbf6' %>;border-radius:14px;padding:12px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <div>
+            <div class="meta-label">PLANO DE CORREIAS • BAIXA AUTOMÁTICA</div>
+            <div class="meta-value" style="font-size:15px;"><%= correiaContext.correia_codigo ? correiaContext.correia_codigo + ' • ' : '' %><%= correiaContext.correia_nome || 'Correia não vinculada' %></div>
+            <div class="muted" style="font-size:12px;">Ao concluir a troca, o sistema baixa <strong><%= Number(correiaContext.quantidade_material||0) %> <%= correiaContext.unidade||'UN' %></strong> do estoque e programa a próxima troca.</div>
+          </div>
+          <span class="pill <%= crit ? 'pill-gray' : 'pill-green' %>"><%= crit ? 'ESTOQUE ABAIXO DO MÍNIMO' : 'ESTOQUE COBERTO' %></span>
+        </div>
+        <div class="plan-meta" style="margin-top:10px;">
+          <div class="meta-item"><div class="meta-label">Saldo livre</div><div class="meta-value"><%= Number(correiaContext.saldo_livre ?? correiaContext.saldo_atual ?? 0) %> <%= correiaContext.unidade||'UN' %></div><div class="muted" style="font-size:11px;"><%=Number(correiaContext.saldo_reservado||0)%> reservado</div></div>
+          <div class="meta-item"><div class="meta-label">Por troca</div><div class="meta-value"><%= Number(correiaContext.quantidade_material||0) %> <%= correiaContext.unidade||'UN' %></div></div>
+          <div class="meta-item"><div class="meta-label">Mínimo calculado</div><div class="meta-value"><%= Number(correiaContext.estoque_minimo_calculado||0) %> <%= correiaContext.unidade||'UN' %></div></div>
+        </div>
+        <% if (crit) { %><div style="margin-top:8px;color:#b42318;font-size:12px;font-weight:800;">Reposição necessária antes que uma troca preventiva fique sem material.</div><% } %>
+      </div>
+    <% } %>
+
     <% const checklist = (() => { try { return JSON.parse(plano.checklist_json || '[]'); } catch (_e) { return []; } })(); %>
     <% if (checklist.length) { %>
       <div style="margin-top:10px;">
