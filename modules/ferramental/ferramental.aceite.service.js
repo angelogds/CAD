@@ -166,6 +166,7 @@ function rejectAcceptance(userId, custodiaId, motivo, meta = {}) {
     db.prepare(`
       UPDATE ferramental_aceites
       SET status='RECUSADO', observacao=?, recusado_em=datetime('now'),
+          tratamento_status='PENDENTE',
           ip_origem=?, user_agent=?, updated_at=datetime('now')
       WHERE id=? AND status='PENDENTE'
     `).run(reason, clean(meta.ip_origem,120)||null, clean(meta.user_agent,500)||null, row.id);
@@ -176,6 +177,48 @@ function rejectAcceptance(userId, custodiaId, motivo, meta = {}) {
       ) VALUES (?,?,?,?,?,?)
     `).run(row.ferramenta_id, cid, 'DIVERGENCIA_RECEBIMENTO', row.equipe_id, uid, reason);
     return row.id;
+  })();
+}
+
+function resolveDivergence(aceiteId, actorUserId, observacao) {
+  assertSchema();
+  const id = int(aceiteId);
+  const actor = int(actorUserId);
+  const note = clean(observacao, 800);
+  if (!id || !actor) throw new Error('Tratamento de divergência inválido.');
+  if (!note) throw new Error('Informe como a divergência foi tratada.');
+
+  const row = getAcceptanceById(id);
+  if (!row) throw new Error('Aceite não encontrado.');
+  if (row.status !== 'RECUSADO') throw new Error('Este aceite não possui divergência pendente.');
+
+  return db.transaction(() => {
+    db.prepare(`
+      UPDATE ferramental_aceites
+      SET status='PENDENTE',
+          tratamento_status='RESOLVIDO_REABERTO',
+          tratado_por_user_id=?,
+          tratado_em=datetime('now'),
+          tratamento_observacao=?,
+          confirmado_em=NULL,
+          updated_at=datetime('now')
+      WHERE id=?
+    `).run(actor, note, id);
+
+    db.prepare(`
+      INSERT INTO ferramental_movimentacoes
+        (ferramenta_id,custodia_id,tipo,equipe_id,actor_user_id,observacao)
+      VALUES (?,?,?,?,?,?)
+    `).run(
+      row.ferramenta_id,
+      row.custodia_id,
+      'TRATAMENTO_DIVERGENCIA',
+      row.equipe_id,
+      actor,
+      note
+    );
+
+    return id;
   })();
 }
 
@@ -238,7 +281,8 @@ function dashboard() {
 
   const recentes = db.prepare(`
     SELECT a.id, a.custodia_id, a.user_id, a.status, a.confirmado_em, a.recusado_em,
-           a.observacao, u.name AS usuario_nome, f.codigo_interno, f.descricao
+           a.observacao, a.tratamento_status, a.tratado_em, a.tratamento_observacao,
+           u.name AS usuario_nome, f.codigo_interno, f.descricao
     FROM ferramental_aceites a
     JOIN ferramental_custodias c ON c.id=a.custodia_id
     JOIN ferramental_itens f ON f.id=c.ferramenta_id
@@ -260,6 +304,7 @@ module.exports = {
   getOwnAcceptance,
   confirmAcceptance,
   rejectAcceptance,
+  resolveDivergence,
   getAcceptanceById,
   teamAcceptances,
   dashboard,

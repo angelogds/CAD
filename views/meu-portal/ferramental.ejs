@@ -1,10 +1,12 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/meu-portal.css?v=20260914-v4" />
-<link rel="stylesheet" href="/css/ferramental.css?v=20261006-v11" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v12" />
 
 <%
   const data = ferramental || { usuario: {}, resumo: {}, equipes: [], ferramentas: [], aceites: [] };
   const aceites = data.aceites || [];
+  const inventarios = data.inventarios || [];
+  const inventariosPendentes = inventarios.filter(function(i){ return i.situacao === 'PENDENTE'; });
   const pendentes = aceites.filter(function(a){ return a.status === 'PENDENTE'; });
   const aceitos = aceites.filter(function(a){ return a.status === 'ACEITO'; });
   const recusados = aceites.filter(function(a){ return a.status === 'RECUSADO'; });
@@ -30,6 +32,7 @@
     <article><span>Pendentes</span><strong><%= pendentes.length %></strong><small>Aguardando seu aceite</small></article>
     <article><span>Confirmadas</span><strong><%= aceitos.length %></strong><small>Selfie + assinatura</small></article>
     <article><span>Divergências</span><strong><%= recusados.length %></strong><small>Aguardando revisão do PCM</small></article>
+    <article><span>Conferências</span><strong><%= inventariosPendentes.length %></strong><small>Pendentes no inventário</small></article>
   </section>
 
   <% if (pendentes.length) { %>
@@ -103,6 +106,47 @@
     </section>
   <% } %>
 
+
+  <% if (inventarios.length) { %>
+    <section class="tool-panel tool-inventory-self" id="conferencias">
+      <div class="tool-panel-head">
+        <div><span>V1.2</span><h2>Conferência do meu ferramental</h2><p>Confira cada item e informe imediatamente qualquer divergência.</p></div>
+        <small><%= inventariosPendentes.length %> pendente(s)</small>
+      </div>
+      <div class="tool-inventory-self-list">
+        <% inventarios.forEach(function(item){ %>
+          <article class="tool-inventory-self-row <%= item.situacao !== 'PENDENTE' ? 'is-done' : '' %>">
+            <div class="tool-inventory-self-info">
+              <span><%= item.inventario_codigo %></span>
+              <strong><%= item.codigo_interno %> — <%= item.descricao %></strong>
+              <small><%= item.armario_codigo %> / C<%= item.compartimento_numero %> • Armário de <%= item.armario_responsavel %><%= item.data_limite ? ' • Prazo: ' + new Date(item.data_limite + 'T12:00:00').toLocaleDateString('pt-BR') : '' %></small>
+              <% if (item.inventario_observacao) { %><em><%= item.inventario_observacao %></em><% } %>
+            </div>
+            <% if (item.situacao === 'PENDENTE') { %>
+              <form method="POST" action="/meu-portal/ferramental/inventario-itens/<%= item.id %>" class="tool-inventory-self-form">
+                <select name="situacao" required>
+                  <option value="">Selecione a situação</option>
+                  <option value="CONFIRMADO">Conferido — está comigo</option>
+                  <option value="DANIFICADO">Danificado</option>
+                  <option value="NAO_LOCALIZADO">Não localizado</option>
+                  <option value="EM_MANUTENCAO">Em manutenção</option>
+                </select>
+                <input name="observacao" maxlength="800" placeholder="Observação, se necessário" />
+                <button class="btn btn-primary" type="submit">Registrar conferência</button>
+              </form>
+            <% } else { %>
+              <div class="tool-inventory-self-result">
+                <span class="tool-badge <%= item.situacao === 'CONFIRMADO' ? 'tool-badge--accepted' : 'tool-badge--rejected' %>"><%= item.situacao.replaceAll('_',' ') %></span>
+                <small><%= formatDateTime(item.conferido_em) %></small>
+                <% if (item.observacao) { %><em><%= item.observacao %></em><% } %>
+              </div>
+            <% } %>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
+
   <% if (!data.equipes.length) { %>
     <section class="my-material-empty card">
       <strong>Nenhuma ferramenta vinculada no momento.</strong>
@@ -122,7 +166,7 @@
       </div>
       <div class="tool-table-wrap">
         <table class="tool-table">
-          <thead><tr><th>Ferramenta</th><th>ID</th><th>Condição</th><th>Local de guarda</th><th>Meu aceite</th></tr></thead>
+          <thead><tr><th>Ferramenta</th><th>ID</th><th>Condição</th><th>Local de guarda</th><th>Meu aceite</th><th>QR</th></tr></thead>
           <tbody>
             <% team.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); %>
               <tr>
@@ -147,6 +191,9 @@
                     <span class="tool-badge tool-badge--pending">PENDENTE</span>
                   <% } %>
                 </td>
+                <td>
+                  <% if (item.qr_token) { %><a class="tool-qr-link" href="/ferramental/qr/<%= item.qr_token %>">Identificar</a><% } else { %>-<% } %>
+                </td>
               </tr>
             <% }) %>
           </tbody>
@@ -156,8 +203,8 @@
   <% }) %>
 
   <section class="tool-self-note">
-    <strong>V1.1 — aceite individual e evidência</strong>
-    <span>Selfie e assinatura ficam armazenadas em área privada. Em ferramenta compartilhada, cada responsável registra seu próprio aceite.</span>
+    <strong>V1.2 — conferência periódica + QR + tratamento de divergências</strong>
+    <span>O aceite individual continua válido; agora cada ciclo de inventário registra a conferência por responsável e o QR identifica rapidamente o ativo, sua custódia e o local de guarda.</span>
   </section>
 </div>
 

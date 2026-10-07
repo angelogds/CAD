@@ -382,6 +382,7 @@ mount(OFFICIAL_ROUTES.dashboard, "./modules/dashboard/dashboard.routes");
 mount("/push", "./modules/push/push.routes");
 mount("/mobile", "./modules/mobile/mobile.routes");
 mount(OFFICIAL_ROUTES.pcm, "./modules/pcm/pcm.routes");
+mount("/ferramental", "./modules/ferramental/ferramental.routes");
 mount("/equipamentos", "./modules/equipamentos/equipamentos.routes");
 mount(OFFICIAL_ROUTES.os, "./modules/os/os.routes");
 mount("/chat-os", "./modules/os-chat/os-chat.routes");

@@ -2,6 +2,9 @@ const service = require('./ferramental.service');
 const pdfService = require('./ferramental.pdf');
 const aceiteService = require('./ferramental.aceite.service');
 const evidence = require('./ferramental.evidence');
+const inventarioService = require('./ferramental.inventario.service');
+const QRCode = require('qrcode');
+const PDFDocument = require('pdfkit');
 
 function pcmBase(res) {
   res.locals.activeMenu = 'pcm';
@@ -13,6 +16,7 @@ function index(req, res) {
   try {
     const ferramental = service.dashboard();
     ferramental.aceites = aceiteService.dashboard();
+    ferramental.inventarios = inventarioService.listDashboard();
     return res.render('ferramental/index', {
       title: 'PCM - Gestão de Ferramental',
       ferramental,
@@ -86,6 +90,7 @@ function ownTools(req, res) {
   try {
     const ferramental = service.listOwnTools(req.session.user.id);
     ferramental.aceites = aceiteService.listOwnAcceptances(req.session.user.id);
+    ferramental.inventarios = inventarioService.listOwn(req.session.user.id);
     return res.render('meu-portal/ferramental', {
       title: 'Meu Ferramental',
       ferramental,
@@ -181,6 +186,100 @@ function pcmEvidence(req, res) {
   return sendEvidence(res, filePath);
 }
 
+
+function createInventory(req, res) {
+  try {
+    inventarioService.createInventory(req.body, req.session.user.id);
+    req.flash('success', 'Conferência periódica criada e distribuída aos responsáveis.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível criar a conferência.');
+  }
+  return res.redirect('/pcm/ferramental#conferencias');
+}
+
+function submitInventoryItem(req, res) {
+  try {
+    inventarioService.submitItem(req.session.user.id, req.params.itemId, req.body);
+    req.flash('success', 'Conferência registrada com sucesso.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível registrar a conferência.');
+  }
+  return res.redirect('/meu-portal/ferramental#conferencias');
+}
+
+function resolveDivergence(req, res) {
+  try {
+    aceiteService.resolveDivergence(req.params.aceiteId, req.session.user.id, req.body.observacao);
+    req.flash('success', 'Divergência tratada. O aceite foi reaberto para nova confirmação do responsável.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível tratar a divergência.');
+  }
+  return res.redirect('/pcm/ferramental#aceites');
+}
+
+function requestBaseUrl(req) {
+  const forwarded = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+  const protocol = forwarded || req.protocol || 'https';
+  return `${protocol}://${req.get('host')}`;
+}
+
+function qrLookup(req, res) {
+  try {
+    const ferramenta = service.getToolByQrToken(req.params.token);
+    if (!ferramenta) return res.status(404).send('Ferramenta não encontrada.');
+    return res.render('ferramental/qr', {
+      title: `Ferramental - ${ferramenta.codigo_interno}`,
+      ferramenta,
+    });
+  } catch (error) {
+    return res.status(500).send(error.message || 'Não foi possível consultar a ferramenta.');
+  }
+}
+
+async function toolLabelPdf(req, res, next) {
+  try {
+    const ferramenta = service.getToolById(req.params.ferramentaId);
+    if (!ferramenta?.qr_token) return res.status(404).send('Ferramenta não encontrada ou sem QR Code.');
+
+    const url = `${requestBaseUrl(req)}/ferramental/qr/${encodeURIComponent(ferramenta.qr_token)}`;
+    const qr = await QRCode.toBuffer(url, { type: 'png', width: 420, margin: 1, errorCorrectionLevel: 'M' });
+    const doc = new PDFDocument({ size: [300, 190], margin: 12, info: { Title: `Etiqueta ${ferramenta.codigo_interno}` } });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="etiqueta-${ferramenta.codigo_interno}.pdf"`);
+    doc.pipe(res);
+
+    doc.font('Helvetica-Bold').fontSize(8).text('CAMPO DO GADO • MANUTENÇÃO', 145, 14, { width: 140 });
+    doc.fontSize(17).text(ferramenta.codigo_interno, 145, 32, { width: 140 });
+    doc.font('Helvetica-Bold').fontSize(10).text(ferramenta.descricao, 145, 58, { width: 140, height: 34 });
+    doc.font('Helvetica').fontSize(7.5)
+      .text(`Série: ${ferramenta.numero_serie || '-'}`, 145, 100, { width: 140 })
+      .text(`Patrimônio: ${ferramenta.patrimonio || '-'}`, 145, 113, { width: 140 })
+      .text(`Condição: ${String(ferramenta.condicao || '-').replaceAll('_', ' ')}`, 145, 126, { width: 140 })
+      .text('Escaneie o QR para consultar a custódia atual.', 145, 146, { width: 140 });
+    doc.image(qr, 12, 12, { fit: [122, 122] });
+    doc.font('Helvetica-Bold').fontSize(7).text('IDENTIFICAÇÃO INTERNA', 12, 141, { width: 122, align: 'center' });
+    doc.rect(4, 4, 292, 182).lineWidth(0.7).stroke('#777777');
+    doc.end();
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function qrImage(req, res, next) {
+  try {
+    const ferramenta = service.getToolById(req.params.ferramentaId);
+    if (!ferramenta?.qr_token) return res.status(404).send('QR Code não disponível.');
+    const url = `${requestBaseUrl(req)}/ferramental/qr/${encodeURIComponent(ferramenta.qr_token)}`;
+    const buffer = await QRCode.toBuffer(url, { type: 'png', width: 360, margin: 2, errorCorrectionLevel: 'M' });
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'private, no-store');
+    return res.end(buffer);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   index,
   createTeam,
@@ -194,4 +293,10 @@ module.exports = {
   rejectOwnTool,
   ownEvidence,
   pcmEvidence,
+  createInventory,
+  submitInventoryItem,
+  resolveDivergence,
+  qrLookup,
+  qrImage,
+  toolLabelPdf,
 };

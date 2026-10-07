@@ -1,0 +1,46 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v12" />
+
+<%
+  const item = ferramenta || {};
+  const responsaveis = item.responsaveis || [];
+  const statusLabel = String(item.status || '-').replaceAll('_',' ');
+  const condicaoLabel = String(item.condicao || '-').replaceAll('_',' ');
+%>
+
+<div class="tool-qr-page">
+  <section class="tool-panel tool-qr-card">
+    <div class="tool-qr-card__head">
+      <div>
+        <span class="tool-eyebrow">FERRAMENTAL • IDENTIFICAÇÃO QR</span>
+        <h1><%= item.codigo_interno %></h1>
+        <p><%= item.descricao %></p>
+      </div>
+      <img
+        class="tool-qr-image"
+        src="/ferramental/ferramentas/<%= item.id %>/qrcode.png"
+        alt="QR Code da ferramenta <%= item.codigo_interno %>"
+      />
+    </div>
+
+    <div class="tool-qr-grid">
+      <article><span>Status</span><strong><%= statusLabel %></strong></article>
+      <article><span>Condição</span><strong><%= condicaoLabel %></strong></article>
+      <article><span>Série</span><strong><%= item.numero_serie || '-' %></strong></article>
+      <article><span>Patrimônio</span><strong><%= item.patrimonio || '-' %></strong></article>
+      <article><span>Marca / modelo</span><strong><%= [item.marca,item.modelo].filter(Boolean).join(' • ') || '-' %></strong></article>
+      <article><span>Local de guarda</span><strong><%= item.armario_codigo ? item.armario_codigo + ' / C' + item.compartimento_numero : '-' %></strong></article>
+    </div>
+
+    <div class="tool-qr-responsibility">
+      <span>Responsáveis atuais</span>
+      <strong><%= responsaveis.length ? responsaveis.map(function(m){ return m.name; }).join(' + ') : 'Sem custódia ativa' %></strong>
+      <% if (item.equipe_codigo) { %><small><%= item.equipe_codigo %> • <%= item.equipe_nome %></small><% } %>
+    </div>
+
+    <div class="tool-head-actions">
+      <a class="ui-btn ui-btn--outline" href="/meu-portal/ferramental">Meu Ferramental</a>
+      <a class="ui-btn ui-btn--outline" href="/pcm/ferramental">Gestão PCM</a>
+    </div>
+  </section>
+</div>
