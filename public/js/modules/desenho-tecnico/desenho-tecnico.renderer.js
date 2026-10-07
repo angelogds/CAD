@@ -160,7 +160,7 @@ export class DesenhoTecnicoRenderer {
       const sp = this.viewport.worldToScreen(x - (orientation === 'vertical' ? r : 0), y - (orientation === 'horizontal' ? r : 0));
       const width = Math.abs((orientation === 'horizontal' ? len : s.diameter) * this.viewport.getViewState().zoom);
       const height = Math.abs((orientation === 'horizontal' ? s.diameter : len) * this.viewport.getViewState().zoom);
-      g.insertAdjacentHTML('beforeend', `<rect x='${sp.x}' y='${sp.y}' width='${width}' height='${height}' fill='none' stroke='${stroke}' stroke-width='${strokeWidth}' ${dash}/>`);
+      g.insertAdjacentHTML('beforeend', `<rect x='${sp.x}' y='${sp.y}' width='${width}' height='${height}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
       if (orientation === 'horizontal') x += len; else y += len;
       const c1 = this.viewport.worldToScreen(orientation === 'horizontal' ? x - len : x, orientation === 'horizontal' ? origin.y : y - len);
       const c2 = this.viewport.worldToScreen(orientation === 'horizontal' ? x : origin.x, orientation === 'horizontal' ? origin.y : y);
