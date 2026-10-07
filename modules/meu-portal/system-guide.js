@@ -361,6 +361,30 @@ const MODULES = [
     ],
   },
   {
+    key: 'modo-tv',
+    title: 'Modo TV',
+    icon: '▣',
+    category: 'Gestão e Apoio',
+    always: true,
+    href: '/tv',
+    summary: 'Painel de exibição contínua para TV com informações operacionais e acompanhamento visual do setor.',
+    actions: [
+      [null, 'Abrir a visualização do Modo TV'],
+    ],
+  },
+  {
+    key: 'saude-sistema',
+    title: 'Saúde do Sistema',
+    icon: '♥',
+    category: 'Sistema',
+    roles: ['ADMIN', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'SUPERVISOR_MANUTENCAO'],
+    href: '/admin/armazenamento',
+    summary: 'Diagnóstico de armazenamento e rotinas administrativas para manter o volume do sistema saudável.',
+    actions: [
+      [null, 'Consultar armazenamento e executar rotinas administrativas autorizadas'],
+    ],
+  },
+  {
     key: 'usuarios',
     title: 'Gerenciar Usuários',
     icon: '♙',
@@ -377,7 +401,9 @@ const MODULES = [
 function getGuideForRole(role) {
   const normalizedRole = normalizeRole(role);
   return MODULES
-    .filter((module) => module.always || canAccessModule(normalizedRole, module.permission))
+    .filter((module) => module.always
+      || (Array.isArray(module.roles) && module.roles.map(normalizeRole).includes(normalizedRole))
+      || canAccessModule(normalizedRole, module.permission))
     .map((module) => ({
       ...module,
       actions: module.actions
