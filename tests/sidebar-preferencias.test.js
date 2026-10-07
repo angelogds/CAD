@@ -67,3 +67,17 @@ test('modo compacto usa ícones e preserva comportamento mobile existente', () =
   assert.match(appLayout, /app\.classList\.toggle\('mobile-sidebar-open'/);
   assert.match(appLayout, /app\.classList\.remove\('mobile-sidebar-open'\)/);
 });
+
+
+test('central de configurações organiza preferências, funcionamento e módulos do perfil', () => {
+  assert.match(settings, /Central de configurações/);
+  assert.match(settings, /href="#preferencias"/);
+  assert.match(settings, /href="#como-funciona"/);
+  assert.match(settings, /href="#meus-modulos"/);
+  assert.match(settings, /Como o sistema funciona/);
+  assert.match(settings, /Módulos disponíveis para você/);
+  assert.match(settings, /systemGuide/);
+  assert.match(portalController, /getGuideForRole\(req\.session\.user\.role\)/);
+  assert.match(portalCss, /\.my-settings-menu/);
+  assert.match(portalCss, /\.my-module-guide-grid/);
+});

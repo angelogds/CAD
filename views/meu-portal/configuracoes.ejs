@@ -1,82 +1,193 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/meu-portal.css?v=20261007-sidebar-v1" />
+<link rel="stylesheet" href="/css/meu-portal.css?v=20261007-config-v2" />
+
+<%
+  const roleLabel = String(portal?.user?.role || '').replaceAll('_', ' ');
+  const modules = Array.isArray(systemGuide) ? systemGuide : [];
+  const groupedModules = modules.reduce((acc, item) => {
+    const category = item.category || 'Outros';
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(item);
+    return acc;
+  }, {});
+%>
 
 <div class="my-portal-page my-system-settings">
-  <header class="my-section-head">
-    <div>
-      <span class="eyebrow">MEU PORTAL • CONFIGURAÇÕES</span>
-      <h1>Configurações do sistema</h1>
-      <p>Escolha como a navegação lateral deve se comportar no computador. Esta preferência fica vinculada ao seu usuário.</p>
+  <header class="my-settings-hero">
+    <div class="my-settings-hero__copy">
+      <span class="eyebrow">CONFIGURAÇÕES DO SISTEMA</span>
+      <h1>Central de configurações</h1>
+      <p>Personalize sua experiência, entenda o fluxo do sistema e consulte o que cada módulo disponível no seu perfil permite fazer.</p>
+      <div class="my-settings-hero__meta">
+        <span>Perfil: <strong><%= roleLabel %></strong></span>
+        <span><strong><%= modules.length %></strong> módulos disponíveis</span>
+      </div>
     </div>
-    <a class="btn btn-ghost" href="/meu-portal">Voltar ao portal</a>
+    <a class="btn btn-ghost" href="/meu-portal">Voltar ao Meu Portal</a>
   </header>
 
-  <form method="POST" action="/meu-portal/configuracoes" class="card my-system-settings-card">
+  <nav class="my-settings-menu" aria-label="Seções das configurações">
+    <a href="#preferencias" class="my-settings-menu__item">
+      <span class="my-settings-menu__icon" aria-hidden="true">☰</span>
+      <span><strong>Preferências</strong><small>Navegação e visual</small></span>
+    </a>
+    <a href="#como-funciona" class="my-settings-menu__item">
+      <span class="my-settings-menu__icon" aria-hidden="true">↔</span>
+      <span><strong>Como funciona</strong><small>Fluxo geral do sistema</small></span>
+    </a>
+    <a href="#meus-modulos" class="my-settings-menu__item">
+      <span class="my-settings-menu__icon" aria-hidden="true">▦</span>
+      <span><strong>Meus módulos</strong><small>Recursos liberados ao perfil</small></span>
+    </a>
+  </nav>
+
+  <section id="preferencias" class="card my-system-settings-card my-settings-section">
     <div class="my-system-settings-card__head">
       <div>
+        <span class="my-settings-kicker">PREFERÊNCIAS DE NAVEGAÇÃO</span>
         <h2>Barra lateral de módulos</h2>
-        <p>O comportamento do celular não muda: no mobile a barra continua abrindo como painel e fecha depois da escolha do módulo.</p>
+        <p>Escolha o comportamento mais confortável no computador. No celular a barra continua abrindo como painel e fechando depois da escolha do módulo.</p>
       </div>
       <span class="my-system-settings-badge">Preferência pessoal</span>
     </div>
 
-    <div class="my-sidebar-mode-grid" role="radiogroup" aria-label="Modo da barra lateral">
-      <label class="my-sidebar-mode-option">
-        <input type="radio" name="sidebar_mode" value="EXPANDED" <%= sidebarMode === 'EXPANDED' ? 'checked' : '' %>>
-        <span class="my-sidebar-mode-card">
-          <span class="my-sidebar-mode-card__title">
+    <form method="POST" action="/meu-portal/configuracoes">
+      <div class="my-sidebar-mode-grid" role="radiogroup" aria-label="Modo da barra lateral">
+        <label class="my-sidebar-mode-option">
+          <input type="radio" name="sidebar_mode" value="EXPANDED" <%= sidebarMode === 'EXPANDED' ? 'checked' : '' %>>
+          <span class="my-sidebar-mode-card">
+            <span class="my-sidebar-mode-card__top">
+              <span class="my-sidebar-mode-card__icon" aria-hidden="true">▤</span>
+              <span class="my-sidebar-mode-check" aria-hidden="true">✓</span>
+            </span>
             <strong>Sempre aberta</strong>
-            <span class="my-sidebar-mode-check" aria-hidden="true">✓</span>
+            <p>Exibe ícones e nomes dos módulos o tempo todo.</p>
+            <small>Indicada para quem troca de módulo com frequência.</small>
           </span>
-          <p>A barra permanece com os nomes de todos os módulos visíveis.</p>
-          <span class="my-sidebar-mode-preview" aria-hidden="true">
-            <span class="my-sidebar-mode-preview__rail"></span>
-            <span class="my-sidebar-mode-preview__content"></span>
-          </span>
-          <small>Melhor para quem navega constantemente entre vários módulos.</small>
-        </span>
-      </label>
+        </label>
 
-      <label class="my-sidebar-mode-option">
-        <input type="radio" name="sidebar_mode" value="COMPACT" <%= sidebarMode === 'COMPACT' ? 'checked' : '' %>>
-        <span class="my-sidebar-mode-card">
-          <span class="my-sidebar-mode-card__title">
+        <label class="my-sidebar-mode-option">
+          <input type="radio" name="sidebar_mode" value="COMPACT" <%= sidebarMode === 'COMPACT' ? 'checked' : '' %>>
+          <span class="my-sidebar-mode-card">
+            <span class="my-sidebar-mode-card__top">
+              <span class="my-sidebar-mode-card__icon" aria-hidden="true">▥</span>
+              <span class="my-sidebar-mode-check" aria-hidden="true">✓</span>
+            </span>
             <strong>Compacta com ícones</strong>
-            <span class="my-sidebar-mode-check" aria-hidden="true">✓</span>
+            <p>Economiza espaço e mantém os módulos acessíveis por ícones.</p>
+            <small>Passe o mouse para visualizar o nome de cada módulo.</small>
           </span>
-          <p>Economiza espaço e mantém somente os ícones. Passe o mouse para ver o nome do módulo.</p>
-          <span class="my-sidebar-mode-preview" aria-hidden="true">
-            <span class="my-sidebar-mode-preview__rail is-compact"></span>
-            <span class="my-sidebar-mode-preview__content"></span>
-          </span>
-          <small>O botão ☰ alterna entre compacta e aberta quando necessário.</small>
-        </span>
-      </label>
+        </label>
 
-      <label class="my-sidebar-mode-option">
-        <input type="radio" name="sidebar_mode" value="AUTO" <%= sidebarMode === 'AUTO' ? 'checked' : '' %>>
-        <span class="my-sidebar-mode-card">
-          <span class="my-sidebar-mode-card__title">
+        <label class="my-sidebar-mode-option">
+          <input type="radio" name="sidebar_mode" value="AUTO" <%= sidebarMode === 'AUTO' ? 'checked' : '' %>>
+          <span class="my-sidebar-mode-card">
+            <span class="my-sidebar-mode-card__top">
+              <span class="my-sidebar-mode-card__icon" aria-hidden="true">⇥</span>
+              <span class="my-sidebar-mode-check" aria-hidden="true">✓</span>
+            </span>
             <strong>Automática</strong>
-            <span class="my-sidebar-mode-check" aria-hidden="true">✓</span>
+            <p>Abra pelo ☰, escolha o módulo e a barra volta ao modo compacto.</p>
+            <small>Recomendada para aproveitar melhor a área da tela.</small>
           </span>
-          <p>Abra pelo ☰, escolha o módulo e a barra volta automaticamente para o modo compacto.</p>
-          <span class="my-sidebar-mode-preview is-auto" aria-hidden="true">
-            <span class="my-sidebar-mode-preview__rail"></span>
-            <span class="my-sidebar-mode-preview__content"></span>
-          </span>
-          <small>Recomendado para ganhar área útil sem perder acesso rápido aos módulos.</small>
-        </span>
-      </label>
+        </label>
+      </div>
+
+      <div class="my-system-settings-actions">
+        <span class="my-settings-save-hint">A alteração vale somente para o seu usuário.</span>
+        <button class="btn btn-green" type="submit">Salvar preferência</button>
+      </div>
+    </form>
+  </section>
+
+  <section id="como-funciona" class="card my-settings-section my-settings-guide">
+    <div class="my-system-settings-card__head">
+      <div>
+        <span class="my-settings-kicker">VISÃO GERAL</span>
+        <h2>Como o sistema funciona</h2>
+        <p>O sistema integra manutenção, materiais e gestão. Cada perfil participa somente das etapas necessárias ao seu trabalho.</p>
+      </div>
+      <span class="my-system-settings-badge">Fluxo integrado</span>
     </div>
 
-    <div class="my-system-settings-note">
-      A configuração é individual. Alterar sua barra lateral não muda a navegação dos demais usuários nem suas permissões de acesso.
+    <div class="my-system-flow">
+      <article>
+        <span>1</span>
+        <div><strong>Necessidade</strong><p>Uma falha, melhoria, inspeção ou necessidade de material é identificada.</p></div>
+      </article>
+      <article>
+        <span>2</span>
+        <div><strong>Demanda ou OS</strong><p>A atividade é planejada como demanda ou aberta diretamente como ordem de serviço.</p></div>
+      </article>
+      <article>
+        <span>3</span>
+        <div><strong>Solicitação</strong><p>Quando há necessidade de material ou serviço externo, a solicitação é vinculada ao fluxo.</p></div>
+      </article>
+      <article>
+        <span>4</span>
+        <div><strong>Compra e recebimento</strong><p>Compras realiza cotação e aquisição; o Almoxarifado recebe e confere o material.</p></div>
+      </article>
+      <article>
+        <span>5</span>
+        <div><strong>Estoque e retirada</strong><p>O material recebido entra no estoque e pode ser retirado para a OS ou finalidade registrada.</p></div>
+      </article>
+      <article>
+        <span>6</span>
+        <div><strong>Execução e histórico</strong><p>A manutenção executa o serviço e os registros alimentam histórico, custos e indicadores.</p></div>
+      </article>
     </div>
 
-    <div class="my-system-settings-actions">
-      <a class="btn btn-ghost" href="/meu-portal">Cancelar</a>
-      <button class="btn btn-green" type="submit">Salvar configuração</button>
+    <div class="my-settings-info-callout">
+      <strong>Importante:</strong> nem todo usuário enxerga todas as etapas. O sistema usa permissões por perfil para liberar apenas consultas e ações compatíveis com a função de cada pessoa.
     </div>
-  </form>
+  </section>
+
+  <section id="meus-modulos" class="card my-settings-section my-settings-modules">
+    <div class="my-system-settings-card__head">
+      <div>
+        <span class="my-settings-kicker">GUIA DO SEU PERFIL</span>
+        <h2>Módulos disponíveis para você</h2>
+        <p>Este guia é montado a partir das permissões reais do seu perfil. Os cartões abaixo mostram somente módulos que você pode acessar.</p>
+      </div>
+      <span class="my-system-settings-badge"><%= modules.length %> liberados</span>
+    </div>
+
+    <% Object.entries(groupedModules).forEach(([category, categoryModules]) => { %>
+      <div class="my-module-category">
+        <div class="my-module-category__head">
+          <h3><%= category %></h3>
+          <span><%= categoryModules.length %> módulo(s)</span>
+        </div>
+
+        <div class="my-module-guide-grid">
+          <% categoryModules.forEach((module) => { %>
+            <article class="my-module-guide-card">
+              <div class="my-module-guide-card__head">
+                <span class="my-module-guide-icon" aria-hidden="true"><%= module.icon %></span>
+                <div>
+                  <strong><%= module.title %></strong>
+                  <small><%= module.category %></small>
+                </div>
+              </div>
+
+              <p><%= module.summary %></p>
+
+              <% if (Array.isArray(module.actions) && module.actions.length) { %>
+                <div class="my-module-capabilities">
+                  <span>O que seu perfil pode fazer</span>
+                  <ul>
+                    <% module.actions.forEach((action) => { %>
+                      <li><%= action %></li>
+                    <% }) %>
+                  </ul>
+                </div>
+              <% } %>
+
+              <a class="my-module-open-link" href="<%= module.href %>">Abrir módulo <span aria-hidden="true">→</span></a>
+            </article>
+          <% }) %>
+        </div>
+      </div>
+    <% }) %>
+  </section>
 </div>
