@@ -73,6 +73,19 @@ test('recebimento e prateleira usam subcategoria e endereço físico', () => {
   assert.match(service, /A subcategoria selecionada não pertence à categoria informada/);
 });
 
+test('estoque existente pode ser reclassificado e endereçado pelo Almoxarifado', () => {
+  const routes = read('modules','almoxarifado','almoxarifado.routes.js');
+  const controller = read('modules','almoxarifado','almoxarifado.controller.js');
+  const stockService = read('modules','estoque','estoque.service.js');
+  const view = read('views','almoxarifado','estoque.ejs');
+  assert.match(routes, /estoque\/:itemId\/classificar/);
+  assert.match(routes, /ACCESS\.estoque_manage/);
+  assert.match(controller, /updateItemClassification/);
+  assert.match(stockService, /function updateItemClassification/);
+  assert.match(view, /Organizar prateleira/);
+  assert.match(view, /Salvar organização/);
+});
+
 test('Plano de Correias fica no PCM e continua sendo uma preventiva', () => {
   const service = read('modules','correias','correias.service.js');
   const routes = read('modules','pcm','pcm.routes.js');
