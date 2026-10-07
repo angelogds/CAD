@@ -86,6 +86,7 @@
       </div>
       <div class="cad-tool-group">
         <span class="cad-tool-group-label">Anotar</span>
+        <button class="cad-tool-btn cad-tool-btn-cotar" data-action="tool-cotar" data-tool="dim_linear" type="button" title="Cotar: 1º ponto, 2º ponto e posição da cota"><span class="cad-tool-icon">↔</span><span>Cotar</span></button>
         <button class="cad-tool-btn" data-action="tool-dim-linear" data-tool="dim_linear" type="button"><span class="cad-tool-icon">↔</span><span>Cota linear</span></button>
         <button class="cad-tool-btn" data-action="tool-dim-diameter" data-tool="dim_diameter" type="button"><span class="cad-tool-icon">⌀</span><span>Diâmetro</span></button>
         <button class="cad-tool-btn" data-action="tool-dim-angular" data-tool="dim_angular" type="button"><span class="cad-tool-icon">∠</span><span>Angular</span></button>
@@ -253,6 +254,6 @@ window.addEventListener('error', function () {
   if (status) status.textContent = 'CAD carregado com limitações (ver console).';
 });
 </script>
-<script type="module" src="/js/cad-engine-v2.js?v=20261006-trim-v7" onerror="(function(){var s=document.getElementById('cadStatusMessage'); if(s) s.textContent='Falha ao carregar o motor CAD.';})()"></script>
+<script type="module" src="/js/cad-engine-v2.js?v=20261006-cotar-v1" onerror="(function(){var s=document.getElementById('cadStatusMessage'); if(s) s.textContent='Falha ao carregar o motor CAD.';})()"></script>
 
 <style>body.cad-editor-mode { overflow: hidden; }</style>
