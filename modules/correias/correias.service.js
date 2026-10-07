@@ -207,6 +207,33 @@ function createPlano(data, userId = null) {
   return planoId;
 }
 
+function agendarProximaExecucao(planoId, execId) {
+  const id=Number(planoId||0);
+  const currentId=Number(execId||0);
+  const plano=db.prepare(`
+    SELECT id,frequencia_tipo,frequencia_valor,ativo,tipo_plano
+    FROM preventiva_planos WHERE id=?
+  `).get(id);
+  if(!plano || Number(plano.ativo||0)!==1 || String(plano.tipo_plano||'').toUpperCase()!=='TROCA_CORREIA') return null;
+
+  const pending=db.prepare(`
+    SELECT id FROM preventiva_execucoes
+    WHERE plano_id=? AND id<>?
+      AND UPPER(COALESCE(status,'')) IN ('PENDENTE','ATRASADA','EM_ANDAMENTO')
+    ORDER BY id DESC LIMIT 1
+  `).get(id,currentId);
+  if(pending?.id) return Number(pending.id);
+
+  const current=db.prepare("SELECT COALESCE(data_executada,date('now','localtime')) base FROM preventiva_execucoes WHERE id=? AND plano_id=?").get(currentId,id);
+  const nextDate=computeNextDate(plano.frequencia_tipo,plano.frequencia_valor,current?.base||null);
+  const cols=db.prepare('PRAGMA table_info(preventiva_execucoes)').all().map((r)=>r.name);
+  const fields=['plano_id','data_prevista','status','responsavel','observacao'];
+  const values=[id,nextDate,'PENDENTE','', 'Próxima troca programada automaticamente pelo Plano de Correias.'];
+  if(cols.includes('origem')){fields.push('origem');values.push('PLANO_CORREIAS');}
+  const info=db.prepare(`INSERT INTO preventiva_execucoes (${fields.join(',')}) VALUES (${fields.map(()=>'?').join(',')})`).run(...values);
+  return Number(info.lastInsertRowid);
+}
+
 function getPlanoContext(planoId) {
   const id = Number(planoId || 0);
   if (!id) return null;
@@ -277,5 +304,6 @@ module.exports = {
   createPlano,
   getPlanoContext,
   baixarEstoquePreventiva,
+  agendarProximaExecucao,
   recalcularMinimoEstoque,
 };
