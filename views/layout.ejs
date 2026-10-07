@@ -14,7 +14,7 @@
   <title><%= title || "Manutenção Campo do Gado" %></title>
   <link rel="stylesheet" href="/css/app.css?v=20260919-1" />
   <link rel="stylesheet" href="/css/ui-maintenance-shell-2026.css?v=20260919-1" />
-  <link rel="stylesheet" href="/css/ui-shell-modern-2026.css?v=20260919-1" />
+  <link rel="stylesheet" href="/css/ui-shell-modern-2026.css?v=20261007-sidebar-v1" />
   <link rel="stylesheet" href="/css/ui-buttons.css?v=20260919-1" />
   <link rel="stylesheet" href="/css/native-menu.css?v=20260924-1" />
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'meu-portal') { %><link rel="stylesheet" href="/css/meu-portal-modernizacao.css?v=20260910-p5" /><% } %>
@@ -27,7 +27,8 @@
   <% if (isAuthFullscreen) { %>
     <%- body %>
   <% } else { %>
-    <div class="app" id="appRoot">
+    <% const shellSidebarMode = String(user?.sidebar_mode || 'EXPANDED').toUpperCase(); %>
+    <div class="app" id="appRoot" data-sidebar-mode="<%= shellSidebarMode %>">
       <%- include("partials/sidebar") %>
 
       <main class="main">
@@ -94,6 +95,7 @@
                     <a class="topbar-notification-item" href="/meu-portal/cartao"><strong>Meu Cartão</strong><br><span class="muted">QR do Almoxarifado</span></a>
                     <a class="topbar-notification-item" href="/escala/meu-painel"><strong>Minha Jornada</strong><br><span class="muted">Escala, horas extras e banco</span></a>
                     <a class="topbar-notification-item" href="/meu-portal/rh"><strong>Meu RH</strong><br><span class="muted">Exames, documentos e folgas</span></a>
+                    <a class="topbar-notification-item" href="/meu-portal/configuracoes"><strong>Configurações do sistema</strong><br><span class="muted">Navegação e aparência da barra lateral</span></a>
                     <a class="topbar-notification-item" href="/meu-portal/conta"><strong>Conta e segurança</strong><br><span class="muted">Alteração de senha</span></a>
                   </nav>
                   <form action="/auth/logout" method="POST">
@@ -124,7 +126,7 @@
     <% } %>
 
     <script src="/js/native-menu.js?v=20260924-1" defer></script>
-    <script src="/js/app-layout.js" defer></script>
+    <script src="/js/app-layout.js?v=20261007-sidebar-v1" defer></script>
     <script src="/js/push.js" defer></script>
     <script src="/js/mobile-bridge.js" defer></script>
     <% if (user) { %><script src="/js/consenso-botoes-confirmacao.js?v=20260919-1" defer></script><% } %>

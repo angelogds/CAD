@@ -10,6 +10,13 @@ function normalizeRole(value) {
   return String(value || '').trim().toUpperCase();
 }
 
+const SIDEBAR_MODES = new Set(['EXPANDED', 'COMPACT', 'AUTO']);
+
+function normalizeSidebarMode(value) {
+  const mode = String(value || '').trim().toUpperCase();
+  return SIDEBAR_MODES.has(mode) ? mode : 'EXPANDED';
+}
+
 function canManageLink(role) {
   return LINK_MANAGER_ROLES.has(normalizeRole(role));
 }
@@ -61,6 +68,7 @@ function getUserById(userId, { includePassword = false } = {}) {
     hasColumn('users','qr_ativo') ? 'qr_ativo' : '0 AS qr_ativo',
     hasColumn('users','qr_emitido_em') ? 'qr_emitido_em' : 'NULL AS qr_emitido_em',
     hasColumn('users','qr_revogado_em') ? 'qr_revogado_em' : 'NULL AS qr_revogado_em',
+    hasColumn('users','sidebar_mode') ? "COALESCE(sidebar_mode,'EXPANDED') AS sidebar_mode" : "'EXPANDED' AS sidebar_mode",
     'COALESCE(ativo,1) AS ativo',
     'deleted_at',
   ].filter(Boolean).join(',');
@@ -368,6 +376,26 @@ function changeOwnPassword(userId, currentPassword, newPassword) {
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, id);
 }
 
+function updateOwnSystemPreferences(userId, { sidebarMode } = {}) {
+  const id = Number(userId);
+  if (!id) throw new Error('Usuário inválido.');
+
+  const mode = normalizeSidebarMode(sidebarMode);
+  if (!hasColumn('users', 'sidebar_mode')) {
+    throw new Error('A preferência da barra lateral ainda não está disponível neste banco.');
+  }
+
+  const result = db.prepare(`
+    UPDATE users
+    SET sidebar_mode = ?
+    WHERE id = ?
+      AND COALESCE(deleted_at, '') = ''
+  `).run(mode, id);
+
+  if (!result.changes) throw new Error('Usuário não encontrado.');
+  return { sidebarMode: mode };
+}
+
 function ensureOwnCard(userId) {
   const portal = getPortalData(userId);
 
@@ -409,6 +437,8 @@ module.exports = {
   linkOwnUserToColaborador,
   getPortalData,
   listOwnMaterialWithdrawals,
+  updateOwnSystemPreferences,
+  normalizeSidebarMode,
   updateOwnPhoto,
   changeOwnPassword,
   ensureOwnCard,

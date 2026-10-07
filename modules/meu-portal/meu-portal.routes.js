@@ -90,6 +90,8 @@ router.use(vinculo.attachAutomaticMaintenanceLink);
 router.get('/', ctrl.index);
 router.get('/perfil', ctrl.perfil);
 router.get('/conta', ctrl.conta);
+router.get('/configuracoes', ctrl.configuracoes);
+router.post('/configuracoes', ctrl.saveConfiguracoes);
 
 // Autoatendimento profissional: liberado inicialmente somente para a equipe de Manutenção.
 router.get('/materiais', vinculo.requireMaterialSelfService, ctrl.materiais);
