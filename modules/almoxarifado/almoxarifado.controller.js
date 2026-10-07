@@ -27,31 +27,33 @@ function estoqueComDisponivel(itens) {
 }
 
 function index(req, res) {
-  const resumo = service.getResumoRecebimentos("");
-  const estoqueItens = estoqueComDisponivel(estoqueService.listItens());
-  const categorias = estoqueService.listCategorias();
-  const reservas = reservaService.dashboard();
-  const estoque = estoqueService.dashboard();
-  const movimentos = estoqueService.listMovimentos().slice(0, 8);
-  const categoriasResumo = categorias.map((categoria) => {
-    const itens = estoqueItens.filter((item) => Number(item.categoria_id) === Number(categoria.id));
-    return {
-      ...categoria,
-      itens: itens.length,
-      saldo_disponivel: itens.reduce((sum, item) => sum + Number(item.saldo_disponivel || 0), 0),
-    };
-  }).filter((categoria) => categoria.itens > 0).slice(0, 8);
+  const qCompra = String(req.query.q_compra || "").trim();
+  const compraEstado = ["TODOS","COTADO","NAO_COTADO"].includes(String(req.query.compra_estado || "").toUpperCase())
+    ? String(req.query.compra_estado || "").toUpperCase() : "TODOS";
+  const qRecebimento = String(req.query.q_recebimento || "").trim();
+  const recebimentoEstado = ["TODOS","CHEGOU","NAO_CHEGOU"].includes(String(req.query.recebimento_estado || "").toUpperCase())
+    ? String(req.query.recebimento_estado || "").toUpperCase() : "TODOS";
+
+  let compras = service.listRecebimentos({ status: "TODAS", query: qCompra })
+    .filter((row) => ["EM_COTACAO","COMPRADA","EM_RECEBIMENTO","RECEBIDA_PARCIAL","RECEBIDA_TOTAL","SEPARADA_PARA_RETIRADA","ENTREGUE_SOLICITANTE","FECHADA"].includes(String(row.status || "").toUpperCase()));
+  if (compraEstado === "COTADO") compras = compras.filter((row) => Number(row.itens_total || 0) > 0 && Number(row.itens_cotados || 0) >= Number(row.itens_total || 0));
+  if (compraEstado === "NAO_COTADO") compras = compras.filter((row) => Number(row.itens_total || 0) === 0 || Number(row.itens_cotados || 0) < Number(row.itens_total || 0));
+
+  let recebimentos = service.listRecebimentos({ status: "TODAS", query: qRecebimento })
+    .filter((row) => Number(row.qtd_comprada_total || 0) > 0);
+  if (recebimentoEstado === "CHEGOU") recebimentos = recebimentos.filter((row) => Number(row.qtd_recebida_total_agregada || 0) > 0);
+  if (recebimentoEstado === "NAO_CHEGOU") recebimentos = recebimentos.filter((row) => Number(row.qtd_recebida_total_agregada || 0) <= 0);
 
   res.render("almoxarifado/index", {
     title: "Central do Almoxarifado",
     activeMenu: "almoxarifado",
     tab: "painel",
-    resumo,
-    estoque,
-    reservas,
-    movimentos,
-    categoriasResumo,
-    itensComSaldo: estoqueItens.filter((item) => Number(item.saldo_disponivel || 0) > 0).length,
+    compras: compras.slice(0, 20),
+    recebimentos: recebimentos.slice(0, 20),
+    qCompra,
+    compraEstado,
+    qRecebimento,
+    recebimentoEstado,
     canManage: canManageAlmox(req.session.user),
     canWithdraw: canWithdrawStock(req.session.user),
   });
@@ -61,6 +63,7 @@ function estoqueOperacional(req, res) {
   const filtros = {
     q: String(req.query.q || "").trim(),
     categoria_id: req.query.categoria_id || "",
+    subcategoria_id: req.query.subcategoria_id || "",
     setor_utilizacao: req.query.setor_utilizacao || "",
     equipamento_id: req.query.equipamento_id || "",
     destino: ["", "GERAL", "EQUIPAMENTO"].includes(String(req.query.destino || "").toUpperCase())
@@ -89,6 +92,7 @@ function estoqueOperacional(req, res) {
     tab: "estoque",
     itens,
     categorias,
+    subcategorias: estoqueService.listSubcategorias(filtros.categoria_id || null),
     categoriasResumo,
     setoresEstoque: estoqueService.SETORES_ESTOQUE,
     equipamentos: estoqueService.listEquipamentosEstoque(),
@@ -167,6 +171,7 @@ function conferir(req, res) {
     sol,
     locais: estoqueService.listLocais(),
     categorias: estoqueService.listCategorias(),
+    subcategorias: estoqueService.listSubcategorias(),
     historico: service.getHistoricoRecebimento(sol.id),
     canManage: canManageAlmox(req.session.user),
     canWithdraw: canWithdrawStock(req.session.user),
@@ -185,6 +190,11 @@ function receberItem(req, res) {
       observacao: req.body.observacao_item,
       localId: req.body.local_id ? Number(req.body.local_id) : null,
       categoriaId: req.body.categoria_id ? Number(req.body.categoria_id) : null,
+      subcategoriaId: req.body.subcategoria_id ? Number(req.body.subcategoria_id) : null,
+      enderecoZona: req.body.endereco_zona,
+      enderecoEstante: req.body.endereco_estante,
+      enderecoPrateleira: req.body.endereco_prateleira,
+      enderecoPosicao: req.body.endereco_posicao,
       destinoEstoque: req.body.destino_estoque || "GERAL",
       userId: req.session.user.id,
     });
