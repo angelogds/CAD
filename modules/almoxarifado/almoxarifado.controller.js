@@ -34,6 +34,19 @@ function index(req, res) {
   const recebimentoEstado = ["TODOS","CHEGOU","NAO_CHEGOU"].includes(String(req.query.recebimento_estado || "").toUpperCase())
     ? String(req.query.recebimento_estado || "").toUpperCase() : "TODOS";
 
+  // Resumo gerencial somente leitura, derivado da fonte oficial de recebimentos.
+  // Não altera saldos nem gera novos registros de movimentação.
+  const hoje = new Date().toISOString().slice(0, 10);
+  const registrosGerenciais = service.listRecebimentos({ status: "TODAS", query: "" });
+  const pedidosComprados = registrosGerenciais.filter((r) => Number(r.qtd_comprada_total || 0) > 0);
+  const painelGerencial = {
+    pedidosComprados: pedidosComprados.length,
+    aguardandoRecebimento: pedidosComprados.filter((r) => Number(r.qtd_comprada_total || 0) > Number(r.qtd_recebida_total_agregada || 0)).length,
+    recebidosParcialmente: pedidosComprados.filter((r) => Number(r.qtd_recebida_total_agregada || 0) > 0 && Number(r.qtd_comprada_total || 0) > Number(r.qtd_recebida_total_agregada || 0)).length,
+    atrasados: pedidosComprados.filter((r) => r.previsao_entrega && String(r.previsao_entrega).slice(0,10) < hoje && Number(r.qtd_comprada_total || 0) > Number(r.qtd_recebida_total_agregada || 0)).length,
+    semPrevisao: pedidosComprados.filter((r) => !r.previsao_entrega && Number(r.qtd_comprada_total || 0) > Number(r.qtd_recebida_total_agregada || 0)).length,
+  };
+
   let compras = service.listRecebimentos({ status: "TODAS", query: qCompra })
     .filter((row) => ["EM_COTACAO","COMPRADA","EM_RECEBIMENTO","RECEBIDA_PARCIAL","RECEBIDA_TOTAL","SEPARADA_PARA_RETIRADA","ENTREGUE_SOLICITANTE","FECHADA"].includes(String(row.status || "").toUpperCase()));
   if (compraEstado === "COTADO") compras = compras.filter((row) => Number(row.itens_total || 0) > 0 && Number(row.itens_cotados || 0) >= Number(row.itens_total || 0));
@@ -48,6 +61,7 @@ function index(req, res) {
     title: "Central do Almoxarifado",
     activeMenu: "almoxarifado",
     tab: "painel",
+    painelGerencial,
     compras: compras.slice(0, 20),
     recebimentos: recebimentos.slice(0, 20),
     qCompra,
