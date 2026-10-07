@@ -224,6 +224,121 @@ function createItem(data) {
   const placeholders = cols.map(() => "?").join(",");
   return Number(db.prepare(`INSERT INTO estoque_itens (${cols.join(",")}) VALUES (${placeholders})`).run(...values).lastInsertRowid);
 }
+
+function findItemForInventory(data = {}) {
+  const itemId = Number(data.estoque_item_id || 0);
+  if (itemId) return getItem(itemId);
+
+  const codigo = normalize(data.codigo);
+  if (codigo) {
+    const row = db.prepare("SELECT id FROM estoque_itens WHERE ativo=1 AND UPPER(TRIM(COALESCE(codigo,'')))=UPPER(TRIM(?)) LIMIT 1").get(codigo);
+    if (row?.id) return getItem(row.id);
+  }
+
+  const nome = normalize(data.nome);
+  const unidade = normalize(data.unidade || 'UN').toUpperCase();
+  if (nome) {
+    const row = db.prepare("SELECT id FROM estoque_itens WHERE ativo=1 AND UPPER(TRIM(nome))=UPPER(TRIM(?)) AND UPPER(TRIM(COALESCE(unidade,'UN')))=? LIMIT 1").get(nome, unidade);
+    if (row?.id) return getItem(row.id);
+  }
+  return null;
+}
+
+function getLocalArmazemFardo() {
+  if (!tableExists('estoque_locais')) return null;
+  try {
+    return db.prepare(`
+      SELECT * FROM estoque_locais
+      WHERE UPPER(TRIM(nome)) IN ('ARMAZÉM FARDO','ARMAZEM FARDO')
+        AND COALESCE(ativo,1)=1
+      ORDER BY id
+      LIMIT 1
+    `).get() || null;
+  } catch {
+    return null;
+  }
+}
+
+function registrarInventarioFisico(data = {}, user = {}) {
+  if (!HAS_SALDO_ATUAL) throw new Error('O saldo canônico do estoque ainda não está disponível.');
+  const quantidadeContada = Number(data.quantidade_contada);
+  if (!Number.isFinite(quantidadeContada) || quantidadeContada < 0) {
+    throw new Error('Informe uma quantidade física válida.');
+  }
+
+  const existing = findItemForInventory(data);
+  const requestedItemId = Number(data.estoque_item_id || 0);
+  if (!requestedItemId && existing) {
+    throw new Error(`Este material já existe no estoque como #${existing.id} — ${existing.nome}. Selecione o item existente para ajustar a contagem sem duplicar o cadastro.`);
+  }
+  if (requestedItemId && !existing) throw new Error('Item existente não encontrado.');
+
+  return db.transaction(() => {
+    let itemId = requestedItemId;
+    let created = false;
+
+    if (!itemId) {
+      const nome = normalize(data.nome);
+      if (!nome) throw new Error('Informe o nome do material.');
+      itemId = createItem({
+        ...data,
+        nome,
+        unidade: normalize(data.unidade || 'UN').toUpperCase(),
+        local_id: data.local_id || getLocalArmazemFardo()?.id || null,
+      });
+      created = true;
+    } else {
+      const atual = getItem(itemId);
+      updateItemClassification(itemId, {
+        categoria_id: data.categoria_id || atual?.categoria_id || null,
+        subcategoria_id: data.subcategoria_id || atual?.subcategoria_id || null,
+        local_id: data.local_id || getLocalArmazemFardo()?.id || atual?.local_id || null,
+        equipamento_id: data.equipamento_id || atual?.equipamento_id || null,
+        endereco_zona: normalize(data.endereco_zona) || atual?.endereco_zona || null,
+        endereco_estante: normalize(data.endereco_estante) || atual?.endereco_estante || null,
+        endereco_prateleira: normalize(data.endereco_prateleira) || atual?.endereco_prateleira || null,
+        endereco_posicao: normalize(data.endereco_posicao) || atual?.endereco_posicao || null,
+      });
+    }
+
+    const item = getItem(itemId);
+    if (!item) throw new Error('Item não encontrado após o cadastro.');
+
+    const saldoAnterior = Number(item.saldo_atual || 0);
+    const diferenca = quantidadeContada - saldoAnterior;
+
+    if (diferenca !== 0) {
+      const update = db.prepare("UPDATE estoque_itens SET saldo_atual=?, updated_at=datetime('now') WHERE id=? AND saldo_atual=?")
+        .run(quantidadeContada, itemId, saldoAnterior);
+      if (!update.changes) throw new Error('O saldo foi alterado por outro usuário. Atualize a página e tente novamente.');
+
+      insertMovimento({
+        tipo: diferenca > 0 ? 'AJUSTE_ENTRADA' : 'AJUSTE_SAIDA',
+        item_id: itemId,
+        quantidade: Math.abs(diferenca),
+        origem: 'INVENTARIO_FISICO_ARMAZEM_FARDO',
+        usuario_id: user.id || null,
+        saldo_anterior: saldoAnterior,
+        saldo_posterior: quantidadeContada,
+        custo_unit: HAS_MOV_CUSTO_UNIT ? (Number(data.custo_unit || item.custo_unit || 0) || null) : null,
+        observacao: normalize(data.observacao)
+          || `${created ? 'Inventário inicial' : 'Ajuste por contagem física'} do Armazém Fardo`,
+        identificacao_origem: HAS_MOV_IDENTIFICACAO_ORIGEM ? 'INVENTARIO_FISICO' : null,
+        setor_utilizacao: item.setor_utilizacao_exibicao || SETOR_COMUM,
+        subarea_centro_custo: item.centro_custo_exibicao || null,
+      });
+    }
+
+    return {
+      itemId,
+      created,
+      saldoAnterior,
+      saldoAtual: quantidadeContada,
+      diferenca,
+      item: getItem(itemId),
+    };
+  })();
+}
 function updateItemClassification(itemId, data = {}) {
   const id = Number(itemId || 0);
   if (!id) throw new Error("Item de estoque inválido.");
@@ -426,5 +541,6 @@ function registrarSaidasSolicitacao({ solicitacao_id, usuario_id, observacao }) 
 module.exports = {
   SETORES_ESTOQUE, SETOR_COMUM, dashboard, listItens, listCategorias, listSubcategorias, listLocais, listCentrosCusto, listEquipamentosEstoque, getInteligenciaReposicao,
   listMovimentos, createCategoria, createLocal, createItem, updateItemClassification, getItem,
+  findItemForInventory, getLocalArmazemFardo, registrarInventarioFisico,
   listOrdensAtivas, registrarSaida, registrarSaidasSolicitacao, getContextoSolicitacao,
 };

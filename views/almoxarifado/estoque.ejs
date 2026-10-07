@@ -21,7 +21,8 @@
       <p class="muted">Localize o material como em uma prateleira: por categoria, setor ou equipamento. O saldo reservado continua protegido.</p>
     </div>
     <div class="almox-hero__actions">
-      <% if(canWithdraw){ %><a class="btn btn-green" href="/estoque/saidas/nova?contexto=almoxarifado">Retirada avulsa</a><% } %>
+      <% if(canManage){ %><a class="btn btn-green" href="/almoxarifado/estoque/inventario">+ Cadastrar material existente</a><% } %>
+      <% if(canWithdraw){ %><a class="btn btn-ghost" href="/estoque/saidas/nova?contexto=almoxarifado">Retirada avulsa</a><% } %>
       <a class="btn btn-ghost" href="/estoque">Visão analítica</a>
     </div>
   </header>
