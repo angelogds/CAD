@@ -98,6 +98,7 @@ router.get('/ferramental/pdf', vinculo.requireMaintenanceSelfService, ferramenta
 router.post('/ferramental/custodias/:custodiaId/aceitar', vinculo.requireMaintenanceSelfService, ferramentalUpload.single('selfie'), ferramentalCtrl.acceptOwnTool);
 router.post('/ferramental/custodias/:custodiaId/divergencia', vinculo.requireMaintenanceSelfService, ferramentalCtrl.rejectOwnTool);
 router.get('/ferramental/aceites/:aceiteId/evidencia/:tipo', vinculo.requireMaintenanceSelfService, ferramentalCtrl.ownEvidence);
+router.post('/ferramental/inventario-itens/:itemId', vinculo.requireMaintenanceSelfService, ferramentalCtrl.submitInventoryItem);
 router.get('/treinamentos', vinculo.requireMaintenanceSelfService, fase2bCtrl.treinamentos);
 router.get('/dados-profissionais', vinculo.requireMaintenanceSelfService, fase2bCtrl.dadosProfissionais);
 router.get('/servicos', vinculo.requireMaintenanceSelfService, fase2bCtrl.servicos);

@@ -62,6 +62,40 @@ function getUser(userId) {
   `).get(Number(userId)) || null;
 }
 
+function getToolById(toolId) {
+  assertSchema();
+  const id = int(toolId);
+  if (!id) return null;
+  const row = db.prepare(`
+    SELECT f.*,
+           c.id AS custodia_id,
+           c.equipe_id,
+           e.codigo AS equipe_codigo,
+           e.nome AS equipe_nome,
+           ac.numero AS compartimento_numero,
+           a.codigo AS armario_codigo,
+           au.name AS armario_responsavel
+    FROM ferramental_itens f
+    LEFT JOIN ferramental_custodias c ON c.ferramenta_id=f.id AND c.ativo=1
+    LEFT JOIN ferramental_equipes e ON e.id=c.equipe_id
+    LEFT JOIN ferramental_armario_compartimentos ac ON ac.id=c.compartimento_id
+    LEFT JOIN ferramental_armarios a ON a.id=ac.armario_id
+    LEFT JOIN users au ON au.id=a.owner_user_id
+    WHERE f.id=? AND f.ativo=1
+    LIMIT 1
+  `).get(id);
+  if (!row) return null;
+  return { ...row, responsaveis: row.equipe_id ? teamMembers(row.equipe_id) : [] };
+}
+
+function getToolByQrToken(token) {
+  assertSchema();
+  const value = clean(token, 80);
+  if (!value) return null;
+  const row = db.prepare('SELECT id FROM ferramental_itens WHERE qr_token=? AND ativo=1 LIMIT 1').get(value);
+  return row ? getToolById(row.id) : null;
+}
+
 function listMaintenanceUsers() {
   assertSchema();
   const placeholders = ACTIVE_MAINTENANCE_ROLES.map(() => '?').join(',');
@@ -229,6 +263,11 @@ function createTool(data, actorUserId) {
     clean(data.observacao, 600) || null,
     int(actorUserId)
   );
+  db.prepare(`
+    UPDATE ferramental_itens
+    SET qr_token=lower(hex(randomblob(16)))
+    WHERE id=? AND (qr_token IS NULL OR trim(qr_token)='')
+  `).run(result.lastInsertRowid);
   return Number(result.lastInsertRowid);
 }
 
@@ -425,6 +464,8 @@ module.exports = {
   listOwnTools,
   getTeamSheet,
   getUserSheet,
+  getToolById,
+  getToolByQrToken,
   createTeam,
   createLocker,
   createTool,

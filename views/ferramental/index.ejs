@@ -1,11 +1,13 @@
 <% layout('layout') %>
 <%- include('../pcm/partials/internal-styles') %>
-<link rel="stylesheet" href="/css/ferramental.css?v=20261006-v1" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v12" />
 
 <%
   const data = ferramental || { resumo: {}, usuarios: [], equipes: [], armarios: [], ferramentas: [] };
   const r = data.resumo || {};
   const aceiteData = data.aceites || { resumo: {}, porCustodia: [], recentes: [] };
+  const inventarioData = data.inventarios || { resumo: {}, inventories: [], divergencias: [] };
+  const inventarioResumo = inventarioData.resumo || {};
   const aceiteResumo = aceiteData.resumo || {};
   const aceitePorCustodia = new Map((aceiteData.porCustodia || []).map(function(a){ return [Number(a.custodia_id), a]; }));
   const formatDateTime = (value) => value ? new Date(value).toLocaleString('pt-BR') : '-';
@@ -40,6 +42,7 @@
         <article><span>Armários</span><strong><%= r.armarios || 0 %></strong><small>8 compartimentos cada</small></article>
         <article><span>Aceites pendentes</span><strong><%= aceiteResumo.pendentes || 0 %></strong><small>Aguardando responsáveis</small></article>
         <article><span>Divergências</span><strong><%= aceiteResumo.recusados || 0 %></strong><small>Revisar no PCM</small></article>
+        <article><span>Conferências abertas</span><strong><%= inventarioResumo.abertos || 0 %></strong><small>Inventário periódico</small></article>
       </section>
 
       <section class="tool-grid">
@@ -135,6 +138,66 @@
         </article>
       </section>
 
+
+      <section class="tool-panel" id="conferencias">
+        <div class="tool-panel-head">
+          <div><span>V1.2</span><h2>Conferência periódica</h2><p>Crie um ciclo para a equipe conferir individualmente todo o ferramental em custódia.</p></div>
+          <small><%= inventarioResumo.abertos || 0 %> aberta(s)</small>
+        </div>
+
+        <div class="tool-grid tool-grid--inventory">
+          <form method="POST" action="/pcm/ferramental/inventarios" class="tool-form tool-inventory-create">
+            <label>Equipe
+              <select name="equipe_id" required>
+                <option value="">Selecione</option>
+                <% data.equipes.forEach(function(team){ %>
+                  <option value="<%= team.id %>"><%= team.codigo %> — <%= team.membros.map(function(m){return m.name;}).join(' + ') %></option>
+                <% }) %>
+              </select>
+            </label>
+            <label>Título
+              <input name="titulo" maxlength="140" placeholder="Ex.: Conferência semanal do ferramental" />
+            </label>
+            <label>Data limite
+              <input name="data_limite" type="date" />
+            </label>
+            <label>Orientação
+              <textarea name="observacao" maxlength="800" rows="3" placeholder="Opcional: observação para a equipe"></textarea>
+            </label>
+            <button class="ui-btn ui-btn--primary" type="submit">Iniciar conferência</button>
+          </form>
+
+          <div class="tool-inventory-list">
+            <% if (!(inventarioData.inventories || []).length) { %>
+              <div class="tool-empty">Nenhuma conferência periódica criada.</div>
+            <% } %>
+            <% (inventarioData.inventories || []).forEach(function(inv){ const total=Number(inv.total_itens||0); const done=Number(inv.conferidos||0); const pct=total ? Math.round(done*100/total) : 0; %>
+              <article class="tool-inventory-row">
+                <div>
+                  <strong><%= inv.codigo %> — <%= inv.titulo %></strong>
+                  <span><%= inv.equipe_codigo %> • <%= inv.equipe_nome %></span>
+                  <small><%= done %>/<%= total %> conferência(ões) • <%= inv.divergencias || 0 %> divergência(s)<%= inv.data_limite ? ' • Limite: ' + new Date(inv.data_limite + 'T12:00:00').toLocaleDateString('pt-BR') : '' %></small>
+                </div>
+                <div class="tool-inventory-progress">
+                  <span><i style="width:<%= pct %>%"></i></span>
+                  <strong><%= pct %>%</strong>
+                  <em class="tool-badge <%= inv.status === 'ABERTO' ? 'tool-badge--pending' : 'tool-badge--accepted' %>"><%= inv.status %></em>
+                </div>
+              </article>
+            <% }) %>
+          </div>
+        </div>
+
+        <% if ((inventarioData.divergencias || []).length) { %>
+          <div class="tool-inventory-alerts">
+            <strong>Divergências encontradas nas conferências</strong>
+            <% inventarioData.divergencias.forEach(function(item){ %>
+              <div><span><%= item.inventario_codigo %> • <%= item.codigo_interno %> — <%= item.descricao %></span><b><%= item.situacao.replaceAll('_',' ') %></b><small><%= item.usuario_nome %><%= item.observacao ? ' • ' + item.observacao : '' %></small></div>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+
       <section class="tool-panel">
         <div class="tool-panel-head"><div><span>GRUPOS</span><h2>Responsabilidades ativas</h2></div></div>
         <% if (!data.equipes.length) { %>
@@ -177,6 +240,12 @@
                       <a href="/pcm/ferramental/aceites/<%= item.id %>/evidencia/assinatura" target="_blank">Assinatura</a>
                     </div>
                   <% } %>
+                  <% if (item.status === 'RECUSADO') { %>
+                    <form class="tool-resolve-form" method="POST" action="/pcm/ferramental/aceites/<%= item.id %>/resolver">
+                      <textarea name="observacao" maxlength="800" rows="2" required placeholder="Descreva a correção realizada"></textarea>
+                      <button class="ui-btn ui-btn--outline ui-btn--compact" type="submit">Tratar e reabrir aceite</button>
+                    </form>
+                  <% } %>
                 </div>
               </article>
             <% }) %>
@@ -188,10 +257,10 @@
         <div class="tool-panel-head"><div><span>INVENTÁRIO</span><h2>Ferramentas cadastradas</h2></div><small>Uma ferramenta física = um cadastro</small></div>
         <div class="tool-table-wrap">
           <table class="tool-table">
-            <thead><tr><th>ID interno</th><th>Ferramenta</th><th>Série / patrimônio</th><th>Condição</th><th>Status</th><th>Responsáveis</th><th>Local de guarda</th><th>Aceite</th></tr></thead>
+            <thead><tr><th>ID interno</th><th>Ferramenta</th><th>Série / patrimônio</th><th>Condição</th><th>Status</th><th>Responsáveis</th><th>Local de guarda</th><th>Aceite</th><th>QR</th></tr></thead>
             <tbody>
-              <% if (!data.ferramentas.length) { %><tr><td colspan="8" class="tool-empty">Nenhuma ferramenta cadastrada.</td></tr><% } %>
-              <% data.ferramentas.forEach(function(item){ %>
+              <% if (!data.ferramentas.length) { %><tr><td colspan="9" class="tool-empty">Nenhuma ferramenta cadastrada.</td></tr><% } %>
+              <% data.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); %>
                 <tr>
                   <td><strong><%= item.codigo_interno %></strong></td>
                   <td><strong><%= item.descricao %></strong><small><%= [item.marca,item.modelo].filter(Boolean).join(' • ') || item.categoria || '-' %></small></td>
@@ -215,6 +284,12 @@
                     <% } else { %>
                       <span class="tool-badge">Sem aceite</span>
                     <% } %>
+                  </td>
+                  <td>
+                    <% if (item.qr_token) { %>
+                      <a class="tool-qr-link" href="/ferramental/qr/<%= item.qr_token %>" target="_blank">Abrir QR</a>
+                      <a class="tool-qr-link" href="/pcm/ferramental/ferramentas/<%= item.id %>/etiqueta-pdf" target="_blank">Etiqueta PDF</a>
+                    <% } else { %>-<% } %>
                   </td>
                 </tr>
               <% }) %>
