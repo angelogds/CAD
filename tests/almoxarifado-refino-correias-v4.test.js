@@ -107,7 +107,9 @@ test('conclusão da troca baixa estoque, é idempotente e bloqueia saldo insufic
   const service = read('modules','correias','correias.service.js');
   const preventive = read('modules','preventivas','preventivas.service.js');
   assert.match(service, /SAIDA_PREVENTIVA_CORREIA/);
-  assert.match(service, /Estoque insuficiente para concluir a troca/);
+  assert.match(service, /Estoque livre insuficiente para concluir a troca/);
+  assert.match(service, /saldo_reservado/);
+  assert.match(service, /saldo_livre/);
   assert.match(service, /estoque_movimento_id/);
   assert.match(service, /if \(exec\.estoque_movimento_id\)/);
   assert.match(service, /saldo_anterior/);
