@@ -197,6 +197,32 @@ function collectCadContent(cadData = {}) {
   };
 }
 
+function resolveCadStrokeStyle(object = {}, fallbackColor = '#0f172a', fallbackWidth = 1, fallbackLineType = 'Continuous') {
+  const style = object.style && typeof object.style === 'object' ? object.style : {};
+  const colorCandidate = String(style.stroke || style.color || fallbackColor);
+  const color = /^#[0-9a-f]{6}$/i.test(colorCandidate) ? colorCandidate : fallbackColor;
+  const strokeWidth = Number(style.strokeWidth);
+  const width = Number.isFinite(strokeWidth)
+    ? Math.max(0.35, Math.min(3.5, strokeWidth * 0.55))
+    : fallbackWidth;
+  const lineType = String(style.lineType || (style.dasharray ? 'DASHED' : fallbackLineType)).toUpperCase();
+  const dasharray = String(style.dasharray || '').trim();
+  return { color, width, lineType, dasharray };
+}
+
+function applyCadStroke(doc, visual = {}) {
+  doc.strokeColor(visual.color || '#0f172a').lineWidth(visual.width || 1);
+  const explicit = String(visual.dasharray || '').trim().split(/[ ,]+/).map(Number).filter((n) => Number.isFinite(n) && n > 0);
+  if (explicit.length >= 2) {
+    doc.dash(explicit[0], { space: explicit[1] });
+    return;
+  }
+  if (visual.lineType === 'DASHED') doc.dash(6, { space: 3 });
+  else if (visual.lineType === 'HIDDEN') doc.dash(3, { space: 2 });
+  else if (visual.lineType === 'CENTER') doc.dash(10, { space: 3 });
+  else if (visual.lineType === 'DASHDOT') doc.dash(8, { space: 2 });
+}
+
 function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}, drawingId = null, paperLayout = null) {
   const visibleObjects = objects.filter((object) => isEntityVisible(object, layers));
   const visibleDimensions = dimensions.filter((dimension) => isEntityVisible(dimension, layers, 'cotas'));
@@ -240,45 +266,50 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}, draw
   // Renderizar objetos
   for (const obj of visibleObjects) {
     const color = colors[obj.type] || '#0f172a';
+    const defaultLineType = obj.type === 'centerline' ? 'CENTER' : (obj.layer === 'construcao' ? 'DASHED' : 'Continuous');
+    const defaultWidth = obj.type === 'centerline' ? 0.6 : 1;
+    const visual = resolveCadStrokeStyle(obj, color, defaultWidth, defaultLineType);
 
     switch (obj.type) {
       case 'line':
+        doc.save();
+        applyCadStroke(doc, visual);
         doc.moveTo(obj.x * scale + offsetX, obj.y * scale + offsetY)
           .lineTo(obj.x2 * scale + offsetX, obj.y2 * scale + offsetY)
-          .lineWidth(1.2)
-          .stroke(color);
+          .stroke();
+        doc.restore();
         break;
 
       case 'centerline':
+        doc.save();
+        applyCadStroke(doc, visual);
         doc.moveTo(obj.x * scale + offsetX, obj.y * scale + offsetY)
           .lineTo(obj.x2 * scale + offsetX, obj.y2 * scale + offsetY)
-          .lineWidth(0.6)
-          .dash(8, { space: 3 })
-          .stroke('#0284c7')
-          .undash();
+          .stroke();
+        doc.restore();
         break;
 
       case 'rect':
+        doc.save();
+        applyCadStroke(doc, visual);
         doc.rect(
           obj.x * scale + offsetX,
           obj.y * scale + offsetY,
           obj.width * scale,
           obj.height * scale
-        )
-          .lineWidth(1)
-          .stroke(color);
+        ).stroke();
+        doc.restore();
         break;
 
       case 'circle':
-        if (obj.style?.dasharray || obj.layer === 'construcao') doc.dash(6, { space: 4 });
+        doc.save();
+        applyCadStroke(doc, visual);
         doc.circle(
           obj.x * scale + offsetX,
           obj.y * scale + offsetY,
           obj.radius * scale
-        )
-          .lineWidth(1)
-          .stroke(color);
-        doc.undash();
+        ).stroke();
+        doc.restore();
         break;
 
       case 'polyline': {
@@ -287,7 +318,10 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}, draw
         doc.moveTo(points[0].x * scale + offsetX, points[0].y * scale + offsetY);
         points.slice(1).forEach((point) => doc.lineTo(point.x * scale + offsetX, point.y * scale + offsetY));
         if (obj.closed) doc.closePath();
-        doc.lineWidth(1).stroke(color);
+        doc.save();
+        applyCadStroke(doc, visual);
+        doc.stroke();
+        doc.restore();
         break;
       }
 
@@ -306,7 +340,10 @@ function renderCadObjectsToPdf(doc, objects, dimensions, area, layers = {}, draw
           const y = (geometry.cy + Math.sin(angle) * geometry.radius) * scale + offsetY;
           if (index === 0) doc.moveTo(x, y); else doc.lineTo(x, y);
         }
-        doc.lineWidth(1).stroke(color);
+        doc.save();
+        applyCadStroke(doc, visual);
+        doc.stroke();
+        doc.restore();
         break;
       }
 
