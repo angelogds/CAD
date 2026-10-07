@@ -1,0 +1,104 @@
+<% layout('layout') %>
+<%- include('../pcm/partials/internal-styles') %>
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v14" />
+
+<%
+  const info = detalhe || {};
+  const insp = info.inspection || {};
+  const items = info.items || [];
+  const block = info.block || null;
+  const fmtDate = (value) => value ? new Date(value + (String(value).length === 10 ? 'T12:00:00' : '')).toLocaleDateString('pt-BR') : '-';
+%>
+
+<div class="tool-page">
+  <header class="tool-head">
+    <div>
+      <span class="tool-eyebrow">PCM • INSPEÇÃO DE FERRAMENTAL</span>
+      <h1><%= insp.codigo %> — <%= insp.codigo_interno %></h1>
+      <p><%= insp.descricao %> • <%= String(insp.tipo || '').replaceAll('_',' ') %> • Programada para <%= fmtDate(insp.data_programada) %></p>
+    </div>
+    <a class="ui-btn ui-btn--outline" href="/pcm/ferramental#inspecoes">Voltar ao Ferramental</a>
+  </header>
+
+  <div class="pcm-shell">
+    <%- include('../pcm/partials/internal-nav', { activePcmSection: 'ferramental' }) %>
+    <main class="pcm-content tool-content">
+      <% if (block) { %>
+        <section class="tool-inspection-block-alert">
+          <strong>BLOQUEADA — NÃO USAR</strong>
+          <span><%= block.motivo %></span>
+        </section>
+      <% } %>
+
+      <section class="tool-kpis tool-kpis--history">
+        <article><span>Perfil</span><strong class="tool-kpi-text"><%= String(insp.perfil_checklist || '-').replaceAll('_',' ') %></strong><small>Checklist aplicado</small></article>
+        <article><span>Status</span><strong class="tool-kpi-text"><%= String(insp.status || '-').replaceAll('_',' ') %></strong><small>Situação da inspeção</small></article>
+        <article><span>Condição atual</span><strong class="tool-kpi-text"><%= String(insp.ferramenta_condicao || '-').replaceAll('_',' ') %></strong><small>Cadastro do ativo</small></article>
+        <article><span>Série / patrimônio</span><strong class="tool-kpi-text"><%= insp.numero_serie || insp.patrimonio || '-' %></strong><small>Identificação</small></article>
+      </section>
+
+      <% if (insp.status === 'AGENDADA') { %>
+        <form method="POST" action="/pcm/ferramental/inspecoes/<%= insp.id %>/executar" class="tool-panel tool-inspection-form">
+          <div class="tool-panel-head">
+            <div><span>CHECKLIST</span><h2>Executar inspeção</h2><p>Todos os itens precisam de uma avaliação antes da conclusão.</p></div>
+            <small><%= items.length %> item(ns)</small>
+          </div>
+
+          <div class="tool-inspection-checklist">
+            <% items.forEach(function(item){ %>
+              <article class="tool-inspection-item">
+                <div>
+                  <span><%= item.codigo_item %></span>
+                  <strong><%= item.descricao %></strong>
+                </div>
+                <div class="tool-inspection-item__controls">
+                  <label><input type="radio" name="item_<%= item.id %>" value="OK" required /> OK</label>
+                  <label><input type="radio" name="item_<%= item.id %>" value="NAO_CONFORME" required /> Não conforme</label>
+                  <label><input type="radio" name="item_<%= item.id %>" value="NAO_APLICAVEL" required /> N/A</label>
+                  <input name="obs_<%= item.id %>" maxlength="500" placeholder="Observação do item, se necessário" />
+                </div>
+              </article>
+            <% }) %>
+          </div>
+
+          <div class="tool-inspection-conclusion">
+            <label>Resultado final
+              <select name="resultado_final" required>
+                <option value="">Selecione</option>
+                <option value="APROVADA">Aprovada</option>
+                <option value="APROVADA_RESTRICAO">Aprovada com restrição</option>
+                <option value="REPROVADA">Reprovada — bloquear uso</option>
+              </select>
+            </label>
+            <label>Conclusão técnica
+              <textarea name="observacao" maxlength="1000" rows="4" placeholder="Obrigatória em aprovação com restrição ou reprovação"></textarea>
+            </label>
+            <div class="tool-help">
+              Reprovação cria bloqueio de uso e ocorrência de manutenção automaticamente. Aprovação libera bloqueio originado por inspeção e agenda o próximo ciclo quando houver plano periódico.
+            </div>
+            <button class="ui-btn ui-btn--primary" type="submit">Concluir inspeção</button>
+          </div>
+        </form>
+      <% } else { %>
+        <section class="tool-panel">
+          <div class="tool-panel-head">
+            <div><span>RESULTADO</span><h2><%= String(insp.status || '').replaceAll('_',' ') %></h2></div>
+            <small><%= insp.executada_por_nome || '-' %></small>
+          </div>
+          <div class="tool-inspection-result">
+            <p><strong>Validade:</strong> <%= fmtDate(insp.validade_ate) %></p>
+            <p><strong>Conclusão:</strong> <%= insp.observacao || 'Sem observação.' %></p>
+          </div>
+          <div class="tool-inspection-checklist is-readonly">
+            <% items.forEach(function(item){ %>
+              <article class="tool-inspection-item">
+                <div><span><%= item.codigo_item %></span><strong><%= item.descricao %></strong></div>
+                <div><span class="tool-badge <%= item.resultado === 'OK' ? 'tool-badge--accepted' : item.resultado === 'NAO_CONFORME' ? 'tool-badge--rejected' : '' %>"><%= String(item.resultado || '-').replaceAll('_',' ') %></span><small><%= item.observacao || '' %></small></div>
+              </article>
+            <% }) %>
+          </div>
+        </section>
+      <% } %>
+    </main>
+  </div>
+</div>

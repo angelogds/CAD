@@ -3,6 +3,7 @@ const service = require('./ferramental.service');
 const aceiteService = require('./ferramental.aceite.service');
 const inventarioService = require('./ferramental.inventario.service');
 const ocorrenciaService = require('./ferramental.ocorrencia.service');
+const inspecaoService = require('./ferramental.inspecao.service');
 
 function statusText(value) {
   const map = {
@@ -80,6 +81,10 @@ function generateTeamPdf(teamId) {
   const ocorrencias = ocorrenciaService.dashboard().recentes
     .filter((item) => Number(item.equipe_id) === Number(teamId))
     .slice(0, 10);
+  const inspecoes = data.ferramentas.map((item) => ({
+    ...item,
+    situacaoInspecao: inspecaoService.toolInspectionStatus(item.id),
+  }));
   const meta = {
     title: 'Ficha de Responsabilidade de Ferramental',
     subtitle: 'Campo do Gado • Manutenção Industrial • PCM',
@@ -155,6 +160,30 @@ function generateTeamPdf(teamId) {
       });
     }
 
+    pdf.sectionBand(doc, 'Inspeções de segurança V1.4', meta);
+    if (!inspecoes.length) {
+      pdf.textBox(doc, 'Nenhuma ferramenta vinculada para avaliação de inspeção.', meta);
+    } else {
+      inspecoes.forEach((item) => {
+        const state = item.situacaoInspecao || {};
+        const nextDate = state.next?.data_programada
+          ? new Date(state.next.data_programada + 'T12:00:00').toLocaleDateString('pt-BR')
+          : '-';
+        const lastText = state.last
+          ? `${state.last.codigo} • ${String(state.last.status || '-').replaceAll('_', ' ')}`
+          : 'Sem inspeção concluída';
+        pdf.textBox(doc, [
+          `${item.codigo_interno} • ${item.descricao}`,
+          `Situação: ${String(state.situation || 'SEM_PLANO').replaceAll('_', ' ')} • Próxima: ${nextDate}`,
+          `Última: ${lastText}`,
+          state.block ? `BLOQUEADA — NÃO USAR: ${state.block.motivo}` : 'Sem bloqueio técnico ativo.',
+        ].join('\n'), meta, {
+          fill: state.block ? pdf.COLORS.yellow : pdf.COLORS.white,
+          fontSize: 8.2,
+        });
+      });
+    }
+
     pdf.sectionBand(doc, 'Termo de responsabilidade', meta);
     pdf.textBox(
       doc,
@@ -175,6 +204,7 @@ function generateUserPdf(userId) {
   const aceites = aceiteService.listOwnAcceptances(userId);
   const conferencias = inventarioService.listOwn(userId);
   const ocorrencias = ocorrenciaService.listOwn(userId).slice(0, 15);
+  const inspecoes = inspecaoService.ownStatus(userId);
   const confirmados = aceites.filter((item) => item.status === 'ACEITO').length;
   const pendentes = aceites.filter((item) => item.status === 'PENDENTE').length;
   const divergencias = aceites.filter((item) => item.status === 'RECUSADO').length;
@@ -196,6 +226,7 @@ function generateUserPdf(userId) {
       { label: 'Pendentes', value: String(pendentes) },
       { label: 'Divergências', value: String(divergencias) },
       { label: 'Conferências pendentes', value: String(conferencias.filter((item) => item.situacao === 'PENDENTE').length) },
+      { label: 'Alertas de inspeção', value: String(inspecoes.filter((item) => ['BLOQUEADA','VENCIDA','A_VENCER'].includes(item.inspecao?.situation)).length) },
     ], meta, { columns: 2 });
 
     if (!data.equipes.length) {
@@ -256,6 +287,26 @@ function generateUserPdf(userId) {
           `Tipo: ${String(occ.tipo || '-').replaceAll('_', ' ')} • Status: ${String(occ.status || '-').replaceAll('_', ' ')}`,
           occ.resolucao ? `Tratamento PCM: ${occ.resolucao}` : `Descrição: ${occ.descricao || '-'}`,
         ].join('\n'), meta, { fill: pdf.COLORS.white, fontSize: 8.2 });
+      });
+    }
+
+    pdf.sectionBand(doc, 'Inspeções de segurança V1.4', meta);
+    if (!inspecoes.length) {
+      pdf.textBox(doc, 'Nenhuma ferramenta atual possui informação de inspeção.', meta);
+    } else {
+      inspecoes.forEach((item) => {
+        const state = item.inspecao || {};
+        const nextDate = state.next?.data_programada
+          ? new Date(state.next.data_programada + 'T12:00:00').toLocaleDateString('pt-BR')
+          : '-';
+        pdf.textBox(doc, [
+          `${item.codigo_interno} • ${item.descricao}`,
+          `Situação: ${String(state.situation || 'SEM_PLANO').replaceAll('_', ' ')} • Próxima: ${nextDate}`,
+          state.block ? `BLOQUEADA — NÃO USAR: ${state.block.motivo}` : 'Sem bloqueio técnico ativo.',
+        ].join('\n'), meta, {
+          fill: state.block ? pdf.COLORS.yellow : pdf.COLORS.white,
+          fontSize: 8.2,
+        });
       });
     }
 

@@ -25,6 +25,24 @@ function nextCode() {
   return `OCO-FER-${String(max + 1).padStart(4, '0')}`;
 }
 
+
+function activeInspectionBlock(toolId) {
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ferramental_bloqueios'").get();
+  if (!exists) return null;
+  return db.prepare(`
+    SELECT id,motivo
+    FROM ferramental_bloqueios
+    WHERE ferramenta_id=? AND ativo=1
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get(int(toolId)) || null;
+}
+
+function assertToolNotBlocked(toolId) {
+  const block = activeInspectionBlock(toolId);
+  if (block) throw new Error(`Ferramenta bloqueada para uso: ${block.motivo}`);
+}
+
 function activeCustody(toolId) {
   return db.prepare(`
     SELECT c.*, e.codigo AS equipe_codigo, e.nome AS equipe_nome,
@@ -279,6 +297,7 @@ function validateTransfer(teamId, compartmentId) {
 }
 
 function transferTool(occurrence, actorUserId, data, note) {
+  assertToolNotBlocked(occurrence.ferramenta_id);
   const target = validateTransfer(data.equipe_id, data.compartimento_id);
   const current = activeCustody(occurrence.ferramenta_id);
   if (current) {
@@ -347,6 +366,7 @@ function resolveOccurrence(occurrenceId, actorUserId, data = {}) {
   return db.transaction(() => {
     let nextStatus = 'RESOLVIDA';
     if (action === 'DEVOLVER_DISPONIVEL') {
+      assertToolNotBlocked(occurrence.ferramenta_id);
       closeActiveCustody(occurrence.ferramenta_id, actor, 'DEVOLUCAO_PCM', 'DISPONIVEL', note, 'CONFIRMADO');
       db.prepare("UPDATE ferramental_itens SET status='DISPONIVEL', updated_at=datetime('now') WHERE id=?")
         .run(occurrence.ferramenta_id);
@@ -370,6 +390,7 @@ function resolveOccurrence(occurrenceId, actorUserId, data = {}) {
       db.prepare("UPDATE ferramental_itens SET status='BAIXADA', updated_at=datetime('now') WHERE id=?")
         .run(occurrence.ferramenta_id);
     } else if (action === 'RETORNAR_DISPONIVEL') {
+      assertToolNotBlocked(occurrence.ferramenta_id);
       const allowedConditions = new Set(['NOVA','BOA','USADA','COM_DESGASTE','DANIFICADA']);
       const returnCondition = clean(data.condicao_retorno, 30).toUpperCase();
       if (returnCondition && !allowedConditions.has(returnCondition)) {
