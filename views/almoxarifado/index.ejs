@@ -1,47 +1,93 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20260824-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20261007-v3" />
+<link rel="stylesheet" href="/css/almoxarifado-operacional-v3.css?v=20261007-v1" />
+<%
+  const typeIcon=(tipo)=>String(tipo||'').toUpperCase().includes('ENTRADA')?'↓':'↑';
+  const qtySignal=(tipo)=>String(tipo||'').toUpperCase().includes('ENTRADA')?'+':'−';
+%>
 
-<div class="almox-page">
+<div class="almox-page almox-op-page">
   <header class="almox-hero">
     <div>
-      <span class="almox-hero__eyebrow">ALMOXARIFADO • CONTROLE DE MATERIAIS</span>
+      <span class="almox-hero__eyebrow">ALMOXARIFADO • OPERAÇÃO INTEGRADA</span>
       <h1>Central do Almoxarifado</h1>
-      <p class="muted">Entrada de compras, retirada vinculada à manutenção e consulta do saldo em estoque em um único fluxo integrado.</p>
+      <p class="muted">Acompanhe o que está sendo comprado, receba e classifique o material, organize as prateleiras e registre a entrega sem sair do fluxo do Almoxarifado.</p>
+    </div>
+    <div class="almox-hero__actions">
+      <a class="btn btn-green" href="/almoxarifado/retiradas/qr">Entregar material</a>
+      <a class="btn btn-ghost" href="/almoxarifado/estoque">Abrir estoque</a>
     </div>
   </header>
 
-  <%- include('_tabs', { tab: typeof tab !== 'undefined' ? tab : '' }) %>
+  <%- include('_tabs', { tab: 'painel' }) %>
 
-  <section class="almox-kpis">
-    <a class="almox-kpi" href="/almoxarifado/recebimentos" style="text-decoration:none;">
-      <span class="almox-kpi__label">Recebimentos</span>
-      <strong class="almox-kpi__value" style="font-size:1.08rem;">Compras → Estoque</strong>
-      <span class="almox-kpi__meta">Conferir materiais comprados e registrar a entrada.</span>
+  <section class="almox-op-flow" aria-label="Fluxo operacional">
+    <a class="almox-op-stage" href="/almoxarifado/recebimentos?status=EM_COTACAO">
+      <div class="almox-op-stage__step"><span>1 • Acompanhar</span><b class="almox-op-stage__badge"><%= Number(resumo.em_cotacao||0) %></b></div>
+      <strong>Compras a caminho</strong>
+      <p>Cotações e solicitações ainda em compra. O Almoxarifado ganha ciência do que deve chegar.</p>
     </a>
-    <a class="almox-kpi almox-kpi--blue" href="/estoque/saidas/nova?contexto=almoxarifado" style="text-decoration:none;">
-      <span class="almox-kpi__label">Retiradas</span>
-      <strong class="almox-kpi__value" style="font-size:1.08rem;">Estoque → OS</strong>
-      <span class="almox-kpi__meta">Dar baixa no material com vínculo obrigatório à OS.</span>
+    <a class="almox-op-stage" href="/almoxarifado/recebimentos?status=COMPRADA">
+      <div class="almox-op-stage__step"><span>2 • Conferir</span><b class="almox-op-stage__badge"><%= Number(resumo.para_receber||0) %></b></div>
+      <strong>Pronto para receber</strong>
+      <p>Materiais comprados aguardando conferência física e entrada no estoque.</p>
     </a>
-    <a class="almox-kpi almox-kpi--amber" href="/estoque" style="text-decoration:none;">
-      <span class="almox-kpi__label">Estoque</span>
-      <strong class="almox-kpi__value" style="font-size:1.08rem;">Consultar saldo</strong>
-      <span class="almox-kpi__meta">Visualizar materiais cadastrados e disponibilidade.</span>
+    <a class="almox-op-stage" href="/almoxarifado/recebimentos?status=EM_RECEBIMENTO">
+      <div class="almox-op-stage__step"><span>3 • Receber</span><b class="almox-op-stage__badge"><%= Number(resumo.em_recebimento||0)+Number(resumo.parciais||0) %></b></div>
+      <strong>Em recebimento</strong>
+      <p>Conferências abertas e recebimentos parciais com quantidade ainda pendente.</p>
     </a>
-    <a class="almox-kpi almox-kpi--slate" href="/estoque/movimentos" style="text-decoration:none;">
-      <span class="almox-kpi__label">Rastreabilidade</span>
-      <strong class="almox-kpi__value" style="font-size:1.08rem;">Movimentações</strong>
-      <span class="almox-kpi__meta">Auditar entradas e saídas registradas no estoque.</span>
+    <a class="almox-op-stage" href="/estoque/reservas">
+      <div class="almox-op-stage__step"><span>4 • Entregar</span><b class="almox-op-stage__badge"><%= Number(reservas.prontas||0) %></b></div>
+      <strong>Materiais separados</strong>
+      <p>Recebidos e reservados para solicitação, OS e equipamento, aguardando retirada.</p>
+    </a>
+    <a class="almox-op-stage" href="/almoxarifado/estoque">
+      <div class="almox-op-stage__step"><span>5 • Manter</span><b class="almox-op-stage__badge"><%= Number(itensComSaldo||0) %></b></div>
+      <strong>Estoque disponível</strong>
+      <p>Prateleiras organizadas por categoria, setor e equipamento, com saldo livre protegido.</p>
     </a>
   </section>
 
-  <section class="almox-summary-card">
-    <div class="almox-summary-card__title">Fluxo operacional preservado</div>
-    <div class="almox-summary-list">
-      <div class="almox-summary-box"><span>1. Compras</span><strong>Define item e quantidade comprada</strong></div>
-      <div class="almox-summary-box"><span>2. Almoxarifado</span><strong>Confere a quantidade recebida</strong></div>
-      <div class="almox-summary-box"><span>3. Estoque</span><strong>Recebe a entrada automaticamente</strong></div>
-      <div class="almox-summary-box"><span>4. Manutenção</span><strong>Retira o material vinculado à OS</strong></div>
-    </div>
+  <section class="almox-kpis">
+    <article class="almox-kpi"><span class="almox-kpi__label">Itens cadastrados</span><strong class="almox-kpi__value"><%= Number(estoque.itens||0) %></strong><span class="almox-kpi__meta">Catálogo único do estoque</span></article>
+    <article class="almox-kpi almox-kpi--blue"><span class="almox-kpi__label">Reservado</span><strong class="almox-kpi__value"><%= Number(reservas.reservado||0) %></strong><span class="almox-kpi__meta">Protegido para solicitações</span></article>
+    <article class="almox-kpi almox-kpi--amber"><span class="almox-kpi__label">Abaixo do mínimo</span><strong class="almox-kpi__value"><%= Number(estoque.baixo||0) %></strong><span class="almox-kpi__meta">Exige atenção de reposição</span></article>
+    <article class="almox-kpi almox-kpi--slate"><span class="almox-kpi__label">Movimentos hoje</span><strong class="almox-kpi__value"><%= Number(estoque.movimentosHoje||0) %></strong><span class="almox-kpi__meta">Entradas e saídas registradas</span></article>
+  </section>
+
+  <section class="almox-op-grid">
+    <article class="almox-op-card">
+      <div class="almox-op-card__head">
+        <div><h2>Prateleiras por categoria</h2><p>Atalho para localizar rapidamente as famílias de materiais já classificadas.</p></div>
+        <a class="btn btn-sm btn-ghost" href="/almoxarifado/estoque">Ver estoque completo</a>
+      </div>
+      <% if(!categoriasResumo.length){ %>
+        <div class="almox-empty"><strong>Estoque ainda sem categorias classificadas.</strong><div class="almox-subline">A categoria pode ser definida durante o recebimento.</div></div>
+      <% } else { %>
+        <div class="almox-category-grid">
+          <% categoriasResumo.forEach(categoria=>{ %>
+            <a class="almox-category-card" href="/almoxarifado/estoque?categoria_id=<%=categoria.id%>">
+              <span>Categoria</span><strong><%= categoria.nome %></strong><b><%= categoria.itens %> item(ns)</b>
+              <small><%= Number(categoria.saldo_disponivel||0).toFixed(2) %> em saldo livre somado</small>
+            </a>
+          <% }) %>
+        </div>
+      <% } %>
+    </article>
+
+    <aside class="almox-op-card">
+      <div class="almox-op-card__head"><div><h2>Últimas movimentações</h2><p>Visão rápida da operação recente.</p></div><a class="btn btn-sm btn-ghost" href="/estoque/movimentos">Auditar</a></div>
+      <div class="almox-activity-list">
+        <% if(!movimentos.length){ %><div class="almox-empty">Nenhuma movimentação registrada.</div><% } %>
+        <% movimentos.forEach(mov=>{ %>
+          <div class="almox-activity">
+            <div class="almox-activity__type"><%= typeIcon(mov.tipo) %></div>
+            <div><strong><%= mov.item_nome %></strong><span><%= mov.equipamento_nome || mov.setor_utilizacao_exibicao || 'Estoque geral' %></span></div>
+            <div class="almox-activity__qty"><%= qtySignal(mov.tipo) %><%= Number(mov.quantidade||0) %> <small><%= mov.item_unidade||'UN' %></small></div>
+          </div>
+        <% }) %>
+      </div>
+    </aside>
   </section>
 </div>
