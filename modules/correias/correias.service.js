@@ -92,8 +92,9 @@ function listPlanos(filters = {}) {
     const like = `%${q}%`; params.push(like,like,like);
   }
   if (filters.equipamento_id) { where.push('p.equipamento_id=?'); params.push(Number(filters.equipamento_id)); }
-  if (String(filters.status || '').toUpperCase()==='CRITICO') where.push('COALESCE(i.saldo_atual,0) < COALESCE(p.quantidade_material,1)*MAX(COALESCE(p.estoque_minimo_conjuntos,1),1)');
-  if (String(filters.status || '').toUpperCase()==='OK') where.push('COALESCE(i.saldo_atual,0) >= COALESCE(p.quantidade_material,1)*MAX(COALESCE(p.estoque_minimo_conjuntos,1),1)');
+  const saldoLivreSql = `MAX(COALESCE(i.saldo_atual,0)-${reservadoExpr('i')},0)`;
+  if (String(filters.status || '').toUpperCase()==='CRITICO') where.push(`${saldoLivreSql} < COALESCE(p.quantidade_material,1)*MAX(COALESCE(p.estoque_minimo_conjuntos,1),1)`);
+  if (String(filters.status || '').toUpperCase()==='OK') where.push(`${saldoLivreSql} >= COALESCE(p.quantidade_material,1)*MAX(COALESCE(p.estoque_minimo_conjuntos,1),1)`);
 
   return db.prepare(`
     SELECT p.id,p.equipamento_id,p.titulo,p.frequencia_tipo,p.frequencia_valor,p.ativo,p.observacao,
