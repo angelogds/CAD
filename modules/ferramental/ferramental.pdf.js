@@ -130,6 +130,7 @@ function generateTeamPdf(teamId) {
           `${aceite.codigo_interno} • ${aceite.descricao}`,
           `Responsável: ${aceite.usuario_nome}`,
           `Status: ${acceptanceStatusText(aceite.status)} • Data/hora: ${formatDateTime(when)}`,
+          `Termo: ${aceite.aceite_termo_versao || 'versão não informada'}`,
           evidenceText,
         ].join('\n'), meta, { fill: pdf.COLORS.white, fontSize: 8.3 });
       });
@@ -205,7 +206,11 @@ function generateTeamPdf(teamId) {
     pdf.sectionBand(doc, 'Termo de responsabilidade', meta);
     pdf.textBox(
       doc,
-      'Cada responsável deve confirmar individualmente o recebimento no Meu Portal. O aceite V1.1 registra usuário, data/hora, selfie, assinatura digital e trilha de auditoria. Registros pendentes ou com divergência permanecem destacados até revisão.',
+      [
+        'Cada responsável confirma individualmente o recebimento, a identificação e a condição do item, assumindo dever de uso adequado, guarda, conservação e comunicação imediata de dano, perda, extravio, furto/roubo ou divergência.',
+        'Quando a ferramenta é compartilhada, os responsáveis cooperam na guarda e organização do mesmo ativo, sem duplicação do patrimônio.',
+        'Este registro não representa autorização de desconto salarial automático. Eventual ressarcimento depende de apuração do caso concreto e da observância dos requisitos legais aplicáveis.'
+      ].join(' '),
       meta,
       { fill: pdf.COLORS.greenSoft, fontSize: 8.5 }
     );
@@ -278,6 +283,7 @@ function generateUserPdf(userId) {
         pdf.textBox(doc, [
           `${aceite.codigo_interno} • ${aceite.descricao}`,
           `Status: ${acceptanceStatusText(aceite.status)} • Data/hora: ${formatDateTime(when)}`,
+          `Termo: ${aceite.aceite_termo_versao || 'versão não informada'}`,
           detail,
         ].join('\n'), meta, { fill: pdf.COLORS.white, fontSize: 8.3 });
       });
@@ -346,7 +352,10 @@ function generateUserPdf(userId) {
     pdf.sectionBand(doc, 'Registro', meta);
     pdf.textBox(
       doc,
-      'Documento gerado a partir da custódia ativa e dos aceites V1.1 registrados no PCM. Ferramentas compartilhadas aparecem para todos os responsáveis sem duplicar o ativo; cada responsável mantém seu próprio aceite e evidência.',
+      [
+        'Documento gerado a partir da custódia ativa e dos aceites registrados no PCM. Ferramentas compartilhadas aparecem para todos os responsáveis sem duplicar o ativo; cada responsável mantém seu próprio aceite e evidência.',
+        'A confirmação registra ciência sobre uso, guarda, conservação e comunicação de ocorrências. Não constitui desconto salarial automático; eventual ressarcimento depende de apuração e dos requisitos legais aplicáveis.'
+      ].join(' '),
       meta,
       { fontSize: 8.2, fill: pdf.COLORS.yellow, stroke: pdf.COLORS.yellowBorder }
     );

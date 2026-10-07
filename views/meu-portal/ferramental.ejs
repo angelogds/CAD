@@ -1,6 +1,6 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/meu-portal.css?v=20260914-v4" />
-<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v2" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-review1" />
 
 <%
   const data = ferramental || { usuario: {}, resumo: {}, equipes: [], ferramentas: [], aceites: [] };
@@ -49,66 +49,129 @@
   <% if (pendentes.length) { %>
     <section class="tool-panel tool-accept-section">
       <div class="tool-panel-head">
-        <div><span>V1.1</span><h2>Confirmações pendentes</h2><p>Cada responsável confirma individualmente o recebimento.</p></div>
+        <div>
+          <span>RESPONSABILIDADE</span>
+          <h2>Confirme o recebimento do seu ferramental</h2>
+          <p>Confira primeiro a ferramenta e as regras de guarda. Depois registre sua evidência de recebimento.</p>
+        </div>
         <small><%= pendentes.length %> pendente(s)</small>
       </div>
 
-      <div class="tool-accept-grid">
-        <% pendentes.forEach(function(item){ %>
-          <article class="tool-accept-card">
+      <div class="tool-responsibility-notice">
+        <div>
+          <strong>O que você está confirmando</strong>
+          <ul>
+            <li>Recebeu e conferiu a identificação e a condição da ferramenta.</li>
+            <li>Vai utilizar corretamente, guardar no local definido e evitar acesso por pessoa não autorizada.</li>
+            <li>Vai comunicar imediatamente dano, perda, extravio, furto/roubo ou qualquer divergência ao responsável/PCM.</li>
+            <li>Em item compartilhado, os responsáveis devem colaborar na guarda, organização e comunicação das ocorrências.</li>
+          </ul>
+        </div>
+        <div class="tool-responsibility-legal">
+          <strong>Importante</strong>
+          <span>Este aceite registra ciência e responsabilidade de guarda e uso. Ele não representa desconto salarial automático. Eventual ressarcimento depende da apuração do caso concreto e dos requisitos legais aplicáveis.</span>
+        </div>
+      </div>
+
+      <div class="tool-accept-grid tool-accept-grid--guided">
+        <% pendentes.forEach(function(item){ const compartilhada = Number(item.total_responsaveis || 0) > 1; %>
+          <article class="tool-accept-card tool-accept-card--guided">
             <div class="tool-accept-card__head">
               <div>
                 <span><%= item.codigo_interno %></span>
                 <h3><%= item.descricao %></h3>
                 <small><%= item.equipe_codigo %> • <%= item.armario_codigo %> / C<%= item.compartimento_numero %></small>
               </div>
-              <span class="tool-badge tool-badge--pending">PENDENTE</span>
+              <span class="tool-badge tool-badge--pending">AGUARDA ACEITE</span>
             </div>
+
+            <div class="tool-receipt-overview">
+              <div><span>Condição</span><strong><%= String(item.condicao || '-').replaceAll('_',' ') %></strong></div>
+              <div><span>Série / patrimônio</span><strong><%= item.numero_serie || item.patrimonio || '-' %></strong></div>
+              <div><span>Responsabilidade</span><strong><%= compartilhada ? 'Compartilhada' : 'Individual' %></strong></div>
+            </div>
+
+            <% if (compartilhada) { %>
+              <div class="tool-shared-responsibility">
+                <strong>Ferramenta compartilhada</strong>
+                <span>Responsáveis: <%= item.responsaveis_nomes || item.equipe_nome %>. Cada pessoa confirma seu próprio recebimento e deve colaborar na guarda e na comunicação de qualquer ocorrência.</span>
+              </div>
+            <% } %>
 
             <form
               method="POST"
               action="/meu-portal/ferramental/custodias/<%= item.custodia_id %>/aceitar"
               enctype="multipart/form-data"
-              class="tool-accept-form"
+              class="tool-accept-form tool-accept-form--guided"
               data-tool-accept-form
             >
-              <label>
-                Selfie de confirmação
-                <input type="file" name="selfie" accept="image/jpeg,image/png,image/webp" capture="user" required />
-                <small>Tire a foto no momento da confirmação ou selecione uma imagem recente.</small>
-              </label>
-
-              <label>
-                Assinatura
-                <canvas class="tool-signature-canvas" width="520" height="150" tabindex="0" data-signature-canvas></canvas>
-                <input type="hidden" name="assinatura_data" data-signature-data />
-              </label>
-              <div class="tool-signature-actions">
-                <small data-signature-status>Assine no quadro acima</small>
-                <button class="btn btn-outline btn-sm" type="button" data-signature-clear>Limpar assinatura</button>
+              <div class="tool-accept-step">
+                <span class="tool-accept-step__number">1</span>
+                <div>
+                  <strong>Confira a ferramenta</strong>
+                  <small>Verifique código, condição, série/patrimônio e local de guarda. Se houver divergência, não confirme: informe o problema no final deste card.</small>
+                </div>
               </div>
 
-              <label>
-                Observação
-                <textarea name="observacao" maxlength="800" rows="2" placeholder="Opcional: condição observada no recebimento"></textarea>
+              <div class="tool-accept-step">
+                <span class="tool-accept-step__number">2</span>
+                <div class="tool-accept-step__content">
+                  <strong>Registre sua selfie</strong>
+                  <label class="tool-selfie-field">
+                    <span>Foto de confirmação</span>
+                    <input type="file" name="selfie" accept="image/jpeg,image/png,image/webp" capture="user" required data-selfie-input />
+                    <small>Tire a foto no momento do aceite. A imagem fica vinculada à evidência deste recebimento; não há reconhecimento facial automatizado.</small>
+                  </label>
+                  <div class="tool-selfie-preview" data-selfie-preview-wrap hidden>
+                    <img alt="Prévia da selfie de confirmação" data-selfie-preview />
+                    <span>Prévia da selfie selecionada</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tool-accept-step">
+                <span class="tool-accept-step__number">3</span>
+                <div class="tool-accept-step__content">
+                  <strong>Assine o recebimento</strong>
+                  <div class="tool-signature-box">
+                    <canvas class="tool-signature-canvas" width="520" height="150" tabindex="0" data-signature-canvas></canvas>
+                    <input type="hidden" name="assinatura_data" data-signature-data />
+                  </div>
+                  <div class="tool-signature-actions">
+                    <small data-signature-status>Assine com o dedo ou mouse no quadro acima</small>
+                    <button class="btn btn-outline btn-sm" type="button" data-signature-clear>Limpar assinatura</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tool-accept-step">
+                <span class="tool-accept-step__number">4</span>
+                <div class="tool-accept-step__content">
+                  <strong>Confirme sua ciência</strong>
+                  <label class="tool-term-check tool-term-check--legal">
+                    <input type="checkbox" name="termo_aceito" value="1" required />
+                    <span>Declaro que conferi o item acima, estou ciente da minha responsabilidade de uso, guarda, conservação e comunicação imediata de qualquer dano, perda, extravio, furto/roubo ou irregularidade. Em caso de responsabilidade compartilhada, comprometo-me a cooperar com o(s) outro(s) responsável(is) na guarda e controle do equipamento.</span>
+                  </label>
+                  <small class="tool-legal-footnote">O aceite não significa concordância com desconto automático em salário. Qualquer apuração de prejuízo deve observar a legislação aplicável e as circunstâncias comprovadas do caso.</small>
+                </div>
+              </div>
+
+              <label class="tool-accept-note">
+                Observação no recebimento
+                <textarea name="observacao" maxlength="800" rows="2" placeholder="Opcional: registre marca, detalhe de conservação, acessório, risco ou observação relevante"></textarea>
               </label>
 
-              <label class="tool-term-check">
-                <input type="checkbox" name="termo_aceito" value="1" required />
-                <span>Confirmo que recebi esta ferramenta, conferi sua identificação e reconheço minha responsabilidade de guarda e uso.</span>
-              </label>
-
-              <button class="btn btn-primary" type="submit">Confirmar recebimento</button>
+              <button class="btn btn-primary tool-accept-submit" type="submit">Confirmar recebimento e responsabilidade</button>
             </form>
 
-            <details class="tool-divergence">
-              <summary>Há alguma divergência?</summary>
+            <details class="tool-divergence tool-divergence--guided">
+              <summary>Não posso confirmar — existe divergência</summary>
               <form method="POST" action="/meu-portal/ferramental/custodias/<%= item.custodia_id %>/divergencia">
                 <label>
                   Informe o problema
-                  <textarea name="motivo" maxlength="800" rows="3" required placeholder="Ex.: ferramenta não recebida, identificação diferente, condição divergente..."></textarea>
+                  <textarea name="motivo" maxlength="800" rows="3" required placeholder="Ex.: ferramenta não recebida, código diferente, dano já existente, acessório faltando..."></textarea>
                 </label>
-                <button class="btn btn-outline" type="submit">Registrar divergência</button>
+                <button class="btn btn-outline" type="submit">Registrar divergência para o PCM</button>
               </form>
             </details>
           </article>
@@ -116,7 +179,6 @@
       </div>
     </section>
   <% } %>
-
 
   <% if (inventarios.length) { %>
     <section class="tool-panel tool-inventory-self" id="conferencias">

@@ -1,5 +1,7 @@
 const db = require('../../database/db');
 
+const ACCEPTANCE_TERM_VERSION = 'V2-RESP-2026-10';
+
 function int(value) {
   const n = Number(value);
   return Number.isInteger(n) && n > 0 ? n : null;
@@ -59,7 +61,22 @@ function listOwnAcceptances(userId) {
       e.nome AS equipe_nome,
       ac.numero AS compartimento_numero,
       ar.codigo AS armario_codigo,
-      au.name AS armario_responsavel
+      au.name AS armario_responsavel,
+      (
+        SELECT COUNT(*)
+        FROM ferramental_equipe_membros em
+        WHERE em.equipe_id=c.equipe_id
+      ) AS total_responsaveis,
+      (
+        SELECT GROUP_CONCAT(nome, ' + ')
+        FROM (
+          SELECT u2.name AS nome
+          FROM ferramental_equipe_membros em2
+          JOIN users u2 ON u2.id=em2.user_id
+          WHERE em2.equipe_id=c.equipe_id
+          ORDER BY em2.ordem
+        )
+      ) AS responsaveis_nomes
     FROM ferramental_aceites a
     JOIN ferramental_custodias c ON c.id=a.custodia_id
     JOIN ferramental_itens f ON f.id=c.ferramenta_id
@@ -118,7 +135,7 @@ function confirmAcceptance(userId, custodiaId, data = {}) {
           selfie_path=?,
           assinatura_path=?,
           observacao=?,
-          aceite_termo_versao='V1.1',
+          aceite_termo_versao=?,
           confirmado_em=datetime('now'),
           ip_origem=?,
           user_agent=?,
@@ -128,6 +145,7 @@ function confirmAcceptance(userId, custodiaId, data = {}) {
       data.selfie_path,
       data.assinatura_path,
       clean(data.observacao, 800) || null,
+      ACCEPTANCE_TERM_VERSION,
       clean(data.ip_origem, 120) || null,
       clean(data.user_agent, 500) || null,
       row.id
@@ -144,7 +162,7 @@ function confirmAcceptance(userId, custodiaId, data = {}) {
       'ACEITE_RESPONSABILIDADE',
       row.equipe_id,
       uid,
-      clean(data.observacao, 800) || 'Recebimento confirmado no Meu Portal com selfie e assinatura.'
+      clean(data.observacao, 800) || `Recebimento confirmado no Meu Portal com selfie, assinatura e termo ${ACCEPTANCE_TERM_VERSION}.`
     );
 
     return row.id;
@@ -308,4 +326,5 @@ module.exports = {
   getAcceptanceById,
   teamAcceptances,
   dashboard,
+  ACCEPTANCE_TERM_VERSION,
 };
