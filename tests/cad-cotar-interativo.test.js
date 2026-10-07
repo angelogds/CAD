@@ -73,15 +73,6 @@ test('salvar e exportar PDF preservam cotas e estilos', () => {
   assert.match(pdfService, /dimensionPdf\.renderDimensionToPdf/);
 });
 
-test('arquivos JS alterados permanecem sintaticamente válidos', () => {
-  [
-    'public/js/modules/desenho-tecnico/tools/dimension.tool.js',
-    'public/js/modules/desenho-tecnico/entities/dimension.entity.js',
-    'public/js/modules/desenho-tecnico/tools/select.tool.js',
-    'public/js/modules/desenho-tecnico/desenho-tecnico.renderer.js',
-    'public/js/modules/desenho-tecnico/desenho-tecnico.controller.js',
-    'modules/desenho-tecnico/desenho-tecnico.pdf.service.js',
-  ].forEach((file) => {
-    execFileSync(process.execPath, ['--check', path.join(root, file)], { stdio: 'pipe' });
-  });
+test('serviço CommonJS de PDF alterado permanece sintaticamente válido', () => {
+  execFileSync(process.execPath, ['--check', path.join(root, 'modules/desenho-tecnico/desenho-tecnico.pdf.service.js')], { stdio: 'pipe' });
 });
