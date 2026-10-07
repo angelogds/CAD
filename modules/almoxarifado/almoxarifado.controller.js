@@ -1,6 +1,7 @@
 const { randomUUID } = require("node:crypto");
 const service = require("./almoxarifado.service");
 const estoqueService = require("../estoque/estoque.service");
+const reservaService = require("../estoque/estoque.reservas.service");
 const alertsHub = require("../alerts/alerts.hub");
 const { normalizeRole, ACCESS } = require("../../config/rbac");
 const { STATUS } = require("../solicitacoes/solicitacoes.service");
@@ -10,6 +11,90 @@ function canManageAlmox(user) {
 }
 function canWithdrawStock(user) {
   return ACCESS.estoque_retirada.includes(normalizeRole(user?.role));
+}
+
+function estoqueComDisponivel(itens) {
+  const reservas = reservaService.resumoPorItem();
+  return itens.map((item) => {
+    const reservado = Number(reservas.get(Number(item.id)) || 0);
+    const saldoFisico = Number(item.saldo_atual || 0);
+    return {
+      ...item,
+      saldo_reservado: reservado,
+      saldo_disponivel: Math.max(saldoFisico - reservado, 0),
+    };
+  });
+}
+
+function index(req, res) {
+  const resumo = service.getResumoRecebimentos("");
+  const estoqueItens = estoqueComDisponivel(estoqueService.listItens());
+  const categorias = estoqueService.listCategorias();
+  const reservas = reservaService.dashboard();
+  const estoque = estoqueService.dashboard();
+  const movimentos = estoqueService.listMovimentos().slice(0, 8);
+  const categoriasResumo = categorias.map((categoria) => {
+    const itens = estoqueItens.filter((item) => Number(item.categoria_id) === Number(categoria.id));
+    return {
+      ...categoria,
+      itens: itens.length,
+      saldo_disponivel: itens.reduce((sum, item) => sum + Number(item.saldo_disponivel || 0), 0),
+    };
+  }).filter((categoria) => categoria.itens > 0).slice(0, 8);
+
+  res.render("almoxarifado/index", {
+    title: "Central do Almoxarifado",
+    activeMenu: "almoxarifado",
+    tab: "painel",
+    resumo,
+    estoque,
+    reservas,
+    movimentos,
+    categoriasResumo,
+    itensComSaldo: estoqueItens.filter((item) => Number(item.saldo_disponivel || 0) > 0).length,
+    canManage: canManageAlmox(req.session.user),
+    canWithdraw: canWithdrawStock(req.session.user),
+  });
+}
+
+function estoqueOperacional(req, res) {
+  const filtros = {
+    q: String(req.query.q || "").trim(),
+    categoria_id: req.query.categoria_id || "",
+    setor_utilizacao: req.query.setor_utilizacao || "",
+    equipamento_id: req.query.equipamento_id || "",
+    destino: ["", "GERAL", "EQUIPAMENTO"].includes(String(req.query.destino || "").toUpperCase())
+      ? String(req.query.destino || "").toUpperCase()
+      : "",
+  };
+  const itens = estoqueComDisponivel(estoqueService.listItens(filtros));
+  const categorias = estoqueService.listCategorias();
+  const todosItens = estoqueComDisponivel(estoqueService.listItens({
+    setor_utilizacao: filtros.setor_utilizacao,
+    equipamento_id: filtros.equipamento_id,
+    destino: filtros.destino,
+  }));
+  const categoriasResumo = categorias.map((categoria) => {
+    const itensCategoria = todosItens.filter((item) => Number(item.categoria_id) === Number(categoria.id));
+    return {
+      ...categoria,
+      itens: itensCategoria.length,
+      saldo_disponivel: itensCategoria.reduce((sum, item) => sum + Number(item.saldo_disponivel || 0), 0),
+    };
+  });
+
+  res.render("almoxarifado/estoque", {
+    title: "Estoque do Almoxarifado",
+    activeMenu: "almoxarifado",
+    tab: "estoque",
+    itens,
+    categorias,
+    categoriasResumo,
+    setoresEstoque: estoqueService.SETORES_ESTOQUE,
+    equipamentos: estoqueService.listEquipamentosEstoque(),
+    filtros,
+    canWithdraw: canWithdrawStock(req.session.user),
+  });
 }
 
 function publicarMaterialDisponivel({ solicitacaoId, itemId, quantidadeRecebida, resultado }) {
@@ -81,6 +166,7 @@ function conferir(req, res) {
     activeMenu: "almoxarifado",
     sol,
     locais: estoqueService.listLocais(),
+    categorias: estoqueService.listCategorias(),
     historico: service.getHistoricoRecebimento(sol.id),
     canManage: canManageAlmox(req.session.user),
     canWithdraw: canWithdrawStock(req.session.user),
@@ -98,6 +184,8 @@ function receberItem(req, res) {
       qtdAgora: quantidadeRecebida,
       observacao: req.body.observacao_item,
       localId: req.body.local_id ? Number(req.body.local_id) : null,
+      categoriaId: req.body.categoria_id ? Number(req.body.categoria_id) : null,
+      destinoEstoque: req.body.destino_estoque || "GERAL",
       userId: req.session.user.id,
     });
 
@@ -203,6 +291,8 @@ function registrarSaida(req, res) {
 }
 
 module.exports = {
+  index,
+  estoqueOperacional,
   recebimentos,
   iniciarRecebimento,
   conferir,
