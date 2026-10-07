@@ -1,6 +1,7 @@
 const db = require("../../database/db");
 const { getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
 const aiEmbeddingsService = require("../ai/ai.embeddings.service");
+const correiasService = require("../correias/correias.service");
 let osServiceCache = null;
 
 function getOSService() {
@@ -488,6 +489,9 @@ function updateExecucaoStatus(planoId, execId, status, dataExecutada, userId = n
 
   const finalizada = ["CONCLUIDA", "EXECUTADA", "FINALIZADA"].includes(statusNorm);
   if (finalizada) {
+    // Planos de correias fazem a baixa física antes de marcar a preventiva como concluída.
+    // Se faltar saldo, a execução permanece aberta e o técnico recebe o erro.
+    correiasService.baixarEstoquePreventiva({ planoId, execId, userId });
     const defaults = {
       descricao_preventiva: "Preventiva executada conforme programação.",
       itens_verificados: "Itens do plano preventivo verificados durante a execução.",
@@ -518,6 +522,7 @@ function updateExecucaoStatus(planoId, execId, status, dataExecutada, userId = n
     Number(planoId)
   );
 
+  if (finalizada) correiasService.agendarProximaExecucao(planoId, execId);
   return true;
 }
 
