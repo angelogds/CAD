@@ -36,15 +36,15 @@ function index(req, res) {
 
   // Resumo gerencial somente leitura, derivado da fonte oficial de recebimentos.
   // Não altera saldos nem gera novos registros de movimentação.
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const registrosGerenciais = service.listRecebimentos({ status: "TODAS", query: "" });
   const pedidosComprados = registrosGerenciais.filter((r) => Number(r.qtd_comprada_total || 0) > 0);
   const painelGerencial = {
     pedidosComprados: pedidosComprados.length,
-    aguardandoRecebimento: pedidosComprados.filter((r) => Number(r.qtd_comprada_total || 0) > Number(r.qtd_recebida_total_agregada || 0)).length,
-    recebidosParcialmente: pedidosComprados.filter((r) => Number(r.qtd_recebida_total_agregada || 0) > 0 && Number(r.qtd_comprada_total || 0) > Number(r.qtd_recebida_total_agregada || 0)).length,
-    atrasados: pedidosComprados.filter((r) => r.previsao_entrega && String(r.previsao_entrega).slice(0,10) < hoje && Number(r.qtd_comprada_total || 0) > Number(r.qtd_recebida_total_agregada || 0)).length,
-    semPrevisao: pedidosComprados.filter((r) => !r.previsao_entrega && Number(r.qtd_comprada_total || 0) > Number(r.qtd_recebida_total_agregada || 0)).length,
+    aguardandoRecebimento: pedidosComprados.filter((r) => Number(r.qtd_pendente_total || 0) > 0).length,
+    recebidosParcialmente: pedidosComprados.filter((r) => Number(r.qtd_recebida_total_agregada || 0) > 0 && Number(r.qtd_pendente_total || 0) > 0).length,
+    atrasados: pedidosComprados.filter((r) => r.previsao_entrega && String(r.previsao_entrega).slice(0,10) < hoje && Number(r.qtd_pendente_total || 0) > 0).length,
+    semPrevisao: pedidosComprados.filter((r) => !r.previsao_entrega && Number(r.qtd_pendente_total || 0) > 0).length,
   };
 
   let compras = service.listRecebimentos({ status: "TODAS", query: qCompra })
