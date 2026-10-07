@@ -6,13 +6,9 @@
 <div class="qr-withdraw-page">
   <header class="reserve-head">
     <div>
-      <span class="eyebrow">ALMOXARIFADO • RETIRADA IDENTIFICADA</span>
-      <h1>Retirada identificada</h1>
-      <p>Identifique o responsável ou colaborador pelo QR ou pelo cadastro, confira a solicitação e entregue somente o material reservado.</p>
-    </div>
-    <div class="reserve-head__actions">
-      <a class="btn btn-ghost" href="/estoque/reservas">Materiais separados</a>
-      <a class="btn btn-ghost" href="/almoxarifado/recebimentos">Recebimentos</a>
+      <span class="eyebrow">ALMOXARIFADO</span>
+      <h1>Retirada</h1>
+      <p aria-label="Identifique o responsável ou colaborador">Identifique quem recebe e confirme o material separado.</p>
     </div>
   </header>
 
@@ -20,7 +16,7 @@
 
   <section class="qr-scan-layout">
     <article class="card qr-scanner-card">
-      <div class="qr-scanner-card__head"><div><h2>1. Identificar responsável</h2><p>Use a câmera, leitor USB ou procure o cadastro do funcionário pelo nome.</p></div></div>
+      <div class="qr-scanner-card__head"><div><h2>1. Identificar</h2><p>QR, leitor ou cadastro.</p></div></div>
       <div class="qr-reader-box"><video id="qrVideo" playsinline muted></video><div id="qrReaderPlaceholder">Câmera desligada</div></div>
       <div class="qr-reader-actions">
         <button class="btn btn-green" id="startQrCamera" type="button">Abrir câmera</button>
@@ -56,7 +52,7 @@
     </article>
 
     <article class="card qr-identity-card">
-      <div><h2>2. Conferir identidade</h2><p class="muted">QR e seleção pelo cadastro são validados no servidor; a entrega continua sendo confirmada pelo almoxarife logado.</p></div>
+      <div><h2>2. Conferir</h2><p class="muted">Confirme a pessoa antes da entrega.</p></div>
       <% if (!codigo && !(pessoaTipo && pessoaId)) { %>
         <div class="qr-identity-empty">Aguardando QR ou seleção de um funcionário.</div>
       <% } else if (!colaborador) { %>
@@ -72,7 +68,7 @@
 
   <section class="card qr-delivery-section">
     <div class="qr-delivery-head">
-      <div><h2>3. Entregar material reservado</h2><p>Baixa vinculada à solicitação, OS, equipamento e identidade de quem recebeu o material.</p></div>
+      <div><h2>3. Entregar</h2><p>Baixa vinculada à solicitação e ao responsável.</p></div>
       <% if (solicitacaoId) { const allParams=new URLSearchParams(); if(codigo)allParams.set('codigo',codigo); if(!codigo&&pessoaTipo&&pessoaId){allParams.set('pessoa_tipo',pessoaTipo);allParams.set('pessoa_id',String(pessoaId));} %><a class="btn btn-ghost" href="/almoxarifado/retiradas/qr?<%=allParams.toString()%>">Ver todas as solicitações</a><% } %>
     </div>
 

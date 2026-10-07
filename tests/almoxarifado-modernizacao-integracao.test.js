@@ -11,7 +11,8 @@ test('almoxarifado usa o fluxo real de retirada do estoque sem duplicar rota avu
   const estoqueRoutes = read('modules', 'estoque', 'estoque.routes.js');
   const almoxRoutes = read('modules', 'almoxarifado', 'almoxarifado.routes.js');
 
-  assert.match(tabs, /\/estoque\/saidas\/nova\?contexto=almoxarifado/);
+  assert.match(tabs, /\/almoxarifado\/retiradas\/qr/);
+  assert.doesNotMatch(tabs, /\/estoque\/saidas\/nova\?contexto=almoxarifado/);
   assert.match(estoqueRoutes, /router\.post\("\/saidas"[\s\S]*almoxCtrl\.registrarSaida/);
   assert.doesNotMatch(almoxRoutes, /post\("\/retiradas"/);
   assert.match(almoxRoutes, /itens\/:itemId\/retirar/);

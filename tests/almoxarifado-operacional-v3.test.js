@@ -19,7 +19,8 @@ test('V3 abre o Almoxarifado em uma central operacional e preserva as rotas ofic
   assert.match(controller, /function estoqueOperacional\(/);
   assert.match(tabs, /Compras a caminho/);
   assert.match(tabs, /Para entregar/);
-  assert.match(tabs, /\/estoque\/saidas\/nova\?contexto=almoxarifado/);
+  assert.match(tabs, /\/almoxarifado\/retiradas\/qr/);
+  assert.doesNotMatch(tabs, /\/estoque\/saidas\/nova\?contexto=almoxarifado/);
 });
 
 test('migration V3 adiciona vínculo opcional ao equipamento e categorias sem saldo paralelo', () => {

@@ -8,18 +8,16 @@
   const itensLivres = itens.filter(item => Number(item.saldo_disponivel || 0) > 0);
 %>
 
-<div class="almox-page almox-flow-page">
+<div class="almox-page almox-flow-page almox-compact-page">
   <header class="almox-hero">
     <div>
-      <span class="almox-hero__eyebrow"><%= isAlmoxContext ? 'ALMOXARIFADO • RETIRADA AVULSA' : 'ESTOQUE • MOVIMENTAÇÃO' %></span>
-      <h1>Retirada de Materiais</h1>
-      <p class="muted">Saída avulsa vinculada a OS ativa. Materiais reservados para solicitações devem ser entregues pelo fluxo da solicitação/QR.</p>
+      <span class="almox-hero__eyebrow"><%= isAlmoxContext ? 'ALMOXARIFADO' : 'ESTOQUE' %></span>
+      <h1>Retirada direta do estoque</h1>
+      <p class="muted">Para material sem reserva. Informe material, quantidade e OS.</p>
     </div>
     <div class="almox-hero__actions">
-      <% if (showAlmoxTabs) { %><a class="btn btn-ghost" href="/almoxarifado/recebimentos">Abrir solicitações</a><% } %>
-      <a class="btn btn-ghost" href="/estoque/reservas">Materiais separados</a>
-      <a class="btn btn-green" href="/almoxarifado/retiradas/qr">Retirada por QR</a>
-      <a class="btn btn-ghost" href="/estoque">Consultar estoque</a>
+      <% if (showAlmoxTabs) { %><a class="btn btn-green" href="/almoxarifado/retiradas/qr">Retirada identificada</a><% } %>
+      <a class="btn btn-ghost" href="<%= isAlmoxContext ? '/almoxarifado/estoque' : '/estoque' %>">Voltar ao estoque</a>
     </div>
   </header>
 
@@ -27,15 +25,8 @@
 
   <div class="almox-warning"><strong>Saldo protegido:</strong> esta tela só pode consumir o saldo livre. Quantidades reservadas para solicitações/OS ficam protegidas no banco até a entrega pelo fluxo de materiais separados.</div>
 
-  <section class="almox-kpis">
-    <article class="almox-kpi"><span class="almox-kpi__label">Itens com saldo livre</span><strong class="almox-kpi__value"><%= itensLivres.length %></strong><span class="almox-kpi__meta">Disponíveis para retirada avulsa</span></article>
-    <article class="almox-kpi almox-kpi--blue"><span class="almox-kpi__label">OS ativas</span><strong class="almox-kpi__value"><%= ordens.length %></strong><span class="almox-kpi__meta">Destinos válidos para retirada avulsa</span></article>
-    <article class="almox-kpi almox-kpi--amber"><span class="almox-kpi__label">Regra da retirada avulsa</span><strong class="almox-kpi__value" style="font-size:1.05rem;">OS obrigatória</strong><span class="almox-kpi__meta">Mantém a rastreabilidade do consumo</span></article>
-    <article class="almox-kpi almox-kpi--slate"><span class="almox-kpi__label">Reservas</span><strong class="almox-kpi__value" style="font-size:1.05rem;">Protegidas</strong><span class="almox-kpi__meta">Não podem ser consumidas aqui</span></article>
-  </section>
-
   <section class="card almox-withdraw-card">
-    <div class="almox-summary-card__head" style="margin-bottom:16px;"><div><div class="almox-summary-card__title">Registrar retirada avulsa</div><div class="almox-subline">Selecione o material, confira o saldo livre e informe a OS que receberá o consumo.</div></div><span class="almox-status almox-status--recebimento">Baixa imediata</span></div>
+    <div class="almox-summary-card__head" style="margin-bottom:12px;"><div><div class="almox-summary-card__title">Registrar retirada</div><div class="almox-subline"><%=itensLivres.length%> item(ns) com saldo livre.</div></div></div>
     <form method="POST" action="/estoque/saidas" class="almox-withdraw-grid" data-lock-submit>
       <% if (isAlmoxContext) { %><input type="hidden" name="contexto" value="almoxarifado" /><% } %><input type="hidden" name="origem" value="<%= origem %>" />
       <div class="almox-field almox-field--full"><label for="almoxStockItem">Item do estoque</label><select id="almoxStockItem" class="input" name="item_id" required data-stock-item-select><option value="">Selecione o material</option><% itens.forEach(item=>{ const livre=Number(item.saldo_disponivel||0), reservado=Number(item.saldo_reservado||0); %><option value="<%=item.id%>" data-balance="<%=livre%>" data-unit="<%=item.unidade||'UN'%>" <%=Number(itemSelecionado)===Number(item.id)?'selected':''%> <%=livre<=0?'disabled':''%>><%=item.codigo?(item.codigo+' • '):''%><%=item.nome%> — livre <%=livre%> <%=item.unidade||'UN'%><%= reservado>0 ? (' • reservado '+reservado) : '' %></option><% }) %></select><div class="almox-stock-hint" data-stock-hint>O valor exibido é o saldo livre: saldo físico menos reservas.</div></div>
