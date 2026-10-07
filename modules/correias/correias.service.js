@@ -22,6 +22,13 @@ function saldoColumn() {
   return hasColumn('estoque_itens','saldo_atual') ? 'saldo_atual' : null;
 }
 
+function reservadoExpr(alias = 'i') {
+  if (!tableExists('estoque_reservas')) return '0';
+  return `COALESCE((SELECT SUM(MAX(r.quantidade_reservada-r.quantidade_retirada,0))
+    FROM estoque_reservas r
+    WHERE r.estoque_item_id=${alias}.id AND r.status<>'CANCELADA'),0)`;
+}
+
 function listEquipamentos() {
   if (!tableExists('equipamentos')) return [];
   const ativo = hasColumn('equipamentos','ativo') ? 'WHERE COALESCE(ativo,1)=1' : '';
@@ -42,6 +49,8 @@ function listCorreiasEstoque() {
   return db.prepare(`
     SELECT i.id,i.codigo,i.nome,i.unidade,
       ${saldo ? `COALESCE(i.${saldo},0)` : '0'} AS saldo_atual,
+      MAX((${saldo ? `COALESCE(i.${saldo},0)` : '0'}) - ${reservadoExpr('i')},0) AS saldo_livre,
+      ${reservadoExpr('i')} AS saldo_reservado,
       ${minimo ? `COALESCE(i.${minimo},0)` : '0'} AS saldo_minimo,
       c.nome categoria_nome,sc.nome subcategoria_nome
     FROM estoque_itens i
@@ -94,6 +103,8 @@ function listPlanos(filters = {}) {
       e.nome equipamento_nome,COALESCE(e.codigo,'') equipamento_codigo,COALESCE(e.setor,'') setor,
       i.nome correia_nome,i.codigo correia_codigo,i.unidade,
       COALESCE(i.saldo_atual,0) saldo_atual,
+      ${reservadoExpr('i')} saldo_reservado,
+      MAX(COALESCE(i.saldo_atual,0)-${reservadoExpr('i')},0) saldo_livre,
       COALESCE((SELECT MIN(pe.data_prevista) FROM preventiva_execucoes pe
         WHERE pe.plano_id=p.id AND UPPER(COALESCE(pe.status,'')) IN ('PENDENTE','ATRASADA','EM_ANDAMENTO')),NULL) proxima_execucao,
       COALESCE((SELECT MAX(pe.data_executada) FROM preventiva_execucoes pe
@@ -109,12 +120,12 @@ function listPlanos(filters = {}) {
     const porTroca = Number(row.quantidade_material || 1);
     const conjuntos = Math.max(Number(row.estoque_minimo_conjuntos || 1),1);
     const minimo = porTroca * conjuntos;
-    const saldo = Number(row.saldo_atual || 0);
+    const saldoLivre = Number(row.saldo_livre ?? row.saldo_atual ?? 0);
     return {
       ...row,
       estoque_minimo_calculado:minimo,
-      conjuntos_disponiveis: porTroca > 0 ? Math.floor(saldo / porTroca) : 0,
-      estoque_status: saldo < minimo ? 'CRITICO' : 'OK',
+      conjuntos_disponiveis: porTroca > 0 ? Math.floor(saldoLivre / porTroca) : 0,
+      estoque_status: saldoLivre < minimo ? 'CRITICO' : 'OK',
     };
   });
 }
@@ -241,7 +252,9 @@ function getPlanoContext(planoId) {
     SELECT p.id,p.equipamento_id,p.estoque_item_id,p.quantidade_material,p.estoque_minimo_conjuntos,
       p.baixa_estoque_automatica,p.tipo_plano,
       e.nome equipamento_nome,i.nome correia_nome,i.codigo correia_codigo,i.unidade,
-      COALESCE(i.saldo_atual,0) saldo_atual
+      COALESCE(i.saldo_atual,0) saldo_atual,
+      ${reservadoExpr('i')} saldo_reservado,
+      MAX(COALESCE(i.saldo_atual,0)-${reservadoExpr('i')},0) saldo_livre
     FROM preventiva_planos p
     LEFT JOIN equipamentos e ON e.id=p.equipamento_id
     LEFT JOIN estoque_itens i ON i.id=p.estoque_item_id
@@ -250,7 +263,7 @@ function getPlanoContext(planoId) {
   if (!row || String(row.tipo_plano||'').toUpperCase()!=='TROCA_CORREIA') return null;
   const quantidade = Number(row.quantidade_material||1);
   const minimo = quantidade*Math.max(Number(row.estoque_minimo_conjuntos||1),1);
-  return {...row,estoque_minimo_calculado:minimo,estoque_status:Number(row.saldo_atual||0)<minimo?'CRITICO':'OK'};
+  return {...row,estoque_minimo_calculado:minimo,estoque_status:Number(row.saldo_livre ?? row.saldo_atual ?? 0)<minimo?'CRITICO':'OK'};
 }
 
 function baixarEstoquePreventiva({ planoId, execId, userId = null }) {
@@ -265,11 +278,15 @@ function baixarEstoquePreventiva({ planoId, execId, userId = null }) {
     if (!exec) throw new Error('Execução preventiva não encontrada.');
     if (exec.estoque_movimento_id) return { movimentoId:Number(exec.estoque_movimento_id), skipped:true };
 
-    const item = db.prepare('SELECT id,nome,unidade,COALESCE(saldo_atual,0) saldo_atual FROM estoque_itens WHERE id=? AND ativo=1').get(Number(plano.estoque_item_id));
+    const item = db.prepare(`SELECT id,nome,unidade,COALESCE(saldo_atual,0) saldo_atual,
+      ${reservadoExpr('estoque_itens')} saldo_reservado
+      FROM estoque_itens WHERE id=? AND ativo=1`).get(Number(plano.estoque_item_id));
     if (!item) throw new Error('Correia vinculada não encontrada no estoque.');
     const anterior = Number(item.saldo_atual||0);
-    if (anterior < quantidade) {
-      throw new Error(`Estoque insuficiente para concluir a troca. Necessário: ${quantidade} ${item.unidade||'UN'}; disponível: ${anterior}.`);
+    const reservado = Number(item.saldo_reservado||0);
+    const livre = Math.max(anterior-reservado,0);
+    if (livre < quantidade) {
+      throw new Error(`Estoque livre insuficiente para concluir a troca. Necessário: ${quantidade} ${item.unidade||'UN'}; livre: ${livre}; reservado: ${reservado}.`);
     }
     const posterior = anterior-quantidade;
     const updated = db.prepare("UPDATE estoque_itens SET saldo_atual=?,updated_at=datetime('now') WHERE id=? AND COALESCE(saldo_atual,0)=?").run(posterior,item.id,anterior);
