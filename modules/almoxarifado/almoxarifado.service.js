@@ -34,6 +34,8 @@ const HAS_MOV_CUSTO_UNIT = hasColumn("estoque_movimentos", "custo_unit");
 const HAS_ITEM_VALOR_UNITARIO = hasColumn("solicitacao_itens", "valor_unitario_centavos");
 const HAS_ESTOQUE_SETOR = hasColumn("estoque_itens", "setor_utilizacao");
 const HAS_ESTOQUE_CENTRO_CUSTO = hasColumn("estoque_itens", "subarea_centro_custo");
+const HAS_ESTOQUE_CATEGORIA_ID = hasColumn("estoque_itens", "categoria_id");
+const HAS_ESTOQUE_EQUIPAMENTO_ID = hasColumn("estoque_itens", "equipamento_id");
 const HAS_MOV_SETOR = hasColumn("estoque_movimentos", "setor_utilizacao");
 const HAS_MOV_CENTRO_CUSTO = hasColumn("estoque_movimentos", "subarea_centro_custo");
 
@@ -343,6 +345,15 @@ function resolveLocal(localId) {
   return Number(row.id);
 }
 
+function resolveCategoria(categoriaId) {
+  const id = Number(categoriaId || 0);
+  if (!id || !HAS_ESTOQUE_CATEGORIA_ID || !tableExists("estoque_categorias")) return null;
+  const ativoFilter = hasColumn("estoque_categorias", "ativo") ? "AND ativo=1" : "";
+  const row = db.prepare(`SELECT id FROM estoque_categorias WHERE id=? ${ativoFilter}`).get(id);
+  if (!row) throw new Error("Categoria de estoque inválida ou inativa.");
+  return Number(row.id);
+}
+
 function normalizeSetorEstoque(value) {
   const raw = String(value || '').trim();
   if (!raw) return 'COMUM';
@@ -351,36 +362,87 @@ function normalizeSetorEstoque(value) {
 }
 
 function resolveEstoqueItem(item, solicitacaoId, localId, contexto = {}) {
+  const dedicatedEquipmentId = contexto.destinoEstoque === 'EQUIPAMENTO' && HAS_ESTOQUE_EQUIPAMENTO_ID
+    ? Number(contexto.equipamentoId || 0) || null
+    : null;
+  const categoriaId = contexto.categoriaId ? Number(contexto.categoriaId) : null;
+
+  function updateClassification(estoqueItemId) {
+    const updates = [];
+    const vals = [];
+    if (HAS_ESTOQUE_SETOR && contexto.setor) {
+      updates.push("setor_utilizacao=CASE WHEN setor_utilizacao IS NULL OR TRIM(setor_utilizacao)='' OR setor_utilizacao='COMUM' THEN ? ELSE setor_utilizacao END");
+      vals.push(normalizeSetorEstoque(contexto.setor));
+    }
+    if (HAS_ESTOQUE_CENTRO_CUSTO && contexto.centroCusto) {
+      updates.push("subarea_centro_custo=COALESCE(NULLIF(TRIM(subarea_centro_custo),''),?)");
+      vals.push(String(contexto.centroCusto).trim());
+    }
+    if (HAS_ESTOQUE_CATEGORIA_ID && categoriaId) {
+      updates.push("categoria_id=?");
+      vals.push(categoriaId);
+    }
+    if (HAS_LOCAL_ID && localId) {
+      updates.push("local_id=COALESCE(local_id,?)");
+      vals.push(localId);
+    }
+    if (HAS_ESTOQUE_EQUIPAMENTO_ID) {
+      updates.push("equipamento_id=?");
+      vals.push(dedicatedEquipmentId);
+    }
+    if (updates.length) {
+      vals.push(Number(estoqueItemId));
+      db.prepare(`UPDATE estoque_itens SET ${updates.join(',')},updated_at=datetime('now') WHERE id=?`).run(...vals);
+    }
+  }
+
   if (item.estoque_item_id) {
-    const linked = db.prepare("SELECT id FROM estoque_itens WHERE id=? AND ativo=1").get(Number(item.estoque_item_id));
+    const linked = db.prepare(`SELECT id,
+      ${HAS_ESTOQUE_EQUIPAMENTO_ID ? "equipamento_id" : "NULL AS equipamento_id"},
+      ${HAS_SALDO_ATUAL ? "COALESCE(saldo_atual,0)" : "0"} AS saldo_atual
+      FROM estoque_itens WHERE id=? AND ativo=1`).get(Number(item.estoque_item_id));
     if (linked) {
-      const updates = [];
-      const vals = [];
-      if (HAS_ESTOQUE_SETOR && contexto.setor) { updates.push("setor_utilizacao=CASE WHEN setor_utilizacao IS NULL OR TRIM(setor_utilizacao)='' OR setor_utilizacao='COMUM' THEN ? ELSE setor_utilizacao END"); vals.push(normalizeSetorEstoque(contexto.setor)); }
-      if (HAS_ESTOQUE_CENTRO_CUSTO && contexto.centroCusto) { updates.push("subarea_centro_custo=COALESCE(NULLIF(TRIM(subarea_centro_custo),''),?)"); vals.push(String(contexto.centroCusto).trim()); }
-      if (updates.length) { vals.push(Number(item.estoque_item_id)); db.prepare(`UPDATE estoque_itens SET ${updates.join(',')},updated_at=datetime('now') WHERE id=?`).run(...vals); }
-      return Number(item.estoque_item_id);
+      const linkedEquipmentId = Number(linked.equipamento_id || 0) || null;
+      const compatible = dedicatedEquipmentId
+        ? linkedEquipmentId === dedicatedEquipmentId || (!linkedEquipmentId && Number(linked.saldo_atual || 0) <= 0)
+        : !linkedEquipmentId;
+      if (compatible) {
+        updateClassification(linked.id);
+        return Number(linked.id);
+      }
     }
   }
 
   const nome = String(item.item_nome || item.item_descricao || item.descricao || `Item ${item.id}`).trim();
   const unidade = String(item.unidade || "UN").trim().toUpperCase();
+  const equipmentWhere = HAS_ESTOQUE_EQUIPAMENTO_ID
+    ? (dedicatedEquipmentId ? "AND equipamento_id=?" : "AND equipamento_id IS NULL")
+    : "";
+  const params = [nome, unidade];
+  if (dedicatedEquipmentId && HAS_ESTOQUE_EQUIPAMENTO_ID) params.push(dedicatedEquipmentId);
   const matches = db.prepare(`
     SELECT id FROM estoque_itens
     WHERE ativo=1
       AND LOWER(TRIM(nome))=LOWER(TRIM(?))
       AND UPPER(TRIM(COALESCE(unidade,'UN')))=?
+      ${equipmentWhere}
     ORDER BY id
     LIMIT 2
-  `).all(nome, unidade);
-  if (matches.length === 1) return Number(matches[0].id);
+  `).all(...params);
+  if (matches.length === 1) {
+    updateClassification(matches[0].id);
+    db.prepare("UPDATE solicitacao_itens SET estoque_item_id=? WHERE id=?").run(Number(matches[0].id), item.id);
+    return Number(matches[0].id);
+  }
 
   const cols = ["codigo", "nome", "unidade"];
-  const vals = [`CMP-${solicitacaoId}-${item.id}`, nome, unidade];
+  const vals = [`CMP-${solicitacaoId}-${item.id}-${dedicatedEquipmentId || 'GERAL'}`, nome, unidade];
   if (HAS_SALDO_ATUAL) { cols.push("saldo_atual"); vals.push(0); }
   if (HAS_LOCAL_ID && localId) { cols.push("local_id"); vals.push(localId); }
+  if (HAS_ESTOQUE_CATEGORIA_ID && categoriaId) { cols.push("categoria_id"); vals.push(categoriaId); }
   if (HAS_ESTOQUE_SETOR) { cols.push("setor_utilizacao"); vals.push(normalizeSetorEstoque(contexto.setor)); }
   if (HAS_ESTOQUE_CENTRO_CUSTO && contexto.centroCusto) { cols.push("subarea_centro_custo"); vals.push(String(contexto.centroCusto).trim()); }
+  if (HAS_ESTOQUE_EQUIPAMENTO_ID) { cols.push("equipamento_id"); vals.push(dedicatedEquipmentId); }
   if (hasColumn("estoque_itens", "ativo")) { cols.push("ativo"); vals.push(1); }
   const info = db.prepare(`INSERT INTO estoque_itens (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(...vals);
   const estoqueItemId = Number(info.lastInsertRowid);
@@ -403,7 +465,7 @@ function insertEstoqueMovimento(data) {
   return Number(info.lastInsertRowid);
 }
 
-function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, userId }) {
+function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, categoriaId, destinoEstoque = 'GERAL', userId }) {
   const quantidade = Number(qtdAgora || 0);
   if (!(quantidade > 0)) throw new Error("Quantidade deve ser maior que zero.");
 
@@ -430,9 +492,20 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, use
     }
 
     const resolvedLocalId = resolveLocal(localId);
+    const resolvedCategoriaId = resolveCategoria(categoriaId);
+    const resolvedDestinoEstoque = String(destinoEstoque || 'GERAL').trim().toUpperCase() === 'EQUIPAMENTO' ? 'EQUIPAMENTO' : 'GERAL';
+    if (resolvedDestinoEstoque === 'EQUIPAMENTO' && !Number(solicitacao.equipamento_id || 0)) {
+      throw new Error("Para estoque dedicado, a solicitação precisa estar vinculada a um equipamento.");
+    }
     const setorDestino = hasColumn('solicitacoes','setor_origem') ? normalizeSetorEstoque(solicitacao.setor_origem) : 'COMUM';
     const centroCustoDestino = hasColumn('solicitacoes','subarea_destino') ? solicitacao.subarea_destino : null;
-    const estoqueItemId = resolveEstoqueItem(item, solicitacaoId, resolvedLocalId, { setor: setorDestino, centroCusto: centroCustoDestino });
+    const estoqueItemId = resolveEstoqueItem(item, solicitacaoId, resolvedLocalId, {
+      setor: setorDestino,
+      centroCusto: centroCustoDestino,
+      categoriaId: resolvedCategoriaId,
+      destinoEstoque: resolvedDestinoEstoque,
+      equipamentoId: solicitacao.equipamento_id || null,
+    });
     if (HAS_LOCAL_ID && resolvedLocalId) {
       db.prepare("UPDATE estoque_itens SET local_id=COALESCE(local_id,?), updated_at=datetime('now') WHERE id=?")
         .run(resolvedLocalId, estoqueItemId);
