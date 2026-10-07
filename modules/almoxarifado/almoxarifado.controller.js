@@ -97,8 +97,22 @@ function estoqueOperacional(req, res) {
     setoresEstoque: estoqueService.SETORES_ESTOQUE,
     equipamentos: estoqueService.listEquipamentosEstoque(),
     filtros,
+    canManage: canManageAlmox(req.session.user),
     canWithdraw: canWithdrawStock(req.session.user),
   });
+}
+
+function classificarEstoqueItem(req, res) {
+  try {
+    estoqueService.updateItemClassification(Number(req.params.itemId), req.body || {});
+    req.flash("success", "Categoria e endereço físico do material atualizados.");
+  } catch (error) {
+    req.flash("error", error.message || "Não foi possível organizar o item do estoque.");
+  }
+  const params = new URLSearchParams();
+  if (req.body.retorno_q) params.set("q", String(req.body.retorno_q));
+  if (req.body.retorno_categoria_id) params.set("categoria_id", String(req.body.retorno_categoria_id));
+  return res.redirect(`/almoxarifado/estoque?${params.toString()}`);
 }
 
 function publicarMaterialDisponivel({ solicitacaoId, itemId, quantidadeRecebida, resultado }) {
@@ -303,6 +317,7 @@ function registrarSaida(req, res) {
 module.exports = {
   index,
   estoqueOperacional,
+  classificarEstoqueItem,
   recebimentos,
   iniciarRecebimento,
   conferir,
