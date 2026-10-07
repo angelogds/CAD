@@ -5,6 +5,7 @@ const { ACCESS } = require("../../config/rbac");
 const ctrl = require("./pcm.controller");
 const preventivasCtrl = require("../preventivas/preventivas.controller");
 const ferramentalCtrl = require("../ferramental/ferramental.controller");
+const correiasCtrl = require("../correias/correias.controller");
 
 const PCM_ACCESS = ACCESS.pcm;
 const PCM_MANAGE = ACCESS.pcm_manage;
@@ -44,6 +45,8 @@ router.get("/dashboard-gerencial/configurar", requireLogin, requireRole(DIRETORI
 
 router.get("/planejamento", requireLogin, requireRole(PCM_ACCESS), ctrl.planejamento);
 router.get("/preventivas", requireLogin, requireRole(PCM_ACCESS), ctrl.preventivas);
+router.get("/correias", requireLogin, requireRole(PCM_ACCESS), correiasCtrl.index);
+router.post("/correias/planos", requireLogin, requireRole(PCM_MANAGE), correiasCtrl.create);
 router.get("/preventivas/nova", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.newForm);
 router.post("/preventivas", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.create);
 router.get("/preventivas/eleger-mecanico", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.elegerMecanicoForm);
