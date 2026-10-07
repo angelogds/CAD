@@ -116,6 +116,38 @@ function classificarEstoqueItem(req, res) {
   return res.redirect(`/almoxarifado/estoque?${params.toString()}`);
 }
 
+function inventarioArmazemFardo(req, res) {
+  const localFardo = estoqueService.getLocalArmazemFardo();
+  return res.render("almoxarifado/inventario_armazem_fardo", {
+    title: "Inventário do Armazém Fardo",
+    activeMenu: "almoxarifado",
+    tab: "estoque",
+    itens: estoqueService.listItens(),
+    categorias: estoqueService.listCategorias(),
+    subcategorias: estoqueService.listSubcategorias(),
+    locais: estoqueService.listLocais(),
+    equipamentos: estoqueService.listEquipamentosEstoque(),
+    setoresEstoque: estoqueService.SETORES_ESTOQUE,
+    localFardo,
+  });
+}
+
+function salvarInventarioArmazemFardo(req, res) {
+  try {
+    const resultado = estoqueService.registrarInventarioFisico(req.body || {}, req.session.user || {});
+    const acao = resultado.created ? "cadastrado" : "ajustado";
+    const diferenca = Number(resultado.diferenca || 0);
+    const complemento = diferenca === 0
+      ? "A contagem já correspondia ao saldo do sistema."
+      : `Saldo alterado de ${resultado.saldoAnterior} para ${resultado.saldoAtual}.`;
+    req.flash("success", `Material ${acao} no inventário do Armazém Fardo. ${complemento}`);
+    return res.redirect(`/estoque/itens/${resultado.itemId}`);
+  } catch (error) {
+    req.flash("error", error.message || "Não foi possível registrar o inventário físico.");
+    return res.redirect("/almoxarifado/estoque/inventario");
+  }
+}
+
 function publicarMaterialDisponivel({ solicitacaoId, itemId, quantidadeRecebida, resultado }) {
   try {
     const sol = service.getSolicitacao(solicitacaoId);
@@ -319,6 +351,8 @@ module.exports = {
   index,
   estoqueOperacional,
   classificarEstoqueItem,
+  inventarioArmazemFardo,
+  salvarInventarioArmazemFardo,
   recebimentos,
   iniciarRecebimento,
   conferir,
