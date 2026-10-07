@@ -41,7 +41,7 @@
 
   <%- include('_tabs', { tab: isCompraView ? 'compras' : 'recebimentos' }) %>
 
-  <section class="almox-flow-toolbar almox-compact-toolbar">
+  <section class="almox-flow-toolbar almox-compact-toolbar almox-kpis-compact">
     <div class="almox-filter-chips" aria-label="Filtrar solicitações do Almoxarifado">
       <a class="almox-chip <%= status === 'TODAS' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=TODAS<%= querySuffix %>">Todas <span class="almox-chip__count"><%= resumo.total_fluxo %></span></a>
       <a class="almox-chip <%= status === 'EM_COTACAO' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=EM_COTACAO<%= querySuffix %>">Cotação <span class="almox-chip__count"><%= resumo.em_cotacao %></span></a>
@@ -60,7 +60,7 @@
     </form>
   </section>
 
-  <section class="card almox-request-card almox-compact-card">
+  <section class="card almox-request-card almox-compact-card" aria-label="Solicitações no Almoxarifado">
     <% if (!lista.length) { %>
       <div class="almox-empty"><strong>Nenhuma solicitação encontrada.</strong><div class="almox-subline">Ajuste o filtro ou a pesquisa.</div></div>
     <% } else { %>
@@ -80,6 +80,7 @@
           const comprados=Number(s.qtd_comprada_total||0);
           const recebidos=Number(s.qtd_recebida_total_agregada||0);
           const isCotacao=s.status === 'EM_COTACAO';
+          const receivedComplete=s.status === 'RECEBIDA_TOTAL';
           const pct=isCotacao ? Number(s.cotacao_pct||0) : Number(s.progresso_pct||0);
           const andamento=isCotacao
             ? `${cotados}/${total} cotado(s)`
@@ -106,7 +107,7 @@
                 <strong><%= andamento %></strong>
                 <span><%= pct %>%</span>
               </div>
-              <div class="almox-compact-progress__track"><i style="width:<%= pct %>%"></i></div>
+              <div class="almox-compact-progress__track <%= receivedComplete ? 'is-complete' : '' %>" title="<%= total %> solicitados • <%= cotados %> cotados • <%= Number(s.itens_comprados||0) %> comprados • <%= recebidos %> recebidos"><i style="width:<%= pct %>%"></i></div>
               <% if(Number(s.qtd_pendente_total||0)>0 && !isCotacao){ %><small><%= Number(s.qtd_pendente_total||0) %> pendente(s)</small><% } %>
             </div>
 
