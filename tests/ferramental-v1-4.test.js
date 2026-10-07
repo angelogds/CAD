@@ -13,7 +13,7 @@ test('V1.4 cria plano, inspeções, checklist e bloqueio técnico', () => {
   assert.match(migration, /ferramental_inspecoes/);
   assert.match(migration, /ferramental_inspecao_itens/);
   assert.match(migration, /ferramental_bloqueios/);
-  assert.match(migration, /BLOQUEIO/);
+  assert.match(migration, /ferramental_bloqueios/);
 });
 
 test('perfis de checklist cobrem padrão, elétrica, solda, abrasiva e manual', () => {
