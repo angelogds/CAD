@@ -1,6 +1,7 @@
 const pdf = require('../../utils/pdf-standard');
 const service = require('./ferramental.service');
 const aceiteService = require('./ferramental.aceite.service');
+const inventarioService = require('./ferramental.inventario.service');
 
 function statusText(value) {
   const map = {
@@ -72,6 +73,9 @@ function signatureBlock(doc, label, meta) {
 function generateTeamPdf(teamId) {
   const data = service.getTeamSheet(teamId);
   const aceites = aceiteService.teamAcceptances(teamId);
+  const conferencias = inventarioService.listDashboard().inventories
+    .filter((item) => Number(item.equipe_id) === Number(teamId))
+    .slice(0, 5);
   const meta = {
     title: 'Ficha de Responsabilidade de Ferramental',
     subtitle: 'Campo do Gado • Manutenção Industrial • PCM',
@@ -118,6 +122,21 @@ function generateTeamPdf(teamId) {
       });
     }
 
+    pdf.sectionBand(doc, 'Conferências periódicas V1.2', meta);
+    if (!conferencias.length) {
+      pdf.textBox(doc, 'Nenhuma conferência periódica registrada para esta equipe.', meta);
+    } else {
+      conferencias.forEach((inv) => {
+        const total = Number(inv.total_itens || 0);
+        const done = Number(inv.conferidos || 0);
+        pdf.textBox(doc, [
+          `${inv.codigo} • ${inv.titulo}`,
+          `Status: ${inv.status} • Progresso: ${done}/${total} • Divergências: ${Number(inv.divergencias || 0)}`,
+          inv.data_limite ? `Data limite: ${new Date(inv.data_limite + 'T12:00:00').toLocaleDateString('pt-BR')}` : 'Sem data limite definida',
+        ].join('\n'), meta, { fill: pdf.COLORS.white, fontSize: 8.3 });
+      });
+    }
+
     pdf.sectionBand(doc, 'Termo de responsabilidade', meta);
     pdf.textBox(
       doc,
@@ -136,6 +155,7 @@ function generateTeamPdf(teamId) {
 function generateUserPdf(userId) {
   const data = service.getUserSheet(userId);
   const aceites = aceiteService.listOwnAcceptances(userId);
+  const conferencias = inventarioService.listOwn(userId);
   const confirmados = aceites.filter((item) => item.status === 'ACEITO').length;
   const pendentes = aceites.filter((item) => item.status === 'PENDENTE').length;
   const divergencias = aceites.filter((item) => item.status === 'RECUSADO').length;
@@ -156,6 +176,7 @@ function generateUserPdf(userId) {
       { label: 'Confirmados', value: String(confirmados) },
       { label: 'Pendentes', value: String(pendentes) },
       { label: 'Divergências', value: String(divergencias) },
+      { label: 'Conferências pendentes', value: String(conferencias.filter((item) => item.situacao === 'PENDENTE').length) },
     ], meta, { columns: 2 });
 
     if (!data.equipes.length) {
@@ -189,6 +210,19 @@ function generateUserPdf(userId) {
           `${aceite.codigo_interno} • ${aceite.descricao}`,
           `Status: ${acceptanceStatusText(aceite.status)} • Data/hora: ${formatDateTime(when)}`,
           detail,
+        ].join('\n'), meta, { fill: pdf.COLORS.white, fontSize: 8.3 });
+      });
+    }
+
+    pdf.sectionBand(doc, 'Conferências V1.2 em andamento', meta);
+    if (!conferencias.length) {
+      pdf.textBox(doc, 'Nenhuma conferência periódica aberta para o colaborador.', meta);
+    } else {
+      conferencias.forEach((item) => {
+        pdf.textBox(doc, [
+          `${item.inventario_codigo} • ${item.codigo_interno} • ${item.descricao}`,
+          `Situação: ${String(item.situacao || '-').replaceAll('_', ' ')} • Data: ${formatDateTime(item.conferido_em)}`,
+          item.observacao ? `Observação: ${item.observacao}` : 'Sem observação registrada.',
         ].join('\n'), meta, { fill: pdf.COLORS.white, fontSize: 8.3 });
       });
     }
