@@ -110,6 +110,8 @@ test('conclusão da troca baixa estoque, é idempotente e bloqueia saldo insufic
   assert.match(service, /Estoque livre insuficiente para concluir a troca/);
   assert.match(service, /saldo_reservado/);
   assert.match(service, /saldo_livre/);
+  assert.match(service, /saldoLivreSql/);
+  assert.match(service, /reservadoExpr/);
   assert.match(service, /estoque_movimento_id/);
   assert.match(service, /if \(exec\.estoque_movimento_id\)/);
   assert.match(service, /saldo_anterior/);
