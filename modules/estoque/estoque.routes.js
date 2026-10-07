@@ -10,6 +10,7 @@ router.get("/reservas", requireLogin, requireRole(ACCESS.estoque_view), reservas
 router.get("/itens", requireLogin, requireRole(ACCESS.estoque_view), ctrl.itens);
 router.get("/itens/novo", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.novoItem);
 router.post("/itens", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.criarItem);
+router.post("/itens/classificacao", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.atualizarClassificacao);
 router.get("/itens/:id", requireLogin, requireRole(ACCESS.estoque_view), ctrl.detalheItem);
 router.get("/categorias", requireLogin, requireRole(ACCESS.estoque_view), ctrl.categorias);
 router.post("/categorias", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.criarCategoria);

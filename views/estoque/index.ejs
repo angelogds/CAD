@@ -54,20 +54,30 @@
 
   <section class="stock-intelligence-grid">
     <article class="card"><div class="stock-table-head"><div><h2>Materiais mais rotacionados</h2><p>Ranking por saídas reais dos últimos 90 dias.</p></div></div>
-      <div class="stock-ranking"><% inteligencia.maisRotacionados.forEach((i,idx)=>{ %><div><span>#<%=idx+1%></span><strong><%=i.nome%></strong><small><%=i.setor_utilizacao_exibicao%> • <%=Number(i.consumo_90d||0).toFixed(2)%> <%=i.unidade||'UN'%> / 90d</small></div><% }) %></div>
+      <div class="stock-ranking stock-ranking--compact"><% inteligencia.maisRotacionados.slice(0,6).forEach((i,idx)=>{ %><div><span>#<%=idx+1%></span><strong><%=i.nome%></strong><small><%=i.setor_utilizacao_exibicao%> • <%=Number(i.consumo_90d||0).toFixed(2)%> <%=i.unidade||'UN'%> / 90d</small></div><% }) %></div>
     </article>
     <article class="card"><div class="stock-table-head"><div><h2>Atenção de reposição</h2><p>Baseado em saldo mínimo e cobertura estimada pelo consumo.</p></div></div>
-      <div class="stock-ranking"><% [...inteligencia.criticos,...inteligencia.programar].slice(0,10).forEach(i=>{ %><div><span class="stock-reorder-badge"><%=reposicaoLabel(i.reposicao_status)%></span><strong><%=i.nome%></strong><small>Saldo <%=Number(i.saldo_disponivel||i.saldo_atual||0).toFixed(2)%> • mínimo <%=Number(i.saldo_minimo||0).toFixed(2)%><% if(i.cobertura_dias_calc!==null){ %> • cobertura <%=Math.round(i.cobertura_dias_calc)%> dias<% } %></small></div><% }) %></div>
+      <div class="stock-ranking stock-ranking--compact"><% [...inteligencia.criticos,...inteligencia.programar].slice(0,6).forEach(i=>{ %><div><span class="stock-reorder-badge"><%=reposicaoLabel(i.reposicao_status)%></span><strong><%=i.nome%></strong><small>Saldo <%=Number(i.saldo_disponivel||i.saldo_atual||0).toFixed(2)%> • mínimo <%=Number(i.saldo_minimo||0).toFixed(2)%><% if(i.cobertura_dias_calc!==null){ %> • cobertura <%=Math.round(i.cobertura_dias_calc)%> dias<% } %></small></div><% }) %></div>
     </article>
   </section>
+
+  <% if(canManage){ %>
+  <form id="bulkClassForm" method="POST" action="/estoque/itens/classificacao" class="stock-bulk-bar">
+    <div><strong>Classificar materiais</strong><span id="bulkCount">0 selecionados</span></div>
+    <select class="input" name="setor_utilizacao" required><option value="">Escolha o setor</option><% setoresEstoque.forEach(s=>{ %><option value="<%=s%>"><%=s%></option><% }) %></select>
+    <input class="input" name="subarea_centro_custo" list="centrosCusto" placeholder="Subárea / centro de custo (opcional)" />
+    <button class="btn btn-green" type="submit" disabled id="bulkSubmit">Aplicar aos selecionados</button>
+  </form>
+  <% } %>
 
   <section class="card stock-table-card">
     <div class="stock-table-head"><div><h2>Materiais em estoque</h2><p>Catálogo por utilização, saldo e histórico real de consumo.</p></div><span><%= itens.length %> item(ns)</span></div>
     <% if(!itens.length){ %><div class="almox-empty"><strong>Nenhum material encontrado.</strong><div class="almox-subline">Revise os filtros ou cadastre um novo item.</div></div><% } else { %>
       <div class="stock-table-wrap stock-table-wrap--sector">
-        <div class="stock-table-columns stock-table-columns--sector" aria-hidden="true"><span>Material</span><span>Utilização</span><span>Categoria / Local</span><span>Disponível</span><span>Mínimo</span><span>Consumo 90d</span><span>Rotação</span><span>Último movimento</span><span>Reposição</span><span>Ações</span></div>
+        <div class="stock-table-columns stock-table-columns--sector <%=canManage?'has-select':''%>" aria-hidden="true"><% if(canManage){ %><span><input type="checkbox" id="selectAllStock" aria-label="Selecionar todos"></span><% } %><span>Material</span><span>Utilização</span><span>Categoria / Local</span><span>Disponível</span><span>Mínimo</span><span>Consumo 90d</span><span>Rotação</span><span>Último movimento</span><span>Reposição</span><span>Ações</span></div>
         <% itens.forEach(item=>{ const state=stockState(item); %>
-          <article class="stock-table-row stock-table-row--sector">
+          <article class="stock-table-row stock-table-row--sector <%=canManage?'has-select':''%>">
+            <% if(canManage){ %><div class="stock-select-cell"><input form="bulkClassForm" class="stock-item-check" type="checkbox" name="item_ids" value="<%=item.id%>" aria-label="Selecionar <%=item.nome%>"></div><% } %>
             <div data-label="Material"><small><%= item.codigo || 'Sem código' %></small><strong><%= item.nome %></strong><span><%= item.unidade || 'UN' %></span></div>
             <div data-label="Utilização"><strong><%= item.setor_utilizacao_exibicao || 'COMUM' %></strong><span><%= item.centro_custo_exibicao || 'Sem centro de custo' %></span></div>
             <div data-label="Categoria / Local"><strong><%= item.categoria_nome || 'Sem categoria' %></strong><span><%= item.local_nome || 'Local não definido' %></span></div>
@@ -84,3 +94,22 @@
     <% } %>
   </section>
 </div>
+
+<script>
+(function(){
+  const all=document.getElementById('selectAllStock');
+  const checks=[...document.querySelectorAll('.stock-item-check')];
+  const count=document.getElementById('bulkCount');
+  const submit=document.getElementById('bulkSubmit');
+  if(!checks.length||!count||!submit)return;
+  function sync(){
+    const n=checks.filter(c=>c.checked).length;
+    count.textContent=n+' selecionado'+(n===1?'':'s');
+    submit.disabled=n===0;
+    if(all){ all.checked=n===checks.length; all.indeterminate=n>0&&n<checks.length; }
+  }
+  checks.forEach(c=>c.addEventListener('change',sync));
+  if(all)all.addEventListener('change',()=>{checks.forEach(c=>c.checked=all.checked);sync();});
+  sync();
+})();
+</script>
