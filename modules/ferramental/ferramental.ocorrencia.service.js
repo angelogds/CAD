@@ -26,6 +26,22 @@ function nextCode() {
 }
 
 
+
+function assertNoOperationalUse(toolId) {
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ferramental_usos'").get();
+  if (!exists) return;
+  const active = db.prepare(`
+    SELECT u.codigo, usr.name AS usuario_nome
+    FROM ferramental_usos u
+    JOIN users usr ON usr.id=u.retirado_por_user_id
+    WHERE u.ferramenta_id=? AND u.status='EM_USO'
+    LIMIT 1
+  `).get(int(toolId));
+  if (active) {
+    throw new Error(`Ferramenta em uso por ${active.usuario_nome} (${active.codigo}). Registre a devolução operacional antes do tratamento PCM.`);
+  }
+}
+
 function activeInspectionBlock(toolId) {
   const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ferramental_bloqueios'").get();
   if (!exists) return null;
@@ -362,6 +378,7 @@ function resolveOccurrence(occurrenceId, actorUserId, data = {}) {
   const allowedFollowup = new Set(['RETORNAR_DISPONIVEL','MARCAR_DANIFICADA','BAIXAR']);
   const allowed = occurrence.status === 'EM_ACOMPANHAMENTO' ? allowedFollowup : allowedInitial;
   if (!allowed.has(action)) throw new Error('Ação de tratamento inválida para o estado atual da ocorrência.');
+  if (!['SEM_ACAO','CANCELAR'].includes(action)) assertNoOperationalUse(occurrence.ferramenta_id);
 
   return db.transaction(() => {
     let nextStatus = 'RESOLVIDA';

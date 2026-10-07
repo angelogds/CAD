@@ -4,6 +4,7 @@ const aceiteService = require('./ferramental.aceite.service');
 const inventarioService = require('./ferramental.inventario.service');
 const ocorrenciaService = require('./ferramental.ocorrencia.service');
 const inspecaoService = require('./ferramental.inspecao.service');
+const v2Service = require('./ferramental.v2.service');
 
 function statusText(value) {
   const map = {
@@ -85,6 +86,9 @@ function generateTeamPdf(teamId) {
     ...item,
     situacaoInspecao: inspecaoService.toolInspectionStatus(item.id),
   }));
+  const teamToolIds = new Set(data.ferramentas.map((item) => Number(item.id)));
+  const v2Dashboard = v2Service.dashboard();
+  const usosAtivos = (v2Dashboard.active || []).filter((uso) => teamToolIds.has(Number(uso.ferramenta_id)));
   const meta = {
     title: 'Ficha de Responsabilidade de Ferramental',
     subtitle: 'Campo do Gado • Manutenção Industrial • PCM',
@@ -184,6 +188,20 @@ function generateTeamPdf(teamId) {
       });
     }
 
+    pdf.sectionBand(doc, 'Uso operacional por QR V2', meta);
+    if (!usosAtivos.length) {
+      pdf.textBox(doc, 'Nenhuma ferramenta desta equipe está com retirada operacional em aberto.', meta);
+    } else {
+      usosAtivos.forEach((uso) => {
+        pdf.textBox(doc, [
+          `${uso.codigo} • ${uso.codigo_interno} • ${uso.descricao}`,
+          `Em uso por: ${uso.retirado_por_nome || '-'} • Retirada: ${formatDateTime(uso.retirada_em)}`,
+          uso.previsao_devolucao ? `Previsão de devolução: ${formatDateTime(uso.previsao_devolucao)}` : 'Sem previsão de devolução definida.',
+          uso.local_uso ? `Local/serviço: ${uso.local_uso}` : 'Local de uso não informado.',
+        ].join('\n'), meta, { fill: pdf.COLORS.white, fontSize: 8.2 });
+      });
+    }
+
     pdf.sectionBand(doc, 'Termo de responsabilidade', meta);
     pdf.textBox(
       doc,
@@ -205,6 +223,7 @@ function generateUserPdf(userId) {
   const conferencias = inventarioService.listOwn(userId);
   const ocorrencias = ocorrenciaService.listOwn(userId).slice(0, 15);
   const inspecoes = inspecaoService.ownStatus(userId);
+  const usosV2 = v2Service.ownUsage(userId).slice(0, 15);
   const confirmados = aceites.filter((item) => item.status === 'ACEITO').length;
   const pendentes = aceites.filter((item) => item.status === 'PENDENTE').length;
   const divergencias = aceites.filter((item) => item.status === 'RECUSADO').length;
@@ -307,6 +326,20 @@ function generateUserPdf(userId) {
           fill: state.block ? pdf.COLORS.yellow : pdf.COLORS.white,
           fontSize: 8.2,
         });
+      });
+    }
+
+    pdf.sectionBand(doc, 'Meu uso operacional V2', meta);
+    if (!usosV2.length) {
+      pdf.textBox(doc, 'Nenhuma retirada operacional por QR registrada para o colaborador.', meta);
+    } else {
+      usosV2.forEach((uso) => {
+        pdf.textBox(doc, [
+          `${uso.codigo} • ${uso.codigo_interno} • ${uso.descricao}`,
+          `Status: ${String(uso.status || '-').replaceAll('_', ' ')} • Retirada: ${formatDateTime(uso.retirada_em)}`,
+          uso.devolvido_em ? `Devolução: ${formatDateTime(uso.devolvido_em)} • Condição: ${conditionText(uso.condicao_retorno)}` : (uso.previsao_devolucao ? `Previsão: ${formatDateTime(uso.previsao_devolucao)}` : 'Uso ainda aberto sem previsão informada.'),
+          uso.local_uso ? `Local/serviço: ${uso.local_uso}` : 'Local de uso não informado.',
+        ].join('\n'), meta, { fill: pdf.COLORS.white, fontSize: 8.2 });
       });
     }
 

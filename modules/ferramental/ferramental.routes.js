@@ -7,6 +7,8 @@ const ctrl = require('./ferramental.controller');
 const VIEW_ACCESS = ACCESS.ferramental_view || [];
 
 router.get('/qr/:token', requireLogin, requireRole(VIEW_ACCESS), ctrl.qrLookup);
+router.post('/qr/:token/retirar', requireLogin, requireRole(VIEW_ACCESS), ctrl.checkoutQr);
+router.post('/qr/:token/devolver', requireLogin, requireRole(VIEW_ACCESS), ctrl.returnQr);
 router.get('/ferramentas/:ferramentaId/qrcode.png', requireLogin, requireRole(VIEW_ACCESS), ctrl.qrImage);
 
 module.exports = router;

@@ -86,6 +86,22 @@ function nextCode() {
   return `INSP-FER-${String(max + 1).padStart(4, '0')}`;
 }
 
+
+function assertNoOperationalUse(toolId) {
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ferramental_usos'").get();
+  if (!exists) return;
+  const active = db.prepare(`
+    SELECT u.codigo, usr.name AS usuario_nome
+    FROM ferramental_usos u
+    JOIN users usr ON usr.id=u.retirado_por_user_id
+    WHERE u.ferramenta_id=? AND u.status='EM_USO'
+    LIMIT 1
+  `).get(int(toolId));
+  if (active) {
+    throw new Error(`Ferramenta em uso por ${active.usuario_nome} (${active.codigo}). Registre a devolução antes da inspeção.`);
+  }
+}
+
 function getTool(toolId) {
   return db.prepare('SELECT * FROM ferramental_itens WHERE id=? AND ativo=1 LIMIT 1').get(int(toolId)) || null;
 }
@@ -300,6 +316,7 @@ function executeInspection(inspectionId, data = {}, actorUserId) {
   const detail = inspectionDetail(inspectionId);
   if (!detail || !actor) throw new Error('Inspeção inválida.');
   if (detail.inspection.status !== 'AGENDADA') throw new Error('Esta inspeção já foi concluída.');
+  assertNoOperationalUse(detail.inspection.ferramenta_id);
 
   const result = clean(data.resultado_final, 40).toUpperCase();
   if (!['APROVADA','APROVADA_RESTRICAO','REPROVADA'].includes(result)) {

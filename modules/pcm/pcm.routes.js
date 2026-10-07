@@ -40,6 +40,10 @@ router.post("/ferramental/inspecoes", requireLogin, requireRole(PCM_MANAGE), fer
 router.post("/ferramental/ferramentas/:ferramentaId/inspecoes", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.scheduleInspection);
 router.get("/ferramental/inspecoes/:inspecaoId", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.inspectionForm);
 router.post("/ferramental/inspecoes/:inspecaoId/executar", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.executeInspection);
+router.post("/ferramental/inventarios-scan", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.createScanInventory);
+router.get("/ferramental/inventarios-scan/:sessaoId", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.scanInventoryPage);
+router.post("/ferramental/inventarios-scan/:sessaoId/scan", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.scanInventoryToken);
+router.post("/ferramental/inventarios-scan/:sessaoId/fechar", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.closeScanInventory);
 
 // Compatibilidade: o painel executivo saiu do PCM operacional e passou a ser
 // parte do Painel da Diretoria. Favoritos antigos continuam funcionando.
