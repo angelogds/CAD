@@ -235,6 +235,8 @@ function getSolicitacao(id) {
     ? "ei.local_id AS estoque_local_id, el.nome AS estoque_local_nome"
     : "NULL AS estoque_local_id, NULL AS estoque_local_nome";
   const localJoin = HAS_LOCAL_ID ? "LEFT JOIN estoque_locais el ON el.id=ei.local_id" : "LEFT JOIN estoque_locais el ON 1=0";
+  const categoriaSelect = HAS_ESTOQUE_CATEGORIA_ID ? "ei.categoria_id AS estoque_categoria_id" : "NULL AS estoque_categoria_id";
+  const equipamentoEstoqueSelect = HAS_ESTOQUE_EQUIPAMENTO_ID ? "ei.equipamento_id AS estoque_equipamento_id" : "NULL AS estoque_equipamento_id";
   const supplierJoin = HAS_ITEM_FORNECEDOR_ID && tableExists("fornecedores")
     ? "LEFT JOIN fornecedores fi ON fi.id=si.fornecedor_id" : "LEFT JOIN fornecedores fi ON 1=0";
   const retiradaExpr = HAS_MOV_SOLICITACAO_ITEM
@@ -256,6 +258,8 @@ function getSolicitacao(id) {
       ei.nome AS estoque_item_nome,
       ${HAS_SALDO_ATUAL ? "COALESCE(ei.saldo_atual,0)" : "0"} AS estoque_saldo_atual,
       ${localSelect},
+      ${categoriaSelect},
+      ${equipamentoEstoqueSelect},
       ${fornecedorNomeColumn("fi")} AS fornecedor_nome_item
     FROM solicitacao_itens si
     LEFT JOIN estoque_itens ei ON ei.id=si.estoque_item_id
