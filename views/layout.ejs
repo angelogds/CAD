@@ -14,7 +14,7 @@
   <title><%= title || "Manutenção Campo do Gado" %></title>
   <link rel="stylesheet" href="/css/app.css?v=20260919-1" />
   <link rel="stylesheet" href="/css/ui-maintenance-shell-2026.css?v=20260919-1" />
-  <link rel="stylesheet" href="/css/ui-shell-modern-2026.css?v=20261007-sidebar-v1" />
+  <link rel="stylesheet" href="/css/ui-shell-modern-2026.css?v=20261007-config-v2" />
   <link rel="stylesheet" href="/css/ui-buttons.css?v=20260919-1" />
   <link rel="stylesheet" href="/css/native-menu.css?v=20260924-1" />
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'meu-portal') { %><link rel="stylesheet" href="/css/meu-portal-modernizacao.css?v=20260910-p5" /><% } %>
@@ -90,13 +90,9 @@
                     <span class="pill-role"><%= String(user.role || '').toUpperCase() %></span>
                   </div>
                   <nav aria-label="Atalhos pessoais">
-                    <a class="topbar-notification-item" href="/meu-portal"><strong>Meu Portal</strong><br><span class="muted">Central dos meus serviços</span></a>
-                    <a class="topbar-notification-item" href="/meu-portal/perfil"><strong>Meu Perfil</strong><br><span class="muted">Identidade e foto</span></a>
-                    <a class="topbar-notification-item" href="/meu-portal/cartao"><strong>Meu Cartão</strong><br><span class="muted">QR do Almoxarifado</span></a>
-                    <a class="topbar-notification-item" href="/escala/meu-painel"><strong>Minha Jornada</strong><br><span class="muted">Escala, horas extras e banco</span></a>
-                    <a class="topbar-notification-item" href="/meu-portal/rh"><strong>Meu RH</strong><br><span class="muted">Exames, documentos e folgas</span></a>
-                    <a class="topbar-notification-item" href="/meu-portal/configuracoes"><strong>Configurações do sistema</strong><br><span class="muted">Navegação e aparência da barra lateral</span></a>
-                    <a class="topbar-notification-item" href="/meu-portal/conta"><strong>Conta e segurança</strong><br><span class="muted">Alteração de senha</span></a>
+                    <a class="topbar-notification-item" href="/meu-portal"><strong>Meu Portal</strong><br><span class="muted">Perfil, jornada, RH e serviços pessoais</span></a>
+                    <a class="topbar-notification-item" href="/meu-portal/cartao"><strong>Cartão do Almoxarifado</strong><br><span class="muted">QR para identificação e retirada de material</span></a>
+                    <a class="topbar-notification-item" href="/meu-portal/configuracoes"><strong>Configurações do sistema</strong><br><span class="muted">Preferências, funcionamento e guia dos módulos</span></a>
                   </nav>
                   <form action="/auth/logout" method="POST">
                     <button class="btn btn-ghost user-menu-logout" type="submit">Sair</button>
