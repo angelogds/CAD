@@ -1,0 +1,82 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/meu-portal.css?v=20261007-sidebar-v1" />
+
+<div class="my-portal-page my-system-settings">
+  <header class="my-section-head">
+    <div>
+      <span class="eyebrow">MEU PORTAL • CONFIGURAÇÕES</span>
+      <h1>Configurações do sistema</h1>
+      <p>Escolha como a navegação lateral deve se comportar no computador. Esta preferência fica vinculada ao seu usuário.</p>
+    </div>
+    <a class="btn btn-ghost" href="/meu-portal">Voltar ao portal</a>
+  </header>
+
+  <form method="POST" action="/meu-portal/configuracoes" class="card my-system-settings-card">
+    <div class="my-system-settings-card__head">
+      <div>
+        <h2>Barra lateral de módulos</h2>
+        <p>O comportamento do celular não muda: no mobile a barra continua abrindo como painel e fecha depois da escolha do módulo.</p>
+      </div>
+      <span class="my-system-settings-badge">Preferência pessoal</span>
+    </div>
+
+    <div class="my-sidebar-mode-grid" role="radiogroup" aria-label="Modo da barra lateral">
+      <label class="my-sidebar-mode-option">
+        <input type="radio" name="sidebar_mode" value="EXPANDED" <%= sidebarMode === 'EXPANDED' ? 'checked' : '' %>>
+        <span class="my-sidebar-mode-card">
+          <span class="my-sidebar-mode-card__title">
+            <strong>Sempre aberta</strong>
+            <span class="my-sidebar-mode-check" aria-hidden="true">✓</span>
+          </span>
+          <p>A barra permanece com os nomes de todos os módulos visíveis.</p>
+          <span class="my-sidebar-mode-preview" aria-hidden="true">
+            <span class="my-sidebar-mode-preview__rail"></span>
+            <span class="my-sidebar-mode-preview__content"></span>
+          </span>
+          <small>Melhor para quem navega constantemente entre vários módulos.</small>
+        </span>
+      </label>
+
+      <label class="my-sidebar-mode-option">
+        <input type="radio" name="sidebar_mode" value="COMPACT" <%= sidebarMode === 'COMPACT' ? 'checked' : '' %>>
+        <span class="my-sidebar-mode-card">
+          <span class="my-sidebar-mode-card__title">
+            <strong>Compacta com ícones</strong>
+            <span class="my-sidebar-mode-check" aria-hidden="true">✓</span>
+          </span>
+          <p>Economiza espaço e mantém somente os ícones. Passe o mouse para ver o nome do módulo.</p>
+          <span class="my-sidebar-mode-preview" aria-hidden="true">
+            <span class="my-sidebar-mode-preview__rail is-compact"></span>
+            <span class="my-sidebar-mode-preview__content"></span>
+          </span>
+          <small>O botão ☰ alterna entre compacta e aberta quando necessário.</small>
+        </span>
+      </label>
+
+      <label class="my-sidebar-mode-option">
+        <input type="radio" name="sidebar_mode" value="AUTO" <%= sidebarMode === 'AUTO' ? 'checked' : '' %>>
+        <span class="my-sidebar-mode-card">
+          <span class="my-sidebar-mode-card__title">
+            <strong>Automática</strong>
+            <span class="my-sidebar-mode-check" aria-hidden="true">✓</span>
+          </span>
+          <p>Abra pelo ☰, escolha o módulo e a barra volta automaticamente para o modo compacto.</p>
+          <span class="my-sidebar-mode-preview is-auto" aria-hidden="true">
+            <span class="my-sidebar-mode-preview__rail"></span>
+            <span class="my-sidebar-mode-preview__content"></span>
+          </span>
+          <small>Recomendado para ganhar área útil sem perder acesso rápido aos módulos.</small>
+        </span>
+      </label>
+    </div>
+
+    <div class="my-system-settings-note">
+      A configuração é individual. Alterar sua barra lateral não muda a navegação dos demais usuários nem suas permissões de acesso.
+    </div>
+
+    <div class="my-system-settings-actions">
+      <a class="btn btn-ghost" href="/meu-portal">Cancelar</a>
+      <button class="btn btn-green" type="submit">Salvar configuração</button>
+    </div>
+  </form>
+</div>
