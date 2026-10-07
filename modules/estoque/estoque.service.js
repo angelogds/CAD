@@ -16,6 +16,11 @@ const HAS_SALDO_ATUAL = hasColumn("estoque_itens", "saldo_atual");
 const HAS_SALDO_MINIMO = hasColumn("estoque_itens", "saldo_minimo");
 const HAS_ESTOQUE_MIN = hasColumn("estoque_itens", "estoque_min");
 const HAS_CATEGORIA_ID = hasColumn("estoque_itens", "categoria_id");
+const HAS_SUBCATEGORIA_ID = hasColumn("estoque_itens", "subcategoria_id");
+const HAS_ENDERECO_ZONA = hasColumn("estoque_itens", "endereco_zona");
+const HAS_ENDERECO_ESTANTE = hasColumn("estoque_itens", "endereco_estante");
+const HAS_ENDERECO_PRATELEIRA = hasColumn("estoque_itens", "endereco_prateleira");
+const HAS_ENDERECO_POSICAO = hasColumn("estoque_itens", "endereco_posicao");
 const HAS_LOCAL_ID = hasColumn("estoque_itens", "local_id");
 const HAS_SETOR_UTILIZACAO = hasColumn("estoque_itens", "setor_utilizacao");
 const HAS_CENTRO_CUSTO = hasColumn("estoque_itens", "subarea_centro_custo");
@@ -39,6 +44,7 @@ const HAS_MOV_CUSTO_UNIT = hasColumn("estoque_movimentos", "custo_unit");
 const HAS_SOL_ITEM_VALOR_UNITARIO = hasColumn("solicitacao_itens", "valor_unitario_centavos");
 
 function categoriaJoin() { return HAS_CATEGORIA_ID && tableExists("estoque_categorias") ? "LEFT JOIN estoque_categorias c ON c.id=i.categoria_id" : "LEFT JOIN (SELECT NULL id,NULL nome) c ON 1=0"; }
+function subcategoriaJoin() { return HAS_SUBCATEGORIA_ID && tableExists("estoque_categorias") ? "LEFT JOIN estoque_categorias sc ON sc.id=i.subcategoria_id" : "LEFT JOIN (SELECT NULL id,NULL nome,NULL parent_id) sc ON 1=0"; }
 function localJoin() { return HAS_LOCAL_ID && tableExists("estoque_locais") ? "LEFT JOIN estoque_locais l ON l.id=i.local_id" : "LEFT JOIN (SELECT NULL id,NULL nome) l ON 1=0"; }
 function itemEquipamentoJoin() { return HAS_ESTOQUE_EQUIPAMENTO_ID && tableExists("equipamentos") ? "LEFT JOIN equipamentos ieq ON ieq.id=i.equipamento_id" : "LEFT JOIN (SELECT NULL id,NULL nome) ieq ON 1=0"; }
 function saldoJoin() { return !HAS_SALDO_ATUAL && tableExists("vw_estoque_saldo") ? "LEFT JOIN vw_estoque_saldo v ON v.item_id=i.id" : "LEFT JOIN (SELECT NULL item_id,0 saldo) v ON 1=0"; }
@@ -100,6 +106,7 @@ function listItens(filters = {}) {
     params.push(like, like);
   }
   if (filters.categoria_id && HAS_CATEGORIA_ID) { where.push("i.categoria_id=?"); params.push(Number(filters.categoria_id)); }
+  if (filters.subcategoria_id && HAS_SUBCATEGORIA_ID) { where.push("i.subcategoria_id=?"); params.push(Number(filters.subcategoria_id)); }
   if (filters.local_id && HAS_LOCAL_ID) { where.push("i.local_id=?"); params.push(Number(filters.local_id)); }
   if (filters.equipamento_id && HAS_ESTOQUE_EQUIPAMENTO_ID) { where.push("i.equipamento_id=?"); params.push(Number(filters.equipamento_id)); }
   if (filters.destino === "GERAL" && HAS_ESTOQUE_EQUIPAMENTO_ID) where.push("i.equipamento_id IS NULL");
@@ -119,12 +126,12 @@ function listItens(filters = {}) {
     : "NULL";
   const consumo90 = consumoExpr(90);
   const consumo30 = consumoExpr(30);
-  return db.prepare(`SELECT i.*, c.nome categoria_nome, l.nome local_nome, ieq.nome equipamento_estoque_nome,
+  return db.prepare(`SELECT i.*, c.nome categoria_nome, sc.nome subcategoria_nome, l.nome local_nome, ieq.nome equipamento_estoque_nome,
       ${saldoExpr()} AS saldo_atual, ${minExpr()} AS saldo_minimo, ${lastMove} AS ultima_movimentacao,
       ${setorItemExpr()} AS setor_utilizacao_exibicao,
       ${centroCustoItemExpr()} AS centro_custo_exibicao,
       ${consumo30} AS consumo_30d, ${consumo90} AS consumo_90d
-    FROM estoque_itens i ${categoriaJoin()} ${localJoin()} ${itemEquipamentoJoin()} ${saldoJoin()}
+    FROM estoque_itens i ${categoriaJoin()} ${subcategoriaJoin()} ${localJoin()} ${itemEquipamentoJoin()} ${saldoJoin()}
     WHERE ${where.join(" AND ")} ORDER BY i.nome`).all(...params).map((row) => {
       const consumo90d = Number(row.consumo_90d || 0);
       const mediaMensal = consumo90d / 3;
@@ -138,10 +145,25 @@ function listItens(filters = {}) {
         : saldo < minimo
           ? 'REPOR'
           : (coberturaDias !== null && coberturaDias < 30 ? 'PROGRAMAR_REPOSICAO' : 'OK');
-      return { ...row, consumo_medio_mensal_calc: mediaMensal, cobertura_dias_calc: coberturaDias, rotacao, reposicao_status: sugestao };
+      const endereco_parts = [
+        row.endereco_zona && `Z${row.endereco_zona}`,
+        row.endereco_estante && `E${row.endereco_estante}`,
+        row.endereco_prateleira && `P${row.endereco_prateleira}`,
+        row.endereco_posicao && `POS ${row.endereco_posicao}`,
+      ].filter(Boolean);
+      return { ...row, endereco_completo: endereco_parts.join(' • '), consumo_medio_mensal_calc: mediaMensal, cobertura_dias_calc: coberturaDias, rotacao, reposicao_status: sugestao };
     });
 }
-function listCategorias() { return tableExists("estoque_categorias") ? db.prepare("SELECT * FROM estoque_categorias WHERE ativo=1 ORDER BY nome").all() : []; }
+function listCategorias() { return tableExists("estoque_categorias") ? db.prepare("SELECT * FROM estoque_categorias WHERE ativo=1 AND COALESCE(parent_id,0)=0 ORDER BY nome").all() : []; }
+function listSubcategorias(parentId = null) {
+  if (!tableExists("estoque_categorias")) return [];
+  const where = parentId ? "WHERE ativo=1 AND parent_id=?" : "WHERE ativo=1 AND COALESCE(parent_id,0)<>0";
+  return db.prepare(`SELECT sc.*, p.nome categoria_pai_nome
+    FROM estoque_categorias sc
+    LEFT JOIN estoque_categorias p ON p.id=sc.parent_id
+    ${where}
+    ORDER BY p.nome,sc.nome`).all(...(parentId ? [Number(parentId)] : []));
+}
 function listLocais() { return tableExists("estoque_locais") ? db.prepare("SELECT * FROM estoque_locais WHERE ativo=1 ORDER BY nome").all() : []; }
 function listCentrosCusto() {
   if (!HAS_CENTRO_CUSTO) return [];
@@ -188,10 +210,15 @@ function createItem(data) {
   const cols = ["codigo", "nome", "unidade"];
   const values = [data.codigo || null, data.nome, data.unidade || "UN"];
   if (HAS_CATEGORIA_ID) { cols.push("categoria_id"); values.push(data.categoria_id || null); }
+  if (HAS_SUBCATEGORIA_ID) { cols.push("subcategoria_id"); values.push(data.subcategoria_id || null); }
   if (HAS_LOCAL_ID) { cols.push("local_id"); values.push(data.local_id || null); }
   if (HAS_SETOR_UTILIZACAO) { cols.push("setor_utilizacao"); values.push(normalizeSetorEstoque(data.setor_utilizacao) || SETOR_COMUM); }
   if (HAS_CENTRO_CUSTO) { cols.push("subarea_centro_custo"); values.push(normalize(data.subarea_centro_custo) || null); }
   if (HAS_ESTOQUE_EQUIPAMENTO_ID) { cols.push("equipamento_id"); values.push(data.equipamento_id ? Number(data.equipamento_id) : null); }
+  if (HAS_ENDERECO_ZONA) { cols.push("endereco_zona"); values.push(normalize(data.endereco_zona) || null); }
+  if (HAS_ENDERECO_ESTANTE) { cols.push("endereco_estante"); values.push(normalize(data.endereco_estante) || null); }
+  if (HAS_ENDERECO_PRATELEIRA) { cols.push("endereco_prateleira"); values.push(normalize(data.endereco_prateleira) || null); }
+  if (HAS_ENDERECO_POSICAO) { cols.push("endereco_posicao"); values.push(normalize(data.endereco_posicao) || null); }
   cols.push(minColumn);
   values.push(Number(data.saldo_minimo || 0));
   const placeholders = cols.map(() => "?").join(",");
@@ -199,10 +226,10 @@ function createItem(data) {
 }
 function getItem(id) {
   const consumo90 = consumoExpr(90);
-  return db.prepare(`SELECT i.*, ieq.nome equipamento_estoque_nome, ${saldoExpr()} AS saldo_atual, ${minExpr()} AS saldo_minimo,
+  return db.prepare(`SELECT i.*, c.nome categoria_nome, sc.nome subcategoria_nome, ieq.nome equipamento_estoque_nome, ${saldoExpr()} AS saldo_atual, ${minExpr()} AS saldo_minimo,
       ${setorItemExpr()} AS setor_utilizacao_exibicao, ${centroCustoItemExpr()} AS centro_custo_exibicao,
       ${consumo90} AS consumo_90d
-    FROM estoque_itens i ${itemEquipamentoJoin()} ${saldoJoin()} WHERE i.id=?`).get(id);
+    FROM estoque_itens i ${categoriaJoin()} ${subcategoriaJoin()} ${itemEquipamentoJoin()} ${saldoJoin()} WHERE i.id=?`).get(id);
 }
 
 function listOrdensAtivas() {
@@ -362,7 +389,7 @@ function registrarSaidasSolicitacao({ solicitacao_id, usuario_id, observacao }) 
 }
 
 module.exports = {
-  SETORES_ESTOQUE, SETOR_COMUM, dashboard, listItens, listCategorias, listLocais, listCentrosCusto, listEquipamentosEstoque, getInteligenciaReposicao,
+  SETORES_ESTOQUE, SETOR_COMUM, dashboard, listItens, listCategorias, listSubcategorias, listLocais, listCentrosCusto, listEquipamentosEstoque, getInteligenciaReposicao,
   listMovimentos, createCategoria, createLocal, createItem, getItem,
   listOrdensAtivas, registrarSaida, registrarSaidasSolicitacao, getContextoSolicitacao,
 };
