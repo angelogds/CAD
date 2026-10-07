@@ -22,6 +22,43 @@ function drawMeasureLabel(g, x, y, text) {
   g.insertAdjacentHTML('beforeend', `<text x='${x.toFixed(2)}' y='${y.toFixed(2)}' class='cad-entity-measure'>${safe}</text>`);
 }
 
+function dashArrayForStyle(style = {}) {
+  if (style.dasharray) return String(style.dasharray);
+  const type = String(style.lineType || '').toUpperCase();
+  if (type === 'DASHED') return '8 5';
+  if (type === 'HIDDEN') return '4 4';
+  if (type === 'CENTER') return '12 4 3 4';
+  if (type === 'DASHDOT') return '9 4 2 4';
+  return '';
+}
+
+function linearDimensionLayout(geometry = {}) {
+  const p1 = geometry.p1;
+  const p2 = geometry.p2;
+  if (!p1 || !p2) return null;
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 1e-9) return null;
+  const unit = { x: dx / length, y: dy / length };
+  const normal = { x: -unit.y, y: unit.x };
+  const middle = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+  const reference = geometry.dimensionLinePoint || geometry.textPoint || middle;
+  const offset = (reference.x - middle.x) * normal.x + (reference.y - middle.y) * normal.y;
+  const linePoint = { x: middle.x + normal.x * offset, y: middle.y + normal.y * offset };
+  const project = (point) => {
+    const t = (point.x - linePoint.x) * unit.x + (point.y - linePoint.y) * unit.y;
+    return { x: linePoint.x + unit.x * t, y: linePoint.y + unit.y * t };
+  };
+  return {
+    p1,
+    p2,
+    dimensionStart: project(p1),
+    dimensionEnd: project(p2),
+    textPoint: geometry.textPoint || linePoint,
+  };
+}
+
 function arcPath(viewport, geometry = {}) {
   const { cx = 0, cy = 0, radius = 0, startAngle = 0, endAngle = 0, ccw = true } = geometry;
   const p1w = { x: cx + Math.cos(startAngle) * radius, y: cy + Math.sin(startAngle) * radius };
@@ -135,6 +172,35 @@ export class DesenhoTecnicoRenderer {
     });
   }
 
+  renderLinearDimension(g, geometry, stroke, width = 1.5, dashAttr = '') {
+    const layout = linearDimensionLayout(geometry);
+    if (!layout) return;
+    const p1 = this.viewport.worldToScreen(layout.p1.x, layout.p1.y);
+    const p2 = this.viewport.worldToScreen(layout.p2.x, layout.p2.y);
+    const d1 = this.viewport.worldToScreen(layout.dimensionStart.x, layout.dimensionStart.y);
+    const d2 = this.viewport.worldToScreen(layout.dimensionEnd.x, layout.dimensionEnd.y);
+    const tp = this.viewport.worldToScreen(layout.textPoint.x, layout.textPoint.y);
+    const label = String(geometry.label || '').replace(/</g, '&lt;');
+    const lineAttrs = `stroke='${stroke}' stroke-width='${width}' ${dashAttr}`;
+    g.insertAdjacentHTML('beforeend', `<line x1='${p1.x}' y1='${p1.y}' x2='${d1.x}' y2='${d1.y}' ${lineAttrs}/>`);
+    g.insertAdjacentHTML('beforeend', `<line x1='${p2.x}' y1='${p2.y}' x2='${d2.x}' y2='${d2.y}' ${lineAttrs}/>`);
+    g.insertAdjacentHTML('beforeend', `<line x1='${d1.x}' y1='${d1.y}' x2='${d2.x}' y2='${d2.y}' ${lineAttrs}/>`);
+
+    const dx = d2.x - d1.x;
+    const dy = d2.y - d1.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const nx = -uy;
+    const ny = ux;
+    const size = 7;
+    const wing = 3;
+    const arrow1 = `${d1.x},${d1.y} ${d1.x + ux * size + nx * wing},${d1.y + uy * size + ny * wing} ${d1.x + ux * size - nx * wing},${d1.y + uy * size - ny * wing}`;
+    const arrow2 = `${d2.x},${d2.y} ${d2.x - ux * size + nx * wing},${d2.y - uy * size + ny * wing} ${d2.x - ux * size - nx * wing},${d2.y - uy * size - ny * wing}`;
+    g.insertAdjacentHTML('beforeend', `<polygon points='${arrow1}' fill='${stroke}'/><polygon points='${arrow2}' fill='${stroke}'/>`);
+    g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y - 5}' text-anchor='middle' fill='${stroke}' font-size='12' font-weight='700' font-family='monospace'>${label}</text>`);
+  }
+
   renderEntities() {
     const g = this.layers.entities;
     g.innerHTML = '';
@@ -144,47 +210,46 @@ export class DesenhoTecnicoRenderer {
       if (layerCfg.visible === false) return;
       const selected = this.selection.includes(e.id);
       const hover = this.selection.hoverId === e.id;
-      const baseStroke = this.getScreenStroke(e.style.stroke || layerCfg.color || '#e5edf6');
+      const baseStroke = this.getScreenStroke(e.style.stroke || e.style.color || layerCfg.color || '#e5edf6');
       const stroke = selected ? '#0ea5e9' : hover ? '#f59e0b' : baseStroke;
-      const dash = e.style?.dasharray ? `stroke-dasharray='${e.style.dasharray}'` : '';
+      const dashValue = dashArrayForStyle(e.style || {});
+      const dash = dashValue ? `stroke-dasharray='${dashValue}'` : '';
+      const strokeWidth = Math.max(0.5, Math.min(8, Number(e.style?.strokeWidth || 2)));
       const opacity = Number.isFinite(Number(e.style?.opacity)) ? `opacity='${Number(e.style.opacity)}'` : '';
       if (e.type === 'line' || e.type === 'centerline') {
         const a = this.viewport.worldToScreen(e.geometry.x1, e.geometry.y1);
         const b = this.viewport.worldToScreen(e.geometry.x2, e.geometry.y2);
-        g.insertAdjacentHTML('beforeend', `<line x1='${a.x}' y1='${a.y}' x2='${b.x}' y2='${b.y}' stroke='${stroke}' stroke-width='2' ${e.type === 'centerline' ? "stroke-dasharray='10 4 2 4'" : dash} ${opacity}/>`);
+        g.insertAdjacentHTML('beforeend', `<line x1='${a.x}' y1='${a.y}' x2='${b.x}' y2='${b.y}' stroke='${stroke}' stroke-width='${strokeWidth}' ${e.type === 'centerline' ? "stroke-dasharray='10 4 2 4'" : dash} ${opacity}/>`);
       } else if (e.type === 'rect') {
         const x = e.geometry.width < 0 ? e.geometry.x + e.geometry.width : e.geometry.x;
         const y = e.geometry.height < 0 ? e.geometry.y + e.geometry.height : e.geometry.y;
         const p = this.viewport.worldToScreen(x, y);
-        g.insertAdjacentHTML('beforeend', `<rect x='${p.x}' y='${p.y}' width='${Math.abs(e.geometry.width * this.viewport.getViewState().zoom)}' height='${Math.abs(e.geometry.height * this.viewport.getViewState().zoom)}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
+        g.insertAdjacentHTML('beforeend', `<rect x='${p.x}' y='${p.y}' width='${Math.abs(e.geometry.width * this.viewport.getViewState().zoom)}' height='${Math.abs(e.geometry.height * this.viewport.getViewState().zoom)}' fill='none' stroke='${stroke}' stroke-width='${strokeWidth}' ${dash}/>`);
       } else if (e.type === 'circle') {
         const c = this.viewport.worldToScreen(e.geometry.cx, e.geometry.cy);
         const radiusScreen = Math.abs(e.geometry.radius * this.viewport.getViewState().zoom);
-        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='${radiusScreen}' fill='none' stroke='${stroke}' stroke-width='2' ${dash} ${opacity}/>`);
+        g.insertAdjacentHTML('beforeend', `<circle cx='${c.x}' cy='${c.y}' r='${radiusScreen}' fill='none' stroke='${stroke}' stroke-width='${strokeWidth}' ${dash} ${opacity}/>`);
       } else if (e.type === 'arc') {
-        g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, e.geometry)}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
+        g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, e.geometry)}' fill='none' stroke='${stroke}' stroke-width='${strokeWidth}' ${dash}/>`);
       } else if (e.type === 'shaft') {
         this.renderShaft(g, e, stroke);
       } else if (e.type === 'polyline') {
         const points = (e.geometry.points || []).map((p) => this.viewport.worldToScreen(p.x, p.y));
-        if (points.length > 1) g.insertAdjacentHTML('beforeend', `<polyline points='${points.map((p) => `${p.x},${p.y}`).join(' ')}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
+        if (points.length > 1) g.insertAdjacentHTML('beforeend', `<polyline points='${points.map((p) => `${p.x},${p.y}`).join(' ')}' fill='none' stroke='${stroke}' stroke-width='${strokeWidth}' ${dash}/>`);
       } else if (e.type === 'text') {
         const p = this.viewport.worldToScreen(e.geometry.x, e.geometry.y);
         g.insertAdjacentHTML('beforeend', `<text x='${p.x}' y='${p.y}' fill='${stroke}' font-size='${Math.max(10, e.geometry.size || 14)}' font-family='monospace'>${String(e.geometry.text || '').replace(/</g, '&lt;')}</text>`);
       } else if (e.type === 'dimension') {
         if (e.geometry.mode === 'angular') {
           const v = this.viewport.worldToScreen(e.geometry.vertex.x, e.geometry.vertex.y);
-          g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, { cx: e.geometry.vertex.x, cy: e.geometry.vertex.y, radius: e.geometry.radius, startAngle: e.geometry.startAngle, endAngle: e.geometry.endAngle, ccw: true })}' fill='none' stroke='var(--cad-dimension)' stroke-width='1.5'/>`);
+          g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, { cx: e.geometry.vertex.x, cy: e.geometry.vertex.y, radius: e.geometry.radius, startAngle: e.geometry.startAngle, endAngle: e.geometry.endAngle, ccw: true })}' fill='none' stroke='${stroke}' stroke-width='${strokeWidth}' ${dash}/>`);
           const mid = (e.geometry.startAngle + e.geometry.endAngle) / 2;
-          const tp = this.viewport.worldToScreen(e.geometry.vertex.x + Math.cos(mid) * (e.geometry.radius + 10), e.geometry.vertex.y + Math.sin(mid) * (e.geometry.radius + 10));
-          g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='var(--cad-dimension)' font-size='12' font-family='monospace'>${e.geometry.label || ''}</text>`);
-          g.insertAdjacentHTML('beforeend', `<circle cx='${v.x}' cy='${v.y}' r='2' fill='var(--cad-dimension)'/>`);
+          const point = e.geometry.textPoint || { x: e.geometry.vertex.x + Math.cos(mid) * (e.geometry.radius + 10), y: e.geometry.vertex.y + Math.sin(mid) * (e.geometry.radius + 10) };
+          const tp = this.viewport.worldToScreen(point.x, point.y);
+          g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='${stroke}' font-size='12' font-family='monospace'>${e.geometry.label || ''}</text>`);
+          g.insertAdjacentHTML('beforeend', `<circle cx='${v.x}' cy='${v.y}' r='2' fill='${stroke}'/>`);
         } else {
-          const p1 = this.viewport.worldToScreen(e.geometry.p1.x, e.geometry.p1.y);
-          const p2 = this.viewport.worldToScreen(e.geometry.p2.x, e.geometry.p2.y);
-          const tp = this.viewport.worldToScreen(e.geometry.textPoint.x, e.geometry.textPoint.y);
-          g.insertAdjacentHTML('beforeend', `<line x1='${p1.x}' y1='${p1.y}' x2='${p2.x}' y2='${p2.y}' stroke='var(--cad-dimension)' stroke-width='1.5'/>`);
-          g.insertAdjacentHTML('beforeend', `<text x='${tp.x}' y='${tp.y}' fill='var(--cad-dimension)' font-size='12' font-family='monospace'>${e.geometry.label || ''}</text>`);
+          this.renderLinearDimension(g, e.geometry, stroke, strokeWidth, dash);
         }
       }
     });
@@ -201,6 +266,9 @@ export class DesenhoTecnicoRenderer {
         const midX = (a.x + b.x) / 2;
         const midY = (a.y + b.y) / 2;
         drawMeasureLabel(g, midX + 8, midY - 8, formatMm(Math.hypot((p.to.x || 0) - (p.from.x || 0), (p.to.y || 0) - (p.from.y || 0))));
+      }
+      if (p.type === 'dimension-preview' && p.geometry) {
+        this.renderLinearDimension(g, p.geometry, '#22d3ee', 1.5, "stroke-dasharray='6 4'");
       }
       if (p.type === 'polyline') {
         const points = p.points.map((pp) => this.viewport.worldToScreen(pp.x, pp.y));

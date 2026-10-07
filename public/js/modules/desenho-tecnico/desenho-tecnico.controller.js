@@ -577,6 +577,36 @@ export class DesenhoTecnicoController {
     const geo = entity.geometry;
     const input = (id, label, value, type = 'text') => `<div class='cad-prop-row'><span class='cad-prop-label'>${label}</span><input class='cad-input' data-prop='${id}' type='${type}' value='${value}'/></div>`;
     const readOnly = (label, value) => `<div class='cad-prop-row'><span class='cad-prop-label'>${label}</span><span>${value}</span></div>`;
+    const style = entity.style || {};
+    const layerStyle = this.state.layers?.[layer] || {};
+    const styleColor = style.stroke || style.color || layerStyle.color || '#e5edf6';
+    const styleWidth = Math.max(0.5, Math.min(8, Number(style.strokeWidth || 2)));
+    const styleLineType = String(style.lineType || (style.dasharray ? 'DASHED' : layerStyle.lineType || 'Continuous')).toUpperCase();
+    const supportsStrokeStyle = ['line', 'centerline', 'polyline', 'rect', 'circle', 'arc', 'dimension'].includes(entity.type);
+    const lineTypeOptions = [
+      ['CONTINUOUS', 'Contínua'],
+      ['DASHED', 'Tracejada'],
+      ['HIDDEN', 'Oculta'],
+      ['CENTER', 'Centro'],
+      ['DASHDOT', 'Traço-ponto'],
+    ];
+    const styleDetails = supportsStrokeStyle ? `
+      <div class='cad-prop-section-title'>Aparência</div>
+      <div class='cad-prop-row'>
+        <span class='cad-prop-label'>Cor da linha</span>
+        <input class='cad-input' data-style-prop='color' type='color' value='${styleColor}'>
+      </div>
+      <div class='cad-prop-row'>
+        <span class='cad-prop-label'>Espessura</span>
+        <input class='cad-input' data-style-prop='strokeWidth' type='number' min='0.5' max='8' step='0.5' value='${styleWidth}'>
+      </div>
+      <div class='cad-prop-row'>
+        <span class='cad-prop-label'>Tipo de linha</span>
+        <select class='cad-select' data-style-prop='lineType'>
+          ${lineTypeOptions.map(([value, label]) => `<option value='${value}' ${styleLineType === value ? 'selected' : ''}>${label}</option>`).join('')}
+        </select>
+      </div>
+    ` : '';
     let details = '';
     if (entity.type === 'line' || entity.type === 'centerline') {
       const dx = (geo.x2 || 0) - (geo.x1 || 0);
@@ -616,12 +646,45 @@ export class DesenhoTecnicoController {
       details += readOnly('Trechos', (geo.segments || []).length);
       details += readOnly('Comp. total', total.toFixed(2));
       details += input('origin.x', 'Origem X', geo.origin?.x || 0, 'number') + input('origin.y', 'Origem Y', geo.origin?.y || 0, 'number');
-    } else if (entity.type === 'dimension' && geo.textPoint) {
-      details += input('textPoint.x', 'Texto X', geo.textPoint.x, 'number') + input('textPoint.y', 'Texto Y', geo.textPoint.y, 'number');
+    } else if (entity.type === 'dimension') {
+      if (geo.dimensionLinePoint) {
+        details += input('dimensionLinePoint.x', 'Linha da cota X', geo.dimensionLinePoint.x, 'number') + input('dimensionLinePoint.y', 'Linha da cota Y', geo.dimensionLinePoint.y, 'number');
+      }
+      if (geo.textPoint) {
+        details += input('textPoint.x', 'Texto X', geo.textPoint.x, 'number') + input('textPoint.y', 'Texto Y', geo.textPoint.y, 'number');
+      }
       details += input('label', 'Texto', geo.label || '');
     }
-    props.innerHTML = `<div class='cad-prop-row'><span class='cad-prop-label'>Tipo</span><span>${entity.type}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>ID</span><span>${entity.id}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>Camada</span><select class='cad-select' id='propLayer'>${Object.keys(this.state.layers || {}).map((l) => `<option ${l === layer ? 'selected' : ''} value='${l}'>${l}</option>`).join('')}</select></div>${details}`;
+    props.innerHTML = `<div class='cad-prop-row'><span class='cad-prop-label'>Tipo</span><span>${entity.type}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>ID</span><span>${entity.id}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>Camada</span><select class='cad-select' id='propLayer'>${Object.keys(this.state.layers || {}).map((l) => `<option ${l === layer ? 'selected' : ''} value='${l}'>${l}</option>`).join('')}</select></div>${details}${styleDetails}`;
     document.getElementById('propLayer')?.addEventListener('change', (e) => { entity.metadata = { ...(entity.metadata || {}), layer: e.target.value }; this.pushHistory(); this.markDirty('Camada do objeto atualizada'); this.render(); });
+    props.querySelectorAll('[data-style-prop]').forEach((el) => el.addEventListener('change', (e) => {
+      const key = e.target.dataset.styleProp;
+      entity.style = { ...(entity.style || {}) };
+
+      if (key === 'color') {
+        entity.style.stroke = e.target.value;
+        entity.style.color = e.target.value;
+      } else if (key === 'strokeWidth') {
+        const width = Math.max(0.5, Math.min(8, Number(e.target.value) || 2));
+        entity.style.strokeWidth = width;
+        entity.style.lineWeight = Math.round(width * 10);
+      } else if (key === 'lineType') {
+        const lineType = String(e.target.value || 'CONTINUOUS').toUpperCase();
+        const dashMap = {
+          CONTINUOUS: '',
+          DASHED: '8 5',
+          HIDDEN: '4 4',
+          CENTER: '12 4 3 4',
+          DASHDOT: '9 4 2 4',
+        };
+        entity.style.lineType = lineType === 'CONTINUOUS' ? 'Continuous' : lineType;
+        entity.style.dasharray = dashMap[lineType] || '';
+      }
+
+      this.pushHistory();
+      this.markDirty('Estilo do objeto atualizado');
+      this.render();
+    }));
     props.querySelectorAll('[data-prop]').forEach((el) => el.addEventListener('change', (e) => {
       const path = e.target.dataset.prop;
       const value = e.target.type === 'number' ? Number(e.target.value) : e.target.value;
