@@ -273,6 +273,22 @@ function createTool(data, actorUserId) {
   return Number(result.lastInsertRowid);
 }
 
+
+function assertNoOperationalUse(toolId) {
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ferramental_usos'").get();
+  if (!exists) return;
+  const active = db.prepare(`
+    SELECT u.codigo, usr.name AS usuario_nome
+    FROM ferramental_usos u
+    JOIN users usr ON usr.id=u.retirado_por_user_id
+    WHERE u.ferramenta_id=? AND u.status='EM_USO'
+    LIMIT 1
+  `).get(Number(toolId));
+  if (active) {
+    throw new Error(`Ferramenta em uso por ${active.usuario_nome} (${active.codigo}). Registre a devolução operacional antes de alterar a custódia.`);
+  }
+}
+
 function locationDescription(compartment) {
   if (!compartment) return 'Sem localização definida';
   return `${compartment.armario_codigo} / Compartimento ${compartment.numero}`;
@@ -288,6 +304,7 @@ function assignTool({ ferramenta_id, equipe_id, compartimento_id, observacao }, 
   const tool = db.prepare('SELECT * FROM ferramental_itens WHERE id=? AND ativo=1 LIMIT 1').get(toolId);
   if (!tool) throw new Error('Ferramenta não encontrada.');
   if (String(tool.status) === 'BAIXADA') throw new Error('Ferramenta baixada não pode receber nova responsabilidade.');
+  assertNoOperationalUse(toolId);
   inspecaoService.assertToolUnblocked(toolId);
 
   const team = db.prepare('SELECT * FROM ferramental_equipes WHERE id=? AND ativo=1 LIMIT 1').get(teamId);

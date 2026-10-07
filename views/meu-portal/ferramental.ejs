@@ -1,11 +1,13 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/meu-portal.css?v=20260914-v4" />
-<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v14" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v2" />
 
 <%
   const data = ferramental || { usuario: {}, resumo: {}, equipes: [], ferramentas: [], aceites: [] };
   const aceites = data.aceites || [];
   const inventarios = data.inventarios || [];
+  const usosV2 = data.usosV2 || [];
+  const usosAbertosV2 = usosV2.filter(function(u){ return u.status === 'EM_USO'; });
   const inspecoes = data.inspecoes || [];
   const inspecaoPorFerramenta = new Map(inspecoes.map(function(t){ return [Number(t.id), t.inspecao]; }));
   const inspecoesCriticas = inspecoes.filter(function(t){ return ['BLOQUEADA','VENCIDA','A_VENCER'].includes(t.inspecao?.situation); });
@@ -41,6 +43,7 @@
     <article><span>Conferências</span><strong><%= inventariosPendentes.length %></strong><small>Pendentes no inventário</small></article>
     <article><span>Ocorrências</span><strong><%= ocorrenciasAbertas.length %></strong><small>Em tratamento pelo PCM</small></article>
     <article><span>Inspeções</span><strong><%= inspecoesCriticas.length %></strong><small>Alertas de segurança</small></article>
+    <article><span>Em uso comigo</span><strong><%= usosAbertosV2.length %></strong><small>Retiradas registradas por QR</small></article>
   </section>
 
   <% if (pendentes.length) { %>
@@ -201,6 +204,31 @@
     </section>
   <% } %>
 
+  <% if (usosV2.length) { %>
+    <section class="tool-panel tool-self-v2-usage" id="uso-operacional">
+      <div class="tool-panel-head">
+        <div><span>V2</span><h2>Meu uso operacional</h2><p>Retiradas e devoluções registradas pelo QR sem alterar a custódia da equipe.</p></div>
+        <small><%= usosAbertosV2.length %> em uso</small>
+      </div>
+      <div class="tool-self-v2-usage-list">
+        <% usosV2.slice(0,20).forEach(function(uso){ const overdue = Boolean(uso.atrasado); %>
+          <article class="<%= overdue ? 'is-overdue' : uso.status === 'EM_USO' ? 'is-active' : 'is-returned' %>">
+            <div>
+              <span><%= uso.codigo %> • <%= uso.status.replaceAll('_',' ') %></span>
+              <strong><%= uso.codigo_interno %> — <%= uso.descricao %></strong>
+              <small>Retirada: <%= formatDateTime(uso.retirada_em) %><%= uso.previsao_devolucao ? ' • Previsão: ' + formatDateTime(uso.previsao_devolucao) : '' %><%= uso.devolvido_em ? ' • Devolvida: ' + formatDateTime(uso.devolvido_em) : '' %></small>
+              <% if (uso.local_uso) { %><small>Local: <%= uso.local_uso %></small><% } %>
+            </div>
+            <div>
+              <span class="tool-badge <%= overdue ? 'tool-badge--rejected' : uso.status === 'EM_USO' ? 'tool-badge--pending' : 'tool-badge--accepted' %>"><%= overdue ? 'ATRASADA' : uso.status.replaceAll('_',' ') %></span>
+              <% if (uso.qr_token) { %><a class="tool-qr-link" href="/ferramental/qr/<%= uso.qr_token %>"><%= uso.status === 'EM_USO' ? 'Abrir para devolver' : 'Abrir QR' %></a><% } %>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
+
   <% if (!data.equipes.length) { %>
     <section class="my-material-empty card">
       <strong>Nenhuma ferramenta vinculada no momento.</strong>
@@ -286,8 +314,8 @@
   <% }) %>
 
   <section class="tool-self-note">
-    <strong>V1.4 — inspeção e bloqueio de segurança</strong>
-    <span>O responsável continua acompanhando aceite, QR, conferência e ocorrências, e agora também visualiza inspeções vencidas, próximas do vencimento e bloqueios de uso por reprovação técnica.</span>
+    <strong>V2 — uso operacional e inventário por QR</strong>
+    <span>A custódia continua vinculada à equipe, enquanto cada retirada e devolução registra quem utilizou a ferramenta. O QR também alimenta os inventários físicos do PCM e a rastreabilidade de uso.</span>
   </section>
 </div>
 

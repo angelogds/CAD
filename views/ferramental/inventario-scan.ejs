@@ -1,0 +1,114 @@
+<% layout('layout') %>
+<%- include('../pcm/partials/internal-styles') %>
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v2" />
+
+<%
+  const data = inventario || { session: {}, items: [] };
+  const s = data.session || {};
+  const items = data.items || [];
+  const pct = Number(s.total_esperado || 0)
+    ? Math.min(100, Math.round(Number(s.total_localizado || 0) * 100 / Number(s.total_esperado || 1)))
+    : 0;
+  const fmt = (value) => value ? new Date(value).toLocaleString('pt-BR') : '-';
+%>
+
+<div class="tool-page tool-v2-scan-page">
+  <header class="tool-head">
+    <div>
+      <span class="tool-eyebrow">FERRAMENTAL V2 • INVENTÁRIO QR</span>
+      <h1><%= s.codigo %> — <%= s.titulo %></h1>
+      <p><%= s.equipe_codigo ? s.equipe_codigo + ' • ' + s.equipe_nome : 'Escopo geral' %> • Aberto por <%= s.criado_por_nome || '-' %> em <%= fmt(s.opened_at) %></p>
+    </div>
+    <div class="tool-head-actions">
+      <a class="ui-btn ui-btn--outline" href="/pcm/ferramental#v2">Voltar ao Ferramental</a>
+      <% if (s.status === 'ABERTO') { %>
+        <form method="POST" action="/pcm/ferramental/inventarios-scan/<%= s.id %>/fechar" onsubmit="return confirm('Fechar o inventário? Itens ainda pendentes serão marcados como não localizados.');">
+          <button class="ui-btn ui-btn--primary" type="submit">Concluir inventário</button>
+        </form>
+      <% } %>
+    </div>
+  </header>
+
+  <div class="pcm-shell">
+    <%- include('../pcm/partials/internal-nav', { activePcmSection: 'ferramental' }) %>
+    <main class="pcm-content tool-content">
+      <section class="tool-kpis tool-kpis--v2-scan">
+        <article><span>Esperados</span><strong data-scan-kpi="esperado"><%= s.total_esperado || 0 %></strong><small>Ferramentas do escopo</small></article>
+        <article><span>Localizados</span><strong data-scan-kpi="localizado"><%= s.total_localizado || 0 %></strong><small>Leituras confirmadas</small></article>
+        <article><span>Não localizados</span><strong data-scan-kpi="nao-localizado"><%= s.total_nao_localizado || 0 %></strong><small>Após fechamento</small></article>
+        <article><span>Fora do escopo</span><strong data-scan-kpi="fora-escopo"><%= s.total_fora_escopo || 0 %></strong><small>Leituras inesperadas</small></article>
+      </section>
+
+      <section class="tool-panel tool-v2-progress-panel">
+        <div class="tool-panel-head">
+          <div><span>PROGRESSO</span><h2><%= pct %>% localizado</h2></div>
+          <small><%= s.status %></small>
+        </div>
+        <div class="tool-v2-progress"><i data-scan-progress style="width:<%= pct %>%"></i></div>
+      </section>
+
+      <% if (s.status === 'ABERTO') { %>
+        <section class="tool-panel tool-v2-scanner" data-scan-root data-scan-endpoint="/pcm/ferramental/inventarios-scan/<%= s.id %>/scan">
+          <div class="tool-panel-head">
+            <div><span>LEITOR</span><h2>Escanear QR da ferramenta</h2><p>Aponte a câmera para a etiqueta. Se o navegador não suportar leitura, use o campo manual abaixo.</p></div>
+            <small>Leitura contínua</small>
+          </div>
+
+          <div class="tool-v2-scanner-grid">
+            <div class="tool-v2-camera">
+              <video playsinline muted data-scan-video></video>
+              <div class="tool-v2-camera-placeholder" data-scan-placeholder>Câmera ainda não iniciada.</div>
+              <div class="tool-v2-camera-actions">
+                <button class="ui-btn ui-btn--primary" type="button" data-scan-start>Iniciar câmera</button>
+                <button class="ui-btn ui-btn--outline" type="button" data-scan-stop disabled>Parar câmera</button>
+              </div>
+            </div>
+
+            <div class="tool-v2-manual">
+              <form method="POST" action="/pcm/ferramental/inventarios-scan/<%= s.id %>/scan" data-scan-form>
+                <label>QR / token / URL
+                  <input name="codigo" autocomplete="off" placeholder="Cole o conteúdo do QR ou digite o token" required data-scan-input />
+                </label>
+                <button class="ui-btn ui-btn--primary" type="submit">Registrar leitura</button>
+              </form>
+              <div class="tool-v2-scan-result" data-scan-result aria-live="polite">
+                <strong>Pronto para leitura.</strong>
+                <span>O sistema aceita tanto o token quanto a URL completa do QR.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      <% } %>
+
+      <section class="tool-panel">
+        <div class="tool-panel-head">
+          <div><span>ITENS</span><h2>Resultado do inventário</h2></div>
+          <small><%= items.length %> registro(s)</small>
+        </div>
+        <div class="tool-table-wrap">
+          <table class="tool-table tool-v2-scan-table">
+            <thead>
+              <tr><th>Ferramenta</th><th>Local esperado</th><th>Status</th><th>Leitura</th></tr>
+            </thead>
+            <tbody>
+              <% items.forEach(function(item){ %>
+                <tr data-scan-tool-id="<%= item.ferramenta_id %>" class="is-<%= String(item.status || '').toLowerCase().replaceAll('_','-') %>">
+                  <td><strong><%= item.codigo_interno %></strong><small><%= item.descricao %></small></td>
+                  <td><%= item.local_esperado || '-' %></td>
+                  <td>
+                    <span class="tool-badge <%= item.status === 'LOCALIZADO' ? 'tool-badge--accepted' : item.status === 'NAO_LOCALIZADO' ? 'tool-badge--rejected' : item.status === 'FORA_ESCOPO' ? 'tool-badge--pending' : '' %>" data-scan-status>
+                      <%= String(item.status || '').replaceAll('_',' ') %>
+                    </span>
+                  </td>
+                  <td><%= item.lido_por_nome || '-' %><small><%= fmt(item.lido_em) %></small></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="/js/ferramental-v2-scanner.js?v=20261007-v2" defer></script>

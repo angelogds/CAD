@@ -7,6 +7,7 @@ const QRCode = require('qrcode');
 const PDFDocument = require('pdfkit');
 const ocorrenciaService = require('./ferramental.ocorrencia.service');
 const inspecaoService = require('./ferramental.inspecao.service');
+const v2Service = require('./ferramental.v2.service');
 
 function pcmBase(res) {
   res.locals.activeMenu = 'pcm';
@@ -21,6 +22,7 @@ function index(req, res) {
     ferramental.inventarios = inventarioService.listDashboard();
     ferramental.ocorrencias = ocorrenciaService.dashboard();
     ferramental.inspecoes = inspecaoService.dashboard();
+    ferramental.v2 = v2Service.dashboard();
     return res.render('ferramental/index', {
       title: 'PCM - Gestão de Ferramental',
       ferramental,
@@ -97,6 +99,7 @@ function ownTools(req, res) {
     ferramental.inventarios = inventarioService.listOwn(req.session.user.id);
     ferramental.ocorrencias = ocorrenciaService.listOwn(req.session.user.id);
     ferramental.inspecoes = inspecaoService.ownStatus(req.session.user.id);
+    ferramental.usosV2 = v2Service.ownUsage(req.session.user.id);
     return res.render('meu-portal/ferramental', {
       title: 'Meu Ferramental',
       ferramental,
@@ -235,11 +238,13 @@ function qrLookup(req, res) {
     if (!ferramenta) return res.status(404).send('Ferramenta não encontrada.');
     const historico = ocorrenciaService.history(ferramenta.id);
     const inspecao = inspecaoService.toolInspectionStatus(ferramenta.id);
+    const operacao = v2Service.toolOperational(ferramenta.id, req.session.user.id);
     return res.render('ferramental/qr', {
       title: `Ferramental - ${ferramenta.codigo_interno}`,
       ferramenta,
       historico,
       inspecao,
+      operacao,
     });
   } catch (error) {
     return res.status(500).send(error.message || 'Não foi possível consultar a ferramenta.');
@@ -399,6 +404,95 @@ function executeInspection(req, res) {
   return res.redirect('/pcm/ferramental#inspecoes');
 }
 
+
+function checkoutQr(req, res) {
+  try {
+    const ferramenta = service.getToolByQrToken(req.params.token);
+    if (!ferramenta) throw new Error('Ferramenta não encontrada.');
+    v2Service.checkout(ferramenta.id, req.session.user.id, req.body, {
+      origem: 'QR',
+      registrado_por_user_id: req.session.user.id,
+    });
+    req.flash('success', 'Retirada operacional registrada por QR.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível registrar a retirada.');
+  }
+  return res.redirect(`/ferramental/qr/${encodeURIComponent(req.params.token)}`);
+}
+
+function returnQr(req, res) {
+  try {
+    const ferramenta = service.getToolByQrToken(req.params.token);
+    if (!ferramenta) throw new Error('Ferramenta não encontrada.');
+    v2Service.returnUse(ferramenta.id, req.session.user.id, req.body);
+    req.flash('success', 'Devolução registrada. A condição de retorno foi salva no histórico.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível registrar a devolução.');
+  }
+  return res.redirect(`/ferramental/qr/${encodeURIComponent(req.params.token)}`);
+}
+
+function createScanInventory(req, res) {
+  try {
+    const id = v2Service.createScanSession(req.body, req.session.user.id);
+    req.flash('success', 'Inventário QR aberto. Inicie a leitura das ferramentas.');
+    return res.redirect(`/pcm/ferramental/inventarios-scan/${id}`);
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível abrir o inventário QR.');
+    return res.redirect('/pcm/ferramental#v2');
+  }
+}
+
+function scanInventoryPage(req, res) {
+  pcmBase(res);
+  try {
+    const inventario = v2Service.getScanSession(req.params.sessaoId);
+    if (!inventario) return res.status(404).send('Inventário QR não encontrado.');
+    return res.render('ferramental/inventario-scan', {
+      title: `Inventário QR - ${inventario.session.codigo}`,
+      inventario,
+    });
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível carregar o inventário QR.');
+    return res.redirect('/pcm/ferramental#v2');
+  }
+}
+
+function scanInventoryToken(req, res) {
+  try {
+    const tool = v2Service.scanInventory(
+      req.params.sessaoId,
+      req.body.codigo || req.body.token || req.body.valor,
+      req.session.user.id
+    );
+    const inventario = v2Service.getScanSession(req.params.sessaoId);
+    if (String(req.get('accept') || '').includes('application/json') || req.body.ajax === '1') {
+      return res.json({
+        ok: true,
+        ferramenta: { id: tool.id, codigo_interno: tool.codigo_interno, descricao: tool.descricao },
+        resumo: inventario?.session || null,
+      });
+    }
+    req.flash('success', `${tool.codigo_interno} localizado no inventário QR.`);
+  } catch (error) {
+    if (String(req.get('accept') || '').includes('application/json') || req.body.ajax === '1') {
+      return res.status(400).json({ ok: false, error: error.message || 'Falha na leitura do QR.' });
+    }
+    req.flash('error', error.message || 'Não foi possível registrar a leitura.');
+  }
+  return res.redirect(`/pcm/ferramental/inventarios-scan/${Number(req.params.sessaoId) || ''}`);
+}
+
+function closeScanInventory(req, res) {
+  try {
+    v2Service.closeScanSession(req.params.sessaoId, req.session.user.id);
+    req.flash('success', 'Inventário QR concluído. Itens pendentes foram marcados como não localizados.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível encerrar o inventário QR.');
+  }
+  return res.redirect(`/pcm/ferramental/inventarios-scan/${Number(req.params.sessaoId) || ''}`);
+}
+
 module.exports = {
   index,
   createTeam,
@@ -426,4 +520,10 @@ module.exports = {
   scheduleInspection,
   inspectionForm,
   executeInspection,
+  checkoutQr,
+  returnQr,
+  createScanInventory,
+  scanInventoryPage,
+  scanInventoryToken,
+  closeScanInventory,
 };

@@ -1,6 +1,6 @@
 <% layout('layout') %>
 <%- include('../pcm/partials/internal-styles') %>
-<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v14" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v2" />
 
 <%
   const data = ferramental || { resumo: {}, usuarios: [], equipes: [], armarios: [], ferramentas: [] };
@@ -13,6 +13,8 @@
   const inspecaoData = data.inspecoes || { resumo: {}, tools: [], scheduled: [], recent: [], profiles: [] };
   const inspecaoResumo = inspecaoData.resumo || {};
   const inspecaoPorFerramenta = new Map((inspecaoData.tools || []).map(function(t){ return [Number(t.id), t.inspecao]; }));
+  const v2Data = data.v2 || { resumo: {}, active: [], overdue: [], scanSessions: [], missing: [], topUsers: [], topTools: [] };
+  const v2Resumo = v2Data.resumo || {};
   const aceiteResumo = aceiteData.resumo || {};
   const aceitePorCustodia = new Map((aceiteData.porCustodia || []).map(function(a){ return [Number(a.custodia_id), a]; }));
   const formatDateTime = (value) => value ? new Date(value).toLocaleString('pt-BR') : '-';
@@ -53,6 +55,10 @@
         <article><span>Inspeções vencidas</span><strong><%= inspecaoResumo.vencidas || 0 %></strong><small>Exigem atenção</small></article>
         <article><span>A vencer</span><strong><%= inspecaoResumo.aVencer || 0 %></strong><small>Dentro do alerta</small></article>
         <article><span>Bloqueadas</span><strong><%= inspecaoResumo.bloqueadas || 0 %></strong><small>Não usar / não transferir</small></article>
+        <article><span>Em uso agora</span><strong><%= v2Resumo.emUso || 0 %></strong><small>Retiradas por QR</small></article>
+        <article><span>Uso atrasado</span><strong><%= v2Resumo.atrasados || 0 %></strong><small>Previsão vencida</small></article>
+        <article><span>Não localizadas</span><strong><%= v2Resumo.naoLocalizados || 0 %></strong><small>Inventário QR</small></article>
+        <article><span>Devoluções danificadas</span><strong><%= v2Resumo.devolucoesDanificadas30d || 0 %></strong><small>Últimos 30 dias</small></article>
       </section>
 
       <section class="tool-grid">
@@ -454,6 +460,97 @@
             </div>
           </details>
         <% } %>
+      </section>
+
+
+      <section class="tool-panel tool-v2-panel" id="v2">
+        <div class="tool-panel-head">
+          <div><span>V2</span><h2>Operação QR e inventário físico</h2><p>Rastreie quem está usando cada ferramenta e faça inventários físicos pela câmera do celular.</p></div>
+          <small><%= v2Resumo.inventariosAbertos || 0 %> inventário(s) aberto(s)</small>
+        </div>
+
+        <div class="tool-grid tool-v2-admin-grid">
+          <form method="POST" action="/pcm/ferramental/inventarios-scan" class="tool-form tool-v2-new-scan">
+            <strong>Novo inventário por QR</strong>
+            <label>Escopo
+              <select name="equipe_id">
+                <option value="">Geral — todas as ferramentas ativas</option>
+                <% data.equipes.forEach(function(team){ %>
+                  <option value="<%= team.id %>"><%= team.codigo %> — <%= team.membros.map(function(m){return m.name;}).join(' + ') %></option>
+                <% }) %>
+              </select>
+            </label>
+            <label>Título <input name="titulo" maxlength="160" placeholder="Ex.: Inventário semanal do ferramental" /></label>
+            <label>Observação <textarea name="observacao" maxlength="800" rows="2" placeholder="Opcional"></textarea></label>
+            <button class="ui-btn ui-btn--primary" type="submit">Abrir inventário QR</button>
+          </form>
+
+          <div class="tool-v2-active-use">
+            <strong>Ferramentas em uso</strong>
+            <% if (!(v2Data.active || []).length) { %>
+              <div class="tool-empty">Nenhuma retirada operacional aberta.</div>
+            <% } else { %>
+              <% (v2Data.active || []).slice(0,10).forEach(function(uso){ const overdue = Boolean(uso.atrasado); %>
+                <article class="<%= overdue ? 'is-overdue' : '' %>">
+                  <div>
+                    <span><%= uso.codigo %></span>
+                    <strong><%= uso.codigo_interno %> — <%= uso.descricao %></strong>
+                    <small><%= uso.retirado_por_nome %> • retirada <%= formatDateTime(uso.retirada_em) %><%= uso.local_uso ? ' • ' + uso.local_uso : '' %></small>
+                  </div>
+                  <span class="tool-badge <%= overdue ? 'tool-badge--rejected' : 'tool-badge--pending' %>"><%= overdue ? 'ATRASADA' : 'EM USO' %></span>
+                </article>
+              <% }) %>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="tool-v2-sessions">
+          <div class="tool-panel-head tool-panel-head--sub">
+            <div><span>INVENTÁRIOS QR</span><h3>Sessões recentes</h3></div>
+          </div>
+          <% if (!(v2Data.scanSessions || []).length) { %>
+            <div class="tool-empty">Nenhum inventário QR realizado.</div>
+          <% } else { %>
+            <div class="tool-v2-session-grid">
+              <% (v2Data.scanSessions || []).forEach(function(scan){ const pct = Number(scan.total_esperado||0) ? Math.round(Number(scan.total_localizado||0)*100/Number(scan.total_esperado||1)) : 0; %>
+                <article>
+                  <div>
+                    <span><%= scan.codigo %> • <%= scan.status %></span>
+                    <strong><%= scan.titulo %></strong>
+                    <small><%= scan.equipe_codigo ? scan.equipe_codigo + ' • ' + scan.equipe_nome : 'Escopo geral' %> • <%= scan.total_localizado || 0 %>/<%= scan.total_esperado || 0 %> localizado(s)</small>
+                  </div>
+                  <div class="tool-v2-session-actions">
+                    <span><i style="width:<%= pct %>%"></i></span>
+                    <b><%= pct %>%</b>
+                    <a class="tool-qr-link" href="/pcm/ferramental/inventarios-scan/<%= scan.id %>"><%= scan.status === 'ABERTO' ? 'Continuar' : 'Ver resultado' %></a>
+                  </div>
+                </article>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+
+        <% if ((v2Data.missing || []).length) { %>
+          <div class="tool-v2-missing">
+            <strong>Não localizadas nos inventários QR</strong>
+            <% (v2Data.missing || []).slice(0,15).forEach(function(item){ %>
+              <div><span><%= item.sessao_codigo %></span><b><%= item.codigo_interno %> — <%= item.descricao %></b><small><%= item.local_esperado || 'Sem local esperado' %></small></div>
+            <% }) %>
+          </div>
+        <% } %>
+
+        <div class="tool-grid tool-v2-ranking-grid">
+          <div class="tool-v2-ranking">
+            <strong>Usuários com mais retiradas — 30 dias</strong>
+            <% if (!(v2Data.topUsers || []).length) { %><span class="tool-empty">Sem dados de uso ainda.</span><% } %>
+            <% (v2Data.topUsers || []).forEach(function(row,index){ %><div><span><%= index+1 %>. <%= row.name %></span><b><%= row.total %></b></div><% }) %>
+          </div>
+          <div class="tool-v2-ranking">
+            <strong>Ferramentas mais utilizadas — 30 dias</strong>
+            <% if (!(v2Data.topTools || []).length) { %><span class="tool-empty">Sem dados de uso ainda.</span><% } %>
+            <% (v2Data.topTools || []).forEach(function(row,index){ %><div><span><%= index+1 %>. <%= row.codigo_interno %> — <%= row.descricao %></span><b><%= row.total %></b></div><% }) %>
+          </div>
+        </div>
       </section>
 
       <section class="tool-panel">

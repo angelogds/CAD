@@ -1,5 +1,5 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v14" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v2" />
 
 <%
   const item = ferramenta || {};
@@ -10,6 +10,9 @@
   const formatDateTime = (value) => value ? new Date(value).toLocaleString('pt-BR') : '-';
   const ocorrenciaAtiva = hist.ocorrencias.find(function(o){ return ['ABERTA','EM_ANALISE','EM_ACOMPANHAMENTO'].includes(o.status); });
   const insp = inspecao || { situation: 'SEM_PLANO', block: null, next: null, last: null };
+  const op = operacao || { usage: null, canCheckout: false, canReturn: false };
+  const uso = op.usage || null;
+  const usoAtrasado = Boolean(uso && uso.atrasado);
 %>
 
 <div class="tool-qr-page">
@@ -57,6 +60,67 @@
         <small><%= ocorrenciaAtiva.status.replaceAll('_',' ') %> • <%= ocorrenciaAtiva.descricao %></small>
       </div>
     <% } %>
+
+
+    <section class="tool-v2-qr-operation">
+      <div class="tool-panel-head">
+        <div><span>V2</span><h2>Uso operacional por QR</h2><p>A custódia continua com a equipe; aqui fica registrado quem está usando a ferramenta neste momento.</p></div>
+        <% if (uso) { %>
+          <span class="tool-badge <%= usoAtrasado ? 'tool-badge--rejected' : 'tool-badge--pending' %>"><%= usoAtrasado ? 'ATRASADA' : 'EM USO' %></span>
+        <% } else { %>
+          <span class="tool-badge tool-badge--accepted">NA GUARDA</span>
+        <% } %>
+      </div>
+
+      <% if (uso) { %>
+        <div class="tool-v2-use-active">
+          <div>
+            <span><%= uso.codigo %></span>
+            <strong>Em uso por <%= uso.retirado_por_nome %></strong>
+            <small>Retirada: <%= formatDateTime(uso.retirada_em) %><%= uso.previsao_devolucao ? ' • Previsão: ' + formatDateTime(uso.previsao_devolucao) : '' %></small>
+            <% if (uso.local_uso) { %><small>Local de uso: <%= uso.local_uso %></small><% } %>
+            <% if (uso.observacao_saida) { %><em><%= uso.observacao_saida %></em><% } %>
+          </div>
+        </div>
+
+        <% if (op.canReturn) { %>
+          <form method="POST" action="/ferramental/qr/<%= item.qr_token %>/devolver" class="tool-v2-qr-form">
+            <label>Condição na devolução
+              <select name="condicao_retorno" required>
+                <option value="BOA">Boa</option>
+                <option value="USADA">Usada</option>
+                <option value="COM_DESGASTE">Com desgaste</option>
+                <option value="DANIFICADA">Danificada</option>
+              </select>
+            </label>
+            <label>Observação da devolução
+              <textarea name="observacao_retorno" maxlength="800" rows="2" placeholder="Opcional: condição observada, limpeza, acessório faltante..."></textarea>
+            </label>
+            <button class="ui-btn ui-btn--primary" type="submit">Registrar devolução</button>
+          </form>
+        <% } else { %>
+          <div class="tool-help">A devolução deve ser registrada pelo usuário que retirou, por outro responsável da mesma equipe ou pelo PCM.</div>
+        <% } %>
+      <% } else if (op.canCheckout) { %>
+        <form method="POST" action="/ferramental/qr/<%= item.qr_token %>/retirar" class="tool-v2-qr-form">
+          <label>Local / serviço
+            <input name="local_uso" maxlength="160" placeholder="Ex.: Digestor 3, oficina, caldeira..." />
+          </label>
+          <label>Previsão de devolução
+            <input name="previsao_devolucao" type="datetime-local" />
+          </label>
+          <label class="tool-span-2">Observação
+            <textarea name="observacao" maxlength="800" rows="2" placeholder="Opcional: serviço ou condição na retirada"></textarea>
+          </label>
+          <button class="ui-btn ui-btn--primary tool-span-2" type="submit">Retirar para uso</button>
+        </form>
+      <% } else { %>
+        <div class="tool-v2-use-unavailable">
+          <strong>Retirada indisponível.</strong>
+          <span>Verifique a custódia, o status da ferramenta e a inspeção de segurança. Apenas os responsáveis atuais ou a gestão podem registrar uso.</span>
+        </div>
+      <% } %>
+    </section>
 
     <section class="tool-qr-history">
       <div class="tool-panel-head"><div><span>V1.3</span><h2>Últimas movimentações</h2></div></div>
