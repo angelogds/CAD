@@ -19,6 +19,7 @@ const HAS_CATEGORIA_ID = hasColumn("estoque_itens", "categoria_id");
 const HAS_LOCAL_ID = hasColumn("estoque_itens", "local_id");
 const HAS_SETOR_UTILIZACAO = hasColumn("estoque_itens", "setor_utilizacao");
 const HAS_CENTRO_CUSTO = hasColumn("estoque_itens", "subarea_centro_custo");
+const HAS_ESTOQUE_EQUIPAMENTO_ID = hasColumn("estoque_itens", "equipamento_id");
 const HAS_DATA_MOV = hasColumn("estoque_movimentos", "data_mov");
 const HAS_USUARIO_ID = hasColumn("estoque_movimentos", "usuario_id");
 const HAS_MOV_OS_ID = hasColumn("estoque_movimentos", "os_id");
@@ -39,6 +40,7 @@ const HAS_SOL_ITEM_VALOR_UNITARIO = hasColumn("solicitacao_itens", "valor_unitar
 
 function categoriaJoin() { return HAS_CATEGORIA_ID && tableExists("estoque_categorias") ? "LEFT JOIN estoque_categorias c ON c.id=i.categoria_id" : "LEFT JOIN (SELECT NULL id,NULL nome) c ON 1=0"; }
 function localJoin() { return HAS_LOCAL_ID && tableExists("estoque_locais") ? "LEFT JOIN estoque_locais l ON l.id=i.local_id" : "LEFT JOIN (SELECT NULL id,NULL nome) l ON 1=0"; }
+function itemEquipamentoJoin() { return HAS_ESTOQUE_EQUIPAMENTO_ID && tableExists("equipamentos") ? "LEFT JOIN equipamentos ieq ON ieq.id=i.equipamento_id" : "LEFT JOIN (SELECT NULL id,NULL nome) ieq ON 1=0"; }
 function saldoJoin() { return !HAS_SALDO_ATUAL && tableExists("vw_estoque_saldo") ? "LEFT JOIN vw_estoque_saldo v ON v.item_id=i.id" : "LEFT JOIN (SELECT NULL item_id,0 saldo) v ON 1=0"; }
 function dataMovExpr(alias = "m") { return HAS_DATA_MOV ? `COALESCE(${alias}.data_mov,${alias}.created_at)` : `${alias}.created_at`; }
 function usuarioJoin() { return HAS_USUARIO_ID && tableExists("users") ? "LEFT JOIN users u ON u.id=m.usuario_id" : "LEFT JOIN (SELECT NULL id,NULL name) u ON 1=0"; }
@@ -99,6 +101,9 @@ function listItens(filters = {}) {
   }
   if (filters.categoria_id && HAS_CATEGORIA_ID) { where.push("i.categoria_id=?"); params.push(Number(filters.categoria_id)); }
   if (filters.local_id && HAS_LOCAL_ID) { where.push("i.local_id=?"); params.push(Number(filters.local_id)); }
+  if (filters.equipamento_id && HAS_ESTOQUE_EQUIPAMENTO_ID) { where.push("i.equipamento_id=?"); params.push(Number(filters.equipamento_id)); }
+  if (filters.destino === "GERAL" && HAS_ESTOQUE_EQUIPAMENTO_ID) where.push("i.equipamento_id IS NULL");
+  if (filters.destino === "EQUIPAMENTO" && HAS_ESTOQUE_EQUIPAMENTO_ID) where.push("i.equipamento_id IS NOT NULL");
   const setor = normalizeSetorEstoque(filters.setor_utilizacao);
   if (setor && HAS_SETOR_UTILIZACAO) { where.push(`${setorItemExpr()}=?`); params.push(setor); }
   if (filters.centro_custo && HAS_CENTRO_CUSTO) {
@@ -114,12 +119,12 @@ function listItens(filters = {}) {
     : "NULL";
   const consumo90 = consumoExpr(90);
   const consumo30 = consumoExpr(30);
-  return db.prepare(`SELECT i.*, c.nome categoria_nome, l.nome local_nome,
+  return db.prepare(`SELECT i.*, c.nome categoria_nome, l.nome local_nome, ieq.nome equipamento_estoque_nome,
       ${saldoExpr()} AS saldo_atual, ${minExpr()} AS saldo_minimo, ${lastMove} AS ultima_movimentacao,
       ${setorItemExpr()} AS setor_utilizacao_exibicao,
       ${centroCustoItemExpr()} AS centro_custo_exibicao,
       ${consumo30} AS consumo_30d, ${consumo90} AS consumo_90d
-    FROM estoque_itens i ${categoriaJoin()} ${localJoin()} ${saldoJoin()}
+    FROM estoque_itens i ${categoriaJoin()} ${localJoin()} ${itemEquipamentoJoin()} ${saldoJoin()}
     WHERE ${where.join(" AND ")} ORDER BY i.nome`).all(...params).map((row) => {
       const consumo90d = Number(row.consumo_90d || 0);
       const mediaMensal = consumo90d / 3;
@@ -142,6 +147,10 @@ function listCentrosCusto() {
   if (!HAS_CENTRO_CUSTO) return [];
   return db.prepare(`SELECT DISTINCT TRIM(subarea_centro_custo) nome FROM estoque_itens
     WHERE ativo=1 AND TRIM(COALESCE(subarea_centro_custo,''))<>'' ORDER BY nome`).all();
+}
+function listEquipamentosEstoque() {
+  if (!tableExists("equipamentos")) return [];
+  return db.prepare("SELECT id,nome FROM equipamentos WHERE COALESCE(ativo,1)=1 ORDER BY nome").all();
 }
 function getInteligenciaReposicao(filters = {}) {
   const itens = listItens(filters);
@@ -181,6 +190,7 @@ function createItem(data) {
   if (HAS_LOCAL_ID) { cols.push("local_id"); values.push(data.local_id || null); }
   if (HAS_SETOR_UTILIZACAO) { cols.push("setor_utilizacao"); values.push(normalizeSetorEstoque(data.setor_utilizacao) || SETOR_COMUM); }
   if (HAS_CENTRO_CUSTO) { cols.push("subarea_centro_custo"); values.push(normalize(data.subarea_centro_custo) || null); }
+  if (HAS_ESTOQUE_EQUIPAMENTO_ID) { cols.push("equipamento_id"); values.push(data.equipamento_id ? Number(data.equipamento_id) : null); }
   cols.push(minColumn);
   values.push(Number(data.saldo_minimo || 0));
   const placeholders = cols.map(() => "?").join(",");
@@ -188,10 +198,10 @@ function createItem(data) {
 }
 function getItem(id) {
   const consumo90 = consumoExpr(90);
-  return db.prepare(`SELECT i.*, ${saldoExpr()} AS saldo_atual, ${minExpr()} AS saldo_minimo,
+  return db.prepare(`SELECT i.*, ieq.nome equipamento_estoque_nome, ${saldoExpr()} AS saldo_atual, ${minExpr()} AS saldo_minimo,
       ${setorItemExpr()} AS setor_utilizacao_exibicao, ${centroCustoItemExpr()} AS centro_custo_exibicao,
       ${consumo90} AS consumo_90d
-    FROM estoque_itens i ${saldoJoin()} WHERE i.id=?`).get(id);
+    FROM estoque_itens i ${itemEquipamentoJoin()} ${saldoJoin()} WHERE i.id=?`).get(id);
 }
 
 function listOrdensAtivas() {
@@ -351,7 +361,7 @@ function registrarSaidasSolicitacao({ solicitacao_id, usuario_id, observacao }) 
 }
 
 module.exports = {
-  SETORES_ESTOQUE, SETOR_COMUM, dashboard, listItens, listCategorias, listLocais, listCentrosCusto, getInteligenciaReposicao,
+  SETORES_ESTOQUE, SETOR_COMUM, dashboard, listItens, listCategorias, listLocais, listCentrosCusto, listEquipamentosEstoque, getInteligenciaReposicao,
   listMovimentos, createCategoria, createLocal, createItem, getItem,
   listOrdensAtivas, registrarSaida, registrarSaidasSolicitacao, getContextoSolicitacao,
 };
