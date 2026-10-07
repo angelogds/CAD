@@ -63,6 +63,34 @@ function conta(req, res) {
   }
 }
 
+function configuracoes(req, res) {
+  res.locals.activeMenu = 'meu-portal';
+  try {
+    const portal = getPortalShell(req.session.user.id);
+    return res.render('meu-portal/configuracoes', {
+      title: 'Configurações do Sistema',
+      portal,
+      sidebarMode: service.normalizeSidebarMode(portal?.user?.sidebar_mode),
+    });
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível carregar as configurações do sistema.');
+    return res.redirect('/meu-portal');
+  }
+}
+
+function saveConfiguracoes(req, res) {
+  try {
+    const result = service.updateOwnSystemPreferences(req.session.user.id, {
+      sidebarMode: req.body.sidebar_mode,
+    });
+    req.session.user.sidebar_mode = result.sidebarMode;
+    req.flash('success', 'Preferência da barra lateral atualizada.');
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível salvar a configuração.');
+  }
+  return res.redirect('/meu-portal/configuracoes');
+}
+
 function materiais(req, res) {
   res.locals.activeMenu = 'meu-portal';
   try {
@@ -188,6 +216,8 @@ module.exports = {
   index,
   perfil,
   conta,
+  configuracoes,
+  saveConfiguracoes,
   materiais,
   linkColaborador,
   updatePhoto,
