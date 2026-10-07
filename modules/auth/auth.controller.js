@@ -76,6 +76,7 @@ exports.doLogin = (req, res) => {
       email: user.email,
       role: user.role,
       photo_path: user.photo_path || null,
+      sidebar_mode: String(user.sidebar_mode || 'EXPANDED').toUpperCase(),
     };
 
     req.session.save((err2) => {
