@@ -150,7 +150,8 @@ function listCentrosCusto() {
 }
 function listEquipamentosEstoque() {
   if (!tableExists("equipamentos")) return [];
-  return db.prepare("SELECT id,nome FROM equipamentos WHERE COALESCE(ativo,1)=1 ORDER BY nome").all();
+  const ativoFilter = hasColumn("equipamentos", "ativo") ? "WHERE COALESCE(ativo,1)=1" : "";
+  return db.prepare(`SELECT id,nome FROM equipamentos ${ativoFilter} ORDER BY nome`).all();
 }
 function getInteligenciaReposicao(filters = {}) {
   const itens = listItens(filters);
