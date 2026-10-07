@@ -28,7 +28,7 @@ test('Cotar usa três etapas e salva a posição real da linha de cota', () => {
   assert.match(dimensionTool, /dimensionLinePoint:/);
   assert.match(dimensionTool, /Puxe a cota para fora da peça/);
   assert.match(dimensionTool, /dimension-preview/);
-  assert.match(dimensionTool, /mode: 'diameter'/);
+  assert.match(dimensionTool, /buildLinearGeometry\(p1, p2, placement,[\s\S]*?'diameter'\)/);
 });
 
 test('cota pode ser reposicionada sem deslocar os pontos medidos', () => {
