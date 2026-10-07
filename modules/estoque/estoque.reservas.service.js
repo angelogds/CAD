@@ -1,6 +1,7 @@
 const db = require('../../database/db');
 const userQrService = require('../usuarios/usuarios.qr.service');
 const fluxoSolicitacaoService = require('./estoque.solicitacao-fluxo.service');
+const { isDirectUserIdentityRole } = require('../usuarios/usuarios.perfil');
 
 function tableExists(name) {
   try { return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name); } catch { return false; }
@@ -71,6 +72,105 @@ function getPessoaByQr(codigo) {
     user_id: Number(colaborador.user_id || 0) || null,
     colaborador_id: Number(colaborador.id),
   };
+}
+
+function getPessoaByCadastro(tipo, id) {
+  const identityType = String(tipo || '').trim().toUpperCase();
+  const identityId = Number(id || 0);
+  if (!identityId) return null;
+
+  if (identityType === 'USUARIO') {
+    const user = userQrService.getById(identityId);
+    if (!user || Number(user.ativo ?? 1) !== 1 || user.deleted_at || !isDirectUserIdentityRole(user.role)) return null;
+    return {
+      identity_type: 'USUARIO',
+      id: Number(user.id),
+      user_id: Number(user.id),
+      colaborador_id: null,
+      nome: user.name,
+      apelido: null,
+      funcao: user.funcao || user.role,
+      setor: user.setor || null,
+      status: 'ATIVO',
+      foto_url: user.photo_path || null,
+      qr_emitido_em: user.qr_emitido_em || null,
+    };
+  }
+
+  if (identityType !== 'COLABORADOR' || !tableExists('colaboradores')) return null;
+  const deletedFilter = hasColumn('colaboradores', 'deleted_at') ? "AND deleted_at IS NULL" : "";
+  const colaborador = db.prepare(`
+    SELECT id,nome,apelido,funcao,setor,status,foto_url,user_id
+    FROM colaboradores
+    WHERE id=? ${deletedFilter}
+      AND UPPER(COALESCE(status,'ATIVO'))='ATIVO'
+    LIMIT 1
+  `).get(identityId);
+  if (!colaborador) return null;
+  return {
+    ...colaborador,
+    identity_type: 'COLABORADOR',
+    user_id: Number(colaborador.user_id || 0) || null,
+    colaborador_id: Number(colaborador.id),
+  };
+}
+
+function listPessoasAtivas(query) {
+  const q = String(query || '').trim().toLowerCase().slice(0, 80);
+  if (q.length < 2) return [];
+  const like = `%${q}%`;
+  const results = [];
+
+  if (tableExists('colaboradores')) {
+    const deletedFilter = hasColumn('colaboradores', 'deleted_at') ? "AND deleted_at IS NULL" : "";
+    const rows = db.prepare(`
+      SELECT id,nome,apelido,funcao,setor,status,foto_url,user_id
+      FROM colaboradores
+      WHERE UPPER(COALESCE(status,'ATIVO'))='ATIVO' ${deletedFilter}
+        AND (
+          LOWER(COALESCE(nome,'')) LIKE ? OR LOWER(COALESCE(apelido,'')) LIKE ?
+          OR LOWER(COALESCE(funcao,'')) LIKE ? OR LOWER(COALESCE(setor,'')) LIKE ?
+        )
+      ORDER BY nome LIMIT 12
+    `).all(like, like, like, like);
+    for (const row of rows) {
+      results.push({
+        ...row,
+        identity_type: 'COLABORADOR',
+        identity_id: Number(row.id),
+        colaborador_id: Number(row.id),
+      });
+    }
+  }
+
+  if (tableExists('users')) {
+    const rows = db.prepare(`
+      SELECT id FROM users
+      WHERE COALESCE(ativo,1)=1 AND COALESCE(deleted_at,'')=''
+        AND LOWER(COALESCE(name,'')) LIKE ?
+      ORDER BY name LIMIT 12
+    `).all(like);
+    for (const row of rows) {
+      const user = userQrService.getById(row.id);
+      if (!user || !isDirectUserIdentityRole(user.role)) continue;
+      results.push({
+        identity_type: 'USUARIO',
+        identity_id: Number(user.id),
+        id: Number(user.id),
+        user_id: Number(user.id),
+        colaborador_id: null,
+        nome: user.name,
+        funcao: user.funcao || user.role,
+        setor: user.setor || null,
+        foto_url: user.photo_path || null,
+        status: 'ATIVO',
+      });
+    }
+  }
+
+  return results
+    .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'))
+    .slice(0, 15);
 }
 
 function dashboard() {
@@ -190,11 +290,11 @@ function insertMovimento(data) {
   return Number(db.prepare(`INSERT INTO estoque_movimentos (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).run(...vals).lastInsertRowid);
 }
 
-function retirarReserva({ reservaId, quantidade, qrCode, entreguePorUserId, observacao }) {
+function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, entreguePorUserId, observacao }) {
   const qtd = Number(quantidade || 0);
   if (!(qtd > 0)) throw new Error('Quantidade inválida para retirada.');
-  const pessoa = getPessoaByQr(qrCode);
-  if (!pessoa) throw new Error('Cartão/QR inválido, inativo ou revogado.');
+  const pessoa = qrCode ? getPessoaByQr(qrCode) : getPessoaByCadastro(pessoaTipo, pessoaId);
+  if (!pessoa) throw new Error('Funcionário não identificado, inativo ou inválido. Use o QR ou selecione um cadastro ativo.');
 
   const resultado = db.transaction(() => {
     const reserva = db.prepare(`
@@ -253,7 +353,9 @@ function retirarReserva({ reservaId, quantidade, qrCode, entreguePorUserId, obse
       retirado_por_colaborador_id: pessoa.identity_type === 'COLABORADOR' ? pessoa.colaborador_id : null,
       retirado_por_user_id: pessoa.identity_type === 'USUARIO' ? pessoa.user_id : null,
       entregue_por_user_id: entreguePorUserId || null,
-      identificacao_origem: pessoa.identity_type === 'USUARIO' ? 'QR_USUARIO' : 'QR_COLABORADOR',
+      identificacao_origem: qrCode
+        ? (pessoa.identity_type === 'USUARIO' ? 'QR_USUARIO' : 'QR_COLABORADOR')
+        : (pessoa.identity_type === 'USUARIO' ? 'CADASTRO_USUARIO' : 'CADASTRO_COLABORADOR'),
     });
 
     return {
@@ -277,6 +379,8 @@ module.exports = {
   normalizeQr,
   getColaboradorByQr,
   getPessoaByQr,
+  getPessoaByCadastro,
+  listPessoasAtivas,
   dashboard,
   resumoPorItem,
   listReservas,
