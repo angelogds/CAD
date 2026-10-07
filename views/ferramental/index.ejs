@@ -1,6 +1,6 @@
 <% layout('layout') %>
 <%- include('../pcm/partials/internal-styles') %>
-<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v12" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v13" />
 
 <%
   const data = ferramental || { resumo: {}, usuarios: [], equipes: [], armarios: [], ferramentas: [] };
@@ -8,6 +8,8 @@
   const aceiteData = data.aceites || { resumo: {}, porCustodia: [], recentes: [] };
   const inventarioData = data.inventarios || { resumo: {}, inventories: [], divergencias: [] };
   const inventarioResumo = inventarioData.resumo || {};
+  const ocorrenciaData = data.ocorrencias || { resumo: {}, abertas: [], recentes: [] };
+  const ocorrenciaResumo = ocorrenciaData.resumo || {};
   const aceiteResumo = aceiteData.resumo || {};
   const aceitePorCustodia = new Map((aceiteData.porCustodia || []).map(function(a){ return [Number(a.custodia_id), a]; }));
   const formatDateTime = (value) => value ? new Date(value).toLocaleString('pt-BR') : '-';
@@ -43,6 +45,8 @@
         <article><span>Aceites pendentes</span><strong><%= aceiteResumo.pendentes || 0 %></strong><small>Aguardando responsáveis</small></article>
         <article><span>Divergências</span><strong><%= aceiteResumo.recusados || 0 %></strong><small>Revisar no PCM</small></article>
         <article><span>Conferências abertas</span><strong><%= inventarioResumo.abertos || 0 %></strong><small>Inventário periódico</small></article>
+        <article><span>Ocorrências</span><strong><%= ocorrenciaResumo.pendentes || 0 %></strong><small>Aguardando PCM</small></article>
+        <article><span>Em manutenção</span><strong><%= ocorrenciaResumo.acompanhamento || 0 %></strong><small>Ocorrências acompanhadas</small></article>
       </section>
 
       <section class="tool-grid">
@@ -253,11 +257,108 @@
         <% } %>
       </section>
 
+
+      <section class="tool-panel tool-occurrence-panel" id="ocorrencias">
+        <div class="tool-panel-head">
+          <div><span>V1.3</span><h2>Ocorrências e ciclo de vida</h2><p>Trate devoluções, manutenção, dano, extravio e transferência sem apagar a responsabilidade anterior.</p></div>
+          <small><%= (ocorrenciaResumo.pendentes || 0) + (ocorrenciaResumo.acompanhamento || 0) %> em andamento</small>
+        </div>
+
+        <% if (!(ocorrenciaData.abertas || []).length) { %>
+          <div class="tool-empty">Nenhuma ocorrência em andamento.</div>
+        <% } else { %>
+          <div class="tool-occurrence-list">
+            <% ocorrenciaData.abertas.forEach(function(occ){ %>
+              <article class="tool-occurrence-card">
+                <div class="tool-occurrence-card__info">
+                  <span><%= occ.codigo %> • <%= occ.tipo.replaceAll('_',' ') %></span>
+                  <strong><%= occ.codigo_interno %> — <%= occ.ferramenta_descricao %></strong>
+                  <small>Aberta por <%= occ.aberta_por_nome %> • <%= formatDateTime(occ.created_at) %><%= occ.equipe_codigo ? ' • ' + occ.equipe_codigo : '' %></small>
+                  <p><%= occ.descricao %></p>
+                  <% if (occ.status === 'EM_ACOMPANHAMENTO' && occ.resolucao) { %>
+                    <em>Último tratamento: <%= occ.resolucao %></em>
+                  <% } %>
+                </div>
+
+                <form method="POST" action="/pcm/ferramental/ocorrencias/<%= occ.id %>/resolver" class="tool-occurrence-resolve">
+                  <label>Ação do PCM
+                    <select name="acao" required>
+                      <option value="">Selecione</option>
+                      <% if (occ.status === 'EM_ACOMPANHAMENTO') { %>
+                        <option value="RETORNAR_DISPONIVEL">Retornar da manutenção → disponível</option>
+                        <option value="MARCAR_DANIFICADA">Retornar como danificada</option>
+                        <option value="BAIXAR">Baixar ferramenta</option>
+                      <% } else { %>
+                        <option value="DEVOLVER_DISPONIVEL">Confirmar devolução → disponível</option>
+                        <option value="ENVIAR_MANUTENCAO">Enviar para manutenção</option>
+                        <option value="MARCAR_DANIFICADA">Marcar como danificada</option>
+                        <option value="MARCAR_EXTRAVIADA">Marcar como extraviada</option>
+                        <option value="TRANSFERIR">Transferir responsabilidade</option>
+                        <option value="BAIXAR">Baixar ferramenta</option>
+                        <option value="SEM_ACAO">Encerrar sem alterar custódia</option>
+                        <option value="CANCELAR">Cancelar ocorrência</option>
+                      <% } %>
+                    </select>
+                  </label>
+
+                  <div class="tool-occurrence-transfer-fields">
+                    <label>Equipe de destino
+                      <select name="equipe_id">
+                        <option value="">Somente para transferência</option>
+                        <% data.equipes.forEach(function(team){ %>
+                          <option value="<%= team.id %>"><%= team.codigo %> — <%= team.membros.map(function(m){ return m.name; }).join(' + ') %></option>
+                        <% }) %>
+                      </select>
+                    </label>
+                    <label>Armário / compartimento
+                      <select name="compartimento_id">
+                        <option value="">Somente para transferência</option>
+                        <% data.armarios.forEach(function(locker){ locker.compartimentos.filter(function(c){ return c.finalidade === 'FERRAMENTAL'; }).forEach(function(c){ %>
+                          <option value="<%= c.id %>"><%= locker.codigo %> — <%= locker.responsavel_nome %> — C<%= c.numero %></option>
+                        <% }); }); %>
+                      </select>
+                    </label>
+                  </div>
+
+                  <% if (occ.status === 'EM_ACOMPANHAMENTO') { %>
+                    <label>Condição no retorno
+                      <select name="condicao_retorno">
+                        <option value="">Manter condição atual</option>
+                        <option value="NOVA">Nova</option>
+                        <option value="BOA">Boa</option>
+                        <option value="USADA">Usada</option>
+                        <option value="COM_DESGASTE">Com desgaste</option>
+                        <option value="DANIFICADA">Danificada</option>
+                      </select>
+                    </label>
+                  <% } %>
+                  <label>Decisão / serviço executado
+                    <textarea name="resolucao" maxlength="1000" rows="3" required placeholder="Descreva o que foi verificado e a decisão tomada"></textarea>
+                  </label>
+                  <button class="ui-btn ui-btn--primary" type="submit">Registrar tratamento</button>
+                </form>
+              </article>
+            <% }) %>
+          </div>
+        <% } %>
+
+        <% if ((ocorrenciaData.recentes || []).length) { %>
+          <details class="tool-occurrence-history-summary">
+            <summary>Ver ocorrências recentes</summary>
+            <div>
+              <% ocorrenciaData.recentes.slice(0,15).forEach(function(occ){ %>
+                <span><strong><%= occ.codigo %></strong> • <%= occ.codigo_interno %> • <%= occ.tipo.replaceAll('_',' ') %> • <%= occ.status.replaceAll('_',' ') %> • <%= occ.aberta_por_nome %></span>
+              <% }) %>
+            </div>
+          </details>
+        <% } %>
+      </section>
+
       <section class="tool-panel">
         <div class="tool-panel-head"><div><span>INVENTÁRIO</span><h2>Ferramentas cadastradas</h2></div><small>Uma ferramenta física = um cadastro</small></div>
         <div class="tool-table-wrap">
           <table class="tool-table">
-            <thead><tr><th>ID interno</th><th>Ferramenta</th><th>Série / patrimônio</th><th>Condição</th><th>Status</th><th>Responsáveis</th><th>Local de guarda</th><th>Aceite</th><th>QR</th></tr></thead>
+            <thead><tr><th>ID interno</th><th>Ferramenta</th><th>Série / patrimônio</th><th>Condição</th><th>Status</th><th>Responsáveis</th><th>Local de guarda</th><th>Aceite</th><th>QR / histórico</th></tr></thead>
             <tbody>
               <% if (!data.ferramentas.length) { %><tr><td colspan="9" class="tool-empty">Nenhuma ferramenta cadastrada.</td></tr><% } %>
               <% data.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); %>
@@ -289,6 +390,7 @@
                     <% if (item.qr_token) { %>
                       <a class="tool-qr-link" href="/ferramental/qr/<%= item.qr_token %>" target="_blank">Abrir QR</a>
                       <a class="tool-qr-link" href="/pcm/ferramental/ferramentas/<%= item.id %>/etiqueta-pdf" target="_blank">Etiqueta PDF</a>
+                      <a class="tool-qr-link" href="/pcm/ferramental/ferramentas/<%= item.id %>/historico">Histórico</a>
                     <% } else { %>-<% } %>
                   </td>
                 </tr>

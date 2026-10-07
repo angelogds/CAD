@@ -30,6 +30,9 @@ router.get("/ferramental/aceites/:aceiteId/evidencia/:tipo", requireLogin, requi
 router.post("/ferramental/aceites/:aceiteId/resolver", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.resolveDivergence);
 router.post("/ferramental/inventarios", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.createInventory);
 router.get("/ferramental/ferramentas/:ferramentaId/etiqueta-pdf", requireLogin, requireRole(PCM_ACCESS), ferramentalCtrl.toolLabelPdf);
+router.get("/ferramental/ferramentas/:ferramentaId/historico", requireLogin, requireRole(PCM_ACCESS), ferramentalCtrl.toolHistory);
+router.post("/ferramental/ferramentas/:ferramentaId/ocorrencias", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.createPcmOccurrence);
+router.post("/ferramental/ocorrencias/:ocorrenciaId/resolver", requireLogin, requireRole(PCM_MANAGE), ferramentalCtrl.resolveOccurrence);
 
 // Compatibilidade: o painel executivo saiu do PCM operacional e passou a ser
 // parte do Painel da Diretoria. Favoritos antigos continuam funcionando.

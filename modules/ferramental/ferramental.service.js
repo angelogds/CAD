@@ -1,5 +1,6 @@
 const db = require('../../database/db');
 const aceiteService = require('./ferramental.aceite.service');
+const ocorrenciaService = require('./ferramental.ocorrencia.service');
 
 const ACTIVE_MAINTENANCE_ROLES = [
   'MECANICO',
@@ -321,6 +322,11 @@ function assignTool({ ferramenta_id, equipe_id, compartimento_id, observacao }, 
 
     if (previous) {
       aceiteService.cancelPendingForCustody(previous.id);
+      ocorrenciaService.settlePendingInventories(
+        previous.id,
+        'CONFIRMADO',
+        'Conferência encerrada automaticamente por transferência de custódia.'
+      );
       db.prepare(`
         UPDATE ferramental_custodias
         SET ativo=0, data_fim=datetime('now')

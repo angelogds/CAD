@@ -1,11 +1,14 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/meu-portal.css?v=20260914-v4" />
-<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v12" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v13" />
 
 <%
   const data = ferramental || { usuario: {}, resumo: {}, equipes: [], ferramentas: [], aceites: [] };
   const aceites = data.aceites || [];
   const inventarios = data.inventarios || [];
+  const ocorrencias = data.ocorrencias || [];
+  const ocorrenciasAbertas = ocorrencias.filter(function(o){ return ['ABERTA','EM_ANALISE','EM_ACOMPANHAMENTO'].includes(o.status); });
+  const ocorrenciaPorFerramenta = new Map(ocorrenciasAbertas.map(function(o){ return [Number(o.ferramenta_id), o]; }));
   const inventariosPendentes = inventarios.filter(function(i){ return i.situacao === 'PENDENTE'; });
   const pendentes = aceites.filter(function(a){ return a.status === 'PENDENTE'; });
   const aceitos = aceites.filter(function(a){ return a.status === 'ACEITO'; });
@@ -33,6 +36,7 @@
     <article><span>Confirmadas</span><strong><%= aceitos.length %></strong><small>Selfie + assinatura</small></article>
     <article><span>Divergências</span><strong><%= recusados.length %></strong><small>Aguardando revisão do PCM</small></article>
     <article><span>Conferências</span><strong><%= inventariosPendentes.length %></strong><small>Pendentes no inventário</small></article>
+    <article><span>Ocorrências</span><strong><%= ocorrenciasAbertas.length %></strong><small>Em tratamento pelo PCM</small></article>
   </section>
 
   <% if (pendentes.length) { %>
@@ -147,6 +151,30 @@
     </section>
   <% } %>
 
+
+  <% if (ocorrencias.length) { %>
+    <section class="tool-panel tool-self-occurrences" id="ocorrencias">
+      <div class="tool-panel-head">
+        <div><span>V1.3</span><h2>Minhas ocorrências</h2><p>Acompanhe devoluções, manutenção, dano ou extravio já comunicados ao PCM.</p></div>
+        <small><%= ocorrenciasAbertas.length %> em andamento</small>
+      </div>
+      <div class="tool-self-occurrence-list">
+        <% ocorrencias.slice(0,20).forEach(function(occ){ %>
+          <article>
+            <div>
+              <span><%= occ.codigo %> • <%= occ.tipo.replaceAll('_',' ') %></span>
+              <strong><%= occ.codigo_interno %> — <%= occ.ferramenta_descricao %></strong>
+              <small>Aberta por <%= occ.aberta_por_nome %> • <%= formatDateTime(occ.created_at) %></small>
+              <p><%= occ.descricao %></p>
+              <% if (occ.resolucao) { %><em>PCM: <%= occ.resolucao %></em><% } %>
+            </div>
+            <span class="tool-badge <%= ['ABERTA','EM_ANALISE'].includes(occ.status) ? 'tool-badge--pending' : occ.status === 'EM_ACOMPANHAMENTO' ? 'tool-badge--pending' : occ.status === 'RESOLVIDA' ? 'tool-badge--accepted' : 'tool-badge--rejected' %>"><%= occ.status.replaceAll('_',' ') %></span>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
+
   <% if (!data.equipes.length) { %>
     <section class="my-material-empty card">
       <strong>Nenhuma ferramenta vinculada no momento.</strong>
@@ -166,9 +194,9 @@
       </div>
       <div class="tool-table-wrap">
         <table class="tool-table">
-          <thead><tr><th>Ferramenta</th><th>ID</th><th>Condição</th><th>Local de guarda</th><th>Meu aceite</th><th>QR</th></tr></thead>
+          <thead><tr><th>Ferramenta</th><th>ID</th><th>Condição</th><th>Local de guarda</th><th>Meu aceite</th><th>QR</th><th>Ocorrência</th></tr></thead>
           <tbody>
-            <% team.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); %>
+            <% team.ferramentas.forEach(function(item){ const aceite = aceitePorCustodia.get(Number(item.custodia_id)); const ocorrencia = ocorrenciaPorFerramenta.get(Number(item.id)); %>
               <tr>
                 <td><strong><%= item.descricao %></strong><small><%= [item.marca,item.modelo].filter(Boolean).join(' • ') || item.categoria || '-' %></small></td>
                 <td><%= item.codigo_interno %><small><%= item.numero_serie ? 'Série: ' + item.numero_serie : (item.patrimonio ? 'Patrimônio: ' + item.patrimonio : '') %></small></td>
@@ -194,6 +222,28 @@
                 <td>
                   <% if (item.qr_token) { %><a class="tool-qr-link" href="/ferramental/qr/<%= item.qr_token %>">Identificar</a><% } else { %>-<% } %>
                 </td>
+                <td>
+                  <% if (ocorrencia) { %>
+                    <span class="tool-badge tool-badge--pending"><%= ocorrencia.codigo %></span>
+                    <small><%= ocorrencia.tipo.replaceAll('_',' ') %> • <%= ocorrencia.status.replaceAll('_',' ') %></small>
+                  <% } else { %>
+                    <details class="tool-own-occurrence-form">
+                      <summary>Informar problema</summary>
+                      <form method="POST" action="/meu-portal/ferramental/ferramentas/<%= item.id %>/ocorrencias">
+                        <select name="tipo" required>
+                          <option value="">Tipo</option>
+                          <option value="DEVOLUCAO">Solicitar devolução</option>
+                          <option value="MANUTENCAO">Necessita manutenção</option>
+                          <option value="DANO">Ferramenta danificada</option>
+                          <option value="EXTRAVIO">Não localizada / extravio</option>
+                          <option value="OUTRO">Outro</option>
+                        </select>
+                        <textarea name="descricao" maxlength="1000" rows="3" required placeholder="Explique o ocorrido"></textarea>
+                        <button class="btn btn-outline btn-sm" type="submit">Enviar ao PCM</button>
+                      </form>
+                    </details>
+                  <% } %>
+                </td>
               </tr>
             <% }) %>
           </tbody>
@@ -203,8 +253,8 @@
   <% }) %>
 
   <section class="tool-self-note">
-    <strong>V1.2 — conferência periódica + QR + tratamento de divergências</strong>
-    <span>O aceite individual continua válido; agora cada ciclo de inventário registra a conferência por responsável e o QR identifica rapidamente o ativo, sua custódia e o local de guarda.</span>
+    <strong>V1.3 — ciclo de vida e ocorrências</strong>
+    <span>Além do aceite, QR e conferência, agora o responsável comunica devolução, manutenção, dano ou extravio sem retirar sozinho a própria responsabilidade. O PCM trata a ocorrência e toda movimentação permanece no histórico.</span>
   </section>
 </div>
 

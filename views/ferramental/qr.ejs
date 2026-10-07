@@ -1,11 +1,14 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v12" />
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v13" />
 
 <%
   const item = ferramenta || {};
   const responsaveis = item.responsaveis || [];
   const statusLabel = String(item.status || '-').replaceAll('_',' ');
   const condicaoLabel = String(item.condicao || '-').replaceAll('_',' ');
+  const hist = historico || { movimentacoes: [], ocorrencias: [] };
+  const formatDateTime = (value) => value ? new Date(value).toLocaleString('pt-BR') : '-';
+  const ocorrenciaAtiva = hist.ocorrencias.find(function(o){ return ['ABERTA','EM_ANALISE','EM_ACOMPANHAMENTO'].includes(o.status); });
 %>
 
 <div class="tool-qr-page">
@@ -37,6 +40,27 @@
       <strong><%= responsaveis.length ? responsaveis.map(function(m){ return m.name; }).join(' + ') : 'Sem custódia ativa' %></strong>
       <% if (item.equipe_codigo) { %><small><%= item.equipe_codigo %> • <%= item.equipe_nome %></small><% } %>
     </div>
+
+    <% if (ocorrenciaAtiva) { %>
+      <div class="tool-qr-alert">
+        <span>Ocorrência em andamento</span>
+        <strong><%= ocorrenciaAtiva.codigo %> • <%= ocorrenciaAtiva.tipo.replaceAll('_',' ') %></strong>
+        <small><%= ocorrenciaAtiva.status.replaceAll('_',' ') %> • <%= ocorrenciaAtiva.descricao %></small>
+      </div>
+    <% } %>
+
+    <section class="tool-qr-history">
+      <div class="tool-panel-head"><div><span>V1.3</span><h2>Últimas movimentações</h2></div></div>
+      <% if (!hist.movimentacoes.length) { %>
+        <div class="tool-empty">Nenhuma movimentação registrada.</div>
+      <% } else { %>
+        <div class="tool-mini-timeline">
+          <% hist.movimentacoes.slice(0,8).forEach(function(move){ %>
+            <div><span><%= formatDateTime(move.created_at) %></span><strong><%= String(move.tipo || '-').replaceAll('_',' ') %></strong><small><%= move.observacao || move.destino_descricao || '' %></small></div>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
 
     <div class="tool-head-actions">
       <a class="ui-btn ui-btn--outline" href="/meu-portal/ferramental">Meu Ferramental</a>

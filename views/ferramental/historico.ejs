@@ -1,0 +1,104 @@
+<% layout('layout') %>
+<%- include('../pcm/partials/internal-styles') %>
+<link rel="stylesheet" href="/css/ferramental.css?v=20261007-v13" />
+
+<%
+  const item = ferramenta || {};
+  const hist = historico || { movimentacoes: [], ocorrencias: [] };
+  const formatDateTime = (value) => value ? new Date(value).toLocaleString('pt-BR') : '-';
+%>
+
+<div class="tool-page">
+  <header class="tool-head">
+    <div>
+      <span class="tool-eyebrow">PCM • HISTÓRICO DE FERRAMENTAL</span>
+      <h1><%= item.codigo_interno %> — <%= item.descricao %></h1>
+      <p>Custódias, transferências, aceites, ocorrências e alterações de estado preservadas em uma única linha do tempo.</p>
+    </div>
+    <div class="tool-head-actions">
+      <% if (item.qr_token) { %><a class="ui-btn ui-btn--outline" href="/ferramental/qr/<%= item.qr_token %>" target="_blank">Abrir QR</a><% } %>
+      <a class="ui-btn ui-btn--outline" href="/pcm/ferramental">Voltar</a>
+    </div>
+  </header>
+
+  <div class="pcm-shell">
+    <%- include('../pcm/partials/internal-nav', { activePcmSection: 'ferramental' }) %>
+    <main class="pcm-content tool-content">
+      <section class="tool-kpis tool-kpis--history">
+        <article><span>Status atual</span><strong class="tool-kpi-text"><%= String(item.status || '-').replaceAll('_',' ') %></strong><small>Estado do ativo</small></article>
+        <article><span>Condição</span><strong class="tool-kpi-text"><%= String(item.condicao || '-').replaceAll('_',' ') %></strong><small>Condição registrada</small></article>
+        <article><span>Responsáveis</span><strong class="tool-kpi-text"><%= item.responsaveis?.length ? item.responsaveis.map(function(m){return m.name;}).join(' + ') : 'Sem custódia' %></strong><small>Responsabilidade atual</small></article>
+        <article><span>Local</span><strong class="tool-kpi-text"><%= item.armario_codigo ? item.armario_codigo + ' / C' + item.compartimento_numero : '-' %></strong><small>Guarda atual</small></article>
+      </section>
+
+      <section class="tool-panel">
+        <div class="tool-panel-head">
+          <div><span>V1.3</span><h2>Abrir ocorrência pelo PCM</h2><p>Use quando a ocorrência for identificada pela gestão antes do registro do mecânico.</p></div>
+        </div>
+        <form method="POST" action="/pcm/ferramental/ferramentas/<%= item.id %>/ocorrencias" class="tool-form tool-form--two">
+          <label>Tipo
+            <select name="tipo" required>
+              <option value="">Selecione</option>
+              <option value="DEVOLUCAO">Devolução</option>
+              <option value="MANUTENCAO">Manutenção</option>
+              <option value="DANO">Dano</option>
+              <option value="EXTRAVIO">Extravio</option>
+              <option value="BAIXA">Baixa</option>
+              <option value="OUTRO">Outro</option>
+            </select>
+          </label>
+          <label class="tool-span-2">Descrição
+            <textarea name="descricao" maxlength="1000" rows="3" required placeholder="Descreva o motivo e o que foi identificado"></textarea>
+          </label>
+          <button class="ui-btn ui-btn--primary tool-span-2" type="submit">Abrir ocorrência</button>
+        </form>
+      </section>
+
+      <section class="tool-panel">
+        <div class="tool-panel-head"><div><span>OCORRÊNCIAS</span><h2>Registros do ativo</h2></div><small><%= hist.ocorrencias.length %> ocorrência(s)</small></div>
+        <% if (!hist.ocorrencias.length) { %>
+          <div class="tool-empty">Nenhuma ocorrência registrada para esta ferramenta.</div>
+        <% } else { %>
+          <div class="tool-history-occurrences">
+            <% hist.ocorrencias.forEach(function(occ){ %>
+              <article>
+                <div>
+                  <span><%= occ.codigo %> • <%= occ.tipo.replaceAll('_',' ') %></span>
+                  <strong><%= occ.status.replaceAll('_',' ') %></strong>
+                  <small>Aberta por <%= occ.aberta_por_nome %> • <%= formatDateTime(occ.created_at) %></small>
+                  <p><%= occ.descricao %></p>
+                  <% if (occ.resolucao) { %><em>Tratamento: <%= occ.resolucao %><%= occ.resolvido_por_nome ? ' • ' + occ.resolvido_por_nome : '' %></em><% } %>
+                </div>
+                <span class="tool-badge <%= occ.status === 'RESOLVIDA' ? 'tool-badge--accepted' : occ.status === 'CANCELADA' ? 'tool-badge--rejected' : 'tool-badge--pending' %>"><%= occ.status.replaceAll('_',' ') %></span>
+              </article>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+
+      <section class="tool-panel">
+        <div class="tool-panel-head"><div><span>LINHA DO TEMPO</span><h2>Movimentações</h2></div><small><%= hist.movimentacoes.length %> evento(s)</small></div>
+        <% if (!hist.movimentacoes.length) { %>
+          <div class="tool-empty">Nenhuma movimentação registrada.</div>
+        <% } else { %>
+          <div class="tool-timeline">
+            <% hist.movimentacoes.forEach(function(move){ %>
+              <article>
+                <i></i>
+                <div>
+                  <span><%= formatDateTime(move.created_at) %></span>
+                  <strong><%= String(move.tipo || '-').replaceAll('_',' ') %></strong>
+                  <% if (move.actor_nome) { %><small>Registrado por <%= move.actor_nome %></small><% } %>
+                  <% if (move.origem_descricao || move.destino_descricao) { %>
+                    <p><%= move.origem_descricao || '-' %> → <%= move.destino_descricao || '-' %></p>
+                  <% } %>
+                  <% if (move.observacao) { %><em><%= move.observacao %></em><% } %>
+                </div>
+              </article>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+    </main>
+  </div>
+</div>

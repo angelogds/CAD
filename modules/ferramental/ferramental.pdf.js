@@ -2,6 +2,7 @@ const pdf = require('../../utils/pdf-standard');
 const service = require('./ferramental.service');
 const aceiteService = require('./ferramental.aceite.service');
 const inventarioService = require('./ferramental.inventario.service');
+const ocorrenciaService = require('./ferramental.ocorrencia.service');
 
 function statusText(value) {
   const map = {
@@ -76,6 +77,9 @@ function generateTeamPdf(teamId) {
   const conferencias = inventarioService.listDashboard().inventories
     .filter((item) => Number(item.equipe_id) === Number(teamId))
     .slice(0, 5);
+  const ocorrencias = ocorrenciaService.dashboard().recentes
+    .filter((item) => Number(item.equipe_id) === Number(teamId))
+    .slice(0, 10);
   const meta = {
     title: 'Ficha de Responsabilidade de Ferramental',
     subtitle: 'Campo do Gado • Manutenção Industrial • PCM',
@@ -137,6 +141,20 @@ function generateTeamPdf(teamId) {
       });
     }
 
+    pdf.sectionBand(doc, 'Ocorrências V1.3', meta);
+    if (!ocorrencias.length) {
+      pdf.textBox(doc, 'Nenhuma ocorrência registrada recentemente para esta equipe.', meta);
+    } else {
+      ocorrencias.forEach((occ) => {
+        pdf.textBox(doc, [
+          `${occ.codigo} • ${occ.codigo_interno} • ${occ.ferramenta_descricao}`,
+          `Tipo: ${String(occ.tipo || '-').replaceAll('_', ' ')} • Status: ${String(occ.status || '-').replaceAll('_', ' ')}`,
+          `Aberta por: ${occ.aberta_por_nome || '-'} • ${formatDateTime(occ.created_at)}`,
+          occ.resolucao ? `Tratamento PCM: ${occ.resolucao}` : `Descrição: ${occ.descricao || '-'}`,
+        ].join('\n'), meta, { fill: pdf.COLORS.white, fontSize: 8.2 });
+      });
+    }
+
     pdf.sectionBand(doc, 'Termo de responsabilidade', meta);
     pdf.textBox(
       doc,
@@ -156,6 +174,7 @@ function generateUserPdf(userId) {
   const data = service.getUserSheet(userId);
   const aceites = aceiteService.listOwnAcceptances(userId);
   const conferencias = inventarioService.listOwn(userId);
+  const ocorrencias = ocorrenciaService.listOwn(userId).slice(0, 15);
   const confirmados = aceites.filter((item) => item.status === 'ACEITO').length;
   const pendentes = aceites.filter((item) => item.status === 'PENDENTE').length;
   const divergencias = aceites.filter((item) => item.status === 'RECUSADO').length;
@@ -224,6 +243,19 @@ function generateUserPdf(userId) {
           `Situação: ${String(item.situacao || '-').replaceAll('_', ' ')} • Data: ${formatDateTime(item.conferido_em)}`,
           item.observacao ? `Observação: ${item.observacao}` : 'Sem observação registrada.',
         ].join('\n'), meta, { fill: pdf.COLORS.white, fontSize: 8.3 });
+      });
+    }
+
+    pdf.sectionBand(doc, 'Minhas ocorrências V1.3', meta);
+    if (!ocorrencias.length) {
+      pdf.textBox(doc, 'Nenhuma ocorrência vinculada ao ferramental atual do colaborador.', meta);
+    } else {
+      ocorrencias.forEach((occ) => {
+        pdf.textBox(doc, [
+          `${occ.codigo} • ${occ.codigo_interno} • ${occ.ferramenta_descricao}`,
+          `Tipo: ${String(occ.tipo || '-').replaceAll('_', ' ')} • Status: ${String(occ.status || '-').replaceAll('_', ' ')}`,
+          occ.resolucao ? `Tratamento PCM: ${occ.resolucao}` : `Descrição: ${occ.descricao || '-'}`,
+        ].join('\n'), meta, { fill: pdf.COLORS.white, fontSize: 8.2 });
       });
     }
 
