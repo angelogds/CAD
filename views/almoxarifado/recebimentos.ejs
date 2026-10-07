@@ -18,7 +18,7 @@
   };
   const statusMeta = (value) => statusConfig[value] || { label: value || '-', cls: '' };
   const querySuffix = q ? `&q=${encodeURIComponent(q)}` : '';
-  const dateBR = (v) => { if (!v) return 'Sem previsão'; const p=String(v).slice(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(v); };
+  const dateBR = (v) => { if (!v) return ''; const p=String(v).slice(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(v); };
   const isCompraView = status === 'EM_COTACAO';
   const pageTitle = isCompraView ? 'Compras a caminho' : (status === 'COMPRADA' ? 'Materiais para receber' : 'Recebimentos');
   const currentCount = lista.length;
@@ -98,7 +98,7 @@
 
             <div class="almox-compact-application" data-label="Aplicação">
               <strong><%= s.equipamento_nome || 'Sem equipamento' %></strong>
-              <small><%= s.os_id ? ('OS #'+s.os_id) : 'Sem OS vinculada' %></small>
+              <% if(s.os_id){ %><small>OS #<%= s.os_id %></small><% } %>
             </div>
 
             <div class="almox-compact-progress" data-label="Andamento">
@@ -111,8 +111,8 @@
             </div>
 
             <div class="almox-compact-supplier" data-label="Fornecedor / previsão">
-              <strong><%= s.fornecedor || 'A definir' %></strong>
-              <small><%= dateBR(s.previsao_entrega) %></small>
+              <strong><%= s.fornecedor || '—' %></strong>
+              <% if(s.previsao_entrega){ %><small><%= dateBR(s.previsao_entrega) %></small><% } %>
             </div>
 
             <div data-label="Ação" class="almox-compact-row-actions" onclick="event.stopPropagation()">
