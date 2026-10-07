@@ -2,6 +2,7 @@
 <link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20260824-v1" />
 <link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-v1" />
 <link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-operacional-v3.css?v=20261007-v1" />
 
 <%
   const statusConfig = {
@@ -17,24 +18,29 @@
   const statusMeta = (value) => statusConfig[value] || { label: value || '-', cls: '' };
   const querySuffix = q ? `&q=${encodeURIComponent(q)}` : '';
   const dateBR = (v) => { if (!v) return 'A definir'; const p=String(v).slice(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(v); };
+  const isCompraView = status === 'EM_COTACAO';
+  const pageTitle = isCompraView ? 'Compras a caminho' : (status === 'COMPRADA' ? 'Materiais para receber' : 'Fluxo de recebimentos');
+  const pageText = isCompraView
+    ? 'Acompanhe o que está em cotação para o Almoxarifado saber o que deverá chegar, sem misturar esta fila com a conferência física.'
+    : 'Confira materiais comprados, registre entradas e acompanhe os recebimentos sem perder a origem da solicitação.';
 %>
 
 <div class="almox-page almox-flow-page">
   <header class="almox-hero">
     <div>
-      <span class="almox-hero__eyebrow">ALMOXARIFADO • SOLICITAÇÕES E RECEBIMENTOS</span>
-      <h1>Fluxo de Materiais</h1>
-      <p class="muted">Acompanhe cada solicitação desde a cotação, confira o que foi comprado, registre entradas e mantenha a retirada vinculada à origem.</p>
+      <span class="almox-hero__eyebrow">ALMOXARIFADO • <%= isCompraView ? 'ACOMPANHAMENTO DE COMPRAS' : 'RECEBIMENTO DE MATERIAIS' %></span>
+      <h1><%= pageTitle %></h1>
+      <p class="muted"><%= pageText %></p>
     </div>
     <div class="almox-hero__actions">
-      <a class="btn btn-ghost" href="/estoque">Consultar estoque</a>
+      <a class="btn btn-ghost" href="/almoxarifado/estoque">Consultar estoque</a>
       <a class="btn btn-ghost" href="/estoque/reservas">Materiais separados</a>
       <a class="btn btn-green" href="/almoxarifado/retiradas/qr">Retirada por QR</a>
       <a class="btn btn-ghost" href="/estoque/saidas/nova?contexto=almoxarifado">Retirada avulsa</a>
     </div>
   </header>
 
-  <%- include('_tabs', { tab: 'recebimentos' }) %>
+  <%- include('_tabs', { tab: isCompraView ? 'compras' : 'recebimentos' }) %>
 
   <section class="almox-flow-kpis almox-kpis" aria-label="Indicadores do fluxo">
     <a href="/almoxarifado/recebimentos?status=EM_COTACAO<%= querySuffix %>" class="almox-flow-kpi kpi-blue"><span>Em cotação</span><strong><%= resumo.em_cotacao %></strong><small>Acompanhamento, sem entrada</small></a>
