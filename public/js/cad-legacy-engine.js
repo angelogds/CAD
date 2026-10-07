@@ -135,6 +135,7 @@ function enhanceCadWorkspace(cad) {
     group.innerHTML = '<span class="cad-ribbon-label">Cotas e anotação</span>';
 
     [
+      { action: 'tool-cotar', tool: 'dim_linear', icon: '↔', label: 'Cotar', title: 'Cotar com posicionamento livre (D)' },
       { action: 'tool-dim-linear', tool: 'dim_linear', icon: '↔', label: 'Linear', title: 'Cota linear (D)' },
       { action: 'tool-dim-diameter', tool: 'dim_diameter', icon: '⌀', label: 'Diâmetro', title: 'Cota de diâmetro (DD)' },
       { action: 'tool-dim-angular', tool: 'dim_angular', icon: '∠', label: 'Angular', title: 'Cota angular (DA)' },
