@@ -288,15 +288,16 @@ function registrarInventarioFisico(data = {}, user = {}) {
       });
       created = true;
     } else {
+      const atual = getItem(itemId);
       updateItemClassification(itemId, {
-        categoria_id: data.categoria_id,
-        subcategoria_id: data.subcategoria_id,
-        local_id: data.local_id || getLocalArmazemFardo()?.id || null,
-        equipamento_id: data.equipamento_id,
-        endereco_zona: data.endereco_zona,
-        endereco_estante: data.endereco_estante,
-        endereco_prateleira: data.endereco_prateleira,
-        endereco_posicao: data.endereco_posicao,
+        categoria_id: data.categoria_id || atual?.categoria_id || null,
+        subcategoria_id: data.subcategoria_id || atual?.subcategoria_id || null,
+        local_id: data.local_id || getLocalArmazemFardo()?.id || atual?.local_id || null,
+        equipamento_id: data.equipamento_id || atual?.equipamento_id || null,
+        endereco_zona: normalize(data.endereco_zona) || atual?.endereco_zona || null,
+        endereco_estante: normalize(data.endereco_estante) || atual?.endereco_estante || null,
+        endereco_prateleira: normalize(data.endereco_prateleira) || atual?.endereco_prateleira || null,
+        endereco_posicao: normalize(data.endereco_posicao) || atual?.endereco_posicao || null,
       });
     }
 
