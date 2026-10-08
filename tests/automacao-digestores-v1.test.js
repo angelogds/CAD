@@ -1,0 +1,29 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const service = require('../modules/automacao/automacao.service');
+const { ACCESS } = require('../config/rbac');
+
+test('automacao v1 expõe quatro digestores com PT100 e duas descargas', () => {
+  const items = service.getDigestoresOverview();
+  assert.equal(items.length, 4);
+  for (const item of items) {
+    assert.equal(item.sensor, 'PT100');
+    assert.deepEqual(item.valvulas.map((v) => v.key), ['EIXO', 'CAMISA']);
+    assert.equal(item.temperatura_c, null);
+    assert.equal(item.temperatura_status, 'SEM_SINAL');
+    assert.ok(item.valvulas.every((v) => v.comando_habilitado === false));
+  }
+});
+
+test('automacao v1 não simula hardware antes da etapa de simulador', () => {
+  const state = service.getIntegrationState();
+  assert.equal(state.live, false);
+  assert.equal(state.simulator, false);
+  assert.equal(state.mode, 'AGUARDANDO_HARDWARE');
+});
+
+test('automacao possui RBAC de leitura separado', () => {
+  assert.ok(Array.isArray(ACCESS.automacao_view));
+  assert.ok(ACCESS.automacao_view.includes('MANUTENCAO_SUPERVISOR'));
+  assert.ok(ACCESS.automacao_view.includes('ENCARREGADO_MANUTENCAO'));
+});
