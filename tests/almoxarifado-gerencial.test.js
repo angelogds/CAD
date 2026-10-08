@@ -32,8 +32,8 @@ test("custos faltantes são identificados sem fabricar valores; material novo n�
  assert.equal(d.resumo.estoqueCentavos,0);
  assert.equal(d.resumo.itensSemValor,2);
  assert.equal(d.resumo.saidasSemPreco,1);
- assert.equal(d.parados.length,1);
- assert.equal(d.parados[0].nome,"Antigo");
+ assert.equal(d.parados.length,0); // Uma saída recente impede classificar o item como parado.
+ assert.equal(d.resumo.parados90d,0);
 });
 test("movimentação com custo de Compras em centavos substitui estimativa de estoque",()=>{
  const p=periodoSeguro({periodo:"7d"},hoje);
