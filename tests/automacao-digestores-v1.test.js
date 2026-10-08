@@ -22,10 +22,9 @@ test('automacao v1 não simula hardware antes da etapa de simulador', () => {
   assert.equal(state.mode, 'AGUARDANDO_HARDWARE');
 });
 
-test('automacao possui RBAC de leitura separado', () => {
-  assert.ok(Array.isArray(ACCESS.automacao_view));
-  assert.ok(ACCESS.automacao_view.includes('MANUTENCAO_SUPERVISOR'));
-  assert.ok(ACCESS.automacao_view.includes('ENCARREGADO_MANUTENCAO'));
+test('automacao restringe visualizacao e gestao aos perfis aprovados', () => {
+  assert.deepEqual([...ACCESS.automacao_view].sort(), ['ADMIN', 'DIRETORIA', 'MANUTENCAO_SUPERVISOR'].sort());
+  assert.deepEqual([...ACCESS.automacao_manage].sort(), ['ADMIN', 'MANUTENCAO_SUPERVISOR'].sort());
 });
 
 test('automacao classifica temperatura do processo para a torre sinalizadora', () => {
