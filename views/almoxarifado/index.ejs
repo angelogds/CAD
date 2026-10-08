@@ -2,6 +2,7 @@
 <link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20261007-v3" />
 <link rel="stylesheet" href="/css/almoxarifado-operacional-v3.css?v=20261007-v1" />
 <link rel="stylesheet" href="/css/almoxarifado-refino-v4.css?v=20261007-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-ux-v10.css?v=20261008-v1" />
 <%
   const dateBR=(v)=>{if(!v)return 'A definir';const p=String(v).slice(0,10).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:String(v)};
   const cotacaoStatus=(r)=>Number(r.itens_total||0)>0&&Number(r.itens_cotados||0)>=Number(r.itens_total||0)?'COTADO':'NÃO COTADO';
