@@ -17,4 +17,12 @@ function digestores(req, res) {
   });
 }
 
-module.exports = { index, digestores };
+function digestoresSimulador(req, res) {
+  return res.render('automacao/simulador', {
+    title: 'Automação - Simulador dos Digestores',
+    activeMenu: 'automacao',
+    digestores: service.getDigestoresOverview(),
+  });
+}
+
+module.exports = { index, digestores, digestoresSimulador };
