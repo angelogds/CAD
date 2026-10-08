@@ -9,6 +9,7 @@ const OFFICIAL_ROUTES = Object.freeze({
   estoque: '/estoque',
   pcm: '/pcm',
   rh: '/rh',
+  automacao: '/automacao',
 });
 
 const COMPATIBILITY_ALIASES = Object.freeze([
