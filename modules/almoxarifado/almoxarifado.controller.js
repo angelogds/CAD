@@ -76,6 +76,10 @@ function index(req, res) {
 }
 
 function estoqueOperacional(req, res) {
+  const situacoesValidas = ["", "SEM_ENDERECO", "ABAIXO_MINIMO", "RESERVADO"];
+  const ordensValidas = ["NOME", "LOCAL", "CATEGORIA", "SALDO"];
+  const situacaoRaw = String(req.query.situacao || "").toUpperCase();
+  const ordemRaw = String(req.query.ordem || "NOME").toUpperCase();
   const filtros = {
     q: String(req.query.q || "").trim(),
     categoria_id: req.query.categoria_id || "",
@@ -83,10 +87,35 @@ function estoqueOperacional(req, res) {
     setor_utilizacao: req.query.setor_utilizacao || "",
     equipamento_id: req.query.equipamento_id || "",
     destino: ["", "GERAL", "EQUIPAMENTO"].includes(String(req.query.destino || "").toUpperCase())
-      ? String(req.query.destino || "").toUpperCase()
-      : "",
+      ? String(req.query.destino || "").toUpperCase() : "",
+    situacao: situacoesValidas.includes(situacaoRaw) ? situacaoRaw : "",
+    ordem: ordensValidas.includes(ordemRaw) ? ordemRaw : "NOME",
   };
-  const itens = estoqueComDisponivel(estoqueService.listItens(filtros));
+  const itensBase = estoqueComDisponivel(estoqueService.listItens(filtros));
+  const semEndereco = (item) => !String(item.endereco_completo || "").trim();
+  const abaixoMinimo = (item) => Number(item.saldo_minimo || 0) > 0
+    && Number(item.saldo_disponivel || 0) < Number(item.saldo_minimo || 0);
+  const reservado = (item) => Number(item.saldo_reservado || 0) > 0;
+  const estoqueResumo = {
+    total: itensBase.length,
+    semEndereco: itensBase.filter(semEndereco).length,
+    abaixoMinimo: itensBase.filter(abaixoMinimo).length,
+    reservados: itensBase.filter(reservado).length,
+  };
+  const itens = itensBase.filter((item) => filtros.situacao === "SEM_ENDERECO" ? semEndereco(item)
+    : filtros.situacao === "ABAIXO_MINIMO" ? abaixoMinimo(item)
+    : filtros.situacao === "RESERVADO" ? reservado(item) : true);
+  const textCompare = (a, b) => String(a || "").localeCompare(String(b || ""), "pt-BR", { sensitivity: "base" });
+  itens.sort((a, b) => {
+    if (filtros.ordem === "SALDO") return Number(a.saldo_disponivel || 0) - Number(b.saldo_disponivel || 0)
+      || textCompare(a.nome, b.nome);
+    if (filtros.ordem === "LOCAL") return Number(semEndereco(a)) - Number(semEndereco(b))
+      || textCompare(a.local_nome, b.local_nome)
+      || textCompare(a.endereco_completo, b.endereco_completo) || textCompare(a.nome, b.nome);
+    if (filtros.ordem === "CATEGORIA") return textCompare(a.categoria_nome, b.categoria_nome)
+      || textCompare(a.subcategoria_nome, b.subcategoria_nome) || textCompare(a.nome, b.nome);
+    return textCompare(a.nome, b.nome);
+  });
   const categorias = estoqueService.listCategorias();
   const todosItens = estoqueComDisponivel(estoqueService.listItens({
     setor_utilizacao: filtros.setor_utilizacao,
@@ -106,7 +135,7 @@ function estoqueOperacional(req, res) {
     title: "Estoque do Almoxarifado",
     activeMenu: "almoxarifado",
     tab: "estoque",
-    itens,
+    itens, estoqueResumo,
     categorias,
     subcategorias: estoqueService.listSubcategorias(),
     locais: estoqueService.listLocais(),
@@ -129,6 +158,8 @@ function classificarEstoqueItem(req, res) {
   const params = new URLSearchParams();
   if (req.body.retorno_q) params.set("q", String(req.body.retorno_q));
   if (req.body.retorno_categoria_id) params.set("categoria_id", String(req.body.retorno_categoria_id));
+  if (req.body.retorno_situacao) params.set("situacao", String(req.body.retorno_situacao));
+  if (req.body.retorno_ordem) params.set("ordem", String(req.body.retorno_ordem));
   return res.redirect(`/almoxarifado/estoque?${params.toString()}`);
 }
 
