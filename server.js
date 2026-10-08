@@ -379,6 +379,7 @@ function mount(basePath, modPath) {
 
 mount("/auth", "./modules/auth/auth.routes");
 mount(OFFICIAL_ROUTES.dashboard, "./modules/dashboard/dashboard.routes");
+mount(OFFICIAL_ROUTES.automacao, "./modules/automacao/automacao.routes");
 mount("/push", "./modules/push/push.routes");
 mount("/mobile", "./modules/mobile/mobile.routes");
 mount(OFFICIAL_ROUTES.pcm, "./modules/pcm/pcm.routes");
