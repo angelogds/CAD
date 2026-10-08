@@ -24,6 +24,26 @@
 
   <%- include('_tabs', { tab: 'painel' }) %>
 
+  <section class="almox-v4-search-card" aria-label="Resumo gerencial de recebimentos" style="margin: 0 0 18px; padding: 18px;">
+    <div class="almox-v4-search-head"><div><h2>Painel gerencial • Compras a receber</h2><p>Indicadores atualizados com os registros oficiais de compras e recebimentos. Quantidades representam pedidos, não unidades de materiais.</p></div><a href="/almoxarifado/recebimentos?status=COMPRADA" class="btn btn-sm btn-ghost">Ver materiais a receber</a></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-top:12px;">
+      <% [
+        ['Compras registradas',painelGerencial.pedidosComprados],
+        ['Aguardando recebimento',painelGerencial.aguardandoRecebimento],
+        ['Recebimento parcial',painelGerencial.recebidosParcialmente],
+        ['Entrega atrasada',painelGerencial.atrasados],
+        ['Sem previsão',painelGerencial.semPrevisao]
+      ].forEach(([nome,total])=>{ %>
+        <div style="border:1px solid var(--border,#dce5df);border-radius:12px;padding:14px;background:var(--surface,#fff);min-width:0;">
+          <span style="display:block;font-size:.84rem;color:var(--muted,#536359);"><%=nome%></span>
+          <strong style="display:block;font-size:1.7rem;line-height:1.35;"><%=total%></strong>
+        </div>
+      <% }) %>
+    </div>
+    <p class="muted" style="margin:12px 0 0;">Os pedidos sem prazo precisam ter a previsão confirmada por Compras. Itens em cotação não entram neste resumo.</p>
+  </section>
+
+
   <section class="almox-v4-search-grid">
     <article class="almox-v4-search-card">
       <div class="almox-v4-search-head">
