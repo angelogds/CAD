@@ -1,4 +1,14 @@
 function classifyTemperature(value) {
+  if (value === null || value === undefined || value === '') {
+    return {
+      key: 'SEM_SINAL',
+      color: 'OFF',
+      label: 'Sem sinal',
+      detail: 'Aguardando leitura PT100',
+      ready: false,
+    };
+  }
+
   const temperatura = Number(value);
   if (!Number.isFinite(temperatura)) {
     return {
