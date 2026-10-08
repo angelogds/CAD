@@ -57,7 +57,7 @@ function exportar(req,res) {
   const pages=doc.bufferedPageRange();
   for(let i=pages.start;i<pages.start+pages.count;i++){
     doc.switchToPage(i);
-    doc.fillColor(gray).fontSize(8).text(`Campo do Gado · Almoxarifado | Página ${i+1}/${pages.count}`,42,810,{width:510,align:"right"});
+    doc.fillColor(gray).fontSize(8).text(`Campo do Gado · Almoxarifado | Página ${i+1}/${pages.count}`,42,790,{width:510,align:"right"});
   }
   doc.end();
 }
