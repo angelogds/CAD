@@ -1,5 +1,6 @@
 const { randomUUID } = require("node:crypto");
 const service = require("./almoxarifado.service");
+const { montarFaixasRecebimento } = require("./almoxarifado.grafico");
 const estoqueService = require("../estoque/estoque.service");
 const reservaService = require("../estoque/estoque.reservas.service");
 const alertsHub = require("../alerts/alerts.hub");
@@ -62,6 +63,7 @@ function index(req, res) {
     activeMenu: "almoxarifado",
     tab: "painel",
     painelGerencial,
+    faixasRecebimento: montarFaixasRecebimento(painelGerencial),
     compras: compras.slice(0, 20),
     recebimentos: recebimentos.slice(0, 20),
     qCompra,
