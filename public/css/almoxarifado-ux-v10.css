@@ -1,0 +1,102 @@
+/* Identidade única do Almoxarifado V10: navegação limpa e cantos discretos. */
+.almox-tabs.almox-tabs--operacional {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:7px;
+  margin:0 0 2px;
+  padding:2px 0 5px;
+}
+.almox-tabs--operacional .almox-tab {
+  min-height:38px;
+  display:inline-flex;
+  justify-content:center;
+  align-items:center;
+  gap:0;
+  padding:8px 12px;
+  border:1px solid #dce5de;
+  border-radius:8px;
+  background:#fff;
+  box-shadow:none;
+  color:#334155;
+  font-size:.78rem;
+  font-weight:700;
+  text-decoration:none;
+  white-space:nowrap;
+  line-height:1.25;
+}
+.almox-tabs--operacional .almox-tab:hover { border-color:#83c9a0; background:#f5faf6; color:#12683b; }
+.almox-tabs--operacional .almox-tab.active,
+.almox-tabs--operacional .almox-tab[aria-current="page"] {
+  border-color:#238451;
+  border-radius:8px;
+  color:#166534;
+  background:#eaf7ee;
+  box-shadow:inset 0 -2px #278357;
+}
+.almox-tabs--operacional .almox-tab:focus-visible,
+.almox-page .btn:focus-visible,.gerencial .btn:focus-visible,
+.qr-withdraw-page .btn:focus-visible {
+  outline:2px solid #257c4f;
+  outline-offset:2px;
+}
+.almox-page .btn, .almox-compact-page .btn, .almox-inventory-page .btn,
+.qr-withdraw-page .btn,.gerencial .btn {
+  border-radius:8px;
+}
+.almox-page .almox-chip,
+.almox-flow-page .almox-chip,
+.almox-compact-toolbar .almox-chip {
+  border-radius:8px;
+}
+.almox-page .almox-chip__count,
+.almox-flow-page .almox-chip__count {
+  border-radius:5px;
+}
+.almox-page .almox-store-category {
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  min-width:132px;
+  padding:9px 11px;
+  border-radius:8px;
+  box-shadow:none;
+}
+.almox-page .almox-store-category strong { display:block;margin:0;font-size:.77rem; }
+.almox-page .almox-store-category b { display:inline-flex;margin:0;padding:2px 7px;border-radius:5px;background:#edf7f0;font-size:.72rem; }
+.almox-page .almox-store-category.is-active { border-color:#288557;background:#eaf7ef; }
+.almox-page .almox-store-category-strip { padding:2px 0 7px; }
+.almox-stock-organization-summary {
+ display:flex;align-items:center;flex-wrap:wrap;gap:8px;
+ padding:9px 12px;border:1px solid #e1e8e2;background:#fff;border-radius:10px;
+}
+.almox-stock-organization-summary > strong {font-size:.77rem;color:#254035;margin-right:7px;}
+.almox-stock-organization-summary a {
+ display:inline-flex;align-items:center;gap:5px;padding:6px 9px;
+ border:1px solid #dce5de;border-radius:7px;text-decoration:none;background:#fff;
+ color:#42564d;font-size:.75rem;font-weight:700;
+}
+.almox-stock-organization-summary a b {font-size:.77rem;color:#185c3e;}
+.almox-stock-organization-summary a.is-current {background:#eaf7ef;border-color:#4eb67c;}
+.almox-stock-v6-row.is-unaddressed { border-left:3px solid #d29b30; }
+.almox-stock-v6-row.is-low-stock:not(.is-unaddressed) { border-left:3px solid #d27743; }
+.almox-stock-v6-row .almox-address-empty {color:#93600f;background:#fff5df;}
+.almox-stock-v6-list .almox-stock-v6-organize summary {cursor:pointer;font-weight:700;}
+.almox-stock-v6-list .almox-stock-v6-organize summary:focus-visible {outline:2px solid #26764b;outline-offset:2px;}
+.almox-page .almox-store-filters { border-radius:11px; }
+.almox-page .almox-v4-search-card,.almox-page .almox-compact-card {border-radius:12px;}
+.gerencial .box {border-radius:12px;}
+.gerencial .totais article {border-radius:9px;}
+@media(max-width:800px){
+ .almox-tabs.almox-tabs--operacional {flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;padding-bottom:10px;}
+ .almox-tabs--operacional .almox-tab {flex:0 0 auto;min-height:40px;}
+ .almox-stock-organization-summary {align-items:flex-start;}
+ .almox-page .almox-store-category {min-width:130px;}
+}
+@media(max-width:480px){
+ .almox-page .almox-hero__actions, .almox-page .almox-stock-v6-actions {flex-wrap:wrap;}
+ .almox-page .almox-store-filters .btn {min-height:40px;}
+ .almox-tabs--operacional .almox-tab {padding:9px 11px;font-size:.75rem;}
+}
