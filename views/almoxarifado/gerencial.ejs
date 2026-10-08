@@ -1,0 +1,93 @@
+<% layout("layout") %>
+<link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20261007-v3">
+<style>
+.gerencial{max-width:1400px;margin:auto;padding:18px}.gerencial h1{font-size:1.65rem;margin:4px 0 8px}.gerencial .box{background:#fff;border:1px solid #dee9e2;border-radius:15px;padding:20px;margin:16px 0}
+.gerencial .totais{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:10px}
+.gerencial .totais article{background:#f7faf7;border:1px solid #e2ebe4;border-radius:12px;padding:13px;min-width:0}
+.gerencial .totais small{display:block;color:#61766b}.gerencial .totais strong{font-size:1.35rem;display:block;margin-top:7px}
+.gerencial .duas{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:15px}.gerencial table{width:100%;border-collapse:collapse;font-size:.89rem}
+.gerencial th,.gerencial td{padding:9px 6px;text-align:left;border-bottom:1px solid #e9eee9;vertical-align:top}.gerencial .scroll{overflow:auto}
+.gerencial .form{display:flex;align-items:end;gap:12px;flex-wrap:wrap}.gerencial label{display:grid;gap:5px;font-size:.85rem}
+.gerencial select,.gerencial input{padding:9px;border-radius:8px;border:1px solid #cbdacf}
+.gerencial .bar{height:13px;background:#e9eeeb;border-radius:7px;overflow:hidden;min-width:90px}.gerencial .fill{height:100%;background:#278357}
+.gerencial .val{font-variant-numeric:tabular-nums}.gerencial .muted{color:#607367}
+@media(max-width:600px){.gerencial{padding:10px}.gerencial .box{padding:12px}.gerencial h1{font-size:1.35rem}}
+</style>
+<%
+const moeda = c => (Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const numero = n => Number(n||0).toLocaleString("pt-BR",{maximumFractionDigits:2});
+const query = new URLSearchParams({periodo: dados.periodo.modo, inicio:dados.periodo.inicio, fim:dados.periodo.fim});
+const r = dados.resumo;
+const maior = Math.max(1,...dados.serie.map(s=>Math.max(s.entradas,s.saidas)));
+%>
+<div class="gerencial">
+  <header style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <div><span style="color:#16844d;font-size:.78rem;font-weight:700">ALMOXARIFADO • GESTÃO E RESULTADOS</span>
+      <h1>Painel gerencial de materiais</h1>
+      <p class="muted">Custos, movimentações e consumo com base nos registros reais do sistema.</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a href="/almoxarifado" class="btn btn-ghost">Voltar à central</a>
+      <a class="btn btn-green" href="/almoxarifado/gerencial/pdf?<%=query.toString()%>">Gerar relatório PDF</a>
+    </div>
+  </header>
+  <section class="box">
+    <form method="get" action="/almoxarifado/gerencial" class="form">
+      <label>Período<select name="periodo" id="periodo-gerencial">
+        <% [['7d','Últimos 7 dias'],['30d','Últimos 30 dias'],['mes','Mês atual'],['ano','Ano atual'],['personalizado','Personalizado']].forEach(([v,n])=>{ %>
+          <option value="<%=v%>" <%=dados.periodo.modo===v?'selected':''%>><%=n%></option><% }) %>
+      </select></label>
+      <label>Início<input type="date" name="inicio" value="<%=dados.periodo.inicio%>"></label>
+      <label>Fim<input type="date" name="fim" value="<%=dados.periodo.fim%>"></label>
+      <button type="submit" class="btn btn-green">Aplicar filtros</button>
+      <small class="muted">Intervalo analisado: <%=dados.periodo.inicio%> a <%=dados.periodo.fim%></small>
+    </form>
+  </section>
+  <section class="box"><h2>Resumo financeiro e operacional</h2>
+    <div class="totais">
+      <% [
+        ['Valor em estoque',moeda(r.estoqueCentavos)],
+        ['Entradas no período',moeda(r.valorEntradaCentavos)],
+        ['Saídas no período',moeda(r.valorSaidaCentavos)],
+        ['Materiais com saldo',numero(r.itensComSaldo)],
+        ['Registros de entrada',numero(r.registrosEntrada)],
+        ['Registros de retirada',numero(r.registrosSaida)]
+      ].forEach(([nome,total])=>{ %>
+        <article><small><%=nome%></small><strong class="val"><%=total%></strong></article>
+      <% }) %>
+    </div>
+    <p class="muted" style="margin:13px 0 0;font-size:.82rem">Valores por custo de aquisição ou estimativa do estoque, não faturamento. <b><%=r.itensSemValor%></b> material(is) em saldo sem custo; <b><%=r.entradasSemPreco%></b> entrada(s) e <b><%=r.saidasSemPreco%></b> saída(s) sem preço; <b><%=r.valoresEstimados%></b> movimento(s) valorizados por estimativa. Esses valores são parciais enquanto houver custos ausentes.</p>
+  </section>
+  <section class="box"><h2>Gráfico de entradas e saídas</h2><p class="muted">Quantidade de registros por <%=dados.serie.some(s=>s.data.length===7)?'mês':'dia'%>; unidades diferentes não são somadas.</p>
+    <div class="scroll"><table><thead><tr><th>Data</th><th>Entradas</th><th>Saídas</th></tr></thead><tbody>
+      <% if(!dados.serie.length){ %><tr><td colspan="3">Sem movimentações no período.</td></tr><% } %>
+      <% dados.serie.forEach(s=>{ %>
+        <tr><td><%=s.data%></td>
+          <td><%=s.entradas%><div class="bar"><div class="fill" style="width:<%=(s.entradas/maior*100).toFixed(1)%>%"></div></div></td>
+          <td><%=s.saidas%><div class="bar"><div class="fill" style="width:<%=(s.saidas/maior*100).toFixed(1)%>%;background:#c08337"></div></div></td></tr>
+      <% }) %>
+    </tbody></table></div>
+  </section>
+  <div class="duas">
+    <section class="box"><h2>Mais utilizados no período</h2><p class="muted">Ordenados pelo número de retiradas, com quantidade por unidade do material.</p>
+      <div class="scroll"><table><thead><tr><th>Material</th><th>Retiradas</th><th>Quantidade</th></tr></thead><tbody>
+      <% if(!dados.maisSaidos.length){ %><tr><td colspan="3">Sem retiradas no período.</td></tr><% } %>
+      <% dados.maisSaidos.forEach(i=>{ %><tr><td><%=i.nome%></td><td><%=i.saidas%></td><td><%=numero(i.qtdSaida)%> <%=i.unidade%></td></tr><% }) %>
+      </tbody></table></div>
+    </section>
+    <section class="box"><h2>Materiais parados há 90 dias</h2><p class="muted">Saldo disponível sem saída recente e cadastro com pelo menos 90 dias. Revisar a reserva estratégica antes de reduzir compras.</p>
+      <div class="scroll"><table><thead><tr><th>Material</th><th>Saldo</th><th>Última saída</th></tr></thead><tbody>
+      <% if(!dados.parados.length){ %><tr><td colspan="3">Nenhum item antigo parado identificado.</td></tr><% } %>
+      <% dados.parados.forEach(i=>{ %><tr><td><%=i.nome%></td><td><%=numero(i.saldo)%> <%=i.unidade%></td><td><%=i.ultimaSaida||'Sem registro'%></td></tr><% }) %>
+      </tbody></table></div>
+    </section>
+  </div>
+  <section class="box"><h2>Materiais atualmente em estoque</h2><p class="muted">Valores calculados pelo custo unitário registrado. Lista completa no PDF.</p>
+    <div class="scroll"><table><thead><tr><th>Material</th><th>Saldo</th><th>Custo unitário</th><th>Valor estimado</th></tr></thead><tbody>
+    <% if(!dados.inventario.length){ %><tr><td colspan="4">Estoque sem saldo registrado.</td></tr><% } %>
+    <% dados.inventario.slice(0,20).forEach(i=>{ %><tr><td><%=i.nome%></td><td><%=numero(i.saldo)%> <%=i.unidade%></td>
+       <td><%=i.custoUnitario==null?'Sem custo':moeda(Math.round(i.custoUnitario*100))%></td>
+       <td><%=i.valorSaldoCentavos==null?'Sem custo':moeda(i.valorSaldoCentavos)%></td></tr><% }) %>
+    </tbody></table></div>
+  </section>
+</div>
