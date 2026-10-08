@@ -2,11 +2,15 @@ const router = require("express").Router();
 const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
 const ctrl = require("./almoxarifado.controller");
+const gerencialCtrl = require("./almoxarifado.gerencial.controller");
+const gerencialPdf = require("./almoxarifado.gerencial.pdf");
 const qrCtrl = require("./retiradas-qr.controller");
 
 const RETIRADA_QR_ACCESS = Array.from(new Set([...(ACCESS.almoxarifado_read || []), ...(ACCESS.estoque_retirada || [])]));
 
 router.get("/", requireLogin, requireRole(ACCESS.almoxarifado_read), ctrl.index);
+router.get("/gerencial", requireLogin, requireRole(ACCESS.almoxarifado_read), gerencialCtrl.index);
+router.get("/gerencial/pdf", requireLogin, requireRole(ACCESS.almoxarifado_read), gerencialPdf.exportar);
 router.get("/estoque", requireLogin, requireRole(ACCESS.almoxarifado_read), ctrl.estoqueOperacional);
 router.get("/estoque/inventario", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.inventarioArmazemFardo);
 router.post("/estoque/inventario", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.salvarInventarioArmazemFardo);
