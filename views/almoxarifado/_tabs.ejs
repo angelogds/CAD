@@ -1,17 +1,12 @@
 <%
   const currentTab = typeof tab !== 'undefined' && tab ? tab : (typeof almoxTab !== 'undefined' ? almoxTab : '');
-  const abasAlmox = [
-    ['painel', 'Painel', '/almoxarifado'],
-    ['compras', 'Compras a caminho', '/almoxarifado/recebimentos?status=EM_COTACAO'],
-    ['recebimentos', 'Compras a receber', '/almoxarifado/recebimentos?status=COMPRADA'],
-    ['separados', 'Para entregar', '/estoque/reservas'],
-    ['estoque', 'Estoque', '/almoxarifado/estoque'],
-    ['retiradas', 'Retirada', '/almoxarifado/retiradas/qr'],
-    ['gerencial', 'Visão gerencial', '/almoxarifado/gerencial']
-  ];
 %>
 <nav class="almox-tabs almox-tabs--operacional" aria-label="Navegação do Almoxarifado">
-  <% abasAlmox.forEach(([id, titulo, url]) => { %>
-    <a class="almox-tab <%= currentTab === id ? 'active' : '' %>" href="<%=url%>" <%- currentTab === id ? 'aria-current="page"' : '' %>><%= titulo %></a>
-  <% }) %>
+  <a class="almox-tab <%= currentTab === 'painel' ? 'active' : '' %>" href="/almoxarifado" <%- currentTab === 'painel' ? 'aria-current="page"' : '' %>>Painel</a>
+  <a class="almox-tab <%= currentTab === 'compras' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=EM_COTACAO" <%- currentTab === 'compras' ? 'aria-current="page"' : '' %>>Compras a caminho</a>
+  <a class="almox-tab <%= currentTab === 'recebimentos' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=COMPRADA" <%- currentTab === 'recebimentos' ? 'aria-current="page"' : '' %>>Compras a receber</a>
+  <a class="almox-tab <%= currentTab === 'separados' ? 'active' : '' %>" href="/estoque/reservas" <%- currentTab === 'separados' ? 'aria-current="page"' : '' %>>Para entregar</a>
+  <a class="almox-tab <%= currentTab === 'estoque' ? 'active' : '' %>" href="/almoxarifado/estoque" <%- currentTab === 'estoque' ? 'aria-current="page"' : '' %>>Estoque</a>
+  <a class="almox-tab <%= currentTab === 'retiradas' ? 'active' : '' %>" href="/almoxarifado/retiradas/qr" <%- currentTab === 'retiradas' ? 'aria-current="page"' : '' %>> Retirada</a>
+  <a class="almox-tab <%= currentTab === 'gerencial' ? 'active' : '' %>" href="/almoxarifado/gerencial" <%- currentTab === 'gerencial' ? 'aria-current="page"' : '' %>>Visão gerencial</a>
 </nav>
