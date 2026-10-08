@@ -6,5 +6,6 @@ const ctrl = require('./automacao.controller');
 
 router.get('/', requireLogin, requireRole(ACCESS.automacao_view), ctrl.index);
 router.get('/digestores', requireLogin, requireRole(ACCESS.automacao_view), ctrl.digestores);
+router.get('/digestores/simulador', requireLogin, requireRole(ACCESS.automacao_view), ctrl.digestoresSimulador);
 
 module.exports = router;
