@@ -1,0 +1,31 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/automacao.css?v=20261008-v1">
+<main class="auto-page">
+  <header class="auto-hero">
+    <div>
+      <span class="auto-eyebrow">RECICLAGEM • AUTOMAÇÃO INDUSTRIAL</span>
+      <h1>Automação</h1>
+      <p>IHM web para acompanhar sensores e, futuramente, comandar equipamentos com segurança pela rede industrial.</p>
+    </div>
+    <span class="auto-state waiting">Em implantação</span>
+  </header>
+
+  <section class="auto-grid auto-sectors">
+    <% (setores || []).forEach((setor) => { %>
+      <a class="auto-sector-card" href="<%= setor.href %>">
+        <span class="auto-sector-icon" aria-hidden="true">⚙</span>
+        <div>
+          <small>SETOR</small>
+          <h2><%= setor.title %></h2>
+          <p><%= setor.description %></p>
+        </div>
+        <span class="auto-open">Abrir IHM →</span>
+      </a>
+    <% }) %>
+  </section>
+
+  <section class="auto-note">
+    <strong>Primeira etapa</strong>
+    <p>O módulo começa pelos quatro digestores. Novas telas poderão ser adicionadas por setor sem misturar os fluxos.</p>
+  </section>
+</main>
