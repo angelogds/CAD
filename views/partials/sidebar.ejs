@@ -26,6 +26,7 @@
   const canAlmoxarifado = can('almoxarifado_read');
   const canEstoque = can('estoque_view');
   const canMotores = can('motores');
+  const canAutomacao = can('automacao_view');
   const canAvisos = can('avisos_view');
   const canUsuarios = can('usuarios');
   const canArmazenamento = ['ADMIN','ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO'].includes(role);
@@ -48,7 +49,7 @@
   const navItem = (href, label, isActive, extraClass = '', suffix = '') =>
     `<a class="nav-item ${extraClass} ${isActive ? 'active' : ''}" href="${href}" data-nav-label="${label}" title="${label}"><span class="nav-label">${label}</span>${suffix}</a>`;
 
-  const hasOperationGroup = canPainel || canDiretoriaManutencao || canDiretoriaCompras || canEquipamentos || canOS || canOSChat || canPreventivas || canLubrificacaoExecucao || canDemandas || canSolicitacoes || canAcompanhamentoOnly || canPreSolicitacoes || canCompras || canFornecedores || canAlmoxarifado || canEstoque || canMotores;
+  const hasOperationGroup = canPainel || canDiretoriaManutencao || canDiretoriaCompras || canAutomacao || canEquipamentos || canOS || canOSChat || canPreventivas || canLubrificacaoExecucao || canDemandas || canSolicitacoes || canAcompanhamentoOnly || canPreSolicitacoes || canCompras || canFornecedores || canAlmoxarifado || canEstoque || canMotores;
   const hasSupportGroup = canAvisos || canEscala || canRH || canMeuPortal || canInspecao || canTracagem || canDesenhoTecnico || canAcademia || canAI || canPCM;
 %>
 
@@ -64,6 +65,7 @@
     <% if (canPainel) { %><%- navItem('/dashboard', 'Painel Principal', activeMenu === 'dashboard') %><% } %>
     <% if (canDiretoriaManutencao) { %><%- navItem('/dashboard/diretoria/manutencao', 'Desempenho da Manutenção', activeMenu === 'diretoria-manutencao') %><% } %>
     <% if (canDiretoriaCompras) { %><%- navItem('/dashboard/diretoria/compras', 'Acompanhamento de Compras', activeMenu === 'diretoria-compras') %><% } %>
+    <% if (canAutomacao) { %><%- navItem('/automacao', 'Automação', activeMenu === 'automacao') %><% } %>
     <% if (canEquipamentos) { %><%- navItem('/equipamentos', 'Equipamentos', activeMenu === 'equipamentos') %><% } %>
     <% if (canOS) { %><%- navItem('/os', 'Ordens de Serviço', activeMenu === 'os', '', badge(counters.osAbertas, counters.osCriticas > 0 ? 'amber' : 'gray')) %><% } %>
     <% if (canOSChat) { %><%- navItem('/chat-os', 'Chat de OS', activeMenu === 'os-chat', '', badge(counters.osChatNaoLidas || 0, 'green')) %><% } %>
