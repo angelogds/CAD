@@ -65,6 +65,7 @@ function consolidar(itens = [], movimentos = [], ultimasSaidas = [], periodo = p
     if (!item) continue;
     const momento = String(mov.data_mov || "").slice(0,10);
     if (!dataValida(momento) || momento < periodo.inicio || momento > periodo.fim) continue;
+    if (saida && (!item.ultimaSaida || momento > item.ultimaSaida)) item.ultimaSaida = momento;
     // custo_unit em movimentos/estoque é BRL; cotação de compras é em centavos.
     const precoMov = numero(mov.custo_unit);
     const precoCompra = numero(mov.valor_unitario_centavos) / 100;
@@ -88,13 +89,14 @@ function consolidar(itens = [], movimentos = [], ultimasSaidas = [], periodo = p
   const materiais = [...porItem.values()];
   const maisSaidos = materiais.filter(i => i.qtdSaida > 0).sort((a,b) => b.saidas-a.saidas || b.qtdSaida-a.qtdSaida || a.nome.localeCompare(b.nome,"pt-BR")).slice(0,10);
   // Sem consumo nos últimos 90 dias E cadastro antigo o suficiente: não chamar material novo de obsoleto.
-  const parados = materiais.filter(i => i.saldo > 0 && i.criadoEm && i.criadoEm <= periodo.corte90
+  const paradosTodos = materiais.filter(i => i.saldo > 0 && i.criadoEm && i.criadoEm <= periodo.corte90
     && (!i.ultimaSaida || i.ultimaSaida <= periodo.corte90))
-    .sort((a,b) => (a.ultimaSaida || a.criadoEm).localeCompare(b.ultimaSaida || b.criadoEm)).slice(0,15);
+    .sort((a,b) => (a.ultimaSaida || a.criadoEm).localeCompare(b.ultimaSaida || b.criadoEm));
+  const parados = paradosTodos.slice(0,15);
   return {
     periodo, resumo: { itensCadastrados: materiais.length, itensComSaldo, estoqueCentavos, itensSemValor,
       registrosEntrada: entradas, registrosSaida: saidas, valorEntradaCentavos, valorSaidaCentavos,
-      entradasSemPreco, saidasSemPreco, valoresEstimados, parados90d: parados.length },
+      entradasSemPreco, saidasSemPreco, valoresEstimados, parados90d: paradosTodos.length },
     serie: [...series.values()].sort((a,b)=>a.data.localeCompare(b.data)),
     maisSaidos, parados, inventario: materiais.filter(i=>i.saldo>0).sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")),
   };
