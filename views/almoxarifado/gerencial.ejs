@@ -13,6 +13,7 @@
 .gerencial .val{font-variant-numeric:tabular-nums}.gerencial .muted{color:#607367}
 @media(max-width:600px){.gerencial{padding:10px}.gerencial .box{padding:12px}.gerencial h1{font-size:1.35rem}}
 </style>
+<link rel="stylesheet" href="/css/almoxarifado-ux-v10.css?v=20261008-v1" />
 <%
 const moeda = c => (Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const numero = n => Number(n||0).toLocaleString("pt-BR",{maximumFractionDigits:2});
@@ -31,6 +32,7 @@ const maior = Math.max(1,...dados.serie.map(s=>Math.max(s.entradas,s.saidas)));
       <a class="btn btn-green" href="/almoxarifado/gerencial/pdf?<%=query.toString()%>">Gerar relatório PDF</a>
     </div>
   </header>
+  <%- include('_tabs', { tab: 'gerencial' }) %>
   <section class="box">
     <form method="get" action="/almoxarifado/gerencial" class="form">
       <label>Período<select name="periodo" id="periodo-gerencial">
