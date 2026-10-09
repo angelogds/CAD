@@ -18,10 +18,10 @@
   const canPreventivas = can('preventivas_view');
   const canLubrificacaoExecucao = role === 'MECANICO' && can('lubrificacao_execucao');
   const canDemandas = can('demandas_view');
-  const canSolicitacoes = can('solicitacoes_read');
+  const canSolicitacoes = can('solicitacoes_read') || can('solicitacoes_reciclagem_read');
   const canAcompanhamentoOnly = can('acompanhamento_compras') && !canSolicitacoes;
   const canPreSolicitacoes = can('pre_solicitacao_almox_read');
-  const canCompras = can('compras');
+  const canCompras = can('compras') || can('compras_reciclagem_read');
   const canFornecedores = can('fornecedores');
   const canAlmoxarifado = can('almoxarifado_read');
   const canEstoque = can('estoque_view');

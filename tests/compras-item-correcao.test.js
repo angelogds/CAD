@@ -27,10 +27,11 @@ test('correção permite voltar comprado para cotado ou pendente sem apagar o it
   assert.match(service, /recalcularStatus/);
 });
 
-test('endpoint de correção mantém RBAC de compras_manage', () => {
+test('endpoint de correção mantém Compras global e adiciona escopo seguro da Reciclagem', () => {
   const routes = read('modules/compras/compras.routes.js');
+  assert.match(routes, /COMPRAS_MANAGE_ACCESS.*ACCESS\.compras_manage.*ACCESS\.compras_reciclagem_manage/s);
   assert.match(routes, /\/solicitacoes\/:id\/itens\/:itemId\/corrigir-compra/);
-  assert.match(routes, /requireRole\(ACCESS\.compras_manage\), itemCorrecaoCtrl\.corrigirItemCompra/);
+  assert.match(routes, /requireRole\(COMPRAS_MANAGE_ACCESS\), reciclagemScope\.requireSolicitacaoScope, reciclagemScope\.requireItemScope, itemCorrecaoCtrl\.corrigirItemCompra/);
 });
 
 test('botão Editar abre correção para comprado e preserva edição simples nos demais', () => {
