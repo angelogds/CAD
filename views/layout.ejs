@@ -21,6 +21,13 @@
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'escala') { %><link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b" /><% } %>
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><link rel="stylesheet" href="/css/compras-demandas-pre-cotacao.css?v=20260902-v1" /><% } %>
   <script>window.__VAPID_PUBLIC_KEY__ = "<%= VAPID_PUBLIC_KEY || "" %>";</script>
+  <script>
+    window.__POSTHOG_CONFIG__ = <%- JSON.stringify({
+      key: POSTHOG_PUBLIC_KEY || "",
+      host: POSTHOG_HOST || "https://us.i.posthog.com",
+      role: user ? String(user.role || user.perfil || "").toUpperCase() : ""
+    }).replace(/</g, "\\u003c") %>;
+  </script>
 </head>
 <body>
   <% const isAuthFullscreen = Boolean((typeof authFullscreen !== 'undefined' && authFullscreen) || (typeof locals !== 'undefined' && locals.authFullscreen)); %>
@@ -121,6 +128,7 @@
       <% } %>
     <% } %>
 
+    <script src="/js/analytics-posthog.js?v=20261007-v1" defer></script>
     <script src="/js/native-menu.js?v=20260924-1" defer></script>
     <script src="/js/app-layout.js?v=20261007-sidebar-v1" defer></script>
     <script src="/js/push.js" defer></script>

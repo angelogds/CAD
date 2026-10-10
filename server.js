@@ -140,6 +140,8 @@ if (webPush && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 }
 
 app.locals.VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
+app.locals.POSTHOG_PUBLIC_KEY = String(process.env.POSTHOG_PUBLIC_KEY || process.env.POSTHOG_KEY || '').trim();
+app.locals.POSTHOG_HOST = String(process.env.POSTHOG_HOST || 'https://us.i.posthog.com').trim();
 app.locals.attachmentExists = mediaVolume.attachmentExists;
 app.locals.REMOVED_ATTACHMENT_MESSAGE = mediaVolume.REMOVED_MESSAGE;
 
@@ -282,6 +284,8 @@ app.use((req, res, next) => {
   res.locals.fmtBR = fmtBR;
   res.locals.TZ = TZ;
   res.locals.VAPID_PUBLIC_KEY = app.locals.VAPID_PUBLIC_KEY || "";
+  res.locals.POSTHOG_PUBLIC_KEY = app.locals.POSTHOG_PUBLIC_KEY || "";
+  res.locals.POSTHOG_HOST = app.locals.POSTHOG_HOST || "";
 
   // ✅ RBAC helpers disponíveis no EJS (sem require no template)
   res.locals.canAccessModule = canAccessModule;
