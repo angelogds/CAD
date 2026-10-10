@@ -1,0 +1,125 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/automacao.css?v=20261008-v2">
+<main class="auto-page auto-hmi">
+  <header class="auto-hero auto-hero-hmi">
+    <div>
+      <span class="auto-eyebrow">AUTOMAÇÃO • DECANTERS</span>
+      <h1>IHM dos Decanters</h1>
+      <p>Visão do fluxo da Área Suja para a Área Limpa, medição do sebo e acompanhamento do nível do Tanque de Serviço.</p>
+    </div>
+    <div class="auto-integration">
+      <span class="auto-state waiting">Sem hardware conectado</span>
+      <small><%= integrationState.label %></small>
+    </div>
+  </header>
+
+  <section class="auto-alert">
+    <strong>Modo de implantação</strong>
+    <span>Esta tela não envia comandos reais. Leituras e estados ficam em “sem sinal” até a integração dos sensores, medidor de vazão e controlador local.</span>
+  </section>
+
+  <section class="process-flow" aria-label="Fluxo do processo de sebo">
+    <article class="process-zone dirty">
+      <small>ORIGEM</small>
+      <h2>Área Suja</h2>
+      <p>Recepção do material antes da etapa de separação.</p>
+      <span class="signal-pill offline">Sem sinal</span>
+    </article>
+
+    <div class="process-arrow" aria-hidden="true"><span>FLUXO</span><i></i></div>
+
+    <article class="process-equipment">
+      <% (processo.decanters || []).forEach((d) => { %>
+        <div class="decanter-machine">
+          <div class="decanter-drum"><span>DECANTER</span><b><%= d.nome %></b></div>
+          <div class="decanter-motor">MOTOR</div>
+          <div class="decanter-base"></div>
+        </div>
+        <div class="equipment-meta">
+          <small><%= d.area %></small>
+          <h2><%= d.nome %></h2>
+          <p><%= d.funcao %></p>
+          <span class="signal-pill offline">Sem sinal</span>
+        </div>
+      <% }) %>
+    </article>
+
+    <div class="process-arrow" aria-hidden="true"><span>SEBO</span><i></i></div>
+
+    <article class="process-zone clean">
+      <small>DESTINO</small>
+      <h2>Área Limpa</h2>
+      <p>Saída do sebo após a etapa de separação.</p>
+      <span class="signal-pill offline">Sem sinal</span>
+    </article>
+  </section>
+
+  <section class="decanter-dashboard">
+    <article class="auto-panel flow-meter-panel">
+      <div class="panel-head">
+        <div>
+          <small>MEDIÇÃO DE SEBO</small>
+          <h2>Medidor de vazão</h2>
+        </div>
+        <span class="signal-pill offline">Sem sinal</span>
+      </div>
+      <div class="meter-grid">
+        <div class="meter-reading">
+          <small>Vazão instantânea</small>
+          <strong>--,-</strong>
+          <span><%= processo.medicaoSebo.unidade_vazao %></span>
+        </div>
+        <div class="meter-reading">
+          <small>Total transferido</small>
+          <strong>---</strong>
+          <span><%= processo.medicaoSebo.unidade_total %></span>
+        </div>
+      </div>
+      <p>O medidor ficará entre a saída do processo e o Tanque de Serviço para registrar quanto sebo está sendo transferido.</p>
+    </article>
+
+    <article class="auto-panel service-tank-panel">
+      <div class="panel-head">
+        <div>
+          <small>ARMAZENAMENTO</small>
+          <h2><%= processo.tanqueServico.nome %></h2>
+        </div>
+        <span class="signal-pill offline">Sem sinal</span>
+      </div>
+      <div class="tank-layout">
+        <div class="service-tank" aria-label="Tanque de serviço sem leitura de nível">
+          <div class="tank-shell">
+            <div class="tank-level level-off"></div>
+            <span class="level-mark high">ALTO</span>
+            <span class="level-mark medium">MÉDIO</span>
+            <span class="level-mark low">BAIXO</span>
+          </div>
+          <div class="tank-leg left"></div>
+          <div class="tank-leg right"></div>
+        </div>
+        <div class="tank-info">
+          <small>Sensor de nível</small>
+          <strong>Sem leitura</strong>
+          <span>Baixo • Médio • Alto</span>
+          <p>O indicador será atualizado automaticamente quando o sensor de nível estiver integrado.</p>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <section class="auto-bottom-grid">
+    <article class="auto-panel">
+      <h2>Leituras previstas</h2>
+      <ol>
+        <li>Estado operacional do Decanter.</li>
+        <li>Vazão instantânea de sebo.</li>
+        <li>Total acumulado transferido.</li>
+        <li>Nível baixo, médio e alto do Tanque de Serviço.</li>
+      </ol>
+    </article>
+    <article class="auto-panel">
+      <h2>Próxima etapa</h2>
+      <p>Depois desta IHM, seguimos para o setor das Prensas. A visão geral da fábrica será montada somente depois que as telas setoriais estiverem prontas.</p>
+    </article>
+  </section>
+</main>

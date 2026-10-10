@@ -1,4 +1,14 @@
 function classifyTemperature(value) {
+  if (value === null || value === undefined || value === '') {
+    return {
+      key: 'SEM_SINAL',
+      color: 'OFF',
+      label: 'Sem sinal',
+      detail: 'Aguardando leitura PT100',
+      ready: false,
+    };
+  }
+
   const temperatura = Number(value);
   if (value == null || String(value).trim() === '' || !Number.isFinite(temperatura)) {
     return {
@@ -46,6 +56,15 @@ const DIGESTORES = Object.freeze([
   { id: 4, nome: 'Digestor 4', sensor: 'PT100', valvulas: [{ key: 'EIXO', nome: 'Eixo' }, { key: 'CAMISA', nome: 'Camisa' }] },
 ]);
 
+const DECANTERS = Object.freeze([
+  {
+    id: 'FAST_SATURN_3',
+    nome: 'Decanter FAST Saturn 3',
+    area: 'ÁREA LIMPA',
+    funcao: 'Separação / filtragem de sebo',
+  },
+]);
+
 function listSetores() {
   return [
     {
@@ -53,6 +72,13 @@ function listSetores() {
       title: 'Digestores',
       description: 'Leitura de temperatura PT100 e descargas automáticas para limpeza dos purgadores.',
       href: '/automacao/digestores',
+      status: 'EM_IMPLANTACAO',
+    },
+    {
+      key: 'decanters',
+      title: 'Decanters',
+      description: 'Fluxo Área Suja → Área Limpa, medição do sebo e nível do Tanque de Serviço.',
+      href: '/automacao/decanters',
       status: 'EM_IMPLANTACAO',
     },
   ];
@@ -72,6 +98,34 @@ function getDigestoresOverview() {
   }));
 }
 
+function getDecantersOverview() {
+  return {
+    areas: [
+      { key: 'AREA_SUJA', nome: 'Área Suja', estado: 'SEM_SINAL' },
+      { key: 'AREA_LIMPA', nome: 'Área Limpa', estado: 'SEM_SINAL' },
+    ],
+    decanters: DECANTERS.map((decanter) => ({
+      ...decanter,
+      estado: 'SEM_SINAL',
+      comando_habilitado: false,
+    })),
+    medicaoSebo: {
+      estado: 'SEM_SINAL',
+      vazao_l_min: null,
+      total_l: null,
+      unidade_vazao: 'L/min',
+      unidade_total: 'L',
+    },
+    tanqueServico: {
+      nome: 'Tanque de Serviço',
+      nivel: null,
+      nivel_estado: 'SEM_SINAL',
+      faixas: ['BAIXO', 'MÉDIO', 'ALTO'],
+      comando_habilitado: false,
+    },
+  };
+}
+
 function getIntegrationState() {
   return {
     mode: 'AGUARDANDO_HARDWARE',
@@ -84,6 +138,7 @@ function getIntegrationState() {
 module.exports = {
   listSetores,
   getDigestoresOverview,
+  getDecantersOverview,
   getIntegrationState,
   classifyTemperature,
 };
