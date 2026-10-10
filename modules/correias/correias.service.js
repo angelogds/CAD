@@ -23,8 +23,9 @@ function saldoColumn() {
 }
 
 function reservadoExpr(alias = 'i') {
-  if (!tableExists('estoque_reservas')) return '0';
-  return `COALESCE((SELECT SUM(MAX(r.quantidade_reservada-r.quantidade_retirada,0))
+  const correias = tableExists('correias_pedidos') ? `COALESCE((SELECT SUM(quantidade) FROM correias_pedidos WHERE estoque_item_id=${alias}.id AND status IN ('SOLICITADA','SEPARADA')),0)` : '0';
+  if (!tableExists('estoque_reservas')) return correias;
+  return `${correias} + COALESCE((SELECT SUM(MAX(r.quantidade_reservada-r.quantidade_retirada,0))
     FROM estoque_reservas r
     WHERE r.estoque_item_id=${alias}.id AND r.status<>'CANCELADA'),0)`;
 }
@@ -268,6 +269,16 @@ function getPlanoContext(planoId) {
 }
 
 function baixarEstoquePreventiva({ planoId, execId, userId = null }) {
+  if (tableExists('correias_pedidos')) {
+    const pedidos = db.prepare('SELECT status,movimento_id FROM correias_pedidos WHERE preventiva_execucao_id=?').all(Number(execId));
+    if (pedidos.length) {
+      if (pedidos.some(p => ['SOLICITADA','SEPARADA','RETIRADA'].includes(p.status))) throw new Error('Conclua a retirada e confirme a troca das correias, ou cancele/devolva o pedido antes de concluir a preventiva.');
+      return { skipped: true };
+    }
+    // Novas execuções usam o pedido e a baixa na retirada. O legado já baixado continua idempotente.
+    const legado = db.prepare('SELECT estoque_movimento_id FROM preventiva_execucoes WHERE id=?').get(Number(execId));
+    if (getPlanoContext(planoId) && !legado?.estoque_movimento_id) throw new Error('Solicite e retire as correias pelo Almoxarifado antes de concluir a troca.');
+  }
   const plano = getPlanoContext(planoId);
   if (!plano || Number(plano.baixa_estoque_automatica||0)!==1) return { skipped:true };
   const quantidade = Number(plano.quantidade_material||0);

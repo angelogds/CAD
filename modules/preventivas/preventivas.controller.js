@@ -131,6 +131,10 @@ function show(req, res) {
     plano,
     execucoes,
     correiaContext: correiasService.getPlanoContext(id),
+    correiasMecanicos: require('../../database/db').prepare("SELECT id,name FROM users WHERE ativo=1 AND UPPER(role)='MECANICO' ORDER BY name").all(),
+    correiasVinculos: require('../correias/correias.fluxo.service').vinculos(plano.equipamento_id),
+    correiasPedidos: require('../correias/correias.fluxo.service').list(plano.equipamento_id),
+    execucoesAutorizadas: execucoes.filter(x => service.userCanExecutePreventiva(x.id, req.session?.user)).map(x=>x.id),
     canAdminPreventivas: isPcmManager(req.session?.user || null),
     canExecutePreventivas: ["ADMIN", "MECANICO", "MANUTENCAO_SUPERVISOR", "SUPERVISOR_MANUTENCAO"].includes(String(req.session?.user?.role || "").toUpperCase()),
   });

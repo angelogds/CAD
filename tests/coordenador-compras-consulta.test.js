@@ -49,21 +49,21 @@ test('middleware libera leitura e recusa permissões de escrita', () => {
   const req = { session: { user }, flash() {}, accepts: () => false };
   const res = { status(code) { this.code = code; return this; }, json() {} };
   let passed = false;
-  requireRole(ACCESS.acompanhamento_compras)(req, res, () => { passed = true; });
+  requireRole(ACCESS.diretoria_compras)(req, res, () => { passed = true; });
   assert.equal(passed, true);
-  for (const key of ['compras_manage', 'compras_delete', 'solicitacoes_create', 'solicitacoes_manage', 'diretoria_aprovacao', 'almoxarifado_manage']) {
+  for (const key of ['compras_manage', 'compras_delete', 'diretoria_aprovacao', 'almoxarifado_manage']) {
     requireRole(ACCESS[key])(req, res, () => assert.fail(key));
     assert.equal(res.code, 403);
   }
 });
 
-test('menu oferece acompanhamento diretamente sem abrir compras operacionais', () => {
+test('menu oferece acompanhamento executivo e solicitações sem compras operacionais', () => {
   const fs = require('node:fs');
   const ejs = require('ejs');
   const html = ejs.render(fs.readFileSync(require.resolve('../views/partials/sidebar.ejs'), 'utf8'), {
     user, normalizeRole, canAccessModule, activeMenu: 'solicitacoes', operationalCounters: {},
   });
-  assert.match(html, /href="\/acompanhamento-compras"/);
+  assert.match(html, /href="\/dashboard\/diretoria\/compras"/);
   assert.doesNotMatch(html, /href="\/compras\/solicitacoes"/);
-  assert.doesNotMatch(html, /href="\/solicitacoes\/minhas"/);
+  assert.match(html, /href="\/solicitacoes\/minhas"/);
 });

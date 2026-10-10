@@ -24,6 +24,9 @@
   </header>
 
   <%- include('_tabs', { tab: 'painel' }) %>
+  <section class="card" style="margin:16px 0"><h2>Reposição e materiais para separar</h2><a class="btn btn-green" href="/almoxarifado/correias">Pedidos e retiradas de correias</a><p>O saldo livre considera as reservas. Pedidos já em andamento impedem uma nova pré-solicitação automática.</p>
+  <% (typeof reposicao==='undefined'?[]:reposicao).forEach(i=>{ %><p><a href="/estoque/itens/<%=i.id%>"><%=i.nome%></a> • livre <%=i.disponivel%> <%=i.unidade%> • reserva mínima <%=i.saldo_minimo%> • ponto de reposição <%=i.ponto_calculado.toFixed(2)%> • a receber <%=i.a_receber%> • <%=i.pedido?'Pré-solicitação '+i.pedido.numero:'Reposição necessária'%></p><% }) %>
+  <% if(['ADMIN','ALMOXARIFADO'].includes(user?.role)){ %><form method="post" action="/estoque/reposicao/gerar"><button class="btn btn-green">Preparar pré-solicitações de reposição</button></form><% } %></section>
 
   <section class="almox-v4-search-card" aria-label="Resumo gerencial de recebimentos" style="margin: 0 0 18px; padding: 18px;">
     <div class="almox-v4-search-head"><div><h2>Painel gerencial • Compras a receber</h2><p>Indicadores atualizados com os registros oficiais de compras e recebimentos. Quantidades representam pedidos, não unidades de materiais.</p></div><a href="/almoxarifado/recebimentos?status=COMPRADA" class="btn btn-sm btn-ghost">Ver materiais a receber</a></div>

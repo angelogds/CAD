@@ -1,0 +1,16 @@
+<% const policy=typeof canManageReposicao!=='undefined'&&canManageReposicao; %>
+<div class="card" style="margin:16px 0"><h2>Reserva mínima e reposição</h2><p>Unidade de controle: <strong><%=item.unidade%></strong>. O prazo deve incluir aprovação, compra e entrega. Ponto automático = reserva mínima + consumo médio diário dos últimos 90 dias × prazo.</p>
+<% if(policy){ %><form method="post" action="/estoque/itens/<%=item.id%>/reposicao"><div class="grid-3">
+<label>Reserva mínima (<%=item.unidade%>)<input name="saldo_minimo" type="number" min="0" step="0.001" required value="<%=item.saldo_minimo||0%>"></label>
+<label>Ponto de reposição (vazio: calcular)<input name="ponto_reposicao" type="number" min="0" step="0.001" value="<%=item.ponto_reposicao??''%>"></label>
+<label>Saldo alvo (<%=item.unidade%>)<input name="saldo_alvo" type="number" min="0" step="0.001" required value="<%=item.saldo_alvo??''%>"></label>
+<label>Prazo total de reposição (dias)<input name="prazo_reposicao_dias" type="number" min="0" step="1" required value="<%=item.prazo_reposicao_dias||0%>"></label>
+<label>Embalagem de referência (CX, RL…)<input name="unidade_compra" value="<%=item.unidade_compra||item.unidade%>"></label>
+<label>Quantidade de <%=item.unidade%> por embalagem<input name="fator_compra" type="number" min="0.001" step="0.001" value="<%=item.fator_compra??''%>"></label>
+</div><p>Compras e recebimentos devem registrar quantidades na unidade de controle; o fator da embalagem ajuda a converter o mínimo no cadastro.</p>
+<label>Quantidade prevista por setor (na unidade de controle)</label><div class="grid-3"><% let rateio={};try{rateio=JSON.parse(item.rateio_setores_json||'{}')}catch{}; ['RECICLAGEM','FRIGORIFICO','LOGISTICA','ADMINISTRATIVO'].forEach(s=>{ %><label><%=s%><input name="rateio_<%=s%>" type="number" min="0" step="0.001" value="<%=rateio[s]||0%>"></label><% }) %></div>
+<p>Materiais comuns são encaminhados ao responsável de manutenção da Reciclagem. O rateio previsto acompanha a pré-solicitação; o consumo real é registrado na retirada.</p>
+<button class="btn btn-green">Salvar política de reposição</button></form>
+<details style="margin-top:16px"><summary>Mínimos validados para solda e abrasivos</summary><ul><li>7018 / OK 48: 10 kg por bitola — 2,5; 3,25; 4 mm.</li><li>6013 / OK 46: 10 kg por bitola — 2,5; 3,25 mm.</li><li>6010: uso específico, mínimo ainda não definido.</li><li>MIG tubular 1,2 mm: 15 kg; MIG sólido 1,2 mm: 15 kg.</li><li>Desbaste: uma caixa de cada — 4, 7 e 9 polegadas.</li><li>Corte: uma caixa de cada — 4, 7 e 9 polegadas.</li><li>Flap: uma caixa de cada — 4 e 7 polegadas.</li></ul><p>Antes de cadastrar discos em UN, confirme as unidades de cada caixa, a medida exata e a especificação. ESAB é a marca usual; equivalentes permanecem identificados no cadastro.</p></details>
+<a href="/estoque/classificacao">Configurar classificação e endereços automáticos</a>
+<% }else{ %><p>Reserva mínima: <%=item.saldo_minimo||0%>; ponto: <%=item.ponto_reposicao??'automático'%>; saldo alvo: <%=item.saldo_alvo??'a definir'%>.</p><% } %></div>

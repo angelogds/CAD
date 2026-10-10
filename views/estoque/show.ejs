@@ -23,3 +23,7 @@
     <% movimentos.forEach((m)=> { %><tr><td><%= fmtBR(m.data_mov || m.created_at) %></td><td><%= m.tipo %></td><td><%= m.quantidade %></td><td><%= m.observacao || '-' %></td></tr><% }) %>
   </tbody></table></div>
 </div>
+
+<%- include('_reposicao') %>
+
+<% if(item.classificacao_pendente){ %><p class="muted">Classificação pendente de cadastro: a descrição ainda não corresponde a uma família conhecida. O material recebido permanece registrado no estoque.</p><% } %>

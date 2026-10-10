@@ -89,6 +89,8 @@
                 <input type="hidden" name="solicitacao_id" value="<%= grupo.solicitacao_id %>" />
                 <div><strong><%= item.item_nome %></strong><small>Saldo físico: <%= Number(item.saldo_fisico||0) %> <%= item.unidade||'UN' %> • Reservado disponível: <%= Number(item.quantidade_disponivel||0) %> <%= item.unidade||'UN' %></small></div>
                 <label><span>Quantidade</span><input class="input" type="number" name="quantidade" min="0.01" step="0.01" max="<%= Number(item.quantidade_disponivel||0) %>" value="<%= Number(item.quantidade_disponivel||0) %>" required /></label>
+                <label><span>Empresa consumidora</span><input class="input" name="empresa_consumidora" required placeholder="Quem utilizará o material" /></label>
+                <label><span>Setor consumidor</span><select class="input" name="setor_consumidor" required><% ['RECICLAGEM','FRIGORIFICO','LOGISTICA','ADMINISTRATIVO'].forEach(s=>{ %><option value="<%=s%>" <%=grupo.setor_origem===s?'selected':''%>><%=s%></option><% }) %></select></label>
                 <label><span>Observação</span><input class="input" name="observacao" placeholder="Opcional" /></label>
                 <button class="btn btn-green" type="submit" data-pending-text="Registrando...">Confirmar entrega</button>
               </form>

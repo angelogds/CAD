@@ -8,8 +8,8 @@ test('Diretoria consulta desempenho da manutenção sem acessar o PCM operaciona
   assert.ok(ACCESS.diretoria_manutencao.includes(ROLE.DIRETORIA));
   assert.ok(!ACCESS.pcm.includes(ROLE.DIRETORIA));
   assert.ok(!ACCESS.pcm_manage.includes(ROLE.DIRETORIA));
-  assert.ok(ACCESS.pcm_manage.includes(ROLE.PCM));
-  assert.ok(ACCESS.pcm_manage.includes(ROLE.MANUTENCAO_SUPERVISOR));
+  assert.ok(ACCESS.pcm_manage.includes(ROLE.ENCARREGADO_MANUTENCAO));
+  assert.ok(!ACCESS.pcm_manage.includes(ROLE.MANUTENCAO_SUPERVISOR));
 });
 
 test('painel da Diretoria é fixo, apresentável e possui exportações', () => {

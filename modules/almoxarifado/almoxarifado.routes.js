@@ -8,6 +8,10 @@ const qrCtrl = require("./retiradas-qr.controller");
 
 const RETIRADA_QR_ACCESS = Array.from(new Set([...(ACCESS.almoxarifado_read || []), ...(ACCESS.estoque_retirada || [])]));
 
+const correias = require('../correias/correias.fluxo.controller');
+router.get('/correias', requireLogin, requireRole(ACCESS.almoxarifado_read), correias.index);
+router.post('/correias/avulsa', requireLogin, requireRole(ACCESS.almoxarifado_manage), correias.avulsa);
+router.post('/correias/:pedidoId', requireLogin, requireRole(ACCESS.almoxarifado_manage), correias.acao);
 router.get("/", requireLogin, requireRole(ACCESS.almoxarifado_read), ctrl.index);
 router.get("/gerencial", requireLogin, requireRole(ACCESS.almoxarifado_read), gerencialCtrl.index);
 router.get("/gerencial/pdf", requireLogin, requireRole(ACCESS.almoxarifado_read), gerencialPdf.exportar);

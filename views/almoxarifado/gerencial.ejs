@@ -91,3 +91,4 @@ const maior = Math.max(1,...dados.serie.map(s=>Math.max(s.entradas,s.saidas)));
     </tbody></table></div>
   </section>
 </div>
+<section class="gerencial box"><h2>Estoque próximo do mínimo e reposições</h2><p>Quantidades na unidade de controle de cada material. Saldo livre desconta reservas de solicitações e correias.</p><div class="scroll"><table><thead><tr><th>Material</th><th>Livre</th><th>Reserva mínima</th><th>Ponto de reposição</th><th>A receber</th><th>Acompanhamento</th></tr></thead><tbody><% (typeof reposicao==='undefined'?[]:reposicao).forEach(i=>{ %><tr><td><a href="/estoque/itens/<%=i.id%>"><%=i.nome%></a> (<%=i.unidade%>)</td><td><%=i.disponivel%></td><td><%=i.saldo_minimo%></td><td><%=i.ponto_calculado.toFixed(2)%></td><td><%=i.a_receber%></td><td><%=i.pedido?'Pré-solicitação '+i.pedido.numero:i.situacao==='RESERVA_MINIMA'?'Na reserva mínima':'No ponto de reposição'%></td></tr><% }) %></tbody></table></div></section>

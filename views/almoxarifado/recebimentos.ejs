@@ -19,7 +19,7 @@
   const statusMeta = (value) => statusConfig[value] || { label: value || '-', cls: '' };
   const querySuffix = q ? `&q=${encodeURIComponent(q)}` : '';
   const dateBR = (v) => { if (!v) return ''; const p=String(v).slice(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(v); };
-  const isCompraView = status === 'EM_COTACAO';
+  const isCompraView = typeof fila !== 'undefined' && fila === 'A_CAMINHO';
   const pageTitle = isCompraView ? 'Compras a caminho' : (status === 'COMPRADA' ? 'Materiais para receber' : 'Recebimentos');
   const currentCount = lista.length;
 %>
@@ -52,10 +52,10 @@
     </div>
 
     <form class="almox-search almox-compact-search" method="GET" action="/almoxarifado/recebimentos">
-      <input type="hidden" name="status" value="<%= status %>" />
+      <input type="hidden" name="status" value="<%= status %>" /><% if(isCompraView){ %><input type="hidden" name="fila" value="A_CAMINHO"><% } %>
       <input class="input" type="search" name="q" value="<%= q %>" placeholder="Buscar solicitação, material, equipamento ou fornecedor" aria-label="Buscar solicitações" />
       <button class="btn btn-sm btn-ghost" type="submit">Buscar</button>
-      <% if (q) { %><a class="btn btn-sm btn-ghost" href="/almoxarifado/recebimentos?status=<%= status %>">Limpar</a><% } %>
+      <% if (q) { %><a class="btn btn-sm btn-ghost" href="/almoxarifado/recebimentos?<%=isCompraView?'fila=A_CAMINHO':'status='+status%>">Limpar</a><% } %>
     </form>
   </section>
 

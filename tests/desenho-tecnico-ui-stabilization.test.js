@@ -6,12 +6,11 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('CAD carrega estabilizacao depois das extensoes', () => {
+test('estabilização MLightCAD permanece opcional no editor 2D ativo', () => {
   const engine = read('public/js/cad-engine-v2.js');
-  const round4 = engine.indexOf("cad-round4-runtime.js");
-  const stabilize = engine.indexOf("cad-ui-stabilization.js");
-  assert.ok(round4 >= 0);
-  assert.ok(stabilize > round4);
+  const { assertOptionalRuntime } = require('./helpers/cad-bootstrap');
+  assertOptionalRuntime(engine, 'cad-round4-runtime.js');
+  assertOptionalRuntime(engine, 'cad-ui-stabilization.js');
 });
 
 test('menu lateral reaproveita botoes existentes sem recriar ferramentas', () => {

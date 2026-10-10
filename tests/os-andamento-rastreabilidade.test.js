@@ -3,12 +3,17 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const Database = require('better-sqlite3');
 
 function read(file) { return fs.readFileSync(file, 'utf8'); }
 
 function sqlite(dbFile, sql) {
-  return execFileSync('sqlite3', [dbFile], { input: sql, encoding: 'utf8' });
+  const db = new Database(dbFile);
+  try {
+    if (sql.startsWith('.schema ')) return db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(sql.slice(8)).sql;
+    if (/^SELECT/i.test(sql)) return String(db.prepare(sql).pluck().get());
+    db.exec(sql); return '';
+  } finally { db.close(); }
 }
 
 test('SQL migration creates history schema, indexes and all quick reasons', () => {

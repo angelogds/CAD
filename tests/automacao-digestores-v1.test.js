@@ -36,5 +36,6 @@ test('automacao classifica temperatura do processo para a torre sinalizadora', (
   assert.equal(service.classifyTemperature(119.9).ready, false);
   assert.equal(service.classifyTemperature(120).color, 'GREEN');
   assert.equal(service.classifyTemperature(120).ready, true);
-  assert.equal(service.classifyTemperature(null).color, 'OFF');
+  for (const value of [null, undefined, '', '  ', 'inválido']) assert.equal(service.classifyTemperature(value).color, 'OFF');
+  assert.equal(service.classifyTemperature(0).color, 'RED');
 });

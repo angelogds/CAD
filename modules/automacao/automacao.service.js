@@ -1,6 +1,6 @@
 function classifyTemperature(value) {
   const temperatura = Number(value);
-  if (!Number.isFinite(temperatura)) {
+  if (value == null || String(value).trim() === '' || !Number.isFinite(temperatura)) {
     return {
       key: 'SEM_SINAL',
       color: 'OFF',
