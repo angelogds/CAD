@@ -63,6 +63,7 @@ function index(req, res) {
     activeMenu: "almoxarifado",
     tab: "painel",
     painelGerencial,
+    reposicao: require('../estoque/estoque.reposicao.service').resumo().filter(i=>i.situacao!=='OK').slice(0,20),
     faixasRecebimento: montarFaixasRecebimento(painelGerencial),
     compras: compras.slice(0, 20),
     recebimentos: recebimentos.slice(0, 20),
@@ -206,7 +207,8 @@ function recebimentos(req, res) {
   res.render("almoxarifado/recebimentos", {
     title: "Almoxarifado",
     activeMenu: "almoxarifado",
-    lista: service.listRecebimentos({ status, query: q }),
+    fila: req.query.fila === 'A_CAMINHO' ? 'A_CAMINHO' : '',
+    lista: service.listRecebimentos({ status, query: q }).filter(row => req.query.fila !== 'A_CAMINHO' || (Number(row.qtd_comprada_total)>0 && Number(row.qtd_pendente_total)>0)),
     resumo: service.getResumoRecebimentos(q),
     status,
     q,
@@ -236,6 +238,7 @@ function conferir(req, res) {
     categorias: estoqueService.listCategorias(),
     subcategorias: estoqueService.listSubcategorias(),
     historico: service.getHistoricoRecebimento(sol.id),
+    operacaoToken: require('crypto').randomUUID(),
     canManage: canManageAlmox(req.session.user),
     canWithdraw: canWithdrawStock(req.session.user),
   });
@@ -250,6 +253,7 @@ function receberItem(req, res) {
       solicitacaoId,
       itemId,
       qtdAgora: quantidadeRecebida,
+      operacaoToken: req.body.operacao_token,
       observacao: req.body.observacao_item,
       localId: req.body.local_id ? Number(req.body.local_id) : null,
       categoriaId: req.body.categoria_id ? Number(req.body.categoria_id) : null,
@@ -262,6 +266,10 @@ function receberItem(req, res) {
       userId: req.session.user.id,
     });
 
+    if (resultado.duplicado) {
+      req.flash('success', 'Este recebimento já foi registrado. O saldo foi mantido.');
+      return res.redirect(`/almoxarifado/solicitacoes/${req.params.id}/conferir#materiais`);
+    }
     // O evento só é emitido depois que receberItem conclui a transação e atualiza
     // o estoque. Se a solicitação não estiver vinculada a uma OS, nenhum alerta
     // de oficina é gerado. Falha de notificação nunca desfaz o recebimento físico.

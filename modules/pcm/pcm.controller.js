@@ -140,6 +140,7 @@ function engenharia(req, res) {
     equipamentos: service.getEquipamentos(),
     equipamentoSelecionado: service.getEquipamentoById(filtros.equipamento_id),
     criticidadeAtual,
+    correiasAlertas: require("../correias/correias.fluxo.service").alertas(filtros.equipamento_id),
     bom,
     resumo: {
       componentes: bom.length,

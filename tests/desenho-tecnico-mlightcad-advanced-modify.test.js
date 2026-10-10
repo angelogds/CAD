@@ -1,3 +1,4 @@
+const { assertOptionalRuntime, assertStableBootstrap } = require('./helpers/cad-bootstrap');
 'use strict';
 
 const test = require('node:test');
@@ -63,13 +64,13 @@ test('extensão registra MIRROR FILLET CHAMFER e reutiliza os solvers geométric
   assert.match(source, /manager\.addCommand\(group, 'chamfer'/);
 });
 
-test('bundle e runtime carregam os modificadores avançados no workspace atual', () => {
+test('bundle e runtime preservam modificadores avançados como biblioteca opcional', () => {
   const build = read('scripts/build-mlightcad.mjs');
   const entry = read('public/js/cad-engine-v2.js');
   const runtime = read('public/js/cad-advanced-modify-runtime.js');
 
   assert.match(build, /mlightcad-advanced-modify/);
-  assert.match(entry, /cad-advanced-modify-runtime\.js/);
+  assertOptionalRuntime(entry, 'cad-advanced-modify-runtime.js');
   assert.match(runtime, /mlightcad-advanced-modify\.js/);
   assert.match(runtime, /mlightMirrorGeometryBtn/);
   assert.match(runtime, /mlightFilletGeometryBtn/);

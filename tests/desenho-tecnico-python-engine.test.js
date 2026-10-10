@@ -1,3 +1,4 @@
+const { assertOptionalRuntime, assertStableBootstrap } = require('./helpers/cad-bootstrap');
 'use strict';
 
 const test = require('node:test');
@@ -28,7 +29,7 @@ test('rotas do desenho técnico expõem análise e DXF sem alterar permissões b
   assert.match(routes, /requireRole\(MANAGE_ACCESS\)/);
 });
 
-test('editor MLightCAD oferece análise técnica e fluxo DXF no runtime atual', () => {
+test('biblioteca MLightCAD preserva análise técnica e DXF sem substituir o editor ativo', () => {
   const runtime = read('public/js/cad-round3-runtime.js');
   const mlightRuntime = read('public/js/cad-mlight-runtime.js');
   const entry = read('public/js/cad-engine-v2.js');
@@ -39,7 +40,7 @@ test('editor MLightCAD oferece análise técnica e fluxo DXF no runtime atual', 
   assert.match(runtime, /\/analisar/);
   assert.match(mlightRuntime, /Abrir DXF/);
   assert.match(mlightRuntime, /Exportar DXF/);
-  assert.match(entry, /cad-round3-runtime\.js/);
+  assertOptionalRuntime(entry, 'cad-round3-runtime.js');
   assert.doesNotMatch(entry, /cad-python-integration\.js/);
 });
 

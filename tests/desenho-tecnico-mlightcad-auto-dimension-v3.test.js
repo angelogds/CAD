@@ -1,3 +1,4 @@
+const { assertOptionalRuntime, assertStableBootstrap } = require('./helpers/cad-bootstrap');
 'use strict';
 
 const test = require('node:test');
@@ -147,7 +148,7 @@ test('planejador limita quantidade de cotas automáticas para preservar legibili
   assert.equal(plan.dimensions.length, AUTO_DIM_V3_MAX);
 });
 
-test('integração V3 mantém V2 como fallback e liga build, runtime e layer centralizado de cotas', () => {
+test('biblioteca V3 mantém V2 como fallback e preserva build e layer de cotas', () => {
   const build = read('scripts/build-mlightcad.mjs');
   const loader = read('public/js/cad-engine-v2.js');
   const runtime = read('public/js/cad-auto-dimension-v3-runtime.js');
@@ -155,7 +156,7 @@ test('integração V3 mantém V2 como fallback e liga build, runtime e layer cen
   const logic = read('frontend/mlightcad-auto-dimension-v3.logic.mjs');
 
   assert.match(build, /mlightcad-auto-dimension-v3/);
-  assert.match(loader, /cad-auto-dimension-v3-runtime\.js/);
+  assertOptionalRuntime(loader, 'cad-auto-dimension-v3-runtime.js');
   assert.match(runtime, /autoDimensionAllLegacy/);
   assert.match(runtime, /fabrication\.autoDimensionAll = tools\.autoDimensionAll/);
   assert.match(runtime, /v2-fallback/);

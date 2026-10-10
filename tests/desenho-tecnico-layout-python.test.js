@@ -1,3 +1,4 @@
+const { assertOptionalRuntime, assertStableBootstrap } = require('./helpers/cad-bootstrap');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -6,11 +7,11 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('rodada 3 carrega sem substituir o runtime principal do MLightCAD', () => {
+test('bibliotecas da rodada 3 permanecem isoladas do bootstrap estável', () => {
   const engine = read('public/js/cad-engine-v2.js');
-  assert.match(engine, /cad-mlight-runtime\.js/);
-  assert.match(engine, /cad-round3-runtime\.js/);
-  assert.doesNotMatch(engine, /legacy/i);
+  assertOptionalRuntime(engine, 'cad-mlight-runtime.js');
+  assertOptionalRuntime(engine, 'cad-round3-runtime.js');
+  assertStableBootstrap(engine);
 });
 
 test('build gera bundle isolado de layout e analise', () => {

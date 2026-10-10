@@ -90,7 +90,7 @@
           <div>
             <div class="meta-label">PLANO DE CORREIAS • BAIXA AUTOMÁTICA</div>
             <div class="meta-value" style="font-size:15px;"><%= correiaContext.correia_codigo ? correiaContext.correia_codigo + ' • ' : '' %><%= correiaContext.correia_nome || 'Correia não vinculada' %></div>
-            <div class="muted" style="font-size:12px;">Ao concluir a troca, o sistema baixa <strong><%= Number(correiaContext.quantidade_material||0) %> <%= correiaContext.unidade||'UN' %></strong> do estoque e programa a próxima troca.</div>
+            <div class="muted" style="font-size:12px;">Na retirada, o Almoxarifado baixa <strong><%= Number(correiaContext.quantidade_material||0) %> <%= correiaContext.unidade||'UN' %></strong> do estoque. A conclusão registra o serviço sem uma segunda baixa.</div>
           </div>
           <span class="pill <%= crit ? 'pill-gray' : 'pill-green' %>"><%= crit ? 'ESTOQUE ABAIXO DO MÍNIMO' : 'ESTOQUE COBERTO' %></span>
         </div>
@@ -276,3 +276,5 @@
   </div>
 </div>
 </div>
+
+<%- include('_correias-inspecao') %>

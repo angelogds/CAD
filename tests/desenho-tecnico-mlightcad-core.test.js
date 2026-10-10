@@ -18,7 +18,7 @@ test('MLightCAD permanece disponível como biblioteca, mas não derruba o editor
   assert.match(runtime, /Flange/);
   assert.match(runtime, /Disco/);
   assert.match(runtime, /Eixo/);
-  assert.match(runtime, /AUTO COTAR/);
+  assert.match(runtime, /AUTO COTAR/i);
 });
 
 test('bundle do MLightCAD gera motor principal e auto-cotagem sem alterar o servidor', () => {

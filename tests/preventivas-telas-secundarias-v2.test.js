@@ -11,7 +11,8 @@ test('nova preventiva preserva campos, endpoint e pré-seleção por equipamento
   const view = read('views/preventivas/nova.ejs');
 
   assert.match(controller, /equipamentoSelecionadoId = Number\(req\.query\?\.equipamento_id/);
-  assert.match(view, /action="\/preventivas"/);
+  assert.match(controller, /formAction: "\/pcm\/preventivas"/);
+  assert.match(view, /action="<%= typeof formAction/);
   assert.match(view, /name="equipamento_id"/);
   assert.match(view, /name="titulo"/);
   assert.match(view, /name="tipo_preventiva"/);
@@ -42,10 +43,10 @@ test('programadas preserva ações protegidas e fluxo de geração/OS', () => {
   const routes = read('modules/preventivas/preventivas.routes.js');
   const view = read('views/preventivas/programadas.ejs');
 
-  assert.match(routes, /"\/programadas\/gerar"[\s\S]*requireRole\(ACCESS\.preventivas_manage\)/);
-  assert.match(routes, /"\/programadas\/lancar-os-segunda"[\s\S]*requireRole\(ACCESS\.preventivas_manage\)/);
-  assert.match(view, /action="\/preventivas\/programadas\/gerar"/);
-  assert.match(view, /action="\/preventivas\/programadas\/lancar-os-segunda"/);
+  assert.match(routes, /"\/programadas\/gerar"[\s\S]*requireRole\(ACCESS\.pcm_manage\)/);
+  assert.match(routes, /"\/programadas\/lancar-os-segunda"[\s\S]*requireRole\(ACCESS\.pcm_manage\)/);
+  assert.match(view, /action="\/pcm\/preventivas\/programadas\/gerar"/);
+  assert.match(view, /action="\/pcm\/preventivas\/programadas\/lancar-os-segunda"/);
   assert.match(view, /Gerar programação semanal/);
   assert.match(view, /Lançar OS da segunda-feira/);
   assert.match(view, /confirm\(/);
@@ -67,7 +68,7 @@ test('eleição de mecânicos mantém validação de disponibilidade e IDs disti
   assert.match(view, /name="mecanico_2_id"/);
 });
 
-test('RBAC das preventivas secundárias permanece preventivas_manage', () => {
+test('RBAC das preventivas secundárias segue gestão pcm_manage', () => {
   const routes = read('modules/preventivas/preventivas.routes.js');
 
   for (const route of [
@@ -77,7 +78,7 @@ test('RBAC das preventivas secundárias permanece preventivas_manage', () => {
   ]) {
     assert.ok(routes.includes(`"${route}"`));
   }
-  const matches = routes.match(/requireRole\(ACCESS\.preventivas_manage\)/g) || [];
+  const matches = routes.match(/requireRole\(ACCESS\.pcm_manage\)/g) || [];
   assert.ok(matches.length >= 7);
 });
 

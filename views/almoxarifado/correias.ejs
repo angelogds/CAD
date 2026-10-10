@@ -1,0 +1,28 @@
+<% layout('layout') %>
+<h1>Separação e retirada de correias</h1>
+<p>Pedidos vinculados ao equipamento e à preventiva. A baixa acontece na entrega; o mecânico confirma a substituição depois.</p>
+<a class="btn btn-ghost" href="/almoxarifado">Voltar ao painel</a>
+<% const manage=['ADMIN','ALMOXARIFADO'].includes(String(user?.role||'').toUpperCase()); %>
+<% if(manage){ %>
+<div class="card" style="margin:16px 0"><h2>Retirada avulsa durante a semana</h2>
+<form method="post" action="/almoxarifado/correias/avulsa" data-lock-submit>
+<input type="hidden" name="operacao_token" value="<%=operacaoToken%>"><div class="grid-3">
+<label>Equipamento — código ou nome<input list="correias-equipamentos" id="equipamento-busca" required placeholder="Digite o código ou nome" autocomplete="off"><datalist id="correias-equipamentos"><% equipamentos.forEach(e=>{ %><option value="<%=e.codigo%> • <%=e.nome%>" data-id="<%=e.id%>"></option><% }) %></datalist><input type="hidden" name="equipamento_id" id="correias-equipamento-id"></label>
+<label>Correia vinculada<select name="estoque_item_id" id="correias-material" required><option value="">Selecione o equipamento</option><% vinculos.forEach(v=>{ %><option value="<%=v.estoque_item_id%>" data-equipamento="<%=v.equipamento_id%>" data-quantidade="<%=v.quantidade_material%>" hidden disabled><%=v.codigo||''%> • <%=v.nome%></option><% }) %></select></label>
+<label>Quantidade retirada<input type="number" step="1" min="1" name="quantidade" id="correias-quantidade" required></label>
+<label>Mecânico<select name="mecanico_user_id" required><option value="">Selecione</option><% mecanicos.forEach(m=>{ %><option value="<%=m.id%>"><%=m.name%></option><% }) %></select></label>
+<label>Empresa consumidora<input name="empresa_consumidora" required></label>
+<label>Setor consumidor<select name="setor_consumidor" required><% ['RECICLAGEM','FRIGORIFICO','LOGISTICA','ADMINISTRATIVO'].forEach(s=>{ %><option><%=s%></option><% }) %></select></label>
+</div><label>Observação<input name="observacao"></label><button class="btn btn-green">Registrar retirada avulsa</button></form></div>
+<% } %>
+<div class="card"><h2>Pedidos para separar e histórico</h2>
+<% if(!pedidos.length){ %><p>Sem pedidos de correias.</p><% } %>
+<% pedidos.forEach(p=>{ %><article style="padding:14px;border-bottom:1px solid #ddd"><strong>#<%=p.id%> • <%=p.equipamento_nome%> • <%=p.material_nome%></strong><p><%=p.quantidade%> retirável(is) • <%=p.mecanico_nome%> • <%=p.status%> • <%=p.empresa_consumidora%> / <%=p.setor_consumidor%><% if(p.preventiva_execucao_id){ %> • preventiva #<%=p.preventiva_execucao_id%><% } %></p>
+<% if(p.troca_em){ %><p>Troca confirmada: <%=p.troca_em%>. A inspeção continua programada.</p><% } %>
+<% if(manage&&['SOLICITADA','SEPARADA'].includes(p.status)){ %><form method="post" action="/almoxarifado/correias/<%=p.id%>" data-lock-submit><button name="acao" value="separar" class="btn">Marcar separado</button><button name="acao" value="entregar" class="btn btn-green">Confirmar retirada</button><button name="acao" value="cancelar" class="btn">Cancelar pedido</button></form><% } %>
+<% if(manage&&p.status==='RETIRADA'){ %><form method="post" action="/almoxarifado/correias/<%=p.id%>" data-lock-submit><input type="hidden" name="acao" value="devolver"><label>Quantidade não utilizada para devolver<input type="number" name="quantidade" min="1" max="<%=p.quantidade-p.quantidade_devolvida%>" step="1" required></label><button class="btn">Registrar devolução</button></form><% } %>
+</article><% }) %></div>
+<script>
+const busca=document.getElementById('equipamento-busca');
+if(busca) { const mat=document.getElementById('correias-material'); busca.addEventListener('input',()=>{const opt=Array.from(document.querySelectorAll('#correias-equipamentos option')).find(o=>o.value===busca.value); const id=opt?.dataset.id||'';document.getElementById('correias-equipamento-id').value=id;mat.value='';Array.from(mat.options).slice(1).forEach(o=>{o.disabled=o.dataset.equipamento!==id;o.hidden=o.disabled;});});mat.addEventListener('change',()=>{document.getElementById('correias-quantidade').value=mat.selectedOptions[0]?.dataset.quantidade||'';});}
+</script>

@@ -30,7 +30,7 @@ test('V6 mantém as ligações principais Almoxarifado, Estoque e Retirada em ro
   assert.match(estoqueRoutes, /router\.get\("\/saidas\/nova"[\s\S]*ctrl\.saidaNova/);
 
   assert.match(tabs, /href="\/almoxarifado\/estoque"/);
-  assert.match(tabs, /href="\/almoxarifado\/recebimentos\?status=EM_COTACAO"/);
+  assert.match(tabs, /href="\/almoxarifado\/recebimentos\?fila=A_CAMINHO"/);
   assert.match(tabs, /href="\/almoxarifado\/recebimentos\?status=COMPRADA"/);
   assert.match(tabs, /href="\/estoque\/reservas"/);
   assert.match(tabs, /href="\/almoxarifado\/retiradas\/qr"/);

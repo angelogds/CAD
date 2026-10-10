@@ -17,7 +17,7 @@ test('acompanhamento executivo fica no Painel da Diretoria e URLs antigas redire
   assert.match(directorRoutes, /DIRETORIA_COMPRAS/);
   assert.match(directorRoutes, /router\.get\('\/compras', requireLogin, requireRole\(DIRETORIA_COMPRAS\)/);
   assert.match(directorRoutes, /router\.get\('\/compras\/:id', requireLogin, requireRole\(DIRETORIA_COMPRAS\)/);
-  assert.match(directorRoutes, /router\.post\('\/compras\/:id\/aprovar-itens-cotados', requireLogin, requireRole\(DIRETORIA_COMPRAS\)/);
+  assert.match(directorRoutes, /router\.post\('\/compras\/:id\/aprovar-itens-cotados', requireLogin, requireRole\(DIRETORIA_APROVACAO\)/);
   assert.match(legacyRoutes, /DIRETORIA_COMPRAS_PATH = "\/dashboard\/diretoria\/compras"/);
   assert.match(legacyRoutes, /router\.get\("\/acompanhamento-compras"/);
   assert.match(legacyRoutes, /redirectAcompanhamentoCompras/);
@@ -27,11 +27,11 @@ test('acompanhamento executivo fica no Painel da Diretoria e URLs antigas redire
 test('controller reutiliza serviços canônicos de compras sem duplicar SQL', () => {
   assert.match(controller, /require\('\.\.\/compras\/acompanhamento\.service'\)/);
   assert.match(controller, /require\('\.\.\/compras\/compras\.aprovacao-itens\.service'\)/);
-  assert.match(controller, /acompanhamentoService\.getDashboard\(req\.query\)/);
+  assert.match(controller, /acompanhamentoService\.getDashboard\(scopedQuery\(req\)\)/);
   assert.match(controller, /itemApprovalService\.getSummary\(row\.id\)/);
   assert.match(controller, /itemApprovalService\.approveQuotedItems/);
   assert.match(controller, /acompanhamentoBasePath: context\.basePath/);
-  assert.match(controller, /backHref: activeMenu === 'diretoria' \? '\/dashboard\/diretoria'/);
+  assert.match(controller, /backHref: \[.*'diretoria-compras'.*\]\.includes\(activeMenu\) \? '\/dashboard\/diretoria'/);
   assert.doesNotMatch(controller, /\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b/i);
 });
 

@@ -406,7 +406,7 @@ function resolveEstoqueItem(item, solicitacaoId, localId, contexto = {}) {
     const updates = [];
     const vals = [];
     if (HAS_ESTOQUE_SETOR && contexto.setor) {
-      updates.push("setor_utilizacao=CASE WHEN setor_utilizacao IS NULL OR TRIM(setor_utilizacao)='' OR setor_utilizacao='COMUM' THEN ? ELSE setor_utilizacao END");
+      updates.push("setor_utilizacao=CASE WHEN setor_utilizacao IS NULL OR TRIM(setor_utilizacao)='' THEN ? ELSE setor_utilizacao END");
       vals.push(normalizeSetorEstoque(contexto.setor));
     }
     if (HAS_ESTOQUE_CENTRO_CUSTO && contexto.centroCusto) {
@@ -513,11 +513,18 @@ function insertEstoqueMovimento(data) {
   return Number(info.lastInsertRowid);
 }
 
-function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, categoriaId, subcategoriaId, enderecoZona, enderecoEstante, enderecoPrateleira, enderecoPosicao, destinoEstoque = 'GERAL', userId }) {
+function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, categoriaId, subcategoriaId, enderecoZona, enderecoEstante, enderecoPrateleira, enderecoPosicao, destinoEstoque = 'GERAL', userId, operacaoToken }) {
   const quantidade = Number(qtdAgora || 0);
   if (!(quantidade > 0)) throw new Error("Quantidade deve ser maior que zero.");
 
   return db.transaction(() => {
+    if (operacaoToken && hasColumn('almox_recebimento_operacoes','token')) {
+      const existente=db.prepare('SELECT * FROM almox_recebimento_operacoes WHERE token=?').get(String(operacaoToken));
+      if(existente) {
+        if(existente.solicitacao_id!==Number(solicitacaoId)||existente.item_id!==Number(itemId)) throw new Error('Operação de recebimento incompatível.');
+        return {movimentoId:existente.movimento_id,duplicado:true};
+      }
+    }
     const solicitacao = db.prepare("SELECT * FROM solicitacoes WHERE id=?").get(solicitacaoId);
     if (!solicitacao) throw new Error("Solicitação não encontrada.");
     const statusSolicitacao = String(solicitacao.status || '').toUpperCase();
@@ -586,6 +593,12 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, cat
     itemValues.push(itemId);
     db.prepare(`UPDATE solicitacao_itens SET ${itemUpdates.join(",")} WHERE id=?`).run(...itemValues);
 
+    require('../estoque/estoque.classificacao.service').classificar(estoqueItemId);
+    const catalogo = db.prepare('SELECT * FROM estoque_itens WHERE id=?').get(estoqueItemId);
+    if (String(item.unidade||'UN').toUpperCase() !== String(catalogo.unidade||'UN').toUpperCase()) {
+      throw new Error('A compra deve usar a unidade de controle do material vinculado ao estoque. Confira a quantidade por embalagem antes de receber.');
+    }
+
     const saldoAnterior = getSaldoEstoqueItem(estoqueItemId);
     const saldoPosterior = saldoAnterior + quantidade;
     const custoCompraUnit = HAS_ITEM_VALOR_UNITARIO && Number(item.valor_unitario_centavos || 0) > 0
@@ -621,6 +634,7 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, cat
       setor_utilizacao: HAS_MOV_SETOR ? setorDestino : null,
       subarea_centro_custo: HAS_MOV_CENTRO_CUSTO ? (centroCustoDestino || null) : null,
     });
+    if (operacaoToken && hasColumn('almox_recebimento_operacoes','token')) db.prepare('INSERT INTO almox_recebimento_operacoes(token,solicitacao_id,item_id,movimento_id) VALUES(?,?,?,?)').run(String(operacaoToken),Number(solicitacaoId),Number(itemId),movimentoId);
 
     if (tableExists("compras_recebimentos")) {
       const cols = ["solicitacao_id", "solicitacao_item_id", "quantidade", "estoque_item_id", "estoque_movimento_id", "usuario_id"];
@@ -630,6 +644,10 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, cat
       }
     }
 
+    // Sincroniza somente quando todos os itens estão efetivamente comprados.
+    // Uma entrega parcial de pedido misto não encerra a cotação dos demais itens.
+    const naoComprados = db.prepare("SELECT COUNT(*) n FROM solicitacao_itens WHERE solicitacao_id=? AND COALESCE(status_compra,'')<>'COMPRADO'").get(solicitacaoId).n;
+    if (!naoComprados) finalizarRecebimento(solicitacaoId);
     const faltanteApos = Math.max(qtdComprada - recebida, 0);
     return {
       estoqueItemId,

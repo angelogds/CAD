@@ -22,7 +22,7 @@ function executiveContext(req) {
   return {
     basePath,
     activeMenu,
-    backHref: activeMenu === 'diretoria' ? '/dashboard/diretoria' : '/solicitacoes/minhas',
+    backHref: ['diretoria', 'diretoria-compras'].includes(activeMenu) ? '/dashboard/diretoria' : '/solicitacoes/minhas',
   };
 }
 

@@ -400,6 +400,11 @@ mount(OFFICIAL_ROUTES.compras, "./modules/compras/compras.routes");
 mount("/fornecedores", "./modules/fornecedores/fornecedores.routes");
 mount("/solicitacoes", "./modules/solicitacoes/solicitacoes.routes");
 mount("/pre-solicitacoes", "./modules/pre-solicitacoes/pre-solicitacoes.routes");
+// Rascunhos de reposição: usa o responsável real do Almoxarifado e o fluxo existente.
+trackInterval(setInterval(() => {
+  try { require('./modules/estoque/estoque.reposicao.service').gerarAutomaticamente(); }
+  catch (error) { console.warn('[ALMOX_REPOSICAO]', error.message); }
+}, 15 * 60 * 1000));
 mount("/acompanhamento-compras", "./modules/acompanhamento-compras/acompanhamento-compras.routes");
 mount(OFFICIAL_ROUTES.estoque, "./modules/estoque/estoque.routes");
 mount(OFFICIAL_ROUTES.almoxarifado, "./modules/almoxarifado/almoxarifado.routes");
