@@ -40,8 +40,9 @@ Implementa a especificação preservada na PR #636. A migration 226 é aditiva: 
 ## Dados que precisam ser configurados na operação
 
 - O cadastro mostra os mínimos validados: 7018/OK48 (2,5; 3,25; 4 mm), 6013/OK46 (2,5; 3,25 mm), 10 kg por referência; MIG tubular e sólido 1,2 mm, 15 kg por tipo; desbaste/corte 4, 7 e 9, flap 4 e 7, uma caixa por referência. 6010 sem mínimo definido.
-- É necessário vincular esses parâmetros às referências reais do catálogo, confirmar a quantidade de discos por caixa e a medida/especificação exata. Não foram criados códigos fictícios, saldos ou conversões presumidas.
-- Configurar endereços físicos, prazos, saldos alvo, distribuição e intervalo de investigação por equipamento.
+- É necessário vincular esses parâmetros às referências reais do catálogo, configurar 25 discos por caixa (mínimo de 25 UN por referência) e confirmar a medida/especificação exata. Não foram criados códigos fictícios, saldos ou conversões presumidas.
+- Todos os oito tipos/tamanhos de discos listados usam 25 unidades por caixa, conforme confirmação do usuário. Unidade de controle UN, unidade de compra CAIXA, fator de compra 25; reserva mínima 25 UN. Isso é política de cadastro, não saldo físico.
+- Endereços físicos ainda não foram definidos: o almoxarife fará esse cadastro quando organizar as prateleiras. Configurar também prazos, saldos alvo, distribuição e intervalo de investigação por equipamento.
 - Oxigênio continua fora desta etapa. Não há dependência de agente OpenAI para esse controle.
 
 ## Falhas anteriores tratadas a pedido do usuário
