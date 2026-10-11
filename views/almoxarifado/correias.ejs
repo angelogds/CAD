@@ -1,7 +1,8 @@
 <% layout('layout') %>
-<h1>Separação e retirada de correias</h1>
+<link rel="stylesheet" href="/css/almoxarifado-layout-v11.css?v=20261011-v1" />
+<header class="stock-v11-head"><div><h1>Separação e retirada de correias</h1>
 <p>Pedidos vinculados ao equipamento e à preventiva. A baixa acontece na entrega; o mecânico confirma a substituição depois.</p>
-<a class="btn btn-ghost" href="/almoxarifado">Voltar ao painel</a>
+</div><a class="btn btn-ghost" href="/almoxarifado">Voltar ao painel</a></header>
 <% const manage=['ADMIN','ALMOXARIFADO'].includes(String(user?.role||'').toUpperCase()); %>
 <% if(manage){ %>
 <div class="card" style="margin:16px 0"><h2>Retirada avulsa durante a semana</h2>
