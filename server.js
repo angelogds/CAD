@@ -473,7 +473,8 @@ try {
       }
     };
     runProgramadasSegunda();
-    trackInterval(setInterval(runProgramadasSegunda, 15 * 60 * 1000));
+    // O serviço valida 05h no horário da Bahia, feriados e idempotência semanal.
+    trackInterval(setInterval(runProgramadasSegunda, 60 * 1000));
   }
 } catch (err) {
   console.warn("⚠️ Serviço de preventivas não carregado para lançamento automático de OS:", err.message || err);

@@ -64,6 +64,7 @@ router.post("/preventivas", requireLogin, requireRole(PCM_MANAGE), preventivasCt
 router.get("/preventivas/eleger-mecanico", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.elegerMecanicoForm);
 router.post("/preventivas/eleger-mecanico", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.salvarElegerMecanico);
 router.get("/preventivas/programadas", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.programadasIndex);
+router.post("/preventivas/programadas/configuracao", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.salvarRegraLancamento);
 router.post("/preventivas/programadas/gerar", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.gerarProgramadas);
 router.post("/preventivas/programadas/lancar-os-segunda", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.gerarOSProgramadasSegunda);
 router.post("/preventivas/programadas/lancar-os-lote-dia", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.lancarLoteDiarioPreventivas);

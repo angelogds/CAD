@@ -243,6 +243,21 @@ function gerarProgramadas(req, res) {
   return res.redirect("/pcm/preventivas/programadas");
 }
 
+function salvarRegraLancamento(req, res) {
+  const user = req.session?.user || null;
+  if (!isPcmManager(user)) {
+    req.flash("error", "Sem permissão para editar a regra de lançamento.");
+    return res.redirect("/pcm/preventivas");
+  }
+  try {
+    service.salvarRegraLancamento({ horario: req.body?.horario, adiarFeriados: req.body?.adiarFeriados === "1", feriadosLocais: req.body?.feriadosLocais }, user);
+    req.flash("success", "Regra de lançamento salva. Será aplicada às próximas OSs preventivas.");
+  } catch (err) {
+    req.flash("error", err.message || "Não foi possível salvar a regra de lançamento.");
+  }
+  return res.redirect("/pcm/preventivas/programadas");
+}
+
 function gerarOSProgramadasSegunda(req, res) {
   const user = req.session?.user || null;
   if (!isPcmManager(user)) {
@@ -253,7 +268,7 @@ function gerarOSProgramadasSegunda(req, res) {
   try {
     const result = service.lancarProgramadasComoOSDaSegunda({ user, refDate: new Date(), automatico: false });
     if (result?.skipped) {
-      req.flash("success", `OS da segunda-feira (${result.dataSegunda || "-"}) já foram lançadas anteriormente.`);
+      req.flash(result.reason === "already_processed_week" ? "success" : "error", result.message || (result.reason === "already_processed_week" ? `OS da segunda-feira (${result.dataSegunda || "-"}) já foram lançadas anteriormente.` : "Não foi possível lançar as OSs preventivas."));
     } else {
       req.flash(
         "success",
@@ -372,6 +387,7 @@ module.exports = {
   create,
   show,
   programadasIndex,
+  salvarRegraLancamento,
   gerarProgramadas,
   gerarOSProgramadasSegunda,
   lancarLoteDiarioPreventivas,
