@@ -80,3 +80,14 @@
 .almox-v11 :is(input,select,textarea):focus-visible {outline:2px solid #277a4f;outline-offset:1px}
 .almox-v11 :is(.btn,button):focus-visible {outline:3px solid #277a4f;outline-offset:2px}
 @media(max-width:850px){.almox-v11 .stock-flow-head,.almox-v11 .stock-v6-head,.almox-v11 .reserve-head {padding:17px}}
+
+.stock-v11-head {
+ display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+ padding:20px 24px;margin:0 0 18px;background:#f4f8f5;
+ border:1px solid #dfeae2;border-radius:16px;
+}
+.stock-v11-head h1 {margin:0 0 4px;color:#20352a;letter-spacing:-.025em}
+.stock-v11-head p {margin:0;color:#52675b}
+.stock-v11-head .btn {min-height:42px}
+.stock-v11-head .btn:focus-visible {outline:3px solid #277a4f;outline-offset:2px}
+@media(max-width:850px){.stock-v11-head {padding:17px}}
