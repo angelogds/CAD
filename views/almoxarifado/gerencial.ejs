@@ -70,6 +70,12 @@ const maior = Math.max(1,...dados.serie.map(s=>Math.max(s.entradas,s.saidas)));
       <% }) %>
     </tbody></table></div>
   </section>
+  <section class="box"><h2>Movimentação por setor e categoria</h2><p class="muted">Entradas e saídas no período selecionado. Cada unidade aparece em linha separada; setor não informado segue identificado.</p>
+    <div class="scroll"><table><thead><tr><th>Setor</th><th>Categoria</th><th>Unidade</th><th>Entradas</th><th>Saídas</th></tr></thead><tbody>
+      <% if(!dados.movimentacaoPorSetorCategoria.length){ %><tr><td colspan="5">Sem movimentações no período.</td></tr><% } %>
+      <% dados.movimentacaoPorSetorCategoria.forEach(g=>{ %><tr><td><%=g.setor%></td><td><%=g.categoria%></td><td><%=g.unidade%></td><td><%=numero(g.entradas)%></td><td><%=numero(g.saidas)%></td></tr><% }) %>
+    </tbody></table></div>
+  </section>
   <div class="duas">
     <section class="box"><h2>Mais utilizados no período</h2><p class="muted">Ordenados pelo número de retiradas, com quantidade por unidade do material.</p>
       <div class="scroll"><table><thead><tr><th>Material</th><th>Retiradas</th><th>Quantidade</th></tr></thead><tbody>
