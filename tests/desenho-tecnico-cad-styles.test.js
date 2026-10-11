@@ -54,10 +54,9 @@ test('drawer oferece propriedades atuais e estilo independente de cotas', () => 
   assert.match(runtime, /type=\"color\"/);
 });
 
-test('runtime de estilos inicia depois da estabilização visual', () => {
+test('runtime de estilos MLightCAD permanece isolado do bootstrap ativo', () => {
   const engine = read('public/js/cad-engine-v2.js');
-  const ui = engine.indexOf("cad-ui-stabilization.js");
-  const style = engine.indexOf("cad-style-runtime.js");
-  assert.ok(ui >= 0);
-  assert.ok(style > ui);
+  const { assertOptionalRuntime } = require('./helpers/cad-bootstrap');
+  assertOptionalRuntime(engine, 'cad-ui-stabilization.js');
+  assertOptionalRuntime(engine, 'cad-style-runtime.js');
 });

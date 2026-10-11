@@ -55,7 +55,7 @@ function detalheItem(req, res) {
   if (!itemBase) return res.status(404).send("Item não encontrado");
   const item = withReserva([itemBase])[0];
   const movimentos = service.listMovimentos().filter((mov) => Number(mov.item_id) === Number(item.id));
-  res.render("estoque/show", { title: item.nome, activeMenu: "estoque", item, movimentos });
+  res.render("estoque/show", { title: item.nome, activeMenu: "estoque", item, movimentos, canManageReposicao: require('../../config/rbac').ACCESS.estoque_manage.includes(normalizeRole(req.session?.user?.role)) });
 }
 function categorias(req, res) { res.render("estoque/categorias", { title: "Categorias", activeMenu: "estoque", categorias: service.listCategorias() }); }
 function criarCategoria(req, res) { service.createCategoria(req.body); req.flash("success", "Categoria criada."); res.redirect("/estoque/categorias"); }

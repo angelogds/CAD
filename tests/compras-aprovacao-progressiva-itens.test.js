@@ -39,7 +39,7 @@ test('aprovação é individual, auditada e aceita ADMIN ou DIRETORIA no painel 
   assert.match(service, /aprovacao_item_em=datetime\('now'\)/);
   assert.match(service, /compras_aprovacoes_itens_historico/);
   assert.match(diretoriaRoutes, /const DIRETORIA_COMPRAS = ACCESS\.diretoria_compras/);
-  assert.match(diretoriaRoutes, /router\.post\('\/compras\/:id\/aprovar-itens-cotados', requireLogin, requireRole\(DIRETORIA_COMPRAS\)/);
+  assert.match(diretoriaRoutes, /router\.post\('\/compras\/:id\/aprovar-itens-cotados', requireLogin, requireRole\(DIRETORIA_APROVACAO\)/);
   assert.match(solicitacoesRoutes, /redirectAprovacaoCompras/);
 });
 

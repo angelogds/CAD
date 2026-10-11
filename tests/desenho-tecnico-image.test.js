@@ -1,3 +1,4 @@
+const { assertOptionalRuntime, assertStableBootstrap } = require('./helpers/cad-bootstrap');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -77,7 +78,7 @@ test('sanitização do CAD preserva geometria e referência segura da imagem', (
   );
 });
 
-test('runtime MLightCAD integra upload, entidade raster, persistência e exportação segura para PDF', () => {
+test('biblioteca MLightCAD preserva upload raster e exportação segura sem substituir o editor ativo', () => {
   const imageEntry = read('frontend/mlightcad-image.entry.js');
   const runtime = read('public/js/cad-image-runtime.js');
   const engine = read('public/js/cad-engine-v2.js');
@@ -91,7 +92,7 @@ test('runtime MLightCAD integra upload, entidade raster, persistência e exporta
   assert.match(imageEntry, /patchMlightImageSerialization/);
   assert.match(runtime, /mlightImageBtn/);
   assert.match(runtime, /Salvando desenho antes do PDF/);
-  assert.match(engine, /cad-image-runtime\.js/);
+  assertOptionalRuntime(engine, 'cad-image-runtime.js');
   assert.match(build, /mlightcad-image/);
   assert.match(routes, /cad\/:id\/images/);
   assert.match(pdf, /case 'image'/);

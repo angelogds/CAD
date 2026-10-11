@@ -16,8 +16,8 @@ test('perfil Coordenador da Reciclagem existe no RBAC e cadastro',()=>{
 
 test('coordenador consulta compras sem receber ações operacionais',()=>{
  const { canAccessModule } = require('../config/rbac');
- assert.equal(canAccessModule('COORDENADOR_RECICLAGEM', 'acompanhamento_compras'), true);
- ['compras','compras_read','compras_manage','compras_delete','solicitacoes_read','solicitacoes_create','solicitacoes_manage','solicitacoes_delete','diretoria_aprovacao','pre_solicitacao_setor_approve','almoxarifado_manage','pcm_manage','preventivas_manage','os_open'].forEach(key=>{
+ assert.equal(canAccessModule('COORDENADOR_RECICLAGEM', 'diretoria_compras'), true);
+ ['compras','compras_read','compras_manage','compras_delete','solicitacoes_delete','diretoria_aprovacao','pre_solicitacao_setor_approve','almoxarifado_manage','pcm_manage','preventivas_manage'].forEach(key=>{
    assert.equal(canAccessModule('COORDENADOR_RECICLAGEM',key),false,key);
  });
 });

@@ -144,6 +144,10 @@ router.post(
 );
 
 
+const correias = require('../correias/correias.fluxo.controller');
+router.post('/:id/execucoes/:execId/correias', requireLogin, requireRole(ACCESS.preventivas_execute), correias.solicitar);
+router.post('/:id/correias/:pedidoId/troca', requireLogin, requireRole(ACCESS.preventivas_execute), correias.confirmar);
+
 // POST /preventivas/:id/execucoes/:execId/apagar
 router.post(
   "/:id/execucoes/:execId/apagar",

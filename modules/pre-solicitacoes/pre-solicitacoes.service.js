@@ -370,7 +370,22 @@ function preparePayload(data, user) {
   const itens = solicitacoesService.parseItensFromBody(data);
   if (!itens.length) throw new Error('Inclua ao menos um material com quantidade maior que zero.');
   const observacao = String(data.observacao || '').trim();
+  const setoresRateio=['RECICLAGEM','FRIGORIFICO','LOGISTICA','ADMINISTRATIVO'];
+  if(setoresRateio.some(s=>data['itens_rateio_'+s]!==undefined||data['itens_rateio_'+s+'[]']!==undefined)) {
+    itens.forEach((item,index)=>{
+      const rateio={};
+      setoresRateio.forEach(s=>{const raw=data['itens_rateio_'+s]??data['itens_rateio_'+s+'[]'];const vals=Array.isArray(raw)?raw:[raw];const n=Number(String(vals[index]??0).replace(',','.'));if(!Number.isFinite(n)||n<0)throw new Error('Quantidade inválida na distribuição por setor.');if(n>0)rateio[s]=n;});
+      if(Object.values(rateio).reduce((a,b)=>a+b,0)>item.qtd_solicitada)throw new Error('A distribuição prevista não pode exceder a quantidade solicitada.');
+      item.rateio_setores_json=JSON.stringify(rateio);
+    });
+  }
   return { setor, semana, subarea, itens, observacao, user };
+}
+
+function persistRateio(id,itens) {
+  if(!columns('solicitacao_itens').has('rateio_setores_json')) return;
+  const rows=db.prepare('SELECT id FROM solicitacao_itens WHERE solicitacao_id=? ORDER BY id').all(Number(id));
+  itens.forEach((item,index)=>{if(item.rateio_setores_json!==undefined&&rows[index])db.prepare('UPDATE solicitacao_itens SET rateio_setores_json=? WHERE id=?').run(item.rateio_setores_json,rows[index].id);});
 }
 
 function sendStateForAction(action) {
@@ -410,6 +425,7 @@ function create(data, user) {
       disponivel_compras: 0,
     });
     initializeItems(id);
+    persistRateio(id,payload.itens);
 
     const created = getById(id);
     if (actionStatus === PRE_STATUS.AGUARDANDO_APROVACAO) notifyApprovers(created);
@@ -423,7 +439,11 @@ function updateDraft(id, data, user) {
   if (!canEditDraft(current, user)) throw new Error('Este rascunho não pode mais ser alterado por este usuário.');
   const payload = preparePayload(data, user);
   const actionStatus = sendStateForAction(data.acao);
-
+  const rateios = new Map((current.itens || []).map(i=>[Number(i.estoque_item_id),i.rateio_setores_json || '{}']));
+  if (tableExists('estoque_reposicao_vinculos')) {
+    const comum=db.prepare("SELECT 1 FROM estoque_reposicao_vinculos v JOIN estoque_itens i ON i.id=v.estoque_item_id WHERE v.solicitacao_id=? AND i.setor_utilizacao='COMUM'").get(Number(id));
+    if(comum && payload.setor!=='RECICLAGEM') throw new Error('Reposição de material comum segue para o responsável da Reciclagem.');
+  }
   return db.transaction(() => {
     solicitacoesService.updateSolicitacao(Number(id), {
       setor_origem: payload.setor,
@@ -446,6 +466,10 @@ function updateDraft(id, data, user) {
       disponivel_compras: 0,
     });
     initializeItems(id);
+    if(columns('solicitacao_itens').has('rateio_setores_json')) {
+      for(const [itemId,json] of rateios) if(itemId) db.prepare('UPDATE solicitacao_itens SET rateio_setores_json=? WHERE solicitacao_id=? AND estoque_item_id=?').run(json,Number(id),itemId);
+    }
+    persistRateio(id,payload.itens);
     const updated = getById(id);
     if (actionStatus === PRE_STATUS.AGUARDANDO_APROVACAO) notifyApprovers(updated);
     return updated;

@@ -82,7 +82,7 @@ test('rotas e RBAC de motores permanecem os mesmos', () => {
   assert.match(routes, /router\.get\("\/", requireLogin, requireRole\(MOTORES_ACCESS\)/);
   assert.match(routes, /router\.post\("\/:id\/enviar", requireLogin, requireRole\(MOTORES_ACCESS\)/);
   assert.match(routes, /router\.post\("\/:id\/retorno", requireLogin, requireRole\(MOTORES_ACCESS\)/);
-  assert.match(rbac, /motores:\s*\[ROLE\.ADMIN, ROLE\.ALMOXARIFADO, ROLE\.MANUTENCAO_SUPERVISOR\]/);
+  assert.match(rbac, /motores:\s*\[ROLE\.ADMIN, ROLE\.ALMOXARIFADO, ROLE\.MANUTENCAO_SUPERVISOR, ROLE\.COORDENADOR_RECICLAGEM\]/);
 });
 
 test('layout de motores é responsivo e tabela vira leitura móvel', () => {

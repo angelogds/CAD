@@ -30,7 +30,7 @@ test('módulo Preventivas fica operacional e sem criação administrativa',()=>{
 
 test('RBAC separa gestão PCM de execução mecânica',()=>{
  const rbac=read('config/rbac.js');
- assert.match(rbac,/preventivas_manage:\s*\[ROLE\.ADMIN, ROLE\.PCM, ROLE\.MANUTENCAO_SUPERVISOR\]/);
+ assert.match(rbac,/preventivas_manage:\s*\[ROLE\.ADMIN, ROLE\.ENCARREGADO_MANUTENCAO\]/);
  assert.match(rbac,/preventivas_execute:\s*\[ROLE\.ADMIN, ROLE\.MECANICO, ROLE\.MANUTENCAO_SUPERVISOR\]/);
  const routes=read('modules/preventivas/preventivas.routes.js');
  assert.match(routes,/execUpdateStatus[\s\S]*?preventivas_execute|preventivas_execute[\s\S]*?execUpdateStatus/);

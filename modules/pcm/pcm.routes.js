@@ -7,6 +7,8 @@ const preventivasCtrl = require("../preventivas/preventivas.controller");
 const ferramentalCtrl = require("../ferramental/ferramental.controller");
 const correiasCtrl = require("../correias/correias.controller");
 
+router.post('/engenharia/correias/prazo', requireLogin, requireRole(ACCESS.pcm_manage), require('../correias/correias.fluxo.controller').prazo);
+
 const PCM_ACCESS = ACCESS.pcm;
 const PCM_MANAGE = ACCESS.pcm_manage;
 const DIRETORIA_MANUTENCAO = ACCESS.diretoria_manutencao || [];
@@ -62,6 +64,7 @@ router.post("/preventivas", requireLogin, requireRole(PCM_MANAGE), preventivasCt
 router.get("/preventivas/eleger-mecanico", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.elegerMecanicoForm);
 router.post("/preventivas/eleger-mecanico", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.salvarElegerMecanico);
 router.get("/preventivas/programadas", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.programadasIndex);
+router.post("/preventivas/programadas/configuracao", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.salvarRegraLancamento);
 router.post("/preventivas/programadas/gerar", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.gerarProgramadas);
 router.post("/preventivas/programadas/lancar-os-segunda", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.gerarOSProgramadasSegunda);
 router.post("/preventivas/programadas/lancar-os-lote-dia", requireLogin, requireRole(PCM_MANAGE), preventivasCtrl.lancarLoteDiarioPreventivas);

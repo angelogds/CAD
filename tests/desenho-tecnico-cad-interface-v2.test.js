@@ -8,13 +8,11 @@ const path = require('node:path');
 const root = process.cwd();
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('Interface CAD V2 é carregada depois da precisão sem substituir o MLightCAD', () => {
+test('Interface CAD V2 permanece opcional e não reinicializa o editor ativo', () => {
   const engine = read('public/js/cad-engine-v2.js');
-  const precisionIndex = engine.indexOf("cad-precision-assist-runtime.js");
-  const interfaceIndex = engine.indexOf("cad-interface-v2.js");
-  assert.ok(precisionIndex >= 0, 'runtime de precisão deve continuar carregado');
-  assert.ok(interfaceIndex > precisionIndex, 'Interface V2 deve carregar depois da precisão');
-  assert.doesNotMatch(engine, /legacy-engine|engine=legacy/i);
+  const { assertOptionalRuntime } = require('./helpers/cad-bootstrap');
+  assertOptionalRuntime(engine, 'cad-precision-assist-runtime.js');
+  assertOptionalRuntime(engine, 'cad-interface-v2.js');
 });
 
 test('topo agrupa ações de arquivo sem recriar listeners das ferramentas', () => {

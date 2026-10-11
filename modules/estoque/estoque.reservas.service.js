@@ -201,7 +201,11 @@ function resumoPorItem() {
     WHERE status<>'CANCELADA'
     GROUP BY estoque_item_id
   `).all();
-  return new Map(rows.map((r) => [Number(r.estoque_item_id), Number(r.reservado || 0)]));
+  const result = new Map(rows.map((r) => [Number(r.estoque_item_id), Number(r.reservado || 0)]));
+  if (tableExists('correias_pedidos')) {
+    for (const r of db.prepare("SELECT estoque_item_id, SUM(quantidade) reservado FROM correias_pedidos WHERE status IN ('SOLICITADA','SEPARADA') GROUP BY estoque_item_id").all()) result.set(Number(r.estoque_item_id), Number(result.get(Number(r.estoque_item_id)) || 0) + Number(r.reservado));
+  }
+  return result;
 }
 
 function listReservas(options = {}) {
@@ -282,7 +286,7 @@ function insertMovimento(data) {
     ['retirado_por_colaborador_id', data.retirado_por_colaborador_id],
     ['retirado_por_user_id', data.retirado_por_user_id],
     ['entregue_por_user_id', data.entregue_por_user_id],
-    ['identificacao_origem', data.identificacao_origem],
+    ['identificacao_origem', data.identificacao_origem], ['empresa_consumidora', data.empresa_consumidora], ['setor_utilizacao', data.setor_utilizacao],
   ];
   for (const [column, value] of optional) {
     if (hasColumn('estoque_movimentos', column)) { cols.push(column); vals.push(value ?? null); }
@@ -290,7 +294,7 @@ function insertMovimento(data) {
   return Number(db.prepare(`INSERT INTO estoque_movimentos (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).run(...vals).lastInsertRowid);
 }
 
-function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, entreguePorUserId, observacao }) {
+function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, entreguePorUserId, observacao, empresaConsumidora, setorConsumidor }) {
   const qtd = Number(quantidade || 0);
   if (!(qtd > 0)) throw new Error('Quantidade inválida para retirada.');
   const pessoa = qrCode ? getPessoaByQr(qrCode) : getPessoaByCadastro(pessoaTipo, pessoaId);
@@ -298,7 +302,7 @@ function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, e
 
   const resultado = db.transaction(() => {
     const reserva = db.prepare(`
-      SELECT r.*,s.numero,si.unidade,${itemNameExpr('si')} item_nome,
+      SELECT r.*,s.numero,s.setor_origem,si.unidade,${itemNameExpr('si')} item_nome,
         COALESCE(ei.saldo_atual,0) saldo_fisico,
         ${hasColumn('solicitacao_itens', 'valor_unitario_centavos') ? 'si.valor_unitario_centavos' : 'NULL'} valor_unitario_centavos,
         ${hasColumn('estoque_itens', 'custo_unit') ? 'ei.custo_unit' : 'NULL'} estoque_custo_unit
@@ -310,6 +314,7 @@ function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, e
     `).get(Number(reservaId));
     if (!reserva) throw new Error('Reserva não encontrada.');
 
+    if (setorConsumidor && !['RECICLAGEM','LOGISTICA','FRIGORIFICO','ADMINISTRATIVO'].includes(setorConsumidor)) throw new Error('Setor consumidor inválido.');
     const disponivelReserva = Math.max(Number(reserva.quantidade_reservada || 0) - Number(reserva.quantidade_retirada || 0), 0);
     if (!(disponivelReserva > 0)) throw new Error('Esta reserva já foi retirada integralmente.');
     if (qtd > disponivelReserva) throw new Error(`Quantidade acima da reserva disponível. Máximo: ${disponivelReserva}.`);
@@ -337,6 +342,8 @@ function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, e
       : Number(reserva.estoque_custo_unit || 0);
     const movimentoId = insertMovimento({
       tipo: 'SAIDA_REQUISICAO_INTERNA',
+      empresa_consumidora: String(empresaConsumidora || reserva.setor_origem || '').trim(),
+      setor_utilizacao: setorConsumidor || reserva.setor_origem || null,
       item_id: reserva.estoque_item_id,
       quantidade: qtd,
       origem: 'SOLICITACAO',

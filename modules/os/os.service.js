@@ -1,4 +1,5 @@
 const db = require("../../database/db");
+const { validarLancamento } = require("../preventivas/preventivas.calendario");
 let osChatService = null;
 try { osChatService = require('../os-chat/os-chat.service'); } catch (_e) {}
 const { classifyOSPriority } = require("./os-priority.service");
@@ -2134,6 +2135,7 @@ async function createOS({
   if (!equipamentoFinal) throw new Error("Informe um equipamento cadastrado ou manual.");
 
   const tipoOS = normalizeTipoOS(tipo || "CORRETIVA");
+  if (tipoOS === "PREVENTIVA") validarLancamento(db);
   const criticidadeEntradaBase = normalizeGrau(criticidade || severidade || grau || "MEDIA");
   const score = classifyOSPriority({ descricao: relatoNaoConformidade, tipo: tipoOS, equipamento_id: equipId });
 
@@ -2439,7 +2441,9 @@ function createOSAutomatica({
   regra_geradora_id = null,
   preventiva_execucao_id = null,
   metadata = null,
+  refDate = new Date(),
 }) {
+  if (normalizeTipoOS(tipo) === "PREVENTIVA") validarLancamento(db, refDate);
   const equipId = Number(equipamento_id || 0) || null;
   if (!equipId) throw new Error("Equipamento obrigatório para OS automática.");
   const eq = db.prepare(`SELECT id, nome FROM equipamentos WHERE id = ?`).get(equipId);

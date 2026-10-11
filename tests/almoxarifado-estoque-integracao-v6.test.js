@@ -30,7 +30,7 @@ test('V6 mantém as ligações principais Almoxarifado, Estoque e Retirada em ro
   assert.match(estoqueRoutes, /router\.get\("\/saidas\/nova"[\s\S]*ctrl\.saidaNova/);
 
   assert.match(tabs, /href="\/almoxarifado\/estoque"/);
-  assert.match(tabs, /href="\/almoxarifado\/recebimentos\?status=EM_COTACAO"/);
+  assert.match(tabs, /href="\/almoxarifado\/recebimentos\?fila=A_CAMINHO"/);
   assert.match(tabs, /href="\/almoxarifado\/recebimentos\?status=COMPRADA"/);
   assert.match(tabs, /href="\/estoque\/reservas"/);
   assert.match(tabs, /href="\/almoxarifado\/retiradas\/qr"/);
@@ -40,7 +40,7 @@ test('V6 deixa somente uma entrada de retirada no menu principal do Almoxarifado
   const tabs = read('views','almoxarifado','_tabs.ejs');
   const links = tabs.match(/href="\/almoxarifado\/retiradas\/qr"/g) || [];
   assert.equal(links.length, 1);
-  assert.match(tabs, /> Retirada\s*<\/a>/);
+  assert.match(tabs, />\s*Retirada\s*<\/a>/);
   assert.doesNotMatch(tabs, /Saída avulsa/);
   assert.doesNotMatch(tabs, /Entrega identificada/);
 });

@@ -1,0 +1,107 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/automacao.css?v=20261008-v1">
+<main class="auto-page auto-hmi">
+  <header class="auto-hero auto-hero-hmi">
+    <div>
+      <span class="auto-eyebrow">AUTOMAÇÃO • DIGESTORES</span>
+      <h1>IHM dos Digestores</h1>
+      <p>Leitura de temperatura PT100 e controle das descargas de limpeza dos purgadores do eixo e da camisa.</p>
+    </div>
+    <div class="auto-integration">
+      <span class="auto-state waiting">Sem hardware conectado</span>
+      <small><%= integrationState.label %></small>
+    </div>
+  </header>
+
+  <section class="auto-alert">
+    <strong>Modo de implantação</strong>
+    <span>Esta tela ainda não envia comandos elétricos. Leituras e válvulas permanecem em “sem sinal” até a integração com o ESP32/gateway.</span>
+  </section>
+
+  <section class="digestor-grid" aria-label="Digestores">
+    <% (digestores || []).forEach((d) => { %>
+      <article class="digestor-card">
+        <div class="process-tower-wrap" aria-label="Indicador térmico do <%= d.nome %>">
+          <div class="process-tower is-off" title="Sem sinal até a integração PT100">
+            <span class="tower-lamp tower-red"></span>
+            <span class="tower-lamp tower-yellow"></span>
+            <span class="tower-lamp tower-green"></span>
+            <i class="tower-pole"></i>
+          </div>
+          <small>Indicador térmico</small>
+        </div>
+        <header class="digestor-title">
+          <div><small>D<%= d.id %></small><h2><%= d.nome %></h2></div>
+          <span class="signal-pill offline">Sem sinal</span>
+        </header>
+
+        <div class="temperature-card">
+          <span class="thermo" aria-hidden="true">🌡</span>
+          <div>
+            <small>Temperatura · <%= d.sensor %></small>
+            <strong>--,- °C</strong>
+            <span>Aguardando leitura</span>
+          </div>
+        </div>
+
+        <div class="digestor-illustration" aria-hidden="true">
+          <div class="vessel"><span>D<%= d.id %></span><i class="sensor-point"></i></div>
+          <div class="steam-drop"><span></span></div>
+        </div>
+
+        <div class="valve-grid">
+          <% d.valvulas.forEach((v) => { %>
+            <section class="valve-card">
+              <div class="valve-head">
+                <div><small>Descarga do purgador</small><strong><%= v.nome %></strong></div>
+                <span class="signal-dot"></span>
+              </div>
+              <div class="valve-state">Estado: <b>Sem sinal</b></div>
+              <div class="valve-symbol" aria-hidden="true"><span></span><i></i><span></span></div>
+              <div class="valve-actions">
+                <button type="button" disabled>Abrir</button>
+                <button type="button" disabled>Fechar</button>
+              </div>
+            </section>
+          <% }) %>
+        </div>
+      </article>
+    <% }) %>
+  </section>
+
+  <section class="temperature-legend" aria-label="Faixas de temperatura dos digestores">
+    <span><i class="legend-red"></i><strong>60–79 °C</strong> Material frio / carregado</span>
+    <span><i class="legend-yellow"></i><strong>80–99 °C</strong> Material fritando</span>
+    <span><i class="legend-yellow"></i><strong>100–119 °C</strong> Cozimento final</span>
+    <span><i class="legend-green"></i><strong>≥ 120 °C</strong> Pronto para descarregar</span>
+  </section>
+
+  <section class="steam-manifold">
+    <div class="steam-line"><span>VAPOR</span><i></i></div>
+    <div>
+      <strong>Cavalete / linha de vapor</strong>
+      <small>Referência visual da alimentação dos quatro digestores. Cada digestor possui duas descargas: eixo e camisa.</small>
+    </div>
+  </section>
+
+  <section class="auto-bottom-grid">
+    <article class="auto-panel">
+      <h2>Programação das descargas</h2>
+      <p>Será habilitada na etapa do simulador e depois enviada ao controlador local.</p>
+      <div class="program-preview">
+        <label>Modo<select disabled><option>Automático</option></select></label>
+        <label>Intervalo<input disabled value="2 min"></label>
+        <label>Tempo aberto<input disabled value="10 s"></label>
+      </div>
+    </article>
+    <article class="auto-panel">
+      <h2>Próxima integração</h2>
+      <ol>
+        <li>Receber leitura PT100 de cada digestor.</li>
+        <li>Ler retorno das válvulas Eixo e Camisa.</li>
+        <li>Habilitar simulador de ciclos.</li>
+        <li>Conectar ESP32/gateway sem expor o equipamento à internet.</li>
+      </ol>
+    </article>
+  </section>
+</main>

@@ -1,3 +1,4 @@
+const { assertOptionalRuntime, assertStableBootstrap } = require('./helpers/cad-bootstrap');
 'use strict';
 
 const test = require('node:test');
@@ -128,14 +129,14 @@ test('painel permite configurar modos OSNAP, incremento polar e medições nativ
   assert.match(source, /POLAR_ANGLES = Object\.freeze\(\[15, 30, 45, 90\]\)/);
 });
 
-test('bundle e loader incluem assistência de precisão sem substituir o core', () => {
+test('bundle preserva assistência de precisão isolada do bootstrap ativo', () => {
   const build = read('scripts/build-mlightcad.mjs');
   const loader = read('public/js/cad-engine-v2.js');
   const css = read('public/css/cad-precision-assist.css');
   const runtime = read('public/js/cad-precision-assist-runtime.js');
 
   assert.match(build, /mlightcad-precision-assist/);
-  assert.match(loader, /cad-precision-assist-runtime\.js/);
+  assertOptionalRuntime(loader, 'cad-precision-assist-runtime.js');
   assert.match(css, /cad-precision-assist/);
   assert.match(css, /cad-precision-coords/);
   assert.match(css, /cad-precision-measure-result/);

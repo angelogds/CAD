@@ -5,6 +5,11 @@ const ctrl = require("./estoque.controller");
 const reservasCtrl = require("./estoque.reservas.controller");
 const almoxCtrl = require("../almoxarifado/almoxarifado.controller");
 
+const reposicaoCtrl=require('./estoque.reposicao.controller');
+router.post('/reposicao/gerar',requireLogin,requireRole(ACCESS.estoque_manage),reposicaoCtrl.gerar);
+router.post('/itens/:id/reposicao',requireLogin,requireRole(ACCESS.estoque_manage),reposicaoCtrl.salvar);
+router.get('/classificacao',requireLogin,requireRole(ACCESS.estoque_manage),reposicaoCtrl.regras);
+router.post('/classificacao/:id',requireLogin,requireRole(ACCESS.estoque_manage),reposicaoCtrl.salvarRegra);
 router.get("/", requireLogin, requireRole(ACCESS.estoque_view), ctrl.index);
 router.get("/reservas", requireLogin, requireRole(ACCESS.estoque_view), reservasCtrl.index);
 router.get("/itens", requireLogin, requireRole(ACCESS.estoque_view), ctrl.itens);

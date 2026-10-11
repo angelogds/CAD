@@ -41,6 +41,8 @@ function retirar(req, res) {
       pessoaId,
       entreguePorUserId: req.session.user.id,
       observacao: req.body.observacao || null,
+      empresaConsumidora: req.body.empresa_consumidora,
+      setorConsumidor: req.body.setor_consumidor,
     });
     req.flash('success', `${resultado.quantidade} unidade(s) entregues a ${resultado.pessoa?.nome || resultado.colaborador?.nome}. Estoque e reserva atualizados.`);
   } catch (error) {

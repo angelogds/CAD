@@ -379,6 +379,7 @@ function mount(basePath, modPath) {
 
 mount("/auth", "./modules/auth/auth.routes");
 mount(OFFICIAL_ROUTES.dashboard, "./modules/dashboard/dashboard.routes");
+mount(OFFICIAL_ROUTES.automacao, "./modules/automacao/automacao.routes");
 mount("/push", "./modules/push/push.routes");
 mount("/mobile", "./modules/mobile/mobile.routes");
 mount(OFFICIAL_ROUTES.pcm, "./modules/pcm/pcm.routes");
@@ -399,6 +400,11 @@ mount(OFFICIAL_ROUTES.compras, "./modules/compras/compras.routes");
 mount("/fornecedores", "./modules/fornecedores/fornecedores.routes");
 mount("/solicitacoes", "./modules/solicitacoes/solicitacoes.routes");
 mount("/pre-solicitacoes", "./modules/pre-solicitacoes/pre-solicitacoes.routes");
+// Rascunhos de reposição: usa o responsável real do Almoxarifado e o fluxo existente.
+trackInterval(setInterval(() => {
+  try { require('./modules/estoque/estoque.reposicao.service').gerarAutomaticamente(); }
+  catch (error) { console.warn('[ALMOX_REPOSICAO]', error.message); }
+}, 15 * 60 * 1000));
 mount("/acompanhamento-compras", "./modules/acompanhamento-compras/acompanhamento-compras.routes");
 mount(OFFICIAL_ROUTES.estoque, "./modules/estoque/estoque.routes");
 mount(OFFICIAL_ROUTES.almoxarifado, "./modules/almoxarifado/almoxarifado.routes");
@@ -467,7 +473,8 @@ try {
       }
     };
     runProgramadasSegunda();
-    trackInterval(setInterval(runProgramadasSegunda, 15 * 60 * 1000));
+    // O serviço valida 05h no horário da Bahia, feriados e idempotência semanal.
+    trackInterval(setInterval(runProgramadasSegunda, 60 * 1000));
   }
 } catch (err) {
   console.warn("⚠️ Serviço de preventivas não carregado para lançamento automático de OS:", err.message || err);

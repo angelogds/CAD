@@ -51,7 +51,7 @@ function normalizeStatus(status) {
   return Object.values(STATUS).includes(token) ? token : (aliases[token] || token);
 }
 
-const CLOSED_STATUSES = new Set([STATUS.FECHADA, STATUS.CANCELADA]);
+const CLOSED_STATUSES = new Set([STATUS.FECHADA, STATUS.CANCELADA, STATUS.RECEBIDA_TOTAL, STATUS.SEPARADA_PARA_RETIRADA, STATUS.ENTREGUE_SOLICITANTE]);
 const ACTIVE_STATUSES = new Set(Object.values(STATUS).filter((status) => !CLOSED_STATUSES.has(status)));
 const CARD_STATUS = Object.freeze({
   abertas: new Set([STATUS.ABERTA, STATUS.REABERTA]),
@@ -212,6 +212,7 @@ function listSolicitacoesPorStatus(filters = {}) {
   }
   const status = normalizeStatus(filters.status);
   if (status) { where.push('s.status = ?'); params.push(status); }
+  else if (!filters.historico) where.push("s.status NOT IN ('RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SOLICITANTE','FECHADA','CANCELADA')");
   if (filters.query) {
     const fornecedorExpr = hasFornecedorCol ? "COALESCE(s.fornecedor, '')" : "''";
     const fornecedorNomeExpr = hasFornecedorIdCol && hasFornecedoresTable ? "COALESCE(f.nome, '')" : "''";

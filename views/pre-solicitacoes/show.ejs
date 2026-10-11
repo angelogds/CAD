@@ -90,7 +90,7 @@ const done=sol.itens_analisados||0,total=sol.itens_total||0;
       %>
         <article class="pre-review-item <%=ist.toLowerCase()%>">
           <div class="pre-review-copy">
-            <div class="pre-review-title"><span class="pre-review-number"><%=index+1%></span><strong><%=item.item_nome||item.descricao||'Item'%></strong><span class="pre-item-status <%=ist.toLowerCase()%>"><%=ist%></span></div>
+            <div class="pre-review-title"><span class="pre-review-number"><%=index+1%></span><strong><%=item.item_nome||item.descricao||'Item'%></strong><% if(item.rateio_setores_json&&item.rateio_setores_json!=='{}'){let rateio={};try{rateio=JSON.parse(item.rateio_setores_json)}catch{}; %><span>Previsão de uso: <%=Object.entries(rateio).filter(([s,q])=>q>0).map(([s,q])=>s+': '+q+' '+item.unidade).join(' • ')%></span><% } %><span class="pre-item-status <%=ist.toLowerCase()%>"><%=ist%></span></div>
             <% if(item.item_descricao||item.descricao){ %><p><%=item.item_descricao||item.descricao%></p><% } %>
             <div class="pre-item-metrics">
               <span><small>Solicitado</small><strong><%=suggested%> <%=item.unidade||'UN'%></strong></span>

@@ -224,7 +224,11 @@ function createItem(data) {
   cols.push(minColumn);
   values.push(Number(data.saldo_minimo || 0));
   const placeholders = cols.map(() => "?").join(",");
-  return Number(db.prepare(`INSERT INTO estoque_itens (${cols.join(",")}) VALUES (${placeholders})`).run(...values).lastInsertRowid);
+  return db.transaction(() => {
+    const id = Number(db.prepare(`INSERT INTO estoque_itens (${cols.join(",")}) VALUES (${placeholders})`).run(...values).lastInsertRowid);
+    require('./estoque.classificacao.service').classificar(id);
+    return id;
+  })();
 }
 
 function findItemForInventory(data = {}) {
@@ -452,14 +456,14 @@ function insertMovimento(data) {
     ["custo_unit", data.custo_unit], ["observacao", data.observacao], ["reserva_id", data.reserva_id],
     ["retirado_por_colaborador_id", data.retirado_por_colaborador_id], ["entregue_por_user_id", data.entregue_por_user_id],
     ["identificacao_origem", data.identificacao_origem], ["setor_utilizacao", data.setor_utilizacao],
-    ["subarea_centro_custo", data.subarea_centro_custo],
+    ["subarea_centro_custo", data.subarea_centro_custo], ["empresa_consumidora", data.empresa_consumidora], ["mecanico_user_id", data.mecanico_user_id],
   ];
   optional.forEach(([col, value]) => { if (hasColumn("estoque_movimentos", col)) { cols.push(col); vals.push(value ?? null); } });
   const info = db.prepare(`INSERT INTO estoque_movimentos (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(...vals);
   return Number(info.lastInsertRowid);
 }
 
-function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id, origem = 'MANUAL', solicitacao_id, solicitacao_item_id }) {
+function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id, origem = 'MANUAL', solicitacao_id, solicitacao_item_id, empresa_consumidora, setor_consumidor, mecanico_user_id }) {
   const contexto = solicitacao_id ? getContextoSolicitacao(solicitacao_id, solicitacao_item_id) : null;
   const resolvedItemId = contexto ? Number(contexto.estoque_item_id) : Number(item_id);
   if (contexto && item_id && Number(item_id) !== resolvedItemId) throw new Error('O material selecionado não corresponde ao item da solicitação.');
@@ -478,6 +482,12 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
     throw new Error(`Quantidade acima do disponível nesta solicitação. Máximo: ${contexto.disponivel_retirada}.`);
   }
 
+  if (!contexto) {
+    const reservado = Number(require('./estoque.reservas.service').resumoPorItem().get(Number(item.id)) || 0);
+    if (qtd > Number(item.saldo_atual || 0) - reservado) throw new Error('Saldo livre insuficiente: material reservado.');
+  }
+  const setorConsumidor = normalizeSetorEstoque(contexto?.setor_origem || setor_consumidor);
+  if (!contexto && item.setor_utilizacao_exibicao === SETOR_COMUM && (!setorConsumidor || setorConsumidor === SETOR_COMUM || !String(empresa_consumidora || '').trim())) throw new Error('Informe empresa e setor consumidor para materiais comuns.');
   const reserva = contexto ? atualizarReservaDaRetirada(contexto, qtd) : null;
   const equipamentoId = contexto?.equipamento_id || os?.equipamento_id || null;
   const anterior = Number(item.saldo_atual || 0);
@@ -489,7 +499,7 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
   const custoUnit = contexto && Number(contexto.valor_unitario_centavos || 0) > 0
     ? Number(contexto.valor_unitario_centavos) / 100
     : (HAS_ESTOQUE_CUSTO_UNIT ? Number(item.custo_unit || 0) : 0);
-  const setorMov = normalizeSetorEstoque(contexto?.setor_origem) || item.setor_utilizacao_exibicao || SETOR_COMUM;
+  const setorMov = setorConsumidor || item.setor_utilizacao_exibicao || SETOR_COMUM;
   const centroMov = normalize(contexto?.subarea_destino) || item.centro_custo_exibicao || null;
   const movimentoId = insertMovimento({
     tipo: 'SAIDA_REQUISICAO_INTERNA', item_id: resolvedItemId, quantidade: qtd,
@@ -502,7 +512,7 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
     reserva_id: reserva?.id || null,
     entregue_por_user_id: contexto ? (usuario_id || null) : null,
     identificacao_origem: contexto ? 'CONTEXTO_SEM_QR' : (String(origem).toUpperCase() === 'QR_CODE' ? 'QR_ITEM' : 'MANUAL'),
-    setor_utilizacao: setorMov, subarea_centro_custo: centroMov,
+    setor_utilizacao: setorMov, subarea_centro_custo: centroMov, empresa_consumidora: String(empresa_consumidora || contexto?.setor_origem || setorMov).trim(), mecanico_user_id: mecanico_user_id || null,
   });
   return { movimentoId, itemId: resolvedItemId, saldoAnterior: anterior, saldoPosterior: posterior, osId: resolvedOsId, equipamentoId, reservaId: reserva?.id || null };
 }

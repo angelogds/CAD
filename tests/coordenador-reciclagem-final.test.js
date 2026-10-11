@@ -11,8 +11,8 @@ test('Coordenador da Reciclagem tem operação e não acessa PCM',()=>{
  const r=ROLE.COORDENADOR_RECICLAGEM;
  ['painel_operacional','equipamentos','os_view','os_open','os_chat_read','solicitacoes_read','solicitacoes_create','demandas_view','diretoria_compras','preventivas_view'].forEach(k=>assert.ok(ACCESS[k].includes(r),k));
  ['pcm','pcm_manage','diretoria_aprovacao','compras_manage','almoxarifado_manage','usuarios'].forEach(k=>assert.ok(!ACCESS[k].includes(r),k));
- assert.deepEqual(ACCESS.pcm.sort(),[ROLE.ADMIN,ROLE.ENCARREGADO_MANUTENCAO].sort());
- assert.deepEqual(ACCESS.pcm_manage.sort(),[ROLE.ADMIN,ROLE.ENCARREGADO_MANUTENCAO].sort());
+ assert.deepEqual([...ACCESS.pcm].sort(),[ROLE.ADMIN,ROLE.ENCARREGADO_MANUTENCAO,ROLE.MANUTENCAO_SUPERVISOR].sort());
+ assert.deepEqual([...ACCESS.pcm_manage].sort(),[ROLE.ADMIN,ROLE.ENCARREGADO_MANUTENCAO,ROLE.MANUTENCAO_SUPERVISOR].sort());
 });
 
 test('solicitações do coordenador ficam fixas na Reciclagem',()=>{

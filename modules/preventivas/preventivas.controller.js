@@ -2,6 +2,7 @@ const service = require("./preventivas.service");
 const correiasService = require("../correias/correias.service");
 const PDFDocument = require("pdfkit");
 const dateBr = require("../../utils/data-hora-br");
+const { canAccessModule } = require("../../config/rbac");
 
 function isAdminOrEncarregado(user = null) {
   const role = String(user?.role || "").toUpperCase();
@@ -9,8 +10,7 @@ function isAdminOrEncarregado(user = null) {
 }
 
 function isPcmManager(user = null) {
-  const role = String(user?.role || "").toUpperCase();
-  return ["ADMIN", "PCM", "MANUTENCAO_SUPERVISOR", "SUPERVISOR_MANUTENCAO"].includes(role);
+  return canAccessModule(user?.role, "pcm_manage");
 }
 
 function redirectGestaoPreventiva(res, suffix = "") {
@@ -131,6 +131,10 @@ function show(req, res) {
     plano,
     execucoes,
     correiaContext: correiasService.getPlanoContext(id),
+    correiasMecanicos: require('../../database/db').prepare("SELECT id,name FROM users WHERE ativo=1 AND UPPER(role)='MECANICO' ORDER BY name").all(),
+    correiasVinculos: require('../correias/correias.fluxo.service').vinculos(plano.equipamento_id),
+    correiasPedidos: require('../correias/correias.fluxo.service').list(plano.equipamento_id),
+    execucoesAutorizadas: execucoes.filter(x => service.userCanExecutePreventiva(x.id, req.session?.user)).map(x=>x.id),
     canAdminPreventivas: isPcmManager(req.session?.user || null),
     canExecutePreventivas: ["ADMIN", "MECANICO", "MANUTENCAO_SUPERVISOR", "SUPERVISOR_MANUTENCAO"].includes(String(req.session?.user?.role || "").toUpperCase()),
   });
@@ -239,6 +243,21 @@ function gerarProgramadas(req, res) {
   return res.redirect("/pcm/preventivas/programadas");
 }
 
+function salvarRegraLancamento(req, res) {
+  const user = req.session?.user || null;
+  if (!isPcmManager(user)) {
+    req.flash("error", "Sem permissão para editar a regra de lançamento.");
+    return res.redirect("/pcm/preventivas");
+  }
+  try {
+    service.salvarRegraLancamento({ horario: req.body?.horario, adiarFeriados: req.body?.adiarFeriados === "1", feriadosLocais: req.body?.feriadosLocais }, user);
+    req.flash("success", "Regra de lançamento salva. Será aplicada às próximas OSs preventivas.");
+  } catch (err) {
+    req.flash("error", err.message || "Não foi possível salvar a regra de lançamento.");
+  }
+  return res.redirect("/pcm/preventivas/programadas");
+}
+
 function gerarOSProgramadasSegunda(req, res) {
   const user = req.session?.user || null;
   if (!isPcmManager(user)) {
@@ -249,7 +268,7 @@ function gerarOSProgramadasSegunda(req, res) {
   try {
     const result = service.lancarProgramadasComoOSDaSegunda({ user, refDate: new Date(), automatico: false });
     if (result?.skipped) {
-      req.flash("success", `OS da segunda-feira (${result.dataSegunda || "-"}) já foram lançadas anteriormente.`);
+      req.flash(result.reason === "already_processed_week" ? "success" : "error", result.message || (result.reason === "already_processed_week" ? `OS da segunda-feira (${result.dataSegunda || "-"}) já foram lançadas anteriormente.` : "Não foi possível lançar as OSs preventivas."));
     } else {
       req.flash(
         "success",
@@ -368,6 +387,7 @@ module.exports = {
   create,
   show,
   programadasIndex,
+  salvarRegraLancamento,
   gerarProgramadas,
   gerarOSProgramadasSegunda,
   lancarLoteDiarioPreventivas,

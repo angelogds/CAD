@@ -54,6 +54,7 @@
                 <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>" <%=Number(item.estoque_item_id||item.item_id)===Number(e.id)?'selected':''%>><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
               </label>
             </div>
+            <details><summary>Distribuição prevista por setor</summary><div class="pre-item-fields"><% let rateio={};try{rateio=JSON.parse(item.rateio_setores_json||'{}')}catch{}; ['RECICLAGEM','FRIGORIFICO','LOGISTICA','ADMINISTRATIVO'].forEach(s=>{ %><label><%=s%><input type="number" min="0" step="0.001" name="itens_rateio_<%=s%>[]" value="<%=rateio[s]||0%>"></label><% }) %></div></details>
             <label class="pre-item-spec">Especificação<textarea name="itens_especificacao[]" rows="1" placeholder="Marca, medida, aplicação ou detalhe técnico"><%=item.item_descricao||item.descricao||''%></textarea></label>
           </div>
         <% }) %>
@@ -82,6 +83,7 @@
         <select name="itens_item_id[]"><option value="">Ainda não cadastrado</option><% estoqueItens.forEach(function(e){ %><option value="<%=e.id%>"><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select>
       </label>
     </div>
+    <details><summary>Distribuição prevista por setor</summary><div class="pre-item-fields"><% ['RECICLAGEM','FRIGORIFICO','LOGISTICA','ADMINISTRATIVO'].forEach(s=>{ %><label><%=s%><input type="number" min="0" step="0.001" name="itens_rateio_<%=s%>[]" value="0"></label><% }) %></div></details>
     <label class="pre-item-spec">Especificação<textarea name="itens_especificacao[]" rows="1" placeholder="Marca, medida, aplicação ou detalhe técnico"></textarea></label>
   </div>
 </template>
