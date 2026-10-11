@@ -3,17 +3,27 @@
 <link rel="stylesheet" href="/css/almoxarifado-operacional-v3.css?v=20261007-v1" />
 <link rel="stylesheet" href="/css/almoxarifado-refino-v4.css?v=20261007-v1" />
 <link rel="stylesheet" href="/css/estoque-compact-v6.css?v=20261007-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-ux-v10.css?v=20261008-v1" />
 <%
   const queryForCategory=(id)=>{
     const p=new URLSearchParams();
+    if(filtros.q)p.set('q',filtros.q);
     if(id)p.set('categoria_id',String(id));
-    if(filtros.subcategoria_id)p.set('subcategoria_id',filtros.subcategoria_id);
+    if(id && String(id) === String(filtros.categoria_id) && filtros.subcategoria_id)p.set('subcategoria_id',filtros.subcategoria_id);
     if(filtros.setor_utilizacao)p.set('setor_utilizacao',filtros.setor_utilizacao);
     if(filtros.equipamento_id)p.set('equipamento_id',filtros.equipamento_id);
     if(filtros.destino)p.set('destino',filtros.destino);
+    if(filtros.situacao)p.set('situacao',filtros.situacao);
+    if(filtros.ordem && filtros.ordem !== 'NOME')p.set('ordem',filtros.ordem);
     return p.toString();
   };
-  const hasAdvanced=Boolean(filtros.destino||filtros.equipamento_id);
+  const hasAdvanced=Boolean(filtros.destino||filtros.equipamento_id||filtros.situacao||(filtros.ordem&&filtros.ordem!=='NOME'));
+  const queryForSituation=(situacao)=>{
+    const p=new URLSearchParams();
+    ['q','categoria_id','subcategoria_id','setor_utilizacao','equipamento_id','destino','ordem'].forEach(k=>{if(filtros[k])p.set(k,filtros[k]);});
+    if(situacao)p.set('situacao',situacao);
+    return p.toString();
+  };
 %>
 
 <div class="almox-page almox-op-page almox-stock-v6">
@@ -43,6 +53,18 @@
     <% }) %>
   </section>
 
+  <nav class="almox-stock-organization-summary" aria-label="Filtros rápidos de organização do estoque">
+    <strong>Organização das prateleiras</strong>
+    <% [
+      ['', 'Todos os materiais', estoqueResumo.total],
+      ['SEM_ENDERECO', 'Sem endereço', estoqueResumo.semEndereco],
+      ['ABAIXO_MINIMO', 'Abaixo do mínimo', estoqueResumo.abaixoMinimo],
+      ['RESERVADO', 'Com reserva', estoqueResumo.reservados]
+    ].forEach(([chave,nome,total])=>{ %>
+      <a class="<%=filtros.situacao===chave?'is-current':''%>" href="/almoxarifado/estoque?<%=queryForSituation(chave)%>" <%- filtros.situacao===chave?'aria-current="true"':''%>><%=nome%> <b><%=total%></b></a>
+    <% }) %>
+  </nav>
+
   <form class="almox-store-filters" method="GET" action="/almoxarifado/estoque">
     <label class="almox-store-search"><span>Buscar</span><input class="input" name="q" value="<%=filtros.q%>" placeholder="Nome ou código" /></label>
     <label><span>Categoria</span><select class="input" name="categoria_id"><option value="">Todas</option><% categorias.forEach(c=>{ %><option value="<%=c.id%>" <%=String(filtros.categoria_id)===String(c.id)?'selected':''%>><%=c.nome%></option><% }) %></select></label>
@@ -53,13 +75,26 @@
     <details class="almox-stock-v6-more" <%=hasAdvanced?'open':''%>>
       <summary>Mais filtros</summary>
       <div class="almox-stock-v6-more-grid">
+        <label><span>Situação do material</span><select class="input" name="situacao">
+          <option value="">Todos</option>
+          <option value="SEM_ENDERECO" <%=filtros.situacao==='SEM_ENDERECO'?'selected':''%>>Sem endereço</option>
+          <option value="ABAIXO_MINIMO" <%=filtros.situacao==='ABAIXO_MINIMO'?'selected':''%>>Abaixo do mínimo</option>
+          <option value="RESERVADO" <%=filtros.situacao==='RESERVADO'?'selected':''%>>Com reserva</option>
+        </select></label>
+        <label><span>Organizar lista por</span><select class="input" name="ordem">
+          <option value="NOME" <%=filtros.ordem==='NOME'?'selected':''%>>Nome</option>
+          <option value="LOCAL" <%=filtros.ordem==='LOCAL'?'selected':''%>>Localização</option>
+          <option value="CATEGORIA" <%=filtros.ordem==='CATEGORIA'?'selected':''%>>Categoria</option>
+          <option value="SALDO" <%=filtros.ordem==='SALDO'?'selected':''%>>Menor saldo disponível</option>
+        </select></label>
         <label><span>Tipo de estoque</span><select class="input" name="destino"><option value="">Todos</option><option value="GERAL" <%=filtros.destino==='GERAL'?'selected':''%>>Estoque geral</option><option value="EQUIPAMENTO" <%=filtros.destino==='EQUIPAMENTO'?'selected':''%>>Dedicado ao equipamento</option></select></label>
         <label><span>Equipamento</span><select class="input" name="equipamento_id"><option value="">Todos</option><% equipamentos.forEach(e=>{ %><option value="<%=e.id%>" <%=String(filtros.equipamento_id)===String(e.id)?'selected':''%>><%=e.nome%></option><% }) %></select></label>
       </div>
     </details>
   </form>
 
-  <section class="card almox-stock-v6-list">
+  <section class="card almox-stock-v6-list" aria-label="Materiais em estoque">
+    <div style="padding:9px 12px;color:#64748b;font-size:.75rem;border-bottom:1px solid #e5ece7">Exibindo <strong><%=itens.length%></strong> de <strong><%=estoqueResumo.total%></strong> materiais encontrados nos filtros de busca.</div>
     <% if(!itens.length){ %>
       <div class="almox-empty"><strong>Nenhum material encontrado.</strong><div class="almox-subline">Revise os filtros ou organize os materiais existentes.</div></div>
     <% } else { %>
@@ -67,7 +102,7 @@
         <span>Material</span><span>Classificação</span><span>Endereço</span><span>Saldo</span><span>Destino</span><span>Ação</span>
       </div>
       <% itens.forEach(item=>{ const livre=Number(item.saldo_disponivel||0), reservado=Number(item.saldo_reservado||0); %>
-        <article class="almox-stock-v6-row">
+        <article class="almox-stock-v6-row <%=!item.endereco_completo?'is-unaddressed':''%> <%=Number(item.saldo_minimo||0)>0&&livre<Number(item.saldo_minimo||0)?'is-low-stock':''%>">
           <div data-label="Material">
             <small><%=item.codigo||''%></small>
             <strong><%=item.nome%></strong>
@@ -104,6 +139,8 @@
               <form method="POST" action="/almoxarifado/estoque/<%=item.id%>/classificar" class="almox-stock-organize-form" data-stock-classifier>
                 <input type="hidden" name="retorno_q" value="<%=filtros.q%>">
                 <input type="hidden" name="retorno_categoria_id" value="<%=filtros.categoria_id%>">
+                <input type="hidden" name="retorno_situacao" value="<%=filtros.situacao%>">
+                <input type="hidden" name="retorno_ordem" value="<%=filtros.ordem%>">
                 <label><span>Categoria</span><select class="input" name="categoria_id" data-category-select><option value="">Sem categoria</option><% categorias.forEach(c=>{ %><option value="<%=c.id%>" <%=Number(item.categoria_id)===Number(c.id)?'selected':''%>><%=c.nome%></option><% }) %></select></label>
                 <label><span>Subcategoria</span><select class="input" name="subcategoria_id" data-subcategory-select><option value="">Sem subcategoria</option><% subcategorias.forEach(sc=>{ %><option value="<%=sc.id%>" data-parent="<%=sc.parent_id||''%>" <%=Number(item.subcategoria_id)===Number(sc.id)?'selected':''%>><%=sc.nome%></option><% }) %></select></label>
                 <label><span>Local / área</span><select class="input" name="local_id"><option value="">Sem local</option><% locais.forEach(l=>{ %><option value="<%=l.id%>" <%=Number(item.local_id)===Number(l.id)?'selected':''%>><%=l.nome%></option><% }) %></select></label>

@@ -44,7 +44,7 @@ function consolidar(itens = [], movimentos = [], ultimasSaidas = [], periodo = p
     }
     porItem.set(Number(i.id), {
       id: Number(i.id), nome: String(i.nome || "Material sem nome"), unidade: String(i.unidade || "UN"),
-      saldo, custoUnitario: precoConhecido ? custo : null, valorSaldoCentavos: precoConhecido ? moedaCentavos(saldo * custo) : null,
+      saldo, categoria: String(i.categoria_nome || "Sem categoria"), setorPadrao: String(i.setor_utilizacao || "Não informado"), custoUnitario: precoConhecido ? custo : null, valorSaldoCentavos: precoConhecido ? moedaCentavos(saldo * custo) : null,
       criadoEm: String(i.created_at || "").slice(0,10), ultimaSaida: saidasPorId.get(Number(i.id)) || null,
       qtdSaida: 0, qtdEntrada: 0, saidas: 0, entradas: 0, valorSaidaCentavos: 0,
     });
@@ -52,6 +52,7 @@ function consolidar(itens = [], movimentos = [], ultimasSaidas = [], periodo = p
   let entradas = 0, saidas = 0, valorEntradaCentavos = 0, valorSaidaCentavos = 0;
   let entradasSemPreco = 0, saidasSemPreco = 0, valoresEstimados = 0;
   const series = new Map();
+  const movimentacaoGrupos = new Map();
   const periodoDias = Math.round((new Date(periodo.fim + "T12:00:00Z") - new Date(periodo.inicio + "T12:00:00Z")) / 86400000) + 1;
   const agruparMes = periodoDias > 45;
   for (const mov of movimentos) {
@@ -73,6 +74,12 @@ function consolidar(itens = [], movimentos = [], ultimasSaidas = [], periodo = p
     const estimado = !(precoMov > 0 || precoCompra > 0);
     const centavos = preco > 0 ? moedaCentavos(qtd * preco) : 0;
     if (preco > 0 && estimado) valoresEstimados++;
+    const setor = String(mov.setor_utilizacao || item.setorPadrao || "Não informado").trim() || "Não informado";
+    const grupoChave = JSON.stringify([setor, item.categoria, item.unidade]);
+    if (!movimentacaoGrupos.has(grupoChave)) movimentacaoGrupos.set(grupoChave, { setor, categoria: item.categoria, unidade: item.unidade, entradas: 0, saidas: 0, registrosEntrada: 0, registrosSaida: 0 });
+    const grupo = movimentacaoGrupos.get(grupoChave);
+    if (entrada) { grupo.entradas += qtd; grupo.registrosEntrada++; }
+    else { grupo.saidas += qtd; grupo.registrosSaida++; }
     const chave = agruparMes ? momento.slice(0,7) : momento;
     if (!series.has(chave)) series.set(chave, { data: chave, entradas: 0, saidas: 0, valorEntradasCentavos: 0, valorSaidasCentavos: 0 });
     const periodoItem = series.get(chave);
@@ -98,6 +105,7 @@ function consolidar(itens = [], movimentos = [], ultimasSaidas = [], periodo = p
       registrosEntrada: entradas, registrosSaida: saidas, valorEntradaCentavos, valorSaidaCentavos,
       entradasSemPreco, saidasSemPreco, valoresEstimados, parados90d: paradosTodos.length },
     serie: [...series.values()].sort((a,b)=>a.data.localeCompare(b.data)),
+    movimentacaoPorSetorCategoria: [...movimentacaoGrupos.values()].sort((a,b)=>a.setor.localeCompare(b.setor,"pt-BR") || a.categoria.localeCompare(b.categoria,"pt-BR") || a.unidade.localeCompare(b.unidade,"pt-BR")),
     maisSaidos, parados, inventario: materiais.filter(i=>i.saldo>0).sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")),
   };
 }
@@ -111,9 +119,11 @@ function gerarRelatorio(query = {}) {
   const mc = colunas("estoque_movimentos");
   const sc = colunas("solicitacao_itens");
   const itemCol = (col, fallback="NULL") => ic.has(col) ? "i."+col : fallback;
-  const itens = db.prepare(`SELECT i.id,i.nome, ${itemCol("unidade", "'UN'")} unidade,
+  const categoriaJoin = ic.has("categoria_id") && temTabela("estoque_categorias") ? "LEFT JOIN estoque_categorias c ON c.id=i.categoria_id" : "";
+  const categoriaNome = categoriaJoin ? "c.nome" : "NULL";
+  const itens = db.prepare(`SELECT i.id,i.nome, ${itemCol("unidade", "'UN'")} unidade, ${categoriaNome} categoria_nome, ${itemCol("setor_utilizacao")} setor_utilizacao,
     ${itemCol("saldo_atual", "0")} saldo_atual, ${itemCol("custo_unit")} custo_unit,
-    ${itemCol("created_at")} created_at FROM estoque_itens i
+    ${itemCol("created_at")} created_at FROM estoque_itens i ${categoriaJoin}
     ${ic.has("ativo") ? "WHERE i.ativo=1" : ""} ORDER BY i.nome`).all();
   if (!mc.size || !mc.has("item_id") || !mc.has("tipo")) return consolidar(itens, [], [], periodo);
   const data = mc.has("data_mov") && mc.has("created_at") ? "COALESCE(m.data_mov,m.created_at)"
@@ -122,7 +132,8 @@ function gerarRelatorio(query = {}) {
   const compraJoin = mc.has("solicitacao_item_id") && sc.has("valor_unitario_centavos")
     ? "LEFT JOIN solicitacao_itens si ON si.id=m.solicitacao_item_id" : "";
   const precoCompra = compraJoin ? "si.valor_unitario_centavos" : "NULL";
-  const movimentos = db.prepare(`SELECT m.item_id,m.tipo,m.quantidade,${data} data_mov,
+  const setorMov = mc.has("setor_utilizacao") ? "m.setor_utilizacao" : "NULL";
+  const movimentos = db.prepare(`SELECT m.item_id,m.tipo,m.quantidade,${data} data_mov, ${setorMov} setor_utilizacao,
       ${precoMov} custo_unit,${precoCompra} valor_unitario_centavos
       FROM estoque_movimentos m ${compraJoin}
       WHERE date(${data}) BETWEEN ? AND ?

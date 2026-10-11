@@ -40,7 +40,7 @@ test('V6 deixa somente uma entrada de retirada no menu principal do Almoxarifado
   const tabs = read('views','almoxarifado','_tabs.ejs');
   const links = tabs.match(/href="\/almoxarifado\/retiradas\/qr"/g) || [];
   assert.equal(links.length, 1);
-  assert.match(tabs, /> Retirada\s*<\/a>/);
+  assert.match(tabs, />\s*Retirada\s*<\/a>/);
   assert.doesNotMatch(tabs, /Saída avulsa/);
   assert.doesNotMatch(tabs, /Entrega identificada/);
 });

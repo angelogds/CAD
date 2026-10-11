@@ -8,11 +8,13 @@ const ejs = require('ejs');
 const root = path.join(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 
-test('V4 reduz a central do Almoxarifado aos dois blocos de pesquisa operacionais', () => {
+test('central do Almoxarifado prioriza recebimento e entrega sem perder consulta de compras', () => {
   const view = read('views','almoxarifado','index.ejs');
   const controller = read('modules','almoxarifado','almoxarifado.controller.js');
+  assert.match(view, /Receber material/);
+  assert.match(view, /Localizar e entregar/);
+  assert.match(view, /Consultar compras e cotações/);
   assert.match(view, /Compras e cotação/);
-  assert.match(view, /Chegada e recebimento/);
   assert.match(view, /name="q_compra"/);
   assert.match(view, /name="q_recebimento"/);
   assert.match(view, /Cotado/);

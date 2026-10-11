@@ -2,6 +2,7 @@
 <link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20261007-v3" />
 <link rel="stylesheet" href="/css/almoxarifado-operacional-v3.css?v=20261007-v1" />
 <link rel="stylesheet" href="/css/almoxarifado-refino-v4.css?v=20261007-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-ux-v10.css?v=20261008-v1" />
 <%
   const dateBR=(v)=>{if(!v)return 'A definir';const p=String(v).slice(0,10).split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:String(v)};
   const cotacaoStatus=(r)=>Number(r.itens_total||0)>0&&Number(r.itens_cotados||0)>=Number(r.itens_total||0)?'COTADO':'NÃO COTADO';
@@ -13,85 +14,18 @@
     <div>
       <span class="almox-hero__eyebrow">ALMOXARIFADO • ROTINA DE TRABALHO</span>
       <h1>Central do Almoxarifado</h1>
-      <p class="muted">Duas consultas para o dia a dia: acompanhar o que foi cotado e localizar o que já chegou ou ainda está pendente.</p>
+      <p class="muted">Receba o material, encontre a prateleira e faça a entrega ao responsável.</p>
     </div>
-    <div class="almox-hero__actions">
-      <a class="btn btn-green" href="/almoxarifado/gerencial">Visão gerencial · Gráficos e PDF</a>
-      <a class="btn btn-green" href="/almoxarifado/retiradas/qr">Retirada</a>
-      <a class="btn btn-ghost" href="/almoxarifado/estoque">Consultar estoque</a>
-      <a class="btn btn-ghost" href="/almoxarifado/recebimentos?status=COMPRADA">Receber material</a>
-    </div>
+
   </header>
 
   <%- include('_tabs', { tab: 'painel' }) %>
-  <section class="card" style="margin:16px 0"><h2>Reposição e materiais para separar</h2><a class="btn btn-green" href="/almoxarifado/correias">Pedidos e retiradas de correias</a><p>O saldo livre considera as reservas. Pedidos já em andamento impedem uma nova pré-solicitação automática.</p>
-  <% (typeof reposicao==='undefined'?[]:reposicao).forEach(i=>{ %><p><a href="/estoque/itens/<%=i.id%>"><%=i.nome%></a> • livre <%=i.disponivel%> <%=i.unidade%> • reserva mínima <%=i.saldo_minimo%> • ponto de reposição <%=i.ponto_calculado.toFixed(2)%> • a receber <%=i.a_receber%> • <%=i.pedido?'Pré-solicitação '+i.pedido.numero:'Reposição necessária'%></p><% }) %>
-  <% if(['ADMIN','ALMOXARIFADO'].includes(user?.role)){ %><form method="post" action="/estoque/reposicao/gerar"><button class="btn btn-green">Preparar pré-solicitações de reposição</button></form><% } %></section>
-
-  <section class="almox-v4-search-card" aria-label="Resumo gerencial de recebimentos" style="margin: 0 0 18px; padding: 18px;">
-    <div class="almox-v4-search-head"><div><h2>Painel gerencial • Compras a receber</h2><p>Indicadores atualizados com os registros oficiais de compras e recebimentos. Quantidades representam pedidos, não unidades de materiais.</p></div><a href="/almoxarifado/recebimentos?status=COMPRADA" class="btn btn-sm btn-ghost">Ver materiais a receber</a></div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-top:12px;">
-      <% [
-        ['Compras registradas',painelGerencial.pedidosComprados],
-        ['Aguardando recebimento',painelGerencial.aguardandoRecebimento],
-        ['Recebimento parcial',painelGerencial.recebidosParcialmente],
-        ['Entrega atrasada',painelGerencial.atrasados],
-        ['Sem previsão',painelGerencial.semPrevisao]
-      ].forEach(([nome,total])=>{ %>
-        <div style="border:1px solid var(--border,#dce5df);border-radius:12px;padding:14px;background:var(--surface,#fff);min-width:0;">
-          <span style="display:block;font-size:.84rem;color:var(--muted,#536359);"><%=nome%></span>
-          <strong style="display:block;font-size:1.7rem;line-height:1.35;"><%=total%></strong>
-        </div>
-      <% }) %>
-    </div>
-    <p class="muted" style="margin:12px 0 0;">Os pedidos sem prazo precisam ter a previsão confirmada por Compras. Itens em cotação não entram neste resumo.</p>
-  </section>
-
-
-  <section class="almox-v4-search-card" aria-label="Gráfico do andamento das compras" style="padding:18px;margin-bottom:18px;">
-    <h2 style="margin:0 0 5px;">Situação dos recebimentos</h2>
-    <p class="muted" style="margin:0 0 14px;">Visão dos pedidos comprados, atualizada a cada abertura do painel.</p>
-    <% const escala = Math.max(1,...faixasRecebimento.map(r => r.total)); %>
-    <div style="display:grid;gap:12px;">
-      <% faixasRecebimento.forEach(({rotulo,total})=>{ %>
-        <div style="display:grid;grid-template-columns:minmax(130px,190px) 1fr 44px;gap:10px;align-items:center;">
-          <span style="font-size:.88rem;"><%=rotulo%></span>
-          <div role="img" aria-label="<%=rotulo%>: <%=total%> pedidos" style="background:#e6ede9;border-radius:8px;height:16px;overflow:hidden;">
-            <div style="height:100%;width:<%=(total/escala*100).toFixed(2)%>%;background:#278357;border-radius:8px;"></div>
-          </div>
-          <strong style="text-align:right;"><%=total%></strong>
-        </div>
-      <% }) %>
-    </div>
-  </section>
-
   <section class="almox-v4-search-grid">
-    <article class="almox-v4-search-card">
-      <div class="almox-v4-search-head">
-        <div><span class="almox-v4-step">1</span><div><h2>Compras e cotação</h2><p>Procure a solicitação e veja rapidamente se já foi cotada.</p></div></div>
-        <a href="/almoxarifado/recebimentos?status=EM_COTACAO" class="btn btn-sm btn-ghost">Ver fluxo completo</a>
-      </div>
-      <form method="GET" action="/almoxarifado" class="almox-v4-search-form">
-        <input type="hidden" name="q_recebimento" value="<%= qRecebimento %>">
-        <input type="hidden" name="recebimento_estado" value="<%= recebimentoEstado %>">
-        <label class="almox-v4-search-main"><span>Pesquisar</span><input class="input" name="q_compra" value="<%=qCompra%>" placeholder="Solicitação, fornecedor, OS ou equipamento"></label>
-        <label><span>Situação</span><select class="input" name="compra_estado"><option value="TODOS" <%=compraEstado==='TODOS'?'selected':''%>>Todos</option><option value="COTADO" <%=compraEstado==='COTADO'?'selected':''%>>Cotado</option><option value="NAO_COTADO" <%=compraEstado==='NAO_COTADO'?'selected':''%>>Não cotado</option></select></label>
-        <button class="btn btn-green" type="submit">Pesquisar</button>
-      </form>
-      <div class="almox-v4-results">
-        <% if(!compras.length){ %><div class="almox-empty"><strong>Nenhuma solicitação encontrada.</strong></div><% } %>
-        <% compras.forEach(r=>{ const cotado=cotacaoStatus(r)==='COTADO'; %>
-          <a class="almox-v4-result" href="/almoxarifado/solicitacoes/<%=r.id%>/conferir">
-            <div><small><%=r.numero||('#'+r.id)%> • <%=r.solicitante_nome||'-'%></small><strong><%=r.titulo||'Solicitação de materiais'%></strong><span><%=r.equipamento_nome||r.setor_origem||'Sem equipamento informado'%></span></div>
-            <div class="almox-v4-result-status"><b class="<%=cotado?'is-ok':'is-wait'%>"><%=cotacaoStatus(r)%></b><small><%=Number(r.itens_cotados||0)%>/<%=Number(r.itens_total||0)%> item(ns)</small></div>
-          </a>
-        <% }) %>
-      </div>
-    </article>
+
 
     <article class="almox-v4-search-card">
       <div class="almox-v4-search-head">
-        <div><span class="almox-v4-step">2</span><div><h2>Chegada e recebimento</h2><p>Pesquise o material e confirme se já chegou ou ainda não chegou ao Almoxarifado.</p></div></div>
+        <div><span class="almox-v4-step">1</span><div><h2>Receber material</h2><p>Pesquise o material e confirme se já chegou ou ainda não chegou ao Almoxarifado.</p></div></div>
         <a href="/almoxarifado/recebimentos?status=COMPRADA" class="btn btn-sm btn-ghost">Abrir recebimentos</a>
       </div>
       <form method="GET" action="/almoxarifado" class="almox-v4-search-form">
@@ -111,5 +45,85 @@
         <% }) %>
       </div>
     </article>
+    <article class="almox-v4-search-card">
+      <div class="almox-v4-search-head"><div><span class="almox-v4-step">2</span><div><h2>Localizar e entregar</h2><p>Veja o saldo e o endereço da prateleira. Abra o material para registrar a retirada.</p></div></div></div>
+      <form method="GET" action="/almoxarifado/estoque" class="almox-material-search">
+        <label><span>Material</span><input class="input" name="q" placeholder="Nome ou código do material"></label>
+        <button class="btn btn-green" type="submit">Buscar no estoque</button>
+      </form>
+      <a class="btn btn-sm btn-ghost" href="/estoque/reservas">Materiais separados para entregar</a>
+    </article>
   </section>
+
+  <details class="almox-routine-details" <%=qCompra||compraEstado!=='TODOS'?'open':''%>>
+    <summary>Consultar compras e cotações</summary>
+    <article class="almox-v4-search-card">
+      <div class="almox-v4-search-head">
+        <div><div><h2>Compras e cotação</h2><p>Procure a solicitação e veja rapidamente se já foi cotada.</p></div></div>
+        <a href="/almoxarifado/recebimentos?status=EM_COTACAO" class="btn btn-sm btn-ghost">Ver fluxo completo</a>
+      </div>
+      <form method="GET" action="/almoxarifado" class="almox-v4-search-form">
+        <input type="hidden" name="q_recebimento" value="<%= qRecebimento %>">
+        <input type="hidden" name="recebimento_estado" value="<%= recebimentoEstado %>">
+        <label class="almox-v4-search-main"><span>Pesquisar</span><input class="input" name="q_compra" value="<%=qCompra%>" placeholder="Solicitação, fornecedor, OS ou equipamento"></label>
+        <label><span>Situação</span><select class="input" name="compra_estado"><option value="TODOS" <%=compraEstado==='TODOS'?'selected':''%>>Todos</option><option value="COTADO" <%=compraEstado==='COTADO'?'selected':''%>>Cotado</option><option value="NAO_COTADO" <%=compraEstado==='NAO_COTADO'?'selected':''%>>Não cotado</option></select></label>
+        <button class="btn btn-green" type="submit">Pesquisar</button>
+      </form>
+      <div class="almox-v4-results">
+        <% if(!compras.length){ %><div class="almox-empty"><strong>Nenhuma solicitação encontrada.</strong></div><% } %>
+        <% compras.forEach(r=>{ const cotado=cotacaoStatus(r)==='COTADO'; %>
+          <a class="almox-v4-result" href="/almoxarifado/solicitacoes/<%=r.id%>/conferir">
+            <div><small><%=r.numero||('#'+r.id)%> • <%=r.solicitante_nome||'-'%></small><strong><%=r.titulo||'Solicitação de materiais'%></strong><span><%=r.equipamento_nome||r.setor_origem||'Sem equipamento informado'%></span></div>
+            <div class="almox-v4-result-status"><b class="<%=cotado?'is-ok':'is-wait'%>"><%=cotacaoStatus(r)%></b><small><%=Number(r.itens_cotados||0)%>/<%=Number(r.itens_total||0)%> item(ns)</small></div>
+          </a>
+        <% }) %>
+      </div>
+    </article>  </details>
+  <details class="almox-routine-details">
+    <summary>Reposição e pedidos de correias</summary>
+  <section class="almox-routine-extra"><h2>Reposição e materiais para separar</h2><a class="btn btn-green" href="/almoxarifado/correias">Pedidos e retiradas de correias</a><p>O saldo livre considera as reservas. Pedidos já em andamento impedem uma nova pré-solicitação automática.</p>
+  <% (typeof reposicao==='undefined'?[]:reposicao).forEach(i=>{ %><p><a href="/estoque/itens/<%=i.id%>"><%=i.nome%></a> • livre <%=i.disponivel%> <%=i.unidade%> • reserva mínima <%=i.saldo_minimo%> • ponto de reposição <%=i.ponto_calculado.toFixed(2)%> • a receber <%=i.a_receber%> • <%=i.pedido?'Pré-solicitação '+i.pedido.numero:'Reposição necessária'%></p><% }) %>
+  <% if(['ADMIN','ALMOXARIFADO'].includes(user?.role)){ %><form method="post" action="/estoque/reposicao/gerar"><button class="btn btn-green">Preparar pré-solicitações de reposição</button></form><% } %></section>
+
+  </details>
+  <details class="almox-routine-details">
+    <summary>Indicadores de recebimento</summary>
+  <section class="almox-v4-search-card" aria-label="Resumo gerencial de recebimentos" >
+    <div class="almox-v4-search-head"><div><h2>Painel gerencial • Compras a receber</h2><p>Indicadores atualizados com os registros oficiais de compras e recebimentos. Quantidades representam pedidos, não unidades de materiais.</p></div><a href="/almoxarifado/recebimentos?status=COMPRADA" class="btn btn-sm btn-ghost">Ver materiais a receber</a></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-top:12px;">
+      <% [
+        ['Compras registradas',painelGerencial.pedidosComprados],
+        ['Aguardando recebimento',painelGerencial.aguardandoRecebimento],
+        ['Recebimento parcial',painelGerencial.recebidosParcialmente],
+        ['Entrega atrasada',painelGerencial.atrasados],
+        ['Sem previsão',painelGerencial.semPrevisao]
+      ].forEach(([nome,total])=>{ %>
+        <div style="border:1px solid var(--border,#dce5df);border-radius:12px;padding:14px;background:var(--surface,#fff);min-width:0;">
+          <span style="display:block;font-size:.84rem;color:var(--muted,#536359);"><%=nome%></span>
+          <strong style="display:block;font-size:1.7rem;line-height:1.35;"><%=total%></strong>
+        </div>
+      <% }) %>
+    </div>
+    <p class="muted" style="margin:12px 0 0;">Os pedidos sem prazo precisam ter a previsão confirmada por Compras. Itens em cotação não entram neste resumo.</p>
+  </section>
+
+
+  <section class="almox-v4-search-card" aria-label="Gráfico do andamento das compras" >
+    <h2 style="margin:0 0 5px;">Situação dos recebimentos</h2>
+    <p class="muted" style="margin:0 0 14px;">Visão dos pedidos comprados, atualizada a cada abertura do painel.</p>
+    <% const escala = Math.max(1,...faixasRecebimento.map(r => r.total)); %>
+    <div style="display:grid;gap:12px;">
+      <% faixasRecebimento.forEach(({rotulo,total})=>{ %>
+        <div style="display:grid;grid-template-columns:minmax(130px,190px) 1fr 44px;gap:10px;align-items:center;">
+          <span style="font-size:.88rem;"><%=rotulo%></span>
+          <div role="img" aria-label="<%=rotulo%>: <%=total%> pedidos" style="background:#e6ede9;border-radius:8px;height:16px;overflow:hidden;">
+            <div style="height:100%;width:<%=(total/escala*100).toFixed(2)%>%;background:#278357;border-radius:8px;"></div>
+          </div>
+          <strong style="text-align:right;"><%=total%></strong>
+        </div>
+      <% }) %>
+    </div>
+  </section>
+
+  </details>
 </div>
