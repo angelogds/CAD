@@ -1,6 +1,7 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-v1" />
-<div class="stock-flow-page">
+<link rel="stylesheet" href="/css/almoxarifado-layout-v11.css?v=20261011-v1" />
+<div class="stock-flow-page almox-v11">
   <header class="stock-flow-head"><div><span>ESTOQUE • RASTREABILIDADE</span><h1>Movimentos de Estoque</h1><p>Entradas e saídas vinculadas à solicitação, OS e equipamento sempre que houver origem conhecida.</p></div><div class="stock-flow-actions"><a class="btn btn-ghost" href="/estoque">Voltar ao estoque</a><a class="btn btn-green" href="/estoque/saidas/nova">Registrar saída</a></div></header>
   <%- include('_tabs', { tab: 'movimentos' }) %>
 

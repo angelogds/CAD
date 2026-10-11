@@ -1,0 +1,93 @@
+/* Almoxarifado V11: rotina clara em desktop e celular. */
+.almox-v11 .almox-hero,
+.almox-v11 .almox-compact-head,
+.almox-v11 .almox-store-head,
+.qr-withdraw-page.almox-v11 .reserve-head {
+  background:#f4f8f5;
+  border:1px solid #dfeae2;
+  border-radius:16px;
+  padding:22px 24px;
+  margin-bottom:16px;
+}
+.almox-v11 .almox-hero h1,
+.almox-v11 .almox-compact-head h1,
+.almox-v11 .almox-store-head h1,
+.qr-withdraw-page.almox-v11 .reserve-head h1 {
+  color:#20352a;
+  letter-spacing:-.025em;
+  line-height:1.18;
+}
+.almox-v11 .almox-hero .muted,
+.almox-v11 .almox-store-head .muted,
+.qr-withdraw-page.almox-v11 .reserve-head p {color:#52675b}
+.almox-v11-actions {
+ display:grid;
+ grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:12px;
+ margin:14px 0 22px;
+}
+.almox-v11-action {
+ display:flex;
+ flex-direction:column;
+ justify-content:center;
+ gap:7px;
+ min-height:104px;
+ padding:17px 20px;
+ border:1px solid #dfeae2;
+ border-radius:14px;
+ background:#fff;
+ text-decoration:none;
+ color:#22362b;
+ box-shadow:0 2px 10px rgba(32,53,42,.035);
+}
+.almox-v11-action:hover {border-color:#64ad80;background:#f5faf6}
+.almox-v11-action:focus-visible {outline:3px solid #277a4f;outline-offset:2px}
+.almox-v11-action strong {font-size:1rem;line-height:1.25}
+.almox-v11-action span {font-size:.82rem;color:#61766a;line-height:1.35}
+.almox-v11-action--primary {background:#176b43;border-color:#176b43;color:#fff}
+.almox-v11-action--primary:hover {background:#115b39;color:#fff}
+.almox-v11-action--primary span {color:#e0f2e7}
+.almox-v11 .almox-v4-search-card,
+.almox-v11 .almox-compact-card,
+.almox-v11 .almox-store-filters,
+.qr-withdraw-page.almox-v11 .qr-scanner-card {border:1px solid #e0e9e3;border-radius:14px;box-shadow:0 2px 12px rgba(32,53,42,.035)}
+.almox-v11 input.input,
+.almox-v11 select.input,
+.qr-withdraw-page.almox-v11 input.input {min-height:44px;border-radius:9px}
+.almox-v11 .btn,
+.qr-withdraw-page.almox-v11 .btn {min-height:42px;display:inline-flex;align-items:center;justify-content:center}
+.almox-v11 .almox-tabs--operacional {margin-bottom:18px}
+.almox-v11 .almox-tabs--operacional .almox-tab {min-height:42px;font-size:.8rem}
+@media(max-width:850px){
+ .almox-v11-actions {grid-template-columns:1fr}
+ .almox-v11-action {min-height:76px;padding:14px 16px}
+ .almox-v11 .almox-hero,.almox-v11 .almox-compact-head,.almox-v11 .almox-store-head,.qr-withdraw-page.almox-v11 .reserve-head {padding:17px}
+}
+@media(max-width:480px){
+ .almox-v11 .almox-hero h1,.almox-v11 .almox-compact-head h1,.almox-v11 .almox-store-head h1,.qr-withdraw-page.almox-v11 .reserve-head h1 {font-size:1.5rem}
+ .almox-v11 .btn,.qr-withdraw-page.almox-v11 .btn {min-height:44px}
+}
+/* Vistas de apoio usam a mesma hierarquia sem esconder controles existentes. */
+.almox-v11 .almox-flow-head,
+.almox-v11 .stock-flow-head,
+.almox-v11 .stock-v6-head,
+.almox-v11 .reserve-head {
+ background:#f4f8f5;border:1px solid #dfeae2;border-radius:16px;
+ padding:20px 24px;margin-bottom:16px;
+}
+.almox-v11 .stock-flow-head h1,.almox-v11 .stock-v6-head h1,.almox-v11 .reserve-head h1 {color:#20352a;letter-spacing:-.025em}
+.almox-v11 .card,.almox-v11 .box,.almox-v11 .stock-flow-filters,.almox-v11 .reserve-kpis article {border-radius:14px}
+.almox-v11 :is(input,select,textarea):focus-visible {outline:2px solid #277a4f;outline-offset:1px}
+.almox-v11 :is(.btn,button):focus-visible {outline:3px solid #277a4f;outline-offset:2px}
+@media(max-width:850px){.almox-v11 .stock-flow-head,.almox-v11 .stock-v6-head,.almox-v11 .reserve-head {padding:17px}}
+
+.stock-v11-head {
+ display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+ padding:20px 24px;margin:0 0 18px;background:#f4f8f5;
+ border:1px solid #dfeae2;border-radius:16px;
+}
+.stock-v11-head h1 {margin:0 0 4px;color:#20352a;letter-spacing:-.025em}
+.stock-v11-head p {margin:0;color:#52675b}
+.stock-v11-head .btn {min-height:42px}
+.stock-v11-head .btn:focus-visible {outline:3px solid #277a4f;outline-offset:2px}
+@media(max-width:850px){.stock-v11-head {padding:17px}}

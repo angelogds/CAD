@@ -14,6 +14,7 @@
 @media(max-width:600px){.gerencial{padding:10px}.gerencial .box{padding:12px}.gerencial h1{font-size:1.35rem}}
 </style>
 <link rel="stylesheet" href="/css/almoxarifado-ux-v10.css?v=20261008-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-layout-v11.css?v=20261011-v1" />
 <%
 const moeda = c => (Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const numero = n => Number(n||0).toLocaleString("pt-BR",{maximumFractionDigits:2});
@@ -21,7 +22,7 @@ const query = new URLSearchParams({periodo: dados.periodo.modo, inicio:dados.per
 const r = dados.resumo;
 const maior = Math.max(1,...dados.serie.map(s=>Math.max(s.entradas,s.saidas)));
 %>
-<div class="gerencial">
+<div class="gerencial almox-v11">
   <header style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
     <div><span style="color:#16844d;font-size:.78rem;font-weight:700">ALMOXARIFADO • GESTÃO E RESULTADOS</span>
       <h1>Painel gerencial de materiais</h1>
