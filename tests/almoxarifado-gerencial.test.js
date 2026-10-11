@@ -42,3 +42,22 @@ test("movimentação com custo de Compras em centavos substitui estimativa de es
  assert.equal(d.resumo.valorSaidaCentavos,2400);
  assert.equal(d.resumo.valoresEstimados,0);
 });
+
+test("movimentação agrupa setor e categoria sem somar unidades diferentes",()=>{
+ const p=periodoSeguro({periodo:"7d"},hoje);
+ const itens=[
+  {id:1,nome:"Óleo",unidade:"L",categoria_nome:"ÓLEOS",setor_utilizacao:"RECICLAGEM"},
+  {id:2,nome:"Correia",unidade:"UN",categoria_nome:"CORREIAS",setor_utilizacao:"RECICLAGEM"},
+  {id:3,nome:"Graxa",unidade:"KG",categoria_nome:"ÓLEOS",setor_utilizacao:"RECICLAGEM"}
+ ];
+ const movs=[
+  {item_id:1,tipo:"ENTRADA_COMPRA",quantidade:10,data_mov:"2026-10-03"},
+  {item_id:1,tipo:"SAIDA_MANUAL",quantidade:2,setor_utilizacao:"FRIGORIFICO",data_mov:"2026-10-04"},
+  {item_id:2,tipo:"SAIDA_MANUAL",quantidade:3,setor_utilizacao:"RECICLAGEM",data_mov:"2026-10-04"},
+  {item_id:3,tipo:"SAIDA_MANUAL",quantidade:4,data_mov:"2026-10-05"}
+ ];
+ const grupos=consolidar(itens,movs,[],p).movimentacaoPorSetorCategoria;
+ assert.equal(grupos.length,4);
+ assert.deepEqual(grupos.find(g=>g.setor==="FRIGORIFICO"),{setor:"FRIGORIFICO",categoria:"ÓLEOS",unidade:"L",entradas:0,saidas:2,registrosEntrada:0,registrosSaida:1});
+ assert.equal(grupos.find(g=>g.categoria==="ÓLEOS"&&g.unidade==="KG").saidas,4);
+});
