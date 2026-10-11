@@ -4,6 +4,7 @@
 <link rel="stylesheet" href="/css/estoque-reservas.css?v=20260902-v1" />
 <link rel="stylesheet" href="/css/estoque-setorial-v2.css?v=20260928-v1" />
 <link rel="stylesheet" href="/css/estoque-compact-v6.css?v=20261007-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-layout-v11.css?v=20261011-v1" />
 <%
   const dateBR = (v) => { if(!v)return ''; const d=String(v).slice(0,10).split('-'); return d.length===3?`${d[2]}/${d[1]}/${d[0]}`:String(v); };
   const reposicaoLabel = (s) => ({REPOR_URGENTE:'Urgente',REPOR:'Repor',PROGRAMAR_REPOSICAO:'Programar',OK:'Normal'})[s] || 'Normal';
@@ -13,7 +14,7 @@
   const hasAdvanced = Boolean(filtros.centro_custo || filtros.local_id);
 %>
 
-<div class="stock-v6-page">
+<div class="stock-v6-page almox-v11">
   <header class="stock-v6-head" aria-label="ESTOQUE • ALMOXARIFADO DA MANUTENÇÃO">
     <div>
       <span class="stock-v6-eyebrow">ESTOQUE</span>
