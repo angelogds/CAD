@@ -2,6 +2,7 @@ const service = require("./preventivas.service");
 const correiasService = require("../correias/correias.service");
 const PDFDocument = require("pdfkit");
 const dateBr = require("../../utils/data-hora-br");
+const { canAccessModule } = require("../../config/rbac");
 
 function isAdminOrEncarregado(user = null) {
   const role = String(user?.role || "").toUpperCase();
@@ -9,8 +10,7 @@ function isAdminOrEncarregado(user = null) {
 }
 
 function isPcmManager(user = null) {
-  const role = String(user?.role || "").toUpperCase();
-  return ["ADMIN", "PCM", "MANUTENCAO_SUPERVISOR", "SUPERVISOR_MANUTENCAO"].includes(role);
+  return canAccessModule(user?.role, "pcm_manage");
 }
 
 function redirectGestaoPreventiva(res, suffix = "") {
