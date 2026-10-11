@@ -2,6 +2,7 @@ const db = require("../../database/db");
 const { getTurnoOperacionalAgora, getTiposTurnoEscala } = require("../../utils/turno-operacional");
 const aiEmbeddingsService = require("../ai/ai.embeddings.service");
 const correiasService = require("../correias/correias.service");
+const { janelaLancamento, janelaDiaria, proximoDiaUtil, partesLocais, normalizarRegra, lerRegra } = require("./preventivas.calendario");
 let osServiceCache = null;
 
 function getOSService() {
@@ -1319,6 +1320,21 @@ function setConfig(chave, valor) {
   `).run(String(chave || ""), valor == null ? null : String(valor));
 }
 
+function getRegraLancamento() {
+  return lerRegra(db);
+}
+
+function salvarRegraLancamento(input, user = null) {
+  if (!tableExists("config_sistema")) throw new Error("Configuração do sistema indisponível.");
+  const regra = normalizarRegra(input);
+  const anterior = getRegraLancamento();
+  db.transaction(() => {
+    setConfig("preventiva_lancamento_regra", JSON.stringify(regra));
+    registrarLogPreventiva({ acao: "PREVENTIVAS_REGRA_LANCAMENTO", user, detalhes: { anterior, regra } });
+  })();
+  return regra;
+}
+
 function executarCicloAutonomo(refDate = new Date()) {
   const hoje = formatDateISO(refDate);
   const ultimaExecucao = getConfig("preventiva_ia_ciclo_data");
@@ -1450,7 +1466,7 @@ const PREVENTIVAS_PROGRAMADAS_TEMPLATE = [
 ];
 
 function getProximaSegundaISO(refDate = new Date()) {
-  const base = new Date(Date.UTC(refDate.getUTCFullYear(), refDate.getUTCMonth(), refDate.getUTCDate()));
+  const base = new Date(`${partesLocais(refDate).data}T00:00:00.000Z`);
   const day = base.getUTCDay();
   const offset = day === 1 ? 0 : day === 0 ? 1 : 8 - day;
   return formatDateISO(addDays(base, offset));
@@ -1674,8 +1690,10 @@ function gerarPreventivasProgramadasSemanais({ user = null, refDate = new Date()
 
 function listarResumoPreventivasProgramadas(refDate = new Date()) {
   const proximaSegunda = getProximaSegundaISO(refDate);
+  const regraLancamento = getRegraLancamento();
+  const dataLancamento = proximoDiaUtil(proximaSegunda, regraLancamento);
   if (!tableExists("preventiva_planos")) {
-    return { proximaSegunda, totalPlanos: 0, totalExecucoesProxima: 0, totalTemplates: PREVENTIVAS_PROGRAMADAS_TEMPLATE.length, planos: [] };
+    return { proximaSegunda, dataLancamento, regraLancamento, totalPlanos: 0, totalExecucoesProxima: 0, totalTemplates: PREVENTIVAS_PROGRAMADAS_TEMPLATE.length, planos: [] };
   }
 
   const planos = db.prepare(`
@@ -1701,6 +1719,8 @@ function listarResumoPreventivasProgramadas(refDate = new Date()) {
 
   return {
     proximaSegunda,
+    dataLancamento,
+    regraLancamento,
     totalPlanos: planos.length,
     totalExecucoesProxima,
     totalTemplates: PREVENTIVAS_PROGRAMADAS_TEMPLATE.length,
@@ -1709,14 +1729,10 @@ function listarResumoPreventivasProgramadas(refDate = new Date()) {
   };
 }
 
-function isMonday(refDate = new Date()) {
-  return Number(refDate?.getUTCDay?.()) === 1;
-}
-
 function getSegundaReferenciaISO(refDate = new Date()) {
-  const base = new Date(Date.UTC(refDate.getUTCFullYear(), refDate.getUTCMonth(), refDate.getUTCDate()));
+  const base = new Date(`${partesLocais(refDate).data}T00:00:00.000Z`);
   if (base.getUTCDay() === 1) return formatDateISO(base);
-  return getProximaSegundaISO(base);
+  return getProximaSegundaISO(refDate);
 }
 
 function existeOSAbertaParaExecucaoPreventiva(execucaoId) {
@@ -1751,18 +1767,20 @@ function findColaboradorByNome(nome = "") {
 }
 
 function lancarProgramadasComoOSDaSegunda({ user = null, refDate = new Date(), automatico = false } = {}) {
+  const regra = getRegraLancamento();
+  const janela = janelaLancamento(refDate, regra);
+  if (!janela.permitido) {
+    return { ok: true, skipped: true, reason: janela.reason, message: janela.message, dataSegunda: janela.dataSegunda, dataLancamento: janela.dataLancamento, dataHoje: janela.dataHoje, osGeradas: 0, preventivasEncontradas: 0 };
+  }
   if (!tableExists("preventiva_execucoes") || !tableExists("preventiva_planos") || !tableExists("equipamentos") || !tableExists("os")) {
     return { ok: false, skipped: true, reason: "missing_tables", dataSegunda: getSegundaReferenciaISO(refDate), osGeradas: 0, preventivasEncontradas: 0 };
   }
-  if (automatico && !isMonday(refDate)) {
-    return { ok: true, skipped: true, reason: "not_monday", dataSegunda: getSegundaReferenciaISO(refDate), osGeradas: 0, preventivasEncontradas: 0 };
-  }
-
-  const dataSegunda = getSegundaReferenciaISO(refDate);
-  const dataHoje = formatDateISO(refDate);
+  const dataSegunda = janela.dataSegunda;
+  const dataLancamento = janela.dataLancamento;
+  const dataHoje = janela.dataHoje;
   const chaveExecucao = `preventiva_programada_os_semana_${dataSegunda}`;
   if (getConfig(chaveExecucao) === "1") {
-    return { ok: true, skipped: true, reason: "already_processed_week", dataSegunda, dataHoje, osGeradas: 0, preventivasEncontradas: 0 };
+    return { ok: true, skipped: true, reason: "already_processed_week", dataSegunda, dataLancamento, dataHoje, osGeradas: 0, preventivasEncontradas: 0 };
   }
 
   const geracao = gerarPreventivasProgramadasSemanais({ user, refDate: new Date(`${dataSegunda}T00:00:00.000Z`) });
@@ -1801,10 +1819,14 @@ function lancarProgramadasComoOSDaSegunda({ user = null, refDate = new Date(), a
         opened_by: user?.id || null,
         origem: automatico ? "AUTOMACAO" : "PREVENTIVA",
         preventiva_execucao_id: Number(execucao.id),
+        refDate,
         metadata: {
           origem_lancamento: automatico ? "AUTO_SEGUNDA" : "MANUAL_SEGUNDA",
           preventiva_execucao_id: Number(execucao.id),
           data_segunda: dataSegunda,
+          data_lancamento_programada: dataLancamento,
+          horario_lancamento: regra.horario,
+          timezone_lancamento: "America/Bahia",
         },
       });
       osGeradas += 1;
@@ -1838,6 +1860,7 @@ function lancarProgramadasComoOSDaSegunda({ user = null, refDate = new Date(), a
     ok: true,
     skipped: false,
     dataSegunda,
+    dataLancamento,
     dataHoje,
     automatico: Boolean(automatico),
     preventivasEncontradas: rows.length,
@@ -1853,6 +1876,8 @@ function lancarProgramadasComoOSDaSegunda({ user = null, refDate = new Date(), a
 }
 
 function lancarLoteDiarioPreventivasComoOS({ user = null, refDate = new Date(), quantidade = 5 } = {}) {
+  const janela = janelaDiaria(refDate, getRegraLancamento());
+  if (!janela.permitido) return { ok: true, skipped: true, reason: janela.reason, message: janela.message, dataReferencia: janela.dataHoje, osGeradas: 0 };
   if (!tableExists("preventiva_execucoes") || !tableExists("preventiva_planos") || !tableExists("equipamentos") || !tableExists("os")) {
     return {
       ok: false,
@@ -1867,7 +1892,7 @@ function lancarLoteDiarioPreventivasComoOS({ user = null, refDate = new Date(), 
   }
 
   const limite = Math.max(1, Number(quantidade || 5));
-  const dataReferencia = formatDateISO(refDate);
+  const dataReferencia = janela.dataHoje;
   const cursorKey = "preventiva_lote_diario_cursor_execucao_id";
   const cursorAtual = Number(getConfig(cursorKey) || 0) || 0;
   const baseQuery = `
@@ -1954,6 +1979,7 @@ function lancarLoteDiarioPreventivasComoOS({ user = null, refDate = new Date(), 
         opened_by: user?.id || null,
         origem: "PREVENTIVA",
         preventiva_execucao_id: Number(execucao.id),
+        refDate,
         metadata: {
           origem_lancamento: "LOTE_DIARIO_PREVENTIVAS",
           preventiva_execucao_id: Number(execucao.id),
@@ -2868,6 +2894,8 @@ function userCanExecutePreventiva(execucaoId, user = null) {
 }
 
 module.exports = {
+  getRegraLancamento,
+  salvarRegraLancamento,
   listPlanos,
   listEquipamentosAtivos,
   createPlano,

@@ -1,4 +1,5 @@
 const db = require("../../database/db");
+const { validarLancamento } = require("../preventivas/preventivas.calendario");
 const intelligenceService = require("./pcm.intelligence.service");
 const aiService = require("../ai/ai.service");
 const lubricationCatalog = require("../lubrificacao/lubrificacao.catalogo.v1");
@@ -163,6 +164,7 @@ function createPlano({ equipamento_id, atividade_descricao, tipo_manutencao, fre
 }
 
 function gerarOS(planoId, userId) {
+  validarLancamento(db);
   const plano = db
     .prepare(`SELECT p.*, e.nome AS equipamento_nome FROM pcm_planos p JOIN equipamentos e ON e.id=p.equipamento_id WHERE p.id=?`)
     .get(Number(planoId));

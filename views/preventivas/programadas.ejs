@@ -3,6 +3,7 @@
 <%
   const proximaSegunda = resumo?.proximaSegunda ? dateBr.formatDateBR(resumo.proximaSegunda) : '-';
   const totalExecucoes = Number(resumo?.totalExecucoesProxima || 0);
+  const regra = resumo?.regraLancamento || { horario: '05:00', adiarFeriados: true, feriadosLocais: [] };
 %>
 
 <main class="preventive-secondary-page">
@@ -21,7 +22,7 @@
     <article class="preventive-secondary-kpi">
       <span>Próxima segunda</span>
       <strong><%= proximaSegunda %></strong>
-      <small>Data de referência da programação</small>
+      <small>Lançamento: <%= resumo?.dataLancamento ? dateBr.formatDateBR(resumo.dataLancamento) : proximaSegunda %> às <%= regra.horario %> (Bahia).</small>
     </article>
     <article class="preventive-secondary-kpi">
       <span>Templates</span>
@@ -41,6 +42,25 @@
   </section>
 
   <% if (canAdminPreventivas) { %>
+    <section class="preventive-secondary-panel">
+      <h2>Regra de lançamento das OSs preventivas</h2>
+      <p>Horário da Bahia. Quando o adiamento estiver habilitado, uma segunda-feira feriada passa para o próximo dia útil. A regra vale também para lotes e lançamentos manuais de OS preventiva.</p>
+      <form method="POST" action="/pcm/preventivas/programadas/configuracao" class="preventive-secondary-grid">
+        <div class="preventive-secondary-field">
+          <label for="pv-horario">Lançar a partir de</label>
+          <input id="pv-horario" name="horario" type="time" required value="<%= regra.horario %>">
+        </div>
+        <div class="preventive-secondary-field">
+          <label class="preventive-rule-checkbox"><input type="checkbox" name="adiarFeriados" value="1" <%= regra.adiarFeriados ? 'checked' : '' %>> Adiar em feriados nacionais e locais cadastrados</label>
+        </div>
+        <div class="preventive-secondary-field is-wide">
+          <label for="pv-feriados">Feriados estaduais, municipais ou dias sem expediente</label>
+          <textarea id="pv-feriados" name="feriadosLocais" rows="3" maxlength="2000" placeholder="2026-12-08"><%= regra.feriadosLocais.join('\n') %></textarea>
+          <small>Uma data por linha, no formato AAAA-MM-DD. Feriados nacionais são reconhecidos automaticamente; pontos facultativos só entram se cadastrados.</small>
+        </div>
+        <div class="preventive-secondary-form-actions is-wide"><button class="ui-btn ui-btn--primary" type="submit">Salvar regra de lançamento</button></div>
+      </form>
+    </section>
     <section class="preventive-secondary-panel is-warning">
       <div class="preventive-secondary-head">
         <div>
