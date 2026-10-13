@@ -21,11 +21,18 @@ function exportar(req,res) {
     doc.moveDown(.3);
   };
   const line=(left,right)=>{
-    if(doc.y>748) doc.addPage();
+    // Reserva a altura da maior célula para evitar sobreposição de descrições longas no PDF.
+    const esquerda=String(left), direita=String(right);
+    doc.font("Helvetica").fontSize(9);
+    const alturaEsquerda=doc.heightOfString(esquerda,{width:354});
+    doc.font("Helvetica-Bold").fontSize(9);
+    const alturaDireita=doc.heightOfString(direita,{width:155});
+    const altura=Math.max(alturaEsquerda,alturaDireita);
+    if (doc.y+altura>748) doc.addPage();
     const y=doc.y;
-    doc.fillColor(black).font("Helvetica").fontSize(9).text(String(left),42,y,{width:354});
-    doc.font("Helvetica-Bold").text(String(right),400,y,{width:155,align:"right"});
-    doc.moveDown(.5);
+    doc.fillColor(black).font("Helvetica").fontSize(9).text(esquerda,42,y,{width:354});
+    doc.font("Helvetica-Bold").fontSize(9).text(direita,400,y,{width:155,align:"right"});
+    doc.y=y+altura+5;
   };
   doc.fillColor(green).font("Helvetica-Bold").fontSize(18).text("ALMOXARIFADO | RELATÓRIO GERENCIAL");
   doc.fillColor(gray).fontSize(9).font("Helvetica").text(`Manutenção Campo do Gado  •  Período: ${periodo.inicio} a ${periodo.fim}`);
