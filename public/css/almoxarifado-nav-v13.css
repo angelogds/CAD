@@ -1,0 +1,19 @@
+/* Almoxarifado V13: navegacao compacta e telas de recebimento/retirada. */
+.almox-tabs--operacional {display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 18px}
+.almox-tabs--operacional .almox-tab {display:inline-flex;align-items:center;justify-content:center;min-height:42px;text-align:center}
+.almox-v13-filters {display:flex;flex-wrap:wrap;gap:7px}
+.almox-v13-filters .almox-chip {min-height:40px;display:inline-flex;align-items:center;gap:6px}
+.almox-v13-cadastro {margin-top:18px;padding:14px;border:1px solid #d7e4db;border-radius:10px;background:#f8faf9}
+.almox-v13-cadastro > summary {font-weight:700;cursor:pointer;color:#185836;min-height:35px}
+.almox-v13-cadastro-form {display:grid;gap:10px;margin-top:12px}
+.almox-v13-cadastro-form label {display:grid;gap:5px}
+.almox-v13-confirmar-nome {grid-column:1/-1;display:grid;gap:5px}
+.almox-v13-confirmar-nome span {font-weight:700}
+.almox-v13-cadastro :is(input,select,button,summary):focus-visible,
+.almox-v13-filters a:focus-visible {outline:3px solid #237a51;outline-offset:2px}
+@media(max-width:800px) {
+  .almox-tabs--operacional {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .almox-tabs--operacional .almox-tab {min-height:44px;white-space:normal}
+  .almox-v13-cadastro {padding:12px}
+}
+@media(max-width:450px) {.almox-v13-filters .almox-chip {font-size:.78rem}}
