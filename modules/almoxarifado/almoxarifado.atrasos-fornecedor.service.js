@@ -59,9 +59,10 @@ function gerarResumoAtrasos(linhas = [], hoje = new Intl.DateTimeFormat("en-CA",
   };
 }
 
-function listarAtrasosPorFornecedor(hoje) {
-  const { ALMOX_STATUS } = require("./almoxarifado.service");
-  const db = require("../../database/db");
+function listarAtrasosPorFornecedor(hoje, options = {}) {
+  // Injeção opcional permite validar a SQL em SQLite isolado, sem acessar o banco de produção.
+  const db = options.db || require("../../database/db");
+  const ALMOX_STATUS = options.status || require("./almoxarifado.service").ALMOX_STATUS;
   const temTabela = nome => Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(nome));
   if (!temTabela("solicitacoes") || !temTabela("solicitacao_itens")) return gerarResumoAtrasos([], hoje);
   const colunas = nome => new Set(db.prepare("PRAGMA table_info(" + nome + ")").all().map(c=>c.name));
