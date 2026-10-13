@@ -11,11 +11,11 @@
     </div>
     <div class="reserve-head__actions">
       <a class="btn btn-ghost" href="/almoxarifado/recebimentos">Recebimentos</a>
-      <a class="btn btn-green" href="/almoxarifado/retiradas/qr">Retirada por QR</a>
+      <a class="btn btn-green" href="/almoxarifado/retiradas/qr">Abrir retirada</a>
     </div>
   </header>
 
-  <%- include('_tabs', { tab: 'reservas' }) %>
+  <%- include('../almoxarifado/_tabs', { tab: 'separados' }) %>
 
   <section class="reserve-kpis">
     <article><span>Solicitações com reserva</span><strong><%= resumo.solicitacoes %></strong><small>Pedidos já recebidos no estoque</small></article>
@@ -69,7 +69,7 @@
 
         <footer class="reserve-card__actions">
           <a class="btn btn-ghost" href="/almoxarifado/solicitacoes/<%= grupo.solicitacao_id %>/conferir">Abrir solicitação</a>
-          <% if (Number(grupo.total_disponivel||0) > 0) { %><a class="btn btn-green" href="/almoxarifado/retiradas/qr?solicitacao_id=<%= grupo.solicitacao_id %>">Entregar por QR</a><% } %>
+          <% if (Number(grupo.total_disponivel||0) > 0) { %><a class="btn btn-green" href="/almoxarifado/retiradas/qr?solicitacao_id=<%= grupo.solicitacao_id %>">Abrir retirada</a><% } %>
         </footer>
       </article>
     <% }) %>
