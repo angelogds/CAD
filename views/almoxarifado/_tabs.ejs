@@ -2,6 +2,7 @@
   const currentTab = typeof tab !== 'undefined' && tab ? tab : (typeof almoxTab !== 'undefined' ? almoxTab : '');
 %>
 <link rel="stylesheet" href="/css/almoxarifado-nav-v13.css?v=20261013-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-layout-v15.css?v=20261013-v1" />
 <nav class="almox-tabs almox-tabs--operacional" aria-label="Navegação do Almoxarifado">
   <a class="almox-tab <%= currentTab === 'painel' ? 'active' : '' %>" href="/almoxarifado" <%- currentTab === 'painel' ? 'aria-current="page"' : '' %>>Painel</a>
   <a class="almox-tab <%= currentTab === 'recebimentos' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=COMPRADA" <%- currentTab === 'recebimentos' ? 'aria-current="page"' : '' %>>Compras a receber</a>
