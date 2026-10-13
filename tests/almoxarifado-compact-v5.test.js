@@ -39,7 +39,7 @@ test('V13 exibe estágio físico para cada compra na lista unificada', () => {
 
 test('V5 mantém as ações críticas da operação', () => {
   const view = read('views','almoxarifado','recebimentos.ejs');
-  assert.match(view, />Retirada<\/a>/);
+  assert.match(view, /include\\('_tabs', \\{ tab: 'recebimentos' \\}\\)/);
   assert.doesNotMatch(view, /Saída avulsa/);
   assert.match(view, /iniciar-recebimento/);
   assert.match(view, />Receber<\/button>/);
