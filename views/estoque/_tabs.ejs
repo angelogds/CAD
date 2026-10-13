@@ -2,6 +2,7 @@
   const currentTab = typeof tab !== 'undefined' && tab ? tab : (typeof estoqueTab !== 'undefined' ? estoqueTab : '');
   const isConfig = ['categorias', 'locais', 'cadastro'].includes(currentTab);
 %>
+<link rel="stylesheet" href="/css/estoque-nav-v12.css?v=20261013-v1" />
 <nav class="subtabs stock-tabs--organized" aria-label="Navegação do estoque">
   <a class="subtab <%= currentTab === 'itens' ? 'active' : '' %>" href="/estoque" <%- currentTab === 'itens' ? 'aria-current="page"' : '' %>>Estoque</a>
   <a class="subtab <%= currentTab === 'reservas' ? 'active' : '' %>" href="/estoque/reservas" <%- currentTab === 'reservas' ? 'aria-current="page"' : '' %>>Para entregar</a>
