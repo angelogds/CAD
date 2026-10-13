@@ -294,11 +294,18 @@ function insertMovimento(data) {
   return Number(db.prepare(`INSERT INTO estoque_movimentos (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).run(...vals).lastInsertRowid);
 }
 
-function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, entreguePorUserId, observacao, empresaConsumidora, setorConsumidor }) {
+function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, nomeRetirante, entreguePorUserId, observacao, empresaConsumidora, setorConsumidor }) {
   const qtd = Number(quantidade || 0);
   if (!(qtd > 0)) throw new Error('Quantidade inválida para retirada.');
   const pessoa = qrCode ? getPessoaByQr(qrCode) : getPessoaByCadastro(pessoaTipo, pessoaId);
   if (!pessoa) throw new Error('Funcionário não identificado, inativo ou inválido. Use o QR ou selecione um cadastro ativo.');
+  // Retirada sem QR exige que o almoxarife digite e confirme o nome.
+  if (!qrCode) {
+    const normalizar = value => String(value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').replace(/\s+/g, ' ');
+    if (!normalizar(nomeRetirante) || normalizar(nomeRetirante) !== normalizar(pessoa.nome)) {
+      throw new Error('Na retirada manual, digite o nome completo conforme o cadastro da pessoa selecionada.');
+    }
+  }
 
   const resultado = db.transaction(() => {
     const reserva = db.prepare(`
