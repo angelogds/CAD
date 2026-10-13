@@ -2,7 +2,6 @@
 
 // Relatório somente leitura, por item comprado e com previsão do item antes da solicitação.
 // Não soma quantidades de unidades distintas e não altera registros operacionais.
-const { ALMOX_STATUS } = require("./almoxarifado.service");
 
 function isoValida(valor) {
   const iso = String(valor || "").slice(0, 10);
@@ -61,6 +60,7 @@ function gerarResumoAtrasos(linhas = [], hoje = new Intl.DateTimeFormat("en-CA",
 }
 
 function listarAtrasosPorFornecedor(hoje) {
+  const { ALMOX_STATUS } = require("./almoxarifado.service");
   const db = require("../../database/db");
   const temTabela = nome => Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(nome));
   if (!temTabela("solicitacoes") || !temTabela("solicitacao_itens")) return gerarResumoAtrasos([], hoje);
