@@ -10,7 +10,7 @@
     <div>
       <span class="eyebrow">ALMOXARIFADO</span>
       <h1>Retirada</h1>
-      <p aria-label="Identifique o responsável ou colaborador">Identifique quem recebe e confirme o material separado.</p>
+      <p aria-label="Identifique o responsável ou colaborador">Priorize a leitura do cartão QR. Sem cartão, identifique a pessoa pelo cadastro e registre o nome na entrega.</p>
     </div>
   </header>
 
@@ -18,7 +18,7 @@
 
   <section class="qr-scan-layout">
     <article class="card qr-scanner-card">
-      <div class="qr-scanner-card__head"><div><h2>1. Identificar</h2><p>QR, leitor ou cadastro.</p></div></div>
+      <div class="qr-scanner-card__head"><div><h2>1. Identificar quem retira</h2><p>Preferencial: cartão QR. Alternativa: busca manual pelo cadastro.</p></div></div>
       <div class="qr-reader-box"><video id="qrVideo" playsinline muted></video><div id="qrReaderPlaceholder">Câmera desligada</div></div>
       <div class="qr-reader-actions">
         <button class="btn btn-green" id="startQrCamera" type="button">Abrir câmera</button>
@@ -34,7 +34,7 @@
       <form method="GET" action="/almoxarifado/retiradas/qr" class="almox-identity-search">
         <% if (solicitacaoId) { %><input type="hidden" name="solicitacao_id" value="<%= solicitacaoId %>" /><% } %>
         <input class="input" name="q_pessoa" value="<%= buscaPessoa || '' %>" placeholder="Buscar funcionário pelo nome, função ou setor" autocomplete="off" />
-        <button class="btn btn-ghost" type="submit">Buscar cadastro</button>
+        <button class="btn btn-ghost" type="submit">Buscar cadastro para retirada manual</button>
       </form>
       <% if (buscaPessoa && pessoasEncontradas.length) { %>
         <div class="almox-identity-results">
@@ -50,6 +50,26 @@
         </div>
       <% } else if (buscaPessoa) { %>
         <div class="almox-subline" style="margin-top:10px">Nenhum cadastro ativo encontrado para “<%=buscaPessoa%>”.</div>
+      <% } %>
+      <% if (podeCadastrarPessoa) { %>
+        <details class="almox-v13-cadastro">
+          <summary>Cadastrar pessoa sem cartão QR</summary>
+          <p class="muted">Use apenas quando a pessoa ainda não estiver cadastrada. O RH ou encarregado autorizado poderá emitir o cartão depois.</p>
+          <form method="POST" action="/almoxarifado/retiradas/colaboradores" class="almox-v13-cadastro-form" data-lock-submit>
+            <% if (solicitacaoId) { %><input type="hidden" name="solicitacao_id" value="<%=solicitacaoId%>" /><% } %>
+            <label><span>Nome completo de quem retirará</span><input class="input" name="nome" minlength="3" maxlength="120" placeholder="Nome completo" required autocomplete="off" /></label>
+            <label><span>Função</span><input class="input" name="funcao" maxlength="80" placeholder="Ex.: Auxiliar de manutenção" /></label>
+            <label><span>Setor</span><select class="input" name="setor">
+              <option value="MANUTENCAO">Manutenção</option>
+              <option value="RECICLAGEM">Reciclagem</option>
+              <option value="FRIGORIFICO">Frigorífico</option>
+              <option value="LOGISTICA">Logística</option>
+              <option value="ADMINISTRATIVO">Administrativo</option>
+              <option value="NAO_INFORMADO">Não informado</option>
+            </select></label>
+            <button class="btn btn-green" type="submit" data-pending-text="Cadastrando...">Cadastrar e selecionar</button>
+          </form>
+        </details>
       <% } %>
     </article>
 
@@ -89,6 +109,7 @@
                 <input type="hidden" name="pessoa_tipo" value="<%= pessoaTipo || '' %>" />
                 <input type="hidden" name="pessoa_id" value="<%= pessoaId || '' %>" />
                 <input type="hidden" name="solicitacao_id" value="<%= grupo.solicitacao_id %>" />
+                <% if (!codigo) { %><label class="almox-v13-confirmar-nome"><span>Nome completo de quem está retirando (obrigatório)</span><input class="input" name="nome_retirante" required minlength="3" maxlength="120" placeholder="Digite o nome conforme o cadastro" autocomplete="off" /></label><% } %>
                 <div><strong><%= item.item_nome %></strong><small>Saldo físico: <%= Number(item.saldo_fisico||0) %> <%= item.unidade||'UN' %> • Reservado disponível: <%= Number(item.quantidade_disponivel||0) %> <%= item.unidade||'UN' %></small></div>
                 <label><span>Quantidade</span><input class="input" type="number" name="quantidade" min="0.01" step="0.01" max="<%= Number(item.quantidade_disponivel||0) %>" value="<%= Number(item.quantidade_disponivel||0) %>" required /></label>
                 <label><span>Empresa consumidora</span><input class="input" name="empresa_consumidora" required placeholder="Quem utilizará o material" /></label>

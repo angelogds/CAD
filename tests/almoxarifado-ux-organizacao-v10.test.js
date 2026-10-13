@@ -8,9 +8,11 @@ const source=p=>fs.readFileSync(path.join(root,p),"utf8");
 
 test("abas do almoxarifado têm rótulos sem símbolos e navegação acessível",()=>{
   const partial=source("views/almoxarifado/_tabs.ejs");
-  for(const label of ["Painel","Compras a caminho","Compras a receber","Para entregar","Estoque","Retirada","Visão gerencial"]){
+  for(const label of ["Painel","Compras a receber","Para entregar","Estoque","Retirada","Visão gerencial"]){
     assert.ok(partial.includes(label),`Falta aba: ${label}`);
   }
+  assert.doesNotMatch(partial,/Compras a caminho/);
+  assert.match(partial,/almoxarifado-nav-v13\.css/);
   assert.doesNotMatch(partial,/<span aria-hidden=/);
   assert.match(partial,/aria-current="page"/);
   assert.match(partial,/aria-label="Navegação do Almoxarifado"/);

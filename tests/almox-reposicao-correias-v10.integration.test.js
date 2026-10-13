@@ -111,11 +111,11 @@ test('classificação automática herda endereço sem inventar especificação e
   assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
 });
 
-test('telas operacionais renderizam ações corretas e busca preserva a fila a caminho',()=>{
+test('telas operacionais renderizam compras unificadas com busca e filtros',()=>{
   const ejs=require('ejs');
   const render=(file,locals)=>ejs.render(fs.readFileSync(path.join(__dirname,'../views',file),'utf8'),{layout:()=>{},fmtBR:v=>String(v),...locals},{filename:path.join(__dirname,'../views',file)});
-  const filas=render('almoxarifado/recebimentos.ejs',{user:almoxUser,lista:[],status:'TODAS',fila:'A_CAMINHO',q:'correia',resumo:{},canManage:true,canWithdraw:false});
-  assert.match(filas,/<h1>Compras a caminho<\/h1>/);assert.match(filas,/name="fila" value="A_CAMINHO"/);
+  const filas=render('almoxarifado/recebimentos.ejs',{user:almoxUser,lista:[],status:'TODAS',situacao:'PENDENTES',contagens:{PENDENTES:0,NAO_CHEGOU:0,PARCIAL:0,TOTAL:0,TODAS:0},q:'correia',canManage:true,canWithdraw:false});
+  assert.match(filas,/<h1>Compras a receber<\/h1>/);assert.match(filas,/name="situacao" value="PENDENTES"/);assert.doesNotMatch(filas,/Compras a caminho/);
   const base={pedidos:belts.list(),equipamentos:legacy.listEquipamentos(),mecanicos:[mecanico],vinculos:belts.vinculos(eq),operacaoToken:'view-test'};
   const readOnly=render('almoxarifado/correias.ejs',{...base,user:{role:'DIRETORIA'}});assert.doesNotMatch(readOnly,/action="\/almoxarifado\/correias\/avulsa"/);
   const editable=render('almoxarifado/correias.ejs',{...base,user:almoxUser});assert.match(editable,/name="empresa_consumidora"/);assert.match(editable,/name="operacao_token"/);

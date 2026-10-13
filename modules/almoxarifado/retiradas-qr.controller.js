@@ -1,4 +1,43 @@
 const reservaService = require('../estoque/estoque.reservas.service');
+const colaboradoresService = require('../colaboradores/colaboradores.service');
+const { normalizeRole } = require('../../config/rbac');
+
+function normNome(value) {
+  return String(value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').replace(/\s+/g, ' ');
+}
+
+function cadastrarColaborador(req, res) {
+  const nome = String(req.body.nome || '').trim().replace(/\s+/g, ' ');
+  const funcao = String(req.body.funcao || 'COLABORADOR').trim().slice(0, 80);
+  const setor = String(req.body.setor || 'NAO_INFORMADO').trim().slice(0, 80);
+  const solicitacaoId = Number(req.body.solicitacao_id || 0) || null;
+  const redirect = (params = '') => res.redirect('/almoxarifado/retiradas/qr' + params);
+  try {
+    if (nome.length < 3 || nome.length > 120) throw new Error('Informe o nome completo da pessoa (3 a 120 caracteres).');
+    if (!/^[\p{L}][\p{L}\p{M}\s'.-]+$/u.test(nome)) throw new Error('Nome inválido para cadastro.');
+    const existente = reservaService.listPessoasAtivas(nome).find(pessoa => normNome(pessoa.nome) === normNome(nome));
+    if (existente) {
+      req.flash('error', 'Essa pessoa já está cadastrada. Use o cadastro existente para evitar duplicidade.');
+      const p = new URLSearchParams({ q_pessoa: nome });
+      if (solicitacaoId) p.set('solicitacao_id', String(solicitacaoId));
+      return redirect('?' + p.toString());
+    }
+    const id = colaboradoresService.createOrUpdateColaborador(
+      { nome, funcao: funcao || 'COLABORADOR', setor: setor || 'NAO_INFORMADO', status: 'ATIVO' },
+      { id: req.session.user.id, name: req.session.user.name, origem: 'ALMOXARIFADO_RETIRADA' }
+    );
+    req.flash('success', 'Cadastro para retirada criado. O cartão QR poderá ser emitido pelo RH ou encarregado autorizado.');
+    const params = new URLSearchParams({ pessoa_tipo: 'COLABORADOR', pessoa_id: String(id) });
+    if (solicitacaoId) params.set('solicitacao_id', String(solicitacaoId));
+    return redirect('?' + params.toString());
+  } catch (error) {
+    req.flash('error', error.message || 'Não foi possível registrar a pessoa.');
+    const params = new URLSearchParams({ q_pessoa: nome });
+    if (solicitacaoId) params.set('solicitacao_id', String(solicitacaoId));
+    return redirect('?' + params.toString());
+  }
+}
+
 
 function scanner(req, res) {
   const codigo = String(req.query.codigo || '').trim();
@@ -23,6 +62,7 @@ function scanner(req, res) {
     pessoa,
     colaborador: pessoa,
     grupos,
+    podeCadastrarPessoa: ['ADMIN','ALMOXARIFADO'].includes(normalizeRole(req.session.user.role)),
   });
 }
 
@@ -39,6 +79,7 @@ function retirar(req, res) {
       qrCode: codigo,
       pessoaTipo,
       pessoaId,
+      nomeRetirante: String(req.body.nome_retirante || '').trim(),
       entreguePorUserId: req.session.user.id,
       observacao: req.body.observacao || null,
       empresaConsumidora: req.body.empresa_consumidora,
@@ -58,4 +99,4 @@ function retirar(req, res) {
   return res.redirect(`/almoxarifado/retiradas/qr?${params.toString()}`);
 }
 
-module.exports = { scanner, retirar };
+module.exports = { scanner, retirar, cadastrarColaborador };

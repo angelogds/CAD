@@ -232,17 +232,39 @@ function publicarMaterialDisponivel({ solicitacaoId, itemId, quantidadeRecebida,
 }
 
 function recebimentos(req, res) {
-  const requestedStatus = String(req.query.status || "TODAS").trim().toUpperCase();
-  const status = requestedStatus === "TODAS" || service.ALMOX_STATUS.includes(requestedStatus) ? requestedStatus : "TODAS";
-  const q = String(req.query.q || "").trim();
+  // Uma única fila de compras com filtros por quantidades efetivamente recebidas.
+  // Preserva URLs antigas de status/fila para links já enviados aos usuários.
+  const antigoStatus = String(req.query.status || '').trim().toUpperCase();
+  const filtroSolicitado = String(req.query.situacao || (
+    ['RECEBIDA_TOTAL', 'SEPARADA_PARA_RETIRADA', 'ENTREGUE_SOLICITANTE', 'FECHADA'].includes(antigoStatus) ? 'TOTAL' :
+    ['RECEBIDA_PARCIAL', 'EM_RECEBIMENTO'].includes(antigoStatus) ? 'PARCIAL' :
+    antigoStatus === 'TODAS' || antigoStatus === 'EM_COTACAO' ? 'TODAS' : 'PENDENTES'
+  )).trim().toUpperCase();
+  const situacao = ['PENDENTES', 'NAO_CHEGOU', 'PARCIAL', 'TOTAL', 'TODAS'].includes(filtroSolicitado)
+    ? filtroSolicitado : 'PENDENTES';
+  const q = String(req.query.q || '').trim();
+  const classificacao = (row) => {
+    const pendente = Number(row.qtd_pendente_total || 0);
+    const recebida = Number(row.qtd_recebida_total_agregada || 0);
+    return pendente <= 0 ? 'TOTAL' : recebida > 0 ? 'PARCIAL' : 'NAO_CHEGOU';
+  };
+  const compras = service.listRecebimentos({ status: 'TODAS', query: q })
+    .filter(row => Number(row.qtd_comprada_total || 0) > 0)
+    .map(row => ({ ...row, situacao_recebimento: classificacao(row) }));
+  const contagens = {
+    PENDENTES: compras.filter(row => row.situacao_recebimento !== 'TOTAL').length,
+    NAO_CHEGOU: compras.filter(row => row.situacao_recebimento === 'NAO_CHEGOU').length,
+    PARCIAL: compras.filter(row => row.situacao_recebimento === 'PARCIAL').length,
+    TOTAL: compras.filter(row => row.situacao_recebimento === 'TOTAL').length,
+    TODAS: compras.length,
+  };
+  const lista = compras.filter(row => situacao === 'TODAS'
+    || (situacao === 'PENDENTES' ? row.situacao_recebimento !== 'TOTAL' : row.situacao_recebimento === situacao));
   res.render("almoxarifado/recebimentos", {
-    title: "Almoxarifado",
+    title: "Compras a receber",
     activeMenu: "almoxarifado",
-    fila: req.query.fila === 'A_CAMINHO' ? 'A_CAMINHO' : '',
-    lista: service.listRecebimentos({ status, query: q }).filter(row => req.query.fila !== 'A_CAMINHO' || (Number(row.qtd_comprada_total)>0 && Number(row.qtd_pendente_total)>0)),
-    resumo: service.getResumoRecebimentos(q),
-    status,
-    q,
+    lista, situacao, contagens,
+    status: "TODAS", q,
     canManage: canManageAlmox(req.session.user),
     canWithdraw: canWithdrawStock(req.session.user),
   });

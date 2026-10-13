@@ -17,7 +17,8 @@ test('V3 abre o Almoxarifado em uma central operacional e preserva as rotas ofic
   assert.match(routes, /router\.get\("\/estoque",[\s\S]*ctrl\.estoqueOperacional/);
   assert.match(controller, /function index\(/);
   assert.match(controller, /function estoqueOperacional\(/);
-  assert.match(tabs, /Compras a caminho/);
+  assert.doesNotMatch(tabs, /Compras a caminho/);
+  assert.match(tabs, /Compras a receber/);
   assert.match(tabs, /Para entregar/);
   assert.match(tabs, /\/almoxarifado\/retiradas\/qr/);
   assert.doesNotMatch(tabs, /\/estoque\/saidas\/nova\?contexto=almoxarifado/);

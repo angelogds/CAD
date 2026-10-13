@@ -73,12 +73,13 @@ test('reabertura preserva o estágio físico real do material', () => {
   assert.match(service, /resumoReserva\.pendente > 0 \? STATUS\.SEPARADA_PARA_RETIRADA : STATUS\.ENTREGUE_SOLICITANTE/);
 });
 
-test('painel do Almoxarifado mostra separado, entregue e só fecha após entrega', () => {
+test('almoxarifado preserva entrega separada e só fecha após entrega', () => {
   const list = read('views/almoxarifado/recebimentos.ejs');
   const detail = read('views/almoxarifado/conferir.ejs');
 
-  assert.match(list, /Separadas/);
-  assert.match(list, /Entregues/);
+  const menu=read('views/almoxarifado/_tabs.ejs');
+  assert.match(menu, /Para entregar/);
+  assert.match(read('views/estoque/reservas.ejs'), /A retirar/);
   assert.match(list, /s\.status === 'ENTREGUE_SOLICITANTE'/);
   assert.match(list, /s\.status === 'ENTREGUE_SOLICITANTE'.*\/fechar/s);
 

@@ -14,8 +14,8 @@ test('V5 remove KPIs duplicados e concentra filtro e busca em uma única faixa',
   assert.doesNotMatch(view, /Compras liberadas/);
   assert.match(view, /almox-compact-toolbar/);
   assert.match(view, /Buscar solicitação, material, equipamento ou fornecedor/);
-  assert.match(view, /Cotação/);
-  assert.match(view, /Receber/);
+  assert.match(view, /Não chegou/);
+  assert.match(view, /Pendentes/);
 });
 
 test('V5 reduz a lista para cinco colunas operacionais', () => {
@@ -29,16 +29,17 @@ test('V5 reduz a lista para cinco colunas operacionais', () => {
   assert.match(view, /s\.equipamento_nome \|\| 'Sem equipamento'/);
 });
 
-test('V5 evita status repetido quando a tela já está filtrada', () => {
+test('V13 exibe estágio físico para cada compra na lista unificada', () => {
   const view = read('views','almoxarifado','recebimentos.ejs');
-  assert.match(view, /const showStatus=status === 'TODAS'/);
+  assert.match(view, /const showStatus=true/);
+  assert.match(view, /situacao_recebimento/);
   assert.match(view, /if\(showStatus\)/);
   assert.match(view, /almox-status--mini/);
 });
 
 test('V5 mantém as ações críticas da operação', () => {
   const view = read('views','almoxarifado','recebimentos.ejs');
-  assert.match(view, />Retirada<\/a>/);
+  assert.match(view, /tab: 'recebimentos'/);
   assert.doesNotMatch(view, /Saída avulsa/);
   assert.match(view, /iniciar-recebimento/);
   assert.match(view, />Receber<\/button>/);

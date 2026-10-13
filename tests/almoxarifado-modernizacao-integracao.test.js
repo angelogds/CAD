@@ -26,7 +26,7 @@ test('recebimentos apresenta indicadores, busca, progresso e status de recebimen
   assert.match(view, /qtd_recebida_total_agregada/);
   assert.match(view, /qtd_comprada_total/);
   assert.match(view, /RECEBIDA_TOTAL/);
-  assert.match(view, /s\.status === 'RECEBIDA_TOTAL'/);
+  assert.match(view, /s\.situacao_recebimento === 'TOTAL'/);
   assert.match(view, /s\.status === 'FECHADA'/);
   assert.doesNotMatch(view, /\['RECEBIDA_TOTAL', 'RECEBIDA_PARCIAL'\][\s\S]{0,100}fechar/);
 });
