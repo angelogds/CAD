@@ -21,8 +21,7 @@
   const statusMeta = (value) => statusConfig[value] || { label: value || '-', cls: '' };
   const querySuffix = q ? `&q=${encodeURIComponent(q)}` : '';
   const dateBR = (v) => { if (!v) return ''; const p=String(v).slice(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(v); };
-  const isCompraView = typeof fila !== 'undefined' && fila === 'A_CAMINHO';
-  const pageTitle = isCompraView ? 'Compras a caminho' : (status === 'COMPRADA' ? 'Materiais para receber' : 'Recebimentos');
+  const pageTitle = 'Compras a receber';
   const currentCount = lista.length;
 %>
 
@@ -35,29 +34,22 @@
         <span class="almox-compact-count"><%= currentCount %></span>
       </div>
     </div>
-    <div class="almox-compact-actions">
-      <a class="btn btn-sm btn-green" href="/almoxarifado/retiradas/qr">Retirada</a>
-    </div>
+    <div class="almox-compact-actions"><small class="muted">Conferência de materiais comprados e entregas pendentes</small></div>
   </header>
 
-  <%- include('_tabs', { tab: isCompraView ? 'compras' : 'recebimentos' }) %>
+  <%- include('_tabs', { tab: 'recebimentos' }) %>
 
   <section class="almox-flow-toolbar almox-compact-toolbar almox-kpis-compact">
-    <div class="almox-filter-chips" aria-label="Filtrar solicitações do Almoxarifado">
-      <a class="almox-chip <%= status === 'TODAS' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=TODAS<%= querySuffix %>">Todas <span class="almox-chip__count"><%= resumo.total_fluxo %></span></a>
-      <a class="almox-chip <%= status === 'EM_COTACAO' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=EM_COTACAO<%= querySuffix %>">Cotação <span class="almox-chip__count"><%= resumo.em_cotacao %></span></a>
-      <a class="almox-chip <%= status === 'COMPRADA' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=COMPRADA<%= querySuffix %>">Receber <span class="almox-chip__count"><%= resumo.para_receber %></span></a>
-      <a class="almox-chip <%= status === 'RECEBIDA_PARCIAL' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=RECEBIDA_PARCIAL<%= querySuffix %>">Parciais <span class="almox-chip__count"><%= resumo.parciais %></span></a>
-      <a class="almox-chip <%= status === 'SEPARADA_PARA_RETIRADA' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=SEPARADA_PARA_RETIRADA<%= querySuffix %>">Separadas <span class="almox-chip__count"><%= resumo.separadas %></span></a>
-      <a class="almox-chip <%= status === 'ENTREGUE_SOLICITANTE' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=ENTREGUE_SOLICITANTE<%= querySuffix %>">Entregues <span class="almox-chip__count"><%= resumo.entregues %></span></a>
-      <a class="almox-chip <%= status === 'FECHADA' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=FECHADA<%= querySuffix %>">Histórico <span class="almox-chip__count"><%= resumo.fechadas %></span></a>
+    <div class="almox-filter-chips almox-v13-filters" aria-label="Situação das compras a receber">
+      <% [['PENDENTES','Pendentes'],['NAO_CHEGOU','Não chegou'],['PARCIAL','Parcial'],['TOTAL','Recebido totalmente'],['TODAS','Todas']].forEach(([chave,rotulo])=>{ %>
+        <a class="almox-chip <%= situacao===chave?'active':'' %>" href="/almoxarifado/recebimentos?situacao=<%=chave%><%=querySuffix%>" <%- situacao===chave?'aria-current="page"':'' %>><%=rotulo%> <span class="almox-chip__count"><%=contagens[chave]%></span></a>
+      <% }) %>
     </div>
-
     <form class="almox-search almox-compact-search" method="GET" action="/almoxarifado/recebimentos">
-      <input type="hidden" name="status" value="<%= status %>" /><% if(isCompraView){ %><input type="hidden" name="fila" value="A_CAMINHO"><% } %>
-      <input class="input" type="search" name="q" value="<%= q %>" placeholder="Buscar solicitação, material, equipamento ou fornecedor" aria-label="Buscar solicitações" />
+      <input type="hidden" name="situacao" value="<%=situacao%>" />
+      <input class="input" type="search" name="q" value="<%=q%>" placeholder="Solicitação, fornecedor ou equipamento" aria-label="Buscar compras" />
       <button class="btn btn-sm btn-ghost" type="submit">Buscar</button>
-      <% if (q) { %><a class="btn btn-sm btn-ghost" href="/almoxarifado/recebimentos?<%=isCompraView?'fila=A_CAMINHO':'status='+status%>">Limpar</a><% } %>
+      <% if(q){ %><a class="btn btn-sm btn-ghost" href="/almoxarifado/recebimentos?situacao=<%=situacao%>">Limpar</a><% } %>
     </form>
   </section>
 
@@ -75,18 +67,16 @@
         </div>
 
         <% lista.forEach((s) => {
-          const meta=statusMeta(s.status);
+          const meta= s.situacao_recebimento === 'TOTAL' ? {label:'Recebido totalmente',cls:'almox-status--total'} : s.situacao_recebimento === 'PARCIAL' ? {label:'Recebido parcialmente',cls:'almox-status--parcial'} : {label:'Não chegou',cls:'almox-status--comprada'};
           const total=Number(s.itens_total||0);
           const cotados=Number(s.itens_cotados||0);
           const comprados=Number(s.qtd_comprada_total||0);
           const recebidos=Number(s.qtd_recebida_total_agregada||0);
           const isCotacao=s.status === 'EM_COTACAO';
-          const receivedComplete=s.status === 'RECEBIDA_TOTAL';
-          const pct=isCotacao ? Number(s.cotacao_pct||0) : Number(s.progresso_pct||0);
-          const andamento=isCotacao
-            ? `${cotados}/${total} cotado(s)`
-            : `${recebidos}/${comprados} recebido(s)`;
-          const showStatus=status === 'TODAS';
+          const receivedComplete=s.situacao_recebimento === 'TOTAL';
+          const pct=Number(s.progresso_pct||0);
+          const andamento=`${recebidos}/${comprados} recebido(s)`;
+          const showStatus=true;
         %>
           <article class="almox-compact-row" data-href="/almoxarifado/solicitacoes/<%= s.id %>/conferir" tabindex="0" role="link">
             <div class="almox-compact-request" data-label="Solicitação">
@@ -131,7 +121,7 @@
                   <button class="btn btn-sm btn-ghost" type="submit">Reabrir</button>
                 </form>
               <% } else { %>
-                <a class="almox-compact-open" href="/almoxarifado/solicitacoes/<%= s.id %>/conferir"><%= isCotacao ? 'Acompanhar' : 'Abrir' %> →</a>
+                <a class="almox-compact-open" href="/almoxarifado/solicitacoes/<%= s.id %>/conferir">Conferir →</a>
               <% } %>
             </div>
           </article>
