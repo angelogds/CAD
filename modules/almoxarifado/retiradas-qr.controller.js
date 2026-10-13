@@ -1,5 +1,6 @@
 const reservaService = require('../estoque/estoque.reservas.service');
 const colaboradoresService = require('../colaboradores/colaboradores.service');
+const { normalizeRole } = require('../../config/rbac');
 
 function normNome(value) {
   return String(value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').replace(/\s+/g, ' ');
@@ -61,6 +62,7 @@ function scanner(req, res) {
     pessoa,
     colaborador: pessoa,
     grupos,
+    podeCadastrarPessoa: ['ADMIN','ALMOXARIFADO'].includes(normalizeRole(req.session.user.role)),
   });
 }
 
