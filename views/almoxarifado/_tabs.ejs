@@ -3,7 +3,6 @@
 %>
 <nav class="almox-tabs almox-tabs--operacional" aria-label="Navegação do Almoxarifado">
   <a class="almox-tab <%= currentTab === 'painel' ? 'active' : '' %>" href="/almoxarifado" <%- currentTab === 'painel' ? 'aria-current="page"' : '' %>>Painel</a>
-  <a class="almox-tab <%= currentTab === 'compras' ? 'active' : '' %>" href="/almoxarifado/recebimentos?fila=A_CAMINHO" <%- currentTab === 'compras' ? 'aria-current="page"' : '' %>>Compras a caminho</a>
   <a class="almox-tab <%= currentTab === 'recebimentos' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=COMPRADA" <%- currentTab === 'recebimentos' ? 'aria-current="page"' : '' %>>Compras a receber</a>
   <a class="almox-tab <%= currentTab === 'separados' ? 'active' : '' %>" href="/estoque/reservas" <%- currentTab === 'separados' ? 'aria-current="page"' : '' %>>Para entregar</a>
   <a class="almox-tab <%= currentTab === 'estoque' ? 'active' : '' %>" href="/almoxarifado/estoque" <%- currentTab === 'estoque' ? 'aria-current="page"' : '' %>>Estoque</a>
