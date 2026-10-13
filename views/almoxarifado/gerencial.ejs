@@ -77,6 +77,44 @@ const maior = Math.max(1,...dados.serie.map(s=>Math.max(s.entradas,s.saidas)));
       <% dados.movimentacaoPorSetorCategoria.forEach(g=>{ %><tr><td><%=g.setor%></td><td><%=g.categoria%></td><td><%=g.unidade%></td><td><%=numero(g.entradas)%></td><td><%=numero(g.saidas)%></td></tr><% }) %>
     </tbody></table></div>
   </section>
+  <section class="box" aria-labelledby="relatorio-atrasos-titulo">
+    <h2 id="relatorio-atrasos-titulo">Materiais atrasados por fornecedor</h2>
+    <p class="muted">Situação de recebimento em <%=pendencias.hoje%> (horário de Brasília). Atraso é calculado por material comprado e ainda não recebido integralmente, usando primeiro a previsão do item. A listagem completa também está no PDF gerencial.</p>
+    <div class="totais">
+      <% [
+        ['Fornecedores com atraso', pendencias.resumo.fornecedoresAtrasados],
+        ['Materiais atrasados', pendencias.resumo.itensAtrasados],
+        ['Pedidos com atraso', pendencias.resumo.pedidosAtrasados],
+        ['Materiais sem previsão', pendencias.resumo.semPrevisao]
+      ].forEach(([titulo, valor])=>{ %>
+        <article><small><%=titulo%></small><strong class="val"><%=numero(valor)%></strong></article>
+      <% }) %>
+    </div>
+    <h3>Resumo por fornecedor</h3>
+    <div class="scroll"><table><thead><tr><th>Fornecedor</th><th>Materiais atrasados</th><th>Pedidos</th><th>Maior atraso</th></tr></thead><tbody>
+      <% if(!pendencias.porFornecedor.length){ %><tr><td colspan="4">Nenhum material com previsão vencida e quantidade pendente.</td></tr><% } %>
+      <% pendencias.porFornecedor.forEach(grupo=>{ %>
+        <tr><td><%=grupo.nome%></td><td><%=grupo.itensAtrasados%></td><td><%=grupo.pedidosAtrasados%></td><td><%=grupo.maiorAtrasoDias%> dia(s)</td></tr>
+      <% }) %>
+    </tbody></table></div>
+    <h3>Materiais com prazo vencido</h3>
+    <div class="scroll"><table><thead><tr><th>Fornecedor</th><th>Solicitação</th><th>Material</th><th>Pendente</th><th>Previsão</th><th>Atraso</th></tr></thead><tbody>
+      <% if(!pendencias.atrasados.length){ %><tr><td colspan="6">Sem entregas vencidas em aberto.</td></tr><% } %>
+      <% pendencias.atrasados.slice(0,40).forEach(item=>{ %>
+        <tr><td><%=item.fornecedor%></td><td><a href="/almoxarifado/solicitacoes/<%=item.solicitacaoId%>/conferir"><%=item.numero%></a></td><td><%=item.nome%></td><td><%=numero(item.pendente)%> <%=item.unidade%></td><td><%=item.previsao%></td><td><%=item.diasAtraso%> dia(s)</td></tr>
+      <% }) %>
+    </tbody></table></div>
+    <% if(pendencias.atrasados.length>40){ %><p class="muted">Mostrando 40 de <%=pendencias.atrasados.length%> materiais atrasados. Consulte a relação completa no PDF.</p><% } %>
+    <h3>Compras pendentes sem previsão de entrega</h3>
+    <p class="muted">Não são classificadas como atrasadas sem uma data válida. Registre ou corrija a previsão em Compras.</p>
+    <div class="scroll"><table><thead><tr><th>Fornecedor</th><th>Solicitação</th><th>Material</th><th>Pendente</th></tr></thead><tbody>
+      <% if(!pendencias.semPrevisao.length){ %><tr><td colspan="4">Nenhum material pendente sem previsão.</td></tr><% } %>
+      <% pendencias.semPrevisao.slice(0,20).forEach(item=>{ %>
+        <tr><td><%=item.fornecedor%></td><td><%=item.numero%></td><td><%=item.nome%></td><td><%=numero(item.pendente)%> <%=item.unidade%></td></tr>
+      <% }) %>
+    </tbody></table></div>
+    <% if(pendencias.semPrevisao.length>20){ %><p class="muted">Mostrando 20 de <%=pendencias.semPrevisao.length%> pendências sem previsão; relação completa no PDF.</p><% } %>
+  </section>
   <div class="duas">
     <section class="box"><h2>Mais utilizados no período</h2><p class="muted">Ordenados pelo número de retiradas, com quantidade por unidade do material.</p>
       <div class="scroll"><table><thead><tr><th>Material</th><th>Retiradas</th><th>Quantidade</th></tr></thead><tbody>
