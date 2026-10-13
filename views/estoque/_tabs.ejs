@@ -1,11 +1,18 @@
 <%
-  const currentTab = tab || estoqueTab || '';
+  const currentTab = typeof tab !== 'undefined' && tab ? tab : (typeof estoqueTab !== 'undefined' ? estoqueTab : '');
+  const isConfig = ['categorias', 'locais', 'cadastro'].includes(currentTab);
 %>
-<div class="subtabs">
-  <a class="subtab <%= currentTab === 'itens' ? 'active' : '' %>" href="/estoque">Itens</a>
-  <a class="subtab <%= currentTab === 'reservas' ? 'active' : '' %>" href="/estoque/reservas">Separados / Solicitações</a>
-  <a class="subtab <%= currentTab === 'categorias' ? 'active' : '' %>" href="/estoque/categorias">Categorias</a>
-  <a class="subtab <%= currentTab === 'locais' ? 'active' : '' %>" href="/estoque/locais">Locais</a>
-  <a class="subtab <%= currentTab === 'movimentos' ? 'active' : '' %>" href="/estoque/movimentos">Movimentos</a>
-  <a class="subtab <%= currentTab === 'saida' ? 'active' : '' %>" href="/estoque/saidas/nova">Registrar saída</a>
-</div>
+<link rel="stylesheet" href="/css/estoque-nav-v12.css?v=20261013-v1" />
+<nav class="subtabs stock-tabs--organized" aria-label="Navegação do estoque">
+  <a class="subtab <%= currentTab === 'itens' ? 'active' : '' %>" href="/estoque" <%- currentTab === 'itens' ? 'aria-current="page"' : '' %>>Estoque</a>
+  <a class="subtab <%= currentTab === 'reservas' ? 'active' : '' %>" href="/estoque/reservas" <%- currentTab === 'reservas' ? 'aria-current="page"' : '' %>>Para entregar</a>
+  <a class="subtab <%= currentTab === 'movimentos' ? 'active' : '' %>" href="/estoque/movimentos" <%- currentTab === 'movimentos' ? 'aria-current="page"' : '' %>>Histórico de movimentações</a>
+  <details class="stock-tabs-config" <%= isConfig ? 'open' : '' %>>
+    <summary class="<%= isConfig ? 'is-current' : '' %>">Configurações do Almoxarifado</summary>
+    <div class="stock-tabs-config__items">
+      <a href="/estoque/itens/novo" <%- currentTab === 'cadastro' ? 'aria-current="page"' : '' %>>Cadastrar material</a>
+      <a href="/estoque/categorias" <%- currentTab === 'categorias' ? 'aria-current="page"' : '' %>>Categorias</a>
+      <a href="/estoque/locais" <%- currentTab === 'locais' ? 'aria-current="page"' : '' %>>Locais e prateleiras</a>
+    </div>
+  </details>
+</nav>
