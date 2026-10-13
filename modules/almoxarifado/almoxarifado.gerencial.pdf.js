@@ -1,6 +1,7 @@
 "use strict";
 const PDFDocument = require("pdfkit");
 const { gerarRelatorio } = require("./almoxarifado.gerencial.service");
+const { listarAtrasosPorFornecedor } = require("./almoxarifado.atrasos-fornecedor.service");
 const brl = v => (Number(v || 0) / 100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const qtd = v => Number(v || 0).toLocaleString("pt-BR", {maximumFractionDigits: 2});
 function exportar(req,res) {
@@ -8,6 +9,7 @@ function exportar(req,res) {
   try { info = gerarRelatorio(req.query || {}); }
   catch(e) { return res.status(400).send(e.message); }
   const {periodo,resumo,maisSaidos,parados,inventario,serie} = info;
+  const pendencias = listarAtrasosPorFornecedor(periodo.hoje);
   const doc = new PDFDocument({size:"A4", margin:42, bufferPages:true, info:{Title:"Almoxarifado - relatório gerencial"}});
   res.setHeader("Content-Type","application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="almoxarifado-gerencial-${periodo.inicio}-${periodo.fim}.pdf"`);
@@ -19,11 +21,18 @@ function exportar(req,res) {
     doc.moveDown(.3);
   };
   const line=(left,right)=>{
-    if(doc.y>748) doc.addPage();
+    // Reserva a altura da maior célula para evitar sobreposição de descrições longas no PDF.
+    const esquerda=String(left), direita=String(right);
+    doc.font("Helvetica").fontSize(9);
+    const alturaEsquerda=doc.heightOfString(esquerda,{width:354});
+    doc.font("Helvetica-Bold").fontSize(9);
+    const alturaDireita=doc.heightOfString(direita,{width:155});
+    const altura=Math.max(alturaEsquerda,alturaDireita);
+    if (doc.y+altura>748) doc.addPage();
     const y=doc.y;
-    doc.fillColor(black).font("Helvetica").fontSize(9).text(String(left),42,y,{width:354});
-    doc.font("Helvetica-Bold").text(String(right),400,y,{width:155,align:"right"});
-    doc.moveDown(.5);
+    doc.fillColor(black).font("Helvetica").fontSize(9).text(esquerda,42,y,{width:354});
+    doc.font("Helvetica-Bold").fontSize(9).text(direita,400,y,{width:155,align:"right"});
+    doc.y=y+altura+5;
   };
   doc.fillColor(green).font("Helvetica-Bold").fontSize(18).text("ALMOXARIFADO | RELATÓRIO GERENCIAL");
   doc.fillColor(gray).fontSize(9).font("Helvetica").text(`Manutenção Campo do Gado  •  Período: ${periodo.inicio} a ${periodo.fim}`);
@@ -47,6 +56,27 @@ function exportar(req,res) {
   doc.fillColor(gray).fontSize(8).text("Lista de atenção; avaliar criticidade e reserva mínima antes de reduzir compras.");
   if (!parados.length) doc.fontSize(9).text("Nenhum item antigo com saldo e sem saída identificado.");
   parados.forEach(i=>line(i.nome,`${qtd(i.saldo)} ${i.unidade} em estoque`));
+  heading("Materiais atrasados por fornecedor");
+  doc.fillColor(gray).font("Helvetica").fontSize(8).text("Prazo vencido em "+pendencias.hoje+" e quantidade comprada ainda pendente. Quantidades de unidades distintas não são somadas.");
+  line("Fornecedores com atraso", pendencias.resumo.fornecedoresAtrasados);
+  line("Materiais atrasados", pendencias.resumo.itensAtrasados);
+  line("Pedidos com atraso", pendencias.resumo.pedidosAtrasados);
+  if (!pendencias.atrasados.length) doc.font("Helvetica").fontSize(9).text("Nenhum material com prazo vencido e recebimento pendente.");
+  let ultimoFornecedor = null;
+  for (const item of pendencias.atrasados) {
+    if (item.fornecedor !== ultimoFornecedor) {
+      heading(item.fornecedor);
+      ultimoFornecedor = item.fornecedor;
+    }
+    line(item.numero+" | "+item.nome,
+      qtd(item.pendente)+" "+item.unidade+" | "+item.diasAtraso+"d | "+item.previsao);
+  }
+  heading("Materiais pendentes sem previsão");
+  doc.fillColor(gray).font("Helvetica").fontSize(8).text("Sem data válida, não se classifica como atraso. Completar previsão em Compras.");
+  if (!pendencias.semPrevisao.length) doc.font("Helvetica").fontSize(9).text("Nenhuma compra pendente sem previsão.");
+  for (const item of pendencias.semPrevisao) {
+    line(item.fornecedor+" | "+item.numero+" | "+item.nome, qtd(item.pendente)+" "+item.unidade);
+  }
   doc.addPage();
   doc.fillColor(green).fontSize(14).font("Helvetica-Bold").text("Inventário valorizado - saldo atual");
   doc.moveDown(.4);
