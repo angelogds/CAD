@@ -91,3 +91,17 @@
 .stock-v11-head .btn {min-height:42px}
 .stock-v11-head .btn:focus-visible {outline:3px solid #277a4f;outline-offset:2px}
 @media(max-width:850px){.stock-v11-head {padding:17px}}
+
+/* Estoque V12: operação diária separada dos cadastros. */
+.stock-tabs--organized{display:flex;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.stock-tabs--organized .subtab{min-height:42px;display:inline-flex;align-items:center}
+.stock-tabs-config{position:relative;min-width:220px;max-width:100%}
+.stock-tabs-config>summary{display:flex;align-items:center;min-height:42px;gap:8px;padding:9px 13px;cursor:pointer;border:1px solid #dce5de;border-radius:8px;background:#fff;color:#334155;font-size:.82rem;font-weight:700;list-style:none}
+.stock-tabs-config>summary::-webkit-details-marker{display:none}
+.stock-tabs-config>summary::after{content:'▾';margin-left:auto;font-size:.85rem}
+.stock-tabs-config>summary.is-current,.stock-tabs-config[open]>summary{background:#eaf7ee;border-color:#6eae85;color:#166534}
+.stock-tabs-config__items{display:grid;gap:3px;padding:8px;margin-top:5px;border:1px solid #dce5de;border-radius:10px;background:#fff;box-shadow:0 4px 12px rgba(32,53,42,.05)}
+.stock-tabs-config__items a{display:block;padding:10px 11px;border-radius:7px;color:#334155;font-size:.82rem;text-decoration:none}
+.stock-tabs-config__items a:hover,.stock-tabs-config__items a[aria-current="page"]{background:#eaf7ee;color:#166534}
+.stock-tabs-config :is(summary,a):focus-visible{outline:3px solid #277a4f;outline-offset:2px}
+@media(max-width:650px){.stock-tabs--organized{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.stock-tabs--organized .subtab{white-space:normal;min-height:44px}.stock-tabs-config{grid-column:1/-1;min-width:0}.stock-tabs-config>summary{min-height:44px}}
