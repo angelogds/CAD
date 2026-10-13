@@ -73,3 +73,46 @@ test("validação ISO não considera datas impossíveis como atraso", () => {
   assert.equal(isoValida("amanha"),"");
   assert.throws(()=>gerarResumoAtrasos([],"2026-14-99"));
 });
+
+
+test("consulta SQL real preserva fornecedores por item, recebimentos parciais e prazo do cabeçalho", () => {
+  const { DatabaseSync } = require("node:sqlite");
+  const db = new DatabaseSync(":memory:");
+  try {
+    db.exec(`
+      CREATE TABLE fornecedores(id INTEGER PRIMARY KEY, nome TEXT, nome_fantasia TEXT);
+      CREATE TABLE solicitacoes(id INTEGER PRIMARY KEY, numero TEXT, status TEXT, fornecedor TEXT, previsao_entrega TEXT);
+      CREATE TABLE solicitacao_itens(
+        id INTEGER PRIMARY KEY, solicitacao_id INTEGER, item_nome TEXT, item_descricao TEXT,
+        unidade TEXT, qtd_comprada REAL, qtd_recebida_total REAL, fornecedor_id INTEGER, previsao_entrega TEXT
+      );
+      INSERT INTO fornecedores VALUES(1,'Fábrica A','Alfa'),(2,'Fábrica B','Beta');
+      INSERT INTO solicitacoes VALUES
+        (10,'SOL-010','EM_COTACAO','Fornecedor do cabeçalho','2026-10-12'),
+        (11,'SOL-011','COMPRADA',NULL,NULL),
+        (12,'SOL-012','ABERTA',NULL,'2026-10-01');
+      INSERT INTO solicitacao_itens VALUES
+        (1,10,'Correia',NULL,'UN',10,4,1,'2026-10-10'),
+        (2,10,'Óleo',NULL,'L',5,1,2,NULL),
+        (3,10,'Item sem compra',NULL,'UN',0,0,1,'2026-10-08'),
+        (4,10,'Item recebido',NULL,'UN',5,5,1,'2026-10-08'),
+        (5,11,'Parafuso',NULL,'UN',12,0,NULL,NULL),
+        (6,12,'Solicitação aberta',NULL,'UN',9,0,NULL,'2026-10-01');
+    `);
+    const antes = db.prepare("SELECT SUM(qtd_recebida_total) total FROM solicitacao_itens").get().total;
+    const rel = require("../modules/almoxarifado/almoxarifado.atrasos-fornecedor.service")
+      .listarAtrasosPorFornecedor(data,{db,status:["EM_COTACAO","COMPRADA","EM_RECEBIMENTO"]});
+    assert.equal(rel.resumo.itensAtrasados,2);
+    assert.equal(rel.resumo.fornecedoresAtrasados,2);
+    assert.equal(rel.resumo.pedidosAtrasados,1);
+    assert.equal(rel.resumo.semPrevisao,1);
+    assert.equal(rel.atrasados.find(i=>i.nome==="Correia").pendente,6);
+    assert.equal(rel.atrasados.find(i=>i.nome==="Correia").fornecedor,"Alfa");
+    assert.equal(rel.atrasados.find(i=>i.nome==="Óleo").fornecedor,"Beta");
+    assert.equal(rel.atrasados.find(i=>i.nome==="Óleo").previsao,"2026-10-12");
+    assert.equal(rel.semPrevisao[0].nome,"Parafuso");
+    assert.equal(db.prepare("SELECT SUM(qtd_recebida_total) total FROM solicitacao_itens").get().total,antes);
+  } finally {
+    db.close();
+  }
+});
