@@ -47,7 +47,7 @@
     </div>
     <form class="almox-search almox-compact-search" method="GET" action="/almoxarifado/recebimentos">
       <input type="hidden" name="situacao" value="<%=situacao%>" />
-      <input class="input" type="search" name="q" value="<%=q%>" placeholder="Solicitação, fornecedor ou equipamento" aria-label="Buscar compras" />
+      <input class="input" type="search" name="q" value="<%=q%>" placeholder="Buscar solicitação, material, equipamento ou fornecedor" aria-label="Buscar compras" />
       <button class="btn btn-sm btn-ghost" type="submit">Buscar</button>
       <% if(q){ %><a class="btn btn-sm btn-ghost" href="/almoxarifado/recebimentos?situacao=<%=situacao%>">Limpar</a><% } %>
     </form>
