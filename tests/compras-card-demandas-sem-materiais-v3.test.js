@@ -6,30 +6,37 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
-test('card oferece demandas técnicas da Reciclagem sem materiais, sem misturar Logística e Frigorífico', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(),'compras-card-demandas-'));
+test('card de pré-cotações só lista solicitações vinculadas a Demandas com itens válidos', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(),'cad-pre-cotacoes-compacto-'));
   try {
-    const out = execFileSync(process.execPath,['-e',"\nconst assert = require('node:assert/strict');\nconst db = require('./database/db');\ndb.exec([\n\"CREATE TABLE equipamentos(id INTEGER PRIMARY KEY, nome TEXT, setor TEXT)\",\n\"CREATE TABLE demandas(id INTEGER PRIMARY KEY, titulo TEXT, status TEXT, prioridade TEXT, categoria TEXT, setor_origem TEXT, equipamento_id INTEGER, aprovacao_status TEXT, created_at TEXT, updated_at TEXT, liberacao_compras_status TEXT)\",\n\"CREATE TABLE solicitacoes(id INTEGER PRIMARY KEY, demanda_id INTEGER, status TEXT)\",\n\"INSERT INTO equipamentos VALUES(1,'Digestor 4','RECICLAGEM')\",\n\"INSERT INTO equipamentos VALUES(2,'Equipamento frigorífico','FRIGORIFICO')\",\n\"INSERT INTO demandas VALUES(1,'Manutenção sem setor','PLANEJAMENTO','ALTA','MANUTENCAO',NULL,NULL,'PENDENTE',datetime('now'),datetime('now'),'PENDENTE')\",\n\"INSERT INTO demandas VALUES(2,'Triturador FAST','NOVA','URGENTE','PROJETO','Reciclagem',NULL,'PENDENTE',datetime('now'),datetime('now'),'PENDENTE')\",\n\"INSERT INTO demandas VALUES(3,'Logística','PLANEJAMENTO','ALTA','MANUTENCAO','LOGISTICA',NULL,'PENDENTE',datetime('now'),datetime('now'),'PENDENTE')\",\n\"INSERT INTO demandas VALUES(4,'Frigorífico','NOVA','ALTA','MANUTENCAO',NULL,2,'PENDENTE',datetime('now'),datetime('now'),'PENDENTE')\",\n\"INSERT INTO demandas VALUES(5,'Demanda com materiais','PLANEJAMENTO','MEDIA','MANUTENCAO','RECICLAGEM',NULL,'PENDENTE',datetime('now'),datetime('now'),'PENDENTE')\",\n\"INSERT INTO demandas VALUES(6,'Demanda concluída','CONCLUIDA','BAIXA','MANUTENCAO','RECICLAGEM',NULL,'PENDENTE',datetime('now'),datetime('now'),'PENDENTE')\",\n\"INSERT INTO demandas VALUES(7,'Demanda liberada','PLANEJAMENTO','BAIXA','MANUTENCAO','RECICLAGEM',NULL,'PENDENTE',datetime('now'),datetime('now'),'LIBERADA')\",\n\"INSERT INTO demandas VALUES(8,'Rotor Digestor','PLANEJAMENTO','BAIXA','PROJETO',NULL,1,'PENDENTE',datetime('now'),datetime('now'),'PENDENTE')\",\n\"INSERT INTO demandas VALUES(9,'Melhoria administrativa sem setor','NOVA','MEDIA','PROJETO',NULL,NULL,'PENDENTE',datetime('now'),datetime('now'),'PENDENTE')\",\n\"INSERT INTO solicitacoes VALUES(51,5,'EM_COTACAO')\"\n].join(';')+';');\nconst s=require('./modules/compras/compras-demandas.service');\nlet list=s.listDemandasSemMateriais(30);\nassert.deepEqual(list.map(x=>x.demanda_id).sort((a,b)=>a-b),[1,2,8]);\nassert.equal(list.find(x=>x.demanda_id===8).equipamento_nome,'Digestor 4');\ndb.prepare(\"UPDATE solicitacoes SET status='CANCELADA' WHERE id=51\").run();\nlist=s.listDemandasSemMateriais(30);\nassert.equal(list.some(x=>x.demanda_id===5),true);\ndb.prepare(\"UPDATE demandas SET liberacao_compras_status='LIBERADA' WHERE id=2\").run();\nlist=s.listDemandasSemMateriais(30);\nassert.equal(list.some(x=>x.demanda_id===2),false);\nprocess.stdout.write('ok');\n"],{
-      cwd:path.join(__dirname,'..'), encoding:'utf8',
-      env:{ ...process.env,DB_PATH:path.join(dir,'test.sqlite'),NODE_ENV:'test' },
-      stdio:['ignore','pipe','pipe']
+    const result = execFileSync(process.execPath,['-e',"\nconst assert = require('node:assert/strict');\nconst db = require('./database/db');\ndb.exec([\n\"CREATE TABLE equipamentos(id INTEGER PRIMARY KEY,nome TEXT)\",\n\"CREATE TABLE demandas(id INTEGER PRIMARY KEY,titulo TEXT,status TEXT,prioridade TEXT,aprovacao_status TEXT,prazo_previsto TEXT,nr_referencia TEXT,equipamento_id INTEGER,setor_origem TEXT,liberacao_compras_status TEXT)\",\n\"CREATE TABLE solicitacoes(id INTEGER PRIMARY KEY,numero TEXT,titulo TEXT,status TEXT,prioridade TEXT,created_at TEXT,updated_at TEXT,demanda_id INTEGER,os_id INTEGER,disponivel_compras INTEGER,setor_origem TEXT)\",\n\"CREATE TABLE solicitacao_itens(id INTEGER PRIMARY KEY,solicitacao_id INTEGER,status_cotacao TEXT,status_compra TEXT)\",\n\"INSERT INTO equipamentos VALUES(1,'Digestor 4')\",\n\"INSERT INTO demandas VALUES(1,'Manutenção','PLANEJAMENTO','ALTA','PENDENTE',NULL,NULL,1,'RECICLAGEM','PENDENTE')\",\n\"INSERT INTO demandas VALUES(2,'Logística','PLANEJAMENTO','MEDIA','PENDENTE',NULL,NULL,NULL,'LOGISTICA','PENDENTE')\",\n\"INSERT INTO demandas VALUES(3,'Já liberada','PLANEJAMENTO','BAIXA','PENDENTE',NULL,NULL,NULL,'RECICLAGEM','LIBERADA')\",\n\"INSERT INTO demandas VALUES(4,'Demanda sem solicitação','PLANEJAMENTO','ALTA','PENDENTE',NULL,NULL,NULL,'RECICLAGEM','PENDENTE')\"\n].join(';')+';');\nconst ins = db.prepare(\"INSERT INTO solicitacoes VALUES(?,?,?,'ABERTA',?,datetime('now'),datetime('now'),?,?,0,?)\");\nfor(let id=11;id<=17;id++){\n  ins.run(id,'SOL-'+id,'Material '+id, id===11?'ALTA':'MEDIA',1,null,'RECICLAGEM');\n  db.prepare(\"INSERT INTO solicitacao_itens VALUES(?,?,'PENDENTE','PENDENTE')\").run(id,id);\n}\nins.run(18,'SOL-18','Sem itens','ALTA',1,null,'RECICLAGEM');\nins.run(19,'SOL-19','Logística','MEDIA',2,null,'LOGISTICA');\ndb.prepare(\"INSERT INTO solicitacao_itens VALUES(19,19,'PENDENTE','PENDENTE')\").run();\nins.run(20,'SOL-20','Liberada','BAIXA',3,null,'RECICLAGEM');\ndb.prepare(\"INSERT INTO solicitacao_itens VALUES(20,20,'PENDENTE','PENDENTE')\").run();\nins.run(21,'SOL-21','Material cancelado','ALTA',1,null,'RECICLAGEM');\ndb.prepare(\"INSERT INTO solicitacao_itens VALUES(21,21,'PENDENTE','CANCELADO')\").run();\nconst s=require('./modules/compras/compras-demandas.service');\nassert.equal(s.countPreCotacoesDemandas(),7);\nassert.equal(s.listPreCotacoesDemandas(5).length,5);\nassert.equal(s.listPreCotacoesDemandas(null).length,7);\nconst ids=s.listPreCotacoesDemandas(null).map(x=>x.id);\nassert.equal(ids.includes(18),false);\nassert.equal(ids.includes(19),false);\nassert.equal(ids.includes(20),false);\nassert.equal(ids.includes(21),false);\nassert.ok(ids.includes(11));\nassert.throws(()=>s.assertCompraLiberada(11),/pré-cotação/);\ndb.prepare(\"UPDATE demandas SET liberacao_compras_status='LIBERADA' WHERE id=1\").run();\nassert.equal(s.countPreCotacoesDemandas(),0);\nassert.doesNotThrow(()=>s.assertCompraLiberada(11));\nprocess.stdout.write('ok');\n"], {
+      cwd:path.join(__dirname,'..'),encoding:'utf8',
+      env:{...process.env,DB_PATH:path.join(dir,'test.sqlite'),NODE_ENV:'test'},
+      stdio:['ignore','pipe','pipe'],
     });
-    assert.equal(out.trim(),'ok');
-  } finally { fs.rmSync(dir,{recursive:true,force:true}); }
+    assert.equal(result.trim(),'ok');
+  } finally {
+    fs.rmSync(dir,{recursive:true,force:true});
+  }
 });
 
-test('UI mantém pré-cotações reais separadas das demandas sem materiais', () => {
+test('UI mostra cinco primeiras, contador verdadeiro e expande todas sem criar materiais',()=>{
   const root=path.join(__dirname,'..');
-  const read=p=>fs.readFileSync(path.join(root,p),'utf8');
-  const ctrl=read('modules/compras/compras.controller.js');
-  const view=read('public/js/compras-demandas-pre-cotacao.js');
+  const read=file=>fs.readFileSync(path.join(root,file),'utf8');
+  const controller=read('modules/compras/compras.controller.js');
+  const js=read('public/js/compras-demandas-pre-cotacao.js');
+  const dbService=read('modules/compras/compras-demandas.service.js');
   const layout=read('views/layout.ejs');
-  assert.match(ctrl,/demandasSemMateriais: demandasComprasService\.listDemandasSemMateriais/);
-  assert.match(view,/Demandas aguardando materiais/);
-  assert.match(view,/Sem solicitação de materiais/);
-  assert.match(view,/Não é uma cotação/);
-  assert.match(view,/demandas\/\$\{demand\.demanda_id\}#materiais/);
-  assert.match(view,/rows\.length \+ demandasSemMateriais\.length/);
-  assert.match(layout,/compras-demandas-pre-cotacao\.js\?v=20261014-v3/);
-  assert.match(read('modules/compras/compras.service.js'),/function demandReleaseWhere/);
+  assert.match(controller,/countPreCotacoesDemandas\(\)/);
+  assert.match(controller,/listPreCotacoesDemandas\(verTodas \? null : 5\)/);
+  assert.doesNotMatch(controller,/demandasSemMateriais/);
+  assert.match(dbService,/JOIN solicitacao_itens si ON si.solicitacao_id = s.id/);
+  assert.match(js,/const INITIAL_VISIBLE = 5/);
+  assert.match(js,/Abrir todas as pré-cotações/);
+  assert.match(js,/Mostrar apenas 5/);
+  assert.match(js,/pre-cotacoes\.json\?todas=1/);
+  assert.match(js,/payload\.total/);
+  assert.doesNotMatch(js,/Demandas aguardando materiais/);
+  assert.doesNotMatch(js,/Planejar materiais/);
+  assert.match(layout,/compras-demandas-pre-cotacao\.js\?v=20261014-v4/);
 });
