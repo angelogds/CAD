@@ -232,6 +232,12 @@ function loadRows(filters = {}) {
   if (solCols.has('tipo_origem') && solCols.has('disponivel_compras')) {
     where.push("(UPPER(COALESCE(s.tipo_origem,'')) <> 'PRE_SOLICITACAO_ALMOX' OR COALESCE(s.disponivel_compras,0)=1)");
   }
+  // Demandas sem autorização aparecem apenas no card de pré-cotação, não nos indicadores.
+  if (solCols.has('demanda_id')) {
+    where.push(tableExists('demandas') && columns('demandas').has('liberacao_compras_status')
+      ? "(s.demanda_id IS NULL OR EXISTS (SELECT 1 FROM demandas dg WHERE dg.id=s.demanda_id AND UPPER(TRIM(COALESCE(dg.liberacao_compras_status,'PENDENTE')))='LIBERADA'))"
+      : "s.demanda_id IS NULL");
+  }
 
   const solValue = solCols.has('valor_total') ? 'COALESCE(s.valor_total,0)' : '0';
   const solDeadline = solCols.has('previsao_entrega') ? "COALESCE(s.previsao_entrega,'')" : "''";
