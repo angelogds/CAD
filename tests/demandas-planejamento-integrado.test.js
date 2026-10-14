@@ -65,7 +65,8 @@ test('painel de compras carrega bloco real de pré-cotações de demandas', () =
   const script = read('public/js/compras-demandas-pre-cotacao.js');
   assert.match(routes, /\/demandas\/pre-cotacoes\.json/);
   assert.match(layout, /compras-demandas-pre-cotacao\.js/);
-  assert.match(script, /Pré-solicitações de Demandas/);
+  assert.match(script, /Pré-cotações de Demandas/);
+  assert.match(script, /INITIAL_VISIBLE = 5/);
   assert.match(script, /Compra aguardando liberação/);
 });
 
