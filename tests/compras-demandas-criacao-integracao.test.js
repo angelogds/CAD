@@ -72,6 +72,11 @@ test('cadastro real de materiais em setor operacional entra na pré-cotação e 
       assert.ok(pre.listSolicitacoesDemandaSemVinculo().some(r=>r.id===semVinculo));
       assert.ok(!compras.getOperationalQueue({tab:'active'}).rows.some(r=>r.id===semVinculo));
       assert.throws(()=>pre.assertCompraLiberada(semVinculo),e=>e.code==='DEMANDA_VINCULO_PENDENTE');
+      db.prepare('UPDATE solicitacoes SET demanda_id=999999 WHERE id=?').run(semVinculo);
+      assert.ok(pre.listSolicitacoesDemandaSemVinculo().some(r=>r.id===semVinculo));
+      assert.ok(!compras.getOperationalQueue({tab:'active'}).rows.some(r=>r.id===semVinculo));
+      assert.throws(()=>pre.assertCompraLiberada(semVinculo),e=>e.code==='DEMANDA_VINCULO_PENDENTE');
+      db.prepare('UPDATE solicitacoes SET demanda_id=NULL WHERE id=?').run(semVinculo);
       for(const setor of ['LOGISTICA','FRIGORIFICO','ADMINISTRATIVO']) {
         const other=demand.create({titulo:'Outro setor',setor_origem:setor},user);
         const request=demand.createMaterialPlanning(other,{user,itens:[{item_nome:'Material teste',qtd_solicitada:1}]});
