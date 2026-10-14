@@ -245,7 +245,7 @@ function lista(req, res) {
 
 function preCotacoesDemandasJson(_req, res) {
   try {
-    return res.json({ ok: true, rows: demandasComprasService.listPreCotacoesDemandas(12) });
+    return res.json({ ok: true, rows: demandasComprasService.listPreCotacoesDemandas(50) });
   } catch (error) {
     console.error('❌ Erro ao carregar pré-cotações de demandas:', error && error.stack ? error.stack : error);
     return res.status(500).json({ ok: false, rows: [] });
