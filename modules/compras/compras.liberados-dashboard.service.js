@@ -48,6 +48,13 @@ function listDashboardStatus() {
   const descExpr = itemCols.has('item_descricao') ? "COALESCE(si.item_descricao,'')" : "''";
   const unitExpr = itemCols.has('unidade') ? "COALESCE(si.unidade,'UN')" : "'UN'";
 
+  const solCols = columns('solicitacoes');
+  const demandaWhere = solCols.has('demanda_id')
+    ? (tableExists('demandas') && columns('demandas').has('liberacao_compras_status')
+      ? "WHERE (s.demanda_id IS NULL OR EXISTS (SELECT 1 FROM demandas dg WHERE dg.id=s.demanda_id AND UPPER(TRIM(COALESCE(dg.liberacao_compras_status,'PENDENTE')))='LIBERADA'))"
+      : "WHERE s.demanda_id IS NULL")
+    : '';
+
   const items = db.prepare(`
     SELECT
       s.id solicitacao_id,
@@ -66,6 +73,7 @@ function listDashboardStatus() {
       si.aprovacao_item_assinatura
     FROM solicitacoes s
     JOIN solicitacao_itens si ON si.solicitacao_id=s.id
+    ${demandaWhere}
     ORDER BY s.id DESC, si.id
   `).all();
 
