@@ -103,6 +103,11 @@ function buildPreCotacoesQuery() {
       AND UPPER(TRIM(COALESCE(s.status, 'ABERTA'))) NOT IN ('CANCELADA','FECHADA','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE')
       AND UPPER(TRIM(COALESCE(d.status, 'NOVA'))) NOT IN ('CANCELADA','CONCLUIDA')
     GROUP BY s.id
+    HAVING COUNT(si.id) > 0
+      OR NOT EXISTS (
+        SELECT 1 FROM solicitacao_itens todos_itens
+        WHERE todos_itens.solicitacao_id = s.id
+      )
     ORDER BY
       CASE UPPER(COALESCE(s.prioridade, d.prioridade, 'MEDIA'))
         WHEN 'CRITICA' THEN 0 WHEN 'CRÍTICA' THEN 0 WHEN 'URGENTE' THEN 0
