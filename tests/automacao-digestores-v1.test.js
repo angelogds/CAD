@@ -39,3 +39,19 @@ test('automacao classifica temperatura do processo para a torre sinalizadora', (
   for (const value of [null, undefined, '', '  ', 'inválido']) assert.equal(service.classifyTemperature(value).color, 'OFF');
   assert.equal(service.classifyTemperature(0).color, 'RED');
 });
+
+
+test('automacao v1 expõe setor de decanters com medição de sebo e tanque de serviço', () => {
+  const setores = service.listSetores();
+  assert.ok(setores.some((setor) => setor.key === 'decanters' && setor.href === '/automacao/decanters'));
+
+  const processo = service.getDecantersOverview();
+  assert.equal(processo.decanters.length, 1);
+  assert.equal(processo.decanters[0].nome, 'Decanter FAST Saturn 3');
+  assert.equal(processo.decanters[0].comando_habilitado, false);
+  assert.equal(processo.medicaoSebo.vazao_l_min, null);
+  assert.equal(processo.medicaoSebo.total_l, null);
+  assert.equal(processo.tanqueServico.nivel, null);
+  assert.deepEqual(processo.tanqueServico.faixas, ['BAIXO', 'MÉDIO', 'ALTO']);
+  assert.equal(processo.tanqueServico.comando_habilitado, false);
+});
