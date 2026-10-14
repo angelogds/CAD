@@ -41,7 +41,6 @@ function listPreCotacoesDemandas(limit = 12) {
     LEFT JOIN equipamentos e ON e.id = d.equipamento_id
     LEFT JOIN solicitacao_itens si ON si.solicitacao_id = s.id
     WHERE s.demanda_id IS NOT NULL
-      AND COALESCE(s.os_id, 0) = 0
       ${availabilityWhere}
       ${releaseWhere}
       ${setorWhere}
@@ -77,9 +76,8 @@ function assertCompraLiberada(solicitacaoId) {
   const row = getDemandGate(solicitacaoId);
   if (!row) return;
   const isDemandRequest = Number(row.demanda_id || 0) > 0;
-  const hasOS = Number(row.os_id || 0) > 0;
   const released = String(row.liberacao_compras_status || 'PENDENTE').toUpperCase() === 'LIBERADA';
-  if (isDemandRequest && !hasOS && !released) {
+  if (isDemandRequest && !released) {
     const error = new Error('Esta solicitação ainda está em pré-cotação da Demanda. Libere a compra na aba Planejamento da Demanda para que ela siga o fluxo normal de Compras. A geração de OS não é necessária para comprar o material.');
     error.code = 'DEMANDA_COMPRA_AGUARDANDO_LIBERACAO';
     throw error;
