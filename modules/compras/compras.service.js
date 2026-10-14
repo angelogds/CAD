@@ -4,6 +4,7 @@ const db = require('../../database/db');
 const osChatService = require('../os-chat/os-chat.service');
 const calculos = require('./compras.calculos');
 const { normalizeSetorCorporativo, setorMatches, dbAliasesForSetor } = require('./compras-setores');
+const { resolvedDemandIdSql } = require('./compras-demandas.service');
 
 const STATUS = Object.freeze({
   ABERTA: 'ABERTA',
@@ -130,12 +131,15 @@ function columnExists(table, col) {
 // Pré-cotações de Demandas só integram as filas após liberação expressa.
 // A presença de OS não substitui a autorização de compra.
 function demandReleaseWhere(alias = 's') {
-  if (!columnExists('solicitacoes', 'demanda_id')) return '';
+  const demandIdExpr = resolvedDemandIdSql(alias);
+  if (demandIdExpr === 'NULL') return '';
+  // A solicitação pode ter sido gerada a partir da OS vinculada à Demanda,
+  // mesmo que solicitacoes.demanda_id esteja nulo. OS não é liberação.
   if (!tableExists('demandas') || !columnExists('demandas', 'liberacao_compras_status')) {
-    return `${alias}.demanda_id IS NULL`; // sem migração, não liberar por engano
+    return `${demandIdExpr} IS NULL`; // sem migração, não liberar por engano
   }
-  return `(${alias}.demanda_id IS NULL OR EXISTS (
-    SELECT 1 FROM demandas dg WHERE dg.id=${alias}.demanda_id
+  return `(${demandIdExpr} IS NULL OR EXISTS (
+    SELECT 1 FROM demandas dg WHERE dg.id=${demandIdExpr}
       AND UPPER(TRIM(COALESCE(dg.liberacao_compras_status,'PENDENTE')))='LIBERADA'
   ))`;
 }
