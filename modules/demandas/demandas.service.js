@@ -2,6 +2,8 @@ const db = require('../../database/db');
 const { normalizeRole, canAccessModule } = require('../../config/rbac');
 const solicitacoesService = require('../solicitacoes/solicitacoes.service');
 const osService = require('../os/os.service');
+const { normalizeSetorCorporativo, SETORES } = require('../compras/compras-setores');
+const { resolvedDemandIdSql } = require('../compras/compras-demandas.service');
 
 const STATUS = ['NOVA', 'EM_ANALISE', 'PLANEJAMENTO', 'AGUARDANDO_APROVACAO', 'EM_ANDAMENTO', 'PARADA', 'CONCLUIDA', 'CANCELADA'];
 const CATEGORIAS = ['MANUTENCAO', 'PRODUCAO', 'NR', 'SEGURANCA', 'AUDITORIA', 'MELHORIA', 'PROJETO', 'DIRETORIA'];
@@ -297,7 +299,7 @@ function getById(id) {
              ${quotedExpr} AS itens_cotados
       FROM solicitacoes s
       LEFT JOIN solicitacao_itens si ON si.solicitacao_id = s.id
-      WHERE s.demanda_id = ?
+      WHERE ${resolvedDemandIdSql('s')} = ?
       GROUP BY s.id
       ORDER BY s.id DESC
     `).all(id);
@@ -593,38 +595,46 @@ function createMaterialPlanning(id, { user, itens, prioridade }) {
   if (!demanda) throw new Error('Demanda não encontrada.');
   if (!Array.isArray(itens) || !itens.length) throw new Error('Informe ao menos um material válido.');
 
-  const solicitacaoId = solicitacoesService.createSolicitacao({
-    userId: user?.id,
-    setor_origem: demanda.setor_origem || 'Manutenção',
-    prioridade: ['CRITICA', 'ALTA', 'MEDIA', 'BAIXA'].includes(String(prioridade || '').trim().toUpperCase())
-      ? String(prioridade).trim().toUpperCase()
-      : priorityForSolicitacao(demanda.prioridade),
-    titulo: `Materiais • Demanda #${demanda.id} - ${demanda.titulo}`,
-    descricao: `Planejamento antecipado de materiais da Demanda #${demanda.id}. A cotação pode ser preparada antes da OS e a compra é liberada no Planejamento da própria Demanda.`,
-    equipamento_id: demanda.equipamento_id || null,
-    destino_uso: demanda.equipamento_id ? null : `Demanda #${demanda.id} - ${demanda.titulo}`,
-    tipo_aplicacao: demanda.equipamento_id ? 'EQUIPAMENTO' : 'OUTRO',
-    os_id: null,
-    demanda_id: demanda.id,
-    itens,
-  });
+  const corporateOrigin = normalizeSetorCorporativo(demanda.setor_origem);
+  // Demandas aceita local operacional (ex.: Caldeira). Compras exige setor
+  // corporativo; nesse caso use o setor real do perfil, sem alterar a Demanda.
+  const setorOrigem = Object.values(SETORES).includes(corporateOrigin)
+    ? corporateOrigin
+    : solicitacoesService.setorForRole(user?.role) || demanda.setor_origem || 'Manutenção';
+  return db.transaction(() => {
+    const solicitacaoId = solicitacoesService.createSolicitacao({
+      userId: user?.id,
+      setor_origem: setorOrigem,
+      prioridade: ['CRITICA', 'ALTA', 'MEDIA', 'BAIXA'].includes(String(prioridade || '').trim().toUpperCase())
+        ? String(prioridade).trim().toUpperCase()
+        : priorityForSolicitacao(demanda.prioridade),
+      titulo: `Materiais • Demanda #${demanda.id} - ${demanda.titulo}`,
+      descricao: `Planejamento antecipado de materiais da Demanda #${demanda.id}. A cotação pode ser preparada antes da OS e a compra é liberada no Planejamento da própria Demanda.`,
+      equipamento_id: demanda.equipamento_id || null,
+      destino_uso: demanda.equipamento_id ? null : `Demanda #${demanda.id} - ${demanda.titulo}`,
+      tipo_aplicacao: demanda.equipamento_id ? 'EQUIPAMENTO' : 'OUTRO',
+      os_id: null,
+      demanda_id: demanda.id,
+      itens,
+    });
 
-  if (hasColumn('solicitacoes', 'tipo_origem')) {
-    db.prepare("UPDATE solicitacoes SET tipo_origem='DEMANDA' WHERE id=?").run(solicitacaoId);
-  }
-  solicitacoesService.finalizarElaboracao(solicitacaoId, user?.id || null);
-
-  db.transaction(() => {
-    if (['NOVA', 'EM_ANALISE'].includes(String(demanda.status || '').toUpperCase())) {
-      db.prepare("UPDATE demandas SET status='PLANEJAMENTO', updated_at=datetime('now') WHERE id=?").run(id);
-    } else {
-      db.prepare("UPDATE demandas SET updated_at=datetime('now') WHERE id=?").run(id);
+    if (hasColumn('solicitacoes', 'tipo_origem')) {
+      db.prepare("UPDATE solicitacoes SET tipo_origem='DEMANDA' WHERE id=?").run(solicitacaoId);
     }
-    db.prepare(`INSERT INTO demanda_logs (demanda_id, user_id, texto, created_at) VALUES (?, ?, ?, datetime('now'))`)
-      .run(id, user?.id || null, `Planejamento de materiais criado na solicitação #${solicitacaoId} e disponibilizado para pré-cotação em Compras.`);
-  })();
+    solicitacoesService.finalizarElaboracao(solicitacaoId, user?.id || null);
 
-  return solicitacaoId;
+    db.transaction(() => {
+      if (['NOVA', 'EM_ANALISE'].includes(String(demanda.status || '').toUpperCase())) {
+        db.prepare("UPDATE demandas SET status='PLANEJAMENTO', updated_at=datetime('now') WHERE id=?").run(id);
+      } else {
+        db.prepare("UPDATE demandas SET updated_at=datetime('now') WHERE id=?").run(id);
+      }
+      db.prepare(`INSERT INTO demanda_logs (demanda_id, user_id, texto, created_at) VALUES (?, ?, ?, datetime('now'))`)
+        .run(id, user?.id || null, `Planejamento de materiais criado na solicitação #${solicitacaoId} e disponibilizado para pré-cotação em Compras.`);
+    })();
+
+    return solicitacaoId;
+  })();
 }
 
 function criticidadeForOS(prioridade) {

@@ -33,6 +33,7 @@
       row.prioridade ? `Criticidade: ${row.prioridade}` : '',
       row.equipamento_nome || '',
       row.nr_referencia ? `NR: ${row.nr_referencia}` : '',
+      row.os_id ? `OS #${row.os_id}` : '',
     ].filter(Boolean).join(' • ') || 'Demanda em planejamento';
     main.append(requestLink, demandLink, meta);
 
@@ -49,13 +50,13 @@
     const gate = document.createElement('div');
     gate.className = 'demand-prequote-gate';
     const gateStatus = document.createElement('strong');
-    gateStatus.textContent = 'Pré-cotação em preparação';
+    gateStatus.textContent = quoted === total && total > 0 ? 'Pré-cotação preparada' : 'Pré-cotação em preparação';
     const gatePurchase = document.createElement('small');
     gatePurchase.textContent = 'Compra aguardando liberação da Demanda';
     const action = document.createElement('a');
     action.href = `/compras/solicitacoes/${row.id}`;
     action.className = 'ui-btn ui-btn--table';
-    action.textContent = 'Abrir e preparar cotação';
+    action.textContent = 'Abrir cotação';
     gate.append(gateStatus, gatePurchase, action);
 
     article.append(main, progress, gate);

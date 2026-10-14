@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const db = require('../../database/db');
 const { ROLE, normalizeRole } = require('../../config/rbac');
+const { assertCompraLiberada } = require('./compras-demandas.service');
 
 const ITEM_APPROVAL = Object.freeze({
   NONE: 'NAO_SOLICITADA',
@@ -156,6 +157,7 @@ function recordHistory({ solicitacaoId, item, userId, action }) {
 
 function approveQuotedItems(solicitacaoId, itemIds, sessionUser) {
   assertCanApprove(sessionUser);
+  assertCompraLiberada(solicitacaoId);
   const summary = getSummary(solicitacaoId);
   const requestedIds = (Array.isArray(itemIds) ? itemIds : [itemIds]).filter(Boolean).map(Number);
   const targets = requestedIds.length

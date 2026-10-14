@@ -1,5 +1,34 @@
 const db = require('../../database/db');
-const { dbAliasesForSetor } = require('./compras-setores');
+const { dbAliasesForSetor, SETORES } = require('./compras-setores');
+
+function recyclingSectorFilter() {
+  const reciclagem = dbAliasesForSetor('RECICLAGEM');
+  const outros = Object.values(SETORES).filter(s => s !== 'RECICLAGEM').flatMap(dbAliasesForSetor);
+  const matches = [], exclusions = [], params = [];
+  const inList = (expr, values) => {
+    params.push(...values);
+    return `TRIM(COALESCE(${expr}, '')) COLLATE NOCASE IN (${values.map(() => '?').join(',')})`;
+  };
+  for (const [alias, table] of [['s','solicitacoes'],['d','demandas']]) {
+    if (hasColumn(table,'setor_origem')) matches.push(inList(`${alias}.setor_origem`,reciclagem));
+  }
+  // Registros antigos podem conservar o local operacional. Só usar fontes
+  // corporativas comprovadas pelo equipamento ou pelo autor já vinculado.
+  if (hasColumn('equipamentos','setor')) matches.push(inList('e.setor',reciclagem));
+  const creatorPaths = [];
+  if (hasColumn('demandas','created_by')) creatorPaths.push('d.created_by');
+  if (hasColumn('solicitacoes','solicitante_user_id')) creatorPaths.push('s.solicitante_user_id');
+  if (hasColumn('users','role') && creatorPaths.length) {
+    matches.push(`EXISTS (SELECT 1 FROM users u WHERE u.id IN (${creatorPaths.join(',')})
+      AND UPPER(TRIM(u.role)) IN ('ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO','COORDENADOR_RECICLAGEM'))`);
+  }
+  // Um vínculo a Reciclagem não pode sobrepor origem explícita de outro setor.
+  for (const [alias, table] of [['s','solicitacoes'],['d','demandas']]) {
+    if (hasColumn(table,'setor_origem')) exclusions.push(`NOT (${inList(`${alias}.setor_origem`,outros)})`);
+  }
+  if (hasColumn('equipamentos','setor')) exclusions.push(`NOT (${inList('e.setor',outros)})`);
+  return {sql:`(${matches.join(' OR ') || '1=0'})${exclusions.length ? ' AND '+exclusions.join(' AND ') : ''}`,params};
+}
 
 function tableExists(name) {
   try { return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name); } catch { return false; }
@@ -35,8 +64,17 @@ function resolvedDemandIdSql(alias = 's') {
   return paths.length > 1 ? `COALESCE(${paths.join(', ')})` : (paths[0] || 'NULL');
 }
 
+function resolvedOrderIdSql(demandIdExpr) {
+  const paths = hasColumn('solicitacoes','os_id') ? ['NULLIF(s.os_id,0)'] : [];
+  if (tableExists('os_solicitacoes_vinculos') && hasColumn('os','demanda_id')) {
+    paths.push(`(SELECT o.id FROM os_solicitacoes_vinculos v JOIN os o ON o.id=v.os_id
+      WHERE v.solicitacao_id=s.id AND o.demanda_id=${demandIdExpr} ORDER BY o.id DESC LIMIT 1)`);
+  }
+  return paths.length>1 ? `COALESCE(${paths.join(',')})` : paths[0] || 'NULL';
+}
+
 function buildPreCotacoesQuery() {
-  if (!tableExists('solicitacoes') || !tableExists('demandas') || !tableExists('solicitacao_itens') || !hasColumn('solicitacoes', 'demanda_id')) return null;
+  if (!tableExists('solicitacoes') || !tableExists('demandas') || !tableExists('solicitacao_itens')) return null;
 
   // Pré-cotação é planejamento antecipado e precisa ter uma solicitação
   // de materiais REAL, não só uma Demanda ou OS sem itens.
@@ -46,19 +84,10 @@ function buildPreCotacoesQuery() {
     : '';
   // A origem da demanda ou da solicitação pode ter variações de escrita/capitalização.
   // O filtro da fila normal já normaliza esses nomes; o card deve fazer o mesmo.
-  const setorAliases = dbAliasesForSetor('RECICLAGEM');
-  const setorClauses = [];
-  const setorParams = [];
-  for (const table of ['s', 'd']) {
-    const column = table === 's' ? 'solicitacoes' : 'demandas';
-    if (hasColumn(column, 'setor_origem')) {
-      setorClauses.push(`TRIM(COALESCE(${table}.setor_origem, '')) COLLATE NOCASE IN (${setorAliases.map(() => '?').join(',')})`);
-      setorParams.push(...setorAliases);
-    }
-  }
-  const setorWhere = setorClauses.length ? `AND (${setorClauses.join(' OR ')})` : 'AND 1=0';
+  const sectorFilter = recyclingSectorFilter();
+  const setorWhere = `AND ${sectorFilter.sql}`;
   const quoteExpr = tableExists('solicitacao_itens') && hasColumn('solicitacao_itens', 'status_cotacao')
-    ? "SUM(CASE WHEN COALESCE(si.status_cotacao, 'PENDENTE') <> 'PENDENTE' THEN 1 ELSE 0 END)"
+    ? "SUM(CASE WHEN UPPER(TRIM(COALESCE(si.status_cotacao, 'PENDENTE'))) = 'COTADO' THEN 1 ELSE 0 END)"
     : '0';
   const purchaseExpr = tableExists('solicitacao_itens') && hasColumn('solicitacao_itens', 'status_compra')
     ? "SUM(CASE WHEN COALESCE(si.status_compra, 'PENDENTE') IN ('COMPRADO','ATENDIDO_ESTOQUE') THEN 1 ELSE 0 END)"
@@ -67,7 +96,7 @@ function buildPreCotacoesQuery() {
   const sql = `
     SELECT
       s.id, s.numero, s.titulo, s.status, s.prioridade, s.created_at,
-      ${demandIdExpr} AS demanda_id, s.os_id,
+      ${demandIdExpr} AS demanda_id, ${resolvedOrderIdSql(demandIdExpr)} AS os_id,
       d.titulo AS demanda_titulo, d.status AS demanda_status, d.prioridade AS demanda_prioridade,
       d.aprovacao_status, d.prazo_previsto, d.nr_referencia,
       ${hasColumn('demandas', 'liberacao_compras_status') ? "COALESCE(d.liberacao_compras_status, 'PENDENTE')" : "'PENDENTE'"} AS liberacao_compras_status,
@@ -79,11 +108,12 @@ function buildPreCotacoesQuery() {
     JOIN demandas d ON d.id = ${demandIdExpr}
     LEFT JOIN equipamentos e ON e.id = d.equipamento_id
     JOIN solicitacao_itens si ON si.solicitacao_id = s.id
-      ${hasColumn('solicitacao_itens', 'status_compra') ? "AND UPPER(COALESCE(si.status_compra, 'PENDENTE')) <> 'CANCELADO'" : ''}
+      ${hasColumn('solicitacao_itens', 'status_compra') ? "AND UPPER(TRIM(COALESCE(si.status_compra, 'PENDENTE'))) <> 'CANCELADO'" : ''}
     WHERE ${demandIdExpr} IS NOT NULL
       ${releaseWhere}
       ${setorWhere}
-      AND UPPER(COALESCE(s.status, 'ABERTA')) NOT IN ('CANCELADA','FECHADA','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE')
+      AND UPPER(TRIM(COALESCE(s.status, 'ABERTA'))) NOT IN ('CANCELADA','FECHADA','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE')
+      AND UPPER(TRIM(COALESCE(d.status, 'NOVA'))) NOT IN ('CANCELADA','CONCLUIDA')
     GROUP BY s.id
     ORDER BY
       CASE UPPER(COALESCE(s.prioridade, d.prioridade, 'MEDIA'))
@@ -94,7 +124,7 @@ function buildPreCotacoesQuery() {
       datetime(COALESCE(s.updated_at, s.created_at)) DESC,
       s.id DESC
   `;
-  return { sql, params: setorParams };
+  return { sql, params: sectorFilter.params };
 }
 
 // Apenas solicitações reais COM itens, sem compra liberada. Sem Demandas vazias.
@@ -122,21 +152,24 @@ function diagnosticarPreCotacoesDemandas() {
     return { disponivel: false, motivo: 'Tabelas de solicitações, itens ou demandas indisponíveis.' };
   }
   const demandIdExpr = resolvedDemandIdSql('s');
+  const sectorFilter = recyclingSectorFilter();
   const validItemFilter = hasColumn('solicitacao_itens','status_compra')
     ? "AND UPPER(TRIM(COALESCE(si.status_compra,'PENDENTE'))) <> 'CANCELADO'" : '';
   const sql = `
-    SELECT s.id, ${hasColumn('solicitacoes','os_id') ? 's.os_id' : 'NULL'} AS os_id,
+    SELECT s.id, ${resolvedOrderIdSql(demandIdExpr)} AS os_id,
       s.status, ${hasColumn('solicitacoes','setor_origem') ? 's.setor_origem' : 'NULL'} AS setor_solicitacao,
       ${demandIdExpr} AS demanda_id,
       ${hasColumn('demandas','setor_origem') ? 'd.setor_origem' : 'NULL'} AS setor_demanda,
       ${hasColumn('demandas','liberacao_compras_status') ? 'd.liberacao_compras_status' : "'PENDENTE'"} AS liberacao,
-      COUNT(si.id) AS itens_validos
+      COUNT(si.id) AS itens_validos,
+      (${sectorFilter.sql}) AS reciclagem_elegivel,
+      d.status AS demanda_status
     FROM solicitacoes s
     LEFT JOIN demandas d ON d.id=${demandIdExpr}
+    LEFT JOIN equipamentos e ON e.id=d.equipamento_id
     LEFT JOIN solicitacao_itens si ON si.solicitacao_id=s.id ${validItemFilter}
     GROUP BY s.id
   `;
-  const { normalizeSetorCorporativo } = require('./compras-setores');
   const conta = {
     solicitacoes_com_materiais: 0,
     solicitacoes_com_os_e_materiais: 0,
@@ -149,7 +182,7 @@ function diagnosticarPreCotacoesDemandas() {
     pre_cotacoes_visiveis_no_card: countPreCotacoesDemandas(),
   };
   const exemplosSemVinculo = [];
-  for (const s of db.prepare(sql).all()) {
+  for (const s of db.prepare(sql).all(...sectorFilter.params)) {
     if (!Number(s.itens_validos)) continue;
     conta.solicitacoes_com_materiais++;
     const osId=Number(s.os_id)||null;
@@ -163,8 +196,7 @@ function diagnosticarPreCotacoesDemandas() {
       continue;
     }
     conta.solicitacoes_vinculadas_demanda_com_materiais++;
-    const reciclagem = normalizeSetorCorporativo(s.setor_solicitacao)==='RECICLAGEM'
-      || normalizeSetorCorporativo(s.setor_demanda)==='RECICLAGEM';
+    const reciclagem = Boolean(s.reciclagem_elegivel);
     if(!reciclagem) continue;
     conta.vinculadas_demanda_reciclagem++;
     if(String(s.liberacao||'PENDENTE').trim().toUpperCase()==='LIBERADA') {
@@ -172,7 +204,8 @@ function diagnosticarPreCotacoesDemandas() {
     } else {
       conta.vinculadas_demanda_reciclagem_pendentes++;
       if(['CANCELADA','FECHADA','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE']
-          .includes(String(s.status||'ABERTA').trim().toUpperCase())) {
+          .includes(String(s.status||'ABERTA').trim().toUpperCase())
+          || ['CANCELADA','CONCLUIDA'].includes(String(s.demanda_status||'').trim().toUpperCase())) {
         conta.candidatas_excluidas_pelo_status++;
       }
     }
@@ -187,10 +220,10 @@ function getDemandGate(solicitacaoId) {
     ? "COALESCE(d.liberacao_compras_status, 'PENDENTE')"
     : "'PENDENTE'";
   return db.prepare(`
-    SELECT s.id, s.numero, ${demandIdExpr} AS demanda_id, s.os_id,
+    SELECT s.id, s.numero, ${demandIdExpr} AS demanda_id, ${resolvedOrderIdSql(demandIdExpr)} AS os_id,
            ${releaseExpr} AS liberacao_compras_status
     FROM solicitacoes s
-    LEFT JOIN demandas d ON d.id=${demandIdExpr}
+    ${tableExists('demandas') ? `LEFT JOIN demandas d ON d.id=${demandIdExpr}` : ''}
     WHERE s.id=?
   `).get(Number(solicitacaoId));
 }
@@ -199,7 +232,7 @@ function assertCompraLiberada(solicitacaoId) {
   const row = getDemandGate(solicitacaoId);
   if (!row) return;
   const isDemandRequest = Number(row.demanda_id || 0) > 0;
-  const released = String(row.liberacao_compras_status || 'PENDENTE').toUpperCase() === 'LIBERADA';
+  const released = String(row.liberacao_compras_status || 'PENDENTE').trim().toUpperCase() === 'LIBERADA';
   if (isDemandRequest && !released) {
     const error = new Error('Esta solicitação ainda está em pré-cotação da Demanda. Libere a compra na aba Planejamento da Demanda para que ela siga o fluxo normal de Compras. A geração de OS não é necessária para comprar o material.');
     error.code = 'DEMANDA_COMPRA_AGUARDANDO_LIBERACAO';

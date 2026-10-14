@@ -27,7 +27,7 @@ test('card mostra ação de cotar e fila continua separada por criticidade após
   const pre=fs.readFileSync(path.join(root,'public/js/compras-demandas-pre-cotacao.js'),'utf8');
   const queue=fs.readFileSync(path.join(root,'modules/compras/compras.service.js'),'utf8');
   const view=fs.readFileSync(path.join(root,'views/compras/solicitacoes/index.ejs'),'utf8');
-  assert.match(pre,/Abrir e preparar cotação/);
+  assert.match(pre,/Abrir cotação/);
   assert.match(pre,/Pré-cotação em preparação/);
   assert.match(queue,/function demandReleaseWhere/);
   assert.match(queue,/priorityGroup: priorityGroup\(row\.prioridade\)/);
