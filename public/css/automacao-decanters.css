@@ -1,0 +1,18 @@
+/* Área das decanters: extensão da identidade existente da Automação IHM */
+.dec-symbols{position:absolute;width:0;height:0;overflow:hidden}
+.dec-layout{display:grid;grid-template-columns:minmax(170px,.8fr) minmax(380px,2fr) minmax(170px,.85fr) minmax(180px,.9fr);grid-template-areas:"entrada processo saida tanque" ". borra borra .";gap:12px;align-items:stretch;margin-bottom:14px}
+.dec-area{background:#fff;border:1px solid var(--auto-line);border-radius:16px;padding:14px;min-width:0;box-shadow:0 8px 20px rgba(15,43,58,.05)}
+.dec-area-entrada{grid-area:entrada}.dec-area-processo{grid-area:processo}.dec-area-saida{grid-area:saida}.dec-area-tanque{grid-area:tanque}.dec-area-borra{grid-area:borra}
+.dec-area-head{display:flex;justify-content:space-between;gap:8px;align-items:baseline;border-bottom:1px solid #e6ecee;padding-bottom:9px;margin-bottom:12px}
+.dec-area-head h2{font-size:15px;margin:0;color:#263b46}.dec-area-head small{font-size:10px;color:#70808a}
+.dec-items{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;align-items:stretch}
+.dec-equipment{border:1px solid #e0e9eb;border-radius:12px;background:#f7faf9;color:#273c47;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:7px;padding:10px;width:100%;min-height:145px;cursor:pointer;font:inherit;transition:border-color .15s,box-shadow .15s}
+.dec-equipment:hover,.dec-equipment:focus-visible,.dec-equipment.is-selected{border-color:#16834b;box-shadow:0 0 0 2px rgba(22,131,75,.12);outline:none}
+.dec-area-processo .dec-equipment{width:calc(50% - 5px);min-width:155px}.dec-area-borra .dec-equipment{max-width:430px;min-height:115px}
+.dec-equipment-svg{width:100%;height:96px;max-width:240px;fill:none}.dec-svg-tanque{height:128px}.dec-svg-rosca{height:70px;max-width:370px}
+.dec-equipment-info{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.dec-equipment-info strong{font-size:13px}.dec-equipment .signal-pill{display:inline-flex;align-items:center;gap:6px}
+.dec-off-dot{width:7px;height:7px;border-radius:50%;background:#98a7ae}
+.dec-bottom{margin-top:8px}.dec-bottom .auto-panel{min-height:120px}
+@media(max-width:1140px){.dec-layout{grid-template-columns:1fr 1.5fr;grid-template-areas:"entrada processo" "saida tanque" "borra borra"}}
+@media(max-width:680px){.dec-layout{grid-template-columns:1fr;grid-template-areas:"entrada" "processo" "saida" "tanque" "borra"}.dec-area-processo .dec-equipment{width:100%}.dec-equipment{min-height:120px}.dec-area-head{flex-wrap:wrap}}
