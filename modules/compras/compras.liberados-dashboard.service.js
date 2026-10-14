@@ -50,10 +50,12 @@ function listDashboardStatus() {
   const unitExpr = itemCols.has('unidade') ? "COALESCE(si.unidade,'UN')" : "'UN'";
 
   const demandIdExpr = resolvedDemandIdSql('s');
-  const demandaWhere = demandIdExpr === 'NULL' ? ''
+  const normalOrigin = columns('solicitacoes').has('tipo_origem')
+    ? " AND UPPER(TRIM(COALESCE(s.tipo_origem,''))) <> 'DEMANDA'" : '';
+  const demandaWhere = demandIdExpr === 'NULL' ? (normalOrigin ? `WHERE ${normalOrigin.slice(5)}` : '')
     : (tableExists('demandas') && columns('demandas').has('liberacao_compras_status')
-      ? `WHERE (${demandIdExpr} IS NULL OR EXISTS (SELECT 1 FROM demandas dg WHERE dg.id=${demandIdExpr} AND UPPER(TRIM(COALESCE(dg.liberacao_compras_status,'PENDENTE')))='LIBERADA'))`
-      : `WHERE ${demandIdExpr} IS NULL`);
+      ? `WHERE ((${demandIdExpr} IS NULL${normalOrigin}) OR EXISTS (SELECT 1 FROM demandas dg WHERE dg.id=${demandIdExpr} AND UPPER(TRIM(COALESCE(dg.liberacao_compras_status,'PENDENTE')))='LIBERADA'))`
+      : `WHERE (${demandIdExpr} IS NULL${normalOrigin})`);
 
   const items = db.prepare(`
     SELECT
