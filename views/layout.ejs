@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="/css/native-menu.css?v=20260924-1" />
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'meu-portal') { %><link rel="stylesheet" href="/css/meu-portal-modernizacao.css?v=20260910-p5" /><% } %>
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'escala') { %><link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b" /><% } %>
-  <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><link rel="stylesheet" href="/css/compras-demandas-pre-cotacao.css?v=20260902-v1" /><% } %>
+  <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><link rel="stylesheet" href="/css/compras-demandas-pre-cotacao.css?v=20261014-v3" /><% } %>
   <script>window.__VAPID_PUBLIC_KEY__ = "<%= VAPID_PUBLIC_KEY || "" %>";</script>
 </head>
 <body>
@@ -128,7 +128,7 @@
     <% if (user) { %><script src="/js/consenso-botoes-confirmacao.js?v=20260919-1" defer></script><% } %>
     <% if (user && ['ADMIN','COMPRAS'].includes(normalizeRole(user.role || user.perfil || ''))) { %><script src="/js/compras-consenso-bilateral.js?v=20260919-1" data-compras-consenso-bilateral defer></script><% } %>
     <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><script src="/js/compras-itens-liberados-dashboard.js?v=20260911-v1" defer></script><% } %>
-    <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><script src="/js/compras-demandas-pre-cotacao.js?v=20260902-v1" defer></script><% } %>
+    <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><script src="/js/compras-demandas-pre-cotacao.js?v=20261014-v3" defer></script><% } %>
   <% } %>
 </body>
 </html>
