@@ -1,5 +1,5 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261008-v1">
+<link rel="stylesheet" href="/css/automacao.css?v=20261014-decanters">
 <main class="auto-page">
   <header class="auto-hero">
     <div>
@@ -9,23 +9,17 @@
     </div>
     <span class="auto-state waiting">Em implantação</span>
   </header>
-
   <section class="auto-grid auto-sectors">
     <% (setores || []).forEach((setor) => { %>
       <a class="auto-sector-card" href="<%= setor.href %>">
         <span class="auto-sector-icon" aria-hidden="true">⚙</span>
-        <div>
-          <small>SETOR</small>
-          <h2><%= setor.title %></h2>
-          <p><%= setor.description %></p>
-        </div>
+        <div><small>SETOR</small><h2><%= setor.title %></h2><p><%= setor.description %></p></div>
         <span class="auto-open">Abrir IHM →</span>
       </a>
     <% }) %>
   </section>
-
   <section class="auto-note">
     <strong>Primeira etapa</strong>
-    <p>O módulo começa pelos quatro digestores. Novas telas poderão ser adicionadas por setor sem misturar os fluxos.</p>
+    <p>Monitoramento por área, com equipamentos e estados indisponíveis até a integração de hardware. As interligações e os comandos dependem de validação de campo e segurança.</p>
   </section>
 </main>
