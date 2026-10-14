@@ -25,7 +25,8 @@ test('com lista parcial, a tela oferece conferência de vínculos e motivos sem 
   assert.match(ctrl,/diagnosticarPreCotacoesDemandas/);
   assert.match(js,/Verificar vínculos das solicitações/);
   assert.match(js,/pre-cotacoes\.json\?diagnostico=1/);
-  assert.match(js,/Copiar diagnóstico/);\n  assert.match(js,/solicitacoes_fora_pre_cotacao/);
+  assert.match(js,/Copiar diagnóstico/);
+  assert.match(js,/solicitacoes_fora_pre_cotacao/);
   assert.doesNotMatch(js,/Planejar materiais/);
-  assert.match(read('views/layout.ejs'),/compras-demandas-pre-cotacao\.js\?v=20261014-v8/);
+  assert.match(read('views/layout.ejs'),/compras-demandas-pre-cotacao\.js\?v=20261014-v9/);
 });
