@@ -25,7 +25,9 @@ test('pré-solicitação sai da fila antecipada quando a Demanda é liberada', (
   assert.match(prequote, /releaseWhere/);
   assert.match(prequote, /liberacao_compras_status[\s\S]*<> 'LIBERADA'/);
   assert.match(queue, /s\.demanda_id IS NULL/);
-  assert.match(queue, /s\.os_id IS NOT NULL/);
+  assert.match(queue, /function demandReleaseWhere/);
+  assert.doesNotMatch(queue.slice(queue.indexOf('function demandReleaseWhere'), queue.indexOf('function resolveUsersTable')), /os_id IS NOT NULL/);
+  assert.match(queue, /visibilityWhere/);
   assert.match(queue, /liberacao_compras_status,'PENDENTE'\)\)='LIBERADA'/);
 });
 
