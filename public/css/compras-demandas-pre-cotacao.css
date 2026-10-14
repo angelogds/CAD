@@ -6,3 +6,9 @@
 .demand-prequote-footer button:disabled{opacity:.6;cursor:wait}
 .demand-prequote-load-error{color:#b91c1c;font-size:.8rem}
 .demand-prequote-footer button:focus-visible{outline:3px solid #2563eb;outline-offset:2px}
+
+.demand-prequote-diagnostic{font-size:.82rem;color:#475569;padding:8px 0}
+.demand-prequote-diagnostic strong{display:block;color:#1e40af;margin:5px 0}
+.demand-prequote-diagnostic ul{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:4px 16px;list-style:none;margin:6px 0 10px;padding:0}
+.demand-prequote-diagnostic li{padding:4px 0;border-bottom:1px solid #eff3f8}
+.demand-prequote-diagnostic p{margin:8px 0;word-break:break-word}
