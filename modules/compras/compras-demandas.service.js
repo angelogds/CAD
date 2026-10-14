@@ -160,6 +160,60 @@ function countPreCotacoesDemandas() {
 
 
 /**
+ * Inventário SOMENTE LEITURA das solicitações classificadas como Demanda.
+ * Explica por que uma solicitação não está nas pré-cotações, sem alterar
+ * vínculos, status ou autorização de compra.
+ */
+function listarSolicitacoesForaPreCotacoes() {
+  if (!['solicitacoes','solicitacao_itens','demandas'].every(tableExists)) return [];
+  const demandIdExpr = resolvedDemandIdSql('s');
+  const setor = recyclingSectorFilter();
+  const origemExpr = hasColumn('solicitacoes','tipo_origem') ? "UPPER(TRIM(COALESCE(s.tipo_origem,'')))" : "''";
+  const validItemExpr = hasColumn('solicitacao_itens','status_compra')
+    ? "UPPER(TRIM(COALESCE(si.status_compra,'PENDENTE'))) <> 'CANCELADO'"
+    : '1=1';
+  const liberacaoExpr = hasColumn('demandas','liberacao_compras_status')
+    ? "COALESCE(d.liberacao_compras_status, 'PENDENTE')" : "'PENDENTE'";
+  const elegiveis = new Set(listPreCotacoesDemandas(null).map(row => Number(row.id)));
+  const rows = db.prepare(`
+    SELECT s.id, s.numero, s.titulo, s.status AS solicitacao_status,
+      ${demandIdExpr} AS demanda_id, d.id AS demanda_existente,
+      d.titulo AS demanda_titulo, d.status AS demanda_status,
+      ${liberacaoExpr} AS liberacao,
+      (${setor.sql}) AS setor_elegivel,
+      COUNT(si.id) AS itens_total,
+      SUM(CASE WHEN si.id IS NOT NULL AND ${validItemExpr} THEN 1 ELSE 0 END) AS itens_ativos
+    FROM solicitacoes s
+    LEFT JOIN demandas d ON d.id=${demandIdExpr}
+    LEFT JOIN solicitacao_itens si ON si.solicitacao_id=s.id
+    WHERE ${demandIdExpr} IS NOT NULL OR ${origemExpr}='DEMANDA'
+    GROUP BY s.id
+    ORDER BY s.id DESC
+  `).all(...setor.params);
+
+  const encerrados = new Set(['CANCELADA','FECHADA','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE']);
+  const demandasEncerradas = new Set(['CANCELADA','CONCLUIDA']);
+  return rows.filter(row => !elegiveis.has(Number(row.id))).map(row => {
+    const token = value => String(value || '').trim().toUpperCase();
+    let motivo = 'Requer conferência do cadastro';
+    if (!row.demanda_existente) motivo = 'Vínculo com a Demanda ausente ou inválido';
+    else if (token(row.liberacao) === 'LIBERADA') motivo = 'Compra já liberada: verificar fila normal';
+    else if (!Number(row.setor_elegivel)) motivo = 'Origem de outro setor corporativo';
+    else if (encerrados.has(token(row.solicitacao_status))) motivo = 'Solicitação encerrada ou cancelada';
+    else if (demandasEncerradas.has(token(row.demanda_status))) motivo = 'Demanda concluída ou cancelada';
+    else if (Number(row.itens_total) && !Number(row.itens_ativos)) motivo = 'Todos os materiais da solicitação foram cancelados';
+    return {
+      solicitacao_id: Number(row.id),
+      numero: row.numero,
+      titulo: row.titulo,
+      demanda_id: Number(row.demanda_existente) || null,
+      demanda_titulo: row.demanda_titulo || null,
+      motivo,
+    };
+  });
+}
+
+/**
  * Diagnóstico somente de leitura. Não cria vínculos e não muda o fluxo de
  * compra: mostra POR QUE o card ficou vazio na base real da fábrica.
  * A saída contém contagens e IDs de solicitações/OS, nunca dados pessoais.
@@ -227,7 +281,7 @@ function diagnosticarPreCotacoesDemandas() {
       }
     }
   }
-  return {disponivel:true,contagens:conta,exemplos_os_sem_demanda:exemplosSemVinculo};
+  return {disponivel:true,contagens:conta,exemplos_os_sem_demanda:exemplosSemVinculo,solicitacoes_fora_pre_cotacao:listarSolicitacoesForaPreCotacoes()};
 }
 
 function getDemandGate(solicitacaoId) {
