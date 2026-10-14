@@ -1,12 +1,10 @@
 (() => {
+  const INITIAL_VISIBLE = 5;
+
   function normalizeToken(value) {
-    return String(value || '')
-      .trim()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, '_')
-      .replace(/^_|_$/g, '');
+    return String(value || '').trim().normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
   }
 
   function isReciclagemSelecionada() {
@@ -14,19 +12,72 @@
     return ['RECICLAGEM', 'MANUTENCAO', 'PRODUCAO'].includes(normalizeToken(setor));
   }
 
+  function addPrequoteRow(list, row) {
+    const total = Number(row.itens_count || 0);
+    const quoted = Number(row.itens_cotados || 0);
+    const pct = total ? Math.min(100, Math.round((quoted / total) * 100)) : 0;
+    const article = document.createElement('article');
+    article.className = 'demand-prequote-row';
+
+    const main = document.createElement('div');
+    main.className = 'demand-prequote-main';
+    const requestLink = document.createElement('a');
+    requestLink.href = `/compras/solicitacoes/${row.id}`;
+    requestLink.textContent = `${row.numero || '#' + row.id} — ${row.titulo || 'Materiais da demanda'}`;
+    const demandLink = document.createElement('a');
+    demandLink.href = `/demandas/${row.demanda_id}`;
+    demandLink.className = 'demand-prequote-demand-link';
+    demandLink.textContent = `Demanda #${row.demanda_id} — ${row.demanda_titulo || 'Abrir demanda'}`;
+    const meta = document.createElement('small');
+    meta.textContent = [
+      row.prioridade ? `Criticidade: ${row.prioridade}` : '',
+      row.equipamento_nome || '',
+      row.nr_referencia ? `NR: ${row.nr_referencia}` : '',
+    ].filter(Boolean).join(' • ') || 'Demanda em planejamento';
+    main.append(requestLink, demandLink, meta);
+
+    const progress = document.createElement('div');
+    progress.className = 'demand-prequote-progress';
+    const progressText = document.createElement('span');
+    progressText.textContent = `${quoted} de ${total} item(ns) cotado(s) — ${pct}%`;
+    const bar = document.createElement('i');
+    const fill = document.createElement('b');
+    fill.style.width = `${pct}%`;
+    bar.append(fill);
+    progress.append(progressText, bar);
+
+    const gate = document.createElement('div');
+    gate.className = 'demand-prequote-gate';
+    const gateStatus = document.createElement('strong');
+    gateStatus.textContent = 'Pré-cotação em preparação';
+    const gatePurchase = document.createElement('small');
+    gatePurchase.textContent = 'Compra aguardando liberação da Demanda';
+    const action = document.createElement('a');
+    action.href = `/compras/solicitacoes/${row.id}`;
+    action.className = 'ui-btn ui-btn--table';
+    action.textContent = 'Abrir e preparar cotação';
+    gate.append(gateStatus, gatePurchase, action);
+
+    article.append(main, progress, gate);
+    list.append(article);
+  }
+
   async function loadDemandPrequotes() {
     if (!isReciclagemSelecionada()) return;
     const dashboard = document.querySelector('.purchase-dashboard');
     if (!dashboard || document.querySelector('.demand-prequote-panel')) return;
 
-    let rows = [];
-    let demandasSemMateriais = [];
+    let initialRows;
+    let total;
     try {
-      const response = await fetch('/compras/demandas/pre-cotacoes.json', { headers: { Accept: 'application/json' } });
+      const response = await fetch('/compras/demandas/pre-cotacoes.json', {
+        headers: { Accept: 'application/json' },
+      });
       if (!response.ok) return;
       const payload = await response.json();
-      rows = Array.isArray(payload?.rows) ? payload.rows : [];
-      demandasSemMateriais = Array.isArray(payload?.demandasSemMateriais) ? payload.demandasSemMateriais : [];
+      if (!payload?.ok) return;
+      initialRows = Array.isArray(payload.rows) ? payload.rows : [];
+      total = Math.max(initialRows.length, Number(payload.total) || 0);
     } catch (_error) {
       return;
     }
@@ -34,7 +85,6 @@
     const section = document.createElement('section');
     section.className = 'dashboard-card demand-prequote-panel';
     section.setAttribute('aria-labelledby', 'demand-prequote-title');
-
     const head = document.createElement('div');
     head.className = 'demand-prequote-head';
     const copy = document.createElement('div');
@@ -43,130 +93,89 @@
     kicker.textContent = 'PLANEJAMENTO ANTECIPADO';
     const title = document.createElement('h2');
     title.id = 'demand-prequote-title';
-    title.textContent = 'Pré-solicitações de Demandas';
+    title.textContent = 'Pré-cotações de Demandas';
     const description = document.createElement('p');
-    description.textContent = 'Materiais das Demandas ainda não liberadas: Compras prepara preços e fornecedores aqui. Quando a compra for autorizada na Demanda, a solicitação entra na lista por criticidade, preservando a cotação.';
+    description.textContent = 'Apenas solicitações de materiais já cadastradas nas Demandas. Compras pode preparar preços e fornecedores; após a liberação, a solicitação passa para a fila por criticidade.';
     copy.append(kicker, title, description);
 
     const count = document.createElement('div');
     count.className = 'demand-prequote-count';
     const countValue = document.createElement('strong');
-    countValue.textContent = String(rows.length + demandasSemMateriais.length);
+    countValue.textContent = String(total);
     const countLabel = document.createElement('span');
-    countLabel.textContent = 'registros de planejamento';
+    countLabel.textContent = total === 1 ? 'pré-cotação disponível' : 'pré-cotações disponíveis';
     count.append(countValue, countLabel);
     head.append(copy, count);
     section.append(head);
 
-    if (!rows.length && !demandasSemMateriais.length) {
+    if (!total) {
       const empty = document.createElement('div');
       empty.className = 'demand-prequote-empty';
-      empty.textContent = 'Nenhuma pré-cotação pendente encontrada. Cadastre os materiais na aba Materiais de uma Demanda da Reciclagem.';
+      empty.textContent = 'Nenhuma solicitação de materiais de Demanda aguardando pré-cotação no momento.';
       section.append(empty);
     } else {
       const list = document.createElement('div');
       list.className = 'demand-prequote-list';
-      rows.forEach((row) => {
-        const total = Number(row.itens_count || 0);
-        const quoted = Number(row.itens_cotados || 0);
-        const pct = total ? Math.round((quoted / total) * 100) : 0;
+      list.id = 'demand-prequote-items';
+      initialRows.slice(0, INITIAL_VISIBLE).forEach(row => addPrequoteRow(list, row));
+      section.append(list);
 
-        const article = document.createElement('article');
-        article.className = 'demand-prequote-row';
-
-        const main = document.createElement('div');
-        main.className = 'demand-prequote-main';
-        const requestLink = document.createElement('a');
-        requestLink.href = `/compras/solicitacoes/${row.id}`;
-        requestLink.textContent = `${row.numero || '#' + row.id} — ${row.titulo || 'Materiais da demanda'}`;
-        const demandLink = document.createElement('a');
-        demandLink.href = `/demandas/${row.demanda_id}`;
-        demandLink.className = 'demand-prequote-demand-link';
-        demandLink.textContent = `Demanda #${row.demanda_id} — ${row.demanda_titulo || 'Abrir demanda'}`;
-        const meta = document.createElement('small');
-        const details = [row.prioridade ? `Criticidade: ${row.prioridade}` : '', row.equipamento_nome || '', row.nr_referencia ? `NR: ${row.nr_referencia}` : '', row.aprovacao_status ? `Execução: ${row.aprovacao_status}` : ''].filter(Boolean);
-        meta.textContent = details.join(' • ') || 'Demanda em planejamento';
-        main.append(requestLink, demandLink, meta);
-
-        const progress = document.createElement('div');
-        progress.className = 'demand-prequote-progress';
-        const progressText = document.createElement('span');
-        progressText.textContent = `${quoted} de ${total} item(ns) cotado(s) — ${pct}%`;
-        const bar = document.createElement('i');
-        const fill = document.createElement('b');
-        fill.style.width = `${pct}%`;
-        bar.append(fill);
-        progress.append(progressText, bar);
-
-        const gate = document.createElement('div');
-        gate.className = 'demand-prequote-gate';
-        const gateStatus = document.createElement('strong');
-        gateStatus.textContent = 'Pré-cotação em preparação';
-        const gatePurchase = document.createElement('small');
-        gatePurchase.textContent = 'Compra aguardando liberação';
-        const action = document.createElement('a');
-        action.href = `/compras/solicitacoes/${row.id}`;
-        action.className = 'ui-btn ui-btn--table';
-        action.textContent = 'Abrir e preparar cotação';
-        gate.append(gateStatus, gatePurchase, action);
-
-        article.append(main, progress, gate);
-        list.append(article);
-      });
-
-      if (rows.length) section.append(list);
-
-      if (demandasSemMateriais.length) {
-        const waitingBlock = document.createElement('div');
-        waitingBlock.className = 'demand-prequote-unplanned';
-        const subheading = document.createElement('h3');
-        subheading.textContent = 'Demandas aguardando materiais';
-        const hint = document.createElement('p');
-        hint.textContent = 'Essas Demandas ainda não têm solicitação de materiais vinculada. Abra o planejamento, cadastre os materiais e Compras poderá preparar a pré-cotação.';
-        waitingBlock.append(subheading, hint);
-
-        const waitingList = document.createElement('div');
-        waitingList.className = 'demand-prequote-list';
-        demandasSemMateriais.forEach((demand) => {
-          const article = document.createElement('article');
-          article.className = 'demand-prequote-row';
-          const main = document.createElement('div');
-          main.className = 'demand-prequote-main';
-          const title = document.createElement('a');
-          title.href = `/demandas/${demand.demanda_id}#materiais`;
-          title.textContent = `Demanda #${demand.demanda_id} — ${demand.demanda_titulo || 'Planejamento de materiais'}`;
-          const meta = document.createElement('small');
-          meta.textContent = [
-            demand.demanda_prioridade ? `Criticidade: ${demand.demanda_prioridade}` : '',
-            demand.equipamento_nome || '',
-            demand.setor_origem || 'Setor de origem a confirmar'
-          ].filter(Boolean).join(' • ');
-          main.append(title, meta);
-
-          const progress = document.createElement('div');
-          progress.className = 'demand-prequote-progress';
-          const progressText = document.createElement('strong');
-          progressText.textContent = 'Sem solicitação de materiais';
-          progress.append(progressText);
-
-          const actions = document.createElement('div');
-          actions.className = 'demand-prequote-gate';
-          const state = document.createElement('small');
-          state.textContent = 'Não é uma cotação: o levantamento ainda precisa ser cadastrado.';
-          const action = document.createElement('a');
-          action.className = 'ui-btn ui-btn--table';
-          action.href = `/demandas/${demand.demanda_id}#materiais`;
-          action.textContent = 'Planejar materiais';
-          actions.append(state, action);
-
-          article.append(main, progress, actions);
-          waitingList.append(article);
+      if (total > INITIAL_VISIBLE) {
+        const actions = document.createElement('div');
+        actions.className = 'demand-prequote-footer';
+        const summary = document.createElement('span');
+        summary.textContent = `Exibindo ${Math.min(INITIAL_VISIBLE, total)} de ${total} pré-cotações`;
+        const toggle = document.createElement('button');
+        toggle.className = 'ui-btn ui-btn--table';
+        toggle.type = 'button';
+        toggle.setAttribute('aria-controls', list.id);
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.textContent = `Abrir todas as pré-cotações (${total})`;
+        const status = document.createElement('span');
+        status.className = 'demand-prequote-load-error';
+        status.setAttribute('role', 'status');
+        let expanded = false;
+        let allRows = null;
+        toggle.addEventListener('click', async () => {
+          if (expanded) {
+            list.replaceChildren();
+            initialRows.slice(0, INITIAL_VISIBLE).forEach(row => addPrequoteRow(list, row));
+            expanded = false;
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.textContent = `Abrir todas as pré-cotações (${total})`;
+            summary.textContent = `Exibindo ${Math.min(INITIAL_VISIBLE, total)} de ${total} pré-cotações`;
+            return;
+          }
+          toggle.disabled = true;
+          toggle.textContent = 'Carregando pré-cotações...';
+          status.textContent = '';
+          try {
+            if (!allRows) {
+              const response = await fetch('/compras/demandas/pre-cotacoes.json?todas=1', {
+                headers: { Accept: 'application/json' },
+              });
+              if (!response.ok) throw new Error('Falha no carregamento');
+              const payload = await response.json();
+              if (!payload?.ok || !Array.isArray(payload.rows)) throw new Error('Resposta inválida');
+              allRows = payload.rows;
+            }
+            list.replaceChildren();
+            allRows.forEach(row => addPrequoteRow(list, row));
+            expanded = true;
+            toggle.setAttribute('aria-expanded', 'true');
+            toggle.textContent = 'Mostrar apenas 5';
+            summary.textContent = `Exibindo ${allRows.length} pré-cotações`;
+          } catch (_error) {
+            status.textContent = 'Não foi possível abrir todas as pré-cotações. Tente novamente.';
+            toggle.textContent = `Abrir todas as pré-cotações (${total})`;
+          } finally {
+            toggle.disabled = false;
+          }
         });
-        waitingBlock.append(waitingList);
-        section.append(waitingBlock);
+        actions.append(summary, toggle, status);
+        section.append(actions);
       }
     }
-
     const attention = dashboard.querySelector('.attention-card');
     if (attention) dashboard.insertBefore(section, attention);
     else dashboard.append(section);
