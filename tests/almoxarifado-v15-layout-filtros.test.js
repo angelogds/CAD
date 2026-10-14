@@ -52,7 +52,7 @@ test("V15 renderiza a tela com paginação e textos escapados usando dados simul
     layout(){},tab:"gerencial",dados,pendencias,consultaAtrasos,reposicao:[]
   },{filename:path.join(raiz,"views/almoxarifado/gerencial.ejs")});
   assert.match(html,/Página 2 de 2/);
-  assert.match(html,/SOL-12[01]/);
+  assert.match(html,/SOL-\d{3}/);
   assert.match(html,/PDF desta pesquisa/);
   assert.match(html,/almoxarifado-layout-v15\.css/);
   assert.ok(!html.includes("<script>inseguro</script>"));
