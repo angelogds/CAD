@@ -20,11 +20,13 @@
     if (!dashboard || document.querySelector('.demand-prequote-panel')) return;
 
     let rows = [];
+    let demandasSemMateriais = [];
     try {
       const response = await fetch('/compras/demandas/pre-cotacoes.json', { headers: { Accept: 'application/json' } });
       if (!response.ok) return;
       const payload = await response.json();
       rows = Array.isArray(payload?.rows) ? payload.rows : [];
+      demandasSemMateriais = Array.isArray(payload?.demandasSemMateriais) ? payload.demandasSemMateriais : [];
     } catch (_error) {
       return;
     }
@@ -49,14 +51,14 @@
     const count = document.createElement('div');
     count.className = 'demand-prequote-count';
     const countValue = document.createElement('strong');
-    countValue.textContent = String(rows.length);
+    countValue.textContent = String(rows.length + demandasSemMateriais.length);
     const countLabel = document.createElement('span');
-    countLabel.textContent = rows.length === 1 ? 'pré-cotação' : 'pré-cotações';
+    countLabel.textContent = 'registros de planejamento';
     count.append(countValue, countLabel);
     head.append(copy, count);
     section.append(head);
 
-    if (!rows.length) {
+    if (!rows.length && !demandasSemMateriais.length) {
       const empty = document.createElement('div');
       empty.className = 'demand-prequote-empty';
       empty.textContent = 'Nenhuma pré-cotação pendente encontrada. Cadastre os materiais na aba Materiais de uma Demanda da Reciclagem.';
@@ -111,7 +113,58 @@
         article.append(main, progress, gate);
         list.append(article);
       });
-      section.append(list);
+
+      if (rows.length) section.append(list);
+
+      if (demandasSemMateriais.length) {
+        const waitingBlock = document.createElement('div');
+        waitingBlock.className = 'demand-prequote-unplanned';
+        const subheading = document.createElement('h3');
+        subheading.textContent = 'Demandas aguardando materiais';
+        const hint = document.createElement('p');
+        hint.textContent = 'Essas Demandas ainda não têm solicitação de materiais vinculada. Abra o planejamento, cadastre os materiais e Compras poderá preparar a pré-cotação.';
+        waitingBlock.append(subheading, hint);
+
+        const waitingList = document.createElement('div');
+        waitingList.className = 'demand-prequote-list';
+        demandasSemMateriais.forEach((demand) => {
+          const article = document.createElement('article');
+          article.className = 'demand-prequote-row';
+          const main = document.createElement('div');
+          main.className = 'demand-prequote-main';
+          const title = document.createElement('a');
+          title.href = `/demandas/${demand.demanda_id}#materiais`;
+          title.textContent = `Demanda #${demand.demanda_id} — ${demand.demanda_titulo || 'Planejamento de materiais'}`;
+          const meta = document.createElement('small');
+          meta.textContent = [
+            demand.demanda_prioridade ? `Criticidade: ${demand.demanda_prioridade}` : '',
+            demand.equipamento_nome || '',
+            demand.setor_origem || 'Setor de origem a confirmar'
+          ].filter(Boolean).join(' • ');
+          main.append(title, meta);
+
+          const progress = document.createElement('div');
+          progress.className = 'demand-prequote-progress';
+          const progressText = document.createElement('strong');
+          progressText.textContent = 'Sem solicitação de materiais';
+          progress.append(progressText);
+
+          const actions = document.createElement('div');
+          actions.className = 'demand-prequote-gate';
+          const state = document.createElement('small');
+          state.textContent = 'Não é uma cotação: o levantamento ainda precisa ser cadastrado.';
+          const action = document.createElement('a');
+          action.className = 'ui-btn ui-btn--table';
+          action.href = `/demandas/${demand.demanda_id}#materiais`;
+          action.textContent = 'Planejar materiais';
+          actions.append(state, action);
+
+          article.append(main, progress, actions);
+          waitingList.append(article);
+        });
+        waitingBlock.append(waitingList);
+        section.append(waitingBlock);
+      }
     }
 
     const attention = dashboard.querySelector('.attention-card');
