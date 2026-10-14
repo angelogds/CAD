@@ -20,9 +20,22 @@ const moeda = c => (Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",c
 const numero = n => Number(n||0).toLocaleString("pt-BR",{maximumFractionDigits:2});
 const query = new URLSearchParams({periodo: dados.periodo.modo, inicio:dados.periodo.inicio, fim:dados.periodo.fim});
 const r = dados.resumo;
+const queryAtrasos = (mudancas = {}) => {
+  const p = new URLSearchParams(query.toString());
+  if (consultaAtrasos.filtros.tipo !== 'TODOS') p.set('tipo', consultaAtrasos.filtros.tipo);
+  if (consultaAtrasos.filtros.fornecedor) p.set('fornecedor', consultaAtrasos.filtros.fornecedor);
+  if (consultaAtrasos.filtros.busca) p.set('busca', consultaAtrasos.filtros.busca);
+  if (consultaAtrasos.paginacao.pagina > 1) p.set('pagina', String(consultaAtrasos.paginacao.pagina));
+  Object.entries(mudancas).forEach(([chave,valor]) => {
+    if (valor === null || valor === undefined || valor === '') p.delete(chave);
+    else p.set(chave, String(valor));
+  });
+  return p.toString();
+};
+const dataBR = iso => iso ? String(iso).slice(0,10).split('-').reverse().join('/') : 'Sem previsão';
 const maior = Math.max(1,...dados.serie.map(s=>Math.max(s.entradas,s.saidas)));
 %>
-<div class="gerencial almox-v11">
+<div class="gerencial almox-v11 almox-v15">
   <header style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
     <div><span style="color:#16844d;font-size:.78rem;font-weight:700">ALMOXARIFADO • GESTÃO E RESULTADOS</span>
       <h1>Painel gerencial de materiais</h1>
@@ -30,7 +43,7 @@ const maior = Math.max(1,...dados.serie.map(s=>Math.max(s.entradas,s.saidas)));
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <a href="/almoxarifado" class="btn btn-ghost">Voltar à central</a>
-      <a class="btn btn-green" href="/almoxarifado/gerencial/pdf?<%=query.toString()%>">Gerar relatório PDF</a>
+      <a class="btn btn-green" href="/almoxarifado/gerencial/pdf?<%=queryAtrasos({pagina:''} )%>">Gerar relatório PDF</a>
     </div>
   </header>
   <%- include('_tabs', { tab: 'gerencial' }) %>
@@ -77,43 +90,81 @@ const maior = Math.max(1,...dados.serie.map(s=>Math.max(s.entradas,s.saidas)));
       <% dados.movimentacaoPorSetorCategoria.forEach(g=>{ %><tr><td><%=g.setor%></td><td><%=g.categoria%></td><td><%=g.unidade%></td><td><%=numero(g.entradas)%></td><td><%=numero(g.saidas)%></td></tr><% }) %>
     </tbody></table></div>
   </section>
-  <section class="box" aria-labelledby="relatorio-atrasos-titulo">
-    <h2 id="relatorio-atrasos-titulo">Materiais atrasados por fornecedor</h2>
-    <p class="muted">Situação de recebimento em <%=pendencias.hoje%> (horário de Brasília). Atraso é calculado por material comprado e ainda não recebido integralmente, usando primeiro a previsão do item. A listagem completa também está no PDF gerencial.</p>
-    <div class="totais">
-      <% [
-        ['Fornecedores com atraso', pendencias.resumo.fornecedoresAtrasados],
-        ['Materiais atrasados', pendencias.resumo.itensAtrasados],
-        ['Pedidos com atraso', pendencias.resumo.pedidosAtrasados],
-        ['Materiais sem previsão', pendencias.resumo.semPrevisao]
-      ].forEach(([titulo, valor])=>{ %>
-        <article><small><%=titulo%></small><strong class="val"><%=numero(valor)%></strong></article>
-      <% }) %>
+  <section class="box almox-v15-report" id="pendencias-fornecedores" aria-labelledby="relatorio-atrasos-titulo">
+    <div class="almox-v15-section-head">
+      <div>
+        <span class="almox-v15-eyebrow">ACOMPANHAMENTO DE COMPRAS</span>
+        <h2 id="relatorio-atrasos-titulo">Entregas e atrasos por fornecedor</h2>
+        <p class="muted">Posição em <%=dataBR(pendencias.hoje)%>. Somente quantidades compradas ainda não recebidas. O vencimento é verificado pela data de hoje, independente do período financeiro acima.</p>
+      </div>
+      <a class="btn btn-ghost" href="/almoxarifado/gerencial/pdf?<%=queryAtrasos({pagina:''})%>">PDF desta pesquisa</a>
     </div>
-    <h3>Resumo por fornecedor</h3>
-    <div class="scroll"><table><thead><tr><th>Fornecedor</th><th>Materiais atrasados</th><th>Pedidos</th><th>Maior atraso</th></tr></thead><tbody>
-      <% if(!pendencias.porFornecedor.length){ %><tr><td colspan="4">Nenhum material com previsão vencida e quantidade pendente.</td></tr><% } %>
-      <% pendencias.porFornecedor.forEach(grupo=>{ %>
-        <tr><td><%=grupo.nome%></td><td><%=grupo.itensAtrasados%></td><td><%=grupo.pedidosAtrasados%></td><td><%=grupo.maiorAtrasoDias%> dia(s)</td></tr>
-      <% }) %>
-    </tbody></table></div>
-    <h3>Materiais com prazo vencido</h3>
-    <div class="scroll"><table><thead><tr><th>Fornecedor</th><th>Solicitação</th><th>Material</th><th>Pendente</th><th>Previsão</th><th>Atraso</th></tr></thead><tbody>
-      <% if(!pendencias.atrasados.length){ %><tr><td colspan="6">Sem entregas vencidas em aberto.</td></tr><% } %>
-      <% pendencias.atrasados.slice(0,40).forEach(item=>{ %>
-        <tr><td><%=item.fornecedor%></td><td><a href="/almoxarifado/solicitacoes/<%=item.solicitacaoId%>/conferir"><%=item.numero%></a></td><td><%=item.nome%></td><td><%=numero(item.pendente)%> <%=item.unidade%></td><td><%=item.previsao%></td><td><%=item.diasAtraso%> dia(s)</td></tr>
-      <% }) %>
-    </tbody></table></div>
-    <% if(pendencias.atrasados.length>40){ %><p class="muted">Mostrando 40 de <%=pendencias.atrasados.length%> materiais atrasados. Consulte a relação completa no PDF.</p><% } %>
-    <h3>Compras pendentes sem previsão de entrega</h3>
-    <p class="muted">Não são classificadas como atrasadas sem uma data válida. Registre ou corrija a previsão em Compras.</p>
-    <div class="scroll"><table><thead><tr><th>Fornecedor</th><th>Solicitação</th><th>Material</th><th>Pendente</th></tr></thead><tbody>
-      <% if(!pendencias.semPrevisao.length){ %><tr><td colspan="4">Nenhum material pendente sem previsão.</td></tr><% } %>
-      <% pendencias.semPrevisao.slice(0,20).forEach(item=>{ %>
-        <tr><td><%=item.fornecedor%></td><td><%=item.numero%></td><td><%=item.nome%></td><td><%=numero(item.pendente)%> <%=item.unidade%></td></tr>
-      <% }) %>
-    </tbody></table></div>
-    <% if(pendencias.semPrevisao.length>20){ %><p class="muted">Mostrando 20 de <%=pendencias.semPrevisao.length%> pendências sem previsão; relação completa no PDF.</p><% } %>
+    <div class="almox-v15-metrics" aria-label="Resumo de pendências">
+      <a class="almox-v15-metric tone-red" href="/almoxarifado/gerencial?<%=queryAtrasos({tipo:'ATRASADOS',pagina:''})%>#pendencias-fornecedores">
+        <span>Materiais atrasados</span><strong><%=numero(pendencias.resumo.itensAtrasados)%></strong><small>Abrir vencidos</small>
+      </a>
+      <a class="almox-v15-metric tone-orange" href="/almoxarifado/gerencial?<%=queryAtrasos({tipo:'SEM_PREVISAO',pagina:''})%>#pendencias-fornecedores">
+        <span>Sem previsão</span><strong><%=numero(pendencias.resumo.semPrevisao)%></strong><small>Conferir datas ausentes</small>
+      </a>
+      <div class="almox-v15-metric tone-green"><span>Fornecedores em atraso</span><strong><%=numero(pendencias.resumo.fornecedoresAtrasados)%></strong><small>Com entrega vencida</small></div>
+      <div class="almox-v15-metric tone-blue"><span>Pedidos atrasados</span><strong><%=numero(pendencias.resumo.pedidosAtrasados)%></strong><small>Solicitações distintas</small></div>
+    </div>
+    <form method="get" action="/almoxarifado/gerencial#pendencias-fornecedores" class="almox-v15-filters">
+      <input type="hidden" name="periodo" value="<%=dados.periodo.modo%>">
+      <input type="hidden" name="inicio" value="<%=dados.periodo.inicio%>">
+      <input type="hidden" name="fim" value="<%=dados.periodo.fim%>">
+      <label class="almox-v15-search"><span>Material ou solicitação</span><input type="search" name="busca" value="<%=consultaAtrasos.filtros.busca%>" placeholder="Buscar nome, número ou fornecedor"></label>
+      <label><span>Situação</span><select name="tipo">
+        <% [['TODOS','Todas as pendências'],['ATRASADOS','Somente atrasados'],['SEM_PREVISAO','Sem previsão']].forEach(([valor,rotulo])=>{ %>
+          <option value="<%=valor%>" <%=consultaAtrasos.filtros.tipo===valor?'selected':''%>><%=rotulo%></option>
+        <% }) %>
+      </select></label>
+      <label><span>Fornecedor</span><select name="fornecedor">
+        <option value="">Todos os fornecedores</option>
+        <% consultaAtrasos.fornecedores.forEach(nome=>{ %><option value="<%=nome%>" <%=consultaAtrasos.filtros.fornecedor===nome?'selected':''%>><%=nome%></option><% }) %>
+      </select></label>
+      <button type="submit" class="btn btn-green">Pesquisar</button>
+      <a class="btn btn-ghost" href="/almoxarifado/gerencial?<%=queryAtrasos({tipo:'',fornecedor:'',busca:'',pagina:''})%>#pendencias-fornecedores">Limpar</a>
+    </form>
+    <div class="almox-v15-section-head almox-v15-result-head">
+      <div><h3>Fila de acompanhamento</h3><p class="muted"><%=consultaAtrasos.resumo.itens%> material(is) encontrado(s): <%=consultaAtrasos.resumo.atrasados%> vencido(s) e <%=consultaAtrasos.resumo.semPrevisao%> sem data de entrega.</p></div>
+      <span class="almox-v15-counter"><%=consultaAtrasos.paginacao.total ? ((consultaAtrasos.paginacao.pagina-1)*consultaAtrasos.paginacao.porPagina+1) : 0%>–<%=Math.min(consultaAtrasos.paginacao.total,consultaAtrasos.paginacao.pagina*consultaAtrasos.paginacao.porPagina)%> de <%=consultaAtrasos.paginacao.total%></span>
+    </div>
+    <div class="scroll almox-v15-table-wrap"><table class="almox-v15-table">
+      <thead><tr><th>Situação</th><th>Fornecedor</th><th>Solicitação</th><th>Material</th><th>Falta receber</th><th>Data prevista</th><th>Ação</th></tr></thead>
+      <tbody>
+        <% if(!consultaAtrasos.itens.length){ %><tr><td colspan="7" class="almox-v15-empty">Nenhuma pendência encontrada para esses filtros. Altere a pesquisa ou limpe os filtros.</td></tr><% } %>
+        <% consultaAtrasos.itens.forEach(item=>{ %>
+          <tr class="<%=item.situacao==='ATRASADOS'?'almox-v15-overdue':'almox-v15-undated'%>">
+            <td><span class="almox-v15-badge <%=item.situacao==='ATRASADOS'?'is-late':'is-undated'%>"><%=item.situacao==='ATRASADOS' ? 'Atrasado '+item.diasAtraso+'d' : 'Sem previsão'%></span></td>
+            <td><%=item.fornecedor%></td>
+            <td><strong><%=item.numero%></strong></td>
+            <td><%=item.nome%></td>
+            <td class="val"><%=numero(item.pendente)%> <%=item.unidade%></td>
+            <td><%=dataBR(item.previsao)%></td>
+            <td><a class="almox-v15-open" href="/almoxarifado/solicitacoes/<%=item.solicitacaoId%>/conferir">Abrir</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table></div>
+    <% if(consultaAtrasos.paginacao.paginas>1){ %>
+      <nav class="almox-v15-pagination" aria-label="Páginas das pendências">
+        <% if(consultaAtrasos.paginacao.pagina>1){ %><a href="/almoxarifado/gerencial?<%=queryAtrasos({pagina:consultaAtrasos.paginacao.pagina-1})%>#pendencias-fornecedores">Anterior</a><% } %>
+        <span>Página <%=consultaAtrasos.paginacao.pagina%> de <%=consultaAtrasos.paginacao.paginas%></span>
+        <% if(consultaAtrasos.paginacao.pagina<consultaAtrasos.paginacao.paginas){ %><a href="/almoxarifado/gerencial?<%=queryAtrasos({pagina:consultaAtrasos.paginacao.pagina+1})%>#pendencias-fornecedores">Próxima</a><% } %>
+      </nav>
+    <% } %>
+    <% if(consultaAtrasos.porFornecedor.length){ %>
+      <details class="almox-v15-suppliers">
+        <summary>Ver totais por fornecedor (<%=consultaAtrasos.porFornecedor.length%>)</summary>
+        <div class="scroll"><table><thead><tr><th>Fornecedor</th><th>Materiais atrasados</th><th>Pedidos</th><th>Maior atraso</th></tr></thead><tbody>
+        <% consultaAtrasos.porFornecedor.forEach(grupo=>{ %>
+          <tr><td><%=grupo.nome%></td><td><%=grupo.itensAtrasados%></td><td><%=grupo.pedidosAtrasados%></td><td><%=grupo.maiorAtrasoDias%> dia(s)</td></tr>
+        <% }) %>
+        </tbody></table></div>
+      </details>
+    <% } %>
+    <p class="muted almox-v15-note">O PDF exporta todos os resultados da pesquisa, não apenas a página exibida. Compras sem data válida são separadas dos atrasos.</p>
   </section>
   <div class="duas">
     <section class="box"><h2>Mais utilizados no período</h2><p class="muted">Ordenados pelo número de retiradas, com quantidade por unidade do material.</p>

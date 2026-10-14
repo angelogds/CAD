@@ -105,4 +105,64 @@ function listarAtrasosPorFornecedor(hoje, options = {}) {
   return gerarResumoAtrasos(linhas, hoje);
 }
 
-module.exports = { isoValida, gerarResumoAtrasos, listarAtrasosPorFornecedor };
+
+/**
+ * V15: filtros de consulta exclusivamente em memória, sem alterar a base.
+ * Os números do relatório permanecem globais; a lista e o resumo filtrado
+ * representam somente os itens que obedecem à pesquisa. O PDF recebe a lista
+ * integral filtrada, sem limite de paginação.
+ */
+function filtrarAtrasos(relatorio, parametros = {}) {
+  const tipoInformado = String(parametros.tipo || "TODOS").toUpperCase();
+  const tipo = ["TODOS", "ATRASADOS", "SEM_PREVISAO"].includes(tipoInformado) ? tipoInformado : "TODOS";
+  const fornecedor = String(parametros.fornecedor || "").trim().slice(0, 120);
+  const busca = String(parametros.busca || "").trim().slice(0, 120);
+  const normalizar = valor => String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+  const grupos = [
+    ...(relatorio.atrasados || []).map(item => ({ ...item, situacao: "ATRASADOS" })),
+    ...(relatorio.semPrevisao || []).map(item => ({ ...item, situacao: "SEM_PREVISAO" }))
+  ];
+  const fornecedores = [...new Set(grupos.map(item => item.fornecedor))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const filtrados = grupos.filter(item => {
+    if (tipo !== "TODOS" && item.situacao !== tipo) return false;
+    if (fornecedor && normalizar(item.fornecedor) !== normalizar(fornecedor)) return false;
+    if (busca && !normalizar([item.nome, item.numero, item.fornecedor].join(" ")).includes(normalizar(busca))) return false;
+    return true;
+  });
+  // Atrasos mais antigos primeiro; itens sem previsão ficam ao final da fila.
+  filtrados.sort((a,b) => (a.situacao === "ATRASADOS" ? 0 : 1) - (b.situacao === "ATRASADOS" ? 0 : 1)
+    || b.diasAtraso - a.diasAtraso
+    || a.fornecedor.localeCompare(b.fornecedor, "pt-BR")
+    || a.nome.localeCompare(b.nome, "pt-BR"));
+  const porPagina = 20;
+  const paginas = Math.max(1, Math.ceil(filtrados.length / porPagina));
+  const paginaSolicitada = Number(parametros.pagina);
+  const pagina = Number.isSafeInteger(paginaSolicitada) && paginaSolicitada > 0 ? Math.min(paginaSolicitada, paginas) : 1;
+  const atrasados = filtrados.filter(item => item.situacao === "ATRASADOS");
+  const semPrevisao = filtrados.filter(item => item.situacao === "SEM_PREVISAO");
+  const resumo = {
+    itens: filtrados.length, atrasados: atrasados.length, semPrevisao: semPrevisao.length,
+    fornecedores: new Set(atrasados.map(item => normalizar(item.fornecedor))).size,
+    pedidos: new Set(atrasados.map(item => item.solicitacaoId)).size
+  };
+  const mapa = new Map();
+  for (const item of atrasados) {
+    const key = normalizar(item.fornecedor);
+    if (!mapa.has(key)) mapa.set(key, { nome: item.fornecedor, itensAtrasados: 0, pedidos: new Set(), maiorAtrasoDias: 0 });
+    const g = mapa.get(key);
+    g.itensAtrasados++;
+    g.pedidos.add(item.solicitacaoId);
+    g.maiorAtrasoDias = Math.max(g.maiorAtrasoDias, item.diasAtraso);
+  }
+  const porFornecedor = [...mapa.values()].map(g => ({
+    nome: g.nome, itensAtrasados: g.itensAtrasados, pedidosAtrasados: g.pedidos.size, maiorAtrasoDias: g.maiorAtrasoDias
+  })).sort((a,b) => b.itensAtrasados-a.itensAtrasados || a.nome.localeCompare(b.nome, "pt-BR"));
+  return {
+    filtros: { tipo, fornecedor, busca },
+    fornecedores, resumo, porFornecedor, atrasados, semPrevisao,
+    todos: filtrados, itens: filtrados.slice((pagina-1)*porPagina, pagina*porPagina),
+    paginacao: { pagina, paginas, porPagina, total: filtrados.length }
+  };
+}
+
+module.exports = { isoValida, gerarResumoAtrasos, listarAtrasosPorFornecedor, filtrarAtrasos };

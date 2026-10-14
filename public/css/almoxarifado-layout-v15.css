@@ -1,0 +1,181 @@
+/* Almoxarifado V15 — linguagem visual compartilhada com Demandas/Preventivas.
+   Camada incremental: sem ocultar controles, alterar fluxos ou permissões. */
+.almox-v11,
+.almox-v11.gerencial {
+  --almox-v15-ink:#182838;
+  --almox-v15-muted:#657586;
+  --almox-v15-line:#dfe9e4;
+  --almox-v15-green:#168a4b;
+  --almox-v15-shadow:0 10px 26px rgba(15,75,46,.06);
+  color:var(--almox-v15-ink);
+}
+.almox-v11 .almox-hero,
+.almox-v11 .almox-compact-head,
+.almox-v11 .almox-store-head,
+.qr-withdraw-page.almox-v11 .reserve-head {
+  background:transparent;
+  border:none;
+  border-radius:0;
+  padding:4px 0 16px;
+  box-shadow:none;
+  margin:0 0 12px;
+}
+.almox-v11 .almox-hero h1,
+.almox-v11 .almox-compact-head h1,
+.almox-v11 .almox-store-head h1,
+.qr-withdraw-page.almox-v11 .reserve-head h1,
+.gerencial.almox-v15 h1 {
+  font-size:clamp(1.6rem,2.7vw,2.25rem);
+  color:#172c3d;
+  line-height:1.12;
+  letter-spacing:-.035em;
+  margin:3px 0 8px;
+}
+.almox-v11 .almox-tabs--operacional {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin:0 0 18px;
+  padding:9px;
+  background:#fff;
+  border:1px solid var(--almox-v15-line);
+  border-radius:14px;
+  box-shadow:var(--almox-v15-shadow);
+}
+.almox-v11 .almox-tabs--operacional .almox-tab {
+  min-height:40px;
+  padding:10px 13px;
+  border-radius:9px;
+  font-weight:800;
+  font-size:.81rem;
+  white-space:normal;
+}
+.almox-v11 .almox-tabs--operacional .almox-tab.active,
+.almox-v11 .almox-tabs--operacional .almox-tab[aria-current="page"] {
+  color:#116d3c;
+  background:#eaf7ef;
+  border-color:#b9dfc8;
+}
+.almox-v11 :is(.card,.almox-v4-search-card,.almox-compact-card,.almox-store-filters,.almox-stock-v6-list),
+.qr-withdraw-page.almox-v11 .qr-scanner-card {
+  border:1px solid var(--almox-v15-line);
+  border-radius:15px;
+  background:#fff;
+  box-shadow:var(--almox-v15-shadow);
+}
+.gerencial.almox-v15 {max-width:1400px;padding:12px 14px 24px;}
+.gerencial.almox-v15>header {
+  padding:2px 0 8px;
+  margin:0 0 8px;
+}
+.gerencial.almox-v15 .box,
+.gerencial.box {
+  background:#fff;
+  border:1px solid var(--almox-v15-line,#dfe9e4);
+  border-radius:15px;
+  box-shadow:var(--almox-v15-shadow,0 10px 26px rgba(15,75,46,.06));
+  padding:19px 21px;
+  margin:0 0 16px;
+}
+.gerencial.almox-v15 .box h2 {
+  font-size:1.08rem;
+  font-weight:800;
+  line-height:1.3;
+  margin:0 0 10px;
+  color:#223345;
+}
+.gerencial.almox-v15 .box h3 {
+  font-size:.96rem;
+  margin:12px 0 9px;
+  color:#24364a;
+}
+.gerencial.almox-v15 .totais {grid-template-columns:repeat(auto-fit,minmax(155px,1fr));}
+.gerencial.almox-v15 .totais article {
+  background:#fff;
+  border-color:#dce7e1;
+  border-radius:12px;
+  padding:13px 15px;
+  box-shadow:0 2px 8px rgba(18,46,32,.035);
+}
+.gerencial.almox-v15 .totais article strong {color:#174d34;font-size:1.35rem;}
+.gerencial.almox-v15 .form {gap:10px;}
+.gerencial.almox-v15 .form label {font-size:.76rem;color:var(--almox-v15-muted);font-weight:700;}
+.gerencial.almox-v15 :is(input,select) {
+  min-height:40px;
+  max-width:100%;
+  border-radius:9px;
+  border:1px solid #d5e0db;
+  background:#fff;
+  color:#1a2b3d;
+  font:inherit;
+}
+.gerencial.almox-v15 :is(input,select):focus-visible,
+.almox-v11 .almox-tabs--operacional a:focus-visible,
+.gerencial.almox-v15 .almox-v15-metric:focus-visible {
+  outline:3px solid #4f9d70;
+  outline-offset:2px;
+}
+.gerencial.almox-v15 table th {font-size:.72rem;letter-spacing:.035em;text-transform:uppercase;color:#5c6e7a;background:#f6f9f7;}
+.gerencial.almox-v15 table td {font-size:.85rem;}
+.gerencial.almox-v15 table th,.gerencial.almox-v15 table td {padding:10px 12px;}
+.gerencial.almox-v15 tbody tr:hover {background:#fafcfb;}
+.almox-v15-section-head {display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 14px;}
+.almox-v15-section-head h2,.almox-v15-section-head h3 {margin:4px 0 5px !important;}
+.almox-v15-section-head p {margin:0;font-size:.84rem;line-height:1.45;}
+.almox-v15-eyebrow {font-size:.68rem;font-weight:900;color:#197748;letter-spacing:.08em;}
+.almox-v15-metrics {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin:15px 0;}
+.almox-v15-metric {--tone:#15834c;display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-height:108px;position:relative;padding:17px 16px 15px;background:#fff;border:1px solid #dfebe3;border-radius:13px;color:#1d3443;text-decoration:none;box-shadow:0 4px 14px rgba(15,75,46,.04);overflow:hidden;}
+.almox-v15-metric:before {position:absolute;content:"";height:4px;left:0;right:0;top:0;background:var(--tone);}
+.almox-v15-metric span {font-size:.74rem;text-transform:uppercase;font-weight:900;letter-spacing:.03em;color:#637384;}
+.almox-v15-metric strong {font-size:1.7rem;font-variant-numeric:tabular-nums;line-height:1;color:var(--tone);}
+.almox-v15-metric small {font-size:.75rem;color:#697d89;}
+a.almox-v15-metric:hover {background:#fbfefc;border-color:#a9d5b9;transform:translateY(-1px);}
+.almox-v15-metric.tone-red {--tone:#d33239;}
+.almox-v15-metric.tone-orange {--tone:#e27d1b;}
+.almox-v15-metric.tone-blue {--tone:#3679bd;}
+.almox-v15-filters {display:grid;grid-template-columns:minmax(205px,1.6fr) minmax(140px,.9fr) minmax(160px,1fr) auto auto;align-items:end;gap:9px;padding:13px;background:#f8fbf9;border:1px solid #e0eae4;border-radius:12px;}
+.almox-v15-filters label {min-width:0;display:grid;gap:6px;}
+.almox-v15-filters label span {font-size:.72rem;font-weight:850;text-transform:uppercase;letter-spacing:.035em;color:#586a78;}
+.almox-v15-filters :is(input,select) {width:100%;min-width:0;min-height:42px;padding:8px 10px;}
+.almox-v15-filters .btn {min-height:42px;white-space:nowrap;}
+.almox-v15-result-head {margin-top:21px;}
+.almox-v15-counter {font-size:.75rem;font-weight:800;color:#246b43;padding:7px 10px;border-radius:8px;background:#eef8f1;}
+.almox-v15-table-wrap {border:1px solid #e4ece8;border-radius:11px;}
+.gerencial.almox-v15 .almox-v15-table {min-width:820px;}
+.gerencial.almox-v15 .almox-v15-table th {white-space:nowrap;}
+.gerencial.almox-v15 .almox-v15-table tr td:first-child {border-left:4px solid transparent;}
+.gerencial.almox-v15 .almox-v15-table tr.almox-v15-overdue td:first-child {border-left-color:#df5750;}
+.gerencial.almox-v15 .almox-v15-table tr.almox-v15-undated td:first-child {border-left-color:#d79b3d;}
+.almox-v15-badge {display:inline-flex;align-items:center;padding:5px 8px;border-radius:8px;font-size:.71rem;font-weight:900;white-space:nowrap;}
+.almox-v15-badge.is-late {color:#a7252a;background:#fff0f0;}
+.almox-v15-badge.is-undated {color:#85520d;background:#fff6e5;}
+.almox-v15-open {color:#126b40;font-weight:850;text-decoration:none;white-space:nowrap;}
+.almox-v15-open:hover {text-decoration:underline;}
+.gerencial.almox-v15 .almox-v15-empty {text-align:center;padding:26px;color:#667786;}
+.almox-v15-pagination {display:flex;justify-content:flex-end;align-items:center;gap:11px;flex-wrap:wrap;margin:14px 0;}
+.almox-v15-pagination a {display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:7px 13px;border:1px solid #dce7e1;border-radius:9px;color:#116d3c;text-decoration:none;font-weight:800;}
+.almox-v15-pagination a:hover {background:#eff9f2;}
+.almox-v15-pagination span {font-size:.78rem;color:#5b6b76;}
+.almox-v15-suppliers {margin:12px 0;border:1px solid #e1ebe5;border-radius:11px;overflow:hidden;}
+.almox-v15-suppliers>summary {cursor:pointer;padding:13px 15px;font-weight:800;color:#29523b;background:#f8faf9;}
+.almox-v15-suppliers>div {padding:6px 10px;}
+.almox-v15-note {font-size:.78rem;margin:14px 0 0;}
+@media(max-width:1000px){
+  .almox-v15-metrics {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .almox-v15-filters {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .almox-v15-filters .almox-v15-search {grid-column:1/-1;}
+}
+@media(max-width:650px){
+  .almox-v11 .almox-tabs--operacional {display:flex;flex-wrap:nowrap;gap:5px;overflow-x:auto;scrollbar-width:thin;padding:6px;}
+  .almox-v11 .almox-tabs--operacional .almox-tab {flex:0 0 auto;min-height:44px;padding:10px 12px;}
+  .gerencial.almox-v15 {padding:10px;}
+  .gerencial.almox-v15 .box {padding:14px;margin-bottom:12px;}
+  .gerencial.almox-v15 .form label {flex:1 1 140px;}
+  .almox-v15-metric {min-height:91px;padding:14px 12px;gap:6px;}
+  .almox-v15-metric strong {font-size:1.5rem;}
+  .almox-v15-filters {grid-template-columns:1fr;padding:10px;}
+  .almox-v15-filters .almox-v15-search {grid-column:auto;}
+  .almox-v15-filters .btn {width:100%;}
+  .almox-v15-section-head {align-items:flex-start;}
+  .almox-v15-counter {width:100%;text-align:center;}
+}
