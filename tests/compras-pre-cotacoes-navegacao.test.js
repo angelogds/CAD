@@ -51,6 +51,13 @@ test('card mostra cinco, abre todas e recolhe sem duplicar registros',async()=>{
   assert.equal(requests.length,2);
 });
 
+test('lista parcial mantém botão para identificar solicitações ausentes', async()=> {
+  const {panel}=await render(3);
+  const actions=panel.children.filter(child=>child.tag==='button');
+  assert.ok(actions.some(child=>child.textContent==='Verificar vínculos das solicitações'));
+  assert.ok(panel.children.some(child=>child.className==='demand-prequote-diagnostic'));
+});
+
 test('até cinco pré-cotações não cria botão de expansão',async()=>{
   for(const total of [1,5]) {
     const {panel}=await render(total);
