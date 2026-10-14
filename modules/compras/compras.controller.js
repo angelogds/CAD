@@ -243,16 +243,17 @@ function lista(req, res) {
   });
 }
 
-function preCotacoesDemandasJson(_req, res) {
+function preCotacoesDemandasJson(req, res) {
   try {
+    const verTodas = String(req.query.todas || '') === '1';
     return res.json({
       ok: true,
-      rows: demandasComprasService.listPreCotacoesDemandas(50),
-      demandasSemMateriais: demandasComprasService.listDemandasSemMateriais(30),
+      total: demandasComprasService.countPreCotacoesDemandas(),
+      rows: demandasComprasService.listPreCotacoesDemandas(verTodas ? null : 5),
     });
   } catch (error) {
     console.error('❌ Erro ao carregar pré-cotações de demandas:', error && error.stack ? error.stack : error);
-    return res.status(500).json({ ok: false, rows: [], demandasSemMateriais: [] });
+    return res.status(500).json({ ok: false, total: 0, rows: [] });
   }
 }
 
