@@ -53,7 +53,7 @@ test('compras permite pré-cotação e libera compra pela Demanda sem exigir OS'
   assert.match(gate, /DEMANDA_COMPRA_AGUARDANDO_LIBERACAO/);
   assert.match(gate, /A geração de OS não é necessária para comprar o material/);
   assert.match(purchaseQueue, /liberacao_compras_status/);
-  assert.match(purchaseQueue, /s\.demanda_id IS NULL/);
+  assert.match(purchaseQueue, /demanda_id IS NULL/);
   assert.match(controller, /demandasComprasService\.assertCompraLiberada/);
   assert.match(controller, /req\.body\.acao === 'comprar'/);
   assert.match(controller, /atendido_estoque/);

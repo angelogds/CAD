@@ -115,6 +115,7 @@ test('pré-cotação usa dados reais e bloqueia compra até liberação no Plane
         liberacao_compras_status TEXT NOT NULL DEFAULT 'PENDENTE'
       );
       CREATE TABLE equipamentos (id INTEGER PRIMARY KEY, nome TEXT);
+      CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
       CREATE TABLE solicitacoes (
         id INTEGER PRIMARY KEY,
         numero TEXT,
@@ -125,7 +126,11 @@ test('pré-cotação usa dados reais e bloqueia compra até liberação no Plane
         updated_at TEXT,
         demanda_id INTEGER,
         os_id INTEGER,
-        disponivel_compras INTEGER
+        disponivel_compras INTEGER,
+        solicitante_user_id INTEGER,
+        compras_user_id INTEGER,
+        setor_origem TEXT,
+        tipo_origem TEXT
       );
       CREATE TABLE solicitacao_itens (
         id INTEGER PRIMARY KEY,
@@ -135,16 +140,24 @@ test('pré-cotação usa dados reais e bloqueia compra até liberação no Plane
       );
 
       INSERT INTO equipamentos (id, nome) VALUES (3, 'Caldeira 1');
+      INSERT INTO users (id, name) VALUES (1, 'Responsável Reciclagem');
       INSERT INTO demandas (id, titulo, status, prioridade, aprovacao_status, prazo_previsto, nr_referencia, equipamento_id, liberacao_compras_status)
       VALUES (11, 'Reforma da Caldeira 1', 'PLANEJAMENTO', 'ALTA', 'PENDENTE', '2026-09-10', 'NR-13', 3, 'PENDENTE');
-      INSERT INTO solicitacoes (id, numero, titulo, status, prioridade, created_at, updated_at, demanda_id, os_id, disponivel_compras)
-      VALUES (21, 'SOL-2026-000021', 'Materiais da reforma', 'ABERTA', 'ALTA', datetime('now'), datetime('now'), 11, NULL, 1);
+      INSERT INTO solicitacoes (id, numero, titulo, status, prioridade, created_at, updated_at, demanda_id, os_id, disponivel_compras, solicitante_user_id, setor_origem, tipo_origem)
+      VALUES (21, 'SOL-2026-000021', 'Materiais da reforma', 'ABERTA', 'ALTA', datetime('now'), datetime('now'), 11, NULL, 1, 1, 'RECICLAGEM', 'DEMANDA');
+      INSERT INTO solicitacoes (id, numero, titulo, status, prioridade, created_at, updated_at, demanda_id, os_id, disponivel_compras, solicitante_user_id, setor_origem)
+      VALUES (22, 'SOL-2026-000022', 'Compra normal', 'ABERTA', 'MEDIA', datetime('now'), datetime('now'), NULL, NULL, 1, 1, 'LOGISTICA');
       INSERT INTO solicitacao_itens (id, solicitacao_id, status_cotacao, status_compra) VALUES
         (31, 21, 'COTADO', 'PENDENTE'),
         (32, 21, 'PENDENTE', 'PENDENTE');
     ` + "`" + `);
 
     const service = require('./modules/compras/compras-demandas.service');
+    const compras = require('./modules/compras/compras.service');
+    const idsNaFila = () => compras.getOperationalQueue({ tab: 'active' }).rows.map(row => row.id);
+    assert.deepEqual(idsNaFila(), [22]); // Reciclagem sem liberação não pode competir com Logística
+    assert.deepEqual(compras.listSolicitacoesPorStatus({ historico: true }).map(row => row.id), [22]);
+    assert.equal(compras.getAnalytics(30).ABERTA, 1);
     const rows = service.listPreCotacoesDemandas(12);
     assert.equal(rows.length, 1);
     assert.equal(rows[0].demanda_titulo, 'Reforma da Caldeira 1');
@@ -161,6 +174,8 @@ test('pré-cotação usa dados reais e bloqueia compra até liberação no Plane
     db.prepare("UPDATE demandas SET liberacao_compras_status='LIBERADA' WHERE id=11").run();
     assert.doesNotThrow(() => service.assertCompraLiberada(21));
     assert.equal(service.listPreCotacoesDemandas(12).length, 0);
+    assert.deepEqual(idsNaFila().sort(), [21,22]);
+    assert.equal(compras.getAnalytics(30).ABERTA, 2);
 
     db.prepare("UPDATE demandas SET liberacao_compras_status='BLOQUEADA' WHERE id=11").run();
     assert.throws(
@@ -169,7 +184,10 @@ test('pré-cotação usa dados reais e bloqueia compra até liberação no Plane
     );
 
     db.prepare('UPDATE solicitacoes SET os_id = ? WHERE id = ?').run(900, 21);
-    assert.doesNotThrow(() => service.assertCompraLiberada(21));
+    assert.throws(() => service.assertCompraLiberada(21), error => error?.code === 'DEMANDA_COMPRA_AGUARDANDO_LIBERACAO');
+    assert.deepEqual(idsNaFila(), [22]);
+    assert.equal(service.listPreCotacoesDemandas(12).length, 1); // OS não substitui liberação
+    assert.equal(compras.getAnalytics(30).ABERTA, 1);
     process.stdout.write('ok');
   `;
 
