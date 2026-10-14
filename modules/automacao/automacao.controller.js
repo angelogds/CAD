@@ -17,4 +17,13 @@ function digestores(req, res) {
   });
 }
 
-module.exports = { index, digestores };
+function decanters(req, res) {
+  return res.render('automacao/decanters', {
+    title: 'Automação - Decanters e Tanque de Serviço',
+    activeMenu: 'automacao',
+    equipamentos: service.getDecantersOverview(),
+    integrationState: service.getIntegrationState(),
+  });
+}
+
+module.exports = { index, digestores, decanters };
