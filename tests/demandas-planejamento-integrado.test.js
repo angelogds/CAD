@@ -48,12 +48,12 @@ test('compras permite pré-cotação e libera compra pela Demanda sem exigir OS'
   const gate = read('modules/compras/compras-demandas.service.js');
   const purchaseQueue = read('modules/compras/compras.service.js');
   const controller = read('modules/compras/compras.controller.js');
-  assert.match(gate, /s\.demanda_id IS NOT NULL/);
+  assert.match(gate, /resolvedDemandIdSql/);
   assert.match(gate, /liberacao_compras_status/);
   assert.match(gate, /DEMANDA_COMPRA_AGUARDANDO_LIBERACAO/);
   assert.match(gate, /A geração de OS não é necessária para comprar o material/);
   assert.match(purchaseQueue, /liberacao_compras_status/);
-  assert.match(purchaseQueue, /demanda_id IS NULL/);
+  assert.match(purchaseQueue, /resolvedDemandIdSql/);
   assert.match(controller, /demandasComprasService\.assertCompraLiberada/);
   assert.match(controller, /req\.body\.acao === 'comprar'/);
   assert.match(controller, /atendido_estoque/);
