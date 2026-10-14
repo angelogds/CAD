@@ -138,12 +138,12 @@ function listSolicitacoesDemandaSemVinculo() {
   return db.prepare(`
     SELECT s.id, s.numero, s.titulo, s.prioridade, COUNT(si.id) AS itens_count
     FROM solicitacoes s
-    LEFT JOIN demandas d ON 1=0
+    LEFT JOIN demandas d ON d.id=${demandIdExpr}
     LEFT JOIN equipamentos e ON e.id=s.equipamento_id
     JOIN solicitacao_itens si ON si.solicitacao_id=s.id
       ${hasColumn('solicitacao_itens','status_compra') ? "AND UPPER(TRIM(COALESCE(si.status_compra,'PENDENTE'))) <> 'CANCELADO'" : ''}
     WHERE UPPER(TRIM(COALESCE(s.tipo_origem,'')))='DEMANDA'
-      AND ${demandIdExpr} IS NULL
+      AND (${demandIdExpr} IS NULL OR d.id IS NULL)
       AND ${setor.sql}
       AND UPPER(TRIM(COALESCE(s.status,'ABERTA'))) NOT IN
         ('CANCELADA','FECHADA','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE')
@@ -247,6 +247,7 @@ function getDemandGate(solicitacaoId) {
   return db.prepare(`
     SELECT s.id, s.numero, ${hasColumn('solicitacoes','tipo_origem') ? 's.tipo_origem' : "''"} AS tipo_origem,
            ${demandIdExpr} AS demanda_id, ${resolvedOrderIdSql(demandIdExpr)} AS os_id,
+           ${tableExists('demandas') ? 'd.id' : 'NULL'} AS demanda_validada_id,
            ${releaseExpr} AS liberacao_compras_status
     FROM solicitacoes s
     ${tableExists('demandas') ? `LEFT JOIN demandas d ON d.id=${demandIdExpr}` : ''}
@@ -258,7 +259,8 @@ function assertCompraLiberada(solicitacaoId) {
   const row = getDemandGate(solicitacaoId);
   if (!row) return;
   const isDemandRequest = Number(row.demanda_id || 0) > 0;
-  if (!isDemandRequest && String(row.tipo_origem || '').trim().toUpperCase() === 'DEMANDA') {
+  if ((isDemandRequest && !Number(row.demanda_validada_id || 0))
+      || (!isDemandRequest && String(row.tipo_origem || '').trim().toUpperCase() === 'DEMANDA')) {
     const error = new Error('Solicitação criada para Demanda sem vínculo válido. Corrija o vínculo com a Demanda antes de liberar a compra.');
     error.code = 'DEMANDA_VINCULO_PENDENTE';
     throw error;
