@@ -132,13 +132,18 @@ function columnExists(table, col) {
 // A presença de OS não substitui a autorização de compra.
 function demandReleaseWhere(alias = 's') {
   const demandIdExpr = resolvedDemandIdSql(alias);
-  if (demandIdExpr === 'NULL') return '';
+  // Tipo DEMANDA sem FK válida não pode cair na fila operacional.
+  // Fica na revisão de vínculos do painel de pré-cotações.
+  const normalOrigin = columnExists('solicitacoes', 'tipo_origem')
+    ? ` AND UPPER(TRIM(COALESCE(${alias}.tipo_origem,''))) <> 'DEMANDA'`
+    : '';
+  if (demandIdExpr === 'NULL') return normalOrigin ? `(1=1${normalOrigin})` : '';
   // A solicitação pode ter sido gerada a partir da OS vinculada à Demanda,
   // mesmo que solicitacoes.demanda_id esteja nulo. OS não é liberação.
   if (!tableExists('demandas') || !columnExists('demandas', 'liberacao_compras_status')) {
-    return `${demandIdExpr} IS NULL`; // sem migração, não liberar por engano
+    return `(${demandIdExpr} IS NULL${normalOrigin})`; // sem migração, não liberar por engano
   }
-  return `(${demandIdExpr} IS NULL OR EXISTS (
+  return `((${demandIdExpr} IS NULL${normalOrigin}) OR EXISTS (
     SELECT 1 FROM demandas dg WHERE dg.id=${demandIdExpr}
       AND UPPER(TRIM(COALESCE(dg.liberacao_compras_status,'PENDENTE')))='LIBERADA'
   ))`;
