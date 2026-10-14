@@ -69,6 +69,55 @@ function listPreCotacoesDemandas(limit = 12) {
   `).all(...setorParams, Math.min(100, Math.max(1, Number(limit) || 12)));
 }
 
+/**
+ * Exibe Demandas ainda sem uma solicitação de materiais cadastrada no card
+ * de planejamento de Compras. Não fabrica cotações, não altera vínculos e não
+ * move nenhum registro para a fila operacional.
+ */
+function listDemandasSemMateriais(limit = 30) {
+  if (!tableExists('demandas')) return [];
+  const hasEquip = tableExists('equipamentos') && hasColumn('demandas','equipamento_id');
+  const equipmentSector = hasEquip && hasColumn('equipamentos','setor') ? 'e.setor' : 'NULL';
+  const equipmentName = hasEquip && hasColumn('equipamentos','nome') ? 'e.nome' : 'NULL';
+  const solExists = tableExists('solicitacoes') && hasColumn('solicitacoes','demanda_id')
+    ? 'AND NOT EXISTS (SELECT 1 FROM solicitacoes s WHERE s.demanda_id=d.id AND UPPER(COALESCE(s.status,\'ABERTA\'))<>\'CANCELADA\')'
+    : '';
+  const releaseFilter = hasColumn('demandas','liberacao_compras_status')
+    ? "AND UPPER(TRIM(COALESCE(d.liberacao_compras_status,'PENDENTE'))) <> 'LIBERADA'"
+    : '';
+  const rows = db.prepare(`
+    SELECT d.id AS demanda_id, d.titulo AS demanda_titulo,
+           d.status AS demanda_status, d.prioridade AS demanda_prioridade,
+           d.categoria, d.setor_origem, d.aprovacao_status, d.created_at,
+           ${equipmentName} AS equipamento_nome,
+           ${equipmentSector} AS equipamento_setor
+    FROM demandas d
+    ${hasEquip ? 'LEFT JOIN equipamentos e ON e.id=d.equipamento_id' : ''}
+    WHERE UPPER(COALESCE(d.status,'NOVA')) NOT IN ('CANCELADA','CONCLUIDA')
+      ${releaseFilter}
+      ${solExists}
+    ORDER BY
+      CASE UPPER(COALESCE(d.prioridade,'NORMAL'))
+        WHEN 'URGENTE' THEN 0 WHEN 'CRITICA' THEN 0 WHEN 'CRÍTICA' THEN 0
+        WHEN 'ALTA' THEN 1 WHEN 'MEDIA' THEN 2 WHEN 'NORMAL' THEN 2
+        WHEN 'BAIXA' THEN 3 ELSE 4
+      END, datetime(COALESCE(d.updated_at,d.created_at)) DESC, d.id DESC
+    LIMIT 500
+  `).all();
+
+  const { normalizeSetorCorporativo } = require('./compras-setores');
+  const outraArea = new Set(['LOGÍSTICA','FRIGORÍFICO','ADMINISTRATIVO']);
+  return rows.filter(row => {
+    const origem = normalizeSetorCorporativo(row.setor_origem);
+    const equipamento = normalizeSetorCorporativo(row.equipamento_setor);
+    if (outraArea.has(origem) || outraArea.has(equipamento)) return false;
+    // Setor é opcional no formulário de Demandas. Para dados legados sem
+    // origem corporativa, as categorias técnicas são candidatas a planejamento.
+    return origem === 'RECICLAGEM' || equipamento === 'RECICLAGEM'
+      || ['MANUTENCAO','PRODUCAO'].includes(String(row.categoria||'').toUpperCase());
+  }).slice(0, Math.min(50, Math.max(1, Number(limit)||30)));
+}
+
 function getDemandGate(solicitacaoId) {
   if (!tableExists('solicitacoes') || !hasColumn('solicitacoes', 'demanda_id')) return null;
   const releaseExpr = tableExists('demandas') && hasColumn('demandas', 'liberacao_compras_status')
@@ -95,4 +144,4 @@ function assertCompraLiberada(solicitacaoId) {
   }
 }
 
-module.exports = { listPreCotacoesDemandas, getDemandGate, assertCompraLiberada };
+module.exports = { listPreCotacoesDemandas, listDemandasSemMateriais, getDemandGate, assertCompraLiberada };
