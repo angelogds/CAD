@@ -1,0 +1,48 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/automacao.css?v=20261014-v2">
+<link rel="stylesheet" href="/css/automacao-prensas.css?v=20261014-v1">
+<main class="auto-page auto-hmi auto-prensas">
+  <header class="auto-hero auto-hero-hmi">
+    <div><span class="auto-eyebrow">AUTOMAÇÃO • RECICLAGEM • PRENSAS</span>
+      <h1>IHM das Prensas</h1>
+      <p>Área das três prensas. Visão ilustrativa da operação e preparação para monitoramento futuro.</p></div>
+    <div class="auto-integration"><span class="auto-state waiting">Sem hardware conectado</span><small>CLP e IHM física existentes: integração pendente</small></div>
+  </header>
+  <section class="auto-alert"><strong>Modo de implantação</strong><span>Os estados apresentados não representam funcionamento real. Não há conexão com CLP nem comandos de máquina nesta versão.</span></section>
+  <section class="prensas-grid" aria-label="Três prensas">
+    <% (prensas || []).forEach((prensa, index) => { %>
+      <article class="prensa-card">
+        <header><div><small>PRENSA <%= index + 1 %></small><h2><%= prensa.nome %></h2></div><span class="signal-pill offline"><%= prensa.estadoLabel %></span></header>
+        <svg viewBox="0 0 360 190" role="img" aria-label="Desenho SVG esquemático de <%= prensa.nome %>">
+          <defs><linearGradient id="metal-prensa-<%= index %>" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eff2f3"/><stop offset=".55" stop-color="#b5c3c9"/><stop offset="1" stop-color="#879ca6"/></linearGradient></defs>
+          <path d="M20 165H342" stroke="#708892" stroke-width="8" stroke-linecap="round"/>
+          <rect x="52" y="69" width="220" height="75" rx="19" fill="url(#metal-prensa-<%= index %>)" stroke="#768d97" stroke-width="4"/>
+          <ellipse cx="55" cy="106" rx="16" ry="37" fill="#ced9dd" stroke="#758d98" stroke-width="4"/>
+          <path d="M82 78L107 132L132 78L157 132L182 78L207 132L232 78" stroke="#718993" stroke-width="5" fill="none" stroke-linejoin="round"/>
+          <rect x="270" y="83" width="55" height="45" rx="6" fill="#90a6b1" stroke="#718894" stroke-width="4"/>
+          <path d="M62 63V32H135L162 59" stroke="#8499a2" stroke-width="11" fill="none" stroke-linejoin="round"/>
+          <path d="M99 142V163M244 142V163" stroke="#718994" stroke-width="10"/>
+          <path d="M276 128L304 151" stroke="#788f99" stroke-width="7"/>
+          <circle cx="298" cy="107" r="11" fill="#dce4e7" stroke="#6e8590" stroke-width="3"/>
+        </svg>
+        <div class="prensa-foot"><span><strong>Condição:</strong> Sem sinal</span><span><strong>Integração:</strong> pendente</span></div>
+        <p><%= prensa.descricao %></p>
+        <button class="prensa-info" type="button" data-name="<%= prensa.nome %>" data-next="<%= prensa.integracaoPrevista %>">Ver detalhes</button>
+      </article>
+    <% }) %>
+  </section>
+  <section class="auto-bottom-grid">
+    <article class="auto-panel"><h2>Equipamento selecionado</h2><p id="prensa-detail" aria-live="polite">Selecione uma prensa para consultar a integração prevista.</p></article>
+    <article class="auto-panel"><h2>Integração futura com segurança</h2><p>Primeiro mapear modelo do CLP, protocolo, rede, variáveis disponíveis e acesso autorizado. Nesta etapa nenhuma escrita ou comando remoto é permitido.</p></article>
+  </section>
+</main>
+<script>
+(() => {
+  const detail = document.getElementById('prensa-detail');
+  document.querySelectorAll('.prensa-info').forEach(button => {
+    button.addEventListener('click', () => {
+      detail.textContent = button.dataset.name + ' — ' + button.dataset.next + '. Estado: sem sinal. Controle remoto: indisponível.';
+    });
+  });
+})();
+</script>

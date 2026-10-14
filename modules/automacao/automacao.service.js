@@ -31,9 +31,22 @@ const DECANTERS = Object.freeze([
   { key: 'tanque-servico', nome: 'Tanque de serviço', tipo: 'tanque', area: 'tanque' },
 ]);
 
+
+// Representação provisória das três prensas, sujeita à conferência com o cadastro e com a fábrica.
+// A prensa já equipada com CLP/IHM é apenas indicada; não há conexão ou telemetria neste módulo.
+const PRENSAS = Object.freeze([
+  { key: 'prensa-clp', nome: 'Prensa com CLP / IHM', descricao: 'Alimentação automática existente', tipo: 'prensa', integracaoPrevista: 'Leitura do CLP existente' },
+  { key: 'prensa-p50', nome: 'Prensa P50', descricao: 'Identificação de campo a validar', tipo: 'prensa', integracaoPrevista: 'Instrumentação a definir' },
+  { key: 'prensa-p46', nome: 'Prensa P46', descricao: 'Identificação de campo a validar', tipo: 'prensa', integracaoPrevista: 'Instrumentação a definir' },
+]);
+function getPrensasOverview() {
+  return PRENSAS.map(item => ({ ...item, estado: 'SEM_SINAL', estadoLabel: 'Sem sinal', integrado: false, comando_habilitado: false }));
+}
+
 function listSetores() {
   return [
     { key: 'digestores', title: 'Digestores', description: 'Leitura de temperatura PT100 e descargas automáticas para limpeza dos purgadores.', href: '/automacao/digestores', status: 'EM_IMPLANTACAO' },
+    { key: 'prensas', title: 'Prensas', description: 'Três prensas em visão esquemática; estudo futuro de monitoramento do CLP e da IHM existente.', href: '/automacao/prensas', status: 'EM_IMPLANTACAO' },
     { key: 'decanters', title: 'Decanters e tanque de serviço', description: 'Visão esquemática das duas decanters, bombas, tanque e rosca da borra.', href: '/automacao/decanters', status: 'EM_IMPLANTACAO' },
   ];
 }
@@ -63,4 +76,4 @@ function getIntegrationState() {
   return { mode: 'AGUARDANDO_HARDWARE', label: 'Aguardando integração com ESP32 / gateway', live: false, simulator: false };
 }
 
-module.exports = { listSetores, getDigestoresOverview, getDecantersOverview, getIntegrationState, classifyTemperature };
+module.exports = { listSetores, getDigestoresOverview, getDecantersOverview, getPrensasOverview, getIntegrationState, classifyTemperature };

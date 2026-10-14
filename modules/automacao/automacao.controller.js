@@ -26,4 +26,13 @@ function decanters(req, res) {
   });
 }
 
-module.exports = { index, digestores, decanters };
+function prensas(req, res) {
+  return res.render('automacao/prensas', {
+    title: 'Automação - Prensas',
+    activeMenu: 'automacao',
+    prensas: service.getPrensasOverview(),
+    integrationState: service.getIntegrationState(),
+  });
+}
+
+module.exports = { index, digestores, decanters, prensas };
