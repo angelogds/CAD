@@ -4,7 +4,7 @@ const db = require('../../database/db');
 const osChatService = require('../os-chat/os-chat.service');
 const calculos = require('./compras.calculos');
 const { normalizeSetorCorporativo, setorMatches, dbAliasesForSetor } = require('./compras-setores');
-const { resolvedDemandIdSql } = require('./compras-demandas.service');
+const { resolvedDemandIdSql, assertCompraLiberada } = require('./compras-demandas.service');
 
 const STATUS = Object.freeze({
   ABERTA: 'ABERTA',
@@ -567,6 +567,7 @@ function salvarPainelItens(solicitacaoId, payload = {}, userId) {
     ? new Set((Array.isArray(payload.comprar) ? payload.comprar : [payload.comprar]).filter(Boolean).map(Number))
     : new Set();
   const atenderEstoque = new Set((Array.isArray(payload.atendido_estoque) ? payload.atendido_estoque : [payload.atendido_estoque]).filter(Boolean).map(Number));
+  if (payload.acao === 'comprar' || atenderEstoque.size) assertCompraLiberada(solicitacaoId);
   const frete = calculos.parseCentavos(payload.frete, 'Frete');
   const desconto = calculos.parseCentavos(payload.desconto, 'Desconto');
   return db.transaction(() => {
@@ -685,6 +686,7 @@ function atualizarDados(id, dados) {
 }
 
 function marcarComprada(id, userId, dados = {}) {
+  assertCompraLiberada(id);
   const cur = getSolicitacaoDetalhe(id);
   if (!cur || ![STATUS.EM_COTACAO, STATUS.APROVADA_DIRETORIA].includes(cur.status)) {
     throw new Error('Somente EM_COTACAO ou APROVADA_DIRETORIA pode virar COMPRADA.');

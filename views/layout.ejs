@@ -128,7 +128,7 @@
     <% if (user) { %><script src="/js/consenso-botoes-confirmacao.js?v=20260919-1" defer></script><% } %>
     <% if (user && ['ADMIN','COMPRAS'].includes(normalizeRole(user.role || user.perfil || ''))) { %><script src="/js/compras-consenso-bilateral.js?v=20260919-1" data-compras-consenso-bilateral defer></script><% } %>
     <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><script src="/js/compras-itens-liberados-dashboard.js?v=20260911-v1" defer></script><% } %>
-    <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><script src="/js/compras-demandas-pre-cotacao.js?v=20261014-v6" defer></script><% } %>
+    <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><script src="/js/compras-demandas-pre-cotacao.js?v=20261014-v7" defer></script><% } %>
   <% } %>
 </body>
 </html>
