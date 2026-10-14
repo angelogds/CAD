@@ -43,7 +43,7 @@
     title.id = 'demand-prequote-title';
     title.textContent = 'Pré-solicitações de Demandas';
     const description = document.createElement('p');
-    description.textContent = 'Materiais ainda em planejamento. Compras pode levantar preços e fornecedores; a solicitação entra na fila normal assim que a compra for liberada na própria Demanda.';
+    description.textContent = 'Materiais das Demandas ainda não liberadas: Compras prepara preços e fornecedores aqui. Quando a compra for autorizada na Demanda, a solicitação entra na lista por criticidade, preservando a cotação.';
     copy.append(kicker, title, description);
 
     const count = document.createElement('div');
@@ -59,7 +59,7 @@
     if (!rows.length) {
       const empty = document.createElement('div');
       empty.className = 'demand-prequote-empty';
-      empty.textContent = 'Nenhuma demanda com materiais aguardando pré-cotação no momento.';
+      empty.textContent = 'Nenhuma pré-cotação pendente encontrada. Cadastre os materiais na aba Materiais de uma Demanda da Reciclagem.';
       section.append(empty);
     } else {
       const list = document.createElement('div');
@@ -99,13 +99,13 @@
         const gate = document.createElement('div');
         gate.className = 'demand-prequote-gate';
         const gateStatus = document.createElement('strong');
-        gateStatus.textContent = 'Cotação liberada';
+        gateStatus.textContent = 'Pré-cotação em preparação';
         const gatePurchase = document.createElement('small');
         gatePurchase.textContent = 'Compra aguardando liberação';
         const action = document.createElement('a');
         action.href = `/compras/solicitacoes/${row.id}`;
         action.className = 'ui-btn ui-btn--table';
-        action.textContent = 'Abrir pré-solicitação';
+        action.textContent = 'Abrir e preparar cotação';
         gate.append(gateStatus, gatePurchase, action);
 
         article.append(main, progress, gate);
