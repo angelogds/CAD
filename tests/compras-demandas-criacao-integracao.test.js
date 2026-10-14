@@ -63,6 +63,15 @@ test('cadastro real de materiais em setor operacional entra na pré-cotação e 
       assert.deepEqual(db.prepare('SELECT * FROM solicitacao_itens WHERE solicitacao_id=?').all(sol),items);
       assert.deepEqual(db.prepare("SELECT * FROM compras_anexos WHERE referencia_tipo='SOLICITACAO' AND referencia_id=?").all(sol),anexos);
       assert.equal(db.prepare('SELECT COUNT(*) n FROM solicitacoes').get().n,1);
+      // Regressão real: solicitação do planejamento cuja referência se perdeu.
+      // Não pode entrar na fila de compra nem ser comprada sem recuperar FK.
+      const semVinculoDemanda=demand.create({titulo:'Planejamento legado sem vínculo',setor_origem:'Caldeira'},user);
+      const semVinculo=demand.createMaterialPlanning(semVinculoDemanda,
+        {user,itens:[{item_nome:'Peça antiga',qtd_solicitada:1}]});
+      db.prepare('UPDATE solicitacoes SET demanda_id=NULL,os_id=NULL WHERE id=?').run(semVinculo);
+      assert.ok(pre.listSolicitacoesDemandaSemVinculo().some(r=>r.id===semVinculo));
+      assert.ok(!compras.getOperationalQueue({tab:'active'}).rows.some(r=>r.id===semVinculo));
+      assert.throws(()=>pre.assertCompraLiberada(semVinculo),e=>e.code==='DEMANDA_VINCULO_PENDENTE');
       for(const setor of ['LOGISTICA','FRIGORIFICO','ADMINISTRATIVO']) {
         const other=demand.create({titulo:'Outro setor',setor_origem:setor},user);
         const request=demand.createMaterialPlanning(other,{user,itens:[{item_nome:'Material teste',qtd_solicitada:1}]});
@@ -98,6 +107,7 @@ test('cadastro real de materiais em setor operacional entra na pré-cotação e 
         assert.equal(first.ok,true);
         assert.equal(first.total,12);
         assert.equal(first.rows.length,5);
+        assert.ok(first.pendentesVinculo.some(r=>r.id===semVinculo));
         const all=await (await get('?todas=1')).json();
         assert.equal(all.rows.length,12);
         const diag=await (await get('?diagnostico=1')).json();
