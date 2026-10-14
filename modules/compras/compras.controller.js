@@ -245,6 +245,9 @@ function lista(req, res) {
 
 function preCotacoesDemandasJson(req, res) {
   try {
+    if (String(req.query.diagnostico || '') === '1') {
+      return res.json({ ok: true, diagnostico: demandasComprasService.diagnosticarPreCotacoesDemandas() });
+    }
     const verTodas = String(req.query.todas || '') === '1';
     return res.json({
       ok: true,

@@ -113,6 +113,74 @@
       empty.className = 'demand-prequote-empty';
       empty.textContent = 'Nenhuma solicitação de materiais de Demanda aguardando pré-cotação no momento.';
       section.append(empty);
+
+      const check = document.createElement('button');
+      check.type = 'button';
+      check.className = 'ui-btn ui-btn--table';
+      check.textContent = 'Verificar vínculos das solicitações';
+      check.style.marginTop = '10px';
+      const feedback = document.createElement('div');
+      feedback.className = 'demand-prequote-diagnostic';
+      feedback.setAttribute('role', 'status');
+
+      check.addEventListener('click', async () => {
+        check.disabled = true;
+        feedback.textContent = 'Conferindo cadastros de materiais, OS e Demandas...';
+        try {
+          const response = await fetch('/compras/demandas/pre-cotacoes.json?diagnostico=1', {
+            headers: { Accept: 'application/json' },
+          });
+          if (!response.ok) throw new Error('Consulta indisponível');
+          const payload = await response.json();
+          const info = payload?.diagnostico;
+          if (!info?.disponivel) throw new Error('Tabelas não disponíveis');
+          const counts = info.contagens || {};
+          const rows = [
+            ['Solicitações com materiais no sistema', counts.solicitacoes_com_materiais],
+            ['Solicitações com OS e materiais', counts.solicitacoes_com_os_e_materiais],
+            ['Solicitações com OS, mas sem vínculo de Demanda', counts.solicitacoes_com_os_sem_vinculo_demanda],
+            ['Solicitações com materiais ligadas a Demandas', counts.solicitacoes_vinculadas_demanda_com_materiais],
+            ['Vinculadas à Reciclagem', counts.vinculadas_demanda_reciclagem],
+            ['Reciclagem aguardando liberação', counts.vinculadas_demanda_reciclagem_pendentes],
+            ['Reciclagem já liberadas', counts.vinculadas_demanda_reciclagem_liberadas],
+            ['Pendentes excluídas por status', counts.candidatas_excluidas_pelo_status],
+            ['Pré-cotações elegíveis para o card', counts.pre_cotacoes_visiveis_no_card],
+          ];
+          feedback.replaceChildren();
+          const label = document.createElement('strong');
+          label.textContent = 'Diagnóstico de vínculos (somente leitura)';
+          const ul = document.createElement('ul');
+          for (const [key,value] of rows) {
+            const li = document.createElement('li');
+            li.textContent = key + ': ' + Number(value || 0);
+            ul.append(li);
+          }
+          feedback.append(label, ul);
+          if (Array.isArray(info.exemplos_os_sem_demanda) && info.exemplos_os_sem_demanda.length) {
+            const samples=document.createElement('p');
+            samples.textContent = 'Exemplos sem vínculo: ' + info.exemplos_os_sem_demanda
+              .map(s => 'Solicitação #' + s.solicitacao_id + ' / OS #' + s.os_id).join('; ');
+            feedback.append(samples);
+          }
+          const textToCopy = rows.map(([key,value]) => key+': '+Number(value||0)).join('\n')
+            + '\n' + (info.exemplos_os_sem_demanda || [])
+              .map(s => 'Solicitação #'+s.solicitacao_id+' / OS #'+s.os_id).join('; ');
+          const copy = document.createElement('button');
+          copy.type='button';
+          copy.className='ui-btn ui-btn--table';
+          copy.textContent='Copiar diagnóstico';
+          copy.addEventListener('click', async () => {
+            try { await navigator.clipboard.writeText(textToCopy); copy.textContent='Copiado'; }
+            catch { copy.textContent='Selecione o texto acima para copiar'; }
+          });
+          feedback.append(copy);
+        } catch (_error) {
+          feedback.textContent = 'Não foi possível conferir os vínculos agora. Atualize a página e tente novamente.';
+        } finally {
+          check.disabled = false;
+        }
+      });
+      section.append(check, feedback);
     } else {
       const list = document.createElement('div');
       list.className = 'demand-prequote-list';
