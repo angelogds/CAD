@@ -149,7 +149,7 @@ function diagnosticarPreCotacoesDemandas() {
     pre_cotacoes_visiveis_no_card: countPreCotacoesDemandas(),
   };
   const exemplosSemVinculo = [];
-  for (const s of db.prepare(sql).iterate()) {
+  for (const s of db.prepare(sql).all()) {
     if (!Number(s.itens_validos)) continue;
     conta.solicitacoes_com_materiais++;
     const osId=Number(s.os_id)||null;
