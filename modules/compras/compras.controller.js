@@ -253,6 +253,7 @@ function preCotacoesDemandasJson(req, res) {
       ok: true,
       total: demandasComprasService.countPreCotacoesDemandas(),
       rows: demandasComprasService.listPreCotacoesDemandas(verTodas ? null : 5),
+      pendentesVinculo: demandasComprasService.listSolicitacoesDemandaSemVinculo(),
     });
   } catch (error) {
     console.error('❌ Erro ao carregar pré-cotações de demandas:', error && error.stack ? error.stack : error);

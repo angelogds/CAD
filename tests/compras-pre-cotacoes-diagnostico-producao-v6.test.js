@@ -27,5 +27,5 @@ test('com zero pré-cotações, a tela oferece conferência de vínculos em vez 
   assert.match(js,/pre-cotacoes\.json\?diagnostico=1/);
   assert.match(js,/Copiar diagnóstico/);
   assert.doesNotMatch(js,/Planejar materiais/);
-  assert.match(read('views/layout.ejs'),/compras-demandas-pre-cotacao\.js\?v=20261014-v7/);
+  assert.match(read('views/layout.ejs'),/compras-demandas-pre-cotacao\.js\?v=20261014-v8/);
 });
