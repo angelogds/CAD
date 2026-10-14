@@ -9,11 +9,38 @@ function hasColumn(table, name) {
   try { return db.prepare(`PRAGMA table_info(${table})`).all().some((column) => column.name === name); } catch { return false; }
 }
 
+/**
+ * A solicitação pode estar vinculada à Demanda diretamente (planejamento),
+ * pela OS gerada a partir dela ou pela tabela legada de vínculos da OS.
+ * Não cria vínculos: consulta somente os relacionamentos existentes.
+ */
+function resolvedDemandIdSql(alias = 's') {
+  const paths = [];
+  if (hasColumn('solicitacoes', 'demanda_id')) {
+    paths.push(`NULLIF(${alias}.demanda_id, 0)`);
+  }
+  if (tableExists('os') && hasColumn('os', 'demanda_id')) {
+    if (hasColumn('solicitacoes','os_id')) {
+      paths.push(`(SELECT o.demanda_id FROM os o WHERE o.id=${alias}.os_id AND o.demanda_id IS NOT NULL LIMIT 1)`);
+    }
+    if (tableExists('os_solicitacoes_vinculos')
+        && hasColumn('os_solicitacoes_vinculos', 'solicitacao_id')
+        && hasColumn('os_solicitacoes_vinculos', 'os_id')) {
+      paths.push(`(SELECT o.demanda_id
+        FROM os_solicitacoes_vinculos v JOIN os o ON o.id=v.os_id
+        WHERE v.solicitacao_id=${alias}.id AND o.demanda_id IS NOT NULL
+        ORDER BY o.id DESC LIMIT 1)`);
+    }
+  }
+  return paths.length > 1 ? `COALESCE(${paths.join(', ')})` : (paths[0] || 'NULL');
+}
+
 function buildPreCotacoesQuery() {
   if (!tableExists('solicitacoes') || !tableExists('demandas') || !tableExists('solicitacao_itens') || !hasColumn('solicitacoes', 'demanda_id')) return null;
 
-  // Pré-cotação é planejamento antecipado: não depende de uma solicitação
-  // já finalizada para a fila normal de Compras.
+  // Pré-cotação é planejamento antecipado e precisa ter uma solicitação
+  // de materiais REAL, não só uma Demanda ou OS sem itens.
+  const demandIdExpr = resolvedDemandIdSql('s');
   const releaseWhere = hasColumn('demandas', 'liberacao_compras_status')
     ? "AND UPPER(TRIM(COALESCE(d.liberacao_compras_status, 'PENDENTE'))) <> 'LIBERADA'"
     : '';
@@ -40,7 +67,7 @@ function buildPreCotacoesQuery() {
   const sql = `
     SELECT
       s.id, s.numero, s.titulo, s.status, s.prioridade, s.created_at,
-      s.demanda_id, s.os_id,
+      ${demandIdExpr} AS demanda_id, s.os_id,
       d.titulo AS demanda_titulo, d.status AS demanda_status, d.prioridade AS demanda_prioridade,
       d.aprovacao_status, d.prazo_previsto, d.nr_referencia,
       ${hasColumn('demandas', 'liberacao_compras_status') ? "COALESCE(d.liberacao_compras_status, 'PENDENTE')" : "'PENDENTE'"} AS liberacao_compras_status,
@@ -49,11 +76,11 @@ function buildPreCotacoesQuery() {
       ${quoteExpr} AS itens_cotados,
       ${purchaseExpr} AS itens_comprados
     FROM solicitacoes s
-    JOIN demandas d ON d.id = s.demanda_id
+    JOIN demandas d ON d.id = ${demandIdExpr}
     LEFT JOIN equipamentos e ON e.id = d.equipamento_id
     JOIN solicitacao_itens si ON si.solicitacao_id = s.id
       ${hasColumn('solicitacao_itens', 'status_compra') ? "AND UPPER(COALESCE(si.status_compra, 'PENDENTE')) <> 'CANCELADO'" : ''}
-    WHERE s.demanda_id IS NOT NULL
+    WHERE ${demandIdExpr} IS NOT NULL
       ${releaseWhere}
       ${setorWhere}
       AND UPPER(COALESCE(s.status, 'ABERTA')) NOT IN ('CANCELADA','FECHADA','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE')
@@ -85,15 +112,16 @@ function countPreCotacoesDemandas() {
 }
 
 function getDemandGate(solicitacaoId) {
-  if (!tableExists('solicitacoes') || !hasColumn('solicitacoes', 'demanda_id')) return null;
+  if (!tableExists('solicitacoes')) return null;
+  const demandIdExpr = resolvedDemandIdSql('s');
   const releaseExpr = tableExists('demandas') && hasColumn('demandas', 'liberacao_compras_status')
     ? "COALESCE(d.liberacao_compras_status, 'PENDENTE')"
     : "'PENDENTE'";
   return db.prepare(`
-    SELECT s.id, s.numero, s.demanda_id, s.os_id,
+    SELECT s.id, s.numero, ${demandIdExpr} AS demanda_id, s.os_id,
            ${releaseExpr} AS liberacao_compras_status
     FROM solicitacoes s
-    LEFT JOIN demandas d ON d.id=s.demanda_id
+    LEFT JOIN demandas d ON d.id=${demandIdExpr}
     WHERE s.id=?
   `).get(Number(solicitacaoId));
 }
@@ -110,4 +138,4 @@ function assertCompraLiberada(solicitacaoId) {
   }
 }
 
-module.exports = { listPreCotacoesDemandas, countPreCotacoesDemandas, getDemandGate, assertCompraLiberada };
+module.exports = { resolvedDemandIdSql, listPreCotacoesDemandas, countPreCotacoesDemandas, getDemandGate, assertCompraLiberada };
