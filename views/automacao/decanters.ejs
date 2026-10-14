@@ -1,0 +1,120 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/automacao.css?v=20261014-decanters">
+<main class="auto-page auto-hmi auto-dec-page">
+  <header class="auto-hero auto-hero-hmi">
+    <div>
+      <span class="auto-eyebrow">AUTOMAÇÃO • RECICLAGEM • DECANTERS</span>
+      <h1>IHM das Decanters e Tanque de Serviço</h1>
+      <p>Visão esquemática da área para identificação dos equipamentos e futura instrumentação.</p>
+    </div>
+    <div class="auto-integration">
+      <span class="auto-state waiting">Sem hardware conectado</span>
+      <small><%= integrationState.label %></small>
+    </div>
+  </header>
+  <section class="auto-alert" role="status">
+    <strong>Modo de implantação</strong>
+    <span>Desenhos ilustrativos, sem leituras ou comandos reais. Todos os equipamentos aparecem “Sem sinal” até que a comunicação seja validada.</span>
+  </section>
+
+  <svg class="dec-symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <linearGradient id="dec-metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#eef2f4"/><stop offset="55%" stop-color="#bfcbd0"/><stop offset="100%" stop-color="#80949d"/></linearGradient>
+      <symbol id="dec-decanter" viewBox="0 0 300 150">
+        <path d="M22 124H280" stroke="#879aa2" stroke-width="7" stroke-linecap="round"/>
+        <path d="M58 102V124M244 102V124" stroke="#788d95" stroke-width="12"/>
+        <rect x="45" y="44" width="205" height="69" rx="34" fill="url(#dec-metal)" stroke="#72858c" stroke-width="4"/>
+        <ellipse cx="49" cy="79" rx="14" ry="33" fill="#bdc8cd" stroke="#72858c" stroke-width="4"/>
+        <path d="M86 47V110M204 47V110" stroke="#879ba3" stroke-width="3" stroke-dasharray="5 5"/>
+        <rect x="252" y="60" width="31" height="36" rx="5" fill="#8fa4ae" stroke="#687a81" stroke-width="3"/>
+        <path d="M268 60V37H295" stroke="#7e9299" stroke-width="5" fill="none"/>
+        <path d="M116 43V22H164" stroke="#7e9299" stroke-width="6" fill="none"/>
+        <path d="M154 112V131H183" stroke="#899aa0" stroke-width="5" fill="none"/>
+        <rect x="14" y="64" width="31" height="31" rx="5" fill="#849ca5" stroke="#6c7e87" stroke-width="3"/>
+      </symbol>
+      <symbol id="dec-bomba" viewBox="0 0 230 150">
+        <path d="M15 129H215" stroke="#7e929a" stroke-width="7" stroke-linecap="round"/>
+        <rect x="21" y="72" width="77" height="43" rx="9" fill="url(#dec-metal)" stroke="#758993" stroke-width="4"/>
+        <path d="M35 77V111M50 77V111M65 77V111" stroke="#8397a0" stroke-width="3"/>
+        <rect x="93" y="85" width="19" height="17" rx="4" fill="#788b93"/>
+        <circle cx="145" cy="92" r="38" fill="url(#dec-metal)" stroke="#6c828d" stroke-width="5"/>
+        <circle cx="145" cy="92" r="13" fill="#8096a0" stroke="#6b7d86" stroke-width="3"/>
+        <path d="M145 55V30H195M179 90H214" stroke="#859aa3" stroke-width="13" fill="none" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="dec-tanque" viewBox="0 0 190 190">
+        <path d="M45 174V154M146 174V154M27 174H164" stroke="#788d97" stroke-width="7"/>
+        <rect x="37" y="35" width="120" height="124" rx="19" fill="url(#dec-metal)" stroke="#7a909a" stroke-width="4"/>
+        <ellipse cx="97" cy="35" rx="60" ry="16" fill="#d7e0e3" stroke="#7a909a" stroke-width="4"/>
+        <path d="M57 85H137M57 117H137" stroke="#8fa1a8" stroke-width="2" stroke-dasharray="5 5"/>
+        <rect x="151" y="60" width="15" height="75" rx="5" fill="#edf2f4" stroke="#7a909a" stroke-width="3"/>
+        <path d="M94 20V8H130" stroke="#7b8e98" stroke-width="6" fill="none"/>
+      </symbol>
+      <symbol id="dec-rosca" viewBox="0 0 370 100">
+        <path d="M9 81H353" stroke="#8397a0" stroke-width="6" stroke-linecap="round"/>
+        <rect x="56" y="24" width="303" height="48" rx="15" fill="url(#dec-metal)" stroke="#728893" stroke-width="4"/>
+        <path d="M72 49q22-35 44 0t44 0t44 0t44 0t44 0t44 0" fill="none" stroke="#7c929c" stroke-width="5" stroke-linecap="round"/>
+        <rect x="7" y="31" width="43" height="35" rx="6" fill="#8fa5af" stroke="#6d818b" stroke-width="4"/>
+        <path d="M84 72V83M332 72V83" stroke="#718792" stroke-width="7"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <section class="dec-layout" aria-label="Área das decanters">
+    <% const areas = [
+      { key: 'entrada', title: 'Entrada', subtitle: 'Alimentação da área' },
+      { key: 'processo', title: 'Separação', subtitle: 'Duas decanters' },
+      { key: 'saida', title: 'Saída', subtitle: 'Duas bombas' },
+      { key: 'tanque', title: 'Tanque', subtitle: 'Serviço' },
+      { key: 'borra', title: 'Descarga da borra', subtitle: 'Rosca sob as decanters' }
+    ]; %>
+    <% areas.forEach((area) => { %>
+      <section class="dec-area dec-area-<%= area.key %>">
+        <div class="dec-area-head"><h2><%= area.title %></h2><small><%= area.subtitle %></small></div>
+        <div class="dec-items">
+          <% (equipamentos || []).filter((e) => e.area === area.key).forEach((e) => { %>
+            <button type="button" class="dec-equipment" data-name="<%= e.nome %>" data-type="<%= e.tipo %>" aria-label="Detalhes de <%= e.nome %>: sem sinal">
+              <svg class="dec-equipment-svg dec-svg-<%= e.tipo %>" role="img" aria-label="Desenho esquemático de <%= e.nome %>">
+                <use href="#dec-<%= e.tipo %>"></use>
+              </svg>
+              <span class="dec-equipment-info">
+                <strong><%= e.nome %></strong>
+                <span class="signal-pill offline"><span class="dec-off-dot" aria-hidden="true"></span><%= e.estadoLabel %></span>
+              </span>
+            </button>
+          <% }) %>
+        </div>
+      </section>
+    <% }) %>
+  </section>
+  <section class="auto-bottom-grid dec-bottom">
+    <article class="auto-panel">
+      <h2>Equipamento selecionado</h2>
+      <div id="dec-selection" aria-live="polite">
+        <strong>Selecione um equipamento no esquema</strong>
+        <p>Os detalhes serão exibidos aqui. Nenhuma ação de comando está disponível nesta etapa.</p>
+      </div>
+    </article>
+    <article class="auto-panel">
+      <h2>Legenda e integração</h2>
+      <p><strong>Sem sinal:</strong> aguardando conexão e validação do estado no controlador.</p>
+      <p>Futuras ligações, instrumentação, nível, vazão e alarmes dependem de levantamento de campo.</p>
+    </article>
+  </section>
+</main>
+<script>
+(() => {
+  const panel = document.getElementById('dec-selection');
+  document.querySelectorAll('.dec-equipment').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('.dec-equipment').forEach((item) => item.classList.remove('is-selected'));
+      button.classList.add('is-selected');
+      panel.replaceChildren();
+      const title = document.createElement('strong');
+      title.textContent = button.dataset.name;
+      const details = document.createElement('p');
+      details.textContent = 'Estado: Sem sinal • Integração: pendente • Comandos: indisponíveis';
+      panel.append(title, details);
+    });
+  });
+})();
+</script>
