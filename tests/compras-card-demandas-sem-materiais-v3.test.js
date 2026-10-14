@@ -38,5 +38,5 @@ test('UI mostra cinco primeiras, contador verdadeiro e expande todas sem criar m
   assert.match(js,/payload\.total/);
   assert.doesNotMatch(js,/Demandas aguardando materiais/);
   assert.doesNotMatch(js,/Planejar materiais/);
-  assert.match(layout,/compras-demandas-pre-cotacao\.js\?v=20261014-v4/);
+  assert.match(layout,/compras-demandas-pre-cotacao\.js\?v=20261014-v6/);
 });
