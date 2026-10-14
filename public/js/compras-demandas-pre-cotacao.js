@@ -50,13 +50,13 @@
     const gate = document.createElement('div');
     gate.className = 'demand-prequote-gate';
     const gateStatus = document.createElement('strong');
-    gateStatus.textContent = quoted === total && total > 0 ? 'Pré-cotação preparada' : 'Pré-cotação em preparação';
+    gateStatus.textContent = !total ? 'Solicitação sem itens cadastrados' : quoted === total ? 'Pré-cotação preparada' : 'Pré-cotação em preparação';
     const gatePurchase = document.createElement('small');
     gatePurchase.textContent = 'Compra aguardando liberação da Demanda';
     const action = document.createElement('a');
     action.href = `/compras/solicitacoes/${row.id}`;
     action.className = 'ui-btn ui-btn--table';
-    action.textContent = 'Abrir cotação';
+    action.textContent = total ? 'Abrir cotação' : 'Ver solicitação';
     gate.append(gateStatus, gatePurchase, action);
 
     article.append(main, progress, gate);

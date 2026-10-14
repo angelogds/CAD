@@ -2,32 +2,19 @@ const db = require('../../database/db');
 const { dbAliasesForSetor, SETORES } = require('./compras-setores');
 
 function recyclingSectorFilter() {
-  const reciclagem = dbAliasesForSetor('RECICLAGEM');
-  const outros = Object.values(SETORES).filter(s => s !== 'RECICLAGEM').flatMap(dbAliasesForSetor);
-  const matches = [], exclusions = [], params = [];
-  const inList = (expr, values) => {
-    params.push(...values);
-    return `TRIM(COALESCE(${expr}, '')) COLLATE NOCASE IN (${values.map(() => '?').join(',')})`;
-  };
-  for (const [alias, table] of [['s','solicitacoes'],['d','demandas']]) {
-    if (hasColumn(table,'setor_origem')) matches.push(inList(`${alias}.setor_origem`,reciclagem));
+  // Solicitações REAIS ligadas a Demandas podem usar locais operacionais
+  // como Caldeira ou Digestor. Não exigir um setor corporativo positivo.
+  // Rejeitar, porém, origens explicitamente pertencentes a outro setor.
+  const outros = Object.values(SETORES)
+    .filter(setor => setor !== 'RECICLAGEM').flatMap(dbAliasesForSetor);
+  const exclusions = [];
+  const params = [];
+  for (const [alias, table] of [['s', 'solicitacoes'], ['d', 'demandas']]) {
+    if (!hasColumn(table, 'setor_origem')) continue;
+    exclusions.push(`TRIM(COALESCE(${alias}.setor_origem, '')) COLLATE NOCASE NOT IN (${outros.map(() => '?').join(',')})`);
+    params.push(...outros);
   }
-  // Registros antigos podem conservar o local operacional. Só usar fontes
-  // corporativas comprovadas pelo equipamento ou pelo autor já vinculado.
-  if (hasColumn('equipamentos','setor')) matches.push(inList('e.setor',reciclagem));
-  const creatorPaths = [];
-  if (hasColumn('demandas','created_by')) creatorPaths.push('d.created_by');
-  if (hasColumn('solicitacoes','solicitante_user_id')) creatorPaths.push('s.solicitante_user_id');
-  if (hasColumn('users','role') && creatorPaths.length) {
-    matches.push(`EXISTS (SELECT 1 FROM users u WHERE u.id IN (${creatorPaths.join(',')})
-      AND UPPER(TRIM(u.role)) IN ('ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO','COORDENADOR_RECICLAGEM'))`);
-  }
-  // Um vínculo a Reciclagem não pode sobrepor origem explícita de outro setor.
-  for (const [alias, table] of [['s','solicitacoes'],['d','demandas']]) {
-    if (hasColumn(table,'setor_origem')) exclusions.push(`NOT (${inList(`${alias}.setor_origem`,outros)})`);
-  }
-  if (hasColumn('equipamentos','setor')) exclusions.push(`NOT (${inList('e.setor',outros)})`);
-  return {sql:`(${matches.join(' OR ') || '1=0'})${exclusions.length ? ' AND '+exclusions.join(' AND ') : ''}`,params};
+  return { sql: exclusions.join(' AND ') || '1=1', params };
 }
 
 function tableExists(name) {
@@ -77,7 +64,7 @@ function buildPreCotacoesQuery() {
   if (!tableExists('solicitacoes') || !tableExists('demandas') || !tableExists('solicitacao_itens')) return null;
 
   // Pré-cotação é planejamento antecipado e precisa ter uma solicitação
-  // de materiais REAL, não só uma Demanda ou OS sem itens.
+  // de materiais REAL; solicitações antigas sem itens também são visíveis.
   const demandIdExpr = resolvedDemandIdSql('s');
   const releaseWhere = hasColumn('demandas', 'liberacao_compras_status')
     ? "AND UPPER(TRIM(COALESCE(d.liberacao_compras_status, 'PENDENTE'))) <> 'LIBERADA'"
@@ -107,7 +94,7 @@ function buildPreCotacoesQuery() {
     FROM solicitacoes s
     JOIN demandas d ON d.id = ${demandIdExpr}
     LEFT JOIN equipamentos e ON e.id = d.equipamento_id
-    JOIN solicitacao_itens si ON si.solicitacao_id = s.id
+    LEFT JOIN solicitacao_itens si ON si.solicitacao_id = s.id
       ${hasColumn('solicitacao_itens', 'status_compra') ? "AND UPPER(TRIM(COALESCE(si.status_compra, 'PENDENTE'))) <> 'CANCELADO'" : ''}
     WHERE ${demandIdExpr} IS NOT NULL
       ${releaseWhere}
@@ -115,6 +102,11 @@ function buildPreCotacoesQuery() {
       AND UPPER(TRIM(COALESCE(s.status, 'ABERTA'))) NOT IN ('CANCELADA','FECHADA','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE')
       AND UPPER(TRIM(COALESCE(d.status, 'NOVA'))) NOT IN ('CANCELADA','CONCLUIDA')
     GROUP BY s.id
+    HAVING COUNT(si.id) > 0
+      OR NOT EXISTS (
+        SELECT 1 FROM solicitacao_itens todos_itens
+        WHERE todos_itens.solicitacao_id = s.id
+      )
     ORDER BY
       CASE UPPER(COALESCE(s.prioridade, d.prioridade, 'MEDIA'))
         WHEN 'CRITICA' THEN 0 WHEN 'CRÍTICA' THEN 0 WHEN 'URGENTE' THEN 0
@@ -152,7 +144,7 @@ function listSolicitacoesDemandaSemVinculo() {
   `).all(...setor.params);
 }
 
-// Apenas solicitações reais COM itens, sem compra liberada. Sem Demandas vazias.
+// Apenas solicitações reais ligadas às Demandas, com ou sem itens; sem criar registros.
 function listPreCotacoesDemandas(limit = 12) {
   const query = buildPreCotacoesQuery();
   if (!query) return [];

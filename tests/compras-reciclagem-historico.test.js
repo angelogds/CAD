@@ -41,7 +41,9 @@ test('pré-cotações de Demandas aparecem somente na aba Reciclagem', () => {
 
   assert.match(script, /function isReciclagemSelecionada/);
   assert.match(script, /if \(!isReciclagemSelecionada\(\)\) return/);
-  assert.match(demandService, /dbAliasesForSetor\('RECICLAGEM'\)/);
+  assert.match(demandService, /function recyclingSectorFilter/);
+  assert.match(demandService, /flatMap\(dbAliasesForSetor\)/);
+  assert.match(demandService, /setor !== 'RECICLAGEM'/);
 });
 
 test('card de liberação da Diretoria continua disponível no painel de Compras', () => {
