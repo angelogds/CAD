@@ -41,6 +41,14 @@ Este repositório é o sistema **Manutenção Campo do Gado V2**. Preserve o com
 - Não execute operação destrutiva em produção, Railway ou banco persistente sem autorização explícita.
 - Trabalhe em branch/PR quando disponível.
 
+## Política permanente de merge automático (decisão do responsável — 14/10/2026)
+- Para PRs que criarmos neste projeto com autorização do responsável, **todos os checks obrigatórios do CI aprovados no SHA atual = merge imediato, sem perguntar novamente**. Use preferencialmente squash merge em `main`.
+- Verifique explicitamente a suíte completa e as regressões CAD Python Engine e Assistente Industrial, além de quaisquer checks obrigatórios futuros. Não considere sucesso apenas por um teste isolado; skipped/cancelled/pending/failure não equivalem a todos aprovados.
+- Antes do merge, confirme diff, estado da PR, ausência de conflitos e nenhuma proibição expressa, falha de segurança, regra de proteção de branch ou bloqueio de aprovação. Se houver impedimento, corrija, repita a CI e integre quando estiver verde; reporte impeditivos reais.
+- Se a PR estiver como draft e estiver pronta, marque como ready for review e faça o merge após os checks passarem. Evite solicitar aprovação repetida para o mesmo trabalho já autorizado.
+- Após o merge, acompanhe o Railway e diferencie `merged` de `deployed` e `SUCCESS`; não declare publicação até a implantação do commit ser confirmada.
+- **Observação técnica (14/10/2026):** `allow_auto_merge` do GitHub está desabilitado neste repositório. Portanto, esta política guia o comportamento dos agentes; o merge autônomo pelo GitHub, sem o agente ativo, exige habilitação posterior de Auto-merge e checks obrigatórios.
+- Fonte oficial desta decisão: [Política no Notion](https://app.notion.com/p/3f97ddca327c8158abebea303379cc99?pvs=204).
 ## Entrega final
 Informe de forma curta:
 1. causa-raiz ou objetivo atendido;
