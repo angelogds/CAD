@@ -111,6 +111,75 @@ function countPreCotacoesDemandas() {
   return Number(db.prepare(`SELECT COUNT(*) AS total FROM (${query.sql})`).get(...query.params)?.total || 0);
 }
 
+
+/**
+ * Diagnóstico somente de leitura. Não cria vínculos e não muda o fluxo de
+ * compra: mostra POR QUE o card ficou vazio na base real da fábrica.
+ * A saída contém contagens e IDs de solicitações/OS, nunca dados pessoais.
+ */
+function diagnosticarPreCotacoesDemandas() {
+  if (!['solicitacoes','solicitacao_itens','demandas'].every(tableExists)) {
+    return { disponivel: false, motivo: 'Tabelas de solicitações, itens ou demandas indisponíveis.' };
+  }
+  const demandIdExpr = resolvedDemandIdSql('s');
+  const validItemFilter = hasColumn('solicitacao_itens','status_compra')
+    ? "AND UPPER(TRIM(COALESCE(si.status_compra,'PENDENTE'))) <> 'CANCELADO'" : '';
+  const sql = `
+    SELECT s.id, ${hasColumn('solicitacoes','os_id') ? 's.os_id' : 'NULL'} AS os_id,
+      s.status, ${hasColumn('solicitacoes','setor_origem') ? 's.setor_origem' : 'NULL'} AS setor_solicitacao,
+      ${demandIdExpr} AS demanda_id,
+      ${hasColumn('demandas','setor_origem') ? 'd.setor_origem' : 'NULL'} AS setor_demanda,
+      ${hasColumn('demandas','liberacao_compras_status') ? 'd.liberacao_compras_status' : "'PENDENTE'"} AS liberacao,
+      COUNT(si.id) AS itens_validos
+    FROM solicitacoes s
+    LEFT JOIN demandas d ON d.id=${demandIdExpr}
+    LEFT JOIN solicitacao_itens si ON si.solicitacao_id=s.id ${validItemFilter}
+    GROUP BY s.id
+  `;
+  const { normalizeSetorCorporativo } = require('./compras-setores');
+  const conta = {
+    solicitacoes_com_materiais: 0,
+    solicitacoes_com_os_e_materiais: 0,
+    solicitacoes_com_os_sem_vinculo_demanda: 0,
+    solicitacoes_vinculadas_demanda_com_materiais: 0,
+    vinculadas_demanda_reciclagem: 0,
+    vinculadas_demanda_reciclagem_pendentes: 0,
+    vinculadas_demanda_reciclagem_liberadas: 0,
+    candidatas_excluidas_pelo_status: 0,
+    pre_cotacoes_visiveis_no_card: countPreCotacoesDemandas(),
+  };
+  const exemplosSemVinculo = [];
+  for (const s of db.prepare(sql).iterate()) {
+    if (!Number(s.itens_validos)) continue;
+    conta.solicitacoes_com_materiais++;
+    const osId=Number(s.os_id)||null;
+    if(osId) conta.solicitacoes_com_os_e_materiais++;
+    const demandaId=Number(s.demanda_id)||null;
+    if(!demandaId) {
+      if (osId) {
+        conta.solicitacoes_com_os_sem_vinculo_demanda++;
+        if(exemplosSemVinculo.length<8) exemplosSemVinculo.push({solicitacao_id:Number(s.id),os_id:osId});
+      }
+      continue;
+    }
+    conta.solicitacoes_vinculadas_demanda_com_materiais++;
+    const reciclagem = normalizeSetorCorporativo(s.setor_solicitacao)==='RECICLAGEM'
+      || normalizeSetorCorporativo(s.setor_demanda)==='RECICLAGEM';
+    if(!reciclagem) continue;
+    conta.vinculadas_demanda_reciclagem++;
+    if(String(s.liberacao||'PENDENTE').trim().toUpperCase()==='LIBERADA') {
+      conta.vinculadas_demanda_reciclagem_liberadas++;
+    } else {
+      conta.vinculadas_demanda_reciclagem_pendentes++;
+      if(['CANCELADA','FECHADA','RECEBIDA_TOTAL','ENTREGUE_SOLICITANTE']
+          .includes(String(s.status||'ABERTA').trim().toUpperCase())) {
+        conta.candidatas_excluidas_pelo_status++;
+      }
+    }
+  }
+  return {disponivel:true,contagens:conta,exemplos_os_sem_demanda:exemplosSemVinculo};
+}
+
 function getDemandGate(solicitacaoId) {
   if (!tableExists('solicitacoes')) return null;
   const demandIdExpr = resolvedDemandIdSql('s');
@@ -138,4 +207,4 @@ function assertCompraLiberada(solicitacaoId) {
   }
 }
 
-module.exports = { resolvedDemandIdSql, listPreCotacoesDemandas, countPreCotacoesDemandas, getDemandGate, assertCompraLiberada };
+module.exports = { resolvedDemandIdSql, listPreCotacoesDemandas, countPreCotacoesDemandas, diagnosticarPreCotacoesDemandas, getDemandGate, assertCompraLiberada };
