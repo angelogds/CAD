@@ -235,10 +235,14 @@ function loadRows(filters = {}) {
   }
   // A OS pode transportar a referência da Demanda mesmo sem s.demanda_id.
   const demandIdExpr = resolvedDemandIdSql('s');
+  const normalOrigin = solCols.has('tipo_origem')
+    ? " AND UPPER(TRIM(COALESCE(s.tipo_origem,''))) <> 'DEMANDA'" : '';
   if (demandIdExpr !== 'NULL') {
     where.push(tableExists('demandas') && columns('demandas').has('liberacao_compras_status')
-      ? `(${demandIdExpr} IS NULL OR EXISTS (SELECT 1 FROM demandas dg WHERE dg.id=${demandIdExpr} AND UPPER(TRIM(COALESCE(dg.liberacao_compras_status,'PENDENTE')))='LIBERADA'))`
-      : `${demandIdExpr} IS NULL`);
+      ? `((${demandIdExpr} IS NULL${normalOrigin}) OR EXISTS (SELECT 1 FROM demandas dg WHERE dg.id=${demandIdExpr} AND UPPER(TRIM(COALESCE(dg.liberacao_compras_status,'PENDENTE')))='LIBERADA'))`
+      : `(${demandIdExpr} IS NULL${normalOrigin})`);
+  } else if (normalOrigin) {
+    where.push(normalOrigin.slice(5));
   }
 
   const solValue = solCols.has('valor_total') ? 'COALESCE(s.valor_total,0)' : '0';

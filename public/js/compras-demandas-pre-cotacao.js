@@ -9,7 +9,7 @@
 
   function isReciclagemSelecionada() {
     const setor = new URLSearchParams(window.location.search).get('setor');
-    return ['RECICLAGEM', 'MANUTENCAO', 'PRODUCAO'].includes(normalizeToken(setor));
+    return !setor || ['RECICLAGEM', 'MANUTENCAO', 'PRODUCAO'].includes(normalizeToken(setor));
   }
 
   function addPrequoteRow(list, row) {
@@ -70,6 +70,7 @@
 
     let initialRows;
     let total;
+    let pendentesVinculo = [];
     try {
       const response = await fetch('/compras/demandas/pre-cotacoes.json', {
         headers: { Accept: 'application/json' },
@@ -79,6 +80,7 @@
       if (!payload?.ok) return;
       initialRows = Array.isArray(payload.rows) ? payload.rows : [];
       total = Math.max(initialRows.length, Number(payload.total) || 0);
+      pendentesVinculo = Array.isArray(payload.pendentesVinculo) ? payload.pendentesVinculo : [];
     } catch (_error) {
       return;
     }
@@ -108,6 +110,27 @@
     count.append(countValue, countLabel);
     head.append(copy, count);
     section.append(head);
+
+    if (pendentesVinculo.length) {
+      const warning = document.createElement('div');
+      warning.className = 'demand-prequote-diagnostic';
+      warning.setAttribute('role', 'status');
+      const warningTitle = document.createElement('strong');
+      warningTitle.textContent = 'Solicitações de Demandas com vínculo pendente: ' + pendentesVinculo.length;
+      const warningText = document.createElement('p');
+      warningText.textContent = 'Estes materiais foram cadastrados como Demanda, mas perderam a referência de origem. Não entram na fila de compras até o vínculo ser conferido. Nenhuma Demanda será vinculada automaticamente por nome.';
+      const refs = document.createElement('ul');
+      pendentesVinculo.forEach(row => {
+        const item = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = '/compras/solicitacoes/' + row.id;
+        link.textContent = (row.numero || '#' + row.id) + ' — ' + (row.titulo || 'Solicitação sem título') + ' (' + Number(row.itens_count || 0) + ' itens)';
+        item.append(link);
+        refs.append(item);
+      });
+      warning.append(warningTitle, warningText, refs);
+      section.append(warning);
+    }
 
     if (!total) {
       const empty = document.createElement('div');
