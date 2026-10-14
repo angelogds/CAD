@@ -32,7 +32,7 @@ function resolvedDemandIdSql(alias = 's') {
         ORDER BY o.id DESC LIMIT 1)`);
     }
   }
-  return paths.length ? `COALESCE(${paths.join(', ')})` : 'NULL';
+  return paths.length > 1 ? `COALESCE(${paths.join(', ')})` : (paths[0] || 'NULL');
 }
 
 function buildPreCotacoesQuery() {
