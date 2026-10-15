@@ -1,26 +1,31 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/automacao.css?v=20261015-sim">
-<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261015-v1">
+<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261015-v2">
 <main class="auto-page auto-hmi" id="sim-digestores">
   <div class="auto-actions-top"><a class="auto-back-link" href="/automacao/digestores">← Voltar aos Digestores</a></div>
   <header class="auto-hero">
     <div><span class="auto-eyebrow">AUTOMAÇÃO • DIGESTORES • MODO DEMONSTRAÇÃO</span>
       <h1>Simulador dos Digestores</h1>
-      <p>Demonstração visual de aquecimento, contatores e alarmes — totalmente separada dos comandos reais.</p>
+      <p>Demonstração visual de aquecimento, sinaleiros e purgadores alternados de eixo e camisa, sem acionar equipamentos reais.</p>
     </div><span class="auto-state waiting">SIMULAÇÃO • SEM HARDWARE</span>
   </header>
-  <section class="auto-alert" role="status"><strong>Simulação, não operação</strong><span>Valores fictícios e faixas demonstrativas: atenção a partir de 110 °C, alarme a partir de 120 °C. Não transmite comandos ao CLP, ESP32, válvulas ou contatores reais.</span></section>
+  <section class="auto-alert" role="status"><strong>Simulação, não operação</strong><span>Somente apresentação: abaixo de 80 °C = carregado (vermelho), 80–119,9 °C = em cozimento (amarelo), a partir de 120 °C = pronto (verde). São faixas ilustrativas, NÃO alarmes reais. Nenhum comando é transmitido ao CLP, ESP32, válvulas ou contatores.</span></section>
   <div class="sim-toolbar">
     <button type="button" id="sim-start">▶ Iniciar simulação</button>
     <button type="button" id="sim-pause" disabled>Ⅱ Pausar</button>
     <button type="button" id="sim-reset">↺ Reiniciar</button>
     <label for="sim-speed">Velocidade</label><select id="sim-speed"><option value="1">1×</option><option value="3" selected>3×</option><option value="8">8×</option></select>
-    <span id="sim-clock" aria-live="polite">Tempo virtual: 00:00</span>
+    <span id="sim-clock" aria-live="polite">Tempo virtual: 00:00</span><small class="sim-speed-note">Purgadores: troca a cada 30 s virtuais; 3× = 10 s reais</small>
   </div>
   <section class="sim-grid" aria-label="Quatro digestores simulados">
     <% for(let id=1;id<=4;id++){ %>
       <article class="sim-vessel-card" data-digestor="<%= id %>">
         <header><div><small>D<%= id %> • SIMULADO</small><h2>Digestor <%= id %></h2></div><span class="sim-status" data-role="status">Parado</span></header>
+        <div class="sim-machine-row">
+          <div class="sim-signal-tower" data-role="tower" data-stage="red" role="img" aria-label="Sinaleiro simulado: vermelho ligado">
+            <span class="sim-lamp sim-lamp-red"></span><span class="sim-lamp sim-lamp-yellow"></span><span class="sim-lamp sim-lamp-green"></span><i class="sim-tower-pole"></i>
+            <small>Sinaleiro</small>
+          </div>
         <svg viewBox="0 0 280 145" role="img" aria-label="Desenho esquemático do digestor <%= id %>">
           <defs><linearGradient id="sim-metal-<%= id %>" x1="0" x2="1"><stop stop-color="#e9eef1"/><stop offset=".5" stop-color="#bfcad0"/><stop offset="1" stop-color="#8d9da5"/></linearGradient></defs>
           <path d="M28 118H253" stroke="#84949c" stroke-width="7" stroke-linecap="round"/>
@@ -32,18 +37,34 @@
           <circle class="sim-led" cx="218" cy="55" r="10" fill="#94a3ad" stroke="#fff" stroke-width="4"/>
           <text x="140" y="83" text-anchor="middle" fill="#344a54" font-size="19" font-weight="800">D<%= id %></text>
         </svg>
-        <div class="sim-temperature"><small>Temperatura simulada</small><strong data-role="temperature">30,0 °C</strong><div class="sim-track"><i data-role="bar"></i></div></div>
+        </div>
+        <div class="sim-temperature"><small>Temperatura simulada</small><strong data-role="temperature">30,0 °C</strong><div class="sim-track" data-role="progress" role="progressbar" aria-label="Progresso térmico simulado do digestor <%= id %>" aria-valuemin="30" aria-valuemax="120" aria-valuenow="30"><i data-role="bar"></i></div><div class="sim-scale"><span>Vermelho</span><span>Amarelo</span><span>Verde</span></div></div>
         <div class="sim-io">
           <span>Contator aquecimento <b data-role="contactor">DESLIGADO</b></span>
-          <span>Indicador térmico <b data-role="alarm">Normal</b></span>
+          <span>Etapa térmica <b data-role="alarm">Carregado / frio</b></span>
+        </div>
+        <div class="sim-purge" aria-label="Purgadores simulados do digestor <%= id %>">
+          <div class="sim-purge-head"><strong>Alternância dos purgadores</strong><span data-role="purga-countdown">Aguardando simulação</span></div>
+          <div class="sim-purge-grid">
+            <div class="sim-purger" data-role="camisa-box" data-state="closed">
+              <span class="sim-valve-icon" aria-hidden="true">◁▷</span>
+              <small>Camisa</small><b data-role="camisa-state">FECHADO</b>
+            </div>
+            <div class="sim-purger" data-role="eixo-box" data-state="closed">
+              <span class="sim-valve-icon" aria-hidden="true">◁▷</span>
+              <small>Eixo</small><b data-role="eixo-state">FECHADO</b>
+            </div>
+          </div>
+          <small class="sim-purge-note">Somente representação: um aberto por vez durante a simulação.</small>
         </div>
         <label class="sim-toggle"><input type="checkbox" data-role="enabled"> Habilitar aquecimento simulado</label>
       </article>
     <% } %>
   </section>
   <section class="auto-bottom-grid">
-    <article class="auto-panel"><h2>Faixas demonstrativas</h2><p><strong>Menor que 110 °C:</strong> aquecimento / normal · <strong>110 a 119,9 °C:</strong> atenção (amarelo) · <strong>120 °C ou mais:</strong> alarme (vermelho). Valores sujeitos à validação técnica.</p></article>
-    <article class="auto-panel"><h2>Limites do simulador</h2><p>Funciona somente no navegador, sem rede industrial e sem persistência. Os contatores são indicadores gráficos fictícios; não representam estados elétricos reais.</p></article>
+    <article class="auto-panel"><h2>Faixas demonstrativas</h2><p><strong>Abaixo de 80 °C:</strong> carregado / frio (vermelho) · <strong>80 a 119,9 °C:</strong> em cozimento (amarelo) · <strong>120 °C ou mais:</strong> pronto para descarga (verde). Cores de apresentação, NÃO substituem os limites de alarme e segurança reais.</p></article>
+    <article class="auto-panel"><h2>Limites do simulador</h2><p>Funciona apenas no navegador, sem rede industrial ou persistência. Os contatores e purgadores são gráficos fictícios; alternam em 30 segundos virtuais por digestor habilitado. Pausar congela a demonstração; reiniciar fecha ambos os purgadores.</p></article>
   </section>
 </main>
-<script src="/js/automacao-simulador.js?v=20261015-v1" defer></script>
+<script src="/js/automacao-simulador-core.js?v=20261015-v2" defer></script>
+<script src="/js/automacao-simulador.js?v=20261015-v2" defer></script>

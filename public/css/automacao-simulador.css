@@ -1,1 +1,39 @@
 .auto-actions-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.auto-back-link,.auto-simulator-link{display:inline-flex;align-items:center;text-decoration:none;border:1px solid #d5e2e4;border-radius:9px;background:#fff;padding:9px 12px;font-size:13px;font-weight:800;color:#375163}.auto-simulator-link{background:#e9f6ee;border-color:#b9d9c6;color:#11683d}.auto-actions-top a:hover,.auto-actions-top a:focus-visible{outline:2px solid #16834b;outline-offset:2px}.sim-toolbar{background:#fff;border:1px solid var(--auto-line);border-radius:14px;padding:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.sim-toolbar button,.sim-toolbar select{border:1px solid #bed4cf;background:#eaf4ed;color:#1c6744;border-radius:8px;padding:9px 12px;font-weight:800;cursor:pointer}.sim-toolbar button:disabled{opacity:.5;cursor:default}.sim-toolbar label{font-size:12px;font-weight:800}.sim-toolbar span{font-size:12px;margin-left:auto;color:#637782}.sim-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.sim-vessel-card{background:#fff;border:1px solid var(--auto-line);border-radius:16px;padding:14px;min-width:0}.sim-vessel-card header{display:flex;justify-content:space-between;align-items:center;gap:6px}.sim-vessel-card h2{font-size:17px;margin:2px 0;color:#183244}.sim-vessel-card header small{font-size:10px;font-weight:800;color:#76848d}.sim-status{font-size:10px;background:#e9eef1;color:#5e6e7a;border-radius:6px;padding:5px 8px}.sim-vessel-card svg{width:100%;height:145px;display:block}.sim-temperature{border-radius:11px;background:#f5f8f7;padding:12px}.sim-temperature small{color:#687985;font-size:11px}.sim-temperature strong{font-size:24px;color:#293f4a;display:block;margin:3px 0}.sim-track{height:9px;background:#dfe8e9;border-radius:99px;overflow:hidden}.sim-track i{display:block;width:0;height:100%;background:#16834b;transition:width .25s,background .25s}.sim-io{display:grid;gap:8px;font-size:11px;color:#5c6f7a;padding:12px 2px}.sim-io span{display:flex;justify-content:space-between;gap:8px}.sim-io b{color:#3e515f}.sim-toggle{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;border-top:1px solid #e2e9ec;padding-top:12px}.sim-toggle input{accent-color:#16834b}.sim-vessel-card.is-heating .sim-led{fill:#1caa64}.sim-vessel-card.is-warning .sim-led{fill:#e3a421}.sim-vessel-card.is-danger .sim-led{fill:#d94343}.sim-vessel-card.is-warning .sim-status{background:#fff1ca;color:#895f00}.sim-vessel-card.is-danger .sim-status{background:#ffdfdf;color:#a82222}@media(max-width:1130px){.sim-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:650px){.sim-grid{grid-template-columns:1fr}.sim-toolbar span{margin-left:0}}
+
+
+/* Simulação V2: sinalização luminosa e purgadores ilustrativos, sem efeito no CLP. */
+.sim-speed-note{flex-basis:100%;font-size:11px;color:#687985}
+.sim-machine-row{display:flex;gap:10px;align-items:center;justify-content:center;min-height:158px}
+.sim-vessel-card .sim-machine-row svg{flex:1;min-width:0;max-width:245px;width:calc(100% - 62px);height:145px}
+.sim-signal-tower{flex:0 0 44px;display:flex;align-items:center;flex-direction:column;gap:0;padding:5px 5px 0}
+.sim-signal-tower small{font-size:8px;color:#70828a;font-weight:800;text-transform:uppercase;margin-top:3px}
+.sim-lamp{width:25px;height:23px;border:2px solid #576a74;opacity:.25;box-shadow:inset 0 0 6px rgba(0,0,0,.25);transition:opacity .2s,box-shadow .2s}
+.sim-lamp-red{border-radius:8px 8px 0 0;background:#d53d3d}
+.sim-lamp-yellow{background:#e9b12e}
+.sim-lamp-green{border-radius:0 0 8px 8px;background:#23a866}
+.sim-tower-pole{display:block;height:13px;width:5px;background:#738792;border-radius:3px;margin-top:2px}
+.sim-signal-tower[data-stage="red"] .sim-lamp-red{opacity:1;box-shadow:0 0 14px #ef5d5d,inset 0 0 7px #fff}
+.sim-signal-tower[data-stage="yellow"] .sim-lamp-yellow{opacity:1;box-shadow:0 0 14px #f7cd55,inset 0 0 7px #fff}
+.sim-signal-tower[data-stage="green"] .sim-lamp-green{opacity:1;box-shadow:0 0 14px #4bd890,inset 0 0 7px #fff}
+.sim-temperature .sim-track{height:13px;background:linear-gradient(to right,#f2b9b9 0%,#f2b9b9 54%,#f9e1a5 55%,#f9e1a5 94%,#a2e6c6 95%,#a2e6c6 100%);border:1px solid #d6e2e3;overflow:visible;position:relative}
+.sim-temperature .sim-track i{height:100%;border-radius:99px;position:relative;transition:width .25s,background .25s;box-shadow:0 0 9px currentColor}
+.sim-stage-red .sim-track i{background:#d84040;color:#d84040}
+.sim-stage-yellow .sim-track i{background:#e2ae26;color:#e2ae26}
+.sim-stage-green .sim-track i{background:#1ba465;color:#1ba465}
+.sim-scale{display:flex;justify-content:space-between;gap:4px;margin-top:7px;font-size:10px;font-weight:800;color:#71838b}
+.sim-scale span:first-child{color:#c13e3e}.sim-scale span:nth-child(2){color:#aa7a14}.sim-scale span:last-child{color:#15824f}
+.sim-stage-red .sim-status{background:#fbe5e5;color:#a33131}
+.sim-stage-green .sim-status{background:#ddf4e8;color:#147747}
+.sim-purge{border:1px solid #e0e8ea;border-radius:11px;padding:10px;margin:7px 0 13px;background:#f8fafb}
+.sim-purge-head{display:flex;justify-content:space-between;gap:9px;flex-wrap:wrap;align-items:baseline;margin-bottom:10px}
+.sim-purge-head strong{color:#253f4b;font-size:12px}
+.sim-purge-head span{color:#617781;font-size:10px;font-weight:750}
+.sim-purge-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.sim-purger{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:3px 7px;border:1px solid #d8e2e5;background:#edf1f3;border-radius:9px;padding:8px 7px;color:#61737d}
+.sim-valve-icon{grid-row:span 2;font-size:20px;line-height:1;color:#82939b}
+.sim-purger small{font-size:10px;font-weight:700}
+.sim-purger b{font-size:11px;color:#596d78}
+.sim-purger[data-state="open"]{background:#dff5e9;border-color:#89caab;color:#196b42;box-shadow:inset 0 0 0 1px rgba(37,159,99,.1)}
+.sim-purger[data-state="open"] .sim-valve-icon,.sim-purger[data-state="open"] b{color:#13824f}
+.sim-purge-note{display:block;margin-top:8px;font-size:10px;color:#71848e}
+@media(max-width:650px){.sim-vessel-card .sim-machine-row svg{height:155px;max-width:270px}.sim-purge-head span{font-size:10px}}
