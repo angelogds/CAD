@@ -97,7 +97,7 @@
       get(item.card, 'status').textContent = item.fase === 'PRONTO'
         ? labels.PRONTO : item.enabled && !running ? 'Pausado' : labels[item.fase];
       get(item.card, 'cycle-clock').textContent = formatTime(item.cycleSeconds);
-      const begin = get(item.card, 'heat');
+      const begin = item.card.querySelector('[data-action="heat"]');
       begin.disabled = item.fase !== 'CARREGADO';
       begin.textContent = item.fase === 'PRONTO' ? '✓ Ciclo concluído' : '▶ Iniciar cozimento';
       for (const step of item.card.querySelectorAll('[data-step]')) {
