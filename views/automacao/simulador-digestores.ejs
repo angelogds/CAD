@@ -1,22 +1,27 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/automacao.css?v=20261015-sim">
 <link rel="stylesheet" href="/css/automacao-simulador.css?v=20261015-v3">
-<main class="auto-page auto-hmi" id="sim-digestores">
+<link rel="stylesheet" href="/css/automacao-simulador-apple.css?v=20261015-v1">
+<main class="auto-page auto-hmi sim-apple" id="sim-digestores">
   <div class="auto-actions-top"><a class="auto-back-link" href="/automacao/digestores">← Voltar aos Digestores</a></div>
-  <header class="auto-hero">
+  <header class="auto-hero sim-apple-hero">
     <div><span class="auto-eyebrow">AUTOMAÇÃO • DIGESTORES • MODO DEMONSTRAÇÃO</span>
       <h1>Simulador dos Digestores</h1>
       <p>Ciclo demonstrativo completo: carga, aquecimento, cozimento e material pronto. Quatro digestores independentes, sem acionar equipamentos reais.</p>
     </div><span class="auto-state waiting">SIMULAÇÃO • SEM HARDWARE</span>
   </header>
   <section class="auto-alert" role="status"><strong>Simulação, não operação</strong><span>Somente apresentação: abaixo de 80 °C = carregado (vermelho), 80–119,9 °C = em cozimento (amarelo), a partir de 120 °C = pronto (verde). São faixas ilustrativas, NÃO alarmes reais. Nenhum comando é transmitido ao CLP, ESP32, válvulas ou contatores.</span></section>
-  <div class="sim-toolbar">
+  <div class="sim-toolbar sim-control-surface" role="group" aria-label="Controles da simulação">
     <button type="button" id="sim-start">▶ Iniciar simulação</button>
     <button type="button" id="sim-pause" disabled>Ⅱ Pausar</button>
     <button type="button" id="sim-reset">↺ Reiniciar</button>
     <button type="button" id="sim-presentation" aria-pressed="false">⛶ Modo apresentação</button>
     <label for="sim-speed">Velocidade</label><select id="sim-speed"><option value="1">1×</option><option value="3" selected>3×</option><option value="8">8×</option></select>
     <span id="sim-clock" aria-live="polite">Tempo virtual: 00:00</span><small class="sim-speed-note">Purgadores: troca a cada 30 s virtuais; 3× = 10 s reais</small>
+  </div>
+  <div class="sim-section-heading">
+    <div><span class="sim-section-eyebrow">VISÃO DOS EQUIPAMENTOS</span><h2>Quatro digestores</h2></div>
+    <p>Indicações fictícias, independentes e atualizadas durante a demonstração.</p>
   </div>
   <section class="sim-grid" aria-label="Quatro digestores simulados">
     <% for(let id=1;id<=4;id++){ %>
@@ -70,7 +75,7 @@
           <span class="sim-unit-clock">Ciclo: <strong data-role="cycle-clock">00:00</strong></span>
         </div>
         <div class="sim-chart-panel">
-          <div class="sim-chart-heading"><strong>Temperatura × tempo</strong><small>Gráfico fictício</small></div>
+          <div class="sim-chart-heading"><strong>Temperatura × tempo</strong><small>Histórico simulado</small></div>
           <svg class="sim-chart" viewBox="0 0 260 90" role="img" aria-label="Histórico simulado de temperatura do digestor <%= id %>">
             <line x1="14" y1="15" x2="246" y2="15" class="sim-chart-guide"/>
             <line x1="14" y1="45" x2="246" y2="45" class="sim-chart-guide"/>
