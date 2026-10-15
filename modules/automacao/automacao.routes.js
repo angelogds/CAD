@@ -10,4 +10,6 @@ router.get('/decanters', requireLogin, requireRole(ACCESS.automacao_view), ctrl.
 
 router.get('/prensas', requireLogin, requireRole(ACCESS.automacao_view), ctrl.prensas);
 
+router.get('/digestores/simulador', requireLogin, requireRole(ACCESS.automacao_view), ctrl.simuladorDigestores);
+
 module.exports = router;
