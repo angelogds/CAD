@@ -1,9 +1,9 @@
 ---
 name: caldeira-cavaco
-description: Apoia estudo de viabilidade, engenharia conceitual e documentação preliminar de projetos novos ou retrofit de caldeiras industriais a vapor alimentadas com cavaco de madeira ou biomassa sólida. Acione para dimensionamento energético preliminar, fluxogramas, combustível, fornalha, alimentação, exaustão, instrumentação, CLP/IHM, lista de materiais e análise normativa/segurança.
+description: Auxilia engenharia conceitual e estudo de viabilidade de conversão de caldeira industrial originalmente a gás (tipo a confirmar) para combustão com cavaco de madeira, incluindo avaliação de compatibilidade, fornalha, silo/dosagem, balanço energético, exaustão, emissões, CLP/IHM, documentação e segurança NR-13; também apoia projetos novos a biomassa.
 ---
 
-# Skill — Projetos de Caldeira a Cavaco de Madeira
+# Skill — Conversão de Caldeira a Gás para Cavaco de Madeira
 
 ## Papel e limites
 
@@ -16,7 +16,7 @@ Não forneça sequências para burlar proteções ou operar com dispositivos de 
 ## Quando usar
 
 - Escolha e comparação de caldeiras a cavaco, lenha, pellets ou outras biomassas.
-- Estudo de troca de combustível em caldeira existente, inclusive conversão de gás para cavaco.
+- **Prioridade deste projeto: estudo de conversão de caldeira existente a gás para cavaco de madeira.** Confirmar tipo de gás atual, placa, tipo de caldeira e documentação; outros sentidos de conversão somente quando pedidos explicitamente.
 - Pré-dimensionamento da necessidade de vapor e estimativa do consumo de combustível.
 - Estudo de lay-out de armazenagem, alimentação de cavacos, fornalha, cinzas e limpeza de gases.
 - Arquitetura de instrumentação e automação, telas IHM e alarmes.
@@ -25,7 +25,21 @@ Não forneça sequências para burlar proteções ou operar com dispositivos de 
 ## Fluxo de trabalho — seguir na ordem
 
 ### 1. Definir a natureza do projeto
-Pergunte se é (A) aquisição de caldeira nova, (B) retrofit de caldeira existente, (C) atualização só da alimentação/combustão ou (D) diagnóstico/estudo. Em retrofit, determine antes de tudo se o fabricante e um PH autorizam/validam a alteração, se a arquitetura/troca térmica suporta o novo regime e se será necessário projeto de alteração ou reparo. **Nunca presumir** que caldeira a gás pode receber fornalha a cavaco diretamente.
+Pergunte se é (A) aquisição de caldeira nova, (B) retrofit de caldeira existente, (C) atualização só da alimentação/combustão ou (D) diagnóstico/estudo. Para este trabalho, registre explicitamente: **combustível atual = gás; combustível futuro = cavaco de madeira**. Pergunte qual gás, sem presumir GN/GLP/biogás. Em retrofit, determine antes de tudo se o fabricante e o profissional legalmente habilitado (PH) autorizam/validam a alteração, se a arquitetura/troca térmica suporta o novo regime e se será necessário projeto de alteração ou reparo. **Nunca presumir que caldeira a gás pode receber uma fornalha a cavaco diretamente.**
+
+### 1A. Projeto em foco: gás → cavaco (biomassa sólida)
+
+**Objetivo real confirmado:** avaliar conversão de **caldeira já operando com gás** para **cavaco de madeira**, NÃO o sentido inverso. O trabalho começa como **estudo conceitual** e não como ordem de modificação. A primeira decisão técnica é se o retrofit da caldeira existente é viável e seguro ou se convém uma caldeira específica para biomassa.
+
+- **Identificar o equipamento e verificar condição documental:** fotos legíveis da placa, tipo de caldeira (flamotubular/aquatubular), fabricante/modelo/ano, prontuário, projeto e histórico de inspeção, PMTA documentada, capacidade nominal e regime de vapor; não extrapolar o que fotos mostram.
+- **Levantar o regime a gás atual:** tipo de gás (natural, GLP, biogás ou outro), consumo e custo medidos, capacidade/curva do queimador, potência de entrada, geometria da câmara, temperatura/perfil de gases, caminhos de troca térmica, tiragem e características da chaminé.
+- **Caracterizar o cavaco a ser utilizado:** umidade na base informada, granulometria, PCI na condição real de recebimento, densidade aparente, teor de cinzas, contaminantes, disponibilidade e área para estoque. Se desconhecidos, marcar A MEDIR e usar cenários, nunca uma única hipótese travestida de medida.
+- **Verificar compatibilidade térmica e mecânica por fabricante/PH:** tipo/volume da fornalha, possibilidade de fornalha externa apropriada, geometria das passagens de gases, radiação/convecção, potencial de fuligem/incrustação e cinzas, temperaturas de metal/refratário, dilatações, contrapressão e acesso à limpeza. **É proibido presumir que basta remover o queimador e acoplar um alimentador de cavacos.**
+- **Estudar blocos adicionais:** pátio ou silo, combate a incêndio e segregações, extração do silo e dosagem, transportadores/roscas com prevenção de retorno de chama, fornalha/grelha fornecida por especialista, alimentação de ar de combustão, exaustor/tiragem, separação de particulados, cinzas, manutenção e inspeções.
+- **Estudar operação e automação:** ponto de medição de processo, matriz preliminar de riscos, modos de partida/parada para aprovação especializada, alarmes e supervisão na IHM, CLP de controle distinto das proteções de segurança requeridas. Priorizar dispositivos de segurança certificados quando exigíveis e análise de falhas.
+- **Verificar exigências legais antes de intervenção:** NR-13, projeto de alteração/reparo quando aplicável, responsável habilitado/ART, exigências do fabricante, avaliação ambiental/emissões, Corpo de Bombeiros e autorizações/inspeções. Não declarar caldeira apta para operação pela conclusão deste estudo.
+
+**Entregáveis preliminares:** diagnóstico comparativo gás × cavaco, memorial conceitual, estimativa de consumo com cenários, fluxograma de processo, desenho de interfaces com limites de bateria, levantamento de materiais por blocos, lista de pendências técnicas e relatório de viabilidade com recomendação de retrofit versus substituição. O projeto executivo e o comissionamento devem ser realizados e aprovados pelos profissionais competentes.
 
 ### 2. Levantamento de dados de campo
 Organize como CONFIRMADO, A MEDIR ou HIPÓTESE:
@@ -33,6 +47,7 @@ Organize como CONFIRMADO, A MEDIR ou HIPÓTESE:
 - Produção nominal, média e de pico de vapor (kg/h ou t/h); pressão/temperatura requeridas (sem impor valores); qualidade do vapor, regime e simultaneidade de consumo.
 - Água de alimentação: temperatura, tratamento, reposição, condensado recuperado, purga e disponibilidade.
 - Biomassa: espécie/proveniência, granulometria, teor de umidade (% base especificada), PCI **na condição de recebimento**, cinzas, densidade aparente, contaminantes e estabilidade de fornecimento.
+- Sistema atual a gás: gás utilizado e condições de suprimento, consumo real e sua unidade/base de medição (kg/h, m³/h, Nm³/h), queimador e potência, geometria e condição da câmara, temperatura e caminho dos gases e esquema atual de combustão. Não misturar Nm³/h com m³/h.
 - Área disponível, acessos, fundações, silo/pátio, alimentação elétrica, ruído, vias de fuga, ventilação, chaminé e acessos de manutenção.
 - Potências existentes, operação, perfil de turnos, custos reais e licenças ambientais.
 - Interface com linhas de vapor, válvulas, bombas, digestores, prensas e outros consumidores.
@@ -44,6 +59,7 @@ Use dados de propriedades de água/vapor em tabelas reconhecidas, na pressão/te
 - Potência térmica útil aproximada: Q_util [kJ/h] = vazão de vapor [kg/h] × (entalpia vapor - entalpia água de alimentação) [kJ/kg].
 - Potência térmica do combustível: Q_comb = Q_util / rendimento global adotado, deixando claro que o rendimento é uma **hipótese** até medição/projeto.
 - Consumo teórico de cavaco: vazão cavaco [kg/h] = Q_comb [kJ/h] / PCI recebido [kJ/kg].
+- Para comparação **gás atual → cavaco proposto**, levantar consumo energético real do gás com sua composição, poder calorífico, unidades e condições de referência; calcular cenários independentes de rendimento para cada combustível, sem fixar a priori a eficiência do retrofit e sem usar histórico não medido como fato.
 - Cenários com variação de umidade e rendimento; considerar perdas, partidas, modulação, disponibilidade, cinzas e dimensionamento do estoque com base em consumo diário.
 - Se dados insuficientes: oferecer planilha de parâmetros e intervalo de cenários explicitamente hipotéticos; não fornecer número final como fato.
 
@@ -53,7 +69,7 @@ Esta estimativa **não dimensiona superfícies de aquecimento, pressurização, 
 Divida o estudo em blocos funcionais:
 1. Recebimento, secagem/armazenagem segregada e medição do cavaco.
 2. Extração do silo, transportadores/roscas, dosagem e barreiras de proteção contra retorno de chama/incêndio, conforme análise de riscos.
-3. Alimentador e tecnologia da fornalha/grelha selecionados por fornecedor especializado; ar primário/secundário, tiragem e exaustão.
+3. Alimentador e tecnologia da fornalha/grelha selecionados por fornecedor especializado; ar primário/secundário, tiragem e exaustão. Em retrofit de gás para cavaco, avaliar **fornalha externa apropriada** como alternativa conceitual e confirmar integração térmica/fluxo de gases com fabricante e PH, sem propor acoplamento direto sem projeto.
 4. Caldeira e circuito água-vapor existentes ou novos, conforme projeto validado.
 5. Tratamento de água, tanque de alimentação/desaeração quando aplicável, bombas, condensado e purgas.
 6. Remoção de cinzas, particulados (multiciclone/filtro conforme estudo), chaminé e monitoramento ambiental.
@@ -64,7 +80,7 @@ Em fluxogramas preliminares, identifique sentido dos fluxos, limites de bateria 
 ### 5. Automação e segurança
 Proponha lista de pontos de medição **sem inventar faixas e ajustes**: pressão do vapor, nível da água, temperatura água/gases, estado de ventiladores, tiragem, combustível, fluxo/ar e condições do alimentador. Use tags coerentes e reserve a confirmação dos pontos pela análise de riscos.
 
-Registre os cenários a serem analisados por PH/especialistas: baixo nível de água, pressão excessiva, perda de chama/combustão instável, retorno de chama pela alimentação, perda de tiragem, falha elétrica, travamento de rosca, incêndio/explosão de pó, ruptura de correias/transportadores, falta de água, emissões fora do permitido.
+Registre os cenários a serem analisados por PH/especialistas: baixo nível de água, pressão excessiva, perda de chama/combustão instável, retorno de chama pela alimentação, perda de tiragem, falha elétrica, travamento de rosca, incêndio/explosão de pó, ruptura de correias/transportadores, falta de água, emissões fora do permitido. Na transição do equipamento a gás para cavaco, acrescentar a avaliação de isolamento/remoção da instalação de gás existente conforme projeto e normas aplicáveis, prevenção de acúmulo de combustíveis e riscos térmicos da nova fornalha.
 
 Diferencie **controle**, **alarme**, **permissivo** e **proteção independente**. Descreva condições esperadas de parada segura apenas de forma conceitual; não proponha parametrizações finais de segurança. A IHM apenas representa estados e permite comandos autorizados, não dispensa dispositivos independentes.
 
@@ -85,7 +101,7 @@ Não declarar conformidade legal apenas porque um item consta deste checklist; c
 
 ### 7. Entregáveis por etapa
 Entregar conforme o estágio e pedido do usuário:
-- Estudo de viabilidade (nova × retrofit), premissas, alternativas e critérios de decisão.
+- Estudo de viabilidade (**adaptar a caldeira a gás atual para cavaco × substituir por caldeira própria para biomassa**), premissas, alternativas e critérios de decisão.
 - Tabela de levantamento de campo: parâmetro, valor, unidade, origem, status, responsável.
 - Balanço energético e comparação de cenários com equações, hipóteses e sensibilidade.
 - Fluxograma de processo, layout conceitual e interfaces com equipamentos da unidade.
