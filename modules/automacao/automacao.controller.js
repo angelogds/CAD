@@ -35,4 +35,11 @@ function prensas(req, res) {
   });
 }
 
-module.exports = { index, digestores, decanters, prensas };
+function simuladorDigestores(req, res) {
+  return res.render('automacao/simulador-digestores', {
+    title: 'Automação - Simulador dos Digestores',
+    activeMenu: 'automacao',
+  });
+}
+
+module.exports = { index, digestores, decanters, prensas, simuladorDigestores };

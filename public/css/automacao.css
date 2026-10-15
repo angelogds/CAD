@@ -7,3 +7,6 @@
 
 /* Navegação leve e responsiva entre áreas da IHM. */
 .auto-area-nav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 18px}.auto-area-nav a{border:1px solid #dbe5e8;border-radius:9px;padding:9px 12px;background:#fff;color:#415865;font-size:12px;font-weight:750;text-decoration:none}.auto-area-nav a:hover,.auto-area-nav a:focus-visible{border-color:#16834b;color:#137246;outline:2px solid transparent}.auto-area-nav a[aria-current="page"]{background:#eaf5ee;border-color:#9ccbb0;color:#126e3d}.auto-area-nav-label{font-size:11px;font-weight:800;color:#687c87;margin-right:4px}
+
+/* Ações comuns do cabeçalho das telas de automação */
+.auto-actions-top{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 12px}.auto-back-link,.auto-simulator-link{display:inline-flex;align-items:center;text-decoration:none;border:1px solid #d5e2e4;border-radius:9px;background:#fff;padding:9px 12px;font-size:13px;font-weight:800;color:#375163}.auto-simulator-link{background:#e9f6ee;border-color:#b9d9c6;color:#11683d}.auto-actions-top a:hover,.auto-actions-top a:focus-visible{outline:2px solid #16834b;outline-offset:2px}
