@@ -1,12 +1,12 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/automacao.css?v=20261015-sim">
-<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261015-v2">
+<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261015-v3">
 <main class="auto-page auto-hmi" id="sim-digestores">
   <div class="auto-actions-top"><a class="auto-back-link" href="/automacao/digestores">← Voltar aos Digestores</a></div>
   <header class="auto-hero">
     <div><span class="auto-eyebrow">AUTOMAÇÃO • DIGESTORES • MODO DEMONSTRAÇÃO</span>
       <h1>Simulador dos Digestores</h1>
-      <p>Demonstração visual de aquecimento, sinaleiros e purgadores alternados de eixo e camisa, sem acionar equipamentos reais.</p>
+      <p>Ciclo demonstrativo completo: carga, aquecimento, cozimento e material pronto. Quatro digestores independentes, sem acionar equipamentos reais.</p>
     </div><span class="auto-state waiting">SIMULAÇÃO • SEM HARDWARE</span>
   </header>
   <section class="auto-alert" role="status"><strong>Simulação, não operação</strong><span>Somente apresentação: abaixo de 80 °C = carregado (vermelho), 80–119,9 °C = em cozimento (amarelo), a partir de 120 °C = pronto (verde). São faixas ilustrativas, NÃO alarmes reais. Nenhum comando é transmitido ao CLP, ESP32, válvulas ou contatores.</span></section>
@@ -14,13 +14,20 @@
     <button type="button" id="sim-start">▶ Iniciar simulação</button>
     <button type="button" id="sim-pause" disabled>Ⅱ Pausar</button>
     <button type="button" id="sim-reset">↺ Reiniciar</button>
+    <button type="button" id="sim-presentation" aria-pressed="false">⛶ Modo apresentação</button>
     <label for="sim-speed">Velocidade</label><select id="sim-speed"><option value="1">1×</option><option value="3" selected>3×</option><option value="8">8×</option></select>
     <span id="sim-clock" aria-live="polite">Tempo virtual: 00:00</span><small class="sim-speed-note">Purgadores: troca a cada 30 s virtuais; 3× = 10 s reais</small>
   </div>
   <section class="sim-grid" aria-label="Quatro digestores simulados">
     <% for(let id=1;id<=4;id++){ %>
       <article class="sim-vessel-card" data-digestor="<%= id %>">
-        <header><div><small>D<%= id %> • SIMULADO</small><h2>Digestor <%= id %></h2></div><span class="sim-status" data-role="status">Parado</span></header>
+        <header><div><small>D<%= id %> • SIMULADO</small><h2>Digestor <%= id %></h2></div><span class="sim-status" data-role="status">Carregado</span></header>
+        <div class="sim-cycle-steps" aria-label="Etapas simuladas do ciclo">
+          <span data-step="CARREGADO" class="is-current">1. Carregado</span>
+          <span data-step="AQUECIMENTO">2. Aquecimento</span>
+          <span data-step="COZIMENTO">3. Cozimento</span>
+          <span data-step="PRONTO">4. Pronto</span>
+        </div>
         <div class="sim-machine-row">
           <div class="sim-signal-tower" data-role="tower" data-stage="red" role="img" aria-label="Sinaleiro simulado: vermelho ligado">
             <span class="sim-lamp sim-lamp-red"></span><span class="sim-lamp sim-lamp-yellow"></span><span class="sim-lamp sim-lamp-green"></span><i class="sim-tower-pole"></i>
@@ -47,24 +54,51 @@
           <div class="sim-purge-head"><strong>Alternância dos purgadores</strong><span data-role="purga-countdown">Aguardando simulação</span></div>
           <div class="sim-purge-grid">
             <div class="sim-purger" data-role="camisa-box" data-state="closed">
-              <span class="sim-valve-icon" aria-hidden="true">◁▷</span>
+              <span class="sim-valve-icon" data-role="camisa-icon" aria-hidden="true">◁▷</span>
               <small>Camisa</small><b data-role="camisa-state">FECHADO</b>
             </div>
             <div class="sim-purger" data-role="eixo-box" data-state="closed">
-              <span class="sim-valve-icon" aria-hidden="true">◁▷</span>
+              <span class="sim-valve-icon" data-role="eixo-icon" aria-hidden="true">◁▷</span>
               <small>Eixo</small><b data-role="eixo-state">FECHADO</b>
             </div>
           </div>
           <small class="sim-purge-note">Somente representação: um aberto por vez durante a simulação.</small>
         </div>
-        <label class="sim-toggle"><input type="checkbox" data-role="enabled"> Habilitar aquecimento simulado</label>
+        <div class="sim-card-controls">
+          <button type="button" data-action="load">↺ Carregar material</button>
+          <button type="button" data-action="heat">▶ Iniciar cozimento</button>
+          <span class="sim-unit-clock">Ciclo: <strong data-role="cycle-clock">00:00</strong></span>
+        </div>
+        <div class="sim-chart-panel">
+          <div class="sim-chart-heading"><strong>Temperatura × tempo</strong><small>Gráfico fictício</small></div>
+          <svg class="sim-chart" viewBox="0 0 260 90" role="img" aria-label="Histórico simulado de temperatura do digestor <%= id %>">
+            <line x1="14" y1="15" x2="246" y2="15" class="sim-chart-guide"/>
+            <line x1="14" y1="45" x2="246" y2="45" class="sim-chart-guide"/>
+            <line x1="14" y1="77" x2="246" y2="77" class="sim-chart-guide"/>
+            <polyline data-role="chart-line" points="14,77" class="sim-chart-line"/>
+          </svg>
+          <small class="sim-chart-caption">Amostras geradas somente durante esta apresentação.</small>
+        </div>
       </article>
     <% } %>
+  </section>
+  <section class="sim-events-panel" aria-label="Histórico dos eventos simulados">
+    <div class="sim-events-title">
+      <div><h2>Histórico da simulação</h2><p>Carregamentos, partidas, mudanças de fase e inversões dos purgadores.</p></div>
+      <label for="sim-events-filter">Exibir
+        <select id="sim-events-filter">
+          <option value="all">Todos os digestores</option>
+          <% for(let id=1;id<=4;id++){ %><option value="<%= id %>">Digestor <%= id %></option><% } %>
+        </select>
+      </label>
+    </div>
+    <ol id="sim-events-list" class="sim-events-list" aria-live="polite" aria-relevant="additions text"></ol>
+    <small>Histórico local e temporário; apagado ao reiniciar ou atualizar a página.</small>
   </section>
   <section class="auto-bottom-grid">
     <article class="auto-panel"><h2>Faixas demonstrativas</h2><p><strong>Abaixo de 80 °C:</strong> carregado / frio (vermelho) · <strong>80 a 119,9 °C:</strong> em cozimento (amarelo) · <strong>120 °C ou mais:</strong> pronto para descarga (verde). Cores de apresentação, NÃO substituem os limites de alarme e segurança reais.</p></article>
     <article class="auto-panel"><h2>Limites do simulador</h2><p>Funciona apenas no navegador, sem rede industrial ou persistência. Os contatores e purgadores são gráficos fictícios; alternam em 30 segundos virtuais por digestor habilitado. Pausar congela a demonstração; reiniciar fecha ambos os purgadores.</p></article>
   </section>
 </main>
-<script src="/js/automacao-simulador-core.js?v=20261015-v2" defer></script>
-<script src="/js/automacao-simulador.js?v=20261015-v2" defer></script>
+<script src="/js/automacao-simulador-core.js?v=20261015-v3" defer></script>
+<script src="/js/automacao-simulador.js?v=20261015-v3" defer></script>

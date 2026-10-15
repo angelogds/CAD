@@ -37,3 +37,49 @@
 .sim-purger[data-state="open"] .sim-valve-icon,.sim-purger[data-state="open"] b{color:#13824f}
 .sim-purge-note{display:block;margin-top:8px;font-size:10px;color:#71848e}
 @media(max-width:650px){.sim-vessel-card .sim-machine-row svg{height:155px;max-width:270px}.sim-purge-head span{font-size:10px}}
+
+
+/* Simulador V3: mantém o estilo claro e destaca cada etapa do ciclo. */
+.sim-cycle-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;margin:13px 0 7px}
+.sim-cycle-steps span{padding:6px 3px;text-align:center;border-radius:6px;background:#ecf1f3;color:#6f838e;font-size:9px;font-weight:800}
+.sim-cycle-steps .is-done{background:#e4f3ea;color:#337955}
+.sim-cycle-steps .is-current{background:#d9ebe3;color:#115d3a;box-shadow:inset 0 0 0 1px #78b69a}
+.sim-stage-red .sim-cycle-steps [data-step="CARREGADO"].is-current{background:#fae1e0;color:#ac3736;border-color:#d68d8b}
+.sim-stage-yellow .sim-cycle-steps .is-current{background:#fff1ca;color:#9b710d;box-shadow:inset 0 0 0 1px #edd68b}
+.sim-unit-clock{display:flex;align-items:center;gap:5px;font-size:11px;color:#667987;font-weight:750}
+.sim-unit-clock strong{color:#263c49;font-size:14px;font-variant-numeric:tabular-nums}
+.sim-card-controls{display:flex;gap:7px;flex-wrap:wrap;align-items:center;border-top:1px solid #e1eaeb;padding:11px 0;margin-top:2px}
+.sim-card-controls button{border:1px solid #c7dbd3;border-radius:8px;background:#eaf6ef;color:#176943;cursor:pointer;font-size:11px;font-weight:800;padding:8px 9px}
+.sim-card-controls button:first-child{background:#fff;color:#415e69;border-color:#d1dedf}
+.sim-card-controls button:hover,.sim-card-controls button:focus-visible{outline:2px solid #16834b;outline-offset:1px}
+.sim-card-controls button:disabled{opacity:.45;cursor:default;outline:0}
+.sim-chart-panel{background:#f7faf9;border:1px solid #dfe9e8;border-radius:12px;padding:10px}
+.sim-chart-heading{display:flex;align-items:center;justify-content:space-between;gap:5px}
+.sim-chart-heading strong{font-size:11px;color:#243f4e}
+.sim-chart-heading small,.sim-chart-caption{font-size:9px;color:#7a8b94}
+.sim-vessel-card .sim-chart{width:100%;height:104px;margin:3px 0;display:block;background:#fff;border-radius:7px;max-width:none}
+.sim-chart-guide{stroke:#e1e9eb;stroke-width:1;stroke-dasharray:4 3}
+.sim-chart-line{fill:none;stroke:#cd4947;stroke-width:2.75;stroke-linecap:round;stroke-linejoin:round;transition:stroke .25s}
+.sim-stage-yellow .sim-chart-line{stroke:#bd9220}
+.sim-stage-green .sim-chart-line{stroke:#1a9765}
+.sim-purger .sim-valve-icon{display:block;transition:transform .3s,filter .3s;white-space:pre}
+.sim-purger[data-state="open"] .sim-valve-icon{transform:scale(1.15);filter:drop-shadow(0 0 4px #62c894)}
+.sim-events-panel{margin:16px 0;padding:20px;background:#fff;border:1px solid var(--auto-line);border-radius:14px}
+.sim-events-title{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;flex-wrap:wrap}
+.sim-events-title h2{margin:0;font-size:17px;color:#1e3948}
+.sim-events-title p{margin:5px 0;color:#697d89;font-size:12px}
+.sim-events-title label{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;color:#52727d}
+.sim-events-title select{border:1px solid #d0dddf;border-radius:8px;padding:8px;background:#fff;color:#2c4b58;font-weight:750}
+.sim-events-list{list-style:none;padding:0;margin:13px 0;max-height:240px;overflow:auto;border-top:1px solid #ecf0f1}
+.sim-events-list li{display:flex;gap:9px;align-items:center;padding:9px 5px;border-bottom:1px solid #edf2f2;font-size:11px;color:#445c68}
+.sim-events-list time{font-variant-numeric:tabular-nums;color:#718995;min-width:39px}
+.sim-events-list strong{color:#116c42;min-width:26px}
+.sim-events-panel>small{font-size:10px;color:#71838b}
+.sim-presenting{max-width:none;padding:14px 18px}
+.sim-presenting .auto-hero h1{font-size:34px}
+.sim-presenting .sim-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.sim-presenting .sim-vessel-card{padding:19px}
+.sim-presenting .sim-machine-row svg{max-width:330px;height:175px}
+.sim-presenting .sim-temperature strong{font-size:30px}
+.sim-presenting .sim-events-panel{max-height:300px;overflow:auto}
+@media(max-width:760px){.sim-presenting .sim-grid{grid-template-columns:1fr}.sim-cycle-steps span{font-size:8px}.sim-card-controls button{flex:1}}
