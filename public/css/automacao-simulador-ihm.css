@@ -1,0 +1,192 @@
+/* IHM industrial V5 — camada de apresentação, baseada na skill Apple Design:
+   hierarquia, resposta direta, profundidade contida, contraste e movimento opcional.
+   Este arquivo não define estados de processo nem interage com equipamentos físicos. */
+.sim-hmi {
+  --hmi-navy:#0e2834;
+  --hmi-panel:#123541;
+  --hmi-panel-2:#1a414d;
+  --hmi-line:#335762;
+  --hmi-neon:#48caa0;
+  --hmi-ink:#183541;
+  --hmi-dim:#607987;
+  --hmi-border:#cbdde2;
+  --hmi-glow:0 1px 2px rgba(12,38,52,.05), 0 13px 33px rgba(12,38,52,.085);
+  background:linear-gradient(180deg,#eef4f5 0%,#f3f7f8 340px,#f8fbfc 100%);
+  color:var(--hmi-ink);
+  border-radius:15px;
+  max-width:none;
+}
+.sim-hmi .auto-actions-top{margin-bottom:15px}
+.sim-hmi .auto-back-link{border-color:#c9dcdf;color:#294b5c;background:#fff;border-radius:9px;font-size:12px}
+.sim-hmi .sim-hmi-hero{
+  position:relative;display:flex;align-items:center;justify-content:space-between;
+  padding:25px 28px;gap:20px;border-radius:16px;margin-bottom:14px;
+  background:radial-gradient(circle at 85% 0%,#245360 0%,transparent 35%),linear-gradient(120deg,#102c3a 0%,#173c49 100%);
+  border:1px solid #275563;box-shadow:0 14px 30px rgba(7,30,43,.16);
+  overflow:hidden;
+}
+.sim-hmi .sim-hmi-hero::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.17;
+  background-image:linear-gradient(rgba(150,208,209,.35) 1px,transparent 1px),linear-gradient(90deg,rgba(150,208,209,.35) 1px,transparent 1px);
+  background-size:24px 24px;mask-image:linear-gradient(to left,#000,transparent 75%);
+}
+.sim-hmi .sim-hmi-hero>div{position:relative;z-index:1}
+.sim-hmi .sim-hmi-hero .auto-eyebrow{color:#83d9c1;font-size:10px;letter-spacing:.13em;font-weight:800}
+.sim-hmi .sim-hmi-hero h1{color:#f4fcff;font-size:clamp(24px,2.45vw,36px);font-weight:800;margin:8px 0;letter-spacing:-.035em}
+.sim-hmi .sim-hmi-hero p{color:#c3dce4;line-height:1.55;max-width:670px;font-size:12px}
+.sim-hmi .sim-hmi-hero-status{display:flex;align-items:flex-end;flex-direction:column;gap:7px;min-width:max-content}
+.sim-hmi .sim-hmi-hero-status .auto-state{background:#eec774;color:#3e311a;border:1px solid #f1d591;font-weight:900;border-radius:9px;box-shadow:none;letter-spacing:.03em}
+.sim-hmi .sim-hmi-hero-caption{color:#b0cbd2;font-size:10px;font-weight:650}
+.sim-hmi .auto-alert{background:#fffbec;border:1px solid #f0e1bc;border-left:4px solid #c88f2f;color:#63542f;box-shadow:none;margin-bottom:13px}
+.sim-hmi .auto-alert strong{color:#80611e}
+.sim-hmi .sim-control-surface{margin-bottom:24px;background:#fff;border:1px solid #d1dfe3;border-radius:13px;box-shadow:var(--hmi-glow);padding:12px 15px;gap:9px}
+.sim-hmi .sim-hmi-toolbar-heading{display:inline-flex;align-items:center;white-space:nowrap;gap:8px;margin-right:8px;font-weight:900;letter-spacing:.08em;font-size:10px;color:#34505d}
+.sim-hmi .sim-hmi-toolbar-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#39b990;box-shadow:0 0 0 4px #e3f5ee}
+.sim-hmi .sim-control-surface button,
+.sim-hmi .sim-control-surface select{border-radius:9px;min-height:41px;font-weight:800;transition:transform .12s ease,background-color .16s ease,box-shadow .16s ease}
+.sim-hmi .sim-control-surface #sim-start{background:#197a57;border-color:#197a57}
+.sim-hmi .sim-control-surface #sim-clock{border-radius:9px;background:#eaf2f3;color:#1e4350;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.sim-hmi .sim-control-surface .sim-speed-note{font-size:10px;color:#647e88}
+.sim-hmi .sim-section-heading{margin:4px 0 13px}
+.sim-hmi .sim-section-eyebrow{font-weight:900;letter-spacing:.12em;font-size:10px;color:#248065}
+.sim-hmi .sim-section-heading h2{font-size:22px;font-weight:850;letter-spacing:-.02em}
+.sim-hmi .sim-section-heading p{color:#597481;font-size:11px}
+.sim-hmi .sim-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:20px}
+.sim-hmi .sim-vessel-card{
+  background:#fff;border:1px solid var(--hmi-border);border-top:4px solid #9eb2b9;border-radius:13px;
+  box-shadow:var(--hmi-glow);padding:16px;column-gap:13px;row-gap:12px;
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  grid-template-areas:"head head" "steps steps" "machine temp" "machine indicators" "purge chart" "controls chart";
+  grid-template-rows:auto auto auto auto auto auto;
+  overflow:hidden;min-width:0;
+}
+.sim-hmi .sim-vessel-card.sim-stage-red{border-top-color:#c85d57}
+.sim-hmi .sim-vessel-card.sim-stage-yellow{border-top-color:#c69b37}
+.sim-hmi .sim-vessel-card.sim-stage-green{border-top-color:#1f9c70}
+.sim-hmi .sim-vessel-card>header{grid-area:head;border-bottom:1px solid #e0ebed;padding:0 1px 10px}
+.sim-hmi .sim-vessel-card>header h2{font-size:21px;letter-spacing:-.03em;color:#153847}
+.sim-hmi .sim-hmi-tag{letter-spacing:.11em;font-weight:900;color:#477a84!important;font-size:10px!important}
+.sim-hmi .sim-status{background:#edf3f4;font-size:10px;font-weight:850;min-height:32px;letter-spacing:.015em;border:1px solid #dae4e5;border-radius:7px}
+.sim-hmi .sim-vessel-card.sim-stage-red .sim-status{background:#f9e9e6;color:#a5493f;border-color:#f0d0c9}
+.sim-hmi .sim-vessel-card.sim-stage-yellow .sim-status{background:#fff1d3;color:#846019;border-color:#ead9ad}
+.sim-hmi .sim-vessel-card.sim-stage-green .sim-status{background:#e4f7ed;color:#176f4b;border-color:#b9dfca}
+.sim-hmi .sim-cycle-steps{grid-area:steps;gap:4px;margin:0}
+.sim-hmi .sim-cycle-steps span{background:#eef3f5;color:#647d88;font-size:9px;font-weight:900;border-radius:5px;padding:8px 3px;border-bottom:2px solid #d4e0e2}
+.sim-hmi .sim-cycle-steps .is-current{color:#124b43;background:#e0efe8;box-shadow:none;border-bottom-color:#2fa57f}
+.sim-hmi .sim-cycle-steps .is-done{color:#2c7561;background:#e5f2ec;border-bottom-color:#96c7b0}
+.sim-hmi .sim-stage-red .sim-cycle-steps .is-current{color:#a43f39;background:#fbe9e7;border-bottom-color:#cb5f54}
+.sim-hmi .sim-stage-yellow .sim-cycle-steps .is-current{color:#805b11;background:#fff1cd;border-bottom-color:#cea63c}
+.sim-hmi .sim-stage-green .sim-cycle-steps .is-current{color:#166d4b;background:#e1f6ea;border-bottom-color:#21875e}
+.sim-hmi .sim-machine-row{
+  position:relative;grid-area:machine;min-height:180px;align-items:center;justify-content:center;gap:4px;
+  background:radial-gradient(circle at 50% 40%,#1b4c59 0%,#103440 62%,#0f2b36 100%);
+  border:1px solid #325662;border-radius:9px;padding:20px 6px 8px;overflow:hidden;
+}
+.sim-hmi .sim-machine-row::after{content:"";position:absolute;pointer-events:none;inset:0;opacity:.24;
+  background-image:linear-gradient(#44717b 1px,transparent 1px),linear-gradient(90deg,#44717b 1px,transparent 1px);
+  background-size:22px 22px;
+}
+.sim-hmi .sim-machine-row .sim-hmi-diagram-label{
+  position:absolute;z-index:2;top:8px;left:10px;color:#b6d2d7;font-size:9px;font-weight:900;letter-spacing:.13em
+}
+.sim-hmi .sim-vessel-card .sim-machine-row svg{
+  z-index:1;position:relative;max-width:295px;width:calc(100% - 54px);height:155px;filter:drop-shadow(0 5px 6px rgba(4,18,23,.45))
+}
+.sim-hmi .sim-machine-row .sim-signal-tower{position:relative;z-index:2;flex-basis:45px;background:rgba(13,38,48,.72);padding:7px 4px 6px;border-radius:7px;border:1px solid #315965}
+.sim-hmi .sim-signal-tower small{color:#c0dbe0;font-size:8px}
+.sim-hmi .sim-temperature{
+  grid-area:temp;min-width:0;
+  background:linear-gradient(145deg,#163948,#0e2a36);color:#e8f7f8;
+  border:1px solid #325463;border-radius:9px;padding:15px;
+}
+.sim-hmi .sim-temperature small{color:#b6d5dd;font-size:10px;letter-spacing:.055em;font-weight:900}
+.sim-hmi .sim-temperature strong{display:block;font-size:clamp(26px,3vw,42px);line-height:1.1;margin:12px 0 15px;font-weight:750;letter-spacing:-.045em;color:#f4fcff;font-variant-numeric:tabular-nums;text-shadow:0 0 12px rgba(120,210,220,.12)}
+.sim-hmi .sim-temperature .sim-track{height:15px;background:linear-gradient(90deg,#a85c5c 0%,#a85c5c 54%,#b69842 55%,#b69842 94%,#4ea888 95%);border-color:#3f6472;border-radius:5px}
+.sim-hmi .sim-temperature .sim-track i{border-radius:4px}
+.sim-hmi .sim-scale{font-size:9px}
+.sim-hmi .sim-scale span:first-child{color:#ffaaa4}
+.sim-hmi .sim-scale span:nth-child(2){color:#ffd987}
+.sim-hmi .sim-scale span:last-child{color:#91e8bf}
+.sim-hmi .sim-io{
+  grid-area:indicators;display:grid;grid-template-columns:1fr;align-self:stretch;gap:7px;padding:0;color:#41616d;min-width:0
+}
+.sim-hmi .sim-io span{display:flex;flex-direction:column;justify-content:center;gap:3px;font-size:10px;
+  padding:9px 11px;border:1px solid #dbe7e9;border-radius:7px;background:#f5f9fa
+}
+.sim-hmi .sim-io b{display:flex;align-items:center;gap:7px;text-align:left;color:#244857;font-size:11px}
+.sim-hmi .sim-io b::before{content:"";display:inline-block;width:8px;height:8px;border-radius:100%;background:#9eb1b8;flex-shrink:0}
+.sim-hmi .is-heating .sim-io [data-role="contactor"]::before{background:#32b486;box-shadow:0 0 0 3px #d5f1e5}
+.sim-hmi .sim-stage-red .sim-io [data-role="alarm"]::before{background:#d05c55}
+.sim-hmi .sim-stage-yellow .sim-io [data-role="alarm"]::before{background:#d9ab47}
+.sim-hmi .sim-stage-green .sim-io [data-role="alarm"]::before{background:#2dac7d}
+.sim-hmi .sim-purge{grid-area:purge;min-width:0;background:#f0f6f7;border:1px solid #d4e3e6;border-radius:9px;padding:12px}
+.sim-hmi .sim-purge-head{display:flex;flex-direction:column;align-items:stretch;gap:5px;margin-bottom:11px}
+.sim-hmi .sim-purge-head strong{color:#1e4656;font-size:11px;font-weight:900;letter-spacing:.01em}
+.sim-hmi .sim-purge-head span{color:#4e6d7a;font-size:10px;font-variant-numeric:tabular-nums}
+.sim-hmi .sim-purge-grid{gap:7px}
+.sim-hmi .sim-purger{grid-template-columns:auto 1fr;gap:5px;padding:8px 7px;background:#fff;border-color:#cddde0;border-radius:7px;min-width:0}
+.sim-hmi .sim-purger small{font-size:9px;color:#527380}
+.sim-hmi .sim-purger b{font-size:10px;color:#33515d}
+.sim-hmi .sim-purger[data-state="open"]{background:#dff6eb;border-color:#73be9c;box-shadow:inset 0 0 0 1px #afe3ce}
+.sim-hmi .sim-purger[data-state="open"] b{color:#0a7d50}
+.sim-hmi .sim-purge-note{color:#5a7480;font-size:9px;line-height:1.4}
+.sim-hmi .sim-card-controls{grid-area:controls;display:flex;flex-wrap:wrap;gap:8px;align-items:start;padding:0;margin:0;border:0}
+.sim-hmi .sim-card-controls button{flex:1 1 100%;min-height:42px;padding:11px;border-radius:7px;font-size:11px;font-weight:850;box-shadow:none}
+.sim-hmi .sim-card-controls button:first-child{border-color:#bfd4da;background:#eef4f5;color:#264755}
+.sim-hmi .sim-card-controls button:nth-child(2){background:#1b805a;border-color:#178055;color:#fff}
+.sim-hmi .sim-card-controls button:disabled{background:#e4efea;color:#8ba29b;border-color:#d8e2de}
+.sim-hmi .sim-card-controls button:active:not(:disabled){transform:scale(.97)}
+.sim-hmi .sim-unit-clock{width:100%;padding:5px 2px 0;justify-content:space-between;font-size:11px;color:#526e7c}
+.sim-hmi .sim-unit-clock strong{font-size:19px;color:#1a4350;font-variant-numeric:tabular-nums}
+.sim-hmi .sim-chart-panel{grid-area:chart;align-self:stretch;min-width:0;background:#102d39;border:1px solid #355764;border-radius:9px;color:#c3e0e5;padding:13px}
+.sim-hmi .sim-chart-heading strong{color:#e5f4f8;font-size:11px}
+.sim-hmi .sim-chart-heading small{color:#b7d1d6;font-size:9px}
+.sim-hmi .sim-vessel-card .sim-chart{display:block;background:#163b48;border:1px solid #315865;max-width:none;width:100%;height:130px;border-radius:6px;margin:9px 0}
+.sim-hmi .sim-chart-guide{stroke:#406774;stroke-width:1}
+.sim-hmi .sim-chart-line{stroke:#eb847c;stroke-width:2.8;filter:drop-shadow(0 0 2px rgba(255,147,134,.32))}
+.sim-hmi .sim-stage-yellow .sim-chart-line{stroke:#e9bb59}
+.sim-hmi .sim-stage-green .sim-chart-line{stroke:#49c69a}
+.sim-hmi .sim-chart-caption{color:#bad1d7;font-size:9px}
+.sim-hmi .sim-events-panel{background:#fff;border:1px solid var(--hmi-border);border-radius:12px;box-shadow:var(--hmi-glow);padding:19px}
+.sim-hmi .sim-events-title h2{color:#204454;font-size:17px}
+.sim-hmi .sim-events-title p{font-size:11px}
+.sim-hmi .sim-events-title select{border:1px solid #c9dade;border-radius:8px;min-height:42px}
+.sim-hmi .sim-events-list{max-height:225px}
+.sim-hmi .sim-events-list li{border-bottom:1px solid #e9f0f2}
+.sim-hmi .auto-bottom-grid .auto-panel{border-radius:10px;box-shadow:none;background:#f9fbfc;border-color:#dce7e9}
+.sim-hmi .auto-bottom-grid .auto-panel h2{font-size:14px;color:#244656}
+.sim-hmi.sim-presenting{background:#eaf2f4}
+.sim-hmi.sim-presenting .sim-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.sim-hmi.sim-presenting .sim-vessel-card{padding:17px}
+.sim-hmi.sim-presenting .sim-vessel-card .sim-machine-row svg{height:166px}
+.sim-hmi button:focus-visible,.sim-hmi a:focus-visible,.sim-hmi select:focus-visible{outline:3px solid #2db99b;outline-offset:3px}
+@media(max-width:1240px){
+  .sim-hmi .sim-grid,.sim-hmi.sim-presenting .sim-grid{grid-template-columns:1fr}
+  .sim-hmi .sim-vessel-card{padding:17px}
+}
+@media(max-width:720px){
+  .sim-hmi .sim-hmi-hero{padding:20px;flex-direction:column;align-items:flex-start}
+  .sim-hmi .sim-hmi-hero-status{align-items:flex-start}
+  .sim-hmi .sim-hmi-toolbar-heading{flex:1 1 100%}
+  .sim-hmi .sim-vessel-card{display:flex;flex-direction:column;gap:11px;padding:12px}
+  .sim-hmi .sim-vessel-card>*{width:100%}
+  .sim-hmi .sim-machine-row{min-height:200px}
+  .sim-hmi .sim-vessel-card .sim-machine-row svg{max-width:310px;height:165px}
+  .sim-hmi .sim-io{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .sim-hmi .sim-io span{min-width:0}
+  .sim-hmi .sim-card-controls button{flex:1 1 46%}
+  .sim-hmi .sim-purge-grid{gap:9px}
+  .sim-hmi .sim-temperature strong{font-size:36px}
+}
+@media(max-width:385px){
+  .sim-hmi .sim-io{grid-template-columns:1fr}
+  .sim-hmi .sim-cycle-steps span{font-size:8px}
+  .sim-hmi .sim-card-controls button{flex-basis:100%}
+}
+@media(prefers-reduced-motion:reduce){
+  .sim-hmi *, .sim-hmi *::before, .sim-hmi *::after{transition-duration:.01ms!important;animation-duration:.01ms!important;scroll-behavior:auto!important}
+}
+@media(prefers-contrast:more){
+  .sim-hmi .sim-machine-row,.sim-hmi .sim-temperature,.sim-hmi .sim-chart-panel{border-width:2px}
+  .sim-hmi .sim-vessel-card{border:2px solid #243c4a}
+  .sim-hmi .sim-status{font-weight:900}
+}
