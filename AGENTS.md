@@ -9,7 +9,7 @@ Este repositório é o sistema **Manutenção Campo do Gado V2**. Preserve o com
 - Não faça varredura recursiva do repositório inteiro por padrão.
 - Consulte `config/routes.js` e `docs/ARQUITETURA.md` antes de inventar novas rotas, aliases ou namespaces.
 - Use a Skill `campo-do-gado-maintenance` para alterações funcionais neste projeto.
-- Para planejamento, estudos preliminares e documentação de caldeiras industriais a cavaco/biomassa e **conversão de caldeira a cavaco para gás** (gás natural, GLP ou outro tipo confirmado), utilize a Skill `caldeira-cavaco` (`.agents/skills/caldeira-cavaco/SKILL.md`). Confirme o sentido da conversão e tipo do gás; não confunda estudo conceitual com projeto executivo aprovado e exija profissional habilitado, inspeções e requisitos legais.
+- Para estudo conceitual de **conversão de caldeira existente a gás para cavaco de madeira** e demais projetos de caldeira a biomassa, utilize a Skill `caldeira-cavaco` (`.agents/skills/caldeira-cavaco/SKILL.md`). Confirme tipo de gás, placa e viabilidade do retrofit antes de sugerir opções; nunca trate engenharia conceitual como projeto executivo aprovado, e exija fabricante/PH, documentação NR-13 e demais requisitos aplicáveis.
 - Para alterações de layout, UI/UX, interações, animações e responsividade, consulte também a Skill `apple-design` (`.agents/skills/apple-design/SKILL.md`), preservando a identidade visual atual do Campo do Gado, o fluxo dos módulos, a acessibilidade e a legibilidade. Em mudanças funcionais, use as duas skills conforme o escopo.
 - Só consulte documentação externa quando o comportamento depender de API/biblioteca atual ou quando o código local não responder.
 - Para assuntos OpenAI/Codex/API, prefira o OpenAI Developer Docs MCP em vez de pesquisa web ampla.
