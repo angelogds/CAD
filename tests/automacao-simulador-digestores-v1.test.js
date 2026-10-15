@@ -10,7 +10,7 @@ test('simulador usa a mesma autorização da IHM e não altera comandos industri
   const view = read('views/automacao/simulador-digestores.ejs');
   assert.match(view, /for\(let id=1;id<=4;id\+\+\)/);
   assert.match(view, /SIMULAÇÃO • SEM HARDWARE/);
-  assert.match(view, /Módulo/);
+  assert.match(view, /Simulador dos Digestores/);
 });
 test('simulador não inclui chamadas de rede, nem comandos reais', () => {
   const js = read('public/js/automacao-simulador.js');
