@@ -14,6 +14,12 @@ Este repositório é o sistema **Manutenção Campo do Gado V2**. Preserve o com
 - Só consulte documentação externa quando o comportamento depender de API/biblioteca atual ou quando o código local não responder.
 - Para assuntos OpenAI/Codex/API, prefira o OpenAI Developer Docs MCP em vez de pesquisa web ampla.
 
+## Graphify — diagnóstico remoto (piloto)
+- Existe um workflow manual de mapeamento em `.github/workflows/graphify-map.yml`, documentado em `docs/GRAPHIFY_REMOTO.md`. Ele gera artefatos no GitHub Actions, **não** os injeta automaticamente no workspace do Codex.
+- Se `graphify-out/graph.json` estiver disponível e atual para o commit investigado, prefira consultas `graphify query`, `graphify explain` e `graphify path` para entender dependências antes de buscas amplas; verifique sempre no código as relações identificadas.
+- Sem grafo disponível, mantenha as buscas direcionadas pelas regras acima. Não considere conclusões inferidas pelo Graphify substitutas dos testes nem execute mapeamentos globais a cada tarefa.
+- A execução inicial é restrita a código (`--code-only`), sem credenciais externas ou acesso ao SQLite de produção.
+
 ## Arquitetura e dados
 - Stack principal: Node.js + Express + EJS + SQLite (`better-sqlite3`).
 - Entrada: `server.js`.

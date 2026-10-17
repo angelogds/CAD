@@ -84,3 +84,6 @@ agenthub/agents/youtube/db
 # Mobile development
 android-sdk/
 mobile/preview/
+
+# Mapas gerados pelo Graphify (artefatos do GitHub Actions)
+graphify-out/
