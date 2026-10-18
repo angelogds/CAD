@@ -20,6 +20,10 @@ Este repositório é o sistema **Manutenção Campo do Gado V2**. Preserve o com
 - Sem grafo disponível, mantenha as buscas direcionadas pelas regras acima. Não considere conclusões inferidas pelo Graphify substitutas dos testes nem execute mapeamentos globais a cada tarefa.
 - A execução inicial é restrita a código (`--code-only`), sem credenciais externas ou acesso ao SQLite de produção.
 
+## Skills de engenharia — Matt Pocock
+- As 27 skills oficiais do plugin `mattpocock-skills` 1.3.1 estão versionadas em `.agents/skills/`. Consulte o catálogo e a origem em `.agents/skills/README.md`.
+- Use somente as skills pertinentes à tarefa. Elas complementam as regras deste projeto, incluindo `campo-do-gado-maintenance`, preservação dos dados, RBAC e política de merge; não ativam todos os fluxos automaticamente.
+
 ## Arquitetura e dados
 - Stack principal: Node.js + Express + EJS + SQLite (`better-sqlite3`).
 - Entrada: `server.js`.
