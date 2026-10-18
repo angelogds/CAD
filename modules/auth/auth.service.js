@@ -30,4 +30,8 @@ function getUserByEmail(email) {
     .get(email);
 }
 
-module.exports = { getUserByEmail };
+function getUserById(id) {
+  return db.prepare('SELECT * FROM users WHERE id=?').get(Number(id)) || null;
+}
+
+module.exports = { getUserByEmail, getUserById };

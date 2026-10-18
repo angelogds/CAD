@@ -19,21 +19,8 @@ const DEFAULT_FILE_SIZE_MB = 200;
 const maxFileSizeMbRaw = Number(process.env.OS_UPLOAD_FILE_SIZE_MB || DEFAULT_FILE_SIZE_MB);
 const maxFileSizeMb = Number.isFinite(maxFileSizeMbRaw) && maxFileSizeMbRaw > 0 ? maxFileSizeMbRaw : DEFAULT_FILE_SIZE_MB;
 
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, "-")}`),
-  }),
-  limits: {
-    fileSize: maxFileSizeMb * 1024 * 1024,
-  },
-  fileFilter: (_req, file, cb) => {
-    const mime = String(file?.mimetype || "").toLowerCase();
-    const isImage = mime.startsWith("image/");
-    const isVideo = mime.startsWith("video/");
-    if (isImage || isVideo) return cb(null, true);
-    return cb(new Error("Formato inválido. Envie somente imagem ou vídeo."));
-  },
+const upload = require('../../config/os-media-upload').createOSMediaUpload({
+  directory:uploadDir, maxBytes:maxFileSizeMb * 1024 * 1024,
 });
 
 const fechamentoUpload = (req, res, next) => {
