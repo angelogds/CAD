@@ -33,7 +33,7 @@
     { key: 'baixa', title: 'Prioridade baixa', note: 'Demandas programáveis', items: lista.filter(d => d.prioridade === 'BAIXA') },
   ];
   const metrics = [
-    { label: 'Demandas ativas', value: painel.ativas, note: 'Fila operacional', tone: 'green', href: query({ tab: 'ATIVAS', status: '', prioridade: '' }) },
+    { label: 'Ativas', value: painel.ativas, note: 'Fila operacional', tone: 'green', href: query({ tab: 'ATIVAS', status: '', prioridade: '' }) },
     { label: 'Novas', value: painel.novas, note: 'Aguardando análise', tone: 'blue', href: query({ tab: 'ATIVAS', status: 'NOVA' }) },
     { label: 'Em análise', value: painel.em_analise, note: painel.planejamento ? `${painel.planejamento} em planejamento` : 'Em avaliação', tone: 'violet', href: query({ tab: 'ATIVAS', status: 'EM_ANALISE' }) },
     { label: 'Em andamento', value: painel.em_andamento, note: 'Execução ativa', tone: 'teal', href: query({ tab: 'ATIVAS', status: 'EM_ANDAMENTO' }) },
@@ -58,10 +58,8 @@
   <section class="demand-metrics" aria-label="Indicadores das demandas">
     <% metrics.forEach(metric => { %>
       <a class="demand-metric tone-<%= metric.tone %>" href="/demandas?<%= metric.href %>">
-        <span class="metric-mark" aria-hidden="true"></span>
         <span class="metric-label"><%= metric.label %></span>
         <strong><%= metric.value || 0 %></strong>
-        <small><%= metric.note %></small>
       </a>
     <% }) %>
   </section>

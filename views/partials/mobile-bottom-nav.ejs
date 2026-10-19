@@ -1,0 +1,32 @@
+<%
+  const mobileRole = normalizeRole(user?.role || '');
+  const mobileCan = key => canAccessModule(mobileRole, key);
+  const mobileMenu = typeof activeMenu === 'undefined' ? '' : String(activeMenu);
+  const mobileHome = mobileCan('painel_operacional') ? '/dashboard' : '/meu-portal';
+  const mobileHomeActive = mobileMenu === 'dashboard' || mobileMenu === 'meu-portal';
+  const mobileDemandasActive = mobileMenu === 'demandas';
+  const mobileOsActive = mobileMenu === 'os';
+%>
+<nav class="mobile-bottom-nav" aria-label="Navegação rápida no celular">
+  <a href="<%= mobileHome %>" class="<%= mobileHomeActive ? 'is-active' : '' %>" <%- mobileHomeActive ? 'aria-current="page"' : '' %>>
+    <span class="mobile-nav-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-8h6v8"/></svg></span><span>Início</span>
+  </a>
+  <% if (mobileCan('demandas_view')) { %>
+    <a href="/demandas" class="<%= mobileDemandasActive ? 'is-active' : '' %>" <%- mobileDemandasActive ? 'aria-current="page"' : '' %>>
+      <span class="mobile-nav-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span>Demandas</span>
+    </a>
+  <% } %>
+  <% if (mobileCan('demandas_open')) { %>
+    <a class="mobile-nav-create" href="/demandas/new" aria-label="Criar nova demanda">
+      <span class="mobile-nav-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><span>Nova</span>
+    </a>
+  <% } %>
+  <% if (mobileCan('os_view')) { %>
+    <a href="/os" class="<%= mobileOsActive ? 'is-active' : '' %>" <%- mobileOsActive ? 'aria-current="page"' : '' %>>
+      <span class="mobile-nav-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg></span><span>OS</span>
+    </a>
+  <% } %>
+  <button type="button" id="mobileNavMore" aria-label="Abrir outros módulos" aria-expanded="false">
+    <span class="mobile-nav-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span><span>Mais</span>
+  </button>
+</nav>
