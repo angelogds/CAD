@@ -51,6 +51,8 @@ function normalizeTextRole(value) {
 
 function isMaintenanceSelfServiceProfile(user = {}) {
   const role = normalizeTextRole(user.role);
+  // ADMIN gerencia horas extras dos mecânicos cadastrados, assim como o encarregado.
+  if (role === ROLE.ADMIN) return true;
   if (role === 'MANUTENCAO' || role === 'ENCARREGADO' || role === 'ENCARREGADO_DE_MANUTENCAO') return true;
   return maintenanceSelfRead.includes(role);
 }
