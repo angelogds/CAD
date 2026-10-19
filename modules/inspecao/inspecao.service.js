@@ -228,6 +228,18 @@ function ensureGradeRows(inspecaoId, ano, mes, equipamentos) {
   }
 }
 
+// A origem é usada junto com o vínculo para cobrir OS antigas e novas.
+function isOSFromDemand(osRow) {
+  return Number(osRow?.demanda_id || 0) > 0 || normalizeText(osRow?.origem) === "demanda";
+}
+
+function osElegiveisParaInspecao(cols, alias = "") {
+  const condicoes = [];
+  if (cols.includes("demanda_id")) condicoes.push(`COALESCE(${alias}demanda_id, 0) = 0`);
+  if (cols.includes("origem")) condicoes.push(`UPPER(TRIM(COALESCE(${alias}origem, ''))) <> 'DEMANDA'`);
+  return condicoes.join(" AND ") || "1=1";
+}
+
 function getOSRowsByMonth(ano, mes) {
   const osTable = resolveOSTable();
   const cols = tableColumns(osTable);
@@ -261,7 +273,8 @@ function getOSRowsByMonth(ano, mes) {
               ${cols.includes("causa_diagnostico") ? "causa_diagnostico" : (cols.includes("causa") ? "causa" : (cols.includes("diagnostico") ? "diagnostico" : "NULL"))} AS acao_preventiva,
               ${cols.includes("nao_conforme") ? "nao_conforme" : "0 AS nao_conforme"}
        FROM ${osTable}
-       WHERE strftime('%Y', ${startExpr}) = ? AND strftime('%m', ${startExpr}) = ?`
+       WHERE strftime('%Y', ${startExpr}) = ? AND strftime('%m', ${startExpr}) = ?
+         AND ${osElegiveisParaInspecao(cols)}`
     )
     .all(y, m);
 
@@ -558,6 +571,7 @@ function syncFromClosedOS(osId) {
     .get(osId);
 
   if (!os) return { synced: false, reason: "os_not_found" };
+  if (isOSFromDemand(os)) return { synced: false, reason: "os_from_demand" };
   if (!normalizeDate(os.data_inicio_normalized)) return { synced: false, reason: "os_or_data_missing" };
 
   if (!isClosedStatus(os.status_normalized)) return { synced: false, reason: "os_not_closed" };
@@ -583,8 +597,11 @@ function syncFromOS(osId) {
   const cols = tableColumns(osTable);
   const startCols = ["data_inicio", "opened_at", "created_at"].filter((c) => cols.includes(c));
   const dataInicioExpr = startCols.length ? `COALESCE(${startCols.join(", ")})` : "NULL";
-  const os = db.prepare(`SELECT id, ${dataInicioExpr} AS data_inicio FROM ${osTable} WHERE id = ?`).get(osId);
+  const demandaExpr = cols.includes("demanda_id") ? "demanda_id" : "NULL AS demanda_id";
+  const origemExpr = cols.includes("origem") ? "origem" : "NULL AS origem";
+  const os = db.prepare(`SELECT id, ${dataInicioExpr} AS data_inicio, ${demandaExpr}, ${origemExpr} FROM ${osTable} WHERE id = ?`).get(osId);
   if (!os || !normalizeDate(os.data_inicio)) return { synced: false, reason: "os_or_data_missing" };
+  if (isOSFromDemand(os)) return { synced: false, reason: "os_from_demand" };
 
   const dt = parseDate(os.data_inicio);
   const mes = dt.getMonth() + 1;
@@ -649,6 +666,7 @@ function listOSEmAndamentoDetalhadas(_inspecaoId, mes, ano) {
     ${colaboradorJoin}
     WHERE UPPER(COALESCE(o.status, '')) IN (${statusParams})
       AND date(${opened}) <= date(?)
+      AND ${osElegiveisParaInspecao(cols, "o.")}
     ORDER BY date(${opened}), o.id
   `).all(...STATUS_OS_EM_ANDAMENTO, fimPeriodo);
 
