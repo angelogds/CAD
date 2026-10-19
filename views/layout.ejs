@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="/css/ui-shell-modern-2026.css?v=20261007-config-v2" />
   <link rel="stylesheet" href="/css/ui-buttons.css?v=20260919-1" />
   <link rel="stylesheet" href="/css/native-menu.css?v=20260924-1" />
+  <link rel="stylesheet" href="/css/mobile-bottom-nav.css?v=20261019-1" />
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'meu-portal') { %><link rel="stylesheet" href="/css/meu-portal-modernizacao.css?v=20260910-p5" /><% } %>
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'escala') { %><link rel="stylesheet" href="/css/escala-dashboard.css?v=20260903b" /><% } %>
   <% if (typeof activeMenu !== 'undefined' && activeMenu === 'compras') { %><link rel="stylesheet" href="/css/compras-demandas-pre-cotacao.css?v=20261014-v6" /><% } %>
@@ -110,6 +111,7 @@
           <div>© <%= new Date().getFullYear() %> • Sistema V2</div>
         </footer>
       </main>
+      <% if (user) { %><%- include("partials/mobile-bottom-nav") %><% } %>
     </div>
 
     <% if (user) { %>
@@ -123,6 +125,7 @@
 
     <script src="/js/native-menu.js?v=20260924-1" defer></script>
     <script src="/js/app-layout.js?v=20261007-sidebar-v1" defer></script>
+    <script src="/js/mobile-bottom-nav.js?v=20261019-1" defer></script>
     <script src="/js/push.js" defer></script>
     <script src="/js/mobile-bridge.js" defer></script>
     <% if (user) { %><script src="/js/consenso-botoes-confirmacao.js?v=20260919-1" defer></script><% } %>
