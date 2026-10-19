@@ -99,7 +99,7 @@
 
   <section class="demand-detail-metrics planning-metrics demand-summary-metrics">
     <article class="detail-metric metric-blue"><small>Status</small><strong><%= statusLabel(demanda.status) %></strong></article>
-    <article class="detail-metric metric-orange"><small>Prioridade</small><strong><%= priorityLabel(demanda.prioridade) %></strong></article>
+    <article class="detail-metric metric-orange metric-priority-<%= slug(demanda.prioridade || 'NORMAL') %>"><small>Prioridade</small><strong><%= priorityLabel(demanda.prioridade) %></strong></article>
     <article class="detail-metric metric-green"><small>Responsável</small><strong><%= demanda.responsavel_nome || 'A definir' %></strong></article>
     <article class="detail-metric metric-slate"><small>Aprovação</small><strong><%= approvalLabel(demanda.aprovacao_status) %></strong></article>
   </section>
