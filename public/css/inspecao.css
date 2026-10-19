@@ -18,3 +18,15 @@
 @media(max-width:700px){.inspection-kpis,.inspecao-header-form,.inspection-filters,.os-summary-grid,.os-card-summary{grid-template-columns:1fr 1fr}.inspection-header,.os-rastreio-page .page-head{flex-direction:column}.top-actions{display:flex;flex-wrap:wrap}.inspection-period{order:-1;width:100%}.inspection-table{min-width:900px}.inspection-table-wrap{overflow-x:auto}.os-card-summary .equipment-cell{grid-column:1/-1}.os-open-action .btn{width:100%}}
 @media(max-width:480px){.inspection-kpis,.inspecao-header-form,.inspection-filters,.os-summary-grid,.os-card-summary{grid-template-columns:1fr}.os-card-summary .equipment-cell{grid-column:auto}}
 @media print{.inspection-tabs,.inspection-filters,.top-actions,.os-filter-bar,.os-open-action,.os-details summary,.sidebar,.topbar,.footer{display:none!important}.content{padding:0!important}.inspection-card,.inspection-matrix-card,.os-tech-card{box-shadow:none}.os-details[open]{display:block}.os-details{border-top:0}}
+
+
+/* Ciclo PAC 01: leitura progressiva e foco acessível sem alterar o padrão visual do sistema. */
+.inspection-cycle-steps{display:flex;flex-wrap:wrap;align-items:center;gap:8px 13px;list-style:none;padding:0;margin:12px 0 0;counter-reset:inspection-step}
+.inspection-cycle-steps li{display:inline-flex;align-items:center;gap:7px;min-height:30px;padding:5px 10px;border:1px solid var(--inspection-border);border-radius:9px;background:#f8fafc;color:#334155;font-size:.78rem;line-height:1.4;font-weight:650;counter-increment:inspection-step}
+.inspection-cycle-steps li::before{content:counter(inspection-step,decimal-leading-zero);font-variant-numeric:tabular-nums;color:var(--inspection-green);font-size:.72rem;font-weight:800}
+.inspection-matrix-scroll:focus-within{outline:2px solid #86b6ed;outline-offset:2px}
+.inspection-page .status-badge-btn:focus-visible,.inspection-page .inspection-tabs a:focus-visible,.inspection-page .top-actions a:focus-visible,.inspecao-modal button:focus-visible{outline:3px solid #2563eb;outline-offset:3px}
+.inspection-page .status-badge-btn[aria-expanded="true"]{box-shadow:0 0 0 3px rgba(37,99,235,.25)}
+@media(max-width:700px){.inspection-cycle-steps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.inspection-cycle-steps li{min-width:0}}
+@media(max-width:480px){.inspection-cycle-steps{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.inspection-page .status-badge-btn,.inspecao-modal,.inspection-page .inspection-tabs a{animation:none!important;transition:none!important}}
