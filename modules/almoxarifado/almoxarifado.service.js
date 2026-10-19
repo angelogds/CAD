@@ -647,7 +647,7 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, cat
     // Sincroniza somente quando todos os itens estão efetivamente comprados.
     // Uma entrega parcial de pedido misto não encerra a cotação dos demais itens.
     const naoComprados = db.prepare("SELECT COUNT(*) n FROM solicitacao_itens WHERE solicitacao_id=? AND COALESCE(status_compra,'')<>'COMPRADO'").get(solicitacaoId).n;
-    if (!naoComprados) finalizarRecebimento(solicitacaoId);
+    if (!naoComprados) finalizarRecebimentoCore(solicitacaoId);
     const faltanteApos = Math.max(qtdComprada - recebida, 0);
     return {
       estoqueItemId,
@@ -660,7 +660,15 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, cat
   })();
 }
 
-function finalizarRecebimento(id) {
+function finalizarRecebimentoCore(id) {
+  const sol = db.prepare('SELECT status FROM solicitacoes WHERE id=?').get(Number(id));
+  if (!sol || !['COMPRADA','EM_RECEBIMENTO','RECEBIDA_PARCIAL','RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','REABERTA'].includes(String(sol.status || '').trim().toUpperCase())) {
+    throw new Error('Esta solicitação não está em uma etapa que permita finalizar o recebimento.');
+  }
+  if (HAS_ITEM_STATUS_COMPRA) {
+    const pendentes = db.prepare("SELECT COUNT(*) n FROM solicitacao_itens WHERE solicitacao_id=? AND UPPER(TRIM(COALESCE(status_compra,''))) NOT IN ('COMPRADO','CANCELADO','ATENDIDO_ESTOQUE')").get(Number(id)).n;
+    if (pendentes) throw new Error('Há itens ainda em cotação ou aguardando compra. Finalize esses itens antes de encerrar o recebimento.');
+  }
   const qtdComprada = HAS_ITEM_QTD_COMPRADA ? "COALESCE(qtd_comprada,0)" : qtdSolicitadaExpr("solicitacao_itens");
   const qtdRecebida = HAS_ITEM_QTD_RECEBIDA ? "COALESCE(qtd_recebida_total,0)" : "0";
   const statusCompraFilter = HAS_ITEM_STATUS_COMPRA ? " AND status_compra='COMPRADO'" : "";
@@ -675,6 +683,10 @@ function finalizarRecebimento(id) {
     return fluxoEstoqueService.syncSolicitacaoEntregaStatus(id).status || status;
   }
   return status;
+}
+
+function finalizarRecebimento(id) {
+  return db.transaction(() => finalizarRecebimentoCore(id))();
 }
 
 function fechar(id) {

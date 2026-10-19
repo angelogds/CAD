@@ -30,11 +30,11 @@ test('fluxo de estoque calcula reservas e promove status físico da solicitaçã
   assert.match(flow, /UPDATE solicitacoes SET status=/);
 });
 
-test('retirada por QR sincroniza a entrega depois da transação', () => {
+test('retirada por QR sincroniza a entrega na mesma transação', () => {
   const service = read('modules/estoque/estoque.reservas.service.js');
 
   assert.match(service, /solicitacaoId: Number\(reserva\.solicitacao_id\)/);
-  assert.match(service, /syncSolicitacaoEntregaStatus\(resultado\.solicitacaoId/);
+  assert.match(service, /syncSolicitacaoEntregaStatus\(reserva\.solicitacao_id/);
   assert.match(service, /solicitacaoStatus: fluxo\.status/);
 });
 

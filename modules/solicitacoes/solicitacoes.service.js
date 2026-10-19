@@ -587,6 +587,11 @@ function cancelarSolicitacao(id, adminId = null) {
     if (hasColumn("solicitacoes", "updated_at")) updates.push("updated_at = datetime('now')");
     params.push(Number(id));
     db.prepare(`UPDATE solicitacoes SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+    if (tableExists('estoque_reservas')) {
+      // Preserva quantidades já retiradas e movimentos; libera somente o restante.
+      db.prepare("UPDATE estoque_reservas SET status='CANCELADA',updated_at=datetime('now') WHERE solicitacao_id=? AND quantidade_reservada>quantidade_retirada")
+        .run(Number(id));
+    }
     registrarLogSolicitacao(
       id,
       adminId,

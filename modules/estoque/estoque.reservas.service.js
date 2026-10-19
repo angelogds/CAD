@@ -183,6 +183,7 @@ function dashboard() {
       COUNT(DISTINCT CASE WHEN quantidade_reservada>quantidade_retirada THEN solicitacao_id END) prontas
     FROM estoque_reservas
     WHERE status<>'CANCELADA'
+      AND NOT EXISTS (SELECT 1 FROM solicitacoes s WHERE s.id=estoque_reservas.solicitacao_id AND UPPER(TRIM(s.status)) IN ('CANCELADA','CANCELADO'))
   `).get();
   return {
     reservado: Number(row?.reservado || 0),
@@ -199,6 +200,7 @@ function resumoPorItem() {
       COALESCE(SUM(MAX(quantidade_reservada-quantidade_retirada,0)),0) reservado
     FROM estoque_reservas
     WHERE status<>'CANCELADA'
+      AND NOT EXISTS (SELECT 1 FROM solicitacoes s WHERE s.id=estoque_reservas.solicitacao_id AND UPPER(TRIM(s.status)) IN ('CANCELADA','CANCELADO'))
     GROUP BY estoque_item_id
   `).all();
   const result = new Map(rows.map((r) => [Number(r.estoque_item_id), Number(r.reservado || 0)]));
@@ -212,7 +214,7 @@ function listReservas(options = {}) {
   if (!tableExists('estoque_reservas')) return [];
   const q = String(options.q || '').trim();
   const params = [];
-  let where = "WHERE r.status<>'CANCELADA'";
+  let where = "WHERE r.status<>'CANCELADA' AND UPPER(TRIM(COALESCE(s.status,''))) NOT IN ('CANCELADA','CANCELADO','FECHADA','FECHADO') AND (o.id IS NULL OR UPPER(TRIM(COALESCE(o.status,''))) NOT IN ('CANCELADA','CANCELADO','CONCLUIDA','CONCLUÍDA','CONCLUIDO','FECHADA','FECHADO','FINALIZADA','FINALIZADO'))";
   if (options.solicitacao_id) { where += ' AND r.solicitacao_id=?'; params.push(Number(options.solicitacao_id)); }
   if (q) {
     where += ` AND (LOWER(COALESCE(s.numero,'')) LIKE ? OR LOWER(COALESCE(s.titulo,'')) LIKE ? OR LOWER(${itemNameExpr('si')}) LIKE ? OR LOWER(COALESCE(e.nome,'')) LIKE ?)`;
@@ -320,6 +322,7 @@ function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, n
       WHERE r.id=? AND r.status<>'CANCELADA'
     `).get(Number(reservaId));
     if (!reserva) throw new Error('Reserva não encontrada.');
+    fluxoSolicitacaoService.assertRetiradaPermitida(reserva.solicitacao_id, reserva.os_id);
 
     if (setorConsumidor && !['RECICLAGEM','LOGISTICA','FRIGORIFICO','ADMINISTRATIVO'].includes(setorConsumidor)) throw new Error('Setor consumidor inválido.');
     const disponivelReserva = Math.max(Number(reserva.quantidade_reservada || 0) - Number(reserva.quantidade_retirada || 0), 0);
@@ -372,6 +375,7 @@ function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, n
         : (pessoa.identity_type === 'USUARIO' ? 'CADASTRO_USUARIO' : 'CADASTRO_COLABORADOR'),
     });
 
+    const fluxo = fluxoSolicitacaoService.syncSolicitacaoEntregaStatus(reserva.solicitacao_id, { userId: entreguePorUserId });
     return {
       reservaId: reserva.id,
       movimentoId,
@@ -382,11 +386,11 @@ function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, n
       status,
       solicitacaoId: Number(reserva.solicitacao_id),
       solicitacaoItemId: Number(reserva.solicitacao_item_id),
+      solicitacaoStatus: fluxo.status,
     };
   })();
 
-  const fluxo = fluxoSolicitacaoService.syncSolicitacaoEntregaStatus(resultado.solicitacaoId || resultado.solicitacao_id, { userId: entreguePorUserId });
-  return { ...resultado, solicitacaoStatus: fluxo.status };
+  return resultado;
 }
 
 module.exports = {

@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 const authService = require("./auth.service");
+const { sessionRevision } = require('./auth.session');
 
 const LOGIN_SLIDESHOW_DIR = path.join(process.cwd(), "public", "img", "login", "slideshow");
 const LOGIN_SLIDESHOW_WEB_BASE = "/img/login/slideshow";
@@ -75,6 +76,7 @@ exports.doLogin = (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      auth_revision: sessionRevision(user),
       photo_path: user.photo_path || null,
       sidebar_mode: String(user.sidebar_mode || 'EXPANDED').toUpperCase(),
     };

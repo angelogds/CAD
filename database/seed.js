@@ -3,39 +3,33 @@ const bcrypt = require("bcryptjs");
 const db = require("./db");
 const { ensureColaboradorSeed } = require('./seeds/colaboradores.seed');
 
-// ✅ Ajuste de senha controlado por ENV
-// ADMIN_PASSWORD=admin123
-// ADMIN_RESET=1  (só uma vez para forçar reset)
+// ADMIN_PASSWORD define a credencial de criação/reset. ADMIN_RESET=1 força reset.
 function ensureAdmin() {
   const email = "admin@campodogado.local";
-  const password = process.env.ADMIN_PASSWORD || "admin123";
   const reset = String(process.env.ADMIN_RESET || "0") === "1";
-
   const row = db.prepare("SELECT id FROM users WHERE lower(email)=lower(?) LIMIT 1").get(email);
+  if (row && !reset) {
+    console.log("✔ Seed: admin já existe (não resetou senha).");
+    return;
+  }
 
+  const local = ['test', 'development'].includes(process.env.NODE_ENV);
+  const password = process.env.ADMIN_PASSWORD || (local ? "admin123" : "");
+  if (!password.trim()) {
+    throw new Error('Defina ADMIN_PASSWORD no ambiente para criar ou redefinir o administrador.');
+  }
   const hash = bcrypt.hashSync(password, 10);
-
   if (!row) {
     db.prepare(`
       INSERT INTO users (name, email, password_hash, role, created_at)
       VALUES (?, ?, ?, ?, datetime('now','-3 hours'))
     `).run("Administrador", email, hash, "ADMIN");
-
-    console.log(`✔ Seed: admin criado (${email} / ${password})`);
+    console.log("✔ Seed: admin criado.");
     return;
   }
 
-  if (reset) {
-    db.prepare(`
-      UPDATE users
-      SET password_hash = ?, role = 'ADMIN'
-      WHERE id = ?
-    `).run(hash, row.id);
-
-    console.log(`✔ Seed: admin ATUALIZADO (senha resetada para ${password})`);
-  } else {
-    console.log("✔ Seed: admin já existe (não resetou senha).");
-  }
+  db.prepare("UPDATE users SET password_hash = ?, role = 'ADMIN' WHERE id = ?").run(hash, row.id);
+  console.log("✔ Seed: senha do admin redefinida.");
 }
 
 // ---------- ESCALA 2026 (mecânicos industriais unificados) ----------

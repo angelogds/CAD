@@ -166,13 +166,6 @@ app.use(express.urlencoded({ extended: false }));
 // ===== Webhooks públicos =====
 app.use("/webhooks/whatsapp", require("./modules/whatsapp/whatsapp.routes"));
 
-// ===== Arquivos estáticos =====
-app.use(express.static(path.join(__dirname, "public")));
-app.use("/vendor/chart.js", express.static(path.join(__dirname, "node_modules", "chart.js", "dist"), { maxAge: "7d", immutable: true }));
-app.use("/uploads", express.static(storage.UPLOAD_DIR));
-app.use("/pdfs", express.static(storage.PDF_DIR));
-app.use("/imagens", express.static(storage.IMAGE_DIR));
-
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
@@ -201,6 +194,11 @@ app.use(
   })
 );
 app.use(flash());
+app.use(require('./modules/auth/auth.session').validateCurrentSession);
+require('./config/private-files').mountPrivateFiles(app, {db,storage,publicDir:path.join(__dirname,'public')});
+// Assets de aplicação e slideshow permanecem públicos, depois das raízes privadas.
+app.use(express.static(path.join(__dirname, 'public')));
+app.use("/vendor/chart.js", express.static(path.join(__dirname, "node_modules", "chart.js", "dist"), { maxAge: "7d", immutable: true }));
 app.use(exposeNotificationPermissions);
 
 // ===== Globals (views) =====
@@ -531,6 +529,11 @@ app.use((_req, res) => res.status(404).send("404 - Página não encontrada"));
 
 // ===== Error handler =====
 app.use((err, req, res, next) => {
+  if (err.code === 'OS_MEDIA_INVALID') {
+    if (!req.accepts('html')) return res.status(400).json({error:err.message});
+    req.flash('error',err.message);
+    return res.redirect(req.params?.id ? `/os/${Number(req.params.id)}` : '/os/novo');
+  }
   console.error("❌ ERRO 500:", req.method, req.originalUrl);
   console.error(err && err.stack ? err.stack : err);
   if (res.headersSent) return next(err);

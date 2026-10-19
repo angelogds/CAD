@@ -36,6 +36,24 @@ function getSolicitacao(solicitacaoId) {
   return db.prepare('SELECT id,numero,status,os_id FROM solicitacoes WHERE id=?').get(Number(solicitacaoId)) || null;
 }
 
+function assertRetiradaPermitida(solicitacaoId, reservaOsId = null) {
+  const sol = getSolicitacao(solicitacaoId);
+  const normalize = value => String(value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  if (!sol || ['CANCELADA','CANCELADO','FECHADA','FECHADO','REPROVADA','ENTREGUE_SOLICITANTE'].includes(normalize(sol.status))) {
+    throw new Error('Esta solicitação está cancelada ou encerrada e não permite retirada.');
+  }
+  // O vínculo atual e a reserva definem o destino desta retirada; os demais
+  // vínculos são preservados como histórico quando a solicitação troca de OS.
+  const ids = new Set([Number(sol.os_id), Number(reservaOsId)].filter(id => id > 0));
+  for (const id of ids) {
+    const os = db.prepare('SELECT status FROM os WHERE id=?').get(id);
+    if (!os || ['CANCELADA','CANCELADO','CONCLUIDA','CONCLUIDO','FECHADA','FECHADO','FINALIZADA','FINALIZADO','ENCERRADA','ENCERRADO'].includes(normalize(os.status))) {
+      throw new Error('A OS vinculada não está ativa e não permite retirada.');
+    }
+  }
+  return sol;
+}
+
 function registrarHistoricoOS(sol, status, userId) {
   if (!sol?.os_id) return;
   try {
@@ -88,5 +106,6 @@ function syncSolicitacaoEntregaStatus(solicitacaoId, options = {}) {
 
 module.exports = {
   getResumoReservas,
+  assertRetiradaPermitida,
   syncSolicitacaoEntregaStatus,
 };
