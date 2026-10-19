@@ -11,7 +11,7 @@ function createFixture() {
     CREATE TABLE colaboradores (id INTEGER PRIMARY KEY, nome TEXT);
     CREATE TABLE os (
       id INTEGER PRIMARY KEY, equipamento_id INTEGER, opened_at TEXT, data_inicio TEXT,
-      data_fim TEXT, status TEXT, tipo TEXT, descricao TEXT, demanda_id INTEGER, origem TEXT
+      data_fim TEXT, closed_at TEXT, status TEXT, tipo TEXT, descricao TEXT, demanda_id INTEGER, origem TEXT
     );
     CREATE TABLE inspecoes_pac01 (
       id INTEGER PRIMARY KEY, mes INTEGER, ano INTEGER, frequencia TEXT,
