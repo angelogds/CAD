@@ -25,6 +25,11 @@ test('arquivos privados, upload e revogação pelo servidor HTTP real', async t 
     const hash = bcrypt.hashSync(password,4);
     const add = role => Number(db.prepare('INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?,?)').run('Pessoa teste',role.toLowerCase()+'@example.invalid',hash,role).lastInsertRowid);
     const buyer=add('COMPRAS'), mechanic=add('MECANICO'), hr=add('RH'), requester=add('ENCARREGADO_FRIGORIFICO');
+    // Perfil legado aceito pelo helper de detalhes da OS, mas não por novos cadastros.
+    db.pragma('ignore_check_constraints = ON');
+    add('AUXILIAR');
+    db.pragma('ignore_check_constraints = OFF');
+    add('PRODUCAO');add('COORDENADOR_RECICLAGEM');add('MANUTENCAO_SUPERVISOR');
     const request=Number(db.prepare("INSERT INTO solicitacoes(numero,titulo,solicitante_user_id,setor_origem,status) VALUES('SEC-1','Fixture sintética',?,'FRIGORIFICO','ABERTA')").run(requester).lastInsertRowid);
     db.prepare("INSERT INTO compras_anexos(referencia_tipo,referencia_id,tipo,original_name,filename,mimetype,size,uploaded_by) VALUES('SOLICITACAO',?,'COTACAO','fixture.pdf','fixture.pdf','application/pdf',20,?)").run(request,buyer);
     for (const p of [env.UPLOAD_DIR,env.PDF_DIR,env.IMAGE_DIR,path.join(env.UPLOAD_DIR,'colaboradores/documentos')]) fs.mkdirSync(p,{recursive:true});
@@ -49,6 +54,21 @@ test('arquivos privados, upload e revogação pelo servidor HTTP real', async t 
       await new Promise(resolve=>setTimeout(resolve,100));
     }
     assert.ok(ready,'servidor iniciou');
+    // O servidor inicializa o schema real dos documentos e etapas da Academia.
+    const course=db.prepare('SELECT id FROM academia_cursos LIMIT 1').get().id;
+    const external='/uploads/academia/certificados-externos/owner.pdf';
+    const internal='/pdfs/academia/documentos-internos/owner.pdf';
+    const certificate='/pdfs/academia/legacy-certificate.pdf';
+    const shared='/pdfs/academia/library.pdf';
+    const unregistered='/uploads/academia/certificados-externos/unregistered.pdf';
+    db.prepare('INSERT INTO academia_etapas_externas(usuario_id,curso_id,certificado_url) VALUES(?,?,?)').run(mechanic,course,external);
+    db.prepare('INSERT INTO academia_documentos_internos(usuario_id,curso_id,tipo_documento,codigo_validacao,arquivo_url) VALUES(?,?,?,?,?)').run(mechanic,course,'Documento sintético','DOC-HTTP-TEST',internal);
+    db.prepare('INSERT INTO academia_certificados(usuario_id,curso_id,arquivo_url) VALUES(?,?,?)').run(mechanic,course,certificate);
+    for (const url of [external,internal,certificate,shared,unregistered]) {
+      const file=path.join(url.startsWith('/uploads/')?env.UPLOAD_DIR:env.PDF_DIR,url.split('/').slice(2).join('/'));
+      fs.mkdirSync(path.dirname(file),{recursive:true});
+      fs.writeFileSync(file,'%PDF-1.4 synthetic Academia only');
+    }
     const get=(url,cookie)=>fetch(base+url,{headers:{Accept:'application/json',...(cookie?{Cookie:cookie}:{})},redirect:'manual'});
     const login=async role=>{
       const r=await fetch(base+'/auth/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({email:role.toLowerCase()+'@example.invalid',password}),redirect:'manual'});
@@ -57,6 +77,8 @@ test('arquivos privados, upload e revogação pelo servidor HTTP real', async t 
       return cookie.split(';')[0];
     };
     const buyerCookie=await login('COMPRAS'), mechanicCookie=await login('MECANICO'), hrCookie=await login('RH'), ownerCookie=await login('ENCARREGADO_FRIGORIFICO');
+    const auxiliaryCookie=await login('AUXILIAR'), productionCookie=await login('PRODUCAO');
+    const peerCookie=await login('COORDENADOR_RECICLAGEM'), managerCookie=await login('MANUTENCAO_SUPERVISOR');
     await t.test('anexo sem sessão é recusado e leitor autorizado continua acessando',async()=>{
       assert.ok([302,401].includes((await get('/uploads/fixture.pdf')).status));
       assert.equal((await get('/uploads/fixture.pdf',buyerCookie)).status,200);
@@ -86,6 +108,27 @@ test('arquivos privados, upload e revogação pelo servidor HTTP real', async t 
       assert.equal(legacy.status,200);
       assert.match(legacy.headers.get('content-disposition'),/^attachment/);
       assert.match(legacy.headers.get('content-type'),/application\/octet-stream/);
+    });
+    await t.test('arquivos de OS preservam acesso de AUXILIAR aos detalhes e dos leitores existentes',async()=>{
+      for (const url of ['/uploads/os/legacy.html','/pdfs/os/fixture.pdf']) {
+        assert.equal((await get(url,auxiliaryCookie)).status,200,url+' AUXILIAR');
+        assert.equal((await get(url,productionCookie)).status,200,url+' PRODUCAO');
+        assert.equal((await get(url,buyerCookie)).status,403,url+' COMPRAS');
+        assert.equal((await get(url,ownerCookie)).status,403,url+' ENCARREGADO_FRIGORIFICO');
+      }
+    });
+    await t.test('certificados e documentos pessoais da Academia exigem titular ou gestor',async()=>{
+      for (const url of [external,internal,certificate]) {
+        assert.equal((await get(url,mechanicCookie)).status,200,url+' titular');
+        assert.equal((await get(url,peerCookie)).status,403,url+' outro aluno');
+        assert.equal((await get(url,managerCookie)).status,200,url+' gestor');
+        assert.equal((await get(url,buyerCookie)).status,403,url+' sem Academia');
+      }
+      assert.equal((await get(unregistered,mechanicCookie)).status,403,'documento pessoal sem titular');
+      assert.equal((await get(unregistered,managerCookie)).status,200,'gestor acessa documento não vinculado');
+      assert.equal((await get(shared,mechanicCookie)).status,200,'material compartilhado');
+      assert.equal((await get(shared,peerCookie)).status,200,'material disponível aos demais alunos');
+      assert.equal((await get(shared,buyerCookie)).status,403,'material exige acesso à Academia');
     });
     await t.test('upload de OS rejeita extensão ativa e conteúdo incompatível sem gravar arquivo',async()=>{
       const target=path.join(env.UPLOAD_DIR,'os');

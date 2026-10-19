@@ -9,6 +9,7 @@ db.exec(`
   CREATE TABLE solicitacao_itens(id INTEGER PRIMARY KEY,solicitacao_id INTEGER,item_nome TEXT,unidade TEXT,estoque_item_id INTEGER,qtd_comprada REAL,qtd_solicitada REAL,qtd_recebida_total REAL,status_compra TEXT);
   CREATE TABLE estoque_itens(id INTEGER PRIMARY KEY,nome TEXT,unidade TEXT,saldo_atual REAL,updated_at TEXT);
   CREATE TABLE os(id INTEGER PRIMARY KEY,status TEXT,equipamento_id INTEGER);
+  CREATE TABLE os_solicitacoes_vinculos(os_id INTEGER,solicitacao_id INTEGER);
   CREATE TABLE equipamentos(id INTEGER PRIMARY KEY,nome TEXT);
   CREATE TABLE colaboradores(id INTEGER PRIMARY KEY,nome TEXT,apelido TEXT,funcao TEXT,setor TEXT,status TEXT,foto_url TEXT,user_id INTEGER,deleted_at TEXT);
   CREATE TABLE estoque_movimentos(id INTEGER PRIMARY KEY,tipo TEXT,item_id INTEGER,quantidade REAL,solicitacao_item_id INTEGER,created_at TEXT);
@@ -37,7 +38,7 @@ function state() {
 beforeEach(() => {
   db.exec(`DROP TRIGGER IF EXISTS fail_status;
     DELETE FROM estoque_movimentos; DELETE FROM estoque_reservas; DELETE FROM solicitacao_itens;
-    DELETE FROM solicitacoes; DELETE FROM estoque_itens; DELETE FROM os; DELETE FROM equipamentos; DELETE FROM colaboradores; DELETE FROM users;
+    DELETE FROM solicitacoes; DELETE FROM estoque_itens; DELETE FROM os_solicitacoes_vinculos; DELETE FROM os; DELETE FROM equipamentos; DELETE FROM colaboradores; DELETE FROM users;
     INSERT INTO users(id,name,role) VALUES(1,'Admin teste','ADMIN');
     INSERT INTO os VALUES(1,'ABERTA',1); INSERT INTO equipamentos VALUES(1,'Equipamento teste');
     INSERT INTO colaboradores(id,nome,funcao,setor,status) VALUES(1,'Pessoa Teste','MECANICO','MANUTENCAO','ATIVO');
@@ -69,6 +70,42 @@ test('retirada recusa solicitação cancelada legada e OS encerrada sem baixar s
   db.exec("UPDATE solicitacoes SET status='SEPARADA_PARA_RETIRADA' WHERE id=1; UPDATE os SET status='FECHADA' WHERE id=1");
   assert.throws(() => retirar(1));
   assert.equal(state().movimentos,0);
+});
+
+for (const [name, execute] of [
+  ['QR', () => retirar(5)],
+  ['contextual', () => estoque.registrarSaida({item_id:1,quantidade:5,solicitacao_id:1,solicitacao_item_id:1,usuario_id:1})],
+  ['em lote', () => estoque.registrarSaidasSolicitacao({solicitacao_id:1,usuario_id:1})],
+]) {
+  test(`retirada ${name} permite a OS atual ativa após vínculo histórico encerrado`, () => {
+    db.exec(`UPDATE os SET status='FECHADA' WHERE id=1;
+      INSERT INTO os VALUES(2,'ABERTA',1);
+      INSERT INTO os_solicitacoes_vinculos VALUES(1,1),(2,1);
+      UPDATE solicitacoes SET os_id=2 WHERE id=1;
+      UPDATE estoque_reservas SET os_id=2 WHERE id=1;
+    `);
+    execute();
+    assert.equal(state().saldo,5);
+    assert.equal(state().status,'ENTREGUE_SOLICITANTE');
+    assert.equal(state().movimentos,1);
+  });
+
+  test(`retirada ${name} recusa a OS atual encerrada mesmo com vínculo histórico ativo`, () => {
+    db.exec(`UPDATE os SET status='FECHADA' WHERE id=1;
+      INSERT INTO os VALUES(2,'ABERTA',1);
+      INSERT INTO os_solicitacoes_vinculos VALUES(1,1),(2,1);
+    `);
+    const initial = state();
+    assert.throws(execute, /OS vinculada não está ativa/);
+    assert.deepEqual(state(),initial);
+  });
+}
+
+test('retirada QR recusa OS encerrada da reserva mesmo com a OS atual da solicitação ativa', () => {
+  db.exec("INSERT INTO os VALUES(2,'FECHADA',1); UPDATE estoque_reservas SET os_id=2 WHERE id=1");
+  const initial = state();
+  assert.throws(() => retirar(5), /OS vinculada não está ativa/);
+  assert.deepEqual(state(),initial);
 });
 
 test('erro na sincronização reverte reserva, movimento e saldo na retirada QR', () => {

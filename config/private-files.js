@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { canAccessModule, normalizeRole } = require('./rbac');
 const { requireLogin } = require('../modules/auth/auth.middleware');
+const { canViewOSDetails } = require('../modules/os/os.permissions');
 
 function mountPrivateFiles(app, { db, storage, publicDir }) {
   const allowed = (user, key) => canAccessModule(normalizeRole(user.role), key);
@@ -11,6 +12,26 @@ function mountPrivateFiles(app, { db, storage, publicDir }) {
       if (/no such (table|column)/i.test(error.message)) return null;
       throw error;
     }
+  }
+  const mayReadOS = user => allowed(user,'os_view') || canViewOSDetails(user);
+  function mayReadAcademia(user, kind, relative) {
+    if (allowed(user,'academia_manage')) return true;
+    if (!allowed(user,'academia_view')) return false;
+    const file = '/'+kind+'/'+relative;
+    let personal = false;
+    for (const [table,column] of [
+      ['academia_etapas_externas','certificado_url'],
+      ['academia_documentos_internos','arquivo_url'],
+      ['academia_certificados','arquivo_url'],
+    ]) {
+      const record = row(`SELECT MAX(usuario_id = ?) AS owned FROM ${table} WHERE ${column}=? HAVING COUNT(*)>0`,user.id,file);
+      if (record?.owned) return true;
+      if (record) personal = true;
+    }
+    if (personal) return false;
+    // Sem registro de titular, documentos pessoais também falham fechado.
+    return !['academia/certificados-externos/','academia/documentos-internos/','academia/certificados/']
+      .some(prefix => relative.startsWith(prefix));
   }
   function mayRead(user, kind, relative) {
     if (normalizeRole(user.role) === 'ADMIN') return true;
@@ -25,9 +46,9 @@ function mountPrivateFiles(app, { db, storage, publicDir }) {
         return require('../modules/solicitacoes/solicitacoes.service').canViewSolicitacao(request,user);
       }
       if (relative.startsWith('colaboradores/documentos/')) return allowed(user,'rh_sensitive');
-      if (relative.startsWith('os/')) return allowed(user,'os_view');
+      if (relative.startsWith('os/')) return mayReadOS(user);
       if (relative.startsWith('equipamentos/')) return allowed(user,'equipamentos');
-      if (relative.startsWith('academia/')) return allowed(user,'academia_view');
+      if (relative.startsWith('academia/')) return mayReadAcademia(user,kind,relative);
       if (relative.startsWith('tv/')) return true; // A tela /tv é acessível a qualquer sessão autenticada.
       if (relative.startsWith('escala-horas/')) {
         if (allowed(user,'escala_rh') || allowed(user,'escala_manage')) return true;
@@ -43,7 +64,9 @@ function mountPrivateFiles(app, { db, storage, publicDir }) {
       return relative.startsWith('equipamentos/') && (allowed(user,'equipamentos') || allowed(user,'os_view'));
     }
     const group = relative.split('/')[0];
-    const permission = {os:'os_view',tracagem:'tracagem_view',academia:'academia_view',
+    if (group === 'os') return mayReadOS(user);
+    if (group === 'academia') return mayReadAcademia(user,kind,relative);
+    const permission = {tracagem:'tracagem_view',
       'desenho-tecnico':'desenho_tecnico_view',escala:'escala_reports'}[group];
     return !!permission && allowed(user,permission);
   }
