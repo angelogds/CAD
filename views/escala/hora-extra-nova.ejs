@@ -18,7 +18,7 @@
     <div class="escala-actions"><a class="btn" href="/escala">← Voltar</a></div>
   </header>
 
-  <div class="escala-notice">O colaborador é definido pelo usuário autenticado. Mecânicos não podem trocar o lançamento para outro funcionário. Horários são registrados pelo sistema e exibidos no horário de Brasília.</div>
+  <div class="escala-notice"><%= canManageEscala ? 'Gestão da Manutenção: selecione o colaborador para registrar ou finalizar a hora extra. Os lançamentos ficam vinculados ao funcionário selecionado.' : 'O colaborador é definido pelo usuário autenticado. Mecânicos não podem trocar o lançamento para outro funcionário.' %> Horários são registrados pelo sistema e exibidos no horário de Brasília.</div>
   <div class="escala-notice is-info"><strong>Priorize a Ordem de Serviço.</strong> Antes de iniciar a Hora Extra, procure uma OS aberta relacionada ao serviço. O vínculo com a OS mantém equipamento, serviço, histórico e Banco de Horas corretamente rastreados. Use <strong>Sem OS</strong> somente quando não existir uma OS correspondente.</div>
 
   <nav class="escala-tabs">
@@ -30,7 +30,7 @@
   </nav>
 
   <% if (!colaborador) { %>
-    <section class="escala-section"><div class="escala-empty">Nenhum colaborador mecânico está vinculado ao usuário atual. Faça o vínculo no cadastro do colaborador antes de registrar hora extra.</div></section>
+    <section class="escala-section"><div class="escala-empty"><%= canManageEscala ? 'Nenhum mecânico ativo cadastrado na equipe de Manutenção. Cadastre os colaboradores antes de registrar horas extras.' : 'Nenhum colaborador mecânico está vinculado ao usuário atual. Faça o vínculo no cadastro do colaborador antes de registrar hora extra.' %></div></section>
   <% } else { %>
     <section class="escala-section">
       <div class="escala-section-head"><div><h2>Colaborador do lançamento</h2><p>Identificação vinculada ao cadastro e ao usuário autenticado.</p></div></div>

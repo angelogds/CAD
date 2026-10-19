@@ -76,9 +76,10 @@ test('telas exibem contador individual e totais separados por colaborador na OS'
   assert.match(osView, /Total por colaborador/);
 });
 
-test('rotas de hora extra exigem perfil operacional da Manutenção', () => {
+test('rotas de hora extra admitem administrador e equipe operacional, sem liberar outros perfis', () => {
   assert.match(routes, /function requireHoraExtraAccess/);
   assert.match(routes, /function isMaintenanceSelfServiceProfile/);
+  assert.match(routes, /if \(role === ROLE\.ADMIN\) return true;/);
   assert.match(routes, /const maintenanceSelfRead = \[ROLE\.MECANICO, ROLE\.MANUTENCAO_SUPERVISOR, ROLE\.SUPERVISOR_MANUTENCAO, ROLE\.ENCARREGADO_MANUTENCAO\]/);
   assert.match(routes, /if \(isMaintenanceSelfServiceProfile\(user\)\) return next\(\)/);
   assert.match(routes, /hora-extra\/nova", requireLogin, requireHoraExtraAccess/);
