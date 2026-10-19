@@ -657,6 +657,8 @@ async function convertToOS(id, openedBy) {
   const relato = `[Demanda #${d.id}] ${d.titulo}. ${String(d.descricao || '').trim() || 'Serviço planejado a partir do banco de demandas.'}`;
   const criticidade = criticidadeForOS(d.prioridade);
   const osId = await osService.createOS({
+    demanda_id: Number(d.id),
+    origem: 'DEMANDA',
     equipamento_id: d.equipamento_id || null,
     equipamento_manual: d.equipamento_id ? null : `DEMANDA - ${d.setor_origem || d.categoria || 'FÁBRICA'}`,
     nao_conformidade: relato,

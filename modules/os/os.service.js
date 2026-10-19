@@ -2093,6 +2093,8 @@ function parseVoiceCommand(text = '') {
 }
 
 async function createOS({
+  demanda_id = null,
+  origem = null,
   equipamento_id,
   equipamento_manual,
   nao_conformidade,
@@ -2209,6 +2211,20 @@ async function createOS({
   const cols = getOSColumns();
   const fields = ["equipamento", "descricao", "tipo", "status", "opened_by"];
   const values = [equipamentoFinal, relatoNaoConformidade, tipoOS, "ABERTA", openedBy];
+  const demandaId = Number(demanda_id || 0);
+  const origemOS = String(origem || "").trim().toUpperCase();
+  if (origemOS === "DEMANDA" && (!Number.isInteger(demandaId) || demandaId <= 0)) {
+    throw new Error("OS originada de demanda exige um identificador válido da demanda.");
+  }
+  if (demandaId > 0) {
+    if (!cols.includes("demanda_id")) throw new Error("Vínculo de demanda indisponível no banco de OS; verifique as migrations.");
+    fields.push("demanda_id");
+    values.push(demandaId);
+  }
+  if (origemOS && cols.includes("origem")) {
+    fields.push("origem");
+    values.push(origemOS);
+  }
 
   if (cols.includes("equipamento_id")) {
     fields.push("equipamento_id");
@@ -2329,7 +2345,8 @@ async function createOS({
   setupPairsIfEmpty();
 
   emitOSEvents(osId, "create");
-  syncInspecaoFromOS(osId);
+  // Reformas e serviços planejados permanecem na OS e no equipamento, mas não alimentam o PAC 01.
+  if (!demandaId && origemOS !== "DEMANDA") syncInspecaoFromOS(osId);
 
   pushService
     .sendPushToAll({
