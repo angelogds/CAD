@@ -33,14 +33,14 @@
     { key: 'baixa', title: 'Prioridade baixa', note: 'Demandas programáveis', items: lista.filter(d => d.prioridade === 'BAIXA') },
   ];
   const metrics = [
-    { label: 'Ativas', value: painel.ativas, note: 'Fila operacional', tone: 'green', href: query({ tab: 'ATIVAS', status: '', prioridade: '' }) },
-    { label: 'Novas', value: painel.novas, note: 'Aguardando análise', tone: 'blue', href: query({ tab: 'ATIVAS', status: 'NOVA' }) },
-    { label: 'Em análise', value: painel.em_analise, note: painel.planejamento ? `${painel.planejamento} em planejamento` : 'Em avaliação', tone: 'violet', href: query({ tab: 'ATIVAS', status: 'EM_ANALISE' }) },
-    { label: 'Em andamento', value: painel.em_andamento, note: 'Execução ativa', tone: 'teal', href: query({ tab: 'ATIVAS', status: 'EM_ANDAMENTO' }) },
-    { label: 'Paradas', value: painel.paradas, note: painel.paradas ? 'Requer atenção' : 'Nenhuma no momento', tone: 'red', href: query({ tab: 'ATIVAS', status: 'PARADA' }) },
-    { label: 'Críticas', value: painel.criticas, note: 'Ação imediata', tone: 'red', href: query({ tab: 'ATIVAS', status: '', prioridade: 'URGENTE' }) },
-    { label: 'Altas', value: painel.altas, note: 'Resposta rápida', tone: 'orange', href: query({ tab: 'ATIVAS', status: '', prioridade: 'ALTA' }) },
-    { label: 'Prazo vencido', value: painel.prazos_atrasados, note: 'Demandas fora do prazo', tone: 'red', href: query({ tab: 'ATIVAS', status: '', prioridade: '' }) },
+    { label: 'Ativas', value: painel.ativas, note: 'Fila operacional', tone: 'green', href: query({ tab: 'ATIVAS', status: '', prioridade: '', prazo_vencido: '' }) },
+    { label: 'Novas', value: painel.novas, note: 'Aguardando análise', tone: 'blue', href: query({ tab: 'ATIVAS', status: 'NOVA', prazo_vencido: '' }) },
+    { label: 'Em análise', value: painel.em_analise, note: painel.planejamento ? `${painel.planejamento} em planejamento` : 'Em avaliação', tone: 'violet', href: query({ tab: 'ATIVAS', status: 'EM_ANALISE', prazo_vencido: '' }) },
+    { label: 'Em andamento', value: painel.em_andamento, note: 'Execução ativa', tone: 'teal', href: query({ tab: 'ATIVAS', status: 'EM_ANDAMENTO', prazo_vencido: '' }) },
+    { label: 'Paradas', value: painel.paradas, note: painel.paradas ? 'Requer atenção' : 'Nenhuma no momento', tone: 'red', href: query({ tab: 'ATIVAS', status: 'PARADA', prazo_vencido: '' }) },
+    { label: 'Críticas', value: painel.criticas, note: 'Ação imediata', tone: 'red', href: query({ tab: 'ATIVAS', status: '', prioridade: 'URGENTE', prazo_vencido: '' }) },
+    { label: 'Altas', value: painel.altas, note: 'Resposta rápida', tone: 'orange', href: query({ tab: 'ATIVAS', status: '', prioridade: 'ALTA', prazo_vencido: '' }) },
+    { label: 'Prazo vencido', value: painel.prazos_atrasados, note: 'Demandas fora do prazo', tone: 'red', href: query({ tab: 'ATIVAS', status: '', prioridade: '', prazo_vencido: '1' }) },
   ];
 %>
 
@@ -78,19 +78,27 @@
           <%= alerts.join(' · ') %>.
         </p>
       </div>
-      <a href="/demandas?<%= query({ tab: 'ATIVAS', status: '', prioridade: '' }) %>">Ver fila</a>
+      <a href="/demandas?<%= query({ tab: 'ATIVAS', status: '', prioridade: '', prazo_vencido: '' }) %>">Ver fila</a>
     </section>
   <% } %>
 
   <section class="demand-card demand-filter-card">
     <nav class="demand-tabs" aria-label="Visualização das demandas">
-      <a class="<%= filters.tab === 'ATIVAS' ? 'active' : '' %>" href="/demandas?<%= query({ tab: 'ATIVAS', status: '' }) %>">Ativas <span><%= painel.ativas || 0 %></span></a>
-      <a class="<%= filters.tab === 'HISTORICO' ? 'active' : '' %>" href="/demandas?<%= query({ tab: 'HISTORICO', status: '' }) %>">Concluídas e histórico <span><%= painel.concluidas || 0 %></span></a>
-      <a class="<%= filters.tab === 'TODAS' ? 'active' : '' %>" href="/demandas?<%= query({ tab: 'TODAS', status: '' }) %>">Todas</a>
+      <a class="<%= filters.tab === 'ATIVAS' ? 'active' : '' %>" href="/demandas?<%= query({ tab: 'ATIVAS', status: '', prazo_vencido: '' }) %>">Ativas <span><%= painel.ativas || 0 %></span></a>
+      <a class="<%= filters.tab === 'HISTORICO' ? 'active' : '' %>" href="/demandas?<%= query({ tab: 'HISTORICO', status: '', prazo_vencido: '' }) %>">Concluídas e histórico <span><%= painel.concluidas || 0 %></span></a>
+      <a class="<%= filters.tab === 'TODAS' ? 'active' : '' %>" href="/demandas?<%= query({ tab: 'TODAS', status: '', prazo_vencido: '' }) %>">Todas</a>
     </nav>
+
+    <% if (filters.prazo_vencido === '1') { %>
+      <div class="demand-tabs demand-deadline-filter" role="group" aria-label="Filtro de prazo ativo">
+        <span class="demand-badge">Prazo vencido (ativas)</span>
+        <a href="/demandas?<%= query({ prazo_vencido: '' }) %>">Remover filtro de prazo</a>
+      </div>
+    <% } %>
 
     <form class="demand-filters" method="GET" action="/demandas">
       <input type="hidden" name="tab" value="<%= filters.tab %>">
+      <% if (filters.prazo_vencido === '1') { %><input type="hidden" name="prazo_vencido" value="1"><% } %>
       <label class="filter-search"><span>Buscar</span><input name="q" value="<%= filters.q %>" placeholder="Número, título, equipamento, NR ou pessoa"></label>
       <label><span>Status</span><select name="status"><option value="">Todos</option><% ['NOVA','EM_ANALISE','PLANEJAMENTO','AGUARDANDO_APROVACAO','EM_ANDAMENTO','PARADA','CONCLUIDA','CANCELADA'].forEach(st => { %><option value="<%= st %>" <%= filters.status === st ? 'selected' : '' %>><%= statusLabel(st) %></option><% }) %></select></label>
       <label><span>Prioridade</span><select name="prioridade"><option value="">Todas</option><% ['URGENTE','ALTA','NORMAL','BAIXA'].forEach(pr => { %><option value="<%= pr %>" <%= filters.prioridade === pr ? 'selected' : '' %>><%= priorityLabel(pr) %></option><% }) %></select></label>

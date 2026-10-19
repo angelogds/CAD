@@ -12,6 +12,7 @@ function index(req, res) {
     status: normalizeChoice(req.query.status),
     prioridade: normalizeChoice(req.query.prioridade),
     responsavel_user_id: String(req.query.responsavel_user_id || '').trim(),
+    prazo_vencido: String(req.query.prazo_vencido || '').trim() === '1' ? '1' : '',
     tab: normalizeChoice(req.query.tab) || 'ATIVAS',
     limit: Number(req.query.limit || 20),
   };

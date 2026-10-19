@@ -87,6 +87,13 @@ function list(filters = {}, user) {
     where += " AND d.status NOT IN ('CONCLUIDA', 'CANCELADA')";
   }
 
+  if (String(filters.prazo_vencido || '').trim() === '1') {
+    // Mesmo critério do indicador: apenas demandas ativas com prazo anterior a hoje.
+    where += ` AND TRIM(COALESCE(d.prazo_previsto, '')) <> ''
+      AND date(d.prazo_previsto) < date('now')
+      AND d.status NOT IN ('CONCLUIDA', 'CANCELADA')`;
+  }
+
   if (prioridade === 'ELEVADA') {
     where += " AND d.prioridade IN ('URGENTE', 'ALTA')";
   } else if (prioridade) {
