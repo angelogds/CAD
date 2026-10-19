@@ -8,19 +8,38 @@
   const modal = document.getElementById('dayModal');
   const modalTitle = document.getElementById('dayModalTitle');
   const modalList = document.getElementById('dayModalList');
+  const closeDayModalButton = document.getElementById('closeDayModal');
+  let selectedCell = null;
   document.querySelectorAll('.status-badge-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       if (!modal || !modalTitle || !modalList) return;
       const rows = detailsByCell[btn.dataset.key] || [];
       modalTitle.textContent = `Detalhes da inspeção — ${btn.dataset.eq} • item ${btn.dataset.item} • dia ${btn.dataset.day}`;
       modalList.innerHTML = rows.length ? rows.map((row) => `<li><strong>OS #${escapeHtml(row.id)}</strong> — ${escapeHtml(row.status)}<br>Não conformidade: ${escapeHtml(row.nao_conformidade || row.problema)}<br>Ação preventiva: ${escapeHtml(row.causa_diagnostico)}<br>Ação corretiva: ${escapeHtml(row.resumo_tecnico)}<br>Ocorrência: ${escapeHtml(row.data_inicio)} | Correção: ${escapeHtml(row.data_fim)}</li>`).join('') : '<li>Sem OS vinculada neste dia.</li>';
+      selectedCell?.setAttribute('aria-expanded', 'false');
+      selectedCell = btn;
+      selectedCell.setAttribute('aria-expanded', 'true');
       modal.style.display = 'flex'; modal.setAttribute('aria-hidden','false');
+      closeDayModalButton?.focus();
     });
   });
-  const closeModal = () => { if (modal) { modal.style.display = 'none'; modal.setAttribute('aria-hidden','true'); } };
-  document.getElementById('closeDayModal')?.addEventListener('click', closeModal);
+  const closeModal = () => {
+    if (!modal || modal.getAttribute('aria-hidden') === 'true') return;
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    selectedCell?.setAttribute('aria-expanded', 'false');
+    selectedCell?.focus();
+    selectedCell = null;
+  };
+  closeDayModalButton?.addEventListener('click', closeModal);
   modal?.addEventListener('click', (event) => { if (event.target === modal) closeModal(); });
-  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeModal(); });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeModal();
+    if (event.key === 'Tab' && modal?.getAttribute('aria-hidden') === 'false') {
+      event.preventDefault();
+      closeDayModalButton?.focus();
+    }
+  });
 
   const filterButtons = [...document.querySelectorAll('[data-filter]')];
   const osCards = [...document.querySelectorAll('[data-os-card]')];
