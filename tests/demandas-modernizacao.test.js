@@ -89,10 +89,10 @@ test('faixa lateral de cada demanda segue exclusivamente a prioridade', () => {
   assert.match(view, /demand-priority-<%= slug\(d\.prioridade\) %>/);
   assert.match(css, /\.demand-row-v2\.demand-priority-urgente:before\{background:#c3222a\}/);
   assert.match(css, /\.demand-row-v2\.demand-priority-alta:before\{background:#e9791a\}/);
-  assert.match(css, /\.demand-row-v2\.demand-priority-normal:before\{background:#d5a600\}/);
+  assert.match(css, /\.demand-row-v2\.demand-priority-normal:before,\.demand-row-v2\.demand-priority-media:before\{background:#2563eb\}/);
   assert.match(css, /\.demand-row-v2\.demand-priority-baixa:before\{background:#168a4b\}/);
-  assert.match(css, /\.priority-media \.priority-heading\{border-left-color:#d5a600/);
-  assert.match(css, /\.priority-normal\{border-color:#ead77b;background:#fffbea;color:#7a5c00\}/);
+  assert.match(css, /\.priority-media \.priority-heading\{border-left-color:#2563eb/);
+  assert.match(css, /\.priority-normal,\.priority-media\{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8\}/);
   assert.doesNotMatch(css, /\.demand-row-v2:nth-child[^}]*:before/);
 
   assert.doesNotMatch(css, /\.demand-row-v2\.is-overdue\{box-shadow:/);
