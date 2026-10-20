@@ -1,6 +1,7 @@
 const service = require("./pcm.service");
 const operationalService = require("./pcm.operational.service");
 const lubrificacaoSemanaService = require("../lubrificacao/lubrificacao-semana.service");
+const reposicaoLubrificacao = require('../lubrificacao/lubrificacao-reposicao.service');
 const preventivasService = require("../preventivas/preventivas.service");
 const PDFDocument = require("pdfkit");
 const { canAccessModule } = require("../../config/rbac");
@@ -195,6 +196,7 @@ function lubrificacao(req, res) {
     semanaReferencia: lubrificacaoSemanaService.getWeekBounds(req.query.semana || null),
     resumoSemanaLubrificacao: lubrificacaoSemanaService.getDashboardResumo(req.query.semana || null),
     acompanhamentoLubrificacao: lubrificacaoSemanaService.getAcompanhamentoPCM(req.query.semana || null),
+    reposicaoLubrificantes: reposicaoLubrificacao.getPainel(),
     resumo: {
       ...resumoBase,
       pendentes_validacao: countBy(todasLubrificacoes, (item) => Number(item.validado_tecnicamente ?? 1) === 0),
@@ -707,7 +709,35 @@ function relatoriosAvancadosExcel(req, res) {
   return res.send(`<!doctype html><html><head><meta charset="utf-8"><style>table{border-collapse:collapse}th{background:#166534;color:#fff}</style></head><body>${sheets.join('<br style="page-break-after:always">')}</body></html>`);
 }
 
+
+function salvarConfiguracaoReposicaoLubrificacao(req, res) {
+  try {
+    reposicaoLubrificacao.salvarConfiguracao(req.params.codigo,req.body || {},req.session?.user);
+    req.flash('success','Parâmetros de reposição de lubrificantes atualizados.');
+  } catch (e) { req.flash('error',e.message || 'Não foi possível salvar a reposição.'); }
+  return res.redirect('/pcm/lubrificacao#reposicao-lubrificantes');
+}
+function ajustarSaldoReposicaoLubrificacao(req,res) {
+  try {
+    reposicaoLubrificacao.ajustarSaldo(req.params.codigo,req.body?.saldo,req.body?.motivo,req.session?.user);
+    req.flash('success','Saldo projetado conciliado. Não foi feita baixa no estoque físico.');
+  } catch (e) { req.flash('error',e.message || 'Falha ao conciliar saldo.'); }
+  return res.redirect('/pcm/lubrificacao#reposicao-lubrificantes');
+}
+function enviarSugestaoReposicaoLubrificacao(req,res) {
+  try {
+    const result = reposicaoLubrificacao.enviarSugestao(req.params.id,req.session?.user,{
+      quantidade_embalagens:req.body?.quantidade_embalagens
+    });
+    req.flash('success','Solicitação de lubrificante #' + result.id + ' enviada ao fluxo de Compras.');
+  } catch (e) { req.flash('error',e.message || 'Falha ao enviar a solicitação.'); }
+  return res.redirect('/pcm/lubrificacao#reposicao-lubrificantes');
+}
+
 module.exports = {
+  salvarConfiguracaoReposicaoLubrificacao,
+  ajustarSaldoReposicaoLubrificacao,
+  enviarSugestaoReposicaoLubrificacao,
   index,
   dashboardGerencial,
   dashboardDados,

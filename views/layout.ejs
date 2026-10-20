@@ -53,6 +53,9 @@
           </div>
 
           <div class="topbar-right">
+            <% if (user && isAdmin && Number(lubrificacaoAlertasCount || 0)>0) { %>
+              <a class="btn btn-ghost" href="/pcm/lubrificacao#reposicao-lubrificantes" title="Pré-solicitações de lubrificantes aguardando revisão">Reposição: <%= lubrificacaoAlertasCount %></a>
+            <% } %>
             <% if (user) { %>
               <% const extraRoles = ['MECANICO','ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO','ADMIN']; %>
               <% if (extraRoles.includes(String(user.role || '').toUpperCase())) { %>

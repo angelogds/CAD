@@ -1,0 +1,23 @@
+.lub-rep-section{scroll-margin-top:80px}
+.lub-rep-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0 18px 18px}
+.lub-rep-item{min-width:0;border:1px solid #dce9e1;border-radius:13px;background:#fff;padding:16px}
+.lub-rep-item-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap}
+.lub-rep-item h3{margin:0;font-size:15px;color:#1a3545}
+.lub-rep-numbers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+.lub-rep-numbers span,.lub-rep-form label,.lub-rep-form-line label{font-size:12px;color:#5b6875}
+.lub-rep-numbers strong{display:block;margin-top:3px;font-size:16px;font-weight:750;color:#165538}
+.lub-rep-caption,.lub-rep-footnote,.lub-rep-warning{font-size:12px;line-height:1.55;color:#536478}
+.lub-rep-footnote{margin:0;padding:0 18px 20px}
+.lub-rep-warning{padding:9px 12px;border-left:3px solid #d6a200;background:#fffbeb}
+.lub-rep-suggestion{padding:10px;border:1px solid #b7dacc;border-radius:10px;background:#f1f9f4}
+.lub-rep-suggestion p{margin:0 0 8px;font-size:13px}
+.lub-rep-config{margin-top:10px;border-top:1px solid #edf1ef;padding-top:10px}
+.lub-rep-config summary{cursor:pointer;font-weight:700;font-size:12px;color:#176b44}
+.lub-rep-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.lub-rep-form-line{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.lub-rep-form label,.lub-rep-form-line label{display:grid;gap:5px;min-width:0}
+.lub-rep-form input:not([type=checkbox]),.lub-rep-form select,.lub-rep-form-line input{min-width:0;width:100%;min-height:38px;border:1px solid #cbdad0;border-radius:8px;padding:6px 9px;font:inherit;color:#172f3b;background:white}
+.lub-rep-form .lub-rep-check{grid-column:1/-1;display:flex;align-items:center;gap:6px}
+.lub-rep-form button{grid-column:1/-1}
+@media(max-width:920px){.lub-rep-grid{grid-template-columns:1fr}}
+@media(max-width:480px){.lub-rep-numbers{grid-template-columns:repeat(2,minmax(0,1fr))}.lub-rep-form{grid-template-columns:1fr}}

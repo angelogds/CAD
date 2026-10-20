@@ -97,6 +97,9 @@ router.post("/falhas/registrar", requireLogin, requireRole(PCM_MANAGE), ctrl.reg
 router.post("/falhas/:osId/classificar", requireLogin, requireRole(PCM_MANAGE), ctrl.classificarFalha);
 router.post("/engenharia/componentes", requireLogin, requireRole(PCM_MANAGE), ctrl.adicionarComponente);
 router.post("/engenharia/criticidade", requireLogin, requireRole(PCM_MANAGE), ctrl.salvarCriticidade);
+router.post('/lubrificacao/reposicao/:codigo/configuracao',requireLogin,requireRole(PCM_MANAGE),ctrl.salvarConfiguracaoReposicaoLubrificacao);
+router.post('/lubrificacao/reposicao/:codigo/saldo',requireLogin,requireRole(PCM_MANAGE),ctrl.ajustarSaldoReposicaoLubrificacao);
+router.post('/lubrificacao/reposicao/sugestao/:id/enviar',requireLogin,requireRole(PCM_MANAGE),ctrl.enviarSugestaoReposicaoLubrificacao);
 router.post("/lubrificacao/pontos", requireLogin, requireRole(PCM_MANAGE), ctrl.adicionarLubrificacao);
 router.post("/lubrificacao/semana/responsavel", requireLogin, requireRole(PCM_MANAGE), ctrl.salvarResponsavelSemanaLubrificacao);
 router.post("/lubrificacao/semana/gerar-os-hoje", requireLogin, requireRole(PCM_MANAGE), ctrl.gerarOSLubrificacaoHoje);
