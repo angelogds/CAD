@@ -1,6 +1,7 @@
 <% layout('layout') %>
 <%- include('partials/internal-styles') %>
 <link rel="stylesheet" href="/css/pcm-lubrificacao-v7.css?v=20260928-2">
+<link rel="stylesheet" href="/css/pcm-lubrificacao-reposicao.css?v=20261020-1">
 <div class="pcm-module-page">
   <header class="pcm-module-head">
     <div>
@@ -27,6 +28,76 @@
         <div class="pcm-stat warn"><span>Pendentes de validação</span><strong><%= resumo.pendentes_validacao %></strong><small>não aparecem ao mecânico</small></div>
         <div class="pcm-stat info"><span>Liberados</span><strong><%= resumo.liberados %></strong><small>prontos para distribuição</small></div>
         <div class="pcm-stat"><span>Cobertura</span><strong><%= resumo.cobertura %>%</strong><small>equipamentos com plano</small></div>
+      </section>
+
+
+      <section class="pcm-card lub-rep-section" id="reposicao-lubrificantes">
+        <div class="pcm-card-head">
+          <div>
+            <span class="pcm-section-label">Controle inteligente de materiais</span>
+            <h2>Reposição de óleos e graxas</h2>
+            <p>Saldo projetado a partir do roteiro executado, sem duplicar a baixa física do Almoxarifado. O PCM pode ajustar o estoque de referência, os mínimos e a quantidade de compra.</p>
+          </div>
+          <% if (reposicaoLubrificantes.alertas) { %><span class="pcm-badge warn"><%= reposicaoLubrificantes.alertas %> pré-solicitação(ões) aguardando</span><% } %>
+        </div>
+        <div class="lub-rep-grid">
+          <% (reposicaoLubrificantes.itens || []).forEach(function(item) { %>
+            <article class="lub-rep-item">
+              <div class="lub-rep-item-head">
+                <h3><%= item.nome %></h3>
+                <span class="pcm-badge <%= item.abaixo_minimo ? 'warn' : '' %>"><%= item.abaixo_minimo ? 'Abaixo do mínimo' : 'Dentro da meta' %></span>
+              </div>
+              <div class="lub-rep-numbers">
+                <div><span>Saldo projetado</span><strong><%= item.saldo.toLocaleString('pt-BR',{maximumFractionDigits:2}) %> <%= item.unidade_saldo %></strong></div>
+                <div><span>Estoque mínimo</span><strong><%= item.minimo %> <%= item.unidade_saldo %></strong></div>
+                <div><span>Consumo do roteiro</span><strong><%= item.consumido.toLocaleString('pt-BR',{maximumFractionDigits:2}) %> <%= item.unidade_saldo %></strong></div>
+              </div>
+              <p class="lub-rep-caption"><strong>Embalagem:</strong> <%= item.embalagem_descricao %>. <%= item.modo==='AUTOMATICO'?'Envio automático habilitado.':'Envio após revisão do PCM.' %></p>
+              <% if (!item.especificacao_confirmada) { %>
+                <p class="lub-rep-warning">Especificação da graxa pendente de confirmação técnica. Não será enviada automaticamente.</p>
+              <% } %>
+              <% if (item.sugestao) { %>
+                <div class="lub-rep-suggestion">
+                  <p><strong><%= item.sugestao.status==='ENVIADA'?'Solicitação enviada':'Pré-solicitação sugerida' %></strong>
+                  <% if (item.sugestao.solicitacao_id) { %> — <a href="/solicitacoes/<%= item.sugestao.solicitacao_id %>">Solicitação #<%= item.sugestao.solicitacao_id %></a><% } %></p>
+                  <% if (item.sugestao.status === 'SUGERIDA' && canManagePcm) { %>
+                    <form method="POST" action="/pcm/lubrificacao/reposicao/sugestao/<%= item.sugestao.id %>/enviar" class="lub-rep-form-line">
+                      <label>Quantidade de embalagens
+                        <input type="number" min="1" step="1" name="quantidade_embalagens" value="<%= item.sugestao.quantidade_embalagens %>" required>
+                      </label>
+                      <button type="submit" class="pcm-button ui-btn ui-btn--outline" <%= item.especificacao_confirmada ? '' : 'disabled' %>>Enviar solicitação</button>
+                    </form>
+                  <% } %>
+                </div>
+              <% } %>
+              <% if (canManagePcm) { %>
+                <details class="lub-rep-config">
+                  <summary>Configurar mínimo, meta e automação</summary>
+                  <form method="POST" action="/pcm/lubrificacao/reposicao/<%= item.codigo %>/configuracao" class="lub-rep-form">
+                    <label>Mínimo (<%= item.unidade_saldo %>)<input type="number" name="minimo" min="0" step="0.01" value="<%= item.minimo %>" required></label>
+                    <label>Estoque-alvo (<%= item.unidade_saldo %>)<input type="number" name="alvo" min="0.01" step="0.01" value="<%= item.alvo %>" required></label>
+                    <label>Quantidade por embalagem (<%= item.unidade_saldo %>)<input type="number" name="embalagem_quantidade" min="0.01" step="0.01" value="<%= item.embalagem_quantidade %>" required></label>
+                    <label>Consumo-padrão (<%= item.unidade_saldo %>)<input type="number" name="consumo_padrao" min="0" step="0.01" value="<%= item.consumo_padrao %>" required></label>
+                    <label>Modo de solicitação
+                      <select name="modo"><option value="ASSISTIDO" <%= item.modo==='ASSISTIDO'?'selected':'' %>>Assistido — PCM revisa</option><option value="AUTOMATICO" <%= item.modo==='AUTOMATICO'?'selected':'' %>>Automático — envia para Compras</option></select>
+                    </label>
+                    <label class="lub-rep-check"><input type="checkbox" name="especificacao_confirmada" value="1" <%= item.especificacao_confirmada?'checked':'' %>> Especificação técnica confirmada</label>
+                    <button type="submit" class="pcm-button primary ui-btn ui-btn--primary">Salvar parâmetros</button>
+                  </form>
+                </details>
+                <details class="lub-rep-config">
+                  <summary>Conciliar saldo com o Almoxarifado</summary>
+                  <form method="POST" action="/pcm/lubrificacao/reposicao/<%= item.codigo %>/saldo" class="lub-rep-form">
+                    <label>Saldo atual conferido (<%= item.unidade_saldo %>)<input type="number" name="saldo" min="0" step="0.01" value="<%= Math.max(0,item.saldo) %>" required></label>
+                    <label>Motivo / recebimento<input name="motivo" maxlength="240" placeholder="Ex.: entrada de material conferida no Almoxarifado"></label>
+                    <button type="submit" class="pcm-button ui-btn ui-btn--outline">Atualizar saldo projetado</button>
+                  </form>
+                </details>
+              <% } %>
+            </article>
+          <% }) %>
+        </div>
+        <p class="lub-rep-footnote">Graxa EP2: previsão inicial de 150 g por máquina/dia, sem duplicar pontos do mesmo equipamento. As graxas especiais dos decanters requerem quantidade registrada e validação técnica. Óleo 680 não é consumido automaticamente por uma simples verificação de nível: registre a reposição e concilie o saldo. Compra e recebimento seguem os módulos existentes.</p>
       </section>
 
       <section class="pcm-card">

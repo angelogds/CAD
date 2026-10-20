@@ -286,6 +286,10 @@ app.use((req, res, next) => {
   res.locals.normalizeRole = normalizeRole;
   res.locals.isAdmin = normalizeRole(req.session?.user?.role || "") === "ADMIN";
   try {
+    res.locals.lubrificacaoAlertasCount = res.locals.isAdmin
+      ? require("./modules/lubrificacao/lubrificacao-reposicao.service").contarAlertas() : 0;
+  } catch (_) { res.locals.lubrificacaoAlertasCount = 0; }
+  try {
     // Apenas statfs aqui: evita varredura síncrona de todo o volume em cada requisição.
     const diag = storageMaintenance.capacity();
     const capacityState = storageMaintenance.capacityStatus(diag);

@@ -1,5 +1,6 @@
 const db = require('../../database/db');
 const semanaService = require('./lubrificacao-semana.service');
+const reposicaoService = require('./lubrificacao-reposicao.service');
 
 function tableExists(name) {
   return !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name);
@@ -301,10 +302,20 @@ function registrarExecucao(planoId, userId, payload = {}) {
       WHERE id = ?
     `).run(proxima, plano.id);
 
-    return Number(info.lastInsertRowid);
+    const execucaoId = Number(info.lastInsertRowid);
+    const equipamentoNome = db.prepare('SELECT nome FROM equipamentos WHERE id=?').get(plano.equipamento_id)?.nome || '';
+    reposicaoService.registrarConsumo(execucaoId,plano,quantidadeUtilizada,equipamentoNome);
+    return execucaoId;
   });
 
   const execucaoId = tx();
+  try {
+    reposicaoService.atualizarSugestoes();
+    reposicaoService.enviarAutomaticas();
+  } catch (erroReposicao) {
+    // A falha de suprimentos nunca desfaz a execução de lubrificação já confirmada.
+    console.error('[LUB_REPOSICAO] Sugestões pendentes:',erroReposicao.message);
+  }
   const osSync = osProgramada?.os_id
     ? semanaService.sincronizarStatusOSProgramada(plano.equipamento_id, executorId)
     : { vinculada:false, concluida:false };
