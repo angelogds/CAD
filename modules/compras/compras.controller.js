@@ -10,7 +10,6 @@ const { normalizeSetorCorporativo } = require('./compras-setores');
 
 const UPLOADS_DIR = storagePaths.UPLOAD_DIR;
 
-const OPERATIONALLY_CLOSED = new Set(['RECEBIDA_TOTAL', 'ENTREGUE_SOLICITANTE', 'FECHADA', 'CANCELADA']);
 
 function normalizeToken(value) {
   return String(value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -69,7 +68,11 @@ function applyActiveItemCounters(rows) {
   if (!ids.length) return rows;
   const placeholders = ids.map(() => '?').join(',');
   const hasQtdComprada = hasColumn('solicitacao_itens', 'qtd_comprada');
+  const hasApprovalStatus = hasColumn('solicitacao_itens', 'aprovacao_item_status');
   const expected = hasQtdComprada ? 'COALESCE(si.qtd_comprada,si.qtd_solicitada,0)' : 'COALESCE(si.qtd_solicitada,0)';
+  const aprovacaoPendente = hasApprovalStatus
+    ? "SUM(CASE WHEN UPPER(TRIM(COALESCE(si.aprovacao_item_status,''))) IN ('AGUARDANDO_APROVACAO','PENDENTE','EM_ANALISE','DEVOLVIDA_REVISAO','REPROVADA') AND UPPER(COALESCE(si.status_compra,''))<>'CANCELADO' THEN 1 ELSE 0 END)"
+    : '0';
   const stats = db.prepare(`
     SELECT si.solicitacao_id,
       SUM(CASE WHEN UPPER(COALESCE(si.status_compra,''))<>'CANCELADO' THEN 1 ELSE 0 END) itens_count,
@@ -77,7 +80,12 @@ function applyActiveItemCounters(rows) {
         AND UPPER(COALESCE(si.status_cotacao,''))='COTADO' THEN 1 ELSE 0 END) itens_cotados,
       SUM(CASE WHEN UPPER(COALESCE(si.status_compra,''))='COMPRADO' THEN 1 ELSE 0 END) itens_comprados,
       SUM(CASE WHEN UPPER(COALESCE(si.status_compra,''))<>'CANCELADO'
-        AND COALESCE(si.qtd_recebida_total,0)>=${expected} AND ${expected}>0 THEN 1 ELSE 0 END) itens_recebidos
+        AND COALESCE(si.qtd_recebida_total,0)>=${expected} AND ${expected}>0 THEN 1 ELSE 0 END) itens_recebidos,
+      SUM(CASE WHEN UPPER(TRIM(COALESCE(si.status_compra,'')))='COMPRADO'
+        AND ${expected}>0 AND COALESCE(si.qtd_recebida_total,0)>=${expected} THEN 1 ELSE 0 END) itens_comprados_recebidos,
+      SUM(CASE WHEN UPPER(TRIM(COALESCE(si.status_compra,''))) NOT IN ('COMPRADO','CANCELADO','ATENDIDO_ESTOQUE')
+        THEN 1 ELSE 0 END) itens_pendentes_compra,
+      ${aprovacaoPendente} itens_aprovacao_pendente
     FROM solicitacao_itens si
     WHERE si.solicitacao_id IN (${placeholders})
     GROUP BY si.solicitacao_id
@@ -92,6 +100,10 @@ function applyActiveItemCounters(rows) {
       itens_cotados: Number(stat.itens_cotados || 0),
       itens_comprados: Number(stat.itens_comprados || 0),
       itens_recebidos: Number(stat.itens_recebidos || 0),
+      itens_comprados_recebidos: Number(stat.itens_comprados_recebidos || 0),
+      itens_pendentes_compra: Number(stat.itens_pendentes_compra || 0),
+      itens_aprovacao_pendente: Number(stat.itens_aprovacao_pendente || 0),
+      itens_conferidos: true,
     };
   });
 }
@@ -105,11 +117,15 @@ function getOperationalQueue(filters) {
   const allRows = applyActiveItemCounters([...unique.values()]).map((row) => ({
     ...row,
     status: service.normalizeStatus(row.status),
+    recebimento_completo_compras: service.isRecebimentoIntegralSemPendencias(row),
     priorityGroup: queuePriorityGroup(row.prioridade),
     setor_origem_exibicao: normalizeSetorCorporativo(row.setor_origem),
   }));
-  const activeRows = allRows.filter((row) => !OPERATIONALLY_CLOSED.has(row.status));
-  const historyRows = allRows.filter((row) => OPERATIONALLY_CLOSED.has(row.status));
+  // Usa a mesma classificação do serviço de Compras, com conferência física.
+  // Materiais separados para retirada permanecem no Almoxarifado, mas saem
+  // das pendências de COMPRA e ficam disponíveis em "Fechadas e histórico".
+  const activeRows = allRows.filter((row) => service.isOperationallyActive(row));
+  const historyRows = allRows.filter((row) => !service.isOperationallyActive(row));
   let filtered = filters.tab === 'history' ? historyRows : activeRows;
 
   if (filters.prioridade) filtered = filtered.filter((row) => row.priorityGroup === filters.prioridade);

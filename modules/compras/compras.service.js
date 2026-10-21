@@ -34,6 +34,8 @@ const STATUS_COMPRAS = [
   STATUS.EM_RECEBIMENTO,
   STATUS.RECEBIDA_PARCIAL,
   STATUS.RECEBIDA_TOTAL,
+  STATUS.SEPARADA_PARA_RETIRADA,
+  STATUS.ENTREGUE_SOLICITANTE,
   STATUS.FECHADA,
   STATUS.REABERTA,
   STATUS.CANCELADA,
@@ -61,6 +63,24 @@ const CARD_STATUS = Object.freeze({
   recebidas: new Set([STATUS.RECEBIDA_PARCIAL, STATUS.RECEBIDA_TOTAL]),
 });
 const isActiveStatus = (status) => !CLOSED_STATUSES.has(normalizeStatus(status));
+
+// A fila operacional considera a conferência do Almoxarifado, mesmo quando o
+// status legado não foi recalculado após o último recebimento. A aprovação
+// pendente e os itens ainda não comprados preservam a solicitação na fila.
+function isRecebimentoIntegralSemPendencias(row = {}) {
+  const status = normalizeStatus(row.status);
+  if (![STATUS.COMPRADA, STATUS.EM_RECEBIMENTO, STATUS.RECEBIDA_PARCIAL].includes(status)) return false;
+  if (row.itens_conferidos !== true) return false;
+  const comprados = Number(row.itens_comprados || 0);
+  return comprados > 0
+    && Number(row.itens_comprados_recebidos || 0) === comprados
+    && Number(row.itens_pendentes_compra || 0) === 0
+    && Number(row.itens_aprovacao_pendente || 0) === 0;
+}
+
+function isOperationallyActive(row = {}) {
+  return isActiveStatus(row.status) && !isRecebimentoIntegralSemPendencias(row);
+}
 
 function priorityGroup(value) {
   const priority = normalizeToken(value);
@@ -1221,6 +1241,8 @@ module.exports = {
   CARD_STATUS,
   normalizeStatus,
   isActiveStatus,
+  isOperationallyActive,
+  isRecebimentoIntegralSemPendencias,
   priorityGroup,
   enrichOperational,
   matchesCard,

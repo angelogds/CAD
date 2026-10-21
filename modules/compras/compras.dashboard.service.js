@@ -9,6 +9,8 @@ const STATUS_ORDER = [
   'EM_RECEBIMENTO',
   'RECEBIDA_PARCIAL',
   'RECEBIDA_TOTAL',
+  'SEPARADA_PARA_RETIRADA',
+  'ENTREGUE_SOLICITANTE',
   'FECHADA',
   'REABERTA',
   'CANCELADA',
@@ -21,6 +23,8 @@ const STATUS_LABELS = Object.freeze({
   EM_RECEBIMENTO: 'Em recebimento',
   RECEBIDA_PARCIAL: 'Recebida parcial',
   RECEBIDA_TOTAL: 'Recebida total',
+  SEPARADA_PARA_RETIRADA: 'Separada para retirada',
+  ENTREGUE_SOLICITANTE: 'Entregue ao solicitante',
   FECHADA: 'Fechada',
   REABERTA: 'Reaberta',
   CANCELADA: 'Cancelada',
@@ -38,6 +42,7 @@ const COMMITTED_STATUSES = new Set([
 
 const CLOSED_RECEIPT_STATUSES = new Set([
   'RECEBIDA_TOTAL',
+  'SEPARADA_PARA_RETIRADA',
   'ENTREGUE_SOLICITANTE',
   'FECHADA',
   'CANCELADA',

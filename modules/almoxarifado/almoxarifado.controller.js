@@ -49,7 +49,9 @@ function index(req, res) {
   };
 
   let compras = service.listRecebimentos({ status: "TODAS", query: qCompra })
-    .filter((row) => ["EM_COTACAO","COMPRADA","EM_RECEBIMENTO","RECEBIDA_PARCIAL","RECEBIDA_TOTAL","SEPARADA_PARA_RETIRADA","ENTREGUE_SOLICITANTE","FECHADA"].includes(String(row.status || "").toUpperCase()));
+    // Compras a receber: encerrado o recebimento, deixa de ser pendência aqui.
+    // Permanecem consultáveis no histórico oficial do Almoxarifado.
+    .filter((row) => ["EM_COTACAO","COMPRADA","EM_RECEBIMENTO","RECEBIDA_PARCIAL"].includes(String(row.status || "").toUpperCase()));
   if (compraEstado === "COTADO") compras = compras.filter((row) => Number(row.itens_total || 0) > 0 && Number(row.itens_cotados || 0) >= Number(row.itens_total || 0));
   if (compraEstado === "NAO_COTADO") compras = compras.filter((row) => Number(row.itens_total || 0) === 0 || Number(row.itens_cotados || 0) < Number(row.itens_total || 0));
 
