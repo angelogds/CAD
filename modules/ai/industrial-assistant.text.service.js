@@ -159,7 +159,7 @@ async function runTextAssistant({ message, user, context = {}, conversationId = 
 
   const cfg = getAIConfig();
   const apiKey = String(cfg?.apiKey || process.env.OPENAI_API_KEY || '').trim();
-  if (providerRouter.primaryName() === 'openai' && !apiKey) { const err = new Error('OPENAI_API_KEY não configurada no servidor.'); err.status = 503; throw err; }
+  if (providerRouter.primaryName('createResponse') === 'openai' && !apiKey) { const err = new Error('OPENAI_API_KEY não configurada no servidor.'); err.status = 503; throw err; }
 
   const model = String(process.env.OPENAI_MODEL_ASSISTANT || cfg?.model || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini').trim();
   const timeoutMs = Math.max(5000, Number(process.env.OPENAI_TIMEOUT_MS || 45000));

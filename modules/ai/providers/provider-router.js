@@ -1,9 +1,11 @@
 const openai = require('./openai.provider');
 const local = require('./local.provider');
+const omniroute = require('./omniroute.provider');
 
 const PROVIDERS = new Map([
   ['openai', openai],
   ['local', local],
+  ['omniroute', omniroute],
 ]);
 
 function normalizeName(value, fallback = 'openai') {
@@ -21,21 +23,29 @@ function getProvider(name) {
   throw err;
 }
 
-function primaryName() {
+function primaryName(method) {
+  if (method === 'createResponse' && String(process.env.AI_PROVIDER_TEXT_PRIMARY || '').trim()) {
+    return normalizeName(process.env.AI_PROVIDER_TEXT_PRIMARY);
+  }
   return normalizeName(process.env.AI_PROVIDER_PRIMARY, 'openai');
 }
 
-function fallbackName() {
+function fallbackName(method) {
+  // Presente e vazia desativa fallback somente para texto.
+  if (method === 'createResponse' && process.env.AI_PROVIDER_TEXT_FALLBACK !== undefined) {
+    const textFallback = String(process.env.AI_PROVIDER_TEXT_FALLBACK).trim();
+    return textFallback ? normalizeName(textFallback) : null;
+  }
   const value = String(process.env.AI_PROVIDER_FALLBACK || '').trim();
   return value ? normalizeName(value) : null;
 }
 
-function primary() {
-  return getProvider(primaryName());
+function primary(method) {
+  return getProvider(primaryName(method));
 }
 
-function fallback() {
-  const name = fallbackName();
+function fallback(method) {
+  const name = fallbackName(method);
   return name ? getProvider(name) : null;
 }
 
@@ -49,11 +59,11 @@ function shouldFallback(error) {
 }
 
 async function runWithFallback(method, args) {
-  const first = primary();
+  const first = primary(method);
   try {
     return await first[method](args);
   } catch (primaryError) {
-    const second = fallback();
+    const second = fallback(method);
     if (!second || second.name === first.name || typeof second[method] !== 'function' || !shouldFallback(primaryError)) throw primaryError;
     try {
       return await second[method](args);
@@ -71,6 +81,10 @@ function status() {
   return {
     primary: { selected: primaryProvider.name, ...primaryProvider.status() },
     fallback: fallbackProvider ? { selected: fallbackProvider.name, ...fallbackProvider.status() } : null,
+    text: {
+      primary: { selected: primaryName('createResponse'), ...primary('createResponse').status() },
+      fallback: fallback('createResponse') ? { selected: fallbackName('createResponse'), ...fallback('createResponse').status() } : null,
+    },
     available: [...PROVIDERS.values()].map((provider) => provider.status()),
   };
 }
