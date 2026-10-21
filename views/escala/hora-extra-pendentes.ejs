@@ -69,6 +69,7 @@
           </div>
 
           <div class="approval-service"><span>Serviço</span><strong><%= h.descricao_servico || h.os_descricao || '-' %></strong></div>
+          <% if (h.inicio_fixo_17h) { %><div class="approval-service"><span>Início fixo às 17h</span><strong>Lançado em <%= dateBr.formatDateTimeBR(h.criado_em) %></strong><small>Responsável: <%= h.registrado_por_nome || ('Usuário ' + h.user_id) %>. Foto e GPS de abertura correspondem ao momento do lançamento.</small></div><% } %>
           <div class="approval-service">
             <span>Localização</span>
             <strong>Início: <%= geoInicio.ok ? '✅ ' : '⚠ ' %><%= geoInicio.label %><%= geoInicio.accuracy ? (' • ' + geoInicio.accuracy) : '' %></strong>

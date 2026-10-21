@@ -1207,6 +1207,11 @@ function isColaboradorMecanico(colaborador = {}) {
 function isMecanicoUser(user = {}) { return userRole(user) === 'MECANICO' || isMecanicoText(user.funcao) || isMecanicoText(user.cargo) || isMecanicoText(user.perfil); }
 function isAdminUser(user) { return userRole(user) === 'ADMIN'; }
 function canManageBancoHoras(user) { return ['ADMIN','ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO'].includes(userRole(user)); }
+function canIniciarHoraExtraDesde17(user) {
+  // MANUTENCAO é um perfil genérico legado e não autoriza este lançamento.
+  const role = userRole({ role: String(user?.role || user?.perfil || '').trim() });
+  return ['ADMIN', 'ADMINISTRADOR', 'ENCARREGADO', 'ENCARREGADO_MANUTENCAO', 'ENCARREGADO_DE_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'SUPERVISOR_MANUTENCAO'].includes(role);
+}
 function canReadBancoHoras(user) { return canManageBancoHoras(user) || ['RH','DIRETORIA'].includes(userRole(user)); }
 function minutosToHoras(minutos) { const m = Math.abs(Number(minutos)||0); const sign = Number(minutos)<0 ? '-' : ''; return `${sign}${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}`; }
 function saldoResumo(minutos) { return { minutos, horas: minutosToHoras(minutos), diasFolga: Math.floor(minutos / MINUTOS_DIA_FOLGA), diasFolgaDecimal: Math.round((minutos / MINUTOS_DIA_FOLGA) * 100) / 100 }; }
@@ -1407,24 +1412,55 @@ function getHoraExtra(id) { return db.prepare('SELECT * FROM escala_horas_extras
 function buscarHoraExtraPorId(id) { return getHoraExtra(id); }
 function filePath(file) { return file ? `/uploads/escala-horas/${file.filename}` : null; }
 
-function iniciarHoraExtra(dados) {
+function registrarInicioHoraExtra(dados, inicioFixo17h = false) {
   const colaboradorId = Number(dados.colaborador_id); if (!colaboradorId) throw new Error('Colaborador obrigatório.');
-  // Bloqueio correto: somente o próprio colaborador não pode ter dois lançamentos ativos.
-  // Não consultar/bloquear por OS: a mesma OS pode ter vários mecânicos simultâneos.
-  if (buscarHoraExtraEmAndamento(colaboradorId)) throw new Error('Você já possui uma hora extra em andamento. Finalize o lançamento atual antes de iniciar outro.');
   const descricao = String(dados.descricao_servico||'').trim();
   const osId = Number(dados.os_id || 0) || null;
   if (!osId && !descricao) throw new Error('Informe uma OS ou descreva o serviço realizado.');
   const os = osId ? db.prepare('SELECT id, equipamento_id FROM os WHERE id=?').get(osId) : null;
   if (osId && !os) throw new Error('OS selecionada não foi encontrada ou não está disponível para hora extra.');
   const now = new Date(); const iso = now.toISOString();
-  const info = db.prepare(`INSERT INTO escala_horas_extras (user_id,colaborador_id,os_id,equipamento_id,data_servico,inicio_extra,descricao_servico,foto_inicio_path,latitude_inicio,longitude_inicio,precisao_inicio,status,criado_em,atualizado_em)
-    VALUES (@user_id,@colaborador_id,@os_id,@equipamento_id,@data_servico,@inicio_extra,@descricao_servico,@foto_inicio_path,@latitude_inicio,@longitude_inicio,@precisao_inicio,'EM_ANDAMENTO',datetime('now'),datetime('now'))`).run({
-    user_id: dados.user_id || null, colaborador_id: colaboradorId, os_id: osId, equipamento_id: os?.equipamento_id || null, data_servico: iso.slice(0,10), inicio_extra: iso, descricao_servico: descricao, foto_inicio_path: dados.foto_inicio_path || null,
-    latitude_inicio: dados.latitude_inicio || null, longitude_inicio: dados.longitude_inicio || null, precisao_inicio: dados.precisao_inicio || null,
+  const dataServico = inicioFixo17h ? getAgoraSaoPauloParts(now).dateISO : iso.slice(0, 10);
+  const inicioExtra = inicioFixo17h ? new Date(`${dataServico}T17:00:00-03:00`).toISOString() : iso;
+  const tx = db.transaction(() => {
+    // A mesma OS pode ter vários mecânicos; o bloqueio é por colaborador.
+    if (buscarHoraExtraEmAndamento(colaboradorId)) throw new Error('Você já possui uma hora extra em andamento. Finalize o lançamento atual antes de iniciar outro.');
+    if (inicioFixo17h) {
+      const sobreposicao = db.prepare(`
+        SELECT id FROM escala_horas_extras
+        WHERE colaborador_id=?
+          AND upper(COALESCE(status,'')) NOT IN ('CANCELADO','REPROVADO')
+          AND julianday(fim_extra) > julianday(?)
+        LIMIT 1
+      `).get(colaboradorId, inicioExtra);
+      if (sobreposicao) throw new Error('Já existe hora extra registrada para este colaborador no período a partir das 17h.');
+    }
+    const info = db.prepare(`INSERT INTO escala_horas_extras (user_id,colaborador_id,os_id,equipamento_id,data_servico,inicio_extra,inicio_fixo_17h,descricao_servico,foto_inicio_path,latitude_inicio,longitude_inicio,precisao_inicio,status,criado_em,atualizado_em)
+      VALUES (@user_id,@colaborador_id,@os_id,@equipamento_id,@data_servico,@inicio_extra,@inicio_fixo_17h,@descricao_servico,@foto_inicio_path,@latitude_inicio,@longitude_inicio,@precisao_inicio,'EM_ANDAMENTO',datetime('now'),datetime('now'))`).run({
+      user_id: dados.user_id || null, colaborador_id: colaboradorId, os_id: osId, equipamento_id: os?.equipamento_id || null, data_servico: dataServico, inicio_extra: inicioExtra, inicio_fixo_17h: inicioFixo17h ? 1 : 0, descricao_servico: descricao, foto_inicio_path: dados.foto_inicio_path || null,
+      latitude_inicio: dados.latitude_inicio || null, longitude_inicio: dados.longitude_inicio || null, precisao_inicio: dados.precisao_inicio || null,
+    });
+    return info.lastInsertRowid;
   });
-  return info.lastInsertRowid;
+  return tx();
 }
+
+function iniciarHoraExtra(dados) {
+  return registrarInicioHoraExtra(dados);
+}
+
+function iniciarHoraExtraDesde17(dados, usuarioResponsavel) {
+  if (!canIniciarHoraExtraDesde17(usuarioResponsavel)) throw new Error('Perfil sem permissão para iniciar hora extra a partir das 17h.');
+  const responsavelId = userIdFrom(usuarioResponsavel);
+  if (!Number.isInteger(responsavelId) || responsavelId <= 0) throw new Error('Responsável autenticado obrigatório.');
+  const colaboradorId = Number(dados.colaborador_id);
+  if (!listarColaboradoresMecanicosHoraExtra().some((colaborador) => Number(colaborador.id) === colaboradorId)) {
+    throw new Error('Selecione um mecânico ativo da manutenção.');
+  }
+  return registrarInicioHoraExtra({ ...dados, user_id: responsavelId }, true);
+}
+
+Object.assign(module.exports, { iniciarHoraExtraDesde17, canIniciarHoraExtraDesde17 });
 
 function finalizarHoraExtra(id, dados) {
   const he = getHoraExtra(id); if (!he) throw new Error('Registro não encontrado.');
@@ -1445,8 +1481,8 @@ function listarHorasExtras(filtros={}) {
   if (filtros.os_id) { where += ' AND he.os_id=?'; params.push(filtros.os_id); }
   if (filtros.inicio) { where += ' AND he.data_servico>=?'; params.push(filtros.inicio); }
   if (filtros.fim) { where += ' AND he.data_servico<=?'; params.push(filtros.fim); }
-  return db.prepare(`SELECT he.*, c.nome AS colaborador_nome, o.equipamento AS os_equipamento, o.descricao AS os_descricao, e.nome AS equipamento_nome, u.name AS aprovado_por_nome
-    FROM escala_horas_extras he JOIN colaboradores c ON c.id=he.colaborador_id LEFT JOIN os o ON o.id=he.os_id LEFT JOIN equipamentos e ON e.id=he.equipamento_id LEFT JOIN users u ON u.id=he.aprovado_por
+  return db.prepare(`SELECT he.*, c.nome AS colaborador_nome, o.equipamento AS os_equipamento, o.descricao AS os_descricao, e.nome AS equipamento_nome, u.name AS aprovado_por_nome, autor.name AS registrado_por_nome
+    FROM escala_horas_extras he JOIN colaboradores c ON c.id=he.colaborador_id LEFT JOIN os o ON o.id=he.os_id LEFT JOIN equipamentos e ON e.id=he.equipamento_id LEFT JOIN users u ON u.id=he.aprovado_por LEFT JOIN users autor ON autor.id=he.user_id
     WHERE ${where} ORDER BY he.data_servico DESC, he.id DESC ${filtros.semLimite ? '' : 'LIMIT 500'}`).all(...params);
 }
 

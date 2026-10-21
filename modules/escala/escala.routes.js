@@ -7,6 +7,7 @@ const router = express.Router();
 const { requireLogin, requireRole, requireAdmin } = require("../auth/auth.middleware");
 const { ACCESS, ROLE } = require("../../config/rbac");
 const controller = require("./escala.controller");
+const { canIniciarHoraExtraDesde17 } = require("./escala.service");
 const weeklyPdfController = require("./escala.weekly-pdf.controller");
 const selfController = require("./escala.self.controller");
 const folgaController = require("./escala.folga.controller");
@@ -60,6 +61,7 @@ function isMaintenanceSelfServiceProfile(user = {}) {
 function requireHoraExtraAccess(req, res, next) {
   const user = req.session?.user || {};
   if (isMaintenanceSelfServiceProfile(user)) return next();
+  if (canIniciarHoraExtraDesde17(user)) return next();
   req.flash?.('error', 'Apenas a equipe de Manutenção pode registrar hora extra.');
   if (req.accepts('html')) {
     return res.status(403).render('errors/403', { layout: 'layout', title: 'Sem permissão', message: 'Apenas a equipe de Manutenção pode registrar hora extra.' });
@@ -71,6 +73,13 @@ function redirectRoleDashboard(req, res, next) {
   const role = normalizeTextRole(req.session?.user?.role);
   if (role === ROLE.RH) return res.redirect('/rh');
   return next();
+}
+
+function requireHoraExtraDesde17Access(req, res, next) {
+  if (canIniciarHoraExtraDesde17(req.session?.user || {})) return next();
+  const message = 'Apenas encarregado de manutenção, supervisor de manutenção ou administrador podem abrir hora extra desde as 17h.';
+  if (req.accepts('html')) return res.status(403).render('errors/403', { layout: 'layout', title: 'Sem permissão', message });
+  return res.status(403).json({ error: message });
 }
 
 router.get("/", requireLogin, requireRole(escalaRead), redirectRoleDashboard, safe(controller.index, "index"));
@@ -90,6 +99,8 @@ router.post("/rodizio/recalcular", requireLogin, requireRole(escalaManage), safe
 router.post("/rodizio/:id/desativar", requireLogin, requireRole(escalaManage), safe(controller.desativarRodizio, "desativarRodizio"));
 
 router.get("/hora-extra/nova", requireLogin, requireHoraExtraAccess, safe(controller.horaExtraNova, "horaExtraNova"));
+router.get("/hora-extra/desde-17", requireLogin, requireHoraExtraDesde17Access, safe(controller.horaExtraDesde17, "horaExtraDesde17"));
+router.post("/hora-extra/desde-17/iniciar", requireLogin, requireHoraExtraDesde17Access, upload.single("foto_inicio"), safe(controller.iniciarHoraExtraDesde17, "iniciarHoraExtraDesde17"));
 router.post("/hora-extra/iniciar", requireLogin, requireHoraExtraAccess, upload.single("foto_inicio"), safe(controller.iniciarHoraExtra, "iniciarHoraExtra"));
 router.post("/hora-extra/:id/finalizar", requireLogin, requireHoraExtraAccess, upload.single("foto_fim"), safe(controller.finalizarHoraExtra, "finalizarHoraExtra"));
 router.get("/hora-extra/pendentes", requireLogin, requireRole(escalaManage), safe(controller.horasExtrasPendentes, "horasExtrasPendentes"));
