@@ -1,5 +1,5 @@
 <%- layout('layout') -%>
-<link rel="stylesheet" href="/css/escala-dashboard.css?v=20260913-rh">
+<link rel="stylesheet" href="/css/escala-dashboard.css?v=20261021-inicio-extra">
 <link rel="stylesheet" href="/css/escala-aprovacoes-folgas.css?v=20260913-rh">
 <%
   const listaColaboradores = Array.isArray(colaboradores) ? colaboradores : (colaborador ? [colaborador] : []);
@@ -98,13 +98,23 @@
             <label class="escala-field full"><span class="label">OS vinculada</span><select class="input" name="os_id" id="horaExtraOs"><option value="">Sem OS — justificar abaixo</option><% listaOs.forEach(os=>{ %><option value="<%= os.id %>" <%= Number(osSelecionadaId) === Number(os.id) ? 'selected' : '' %>>OS <%= os.id %> — <%= os.equipamento_nome || os.equipamento || 'Equipamento' %> — <%= os.descricao %></option><% }) %></select><small><%= listaOs.length %> OS aberta(s) disponível(is) para consulta. A mesma OS pode ter horas extras de mais de um mecânico; não bloqueia outros mecânicos.</small></label>
             <label class="escala-field full"><span class="label">Descrição do serviço / justificativa</span><textarea class="input" name="descricao_servico" id="horaExtraDescricao" rows="4" placeholder="Ex.: apoio emergencial no triturador FAST; troca de rolamento; solda de reforço..."></textarea><small id="horaExtraDescricaoAjuda">Obrigatória quando não houver OS. Com OS, pode ser usada como complemento.</small></label>
             <div class="escala-choice full">
-              <strong>📍 <%= inicioFixo17 ? 'Localização no momento do lançamento' : 'Localização do início' %></strong>
+              <strong id="horaExtraLocalizacaoTitulo">📍 <%= inicioFixo17 ? 'Localização no momento do lançamento' : 'Localização do início' %></strong>
               <small class="js-geo-status" data-context="inicio">Obtendo localização...</small>
               <button class="btn btn-sm js-geo-retry" type="button" data-context="inicio">Tentar novamente</button>
             </div>
             <div class="escala-photo-box full"><span class="label">Foto inicial (opcional)</span><input class="input" type="file" name="foto_inicio" accept="image/*" capture="environment"><small>Registre a condição inicial quando a evidência for necessária.</small></div>
           </div>
-          <div class="escala-actionbar"><span class="muted"><%= inicioFixo17 ? 'Início às 17h de hoje (Brasília). A foto e o GPS correspondem ao momento do lançamento.' : 'O horário é automático. Ao iniciar, o sistema tenta capturar novamente a localização.' %></span><button class="btn btn-green" type="submit"><%= inicioFixo17 ? 'Abrir hora extra desde as 17h' : 'Iniciar Hora Extra' %></button></div>
+          <% if (acessoInicioFixo17 && !inicioFixo17) { %>
+            <fieldset class="escala-inicio-opcoes" id="horaExtraModoInicio" aria-describedby="horaExtraInicioResumo">
+              <legend>Início da hora extra</legend>
+              <div class="escala-choice-grid">
+                <label class="escala-inicio-opcao"><input type="radio" name="modo_inicio" value="AGORA" checked required><span><strong>Iniciar agora</strong><small>Usar o horário real ao confirmar a abertura.</small></span></label>
+                <label class="escala-inicio-opcao"><input type="radio" name="modo_inicio" value="FIXO_17H" required><span><strong>Iniciar às 17h de hoje</strong><small>Contar desde o fim do expediente, mesmo que a abertura seja feita mais tarde.</small></span></label>
+              </div>
+              <p id="horaExtraInicioResumo" aria-live="polite">O início será o horário real da abertura.</p>
+            </fieldset>
+          <% } %>
+          <div class="escala-actionbar"><span class="muted" id="horaExtraInicioAviso"><%= inicioFixo17 ? 'Início às 17h de hoje (Brasília). A foto e o GPS correspondem ao momento do lançamento.' : 'O horário é automático. Ao iniciar, o sistema tenta capturar novamente a localização.' %></span><button class="btn btn-green" id="horaExtraIniciarButton" type="submit"><%= inicioFixo17 ? 'Abrir hora extra desde as 17h' : 'Iniciar Hora Extra' %></button></div>
         </form>
       </section>
     <% } %>
@@ -135,6 +145,22 @@
   const descricao=document.getElementById('horaExtraDescricao');
   const ajuda=document.getElementById('horaExtraDescricaoAjuda');
   const openOsCount=<%- JSON.stringify(listaOs.length) %>;
+
+  function atualizarModoInicio(){
+    const escolha=formInicio?.querySelector('[name="modo_inicio"]:checked');
+    if(!escolha)return;
+    const fixo=escolha.value==='FIXO_17H';
+    const resumo=document.getElementById('horaExtraInicioResumo');
+    const aviso=document.getElementById('horaExtraInicioAviso');
+    const titulo=document.getElementById('horaExtraLocalizacaoTitulo');
+    const botao=document.getElementById('horaExtraIniciarButton');
+    if(resumo)resumo.textContent=fixo?'O início será às 17h de hoje (Brasília). Antes desse horário, o contador ficará em zero. O fechamento usará o horário real.':'O início será o horário real da abertura.';
+    if(aviso)aviso.textContent=fixo?'Início às 17h de hoje (Brasília). A foto e o GPS correspondem ao momento do lançamento.':'O horário é automático. Ao iniciar, o sistema tenta capturar novamente a localização.';
+    if(titulo)titulo.textContent=fixo?'📍 Localização no momento do lançamento':'📍 Localização do início';
+    if(botao)botao.textContent=fixo?'Iniciar Hora Extra às 17h':'Iniciar Hora Extra';
+  }
+  formInicio?.querySelectorAll('[name="modo_inicio"]').forEach(input=>input.addEventListener('change',atualizarModoInicio));
+  atualizarModoInicio();
 
   function atualizarObrigatoriedade(){
     if(!descricao)return;

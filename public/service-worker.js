@@ -9,8 +9,12 @@ const STATIC_ASSETS = [
   '/manifest.webmanifest',
   '/images/pwa/icon.png',
   '/images/pwa/maskable-icon.png',
-  '/images/notification-icon.png',
 ];
+
+function isEscalaRequest(requestUrl) {
+  return requestUrl.origin === self.location.origin
+    && (requestUrl.pathname === '/escala' || requestUrl.pathname.startsWith('/escala/'));
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -24,6 +28,10 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then((names) => Promise.all(names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))))
+      .then(() => caches.open(CACHE_NAME))
+      .then((cache) => cache.keys().then((requests) => Promise.all(
+        requests.filter((request) => isEscalaRequest(new URL(request.url))).map((request) => cache.delete(request))
+      )))
       .then(() => self.clients.claim())
   );
 });
@@ -33,7 +41,9 @@ self.addEventListener('fetch', (event) => {
 
   const requestUrl = new URL(event.request.url);
   const bypassPrefixes = ['/push/', '/mobile/', '/auth/'];
-  const shouldBypass = bypassPrefixes.some((prefix) => requestUrl.pathname.startsWith(prefix));
+  // A Escala mostra pontos e formulários atuais; HTML salvo pode ocultar novos controles.
+  const shouldBypass = isEscalaRequest(requestUrl)
+    || bypassPrefixes.some((prefix) => requestUrl.pathname.startsWith(prefix));
   if (shouldBypass) return;
 
   event.respondWith(

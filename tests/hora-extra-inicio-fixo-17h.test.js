@@ -287,7 +287,7 @@ function request(user = gestor, body = {}) {
   return { session: { user }, body, query: {}, accepts: () => false, flash: (type, message) => messages.push({ type, message }), messages };
 }
 
-test('controller abre tela da gestão e formulário distinto sem alterar a tela comum', t => {
+test('controller disponibiliza início fixo também no formulário comum da gestão', t => {
   const f = fixture(t);
   const controller = loadController(f.service);
   const req = request();
@@ -302,6 +302,8 @@ test('controller abre tela da gestão e formulário distinto sem alterar a tela 
   const normal = response();
   controller.horaExtraNova(request(), normal, assert.ifError);
   assert.equal(normal.data.modoInicioFixo17, false);
+  assert.equal(normal.data.podeInicioFixo17, true);
+  assert.equal(normal.data.colaboradores.length, 2);
 });
 
 test('controller usa o funcionário selecionado e conserva autoria da sessão', t => {
@@ -381,7 +383,7 @@ test('aprovação credita no banco do colaborador o período inteiro desde 17h',
   assert.equal(f.row(id).status, 'APROVADO');
 });
 
-function loadRoutes(service) {
+function loadRoutes(service, controller = new Proxy({}, { get: (_target, name) => req => { req.handledBy = name; } })) {
   const routes = [];
   const router = {
     get: (url, ...handlers) => routes.push({ method: 'GET', url, handlers }),
@@ -397,7 +399,7 @@ function loadRoutes(service) {
     '../auth/auth.middleware': { requireLogin, requireRole: () => (_req, _res, next) => next(), requireAdmin: (_req, _res, next) => next() },
     '../../config/storage': { UPLOAD_DIR: path.join(root, 'work', 'unused-test-upload') },
     './escala.service': service,
-    './escala.controller': new Proxy({}, { get: (_target, name) => req => { req.handledBy = name; } }),
+    './escala.controller': controller,
     './escala.weekly-pdf.controller': {},
     './escala.self.controller': {},
     './escala.folga.controller': {},
@@ -445,6 +447,193 @@ test('rota de finalização aceita os aliases autorizados a abrir o lançamento'
     next();
     assert.equal(req.handledBy, 'finalizarHoraExtra', role);
   }
+});
+
+function executeRoute(route, req, res) {
+  assert.ok(route, 'Rota esperada não encontrada');
+  let cursor = 0;
+  const next = error => { assert.ifError(error); route.handlers[cursor++]?.(req, res, next); };
+  next();
+}
+
+for (const role of [
+  'ADMIN', 'ENCARREGADO_MANUTENCAO', 'SUPERVISOR_MANUTENCAO', 'MANUTENCAO_SUPERVISOR',
+  'ADMINISTRADOR', 'ENCARREGADO', 'ENCARREGADO_DE_MANUTENCAO',
+]) {
+  test(`POST comum permite a ${role} escolher FIXO_17H para o colaborador selecionado`, t => {
+    const f = fixture(t);
+    const calls = [];
+    const service = {
+      ...f.service,
+      iniciarHoraExtraDesde17(dados, user) {
+        calls.push({ dados, user });
+        return f.service.iniciarHoraExtraDesde17(dados, user);
+      },
+      iniciarHoraExtra() { assert.fail('A escolha FIXO_17H deve usar o serviço autorizado de início fixo'); },
+    };
+    const { routes } = loadRoutes(service, loadController(service));
+    const req = request({ id: 91, role }, { ...dadosServico, colaborador_id: '2', modo_inicio: 'FIXO_17H', user_id: 12 });
+    const res = response();
+    executeRoute(routes.find(route => route.method === 'POST' && route.url === '/hora-extra/iniciar'), req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].user.id, 91);
+    assert.equal(calls[0].dados.colaborador_id, 2);
+    assert.equal(f.count(), 1);
+    assert.equal(f.row(1).colaborador_id, 2);
+    assert.equal(f.row(1).inicio_extra, '2026-10-21T20:00:00.000Z');
+    assert.equal(f.row(1).inicio_fixo_17h, 1);
+    assert.equal(f.row(1).user_id, 91);
+    assert.equal(instant(f.row(1).criado_em), '2026-10-21T20:31:00.000Z');
+    assert.equal(res.redirected, '/escala/hora-extra/nova?colaborador_id=2');
+    assert.equal(req.messages[0].type, 'success');
+  });
+}
+
+for (const modo of ['AGORA', undefined]) {
+  test(`POST comum conserva início real quando modo_inicio é ${modo ?? 'omitido'}`, t => {
+    const f = fixture(t);
+    const calls = [];
+    const service = {
+      ...f.service,
+      iniciarHoraExtra(dados) { calls.push(dados); return f.service.iniciarHoraExtra(dados); },
+      iniciarHoraExtraDesde17() { assert.fail('Abertura AGORA não pode escolher início fixo'); },
+    };
+    const { routes } = loadRoutes(service, loadController(service));
+    const body = { ...dadosServico, inicio_extra: '2026-10-21T20:00:00.000Z', inicio_fixo_17h: 1 };
+    if (modo !== undefined) body.modo_inicio = modo;
+    const req = request(gestor, body);
+    const res = response();
+    executeRoute(routes.find(route => route.method === 'POST' && route.url === '/hora-extra/iniciar'), req, res);
+    assert.equal(calls.length, 1);
+    assert.equal(f.count(), 1);
+    assert.equal(f.row(1).inicio_extra, '2026-10-21T20:31:00.000Z');
+    assert.equal(f.row(1).inicio_fixo_17h, 0);
+    assert.equal(res.redirected, '/escala/hora-extra/nova?colaborador_id=1');
+    assert.equal(req.messages[0].type, 'success');
+  });
+}
+
+test('mecânico não pode forjar FIXO_17H no POST comum nem criar lançamento', t => {
+  const f = fixture(t);
+  const service = {
+    ...f.service,
+    iniciarHoraExtra() { assert.fail('Pedido de início fixo não autorizado não pode criar lançamento comum'); },
+    iniciarHoraExtraDesde17() { assert.fail('Pedido de início fixo não autorizado não pode chegar ao serviço'); },
+  };
+  const { routes } = loadRoutes(service, loadController(service));
+  const req = request({ id: 12, role: 'MECANICO' }, { ...dadosServico, modo_inicio: 'FIXO_17H' });
+  const res = response();
+  executeRoute(routes.find(route => route.method === 'POST' && route.url === '/hora-extra/iniciar'), req, res);
+  assert.equal(res.statusCode, 403);
+  assert.equal(f.count(), 0);
+  assert.equal(res.redirected, undefined);
+});
+
+function renderHoraExtra(data) {
+  const ejs = require('ejs');
+  const view = fs.readFileSync(path.join(root, 'views/escala/hora-extra-nova.ejs'), 'utf8');
+  return ejs.render(view, { layout: () => '', dateBr: require('../utils/data-hora-br'), ...data });
+}
+
+for (const role of ['ADMIN', 'ENCARREGADO_MANUTENCAO', 'SUPERVISOR_MANUTENCAO', 'ADMINISTRADOR', 'ENCARREGADO', 'ENCARREGADO_DE_MANUTENCAO']) {
+  test(`formulário comum de ${role} oferece AGORA e FIXO_17H antes de iniciar`, t => {
+    const f = fixture(t);
+    const res = response();
+    loadController(f.service).horaExtraNova(request({ id: 91, role }), res, assert.ifError);
+    const html = renderHoraExtra(res.data);
+    const colaboradorSelect = html.match(/<select\b[^>]*\bname="colaborador_id"[^>]*>[\s\S]*?<\/select>/)?.[0];
+    assert.ok(colaboradorSelect, 'Gestão deve poder selecionar o funcionário, inclusive com perfil legado');
+    assert.match(colaboradorSelect, /<option\b[^>]*\bvalue="1"[^>]*>Mecânico A<\/option>/);
+    assert.match(colaboradorSelect, /<option\b[^>]*\bvalue="2"[^>]*>Mecânico B<\/option>/);
+    const form = html.match(/<form\b[^>]*\bid="horaExtraForm"[^>]*>[\s\S]*?<\/form>/)?.[0];
+    assert.ok(form, 'Formulário comum deve estar disponível para a gestão');
+    assert.match(form, /action="\/escala\/hora-extra\/iniciar"/);
+    const radios = [...form.matchAll(/<input\b[^>]*>/g)].map(match => match[0]).filter(input => /\bname="modo_inicio"/.test(input));
+    assert.equal(radios.length, 2);
+    const agora = radios.find(input => /\bvalue="AGORA"/.test(input));
+    const fixo = radios.find(input => /\bvalue="FIXO_17H"/.test(input));
+    assert.ok(agora, 'Gestão deve poder abrir no horário real');
+    assert.ok(fixo, 'Gestão deve poder abrir com início às 17h');
+    assert.match(agora, /\bchecked(?:\s|>|=)/);
+    assert.doesNotMatch(fixo, /\bchecked(?:\s|>|=)/);
+    assert.ok(form.indexOf('name="modo_inicio"') < form.indexOf('type="submit"'), 'A escolha deve aparecer antes do botão de iniciar');
+    assert.match(form, /17h/);
+    assert.doesNotMatch(form, /name="(?:inicio_extra|data_servico|criado_em|user_id)"/);
+  });
+}
+
+test('formulário do mecânico não oferece seletor de início fixo', t => {
+  const f = fixture(t);
+  const res = response();
+  loadController(f.service).horaExtraNova(request({ id: 12, role: 'MECANICO' }), res, assert.ifError);
+  const html = renderHoraExtra(res.data);
+  assert.match(html, /action="\/escala\/hora-extra\/iniciar"/);
+  assert.doesNotMatch(html, /<input\b[^>]*name="modo_inicio"/);
+  assert.doesNotMatch(html, /<input\b[^>]*value="FIXO_17H"/);
+  assert.doesNotMatch(html, /<select\b[^>]*\bname="colaborador_id"/);
+});
+
+test('JavaScript troca a explicação de início e envia FIXO_17H pela mesma action comum', async t => {
+  const f = fixture(t);
+  const res = response();
+  loadController(f.service).horaExtraNova(request(), res, assert.ifError);
+  const html = renderHoraExtra(res.data);
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(script);
+  const element = (value = '') => ({
+    value, textContent: '', dataset: {}, listeners: {},
+    addEventListener(event, listener) { this.listeners[event] = listener; },
+  });
+  const agora = { ...element('AGORA'), checked: true };
+  const fixo = { ...element('FIXO_17H'), checked: false };
+  const escolhas = [agora, fixo];
+  const button = element();
+  const submissions = [];
+  const form = {
+    ...element(), action: '/escala/hora-extra/iniciar',
+    querySelector: selector => selector.includes(':checked') ? escolhas.find(item => item.checked) : selector === 'button[type="submit"]' ? button : null,
+    querySelectorAll: selector => selector === '[name="modo_inicio"]' ? escolhas : [],
+    setAttribute(name, value) { this[name] = value; },
+    submit() { submissions.push({ action: this.action, modo_inicio: escolhas.find(item => item.checked)?.value }); },
+  };
+  const elements = {
+    horaExtraForm: form,
+    horaExtraOs: element('145'),
+    horaExtraDescricao: element('Serviço na OS'),
+    horaExtraDescricaoAjuda: element(),
+    horaExtraInicioResumo: element(),
+    horaExtraInicioAviso: element(),
+    horaExtraLocalizacaoTitulo: element(),
+    horaExtraIniciarButton: button,
+  };
+  vm.runInNewContext(script, {
+    document: { getElementById: id => elements[id] || null, querySelector: () => null, querySelectorAll: () => [] },
+    navigator: {}, window: { confirm: () => true }, setInterval: () => {},
+  });
+  assert.match(elements.horaExtraInicioResumo.textContent, /horário real/);
+  agora.checked = false;
+  fixo.checked = true;
+  fixo.listeners.change();
+  assert.match(elements.horaExtraInicioResumo.textContent, /17h.*Brasília/);
+  assert.match(elements.horaExtraInicioResumo.textContent, /fechamento.*horário real/i);
+  assert.match(button.textContent, /17h/);
+  assert.match(elements.horaExtraLocalizacaoTitulo.textContent, /momento do lançamento/);
+  assert.match(elements.horaExtraInicioAviso.textContent, /foto.*GPS.*lançamento/);
+  assert.equal(form.action, '/escala/hora-extra/iniciar');
+  fixo.checked = false;
+  agora.checked = true;
+  agora.listeners.change();
+  assert.match(elements.horaExtraInicioResumo.textContent, /horário real/);
+  assert.equal(button.textContent, 'Iniciar Hora Extra');
+  agora.checked = false;
+  fixo.checked = true;
+  fixo.listeners.change();
+  let prevented = false;
+  form.listeners.submit({ preventDefault() { prevented = true; } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(prevented, true);
+  assert.deepEqual(submissions, [{ action: '/escala/hora-extra/iniciar', modo_inicio: 'FIXO_17H' }]);
 });
 
 test('EJS renderiza início fixo, formulário correto e histórico do lançamento real', t => {

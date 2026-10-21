@@ -491,6 +491,7 @@ function colaboradoresPermitidosHoraExtra(req) {
   const colaboradores = service.listarColaboradoresMecanicosHoraExtra();
   if (canManageEscala(req)) return colaboradores;
   const user = currentUser(req);
+  if (service.canIniciarHoraExtraDesde17(user)) return colaboradores;
   if (!service.isMecanicoUser(user)) return [];
   const vinculado = service.buscarColaboradorDoUsuario(user.id);
   return vinculado && service.isColaboradorMecanico(vinculado) ? colaboradores.filter((c) => Number(c.id) === Number(vinculado.id)) : [];
@@ -523,7 +524,7 @@ function renderHoraExtra(req, res, next, modoInicioFixo17 = false) { try {
     osSelecionadaId,
     horasExtrasAtivasOS,
     osDisponiveis: service.listarOsDisponiveisParaHoraExtra(),
-    canManageEscala: modoInicioFixo17 || canManageEscala(req),
+    canManageEscala: podeInicioFixo17 || canManageEscala(req),
     podeInicioFixo17,
     modoInicioFixo17,
   });
@@ -550,11 +551,18 @@ exports.iniciarHoraExtraDesde17 = (req, res) => {
 
 exports.iniciarHoraExtra = (req, res, next) => { try {
   const user = currentUser(req);
+  const modoInicio = String(req.body?.modo_inicio || 'AGORA').trim();
+  if (!['AGORA', 'FIXO_17H'].includes(modoInicio)) throw new Error('Selecione como deseja iniciar a hora extra.');
+  const inicioFixo17 = modoInicio === 'FIXO_17H';
+  if (inicioFixo17 && !service.canIniciarHoraExtraDesde17(user)) return res.status(403).send('Sem permissão para abrir hora extra desde as 17h.');
   const colaboradores = colaboradoresPermitidosHoraExtra(req);
+  if (inicioFixo17 && !colaboradores.some(c => Number(c.id) === Number(req.body?.colaborador_id))) throw new Error('Selecione um mecânico ativo da equipe de Manutenção.');
   const colaborador = selecionarColaboradorHoraExtra(req, colaboradores);
   if (!colaborador) throw new Error(service.isMecanicoUser(user) ? 'Colaborador obrigatório ou sem permissão para registrar hora extra.' : 'Apenas mecânicos podem lançar hora extra.');
-  service.iniciarHoraExtra({ ...req.body, user_id: user.id, colaborador_id: colaborador.id, foto_inicio_path: uploadPath(req) });
-  flashSuccess(req, 'Hora extra registrada com sucesso.'); return res.redirect(`/escala/hora-extra/nova?colaborador_id=${colaborador.id}`);
+  const dados = { ...req.body, user_id: user.id, colaborador_id: colaborador.id, foto_inicio_path: uploadPath(req) };
+  if (inicioFixo17) service.iniciarHoraExtraDesde17(dados, user);
+  else service.iniciarHoraExtra(dados);
+  flashSuccess(req, inicioFixo17 ? 'Hora extra aberta com início às 17h. O fechamento usará o horário real.' : 'Hora extra registrada com sucesso.'); return res.redirect(`/escala/hora-extra/nova?colaborador_id=${colaborador.id}`);
 } catch(e){ console.error('❌ iniciarHoraExtra:', e && e.stack ? e.stack : e); flashError(req, e.message); return res.redirect('/escala/hora-extra/nova'); } };
 
 exports.finalizarHoraExtra = (req, res, next) => { try {
