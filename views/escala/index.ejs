@@ -22,6 +22,7 @@
   </section>
 
   <section class="escala-section"><div class="escala-section-head"><div><h2>Acesso rápido</h2><div class="muted">Fluxos principais da gestão da equipe.</div></div></div><div class="escala-quick-grid">
+    <% if (canManageEscala) { %><a class="escala-quick-card" href="/escala/hora-extra/desde-17"><strong>Hora extra desde as 17h</strong><small>Abertura pela gestão, com início fixo às 17h e fechamento no horário real.</small></a><% } %>
     <% [{t:'Escala da Semana',d:'Equipe, turnos e programação atual.',u:'/escala/semana'},{t:'Escala Completa',d:'Consulta e gestão por período.',u:'/escala/completa'},{t:'Folgas / Atestados / Férias',d:'Indisponibilidades da equipe.',u:'/escala/ausencias'},{t:'Registrar Hora Extra',d:'Registro individual ou em equipe vinculado à OS.',u:'/escala/hora-extra/nova'},{t:'Horas Extras Pendentes',d:'Fila de aprovação e rastreabilidade.',u:'/escala/hora-extra/pendentes'},{t:'Banco de Horas',d:'Créditos, débitos e saldos individuais.',u:'/escala/banco-horas'},{t:'Programar Folga',d:'Folga compensatória e demais ocorrências.',u:'/escala/folgas'},{t:'Relatórios PDF',d:'Relatórios operacionais da escala.',u:'/escala/relatorios'}].forEach(c=>{ %><a class="escala-quick-card" href="<%= c.u %>"><strong><%= c.t %></strong><small><%= c.d %></small></a><% }) %>
   </div></section>
 
