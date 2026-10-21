@@ -72,7 +72,11 @@
     <% } else { %>
       <section class="escala-section">
         <div class="escala-section-head"><div><h2><%= inicioFixo17 ? 'Abrir com início às 17h' : 'Iniciar hora extra' %></h2><p>Procure primeiro a OS correspondente. Sem OS, registre obrigatoriamente a descrição técnica.</p></div></div>
-        <form method="POST" action="<%= inicioFixo17 ? '/escala/hora-extra/desde-17/iniciar' : '/escala/hora-extra/iniciar' %>" enctype="multipart/form-data" id="horaExtraForm">
+        <% if (inicioFixo17) { %>
+        <form method="POST" action="/escala/hora-extra/desde-17/iniciar" enctype="multipart/form-data" id="horaExtraForm">
+        <% } else { %>
+        <form method="POST" action="/escala/hora-extra/iniciar" enctype="multipart/form-data" id="horaExtraForm">
+        <% } %>
           <input type="hidden" name="latitude_inicio"><input type="hidden" name="longitude_inicio"><input type="hidden" name="precisao_inicio"><input type="hidden" name="colaborador_id" value="<%= colaborador.id %>">
           <div class="escala-choice-grid">
             <div class="escala-choice"><strong>1. Serviço em OS • recomendado</strong><small>Selecione a Ordem de Serviço correspondente para manter rastreabilidade de equipamento, atividade e histórico.</small></div>

@@ -459,6 +459,11 @@ test('EJS renderiza início fixo, formulário correto e histórico do lançament
   assert.match(html, /action="\/escala\/hora-extra\/desde-17\/iniciar"/);
   assert.match(html, /Início fixo às 17h de hoje/);
   assert.doesNotMatch(html, /name="(?:inicio_extra|data_servico|criado_em|user_id)"/);
+  const semHoraExtra = response();
+  controller.horaExtraNova(request({ id: 12, role: 'MECANICO' }), semHoraExtra, assert.ifError);
+  const htmlComum = render(semHoraExtra.data);
+  assert.match(htmlComum, /action="\/escala\/hora-extra\/iniciar"/);
+  assert.doesNotMatch(htmlComum, /\/escala\/hora-extra\/desde-17/);
   f.service.iniciarHoraExtraDesde17(dadosServico, gestor);
   const andamento = response();
   controller.horaExtraDesde17(request(), andamento, assert.ifError);
