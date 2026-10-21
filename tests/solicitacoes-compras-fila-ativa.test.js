@@ -26,9 +26,12 @@ test('compras usa fila operacional própria, histórico concluído e quatro prio
   const controller = read('modules/compras/compras.controller.js');
   const view = read('views/compras/solicitacoes/index.ejs');
 
-  assert.match(controller, /OPERATIONALLY_CLOSED/);
-  assert.match(controller, /RECEBIDA_TOTAL/);
-  assert.match(controller, /ENTREGUE_SOLICITANTE/);
+  // A fila usa a regra compartilhada, incluindo a conferência física do Almoxarifado.
+  assert.match(controller, /service\.isOperationallyActive\(row\)/);
+  const service = require('../modules/compras/compras.service');
+  assert.equal(service.isOperationallyActive({status:'RECEBIDA_TOTAL'}), false);
+  assert.equal(service.isOperationallyActive({status:'SEPARADA_PARA_RETIRADA'}), false);
+  assert.equal(service.isOperationallyActive({status:'ENTREGUE_SOLICITANTE'}), false);
   assert.match(controller, /return 'critical'/);
   assert.match(controller, /return 'high'/);
   assert.match(view, /\['critical','Críticas'\]/);
