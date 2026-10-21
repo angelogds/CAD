@@ -1,8 +1,13 @@
 # Hora extra desde as 17h
 
-O fluxo `/escala/hora-extra/desde-17` permite ao encarregado de manutenção,
-supervisor de manutenção ou administrador abrir a hora extra de um mecânico
-ativo com início às **17h de hoje, no horário de Brasília**.
+No formulário **Registrar Hora Extra** (`/escala/hora-extra/nova`), o encarregado
+de manutenção, supervisor de manutenção ou administrador escolhe **Iniciar agora**
+ou **Iniciar às 17h de hoje**, antes de confirmar a abertura. O padrão é iniciar
+agora. A opção de início às 17h é validada no servidor, inclusive para requisições
+que não passaram pela tela. Mecânicos mantêm somente a abertura no horário real.
+
+O atalho `/escala/hora-extra/desde-17` continua disponível para abertura com início
+às **17h de hoje, no horário de Brasília**.
 
 - O início é calculado no servidor. O formulário não escolhe data nem horário.
 - Uma abertura lançada às 17h31 contabiliza o período desde as 17h.
