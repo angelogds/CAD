@@ -41,9 +41,20 @@
         </div>
         <header class="digestor-title">
           <div><small>D<%= d.id %></small><h2><%= d.nome %></h2></div>
-          <span class="signal-pill offline">Sem sinal</span>
+          <span class="signal-pill offline" <% if (d.id === 1) { %>id="esp32-d1-selo"<% } %>>Sem sinal</span>
         </header>
 
+        <% if (d.id === 1) { %>
+          <div class="temperature-card" role="status" aria-live="off">
+            <span class="thermo" aria-hidden="true">💡</span>
+            <div>
+              <small>Teste de comunicação ESP32 · GPIO 2 (sem PT100)</small>
+              <strong id="esp32-d1-gpio2">Sem sinal</strong>
+              <span id="esp32-d1-estado">Aguardando pacotes do ESP32</span>
+              <span id="esp32-d1-ultima">Nenhum pacote recebido</span>
+            </div>
+          </div>
+        <% } %>
         <div class="temperature-card">
           <span class="thermo" aria-hidden="true">🌡</span>
           <div>
@@ -114,3 +125,5 @@
     </article>
   </section>
 </main>
+
+<script src="/js/automacao-esp32-teste.js?v=20261021-piloto-d1" defer></script>
