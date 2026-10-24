@@ -165,6 +165,8 @@ app.use(express.urlencoded({ extended: false }));
 
 // ===== Webhooks públicos =====
 app.use("/webhooks/whatsapp", require("./modules/whatsapp/whatsapp.routes"));
+// API de dispositivos (ESP32): token Bearer, sem sessão/cookies.
+app.use("/api/automacao/device", require("./modules/automacao/dispositivos.routes"));
 
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");

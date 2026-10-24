@@ -1,0 +1,23 @@
+.auto-config-page .cfg-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin:18px 0}
+.auto-config-page .cfg-panel{border:1px solid #ccd9df;background:#f8fbfc;border-radius:16px;padding:22px;margin-bottom:16px;color:#253d49}
+.auto-config-page .cfg-panel h2{font-size:1.18rem;margin:0 0 13px;color:#173948}
+.auto-config-page .cfg-panel p{line-height:1.5}
+.auto-config-page .cfg-panel label{display:block;font-size:.9rem;font-weight:700;margin:14px 0 5px}
+.auto-config-page .cfg-panel input,.auto-config-page .cfg-panel select{display:block;width:100%;max-width:100%;border:1px solid #a6b9c2;border-radius:10px;background:#fff;color:#203946;padding:11px 12px;font:inherit}
+.auto-config-page .cfg-panel button{background:#fff;border:1px solid #7d9ba8;border-radius:10px;color:#1b4b5a;font-weight:700;padding:10px 14px;cursor:pointer}
+.auto-config-page .cfg-panel button.cfg-primary{background:#146e52;color:#fff;border-color:#146e52;margin:15px 0}
+.auto-config-page .cfg-panel button:disabled{opacity:.4;cursor:not-allowed}
+.auto-config-page .cfg-caption{font-size:.85rem;color:#506875}
+.auto-config-page .cfg-message{font-size:.9rem;min-height:24px;font-weight:600}
+.auto-config-page .cfg-result{padding:14px;border:1px solid #a7cec0;border-radius:12px;background:#edf8f3;margin:12px 0}
+.auto-config-page .cfg-result code,.auto-config-page .cfg-endpoint{display:block;padding:12px;border-radius:9px;background:#fff;overflow-wrap:anywhere;margin:9px 0;font-size:.84rem}
+.auto-config-page .cfg-actions{display:flex;gap:8px;flex-wrap:wrap}
+.auto-config-page .cfg-list-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.auto-config-page .cfg-devices{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:13px}
+.auto-config-page .cfg-device{border:1px solid #d2dfe3;border-radius:12px;padding:15px;background:white}
+.auto-config-page .cfg-device .cfg-row{display:block;font-size:.88rem;margin:6px 0;overflow-wrap:anywhere}
+.auto-config-page .cfg-status{border-radius:100px;border:1px solid #c2ced4;padding:4px 9px;font-size:.72rem;font-weight:700}
+.auto-config-page .cfg-status[data-status="online"]{background:#daf3e4;color:#145939}
+.auto-config-page .cfg-status[data-status="offline"]{background:#f5f3e9;color:#716132}
+.auto-config-page .cfg-status[data-status="revogado"]{background:#f8e3e3;color:#853030}
+@media(max-width:760px){.auto-config-page .cfg-grid{grid-template-columns:1fr}.auto-config-page .cfg-panel{padding:16px}}

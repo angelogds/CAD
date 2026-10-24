@@ -1,3 +1,4 @@
+const { normalizeRole } = require('../../config/rbac');
 const service = require('./automacao.service');
 
 function index(req, res) {
@@ -5,6 +6,7 @@ function index(req, res) {
     title: 'Automação',
     activeMenu: 'automacao',
     setores: service.listSetores(),
+    configuracaoAdmin: normalizeRole(req.session && req.session.user && req.session.user.role) === 'ADMIN',
   });
 }
 
