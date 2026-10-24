@@ -22,7 +22,7 @@
       <option value="all" selected>Todos os quatro digestores</option>
     </select>
     <span id="sim-selection-status" role="status" aria-live="polite">Quatro digestores selecionados</span>
-    <p class="sim-select-warning">Somente visualização no CAD. A API atual recebe telemetria dos ESP32, mas o firmware instalado não recebe comandos de luz do simulador.</p>
+    <p class="sim-select-warning">A simulação é visual. ADMIN pode sincronizar os três sinaleiros de bancada com o ESP32 (somente luzes, sem válvulas ou vapor).</p>
   </section>
   <% if (simuladorBancadaAdmin) { %>
   <section class="sim-bancada-online" aria-label="Sincronização de sinaleiros da bancada">
@@ -30,6 +30,11 @@
     <p>Ative somente depois de instalar firmware compatível no ESP32 e habilitar o modo remoto pela IHM local. O comando expira se a página parar de transmitir. Não conecta válvulas ou vapor.</p></div>
     <label class="sim-remote-switch"><input type="checkbox" id="sim-remote-enable" data-csrf="<%= csrfAutomacao %>"> Sincronizar seleção com ESP32</label>
     <small id="sim-remote-status" role="status" aria-live="polite">Desativado · apenas simulação na tela</small>
+    <table class="sim-remote-table" id="sim-remote-table" aria-label="Estado do ESP32 por digestor" style="width:100%;font-size:.85rem;margin-top:.5rem;border-collapse:collapse">
+      <thead><tr><th>Digestor</th><th>Fase enviada (CAD)</th><th>Recebida</th><th>Aplicada</th><th>Saída</th><th>Último contato</th><th>ESP32</th></tr></thead>
+      <tbody id="sim-remote-rows"><tr><td colspan="7">Carregando…</td></tr></tbody>
+    </table>
+    <small>“Aplicada” e “Saída” só aparecem se o firmware informar. Comando enviado não confirma que a lâmpada acendeu.</small>
   </section>
   <% } %>
   <div class="sim-toolbar">

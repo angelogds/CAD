@@ -7,6 +7,8 @@ require.cache[require.resolve('../database/db')]={exports:db};
 require('../database/migrations/229_automacao_dispositivos.js')();
 require('../database/migrations/230_automacao_dispositivo_estados.js')();
 require('../database/migrations/231_automacao_sinaleiros_bancada.js')();
+require('../database/migrations/232_automacao_bancada_telemetria.js')();
+require('../database/migrations/233_automacao_bancada_correlacao.js')();
 const devices=require('../modules/automacao/dispositivos.service');
 const bancada=require('../modules/automacao/sinaleiro-bancada.service');
 after(()=>db.close());
@@ -56,4 +58,39 @@ test('ESP32 consulta apenas sinais autorizados usando Bearer',async()=>{
     assert.deepEqual(body.comandos,[]);
     assert.equal(body.comando_habilitado,false);
   }finally{server.close();}
+});
+test('versao_fase permanece estável em renovações da mesma fase e avança em transição, PARADO e novo ciclo',()=>{
+  const realNow=Date.now;let t=1_000_000;Date.now=()=>t;
+  const row=()=>db.prepare('SELECT fase,versao,published_at_ms,valid_until_ms FROM automacao_sinaleiros_bancada WHERE digestor_id=4').get();
+  const d=devices.authenticate(devices.issueToken('ESP32-DIGESTOR-04',1,4).token);
+  try {
+    bancada.publish([{digestor_id:4,fase:'INICIO'}],1);
+    const v0=row().versao,pub0=row().published_at_ms;
+    for(let i=1;i<=5;i++){
+      t+=2500;bancada.publish([{digestor_id:4,fase:'INICIO'}],1);
+      const r=row();
+      assert.equal(r.versao,v0);assert.equal(r.published_at_ms,pub0);assert.equal(r.valid_until_ms,t+bancada.DURACAO_MS);
+      const p=bancada.poll(d,4);
+      assert.equal(p.versao_fase,v0);assert.equal(p.fase,'INICIO');assert.ok(p.validade_ms<=6500);
+    }
+    // transição de fase
+    t+=2500;bancada.publish([{digestor_id:4,fase:'MEIO'}],1);
+    assert.equal(row().versao,v0+1);assert.equal(row().published_at_ms,t);
+    t+=2500;bancada.publish([{digestor_id:4,fase:'MEIO'}],1);
+    assert.equal(row().versao,v0+1);
+    // PARADO é transição; repetição de PARADO é estável
+    t+=2500;bancada.publish([{digestor_id:4,fase:'PARADO'}],1);
+    assert.equal(row().versao,v0+2);assert.equal(bancada.poll(d,4).fase,'PARADO');
+    t+=2500;bancada.publish([{digestor_id:4,fase:'PARADO'}],1);
+    assert.equal(row().versao,v0+2);
+    // expiração e reinício do ciclo com a mesma fase
+    bancada.publish([{digestor_id:4,fase:'FINAL'}],1);
+    assert.equal(row().versao,v0+3);
+    t+=bancada.DURACAO_MS+1;
+    assert.equal(bancada.poll(d,4).fase,'PARADO');
+    assert.equal(row().versao,v0+3);
+    bancada.publish([{digestor_id:4,fase:'FINAL'}],1);
+    assert.equal(row().versao,v0+4);assert.equal(row().published_at_ms,t);
+    assert.equal(bancada.poll(d,4).fase,'FINAL');
+  } finally {Date.now=realNow;}
 });

@@ -6,6 +6,7 @@ const { ACCESS, ROLE } = require('../../config/rbac');
 const ctrl = require('./automacao.controller');
 const devices = require('./dispositivos.service');
 const bancada = require('./sinaleiro-bancada.service');
+const telemetria = require('./bancada-telemetria.service');
 
 router.get('/', requireLogin, requireRole(ACCESS.automacao_view), ctrl.index);
 router.get('/digestores', requireLogin, requireRole(ACCESS.automacao_view), ctrl.digestores);
@@ -40,6 +41,10 @@ router.post('/api/simulador/sinaleiros', ...admin, csrfAdmin, (req,res) => {
   res.setHeader('Cache-Control','no-store');
   try { return res.json(bancada.publish(req.body && req.body.estados, req.session.user.id)); }
   catch (e) { return res.status(e.status||400).json({ok:false,error:e.message}); }
+});
+router.get('/api/simulador/sinaleiros/status', ...admin, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json(telemetria.status());
 });
 router.get('/api/dispositivos', ...admin, (req, res) => {
   res.setHeader('Cache-Control', 'no-store');

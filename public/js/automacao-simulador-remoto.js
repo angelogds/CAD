@@ -7,7 +7,33 @@
   const selector=document.getElementById('sim-select-digestor');
   const start=document.getElementById('sim-start');
   if(!root||!toggle||!status||!selector||!start)return;
-  let timer=null,busy=false;
+  let timer=null,busy=false,statusTimer=null;
+  const rows=document.getElementById('sim-remote-rows');
+  const CONEXAO={ONLINE:'Online',ATRASADO:'Comunicação atrasada',OFFLINE:'Offline',SEM_DISPOSITIVO:'Sem ESP32 registrado'};
+  const SAIDA=v=>v==='CONFIRMADA'?'Confirmada':v==='NAO_CONFIRMADA'?'Não confirmada':'Não informada';
+  const STATUS={PENDENTE:'Pendente',NAO_INFORMADA:'Não informada',DIVERGENTE:'Divergente'};
+  const fase=(f,st)=>f&&st==='CONFIRMADA'?f:(f&&st==='DIVERGENTE'?f+' (divergente)':(STATUS[st]||'Pendente'));
+  const txt=(v)=>v==null?'—':String(v);
+  const ago=(v)=>v==null?'nunca':(v<2?'agora':v+' s atrás');
+  async function refreshStatus() {
+    if(!rows)return;
+    try{
+      const r=await fetch('/automacao/api/simulador/sinaleiros/status',{credentials:'same-origin',cache:'no-store'});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      const data=await r.json();
+      const sel=selector.value==='all'?null:Number(selector.value);
+      rows.replaceChildren(...data.digestores.filter(d=>sel===null||d.digestor_id===sel).map(d=>{
+        const tr=document.createElement('tr');
+        [ 'D'+d.digestor_id, d.fase_solicitada, fase(d.fase_recebida,d.recebida_status), fase(d.fase_aplicada,d.aplicacao_status), SAIDA(d.saida_status), ago(d.ultimo_contato_s), CONEXAO[d.conexao]||d.conexao ]
+          .forEach(t=>{const td=document.createElement('td');td.textContent=t;tr.appendChild(td);});
+        return tr;
+      }));
+    }catch(e){
+      rows.replaceChildren(Object.assign(document.createElement('tr'),{innerHTML:'<td colspan="7">Status indisponível ('+e.message+')</td>'}));
+    }
+  }
+  void refreshStatus();
+  statusTimer=setInterval(refreshStatus,3000);
   function snapshots(stopped=false) {
     const ids=selector.value==='all'?[1,2,3,4]:[Number(selector.value)];
     return ids.map(id=>{
@@ -29,6 +55,7 @@
         body:JSON.stringify({estados}),
       });
       if(!response.ok)throw new Error('HTTP '+response.status);
+      void refreshStatus();
       status.textContent=stopped?'Teste remoto interrompido':'Sincronização de bancada: '+estados.map(e=>'D'+e.digestor_id+' '+e.fase).join(' · ');
     }catch(e){
       toggle.checked=false;
@@ -56,5 +83,5 @@
   selector.addEventListener('change',stop);
   document.getElementById('sim-pause').addEventListener('click',()=>{if(toggle.checked)void publish(true);});
   document.getElementById('sim-reset').addEventListener('click',stop);
-  window.addEventListener('pagehide',()=>{if(timer!==null)clearInterval(timer);},{once:true});
+  window.addEventListener('pagehide',()=>{if(timer!==null)clearInterval(timer);if(statusTimer!==null)clearInterval(statusTimer);},{once:true});
 })();
