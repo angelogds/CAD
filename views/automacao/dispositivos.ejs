@@ -1,0 +1,43 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/automacao.css?v=20261014-v2">
+<main class="auto-page">
+  <div class="auto-actions-top"><a class="auto-back-link" href="/automacao">← Voltar</a></div>
+  <h1>Dispositivos ESP32</h1>
+  <p>Modo SIMULAÇÃO. Esta área só emite credenciais de comunicação; nenhum comando de equipamento é habilitado.</p>
+  <p>
+    <label>ID do dispositivo <input id="dev-id" value="ESP32-DIGESTOR-01" autocapitalize="characters" autocomplete="off"></label>
+    <button type="button" id="btn-token">Gerar / substituir token</button>
+  </p>
+  <pre id="token-box" hidden style="white-space:pre-wrap;word-break:break-all"></pre>
+  <div id="lista">Carregando…</div>
+</main>
+<script>
+(function () {
+  var box = document.getElementById('token-box'), lista = document.getElementById('lista');
+  function esc(s) { return String(s == null ? '—' : s).replace(/[&<>"]/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
+  function load() {
+    fetch('/automacao/api/dispositivos', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+      lista.innerHTML = (d.dispositivos || []).map(function (x) {
+        return '<div style="margin:12px 0"><strong>' + esc(x.device_id) + '</strong> — ' + (x.online ? 'ONLINE' : 'OFFLINE') + ' (' + esc(x.status) + ')<br>' +
+          'Último contato: ' + esc(x.ultimo_contato) + '<br>Fase: ' + esc(x.fase) + ' • Sinaleiro: ' + esc(x.sinaleiro && x.sinaleiro.sinaleiro) + (x.sinaleiro && x.sinaleiro.piscando ? ' piscando' : '') +
+          '<br>Token: ' + esc(x.token_final) + ' <button type="button" data-rev="' + esc(x.device_id) + '">Revogar</button></div>';
+      }).join('') || 'Nenhum dispositivo cadastrado.';
+    });
+  }
+  document.getElementById('btn-token').addEventListener('click', function () {
+    var id = document.getElementById('dev-id').value.trim();
+    if (!confirm('Gerar novo token para ' + id + '? O token anterior deixa de valer.')) return;
+    fetch('/automacao/api/dispositivos/' + encodeURIComponent(id) + '/token', { method: 'POST', credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+      box.hidden = false;
+      box.textContent = d.ok ? 'Token (mostrado só agora):\n' + d.token : 'Erro: ' + d.error;
+      load();
+    });
+  });
+  lista.addEventListener('click', function (e) {
+    var id = e.target.getAttribute && e.target.getAttribute('data-rev');
+    if (!id || !confirm('Revogar o token de ' + id + '?')) return;
+    fetch('/automacao/api/dispositivos/' + encodeURIComponent(id) + '/revogar', { method: 'POST', credentials: 'same-origin' }).then(load);
+  });
+  load();
+})();
+</script>
