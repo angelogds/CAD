@@ -33,7 +33,7 @@ function deviceAuth(req, res, next) {
 const base = (req) => ({ ok: true, device_id: req.device.device_id, modo: 'SIMULACAO', comando_habilitado: false, comandos: [], server_time: new Date().toISOString() });
 
 router.post('/ping', deviceAuth, (req, res) => {
-  svc.recordContact(req.device, null);
+  svc.recordPing(req.device);
   res.json(base(req));
 });
 
