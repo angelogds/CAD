@@ -66,6 +66,11 @@ function authenticate(token) {
   return db.prepare("SELECT id,device_id,digestor_id FROM automacao_dispositivos WHERE token_hash=? AND status='ATIVO'")
     .get(hashToken(token)) || null;
 }
+function recordPing(deviceRow) {
+  db.prepare("UPDATE automacao_dispositivos SET last_seen_at=datetime('now') WHERE id=?")
+    .run(deviceRow.id);
+}
+
 function recordContact(deviceRow, body) {
   const b = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
   if (b.device_id != null && assertDeviceId(b.device_id) !== deviceRow.device_id) {
@@ -129,4 +134,4 @@ function listDevices() {
     };
   });
 }
-module.exports = { issueToken, revoke, authenticate, recordContact, listDevices, hashToken, FASES, ONLINE_WINDOW_S };
+module.exports = { issueToken, revoke, authenticate, recordPing, recordContact, listDevices, hashToken, FASES, ONLINE_WINDOW_S };
