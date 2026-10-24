@@ -1,13 +1,46 @@
-# Automação — API de dispositivos ESP32 (modo SIMULAÇÃO)
+# Automação — Configuração de ESP32 (somente ADMIN)
 
-Base: `https://manutencao.campodogado.app.br/api/automacao/device` (HTTPS iniciado pelo ESP32).
-Auth: `Authorization: Bearer <token>`. O token é gerado em `/automacao/dispositivos` (ADMIN / supervisor),
-mostrado uma vez; só o hash SHA-256 fica no banco. Gerar de novo substitui o token; "Revogar" o invalida.
+## Painel administrativo
+No CAD, abra Automação > Configuração, rota /automacao/configuracao.
+O cartão Configuração somente aparece para ADMIN; o servidor protege
+a página, a consulta e os POSTs com ADMIN, sessão e token CSRF.
+A rota antiga /automacao/dispositivos redireciona para Configuração.
 
-- `POST /ping` — teste de comunicação, atualiza último contato.
-- `POST /estado` — `{"fase":"INICIO|MEIO|FINAL","temperatura_c":95.2,"firmware":"0.1","uptime_s":120}`.
-  INICIO = vermelho, MEIO = amarelo, FINAL = verde piscando (retornado em `sinaleiro`).
-- Admin: `GET /automacao/api/dispositivos` (online = contato nos últimos 90 s).
+Escolha Digestor 1, 2, 3, 4 ou Todos e informe o ID da placa.
+Sugestões: ESP32-DIGESTOR-01, -02, -03, -04 ou ESP32-GERAL-01.
+Uma credencial está associada a UM ESP32 e tem autorização apenas no
+escopo escolhido. O token geral permite telemetria dos quatro digestores
+somente se o hardware realmente oferecer as quatro leituras.
 
-Respostas sempre trazem `modo: SIMULACAO`, `comando_habilitado: false`, `comandos: []`. Não há rota de comando.
-Digestores 2–4: gerar token para `ESP32-DIGESTOR-02..04`.
+A chave cgd_... é gerada pelo CAD e aparece uma única vez. Somente o
+hash SHA-256 e os quatro caracteres finais ficam no banco. Não é possível
+recuperar o token depois: gere um novo se necessário. Substituir/revogar
+invalida a chave antiga. Não publique credenciais no repositório.
+
+## API HTTPS iniciada pelo ESP32
+Base: https://manutencao.campodogado.app.br/api/automacao/device
+Header: Authorization: Bearer <token>
+
+- POST /ping: registra último contato e devolve modo SIMULACAO.
+- POST /estado: body JSON com fase INICIO, MEIO ou FINAL.
+  Aceita campos opcionais temperatura_c, firmware, uptime_s e device_id.
+  Token de um único digestor infere digestor_id e recusa outro.
+  Token TODOS exige digestor_id explícito 1, 2, 3 ou 4 em cada envio.
+- GET /automacao/api/dispositivos: ADMIN consulta escopos, contatos e
+  estado de cada digestor (online equivale a contato nos últimos 90 s).
+- POST /automacao/api/dispositivos/:deviceId/token: ADMIN emite chave
+  com body {escopo: '1'|'2'|'3'|'4'|'TODOS'} + sessão CSRF.
+- POST /automacao/api/dispositivos/:deviceId/revogar: ADMIN revoga.
+
+Fases: INICIO = vermelho, MEIO = amarelo, FINAL = verde piscando.
+Esta API é somente telemetria de SIMULAÇÃO: sempre retorna
+comando_habilitado false e comandos []. NÃO existe rota de comando
+para relés, válvulas, vapor ou outros atuadores.
+
+## Teste/produção
+Migrations 229 e 230 são incrementais e não destrutivas.
+O ESP32 deve validar TLS/HTTPS e iniciar conexões de saída; não abrir
+portas no roteador. A página local do ESP32 com Wi-Fi e token requer
+proteção antes de ser exposta fora da rede de testes.
+Teste apenas relés de baixa tensão. Temperatura PT100 real e atuação
+de campo dependem de projeto, calibração e validação de segurança.
