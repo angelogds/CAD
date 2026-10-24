@@ -25,6 +25,16 @@
         <span class="auto-open">Abrir IHM →</span>
       </a>
     <% }) %>
+
+    <% if (configuracaoAdmin) { %>
+      <a class="auto-sector-card" href="/automacao/configuracao" aria-label="Configuração: chaves ESP32 e associação aos digestores">
+        <span class="auto-sector-icon" aria-hidden="true">🔐</span>
+        <div><small>ADMINISTRADOR • RESTRITO</small><h2>Configuração</h2>
+          <p>Gerar, copiar uma vez, substituir ou revogar tokens ESP32. Vincular cada dispositivo a um digestor ou a todos os quatro.</p>
+        </div>
+        <span class="auto-open">Gerenciar dispositivos →</span>
+      </a>
+    <% } %>
   </section>
   <section class="auto-note">
     <strong>Primeira etapa</strong>
