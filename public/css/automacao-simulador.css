@@ -83,3 +83,14 @@
 .sim-presenting .sim-temperature strong{font-size:30px}
 .sim-presenting .sim-events-panel{max-height:300px;overflow:auto}
 @media(max-width:760px){.sim-presenting .sim-grid{grid-template-columns:1fr}.sim-cycle-steps span{font-size:8px}.sim-card-controls button{flex:1}}
+
+/* Seleção de um digestor ou de todos no simulador. */
+.sim-select-panel{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px;background:#f4faf8;border:1px solid #cce1da;border-radius:14px;margin-bottom:14px}
+.sim-select-panel h2{font-size:17px;color:#204352;margin:0 0 5px}
+.sim-select-panel p{font-size:12px;color:#55727e;margin:0}
+.sim-select-panel label{font-weight:800;font-size:12px}
+.sim-select-panel select{font:inherit;font-size:13px;padding:10px;background:#fff;border:1px solid #9fcab7;color:#173d34;border-radius:9px}
+.sim-select-panel #sim-selection-status{font-size:12px;color:#26744e;font-weight:700}
+.sim-select-panel .sim-select-warning{flex-basis:100%;border-top:1px solid #dbe9e2;padding-top:9px}
+.sim-grid .sim-vessel-card[hidden]{display:none!important}
+.sim-single-selection .sim-grid{grid-template-columns:minmax(0,650px);justify-content:center}

@@ -1,6 +1,6 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/automacao.css?v=20261015-sim">
-<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261015-v3">
+<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261024-selecao">
 <main class="auto-page auto-hmi" id="sim-digestores">
   <div class="auto-actions-top"><a class="auto-back-link" href="/automacao/digestores">← Voltar aos Digestores</a></div>
   <header class="auto-hero">
@@ -10,6 +10,20 @@
     </div><span class="auto-state waiting">SIMULAÇÃO • SEM HARDWARE</span>
   </header>
   <section class="auto-alert" role="status"><strong>Simulação, não operação</strong><span>Somente apresentação: abaixo de 80 °C = carregado (vermelho), 80–119,9 °C = em cozimento (amarelo), a partir de 120 °C = pronto (verde). São faixas ilustrativas, NÃO alarmes reais. Nenhum comando é transmitido ao CLP, ESP32, válvulas ou contatores.</span></section>
+  <section class="sim-select-panel" aria-labelledby="sim-target-title">
+    <div>
+      <h2 id="sim-target-title">Quais digestores deseja simular?</h2>
+      <p>Escolha um digestor ou os quatro. A seleção controla quais ciclos serão iniciados nesta tela.</p>
+    </div>
+    <label for="sim-select-digestor">Equipamentos da simulação</label>
+    <select id="sim-select-digestor">
+      <option value="1">Digestor 1</option><option value="2">Digestor 2</option>
+      <option value="3">Digestor 3</option><option value="4">Digestor 4</option>
+      <option value="all" selected>Todos os quatro digestores</option>
+    </select>
+    <span id="sim-selection-status" role="status" aria-live="polite">Quatro digestores selecionados</span>
+    <p class="sim-select-warning">Somente visualização no CAD. A API atual recebe telemetria dos ESP32, mas o firmware instalado não recebe comandos de luz do simulador.</p>
+  </section>
   <div class="sim-toolbar">
     <button type="button" id="sim-start">▶ Iniciar simulação</button>
     <button type="button" id="sim-pause" disabled>Ⅱ Pausar</button>
@@ -101,4 +115,4 @@
   </section>
 </main>
 <script src="/js/automacao-simulador-core.js?v=20261015-v3" defer></script>
-<script src="/js/automacao-simulador.js?v=20261015-v3" defer></script>
+<script src="/js/automacao-simulador.js?v=20261024-selecao" defer></script>
