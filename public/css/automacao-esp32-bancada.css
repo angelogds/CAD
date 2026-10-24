@@ -1,0 +1,22 @@
+
+.esp32-bancada{margin:26px 0;padding:22px;border:1px solid #c4d3d8;border-radius:18px;background:linear-gradient(140deg,#f5fafb,#eaf4f4);color:#263d48}
+.esp32-bancada header{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;flex-wrap:wrap;margin-bottom:16px}
+.esp32-bancada h2{margin:0 0 6px;font-size:1.25rem;color:#153a49}
+.esp32-bancada p{margin:4px 0 12px;line-height:1.5}
+.esp32-bancada .esp32-teste-tag{border:1px solid #cb8d3b;background:#fff4df;color:#854711;border-radius:20px;padding:6px 11px;font-weight:700;font-size:.74rem}
+.esp32-bancada-content{display:grid;grid-template-columns:190px 1fr;gap:24px;align-items:start}
+.esp32-bancada .esp32-torre{width:97px;border:6px solid #223541;border-radius:22px;background:#294654;padding:10px;display:grid;gap:8px;margin:4px auto 10px}
+.esp32-bancada .esp32-luz{display:block;border-radius:100%;width:60px;height:60px;margin:auto;opacity:.19;filter:grayscale(.6);border:3px solid #12232c}
+.esp32-bancada .esp32-luz.vermelha{background:#e94352}.esp32-bancada .esp32-luz.amarela{background:#f5c431}.esp32-bancada .esp32-luz.verde{background:#24c879}
+.esp32-bancada .esp32-torre[data-cor="inicio"] .vermelha,.esp32-bancada .esp32-torre[data-cor="meio"] .amarela,.esp32-bancada .esp32-torre[data-cor="fim"] .verde{opacity:1;filter:none}
+.esp32-bancada .esp32-torre[data-cor="fim"] .verde{animation:esp32-pisca .5s steps(1,end) infinite alternate}
+@keyframes esp32-pisca{from{opacity:1}to{opacity:.2}}
+.esp32-bancada .esp32-label{display:block;font-weight:700;margin:15px 0 5px}
+.esp32-bancada input{width:min(270px,100%);max-width:100%;padding:10px 12px;border:1px solid #a3b6bf;border-radius:10px;background:#fff;color:#253e4c}
+.esp32-bancada .esp32-botoes{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.esp32-bancada button,.esp32-bancada a.esp32-abrir{padding:10px 13px;border:1px solid #6e8f9d;border-radius:10px;background:#fff;color:#214554;font-weight:700;font-size:.91rem;cursor:pointer;text-decoration:none;display:inline-block}
+.esp32-bancada a.esp32-abrir{background:#126e55;color:#fff;border-color:#126e55}
+.esp32-bancada [aria-pressed="true"]{outline:3px solid #31ad8a}
+.esp32-bancada .esp32-observacao{font-size:.84rem;color:#486571}
+@media(max-width:650px){.esp32-bancada-content{grid-template-columns:1fr}.esp32-bancada{padding:16px}}
+@media(prefers-reduced-motion:reduce){.esp32-bancada .esp32-torre[data-cor="fim"] .verde{animation:none}}
