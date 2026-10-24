@@ -7,7 +7,9 @@ catch { db = new (require('node:sqlite').DatabaseSync)(':memory:'); }
 require.cache[require.resolve('../database/db')] = { exports: db };
 require('../database/migrations/229_automacao_dispositivos.js')();
 require('../database/migrations/230_automacao_dispositivo_estados.js')();
+require('../database/migrations/231_automacao_sinaleiros_bancada.js')();
 require('../database/migrations/232_automacao_bancada_telemetria.js')();
+require('../database/migrations/233_automacao_bancada_correlacao.js')();
 const svc = require('../modules/automacao/dispositivos.service');
 after(() => db.close());
 

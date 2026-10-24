@@ -4,7 +4,7 @@ const express=require('express');
 let db;
 try {db=new (require('better-sqlite3'))(':memory:');}catch{db=new (require('node:sqlite').DatabaseSync)(':memory:');}
 require.cache[require.resolve('../database/db')]={exports:db};
-for (const m of ['229_automacao_dispositivos','230_automacao_dispositivo_estados','231_automacao_sinaleiros_bancada','232_automacao_bancada_telemetria']) require('../database/migrations/'+m+'.js')();
+for (const m of ['229_automacao_dispositivos','230_automacao_dispositivo_estados','231_automacao_sinaleiros_bancada','232_automacao_bancada_telemetria','233_automacao_bancada_correlacao']) require('../database/migrations/'+m+'.js')();
 const devices=require('../modules/automacao/dispositivos.service');
 const bancada=require('../modules/automacao/sinaleiro-bancada.service');
 const tel=require('../modules/automacao/bancada-telemetria.service');
@@ -41,14 +41,14 @@ test('telemetria distingue solicitada, entregue, recebida, aplicada e saida; PAR
     let s=d1();
     assert.equal(s.fase_solicitada,'MEIO'); assert.equal(s.fase_entregue,'MEIO');
     assert.equal(s.fase_recebida,null); assert.equal(s.saida_confirmada,null);
-    assert.equal(s.conexao,'SEM_CONFIRMACAO'); // comando enviado não é confirmação
+    assert.equal(s.conexao,'ONLINE'); assert.equal(s.aplicacao_status,'PENDENTE'); // comando enviado não é confirmação
     // Retrocompatível: payload antigo continua válido
     assert.equal((await post('/estado',token,{fase:'MEIO'})).status,200);
     r=await post('/estado',token,{fase:'MEIO',fase_recebida:'MEIO',fase_aplicada:'MEIO',origem:'SIMULACAO',wifi_rssi:-60,firmware:'v5'});
     assert.equal(r.status,200);
     s=d1(); assert.equal(s.fase_aplicada,'MEIO'); assert.equal(s.saida_confirmada,null); assert.equal(s.conexao,'ONLINE');
     assert.equal((await post('/estado',token,{fase:'MEIO',fase_aplicada:'MEIO',saida_confirmada:true})).status,200);
-    assert.equal(d1().saida_confirmada,true);
+    assert.equal(d1().saida_confirmada,true); assert.equal(d1().saida_status,'CONFIRMADA');
     // PARADO após expiração
     assert.equal((await post('/estado',token,{fase:'PARADO',fase_recebida:'PARADO',fase_aplicada:'PARADO'})).status,200);
     assert.equal(d1().fase_aplicada,'PARADO');
@@ -60,6 +60,9 @@ test('validações: origem, fase, saida_confirmada sem fase aplicada',async()=>{
   await withApp(async(post)=>{
     assert.equal((await post('/estado',token,{fase:'ABRIR_VALVULA'})).status,400);
     assert.equal((await post('/estado',token,{fase:'MEIO',origem:'PRODUCAO'})).status,400);
+    assert.equal((await post('/estado',token,{fase:'MEIO',origem:'REAL',fase_aplicada:'MEIO'})).status,200);
+    assert.equal(d1().origem,'SIMULACAO'); // protótipo nunca vira medição real
+    assert.equal(db.prepare('SELECT origem FROM automacao_bancada_telemetria').get().origem,'SIMULACAO');
     assert.equal((await post('/estado',token,{fase:'MEIO',fase_aplicada:'VAPOR'})).status,400);
     assert.equal((await post('/estado',token,{fase:'MEIO',saida_confirmada:true})).status,400);
     assert.equal((await post('/estado',token,{fase:'MEIO',fase_aplicada:'MEIO',saida_confirmada:'sim'})).status,400);
@@ -121,4 +124,126 @@ test('status só para ADMIN',async()=>{
     const r=await fetch(url);assert.equal(r.status,200);
     const b=await r.json();assert.equal(b.digestores.length,4);assert.equal(b.comando_industrial_habilitado,false);
   }finally{server.close();}
+});
+
+// ---- Precisão da supervisão: confirmação ausente/antiga, PARADO, offline ----
+const reset=()=>{db.exec('DELETE FROM automacao_bancada_telemetria; DELETE FROM automacao_sinaleiros_bancada;');};
+const tok=()=>devices.issueToken('ESP32-DIGESTOR-01',1,1).token;
+
+test('fase_recebida sem fase_aplicada: recebida confirmada, aplicação NÃO informada, saída não informada',async()=>{
+  reset();const token=tok();
+  bancada.publish([{digestor_id:1,fase:'INICIO'}],1);
+  await withApp(async(post)=>{
+    await post('/sinaleiro-bancada',token,{digestor_id:1});
+    await post('/estado',token,{fase:'INICIO',fase_recebida:'INICIO'});
+    const s=d1();
+    assert.equal(s.recebida_status,'CONFIRMADA'); assert.equal(s.aplicacao_status,'NAO_INFORMADA');
+    assert.equal(s.saida_status,'NAO_INFORMADA'); assert.equal(s.saida_confirmada,null);
+    assert.equal(s.fase_aplicada,null); assert.equal(s.conexao,'ONLINE');
+  });
+});
+
+test('v6: aplicada sem feedback elétrico não confirma saída física',async()=>{
+  reset();const token=tok();
+  bancada.publish([{digestor_id:1,fase:'MEIO'}],1);
+  await withApp(async(post)=>{
+    const p=await (await post('/sinaleiro-bancada',token,{digestor_id:1})).json();
+    assert.equal(p.sinaleiro_bancada.versao_fase,1);
+    await post('/estado',token,{fase:'MEIO',fase_recebida:'MEIO',fase_aplicada:'MEIO',versao_fase:1,firmware:'bancada-v6',wifi_rssi:-55,uptime_s:10});
+    const s=d1();
+    assert.equal(s.correlacao,'VERSAO'); assert.equal(s.aplicacao_status,'CONFIRMADA');
+    assert.equal(s.saida_status,'NAO_INFORMADA'); assert.equal(s.saida_confirmada,null); assert.equal(s.origem,'SIMULACAO');
+  });
+});
+
+test('relatório antigo dentro de 15 s não confirma novo comando (versão e firmware legado)',async()=>{
+  reset();const token=tok();
+  bancada.publish([{digestor_id:1,fase:'MEIO'}],1);
+  await withApp(async(post)=>{
+    await post('/sinaleiro-bancada',token,{digestor_id:1});
+    await post('/estado',token,{fase:'MEIO',fase_recebida:'MEIO',fase_aplicada:'MEIO',versao_fase:1});
+    assert.equal(d1().aplicacao_status,'CONFIRMADA');
+    // novo comando MEIO -> MEIO (mesma fase!): versão 2, relatório v1 é antigo
+    bancada.publish([{digestor_id:1,fase:'MEIO'}],1);
+    let s=d1(); assert.equal(s.versao_fase,2);
+    assert.equal(s.aplicacao_status,'PENDENTE'); assert.equal(s.recebida_status,'PENDENTE'); assert.equal(s.fase_aplicada,null);
+    await post('/sinaleiro-bancada',token,{digestor_id:1});
+    assert.equal(d1().aplicacao_status,'PENDENTE');
+    // firmware v6 reenviando versão antiga continua pendente
+    await post('/estado',token,{fase:'MEIO',fase_aplicada:'MEIO',fase_recebida:'MEIO',versao_fase:1});
+    assert.equal(d1().aplicacao_status,'PENDENTE');
+    await post('/estado',token,{fase:'MEIO',fase_aplicada:'MEIO',fase_recebida:'MEIO',versao_fase:2});
+    assert.equal(d1().aplicacao_status,'CONFIRMADA');
+  });
+  // legado (sem versao_fase): relatório anterior à entrega do novo comando não vale
+  reset();
+  bancada.publish([{digestor_id:1,fase:'FINAL'}],1);
+  await withApp(async(post)=>{
+    await post('/estado',token,{fase:'FINAL',fase_recebida:'FINAL',fase_aplicada:'FINAL'}); // antes da entrega
+    assert.equal(d1().aplicacao_status,'PENDENTE');
+    await new Promise((r)=>setTimeout(r,5));
+    await post('/sinaleiro-bancada',token,{digestor_id:1});
+    assert.equal(d1().aplicacao_status,'PENDENTE'); // relatório ainda é anterior à entrega
+    await new Promise((r)=>setTimeout(r,5));
+    await post('/estado',token,{fase:'FINAL',fase_recebida:'FINAL',fase_aplicada:'FINAL'});
+    const s=d1(); assert.equal(s.aplicacao_status,'CONFIRMADA'); assert.equal(s.correlacao,'TEMPORAL');
+  });
+});
+
+test('comando expirado não aparece como aplicação atual confirmada',async()=>{
+  reset();const token=tok();
+  bancada.publish([{digestor_id:1,fase:'INICIO'}],1);
+  await withApp(async(post)=>{
+    await post('/sinaleiro-bancada',token,{digestor_id:1});
+    await post('/estado',token,{fase:'INICIO',fase_recebida:'INICIO',fase_aplicada:'INICIO',versao_fase:1});
+    assert.equal(d1().aplicacao_status,'CONFIRMADA');
+    db.prepare('UPDATE automacao_sinaleiros_bancada SET valid_until_ms=? WHERE digestor_id=1').run(Date.now()+1-1);
+    await new Promise((r)=>setTimeout(r,3));
+    const s=d1();
+    assert.equal(s.comando_expirado,true); assert.equal(s.fase_solicitada,'PARADO');
+    assert.equal(s.aplicacao_status,'PENDENTE'); assert.equal(s.fase_aplicada,null); assert.equal(s.saida_confirmada,null);
+    // só um relatório posterior ao vencimento, informando PARADO, confirma
+    await post('/estado',token,{fase:'PARADO',fase_recebida:'PARADO',fase_aplicada:'PARADO',versao_fase:1});
+    const f=d1(); assert.equal(f.aplicacao_status,'CONFIRMADA'); assert.equal(f.fase_aplicada,'PARADO');
+  });
+});
+
+test('fase PARADO explícita: exige relatório PARADO posterior; INICIO antigo não confirma',async()=>{
+  reset();const token=tok();
+  bancada.publish([{digestor_id:1,fase:'INICIO'}],1);
+  await withApp(async(post)=>{
+    await post('/sinaleiro-bancada',token,{digestor_id:1});
+    await post('/estado',token,{fase:'INICIO',fase_recebida:'INICIO',fase_aplicada:'INICIO',versao_fase:1});
+    await new Promise((r)=>setTimeout(r,5));
+    bancada.publish([{digestor_id:1,fase:'PARADO'}],1);
+    let s=d1(); assert.equal(s.fase_solicitada,'PARADO'); assert.equal(s.aplicacao_status,'PENDENTE'); assert.equal(s.fase_aplicada,null);
+    await new Promise((r)=>setTimeout(r,5));
+    await post('/estado',token,{fase:'INICIO',fase_recebida:'INICIO',fase_aplicada:'INICIO'});
+    assert.equal(d1().aplicacao_status,'DIVERGENTE');
+    await post('/estado',token,{fase:'PARADO',fase_recebida:'PARADO',fase_aplicada:'PARADO'});
+    assert.equal(d1().aplicacao_status,'CONFIRMADA'); assert.equal(d1().conexao,'ONLINE');
+  });
+});
+
+test('dispositivo offline/atrasado: nada é confirmado mesmo com relatório correlacionado',async()=>{
+  reset();const token=tok();
+  bancada.publish([{digestor_id:1,fase:'MEIO'}],1);
+  await withApp(async(post)=>{
+    await post('/sinaleiro-bancada',token,{digestor_id:1});
+    await post('/estado',token,{fase:'MEIO',fase_recebida:'MEIO',fase_aplicada:'MEIO',versao_fase:1,saida_confirmada:true});
+    assert.equal(d1().saida_status,'CONFIRMADA');
+    db.prepare("UPDATE automacao_bancada_telemetria SET last_poll_at=datetime('now','-40 seconds'),reported_at=datetime('now','-40 seconds'),reported_ms=reported_ms-40000").run();
+    db.prepare("UPDATE automacao_dispositivos SET last_seen_at=datetime('now','-40 seconds')").run();
+    let s=d1(); assert.equal(s.conexao,'ATRASADO'); assert.equal(s.aplicacao_status,'PENDENTE'); assert.equal(s.saida_confirmada,null);
+    db.prepare("UPDATE automacao_bancada_telemetria SET last_poll_at=datetime('now','-300 seconds'),reported_at=datetime('now','-300 seconds'),reported_ms=reported_ms-260000").run();
+    db.prepare("UPDATE automacao_dispositivos SET last_seen_at=datetime('now','-300 seconds')").run();
+    s=d1(); assert.equal(s.conexao,'OFFLINE'); assert.equal(s.recebida_status,'PENDENTE'); assert.equal(s.aplicacao_status,'PENDENTE'); assert.equal(s.fase_aplicada,null);
+  });
+});
+
+test('migration 233 é aditiva e idempotente (preserva dados anteriores)',()=>{
+  reset();
+  db.prepare("INSERT INTO automacao_sinaleiros_bancada (digestor_id,fase,valid_until_ms) VALUES (2,'MEIO',1)").run();
+  require('../database/migrations/233_automacao_bancada_correlacao.js')();
+  assert.equal(db.prepare('SELECT fase FROM automacao_sinaleiros_bancada WHERE digestor_id=2').get().fase,'MEIO');
 });

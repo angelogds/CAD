@@ -9,8 +9,10 @@
   if(!root||!toggle||!status||!selector||!start)return;
   let timer=null,busy=false,statusTimer=null;
   const rows=document.getElementById('sim-remote-rows');
-  const CONEXAO={ONLINE:'Online',ATRASADO:'Comunicação atrasada',OFFLINE:'Offline',SEM_CONFIRMACAO:'Sem confirmação',SEM_DISPOSITIVO:'Sem ESP32 registrado'};
-  const SAIDA=v=>v===true?'Confirmada':v===false?'Não confirmada':'Não informada';
+  const CONEXAO={ONLINE:'Online',ATRASADO:'Comunicação atrasada',OFFLINE:'Offline',SEM_DISPOSITIVO:'Sem ESP32 registrado'};
+  const SAIDA=v=>v==='CONFIRMADA'?'Confirmada':v==='NAO_CONFIRMADA'?'Não confirmada':'Não informada';
+  const STATUS={PENDENTE:'Pendente',NAO_INFORMADA:'Não informada',DIVERGENTE:'Divergente'};
+  const fase=(f,st)=>f&&st==='CONFIRMADA'?f:(f&&st==='DIVERGENTE'?f+' (divergente)':(STATUS[st]||'Pendente'));
   const txt=(v)=>v==null?'—':String(v);
   const ago=(v)=>v==null?'nunca':(v<2?'agora':v+' s atrás');
   async function refreshStatus() {
@@ -22,7 +24,7 @@
       const sel=selector.value==='all'?null:Number(selector.value);
       rows.replaceChildren(...data.digestores.filter(d=>sel===null||d.digestor_id===sel).map(d=>{
         const tr=document.createElement('tr');
-        [ 'D'+d.digestor_id, d.fase_solicitada, txt(d.fase_recebida), txt(d.fase_aplicada), SAIDA(d.saida_confirmada), ago(d.ultimo_contato_s), CONEXAO[d.conexao]||d.conexao ]
+        [ 'D'+d.digestor_id, d.fase_solicitada, fase(d.fase_recebida,d.recebida_status), fase(d.fase_aplicada,d.aplicacao_status), SAIDA(d.saida_status), ago(d.ultimo_contato_s), CONEXAO[d.conexao]||d.conexao ]
           .forEach(t=>{const td=document.createElement('td');td.textContent=t;tr.appendChild(td);});
         return tr;
       }));
