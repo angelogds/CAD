@@ -9,6 +9,51 @@
   const start = document.getElementById('sim-start');
   const selector = document.getElementById('sim-select-digestor');
   const selectionStatus = document.getElementById('sim-selection-status');
+  const remoteEnable = document.getElementById('sim-remote-enable');
+  const remoteStatus = document.getElementById('sim-remote-status');
+  let remoteBusy = false;
+  let remoteTimer = null;
+  async function emitRemote(stopAll=false) {
+    if (!remoteEnable || !remoteEnable.checked || remoteBusy) return;
+    const estados = values.filter(selected).map(item => ({
+      digestor_id:item.id,
+      fase:stopAll || !running ? 'PARADO'
+        : item.temp >= core.TEMPERATURA_PRONTA ? 'FINAL'
+        : item.temp >= core.TEMPERATURA_COZIMENTO ? 'MEIO' : 'INICIO',
+    }));
+    if (!estados.length) return;
+    remoteBusy=true;
+    try {
+      const response=await fetch('/automacao/api/simulador/sinaleiros',{
+        method:'POST',cache:'no-store',credentials:'same-origin',
+        headers:{'Content-Type':'application/json','X-CGD-CSRF':remoteEnable.dataset.csrf},
+        body:JSON.stringify({estados}),
+      });
+      if (!response.ok) throw Error('HTTP '+response.status);
+      remoteStatus.textContent=stopAll?'Teste remoto parado':'Sinais de bancada atualizados ('+estados.map(x=>'D'+x.digestor_id+': '+x.fase).join(', ')+')';
+    } catch(e) {
+      remoteStatus.textContent='Falha no envio: '+e.message+'; os sinais vencem automaticamente.';
+      remoteEnable.checked=false;
+      if(remoteTimer!==null){clearInterval(remoteTimer);remoteTimer=null;}
+    } finally { remoteBusy=false; }
+  }
+  function stopRemote() {
+    if(remoteTimer!==null){clearInterval(remoteTimer);remoteTimer=null;}
+    if(remoteEnable && remoteEnable.checked) { void emitRemote(true); }
+  }
+  if(remoteEnable) remoteEnable.addEventListener('change', () => {
+    if(remoteEnable.checked){
+      const approved=confirm('Ativar apenas a sinalização de bancada dos digestores selecionados? Não conecte cargas de 220 V ou equipamentos industriais.');
+      if(!approved){remoteEnable.checked=false;return;}
+      void emitRemote();
+      remoteTimer=setInterval(()=>{void emitRemote();},2500);
+    } else {
+      remoteStatus.textContent='Desativado · sem comando remoto';
+      // Os comandos anteriores expiram no servidor em no máximo 6,5 s.
+      if(remoteTimer!==null){clearInterval(remoteTimer);remoteTimer=null;}
+    }
+  });
+
   let selection = 'all';
   const pause = document.getElementById('sim-pause');
   const reset = document.getElementById('sim-reset');
@@ -171,6 +216,7 @@
   }
 
   function stop() {
+    stopRemote();
     running = false;
     if (handle !== null) clearInterval(handle);
     handle = null;
