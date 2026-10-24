@@ -39,7 +39,11 @@
   }
   function stopRemote() {
     if(remoteTimer!==null){clearInterval(remoteTimer);remoteTimer=null;}
-    if(remoteEnable && remoteEnable.checked) { void emitRemote(true); }
+    if(remoteEnable && remoteEnable.checked) {
+      void emitRemote(true);
+      remoteEnable.checked=false;
+      remoteStatus.textContent='Parado · reative a sincronização para novo teste';
+    }
   }
   if(remoteEnable) remoteEnable.addEventListener('change', () => {
     if(remoteEnable.checked){
