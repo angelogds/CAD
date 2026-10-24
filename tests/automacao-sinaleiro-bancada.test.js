@@ -7,6 +7,7 @@ require.cache[require.resolve('../database/db')]={exports:db};
 require('../database/migrations/229_automacao_dispositivos.js')();
 require('../database/migrations/230_automacao_dispositivo_estados.js')();
 require('../database/migrations/231_automacao_sinaleiros_bancada.js')();
+require('../database/migrations/232_automacao_bancada_telemetria.js')();
 const devices=require('../modules/automacao/dispositivos.service');
 const bancada=require('../modules/automacao/sinaleiro-bancada.service');
 after(()=>db.close());

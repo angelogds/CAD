@@ -32,6 +32,8 @@ function poll(device, requested) {
   if (requested != null && Number(requested)!==id) throw bad('Token sem autorização para este digestor.',403);
   const row=db.prepare("SELECT fase,valid_until_ms FROM automacao_sinaleiros_bancada WHERE digestor_id=?").get(id);
   const remaining=row ? Math.max(0, Number(row.valid_until_ms)-Date.now()) : 0;
-  return {digestor_id:id,fase:remaining>0?row.fase:'PARADO',validade_ms:Math.min(remaining,DURACAO_MS),bancada:true,processo_habilitado:false};
+  const fase=remaining>0?row.fase:'PARADO';
+  try{require('./bancada-telemetria.service').recordPoll(device,id,fase);}catch(_){/* telemetria nunca bloqueia o sinal */}
+  return {digestor_id:id,fase,validade_ms:Math.min(remaining,DURACAO_MS),bancada:true,processo_habilitado:false};
 }
 module.exports={publish,poll,DURACAO_MS};

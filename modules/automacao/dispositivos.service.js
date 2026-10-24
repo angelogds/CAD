@@ -3,6 +3,7 @@ const db = require('../../database/db');
 
 const ONLINE_WINDOW_S = 90;
 const DEVICE_ID_RE = /^[A-Z0-9][A-Z0-9-]{2,39}$/;
+const FASES_TEL = ['INICIO', 'MEIO', 'FINAL', 'PARADO'];
 const FASES = Object.freeze({
   INICIO: { sinaleiro: 'VERMELHO', piscando: false },
   MEIO: { sinaleiro: 'AMARELO', piscando: false },
@@ -50,6 +51,7 @@ function issueToken(deviceId, userId, escopo) {
     db.prepare("UPDATE automacao_dispositivos SET token_hash=?, token_hint=?, digestor_id=?, status='ATIVO', rotated_at=datetime('now'), revoked_at=NULL, last_seen_at=NULL, last_fase=NULL, last_payload=NULL WHERE id=?")
       .run(hash, hint, scope, existing.id);
     db.prepare('DELETE FROM automacao_dispositivo_estados WHERE device_pk=?').run(existing.id);
+    try { db.prepare('DELETE FROM automacao_bancada_telemetria WHERE device_pk=?').run(existing.id); } catch (_) { /* migration 232 ainda não aplicada */ }
   } else {
     db.prepare('INSERT INTO automacao_dispositivos(device_id,digestor_id,nome,token_hash,token_hint,created_by) VALUES (?,?,?,?,?,?)')
       .run(id, scope, id, hash, hint, userId || null);
@@ -77,8 +79,8 @@ function recordContact(deviceRow, body) {
     throw inputError('O token pertence a outro ESP32.', 403);
   }
   const fase = b.fase == null ? null : String(b.fase).trim().toUpperCase();
-  if (!fase || !Object.prototype.hasOwnProperty.call(FASES, fase)) {
-    throw inputError('Informe a fase INICIO, MEIO ou FINAL.');
+  if (!fase || !FASES_TEL.includes(fase)) {
+    throw inputError('Informe a fase INICIO, MEIO, FINAL ou PARADO.');
   }
 
   let digestorId = deviceRow.digestor_id;
@@ -93,16 +95,18 @@ function recordContact(deviceRow, body) {
   const num = (v) => (v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
   const payload = {
     digestor_id: digestorId, fase,
-    temperatura_c: num(b.temperatura_c),
+    temperatura_c: null, // PT100 desativado: nenhuma temperatura é armazenada (ver bancada-telemetria.service)
     firmware: b.firmware == null ? null : String(b.firmware).slice(0, 40),
     uptime_s: num(b.uptime_s),
   };
   const serialized = JSON.stringify(payload);
+  const telemetria = require('./bancada-telemetria.service').recordReport(deviceRow, digestorId, b);
   db.prepare("UPDATE automacao_dispositivos SET last_seen_at=datetime('now'),last_fase=?,last_payload=? WHERE id=?")
     .run(fase, serialized, deviceRow.id);
-  db.prepare("INSERT INTO automacao_dispositivo_estados (device_pk,digestor_id,last_fase,last_payload,last_seen_at) VALUES (?,?,?,?,datetime('now')) ON CONFLICT(device_pk,digestor_id) DO UPDATE SET last_fase=excluded.last_fase,last_payload=excluded.last_payload,last_seen_at=excluded.last_seen_at")
+  // Tabela 230 só aceita INICIO/MEIO/FINAL (CHECK); PARADO fica na telemetria da bancada (232).
+  if (fase !== 'PARADO') db.prepare("INSERT INTO automacao_dispositivo_estados (device_pk,digestor_id,last_fase,last_payload,last_seen_at) VALUES (?,?,?,?,datetime('now')) ON CONFLICT(device_pk,digestor_id) DO UPDATE SET last_fase=excluded.last_fase,last_payload=excluded.last_payload,last_seen_at=excluded.last_seen_at")
     .run(deviceRow.id, digestorId, fase, serialized);
-  return { digestor_id: digestorId, fase, sinaleiro: FASES[fase] };
+  return { digestor_id: digestorId, fase, sinaleiro: FASES[fase] || null, origem: telemetria.origem };
 }
 function listDevices() {
   const records = db.prepare("SELECT *, CAST(strftime('%s','now') - strftime('%s',last_seen_at) AS INTEGER) AS idade_s FROM automacao_dispositivos ORDER BY device_id").all();
