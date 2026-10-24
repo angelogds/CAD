@@ -7,6 +7,9 @@
   if (!core) throw new Error('Núcleo local do simulador indisponível.');
   const cards = [...root.querySelectorAll('[data-digestor]')];
   const start = document.getElementById('sim-start');
+  const selector = document.getElementById('sim-select-digestor');
+  const selectionStatus = document.getElementById('sim-selection-status');
+  let selection = 'all';
   const pause = document.getElementById('sim-pause');
   const reset = document.getElementById('sim-reset');
   const presentation = document.getElementById('sim-presentation');
@@ -22,6 +25,26 @@
   let virtualSeconds = 0;
   let handle = null;
   const get = (card, key) => card.querySelector('[data-role="' + key + '"]');
+  const selected = item => selection === 'all' || item.id === Number(selection);
+  function applySelection() {
+    root.classList.toggle('sim-single-selection', selection !== 'all');
+    const visible = [];
+    for (const item of values) {
+      const show = selected(item);
+      item.card.hidden = !show;
+      if (!show) {
+        // O digestor oculto volta para CARREGADO e pode iniciar ao ser selecionado novamente.
+        core.carregarDigestor(item, core.TEMPERATURA_INICIAL + (item.id - 1) * 2);
+      } else visible.push(item.id);
+    }
+    selectionStatus.textContent = selection === 'all'
+      ? 'Quatro digestores selecionados · simulação independente'
+      : 'Digestor ' + selection + ' selecionado · os demais não iniciam';
+    eventsFilter.value = selection;
+    renderEvents();
+    render();
+  }
+
 
   function formatTime(seconds) {
     const whole = Math.floor(Math.max(0, seconds));
@@ -175,6 +198,7 @@
     if (running) return;
     // Uma partida geral inicia apenas os digestores carregados; os outros mantêm seu próprio ciclo.
     for (const item of values) {
+      if (!selected(item)) continue;
       if (core.iniciarDigestor(item)) record(item, 'Aquecimento iniciado pelo comando geral simulado.');
     }
     running = true;
@@ -184,6 +208,12 @@
     render();
   });
   pause.addEventListener('click', stop);
+  selector.addEventListener('change', () => {
+    stop();
+    selection = selector.value;
+    // Trocar seleção nunca deixa aquecimento oculto executando.
+    applySelection();
+  });
   reset.addEventListener('click', () => {
     stop();
     virtualSeconds = 0;
@@ -202,5 +232,5 @@
     root.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   window.addEventListener('pagehide', stop, { once: true });
-  render();
+  applySelection();
 })();
