@@ -1,43 +1,182 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/automacao.css?v=20261014-v2">
-<main class="auto-page">
-  <div class="auto-actions-top"><a class="auto-back-link" href="/automacao">← Voltar</a></div>
-  <h1>Dispositivos ESP32</h1>
-  <p>Modo SIMULAÇÃO. Esta área só emite credenciais de comunicação; nenhum comando de equipamento é habilitado.</p>
-  <p>
-    <label>ID do dispositivo <input id="dev-id" value="ESP32-DIGESTOR-01" autocapitalize="characters" autocomplete="off"></label>
-    <button type="button" id="btn-token">Gerar / substituir token</button>
-  </p>
-  <pre id="token-box" hidden style="white-space:pre-wrap;word-break:break-all"></pre>
-  <div id="lista">Carregando…</div>
+<link rel="stylesheet" href="/css/automacao-configuracao.css?v=20261024">
+<main class="auto-page auto-config-page">
+  <div class="auto-actions-top"><a class="auto-back-link" href="/automacao">← Voltar para Automação</a></div>
+  <header class="auto-hero">
+    <div><span class="auto-eyebrow">CAMPO DO GADO • AUTOMAÇÃO • ACESSO ADMIN</span>
+      <h1>Configuração dos ESP32</h1>
+      <p>Gerencie as credenciais e a vinculação dos quatro digestores pela própria página do CAD.</p>
+    </div><span class="auto-state waiting">SOMENTE SIMULAÇÃO</span>
+  </header>
+  <section class="auto-alert" role="note">
+    <strong>Segurança das chaves</strong>
+    <span>A chave completa aparece somente na geração. Depois, fica apenas o final de quatro caracteres. Se perdê-la, gere outra; a anterior será invalidada. Uma chave geral concede acesso de <em>telemetria</em> aos quatro digestores; use-a apenas quando um único ESP32 monitorar todos. Esta API não aciona equipamentos.</span>
+  </section>
+  <div class="cfg-grid">
+    <section class="cfg-panel" aria-labelledby="cfg-criar-title">
+      <h2 id="cfg-criar-title">Gerar token de dispositivo</h2>
+      <label for="cfg-scope">Equipamento autorizado</label>
+      <select id="cfg-scope">
+        <option value="1">Digestor 1</option>
+        <option value="2">Digestor 2</option>
+        <option value="3">Digestor 3</option>
+        <option value="4">Digestor 4</option>
+        <option value="TODOS">Todos os digestores (token geral)</option>
+      </select>
+      <label for="cfg-device">Identificação do ESP32</label>
+      <input id="cfg-device" value="ESP32-DIGESTOR-01" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="cfg-device-help">
+      <p class="cfg-caption" id="cfg-device-help">Um token pertence a um ESP32. O mesmo dispositivo pode ser vinculado a um digestor ou a todos os quatro.</p>
+      <button type="button" class="cfg-primary" id="cfg-issue">Gerar / substituir token</button>
+      <div class="cfg-result" id="cfg-result" hidden role="status">
+        <strong>Nova chave — copie agora</strong>
+        <code id="cfg-token"></code>
+        <div class="cfg-actions">
+          <button type="button" id="cfg-copy">Copiar chave</button>
+          <button type="button" id="cfg-hide">Ocultar chave</button>
+        </div>
+        <small>Coloque a chave na IHM local do ESP32, em Integração CAD. Ela não será mostrada novamente.</small>
+      </div>
+      <p id="cfg-message" class="cfg-message" role="status" aria-live="polite"></p>
+    </section>
+    <section class="cfg-panel" aria-labelledby="cfg-connection-title">
+      <h2 id="cfg-connection-title">Dados para conectar a IHM</h2>
+      <p>Use estes dados na página do ESP32 conectado à rede da casa.</p>
+      <label>Endereço HTTPS da API</label>
+      <code class="cfg-endpoint">https://manutencao.campodogado.app.br/api/automacao/device</code>
+      <p class="cfg-caption">Identificação do dispositivo: igual à cadastrada ao gerar a chave.</p>
+      <p class="cfg-caption">Autenticação: <code>Authorization: Bearer &lt;token&gt;</code></p>
+      <p class="cfg-caption">O ESP32 envia <code>POST /ping</code> e <code>POST /estado</code>, indicando <code>INICIO</code>, <code>MEIO</code> ou <code>FINAL</code>.</p>
+      <p><strong>Aviso:</strong> no token geral, cada envio de estado deve indicar <code>digestor_id</code> (1 a 4). A IHM de bancada V4 usa o Digestor 1; não é firmware de quatro sensores.</p>
+    </section>
+  </div>
+  <section class="cfg-panel" aria-labelledby="cfg-list-title">
+    <div class="cfg-list-head"><h2 id="cfg-list-title">Dispositivos cadastrados</h2><button type="button" id="cfg-refresh">Atualizar</button></div>
+    <div class="cfg-devices" id="cfg-devices" aria-live="polite">Carregando dispositivos...</div>
+  </section>
 </main>
 <script>
-(function () {
-  var box = document.getElementById('token-box'), lista = document.getElementById('lista');
-  function esc(s) { return String(s == null ? '—' : s).replace(/[&<>"]/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
-  function load() {
-    fetch('/automacao/api/dispositivos', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
-      lista.innerHTML = (d.dispositivos || []).map(function (x) {
-        return '<div style="margin:12px 0"><strong>' + esc(x.device_id) + '</strong> — ' + (x.online ? 'ONLINE' : 'OFFLINE') + ' (' + esc(x.status) + ')<br>' +
-          'Último contato: ' + esc(x.ultimo_contato) + '<br>Fase: ' + esc(x.fase) + ' • Sinaleiro: ' + esc(x.sinaleiro && x.sinaleiro.sinaleiro) + (x.sinaleiro && x.sinaleiro.piscando ? ' piscando' : '') +
-          '<br>Token: ' + esc(x.token_final) + ' <button type="button" data-rev="' + esc(x.device_id) + '">Revogar</button></div>';
-      }).join('') || 'Nenhum dispositivo cadastrado.';
-    });
+(() => {
+  'use strict';
+  const csrf = '<%= csrfAutomacao %>';
+  const scope = document.getElementById('cfg-scope');
+  const device = document.getElementById('cfg-device');
+  const result = document.getElementById('cfg-result');
+  const tokenEl = document.getElementById('cfg-token');
+  const message = document.getElementById('cfg-message');
+  const devices = document.getElementById('cfg-devices');
+  const api = '/automacao/api/dispositivos';
+  const suffix = {'1':'01','2':'02','3':'03','4':'04'};
+
+  scope.addEventListener('change', () => {
+    device.value = scope.value === 'TODOS' ? 'ESP32-GERAL-01' : 'ESP32-DIGESTOR-' + suffix[scope.value];
+  });
+  function clearToken() {
+    tokenEl.textContent = '';
+    result.hidden = true;
   }
-  document.getElementById('btn-token').addEventListener('click', function () {
-    var id = document.getElementById('dev-id').value.trim();
-    if (!confirm('Gerar novo token para ' + id + '? O token anterior deixa de valer.')) return;
-    fetch('/automacao/api/dispositivos/' + encodeURIComponent(id) + '/token', { method: 'POST', credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
-      box.hidden = false;
-      box.textContent = d.ok ? 'Token (mostrado só agora):\n' + d.token : 'Erro: ' + d.error;
-      load();
+  document.getElementById('cfg-hide').addEventListener('click', clearToken);
+  document.getElementById('cfg-copy').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(tokenEl.textContent);
+      message.textContent = 'Chave copiada. Cole na IHM do ESP32.';
+    } catch (_) {
+      message.textContent = 'Não foi possível copiar automaticamente. Selecione o texto da chave e copie.';
+    }
+  });
+  async function request(path, options = {}) {
+    const response = await fetch(path, {
+      credentials: 'same-origin', cache: 'no-store',
+      ...options,
+      headers: {...options.headers, 'Accept': 'application/json'},
     });
+    let data;
+    try { data = await response.json(); }
+    catch (_) { throw new Error('Resposta inesperada do servidor. Verifique sua sessão.'); }
+    if (!response.ok || !data.ok) throw new Error(data.error || 'Falha na operação.');
+    return data;
+  }
+  const label = (text, cls) => {
+    const el = document.createElement('span');
+    el.className = cls || '';
+    el.textContent = text;
+    return el;
+  };
+  function formatDate(value) {
+    if (!value) return 'Nunca';
+    const dt = new Date(value);
+    return Number.isNaN(dt.getTime()) ? value : dt.toLocaleString('pt-BR');
+  }
+  async function refresh() {
+    try {
+      const response = await request(api);
+      devices.replaceChildren();
+      if (!response.dispositivos.length) {
+        devices.append(label('Nenhum token cadastrado. Escolha o equipamento e gere a primeira chave.', 'cfg-caption'));
+        return;
+      }
+      response.dispositivos.forEach(d => {
+        const card = document.createElement('article');
+        card.className = 'cfg-device';
+        const head = document.createElement('div');
+        head.className = 'cfg-list-head';
+        const title = document.createElement('strong');
+        title.textContent = d.device_id;
+        const status = label(d.status === 'REVOGADO' ? 'REVOGADO' : (d.online ? 'ONLINE' : 'OFFLINE'), 'cfg-status');
+        status.dataset.status = d.status === 'REVOGADO' ? 'revogado' : (d.online ? 'online' : 'offline');
+        head.append(title, status);
+        card.append(head);
+        card.append(label('Equipamento: ' + (d.escopo === 'TODOS' ? 'TODOS OS DIGESTORES' : 'Digestor ' + d.escopo), 'cfg-row'));
+        card.append(label('Token armazenado: ' + (d.token_final || 'Sem token') + ' (somente final)', 'cfg-row'));
+        card.append(label('Último contato: ' + formatDate(d.ultimo_contato), 'cfg-row'));
+        card.append(label('Última fase: ' + (d.fase || 'sem informação'), 'cfg-row'));
+        (d.estados || []).forEach(s => card.append(label('D' + s.digestor_id + ': ' + (s.fase || 'sem estado'), 'cfg-row')));
+        const revoke = document.createElement('button');
+        revoke.type = 'button';
+        revoke.textContent = 'Revogar token';
+        revoke.disabled = d.status === 'REVOGADO';
+        revoke.addEventListener('click', async () => {
+          if (!confirm('Revogar a chave de ' + d.device_id + '? O ESP32 perderá acesso à API.')) return;
+          clearToken();
+          try {
+            await request(api + '/' + encodeURIComponent(d.device_id) + '/revogar', {
+              method:'POST', headers: {'X-CGD-CSRF':csrf}
+            });
+            message.textContent = 'Token revogado para ' + d.device_id + '.';
+            await refresh();
+          } catch (e) { message.textContent = e.message; }
+        });
+        card.append(revoke);
+        devices.append(card);
+      });
+    } catch (e) {
+      devices.textContent = 'Falha ao atualizar: ' + e.message;
+    }
+  }
+  document.getElementById('cfg-issue').addEventListener('click', async () => {
+    const id = device.value.trim().toUpperCase();
+    if (!/^[A-Z0-9][A-Z0-9-]{2,39}$/.test(id)) {
+      message.textContent = 'Informe um ID válido, de 3 a 40 caracteres.';
+      return;
+    }
+    const target = scope.value === 'TODOS' ? 'todos os quatro digestores' : 'Digestor ' + scope.value;
+    if (!confirm('Gerar token para ' + id + ' (' + target + ')? Se já existir, a chave anterior será invalidada.')) return;
+    clearToken();
+    message.textContent = 'Gerando chave...';
+    try {
+      const data = await request(api + '/' + encodeURIComponent(id) + '/token', {
+        method:'POST',
+        headers: {'Content-Type':'application/json','X-CGD-CSRF':csrf},
+        body:JSON.stringify({escopo:scope.value}),
+      });
+      tokenEl.textContent = data.token;
+      result.hidden = false;
+      message.textContent = 'Token gerado para ' + data.device_id + ' • ' + target + '.';
+      await refresh();
+    } catch (e) { message.textContent = e.message; }
   });
-  lista.addEventListener('click', function (e) {
-    var id = e.target.getAttribute && e.target.getAttribute('data-rev');
-    if (!id || !confirm('Revogar o token de ' + id + '?')) return;
-    fetch('/automacao/api/dispositivos/' + encodeURIComponent(id) + '/revogar', { method: 'POST', credentials: 'same-origin' }).then(load);
-  });
-  load();
+  document.getElementById('cfg-refresh').addEventListener('click', refresh);
+  refresh();
+  setInterval(refresh, 20000);
 })();
 </script>
