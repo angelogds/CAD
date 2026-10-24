@@ -94,3 +94,9 @@
 .sim-select-panel .sim-select-warning{flex-basis:100%;border-top:1px solid #dbe9e2;padding-top:9px}
 .sim-grid .sim-vessel-card[hidden]{display:none!important}
 .sim-single-selection .sim-grid{grid-template-columns:minmax(0,650px);justify-content:center}
+
+.sim-bancada-online{background:#f0f7fb;border:1px solid #a2c1cd;border-radius:12px;padding:14px;margin:12px 0 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:#204754}
+.sim-bancada-online strong{font-size:15px}
+.sim-bancada-online p{font-size:12px;line-height:1.45;max-width:540px;margin:5px 0}
+.sim-bancada-online .sim-remote-switch{font-size:12px;font-weight:800;display:flex;gap:7px;align-items:center;cursor:pointer}
+.sim-bancada-online small{display:block;flex-basis:100%;font-size:11px;color:#61727e}

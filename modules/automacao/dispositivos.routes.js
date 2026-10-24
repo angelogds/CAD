@@ -2,6 +2,7 @@
 // Somente recebe estados: não existe rota de comando para válvulas, vapor ou outros equipamentos.
 const express = require('express');
 const svc = require('./dispositivos.service');
+const bancada = require('./sinaleiro-bancada.service');
 
 const router = express.Router();
 const failures = new Map(); // ip -> { n, reset }
@@ -46,4 +47,11 @@ router.post('/estado', deviceAuth, (req, res) => {
   }
 });
 
+// Consulta iniciada pelo ESP32; somente sinalização e somente para o digestor autorizado.
+router.post('/sinaleiro-bancada', deviceAuth, (req,res) => {
+  try {
+    svc.recordPing(req.device);
+    return res.json({...base(req),sinaleiro_bancada:bancada.poll(req.device, req.body && req.body.digestor_id)});
+  } catch (e) { return res.status(e.status||500).json({ok:false,error:e.status?e.message:'erro interno'}); }
+});
 module.exports = router;

@@ -1,5 +1,6 @@
 const { normalizeRole } = require('../../config/rbac');
 const service = require('./automacao.service');
+const crypto = require('node:crypto');
 
 function index(req, res) {
   return res.render('automacao/index', {
@@ -38,7 +39,11 @@ function prensas(req, res) {
 }
 
 function simuladorDigestores(req, res) {
+  const admin = normalizeRole(req.session && req.session.user && req.session.user.role) === 'ADMIN';
+  if (admin && req.session && !req.session.automacaoConfigCsrf) req.session.automacaoConfigCsrf=crypto.randomBytes(32).toString('hex');
   return res.render('automacao/simulador-digestores', {
+    simuladorBancadaAdmin: admin,
+    csrfAutomacao: admin && req.session ? req.session.automacaoConfigCsrf : '',
     title: 'Automação - Simulador dos Digestores',
     activeMenu: 'automacao',
   });
