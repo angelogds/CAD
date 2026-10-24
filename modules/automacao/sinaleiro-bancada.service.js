@@ -19,9 +19,22 @@ function normalize(states) {
 function publish(states, adminId) {
   const entries = normalize(states);
   const now = Date.now();
-  const stmt = db.prepare("INSERT INTO automacao_sinaleiros_bancada (digestor_id,fase,valid_until_ms,updated_by,versao,published_at_ms) VALUES(?,?,?,?,1,?) ON CONFLICT(digestor_id) DO UPDATE SET fase=excluded.fase, valid_until_ms=excluded.valid_until_ms, updated_by=excluded.updated_by, versao=automacao_sinaleiros_bancada.versao+1, published_at_ms=excluded.published_at_ms");
+  const sel = db.prepare("SELECT fase,valid_until_ms FROM automacao_sinaleiros_bancada WHERE digestor_id=?");
+  const ins = db.prepare("INSERT INTO automacao_sinaleiros_bancada (digestor_id,fase,valid_until_ms,updated_by,versao,published_at_ms) VALUES(?,?,?,?,1,?)");
+  // Nova transição: avança versao e published_at_ms.
+  const nova = db.prepare("UPDATE automacao_sinaleiros_bancada SET fase=?, valid_until_ms=?, updated_by=?, versao=versao+1, published_at_ms=? WHERE digestor_id=?");
+  // Renovação da mesma fase ainda válida: estende só a validade; versao e published_at_ms permanecem.
+  const renova = db.prepare("UPDATE automacao_sinaleiros_bancada SET valid_until_ms=?, updated_by=? WHERE digestor_id=?");
   const apply = db.transaction(() => {
-    for (const entry of entries) stmt.run(entry.digestor_id,entry.fase,entry.fase==='PARADO'?0:now+DURACAO_MS, adminId||null, now);
+    for (const entry of entries) {
+      const validade = entry.fase==='PARADO' ? 0 : now+DURACAO_MS;
+      const atual = sel.get(entry.digestor_id);
+      if (!atual) { ins.run(entry.digestor_id,entry.fase,validade,adminId||null,now); continue; }
+      const mesmaFase = atual.fase===entry.fase;
+      const ativa = entry.fase==='PARADO' || Number(atual.valid_until_ms)>now;
+      if (mesmaFase && ativa) renova.run(validade,adminId||null,entry.digestor_id);
+      else nova.run(entry.fase,validade,adminId||null,now,entry.digestor_id);
+    }
   });
   apply();
   return {ok:true,modo:'SIMULACAO',comando_industrial_habilitado:false,estados:entries,duracao_ms:DURACAO_MS};

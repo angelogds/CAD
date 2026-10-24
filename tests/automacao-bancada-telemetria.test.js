@@ -163,7 +163,11 @@ test('relatório antigo dentro de 15 s não confirma novo comando (versão e fir
     await post('/sinaleiro-bancada',token,{digestor_id:1});
     await post('/estado',token,{fase:'MEIO',fase_recebida:'MEIO',fase_aplicada:'MEIO',versao_fase:1});
     assert.equal(d1().aplicacao_status,'CONFIRMADA');
-    // novo comando MEIO -> MEIO (mesma fase!): versão 2, relatório v1 é antigo
+    // renovação da mesma fase ainda válida mantém a versão 1 (confirmação segue válida)
+    bancada.publish([{digestor_id:1,fase:'MEIO'}],1);
+    assert.equal(d1().versao_fase,1); assert.equal(d1().aplicacao_status,'CONFIRMADA');
+    // novo ciclo MEIO -> MEIO após expiração: versão 2, relatório v1 é antigo
+    db.prepare('UPDATE automacao_sinaleiros_bancada SET valid_until_ms=1 WHERE digestor_id=1').run();
     bancada.publish([{digestor_id:1,fase:'MEIO'}],1);
     let s=d1(); assert.equal(s.versao_fase,2);
     assert.equal(s.aplicacao_status,'PENDENTE'); assert.equal(s.recebida_status,'PENDENTE'); assert.equal(s.fase_aplicada,null);
