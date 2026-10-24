@@ -1,6 +1,7 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/automacao.css?v=20261015-sim">
 <link rel="stylesheet" href="/css/automacao-simulador.css?v=20261015-v3">
+<link rel="stylesheet" href="/css/automacao-esp32-bancada.css?v=20261023">
 <main class="auto-page auto-hmi" id="sim-digestores">
   <div class="auto-actions-top"><a class="auto-back-link" href="/automacao/digestores">← Voltar aos Digestores</a></div>
   <header class="auto-hero">
@@ -82,6 +83,36 @@
       </article>
     <% } %>
   </section>
+
+  <section class="esp32-bancada" id="esp32-bancada-local" aria-label="Piloto ESP32 em rede local">
+    <header>
+      <div><h2>Digestor 1 · Bancada ESP32</h2><p>Teste local das três fases do cozimento, sem token externo.</p></div>
+      <span class="esp32-teste-tag">SOMENTE TESTE</span>
+    </header>
+    <div class="esp32-bancada-content">
+      <div>
+        <div class="esp32-torre" id="esp32-torre-bancada" data-cor="nenhuma" role="img" aria-label="Sinaleiro demonstrativo">
+          <span class="esp32-luz vermelha"></span><span class="esp32-luz amarela"></span><span class="esp32-luz verde"></span>
+        </div>
+        <p id="esp32-etapa-bancada" style="text-align:center;font-weight:700">Parado</p>
+      </div>
+      <div>
+        <p><strong>Visualização no CAD:</strong> estes botões alteram apenas a torre desenhada, não acionam relés.</p>
+        <div class="esp32-botoes">
+          <button type="button" data-esp32-etapa="inicio" aria-pressed="false">Início · Vermelho</button>
+          <button type="button" data-esp32-etapa="meio" aria-pressed="false">Meio · Amarelo</button>
+          <button type="button" data-esp32-etapa="fim" aria-pressed="false">Final · Verde</button>
+          <button type="button" id="esp32-parar-bancada">Parar</button>
+        </div>
+        <label class="esp32-label" for="esp32-ip-local">IP local do ESP32 · Digestor 1</label>
+        <input id="esp32-ip-local" inputmode="decimal" autocomplete="off" spellcheck="false" aria-describedby="esp32-aviso-ip">
+        <div class="esp32-botoes"><a class="esp32-abrir" id="esp32-abrir-ihm" href="#" target="_blank" rel="noopener noreferrer">Abrir IHM local do ESP32 ↗</a></div>
+        <p id="esp32-aviso-ip" class="esp32-observacao" role="status"></p>
+        <p class="esp32-observacao">Para testar as lâmpadas reais, abra a IHM local e use os comandos dela. Um CAD acessado por HTTPS não envia diretamente comandos HTTP ao endereço privado do ESP32. Sem PT100: estados ilustrativos, não temperaturas medidas. Nunca usar este simulador para operar válvulas ou vapor.</p>
+      </div>
+    </div>
+  </section>
+
   <section class="sim-events-panel" aria-label="Histórico dos eventos simulados">
     <div class="sim-events-title">
       <div><h2>Histórico da simulação</h2><p>Carregamentos, partidas, mudanças de fase e inversões dos purgadores.</p></div>
@@ -100,5 +131,6 @@
     <article class="auto-panel"><h2>Limites do simulador</h2><p>Funciona apenas no navegador, sem rede industrial ou persistência. Os contatores e purgadores são gráficos fictícios; alternam em 30 segundos virtuais por digestor habilitado. Pausar congela a demonstração; reiniciar fecha ambos os purgadores.</p></article>
   </section>
 </main>
+<script src="/js/automacao-esp32-bancada.js?v=20261023" defer></script>
 <script src="/js/automacao-simulador-core.js?v=20261015-v3" defer></script>
 <script src="/js/automacao-simulador.js?v=20261015-v3" defer></script>
