@@ -33,8 +33,8 @@
       const show = selected(item);
       item.card.hidden = !show;
       if (!show) {
-        item.enabled = false;
-        item.cycleActive = false;
+        // O digestor oculto volta para CARREGADO e pode iniciar ao ser selecionado novamente.
+        core.carregarDigestor(item, core.TEMPERATURA_INICIAL + (item.id - 1) * 2);
       } else visible.push(item.id);
     }
     selectionStatus.textContent = selection === 'all'
