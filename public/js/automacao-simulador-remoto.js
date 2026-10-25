@@ -18,36 +18,51 @@
   const fase=(f,st)=>f&&st==='CONFIRMADA'?f:(f&&st==='DIVERGENTE'?f+' (divergente)':(STATUS[st]||'Pendente'));
   const txt=(v)=>v==null?'—':String(v);
   const ago=(v)=>v==null?'nunca':(v<2?'agora':v+' s atrás');
-  async function refreshStatus() {
-    if(!rows)return;
-    try{
-      const data=await http.fetchJson('/automacao/api/simulador/sinaleiros/status');
-      if(!Array.isArray(data.digestores))throw Object.assign(new Error(http.MSG.RESPOSTA_INVALIDA),{kind:'RESPOSTA_INVALIDA'});
+  let ultimoStatus=[],recebidoEm=null,statusBusy=false;
+  function renderStatus() {
+    const ui=window.AutomacaoTelemetriaUI;
+    const digestores=ui&&recebidoEm!==null?ui.expirar(ultimoStatus,(Date.now()-recebidoEm)/1000):ultimoStatus;
       const sel=selector.value==='all'?null:Number(selector.value);
       if(indicator){
-        const matched=data.digestores.filter(d=>sel===null||d.digestor_id===sel);
+        const matched=digestores.filter(d=>sel===null||d.digestor_id===sel);
         const online=matched.filter(d=>d.conexao==='ONLINE').length;
-        indicator.textContent=online
+        const reais=matched.filter(d=>d.origem==='REAL').length;
+        indicator.textContent=reais ? 'SIMULAÇÃO VISUAL • '+reais+' ESP32 EM OPERAÇÃO REAL (SUPERVISÃO)' : online
           ? 'SIMULAÇÃO • '+online+' ESP32 ONLINE'+(toggle.checked?' • SINCRONIZANDO':' • NÃO SINCRONIZADO')
           : 'SIMULAÇÃO • ESP32 '+(matched.some(d=>d.conexao==='ATRASADO')?'COMUNICAÇÃO ATRASADA':matched.some(d=>d.conexao==='OFFLINE')?'OFFLINE':'NÃO CADASTRADO');
         indicator.dataset.conexao=online?'online':'offline';
       }
-      rows.replaceChildren(...data.digestores.filter(d=>sel===null||d.digestor_id===sel).map(d=>{
+      rows.replaceChildren(...digestores.filter(d=>sel===null||d.digestor_id===sel).map(d=>{
         const tr=document.createElement('tr');
         tr.dataset.conexao=d.conexao;
-        [ 'D'+d.digestor_id, d.fase_solicitada, fase(d.fase_recebida,d.recebida_status), fase(d.fase_aplicada,d.aplicacao_status), SAIDA(d.saida_status), ago(d.ultimo_contato_s), CONEXAO[d.conexao]||d.conexao ]
+        [ 'D'+d.digestor_id, d.origem==='REAL'?'REAL':'SIMULAÇÃO',
+          d.origem==='REAL'&&d.medicao_atual&&typeof d.temperatura_c==='number'?d.temperatura_c.toLocaleString('pt-BR')+' °C':'—',
+          txt(d.faixa_temperatura), txt(d.cor_sinaleiro)+(d.pronto_descarga?' • PRONTO PARA DESCARGA':''), txt(d.sensor_status),
+          d.origem==='REAL'?'Decisão local':d.fase_solicitada, d.origem==='REAL'?'—':fase(d.fase_recebida,d.recebida_status),
+          d.origem==='REAL'?'Informada pelo ESP32':fase(d.fase_aplicada,d.aplicacao_status), SAIDA(d.saida_status), ago(d.ultimo_contato_s), CONEXAO[d.conexao]||d.conexao ]
           .forEach(t=>{const td=document.createElement('td');td.textContent=t;tr.appendChild(td);});
         return tr;
       }));
+  }
+  async function refreshStatus() {
+    if(!rows||statusBusy)return;
+    statusBusy=true;
+    const solicitadoEm=Date.now();
+    try{
+      const data=await http.fetchJson('/automacao/api/simulador/sinaleiros/status');
+      if(!Array.isArray(data.digestores))throw Object.assign(new Error(http.MSG.RESPOSTA_INVALIDA),{kind:'RESPOSTA_INVALIDA'});
+      ultimoStatus=data.digestores;recebidoEm=solicitadoEm;
+      renderStatus();
     }catch(e){
+      ultimoStatus=[];recebidoEm=null;
       if(indicator){indicator.textContent='SIMULAÇÃO • STATUS ESP32 INDISPONÍVEL';indicator.dataset.conexao='erro';}
       const td=document.createElement('td');
-      td.colSpan=7;td.setAttribute('role','alert');
+      td.colSpan=12;td.setAttribute('role','alert');
       td.textContent=(e.kind==='SESSAO_EXPIRADA'||e.kind==='SEM_PERMISSAO'?'':'Status indisponível: ')+e.message;
       const tr=document.createElement('tr');tr.dataset.erro=e.kind||'DESCONHECIDO';tr.appendChild(td);
       rows.replaceChildren(tr);
       if(e.kind==='SESSAO_EXPIRADA'||e.kind==='SEM_PERMISSAO'){halt(e.message);if(statusTimer!==null){clearInterval(statusTimer);statusTimer=null;}}
-    }
+    }finally{statusBusy=false;}
   }
   // Interrompe renovações; o ESP32 expira o comando sozinho (6,5 s) e desliga as saídas.
   function halt(msg){
@@ -57,14 +72,17 @@
   }
   void refreshStatus();
   statusTimer=setInterval(refreshStatus,3000);
+  const validadeTimer=setInterval(()=>{if(recebidoEm!==null)renderStatus();},1000);
   function snapshots(stopped=false) {
     const ids=selector.value==='all'?[1,2,3,4]:[Number(selector.value)];
     return ids.map(id=>{
       const card=root.querySelector('[data-digestor="'+id+'"]');
-      const lamp=card && card.querySelector('[data-role="tower"]');
-      const stage=lamp && lamp.dataset.stage;
-      const fase=stopped||!start.disabled?'PARADO':stage==='green'?'FINAL':stage==='yellow'?'MEIO':'INICIO';
-      return {digestor_id:id,fase};
+      const valor=card && card.dataset.temperaturaC;
+      const temperatura=typeof valor==='string'&&valor.trim()!==''?Number(valor):NaN;
+      const valido=Number.isFinite(temperatura)&&temperatura>=0&&temperatura<=850;
+      const parado=stopped||!start.disabled||!valido;
+      const fase=parado?'PARADO':temperatura>120?'FINAL':temperatura>50?'MEIO':'INICIO';
+      return {digestor_id:id,fase,...(!parado&&Number.isFinite(temperatura)?{temperatura_c:temperatura}:{})};
     });
   }
   async function publish(stopped=false) {
@@ -91,18 +109,19 @@
   }
   toggle.addEventListener('change',()=>{
     if(toggle.checked){
-      if(!confirm('Ativar somente sinais de bancada, com todas as cargas 220 V desconectadas e ESP32 V5 autorizado localmente?')){
+      if(!confirm('Ativar somente os sinaleiros de bancada, com cargas industriais desconectadas e firmware por temperatura V8 autorizado localmente?')){
         toggle.checked=false;return;
       }
       void publish();
-      timer=setInterval(()=>{if(toggle.checked)void publish();},2500);
+      timer=setInterval(()=>{if(toggle.checked)void publish();},1000);
     }else{
       void publish(true);
       if(timer!==null){clearInterval(timer);timer=null;}
     }
   });
+  root.addEventListener('simulador:estado',()=>{if(toggle.checked)void publish();});
   selector.addEventListener('change',stop);
   document.getElementById('sim-pause').addEventListener('click',()=>{if(toggle.checked)void publish(true);});
   document.getElementById('sim-reset').addEventListener('click',stop);
-  window.addEventListener('pagehide',()=>{if(timer!==null)clearInterval(timer);if(statusTimer!==null)clearInterval(statusTimer);},{once:true});
+  window.addEventListener('pagehide',()=>{if(timer!==null)clearInterval(timer);if(statusTimer!==null)clearInterval(statusTimer);clearInterval(validadeTimer);},{once:true});
 })();

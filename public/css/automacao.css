@@ -10,3 +10,5 @@
 
 /* Ações comuns do cabeçalho das telas de automação */
 .auto-actions-top{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 12px}.auto-back-link,.auto-simulator-link{display:inline-flex;align-items:center;text-decoration:none;border:1px solid #d5e2e4;border-radius:9px;background:#fff;padding:9px 12px;font-size:13px;font-weight:800;color:#375163}.auto-simulator-link{background:#e9f6ee;border-color:#b9d9c6;color:#11683d}.auto-actions-top a:hover,.auto-actions-top a:focus-visible{outline:2px solid #16834b;outline-offset:2px}
+
+.thermal-supervision{display:grid;gap:7px;padding:12px 0;font-size:11px;overflow-wrap:anywhere}.thermal-supervision>strong:first-child{font-size:10px;letter-spacing:.04em}.thermal-ready{border-color:#d43b3b}.thermal-ready [data-telemetria-role="pronto"]{padding:8px;border-radius:7px;background:#fbe5e5;color:#982727}.process-tower[data-blink="true"] .tower-red{animation:process-thermal-ready 1s steps(1,end) infinite}@keyframes process-thermal-ready{50%{opacity:.22;box-shadow:none}}@media(prefers-reduced-motion:reduce){.process-tower[data-blink="true"] .tower-red{animation:none}}

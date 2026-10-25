@@ -2,17 +2,15 @@
 // confirmacao de saida (somente se o firmware informar) e ultimo contato. Nao comanda processo industrial.
 const db = require('../../database/db');
 const bancada = require('./sinaleiro-bancada.service');
+const { classifyTemperature, legacySignal, FAIXAS, CORES } = require('./temperatura-sinaleiro');
 
 const FASES_TEL = ['INICIO', 'MEIO', 'FINAL', 'PARADO'];
 const SENSOR_STATUS = ['SEM_SENSOR', 'SEM_SINAL', 'VALIDO', 'FALHA'];
 const ORIGENS = ['SIMULACAO', 'REAL'];
-// Fase de bancada: toda telemetria e SIMULACAO. 'REAL' e aceito no payload (compatibilidade),
-// mas nunca armazenado nem exibido como medicao de processo.
 const ORIGEM_BANCADA = 'SIMULACAO';
-const ONLINE_S = 15;     // contato recente (consulta a cada ~2-5 s)
-const ATRASADO_S = 90;   // acima disso: offline (igual a ONLINE_WINDOW_S de dispositivos.service)
-// PT100 permanece desativado: leituras de temperatura NAO sao armazenadas.
-const PT100_HABILITADO = false;
+const ONLINE_S = 15;
+const ATRASADO_S = 90;
+const PT100_HABILITADO = true;
 
 function bad(msg, status = 400) { const e = new Error(msg); e.status = status; return e; }
 function enumOrNull(v, list, label) {
@@ -33,35 +31,62 @@ function recordPoll(deviceRow, digestorId, faseEntregue, versao) {
     .run(deviceRow.id, digestorId, faseEntregue, v, Date.now());
 }
 
-// Campos opcionais e retrocompativeis de /estado. Retorna o que foi gravado.
+// REAL exige um pacote completo. Nunca usa a temperatura para comandar GPIOs pelo CAD.
+function normalizeReading(b) {
+  const origem = enumOrNull(b.origem, ORIGENS, 'origem') || ORIGEM_BANCADA;
+  const sensorIn = enumOrNull(b.sensor_status, SENSOR_STATUS, 'sensor_status');
+  const sensor_status = origem === 'REAL' ? sensorIn : (sensorIn === 'FALHA' ? 'FALHA' : 'SEM_SENSOR');
+  const unavailable = { temperatura_c: null, timestamp_medicao: null, faixa_temperatura: 'SENSOR_INDISPONIVEL', cor_sinaleiro: 'DESLIGADO', pronto_descarga: false };
+  if (origem === 'REAL') {
+    if (b.sensor_tipo !== 'PT100' || !sensor_status) throw bad('Operação REAL exige sensor_tipo PT100 e sensor_status.');
+    if (sensor_status !== 'VALIDO') {
+      if (b.temperatura_c != null || b.timestamp_medicao != null || b.pronto_descarga !== false || b.cor_sinaleiro !== 'DESLIGADO' || b.faixa_temperatura !== 'SENSOR_INDISPONIVEL') throw bad('Sensor indisponível exige temperatura/timestamp nulos, sinaleiro desligado e pronto_descarga false.');
+      return { origem, sensor_tipo: 'PT100', sensor_status, ...unavailable };
+    }
+    const expected = classifyTemperature(b.temperatura_c);
+    if (!expected) throw bad('temperatura_c deve ser um número finito entre 0 e 850 °C.');
+    const ms = typeof b.timestamp_medicao === 'string' && /^\d{4}-\d{2}-\d{2}T.*Z$/.test(b.timestamp_medicao) ? Date.parse(b.timestamp_medicao) : NaN;
+    if (!Number.isFinite(ms) || ms > Date.now() + 30000 || ms < Date.now() - ONLINE_S * 1000) throw bad('timestamp_medicao deve ser uma leitura UTC atual (até 15 s).');
+    const faixa = enumOrNull(b.faixa_temperatura, FAIXAS, 'faixa_temperatura');
+    const cor = enumOrNull(b.cor_sinaleiro, CORES, 'cor_sinaleiro');
+    if (faixa !== expected.faixa_temperatura || cor !== expected.cor_sinaleiro || typeof b.pronto_descarga !== 'boolean' || b.pronto_descarga !== expected.pronto_descarga) throw bad('Faixa, cor e indicador de pronto inconsistentes com a leitura informada.');
+    // Persiste os campos reportados pelo ESP32; a decisão física continua local.
+    return { origem, sensor_tipo: 'PT100', sensor_status, temperatura_c: b.temperatura_c, timestamp_medicao: new Date(ms).toISOString(), faixa_temperatura: faixa, cor_sinaleiro: cor, pronto_descarga: b.pronto_descarga };
+  }
+  // Compatibilidade: temperatura sem origem explícita continua sem valor de processo.
+  const t = b.origem === 'SIMULACAO' && b.temperatura_c != null ? b.temperatura_c : null;
+  if (t != null && !classifyTemperature(t)) throw bad('Temperatura simulada inválida.');
+  const signal = t == null ? legacySignal(b.fase_aplicada || b.fase || 'PARADO') : classifyTemperature(t);
+  return { origem, sensor_tipo: null, sensor_status, ...unavailable, ...signal, temperatura_c: t };
+}
+
 function recordReport(deviceRow, digestorId, b) {
   const fase_recebida = enumOrNull(b.fase_recebida, FASES_TEL, 'fase_recebida');
   const fase_aplicada = enumOrNull(b.fase_aplicada, FASES_TEL, 'fase_aplicada');
-  enumOrNull(b.origem, ORIGENS, 'origem'); // validado, porem ignorado: bancada = SIMULACAO
-  const origem = ORIGEM_BANCADA;
+  const reading = normalizeReading(b);
+  if (reading.origem === 'REAL' && reading.sensor_status === 'VALIDO') {
+    const previous = db.prepare('SELECT origem,sensor_status,timestamp_medicao,reported_ms,temperatura_c,cor_sinaleiro FROM automacao_bancada_telemetria WHERE device_pk=? AND digestor_id=?').get(deviceRow.id, digestorId);
+    if (previous && previous.origem === 'REAL') {
+      const previousMs = previous.timestamp_medicao ? Date.parse(previous.timestamp_medicao) : Number(previous.reported_ms);
+      const incomingMs = Date.parse(reading.timestamp_medicao);
+      if (Number.isFinite(previousMs) && (incomingMs < previousMs || (incomingMs === previousMs && previous.sensor_status === 'VALIDO' && (previous.temperatura_c !== reading.temperatura_c || previous.cor_sinaleiro !== reading.cor_sinaleiro)))) throw bad('Leitura anterior à última medição ou conflitante com o mesmo timestamp.');
+    }
+  }
   const versao_reportada = intOrNull(b.versao_fase);
   let saida = null;
   if (b.saida_confirmada !== undefined && b.saida_confirmada !== null) {
     if (typeof b.saida_confirmada !== 'boolean') throw bad('saida_confirmada deve ser true ou false.');
-    if (!fase_aplicada) throw bad('saida_confirmada exige fase_aplicada.');
+    if (!fase_aplicada && reading.origem !== 'REAL') throw bad('saida_confirmada exige fase_aplicada.');
     saida = b.saida_confirmada ? 1 : 0;
   }
-  // PT100 desativado: valida o formato, mas nunca persiste temperatura nem aceita status VALIDO.
-  const sensor_status_in = enumOrNull(b.sensor_status, SENSOR_STATUS, 'sensor_status');
-  const sensor_status = PT100_HABILITADO ? (sensor_status_in || 'SEM_SENSOR') : (sensor_status_in === 'FALHA' ? 'FALHA' : 'SEM_SENSOR');
-  const row = {
-    fase_recebida, fase_aplicada, saida, origem, sensor_status,
-    sensor_tipo: PT100_HABILITADO && b.sensor_tipo === 'PT100' ? 'PT100' : null,
+  const row = { ...reading, fase_recebida, fase_aplicada, saida,
     firmware: b.firmware == null ? null : String(b.firmware).slice(0, 40),
-    uptime_s: intOrNull(b.uptime_s), wifi_rssi: intOrNull(b.wifi_rssi), versao_reportada,
-  };
-  db.prepare(`INSERT INTO automacao_bancada_telemetria (device_pk,digestor_id,reported_at,fase_recebida,fase_aplicada,saida_confirmada,origem,firmware,uptime_s,wifi_rssi,sensor_tipo,sensor_status,temperatura_c,timestamp_medicao,versao_reportada,reported_ms)
-    VALUES (?,?,datetime('now'),?,?,?,?,?,?,?,?,?,NULL,NULL,?,?)
-    ON CONFLICT(device_pk,digestor_id) DO UPDATE SET reported_at=excluded.reported_at, fase_recebida=excluded.fase_recebida, fase_aplicada=excluded.fase_aplicada,
-      saida_confirmada=excluded.saida_confirmada, origem=excluded.origem, firmware=excluded.firmware, uptime_s=excluded.uptime_s, wifi_rssi=excluded.wifi_rssi,
-      sensor_tipo=excluded.sensor_tipo, sensor_status=excluded.sensor_status, temperatura_c=NULL, timestamp_medicao=NULL,
-      versao_reportada=excluded.versao_reportada, reported_ms=excluded.reported_ms`)
-    .run(deviceRow.id, digestorId, row.fase_recebida, row.fase_aplicada, row.saida, row.origem, row.firmware, row.uptime_s, row.wifi_rssi, row.sensor_tipo, row.sensor_status, row.versao_reportada, Date.now());
+    uptime_s: intOrNull(b.uptime_s), wifi_rssi: intOrNull(b.wifi_rssi), versao_reportada };
+  const columns = ['fase_recebida','fase_aplicada','saida_confirmada','origem','firmware','uptime_s','wifi_rssi','sensor_tipo','sensor_status','temperatura_c','timestamp_medicao','versao_reportada','reported_ms','faixa_temperatura','cor_sinaleiro','pronto_descarga'];
+  const values = [fase_recebida, fase_aplicada, saida, row.origem, row.firmware, row.uptime_s, row.wifi_rssi, row.sensor_tipo, row.sensor_status, row.temperatura_c, row.timestamp_medicao, versao_reportada, Date.now(), row.faixa_temperatura, row.cor_sinaleiro, row.pronto_descarga ? 1 : 0];
+  db.prepare(`INSERT INTO automacao_bancada_telemetria (device_pk,digestor_id,reported_at,${columns.join(',')}) VALUES (?,?,datetime('now'),${columns.map(()=>'?').join(',')})
+    ON CONFLICT(device_pk,digestor_id) DO UPDATE SET reported_at=excluded.reported_at,${columns.map(c=>`${c}=excluded.${c}`).join(',')}`)
+    .run(deviceRow.id, digestorId, ...values);
   return row;
 }
 
@@ -103,6 +128,7 @@ function status() {
   const now = Date.now();
   const sol = db.prepare('SELECT digestor_id,fase,valid_until_ms,versao,published_at_ms FROM automacao_sinaleiros_bancada').all();
   const tels = db.prepare(`SELECT t.*, d.device_id, d.last_seen_at AS dev_seen,
+      CAST(strftime('%s','now') - strftime('%s',d.last_seen_at) AS INTEGER) AS dev_age_s,
       CAST(strftime('%s','now') - strftime('%s',t.last_poll_at) AS INTEGER) AS poll_age_s,
       CAST(strftime('%s','now') - strftime('%s',t.reported_at) AS INTEGER) AS report_age_s
     FROM automacao_bancada_telemetria t JOIN automacao_dispositivos d ON d.id=t.device_pk WHERE d.status='ATIVO'`).all();
@@ -114,15 +140,21 @@ function status() {
     const ativo = !!s && restante > 0 && s.fase !== 'PARADO';
     const comando_expirado = !!s && s.fase !== 'PARADO' && restante === 0;
     const fase_solicitada = ativo ? s.fase : 'PARADO';
-    const t = tels.filter((x) => x.digestor_id === id).sort((a, b) => Math.min(a.poll_age_s ?? 1e9, a.report_age_s ?? 1e9) - Math.min(b.poll_age_s ?? 1e9, b.report_age_s ?? 1e9))[0] || null;
+    const t = tels.filter((x) => x.digestor_id === id).sort((a, b) => (Number(b.reported_ms) || 0) - (Number(a.reported_ms) || 0) || Math.min(a.poll_age_s ?? 1e9, a.report_age_s ?? 1e9) - Math.min(b.poll_age_s ?? 1e9, b.report_age_s ?? 1e9))[0] || null;
     const ages = [];
-    if (t) { if (t.poll_age_s != null) ages.push(Number(t.poll_age_s)); if (t.report_age_s != null) ages.push(Number(t.report_age_s)); }
-    const sc = scoped.find((x) => x.digestor_id === id);
+    if (t) { if (t.poll_age_s != null) ages.push(Number(t.poll_age_s)); if (t.report_age_s != null) ages.push(Number(t.report_age_s)); if (t.dev_age_s != null) ages.push(Number(t.dev_age_s)); }
+    const sc = scoped.find((x) => x.digestor_id === id && (!t || x.device_id === t.device_id));
     if (sc && sc.age_s != null) ages.push(Number(sc.age_s));
     const age = ages.length ? Math.min(...ages) : null;
     const comunicacao = connection(age);
     const corr = relatorioAtual(t, s, ativo);
     const conf = confirmacao(fase_solicitada, t, corr, comunicacao);
+    const origem = t ? t.origem : ORIGEM_BANCADA;
+    const telemetria_atual = !!t && t.report_age_s != null && Number(t.report_age_s) <= ONLINE_S;
+    const timestampMs = t && t.timestamp_medicao ? Date.parse(t.timestamp_medicao) : NaN;
+    const medicao_atual = origem === 'REAL' && telemetria_atual && t.sensor_status === 'VALIDO' && Number.isFinite(timestampMs) && now - timestampMs <= ONLINE_S * 1000 && timestampMs <= now + 30000;
+    const estado_atual = origem === 'REAL' ? medicao_atual : telemetria_atual;
+
     out.push({
       digestor_id: id,
       device_id: t ? t.device_id : (sc ? sc.device_id : null),
@@ -135,16 +167,22 @@ function status() {
       fase_aplicada: corr && comunicacao === 'ONLINE' ? t.fase_aplicada : null,
       saida_confirmada: conf.saida_status === 'CONFIRMADA' ? true : (conf.saida_status === 'NAO_CONFIRMADA' ? false : null),
       comunicacao, ...conf,
-      origem: ORIGEM_BANCADA,
+      origem, modo: origem, telemetria_atual, medicao_atual,
+      medicao_idade_s: Number.isFinite(timestampMs) ? Math.max(0, (now - timestampMs) / 1000) : null,
       ultimo_contato_s: age,
       ultima_confirmacao_s: t && t.report_age_s != null ? Number(t.report_age_s) : null,
       conexao: comunicacao,
       firmware: t ? t.firmware : null,
       sensor_status: t ? t.sensor_status : 'SEM_SENSOR',
-      pt100_habilitado: PT100_HABILITADO,
-      temperatura_c: null,
+      sensor_tipo: t ? t.sensor_tipo : null,
+      pt100_habilitado: origem === 'REAL',
+      temperatura_c: estado_atual && t ? t.temperatura_c : null,
+      timestamp_medicao: t ? t.timestamp_medicao : null,
+      faixa_temperatura: estado_atual && t ? t.faixa_temperatura : (origem === 'REAL' && telemetria_atual && t.sensor_status !== 'VALIDO' ? 'SENSOR_INDISPONIVEL' : null),
+      cor_sinaleiro: estado_atual && t ? t.cor_sinaleiro : (origem === 'REAL' && telemetria_atual && t.sensor_status !== 'VALIDO' ? 'DESLIGADO' : null),
+      pronto_descarga: !!(estado_atual && t && t.pronto_descarga),
     });
   }
-  return { ok: true, modo: 'SIMULACAO', comando_industrial_habilitado: false, digestores: out, duracao_ms: bancada.DURACAO_MS };
+  return { ok: true, server_time: new Date(now).toISOString(), modo: out.some(d => d.origem === 'REAL') ? 'SUPERVISAO' : 'SIMULACAO', comando_industrial_habilitado: false, digestores: out, duracao_ms: bancada.DURACAO_MS };
 }
-module.exports = { recordPoll, recordReport, status, PT100_HABILITADO };
+module.exports = { recordPoll, recordReport, status, PT100_HABILITADO, normalizeReading };

@@ -6,15 +6,21 @@ const core = require('../public/js/automacao-simulador-core.js');
 
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 
-test('sinaleiros térmicos seguem fases ilustrativas vermelho, amarelo e verde', () => {
-  const cases = [[30, 'red', false], [79.9, 'red', false], [80, 'yellow', false],
-    [110, 'yellow', false], [119.9, 'yellow', false], [120, 'green', true], [125, 'green', true]];
-  for (const [temp, lamp, ready] of cases) {
+test('sinaleiros seguem quatro faixas contínuas e pronto somente acima de 120 °C', () => {
+  const cases = [[0, 'green', false, false], [50, 'green', false, false], [50.1, 'yellow', false, false],
+    [51, 'yellow', false, false], [99.9, 'yellow', false, false], [100, 'red', false, false],
+    [120, 'red', false, false], [120.1, 'red', true, true], [125, 'red', true, true]];
+  for (const [temp, lamp, ready, blink] of cases) {
     const result = core.faixaTemperatura(temp);
     assert.equal(result.lamp, lamp, 'temp ' + temp);
     assert.equal(result.ready, ready, 'temp ' + temp);
+    assert.equal(result.blink, blink, 'temp ' + temp);
   }
-  assert.equal(core.faixaTemperatura(NaN).lamp, 'off');
+  for (const value of [NaN, Infinity, null, undefined, '', ' ', true, -1, 851]) {
+    const invalid = core.faixaTemperatura(value);
+    assert.equal(invalid.lamp, 'off');
+    assert.equal(invalid.ready, false);
+  }
 });
 
 test('purgadores alternam exclusivamente em intervalos de 30 segundos virtuais', () => {
@@ -37,7 +43,7 @@ test('purgadores alternam exclusivamente em intervalos de 30 segundos virtuais',
   }
 });
 
-test('digestores evoluem separadamente e interrompem o aquecimento simulado em 120 °C', () => {
+test('digestores evoluem separadamente e interrompem o aquecimento simulado acima de 120 °C', () => {
   const a = { temp: 30, enabled: true, cycleSeconds: 0, cycleActive: false };
   const b = { temp: 34, enabled: false, cycleSeconds: 0, cycleActive: false };
   core.avancarDigestor(a, 30);
@@ -48,7 +54,7 @@ test('digestores evoluem separadamente e interrompem o aquecimento simulado em 1
   assert.equal(b.temp, 34);
   assert.equal(core.estadoPurgadores(a.cycleSeconds, true).eixo, 'ABERTO');
   core.avancarDigestor(a, 1000);
-  assert.equal(a.temp, 120);
+  assert.ok(a.temp > 120);
   assert.equal(core.faixaTemperatura(a.temp).ready, true);
   const previous = a.cycleSeconds;
   core.avancarDigestor(a, 0);

@@ -10,6 +10,7 @@ require('../database/migrations/230_automacao_dispositivo_estados.js')();
 require('../database/migrations/231_automacao_sinaleiros_bancada.js')();
 require('../database/migrations/232_automacao_bancada_telemetria.js')();
 require('../database/migrations/233_automacao_bancada_correlacao.js')();
+require('../database/migrations/235_automacao_temperatura_real.js')();
 const svc = require('../modules/automacao/dispositivos.service');
 after(() => db.close());
 
@@ -40,7 +41,7 @@ test('token por dispositivo: hash, ping, fases, troca de escopo e revogação', 
     const resp = await post(b + '/estado', token, { fase: 'FINAL' });
     assert.equal(resp.status, 200);
     const f = await resp.json();
-    assert.deepEqual(f.sinaleiro, { sinaleiro: 'VERDE', piscando: true });
+    assert.deepEqual(f.sinaleiro, { sinaleiro: 'VERMELHO', piscando: true });
     assert.equal(f.digestor_id, 1);
     assert.equal((await post(b + '/estado', token, { fase: 'ABRIR_VALVULA' })).status, 400);
     assert.equal((await post(b + '/estado', token, { fase: 'INICIO', digestor_id: 2 })).status, 403);

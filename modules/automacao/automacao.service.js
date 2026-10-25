@@ -1,15 +1,10 @@
 function classifyTemperature(value) {
-  const temperatura = Number(value);
-  if (value == null || String(value).trim() === '' || !Number.isFinite(temperatura)) {
-    return { key: 'SEM_SINAL', color: 'OFF', label: 'Sem sinal', detail: 'Aguardando leitura PT100', ready: false };
-  }
-  if (temperatura < 80) {
-    return { key: 'FRIO', color: 'RED', label: 'Material frio', detail: temperatura < 60 ? 'Abaixo da faixa operacional informada' : 'Material carregado / frio', ready: false };
-  }
-  if (temperatura < 120) {
-    return { key: temperatura < 100 ? 'FRITANDO' : 'COZIMENTO_FINAL', color: 'YELLOW', label: temperatura < 100 ? 'Material fritando' : 'Cozimento final', detail: temperatura < 100 ? 'Faixa de aquecimento 80–100 °C' : 'Aguardando atingir 120 °C', ready: false };
-  }
-  return { key: 'PRONTO', color: 'GREEN', label: 'Pronto para descarregar', detail: 'Temperatura de referência atingida', ready: true };
+  const numero = typeof value === 'number' || typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN;
+  const estado = require('./temperatura-sinaleiro').classifyTemperature(numero) || { faixa_temperatura: 'SENSOR_INDISPONIVEL', cor_sinaleiro: 'DESLIGADO', pronto_descarga: false };
+  const labels = { BAIXA: 'Temperatura baixa / início', INTERMEDIARIA: 'Aquecimento intermediário', ALTA: 'Faixa alta de cozimento', PRONTO: 'Pronto para descarga', SENSOR_INDISPONIVEL: 'Sem sinal' };
+  const colors = { VERDE: 'GREEN', AMARELO: 'YELLOW', VERMELHO: 'RED', VERMELHO_PISCANDO: 'RED', DESLIGADO: 'OFF' };
+  return { key: estado.faixa_temperatura, color: colors[estado.cor_sinaleiro], label: labels[estado.faixa_temperatura],
+    detail: labels[estado.faixa_temperatura], ready: estado.pronto_descarga, blink: estado.cor_sinaleiro === 'VERMELHO_PISCANDO' };
 }
 
 const DIGESTORES = Object.freeze([

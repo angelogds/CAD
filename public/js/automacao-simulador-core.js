@@ -4,17 +4,20 @@
 
   const INTERVALO_PURGA_SEGUNDOS = 30;
   const TEMPERATURA_INICIAL = 30;
-  const TEMPERATURA_PRONTA = 120;
-  const TEMPERATURA_COZIMENTO = 80;
+  const TEMPERATURA_PRONTA = 121; // A indicação de pronto exige leitura acima de 120 °C.
+  const TEMPERATURA_COZIMENTO = 100;
   const MAX_AMOSTRAS = 90;
   const FASES = Object.freeze({ CARREGADO: 'CARREGADO', AQUECIMENTO: 'AQUECIMENTO', COZIMENTO: 'COZIMENTO', PRONTO: 'PRONTO' });
 
   function faixaTemperatura(valor) {
     const temp = Number(valor);
-    if (!Number.isFinite(temp)) return { key: 'sem-sinal', label: 'Valor inválido', lamp: 'off', ready: false };
-    if (temp < TEMPERATURA_COZIMENTO) return { key: 'carregado', label: 'Carregado / frio', lamp: 'red', ready: false };
-    if (temp < TEMPERATURA_PRONTA) return { key: 'aquecendo', label: 'Em cozimento', lamp: 'yellow', ready: false };
-    return { key: 'pronto', label: 'Pronto para descarregar (sim.)', lamp: 'green', ready: true };
+    if (valor == null || typeof valor === 'boolean' || String(valor).trim() === '' || !Number.isFinite(temp) || temp < 0 || temp > 850) {
+      return { key: 'sem-sinal', label: 'Valor inválido', lamp: 'off', blink: false, ready: false };
+    }
+    if (temp <= 50) return { key: 'BAIXA', label: 'Temperatura baixa / início', lamp: 'green', blink: false, ready: false };
+    if (temp < 100) return { key: 'INTERMEDIARIA', label: 'Aquecimento intermediário', lamp: 'yellow', blink: false, ready: false };
+    if (temp <= 120) return { key: 'ALTA', label: 'Faixa alta de cozimento', lamp: 'red', blink: false, ready: false };
+    return { key: 'PRONTO', label: 'Pronto para descarga (sim.)', lamp: 'red', blink: true, ready: true };
   }
 
   // Intertravamento apenas gráfico. Inativo significa os dois fechados.
@@ -39,7 +42,7 @@
 
   function carregarDigestor(item, temperatura) {
     const t = temperatura === undefined ? TEMPERATURA_INICIAL : Number(temperatura);
-    item.temp = Number.isFinite(t) ? Math.max(0, Math.min(79.9, t)) : TEMPERATURA_INICIAL;
+    item.temp = Number.isFinite(t) ? Math.max(0, Math.min(50, t)) : TEMPERATURA_INICIAL;
     item.enabled = false;
     item.cycleActive = false;
     item.cycleSeconds = 0;
@@ -66,7 +69,7 @@
     item.cycleSeconds += delta;
     item.temp = Math.min(TEMPERATURA_PRONTA, item.temp + delta * 0.22);
     if (item.fase) {
-      if (item.temp >= TEMPERATURA_PRONTA) {
+      if (item.temp > 120) {
         item.fase = FASES.PRONTO;
         item.enabled = false;
         item.cycleActive = false;

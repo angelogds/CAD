@@ -1,6 +1,6 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261008-v1">
-<main class="auto-page auto-hmi">
+<link rel="stylesheet" href="/css/automacao.css?v=20261025-temperatura">
+<main class="auto-page auto-hmi" id="digestores-supervisao">
   <div class="auto-actions-top"><a class="auto-back-link" href="/automacao">← Voltar</a> <a class="auto-simulator-link" href="/automacao/digestores/simulador">▶ Módulo de simulação</a></div>
   <nav class="auto-area-nav" aria-label="Navegação das áreas de automação">
     <span class="auto-area-nav-label">ÁREAS</span>
@@ -14,24 +14,24 @@
     <div>
       <span class="auto-eyebrow">AUTOMAÇÃO • DIGESTORES</span>
       <h1>IHM dos Digestores</h1>
-      <p>Leitura de temperatura PT100 e controle das descargas de limpeza dos purgadores do eixo e da camisa.</p>
+      <p>Temperatura PT100 e estado dos sinaleiros informados pelo ESP32. A decisão da cor acontece no controlador local.</p>
     </div>
     <div class="auto-integration">
-      <span class="auto-state waiting">Sem hardware conectado</span>
-      <small><%= integrationState.label %></small>
+      <span class="auto-state waiting" id="digestores-supervisao-status" aria-live="polite">Consultando ESP32…</span>
+      <small>Somente leitura · sem comandos industriais</small>
     </div>
   </header>
 
   <section class="auto-alert">
     <strong>Modo de implantação</strong>
-    <span>Esta tela ainda não envia comandos elétricos. Leituras e válvulas permanecem em “sem sinal” até a integração com o ESP32/gateway.</span>
+    <span>Esta tela supervisiona as leituras recebidas e distingue operação real de simulação. “Pronto para descarga” indica a faixa térmica; não libera descarga automática. Válvulas, purgadores e comportas permanecem sem comandos.</span>
   </section>
 
   <section class="digestor-grid" aria-label="Digestores">
     <% (digestores || []).forEach((d) => { %>
-      <article class="digestor-card">
+      <article class="digestor-card" data-telemetria-digestor="<%= d.id %>">
         <div class="process-tower-wrap" aria-label="Indicador térmico do <%= d.nome %>">
-          <div class="process-tower is-off" title="Sem sinal até a integração PT100">
+          <div class="process-tower is-off" role="img" aria-label="Sem estado atual">
             <span class="tower-lamp tower-red"></span>
             <span class="tower-lamp tower-yellow"></span>
             <span class="tower-lamp tower-green"></span>
@@ -41,16 +41,25 @@
         </div>
         <header class="digestor-title">
           <div><small>D<%= d.id %></small><h2><%= d.nome %></h2></div>
-          <span class="signal-pill offline">Sem sinal</span>
+          <span class="signal-pill offline" data-telemetria-role="conexao">Sem sinal</span>
         </header>
 
         <div class="temperature-card">
           <span class="thermo" aria-hidden="true">🌡</span>
           <div>
             <small>Temperatura · <%= d.sensor %></small>
-            <strong>--,- °C</strong>
-            <span>Aguardando leitura</span>
+            <strong data-telemetria-role="temperatura">--,- °C</strong>
+            <span data-telemetria-role="faixa">Aguardando leitura</span>
           </div>
+        </div>
+
+        <div class="thermal-supervision" aria-live="polite">
+          <strong data-telemetria-role="modo">Aguardando telemetria</strong>
+          <span>Sinaleiro: <b data-telemetria-role="cor">Sem estado atual</b></span>
+          <strong data-telemetria-role="pronto">Pronto para descarga: não confirmado</strong>
+          <span>PT100: <b data-telemetria-role="sensor">SEM_SENSOR</b></span>
+          <span>Último contato: <b data-telemetria-role="contato">Nunca</b></span>
+          <span>Leitura: <b data-telemetria-role="medicao">Sem leitura atual</b></span>
         </div>
 
         <div class="digestor-illustration" aria-hidden="true">
@@ -79,10 +88,10 @@
   </section>
 
   <section class="temperature-legend" aria-label="Faixas de temperatura dos digestores">
-    <span><i class="legend-red"></i><strong>60–79 °C</strong> Material frio / carregado</span>
-    <span><i class="legend-yellow"></i><strong>80–99 °C</strong> Material fritando</span>
-    <span><i class="legend-yellow"></i><strong>100–119 °C</strong> Cozimento final</span>
-    <span><i class="legend-green"></i><strong>≥ 120 °C</strong> Pronto para descarregar</span>
+    <span><i class="legend-green"></i><strong>0–50 °C</strong> Verde fixo · início</span>
+    <span><i class="legend-yellow"></i><strong>&gt;50 e &lt;100 °C</strong> Amarelo fixo · aquecimento</span>
+    <span><i class="legend-red"></i><strong>100–120 °C</strong> Vermelho fixo · cozimento</span>
+    <span><i class="legend-red"></i><strong>&gt;120 °C</strong> Vermelho piscando · pronto</span>
   </section>
 
   <section class="steam-manifold">
@@ -96,7 +105,7 @@
   <section class="auto-bottom-grid">
     <article class="auto-panel">
       <h2>Programação das descargas</h2>
-      <p>Será habilitada na etapa do simulador e depois enviada ao controlador local.</p>
+      <p>Funcionalidade futura, desativada nesta etapa. Não há comandos para válvulas, purgadores ou comportas.</p>
       <div class="program-preview">
         <label>Modo<select disabled><option>Automático</option></select></label>
         <label>Intervalo<input disabled value="2 min"></label>
@@ -114,3 +123,6 @@
     </article>
   </section>
 </main>
+
+<script src="/js/automacao-simulador-http.js?v=20261025-temperatura" defer></script>
+<script src="/js/automacao-digestores.js?v=20261025-temperatura" defer></script>

@@ -17,8 +17,8 @@ test('simulador não inclui chamadas de rede, nem comandos reais', () => {
   assert.doesNotMatch(js, /\b(fetch|XMLHttpRequest|WebSocket|EventSource)\b\s*\(/);
   assert.match(js, /setInterval\(tick, 1000\)/);
   assert.match(js, /clearInterval\(handle\)/);
-  assert.match(js, /item\.temp >= 110/);
-  assert.match(js, /item\.temp >= 120/);
+  assert.match(js, /const ready = faixa\.ready/);
+  assert.match(js, /dataset\.blink = String\(faixa\.blink\)/);
 });
 test('as três telas operacionais incluem botões Voltar, e digestores abre simulador', () => {
   for (const page of ['digestores','decanters','prensas']) {

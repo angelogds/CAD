@@ -91,8 +91,7 @@
     clock.textContent = 'Tempo virtual: ' + formatTime(virtualSeconds);
     for (const item of values) {
       const faixa = core.faixaTemperatura(item.temp);
-      const nearFinish = item.temp >= 110;
-      const ready = item.temp >= 120;
+      const ready = faixa.ready;
       const heating = running && item.enabled && !ready;
       item.card.classList.toggle('is-heating', heating);
       item.card.classList.toggle('is-warning', faixa.lamp === 'yellow');
@@ -101,16 +100,18 @@
       item.card.classList.toggle('sim-stage-yellow', faixa.lamp === 'yellow');
       item.card.classList.toggle('sim-stage-green', faixa.lamp === 'green');
 
+      item.card.dataset.temperaturaC = String(item.temp);
       get(item.card, 'temperature').textContent = item.temp.toFixed(1).replace('.', ',') + ' °C';
       get(item.card, 'bar').style.width =
         Math.max(0, Math.min(100, ((item.temp - 30) / (core.TEMPERATURA_PRONTA - 30)) * 100)) + '%';
       get(item.card, 'progress').setAttribute('aria-valuenow', item.temp.toFixed(1));
       get(item.card, 'tower').dataset.stage = faixa.lamp;
+      get(item.card, 'tower').dataset.blink = String(faixa.blink);
       get(item.card, 'tower').setAttribute('aria-label', 'Sinaleiro simulado: ' +
-        ({ red: 'vermelho', yellow: 'amarelo', green: 'verde' })[faixa.lamp] + ' ligado');
+        ({ red: 'vermelho', yellow: 'amarelo', green: 'verde' })[faixa.lamp] + (faixa.blink ? ' piscando • pronto para descarga (sim.)' : ' fixo'));
 
       get(item.card, 'contactor').textContent = heating ? 'LIGADO • SIM.' : 'DESLIGADO';
-      get(item.card, 'alarm').textContent = nearFinish && !ready ? 'Finalização (amarelo)' : faixa.label;
+      get(item.card, 'alarm').textContent = faixa.label;
       const labels = {
         CARREGADO: 'Material carregado',
         AQUECIMENTO: 'Aquecendo',
@@ -142,6 +143,7 @@
       get(item.card, 'eixo-icon').textContent = purga.eixo === 'ABERTO' ? '◀  ▶' : '◁▷';
       drawChart(item);
     }
+    root.dispatchEvent(new CustomEvent('simulador:estado'));
   }
 
   function tick() {
@@ -163,7 +165,7 @@
           virtualSeconds - (item.cycleSeconds - elapsed));
       }
       if (item.fase !== previousStage) {
-        if (item.fase === 'COZIMENTO') record(item, 'Entrou em cozimento (amarelo).');
+        if (item.fase === 'COZIMENTO') record(item, 'Entrou na faixa alta de cozimento (vermelho fixo).');
         if (item.fase === 'PRONTO') record(item, 'Temperatura de referência atingida: pronto na simulação; contatores e purgadores desligados.');
       }
     }

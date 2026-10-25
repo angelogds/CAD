@@ -6,9 +6,9 @@ const ONLINE_WINDOW_S = 90;
 const DEVICE_ID_RE = /^[A-Z0-9][A-Z0-9-]{2,39}$/;
 const FASES_TEL = ['INICIO', 'MEIO', 'FINAL', 'PARADO'];
 const FASES = Object.freeze({
-  INICIO: { sinaleiro: 'VERMELHO', piscando: false },
+  INICIO: { sinaleiro: 'VERDE', piscando: false },
   MEIO: { sinaleiro: 'AMARELO', piscando: false },
-  FINAL: { sinaleiro: 'VERDE', piscando: true },
+  FINAL: { sinaleiro: 'VERMELHO', piscando: true },
 });
 const hashToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 const newToken = () => 'cgd_' + crypto.randomBytes(32).toString('base64url');
@@ -89,7 +89,7 @@ function recordContact(deviceRow, body) {
   if (b.device_id != null && assertDeviceId(b.device_id) !== deviceRow.device_id) {
     throw inputError('O token pertence a outro ESP32.', 403);
   }
-  const fase = b.fase == null ? null : String(b.fase).trim().toUpperCase();
+  const fase = b.fase == null && b.origem === 'REAL' ? 'PARADO' : b.fase == null ? null : String(b.fase).trim().toUpperCase();
   if (!fase || !FASES_TEL.includes(fase)) {
     throw inputError('Informe a fase INICIO, MEIO, FINAL ou PARADO.');
   }
@@ -104,25 +104,40 @@ function recordContact(deviceRow, body) {
     throw inputError('Este token não está autorizado para o digestor informado.', 403);
   }
   const num = (v) => (v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
-  const payload = {
-    digestor_id: digestorId, fase,
-    temperatura_c: null, // PT100 desativado: nenhuma temperatura é armazenada (ver bancada-telemetria.service)
-    firmware: b.firmware == null ? null : String(b.firmware).slice(0, 40),
-    uptime_s: num(b.uptime_s),
-  };
-  const serialized = JSON.stringify(payload);
-  const telemetria = require('./bancada-telemetria.service').recordReport(deviceRow, digestorId, b);
-  db.prepare("UPDATE automacao_dispositivos SET last_seen_at=datetime('now'),last_fase=?,last_payload=? WHERE id=?")
-    .run(fase, serialized, deviceRow.id);
-  // Tabela 230 só aceita INICIO/MEIO/FINAL (CHECK); PARADO fica na telemetria da bancada (232).
-  if (fase !== 'PARADO') db.prepare("INSERT INTO automacao_dispositivo_estados (device_pk,digestor_id,last_fase,last_payload,last_seen_at) VALUES (?,?,?,?,datetime('now')) ON CONFLICT(device_pk,digestor_id) DO UPDATE SET last_fase=excluded.last_fase,last_payload=excluded.last_payload,last_seen_at=excluded.last_seen_at")
-    .run(deviceRow.id, digestorId, fase, serialized);
-  return { digestor_id: digestorId, fase, sinaleiro: FASES[fase] || null, origem: telemetria.origem };
+  const telemetriaService = require('./bancada-telemetria.service');
+  const persist = db.transaction(() => {
+    const telemetria = telemetriaService.recordReport(deviceRow, digestorId, b);
+    const payload = {
+      digestor_id: digestorId, fase, origem: telemetria.origem,
+      temperatura_c: telemetria.temperatura_c, faixa_temperatura: telemetria.faixa_temperatura,
+      cor_sinaleiro: telemetria.cor_sinaleiro, pronto_descarga: telemetria.pronto_descarga,
+      sensor_tipo: telemetria.sensor_tipo, sensor_status: telemetria.sensor_status,
+      timestamp_medicao: telemetria.timestamp_medicao,
+      firmware: telemetria.firmware, uptime_s: num(b.uptime_s),
+    };
+    const serialized = JSON.stringify(payload);
+    db.prepare("UPDATE automacao_dispositivos SET last_seen_at=datetime('now'),last_fase=?,last_payload=? WHERE id=?")
+      .run(fase, serialized, deviceRow.id);
+    // A tabela legada só aceita três fases. REAL permanece na telemetria completa (232/235).
+    if (fase !== 'PARADO' && telemetria.origem !== 'REAL') db.prepare("INSERT INTO automacao_dispositivo_estados (device_pk,digestor_id,last_fase,last_payload,last_seen_at) VALUES (?,?,?,?,datetime('now')) ON CONFLICT(device_pk,digestor_id) DO UPDATE SET last_fase=excluded.last_fase,last_payload=excluded.last_payload,last_seen_at=excluded.last_seen_at")
+      .run(deviceRow.id, digestorId, fase, serialized);
+    return { digestor_id: digestorId, fase, sinaleiro: lamp(telemetria.cor_sinaleiro), origem: telemetria.origem, modo: telemetria.origem };
+  });
+  return persist();
+}
+function lamp(cor) {
+  if (!cor || cor === 'DESLIGADO') return null;
+  return { sinaleiro: cor === 'VERMELHO_PISCANDO' ? 'VERMELHO' : cor, piscando: cor === 'VERMELHO_PISCANDO' };
 }
 function listDevices() {
   const records = db.prepare("SELECT *, CAST(strftime('%s','now') - strftime('%s',last_seen_at) AS INTEGER) AS idade_s FROM automacao_dispositivos ORDER BY device_id").all();
   const estados = db.prepare("SELECT device_pk,digestor_id,last_fase,last_seen_at FROM automacao_dispositivo_estados ORDER BY digestor_id").all();
+  const supervision = require('./bancada-telemetria.service').status().digestores;
   return records.map((r) => {
+    let payload = {};
+    try { payload = JSON.parse(r.last_payload || '{}'); } catch (_) {}
+    const real = payload.origem === 'REAL';
+    const current = supervision.find(d => d.device_id === r.device_id && d.digestor_id === payload.digestor_id);
     const age = r.idade_s == null ? null : Number(r.idade_s);
     return {
       device_id: r.device_id,
@@ -135,13 +150,20 @@ function listDevices() {
       ultimo_contato: r.last_seen_at ? r.last_seen_at + 'Z' : null,
       segundos_desde_contato: age,
       fase: r.last_fase,
-      sinaleiro: FASES[r.last_fase] || null,
-      modo: 'SIMULACAO',
+      sinaleiro: real ? lamp(current && current.cor_sinaleiro) : (FASES[r.last_fase] || null),
+      modo: real ? 'REAL' : 'SIMULACAO',
+      origem: real ? 'REAL' : 'SIMULACAO',
+      temperatura_c: current ? current.temperatura_c : null,
+      cor_sinaleiro: current ? current.cor_sinaleiro : null,
+      faixa_temperatura: current ? current.faixa_temperatura : null,
+      pronto_descarga: current ? current.pronto_descarga : false,
+      sensor_status: current ? current.sensor_status : 'SEM_SENSOR',
+      timestamp_medicao: current ? current.timestamp_medicao : null,
       comando_habilitado: false,
       criado_em: r.created_at,
       token_substituido_em: r.rotated_at,
       revogado_em: r.revoked_at,
-      estados: estados.filter(s => s.device_pk === r.id).map(s => ({
+      estados: estados.filter(s => !real && s.device_pk === r.id).map(s => ({
         digestor_id: s.digestor_id,
         fase: s.last_fase,
         sinaleiro: FASES[s.last_fase] || null,

@@ -14,12 +14,14 @@ test('ciclo demonstrativo completo: carregado, aquecimento, cozimento e pronto',
   assert.equal(core.iniciarDigestor(d), true);
   assert.equal(core.iniciarDigestor(d), false);
   assert.equal(d.fase, core.FASES.AQUECIMENTO);
-  for (let i = 0; i < 230; i++) core.avancarDigestor(d, 1);
+  for (let i = 0; i < 330; i++) core.avancarDigestor(d, 1);
   assert.equal(d.fase, core.FASES.COZIMENTO);
-  assert.equal(core.faixaTemperatura(d.temp).lamp, 'yellow');
+  assert.equal(core.faixaTemperatura(d.temp).lamp, 'red');
+  assert.equal(core.faixaTemperatura(d.temp).blink, false);
   for (let i = 0; i < 250; i++) core.avancarDigestor(d, 1);
   assert.equal(d.fase, core.FASES.PRONTO);
-  assert.equal(d.temp, 120);
+  assert.ok(d.temp > 120);
+  assert.equal(core.faixaTemperatura(d.temp).blink, true);
   assert.equal(d.enabled, false);
   assert.equal(d.cycleActive, false);
   assert.deepEqual(

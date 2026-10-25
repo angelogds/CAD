@@ -1,5 +1,11 @@
 # ESP32 V5/V6 — sinaleiros de bancada (somente luzes, baixa tensão)
 
+> Referência histórica do protocolo V5/V6 e de sua sequência de cores.
+> Para a classificação por temperatura e o contrato REAL atual, consulte
+> [Sinaleiros por temperatura](automacao-temperatura-real.md).
+> Atualize o sketch antes de testar as quatro faixas: versões antigas
+> podem interpretar as fases com as cores anteriores.
+
 Base: `https://manutencao.campodogado.app.br` · Header `Authorization: Bearer <token do digestor>` · JSON.
 
 ## CAD -> ESP32 (consulta a cada 2-3 s)

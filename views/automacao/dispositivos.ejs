@@ -46,7 +46,7 @@
       <code class="cfg-endpoint">https://manutencao.campodogado.app.br/api/automacao/device</code>
       <p class="cfg-caption">Identificação do dispositivo: igual à cadastrada ao gerar a chave.</p>
       <p class="cfg-caption">Autenticação: <code>Authorization: Bearer &lt;token&gt;</code></p>
-      <p class="cfg-caption">O ESP32 envia <code>POST /ping</code> e <code>POST /estado</code>, indicando <code>INICIO</code>, <code>MEIO</code> ou <code>FINAL</code>.</p>
+      <p class="cfg-caption">O ESP32 envia <code>POST /ping</code> e <code>POST /estado</code>, indicando o modo <code>SIMULACAO</code> ou <code>REAL</code>. Em operação real, o ESP32 informa a leitura PT100, faixa, cor aplicada e indicador de pronto.</p>
       <p><strong>Aviso:</strong> no token geral, cada envio de estado deve indicar <code>digestor_id</code> (1 a 4). A IHM de bancada V4 usa o Digestor 1; não é firmware de quatro sensores.</p>
     </section>
   </div>
@@ -129,7 +129,9 @@
         card.append(label('Equipamento: ' + (d.escopo === 'TODOS' ? 'TODOS OS DIGESTORES' : 'Digestor ' + d.escopo), 'cfg-row'));
         card.append(label('Token armazenado: ' + (d.token_final || 'Sem token') + ' (somente final)', 'cfg-row'));
         card.append(label('Último contato: ' + formatDate(d.ultimo_contato), 'cfg-row'));
+        card.append(label('Modo: ' + (d.modo || 'SIMULACAO'), 'cfg-row'));
         card.append(label('Última fase: ' + (d.fase || 'sem informação'), 'cfg-row'));
+        card.append(label('Acompanhe temperatura, sensor e sinaleiros na IHM dos Digestores.', 'cfg-caption'));
         (d.estados || []).forEach(s => card.append(label('D' + s.digestor_id + ': ' + (s.fase || 'sem estado'), 'cfg-row')));
         const localBox = document.createElement('div');
         localBox.className = 'cfg-local-box';

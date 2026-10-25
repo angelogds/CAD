@@ -15,13 +15,13 @@
 .sim-signal-tower[data-stage="red"] .sim-lamp-red{opacity:1;box-shadow:0 0 14px #ef5d5d,inset 0 0 7px #fff}
 .sim-signal-tower[data-stage="yellow"] .sim-lamp-yellow{opacity:1;box-shadow:0 0 14px #f7cd55,inset 0 0 7px #fff}
 .sim-signal-tower[data-stage="green"] .sim-lamp-green{opacity:1;box-shadow:0 0 14px #4bd890,inset 0 0 7px #fff}
-.sim-temperature .sim-track{height:13px;background:linear-gradient(to right,#f2b9b9 0%,#f2b9b9 54%,#f9e1a5 55%,#f9e1a5 94%,#a2e6c6 95%,#a2e6c6 100%);border:1px solid #d6e2e3;overflow:visible;position:relative}
+.sim-temperature .sim-track{height:13px;background:linear-gradient(to right,#a2e6c6 0%,#a2e6c6 22%,#f9e1a5 23%,#f9e1a5 76%,#f2b9b9 77%,#f2b9b9 100%);border:1px solid #d6e2e3;overflow:visible;position:relative}
 .sim-temperature .sim-track i{height:100%;border-radius:99px;position:relative;transition:width .25s,background .25s;box-shadow:0 0 9px currentColor}
 .sim-stage-red .sim-track i{background:#d84040;color:#d84040}
 .sim-stage-yellow .sim-track i{background:#e2ae26;color:#e2ae26}
 .sim-stage-green .sim-track i{background:#1ba465;color:#1ba465}
 .sim-scale{display:flex;justify-content:space-between;gap:4px;margin-top:7px;font-size:10px;font-weight:800;color:#71838b}
-.sim-scale span:first-child{color:#c13e3e}.sim-scale span:nth-child(2){color:#aa7a14}.sim-scale span:last-child{color:#15824f}
+.sim-scale span:first-child{color:#15824f}.sim-scale span:nth-child(2){color:#aa7a14}.sim-scale span:last-child{color:#c13e3e}
 .sim-stage-red .sim-status{background:#fbe5e5;color:#a33131}
 .sim-stage-green .sim-status{background:#ddf4e8;color:#147747}
 .sim-purge{border:1px solid #e0e8ea;border-radius:11px;padding:10px;margin:7px 0 13px;background:#f8fafb}
@@ -100,3 +100,9 @@
 .sim-bancada-online p{font-size:12px;line-height:1.45;max-width:540px;margin:5px 0}
 .sim-bancada-online .sim-remote-switch{font-size:12px;font-weight:800;display:flex;gap:7px;align-items:center;cursor:pointer}
 .sim-bancada-online small{display:block;flex-basis:100%;font-size:11px;color:#61727e}
+
+.sim-signal-tower[data-blink="true"] .sim-lamp-red{animation:thermal-ready 1s steps(1,end) infinite}
+@keyframes thermal-ready{50%{opacity:.25;box-shadow:none}}
+@media(prefers-reduced-motion:reduce){.sim-signal-tower[data-blink="true"] .sim-lamp-red{animation:none}.sim-track i,.sim-lamp,.sim-chart-line,.sim-valve-icon{transition:none}}
+
+.sim-remote-table-scroll{width:100%;overflow:auto}.sim-remote-table th,.sim-remote-table td{text-align:left;padding:8px;border-bottom:1px solid #dbe5e8;white-space:nowrap}.sim-remote-table th{font-size:11px}
