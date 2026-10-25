@@ -101,6 +101,7 @@
       item.card.classList.toggle('sim-stage-green', faixa.lamp === 'green');
 
       item.card.dataset.temperaturaC = String(item.temp);
+      item.card.dataset.aquecimentoSimulado = String(heating);
       get(item.card, 'temperature').textContent = item.temp.toFixed(1).replace('.', ',') + ' °C';
       get(item.card, 'bar').style.width =
         Math.max(0, Math.min(100, ((item.temp - 30) / (core.TEMPERATURA_PRONTA - 30)) * 100)) + '%';
@@ -130,7 +131,9 @@
           Object.keys(labels).indexOf(step.dataset.step) < Object.keys(labels).indexOf(item.fase));
       }
 
-      const purga = core.estadoPurgadores(item.cycleSeconds, item.cycleActive);
+      const purga = core.estadoPurgadores(item.cycleSeconds, running && item.cycleActive);
+      item.card.dataset.camisaSimulada = purga.camisa;
+      item.card.dataset.eixoSimulado = purga.eixo;
       get(item.card, 'camisa-state').textContent = purga.camisa;
       get(item.card, 'eixo-state').textContent = purga.eixo;
       get(item.card, 'camisa-box').dataset.state = purga.camisa === 'ABERTO' ? 'open' : 'closed';

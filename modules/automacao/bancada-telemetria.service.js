@@ -3,9 +3,10 @@
 const db = require('../../database/db');
 const bancada = require('./sinaleiro-bancada.service');
 const { classifyTemperature, legacySignal, FAIXAS, CORES } = require('./temperatura-sinaleiro');
+const { normalizeSimulationState, readStoredState, CLOSED } = require('./estado-simulacao');
 
 const FASES_TEL = ['INICIO', 'MEIO', 'FINAL', 'PARADO'];
-const SENSOR_STATUS = ['SEM_SENSOR', 'SEM_SINAL', 'VALIDO', 'FALHA'];
+const SENSOR_STATUS = ['SEM_SENSOR', 'SEM_SINAL', 'VALIDO', 'FALHA', 'SIMULADO'];
 const ORIGENS = ['SIMULACAO', 'REAL'];
 const ORIGEM_BANCADA = 'SIMULACAO';
 const ONLINE_S = 15;
@@ -38,7 +39,7 @@ function normalizeReading(b) {
   const sensor_status = origem === 'REAL' ? sensorIn : (sensorIn === 'FALHA' ? 'FALHA' : 'SEM_SENSOR');
   const unavailable = { temperatura_c: null, timestamp_medicao: null, faixa_temperatura: 'SENSOR_INDISPONIVEL', cor_sinaleiro: 'DESLIGADO', pronto_descarga: false };
   if (origem === 'REAL') {
-    if (b.sensor_tipo !== 'PT100' || !sensor_status) throw bad('Operação REAL exige sensor_tipo PT100 e sensor_status.');
+    if (b.sensor_tipo !== 'PT100' || !sensor_status || sensor_status === 'SIMULADO') throw bad('Operação REAL exige sensor_tipo PT100 e sensor_status.');
     if (sensor_status !== 'VALIDO') {
       if (b.temperatura_c != null || b.timestamp_medicao != null || b.pronto_descarga !== false || b.cor_sinaleiro !== 'DESLIGADO' || b.faixa_temperatura !== 'SENSOR_INDISPONIVEL') throw bad('Sensor indisponível exige temperatura/timestamp nulos, sinaleiro desligado e pronto_descarga false.');
       return { origem, sensor_tipo: 'PT100', sensor_status, ...unavailable };
@@ -53,11 +54,31 @@ function normalizeReading(b) {
     // Persiste os campos reportados pelo ESP32; a decisão física continua local.
     return { origem, sensor_tipo: 'PT100', sensor_status, temperatura_c: b.temperatura_c, timestamp_medicao: new Date(ms).toISOString(), faixa_temperatura: faixa, cor_sinaleiro: cor, pronto_descarga: b.pronto_descarga };
   }
-  // Compatibilidade: temperatura sem origem explícita continua sem valor de processo.
-  const t = b.origem === 'SIMULACAO' && b.temperatura_c != null ? b.temperatura_c : null;
-  if (t != null && !classifyTemperature(t)) throw bad('Temperatura simulada inválida.');
-  const signal = t == null ? legacySignal(b.fase_aplicada || b.fase || 'PARADO') : classifyTemperature(t);
-  return { origem, sensor_tipo: null, sensor_status, ...unavailable, ...signal, temperatura_c: t };
+  // O computador pode ser a fonte de temperatura em SIMULAÇÃO, sem fingir PT100.
+  // Firmware legado sem origem explícita mantém sua semântica de fase, sem medição inventada.
+  const explicitSimulation = b.origem === 'SIMULACAO';
+  const stopped = b.fase_aplicada === 'PARADO' || b.fase === 'PARADO';
+  const fonte_simulacao = enumOrNull(b.fonte_simulacao, ['CAD','LOCAL'], 'fonte_simulacao') || (b.versao_fase == null ? 'LOCAL' : 'CAD');
+  const virtual = explicitSimulation ? normalizeSimulationState(b) : null;
+  const noStateJson = explicitSimulation ? JSON.stringify({fonte_simulacao}) : null;
+  if (!explicitSimulation) {
+    return { origem, sensor_tipo: null, sensor_status, ...unavailable,
+      ...legacySignal(b.fase_aplicada || b.fase || 'PARADO') };
+  }
+  if (stopped || b.temperatura_c == null) {
+    return { origem, sensor_tipo: 'SIMULADO', sensor_status: 'SEM_SINAL', ...unavailable, estado_simulacao_json: noStateJson };
+  }
+  const expected = classifyTemperature(b.temperatura_c);
+  if (!expected) throw bad('Temperatura simulada inválida.');
+  const faixa = enumOrNull(b.faixa_temperatura, FAIXAS, 'faixa_temperatura');
+  const cor = enumOrNull(b.cor_sinaleiro, CORES, 'cor_sinaleiro');
+  if (faixa !== expected.faixa_temperatura || cor !== expected.cor_sinaleiro || typeof b.pronto_descarga !== 'boolean' || b.pronto_descarga !== expected.pronto_descarga) throw bad('Faixa, cor e indicador de pronto inconsistentes com a temperatura simulada.');
+  if (b.sensor_status === 'FALHA' || b.sensor_status === 'SEM_SINAL') throw bad('Sinal simulado indisponível não pode informar temperatura.');
+  return { origem, sensor_tipo: 'SIMULADO', sensor_status: 'SIMULADO',
+    temperatura_c: b.temperatura_c, timestamp_medicao: null,
+    faixa_temperatura: faixa, cor_sinaleiro: cor, pronto_descarga: b.pronto_descarga,
+    estado_simulacao_json: JSON.stringify({...virtual,fonte_simulacao}) };
+
 }
 
 function recordReport(deviceRow, digestorId, b) {
@@ -82,8 +103,9 @@ function recordReport(deviceRow, digestorId, b) {
   const row = { ...reading, fase_recebida, fase_aplicada, saida,
     firmware: b.firmware == null ? null : String(b.firmware).slice(0, 40),
     uptime_s: intOrNull(b.uptime_s), wifi_rssi: intOrNull(b.wifi_rssi), versao_reportada };
-  const columns = ['fase_recebida','fase_aplicada','saida_confirmada','origem','firmware','uptime_s','wifi_rssi','sensor_tipo','sensor_status','temperatura_c','timestamp_medicao','versao_reportada','reported_ms','faixa_temperatura','cor_sinaleiro','pronto_descarga'];
-  const values = [fase_recebida, fase_aplicada, saida, row.origem, row.firmware, row.uptime_s, row.wifi_rssi, row.sensor_tipo, row.sensor_status, row.temperatura_c, row.timestamp_medicao, versao_reportada, Date.now(), row.faixa_temperatura, row.cor_sinaleiro, row.pronto_descarga ? 1 : 0];
+  const columns = ['fase_recebida','fase_aplicada','saida_confirmada','origem','firmware','uptime_s','wifi_rssi','sensor_tipo','sensor_status','temperatura_c','timestamp_medicao','versao_reportada','reported_ms','faixa_temperatura','cor_sinaleiro','pronto_descarga','estado_simulacao_json'];
+  // CHECK histórico mantém VALIDO; origem+sensor_tipo distinguem a simulação. A API projeta SIMULADO.
+  const values = [fase_recebida, fase_aplicada, saida, row.origem, row.firmware, row.uptime_s, row.wifi_rssi, row.sensor_tipo, row.sensor_status === 'SIMULADO' ? 'VALIDO' : row.sensor_status, row.temperatura_c, row.timestamp_medicao, versao_reportada, Date.now(), row.faixa_temperatura, row.cor_sinaleiro, row.pronto_descarga ? 1 : 0, row.estado_simulacao_json || null];
   db.prepare(`INSERT INTO automacao_bancada_telemetria (device_pk,digestor_id,reported_at,${columns.join(',')}) VALUES (?,?,datetime('now'),${columns.map(()=>'?').join(',')})
     ON CONFLICT(device_pk,digestor_id) DO UPDATE SET reported_at=excluded.reported_at,${columns.map(c=>`${c}=excluded.${c}`).join(',')}`)
     .run(deviceRow.id, digestorId, ...values);
@@ -153,7 +175,14 @@ function status() {
     const telemetria_atual = !!t && t.report_age_s != null && Number(t.report_age_s) <= ONLINE_S;
     const timestampMs = t && t.timestamp_medicao ? Date.parse(t.timestamp_medicao) : NaN;
     const medicao_atual = origem === 'REAL' && telemetria_atual && t.sensor_status === 'VALIDO' && Number.isFinite(timestampMs) && now - timestampMs <= ONLINE_S * 1000 && timestampMs <= now + 30000;
-    const estado_atual = origem === 'REAL' ? medicao_atual : telemetria_atual;
+    const sensorSimulado = origem === 'SIMULACAO' && t && t.sensor_tipo === 'SIMULADO';
+    const simulationState = t ? readStoredState(t.estado_simulacao_json) : null;
+    const fonte_simulacao = sensorSimulado ? (simulationState ? simulationState.fonte_simulacao : t.versao_reportada == null ? 'LOCAL' : 'CAD') : null;
+    const remoteCurrent = fonte_simulacao === 'CAD' ? ativo && t.versao_reportada != null && Number(t.versao_reportada) === Number(s.versao) && corr && conf.aplicacao_status === 'CONFIRMADA' : true;
+    const simulacao_atual = !!(sensorSimulado && telemetria_atual && remoteCurrent && typeof t.temperatura_c === 'number' && classifyTemperature(t.temperatura_c));
+    const virtualCurrent = !!(simulacao_atual && simulationState && simulationState.estado_simulacao_disponivel);
+    const estado_atual = origem === 'REAL' ? medicao_atual : sensorSimulado ? simulacao_atual : telemetria_atual;
+
 
     out.push({
       digestor_id: id,
@@ -167,13 +196,15 @@ function status() {
       fase_aplicada: corr && comunicacao === 'ONLINE' ? t.fase_aplicada : null,
       saida_confirmada: conf.saida_status === 'CONFIRMADA' ? true : (conf.saida_status === 'NAO_CONFIRMADA' ? false : null),
       comunicacao, ...conf,
-      origem, modo: origem, telemetria_atual, medicao_atual,
+      origem, modo: origem, telemetria_atual: sensorSimulado ? simulacao_atual : telemetria_atual, medicao_atual, simulacao_atual, fonte_simulacao,
+      ...(virtualCurrent ? {aquecimento_simulado:simulationState.aquecimento_simulado,purgadores_simulados:simulationState.purgadores_simulados} : CLOSED),
+      estado_simulacao_disponivel: virtualCurrent,
       medicao_idade_s: Number.isFinite(timestampMs) ? Math.max(0, (now - timestampMs) / 1000) : null,
       ultimo_contato_s: age,
       ultima_confirmacao_s: t && t.report_age_s != null ? Number(t.report_age_s) : null,
       conexao: comunicacao,
       firmware: t ? t.firmware : null,
-      sensor_status: t ? t.sensor_status : 'SEM_SENSOR',
+      sensor_status: sensorSimulado ? (simulacao_atual ? 'SIMULADO' : 'SEM_SINAL') : t ? t.sensor_status : 'SEM_SENSOR',
       sensor_tipo: t ? t.sensor_tipo : null,
       pt100_habilitado: origem === 'REAL',
       temperatura_c: estado_atual && t ? t.temperatura_c : null,

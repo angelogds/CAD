@@ -17,6 +17,7 @@ for (const enabled of [false, true]) {
       const firmware = path.join(__dirname, '../firmware/esp32-sinaleiros');
       fs.copyFileSync(path.join(firmware, 'purge_outputs.h'), path.join(directory, 'purge_outputs.h'));
       fs.copyFileSync(path.join(firmware, 'purge_timer.h'), path.join(directory, 'purge_timer.h'));
+      fs.copyFileSync(path.join(firmware, 'cad_purge_test.h'), path.join(directory, 'cad_purge_test.h'));
       fs.writeFileSync(path.join(directory, 'Arduino.h'), `#pragma once
 #include <stdint.h>
 #define LOW 0

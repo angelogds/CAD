@@ -1,4 +1,4 @@
-# ESP32 — sinaleiros por temperatura e purgadores locais
+# ESP32 V9 — sensor simulado pelo CAD, sinaleiros e purgadores locais
 
 Evolução do sketch `bancada-v7` fornecido pelo responsável, para **ESP32-D0WD-V3 / ESP32 Dev Module**, Arduino IDE. O firmware completo está em `esp32-sinaleiros.ino`; mantenha os demais `.h` na mesma pasta. Instale **ArduinoJson 7** pelo gerenciador de bibliotecas. A compilação foi preparada com Arduino ESP32 core 3.3.0.
 
@@ -24,7 +24,7 @@ Cada canal tem tempos próprios, gravados em NVS: fechado de 1 a 120 minutos e a
 - **Parar** fecha/desarma o canal. **Parar tudo** fecha/desarma ambos e apaga sinaleiros.
 - Alterar os tempos para o canal, trocar o modo de sinalização, reiniciar ou detectar falha relevante exige novo armamento/início. O armamento e o estado aberto nunca são restaurados de NVS.
 
-O ciclo físico pode ser iniciado com os sinaleiros parados, sem depender de PT100, ou em operação REAL com sensor válido. Não pode ser armado em modos manual, teste ou simulação CAD. Em REAL, falha do PT100 fecha/desarma os canais. Atraso no atendimento do temporizador acima de 2 segundos encerra o ciclo fechado, sem reproduzir pulsos perdidos. Falha de sincronização da tarefa força saídas desligadas e requer novo comando local.
+O ciclo físico pode ser iniciado com os sinaleiros parados, sem depender de PT100, ou em operação REAL com sensor válido. O ciclo autônomo local não pode ser armado em modos manual, teste ou simulação CAD. O teste físico comandado pelo CAD tem autorização própria, descrita abaixo. Em REAL, falha do PT100 fecha/desarma os canais. Atraso no atendimento do temporizador acima de 2 segundos encerra o ciclo fechado, sem reproduzir pulsos perdidos. Falha de sincronização da tarefa força saídas desligadas e requer novo comando local.
 
 A IHM mostra **comando aberto/fechado** e **relé habilitado/armado**. Não existe entrada de retorno: isso não confirma mecanicamente a posição da válvula, o contato do relé ou a descarga de água. Para bloquear o driver físico em uma compilação de bancada, use `CGD_ENABLE_PURGE_OUTPUTS 0`.
 
@@ -40,16 +40,30 @@ Os tempos de purga usam uma namespace separada `purga-sim`, reaproveitando o nom
 
 REAL publica `temperatura_c`, `faixa_temperatura`, `cor_sinaleiro`, `pronto_descarga`, `sensor_tipo=PT100`, `sensor_status`, `timestamp_medicao` UTC com milissegundos e `origem=REAL`. Em falha, temperatura/timestamp são nulos, faixa é `SENSOR_INDISPONIVEL`, cor `DESLIGADO`, pronto `false`. Sem relógio sincronizado, a decisão local continua; nenhum timestamp inventado é enviado ao CAD.
 
-SIMULAÇÃO publica origem explícita e temperatura simulada; o PT100 fica marcado `SEM_SENSOR`. O poll do CAD deve fornecer temperatura/faixa/cor/pronto coerentes e validade de até 6.500 ms. Comando vencido/ausente apaga os sinaleiros, mantendo a seleção de simulação. Nenhuma resposta de rede troca o firmware para REAL ou arma purgadores.
+SIMULAÇÃO válida publica origem explícita, temperatura simulada e `sensor_tipo/sensor_status=SIMULADO`; não depende de PT100 físico. A origem da leitura fica identificada por `fonte_simulacao=CAD` ou `LOCAL`. Sem pacote, a IHM mostra aguardando simulação; uma leitura vencida aparece como simulação expirada, sem indicar falha de PT100. O poll do CAD deve fornecer temperatura/faixa/cor/pronto coerentes e validade de até 6.500 ms. Comando vencido/ausente apaga os sinaleiros, mantendo a seleção de simulação. Nenhuma resposta de rede troca o firmware para REAL ou arma purgadores. Somente a ação local específica de teste CAD libera cada relé para seguir as válvulas virtuais.
 
 Ao parar ou mudar para manual, o firmware também publica estado sem pronto para limpar a supervisão anterior do CAD. `cor_sinaleiro` descreve o GPIO comandado, **sem confirmação elétrica**; o firmware nunca envia `saida_confirmada` inventada. Não foram adicionados controles de carregamento, comporta, vapor ou descarga automática de material.
+
+## V9 — testar o equipamento montado com sensor simulado pelo computador
+
+1. No computador, abra o simulador CAD, selecione o digestor e marque **Sincronizar seleção com ESP32**. Carregue o digestor e use **Iniciar cozimento**, mantendo o simulador em execução.
+2. Na IHM desse ESP32, confirme Wi-Fi/token e selecione **Simulação CAD**. O card deve mostrar **Sensor simulado · PC**, temperatura e cor iguais às do computador. O PT100 pode continuar desconectado/desabilitado.
+3. Confira as duas válvulas virtuais recebidas: **Camisa = canal 1 / GPIO25**, **Eixo = canal 2 / GPIO26**. Aquecimento é somente um indicador virtual; não existe GPIO ou comando físico de aquecimento/admissão de vapor.
+4. Para testar o solenoide montado, use **Armar teste pelo CAD** no canal desejado, localmente. A partir dessa autorização, o relé desse canal segue ABERTO/FECHADO do computador; se a válvula virtual já estiver aberta, o relé poderá ser energizado imediatamente. Cada canal exige sua própria autorização; o computador nunca os arma.
+5. Parar/pausar a simulação, vencer a validade do pacote, perder Wi-Fi, mudar de modo, reiniciar ou parar o canal fecha/desarma o teste. Reconexão e retomada do computador não rearmam: repita a autorização local quando apropriado.
+
+Esse fluxo usa `aquecimento_simulado` e `purgadores_simulados` de um pacote completo, identificado por `estado_simulacao_disponivel=true`. Uma temperatura simulada legada pode acender sinaleiros sem liberar o teste físico dos purgadores. Um atraso maior que 2 segundos na tarefa local também remove o armamento, mesmo que a tarefa de rede tenha recebido novos comandos.
+
+Os temporizadores autônomos locais continuam separados: com os sinaleiros parados, **Armar saída** mantém fechado e **Iniciar ciclo** inicia o período fechado configurado. **Testar simulação** executa somente o temporizador virtual. O modo REAL continua exigindo PT100 válido e ignora o sensor/válvulas simulados do computador.
+
+As indicações são de comando dos GPIOs, sem retorno elétrico ou confirmação mecânica. Faça o comissionamento com o processo isolado para manutenção e o circuito de relés já conferido; o firmware não define a ligação de potência dos solenoides.
 
 ## Validação
 
 Na raiz do repositório:
 
 ```bash
-node --test tests/esp32-temperature-firmware.test.js tests/esp32-purge-timer.test.js tests/esp32-purge-outputs.test.js
+node --test tests/esp32-temperature-firmware.test.js tests/esp32-purge-timer.test.js tests/esp32-purge-outputs.test.js tests/esp32-cad-protocol.test.js tests/esp32-cad-purge-test.test.js tests/esp32-local-ui.test.js
 ```
 
-Os testes compilam/executam os mesmos núcleos C++ do firmware com `g++`: limites/fracionários, falhas, pisca, isolamento REAL/SIMULAÇÃO, expiração, rollover, dois temporizadores, partida fechada, armamento separado de início, polaridade LOW e desligamento/desarme. A compilação específica da placa valida o sketch e dependências. Nenhum teste de software comprova montagem elétrica, calibração do PT100, tensão de bobinas ou funcionamento físico das válvulas; não foi realizada gravação ou intervenção no equipamento.
+Os testes compilam/executam os mesmos núcleos C++ do firmware com `g++`: limites/fracionários, falhas, pisca, isolamento REAL/SIMULAÇÃO, expiração, rollover, dois temporizadores, partida fechada, armamento separado de início, polaridade LOW e desligamento/desarme. Os testes de protocolo usam a resposta real de referência com wrapper SUPERVISAO e origem SIMULACAO no objeto do sinaleiro; o adaptador ArduinoJson chama o mesmo validador portátil. O parse completo foi executado também em C++ host com ArduinoJson 7.4.2. A compilação específica da placa valida o sketch e dependências. Nenhum teste de software comprova montagem elétrica, calibração do PT100, tensão de bobinas ou funcionamento físico das válvulas; não foi realizada gravação ou intervenção no equipamento.

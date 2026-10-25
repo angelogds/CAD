@@ -1,5 +1,6 @@
 // API HTTPS iniciada pelo ESP32. Montada antes da sessão (sem cookies) e autenticada por token Bearer.
-// Somente recebe estados: não existe rota de comando para válvulas, vapor ou outros equipamentos.
+// Telemetria e poll de simulação; teste físico de canais exige autorização local no ESP32.
+// Não oferece armamento remoto, comandos de comporta, admissão de vapor ou descarga de material.
 const express = require('express');
 const svc = require('./dispositivos.service');
 const bancada = require('./sinaleiro-bancada.service');
@@ -47,11 +48,11 @@ router.post('/estado', deviceAuth, (req, res) => {
   }
 });
 
-// Consulta iniciada pelo ESP32; somente sinalização e somente para o digestor autorizado.
+// Consulta iniciada pelo ESP32; pacote virtual de teste apenas para o digestor autorizado.
 router.post('/sinaleiro-bancada', deviceAuth, (req,res) => {
   try {
     svc.recordPing(req.device);
-    return res.json({...base(req),sinaleiro_bancada:bancada.poll(req.device, req.body && req.body.digestor_id)});
+    return res.json({...base(req),modo:'SIMULACAO',sinaleiro_bancada:bancada.poll(req.device, req.body && req.body.digestor_id)});
   } catch (e) { return res.status(e.status||500).json({ok:false,error:e.status?e.message:'erro interno'}); }
 });
 module.exports = router;

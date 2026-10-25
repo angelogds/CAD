@@ -10,15 +10,17 @@ armazenamento do token. Código compilado não comprova gravação em placa.
 
 Há sinalização, supervisão e dois temporizadores locais de purga.
 A indicação “pronto para descarga” significa
-que a leitura ultrapassou 120 °C; não libera descarga, abertura de comporta,
-vapor ou comporta.
+que a leitura ultrapassou 120 °C; não libera descarga, abertura de comporta
+ou admissão de vapor.
 
 A solicitação posterior acrescentou dois temporizadores locais para os
 purgadores, confirmados pelo responsável como duas válvulas por digestor.
 O responsável confirmou relés ativos em LOW e válvulas que fecham sem
 energia. O firmware configura GPIO25 e GPIO26 e exige armar/iniciar
 localmente; nenhum ciclo é retomado na partida. Isso não altera o bloqueio
-de comportas e descarga automática nem cria comando de purga no CAD.
+de comportas e descarga automática. Na V9, o modo de simulação também
+leva os estados virtuais das purgas do computador ao ESP32; a atuação
+física de teste depende de autorização local por canal.
 A tensão das bobinas e a capacidade dos contatos dos relés ainda devem
 ser conferidas antes da ligação de potência.
 
@@ -39,11 +41,16 @@ Ausência, falha ou leitura inválida de sensor nunca equivalem a 0 °C.
 ## Dois modos independentes
 
 **SIMULACAO:** usa temperatura simulada, sem PT100. O CAD pode publicar
-estados para bancada. A validade curta do comando continua obrigatória.
+estados para bancada. Temperatura recebida aparece como sensor simulado,
+e não como ausência de PT100. A validade curta do comando continua obrigatória.
 As fases legadas continuam existindo para compatibilidade, mas a cor
 explícita diferencia amarelo de vermelho fixo dentro da fase MEIO.
 Firmware antigo que só interpreta fases precisa ser atualizado antes de
 validar as quatro faixas.
+
+Consulte o roteiro e o contrato completos em
+[Simulação CAD V9](automacao-simulacao-cad-v9.md), incluindo aquecimento
+visual e teste localmente autorizado das duas solenoides.
 
 **REAL:** o ESP32 lê o PT100, classifica e aciona os sinaleiros localmente.
 Requisições HTTP e indisponibilidade do CAD não podem bloquear a leitura

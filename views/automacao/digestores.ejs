@@ -1,6 +1,10 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261025-temperatura">
-<main class="auto-page auto-hmi" id="digestores-supervisao">
+<link rel="stylesheet" href="/css/automacao.css?v=20261025-2a-v9">
+<main class="auto-page auto-hmi auto-2a" id="digestores-supervisao">
+  <div class="auto-brandbar">
+    <div class="auto-brand"><span class="auto-monogram" aria-hidden="true">2A</span><div><strong>2A Automação Industrial</strong><small>Ângelo Gomes da Silva — Fundador</small></div></div>
+    <div class="auto-brand-context"><b>Campo do Gado</b><span>CAD · Supervisão dos digestores</span></div>
+  </div>
   <div class="auto-actions-top"><a class="auto-back-link" href="/automacao">← Voltar</a> <a class="auto-simulator-link" href="/automacao/digestores/simulador">▶ Módulo de simulação</a></div>
   <nav class="auto-area-nav" aria-label="Navegação das áreas de automação">
     <span class="auto-area-nav-label">ÁREAS</span>
@@ -14,7 +18,7 @@
     <div>
       <span class="auto-eyebrow">AUTOMAÇÃO • DIGESTORES</span>
       <h1>IHM dos Digestores</h1>
-      <p>Temperatura PT100 e estado dos sinaleiros informados pelo ESP32. A decisão da cor acontece no controlador local.</p>
+      <p>Temperatura e sinaleiros informados pelo ESP32. Em simulação, o CAD gera a temperatura; em operação real, a leitura vem do PT100.</p>
     </div>
     <div class="auto-integration">
       <span class="auto-state waiting" id="digestores-supervisao-status" aria-live="polite">Consultando ESP32…</span>
@@ -23,8 +27,8 @@
   </header>
 
   <section class="auto-alert">
-    <strong>Modo de implantação</strong>
-    <span>Esta tela supervisiona as leituras recebidas e distingue operação real de simulação. “Pronto para descarga” indica a faixa térmica; não libera descarga automática. Válvulas, purgadores e comportas permanecem sem comandos.</span>
+    <strong>Supervisão e testes de bancada</strong>
+    <span>Esta tela é somente leitura. O teste dos purgadores é autorizado por canal na IHM local do ESP32. “Pronto para descarga” indica a faixa térmica e não libera descarga automática; comportas e cargas industriais permanecem fora deste controle.</span>
   </section>
 
   <section class="digestor-grid" aria-label="Digestores">
@@ -47,7 +51,7 @@
         <div class="temperature-card">
           <span class="thermo" aria-hidden="true">🌡</span>
           <div>
-            <small>Temperatura · <%= d.sensor %></small>
+            <small>Temperatura · origem indicada abaixo</small>
             <strong data-telemetria-role="temperatura">--,- °C</strong>
             <span data-telemetria-role="faixa">Aguardando leitura</span>
           </div>
@@ -57,7 +61,9 @@
           <strong data-telemetria-role="modo">Aguardando telemetria</strong>
           <span>Sinaleiro: <b data-telemetria-role="cor">Sem estado atual</b></span>
           <strong data-telemetria-role="pronto">Pronto para descarga: não confirmado</strong>
-          <span>PT100: <b data-telemetria-role="sensor">SEM_SENSOR</b></span>
+          <span>Sensor: <b data-telemetria-role="sensor">Aguardando temperatura</b></span>
+          <span>Aquecimento simulado: <b data-telemetria-role="aquecimento">Sem estado simulado</b></span>
+          <span>Purgadores simulados: <b data-telemetria-role="purgadores">Sem estado simulado</b></span>
           <span>Último contato: <b data-telemetria-role="contato">Nunca</b></span>
           <span>Leitura: <b data-telemetria-role="medicao">Sem leitura atual</b></span>
         </div>
@@ -67,14 +73,14 @@
           <div class="steam-drop"><span></span></div>
         </div>
 
-        <div class="valve-grid">
+        <details class="auto-valve-details"><summary>Retorno físico das válvulas · não disponível</summary><div class="valve-grid">
           <% d.valvulas.forEach((v) => { %>
             <section class="valve-card">
               <div class="valve-head">
                 <div><small>Descarga do purgador</small><strong><%= v.nome %></strong></div>
                 <span class="signal-dot"></span>
               </div>
-              <div class="valve-state">Estado: <b>Sem sinal</b></div>
+              <div class="valve-state">Retorno físico: <b>Não disponível</b></div>
               <div class="valve-symbol" aria-hidden="true"><span></span><i></i><span></span></div>
               <div class="valve-actions">
                 <button type="button" disabled>Abrir</button>
@@ -82,7 +88,7 @@
               </div>
             </section>
           <% }) %>
-        </div>
+        </div></details>
       </article>
     <% }) %>
   </section>
@@ -104,25 +110,25 @@
 
   <section class="auto-bottom-grid">
     <article class="auto-panel">
-      <h2>Programação das descargas</h2>
-      <p>Funcionalidade futura, desativada nesta etapa. Não há comandos para válvulas, purgadores ou comportas.</p>
+      <h2>Configuração dos ciclos na IHM local ESP32</h2>
+      <p>Configure os tempos e autorize os testes de cada purgador na IHM local do ESP32. Esta tela do CAD supervisiona os estados e não altera a configuração dos ciclos.</p>
       <div class="program-preview">
-        <label>Modo<select disabled><option>Automático</option></select></label>
-        <label>Intervalo<input disabled value="2 min"></label>
-        <label>Tempo aberto<input disabled value="10 s"></label>
+        <label>Modo<select disabled><option>Consultar IHM local</option></select></label>
+        <label>Intervalo<input disabled value="Definido no ESP32"></label>
+        <label>Tempo aberto<input disabled value="Definido no ESP32"></label>
       </div>
     </article>
     <article class="auto-panel">
-      <h2>Próxima integração</h2>
+      <h2>Operação e testes</h2>
       <ol>
-        <li>Receber leitura PT100 de cada digestor.</li>
-        <li>Ler retorno das válvulas Eixo e Camisa.</li>
-        <li>Habilitar simulador de ciclos.</li>
-        <li>Conectar ESP32/gateway sem expor o equipamento à internet.</li>
+        <li>Simulação CAD: temperatura gerada no computador, sem exigir PT100.</li>
+        <li>Operação real: exige sensor PT100 configurado e leitura válida.</li>
+        <li>Teste de purgadores: exige autorização local por canal no ESP32.</li>
+        <li>Retorno físico das válvulas: ainda não disponível; comando do relé não confirma posição.</li>
       </ol>
     </article>
   </section>
 </main>
 
-<script src="/js/automacao-simulador-http.js?v=20261025-temperatura" defer></script>
-<script src="/js/automacao-digestores.js?v=20261025-temperatura" defer></script>
+<script src="/js/automacao-simulador-http.js?v=20261025-2a-v9" defer></script>
+<script src="/js/automacao-digestores.js?v=20261025-2a-v9" defer></script>

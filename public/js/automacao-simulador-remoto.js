@@ -35,9 +35,10 @@
       rows.replaceChildren(...digestores.filter(d=>sel===null||d.digestor_id===sel).map(d=>{
         const tr=document.createElement('tr');
         tr.dataset.conexao=d.conexao;
+        const p=ui?ui.apresentacao(d):null;
         [ 'D'+d.digestor_id, d.origem==='REAL'?'REAL':'SIMULAÇÃO',
-          d.origem==='REAL'&&d.medicao_atual&&typeof d.temperatura_c==='number'?d.temperatura_c.toLocaleString('pt-BR')+' °C':'—',
-          txt(d.faixa_temperatura), txt(d.cor_sinaleiro)+(d.pronto_descarga?' • PRONTO PARA DESCARGA':''), txt(d.sensor_status),
+          p?p.temperatura:'—',
+          p?p.faixa:txt(d.faixa_temperatura), p?p.cor+(p.ready?' • '+p.pronto:''):txt(d.cor_sinaleiro), p?p.sensor:txt(d.sensor_status),
           d.origem==='REAL'?'Decisão local':d.fase_solicitada, d.origem==='REAL'?'—':fase(d.fase_recebida,d.recebida_status),
           d.origem==='REAL'?'Informada pelo ESP32':fase(d.fase_aplicada,d.aplicacao_status), SAIDA(d.saida_status), ago(d.ultimo_contato_s), CONEXAO[d.conexao]||d.conexao ]
           .forEach(t=>{const td=document.createElement('td');td.textContent=t;tr.appendChild(td);});
@@ -82,7 +83,11 @@
       const valido=Number.isFinite(temperatura)&&temperatura>=0&&temperatura<=850;
       const parado=stopped||!start.disabled||!valido;
       const fase=parado?'PARADO':temperatura>120?'FINAL':temperatura>50?'MEIO':'INICIO';
-      return {digestor_id:id,fase,...(!parado&&Number.isFinite(temperatura)?{temperatura_c:temperatura}:{})};
+      const camisa=!parado&&card.dataset.camisaSimulada==='ABERTO'?'ABERTO':'FECHADO';
+      const eixo=!parado&&card.dataset.eixoSimulado==='ABERTO'?'ABERTO':'FECHADO';
+      return {digestor_id:id,fase,...(!parado&&Number.isFinite(temperatura)?{temperatura_c:temperatura}:{}),
+        aquecimento_simulado:!parado&&card.dataset.aquecimentoSimulado==='true',
+        purgadores_simulados:{camisa,eixo}};
     });
   }
   async function publish(stopped=false) {
@@ -109,7 +114,7 @@
   }
   toggle.addEventListener('change',()=>{
     if(toggle.checked){
-      if(!confirm('Ativar somente os sinaleiros de bancada, com cargas industriais desconectadas e firmware por temperatura V8 autorizado localmente?')){
+      if(!confirm('Sincronizar temperatura, sinaleiros e estados simulados com o ESP32? Solenoides de bancada só respondem após autorização local por canal. Mantenha cargas industriais desconectadas.')){
         toggle.checked=false;return;
       }
       void publish();

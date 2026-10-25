@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "modo": "SUPERVISAO",
+  "comando_habilitado": false,
+  "sinaleiro_bancada": {
+    "digestor_id": 1,
+    "fase": "MEIO",
+    "temperatura_c": 75,
+    "faixa_temperatura": "INTERMEDIARIA",
+    "cor_sinaleiro": "AMARELO",
+    "pronto_descarga": false,
+    "origem": "SIMULACAO",
+    "versao_fase": 12,
+    "validade_ms": 6500,
+    "bancada": true,
+    "processo_habilitado": false,
+    "estado_simulacao_disponivel": true,
+    "aquecimento_simulado": true,
+    "purgadores_simulados": {
+      "camisa": "ABERTO",
+      "eixo": "FECHADO"
+    },
+    "fonte_simulacao": "CAD"
+  }
+}

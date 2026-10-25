@@ -18,6 +18,12 @@ recuperar o token depois: gere um novo se necessário. Substituir/revogar
 invalida a chave antiga. Não publique credenciais no repositório.
 
 ## API HTTPS iniciada pelo ESP32
+
+Para simulação com temperatura gerada pelo computador, aquecimento visual
+e estados das solenoides, consulte [Simulação CAD V9](automacao-simulacao-cad-v9.md).
+Esse modo não exige PT100. A atuação física de teste dos purgadores exige
+autorização na IHM local de cada canal; o CAD não arma saídas.
+
 Base: https://manutencao.campodogado.app.br/api/automacao/device
 Header: Authorization: Bearer <token>
 
@@ -37,8 +43,10 @@ Fases de simulação atualizadas: INICIO = verde fixo, MEIO = amarelo
 (ou vermelho fixo quando a temperatura simulada está entre 100 e 120 °C),
 FINAL = vermelho piscando. A cor explícita distingue as quatro faixas.
 A API recebe telemetria REAL ou SIMULACAO e sempre retorna
-comando_habilitado false e comandos []. NÃO existe rota de comando
-para relés, válvulas, vapor ou outros atuadores.
+comando_habilitado false e comandos []. O poll específico de simulação
+transporta estados virtuais para testes dos sinaleiros e dos purgadores
+autorizados localmente. Não há armamento remoto, comando de comporta,
+admissão de vapor ou descarga automática de material.
 
 ## Teste/produção
 Migrations 229 e 230 são incrementais e não destrutivas.
