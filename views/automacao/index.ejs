@@ -5,9 +5,9 @@
   <nav class="auto-area-nav" aria-label="Navegação das áreas de automação">
     <span class="auto-area-nav-label">ÁREAS</span>
     <a href="/automacao" aria-current="page">Visão das áreas</a>
-    <a href="/automacao/digestores">Digestores</a>
+    <% if (typeof visualizacaoAutomacaoCompleta === 'undefined' || visualizacaoAutomacaoCompleta) { %><a href="/automacao/digestores">Digestores</a>
     <a href="/automacao/decanters">Decanters e tanque</a>
-    <a href="/automacao/prensas">Prensas</a>
+    <a href="/automacao/prensas">Prensas</a><% } else { %><a href="/automacao/decanters">Decanters e tanque</a><% } %>
   </nav>
   <header class="auto-hero auto-home-hero">
     <div>
@@ -46,7 +46,7 @@
     <% } %>
   </section>
   <section class="auto-bottom-grid auto-home-notes">
-    <article class="auto-panel"><span class="auto-eyebrow">TESTAR O COMPORTAMENTO</span><h2>Explore antes de integrar</h2><p>Veja o aquecimento e os sinaleiros dos digestores ou percorra o circuito animado das decanters. Cada painel identifica a simulação e as leituras disponíveis.</p><a class="auto-simulator-link" href="/automacao/digestores/simulador">Simulador dos digestores →</a></article>
+    <article class="auto-panel"><span class="auto-eyebrow">TESTAR O COMPORTAMENTO</span><h2>Explore antes de integrar</h2><p>Veja o aquecimento e os sinaleiros dos digestores ou percorra o circuito animado das decanters. Cada painel identifica a simulação e as leituras disponíveis.</p><% if (typeof visualizacaoAutomacaoCompleta === 'undefined' || visualizacaoAutomacaoCompleta) { %><a class="auto-simulator-link" href="/automacao/digestores/simulador">Simulador dos digestores →</a><% } else { %><a class="auto-simulator-link" href="/automacao/decanters/simulador">Simulador das decanters →</a><% } %></article>
     <article class="auto-panel"><span class="auto-eyebrow">OPERAÇÃO E MANUTENÇÃO</span><h2>Uma identidade, áreas bem definidas</h2><p>A 2A reúne a visualização do processo. O CAD continua concentrando a gestão de manutenção. Integrações físicas serão implantadas por equipamento, conforme os sinais disponíveis.</p></article>
   </section>
 </main>

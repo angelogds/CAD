@@ -56,6 +56,7 @@
   if (!Core) return;
   const state = Core.createState();
   const main = document.getElementById('decanters-dashboard');
+  const simulationAllowed = main.dataset.decSimulationAllowed === 'true';
   const $ = id => document.getElementById(id);
   const send = (name, detail) => root.dispatchEvent(new CustomEvent('decanters:' + name, { detail }));
   const text = (id, value) => { const el = $(id); if (el && el.textContent !== value) el.textContent = value; };
@@ -102,10 +103,10 @@
     const sim = s.mode === 'SIMULACAO';
     main.classList.toggle('is-demo', sim);
     main.classList.toggle('motion-paused', !motion || !s.running);
-    $('dec-demo-start').hidden = sim;
-    $('dec-live-return').hidden = !sim;
+    if ($('dec-demo-start')) $('dec-demo-start').hidden = sim;
+    if ($('dec-live-return')) $('dec-live-return').hidden = !sim;
     $('dec-demo-notice').hidden = !sim;
-    $('dec-sim-panel').hidden = !sim;
+    if ($('dec-sim-panel')) $('dec-sim-panel').hidden = !sim;
     text('dec-source-label', sim ? 'SIMULAÇÃO LOCAL' : 'SUPERVISÃO · SEM SINAL');
     text('dec-source-description', sim ? s.running ? 'Maquete em execução' : 'Maquete pausada / parada' : 'Sem hardware conectado');
     text('dec-mode-description', sim ? 'Explore as seleções e permissivos da maquete. Dados não são gravados como produção.' : 'Comandos: indisponíveis. Instrumentos e comunicação desta área ainda não integrados.');
@@ -157,7 +158,7 @@
       pipe.classList.toggle('is-flowing', Boolean(sim && active));
     });
     const alarms = $('dec-alarm-list');
-    if (alarms.dataset.text !== s.alarms.join('|')) {
+    if (alarms && alarms.dataset.text !== s.alarms.join('|')) {
       alarms.dataset.text = s.alarms.join('|');
       alarms.replaceChildren(...s.alarms.map(message => { const item = document.createElement('li'); item.textContent = message; return item; }));
     }
@@ -167,39 +168,42 @@
   }
   function feedback(message) { text('dec-control-feedback', message); }
   function change(key, value) {
+    if (!simulationAllowed) return { ok: false, reason: 'Simulação indisponível nesta página.' };
     const result = Core.set(state, key, value);
     feedback(result.ok ? '' : result.reason);
     render();
     return result;
   }
   main.querySelectorAll('[data-select-key]').forEach(element => element.addEventListener('click', () => selectEquipment(element.dataset.selectKey)));
-  simControls.forEach(input => input.addEventListener('change', () => {
-    const key = input.dataset.core;
-    const value = input.type === 'checkbox' ? input.checked : input.type === 'number' ? input.value === '' ? null : input.valueAsNumber
-      : ['outletPump', 'selectedStorage'].includes(key) ? input.value === '' ? null : Number(input.value) : input.value || null;
-    const result = change(key, value);
-    if (!result.ok) { input.blur(); renderControls(Core.snapshot(state)); }
-  }));
-  $('dec-demo-start').addEventListener('click', () => { Core.startDemo(state); $('dec-sim-panel').open = true; render(); feedback('Simulação iniciada. Configure as condições ou escolha Demonstrar circuito.'); });
-  $('dec-live-return').addEventListener('click', () => { Core.dispatch(state, { type: 'LIVE' }); render(); });
-  $('dec-demo-circuit').addEventListener('click', () => {
-    Core.startDemo(state);
-    for (const [key, value] of Object.entries({ temperatureMinC: 60, temperatureMaxC: 85, tempC: 72, mixer: true, screw: true,
-      selectedDecanter: 'FAST', readyFAST: true, selectedTacho: 'FAST', selectedStorage: 1, tachoFAST: 150, inletFlowLpm: 25, feedPump: true, outletPump: 1 })) Core.set(state, key, value);
-    render(); feedback('Sessão reiniciada. Faixa 60–85 °C e vazões são exemplos didáticos; não são parâmetros aprovados da fábrica.');
-  });
-  $('dec-pause').addEventListener('click', () => { Core.dispatch(state, { type: state.running ? 'PAUSE' : 'RESUME' }); render(); });
-  $('dec-speed').addEventListener('change', event => { const value = Number(event.target.value); if ([1, 10, 60].includes(value)) speed = value; });
-  $('dec-stop').addEventListener('click', () => { Core.stop(state); render(); feedback('Maquete parada. Todos os acionamentos virtuais foram desligados.'); });
-  main.querySelectorAll('[data-fault]').forEach(button => button.addEventListener('click', () => {
-    const fault = button.dataset.fault;
-    if (fault === 'low') change('tankLiters', 1000);
-    if (fault === 'level') change('levelFault', 'INCONSISTENTE');
-    if (fault === 'pt100') change('pt100Fault', true);
-    if (fault === 'full') change('tacho' + (state.selectedDecanter || 'FAST'), 900);
-    feedback('Condição de teste aplicada. Consulte os permissivos e os estados dos equipamentos.');
-  }));
-  $('dec-clear-faults').addEventListener('click', () => { Core.set(state, 'levelFault', null); Core.set(state, 'pt100Fault', false); render(); feedback('Falhas de sensor retiradas. Corrija os níveis e religue os componentes da maquete se necessário.'); });
+  if (simulationAllowed) {
+    simControls.forEach(input => input.addEventListener('change', () => {
+      const key = input.dataset.core;
+      const value = input.type === 'checkbox' ? input.checked : input.type === 'number' ? input.value === '' ? null : input.valueAsNumber
+        : ['outletPump', 'selectedStorage'].includes(key) ? input.value === '' ? null : Number(input.value) : input.value || null;
+      const result = change(key, value);
+      if (!result.ok) { input.blur(); renderControls(Core.snapshot(state)); }
+    }));
+    $('dec-demo-start').addEventListener('click', () => { Core.startDemo(state); $('dec-sim-panel').open = true; render(); feedback('Simulação iniciada. Configure as condições ou escolha Demonstrar circuito.'); });
+    $('dec-live-return').addEventListener('click', () => { Core.dispatch(state, { type: 'LIVE' }); render(); });
+    $('dec-demo-circuit').addEventListener('click', () => {
+      Core.startDemo(state);
+      for (const [key, value] of Object.entries({ temperatureMinC: 60, temperatureMaxC: 85, tempC: 72, mixer: true, screw: true,
+        selectedDecanter: 'FAST', readyFAST: true, selectedTacho: 'FAST', selectedStorage: 1, tachoFAST: 150, inletFlowLpm: 25, feedPump: true, outletPump: 1 })) Core.set(state, key, value);
+      render(); feedback('Sessão reiniciada. Faixa 60–85 °C e vazões são exemplos didáticos; não são parâmetros aprovados da fábrica.');
+    });
+    $('dec-pause').addEventListener('click', () => { Core.dispatch(state, { type: state.running ? 'PAUSE' : 'RESUME' }); render(); });
+    $('dec-speed').addEventListener('change', event => { const value = Number(event.target.value); if ([1, 10, 60].includes(value)) speed = value; });
+    $('dec-stop').addEventListener('click', () => { Core.stop(state); render(); feedback('Maquete parada. Todos os acionamentos virtuais foram desligados.'); });
+    main.querySelectorAll('[data-fault]').forEach(button => button.addEventListener('click', () => {
+      const fault = button.dataset.fault;
+      if (fault === 'low') change('tankLiters', 1000);
+      if (fault === 'level') change('levelFault', 'INCONSISTENTE');
+      if (fault === 'pt100') change('pt100Fault', true);
+      if (fault === 'full') change('tacho' + (state.selectedDecanter || 'FAST'), 900);
+      feedback('Condição de teste aplicada. Consulte os permissivos e os estados dos equipamentos.');
+    }));
+    $('dec-clear-faults').addEventListener('click', () => { Core.set(state, 'levelFault', null); Core.set(state, 'pt100Fault', false); render(); feedback('Falhas de sensor retiradas. Corrija os níveis e religue os componentes da maquete se necessário.'); });
+  }
   function setView(next) {
     view = unavailable3d ? 'scheme' : next;
     $('dec-three-host').hidden = view !== '3d';
@@ -238,6 +242,6 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
   root.AutomacaoDecantersDashboard = { getSnapshot: () => Core.snapshot(state), selectEquipment };
-  root.setInterval(() => { if (state.mode === 'SIMULACAO' && state.running && !document.hidden) { Core.tick(state, speed); render(); } }, 1000);
+  if (simulationAllowed) root.setInterval(() => { if (state.mode === 'SIMULACAO' && state.running && !document.hidden) { Core.tick(state, speed); render(); } }, 1000);
   render(); selectEquipment('tank'); send('ready');
 })(typeof window === 'undefined' ? null : window);

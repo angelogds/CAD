@@ -1,13 +1,16 @@
-const { normalizeRole } = require('../../config/rbac');
+const { normalizeRole, ACCESS } = require('../../config/rbac');
 const service = require('./automacao.service');
 const crypto = require('node:crypto');
 
 function index(req, res) {
+  const role = normalizeRole(req.session && req.session.user && req.session.user.role);
+  const visualizacaoAutomacaoCompleta = ACCESS.automacao_view.includes(role);
   return res.render('automacao/index', {
     title: '2A Automação Industrial',
     activeMenu: 'automacao',
-    setores: service.listSetores(),
-    configuracaoAdmin: normalizeRole(req.session && req.session.user && req.session.user.role) === 'ADMIN',
+    setores: service.listSetores().filter(setor => visualizacaoAutomacaoCompleta || setor.key === 'decanters'),
+    visualizacaoAutomacaoCompleta,
+    configuracaoAdmin: role === 'ADMIN',
   });
 }
 
@@ -21,9 +24,22 @@ function digestores(req, res) {
 }
 
 function decanters(req, res) {
+  return renderDecanters(req, res, false);
+}
+
+function simuladorDecanters(req, res) {
+  return renderDecanters(req, res, true);
+}
+
+function renderDecanters(req, res, modoSimulacaoDecanters) {
+  const role = normalizeRole(req.session && req.session.user && req.session.user.role);
+  res.setHeader('Cache-Control', 'no-store');
   return res.render('automacao/decanters', {
-    title: '2A Automação Industrial · Decanters e Tanque de Serviço',
+    title: '2A Automação Industrial · ' + (modoSimulacaoDecanters ? 'Simulador das Decanters' : 'Decanters e Tanque de Serviço'),
     activeMenu: 'automacao',
+    visualizacaoAutomacaoCompleta: ACCESS.automacao_view.includes(role),
+    simulacaoDecantersHabilitada: ACCESS.automacao_decanters_simulate.includes(role),
+    modoSimulacaoDecanters,
     equipamentos: service.getDecantersOverview(),
     integrationState: service.getIntegrationState(),
   });
@@ -49,4 +65,4 @@ function simuladorDigestores(req, res) {
   });
 }
 
-module.exports = { index, digestores, decanters, prensas, simuladorDigestores };
+module.exports = { index, digestores, decanters, prensas, simuladorDigestores, simuladorDecanters };

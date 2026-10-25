@@ -6,9 +6,9 @@ const ejs = require('ejs');
 const core = require('../public/js/automacao-decanters-core');
 
 // Exercita o adaptador com os controles da view renderizada, sem WebGL/rede.
-function dashboard() {
+function dashboard(simulationAllowed = true) {
   const file = require('node:path').join(__dirname, '../views/automacao/decanters.ejs');
-  const html = ejs.render(fs.readFileSync(file, 'utf8'), { layout() {} }, { filename: file });
+  const html = ejs.render(fs.readFileSync(file, 'utf8'), { layout() {}, simulacaoDecantersHabilitada: simulationAllowed, modoSimulacaoDecanters: simulationAllowed }, { filename: file });
   const elements = [];
   const ids = new Map();
   const document = { hidden: false, activeElement: null };
@@ -68,6 +68,15 @@ test('dashboard inicia sem leituras falsas e coloca os três indicadores ao lado
   assert.equal(ui.ids.get('dec-tank-received').textContent, '— L');
   assert.equal(ui.ids.get('dec-tank-remaining').textContent, 'Sem estimativa');
   assert.equal(ui.ids.get('dec-sim-panel').hidden, true);
+});
+
+test('supervisão não recebe controles nem inicia relógio de simulação', () => {
+  const ui = dashboard(false);
+  assert.equal(ui.snapshot().mode, 'LIVE');
+  assert.equal(ui.ids.has('dec-demo-start'), false);
+  assert.equal(ui.ids.has('dec-sim-panel'), false);
+  assert.equal(ui.intervals.length, 0);
+  assert.equal(ui.ids.get('dec-tank-received').textContent, '— L');
 });
 
 test('ações da view iniciam circuito, atualizam total recebido e distinguem transferência', () => {

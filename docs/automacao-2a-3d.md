@@ -2,6 +2,8 @@
 
 O módulo `/automacao` passa a usar a identidade 2A em início, digestores, simulador, decanters, prensas e configuração. Marca: **2A Automação Industrial — Ângelo Gomes da Silva — Fundador**. Rotas, permissões, banco e integração ESP32 existente permanecem compatíveis.
 
+A simulação das decanters fica em **`/automacao/decanters/simulador`**, restrita no servidor a ADMIN, Encarregado de Manutenção e Supervisor de Manutenção. A Diretoria mantém a supervisão sem controles/atalho de simulação. O encarregado recebe entrada no módulo e acesso às decanters, sem liberar digestores, prensas ou configuração que não estejam no seu perfil anterior. Aliases de supervisor e encarregado são normalizados pelo RBAC existente.
+
 ## Área das decanters
 
 Cena Three.js local, com câmera orbital, zoom, seleção por clique/toque, lista de equipamentos para teclado, ajuste de vista, tela cheia e pausa de movimento. O esquema SVG interativo continua disponível e pode ser baixado. Se WebGL não estiver disponível, o painel abre o esquema.

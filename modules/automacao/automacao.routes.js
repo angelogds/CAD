@@ -9,9 +9,11 @@ const devices = require('./dispositivos.service');
 const bancada = require('./sinaleiro-bancada.service');
 const telemetria = require('./bancada-telemetria.service');
 
-router.get('/', requireLogin, requireRole(ACCESS.automacao_view), ctrl.index);
+const acessoDecanters = [...new Set([...ACCESS.automacao_view, ...ACCESS.automacao_decanters_simulate])];
+router.get('/', requireLogin, requireRole(acessoDecanters), ctrl.index);
 router.get('/digestores', requireLogin, requireRole(ACCESS.automacao_view), ctrl.digestores);
-router.get('/decanters', requireLogin, requireRole(ACCESS.automacao_view), ctrl.decanters);
+router.get('/decanters', requireLogin, requireRole(acessoDecanters), ctrl.decanters);
+router.get('/decanters/simulador', requireLogin, requireRole(ACCESS.automacao_decanters_simulate), ctrl.simuladorDecanters);
 router.get('/prensas', requireLogin, requireRole(ACCESS.automacao_view), ctrl.prensas);
 router.get('/digestores/simulador', requireLogin, requireRole(ACCESS.automacao_view), ctrl.simuladorDigestores);
 

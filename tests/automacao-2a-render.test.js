@@ -37,9 +37,9 @@ after(async () => {
   db.close();
 });
 
-test('as seis telas 2A renderizam pelo router e layout reais, com uma assinatura da empresa', async () => {
+test('telas 2A e simulador renderizam pelo router e layout reais, com uma assinatura da empresa', async () => {
   role = 'ADMIN';
-  for (const route of ['', '/digestores', '/digestores/simulador', '/decanters', '/prensas', '/configuracao']) {
+  for (const route of ['', '/digestores', '/digestores/simulador', '/decanters', '/decanters/simulador', '/prensas', '/configuracao']) {
     const response = await request('/automacao' + route);
     const html = await response.text();
     assert.equal(response.status, 200, route + ': ' + html.slice(0, 160));
@@ -58,6 +58,9 @@ test('nova apresentação preserva leitura autorizada e configuração exclusiva
   assert.equal(home.status, 200);
   assert.doesNotMatch(html, /href="\/automacao\/configuracao"/);
   assert.equal((await request('/automacao/decanters')).status, 200);
+  assert.equal((await request('/automacao/decanters/simulador')).status, 403);
+  const readOnly = await (await request('/automacao/decanters')).text();
+  assert.doesNotMatch(readOnly, /id="dec-sim-panel"|id="dec-demo-start"|href="\/automacao\/decanters\/simulador"/);
   assert.equal((await request('/automacao/configuracao')).status, 403);
   role = 'PRODUCAO';
   assert.equal((await request('/automacao/decanters')).status, 403);
@@ -65,4 +68,23 @@ test('nova apresentação preserva leitura autorizada e configuração exclusiva
   const loggedOut = await request('/automacao/decanters');
   assert.equal(loggedOut.status, 302);
   assert.match(loggedOut.headers.get('location'), /login/);
+});
+
+test('simulador das decanters é exclusivo de ADMIN, encarregado e supervisor de manutenção', async () => {
+  for (const allowed of ['ADMIN', 'ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'SUPERVISOR_MANUTENCAO']) {
+    role = allowed;
+    const response = await request('/automacao/decanters/simulador');
+    assert.equal(response.status, 200, allowed);
+    assert.match(await response.text(), /data-dec-simulation-allowed="true"/);
+  }
+  role = 'ENCARREGADO_MANUTENCAO';
+  const home = await (await request('/automacao')).text();
+  assert.match(home, /href="\/automacao\/decanters"/);
+  assert.doesNotMatch(home, /href="\/automacao\/digestores"|href="\/automacao\/prensas"|href="\/automacao\/configuracao"/);
+  assert.equal((await request('/automacao/digestores')).status, 403);
+  assert.equal((await request('/automacao/prensas')).status, 403);
+  for (const denied of ['DIRETORIA', 'PRODUCAO', 'ENCARREGADO_PRODUCAO', 'MECANICO', 'RH']) {
+    role = denied;
+    assert.equal((await request('/automacao/decanters/simulador')).status, 403, denied);
+  }
 });

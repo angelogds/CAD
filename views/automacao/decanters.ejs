@@ -1,21 +1,25 @@
 <% layout('layout') %>
+<% const podeSimular = typeof simulacaoDecantersHabilitada !== 'undefined' && simulacaoDecantersHabilitada;
+   const paginaSimulacao = podeSimular && typeof modoSimulacaoDecanters !== 'undefined' && modoSimulacaoDecanters;
+   const todasAreas = typeof visualizacaoAutomacaoCompleta === 'undefined' || visualizacaoAutomacaoCompleta; %>
 <link rel="stylesheet" href="/css/automacao.css?v=20261025-2a-industrial">
 <link rel="stylesheet" href="/css/automacao-decanters.css?v=20261025-2a-3d">
-<main class="auto-page auto-hmi auto-2a auto-dec-page" id="decanters-dashboard">
+<main class="auto-page auto-hmi auto-2a auto-dec-page" id="decanters-dashboard" data-dec-simulation-allowed="<%= paginaSimulacao ? 'true' : 'false' %>">
   <%- include('partials/brand', { brandContext: 'CAD · Decanters e tanque de serviço' }) %>
+  <div class="auto-actions-top"><a class="auto-back-link" href="/automacao">← Voltar</a></div>
   <nav class="auto-area-nav" aria-label="Navegação das áreas de automação">
     <span class="auto-area-nav-label">ÁREAS</span>
-    <a href="/automacao">Visão das áreas</a><a href="/automacao/digestores">Digestores</a>
-    <a href="/automacao/decanters" aria-current="page">Decanters e tanque</a><a href="/automacao/prensas">Prensas</a>
+    <a href="/automacao">Visão das áreas</a><% if (todasAreas) { %><a href="/automacao/digestores">Digestores</a><% } %>
+    <a href="/automacao/decanters" aria-current="page">Decanters e tanque</a><% if (todasAreas) { %><a href="/automacao/prensas">Prensas</a><% } %>
   </nav>
   <header class="auto-hero auto-hero-hmi">
     <div><span class="auto-eyebrow">VISÃO INDUSTRIAL · TANQUE, SEPARAÇÃO E TRANSFERÊNCIA</span>
-      <h1>Decanters e tanque de serviço</h1><p>Explore o circuito em 3D. Selecione uma máquina para ver seus indicadores, instrumentos e condições de operação.</p></div>
+      <h1><%= paginaSimulacao ? 'Simulador das decanters' : 'Decanters e tanque de serviço' %></h1><p>Explore o circuito em 3D. Selecione uma máquina para ver seus indicadores, instrumentos e condições de operação.</p></div>
     <div class="auto-integration"><span class="auto-state waiting" id="dec-source-label">SUPERVISÃO · SEM SINAL</span><small id="dec-source-description">Sem hardware conectado</small></div>
   </header>
   <div class="dec-modebar"><p id="dec-mode-description">Comandos: indisponíveis. Instrumentos e comunicação desta área ainda não integrados.</p>
-    <button type="button" class="dec-button dec-primary" id="dec-demo-start">Explorar simulação</button>
-    <button type="button" class="dec-button" id="dec-live-return" hidden>Voltar à supervisão</button></div>
+    <% if (paginaSimulacao) { %><button type="button" class="dec-button dec-primary" id="dec-demo-start">Iniciar simulação</button>
+    <a class="dec-button" href="/automacao/decanters" id="dec-live-return" hidden>Voltar à supervisão</a><% } else if (podeSimular) { %><a class="dec-button dec-primary" href="/automacao/decanters/simulador">Abrir simulação da área</a><% } %></div>
   <p class="dec-demo-notice" id="dec-demo-notice" hidden><strong>SIMULAÇÃO LOCAL</strong> Maquete didática no navegador. Temperaturas, níveis e movimentos são simulados. Nenhum comando é enviado às máquinas ou ao ESP32.</p>
   <section class="dec-kpis" aria-label="Indicadores da área">
     <article><small>NÍVEL ESTIMADO · 5 PONTOS</small><strong id="dec-level">Sem sinal</strong><span id="dec-level-volume">Tanque nominal · 15.000 L</span></article>
@@ -120,7 +124,7 @@
     <article class="auto-panel dec-detail"><span class="auto-eyebrow">EQUIPAMENTO SELECIONADO</span><h2 id="dec-selected-title">Tanque de serviço</h2><p id="dec-selected-description">Reservatório nominal de 15.000 L. Cinco pontos de nível, mexedor, vapor e temperatura do sebo.</p><dl id="dec-selected-values"></dl><p class="dec-quality" id="dec-selected-quality">Sem sinal · aguardando integração</p></article>
     <article class="auto-panel"><span class="auto-eyebrow">INSTRUMENTAÇÃO DO TANQUE</span><h2>Cinco pontos, seis faixas de nível</h2><div id="dec-sensor-list" class="dec-sensor-list"><% [['LSH',90,'13.500'],['LS4',75,'11.250'],['LS3',50,'7.500'],['LS2',25,'3.750'],['LSL',10,'1.500']].forEach(([tag,p,l],i)=>{ %><button type="button" data-select-key="sensor<%= 5-i %>"><i data-sensor-dot="<%= 4-i %>"></i><strong><%= tag %></strong><span><%= p %>% · <%= l %> L*</span><b data-sensor-state="<%= 4-i %>">Sem sinal</b></button><% }) %></div><p class="dec-caption">*Patamares propostos para o estudo. Calibrar pela geometria do tanque; não são alturas de instalação. Chaves pontuais indicam uma faixa, não litros exatos.</p></article>
   </section>
-  <details class="dec-sim-panel auto-panel" id="dec-sim-panel" hidden><summary>Bancada virtual <span>Configurações e testes da simulação</span></summary>
+  <% if (paginaSimulacao) { %><details class="dec-sim-panel auto-panel" id="dec-sim-panel" hidden><summary>Bancada virtual <span>Configurações e testes da simulação</span></summary>
     <p class="dec-caption">Valores de vazão, aquecimento e capacidade dos tachos são ilustrativos. A faixa ideal do processo deve ser definida em campo.</p>
     <div class="dec-demo-actions"><button type="button" class="dec-button dec-primary" id="dec-demo-circuit">Demonstrar circuito</button><button type="button" class="dec-button" id="dec-pause">Pausar simulação</button><button type="button" class="dec-button" id="dec-stop">Parar simulação</button><label>Tempo virtual <select id="dec-speed"><option value="1">1×</option><option value="10" selected>10×</option><option value="60">60×</option></select></label><span id="dec-sim-clock">Sessão · 00:00</span></div>
     <div class="dec-controls-grid">
@@ -132,7 +136,7 @@
     </div>
     <div class="dec-fault-tests"><strong>Testar permissivos</strong><button type="button" data-fault="low">Nível baixo</button><button type="button" data-fault="level">Sensores incoerentes</button><button type="button" data-fault="pt100">Falha PT100</button><button type="button" data-fault="full">Tacho alto</button><button type="button" id="dec-clear-faults">Limpar falhas de sensor</button></div>
     <p id="dec-control-feedback" class="dec-control-feedback" role="status" aria-live="polite"></p><ul id="dec-alarm-list" class="dec-alarms" aria-label="Ocorrências da maquete"></ul>
-  </details>
+  </details><% } %>
   <details class="auto-panel dec-study"><summary>Leitura de produção, instrumentos e lógica prevista</summary><div class="dec-study-grid"><section><h2>Quanto sebo saiu na noite?</h2><p>FT-IN totaliza o recebido. FT-OUT, após as bombas, totaliza o transferido aos tanques externos. Produção apurada exige definir o ponto de medição e considerar estoque inicial/final, retornos e recirculação.</p><p>Turno noturno: início e fim a configurar em America/Sao_Paulo. Nesta demonstração, os contadores pertencem apenas à sessão do navegador.</p></section><section><h2>Condições de alimentação</h2><p>Estudo: nível e temperatura válidos, mistura em funcionamento, válvula de destino confirmada, decanter liberada, rosca disponível e tacho com capacidade. O controle real seguirá a sequência do fabricante.</p></section><section><h2>Mexedor e vapor</h2><p>Movimento das hélices não comprova homogeneização. Prever retorno de rotação e avaliação do processo. Um PT100 mede a temperatura no ponto instalado; a posição da válvula não confirma fluxo de vapor.</p></section><section><h2>Expansão do armazenamento</h2><p>Tanques 1 a 5 são uma previsão visual. Capacidades, sensores, válvulas, disponibilidade e ligação física ainda serão levantados. A maquete não libera transferência real.</p></section></div></details>
 </main>
 <script src="/js/automacao-decanters-core.js?v=20261025-2a-3d" defer></script>
