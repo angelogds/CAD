@@ -531,7 +531,10 @@ app.get("/health", (_req, res) => {
 });
 
 // ===== 404 =====
-app.use((_req, res) => res.status(404).send("404 - Página não encontrada"));
+app.use((req, res) => {
+  if (require("./modules/auth/auth.middleware").wantsJson(req)) return res.status(404).json({ ok: false, error: "not_found", message: "Rota não encontrada" });
+  return res.status(404).send("404 - Página não encontrada");
+});
 
 // ===== Error handler =====
 app.use((err, req, res, next) => {
@@ -550,6 +553,7 @@ app.use((err, req, res, next) => {
       message: `O sistema está sem espaço de armazenamento. Libere espaço no volume ${storage.DATA_DIR} ou execute a rotina de limpeza administrativa.`,
     });
   }
+  if (require("./modules/auth/auth.middleware").wantsJson(req)) return res.status(500).json({ ok: false, error: "internal_error", message: "Erro interno" });
   res.status(500).send("500 - Erro interno");
 });
 
