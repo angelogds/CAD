@@ -42,7 +42,7 @@ function csrfAdmin(req, res, next) {
   const received = req.get('x-cgd-csrf') || '';
   const expected = req.session && req.session.automacaoConfigCsrf;
   if (!expected || received !== expected) {
-    return res.status(403).json({ ok: false, error: 'Sessão de configuração inválida. Recarregue a página.' });
+    return res.status(403).json({ ok: false, code: 'CSRF_INVALIDO', error: 'Sessão de configuração inválida. Recarregue a página.' });
   }
   return next();
 }

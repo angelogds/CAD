@@ -8,6 +8,7 @@
   const MSG = {
     SESSAO_EXPIRADA: 'Sessão expirada — entre novamente no CAD',
     SEM_PERMISSAO: 'Sem permissão de ADMIN para a bancada',
+    CSRF_INVALIDO: 'Sessão de configuração alterada — recarregue a página',
     SERVIDOR: 'Erro do servidor',
     RESPOSTA_INVALIDA: 'Resposta inesperada do servidor',
     REDE: 'Sem comunicação com o CAD',
@@ -28,6 +29,7 @@
     if (r.status === 403) {
       let code = '';
       try { if (isJson(r)) code = (await r.json()).code || ''; } catch (_e) { /* ignora */ }
+      if (code === 'CSRF_INVALIDO') throw fail('CSRF_INVALIDO');
       throw fail('SEM_PERMISSAO', code === 'SEM_PERMISSAO' ? '' : 'HTTP 403');
     }
     if (!r.ok) throw fail('SERVIDOR', 'HTTP ' + r.status);

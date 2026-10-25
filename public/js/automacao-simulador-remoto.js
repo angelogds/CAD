@@ -70,7 +70,7 @@
       void refreshStatus();
       status.textContent=stopped?'Teste remoto interrompido':'Sincronização de bancada: '+estados.map(e=>'D'+e.digestor_id+' '+e.fase).join(' · ');
     }catch(e){
-      halt(e.kind==='SESSAO_EXPIRADA'?e.message:'Falha na sincronização: '+e.message);
+      halt(e.kind==='SESSAO_EXPIRADA'||e.kind==='CSRF_INVALIDO'?e.message:'Falha na sincronização: '+e.message);
       if(e.kind==='SESSAO_EXPIRADA'||e.kind==='SEM_PERMISSAO'){if(statusTimer!==null){clearInterval(statusTimer);statusTimer=null;}void refreshStatus();}
     }finally{busy=false;}
   }
