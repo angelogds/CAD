@@ -25,7 +25,7 @@ test('reversao visual mantem o simulador V3 com graficos e purgadores ficticios'
     'data-role="temperature"', 'data-role="contactor"', 'data-role="tower"',
     'data-role="camisa-state"', 'data-role="eixo-state"', 'data-role="chart-line"',
     'data-role="cycle-clock"', 'data-action="load"', 'data-action="heat"',
-    'id="sim-events-list"', 'SIMULAÇÃO • SEM HARDWARE',
+    'id="sim-events-list"', 'sim-hardware-indicator',
   ]) assert.ok(view.includes(token), token);
   assert.match(js, /core\.estadoPurgadores/);
   assert.match(js, /core\.registrarAmostra/);
