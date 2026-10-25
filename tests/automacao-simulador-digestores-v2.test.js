@@ -61,7 +61,7 @@ test('a IHM V2 apresenta torres e os dois purgadores em cada digestor', () => {
     'camisa-state', 'eixo-state', 'purga-countdown', 'sim-track', 'simulador-core.js']) {
     assert.ok(view.includes(token), token);
   }
-  assert.match(view, /SIMULAÇÃO • SEM HARDWARE/);
+  assert.match(view, /id="sim-hardware-indicator"/);
   assert.match(view, /NÃO alarmes reais/);
 });
 
