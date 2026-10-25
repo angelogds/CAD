@@ -1,6 +1,6 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/automacao.css?v=20261015-sim">
-<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261024-bancada">
+<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261025-temperatura">
 <main class="auto-page auto-hmi" id="sim-digestores">
   <div class="auto-actions-top"><a class="auto-back-link" href="/automacao/digestores">← Voltar aos Digestores</a></div>
   <header class="auto-hero">
@@ -9,7 +9,7 @@
       <p>Ciclo demonstrativo completo: carga, aquecimento, cozimento e material pronto. Quatro digestores independentes, sem acionar equipamentos reais.</p>
     </div><span class="auto-state waiting" id="sim-hardware-indicator" aria-live="polite"><%= simuladorBancadaAdmin ? 'SIMULAÇÃO • VERIFICANDO ESP32' : 'SIMULAÇÃO • VISUAL' %></span>
   </header>
-  <section class="auto-alert" role="status"><strong>Simulação, não operação</strong><span>Somente apresentação: abaixo de 80 °C = carregado (vermelho), 80–119,9 °C = em cozimento (amarelo), a partir de 120 °C = pronto (verde). São faixas ilustrativas, NÃO alarmes reais. Sem autorização ADMIN para sincronização, nenhum sinal é transmitido ao ESP32. A sincronização opcional se limita aos três relés da bancada, sem comandos para CLP, válvulas ou vapor. O modo de operação com leitura PT100 real ainda não está habilitado.</span></section>
+  <section class="auto-alert" role="status"><strong>Modo simulação · bancada</strong><span>0–50 °C: verde fixo; acima de 50 e abaixo de 100 °C: amarelo fixo; 100–120 °C: vermelho fixo; acima de 120 °C: vermelho piscando, pronto para descarga na simulação. NÃO alarmes reais. O modo real é supervisionado na <a href="/automacao/digestores">IHM dos Digestores</a>; a decisão da cor ocorre no ESP32. A sincronização opcional transmite somente sinais de bancada. Contatores e purgadores desta demonstração são gráficos, sem comandos industriais.</span></section>
   <section class="sim-select-panel" aria-labelledby="sim-target-title">
     <div>
       <h2 id="sim-target-title">Quais digestores deseja simular?</h2>
@@ -30,10 +30,10 @@
     <p>Ative somente depois de instalar firmware compatível no ESP32 e habilitar o modo remoto pela IHM local. O comando expira se a página parar de transmitir. Não conecta válvulas ou vapor.</p></div>
     <label class="sim-remote-switch"><input type="checkbox" id="sim-remote-enable" data-csrf="<%= csrfAutomacao %>"> Sincronizar seleção com ESP32</label>
     <small id="sim-remote-status" role="status" aria-live="polite">Desativado · apenas simulação na tela</small>
-    <table class="sim-remote-table" id="sim-remote-table" aria-label="Estado do ESP32 por digestor" style="width:100%;font-size:.85rem;margin-top:.5rem;border-collapse:collapse">
-      <thead><tr><th>Digestor</th><th>Fase enviada (CAD)</th><th>Recebida</th><th>Aplicada</th><th>Saída</th><th>Último contato</th><th>ESP32</th></tr></thead>
-      <tbody id="sim-remote-rows"><tr><td colspan="7">Carregando…</td></tr></tbody>
-    </table>
+    <div class="sim-remote-table-scroll"><table class="sim-remote-table" id="sim-remote-table" aria-label="Estado do ESP32 por digestor" style="width:100%;font-size:.85rem;margin-top:.5rem;border-collapse:collapse">
+      <thead><tr><th>Digestor</th><th>Modo ESP32</th><th>Temperatura real</th><th>Faixa</th><th>Sinaleiro / pronto</th><th>Sensor</th><th>Fase enviada (CAD)</th><th>Recebida</th><th>Aplicada</th><th>Saída</th><th>Último contato</th><th>ESP32</th></tr></thead>
+      <tbody id="sim-remote-rows"><tr><td colspan="12">Carregando…</td></tr></tbody>
+    </table></div>
     <small>“Aplicada” e “Saída” só aparecem se o firmware informar. Comando enviado não confirma que a lâmpada acendeu.</small>
     <p><a href="/automacao/configuracao">Configuração dos ESP32 e links para suas IHMs locais</a></p>
   </section>
@@ -57,7 +57,7 @@
           <span data-step="PRONTO">4. Pronto</span>
         </div>
         <div class="sim-machine-row">
-          <div class="sim-signal-tower" data-role="tower" data-stage="red" role="img" aria-label="Sinaleiro simulado: vermelho ligado">
+          <div class="sim-signal-tower" data-role="tower" data-stage="green" role="img" aria-label="Sinaleiro simulado: verde fixo">
             <span class="sim-lamp sim-lamp-red"></span><span class="sim-lamp sim-lamp-yellow"></span><span class="sim-lamp sim-lamp-green"></span><i class="sim-tower-pole"></i>
             <small>Sinaleiro</small>
           </div>
@@ -73,7 +73,7 @@
           <text x="140" y="83" text-anchor="middle" fill="#344a54" font-size="19" font-weight="800">D<%= id %></text>
         </svg>
         </div>
-        <div class="sim-temperature"><small>Temperatura simulada</small><strong data-role="temperature">30,0 °C</strong><div class="sim-track" data-role="progress" role="progressbar" aria-label="Progresso térmico simulado do digestor <%= id %>" aria-valuemin="30" aria-valuemax="120" aria-valuenow="30"><i data-role="bar"></i></div><div class="sim-scale"><span>Vermelho</span><span>Amarelo</span><span>Verde</span></div></div>
+        <div class="sim-temperature"><small>Temperatura simulada</small><strong data-role="temperature">30,0 °C</strong><div class="sim-track" data-role="progress" role="progressbar" aria-label="Progresso térmico simulado do digestor <%= id %>" aria-valuemin="30" aria-valuemax="121" aria-valuenow="30"><i data-role="bar"></i></div><div class="sim-scale"><span>0–50 °C · verde</span><span>50–100 °C · amarelo</span><span>100–120 °C · vermelho</span></div></div>
         <div class="sim-io">
           <span>Contator aquecimento <b data-role="contactor">DESLIGADO</b></span>
           <span>Etapa térmica <b data-role="alarm">Carregado / frio</b></span>
@@ -124,10 +124,10 @@
     <small>Histórico local e temporário; apagado ao reiniciar ou atualizar a página.</small>
   </section>
   <section class="auto-bottom-grid">
-    <article class="auto-panel"><h2>Faixas demonstrativas</h2><p><strong>Abaixo de 80 °C:</strong> carregado / frio (vermelho) · <strong>80 a 119,9 °C:</strong> em cozimento (amarelo) · <strong>120 °C ou mais:</strong> pronto para descarga (verde). Cores de apresentação, NÃO substituem os limites de alarme e segurança reais.</p></article>
+    <article class="auto-panel"><h2>Faixas demonstrativas</h2><p><strong>0 a 50 °C:</strong> verde fixo · <strong>acima de 50 e abaixo de 100 °C:</strong> amarelo fixo · <strong>100 a 120 °C:</strong> vermelho fixo · <strong>acima de 120 °C:</strong> vermelho piscando, pronto para descarga. O aviso de pronto é uma indicação térmica e não autoriza descarga automática.</p></article>
     <article class="auto-panel"><h2>Limites do simulador</h2><p>Funciona apenas no navegador, sem rede industrial ou persistência. Os contatores e purgadores são gráficos fictícios; alternam em 30 segundos virtuais por digestor habilitado. Pausar congela a demonstração; reiniciar fecha ambos os purgadores.</p></article>
   </section>
 </main>
-<script src="/js/automacao-simulador-core.js?v=20261015-v3" defer></script>
-<script src="/js/automacao-simulador.js?v=20261024-selecao" defer></script>
-<% if (simuladorBancadaAdmin) { %><script src="/js/automacao-simulador-http.js?v=20261025" defer></script><script src="/js/automacao-simulador-remoto.js?v=20261025" defer></script><% } %>
+<script src="/js/automacao-simulador-core.js?v=20261025-temperatura" defer></script>
+<script src="/js/automacao-simulador.js?v=20261025-temperatura" defer></script>
+<% if (simuladorBancadaAdmin) { %><script src="/js/automacao-simulador-http.js?v=20261025-temperatura" defer></script><script src="/js/automacao-digestores.js?v=20261025-temperatura" defer></script><script src="/js/automacao-simulador-remoto.js?v=20261025-temperatura" defer></script><% } %>

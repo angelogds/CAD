@@ -4,7 +4,7 @@ const express=require('express');
 let db;
 try {db=new (require('better-sqlite3'))(':memory:');}catch{db=new (require('node:sqlite').DatabaseSync)(':memory:');}
 require.cache[require.resolve('../database/db')]={exports:db};
-for (const m of ['229_automacao_dispositivos','230_automacao_dispositivo_estados','231_automacao_sinaleiros_bancada','232_automacao_bancada_telemetria','233_automacao_bancada_correlacao']) require('../database/migrations/'+m+'.js')();
+for (const m of ['229_automacao_dispositivos','230_automacao_dispositivo_estados','231_automacao_sinaleiros_bancada','232_automacao_bancada_telemetria','233_automacao_bancada_correlacao','235_automacao_temperatura_real']) require('../database/migrations/'+m+'.js')();
 const devices=require('../modules/automacao/dispositivos.service');
 const bancada=require('../modules/automacao/sinaleiro-bancada.service');
 const tel=require('../modules/automacao/bancada-telemetria.service');
@@ -60,16 +60,16 @@ test('validações: origem, fase, saida_confirmada sem fase aplicada',async()=>{
   await withApp(async(post)=>{
     assert.equal((await post('/estado',token,{fase:'ABRIR_VALVULA'})).status,400);
     assert.equal((await post('/estado',token,{fase:'MEIO',origem:'PRODUCAO'})).status,400);
-    assert.equal((await post('/estado',token,{fase:'MEIO',origem:'REAL',fase_aplicada:'MEIO'})).status,200);
+    assert.equal((await post('/estado',token,{fase:'MEIO',origem:'REAL',fase_aplicada:'MEIO'})).status,400);
     assert.equal(d1().origem,'SIMULACAO'); // protótipo nunca vira medição real
-    assert.equal(db.prepare('SELECT origem FROM automacao_bancada_telemetria').get().origem,'SIMULACAO');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM automacao_bancada_telemetria').get().n,0); // rejeição é atômica
     assert.equal((await post('/estado',token,{fase:'MEIO',fase_aplicada:'VAPOR'})).status,400);
     assert.equal((await post('/estado',token,{fase:'MEIO',saida_confirmada:true})).status,400);
     assert.equal((await post('/estado',token,{fase:'MEIO',fase_aplicada:'MEIO',saida_confirmada:'sim'})).status,400);
   });
 });
 
-test('PT100 desativado: temperatura nunca é armazenada nem retornada',async()=>{
+test('simulação legada sem origem REAL não aceita temperatura como leitura de processo',async()=>{
   const token=devices.issueToken('ESP32-DIGESTOR-01',1,1).token;
   await withApp(async(post)=>{
     const r=await post('/estado',token,{fase:'INICIO',temperatura_c:95.5,sensor_tipo:'PT100',sensor_status:'VALIDO',timestamp_medicao:new Date().toISOString()});

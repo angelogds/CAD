@@ -19,7 +19,18 @@
     return e;
   }
   const isJson = (r) => /(^|[/+])json\b/i.test((r.headers && r.headers.get('content-type')) || '');
-  async function fetchJson(url, options, fetchImpl) {
+  async function fetchJson(url, options = {}, fetchImpl) {
+    const { timeoutMs = 5000, ...requestOptions } = options;
+    const controller = new AbortController();
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => { controller.abort(); reject(fail('REDE', 'tempo de resposta excedido')); }, timeoutMs);
+    });
+    try {
+      return await Promise.race([readJson(url, { ...requestOptions, signal: controller.signal }, fetchImpl), timeout]);
+    } finally { clearTimeout(timer); }
+  }
+  async function readJson(url, options, fetchImpl) {
     let r;
     try { r = await (fetchImpl || fetch)(url, { credentials: 'same-origin', cache: 'no-store', redirect: 'manual', ...options }); }
     catch (_e) { throw fail('REDE'); }

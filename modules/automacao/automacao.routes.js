@@ -52,6 +52,10 @@ router.post('/api/simulador/sinaleiros', ...adminApi, csrfAdmin, (req,res) => {
   try { return res.json(bancada.publish(req.body && req.body.estados, req.session.user.id)); }
   catch (e) { return res.status(e.status||400).json({ok:false,error:e.message}); }
 });
+router.get('/api/digestores/status', requireLogin, requireRole(ACCESS.automacao_view), (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json(telemetria.status());
+});
 router.get('/api/simulador/sinaleiros/status', ...adminApi, (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   return res.json(telemetria.status());

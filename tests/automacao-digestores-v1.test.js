@@ -27,15 +27,16 @@ test('automacao restringe visualizacao e gestao aos perfis aprovados', () => {
   assert.deepEqual([...ACCESS.automacao_manage].sort(), ['ADMIN', 'MANUTENCAO_SUPERVISOR'].sort());
 });
 
-test('automacao classifica temperatura do processo para a torre sinalizadora', () => {
-  assert.equal(service.classifyTemperature(60).color, 'RED');
-  assert.equal(service.classifyTemperature(79.9).key, 'FRIO');
-  assert.equal(service.classifyTemperature(80).key, 'FRITANDO');
-  assert.equal(service.classifyTemperature(99.9).color, 'YELLOW');
-  assert.equal(service.classifyTemperature(100).key, 'COZIMENTO_FINAL');
-  assert.equal(service.classifyTemperature(119.9).ready, false);
-  assert.equal(service.classifyTemperature(120).color, 'GREEN');
-  assert.equal(service.classifyTemperature(120).ready, true);
-  for (const value of [null, undefined, '', '  ', 'inválido']) assert.equal(service.classifyTemperature(value).color, 'OFF');
-  assert.equal(service.classifyTemperature(0).color, 'RED');
+test('automacao classifica temperatura nas faixas locais do ESP32', () => {
+  for (const [value, color, ready, blink] of [
+    [0, 'GREEN', false, false], [50, 'GREEN', false, false], [50.1, 'YELLOW', false, false],
+    [99.9, 'YELLOW', false, false], [100, 'RED', false, false], [120, 'RED', false, false],
+    [120.1, 'RED', true, true],
+  ]) {
+    const result = service.classifyTemperature(value);
+    assert.equal(result.color, color, String(value));
+    assert.equal(result.ready, ready);
+    assert.equal(result.blink, blink);
+  }
+  for (const value of [null, undefined, '', '  ', 'inválido', false, -1, Infinity]) assert.equal(service.classifyTemperature(value).color, 'OFF');
 });

@@ -22,8 +22,9 @@ Base: https://manutencao.campodogado.app.br/api/automacao/device
 Header: Authorization: Bearer <token>
 
 - POST /ping: registra último contato e devolve modo SIMULACAO.
-- POST /estado: body JSON com fase INICIO, MEIO ou FINAL.
-  Aceita campos opcionais temperatura_c, firmware, uptime_s e device_id.
+- POST /estado: aceita relatório SIMULACAO com fase INICIO, MEIO, FINAL
+  ou PARADO e relatório REAL com leitura e decisão local do ESP32.
+  Consulte o contrato em [Sinaleiros por temperatura](automacao-temperatura-real.md).
   Token de um único digestor infere digestor_id e recusa outro.
   Token TODOS exige digestor_id explícito 1, 2, 3 ou 4 em cada envio.
 - GET /automacao/api/dispositivos: ADMIN consulta escopos, contatos e
@@ -32,8 +33,10 @@ Header: Authorization: Bearer <token>
   com body {escopo: '1'|'2'|'3'|'4'|'TODOS'} + sessão CSRF.
 - POST /automacao/api/dispositivos/:deviceId/revogar: ADMIN revoga.
 
-Fases: INICIO = vermelho, MEIO = amarelo, FINAL = verde piscando.
-Esta API é somente telemetria de SIMULAÇÃO: sempre retorna
+Fases de simulação atualizadas: INICIO = verde fixo, MEIO = amarelo
+(ou vermelho fixo quando a temperatura simulada está entre 100 e 120 °C),
+FINAL = vermelho piscando. A cor explícita distingue as quatro faixas.
+A API recebe telemetria REAL ou SIMULACAO e sempre retorna
 comando_habilitado false e comandos []. NÃO existe rota de comando
 para relés, válvulas, vapor ou outros atuadores.
 
