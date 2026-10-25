@@ -24,7 +24,7 @@ test('MLightCAD permanece disponível como biblioteca, mas não derruba o editor
 test('bundle do MLightCAD gera motor principal e auto-cotagem sem alterar o servidor', () => {
   const pkg = JSON.parse(read('package.json'));
   assert.equal(pkg.scripts['build:cad-core'], 'node scripts/build-mlightcad.mjs');
-  assert.equal(pkg.scripts.postinstall, 'node scripts/build-mlightcad.mjs');
+  assert.match(pkg.scripts.postinstall, /(?:^|&&\s*)node scripts\/build-mlightcad\.mjs(?:\s*&&|$)/);
   assert.equal(pkg.dependencies['@mlightcad/cad-simple-viewer'], '1.6.1');
   assert.equal(pkg.dependencies['@mlightcad/cad-simple-ui-plugin'], '1.6.1');
   assert.equal(pkg.dependencies['@mlightcad/data-model'], '1.13.1');

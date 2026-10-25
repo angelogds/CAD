@@ -87,3 +87,6 @@ mobile/preview/
 
 # Mapas gerados pelo Graphify (artefatos do GitHub Actions)
 graphify-out/
+
+# Biblioteca 3D da Automação 2A, copiada da dependência pelo postinstall.
+public/vendor/three-0.172.0/

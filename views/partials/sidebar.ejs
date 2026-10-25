@@ -26,7 +26,7 @@
   const canAlmoxarifado = can('almoxarifado_read');
   const canEstoque = can('estoque_view');
   const canMotores = can('motores');
-  const canAutomacao = can('automacao_view');
+  const canAutomacao = can('automacao_view') || can('automacao_decanters_simulate');
   const canAvisos = can('avisos_view');
   const canUsuarios = can('usuarios');
   const canArmazenamento = ['ADMIN','ENCARREGADO_MANUTENCAO','MANUTENCAO_SUPERVISOR','SUPERVISOR_MANUTENCAO'].includes(role);
@@ -65,7 +65,7 @@
     <% if (canPainel) { %><%- navItem('/dashboard', 'Painel Principal', activeMenu === 'dashboard') %><% } %>
     <% if (canDiretoriaManutencao) { %><%- navItem('/dashboard/diretoria/manutencao', 'Desempenho da Manutenção', activeMenu === 'diretoria-manutencao') %><% } %>
     <% if (canDiretoriaCompras) { %><%- navItem('/dashboard/diretoria/compras', 'Acompanhamento de Compras', activeMenu === 'diretoria-compras') %><% } %>
-    <% if (canAutomacao) { %><%- navItem('/automacao', 'Automação', activeMenu === 'automacao') %><% } %>
+    <% if (canAutomacao) { %><%- navItem('/automacao', '2A Automação Industrial', activeMenu === 'automacao') %><% } %>
     <% if (canEquipamentos) { %><%- navItem('/equipamentos', 'Equipamentos', activeMenu === 'equipamentos') %><% } %>
     <% if (canOS) { %><%- navItem('/os', 'Ordens de Serviço', activeMenu === 'os', '', badge(counters.osAbertas, counters.osCriticas > 0 ? 'amber' : 'gray')) %><% } %>
     <% if (canOSChat) { %><%- navItem('/chat-os', 'Chat de OS', activeMenu === 'os-chat', '', badge(counters.osChatNaoLidas || 0, 'green')) %><% } %>

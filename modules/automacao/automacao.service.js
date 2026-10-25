@@ -17,7 +17,7 @@ const DIGESTORES = Object.freeze([
 // Inventário preliminar da área; tags e vínculos com o cadastro são pendências de campo.
 // Nenhum status real de máquina é inferido sem telemetria validada.
 const DECANTERS = Object.freeze([
-  { key: 'bomba-entrada', nome: 'Bomba de entrada', tipo: 'bomba', area: 'entrada' },
+  { key: 'bomba-entrada', nome: 'Bomba helicoidal de alimentação', tipo: 'bomba', area: 'entrada' },
   { key: 'decanter-fast', nome: 'Decanter FAST', tipo: 'decanter', area: 'processo' },
   { key: 'decanter-grate', nome: 'Decanter GRATE', tipo: 'decanter', area: 'processo' },
   { key: 'rosca-borra', nome: 'Rosca de saída da borra', tipo: 'rosca', area: 'borra' },
@@ -40,9 +40,9 @@ function getPrensasOverview() {
 
 function listSetores() {
   return [
-    { key: 'digestores', title: 'Digestores', description: 'Leitura de temperatura PT100 e descargas automáticas para limpeza dos purgadores.', href: '/automacao/digestores', status: 'EM_IMPLANTACAO' },
-    { key: 'prensas', title: 'Prensas', description: 'Três prensas em visão esquemática; estudo futuro de monitoramento do CLP e da IHM existente.', href: '/automacao/prensas', status: 'EM_IMPLANTACAO' },
-    { key: 'decanters', title: 'Decanters e tanque de serviço', description: 'Visão esquemática das duas decanters, bombas, tanque e rosca da borra.', href: '/automacao/decanters', status: 'EM_IMPLANTACAO' },
+    { key: 'digestores', title: 'Digestores', description: 'Supervisão dos quatro digestores, temperatura, sinaleiros e simulação CAD com ESP32.', href: '/automacao/digestores', status: 'EM_IMPLANTACAO' },
+    { key: 'prensas', title: 'Prensas', description: 'Fluxo das três prensas e planejamento de sensores, proteções e integração ao CLP existente.', href: '/automacao/prensas', status: 'EM_IMPLANTACAO' },
+    { key: 'decanters', title: 'Decanters e tanque de serviço', description: 'Circuito animado: tanque de 15.000 L, instrumentação, FAST / GRATE, borra e transferência de sebo.', href: '/automacao/decanters', status: 'EM_IMPLANTACAO' },
   ];
 }
 

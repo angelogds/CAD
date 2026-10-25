@@ -1,32 +1,40 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261014-decanters">
-<link rel="stylesheet" href="/css/automacao-decanters.css?v=20261014-v1">
-<main class="auto-page auto-hmi auto-dec-page">
+<% const podeSimular = typeof simulacaoDecantersHabilitada !== 'undefined' && simulacaoDecantersHabilitada;
+   const paginaSimulacao = podeSimular && typeof modoSimulacaoDecanters !== 'undefined' && modoSimulacaoDecanters;
+   const todasAreas = typeof visualizacaoAutomacaoCompleta === 'undefined' || visualizacaoAutomacaoCompleta; %>
+<link rel="stylesheet" href="/css/automacao.css?v=20261025-2a-industrial">
+<link rel="stylesheet" href="/css/automacao-decanters.css?v=20261025-2a-3d">
+<main class="auto-page auto-hmi auto-2a auto-dec-page" id="decanters-dashboard" data-dec-simulation-allowed="<%= paginaSimulacao ? 'true' : 'false' %>">
+  <%- include('partials/brand', { brandContext: 'CAD · Decanters e tanque de serviço' }) %>
   <div class="auto-actions-top"><a class="auto-back-link" href="/automacao">← Voltar</a></div>
   <nav class="auto-area-nav" aria-label="Navegação das áreas de automação">
     <span class="auto-area-nav-label">ÁREAS</span>
-    <a href="/automacao">Visão das áreas</a>
-    <a href="/automacao/digestores">Digestores</a>
-    <a href="/automacao/decanters" aria-current="page">Decanters e tanque</a>
-    <a href="/automacao/prensas">Prensas</a>
+    <a href="/automacao">Visão das áreas</a><% if (todasAreas) { %><a href="/automacao/digestores">Digestores</a><% } %>
+    <a href="/automacao/decanters" aria-current="page">Decanters e tanque</a><% if (todasAreas) { %><a href="/automacao/prensas">Prensas</a><% } %>
   </nav>
-
   <header class="auto-hero auto-hero-hmi">
-    <div>
-      <span class="auto-eyebrow">AUTOMAÇÃO • RECICLAGEM • DECANTERS</span>
-      <h1>IHM das Decanters e Tanque de Serviço</h1>
-      <p>Visão esquemática da área para identificação dos equipamentos e futura instrumentação.</p>
-    </div>
-    <div class="auto-integration">
-      <span class="auto-state waiting">Sem hardware conectado</span>
-      <small><%= integrationState.label %></small>
-    </div>
+    <div><span class="auto-eyebrow">VISÃO INDUSTRIAL · TANQUE, SEPARAÇÃO E TRANSFERÊNCIA</span>
+      <h1><%= paginaSimulacao ? 'Simulador das decanters' : 'Decanters e tanque de serviço' %></h1><p>Explore o circuito em 3D. Selecione uma máquina para ver seus indicadores, instrumentos e condições de operação.</p></div>
+    <div class="auto-integration"><span class="auto-state waiting" id="dec-source-label">SUPERVISÃO · SEM SINAL</span><small id="dec-source-description">Sem hardware conectado</small></div>
   </header>
-  <section class="auto-alert" role="status">
-    <strong>Modo de implantação</strong>
-    <span>Desenhos ilustrativos, sem leituras ou comandos reais. Todos os equipamentos aparecem “Sem sinal” até que a comunicação seja validada.</span>
+  <div class="dec-modebar"><p id="dec-mode-description">Comandos: indisponíveis. Instrumentos e comunicação desta área ainda não integrados.</p>
+    <% if (paginaSimulacao) { %><button type="button" class="dec-button dec-primary" id="dec-demo-start">Iniciar simulação</button>
+    <a class="dec-button" href="/automacao/decanters" id="dec-live-return" hidden>Voltar à supervisão</a><% } else if (podeSimular) { %><a class="dec-button dec-primary" href="/automacao/decanters/simulador">Abrir simulação da área</a><% } %></div>
+  <p class="dec-demo-notice" id="dec-demo-notice" hidden><strong>SIMULAÇÃO LOCAL</strong> Maquete didática no navegador. Temperaturas, níveis e movimentos são simulados. Nenhum comando é enviado às máquinas ou ao ESP32.</p>
+  <section class="dec-kpis" aria-label="Indicadores da área">
+    <article><small>NÍVEL ESTIMADO · 5 PONTOS</small><strong id="dec-level">Sem sinal</strong><span id="dec-level-volume">Tanque nominal · 15.000 L</span></article>
+    <article><small>TEMPERATURA DO SEBO · PT100</small><strong id="dec-temperature">— °C</strong><span id="dec-temperature-band">Faixa de processo a definir</span></article>
+    <article><small>RECEBIDO NO TANQUE · FT-IN</small><strong id="dec-inlet-total">— L</strong><span>Totalizador de entrada a integrar</span></article>
+    <article><small>TRANSFERIDO · FT-OUT</small><strong id="dec-outlet-total">— L</strong><span id="dec-shift-label">Turno noturno · medição a integrar</span></article>
   </section>
-
+  <section class="dec-visual-panel" aria-label="Circuito industrial interativo">
+    <header class="dec-visual-toolbar"><div class="dec-view-tabs" role="group" aria-label="Visualização do circuito">
+      <button type="button" data-dec-view="3d" aria-pressed="true">Cena 3D</button><button type="button" data-dec-view="scheme" aria-pressed="false">Esquema técnico</button></div>
+      <div class="dec-view-tools"><button type="button" id="dec-fit" title="Restaurar a vista do circuito">Ajustar vista</button><button type="button" id="dec-motion" aria-pressed="false">Pausar animação</button><button type="button" id="dec-fullscreen">Expandir</button></div>
+    </header>
+    <div class="dec-scene-workspace"><div class="dec-scene-wrap" id="dec-scene-wrap"><span class="dec-scene-badge" id="dec-scene-badge">SUPERVISÃO · SEM DADOS</span>
+      <div id="dec-three-host" class="dec-three-host"><p id="dec-3d-loading">Carregando maquete 3D…</p></div>
+      <div id="dec-scheme-host" class="dec-diagram-scroll" tabindex="0" aria-label="Esquema técnico. Role lateralmente para explorar." hidden>
   <svg class="dec-symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <defs>
       <linearGradient id="dec-metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#eef2f4"/><stop offset="55%" stop-color="#bfcbd0"/><stop offset="100%" stop-color="#80949d"/></linearGradient>
@@ -69,62 +77,68 @@
     </defs>
   </svg>
 
-  <section class="dec-layout" aria-label="Área das decanters">
-    <% const areas = [
-      { key: 'entrada', title: 'Entrada', subtitle: 'Alimentação da área' },
-      { key: 'processo', title: 'Separação', subtitle: 'Duas decanters' },
-      { key: 'saida', title: 'Saída', subtitle: 'Duas bombas' },
-      { key: 'tanque', title: 'Tanque', subtitle: 'Serviço' },
-      { key: 'borra', title: 'Descarga da borra', subtitle: 'Rosca sob as decanters' }
-    ]; %>
-    <% areas.forEach((area) => { %>
-      <section class="dec-area dec-area-<%= area.key %>">
-        <div class="dec-area-head"><h2><%= area.title %></h2><small><%= area.subtitle %></small></div>
-        <div class="dec-items">
-          <% (equipamentos || []).filter((e) => e.area === area.key).forEach((e) => { %>
-            <button type="button" class="dec-equipment" data-name="<%= e.nome %>" data-type="<%= e.tipo %>" aria-label="Detalhes de <%= e.nome %>: sem sinal">
-              <svg class="dec-equipment-svg dec-svg-<%= e.tipo %>" role="img" aria-label="Desenho esquemático de <%= e.nome %>">
-                <use href="#dec-<%= e.tipo %>"></use>
-              </svg>
-              <span class="dec-equipment-info">
-                <strong><%= e.nome %></strong>
-                <span class="signal-pill offline"><span class="dec-off-dot" aria-hidden="true"></span><%= e.estadoLabel %></span>
-              </span>
-            </button>
-          <% }) %>
-        </div>
-      </section>
-    <% }) %>
-  </section>
-  <section class="auto-bottom-grid dec-bottom">
-    <article class="auto-panel">
-      <h2>Equipamento selecionado</h2>
-      <div id="dec-selection" aria-live="polite">
-        <strong>Selecione um equipamento no esquema</strong>
-        <p>Os detalhes serão exibidos aqui. Nenhuma ação de comando está disponível nesta etapa.</p>
+
+        <svg id="dec-process-svg" class="dec-process-svg" viewBox="0 0 1400 700" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="dec-svg-title dec-svg-desc">
+          <title id="dec-svg-title">Circuito conceitual das decanters</title><desc id="dec-svg-desc">Tanque de quinze mil litros com cinco sensores, mexedor, vapor e PT100. Bomba helicoidal com seleção FAST ou GRATE, dois tachos e rosca de borra. Bombas um e dois para cinco tanques futuros. Sem escala.</desc>
+          <defs><clipPath id="dec-tank-clip"><rect x="70" y="165" width="150" height="230" rx="16"/></clipPath></defs>
+          <rect width="1400" height="700" fill="#f5f6f8"/>
+          <g class="dec-svg-caption"><text x="36" y="40">2A · CIRCUITO FUNCIONAL · SEM ESCALA</text><text x="950" y="40">ARMAZENAMENTO · EXPANSÃO FUTURA</text></g>
+          <g class="dec-svg-pipe"><path data-flow="inlet" d="M25 115H145V170"/><path data-flow="steam" d="M25 350H70"/><path data-flow="feed" d="M220 360H290V430H420V120H650"/><path data-flow="GRATE" d="M650 120H1010"/>
+            <path data-flow="FAST" d="M650 120V205"/><path data-flow="GRATE" d="M1000 120V205"/>
+            <path data-flow="tachoFAST" d="M680 280V345"/><path data-flow="tachoGRATE" d="M1030 280V345"/>
+            <path data-flow="borraFAST" d="M575 280V530"/><path data-flow="borraGRATE" d="M925 280V530"/>
+            <path data-flow="outFAST" d="M680 425V460H1140"/><path data-flow="outGRATE" d="M1030 425V460H1140"/>
+            <path data-flow="out1" d="M1140 460V375H1200M1270 375H1340V100H985"/><path data-flow="out2" d="M1140 460V505H1200M1270 505H1340V100"/>
+          </g>
+          <g class="dec-svg-future"><% for(let i=1;i<=5;i++){ const x=725+(i-1)*112; %><g data-select-key="storage<%= i %>"><rect x="<%= x %>" y="62" width="60" height="62" rx="14"/><text x="<%= x+30 %>" y="89" text-anchor="middle">T<%= i %></text><text x="<%= x+30 %>" y="111" text-anchor="middle">FUTURO</text></g><% } %></g>
+          <g data-select-key="tank"><rect x="68" y="160" width="154" height="240" rx="19" fill="#e4e6ea" stroke="#8c929f" stroke-width="3"/><rect id="dec-svg-tank-fill" x="70" y="395" width="150" height="0" fill="#bc934c" clip-path="url(#dec-tank-clip)"/>
+            <ellipse cx="145" cy="165" rx="77" ry="16" fill="#f1f2f4" stroke="#8c929f" stroke-width="3"/><text x="145" y="445" text-anchor="middle">TANQUE DE SERVIÇO</text><text x="145" y="466" text-anchor="middle">15.000 L · nominal</text></g>
+          <g data-select-key="mixer"><rect x="128" y="137" width="34" height="27" rx="5" fill="#ba1931"/><path d="M145 160V377" stroke="#555b66" stroke-width="5"/><g id="dec-svg-mixer"><path d="M105 255L185 245M105 245L185 255M105 345L185 335M105 335L185 345" stroke="#555b66" stroke-width="8"/></g></g>
+          <g class="dec-svg-sensors"><% [10,25,50,75,90].forEach((p,i)=>{ const y=395-p*2.3; %><g data-select-key="sensor<%= i+1 %>"><path d="M215 <%= y %>H245"/><circle data-level-sensor="<%= i %>" cx="245" cy="<%= y %>" r="6"/><text x="260" y="<%= y+4 %>"><%= ['LSL','LS2','LS3','LS4','LSH'][i] %> · <%= p %>%</text></g><% }) %></g>
+          <g class="dec-svg-tag" data-select-key="pt100"><rect x="30" y="490" width="214" height="48" rx="9"/><text x="45" y="511">TT-101 · PT100</text><text x="45" y="529" id="dec-svg-temperature">Temperatura: sem sinal</text></g>
+          <g class="dec-svg-tag" data-select-key="inlet"><rect x="20" y="66" width="184" height="35" rx="8"/><text x="31" y="88">FT-IN · total recebido</text></g>
+          <g class="dec-svg-valve" data-select-key="steam"><path d="M35 340L55 360V340L35 360Z"/><text x="25" y="330">VAPOR</text></g>
+          <g data-select-key="feed"><use href="#dec-bomba" x="284" y="385" width="130" height="86"/><text x="350" y="495" text-anchor="middle">BOMBA HELICOIDAL</text><text x="350" y="515" text-anchor="middle">Alimentação</text></g>
+          <% ['FAST','GRATE'].forEach((name,i)=>{const x=520+i*350; %><g data-select-key="<%= name %>"><use href="#dec-decanter" x="<%= x %>" y="183" width="280" height="140"/><text x="<%= x+140 %>" y="182" text-anchor="middle">DECANTER <%= name %></text></g>
+          <g class="dec-svg-valve" data-select-key="valve<%= name %>"><path d="M<%= x+120 %> 136L<%= x+140 %> 154L<%= x+140 %> 136L<%= x+120 %> 154Z"/></g>
+          <g class="dec-svg-tacho" data-select-key="tacho<%= name %>"><path d="M<%= x+105 %> 345H<%= x+205 %>L<%= x+195 %> 425H<%= x+115 %>Z"/><text x="<%= x+155 %>" y="387" text-anchor="middle">TACHO <%= name %></text></g><% }) %>
+          <g data-select-key="screw"><use href="#dec-rosca" x="500" y="514" width="580" height="112"/><text x="790" y="639" text-anchor="middle">ROSCA COMUM · TRANSPORTE DE BORRA</text></g>
+          <% [1,2].forEach((number,i)=>{const y=320+i*130; %><g data-select-key="out<%= number %>"><use href="#dec-bomba" x="1180" y="<%= y %>" width="110" height="86"/><text x="1235" y="<%= y+100 %>" text-anchor="middle">BOMBA DE SAÍDA <%= number %></text></g><% }) %>
+          <g class="dec-svg-tag" data-select-key="outlet"><rect x="1175" y="190" width="178" height="50" rx="9"/><text x="1187" y="212">FT-OUT</text><text x="1187" y="230">Total transferido ao exterior</text></g>
+          <text x="36" y="677" class="dec-svg-footnote">Posições dos sensores, tubulações e proporções conceituais. Conferir cubagem, arranjo e instrumentos em campo.</text>
+        </svg>
       </div>
-    </article>
-    <article class="auto-panel">
-      <h2>Legenda e integração</h2>
-      <p><strong>Sem sinal:</strong> aguardando conexão e validação do estado no controlador.</p>
-      <p>Futuras ligações, instrumentação, nível, vazão e alarmes dependem de levantamento de campo.</p>
-    </article>
+    </div><aside class="dec-tank-readout" aria-label="Indicadores ao lado do tanque de serviço">
+      <span class="auto-eyebrow">TANQUE DE SERVIÇO</span><h2>15.000 L</h2><small>Capacidade nominal informada</small>
+      <div class="dec-tank-metric"><span>Temperatura · PT100</span><strong id="dec-tank-temperature" data-condition="unknown">— °C</strong></div>
+      <div class="dec-tank-metric"><span>Recebido no turno · FT-IN</span><strong id="dec-tank-received">— L</strong><small id="dec-tank-turn">Turno a configurar · sem medidor</small></div>
+      <div class="dec-tank-metric"><span>Volume restante · estimativa</span><strong id="dec-tank-remaining">Sem estimativa</strong><div class="dec-tank-gauge" id="dec-tank-gauge" aria-hidden="true"><i></i><b></b></div><small id="dec-tank-level">Nível sem sinal</small></div>
+      <dl><div><dt>Mexedor</dt><dd id="dec-tank-mixer">Sem sinal</dd></div><div><dt>Vapor</dt><dd id="dec-tank-steam">Sem sinal</dd></div></dl><p>Cinco pontos indicam uma faixa aproximada. Recebido e transferido são totalizadores separados.</p>
+    </aside></div>
+    <footer class="dec-scene-footer"><span id="dec-view-message">Arraste para girar · pinça ou roda para aproximar · clique em uma máquina</span><button type="button" id="dec-export-svg">Baixar desenho SVG</button></footer>
   </section>
+  <nav class="dec-equipment-picker" aria-label="Selecionar equipamento por nome">
+    <% const choices=[['tank','Tanque de serviço'],['mixer','Mexedor'],['steam','Vapor'],['pt100','PT100'],['feed','Bomba helicoidal'],['FAST','FAST'],['GRATE','GRATE'],['tachoFAST','Tacho FAST'],['tachoGRATE','Tacho GRATE'],['screw','Rosca de borra'],['out1','Bomba de saída 1'],['out2','Bomba de saída 2'],['outlet','Medidor de saída']]; choices.forEach(([key,label])=>{ %><button type="button" data-select-key="<%= key %>" aria-pressed="false"><%= label %></button><% }) %>
+  </nav>
+  <section class="dec-info-grid">
+    <article class="auto-panel dec-detail"><span class="auto-eyebrow">EQUIPAMENTO SELECIONADO</span><h2 id="dec-selected-title">Tanque de serviço</h2><p id="dec-selected-description">Reservatório nominal de 15.000 L. Cinco pontos de nível, mexedor, vapor e temperatura do sebo.</p><dl id="dec-selected-values"></dl><p class="dec-quality" id="dec-selected-quality">Sem sinal · aguardando integração</p></article>
+    <article class="auto-panel"><span class="auto-eyebrow">INSTRUMENTAÇÃO DO TANQUE</span><h2>Cinco pontos, seis faixas de nível</h2><div id="dec-sensor-list" class="dec-sensor-list"><% [['LSH',90,'13.500'],['LS4',75,'11.250'],['LS3',50,'7.500'],['LS2',25,'3.750'],['LSL',10,'1.500']].forEach(([tag,p,l],i)=>{ %><button type="button" data-select-key="sensor<%= 5-i %>"><i data-sensor-dot="<%= 4-i %>"></i><strong><%= tag %></strong><span><%= p %>% · <%= l %> L*</span><b data-sensor-state="<%= 4-i %>">Sem sinal</b></button><% }) %></div><p class="dec-caption">*Patamares propostos para o estudo. Calibrar pela geometria do tanque; não são alturas de instalação. Chaves pontuais indicam uma faixa, não litros exatos.</p></article>
+  </section>
+  <% if (paginaSimulacao) { %><details class="dec-sim-panel auto-panel" id="dec-sim-panel" hidden><summary>Bancada virtual <span>Configurações e testes da simulação</span></summary>
+    <p class="dec-caption">Valores de vazão, aquecimento e capacidade dos tachos são ilustrativos. A faixa ideal do processo deve ser definida em campo.</p>
+    <div class="dec-demo-actions"><button type="button" class="dec-button dec-primary" id="dec-demo-circuit">Demonstrar circuito</button><button type="button" class="dec-button" id="dec-pause">Pausar simulação</button><button type="button" class="dec-button" id="dec-stop">Parar simulação</button><label>Tempo virtual <select id="dec-speed"><option value="1">1×</option><option value="10" selected>10×</option><option value="60">60×</option></select></label><span id="dec-sim-clock">Sessão · 00:00</span></div>
+    <div class="dec-controls-grid">
+      <fieldset><legend>Tanque e aquecimento</legend><label>Volume da maquete (L)<input data-core="tankLiters" type="number" min="0" max="15000" step="50" value="9000"></label><label>Temperatura simulada (°C)<input data-core="tempC" type="number" min="-50" max="200" step="1" value="45"></label>
+        <div class="dec-control-pair"><label>Faixa mínima (°C)<input data-core="temperatureMinC" type="number" min="-50" max="200" placeholder="A definir"></label><label>Faixa máxima (°C)<input data-core="temperatureMaxC" type="number" min="-50" max="200" placeholder="A definir"></label></div>
+        <label class="dec-check"><input data-core="mixer" type="checkbox">Mexedor</label><label class="dec-check"><input data-core="steam" type="checkbox">Vapor</label><label>Entrada simulada (L/min)<input data-core="inletFlowLpm" type="number" min="0" max="1000" value="0"></label></fieldset>
+      <fieldset><legend>Alimentação e separação</legend><label>Selecionar decanter<select data-core="selectedDecanter"><option value="">Selecionar</option><option>FAST</option><option>GRATE</option></select></label><label class="dec-check"><input data-core="readyFAST" type="checkbox">FAST pronta · retorno simulado</label><label class="dec-check"><input data-core="readyGRATE" type="checkbox">GRATE pronta · retorno simulado</label><label class="dec-check"><input data-core="screw" type="checkbox">Rosca de borra</label><label class="dec-check"><input data-core="feedPump" type="checkbox">Bomba helicoidal</label><p id="dec-feed-permissives" class="dec-permissive">Defina as condições da simulação.</p></fieldset>
+      <fieldset><legend>Coleta e transferência</legend><label>Tacho de sucção<select data-core="selectedTacho"><option value="">Selecionar</option><option>FAST</option><option>GRATE</option></select></label><label>Destino futuro da maquete<select data-core="selectedStorage"><option value="">Selecionar</option><% for(let i=1;i<=5;i++){ %><option value="<%= i %>">Tanque <%= i %> · futuro</option><% } %></select></label><label>Bomba de saída<select data-core="outletPump"><option value="">Desligadas</option><option value="1">Bomba 1</option><option value="2">Bomba 2</option></select></label><label>Tacho FAST (L · maquete)<input data-core="tachoFAST" type="number" min="0" max="1000" value="0"></label><label>Tacho GRATE (L · maquete)<input data-core="tachoGRATE" type="number" min="0" max="1000" value="0"></label><p class="dec-caption">Capacidade ilustrativa dos tachos: 1.000 L. Seleções exclusivas de bomba e destino.</p></fieldset>
+    </div>
+    <div class="dec-fault-tests"><strong>Testar permissivos</strong><button type="button" data-fault="low">Nível baixo</button><button type="button" data-fault="level">Sensores incoerentes</button><button type="button" data-fault="pt100">Falha PT100</button><button type="button" data-fault="full">Tacho alto</button><button type="button" id="dec-clear-faults">Limpar falhas de sensor</button></div>
+    <p id="dec-control-feedback" class="dec-control-feedback" role="status" aria-live="polite"></p><ul id="dec-alarm-list" class="dec-alarms" aria-label="Ocorrências da maquete"></ul>
+  </details><% } %>
+  <details class="auto-panel dec-study"><summary>Leitura de produção, instrumentos e lógica prevista</summary><div class="dec-study-grid"><section><h2>Quanto sebo saiu na noite?</h2><p>FT-IN totaliza o recebido. FT-OUT, após as bombas, totaliza o transferido aos tanques externos. Produção apurada exige definir o ponto de medição e considerar estoque inicial/final, retornos e recirculação.</p><p>Turno noturno: início e fim a configurar em America/Sao_Paulo. Nesta demonstração, os contadores pertencem apenas à sessão do navegador.</p></section><section><h2>Condições de alimentação</h2><p>Estudo: nível e temperatura válidos, mistura em funcionamento, válvula de destino confirmada, decanter liberada, rosca disponível e tacho com capacidade. O controle real seguirá a sequência do fabricante.</p></section><section><h2>Mexedor e vapor</h2><p>Movimento das hélices não comprova homogeneização. Prever retorno de rotação e avaliação do processo. Um PT100 mede a temperatura no ponto instalado; a posição da válvula não confirma fluxo de vapor.</p></section><section><h2>Expansão do armazenamento</h2><p>Tanques 1 a 5 são uma previsão visual. Capacidades, sensores, válvulas, disponibilidade e ligação física ainda serão levantados. A maquete não libera transferência real.</p></section></div></details>
 </main>
-<script>
-(() => {
-  const panel = document.getElementById('dec-selection');
-  document.querySelectorAll('.dec-equipment').forEach((button) => {
-    button.addEventListener('click', () => {
-      document.querySelectorAll('.dec-equipment').forEach((item) => item.classList.remove('is-selected'));
-      button.classList.add('is-selected');
-      panel.replaceChildren();
-      const title = document.createElement('strong');
-      title.textContent = button.dataset.name;
-      const details = document.createElement('p');
-      details.textContent = 'Estado: Sem sinal • Integração: pendente • Comandos: indisponíveis';
-      panel.append(title, details);
-    });
-  });
-})();
-</script>
+<script src="/js/automacao-decanters-core.js?v=20261025-2a-3d" defer></script>
+<script src="/js/automacao-decanters.js?v=20261025-2a-3d" defer></script>
+<script type="module" src="/js/automacao-decanters-3d.mjs?v=20261025-2a-3d"></script>
