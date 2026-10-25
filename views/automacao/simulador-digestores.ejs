@@ -7,9 +7,9 @@
     <div><span class="auto-eyebrow">AUTOMAÇÃO • DIGESTORES • MODO DEMONSTRAÇÃO</span>
       <h1>Simulador dos Digestores</h1>
       <p>Ciclo demonstrativo completo: carga, aquecimento, cozimento e material pronto. Quatro digestores independentes, sem acionar equipamentos reais.</p>
-    </div><span class="auto-state waiting">SIMULAÇÃO • SEM HARDWARE</span>
+    </div><span class="auto-state waiting" id="sim-hardware-indicator" aria-live="polite"><%= simuladorBancadaAdmin ? 'SIMULAÇÃO • VERIFICANDO ESP32' : 'SIMULAÇÃO • VISUAL' %></span>
   </header>
-  <section class="auto-alert" role="status"><strong>Simulação, não operação</strong><span>Somente apresentação: abaixo de 80 °C = carregado (vermelho), 80–119,9 °C = em cozimento (amarelo), a partir de 120 °C = pronto (verde). São faixas ilustrativas, NÃO alarmes reais. Sem autorização ADMIN para sincronização, nenhum sinal é transmitido ao ESP32. A sincronização opcional se limita aos três relés da bancada, sem comandos para CLP, válvulas ou vapor.</span></section>
+  <section class="auto-alert" role="status"><strong>Simulação, não operação</strong><span>Somente apresentação: abaixo de 80 °C = carregado (vermelho), 80–119,9 °C = em cozimento (amarelo), a partir de 120 °C = pronto (verde). São faixas ilustrativas, NÃO alarmes reais. Sem autorização ADMIN para sincronização, nenhum sinal é transmitido ao ESP32. A sincronização opcional se limita aos três relés da bancada, sem comandos para CLP, válvulas ou vapor. O modo de operação com leitura PT100 real ainda não está habilitado.</span></section>
   <section class="sim-select-panel" aria-labelledby="sim-target-title">
     <div>
       <h2 id="sim-target-title">Quais digestores deseja simular?</h2>
@@ -35,6 +35,7 @@
       <tbody id="sim-remote-rows"><tr><td colspan="7">Carregando…</td></tr></tbody>
     </table>
     <small>“Aplicada” e “Saída” só aparecem se o firmware informar. Comando enviado não confirma que a lâmpada acendeu.</small>
+    <p><a href="/automacao/configuracao">Configuração dos ESP32 e links para suas IHMs locais</a></p>
   </section>
   <% } %>
   <div class="sim-toolbar">

@@ -76,7 +76,7 @@ test('a tela V3 mostra etapas, botoes, grafico, cronometro e modo apresentacao',
     'data-step="CARREGADO"', 'data-step="AQUECIMENTO"', 'data-step="COZIMENTO"',
     'data-step="PRONTO"', 'camisa-icon', 'eixo-icon', 'sim-signal-tower'];
   for (const selector of selectors) assert.ok(view.includes(selector), selector);
-  assert.match(view, /SIMULAÇÃO • SEM HARDWARE/);
+  assert.match(view, /id="sim-hardware-indicator"/);
   assert.match(view, /NÃO alarmes reais/);
   assert.match(view, /for\(let id=1;id<=4;id\+\+\)/);
 });

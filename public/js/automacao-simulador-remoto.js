@@ -11,6 +11,7 @@
   const http=window.CGDSimHttp;
   if(!http)return;
   const rows=document.getElementById('sim-remote-rows');
+  const indicator=document.getElementById('sim-hardware-indicator');
   const CONEXAO={ONLINE:'Online',ATRASADO:'Comunicação atrasada',OFFLINE:'ESP32 offline',SEM_DISPOSITIVO:'Sem ESP32 registrado'};
   const SAIDA=v=>v==='CONFIRMADA'?'Confirmada':v==='NAO_CONFIRMADA'?'Não confirmada':'Não informada';
   const STATUS={PENDENTE:'Pendente',NAO_INFORMADA:'Não informada',DIVERGENTE:'Divergente'};
@@ -23,6 +24,14 @@
       const data=await http.fetchJson('/automacao/api/simulador/sinaleiros/status');
       if(!Array.isArray(data.digestores))throw Object.assign(new Error(http.MSG.RESPOSTA_INVALIDA),{kind:'RESPOSTA_INVALIDA'});
       const sel=selector.value==='all'?null:Number(selector.value);
+      if(indicator){
+        const matched=data.digestores.filter(d=>sel===null||d.digestor_id===sel);
+        const online=matched.filter(d=>d.conexao==='ONLINE').length;
+        indicator.textContent=online
+          ? 'SIMULAÇÃO • '+online+' ESP32 ONLINE'+(toggle.checked?' • SINCRONIZANDO':' • NÃO SINCRONIZADO')
+          : 'SIMULAÇÃO • ESP32 '+(matched.some(d=>d.conexao==='ATRASADO')?'COMUNICAÇÃO ATRASADA':matched.some(d=>d.conexao==='OFFLINE')?'OFFLINE':'NÃO CADASTRADO');
+        indicator.dataset.conexao=online?'online':'offline';
+      }
       rows.replaceChildren(...data.digestores.filter(d=>sel===null||d.digestor_id===sel).map(d=>{
         const tr=document.createElement('tr');
         tr.dataset.conexao=d.conexao;
@@ -31,6 +40,7 @@
         return tr;
       }));
     }catch(e){
+      if(indicator){indicator.textContent='SIMULAÇÃO • STATUS ESP32 INDISPONÍVEL';indicator.dataset.conexao='erro';}
       const td=document.createElement('td');
       td.colSpan=7;td.setAttribute('role','alert');
       td.textContent=(e.kind==='SESSAO_EXPIRADA'||e.kind==='SEM_PERMISSAO'?'':'Status indisponível: ')+e.message;

@@ -6,8 +6,8 @@
   <header class="auto-hero">
     <div><span class="auto-eyebrow">CAMPO DO GADO • AUTOMAÇÃO • ACESSO ADMIN</span>
       <h1>Configuração dos ESP32</h1>
-      <p>Gerencie as credenciais e a vinculação dos quatro digestores pela própria página do CAD.</p>
-    </div><span class="auto-state waiting">SOMENTE SIMULAÇÃO</span>
+      <p>Gerencie credenciais, conexão e atalhos para a IHM local de cada digestor.</p>
+    </div><span class="auto-state waiting">CONFIGURAÇÃO E DIAGNÓSTICO</span>
   </header>
   <section class="auto-alert" role="note">
     <strong>Segurança das chaves</strong>
@@ -41,7 +41,7 @@
     </section>
     <section class="cfg-panel" aria-labelledby="cfg-connection-title">
       <h2 id="cfg-connection-title">Dados para conectar a IHM</h2>
-      <p>Use estes dados na página do ESP32 conectado à rede da casa.</p>
+      <p>Use estes dados na página do ESP32 conectado à rede industrial. Cada ESP32 também pode ter seu endereço LAN cadastrado abaixo.</p>
       <label>Endereço HTTPS da API</label>
       <code class="cfg-endpoint">https://manutencao.campodogado.app.br/api/automacao/device</code>
       <p class="cfg-caption">Identificação do dispositivo: igual à cadastrada ao gerar a chave.</p>
@@ -131,6 +131,50 @@
         card.append(label('Último contato: ' + formatDate(d.ultimo_contato), 'cfg-row'));
         card.append(label('Última fase: ' + (d.fase || 'sem informação'), 'cfg-row'));
         (d.estados || []).forEach(s => card.append(label('D' + s.digestor_id + ': ' + (s.fase || 'sem estado'), 'cfg-row')));
+        const localBox = document.createElement('div');
+        localBox.className = 'cfg-local-box';
+        const localLabel = document.createElement('label');
+        localLabel.textContent = 'IP da IHM local (rede interna)';
+        const localInput = document.createElement('input');
+        localInput.type = 'url';
+        localInput.value = d.local_url || '';
+        localInput.placeholder = 'http://192.168.1.100';
+        localInput.autocomplete = 'off';
+        localInput.setAttribute('aria-label', 'Endereço da IHM ' + d.device_id);
+        const localActions = document.createElement('div');
+        localActions.className = 'cfg-actions';
+        const saveIp = document.createElement('button');
+        saveIp.type = 'button';
+        saveIp.textContent = 'Salvar IP';
+        saveIp.addEventListener('click', async () => {
+          saveIp.disabled = true;
+          try {
+            await request(api + '/' + encodeURIComponent(d.device_id) + '/local-url', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json','X-CGD-CSRF':csrf},
+              body: JSON.stringify({local_url: localInput.value.trim()}),
+            });
+            message.textContent = 'Endereço LAN atualizado para ' + d.device_id + '.';
+            await refresh();
+          } catch (e) { message.textContent = e.message; }
+          finally { saveIp.disabled = false; }
+        });
+        localActions.append(saveIp);
+        if (d.local_url) {
+          const openLocal = document.createElement('a');
+          openLocal.href = d.local_url;
+          openLocal.target = '_blank';
+          openLocal.rel = 'noopener noreferrer';
+          openLocal.textContent = 'Abrir IHM deste ESP32';
+          openLocal.className = 'cfg-open-local';
+          localActions.append(openLocal);
+        }
+        localBox.append(localLabel, localInput, localActions);
+        const localHelp = document.createElement('small');
+        localHelp.className = 'cfg-caption';
+        localHelp.textContent = 'O link abre no seu navegador; precisa estar na mesma rede do ESP32. Não transmite token pelo link.';
+        localBox.append(localHelp);
+        card.append(localBox);
         const revoke = document.createElement('button');
         revoke.type = 'button';
         revoke.textContent = 'Revogar token';

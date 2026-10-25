@@ -21,3 +21,9 @@
 .auto-config-page .cfg-status[data-status="offline"]{background:#f5f3e9;color:#716132}
 .auto-config-page .cfg-status[data-status="revogado"]{background:#f8e3e3;color:#853030}
 @media(max-width:760px){.auto-config-page .cfg-grid{grid-template-columns:1fr}.auto-config-page .cfg-panel{padding:16px}}
+
+.auto-config-page .cfg-local-box{margin:14px 0;border:1px solid #c9dde2;border-radius:12px;background:#f0f7f9;padding:12px}
+.auto-config-page .cfg-local-box label{margin:0 0 7px}
+.auto-config-page .cfg-local-box input{margin-bottom:10px}
+.auto-config-page .cfg-open-local{display:inline-flex;align-items:center;padding:9px 12px;border-radius:9px;color:#075e49;background:#d6f4e9;border:1px solid #90cbb5;font-size:.88rem;font-weight:700;text-decoration:none}
+.auto-config-page .cfg-open-local:hover{text-decoration:underline}
