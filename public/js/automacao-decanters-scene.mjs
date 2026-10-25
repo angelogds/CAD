@@ -37,10 +37,11 @@ export function createIndustrialScene({ makeLabel } = {}) {
     if (axis === 'z') object.rotation.x = Math.PI / 2;
     return object;
   }
-  function label(text, position, width = 2.3) {
+  function label(text, position, width = 2.3, key = null) {
     if (!makeLabel) return;
     const object = makeLabel(text, width);
     object.position.set(...position);
+    if (key) object.userData.selectKey = key;
     root.add(object);
   }
   function register(key, group) {
@@ -129,8 +130,8 @@ export function createIndustrialScene({ makeLabel } = {}) {
   }
   box(mixer, [0.7, 0.6, 0.7], [0, 5.75, 0], red);
   box(tank, [3.2, 0.1, 0.35], [0, 5.42, 0], dark);
-  label('TANQUE DE SERVIÇO · 15.000 L', [-8.1, 6.6, 0], 4.0);
-  label('Corte didático · cinco patamares', [-8.1, 0.3, 2.2], 3.8);
+  label('TANQUE DE SERVIÇO · 15.000 L', [-8.1, 6.6, 0], 4.0, 'tank');
+  label('Corte didático · cinco patamares', [-8.1, 0.3, 2.2], 3.8, 'tank');
 
   const percentages = [10, 25, 50, 75, 90];
   percentages.forEach((percent, index) => {
@@ -140,16 +141,16 @@ export function createIndustrialScene({ makeLabel } = {}) {
     sensors.push(lamp);
   });
   indicator('pt100', [-6.4, 1.7, 0.85], s => s.temperature.status === 'SIMULADO');
-  label('PT100', [-6.15, 1.45, 1.25], 1.1);
+  label('PT100', [-6.15, 1.45, 1.25], 1.1, 'pt100');
   const steam = group('steam', [-9.95, 1.5, -0.25]);
   cylinder(steam, 0.17, 0.48, [0, 0, 0], dark, 'x');
   valve('steam', [-9.95, 1.8, -0.25], s => s.effective.steam);
   pipe('steam', [[-11, 1.5, -0.25], [-9.9, 1.5, -0.25], [-9.1, 1.5, -0.25]], s => s.effective.steam, brown);
-  label('VAPOR', [-10.45, 2.4, -0.25], 1.2);
+  label('VAPOR', [-10.45, 2.4, -0.25], 1.2, 'steam');
   pipe('inlet', [[-11, 4.9, 0], [-10.1, 4.9, 0], [-8.1, 4.9, 0], [-8.1, 4.3, 0]],
     s => s.inletFlowLpm > 0 && s.permissives.admission);
   indicator('inlet', [-10.25, 4.9, 0], s => s.inletFlowLpm > 0);
-  label('FT-IN · recebido', [-10.3, 5.55, 0], 2.2);
+  label('FT-IN · recebido', [-10.3, 5.55, 0], 2.2, 'inlet');
 
   function pump(key, position, feed = false) {
     const object = group(key, position);
@@ -162,9 +163,10 @@ export function createIndustrialScene({ makeLabel } = {}) {
     return object;
   }
   pump('feed', [-4.65, 0.86, 1.7], true);
-  label('BOMBA HELICOIDAL', [-4.65, 1.65, 2.1], 2.8);
+  label('BOMBA HELICOIDAL', [-4.65, 1.65, 2.1], 2.8, 'feed');
   pipe('feed', [[-6.6, 1.05, 0], [-5.85, 1.05, 0], [-5.85, 0.86, 1.7], [-5.6, 0.86, 1.7]], s => s.effective.feedPump);
-  pipe('feed', [[-3.55, 0.86, 1.7], [-3.1, 0.86, 1.7], [-3.1, 4.4, 1.7], [4.8, 4.4, 1.7]], s => s.effective.feedPump);
+  pipe('feed', [[-3.55, 0.86, 1.7], [-3.1, 0.86, 1.7], [-3.1, 4.4, 1.7], [0, 4.4, 1.7]], s => s.effective.feedPump);
+  pipe(null, [[0, 4.4, 1.7], [4.8, 4.4, 1.7]], s => s.effective.feedPump && s.selectedDecanter === 'GRATE');
 
   function decanter(name, x) {
     const object = group(name, [x, 2.25, 0]);
@@ -199,7 +201,7 @@ export function createIndustrialScene({ makeLabel } = {}) {
     }
     object.add(rotor);
     rotors.push({ mesh: rotor, axis: 'x', active: s => Boolean(s.decanterReady[name] && s.running) });
-    label('DECANTER ' + name, [x, 3.35, -0.7], 2.7);
+    label('DECANTER ' + name, [x, 3.35, -0.7], 2.7, name);
     pipe('valve' + name, [[x, 4.4, 1.7], [x, 4.4, 0], [x, 2.85, 0]], s => s.effective.feedPump && s.selectedDecanter === name);
     valve('valve' + name, [x, 3.75, 0], s => s.effective.feedPump && s.selectedDecanter === name);
     pipe('tacho' + name, [[x + 0.55, 1.65, 0.28], [x + 0.55, 1.18, 1.5]], s => s.effective.feedPump && s.selectedDecanter === name);
@@ -213,7 +215,7 @@ export function createIndustrialScene({ makeLabel } = {}) {
     const fluid = cylinder(tacho, 0.62, 1, [0, 0.6, 0], oil);
     fluid.visible = false;
     liquid.push({ mesh: fluid, volume: s => s.tachos[name], capacity: 1000, bottom: 0.44, height: 0.65 });
-    label('TACHO ' + name, [x + 0.55, 0.1, 2.5], 2.0);
+    label('TACHO ' + name, [x + 0.55, 0.1, 2.5], 2.0, 'tacho' + name);
     pipe('tacho' + name, [[x + 0.55, 0.45, 1.5], [x + 0.55, 0.45, 3.5], [6.2, 0.45, 3.5]],
       s => Boolean(s.effective.outletPump && s.selectedTacho === name));
   }
@@ -227,25 +229,25 @@ export function createIndustrialScene({ makeLabel } = {}) {
   const auger = helix(screw, 9, 0.23, [0, 0, 0], brown, 18);
   rotors.push({ mesh: auger, axis: 'x', active: s => s.effective.screw });
   cylinder(screw, 0.3, 0.55, [-4.85, 0, 0], red, 'x');
-  label('ROSCA DE BORRA', [2.2, 0.15, -2.7], 3.0);
+  label('ROSCA DE BORRA', [2.2, 0.15, -2.7], 3.0, 'screw');
 
   for (const [i, z] of [[1, 0.4], [2, 2.9]]) {
     pump('out' + i, [7.7, 0.9, z]);
-    label('SAÍDA · BOMBA ' + i, [7.7, 1.85, z], 2.4);
+    label('SAÍDA · BOMBA ' + i, [7.7, 1.85, z], 2.4, 'out' + i);
     pipe('out' + i, [[6.2, 0.45, 3.5], [6.2, 0.45, z], [6.2, 0.9, z], [6.65, 0.9, z]], s => s.effective.outletPump === i);
     pipe('out' + i, [[8.7, 0.9, z], [10.35, 0.9, z], [10.35, 2.2, z]], s => s.effective.outletPump === i);
   }
   pipe('outlet', [[10.35, 2.2, 2.9], [10.35, 2.2, -4.2], [-2.8, 2.2, -4.2]],
     s => Boolean(s.effective.outletPump && s.outletDestination === 'ARMAZENAMENTO'));
   indicator('outlet', [10.35, 2.2, -1.8], s => Boolean(s.effective.outletPump));
-  label('FT-OUT · transferido', [10.1, 3, -1.8], 2.7);
+  label('FT-OUT · transferido', [10.1, 3, -1.8], 2.7, 'outlet');
   for (let i = 1; i <= 5; i++) {
     const x = -3 + (i - 1) * 3.0;
     const storage = group('storage' + i, [x, 0, -6.4]);
     cylinder(storage, 0.78, 2.25, [0, 1.25, 0], material(0xc6c9d0, { transparent: true, opacity: 0.27 }));
     const rim = mesh(storage, new THREE.TorusGeometry(0.78, 0.035, 6, 28), dark, [0, 2.38, 0]);
     rim.rotation.x = Math.PI / 2;
-    label('T' + i + ' · FUTURO', [x, 3.0, -6.4], 2.05);
+    label('T' + i + ' · FUTURO', [x, 3.0, -6.4], 2.05, 'storage' + i);
     pipe('storage' + i, [[x, 2.2, -4.2], [x, 2.2, -6.4], [x, 2.4, -6.4]],
       s => Boolean(s.effective.outletPump && s.outletDestination === 'ARMAZENAMENTO' && s.selectedStorage === i));
   }
