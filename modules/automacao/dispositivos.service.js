@@ -1,5 +1,6 @@
 const crypto = require('node:crypto');
 const db = require('../../database/db');
+const { normalizeLocalUrl } = require('./esp32-local-url');
 
 const ONLINE_WINDOW_S = 90;
 const DEVICE_ID_RE = /^[A-Z0-9][A-Z0-9-]{2,39}$/;
@@ -58,6 +59,16 @@ function issueToken(deviceId, userId, escopo) {
   }
   return { device_id: id, escopo: scope === null ? 'TODOS' : String(scope), token, replaced: !!existing };
 }
+// Configuração de navegação LAN: não executa requisições ao ESP32 no servidor.
+function updateLocalUrl(deviceId, rawUrl) {
+  const id = assertDeviceId(deviceId);
+  const url = normalizeLocalUrl(rawUrl);
+  const result = db.prepare('UPDATE automacao_dispositivos SET local_url=? WHERE device_id=?')
+    .run(url, id);
+  if (!result.changes) throw inputError('ESP32 não cadastrado.', 404);
+  return { device_id: id, local_url: url };
+}
+
 function revoke(deviceId) {
   const result = db.prepare("UPDATE automacao_dispositivos SET status='REVOGADO', token_hash=NULL, revoked_at=datetime('now'), last_seen_at=NULL WHERE device_id=?")
     .run(assertDeviceId(deviceId));
@@ -115,6 +126,7 @@ function listDevices() {
     const age = r.idade_s == null ? null : Number(r.idade_s);
     return {
       device_id: r.device_id,
+      local_url: r.local_url || null,
       digestor_id: r.digestor_id,
       escopo: r.digestor_id == null ? 'TODOS' : String(r.digestor_id),
       status: r.status,
@@ -138,4 +150,4 @@ function listDevices() {
     };
   });
 }
-module.exports = { issueToken, revoke, authenticate, recordPing, recordContact, listDevices, hashToken, FASES, ONLINE_WINDOW_S };
+module.exports = { issueToken, updateLocalUrl, revoke, authenticate, recordPing, recordContact, listDevices, hashToken, FASES, ONLINE_WINDOW_S };
