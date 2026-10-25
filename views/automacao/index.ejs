@@ -1,6 +1,7 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261014-decanters">
-<main class="auto-page">
+<link rel="stylesheet" href="/css/automacao.css?v=20261025-2a-industrial">
+<main class="auto-page auto-2a auto-module-home">
+  <%- include('partials/brand') %>
   <nav class="auto-area-nav" aria-label="Navegação das áreas de automação">
     <span class="auto-area-nav-label">ÁREAS</span>
     <a href="/automacao" aria-current="page">Visão das áreas</a>
@@ -8,36 +9,44 @@
     <a href="/automacao/decanters">Decanters e tanque</a>
     <a href="/automacao/prensas">Prensas</a>
   </nav>
-
-  <header class="auto-hero">
+  <header class="auto-hero auto-home-hero">
     <div>
-      <span class="auto-eyebrow">RECICLAGEM • AUTOMAÇÃO INDUSTRIAL</span>
-      <h1>Automação</h1>
-      <p>IHM web para acompanhar sensores e, futuramente, comandar equipamentos com segurança pela rede industrial.</p>
+      <span class="auto-eyebrow">ENGENHARIA, VISUALIZAÇÃO E SUPERVISÃO</span>
+      <h1>2A Automação Industrial</h1>
+      <p>O processo da fábrica em uma visão. Módulo exclusivo da 2A para implementação junto ao CAD, o sistema de manutenção do Campo do Gado.</p>
     </div>
-    <span class="auto-state waiting">Em implantação</span>
+    <div class="auto-home-stamp"><span class="auto-state waiting">IMPLANTAÇÃO POR ÁREA</span><small>Dados reais identificados pela origem.<br>Simulações sempre sinalizadas.</small></div>
   </header>
-  <section class="auto-grid auto-sectors">
-    <% (setores || []).forEach((setor) => { %>
+
+  <section class="auto-process-overview" aria-labelledby="auto-process-title">
+    <div class="auto-overview-heading"><div><span class="auto-eyebrow">MAPA DE PROCESSO</span><h2 id="auto-process-title">Da preparação ao armazenamento</h2></div><a href="/automacao/decanters">Explorar circuito das decanters <span aria-hidden="true">→</span></a></div>
+    <ol class="auto-process-stages">
+      <li><span>01</span><div><strong>Digestores</strong><small>Temperatura · sinaleiros · purgadores</small></div></li>
+      <li><span>02</span><div><strong>Prensas</strong><small>Separação · acionamento · carga</small></div></li>
+      <li><span>03</span><div><strong>Tanque e decanters</strong><small>Nível · aquecimento · alimentação</small></div></li>
+      <li><span>04</span><div><strong>Armazenamento</strong><small>Tanques 1 a 5 · expansão prevista</small></div></li>
+    </ol>
+    <p>Sequência de referência para organizar as áreas. Interligações e instrumentação serão conferidas na fábrica.</p>
+  </section>
+
+  <section class="auto-grid auto-sectors" aria-label="Painéis industriais">
+    <% (setores || []).forEach((setor, index) => { %>
       <a class="auto-sector-card" href="<%= setor.href %>">
-        <span class="auto-sector-icon" aria-hidden="true">⚙</span>
-        <div><small>SETOR</small><h2><%= setor.title %></h2><p><%= setor.description %></p></div>
-        <span class="auto-open">Abrir IHM →</span>
+        <div class="auto-sector-heading"><span class="auto-sector-index"><%= String(index + 1).padStart(2, '0') %></span><small>PAINEL DA ÁREA</small><span aria-hidden="true">→</span></div>
+        <div><h2><%= setor.title %></h2><p><%= setor.description %></p></div>
+        <div class="auto-sector-bottom"><span class="auto-sector-status"><%= setor.key === 'digestores' ? 'Supervisão ESP32 e simulação' : setor.key === 'decanters' ? 'Circuito animado e instrumentação' : 'Estudo de integração' %></span><span class="auto-open">Abrir painel →</span></div>
       </a>
     <% }) %>
-
     <% if (configuracaoAdmin) { %>
-      <a class="auto-sector-card" href="/automacao/configuracao" aria-label="Configuração: chaves ESP32 e associação aos digestores">
-        <span class="auto-sector-icon" aria-hidden="true">🔐</span>
-        <div><small>ADMINISTRADOR • RESTRITO</small><h2>Configuração</h2>
-          <p>Gerar, copiar uma vez, substituir ou revogar tokens ESP32. Vincular cada dispositivo a um digestor ou a todos os quatro.</p>
-        </div>
-        <span class="auto-open">Gerenciar dispositivos →</span>
+      <a class="auto-sector-card auto-sector-settings" href="/automacao/configuracao" aria-label="Configuração: chaves ESP32 e associação aos digestores">
+        <div class="auto-sector-heading"><span class="auto-sector-index" aria-hidden="true"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h16"/><path d="M8 3v6M16 9v6M10 15v6" stroke-width="3.5"/></svg></span><small>ADMINISTRADOR · RESTRITO</small><span aria-hidden="true">→</span></div>
+        <div><h2>Dispositivos e conexão</h2><p>Credenciais ESP32, associação aos digestores e atalhos para as centrais de controle locais.</p></div>
+        <div class="auto-sector-bottom"><span class="auto-sector-status">Configuração</span><span class="auto-open">Gerenciar dispositivos →</span></div>
       </a>
     <% } %>
   </section>
-  <section class="auto-note">
-    <strong>Primeira etapa</strong>
-    <p>Monitoramento por área, com equipamentos e estados indisponíveis até a integração de hardware. As interligações e os comandos dependem de validação de campo e segurança.</p>
+  <section class="auto-bottom-grid auto-home-notes">
+    <article class="auto-panel"><span class="auto-eyebrow">TESTAR O COMPORTAMENTO</span><h2>Explore antes de integrar</h2><p>Veja o aquecimento e os sinaleiros dos digestores ou percorra o circuito animado das decanters. Cada painel identifica a simulação e as leituras disponíveis.</p><a class="auto-simulator-link" href="/automacao/digestores/simulador">Simulador dos digestores →</a></article>
+    <article class="auto-panel"><span class="auto-eyebrow">OPERAÇÃO E MANUTENÇÃO</span><h2>Uma identidade, áreas bem definidas</h2><p>A 2A reúne a visualização do processo. O CAD continua concentrando a gestão de manutenção. Integrações físicas serão implantadas por equipamento, conforme os sinais disponíveis.</p></article>
   </section>
 </main>

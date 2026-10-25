@@ -1,8 +1,15 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261014-v2">
-<link rel="stylesheet" href="/css/automacao-configuracao.css?v=20261024">
-<main class="auto-page auto-config-page">
-  <div class="auto-actions-top"><a class="auto-back-link" href="/automacao">← Voltar para Automação</a></div>
+<link rel="stylesheet" href="/css/automacao.css?v=20261025-2a-industrial">
+<link rel="stylesheet" href="/css/automacao-configuracao.css?v=20261025-2a-industrial">
+<main class="auto-page auto-config-page auto-2a">
+  <%- include('partials/brand') %>
+  <div class="auto-actions-top"><a class="auto-back-link" href="/automacao">← Voltar para 2A Automação Industrial</a></div>
+  <nav class="auto-area-nav" aria-label="Navegação das áreas de automação">
+    <span class="auto-area-nav-label">ÁREAS</span>
+    <a href="/automacao">Visão das áreas</a><a href="/automacao/digestores">Digestores</a>
+    <a href="/automacao/decanters">Decanters e tanque</a><a href="/automacao/prensas">Prensas</a>
+    <a href="/automacao/configuracao" aria-current="page">Dispositivos</a>
+  </nav>
   <header class="auto-hero">
     <div><span class="auto-eyebrow">CAMPO DO GADO • AUTOMAÇÃO • ACESSO ADMIN</span>
       <h1>Configuração dos ESP32</h1>

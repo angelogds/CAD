@@ -24,7 +24,7 @@ router.get('/configuracao', ...admin, (req, res) => {
   }
   res.setHeader('Cache-Control', 'no-store');
   return res.render('automacao/dispositivos', {
-    title: 'Automação - Configuração ESP32',
+    title: '2A Automação Industrial · Configuração ESP32',
     activeMenu: 'automacao',
     csrfAutomacao: req.session.automacaoConfigCsrf,
   });

@@ -1,10 +1,7 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261025-2a-v9">
+<link rel="stylesheet" href="/css/automacao.css?v=20261025-2a-industrial">
 <main class="auto-page auto-hmi auto-2a" id="digestores-supervisao">
-  <div class="auto-brandbar">
-    <div class="auto-brand"><span class="auto-monogram" aria-hidden="true">2A</span><div><strong>2A Automação Industrial</strong><small>Ângelo Gomes da Silva — Fundador</small></div></div>
-    <div class="auto-brand-context"><b>Campo do Gado</b><span>CAD · Supervisão dos digestores</span></div>
-  </div>
+  <%- include('partials/brand') %>
   <div class="auto-actions-top"><a class="auto-back-link" href="/automacao">← Voltar</a> <a class="auto-simulator-link" href="/automacao/digestores/simulador">▶ Módulo de simulação</a></div>
   <nav class="auto-area-nav" aria-label="Navegação das áreas de automação">
     <span class="auto-area-nav-label">ÁREAS</span>
@@ -130,5 +127,5 @@
   </section>
 </main>
 
-<script src="/js/automacao-simulador-http.js?v=20261025-2a-v9" defer></script>
-<script src="/js/automacao-digestores.js?v=20261025-2a-v9" defer></script>
+<script src="/js/automacao-simulador-http.js?v=20261025-2a-industrial" defer></script>
+<script src="/js/automacao-digestores.js?v=20261025-2a-industrial" defer></script>

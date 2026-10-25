@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 
 function index(req, res) {
   return res.render('automacao/index', {
-    title: 'Automação',
+    title: '2A Automação Industrial',
     activeMenu: 'automacao',
     setores: service.listSetores(),
     configuracaoAdmin: normalizeRole(req.session && req.session.user && req.session.user.role) === 'ADMIN',
@@ -13,7 +13,7 @@ function index(req, res) {
 
 function digestores(req, res) {
   return res.render('automacao/digestores', {
-    title: 'Automação - Digestores',
+    title: '2A Automação Industrial · Digestores',
     activeMenu: 'automacao',
     digestores: service.getDigestoresOverview(),
     integrationState: service.getIntegrationState(),
@@ -22,7 +22,7 @@ function digestores(req, res) {
 
 function decanters(req, res) {
   return res.render('automacao/decanters', {
-    title: 'Automação - Decanters e Tanque de Serviço',
+    title: '2A Automação Industrial · Decanters e Tanque de Serviço',
     activeMenu: 'automacao',
     equipamentos: service.getDecantersOverview(),
     integrationState: service.getIntegrationState(),
@@ -31,7 +31,7 @@ function decanters(req, res) {
 
 function prensas(req, res) {
   return res.render('automacao/prensas', {
-    title: 'Automação - Prensas',
+    title: '2A Automação Industrial · Prensas',
     activeMenu: 'automacao',
     prensas: service.getPrensasOverview(),
     integrationState: service.getIntegrationState(),
@@ -44,7 +44,7 @@ function simuladorDigestores(req, res) {
   return res.render('automacao/simulador-digestores', {
     simuladorBancadaAdmin: admin,
     csrfAutomacao: admin && req.session ? req.session.automacaoConfigCsrf : '',
-    title: 'Automação - Simulador dos Digestores',
+    title: '2A Automação Industrial · Simulador dos Digestores',
     activeMenu: 'automacao',
   });
 }

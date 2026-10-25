@@ -19,7 +19,7 @@
     "limpar:anexos:confirmar": "node scripts/limpar-anexos.js --confirm",
     "db:manutencao": "node scripts/manutencao-db.js",
     "build:cad-core": "node scripts/build-mlightcad.mjs",
-    "postinstall": "node scripts/build-mlightcad.mjs"
+    "postinstall": "node scripts/build-automacao-three.cjs && node scripts/build-mlightcad.mjs"
   },
   "engines": {
     "node": ">=18"
