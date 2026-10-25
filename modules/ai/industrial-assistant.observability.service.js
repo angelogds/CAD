@@ -138,14 +138,18 @@ function healthSnapshot() {
   const enabled = String(process.env.AI_ENABLED ?? 'true').trim().toLowerCase() !== 'false';
   const providers = safeProviderStatus();
   const primaryConfigured = providers?.primary?.configured !== false;
+  const textConfigured = providers?.text?.primary?.configured !== false;
   return {
-    ok: enabled && primaryConfigured,
+    ok: enabled && primaryConfigured && textConfigured,
     enabled,
     provider_primary: providers?.primary?.selected || String(process.env.AI_PROVIDER_PRIMARY || 'openai').trim() || 'openai',
     providers,
+    provider_text_primary: providers?.text?.primary?.selected || providers?.primary?.selected || 'openai',
     openai_key_configured: configured,
     models: {
-      assistant: String(process.env.OPENAI_MODEL_ASSISTANT || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini').trim(),
+      assistant: providers?.text?.primary?.selected === 'omniroute'
+        ? String(process.env.OMNIROUTE_MODEL || '').trim()
+        : String(process.env.OPENAI_MODEL_ASSISTANT || process.env.OPENAI_MODEL_TEXT || 'gpt-4o-mini').trim(),
       voice: String(process.env.OPENAI_MODEL_VOICE || 'gpt-realtime-2.1-mini').trim(),
       transcription: String(process.env.OPENAI_MODEL_TRANSCRIBE || 'gpt-4o-mini-transcribe').trim(),
       transcription_enabled: String(process.env.OPENAI_REALTIME_TRANSCRIPTION_ENABLED || 'false').trim().toLowerCase() === 'true',
