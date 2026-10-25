@@ -19,6 +19,8 @@
 #include "temperature_logic.h"
 #include "purge_timer.h"
 #include "purge_outputs.h"
+#include "cad_purge_test.h"
+#include "cad_simulation_json.h"
 #include "pt100_max31865.h"
 #include "local_ui.h"
 
@@ -32,7 +34,7 @@ constexpr uint8_t RELE_LIGA = LOW, RELE_DESLIGA = HIGH;
 constexpr uint32_t DURACAO_FASE_MS = 5000;
 constexpr uint32_t VALIDADE_MAXIMA_REMOTA_MS = 6500;
 const char *CAD_BASE = "https://manutencao.campodogado.app.br/api/automacao/device";
-const char *CAD_FIRMWARE = "temperatura-v8";
+const char *CAD_FIRMWARE = "temperatura-v9";
 const char *CERTIFICADOS_CAD = R"CGCERT(
 -----BEGIN CERTIFICATE-----
 MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
@@ -107,7 +109,8 @@ uint8_t fase = 0;
 int8_t corManual = -1;
 uint32_t inicioFase = 0;
 struct RemoteCommand {
-  bool valid = false;
+  bool valid = false, everReceived = false, completeState = false, heating = false;
+  bool purgeOpen[2] = {false, false};
   float temperature = NAN;
   uint32_t receivedAt = 0, validity = 0, generation = 0;
   int32_t version = -1;
@@ -122,9 +125,12 @@ struct LocalSnapshot {
   int32_t version = -1;
   int8_t receivedPhase = -1;
   bool red = false, yellow = false, green = false;
+  bool cadCurrent = false, cadExpired = false, cadComplete = false, heating = false;
+  bool purgeVirtualOpen[2] = {false, false};
 } localSnapshot;
 cgd::PurgeTimer purgadores[2] = { cgd::PurgeTimer(5, 60), cgd::PurgeTimer(10, 60) };
 PurgeOutputs purgeOutputs;
+cgd::CadPurgeTest cadPurgeTest;
 Pt100Reader pt100;
 bool pt100Configurado = false;
 
@@ -160,6 +166,8 @@ bool snapshot(LocalSnapshot &copy) {
   if (millis() - copy.updatedAt > 1250U) {
     copy.signal = cgd::unavailable(cgd::SensorStatus::SEM_SINAL);
     copy.red = copy.yellow = copy.green = false; copy.measuredAt = 0;
+    copy.cadCurrent = false; copy.cadComplete = false; copy.heating = false;
+    copy.purgeVirtualOpen[0] = copy.purgeVirtualOpen[1] = false;
   }
   return true;
 }
@@ -180,7 +188,7 @@ String timestampISO(time_t epoch, uint16_t ms) {
   strftime(out, sizeof(out), "%Y-%m-%dT%H:%M:%S", &utc);
   char suffix[8]; snprintf(suffix, sizeof(suffix), ".%03uZ", unsigned(ms)); return String(out) + suffix;
 }
-void preencherSinal(JsonDocument &doc, const LocalSnapshot &s) {
+void preencherSinal(JsonDocument &doc, const LocalSnapshot &s, bool localPage = false) {
   const bool real = s.mode == OPERACAO_REAL;
   doc["origem"] = real ? "REAL" : "SIMULACAO";
   if (s.signal.hasTemperature) doc["temperatura_c"] = s.signal.temperatureC;
@@ -188,8 +196,16 @@ void preencherSinal(JsonDocument &doc, const LocalSnapshot &s) {
   doc["faixa_temperatura"] = cgd::name(s.signal.range);
   doc["cor_sinaleiro"] = cgd::name(s.signal.color);
   doc["pronto_descarga"] = s.signal.ready;
-  doc["sensor_tipo"] = real ? "PT100" : nullptr;
-  doc["sensor_status"] = real ? cgd::name(s.signal.sensorStatus) : "SEM_SENSOR";
+  doc["sensor_tipo"] = real ? "PT100" : (s.signal.hasTemperature ? "SIMULADO" : nullptr);
+  doc["sensor_status"] = real ? cgd::name(s.signal.sensorStatus) : (s.signal.hasTemperature ? "SIMULADO" :
+    (localPage && s.mode == REMOTO_BANCADA ? (s.cadExpired ? "SIMULACAO_EXPIRADA" : "AGUARDANDO_SIMULACAO") : "SEM_SINAL"));
+  if (!real) doc["fonte_simulacao"] = s.mode == REMOTO_BANCADA ? "CAD" : "LOCAL";
+  doc["simulacao_cad_atual"] = s.cadCurrent;
+  doc["estado_simulacao_disponivel"] = s.cadComplete;
+  doc["aquecimento_simulado"] = s.cadComplete && s.heating;
+  JsonObject virtualPurges = doc["purgadores_simulados"].to<JsonObject>();
+  virtualPurges["camisa"] = s.cadComplete && s.purgeVirtualOpen[0] ? "ABERTO" : "FECHADO";
+  virtualPurges["eixo"] = s.cadComplete && s.purgeVirtualOpen[1] ? "ABERTO" : "FECHADO";
   const String stamp = real && s.signal.hasTemperature ? timestampISO(s.measuredAt, s.measuredMillis) : "";
   if (stamp.length()) doc["timestamp_medicao"] = stamp;
   else doc["timestamp_medicao"] = nullptr;
@@ -235,7 +251,7 @@ void tarefaSinalizacao(void*) {
     if (xSemaphoreTake(mutexEstado, pdMS_TO_TICKS(5)) == pdTRUE) {
       if (synchronizationFault) {
         modo = PARADO; corManual = -1; remoteCommand.valid = false;
-        for (auto &p : purgadores) p.fault(); purgeOutputs.stopAll(); synchronizationFault = false;
+        for (auto &p : purgadores) p.fault(); purgeOutputs.stopAll(); cadPurgeTest.stopAll(); synchronizationFault = false;
       }
       LocalSnapshot next; next.updatedAt = now;
       next.mode = modo;
@@ -256,12 +272,15 @@ void tarefaSinalizacao(void*) {
           next.signal = localSimulation.current(now);
           next.version = remoteCommand.version; next.receivedPhase = remoteCommand.receivedPhase;
           next.sampledAt = remoteCommand.receivedAt;
-        }
+          next.cadCurrent = true; next.cadComplete = remoteCommand.completeState;
+          next.heating = remoteCommand.heating;
+          next.purgeVirtualOpen[0] = remoteCommand.purgeOpen[0]; next.purgeVirtualOpen[1] = remoteCommand.purgeOpen[1];
+        } else next.cadExpired = remoteCommand.everReceived;
       } else if (modo == AUTOMATICO || modo == SIMULACAO) {
         uint32_t elapsed = now - inicioFase;
         if (elapsed >= DURACAO_FASE_MS) {
           if (modo == AUTOMATICO && fase < 3) { ++fase; inicioFase = now; }
-          else { modo = PARADO; next.mode = PARADO; for (auto &p : purgadores) p.stop(); purgeOutputs.stopAll(); }
+          else { modo = PARADO; next.mode = PARADO; for (auto &p : purgadores) p.stop(); purgeOutputs.stopAll(); cadPurgeTest.stopAll(); }
         }
         if (modo == AUTOMATICO || modo == SIMULACAO) {
           const float values[] = {25, 75, 110, 125};
@@ -278,8 +297,17 @@ void tarefaSinalizacao(void*) {
       escreverSaidas(pins.red, pins.yellow, pins.green);
       next.red = pins.red; next.yellow = pins.yellow; next.green = pins.green;
       localSnapshot = next;
-      // Driver físico separado: exige armamento local e condições válidas.
+      cadPurgeTest.update(modo == REMOTO_BANCADA, WiFi.status() == WL_CONNECTED,
+        remoteCommand.valid && remoteCommand.completeState, now, remoteCommand.receivedAt,
+        remoteCommand.validity, remoteCommand.purgeOpen[0], remoteCommand.purgeOpen[1]);
+      // Driver físico separado: teste CAD exige armamento LOCAL e pacote completo fresco.
       for (int i = 0; i < 2; ++i) {
+        if (modo == REMOTO_BANCADA) {
+          purgadores[i].stop();
+          if (!cadPurgeTest.armed(i)) purgeOutputs.stop(i);
+          purgeOutputs.apply(i, cadPurgeTest.requestedOpen(i), cadPurgeTest.current());
+          continue;
+        }
         const bool healthy = modo == PARADO || (modo == OPERACAO_REAL && next.signal.hasTemperature);
         if (modo == OPERACAO_REAL && !next.signal.hasTemperature) { purgadores[i].fault(); purgeOutputs.stop(i); }
         const bool wasActive = purgadores[i].isActive();
@@ -328,29 +356,17 @@ String payloadTelemetria(const LocalSnapshot &s) {
   String out; serializeJson(doc, out); return out;
 }
 bool receberSimulacaoCAD(const String &body) {
-  JsonDocument doc;
-  if (deserializeJson(doc, body) || !doc["sinaleiro_bancada"].is<JsonObject>()) return false;
-  JsonObject signal = doc["sinaleiro_bancada"].as<JsonObject>();
-  if (String(doc["modo"] | "") != "SIMULACAO" || signal["processo_habilitado"] != false ||
-      signal["digestor_id"].as<int>() != DIGESTOR_ID || !signal["validade_ms"].is<uint32_t>()) return false;
-  const uint32_t validity = signal["validade_ms"].as<uint32_t>();
-  const String phase = signal["fase"] | "PARADO";
-  if (phase == "PARADO" || validity == 0) {
-    if (xSemaphoreTake(mutexEstado, pdMS_TO_TICKS(20)) != pdTRUE) return false;
-    remoteCommand.valid = false; ++remoteCommand.generation; xSemaphoreGive(mutexEstado); return true;
-  }
-  if (validity > VALIDADE_MAXIMA_REMOTA_MS || !signal["temperatura_c"].is<float>()) return false;
-  const auto classified = cgd::classify(signal["temperatura_c"].as<float>());
-  if (phase != cgd::phase(classified) || !classified.hasTemperature || String(signal["faixa_temperatura"] | "") != cgd::name(classified.range) ||
-      String(signal["cor_sinaleiro"] | "") != cgd::name(classified.color) ||
-      !signal["pronto_descarga"].is<bool>() || signal["pronto_descarga"].as<bool>() != classified.ready) return false;
+  cgd::CadSimulationCommand command;
+  if (!cgd::parseCadSimulationJson(body.c_str(), body.length(), DIGESTOR_ID, command)) return false;
   if (xSemaphoreTake(mutexEstado, pdMS_TO_TICKS(20)) != pdTRUE) return false;
-  // Checar modo ao receber: rede não pode substituir leitura REAL.
   if (modo == REMOTO_BANCADA) {
-    remoteCommand.valid = true; remoteCommand.temperature = classified.temperatureC;
-    remoteCommand.validity = validity; remoteCommand.receivedAt = millis(); ++remoteCommand.generation;
-    remoteCommand.version = signal["versao_fase"] | -1;
-    remoteCommand.receivedPhase = phase == "INICIO" ? 0 : (phase == "MEIO" ? 1 : (phase == "FINAL" ? 2 : -1));
+    remoteCommand.valid = command.active; remoteCommand.everReceived = command.active;
+    remoteCommand.completeState = command.active && command.completeState;
+    remoteCommand.heating = command.heating;
+    remoteCommand.purgeOpen[0] = command.purgeOpen[0]; remoteCommand.purgeOpen[1] = command.purgeOpen[1];
+    remoteCommand.temperature = command.temperature; remoteCommand.validity = command.validity;
+    remoteCommand.receivedAt = millis(); ++remoteCommand.generation;
+    remoteCommand.version = command.version; remoteCommand.receivedPhase = command.phase;
   }
   xSemaphoreGive(mutexEstado); return true;
 }
@@ -411,7 +427,7 @@ void enviarEstado() {
   doc["restante_ms"] = (s.mode == AUTOMATICO || s.mode == SIMULACAO) ?
     (millis() - inicioFase < DURACAO_FASE_MS ? DURACAO_FASE_MS - (millis() - inicioFase) : 0) : 0;
   doc["remoto_restante_s"] = 0; doc["simulacao_persistente"] = s.mode == REMOTO_BANCADA;
-  preencherSinal(doc, s); doc["pt100_habilitado"] = pt100Configurado;
+  preencherSinal(doc, s, true); doc["pt100_habilitado"] = pt100Configurado;
   doc["sensores_integrados"] = pt100Configurado; doc["saidas_habilitadas"] = true;
   doc["wifi_conectado"] = WiFi.status() == WL_CONNECTED; doc["wifi_tentando"] = wifiTentando;
   doc["wifi_ssid"] = WiFi.status() == WL_CONNECTED ? WiFi.SSID() : wifiPendenteNome;
@@ -428,11 +444,15 @@ void enviarEstado() {
     for (int i = 0; i < 2; ++i) {
       const auto state = purgadores[i].state(millis()); JsonObject entry = timers.add<JsonObject>();
       entry["canal"] = i + 1; entry["fechado_min"] = purgadores[i].closedMinutes();
-      entry["aberto_s"] = purgadores[i].openSeconds(); entry["ativo"] = state.active;
-      entry["aberto"] = state.open; entry["restante_ms"] = state.remainingMs;
+      entry["aberto_s"] = purgadores[i].openSeconds();
+      const bool cadArmed = cadPurgeTest.armed(i);
+      entry["ativo"] = cadArmed ? cadPurgeTest.current() : state.active;
+      entry["aberto"] = cadArmed ? cadPurgeTest.requestedOpen(i) : state.open;
+      entry["comando_aberto"] = cadArmed ? cadPurgeTest.requestedOpen(i) : (purgeOutputs.armed(i) && state.open);
+      entry["restante_ms"] = state.remainingMs; entry["armado_teste_cad"] = cadArmed;
       entry["saida_fisica_habilitada"] = purgeOutputs.configured(); entry["armado_real"] = purgeOutputs.armed(i);
       entry["armado"] = purgeOutputs.armed(i);
-      entry["modo"] = purgeOutputs.armed(i) ? "REAL" : (state.active ? "SIMULACAO" : "PARADO");
+      entry["modo"] = cadArmed ? "TESTE_CAD" : (purgeOutputs.armed(i) ? "REAL" : (state.active ? "SIMULACAO" : "PARADO"));
       entry["pino_reservado"] = PurgeOutputs::pin(i);
     }
     xSemaphoreGive(mutexEstado);
@@ -472,7 +492,7 @@ void modoHandler() {
   else { servidor.send(400, "text/plain", "Modo invalido"); return; }
   if (xSemaphoreTake(mutexEstado, pdMS_TO_TICKS(20)) != pdTRUE) { servidor.send(503, "text/plain", "Tente novamente"); return; }
   modo = next; corManual = -1; fase = 0; inicioFase = millis(); remoteCommand.valid = false; ++remoteCommand.generation;
-  for (auto &p : purgadores) p.stop(); purgeOutputs.stopAll();
+  for (auto &p : purgadores) p.stop(); purgeOutputs.stopAll(); cadPurgeTest.stopAll();
   xSemaphoreGive(mutexEstado);
   preferenciasCAD.putString("modo", next == REMOTO_BANCADA ? "simulacao" : "parado");
   // A resposta de mudança será refletida pela tarefa local em até um ciclo.
@@ -496,7 +516,7 @@ void simularHandler() {
   else { servidor.send(400, "text/plain", "Etapa invalida"); return; }
   if (xSemaphoreTake(mutexEstado, pdMS_TO_TICKS(20)) != pdTRUE) { servidor.send(503, "text/plain", "Tente novamente"); return; }
   modo = SIMULACAO; fase = value; inicioFase = millis(); remoteCommand.valid = false;
-  for (auto &p : purgadores) p.stop(); purgeOutputs.stopAll();
+  for (auto &p : purgadores) p.stop(); purgeOutputs.stopAll(); cadPurgeTest.stopAll();
   xSemaphoreGive(mutexEstado); preferenciasCAD.putString("modo", "parado");
   servidor.send(200, "application/json", "{\"ok\":true}");
 }
@@ -507,7 +527,7 @@ void autorizarRemotoHandler() {
   if (WiFi.status() != WL_CONNECTED || copiarTokenCAD().isEmpty()) { servidor.send(409, "text/plain", "Conecte Wi-Fi e token CAD."); return; }
   if (xSemaphoreTake(mutexEstado, pdMS_TO_TICKS(20)) != pdTRUE) { servidor.send(503, "text/plain", "Tente novamente"); return; }
   modo = REMOTO_BANCADA; remoteCommand.valid = false; ++remoteCommand.generation;
-  for (auto &p : purgadores) p.stop(); purgeOutputs.stopAll(); xSemaphoreGive(mutexEstado);
+  for (auto &p : purgadores) p.stop(); purgeOutputs.stopAll(); cadPurgeTest.stopAll(); xSemaphoreGive(mutexEstado);
   preferenciasCAD.putString("modo", "simulacao"); servidor.send(200, "application/json", "{\"ok\":true}");
 }
 void purgadoresHandler() {
@@ -521,17 +541,24 @@ void purgadoresHandler() {
   if (action == "configurar" && (!digits(closed) || !digits(opened))) { servidor.send(400, "text/plain", "Tempos devem ser inteiros validos."); return; }
   if (xSemaphoreTake(mutexEstado, pdMS_TO_TICKS(20)) != pdTRUE) { servidor.send(503, "text/plain", "Tente novamente"); return; }
   bool ok = true;
-  if (action == "configurar") { purgeOutputs.stop(i); ok = purgadores[i].configure(closed.toInt(), opened.toInt()); }
-  else if (action == "iniciar" && modo != OPERACAO_REAL) { purgeOutputs.stop(i); purgadores[i].startSimulation(millis()); }
+  if (action == "configurar") { cadPurgeTest.stop(i); purgeOutputs.stop(i); ok = purgadores[i].configure(closed.toInt(), opened.toInt()); }
+  else if (action == "iniciar" && modo != OPERACAO_REAL && modo != REMOTO_BANCADA) { cadPurgeTest.stop(i); purgeOutputs.stop(i); purgadores[i].startSimulation(millis()); }
   else if (action == "armar_real" && (modo == PARADO || (modo == OPERACAO_REAL && localSnapshot.signal.hasTemperature)) && purgeOutputs.configured()) {
-    purgadores[i].stop(); ok = purgeOutputs.arm(i);
+    cadPurgeTest.stop(i); purgadores[i].stop(); ok = purgeOutputs.arm(i);
   }
   else if (action == "iniciar_real" && (modo == PARADO || (modo == OPERACAO_REAL && localSnapshot.signal.hasTemperature)) && purgeOutputs.armed(i))
     purgadores[i].startSimulation(millis()); // somente o scheduler; driver armado separado.
-  else if (action == "parar") { purgadores[i].stop(); purgeOutputs.stop(i); }
+  else if (action == "armar_teste_cad" && modo == REMOTO_BANCADA && purgeOutputs.configured()) {
+    cadPurgeTest.update(true, WiFi.status() == WL_CONNECTED, remoteCommand.valid && remoteCommand.completeState,
+      millis(), remoteCommand.receivedAt, remoteCommand.validity, remoteCommand.purgeOpen[0], remoteCommand.purgeOpen[1]);
+    ok = cadPurgeTest.arm(i);
+    if (ok) { purgadores[i].stop(); ok = purgeOutputs.arm(i); }
+    if (!ok) { cadPurgeTest.stop(i); purgeOutputs.stop(i); }
+  }
+  else if (action == "parar") { cadPurgeTest.stop(i); purgadores[i].stop(); purgeOutputs.stop(i); }
   else ok = false;
   xSemaphoreGive(mutexEstado);
-  if (!ok) { servidor.send(400, "text/plain", "Fechado 1-120 min; aberto 1-300 s. Simulacao apenas."); return; }
+  if (!ok) { servidor.send(400, "text/plain", "Comando indisponivel: confira modo, armamento e simulacao CAD atual. Tempos 1-120 min / 1-300 s."); return; }
   if (action == "configurar") {
     preferenciasPurga.putUInt(i == 0 ? "closed1" : "closed2", closed.toInt());
     preferenciasPurga.putUInt(i == 0 ? "open1" : "open2", opened.toInt());

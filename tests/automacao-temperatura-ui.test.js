@@ -38,7 +38,7 @@ test('sincronização transmite temperatura simulada e transições sem comando 
     replaceChildren() {}, setAttribute() {}, appendChild() {} });
   const els = Object.fromEntries(['sim-digestores','sim-remote-enable','sim-remote-status','sim-select-digestor',
     'sim-start','sim-remote-rows','sim-pause','sim-reset'].map(id => [id, { ...element(), id }]));
-  const card = { dataset: { temperaturaC: '120' }, querySelector() { return { dataset: { stage: 'red' } }; } };
+  const card = { dataset: { temperaturaC: '120', aquecimentoSimulado: 'true', camisaSimulada: 'ABERTO', eixoSimulado: 'FECHADO' }, querySelector() { return { dataset: { stage: 'red' } }; } };
   els['sim-digestores'].querySelector = () => card;
   els['sim-start'].disabled = true;
   els['sim-remote-enable'].dataset.csrf = 'csrf';
@@ -55,24 +55,28 @@ test('sincronização transmite temperatura simulada e transições sem comando 
   els['sim-remote-enable'].checked = true;
   handlers['sim-remote-enable:change']();
   await flush();
-  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'MEIO', temperatura_c: 120 }]);
+  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'MEIO', temperatura_c: 120, aquecimento_simulado: true, purgadores_simulados: { camisa: 'ABERTO', eixo: 'FECHADO' } }]);
   card.dataset.temperaturaC = '120.1';
+  card.dataset.aquecimentoSimulado = 'false';
+  card.dataset.camisaSimulada = 'FECHADO';
   handlers['sim-digestores:simulador:estado']();
   await flush();
-  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'FINAL', temperatura_c: 120.1 }]);
+  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'FINAL', temperatura_c: 120.1, aquecimento_simulado: false, purgadores_simulados: { camisa: 'FECHADO', eixo: 'FECHADO' } }]);
   card.dataset.temperaturaC = '50';
+  card.dataset.aquecimentoSimulado = 'true';
+  card.dataset.eixoSimulado = 'ABERTO';
   handlers['sim-digestores:simulador:estado']();
   await flush();
-  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'INICIO', temperatura_c: 50 }]);
+  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'INICIO', temperatura_c: 50, aquecimento_simulado: true, purgadores_simulados: { camisa: 'FECHADO', eixo: 'ABERTO' } }]);
   assert.ok(intervals.some(timer => timer.ms === 1000));
   card.dataset.temperaturaC = '';
   handlers['sim-digestores:simulador:estado']();
   await flush();
-  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'PARADO' }]);
+  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'PARADO', aquecimento_simulado: false, purgadores_simulados: { camisa: 'FECHADO', eixo: 'FECHADO' } }]);
   els['sim-start'].disabled = false;
   handlers['sim-digestores:simulador:estado']();
   await flush();
-  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'PARADO' }]);
+  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'PARADO', aquecimento_simulado: false, purgadores_simulados: { camisa: 'FECHADO', eixo: 'FECHADO' } }]);
 });
 
 test('PRONTO expira localmente com relógio avançado mesmo se próxima consulta ficar pendente', async () => {
@@ -128,4 +132,56 @@ test('latência de resposta entra na validade local e não renova leitura antiga
   assert.equal(apresentacao(delayed).ready, false);
   assert.equal(delayed.faixa_temperatura, null);
   assert.equal(delayed.cor_sinaleiro, null);
+});
+
+test('temperatura SIM atual é exibida como sensor simulado sem exigir PT100 real', () => {
+  const p = apresentacao({ ...real, origem: 'SIMULACAO', sensor_tipo: 'SIMULADO', sensor_status: 'SIMULADO', medicao_atual: false, simulacao_atual: true, fonte_simulacao: 'CAD' });
+  assert.equal(p.temperatura, '121,25 °C');
+  assert.equal(p.sensor, 'Sensor simulado · gerado pelo CAD');
+  assert.match(p.modo, /^SIMULAÇÃO/);
+  assert.match(p.pronto, /SIMULAÇÃO/);
+  assert.equal(p.lamp, 'red');
+  assert.equal(p.blink, true);
+  assert.equal(p.ready, true);
+});
+
+test('SIM sem pacote e SIM expirada aguardam CAD, sem apresentar falha de PT100', () => {
+  for (const d of [
+    { origem: 'SIMULACAO', sensor_status: 'SEM_SINAL', telemetria_atual: true },
+    { ...real, origem: 'SIMULACAO', sensor_status: 'SIMULADO', telemetria_atual: false },
+  ]) {
+    const p = apresentacao(d);
+    assert.equal(p.temperatura, '--,- °C');
+    assert.match(p.sensor, /Aguardando temperatura simulada do CAD/);
+    assert.doesNotMatch(p.sensor, /PT100|FALHA|SEM_SENSOR/);
+    assert.equal(p.lamp, 'off');
+    assert.equal(p.ready, false);
+  }
+  const fault = apresentacao({ ...real, sensor_status: 'FALHA', temperatura_c: null, cor_sinaleiro: 'DESLIGADO', faixa_temperatura: 'SENSOR_INDISPONIVEL' });
+  assert.equal(fault.sensor, 'FALHA');
+  assert.equal(fault.faixa, 'Sensor indisponível');
+  assert.equal(fault.ready, false);
+});
+
+test('SIM gerada localmente é identificada sem ser atribuída ao computador', () => {
+  const p = apresentacao({ ...real, origem: 'SIMULACAO', sensor_status: 'SIMULADO', simulacao_atual: true, fonte_simulacao: 'LOCAL' });
+  assert.equal(p.sensor, 'Sensor simulado · gerado no ESP32');
+  assert.doesNotMatch(p.sensor, /CAD|PT100/);
+});
+
+test('prazo CAD de 6,5 s limita temperatura e estados simulados, LOCAL continua independente', () => {
+  const { expirar } = require('../public/js/automacao-digestores');
+  const sim = { ...real, origem: 'SIMULACAO', sensor_status: 'SIMULADO', simulacao_atual: true, fonte_simulacao: 'CAD', validade_ms: 6500,
+    ultima_confirmacao_s: 0, medicao_idade_s: 0, estado_simulacao_disponivel: true,
+    aquecimento_simulado: true, purgadores_simulados: { camisa: 'ABERTO', eixo: 'FECHADO' } };
+  const current = apresentacao(expirar([sim], 6)[0]);
+  assert.equal(current.ready, true);
+  assert.equal(current.aquecimento, 'LIGADO · SIM.');
+  assert.match(current.purgadores, /Camisa: ABERTO/);
+  const stopped = expirar([sim], 6.5)[0];
+  assert.equal(apresentacao(stopped).ready, false);
+  assert.equal(apresentacao(stopped).temperatura, '--,- °C');
+  assert.equal(stopped.aquecimento_simulado, false);
+  assert.deepEqual(stopped.purgadores_simulados, { camisa: 'FECHADO', eixo: 'FECHADO' });
+  assert.equal(apresentacao(expirar([{ ...sim, fonte_simulacao: 'LOCAL', validade_ms: 0 }], 7)[0]).ready, true);
 });

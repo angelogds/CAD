@@ -8,12 +8,17 @@ const html = fs.readFileSync(path.join(__dirname, '../firmware/esp32-sinaleiros/
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const settle = () => new Promise(setImmediate);
 const channel = (canal, extra = {}) => ({ canal, fechado_min: canal === 1 ? 5 : 10, aberto_s: 60,
-  ativo: false, aberto: false, modo: 'PARADO', armado: false, saida_fisica_habilitada: true,
+  ativo: false, aberto: false, comando_aberto: false, modo: 'PARADO', armado: false, armado_teste_cad: false, saida_fisica_habilitada: true,
   pino_reservado: canal === 1 ? 25 : 26, restante_ms: 0, ...extra });
 const payload = (extra = {}) => ({ digestor: 1, modo: 'parado', origem: 'SIMULACAO', temperatura_c: null,
   faixa_temperatura: 'SENSOR_INDISPONIVEL', cor_sinaleiro: 'DESLIGADO', pronto_descarga: false,
   sensor_status: 'SEM_SENSOR', pt100_habilitado: false, vermelho: false, amarelo: false, verde: false,
   saidas_habilitadas: true, purgadores: [channel(1), channel(2)], ...extra });
+const remoteSimulation = (extra = {}) => payload({ modo: 'simulacao', origem: 'SIMULACAO',
+  sensor_status: 'SIMULADO', simulacao_cad_atual: true, estado_simulacao_disponivel: true, temperatura_c: 121.5,
+  faixa_temperatura: 'PRONTO', cor_sinaleiro: 'VERMELHO_PISCANDO', pronto_descarga: true,
+  vermelho: true, aquecimento_simulado: true,
+  purgadores_simulados: { camisa: 'ABERTO', eixo: 'FECHADO' }, ...extra });
 
 function makeElement() {
   const element = { textContent: '', className: '', dataset: {}, value: '', disabled: false, listeners: {},
@@ -112,7 +117,7 @@ test('HMI não inventa temperatura na simulação nem mantém pronto após perda
   const ui = createUi(payload({ modo: 'teste', faixa_temperatura: 'PRONTO', cor_sinaleiro: 'VERMELHO_PISCANDO', pronto_descarga: true }));
   await settle();
   assert.equal(ui.ids.get('d1temp').textContent, '—');
-  assert.equal(ui.ids.get('d1ready').textContent, 'Pronto · simulado');
+  assert.equal(ui.ids.get('d1ready').textContent, 'Pronto: não');
   ui.setFetch(async () => { throw new Error('Sem rede'); }); await ui.refresh();
   assert.equal(ui.ids.get('d1ready').textContent, 'Pronto não confirmado');
   assert.equal(ui.ids.get('d1signal').textContent, 'Sem leitura');
@@ -148,4 +153,93 @@ test('HMI mantém timeout ativo até receber corpo completo e limpa estado quand
   pending.forEach(timer => timer.fn()); await settle();
   assert.equal(ui.ids.get('connectionText').textContent, 'Sem comunicação local');
   assert.equal(ui.ids.get('d1ready').textContent, 'Pronto não confirmado');
+});
+
+test('HMI identifica temperatura e aquecimento simulados do PC e separa válvula virtual do relé comandado', async () => {
+  const ui = createUi(remoteSimulation()); await settle();
+  assert.equal(ui.ids.get('d1temp').textContent, '121,5');
+  assert.match(ui.ids.get('d1sensor').textContent, /simulad/i);
+  assert.equal(ui.ids.get('d1ready').textContent, 'Pronto · simulado');
+  assert.equal(ui.ids.get('pcSimStatus').textContent, 'SIMULAÇÃO PC ATUAL');
+  assert.equal(ui.ids.get('pcHeating').textContent, 'Aquecimento virtual: ligado · simulado');
+  assert.equal(ui.ids.get('p1virtual').textContent, 'Aberto · simulado');
+  assert.equal(ui.ids.get('p2virtual').textContent, 'Fechado · simulado');
+  assert.equal(ui.ids.get('p1relay').textContent, 'Fechar · comandado');
+  assert.equal(ui.query('[data-purge-cad="1"]')[0].disabled, false, 'referência PC não arma a saída local');
+  ui.setData(remoteSimulation({ purgadores: [channel(1, { modo: 'TESTE_CAD', armado_teste_cad: true,
+    ativo: true, aberto: true, comando_aberto: true }), channel(2)] }));
+  await ui.refresh();
+  assert.equal(ui.ids.get('p1relay').textContent, 'Abrir · comandado');
+  assert.equal(ui.query('[data-purge-cad="1"]')[0].disabled, true);
+  assert.equal(ui.query('[data-purge-cad="2"]')[0].disabled, false, 'arme de um canal não arma o outro');
+});
+
+test('HMI preserva temperatura simulada atual sem aceitar estados virtuais de pacote incompleto', async () => {
+  const ui = createUi(remoteSimulation({ estado_simulacao_disponivel: false })); await settle();
+  assert.equal(ui.ids.get('d1temp').textContent, '121,5');
+  assert.match(ui.ids.get('d1sensor').textContent, /simulad/i);
+  assert.equal(ui.ids.get('pcSimStatus').textContent, 'SIMULAÇÃO PC ATUAL');
+  assert.equal(ui.ids.get('pcHeating').textContent, 'Aquecimento virtual: não confirmado');
+  for (const ch of [1, 2]) {
+    assert.equal(ui.ids.get('p' + ch + 'virtual').textContent, 'Não informado');
+    assert.equal(ui.query('[data-purge-cad="' + ch + '"]')[0].disabled, true);
+  }
+});
+
+test('HMI distingue simulação aguardando ou expirada de leitura PT100 e esconde dados antigos', async () => {
+  const ui = createUi(remoteSimulation()); await settle();
+  for (const [status, label] of [['AGUARDANDO_SIMULACAO', 'AGUARDANDO SIMULAÇÃO'], ['SIMULACAO_EXPIRADA', 'SIMULAÇÃO EXPIRADA']]) {
+    ui.setData(remoteSimulation({ sensor_status: status, simulacao_cad_atual: false })); await ui.refresh();
+    assert.equal(ui.ids.get('pcSimStatus').textContent, label);
+    assert.equal(ui.ids.get('d1temp').textContent, '—');
+    assert.equal(ui.ids.get('d1ready').textContent, 'Pronto: não confirmado');
+    assert.equal(ui.ids.get('d1signal').textContent, 'Desligado');
+    assert.equal(ui.ids.get('d1red').classList.contains('active'), false);
+    assert.equal(ui.query('[data-purge-cad="1"]')[0].disabled, true);
+    assert.doesNotMatch(ui.ids.get('p1virtual').textContent, /Aberto/);
+    assert.doesNotMatch(ui.ids.get('pcHeating').textContent, /^Aquecimento virtual: ligado/);
+  }
+});
+
+test('HMI só permite armar teste CAD com simulação atual e mantém operação REAL independente dos campos PC', async () => {
+  const ui = createUi(remoteSimulation()); await settle();
+  const cadButton = () => ui.query('[data-purge-cad="1"]')[0];
+  assert.equal(cadButton().disabled, false);
+  for (const extra of [
+    { simulacao_cad_atual: false }, { estado_simulacao_disponivel: false }, { sensor_status: 'SEM_SENSOR' }, { temperatura_c: null },
+    { modo: 'manual' }, { origem: 'REAL' },
+    { purgadores: [channel(1, { saida_fisica_habilitada: false }), channel(2)] },
+    { purgadores: [channel(1, { armado: true, modo: 'REAL' }), channel(2)] },
+    { purgadores: [channel(1, { ativo: true, modo: 'SIMULACAO' }), channel(2)] },
+  ]) {
+    ui.setData(remoteSimulation(extra)); await ui.refresh();
+    assert.equal(cadButton().disabled, true, JSON.stringify(extra));
+  }
+  ui.setData(remoteSimulation({ modo: 'real', origem: 'REAL', sensor_status: 'VALIDO', temperatura_c: 105,
+    faixa_temperatura: 'ALTA', cor_sinaleiro: 'VERMELHO', pronto_descarga: false, pt100_habilitado: true }));
+  await ui.refresh();
+  assert.equal(ui.ids.get('d1temp').textContent, '105,0');
+  assert.equal(ui.ids.get('d1signal').textContent, 'Vermelho fixo');
+  assert.equal(ui.ids.get('pcSimStatus').textContent, 'PT100 REAL');
+  assert.equal(ui.ids.get('pcHeating').textContent, 'Aquecimento virtual: não utilizado no modo real');
+  assert.equal(ui.ids.get('p1virtual').textContent, 'Não utilizado no modo real');
+  assert.equal(cadButton().disabled, true);
+});
+
+test('HMI envia arme CAD como ação local explícita e limpa referências virtuais na perda de contato', async () => {
+  const ui = createUi(remoteSimulation()); await settle();
+  const before = ui.requests.length;
+  await ui.click('[data-purge-cad="1"]');
+  const command = ui.requests.slice(before).find(item => item.url === '/api/purgadores' && item.options.method === 'POST');
+  assert.ok(command);
+  assert.equal(command.options.headers['X-CGD-Local'], 'true');
+  assert.deepEqual(Object.fromEntries(command.options.body), { canal: '1', valor: 'armar_teste_cad' });
+  ui.setFetch(async () => { throw new Error('Sem rede'); }); await ui.refresh();
+  assert.equal(ui.ids.get('pcSimStatus').textContent, 'SEM CONTATO');
+  assert.equal(ui.ids.get('pcHeating').textContent, 'Aquecimento virtual: não confirmado');
+  for (const ch of [1, 2]) {
+    assert.equal(ui.ids.get('p' + ch + 'virtual').textContent, 'Não confirmado');
+    assert.equal(ui.ids.get('p' + ch + 'relay').textContent, 'Não confirmado');
+    assert.equal(ui.query('[data-purge-cad="' + ch + '"]')[0].disabled, true);
+  }
 });

@@ -6,20 +6,28 @@
   const FAIXAS = { BAIXA: 'Baixa / início', INTERMEDIARIA: 'Aquecimento intermediário', ALTA: 'Faixa alta de cozimento', PRONTO: 'Pronto para descarga', SENSOR_INDISPONIVEL: 'Sensor indisponível' };
   function apresentacao(d = {}) {
     const real = d.origem === 'REAL';
+    const simulacao = d.origem === 'SIMULACAO';
     const atual = d.telemetria_atual === true;
-    const medicao = real && atual && d.medicao_atual === true && d.sensor_status === 'VALIDO' && typeof d.temperatura_c === 'number' && Number.isFinite(d.temperatura_c);
-    // A cor vem do firmware; não é calculada a partir da temperatura pelo CAD.
-    const cor = atual && real && CORES[d.cor_sinaleiro] ? CORES[d.cor_sinaleiro] : ['off', 'Sem estado atual'];
+    const temperaturaValida = typeof d.temperatura_c === 'number' && Number.isFinite(d.temperatura_c) && d.temperatura_c >= 0 && d.temperatura_c <= 850;
+    const medicaoReal = real && atual && d.medicao_atual === true && d.sensor_status === 'VALIDO' && temperaturaValida;
+    const medicaoSimulada = simulacao && atual && d.simulacao_atual === true && d.sensor_status === 'SIMULADO' && temperaturaValida;
+    const fonteSimulada = d.fonte_simulacao === 'LOCAL' ? 'gerado no ESP32' : d.fonte_simulacao === 'CAD' ? 'gerado pelo CAD' : 'origem não informada';
+    const componentesSimulados = medicaoSimulada && d.estado_simulacao_disponivel === true;
+    const medicao = medicaoReal || medicaoSimulada;
+    // A cor recebida pertence à origem indicada; nenhuma leitura SIM é tratada como PT100.
+    const cor = (medicao || real && atual && d.cor_sinaleiro === 'DESLIGADO') && CORES[d.cor_sinaleiro] ? CORES[d.cor_sinaleiro] : ['off', 'Sem estado atual'];
     const pronto = medicao && d.pronto_descarga === true && d.cor_sinaleiro === 'VERMELHO_PISCANDO';
     return {
-      modo: real ? 'OPERAÇÃO REAL · SUPERVISÃO' : 'SIMULAÇÃO · SEM MEDIÇÃO REAL',
+      modo: real ? 'OPERAÇÃO REAL · SUPERVISÃO' : simulacao ? 'SIMULAÇÃO · '+fonteSimulada.toUpperCase() : 'AGUARDANDO TELEMETRIA',
       temperatura: medicao ? d.temperatura_c.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + ' °C' : '--,- °C',
-      faixa: atual && real ? (FAIXAS[d.faixa_temperatura] || 'Faixa não informada') : 'Aguardando telemetria atual',
-      cor: cor[1], lamp: cor[0], blink: atual && real && d.cor_sinaleiro === 'VERMELHO_PISCANDO',
-      pronto: pronto ? 'PRONTO PARA DESCARGA · indicação térmica' : 'Pronto para descarga: não confirmado',
-      sensor: real ? (atual ? d.sensor_status || 'SEM_SENSOR' : 'SEM_SINAL') : 'SEM MEDIÇÃO REAL',
+      faixa: medicao || real && atual ? (FAIXAS[d.faixa_temperatura] || 'Faixa não informada') : simulacao ? 'Aguardando temperatura simulada do CAD' : 'Aguardando telemetria atual',
+      cor: cor[1], lamp: cor[0], blink: medicao && d.cor_sinaleiro === 'VERMELHO_PISCANDO',
+      pronto: pronto ? (medicaoSimulada ? 'PRONTO PARA DESCARGA · SIMULAÇÃO' : 'PRONTO PARA DESCARGA · indicação térmica') : 'Pronto para descarga: não confirmado',
+      sensor: real ? (atual ? d.sensor_status || 'SEM_SENSOR' : 'SEM_SINAL') : medicaoSimulada ? 'Sensor simulado · '+fonteSimulada : simulacao ? 'Aguardando temperatura simulada do CAD' : 'Aguardando origem da temperatura',
       contato: d.ultimo_contato_s == null ? 'Nunca' : d.ultimo_contato_s < 2 ? 'Agora' : d.ultimo_contato_s + ' s atrás',
-      medicao: medicao && d.timestamp_medicao ? d.timestamp_medicao : 'Sem leitura atual',
+      medicao: medicao && d.timestamp_medicao ? d.timestamp_medicao : medicaoSimulada ? 'Temperatura simulada · '+fonteSimulada : 'Sem leitura atual',
+      aquecimento: componentesSimulados && typeof d.aquecimento_simulado === 'boolean' ? (d.aquecimento_simulado ? 'LIGADO · SIM.' : 'DESLIGADO · SIM.') : 'Sem estado simulado',
+      purgadores: componentesSimulados && d.purgadores_simulados ? 'Camisa: '+d.purgadores_simulados.camisa+' · Eixo: '+d.purgadores_simulados.eixo+' · SIM.' : 'Sem estado simulado',
       conexao: d.conexao || 'SEM_DISPOSITIVO',
       ready: pronto,
     };
@@ -27,7 +35,10 @@
   function expirar(digestores, segundos) {
     return digestores.map(d => {
       const idade = Math.max(Number(d.ultima_confirmacao_s) || 0, Number(d.medicao_idade_s) || 0) + segundos;
-      return idade >= 15 ? { ...d, telemetria_atual: false, medicao_atual: false, pronto_descarga: false,
+      const prazoCad = d.origem === 'SIMULACAO' && d.fonte_simulacao === 'CAD';
+      const expirouCad = prazoCad && (!Number.isFinite(d.validade_ms) || segundos * 1000 >= d.validade_ms);
+      return idade >= 15 || expirouCad ? { ...d, telemetria_atual: false, medicao_atual: false, simulacao_atual: false, pronto_descarga: false,
+        estado_simulacao_disponivel: false, aquecimento_simulado: false, purgadores_simulados: { camisa: 'FECHADO', eixo: 'FECHADO' },
         temperatura_c: null, cor_sinaleiro: null, faixa_temperatura: null, fase_recebida: null, fase_aplicada: null,
         recebida_status: 'PENDENTE', aplicacao_status: 'PENDENTE', saida_status: 'NAO_INFORMADA' } : d;
     });

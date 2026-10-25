@@ -1,5 +1,6 @@
 #include "purge_outputs.h"
 #include "purge_timer.h"
+#include "cad_purge_test.h"
 #include <assert.h>
 #include <stdio.h>
 #include <vector>
@@ -118,6 +119,27 @@ int main() {
   timer.startSimulation(150000);
   service(153000, true); // Stall before the first service must also disarm.
   assert(!timer.isActive() && !outputs.armed(0) && levels[25] == HIGH);
+
+  // Actual PC simulation requests cannot energize a solenoid before LOCAL arm.
+  cgd::CadPurgeTest cad;
+  assert(cad.update(true,true,true,200000,200000,6500,true,false));
+  outputs.apply(0,cad.requestedOpen(0),cad.current());
+  assert(levels[25] == HIGH && !outputs.armed(0));
+  assert(cad.arm(0) && outputs.arm(0)); // Mirrors the guarded local API only.
+  outputs.apply(0,cad.requestedOpen(0),cad.current());
+  assert(levels[25] == LOW && levels[26] == HIGH);
+  assert(cad.update(true,true,true,200100,200100,6500,false,true));
+  outputs.apply(0,cad.requestedOpen(0),cad.current());
+  outputs.apply(1,cad.requestedOpen(1),cad.current());
+  assert(levels[25] == HIGH && levels[26] == HIGH); // Channel 2 remains unauthorized.
+  assert(cad.arm(1) && outputs.arm(1));
+  outputs.apply(1,cad.requestedOpen(1),cad.current()); assert(levels[26] == LOW);
+  assert(!cad.update(true,false,true,200200,200100,6500,false,true));
+  for(int i=0;i<2;++i){if(!cad.armed(i))outputs.stop(i);outputs.apply(i,cad.requestedOpen(i),cad.current());}
+  assert(!outputs.armed(0)&&!outputs.armed(1)&&levels[25]==HIGH&&levels[26]==HIGH);
+  assert(cad.update(true,true,true,200300,200300,6500,true,true));
+  for(int i=0;i<2;++i)outputs.apply(i,cad.requestedOpen(i),cad.current());
+  assert(levels[25]==HIGH&&levels[26]==HIGH); // Reconnection cannot revive authorization.
 #else
   assert(!outputs.configured());
   assert(events.empty());

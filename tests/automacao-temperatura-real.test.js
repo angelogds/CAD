@@ -4,7 +4,7 @@ const express = require('express');
 let db;
 try { db = new (require('better-sqlite3'))(':memory:'); } catch { db = new (require('node:sqlite').DatabaseSync)(':memory:'); }
 require.cache[require.resolve('../database/db')] = { exports: db };
-for (const m of ['229_automacao_dispositivos','230_automacao_dispositivo_estados','231_automacao_sinaleiros_bancada','232_automacao_bancada_telemetria','233_automacao_bancada_correlacao','235_automacao_temperatura_real']) require('../database/migrations/'+m+'.js')();
+for (const m of ['229_automacao_dispositivos','230_automacao_dispositivo_estados','231_automacao_sinaleiros_bancada','232_automacao_bancada_telemetria','233_automacao_bancada_correlacao','235_automacao_temperatura_real','236_automacao_sensor_simulado']) require('../database/migrations/'+m+'.js')();
 const devices = require('../modules/automacao/dispositivos.service');
 const tel = require('../modules/automacao/bancada-telemetria.service');
 const bancada = require('../modules/automacao/sinaleiro-bancada.service');

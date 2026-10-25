@@ -11,6 +11,7 @@ require('../database/migrations/231_automacao_sinaleiros_bancada.js')();
 require('../database/migrations/232_automacao_bancada_telemetria.js')();
 require('../database/migrations/233_automacao_bancada_correlacao.js')();
 require('../database/migrations/235_automacao_temperatura_real.js')();
+require('../database/migrations/236_automacao_sensor_simulado.js')();
 const svc = require('../modules/automacao/dispositivos.service');
 after(() => db.close());
 
