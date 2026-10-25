@@ -85,7 +85,7 @@ pelo firmware também não comprova feedback elétrico da lâmpada.
 ## IHM local de cada ESP32
 
 Identidade: **2A Automação Industrial** e
-**Pauler B · Angelo Gomes da Silva — Fundador**.
+**Ângelo Gomes da Silva — Fundador**.
 Paleta de branco, cinza, vermelho e preto; cores funcionais dos sinaleiros
 preservadas. Organizar a página em temperatura e faixa, estado do ESP32,
 sensor, sinaleiros, Wi-Fi, integração CAD e modos. Destacar modo REAL ou

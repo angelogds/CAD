@@ -16,7 +16,7 @@ const char LOCAL_UI[] PROGMEM = R"LOCALHTML(<!doctype html>
 </style>
 </head>
 <body>
-<header><div class="wrap brandbar"><div class="brand"><div class="monogram" aria-hidden="true">2A</div><div><strong>2A Automação Industrial</strong><div class="byline">Pauler B · Angelo Gomes da Silva — Fundador</div></div></div><div class="local"><b>Campo do Gado</b>IHM local · ESP32 individual por digestor</div></div></header>
+<header><div class="wrap brandbar"><div class="brand"><div class="monogram" aria-hidden="true">2A</div><div><strong>2A Automação Industrial</strong><div class="byline">Ângelo Gomes da Silva — Fundador</div></div></div><div class="local"><b>Campo do Gado</b>IHM local · ESP32 individual por digestor</div></div></header>
 <main class="wrap">
 <div class="topline"><div><div class="eyebrow">Painel de automação</div><h1>Supervisão dos digestores</h1><p class="sub">Temperatura, sinaleiros e testes de bancada.</p></div><div><button class="refresh" id="refresh" type="button">Atualizar painel</button><div id="connection" class="connection offline" role="status"><span class="dot" aria-hidden="true"></span><span id="connectionText">Aguardando conexão</span></div></div></div>
 <section class="dashboard" aria-label="Digestores">
