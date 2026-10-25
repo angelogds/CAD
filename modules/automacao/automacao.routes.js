@@ -60,6 +60,15 @@ router.get('/api/dispositivos', ...adminApi, (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   return res.json({ ok: true, dispositivos: devices.listDevices() });
 });
+// Link local guardado no CAD. Acessado apenas pelo navegador do operador na mesma LAN.
+router.post('/api/dispositivos/:deviceId/local-url', ...adminApi, csrfAdmin, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    return res.json({ ok: true, ...devices.updateLocalUrl(req.params.deviceId, req.body && req.body.local_url) });
+  } catch (e) {
+    return res.status(e.status || 400).json({ ok: false, error: e.message });
+  }
+});
 router.post('/api/dispositivos/:deviceId/token', ...adminApi, csrfAdmin, (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   try {
