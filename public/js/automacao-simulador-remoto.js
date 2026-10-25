@@ -9,18 +9,25 @@
   if(!root||!toggle||!status||!selector||!start)return;
   let timer=null,busy=false,statusTimer=null;
   const rows=document.getElementById('sim-remote-rows');
-  const CONEXAO={ONLINE:'Online',ATRASADO:'Comunicação atrasada',OFFLINE:'Offline',SEM_DISPOSITIVO:'Sem ESP32 registrado'};
+  const http=window.CGDBancadaHttp;
+  if(!http){status.textContent='Erro: módulo de comunicação da bancada não carregado';return;}
+  const CONEXAO={ONLINE:'Online',ATRASADO:'Comunicação atrasada',OFFLINE:'ESP32 offline',SEM_DISPOSITIVO:'Sem ESP32 registrado'};
   const SAIDA=v=>v==='CONFIRMADA'?'Confirmada':v==='NAO_CONFIRMADA'?'Não confirmada':'Não informada';
   const STATUS={PENDENTE:'Pendente',NAO_INFORMADA:'Não informada',DIVERGENTE:'Divergente'};
   const fase=(f,st)=>f&&st==='CONFIRMADA'?f:(f&&st==='DIVERGENTE'?f+' (divergente)':(STATUS[st]||'Pendente'));
   const txt=(v)=>v==null?'—':String(v);
   const ago=(v)=>v==null?'nunca':(v<2?'agora':v+' s atrás');
+  function falhaComunicacao(e) {
+    // Interrompe renovações; o firmware desliga as saídas ao expirar o comando (6,5 s).
+    toggle.checked=false;
+    if(timer!==null){clearInterval(timer);timer=null;}
+    status.textContent=(e.kind==='sessao'?'Sessão expirada — entre novamente no CAD':'Erro na sincronização: '+e.message)+'. Renovações interrompidas; comandos expiram automaticamente.';
+  }
   async function refreshStatus() {
     if(!rows)return;
     try{
-      const r=await fetch('/automacao/api/simulador/sinaleiros/status',{credentials:'same-origin',cache:'no-store'});
-      if(!r.ok)throw new Error('HTTP '+r.status);
-      const data=await r.json();
+      const data=await http.fetchJson('/automacao/api/simulador/sinaleiros/status');
+      if(!Array.isArray(data.digestores))throw new http.BancadaError('resposta','Resposta inesperada do servidor (sem digestores)');
       const sel=selector.value==='all'?null:Number(selector.value);
       rows.replaceChildren(...data.digestores.filter(d=>sel===null||d.digestor_id===sel).map(d=>{
         const tr=document.createElement('tr');
@@ -29,7 +36,12 @@
         return tr;
       }));
     }catch(e){
-      rows.replaceChildren(Object.assign(document.createElement('tr'),{innerHTML:'<td colspan="7">Status indisponível ('+e.message+')</td>'}));
+      const tr=document.createElement('tr'),td=document.createElement('td');
+      td.colSpan=7;
+      td.textContent=(e.kind==='sessao'?'Sessão expirada — entre novamente no CAD':e.kind==='servidor'?'Erro do servidor: ':'Supervisão indisponível: ')+(e.kind==='sessao'?'':e.message);
+      td.dataset.erro=e.kind||'desconhecido';
+      tr.appendChild(td);rows.replaceChildren(tr);
+      if(e.kind==='sessao'||e.kind==='permissao')falhaComunicacao(e);
     }
   }
   void refreshStatus();
@@ -49,18 +61,16 @@
     busy=true;
     const estados=snapshots(stopped);
     try{
-      const response=await fetch('/automacao/api/simulador/sinaleiros',{
-        method:'POST',credentials:'same-origin',cache:'no-store',
+      const resp=await http.fetchJson('/automacao/api/simulador/sinaleiros',{
+        method:'POST',
         headers:{'Content-Type':'application/json','X-CGD-CSRF':toggle.dataset.csrf},
         body:JSON.stringify({estados}),
       });
-      if(!response.ok)throw new Error('HTTP '+response.status);
+      if(resp.ok===false||!Array.isArray(resp.estados))throw new http.BancadaError('resposta',resp.error||'Publicação não confirmada pelo servidor');
       void refreshStatus();
       status.textContent=stopped?'Teste remoto interrompido':'Sincronização de bancada: '+estados.map(e=>'D'+e.digestor_id+' '+e.fase).join(' · ');
     }catch(e){
-      toggle.checked=false;
-      if(timer!==null){clearInterval(timer);timer=null;}
-      status.textContent='Erro na sincronização: '+e.message+'; comandos expiram automaticamente.';
+      falhaComunicacao(e);
     }finally{busy=false;}
   }
   function stop() {
