@@ -58,6 +58,14 @@
             <path d="M<%= x - 15 %> 313V385L<%= x + 5 %> 413" class="circuito-discharge"/>
             <path d="M<%= x - 15 %> 313V385L<%= x + 5 %> 413" data-flow="digestor<%= id %>" class="circuito-flow"/>
             <text x="<%= x %>" y="341" text-anchor="middle" class="circuito-label" data-circuito-unit-status="<%= id %>">Sem sinal mecânico</text>
+            <!-- Torre térmica de três lentes; independente do motor e das válvulas. -->
+            <g data-circuito-tower="<%= id %>" data-thermal="DESLIGADO" transform="translate(<%= x + 96 %> 202)" aria-hidden="true">
+              <path d="M0 17V29" class="circuito-tower-pole"/>
+              <rect x="-13" y="-43" width="26" height="60" rx="8" class="circuito-tower-body"/>
+              <circle cx="0" cy="-32" r="7" class="circuito-tower-red"/>
+              <circle cx="0" cy="-13" r="7" class="circuito-tower-yellow"/>
+              <circle cx="0" cy="6" r="7" class="circuito-tower-green"/>
+            </g>
           </g>
           <% }) %>
           <g data-circuito-equipment="percolator" tabindex="0" role="button" aria-label="Selecionar percoladora e sua rosca interna" aria-pressed="false" data-active="false">

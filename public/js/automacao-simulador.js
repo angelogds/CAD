@@ -88,9 +88,13 @@
   }
 
   function render() {
+    const thermalStates = Array(4).fill('DESLIGADO');
     clock.textContent = 'Tempo virtual: ' + formatTime(virtualSeconds);
     for (const item of values) {
       const faixa = core.faixaTemperatura(item.temp);
+      if (selected(item) && Number.isFinite(item.temp))
+        thermalStates[item.id - 1] = faixa.blink ? 'VERMELHO_PISCANDO' : faixa.lamp === 'red' ? 'VERMELHO'
+          : faixa.lamp === 'yellow' ? 'AMARELO' : faixa.lamp === 'green' ? 'VERDE' : 'DESLIGADO';
       const ready = faixa.ready;
       const heating = running && item.enabled && !ready;
       item.card.classList.toggle('is-heating', heating);
@@ -146,6 +150,10 @@
       get(item.card, 'eixo-icon').textContent = purga.eixo === 'ABERTO' ? '◀  ▶' : '◁▷';
       drawChart(item);
     }
+    // Réplica somente visual dos cards do simulador; não envia comandos para o ESP32.
+    window.CGDThermalState = { states: thermalStates, source: 'SIMULACAO_LOCAL' };
+    if (typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function')
+      window.dispatchEvent(new CustomEvent('digestores-circuito:thermal', { detail: window.CGDThermalState }));
     root.dispatchEvent(new CustomEvent('simulador:estado'));
   }
 
