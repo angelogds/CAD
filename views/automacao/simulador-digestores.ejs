@@ -44,7 +44,7 @@
       <tbody id="sim-remote-rows"><tr><td colspan="12">Carregando…</td></tr></tbody>
     </table></div></details>
     <small>“Aplicada” e “Saída” só aparecem se o firmware informar. Purgadores permanecem fechados até uma autorização explícita no CAD e uma autorização local por canal no ESP32, somente para bancada isolada.</small>
-    <p><a href="/automacao/configuracao">Configuração dos ESP32 e links para suas IHMs locais</a></p>
+    <% if (configuracaoAdmin) { %><p><a href="/automacao/configuracao">Configuração dos ESP32 e links para suas IHMs locais</a></p><% } else { %><p>Credenciais são configuradas pelo ADMIN. Para o teste da bancada, selecione SIMULAÇÃO na IHM local de cada ESP32 autorizado.</p><% } %>
   </section>
   <% } %>
   <div class="sim-toolbar">
