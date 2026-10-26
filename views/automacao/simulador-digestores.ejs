@@ -1,7 +1,7 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261026-circuitos-v2">
-<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261026-circuitos-v2">
-<link rel="stylesheet" href="/css/automacao-digestores-circuito.css?v=20261026-circuito2">
+<link rel="stylesheet" href="/css/automacao.css?v=20261026-circuitos-torres1">
+<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261026-circuitos-torres1">
+<link rel="stylesheet" href="/css/automacao-digestores-circuito.css?v=20261026-torres1">
 <main class="auto-page auto-hmi auto-2a" id="sim-digestores">
   <%- include('partials/brand') %>
   <div class="auto-actions-top"><a class="auto-back-link" href="<%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? '/automacao' : '/automacao/digestores' %>">← <%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? 'Voltar à automação' : 'Voltar aos Digestores' %></a></div>
@@ -131,9 +131,9 @@
     <article class="auto-panel"><h2>Limites do simulador</h2><p>O ciclo é gerado no navegador e pode ser sincronizado com a bancada. O aquecimento é apenas representado. Os purgadores alternam em 30 segundos virtuais por digestor habilitado; seus estados são enviados ao ESP32 quando a sincronização está ativa. Pausar ou reiniciar fecha ambos os estados. O teste físico de solenoides depende da liberação local de cada canal.</p></article>
   </section>
 </main>
-<script src="/js/automacao-simulador-core.js?v=20261026-circuitos-v2" defer></script>
-<script src="/js/automacao-simulador.js?v=20261026-circuitos-v2" defer></script>
-<% if (simuladorBancadaAdmin) { %><script src="/js/automacao-simulador-http.js?v=20261026-circuitos-v2" defer></script><script src="/js/automacao-digestores.js?v=20261026-circuitos-v2" defer></script><script src="/js/automacao-simulador-remoto.js?v=20261026-circuitos-v2" defer></script><% } %>
-<script src="/js/automacao-digestores-circuito-core.js?v=20261026-circuito2" defer></script>
-<script src="/js/automacao-digestores-circuito.js?v=20261026-circuito2" defer></script>
-<script type="module" src="/js/automacao-digestores-3d.mjs?v=20261026-circuito2"></script>
+<script src="/js/automacao-simulador-core.js?v=20261026-circuitos-torres1" defer></script>
+<script src="/js/automacao-simulador.js?v=20261026-circuitos-torres1" defer></script>
+<% if (simuladorBancadaAdmin) { %><script src="/js/automacao-simulador-http.js?v=20261026-circuitos-torres1" defer></script><script src="/js/automacao-digestores.js?v=20261026-circuitos-torres1" defer></script><script src="/js/automacao-simulador-remoto.js?v=20261026-circuitos-torres1" defer></script><% } %>
+<script src="/js/automacao-digestores-circuito-core.js?v=20261026-torres1" defer></script>
+<script src="/js/automacao-digestores-circuito.js?v=20261026-torres1" defer></script>
+<script type="module" src="/js/automacao-digestores-3d.mjs?v=20261026-torres1"></script>
