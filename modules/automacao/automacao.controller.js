@@ -58,13 +58,15 @@ function prensas(req, res) {
 function simuladorDigestores(req, res) {
   const role = normalizeRole(req.session && req.session.user && req.session.user.role);
   res.setHeader('Cache-Control', 'no-store');
-  const admin = role === 'ADMIN';
-  if (admin && req.session && !req.session.automacaoConfigCsrf) req.session.automacaoConfigCsrf=crypto.randomBytes(32).toString('hex');
+  const podeSincronizarBancada = ACCESS.automacao_bancada_simulate.includes(role);
+  if (podeSincronizarBancada && req.session && !req.session.automacaoConfigCsrf) req.session.automacaoConfigCsrf=crypto.randomBytes(32).toString('hex');
   return res.render('automacao/simulador-digestores', {
-    simuladorBancadaAdmin: admin,
+    simuladorBancadaAdmin: podeSincronizarBancada,
+    simuladorBancadaPermitida: podeSincronizarBancada,
+    configuracaoAdmin: role === 'ADMIN',
     simulacaoCircuitoPermitida: ACCESS.automacao_decanters_simulate.includes(role),
     visualizacaoAutomacaoCompleta: ACCESS.automacao_view.includes(role),
-    csrfAutomacao: admin && req.session ? req.session.automacaoConfigCsrf : '',
+    csrfAutomacao: podeSincronizarBancada && req.session ? req.session.automacaoConfigCsrf : '',
     title: '2A Automação Industrial · Simulador dos Digestores',
     activeMenu: 'automacao',
   });

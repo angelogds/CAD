@@ -26,7 +26,7 @@ test('sinaleiro de bancada aceita somente fases previstas e expira',()=>{
   db.prepare('UPDATE automacao_sinaleiros_bancada SET valid_until_ms=0 WHERE digestor_id=1').run();
   assert.equal(bancada.poll(d,1).fase,'PARADO');
 });
-test('admin publica sinais; supervisor não e CSRF é obrigatório',async()=>{
+test('supervisor e admin publicam sinais apenas com CSRF; gestão dos tokens continua ADMIN',async()=>{
   const app=express();app.use(express.json());
   let role='MANUTENCAO_SUPERVISOR';
   app.use((req,_res,next)=>{req.session={user:{id:1,role},automacaoConfigCsrf:'test_csrf'};req.flash=()=>{};next()});
@@ -35,6 +35,9 @@ test('admin publica sinais; supervisor não e CSRF é obrigatório',async()=>{
   try {
     const payload=JSON.stringify({estados:[{digestor_id:1,fase:'INICIO'}]});
     const send=(headers={})=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json',...headers},body:payload});
+    assert.equal((await send()).status,403);
+    assert.equal((await send({'X-CGD-CSRF':'test_csrf'})).status,200);
+    role='COMPRAS';
     assert.equal((await send({'X-CGD-CSRF':'test_csrf'})).status,403);
     role='ADMIN';
     assert.equal((await send()).status,403);

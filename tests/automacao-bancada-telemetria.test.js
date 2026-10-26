@@ -112,14 +112,16 @@ test('token geral informa digestor; quatro digestores são independentes',async(
   assert.equal(s[2].fase_aplicada,'INICIO'); assert.equal(s[0].fase_aplicada,null);
 });
 
-test('status só para ADMIN',async()=>{
+test('status da bancada acessível a supervisor e ADMIN, não aos demais perfis',async()=>{
   const app=express();app.use(express.json());
   let role='MANUTENCAO_SUPERVISOR';
   app.use((req,_res,next)=>{req.session={user:{id:1,role}};req.flash=()=>{};next()});
   app.use('/automacao',require('../modules/automacao/automacao.routes'));
   const server=app.listen(0);const url='http://127.0.0.1:'+server.address().port+'/automacao/api/simulador/sinaleiros/status';
   try{
-    assert.notEqual((await fetch(url,{redirect:'manual'})).status,200);
+    assert.equal((await fetch(url,{redirect:'manual'})).status,200);
+    role='COMPRAS';
+    assert.equal((await fetch(url,{redirect:'manual'})).status,403);
     role='ADMIN';
     const r=await fetch(url);assert.equal(r.status,200);
     const b=await r.json();assert.equal(b.digestores.length,4);assert.equal(b.comando_industrial_habilitado,false);

@@ -184,6 +184,21 @@
   }
   main.querySelectorAll('[data-select-key]').forEach(element => element.addEventListener('click', () => selectEquipment(element.dataset.selectKey)));
   if (simulationAllowed) {
+    // Consulta autenticada e somente de leitura. Ainda não existe canal ESP32 homologado
+    // para as decanters: não usar o dispositivo DIGESTOR-01 nem fingir que a maquete é telemetria.
+    async function verificarEsp32Decanter() {
+      const status = $('dec-esp32-status');
+      if(status) status.textContent = 'Consultando cadastro e integração do ESP32 das decanters…';
+      try {
+        const response = await fetch('/automacao/api/decanters/esp32/status',
+          { credentials: 'same-origin', cache: 'no-store', redirect: 'manual', headers: { Accept: 'application/json' } });
+        if(!response.ok || !(response.headers.get('content-type') || '').includes('application/json'))
+          throw new Error(response.status === 401 ? 'Sessão expirada' : 'Consulta não disponível');
+        const data = await response.json();
+        if(status) status.textContent = data.integrado && data.conectado ? 'ESP32 conectado' : data.mensagem || 'ESP32 das decanters ainda não integrado';
+      } catch (_e) { if(status) status.textContent = 'Não foi possível verificar o ESP32 das decanters; a simulação continua local.'; }
+    }
+    $('dec-esp32-connect')?.addEventListener('click', () => { void verificarEsp32Decanter(); });
     simControls.forEach(input => input.addEventListener('change', () => {
       const key = input.dataset.core;
       const value = input.type === 'checkbox' ? input.checked : input.type === 'number' ? input.value === '' ? null : input.valueAsNumber
@@ -191,7 +206,7 @@
       const result = change(key, value);
       if (!result.ok) { input.blur(); renderControls(Core.snapshot(state)); }
     }));
-    $('dec-demo-start').addEventListener('click', () => { Core.startDemo(state); $('dec-sim-panel').open = true; render(); feedback('Simulação iniciada. Configure as condições ou escolha Demonstrar FAST e GRATE.'); });
+    $('dec-demo-start').addEventListener('click', () => { void verificarEsp32Decanter(); Core.startDemo(state); $('dec-sim-panel').open = true; render(); feedback('Simulação iniciada. Configure as condições ou escolha Demonstrar FAST e GRATE.'); });
     $('dec-live-return').addEventListener('click', () => { Core.dispatch(state, { type: 'LIVE' }); render(); });
     $('dec-demo-circuit').addEventListener('click', () => {
       Core.startDemo(state);

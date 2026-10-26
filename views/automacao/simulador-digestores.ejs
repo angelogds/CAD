@@ -1,6 +1,7 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261026-circuitos-torres1">
-<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261026-circuitos-torres1">
+<% const bancadaPermitida = typeof simuladorBancadaPermitida !== 'undefined' ? simuladorBancadaPermitida : (typeof simuladorBancadaAdmin !== 'undefined' && simuladorBancadaAdmin); %>
+<link rel="stylesheet" href="/css/automacao.css?v=20261026-sync-esp-1">
+<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261026-sync-esp-1">
 <link rel="stylesheet" href="/css/automacao-digestores-circuito.css?v=20261026-torres1">
 <main class="auto-page auto-hmi auto-2a" id="sim-digestores">
   <%- include('partials/brand') %>
@@ -9,7 +10,7 @@
     <div><span class="auto-eyebrow">AUTOMAÇÃO • DIGESTORES • MODO DEMONSTRAÇÃO</span>
       <h1>Simulador dos Digestores</h1>
       <p>Temperatura, sinaleiros e purgadores simulados para os quatro digestores.</p>
-    </div><span class="auto-state waiting" id="sim-hardware-indicator" aria-live="polite"><%= simuladorBancadaAdmin ? 'SIMULAÇÃO • VERIFICANDO ESP32' : 'SIMULAÇÃO • VISUAL' %></span>
+    </div><span class="auto-state waiting" id="sim-hardware-indicator" aria-live="polite"><%= bancadaPermitida ? 'SIMULAÇÃO • VERIFICANDO ESP32' : 'SIMULAÇÃO • VISUAL' %></span>
   </header>
   <section class="auto-alert" role="status"><strong>Simulação de bancada</strong><span>Temperatura gerada no CAD, sem PT100. Faixas de simulação, NÃO alarmes reais. O teste de cada solenoide exige liberação local no ESP32; aquecimento é somente visual. Sem comandos para cargas industriais ou descarga automática.</span></section>
   <%- include('partials/digestores-circuito', { controls: typeof simulacaoCircuitoPermitida !== 'undefined' && simulacaoCircuitoPermitida === true }) %>
@@ -25,20 +26,26 @@
       <option value="all" selected>Todos os quatro digestores</option>
     </select>
     <span id="sim-selection-status" role="status" aria-live="polite">Quatro digestores selecionados</span>
-    <p class="sim-select-warning">ADMIN pode sincronizar temperatura simulada, sinaleiros e estados dos purgadores. O teste físico de cada solenoide de bancada exige liberação local no ESP32. Sem controle de aquecimento, vapor ou cargas industriais.</p>
+    <p class="sim-select-warning">ADMIN, Supervisor ou Encarregado de Manutenção podem sincronizar temperatura e luzes. Os purgadores permanecem fechados até autorização específica. O teste físico de cada solenoide de bancada exige liberação local no ESP32. Sem controle de aquecimento, vapor ou cargas industriais.</p>
   </section>
-  <% if (simuladorBancadaAdmin) { %>
+  <% if (bancadaPermitida) { %>
   <section class="sim-bancada-online" aria-label="Sincronização do simulador com a bancada">
-    <div><strong>Simulador CAD → ESP32 · ADMIN</strong>
-    <p>Sincronize os estados do computador com o ESP32. Solenoides de bancada só respondem após autorização local por canal e fecham ao parar ou expirar a comunicação.</p></div>
-    <label class="sim-remote-switch"><input type="checkbox" id="sim-remote-enable" data-csrf="<%= csrfAutomacao %>"> Sincronizar seleção com ESP32</label>
-    <small id="sim-remote-status" role="status" aria-live="polite">Desativado · apenas simulação na tela</small>
+    <div><strong>Conexão CAD ↔ ESP32 · bancada dos digestores</strong>
+    <p>Ao iniciar a simulação, o CAD sincroniza automaticamente temperatura e luzes com o ESP32 autorizado. A comunicação não comprova acionamento físico e nunca arma relés remotamente.</p></div>
+    <div class="sim-remote-actions">
+      <label class="sim-remote-switch"><input type="checkbox" id="sim-auto-sync" checked> Sincronização automática ao iniciar</label>
+      <button type="button" id="sim-connect-esp32">Conectar / verificar ESP32</button>
+      <label class="sim-remote-switch"><input type="checkbox" id="sim-remote-enable" data-csrf="<%= csrfAutomacao %>"> Sincronização ativa</label>
+    </div>
+    <label class="sim-remote-switch"><input type="checkbox" id="sim-solenoids-enable"> Transmitir estados de purgadores de bancada (exige liberação local)</label>
+    <small id="sim-solenoids-status" role="status">Purgadores bloqueados no CAD; somente temperatura e luzes.</small>
+    <small id="sim-remote-status" role="status" aria-live="polite">Aguardando simulação; é possível verificar a conexão agora.</small>
     <details class="sim-remote-details"><summary>Comunicação e estados dos ESP32</summary><div class="sim-remote-table-scroll"><table class="sim-remote-table" id="sim-remote-table" aria-label="Estado do ESP32 por digestor" style="width:100%;font-size:.85rem;margin-top:.5rem;border-collapse:collapse">
       <thead><tr><th>Digestor</th><th>Modo ESP32</th><th>Temperatura · origem indicada</th><th>Faixa</th><th>Sinaleiro / pronto</th><th>Sensor</th><th>Fase enviada (CAD)</th><th>Recebida</th><th>Aplicada</th><th>Saída</th><th>Último contato</th><th>ESP32</th></tr></thead>
       <tbody id="sim-remote-rows"><tr><td colspan="12">Carregando…</td></tr></tbody>
     </table></div></details>
-    <small>“Aplicada” e “Saída” só aparecem se o firmware informar. Comando enviado não confirma que a lâmpada acendeu.</small>
-    <p><a href="/automacao/configuracao">Configuração dos ESP32 e links para suas IHMs locais</a></p>
+    <small>“Aplicada” e “Saída” só aparecem se o firmware informar. Purgadores permanecem fechados até uma autorização explícita no CAD e uma autorização local por canal no ESP32, somente para bancada isolada.</small>
+    <% if (typeof configuracaoAdmin !== 'undefined' && configuracaoAdmin) { %><p><a href="/automacao/configuracao">Configuração dos ESP32 e links para suas IHMs locais</a></p><% } else { %><p>Credenciais são configuradas pelo ADMIN. Para o teste da bancada, selecione SIMULAÇÃO na IHM local de cada ESP32 autorizado.</p><% } %>
   </section>
   <% } %>
   <div class="sim-toolbar">
@@ -131,9 +138,9 @@
     <article class="auto-panel"><h2>Limites do simulador</h2><p>O ciclo é gerado no navegador e pode ser sincronizado com a bancada. O aquecimento é apenas representado. Os purgadores alternam em 30 segundos virtuais por digestor habilitado; seus estados são enviados ao ESP32 quando a sincronização está ativa. Pausar ou reiniciar fecha ambos os estados. O teste físico de solenoides depende da liberação local de cada canal.</p></article>
   </section>
 </main>
-<script src="/js/automacao-simulador-core.js?v=20261026-circuitos-torres1" defer></script>
-<script src="/js/automacao-simulador.js?v=20261026-circuitos-torres1" defer></script>
-<% if (simuladorBancadaAdmin) { %><script src="/js/automacao-simulador-http.js?v=20261026-circuitos-torres1" defer></script><script src="/js/automacao-digestores.js?v=20261026-circuitos-torres1" defer></script><script src="/js/automacao-simulador-remoto.js?v=20261026-circuitos-torres1" defer></script><% } %>
+<script src="/js/automacao-simulador-core.js?v=20261026-sync-esp-1" defer></script>
+<script src="/js/automacao-simulador.js?v=20261026-sync-esp-1" defer></script>
+<% if (bancadaPermitida) { %><script src="/js/automacao-simulador-http.js?v=20261026-sync-esp-1" defer></script><script src="/js/automacao-digestores.js?v=20261026-sync-esp-1" defer></script><script src="/js/automacao-simulador-remoto.js?v=20261026-sync-esp-1" defer></script><% } %>
 <script src="/js/automacao-digestores-circuito-core.js?v=20261026-torres1" defer></script>
 <script src="/js/automacao-digestores-circuito.js?v=20261026-torres1" defer></script>
 <script type="module" src="/js/automacao-digestores-3d.mjs?v=20261026-torres1"></script>

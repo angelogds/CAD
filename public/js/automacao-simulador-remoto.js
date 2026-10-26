@@ -6,6 +6,10 @@
   const status=document.getElementById('sim-remote-status');
   const selector=document.getElementById('sim-select-digestor');
   const start=document.getElementById('sim-start');
+  const autoSync=document.getElementById('sim-auto-sync');
+  const connectButton=document.getElementById('sim-connect-esp32');
+  const solenoids=document.getElementById('sim-solenoids-enable');
+  const solenoidsStatus=document.getElementById('sim-solenoids-status');
   if(!root||!toggle||!status||!selector||!start)return;
   let timer=null,busy=false,statusTimer=null;
   const http=window.CGDSimHttp;
@@ -69,7 +73,9 @@
   function halt(msg){
     toggle.checked=false;
     if(timer!==null){clearInterval(timer);timer=null;}
-    status.textContent=msg+'. Teste remoto interrompido; comandos expiram automaticamente.';
+    if(solenoids)solenoids.checked=false;
+    if(solenoidsStatus)solenoidsStatus.textContent='Purgadores bloqueados no CAD após interrupção.';
+    status.textContent=msg+'. Sincronização interrompida; comandos expiram automaticamente.';
   }
   void refreshStatus();
   statusTimer=setInterval(refreshStatus,3000);
@@ -83,8 +89,11 @@
       const valido=Number.isFinite(temperatura)&&temperatura>=0&&temperatura<=850;
       const parado=stopped||!start.disabled||!valido;
       const fase=parado?'PARADO':temperatura>120?'FINAL':temperatura>50?'MEIO':'INICIO';
-      const camisa=!parado&&card.dataset.camisaSimulada==='ABERTO'?'ABERTO':'FECHADO';
-      const eixo=!parado&&card.dataset.eixoSimulado==='ABERTO'?'ABERTO':'FECHADO';
+      // Auto sincronização nunca arma atuadores: só inclui estados dos relés após
+      // confirmação adicional no CAD e liberação física local por canal no ESP32.
+      const testeSolenoides=solenoids?.checked===true;
+      const camisa=testeSolenoides&&!parado&&card.dataset.camisaSimulada==='ABERTO'?'ABERTO':'FECHADO';
+      const eixo=testeSolenoides&&!parado&&card.dataset.eixoSimulado==='ABERTO'?'ABERTO':'FECHADO';
       return {digestor_id:id,fase,...(!parado&&Number.isFinite(temperatura)?{temperatura_c:temperatura}:{}),
         aquecimento_simulado:!parado&&card.dataset.aquecimentoSimulado==='true',
         purgadores_simulados:{camisa,eixo}};
@@ -111,22 +120,47 @@
     if(timer!==null){clearInterval(timer);timer=null;}
     if(toggle.checked)void publish(true);
     toggle.checked=false;
+    if(solenoids)solenoids.checked=false;
+    if(solenoidsStatus)solenoidsStatus.textContent='Purgadores bloqueados; é preciso autorizar novamente para outro teste.';
+  }
+  function connect() {
+    if(toggle.checked)return;
+    toggle.checked=true;
+    status.textContent='Conectando CAD à bancada ESP32…';
+    void publish();
+    timer=setInterval(()=>{if(toggle.checked)void publish();},1000);
   }
   toggle.addEventListener('change',()=>{
-    if(toggle.checked){
-      if(!confirm('Sincronizar temperatura, sinaleiros e estados simulados com o ESP32? Solenoides de bancada só respondem após autorização local por canal. Mantenha cargas industriais desconectadas.')){
-        toggle.checked=false;return;
-      }
-      void publish();
-      timer=setInterval(()=>{if(toggle.checked)void publish();},1000);
-    }else{
-      void publish(true);
-      if(timer!==null){clearInterval(timer);timer=null;}
-    }
+    if(toggle.checked)connectFromToggle();
+    else { void publish(true); stop(); }
   });
+  function connectFromToggle() {
+    // A opção do painel apenas sincroniza as lâmpadas por padrão.
+    if(timer!==null)clearInterval(timer);
+    status.textContent='Sincronizando luzes e temperatura. Purgadores bloqueados por padrão.';
+    void publish();
+    timer=setInterval(()=>{if(toggle.checked)void publish();},1000);
+  }
+  connectButton?.addEventListener('click',()=>{
+    void refreshStatus();
+    if(!start.disabled) {
+      status.textContent='Status consultado. Para enviar a simulação, clique em Iniciar simulação.';
+    } else connect();
+  });
+  solenoids?.addEventListener('change',()=>{
+    if(solenoids.checked) {
+      if(!confirm('Teste de bancada ISOLADA: as solenóides podem atuar após liberação física LOCAL de cada canal no ESP32. Confirma que não há vapor, pressão, cargas de 220 V em processo ou máquina produtiva conectada?')) {
+        solenoids.checked=false;
+        return;
+      }
+      if(solenoidsStatus)solenoidsStatus.textContent='Estados de purgadores habilitados no CAD; a autorização física por canal continua obrigatória no ESP32.';
+    } else if(solenoidsStatus)solenoidsStatus.textContent='Purgadores bloqueados no CAD; somente temperatura e luzes.';
+    if(toggle.checked)void publish(!start.disabled);
+  });
+  start.addEventListener('click',()=>{if(autoSync?.checked!==false)connect();});
   root.addEventListener('simulador:estado',()=>{if(toggle.checked)void publish();});
   selector.addEventListener('change',stop);
-  document.getElementById('sim-pause').addEventListener('click',()=>{if(toggle.checked)void publish(true);});
+  document.getElementById('sim-pause').addEventListener('click',stop);
   document.getElementById('sim-reset').addEventListener('click',stop);
   window.addEventListener('pagehide',()=>{if(timer!==null)clearInterval(timer);if(statusTimer!==null)clearInterval(statusTimer);clearInterval(validadeTimer);},{once:true});
 })();
