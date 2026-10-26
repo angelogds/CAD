@@ -63,6 +63,7 @@ function simuladorDigestores(req, res) {
   return res.render('automacao/simulador-digestores', {
     simuladorBancadaAdmin: admin,
     simulacaoCircuitoPermitida: ACCESS.automacao_decanters_simulate.includes(role),
+    visualizacaoAutomacaoCompleta: ACCESS.automacao_view.includes(role),
     csrfAutomacao: admin && req.session ? req.session.automacaoConfigCsrf : '',
     title: '2A Automação Industrial · Simulador dos Digestores',
     activeMenu: 'automacao',

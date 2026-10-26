@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="/css/automacao-digestores-circuito.css?v=20261026-circuito2">
 <main class="auto-page auto-hmi auto-2a" id="sim-digestores">
   <%- include('partials/brand') %>
-  <div class="auto-actions-top"><a class="auto-back-link" href="/automacao/digestores">← Voltar aos Digestores</a></div>
+  <div class="auto-actions-top"><a class="auto-back-link" href="<%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? '/automacao' : '/automacao/digestores' %>">← <%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? 'Voltar à automação' : 'Voltar aos Digestores' %></a></div>
   <header class="auto-hero">
     <div><span class="auto-eyebrow">AUTOMAÇÃO • DIGESTORES • MODO DEMONSTRAÇÃO</span>
       <h1>Simulador dos Digestores</h1>

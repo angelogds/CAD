@@ -60,6 +60,8 @@ test('encarregado entra nas decanters e simulador mecânico sem ganhar gestão d
   assert.equal(home.data.setores.find(setor => setor.key === 'digestores').href, '/automacao/digestores/simulador');
   assert.equal(request('/digestores/simulador', role).status, 200);
   assert.equal(request('/digestores/simulador', role).data.simulacaoCircuitoPermitida, true);
+  assert.match(render(request('/digestores/simulador', role)), /class="auto-back-link" href="\/automacao"/);
+  assert.doesNotMatch(render(request('/digestores/simulador', role)), /href="\/automacao\/digestores"/);
   assert.match(render(home), /href="\/automacao\/decanters\/simulador"/);
   assert.doesNotMatch(render(home), /href="\/automacao\/digestores"|href="\/automacao\/prensas"|href="\/automacao\/configuracao"/);
   for (const route of ['/digestores', '/prensas', '/configuracao']) assert.equal(request(route, role).status, 403, route);
