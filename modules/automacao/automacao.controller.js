@@ -63,6 +63,7 @@ function simuladorDigestores(req, res) {
   return res.render('automacao/simulador-digestores', {
     simuladorBancadaAdmin: podeSincronizarBancada,
     simuladorBancadaPermitida: podeSincronizarBancada,
+    configuracaoAdmin: role === 'ADMIN',
     simulacaoCircuitoPermitida: ACCESS.automacao_decanters_simulate.includes(role),
     visualizacaoAutomacaoCompleta: ACCESS.automacao_view.includes(role),
     csrfAutomacao: podeSincronizarBancada && req.session ? req.session.automacaoConfigCsrf : '',
