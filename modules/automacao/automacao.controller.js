@@ -8,7 +8,8 @@ function index(req, res) {
   return res.render('automacao/index', {
     title: '2A Automação Industrial',
     activeMenu: 'automacao',
-    setores: service.listSetores().filter(setor => visualizacaoAutomacaoCompleta || setor.key === 'decanters'),
+    setores: service.listSetores().filter(setor => visualizacaoAutomacaoCompleta || ['decanters', 'digestores'].includes(setor.key))
+      .map(setor => !visualizacaoAutomacaoCompleta && setor.key === 'digestores' ? { ...setor, href: '/automacao/digestores/simulador', description: 'Simuladores locais dos digestores e do circuito mecânico.' } : setor),
     visualizacaoAutomacaoCompleta,
     configuracaoAdmin: role === 'ADMIN',
   });
@@ -55,10 +56,14 @@ function prensas(req, res) {
 }
 
 function simuladorDigestores(req, res) {
-  const admin = normalizeRole(req.session && req.session.user && req.session.user.role) === 'ADMIN';
+  const role = normalizeRole(req.session && req.session.user && req.session.user.role);
+  res.setHeader('Cache-Control', 'no-store');
+  const admin = role === 'ADMIN';
   if (admin && req.session && !req.session.automacaoConfigCsrf) req.session.automacaoConfigCsrf=crypto.randomBytes(32).toString('hex');
   return res.render('automacao/simulador-digestores', {
     simuladorBancadaAdmin: admin,
+    simulacaoCircuitoPermitida: ACCESS.automacao_decanters_simulate.includes(role),
+    visualizacaoAutomacaoCompleta: ACCESS.automacao_view.includes(role),
     csrfAutomacao: admin && req.session ? req.session.automacaoConfigCsrf : '',
     title: '2A Automação Industrial · Simulador dos Digestores',
     activeMenu: 'automacao',

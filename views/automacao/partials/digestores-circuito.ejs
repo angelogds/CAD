@@ -1,0 +1,130 @@
+<% const circuitoPodeControlar = typeof controls !== 'undefined' && controls === true; %>
+<section id="digestores-circuito-panel" class="circuito-panel" data-controls="<%= circuitoPodeControlar %>" data-mode="LIVE" data-motion="true" data-running="false" aria-labelledby="digestores-circuito-heading">
+  <header class="circuito-heading">
+    <div><span class="circuito-eyebrow">2A · DIGESTORES</span><h2 id="digestores-circuito-heading">Circuito mecânico · maquete ilustrativa</h2><p>Quatro digestores elevados, alimentação comum e descarga frontal para a percoladora. Selecione um equipamento para consultar sua função.</p></div>
+    <span class="circuito-mode" data-circuito-role="mode">LIVE · sem sinal mecânico</span>
+  </header>
+  <div class="circuito-note"><strong>Leitura do circuito</strong><span>Posições, movimentos e volumes reais aguardam instrumentação. A temperatura e a bancada ESP32 continuam nos painéis próprios abaixo. Capacidades, tempos e frações da demonstração são ilustrativos.</span></div>
+  <div class="circuito-toolbar" aria-label="Visualização do circuito">
+    <div class="circuito-view-tabs"><button type="button" data-circuito-action="view-3d" aria-pressed="true">Cena 3D</button><button type="button" data-circuito-action="view-scheme" aria-pressed="false">Esquema técnico</button></div>
+    <span id="digestores-circuito-3d-status" role="status" aria-live="polite">Preparando visualização 3D…</span>
+    <div><button type="button" data-circuito-action="fit">Enquadrar circuito</button><button type="button" data-circuito-action="motion" aria-pressed="false">Pausar animação</button></div>
+  </div>
+  <div class="circuito-layout">
+    <div class="circuito-visual">
+      <div id="digestores-circuito-3d" class="circuito-3d" aria-label="Maquete 3D ilustrativa do circuito dos digestores"><p id="digestores-circuito-3d-loading" class="circuito-loading">Carregando maquete… O esquema abaixo permanece disponível.</p></div>
+      <div id="digestores-circuito-scheme" class="circuito-scheme">
+        <svg viewBox="0 0 1200 620" role="group" aria-labelledby="digestores-circuito-svg-title digestores-circuito-svg-desc">
+          <title id="digestores-circuito-svg-title">Esquema do circuito mecânico dos quatro digestores</title>
+          <desc id="digestores-circuito-svg-desc">Digestores D1, D2, D3 e D4, da esquerda para a direita, sobre uma plataforma. Uma rosca comum superior alimenta guilhotinas pneumáticas individuais. A descarga frontal cai na percoladora com rosca interna. Abaixo à esquerda, o tacho coletor possui mexedor e bomba de sebo para o tanque de serviço da área de decanters. Uma seta reserva a saída futura para prensas. Sem estados mecânicos reais disponíveis.</desc>
+          <defs>
+            <linearGradient id="digestores-circuito-metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f8fa"/><stop offset=".5" stop-color="#c6cdd5"/><stop offset="1" stop-color="#e4e8ed"/></linearGradient>
+            <marker id="digestores-circuito-arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0L8 4.5L0 9Z" fill="#6b7480"/></marker>
+            <clipPath id="digestores-circuito-tacho-clip"><path d="M203 500H327V560Q327 577 265 577Q203 577 203 560Z"/></clipPath>
+          </defs>
+          <path d="M145 484H1080" class="circuito-ground"/>
+          <g class="circuito-platform" aria-hidden="true"><path d="M164 356H1050V369H164Z"/><path d="M182 369V483M430 369V483M775 369V483M1030 369V483"/><path d="M180 349V321M1040 349V321M180 324H1040"/><path d="M1060 369L1120 482M1070 388H1110M1082 412H1123M1094 436H1135M1107 461H1147"/></g>
+          <g data-circuito-equipment="gasHeader" tabindex="0" role="button" aria-label="Selecionar coletor comum de gases, sem telemetria" aria-pressed="false">
+            <path d="M190 190H1040" class="circuito-gas-line"/>
+            <% [250,470,690,910].forEach((x) => { %><path d="M<%= x %> 190V227" class="circuito-gas-line"/><% }) %>
+            <text x="1060" y="179" class="circuito-label"><tspan x="1060">Coletor de gases</tspan><tspan x="1060" dy="19">Sem sinal</tspan></text>
+          </g>
+          <g data-circuito-equipment="feedAuger" tabindex="0" role="button" aria-label="Selecionar rosca comum de alimentação" aria-pressed="false" data-active="false">
+            <text x="610" y="31" text-anchor="middle" class="circuito-label circuito-label-strong">ROSCA COMUM DE ALIMENTAÇÃO</text>
+            <rect x="172" y="53" width="873" height="37" rx="8" class="circuito-machine"/>
+            <path d="M180 72H1035" class="circuito-shaft"/>
+            <path d="M185 59L210 85L235 59L260 85L285 59L310 85L335 59L360 85L385 59L410 85L435 59L460 85L485 59L510 85L535 59L560 85L585 59L610 85L635 59L660 85L685 59L710 85L735 59L760 85L785 59L810 85L835 59L860 85L885 59L910 85L935 59L960 85L985 59L1010 85L1035 59" class="circuito-auger"/>
+            <rect x="126" y="59" width="44" height="25" rx="5" class="circuito-motor"/>
+            <path d="M183 72H1032" data-flow="feedAuger" class="circuito-flow"/>
+          </g>
+          <% [250,470,690,910].forEach((x,index) => { const id = index + 1; %>
+          <g data-circuito-equipment="gate<%= id %>" tabindex="0" role="button" aria-label="Selecionar guilhotina pneumática do digestor <%= id %>" aria-pressed="false" data-active="false" data-gate-state="unknown">
+            <path d="M<%= x - 18 %> 91V199H<%= x + 18 %>V91" class="circuito-gate-chute"/>
+            <rect x="<%= x + 27 %>" y="100" width="20" height="35" rx="4" class="circuito-motor"/>
+            <path d="M<%= x + 37 %> 134V159H<%= x %>" class="circuito-stem"/>
+            <rect x="<%= x - 27 %>" y="146" width="54" height="12" rx="2" class="circuito-gate-blade"/>
+            <path d="M<%= x %> 94V218" data-flow="gate<%= id %>" class="circuito-flow"/>
+            <text x="<%= x %>" y="121" text-anchor="end" class="circuito-label">Guilhotina D<%= id %></text>
+          </g>
+          <g data-circuito-equipment="digestor<%= id %>" tabindex="0" role="button" aria-label="Selecionar digestor <%= id %>, elevado na plataforma" aria-pressed="false" data-active="false">
+            <rect x="<%= x - 67 %>" y="220" width="146" height="98" rx="42" class="circuito-machine"/>
+            <ellipse cx="<%= x + 72 %>" cy="269" rx="15" ry="46" class="circuito-machine"/>
+            <circle cx="<%= x - 15 %>" cy="269" r="43" class="circuito-door"/>
+            <circle cx="<%= x - 15 %>" cy="269" r="34" class="circuito-door-ring"/>
+            <path d="M<%= x - 29 %> 269H<%= x - 1 %>" class="circuito-shaft"/>
+            <text x="<%= x + 43 %>" y="276" text-anchor="middle" class="circuito-unit-name">D<%= id %></text>
+            <path d="M<%= x - 44 %> 315V353M<%= x + 51 %> 315V353" class="circuito-feet"/>
+            <rect x="<%= x + 79 %>" y="254" width="24" height="29" rx="4" class="circuito-motor"/>
+            <path d="M<%= x - 15 %> 313V385L<%= x + 5 %> 413" class="circuito-discharge"/>
+            <path d="M<%= x - 15 %> 313V385L<%= x + 5 %> 413" data-flow="digestor<%= id %>" class="circuito-flow"/>
+            <text x="<%= x %>" y="341" text-anchor="middle" class="circuito-label" data-circuito-unit-status="<%= id %>">Sem sinal mecânico</text>
+          </g>
+          <% }) %>
+          <g data-circuito-equipment="percolator" tabindex="0" role="button" aria-label="Selecionar percoladora e sua rosca interna" aria-pressed="false" data-active="false">
+            <path d="M157 412H1049V468H157Z" class="circuito-machine"/>
+            <path d="M164 459H1042" class="circuito-shaft"/>
+            <path d="M168 421L193 458L218 421L243 458L268 421L293 458L318 421L343 458L368 421L393 458L418 421L443 458L468 421L493 458L518 421L543 458L568 421L593 458L618 421L643 458L668 421L693 458L718 421L743 458L768 421L793 458L818 421L843 458L868 421L893 458L918 421L943 458L968 421L993 458L1018 421L1043 458" class="circuito-auger"/>
+            <rect x="113" y="427" width="43" height="27" rx="5" class="circuito-motor"/>
+            <path d="M169 443H1041" data-flow="percolator" class="circuito-flow"/>
+            <text x="690" y="498" text-anchor="middle" class="circuito-label circuito-label-strong">PERCOLADORA · ROSCA INTERNA</text>
+            <path d="M1050 444H1160" class="circuito-expansion" marker-end="url(#digestores-circuito-arrow)"/>
+            <text x="1110" y="395" text-anchor="middle" class="circuito-label"><tspan x="1110">Para prensas</tspan><tspan x="1110" dy="19">Expansão</tspan></text>
+          </g>
+          <g data-circuito-equipment="tacho" tabindex="0" role="button" aria-label="Selecionar tacho coletor à esquerda, volume ilustrativo" aria-pressed="false" data-active="false">
+            <path d="M265 468V500" class="circuito-liquid-pipe"/>
+            <path d="M265 468V500" data-flow="tacho" class="circuito-flow circuito-flow-oil"/>
+            <path d="M203 500H327V560Q327 577 265 577Q203 577 203 560Z" class="circuito-machine"/>
+            <rect x="204" y="536" width="122" height="43" clip-path="url(#digestores-circuito-tacho-clip)" data-circuito-tacho-liquid="true" data-circuito-role="tacho-fill" class="circuito-tacho-liquid" hidden/>
+            <ellipse cx="265" cy="500" rx="62" ry="13" class="circuito-tacho-rim"/>
+            <path d="M221 576V588M309 576V588" class="circuito-feet"/>
+            <text x="310" y="610" text-anchor="middle" class="circuito-label">Tacho coletor · volume ilustrativo</text>
+          </g>
+          <g data-circuito-equipment="tachoMixer" tabindex="0" role="button" aria-label="Selecionar mexedor central do tacho coletor" aria-pressed="false" data-active="false">
+            <rect x="253" y="478" width="24" height="26" rx="5" class="circuito-motor"/>
+            <path d="M265 504V557M237 550L294 558M237 558L294 550" class="circuito-shaft"/>
+            <text x="374" y="540" class="circuito-label">Mexedor</text>
+            <path d="M362 536L282 510" class="circuito-leader"/>
+          </g>
+          <g data-circuito-equipment="pump" tabindex="0" role="button" aria-label="Selecionar bomba de sebo do tacho para o tanque de serviço" aria-pressed="false" data-active="false">
+            <path d="M203 549H158" class="circuito-liquid-pipe"/>
+            <rect x="94" y="533" width="40" height="32" rx="6" class="circuito-motor"/>
+            <rect x="133" y="536" width="29" height="26" rx="8" class="circuito-machine"/>
+            <path d="M86 569H169" class="circuito-feet"/>
+            <text x="127" y="590" text-anchor="middle" class="circuito-label">Bomba de sebo</text>
+          </g>
+          <g data-circuito-equipment="serviceTankBoundary" tabindex="0" role="button" aria-label="Selecionar destino do sebo, tanque de serviço da área de decanters" aria-pressed="false" data-active="false">
+            <path d="M94 549H25V516" class="circuito-liquid-pipe" marker-end="url(#digestores-circuito-arrow)"/>
+            <path d="M204 549H25V516" data-flow="serviceTankBoundary" class="circuito-flow circuito-flow-oil"/>
+            <text x="22" y="490" class="circuito-label"><tspan x="22">Tanque de serviço</tspan><tspan x="22" dy="19">Área de decanters</tspan></text>
+          </g>
+        </svg>
+      </div>
+      <p class="circuito-caption">Maquete sem escala. As setas mostram os caminhos do processo; movimento e preenchimento aparecem apenas na demonstração local.</p>
+    </div>
+    <aside class="circuito-inspector" aria-labelledby="digestores-circuito-inspector-title">
+      <span class="circuito-eyebrow">EQUIPAMENTO SELECIONADO</span>
+      <h3 id="digestores-circuito-inspector-title" data-circuito-role="title">Circuito dos digestores</h3>
+      <span class="circuito-selection-status" data-circuito-role="status">Sem sinal mecânico</span>
+      <p data-circuito-role="description">Selecione um digestor, guilhotina ou equipamento auxiliar para ver os detalhes da maquete.</p>
+      <dl data-circuito-role="rows"><div><dt>Origem</dt><dd>Representação ilustrativa</dd></div><div><dt>Acionamento real</dt><dd>Indisponível nesta tela</dd></div></dl>
+    </aside>
+  </div>
+  <div class="circuito-stats" aria-label="Estado da demonstração mecânica">
+    <div><small>Etapa mecânica</small><strong data-circuito-role="phase">Sem sinal</strong></div>
+    <div><small>Seleção da demonstração</small><strong data-circuito-role="selection">Aguardando início</strong></div>
+    <div><small>Volume no tacho · ilustrativo</small><strong data-circuito-role="tacho">— L</strong></div>
+    <div><small>Transferido nesta sessão · ilustrativo</small><strong data-circuito-role="transferred">— L</strong></div>
+  </div>
+  <% if (circuitoPodeControlar) { %>
+  <details class="circuito-demo-controls">
+    <summary>Demonstração mecânica local</summary>
+    <div class="circuito-demo-body">
+      <p>O ciclo local percorre carga pela guilhotina, mistura, descarga para a percoladora e transferência ilustrativa ao tanque de serviço. Inicie quando desejar; esta demonstração não sincroniza comandos com o ESP32.</p>
+      <div class="circuito-demo-settings"><label for="digestores-circuito-selection">Digestores da demonstração<select id="digestores-circuito-selection"><option value="D1">Digestor 1</option><option value="D2">Digestor 2</option><option value="D3">Digestor 3</option><option value="D4">Digestor 4</option><option value="TODOS" selected>Todos · um por vez</option></select></label><label for="digestores-circuito-speed">Velocidade virtual<select id="digestores-circuito-speed"><option value="1">1×</option><option value="3" selected>3×</option><option value="8">8×</option></select></label></div>
+      <div class="circuito-demo-actions"><button type="button" data-circuito-action="start" class="circuito-primary">Iniciar demonstração</button><button type="button" data-circuito-action="pause" disabled>Pausar</button><button type="button" data-circuito-action="stop" disabled>Parar demonstração</button><button type="button" data-circuito-action="live">Voltar à supervisão</button></div>
+      <p class="circuito-feedback" data-circuito-role="feedback" role="status" aria-live="polite">Aguardando início da demonstração local.</p>
+      <small>Carga, tempo, capacidade e volume são exemplos da maquete. O total da sessão não representa produção medida.</small>
+    </div>
+  </details>
+  <% } %>
+</section>

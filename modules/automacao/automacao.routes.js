@@ -9,13 +9,13 @@ const devices = require('./dispositivos.service');
 const bancada = require('./sinaleiro-bancada.service');
 const telemetria = require('./bancada-telemetria.service');
 
-const acessoDecanters = [...new Set([...ACCESS.automacao_view, ...ACCESS.automacao_decanters_simulate])];
-router.get('/', requireLogin, requireRole(acessoDecanters), ctrl.index);
+const acessoCircuitos = [...new Set([...ACCESS.automacao_view, ...ACCESS.automacao_decanters_simulate])];
+router.get('/', requireLogin, requireRole(acessoCircuitos), ctrl.index);
 router.get('/digestores', requireLogin, requireRole(ACCESS.automacao_view), ctrl.digestores);
-router.get('/decanters', requireLogin, requireRole(acessoDecanters), ctrl.decanters);
+router.get('/decanters', requireLogin, requireRole(acessoCircuitos), ctrl.decanters);
 router.get('/decanters/simulador', requireLogin, requireRole(ACCESS.automacao_decanters_simulate), ctrl.simuladorDecanters);
 router.get('/prensas', requireLogin, requireRole(ACCESS.automacao_view), ctrl.prensas);
-router.get('/digestores/simulador', requireLogin, requireRole(ACCESS.automacao_view), ctrl.simuladorDigestores);
+router.get('/digestores/simulador', requireLogin, requireRole(acessoCircuitos), ctrl.simuladorDigestores);
 
 // Gestão de credenciais EXCLUSIVA do ADMIN: inclusive endpoints JSON e URL legada.
 const admin = [requireLogin, requireRole([ROLE.ADMIN])];

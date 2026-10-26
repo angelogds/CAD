@@ -4,9 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const read = p => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
 
-test('simulador usa a mesma autorização da IHM e não altera comandos industriais', () => {
+test('simulador preserva a autorização visual e permite os perfis dos circuitos sem alterar comandos industriais', () => {
   const routes = read('modules/automacao/automacao.routes.js');
-  assert.match(routes, /router\.get\('\/digestores\/simulador', requireLogin, requireRole\(ACCESS\.automacao_view\)/);
+  assert.match(routes, /router\.get\('\/digestores\/simulador', requireLogin, requireRole\(acessoCircuitos\)/);
   const view = read('views/automacao/simulador-digestores.ejs');
   assert.match(view, /for\(let id=1;id<=4;id\+\+\)/);
   assert.match(view, /id="sim-hardware-indicator"/);

@@ -1,5 +1,6 @@
 (function (root) {
   'use strict';
+  const Core = root?.AutomacaoDecantersCore || (typeof module !== 'undefined' && module.exports ? require('./automacao-decanters-core') : null);
   const fmt = (value, digits = 0) => typeof value === 'number' && Number.isFinite(value)
     ? value.toLocaleString('pt-BR', { maximumFractionDigits: digits }) : '—';
   const labels = {
@@ -8,13 +9,13 @@
     steam: ['Aquecimento por vapor', 'Linha de vapor do tanque. Retorno de posição e fluxo de vapor ainda serão instrumentados.'],
     pt100: ['TT-101 · PT100 do sebo', 'Temperatura no ponto de inserção. Faixa ideal, poço e posicionamento dependem do levantamento de campo.'],
     inlet: ['FT-IN · recebido no tanque', 'Medidor e totalizador propostos na entrada. Material recebido não equivale à produção final.'],
-    feed: ['Bomba helicoidal de alimentação', 'Transporte do tanque para a decanter selecionada. Prever proteção contra operação seca e pressão excessiva.'],
+    feed: ['Bomba helicoidal de alimentação', 'Transporte do tanque para FAST, GRATE ou ambas. Na maquete, a vazão total se divide igualmente quando as duas estão selecionadas.'],
     FAST: ['Decanter FAST', 'Separação do sebo e da borra. A liberação real dependerá dos sinais e da sequência do controlador da máquina.'],
     GRATE: ['Decanter GRATE', 'Separação do sebo e da borra. A seleção do coletor deve corresponder aos retornos das válvulas.'],
     valveFAST: ['Válvula de seleção FAST', 'Ramal do coletor de alimentação. O caminho real exigirá retorno de posição.'],
     valveGRATE: ['Válvula de seleção GRATE', 'Ramal do coletor de alimentação. Trocar de linha interrompe a bomba na maquete.'],
-    tachoFAST: ['Tacho de coleta FAST', 'Acumulação sob a FAST antes da transferência. Capacidade e sensores reais ainda a levantar.'],
-    tachoGRATE: ['Tacho de coleta GRATE', 'Acumulação sob a GRATE antes da transferência. A maquete usa um volume ilustrativo.'],
+    tachoFAST: ['Tacho de coleta FAST', 'Acumulação e mistura sob a FAST antes da transferência. Capacidade e sensores reais ainda a levantar.'],
+    tachoGRATE: ['Tacho de coleta GRATE', 'Acumulação e mistura sob a GRATE antes da transferência. A maquete usa um volume ilustrativo.'],
     screw: ['Rosca de transporte de borra', 'Transporte sob as duas decanters. Estudar retorno de rotação, carga e bloqueio da saída.'],
     out1: ['Bomba de saída 1', 'Transferência do tacho selecionado para o coletor externo. Seleção exclusiva na maquete.'],
     out2: ['Bomba de saída 2', 'Segunda bomba para transferência ao coletor externo. Não representa confirmação de funcionamento real.'],
@@ -28,6 +29,8 @@
   function detailsFor(key, s) {
     const name = labels[key] || labels.tank;
     const sim = s.mode === 'SIMULACAO';
+    const machines = Core.selectedMachines(s);
+    const selectedLines = machines.length ? machines.join(' e ') : 'Nenhuma';
     const status = value => sim ? (value ? 'Ligado · simulado' : 'Desligado · simulado') : 'Sem sinal';
     const level = s.level?.status === 'VALIDO' ? fmt(s.level.percentMin) + '–' + fmt(s.level.percentMax) + '%' : 'Sem sinal';
     let rows = [];
@@ -39,12 +42,12 @@
       const index = Number(key.slice(6)) - 1;
       const percent = [10, 25, 50, 75, 90][index];
       rows = [['Patamar volumétrico proposto', percent + '% · ' + fmt(percent * 150) + ' L'], ['Estado', sim && s.level.status === 'VALIDO' ? s.level.switches[index] ? 'Atingido · simulado' : 'Livre · simulado' : 'Sem sinal / indisponível'], ['Altura física', 'A calibrar pela geometria']];
-    } else if (key === 'feed') rows = [['Funcionamento', status(s.effective?.feedPump)], ['Linha selecionada', sim ? s.selectedDecanter || 'Nenhuma' : 'Sem sinal'], ['Vazão da maquete', sim ? fmt(s.effective?.feedPump ? s.feedFlowLpm : 0) + ' L/min' : 'Sem sinal'], ['Permissivos', sim ? s.permissives.feedPump ? 'Atendidos na maquete' : s.reasons.feedPump.join(' ') : 'Sem dados']];
-    else if (key === 'FAST' || key === 'GRATE') rows = [['Liberação na maquete', sim ? s.decanterReady[key] ? 'Pronta · simulado' : 'Indisponível · simulado' : 'Sem sinal'], ['Alimentação', status(s.effective?.feedPump && s.selectedDecanter === key)], ['Tambor e rosca interna', sim && s.running && s.decanterReady[key] ? 'Em movimento · corte didático' : sim ? 'Parados na maquete' : 'Sem sinal'], ['Velocidades / diferencial real', 'Não medidos · animação ilustrativa'], ['Rotação / torque / vibração', 'Instrumentação a integrar'], ['Tacho da maquete', sim ? fmt(s.tachos[key], 1) + ' L · ilustrativo' : 'Sem sinal']];
-    else if (key.startsWith('valve')) rows = [['Rota virtual', sim ? s.selectedDecanter === key.slice(5) ? 'Selecionada' : 'Não selecionada' : 'Sem sinal'], ['Retorno físico de posição', 'Não integrado']];
-    else if (key.startsWith('tacho')) rows = [['Volume da maquete', sim ? fmt(s.tachos[key.slice(5)], 1) + ' L' : 'Sem sinal'], ['Capacidade real', 'A levantar'], ['Capacidade ilustrativa', '1.000 L'], ['Origem / retorno físico', sim ? 'Modelo simulado / não integrado' : 'Sem sinal']];
+    } else if (key === 'feed') rows = [['Funcionamento', status(s.effective?.feedPump)], ['Linhas selecionadas', sim ? selectedLines : 'Sem sinal'], ['Vazão total da maquete', sim ? fmt(s.effective?.feedPump ? s.feedFlowLpm : 0) + ' L/min' : 'Sem sinal'], ['Divisão da vazão', sim && machines.length === 2 ? 'Metade para FAST e metade para GRATE' : sim ? 'Toda a vazão para a linha selecionada' : 'Sem sinal'], ['Permissivos', sim ? s.permissives.feedPump ? 'Atendidos na maquete' : s.reasons.feedPump.join(' ') : 'Sem dados']];
+    else if (key === 'FAST' || key === 'GRATE') rows = [['Liberação na maquete', sim ? s.decanterReady[key] ? 'Pronta · simulado' : 'Indisponível · simulado' : 'Sem sinal'], ['Alimentação', status(s.effective?.feedMachines[key])], ['Vazão desta máquina', sim ? fmt(s.effective?.feedMachines[key] ? s.feedFlowLpm / machines.length : 0, 1) + ' L/min · simulado' : 'Sem sinal'], ['Tambor e rosca interna', sim && s.running && s.decanterReady[key] ? 'Em movimento · corte didático' : sim ? 'Parados na maquete' : 'Sem sinal'], ['Velocidades / diferencial real', 'Não medidos · animação ilustrativa'], ['Rotação / torque / vibração', 'Instrumentação a integrar'], ['Tacho da maquete', sim ? fmt(s.tachos[key], 1) + ' L · ilustrativo' : 'Sem sinal']];
+    else if (key.startsWith('valve')) rows = [['Rota virtual', sim ? machines.includes(key.slice(5)) ? 'Selecionada' : 'Não selecionada' : 'Sem sinal'], ['Retorno físico de posição', 'Não integrado']];
+    else if (key.startsWith('tacho')) rows = [['Volume da maquete', sim ? fmt(s.tachos[key.slice(5)], 1) + ' L' : 'Sem sinal'], ['Mexedor do tacho', status(s.effective?.tachoMixers[key.slice(5)])], ['Capacidade real', 'A levantar'], ['Capacidade ilustrativa', '1.000 L'], ['Origem / retorno físico', sim ? 'Modelo simulado / não integrado' : 'Sem sinal']];
     else if (key === 'screw') rows = [['Movimento', status(s.effective?.screw)], ['Retorno de rotação / bloqueio', 'Não integrado'], ['Sequência real de parada', 'Conforme fabricante']];
-    else if (key === 'out1' || key === 'out2') rows = [['Funcionamento', status(s.effective?.outletPump === Number(key.slice(-1)))], ['Sucção da maquete', sim ? s.selectedTacho || 'Não selecionada' : 'Sem sinal'], ['Destino da maquete', sim && s.selectedStorage ? 'Tanque ' + s.selectedStorage + ' · futuro' : 'Não disponível'], ['Retorno físico / vazão real', 'Não integrado']];
+    else if (key === 'out1' || key === 'out2') rows = [['Funcionamento', status(s.effective?.outletPump === Number(key.slice(-1)))], ['Sucção da maquete', sim ? s.selectedTacho || 'Não selecionada' : 'Sem sinal'], ['Destino da maquete', sim && s.selectedStorage ? 'Tanque ' + s.selectedStorage + ' · futuro' : 'Não disponível'], ['Alternância das bombas', sim ? s.autoAlternatePump ? 'Ativada · a cada ' + fmt(s.pumpSwitchSeconds) + ' s virtuais · ilustrativo' : 'Desativada · seleção manual' : 'Sem sinal'], ['Retorno físico / vazão real', 'Não integrado']];
     else if (key === 'inlet') rows = [['Total recebido', fmt(s.inletTotalLiters, 1) + ' L'], ['Vazão', sim ? fmt(s.inletFlowLpm) + ' L/min · simulado' : 'Sem sinal'], ['Produção final', 'Não inferida pela entrada']];
     else if (key === 'outlet') rows = [['Transferido nesta sessão', fmt(s.transferredTotalLiters, 1) + ' L'], ['Produção apurada', 'Fronteira e estoques a validar'], ['Turno noturno', 'Horários a configurar em São Paulo']];
     else if (key.startsWith('storage')) rows = [['Etapa', 'Expansão futura'], ['Capacidade / nível real', 'Não disponíveis'], ['Transferência da maquete', sim ? fmt(s.storageTotals[Number(key.slice(7)) - 1], 1) + ' L' : 'Sem dados']];
@@ -52,7 +55,6 @@
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = { detailsFor, fmt };
   if (!root || typeof document === 'undefined' || !document.getElementById('decanters-dashboard')) return;
-  const Core = root.AutomacaoDecantersCore;
   if (!Core) return;
   const state = Core.createState();
   const main = document.getElementById('decanters-dashboard');
@@ -93,7 +95,8 @@
   function renderControls(s) {
     simControls.forEach(input => {
       const key = input.dataset.core;
-      let value = key.startsWith('ready') ? s.decanterReady[key.slice(5)] : key.startsWith('tacho') ? s.tachos[key.slice(5)] : s[key];
+      let value = key.startsWith('ready') ? s.decanterReady[key.slice(5)] : key.startsWith('tacho') ? s.tachos[key.slice(5)]
+        : ['mixerFAST', 'mixerGRATE'].includes(key) ? s.tachoMixers[key.slice(5)] : s[key];
       if (input.type === 'checkbox') input.checked = Boolean(value);
       else if (document.activeElement !== input) input.value = value == null ? '' : typeof value === 'number' ? Math.round(value * 10) / 10 : value;
     });
@@ -134,6 +137,10 @@
     text('dec-sim-clock', 'Tempo virtual · ' + String(Math.floor(elapsed / 60)).padStart(2, '0') + ':' + String(elapsed % 60).padStart(2, '0'));
     text('dec-pause', s.running ? 'Pausar simulação' : 'Retomar simulação');
     text('dec-feed-permissives', s.permissives.feedPump ? 'Condições atendidas na maquete.' : s.reasons.feedPump.join(' '));
+    text('dec-pump-alternation-state', s.autoAlternatePump ? s.effective.outletPump
+      ? 'Bomba ' + s.effective.outletPump + ' · próxima troca em ' + fmt(Math.max(0, s.pumpSwitchSeconds - s.pumpElapsedSeconds)) + ' s virtuais · ilustrativo.'
+      : 'Alternância ativada. Selecione uma bomba com produto disponível no tacho.'
+      : 'Alternância desativada · seleção manual da bomba.');
     for (let i = 0; i < 5; i++) {
       const reached = validLevel && s.level.switches[i];
       const color = !validLevel ? '#9da5b2' : reached ? i === 4 ? '#ba1931' : '#19835c' : '#d0d3d9';
@@ -146,13 +153,14 @@
     fill.setAttribute('height', String(height));
     fill.setAttribute('y', String(395 - height));
     $('dec-svg-mixer').classList.toggle('is-running', Boolean(s.effective.mixer));
+    main.querySelectorAll('[data-tacho-mixer]').forEach(mixer => mixer.classList.toggle('is-running', Boolean(s.effective.tachoMixers[mixer.dataset.tachoMixer])));
     text('dec-svg-temperature', 'Temperatura: ' + fmt(s.temperature.value, 1) + ' °C');
     main.querySelectorAll('[data-flow]').forEach(pipe => {
       const key = pipe.dataset.flow;
       const active = ({ inlet: s.inletFlowLpm > 0 && s.permissives.admission, steam: s.effective.steam, feed: s.effective.feedPump,
-        FAST: s.effective.feedPump && s.selectedDecanter === 'FAST', GRATE: s.effective.feedPump && s.selectedDecanter === 'GRATE',
-        tachoFAST: s.effective.feedPump && s.selectedDecanter === 'FAST', tachoGRATE: s.effective.feedPump && s.selectedDecanter === 'GRATE',
-        borraFAST: s.effective.feedPump && s.selectedDecanter === 'FAST', borraGRATE: s.effective.feedPump && s.selectedDecanter === 'GRATE',
+        FAST: s.effective.feedMachines.FAST, GRATE: s.effective.feedMachines.GRATE,
+        tachoFAST: s.effective.feedMachines.FAST, tachoGRATE: s.effective.feedMachines.GRATE,
+        borraFAST: s.effective.feedMachines.FAST, borraGRATE: s.effective.feedMachines.GRATE,
         outFAST: s.effective.outletPump && s.selectedTacho === 'FAST', outGRATE: s.effective.outletPump && s.selectedTacho === 'GRATE',
         out1: s.effective.outletPump === 1, out2: s.effective.outletPump === 2 })[key];
       pipe.classList.toggle('is-flowing', Boolean(sim && active));
@@ -183,13 +191,15 @@
       const result = change(key, value);
       if (!result.ok) { input.blur(); renderControls(Core.snapshot(state)); }
     }));
-    $('dec-demo-start').addEventListener('click', () => { Core.startDemo(state); $('dec-sim-panel').open = true; render(); feedback('Simulação iniciada. Configure as condições ou escolha Demonstrar circuito.'); });
+    $('dec-demo-start').addEventListener('click', () => { Core.startDemo(state); $('dec-sim-panel').open = true; render(); feedback('Simulação iniciada. Configure as condições ou escolha Demonstrar FAST e GRATE.'); });
     $('dec-live-return').addEventListener('click', () => { Core.dispatch(state, { type: 'LIVE' }); render(); });
     $('dec-demo-circuit').addEventListener('click', () => {
       Core.startDemo(state);
       for (const [key, value] of Object.entries({ temperatureMinC: 60, temperatureMaxC: 85, tempC: 72, mixer: true, screw: true,
-        selectedDecanter: 'FAST', readyFAST: true, selectedTacho: 'FAST', selectedStorage: 1, tachoFAST: 150, inletFlowLpm: 25, feedPump: true, outletPump: 1 })) Core.set(state, key, value);
-      render(); feedback('Sessão reiniciada. Faixa 60–85 °C e vazões são exemplos didáticos; não são parâmetros aprovados da fábrica.');
+        selectedDecanter: 'AMBAS', readyFAST: true, readyGRATE: true, tachoFAST: 150, tachoGRATE: 150,
+        mixerFAST: true, mixerGRATE: true, selectedTacho: 'FAST', selectedStorage: 1, inletFlowLpm: 25,
+        feedPump: true, outletPump: 1 })) Core.set(state, key, value);
+      render(); feedback('FAST e GRATE em demonstração, com os dois mexedores dos tachos ligados. Faixa 60–85 °C e vazões são exemplos didáticos; não são parâmetros aprovados da fábrica.');
     });
     $('dec-pause').addEventListener('click', () => { Core.dispatch(state, { type: state.running ? 'PAUSE' : 'RESUME' }); render(); });
     $('dec-speed').addEventListener('change', event => { const value = Number(event.target.value); if ([1, 10, 60].includes(value)) speed = value; });
@@ -199,7 +209,7 @@
       if (fault === 'low') change('tankLiters', 1000);
       if (fault === 'level') change('levelFault', 'INCONSISTENTE');
       if (fault === 'pt100') change('pt100Fault', true);
-      if (fault === 'full') change('tacho' + (state.selectedDecanter || 'FAST'), 900);
+      if (fault === 'full') change('tacho' + (Core.selectedMachines(state)[0] || 'FAST'), 900);
       feedback('Condição de teste aplicada. Consulte os permissivos e os estados dos equipamentos.');
     }));
     $('dec-clear-faults').addEventListener('click', () => { Core.set(state, 'levelFault', null); Core.set(state, 'pt100Fault', false); render(); feedback('Falhas de sensor retiradas. Corrija os níveis e religue os componentes da maquete se necessário.'); });
@@ -232,7 +242,7 @@
     const symbols = main.querySelector('.dec-symbols defs').cloneNode(true);
     drawing.prepend(symbols);
     const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-    style.textContent = 'text{font-family:Arial,sans-serif;font-size:13px;fill:#444b57}.dec-svg-pipe path{fill:none;stroke:#aeb5c0;stroke-width:8}.dec-svg-valve path{fill:#d6dae1;stroke:#727a88}.dec-svg-tacho path{fill:#e0e4e9;stroke:#8f97a4}.dec-svg-tag rect,.dec-svg-future rect{fill:#f4f5f7;stroke:#bfc5cf}.dec-svg-sensors path{stroke:#777f8d}.dec-svg-future text,.dec-svg-sensors text,.dec-svg-tag text,.dec-svg-footnote{font-size:10px}.dec-svg-caption text{font-size:11px}';
+    style.textContent = 'text{font-family:Arial,sans-serif;font-size:13px;fill:#444b57}.dec-svg-pipe path{fill:none;stroke:#aeb5c0;stroke-width:8}.dec-svg-valve path{fill:#d6dae1;stroke:#727a88}.dec-svg-tacho path{fill:#e0e4e9;stroke:#8f97a4}.dec-svg-tag rect,.dec-svg-future rect{fill:#f4f5f7;stroke:#bfc5cf}.dec-svg-sensors path{stroke:#777f8d}.dec-svg-future text,.dec-svg-sensors text,.dec-svg-tag text,.dec-svg-footnote{font-size:10px}.dec-svg-caption text{font-size:11px}.dec-svg-future-feed path{fill:none;stroke:#aeb5c0;stroke-width:5;stroke-dasharray:6 5}.dec-svg-tacho .dec-tacho-shaft{fill:none;stroke:#555d6b;stroke-width:4}';
     drawing.prepend(style);
     const title = drawing.querySelector('title');
     title.textContent += state.mode === 'SIMULACAO' ? ' · retrato da simulação local' : ' · sem dados de campo';

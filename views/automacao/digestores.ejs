@@ -1,5 +1,6 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261025-2a-industrial">
+<link rel="stylesheet" href="/css/automacao.css?v=20261026-circuitos-v2">
+<link rel="stylesheet" href="/css/automacao-digestores-circuito.css?v=20261026-circuito2">
 <main class="auto-page auto-hmi auto-2a" id="digestores-supervisao">
   <%- include('partials/brand') %>
   <div class="auto-actions-top"><a class="auto-back-link" href="/automacao">← Voltar</a> <a class="auto-simulator-link" href="/automacao/digestores/simulador">▶ Módulo de simulação</a></div>
@@ -27,6 +28,8 @@
     <strong>Supervisão e testes de bancada</strong>
     <span>Esta tela é somente leitura. O teste dos purgadores é autorizado por canal na IHM local do ESP32. “Pronto para descarga” indica a faixa térmica e não libera descarga automática; comportas e cargas industriais permanecem fora deste controle.</span>
   </section>
+
+  <%- include('partials/digestores-circuito', { controls: false }) %>
 
   <section class="digestor-grid" aria-label="Digestores">
     <% (digestores || []).forEach((d) => { %>
@@ -127,5 +130,8 @@
   </section>
 </main>
 
-<script src="/js/automacao-simulador-http.js?v=20261025-2a-industrial" defer></script>
-<script src="/js/automacao-digestores.js?v=20261025-2a-industrial" defer></script>
+<script src="/js/automacao-simulador-http.js?v=20261026-circuitos-v2" defer></script>
+<script src="/js/automacao-digestores.js?v=20261026-circuitos-v2" defer></script>
+<script src="/js/automacao-digestores-circuito-core.js?v=20261026-circuito2" defer></script>
+<script src="/js/automacao-digestores-circuito.js?v=20261026-circuito2" defer></script>
+<script type="module" src="/js/automacao-digestores-3d.mjs?v=20261026-circuito2"></script>

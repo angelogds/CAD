@@ -12,6 +12,7 @@
     Object.freeze({ tag: 'LSH', percent: 90, liters: 13500 }),
   ]);
   const MACHINES = ['FAST', 'GRATE'];
+  const PUMP_SWITCH_SECONDS = 60; // Apenas relógio ilustrativo da maquete, sem ajuste de campo.
   const finite = value => typeof value === 'number' && Number.isFinite(value);
   const clone = value => JSON.parse(JSON.stringify(value));
 
@@ -41,7 +42,9 @@
     return { mode: 'LIVE', running: false, seconds: 0, tankLiters: null, tempC: null,
       switches: Array(5).fill(null), temperatureMinC: null, temperatureMaxC: null,
       mixer: false, steam: false, feedPump: false, screw: false, selectedDecanter: null,
-      decanterReady: { FAST: false, GRATE: false }, outletPump: null, selectedTacho: null,
+      decanterReady: { FAST: false, GRATE: false }, tachoMixers: { FAST: false, GRATE: false },
+      outletPump: null, autoAlternatePump: false, pumpSwitchSeconds: PUMP_SWITCH_SECONDS,
+      pumpElapsedSeconds: 0, selectedTacho: null,
       selectedStorage: null, outletDestination: 'ARMAZENAMENTO', tachos: { FAST: null, GRATE: null },
       // FT-OUT totaliza transferência. Estoque anterior impede chamar isto de produção.
       inletFlowLpm: 0, inletTotalLiters: null, transferredTotalLiters: null, recirculatedLiters: null,
@@ -64,6 +67,9 @@
     state.feedPump = false;
     state.screw = false;
     state.outletPump = null;
+    state.pumpElapsedSeconds = 0;
+    state.autoAlternatePump = false;
+    state.tachoMixers = { FAST: false, GRATE: false };
     state.inletFlowLpm = 0;
     state.selectedDecanter = null;
     state.decanterReady = { FAST: false, GRATE: false };
@@ -76,6 +82,11 @@
     return levelFromSwitches(state.switches);
   }
 
+  function selectedMachines(state) {
+    if (state.selectedDecanter === 'AMBAS') return MACHINES.slice();
+    return MACHINES.includes(state.selectedDecanter) ? [state.selectedDecanter] : [];
+  }
+
   function evaluate(state) {
     const demo = state.mode === 'SIMULACAO';
     const level = levelFor(state);
@@ -85,7 +96,8 @@
     const inRange = tempValid && configured && state.tempC >= state.temperatureMinC && state.tempC <= state.temperatureMaxC;
     const low = level.status === 'VALIDO' && level.switches[0] === false;
     const high = level.status === 'VALIDO' && level.switches[4] === true;
-    const reasons = { mixer: [], steam: [], feedPump: [], outletPump: [], admission: [] };
+    const machines = selectedMachines(state);
+    const reasons = { mixer: [], steam: [], feedPump: [], outletPump: [], admission: [], mixerFAST: [], mixerGRATE: [] };
     const requireAll = (condition, keys, message) => { if (!condition) keys.forEach(key => reasons[key].push(message)); };
     requireAll(demo, Object.keys(reasons), 'Sem hardware conectado; comandos reais indisponíveis.');
     requireAll(demo && state.running, Object.keys(reasons), 'Inicie ou retome a simulação local.');
@@ -97,11 +109,13 @@
     requireAll(!tempValid || !configured || state.tempC < state.temperatureMaxC, ['steam'], 'Limite térmico superior atingido.');
     requireAll(state.mixer, ['steam', 'feedPump'], 'Homogeneizador simulado parado.');
     requireAll(inRange, ['feedPump'], 'Temperatura fora da faixa configurada.');
-    requireAll(MACHINES.includes(state.selectedDecanter), ['feedPump'], 'Selecione FAST ou GRATE.');
-    requireAll(Boolean(state.selectedDecanter && state.decanterReady[state.selectedDecanter]), ['feedPump'], 'Decanter selecionada sem confirmação simulada de pronta.');
+    requireAll(machines.length > 0, ['feedPump'], 'Selecione FAST, GRATE ou ambas.');
+    requireAll(machines.length > 0 && machines.every(name => state.decanterReady[name]), ['feedPump'], 'Decanter selecionada sem confirmação simulada de pronta.');
     requireAll(state.screw, ['feedPump'], 'Rosca de borra simulada parada.');
-    const targetTacho = state.selectedDecanter && state.tachos[state.selectedDecanter];
-    requireAll(finite(targetTacho) && targetTacho < TACHO_CAPACITY_LITERS * 0.9, ['feedPump'], 'Tacho sem leitura ou no limite alto da maquete.');
+    requireAll(machines.length > 0 && machines.every(name => finite(state.tachos[name]) && state.tachos[name] < TACHO_CAPACITY_LITERS * 0.9),
+      ['feedPump'], 'Tacho sem leitura ou no limite alto da maquete.');
+    MACHINES.forEach(name => requireAll(finite(state.tachos[name]) && state.tachos[name] > 0,
+      ['mixer' + name], 'Tacho ' + name + ' sem volume simulado disponível.'));
     const sourceTacho = state.selectedTacho && state.tachos[state.selectedTacho];
     requireAll(MACHINES.includes(state.selectedTacho) && finite(sourceTacho) && sourceTacho > 0, ['outletPump'], 'Selecione um tacho com volume simulado disponível.');
     if (state.outletDestination === 'RECIRCULACAO') {
@@ -124,27 +138,31 @@
       value: tempValid ? state.tempC : null }, permissives, reasons, alarms,
       effective: { mixer: Boolean(state.mixer && permissives.mixer), steam: Boolean(state.steam && permissives.steam),
         feedPump: Boolean(state.feedPump && permissives.feedPump), screw: Boolean(demo && state.running && state.screw),
-        outletPump: permissives.outletPump ? state.outletPump : null } };
+        feedMachines: Object.fromEntries(MACHINES.map(name => [name, Boolean(state.feedPump && permissives.feedPump && machines.includes(name))])),
+        tachoMixers: Object.fromEntries(MACHINES.map(name => [name, Boolean(state.tachoMixers[name] && permissives['mixer' + name])])),
+        outletPump: permissives.outletPump && [1, 2].includes(state.outletPump) ? state.outletPump : null } };
   }
 
   function reconcile(state) {
     const status = evaluate(state);
     ['mixer', 'steam', 'feedPump'].forEach(key => { if (!status.permissives[key]) state[key] = false; });
-    if (!status.permissives.outletPump) state.outletPump = null;
+    MACHINES.forEach(name => { if (!status.permissives['mixer' + name]) state.tachoMixers[name] = false; });
+    if (!status.permissives.outletPump) { state.outletPump = null; state.pumpElapsedSeconds = 0; }
     if (!status.permissives.admission) state.inletFlowLpm = 0;
     return evaluate(state);
   }
 
   function set(state, key, value) {
     if (state.mode !== 'SIMULACAO') return { ok: false, reason: 'Controles disponíveis somente na simulação local.' };
-    const booleans = ['mixer', 'steam', 'feedPump', 'screw', 'pt100Fault', 'readyFAST', 'readyGRATE'];
+    const booleans = ['mixer', 'steam', 'feedPump', 'screw', 'pt100Fault', 'readyFAST', 'readyGRATE', 'mixerFAST', 'mixerGRATE', 'autoAlternatePump'];
     const nonnegative = ['tankLiters', 'inletFlowLpm', 'tachoFAST', 'tachoGRATE'];
     const thermal = ['tempC', 'temperatureMinC', 'temperatureMaxC'];
     let valid = false;
     if (booleans.includes(key)) valid = typeof value === 'boolean';
     if (nonnegative.includes(key)) valid = finite(value) && value >= 0 && value <= (key === 'tankLiters' ? CAPACITY_LITERS : 1000);
     if (thermal.includes(key)) valid = value === null || finite(value) && value >= -50 && value <= 200;
-    if (['selectedDecanter', 'selectedTacho'].includes(key)) valid = value === null || MACHINES.includes(value);
+    if (key === 'selectedDecanter') valid = value === null || MACHINES.includes(value) || value === 'AMBAS';
+    if (key === 'selectedTacho') valid = value === null || MACHINES.includes(value);
     if (key === 'outletPump') valid = value === null || value === 1 || value === 2;
     if (key === 'selectedStorage') valid = value === null || Number.isInteger(value) && value >= 1 && value <= 5;
     if (key === 'outletDestination') valid = ['ARMAZENAMENTO', 'RECIRCULACAO'].includes(value);
@@ -153,11 +171,13 @@
     const previous = clone(state);
     if (key === 'readyFAST' || key === 'readyGRATE') state.decanterReady[key.slice(5)] = value;
     else if (key === 'tachoFAST' || key === 'tachoGRATE') state.tachos[key.slice(5)] = value;
+    else if (key === 'mixerFAST' || key === 'mixerGRATE') state.tachoMixers[key.slice(5)] = value;
     else state[key] = value;
     if (key === 'tankLiters') state.switches = sensorsFromVolume(value);
     // Toda troca da linha de alimentação exige novo início deliberado da bomba.
     if (key === 'selectedDecanter' && previous.selectedDecanter !== value) state.feedPump = false;
     if (['selectedTacho', 'selectedStorage', 'outletDestination'].includes(key) && previous[key] !== value) state.outletPump = null;
+    if (key === 'outletPump' || key === 'autoAlternatePump' || state.outletPump === null) state.pumpElapsedSeconds = 0;
     const status = reconcile(state);
     const requestedOn = value === true || key === 'outletPump' && value !== null || key === 'inletFlowLpm' && value > 0;
     if (requestedOn && Object.hasOwn(status.permissives, key) && !status.permissives[key]) {
@@ -182,12 +202,15 @@
         state.inletTotalLiters += Math.max(0, volume);
       }
       if (status.effective.feedPump) {
-        const name = state.selectedDecanter;
+        const machines = selectedMachines(state);
+        // A vazão informada é total; ambas recebem parcelas iguais, sem criar produto.
+        const room = Math.min(...machines.map(name => Math.max(0, TACHO_CAPACITY_LITERS * 0.9 - state.tachos[name]))) * machines.length;
         const volume = Math.min(state.feedFlowLpm * delta / 60,
-          Math.max(0, state.tankLiters - SENSOR_POINTS[0].liters), Math.max(0, TACHO_CAPACITY_LITERS * 0.9 - state.tachos[name]));
+          Math.max(0, state.tankLiters - SENSOR_POINTS[0].liters), room);
         state.tankLiters -= volume;
-        state.tachos[name] += volume;
-        if (state.tankLiters <= SENSOR_POINTS[0].liters) state.feedPump = false;
+        machines.forEach(name => { state.tachos[name] += volume / machines.length; });
+        if (state.tankLiters <= SENSOR_POINTS[0].liters
+          || machines.some(name => state.tachos[name] >= TACHO_CAPACITY_LITERS * 0.9)) state.feedPump = false;
       }
       if (status.effective.outletPump) {
         const name = state.selectedTacho;
@@ -201,6 +224,15 @@
           state.transferredTotalLiters += volume;
           state.storageTotals[state.selectedStorage - 1] += volume;
         }
+        if (state.autoAlternatePump && volume > 0) {
+          state.pumpElapsedSeconds += volume / state.outletFlowLpm * 60;
+          if (state.pumpElapsedSeconds >= state.pumpSwitchSeconds) {
+            state.outletPump = state.outletPump === 1 ? 2 : 1;
+            state.pumpElapsedSeconds %= state.pumpSwitchSeconds;
+          }
+        }
+        // Um tacho seco exige seleção explícita da bomba após recuperar produto.
+        if (state.tachos[name] <= 0 || volume <= 0) { state.outletPump = null; state.pumpElapsedSeconds = 0; }
       }
       state.switches = sensorsFromVolume(state.tankLiters);
       remaining -= delta;
@@ -215,14 +247,19 @@
     if (action.type === 'START_DEMO') { startDemo(state); return { ok: true, reason: '' }; }
     if (action.type === 'STOP') { stop(state); return { ok: true, reason: '' }; }
     if (action.type === 'LIVE') { Object.assign(state, createState()); return { ok: true, reason: '' }; }
-    if (action.type === 'PAUSE') { state.running = false; return { ok: true, reason: '' }; }
+    if (action.type === 'PAUSE') {
+      state.running = false;
+      state.screw = false;
+      reconcile(state);
+      return { ok: true, reason: '' };
+    }
     if (action.type === 'RESUME' && state.mode === 'SIMULACAO') { state.running = true; reconcile(state); return { ok: true, reason: '' }; }
     if (action.type === 'SET') return set(state, action.key, action.value);
     return { ok: false, reason: 'Ação inválida.' };
   }
 
   const api = { CAPACITY_LITERS, TACHO_CAPACITY_LITERS, SENSOR_POINTS, createState, startDemo, stop,
-    set, tick, evaluate, snapshot, dispatch, sensorsFromVolume, levelFromSwitches };
+    set, tick, evaluate, snapshot, dispatch, sensorsFromVolume, levelFromSwitches, selectedMachines };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.AutomacaoDecantersCore = api;
 })(typeof window === 'undefined' ? null : window);

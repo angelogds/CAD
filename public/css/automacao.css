@@ -35,3 +35,12 @@
 @media(max-width:1050px){.auto-home-stamp{display:none}.auto-process-stages{grid-template-columns:1fr 1fr;gap:20px 32px}.auto-process-stages li:nth-child(2):after{content:none}.auto-overview-heading{align-items:flex-start}.auto-overview-heading>a{white-space:normal;text-align:right;max-width:180px}}
 @media(max-width:760px){.auto-2a .auto-home-hero{padding-top:0}.auto-2a .auto-home-hero h1{font-size:32px}.auto-2a .auto-sectors,.auto-2a .auto-home-notes{grid-template-columns:1fr}.auto-process-overview{padding:19px}.auto-overview-heading{display:block;margin-bottom:20px}.auto-overview-heading>a{display:inline-block;margin-top:13px;max-width:none;text-align:left}.auto-process-stages{grid-template-columns:1fr;gap:18px}.auto-process-stages li:not(:last-child):after{content:none}.auto-2a .auto-sector-card{padding:20px;gap:18px}.auto-sector-bottom{flex-wrap:wrap}.auto-2a .auto-sector-card h2{font-size:21px}.auto-2a .auto-brand strong{font-size:15px}.auto-2a .auto-brand small{font-size:10px}}
 @media(prefers-reduced-motion:reduce){.auto-2a .auto-sector-card{transition:none}}@media(prefers-contrast:more){.auto-process-overview,.auto-2a .auto-sector-card{border-color:var(--auto-line)}}
+
+/* Nomes de equipamentos em camada HTML, legíveis em qualquer zoom da cena. */
+.auto-page .auto-scene-labels{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:3}
+.auto-page .auto-scene-label{position:absolute;box-sizing:border-box;min-height:27px;max-width:180px;padding:5px 8px;border:1px solid #c9ced7;border-left:3px solid #ba1931;border-radius:5px;background:#fff;color:#222832;font:700 12px/14px Arial,sans-serif;letter-spacing:0;text-align:center;white-space:normal;overflow-wrap:normal;box-shadow:0 1px 4px #17203318;pointer-events:auto;cursor:pointer;opacity:1}
+.auto-page .auto-scene-label:hover,.auto-page .auto-scene-label:focus-visible{border-color:#ba1931;outline:2px solid #ba193150;outline-offset:2px}
+.auto-page .auto-scene-label[aria-pressed=true]{background:#fff0f3;border-color:#ba1931}
+.auto-page .auto-scene-label-leader{position:absolute;height:1px;background:#8e98a7;transform-origin:0 50%;pointer-events:none}
+.auto-page .auto-scene-labels [hidden]{display:none!important}
+@media(max-width:600px){.auto-page .auto-scene-label{max-width:142px;font-size:11px;line-height:14px}}
