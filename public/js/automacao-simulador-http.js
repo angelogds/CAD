@@ -7,8 +7,8 @@
   'use strict';
   const MSG = {
     SESSAO_EXPIRADA: 'Sessão expirada — entre novamente no CAD',
-    SEM_PERMISSAO: 'Sem permissão de ADMIN para a bancada',
-    CSRF_INVALIDO: 'Sessão de configuração alterada — recarregue a página',
+    SEM_PERMISSAO: 'Sem permissão para a sincronização da bancada',
+    CSRF_INVALIDO: 'Sessão de sincronização alterada — recarregue a página',
     SERVIDOR: 'Erro do servidor',
     RESPOSTA_INVALIDA: 'Resposta inesperada do servidor',
     REDE: 'Sem comunicação com o CAD',
