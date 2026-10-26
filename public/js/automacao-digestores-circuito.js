@@ -49,6 +49,7 @@
   if (!panel || !Core) return;
   const controls = panel.dataset.controls === 'true';
   const state = Core.createState();
+  let thermalStates = Array(4).fill('DESLIGADO');
   const media = root.matchMedia?.('(prefers-reduced-motion: reduce)');
   let motion = !media?.matches;
   let selected = 'digestor1';
@@ -61,6 +62,16 @@
   const role = key => panel.querySelector('[data-circuito-role="' + key + '"]');
   const text = (key, value) => { const element = role(key); if (element) element.textContent = value; };
   const action = key => panel.querySelector('[data-circuito-action="' + key + '"]');
+  function applyThermal(detail) {
+    const allowed = new Set(['VERDE', 'AMARELO', 'VERMELHO', 'VERMELHO_PISCANDO']);
+    thermalStates = Array.from({ length: 4 }, (_, index) => allowed.has(detail?.states?.[index]) ? detail.states[index] : 'DESLIGADO');
+    panel.querySelectorAll('[data-circuito-tower]').forEach(element => {
+      const id = Number(element.dataset.circuitoTower);
+      element.dataset.thermal = Number.isInteger(id) && id >= 1 && id <= 4 ? thermalStates[id - 1] : 'DESLIGADO';
+    });
+  }
+  root.addEventListener('digestores-circuito:thermal', event => applyThermal(event.detail));
+  applyThermal(root.CGDThermalState);
   function renderDetail(s) {
     const detail = detailsFor(selected, s);
     text('title', detail.title);
