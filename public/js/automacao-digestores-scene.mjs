@@ -10,11 +10,13 @@ export function createDigestorScene({ makeLabel } = {}) {
   const flows = [];
   const liquid = [];
   const gates = [];
+  const towers = [];
   const material = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.22, ...extra });
   const steel = material(0xc7cbd1);
   const light = material(0xf0f1f3);
   const dark = material(0x555d68);
   const red = material(0xba1931);
+  const paddleSteel = material(0xc0904f);
   const oil = material(0xc69a43, { transparent: true, opacity: 0.83, metalness: 0.05 });
   const product = material(0xa88b62);
   const pipeMaterial = material(0x939ca7);
@@ -157,7 +159,7 @@ export function createDigestorScene({ makeLabel } = {}) {
     const digestor = group(key, [x, 4.08, -0.1]);
     // Corte superior didático revela o eixo; as portas frontais permanecem grandes.
     const casing = mesh(digestor, new THREE.CylinderGeometry(1.17, 1.17, 3.65, 40, 1, true, Math.PI * 4 / 3, Math.PI * 4 / 3),
-      material(0xd8dce1, { side: THREE.DoubleSide }));
+      material(0xd8dce1, { side: THREE.DoubleSide, transparent: true, opacity: 0.63, depthWrite: false }));
     casing.rotation.x = Math.PI / 2;
     for (const z of [-1.84, 1.84]) {
       const rim = mesh(digestor, new THREE.TorusGeometry(1.17, 0.075, 8, 40), steel, [0, 0, z]);
@@ -180,14 +182,33 @@ export function createDigestorScene({ makeLabel } = {}) {
     cylinder(digestor, 0.39, 0.64, [0, 0, -2.27], red, 'z');
     box(digestor, [0.95, 0.14, 0.75], [0, -0.48, -2.27], dark);
     const shaft = rotor(digestor, key, [0, 0, 0], 'z', s => on(unit(s, index).shaft), 1.4);
+    shaft.name = 'eixo-interno-d' + (index + 1);
     cylinder(shaft, 0.085, 4.3, [0, 0, -0.12], dark, 'z');
     for (const z of [-1.15, 0, 1.15]) {
       for (const angle of [0, Math.PI / 2]) {
-        const paddle = box(shaft, [1.75, 0.1, 0.32], [0, 0, z], steel);
+        const paddle = box(shaft, [1.75, 0.1, 0.32], [0, 0, z], paddleSteel);
         paddle.rotation.z = angle;
         paddle.rotation.y = 0.2;
       }
     }
+    // Sinaleiro 3D na tampa superior: réplica visual da cor validada pelo painel térmico.
+    // Não comanda pinos, vapor, descarga ou motor; o eixo real segue sem retorno físico.
+    const towerGroup = new THREE.Group();
+    towerGroup.name = 'torre-termica-d' + (index + 1);
+    towerGroup.position.set(0.94, 1.48, 1.28);
+    digestor.add(towerGroup);
+    const towerHousing = box(towerGroup, [0.4, 0.94, 0.36], [0, 0, 0], dark);
+    towerHousing.name = 'corpo-sinaleiro';
+    cylinder(towerGroup, 0.045, 0.37, [0, -0.64, 0], steel);
+    const lenses = {};
+    const lensColors = { red: 0xf13750, yellow: 0xffc531, green: 0x18e477 };
+    for (const [color, y] of [['red', 0.29], ['yellow', 0], ['green', -0.29]]) {
+      const glass = material(0x33404a, { emissive: 0x000000, emissiveIntensity: 0 });
+      const bulb = mesh(towerGroup, new THREE.SphereGeometry(0.146, 16, 12), glass, [0, y, 0.19]);
+      bulb.name = 'lente-' + color;
+      lenses[color] = { bulb, bright: lensColors[color] };
+    }
+    towers.push({ index, key, group: towerGroup, lenses, state: 'DESLIGADO' });
     const gateKey = 'gate' + (index + 1);
     const gate = group(gateKey, [x, 5.85, -0.35]);
     cylinder(gate, 0.33, 1.15, [0, 0.13, 0], steel);
@@ -264,7 +285,22 @@ export function createDigestorScene({ makeLabel } = {}) {
 
   let lastPhase = 0;
   let flowPhase = 0;
-  function update(snapshot = {}, phase = 0, { motion = true } = {}) {
+  function update(snapshot = {}, phase = 0, { motion = true, thermal = [], blinkOn = true } = {}) {
+    const colors = Array.isArray(thermal) ? thermal : [];
+    for (const tower of towers) {
+      const state = ['VERDE', 'AMARELO', 'VERMELHO', 'VERMELHO_PISCANDO'].includes(colors[tower.index])
+        ? colors[tower.index] : 'DESLIGADO';
+      tower.state = state;
+      tower.group.userData.thermalState = state;
+      const activeColor = state === 'VERDE' ? 'green' : state === 'AMARELO' ? 'yellow'
+        : state === 'VERMELHO' || state === 'VERMELHO_PISCANDO' && blinkOn ? 'red' : null;
+      for (const [color, lens] of Object.entries(tower.lenses)) {
+        const lit = color === activeColor;
+        lens.bulb.material.color.setHex(lit ? lens.bright : 0x33404a);
+        lens.bulb.material.emissive.setHex(lit ? lens.bright : 0x000000);
+        lens.bulb.material.emissiveIntensity = lit ? 1.6 : 0;
+      }
+    }
     const sim = snapshot.mode === 'SIMULACAO';
     const clock = Number.isFinite(phase) ? phase : lastPhase;
     // Limita saltos de quadros e conserva a posição ao pausar ou reduzir movimento.
@@ -316,7 +352,7 @@ export function createDigestorScene({ makeLabel } = {}) {
     textures.forEach(texture => texture.dispose());
     materials.forEach(mat => mat.dispose());
   }
-  return { root, equipment, update, dispose, rotors, flows, liquid, gates };
+  return { root, equipment, update, dispose, rotors, flows, liquid, gates, towers };
 }
 
 export function selectionKey(object) {
