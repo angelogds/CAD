@@ -8,7 +8,7 @@ for(const m of ['229_automacao_dispositivos','230_automacao_dispositivo_estados'
 const {fetchJson}=require('../public/js/automacao-simulador-http.js');
 after(()=>db.close());
 
-test('API da bancada: 401 sem sessão e 403 sem ADMIN, nunca redireciona',async()=>{
+test('API da bancada: 401 sem sessão, supervisor autorizado e configuração ADMIN, sem redirects',async()=>{
   const app=express();app.use(express.json());
   let user=null;
   app.use((req,_res,next)=>{req.session={user,automacaoConfigCsrf:'csrf'};req.flash=()=>{};next()});
@@ -23,7 +23,9 @@ test('API da bancada: 401 sem sessão e 403 sem ADMIN, nunca redireciona',async(
     }
     user={id:2,role:'MANUTENCAO_SUPERVISOR'};
     const r2=await fetch(base+'/simulador/sinaleiros/status',{redirect:'manual'});
-    assert.equal(r2.status,403);assert.equal((await r2.json()).code,'SEM_PERMISSAO');
+    assert.equal(r2.status,200);assert.equal((await r2.json()).digestores.length,4);
+    const adminOnly=await fetch(base+'/dispositivos',{redirect:'manual'});
+    assert.equal(adminOnly.status,403);assert.equal((await adminOnly.json()).code,'SEM_PERMISSAO');
     user={id:1,role:'ADMIN'};
     const ok=await fetch(base+'/simulador/sinaleiros/status',{redirect:'manual'});
     assert.equal(ok.status,200);assert.ok(Array.isArray((await ok.json()).digestores));
@@ -76,7 +78,7 @@ test('ADMIN com CSRF inválido: 403 CSRF_INVALIDO, mensagem própria e sem anunc
     }
     // Cliente: erro dedicado, distinto de SEM_PERMISSAO.
     await assert.rejects(fetchJson(base,{method:'POST',headers:{'Content-Type':'application/json','X-CGD-CSRF':'antigo'},body:'{"estados":[]}'}),
-      e=>e.kind==='CSRF_INVALIDO'&&e.message==='Sessão de configuração alterada — recarregue a página'&&!/permiss/i.test(e.message));
+      e=>e.kind==='CSRF_INVALIDO'&&e.message==='Sessão de sincronização alterada — recarregue a página'&&!/permiss/i.test(e.message));
     // Script da tela: interrompe e não anuncia sincronização.
     const els={};const el=(id)=>els[id]||(els[id]={id,checked:true,dataset:{csrf:'antigo'},value:'1',disabled:false,textContent:'',
       addEventListener(){},querySelector:()=>null,replaceChildren(){},setAttribute(){},appendChild(){},colSpan:0});
