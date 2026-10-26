@@ -37,11 +37,12 @@ test('sincronização transmite temperatura simulada e transições sem comando 
     addEventListener(event, fn) { handlers[this.id + ':' + event] = fn; }, querySelector() { return null; },
     replaceChildren() {}, setAttribute() {}, appendChild() {} });
   const els = Object.fromEntries(['sim-digestores','sim-remote-enable','sim-remote-status','sim-select-digestor',
-    'sim-start','sim-remote-rows','sim-pause','sim-reset'].map(id => [id, { ...element(), id }]));
+    'sim-start','sim-remote-rows','sim-pause','sim-reset','sim-auto-sync','sim-solenoids-enable','sim-solenoids-status','sim-connect-esp32'].map(id => [id, { ...element(), id }]));
   const card = { dataset: { temperaturaC: '120', aquecimentoSimulado: 'true', camisaSimulada: 'ABERTO', eixoSimulado: 'FECHADO' }, querySelector() { return { dataset: { stage: 'red' } }; } };
   els['sim-digestores'].querySelector = () => card;
   els['sim-start'].disabled = true;
   els['sim-remote-enable'].dataset.csrf = 'csrf';
+  els['sim-auto-sync'].checked = true;
   const intervals = [];
   vm.runInNewContext(fs.readFileSync(require.resolve('../public/js/automacao-simulador-remoto'), 'utf8'), {
     window: { CGDSimHttp: { MSG: {}, async fetchJson(url, options) {
@@ -54,6 +55,11 @@ test('sincronização transmite temperatura simulada e transições sem comando 
   const flush = () => new Promise(resolve => setImmediate(resolve));
   els['sim-remote-enable'].checked = true;
   handlers['sim-remote-enable:change']();
+  await flush();
+  // Conexão automática/manual mantém as solenóides FECHADAS por padrão.
+  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'MEIO', temperatura_c: 120, aquecimento_simulado: true, purgadores_simulados: { camisa: 'FECHADO', eixo: 'FECHADO' } }]);
+  els['sim-solenoids-enable'].checked = true;
+  handlers['sim-solenoids-enable:change']();
   await flush();
   assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'MEIO', temperatura_c: 120, aquecimento_simulado: true, purgadores_simulados: { camisa: 'ABERTO', eixo: 'FECHADO' } }]);
   card.dataset.temperaturaC = '120.1';
