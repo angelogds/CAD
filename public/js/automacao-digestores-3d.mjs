@@ -9,6 +9,7 @@ mountIndustrialViewer({
   prefix: 'digestores-circuito',
   dashboardName: 'AutomacaoDigestoresCircuito',
   createModel: createDigestorScene,
+  thermalEvent: 'digestores-circuito:thermal',
   fitPosition: [20, 16, 26],
   target: [-0.5, 3, 1.3],
   viewWidth: 30,
