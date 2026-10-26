@@ -2,8 +2,8 @@
 <% const podeSimular = typeof simulacaoDecantersHabilitada !== 'undefined' && simulacaoDecantersHabilitada;
    const paginaSimulacao = podeSimular && typeof modoSimulacaoDecanters !== 'undefined' && modoSimulacaoDecanters;
    const todasAreas = typeof visualizacaoAutomacaoCompleta === 'undefined' || visualizacaoAutomacaoCompleta; %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261026-circuitos-v2">
-<link rel="stylesheet" href="/css/automacao-decanters.css?v=20261026-circuitos-v2">
+<link rel="stylesheet" href="/css/automacao.css?v=20261026-esp32-status1">
+<link rel="stylesheet" href="/css/automacao-decanters.css?v=20261026-esp32-status1">
 <main class="auto-page auto-hmi auto-2a auto-dec-page" id="decanters-dashboard" data-dec-simulation-allowed="<%= paginaSimulacao ? 'true' : 'false' %>">
   <%- include('partials/brand', { brandContext: 'CAD · Decanters e tanque de serviço' }) %>
   <div class="auto-actions-top"><a class="auto-back-link" href="/automacao">← Voltar</a></div>
@@ -18,7 +18,7 @@
     <div class="auto-integration"><span class="auto-state waiting" id="dec-source-label">SUPERVISÃO · SEM SINAL</span><small id="dec-source-description">Sem hardware conectado</small></div>
   </header>
   <div class="dec-modebar"><p id="dec-mode-description">Comandos: indisponíveis. Instrumentos e comunicação desta área ainda não integrados.</p>
-    <% if (paginaSimulacao) { %><button type="button" class="dec-button dec-primary" id="dec-demo-start">Iniciar simulação</button>
+    <% if (paginaSimulacao) { %><button type="button" class="dec-button dec-primary" id="dec-demo-start">Iniciar simulação</button><button type="button" class="dec-button" id="dec-esp32-connect">Conectar / verificar ESP32</button><span id="dec-esp32-status" role="status" aria-live="polite">ESP32 do decanter: aguardando integração</span>
     <a class="dec-button" href="/automacao/decanters" id="dec-live-return" hidden>Voltar à supervisão</a><% } else if (podeSimular) { %><a class="dec-button dec-primary" href="/automacao/decanters/simulador">Abrir simulação da área</a><% } %></div>
   <p class="dec-demo-notice" id="dec-demo-notice" hidden><strong>SIMULAÇÃO LOCAL</strong> Maquete didática no navegador. Temperaturas, níveis e movimentos são simulados. Nenhum comando é enviado às máquinas ou ao ESP32.</p>
   <section class="dec-kpis" aria-label="Indicadores da área">
@@ -143,6 +143,6 @@
   </details><% } %>
   <details class="auto-panel dec-study"><summary>Leitura de produção, instrumentos e lógica prevista</summary><div class="dec-study-grid"><section><h2>Quanto sebo saiu na noite?</h2><p>FT-IN totaliza o recebido. FT-OUT, após as bombas, totaliza o transferido aos tanques externos. Produção apurada exige definir o ponto de medição e considerar estoque inicial/final, retornos e recirculação.</p><p>Turno noturno: início e fim a configurar em America/Sao_Paulo. Nesta demonstração, os contadores pertencem apenas à sessão do navegador.</p></section><section><h2>Condições de alimentação</h2><p>Estudo: nível e temperatura válidos, mistura em funcionamento, válvula de destino confirmada, decanter liberada, rosca disponível e tacho com capacidade. O controle real seguirá a sequência do fabricante.</p></section><section><h2>Mexedor e vapor</h2><p>Movimento das hélices não comprova homogeneização. Prever retorno de rotação e avaliação do processo. Um PT100 mede a temperatura no ponto instalado; a posição da válvula não confirma fluxo de vapor.</p></section><section><h2>Expansão do armazenamento</h2><p>Tanques 1 a 5 são uma previsão visual. Capacidades, sensores, válvulas, disponibilidade e ligação física ainda serão levantados. A maquete não libera transferência real.</p></section></div></details>
 </main>
-<script src="/js/automacao-decanters-core.js?v=20261026-circuitos-v2" defer></script>
-<script src="/js/automacao-decanters.js?v=20261026-circuitos-v2" defer></script>
-<script type="module" src="/js/automacao-decanters-3d.mjs?v=20261026-circuitos-v2"></script>
+<script src="/js/automacao-decanters-core.js?v=20261026-esp32-status1" defer></script>
+<script src="/js/automacao-decanters.js?v=20261026-esp32-status1" defer></script>
+<script type="module" src="/js/automacao-decanters-3d.mjs?v=20261026-esp32-status1"></script>
