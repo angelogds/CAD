@@ -40,6 +40,16 @@ function apiAdmin(req, res, next) {
   return next();
 }
 const adminApi = [apiAdmin];
+// A simulação da bancada é operacional. Token e dispositivo continuam exclusivos do ADMIN.
+function apiBancada(req, res, next) {
+  res.setHeader('Cache-Control', 'no-store');
+  const user = req.session && req.session.user;
+  if (!user) return res.status(401).json({ok:false,code:'SESSAO_EXPIRADA',error:'Sessão expirada.'});
+  if (!ACCESS.automacao_bancada_simulate.includes(normalizeRole(user.role)))
+    return res.status(403).json({ok:false,code:'SEM_PERMISSAO',error:'Sem autorização para sincronização de bancada.'});
+  return next();
+}
+const bancadaApi = [apiBancada];
 function csrfAdmin(req, res, next) {
   const received = req.get('x-cgd-csrf') || '';
   const expected = req.session && req.session.automacaoConfigCsrf;
@@ -49,7 +59,7 @@ function csrfAdmin(req, res, next) {
   return next();
 }
 // O CAD transmite apenas três sinais de bancada, nunca comandos de vapor.
-router.post('/api/simulador/sinaleiros', ...adminApi, csrfAdmin, (req,res) => {
+router.post('/api/simulador/sinaleiros', ...bancadaApi, csrfAdmin, (req,res) => {
   res.setHeader('Cache-Control','no-store');
   try { return res.json(bancada.publish(req.body && req.body.estados, req.session.user.id)); }
   catch (e) { return res.status(e.status||400).json({ok:false,error:e.message}); }
@@ -58,7 +68,7 @@ router.get('/api/digestores/status', requireLogin, requireRole(ACCESS.automacao_
   res.setHeader('Cache-Control', 'no-store');
   return res.json(telemetria.status());
 });
-router.get('/api/simulador/sinaleiros/status', ...adminApi, (_req, res) => {
+router.get('/api/simulador/sinaleiros/status', ...bancadaApi, (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   return res.json(telemetria.status());
 });
