@@ -51,13 +51,24 @@ test('Diretoria recebe supervisão sem atalhos ou controles de simulação', () 
   assert.doesNotMatch(html, /id="dec-sim-panel"|id="dec-demo-start"|href="\/automacao\/decanters\/simulador"/);
 });
 
-test('encarregado entra nas decanters sem ganhar gestão de tokens ou acesso às demais áreas', () => {
+test('encarregado entra nas decanters e simulador mecânico sem ganhar gestão de tokens ou supervisão das demais áreas', () => {
   const role = 'ENCARREGADO_MANUTENCAO';
   assert.equal(request('/decanters', role).status, 200);
   const home = request('/', role);
   assert.equal(home.status, 200);
-  assert.deepEqual(home.data.setores.map(setor => setor.key), ['decanters']);
+  assert.deepEqual(home.data.setores.map(setor => setor.key), ['digestores', 'decanters']);
+  assert.equal(home.data.setores.find(setor => setor.key === 'digestores').href, '/automacao/digestores/simulador');
+  assert.equal(request('/digestores/simulador', role).status, 200);
+  assert.equal(request('/digestores/simulador', role).data.simulacaoCircuitoPermitida, true);
   assert.match(render(home), /href="\/automacao\/decanters\/simulador"/);
   assert.doesNotMatch(render(home), /href="\/automacao\/digestores"|href="\/automacao\/prensas"|href="\/automacao\/configuracao"/);
   for (const route of ['/digestores', '/prensas', '/configuracao']) assert.equal(request(route, role).status, 403, route);
+});
+
+test('simulador térmico da Diretoria preserva leitura visual sem controles mecânicos ou sincronização ESP32', () => {
+  const result = request('/digestores/simulador', 'DIRETORIA');
+  assert.equal(result.status, 200);
+  assert.equal(result.data.simulacaoCircuitoPermitida, false);
+  assert.equal(result.data.simuladorBancadaAdmin, false);
+  assert.doesNotMatch(render(result), /class="circuito-demo-controls"|id="sim-remote-enable"/);
 });

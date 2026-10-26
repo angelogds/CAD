@@ -87,7 +87,7 @@ test('indicadores desconhecidos não viram desligado, zero ou confirmação de h
 });
 
 test('biblioteca 3D usa mesma versão local com licença e sem dependência de CDN', () => {
-  const renderer = fs.readFileSync(require.resolve('../public/js/automacao-decanters-3d.mjs'), 'utf8');
+  const renderer = fs.readFileSync(require.resolve('../public/js/automacao-industrial-viewer.mjs'), 'utf8');
   const vendor = require('../public/vendor/three-0.172.0/package.json');
   const installed = JSON.parse(fs.readFileSync(require('node:path').join(require('node:path').dirname(require.resolve('three')), '../package.json'), 'utf8'));
   assert.equal(vendor.version, installed.version);

@@ -44,16 +44,16 @@ export function createIndustrialScene({ makeLabel } = {}) {
     if (key) object.userData.selectKey = key;
     root.add(object);
   }
-  function register(key, group) {
+  function register(key, group, primary = false) {
     group.userData.selectKey = key;
-    equipment.set(key, group);
+    if (primary || !equipment.has(key)) equipment.set(key, group);
     return group;
   }
   function group(key, position = [0, 0, 0]) {
     const object = new THREE.Group();
     object.position.set(...position);
     root.add(object);
-    return register(key, object);
+    return register(key, object, true);
   }
   function pipe(key, positions, active, mat = pipeMaterial, radius = 0.065) {
     const curve = new THREE.CurvePath();
@@ -94,7 +94,7 @@ export function createIndustrialScene({ makeLabel } = {}) {
     return mesh(parent, new THREE.TubeGeometry(curve, 160, 0.045, 5, false), mat, position);
   }
 
-  const platform = box(root, [25, 0.15, 15.8], [0, -0.13, -0.7], material(0xe9eaed, { metalness: 0 }));
+  const platform = box(root, [25, 0.15, 18.5], [0, -0.13, -1.8], material(0xe9eaed, { metalness: 0 }));
   platform.castShadow = false;
   const grid = new THREE.GridHelper(24, 24, 0xcdd0d6, 0xdfe1e6);
   grid.position.set(0, -0.04, -0.7);
@@ -166,7 +166,8 @@ export function createIndustrialScene({ makeLabel } = {}) {
   label('BOMBA HELICOIDAL', [-4.65, 1.65, 2.1], 2.8, 'feed');
   pipe('feed', [[-6.6, 1.05, 0], [-5.85, 1.05, 0], [-5.85, 0.86, 1.7], [-5.6, 0.86, 1.7]], s => s.effective.feedPump);
   pipe('feed', [[-3.55, 0.86, 1.7], [-3.1, 0.86, 1.7], [-3.1, 4.4, 1.7], [0, 4.4, 1.7]], s => s.effective.feedPump);
-  pipe(null, [[0, 4.4, 1.7], [4.8, 4.4, 1.7]], s => s.effective.feedPump && s.selectedDecanter === 'GRATE');
+  const feeding = (s, name) => Boolean(s.effective.feedMachines?.[name]);
+  pipe(null, [[0, 4.4, 1.7], [4.8, 4.4, 1.7]], s => feeding(s, 'GRATE'));
 
   function decanter(name, x) {
     const object = group(name, [x, 2.25, 0]);
@@ -202,11 +203,11 @@ export function createIndustrialScene({ makeLabel } = {}) {
     object.add(rotor);
     rotors.push({ mesh: rotor, axis: 'x', active: s => Boolean(s.decanterReady[name] && s.running) });
     label('DECANTER ' + name, [x, 3.35, -0.7], 2.7, name);
-    pipe('valve' + name, [[x, 4.4, 1.7], [x, 4.4, 0], [x, 2.85, 0]], s => s.effective.feedPump && s.selectedDecanter === name);
-    valve('valve' + name, [x, 3.75, 0], s => s.effective.feedPump && s.selectedDecanter === name);
-    pipe('tacho' + name, [[x + 0.55, 1.65, 0.28], [x + 0.55, 1.18, 1.5]], s => s.effective.feedPump && s.selectedDecanter === name);
+    pipe('valve' + name, [[x, 4.4, 1.7], [x, 4.4, 0], [x, 2.85, 0]], s => feeding(s, name));
+    valve('valve' + name, [x, 3.75, 0], s => feeding(s, name));
+    pipe('tacho' + name, [[x + 0.55, 1.65, 0.28], [x + 0.85, 1.18, 1.5]], s => feeding(s, name));
     pipe('screw', [[x - 0.75, 1.65, -0.3], [x - 0.75, 1.15, -1.6], [x - 0.75, 0.57, -1.6]],
-      s => s.effective.feedPump && s.selectedDecanter === name, brown);
+      s => feeding(s, name), brown);
     const tacho = group('tacho' + name, [x + 0.55, 0, 1.5]);
     mesh(tacho, new THREE.CylinderGeometry(0.7, 0.63, 0.75, 32, 1, true),
       material(0xb9bec7, { side: THREE.DoubleSide, transparent: true, opacity: 0.48 }), [0, 0.76, 0]);
@@ -215,6 +216,18 @@ export function createIndustrialScene({ makeLabel } = {}) {
     const fluid = cylinder(tacho, 0.62, 1, [0, 0.6, 0], oil);
     fluid.visible = false;
     liquid.push({ mesh: fluid, volume: s => s.tachos[name], capacity: 1000, bottom: 0.44, height: 0.65 });
+    const mixer = new THREE.Group();
+    tacho.add(mixer);
+    mixer.userData.selectKey = 'tacho' + name;
+    box(mixer, [0.28, 0.25, 0.28], [0, 1.6, 0], red);
+    box(mixer, [1.3, 0.06, 0.12], [0, 1.35, 0], dark);
+    cylinder(mixer, 0.035, 0.95, [0, 0.96, 0], dark);
+    const blades = new THREE.Group();
+    blades.position.y = 0.65;
+    box(blades, [0.95, 0.06, 0.13], [0, 0, 0], steel);
+    box(blades, [0.13, 0.06, 0.95], [0, 0, 0], steel);
+    mixer.add(blades);
+    rotors.push({ mesh: blades, axis: 'y', active: s => Boolean(s.effective.tachoMixers?.[name]) });
     label('TACHO ' + name, [x + 0.55, 0.1, 2.5], 2.0, 'tacho' + name);
     pipe('tacho' + name, [[x + 0.55, 0.45, 1.5], [x + 0.55, 0.45, 3.5], [6.2, 0.45, 3.5]],
       s => Boolean(s.effective.outletPump && s.selectedTacho === name));
@@ -237,18 +250,18 @@ export function createIndustrialScene({ makeLabel } = {}) {
     pipe('out' + i, [[6.2, 0.45, 3.5], [6.2, 0.45, z], [6.2, 0.9, z], [6.65, 0.9, z]], s => s.effective.outletPump === i);
     pipe('out' + i, [[8.7, 0.9, z], [10.35, 0.9, z], [10.35, 2.2, z]], s => s.effective.outletPump === i);
   }
-  pipe('outlet', [[10.35, 2.2, 2.9], [10.35, 2.2, -4.2], [-2.8, 2.2, -4.2]],
+  pipe('outlet', [[10.35, 2.2, 2.9], [10.35, 2.2, -6.5], [-3, 2.2, -6.5]],
     s => Boolean(s.effective.outletPump && s.outletDestination === 'ARMAZENAMENTO'));
   indicator('outlet', [10.35, 2.2, -1.8], s => Boolean(s.effective.outletPump));
   label('FT-OUT · transferido', [10.1, 3, -1.8], 2.7, 'outlet');
   for (let i = 1; i <= 5; i++) {
     const x = -3 + (i - 1) * 3.0;
-    const storage = group('storage' + i, [x, 0, -6.4]);
-    cylinder(storage, 0.78, 2.25, [0, 1.25, 0], material(0xc6c9d0, { transparent: true, opacity: 0.27 }));
+    const storage = group('storage' + i, [x, 0, -8.8]);
+    cylinder(storage, 0.78, 2.25, [0, 1.25, 0], material(0xb5bbc5, { transparent: true, opacity: 0.55 }));
     const rim = mesh(storage, new THREE.TorusGeometry(0.78, 0.035, 6, 28), dark, [0, 2.38, 0]);
     rim.rotation.x = Math.PI / 2;
-    label('T' + i + ' · FUTURO', [x, 3.0, -6.4], 2.05, 'storage' + i);
-    pipe('storage' + i, [[x, 2.2, -4.2], [x, 2.2, -6.4], [x, 2.4, -6.4]],
+    label('T' + i + ' · FUTURO', [x, 3.0, -8.8], 2.05, 'storage' + i);
+    pipe('storage' + i, [[x, 2.2, -6.5], [x, 2.2, -8.8], [x, 2.4, -8.8]],
       s => Boolean(s.effective.outletPump && s.outletDestination === 'ARMAZENAMENTO' && s.selectedStorage === i));
   }
 
