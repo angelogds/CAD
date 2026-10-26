@@ -132,7 +132,7 @@
   }
   toggle.addEventListener('change',()=>{
     if(toggle.checked)connectFromToggle();
-    else stop();
+    else { void publish(true); stop(); }
   });
   function connectFromToggle() {
     // A opção do painel apenas sincroniza as lâmpadas por padrão.
