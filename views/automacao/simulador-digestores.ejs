@@ -1,4 +1,5 @@
 <% layout('layout') %>
+<% const bancadaPermitida = typeof simuladorBancadaPermitida !== 'undefined' ? simuladorBancadaPermitida : (typeof simuladorBancadaAdmin !== 'undefined' && simuladorBancadaAdmin); %>
 <link rel="stylesheet" href="/css/automacao.css?v=20261026-sync-esp-1">
 <link rel="stylesheet" href="/css/automacao-simulador.css?v=20261026-sync-esp-1">
 <link rel="stylesheet" href="/css/automacao-digestores-circuito.css?v=20261026-torres1">
@@ -9,7 +10,7 @@
     <div><span class="auto-eyebrow">AUTOMAÇÃO • DIGESTORES • MODO DEMONSTRAÇÃO</span>
       <h1>Simulador dos Digestores</h1>
       <p>Temperatura, sinaleiros e purgadores simulados para os quatro digestores.</p>
-    </div><span class="auto-state waiting" id="sim-hardware-indicator" aria-live="polite"><%= simuladorBancadaPermitida ? 'SIMULAÇÃO • VERIFICANDO ESP32' : 'SIMULAÇÃO • VISUAL' %></span>
+    </div><span class="auto-state waiting" id="sim-hardware-indicator" aria-live="polite"><%= bancadaPermitida ? 'SIMULAÇÃO • VERIFICANDO ESP32' : 'SIMULAÇÃO • VISUAL' %></span>
   </header>
   <section class="auto-alert" role="status"><strong>Simulação de bancada</strong><span>Temperatura gerada no CAD, sem PT100. Faixas de simulação, NÃO alarmes reais. O teste de cada solenoide exige liberação local no ESP32; aquecimento é somente visual. Sem comandos para cargas industriais ou descarga automática.</span></section>
   <%- include('partials/digestores-circuito', { controls: typeof simulacaoCircuitoPermitida !== 'undefined' && simulacaoCircuitoPermitida === true }) %>
@@ -25,9 +26,9 @@
       <option value="all" selected>Todos os quatro digestores</option>
     </select>
     <span id="sim-selection-status" role="status" aria-live="polite">Quatro digestores selecionados</span>
-    <p class="sim-select-warning">ADMIN pode sincronizar temperatura simulada, sinaleiros e estados dos purgadores. O teste físico de cada solenoide de bancada exige liberação local no ESP32. Sem controle de aquecimento, vapor ou cargas industriais.</p>
+    <p class="sim-select-warning">ADMIN, Supervisor ou Encarregado de Manutenção podem sincronizar temperatura e luzes. Os purgadores permanecem fechados até autorização específica. O teste físico de cada solenoide de bancada exige liberação local no ESP32. Sem controle de aquecimento, vapor ou cargas industriais.</p>
   </section>
-  <% if (simuladorBancadaPermitida) { %>
+  <% if (bancadaPermitida) { %>
   <section class="sim-bancada-online" aria-label="Sincronização do simulador com a bancada">
     <div><strong>Conexão CAD ↔ ESP32 · bancada dos digestores</strong>
     <p>Ao iniciar a simulação, o CAD sincroniza automaticamente temperatura e luzes com o ESP32 autorizado. A comunicação não comprova acionamento físico e nunca arma relés remotamente.</p></div>
@@ -44,7 +45,7 @@
       <tbody id="sim-remote-rows"><tr><td colspan="12">Carregando…</td></tr></tbody>
     </table></div></details>
     <small>“Aplicada” e “Saída” só aparecem se o firmware informar. Purgadores permanecem fechados até uma autorização explícita no CAD e uma autorização local por canal no ESP32, somente para bancada isolada.</small>
-    <% if (configuracaoAdmin) { %><p><a href="/automacao/configuracao">Configuração dos ESP32 e links para suas IHMs locais</a></p><% } else { %><p>Credenciais são configuradas pelo ADMIN. Para o teste da bancada, selecione SIMULAÇÃO na IHM local de cada ESP32 autorizado.</p><% } %>
+    <% if (typeof configuracaoAdmin !== 'undefined' && configuracaoAdmin) { %><p><a href="/automacao/configuracao">Configuração dos ESP32 e links para suas IHMs locais</a></p><% } else { %><p>Credenciais são configuradas pelo ADMIN. Para o teste da bancada, selecione SIMULAÇÃO na IHM local de cada ESP32 autorizado.</p><% } %>
   </section>
   <% } %>
   <div class="sim-toolbar">
@@ -139,7 +140,7 @@
 </main>
 <script src="/js/automacao-simulador-core.js?v=20261026-sync-esp-1" defer></script>
 <script src="/js/automacao-simulador.js?v=20261026-sync-esp-1" defer></script>
-<% if (simuladorBancadaPermitida) { %><script src="/js/automacao-simulador-http.js?v=20261026-sync-esp-1" defer></script><script src="/js/automacao-digestores.js?v=20261026-sync-esp-1" defer></script><script src="/js/automacao-simulador-remoto.js?v=20261026-sync-esp-1" defer></script><% } %>
+<% if (bancadaPermitida) { %><script src="/js/automacao-simulador-http.js?v=20261026-sync-esp-1" defer></script><script src="/js/automacao-digestores.js?v=20261026-sync-esp-1" defer></script><script src="/js/automacao-simulador-remoto.js?v=20261026-sync-esp-1" defer></script><% } %>
 <script src="/js/automacao-digestores-circuito-core.js?v=20261026-torres1" defer></script>
 <script src="/js/automacao-digestores-circuito.js?v=20261026-torres1" defer></script>
 <script type="module" src="/js/automacao-digestores-3d.mjs?v=20261026-torres1"></script>
