@@ -10,7 +10,7 @@ export function selectionKey(object) {
 }
 
 export function mountIndustrialViewer({ hostId, schemeId, statusId, loadingId, prefix, dashboardName, createModel,
-  fitPosition = [18,16,23], target = [-0.4,1.5,-0.7], viewWidth = 29, viewHeight = 16 }) {
+  fitPosition = [18,16,23], target = [-0.4,1.5,-0.7], viewWidth = 29, viewHeight = 16, thermalEvent = null }) {
   const host = document.getElementById(hostId);
   if (host) {
     try { initialize(); } catch (error) { fallback('Visualização 3D indisponível neste navegador. Use o esquema interativo.'); }
@@ -69,6 +69,7 @@ export function mountIndustrialViewer({ hostId, schemeId, statusId, loadingId, p
     let dirty = true;
     let selected = null;
     let snapshot = window[dashboardName]?.getSnapshot();
+    let thermal = thermalEvent && Array.isArray(window.CGDThermalState?.states) ? window.CGDThermalState.states : [];
     let phase = 0;
     let lastFrame = 0;
     let disposed = false;
@@ -121,6 +122,10 @@ export function mountIndustrialViewer({ hostId, schemeId, statusId, loadingId, p
     });
     controls.addEventListener('change', () => { dirty = true; });
     window.addEventListener(prefix + ':state', event => { snapshot = event.detail; dirty = true; });
+    if (thermalEvent) window.addEventListener(thermalEvent, event => {
+      thermal = Array.isArray(event.detail?.states) ? event.detail.states : [];
+      dirty = true;
+    });
     window.addEventListener(prefix + ':ready', () => { snapshot = window[dashboardName]?.getSnapshot(); dirty = true; });
     window.addEventListener(prefix + ':select', event => select(event.detail.key));
     window.addEventListener(prefix + ':fit', () => { fit(); resize(); });
@@ -139,10 +144,11 @@ export function mountIndustrialViewer({ hostId, schemeId, statusId, loadingId, p
       const delta = lastFrame ? Math.min(0.05, (time - lastFrame) / 1000) : 0;
       lastFrame = time;
       const animating = motion && snapshot?.mode === 'SIMULACAO' && snapshot.running;
+      const blinking = thermal.includes('VERMELHO_PISCANDO') && !reduced.matches;
       if (animating) phase += delta;
       controls.update();
-      if (!dirty && !animating) return;
-      if (snapshot) model.update(snapshot, phase, { motion });
+      if (!dirty && !animating && !blinking) return;
+      if (snapshot) model.update(snapshot, phase, { motion, thermal, blinkOn: reduced.matches || Math.floor(time / 500) % 2 === 0 });
       if (selected) selection.update();
       renderer.render(scene, camera);
       labels.update(camera, host.clientWidth, host.clientHeight);
