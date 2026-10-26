@@ -50,9 +50,15 @@
   if (!root || !window.CGDSimHttp) return;
   const cards = [...root.querySelectorAll('[data-telemetria-digestor]')];
   function render(digestores) {
+    const states = Array(4).fill('DESLIGADO');
     for (const card of cards) {
       const d = digestores.find(item => Number(item.digestor_id) === Number(card.dataset.telemetriaDigestor));
       const state = apresentacao(d);
+      const id = Number(card.dataset.telemetriaDigestor);
+      if (Number.isInteger(id) && id >= 1 && id <= 4) {
+        states[id - 1] = state.blink ? 'VERMELHO_PISCANDO' : state.lamp === 'red' ? 'VERMELHO'
+          : state.lamp === 'yellow' ? 'AMARELO' : state.lamp === 'green' ? 'VERDE' : 'DESLIGADO';
+      }
       for (const el of card.querySelectorAll('[data-telemetria-role]')) {
         el.textContent = state[el.dataset.telemetriaRole] || '—';
       }
@@ -62,6 +68,10 @@
       tower.setAttribute('aria-label', state.cor);
       card.classList.toggle('thermal-ready', state.ready);
     }
+    // O circuito mostra apenas o estado térmico já validado no cartão; nenhuma cor é inferida por temperatura bruta.
+    window.CGDThermalState = { states, source: 'TELEMETRIA' };
+    if (typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function')
+      window.dispatchEvent(new CustomEvent('digestores-circuito:thermal', { detail: window.CGDThermalState }));
   }
   let busy = false, recebidoEm = null, ultimoEstado = [];
   async function refresh() {
