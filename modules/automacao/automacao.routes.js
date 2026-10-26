@@ -14,6 +14,14 @@ router.get('/', requireLogin, requireRole(acessoCircuitos), ctrl.index);
 router.get('/digestores', requireLogin, requireRole(ACCESS.automacao_view), ctrl.digestores);
 router.get('/decanters', requireLogin, requireRole(acessoCircuitos), ctrl.decanters);
 router.get('/decanters/simulador', requireLogin, requireRole(ACCESS.automacao_decanters_simulate), ctrl.simuladorDecanters);
+// Status de integração, sem apresentar dispositivos de digestores como ESP32 das decanters.
+router.get('/api/decanters/esp32/status', requireLogin, requireRole(ACCESS.automacao_decanters_simulate), (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const registrados = devices.listDevices().filter(d => /^ESP32-DECANTER/i.test(d.device_id)).length;
+  return res.json({ ok: true, integrado: false, conectado: false, registrados,
+    estado: 'AGUARDANDO_INSTRUMENTACAO',
+    mensagem: 'Decanters: ESP32 e protocolo de telemetria ainda não homologados. Simulação local, sem comandos físicos.' });
+});
 router.get('/prensas', requireLogin, requireRole(ACCESS.automacao_view), ctrl.prensas);
 router.get('/digestores/simulador', requireLogin, requireRole(acessoCircuitos), ctrl.simuladorDigestores);
 
