@@ -92,7 +92,7 @@ test('ADMIN com CSRF inválido: 403 CSRF_INVALIDO, mensagem própria e sem anunc
     require('node:vm').runInNewContext(require('node:fs').readFileSync(require.resolve('../public/js/automacao-simulador-remoto.js'),'utf8'),sandbox);
     change();await new Promise(r=>setTimeout(r,300));
     const st=els['sim-remote-status'].textContent;
-    assert.match(st,/Sessão de configuração alterada — recarregue a página/);
+    assert.match(st,/Sessão de sincronização alterada — recarregue a página/);
     assert.doesNotMatch(st,/Sincronização de bancada|Sem permissão/);
     assert.equal(els['sim-remote-enable'].checked,false);
   }finally{server.close();}
