@@ -98,7 +98,9 @@ test('API REAL funciona com token no escopo e supervisão usa RBAC existente sem
     const r=await post(reading());assert.equal(r.status,200);assert.equal((await r.json()).modo,'REAL');
     assert.equal((await post({...reading(),digestor_id:2})).status,403);
     const s=await fetch(base+'/automacao/api/digestores/status',{headers:{Accept:'application/json'}});assert.equal(s.status,200);assert.equal((await s.json()).comando_industrial_habilitado,false);
-    assert.equal((await fetch(base+'/automacao/api/simulador/sinaleiros/status')).status,403);
+    const supervisorBancada=await fetch(base+'/automacao/api/simulador/sinaleiros/status');
+    assert.equal(supervisorBancada.status,200);
+    assert.equal((await supervisorBancada.json()).comando_industrial_habilitado,false);
     role='COMPRAS';assert.equal((await fetch(base+'/automacao/api/digestores/status',{headers:{Accept:'application/json'}})).status,403);
   } finally {server.close();}
 });
