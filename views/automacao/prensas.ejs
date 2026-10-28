@@ -1,7 +1,8 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261025-2a-industrial">
-<link rel="stylesheet" href="/css/automacao-prensas.css?v=20261025-2a-industrial">
-<main class="auto-page auto-hmi auto-prensas auto-2a">
+<% const prModoSimulacao = typeof simulacaoPrensasHabilitada !== 'undefined' && simulacaoPrensasHabilitada; const prAdmin = typeof configuracaoAdmin !== 'undefined' && configuracaoAdmin; %>
+<link rel="stylesheet" href="/css/automacao.css?v=20261028-tolva-v1">
+<link rel="stylesheet" href="/css/automacao-prensas.css?v=20261028-tolva-v1">
+<main class="auto-page auto-hmi auto-prensas auto-2a" id="prensas-dashboard" data-pr-simulation-allowed="<%= prModoSimulacao ? 'true' : 'false' %>">
   <%- include('partials/brand') %>
   <div class="auto-actions-top"><a class="auto-back-link" href="/automacao">← Voltar</a></div>
   <nav class="auto-area-nav" aria-label="Navegação das áreas de automação">
@@ -14,12 +15,74 @@
 
   <header class="auto-hero auto-hero-hmi">
     <div><span class="auto-eyebrow">2A • SEPARAÇÃO MECÂNICA • PRENSAS</span>
-      <h1>Supervisão das prensas</h1>
+      <h1><%= prModoSimulacao ? 'Simulador das prensas' : 'Supervisão das prensas' %></h1>
       <p>Alimentação, compressão e separação do material. Estudo visual das três prensas e dos sinais para futura integração.</p></div>
     <div class="auto-integration"><span class="auto-state waiting">Sem hardware conectado</span><small>CLP e IHM física existentes: integração pendente</small></div>
   </header>
   <section class="auto-alert"><strong>Modo de implantação</strong><span>Os estados apresentados não representam funcionamento real. Não há conexão com CLP nem comandos de máquina nesta versão.</span></section>
+  <div class="pr-section-actions"><% if (prAdmin && !prModoSimulacao) { %><a class="pr-action-primary" href="/automacao/prensas/simulador">Abrir simulador das prensas (ADMIN)</a><% } else if (prModoSimulacao) { %><a class="pr-action-primary" href="/automacao/prensas">Voltar à supervisão</a><% } %><span>Maquete conceitual · sem comunicação com máquina</span></div>
   <section class="prensa-process-strip" aria-label="Fluxo esquemático de prensagem"><span><b>01</b> Alimentação do material</span><i aria-hidden="true">→</i><span><b>02</b> Rosca e compressão</span><i aria-hidden="true">→</i><span><b>03</b> Saídas de sebo e sólidos</span></section>
+  <section class="pr-visual-panel auto-panel" id="pr-visual-panel" aria-label="Conjunto de alimentação, prensagem, óleo e retorno">
+    <header class="pr-visual-header">
+      <div><span class="auto-eyebrow">2A · TOLVA DAS PRENSAS E CIRCUITO COMPLETO</span><h2>Cena 3D e esquema técnico</h2>
+        <p>Percoladora → tolva com duas roscas → três guilhotinas e roscas de alimentação → FAST, P50, P46 → torta / óleo. Retorno inclinado próximo da P46 à tolva.</p></div>
+      <span class="auto-state waiting" id="pr-mode-status" role="status" aria-live="polite">SUPERVISÃO · SEM SINAL</span>
+    </header>
+    <div class="pr-visual-toolbar">
+      <div role="group" aria-label="Selecionar vista do circuito" class="pr-view-tabs">
+        <button type="button" data-pr-view="3d" aria-pressed="true">Cena 3D</button>
+        <button type="button" data-pr-view="scheme" aria-pressed="false">Esquema técnico</button>
+      </div>
+      <div class="pr-view-tools">
+        <button type="button" id="pr-fit">Ajustar vista</button>
+        <button type="button" id="pr-motion" aria-pressed="false">Pausar movimento 3D</button>
+        <button type="button" id="pr-export-svg">Baixar esquema SVG</button>
+        <button type="button" id="pr-expand">Expandir</button>
+      </div>
+    </div>
+    <div class="pr-visual-workspace">
+      <div id="pr-three-host" class="pr-three-host"><p id="pr-3d-loading">Carregando a cena 3D…</p></div>
+      <div id="pr-scheme-host" class="pr-scheme-host" tabindex="0" aria-label="Esquema industrial. Role horizontalmente para ler os detalhes." hidden><%- include('partials/prensas-circuito') %></div>
+    </div>
+    <p id="pr-view-message" role="status" aria-live="polite" class="pr-visual-message">Arraste para girar e selecione um componente</p>
+    <p class="pr-visual-disclaimer">Maquete sem escala, com carcaças ilustrativas em corte. Posições, dimensões, sensores, inversores, permissivos e tubulações exigem levantamento em campo. Os dois circuitos de material e óleo são distintos.</p>
+  </section>
+  <section class="pr-dashboard-grid">
+    <article class="auto-panel"><h2 id="pr-selection-name">Tolva das prensas</h2><p id="pr-selection-detail">Selecione um equipamento no 3D ou esquema.</p>
+      <p><strong>Instrumentação:</strong> sensores e retorno de posição ainda não integrados. Corrente, rotação, nível e pressão: <strong>sem sinal</strong>.</p>
+    </article>
+    <article class="auto-panel"><h2>Legenda dos caminhos</h2>
+      <p><span class="pr-legend-cake">●</span> Material e torta seca · saída comum por rosca inferior.</p>
+      <p><span class="pr-legend-oil">●</span> Óleo · uma bomba por prensa → tacho da percoladora.</p>
+      <p><strong>Retorno:</strong> rosca helicoidal inclinada dentro de tubo, ao fim da linha da P46, devolve material mal prensado à tolva superior.</p>
+    </article>
+  </section>
+  <% if (prModoSimulacao) { %>
+  <section class="pr-simulator auto-panel" aria-label="Simulação local reservada ao administrador">
+    <header><div><span class="auto-eyebrow">ACESSO ADMIN · SOMENTE NAVEGADOR</span><h2>Simulador das prensas e da tolva</h2>
+      <p>Movimentos e estados virtuais para estudo de futuros sensores. Não aciona CLP, válvulas pneumáticas, motores ou bombas.</p></div>
+      <strong id="pr-timer">Tempo virtual: —</strong></header>
+    <div class="pr-sim-actions"><button type="button" id="pr-sim-start">Iniciar simulação</button>
+      <button type="button" id="pr-sim-pause">Pausar / retomar</button>
+      <button type="button" id="pr-sim-reset">Parar e limpar</button></div>
+    <div class="pr-switch-grid">
+      <fieldset><legend>Tolva e transporte</legend>
+        <label><input type="checkbox" data-pr-switch="mixer"> Duas roscas homogeneizadoras</label>
+        <label><input type="checkbox" data-pr-switch="cake"> Rosca de saída da torta</label>
+        <label><input type="checkbox" data-pr-switch="return"> Rosca inclinada de retorno</label>
+      </fieldset>
+      <% ['FAST','P50','P46'].forEach(id => { %>
+      <fieldset><legend>Prensa <%= id %></legend>
+        <label><input type="checkbox" data-pr-switch="press" data-pr-key="<%= id %>"> Prensa simulada</label>
+        <label><input type="checkbox" data-pr-switch="gate" data-pr-key="<%= id %>"> Guilhotina pneumática virtual</label>
+        <p id="pr-state-<%= id %>">SEM SINAL</p>
+      </fieldset>
+      <% }); %>
+    </div>
+    <p id="pr-flow-status" aria-live="polite">Aguardando simulação.</p>
+    <p>Este simulador não fornece confirmação de posição das guilhotinas, sensores, partida de motores ou circulação de óleo. Nenhum endpoint de escrita industrial foi criado.</p>
+  </section>
+  <% } %>
   <section class="prensas-grid" aria-label="Três prensas">
     <% (prensas || []).forEach((prensa, index) => { %>
       <article class="prensa-card" data-prensa="<%= prensa.key %>">
@@ -71,3 +134,6 @@
   });
 })();
 </script>
+<script src="/js/automacao-prensas-core.js?v=20261028-tolva-v1" defer></script>
+<script src="/js/automacao-prensas.js?v=20261028-tolva-v1" defer></script>
+<script type="module" src="/js/automacao-prensas-3d.mjs?v=20261028-tolva-v1"></script>
