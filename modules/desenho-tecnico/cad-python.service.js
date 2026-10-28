@@ -83,6 +83,14 @@ async function exportDxf(cad, filename) {
   });
 }
 
+async function exportStep(shaft, filename) {
+  return request('/v1/shaft/step', {
+    method: 'POST',
+    body: { shaft, filename: filename || 'eixo.step' },
+    timeoutMs: 60000,
+  });
+}
+
 async function importDxf(buffer) {
   if (!Buffer.isBuffer(buffer) || !buffer.length) {
     return { ok: false, available: true, status: 400, error: 'Arquivo DXF vazio.' };
