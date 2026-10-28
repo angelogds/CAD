@@ -1643,7 +1643,8 @@ function programarFolgaCompensatoria(dados) {
     const info=db.prepare(`INSERT INTO escala_folgas_programadas (user_id,colaborador_id,data_folga,data_fim,tipo_lancamento,minutos_descontados,motivo,status,aprovado_por,data_servico,hora_inicio,hora_fim,equipamento,descricao_servico,anexo_path,debita_banco,saldo_antes_minutos,saldo_depois_minutos,justificativa_saldo_negativo,criado_em,atualizado_em) VALUES (?,?,?,?,?,?,?,'PROGRAMADA',?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`).run(dados.user_id||null,col,inicio,fim,tipo,minutos,motivo,userIdFrom(dados.usuario),dados.data_servico||null,dados.hora_inicio||null,dados.hora_fim||null,dados.equipamento||null,dados.descricao_servico||null,dados.anexo_path||null,debita?1:0,saldo,saldo-minutos,justificativaFinal||null);
     if(debita) db.prepare(`INSERT INTO escala_banco_horas_movimentos (user_id,colaborador_id,folga_id,tipo,minutos,data_movimento,descricao,criado_por) VALUES (?,?,?,?,?,date('now'),?,?)`).run(dados.user_id||null,col,info.lastInsertRowid,'DEBITO_FOLGA',minutos,`Folga compensatória de ${inicio} a ${fim}; saldo ${saldo} → ${saldo-minutos} min`,userIdFrom(dados.usuario));
     let ausenciaId=null;
-    if(tableExists('escala_ausencias')) { const legacy=tipo==='ATESTADO'?'atestado':'folga'; ausenciaId=db.prepare(`INSERT INTO escala_ausencias (colaborador_id,tipo,tipo_lancamento,data_inicio,data_fim,motivo,created_at) VALUES (?,?,?,?,?,?,datetime('now'))`).run(col,legacy,tipo,inicio,fim,motivo).lastInsertRowid; db.prepare('UPDATE escala_folgas_programadas SET ausencia_id=? WHERE id=?').run(ausenciaId,info.lastInsertRowid); }
+    // Compensações parciais (1h ou 4h) não são ausência de dia inteiro.
+    if(tableExists('escala_ausencias') && !(debita && minutos < MINUTOS_DIA_FOLGA)) { const legacy=tipo==='ATESTADO'?'atestado':'folga'; ausenciaId=db.prepare(`INSERT INTO escala_ausencias (colaborador_id,tipo,tipo_lancamento,data_inicio,data_fim,motivo,created_at) VALUES (?,?,?,?,?,?,datetime('now'))`).run(col,legacy,tipo,inicio,fim,motivo).lastInsertRowid; db.prepare('UPDATE escala_folgas_programadas SET ausencia_id=? WHERE id=?').run(ausenciaId,info.lastInsertRowid); }
     return info.lastInsertRowid;
   })();
 }
@@ -1676,7 +1677,7 @@ function buscarIndisponibilidadesNoPeriodo(colaboradorId, inicio, fim) {
   const rows = [];
   if (tableExists('escala_ausencias')) rows.push(...db.prepare(`SELECT tipo, data_inicio AS inicio, data_fim AS fim, motivo FROM escala_ausencias WHERE colaborador_id=? AND NOT (data_fim < ? OR data_inicio > ?)`).all(colaboradorId, inicio, fim));
   if (tableExists('escala_concessoes')) rows.push(...db.prepare(`SELECT tipo, inicio, fim, motivo FROM escala_concessoes WHERE colaborador_id=? AND NOT (fim < ? OR inicio > ?)`).all(colaboradorId, inicio, fim));
-  if (tableExists('escala_folgas_programadas')) rows.push(...db.prepare(`SELECT tipo_lancamento AS tipo, data_folga AS inicio, COALESCE(data_fim,data_folga) AS fim, motivo FROM escala_folgas_programadas WHERE colaborador_id=? AND status <> 'CANCELADA' AND NOT (COALESCE(data_fim,data_folga) < ? OR data_folga > ?)`).all(colaboradorId, inicio, fim));
+  if (tableExists('escala_folgas_programadas')) rows.push(...db.prepare(`SELECT tipo_lancamento AS tipo, data_folga AS inicio, COALESCE(data_fim,data_folga) AS fim, motivo FROM escala_folgas_programadas WHERE colaborador_id=? AND status <> 'CANCELADA' AND NOT (tipo_lancamento='FOLGA_COMPENSATORIA' AND minutos_descontados < 480) AND NOT (COALESCE(data_fim,data_folga) < ? OR data_folga > ?)`).all(colaboradorId, inicio, fim));
   return rows;
 }
 function listarConfiguracoesRodizio() {
