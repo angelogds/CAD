@@ -23,6 +23,8 @@ router.get('/api/decanters/esp32/status', requireLogin, requireRole(ACCESS.autom
     mensagem: 'Decanters: ESP32 e protocolo de telemetria ainda não homologados. Simulação local, sem comandos físicos.' });
 });
 router.get('/prensas', requireLogin, requireRole(ACCESS.automacao_view), ctrl.prensas);
+// Apenas ADMIN pode abrir o simulador local das prensas. Não há POST ou API industrial neste módulo.
+router.get('/prensas/simulador', requireLogin, requireRole([ROLE.ADMIN]), ctrl.simuladorPrensas);
 router.get('/digestores/simulador', requireLogin, requireRole(acessoCircuitos), ctrl.simuladorDigestores);
 
 // Gestão de credenciais EXCLUSIVA do ADMIN: inclusive endpoints JSON e URL legada.
