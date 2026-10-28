@@ -22,6 +22,7 @@ export function createDesenhoTecnicoState(initial = {}) {
     },
     gridConfig: { visible: true, step: 20 },
     orthoEnabled: false,
+    polarConfig: { enabled: false, angleDeg: 45 },
     dimensionMode: 'linear',
     metadata: { codigo: '', titulo: '', material: '', equipamento_id: null, observacoes: '', categoria: 'mecanico_2d', unidade: 'mm' },
     uiState: { showCoordinates: true, showTempMeasures: true },
