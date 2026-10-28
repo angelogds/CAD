@@ -116,6 +116,7 @@ router.get("/folgas", requireLogin, requireRole(escalaRead), safe(folgaControlle
 router.get("/folgas-sabado", requireLogin, requireRole(escalaRead), safe(controller.folgasSabado, "folgasSabado"));
 router.post("/folgas-sabado/:semanaId", requireLogin, requireRole(escalaManage), safe(controller.salvarFolgaSabado, "salvarFolgaSabado"));
 
+router.get("/folgas/disponibilidade", requireLogin, requireRole(maintenanceSelfRead), safe(folgaController.disponibilidade, "disponibilidadeFolga"));
 router.post("/folgas/solicitar", requireLogin, requireRole(maintenanceSelfRead), safe(folgaController.solicitar, "solicitarFolga"));
 router.post("/folgas/solicitacoes/:id/cancelar", requireLogin, requireRole(maintenanceSelfRead), safe(folgaController.cancelarSolicitacao, "cancelarSolicitacaoFolga"));
 router.post("/folgas/solicitacoes/:id/aprovar", requireLogin, requireRole(escalaManage), safe(folgaController.aprovarSolicitacao, "aprovarSolicitacaoFolga"));
