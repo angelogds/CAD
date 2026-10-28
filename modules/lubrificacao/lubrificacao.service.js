@@ -239,9 +239,10 @@ function registrarExecucao(planoId, userId, payload = {}) {
   }
 
   const rawQuantidade = payload.quantidade_utilizada;
+  // A quantidade prevista serve apenas como referência. Sem confirmação explícita, não há consumo.
   const quantidadeUtilizada = rawQuantidade === '' || rawQuantidade == null
-    ? (plano.quantidade == null ? null : Number(plano.quantidade))
-    : Number(rawQuantidade);
+    ? null
+    : Number(String(rawQuantidade).replace(',', '.'));
 
   if (quantidadeUtilizada != null && (!Number.isFinite(quantidadeUtilizada) || quantidadeUtilizada < 0)) {
     throw new Error('Informe uma quantidade utilizada válida.');
@@ -304,7 +305,7 @@ function registrarExecucao(planoId, userId, payload = {}) {
 
     const execucaoId = Number(info.lastInsertRowid);
     const equipamentoNome = db.prepare('SELECT nome FROM equipamentos WHERE id=?').get(plano.equipamento_id)?.nome || '';
-    reposicaoService.registrarConsumo(execucaoId,plano,quantidadeUtilizada,equipamentoNome);
+    reposicaoService.registrarConsumo(execucaoId,plano,quantidadeUtilizada,equipamentoNome,executorId);
     return execucaoId;
   });
 
