@@ -38,6 +38,7 @@ function createShell(initial) {
       <div class="cad-mlight-top-actions" aria-label="Ações do arquivo">
         <button id="mlightDxfImportBtn" class="cad-mlight-action" type="button">⇧ <span>Abrir DXF</span></button>
         <button id="mlightDxfExportBtn" class="cad-mlight-action" type="button">⇩ <span>Exportar DXF</span></button>
+        <button id="mlightShaft3dBtn" class="cad-mlight-action" type="button" title="Visualizar eixo paramétrico em 3D">3D eixo</button>
         <a class="cad-mlight-action" href="/desenho-tecnico/cad/${drawingId}/pdf">PDF</a>
         <span id="mlightSaveState" class="cad-mlight-save-state" data-state="saved">Tudo salvo</span>
         <button id="mlightSaveBtn" class="cad-mlight-action primary" type="button">Salvar desenho</button>
@@ -161,6 +162,7 @@ async function boot() {
         setSaveState('Salvando…', 'saving');
         const payload = app.serializeForSave(cadData);
         if (cadData.manufacturing) payload.manufacturing = cadData.manufacturing;
+        if (cadData.shaftSheet) payload.shaftSheet = cadData.shaftSheet;
         const snapshot = [...(Array.isArray(payload.history) ? payload.history : [])].reverse()
           .find((item) => item && typeof item === 'object' && item.kind === 'mlightcad-document');
         if (String(snapshot?.dxfBase64 || '').length > 1_500_000) {
@@ -183,6 +185,19 @@ async function boot() {
       }
     };
 
+    document.getElementById('mlightShaft3dBtn')?.addEventListener('click', async () => {
+      try {
+        const current = app.serializeForSave(cadData);
+        if (cadData.shaftSheet) current.shaftSheet = cadData.shaftSheet;
+        const { openShaft3D } = await import('/js/cad-shaft-3d.mjs?v=20261028-706-v1');
+        await openShaft3D({
+          cadData: current, drawingId,
+          label: cadData.titulo || 'Eixo escalonado',
+        });
+      } catch (error) {
+        setStatus('Falha ao abrir 3D: ' + (error.message || error), 'error');
+      }
+    });
     document.getElementById('mlightSaveBtn')?.addEventListener('click', save);
     document.getElementById('mlightDxfExportBtn')?.addEventListener('click', () => app.downloadDxf(cadData.codigo || `CAD-${drawingId}`));
     document.getElementById('mlightZoomExtentsBtn')?.addEventListener('click', () => app.zoomExtents());
