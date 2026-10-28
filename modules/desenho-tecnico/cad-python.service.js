@@ -108,5 +108,6 @@ module.exports = {
   analyze,
   nesting,
   exportDxf,
+  exportStep,
   importDxf,
 };
