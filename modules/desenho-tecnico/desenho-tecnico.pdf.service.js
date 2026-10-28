@@ -19,8 +19,17 @@ function generateTechnicalPdf(desenho, svgMarkup, options = {}) {
   const relPath = `/pdfs/desenho-tecnico/${filename}`;
   const cadData = options.cadData || desenho.cad_data || {};
   const shaft = shaftSheet.pickShaft(cadData);
-  if (shaft) return shaftSheet.generateShaftPdf(desenho, cadData, shaft, { pdfDir: PDF_DIR });
-  const paperConfig = layoutUtils.resolvePaperConfig(cadData);
+  const standaloneShaft = shaft && shaftSheet.isStandaloneShaft(cadData, shaft);
+  if (standaloneShaft) return shaftSheet.generateShaftPdf(desenho, cadData, shaft, { pdfDir: PDF_DIR });
+  // Desenhos mistos (flange + eixo) preservam todas as entidades na primeira
+  // folha e acrescentam uma prancha exclusiva do eixo. Nao esconder o flange.
+  const mixedShaft = Boolean(shaft);
+  const normalPaper = layoutUtils.resolvePaperConfig(cadData);
+  const paperConfig = mixedShaft
+    ? { ...normalPaper, format: 'A3', pdfSize: 'A3',
+        widthMm: 420, heightMm: 297, scaleLabel: 'SEM ESCALA',
+        trueScale: false, paperLayout: null }
+    : normalPaper;
 
   const doc = new PDFDocument({
     size: paperConfig.pdfSize,
@@ -48,12 +57,16 @@ function generateTechnicalPdf(desenho, svgMarkup, options = {}) {
     height: pageHeight - 180
   };
 
-  const renderOptions = { ...options, cadData, paperConfig };
+  const renderOptions = { ...options, cadData, paperConfig, cleanSheet: mixedShaft };
   drawDrawingArea(doc, drawArea, desenho, svgMarkup, renderOptions);
 
   // Legenda/Carimbo
   drawLegend(doc, desenho, pageWidth, pageHeight, margin, renderOptions);
 
+  if (mixedShaft) {
+    doc.addPage({ size: 'A3', layout: 'landscape', margin: 0 });
+    shaftSheet.renderShaftSheetPage(doc, desenho, cadData, shaft);
+  }
   doc.end();
 
   return new Promise((resolve, reject) => {
@@ -120,7 +133,7 @@ function drawDrawingArea(doc, area, desenho, svgMarkup, options) {
     .fillAndStroke('#ffffff', '#e2e8f0');
 
   // Compatibilidade: desenhos antigos, sem Paper Space salvo, mantêm o grid e o auto-fit.
-  if (!paperConfig.trueScale) {
+  if (!paperConfig.trueScale && !options.cleanSheet) {
     doc.save();
     doc.strokeColor('#e2e8f0').lineWidth(0.3);
     const gridStep = 20;
