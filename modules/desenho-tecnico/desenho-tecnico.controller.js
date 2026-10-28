@@ -235,8 +235,8 @@ function renderCad3d(req, res) {
   const supplied = req.body?.cad_json || req.body?.cadData || req.body;
   const hasPayload = supplied && typeof supplied === 'object'
     && (Array.isArray(supplied.objects) || supplied.shaftSheet);
-  const cadPayload = hasPayload ? cadService.sanitizeCadData(supplied) : desenho.cad_data || {};
   try {
+    const cadPayload = hasPayload ? cadService.sanitizeCadData(supplied) : desenho.cad_data || {};
     if (!service.isCad3dCompatible(cadPayload)) {
       return res.status(422).json({ ok: false, error: 'Crie um eixo por diâmetros e comprimentos para visualizar em 3D.' });
     }
