@@ -14,7 +14,7 @@ function fixture({ saldo = 480, programada = null, pendente = null, registro = n
       return {
         get() {
           if (sql.includes('sqlite_master')) return { name: 'tabela' };
-          if (sql.includes('FROM escala_folga_solicitacoes s')) return registro;
+          if (sql.includes('FROM escala_folga_solicitacoes s') && sql.includes('LEFT JOIN users u')) return registro;
           if (sql.includes('SELECT id FROM escala_folga_solicitacoes')) return null;
           if (sql.includes('FROM escala_folgas_programadas f')) return programada;
           if (sql.includes('FROM escala_ausencias a')) return null;
