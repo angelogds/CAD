@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="/css/almoxarifado-refino-v4.css?v=20261007-v1" />
 <link rel="stylesheet" href="/css/estoque-compact-v6.css?v=20261007-v1" />
 <link rel="stylesheet" href="/css/almoxarifado-ux-v10.css?v=20261008-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-layout-v11.css?v=20261011-v1" />
+<link rel="stylesheet" href="/css/almoxarifado-layout-v11.css?v=20261028-v1" />
 <%
   const queryForCategory=(id)=>{
     const p=new URLSearchParams();
@@ -32,7 +32,7 @@
     <div>
       <span class="almox-hero__eyebrow">ALMOXARIFADO</span>
       <h1 style="margin:0">Prateleiras do estoque</h1>
-      <p class="muted">Localize e organize os materiais.</p>
+      <p class="muted">Busque por categoria ou subcategoria (soldas MIG/TIG, eletrodos, abrasivos, pintura e lubrificantes), setor, saldo e endereço físico. Confira a classificação antes de movimentar.</p>
     </div>
     <div class="almox-hero__actions">
       <% if(canManage){ %><a class="btn btn-sm btn-ghost" href="/almoxarifado/estoque/inventario">Cadastrar material existente</a><% } %>
