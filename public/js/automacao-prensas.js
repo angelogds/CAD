@@ -47,7 +47,7 @@
         ' · retorno '+(s.returnScrew?'ativo':'parado')+' (apenas virtual)');
     setText('pr-timer',s.mode==='SIMULACAO'?'Tempo virtual: '+Math.round(s.seconds)+' s':'Tempo virtual: —');
     for(const id of Core.MACHINES){
-      const c=main.querySelector('[data-prensa="'+id.toLowerCase()+'"]');
+      const c=main.querySelector('[data-prensa="prensa-'+id.toLowerCase()+'"]');
       if(c){const badge=c.querySelector('.signal-pill');if(badge){badge.textContent=s.mode==='LIVE'?'Sem sinal':s.feed[id]?'Alimentando · simulado':'Parada · simulado';badge.classList.toggle('offline',s.mode==='LIVE');}}
       const lbl=$('pr-state-'+id);
       if(lbl)lbl.textContent=s.mode==='LIVE'?'SEM SINAL':s.feed[id]?'Alimentação virtual ativa':'Bloqueado / parado';
