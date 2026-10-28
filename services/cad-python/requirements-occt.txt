@@ -1,0 +1,2 @@
+# OCP OpenCascade kernel (STEP solid) — optional rendering extras intentionally excluded
+cadquery-ocp==7.9.3.1
