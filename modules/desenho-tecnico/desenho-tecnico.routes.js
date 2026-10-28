@@ -69,6 +69,7 @@ router.get('/cad/:id/python/status', requireLogin, requireRole(MANAGE_ACCESS), w
 router.post('/cad/:id/analisar', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.analyzeCadPython));
 router.post('/cad/:id/nesting', requireLogin, requireRole(MANAGE_ACCESS), withMenu(nestingCtrl.nestingCadPython));
 router.get('/cad/:id/dxf', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.exportCadDxf));
+router.get('/cad/:id/step', requireLogin, requireRole(MANAGE_ACCESS), withMenu(ctrl.exportCadStep));
 router.post('/cad/:id/dxf/importar', requireLogin, requireRole(MANAGE_ACCESS), dxfUpload.single('dxf'), withMenu(ctrl.importCadDxf));
 router.post('/cad/:id/arquivar', requireLogin, requireRole(DELETE_ACCESS), withMenu(archiveCtrl.archiveCad));
 router.get('/cad/:id', requireLogin, requireRole(VIEW_ACCESS), openCad);
