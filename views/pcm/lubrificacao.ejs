@@ -36,7 +36,7 @@
           <div>
             <span class="pcm-section-label">Controle inteligente de materiais</span>
             <h2>Reposição de óleos e graxas</h2>
-            <p>Saldo projetado a partir do roteiro executado, sem duplicar a baixa física do Almoxarifado. O PCM pode ajustar o estoque de referência, os mínimos e a quantidade de compra.</p>
+            <p>Saldo oficial do Almoxarifado, com baixa somente quando o mecânico informa o consumo real. Vincule primeiro o material e confira sua localização física antes de liberar solicitações automáticas.</p>
           </div>
           <% if (reposicaoLubrificantes.alertas) { %><span class="pcm-badge warn"><%= reposicaoLubrificantes.alertas %> pré-solicitação(ões) aguardando</span><% } %>
         </div>
@@ -45,14 +45,20 @@
             <article class="lub-rep-item">
               <div class="lub-rep-item-head">
                 <h3><%= item.nome %></h3>
-                <span class="pcm-badge <%= item.abaixo_minimo ? 'warn' : '' %>"><%= item.abaixo_minimo ? 'Abaixo do mínimo' : 'Dentro da meta' %></span>
+                <span class="pcm-badge <%= !item.saldo_confiavel || item.abaixo_minimo ? 'warn' : '' %>"><%= !item.saldo_confiavel ? 'Vincular estoque' : (item.abaixo_minimo ? 'Reposição necessária' : 'Saldo acima do mínimo') %></span>
               </div>
               <div class="lub-rep-numbers">
-                <div><span>Saldo projetado</span><strong><%= item.saldo.toLocaleString('pt-BR',{maximumFractionDigits:2}) %> <%= item.unidade_saldo %></strong></div>
+                <div><span>Saldo físico oficial</span><strong><%= item.saldo_confiavel ? item.saldo.toLocaleString('pt-BR',{maximumFractionDigits:2})+' '+item.unidade_saldo : 'Aguardando vínculo' %></strong></div>
                 <div><span>Estoque mínimo</span><strong><%= item.minimo %> <%= item.unidade_saldo %></strong></div>
-                <div><span>Consumo do roteiro</span><strong><%= item.consumido.toLocaleString('pt-BR',{maximumFractionDigits:2}) %> <%= item.unidade_saldo %></strong></div>
+                <div><span>Consumo confirmado no estoque</span><strong><%= item.consumido.toLocaleString('pt-BR',{maximumFractionDigits:2}) %> <%= item.unidade_saldo %></strong></div>
               </div>
-              <p class="lub-rep-caption"><strong>Embalagem:</strong> <%= item.embalagem_descricao %>. <%= item.modo==='AUTOMATICO'?'Envio automático habilitado.':'Envio após revisão do PCM.' %></p>
+              <p class="lub-rep-caption"><strong>Embalagem:</strong> <%= item.embalagem_descricao %>. <%= item.modo==='AUTOMATICO'?'Solicitação automática habilitada.':'Solicitação revisada pelo PCM.' %></p>
+              <% if (item.saldo_confiavel) { %>
+                <p class="lub-rep-caption"><strong>Estoque vinculado:</strong> <a href="/estoque/itens/<%= item.estoque_item_id %>">#<%= item.estoque_item_id %> — <%= item.estoque_nome %></a> • <%= item.estoque_local %></p>
+              <% } else { %>
+                <p class="lub-rep-warning">Nenhum saldo físico vinculado. Não são criadas reposições com base em valores de referência.</p>
+              <% } %>
+              <% if (item.pedido_estoque) { %><p class="lub-rep-caption">Compra em andamento: <a href="/solicitacoes/<%= item.pedido_estoque.id %>"><%= item.pedido_estoque.numero || ('#'+item.pedido_estoque.id) %></a>. Nova solicitação bloqueada para evitar duplicidade.</p><% } %>
               <% if (!item.especificacao_confirmada) { %>
                 <p class="lub-rep-warning">Especificação da graxa pendente de confirmação técnica. Não será enviada automaticamente.</p>
               <% } %>
@@ -74,10 +80,18 @@
                 <details class="lub-rep-config">
                   <summary>Configurar mínimo, meta e automação</summary>
                   <form method="POST" action="/pcm/lubrificacao/reposicao/<%= item.codigo %>/configuracao" class="lub-rep-form">
+                    <label>Item físico do Almoxarifado / Oficina
+                      <select name="estoque_item_id">
+                        <option value="">Não vinculado — compra automática bloqueada</option>
+                        <% (reposicaoOpcoesEstoque || []).filter(function(e){ return String(e.unidade||'').toUpperCase() === item.unidade_saldo; }).forEach(function(e){ %>
+                          <option value="<%= e.id %>" <%= Number(item.estoque_item_id||0)===Number(e.id)?'selected':'' %>>#<%= e.id %> — <%= e.nome %> • <%= e.local_nome || 'Local não definido' %> • <%= e.saldo_atual %> <%= e.unidade %></option>
+                        <% }) %>
+                      </select>
+                    </label>
                     <label>Mínimo (<%= item.unidade_saldo %>)<input type="number" name="minimo" min="0" step="0.01" value="<%= item.minimo %>" required></label>
                     <label>Estoque-alvo (<%= item.unidade_saldo %>)<input type="number" name="alvo" min="0.01" step="0.01" value="<%= item.alvo %>" required></label>
                     <label>Quantidade por embalagem (<%= item.unidade_saldo %>)<input type="number" name="embalagem_quantidade" min="0.01" step="0.01" value="<%= item.embalagem_quantidade %>" required></label>
-                    <label>Consumo-padrão (<%= item.unidade_saldo %>)<input type="number" name="consumo_padrao" min="0" step="0.01" value="<%= item.consumo_padrao %>" required></label>
+                    <input type="hidden" name="consumo_padrao" value="0"><p class="lub-rep-caption">Não há baixa por consumo-padrão. Somente a quantidade efetivamente informada no roteiro será debitada.</p>
                     <label>Modo de solicitação
                       <select name="modo"><option value="ASSISTIDO" <%= item.modo==='ASSISTIDO'?'selected':'' %>>Assistido — PCM revisa</option><option value="AUTOMATICO" <%= item.modo==='AUTOMATICO'?'selected':'' %>>Automático — envia para Compras</option></select>
                     </label>
@@ -85,19 +99,13 @@
                     <button type="submit" class="pcm-button primary ui-btn ui-btn--primary">Salvar parâmetros</button>
                   </form>
                 </details>
-                <details class="lub-rep-config">
-                  <summary>Conciliar saldo com o Almoxarifado</summary>
-                  <form method="POST" action="/pcm/lubrificacao/reposicao/<%= item.codigo %>/saldo" class="lub-rep-form">
-                    <label>Saldo atual conferido (<%= item.unidade_saldo %>)<input type="number" name="saldo" min="0" step="0.01" value="<%= Math.max(0,item.saldo) %>" required></label>
-                    <label>Motivo / recebimento<input name="motivo" maxlength="240" placeholder="Ex.: entrada de material conferida no Almoxarifado"></label>
-                    <button type="submit" class="pcm-button ui-btn ui-btn--outline">Atualizar saldo projetado</button>
-                  </form>
-                </details>
+                <p class="lub-rep-caption">Para corrigir saldos, registre a entrada, retirada ou conferência física no <a href="/almoxarifado/estoque">Almoxarifado</a>. O PCM não altera saldos manualmente.</p>
+
               <% } %>
             </article>
           <% }) %>
         </div>
-        <p class="lub-rep-footnote">Graxa EP2: previsão inicial de 150 g por máquina/dia, sem duplicar pontos do mesmo equipamento. As graxas especiais dos decanters requerem quantidade registrada e validação técnica. Óleo 680 não é consumido automaticamente por uma simples verificação de nível: registre a reposição e concilie o saldo. Compra e recebimento seguem os módulos existentes.</p>
+        <p class="lub-rep-footnote">Graxa EP2: alerta no saldo físico da Oficina até 5 kg, reposição configurável em embalagens de 20 kg. Óleo industrial 680: alerta até 2 tambores no Almoxarifado, somente após confirmar o produto, a embalagem e o local. Verificação de nível não é consumo. Graxas especiais e óleos dos decanters exigem especificação própria. Compras, aprovação e recebimento seguem os fluxos existentes.</p>
       </section>
 
       <section class="pcm-card">
