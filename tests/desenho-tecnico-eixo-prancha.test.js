@@ -175,3 +175,45 @@ test('CAD0008: não infere eixo com apenas dois retângulos ou perfis fora de ei
     {type:'rect',x:100,y:0,width:40,height:25},
   ]}),null);
 });
+
+test('Eixo criado por medidas preserva somente os trechos, sem furos obrigatórios', () => {
+  const fast = fs.readFileSync(path.join(__dirname,'../frontend/mlightcad-auto-dimension.entry.js'),'utf8');
+  const shaftPart=fast.slice(fast.indexOf('async function createShaft('),fast.indexOf('export function createMlightAutoDimensionTools'));
+  assert.ok(!shaftPart.includes("prompt('Alojamento interno"),'Não solicitar alojamento no fluxo rápido');
+  assert.ok(!shaftPart.includes("prompt('Posições dos furos"),'Não solicitar posições de furos no fluxo rápido');
+  assert.match(shaftPart,/startC/,'Desenhar quebras de aresta nos extremos');
+});
+
+test('Modelo paramétrico MLightCAD com chanfros gráficos permanece elegível para prancha única', () => {
+  const first={length:40,diameter:25},middle={length:60,diameter:40},last={length:40,diameter:25};
+  const spec={origin:{x:240,y:100},orientation:'horizontal',segments:[first,middle,last],bore:null,crossHoles:[]};
+  let x=240;
+  const objects=spec.segments.map(v=>{
+    const o={type:'polyline',closed:true,points:[
+      {x,y:100-v.diameter/2},{x:x+v.length,y:100-v.diameter/2},
+      {x:x+v.length,y:100+v.diameter/2},{x,y:100+v.diameter/2},
+    ]};x+=v.length;return o;
+  });
+  objects.push({type:'line',x:240,y:100,x2:380,y2:100});
+  const ch=Math.min(1.5,first.length*.045,first.diameter*.025);
+  for(const side of [-1,1]) {
+    objects.push({type:'line',x:240,y:100+side*(first.diameter/2-ch),
+      x2:240+ch,y2:100+side*first.diameter/2});
+    objects.push({type:'line',x:380-ch,y:100+side*last.diameter/2,
+      x2:380,y2:100+side*(last.diameter/2-ch)});
+  }
+  const cad=sanitizeCadData({objects,shaftSheet:spec});
+  const shaft=pickShaft(cad);
+  assert.ok(shaft);
+  assert.equal(isStandaloneShaft(cad,shaft),true);
+  assert.deepEqual(buildModel(shaft).crossHoles,[]);
+});
+
+test('Gerador de prancha identifica nomes corretos sem apresentar isométrica como STEP',()=>{
+  const src=fs.readFileSync(path.join(__dirname,'../modules/desenho-tecnico/desenho-tecnico.shaft-sheet.js'),'utf8');
+  assert.match(src,/CORTE A-A/);
+  assert.match(src,/CORTE A/);
+  assert.match(src,/VISTA ISOMÉTRICA/);
+  assert.match(src,/Quebra de aresta|Quebras de aresta|CHANFROS ILUSTRATIVOS/);
+  assert.match(src,/function drawIsometric/);
+});

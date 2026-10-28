@@ -160,7 +160,23 @@ export class DesenhoTecnicoRenderer {
       const sp = this.viewport.worldToScreen(x - (orientation === 'vertical' ? r : 0), y - (orientation === 'horizontal' ? r : 0));
       const width = Math.abs((orientation === 'horizontal' ? len : s.diameter) * this.viewport.getViewState().zoom);
       const height = Math.abs((orientation === 'horizontal' ? s.diameter : len) * this.viewport.getViewState().zoom);
-      g.insertAdjacentHTML('beforeend', `<rect x='${sp.x}' y='${sp.y}' width='${width}' height='${height}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
+      const c = Math.max(1.1, Math.min(width * 0.07, height * 0.09, 7));
+      const left = idx === 0 ? c : 0;
+      const right = idx === segments.length - 1 ? c : 0;
+      let contour = '';
+      if (orientation === 'horizontal') {
+        contour = `M ${sp.x + left} ${sp.y} L ${sp.x+width-right} ${sp.y}
+          L ${sp.x+width} ${sp.y+right} L ${sp.x+width} ${sp.y+height-right}
+          L ${sp.x+width-right} ${sp.y+height} L ${sp.x+left} ${sp.y+height}
+          L ${sp.x} ${sp.y+height-left} L ${sp.x} ${sp.y+left} Z`;
+      } else {
+        contour = `M ${sp.x+left} ${sp.y} L ${sp.x+width-left} ${sp.y}
+          L ${sp.x+width} ${sp.y+left} L ${sp.x+width} ${sp.y+height-right}
+          L ${sp.x+width-right} ${sp.y+height} L ${sp.x+right} ${sp.y+height}
+          L ${sp.x} ${sp.y+height-right} L ${sp.x} ${sp.y+left} Z`;
+      }
+      g.insertAdjacentHTML('beforeend',
+        `<path d='${contour}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
       if (orientation === 'horizontal') x += len; else y += len;
       const c1 = this.viewport.worldToScreen(orientation === 'horizontal' ? x - len : x, orientation === 'horizontal' ? origin.y : y - len);
       const c2 = this.viewport.worldToScreen(orientation === 'horizontal' ? x : origin.x, orientation === 'horizontal' ? origin.y : y);

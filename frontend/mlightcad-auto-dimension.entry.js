@@ -542,32 +542,9 @@ async function createShaft(onStatus = () => {}) {
     return { length, diameter };
   }).filter((segment) => segment.length > 0 && segment.diameter > 0);
   if (!segments.length) return false;
-  const boreRaw = String(prompt('Alojamento interno: diâmetro x profundidade (mm), ou deixe em branco', '') || '').trim();
-  let bore = null;
-  if (boreRaw) {
-    const parts = boreRaw.toLowerCase().split('x');
-    const diameter = Number(parts[0]), depth = Number(parts[1]);
-    if (parts.length !== 2 || !(diameter > 0 && diameter < segments[0].diameter) ||
-      !(depth > 0 && depth <= segments[0].length)) {
-      throw new Error('Alojamento inválido: Ø e profundidade devem caber no primeiro trecho.');
-    }
-    bore = { diameter, depth, from: 'start' };
-  }
-  const holesRaw = String(prompt('Posições dos furos transversais PASSANTES (mm desde a primeira face), separadas por ; — em branco se não há', '') || '').trim();
-  const positions = holesRaw ? holesRaw.split(/[;,\s]+/).filter(Boolean).map(Number) : [];
-  let crossHoles = [];
-  if (positions.length) {
-    const diameter = Number(prompt('Diâmetro Ø dos furos passantes (mm):', '13'));
-    if (!(diameter > 0)) throw new Error('Diâmetro de furação inválido.');
-    crossHoles = positions.map((distance, index) => {
-      if (!Number.isFinite(distance) || distance - diameter/2 <= 0 ||
-        distance + diameter/2 >= segments[0].length ||
-        (bore && distance + diameter/2 > bore.depth)) {
-        throw new Error(`Posição do furo ${index+1} fora da área do alojamento.`);
-      }
-      return { distance, diameter };
-    });
-  }
+  // Criacao rapida de eixo: nao solicitar informacoes raras de alojamento/furacao.
+  const bore = null;
+  const crossHoles = [];
   const origin = await acquirePoint('Clique no centro da face inicial do eixo');
   if (!origin) return false;
   let x = origin.x;
@@ -580,6 +557,16 @@ async function createShaft(onStatus = () => {}) {
     x += segment.length;
   }
   appendLine({ x: origin.x, y: origin.y }, { x, y: origin.y });
+  // Quebras de aresta desenhadas em 2D sem definir chanfro de fabricação.
+  const first = segments[0], last = segments[segments.length - 1];
+  const breakSize = seg => Math.min(1.5, seg.length * 0.045, seg.diameter * 0.025);
+  const startC = breakSize(first), endC = breakSize(last);
+  for(const side of [-1,1]) {
+    appendLine({x:origin.x,y:origin.y+side*(first.diameter/2-startC)},
+               {x:origin.x+startC,y:origin.y+side*first.diameter/2});
+    appendLine({x:x-endC,y:origin.y+side*last.diameter/2},
+               {x,y:origin.y+side*(last.diameter/2-endC)});
+  }
   clearAutoDimensions();
   const step = Math.max(10, Math.max(x - origin.x, maxDiameter) * 0.055);
   let count = 0;
