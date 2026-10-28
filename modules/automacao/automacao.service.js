@@ -30,9 +30,9 @@ const DECANTERS = Object.freeze([
 // Representação provisória das três prensas, sujeita à conferência com o cadastro e com a fábrica.
 // A prensa já equipada com CLP/IHM é apenas indicada; não há conexão ou telemetria neste módulo.
 const PRENSAS = Object.freeze([
-  { key: 'prensa-clp', nome: 'Prensa com CLP / IHM', descricao: 'Alimentação automática existente', tipo: 'prensa', integracaoPrevista: 'Leitura do CLP existente' },
-  { key: 'prensa-p50', nome: 'Prensa P50', descricao: 'Identificação de campo a validar', tipo: 'prensa', integracaoPrevista: 'Instrumentação a definir' },
-  { key: 'prensa-p46', nome: 'Prensa P46', descricao: 'Identificação de campo a validar', tipo: 'prensa', integracaoPrevista: 'Instrumentação a definir' },
+  { key: 'prensa-fast', nome: 'Prensa FAST', descricao: 'Alimentada pela tolva e rosca dedicada; CLP/IHM existente a mapear', tipo: 'prensa', integracaoPrevista: 'Leitura do CLP existente, sem comandos' },
+  { key: 'prensa-p50', nome: 'Prensa P50', descricao: 'Guilhotina e rosca alimentadora individuais; bomba de óleo dedicada', tipo: 'prensa', integracaoPrevista: 'Instrumentação a definir' },
+  { key: 'prensa-p46', nome: 'Prensa P46', descricao: 'Descarga de torta próxima à rosca inclinada de retorno', tipo: 'prensa', integracaoPrevista: 'Instrumentação a definir' },
 ]);
 function getPrensasOverview() {
   return PRENSAS.map(item => ({ ...item, estado: 'SEM_SINAL', estadoLabel: 'Sem sinal', integrado: false, comando_habilitado: false }));
