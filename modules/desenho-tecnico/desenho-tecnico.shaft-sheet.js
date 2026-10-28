@@ -342,6 +342,19 @@ function drawSection(doc, model, x, y, scale) {
     line(doc, start + width, top, start + width, bottom, 1.05);
     start += width;
   });
+  // O corte acompanha as mesmas quebras de aresta da vista de perfil.
+  const first=segments[0],last=segments[segments.length-1];
+  const bevel=seg=>Math.min(1.5,seg.length*.045,seg.diameter*.025)*scale;
+  const cutCorner=(outerX,outerY,innerX,innerY)=>{
+    doc.save().fillColor('white').moveTo(outerX,outerY)
+      .lineTo(innerX,outerY).lineTo(outerX,innerY).closePath().fill().restore();
+    line(doc,innerX,outerY,outerX,innerY,1);
+  };
+  const c1=bevel(first),c2=bevel(last),endX=x+model.total*scale;
+  cutCorner(x,y-first.diameter*scale/2,x+c1,y-first.diameter*scale/2+c1);
+  cutCorner(x,y+first.diameter*scale/2,x+c1,y+first.diameter*scale/2-c1);
+  cutCorner(endX,y-last.diameter*scale/2,endX-c2,y-last.diameter*scale/2+c2);
+  cutCorner(endX,y+last.diameter*scale/2,endX-c2,y+last.diameter*scale/2-c2);
   dashed(doc, x - 9, y, x + model.total * scale + 14, y, [12, 4]);
   if (bore) {
     text(doc, 'ALOJAMENTO: Ø' + number(bore.diameter) + ' × ' + number(bore.depth), x + 8, y + model.maxDiameter * scale / 2 + 8, 9, { bold: true });
