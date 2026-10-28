@@ -554,7 +554,7 @@ async function createShaft(onStatus = () => {}) {
     bore = { diameter, depth, from: 'start' };
   }
   const holesRaw = String(prompt('Posições dos furos transversais PASSANTES (mm desde a primeira face), separadas por ; — em branco se não há', '') || '').trim();
-  const positions = holesRaw ? holesRaw.split(/[;,\\s]+/).filter(Boolean).map(Number) : [];
+  const positions = holesRaw ? holesRaw.split(/[;,\s]+/).filter(Boolean).map(Number) : [];
   let crossHoles = [];
   if (positions.length) {
     const diameter = Number(prompt('Diâmetro Ø dos furos passantes (mm):', '13'));
