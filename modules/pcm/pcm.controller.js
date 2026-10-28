@@ -197,6 +197,7 @@ function lubrificacao(req, res) {
     resumoSemanaLubrificacao: lubrificacaoSemanaService.getDashboardResumo(req.query.semana || null),
     acompanhamentoLubrificacao: lubrificacaoSemanaService.getAcompanhamentoPCM(req.query.semana || null),
     reposicaoLubrificantes: reposicaoLubrificacao.getPainel(),
+    reposicaoOpcoesEstoque: reposicaoLubrificacao.listarOpcoesEstoque(),
     resumo: {
       ...resumoBase,
       pendentes_validacao: countBy(todasLubrificacoes, (item) => Number(item.validado_tecnicamente ?? 1) === 0),
@@ -720,7 +721,7 @@ function salvarConfiguracaoReposicaoLubrificacao(req, res) {
 function ajustarSaldoReposicaoLubrificacao(req,res) {
   try {
     reposicaoLubrificacao.ajustarSaldo(req.params.codigo,req.body?.saldo,req.body?.motivo,req.session?.user);
-    req.flash('success','Saldo projetado conciliado. Não foi feita baixa no estoque físico.');
+    req.flash('success','Inventário conferido no Almoxarifado.');
   } catch (e) { req.flash('error',e.message || 'Falha ao conciliar saldo.'); }
   return res.redirect('/pcm/lubrificacao#reposicao-lubrificantes');
 }

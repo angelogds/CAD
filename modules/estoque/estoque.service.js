@@ -88,7 +88,7 @@ function consumoExpr(days = 90) {
 function dashboard() {
   const itens = db.prepare("SELECT COUNT(*) total FROM estoque_itens WHERE ativo=1").get().total;
   const join = saldoJoin();
-  const baixo = db.prepare(`SELECT COUNT(*) total FROM estoque_itens i ${join} WHERE i.ativo=1 AND ${saldoExpr()} < ${minExpr()}`).get().total;
+  const baixo = db.prepare(`SELECT COUNT(*) total FROM estoque_itens i ${join} WHERE i.ativo=1 AND ${saldoExpr()} <= ${minExpr()}`).get().total;
   const zerados = db.prepare(`SELECT COUNT(*) total FROM estoque_itens i ${join} WHERE i.ativo=1 AND ${saldoExpr()} <= 0`).get().total;
   const saldo = db.prepare(`SELECT COALESCE(SUM(${saldoExpr()}),0) total FROM estoque_itens i ${join} WHERE i.ativo=1`).get().total;
   let movimentosHoje = 0;
@@ -118,8 +118,8 @@ function listItens(filters = {}) {
     params.push(`%${String(filters.centro_custo).trim().toLowerCase()}%`);
   }
   if (filters.situacao === "zerado") where.push(`${saldoExpr()} <= 0`);
-  if (filters.situacao === "baixo") where.push(`${saldoExpr()} > 0 AND ${saldoExpr()} < ${minExpr()}`);
-  if (filters.situacao === "ok") where.push(`${saldoExpr()} >= ${minExpr()} AND ${saldoExpr()} > 0`);
+  if (filters.situacao === "baixo") where.push(`${saldoExpr()} > 0 AND ${saldoExpr()} <= ${minExpr()}`);
+  if (filters.situacao === "ok") where.push(`${saldoExpr()} > ${minExpr()} AND ${saldoExpr()} > 0`);
 
   const lastMove = tableExists("estoque_movimentos")
     ? `(SELECT MAX(${dataMovExpr("lm")}) FROM estoque_movimentos lm WHERE lm.item_id=i.id)`
@@ -142,7 +142,7 @@ function listItens(filters = {}) {
       const rotacao = consumo90d >= 20 ? 'ALTA' : consumo90d >= 5 ? 'MEDIA' : consumo90d > 0 ? 'BAIXA' : 'SEM_CONSUMO';
       const sugestao = saldo <= 0
         ? 'REPOR_URGENTE'
-        : saldo < minimo
+        : saldo <= minimo
           ? 'REPOR'
           : (coberturaDias !== null && coberturaDias < 30 ? 'PROGRAMAR_REPOSICAO' : 'OK');
       const endereco_parts = [
@@ -554,9 +554,44 @@ function registrarSaidasSolicitacao({ solicitacao_id, usuario_id, observacao }) 
   return resultados;
 }
 
+
+/**
+ * Baixa do lubrificante aplicado e confirmado pelo mecânico.
+ * Vincula-se à execução do roteiro; não exige OS artificial e respeita reservas.
+ * Deve ser executada dentro da transação que cria a execução PCM.
+ */
+function registrarSaidaLubrificacao({item_id,quantidade,usuario_id,equipamento_id,execucao_id,codigo}) {
+  return db.transaction(() => {
+    const id=Number(item_id), qtd=Number(quantidade), uid=Number(usuario_id), exec=Number(execucao_id);
+    if (!HAS_SALDO_ATUAL || !id || !uid || !exec || !(qtd>0) || !Number.isFinite(qtd)) {
+      throw new Error('Baixa de lubrificação inválida: confira material, quantidade e responsável.');
+    }
+    const item=getItem(id);
+    if (!item || !item.ativo) throw new Error('Lubrificante não está ativo no estoque oficial.');
+    const anterior=Number(item.saldo_atual || 0);
+    if (qtd>anterior) throw new Error('Saldo físico insuficiente. Regularize o estoque no Almoxarifado.');
+    const reservado=Number(require('./estoque.reservas.service').resumoPorItem().get(id)||0);
+    if (qtd>anterior-reservado) throw new Error('Saldo livre insuficiente: material já reservado para outra solicitação.');
+    const posterior=Math.round((anterior-qtd)*10000)/10000;
+    const updated=db.prepare("UPDATE estoque_itens SET saldo_atual=?,updated_at=datetime('now') WHERE id=? AND saldo_atual=?")
+      .run(posterior,id,anterior);
+    if (!updated.changes) throw new Error('Saldo alterado por outra operação. Tente novamente.');
+    const movimentoId=insertMovimento({
+      tipo:'SAIDA_REQUISICAO_INTERNA',item_id:id,quantidade:qtd,origem:'LUBRIFICACAO_PCM',
+      equipamento_id:Number(equipamento_id)||null,usuario_id:uid,mecanico_user_id:uid,
+      saldo_anterior:anterior,saldo_posterior:posterior,
+      observacao:'Consumo confirmado no roteiro de lubrificação • execução #'+exec+' • '+String(codigo||''),
+      identificacao_origem:'LUBRIFICACAO_PCM#'+exec, setor_utilizacao:'RECICLAGEM',
+      empresa_consumidora:'RECICLAGEM',subarea_centro_custo:'MANUTENÇÃO',
+      custo_unit:HAS_ESTOQUE_CUSTO_UNIT?(Number(item.custo_unit)||null):null
+    });
+    return {movimentoId,itemId:id,saldoAnterior:anterior,saldoPosterior:posterior};
+  })();
+}
+
 module.exports = {
   SETORES_ESTOQUE, SETOR_COMUM, dashboard, listItens, listCategorias, listSubcategorias, listLocais, listCentrosCusto, listEquipamentosEstoque, getInteligenciaReposicao,
   listMovimentos, createCategoria, createLocal, createItem, updateItemClassification, getItem,
   findItemForInventory, getLocalArmazemFardo, registrarInventarioFisico,
-  listOrdensAtivas, registrarSaida, registrarSaidasSolicitacao, getContextoSolicitacao,
+  listOrdensAtivas, registrarSaida, registrarSaidaLubrificacao, registrarSaidasSolicitacao, getContextoSolicitacao,
 };

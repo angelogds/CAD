@@ -21,3 +21,22 @@
 .lub-rep-form button{grid-column:1/-1}
 @media(max-width:920px){.lub-rep-grid{grid-template-columns:1fr}}
 @media(max-width:480px){.lub-rep-numbers{grid-template-columns:repeat(2,minmax(0,1fr))}.lub-rep-form{grid-template-columns:1fr}}
+
+/* PCM + Almoxarifado: cartões compactos e responsivos com estoque físico oficial. */
+.lub-rep-item{box-shadow:0 2px 12px rgba(18,56,34,.04)}
+.lub-rep-numbers strong{overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.lub-rep-form label:has(select[name="estoque_item_id"]){grid-column:1/-1}
+.lub-rep-form select{max-width:100%}
+.lub-rep-item a{color:#176b44;text-underline-offset:3px;overflow-wrap:anywhere}
+.lub-rep-grid .pcm-badge{font-size:11px;max-width:100%}
+@media(max-width:680px){
+  .lub-rep-grid{padding:0 12px 14px;gap:9px}
+  .lub-rep-item{padding:12px;border-radius:11px}
+  .lub-rep-numbers{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .lub-rep-numbers div{padding:9px;background:#f5f9f6;border-radius:9px}
+  .lub-rep-numbers strong{font-size:15px}
+  .lub-rep-form{grid-template-columns:1fr;gap:9px}
+  .lub-rep-form select,.lub-rep-form input{font-size:16px}
+  .lub-rep-section .pcm-card-head{gap:8px}
+  .lub-rep-footnote{padding:2px 12px 15px}
+}
