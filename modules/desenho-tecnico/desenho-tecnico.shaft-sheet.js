@@ -45,8 +45,17 @@ function matchesMlightShaft(objects, spec) {
     polylines.splice(idx, 1);
     x += len;
   }
-  // Interromper o modo automatico se a edicao ganhou geometria diferente do eixo.
-  if (objects.some(o => o.visible !== false && !['polyline', 'line', 'centerline', 'dimension', 'text'].includes(o.type))) return false;
+  // Aceitar somente a linha de centro criada com o eixo. Linhas extras podem
+  // indicar modificacao do DXF e nao devem produzir folha divergente.
+  for (const obj of objects) {
+    if (obj.visible === false) continue;
+    if (!['polyline', 'line', 'centerline', 'dimension', 'text'].includes(obj.type)) return false;
+    if (['line', 'centerline'].includes(obj.type)) {
+      const isAxis = same(obj.x, origin.x) && same(obj.x2, x)
+        && same(obj.y, origin.y) && same(obj.y2, origin.y);
+      if (!isAxis) return false;
+    }
+  }
   return true;
 }
 
