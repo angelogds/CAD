@@ -88,3 +88,11 @@ test('prévia 3D está presente nos dois editores sem depender de CDN',()=>{
   assert.match(controller,/cadService\.sanitizeCadData\(supplied\)/);
   assert.doesNotMatch(viewer,/https?:\/\/(cdn|unpkg|jsdelivr)/);
 });
+
+
+test('módulo de visualização Three.js usa sintaxe ESM válida',()=>{
+  const {spawnSync}=require('node:child_process');
+  const script=path.join(__dirname,'../public/js/cad-shaft-3d.mjs');
+  const r=spawnSync(process.execPath,['--check',script],{encoding:'utf8'});
+  assert.equal(r.status,0,r.stderr||r.stdout);
+});
