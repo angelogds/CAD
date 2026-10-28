@@ -410,6 +410,7 @@ module.exports = {
   pythonStatus,
   analyzeCadPython,
   exportCadDxf,
+  exportCadStep,
   importCadDxf,
   updateCadMetadata,
   openById,
