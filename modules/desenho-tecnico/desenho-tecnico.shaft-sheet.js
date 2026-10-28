@@ -217,6 +217,17 @@ function drawLateral(doc, model, x, y, scale) {
   });
   const first = segments[0];
   const last = segments[segments.length - 1];
+  // Linhas de chanfro indicativo: não se atribui cota de usinagem.
+  const chamfer = seg => Math.min(1.5, seg.length * .045, seg.diameter * .025) * scale;
+  const startTop = y - first.diameter * scale / 2, startBottom = y + first.diameter * scale / 2;
+  const startChamfer = chamfer(first);
+  line(doc,x,startTop + startChamfer,x + startChamfer,startTop,1);
+  line(doc,x,startBottom - startChamfer,x + startChamfer,startBottom,1);
+  const endX=x+model.total*scale;
+  const endTop=y-last.diameter*scale/2,endBottom=y+last.diameter*scale/2;
+  const endChamfer=chamfer(last);
+  line(doc,endX-endChamfer,endTop,endX,endTop+endChamfer,1);
+  line(doc,endX-endChamfer,endBottom,endX,endBottom-endChamfer,1);
   line(doc, x, y - first.diameter * scale / 2, x, y + first.diameter * scale / 2, 1.15);
   line(doc, x + model.total * scale, y - last.diameter * scale / 2,
     x + model.total * scale, y + last.diameter * scale / 2, 1.1);
@@ -427,7 +438,7 @@ function frame(doc, desenho, model, cadData) {
   text(doc,'CÓDIGO DO DESENHO',925,32,8,{width:220,align:'center'});
   text(doc,String(desenho.codigo||'S/C'),924,50,17,{bold:true,width:225,align:'center'});
   // Legendas nunca ficam em cima das cotas ou do carimbo.
-  text(doc,'VISTA A',425,365,12,{bold:true,width:210,align:'center'});
+  text(doc,'CORTE A',425,365,12,{bold:true,width:210,align:'center'});
   text(doc,'CORTE A-A',270,649,12,{bold:true,width:230,align:'center'});
   text(doc,'VISTA ISOMÉTRICA',860,649,12,{bold:true,width:250,align:'center'});
   line(doc,23,693,W-23,693,1);
