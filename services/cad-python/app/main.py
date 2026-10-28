@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from .cad_engine import analyze_cad, export_dxf, import_dxf
 from .manufacturing_metrics import enhance_analysis, prepare_analysis_cad
 from .nesting import pack_rectangles
+from .shaft_step import make_step
 
 app = FastAPI(title="Campo do Gado CAD Python Engine", version="1.2.0")
 
@@ -39,6 +40,11 @@ class NestingRequest(BaseModel):
     max_sheets: int = 20
     parts: list[dict[str, Any]] = Field(default_factory=list)
 
+class ShaftStepRequest(BaseModel):
+    shaft: dict[str, Any] = Field(default_factory=dict)
+    filename: str = "eixo.step"
+
+
 
 def require_internal_token(x_cad_engine_token: str | None = Header(default=None)) -> None:
     expected = str(os.getenv("CAD_ENGINE_TOKEN") or "").strip()
@@ -66,6 +72,21 @@ def nesting(payload: NestingRequest) -> dict[str, Any]:
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"ok": True, "data": data}
+
+
+@app.post("/v1/shaft/step", dependencies=[Depends(require_internal_token)])
+def shaft_step_export(payload: ShaftStepRequest) -> dict[str, Any]:
+    """STEP preciso; posição dos furos e alojamento vêm do cadastro."""
+    try:
+        result = make_step(payload.shaft)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    safe = "".join(c if c.isalnum() or c in "._-" else "-" for c in payload.filename)[:100]
+    if not safe.lower().endswith(".step"):
+        safe += ".step"
+    return {"ok": True, "filename": safe, **result}
 
 
 @app.post("/v1/dxf/export", dependencies=[Depends(require_internal_token)])

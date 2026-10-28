@@ -2,7 +2,7 @@ import { BaseTool } from './base.tool.js';
 import { lineIntersection } from './modify.utils.js';
 import { ArcEntity } from '../entities/arc.entity.js';
 import { angle2D, circleCircleIntersections, isAngleBetween } from '../core/geometry.js';
-import { solveCircularTrimSegment } from '../core/modify.geometry.mjs?v=20261028-706-v1';
+import { solveCircularTrimSegment } from '../core/modify.geometry.mjs?v=20261028-706-step-v1';
 
 function isCircular(entity) {
   return Boolean(entity && ['circle', 'arc'].includes(entity.type));

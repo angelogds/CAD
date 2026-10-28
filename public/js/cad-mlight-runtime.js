@@ -39,6 +39,7 @@ function createShell(initial) {
         <button id="mlightDxfImportBtn" class="cad-mlight-action" type="button">⇧ <span>Abrir DXF</span></button>
         <button id="mlightDxfExportBtn" class="cad-mlight-action" type="button">⇩ <span>Exportar DXF</span></button>
         <button id="mlightShaft3dBtn" class="cad-mlight-action" type="button" title="Visualizar eixo paramétrico em 3D">3D eixo</button>
+        <button id="mlightStepExportBtn" class="cad-mlight-action" type="button">Exportar STEP</button>
         <a class="cad-mlight-action" href="/desenho-tecnico/cad/${drawingId}/pdf">PDF</a>
         <span id="mlightSaveState" class="cad-mlight-save-state" data-state="saved">Tudo salvo</span>
         <button id="mlightSaveBtn" class="cad-mlight-action primary" type="button">Salvar desenho</button>
@@ -178,10 +179,12 @@ async function boot() {
         Object.assign(cadData, payload);
         setSaveState('Tudo salvo', 'saved');
         setStatus('Desenho salvo no histórico técnico', 'ok');
+        return true;
       } catch (error) {
         console.error('[CAD][MLightCAD] save error', error);
         setSaveState('Falha ao salvar', 'error');
         setStatus(`Falha ao salvar: ${error.message || error}`, 'error');
+        return false;
       }
     };
 
@@ -199,6 +202,16 @@ async function boot() {
       }
     });
     document.getElementById('mlightSaveBtn')?.addEventListener('click', save);
+    document.getElementById('mlightStepExportBtn')?.addEventListener('click', async () => {
+      if (!(await save())) return;
+      try {
+        const { downloadStep } = await import('/js/cad-step-download.mjs?v=20261028-706-step-v1');
+        await downloadStep(drawingId, cadData.codigo || 'eixo');
+        setStatus('Arquivo STEP exportado.', 'ok');
+      } catch (error) {
+        setStatus('Falha no STEP: ' + (error.message || error), 'error');
+      }
+    });
     document.getElementById('mlightDxfExportBtn')?.addEventListener('click', () => app.downloadDxf(cadData.codigo || `CAD-${drawingId}`));
     document.getElementById('mlightZoomExtentsBtn')?.addEventListener('click', () => app.zoomExtents());
     document.getElementById('mlightFlangeBtn')?.addEventListener('click', () => runTool(() => fabrication.createFlange()));
