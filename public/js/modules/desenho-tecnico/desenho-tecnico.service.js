@@ -1,4 +1,4 @@
-import { DesenhoTecnicoController } from './desenho-tecnico.controller.js?v=20261028-eixo-v2';
+import { DesenhoTecnicoController } from './desenho-tecnico.controller.js?v=20261028-706-v1';
 import { installCadFinal2D } from '../../cad-final-2d.js';
 import { installCadProfessionalWorkspace } from './cad-professional-workspace.js';
 
