@@ -160,23 +160,23 @@ export class DesenhoTecnicoRenderer {
       const sp = this.viewport.worldToScreen(x - (orientation === 'vertical' ? r : 0), y - (orientation === 'horizontal' ? r : 0));
       const width = Math.abs((orientation === 'horizontal' ? len : s.diameter) * this.viewport.getViewState().zoom);
       const height = Math.abs((orientation === 'horizontal' ? s.diameter : len) * this.viewport.getViewState().zoom);
-      g.insertAdjacentHTML('beforeend', `<rect x='${sp.x}' y='${sp.y}' width='${width}' height='${height}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
-      // Quebra de aresta apenas representativa, sem cota de usinagem inventada.
-      // Linhas diagonais aparecem tanto na previa quanto no eixo salvo.
-      if (idx === 0 || idx === segments.length - 1) {
-        const c = Math.max(2, Math.min(width * 0.07, height * 0.09, 9));
-        if (orientation === 'horizontal') {
-          const faceX = idx === 0 ? sp.x : sp.x + width;
-          const innerX = idx === 0 ? faceX + c : faceX - c;
-          g.insertAdjacentHTML('beforeend',
-            `<path d='M ${faceX} ${sp.y+c} L ${innerX} ${sp.y} M ${faceX} ${sp.y+height-c} L ${innerX} ${sp.y+height}' fill='none' stroke='${stroke}' stroke-width='1.5'/>`);
-        } else {
-          const faceY = idx === 0 ? sp.y : sp.y + height;
-          const innerY = idx === 0 ? faceY + c : faceY - c;
-          g.insertAdjacentHTML('beforeend',
-            `<path d='M ${sp.x+c} ${faceY} L ${sp.x} ${innerY} M ${sp.x+width-c} ${faceY} L ${sp.x+width} ${innerY}' fill='none' stroke='${stroke}' stroke-width='1.5'/>`);
-        }
+      const c = Math.max(1.1, Math.min(width * 0.07, height * 0.09, 7));
+      const left = idx === 0 ? c : 0;
+      const right = idx === segments.length - 1 ? c : 0;
+      let contour = '';
+      if (orientation === 'horizontal') {
+        contour = `M ${sp.x + left} ${sp.y} L ${sp.x+width-right} ${sp.y}
+          L ${sp.x+width} ${sp.y+right} L ${sp.x+width} ${sp.y+height-right}
+          L ${sp.x+width-right} ${sp.y+height} L ${sp.x+left} ${sp.y+height}
+          L ${sp.x} ${sp.y+height-left} L ${sp.x} ${sp.y+left} Z`;
+      } else {
+        contour = `M ${sp.x+left} ${sp.y} L ${sp.x+width-left} ${sp.y}
+          L ${sp.x+width} ${sp.y+left} L ${sp.x+width} ${sp.y+height-right}
+          L ${sp.x+width-right} ${sp.y+height} L ${sp.x+right} ${sp.y+height}
+          L ${sp.x} ${sp.y+height-right} L ${sp.x} ${sp.y+left} Z`;
       }
+      g.insertAdjacentHTML('beforeend',
+        `<path d='${contour}' fill='none' stroke='${stroke}' stroke-width='2'/>`);
       if (orientation === 'horizontal') x += len; else y += len;
       const c1 = this.viewport.worldToScreen(orientation === 'horizontal' ? x - len : x, orientation === 'horizontal' ? origin.y : y - len);
       const c2 = this.viewport.worldToScreen(orientation === 'horizontal' ? x : origin.x, orientation === 'horizontal' ? origin.y : y);
