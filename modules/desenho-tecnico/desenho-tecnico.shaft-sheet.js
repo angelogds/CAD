@@ -21,59 +21,109 @@ function same(a, b) {
   return Number.isFinite(Number(a)) && Math.abs(Number(a) - Number(b)) <= 0.02;
 }
 
-function matchesMlightShaft(objects, spec) {
-  const segments = spec.segments || [];
-  if (!segments.length || segments.length > 12) return false;
-  const origin = spec.origin || {};
-  if (![origin.x, origin.y].every(v => Number.isFinite(Number(v)))) return false;
-  const polylines = objects.filter(o => o.type === 'polyline' && o.visible !== false);
-  if (polylines.length !== segments.length) return false;
-  // Geometria espelhada do DXF: validar cada retangulo real antes de emitir a prancha.
-  let x = Number(origin.x);
-  for (const segment of segments) {
-    const len = positive(segment.length), dia = positive(segment.diameter);
-    if (!len || !dia) return false;
-    const idx = polylines.findIndex(obj => {
-      if (!obj.closed || !Array.isArray(obj.points) || obj.points.length !== 4) return false;
-      const xs = obj.points.map(p => Number(p.x)), ys = obj.points.map(p => Number(p.y));
-      return xs.every(Number.isFinite) && ys.every(Number.isFinite) &&
-        same(Math.min(...xs), x) && same(Math.max(...xs), x + len) &&
-        same(Math.min(...ys), Number(origin.y) - dia/2) &&
-        same(Math.max(...ys), Number(origin.y) + dia/2);
-    });
-    if (idx < 0) return false;
-    polylines.splice(idx, 1);
-    x += len;
+function getRectangle(obj) {
+  if (!obj || obj.visible === false) return null;
+  if (obj.type === 'rect') {
+    const g = obj.geometry || obj;
+    const x = Number(g.x), y = Number(g.y), w = Number(g.width), h = Number(g.height);
+    if (![x,y,w,h].every(Number.isFinite) || w <= 0 || h <= 0) return null;
+    return { minX:x, maxX:x+w, minY:y, maxY:y+h, centerY:y+h/2, width:w, height:h };
   }
-  // Aceitar somente a linha de centro criada com o eixo. Linhas extras podem
-  // indicar modificacao do DXF e nao devem produzir folha divergente.
-  for (const obj of objects) {
-    if (obj.visible === false) continue;
-    if (!['polyline', 'line', 'centerline', 'dimension', 'text'].includes(obj.type)) return false;
-    if (['line', 'centerline'].includes(obj.type)) {
-      const isAxis = same(obj.x, origin.x) && same(obj.x2, x)
-        && same(obj.y, origin.y) && same(obj.y2, origin.y);
-      if (!isAxis) return false;
+  if (obj.type !== 'polyline' || !obj.closed || !Array.isArray(obj.points) || obj.points.length !== 4) return null;
+  const p = obj.points.map(v => ({x:Number(v.x),y:Number(v.y)}));
+  if (p.some(v=>!Number.isFinite(v.x)||!Number.isFinite(v.y))) return null;
+  const minX=Math.min(...p.map(v=>v.x)), maxX=Math.max(...p.map(v=>v.x));
+  const minY=Math.min(...p.map(v=>v.y)), maxY=Math.max(...p.map(v=>v.y));
+  if (!(maxX>minX && maxY>minY)) return null;
+  // So reconhecer polilinhas que sejam retangulos ortogonais exatos.
+  const corners=new Set(p.map(v=>`${same(v.x,minX)?0:same(v.x,maxX)?1:'x'}-${same(v.y,minY)?0:same(v.y,maxY)?1:'x'}`));
+  if (corners.size!==4 || [...corners].some(k=>k.includes('x'))) return null;
+  return {minX,maxX,minY,maxY,centerY:(minY+maxY)/2,width:maxX-minX,height:maxY-minY};
+}
+
+function modelForRectangles(rects) {
+  return {
+    type:'shaft',
+    source:'inferred-2d',
+    geometry: {
+      origin:{x:rects[0].minX,y:rects[0].centerY},
+      orientation:'horizontal',
+      segments: rects.map(r=>({length:r.width,diameter:r.height})),
+      bore:null,crossHoles:[],
     }
+  };
+}
+
+function inferredShaft(objects) {
+  const rectangles=objects.map(getRectangle).filter(Boolean).sort((a,b)=>a.minX-b.minX);
+  // Tres ou mais trechos consecutivos, simetricos no mesmo eixo Y.
+  // Nunca inferir furos internos a partir de geometria externa.
+  if (rectangles.length < 3) return null;
+  const chains=[];
+  for (let i=0;i<rectangles.length;i++) {
+    const seq=[rectangles[i]];
+    let right=rectangles[i].maxX;
+    for (let j=i+1;j<rectangles.length;j++) {
+      const candidate=rectangles[j];
+      if (!same(candidate.minX,right) || !same(candidate.centerY,seq[0].centerY)) continue;
+      seq.push(candidate);right=candidate.maxX;
+    }
+    if (seq.length>=3) chains.push(seq);
+  }
+  chains.sort((a,b)=>b.length-a.length);
+  if (!chains.length) return null;
+  // Em caso de possivel empate, nao selecionar eixo arbitrario.
+  if (chains.length>1 && chains[0].length===chains[1].length &&
+    !same(chains[0][0].minX,chains[1][0].minX)) return null;
+  return modelForRectangles(chains[0]);
+}
+
+function matchesMlightShaft(objects, spec) {
+  const segments=spec?.segments||[];
+  const origin=spec?.origin||{};
+  if (!segments.length || segments.length>12 ||
+      ![origin.x,origin.y].every(v=>Number.isFinite(Number(v)))) return false;
+  const rects=objects.map(getRectangle).filter(Boolean);
+  let x=Number(origin.x);
+  for(const seg of segments) {
+    const len=positive(seg.length),dia=positive(seg.diameter);
+    if(!len||!dia) return false;
+    const idx=rects.findIndex(r=>same(r.minX,x)&&same(r.maxX,x+len)&&
+      same(r.minY,Number(origin.y)-dia/2)&&same(r.maxY,Number(origin.y)+dia/2));
+    if(idx<0) return false;
+    rects.splice(idx,1);x+=len;
   }
   return true;
 }
 
 function pickShaft(cadData = {}) {
-  const objects = Array.isArray(cadData.objects) ? cadData.objects : [];
-  const shafts = objects.filter((obj) => obj && obj.type === 'shaft' && obj.visible !== false);
-  // Nao interceptar desenhos compostos: manter o exportador CAD legado.
-  const otherGeometry = objects.filter((obj) =>
-    obj && obj.visible !== false && !['shaft', 'dimension', 'centerline', 'text'].includes(obj.type));
-  if (shafts.length === 1 && !otherGeometry.length) {
-    const geo = shafts[0].geometry || shafts[0];
-    const segments = (Array.isArray(geo.segments) ? geo.segments : [])
-      .map((seg) => ({ length: positive(seg.length), diameter: positive(seg.diameter) }));
-    if (segments.length && segments.every(seg => seg.length && seg.diameter)) return shafts[0];
+  const objects=Array.isArray(cadData.objects)?cadData.objects:[];
+  const shafts=objects.filter(o=>o&&o.type==='shaft'&&o.visible!==false);
+  if(shafts.length===1) {
+    const geo=shafts[0].geometry||shafts[0];
+    if(Array.isArray(geo.segments)&&geo.segments.length&&
+      geo.segments.every(seg=>positive(seg.length)&&positive(seg.diameter))) {
+      return shafts[0];
+    }
   }
-  const spec = cadData.shaftSheet;
-  if (shafts.length || !spec || !Array.isArray(spec.segments)) return null;
-  return matchesMlightShaft(objects, spec) ? { type:'shaft', geometry: spec } : null;
+  if (shafts.length>1) return null;
+  const spec=cadData.shaftSheet;
+  if(spec&&Array.isArray(spec.segments)&&matchesMlightShaft(objects,spec)) {
+    return {type:'shaft',source:'mlightcad',geometry:spec};
+  }
+  return inferredShaft(objects);
+}
+
+function isStandaloneShaft(cadData = {}, shaft = null) {
+  if(!shaft || shaft.source === 'inferred-2d') return false;
+  const objs=Array.isArray(cadData.objects)?cadData.objects:[];
+  if(shaft.source==='mlightcad') {
+    return objs.every(o=>o.visible===false||['polyline','line','centerline','dimension','text'].includes(o.type)) &&
+      objs.filter(o=>getRectangle(o)).length===(shaft.geometry?.segments||[]).length &&
+      objs.every(o=>o.visible===false||o.type!=='line'||
+        (same(o.x,shaft.geometry.origin.x)&&same(o.y,shaft.geometry.origin.y)));
+  }
+  return objs.every(o=>o.visible===false||['shaft','dimension','centerline','text'].includes(o.type));
 }
 
 function buildModel(shaft) {
@@ -349,21 +399,32 @@ function frame(doc, desenho, model, cadData) {
   text(doc, 'POSIÇÕES MEDIDAS A PARTIR DA PRIMEIRA FACE. CONFERIR TOLERÂNCIAS ANTES DE USINAR.', 40, 791, 8, { width: 545 });
 }
 
+function renderShaftSheetPage(doc, desenho, cadData, shaft) {
+  const model=buildModel(shaft);
+  const scaleA=Math.min(1.55,760/model.total,190/model.maxDiameter);
+  const scaleSection=Math.min(1.38,620/model.total,190/model.maxDiameter);
+  drawLateral(doc,model,116,238,scaleA);
+  drawSection(doc,model,103,535,scaleSection);
+  drawIsometric(doc,model,855,570);
+  frame(doc,desenho,model,cadData);
+  if(shaft.source==='inferred-2d') {
+    doc.save();
+    doc.fillColor('#9a3412').font(BOLD).fontSize(9)
+      .text('PERFIL INFERIDO DO 2D - CONFIRMAR DADOS INTERNOS E FUROS',35,672,
+        {width:565,lineBreak:false});
+    doc.restore();
+  }
+}
+
 function generateShaftPdf(desenho, cadData, shaft, { pdfDir }) {
-  const model = buildModel(shaft);
+  buildModel(shaft);
   const filename = `${String(desenho.codigo || 'eixo').replace(/[^a-zA-Z0-9_-]+/g, '-')}-eixo-rev${desenho.revisao || 0}-${Date.now()}.pdf`;
   const fullPath = path.join(pdfDir, filename);
   const relPath = `/pdfs/desenho-tecnico/${filename}`;
   const doc = new PDFDocument({ size: 'A3', layout: 'landscape', margin: 0, autoFirstPage: true });
   const out = fs.createWriteStream(fullPath);
   doc.pipe(out);
-  // Faixas separadas evitam que as vistas compartilhem furos ou linhas de corte.
-  const scaleA = Math.min(1.55, 760 / model.total, 190 / model.maxDiameter);
-  const scaleSection = Math.min(1.38, 620 / model.total, 190 / model.maxDiameter);
-  drawLateral(doc, model, 116, 238, scaleA);
-  drawSection(doc, model, 103, 535, scaleSection);
-  drawIsometric(doc, model, 855, 570);
-  frame(doc, desenho, model, cadData);
+  renderShaftSheetPage(doc, desenho, cadData, shaft);
   doc.end();
   return new Promise((resolve, reject) => {
     out.on('finish', () => resolve({ fullPath, relPath, filename }));
@@ -371,4 +432,4 @@ function generateShaftPdf(desenho, cadData, shaft, { pdfDir }) {
   });
 }
 
-module.exports = { pickShaft, buildModel, generateShaftPdf };
+module.exports = { pickShaft, buildModel, isStandaloneShaft, renderShaftSheetPage, generateShaftPdf };
