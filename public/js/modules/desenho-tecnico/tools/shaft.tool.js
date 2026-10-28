@@ -26,8 +26,6 @@ export class ShaftTool extends BaseTool {
     this.segments = [];
     this.bore = null;
     this.crossHoles = [];
-    const fields = document.getElementById('cadShaftForm')?.elements;
-    if (fields) ['boreDiameter', 'boreDepth', 'crossHolePositions', 'crossHoleDiameter'].forEach(key => { if (fields[key]) fields[key].value = ''; });
     this.clearPreview();
     this.openModal();
   }
@@ -61,9 +59,9 @@ export class ShaftTool extends BaseTool {
         this.orientation = this.form.elements.orientation.value === 'vertical' ? 'vertical' : 'horizontal';
         this.segments = this.readRows();
         if (!this.segments.length) throw new Error('Adicione pelo menos um trecho.');
-        const { bore, crossHoles } = this.readBoreAndHoles();
-        this.bore = bore;
-        this.crossHoles = crossHoles;
+        // Etapa simples: somente comprimento e diametro. Furação é detalhamento posterior.
+        this.bore = null;
+        this.crossHoles = [];
         this.hideModal();
         const total = this.segments.reduce((sum, item) => sum + item.length, 0);
         this.ctx.prompt.set({ message: 'Eixo configurado: clique no ponto inicial para posicionar.' });
@@ -109,39 +107,6 @@ export class ShaftTool extends BaseTool {
         diameter: Number.isFinite(diameter) && diameter > 0 ? diameter : 25,
       };
     });
-  }
-
-  readBoreAndHoles() {
-    const fields = this.form.elements;
-    const bd = fields.boreDiameter?.value.trim() || '';
-    const depth = fields.boreDepth?.value.trim() || '';
-    if (Boolean(bd) !== Boolean(depth)) throw new Error('Informe diâmetro e profundidade do alojamento.');
-    let bore = null;
-    if (bd) {
-      const diameter = Number(bd);
-      const boreDepth = Number(depth);
-      if (!(diameter > 0 && diameter < this.segments[0].diameter) ||
-          !(boreDepth > 0 && boreDepth <= this.segments[0].length)) {
-        throw new Error('O alojamento deve caber inteiramente no primeiro trecho.');
-      }
-      bore = { diameter, depth: boreDepth, from: 'start' };
-    }
-    const positions = (fields.crossHolePositions?.value || '').split(/[;,\s]+/).filter(Boolean);
-    const holeDiameterText = fields.crossHoleDiameter?.value.trim() || '';
-    if (Boolean(positions.length) !== Boolean(holeDiameterText)) {
-      throw new Error('Informe as posições e o diâmetro dos furos transversais.');
-    }
-    const holeDiameter = Number(holeDiameterText);
-    const crossHoles = positions.map((item, index) => {
-      const distance = Number(item);
-      if (!(holeDiameter > 0) || !(distance > holeDiameter / 2) ||
-        !(distance + holeDiameter / 2 < this.segments[0].length) ||
-        (bore && distance + holeDiameter / 2 > bore.depth)) {
-        throw new Error(`Furo ${index + 1}: confirme diâmetro/posição na primeira seção.`);
-      }
-      return { distance, diameter: holeDiameter };
-    });
-    return { bore, crossHoles };
   }
 
   renderRows(rows) {
