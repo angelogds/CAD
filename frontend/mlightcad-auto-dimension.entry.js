@@ -557,6 +557,16 @@ async function createShaft(onStatus = () => {}) {
     x += segment.length;
   }
   appendLine({ x: origin.x, y: origin.y }, { x, y: origin.y });
+  // Quebras de aresta desenhadas em 2D sem definir chanfro de fabricação.
+  const first = segments[0], last = segments[segments.length - 1];
+  const breakSize = seg => Math.min(1.5, seg.length * 0.045, seg.diameter * 0.025);
+  const startC = breakSize(first), endC = breakSize(last);
+  for(const side of [-1,1]) {
+    appendLine({x:origin.x,y:origin.y+side*(first.diameter/2-startC)},
+               {x:origin.x+startC,y:origin.y+side*first.diameter/2});
+    appendLine({x:x-endC,y:origin.y+side*last.diameter/2},
+               {x,y:origin.y+side*(last.diameter/2-endC)});
+  }
   clearAutoDimensions();
   const step = Math.max(10, Math.max(x - origin.x, maxDiameter) * 0.055);
   let count = 0;
