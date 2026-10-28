@@ -222,33 +222,26 @@ function dashed(doc, x1, y1, x2, y2, pattern = [7, 4]) {
 function drawLateral(doc, model, x, y, scale) {
   const { segments, bore, crossHoles } = model;
   let acc = 0;
-  segments.forEach((seg) => {
-    const sx = x + acc * scale;
-    const right = sx + seg.length * scale;
-    const top = y - seg.diameter * scale / 2;
-    const bottom = y + seg.diameter * scale / 2;
-    line(doc, sx, top, right, top, 1.15);
-    line(doc, sx, bottom, right, bottom, 1.15);
-    line(doc, sx, top, sx, bottom, .65);
-    line(doc, right, top, right, bottom, 1.0);
-    acc += seg.length;
+  const edge = seg => Math.min(1.5, seg.length * .045, seg.diameter * .025) * scale;
+  segments.forEach((seg, idx) => {
+    const sx=x+acc*scale, right=sx+seg.length*scale;
+    const top=y-seg.diameter*scale/2,bottom=y+seg.diameter*scale/2;
+    const chL=idx===0?edge(seg):0, chR=idx===segments.length-1?edge(seg):0;
+    line(doc,sx+chL,top,right-chR,top,1.1);
+    line(doc,sx+chL,bottom,right-chR,bottom,1.1);
+    line(doc,sx,top+chL,sx,bottom-chL,.9);
+    line(doc,right,top+chR,right,bottom-chR,.9);
+    if(chL) {
+      line(doc,sx,top+chL,sx+chL,top,1.1);
+      line(doc,sx,bottom-chL,sx+chL,bottom,1.1);
+    }
+    if(chR) {
+      line(doc,right-chR,top,right,top+chR,1.1);
+      line(doc,right-chR,bottom,right,bottom-chR,1.1);
+    }
+    acc+=seg.length;
   });
-  const first = segments[0];
-  const last = segments[segments.length - 1];
-  // Linhas de chanfro indicativo: não se atribui cota de usinagem.
-  const chamfer = seg => Math.min(1.5, seg.length * .045, seg.diameter * .025) * scale;
-  const startTop = y - first.diameter * scale / 2, startBottom = y + first.diameter * scale / 2;
-  const startChamfer = chamfer(first);
-  line(doc,x,startTop + startChamfer,x + startChamfer,startTop,1);
-  line(doc,x,startBottom - startChamfer,x + startChamfer,startBottom,1);
-  const endX=x+model.total*scale;
-  const endTop=y-last.diameter*scale/2,endBottom=y+last.diameter*scale/2;
-  const endChamfer=chamfer(last);
-  line(doc,endX-endChamfer,endTop,endX,endTop+endChamfer,1);
-  line(doc,endX-endChamfer,endBottom,endX,endBottom-endChamfer,1);
-  line(doc, x, y - first.diameter * scale / 2, x, y + first.diameter * scale / 2, 1.15);
-  line(doc, x + model.total * scale, y - last.diameter * scale / 2,
-    x + model.total * scale, y + last.diameter * scale / 2, 1.1);
+  const first=segments[0];
   dashed(doc, x - 10, y, x + model.total * scale + 12, y, [12, 4]);
   if (bore) {
     const end = x + bore.depth * scale;
