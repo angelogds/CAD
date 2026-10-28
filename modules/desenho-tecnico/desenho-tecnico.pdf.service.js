@@ -5,6 +5,7 @@ const storagePaths = require('../../config/storage');
 const imageService = require('./desenho-tecnico.image.service');
 const dimensionPdf = require('./desenho-tecnico.dimension-pdf');
 const layoutUtils = require('./desenho-tecnico.layout');
+const shaftSheet = require('./desenho-tecnico.shaft-sheet');
 
 const PDF_DIR = path.join(storagePaths.PDF_DIR, 'desenho-tecnico');
 if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
@@ -17,6 +18,8 @@ function generateTechnicalPdf(desenho, svgMarkup, options = {}) {
   const fullPath = path.join(PDF_DIR, filename);
   const relPath = `/pdfs/desenho-tecnico/${filename}`;
   const cadData = options.cadData || desenho.cad_data || {};
+  const shaft = shaftSheet.pickShaft(cadData);
+  if (shaft) return shaftSheet.generateShaftPdf(desenho, cadData, shaft, { pdfDir: PDF_DIR });
   const paperConfig = layoutUtils.resolvePaperConfig(cadData);
 
   const doc = new PDFDocument({
