@@ -148,7 +148,7 @@ function drawLateral(doc, model, x, y, scale) {
   }
   dimVertical(doc, y - first.diameter * scale / 2, y + first.diameter * scale / 2,
     x - 34, x - 3, 'Ø' + number(first.diameter));
-  position = x;
+  position = x + first.length * scale;
   segments.slice(1).forEach((seg) => {
     const mid = position + (seg.length * scale) / 2 + 3;
     text(doc, 'Ø' + number(seg.diameter), mid, y - seg.diameter * scale / 2 - 23, 10);
