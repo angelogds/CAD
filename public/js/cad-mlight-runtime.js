@@ -179,6 +179,7 @@ async function boot() {
         Object.assign(cadData, payload);
         setSaveState('Tudo salvo', 'saved');
         setStatus('Desenho salvo no histórico técnico', 'ok');
+        return true;
       } catch (error) {
         console.error('[CAD][MLightCAD] save error', error);
         setSaveState('Falha ao salvar', 'error');
