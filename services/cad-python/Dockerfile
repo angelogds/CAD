@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Runtime mínimo das bibliotecas nativas OCCT (arquivo STEP).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 libx11-6 libstdc++6 \
+    libgl1 libx11-6 libstdc++6 libxrender1 libxext6 libsm6 libice6 libxi6 libxfixes3 libxrandr2 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements-occt.txt ./
