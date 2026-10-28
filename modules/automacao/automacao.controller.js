@@ -47,11 +47,24 @@ function renderDecanters(req, res, modoSimulacaoDecanters) {
 }
 
 function prensas(req, res) {
+  return renderPrensas(req, res, false);
+}
+
+function simuladorPrensas(req, res) {
+  return renderPrensas(req, res, true);
+}
+
+function renderPrensas(req, res, simular) {
+  const role = normalizeRole(req.session && req.session.user && req.session.user.role);
+  const admin = role === 'ADMIN';
+  res.setHeader('Cache-Control', 'no-store');
   return res.render('automacao/prensas', {
-    title: '2A Automação Industrial · Prensas',
+    title: '2A Automação Industrial · ' + (simular ? 'Simulador das Prensas' : 'Prensas'),
     activeMenu: 'automacao',
     prensas: service.getPrensasOverview(),
     integrationState: service.getIntegrationState(),
+    simulacaoPrensasHabilitada: admin && simular,
+    configuracaoAdmin: admin,
   });
 }
 
@@ -72,4 +85,4 @@ function simuladorDigestores(req, res) {
   });
 }
 
-module.exports = { index, digestores, decanters, prensas, simuladorDigestores, simuladorDecanters };
+module.exports = { index, digestores, decanters, prensas, simuladorPrensas, simuladorDigestores, simuladorDecanters };
