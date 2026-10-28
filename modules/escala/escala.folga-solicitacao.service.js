@@ -4,9 +4,12 @@ const { normalizeRole, canAccessModule } = require('../../config/rbac');
 const dateBr = require('../../utils/data-hora-br');
 
 const MINUTOS_DIA_FOLGA = 480;
+const MINUTOS_FOLGA_UMA_HORA = 60;
 const MINUTOS_MEIO_PERIODO_FOLGA = 240;
 const MINUTOS_MINIMOS_MEIO_PERIODO = 210;
 const PERIODOS_FOLGA = {
+  ENTRADA_TARDIA: { value: 'ENTRADA_TARDIA', label: 'entrada 1h mais tarde', minutos: MINUTOS_FOLGA_UMA_HORA, minimo: MINUTOS_FOLGA_UMA_HORA },
+  SAIDA_ANTECIPADA: { value: 'SAIDA_ANTECIPADA', label: 'saída 1h mais cedo', minutos: MINUTOS_FOLGA_UMA_HORA, minimo: MINUTOS_FOLGA_UMA_HORA },
   MANHA: { value: 'MANHA', label: 'manhã', minutos: MINUTOS_MEIO_PERIODO_FOLGA, minimo: MINUTOS_MINIMOS_MEIO_PERIODO },
   TARDE: { value: 'TARDE', label: 'tarde', minutos: MINUTOS_MEIO_PERIODO_FOLGA, minimo: MINUTOS_MINIMOS_MEIO_PERIODO },
   DIA_TODO: { value: 'DIA_TODO', label: 'dia todo', minutos: MINUTOS_DIA_FOLGA, minimo: MINUTOS_DIA_FOLGA },
@@ -35,6 +38,8 @@ function normalizarPeriodoFolga(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
     .replace(/[\s/-]+/g, '_');
+  if (raw === 'ENTRADA_TARDIA') return PERIODOS_FOLGA.ENTRADA_TARDIA;
+  if (raw === 'SAIDA_ANTECIPADA') return PERIODOS_FOLGA.SAIDA_ANTECIPADA;
   if (['MANHA', 'MANHÃ', 'MEIO_PERIODO_MANHA', 'MEIO_PERIODO'].includes(raw)) return PERIODOS_FOLGA.MANHA;
   if (['TARDE', 'MEIO_PERIODO_TARDE'].includes(raw)) return PERIODOS_FOLGA.TARDE;
   return PERIODOS_FOLGA.DIA_TODO;
@@ -43,12 +48,16 @@ function normalizarPeriodoFolga(value) {
 function saldoPermiteFolga(saldoMinutos, minutosSolicitados) {
   const saldo = Number(saldoMinutos || 0);
   const minutos = Number(minutosSolicitados || MINUTOS_DIA_FOLGA);
+  if (minutos === MINUTOS_FOLGA_UMA_HORA) return saldo >= MINUTOS_FOLGA_UMA_HORA;
   if (minutos === MINUTOS_MEIO_PERIODO_FOLGA) return saldo >= MINUTOS_MINIMOS_MEIO_PERIODO;
   return saldo >= minutos;
 }
 
 function assertSaldoPermiteFolga(saldoMinutos, minutosSolicitados) {
   if (saldoPermiteFolga(saldoMinutos, minutosSolicitados)) return true;
+  if (Number(minutosSolicitados || 0) === MINUTOS_FOLGA_UMA_HORA) {
+    throw new Error('Saldo insuficiente. Para liberação de 1 hora, é necessário possuir pelo menos 1h00 no Banco de Horas.');
+  }
   if (Number(minutosSolicitados || 0) === MINUTOS_MEIO_PERIODO_FOLGA) {
     throw new Error('Saldo insuficiente. Para folga de meio período, é necessário possuir pelo menos 3h30 no Banco de Horas.');
   }
@@ -142,20 +151,31 @@ function conflitoSolicitacaoNaData(dataISO, ignoreSolicitacaoId = null) {
   `).get(...params);
 }
 
-function assertDataFolgaDisponivel(dataISO, { ignoreSolicitacaoId = null } = {}) {
+// Mantém a segunda-feira bloqueada e consulta ocupação sem expor outros nomes no autoatendimento.
+function consultarDisponibilidadeFolga(dataISO, { ignoreSolicitacaoId = null, colaboradorId = null } = {}) {
+  const programado = conflitoProgramadoNaData(dataISO);
+  const legacy = conflitoAusenciaLegacy(dataISO);
+  const pendente = conflitoSolicitacaoNaData(dataISO, ignoreSolicitacaoId);
+  const conflitos = [programado, legacy, pendente].filter(Boolean);
+  return {
+    ocupada: conflitos.length > 0,
+    temFolgaAprovada: Boolean(programado || legacy),
+    conflitoProprio: colaboradorId != null && conflitos.some((r) => Number(r.colaborador_id) === Number(colaboradorId)),
+    colaboradores: [...new Set(conflitos.map((r) => r.colaborador_nome).filter(Boolean))],
+  };
+}
+
+function assertDataFolgaDisponivel(dataISO, { ignoreSolicitacaoId = null, colaboradorId = null, permitirConflitos = false } = {}) {
   if (!dateBr.isValidISODate(dataISO)) throw new Error('Informe uma data válida para a folga.');
   if (dataISO < dateBr.todayISO()) throw new Error('Não é possível solicitar folga em data passada.');
   if (dateBr.isMondayISO(dataISO)) throw new Error('Segunda-feira não está disponível para folga pelo Banco de Horas.');
 
-  const programado = conflitoProgramadoNaData(dataISO);
-  if (programado) throw new Error(`A data já possui afastamento de ${programado.colaborador_nome}. Escolha outro dia.`);
-
-  const legacy = conflitoAusenciaLegacy(dataISO);
-  if (legacy) throw new Error(`A data já possui ausência de ${legacy.colaborador_nome}. Escolha outro dia.`);
-
-  const pendente = conflitoSolicitacaoNaData(dataISO, ignoreSolicitacaoId);
-  if (pendente) throw new Error(`A data já está reservada por solicitação de ${pendente.colaborador_nome}. Escolha outro dia.`);
-  return true;
+  const disponibilidade = consultarDisponibilidadeFolga(dataISO, { ignoreSolicitacaoId, colaboradorId });
+  if (disponibilidade.conflitoProprio) throw new Error('Você já possui folga ou solicitação nesta data.');
+  if (disponibilidade.ocupada && !permitirConflitos) {
+    throw new Error('Já existe folga ou solicitação nesta data. Uma segunda folga exige liberação excepcional da gestão.');
+  }
+  return disponibilidade;
 }
 
 function solicitarFolga({ user, data_folga, periodo_folga = 'DIA_TODO', motivo = '' }) {
@@ -171,7 +191,7 @@ function solicitarFolga({ user, data_folga, periodo_folga = 'DIA_TODO', motivo =
   if (existente) throw new Error('Você já possui uma solicitação de folga aguardando aprovação.');
 
   const dataISO = String(data_folga || '').slice(0, 10);
-  assertDataFolgaDisponivel(dataISO);
+  const disponibilidade = assertDataFolgaDisponivel(dataISO, { colaboradorId: colaborador.id, permitirConflitos: true });
   const saldo = escala.calcularSaldoBancoHoras(colaborador.id).minutos;
   const periodo = normalizarPeriodoFolga(periodo_folga);
   assertSaldoPermiteFolga(saldo, periodo.minutos);
@@ -179,9 +199,9 @@ function solicitarFolga({ user, data_folga, periodo_folga = 'DIA_TODO', motivo =
   try {
     const info = db.prepare(`
       INSERT INTO escala_folga_solicitacoes
-        (user_id, colaborador_id, data_folga, minutos_solicitados, motivo, status, solicitado_em)
-      VALUES (?, ?, ?, ?, ?, '${STATUS_PENDENTE}', datetime('now'))
-    `).run(userId(user), Number(colaborador.id), dataISO, periodo.minutos, montarMotivoFolga(periodo, motivo));
+        (user_id, colaborador_id, data_folga, minutos_solicitados, motivo, exige_excecao, status, solicitado_em)
+      VALUES (?, ?, ?, ?, ?, ?, '${STATUS_PENDENTE}', datetime('now'))
+    `).run(userId(user), Number(colaborador.id), dataISO, periodo.minutos, montarMotivoFolga(periodo, motivo), disponibilidade.ocupada ? 1 : 0);
     return Number(info.lastInsertRowid);
   } catch (error) {
     if (/UNIQUE constraint failed|uidx_escala_folga_solic_data_pendente/i.test(String(error?.message || ''))) {
@@ -202,18 +222,28 @@ function cancelarSolicitacao(id, user) {
   db.prepare(`UPDATE escala_folga_solicitacoes SET status='CANCELADA', decidido_em=datetime('now'), observacao_decisao='Cancelada pelo colaborador' WHERE id=?`).run(Number(id));
 }
 
-function aprovarSolicitacao(id, user, observacao = '') {
+function aprovarSolicitacao(id, user, observacao = '', { autorizar_excecao = false, justificativa_excecao = '' } = {}) {
   assertManage(user);
-  const solicitacao = getSolicitacao(id);
-  if (!solicitacao) throw new Error('Solicitação de folga não encontrada.');
-  if (solicitacao.status !== STATUS_PENDENTE) throw new Error('Esta solicitação já foi analisada.');
-
-  assertDataFolgaDisponivel(solicitacao.data_folga, { ignoreSolicitacaoId: solicitacao.id });
-  const saldo = escala.calcularSaldoBancoHoras(solicitacao.colaborador_id).minutos;
-  const minutosSolicitados = Number(solicitacao.minutos_solicitados || MINUTOS_DIA_FOLGA);
-  assertSaldoPermiteFolga(saldo, minutosSolicitados);
-
   return db.transaction(() => {
+    const solicitacao = getSolicitacao(id);
+    if (!solicitacao) throw new Error('Solicitação de folga não encontrada.');
+    if (solicitacao.status !== STATUS_PENDENTE) throw new Error('Esta solicitação já foi analisada.');
+
+    const disponibilidade = assertDataFolgaDisponivel(solicitacao.data_folga, {
+      ignoreSolicitacaoId: solicitacao.id,
+      colaboradorId: solicitacao.colaborador_id,
+      permitirConflitos: true,
+    });
+    const saldo = escala.calcularSaldoBancoHoras(solicitacao.colaborador_id).minutos;
+    const minutosSolicitados = Number(solicitacao.minutos_solicitados || MINUTOS_DIA_FOLGA);
+    assertSaldoPermiteFolga(saldo, minutosSolicitados);
+
+    // Uma segunda folga já programada exige autorização consciente e justificativa auditável.
+    const excecao = disponibilidade.temFolgaAprovada;
+    const justificativa = String(justificativa_excecao || '').trim();
+    if (excecao && (!autorizar_excecao || justificativa.length < 10)) {
+      throw new Error('Já existe folga nesta data. Confirme a liberação excepcional e informe justificativa de pelo menos 10 caracteres.');
+    }
     const folgaId = escala.programarFolgaCompensatoria({
       user_id: solicitacao.user_id,
       colaborador_id: solicitacao.colaborador_id,
@@ -226,9 +256,12 @@ function aprovarSolicitacao(id, user, observacao = '') {
     });
     db.prepare(`
       UPDATE escala_folga_solicitacoes
-      SET status='APROVADA', folga_id=?, decidido_por=?, decidido_em=datetime('now'), observacao_decisao=?
+      SET status='APROVADA', folga_id=?, decidido_por=?, decidido_em=datetime('now'), observacao_decisao=?,
+          exige_excecao=?, excecao_autorizada_por=?, justificativa_excecao=?, excecao_autorizada_em=?
       WHERE id=? AND status='${STATUS_PENDENTE}'
-    `).run(Number(folgaId), userId(user), String(observacao || '').trim() || null, Number(id));
+    `).run(Number(folgaId), userId(user), String(observacao || '').trim() || null,
+      excecao ? 1 : 0, excecao ? userId(user) : null, excecao ? justificativa : null,
+      excecao ? new Date().toISOString() : null, Number(id));
     return folgaId;
   })();
 }
@@ -257,18 +290,30 @@ function eachDateInclusive(start, end, fn) {
   }
 }
 
-function validarProgramacaoManual(dados = {}) {
+function validarProgramacaoManual(dados = {}, user = {}) {
   const tipo = String(dados.tipo_lancamento || dados.tipo || '').trim().toUpperCase();
   if (!['FOLGA_COMPENSATORIA', 'FOLGA_MANUAL'].includes(tipo)) return true;
   const inicio = String(dados.data_folga || dados.data_inicio || '').slice(0, 10);
   const fim = String(dados.data_fim || inicio).slice(0, 10);
   if (!dateBr.isValidISODate(inicio) || !dateBr.isValidISODate(fim) || fim < inicio) throw new Error('Período de folga inválido.');
-  eachDateInclusive(inicio, fim, (data) => assertDataFolgaDisponivel(data));
+  const justificativa = String(dados.justificativa_excecao || '').trim();
+  eachDateInclusive(inicio, fim, (data) => {
+    const disponibilidade = assertDataFolgaDisponivel(data, {
+      colaboradorId: Number(dados.colaborador_id),
+      permitirConflitos: true,
+    });
+    if (disponibilidade.ocupada &&
+        (!canAccessModule(normalizeRole(user?.role), 'escala_manage') ||
+         String(dados.autorizar_excecao || '') !== '1' || justificativa.length < 10)) {
+      throw new Error('Já existe folga nesta data. Para liberar outra folga, marque a autorização excepcional e justifique (mínimo 10 caracteres).');
+    }
+  });
   return true;
 }
 
 module.exports = {
   MINUTOS_DIA_FOLGA,
+  MINUTOS_FOLGA_UMA_HORA,
   MINUTOS_MEIO_PERIODO_FOLGA,
   MINUTOS_MINIMOS_MEIO_PERIODO,
   STATUS_PENDENTE,
@@ -277,6 +322,7 @@ module.exports = {
   saldoPermiteFolga,
   getSolicitacao,
   listarSolicitacoes,
+  consultarDisponibilidadeFolga,
   assertDataFolgaDisponivel,
   solicitarFolga,
   cancelarSolicitacao,
