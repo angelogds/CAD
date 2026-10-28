@@ -327,7 +327,7 @@ function drawSection(doc, model, x, y, scale) {
 }
 
 function drawIsometric(doc, model, ox, oy) {
-  const unit = .58;
+  const unit = Math.min(1.9, 260 / model.total);
   const vx = .89, vy = -.45, px = .45, py = .89;
   let at = 0;
   model.segments.forEach((seg, idx) => {
@@ -365,7 +365,7 @@ function frame(doc, desenho, model, cadData) {
   doc.rect(22, 22, W - 44, H - 44).lineWidth(1.3).stroke('#111827');
   line(doc, 22, 70, W - 22, 70, 1);
   text(doc, 'MANUTENÇÃO INDUSTRIAL — CAMPO DO GADO', 40, 36, 15, { bold: true });
-  text(doc, 'PADRÃO DE FABRICAÇÃO | EIXO PARAMÉTRICO', W - 395, 40, 10);
+  text(doc, 'PRANCHA TÉCNICA PADRÃO | EIXO MECÂNICO', W - 395, 40, 10);
   text(doc, 'VISTA A — LATERAL', 380, 362, 12, { bold: true, width: 250, align: 'center' });
   text(doc, 'SEÇÃO A-A — LONGITUDINAL', 270, 658, 12, { bold: true, width: 320, align: 'center' });
   text(doc, 'VISTA ISOMÉTRICA (ESQUEMÁTICA)', 835, 654, 10, { bold: true, width: 305, align: 'center' });
@@ -391,26 +391,26 @@ function frame(doc, desenho, model, cadData) {
   text(doc, 'TRECHOS: ' + model.segments.map(s => 'Ø' + number(s.diameter) + ' × ' + number(s.length)).join(' / ').slice(0, 81), 40, 730, 9, { width: 545 });
   text(doc, model.bore
     ? 'ALOJAMENTO: Ø' + number(model.bore.diameter) + ' × ' + number(model.bore.depth) + ' (a partir da primeira face)'
-    : 'ALOJAMENTO: NÃO INFORMADO / SEM USINAGEM INTERNA', 40, 749, 9, { width: 545 });
+    : 'ALOJAMENTO: NÃO INFORMADO - CONFIRMAR ANTES DE USINAR', 40, 749, 9, { width: 545 });
   const holes = model.crossHoles.length;
   text(doc, holes
     ? holes + ' FURO(S) PASSANTE(S) TRANSVERSAL(IS): ' + model.crossHoles.map(h => 'Ø' + number(h.diameter) + ' @ ' + number(h.distance)).join('; ').slice(0, 61)
-    : 'FUROS TRANSVERSAIS: NENHUM INFORMADO', 40, 766, 8, { width: 540 });
+    : 'FUROS TRANSVERSAIS: NÃO CADASTRADOS (CONFIRMAR)', 40, 766, 8, { width: 540 });
   text(doc, 'POSIÇÕES MEDIDAS A PARTIR DA PRIMEIRA FACE. CONFERIR TOLERÂNCIAS ANTES DE USINAR.', 40, 791, 8, { width: 545 });
 }
 
 function renderShaftSheetPage(doc, desenho, cadData, shaft) {
   const model=buildModel(shaft);
-  const scaleA=Math.min(1.55,760/model.total,190/model.maxDiameter);
-  const scaleSection=Math.min(1.38,620/model.total,190/model.maxDiameter);
-  drawLateral(doc,model,116,238,scaleA);
+  const scaleA=Math.min(3.5,760/model.total,168/model.maxDiameter);
+  const scaleSection=Math.min(3,620/model.total,160/model.maxDiameter);
+  drawLateral(doc,model,116,250,scaleA);
   drawSection(doc,model,103,535,scaleSection);
   drawIsometric(doc,model,855,570);
   frame(doc,desenho,model,cadData);
   if(shaft.source==='inferred-2d') {
     doc.save();
     doc.fillColor('#9a3412').font(BOLD).fontSize(9)
-      .text('PERFIL INFERIDO DO 2D - CONFIRMAR DADOS INTERNOS E FUROS',35,672,
+      .text('PRELIMINAR - PERFIL INFERIDO DO 2D: CONFERIR DADOS INTERNOS E FUROS',35,672,
         {width:565,lineBreak:false});
     doc.restore();
   }
