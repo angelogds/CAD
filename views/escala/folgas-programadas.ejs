@@ -24,7 +24,7 @@
     <a class="escala-tab" href="/escala/banco-horas">Banco de Horas</a>
   </nav>
 
-  <div class="escala-notice is-info"><strong>Regra operacional:</strong> folga eletiva pelo Banco de Horas nunca é liberada na segunda-feira e somente um colaborador pode reservar/usar a mesma data. Meio período consome 4h; com 3h30 ou mais, a liderança pode aprovar e o saldo fica até -0h30.</div>
+  <div class="escala-notice is-info"><strong>Regra operacional:</strong> folga eletiva pelo Banco de Horas nunca é liberada na segunda-feira e somente uma folga por dia é aprovada normalmente. Pedido adicional exige justificativa e autorização do encarregado, supervisor ou gestão do sistema. Entrada/saída de 1h consome 1h; meio período consome 4h; com 3h30 ou mais, a liderança pode aprovar e o saldo fica até -0h30.</div>
 
   <section class="escala-section">
     <div class="escala-section-head"><div><h2>Solicitações aguardando aprovação</h2><p>O saldo e a disponibilidade da data são revalidados no momento da aprovação.</p></div><span class="approval-counter"><%= pendentesFolga.length %> pendente(s)</span></div>
@@ -40,9 +40,26 @@
             <div><span>Saldo previsto</span><strong><%= fmtMin(s.saldo_previsto_minutos) %></strong></div>
             <div><span>Motivo</span><strong><%= s.motivo || 'Folga compensatória' %></strong></div>
           </div>
+          <% if(s.conflito_dia?.ocupada){ %>
+            <div class="escala-audit-note" role="alert">
+              <strong>Atenção: já existe folga ou solicitação nesse dia.</strong>
+              <span><%= s.conflito_dia.colaboradores.join(', ') || 'Equipe de manutenção' %></span>
+              <% if(s.conflito_dia.temFolgaAprovada){ %>
+                <span>Para aprovar esta segunda folga, é obrigatória a liberação excepcional e a justificativa.</span>
+              <% } else { %>
+                <span>Há outro pedido pendente. Apenas uma solicitação pode ser aprovada normalmente para essa data.</span>
+              <% } %>
+            </div>
+          <% } %>
           <% if(canManageEscala){ %>
             <div class="approval-primary-actions">
-              <form method="POST" action="/escala/folgas/solicitacoes/<%= s.id %>/aprovar" onsubmit="return confirm('Aprovar a folga de <%= s.colaborador_nome %> em <%= dateBr.formatDateBR(s.data_folga) %>?');"><button class="btn btn-green" type="submit">✓ Aprovar folga</button></form>
+              <form method="POST" action="/escala/folgas/solicitacoes/<%= s.id %>/aprovar" onsubmit="return confirm('Confirmar a aprovação desta folga?');">
+                <% if(s.conflito_dia?.temFolgaAprovada){ %>
+                  <label class="escala-field"><span class="label">Liberação excepcional</span><span><input type="checkbox" name="autorizar_excecao" value="1" required> Autorizo segunda folga nesta data</span></label>
+                  <label class="escala-field"><span class="label">Justificativa obrigatória</span><textarea class="input" name="justificativa_excecao" minlength="10" required placeholder="Explique a necessidade e a cobertura da equipe"></textarea></label>
+                <% } %>
+                <button class="btn btn-green" type="submit">Aprovar folga</button>
+              </form>
               <details class="approval-details"><summary>Reprovar</summary><form method="POST" action="/escala/folgas/solicitacoes/<%= s.id %>/reprovar"><input class="input" name="motivo" placeholder="Motivo da reprovação" required><button class="btn btn-sm" type="submit">Confirmar reprovação</button></form></details>
             </div>
           <% } else { %><div class="muted">Consulta somente. A decisão pertence à gestão da Manutenção.</div><% } %>
@@ -73,7 +90,11 @@
             <label class="escala-field full"><span class="label">Justificativa da liderança para saldo negativo</span><input class="input" name="justificativa_saldo_negativo" placeholder="Somente quando necessário"></label>
             <div class="escala-field full" id="compensacao-os-wrap" hidden><div class="compensacao-os-panel"><div class="compensacao-os-head"><div><strong id="compensacao-os-title">OS da data do serviço</strong><small id="compensacao-os-help">Selecione funcionário e data do serviço para buscar as horas extras aprovadas.</small></div><span id="compensacao-os-total">0h00</span></div><div id="compensacao-os-list" class="compensacao-os-list"></div></div></div>
             <div class="escala-field full"><div class="escala-notice is-info"><strong id="saldo-info">Selecione o funcionário.</strong><br><span id="debito-info">Folga compensatória debita o Banco de Horas.</span></div></div>
-            <div class="escala-field full"><div class="escala-actionbar"><span class="muted">Folgas eletivas também respeitam segunda-feira bloqueada e uma pessoa por data.</span><button class="btn btn-green" type="submit">Programar ocorrência</button></div></div>
+            <div class="escala-field full">
+              <label class="escala-field"><span class="label">Exceção: somente se já existir folga nesta data</span><span><input type="checkbox" name="autorizar_excecao" value="1"> Autorizo uma folga adicional para a equipe</span></label>
+              <label class="escala-field"><span class="label">Justificativa da exceção</span><textarea class="input" name="justificativa_excecao" minlength="10" placeholder="Necessidade e cobertura operacional"></textarea></label>
+            </div>
+            <div class="escala-field full"><div class="escala-actionbar"><span class="muted">Segunda-feira bloqueada. Uma pessoa por dia; exceções são justificadas e autorizadas.</span><button class="btn btn-green" type="submit">Programar ocorrência</button></div></div>
           </form>
         </div>
       </details>
