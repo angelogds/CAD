@@ -42,7 +42,7 @@
     return snapshot(state);
   }
   function select(state, key) {
-    if (['TOLVA', 'CAKE', 'RETURN', 'OIL', ...MACHINES].includes(key)) state.selected = key;
+    if (['PERCOLADORA','TOLVA', 'CAKE', 'RETURN', 'OIL', ...MACHINES, ...MACHINES.map(id=>'PUMP_'+id), ...MACHINES.map(id=>'GATE_'+id)].includes(key)) state.selected = key;
     return snapshot(state);
   }
   function tick(state, seconds = 1) {
