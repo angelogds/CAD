@@ -542,6 +542,32 @@ async function createShaft(onStatus = () => {}) {
     return { length, diameter };
   }).filter((segment) => segment.length > 0 && segment.diameter > 0);
   if (!segments.length) return false;
+  const boreRaw = String(prompt('Alojamento interno: diâmetro x profundidade (mm), ou deixe em branco', '') || '').trim();
+  let bore = null;
+  if (boreRaw) {
+    const parts = boreRaw.toLowerCase().split('x');
+    const diameter = Number(parts[0]), depth = Number(parts[1]);
+    if (parts.length !== 2 || !(diameter > 0 && diameter < segments[0].diameter) ||
+      !(depth > 0 && depth <= segments[0].length)) {
+      throw new Error('Alojamento inválido: Ø e profundidade devem caber no primeiro trecho.');
+    }
+    bore = { diameter, depth, from: 'start' };
+  }
+  const holesRaw = String(prompt('Posições dos furos transversais PASSANTES (mm desde a primeira face), separadas por ; — em branco se não há', '') || '').trim();
+  const positions = holesRaw ? holesRaw.split(/[;,\s]+/).filter(Boolean).map(Number) : [];
+  let crossHoles = [];
+  if (positions.length) {
+    const diameter = Number(prompt('Diâmetro Ø dos furos passantes (mm):', '13'));
+    if (!(diameter > 0)) throw new Error('Diâmetro de furação inválido.');
+    crossHoles = positions.map((distance, index) => {
+      if (!Number.isFinite(distance) || distance - diameter/2 <= 0 ||
+        distance + diameter/2 >= segments[0].length ||
+        (bore && distance + diameter/2 > bore.depth)) {
+        throw new Error(`Posição do furo ${index+1} fora da área do alojamento.`);
+      }
+      return { distance, diameter };
+    });
+  }
   const origin = await acquirePoint('Clique no centro da face inicial do eixo');
   if (!origin) return false;
   let x = origin.x;
@@ -578,7 +604,12 @@ async function createShaft(onStatus = () => {}) {
     `TOTAL ${fmt(x - origin.x)}`
   ); count += 1;
   finalize(`Eixo criado com ${count} cota(s) de fabricação.`, onStatus);
-  return true;
+  return { shaftSheet: {
+    origin: { x: origin.x, y: origin.y },
+    orientation: 'horizontal',
+    segments: segments.map(({ length, diameter }) => ({ length, diameter })),
+    bore, crossHoles,
+  } };
 }
 
 export function createMlightAutoDimensionTools({ onStatus = () => {} } = {}) {

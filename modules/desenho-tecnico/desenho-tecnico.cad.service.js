@@ -161,11 +161,35 @@ function normalizeObject(obj = {}) {
             diameter: Math.abs(toFinite(segment.diameter)),
           })).filter((segment) => segment.length > 0 && segment.diameter > 0)
           : [],
+        bore: geometry.bore && typeof geometry.bore === 'object'
+          ? { diameter: toFinite(geometry.bore.diameter), depth: toFinite(geometry.bore.depth), from: 'start' }
+          : null,
+        crossHoles: Array.isArray(geometry.crossHoles)
+          ? geometry.crossHoles.map(hole => ({ distance: toFinite(hole.distance), diameter: toFinite(hole.diameter) }))
+          : [],
       },
     };
   }
 
   return { ...base, geometry: { ...plainObject(obj.geometry) } };
+}
+
+function sanitizeShaftSheet(input) {
+  if (!input || typeof input !== 'object' || !Array.isArray(input.segments)) return null;
+  const segments = input.segments.slice(0, 12).map(s => ({
+    length: toFinite(s.length), diameter: toFinite(s.diameter),
+  }));
+  if (!segments.length || segments.some(s => s.length <= 0 || s.diameter <= 0)) return null;
+  const bore = input.bore && typeof input.bore === 'object'
+    ? { diameter: toFinite(input.bore.diameter), depth: toFinite(input.bore.depth), from: 'start' }
+    : null;
+  const crossHoles = Array.isArray(input.crossHoles)
+    ? input.crossHoles.slice(0, 36).map(h => ({ distance: toFinite(h.distance), diameter: toFinite(h.diameter) }))
+    : [];
+  return {
+    origin: normalizePoint(input.origin),
+    orientation: 'horizontal', segments, bore, crossHoles,
+  };
 }
 
 function sanitizeCadData(payload = {}) {
@@ -226,6 +250,7 @@ function sanitizeCadData(payload = {}) {
     viewport,
     history: Array.isArray(payload.history) ? payload.history.slice(-100) : [],
     manufacturing: sanitizeManufacturing(payload.manufacturing),
+    shaftSheet: sanitizeShaftSheet(payload.shaftSheet),
   };
 }
 
