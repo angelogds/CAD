@@ -9,12 +9,14 @@
   const saldoMinutos = Number(banco?.saldo?.minutos ?? card?.saldo?.minutos ?? 0);
   const periodoMap = periodosFolga || {};
   const periodoFolgaItens = [
+    { value: 'ENTRADA_TARDIA', titulo: 'Entrar 1h mais tarde', descricao: 'Liberação de 1 hora', minutos: Number(periodoMap.ENTRADA_TARDIA?.minutos || 60), minimo: Number(periodoMap.ENTRADA_TARDIA?.minimo || 60) },
+    { value: 'SAIDA_ANTECIPADA', titulo: 'Sair 1h mais cedo', descricao: 'Liberação de 1 hora', minutos: Number(periodoMap.SAIDA_ANTECIPADA?.minutos || 60), minimo: Number(periodoMap.SAIDA_ANTECIPADA?.minimo || 60) },
     { value: 'MANHA', titulo: 'Manhã', descricao: 'Meio período', minutos: Number(periodoMap.MANHA?.minutos || 240), minimo: Number(periodoMap.MANHA?.minimo || 210) },
     { value: 'TARDE', titulo: 'Tarde', descricao: 'Meio período', minutos: Number(periodoMap.TARDE?.minutos || 240), minimo: Number(periodoMap.TARDE?.minimo || 210) },
     { value: 'DIA_TODO', titulo: 'Dia todo', descricao: 'Jornada completa', minutos: Number(periodoMap.DIA_TODO?.minutos || minutosFolga || 480), minimo: Number(periodoMap.DIA_TODO?.minimo || minutosFolga || 480) },
   ].map((item) => ({ ...item, permitido: saldoMinutos >= item.minimo }));
   const podeSolicitar = periodoFolgaItens.some((item) => item.permitido) && !requestPendente;
-  const periodoDefault = periodoFolgaItens.find((item) => item.permitido)?.value || 'MANHA';
+  const periodoDefault = periodoFolgaItens.find((item) => item.permitido)?.value || 'SAIDA_ANTECIPADA';
 %>
 <div class="escala-page escala-self-page">
   <header class="escala-head"><div><h1>Minha Escala</h1><p>Consulta pessoal de escala, horas extras, Banco de Horas e solicitação de folga.</p></div><div class="escala-actions"><a class="btn" href="/escala/banco-horas">Meu banco de horas</a><% if(vinculado && canOpenProfile){ %><a class="btn btn-green" href="/colaboradores/<%= colaborador.id %>">Meu perfil</a><% } %></div></header>
@@ -27,11 +29,12 @@
     <section class="escala-kpis self-kpis"><div class="escala-kpi"><span>Situação atual</span><strong><%= card?.statusAtual || '-' %></strong><small>Status da escala vigente</small></div><div class="escala-kpi"><span>Turno atual</span><strong><%= card?.turnoAtual || '-' %></strong><small>Programação da semana</small></div><div class="escala-kpi"><span>Banco de horas</span><strong><%= banco?.saldo?.horas || card?.saldo?.horas || '0h00' %></strong><small>Créditos e débitos aprovados</small></div><div class="escala-kpi"><span>Horas extras no mês</span><strong><%= card?.horasExtrasMes || '0h00' %></strong><small>Somente registros aprovados</small></div></section>
 
     <section class="escala-section self-leave-request" id="solicitar-folga">
-      <div class="escala-section-head"><div><h2>Solicitar folga pelo Banco de Horas</h2><p>Escolha a data e o período. A origem do direito à folga vem automaticamente das horas extras já aprovadas.</p></div><span class="approval-counter"><%= requestPendente ? '1 aguardando' : 'Disponível' %></span></div>
-      <div class="leave-rules"><span>Meio período libera com <strong>3h30</strong></span><span>Meio período debita <strong>4h00</strong></span><span><strong>Dia todo</strong> usa 8h00</span><span><strong>1 colaborador por dia</strong></span><span>Segunda-feira bloqueada</span></div>
-      <% if(requestPendente){ %><div class="self-pending-request"><div><span>Data reservada</span><strong><%= dateBr.formatDateBR(requestPendente.data_folga) %></strong><small>Aguardando aprovação da gestão</small></div><form method="POST" action="/escala/folgas/solicitacoes/<%= requestPendente.id %>/cancelar" onsubmit="return confirm('Cancelar sua solicitação e liberar esta data?');"><button class="btn btn-sm" type="submit">Cancelar solicitação</button></form></div><% } else { %>
+      <div class="escala-section-head"><div><h2>Solicitar folga pelo Banco de Horas</h2><p>Escolha a data e o período. O desconto é feito no Banco de Horas após a aprovação da gestão.</p></div><span class="approval-counter"><%= requestPendente ? '1 aguardando' : 'Disponível' %></span></div>
+      <div class="leave-rules"><span><strong>1 hora</strong> de entrada ou saída debita 1h00</span><span>Meio período libera com <strong>3h30</strong></span><span>Meio período debita <strong>4h00</strong></span><span><strong>Dia todo</strong> usa 8h00</span><span><strong>1 colaborador por dia</strong>; exceção só com autorização e justificativa</span><span>Segunda-feira bloqueada</span></div>
+      <% if(requestPendente){ %><div class="self-pending-request"><div><span>Data solicitada</span><strong><%= dateBr.formatDateBR(requestPendente.data_folga) %></strong><small>Aguardando aprovação da gestão; a data não garante liberação</small></div><form method="POST" action="/escala/folgas/solicitacoes/<%= requestPendente.id %>/cancelar" onsubmit="return confirm('Cancelar sua solicitação?');"><button class="btn btn-sm" type="submit">Cancelar solicitação</button></form></div><% } else { %>
         <form method="POST" action="/escala/folgas/solicitar" class="self-leave-form self-leave-form--compact" id="selfLeaveForm">
           <label class="escala-field"><span class="label">Data desejada</span><input class="input" type="date" name="data_folga" id="selfLeaveDate" min="<%= todayISO %>" required <%= podeSolicitar?'':'disabled' %>></label>
+          <div id="selfLeaveAvailability" class="escala-audit-note" role="status" aria-live="polite">Regra: 1 folga por dia. Se alguém já tiver pedido essa data, sua solicitação dependerá de liberação excepcional da gestão.</div>
           <div class="self-leave-options" role="radiogroup" aria-label="Período da folga">
             <% periodoFolgaItens.forEach((item)=>{ %>
               <label class="self-leave-option <%= item.permitido ? '' : 'is-disabled' %>">
@@ -47,7 +50,7 @@
           </div>
           <button class="btn btn-green" type="submit" <%= podeSolicitar?'':'disabled' %>>Solicitar</button>
         </form>
-        <% if(!podeSolicitar){ %><div class="escala-audit-note">Seu saldo atual ainda não libera folga. Para meio período, o mínimo é 3h30; para dia todo, 8h00.</div><% } else if(saldoMinutos >= 210 && saldoMinutos < 240){ %><div class="escala-audit-note">Com 3h30 ou mais, a folga de meio período pode ser solicitada; se aprovada, o saldo pode ficar até -0h30.</div><% } %>
+        <% if(!podeSolicitar){ %><div class="escala-audit-note">Seu saldo atual ainda não libera folga. Para 1 hora, é necessário 1h00; para meio período, 3h30; para dia todo, 8h00.</div><% } else if(saldoMinutos >= 210 && saldoMinutos < 240){ %><div class="escala-audit-note">Com 3h30 ou mais, a folga de meio período pode ser solicitada; se aprovada, o saldo pode ficar até -0h30.</div><% } %>
       <% } %>
       <% if(requests.length){ %><div class="self-table-wrap" style="margin-top:14px"><table class="self-table"><thead><tr><th>Data</th><th>Período</th><th>Status</th><th>Decisão</th></tr></thead><tbody><% requests.slice(0,10).forEach(s=>{ %><tr><td><strong><%= dateBr.formatDateBR(s.data_folga) %></strong><small><%= dateBr.formatDateTimeBR(s.solicitado_em) %></small></td><td><%= s.motivo || fmtMin(s.minutos_solicitados) %></td><td><span class="self-badge"><%= String(s.status||'').replaceAll('_',' ') %></span></td><td><%= s.observacao_decisao || '-' %></td></tr><% }) %></tbody></table></div><% } %>
     </section>
@@ -64,11 +67,27 @@
   const impact=document.querySelector('.self-leave-impact[data-saldo]');
   const debit=document.getElementById('leaveDebitPreview');
   const balance=document.getElementById('leaveBalancePreview');
+  const availability=document.getElementById('selfLeaveAvailability');
+  let disponibilidadeToken=0;
+  async function verificarDisponibilidade(){
+    if(!input?.value || !availability)return;
+    const data=input.value, token=++disponibilidadeToken;
+    availability.textContent='Verificando folgas da data...';
+    try{
+      const resposta=await fetch('/escala/folgas/disponibilidade?data_folga='+encodeURIComponent(data), { headers: { Accept:'application/json' } });
+      const informacao=await resposta.json();
+      if(token!==disponibilidadeToken || input.value!==data)return;
+      availability.textContent=informacao.aviso||informacao.error||'Não foi possível consultar a data.';
+      availability.dataset.ocupada=informacao.ocupada?'1':'0';
+    }catch(error){
+      if(token===disponibilidadeToken){ availability.textContent='Consulta indisponível. A data será revalidada ao enviar a solicitação.'; }
+    }
+  }
   const fmt=(value)=>{const n=Number(value||0),sign=n<0?'-':'',m=Math.abs(n);return sign+Math.floor(m/60)+'h'+String(m%60).padStart(2,'0');};
   function updateImpact(){const checked=form?.querySelector('input[name="periodo_folga"]:checked');if(!checked||!impact)return;const saldo=Number(impact.dataset.saldo||0),min=Number(checked.dataset.minutos||0);if(debit)debit.textContent='-'+fmt(min);if(balance)balance.textContent=fmt(saldo-min);}
   function validarData(){if(!input||!input.value)return true;const [y,m,d]=input.value.split('-').map(Number);const day=new Date(Date.UTC(y,m-1,d,12)).getUTCDay();if(day===1){alert('Segunda-feira não está disponível para folga pelo Banco de Horas. Escolha outro dia.');input.value='';input.focus();return false;}return true;}
   document.querySelectorAll('input[name="periodo_folga"]').forEach((radio)=>radio.addEventListener('change',updateImpact));
-  input?.addEventListener('change',validarData);
+  input?.addEventListener('change',()=>{disponibilidadeToken++;if(validarData())verificarDisponibilidade();});
   form?.addEventListener('submit',(event)=>{if(!validarData())event.preventDefault();});
   updateImpact();
 })();
