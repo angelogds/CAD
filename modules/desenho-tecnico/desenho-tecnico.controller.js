@@ -3,6 +3,7 @@ const service = require('./desenho-tecnico.service');
 const equipamentosService = require('../equipamentos/equipamentos.service');
 const cadService = require('./desenho-tecnico.cad.service');
 const cadPythonService = require('./cad-python.service');
+const shaftSheet = require('./desenho-tecnico.shaft-sheet');
 
 function base(res, view, payload = {}) {
   return res.render(view, {
