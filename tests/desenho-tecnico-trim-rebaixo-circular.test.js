@@ -99,7 +99,7 @@ test('pré-visualização mostra o que vai ficar antes do terceiro clique',()=>{
 });
 
 test('cadeia do editor força versão nova do Aparar de três cliques',()=>{
-  const version='20261028-eixo-v2';
+  const version='20261028-706-v1';
   const view=fs.readFileSync(path.join(root,'views/desenho-tecnico/cad-editor-v2.ejs'),'utf8');
   const engine=fs.readFileSync(path.join(root,'public/js/cad-engine-v2.js'),'utf8');
   const legacy=fs.readFileSync(path.join(root,'public/js/cad-legacy-engine.js'),'utf8');

@@ -1,6 +1,7 @@
 const repo = require('./desenho-tecnico.repository');
 const svg = require('./desenho-tecnico.svg.service');
 const pdf = require('./desenho-tecnico.pdf.service');
+const shaftSheet = require('./desenho-tecnico.shaft-sheet');
 const integration = require('./desenho-tecnico.integration.service');
 const cadService = require('./desenho-tecnico.cad.service');
 
@@ -283,12 +284,39 @@ function updateCadMetadata(desenhoId, payload = {}) {
 }
 
 function isCad3dCompatible(payload = {}) {
+  if (shaftSheet.pickShaft(payload)) return true;
   const objects = Array.isArray(payload.objects) ? payload.objects : [];
-  const closedShapes = objects.filter((o) => ['rect', 'circle', 'polyline'].includes(o.type));
-  return closedShapes.length > 0;
+  return objects.some((o) => ['rect', 'circle', 'polyline'].includes(o.type));
 }
 
 function build3dFromCad(payload = {}) {
+  // Priorizar a geometria paramétrica real; nunca extrudar como cubos os
+  // retângulos que representam os diferentes diâmetros de um eixo.
+  const shaft = shaftSheet.pickShaft(payload);
+  if (shaft) {
+    const model = shaftSheet.buildModel(shaft);
+    const warnings = [];
+    if (shaft.source === 'inferred-2d') {
+      warnings.push('Perfil inferido do 2D: confirme medidas, alojamento e usinagens internas.');
+    }
+    if (model.crossHoles.length) {
+      warnings.push('Os furos transversais ainda não são subtraídos do modelo 3D. Vista parcial, não usar para fabricação.');
+    }
+    warnings.push('Quebras de aresta ilustrativas; dimensão do chanfro não definida.');
+    return {
+      mode: 'parametric-shaft',
+      units: 'mm',
+      axis: 'X',
+      segments: model.segments,
+      length: model.total,
+      maxDiameter: model.maxDiameter,
+      bore: model.bore,
+      crossHoles: model.crossHoles,
+      previewOnly: Boolean(model.crossHoles.length || shaft.source === 'inferred-2d'),
+      warnings,
+      generatedAt: new Date().toISOString(),
+    };
+  }
   const objects = Array.isArray(payload.objects) ? payload.objects : [];
   const extrudables = objects
     .filter((o) => ['rect', 'circle', 'polyline'].includes(o.type))
@@ -303,7 +331,6 @@ function build3dFromCad(payload = {}) {
       thickness: Number(o.thickness || payload.defaultThickness || 10),
       layer: o.layer || 'geometria_principal',
     }));
-
   return {
     mode: 'simple-extrusion',
     generatedAt: new Date().toISOString(),

@@ -5,7 +5,7 @@ import { SelectionManager } from './interaction/selection.manager.js';
 import { PromptManager } from './interaction/prompt.manager.js';
 import { ViewportController } from './viewport/viewport.controller.js';
 import { InteractionController } from './interaction/interaction.controller.js';
-import { DesenhoTecnicoRenderer } from './desenho-tecnico.renderer.js?v=20261028-eixo-v2';
+import { DesenhoTecnicoRenderer } from './desenho-tecnico.renderer.js?v=20261028-706-v1';
 import { SelectTool } from './tools/select.tool.js';
 import { PanTool } from './tools/pan.tool.js';
 import { LineTool } from './tools/line.tool.js';
@@ -17,9 +17,9 @@ import { ZoomWindowTool } from './tools/zoom-window.tool.js';
 import { PolylineTool } from './tools/polyline.tool.js';
 import { TextTool } from './tools/text.tool.js';
 import { CenterlineTool } from './tools/centerline.tool.js';
-import { ShaftTool } from './tools/shaft.tool.js?v=20261028-eixo-v2';
+import { ShaftTool } from './tools/shaft.tool.js?v=20261028-706-v1';
 import { ArcTool } from './tools/arc.tool.js';
-import { TrimTool } from './tools/trim.tool.js?v=20261028-eixo-v2';
+import { TrimTool } from './tools/trim.tool.js?v=20261028-706-v1';
 import { ExtendTool } from './tools/extend.tool.js';
 import { OffsetTool } from './tools/offset.tool.js';
 import { MirrorTool } from './tools/mirror.tool.js';
@@ -872,6 +872,14 @@ export class DesenhoTecnicoController {
         const pdfUrl = source?.dataset?.pdfUrl || source?.getAttribute?.('href');
         if (!pdfUrl) throw new Error('Rota de exportação do PDF não encontrada');
         window.location.assign(pdfUrl);
+      },
+      'view-3d-shaft': async () => {
+        const { openShaft3D } = await import('/js/cad-shaft-3d.mjs?v=20261028-706-v1');
+        await openShaft3D({
+          cadData: this.serialize(),
+          drawingId: window.CAD_INITIAL?.desenhoId,
+          label: this.state.metadata?.titulo || 'Eixo escalonado',
+        });
       },
       'save-metadata': async () => { await this.saveMetadata(); },
     };
