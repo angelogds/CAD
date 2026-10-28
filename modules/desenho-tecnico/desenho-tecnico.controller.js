@@ -279,6 +279,45 @@ async function analyzeCadPython(req, res) {
   return res.json({ ok: true, data: result.data?.data || result.data });
 }
 
+async function exportCadStep(req, res) {
+  const desenho = service.getById(req.params.id);
+  if (!desenho || desenho.tipo_origem !== 'cad') {
+    return res.status(404).json({ ok: false, error: 'Desenho CAD não encontrado.' });
+  }
+  const shaft = shaftSheet.pickShaft(desenho.cad_data || {});
+  if (!shaft || shaft.source === 'inferred-2d') {
+    return res.status(422).json({ ok: false, error: 'Para exportar STEP, crie ou confirme um eixo paramétrico com medidas explícitas.' });
+  }
+  let model;
+  try {
+    model = shaftSheet.buildModel(shaft);
+  } catch (err) {
+    return res.status(422).json({ ok: false, error: err.message });
+  }
+  const safeCode = String(desenho.codigo || ('CAD-' + desenho.id))
+    .replace(/[^a-z0-9._-]+/gi, '-').slice(0, 85);
+  const result = await cadPythonService.exportStep({
+    segments: model.segments,
+    bore: model.bore,
+    crossHoles: model.crossHoles,
+  }, safeCode + '.step');
+  if (!result.ok) {
+    return res.status(result.status || 503).json({
+      ok: false, error: result.error, available: result.available,
+    });
+  }
+  const raw = String(result.data?.content_base64 || '');
+  const buffer = Buffer.from(raw, 'base64');
+  if (!buffer.length || buffer.length > 8_000_000 ||
+      buffer.subarray(0, 12).toString('ascii') !== 'ISO-10303-21;') {
+    return res.status(502).json({ ok: false, error: 'CAD Python retornou STEP inválido.' });
+  }
+  res.setHeader('Content-Type', 'application/step');
+  res.setHeader('Content-Disposition', 'attachment; filename="' + safeCode + '.step"');
+  res.setHeader('Cache-Control', 'no-store');
+  return res.send(buffer);
+}
+
 async function exportCadDxf(req, res) {
   const desenho = service.getById(req.params.id);
   if (!desenho || desenho.tipo_origem !== 'cad') return res.status(404).json({ ok: false, error: 'CAD não encontrado' });
