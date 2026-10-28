@@ -126,7 +126,7 @@ export class ShaftTool extends BaseTool {
       }
       bore = { diameter, depth: boreDepth, from: 'start' };
     }
-    const positions = (fields.crossHolePositions?.value || '').split(/[;,\\s]+/).filter(Boolean);
+    const positions = (fields.crossHolePositions?.value || '').split(/[;,\s]+/).filter(Boolean);
     const holeDiameterText = fields.crossHoleDiameter?.value.trim() || '';
     if (Boolean(positions.length) !== Boolean(holeDiameterText)) {
       throw new Error('Informe as posições e o diâmetro dos furos transversais.');
