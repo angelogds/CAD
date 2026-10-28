@@ -86,3 +86,37 @@ test('gera PDF A3 usando as medidas salvas do eixo e sem serviço externo', asyn
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test('MLightCAD: gera prancha apenas quando retângulos DXF conferem com parâmetros', () => {
+  const spec = {
+    origin: { x: 10, y: 50 }, orientation: 'horizontal',
+    segments: [
+      { diameter: 127, length: 120 },
+      { diameter: 104, length: 100 },
+      { diameter: 96, length: 150 },
+    ],
+    bore: { diameter: 96, depth: 120, from: 'start' },
+    crossHoles: [{ distance: 30, diameter: 13 }, { distance: 60, diameter: 13 }, { distance: 90, diameter: 13 }],
+  };
+  const rectangles = [];
+  let x = spec.origin.x;
+  for (const { length, diameter } of spec.segments) {
+    rectangles.push({
+      type: 'polyline', visible: true, closed: true,
+      points: [
+        { x, y: 50-diameter/2 }, { x: x+length, y: 50-diameter/2 },
+        { x: x+length, y: 50+diameter/2 }, { x, y: 50+diameter/2 },
+      ],
+    });
+    x += length;
+  }
+  const sheet = sanitizeCadData({ objects: rectangles, shaftSheet: spec });
+  assert.ok(pickShaft(sheet), 'O desenho paramétrico correspondente deve ser reconhecido');
+  assert.equal(buildModel(pickShaft(sheet)).total, 370);
+  const changed = structuredClone(sheet);
+  changed.objects[1].points[1].x += 5;
+  assert.equal(pickShaft(changed), null, 'Mudança de geometria impede prancha desatualizada');
+  const withExtra = structuredClone(sheet);
+  withExtra.objects.push({ type: 'circle', x: 100, y: 50, radius: 10 });
+  assert.equal(pickShaft(withExtra), null, 'Geometria extra não pode ser ignorada');
+});
