@@ -161,6 +161,12 @@ function normalizeObject(obj = {}) {
             diameter: Math.abs(toFinite(segment.diameter)),
           })).filter((segment) => segment.length > 0 && segment.diameter > 0)
           : [],
+        bore: geometry.bore && typeof geometry.bore === 'object'
+          ? { diameter: toFinite(geometry.bore.diameter), depth: toFinite(geometry.bore.depth), from: 'start' }
+          : null,
+        crossHoles: Array.isArray(geometry.crossHoles)
+          ? geometry.crossHoles.map(hole => ({ distance: toFinite(hole.distance), diameter: toFinite(hole.diameter) }))
+          : [],
       },
     };
   }
