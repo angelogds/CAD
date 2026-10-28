@@ -17,18 +17,54 @@ function positive(value) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function same(a, b) {
+  return Number.isFinite(Number(a)) && Math.abs(Number(a) - Number(b)) <= 0.02;
+}
+
+function matchesMlightShaft(objects, spec) {
+  const segments = spec.segments || [];
+  if (!segments.length || segments.length > 12) return false;
+  const origin = spec.origin || {};
+  if (![origin.x, origin.y].every(v => Number.isFinite(Number(v)))) return false;
+  const polylines = objects.filter(o => o.type === 'polyline' && o.visible !== false);
+  if (polylines.length !== segments.length) return false;
+  // Geometria espelhada do DXF: validar cada retangulo real antes de emitir a prancha.
+  let x = Number(origin.x);
+  for (const segment of segments) {
+    const len = positive(segment.length), dia = positive(segment.diameter);
+    if (!len || !dia) return false;
+    const idx = polylines.findIndex(obj => {
+      if (!obj.closed || !Array.isArray(obj.points) || obj.points.length !== 4) return false;
+      const xs = obj.points.map(p => Number(p.x)), ys = obj.points.map(p => Number(p.y));
+      return xs.every(Number.isFinite) && ys.every(Number.isFinite) &&
+        same(Math.min(...xs), x) && same(Math.max(...xs), x + len) &&
+        same(Math.min(...ys), Number(origin.y) - dia/2) &&
+        same(Math.max(...ys), Number(origin.y) + dia/2);
+    });
+    if (idx < 0) return false;
+    polylines.splice(idx, 1);
+    x += len;
+  }
+  // Interromper o modo automatico se a edicao ganhou geometria diferente do eixo.
+  if (objects.some(o => o.visible !== false && !['polyline', 'line', 'centerline', 'dimension', 'text'].includes(o.type))) return false;
+  return true;
+}
+
 function pickShaft(cadData = {}) {
   const objects = Array.isArray(cadData.objects) ? cadData.objects : [];
   const shafts = objects.filter((obj) => obj && obj.type === 'shaft' && obj.visible !== false);
   // Nao interceptar desenhos compostos: manter o exportador CAD legado.
   const otherGeometry = objects.filter((obj) =>
     obj && obj.visible !== false && !['shaft', 'dimension', 'centerline', 'text'].includes(obj.type));
-  if (shafts.length !== 1 || otherGeometry.length) return null;
-  const geo = shafts[0].geometry || shafts[0];
-  const segments = (Array.isArray(geo.segments) ? geo.segments : [])
-    .map((s) => ({ length: positive(s.length), diameter: positive(s.diameter) }));
-  if (!segments.length || segments.some((s) => !s.length || !s.diameter)) return null;
-  return shafts[0];
+  if (shafts.length === 1 && !otherGeometry.length) {
+    const geo = shafts[0].geometry || shafts[0];
+    const segments = (Array.isArray(geo.segments) ? geo.segments : [])
+      .map((seg) => ({ length: positive(seg.length), diameter: positive(seg.diameter) }));
+    if (segments.length && segments.every(seg => seg.length && seg.diameter)) return shafts[0];
+  }
+  const spec = cadData.shaftSheet;
+  if (shafts.length || !spec || !Array.isArray(spec.segments)) return null;
+  return matchesMlightShaft(objects, spec) ? { type:'shaft', geometry: spec } : null;
 }
 
 function buildModel(shaft) {
@@ -61,7 +97,7 @@ function buildModel(shaft) {
       throw new Error(`Furo transversal ${index + 1}: reveja posicao, diametro e alojamento.`);
     }
     return { distance: position, diameter };
-  });
+  }).sort((a, b) => a.distance - b.distance);
   return { segments, total, bore, crossHoles, maxDiameter: Math.max(...segments.map(s => s.diameter)) };
 }
 
