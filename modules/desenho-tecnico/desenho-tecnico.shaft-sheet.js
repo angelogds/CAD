@@ -115,15 +115,33 @@ function pickShaft(cadData = {}) {
 }
 
 function isStandaloneShaft(cadData = {}, shaft = null) {
-  if(!shaft || shaft.source === 'inferred-2d') return false;
-  const objs=Array.isArray(cadData.objects)?cadData.objects:[];
+  if (!shaft || shaft.source === 'inferred-2d') return false;
+  const objs = Array.isArray(cadData.objects) ? cadData.objects : [];
   if(shaft.source==='mlightcad') {
-    return objs.every(o=>o.visible===false||['polyline','line','centerline','dimension','text'].includes(o.type)) &&
-      objs.filter(o=>getRectangle(o)).length===(shaft.geometry?.segments||[]).length &&
-      objs.every(o=>o.visible===false||o.type!=='line'||
-        (same(o.x,shaft.geometry.origin.x)&&same(o.y,shaft.geometry.origin.y)));
+    const g=shaft.geometry, x0=Number(g.origin.x), cy=Number(g.origin.y);
+    const total=g.segments.reduce((a,s)=>a+Number(s.length),0);
+    const first=g.segments[0],last=g.segments[g.segments.length-1];
+    const c=seg=>Math.min(1.5,seg.length*.045,seg.diameter*.025);
+    const breaks=[];
+    for(const side of [-1,1]) {
+      breaks.push([{x:x0,y:cy+side*(first.diameter/2-c(first))},
+                   {x:x0+c(first),y:cy+side*first.diameter/2}]);
+      breaks.push([{x:x0+total-c(last),y:cy+side*last.diameter/2},
+                   {x:x0+total,y:cy+side*(last.diameter/2-c(last))}]);
+    }
+    const matching=(a,b)=>same(a.x,b.x)&&same(a.y,b.y);
+    const validLine=o=>{
+      const p={x:o.x,y:o.y},q={x:o.x2,y:o.y2};
+      if(matching(p,{x:x0,y:cy})&&matching(q,{x:x0+total,y:cy}))return true;
+      return breaks.some(([u,v])=>(matching(p,u)&&matching(q,v))||
+        (matching(p,v)&&matching(q,u)));
+    };
+    return objs.filter(o=>o.visible!==false).every(o=>
+      ['polyline','dimension','text','line','centerline'].includes(o.type) &&
+      (!['line','centerline'].includes(o.type)||validLine(o))) &&
+      objs.filter(o=>getRectangle(o)).length===g.segments.length;
   }
-  return objs.every(o=>o.visible===false||['shaft','dimension','centerline','text'].includes(o.type));
+  return objs.every(o=>o.visible===false || ['shaft','dimension','centerline','text'].includes(o.type));
 }
 
 function buildModel(shaft) {
