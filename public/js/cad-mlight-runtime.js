@@ -184,6 +184,7 @@ async function boot() {
         console.error('[CAD][MLightCAD] save error', error);
         setSaveState('Falha ao salvar', 'error');
         setStatus(`Falha ao salvar: ${error.message || error}`, 'error');
+        return false;
       }
     };
 
@@ -201,6 +202,16 @@ async function boot() {
       }
     });
     document.getElementById('mlightSaveBtn')?.addEventListener('click', save);
+    document.getElementById('mlightStepExportBtn')?.addEventListener('click', async () => {
+      if (!(await save())) return;
+      try {
+        const { downloadStep } = await import('/js/cad-step-download.mjs?v=20261028-706-step-v1');
+        await downloadStep(drawingId, cadData.codigo || 'eixo');
+        setStatus('Arquivo STEP exportado.', 'ok');
+      } catch (error) {
+        setStatus('Falha no STEP: ' + (error.message || error), 'error');
+      }
+    });
     document.getElementById('mlightDxfExportBtn')?.addEventListener('click', () => app.downloadDxf(cadData.codigo || `CAD-${drawingId}`));
     document.getElementById('mlightZoomExtentsBtn')?.addEventListener('click', () => app.zoomExtents());
     document.getElementById('mlightFlangeBtn')?.addEventListener('click', () => runTool(() => fabrication.createFlange()));
