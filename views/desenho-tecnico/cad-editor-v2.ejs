@@ -235,18 +235,7 @@
         <label class="cad-field cad-orientation-field"><span>Orientação</span><select class="cad-select" name="orientation"><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>
         <table class="cad-shaft-segments"><thead><tr><th>Trecho</th><th>Comprimento (mm)</th><th>Diâmetro (mm)</th><th></th></tr></thead><tbody data-shaft-rows></tbody></table>
         <button class="cad-shaft-add" data-shaft-add type="button">+ Adicionar trecho</button>
-        <fieldset class="cad-shaft-drilling" style="margin-top:14px;padding:12px;border:1px solid #94a3b8;border-radius:8px;">
-          <legend style="padding:0 6px">Alojamento interno e furação transversal (opcional)</legend>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
-            <label class="cad-field"><span>Ø interno (mm)</span><input class="cad-input" name="boreDiameter" type="number" min="0.001" step="any" placeholder="Ex.: 96"></label>
-            <label class="cad-field"><span>Profundidade a partir da 1ª face (mm)</span><input class="cad-input" name="boreDepth" type="number" min="0.001" step="any" placeholder="Ex.: 120"></label>
-            <label class="cad-field"><span>Posições dos furos (mm)</span><input class="cad-input" name="crossHolePositions" type="text" placeholder="Ex.: 25; 60; 95" title="Distâncias desde a primeira face, separadas por ponto e vírgula"></label>
-            <label class="cad-field"><span>Ø dos furos passantes (mm)</span><input class="cad-input" name="crossHoleDiameter" type="number" min="0.001" step="any" placeholder="Ex.: 13"></label>
-          </div>
-          <p style="margin:7px 0 0;font-size:12px;color:#64748b">
-            Os furos são radiais, passantes de um lado ao outro da primeira seção. Não são criados na seção de 100 mm nem na de 150 mm; informe distâncias reais antes de emitir para fabricação.
-          </p>
-        </fieldset>
+        <p class="cad-shaft-hint" style="margin:12px 0 4px;color:#94a3b8;font-size:12px">Informe somente comprimentos e diâmetros. Chanfros de representação serão desenhados nas extremidades; detalhes de furação/alojamento podem ser acrescentados posteriormente à prancha.</p>
         <p class="cad-form-error" data-shaft-error role="alert"></p>
       </div>
       <div class="cad-modal-footer"><button class="cad-btn cad-btn-secondary" data-shaft-close type="button">Cancelar</button><button class="cad-btn cad-btn-primary" type="submit">Continuar e posicionar</button></div>
