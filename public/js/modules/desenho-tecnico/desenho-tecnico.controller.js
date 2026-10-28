@@ -881,6 +881,14 @@ export class DesenhoTecnicoController {
           label: this.state.metadata?.titulo || 'Eixo escalonado',
         });
       },
+      'export-step': async () => {
+        clearTimeout(this.autoSaveTimer);
+        await this.saveDrawing();
+        const { downloadStep } = await import('/js/cad-step-download.mjs?v=20261028-706-step-v1');
+        await downloadStep(window.CAD_INITIAL?.desenhoId, this.state.metadata?.codigo || 'eixo');
+        this.state.statusMessage = 'Arquivo STEP exportado.';
+        this.render();
+      },
       'save-metadata': async () => { await this.saveMetadata(); },
     };
 
