@@ -19,5 +19,5 @@ test('motor estável não depende mais de DOMContentLoaded para registrar botõe
 
 test('template força versão nova do bootstrap para evitar cache antigo',()=>{
   const view=read('views/desenho-tecnico/cad-editor-v2.ejs');
-  assert.match(view,/cad-engine-v2\.js\?v=20261028-eixo-v2/);
+  assert.match(view,/cad-engine-v2\.js\?v=20261028-706-v1/);
 });
