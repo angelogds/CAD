@@ -326,91 +326,152 @@ function drawSection(doc, model, x, y, scale) {
   }
 }
 
+/**
+ * Renderiza cilindros de revolucao com anéis, sombreamento metalico e chanfro
+ * ilustrativo. Toda projeção deriva das medidas, não de cubos desenhados à mão.
+ * Este é um render vetorial de uma geometria 3D, não um sólido STEP.
+ */
 function drawIsometric(doc, model, ox, oy) {
-  const unit = Math.min(1.9, 260 / model.total);
-  const vx = .89, vy = -.45, px = .45, py = .89;
-  let at = 0;
-  model.segments.forEach((seg, idx) => {
-    const x1 = ox + at * unit * vx, y1 = oy + at * unit * vy;
-    const x2 = x1 + seg.length * unit * vx, y2 = y1 + seg.length * unit * vy;
-    const radius = seg.diameter * .31;
-    const a = { x: x1 + radius * px, y: y1 + radius * py };
-    const b = { x: x1 - radius * px, y: y1 - radius * py };
-    const c = { x: x2 + radius * px, y: y2 + radius * py };
-    const d = { x: x2 - radius * px, y: y2 - radius * py };
-    doc.fillColor(idx % 2 ? '#cbd5e1' : '#d7dee7').strokeColor('#334155').lineWidth(1)
-      .moveTo(a.x, a.y).lineTo(c.x, c.y).lineTo(d.x, d.y).lineTo(b.x, b.y).closePath().fillAndStroke();
-    if (idx === 0) {
-      doc.save().translate(x1, y1).rotate(-26).ellipse(0, 0, radius * .34, radius).fillColor('#edf2f7').fillAndStroke('#edf2f7', '#334155');
-      if (model.bore) {
-        const inner = model.bore.diameter / seg.diameter;
-        doc.ellipse(0, 0, radius * .34 * inner, radius * inner).fillColor('#7b8794').fillAndStroke('#7b8794', '#334155');
-      }
-      doc.restore();
+  const unit = Math.min(1.58, 250 / model.total, 125 / model.maxDiameter);
+  const ax = { x: 0.87, y: -0.44 };
+  const per = { x: 0.45, y: 0.89 };
+  const project = (x, radius, theta) => ({
+    x: ox + unit * (x * ax.x + radius * (per.x * Math.cos(theta) + ax.x * 0.36 * Math.sin(theta))),
+    y: oy + unit * (x * ax.y + radius * (per.y * Math.cos(theta) + ax.y * 0.36 * Math.sin(theta))),
+  });
+  const ellipse = (x, radius, fill, stroke = '#425269') => {
+    doc.save().fillColor(fill).strokeColor(stroke).lineWidth(0.8);
+    for (let i = 0; i <= 64; i++) {
+      const pt = project(x, radius, i * Math.PI / 32);
+      if (i === 0) doc.moveTo(pt.x, pt.y); else doc.lineTo(pt.x, pt.y);
     }
-    doc.save().translate(x2, y2).rotate(-26).ellipse(0, 0, radius * .34, radius)
-      .strokeColor('#334155').lineWidth(.8).stroke().restore();
-    at += seg.length;
+    doc.closePath().fillAndStroke().restore();
+  };
+  const surface = (x1, x2, r1, r2) => {
+    const bands = 36;
+    for (let i = 0; i < bands; i++) {
+      const theta1 = -Math.PI + i * Math.PI / bands;
+      const theta2 = -Math.PI + (i + 1) * Math.PI / bands;
+      const p1 = project(x1, r1, theta1), p2 = project(x2, r2, theta1);
+      const p3 = project(x2, r2, theta2), p4 = project(x1, r1, theta2);
+      const t = (i + 0.5) / bands;
+      const highlight = Math.exp(-Math.pow((t - 0.56) / 0.17, 2));
+      const shade = 107 + Math.round(61 * Math.sin(t * Math.PI) + 55 * highlight);
+      const rgb = [Math.min(239, shade + 11), Math.min(245, shade + 17), Math.min(252, shade + 28)];
+      const hex = '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join('');
+      doc.save().fillColor(hex).moveTo(p1.x,p1.y).lineTo(p2.x,p2.y)
+        .lineTo(p3.x,p3.y).lineTo(p4.x,p4.y).closePath().fill().restore();
+    }
+  };
+  const outlineRing = (x, radius) => {
+    doc.save().lineWidth(1.15).strokeColor('#526072');
+    for (let i = 0; i <= 60; i++) {
+      const pt=project(x,radius,i*Math.PI/30);
+      if(i===0)doc.moveTo(pt.x,pt.y);else doc.lineTo(pt.x,pt.y);
+    }
+    doc.closePath().stroke().restore();
+  };
+  // Pintar da ultima seção para a primeira respeita os degraus de torneamento.
+  let cumulative = 0;
+  const starts = model.segments.map(seg => {
+    const at = cumulative; cumulative += seg.length; return at;
   });
-  model.crossHoles.forEach((h) => {
-    const cx = ox + h.distance * unit * vx + 8;
-    const cy = oy + h.distance * unit * vy + model.segments[0].diameter * .11;
-    doc.ellipse(cx, cy, h.diameter * .45, h.diameter * .25).fillColor('#6b7280').strokeColor('#1f2937').fillAndStroke();
-  });
+  for(let index=model.segments.length-1;index>=0;index--) {
+    const seg=model.segments[index], x0=starts[index], x1=x0+seg.length;
+    const radius=seg.diameter/2;
+    ellipse(x1,radius,'#9aa5b6','#5c677a');
+    const edgeBreak = index===0 ? Math.min(1.5,seg.length*.04,seg.diameter*.025) : 0;
+    surface(x0+edgeBreak,x1,radius,radius);
+    if(edgeBreak) {
+      surface(x0,x0+edgeBreak,radius-edgeBreak,radius);
+      outlineRing(x0+edgeBreak,radius);
+    }
+    const faceRadius=radius-edgeBreak;
+    ellipse(x0,faceRadius,'#d8e0e9','#465264');
+    if(index===0 && model.bore) {
+      // Abertura frontal real (geometria armazenada), sem presumir furos.
+      const inner=model.bore.diameter/2;
+      ellipse(x0,inner,'#263443','#283c4e');
+      ellipse(x0+Math.min(model.bore.depth*.12,9),inner*.95,'#4d6174','#57677a');
+      ellipse(x0,inner,'#2d3d50','#34495b');
+      outlineRing(x0,inner);
+    }
+    outlineRing(x0,faceRadius);
+  }
+  for(const hole of model.crossHoles) {
+    const seg=model.segments[0],outer=seg.diameter/2;
+    const c=project(hole.distance,outer,-Math.PI/2);
+    const r=Math.max(2.2,hole.diameter*unit*.48);
+    doc.save().fillColor('#263746').lineWidth(.8).strokeColor('#172534')
+      .ellipse(c.x,c.y,r*.77,r*.62).fillAndStroke().restore();
+    doc.save().lineWidth(.8).strokeColor('#dde7f0')
+      .ellipse(c.x-0.6,c.y-0.6,r*.69,r*.54).stroke().restore();
+  }
 }
-
 function frame(doc, desenho, model, cadData) {
   const W = doc.page.width, H = doc.page.height;
   const logo = path.join(__dirname, '..', '..', 'public', 'IMG', 'logopdf_campo_do_gado.png.png');
-  doc.rect(22, 22, W - 44, H - 44).lineWidth(1.3).stroke('#111827');
-  line(doc, 22, 70, W - 22, 70, 1);
-  text(doc, 'MANUTENÇÃO INDUSTRIAL — CAMPO DO GADO', 40, 36, 15, { bold: true });
-  text(doc, 'PRANCHA TÉCNICA PADRÃO | EIXO MECÂNICO', W - 395, 40, 10);
-  text(doc, 'VISTA A — LATERAL', 380, 362, 12, { bold: true, width: 250, align: 'center' });
-  text(doc, 'SEÇÃO A-A — LONGITUDINAL', 270, 658, 12, { bold: true, width: 320, align: 'center' });
-  text(doc, 'VISTA ISOMÉTRICA (ESQUEMÁTICA)', 835, 654, 10, { bold: true, width: 305, align: 'center' });
-  line(doc, 22, 691, W - 22, 691, 1);
-  line(doc, 22, H - 22, W - 22, H - 22, 1);
-  line(doc, 600, 691, 600, H - 22, .8);
-  line(doc, 810, 691, 810, H - 22, .8);
+  const ink='#1b2937';
+  doc.save().strokeColor(ink).lineWidth(1.15).rect(18,18,W-36,H-36).stroke().restore();
+  doc.save().strokeColor('#7f8b99').lineWidth(.65).rect(23,23,W-46,H-46).stroke().restore();
+  line(doc,23,92,W-23,92,.85);
+  // Cabeçalho isolado em três regiões; código jamais sobrepõe título.
+  line(doc,255,23,255,92,.65);
+  line(doc,910,23,910,92,.65);
+  text(doc,'CAMPO DO GADO',37,36,16,{bold:true,width:205});
+  text(doc,'MANUTENÇÃO INDUSTRIAL',37,61,9,{width:200});
+  text(doc,String(desenho.titulo||'EIXO ESCALONADO').toUpperCase().slice(0,58),
+    270,43,15,{bold:true,width:625,align:'center'});
+  text(doc,'PRANCHA MECÂNICA — PADRÃO CAMPO DO GADO',
+    285,69,8,{width:605,align:'center'});
+  text(doc,'CÓDIGO DO DESENHO',925,32,8,{width:220,align:'center'});
+  text(doc,String(desenho.codigo||'S/C'),924,50,17,{bold:true,width:225,align:'center'});
+  // Legendas nunca ficam em cima das cotas ou do carimbo.
+  text(doc,'VISTA A',425,365,12,{bold:true,width:210,align:'center'});
+  text(doc,'CORTE A-A',270,649,12,{bold:true,width:230,align:'center'});
+  text(doc,'VISTA ISOMÉTRICA',860,649,12,{bold:true,width:250,align:'center'});
+  line(doc,23,693,W-23,693,1);
+  line(doc,603,693,603,H-23,.65);
+  line(doc,816,693,816,H-23,.65);
+  text(doc,'INFORMAÇÕES DA PEÇA',36,702,9,{bold:true});
+  text(doc,'COMPRIMENTO TOTAL: '+number(model.total)+' mm',36,726,10,{bold:true,width:550});
+  text(doc,'TRECHOS: '+model.segments.map(seg=>'Ø'+number(seg.diameter)+' × '+number(seg.length)).join('  /  ').slice(0,81),
+    36,744,8,{width:548});
+  text(doc,model.bore
+    ? 'ALOJAMENTO: Ø'+number(model.bore.diameter)+' × '+number(model.bore.depth)+' (1ª face)'
+    : 'ALOJAMENTO: NÃO CADASTRADO',36,763,8,{width:548});
+  text(doc,model.crossHoles.length
+    ? 'FUROS TRANSVERSAIS: '+model.crossHoles.map(h=>'Ø'+number(h.diameter)+' a '+number(h.distance)+' mm').join(' | ').slice(0,62)
+    : 'FUROS TRANSVERSAIS: NÃO CADASTRADOS',36,778,8,{width:548});
+  text(doc,'ARESTAS/CHANFROS ILUSTRATIVOS: CONFIRMAR MEDIDA PARA USINAGEM.',
+    36,800,7,{width:548});
   try {
-    if (fs.existsSync(logo)) doc.image(logo, 625, 706, { fit: [155, 92], align: 'center', valign: 'center' });
-    else text(doc, 'CAMPO DO GADO', 625, 730, 15, { bold: true });
-  } catch (_error) {
-    text(doc, 'CAMPO DO GADO', 625, 730, 15, { bold: true });
-  }
-  const machine = String(desenho.equipamento_nome || cadData.equipamento_nome || desenho.titulo || 'NÃO INFORMADO');
-  const drafter = String(cadData.desenhista || desenho.criado_por_nome || 'NÃO INFORMADO');
-  text(doc, 'PEÇA: ' + String(desenho.titulo || 'Eixo escalonado').slice(0, 35), 824, 705, 11, { bold: true, width: 338 });
-  text(doc, 'EQUIPAMENTO: ' + machine.slice(0, 42), 824, 728, 9, { width: 340 });
-  text(doc, 'CÓDIGO: ' + String(desenho.codigo || '-'), 824, 747, 9);
-  text(doc, 'DESENHISTA: ' + drafter.slice(0, 45), 824, 764, 9);
-  text(doc, 'REVISÃO: ' + String(desenho.revisao ?? 0) + ' | DATA: ' + new Date().toLocaleDateString('pt-BR'), 824, 784, 8);
-  text(doc, 'UNIDADE: mm | VISTAS: SEM ESCALA DE FABRICAÇÃO', 824, 800, 7);
-  text(doc, 'COMPRIMENTO TOTAL: ' + number(model.total) + ' mm', 40, 705, 11, { bold: true });
-  text(doc, 'TRECHOS: ' + model.segments.map(s => 'Ø' + number(s.diameter) + ' × ' + number(s.length)).join(' / ').slice(0, 81), 40, 730, 9, { width: 545 });
-  text(doc, model.bore
-    ? 'ALOJAMENTO: Ø' + number(model.bore.diameter) + ' × ' + number(model.bore.depth) + ' (a partir da primeira face)'
-    : 'ALOJAMENTO: NÃO INFORMADO - CONFIRMAR ANTES DE USINAR', 40, 749, 9, { width: 545 });
-  const holes = model.crossHoles.length;
-  text(doc, holes
-    ? holes + ' FURO(S) PASSANTE(S) TRANSVERSAL(IS): ' + model.crossHoles.map(h => 'Ø' + number(h.diameter) + ' @ ' + number(h.distance)).join('; ').slice(0, 61)
-    : 'FUROS TRANSVERSAIS: NÃO CADASTRADOS (CONFIRMAR)', 40, 766, 8, { width: 540 });
-  text(doc, 'POSIÇÕES MEDIDAS A PARTIR DA PRIMEIRA FACE. CONFERIR TOLERÂNCIAS ANTES DE USINAR.', 40, 791, 8, { width: 545 });
+    if(fs.existsSync(logo))doc.image(logo,625,705,{fit:[166,105],align:'center',valign:'center'});
+    else text(doc,'CAMPO DO GADO',631,741,15,{bold:true});
+  }catch(_e){text(doc,'CAMPO DO GADO',631,741,15,{bold:true});}
+  const machine=String(desenho.equipamento_nome||cadData.equipamento_nome||'NÃO INFORMADO');
+  const drafter=String(cadData.desenhista||desenho.criado_por_nome||'NÃO INFORMADO');
+  text(doc,'EQUIPAMENTO',829,702,8,{bold:true});
+  text(doc,machine.slice(0,41),829,716,9,{width:330});
+  text(doc,'DESENHISTA',829,736,8,{bold:true});
+  text(doc,drafter.slice(0,45),829,749,9,{width:330});
+  line(doc,820,769,W-25,769,.4);
+  text(doc,'REV. '+String(desenho.revisao??0)+'   |   '+new Date().toLocaleDateString('pt-BR')+'   |   mm',
+    829,775,9,{width:322});
+  text(doc,'FOLHA A3  |  REPRESENTAÇÃO SEM ESCALA',829,797,7,{width:330});
 }
-
 function renderShaftSheetPage(doc, desenho, cadData, shaft) {
   const model=buildModel(shaft);
   const scaleA=Math.min(3.5,760/model.total,168/model.maxDiameter);
   const scaleSection=Math.min(3,620/model.total,160/model.maxDiameter);
   drawLateral(doc,model,116,250,scaleA);
   drawSection(doc,model,103,535,scaleSection);
-  drawIsometric(doc,model,855,570);
+  drawIsometric(doc,model,855,556);
   frame(doc,desenho,model,cadData);
   if(shaft.source==='inferred-2d') {
     doc.save();
     doc.fillColor('#9a3412').font(BOLD).fontSize(9)
-      .text('PRELIMINAR - PERFIL INFERIDO DO 2D: CONFERIR DADOS INTERNOS E FUROS',35,672,
+      .text('PERFIL INFERIDO DO 2D - CONFERIR FURAÇÃO/ALOJAMENTO',35,672,
         {width:565,lineBreak:false});
     doc.restore();
   }
