@@ -11,7 +11,6 @@ const PDFDocument = require('pdfkit');
 
 const FONT = 'Helvetica';
 const BOLD = 'Helvetica-Bold';
-const MM = 72 / 25.4;
 
 function positive(value) {
   const n = Number(value);
@@ -165,6 +164,17 @@ function hatchRect(doc, x, y, w, h) {
   doc.restore();
 }
 
+function outlineWithHoles(doc, x, y, width, holes, scale) {
+  let cursor = x;
+  for (const hole of holes) {
+    const left = x + (hole.distance - hole.diameter / 2) * scale;
+    const right = x + (hole.distance + hole.diameter / 2) * scale;
+    if (left > cursor) line(doc, cursor, y, left, y, 1.1);
+    cursor = Math.max(cursor, right);
+  }
+  if (cursor < x + width) line(doc, cursor, y, x + width, y, 1.1);
+}
+
 function drawSection(doc, model, x, y, scale) {
   const { segments, bore, crossHoles } = model;
   let start = x;
@@ -191,10 +201,27 @@ function drawSection(doc, model, x, y, scale) {
       line(doc, start + bore.depth * scale, bt, start + bore.depth * scale, bb, .9);
     } else {
       hatchRect(doc, start, top, width, seg.diameter * scale);
+      if (idx === 0) crossHoles.forEach((hole) => {
+        const hx = x + (hole.distance - hole.diameter / 2) * scale;
+        const hw = hole.diameter * scale;
+        doc.fillColor('white').rect(hx, top, hw, bottom - top).fill();
+        line(doc, hx, top, hx, bottom, .8);
+        line(doc, hx + hw, top, hx + hw, bottom, .8);
+      });
     }
-    line(doc, start, top, start + width, top, 1.1);
-    line(doc, start, bottom, start + width, bottom, 1.1);
-    line(doc, start, top, start, bottom, .8);
+    if (idx === 0 && crossHoles.length) {
+      outlineWithHoles(doc, start, top, width, crossHoles, scale);
+      outlineWithHoles(doc, start, bottom, width, crossHoles, scale);
+    } else {
+      line(doc, start, top, start + width, top, 1.1);
+      line(doc, start, bottom, start + width, bottom, 1.1);
+    }
+    if (idx === 0 && bore) {
+      line(doc, start, top, start, y - bore.diameter * scale / 2, .8);
+      line(doc, start, y + bore.diameter * scale / 2, start, bottom, .8);
+    } else {
+      line(doc, start, top, start, bottom, .8);
+    }
     line(doc, start + width, top, start + width, bottom, 1.05);
     start += width;
   });
@@ -286,8 +313,10 @@ function generateShaftPdf(desenho, cadData, shaft, { pdfDir }) {
   const out = fs.createWriteStream(fullPath);
   doc.pipe(out);
   // Faixas separadas evitam que as vistas compartilhem furos ou linhas de corte.
-  drawLateral(doc, model, 116, 238, 1.55);
-  drawSection(doc, model, 103, 535, 1.38);
+  const scaleA = Math.min(1.55, 760 / model.total, 190 / model.maxDiameter);
+  const scaleSection = Math.min(1.38, 620 / model.total, 190 / model.maxDiameter);
+  drawLateral(doc, model, 116, 238, scaleA);
+  drawSection(doc, model, 103, 535, scaleSection);
   drawIsometric(doc, model, 855, 570);
   frame(doc, desenho, model, cadData);
   doc.end();
