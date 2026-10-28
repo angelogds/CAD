@@ -84,7 +84,7 @@ test('prévia 3D está presente nos dois editores sem depender de CDN',()=>{
   assert.match(mlight,/payload\.shaftSheet = cadData\.shaftSheet/);
   assert.match(viewer,/new THREE\.LatheGeometry/);
   assert.match(viewer,/new OrbitControls/);
-  assert.match(viewer,/Fu/);
+  assert.match(viewer,/não subtrai furações transversais/i);
   assert.match(controller,/cadService\.sanitizeCadData\(supplied\)/);
   assert.doesNotMatch(viewer,/https?:\/\/(cdn|unpkg|jsdelivr)/);
 });
