@@ -230,11 +230,20 @@ function renderCad3d(req, res) {
   const desenho = service.getById(req.params.id);
   if (!desenho || desenho.tipo_origem !== 'cad') return res.status(404).json({ ok: false, error: 'CAD não encontrado' });
 
-  const cadPayload = desenho.cad_data || {};
-  if (!service.isCad3dCompatible(cadPayload)) {
-    return res.status(422).json({ ok: false, error: 'Desenho CAD sem geometria compatível com extrusão simples.' });
+  // Aceita preview do desenho ainda não salvo. Continua autenticado, protegido
+  // por RBAC e passa pelo mesmo sanitizador de CAD usado no salvamento.
+  const supplied = req.body?.cad_json || req.body?.cadData || req.body;
+  const hasPayload = supplied && typeof supplied === 'object'
+    && (Array.isArray(supplied.objects) || supplied.shaftSheet);
+  const cadPayload = hasPayload ? cadService.sanitizeCadData(supplied) : desenho.cad_data || {};
+  try {
+    if (!service.isCad3dCompatible(cadPayload)) {
+      return res.status(422).json({ ok: false, error: 'Crie um eixo por diâmetros e comprimentos para visualizar em 3D.' });
+    }
+    return res.json({ ok: true, preview3d: service.build3dFromCad(cadPayload) });
+  } catch (err) {
+    return res.status(422).json({ ok: false, error: err.message || 'Geometria 3D inválida.' });
   }
-  return res.json({ ok: true, preview3d: service.build3dFromCad(cadPayload) });
 }
 
 async function pythonStatus(_req, res) {
