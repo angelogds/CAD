@@ -145,6 +145,7 @@ async function boot() {
         const result = await action();
         if (result !== false && result?.count !== 0) {
           if (result?.manufacturing) cadData.manufacturing = result.manufacturing;
+          if (result?.shaftSheet) cadData.shaftSheet = result.shaftSheet;
           markDirty();
         }
         return result;
