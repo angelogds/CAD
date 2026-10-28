@@ -39,6 +39,7 @@ function createShell(initial) {
         <button id="mlightDxfImportBtn" class="cad-mlight-action" type="button">⇧ <span>Abrir DXF</span></button>
         <button id="mlightDxfExportBtn" class="cad-mlight-action" type="button">⇩ <span>Exportar DXF</span></button>
         <button id="mlightShaft3dBtn" class="cad-mlight-action" type="button" title="Visualizar eixo paramétrico em 3D">3D eixo</button>
+        <button id="mlightStepExportBtn" class="cad-mlight-action" type="button">Exportar STEP</button>
         <a class="cad-mlight-action" href="/desenho-tecnico/cad/${drawingId}/pdf">PDF</a>
         <span id="mlightSaveState" class="cad-mlight-save-state" data-state="saved">Tudo salvo</span>
         <button id="mlightSaveBtn" class="cad-mlight-action primary" type="button">Salvar desenho</button>
