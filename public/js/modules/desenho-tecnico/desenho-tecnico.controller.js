@@ -873,6 +873,14 @@ export class DesenhoTecnicoController {
         if (!pdfUrl) throw new Error('Rota de exportação do PDF não encontrada');
         window.location.assign(pdfUrl);
       },
+      'view-3d-shaft': async () => {
+        const { openShaft3D } = await import('/js/cad-shaft-3d.mjs?v=20261028-706-v1');
+        await openShaft3D({
+          cadData: this.serialize(),
+          drawingId: window.CAD_INITIAL?.desenhoId,
+          label: this.state.metadata?.titulo || 'Eixo escalonado',
+        });
+      },
       'save-metadata': async () => { await this.saveMetadata(); },
     };
 
