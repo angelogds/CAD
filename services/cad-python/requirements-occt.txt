@@ -1,0 +1,4 @@
+# OCP OpenCascade kernel (STEP solid) — optional rendering extras intentionally excluded
+cadquery-ocp==7.9.3.1
+# Dependência nativa exigida pelo OCP; instalar sem matplotlib e extras
+vtk==9.5.2
