@@ -217,3 +217,42 @@ test('Gerador de prancha identifica nomes corretos sem apresentar isométrica co
   assert.match(src,/Quebra de aresta|Quebras de aresta|CHANFROS ILUSTRATIVOS/);
   assert.match(src,/function drawIsometric/);
 });
+
+test('CAD0009: modelo de três degraus gera prancha sem tampas nos ombros internos', async () => {
+  const cad = sanitizeCadData({ objects: [{
+    id: 'eixo-cad0009', type: 'shaft',
+    geometry: {
+      origin: {x:0,y:0}, orientation: 'horizontal',
+      segments: [
+        {diameter:25,length:40},
+        {diameter:40,length:60},
+        {diameter:25,length:40},
+      ],
+      bore: null, crossHoles: [],
+    },
+  }] });
+  const model = buildModel(pickShaft(cad));
+  assert.equal(model.total,140);
+  assert.deepEqual(model.segments.map(s=>s.diameter),[25,40,25]);
+  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'cg-cad0009-'));
+  try{
+    const result=await generateShaftPdf({
+      codigo:'CAD0009',revisao:0,titulo:'EIXO ESCALONADO',
+      equipamento_nome:'NÃO INFORMADO',
+    },cad,pickShaft(cad),{pdfDir:tmp});
+    const bytes=fs.readFileSync(result.fullPath);
+    assert.equal(bytes.subarray(0,4).toString('ascii'),'%PDF');
+    assert.ok(bytes.byteLength>3000);
+  }finally{fs.rmSync(tmp,{recursive:true,force:true});}
+});
+
+test('isométrica da prancha usa anéis de ombro e não desenha discos completos para cada trecho', () => {
+  const src=fs.readFileSync(path.join(__dirname,
+    '../modules/desenho-tecnico/desenho-tecnico.shaft-sheet.js'),'utf8');
+  const iso=src.slice(src.indexOf('function drawIsometric('),src.indexOf('function frame('));
+  assert.match(iso,/const shoulder = \(x, rOuter, rInner\)/);
+  assert.match(iso,/if\(r>frontRadius\)shoulder\(x0,r,frontRadius\)/);
+  assert.doesNotMatch(iso,/ellipse\(x1,radius/);
+  assert.match(src,/drawLateral\(doc,model,116,275,scaleA\)/);
+  assert.match(src,/Cotas com lideres/);
+});

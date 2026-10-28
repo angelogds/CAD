@@ -265,9 +265,14 @@ function drawLateral(doc, model, x, y, scale) {
   dimVertical(doc, y - first.diameter * scale / 2, y + first.diameter * scale / 2,
     x - 34, x - 3, 'Ø' + number(first.diameter));
   position = x + first.length * scale;
+  // Cotas com lideres, e nao textos soltos por cima da vista.
   segments.slice(1).forEach((seg) => {
-    const mid = position + (seg.length * scale) / 2 + 3;
-    text(doc, 'Ø' + number(seg.diameter), mid, y - seg.diameter * scale / 2 - 23, 10);
+    const mid = position + seg.length * scale * .57;
+    const top = y - seg.diameter * scale / 2;
+    const elbowX = mid + 13, elbowY = top - 15;
+    line(doc, mid, top, elbowX, elbowY, .7, '#334155');
+    doc.save().fillColor('#334155').circle(mid, top, 1.65).fill().restore();
+    text(doc, 'Ø' + number(seg.diameter), elbowX + 3, elbowY - 8, 9, {width:62});
     position += seg.length * scale;
   });
 }
@@ -366,81 +371,122 @@ function drawSection(doc, model, x, y, scale) {
  * ilustrativo. Toda projeção deriva das medidas, não de cubos desenhados à mão.
  * Este é um render vetorial de uma geometria 3D, não um sólido STEP.
  */
+/**
+ * Projecao ortografica de um SOLIDO DE REVOLUCAO.
+ *
+ * As faces circulares internas dos trechos NAO sao tampas: a unica face
+ * frontal macica fica no inicio do eixo. Nos degraus de aumento de raio
+ * pintamos apenas o ANEL exposto, nunca um disco inteiro. Isso evita
+ * a aparencia de arruelas empilhadas no PDF (regressao CAD0009).
+ *
+ * Trata-se da vista isometrica vetorial da prancha, nao de STEP/BREP.
+ */
 function drawIsometric(doc, model, ox, oy) {
-  const unit = Math.min(1.58, 250 / model.total, 125 / model.maxDiameter);
-  const ax = { x: 0.87, y: -0.44 };
-  const per = { x: 0.45, y: 0.89 };
-  const project = (x, radius, theta) => ({
-    x: ox + unit * (x * ax.x + radius * (per.x * Math.cos(theta) + ax.x * 0.36 * Math.sin(theta))),
-    y: oy + unit * (x * ax.y + radius * (per.y * Math.cos(theta) + ax.y * 0.36 * Math.sin(theta))),
+  const unit = Math.min(1.58, 245 / model.total, 122 / model.maxDiameter);
+  // A = eixo inclinado para direita/cima. B e C projetam a secao circular.
+  const A = { x: 0.87, y: -0.44 };
+  const B = { x: 0.45, y: 0.89 };
+  const C = { x: 0.26, y: -0.13 };
+  const point = (x, r, theta) => ({
+    x: ox + unit * (x * A.x + r * (B.x * Math.cos(theta) + C.x * Math.sin(theta))),
+    y: oy + unit * (x * A.y + r * (B.y * Math.cos(theta) + C.y * Math.sin(theta))),
   });
-  const ellipse = (x, radius, fill, stroke = '#425269') => {
-    doc.save().fillColor(fill).strokeColor(stroke).lineWidth(0.8);
-    for (let i = 0; i <= 64; i++) {
-      const pt = project(x, radius, i * Math.PI / 32);
-      if (i === 0) doc.moveTo(pt.x, pt.y); else doc.lineTo(pt.x, pt.y);
+  const ellipsePath = (x, r) => {
+    for(let i=0;i<=72;i++){
+      const p=point(x,r,2*Math.PI*i/72);
+      if(i===0)doc.moveTo(p.x,p.y);else doc.lineTo(p.x,p.y);
     }
-    doc.closePath().fillAndStroke().restore();
+    doc.closePath();
   };
-  const surface = (x1, x2, r1, r2) => {
-    const bands = 36;
-    for (let i = 0; i < bands; i++) {
-      const theta1 = -Math.PI + i * Math.PI / bands;
-      const theta2 = -Math.PI + (i + 1) * Math.PI / bands;
-      const p1 = project(x1, r1, theta1), p2 = project(x2, r2, theta1);
-      const p3 = project(x2, r2, theta2), p4 = project(x1, r1, theta2);
-      const t = (i + 0.5) / bands;
-      const highlight = Math.exp(-Math.pow((t - 0.56) / 0.17, 2));
-      const shade = 107 + Math.round(61 * Math.sin(t * Math.PI) + 55 * highlight);
-      const rgb = [Math.min(239, shade + 11), Math.min(245, shade + 17), Math.min(252, shade + 28)];
-      const hex = '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join('');
-      doc.save().fillColor(hex).moveTo(p1.x,p1.y).lineTo(p2.x,p2.y)
-        .lineTo(p3.x,p3.y).lineTo(p4.x,p4.y).closePath().fill().restore();
-    }
+  const rgb = (r,g,b) => '#'+[r,g,b].map(n=>Math.max(0,Math.min(255,Math.round(n))).toString(16).padStart(2,'0')).join('');
+  const strokeEllipse = (x,r,color='#45556a',width=.85) => {
+    doc.save().strokeColor(color).lineWidth(width);
+    ellipsePath(x,r);doc.stroke().restore();
   };
-  const outlineRing = (x, radius) => {
-    doc.save().lineWidth(1.15).strokeColor('#526072');
-    for (let i = 0; i <= 60; i++) {
-      const pt=project(x,radius,i*Math.PI/30);
-      if(i===0)doc.moveTo(pt.x,pt.y);else doc.lineTo(pt.x,pt.y);
-    }
-    doc.closePath().stroke().restore();
+  const solidFace = (x,r,fill='#c3cbd5') => {
+    doc.save().fillColor(fill).strokeColor('#48566a').lineWidth(.9);
+    ellipsePath(x,r);doc.fillAndStroke().restore();
   };
-  // Pintar da ultima seção para a primeira respeita os degraus de torneamento.
-  let cumulative = 0;
-  const starts = model.segments.map(seg => {
-    const at = cumulative; cumulative += seg.length; return at;
-  });
-  for(let index=model.segments.length-1;index>=0;index--) {
-    const seg=model.segments[index], x0=starts[index], x1=x0+seg.length;
-    const radius=seg.diameter/2;
-    ellipse(x1,radius,'#9aa5b6','#5c677a');
-    const edgeBreak = index===0 ? Math.min(1.5,seg.length*.04,seg.diameter*.025) : 0;
-    surface(x0+edgeBreak,x1,radius,radius);
-    if(edgeBreak) {
-      surface(x0,x0+edgeBreak,radius-edgeBreak,radius);
-      outlineRing(x0+edgeBreak,radius);
+  // Bandas laterais (metade posterior + metade visivel), sombreamento aço.
+  const side = (x0,x1,r0,r1) => {
+    const steps=48;
+    for(const front of [false,true]) {
+      const base=front?0:-Math.PI;
+      for(let i=0;i<steps;i++){
+        const t=(i+.5)/steps;
+        const t0=base+Math.PI*i/steps,t1=base+Math.PI*(i+1)/steps;
+        const ps=[point(x0,r0,t0),point(x1,r1,t0),point(x1,r1,t1),point(x0,r0,t1)];
+        const specular=Math.exp(-Math.pow((t-.42)/.15,2));
+        const value=(front?119:75)+(front?68:24)*Math.sin(t*Math.PI)+54*specular;
+        doc.save().fillColor(rgb(value,value+8,value+18))
+          .moveTo(ps[0].x,ps[0].y).lineTo(ps[1].x,ps[1].y)
+          .lineTo(ps[2].x,ps[2].y).lineTo(ps[3].x,ps[3].y)
+          .closePath().fill().restore();
+      }
     }
-    const faceRadius=radius-edgeBreak;
-    ellipse(x0,faceRadius,'#d8e0e9','#465264');
-    if(index===0 && model.bore) {
-      // Abertura frontal real (geometria armazenada), sem presumir furos.
-      const inner=model.bore.diameter/2;
-      ellipse(x0,inner,'#263443','#283c4e');
-      ellipse(x0+Math.min(model.bore.depth*.12,9),inner*.95,'#4d6174','#57677a');
-      ellipse(x0,inner,'#2d3d50','#34495b');
-      outlineRing(x0,inner);
+    doc.save().strokeColor('#465568').lineWidth(.85);
+    for(const theta of [0,Math.PI]){
+      const p=point(x0,r0,theta),q=point(x1,r1,theta);
+      doc.moveTo(p.x,p.y).lineTo(q.x,q.y);
     }
-    outlineRing(x0,faceRadius);
+    doc.stroke().restore();
+  };
+  // Anel de ombro com o centro vazado no desenho (nao é furo real no eixo).
+  // O cilindro de menor diametro da etapa anterior cobre o centro.
+  const shoulder = (x, rOuter, rInner) => {
+    if(rOuter<=rInner+1e-8)return;
+    const steps=72;
+    for(let i=0;i<steps;i++){
+      const t0=2*Math.PI*i/steps,t1=2*Math.PI*(i+1)/steps;
+      const a=point(x,rOuter,t0),b=point(x,rOuter,t1);
+      const c=point(x,rInner,t1),d=point(x,rInner,t0);
+      const v=160+45*Math.cos((i+.5)*2*Math.PI/steps);
+      doc.save().fillColor(rgb(v,v+8,v+16))
+        .moveTo(a.x,a.y).lineTo(b.x,b.y).lineTo(c.x,c.y).lineTo(d.x,d.y)
+        .closePath().fill().restore();
+    }
+    strokeEllipse(x,rOuter,'#465366',1.0);
+    strokeEllipse(x,rInner,'#68788c',.7);
+  };
+  const starts=[];
+  let x=0;
+  for(const seg of model.segments){starts.push(x);x+=seg.length;}
+  const last=model.segments[model.segments.length-1];
+  const lastBevel=Math.min(1.5,last.length*.045,last.diameter*.025);
+  // Tampa distante: fica atras da superficie do ultimo trecho.
+  solidFace(model.total,last.diameter/2-lastBevel,'#8c9bac');
+  for(let i=model.segments.length-1;i>=0;i--){
+    const seg=model.segments[i];
+    const x0=starts[i],x1=x0+seg.length,r=seg.diameter/2;
+    const initialBevel=i===0?Math.min(1.5,seg.length*.045,seg.diameter*.025):0;
+    const terminalBevel=i===model.segments.length-1?lastBevel:0;
+    if(terminalBevel)side(x1-terminalBevel,x1,r,r-terminalBevel);
+    side(x0+initialBevel,x1-terminalBevel,r,r);
+    if(initialBevel)side(x0,x0+initialBevel,r-initialBevel,r);
+    if(i>0){
+      const frontRadius=model.segments[i-1].diameter/2;
+      if(r>frontRadius)shoulder(x0,r,frontRadius);
+    }
   }
+  const first=model.segments[0];
+  const frontBevel=Math.min(1.5,first.length*.045,first.diameter*.025);
+  const frontR=first.diameter/2-frontBevel;
+  solidFace(0,frontR,'#d4dce6');
+  if(model.bore){
+    // Boca axial, somente quando registrada; nao inventar alojamento.
+    const inner=model.bore.diameter/2;
+    solidFace(0,inner,'#2d3d4d');
+    const depth=Math.min(9,model.bore.depth*.12);
+    strokeEllipse(depth,inner*.96,'#75879a',.65);
+    strokeEllipse(0,inner,'#344357',1);
+  }
+  // Furos representados esquematicamente nesta projeção PDF: não são BREP.
   for(const hole of model.crossHoles) {
-    const seg=model.segments[0],outer=seg.diameter/2;
-    const c=project(hole.distance,outer,-Math.PI/2);
-    const r=Math.max(2.2,hole.diameter*unit*.48);
-    doc.save().fillColor('#263746').lineWidth(.8).strokeColor('#172534')
-      .ellipse(c.x,c.y,r*.77,r*.62).fillAndStroke().restore();
-    doc.save().lineWidth(.8).strokeColor('#dde7f0')
-      .ellipse(c.x-0.6,c.y-0.6,r*.69,r*.54).stroke().restore();
+    const radius=model.segments[0].diameter/2;
+    const c=point(hole.distance,radius,Math.PI/2);
+    const size=Math.max(1.8,hole.diameter*unit*.40);
+    doc.save().fillColor('#263748').strokeColor('#233245').lineWidth(.8)
+      .ellipse(c.x,c.y,size*.78,size*.56).fillAndStroke().restore();
   }
 }
 function frame(doc, desenho, model, cadData) {
@@ -462,9 +508,9 @@ function frame(doc, desenho, model, cadData) {
   text(doc,'CÓDIGO DO DESENHO',925,32,8,{width:220,align:'center'});
   text(doc,String(desenho.codigo||'S/C'),924,50,17,{bold:true,width:225,align:'center'});
   // Legendas nunca ficam em cima das cotas ou do carimbo.
-  text(doc,'CORTE A',425,365,12,{bold:true,width:210,align:'center'});
-  text(doc,'CORTE A-A',270,649,12,{bold:true,width:230,align:'center'});
-  text(doc,'VISTA ISOMÉTRICA',860,649,12,{bold:true,width:250,align:'center'});
+  text(doc,'CORTE A',254,382,12,{bold:true,width:210,align:'center'});
+  text(doc,'CORTE A-A',240,649,12,{bold:true,width:230,align:'center'});
+  text(doc,'VISTA ISOMÉTRICA',865,649,12,{bold:true,width:250,align:'center'});
   line(doc,23,693,W-23,693,1);
   line(doc,603,693,603,H-23,.65);
   line(doc,816,693,816,H-23,.65);
@@ -499,7 +545,7 @@ function renderShaftSheetPage(doc, desenho, cadData, shaft) {
   const model=buildModel(shaft);
   const scaleA=Math.min(3.5,760/model.total,168/model.maxDiameter);
   const scaleSection=Math.min(3,620/model.total,160/model.maxDiameter);
-  drawLateral(doc,model,116,250,scaleA);
+  drawLateral(doc,model,116,275,scaleA);
   drawSection(doc,model,103,535,scaleSection);
   drawIsometric(doc,model,855,556);
   frame(doc,desenho,model,cadData);
