@@ -1,0 +1,89 @@
+<svg id="pr-circuit-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 790" role="img" aria-labelledby="pr-circuit-title pr-circuit-desc">
+<title id="pr-circuit-title">Esquema técnico conceitual das três prensas</title>
+<desc id="pr-circuit-desc">Material sai da percoladora e entra na tolva com duas roscas homogeneizadoras opostas. Três guilhotinas pneumáticas e três roscas alimentam FAST, P50 e P46 por cima. Óleo sai por baixo para bombas individuais e volta ao tacho da percoladora. Torta seca segue por rosca comum e uma rosca tubular inclinada junto da P46 retorna material mal prensado à tolva.</desc>
+<defs>
+ <marker id="pr-arrow" markerWidth="10" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5 0 9Z" fill="#876a51"/></marker>
+ <marker id="pr-oil-arrow" markerWidth="10" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5 0 9Z" fill="#c48b39"/></marker>
+ <pattern id="pr-helix" width="27" height="30" patternUnits="userSpaceOnUse"><path d="M1 4L14 26 27 4" stroke="#697887" stroke-width="4" fill="none"/></pattern>
+ <linearGradient id="pr-metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e9edf2"/><stop offset=".65" stop-color="#c3cbd5"/><stop offset="1" stop-color="#aab5c0"/></linearGradient>
+</defs>
+<rect width="1280" height="790" fill="#f9fafb"/>
+<g font-family="Arial,sans-serif" fill="#303944" font-size="15">
+ <text x="36" y="36" font-weight="bold" font-size="21">CIRCUITO DAS PRENSAS · FLUXO DO MATERIAL</text>
+ <text x="36" y="60" fill="#67717e" font-size="13">Esquema ilustrativo sem escala | nenhuma linha representa comando ou retorno físico validado</text>
+ <g id="pr-percoladora" data-prensa-select="PERCOLADORA" tabindex="0" role="button" aria-label="Selecionar percoladora">
+  <rect x="35" y="132" width="157" height="95" rx="12" fill="url(#pr-metal)" stroke="#6a7686" stroke-width="3"/>
+  <path d="M47 169H181M47 190H181" stroke="#748596" stroke-width="4" stroke-dasharray="11 8"/>
+  <text x="39" y="116" font-weight="bold">PERCOLADORA</text><text x="43" y="247" font-size="12">Saída do material</text>
+ </g>
+ <path d="M192 184H287" stroke="#967557" stroke-width="15" fill="none" marker-end="url(#pr-arrow)"/>
+ <g id="pr-tolva" data-prensa-select="TOLVA" tabindex="0" role="button" aria-label="Selecionar tolva das prensas">
+  <path d="M276 109H988L964 287H300Z" fill="#d9dee5" fill-opacity=".38" stroke="#606b7a" stroke-width="5"/>
+  <rect x="297" y="139" width="666" height="44" rx="14" fill="url(#pr-metal)" stroke="#707b89" stroke-width="3"/>
+  <rect x="303" y="144" width="654" height="34" fill="url(#pr-helix)"/>
+  <rect x="297" y="212" width="666" height="44" rx="14" fill="url(#pr-metal)" stroke="#707b89" stroke-width="3"/>
+  <rect x="303" y="216" width="654" height="36" fill="url(#pr-helix)"/>
+  <path d="M336 198H920" stroke="#728192" stroke-width="2" stroke-dasharray="8 7"/>
+  <text x="460" y="96" font-size="19" font-weight="bold">TOLVA DAS PRENSAS</text>
+  <text x="440" y="133" font-size="12">ROSCA A · SENTIDO →</text><text x="430" y="206" font-size="12">ROSCA B · SENTIDO ←</text>
+  <path d="M415 162H564" stroke="#b91e35" stroke-width="3" marker-end="url(#pr-arrow)"/>
+  <path d="M875 234H724" stroke="#b91e35" stroke-width="3" marker-end="url(#pr-arrow)"/>
+  <text x="490" y="275" font-size="12">Mistura / homogeneização interna</text>
+ </g>
+ <g stroke-linecap="round" stroke-linejoin="round">
+ <% ['FAST','P50','P46'].forEach((id,index)=>{const x=[371,632,894][index]; %>
+ <g data-prensa-select="<%= id %>" tabindex="0" role="button" aria-label="Selecionar prensa <%= id %>">
+  <path d="M<%= x %> 286V326" stroke="#8895a2" stroke-width="16"/>
+  <rect x="<%= x-30 %>" y="309" width="60" height="31" rx="5" fill="#677483" stroke="#364453" stroke-width="2"/>
+  <rect x="<%= x-26 %>" y="314" width="52" height="7" rx="3" fill="#b91e35"/>
+  <rect x="<%= x-10 %>" y="291" width="20" height="18" rx="2" fill="#cad0d8" stroke="#596577"/>
+  <text x="<%= x-68 %>" y="358" font-weight="bold" font-size="12">GUILHOTINA <%= id %></text>
+  <rect x="<%= x-35 %>" y="373" width="70" height="68" rx="10" fill="url(#pr-metal)" stroke="#737f8e" stroke-width="3"/>
+  <path d="M<%= x-24 %> 384L<%= x+24 %> 399L<%= x-24 %> 416L<%= x+24 %> 430" fill="none" stroke="#778899" stroke-width="5"/>
+  <path d="M<%= x %> 342V373" stroke="#967557" stroke-width="12" marker-end="url(#pr-arrow)"/>
+  <text x="<%= x-66 %>" y="456" font-size="12">Rosca alimentadora</text>
+  <rect x="<%= x-89 %>" y="488" width="178" height="116" rx="41" fill="url(#pr-metal)" stroke="#626f7e" stroke-width="4"/>
+  <path d="M<%= x-60 %> 507L<%= x-30 %> 588L<%= x %> 507L<%= x+30 %> 588L<%= x+60 %> 507" stroke="#758697" stroke-width="5" fill="none"/>
+  <rect x="<%= x-26 %>" y="475" width="52" height="17" rx="5" fill="#d0d6de" stroke="#647385"/>
+  <text x="<%= x-54 %>" y="480" font-size="16" font-weight="bold">PRENSA <%= id %></text>
+  <path d="M<%= x %> 461V476" stroke="#967557" stroke-width="12" marker-end="url(#pr-arrow)"/>
+  <path d="M<%= x %> 604V655" stroke="#8f7051" stroke-width="13" marker-end="url(#pr-arrow)"/>
+  <text x="<%= x+22 %>" y="626" font-size="11">Torta ↓</text>
+  <path d="M<%= x-56 %> 602V684" stroke="#c48b39" stroke-width="6" fill="none" marker-end="url(#pr-oil-arrow)"/>
+  <circle cx="<%= x-56 %>" cy="699" r="18" fill="#f1dcb5" stroke="#ae7d30" stroke-width="4"/>
+  <path d="M<%= x-63 %> 687L<%= x-48 %> 709M<%= x-48 %> 687L<%= x-63 %> 709" stroke="#ae7d30" stroke-width="4"/>
+  <text x="<%= x-98 %>" y="734" font-size="11" font-weight="bold">BOMBA <%= id %></text>
+  <path d="M<%= x-56 %> 716V755H178" stroke="#c48b39" stroke-width="6" fill="none"/>
+ </g>
+ <% }); %>
+ </g>
+ <g data-prensa-select="CAKE" tabindex="0" role="button" aria-label="Selecionar rosca de saída da torta">
+  <rect x="250" y="655" width="795" height="36" rx="10" fill="url(#pr-metal)" stroke="#66717e" stroke-width="3"/>
+  <rect x="256" y="660" width="783" height="26" fill="url(#pr-helix)"/>
+  <text x="490" y="650" font-size="14" font-weight="bold">ROSCA DE DESCARGA · TORTA SECA</text>
+ </g>
+ <g data-prensa-select="RETURN" tabindex="0" role="button" aria-label="Selecionar rosca inclinada de retorno">
+  <path d="M1045 675L1092 241L981 231" fill="none" stroke="#637080" stroke-width="29" stroke-linejoin="round"/>
+  <path d="M1045 675L1092 241L981 231" fill="none" stroke="#d3dae2" stroke-width="18" stroke-dasharray="6 9" stroke-linejoin="round"/>
+  <path d="M1066 478L1080 343L994 257" stroke="#9e7953" stroke-width="5" fill="none" marker-end="url(#pr-arrow)"/>
+  <rect x="1085" y="418" width="175" height="85" rx="8" fill="#fff" stroke="#d7dbe2"/>
+  <text x="1101" y="440" font-weight="bold" font-size="13">RETORNO À TOLVA</text>
+  <text x="1101" y="459" font-size="11">Rosca dentro do tubo</text><text x="1101" y="477" font-size="11">Material mal prensado</text>
+  <text x="1070" y="705" font-size="11">Coleta após P46</text>
+ </g>
+ <g data-prensa-select="OIL" tabindex="0" role="button" aria-label="Selecionar circuito de óleo">
+  <path d="M178 755H100" fill="none" stroke="#c48b39" stroke-width="8" marker-end="url(#pr-oil-arrow)"/>
+  <ellipse cx="105" cy="716" rx="57" ry="14" fill="#dce0e5" stroke="#657180" stroke-width="3"/>
+  <path d="M48 716V755Q105 781 162 755V716" fill="#e4e7eb" stroke="#697785" stroke-width="3"/>
+  <text x="35" y="689" font-size="12" font-weight="bold">TACHO PERCO.</text>
+  <text x="185" y="784" font-size="12" fill="#997028">Óleo das três bombas → tacho da percoladora</text>
+ </g>
+ <g font-size="11" fill="#626c79">
+  <rect x="52" y="315" width="180" height="92" rx="10" fill="white" stroke="#d2d6dd"/>
+  <text x="68" y="338" font-weight="bold">LEGENDA</text>
+  <text x="68" y="361">Marrom · material / torta</text>
+  <text x="68" y="383">Ocre · circuito do óleo</text>
+  <text x="68" y="400">Vermelho · guilhotina</text>
+ </g>
+</g>
+</svg>
