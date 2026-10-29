@@ -116,7 +116,8 @@ test('linha de comando encaminha coordenadas e opções à ferramenta ativa', as
   assert.equal(cad.executeCommand('U'), true);
   assert.equal(cad.executeCommand('Fechar'), true);
   assert.equal(cad.executeCommand('desfazer'), true);
-  assert.deepEqual(calls, ['@12,5;8,25', 'c', 'u', 'c', 'u']);
+  assert.equal(cad.executeCommand('1e-7'), true);
+  assert.deepEqual(calls, ['@12,5;8,25', 'c', 'u', 'c', 'u', '1e-7']);
 });
 
 test('cadastro paramétrico legado do eixo não é perdido ao editar o desenho 2D', async () => {
@@ -127,4 +128,24 @@ test('cadastro paramétrico legado do eixo não é perdido ao editar o desenho 2
   assert.deepEqual(saved.shaftSheet.segments, shaftSheet.segments);
   assert.deepEqual(saved.shaftSheet.origin, shaftSheet.origin);
   assert.notEqual(cad.state.shaftSheet, shaftSheet);
+});
+
+test('reflow reduz a altura após resize e entrega o espaço do canvas à grade CSS', async () => {
+  const cad = await controller();
+  const originalDocument = globalThis.document, originalWindow = globalThis.window;
+  const workspace = { style: { height: '1200px', minHeight: '1200px' } };
+  const root = { style: {}, getBoundingClientRect: () => ({ top: 0, height: 1600 }), querySelector: () => ({}) };
+  globalThis.document = { querySelector: () => root, getElementById: () => workspace };
+  globalThis.window = { visualViewport: { height: 768 } };
+  try {
+    cad.reflowWorkspace();
+    assert.equal(root.style.height, '768px');
+    assert.equal(workspace.style.height, '');
+    assert.equal(workspace.style.minHeight, '0px');
+    globalThis.window.visualViewport.height = 480;
+    cad.reflowWorkspace();
+    assert.equal(root.style.height, '480px');
+  } finally {
+    globalThis.document = originalDocument; globalThis.window = originalWindow;
+  }
 });

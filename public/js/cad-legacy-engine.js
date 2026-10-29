@@ -1,5 +1,5 @@
 import './cad-python-integration.js';
-import { bootstrapDesenhoTecnico } from './modules/desenho-tecnico/desenho-tecnico.service.js?v=20261028-drafting-3d-v1';
+import { bootstrapDesenhoTecnico } from './modules/desenho-tecnico/desenho-tecnico.service.js?v=20261029-workspace-v1';
 import { RotateTool } from './modules/desenho-tecnico/tools/rotate.tool.js';
 import { FilletTool } from './modules/desenho-tecnico/tools/fillet.tool.js';
 import { ChamferTool } from './modules/desenho-tecnico/tools/chamfer.tool.js';
@@ -18,19 +18,6 @@ function createRibbonButton({ action, tool, icon, label, title, danger = false }
   button.title = title || label;
   button.setAttribute('aria-label', label);
   button.innerHTML = `<span class="cad-ribbon-icon" aria-hidden="true">${icon}</span><span>${label}</span>`;
-  return button;
-}
-
-function createSideToolButton({ action, tool, icon, label, title }) {
-  const button = document.createElement('button');
-  button.className = 'cad-tool-btn';
-  button.type = 'button';
-  button.dataset.action = action;
-  button.dataset.tool = tool;
-  button.dataset.tooltip = title || label;
-  button.title = title || label;
-  button.setAttribute('aria-label', label);
-  button.innerHTML = `<span class="cad-tool-icon" aria-hidden="true">${icon}</span><span>${label}</span>`;
   return button;
 }
 
@@ -135,7 +122,6 @@ function enhanceCadWorkspace(cad) {
     group.innerHTML = '<span class="cad-ribbon-label">Cotas e anotação</span>';
 
     [
-      { action: 'tool-cotar', tool: 'dim_linear', icon: '↔', label: 'Cotar', title: 'Cotar com posicionamento livre (D)' },
       { action: 'tool-dim-linear', tool: 'dim_linear', icon: '↔', label: 'Linear', title: 'Cota linear (D)' },
       { action: 'tool-dim-diameter', tool: 'dim_diameter', icon: '⌀', label: 'Diâmetro', title: 'Cota de diâmetro (DD)' },
       { action: 'tool-dim-angular', tool: 'dim_angular', icon: '∠', label: 'Angular', title: 'Cota angular (DA)' },
@@ -147,21 +133,6 @@ function enhanceCadWorkspace(cad) {
     else ribbon.appendChild(group);
   }
 
-  const leftPanel = document.querySelector('.cad-panel-left');
-  if (leftPanel && !leftPanel.querySelector('.cad-tool-group-modify')) {
-    const group = document.createElement('div');
-    group.className = 'cad-tool-group cad-tool-group-modify';
-    group.innerHTML = '<span class="cad-tool-group-label">Modificar</span>';
-    [
-      { action: 'tool-rotate', tool: 'rotate', icon: '↻', label: 'Rotacionar', title: 'Rotacionar (RO)' },
-      { action: 'tool-fillet', tool: 'fillet', icon: '⌒', label: 'Fillet', title: 'Arredondar canto (FI)' },
-      { action: 'tool-chamfer', tool: 'chamfer', icon: '⌞', label: 'Chanfro', title: 'Chanfro (CHA)' },
-      { action: 'tool-mirror', tool: 'mirror', icon: '⇆', label: 'Espelhar', title: 'Espelhar (MI)' },
-    ].forEach((config) => group.appendChild(createSideToolButton(config)));
-    const viewGroup = Array.from(leftPanel.querySelectorAll(':scope > .cad-tool-group')).find((item) => item.textContent.includes('Vista'));
-    leftPanel.insertBefore(group, viewGroup || null);
-  }
-
   document.querySelectorAll('.cad-tool-btn').forEach((button) => {
     const label = button.querySelector('span:last-child')?.textContent?.trim();
     if (!label) return;
@@ -171,7 +142,7 @@ function enhanceCadWorkspace(cad) {
   });
 
   const commandInput = document.getElementById('cadCommandInput');
-  if (commandInput) commandInput.placeholder = 'Comandos: L, C, M, RO, FI, CHA, MI, D, F, X...';
+  if (commandInput) commandInput.placeholder = 'Comando ou coordenada — L, C, M, @50,0';
 
   cad?.render?.();
 }

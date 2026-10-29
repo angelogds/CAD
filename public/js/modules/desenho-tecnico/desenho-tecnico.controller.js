@@ -132,6 +132,7 @@ const COMMAND_ALIASES = {
   snap: 'toggle-snap', osnap: 'toggle-snap',
   ortho: 'toggle-ortho', ortogonal: 'toggle-ortho',
   polar: 'toggle-polar',
+  calc: 'calculator', qc: 'calculator', calculadora: 'calculator',
   save: 'save', salvar: 'save',
 };
 
@@ -909,6 +910,10 @@ export class DesenhoTecnicoController {
       'toggle-snap': () => { this.state.snappingConfig.enabled = !this.state.snappingConfig.enabled; this.markDirty('Snap atualizado'); this.render(); },
       'toggle-ortho': () => { this.state.orthoEnabled = !this.state.orthoEnabled; if (this.state.orthoEnabled) this.state.polarConfig.enabled = false; this.markDirty('Ortho atualizado'); this.render(); },
       'toggle-polar': () => { this.state.polarConfig.enabled = !this.state.polarConfig.enabled; if (this.state.polarConfig.enabled) this.state.orthoEnabled = false; this.markDirty(`Polar ${this.state.polarConfig.enabled ? 'ativado' : 'desativado'}`); this.render(); },
+      calculator: async () => {
+        const { openCadCalculator } = await import('/js/cad-calculator.mjs?v=20261029-workspace-v1');
+        openCadCalculator(this);
+      },
       'toggle-theme': () => {
         const root = document.querySelector('.cad-fullscreen');
         if (!root) return;
@@ -1007,7 +1012,7 @@ export class DesenhoTecnicoController {
     const command = String(rawCommand || '').trim().toLowerCase();
     if (!command) return false;
     const active = this.toolManager.active;
-    const pointInput = /^[\d.,;@<+\-\s]+$/.test(command);
+    const pointInput = /^(?=.*\d)[\deE.,;@<+\-\s]+$/.test(command);
     const polylineOption = active?.name === 'polyline' && /^(c|close|fechar|u|undo|desfazer)$/.test(command);
     if (['line', 'polyline'].includes(active?.name) && (pointInput || polylineOption)) {
       const option = /^(close|fechar)$/.test(command) ? 'c' : /^(undo|desfazer)$/.test(command) ? 'u' : command;
@@ -1244,14 +1249,13 @@ export class DesenhoTecnicoController {
     if (!root || !workspace || !toolbar || !status) return;
     const viewportHeight = window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || 0;
     const rootRect = root.getBoundingClientRect();
-    const toolbarRect = toolbar.getBoundingClientRect();
-    const statusRect = status.getBoundingClientRect();
     const rootTop = Math.max(0, rootRect.top || 0);
-    const rootHeight = Math.max(rootRect.height || 0, viewportHeight - rootTop);
+    const rootHeight = Math.max(0, viewportHeight - rootTop);
     root.style.height = `${Math.floor(rootHeight)}px`;
-    const available = Math.max(220, rootHeight - toolbarRect.height - statusRect.height);
-    workspace.style.height = `${Math.floor(available)}px`;
-    workspace.style.minHeight = `${Math.floor(available)}px`;
+    // CSS grid owns the space between ribbon and command line. Do not retain
+    // dimensions measured before asynchronous styles loaded, or prevent shrinking.
+    workspace.style.height = '';
+    workspace.style.minHeight = '0px';
   }
 
   setupLayoutControls() {

@@ -1,3 +1,4 @@
+import { normalizeCadRibbon } from '../../cad-final-2d.js';
 import { buildFeatureTreeModel, isUsefulViewport } from './professional-workspace.logic.mjs';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -31,39 +32,13 @@ function ensureProfessionalStyles() {
   if (document.querySelector('link[data-cad-professional-style]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = '/css/cad-professional-final.css?v=20260820-v1';
+  link.href = '/css/cad-professional-final.css?v=20261029-workspace-v1';
   link.dataset.cadProfessionalStyle = '1';
   document.head.appendChild(link);
 }
 
 function normalizeRibbonGroups() {
-  const ribbon = document.querySelector('.cad-ribbon');
-  if (!ribbon) return;
-  const mapping = [
-    ['.cad-ribbon-featured', 'home'],
-    ['.cad-ribbon-home-quick', 'home'],
-    ['.cad-ribbon-selection', 'modify'],
-    ['.cad-ribbon-annotation', 'annotate'],
-    ['.cad-ribbon-hatch-final', 'draw'],
-    ['.cad-ribbon-array-final', 'modify'],
-    ['.cad-ribbon-layer-manager', 'layers'],
-    ['.cad-ribbon-precision', 'view'],
-    ['.cad-ribbon-display-mode', 'view'],
-  ];
-  mapping.forEach(([selector, tabs]) => {
-    const group = ribbon.querySelector(selector);
-    if (group) group.dataset.cadTabs = tabs;
-  });
-  const draw = Array.from(ribbon.querySelectorAll(':scope > .cad-ribbon-group')).find((group) => group.querySelector('[data-action="tool-line"]') && !group.classList.contains('cad-ribbon-home-quick'));
-  const modify = Array.from(ribbon.querySelectorAll(':scope > .cad-ribbon-group')).find((group) => group.querySelector('[data-action="tool-move"]') && !group.classList.contains('cad-ribbon-home-quick'));
-  if (draw) draw.dataset.cadTabs = 'draw';
-  if (modify) modify.dataset.cadTabs = 'modify';
-
-  const active = ribbon.dataset.activeCadTab || 'home';
-  ribbon.querySelectorAll(':scope > .cad-ribbon-group').forEach((group) => {
-    const tabs = String(group.dataset.cadTabs || 'home').split(/\s+/).filter(Boolean);
-    group.hidden = !tabs.includes(active);
-  });
+  normalizeCadRibbon(document.querySelector('.cad-ribbon'));
 }
 
 function installRibbonNormalizer() {
@@ -223,11 +198,18 @@ function updateFeatureTree(cad) {
   const tree = createFeatureTree(left);
   const groups = buildFeatureTreeModel(cad.state.entities || [], cad.state.layers || {}, cad.state.activeLayer);
   const selected = new Set(Array.from(cad.selection?.ids || []).map(String));
+  const signature = JSON.stringify([groups, [...selected], cad.state.metadata?.codigo, cad.state.metadata?.titulo]);
+  if (tree.__cadSignature === signature) return;
+  const expanded = new Map([...tree.querySelectorAll('.cad-feature-layer')].map(node => [node.dataset.layerName, node.open]));
+  tree.__cadSignature = signature;
   tree.innerHTML = '';
 
   const root = document.createElement('div');
   root.className = 'cad-feature-root';
-  root.innerHTML = `<span>📄</span><div><strong>${cad.state.metadata?.codigo || 'DESENHO'}</strong><small>${cad.state.metadata?.titulo || 'Modelo 2D'}</small></div>`;
+  const rootCode = document.createElement('strong'); rootCode.textContent = cad.state.metadata?.codigo || 'DESENHO';
+  const rootTitle = document.createElement('small'); rootTitle.textContent = cad.state.metadata?.titulo || 'Modelo 2D';
+  const rootCopy = document.createElement('div'); rootCopy.append(rootCode, rootTitle);
+  const rootIcon = document.createElement('span'); rootIcon.textContent = '◇'; root.append(rootIcon, rootCopy);
   tree.appendChild(root);
 
   const plane = document.createElement('div');
@@ -238,10 +220,13 @@ function updateFeatureTree(cad) {
   groups.forEach((group) => {
     const details = document.createElement('details');
     details.className = 'cad-feature-layer';
-    details.open = group.active || group.entities.some((entity) => selected.has(entity.id));
+    details.dataset.layerName = group.name;
+    details.open = group.entities.some((entity) => selected.has(entity.id)) || (expanded.get(group.name) ?? group.active);
     const summary = document.createElement('summary');
-    summary.innerHTML = `<span>▤</span><strong>${group.name}</strong><small>${group.entities.length}</small>`;
-    summary.addEventListener('click', () => { cad.state.activeLayer = group.name; });
+    const layerIcon = document.createElement('span'); layerIcon.textContent = '▤';
+    const layerName = document.createElement('strong'); layerName.textContent = group.name;
+    const layerCount = document.createElement('small'); layerCount.textContent = group.entities.length;
+    summary.append(layerIcon, layerName, layerCount);
     details.appendChild(summary);
     const list = document.createElement('div');
     list.className = 'cad-feature-entities';
@@ -250,7 +235,8 @@ function updateFeatureTree(cad) {
       button.type = 'button';
       button.className = `cad-feature-entity${selected.has(item.id) ? ' active' : ''}${item.visible ? '' : ' muted'}`;
       button.dataset.cadTreeEntity = item.id;
-      button.innerHTML = `<span class="cad-feature-entity-icon">${item.icon}</span><span>${item.label}</span>`;
+      const icon = document.createElement('span'); icon.className = 'cad-feature-entity-icon'; icon.textContent = item.icon;
+      const label = document.createElement('span'); label.textContent = item.label; button.append(icon, label);
       button.addEventListener('click', () => {
         const entity = (cad.state.entities || []).find((candidate) => String(candidate.id) === item.id);
         if (!entity) return;
@@ -288,19 +274,6 @@ function installCanvasWidgets(cad) {
   const shell = document.querySelector('.cad-fullscreen');
   if (!container || !shell || container.querySelector('.cad-ucs-widget')) return;
 
-  const ucs = document.createElement('div');
-  ucs.className = 'cad-ucs-widget';
-  ucs.innerHTML = '<span class="cad-ucs-origin"></span><span class="cad-ucs-x">X</span><span class="cad-ucs-y">Y</span>';
-  container.appendChild(ucs);
-
-  const view = document.createElement('button');
-  view.type = 'button';
-  view.className = 'cad-top-view-widget';
-  view.title = 'Vista superior / enquadrar desenho';
-  view.innerHTML = '<strong>TOP</strong><span>2D</span>';
-  view.addEventListener('click', () => cad.executeAction('zoom-extents'));
-  container.appendChild(view);
-
   const frame = document.createElement('div');
   frame.className = 'cad-sheet-frame';
   frame.setAttribute('aria-hidden', 'true');
@@ -308,7 +281,7 @@ function installCanvasWidgets(cad) {
 
   const tabs = document.createElement('div');
   tabs.className = 'cad-layout-tabs';
-  tabs.innerHTML = '<button type="button" data-sheet-mode="model" class="active">MODEL</button><button type="button" data-sheet-mode="a4">LAYOUT A4</button><button type="button" data-sheet-mode="a3">LAYOUT A3</button>';
+  tabs.innerHTML = '<button type="button" data-sheet-mode="model" class="active">Modelo</button><button type="button" data-sheet-mode="a4">Folha A4</button><button type="button" data-sheet-mode="a3">Folha A3</button>';
   container.appendChild(tabs);
   shell.dataset.sheetMode = 'model';
   tabs.addEventListener('click', (event) => {
@@ -337,6 +310,30 @@ function ensureDrawingVisible(cad) {
   requestAnimationFrame(() => requestAnimationFrame(check));
 }
 
+function installCompactPalettes(cad) {
+  const compact = window.matchMedia('(max-width: 960px)');
+  const shell = document.querySelector('.cad-fullscreen');
+  const priorAction = cad.executeAction.bind(cad);
+  cad.executeAction = (action, source) => {
+    const result = priorAction(action, source);
+    if (compact.matches && ['toggle-left-panel', 'toggle-right-panel'].includes(action)) {
+      const side = action === 'toggle-left-panel' ? 'left' : 'right';
+      const other = side === 'left' ? 'right' : 'left';
+      if (!shell.classList.contains(`cad-${side}-collapsed`) && !shell.classList.contains(`cad-${other}-collapsed`)) {
+        priorAction(`toggle-${other}-panel`);
+      }
+    }
+    return result;
+  };
+  const collapse = () => {
+    if (!compact.matches) return;
+    if (!shell.classList.contains('cad-left-collapsed')) priorAction('toggle-left-panel');
+    if (!shell.classList.contains('cad-right-collapsed')) priorAction('toggle-right-panel');
+  };
+  compact.addEventListener('change', collapse);
+  collapse();
+}
+
 export function installCadProfessionalWorkspace(cad) {
   if (!cad || cad.__professionalWorkspaceInstalled) return;
   cad.__professionalWorkspaceInstalled = true;
@@ -346,6 +343,7 @@ export function installCadProfessionalWorkspace(cad) {
   installFeatureTree(cad);
   installCanvasWidgets(cad);
   installRibbonNormalizer();
+  installCompactPalettes(cad);
   ensureDrawingVisible(cad);
   cad.render();
 }

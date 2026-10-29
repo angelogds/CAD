@@ -31,7 +31,7 @@ function renderCentral(canManage = true) {
   });
 }
 
-test('central de desenhos renderiza indicadores, filtros e arquivo técnico', async () => {
+test('central de desenhos renderiza recentes, filtros e arquivo técnico', async () => {
   const html = await renderCentral(true);
   assert.match(html, /Central de Desenhos Técnicos/);
   assert.match(html, /Todos os equipamentos/);
@@ -45,7 +45,7 @@ test('central de desenhos renderiza indicadores, filtros e arquivo técnico', as
 
 test('central respeita modo somente leitura para usuário sem gerenciamento', async () => {
   const html = await renderCentral(false);
-  assert.doesNotMatch(html, /Novo desenho 2D/);
+  assert.doesNotMatch(html, /\/desenho-tecnico\/cad\/novo/);
   assert.doesNotMatch(html, /\/desenho-tecnico\/cad\/41\/editor/);
   assert.doesNotMatch(html, /\/desenho-tecnico\/cad\/41\/pdf/);
   assert.match(html, /\/desenho-tecnico\/cad\/41/);

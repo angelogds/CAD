@@ -37,8 +37,8 @@ test('workspace profissional corrige enquadramento e organiza árvore, grid e la
   assert.match(workspace, /zoomExtents\(bounds\)/);
   assert.match(workspace, /viewport salvo estava fora da geometria/);
   assert.match(workspace, /cad-feature-tree/);
-  assert.match(workspace, /cad-ucs-widget/);
-  assert.match(workspace, /LAYOUT A4/);
+  assert.match(workspace, /cad-sheet-frame/);
+  assert.match(workspace, /Folha A4/);
   assert.match(workspace, /display-hatch/);
   assert.match(workspace, /MutationObserver/);
   assert.match(workspace, /recurso auxiliar com erro/);
@@ -53,10 +53,11 @@ test('modo arame oculta somente hachuras durante a renderização sem alterar pe
   assert.doesNotMatch(workspace, /saveCad\(/);
 });
 
-test('motor Python aparece como básico quando offline e avançado quando online', () => {
+test('análise e arquivos ficam em Documento e são desativados quando indisponíveis', () => {
   const pythonUi = read('public/js/cad-python-integration.js');
-  assert.match(pythonUi, /MOTOR TÉCNICO • AVANÇADO/);
-  assert.match(pythonUi, /MOTOR TÉCNICO • BÁSICO/);
-  assert.match(pythonUi, /cad-python-tools-menu/);
+  assert.match(pythonUi, /document\.querySelector\('\.cad-ribbon-file'\)/);
+  assert.match(pythonUi, /el\.disabled = !online/);
+  assert.match(pythonUi, /Analisar desenho/);
+  assert.doesNotMatch(pythonUi, /MOTOR TÉCNICO/);
   assert.doesNotMatch(pythonUi, /PYTHON OFFLINE/);
 });

@@ -90,3 +90,4 @@ graphify-out/
 
 # Biblioteca 3D da Automação 2A, copiada da dependência pelo postinstall.
 public/vendor/three-0.172.0/
+public/vendor/jsep-1.4.0/

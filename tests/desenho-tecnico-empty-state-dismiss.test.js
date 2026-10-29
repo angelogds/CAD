@@ -16,6 +16,6 @@ test('qualquer ferramenta fecha a introdução antes do desenho',()=>{
 });
 
 test('hidden da introdução prevalece sobre qualquer estilo visual',()=>{
-  const css=read('public/css/cad-system-shell.css');
-  assert.match(css,/\.cad-fullscreen \.cad-empty-state\[hidden\]\{[\s\S]*display:none !important/);
+  const css=read('public/css/cad-solidworks-workbench.css');
+  assert.match(css,/\.cad-empty-state\[hidden\]\{display:none!important/);
 });

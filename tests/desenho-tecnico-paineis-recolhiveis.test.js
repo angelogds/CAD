@@ -13,13 +13,13 @@ test('editor possui controles independentes para os dois painéis',()=>{
 
 test('workspace amplia com esquerda, direita ou ambas recolhidas',()=>{
   const css=read('public/css/cad-solidworks-workbench.css');
-  assert.match(css,/cad-left-collapsed \.cad-workspace[\s\S]*grid-template-columns: 0 minmax\(0, 1fr\) 292px/);
-  assert.match(css,/cad-right-collapsed \.cad-workspace[\s\S]*grid-template-columns: 218px minmax\(0, 1fr\) 0/);
-  assert.match(css,/cad-left-collapsed\.cad-right-collapsed \.cad-workspace[\s\S]*grid-template-columns: 0 minmax\(0, 1fr\) 0/);
+  assert.match(css,/cad-left-collapsed \.cad-workspace\{--cad-left-width:0px/);
+  assert.match(css,/cad-right-collapsed \.cad-workspace\{--cad-right-width:0px/);
+  assert.match(css,/grid-template-columns:var\(--cad-left-width\) minmax\(0,1fr\) var\(--cad-right-width\)/);
 });
 
-test('PropertyManager permanece no tema cinza técnico',()=>{
+test('paleta de propriedades usa os tokens do tema sem camada de cor concorrente',()=>{
   const css=read('public/css/cad-solidworks-workbench.css');
-  assert.match(css,/\.cad-technical-shell \.cad-panel-content[\s\S]*background: var\(--cad-panel\) !important/);
-  assert.match(css,/background: #1f262c !important/);
+  assert.match(css,/\.cad-panel-content\{[^}]*background:var\(--cad-surface\)/);
+  assert.doesNotMatch(css,/background:[^;}]+!important/);
 });

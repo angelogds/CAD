@@ -16,7 +16,7 @@ const controller = read('public/js/modules/desenho-tecnico/desenho-tecnico.contr
 const pdfService = read('modules/desenho-tecnico/desenho-tecnico.pdf.service.js');
 
 test('Anotar oferece botão Cotar sem remover cotas especializadas', () => {
-  assert.match(view, /data-action="tool-cotar" data-tool="dim_linear"[^>]*>[\s\S]*?<span>Cotar<\/span>/);
+  assert.match(view, /data-action="tool-dim-linear" data-tool="dim_linear"[^>]*>[\s\S]*?<span>Cotar<\/span>/);
   assert.match(view, /data-action="tool-dim-linear"/);
   assert.match(view, /data-action="tool-dim-diameter"/);
   assert.match(view, /data-action="tool-dim-angular"/);

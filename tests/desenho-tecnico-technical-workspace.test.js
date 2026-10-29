@@ -13,7 +13,9 @@ test('CommandManager do CAD usa abas técnicas em vez de exibir todas as ferrame
   assert.match(entry, /\['draw', 'Desenhar'\]/);
   assert.match(entry, /\['modify', 'Modificar'\]/);
   assert.match(entry, /\['annotate', 'Anotar'\]/);
-  assert.match(entry, /\['layers', 'Camadas'\]/);
+  assert.doesNotMatch(entry, /\['layers', 'Camadas'\]/);
+  assert.match(entry, /utility.dataset.cadTabs = 'home'/);
+  assert.match(entry, /action: 'calculator'/);
   assert.match(entry, /\['view', 'Vista'\]/);
   assert.match(entry, /group\.hidden = !assigned\.includes\(active\)/);
   assert.match(css, /\.cad-technical-shell \.cad-ribbon-group\[hidden\]/);
@@ -32,24 +34,25 @@ test('modo Sólido 2D preenche somente primitivas fechadas sem alterar o modelo 
   assert.doesNotMatch(entry, /state\.displayMode\s*=/);
 });
 
-test('interface CAD abandona verde institucional dentro do editor e usa paleta técnica neutra', () => {
-  assert.match(css, /--cad-accent: #43a6e2/);
-  assert.match(css, /--cad-canvas: #1c2329/);
-  assert.match(css, /background: #1b2228 !important/);
-  assert.match(entry, /cad-theme-dark/);
-  assert.match(entry, /DESENHO MECÂNICO • CAD 2D/);
-  assert.doesNotMatch(css, /#159653/i);
-  assert.doesNotMatch(css, /#0d8044/i);
+test('editor preserva identidade Campo do Gado com canvas e controles em tema técnico', () => {
+  const identity = fs.readFileSync(path.join(root, 'public/css/cad-system-shell.css'), 'utf8');
+  assert.match(identity, /--cad-system-green:var\(--action-700,#15803d\)/);
+  assert.match(identity, /--cad-canvas:/);
+  assert.match(identity, /cad-theme-light/);
+  assert.match(entry, /brand.textContent = 'CG'/);
+  assert.doesNotMatch(entry, /textContent = 'PropertyManager'|<strong>FeatureManager/);
+
 });
 
-test('FeatureManager mantém nomes visíveis e mostra resumo do desenho', () => {
+test('explorador mantém resumo do desenho sem duplicar ferramentas laterais', () => {
   assert.match(entry, /cad-feature-summary/);
-  assert.match(entry, /layers/);
+  assert.match(entry, /camadas/);
   assert.match(entry, /objetos/);
   assert.match(entry, /cotas/);
   assert.match(entry, /hachuras/);
-  assert.match(css, /\.cad-tool-btn > span:last-child/);
-  assert.match(css, /display: inline !important/);
+  assert.match(css, /\.cad-feature-manager-head/);
+  assert.match(entry, /Explorador/);
+  assert.doesNotMatch(entry, /cad-tool-group-final2d/);
 });
 
 test('ribbon usa ícones SVG técnicos consistentes em vez de glifos como acabamento final', () => {
@@ -63,7 +66,8 @@ test('ribbon usa ícones SVG técnicos consistentes em vez de glifos como acabam
   assert.match(entry, /'tool-dim-linear': 'dimLinear'/);
   assert.match(entry, /installProfessionalIcons/);
   assert.match(css, /\.cad-icon-svg/);
-  assert.match(css, /\.cad-ribbon-btn\[data-shortcut\]::after/);
+  assert.match(css, /\.cad-ribbon-icon/);
+  assert.match(entry, /el.dataset.shortcut = shortcut/);
 });
 
 test('workspace adiciona cromado de navegação 2D inspirado em CAD profissional', () => {
@@ -75,7 +79,7 @@ test('workspace adiciona cromado de navegação 2D inspirado em CAD profissional
   assert.match(entry, /SUPERIOR/);
   assert.match(entry, /WCS/);
   assert.match(css, /\.cad-ribbon-home-quick/);
-  assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
   assert.match(css, /\.cad-navigation-bar/);
   assert.match(css, /\.cad-ucs-indicator/);
 });
