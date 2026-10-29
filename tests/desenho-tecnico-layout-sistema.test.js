@@ -12,8 +12,8 @@ test('editor carrega a identidade visual do sistema após a base CAD',()=>{
 test('tema do CAD reutiliza identidade verde e preserva canvas técnico',()=>{
   const css=read('public/css/cad-system-shell.css');
   assert.match(css,/--cad-system-green:var\(--action-700,#15803d\)/);
-  assert.match(css,/\.cad-fullscreen \.cad-panel-right/);
-  assert.match(css,/\.cad-fullscreen #cadCanvas/);
-  assert.match(css,/background:#0a0f14/);
+  assert.match(css,/--cad-canvas:#141b23/);
+  assert.match(css,/\.cad-fullscreen\.cad-theme-light/);
+  assert.doesNotMatch(css,/grid-template-columns|position:absolute/);
   assert.match(css,/\.cad-fullscreen \.cad-btn-primary/);
 });

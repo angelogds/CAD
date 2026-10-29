@@ -62,6 +62,6 @@ test('integração final expõe layout e comandos CAD 2D', () => {
   ['tool-ellipse', 'tool-spline', 'tool-hatch', 'tool-scale', 'tool-stretch', 'tool-break', 'tool-join', 'tool-explode', 'tool-array-rect', 'tool-array-polar'].forEach((needle) => assert.match(entry, new RegExp(needle)));
   assert.match(entry, /EllipseTool/);
   assert.match(entry, /HatchTool/);
-  assert.match(css, /cad-solidworks-shell/);
-  assert.match(css, /CommandManager/);
+  assert.match(css, /cad-technical-shell/);
+  assert.match(css, /cad-command-tabs/);
 });

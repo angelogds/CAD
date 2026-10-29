@@ -2,15 +2,16 @@
 
 <link rel="stylesheet" href="/css/cad-autocad.css">
 <link rel="stylesheet" href="/css/cad-system-shell.css">
+<link rel="stylesheet" href="/css/cad-solidworks-workbench.css?v=20261029-workspace-v1" data-cad-final2d-style="1">
 
-<div class="cad-fullscreen cad-theme-dark">
+<div class="cad-fullscreen cad-technical-shell cad-theme-dark">
   <div class="cad-toolbar">
     <header class="cad-appbar">
       <div class="cad-appbar-start">
-        <a class="cad-icon-btn cad-back" href="/desenho-tecnico/cad/<%= desenho.id %>" aria-label="Voltar" title="Voltar">←</a>
+        <a class="cad-icon-btn cad-back" href="/desenho-tecnico" aria-label="Voltar à central de desenhos" title="Central de desenhos">←</a>
         <span class="cad-brand-mark" aria-hidden="true">CG</span>
         <div class="cad-document-heading">
-          <div class="cad-document-eyebrow">Desenho técnico 2D / 3D</div>
+          <div class="cad-document-eyebrow">Campo do Gado · Desenho técnico</div>
           <div class="cad-document-title">
             <strong><%= desenho.codigo %></strong>
             <span><%= desenho.titulo %></span>
@@ -26,10 +27,7 @@
       <div class="cad-appbar-actions">
         <button class="cad-icon-btn" data-action="undo" id="cadUndoBtn" type="button" title="Desfazer (Ctrl+Z)" aria-label="Desfazer">↶</button>
         <button class="cad-icon-btn" data-action="redo" id="cadRedoBtn" type="button" title="Refazer (Ctrl+Y)" aria-label="Refazer">↷</button>
-        <button class="cad-icon-btn" data-action="toggle-theme" type="button" title="Alternar tema" aria-label="Alternar tema">◐</button>
         <button class="cad-btn cad-btn-secondary" data-action="view-3d-shaft" type="button" title="Abrir vistas isométrica, frontal, superior e lateral">Visualizar 3D</button>
-        <button class="cad-btn cad-btn-secondary" data-action="export-step" type="button" title="Gerar STEP real a partir do eixo salvo">Exportar STEP</button>
-        <a class="cad-btn cad-btn-secondary" data-action="export-pdf" data-pdf-url="/desenho-tecnico/cad/<%= desenho.id %>/pdf" href="/desenho-tecnico/cad/<%= desenho.id %>/pdf" title="Salvar desenho e gerar PDF">Exportar PDF</a>
         <button class="cad-btn cad-btn-primary" id="cadSaveBtn" data-action="save" type="button" title="Salvar (Ctrl+S)">Salvar desenho</button>
       </div>
     </header>
@@ -64,6 +62,21 @@
         <button class="cad-ribbon-btn danger" id="cadDeleteBtn" data-action="delete-selection" type="button" title="Apagar seleção (Del)">⌫ <span>Apagar</span></button>
       </div>
 
+      <div class="cad-ribbon-group cad-ribbon-annotation" data-cad-tabs="annotate">
+        <span class="cad-ribbon-label">Cotas e anotação</span>
+        <button class="cad-ribbon-btn" data-action="tool-dim-linear" data-tool="dim_linear" type="button" title="Cotar (D)">↔ <span>Cotar</span></button>
+        <button class="cad-ribbon-btn" data-action="tool-dim-diameter" data-tool="dim_diameter" type="button" title="Cota de diâmetro (DD)">⌀ <span>Diâmetro</span></button>
+        <button class="cad-ribbon-btn" data-action="tool-dim-angular" data-tool="dim_angular" type="button" title="Cota angular (DA)">∠ <span>Angular</span></button>
+        <button class="cad-ribbon-btn" data-action="tool-centerline" data-tool="centerline" type="button" title="Linha de centro (CL)">╍ <span>Centro</span></button>
+        <button class="cad-ribbon-btn" data-action="tool-text" data-tool="text" type="button" title="Texto (T)">T <span>Texto</span></button>
+        <button class="cad-ribbon-btn" data-action="tool-measure" data-tool="measure" type="button" title="Medir (DI)">⌖ <span>Medir</span></button>
+      </div>
+      <div class="cad-ribbon-group cad-ribbon-file" data-cad-tabs="view">
+        <span class="cad-ribbon-label">Documento</span>
+        <a class="cad-ribbon-btn" data-action="export-pdf" data-pdf-url="/desenho-tecnico/cad/<%= desenho.id %>/pdf" href="/desenho-tecnico/cad/<%= desenho.id %>/pdf" title="Salvar e exportar PDF"><span class="cad-ribbon-icon">PDF</span><span>Exportar PDF</span></a>
+        <button class="cad-ribbon-btn" data-action="export-step" type="button" title="Exportar STEP do eixo salvo"><span class="cad-ribbon-icon">3D</span><span>Exportar STEP</span></button>
+        <button class="cad-ribbon-btn" data-action="toggle-theme" type="button" title="Alternar tema"><span class="cad-ribbon-icon">◐</span><span>Tema</span></button>
+      </div>
       <div class="cad-ribbon-group cad-ribbon-precision">
         <span class="cad-ribbon-label">Precisão</span>
         <button class="cad-chip" id="cadGridToggle" data-action="toggle-grid" type="button">Grade</button>
@@ -76,38 +89,26 @@
   </div>
 
   <div class="cad-workspace" id="cadWorkspace">
-    <aside class="cad-panel-left" id="cadLeftPanel" aria-label="Ferramentas CAD">
-      <div class="cad-tool-group">
-        <span class="cad-tool-group-label">Criar</span>
-        <button class="cad-tool-btn" data-action="tool-select" data-tool="select" type="button"><span class="cad-tool-icon">⌁</span><span>Selecionar</span></button>
-        <button class="cad-tool-btn" data-action="tool-line" data-tool="line" type="button"><span class="cad-tool-icon">／</span><span>Linha</span></button>
-        <button class="cad-tool-btn" data-action="tool-polyline" data-tool="polyline" type="button"><span class="cad-tool-icon">⌇</span><span>Polilinha</span></button>
-        <button class="cad-tool-btn" data-action="tool-circle" data-tool="circle" type="button"><span class="cad-tool-icon">○</span><span>Círculo</span></button>
-        <button class="cad-tool-btn" data-action="tool-arc" data-tool="arc" type="button"><span class="cad-tool-icon">◜</span><span>Arco</span></button>
-        <button class="cad-tool-btn" data-action="tool-rect" data-tool="rect" type="button"><span class="cad-tool-icon">□</span><span>Retângulo</span></button>
-        <button class="cad-tool-btn" data-action="tool-text" data-tool="text" type="button"><span class="cad-tool-icon">T</span><span>Texto</span></button>
-      </div>
-      <div class="cad-tool-group">
-        <span class="cad-tool-group-label">Anotar</span>
-        <button class="cad-tool-btn cad-tool-btn-cotar" data-action="tool-cotar" data-tool="dim_linear" type="button" title="Cotar: 1º ponto, 2º ponto e posição da cota"><span class="cad-tool-icon">↔</span><span>Cotar</span></button>
-        <button class="cad-tool-btn" data-action="tool-dim-linear" data-tool="dim_linear" type="button"><span class="cad-tool-icon">↔</span><span>Cota linear</span></button>
-        <button class="cad-tool-btn" data-action="tool-dim-diameter" data-tool="dim_diameter" type="button"><span class="cad-tool-icon">⌀</span><span>Diâmetro</span></button>
-        <button class="cad-tool-btn" data-action="tool-dim-angular" data-tool="dim_angular" type="button"><span class="cad-tool-icon">∠</span><span>Angular</span></button>
-        <button class="cad-tool-btn" data-action="tool-centerline" data-tool="centerline" type="button"><span class="cad-tool-icon">╍</span><span>Linha de centro</span></button>
-        <button class="cad-tool-btn" data-action="tool-measure" data-tool="measure" type="button"><span class="cad-tool-icon">⌖</span><span>Medir</span></button>
-      </div>
-      <div class="cad-tool-group">
-        <span class="cad-tool-group-label">Vista</span>
-        <button class="cad-tool-btn" data-action="tool-pan" data-tool="pan" type="button"><span class="cad-tool-icon">✋</span><span>Mover vista</span></button>
-        <button class="cad-tool-btn" data-action="tool-zoom-window" data-tool="zoom-window" type="button"><span class="cad-tool-icon">⌗</span><span>Zoom janela</span></button>
-      </div>
+    <aside class="cad-panel-left" id="cadLeftPanel" aria-label="Explorador do desenho">
+      <details class="cad-inspector-section cad-layers-section">
+        <summary>Camadas <span>Organização visual</span></summary>
+        <div class="cad-panel-content">
+          <label class="cad-field"><span>Camada ativa</span><select class="cad-select" id="cadLayerSelect"></select></label>
+          <div class="cad-layer-create">
+            <input class="cad-input" id="cadLayerNewName" placeholder="Nova camada">
+            <button class="cad-btn cad-btn-secondary" id="cadLayerAddBtn" data-action="add-layer" type="button">Adicionar</button>
+          </div>
+          <div id="cadLayersList"></div>
+        </div>
+      </details>
+      <div class="cad-feature-tree" aria-label="Objetos por camada"></div>
     </aside>
     <button class="cad-panel-handle cad-panel-handle-left" id="cadLeftToggle" data-action="toggle-left-panel" type="button" aria-label="Recolher painel esquerdo" aria-expanded="true" title="Recolher painel esquerdo">‹</button>
 
     <main class="cad-canvas-container">
       <div class="cad-canvas-context">
         <div><span class="cad-context-label">Plano</span><strong>Vista principal</strong></div>
-        <div class="cad-context-meta"><span id="cadEntityCount">0 objetos</span><span>Unidade: mm</span></div>
+        <div class="cad-context-meta"><span id="cadEntityCount">0 objetos</span><span>mm</span></div>
       </div>
       <svg id="cadCanvas" aria-label="Área de desenho técnico 2D"></svg>
       <div id="cadDynamicInput" class="cad-dynamic-input" aria-live="polite"></div>
@@ -128,27 +129,18 @@
 
     <aside class="cad-panel-right" id="cadRightPanel" aria-label="Inspetor do desenho">
       <div class="cad-inspector-head">
-        <div><span>Inspetor</span><strong>Detalhes do desenho</strong></div>
+        <div><span>Paleta</span><strong>Propriedades</strong></div>
         <button class="cad-icon-btn" data-action="toggle-right-panel" type="button" aria-label="Recolher painel direito" title="Recolher painel direito">→</button>
       </div>
 
-      <div class="cad-equipment-card">
-        <span class="cad-equipment-icon">⚙</span>
-        <div>
-          <small>Vínculo com o histórico</small>
-          <strong><%= desenho.equipamento_id ? 'Equipamento vinculado' : 'Selecione um equipamento' %></strong>
-          <span>O PDF ficará disponível no arquivo técnico do ativo.</span>
-        </div>
-      </div>
-
       <details class="cad-inspector-section" open>
-        <summary>Propriedades <span>Objeto selecionado</span></summary>
+        <summary>Objeto selecionado <span>Medidas e estilo</span></summary>
         <div class="cad-panel-content" id="cadProperties">
           <p class="cad-muted">Selecione um objeto para editar suas medidas e posição.</p>
         </div>
       </details>
 
-      <details class="cad-inspector-section" open>
+      <details class="cad-inspector-section">
         <summary>Precisão 2D <span>Grade e snap</span></summary>
         <div class="cad-panel-content">
           <label class="cad-field"><span>Passo da grade (mm)</span><input class="cad-input" id="cadGridStepInput" type="number" min="0.001" step="0.001" value="20"></label>
@@ -166,19 +158,9 @@
         </div>
       </details>
 
-      <details class="cad-inspector-section">
-        <summary>Camadas <span>Organização visual</span></summary>
-        <div class="cad-panel-content">
-          <label class="cad-field"><span>Camada ativa</span><select class="cad-select" id="cadLayerSelect"></select></label>
-          <div class="cad-layer-create">
-            <input class="cad-input" id="cadLayerNewName" placeholder="Nova camada">
-            <button class="cad-btn cad-btn-secondary" id="cadLayerAddBtn" data-action="add-layer" type="button">Adicionar</button>
-          </div>
-          <div id="cadLayersList"></div>
-        </div>
-      </details>
 
-      <details class="cad-inspector-section" open>
+
+      <details class="cad-inspector-section">
         <summary>Arquivo técnico <span>Identificação</span></summary>
         <div class="cad-panel-content cad-props-grid">
           <label class="cad-field"><span>Código</span><input class="cad-input" id="cadMetaCodigo" value="<%= desenho.codigo %>"></label>
@@ -202,8 +184,8 @@
 
   <footer class="cad-statusbar" id="cadStatusBar">
     <div class="cad-command-wrap">
-      <span class="cad-command-symbol">›_</span>
-      <input id="cadCommandInput" class="cad-command-input" type="text" autocomplete="off" spellcheck="false" placeholder="Digite um comando: L, C, F, X, M, CO..." aria-label="Linha de comando CAD">
+      <label class="cad-command-symbol" for="cadCommandInput">Comando</label>
+      <input id="cadCommandInput" class="cad-command-input" type="text" autocomplete="off" spellcheck="false" placeholder="Digite um comando ou coordenada — L, C, M, @50,0" aria-label="Linha de comando CAD">
     </div>
     <div class="cad-status-message"><span id="cadStatusMessage">Inicializando…</span><span id="cadStatusTool">Ferramenta: Selecionar</span></div>
     <div class="cad-status-coordinates"><span id="cadStatusX">X: 0.00</span><span id="cadStatusY">Y: 0.00</span><span id="cadStatusZoom">Zoom: 100%</span><span id="cadStatusSelected">Selecionado: —</span></div>
@@ -262,6 +244,6 @@ window.addEventListener('error', function () {
   if (status) status.textContent = 'CAD carregado com limitações (ver console).';
 });
 </script>
-<script type="module" src="/js/cad-engine-v2.js?v=20261028-drafting-3d-v1" onerror="(function(){var s=document.getElementById('cadStatusMessage'); if(s) s.textContent='Falha ao carregar o motor CAD.';})()"></script>
+<script type="module" src="/js/cad-engine-v2.js?v=20261029-workspace-v1" onerror="(function(){var s=document.getElementById('cadStatusMessage'); if(s) s.textContent='Falha ao carregar o motor CAD.';})()"></script>
 
 <style>body.cad-editor-mode { overflow: hidden; }</style>

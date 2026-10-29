@@ -9,8 +9,8 @@ test('editor não carrega camada antiga conflitante',()=>{
 });
 
 test('canvas ocupa integralmente a coluna central',()=>{
-  const css=read('public/css/cad-system-shell.css');
-  assert.match(css,/\.cad-fullscreen \.cad-canvas-container\{[\s\S]*height:100%/);
-  assert.match(css,/\.cad-fullscreen #cadCanvas\{[\s\S]*position:absolute;[\s\S]*inset:0;[\s\S]*height:100%/);
-  assert.match(css,/grid-template-columns:74px minmax\(0,1fr\) minmax\(290px,320px\)/);
+  const css=read('public/css/cad-solidworks-workbench.css');
+  assert.match(css,/\.cad-technical-shell \.cad-canvas-container\{[^}]*height:100%/);
+  assert.match(css,/\.cad-technical-shell #cadCanvas\{[^}]*position:absolute;inset:0;[^}]*height:100%/);
+  assert.match(css,/grid-template-columns:var\(--cad-left-width\) minmax\(0,1fr\) var\(--cad-right-width\)/);
 });

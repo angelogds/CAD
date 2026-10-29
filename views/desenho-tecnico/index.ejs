@@ -1,172 +1,99 @@
 <% layout("layout") %>
-<link rel="stylesheet" href="/css/desenho-tecnico-central.css?v=20260819a">
-<link rel="stylesheet" href="/css/desenho-tecnico-central-stabilization.css?v=20260821-ui-v1">
-
+<link rel="stylesheet" href="/css/desenho-tecnico-central.css?v=20261029-start-v1">
 <%
-  const stats = resumo || { total: 0, vinculados: 0, semVinculo: 0, comPdf: 0, recentes: 0 };
   const listaSegura = Array.isArray(lista) ? lista : [];
   const equipamentosSeguros = Array.isArray(equipamentos) ? equipamentos : [];
+  const filtrosSeguros = typeof filtros !== 'undefined' && filtros ? filtros : {};
+  const canManageResolved = Boolean(typeof canManage !== 'undefined' && canManage);
   const canDeleteResolved = Boolean(typeof canDelete !== 'undefined' && canDelete);
+  const arquivados = filtrosSeguros.status === 'INATIVO';
+  const temFiltros = Boolean(filtrosSeguros.q || filtrosSeguros.equipamento_id);
+  const codigo = (d) => d.codigo || `CAD-${d.id}`;
+  const inativo = (d) => String(d.status || '').toUpperCase() === 'INATIVO';
+  const revisao = (d) => d.revisao != null && String(d.revisao).trim() !== '' && Number.isFinite(Number(d.revisao)) ? `REV. ${Number(d.revisao)}` : 'REV. —';
+  const abrirUrl = (d) => canManageResolved ? `/desenho-tecnico/cad/${d.id}/editor` : `/desenho-tecnico/cad/${d.id}`;
   const formatDate = (value) => {
     const raw = String(value || '').slice(0, 10);
-    if (!raw) return '—';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return '—';
     const parts = raw.split('-');
-    return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : raw;
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
   };
+  const recentes = !arquivados && !temFiltros ? listaSegura
+    .filter((d) => !inativo(d) && Number.isFinite(Date.parse(d.atualizado_em || '')))
+    .slice().sort((a, b) => Date.parse(b.atualizado_em) - Date.parse(a.atualizado_em)).slice(0, 3) : [];
+  const vinculados = listaSegura.filter((d) => Number(d.equipamento_id) > 0).length;
+  const comPdf = listaSegura.filter((d) => Number(d.total_pdfs) > 0).length;
 %>
-
-<section class="dtc-page">
-  <header class="dtc-hero">
-    <div class="dtc-hero-copy">
-      <span class="dtc-eyebrow">ENGENHARIA DE MANUTENÇÃO</span>
-      <h1>Central de Desenhos Técnicos</h1>
-      <p>Crie, abra e organize desenhos mecânicos 2D vinculados aos equipamentos da fábrica.</p>
-    </div>
-    <div class="dtc-hero-actions">
-      <% if (canDeleteResolved) { %>
-        <a class="dtc-btn dtc-hero-secondary" href="/desenho-tecnico?status=INATIVO">Arquivados</a>
-      <% } %>
-      <% if (canManage) { %>
-        <a class="dtc-btn dtc-btn-primary" href="/desenho-tecnico/cad/novo">
-          <span aria-hidden="true">＋</span> NOVO CAD
-        </a>
-      <% } %>
-    </div>
-  </header>
-
-  <div class="dtc-kpis" aria-label="Resumo dos desenhos técnicos">
-    <article class="dtc-kpi">
-      <span class="dtc-kpi-icon">▱</span>
-      <div><strong><%= stats.total %></strong><span>Desenhos exibidos</span></div>
-    </article>
-    <article class="dtc-kpi">
-      <span class="dtc-kpi-icon">⚙</span>
-      <div><strong><%= stats.vinculados %></strong><span>Vinculados a equipamentos</span></div>
-    </article>
-    <article class="dtc-kpi">
-      <span class="dtc-kpi-icon">⌁</span>
-      <div><strong><%= stats.semVinculo %></strong><span>Sem vínculo técnico</span></div>
-    </article>
-    <article class="dtc-kpi">
-      <span class="dtc-kpi-icon">PDF</span>
-      <div><strong><%= stats.comPdf %></strong><span>Com PDF gerado</span></div>
-    </article>
-    <article class="dtc-kpi">
-      <span class="dtc-kpi-icon">↻</span>
-      <div><strong><%= stats.recentes %></strong><span>Atualizados em 30 dias</span></div>
-    </article>
-  </div>
-
-  <form class="dtc-filters" method="GET" action="/desenho-tecnico">
-    <div class="dtc-filter-main">
-      <label class="dtc-field dtc-search">
-        <span>Buscar desenho</span>
-        <input type="search" name="q" placeholder="Código ou título do desenho" value="<%= filtros.q || '' %>">
-      </label>
-      <label class="dtc-field">
-        <span>Equipamento</span>
-        <select name="equipamento_id">
-          <option value="">Todos os equipamentos</option>
-          <% equipamentosSeguros.forEach((eq) => { %>
-            <option value="<%= eq.id %>" <%= String(filtros.equipamento_id || '') === String(eq.id) ? 'selected' : '' %>>
-              <%= eq.codigo ? `${eq.codigo} — ` : '' %><%= eq.nome %>
-            </option>
-          <% }) %>
-        </select>
-      </label>
-      <label class="dtc-field">
-        <span>Status</span>
-        <select name="status">
-          <option value="" <%= !filtros.status ? 'selected' : '' %>>Todos</option>
-          <option value="ATIVO" <%= filtros.status === 'ATIVO' ? 'selected' : '' %>>Ativos</option>
-          <option value="INATIVO" <%= filtros.status === 'INATIVO' ? 'selected' : '' %>>Arquivados</option>
-        </select>
-      </label>
-    </div>
-    <div class="dtc-filter-actions">
-      <a class="dtc-btn dtc-btn-ghost" href="/desenho-tecnico?status=ATIVO">Limpar</a>
-      <button class="dtc-btn dtc-btn-secondary" type="submit">Aplicar filtros</button>
-    </div>
-  </form>
-
-  <section class="dtc-list-card">
-    <div class="dtc-section-head">
-      <div>
-        <span class="dtc-eyebrow">ARQUIVO TÉCNICO</span>
-        <h2><%= filtros.status === 'INATIVO' ? 'Desenhos arquivados' : 'Desenhos cadastrados' %></h2>
-      </div>
-      <span class="dtc-count"><%= listaSegura.length %> registro<%= listaSegura.length === 1 ? '' : 's' %></span>
-    </div>
-
-    <% if (!listaSegura.length) { %>
-      <div class="dtc-empty">
-        <span class="dtc-empty-icon">⌑</span>
-        <h3>Nenhum desenho encontrado</h3>
-        <p>Ajuste os filtros ou crie um novo desenho técnico 2D.</p>
-        <% if (canManage) { %><a class="dtc-btn dtc-btn-primary" href="/desenho-tecnico/cad/novo">Criar novo CAD</a><% } %>
-      </div>
-    <% } else { %>
-      <div class="dtc-table-wrap">
-        <table class="dtc-table">
-          <thead>
-            <tr>
-              <th>Desenho</th>
-              <th>Equipamento</th>
-              <th>Material</th>
-              <th>Revisão</th>
-              <th>Atualização</th>
-              <th>Status</th>
-              <th class="dtc-actions-col">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% listaSegura.forEach((d) => { %>
-              <tr>
-                <td data-label="Desenho">
-                  <div class="dtc-drawing-id">
-                    <span class="dtc-drawing-icon">⌗</span>
-                    <div>
-                      <strong><%= d.codigo || `CAD-${d.id}` %></strong>
-                      <span><%= d.titulo %></span>
-                    </div>
-                  </div>
-                </td>
-                <td data-label="Equipamento">
-                  <% if (d.equipamento_nome) { %>
-                    <span class="dtc-equipment">⚙ <%= d.equipamento_nome %></span>
-                  <% } else { %>
-                    <span class="dtc-muted">Sem vínculo</span>
-                  <% } %>
-                </td>
-                <td data-label="Material"><%= d.material || '—' %></td>
-                <td data-label="Revisão"><span class="dtc-revision">REV. <%= Number(d.revisao || 0) %></span></td>
-                <td data-label="Atualização"><%= formatDate(d.atualizado_em) %></td>
-                <td data-label="Status">
-                  <span class="dtc-status <%= String(d.status || 'ATIVO').toUpperCase() === 'ATIVO' ? 'is-active' : 'is-inactive' %>"><%= String(d.status || 'ATIVO').toUpperCase() === 'INATIVO' ? 'ARQUIVADO' : (d.status || 'ATIVO') %></span>
-                </td>
-                <td data-label="Ações" class="dtc-actions-col">
-                  <div class="dtc-row-actions">
-                    <% if (canManage && String(d.status || 'ATIVO').toUpperCase() !== 'INATIVO') { %>
-                      <a class="dtc-action dtc-action-primary" href="/desenho-tecnico/cad/<%= d.id %>/editor">Abrir CAD</a>
-                      <a class="dtc-action" href="/desenho-tecnico/cad/<%= d.id %>/pdf" target="_blank" rel="noopener">PDF</a>
-                    <% } else if (!canManage) { %>
-                      <a class="dtc-action" href="/desenho-tecnico/cad/<%= d.id %>">Detalhes</a>
-                    <% } %>
-                    <% if (canDeleteResolved && String(d.status || 'ATIVO').toUpperCase() !== 'INATIVO') { %>
-                      <form method="POST" action="/desenho-tecnico/cad/<%= d.id %>/arquivar" onsubmit="return confirm('Remover <%= d.codigo || `CAD-${d.id}` %> da lista principal? Os dados serão preservados como arquivados.');">
-                        <button class="dtc-action dtc-action-danger dtc-action-button" type="submit">Excluir</button>
-                      </form>
-                    <% } %>
-                    <% if (String(d.status || '').toUpperCase() === 'INATIVO') { %>
-                      <span class="dtc-archive-note">Arquivado</span>
-                    <% } %>
-                  </div>
-                </td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
+<section class="dtc-page" data-cad-central>
+  <aside class="dtc-nav" aria-label="Navegação de desenho técnico">
+    <div class="dtc-module-brand"><span class="dtc-brand-symbol" aria-hidden="true">CG</span><div><strong>Desenho técnico</strong><span>Campo do Gado</span></div></div>
+    <% if (canManageResolved) { %><a class="dtc-btn dtc-btn-primary dtc-new-drawing" href="/desenho-tecnico/cad/novo"><span aria-hidden="true">＋</span> Novo desenho</a><% } %>
+    <nav class="dtc-nav-links" aria-label="Biblioteca de desenhos">
+      <a href="/desenho-tecnico?status=ATIVO" class="dtc-nav-link <%= !arquivados ? 'is-current' : '' %>" <%- !arquivados ? 'aria-current="page"' : '' %>><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 3h9l5 5v13H5zM14 3v6h5M8 13h8M8 17h6"/></svg> Desenhos</a>
+      <% if (canDeleteResolved) { %><a href="/desenho-tecnico?status=INATIVO" class="dtc-nav-link <%= arquivados ? 'is-current' : '' %>" <%- arquivados ? 'aria-current="page"' : '' %>><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v4H4zM6 8v12h12V8M10 12h4"/></svg> Arquivados</a><% } %>
+    </nav>
+    <div class="dtc-nav-note"><span class="dtc-archive-dot" aria-hidden="true"></span><span>Arquivo técnico<br><strong>Manutenção Campo do Gado</strong></span></div>
+  </aside>
+  <div class="dtc-main">
+    <header class="dtc-hero">
+      <div><span class="dtc-eyebrow">BIBLIOTECA CAD</span><h1>Central de Desenhos Técnicos</h1><p><%= arquivados ? 'Consulte os desenhos preservados no arquivo técnico.' : 'Abra um desenho para continuar ou comece um novo projeto.' %></p></div>
+      <span class="dtc-access-label"><%= canManageResolved ? 'Desenho 2D · Visualização 3D' : 'Consulta de desenhos' %></span>
+    </header>
+    <% if (recentes.length) { %>
+      <section class="dtc-recent-section" aria-labelledby="dtcRecentTitle">
+        <div class="dtc-section-title"><h2 id="dtcRecentTitle">Desenhos recentes</h2><span>Atualizados recentemente</span></div>
+        <div class="dtc-recent-grid"><% recentes.forEach((d) => { %>
+          <a class="dtc-recent-card" href="<%= abrirUrl(d) %>" aria-label="<%= canManageResolved ? 'Abrir' : 'Consultar' %> <%= codigo(d) %> — <%= d.titulo || 'Sem título' %>">
+            <div class="dtc-recent-top"><span class="dtc-file-symbol" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 4h11l6 6v18H8zM19 4v7h6M12 16h9M12 20h9M12 24h5"/></svg></span><span class="dtc-revision"><%= revisao(d) %></span></div>
+            <strong class="dtc-recent-title"><%= d.titulo || 'Sem título' %></strong><span class="dtc-recent-code"><%= codigo(d) %></span>
+            <div class="dtc-recent-bottom"><span><%= d.equipamento_nome || 'Sem equipamento vinculado' %></span><time datetime="<%= String(d.atualizado_em).slice(0, 10) %>"><%= formatDate(d.atualizado_em) %></time></div>
+          </a>
+        <% }) %></div>
+      </section>
     <% } %>
-  </section>
+    <section class="dtc-library" aria-labelledby="dtcLibraryTitle">
+      <div class="dtc-section-head">
+        <div class="dtc-library-title"><h2 id="dtcLibraryTitle"><%= arquivados ? 'Desenhos arquivados' : 'Seus desenhos' %></h2><span class="dtc-count"><%= listaSegura.length %></span></div>
+        <div class="dtc-view-switch" data-cad-view-switch hidden role="group" aria-label="Exibição dos desenhos">
+          <button type="button" data-cad-view="list" aria-pressed="true" title="Exibir como lista"><svg aria-hidden="true" viewBox="0 0 20 20"><path d="M3 5h2M8 5h9M3 10h2M8 10h9M3 15h2M8 15h9"/></svg><span>Lista</span></button>
+          <button type="button" data-cad-view="cards" aria-pressed="false" title="Exibir como cartões"><svg aria-hidden="true" viewBox="0 0 20 20"><path d="M3 3h5v5H3zM12 3h5v5h-5zM3 12h5v5H3zM12 12h5v5h-5z"/></svg><span>Cartões</span></button>
+        </div>
+      </div>
+      <form class="dtc-filters" method="GET" action="/desenho-tecnico" aria-label="Filtrar desenhos">
+        <label class="dtc-field dtc-search"><span>Buscar desenho</span><span class="dtc-search-input"><svg aria-hidden="true" viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg><input type="search" name="q" placeholder="Buscar por código ou título" value="<%= filtrosSeguros.q || '' %>"></span></label>
+        <label class="dtc-field"><span>Equipamento</span><select name="equipamento_id"><option value="">Todos os equipamentos</option><% equipamentosSeguros.forEach((eq) => { %><option value="<%= eq.id %>" <%= String(filtrosSeguros.equipamento_id || '') === String(eq.id) ? 'selected' : '' %>><%= eq.codigo ? `${eq.codigo} — ` : '' %><%= eq.nome %></option><% }) %></select></label>
+        <label class="dtc-field dtc-status-field"><span>Status</span><select name="status"><option value="" <%= !filtrosSeguros.status ? 'selected' : '' %>>Todos</option><option value="ATIVO" <%= filtrosSeguros.status === 'ATIVO' ? 'selected' : '' %>>Ativos</option><option value="INATIVO" <%= filtrosSeguros.status === 'INATIVO' ? 'selected' : '' %>>Arquivados</option></select></label>
+        <div class="dtc-filter-actions"><button class="dtc-btn dtc-btn-secondary" type="submit">Filtrar</button><a class="dtc-btn dtc-btn-ghost" href="/desenho-tecnico?status=ATIVO">Limpar</a></div>
+      </form>
+      <% if (!listaSegura.length) { %>
+        <div class="dtc-empty"><span class="dtc-empty-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 4h11l6 6v18H8zM19 4v7h6M12 16h9M12 21h6"/></svg></span>
+          <h3><%= temFiltros ? 'Nenhum desenho corresponde à busca' : arquivados ? 'Nenhum desenho arquivado' : 'Seu próximo desenho começa aqui' %></h3>
+          <p><%= temFiltros ? 'Tente outro código, título ou equipamento para encontrar o desenho.' : arquivados ? 'Os desenhos arquivados aparecerão aqui, com seus dados preservados.' : canManageResolved ? 'Crie um desenho e mantenha medidas, revisões e equipamentos no mesmo lugar.' : 'Os desenhos cadastrados ficarão disponíveis aqui para consulta.' %></p>
+          <% if (temFiltros) { %><a class="dtc-btn dtc-btn-secondary" href="/desenho-tecnico?status=<%= arquivados ? 'INATIVO' : 'ATIVO' %>">Limpar busca</a><% } else if (canManageResolved && !arquivados) { %><a class="dtc-btn dtc-btn-primary" href="/desenho-tecnico/cad/novo">Criar primeiro desenho</a><% } %>
+        </div>
+      <% } else { %>
+        <div class="dtc-records" data-cad-records data-view="list"><table class="dtc-table">
+          <caption class="dtc-sr-only"><%= arquivados ? 'Desenhos arquivados' : 'Desenhos técnicos' %>, ordenados pela atualização mais recente</caption>
+          <thead><tr><th scope="col">Desenho</th><th scope="col">Equipamento</th><th scope="col">Material</th><th scope="col">Revisão</th><th scope="col">Atualização</th><th scope="col">Status</th><th scope="col" class="dtc-actions-col">Ações</th></tr></thead>
+          <tbody><% listaSegura.forEach((d) => { %>
+            <tr>
+              <td data-label="Desenho" class="dtc-drawing-cell"><div class="dtc-drawing-id"><span class="dtc-drawing-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h9l5 5v13H5zM14 3v6h5M8 13h8M8 17h6"/></svg></span><div><span class="dtc-drawing-code"><%= codigo(d) %></span><% if (!inativo(d) || !canManageResolved) { %><a class="dtc-drawing-title" href="<%= abrirUrl(d) %>"><%= d.titulo || 'Sem título' %></a><% } else { %><strong class="dtc-drawing-title"><%= d.titulo || 'Sem título' %></strong><% } %></div></div></td>
+              <td data-label="Equipamento"><span class="<%= d.equipamento_nome ? 'dtc-equipment' : 'dtc-muted' %>"><%= d.equipamento_nome || 'Sem vínculo' %></span></td>
+              <td data-label="Material"><%= d.material || '—' %></td>
+              <td data-label="Revisão"><span class="dtc-revision"><%= revisao(d) %></span></td>
+              <td data-label="Atualização"><time datetime="<%= /^\d{4}-\d{2}-\d{2}/.test(String(d.atualizado_em || '')) ? String(d.atualizado_em).slice(0, 10) : '' %>"><%= formatDate(d.atualizado_em) %></time></td>
+              <td data-label="Status"><span class="dtc-status <%= inativo(d) ? 'is-inactive' : 'is-active' %>"><span aria-hidden="true"></span><%= inativo(d) ? 'Arquivado' : (d.status || '—') %></span></td>
+              <td data-label="Ações" class="dtc-actions-col"><div class="dtc-row-actions">
+                <% if (canManageResolved && !inativo(d)) { %><a class="dtc-action dtc-action-primary" href="/desenho-tecnico/cad/<%= d.id %>/editor">Abrir CAD</a><a class="dtc-action" href="/desenho-tecnico/cad/<%= d.id %>/pdf" target="_blank" rel="noopener" aria-label="PDF de <%= codigo(d) %>">PDF</a><% } else if (!canManageResolved) { %><a class="dtc-action dtc-action-primary" href="/desenho-tecnico/cad/<%= d.id %>">Detalhes</a><% } %>
+                <% if (canDeleteResolved && !inativo(d)) { %><form method="POST" action="/desenho-tecnico/cad/<%= d.id %>/arquivar" onsubmit="return confirm('Arquivar este desenho? Os dados serão preservados e poderão ser consultados em Arquivados.');"><button class="dtc-action dtc-action-archive" type="submit" aria-label="Arquivar <%= codigo(d) %>">Arquivar</button></form><% } %>
+                <% if (canManageResolved && inativo(d)) { %><span class="dtc-archive-note">Dados preservados</span><% } %>
+              </div></td>
+            </tr>
+          <% }) %></tbody>
+        </table></div>
+        <div class="dtc-library-foot"><span><%= listaSegura.length %> desenho<%= listaSegura.length === 1 ? '' : 's' %> nesta seleção</span><span><%= vinculados %> com equipamento · <%= comPdf %> com PDF gerado</span></div>
+      <% } %>
+    </section>
+  </div>
 </section>
+<script src="/js/desenho-tecnico-central.js?v=20261029-start-v1" defer></script>

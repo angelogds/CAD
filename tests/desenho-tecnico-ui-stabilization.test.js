@@ -26,7 +26,7 @@ test('menu lateral reaproveita botoes existentes sem recriar ferramentas', () =>
   assert.match(ui, /hideLegacyEditor/);
 });
 
-test('central usa permissao RBAC real e abre MLightCAD diretamente', () => {
+test('central usa permissao RBAC real e abre o editor CAD diretamente', () => {
   const routes = read('modules/desenho-tecnico/desenho-tecnico.routes.js');
   const view = read('views/desenho-tecnico/index.ejs');
   assert.match(routes, /canAccessModule/);
@@ -34,7 +34,7 @@ test('central usa permissao RBAC real e abre MLightCAD diretamente', () => {
   assert.match(routes, /req\.query\.status = 'ATIVO'/);
   assert.match(routes, /desenho_tecnico_manage/);
   assert.match(routes, /res\.redirect\(`\/desenho-tecnico\/cad\/\$\{req\.params\.id\}\/editor`\)/);
-  assert.match(view, /NOVO CAD/);
+  assert.match(view, /Novo desenho/);
   assert.match(view, />Abrir CAD</);
   assert.doesNotMatch(view, />Visualizar</);
 });
@@ -48,7 +48,7 @@ test('exclusao da central e arquivamento nao destroem dados', () => {
   assert.match(archive, /service\.inactivate\(desenho\.id\)/);
   assert.match(archive, /dados foram preservados/i);
   assert.match(view, /action="\/desenho-tecnico\/cad\/<%= d\.id %>\/arquivar"/);
-  assert.match(view, />Excluir</);
+  assert.match(view, />Arquivar</);
 });
 
 test('pagina antiga de detalhes nao renderiza mais preview SVG legado', () => {

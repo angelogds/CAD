@@ -18,10 +18,10 @@ test('editor carrega apenas a base CAD e a identidade visual atual', () => {
 });
 
 test('camada atual preserva workspace, inspetor e responsividade', () => {
-  const css = read('public/css/cad-system-shell.css');
-  assert.match(css, /\.cad-fullscreen \.cad-ribbon/);
-  assert.match(css, /\.cad-fullscreen \.cad-canvas-container/);
-  assert.match(css, /\.cad-fullscreen \.cad-panel-right/);
-  assert.match(css, /\.cad-fullscreen \.cad-statusbar/);
-  assert.match(css, /@media \(max-width:960px\)/);
+  const css = read('public/css/cad-solidworks-workbench.css');
+  assert.match(css, /\.cad-technical-shell \.cad-ribbon/);
+  assert.match(css, /\.cad-technical-shell \.cad-canvas-container/);
+  assert.match(css, /\.cad-technical-shell \.cad-panel-right/);
+  assert.match(css, /\.cad-technical-shell \.cad-statusbar/);
+  assert.match(css, /@media\(max-width:960px\)/);
 });

@@ -14,6 +14,7 @@ import {
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const CAD_ICONS = {
+  calculator: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h1m3 0h1m3 0h.1M8 15h1m3 0h1m3 0h.1M8 18h1m3 0h1m3 0h.1"/>',
   select: '<path d="M5 3l13 9-6 1.6 3.6 5.2-2.5 1.7-3.5-5.3L5 19V3z"/>',
   line: '<path d="M5 19L19 5"/><circle cx="5" cy="19" r="1.5"/><circle cx="19" cy="5" r="1.5"/>',
   polyline: '<path d="M4 18l5-9 5 5 6-9"/><circle cx="4" cy="18" r="1.3"/><circle cx="9" cy="9" r="1.3"/><circle cx="14" cy="14" r="1.3"/><circle cx="20" cy="5" r="1.3"/>',
@@ -67,6 +68,7 @@ const CAD_ICONS = {
 };
 
 const CAD_ACTION_ICONS = {
+  calculator: 'calculator', 'export-pdf': 'pdf', 'export-step': 'solid', 'display-hatch': 'hatch', 'tool-cotar': 'dimLinear', 'toggle-polar': 'polar',
   'tool-select': 'select', 'tool-line': 'line', 'tool-polyline': 'polyline', 'tool-circle': 'circle', 'tool-arc': 'arc', 'tool-rect': 'rect',
   'tool-ellipse': 'ellipse', 'tool-spline': 'spline', 'tool-flange': 'flange', 'tool-shaft': 'shaft', 'tool-text': 'text',
   'tool-move': 'move', 'tool-copy': 'copy', 'tool-offset': 'offset', 'tool-trim': 'trim', 'tool-extend': 'extend', 'delete-selection': 'delete',
@@ -130,12 +132,12 @@ function addGroup(ribbon, className, label, items, before = null) {
 function ensureStyleSheet() {
   const existing = document.querySelector('link[data-cad-final2d-style]');
   if (existing) {
-    existing.href = '/css/cad-solidworks-workbench.css?v=20261005-panels-v1';
+    existing.href = '/css/cad-solidworks-workbench.css?v=20261029-workspace-v1';
     return;
   }
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = '/css/cad-solidworks-workbench.css?v=20261005-panels-v1';
+  link.href = '/css/cad-solidworks-workbench.css?v=20261029-workspace-v1';
   link.dataset.cadFinal2dStyle = '1';
   document.head.appendChild(link);
 }
@@ -145,37 +147,25 @@ function installTechnicalShell(cad) {
   const shell = document.querySelector('.cad-fullscreen');
   if (!shell) return;
 
-  shell.classList.add('cad-solidworks-shell', 'cad-technical-shell', 'cad-theme-dark');
-  shell.classList.remove('cad-theme-light');
+  shell.classList.add('cad-technical-shell');
   shell.dataset.displayMode = 'wireframe';
-  document.body.classList.add('cad-solidworks-mode', 'cad-technical-mode');
+  document.body.classList.add('cad-technical-mode');
 
   const brand = document.querySelector('.cad-brand-mark');
-  if (brand) brand.textContent = '2D';
-
-  const appbar = document.querySelector('.cad-appbar');
-  if (appbar && !appbar.querySelector('.cad-workbench-badge')) {
-    const heading = appbar.querySelector('.cad-document-heading');
-    const badge = document.createElement('span');
-    badge.className = 'cad-workbench-badge';
-    badge.textContent = 'DESENHO MECÂNICO • CAD 2D';
-    heading?.prepend(badge);
-  } else if (appbar?.querySelector('.cad-workbench-badge')) {
-    appbar.querySelector('.cad-workbench-badge').textContent = 'DESENHO MECÂNICO • CAD 2D';
-  }
+  if (brand) brand.textContent = 'CG';
 
   const left = document.querySelector('.cad-panel-left');
   if (left && !left.querySelector('.cad-feature-manager-head')) {
     const head = document.createElement('div');
     head.className = 'cad-feature-manager-head';
-    head.innerHTML = '<div class="cad-feature-manager-copy"><strong>FeatureManager</strong><span>Árvore e ferramentas do desenho</span></div><button class="cad-side-header-toggle" data-action="toggle-left-panel" type="button" aria-label="Recolher painel esquerdo" title="Recolher painel esquerdo">‹</button>';
+    head.innerHTML = '<div class="cad-feature-manager-copy"><strong>Explorador</strong><span>Camadas e objetos</span></div><button class="cad-side-header-toggle" data-action="toggle-left-panel" type="button" aria-label="Recolher painel esquerdo" title="Recolher painel esquerdo">‹</button>';
     left.prepend(head);
   } else if (left?.querySelector('.cad-feature-manager-head span')) {
-    left.querySelector('.cad-feature-manager-head span').textContent = 'Árvore e ferramentas do desenho';
+    left.querySelector('.cad-feature-manager-head span').textContent = 'Camadas e objetos';
   }
 
   const rightHead = document.querySelector('.cad-inspector-head strong');
-  if (rightHead) rightHead.textContent = 'PropertyManager';
+  if (rightHead) rightHead.textContent = 'Propriedades';
 
   cad.render?.();
 }
@@ -189,7 +179,7 @@ function installFinalTools(cad) {
   ].forEach((tool) => cad.toolManager.register(tool));
 
   const labels = {
-    ellipse: 'Elipse', spline: 'Spline', hatch: 'Hachura', scale: 'Escala', stretch: 'Stretch', break: 'Break', join: 'Join', explode: 'Explode', array_rect: 'Array retangular', array_polar: 'Array circular',
+    ellipse: 'Elipse', spline: 'Spline', hatch: 'Hachura', scale: 'Escala', stretch: 'Esticar', break: 'Quebrar', join: 'Unir', explode: 'Explodir', array_rect: 'Matriz retangular', array_polar: 'Matriz circular',
   };
   const priorLabel = cad.getToolLabel.bind(cad);
   cad.getToolLabel = (name) => labels[name] || priorLabel(name);
@@ -244,10 +234,10 @@ function installFinalRibbon() {
 
   [
     { action: 'tool-scale', tool: 'scale', icon: '⤢', label: 'Escala', title: 'Escalar seleção (SC)' },
-    { action: 'tool-stretch', tool: 'stretch', icon: '↔', label: 'Stretch', title: 'Esticar por grip (ST)' },
-    { action: 'tool-break', tool: 'break', icon: '⌇', label: 'Break', title: 'Remover trecho de linha (BR)' },
-    { action: 'tool-join', tool: 'join', icon: '⛓', label: 'Join', title: 'Unir linhas conectadas (J)' },
-    { action: 'tool-explode', tool: 'explode', icon: '✣', label: 'Explode', title: 'Explodir polilinha/retângulo (XP)' },
+    { action: 'tool-stretch', tool: 'stretch', icon: '↔', label: 'Esticar', title: 'Esticar por grip (ST)' },
+    { action: 'tool-break', tool: 'break', icon: '⌇', label: 'Quebrar', title: 'Remover trecho de linha (BR)' },
+    { action: 'tool-join', tool: 'join', icon: '⛓', label: 'Unir', title: 'Unir linhas conectadas (J)' },
+    { action: 'tool-explode', tool: 'explode', icon: '✣', label: 'Explodir', title: 'Explodir polilinha/retângulo (XP)' },
   ].forEach((config) => { if (modify && !modify.querySelector(`[data-action="${config.action}"]`)) modify.appendChild(button(config)); });
 
   addGroup(ribbon, 'cad-ribbon-hatch-final', 'Hachura', [
@@ -258,23 +248,8 @@ function installFinalRibbon() {
     { action: 'tool-array-polar', tool: 'array_polar', icon: '◉', label: 'Circular', title: 'Array circular/polar (AP)' },
   ], precision);
 
-  const left = document.querySelector('.cad-panel-left');
-  if (left && !left.querySelector('.cad-tool-group-final2d')) {
-    const group = document.createElement('div');
-    group.className = 'cad-tool-group cad-tool-group-final2d';
-    group.innerHTML = '<span class="cad-tool-group-label">CAD 2D avançado</span>';
-    [
-      { action: 'tool-ellipse', tool: 'ellipse', icon: '⬭', label: 'Elipse' }, { action: 'tool-spline', tool: 'spline', icon: '∿', label: 'Spline' },
-      { action: 'tool-hatch', tool: 'hatch', icon: '▧', label: 'Hachura' }, { action: 'tool-scale', tool: 'scale', icon: '⤢', label: 'Escala' },
-      { action: 'tool-stretch', tool: 'stretch', icon: '↔', label: 'Stretch' }, { action: 'tool-break', tool: 'break', icon: '⌇', label: 'Break' },
-      { action: 'tool-join', tool: 'join', icon: '⛓', label: 'Join' }, { action: 'tool-explode', tool: 'explode', icon: '✣', label: 'Explode' },
-      { action: 'tool-array-rect', tool: 'array_rect', icon: '▦', label: 'Array ret.' }, { action: 'tool-array-polar', tool: 'array_polar', icon: '◉', label: 'Array circ.' },
-    ].forEach((config) => group.appendChild(sideButton(config)));
-    left.appendChild(group);
-  }
-
   const command = document.getElementById('cadCommandInput');
-  if (command) command.placeholder = 'Comando: L, PL, C, EL, SPL, H, M, RO, FI, CHA, SC, ST, BR, J, XP, AR, AP...';
+  if (command) command.placeholder = 'Digite um comando ou coordenada — L, C, M, @50,0';
 }
 
 function createTabButton(id, label) {
@@ -283,6 +258,8 @@ function createTabButton(id, label) {
   el.className = 'cad-command-tab';
   el.dataset.cadTab = id;
   el.setAttribute('role', 'tab');
+  el.id = `cad-tab-${id}`;
+  el.setAttribute('aria-controls', 'cadRibbon');
   el.textContent = label;
   return el;
 }
@@ -292,13 +269,34 @@ function activateCadTab(ribbon, tabs, active) {
     const selected = tab.dataset.cadTab === active;
     tab.classList.toggle('active', selected);
     tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+    tab.tabIndex = selected ? 0 : -1;
   });
   ribbon.querySelectorAll(':scope > .cad-ribbon-group').forEach((group) => {
     const assigned = String(group.dataset.cadTabs || 'home').split(/\s+/).filter(Boolean);
     group.hidden = !assigned.includes(active);
   });
   ribbon.dataset.activeCadTab = active;
+  ribbon.setAttribute('aria-labelledby', `cad-tab-${active}`);
+  requestAnimationFrame(() => window.CAD_APP?.reflowWorkspace?.());
   window.localStorage?.setItem?.('cad2d.commandTab', active);
+}
+
+export function normalizeCadRibbon(ribbon) {
+  if (!ribbon) return;
+  const mapping = [
+    ['cad-ribbon-featured', 'home'], ['cad-ribbon-home-quick', 'home'],
+    ['cad-ribbon-selection', 'modify'], ['cad-ribbon-annotation', 'annotate'],
+    ['cad-ribbon-hatch-final', 'draw'], ['cad-ribbon-array-final', 'modify'],
+    ['cad-ribbon-layer-manager', 'home view'], ['cad-ribbon-precision', 'view'],
+    ['cad-ribbon-display-mode', 'view'], ['cad-ribbon-file', 'view'], ['cad-ribbon-utilities', 'home'],
+  ];
+  mapping.forEach(([name, owner]) => { const group = ribbon.querySelector(`.${name}`); if (group) group.dataset.cadTabs = owner; });
+  const active = ribbon.dataset.activeCadTab || 'home';
+  ribbon.querySelectorAll(':scope > .cad-ribbon-group').forEach((group) => {
+    const assigned = String(group.dataset.cadTabs || 'home').split(/\s+/).filter(Boolean);
+    group.hidden = !assigned.includes(active);
+    group.querySelectorAll('.cad-ribbon-btn[data-action]').forEach((el) => replaceCommandIcon(el, '.cad-ribbon-icon', 'cad-ribbon-icon'));
+  });
 }
 
 function installCommandManagerTabs(cad) {
@@ -322,14 +320,14 @@ function installCommandManagerTabs(cad) {
     { action: 'tool-move', tool: 'move', icon: '✥', label: 'Mover', title: 'Mover (M)' },
     { action: 'tool-copy', tool: 'copy', icon: '⧉', label: 'Copiar', title: 'Copiar (CO)' },
     { action: 'tool-trim', tool: 'trim', icon: '⌁', label: 'Aparar', title: 'Aparar (TR)' },
-    { action: 'tool-hatch', tool: 'hatch', icon: '▧', label: 'Hachura', title: 'Hachura (H)' },
+    { action: 'tool-select', tool: 'select', icon: 'select', label: 'Selecionar', title: 'Selecionar objetos (Esc)' },
     { action: 'tool-measure', tool: 'measure', icon: '⌖', label: 'Medir', title: 'Medir distância (DI)' },
   ], precision);
 
   const layers = addGroup(ribbon, 'cad-ribbon-layer-manager', 'Camadas', [
-    { action: 'focus-layers', icon: '▤', label: 'Layer atual', title: 'Abrir gerenciador de camadas' },
-    { action: 'new-layer', icon: '＋', label: 'Nova layer', title: 'Criar uma nova camada' },
-    { action: 'focus-properties', icon: '☷', label: 'Propriedades', title: 'Abrir PropertyManager' },
+    { action: 'focus-layers', icon: '▤', label: 'Camadas', title: 'Abrir gerenciador de camadas' },
+    { action: 'new-layer', icon: '＋', label: 'Nova camada', title: 'Criar uma nova camada' },
+    { action: 'focus-properties', icon: '☷', label: 'Propriedades', title: 'Abrir propriedades' },
   ], precision);
 
   const display = addGroup(ribbon, 'cad-ribbon-display-mode', 'Visualização 2D', [
@@ -345,13 +343,20 @@ function installCommandManagerTabs(cad) {
   if (arrays) arrays.dataset.cadTabs = 'modify';
   if (selection) selection.dataset.cadTabs = 'modify';
   if (annotation) annotation.dataset.cadTabs = 'annotate';
-  if (layers) layers.dataset.cadTabs = 'layers';
+  if (layers) layers.dataset.cadTabs = 'home view';
   if (precision) precision.dataset.cadTabs = 'view';
   if (display) display.dataset.cadTabs = 'view';
 
   Array.from(ribbon.querySelectorAll(':scope > .cad-ribbon-group')).forEach((group) => {
     if (!group.dataset.cadTabs) group.dataset.cadTabs = 'home';
   });
+
+  const utility = addGroup(ribbon, 'cad-ribbon-utilities', 'Utilitários', [
+    { action: 'calculator', icon: 'calculator', label: 'Calculadora', title: 'Calculadora técnica' },
+  ]);
+  utility.dataset.cadTabs = 'home';
+  ribbon.id = 'cadRibbon';
+  ribbon.setAttribute('role', 'tabpanel');
 
   const tabs = document.createElement('div');
   tabs.className = 'cad-command-tabs';
@@ -361,7 +366,6 @@ function installCommandManagerTabs(cad) {
     ['draw', 'Desenhar'],
     ['modify', 'Modificar'],
     ['annotate', 'Anotar'],
-    ['layers', 'Camadas'],
     ['view', 'Vista'],
   ].forEach(([id, label]) => tabs.appendChild(createTabButton(id, label)));
   toolbar.insertBefore(tabs, ribbon);
@@ -371,21 +375,31 @@ function installCommandManagerTabs(cad) {
     if (!tab) return;
     activateCadTab(ribbon, tabs, tab.dataset.cadTab);
   });
+  tabs.addEventListener('keydown', (event) => {
+    const controls = [...tabs.querySelectorAll('[role=tab]')];
+    const index = controls.indexOf(document.activeElement);
+    if (index < 0 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault(); event.stopPropagation();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? controls.length - 1
+      : (index + (event.key === 'ArrowRight' ? 1 : -1) + controls.length) % controls.length;
+    controls[next].focus(); activateCadTab(ribbon, tabs, controls[next].dataset.cadTab);
+  });
   const savedTab = window.localStorage?.getItem?.('cad2d.commandTab');
-  const initialTab = ['home', 'draw', 'modify', 'annotate', 'layers', 'view'].includes(savedTab) ? savedTab : 'home';
+  const initialTab = ['home', 'draw', 'modify', 'annotate', 'view'].includes(savedTab) ? savedTab : 'home';
   activateCadTab(ribbon, tabs, initialTab);
 
   const priorAction = cad.executeAction.bind(cad);
   cad.executeAction = (action, source) => {
     if (action === 'focus-layers' || action === 'new-layer' || action === 'focus-properties') {
-      const rightPanel = document.getElementById('cadRightPanel');
-      rightPanel?.classList.remove('collapsed');
+      const shell = document.querySelector('.cad-fullscreen');
+      const side = action === 'focus-properties' ? 'right' : 'left';
+      if (shell?.classList.contains(`cad-${side}-collapsed`)) cad.executeAction(`toggle-${side}-panel`);
       const target = action === 'new-layer' ? document.getElementById('cadLayerNewName')
         : action === 'focus-layers' ? document.getElementById('cadLayerSelect')
           : document.getElementById('cadProperties');
       const details = target?.closest('details');
       if (details) details.open = true;
-      target?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+      target?.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
       if (action === 'new-layer') target?.focus?.();
       return;
     }
@@ -509,13 +523,6 @@ function installDisplayMode(cad) {
     return priorAction(action, source);
   };
 
-  const statusbar = document.querySelector('.cad-statusbar');
-  if (statusbar && !statusbar.querySelector('.cad-display-status-switch')) {
-    const switcher = document.createElement('div');
-    switcher.className = 'cad-display-status-switch';
-    switcher.innerHTML = '<span>VISUAL</span><button type="button" data-action="display-wireframe">LINHAS</button><button type="button" data-action="display-solid">SÓLIDO</button>';
-    statusbar.appendChild(switcher);
-  }
   cad.render();
 }
 
@@ -533,7 +540,7 @@ function updateFeatureManager(cad) {
   const dimensions = entities.filter((entity) => entity.type === 'dimension').length;
   const hatches = entities.filter((entity) => entity.metadata?.primitive === 'hatch').length;
   const layers = Object.keys(cad.state?.layers || {}).length;
-  summary.innerHTML = `<div><span>${cadIcon('layer')}</span><strong>${layers}</strong><small>layers</small></div><div><span>${cadIcon('wireframe')}</span><strong>${entities.length}</strong><small>objetos</small></div><div><span>${cadIcon('dimLinear')}</span><strong>${dimensions}</strong><small>cotas</small></div><div><span>${cadIcon('hatch')}</span><strong>${hatches}</strong><small>hachuras</small></div>`;
+  summary.innerHTML = `<div><span>${cadIcon('layer')}</span><strong>${layers}</strong><small>camadas</small></div><div><span>${cadIcon('wireframe')}</span><strong>${entities.length}</strong><small>objetos</small></div><div><span>${cadIcon('dimLinear')}</span><strong>${dimensions}</strong><small>cotas</small></div><div><span>${cadIcon('hatch')}</span><strong>${hatches}</strong><small>hachuras</small></div>`;
 }
 
 function installFeatureManagerSummary(cad) {
@@ -596,8 +603,8 @@ function installProfessionalIcons() {
   if (flangePreview) flangePreview.innerHTML = cadIcon('flange');
 
   [
-    ['.cad-feature-manager-head strong', 'wireframe', 'FeatureManager'],
-    ['.cad-inspector-head strong', 'properties', 'PropertyManager'],
+    ['.cad-feature-manager-head strong', 'wireframe', 'Explorador'],
+    ['.cad-inspector-head strong', 'properties', 'Propriedades'],
   ].forEach(([selector, iconName, label]) => {
     const title = document.querySelector(selector);
     if (title && !title.querySelector('.cad-manager-icon')) title.innerHTML = `<span class="cad-manager-icon">${cadIcon(iconName)}</span><span>${label}</span>`;
