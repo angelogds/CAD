@@ -99,7 +99,8 @@ test('pré-visualização mostra o que vai ficar antes do terceiro clique',()=>{
 });
 
 test('cadeia do editor força versão nova do Aparar de três cliques',()=>{
-  const version='20261028-706-step-v1';
+  const version='20261028-drafting-3d-v1';
+  const trimVersion='20261028-706-step-v1';
   const view=fs.readFileSync(path.join(root,'views/desenho-tecnico/cad-editor-v2.ejs'),'utf8');
   const engine=fs.readFileSync(path.join(root,'public/js/cad-engine-v2.js'),'utf8');
   const legacy=fs.readFileSync(path.join(root,'public/js/cad-legacy-engine.js'),'utf8');
@@ -111,6 +112,6 @@ test('cadeia do editor força versão nova do Aparar de três cliques',()=>{
   assert.match(engine,new RegExp('cad-legacy-engine\\.js\\?v='+version));
   assert.match(legacy,new RegExp('desenho-tecnico\\.service\\.js\\?v='+version));
   assert.match(service,new RegExp('desenho-tecnico\\.controller\\.js\\?v='+version));
-  assert.match(controller,new RegExp('trim\\.tool\\.js\\?v='+version));
-  assert.match(trim,new RegExp('modify\\.geometry\\.mjs\\?v='+version));
+  assert.match(controller,new RegExp('trim\\.tool\\.js\\?v='+trimVersion));
+  assert.match(trim,new RegExp('modify\\.geometry\\.mjs\\?v='+trimVersion));
 });

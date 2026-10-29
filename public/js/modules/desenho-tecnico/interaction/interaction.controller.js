@@ -20,7 +20,8 @@ export class InteractionController {
     this.svg.addEventListener('dblclick', (e) => this.toolManager.active?.onDblClick?.(this.#evt(e)));
     this.svg.addEventListener('wheel', (e) => this.#onWheel(e), { passive: false });
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space' && !e.target?.matches?.('input, textarea, select, [contenteditable="true"]')) {
+      if (this.#isEditing(e) || e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.code === 'Space') {
         this.spacePan = true;
         e.preventDefault();
       }
@@ -28,9 +29,15 @@ export class InteractionController {
     });
     window.addEventListener('keyup', (e) => {
       if (e.code === 'Space') { this.spacePan = false; this.dragState = null; }
+      if (this.#isEditing(e) || e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
       this.toolManager.active?.onKeyUp?.(e);
     });
     window.addEventListener('blur', () => { this.spacePan = false; this.dragState = null; });
+  }
+
+  #isEditing(e) {
+    const target = e.target;
+    return Boolean(target?.isContentEditable || target?.closest?.('input, textarea, select, [contenteditable="true"]'));
   }
 
   #screenFromEvent(e) {
@@ -56,6 +63,7 @@ export class InteractionController {
       this.dragState = this.#evt(e);
       return;
     }
+    if (e.button !== 0) return;
     this.toolManager.active?.onMouseDown?.(this.#evt(e));
   }
 

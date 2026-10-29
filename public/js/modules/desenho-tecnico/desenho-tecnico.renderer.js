@@ -251,6 +251,7 @@ export class DesenhoTecnicoRenderer {
         this.renderShaft(g, e, stroke);
       } else if (e.type === 'polyline') {
         const points = (e.geometry.points || []).map((p) => this.viewport.worldToScreen(p.x, p.y));
+        if (e.geometry.closed && points.length > 2) points.push(points[0]);
         if (points.length > 1) g.insertAdjacentHTML('beforeend', `<polyline points='${points.map((p) => `${p.x},${p.y}`).join(' ')}' fill='none' stroke='${stroke}' stroke-width='${strokeWidth}' ${dash}/>`);
       } else if (e.type === 'text') {
         const p = this.viewport.worldToScreen(e.geometry.x, e.geometry.y);
@@ -352,6 +353,7 @@ export class DesenhoTecnicoRenderer {
           g.insertAdjacentHTML('beforeend', `<rect x='${p0.x}' y='${p0.y}' width='${Math.abs(e.geometry.width * this.viewport.getViewState().zoom)}' height='${Math.abs(e.geometry.height * this.viewport.getViewState().zoom)}' fill='none' stroke='${stroke}' stroke-dasharray='6 4'/>`);
         } else if (e.type === 'polyline') {
           const points = (e.geometry.points || []).map((pp) => this.viewport.worldToScreen(pp.x, pp.y));
+          if (e.geometry.closed && points.length > 2) points.push(points[0]);
           if (points.length > 1) g.insertAdjacentHTML('beforeend', `<polyline points='${points.map((pp) => `${pp.x},${pp.y}`).join(' ')}' fill='none' stroke='${stroke}' stroke-dasharray='6 4'/>`);
         } else if (e.type === 'arc') {
           g.insertAdjacentHTML('beforeend', `<path d='${arcPath(this.viewport, e.geometry)}' fill='none' stroke='${stroke}' stroke-dasharray='6 4'/>`);

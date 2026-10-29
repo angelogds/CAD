@@ -152,37 +152,70 @@ export function circleCircleIntersections(c1, r1, c2, r2) {
 }
 
 export function parseCadPointInput(raw, basePoint = null, cursorPoint = null) {
-  const text = String(raw || '').trim().replace(/\s+/g, '');
+  const text = String(raw ?? '').trim().replace(/\s+/g, '');
   if (!text) return null;
   const relative = text.startsWith('@');
   const body = relative ? text.slice(1) : text;
+  const number = (value, decimalComma = false) => {
+    const token = decimalComma ? value.replace(',', '.') : value;
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(token)) return NaN;
+    return Number(token);
+  };
+  const base = isFinitePoint(basePoint) ? { x: Number(basePoint.x), y: Number(basePoint.y) } : null;
+  const validPoint = (point) => Number.isFinite(point.x) && Number.isFinite(point.y) ? point : null;
   if (body.includes('<')) {
-    if (!basePoint) return null;
-    const [distanceRaw, angleRaw] = body.split('<');
-    const length = Number(distanceRaw);
-    const degrees = Number(angleRaw);
+    const polar = body.split('<');
+    if (polar.length !== 2 || (relative && !base)) return null;
+    const length = number(polar[0], true);
+    const degrees = number(polar[1], true);
     if (!Number.isFinite(length) || length < 0 || !Number.isFinite(degrees)) return null;
-    const radians = degrees * Math.PI / 180;
-    return { x: basePoint.x + Math.cos(radians) * length, y: basePoint.y + Math.sin(radians) * length };
+    const origin = relative ? base : { x: 0, y: 0 };
+    const radians = (degrees % 360) * Math.PI / 180;
+    return validPoint({ x: origin.x + Math.cos(radians) * length, y: origin.y + Math.sin(radians) * length });
   }
-  const coordinates = body.split(/[;,]/);
+  // With ';' as the coordinate separator, each ordinate may use a decimal comma.
+  const decimalComma = body.includes(';');
+  const coordinates = body.split(decimalComma ? ';' : ',');
   if (coordinates.length === 2) {
-    const x = Number(coordinates[0]);
-    const y = Number(coordinates[1]);
+    const x = number(coordinates[0], decimalComma);
+    const y = number(coordinates[1], decimalComma);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
     if (relative) {
-      if (!basePoint) return null;
-      return { x: basePoint.x + x, y: basePoint.y + y };
+      if (!base) return null;
+      return validPoint({ x: base.x + x, y: base.y + y });
     }
     return { x, y };
   }
-  const length = Number(body);
-  if (!Number.isFinite(length) || length < 0 || !basePoint) return null;
-  const target = cursorPoint || { x: basePoint.x + 1, y: basePoint.y };
-  const dx = target.x - basePoint.x;
-  const dy = target.y - basePoint.y;
-  const currentLength = Math.hypot(dx, dy) || 1;
-  return { x: basePoint.x + (dx / currentLength) * length, y: basePoint.y + (dy / currentLength) * length };
+  const length = number(body);
+  if (relative || !Number.isFinite(length) || length < 0 || !base) return null;
+  const target = isFinitePoint(cursorPoint) ? cursorPoint : { x: base.x + 1, y: base.y };
+  let dx = Number(target.x) - base.x;
+  let dy = Number(target.y) - base.y;
+  let currentLength = Math.hypot(dx, dy);
+  if (currentLength <= EPSILON) { dx = 1; dy = 0; currentLength = 1; }
+  return validPoint({ x: base.x + (dx / currentLength) * length, y: base.y + (dy / currentLength) * length });
+}
+
+// Return the closest polar ray projection only inside the cursor's snap aperture.
+// `distance` is the cursor-to-ray deviation, in drawing units.
+export function projectPointToPolarRay(point, basePoint, { angleDeg = 45, tolerance = Infinity } = {}) {
+  if (!isFinitePoint(point) || !isFinitePoint(basePoint)) return null;
+  const increment = Number(angleDeg);
+  const aperture = Number(tolerance);
+  if (!(increment > 0 && increment <= 180) || !(aperture >= 0)) return null;
+  const dx = Number(point.x) - Number(basePoint.x);
+  const dy = Number(point.y) - Number(basePoint.y);
+  if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.hypot(dx, dy) <= EPSILON) return null;
+  const step = increment * Math.PI / 180;
+  const angle = Math.round(Math.atan2(dy, dx) / step) * step;
+  const ux = Math.cos(angle);
+  const uy = Math.sin(angle);
+  const along = Math.max(0, dx * ux + dy * uy);
+  const x = Number(basePoint.x) + ux * along;
+  const y = Number(basePoint.y) + uy * along;
+  const distance = Math.hypot(Number(point.x) - x, Number(point.y) - y);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(distance) || distance > aperture + EPSILON) return null;
+  return { x, y, angleDeg: ((angle * 180 / Math.PI) % 360 + 360) % 360, distance };
 }
 
 export function snapPoint(point, { gridEnabled = false, gridSize = 10 } = {}) {

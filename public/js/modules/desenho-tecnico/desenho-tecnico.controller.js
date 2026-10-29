@@ -42,6 +42,7 @@ import {
   lineCircleIntersections,
   normalizeAngle,
   projectPointToSegment,
+  projectPointToPolarRay,
   segmentIntersection as intersectSegments,
 } from './core/geometry.js';
 
@@ -130,6 +131,7 @@ const COMMAND_ALIASES = {
   grid: 'toggle-grid', grade: 'toggle-grid',
   snap: 'toggle-snap', osnap: 'toggle-snap',
   ortho: 'toggle-ortho', ortogonal: 'toggle-ortho',
+  polar: 'toggle-polar',
   save: 'save', salvar: 'save',
 };
 
@@ -198,6 +200,12 @@ export class DesenhoTecnicoController {
     this.state.gridConfig.step = initial.gridStep || 20;
     this.state.snappingConfig = { ...this.state.snappingConfig, ...(initial.snappingConfig || {}), enabled: initial.snapEnabled !== false };
     this.state.orthoEnabled = Boolean(initial.orthoEnabled);
+    this.state.polarConfig = {
+      enabled: initial.polarConfig?.enabled === true && !this.state.orthoEnabled,
+      angleDeg: [15, 30, 45, 60, 90].includes(Number(initial.polarConfig?.angleDeg))
+        ? Number(initial.polarConfig.angleDeg) : 45,
+    };
+    this.state.shaftSheet = initial.shaftSheet ? structuredClone(initial.shaftSheet) : null;
     this.state.metadata = {
       codigo: initial.codigo || '', titulo: initial.titulo || '', material: initial.material || '', equipamento_id: initial.equipamento_id || '', observacoes: initial.observacoes || '', unidade: initial.unidade || 'mm',
     };
@@ -248,6 +256,8 @@ export class DesenhoTecnicoController {
       snapEnabled: this.state.snappingConfig.enabled,
       snappingConfig: this.state.snappingConfig,
       orthoEnabled: this.state.orthoEnabled,
+      polarConfig: { ...this.state.polarConfig },
+      ...(this.state.shaftSheet ? { shaftSheet: structuredClone(this.state.shaftSheet) } : {}),
       gridStep: this.state.gridConfig.step,
       layers: this.state.layers,
       objects,
@@ -340,9 +350,10 @@ export class DesenhoTecnicoController {
       }
       if (e.type === 'polyline') (e.geometry.points || []).forEach((pt, idx, arr) => {
         asPoint(pt.x, pt.y, 'endpoint');
-        if (idx < arr.length - 1) {
-          asPoint((pt.x + arr[idx + 1].x) / 2, (pt.y + arr[idx + 1].y) / 2, 'midpoint');
-          asSegment(pt, arr[idx + 1], e);
+        const next = arr[idx + 1] || (e.geometry.closed && arr.length > 2 ? arr[0] : null);
+        if (next) {
+          asPoint((pt.x + next.x) / 2, (pt.y + next.y) / 2, 'midpoint');
+          asSegment(pt, next, e);
         }
       });
     });
@@ -381,7 +392,11 @@ export class DesenhoTecnicoController {
       return { x: g.cx + Math.cos(a) * g.radius, y: g.cy + Math.sin(a) * g.radius, kind: 'nearest' };
     }
     let segments = [];
-    if (entity.type === 'polyline') segments = (g.points || []).slice(1).map((end, index) => [g.points[index], end]);
+    if (entity.type === 'polyline') {
+      const points = g.points || [];
+      segments = points.slice(1).map((end, index) => [points[index], end]);
+      if (g.closed && points.length > 2) segments.push([points[points.length - 1], points[0]]);
+    }
     if (entity.type === 'rect') {
       const x2 = g.x + g.width; const y2 = g.y + g.height;
       const corners = [{ x: g.x, y: g.y }, { x: x2, y: g.y }, { x: x2, y: y2 }, { x: g.x, y: y2 }];
@@ -398,24 +413,41 @@ export class DesenhoTecnicoController {
 
   getPoint(point, from = null) {
     let p = { ...point };
+    let constrained = false;
+    const tol = 10 / this.viewport.getViewState().zoom;
     if (this.state.orthoEnabled && from) {
       const dx = Math.abs(point.x - from.x); const dy = Math.abs(point.y - from.y);
       p = dx >= dy ? { x: point.x, y: from.y } : { x: from.x, y: point.y };
+      constrained = true;
+    } else if (this.state.polarConfig.enabled && from) {
+      const projected = projectPointToPolarRay(point, from, {
+        angleDeg: this.state.polarConfig.angleDeg, tolerance: tol,
+      });
+      if (projected) { p = { x: projected.x, y: projected.y }; constrained = true; }
     }
+    this.state.snappingConfig.activeKind = null;
+    this.previewLayer.set(this.previewLayer.items.filter((i) => i.type !== 'snap'));
     if (!this.state.snappingConfig.enabled) return p;
-    const tol = 10 / this.viewport.getViewState().zoom;
     const cfg = this.state.snappingConfig || {};
     const priority = { endpoint: 1, intersection: 2, midpoint: 3, center: 4, quadrant: 5, nearest: 6, grid: 7 };
     const candidates = this.getSnapCandidates().filter((c) => cfg[c.kind] !== false);
     if (cfg.nearest !== false) {
       this.state.entities.forEach((e) => {
+        const layer = this.state.layers[e.metadata?.layer || this.state.activeLayer] || {};
+        if (e.visible === false || layer.visible === false) return;
         const n = this.getNearestPointOnEntity(e, p);
         if (n) candidates.push(n);
       });
     }
     if (cfg.grid !== false) {
       const step = Math.max(0.001, this.state.gridConfig.step || 20);
-      candidates.push({ x: Math.round(p.x / step) * step, y: Math.round(p.y / step) * step, kind: 'grid' });
+      const grid = { x: Math.round(p.x / step) * step, y: Math.round(p.y / step) * step, kind: 'grid' };
+      const dx = constrained ? p.x - from.x : 0, dy = constrained ? p.y - from.y : 0;
+      const length = Math.hypot(dx, dy);
+      // Object snaps may override tracking, but the drawing grid must keep the chosen ray.
+      if (!constrained || length > 1e-9
+        && Math.abs((grid.x - from.x) * dy - (grid.y - from.y) * dx) / length < 1e-7
+        && (grid.x - from.x) * dx + (grid.y - from.y) * dy >= 0) candidates.push(grid);
     }
     const nearest = candidates
       .map((c) => ({ ...c, d: Math.hypot(c.x - p.x, c.y - p.y) }))
@@ -434,6 +466,17 @@ export class DesenhoTecnicoController {
   getAssistGuides(from, to) {
     if (!from || !to) return [];
     const guides = [];
+    if (this.state.polarConfig.enabled && !this.state.orthoEnabled) {
+      const polar = projectPointToPolarRay(to, from, {
+        angleDeg: this.state.polarConfig.angleDeg, tolerance: 0.8 / Math.max(this.viewport.getViewState().zoom, 0.1),
+      });
+      if (polar && Math.hypot(to.x - from.x, to.y - from.y) > 1e-8) {
+        const angle = polar.angleDeg * Math.PI / 180;
+        guides.push({ type: 'guide', kind: 'polar', from, to: {
+          x: from.x + Math.cos(angle) * 2000, y: from.y + Math.sin(angle) * 2000,
+        } });
+      }
+    }
     const eps = 0.8 / Math.max(this.viewport.getViewState().zoom, 0.1);
     if (Math.abs(to.x - from.x) <= eps) guides.push({ type: 'guide', kind: 'vertical', from: { x: from.x, y: from.y - 2000 }, to: { x: from.x, y: from.y + 2000 } });
     if (Math.abs(to.y - from.y) <= eps) guides.push({ type: 'guide', kind: 'horizontal', from: { x: from.x - 2000, y: from.y }, to: { x: from.x + 2000, y: from.y } });
@@ -470,12 +513,18 @@ export class DesenhoTecnicoController {
   showDynamicInput(cfg = {}) {
     const overlay = document.getElementById('cadDynamicInput');
     if (!overlay) return;
+    if (overlay.contains(document.activeElement)) return;
     overlay.style.display = 'flex';
     overlay.style.left = `${Math.max(8, cfg.x || 8)}px`;
     overlay.style.top = `${Math.max(8, cfg.y || 8)}px`;
-    overlay.innerHTML = `<button type='button' class='cad-dyn-value'>${cfg.value || '0.00'}</button><input class='cad-dyn-input' type='text' inputmode='decimal' value='${cfg.value || ''}' style='display:none;'/>`;
+    overlay.innerHTML = "<button type='button' class='cad-dyn-value'></button><input class='cad-dyn-input' type='text' style='display:none;'/>";
     const valueBtn = overlay.querySelector('.cad-dyn-value');
     const input = overlay.querySelector('.cad-dyn-input');
+    valueBtn.textContent = String(cfg.value || '0.00');
+    input.value = String(cfg.value || '');
+    input.setAttribute('aria-label', 'Medida ou coordenadas exatas');
+    const readInput = () => ['line', 'polyline', 'rect'].includes(cfg.mode)
+      ? input.value : input.value.replace(',', '.');
     const enterEdit = () => {
       valueBtn.style.display = 'none';
       input.style.display = 'inline-flex';
@@ -483,15 +532,17 @@ export class DesenhoTecnicoController {
       input.select();
     };
     valueBtn.addEventListener('click', enterEdit);
-    input.addEventListener('input', () => cfg.onChange?.(input.value.replace(',', '.')));
+    input.addEventListener('input', () => cfg.onChange?.(readInput()));
     input.addEventListener('keydown', (evt) => {
       if (evt.key === 'Enter') {
         evt.preventDefault();
-        const ok = cfg.onConfirm?.(input.value.replace(',', '.'));
+        evt.stopPropagation();
+        const ok = cfg.onConfirm?.(readInput());
         if (ok !== false) this.hideDynamicInput();
       }
       if (evt.key === 'Escape') {
         evt.preventDefault();
+        evt.stopPropagation();
         cfg.onCancel?.();
         this.hideDynamicInput();
       }
@@ -565,6 +616,9 @@ export class DesenhoTecnicoController {
   renderProperties(entity) {
     const props = document.getElementById('cadProperties');
     if (!props) return;
+    // Cursor updates must not replace a field while the user is typing.
+    if (props.dataset.entityId === String(entity?.id || '') && props.contains(document.activeElement)) return;
+    props.dataset.entityId = String(entity?.id || '');
     if (this.selection.ids.size > 1) {
       props.innerHTML = `<p class='cad-muted'><strong>${this.selection.ids.size} objetos selecionados</strong></p><p class='cad-muted'>Use Mover, Copiar ou Apagar para editar o conjunto.</p>`;
       return;
@@ -575,7 +629,8 @@ export class DesenhoTecnicoController {
     }
     const layer = entity.metadata?.layer || this.state.activeLayer;
     const geo = entity.geometry;
-    const input = (id, label, value, type = 'text') => `<div class='cad-prop-row'><span class='cad-prop-label'>${label}</span><input class='cad-input' data-prop='${id}' type='${type}' value='${value}'/></div>`;
+    const escapeValue = (value) => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    const input = (id, label, value, type = 'text') => `<div class='cad-prop-row'><span class='cad-prop-label'>${label}</span><input class='cad-input' data-prop='${id}' type='${type}' value='${escapeValue(value)}'/></div>`;
     const readOnly = (label, value) => `<div class='cad-prop-row'><span class='cad-prop-label'>${label}</span><span>${value}</span></div>`;
     const style = entity.style || {};
     const layerStyle = this.state.layers?.[layer] || {};
@@ -597,7 +652,7 @@ export class DesenhoTecnicoController {
         <input class='cad-input' data-style-prop='color' type='color' value='${styleColor}'>
       </div>
       <div class='cad-prop-row'>
-        <span class='cad-prop-label'>Espessura</span>
+        <span class='cad-prop-label'>Espessura da linha</span>
         <input class='cad-input' data-style-prop='strokeWidth' type='number' min='0.5' max='8' step='0.5' value='${styleWidth}'>
       </div>
       <div class='cad-prop-row'>
@@ -655,7 +710,44 @@ export class DesenhoTecnicoController {
       }
       details += input('label', 'Texto', geo.label || '');
     }
-    props.innerHTML = `<div class='cad-prop-row'><span class='cad-prop-label'>Tipo</span><span>${entity.type}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>ID</span><span>${entity.id}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>Camada</span><select class='cad-select' id='propLayer'>${Object.keys(this.state.layers || {}).map((l) => `<option ${l === layer ? 'selected' : ''} value='${l}'>${l}</option>`).join('')}</select></div>${details}${styleDetails}`;
+    const supportsExtrusion = entity.type === 'rect' || entity.type === 'circle' || (entity.type === 'polyline' && geo.closed);
+    if (supportsExtrusion) {
+      const flange = entity.metadata?.componentType === 'flange';
+      const depth = flange ? entity.metadata.flangeParameters?.thickness : entity.metadata?.extrusionDepth;
+      details += `<div class='cad-prop-section-title'>Volume 3D</div><label class='cad-field'><span>Espessura ${flange ? 'do flange' : 'do perfil'} (mm)</span><input class='cad-input' data-extrusion-depth type='number' min='0.001' max='1000000' step='0.001' placeholder='Sem volume 3D' value='${Number.isFinite(Number(depth)) && Number(depth) > 0 ? Number(depth) : ''}'></label><p class='cad-muted'>Informe a espessura real para visualizar o volume. Vazio mantém o desenho apenas em 2D.</p>`;
+    }
+    props.innerHTML = `<div class='cad-prop-row'><span class='cad-prop-label'>Tipo</span><span>${entity.type}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>ID</span><span>${escapeValue(entity.id)}</span></div><div class='cad-prop-row'><span class='cad-prop-label'>Camada</span><select class='cad-select' id='propLayer'>${Object.keys(this.state.layers || {}).map((l) => `<option ${l === layer ? 'selected' : ''} value='${escapeValue(l)}'>${escapeValue(l)}</option>`).join('')}</select></div>${details}${styleDetails}`;
+    props.querySelector('[data-extrusion-depth]')?.addEventListener('change', (event) => {
+      const raw = event.target.value.trim();
+      const depth = raw ? Number(raw) : null;
+      if (depth !== null && (!Number.isFinite(depth) || depth <= 0 || depth > 1000000)) {
+        event.target.setCustomValidity('Informe uma espessura maior que zero e no máximo 1.000.000 mm.');
+        event.target.reportValidity();
+        return;
+      }
+      event.target.setCustomValidity('');
+      if (!this.isEntityEditable(entity)) return;
+      const groupId = entity.metadata?.componentType === 'flange' ? entity.metadata.groupId : null;
+      const members = groupId ? this.state.entities.filter((item) => item.metadata?.groupId === groupId) : [entity];
+      if (members.some((item) => this.state.layers[item.metadata?.layer]?.locked === true)) {
+        event.target.value = String(entity.metadata?.flangeParameters?.thickness ?? entity.metadata?.extrusionDepth ?? '');
+        this.state.statusMessage = 'Desbloqueie as camadas do flange antes de alterar sua espessura.';
+        this.render();
+        return;
+      }
+      members.forEach((item) => {
+        item.metadata = { ...item.metadata };
+        if (groupId) {
+          item.metadata.flangeParameters = { ...item.metadata.flangeParameters };
+          if (depth === null) delete item.metadata.flangeParameters.thickness;
+          else item.metadata.flangeParameters.thickness = depth;
+        } else if (depth === null) delete item.metadata.extrusionDepth;
+        else item.metadata.extrusionDepth = depth;
+      });
+      this.pushHistory();
+      this.markDirty('Espessura 3D atualizada');
+      this.render();
+    });
     document.getElementById('propLayer')?.addEventListener('change', (e) => { entity.metadata = { ...(entity.metadata || {}), layer: e.target.value }; this.pushHistory(); this.markDirty('Camada do objeto atualizada'); this.render(); });
     props.querySelectorAll('[data-style-prop]').forEach((el) => el.addEventListener('change', (e) => {
       const key = e.target.dataset.styleProp;
@@ -729,6 +821,12 @@ export class DesenhoTecnicoController {
     document.querySelectorAll('.cad-status-toggle[data-toggle="grid"],#cadGridToggle').forEach((b) => b.classList.toggle('active', this.state.gridConfig.visible));
     document.querySelectorAll('.cad-status-toggle[data-toggle="snap"],#cadSnapToggle').forEach((b) => b.classList.toggle('active', this.state.snappingConfig.enabled));
     document.querySelectorAll('.cad-status-toggle[data-toggle="ortho"],#cadOrthoToggle').forEach((b) => b.classList.toggle('active', this.state.orthoEnabled));
+    document.querySelectorAll('.cad-status-toggle[data-toggle="polar"],#cadPolarToggle').forEach((b) => {
+      b.classList.toggle('active', this.state.polarConfig.enabled);
+      b.setAttribute('aria-pressed', String(this.state.polarConfig.enabled));
+    });
+    const polarAngleInput = document.getElementById('cadPolarAngleInput');
+    if (polarAngleInput && document.activeElement !== polarAngleInput) polarAngleInput.value = String(this.state.polarConfig.angleDeg);
     const gridStepInput = document.getElementById('cadGridStepInput');
     if (gridStepInput && document.activeElement !== gridStepInput) gridStepInput.value = String(this.state.gridConfig.step);
     document.querySelectorAll('[data-snap-option]').forEach((input) => {
@@ -809,7 +907,8 @@ export class DesenhoTecnicoController {
       'reset-view': () => { this.viewport.resetView(); this.fitInitial(); },
       'toggle-grid': () => { this.state.gridConfig.visible = !this.state.gridConfig.visible; this.markDirty('Grade atualizada'); this.render(); },
       'toggle-snap': () => { this.state.snappingConfig.enabled = !this.state.snappingConfig.enabled; this.markDirty('Snap atualizado'); this.render(); },
-      'toggle-ortho': () => { this.state.orthoEnabled = !this.state.orthoEnabled; this.markDirty('Ortho atualizado'); this.render(); },
+      'toggle-ortho': () => { this.state.orthoEnabled = !this.state.orthoEnabled; if (this.state.orthoEnabled) this.state.polarConfig.enabled = false; this.markDirty('Ortho atualizado'); this.render(); },
+      'toggle-polar': () => { this.state.polarConfig.enabled = !this.state.polarConfig.enabled; if (this.state.polarConfig.enabled) this.state.orthoEnabled = false; this.markDirty(`Polar ${this.state.polarConfig.enabled ? 'ativado' : 'desativado'}`); this.render(); },
       'toggle-theme': () => {
         const root = document.querySelector('.cad-fullscreen');
         if (!root) return;
@@ -874,11 +973,11 @@ export class DesenhoTecnicoController {
         window.location.assign(pdfUrl);
       },
       'view-3d-shaft': async () => {
-        const { openShaft3D } = await import('/js/cad-shaft-3d.mjs?v=20261028-706-step-v1');
+        const { openShaft3D } = await import('/js/cad-shaft-3d.mjs?v=20261028-drafting-3d-v1');
         await openShaft3D({
           cadData: this.serialize(),
           drawingId: window.CAD_INITIAL?.desenhoId,
-          label: this.state.metadata?.titulo || 'Eixo escalonado',
+          label: this.state.metadata?.titulo || 'Desenho técnico',
         });
       },
       'export-step': async () => {
@@ -907,6 +1006,18 @@ export class DesenhoTecnicoController {
   executeCommand(rawCommand) {
     const command = String(rawCommand || '').trim().toLowerCase();
     if (!command) return false;
+    const active = this.toolManager.active;
+    const pointInput = /^[\d.,;@<+\-\s]+$/.test(command);
+    const polylineOption = active?.name === 'polyline' && /^(c|close|fechar|u|undo|desfazer)$/.test(command);
+    if (['line', 'polyline'].includes(active?.name) && (pointInput || polylineOption)) {
+      const option = /^(close|fechar)$/.test(command) ? 'c' : /^(undo|desfazer)$/.test(command) ? 'u' : command;
+      const ok = active.applyInput?.(option) === true;
+      if (!ok) {
+        this.state.statusMessage = 'Entrada inválida. Use X,Y, @ΔX,ΔY ou @distância<ângulo.';
+        this.render();
+      }
+      return ok;
+    }
     const action = COMMAND_ALIASES[command];
     if (!action) {
       this.state.statusMessage = `Comando não reconhecido: ${rawCommand}`;
@@ -1021,6 +1132,12 @@ export class DesenhoTecnicoController {
         this.state.gridConfig.step = value;
         this.markDirty('Passo da grade atualizado');
         this.render();
+      } else if (target.id === 'cadPolarAngleInput') {
+        const angle = Number(target.value);
+        if (![15, 30, 45, 60, 90].includes(angle)) return;
+        this.state.polarConfig.angleDeg = angle;
+        this.markDirty('Incremento polar atualizado');
+        this.render();
       } else if (target.dataset.snapOption) {
         this.state.snappingConfig[target.dataset.snapOption] = target.checked;
         this.markDirty(`Snap ${target.dataset.snapOption} atualizado`);
@@ -1070,7 +1187,9 @@ export class DesenhoTecnicoController {
       if (this.executeCommand(command)) commandInput.blur();
     });
     window.addEventListener('keydown', async (e) => {
+      if (e.defaultPrevented) return;
       const activeEl = document.activeElement;
+      if (activeEl?.closest?.('[aria-modal="true"]')) return;
       const isFormField = activeEl && (
         activeEl.tagName === 'INPUT'
         || activeEl.tagName === 'TEXTAREA'
@@ -1079,9 +1198,11 @@ export class DesenhoTecnicoController {
       );
       if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); this.executeAction('save'); }
       if (!isFormField && e.key === 'Delete') this.executeAction('delete-selection');
-      if (e.ctrlKey && e.key.toLowerCase() === 'z') this.executeAction('undo');
-      if (e.ctrlKey && e.key.toLowerCase() === 'y') this.executeAction('redo');
+      if (!isFormField && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); this.executeAction(e.shiftKey ? 'redo' : 'undo'); }
+      if (!isFormField && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); this.executeAction('redo'); }
+      if (!isFormField && e.key === 'F3') { e.preventDefault(); this.executeAction('toggle-snap'); }
       if (!isFormField && e.key === 'F8') { e.preventDefault(); this.executeAction('toggle-ortho'); }
+      if (!isFormField && e.key === 'F10') { e.preventDefault(); this.executeAction('toggle-polar'); }
       if (!isFormField && !e.ctrlKey && !e.altKey && !e.metaKey && this.toolManager.name === 'select' && /^[a-zA-Z]$/.test(e.key)) {
         e.preventDefault();
         commandInput?.focus();

@@ -10,7 +10,7 @@
         <a class="cad-icon-btn cad-back" href="/desenho-tecnico/cad/<%= desenho.id %>" aria-label="Voltar" title="Voltar">←</a>
         <span class="cad-brand-mark" aria-hidden="true">CG</span>
         <div class="cad-document-heading">
-          <div class="cad-document-eyebrow">Desenho técnico 2D</div>
+          <div class="cad-document-eyebrow">Desenho técnico 2D / 3D</div>
           <div class="cad-document-title">
             <strong><%= desenho.codigo %></strong>
             <span><%= desenho.titulo %></span>
@@ -27,7 +27,7 @@
         <button class="cad-icon-btn" data-action="undo" id="cadUndoBtn" type="button" title="Desfazer (Ctrl+Z)" aria-label="Desfazer">↶</button>
         <button class="cad-icon-btn" data-action="redo" id="cadRedoBtn" type="button" title="Refazer (Ctrl+Y)" aria-label="Refazer">↷</button>
         <button class="cad-icon-btn" data-action="toggle-theme" type="button" title="Alternar tema" aria-label="Alternar tema">◐</button>
-        <button class="cad-btn cad-btn-secondary" data-action="view-3d-shaft" type="button" title="Girar o modelo do eixo em 3D">Visualizar eixo 3D</button>
+        <button class="cad-btn cad-btn-secondary" data-action="view-3d-shaft" type="button" title="Abrir vistas isométrica, frontal, superior e lateral">Visualizar 3D</button>
         <button class="cad-btn cad-btn-secondary" data-action="export-step" type="button" title="Gerar STEP real a partir do eixo salvo">Exportar STEP</button>
         <a class="cad-btn cad-btn-secondary" data-action="export-pdf" data-pdf-url="/desenho-tecnico/cad/<%= desenho.id %>/pdf" href="/desenho-tecnico/cad/<%= desenho.id %>/pdf" title="Salvar desenho e gerar PDF">Exportar PDF</a>
         <button class="cad-btn cad-btn-primary" id="cadSaveBtn" data-action="save" type="button" title="Salvar (Ctrl+S)">Salvar desenho</button>
@@ -69,6 +69,7 @@
         <button class="cad-chip" id="cadGridToggle" data-action="toggle-grid" type="button">Grade</button>
         <button class="cad-chip" id="cadSnapToggle" data-action="toggle-snap" type="button">Snap</button>
         <button class="cad-chip" id="cadOrthoToggle" data-action="toggle-ortho" type="button">Ortho</button>
+        <button class="cad-chip" id="cadPolarToggle" data-action="toggle-polar" type="button" title="Rastreamento polar (F10)">Polar</button>
         <button class="cad-chip" id="cadZoomExtentsBtn" data-action="zoom-extents" type="button">Enquadrar</button>
       </div>
     </nav>
@@ -151,7 +152,9 @@
         <summary>Precisão 2D <span>Grade e snap</span></summary>
         <div class="cad-panel-content">
           <label class="cad-field"><span>Passo da grade (mm)</span><input class="cad-input" id="cadGridStepInput" type="number" min="0.001" step="0.001" value="20"></label>
+          <label class="cad-field"><span>Incremento polar (F10)</span><select class="cad-select" id="cadPolarAngleInput"><option value="15">15°</option><option value="30">30°</option><option value="45" selected>45°</option><option value="60">60°</option><option value="90">90°</option></select></label>
           <div class="cad-snap-options" aria-label="Modos de snap">
+            <label><input type="checkbox" data-snap-option="grid"> Grade</label>
             <label><input type="checkbox" data-snap-option="endpoint"> Extremidade</label>
             <label><input type="checkbox" data-snap-option="midpoint"> Meio</label>
             <label><input type="checkbox" data-snap-option="intersection"> Interseção</label>
@@ -159,7 +162,7 @@
             <label><input type="checkbox" data-snap-option="quadrant"> Quadrante</label>
             <label><input type="checkbox" data-snap-option="nearest"> Próximo</label>
           </div>
-          <p class="cad-precision-help">Entrada exata: <code>@ΔX,ΔY</code> ou <code>@distância&lt;ângulo</code>.</p>
+          <p class="cad-precision-help">Coordenadas: <code>X,Y</code>, <code>@ΔX,ΔY</code> ou <code>@distância&lt;ângulo</code>. Vírgula decimal: <code>@12,5;8,25</code>. F3: snap · F8: ortho · F10: polar. Polilinha: C fecha, U desfaz vértice.</p>
         </div>
       </details>
 
@@ -208,6 +211,7 @@
       <button class="cad-status-toggle active" data-toggle="grid" data-action="toggle-grid" type="button">GRID</button>
       <button class="cad-status-toggle active" data-toggle="snap" data-action="toggle-snap" type="button">SNAP</button>
       <button class="cad-status-toggle" data-toggle="ortho" data-action="toggle-ortho" type="button">ORTHO</button>
+      <button class="cad-status-toggle" data-toggle="polar" data-action="toggle-polar" type="button" title="Rastreamento polar (F10)">POLAR</button>
     </div>
   </footer>
 
@@ -223,6 +227,7 @@
           <label class="cad-field"><span>Diâmetro dos furos (mm)</span><input class="cad-input" name="holeDiameter" type="number" min="0.001" step="0.001" value="18" required></label>
           <label class="cad-field"><span>Quantidade de furos</span><input class="cad-input" name="holeCount" type="number" min="2" max="72" step="1" value="8" required></label>
           <label class="cad-field"><span>Rotação inicial (graus)</span><input class="cad-input" name="rotation" type="number" step="0.001" value="0"></label>
+          <label class="cad-field"><span>Espessura para 3D (mm, opcional)</span><input class="cad-input" name="thickness" type="number" min="0.001" max="1000000" step="0.001" placeholder="Sem espessura: desenho 2D"></label>
         </div>
         <p class="cad-form-error" data-flange-error role="alert"></p>
       </div>
@@ -257,6 +262,6 @@ window.addEventListener('error', function () {
   if (status) status.textContent = 'CAD carregado com limitações (ver console).';
 });
 </script>
-<script type="module" src="/js/cad-engine-v2.js?v=20261028-706-step-v1" onerror="(function(){var s=document.getElementById('cadStatusMessage'); if(s) s.textContent='Falha ao carregar o motor CAD.';})()"></script>
+<script type="module" src="/js/cad-engine-v2.js?v=20261028-drafting-3d-v1" onerror="(function(){var s=document.getElementById('cadStatusMessage'); if(s) s.textContent='Falha ao carregar o motor CAD.';})()"></script>
 
 <style>body.cad-editor-mode { overflow: hidden; }</style>

@@ -49,9 +49,20 @@ export class LineTool extends BaseTool {
   }
 
   applyManualLength() {
-    if (!this.start) return;
-    const end = parseCadPointInput(this.dynamicValue, this.start, this.currentPoint);
-    if (!end || distance2D(this.start, end) <= 1e-9) return false;
+    return this.applyInput(this.dynamicValue);
+  }
+
+  applyInput(raw) {
+    const end = parseCadPointInput(raw, this.start, this.currentPoint);
+    if (!end || (this.start && distance2D(this.start, end) <= 1e-9)) return false;
+    if (!this.start) {
+      this.start = end;
+      this.currentPoint = end;
+      this.dynamicValue = '';
+      this.ctx.hideDynamicInput?.();
+      this.ctx.prompt.set({ message: 'Ponto inicial definido. Clique ou informe X,Y, @ΔX,ΔY ou @distância<ângulo.' });
+      return true;
+    }
     this.ctx.addEntity(new LineEntity({ geometry: { x1: this.start.x, y1: this.start.y, x2: end.x, y2: end.y }, metadata: { layer: this.ctx.state.activeLayer } }));
     this.start = end;
     this.currentPoint = end;
@@ -72,6 +83,7 @@ export class LineTool extends BaseTool {
       this.ctx.prompt.set({ message: 'Clique para definir o segundo ponto ou digite o comprimento' });
       return;
     }
+    if (distance2D(this.start, p) <= 1e-9) return;
     this.ctx.addEntity(new LineEntity({ geometry: { x1: this.start.x, y1: this.start.y, x2: p.x, y2: p.y }, metadata: { layer: this.ctx.state.activeLayer } }));
     this.dynamicValue = '';
     this.manualLength = null;

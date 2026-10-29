@@ -13,6 +13,15 @@ export function normalizeFlangeParameters(input = {}) {
     rotation: numberValue(input.rotation, 0),
   };
 
+  // Physical depth is optional for 2D drawings and never comes from line weight.
+  if (input.thickness != null && String(input.thickness).trim() !== '') {
+    const thickness = Number(String(input.thickness).replace(',', '.'));
+    if (!Number.isFinite(thickness) || thickness <= 0 || thickness > 1000000) {
+      throw new Error('A espessura deve ser maior que zero e no máximo 1.000.000 mm.');
+    }
+    parameters.thickness = thickness;
+  }
+
   if (parameters.outerDiameter <= 0) throw new Error('O diâmetro externo deve ser maior que zero.');
   if (parameters.boreDiameter < 0 || parameters.boreDiameter >= parameters.outerDiameter) throw new Error('O furo central deve ser menor que o diâmetro externo.');
   if (parameters.pitchDiameter <= 0 || parameters.pitchDiameter >= parameters.outerDiameter) throw new Error('O círculo de furação deve ficar dentro do flange.');

@@ -243,6 +243,11 @@ function sanitizeCadData(payload = {}) {
     snapCenter: snappingConfig.center,
     snappingConfig,
     orthoEnabled: Boolean(payload.orthoEnabled),
+    polarConfig: {
+      enabled: plainObject(payload.polarConfig).enabled === true && !payload.orthoEnabled,
+      angleDeg: [15, 30, 45, 60, 90].includes(Number(payload.polarConfig?.angleDeg))
+        ? Number(payload.polarConfig.angleDeg) : 45,
+    },
     gridStep: Math.max(0.001, Math.min(1000000, toFinite(payload.gridStep, 20))),
     layers,
     objects: normalizedObjects.filter((object) => object.type !== 'dimension'),

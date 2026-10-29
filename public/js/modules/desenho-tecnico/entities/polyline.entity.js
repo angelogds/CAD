@@ -12,6 +12,7 @@ export class PolylineEntity extends BaseEntity {
     for (let i = 0; i < points.length - 1; i += 1) {
       if (hitTestPointToSegment(point, points[i], points[i + 1], tolerance)) return true;
     }
+    if (this.geometry.closed && points.length > 2 && hitTestPointToSegment(point, points[points.length - 1], points[0], tolerance)) return true;
     return false;
   }
   move(dx, dy) {
