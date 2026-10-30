@@ -35,7 +35,7 @@
   function applyStage(state) {
     clearCommands(state);
     const index = DIGESTORS.indexOf(state.activeDigestor);
-    if (index < 0 || !STAGES.includes(state.stage)) return;
+    if (index < 0 || !(state.linked ? LINKED_STAGES : STAGES).includes(state.stage)) return;
     if (state.stage === 'CARGA') {
       state.feedAuger = true;
       state.gates[index] = true;
