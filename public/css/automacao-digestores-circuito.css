@@ -47,6 +47,12 @@
 #digestores-circuito-panel .circuito-stem{fill:none;stroke:#7d8896;stroke-width:4;stroke-linecap:round}
 #digestores-circuito-panel .circuito-gate-blade{fill:#788694;stroke:#5f6f7f;stroke-width:2}
 #digestores-circuito-panel [data-gate-state="open"] .circuito-gate-blade{transform:translateX(-36px)}
+#digestores-circuito-panel [data-circuito-equipment^="dischargeGate"] .circuito-gate-blade{transition:transform .2s ease}
+#digestores-circuito-panel [data-circuito-equipment^="dischargeGate"][data-gate-state="open"] .circuito-gate-blade{transform:translateY(-13px)}
+#digestores-circuito-panel .circuito-gate-led{fill:#a1a1aa;stroke:#52525b;stroke-width:1.4}
+#digestores-circuito-panel [data-circuito-equipment^="dischargeGate"][data-gate-state="open"] .circuito-gate-led{fill:#22c55e}
+#sim-link-circuits[aria-pressed="true"]{outline:2px solid #166534;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){#digestores-circuito-panel [data-circuito-equipment^="dischargeGate"] .circuito-gate-blade{transition:none}}
 #digestores-circuito-panel .circuito-discharge{fill:none;stroke:#b1bbc7;stroke-width:17;stroke-linejoin:round;stroke-linecap:round}
 #digestores-circuito-panel .circuito-expansion{fill:none;stroke:#6b7480;stroke-width:4;stroke-dasharray:8 5}
 #digestores-circuito-panel .circuito-liquid-pipe{fill:none;stroke:#8b98a9;stroke-width:7;stroke-linecap:round;stroke-linejoin:round}
