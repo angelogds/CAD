@@ -10,6 +10,7 @@ export function createDigestorScene({ makeLabel } = {}) {
   const flows = [];
   const liquid = [];
   const gates = [];
+  const dischargeGates = [];
   const towers = [];
   const material = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.22, ...extra });
   const steel = material(0xc7cbd1);
@@ -224,8 +225,17 @@ export function createDigestorScene({ makeLabel } = {}) {
     gate.userData.positionStatus = 'SEM_SINAL';
     label('D' + (index + 1), [x, 5.2, 2.15], 1.5, key);
     label('GUILHOTINA D' + (index + 1), [x, 6.2, 1.1], 2.3, gateKey);
-    // Descarga frontal: produto cai na percoladora, sem criar prensas fictícias.
+    // Descarga frontal: uma SEGUNDA guilhotina virtual, sem GPIO nem sensor.
+    // Produto cai na percoladora, sem criar prensas fictícias.
     pipe(digestor, [[0, -0.81, 2.02], [0, -1.15, 2.4], [0, -1.85, 3.2]], 0.23, steel);
+    const dischargeKey = 'dischargeGate' + (index + 1);
+    const dischargeGate = group(dischargeKey, [x, 2.99, 2.53]);
+    box(dischargeGate, [0.75, 0.2, 0.55], [0, 0, 0], dark);
+    const dischargeSlide = box(dischargeGate, [0.58, 0.39, 0.1], [0, 0.12, 0.34], steel);
+    cylinder(dischargeGate, 0.1, 0.33, [0.47, 0.47, 0.15], red);
+    dischargeGates.push({ key: dischargeKey, mesh: dischargeGate, slide: dischargeSlide, index });
+    dischargeGate.userData.positionStatus = 'SEM_SINAL';
+    label('DESCARGA D' + (index + 1), [x, 2.72, 3.55], 2, dischargeKey);
     flow(key, [[x, 3.27, 1.92], [x, 2.93, 2.3], [x, 2.23, 3.1]], s => on(unit(s, index).discharging), product, 0.13);
     flow(gateKey, [[x, 6.6, -0.35], [x, 5.95, -0.35], [x, 5.1, -0.35]],
       s => on(s.feedAuger) && on(s.gates?.[index]) && on(unit(s, index).loading));
@@ -318,6 +328,12 @@ export function createDigestorScene({ makeLabel } = {}) {
       gate.stemLink.position.y = 0.45 + opening;
       gate.mesh.userData.positionStatus = known ? snapshot.gates[gate.index] ? 'ABERTA_SIMULADA' : 'FECHADA_SIMULADA' : 'SEM_SINAL';
     }
+    for (const gate of dischargeGates) {
+      const known = sim && typeof snapshot.dischargeGates?.[gate.index] === 'boolean';
+      const open = known && snapshot.dischargeGates[gate.index];
+      gate.slide.position.y = open ? 0.55 : 0.12;
+      gate.mesh.userData.positionStatus = !known ? 'SEM_SINAL' : open ? 'ABERTA_SIMULADA' : 'FECHADA_SIMULADA';
+    }
     const capacity = Number.isFinite(snapshot.tachoCapacityLiters) && snapshot.tachoCapacityLiters > 0 ? snapshot.tachoCapacityLiters : null;
     const liters = Number.isFinite(snapshot.tachoLiters) ? snapshot.tachoLiters : null;
     const fill = liquid[0];
@@ -352,7 +368,7 @@ export function createDigestorScene({ makeLabel } = {}) {
     textures.forEach(texture => texture.dispose());
     materials.forEach(mat => mat.dispose());
   }
-  return { root, equipment, update, dispose, rotors, flows, liquid, gates, towers };
+  return { root, equipment, update, dispose, rotors, flows, liquid, gates, dischargeGates, towers };
 }
 
 export function selectionKey(object) {

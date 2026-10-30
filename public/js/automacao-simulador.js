@@ -14,6 +14,10 @@
   const reset = document.getElementById('sim-reset');
   const presentation = document.getElementById('sim-presentation');
   const speed = document.getElementById('sim-speed');
+  const integrationButton = document.getElementById('sim-link-circuits');
+  let integrationOn = false;
+  let integrationActive = false;
+  const circuit = () => window.AutomacaoDigestoresCircuito;
   const clock = document.getElementById('sim-clock');
   const eventsFilter = document.getElementById('sim-events-filter');
   const eventsList = document.getElementById('sim-events-list');
@@ -42,6 +46,10 @@
       : 'Digestor ' + selection + ' selecionado · os demais não iniciam';
     eventsFilter.value = selection;
     renderEvents();
+    if (integrationOn) {
+      const mech = document.getElementById('digestores-circuito-selection');
+      if (mech) mech.value = selection === 'all' ? 'TODOS' : 'D' + selection;
+    }
     render();
   }
 
@@ -180,6 +188,26 @@
         if (item.fase === 'PRONTO') record(item, 'Temperatura de referência atingida: pronto na simulação; contatores e purgadores desligados.');
       }
     }
+    if (integrationActive && circuit()) {
+      const before = circuit().getSnapshot();
+      circuit().tickLinked(factor, values.map(item => ({
+        tempC: item.temp, ready: core.faixaTemperatura(item.temp).ready && item.fase === core.FASES.PRONTO,
+      })));
+      const after = circuit().getSnapshot();
+      if (after.stage === 'COZIMENTO' && (before.stage !== 'COZIMENTO' || before.activeDigestor !== after.activeDigestor)) {
+        const id = Number(after.activeDigestor?.slice(1));
+        const item = values[id - 1];
+        if (item && core.iniciarDigestor(item)) record(item, 'Carga finalizada: guilhotina fechada e cozimento iniciado na simulação integrada.');
+      }
+      if (after.stage === 'DESCARGA' && before.stage !== 'DESCARGA') {
+        const item = values[Number(after.activeDigestor?.slice(1)) - 1];
+        if (item) record(item, 'Pronto acima de 120 °C: guilhotina frontal ABERTA só na maquete; percoladora em movimento.');
+      }
+      if (after.stage === 'CONCLUIDO') {
+        integrationActive = false;
+        stop();
+      }
+    }
     render();
   }
 
@@ -189,6 +217,8 @@
     handle = null;
     start.disabled = false;
     pause.disabled = true;
+    if (integrationActive) circuit()?.pauseLinked();
+    if (integrationButton) integrationButton.disabled = false;
     render();
   }
 
@@ -207,28 +237,56 @@
     record(item, 'Material carregado (simulação).', 0);
   });
 
+  integrationButton?.addEventListener('click', () => {
+    if (running) return;
+    integrationOn = !integrationOn;
+    if (!integrationOn) { circuit()?.exitLinked(); integrationActive = false; }
+    integrationButton.setAttribute('aria-pressed', String(integrationOn));
+    integrationButton.textContent = integrationOn ? '✓ Simulações vinculadas · desativar' : 'Vincular simulações elétrica + mecânica';
+    const mech = document.getElementById('digestores-circuito-selection');
+    if (mech) mech.value = selection === 'all' ? 'TODOS' : 'D' + selection;
+  });
   start.addEventListener('click', () => {
     if (running) return;
-    // Uma partida geral inicia apenas os digestores carregados; os outros mantêm seu próprio ciclo.
-    for (const item of values) {
-      if (!selected(item)) continue;
-      if (core.iniciarDigestor(item)) record(item, 'Aquecimento iniciado pelo comando geral simulado.');
+    const existing = circuit()?.getSnapshot();
+    if (integrationOn) {
+      if (!circuit()) { integrationOn = false; return; }
+      if (existing?.paused && existing?.linked) circuit().resumeLinked();
+      else {
+        const result = circuit().startLinked(selection === 'all' ? 'TODOS' : 'D' + selection);
+        if (!result.ok) return;
+        for (const item of values) {
+          core.carregarDigestor(item, core.TEMPERATURA_INICIAL + (item.id - 1) * 2);
+        }
+      }
+      integrationActive = true;
+    } else {
+      // Modo independente preservado para demonstrar só o circuito elétrico.
+      for (const item of values) {
+        if (!selected(item)) continue;
+        if (core.iniciarDigestor(item)) record(item, 'Aquecimento iniciado pelo comando geral simulado.');
+      }
     }
     running = true;
     start.disabled = true;
     pause.disabled = false;
+    if (integrationButton) integrationButton.disabled = true;
     handle = setInterval(tick, 1000);
     render();
   });
   pause.addEventListener('click', stop);
   selector.addEventListener('change', () => {
     stop();
+    if (integrationActive) circuit()?.stopLinked();
+    integrationActive = false;
     selection = selector.value;
     // Trocar seleção nunca deixa aquecimento oculto executando.
     applySelection();
   });
   reset.addEventListener('click', () => {
     stop();
+    if (integrationOn) circuit()?.stopLinked();
+    integrationActive = false;
     virtualSeconds = 0;
     events.length = 0;
     values.forEach((item, index) => {

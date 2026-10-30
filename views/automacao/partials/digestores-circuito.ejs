@@ -67,6 +67,12 @@
               <circle cx="0" cy="6" r="7" class="circuito-tower-green"/>
             </g>
           </g>
+          <g data-circuito-equipment="dischargeGate<%= id %>" tabindex="0" role="button" aria-label="Selecionar guilhotina frontal de descarga D<%= id %>" aria-pressed="false" data-gate-state="unknown" data-active="false">
+            <rect x="<%= x - 29 %>" y="351" width="31" height="20" rx="3" class="circuito-gate-chute"/>
+            <rect x="<%= x - 25 %>" y="357" width="28" height="8" rx="2" class="circuito-gate-blade"/>
+            <circle cx="<%= x + 9 %>" cy="358" r="5" class="circuito-gate-led"/>
+            <text x="<%= x + 17 %>" y="378" class="circuito-label">DESC. D<%= id %></text>
+          </g>
           <% }) %>
           <g data-circuito-equipment="percolator" tabindex="0" role="button" aria-label="Selecionar percoladora e sua rosca interna" aria-pressed="false" data-active="false">
             <path d="M157 412H1049V468H157Z" class="circuito-machine"/>
@@ -120,14 +126,14 @@
   <div class="circuito-stats" aria-label="Estado da demonstração mecânica">
     <div><small>Etapa mecânica</small><strong data-circuito-role="phase">Sem sinal</strong></div>
     <div><small>Seleção da demonstração</small><strong data-circuito-role="selection">Aguardando início</strong></div>
-    <div><small>Volume no tacho · ilustrativo</small><strong data-circuito-role="tacho">— L</strong></div>
+    <div><small>Volume no tacho · ilustrativo</small><strong data-circuito-role="tacho">— L</strong><small data-circuito-role="tacho-level">SEM SINAL</small></div>
     <div><small>Transferido nesta sessão · ilustrativo</small><strong data-circuito-role="transferred">— L</strong></div>
   </div>
   <% if (circuitoPodeControlar) { %>
   <details class="circuito-demo-controls">
     <summary>Demonstração mecânica local</summary>
     <div class="circuito-demo-body">
-      <p>O ciclo local percorre carga pela guilhotina, mistura, descarga para a percoladora e transferência ilustrativa ao tanque de serviço. Inicie quando desejar; esta demonstração não sincroniza comandos com o ESP32.</p>
+      <p>O ciclo independente percorre carga, mistura, descarga e transferência. No modo VINCULADO, aguarda o sinaleiro vermelho piscando (>120 °C) antes da descarga frontal virtual. Inicie quando desejar; esta demonstração não sincroniza comandos com o ESP32.</p>
       <div class="circuito-demo-settings"><label for="digestores-circuito-selection">Digestores da demonstração<select id="digestores-circuito-selection"><option value="D1">Digestor 1</option><option value="D2">Digestor 2</option><option value="D3">Digestor 3</option><option value="D4">Digestor 4</option><option value="TODOS" selected>Todos · um por vez</option></select></label><label for="digestores-circuito-speed">Velocidade virtual<select id="digestores-circuito-speed"><option value="1">1×</option><option value="3" selected>3×</option><option value="8">8×</option></select></label></div>
       <div class="circuito-demo-actions"><button type="button" data-circuito-action="start" class="circuito-primary">Iniciar demonstração</button><button type="button" data-circuito-action="pause" disabled>Pausar</button><button type="button" data-circuito-action="stop" disabled>Parar demonstração</button><button type="button" data-circuito-action="live">Voltar à supervisão</button></div>
       <p class="circuito-feedback" data-circuito-role="feedback" role="status" aria-live="polite">Aguardando início da demonstração local.</p>
