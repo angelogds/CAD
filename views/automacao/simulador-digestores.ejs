@@ -12,7 +12,7 @@
       <p>Ciclo completo: alimentação, guilhotinas, aquecimento, purgadores, descarga e percoladora em uma simulação.</p>
     </div><span class="auto-state waiting" id="sim-hardware-indicator" aria-live="polite"><%= bancadaPermitida ? 'SIMULAÇÃO • VERIFICANDO ESP32' : 'SIMULAÇÃO • VISUAL' %></span>
   </header>
-  <section class="auto-alert" role="status"><strong>Simulação de bancada</strong><span>Temperatura gerada no CAD, sem PT100. Faixas de simulação, NÃO alarmes reais. O teste de cada solenoide exige liberação local no ESP32; aquecimento é somente visual. Sem comandos para cargas industriais ou descarga automática.</span></section>
+  <section class="auto-alert" role="status"><strong>Simulação de bancada</strong><span>Temperatura gerada no CAD, sem PT100. Faixas de simulação, NÃO alarmes reais. O modo SIMULAÇÃO não energiza bobinas nem relés; o modo REAL mantém temporizadores locais sob intertravamentos. Sem comandos para cargas industriais ou descarga automática.</span></section>
   <div class="sim-toolbar">
     <% if (typeof simulacaoCircuitoPermitida !== 'undefined' && simulacaoCircuitoPermitida === true) { %><button type="button" id="sim-link-circuits" aria-pressed="true" title="Une os tempos térmicos e mecânicos apenas na maquete; não comanda descarga física">✓ Integrado · elétrica + mecânica</button><% } %>
     <button type="button" id="sim-start">▶ Iniciar simulação</button>
@@ -36,7 +36,7 @@
       <option value="all" selected>Todos os quatro digestores</option>
     </select>
     <span id="sim-selection-status" role="status" aria-live="polite">Quatro digestores selecionados</span>
-    <p class="sim-select-warning">ADMIN, Supervisor ou Encarregado de Manutenção podem sincronizar temperatura e luzes. Os purgadores permanecem fechados até autorização específica. O teste físico de cada solenoide de bancada exige liberação local no ESP32. Sem controle de aquecimento, vapor ou cargas industriais.</p>
+    <p class="sim-select-warning">ADMIN, Supervisor ou Encarregado de Manutenção podem sincronizar temperatura e luzes. Os purgadores são simulados visualmente; os relés físicos só podem operar em modo real, com autorização local. Sem controle de aquecimento, vapor ou cargas industriais.</p>
   </section>
   <% if (bancadaPermitida) { %>
   <section class="sim-bancada-online" aria-label="Sincronização do simulador com a bancada">
@@ -47,14 +47,14 @@
       <button type="button" id="sim-connect-esp32">Conectar / verificar ESP32</button>
       <label class="sim-remote-switch"><input type="checkbox" id="sim-remote-enable" data-csrf="<%= csrfAutomacao %>"> Sincronização ativa</label>
     </div>
-    <label class="sim-remote-switch"><input type="checkbox" id="sim-solenoids-enable"> Autorizar teste FÍSICO dos purgadores na bancada isolada (a animação é sempre transmitida)</label>
+    <label class="sim-remote-switch"><input type="checkbox" id="sim-solenoids-enable" disabled> Teste FÍSICO indisponível durante SIMULAÇÃO • Autorizar teste FÍSICO dos purgadores na bancada isolada (a animação é sempre transmitida)</label>
     <small id="sim-solenoids-status" role="status">Estados visuais de camisa/eixo espelhados no ESP32; solenóides físicas bloqueadas.</small>
     <small id="sim-remote-status" role="status" aria-live="polite">Aguardando simulação; é possível verificar a conexão agora.</small>
     <details class="sim-remote-details"><summary>Comunicação e estados dos ESP32</summary><div class="sim-remote-table-scroll"><table class="sim-remote-table" id="sim-remote-table" aria-label="Estado do ESP32 por digestor" style="width:100%;font-size:.85rem;margin-top:.5rem;border-collapse:collapse">
       <thead><tr><th>Digestor</th><th>Modo ESP32</th><th>Temperatura · origem indicada</th><th>Faixa</th><th>Sinaleiro / pronto</th><th>Sensor</th><th>Fase enviada (CAD)</th><th>Recebida</th><th>Aplicada</th><th>Saída</th><th>Último contato</th><th>ESP32</th></tr></thead>
       <tbody id="sim-remote-rows"><tr><td colspan="12">Carregando…</td></tr></tbody>
     </table></div></details>
-    <small>“Aplicada” e “Saída” só aparecem se o firmware informar. Purgadores permanecem fechados até uma autorização explícita no CAD e uma autorização local por canal no ESP32, somente para bancada isolada.</small>
+    <small>“Aplicada” e “Saída” só aparecem se o firmware informar. Sinaleiros e purgadores virtuais são espelhados ao ESP32; relés físicos permanecem bloqueados no modo SIMULAÇÃO.</small>
     <% if (typeof configuracaoAdmin !== 'undefined' && configuracaoAdmin) { %><p><a href="/automacao/configuracao">Configuração dos ESP32 e links para suas IHMs locais</a></p><% } else { %><p>Credenciais são configuradas pelo ADMIN. Para o teste da bancada, selecione SIMULAÇÃO na IHM local de cada ESP32 autorizado.</p><% } %>
   </section>
   <% } %>
