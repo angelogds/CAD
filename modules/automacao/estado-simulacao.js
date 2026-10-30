@@ -28,9 +28,9 @@ function normalizeSimulationState(value) {
     const e = new Error('Etapa mecânica inválida.'); e.status = 400; throw e;
   }
   return { aquecimento_simulado: b.aquecimento_simulado, purgadores_simulados: { camisa: p.camisa, eixo: p.eixo },
-    purgadores_visuais: visual ? { camisa: visual.camisa, eixo: visual.eixo } : { camisa: p.camisa, eixo: p.eixo },
-    guilhotinas_simuladas: gates ? { carga: gates.carga, descarga: gates.descarga } : { carga: 'FECHADA', descarga: 'FECHADA' },
-    etapa_mecanica: b.etapa_mecanica || 'PARADO' };
+    ...(visual ? { purgadores_visuais: { camisa: visual.camisa, eixo: visual.eixo } } : {}),
+    ...(gates ? { guilhotinas_simuladas: { carga: gates.carga, descarga: gates.descarga } } : {}),
+    ...(b.etapa_mecanica !== undefined ? { etapa_mecanica: b.etapa_mecanica } : {}) };
 }
 function readStoredState(raw) {
   try { const state = JSON.parse(raw || 'null'); if (!state) return null; const virtual = normalizeSimulationState(state); return { ...(virtual || CLOSED), estado_simulacao_disponivel: !!virtual, fonte_simulacao: state.fonte_simulacao === 'CAD' ? 'CAD' : 'LOCAL' }; } catch (_) { return null; }
