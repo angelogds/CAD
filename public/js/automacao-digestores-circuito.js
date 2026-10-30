@@ -13,6 +13,7 @@
   for (let index = 1; index <= 4; index++) {
     names['digestor' + index] = ['Digestor D' + index, 'Digestor horizontal elevado, com entrada superior e descarga frontal para a percoladora. A temperatura continua no painel térmico existente.'];
     names['gate' + index] = ['Guilhotina pneumática D' + index, 'Entrada superior individual. Posição na maquete não é retorno físico nem comando para o cilindro pneumático.'];
+    names['dischargeGate' + index] = ['Guilhotina frontal D' + index, 'Descarga virtual para a percoladora. Posição gráfica não equivale a sensor de fim de curso nem comanda a bobina.'];
   }
   function activeFor(key, s) {
     if (s.mode !== 'SIMULACAO' || !s.running) return false;
@@ -21,6 +22,7 @@
       return Boolean(unit.shaft || unit.loading || unit.discharging);
     }
     if (/^gate[1-4]$/.test(key)) return s.gates[Number(key.slice(-1)) - 1] === true;
+    if (/^dischargeGate[1-4]$/.test(key)) return s.dischargeGates?.[Number(key.slice(-1)) - 1] === true;
     if (key === 'serviceTankBoundary') return s.pump === true && s.tachoLiters > 0;
     if (key === 'gasHeader') return false;
     return s[key] === true;
@@ -35,6 +37,7 @@
       rows = [['Eixo', state(unit.shaft)], ['Carga / descarga', !sim ? 'Sem sinal' : unit.loading ? 'Carga virtual' : unit.discharging ? 'Descarga virtual' : 'Sem fluxo virtual'],
         ['Temperatura', 'Consultar painel térmico'], ['Volume na maquete', sim ? fmt(unit.chargeLiters) + ' L · ilustrativo' : 'Sem sinal'], ['Capacidade real', 'A levantar']];
     } else if (/^gate[1-4]$/.test(key)) rows = [['Posição', !sim ? 'Sem sinal' : s.gates[Number(key.slice(-1)) - 1] ? 'Aberta · simulada' : 'Fechada · simulada'], ['Retorno físico', 'Não integrado'], ['Comando industrial', 'Indisponível neste circuito']];
+    else if (/^dischargeGate[1-4]$/.test(key)) rows = [['Posição', !sim ? 'Sem sinal' : s.dischargeGates?.[Number(key.slice(-1)) - 1] ? 'Aberta · simulada' : 'Fechada · simulada'], ['Bobina real', 'Não conectada'], ['Retorno de fim de curso', 'Não integrado']];
     else if (key === 'tacho') rows = [['Volume', sim ? fmt(s.tachoLiters) + ' L · ilustrativo' : 'Sem sinal'], ['Capacidade da maquete', sim ? fmt(s.tachoCapacityLiters) + ' L · ilustrativa' : 'Não aplicada'], ['Capacidade real', 'A levantar'], ['Nível físico', 'Não integrado']];
     else if (key === 'serviceTankBoundary') rows = [['Transferido nesta sessão', sim ? fmt(s.transferredLiters) + ' L · virtual' : 'Sem sinal'], ['Produção apurada', 'Não inferida pela maquete'], ['Próxima área', 'Decanters e tanque de serviço']];
     else if (key === 'gasHeader') rows = [['Fluxo / pressão', 'Sem sinal'], ['Representação', 'Estática · sem estado inferido']];
@@ -49,6 +52,7 @@
   if (!panel || !Core) return;
   const controls = panel.dataset.controls === 'true';
   const state = Core.createState();
+  let linked = false;
   let thermalStates = Array(4).fill('DESLIGADO');
   const media = root.matchMedia?.('(prefers-reduced-motion: reduce)');
   let motion = !media?.matches;
@@ -104,15 +108,17 @@
     panel.dataset.running = String(s.running);
     panel.dataset.motion = String(motion && !media?.matches);
     panel.dataset.mode = s.mode;
-    text('mode', s.mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL' : 'SUPERVISÃO · SEM SINAL MECÂNICO');
+    text('mode', s.mode === 'SIMULACAO' ? linked ? 'SIMULAÇÃO INTEGRADA · ELÉTRICA + MECÂNICA' : 'SIMULAÇÃO LOCAL' : 'SUPERVISÃO · SEM SINAL MECÂNICO');
     text('phase', s.phaseLabel + (s.paused ? ' · pausada' : '') + (s.activeDigestor ? ' · ' + s.activeDigestor : ''));
     text('selection', s.selectionLabel);
     text('tacho', s.mode === 'SIMULACAO' ? fmt(s.tachoLiters) + ' L · ilustrativo' : 'Sem sinal');
+    text('tacho-level', s.mode === 'SIMULACAO' ? s.tachoLevel.replace('_VIRTUAL', '') + ' · SIMULADO' : 'SEM SINAL');
     text('transferred', s.mode === 'SIMULACAO' ? fmt(s.transferredLiters) + ' L · virtual' : 'Sem sinal');
     panel.querySelectorAll('[data-circuito-equipment]').forEach(element => {
       const key = element.dataset.circuitoEquipment;
       element.dataset.active = String(activeFor(key, s));
       if (/^gate[1-4]$/.test(key)) element.dataset.gateState = s.mode !== 'SIMULACAO' ? 'unknown' : s.gates[Number(key.slice(-1)) - 1] ? 'open' : 'closed';
+      if (/^dischargeGate[1-4]$/.test(key)) element.dataset.gateState = s.mode !== 'SIMULACAO' ? 'unknown' : s.dischargeGates[Number(key.slice(-1)) - 1] ? 'open' : 'closed';
     });
     panel.querySelectorAll('[data-flow]').forEach(element => {
       const key = element.dataset.flow;
@@ -138,11 +144,12 @@
     }
     if (controls) {
       const pauseButton = action('pause');
-      if (pauseButton) { pauseButton.disabled = s.mode !== 'SIMULACAO' || !s.running && !s.paused; pauseButton.textContent = s.paused ? 'Retomar' : 'Pausar'; }
-      if (action('stop')) action('stop').disabled = s.mode !== 'SIMULACAO' || !s.running && !s.paused;
-      if (action('live')) action('live').disabled = s.mode !== 'SIMULACAO';
+      if (pauseButton) { pauseButton.disabled = linked || s.mode !== 'SIMULACAO' || !s.running && !s.paused; pauseButton.textContent = s.paused ? 'Retomar' : 'Pausar'; }
+      if (action('start')) action('start').disabled = linked;
+      if (action('stop')) action('stop').disabled = linked || s.mode !== 'SIMULACAO' || !s.running && !s.paused;
+      if (action('live')) action('live').disabled = linked || s.mode !== 'SIMULACAO';
       const selection = document.getElementById('digestores-circuito-selection');
-      if (selection) selection.disabled = s.running || s.paused;
+      if (selection) selection.disabled = linked || s.running || s.paused;
     }
     renderDetail(s);
     send('state', s);
@@ -187,7 +194,7 @@
       const next = Number(event.target.value);
       if ([1, 3, 8].includes(next)) speed = next;
     });
-    root.setInterval(() => { if (!document.hidden && state.running) { Core.tick(state, 0.2 * speed); render(); } }, 200);
+    root.setInterval(() => { if (!linked && !document.hidden && state.running) { Core.tick(state, 0.2 * speed); render(); } }, 200);
   }
   root.addEventListener('digestores-circuito:3d-unavailable', () => {
     unavailable = true;
@@ -204,7 +211,22 @@
     send('select', { key: selected });
   });
   media?.addEventListener?.('change', () => { send('motion', { enabled: motion && !media.matches }); render(); });
-  root.AutomacaoDigestoresCircuito = { getSnapshot: () => Core.snapshot(state), selectEquipment };
+  root.AutomacaoDigestoresCircuito = {
+    getSnapshot: () => Core.snapshot(state), selectEquipment,
+    startLinked(selection) {
+      if (!controls) return { ok: false, reason: 'Sem permissão de simulação mecânica.' };
+      Core.stop(state);
+      const result = Core.startLinkedDemo(state, selection);
+      if (result.ok) { linked = true; text('feedback', 'Simulações unidas: o vermelho piscando (>120 °C) libera apenas a descarga VIRTUAL.'); }
+      render();
+      return result;
+    },
+    tickLinked(delta, readings) { if (linked) { Core.tick(state, delta, readings); render(); } },
+    pauseLinked() { if (linked) { Core.pause(state); render(); } },
+    resumeLinked() { if (linked) { Core.resume(state); render(); } },
+    stopLinked() { if (linked) { Core.stop(state); render(); } },
+    exitLinked() { linked = false; Core.returnLive(state); render(); },
+  };
   render();
   selectEquipment(selected);
   send('ready');
