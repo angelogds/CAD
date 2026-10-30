@@ -34,8 +34,8 @@ test('protocolo rejeita guilhotinas e etapas invalidas',()=>{
 });
 test('compatibilidade com pacotes anteriores preserva portao virtual fechado',()=>{
  const state=normalizeSimulationState({aquecimento_simulado:false,purgadores_simulados:{camisa:'FECHADO',eixo:'FECHADO'}});
- assert.deepEqual(state.guilhotinas_simuladas,{carga:'FECHADA',descarga:'FECHADA'});
- assert.equal(state.etapa_mecanica,'PARADO');
+ assert.equal(Object.hasOwn(state,'guilhotinas_simuladas'),false,'pacotes antigos permanecem idênticos');
+ assert.equal(Object.hasOwn(state,'etapa_mecanica'),false);
 });
 test('etapas carga, cozimento, descarga, transferencia e retomada sem ultrapassar 120C',()=>{
  const state=Core.createState();
