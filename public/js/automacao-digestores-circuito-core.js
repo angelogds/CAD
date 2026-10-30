@@ -134,7 +134,7 @@
     return state;
   }
   function resume(state) {
-    if (state.mode === 'SIMULACAO' && state.paused === true && STAGES.includes(state.stage)) { state.running = true; state.paused = false; }
+    if (state.mode === 'SIMULACAO' && state.paused === true && (STAGES.includes(state.stage) || (state.linked && state.stage === 'COZIMENTO'))) { state.running = true; state.paused = false; }
     return state;
   }
   function stop(state) {
