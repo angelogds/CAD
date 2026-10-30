@@ -771,7 +771,7 @@ function render(data){
  text('remoteInfo',remote?(completeSimulation?'Simulação PC atual. Os sinaleiros seguem a temperatura simulada; cada válvula exige armar o teste neste ESP32.':simCurrent?'Temperatura simulada atual. O pacote de válvulas não está disponível; armar teste pelo CAD permanece bloqueado.':expired?'Simulação CAD expirada. Sinaleiros apagados e teste CAD desarmado.':'Simulação CAD selecionada. Aguardando temperatura e estados virtuais atuais do PC.'):'Simulação CAD não selecionada.');
  text('wifiStatus',data.wifi_tentando?'Conectando...':(data.wifi_conectado?'Conectado':'Não conectado'));text('wifiSummary',data.wifi_tentando?'CONECTANDO':(data.wifi_conectado?'CONECTADO':'SEM REDE'));
  text('wifiIp',data.wifi_conectado?data.wifi_ip:'Use 192.168.4.1');text('wifiSsid',data.wifi_ssid||'Não configurada');text('wifiMessage',data.wifi_mensagem||'');el('connectWifi').disabled=data.wifi_tentando===true;
- text('firmware',data.firmware||'ESP32 · IHM local');renderPurge(data.purgadores,id,real,data.modo==='parado'||(data.modo==='real'&&sensorValid&&readable),{current:simCurrent,complete:completeSimulation,valves:data.purgadores_simulados});lastContact=Date.now();
+ text('firmware',data.firmware||'ESP32 · IHM local');renderPurge(data.purgadores,id,real,data.modo==='parado'||(data.modo==='real'&&sensorValid&&readable),{current:simCurrent,complete:completeSimulation,valves:data.purgadores_visuais||data.purgadores_simulados});lastContact=Date.now();
 }
 async function poll(){if(polling)return;polling=true;try{const response=await request('/api/estado',{},1800);if(!response.ok)throw Error('Sem contato');render(await response.json());}catch(_){clearLive();}finally{polling=false;}}
 async function pollCad(){if(cadPolling)return;cadPolling=true;try{const response=await request('/api/cad/status');if(!response.ok)throw Error('Sem contato');const data=await response.json();text('cadDevice',data.device_id);text('cadConfigured',data.credencial_configurada?'Salva no ESP32':'Não configurada');text('cadStatus',cadNames[data.status]||'Não informado');text('cadHttp',data.http===0?'—':data.http);text('cadSummary',data.status===4?'CONECTADO':data.credencial_configurada?'CONFIGURADO':'SEM TOKEN');}catch(_){text('cadStatus','Sem comunicação local');text('cadSummary','SEM CONTATO');}finally{cadPolling=false;}}
@@ -818,6 +818,20 @@ function showVirtual(gate){
 window.cgdGatePanelUpdate=function(data){
  if(!el('cg-io-status'))return;
  const g=data&&data.guilhotinas?data.guilhotinas:{};
+ const cad=data&&data.modo==='simulacao'&&data.simulacao_cad_atual===true&&data.estado_simulacao_disponivel===true;
+ const mirrored=data?.guilhotinas_simuladas||{};
+ if(cad){
+  virtual.carga=mirrored.carga==='ABERTA'?'aberta':'fechada';
+  virtual.descarga=mirrored.descarga==='ABERTA'?'aberta':'fechada';
+ }else if(!data||data?.modo==='simulacao'){
+  virtual.carga='fechada'; virtual.descarga='fechada';
+ }
+ showVirtual('carga');showVirtual('descarga');
+ document.querySelectorAll('#cgdgate [data-cg-virtual]').forEach(b=>{b.disabled=Boolean(cad);});
+ el('cg-feedback').textContent=cad?
+  'Recebendo CAD: '+(data.etapa_mecanica||'PARADO')+' · movimento visual, sem relés físicos.':
+  (data?.modo==='simulacao'?'CAD sem pacote válido ou expirado. Guilhotinas virtuais fechadas.':
+   'Simulação local independente do modo real; nenhuma posição física confirmada.');
  const configured=g.saidas_habilitadas===true;
  const key=g.chave_local_ativa===true;
  const stopped=data&&data.modo==='parado';
@@ -970,7 +984,7 @@ constexpr uint8_t RELE_LIGA = LOW, RELE_DESLIGA = HIGH;
 constexpr uint32_t DURACAO_FASE_MS = 5000;
 constexpr uint32_t VALIDADE_MAXIMA_REMOTA_MS = 6500;
 const char *CAD_BASE = "https://manutencao.campodogado.app.br/api/automacao/device";
-const char *CAD_FIRMWARE = "temperatura-v10-guilhotinas-local";
+const char *CAD_FIRMWARE = "temperatura-v10-cad-ciclo-integrado";
 const char *CERTIFICADOS_CAD = R"CGCERT(
 -----BEGIN CERTIFICATE-----
 MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
@@ -1046,7 +1060,10 @@ int8_t corManual = -1;
 uint32_t inicioFase = 0;
 struct RemoteCommand {
   bool valid = false, everReceived = false, completeState = false, heating = false;
-  bool purgeOpen[2] = {false, false};
+  bool purgeOpen[2] = {false, false};  // Fisico continua dependendo de armar local
+  bool purgeVisualOpen[2] = {false, false};
+  bool gateVisualOpen[2] = {false, false}; // SOMENTE ILUSTRACAO, nunca driver GPIO
+  char mechanicalStage[20] = "PARADO";
   float temperature = NAN;
   uint32_t receivedAt = 0, validity = 0, generation = 0;
   int32_t version = -1;
@@ -1063,6 +1080,9 @@ struct LocalSnapshot {
   bool red = false, yellow = false, green = false;
   bool cadCurrent = false, cadExpired = false, cadComplete = false, heating = false;
   bool purgeVirtualOpen[2] = {false, false};
+  bool purgeDisplayOpen[2] = {false, false};
+  bool gateDisplayOpen[2] = {false, false};
+  char mechanicalStage[20] = "PARADO";
 } localSnapshot;
 cgd::PurgeTimer purgadores[2] = { cgd::PurgeTimer(5, 60), cgd::PurgeTimer(10, 60) };
 PurgeOutputs purgeOutputs;
@@ -1142,6 +1162,13 @@ void preencherSinal(JsonDocument &doc, const LocalSnapshot &s, bool localPage = 
   JsonObject virtualPurges = doc["purgadores_simulados"].to<JsonObject>();
   virtualPurges["camisa"] = s.cadComplete && s.purgeVirtualOpen[0] ? "ABERTO" : "FECHADO";
   virtualPurges["eixo"] = s.cadComplete && s.purgeVirtualOpen[1] ? "ABERTO" : "FECHADO";
+  JsonObject displayPurges = doc["purgadores_visuais"].to<JsonObject>();
+  displayPurges["camisa"] = s.cadCurrent && s.cadComplete && s.purgeDisplayOpen[0] ? "ABERTO" : "FECHADO";
+  displayPurges["eixo"] = s.cadCurrent && s.cadComplete && s.purgeDisplayOpen[1] ? "ABERTO" : "FECHADO";
+  JsonObject displayGates = doc["guilhotinas_simuladas"].to<JsonObject>();
+  displayGates["carga"] = s.cadCurrent && s.cadComplete && s.gateDisplayOpen[0] ? "ABERTA" : "FECHADA";
+  displayGates["descarga"] = s.cadCurrent && s.cadComplete && s.gateDisplayOpen[1] ? "ABERTA" : "FECHADA";
+  doc["etapa_mecanica"] = s.cadCurrent && s.cadComplete ? s.mechanicalStage : "PARADO";
   const String stamp = real && s.signal.hasTemperature ? timestampISO(s.measuredAt, s.measuredMillis) : "";
   if (stamp.length()) doc["timestamp_medicao"] = stamp;
   else doc["timestamp_medicao"] = nullptr;
@@ -1211,6 +1238,10 @@ void tarefaSinalizacao(void*) {
           next.cadCurrent = true; next.cadComplete = remoteCommand.completeState;
           next.heating = remoteCommand.heating;
           next.purgeVirtualOpen[0] = remoteCommand.purgeOpen[0]; next.purgeVirtualOpen[1] = remoteCommand.purgeOpen[1];
+          next.purgeDisplayOpen[0] = remoteCommand.purgeVisualOpen[0]; next.purgeDisplayOpen[1] = remoteCommand.purgeVisualOpen[1];
+          next.gateDisplayOpen[0] = remoteCommand.gateVisualOpen[0]; next.gateDisplayOpen[1] = remoteCommand.gateVisualOpen[1];
+          strncpy(next.mechanicalStage, remoteCommand.mechanicalStage, sizeof(next.mechanicalStage)-1);
+          next.mechanicalStage[sizeof(next.mechanicalStage)-1] = '\0';
         } else next.cadExpired = remoteCommand.everReceived;
       } else if (modo == AUTOMATICO || modo == SIMULACAO) {
         uint32_t elapsed = now - inicioFase;
@@ -1295,12 +1326,39 @@ String payloadTelemetria(const LocalSnapshot &s) {
 bool receberSimulacaoCAD(const String &body) {
   cgd::CadSimulationCommand command;
   if (!cgd::parseCadSimulationJson(body.c_str(), body.length(), DIGESTOR_ID, command)) return false;
+  // Estados abaixo so alimentam a IHM; nenhuma bobina recebe comandos desses campos.
+  JsonDocument mirror;
+  if (deserializeJson(mirror, body, DeserializationOption::NestingLimit(8))) return false;
+  JsonObject mirrored = mirror["sinaleiro_bancada"].as<JsonObject>();
+  const char* visualCamisa = mirrored["purgadores_visuais"]["camisa"].as<const char*>();
+  const char* visualEixo = mirrored["purgadores_visuais"]["eixo"].as<const char*>();
+  const char* visualCarga = mirrored["guilhotinas_simuladas"]["carga"].as<const char*>();
+  const char* visualDescarga = mirrored["guilhotinas_simuladas"]["descarga"].as<const char*>();
+  const char* visualStage = mirrored["etapa_mecanica"].as<const char*>();
+  const auto mirrorPurge = [](const char *v) { return v && (strcmp(v, "ABERTO") == 0 || strcmp(v, "FECHADO") == 0); };
+  const auto mirrorGate = [](const char *v) { return v && (strcmp(v, "ABERTA") == 0 || strcmp(v, "FECHADA") == 0); };
+  const bool visualValid = command.active && command.completeState &&
+    mirrorPurge(visualCamisa) && mirrorPurge(visualEixo) &&
+    mirrorGate(visualCarga) && mirrorGate(visualDescarga);
   if (xSemaphoreTake(mutexEstado, pdMS_TO_TICKS(20)) != pdTRUE) return false;
   if (modo == REMOTO_BANCADA) {
     remoteCommand.valid = command.active; remoteCommand.everReceived = command.active;
     remoteCommand.completeState = command.active && command.completeState;
     remoteCommand.heating = command.heating;
     remoteCommand.purgeOpen[0] = command.purgeOpen[0]; remoteCommand.purgeOpen[1] = command.purgeOpen[1];
+    remoteCommand.purgeVisualOpen[0] = visualValid && strcmp(visualCamisa, "ABERTO") == 0;
+    remoteCommand.purgeVisualOpen[1] = visualValid && strcmp(visualEixo, "ABERTO") == 0;
+    remoteCommand.gateVisualOpen[0] = visualValid && strcmp(visualCarga, "ABERTA") == 0;
+    remoteCommand.gateVisualOpen[1] = visualValid && strcmp(visualDescarga, "ABERTA") == 0;
+    strncpy(remoteCommand.mechanicalStage, "PARADO", sizeof(remoteCommand.mechanicalStage));
+    if (visualValid && visualStage) {
+      const char* validStages[] = {"PARADO","CARGA","COZIMENTO","DESCARGA","TRANSFERENCIA","CONCLUIDO"};
+      for (auto entry : validStages) if (strcmp(visualStage, entry) == 0) {
+        strncpy(remoteCommand.mechanicalStage, entry, sizeof(remoteCommand.mechanicalStage)-1);
+        break;
+      }
+    }
+    remoteCommand.mechanicalStage[sizeof(remoteCommand.mechanicalStage)-1] = '\0';
     remoteCommand.temperature = command.temperature; remoteCommand.validity = command.validity;
     remoteCommand.receivedAt = millis(); ++remoteCommand.generation;
     remoteCommand.version = command.version; remoteCommand.receivedPhase = command.phase;
