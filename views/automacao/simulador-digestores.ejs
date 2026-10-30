@@ -2,7 +2,7 @@
 <% const bancadaPermitida = typeof simuladorBancadaPermitida !== 'undefined' ? simuladorBancadaPermitida : (typeof simuladorBancadaAdmin !== 'undefined' && simuladorBancadaAdmin); %>
 <link rel="stylesheet" href="/css/automacao.css?v=20261026-sync-esp-1">
 <link rel="stylesheet" href="/css/automacao-simulador.css?v=20261026-sync-esp-1">
-<link rel="stylesheet" href="/css/automacao-digestores-circuito.css?v=20261026-torres1">
+<link rel="stylesheet" href="/css/automacao-digestores-circuito.css?v=20261030-integrado1">
 <main class="auto-page auto-hmi auto-2a" id="sim-digestores">
   <%- include('partials/brand') %>
   <div class="auto-actions-top"><a class="auto-back-link" href="<%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? '/automacao' : '/automacao/digestores' %>">← <%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? 'Voltar à automação' : 'Voltar aos Digestores' %></a></div>
@@ -49,6 +49,7 @@
   </section>
   <% } %>
   <div class="sim-toolbar">
+    <% if (typeof simulacaoCircuitoPermitida !== 'undefined' && simulacaoCircuitoPermitida === true) { %><button type="button" id="sim-link-circuits" aria-pressed="false" title="Une os tempos térmicos e mecânicos apenas na maquete; não comanda descarga física">Vincular simulações elétrica + mecânica</button><% } %>
     <button type="button" id="sim-start">▶ Iniciar simulação</button>
     <button type="button" id="sim-pause" disabled>Ⅱ Pausar</button>
     <button type="button" id="sim-reset">↺ Reiniciar</button>
@@ -139,8 +140,8 @@
   </section>
 </main>
 <script src="/js/automacao-simulador-core.js?v=20261026-sync-esp-1" defer></script>
-<script src="/js/automacao-simulador.js?v=20261026-sync-esp-1" defer></script>
+<script src="/js/automacao-simulador.js?v=20261030-integrado1" defer></script>
 <% if (bancadaPermitida) { %><script src="/js/automacao-simulador-http.js?v=20261026-sync-esp-1" defer></script><script src="/js/automacao-digestores.js?v=20261026-sync-esp-1" defer></script><script src="/js/automacao-simulador-remoto.js?v=20261026-sync-esp-1" defer></script><% } %>
-<script src="/js/automacao-digestores-circuito-core.js?v=20261026-torres1" defer></script>
-<script src="/js/automacao-digestores-circuito.js?v=20261026-torres1" defer></script>
-<script type="module" src="/js/automacao-digestores-3d.mjs?v=20261026-torres1"></script>
+<script src="/js/automacao-digestores-circuito-core.js?v=20261030-integrado1" defer></script>
+<script src="/js/automacao-digestores-circuito.js?v=20261030-integrado1" defer></script>
+<script type="module" src="/js/automacao-digestores-3d.mjs?v=20261030-integrado1"></script>
