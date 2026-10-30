@@ -77,7 +77,7 @@ function simuladorDigestores(req, res) {
     simuladorBancadaAdmin: podeSincronizarBancada,
     simuladorBancadaPermitida: podeSincronizarBancada,
     configuracaoAdmin: role === 'ADMIN',
-    simulacaoCircuitoPermitida: ACCESS.automacao_decanters_simulate.includes(role),
+    simulacaoCircuitoPermitida: ACCESS.automacao_view.includes(role) || ACCESS.automacao_decanters_simulate.includes(role),
     visualizacaoAutomacaoCompleta: ACCESS.automacao_view.includes(role),
     csrfAutomacao: podeSincronizarBancada && req.session ? req.session.automacaoConfigCsrf : '',
     title: '2A Automação Industrial · Simulador dos Digestores',
