@@ -21,7 +21,7 @@ function normalizeSimulationState(value) {
     const e = new Error('Purgadores visuais inválidos.'); e.status = 400; throw e;
   }
   if (gates !== undefined && (!gates || typeof gates !== 'object' || Array.isArray(gates) ||
-      !valves.includes(gates.carga) || !valves.includes(gates.descarga))) {
+      !['ABERTA','FECHADA'].includes(gates.carga) || !['ABERTA','FECHADA'].includes(gates.descarga))) {
     const e = new Error('Guilhotinas simuladas inválidas.'); e.status = 400; throw e;
   }
   if (b.etapa_mecanica !== undefined && !stages.includes(b.etapa_mecanica)) {
@@ -29,7 +29,7 @@ function normalizeSimulationState(value) {
   }
   return { aquecimento_simulado: b.aquecimento_simulado, purgadores_simulados: { camisa: p.camisa, eixo: p.eixo },
     purgadores_visuais: visual ? { camisa: visual.camisa, eixo: visual.eixo } : { camisa: p.camisa, eixo: p.eixo },
-    guilhotinas_simuladas: gates ? { carga: gates.carga, descarga: gates.descarga } : { carga: 'FECHADO', descarga: 'FECHADO' },
+    guilhotinas_simuladas: gates ? { carga: gates.carga, descarga: gates.descarga } : { carga: 'FECHADA', descarga: 'FECHADA' },
     etapa_mecanica: b.etapa_mecanica || 'PARADO' };
 }
 function readStoredState(raw) {
