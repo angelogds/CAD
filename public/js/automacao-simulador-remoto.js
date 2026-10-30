@@ -103,12 +103,11 @@
       const carga=current&&mech.gates?.[id-1]===true?'ABERTA':'FECHADA';
       const descarga=current&&mech.dischargeGates?.[id-1]===true?'ABERTA':'FECHADA';
       const stage=current&&mech.activeDigestor==='D'+id?mech.stage:'PARADO';
+      const espelho=mech?{purgadores_visuais:{camisa:camisaVisual,eixo:eixoVisual},
+        guilhotinas_simuladas:{carga,descarga},etapa_mecanica:stage}:{};
       return {digestor_id:id,fase,...(!parado&&Number.isFinite(temperatura)?{temperatura_c:temperatura}:{}),
         aquecimento_simulado:!parado&&card.dataset.aquecimentoSimulado==='true',
-        purgadores_simulados:{camisa,eixo},
-        purgadores_visuais:{camisa:camisaVisual,eixo:eixoVisual},
-        guilhotinas_simuladas:{carga,descarga},
-        etapa_mecanica:stage};
+        purgadores_simulados:{camisa,eixo},...espelho};
     });
   }
   async function publish(stopped=false) {
