@@ -726,15 +726,17 @@ function renderPurge(items,id,real,realEligible,simulation){
   const opened=item.comando_aberto===true;
   const relayLabel=!commandKnown||(cadTest&&!available)?'Não confirmado':opened?'Abrir · comandado':'Fechar · comandado';
   const label=cadTest?(available?(opened?'Teste CAD · aberto comandado':'Teste CAD · fechado comandado'):'Teste CAD sem simulação atual'):(simulated?(item.aberto===true?'Aberto · simulado':'Fechado · simulado'):(armed?(item.ativo===true?(opened?'Aberto · comandado':'Fechado · comandado'):'Armado · fechado comandado'):'Desarmado · fechado comandado'));
-  text('p'+ch+'mode',cadTest?'TESTE CAD ARMADO':simulated?'SIMULAÇÃO LOCAL':armed?'SAÍDA ARMADA':'DESARMADO');
-  text('p'+ch+'relay',relayLabel);text('p'+ch+'state',label);text('d'+id+'p'+ch,label);
+  const mirrored=available&&!real;
+  const visualLabel=virtual==='ABERTO'?'ABERTO · CAD (SIMULADO)':virtual==='FECHADO'?'FECHADO · CAD (SIMULADO)':'SEM ESTADO VIRTUAL';
+  text('p'+ch+'mode',mirrored?'SIMULAÇÃO CAD':cadTest?'TESTE CAD ARMADO':simulated?'SIMULAÇÃO LOCAL':armed?'SAÍDA ARMADA':'DESARMADO');
+  text('p'+ch+'relay',relayLabel);text('p'+ch+'state',mirrored?visualLabel:label);text('d'+id+'p'+ch,mirrored?visualLabel:label);
   text('p'+ch+'remaining',cadTest?'Segue a válvula virtual do PC enquanto a simulação atual for renovada.':item.ativo===true&&Number.isFinite(item.restante_ms)?'Próxima transição em '+Math.ceil(Math.max(0,item.restante_ms)/1000)+' s':armed?'Saída armada. Inicie o ciclo para usar os tempos configurados.':'Ciclo parado. O teste pelo CAD e o temporizador exigem seleções locais separadas.');
   [['closed','fechado_min'],['open','aberto_s']].forEach(([suffix,key])=>{const field=el('p'+ch+suffix);if(field.dataset.dirty!=='true'&&Number.isFinite(item[key]))field.value=String(item[key]);});
   text('p'+ch+'physical',physical?'GPIO '+String(item.pino_reservado||'—')+' · relé LOW · estado comandado, sem feedback físico':'Saída física indisponível neste firmware');
   document.querySelector('[data-purge-arm="'+ch+'"]').disabled=!physical||!realEligible||armed||cadArmed||item.ativo===true;
   document.querySelector('[data-purge-real="'+ch+'"]').disabled=!physical||!realEligible||!armed||cadArmed||item.ativo===true;
-  document.querySelector('[data-purge-cad="'+ch+'"]').disabled=!physical||!available||armed||cadArmed||item.ativo===true;
-  document.querySelector('[data-purge-start="'+ch+'"]').disabled=real||armed||cadArmed||item.ativo===true;
+  document.querySelector('[data-purge-cad="'+ch+'"]').disabled=true; // Simulação nunca arma relé
+  document.querySelector('[data-purge-start="'+ch+'"]').disabled=real||simulation.current||armed||cadArmed||item.ativo===true;
   document.querySelector('[data-purge-save="'+ch+'"]').disabled=item.ativo===true||cadArmed;
  }
 }
