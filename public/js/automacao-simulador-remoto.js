@@ -74,7 +74,7 @@
     toggle.checked=false;
     if(timer!==null){clearInterval(timer);timer=null;}
     if(solenoids)solenoids.checked=false;
-    if(solenoidsStatus)solenoidsStatus.textContent='Purgadores bloqueados no CAD após interrupção.';
+    if(solenoidsStatus)solenoidsStatus.textContent='Purgadores físicos bloqueados no CAD após interrupção.';
     status.textContent=msg+'. Sincronização interrompida; comandos expiram automaticamente.';
   }
   void refreshStatus();
@@ -92,11 +92,23 @@
       // Auto sincronização nunca arma atuadores: só inclui estados dos relés após
       // confirmação adicional no CAD e liberação física local por canal no ESP32.
       const testeSolenoides=solenoids?.checked===true;
-      const camisa=testeSolenoides&&!parado&&card.dataset.camisaSimulada==='ABERTO'?'ABERTO':'FECHADO';
-      const eixo=testeSolenoides&&!parado&&card.dataset.eixoSimulado==='ABERTO'?'ABERTO':'FECHADO';
+      const camisaVisual=!parado&&card.dataset.camisaSimulada==='ABERTO'?'ABERTO':'FECHADO';
+      const eixoVisual=!parado&&card.dataset.eixoSimulado==='ABERTO'?'ABERTO':'FECHADO';
+      // Saídas físicas e estados VISUAIS são canais distintos: firmware antigo
+      // continua recebendo FECHADO por padrão, inclusive com animação ativa.
+      const camisa=testeSolenoides?camisaVisual:'FECHADO';
+      const eixo=testeSolenoides?eixoVisual:'FECHADO';
+      const mech=window.AutomacaoDigestoresCircuito?.getSnapshot?.();
+      const current=mech?.linked===true&&mech.mode==='SIMULACAO'&&!parado;
+      const carga=current&&mech.gates?.[id-1]===true?'ABERTA':'FECHADA';
+      const descarga=current&&mech.dischargeGates?.[id-1]===true?'ABERTA':'FECHADA';
+      const stage=current&&mech.activeDigestor==='D'+id?mech.stage:'PARADO';
       return {digestor_id:id,fase,...(!parado&&Number.isFinite(temperatura)?{temperatura_c:temperatura}:{}),
         aquecimento_simulado:!parado&&card.dataset.aquecimentoSimulado==='true',
-        purgadores_simulados:{camisa,eixo}};
+        purgadores_simulados:{camisa,eixo},
+        purgadores_visuais:{camisa:camisaVisual,eixo:eixoVisual},
+        guilhotinas_simuladas:{carga,descarga},
+        etapa_mecanica:stage};
     });
   }
   async function publish(stopped=false) {
@@ -121,7 +133,7 @@
     if(toggle.checked)void publish(true);
     toggle.checked=false;
     if(solenoids)solenoids.checked=false;
-    if(solenoidsStatus)solenoidsStatus.textContent='Purgadores bloqueados; é preciso autorizar novamente para outro teste.';
+    if(solenoidsStatus)solenoidsStatus.textContent='Purgadores físicos bloqueados; a simulação visual permanece independente.';
   }
   function connect() {
     if(toggle.checked)return;
@@ -137,7 +149,7 @@
   function connectFromToggle() {
     // A opção do painel apenas sincroniza as lâmpadas por padrão.
     if(timer!==null)clearInterval(timer);
-    status.textContent='Sincronizando luzes e temperatura. Purgadores bloqueados por padrão.';
+    status.textContent='Sincronizando luzes, temperatura, purgadores virtuais e guilhotinas; relés físicos bloqueados.';
     void publish();
     timer=setInterval(()=>{if(toggle.checked)void publish();},1000);
   }
@@ -154,7 +166,7 @@
         return;
       }
       if(solenoidsStatus)solenoidsStatus.textContent='Estados de purgadores habilitados no CAD; a autorização física por canal continua obrigatória no ESP32.';
-    } else if(solenoidsStatus)solenoidsStatus.textContent='Purgadores bloqueados no CAD; somente temperatura e luzes.';
+    } else if(solenoidsStatus)solenoidsStatus.textContent='Somente os relés físicos estão bloqueados; purgadores virtuais continuam espelhados.';
     if(toggle.checked)void publish(!start.disabled);
   });
   start.addEventListener('click',()=>{if(autoSync?.checked!==false)connect();});
