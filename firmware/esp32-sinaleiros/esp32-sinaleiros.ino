@@ -1,6 +1,6 @@
 /*
   CAMPO DO GADO · 2A Automação Industrial · ESP32-D0WD-V3 / ESP32 Dev Module
-  Evolução do sketch bancada-v7 fornecido pelo responsável.
+  Evolução do sketch bancada-v7 fornecido pelo responsável. V10 demonstrativo.
   Três sinaleiros ativos LOW; PT100 opt-in; purgadores LOW/fecha-sem-energia confirmados pelo responsável.
   NVS Wi-Fi/token preservada. Purga exige Armar+Iniciar local. Nenhum comando de comporta/descarga de material.
 */
@@ -34,7 +34,7 @@ constexpr uint8_t RELE_LIGA = LOW, RELE_DESLIGA = HIGH;
 constexpr uint32_t DURACAO_FASE_MS = 5000;
 constexpr uint32_t VALIDADE_MAXIMA_REMOTA_MS = 6500;
 const char *CAD_BASE = "https://manutencao.campodogado.app.br/api/automacao/device";
-const char *CAD_FIRMWARE = "temperatura-v9";
+const char *CAD_FIRMWARE = "temperatura-v10-demo";
 const char *CERTIFICADOS_CAD = R"CGCERT(
 -----BEGIN CERTIFICATE-----
 MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
@@ -427,7 +427,14 @@ void enviarEstado() {
   doc["restante_ms"] = (s.mode == AUTOMATICO || s.mode == SIMULACAO) ?
     (millis() - inicioFase < DURACAO_FASE_MS ? DURACAO_FASE_MS - (millis() - inicioFase) : 0) : 0;
   doc["remoto_restante_s"] = 0; doc["simulacao_persistente"] = s.mode == REMOTO_BANCADA;
-  preencherSinal(doc, s, true); doc["pt100_habilitado"] = pt100Configurado;
+  preencherSinal(doc, s, true);
+  // Sem GPIO nem fim de curso: NÃO inferir abertura real a partir da animação.
+  JsonObject materialGates = doc["guilhotinas"].to<JsonObject>();
+  materialGates["carregamento"] = "SEM_RETORNO_FISICO";
+  materialGates["descarga"] = "SEM_RETORNO_FISICO";
+  materialGates["saidas_habilitadas"] = false;
+  materialGates["comandos_remotos_habilitados"] = false;
+  doc["pt100_habilitado"] = pt100Configurado;
   doc["sensores_integrados"] = pt100Configurado; doc["saidas_habilitadas"] = true;
   doc["wifi_conectado"] = WiFi.status() == WL_CONNECTED; doc["wifi_tentando"] = wifiTentando;
   doc["wifi_ssid"] = WiFi.status() == WL_CONNECTED ? WiFi.SSID() : wifiPendenteNome;
