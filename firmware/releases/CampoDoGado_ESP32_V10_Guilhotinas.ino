@@ -1264,15 +1264,17 @@ void tarefaSinalizacao(void*) {
       escreverSaidas(pins.red, pins.yellow, pins.green);
       next.red = pins.red; next.yellow = pins.yellow; next.green = pins.green;
       localSnapshot = next;
-      cadPurgeTest.update(modo == REMOTO_BANCADA, WiFi.status() == WL_CONNECTED,
+      cadPurgeTest.update(false, WiFi.status() == WL_CONNECTED,
         remoteCommand.valid && remoteCommand.completeState, now, remoteCommand.receivedAt,
         remoteCommand.validity, remoteCommand.purgeOpen[0], remoteCommand.purgeOpen[1]);
       // Driver físico separado: teste CAD exige armamento LOCAL e pacote completo fresco.
       for (int i = 0; i < 2; ++i) {
         if (modo == REMOTO_BANCADA) {
           purgadores[i].stop();
-          if (!cadPurgeTest.armed(i)) purgeOutputs.stop(i);
-          purgeOutputs.apply(i, cadPurgeTest.requestedOpen(i), cadPurgeTest.current());
+          // Modo SIMULACAO/CAD = SOMENTE espelhamento grafico. Nunca abrir
+          // relé de purgador nem guilhotina a partir de pacotes remotos.
+          cadPurgeTest.stop(i);
+          purgeOutputs.stop(i);
           continue;
         }
         const bool healthy = modo == PARADO || (modo == OPERACAO_REAL && next.signal.hasTemperature);
@@ -1457,7 +1459,8 @@ void enviarEstado() {
       entry["restante_ms"] = state.remainingMs; entry["armado_teste_cad"] = cadArmed;
       entry["saida_fisica_habilitada"] = purgeOutputs.configured(); entry["armado_real"] = purgeOutputs.armed(i);
       entry["armado"] = purgeOutputs.armed(i);
-      entry["modo"] = cadArmed ? "TESTE_CAD" : (purgeOutputs.armed(i) ? "REAL" : (state.active ? "SIMULACAO" : "PARADO"));
+      entry["modo"] = modo == REMOTO_BANCADA ? "SIMULACAO" :
+        (purgeOutputs.armed(i) ? "REAL" : (state.active ? "SIMULACAO" : "PARADO"));
       entry["pino_reservado"] = PurgeOutputs::pin(i);
     }
     xSemaphoreGive(mutexEstado);
@@ -1553,12 +1556,9 @@ void purgadoresHandler() {
   }
   else if (action == "iniciar_real" && (modo == PARADO || (modo == OPERACAO_REAL && localSnapshot.signal.hasTemperature)) && purgeOutputs.armed(i))
     purgadores[i].startSimulation(millis()); // somente o scheduler; driver armado separado.
-  else if (action == "armar_teste_cad" && modo == REMOTO_BANCADA && purgeOutputs.configured()) {
-    cadPurgeTest.update(true, WiFi.status() == WL_CONNECTED, remoteCommand.valid && remoteCommand.completeState,
-      millis(), remoteCommand.receivedAt, remoteCommand.validity, remoteCommand.purgeOpen[0], remoteCommand.purgeOpen[1]);
-    ok = cadPurgeTest.arm(i);
-    if (ok) { purgadores[i].stop(); ok = purgeOutputs.arm(i); }
-    if (!ok) { cadPurgeTest.stop(i); purgeOutputs.stop(i); }
+  else if (action == "armar_teste_cad") {
+    // Bloqueado: CAD e simulacao sao visualizacao, nunca acionamento fisico.
+    cadPurgeTest.stop(i); purgeOutputs.stop(i); ok = false;
   }
   else if (action == "parar") { cadPurgeTest.stop(i); purgadores[i].stop(); purgeOutputs.stop(i); }
   else ok = false;
