@@ -6,9 +6,10 @@
   const EXAMPLE = Object.freeze({ tachoCapacityLiters: 1000, chargeLiters: 600, liquidFraction: 0.25,
     loadSeconds: 6, mixSeconds: 10, dischargeSeconds: 8, transferSeconds: 12 });
   const STAGES = Object.freeze(['CARGA', 'MISTURA', 'DESCARGA', 'TRANSFERENCIA']);
+  const LINKED_STAGES = Object.freeze(['CARGA', 'COZIMENTO', 'DESCARGA', 'TRANSFERENCIA']);
   const DURATIONS = Object.freeze({ CARGA: EXAMPLE.loadSeconds, MISTURA: EXAMPLE.mixSeconds,
     DESCARGA: EXAMPLE.dischargeSeconds, TRANSFERENCIA: EXAMPLE.transferSeconds });
-  const PHASE_LABELS = Object.freeze({ SEM_SINAL: 'Sem sinal mecânico', CARGA: 'Carga virtual', MISTURA: 'Mistura virtual',
+  const PHASE_LABELS = Object.freeze({ SEM_SINAL: 'Sem sinal mecânico', CARGA: 'Carga virtual', MISTURA: 'Mistura virtual', COZIMENTO: 'Cozimento virtual · aguardando PT100 simulado',
     DESCARGA: 'Descarga virtual', TRANSFERENCIA: 'Transferência virtual', PARADO: 'Maquete parada', CONCLUIDO: 'Demonstração concluída' });
   const clone = value => JSON.parse(JSON.stringify(value));
   const finite = value => typeof value === 'number' && Number.isFinite(value);
@@ -16,8 +17,8 @@
 
   function createState() {
     return { mode: 'LIVE', running: false, paused: false, seconds: 0, selection: null, queue: [], completed: [],
-      activeDigestor: null, stage: 'SEM_SINAL', stageSeconds: 0, stageDurationSeconds: null,
-      feedAuger: null, gates: Array(4).fill(null),
+      activeDigestor: null, stage: 'SEM_SINAL', stageSeconds: 0, stageDurationSeconds: null, linked: false,
+      feedAuger: null, gates: Array(4).fill(null), dischargeGates: Array(4).fill(null),
       digestors: DIGESTORS.map(() => ({ tempC: null, shaft: null, loading: null, discharging: null, chargeLiters: null })),
       percolator: null, tachoMixer: null, pump: null, tachoLiters: null, tachoCapacityLiters: null,
       collectedLiters: null, transferredLiters: null, illustrative: true };
@@ -25,6 +26,7 @@
   function clearCommands(state) {
     state.feedAuger = false;
     state.gates = Array(4).fill(false);
+    state.dischargeGates = Array(4).fill(false);
     state.digestors.forEach(unit => { unit.shaft = false; unit.loading = false; unit.discharging = false; });
     state.percolator = false;
     state.tachoMixer = false;
@@ -38,8 +40,9 @@
       state.feedAuger = true;
       state.gates[index] = true;
       state.digestors[index].loading = true;
-    } else if (state.stage === 'MISTURA') state.digestors[index].shaft = true;
+    } else if (state.stage === 'MISTURA' || state.stage === 'COZIMENTO') state.digestors[index].shaft = true;
     else if (state.stage === 'DESCARGA') {
+      state.dischargeGates[index] = true;
       state.digestors[index].discharging = true;
       state.percolator = true;
       state.tachoMixer = state.tachoLiters > 0;
@@ -58,10 +61,16 @@
     applyStage(state);
     return { ok: true };
   }
+  function startLinkedDemo(state, selection = 'D1') {
+    const result = startDemo(state, selection);
+    if (result.ok) state.linked = true;
+    return result;
+  }
   function nextStage(state) {
-    const next = STAGES.indexOf(state.stage) + 1;
+    const stages = state.linked ? LINKED_STAGES : STAGES;
+    const next = stages.indexOf(state.stage) + 1;
     state.stageSeconds = 0;
-    if (next < STAGES.length) state.stage = STAGES[next];
+    if (next < stages.length) state.stage = stages[next];
     else {
       state.completed.push(state.activeDigestor);
       const nextUnit = state.queue[state.completed.length];
@@ -77,13 +86,26 @@
       state.activeDigestor = nextUnit;
       state.stage = 'CARGA';
     }
-    state.stageDurationSeconds = DURATIONS[state.stage];
+    state.stageDurationSeconds = state.stage === 'COZIMENTO' ? null : DURATIONS[state.stage];
     applyStage(state);
   }
-  function tick(state, elapsedSeconds) {
+  function tick(state, elapsedSeconds, thermal = null) {
     if (state.mode !== 'SIMULACAO' || state.running !== true || !finite(elapsedSeconds) || elapsedSeconds <= 0) return state;
     let remaining = Math.min(elapsedSeconds, 3600);
-    while (remaining > 0.0000001 && state.running && STAGES.includes(state.stage)) {
+    while (remaining > 0.0000001 && state.running && (STAGES.includes(state.stage) || (state.linked && state.stage === 'COZIMENTO'))) {
+      if (state.linked && state.stage === 'COZIMENTO') {
+        const id = DIGESTORS.indexOf(state.activeDigestor);
+        const reading = Array.isArray(thermal) ? thermal[id] : null;
+        const valid = reading && finite(reading.tempC) && reading.tempC >= 0 && reading.tempC <= 850;
+        state.digestors[id].tempC = valid ? reading.tempC : null;
+        state.stageSeconds += remaining;
+        state.seconds += remaining;
+        remaining = 0;
+        // A abertura aqui é SOMENTE ANIMAÇÃO; nunca encaminhar este bit a relés.
+        if (valid && reading.ready === true && reading.tempC > 120) nextStage(state);
+        else applyStage(state);
+        continue;
+      }
       const step = Math.min(remaining, Math.max(0, state.stageDurationSeconds - state.stageSeconds));
       if (step <= 0.0000001) { nextStage(state); continue; }
       const unit = state.digestors[DIGESTORS.indexOf(state.activeDigestor)];
@@ -128,13 +150,14 @@
   }
   function snapshot(state) {
     const current = clone(state.mode === 'SIMULACAO' ? state : createState());
+    current.tachoLevel = current.mode !== 'SIMULACAO' ? 'SEM_SINAL' : !finite(current.tachoLiters) || !finite(current.tachoCapacityLiters) ? 'SEM_SINAL' : current.tachoLiters <= 0 ? 'VAZIO_VIRTUAL' : current.tachoLiters / current.tachoCapacityLiters >= 0.75 ? 'ALTO_VIRTUAL' : current.tachoLiters / current.tachoCapacityLiters >= 0.25 ? 'MEDIO_VIRTUAL' : 'BAIXO_VIRTUAL';
     current.phaseLabel = PHASE_LABELS[current.stage] || 'Sem sinal mecânico';
     current.selectionLabel = current.selection === 'TODOS' ? 'D1 → D2 → D3 → D4' : current.selection || 'Sem seleção virtual';
     current.quality = current.mode === 'SIMULACAO' ? 'Simulação local · volumes e tempos ilustrativos' : 'Sem sinal mecânico · aguardando instrumentação';
     return current;
   }
-  const api = { DIGESTORS, EXAMPLE, STAGES, PHASE_LABELS, createState, selectedDigestors,
-    startDemo, tick, pause, resume, stop, returnLive, snapshot };
+  const api = { DIGESTORS, EXAMPLE, STAGES, LINKED_STAGES, PHASE_LABELS, createState, selectedDigestors,
+    startDemo, startLinkedDemo, tick, pause, resume, stop, returnLive, snapshot };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.AutomacaoDigestoresCircuitoCore = api;
 })(typeof window !== 'undefined' ? window : null);
