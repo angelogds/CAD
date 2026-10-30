@@ -13,7 +13,7 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
-#pragma once
+
 // Somente o módulo e a fiação confirmados devem ser habilitados.
 // O ESP32-D0WD-V3 e os sinaleiros 18/19/21 ativos em LOW vieram do sketch fornecido.
 #define CGD_ENABLE_PT100 0
@@ -592,7 +592,6 @@ class Pt100Reader {
 #endif
 };
 
-#pragma once
 
 // IHM LAN: configuração local de Wi-Fi/token com POST guardado; segredos nunca são devolvidos.
 // Testes CAD dos relés de purga exigem arme local; separados de temporizadores e PT100 real.
@@ -607,6 +606,30 @@ const char LOCAL_UI[] PROGMEM = R"LOCALHTML(<!doctype html>
 :root{font:100%/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#18191c;background:#f4f5f7;--red:#ba1931;--line:#e3e5e9;--muted:#5b606b;--radius:18px}*{box-sizing:border-box}body{margin:0}button{font:inherit}button:focus-visible,a:focus-visible{outline:3px solid #ba1931;outline-offset:4px}header{background:#fff;border-bottom:1px solid var(--line)}.wrap{width:min(1160px,calc(100% - 40px));margin:auto}.brandbar{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:25px 0}.brand{display:flex;gap:15px;align-items:center}.monogram{display:grid;place-items:center;flex:none;width:52px;height:52px;border-radius:14px;background:var(--red);color:#fff;font-size:1.45rem;line-height:1;font-weight:850;letter-spacing:-.07em}.brand strong{font-size:1.13rem;letter-spacing:-.025em}.byline{font-size:.76rem;color:var(--muted);margin-top:3px}.local{color:var(--muted);font-size:.8rem}.local b{display:block;color:#27292e;letter-spacing:.09em;font-size:.65rem;text-transform:uppercase}.topline{display:flex;justify-content:space-between;align-items:center;gap:24px;margin:31px 0 20px}h1{font-size:clamp(1.6rem,3vw,2.1rem);line-height:1.15;letter-spacing:-.045em;margin:5px 0 6px}.eyebrow{font-size:.65rem;letter-spacing:.13em;text-transform:uppercase;font-weight:750;color:var(--muted)}p{margin:0}.sub{font-size:.86rem;color:var(--muted)}.refresh{background:#fff;border:1px solid #d7dae0;border-radius:10px;padding:9px 16px;cursor:pointer;font-size:.8rem;font-weight:650;white-space:nowrap}.refresh:active{background:#eceef2}.connection{display:flex;align-items:center;gap:7px;font-size:.72rem;color:var(--muted);margin-top:8px;justify-content:flex-end}.dot{width:7px;height:7px;border-radius:50%;background:#9095a0}.online .dot{background:#1c7a54}.offline .dot{background:var(--red)}.grid{display:grid;grid-template-columns:1.5fr 1fr;gap:18px}.card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:25px;min-width:0}.hero{position:relative;overflow:hidden}.cardhead{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}h2{font-size:.84rem;letter-spacing:-.01em;margin:0}.badge{background:#f0f1f4;border:1px solid #e2e4e8;border-radius:6px;font-size:.62rem;font-weight:750;letter-spacing:.06em;padding:4px 8px;white-space:nowrap}.badge.real{background:#fdeef1;color:#9f152a;border-color:#f3cdd5}.temperature{font-size:clamp(4rem,8vw,6.5rem);line-height:1;letter-spacing:-.075em;font-weight:730;margin:27px 0 12px;font-variant-numeric:tabular-nums}.unit{font-size:1.55rem;color:#747985;letter-spacing:-.03em;vertical-align:top;display:inline-block;margin:14px 0 0 10px;font-weight:500}.measurelabel{color:var(--muted);font-size:.76rem;min-height:1.5em}.range{display:flex;gap:5px;margin:28px 0 8px}.range span{height:5px;border-radius:3px;flex:1;background:#e5e7eb}.range span.active{background:var(--red)}.rangecaptions{display:flex;justify-content:space-between;font-size:.62rem;color:#727784;gap:8px}.statfoot{margin-top:23px;padding-top:15px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;font-size:.7rem;color:var(--muted)}.statfoot b{font-weight:650;color:#30333b}.signal{display:flex;align-items:center;gap:25px;margin:25px 0}.tower{background:#f3f4f6;border:1px solid #e2e4e9;display:flex;flex-direction:column;gap:9px;padding:12px;border-radius:30px;flex:none}.lamp{width:29px;height:29px;background:#dfe1e6;border:1px solid #d0d3da;border-radius:50%}.lamp.green.active{background:#198754;border-color:#166b45;box-shadow:0 0 0 4px #19875412}.lamp.yellow.active{background:#e8ae19;border-color:#b6870c;box-shadow:0 0 0 4px #e8ae1912}.lamp.red.active{background:#c41e38;border-color:#a91a30;box-shadow:0 0 0 4px #c41e3812}.lamp.blink{animation:pulse 1s step-end infinite}.signalname{font-weight:750;font-size:1.3rem;letter-spacing:-.035em;line-height:1.2;margin:0 0 7px}.signaldesc{font-size:.79rem;color:var(--muted)}.ready{border:1px solid #e5e7eb;background:#f7f8fa;padding:11px 13px;border-radius:10px;font-size:.76rem;font-weight:650;margin:18px 0 13px}.ready.active{background:#fff1f3;color:#a4152b;border-color:#f2c3cd}.output{font-size:.72rem;color:var(--muted)}.output b{color:#323640}.details{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:18px}.details .card{padding:21px}.details h2{margin-bottom:17px}.rows{margin:0}.rows div{display:flex;justify-content:space-between;gap:15px;padding:9px 0;border-bottom:1px solid #f0f1f4;font-size:.72rem}.rows div:last-child{border:0}.rows dt{color:var(--muted);flex:none}.rows dd{margin:0;text-align:right;font-weight:600;overflow-wrap:anywhere;min-width:0}.note{font-size:.69rem;line-height:1.6;color:var(--muted);margin-top:15px}.safety{display:flex;gap:14px;background:#fff;border:1px solid #e2e4e9;border-left:3px solid var(--red);padding:17px 21px;border-radius:10px;margin:20px 0 30px}.safety strong{display:block;font-size:.76rem;margin-bottom:3px}.safety p{color:var(--muted);font-size:.72rem}.safetyicon{color:var(--red);font-size:1rem;font-weight:800}.footer{display:flex;justify-content:space-between;gap:20px;padding:0 0 24px;font-size:.65rem;color:#747985}.offline-label{color:var(--red)}@keyframes pulse{50%{opacity:.25}}@media(prefers-reduced-motion:reduce){.lamp.blink{animation:none}}@media(min-width:800px){.hero{min-height:338px}}@media(max-width:760px){.grid{grid-template-columns:1fr}.details{grid-template-columns:1fr}.brandbar{padding:18px 0}.local{display:none}.wrap{width:calc(100% - 28px)}.card{padding:22px}.topline{gap:12px;margin-top:23px}.refresh{padding:8px 10px}.sub{max-width:240px}.temperature{font-size:5.5rem}.brand strong{font-size:1rem}.byline{font-size:.65rem}.monogram{width:45px;height:45px}.footer{flex-direction:column;gap:5px}.signal{margin:18px 0}.statfoot{flex-wrap:wrap}}@media(prefers-contrast:more){:root{--muted:#353943;--line:#a8adb7}.card{border-color:#a8adb7}.rows div{border-color:#c8cbd2}}
 
 .dashboard{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.digestor-card{padding:22px;position:relative}.digestor-card.linked{border-color:#cf7887;box-shadow:0 4px 20px #171b2406}.digestor-card.unlinked{background:#fafbfc;color:#656b77}.digestor-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.digestor-title{display:flex;align-items:center;gap:11px}.number{width:32px;height:32px;display:grid;place-items:center;background:#eceef2;border-radius:9px;font-weight:750;font-size:.8rem}.linked .number{background:#fce7ec;color:#a81c34}.digestor-body{display:flex;align-items:center;gap:18px;margin:17px 0}.digestor-visual{width:36%;min-width:100px;color:#9da4af}.digestor-visual svg{width:100%;display:block}.digestor-temp{font-size:clamp(2.8rem,5vw,4rem);line-height:1;letter-spacing:-.065em;font-weight:730;font-variant-numeric:tabular-nums}.digestor-unit{font-size:1.1rem;letter-spacing:-.02em;color:#747b86;font-weight:500}.digestor-desc{font-size:.72rem;color:var(--muted);margin-top:8px}.digestor-bottom{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid var(--line);padding-top:13px;margin-top:12px}.smalltower{display:flex;gap:5px;align-items:center}.smalltower .lamp{width:17px;height:17px}.signaltext{font-size:.72rem;font-weight:650;margin-left:5px}.readystatus{font-size:.68rem;border-radius:5px;background:#f0f2f5;padding:4px 7px;max-width:52%}.readystatus.ready-on{background:#fce5eb;color:#a31c34;font-weight:750}.channel-strip{display:flex;gap:12px;font-size:.65rem;color:var(--muted);margin-top:10px}.channel-strip b{font-weight:600}.panel{margin-top:18px}.controlgrid{display:grid;grid-template-columns:1.1fr 1fr;gap:24px}.controlgrid h2{margin-bottom:13px}.buttonrow{display:flex;flex-wrap:wrap;gap:8px}.control{background:#fff;border:1px solid #cdd1d9;color:#2a2e36;border-radius:9px;padding:10px 12px;min-height:42px;cursor:pointer;font-weight:650;font-size:.75rem}.control.selected{background:#26282d;color:#fff;border-color:#26282d}.control.primary{background:var(--red);color:#fff;border-color:var(--red)}.control.stop{color:#9d1d32;border-color:#e3b7c0}.control.stop.selected{background:#a51c32;color:#fff;border-color:#a51c32}.control:active{transform:scale(.98)}.control:disabled{opacity:.45;cursor:not-allowed;transform:none}.control.light-green{border-bottom:3px solid #198754}.control.light-yellow{border-bottom:3px solid #d0a21c}.control.light-red{border-bottom:3px solid #ba1931}.help{font-size:.72rem;color:var(--muted);line-height:1.65;margin:10px 0 0}.sectiontitle{margin:25px 0 13px;font-size:.84rem}.message{font-size:.75rem;min-height:1.5em;margin-top:12px;color:#9d1d32;overflow-wrap:anywhere}.settings{margin-top:14px;padding:0;overflow:hidden}.settings summary{list-style:none;cursor:pointer;padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:20px;font-weight:700;font-size:.85rem}.settings summary::-webkit-details-marker{display:none}.settings summary::after{content:'+';color:var(--muted);font-size:1.2rem;font-weight:450}.settings[open] summary::after{content:'−'}.settings[open] summary{border-bottom:1px solid var(--line)}.settingbody{padding:21px 22px}.configgrid{display:grid;grid-template-columns:1fr 1fr;gap:28px}.field{display:flex;flex-direction:column;gap:7px;font-weight:600;font-size:.76rem;margin-bottom:14px}.field input{font:inherit;border:1px solid #cdd1d9;padding:11px 12px;border-radius:8px;min-width:0;width:100%;background:#fff;color:#20242a}.field input:focus{outline:2px solid #ba19313d;outline-offset:1px}.savedstatus{background:#f6f7f9;border:1px solid #e5e7ec;border-radius:11px;padding:15px 17px}.networklist{display:grid;gap:6px;max-height:220px;overflow:auto;margin:12px 0}.networklist button{display:flex;justify-content:space-between;text-align:left;gap:10px}.networklist span{overflow-wrap:anywhere}.networklist small{white-space:nowrap}.twocol{display:grid;grid-template-columns:1fr 1fr;gap:12px}.purgechannel{border:1px solid var(--line);border-radius:12px;padding:17px}.purgechannel h3{font-size:.85rem;margin:0}.purgechannel .cardhead{margin-bottom:15px}.purge-state{font-size:.76rem;font-weight:700}.purge-time{font-size:.72rem;color:var(--muted);margin:5px 0 14px}.statusline{display:flex;justify-content:space-between;gap:15px;font-size:.71rem;color:var(--muted);padding-top:8px}.statusline b{color:#353b45;font-weight:650}.limits{margin-top:14px;border-top:1px solid var(--line);padding-top:12px;font-size:.68rem;color:var(--muted)}@media(max-width:760px){.dashboard,.controlgrid,.configgrid{grid-template-columns:1fr}.controlgrid{gap:20px}.settingbody{padding:18px}.settings summary{padding:17px 18px}.digestor-card{padding:18px}.digestor-body{gap:14px}.channel-strip{flex-wrap:wrap}}@media(prefers-reduced-motion:reduce){.control:active{transform:none}}
+</style>
+
+<style>
+#cgdgate{margin:24px auto;background:#fff;border:1px solid #dbe3e5;border-radius:16px;padding:18px;box-shadow:0 6px 20px rgba(0,0,0,.04)}
+#cgdgate h2{margin:0 0 6px;font-size:1.35rem}
+#cgdgate .cg-muted{color:#506069;font-size:.92rem}
+#cgdgate .cg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:16px}
+#cgdgate .cg-item{border:1px solid #dbe1e5;border-radius:12px;padding:14px;background:#f9fbfb}
+#cgdgate .cg-item h3{margin:0 0 10px}
+#cgdgate .cg-window{height:116px;border:3px solid #61717a;border-radius:12px;background:repeating-linear-gradient(0deg,#eef2f3 0px,#eef2f3 14px,#dbe2e4 14px,#dbe2e4 16px);position:relative;overflow:hidden}
+#cgdgate .cg-slide{position:absolute;inset:0;background:linear-gradient(120deg,#79909b,#b6c8cf);border-bottom:5px solid #44616d;transform:translateY(0);transition:transform .65s ease}
+#cgdgate .cg-window[data-virtual="aberta"] .cg-slide{transform:translateY(-115%)}
+#cgdgate .cg-window[data-virtual="aberta"]{background:#b7e3d4}
+#cgdgate .cg-status{font-size:.9rem;font-weight:700;margin:10px 0}
+#cgdgate .cg-buttons{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+#cgdgate button{border:1px solid #bdced0;background:white;color:#16343a;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+#cgdgate .cg-buttons button{flex:1}
+#cgdgate button:disabled{opacity:.48;cursor:not-allowed}
+#cgdgate .cg-live{border-top:1px solid #e0e5e7;margin-top:16px;padding-top:14px}
+#cgdgate .cg-state{font-variant-numeric:tabular-nums}
+#cgdgate .cg-label{color:#4d5e65}
+#cgdgate .cg-ok{color:#206447}
+#cgdgate .cg-alert{color:#973c25}
+@media(prefers-reduced-motion:reduce){#cgdgate .cg-slide{transition:none}}
 </style>
 </head>
 <body>
@@ -628,6 +651,35 @@ const char LOCAL_UI[] PROGMEM = R"LOCALHTML(<!doctype html>
 <details class="card settings" id="wifiSettings"><summary>Configuração de Wi-Fi <span class="badge" id="wifiSummary">CONSULTANDO</span></summary><div class="settingbody configgrid"><div><label class="field" for="ssid">Rede Wi-Fi de 2,4 GHz (SSID)<input id="ssid" maxlength="32" autocomplete="off" placeholder="Selecione uma rede ou digite" list="networkOptions"><datalist id="networkOptions"></datalist></label><label class="field" for="wifiPassword">Senha da rede<input id="wifiPassword" type="password" maxlength="63" autocomplete="new-password" placeholder="Senha nunca é exibida novamente"></label><div class="buttonrow"><button class="control" id="scanWifi">Procurar redes</button><button class="control primary" id="connectWifi">Conectar e salvar</button></div><p class="help" id="networkInfo">A rede é salva no ESP32 somente após a conexão ser confirmada.</p><div class="networklist" id="networkList" aria-label="Redes Wi-Fi encontradas"></div></div><div><div class="savedstatus"><dl class="rows"><div><dt>Conexão</dt><dd id="wifiStatus">—</dd></div><div><dt>Rede</dt><dd id="wifiSsid">—</dd></div><div><dt>Endereço local</dt><dd id="wifiIp">—</dd></div><div><dt>Acesso direto</dt><dd>192.168.4.1</dd></div></dl></div><p class="help">O ponto de acesso próprio do ESP32 permanece disponível durante a configuração. Esta página usa HTTP local: configure senhas e token apenas na rede controlada de bancada.</p><div class="buttonrow" style="margin-top:15px"><button class="control stop" id="deleteWifi">Esquecer rede salva</button></div><p class="message" id="wifiMessage" role="status"></p></div></div></details>
 <details class="card settings" id="cadSettings"><summary>Integração com o CAD <span class="badge" id="cadSummary">CONSULTANDO</span></summary><div class="settingbody configgrid"><div><label class="field" for="cadToken">Token exclusivo deste ESP32<input id="cadToken" type="password" maxlength="200" autocomplete="off" placeholder="cgd_..."></label><div class="buttonrow"><button class="control primary" id="saveToken">Salvar token</button><button class="control stop" id="deleteToken">Apagar token</button><button class="control" id="authorizeRemote">Autorizar CAD</button></div><p class="help">Gere a credencial em Automação → Configuração no CAD. Pare os testes antes de trocar o token. A credencial salva não é devolvida para a página.</p><p class="message" id="cadMessage" role="status"></p></div><div><div class="savedstatus"><dl class="rows"><div><dt>Dispositivo</dt><dd id="cadDevice">—</dd></div><div><dt>Credencial</dt><dd id="cadConfigured">—</dd></div><div><dt>Comunicação</dt><dd id="cadStatus">—</dd></div><div><dt>HTTP</dt><dd id="cadHttp">—</dd></div><div><dt>Servidor</dt><dd>manutencao.campodogado.app.br</dd></div></dl></div><p class="help">Em operação real, o ESP32 decide a cor e envia a telemetria por HTTPS. A simulação CAD recebe apenas sinais de bancada; ordens industriais não fazem parte desta integração.</p></div></div></details>
 <aside class="safety"><div class="safetyicon" aria-hidden="true">!</div><div><strong>Comandos locais · confira o estado de cada canal</strong><p>Os GPIOs 25/26 comandam relés de baixa tensão; a tela não confirma posição de válvulas. Modelos e tensão de potência das válvulas precisam ser conferidos na instalação. Parar tudo fecha os dois canais. Comportas e descarga automática permanecem fora deste controle. “Pronto” indica somente a faixa de temperatura.</p></div></aside>
+
+<section id="cgdgate" aria-label="Guilhotinas de carregamento e descarga">
+ <h2>Guilhotinas do Digestor <span id="cg-digestor">1</span></h2>
+ <p class="cg-muted">Visualizacao local de duas guilhotinas: teste virtual para demonstrar abertura/fechamento, sem mover bobinas. Comando eletrico disponivel apenas apos validacao do hardware.</p>
+ <div class="cg-grid">
+  <article class="cg-item">
+   <h3>Guilhotina de carregamento</h3>
+   <div id="cg-visual-carga" class="cg-window" data-virtual="fechada" role="img" aria-label="Guilhotina de carga fechada apenas na simulacao"><div class="cg-slide"></div></div>
+   <div id="cg-virtual-carga" class="cg-status">FECHADA - SIMULADA</div>
+   <div class="cg-buttons"><button data-cg-virtual="carga:abrir" type="button">Simular abrir</button><button data-cg-virtual="carga:fechar" type="button">Simular fechar</button></div>
+   <p class="cg-muted">Saidas previstas: GPIO 32 abrir, GPIO 33 fechar</p>
+   <div class="cg-buttons"><button data-cg-real="carga:abrir" type="button" disabled>Pulso local abrir</button><button data-cg-real="carga:fechar" type="button" disabled>Pulso local fechar</button></div>
+  </article>
+  <article class="cg-item">
+   <h3>Guilhotina de descarga</h3>
+   <div id="cg-visual-descarga" class="cg-window" data-virtual="fechada" role="img" aria-label="Guilhotina de descarga fechada apenas na simulacao"><div class="cg-slide"></div></div>
+   <div id="cg-virtual-descarga" class="cg-status">FECHADA - SIMULADA</div>
+   <div class="cg-buttons"><button data-cg-virtual="descarga:abrir" type="button">Simular abrir</button><button data-cg-virtual="descarga:fechar" type="button">Simular fechar</button></div>
+   <p class="cg-muted">Saidas previstas: GPIO 16 abrir, GPIO 17 fechar</p>
+   <div class="cg-buttons"><button data-cg-real="descarga:abrir" type="button" disabled>Pulso local abrir</button><button data-cg-real="descarga:fechar" type="button" disabled>Pulso local fechar</button></div>
+  </article>
+ </div>
+ <div class="cg-live" aria-live="polite">
+  <strong>Diagnostico das saidas fisicas:</strong>
+  <p id="cg-io-status" class="cg-state cg-alert">Aguardando estado da ESP32. O teste virtual nao energiza relés.</p>
+  <p class="cg-muted">Firmware: <span id="cg-fw">Aguardando</span> | Modo: <span id="cg-mode">Sem leitura</span> | Chave GPIO27: <span id="cg-key">Nao confirmada</span> | Ultimo comando: <span id="cg-last">Nenhum</span></p>
+  <p id="cg-feedback" class="cg-muted">Sem confirmacao de posicao fisica: esta demonstracao NAO utiliza fins de curso.</p>
+ </div>
+</section>
 </main><footer class="wrap footer"><span>2A Automação Industrial · <span id="firmware">ESP32</span></span><span>4 digestores no painel · 1 ESP32 vinculado · atualização local a cada 1 segundo</span></footer>
 <script>
 (function(){
@@ -652,7 +704,7 @@ async function post(url,params,messageId='commandMessage'){
  finally{mutating=false;}
 }
 function clearLive(){
- state=null;el('connection').className='connection offline';text('connectionText','Sem comunicação local');text('outputBadge','SAÍDAS NÃO CONFIRMADAS');
+ state=null;window.cgdGatePanelUpdate?.(null);el('connection').className='connection offline';text('connectionText','Sem comunicação local');text('outputBadge','SAÍDAS NÃO CONFIRMADAS');
  for(let id=1;id<=4;id++){if(!el('card'+id).classList.contains('linked'))continue;text('d'+id+'temp','—');text('d'+id+'range','Estado atual não confirmado');text('d'+id+'sensor','Origem dos dados: sem contato');text('d'+id+'mode','SEM COMUNICAÇÃO');text('d'+id+'signal','Sem leitura');text('d'+id+'ready','Pronto não confirmado');el('d'+id+'ready').className='readystatus';text('d'+id+'contact','Sem contato local');text('d'+id+'stamp','—');['red','yellow','green'].forEach(color=>el('d'+id+color).className='lamp '+color);[1,2].forEach(ch=>text('d'+id+'p'+ch,'sem contato'));}
  each('[data-manual],[data-purge-start],[data-purge-arm],[data-purge-real],[data-purge-cad]',button=>button.disabled=true);el('modeReal').disabled=true;
  text('pcSimStatus','SEM CONTATO');text('pcHeating','Aquecimento virtual: não confirmado');text('pcSimHelp','Sem contato com o ESP32. Os estados da simulação e dos relés não estão confirmados.');
@@ -688,7 +740,7 @@ function renderPurge(items,id,real,realEligible,simulation){
 }
 function render(data){
  if(!data||typeof data!=='object'||!Number.isInteger(data.digestor)||data.digestor<1||data.digestor>4)throw Error('Estado inválido');
- state=data;const id=data.digestor;const prefix='d'+id;const real=data.origem==='REAL'||data.modo==='real';const remote=data.modo==='simulacao'&&!real;const sensorValid=data.sensor_status==='VALIDO';
+ state=data;window.cgdGatePanelUpdate?.(data);const id=data.digestor;const prefix='d'+id;const real=data.origem==='REAL'||data.modo==='real';const remote=data.modo==='simulacao'&&!real;const sensorValid=data.sensor_status==='VALIDO';
  const numeric=typeof data.temperatura_c==='number'&&Number.isFinite(data.temperatura_c);
  const simCurrent=remote&&data.origem==='SIMULACAO'&&data.sensor_status==='SIMULADO'&&data.simulacao_cad_atual===true&&numeric;
  const readable=numeric&&(real?sensorValid:remote?simCurrent:data.sensor_status==='SIMULADO');
@@ -749,26 +801,73 @@ async function purge(channel,action){const params={canal:String(channel),valor:a
  document.addEventListener('visibilitychange',()=>{if(!document.hidden){clearLive();poll();pollCad();}});poll();pollCad();
 })();
 </script>
-<section id="cgdgate" style="max-width:960px;margin:16px auto;padding:16px;background:#1b2a2d;color:#fff;border-radius:12px">
- <h3>GUILHOTINAS - TESTE LOCAL</h3>
- <p>Somente equipamento PARADO, chave fisica local e area isolada. Saida sem retorno de fim de curso.</p>
- <button type="button" onclick="cgGate('carga','abrir')">CARGA: ABRIR</button>
- <button type="button" onclick="cgGate('carga','fechar')">CARGA: FECHAR</button>
- <button type="button" onclick="cgGate('descarga','abrir')">DESCARGA: ABRIR</button>
- <button type="button" onclick="cgGate('descarga','fechar')">DESCARGA: FECHAR</button>
- <p id="cgdgate-msg">Nenhum pulso solicitado.</p>
-</section>
+
 <script>
-async function cgGate(guilhotina,acao){
-  if(!confirm('TESTE FISICO: area isolada e equipe autorizou?'))return;
-  const m=document.getElementById('cgdgate-msg');
-  try{
-    const r=await fetch('/api/guilhotinas',{method:'POST',
-      headers:{'X-CGD-Local':'true','Content-Type':'application/x-www-form-urlencoded'},
-      body:new URLSearchParams({guilhotina,acao})});
-    m.textContent=r.ok?'PULSO SOLICITADO. Posicao mecanica NAO confirmada.':await r.text();
-  }catch(e){m.textContent='Falha: '+e.message;}
+(function(){
+'use strict';
+const el=(id)=>document.getElementById(id);
+const virtual={carga:'fechada',descarga:'fechada'};
+let canLocalPulse=false,busy=false;
+function showVirtual(gate){
+ const s=virtual[gate],label=s==='aberta'?'ABERTA - SIMULADA':'FECHADA - SIMULADA';
+ const visual=el('cg-visual-'+gate);if(!visual)return;
+ visual.dataset.virtual=s;
+ visual.setAttribute('aria-label','Guilhotina de '+gate+' '+label.toLowerCase());
+ el('cg-virtual-'+gate).textContent=label;
 }
+window.cgdGatePanelUpdate=function(data){
+ if(!el('cg-io-status'))return;
+ const g=data&&data.guilhotinas?data.guilhotinas:{};
+ const configured=g.saidas_habilitadas===true;
+ const key=g.chave_local_ativa===true;
+ const stopped=data&&data.modo==='parado';
+ canLocalPulse=!!data&&configured&&key&&stopped&&!busy;
+ el('cg-digestor').textContent=data?.digestor||'1';
+ el('cg-fw').textContent=data?.firmware||'Sem contato';
+ el('cg-mode').textContent=data?.modo||'Sem contato';
+ el('cg-key').textContent=!data?'Sem contato':key?'LOCAL HABILITADA':'DESLIGADA';
+ el('cg-last').textContent=g.ultimo_comando_local||'Nenhum';
+ const output=el('cg-io-status');
+ const reasons=[];
+ if(!data)reasons.push('ESP32 desconectado');
+ else{
+  if(!configured)reasons.push('Saidas GPIO bloqueadas no firmware');
+  if(!key)reasons.push('Chave local GPIO27 nao habilitada');
+  if(!stopped)reasons.push('Modo diferente de PARADO');
+ }
+ output.textContent=reasons.length?'PULSOS FISICOS BLOQUEADOS: '+reasons.join('; ')+'.':
+  (g.pulso_ativo?'PULSO LOCAL ATIVO - sem retorno de posicao':'Teste local habilitado, aguardando comando. Nenhum fim de curso informado.');
+ output.className='cg-state '+(reasons.length?'cg-alert':'cg-ok');
+ document.querySelectorAll('#cgdgate [data-cg-real]').forEach(b=>{b.disabled=!canLocalPulse;});
+};
+document.querySelectorAll('#cgdgate [data-cg-virtual]').forEach(b=>{
+ b.addEventListener('click',()=>{
+  const [gate,action]=b.dataset.cgVirtual.split(':');
+  virtual[gate]=action==='abrir'?'aberta':'fechada';
+  showVirtual(gate);
+  el('cg-feedback').textContent='Movimento '+(action==='abrir'?'de abertura':'de fechamento')+' da guilhotina de '+gate+' SIMULADO SOMENTE NA TELA. Nenhum GPIO foi energizado.';
+ });
+});
+document.querySelectorAll('#cgdgate [data-cg-real]').forEach(b=>{
+ b.addEventListener('click',async()=>{
+  if(!canLocalPulse||busy)return;
+  const [gate,action]=b.dataset.cgReal.split(':');
+  if(!confirm('TESTE ELETRICO LOCAL: equipamento PARADO, area isolada, relés e solenóides validados?'))return;
+  busy=true;window.cgdGatePanelUpdate?.(null);
+  try{
+   const r=await fetch('/api/guilhotinas',{method:'POST',cache:'no-store',
+    headers:{'X-CGD-Local':'true','Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({guilhotina:gate,acao:action})});
+   const body=await r.text();
+   el('cg-feedback').textContent=r.ok?
+     'Pulso solicitado ao controlador. A posicao mecanica da guilhotina NAO foi confirmada.':
+     'Comando nao executado: '+body.slice(0,220);
+  }catch(e){el('cg-feedback').textContent='Falha de comunicacao: '+e.message;}
+  finally{busy=false;el('cg-io-status').textContent='Atualize o estado para conferir autorizacoes e ultimo comando.';}
+ });
+});
+Object.keys(virtual).forEach(showVirtual);
+})();
 </script>
 </body></html>)LOCALHTML";
 
