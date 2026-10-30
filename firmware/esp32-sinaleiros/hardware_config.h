@@ -15,3 +15,11 @@
 #define CGD_ENABLE_PURGE_OUTPUTS 1
 #define CGD_PURGE_RELAY_ACTIVE_LEVEL LOW
 #define CGD_PURGE_FAIL_CLOSED_CONFIRMED 1
+
+// Preparação V10: GPIO32/33 são somente CANDIDATOS após conferir ligação do
+// PT100, todas as cargas e tipo de distribuidora pneumática. Não há driver físico.
+// Solenoide com DUAS BOBINAS não deve ser tratada como monoestável sem ensaio.
+// Nenhuma rotina usa estes pinos enquanto o projeto executivo não for aprovado.
+#define CGD_ENABLE_MATERIAL_GATE_OUTPUTS 0
+#define CGD_GATE_FEED_CANDIDATE_GPIO 32
+#define CGD_GATE_DISCHARGE_CANDIDATE_GPIO 33
