@@ -56,12 +56,14 @@ test('sincronização transmite temperatura simulada e transições sem comando 
   els['sim-remote-enable'].checked = true;
   handlers['sim-remote-enable:change']();
   await flush();
-  // Conexão automática/manual mantém as solenóides FECHADAS por padrão.
+  // O canal industrial permanece FECHADO, inclusive se um controle legado
+  // for injetado no DOM: não existe handler remoto que arme solenóides.
   assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'MEIO', temperatura_c: 120, aquecimento_simulado: true, purgadores_simulados: { camisa: 'FECHADO', eixo: 'FECHADO' } }]);
   els['sim-solenoids-enable'].checked = true;
-  handlers['sim-solenoids-enable:change']();
+  assert.equal(handlers['sim-solenoids-enable:change'], undefined);
+  handlers['sim-digestores:simulador:estado']();
   await flush();
-  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'MEIO', temperatura_c: 120, aquecimento_simulado: true, purgadores_simulados: { camisa: 'ABERTO', eixo: 'FECHADO' } }]);
+  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'MEIO', temperatura_c: 120, aquecimento_simulado: true, purgadores_simulados: { camisa: 'FECHADO', eixo: 'FECHADO' } }]);
   card.dataset.temperaturaC = '120.1';
   card.dataset.aquecimentoSimulado = 'false';
   card.dataset.camisaSimulada = 'FECHADO';
@@ -73,7 +75,7 @@ test('sincronização transmite temperatura simulada e transições sem comando 
   card.dataset.eixoSimulado = 'ABERTO';
   handlers['sim-digestores:simulador:estado']();
   await flush();
-  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'INICIO', temperatura_c: 50, aquecimento_simulado: true, purgadores_simulados: { camisa: 'FECHADO', eixo: 'ABERTO' } }]);
+  assert.deepEqual(posts.at(-1).estados, [{ digestor_id: 1, fase: 'INICIO', temperatura_c: 50, aquecimento_simulado: true, purgadores_simulados: { camisa: 'FECHADO', eixo: 'FECHADO' } }]);
   assert.ok(intervals.some(timer => timer.ms === 1000));
   card.dataset.temperaturaC = '';
   handlers['sim-digestores:simulador:estado']();

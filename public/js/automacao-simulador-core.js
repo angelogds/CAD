@@ -21,11 +21,12 @@
   }
 
   // Intertravamento apenas gráfico. Inativo significa os dois fechados.
-  function estadoPurgadores(tempoCicloSegundos, ativado) {
-    if (!ativado) return { camisa: 'FECHADO', eixo: 'FECHADO', proximaTroca: INTERVALO_PURGA_SEGUNDOS, fase: 'inativo' };
+  function estadoPurgadores(tempoCicloSegundos, ativado, intervalo = INTERVALO_PURGA_SEGUNDOS) {
+    const segundos = Number.isFinite(intervalo) ? Math.max(1, Math.min(300, Math.round(intervalo))) : INTERVALO_PURGA_SEGUNDOS;
+    if (!ativado) return { camisa: 'FECHADO', eixo: 'FECHADO', proximaTroca: segundos, fase: 'inativo' };
     const tempo = Math.max(0, Number(tempoCicloSegundos) || 0);
-    const faseCamisa = Math.floor(tempo / INTERVALO_PURGA_SEGUNDOS) % 2 === 0;
-    const restante = INTERVALO_PURGA_SEGUNDOS - (tempo % INTERVALO_PURGA_SEGUNDOS);
+    const faseCamisa = Math.floor(tempo / segundos) % 2 === 0;
+    const restante = segundos - (tempo % segundos);
     return {
       camisa: faseCamisa ? 'ABERTO' : 'FECHADO',
       eixo: faseCamisa ? 'FECHADO' : 'ABERTO',

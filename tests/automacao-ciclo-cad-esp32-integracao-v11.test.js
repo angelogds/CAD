@@ -32,6 +32,27 @@ test('protocolo rejeita guilhotinas e etapas invalidas',()=>{
   payload({etapa_mecanica:'ACIONAR_RELE'}),
  ]) assert.throws(()=>normalizeSimulationState(bad),{status:400});
 });
+
+test('protocolo interrompe pares contraditorios antes de publicar para a bancada',()=>{
+ for (const changes of [
+  {guilhotinas_simuladas:{carga:'ABERTA',descarga:'ABERTA'}},
+  {purgadores_visuais:{camisa:'ABERTO',eixo:'ABERTO'}},
+  {empurradores_simulados:{camisa:'ABERTO',eixo:'ABERTO'}},
+ ]) assert.throws(()=>normalizeSimulationState(payload(changes)),{status:400});
+ const contradictory=JSON.stringify({...payload(),guilhotinas_simuladas:{carga:'ABERTA',descarga:'ABERTA'}});
+ assert.equal(readStoredState(contradictory),null,'estado persistido contraditório também é bloqueado');
+});
+
+test('tempo configuravel dos purgadores alterna canais e mantem ambos fechados ao parar',()=>{
+ const thermal=require('../public/js/automacao-simulador-core');
+ assert.equal(thermal.estadoPurgadores(4,true,5).camisa,'ABERTO');
+ assert.equal(thermal.estadoPurgadores(5,true,5).eixo,'ABERTO');
+ assert.equal(thermal.estadoPurgadores(10,true,5).camisa,'ABERTO');
+ assert.equal(thermal.estadoPurgadores(5,false,5).camisa,'FECHADO');
+ assert.equal(thermal.estadoPurgadores(5,false,5).eixo,'FECHADO');
+ assert.equal(thermal.estadoPurgadores(299,true,900).proximaTroca,1);
+ assert.equal(thermal.estadoPurgadores(1,true,0).eixo,'ABERTO');
+});
 test('compatibilidade com pacotes anteriores preserva portao virtual fechado',()=>{
  const state=normalizeSimulationState({aquecimento_simulado:false,purgadores_simulados:{camisa:'FECHADO',eixo:'FECHADO'}});
  assert.equal(Object.hasOwn(state,'guilhotinas_simuladas'),false,'pacotes antigos permanecem idênticos');

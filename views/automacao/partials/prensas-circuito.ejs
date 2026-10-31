@@ -2,8 +2,9 @@
 <title id="pr-circuit-title">Esquema técnico conceitual das três prensas</title>
 <desc id="pr-circuit-desc">Material sai da percoladora e entra na tolva com duas roscas homogeneizadoras opostas. Três guilhotinas pneumáticas e três roscas alimentam FAST, P50 e P46 por cima. Óleo sai por baixo para bombas individuais e volta ao tacho da percoladora. Torta seca segue por rosca comum e uma rosca tubular inclinada junto da P46 retorna material mal prensado à tolva.</desc>
 <defs>
- <marker id="pr-arrow" markerWidth="10" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5 0 9Z" fill="#876a51"/></marker>
- <marker id="pr-oil-arrow" markerWidth="10" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5 0 9Z" fill="#c48b39"/></marker>
+ <marker id="pr-arrow" markerUnits="userSpaceOnUse" markerWidth="20" markerHeight="18" refX="17" refY="9" orient="auto"><path d="M0 0L18 9 0 18Z" fill="#876a51"/></marker>
+ <marker id="pr-oil-arrow" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="13" refX="12" refY="6.5" orient="auto"><path d="M0 0L13 6.5 0 13Z" fill="#c48b39"/></marker>
+ <marker id="pr-screw-arrow" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5 0 9Z" fill="#b91e35"/></marker>
  <pattern id="pr-helix" width="27" height="30" patternUnits="userSpaceOnUse"><path d="M1 4L14 26 27 4" stroke="#697887" stroke-width="4" fill="none"/></pattern>
  <linearGradient id="pr-metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e9edf2"/><stop offset=".65" stop-color="#c3cbd5"/><stop offset="1" stop-color="#aab5c0"/></linearGradient>
 </defs>
@@ -17,26 +18,47 @@
   <text x="39" y="116" font-weight="bold">PERCOLADORA</text><text x="43" y="247" font-size="12">Saída do material</text>
  </g>
  <path d="M192 184H287" stroke="#967557" stroke-width="15" fill="none" marker-end="url(#pr-arrow)"/>
- <g id="pr-tolva" data-prensa-select="TOLVA" tabindex="0" role="button" aria-label="Selecionar tolva das prensas">
-  <rect x="282" y="112" width="712" height="181" fill="#d9dee5" fill-opacity=".38" stroke="#606b7a" stroke-width="5"/>
-  <!-- Carcaça e quatro módulos de tampas inspirados nas vistas FAST. -->
-  <rect x="286" y="111" width="173" height="20" fill="#dce4ed" stroke="#80909f" stroke-width="2"/><path d="M290 116l164 11m0-11l-164 11" stroke="#a9b6c2" stroke-width="1.3"/>
-  <rect x="462" y="111" width="173" height="20" fill="#dce4ed" stroke="#80909f" stroke-width="2"/><path d="M466 116l164 11m0-11l-164 11" stroke="#a9b6c2" stroke-width="1.3"/>
-  <rect x="638" y="111" width="173" height="20" fill="#dce4ed" stroke="#80909f" stroke-width="2"/><path d="M642 116l164 11m0-11l-164 11" stroke="#a9b6c2" stroke-width="1.3"/>
-  <rect x="814" y="111" width="173" height="20" fill="#dce4ed" stroke="#80909f" stroke-width="2"/><path d="M818 116l164 11m0-11l-164 11" stroke="#a9b6c2" stroke-width="1.3"/>
-  <rect x="259" y="139" width="23" height="55" rx="5" fill="#b91e35" stroke="#727e8a" stroke-width="2"/>
-  <rect x="259" y="211" width="23" height="55" rx="5" fill="#b91e35" stroke="#727e8a" stroke-width="2"/>
-  <text x="293" y="306" font-size="11" fill="#566779">Motoredutores na extremidade · duas roscas paralelas</text>
-  <rect x="297" y="139" width="666" height="44" rx="14" fill="url(#pr-metal)" stroke="#707b89" stroke-width="3"/>
-  <rect x="303" y="144" width="654" height="34" fill="url(#pr-helix)"/>
-  <rect x="297" y="212" width="666" height="44" rx="14" fill="url(#pr-metal)" stroke="#707b89" stroke-width="3"/>
-  <rect x="303" y="216" width="654" height="36" fill="url(#pr-helix)"/>
-  <path d="M336 198H920" stroke="#728192" stroke-width="2" stroke-dasharray="8 7"/>
-  <text x="460" y="96" font-size="19" font-weight="bold">TOLVA DAS PRENSAS</text>
-  <text x="440" y="133" font-size="12">ROSCA A · SENTIDO →</text><text x="430" y="206" font-size="12">ROSCA B · SENTIDO ←</text>
-  <path d="M415 162H564" stroke="#b91e35" stroke-width="3" marker-end="url(#pr-arrow)"/>
-  <path d="M875 234H724" stroke="#b91e35" stroke-width="3" marker-end="url(#pr-arrow)"/>
-  <text x="490" y="275" font-size="12">Mistura / homogeneização interna</text>
+ <g id="pr-tolva" data-prensa-select="TOLVA" tabindex="0" role="button" aria-label="Selecionar tolva elevada, quatro tampas e duas roscas paralelas, em corte oblíquo">
+  <text x="462" y="94" font-size="19" font-weight="bold">TOLVA DAS PRENSAS</text>
+  <!-- Projeção oblíqua do mesmo conjunto da cena 3D: carcaça, quatro
+       tampas nervuradas, dois eixos paralelos e motoredutores na extremidade. -->
+  <path d="M290 148L326 112H1015V243L978 279H290Z" fill="#d9dee5" stroke="#606b7a" stroke-width="3"/>
+  <path d="M978 148L1015 112V243L978 279Z" fill="#b6c0cb" stroke="#687687" stroke-width="2"/>
+  <g id="pr-tolva-lids" fill="#e3e7ec" stroke="#7c8a99" stroke-width="2">
+   <% [290,462,634,806].forEach(x => { %>
+   <path d="M<%= x+2 %> 147L<%= x+37 %> 112H<%= x+205 %>L<%= x+170 %> 147Z"/>
+   <path d="M<%= x+15 %> 142L<%= x+43 %> 117M<%= x+158 %> 142L<%= x+185 %> 117" stroke="#9aa6b3"/>
+   <path d="M<%= x+88 %> 133V125H<%= x+105 %>V133" fill="none" stroke="#5e6977" stroke-width="3"/>
+   <% }); %>
+  </g>
+  <!-- Duas roscas em planos paralelos; o desnível aparente é a projeção
+       da profundidade, não uma disposição sobreposta dos eixos. -->
+  <g id="pr-tolva-screw-rear" opacity=".7">
+   <rect x="326" y="177" width="651" height="31" rx="13" fill="url(#pr-metal)" stroke="#6a7888" stroke-width="2"/>
+   <rect x="334" y="179" width="635" height="27" fill="url(#pr-helix)"/>
+   <path d="M324 193H981" stroke="#536371" stroke-width="3"/>
+  </g>
+  <g id="pr-tolva-screw-front">
+   <rect x="294" y="218" width="670" height="33" rx="14" fill="url(#pr-metal)" stroke="#6a7888" stroke-width="2"/>
+   <rect x="303" y="221" width="652" height="27" fill="url(#pr-helix)"/>
+   <path d="M288 235H970" stroke="#536371" stroke-width="3"/>
+  </g>
+  <!-- Janelas de corte e reforços da carcaça, mantendo os eixos visíveis. -->
+  <rect x="290" y="148" width="688" height="131" fill="#eef2f6" fill-opacity=".16" stroke="#606b7a" stroke-width="3"/>
+  <path d="M290 159H978M290 268H978M462 149V278M634 149V278M806 149V278" stroke="#7b8998" stroke-width="5"/>
+  <g id="pr-tolva-drives" stroke="#657180" stroke-width="2">
+   <path d="M301 193H326M269 235H294" stroke-width="6"/>
+   <rect x="274" y="178" width="29" height="30" rx="3" fill="#b91e35"/>
+   <rect x="242" y="220" width="29" height="30" rx="3" fill="#b91e35"/>
+   <rect x="245" y="184" width="28" height="18" rx="4" fill="#657180"/>
+   <rect x="213" y="226" width="28" height="18" rx="4" fill="#657180"/>
+  </g>
+  <path d="M534 193H646M738 235H626" stroke="#b91e35" stroke-width="3" marker-end="url(#pr-screw-arrow)"/>
+  <text x="543" y="172" font-size="11" fill="#455767">ROSCA A</text>
+  <text x="655" y="259" font-size="11" fill="#455767">ROSCA B</text>
+  <text x="42" y="279" font-size="11" fill="#566779">Dois motoredutores</text>
+  <path d="M175 274L226 249" fill="none" stroke="#8996a4"/>
+  <text x="714" y="94" font-size="11" fill="#566779">Corte oblíquo · sem escala</text>
  </g>
  <!-- Pórtico metálico elevado atrás das três alimentações. Suportes e vãos ilustrativos. -->
  <g id="pr-estrutura-tolva" data-prensa-select="TOLVA" role="group" aria-label="Estrutura elevada de apoio da tolva, altura a confirmar">
@@ -65,7 +87,7 @@
   <rect x="<%= x-89 %>" y="488" width="178" height="116" rx="41" fill="url(#pr-metal)" stroke="#626f7e" stroke-width="4"/>
   <path d="M<%= x-60 %> 507L<%= x-30 %> 588L<%= x %> 507L<%= x+30 %> 588L<%= x+60 %> 507" stroke="#758697" stroke-width="5" fill="none"/>
   <rect x="<%= x-26 %>" y="475" width="52" height="17" rx="5" fill="#d0d6de" stroke="#647385"/>
-  <text x="<%= x-54 %>" y="480" font-size="16" font-weight="bold">PRENSA <%= id %></text>
+  <text x="<%= x %>" y="553" text-anchor="middle" font-size="16" font-weight="bold" stroke="#e3e8ee" stroke-width="6" paint-order="stroke" stroke-linejoin="round">PRENSA <%= id %></text>
   <path d="M<%= x %> 461V476" stroke="#967557" stroke-width="12" marker-end="url(#pr-arrow)"/>
   <path d="M<%= x %> 604V655" stroke="#8f7051" stroke-width="13" marker-end="url(#pr-arrow)"/>
   <text x="<%= x+22 %>" y="626" font-size="11">Torta ↓</text>

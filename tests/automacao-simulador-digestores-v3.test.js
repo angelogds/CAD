@@ -71,13 +71,14 @@ test('historico de amostras tem limite e curva SVG finita', () => {
   assert.equal(core.pontosGrafico([]), '');
 });
 
-test('a tela V3 mostra etapas, botoes, grafico, cronometro e modo apresentacao', () => {
+test('a tela mostra etapas, botões, cronômetro e apresentação sem gráfico', () => {
   const view = source('views/automacao/simulador-digestores.ejs');
   const selectors = ['sim-presentation', 'sim-events-filter', 'sim-events-list',
-    'cycle-clock', 'chart-line', 'data-action="load"', 'data-action="heat"',
+    'cycle-clock', 'data-action="load"', 'data-action="heat"',
     'data-step="CARREGADO"', 'data-step="AQUECIMENTO"', 'data-step="COZIMENTO"',
     'data-step="PRONTO"', 'camisa-icon', 'eixo-icon', 'sim-signal-tower'];
   for (const selector of selectors) assert.ok(view.includes(selector), selector);
+  assert.doesNotMatch(view, /chart-line|sim-chart-panel/);
   assert.match(view, /id="sim-hardware-indicator"/);
   assert.match(view, /NÃO alarmes reais/);
   assert.match(view, /for\(let id=1;id<=4;id\+\+\)/);

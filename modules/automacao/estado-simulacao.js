@@ -33,6 +33,12 @@ function normalizeSimulationState(value) {
       !['ABERTA','FECHADA'].includes(gates.carga) || !['ABERTA','FECHADA'].includes(gates.descarga))) {
     const e = new Error('Guilhotinas simuladas inválidas.'); e.status = 400; throw e;
   }
+  if (gates?.carga === 'ABERTA' && gates.descarga === 'ABERTA') {
+    const e = new Error('Carga e descarga simuladas não podem abrir juntas.'); e.status = 400; throw e;
+  }
+  if ([visual, pushers].some(pair => pair?.camisa === 'ABERTO' && pair.eixo === 'ABERTO')) {
+    const e = new Error('Purgadores simulados devem alternar; os dois não podem abrir juntos.'); e.status = 400; throw e;
+  }
   if (b.etapa_mecanica !== undefined && !stages.includes(b.etapa_mecanica)) {
     const e = new Error('Etapa mecânica inválida.'); e.status = 400; throw e;
   }

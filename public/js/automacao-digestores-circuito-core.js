@@ -101,7 +101,7 @@
         state.stageSeconds += remaining;
         state.seconds += remaining;
         remaining = 0;
-        // A abertura aqui é SOMENTE ANIMAÇÃO; nunca encaminhar este bit a relés.
+        // Estado virtual: pode indicar LEDs da bancada, nunca comandar válvulas reais.
         if (valid && reading.ready === true && reading.tempC > 120) nextStage(state);
         else applyStage(state);
         continue;
