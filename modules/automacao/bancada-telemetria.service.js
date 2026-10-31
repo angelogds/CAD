@@ -131,8 +131,13 @@ function relatorioAtual(t, s, ativo) {
     if (t.versao_reportada != null) return Number(t.versao_reportada) === Number(s.versao) ? 'VERSAO' : null;
     return t.versao_entregue != null && Number(t.versao_entregue) === Number(s.versao) && t.entregue_desde_ms != null && Number(t.reported_ms) >= Number(t.entregue_desde_ms) ? 'TEMPORAL' : null;
   }
-  const ref = s ? (s.fase === 'PARADO' ? Number(s.published_at_ms) || 0 : Number(s.valid_until_ms)) : 0;
-  return Number(t.reported_ms) >= ref ? 'TEMPORAL' : null;
+  const stoppedByCommand = !!s && s.fase === 'PARADO';
+  const ref = s ? (stoppedByCommand ? Number(s.published_at_ms) || 0 : Number(s.valid_until_ms)) : 0;
+  // Na expiração, relatório com o MESMO milissegundo do vencimento ainda é
+  // anterior à retirada confirmada da saída. Exigir timestamp posterior evita
+  // reconhecer um INICIO antigo como resposta ao PARADO, sobretudo sob carga CI.
+  return (stoppedByCommand ? Number(t.reported_ms) >= ref : Number(t.reported_ms) > ref)
+    ? 'TEMPORAL' : null;
 }
 
 function confirmacao(alvo, t, corr, comunicacao) {
