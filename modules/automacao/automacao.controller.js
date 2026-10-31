@@ -74,6 +74,8 @@ function simuladorDigestores(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const podeSincronizarBancada = ACCESS.automacao_bancada_simulate.includes(role);
   if (podeSincronizarBancada && req.session && !req.session.automacaoConfigCsrf) req.session.automacaoConfigCsrf=crypto.randomBytes(32).toString('hex');
+  if (ACCESS.automacao_decanters_simulate.includes(role) && req.session && !req.session.automacaoCiclosCsrf)
+    req.session.automacaoCiclosCsrf=crypto.randomBytes(32).toString('hex');
   return res.render('automacao/simulador-digestores', {
     simuladorBancadaAdmin: podeSincronizarBancada,
     simuladorBancadaPermitida: podeSincronizarBancada,
@@ -81,6 +83,7 @@ function simuladorDigestores(req, res) {
     simulacaoCircuitoPermitida: ACCESS.automacao_decanters_simulate.includes(role),
     visualizacaoAutomacaoCompleta: ACCESS.automacao_view.includes(role),
     csrfAutomacao: podeSincronizarBancada && req.session ? req.session.automacaoConfigCsrf : '',
+    csrfCiclos: ACCESS.automacao_decanters_simulate.includes(role) && req.session ? req.session.automacaoCiclosCsrf : '',
     title: '2A Automação Industrial · Simulador dos Digestores',
     activeMenu: 'automacao',
   });
