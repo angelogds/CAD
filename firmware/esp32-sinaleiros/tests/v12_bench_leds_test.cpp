@@ -13,8 +13,7 @@ void digitalWrite(int pin,int level) {
   if(monitoring) {
     assert(!(levels[25]==LOW&&levels[26]==LOW));
     assert(!(levels[32]==LOW&&levels[33]==LOW));
-    assert(!(levels[16]==LOW&&levels[17]==LOW));
-    assert(!(levels[32]==LOW&&levels[16]==LOW));
+    assert(levels[16]==HIGH&&levels[17]==HIGH); // No writes to former outputs.
   }
 }
 int digitalRead(int pin) { return levels[pin]; }
@@ -32,15 +31,20 @@ static void checkDrivers() {
   purges.applyBench(true,true,true);assert(levels[25]==HIGH&&levels[26]==HIGH);
   purges.applyBench(true,true,false);purges.applyBench(false,true,false);
   assert(levels[25]==HIGH&&levels[26]==HIGH);
-  gates.apply(true,false,true,false,true);assert(levels[33]==LOW&&levels[17]==LOW);
-  gates.apply(true,true,false,false,true);assert(levels[32]==LOW&&levels[33]==HIGH);
-  gates.apply(true,false,true,true,false);assert(levels[16]==LOW&&levels[17]==HIGH);
-  gates.apply(true,true,false,true,false); // Conflicting openings: all off.
-  assert(levels[32]==HIGH&&levels[33]==HIGH&&levels[16]==HIGH&&levels[17]==HIGH);
-  gates.apply(true,false,true,false,false); // Individual closed LED only.
-  assert(levels[33]==LOW&&levels[32]==HIGH&&levels[16]==HIGH&&levels[17]==HIGH);
-  levels[27]=HIGH;gates.apply(true,true,false,false,true);
-  assert(levels[32]==HIGH&&levels[33]==HIGH&&levels[16]==HIGH&&levels[17]==HIGH);
+  gates.apply(true,false,false);assert(levels[32]==HIGH&&levels[33]==HIGH);
+  gates.apply(true,true,false);assert(levels[32]==LOW&&levels[33]==HIGH);
+  writesOff.clear();gates.apply(true,true,false);
+  for(int pin:writesOff)assert(pin!=32); // Held coil must not chatter.
+  gates.apply(true,false,true);assert(levels[32]==HIGH&&levels[33]==LOW);
+  gates.apply(true,true,true);assert(levels[32]==HIGH&&levels[33]==HIGH);
+  levels[27]=HIGH;gates.apply(true,true,false);
+#if CGD_BENCH_REQUIRE_LOCAL_KEY
+  assert(levels[32]==HIGH&&levels[33]==HIGH);
+#else
+  assert(levels[32]==LOW&&levels[33]==HIGH);
+#endif
+  gates.stop();assert(levels[32]==HIGH&&levels[33]==HIGH);
+  for(int pin:writesOff)assert(pin!=16&&pin!=17);
   monitoring=false;
 }
 
@@ -53,16 +57,16 @@ static cgd::BenchInput packet(uint32_t now=100U) {
 static void off(const cgd::BenchState &s) { for(bool value:s.outputs)assert(!value); }
 static void isolated(const cgd::BenchState &s,int channel) {
   assert(s.testing&&!s.mirroring);
-  for(int j=0;j<9;++j)assert(s.outputs[j]==(j==channel));
+  for(int j=0;j<7;++j)assert(s.outputs[j]==(j==channel));
 }
 int main() {
   cgd::BenchLeds c;auto i=packet();
   off(c.tick(i,100)); // Fresh network packets and a held key never authorize boot.
   c.selectCad(100);auto s=c.tick(i,100);
-  assert(s.mirroring&&s.outputs[2]&&s.outputs[3]&&s.outputs[6]&&s.outputs[8]);
+  assert(s.mirroring&&s.outputs[2]&&s.outputs[3]&&!s.outputs[5]&&!s.outputs[6]);
   i.loadOpen=true;s=c.tick(i,110);assert(s.outputs[5]&&!s.outputs[6]);
   i.loadOpen=false;i.dischargeOpen=true;s=c.tick(i,120);
-  assert(s.outputs[7]&&!s.outputs[8]);
+  assert(s.outputs[6]&&!s.outputs[5]);
   i.loadOpen=true;off(c.tick(i,130)); // Load/discharge interlock faults the cycle.
   i.loadOpen=false;off(c.tick(i,140));
   c.selectCad(150);assert(c.tick(i,150).mirroring);
@@ -101,18 +105,18 @@ int main() {
     if(conflict==1)p.red=true;
     if(conflict==2)p.yellow=true;
     if(conflict==3){p.green=false;p.red=p.yellow=true;}
-    b.selectCad(100);off(b.tick(p,100));assert(!b.startTest(0,p,110));
+    b.selectCad(100);off(b.tick(p,100)); // A local isolated test ignores conflicting CAD values.
   }
 
-  for(int channel=0;channel<9;++channel) {
+  for(int channel=0;channel<7;++channel) {
     cgd::BenchLeds b;auto p=packet();b.selectCad(100);b.tick(p,100);
     assert(b.startTest(channel,p,110));isolated(b.tick(p,110),channel);
-    assert(!b.startTest((channel+1)%9,p,120));
+    assert(!b.startTest((channel+1)%7,p,120));
     isolated(b.tick(p,1110),channel);isolated(b.tick(p,2109),channel);
     off(b.tick(p,2110));off(b.tick(p,2120)); // Expiry never resumes the cycle.
     assert(!b.startTest(channel,p,2120)); // Cooldown.
     assert(b.startTest(channel,p,3110));isolated(b.tick(p,3110),channel);
-    p.wifi=false;off(b.tick(p,3120));p.wifi=true;off(b.tick(p,3130));
+    p.wifi=false;isolated(b.tick(p,3120),channel);p.wifi=true;isolated(b.tick(p,3130),channel);
     p.key=false;off(b.tick(p,3140));p.key=true;off(b.tick(p,3150));
     b.selectCad(3160);assert(b.tick(p,3160).mirroring);
   }
@@ -121,6 +125,24 @@ int main() {
   i=packet(start);rollover.selectCad(start);assert(rollover.tick(i,start).mirroring);
   assert(rollover.startTest(5,i,start+10U));isolated(rollover.tick(i,start+20U),5);
   isolated(rollover.tick(i,start+1100U),5);off(rollover.tick(i,start+2010U));
+  // Offline/AP tests work on all seven mapped channels without any CAD cycle.
+  for(int channel=0;channel<7;++channel){
+    cgd::BenchLeds b;cgd::BenchInput local;local.key=local.compatible=true;
+    assert(b.startTest(channel,local,100));isolated(b.tick(local,100),channel);
+    isolated(b.tick(local,1100),channel);off(b.tick(local,2100));off(b.tick(local,2110));
+    b.selectCad(2200);off(b.tick(local,2200)); // No cloud packet, no mirror.
+    local.compatible=false;assert(!b.startTest(channel,local,3200));
+    local.compatible=true;local.key=false;assert(!b.startTest(channel,local,3200));
+  }
+  cgd::BenchLeds local;cgd::BenchInput l;l.localMode=l.key=l.compatible=l.green=true;
+  l.receivedAt=100;l.validity=5000;local.selectLocal(100);
+  for(uint32_t t=100;t<=5100;t+=1000){
+    auto out=local.tick(l,t);assert(out.local&&!out.mirroring&&out.outputs[2]);
+    for(int ch=3;ch<7;++ch)assert(!out.outputs[ch]);
+  }
+  off(local.tick(l,5101));l.receivedAt=5200;off(local.tick(l,5200));
+  local.selectLocal(5300);assert(local.tick(l,5300).local);
+  local.stop();off(local.tick(l,5310));
   checkDrivers();
   return 0;
 }

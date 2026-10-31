@@ -44,7 +44,7 @@
         <div class="sim-remote-table-scroll"><table class="sim-remote-table" id="sim-remote-table" aria-label="Estado do ESP32 por digestor"><thead><tr><th>Digestor</th><th>Modo ESP32</th><th>Temperatura</th><th>Faixa</th><th>Sinaleiro</th><th>Sensor</th><th>Enviada</th><th>Recebida</th><th>Aplicada</th><th>Saída</th><th>Contato</th><th>ESP32</th></tr></thead><tbody id="sim-remote-rows"><tr><td colspan="12">Carregando…</td></tr></tbody></table></div>
         <% if (typeof configuracaoAdmin !== 'undefined' && configuracaoAdmin) { %><p><a href="/automacao/configuracao">Configurar ESP32 e abrir IHM local</a></p><% } %>
         <% } %>
-        <p class="sim-command-help">Somente LEDs de bancada. Selecione Simulação CAD e habilite GPIO27 na ESP32; não conectar solenóides ou cilindros. Pausar ou reiniciar envia PARADO; confirme na IHM. Após desarmar, selecione novamente Simulação CAD localmente.</p>
+        <p class="sim-command-help">Somente LEDs de bancada. Selecione Simulação CAD na ESP32; GPIO27 é opcional no firmware r3. Guilhotinas: GPIO32 alimentação e GPIO33 descarga; não conectar solenóides ou cilindros. Pausar ou reiniciar envia PARADO; confirme na IHM. Após desarmar, selecione novamente Simulação CAD localmente.</p>
         <p class="sim-command-help">Os tempos são virtuais e acompanham a velocidade. Ajuste os purgadores com o ciclo pausado.</p>
         <%- include('partials/digestores-circuito-demo', { controls: typeof simulacaoCircuitoPermitida !== 'undefined' && simulacaoCircuitoPermitida === true }) %>
       </div>

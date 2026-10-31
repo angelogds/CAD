@@ -20,12 +20,14 @@ test('V12 executa o núcleo C++ do sketch: espelhamento, falhas, testes isolados
     const config=source.match(/^#define CGD_(?:ENABLE_PURGE_OUTPUTS|ENABLE_MATERIAL_GATE_OUTPUTS|PURGE_RELAY_ACTIVE_LEVEL|PURGE_FAIL_CLOSED_CONFIRMED|GATE_\w+)[^\r\n]*/gm).join('\n');
     const purges=source.split('// ===== purge_outputs.h =====')[1].split('// ===== cad_purge_test.h =====')[0];
     const gates=source.slice(source.indexOf('bool benchPinsCompatible=false;'),source.indexOf('CgdGatePulse cgdGate;'));
-    fs.writeFileSync(path.join(directory,'bench_drivers.h'),`#pragma once\n#include <Arduino.h>\n${config}\n${purges}\n${gates}`);
-    const binary=path.join(directory,process.platform==='win32'?'bench-test.exe':'bench-test');
-    const build=spawnSync('g++',['-std=c++11','-Wall','-Wextra','-Werror','-I',directory,
+    fs.writeFileSync(path.join(directory,'bench_drivers.h'),`#pragma once\n#include <Arduino.h>\n#ifndef CGD_BENCH_REQUIRE_LOCAL_KEY\n#define CGD_BENCH_REQUIRE_LOCAL_KEY 0\n#endif\n${config}\n${purges}\n${gates}`);
+    for(const requireKey of [0,1]) {
+      const binary=path.join(directory,'bench-test-'+requireKey+(process.platform==='win32'?'.exe':''));
+      const build=spawnSync('g++',['-std=c++11','-DCGD_BENCH_REQUIRE_LOCAL_KEY='+requireKey,'-Wall','-Wextra','-Werror','-I',directory,
       path.join(__dirname,'../firmware/esp32-sinaleiros/tests/v12_bench_leds_test.cpp'),'-o',binary],{encoding:'utf8'});
-    assert.equal(build.status,0,build.stderr||build.stdout);
-    const run=spawnSync(binary,[],{encoding:'utf8'});
-    assert.equal(run.status,0,run.stderr||run.stdout);
-  }finally{fs.rmSync(directory,{recursive:true,force:true});}
+      assert.equal(build.status,0,build.stderr||build.stdout);
+      const run=spawnSync(binary,[],{encoding:'utf8',timeout:10000,windowsHide:true});
+      assert.equal(run.status,0,run.stderr||run.stdout);
+    }
+  }finally{fs.rmSync(directory,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 });
