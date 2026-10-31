@@ -3,7 +3,7 @@ on:
   pull_request:
     paths:
       - 'firmware/releases/CampoDoGado_ESP32_V12_Bancada_Reles.ino'
-      - '.github/workflows/esp32-v12-simulacao-integrada.yml'
+      - '.github/workflows/esp32-v12-bancada-reles.yml'
   workflow_dispatch:
 jobs:
   compile:
