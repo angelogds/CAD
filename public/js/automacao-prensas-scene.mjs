@@ -55,21 +55,79 @@ export function createPrensasScene({ makeLabel } = {}) {
   line(root,[[-9.5,5.4,-1.5],[-7.7,5.4,-1.5]],.25,cake);
   mark('SAÍDA DA PERCOLADORA',[-10.7,6.75,-1.2],3.6,'PERCOLADORA');
 
+  // Tolva elevada (conjunto industrial ilustrativo). Relação L x B tomada
+  // das referências: 6891 x 1615 mm. Altura e perfis do suporte NÃO cotados.
   const tolva=group('TOLVA',[0,5.85,-1.3]);
-  // Carcaça retangular com face frontal aberta e duas roscas visíveis.
-  box(tolva,[15,.14,2.4],[0,-.88,0],edge);
-  box(tolva,[15,.13,2.4],[0,.95,0],glass);
-  box(tolva,[15,1.8,.12],[0,0,-1.19],steel);
-  box(tolva,[15,1.8,.10],[0,0,1.19],glass);
-  box(tolva,[.14,1.85,2.4],[-7.5,0,0],steel);
-  box(tolva,[.14,1.85,2.4],[7.5,0,0],steel);
-  for(let n=0;n<2;n++){
-    const screw=new THREE.Group(); screw.position.set(0,0,n? .63:-.63);tolva.add(screw);
-    cyl(screw,.07,14.2,[0,0,0],dark,'x');helix(screw,14.2,.39,16,steel);
-    rotors.push({mesh:screw,axis:'x',speed:n?-1.4:1.4,active:s=>s.mixers});
+  const L=13.50, B=3.16;
+  // Base e bordas da caixa retangular; frente em painéis translúcidos
+  // para manter visíveis as duas roscas internas, sem retirar sua carcaça.
+  box(tolva,[L,.18,B],[0,-1.03,0],edge);
+  box(tolva,[L,.16,B],[0,1.15,0],glass);
+  box(tolva,[L,2.24,.11],[0,.07,-B/2],steel);
+  box(tolva,[.15,2.25,B],[-L/2,.07,0],steel);
+  box(tolva,[.15,2.25,B],[ L/2,.07,0],steel);
+  for (let i=0;i<4;i++) {
+    const x=-L/2+(i+.5)*L/4;
+    // Quatro tampas superiores nervuradas e com alças; chapa em corte
+    // alternado, para mostrar o misturador sem ocultar a inspeção interna.
+    const lid=box(tolva,[L/4-.06,.10,B-.10],[x,1.26,0],i===2?glass:pale);
+    lid.userData.selectKey='TOLVA';
+    for (const z of [-1.28,1.28])
+      box(tolva,[L/4-.12,.065,.08],[x,1.34,z],edge);
+    box(tolva,[.27,.15,.26],[x,1.42,.1],dark);
+    // Emenda estrutural externa das chapas a cada módulo.
+    if (i>0)box(tolva,[.075,2.24,.15],[-L/2+i*L/4,.07,B/2],edge);
   }
-  mark('TOLVA DAS PRENSAS · 2 ROSCAS CONTRARROTATIVAS',[0,7.1,-1.3],7,'TOLVA');
+  for (let i=0;i<3;i++) {
+    const x=-L/2+(i+.5)*L/3;
+    // Paredes frontais com janelas de inspeção; corte revela eixo e hélice.
+    box(tolva,[L/3-.10,1.30,.08],[x,-.31,B/2],glass);
+    box(tolva,[L/3-.10,.56,.11],[x,.72,B/2],steel);
+    box(tolva,[L/3-.10,.30,.10],[x,-.94,B/2],steel);
+  }
+  // Laterais inferiores de reforço e viga longitudinal de apoio da tolva.
+  for (const z of [-B/2,B/2]) {
+    box(tolva,[L,.18,.17],[0,-1.10,z],edge);
+    box(tolva,[L,.09,.11],[0,.88,z],edge);
+  }
+  // Eixos paralelos, helicoides e dois motoredutores do mesmo lado.
+  for (let n=0;n<2;n++) {
+    const z=n?.70:-.70;
+    const screw=new THREE.Group();screw.position.set(0,.00,z);tolva.add(screw);
+    cyl(screw,.10,L-.48,[0,0,0],dark,'x');
+    helix(screw,L-.65,.42,18,n?steel:edge);
+    rotors.push({mesh:screw,axis:'x',speed:n?-1.4:1.4,active:s=>s.mixers});
+    cyl(tolva,.20,.40,[-L/2-.19,.00,z],dark,'x');
+    const gearbox=box(tolva,[.60,.75,.67],[-L/2-.68,.00,z],red);
+    gearbox.userData.selectKey='TOLVA';
+    cyl(tolva,.30,.68,[-L/2-1.30,.02,z],edge,'x');
+    cyl(tolva,.14,.16,[-L/2-1.72,.02,z],dark,'x');
+  }
+  mark('TOLVA FAST · 2 ROSCAS · 6891 x 1615 mm (REF.)',[0,7.90,-1.3],7,'TOLVA');
 
+  // Estrutura metálica independente sob a tolva: travessas, pilares,
+  // bases e contraventamentos apenas conceituais. NÃO usar para cálculo,
+  // fabricação, carga admissível ou obra sem levantamento de campo.
+  const support=group('ESTRUTURA_TOLVA');
+  support.userData.selectKey='TOLVA';
+  const xs=[-6.90,-2.52,2.52,6.90],zs=[-2.96,.36];
+  for(const z of zs){
+    box(support,[14.05,.22,.24],[0,4.70,z],edge);
+    box(support,[14.05,.14,.20],[0,.32,z],edge);
+    for(const x of xs){
+      box(support,[.22,4.22,.22],[x,2.54,z],dark);
+      box(support,[.62,.14,.62],[x,.27,z],edge);
+      box(support,[.52,.14,.52],[x,4.64,z],edge);
+    }
+    for(let i=0;i<xs.length-1;i++){
+      const from=xs[i]+.17,to=xs[i+1]-.17;
+      line(support,[[from,.59,z],[to,4.44,z]],.055,edge);
+    }
+  }
+  for(const x of xs) {
+    box(support,[.26,.19,B+.63],[x,4.72,-1.30],edge);
+    box(support,[.16,.13,B+.63],[x,.42,-1.30],edge);
+  }
   const presses=[{id:'FAST',x:-5.2},{id:'P50',x:0},{id:'P46',x:5.2}];
   presses.forEach(({id,x})=>{
     const g=group(id,[x,2.18,1.7]);

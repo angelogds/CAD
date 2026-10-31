@@ -12,7 +12,7 @@
   const send=(event,detail={})=>root.dispatchEvent(new CustomEvent('prensas:'+event,{detail}));
   const setText=(id,value)=>{const e=$(id);if(e)e.textContent=value;};
   const names={
-    TOLVA:['Tolva das prensas','Duas roscas internas de sentidos opostos para homogeneizar o material proveniente da percoladora.'], 
+    TOLVA:['Tolva das prensas','Carcaça com quatro tampas superiores, duas roscas paralelas, motoredutores laterais e três descargas inferiores sobre estrutura metálica elevada. As cotas do suporte ainda não foram levantadas.'], 
     PERCOLADORA:['Saída da percoladora','Material segue da percoladora até a tolva superior das prensas.'],
     FAST:['Prensa FAST','Entrada superior de material; torta seca pela descarga inferior; óleo segue à bomba individual da FAST.'],
     P50:['Prensa P50','Alimentação pela guilhotina e rosca P50. Óleo coletado pela bomba da P50.'],
