@@ -53,14 +53,3 @@
 @media(max-width:1000px){.pr-switch-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:720px){.pr-dashboard-grid,.pr-switch-grid{grid-template-columns:1fr}.pr-visual-header{padding:14px}.pr-three-host{height:420px}.pr-visual-toolbar{padding:9px}.pr-scheme-host{min-height:400px}.pr-section-actions{align-items:flex-start}}
 @media(prefers-reduced-motion:reduce){.pr-scheme-host [data-prensa-select]{transition:none}}
-
-/* Desenho técnico da tolva ancorado às vistas da fábrica, navegável no celular. */
-.pr-tolva-detail{margin:16px 0;padding:20px}
-.pr-tolva-detail>header{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
-.pr-tolva-detail h2{font-size:19px;margin:5px 0 9px}
-.pr-tolva-detail p{color:#5f6d7c;font-size:12px;line-height:1.7;max-width:930px}
-.pr-drawing-download{background:#fff;color:#a51a30;text-decoration:none;border:1px solid #bd7a87;border-radius:9px;padding:10px 14px;font-weight:800;font-size:12px;min-height:40px;display:inline-flex;align-items:center}
-.pr-drawing-download:hover{background:#fff3f5}
-.pr-drawing-scroll{overflow:auto;background:#f5f7fa;border-radius:10px;border:1px solid #e3e8ee;max-height:690px;margin-top:14px}
-.pr-drawing-scroll img{width:max(100%,1050px);height:auto;display:block}
-@media(max-width:720px){.pr-tolva-detail{padding:14px}.pr-drawing-scroll{max-height:520px}}

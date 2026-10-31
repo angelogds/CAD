@@ -34,14 +34,23 @@ test('circuito técnico mostra tolva de carcaça retangular e pórtico independe
   assert.match(schematic,/data-prensa-select="TOLVA"/);
   assert.match(schematic,/Estrutura metálica elevada/);
   assert.match(schematic,/Altura \/ perfis a levantar/);
+  for (const id of ['pr-tolva-lids', 'pr-tolva-screw-rear', 'pr-tolva-screw-front', 'pr-tolva-drives']) {
+    assert.match(schematic, new RegExp('id="' + id + '"'));
+  }
+  assert.match(schematic, /\[290,462,634,806\]\.forEach/);
+  assert.match(schematic, /Corte oblíquo · sem escala/);
+  // As setas não crescem com a espessura dos caminhos nem cobrem as guilhotinas.
+  for (const id of ['pr-arrow', 'pr-oil-arrow', 'pr-screw-arrow']) {
+    assert.match(schematic, new RegExp('<marker id="' + id + '" markerUnits="userSpaceOnUse"'));
+  }
   for (const term of ['FAST','P50','P46'])assert.match(schematic,new RegExp(term));
 });
 
-test('a vista detalhada só exibe desenho e não amplia acesso ao simulador', () => {
+test('prensas usa esquema integrado e remove a imagem de referência da tolva', () => {
   const page=read('views/automacao/prensas.ejs');
   const routes=read('modules/automacao/automacao.routes.js');
-  assert.match(page,/pr-tolva-detail/);
-  assert.match(page,/tolva-prensas-estrutura-v2\.svg/);
+  assert.doesNotMatch(page,/pr-tolva-detail|tolva-prensas-estrutura-v2\.svg/);
+  assert.match(page,/include\('partials\/prensas-circuito'\)/);
   assert.match(page,/if \(prModoSimulacao\)/);
   assert.match(routes,/router\.get\('\/prensas\/simulador',\s*requireLogin,\s*requireRole\(\[ROLE\.ADMIN\]\)/);
   assert.doesNotMatch(page, /acionar CLP|liga.{0,8}solenoide fisicamente/i);

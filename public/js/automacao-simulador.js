@@ -14,6 +14,11 @@
   const reset = document.getElementById('sim-reset');
   const presentation = document.getElementById('sim-presentation');
   const speed = document.getElementById('sim-speed');
+  const purgeTiming = document.getElementById('sim-purge-seconds');
+  const purgeSeconds = () => {
+    const value = Number(purgeTiming?.value);
+    return Number.isFinite(value) && value >= 1 && value <= 300 ? Math.round(value) : core.INTERVALO_PURGA_SEGUNDOS;
+  };
   const integrationButton = document.getElementById('sim-link-circuits');
   let integrationOn = Boolean(integrationButton);
   let integrationActive = false;
@@ -93,11 +98,6 @@
     renderEvents();
   }
 
-  function drawChart(item) {
-    const line = get(item.card, 'chart-line');
-    line.setAttribute('points', core.pontosGrafico(item.samples, 260, 90));
-  }
-
   function render() {
     const thermalStates = Array(4).fill('DESLIGADO');
     const mechState=integrationActive ? circuit()?.getSnapshot?.() : null;
@@ -144,7 +144,8 @@
         ? labels.PRONTO : item.enabled && !running ? 'Pausado' : labels[item.fase];
       get(item.card, 'cycle-clock').textContent = formatTime(item.cycleSeconds);
       const begin = item.card.querySelector('[data-action="heat"]');
-      begin.disabled = item.fase !== 'CARREGADO';
+      begin.disabled = integrationActive || item.fase !== 'CARREGADO';
+      item.card.querySelector('[data-action="load"]').disabled = integrationActive;
       begin.textContent = item.fase === 'PRONTO' ? '✓ Ciclo concluído' : '▶ Iniciar cozimento';
       for (const step of item.card.querySelectorAll('[data-step]')) {
         step.classList.toggle('is-current', step.dataset.step === item.fase);
@@ -152,7 +153,7 @@
           Object.keys(labels).indexOf(step.dataset.step) < Object.keys(labels).indexOf(item.fase));
       }
 
-      const purga = core.estadoPurgadores(item.cycleSeconds, running && item.cycleActive);
+      const purga = core.estadoPurgadores(item.cycleSeconds, running && item.cycleActive, purgeSeconds());
       item.card.dataset.camisaSimulada = purga.camisa;
       item.card.dataset.eixoSimulado = purga.eixo;
       get(item.card, 'camisa-state').textContent = purga.camisa;
@@ -165,7 +166,6 @@
         : 'Inversão em ' + purga.proximaTroca + ' s virtuais' + (!running ? ' • pausado' : '');
       get(item.card, 'camisa-icon').textContent = purga.camisa === 'ABERTO' ? '◀  ▶' : '◁▷';
       get(item.card, 'eixo-icon').textContent = purga.eixo === 'ABERTO' ? '◀  ▶' : '◁▷';
-      drawChart(item);
     }
     // Réplica somente visual dos cards do simulador; não envia comandos para o ESP32.
     window.CGDThermalState = { states: thermalStates, source: 'SIMULACAO_LOCAL' };
@@ -184,11 +184,12 @@
       const previousSeconds = item.cycleSeconds;
       core.avancarDigestor(item, factor);
       core.registrarAmostra(item);
-      const lastBoundary = Math.floor(item.cycleSeconds / core.INTERVALO_PURGA_SEGUNDOS);
-      const previousBoundary = Math.floor(previousSeconds / core.INTERVALO_PURGA_SEGUNDOS);
+      const interval = purgeSeconds();
+      const lastBoundary = Math.floor(item.cycleSeconds / interval);
+      const previousBoundary = Math.floor(previousSeconds / interval);
       for (let boundary = previousBoundary + 1; boundary <= lastBoundary; boundary++) {
-        const elapsed = boundary * core.INTERVALO_PURGA_SEGUNDOS;
-        const state = core.estadoPurgadores(elapsed, true);
+        const elapsed = boundary * interval;
+        const state = core.estadoPurgadores(elapsed, true, interval);
         record(item, 'Purgadores invertidos: ' + (state.camisa === 'ABERTO' ? 'camisa aberta / eixo fechado' : 'eixo aberto / camisa fechada'),
           virtualSeconds - (item.cycleSeconds - elapsed));
       }
@@ -230,6 +231,7 @@
     if (integrationActive) circuit()?.pauseLinked();
     if (integrationOn) setLinkedStatus('Ciclo pausado. Clique em Iniciar simulação para retomar.');
     if (integrationButton) integrationButton.disabled = false;
+    if (purgeTiming) purgeTiming.disabled = false;
     render();
   }
 
@@ -237,11 +239,13 @@
     const load = item.card.querySelector('[data-action="load"]');
     const heat = item.card.querySelector('[data-action="heat"]');
     load.addEventListener('click', () => {
+      if (integrationActive) return;
       core.carregarDigestor(item, core.TEMPERATURA_INICIAL + index * 2);
-      record(item, 'Novo carregamento simulado; contador e gráfico reiniciados.');
+      record(item, 'Novo carregamento simulado; contador reiniciado.');
       render();
     });
     heat.addEventListener('click', () => {
+      if (integrationActive) return;
       if (core.iniciarDigestor(item)) record(item, 'Aquecimento iniciado no modo demonstração.');
       render();
     });
@@ -284,6 +288,7 @@
     start.disabled = true;
     pause.disabled = false;
     if (integrationButton) integrationButton.disabled = true;
+    if (purgeTiming) purgeTiming.disabled = true;
     handle = setInterval(tick, 1000);
     render();
   });
@@ -309,6 +314,10 @@
     render();
   });
   eventsFilter.addEventListener('change', renderEvents);
+  purgeTiming?.addEventListener('change', () => {
+    purgeTiming.value = String(purgeSeconds());
+    render();
+  });
   presentation.addEventListener('click', () => {
     const showing = root.classList.toggle('sim-presenting');
     presentation.setAttribute('aria-pressed', String(showing));
