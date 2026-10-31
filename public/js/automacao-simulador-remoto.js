@@ -103,8 +103,12 @@
       const carga=current&&mech.gates?.[id-1]===true?'ABERTA':'FECHADA';
       const descarga=current&&mech.dischargeGates?.[id-1]===true?'ABERTA':'FECHADA';
       const stage=current&&mech.activeDigestor==='D'+id?mech.stage:'PARADO';
+      // Motor e empurradores do CAD são estados VISUAIS, não ordens de energia.
+      const isCooking=current&&mech.activeDigestor==='D'+id&&stage==='COZIMENTO'&&mech.running===true;
+      const empurradores={camisa:isCooking?camisaVisual:'FECHADO',eixo:isCooking?eixoVisual:'FECHADO'};
       const espelho=mech?{purgadores_visuais:{camisa:camisaVisual,eixo:eixoVisual},
-        guilhotinas_simuladas:{carga,descarga},etapa_mecanica:stage}:{};
+        guilhotinas_simuladas:{carga,descarga},empurradores_simulados:empurradores,
+        motor_digestor_simulado:isCooking,etapa_mecanica:stage}:{};
       return {digestor_id:id,fase,...(!parado&&Number.isFinite(temperatura)?{temperatura_c:temperatura}:{}),
         aquecimento_simulado:!parado&&card.dataset.aquecimentoSimulado==='true',
         purgadores_simulados:{camisa,eixo},...espelho};
