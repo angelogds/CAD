@@ -749,7 +749,7 @@ function renderPurge(items,id,real,realEligible,simulation){
   text('p'+ch+'physical',physical?'GPIO '+String(item.pino_reservado||'—')+' · relé LOW · estado comandado, sem feedback físico':'Saída física indisponível neste firmware');
   document.querySelector('[data-purge-arm="'+ch+'"]').disabled=!physical||!realEligible||armed||cadArmed||item.ativo===true;
   document.querySelector('[data-purge-real="'+ch+'"]').disabled=!physical||!realEligible||!armed||cadArmed||item.ativo===true;
-  document.querySelector('[data-purge-cad="'+ch+'"]').disabled=true; // Simulação nunca arma relé
+  document.querySelector('[data-purge-cad="'+ch+'"]').disabled=true; // Arme conjunto via bancada LED
   document.querySelector('[data-purge-start="'+ch+'"]').disabled=real||simulation.current||armed||cadArmed||item.ativo===true;
   document.querySelector('[data-purge-save="'+ch+'"]').disabled=item.ativo===true||cadArmed;
  }
@@ -777,14 +777,14 @@ function render(data){
  text(prefix+'stamp',measured&&Number.isFinite(measured.getTime())&&validSource?(real?'Medição ':'Simulação ')+measured.toLocaleTimeString('pt-BR'):(real?'Horário pendente':simCurrent?'Temperatura simulada atual':'Sem medição real'));
  text('pcSimStatus',real?'PT100 REAL':remote?(simCurrent?'SIMULAÇÃO PC ATUAL':expired?'SIMULAÇÃO EXPIRADA':'AGUARDANDO SIMULAÇÃO'):'TESTE LOCAL');
  text('pcHeating',real?'Aquecimento virtual: não utilizado no modo real':completeSimulation&&typeof data.aquecimento_simulado==='boolean'?'Aquecimento virtual: '+(data.aquecimento_simulado?'ligado':'desligado')+' · simulado':'Aquecimento virtual: não confirmado');
- text('pcSimHelp',real?'As informações simuladas do PC não alteram o PT100 nem os ciclos locais neste modo.':completeSimulation?'Temperatura e válvulas vêm do simulador do PC. Os relés só acompanham as válvulas após armar cada teste localmente.':simCurrent?'Temperatura simulada atual. Estados de aquecimento e válvulas indisponíveis; o teste dos relés pelo CAD permanece bloqueado.':remote?'Aguardando uma simulação atual do PC. Sem renovação válida, o teste CAD fecha e desarma os canais.':'Selecione Simulação CAD para acompanhar temperatura, aquecimento e válvulas virtuais do PC.');
+ text('pcSimHelp',real?'As informações simuladas do PC não alteram o PT100 nem os ciclos locais neste modo.':completeSimulation?'O CAD controla a animação. Para energizar LEDs de teste, habilite a chave física e arme a bancada no bloco dos purgadores.':simCurrent?'Temperatura simulada atual. Estados de aquecimento e válvulas indisponíveis; o teste dos relés pelo CAD permanece bloqueado.':remote?'Aguardando uma simulação atual do PC. Sem renovação válida, o teste CAD fecha e desarma os canais.':'Selecione Simulação CAD para acompanhar temperatura, aquecimento e válvulas virtuais do PC.');
  el('connection').className='connection online';text('connectionText','ESP32 conectado · D'+id);
  text('outputBadge',data.saidas_habilitadas===true?'SINALEIROS DE BANCADA':'SINALEIROS DESATIVADOS');
  each('[data-mode]',button=>button.classList.toggle('selected',button.dataset.mode===data.modo));
  each('[data-manual]',button=>button.disabled=data.modo!=='manual');el('modeReal').disabled=data.pt100_habilitado!==true;
  text('modeHelp',real?'Operação real: o ESP32 lê o PT100 e decide a sinalização. O CAD somente supervisiona.':(data.pt100_habilitado===true?'PT100 habilitado. A seleção de operação real é local.':'PT100 ainda não habilitado. Modo real bloqueado; a simulação do PC funciona sem PT100.'));
  text('testRemaining',['teste','automatico'].includes(data.modo)&&Number.isFinite(data.restante_ms)?'Etapa atual: '+(Math.max(0,data.restante_ms)/1000).toFixed(1)+' s restantes.':'Nenhum teste rápido em andamento.');
- text('remoteInfo',remote?(completeSimulation?'Simulação CAD ativa: temperatura, sinaleiros, purgadores e guilhotinas acompanham o CAD na tela. Relés físicos bloqueados.':simCurrent?'Temperatura simulada atual. Aguardando dados visuais de purgadores e guilhotinas do CAD.':expired?'Simulação CAD expirada. Sinaleiros apagados e teste CAD desarmado.':'Simulação CAD selecionada. Aguardando temperatura e estados virtuais atuais do PC.'):'Simulação CAD não selecionada.');
+ text('remoteInfo',remote?(completeSimulation?'Simulação CAD ativa: luzes e relés de LEDs acompanham o CAD após autorização LOCAL da bancada.':simCurrent?'Temperatura simulada atual. Aguardando dados visuais de purgadores e guilhotinas do CAD.':expired?'Simulação CAD expirada. Sinaleiros apagados e teste CAD desarmado.':'Simulação CAD selecionada. Aguardando temperatura e estados virtuais atuais do PC.'):'Simulação CAD não selecionada.');
  text('wifiStatus',data.wifi_tentando?'Conectando...':(data.wifi_conectado?'Conectado':'Não conectado'));text('wifiSummary',data.wifi_tentando?'CONECTANDO':(data.wifi_conectado?'CONECTADO':'SEM REDE'));
  text('wifiIp',data.wifi_conectado?data.wifi_ip:'Use 192.168.4.1');text('wifiSsid',data.wifi_ssid||'Não configurada');text('wifiMessage',data.wifi_mensagem||'');el('connectWifi').disabled=data.wifi_tentando===true;
  text('firmware',data.firmware||'ESP32 · IHM local');renderPurge(data.purgadores,id,real,data.modo==='parado'||(data.modo==='real'&&sensorValid&&readable),{current:simCurrent,complete:completeSimulation,valves:data.purgadores_visuais||data.purgadores_simulados});lastContact=Date.now();
@@ -821,94 +821,63 @@ async function purge(channel,action){const params={canal:String(channel),valor:a
 <script>
 (function(){
 'use strict';
-const el=(id)=>document.getElementById(id);
-const virtual={carga:'fechada',descarga:'fechada'};
-let canLocalPulse=false,busy=false;
-function showVirtual(gate){
- const s=virtual[gate],label=s==='aberta'?'ABERTA - SIMULADA':'FECHADA - SIMULADA';
- const visual=el('cg-visual-'+gate);if(!visual)return;
- visual.dataset.virtual=s;
- visual.setAttribute('aria-label','Guilhotina de '+gate+' '+label.toLowerCase());
- el('cg-virtual-'+gate).textContent=label;
-}
+const el=id=>document.getElementById(id);
+const set=(id,value)=>{const node=el(id);if(node)node.textContent=String(value)};
+const led=(id,on)=>{const node=el(id);if(node)node.dataset.on=String(Boolean(on))};
+let sending=false;
 window.cgdGatePanelUpdate=function(data){
- if(!el('cg-io-status'))return;
- const g=data&&data.guilhotinas?data.guilhotinas:{};
- const cad=data&&data.modo==='simulacao'&&data.simulacao_cad_atual===true&&data.estado_simulacao_disponivel===true;
- const mirrored=data?.guilhotinas_simuladas||{};
- const stage = cad ? (data.etapa_mecanica||'PARADO') : 'PARADO';
- const motor = Boolean(cad && data.motor_digestor_simulado===true && stage==='COZIMENTO');
- el('cg-motor-led').dataset.on=String(motor);
- el('cg-motor-state').textContent=motor?'LIGADO — SIMULADO':'PARADO — SIMULADO';
- for(const id of ['camisa','eixo']){
-   const opened=Boolean(cad && motor && data.empurradores_simulados?.[id]==='ABERTO');
-   el('cg-pusher-'+id).dataset.open=String(opened);
-   el('cg-pusher-'+id).setAttribute('aria-label','Empurrador '+id+(opened?' aberto':' fechado')+' — apenas visual');
-   el('cg-pusher-'+id+'-state').textContent=opened?'ABERTO — SIMULADO':'FECHADO — SIMULADO';
+ const cad=Boolean(data&&data.modo==='simulacao'&&data.simulacao_cad_atual&&data.estado_simulacao_disponivel);
+ const bench=data?.bancada_reles||{};
+ const active=Boolean(cad&&bench.armada&&bench.chave_local_ativa);
+ const motor=Boolean(cad&&data.motor_digestor_simulado&&data.etapa_mecanica==='COZIMENTO');
+ led('cg-motor-led',motor);
+ set('cg-motor-state',motor?'LIGADO · SIMULADO':'PARADO · SIMULADO');
+ led('p1led',active&&bench.camisa);led('p2led',active&&bench.eixo);
+ for(const gate of ['carga','descarga']){
+   const opened=Boolean(cad&&data.guilhotinas_simuladas?.[gate]==='ABERTA');
+   const vis=el('cg-visual-'+gate);
+   if(vis){vis.dataset.virtual=opened?'aberta':'fechada';vis.setAttribute('aria-label','Guilhotina de '+gate+(opened?' aberta':' fechada')+' virtual');}
+   set('cg-virtual-'+gate,opened?'ABERTA · SIMULADA':'FECHADA · SIMULADA');
+   set('cg-time-'+gate,String(data?.tempo_estado_guilhotinas_s?.[gate]||0)+' s');
+   led('cg-led-'+gate,active&&(gate==='carga'?bench.carga_aberta:bench.descarga_aberta));
  }
- if(cad){
-  virtual.carga=mirrored.carga==='ABERTA'?'aberta':'fechada';
-  virtual.descarga=mirrored.descarga==='ABERTA'?'aberta':'fechada';
- }else if(!data||data.modo!=='parado'){
-  // Qualquer troca para REAL/MANUAL ou expiração da simulação limpa o estado
-  // virtual: jamais representar uma posição física com bit do CAD antigo.
-  virtual.carga='fechada'; virtual.descarga='fechada';
- }
- showVirtual('carga');showVirtual('descarga');
- document.querySelectorAll('#cgdgate [data-cg-virtual]').forEach(b=>{b.disabled=Boolean(cad);});
- el('cg-feedback').textContent=cad?
-  'Recebendo CAD: '+(data.etapa_mecanica||'PARADO')+' · movimento visual, sem relés físicos.':
-  (data?.modo==='simulacao'?'CAD sem pacote válido ou expirado. Guilhotinas virtuais fechadas.':
-   'Simulação local independente do modo real; nenhuma posição física confirmada.');
- const configured=g.saidas_habilitadas===true;
- const key=g.chave_local_ativa===true;
- const stopped=data&&data.modo==='parado';
- canLocalPulse=!!data&&configured&&key&&stopped&&!busy;
- el('cg-digestor').textContent=data?.digestor||'1';
- el('cg-fw').textContent=data?.firmware||'Sem contato';
- el('cg-mode').textContent=data?.modo||'Sem contato';
- el('cg-key').textContent=!data?'Sem contato':key?'LOCAL HABILITADA':'DESLIGADA';
- el('cg-last').textContent=g.ultimo_comando_local||'Nenhum';
- const output=el('cg-io-status');
- const reasons=[];
- if(!data)reasons.push('ESP32 desconectado');
- else{
-  if(!configured)reasons.push('Saidas GPIO bloqueadas no firmware');
-  if(!key)reasons.push('Chave local GPIO27 nao habilitada');
-  if(!stopped)reasons.push('Modo diferente de PARADO');
- }
- output.textContent=reasons.length?'PULSOS FISICOS BLOQUEADOS: '+reasons.join('; ')+'.':
-  (g.pulso_ativo?'PULSO LOCAL ATIVO - sem retorno de posicao':'Teste local habilitado, aguardando comando. Nenhum fim de curso informado.');
- output.className='cg-state '+(reasons.length?'cg-alert':'cg-ok');
- document.querySelectorAll('#cgdgate [data-cg-real]').forEach(b=>{b.disabled=!canLocalPulse;});
+ const arm=el('benchArm'),stop=el('benchStop');
+ if(arm)arm.disabled=sending||!cad||!bench.chave_local_ativa||active;
+ if(stop)stop.disabled=sending||!active;
+ set('benchStatus',!data?'SEM CONTATO COM ESP32':active?
+   'RELÉS LEDS ARMADOS · '+(bench.habilitacao_restante_s||0)+' s até desarmar automaticamente':
+   cad?(bench.chave_local_ativa?'CAD atual · aguarda arme local dos LEDs':'CAD atual · feche chave GPIO27-GND'):
+   'Relés de LEDs desarmados · aguardando simulação válida');
+ set('cg-gates-summary',active?'LEDS ATIVOS':'LEDS DESARMADOS');
+ set('cg-digestor',data?.digestor||'1');
+ set('cg-fw',data?.firmware||'Sem contato');
+ set('cg-mode',data?.modo||'Sem contato');
+ set('cg-key',bench.chave_local_ativa?'JUMPER ATIVO':'JUMPER AUSENTE');
+ set('cg-last','Somente LEDS de bancada');
+ set('cg-io-status',!data?'Sem contato com ESP32':active?
+   'GPIO25/26 alternando nos purgadores; pares GPIO32/33 e GPIO16/17 indicando guilhotinas.':
+   'Nenhum relé da bancada autorizado; saídas em estado de desligamento.');
+ set('cg-feedback',cad?'Etapa CAD: '+(data.etapa_mecanica||'PARADO')+' · movimento virtual, sem fim de curso.':
+  'Simulação CAD sem estado atual. Os indicadores não confirmam movimento físico.');
 };
-document.querySelectorAll('#cgdgate [data-cg-virtual]').forEach(b=>{
- b.addEventListener('click',()=>{
-  const [gate,action]=b.dataset.cgVirtual.split(':');
-  virtual[gate]=action==='abrir'?'aberta':'fechada';
-  showVirtual(gate);
-  el('cg-feedback').textContent='Movimento '+(action==='abrir'?'de abertura':'de fechamento')+' da guilhotina de '+gate+' SIMULADO SOMENTE NA TELA. Nenhum GPIO foi energizado.';
- });
-});
-document.querySelectorAll('#cgdgate [data-cg-real]').forEach(b=>{
- b.addEventListener('click',async()=>{
-  if(!canLocalPulse||busy)return;
-  const [gate,action]=b.dataset.cgReal.split(':');
-  if(!confirm('TESTE ELETRICO LOCAL: equipamento PARADO, area isolada, relés e solenóides validados?'))return;
-  busy=true;window.cgdGatePanelUpdate?.(null);
-  try{
-   const r=await fetch('/api/guilhotinas',{method:'POST',cache:'no-store',
-    headers:{'X-CGD-Local':'true','Content-Type':'application/x-www-form-urlencoded'},
-    body:new URLSearchParams({guilhotina:gate,acao:action})});
-   const body=await r.text();
-   el('cg-feedback').textContent=r.ok?
-     'Pulso solicitado ao controlador. A posicao mecanica da guilhotina NAO foi confirmada.':
-     'Comando nao executado: '+body.slice(0,220);
-  }catch(e){el('cg-feedback').textContent='Falha de comunicacao: '+e.message;}
-  finally{busy=false;el('cg-io-status').textContent='Atualize o estado para conferir autorizacoes e ultimo comando.';}
- });
-});
-Object.keys(virtual).forEach(showVirtual);
+async function bench(action){
+ if(sending)return;
+ if(action==='armar'&&!confirm('CONFIRMAÇÃO DE BANCADA: apenas relés com lâmpadas de baixa tensão, nenhum cilindro ou solenóide industrial conectado?'))return;
+ sending=true;
+ const arm=el('benchArm'),stop=el('benchStop');
+ if(arm)arm.disabled=true;if(stop)stop.disabled=true;
+ try{
+   const response=await fetch('/api/bancada/reles',{method:'POST',credentials:'same-origin',cache:'no-store',
+     headers:{'X-CGD-Local':'true','Content-Type':'application/x-www-form-urlencoded'},
+     body:new URLSearchParams({valor:action})});
+   const body=await response.text();
+   set('benchMessage',response.ok?(action==='armar'?'Bancada armada para LEDs. Acompanhe os estados acima.':'Todos os canais de LED desarmados.'):
+     'Falha na autorização: '+body.slice(0,210));
+ }catch(e){set('benchMessage','Não foi possível comunicar com a bancada: '+e.message)}
+ finally{sending=false}
+}
+el('benchArm')?.addEventListener('click',()=>bench('armar'));
+el('benchStop')?.addEventListener('click',()=>bench('parar'));
 })();
 </script>
 </body></html>)LOCALHTML";
@@ -1543,7 +1512,9 @@ void enviarEstado() {
       const bool cadArmed = cadPurgeTest.armed(i);
       entry["ativo"] = cadArmed ? cadPurgeTest.current() : state.active;
       entry["aberto"] = cadArmed ? cadPurgeTest.requestedOpen(i) : state.open;
-      entry["comando_aberto"] = cadArmed ? cadPurgeTest.requestedOpen(i) : (purgeOutputs.armed(i) && state.open);
+      entry["comando_aberto"] = modo==REMOTO_BANCADA ?
+        (benchRelaysArmed && s.cadCurrent && s.pusherDisplayOpen[i]) :
+        (cadArmed ? cadPurgeTest.requestedOpen(i) : (purgeOutputs.armed(i) && state.open));
       entry["restante_ms"] = state.remainingMs; entry["armado_teste_cad"] = cadArmed;
       entry["saida_fisica_habilitada"] = purgeOutputs.configured(); entry["armado_real"] = purgeOutputs.armed(i);
       entry["armado"] = purgeOutputs.armed(i);
