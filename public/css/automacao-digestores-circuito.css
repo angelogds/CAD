@@ -113,3 +113,6 @@
 
 #digestores-circuito-panel .circuito-upper-gate-led{fill:#9aa3ad;stroke:#57616d;stroke-width:1.5}
 #digestores-circuito-panel [data-circuito-equipment^="gate"][data-gate-state="open"] .circuito-upper-gate-led{fill:#22c55e;stroke:#0f7b3e;filter:drop-shadow(0 0 5px #22c55e)}
+
+/* 3D sem nomes flutuantes: preserva o inspetor e as âncoras internas. */
+#digestores-circuito-panel .auto-scene-labels{display:none !important;pointer-events:none}
