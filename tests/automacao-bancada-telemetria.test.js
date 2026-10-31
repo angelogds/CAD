@@ -19,6 +19,24 @@ async function withApp(fn){
 }
 const d1=()=>tel.status().digestores[0];
 
+test('V12 desarmada publica PARADO sem temperatura, mantendo telemetria coerente em SIM e REAL',async()=>{
+  const token=devices.issueToken('ESP32-DIGESTOR-01',1,1).token;
+  await withApp(async(post)=>{
+    for(const origem of ['SIMULACAO','REAL']){
+      const payload={digestor_id:1,origem,fase:'PARADO',fase_aplicada:'PARADO',
+        sensor_tipo:origem==='REAL'?'PT100':null,sensor_status:'SEM_SINAL',temperatura_c:null,
+        faixa_temperatura:'SENSOR_INDISPONIVEL',cor_sinaleiro:'DESLIGADO',pronto_descarga:false,
+        estado_simulacao_disponivel:false,simulacao_cad_atual:false,aquecimento_simulado:false,
+        purgadores_simulados:{camisa:'FECHADO',eixo:'FECHADO'},firmware:'temperatura-v12-bancada-reles-leds-r2'};
+      const response=await post('/estado',token,payload);
+      assert.equal(response.status,200,await response.text());
+      assert.equal(d1().temperatura_c,null);
+      assert.equal(d1().pronto_descarga,false);
+      assert.equal(d1().estado_simulacao_disponivel,false);
+    }
+  });
+});
+
 test('token invalido, ausente e de outro digestor são rejeitados em ping, estado e sinaleiro',async()=>{
   const t1=devices.issueToken('ESP32-DIGESTOR-01',1,1).token;
   await withApp(async(post)=>{

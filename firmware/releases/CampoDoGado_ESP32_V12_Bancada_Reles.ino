@@ -1096,7 +1096,7 @@ constexpr uint8_t RELE_LIGA = LOW, RELE_DESLIGA = HIGH;
 constexpr uint32_t DURACAO_FASE_MS = 5000;
 constexpr uint32_t VALIDADE_MAXIMA_REMOTA_MS = 6500;
 const char *CAD_BASE = "https://manutencao.campodogado.app.br/api/automacao/device";
-const char *CAD_FIRMWARE = "temperatura-v12-bancada-reles-leds";
+const char *CAD_FIRMWARE = "temperatura-v12-bancada-reles-leds-r2";
 const char *CERTIFICADOS_CAD = R"CGCERT(
 -----BEGIN CERTIFICATE-----
 MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
@@ -1477,18 +1477,22 @@ int fazerPostCAD(const String &rota, const String &token, const String &json, St
   http.end(); return code;
 }
 String payloadTelemetria(const LocalSnapshot &s) {
+  LocalSnapshot published=s;
+  if(s.mode!=REMOTO_BANCADA||!s.bench.mirroring){
+    published.signal=cgd::unavailable(cgd::SensorStatus::SEM_SINAL);
+    published.cadCurrent=published.cadComplete=published.heating=false;
+  }
   JsonDocument doc; doc["device_id"] = deviceId(); doc["digestor_id"] = DIGESTOR_ID;
-  doc["fase"] = cgd::phase(s.signal);
-  if (s.mode != MANUAL) doc["fase_aplicada"] = cgd::phase(s.signal);
+  doc["fase"] = cgd::phase(published.signal);
+  if (s.mode != MANUAL) doc["fase_aplicada"] = cgd::phase(published.signal);
   if (s.mode == REMOTO_BANCADA) {
     doc["fase_recebida"] = s.receivedPhase == 0 ? "INICIO" :
       (s.receivedPhase == 1 ? "MEIO" : (s.receivedPhase == 2 ? "FINAL" : "PARADO"));
     if (s.version >= 0) doc["versao_fase"] = s.version;
   }
-  if (s.mode == MANUAL) {
-    LocalSnapshot stopped = s; stopped.signal = cgd::unavailable(cgd::SensorStatus::SEM_SENSOR);
-    preencherSinal(doc, stopped);
-  } else preencherSinal(doc, s);
+  // Supervisao publica PARADO/SEM_SINAL quando os GPIOs nao espelham o CAD.
+  // A leitura e a previa virtual locais continuam no snapshot original da IHM.
+  preencherSinal(doc,published);
   doc["firmware"] = CAD_FIRMWARE; doc["uptime_s"] = millis() / 1000;
   doc["wifi_rssi"] = WiFi.RSSI();
   // GPIO comandado não comprova retorno elétrico: nunca enviar saida_confirmada.

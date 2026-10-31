@@ -1,4 +1,6 @@
-# ESP32 V12 — ensaio de relés e LEDs na bancada
+# ESP32 V12 revisão 2 — ensaio de relés e LEDs na bancada
+
+Identificador desta revisão na IHM: `temperatura-v12-bancada-reles-leds-r2`. A atualização do site não grava o firmware na placa: carregar o novo `.ino` continua sendo uma etapa local da bancada.
 
 Projeto Campo do Gado · 2A Automação Industrial. Esta versão destina-se **exclusivamente a relés que acendem lâmpadas de teste**, desacoplados de máquinas, cilindros, válvulas pneumáticas, vapor e circuitos de produção. **Não instalar no chão de fábrica.**
 
