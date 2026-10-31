@@ -1,6 +1,7 @@
 const { normalizeRole, ACCESS } = require('../../config/rbac');
 const service = require('./automacao.service');
 const crypto = require('node:crypto');
+const ciclos = require('./ciclos.service');
 
 function index(req, res) {
   const role = normalizeRole(req.session && req.session.user && req.session.user.role);
@@ -85,4 +86,22 @@ function simuladorDigestores(req, res) {
   });
 }
 
-module.exports = { index, digestores, decanters, prensas, simuladorPrensas, simuladorDigestores, simuladorDecanters };
+function ciclosDigestores(req,res) {
+  const role = normalizeRole(req.session && req.session.user && req.session.user.role);
+  const podeRegistrar = ACCESS.automacao_decanters_simulate.includes(role);
+  if (podeRegistrar && !req.session.automacaoCiclosCsrf) req.session.automacaoCiclosCsrf = crypto.randomBytes(32).toString('hex');
+  res.setHeader('Cache-Control','no-store');
+  try {
+    const origem=req.query?.origem === 'SIMULACAO' ? 'SIMULACAO' : 'REAL_MANUAL';
+    const filtros={origem,de:req.query?.de||'',ate:req.query?.ate||'',digestor_id:req.query?.digestor_id||'',
+      colaborador_id:origem==='REAL_MANUAL'?req.query?.colaborador_id||'':''};
+    const relatorio=ciclos.list(filtros);
+    return res.render('automacao/digestores-ciclos',{
+      title:'2A Automação · Ciclos dos Digestores',activeMenu:'automacao',
+      configuracaoAdmin:role==='ADMIN',podeRegistrar,
+      ciclosCsrf:podeRegistrar?req.session.automacaoCiclosCsrf:'',
+      funcionarios:ciclos.getColaboradores(),relatorio,filtros
+    });
+  }catch(error){return res.status(error.status||500).send(error.message||'Falha ao consultar ciclos.');}
+}
+module.exports = { index, digestores, decanters, prensas, simuladorPrensas, simuladorDigestores, simuladorDecanters, ciclosDigestores };
