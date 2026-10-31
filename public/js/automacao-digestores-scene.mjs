@@ -51,6 +51,8 @@ export function createDigestorScene({ makeLabel } = {}) {
     parent.add(object);
     return register(key, object);
   }
+  // Os rotulos continuam registrados para o inspetor e testes antigos,
+  // mas a camada visual de etiquetas é oculta no CSS desta cena.
   function label(text, position, width, key) {
     if (!makeLabel) return;
     const object = makeLabel(text, width);
@@ -221,7 +223,10 @@ export function createDigestorScene({ makeLabel } = {}) {
     cylinder(gate, 0.14, 0.55, [0.65, 0.74, 0.4], red);
     cylinder(gate, 0.035, 0.65, [0.65, 0.22, 0.4], light);
     const stemLink = box(gate, [0.69, 0.08, 0.09], [0.32, 0.45, 0.4], dark);
-    gates.push({ key: gateKey, mesh: gate, slide, stemLink, closedY: 0.18, travel: 0.6, index });
+    const ledMat=material(0x555d68,{emissive:0x000000,emissiveIntensity:0});
+    const led=mesh(gate,new THREE.SphereGeometry(0.13,16,12),ledMat,[0.66,1.08,0.44]);
+    led.name='indicador-abertura-guilhotina-superior';
+    gates.push({ key: gateKey, mesh: gate, slide, stemLink, led, closedY: 0.18, travel: 0.6, index });
     gate.userData.positionStatus = 'SEM_SINAL';
     label('D' + (index + 1), [x, 5.2, 2.15], 1.5, key);
     label('GUILHOTINA D' + (index + 1), [x, 6.2, 1.1], 2.3, gateKey);
@@ -327,6 +332,10 @@ export function createDigestorScene({ makeLabel } = {}) {
       gate.slide.position.y = gate.closedY + opening;
       gate.stemLink.position.y = 0.45 + opening;
       gate.mesh.userData.positionStatus = known ? snapshot.gates[gate.index] ? 'ABERTA_SIMULADA' : 'FECHADA_SIMULADA' : 'SEM_SINAL';
+      const lit=known&&snapshot.gates[gate.index]===true;
+      gate.led.material.color.setHex(lit?0x22c55e:0x555d68);
+      gate.led.material.emissive.setHex(lit?0x22c55e:0x000000);
+      gate.led.material.emissiveIntensity=lit?1.8:0;
     }
     for (const gate of dischargeGates) {
       const known = sim && typeof snapshot.dischargeGates?.[gate.index] === 'boolean';

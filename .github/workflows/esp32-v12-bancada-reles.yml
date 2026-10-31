@@ -1,0 +1,25 @@
+name: ESP32 V12 - reles LED bancada - compilacao
+on:
+  pull_request:
+    paths:
+      - 'firmware/releases/CampoDoGado_ESP32_V12_Bancada_Reles.ino'
+      - '.github/workflows/esp32-v12-bancada-reles.yml'
+  workflow_dispatch:
+jobs:
+  compile:
+    name: Compila ESP32 Dev Module - 3.3.12
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Instalar core ESP32 e biblioteca ArduinoJson
+        run: |
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli lib install "ArduinoJson@7.4.3"
+      - name: Verificar sketch unico sem headers externos
+        run: |
+          mkdir -p /tmp/CampoDoGado_ESP32_V12_Bancada_Reles
+          cp firmware/releases/CampoDoGado_ESP32_V12_Bancada_Reles.ino /tmp/CampoDoGado_ESP32_V12_Bancada_Reles/
+          arduino-cli compile --fqbn esp32:esp32:esp32 /tmp/CampoDoGado_ESP32_V12_Bancada_Reles --warnings all
