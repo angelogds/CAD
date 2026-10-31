@@ -35,12 +35,11 @@
 // PT100, todas as cargas e tipo de distribuidora pneumática. Não há driver físico.
 // Solenoide com DUAS BOBINAS não deve ser tratada como monoestável sem ensaio.
 // Nenhuma rotina usa estes pinos enquanto o projeto executivo não for aprovado.
-#define CGD_ENABLE_MATERIAL_GATE_OUTPUTS 0
+#define CGD_ENABLE_MATERIAL_GATE_OUTPUTS 1 // Somente LEDs de bancada, NÃO válvulas
 #define CGD_GATE_FEED_CANDIDATE_GPIO 32
 #define CGD_GATE_DISCHARGE_CANDIDATE_GPIO 33
 
-#undef CGD_ENABLE_MATERIAL_GATE_OUTPUTS
-#define CGD_ENABLE_MATERIAL_GATE_OUTPUTS 0  // HABILITACAO EXPLICITA APOS VALIDACAO DE BANCADA
+// Saidas condicionadas a chave GPIO27 e arme WEB local não persistido.
 #define CGD_GATE_FEED_OPEN_GPIO 32
 #define CGD_GATE_FEED_CLOSE_GPIO 33
 #define CGD_GATE_DISCHARGE_OPEN_GPIO 16
@@ -952,7 +951,15 @@ class CgdGatePulse {
     if(uint32_t(now-start)>=CGD_GATE_PULSE_MS){stop();return;}
     for(uint8_t i=0;i<N;i++)if(i!=uint8_t(selected))digitalWrite(p[i],offLevel());
     digitalWrite(p[uint8_t(selected)],CGD_GATE_RELAY_ACTIVE_LEVEL);
+  }  // Quatro relés exclusivamente para lampadas de indicacao; dois pares exclusivos.
+  void benchSet(bool allow,bool loadOpen,bool dischargeOpen){
+    if(!configured()||!allow||!keyOn()){stop();return;}
+    selected=-1;
+    for(uint8_t i=0;i<N;i++)digitalWrite(p[i],offLevel());
+    digitalWrite(p[loadOpen?0:1],CGD_GATE_RELAY_ACTIVE_LEVEL);
+    digitalWrite(p[dischargeOpen?2:3],CGD_GATE_RELAY_ACTIVE_LEVEL);
   }
+
   void forceOff(){
     if(!configured())return;
     for(uint8_t i=0;i<N;i++)digitalWrite(p[i],offLevel());
@@ -1122,6 +1129,11 @@ struct LocalSnapshot {
 cgd::PurgeTimer purgadores[2] = { cgd::PurgeTimer(5, 60), cgd::PurgeTimer(10, 60) };
 PurgeOutputs purgeOutputs;
 cgd::CadPurgeTest cadPurgeTest;
+bool benchRelaysArmed=false; // VOLATIL, nao persistir
+uint32_t benchArmedAt=0;
+constexpr uint32_t BENCH_MAX_ARM_MS=600000U;
+uint32_t gateChangedAt[2]={0,0};
+bool gatePrevOpen[2]={false,false};
 Pt100Reader pt100;
 bool pt100Configurado = false;
 
