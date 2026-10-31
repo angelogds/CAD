@@ -3,9 +3,9 @@
 <link rel="stylesheet" href="/css/automacao.css?v=20261026-sync-esp-1">
 <link rel="stylesheet" href="/css/automacao-simulador.css?v=20261026-sync-esp-1">
 <link rel="stylesheet" href="/css/automacao-digestores-circuito.css?v=20261030-integrado2">
-<main class="auto-page auto-hmi auto-2a" id="sim-digestores">
+<main class="auto-page auto-hmi auto-2a" id="sim-digestores" data-ciclos-csrf="<%= typeof csrfCiclos!=='undefined'?csrfCiclos:'' %>">
   <%- include('partials/brand') %>
-  <div class="auto-actions-top"><a class="auto-back-link" href="<%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? '/automacao' : '/automacao/digestores' %>">← <%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? 'Voltar à automação' : 'Voltar aos Digestores' %></a></div>
+  <div class="auto-actions-top"><a href="/automacao/digestores/ciclos" class="auto-simulator-link">Histórico e relatórios dos ciclos</a> <a class="auto-back-link" href="<%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? '/automacao' : '/automacao/digestores' %>">← <%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? 'Voltar à automação' : 'Voltar aos Digestores' %></a></div>
   <header class="auto-hero">
     <div><span class="auto-eyebrow">AUTOMAÇÃO • DIGESTORES • MODO DEMONSTRAÇÃO</span>
       <h1>Simulador dos Digestores</h1>
@@ -122,6 +122,7 @@
       </article>
     <% } %>
   </section>
+  <p id="sim-cycles-storage-status" role="status" aria-live="polite">Ciclos virtuais concluídos serão gravados em relatório separado. Não representam produção real.</p>
   <section class="sim-events-panel" aria-label="Histórico dos eventos simulados">
     <div class="sim-events-title">
       <div><h2>Histórico da simulação</h2><p>Carregamentos, partidas, mudanças de fase e inversões dos purgadores.</p></div>
@@ -146,3 +147,4 @@
 <script src="/js/automacao-digestores-circuito-core.js?v=20261030-integrado2" defer></script>
 <script src="/js/automacao-digestores-circuito.js?v=20261030-integrado2" defer></script>
 <script type="module" src="/js/automacao-digestores-3d.mjs?v=20261030-integrado2"></script>
+<% if (typeof csrfCiclos !== 'undefined' && csrfCiclos) { %><script src="/js/automacao-digestores-ciclos-simulacao.js?v=20261030-ciclos1" defer></script><% } %>
