@@ -1,0 +1,13 @@
+<% const circuitoPodeControlar = typeof controls !== 'undefined' && controls === true; %>
+  <% if (circuitoPodeControlar) { %>
+  <details class="circuito-demo-controls">
+    <summary>Demonstração mecânica local</summary>
+    <div class="circuito-demo-body">
+      <p>Teste mecânico independente, sem espelhamento no ESP32. Para o ciclo completo, use Iniciar no painel principal.</p>
+      <div class="circuito-demo-settings"><label for="digestores-circuito-selection">Digestores da demonstração<select id="digestores-circuito-selection"><option value="D1">Digestor 1</option><option value="D2">Digestor 2</option><option value="D3">Digestor 3</option><option value="D4">Digestor 4</option><option value="TODOS" selected>Todos · um por vez</option></select></label><label for="digestores-circuito-speed">Velocidade virtual<select id="digestores-circuito-speed"><option value="1">1×</option><option value="3" selected>3×</option><option value="8">8×</option></select></label></div>
+      <div class="circuito-demo-actions"><button type="button" data-circuito-action="start" class="circuito-primary">Iniciar demonstração</button><button type="button" data-circuito-action="pause" disabled>Pausar</button><button type="button" data-circuito-action="stop" disabled>Parar demonstração</button><button type="button" data-circuito-action="live">Voltar à supervisão</button></div>
+      <p class="circuito-feedback" data-circuito-role="feedback" role="status" aria-live="polite">Aguardando início da demonstração local.</p>
+      <small>Tempos e volumes ilustrativos.</small>
+    </div>
+  </details>
+  <% } %>

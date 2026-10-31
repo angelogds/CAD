@@ -58,7 +58,8 @@ test('CAD separa comandar relé de espelhar motor, empurradores e guilhotinas',(
  assert.match(r,/motor_digestor_simulado:isCooking/);
  assert.match(r,/purgadores_simulados:\{camisa,eixo\}/);
  const cad=contents('views/automacao/simulador-digestores.ejs');
- assert.match(cad,/Vincular simulações elétrica \+ mecânica|Integrado · elétrica \+ mecânica/);
+ assert.match(cad,/id="sim-link-circuits"[^>]*aria-pressed="true"/);
+ assert.match(cad,/Ciclo integrado/);
  assert.match(cad,/motor-virtual/);
 });
 test('ESP32 V11 nunca usa o espelho CAD para movimentar saidas fisicas',()=>{

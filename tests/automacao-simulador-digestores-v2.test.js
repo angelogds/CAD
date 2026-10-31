@@ -68,7 +68,7 @@ test('a IHM V2 apresenta torres e os dois purgadores em cada digestor', () => {
     assert.ok(view.includes(token), token);
   }
   assert.match(view, /id="sim-hardware-indicator"/);
-  assert.match(view, /NÃO alarmes reais/);
+  assert.match(view, /Somente LEDs de bancada/);
 });
 
 test('nenhum código do simulador abre comunicação com hardware', () => {

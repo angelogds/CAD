@@ -257,7 +257,7 @@
     integrationOn = !integrationOn;
     if (!integrationOn) { circuit()?.exitLinked(); integrationActive = false; }
     integrationButton.setAttribute('aria-pressed', String(integrationOn));
-    integrationButton.textContent = integrationOn ? '✓ Integrado · elétrica + mecânica' : 'Vincular simulações elétrica + mecânica';
+    integrationButton.textContent = integrationOn ? '✓ Ciclo integrado' : 'Ciclo independente';
     setLinkedStatus(integrationOn ? 'Integração ativada: clique em Iniciar simulação para percorrer o ciclo completo.' : 'Modo térmico independente: circuito mecânico desligado.');
     const mech = document.getElementById('digestores-circuito-selection');
     if (mech) mech.value = selection === 'all' ? 'TODOS' : 'D' + selection;
@@ -321,10 +321,10 @@
   presentation.addEventListener('click', () => {
     const showing = root.classList.toggle('sim-presenting');
     presentation.setAttribute('aria-pressed', String(showing));
-    presentation.textContent = showing ? '⤺ Sair da apresentação' : '⛶ Modo apresentação';
+    presentation.textContent = showing ? 'Sair da apresentação' : 'Apresentação';
     root.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   window.addEventListener('pagehide', stop, { once: true });
-  if (integrationButton) { integrationButton.setAttribute('aria-pressed', 'true'); integrationButton.textContent = '✓ Integrado · elétrica + mecânica'; }
+  if (integrationButton) { integrationButton.setAttribute('aria-pressed', 'true'); integrationButton.textContent = '✓ Ciclo integrado'; }
   applySelection();
 })();

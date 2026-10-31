@@ -80,7 +80,7 @@ test('a tela mostra etapas, botões, cronômetro e apresentação sem gráfico',
   for (const selector of selectors) assert.ok(view.includes(selector), selector);
   assert.doesNotMatch(view, /chart-line|sim-chart-panel/);
   assert.match(view, /id="sim-hardware-indicator"/);
-  assert.match(view, /NÃO alarmes reais/);
+  assert.match(view, /Somente LEDs de bancada/);
   assert.match(view, /for\(let id=1;id<=4;id\+\+\)/);
 });
 

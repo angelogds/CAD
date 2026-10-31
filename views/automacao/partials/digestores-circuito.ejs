@@ -1,15 +1,18 @@
 <% const circuitoPodeControlar = typeof controls !== 'undefined' && controls === true; %>
-<section id="digestores-circuito-panel" class="circuito-panel" data-controls="<%= circuitoPodeControlar %>" data-mode="LIVE" data-motion="true" data-running="false" aria-labelledby="digestores-circuito-heading">
+<% const circuitoCompacto = typeof compact !== 'undefined' && compact === true; %>
+<section id="digestores-circuito-panel" class="circuito-panel<%= circuitoCompacto ? ' circuito-compact' : '' %>" data-controls="<%= circuitoPodeControlar %>" data-mode="LIVE" data-motion="true" data-running="false" aria-labelledby="digestores-circuito-heading">
   <header class="circuito-heading">
-    <div><span class="circuito-eyebrow">2A · DIGESTORES</span><h2 id="digestores-circuito-heading">Circuito mecânico · maquete ilustrativa</h2><p>Quatro digestores elevados, alimentação comum e descarga frontal para a percoladora. Selecione um equipamento para consultar sua função.</p></div>
+    <div><% if (!circuitoCompacto) { %><span class="circuito-eyebrow">2A · DIGESTORES</span><% } %><h2 id="digestores-circuito-heading"><%= circuitoCompacto ? 'Circuito de demonstração' : 'Circuito mecânico · maquete ilustrativa' %></h2><% if (!circuitoCompacto) { %><p>Quatro digestores elevados, alimentação comum e descarga frontal para a percoladora. Selecione um equipamento para consultar sua função.</p><% } %></div>
     <span class="circuito-mode" data-circuito-role="mode">LIVE · sem sinal mecânico</span>
   </header>
+  <% if (!circuitoCompacto) { %>
   <div class="circuito-note"><strong>Leitura do circuito</strong><span>Posições, movimentos e volumes reais aguardam instrumentação. A temperatura e a bancada ESP32 continuam nos painéis próprios desta tela. Capacidades, tempos e frações da demonstração são ilustrativos.</span></div>
   <div class="circuito-toolbar" aria-label="Visualização do circuito">
     <div class="circuito-view-tabs"><button type="button" data-circuito-action="view-3d" aria-pressed="true">Cena 3D</button><button type="button" data-circuito-action="view-scheme" aria-pressed="false">Esquema técnico</button></div>
     <span id="digestores-circuito-3d-status" role="status" aria-live="polite">Preparando visualização 3D…</span>
     <div><button type="button" data-circuito-action="fit">Enquadrar circuito</button><button type="button" data-circuito-action="motion" aria-pressed="false">Pausar animação</button></div>
   </div>
+  <% } %>
   <div class="circuito-layout">
     <div class="circuito-visual">
       <div id="digestores-circuito-3d" class="circuito-3d" aria-label="Maquete 3D ilustrativa do circuito dos digestores"><p id="digestores-circuito-3d-loading" class="circuito-loading">Carregando maquete… O esquema abaixo permanece disponível.</p></div>
@@ -114,8 +117,9 @@
           </g>
         </svg>
       </div>
-      <p class="circuito-caption">Maquete sem escala. As setas mostram os caminhos do processo; movimento e preenchimento aparecem apenas na demonstração local.</p>
+      <% if (!circuitoCompacto) { %><p class="circuito-caption">Maquete sem escala. As setas mostram os caminhos do processo; movimento e preenchimento aparecem apenas na demonstração local.</p><% } %>
     </div>
+    <% if (circuitoCompacto) { %><details class="sim-circuit-inspector"><summary>Detalhes do equipamento selecionado</summary><% } %>
     <aside class="circuito-inspector" aria-labelledby="digestores-circuito-inspector-title">
       <span class="circuito-eyebrow">EQUIPAMENTO SELECIONADO</span>
       <h3 id="digestores-circuito-inspector-title" data-circuito-role="title">Circuito dos digestores</h3>
@@ -123,6 +127,7 @@
       <p data-circuito-role="description">Selecione um digestor, guilhotina ou equipamento auxiliar para ver os detalhes da maquete.</p>
       <dl data-circuito-role="rows"><div><dt>Origem</dt><dd>Representação ilustrativa</dd></div><div><dt>Acionamento real</dt><dd>Indisponível nesta tela</dd></div></dl>
     </aside>
+    <% if (circuitoCompacto) { %></details><% } %>
   </div>
   <div class="circuito-stats" aria-label="Estado da demonstração mecânica">
     <div><small>Etapa mecânica</small><strong data-circuito-role="phase">Sem sinal</strong></div>
@@ -130,16 +135,7 @@
     <div><small>Volume no tacho · ilustrativo</small><strong data-circuito-role="tacho">— L</strong><small data-circuito-role="tacho-level">SEM SINAL</small></div>
     <div><small>Transferido nesta sessão · ilustrativo</small><strong data-circuito-role="transferred">— L</strong></div>
   </div>
-  <% if (circuitoPodeControlar) { %>
-  <details class="circuito-demo-controls">
-    <summary>Demonstração mecânica local</summary>
-    <div class="circuito-demo-body">
-      <p>O ciclo independente percorre carga, mistura, descarga e transferência. No modo VINCULADO, aguarda o sinaleiro vermelho piscando (>120 °C) antes da descarga frontal virtual. Inicie quando desejar; esta demonstração não sincroniza comandos com o ESP32.</p>
-      <div class="circuito-demo-settings"><label for="digestores-circuito-selection">Digestores da demonstração<select id="digestores-circuito-selection"><option value="D1">Digestor 1</option><option value="D2">Digestor 2</option><option value="D3">Digestor 3</option><option value="D4">Digestor 4</option><option value="TODOS" selected>Todos · um por vez</option></select></label><label for="digestores-circuito-speed">Velocidade virtual<select id="digestores-circuito-speed"><option value="1">1×</option><option value="3" selected>3×</option><option value="8">8×</option></select></label></div>
-      <div class="circuito-demo-actions"><button type="button" data-circuito-action="start" class="circuito-primary">Iniciar demonstração</button><button type="button" data-circuito-action="pause" disabled>Pausar</button><button type="button" data-circuito-action="stop" disabled>Parar demonstração</button><button type="button" data-circuito-action="live">Voltar à supervisão</button></div>
-      <p class="circuito-feedback" data-circuito-role="feedback" role="status" aria-live="polite">Aguardando início da demonstração local.</p>
-      <small>Carga, tempo, capacidade e volume são exemplos da maquete. O total da sessão não representa produção medida.</small>
-    </div>
-  </details>
+  <% if (!circuitoCompacto) { %>
+  <%- include('digestores-circuito-demo', { controls: circuitoPodeControlar }) %>
   <% } %>
 </section>

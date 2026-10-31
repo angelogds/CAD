@@ -1,64 +1,58 @@
 <% layout('layout') %>
 <% const bancadaPermitida = typeof simuladorBancadaPermitida !== 'undefined' ? simuladorBancadaPermitida : (typeof simuladorBancadaAdmin !== 'undefined' && simuladorBancadaAdmin); %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261031-bancada-v12.1">
-<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261031-bancada-v12.1">
-<link rel="stylesheet" href="/css/automacao-digestores-circuito.css?v=20261031-bancada-v12.1">
+<link rel="stylesheet" href="/css/automacao.css?v=20261031-painel-compacto">
+<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261031-painel-compacto">
+<link rel="stylesheet" href="/css/automacao-digestores-circuito.css?v=20261031-painel-compacto">
 <main class="auto-page auto-hmi auto-2a" id="sim-digestores" data-ciclos-csrf="<%= typeof csrfCiclos!=='undefined'?csrfCiclos:'' %>">
   <%- include('partials/brand') %>
-  <div class="auto-actions-top"><a href="/automacao/digestores/ciclos" class="auto-simulator-link">Histórico e relatórios dos ciclos</a> <a class="auto-back-link" href="<%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? '/automacao' : '/automacao/digestores' %>">← <%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? 'Voltar à automação' : 'Voltar aos Digestores' %></a></div>
-  <header class="auto-hero">
-    <div><span class="auto-eyebrow">AUTOMAÇÃO • DIGESTORES • MODO DEMONSTRAÇÃO</span>
+  <section class="sim-controls-top sim-command-panel" id="sim-circuit-controls" aria-label="Controles do simulador">
+    <div class="sim-command-heading">
       <h1>Simulador dos Digestores</h1>
-      <p>Ciclo completo: alimentação, guilhotinas, aquecimento, purgadores, descarga e percoladora em uma simulação.</p>
-    </div><span class="auto-state waiting" id="sim-hardware-indicator" aria-live="polite"><%= bancadaPermitida ? 'SIMULAÇÃO • VERIFICANDO ESP32' : 'SIMULAÇÃO • VISUAL' %></span>
-  </header>
-  <section class="auto-alert" role="status"><strong>Simulação de bancada</strong><span>Temperatura gerada no CAD, sem PT100. Faixas de simulação, NÃO alarmes reais. Relés de LED podem acompanhar o ciclo com autorização local no ESP32. Somente bancada isolada: não conectar solenóides, cilindros ou outras cargas industriais.</span></section>
-  <div class="sim-controls-top" aria-label="Controles da simulação">
-  <% if (bancadaPermitida) { %>
-  <section class="sim-bancada-online" aria-label="Sincronização do simulador com a bancada">
-    <div><strong>Conexão CAD ↔ ESP32 · bancada dos digestores</strong>
-    <p>Ao iniciar a simulação, o CAD sincroniza temperatura, sinaleiros, purgadores e guilhotinas com o ESP32 autorizado. O estado do relé não confirma posição física.</p></div>
-    <div class="sim-remote-actions">
-      <label class="sim-remote-switch"><input type="checkbox" id="sim-auto-sync" checked> Sincronização automática ao iniciar</label>
-      <button type="button" id="sim-connect-esp32">Conectar / verificar ESP32</button>
-      <label class="sim-remote-switch"><input type="checkbox" id="sim-remote-enable" data-csrf="<%= csrfAutomacao %>"> Sincronização ativa</label>
+      <span class="auto-state waiting" id="sim-hardware-indicator" aria-live="polite"><%= bancadaPermitida ? 'Verificando ESP32…' : 'Simulação local' %></span>
+      <nav class="sim-command-links" aria-label="Navegação do simulador"><a class="auto-back-link" href="<%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? '/automacao' : '/automacao/digestores' %>">Voltar</a></nav>
     </div>
-    <small>Relés de LED acompanham o ciclo após selecionar Simulação CAD e habilitar a chave local GPIO27 na ESP32. Somente bancada; não conectar solenóides ou cilindros.</small>
-    <small id="sim-remote-status" role="status" aria-live="polite">Aguardando simulação; é possível verificar a conexão agora.</small>
-    <details class="sim-remote-details"><summary>Comunicação e estados dos ESP32</summary><div class="sim-remote-table-scroll"><table class="sim-remote-table" id="sim-remote-table" aria-label="Estado do ESP32 por digestor" style="width:100%;font-size:.85rem;margin-top:.5rem;border-collapse:collapse">
-      <thead><tr><th>Digestor</th><th>Modo ESP32</th><th>Temperatura · origem indicada</th><th>Faixa</th><th>Sinaleiro / pronto</th><th>Sensor</th><th>Fase enviada (CAD)</th><th>Recebida</th><th>Aplicada</th><th>Saída</th><th>Último contato</th><th>ESP32</th></tr></thead>
-      <tbody id="sim-remote-rows"><tr><td colspan="12">Carregando…</td></tr></tbody>
-    </table></div></details>
-    <small>“Aplicada” e “Saída” só aparecem se o firmware informar. A comunicação, a chave local e os intertravamentos da ESP32 condicionam o espelhamento nos relés de LED.</small>
-    <% if (typeof configuracaoAdmin !== 'undefined' && configuracaoAdmin) { %><p><a href="/automacao/configuracao">Configuração dos ESP32 e links para suas IHMs locais</a></p><% } else { %><p>Credenciais são configuradas pelo ADMIN. Para o teste da bancada, selecione SIMULAÇÃO na IHM local de cada ESP32 autorizado.</p><% } %>
-  </section>
-  <% } %>
-  <section class="sim-select-panel" aria-labelledby="sim-target-title">
-    <div>
-      <h2 id="sim-target-title">Quais digestores deseja simular?</h2>
-      <p>Escolha um digestor ou os quatro. A seleção controla quais ciclos serão iniciados nesta tela.</p>
+    <div class="sim-command-main">
+      <label class="sim-command-field" for="sim-select-digestor">Digestores<select id="sim-select-digestor"><option value="1">Digestor 1</option><option value="2">Digestor 2</option><option value="3">Digestor 3</option><option value="4">Digestor 4</option><option value="all" selected>Todos os quatro</option></select></label>
+      <div class="sim-command-buttons" role="group" aria-label="Comandos do ciclo">
+        <button type="button" id="sim-start" class="sim-command-primary"><span aria-hidden="true">▶</span> Iniciar</button>
+        <button type="button" id="sim-pause" disabled><span aria-hidden="true">Ⅱ</span> Pausar</button>
+        <button type="button" id="sim-reset"><span aria-hidden="true">↻</span> Reiniciar</button>
+      </div>
+      <% if (bancadaPermitida) { %>
+      <div class="sim-command-connection" role="group" aria-label="Conexão ESP32">
+        <button type="button" id="sim-connect-esp32">Conectar ESP32</button>
+        <label class="sim-command-switch"><input type="checkbox" id="sim-remote-enable" data-csrf="<%= csrfAutomacao %>"> Espelhar LEDs</label>
+      </div>
+      <% } %>
     </div>
-    <label for="sim-select-digestor">Equipamentos da simulação</label>
-    <select id="sim-select-digestor">
-      <option value="1">Digestor 1</option><option value="2">Digestor 2</option>
-      <option value="3">Digestor 3</option><option value="4">Digestor 4</option>
-      <option value="all" selected>Todos os quatro digestores</option>
-    </select>
-    <span id="sim-selection-status" role="status" aria-live="polite">Quatro digestores selecionados</span>
-    <p class="sim-select-warning">ADMIN, Supervisor ou Encarregado de Manutenção podem sincronizar temperatura e luzes. Os relés de LED da bancada acompanham a simulação com autorização local e intertravamentos. Sem controle de aquecimento, vapor ou cargas industriais.</p>
+    <div class="sim-command-secondary">
+      <% if (typeof simulacaoCircuitoPermitida !== 'undefined' && simulacaoCircuitoPermitida === true) { %><button type="button" id="sim-link-circuits" aria-pressed="true" title="Integra o ciclo térmico e mecânico da simulação">✓ Ciclo integrado</button><% } %>
+      <label class="sim-command-field sim-command-inline" for="sim-speed">Velocidade<select id="sim-speed"><option value="1">1×</option><option value="3" selected>3×</option><option value="8">8×</option></select></label>
+      <label class="sim-command-field sim-command-inline" for="sim-purge-seconds">Purgadores (s)<input id="sim-purge-seconds" type="number" min="1" max="300" step="1" value="30" inputmode="numeric"></label>
+      <div class="sim-view-buttons" role="group" aria-label="Visualização do circuito"><button type="button" data-circuito-action="view-3d" aria-pressed="true">Cena 3D</button><button type="button" data-circuito-action="view-scheme" aria-pressed="false">Esquema técnico</button></div>
+    </div>
+    <div class="sim-command-footer">
+    <details class="sim-command-details">
+      <summary>Ajustes e comunicação</summary>
+      <div class="sim-command-detail-body">
+        <div class="sim-extra-actions"><button type="button" data-circuito-action="fit">Enquadrar circuito</button><button type="button" data-circuito-action="motion" aria-pressed="false">Pausar animação</button><button type="button" id="sim-presentation" aria-pressed="false">Apresentação</button><a href="/automacao/digestores/ciclos">Histórico e relatórios dos ciclos</a></div>
+        <p><span id="sim-selection-status" role="status">Quatro digestores selecionados</span> · <span id="sim-integration-state" role="status">Ciclo integrado</span></p>
+        <p id="digestores-circuito-3d-status" role="status" aria-live="polite">Preparando visualização 3D…</p>
+        <% if (bancadaPermitida) { %>
+        <label class="sim-command-switch"><input type="checkbox" id="sim-auto-sync" checked> Conectar automaticamente ao iniciar</label>
+        <p id="sim-remote-status" role="status" aria-live="polite">Aguardando simulação.</p>
+        <div class="sim-remote-table-scroll"><table class="sim-remote-table" id="sim-remote-table" aria-label="Estado do ESP32 por digestor"><thead><tr><th>Digestor</th><th>Modo ESP32</th><th>Temperatura</th><th>Faixa</th><th>Sinaleiro</th><th>Sensor</th><th>Enviada</th><th>Recebida</th><th>Aplicada</th><th>Saída</th><th>Contato</th><th>ESP32</th></tr></thead><tbody id="sim-remote-rows"><tr><td colspan="12">Carregando…</td></tr></tbody></table></div>
+        <% if (typeof configuracaoAdmin !== 'undefined' && configuracaoAdmin) { %><p><a href="/automacao/configuracao">Configurar ESP32 e abrir IHM local</a></p><% } %>
+        <% } %>
+        <p class="sim-command-help">Somente LEDs de bancada. Selecione Simulação CAD e habilite GPIO27 na ESP32; não conectar solenóides ou cilindros. Pausar ou reiniciar envia PARADO; confirme na IHM. Após desarmar, selecione novamente Simulação CAD localmente.</p>
+        <p class="sim-command-help">Os tempos são virtuais e acompanham a velocidade. Ajuste os purgadores com o ciclo pausado.</p>
+        <%- include('partials/digestores-circuito-demo', { controls: typeof simulacaoCircuitoPermitida !== 'undefined' && simulacaoCircuitoPermitida === true }) %>
+      </div>
+    </details>
+    <span id="sim-clock" class="sim-command-clock" aria-live="polite">Tempo virtual: 00:00</span>
+    </div>
   </section>
-  <div class="sim-toolbar">
-    <% if (typeof simulacaoCircuitoPermitida !== 'undefined' && simulacaoCircuitoPermitida === true) { %><button type="button" id="sim-link-circuits" aria-pressed="true" title="Une os tempos térmicos e mecânicos apenas na maquete; não comanda descarga física">✓ Integrado · elétrica + mecânica</button><% } %>
-    <button type="button" id="sim-start">▶ Iniciar simulação</button>
-    <button type="button" id="sim-pause" disabled>Ⅱ Pausar</button>
-    <button type="button" id="sim-reset">↺ Reiniciar</button>
-    <button type="button" id="sim-presentation" aria-pressed="false">⛶ Modo apresentação</button>
-    <label for="sim-speed">Velocidade</label><select id="sim-speed"><option value="1">1×</option><option value="3" selected>3×</option><option value="8">8×</option></select>
-    <label class="sim-purge-setting" for="sim-purge-seconds">Alternância dos purgadores (s virtuais)<input id="sim-purge-seconds" type="number" min="1" max="300" step="1" value="30" inputmode="numeric"></label>
-    <span id="sim-clock" aria-live="polite">Tempo virtual: 00:00</span><small class="sim-speed-note">Exemplo: com 30 s virtuais e velocidade 3×, a troca ocorre a cada 10 s reais. Ajuste o intervalo com a simulação pausada.</small>
-  </div>
-  <small id="sim-integration-state" role="status" aria-live="polite">Circuito completo ativado: carga → cozimento → descarga → transporte → tacho (simulado).</small>
-  </div>
+  <%- include('partials/digestores-circuito', { controls: typeof simulacaoCircuitoPermitida !== 'undefined' && simulacaoCircuitoPermitida === true, compact: true }) %>
   <section class="sim-grid" aria-label="Quatro digestores simulados">
     <% for(let id=1;id<=4;id++){ %>
       <article class="sim-vessel-card" data-digestor="<%= id %>">
@@ -114,7 +108,6 @@
       </article>
     <% } %>
   </section>
-  <%- include('partials/digestores-circuito', { controls: typeof simulacaoCircuitoPermitida !== 'undefined' && simulacaoCircuitoPermitida === true }) %>
   <p id="sim-cycles-storage-status" role="status" aria-live="polite">Ciclos virtuais concluídos serão gravados em relatório separado. Não representam produção real.</p>
   <section class="sim-events-panel" aria-label="Histórico dos eventos simulados">
     <div class="sim-events-title">
@@ -129,15 +122,17 @@
     <ol id="sim-events-list" class="sim-events-list" aria-live="polite" aria-relevant="additions text"></ol>
     <small>Histórico local e temporário; apagado ao reiniciar ou atualizar a página.</small>
   </section>
+  <details class="sim-secondary-details"><summary>Faixas e limites da simulação</summary>
   <section class="auto-bottom-grid">
     <article class="auto-panel"><h2>Faixas demonstrativas</h2><p><strong>0 a 50 °C:</strong> verde fixo · <strong>acima de 50 e abaixo de 100 °C:</strong> amarelo fixo · <strong>100 a 120 °C:</strong> vermelho fixo · <strong>acima de 120 °C:</strong> vermelho piscando, pronto para descarga. O aviso de pronto é uma indicação térmica e não autoriza descarga automática.</p></article>
     <article class="auto-panel"><h2>Limites do simulador</h2><p>O ciclo é gerado no navegador e pode ser sincronizado com a bancada. O aquecimento é apenas representado. Empurradores/purgadores alternam durante o cozimento no intervalo virtual ajustado acima; motor virtual, guilhotinas e etapas mecânicas são espelhados na IHM ESP32. Relés de LED dependem de comunicação, chave local e intertravamentos. Pausar ou reiniciar envia PARADO; confira a confirmação na IHM. Após um desarme, selecione novamente Simulação CAD localmente para retomar os LEDs. Solenóides e cilindros reais ficam fora desta bancada.</p></article>
   </section>
+  </details>
 </main>
-<script src="/js/automacao-simulador-core.js?v=20261031-bancada-v12.1" defer></script>
-<script src="/js/automacao-simulador.js?v=20261031-bancada-v12.1" defer></script>
-<% if (bancadaPermitida) { %><script src="/js/automacao-simulador-http.js?v=20261031-bancada-v12.1" defer></script><script src="/js/automacao-digestores.js?v=20261031-bancada-v12.1" defer></script><script src="/js/automacao-simulador-remoto.js?v=20261031-bancada-v12.1" defer></script><% } %>
-<script src="/js/automacao-digestores-circuito-core.js?v=20261031-bancada-v12.1" defer></script>
-<script src="/js/automacao-digestores-circuito.js?v=20261031-bancada-v12.1" defer></script>
-<script type="module" src="/js/automacao-digestores-3d.mjs?v=20261031-bancada-v12.1"></script>
+<script src="/js/automacao-simulador-core.js?v=20261031-painel-compacto" defer></script>
+<script src="/js/automacao-simulador.js?v=20261031-painel-compacto" defer></script>
+<% if (bancadaPermitida) { %><script src="/js/automacao-simulador-http.js?v=20261031-painel-compacto" defer></script><script src="/js/automacao-digestores.js?v=20261031-painel-compacto" defer></script><script src="/js/automacao-simulador-remoto.js?v=20261031-painel-compacto" defer></script><% } %>
+<script src="/js/automacao-digestores-circuito-core.js?v=20261031-painel-compacto" defer></script>
+<script src="/js/automacao-digestores-circuito.js?v=20261031-painel-compacto" defer></script>
+<script type="module" src="/js/automacao-digestores-3d.mjs?v=20261031-painel-compacto"></script>
 <% if (typeof csrfCiclos !== 'undefined' && csrfCiclos) { %><script src="/js/automacao-digestores-ciclos-simulacao.js?v=20261030-ciclos1" defer></script><% } %>

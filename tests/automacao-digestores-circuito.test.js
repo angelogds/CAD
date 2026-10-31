@@ -135,9 +135,9 @@ test('seleção inválida e relógio inválido não disparam ciclo ou alteram vo
 });
 
 // Exercita a página renderizada e os mesmos eventos usados pelo viewer compartilhado.
-function dashboard(controls = true) {
-  const file = path.join(rootPath, 'views/automacao/partials/digestores-circuito.ejs');
-  const html = ejs.render(fs.readFileSync(file, 'utf8'), { controls }, { filename: file });
+function dashboard(controls = true, external = false) {
+  const file = path.join(rootPath, external ? 'views/automacao/simulador-digestores.ejs' : 'views/automacao/partials/digestores-circuito.ejs');
+  const html = ejs.render(fs.readFileSync(file, 'utf8'), { controls, layout() {}, simuladorBancadaPermitida: false, simulacaoCircuitoPermitida: controls }, { filename: file });
   const elements = [];
   const ids = new Map();
   const document = { hidden: false };
@@ -171,8 +171,11 @@ function dashboard(controls = true) {
     return Boolean(attr && Object.hasOwn(object.attrs, attr[1]) && (attr[2] === undefined || object.attrs[attr[1]] === attr[2]));
   };
   const panel = ids.get('digestores-circuito-panel');
-  panel.querySelectorAll = selector => elements.filter(object => matches(object, selector));
-  panel.querySelector = selector => elements.find(object => matches(object, selector));
+  const belongsToControls = object => external && (Object.hasOwn(object.attrs, 'data-circuito-action') || object.attrs['data-circuito-role'] === 'feedback');
+  panel.querySelectorAll = selector => elements.filter(object => !belongsToControls(object) && matches(object, selector));
+  panel.querySelector = selector => elements.find(object => !belongsToControls(object) && matches(object, selector));
+  const controlPanel = ids.get('sim-circuit-controls');
+  if (controlPanel) controlPanel.querySelector = selector => elements.find(object => belongsToControls(object) && matches(object, selector));
   document.getElementById = id => ids.get(id) || null;
   document.createElement = tag => element(tag);
   const listeners = {};
@@ -188,10 +191,38 @@ function dashboard(controls = true) {
     CustomEvent: class { constructor(type, options = {}) { this.type = type; this.detail = options.detail; } }
   });
   return { html, panel, elements, ids, window, intervals,
-    action: key => panel.querySelector('[data-circuito-action="' + key + '"]'),
-    role: key => panel.querySelector('[data-circuito-role="' + key + '"]'),
+    action: key => controlPanel?.querySelector('[data-circuito-action="' + key + '"]') || panel.querySelector('[data-circuito-action="' + key + '"]'),
+    role: key => panel.querySelector('[data-circuito-role="' + key + '"]') || controlPanel?.querySelector('[data-circuito-role="' + key + '"]'),
     snapshot: () => window.AutomacaoDigestoresCircuito.getSnapshot() };
 }
+
+test('comandos no painel superior continuam controlando o circuito, a câmera e a animação', () => {
+  const ui = dashboard(true, true);
+  assert.equal(ui.panel.querySelector('[data-circuito-action="start"]'), undefined);
+  ui.ids.get('digestores-circuito-selection').value = 'D2';
+  ui.action('start').fire('click');
+  assert.equal(ui.snapshot().activeDigestor, 'D2');
+  assert.equal(ui.snapshot().running, true);
+  assert.match(ui.role('feedback').textContent, /Nova sessão local/);
+  ui.action('pause').fire('click');
+  assert.equal(ui.snapshot().paused, true);
+  ui.action('pause').fire('click');
+  assert.equal(ui.snapshot().running, true);
+  ui.action('motion').fire('click');
+  assert.equal(ui.action('motion').attrs['aria-pressed'], 'true');
+  ui.window.dispatchEvent({ type: 'digestores-circuito:3d-ready' });
+  assert.equal(ui.ids.get('digestores-circuito-3d').hidden, false);
+  ui.action('view-scheme').fire('click');
+  assert.equal(ui.ids.get('digestores-circuito-scheme').hidden, false);
+  let fit = 0;
+  ui.window.addEventListener('digestores-circuito:fit', () => fit++);
+  ui.action('fit').fire('click');
+  assert.equal(fit, 1);
+  ui.action('stop').fire('click');
+  assert.equal(ui.snapshot().stage, 'PARADO');
+  ui.action('live').fire('click');
+  assert.equal(ui.snapshot().mode, 'LIVE');
+});
 
 test('adaptador permanece LIVE até botão explícito e respeita seleção, pausa e parada', () => {
   const ui = dashboard();

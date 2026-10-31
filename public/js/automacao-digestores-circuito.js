@@ -51,6 +51,7 @@
   const Core = root.AutomacaoDigestoresCircuitoCore;
   if (!panel || !Core) return;
   const controls = panel.dataset.controls === 'true';
+  const controlPanel = document.getElementById('sim-circuit-controls');
   const state = Core.createState();
   let linked = false;
   let thermalStates = Array(4).fill('DESLIGADO');
@@ -63,9 +64,9 @@
   let threeReady = false;
   let requestedView = '3d';
   const send = (name, detail) => root.dispatchEvent(new CustomEvent('digestores-circuito:' + name, { detail }));
-  const role = key => panel.querySelector('[data-circuito-role="' + key + '"]');
+  const role = key => panel.querySelector('[data-circuito-role="' + key + '"]') || controlPanel?.querySelector('[data-circuito-role="' + key + '"]');
   const text = (key, value) => { const element = role(key); if (element) element.textContent = value; };
-  const action = key => panel.querySelector('[data-circuito-action="' + key + '"]');
+  const action = key => controlPanel?.querySelector('[data-circuito-action="' + key + '"]') || panel.querySelector('[data-circuito-action="' + key + '"]');
   function applyThermal(detail) {
     const allowed = new Set(['VERDE', 'AMARELO', 'VERMELHO', 'VERMELHO_PISCANDO']);
     thermalStates = Array.from({ length: 4 }, (_, index) => allowed.has(detail?.states?.[index]) ? detail.states[index] : 'DESLIGADO');
