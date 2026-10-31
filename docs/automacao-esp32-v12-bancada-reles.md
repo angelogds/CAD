@@ -1,71 +1,63 @@
-# ESP32 V12 revisão 2 — ensaio de relés e LEDs na bancada
+# ESP32 V12 revisão 3 — relés de bancada e guilhotinas em GPIO32/33
 
-Identificador desta revisão na IHM: `temperatura-v12-bancada-reles-leds-r2`. A atualização do site não grava o firmware na placa: carregar o novo `.ino` continua sendo uma etapa local da bancada.
+Identificador na IHM: `temperatura-v12-bancada-reles-leds-r3`.
+Arquivo único: `firmware/releases/CampoDoGado_ESP32_V12_Bancada_Reles.ino`.
+A atualização do site não grava a placa: carregar este `.ino` na Arduino IDE continua sendo uma etapa local.
 
-Projeto Campo do Gado · 2A Automação Industrial. Esta versão destina-se **exclusivamente a relés que acendem lâmpadas de teste**, desacoplados de máquinas, cilindros, válvulas pneumáticas, vapor e circuitos de produção. **Não instalar no chão de fábrica.**
+Uso exclusivo em bancada com relés e LEDs, sem máquinas, solenóides ou cilindros conectados. A indicação ABERTA/FECHADA é simulada, sem retorno de fim de curso.
 
-## Objetivo e comportamento
+## O que muda em relação à r2
 
-A simulação CAD gera etapas CARGA, COZIMENTO, DESCARGA e TRANSFERÊNCIA. Na IHM local do ESP32 os **purgadores de camisa/eixo** permanecem nos dois blocos originais e recebem uma indicação luminosa por canal. Logo abaixo, um bloco "Guilhotinas" mostra a posição virtual ABERTA/FECHADA e o tempo em cada estado.
+- Sete saídas disponíveis para testes físicos de LEDs. Nenhum GPIO é energizado automaticamente na partida.
+- GPIO27→GND passa a ser opcional. A compilação padrão usa `CGD_BENCH_REQUIRE_LOCAL_KEY 0`; usar `1` exige novamente a chave. A IHM distingue presença do jumper de autorização. GPIO27 permanece entrada, nunca saída.
+- Cada guilhotina usa **um único GPIO e um relé com contatos COM/NA/NF**: GPIO32 para alimentação e GPIO33 para descarga. Ativar o GPIO energiza a bobina e comuta o contato; desativar retorna ao contato normalmente fechado. Não existe GPIO separado para fechamento.
+- GPIO16/17 não são configurados nem acionados. Foi retirado o bloqueio de PSRAM associado à antiga pinagem. Esta versão continua direcionada ao ESP32 clássico; conferir a disponibilidade de GPIO32/33 no módulo físico.
+- Testes individuais dos sete canais funcionam mesmo sem token, conexão ao CAD ou ciclo ativo, pela IHM local/AP. São comandos locais temporizados, independentes da comunicação com o CAD.
+- Manual, Automático e testes rápidos voltam a acionar os relés dos sinaleiros. Manual e teste rápido expiram em 5 s; Automático percorre quatro fases de 5 s e encerra. Purgadores e guilhotinas ficam desligados nesses modos.
+- No modo Simulação CAD, os sete canais acompanham o pacote completo e atual recebido do sistema 2A. Sem comunicação ou com falha, não há espelhamento.
+- As trocas de guilhotina desligam o canal anterior antes do próximo; um relé mantido ligado não recebe pulsos de desligamento a cada atualização.
 
-Selecionar **Simulação CAD** na IHM e fechar a chave GPIO27→GND autoriza o espelhamento automático dos LEDs. Não existe segundo botão de armamento. Os sinaleiros GPIO18/19/21 seguem a temperatura simulada; GPIO25/26 seguem os purgadores/empurradores virtuais; os dois pares das guilhotinas mostram aberto/fechado. Aquecimento e motor continuam exclusivamente virtuais, sem saída de vapor ou partida de motor.
+## Pinagem
 
-Nesta V12, **Manual, Automático, testes rápidos e PT100 são somente visualização**, com GPIOs desligados. Todos os nove relés exigem o modo Simulação CAD e os permissivos da bancada, incluindo os testes individuais de 2 segundos. Os firmwares legados V11 e `esp32-sinaleiros` não foram alterados.
-
-## Pinagem para painel EXCLUSIVO de LEDs
-
-| Indicação na bancada | GPIO ESP32 | Comportamento |
+| Canal | GPIO | Relé/indicação |
 |---|---:|---|
-| Sinaleiro vermelho | 18 | Simulação térmica |
-| Sinaleiro amarelo | 19 | Simulação térmica |
-| Sinaleiro verde | 21 | Simulação térmica |
-| Purgador/empurrador camisa | 25 | Alterna com o estado virtual CAD |
-| Purgador/empurrador eixo | 26 | Alterna com o estado virtual CAD |
-| Guilhotina carga ABERTA | 32 | Aceso se CAD simula aberta |
-| Guilhotina carga FECHADA | 33 | Aceso se CAD simula fechada |
-| Guilhotina descarga ABERTA | 16 | Aceso se CAD simula aberta |
-| Guilhotina descarga FECHADA | 17 | Aceso se CAD simula fechada |
-| Habilitação física local | 27 → GND | Chave/jumper mantido durante o ensaio (entrada INPUT_PULLUP) |
+| Sinaleiro vermelho | 18 | Temperatura/faixa simulada |
+| Sinaleiro amarelo | 19 | Temperatura/faixa simulada |
+| Sinaleiro verde | 21 | Temperatura/faixa simulada |
+| Purgador camisa | 25 | Aberto no CAD = energizado |
+| Purgador eixo | 26 | Aberto no CAD = energizado |
+| Guilhotina de alimentação | 32 | Energizado = abertura; desligado = retorno ao NF |
+| Guilhotina de descarga | 33 | Energizado = abertura; desligado = retorno ao NF |
+| Chave opcional | 27→GND | Entrada INPUT_PULLUP; dispensada na compilação padrão |
 
-As saídas são **ativas em LOW** conforme o módulo de relés do piloto; confirmar com multímetro **antes de conectar qualquer carga**. GPIOs do ESP32 são de 3,3 V: não ligar lâmpadas de 24 V nem bobinas diretamente aos pinos; utilizar interfaces de relés apropriadas e fonte externa corretamente protegida. Manter cargas e comandos industriais completamente desconectados nesta fase.
+Saídas **ativas em LOW**: LOW energiza o relé, HIGH desenergiza. COM/NA/NF são contatos do relé; o GPIO comanda apenas sua interface de entrada. GPIO é 3,3 V: não ligar bobina ou lâmpada diretamente ao ESP32. Usar interface compatível e fonte adequada. O retorno do relé ao NF não comprova posição nem fechamento de uma guilhotina real.
 
-**Compatibilidade:** a pinagem acima destina-se ao ESP32 clássico com módulo **WROOM sem PSRAM**. No WROVER, GPIO16/17 são usados pela memória e não são alternativas livres para LEDs; consulte os [esquemas oficiais WROVER-E/IE](https://www.espressif.com/sites/default/files/documentation/esp32-wrover-e_esp32-wrover-ie_datasheet_en.pdf). O sketch bloqueia os indicadores antes de configurar os pinos quando `BOARD_HAS_PSRAM`, a placa WROVER Kit ou `psramFound()` indicarem PSRAM. Compilar como Dev Module com PSRAM desabilitada **não identifica automaticamente** um módulo WROVER montado: conferir a inscrição do módulo e a placa continua obrigatório. Também não usar UART2 em GPIO16/17 simultaneamente. Outro módulo/PSRAM exige remapeamento e validação elétrica; não foi inventada uma pinagem substituta.
+## Gravar e testar
 
-## Habilitar o ensaio
+1. Na Arduino IDE, instalar **ESP32 core 3.3.12** e **ArduinoJson 7.4.3**. Selecionar ESP32 Dev Module para o módulo clássico utilizado na bancada.
+2. Abrir o `.ino` em pasta com o mesmo nome e gravar. Preservar a configuração elétrica LOW do módulo existente. Confirmar `...-r3` no rodapé da IHM após atualizar a página.
+3. Entrar na IHM pelo IP local ou pelo AP `192.168.4.1`. Não é necessário jumper GPIO27 nesta compilação.
+4. Sem iniciar o CAD, usar **Testar LED · 2 s** em cada um dos sete canais. Cada teste desliga os demais, expira automaticamente e deixa a bancada parada. Aguardar 1 s entre testes. Nas guilhotinas, **Fechar e parar bancada** desenergiza todas as saídas.
+5. Para sinaleiros, selecionar **Manual · LEDs** e uma cor, ou usar os testes rápidos de 5 s / Automático. A IHM exibe o comando elétrico aplicado.
+6. Para o ciclo completo, configurar Wi-Fi 2,4 GHz e token CAD; selecionar **Simulação CAD** na IHM. No CAD 2A, selecionar digestor, manter sincronização ativa e iniciar o circuito integrado.
+7. Confirmar **ESPELHAMENTO CAD ATIVO**: sinaleiros seguem a temperatura; GPIO25/26 alternam durante cozimento; GPIO32 acompanha abertura de alimentação e GPIO33 abertura da descarga. As duas saídas das guilhotinas ficam desligadas quando ambas estão fechadas.
+8. **Desarmar e apagar todos / Parar tudo** cancela testes e apaga as saídas. Selecionar novamente Simulação CAD para retomar. Nenhum pacote remoto sozinho desfaz esse desarme.
 
-1. Gravar o firmware `firmware/releases/CampoDoGado_ESP32_V12_Bancada_Reles.ino` na ESP32 Dev Module (core 3.3.12 / ArduinoJson 7.4.3).
-2. Ligar **apenas interfaces de relés e LEDs de baixa tensão**; verificar saída desligada antes de conectar a carga. Usar fonte e resistores/limitadores compatíveis.
-3. Ligar o ESP32 ao Wi-Fi 2,4 GHz e à integração CAD como na V11.
-4. Selecionar **Simulação CAD** na IHM local `http://192.168.4.1`. No CAD, ativar o circuito integrado e iniciar.
-5. Conferir a atualização do pacote CAD em `/api/estado`. A aba precisa mostrar `simulacao_cad_atual: true`.
-6. Fechar a chave GPIO27→GND. Com pacote completo e atual, a IHM informa **ESPELHAMENTO CAD ATIVO** e os LEDs acompanham o processo automaticamente.
-7. Observar os dois purgadores nos blocos existentes e as guilhotinas no único bloco compacto logo abaixo. A posição e o tempo são simulados; os LEDs representam comandos de GPIO.
-8. Para encerrar, clicar **Desarmar e apagar todos**: o ESP32 entra em PARADO, apaga todos os LEDs, cancela temporizadores e impede retomada automática. Para retomar, selecionar novamente **Simulação CAD**. Abrir a chave também corta o espelhamento.
+## Intertravamentos e expiração
 
-## Testes individuais isolados
+O núcleo rejeita alimentação e descarga simultaneamente abertas, ambos os purgadores abertos e várias cores do sinaleiro juntas. A partida é PARADO. Sem pacote CAD completo, digestor correto, modo SIMULACAO, campos coerentes e validade máxima de 6.500 ms, não há espelhamento. Perda do Wi-Fi/pacote ou atraso da tarefa acima de 2 s apaga as saídas e exige nova seleção local. Na compilação opcional com chave obrigatória, abrir GPIO27 também interrompe as saídas.
 
-Com Simulação CAD selecionada, comunicação atual e chave ativa, usar **Testar LED** junto ao purgador, **Testar aberta/fechada** junto à guilhotina ou os três botões de teste individual dos sinaleiros no bloco de bancada. A requisição local `/api/bancada/teste` aceita exatamente nove canais nomeados: `vermelho`, `amarelo`, `verde`, `camisa`, `eixo`, `carga_aberta`, `carga_fechada`, `descarga_aberta`, `descarga_fechada`.
+A requisição `/api/bancada/teste` aceita sete nomes: `vermelho`, `amarelo`, `verde`, `camisa`, `eixo`, `carga_aberta`, `descarga_aberta`. Nomes antigos `carga_fechada`/`descarga_fechada` são recusados: fechar significa desenergizar. Cada teste local dura até 2 s, com os outros seis canais apagados; não depende da rede CAD e não retoma o ciclo ao terminar. Sobreposição é recusada; perda da autorização opcional, falha ou tarefa atrasada interrompe o teste.
 
-Cada teste apaga os demais oito LEDs e energiza somente o canal selecionado por **até 2 segundos**, controlados pela tarefa local da ESP32. Requisições sobrepostas são recusadas; existe intervalo mínimo de 1 segundo após o término. Perder comunicação, chave ou validade interrompe o teste. A expiração mantém tudo desarmado: selecionar novamente Simulação CAD para voltar ao ciclo. O botão de desarme funciona durante o teste. Nenhum comando de teste contém saída industrial, posição mecânica confirmada ou duração livre enviada pelo navegador.
+Temporizadores locais de purga continuam somente virtuais. Aquecimento, motor e rotas industriais não são liberados. Firmwares V11 e `esp32-sinaleiros` não foram alterados; este arquivo não é uma atualização para automação real de descarga.
 
-## Condições de bloqueio e segurança
-
-- Sem autorização local, nenhum canal de LED de atuador é energizado, mesmo que o CAD esteja funcionando.
-- A seleção é **volátil**: reiniciar sempre deixa o modo PARADO e todas as saídas apagadas. Wi-Fi e token salvos permanecem disponíveis.
-- O pacote CAD deve identificar SIMULACAO, bancada e processo desabilitado, digestor correto, temperatura/faixa/cor/pronto coerentes e estados completos de purgadores/guilhotinas. A validade máxima é **6.500 ms**; cada pacote tem seu próprio vencimento. Estados ausentes ou guilhotinas simultaneamente abertas não liberam o espelhamento.
-- Troca de modo, perda do Wi-Fi, pacote inválido/vencido, remoção da chave e atraso da tarefa local acima de 2 segundos desligam os LEDs. Pacotes novos e reconexão sozinhos **não rearmam** após falha: selecionar novamente Simulação CAD ou deliberadamente abrir e fechar a chave. Após desarme manual ou teste individual, somente nova seleção de Simulação CAD retoma o ciclo.
-- O núcleo e o driver aplicam intertravamento entre aberta/fechada de cada guilhotina e entre abertura de carga/descarga. O núcleo também rejeita ambos os purgadores abertos ou várias cores de sinaleiro simultaneamente. A troca dos LEDs do par desliga primeiro os pinos anteriores.
-- As indicações `ABERTA` e `FECHADA` vêm do CAD: **não constituem retorno físico de fim de curso**.
-- A rota de pulso local de guilhotinas e as rotas reais de purgadores permanecem inoperantes na V12. Somente o modo LED de bancada permite saídas.
-- A V11 permanece como referência de simulação visual; **não fazer upgrade automático da V12 para operação real**. Exigirá projeto próprio, intertravamentos físicos, análise de risco, teste de campo e validação pelos responsáveis.
-
-## Verificação sem inventar testes
-
-A integração de software é verificada pela action `.github/workflows/esp32-v12-bancada-reles.yml` (Arduino CLI) e pelos testes abaixo. O teste C++ extrai e compila o próprio núcleo portátil embutido no sketch entregue: partida desligada, seleção CAD, estados dos nove LEDs, validade, perda de Wi-Fi/chave, latch após falha, ausência de rearme após desarme, intertravamentos, isolamento/expiração dos nove testes e rollover de `millis()`.
+## Verificação
 
 ```sh
-node --test tests/automacao-esp32-v12-bancada-reles.test.js tests/esp32-v12-bench-state.test.js
+node --test tests/automacao-esp32-v12-bancada-reles.test.js tests/esp32-v12-bench-state.test.js tests/esp32-v12-ihm-reles.test.js
 arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all CampoDoGado_ESP32_V12_Bancada_Reles
 ```
 
-Para Arduino CLI/IDE, copiar o `.ino` único para uma pasta de mesmo nome, instalar ESP32 core 3.3.12 e ArduinoJson 7.4.3. Não exige os headers do firmware legado. A compilação e os testes de software **não confirmam montagem elétrica**, polaridade real do módulo, resposta das lâmpadas ou compatibilidade da placa física. Não houve gravação/intervenção no equipamento nem teste de hardware concluído. O responsável pela bancada deve registrar os resultados físicos.
+O teste C++ extrai o núcleo e os drivers do próprio `.ino` e os executa com a chave opcional e obrigatória. Verifica sete canais isolados, testes locais sem CAD, expiração, falhas de rede, parada sem rearme, rollover, intertravamento e ausência de escritas em GPIO16/17. A IHM é exercitada com estados disponíveis, teste ativo, perda de contato e bloqueio de placa.
+
+Compilação e testes de software não confirmam montagem, polaridade física ou resposta das lâmpadas. A gravação e o teste de hardware continuam a cargo do responsável pela bancada; não foram executados pelo agente.

@@ -15,7 +15,7 @@ Base inspecionada: `main` em `1c85c494b012d48f4406777323425d90d4f8c09c`, após o
 
 Conexão, seleção e modos ficam acima dos cartões. O gráfico temperatura × tempo foi retirado. A tela de prensas deixa de mostrar a imagem de referência e usa um esquema conceitual da tolva com quatro tampas, dois eixos paralelos e apoios, baseado na cena 3D existente. Não é um desenho executivo nem contém medidas de fabricação.
 
-A IHM ESP32 conserva os dois blocos de purgadores e somente um bloco compacto de guilhotinas. Selecionar **Simulação CAD** localmente e habilitar GPIO27 autoriza o espelhamento. Falha, perda de comunicação e desarme retiram as saídas; o firmware não restaura uma autorização após reiniciar. Testes individuais são temporários e isolam os demais LEDs. Consulte a pinagem, restrição de PSRAM e procedimento em [automacao-esp32-v12-bancada-reles.md](automacao-esp32-v12-bancada-reles.md).
+A IHM ESP32 conserva os dois blocos de purgadores e somente um bloco compacto de guilhotinas. Na revisão r3, selecionar **Simulação CAD** localmente autoriza o espelhamento; GPIO27 é opcional. As guilhotinas usam um relé por canal: GPIO32 para alimentação e GPIO33 para descarga, desenergizado com retorno ao NF. GPIO16/17 não são usados. Testes locais dos sete canais não dependem de pacote CAD e expiram em 2 s; os modos locais dos sinaleiros também acionam seus relés de LED, com prazo de 5 s por cor. Falha, perda de comunicação e desarme retiram as saídas; o firmware não restaura uma autorização após reiniciar. Testes individuais são temporários e isolam os demais LEDs. Consulte a pinagem e procedimento atualizado em [automacao-esp32-v12-bancada-reles.md](automacao-esp32-v12-bancada-reles.md).
 
 ## Evidência de software
 
