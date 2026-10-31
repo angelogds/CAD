@@ -608,12 +608,12 @@ const char LOCAL_UI[] PROGMEM = R"LOCALHTML(<!doctype html>
 </style>
 
 <style>
-#cgdgate{margin:24px auto;background:#fff;border:1px solid #dbe3e5;border-radius:16px;padding:18px;box-shadow:0 6px 20px rgba(0,0,0,.04)}
+#cgdgate{margin-top:14px} #cgdgate .settingbody{padding:21px 22px} #cgdgate .purgechannel{background:#fff}
 #cgdgate h2{margin:0 0 6px;font-size:1.35rem}
 #cgdgate .cg-muted{color:#506069;font-size:.92rem}
 #cgdgate .cg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:16px}
 #cgdgate .cg-item{border:1px solid #dbe1e5;border-radius:12px;padding:14px;background:#f9fbfb}
-#cgdgate .cg-item h3{margin:0 0 10px}
+#cgdgate .purgechannel h3{margin:0 0 10px} .purgechannel [data-purge-arm],.purgechannel [data-purge-real],.purgechannel [data-purge-cad]{display:none}
 #cgdgate .cg-window{height:84px;border:3px solid #61717a;border-radius:12px;background:repeating-linear-gradient(0deg,#eef2f3 0px,#eef2f3 14px,#dbe2e4 14px,#dbe2e4 16px);position:relative;overflow:hidden}
 #cgdgate .cg-slide{position:absolute;inset:0;background:linear-gradient(120deg,#79909b,#b6c8cf);border-bottom:5px solid #44616d;transform:translateY(0);transition:transform .65s ease}
 #cgdgate .cg-window[data-virtual="aberta"] .cg-slide{transform:translateY(-115%)}
@@ -648,7 +648,7 @@ const char LOCAL_UI[] PROGMEM = R"LOCALHTML(<!doctype html>
 <article class="card digestor-card unlinked" id="card3" aria-label="Digestor 3"><div class="digestor-top"><div class="digestor-title"><span class="number">03</span><h2>Digestor 3</h2></div><span class="badge" id="d3mode">NÃO VINCULADO</span></div><div class="digestor-body"><div class="digestor-visual" aria-hidden="true"><svg viewBox="0 0 220 125"><path d="M10 108H210M47 89V107M175 89V107" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><rect x="28" y="30" width="165" height="62" rx="29" fill="#e2e5ea" stroke="currentColor" stroke-width="2"/><ellipse cx="31" cy="61" rx="14" ry="30" fill="#f3f4f7" stroke="currentColor" stroke-width="2"/><path d="M109 30V13H153" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="169" cy="44" r="7" fill="#f5f6f8" stroke="currentColor" stroke-width="2"/><text x="118" y="70" fill="#747c89" text-anchor="middle" font-size="21" font-weight="750">D3</text></svg></div><div><div class="digestor-temp"><span id="d3temp">—</span><span class="digestor-unit"> °C</span></div><div class="digestor-desc" id="d3range">Outro ESP32 · sem leitura vinculada</div><div class="digestor-desc" id="d3sensor">Sem telemetria vinculada</div></div></div><div class="digestor-bottom"><div class="smalltower" role="img" id="d3tower" aria-label="Sem estado vinculado"><span class="lamp red" id="d3red"></span><span class="lamp yellow" id="d3yellow"></span><span class="lamp green" id="d3green"></span><span class="signaltext" id="d3signal">Sem sinal</span></div><div class="readystatus" id="d3ready">Pronto não informado</div></div><div class="channel-strip"><span>Purgador 1: <b id="d3p1">não vinculado</b></span><span>Purgador 2: <b id="d3p2">não vinculado</b></span></div><div class="statusline"><span id="d3contact">Aguardando vínculo</span><b id="d3stamp">—</b></div></article>
 <article class="card digestor-card unlinked" id="card4" aria-label="Digestor 4"><div class="digestor-top"><div class="digestor-title"><span class="number">04</span><h2>Digestor 4</h2></div><span class="badge" id="d4mode">NÃO VINCULADO</span></div><div class="digestor-body"><div class="digestor-visual" aria-hidden="true"><svg viewBox="0 0 220 125"><path d="M10 108H210M47 89V107M175 89V107" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><rect x="28" y="30" width="165" height="62" rx="29" fill="#e2e5ea" stroke="currentColor" stroke-width="2"/><ellipse cx="31" cy="61" rx="14" ry="30" fill="#f3f4f7" stroke="currentColor" stroke-width="2"/><path d="M109 30V13H153" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="169" cy="44" r="7" fill="#f5f6f8" stroke="currentColor" stroke-width="2"/><text x="118" y="70" fill="#747c89" text-anchor="middle" font-size="21" font-weight="750">D4</text></svg></div><div><div class="digestor-temp"><span id="d4temp">—</span><span class="digestor-unit"> °C</span></div><div class="digestor-desc" id="d4range">Outro ESP32 · sem leitura vinculada</div><div class="digestor-desc" id="d4sensor">Sem telemetria vinculada</div></div></div><div class="digestor-bottom"><div class="smalltower" role="img" id="d4tower" aria-label="Sem estado vinculado"><span class="lamp red" id="d4red"></span><span class="lamp yellow" id="d4yellow"></span><span class="lamp green" id="d4green"></span><span class="signaltext" id="d4signal">Sem sinal</span></div><div class="readystatus" id="d4ready">Pronto não informado</div></div><div class="channel-strip"><span>Purgador 1: <b id="d4p1">não vinculado</b></span><span>Purgador 2: <b id="d4p2">não vinculado</b></span></div><div class="statusline"><span id="d4contact">Aguardando vínculo</span><b id="d4stamp">—</b></div></article>
 </section>
-<section class="card panel" aria-labelledby="pcSourceTitle"><div class="cardhead"><h2 id="pcSourceTitle">Fonte da simulação</h2><span class="badge" id="pcSimStatus">AGUARDANDO ESTADO</span></div><p class="sub" id="pcHeating">Aquecimento virtual: não confirmado</p><p class="help"><span class="cg-led" id="cg-motor-led" data-on="false"></span> Motor virtual: <strong id="cg-motor-state">PARADO</strong></p><p class="help" id="pcSimHelp">O PC simula temperatura e válvulas. Cada teste físico de válvula exige armar o canal nesta IHM; o PC não arma saídas.</p></section>
+<section class="card panel" aria-labelledby="pcSourceTitle"><div class="cardhead"><h2 id="pcSourceTitle">Fonte da simulação</h2><span class="badge" id="pcSimStatus">AGUARDANDO ESTADO</span></div><p class="sub" id="pcHeating">Aquecimento virtual: não confirmado</p><p class="help"><span class="cg-led" id="cg-motor-led" data-on="false"></span> Motor virtual: <strong id="cg-motor-state">PARADO</strong></p><p class="help" id="pcSimHelp">Simulação CAD e bancada são independentes da produção. Para testar relés com LEDs, arme no bloco dos purgadores com a chave GPIO27.</p></section>
 <section class="card panel" aria-labelledby="controlTitle"><div class="cardhead"><h2 id="controlTitle">Controles deste ESP32 · <span id="selectedDigestor">Digestor 1</span></h2><span class="badge" id="outputBadge">SAÍDAS NÃO CONFIRMADAS</span></div><div class="controlgrid"><div><h2>Modo de funcionamento</h2><div class="buttonrow"><button class="control" id="modeRemote" data-mode="simulacao">Simulação CAD</button><button class="control" id="modeAuto" data-mode="automatico">Automático · teste</button><button class="control" id="modeManual" data-mode="manual">Manual</button><button class="control" id="modeReal" data-mode="real" disabled>PT100 · operação real</button><button class="control stop" id="modeStop" data-mode="parado">Parar tudo</button></div><p class="help" id="modeHelp">Modo real disponível após habilitação e validação do PT100. O CAD apenas acompanha a decisão local.</p><h2 class="sectiontitle">Teste manual dos sinaleiros</h2><div class="buttonrow"><button class="control light-green" data-manual="verde" disabled>Verde</button><button class="control light-yellow" data-manual="amarelo" disabled>Amarelo</button><button class="control light-red" data-manual="vermelho" disabled>Vermelho</button><button class="control" data-manual="nenhum" disabled>Desligar</button></div></div><div><h2>Testes rápidos · 5 segundos</h2><div class="buttonrow"><button class="control light-green" data-test="inicio">Baixa · verde</button><button class="control light-yellow" data-test="meio">Intermediária · amarelo</button><button class="control light-red" data-test="alto">Alta · vermelho</button><button class="control light-red" data-test="fim">Pronto · vermelho piscando</button></div><p class="help">Os testes de bancada não representam uma medição PT100. O automático percorre as quatro faixas e encerra com os sinaleiros desligados.</p><p class="help" id="testRemaining">Nenhum teste em andamento.</p><p class="help" id="remoteInfo">Simulação CAD não selecionada.</p></div></div><p id="commandMessage" class="message" role="status"></p></section>
 <details class="card settings" id="purgeSettings"><summary>Controle dos purgadores <span class="badge">DOIS CANAIS LOCAIS</span></summary><div class="settingbody"><div class="savedstatus" style="margin-bottom:14px"><strong>Relés para lâmpadas de bancada · SIMULAÇÃO CAD</strong>
  <p class="help">Teste elétrico isolado: somente LEDs/relés de baixa tensão. A chave física GPIO27→GND habilita a bancada; nenhum atuador da fábrica deve estar conectado.</p>
@@ -657,7 +657,7 @@ const char LOCAL_UI[] PROGMEM = R"LOCALHTML(<!doctype html>
  <p class="message" id="benchMessage" role="status"></p><p class="help" id="benchStatus">Aguardando estado</p></div><p class="sub">Temporizadores reais configurados abaixo. No ensaio com LEDs, ambos os relés seguem os empurradores virtuais ao armar a bancada no botão acima; operação industrial segue separada.</p><div class="configgrid" style="margin-top:17px">
 <section class="purgechannel"><div class="cardhead"><h3>Purgador 1 · Camisa</h3><span class="cg-led" id="p1led" data-on="false" title="Saída do relé camisa"></span><span class="badge" id="p1mode">DESARMADO</span></div><div class="purge-state" id="p1state">Não iniciado</div><p class="purge-time" id="p1remaining">Aguardando estado do ESP32</p><div class="savedstatus" style="margin-bottom:15px"><dl class="rows"><div><dt>Válvula virtual do PC</dt><dd id="p1virtual">Não confirmada</dd></div><div><dt>Relé local</dt><dd id="p1relay">Não confirmado</dd></div></dl></div><div class="twocol"><label class="field" for="p1closed">Fechado (min)<input id="p1closed" type="number" min="1" max="120" step="1" value="5"></label><label class="field" for="p1open">Aberto (s)<input id="p1open" type="number" min="1" max="300" step="1" value="60"></label></div><div class="buttonrow"><button class="control" data-purge-save="1">Salvar tempos</button><button class="control" data-purge-arm="1" disabled>Armar saída</button><button class="control" data-purge-cad="1" disabled>Teste CAD: use botão acima</button><button class="control primary" data-purge-real="1" disabled>Iniciar ciclo</button><button class="control" data-purge-start="1" disabled>Testar simulação</button><button class="control stop" data-purge-stop="1">Parar e fechar</button></div><p class="help" id="p1physical">Saída física desarmada · aguardando estado do ESP32.</p><p class="message" id="p1message" role="status"></p></section>
 <section class="purgechannel"><div class="cardhead"><h3>Purgador 2 · Eixo</h3><span class="cg-led" id="p2led" data-on="false" title="Saída do relé eixo"></span><span class="badge" id="p2mode">DESARMADO</span></div><div class="purge-state" id="p2state">Não iniciado</div><p class="purge-time" id="p2remaining">Aguardando estado do ESP32</p><div class="savedstatus" style="margin-bottom:15px"><dl class="rows"><div><dt>Válvula virtual do PC</dt><dd id="p2virtual">Não confirmada</dd></div><div><dt>Relé local</dt><dd id="p2relay">Não confirmado</dd></div></dl></div><div class="twocol"><label class="field" for="p2closed">Fechado (min)<input id="p2closed" type="number" min="1" max="120" step="1" value="10"></label><label class="field" for="p2open">Aberto (s)<input id="p2open" type="number" min="1" max="300" step="1" value="60"></label></div><div class="buttonrow"><button class="control" data-purge-save="2">Salvar tempos</button><button class="control" data-purge-arm="2" disabled>Armar saída</button><button class="control" data-purge-cad="2" disabled>Teste CAD: use botão acima</button><button class="control primary" data-purge-real="2" disabled>Iniciar ciclo</button><button class="control" data-purge-start="2" disabled>Testar simulação</button><button class="control stop" data-purge-stop="2">Parar e fechar</button></div><p class="help" id="p2physical">Saída física desarmada · aguardando estado do ESP32.</p><p class="message" id="p2message" role="status"></p></section>
-</div><div class="limits">Relés LOW: GPIO 25 (camisa) e GPIO 26 (eixo). O estado do PC é virtual; o relé mostra um comando, sem confirmação da posição da válvula. Teste CAD exige simulação atual e arme local. Temporizadores locais: fechado de 1 a 120 minutos; aberto de 1 a 300 segundos.</div></div></details>
+</div><div class="limits">GPIO25 camisa, GPIO26 eixo (LOW ativo). Indicadores de bancada não comprovam movimento de válvulas. Tempos reais são independentes da simulação CAD.</div></div></details>
 <details class="card settings" id="cgdgate">
  <summary>Guilhotinas de carga e descarga <span class="badge" id="cg-gates-summary">BANCADA DE LEDS</span></summary>
  <div class="settingbody">
@@ -668,23 +668,23 @@ const char LOCAL_UI[] PROGMEM = R"LOCALHTML(<!doctype html>
    <h3>Guilhotina de carregamento</h3>
    <div id="cg-visual-carga" class="cg-window" data-virtual="fechada" role="img" aria-label="Guilhotina de carga fechada apenas na simulacao"><div class="cg-slide"></div></div>
    <div id="cg-virtual-carga" class="purge-state">FECHADA · SIMULADA</div><p class="purge-time">Tempo no estado: <b id="cg-time-carga">0 s</b> · <span class="cg-led" id="cg-led-carga" data-on="false"></span> LED abertura</p>
-   <div class="cg-buttons"><button data-cg-virtual="carga:abrir" type="button">Simular abrir</button><button data-cg-virtual="carga:fechar" type="button">Simular fechar</button></div>
+   
    <p class="purge-time">LEDs: GPIO32 = aberta, GPIO33 = fechada.</p>
-   <div class="cg-buttons"><button data-cg-real="carga:abrir" type="button" disabled>Pulso local abrir</button><button data-cg-real="carga:fechar" type="button" disabled>Pulso local fechar</button></div>
+   
   </article>
   <article class="purgechannel">
    <h3>Guilhotina de descarga</h3>
    <div id="cg-visual-descarga" class="cg-window" data-virtual="fechada" role="img" aria-label="Guilhotina de descarga fechada apenas na simulacao"><div class="cg-slide"></div></div>
    <div id="cg-virtual-descarga" class="purge-state">FECHADA · SIMULADA</div><p class="purge-time">Tempo no estado: <b id="cg-time-descarga">0 s</b> · <span class="cg-led" id="cg-led-descarga" data-on="false"></span> LED abertura</p>
-   <div class="cg-buttons"><button data-cg-virtual="descarga:abrir" type="button">Simular abrir</button><button data-cg-virtual="descarga:fechar" type="button">Simular fechar</button></div>
+   
    <p class="purge-time">LEDs: GPIO16 = aberta, GPIO17 = fechada.</p>
-   <div class="cg-buttons"><button data-cg-real="descarga:abrir" type="button" disabled>Pulso local abrir</button><button data-cg-real="descarga:fechar" type="button" disabled>Pulso local fechar</button></div>
+   
   </article>
  </div>
 
  <div class="cg-live" aria-live="polite">
-  <strong>Diagnostico das saidas fisicas:</strong>
-  <p id="cg-io-status" class="cg-state cg-alert">Aguardando estado da ESP32. O teste virtual nao energiza relés.</p>
+  <strong>Diagnóstico das saídas de luzes:</strong>
+  <p id="cg-io-status" class="cg-state cg-alert">Saídas de bancada desarmadas. Aguardando autorização local.</p>
   <p class="cg-muted">Firmware: <span id="cg-fw">Aguardando</span> | Modo: <span id="cg-mode">Sem leitura</span> | Chave GPIO27: <span id="cg-key">Nao confirmada</span> | Ultimo comando: <span id="cg-last">Nenhum</span></p>
   <p id="cg-feedback" class="cg-muted">Relés desta versão representam somente LEDs de teste. Não há retorno físico das comportas.</p>
  </div>
@@ -747,8 +747,8 @@ function renderPurge(items,id,real,realEligible,simulation){
   text('p'+ch+'remaining',cadTest?'Segue a válvula virtual do PC enquanto a simulação atual for renovada.':item.ativo===true&&Number.isFinite(item.restante_ms)?'Próxima transição em '+Math.ceil(Math.max(0,item.restante_ms)/1000)+' s':armed?'Saída armada. Inicie o ciclo para usar os tempos configurados.':'Ciclo parado. O teste pelo CAD e o temporizador exigem seleções locais separadas.');
   [['closed','fechado_min'],['open','aberto_s']].forEach(([suffix,key])=>{const field=el('p'+ch+suffix);if(field.dataset.dirty!=='true'&&Number.isFinite(item[key]))field.value=String(item[key]);});
   text('p'+ch+'physical',physical?'GPIO '+String(item.pino_reservado||'—')+' · relé LOW · estado comandado, sem feedback físico':'Saída física indisponível neste firmware');
-  document.querySelector('[data-purge-arm="'+ch+'"]').disabled=!physical||!realEligible||armed||cadArmed||item.ativo===true;
-  document.querySelector('[data-purge-real="'+ch+'"]').disabled=!physical||!realEligible||!armed||cadArmed||item.ativo===true;
+  document.querySelector('[data-purge-arm="'+ch+'"]').disabled=true;
+  document.querySelector('[data-purge-real="'+ch+'"]').disabled=true;
   document.querySelector('[data-purge-cad="'+ch+'"]').disabled=true; // Arme conjunto via bancada LED
   document.querySelector('[data-purge-start="'+ch+'"]').disabled=real||simulation.current||armed||cadArmed||item.ativo===true;
   document.querySelector('[data-purge-save="'+ch+'"]').disabled=item.ativo===true||cadArmed;
@@ -1510,15 +1510,16 @@ void enviarEstado() {
       entry["canal"] = i + 1; entry["fechado_min"] = purgadores[i].closedMinutes();
       entry["aberto_s"] = purgadores[i].openSeconds();
       const bool cadArmed = cadPurgeTest.armed(i);
-      entry["ativo"] = cadArmed ? cadPurgeTest.current() : state.active;
-      entry["aberto"] = cadArmed ? cadPurgeTest.requestedOpen(i) : state.open;
+      const bool benchOn=s.mode==REMOTO_BANCADA && benchRelaysArmed && s.cadCurrent && s.cadComplete;
+      entry["ativo"]=benchOn ? true : (cadArmed ? cadPurgeTest.current() : state.active);
+      entry["aberto"]=benchOn ? s.pusherDisplayOpen[i] : (cadArmed ? cadPurgeTest.requestedOpen(i) : state.open);
       entry["comando_aberto"] = modo==REMOTO_BANCADA ?
         (benchRelaysArmed && s.cadCurrent && s.pusherDisplayOpen[i]) :
         (cadArmed ? cadPurgeTest.requestedOpen(i) : (purgeOutputs.armed(i) && state.open));
-      entry["restante_ms"] = state.remainingMs; entry["armado_teste_cad"] = cadArmed;
-      entry["saida_fisica_habilitada"] = purgeOutputs.configured(); entry["armado_real"] = purgeOutputs.armed(i);
+      entry["restante_ms"]=state.remainingMs;entry["armado_teste_cad"]=benchOn;
+      entry["saida_fisica_habilitada"]=purgeOutputs.configured();entry["armado_real"]=modo!=REMOTO_BANCADA && purgeOutputs.armed(i);
       entry["armado"] = purgeOutputs.armed(i);
-      entry["modo"] = modo == REMOTO_BANCADA ? "SIMULACAO" :
+      entry["modo"]=modo==REMOTO_BANCADA?(benchOn?"TESTE_CAD_LEDS":"SIMULACAO"):
         (purgeOutputs.armed(i) ? "REAL" : (state.active ? "SIMULACAO" : "PARADO"));
       entry["pino_reservado"] = PurgeOutputs::pin(i);
     }
@@ -1610,10 +1611,10 @@ void purgadoresHandler() {
   bool ok = true;
   if (action == "configurar") { cadPurgeTest.stop(i); purgeOutputs.stop(i); ok = purgadores[i].configure(closed.toInt(), opened.toInt()); }
   else if (action == "iniciar" && modo != OPERACAO_REAL && modo != REMOTO_BANCADA) { cadPurgeTest.stop(i); purgeOutputs.stop(i); purgadores[i].startSimulation(millis()); }
-  else if (action == "armar_real" && (modo == PARADO || (modo == OPERACAO_REAL && localSnapshot.signal.hasTemperature)) && purgeOutputs.configured()) {
+  else if (action == "armar_real" && false /* V12 somente LEDs de bancada */) {
     cadPurgeTest.stop(i); purgadores[i].stop(); ok = purgeOutputs.arm(i);
   }
-  else if (action == "iniciar_real" && (modo == PARADO || (modo == OPERACAO_REAL && localSnapshot.signal.hasTemperature)) && purgeOutputs.armed(i))
+  else if (action == "iniciar_real" && false /* V12 somente LEDs de bancada */)
     purgadores[i].startSimulation(millis()); // somente o scheduler; driver armado separado.
   else if (action == "armar_teste_cad") {
     // Bloqueado: CAD e simulacao sao visualizacao, nunca acionamento fisico.
