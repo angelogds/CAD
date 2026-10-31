@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1080" role="img" aria-labelledby="t-title t-desc">
+<title id="t-title">Tolva homogeneizadora das prensas — elevação sobre estrutura, planta e vista frontal</title>
+<desc id="t-desc">Detalhamento conceitual da tolva FAST de duas roscas horizontais: carcaça, quatro tampas, dois motoredutores em uma extremidade, três descargas inferiores com guilhotinas e alimentação gravítica às prensas FAST, P50 e P46. A tolva se apoia em estrutura metálica independente, cuja altura e seções exigem levantamento e cálculo.</desc>
+<defs>
+ <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#eaf0f6"/><stop offset=".54" stop-color="#cbd5df"/><stop offset="1" stop-color="#9eacbb"/></linearGradient>
+ <pattern id="flights" width="32" height="40" patternUnits="userSpaceOnUse"><path d="M0 5L16 35L32 5" fill="none" stroke="#76889b" stroke-width="6"/></pattern>
+ <marker id="arrow" markerWidth="8" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5 0 7" fill="#a5744d"/></marker>
+ <marker id="dim" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto-start-reverse"><path d="M7 0L0 3.5L7 7" fill="none" stroke="#36516d" stroke-width="1.3"/></marker>
+</defs>
+<rect width="1600" height="1080" fill="#fff"/><rect x="16" y="16" width="1568" height="1048" fill="none" stroke="#788696" stroke-width="2"/>
+<rect x="16" y="16" width="1568" height="99" fill="#213348"/>
+<text x="40" y="58" font-size="31" font-weight="bold" fill="#fff" font-family="Arial,sans-serif">CAMPO DO GADO · TOLVA DAS PRENSAS</text>
+<text x="40" y="91" font-size="17" fill="#bfcfdd" font-family="Arial,sans-serif">REV. CONCEITUAL 02  |  Estrutura elevada + alimentação inferior FAST / P50 / P46</text>
+<g font-family="Arial,sans-serif">
+<text x="40" y="151" font-size="23" font-weight="bold" fill="#263c51">A · ELEVAÇÃO LONGITUDINAL COM ESTRUTURA METÁLICA</text>
+<text x="41" y="177" font-size="14" fill="#637285">Tampas superiores, eixos paralelos, três guilhotinas, roscas alimentadoras e prensas abaixo (prensas esquemáticas)</text>
+<!-- cota horizontal, medida geral de referência -->
+<path d="M185 188V169M1410 188V169M185 182H1410" stroke="#42617d" stroke-width="1.7" fill="none" marker-start="url(#dim)" marker-end="url(#dim)"/>
+<text x="795" y="173" text-anchor="middle" font-size="18" font-weight="bold" fill="#233e58">6891 mm (referência vista geral)</text>
+<rect x="185" y="229" width="1225" height="181" rx="3" fill="url(#steel)" stroke="#647588" stroke-width="4"/>
+<rect x="189" y="239" width="1217" height="153" fill="#e2e9f0" opacity=".6"/>
+<path d="M189 273H1405M189 384H1405" stroke="#718497" stroke-width="4"/>
+<g><rect x="189" y="201" width="302" height="28" fill="#eef2f6" stroke="#7b8998" stroke-width="2"/><path d="M197 208l286 14M483 208l-286 14" stroke="#a9b5c2" stroke-width="1.6"/><circle cx="195" cy="197" r="4" fill="#6d7d8d"/><circle cx="483" cy="197" r="4" fill="#6d7d8d"/></g>
+<g><rect x="495" y="201" width="302" height="28" fill="#eef2f6" stroke="#7b8998" stroke-width="2"/><path d="M503 208l286 14M789 208l-286 14" stroke="#a9b5c2" stroke-width="1.6"/><circle cx="501" cy="197" r="4" fill="#6d7d8d"/><circle cx="789" cy="197" r="4" fill="#6d7d8d"/></g>
+<g><rect x="801" y="201" width="302" height="28" fill="#eef2f6" stroke="#7b8998" stroke-width="2"/><path d="M809 208l286 14M1095 208l-286 14" stroke="#a9b5c2" stroke-width="1.6"/><circle cx="807" cy="197" r="4" fill="#6d7d8d"/><circle cx="1095" cy="197" r="4" fill="#6d7d8d"/></g>
+<g><rect x="1107" y="201" width="302" height="28" fill="#eef2f6" stroke="#7b8998" stroke-width="2"/><path d="M1115 208l286 14M1401 208l-286 14" stroke="#a9b5c2" stroke-width="1.6"/><circle cx="1113" cy="197" r="4" fill="#6d7d8d"/><circle cx="1401" cy="197" r="4" fill="#6d7d8d"/></g>
+<path d="M495 231V408" stroke="#9daebd" stroke-width="2"/><path d="M800 231V408" stroke="#9daebd" stroke-width="2"/><path d="M1105 231V408" stroke="#9daebd" stroke-width="2"/>
+<rect x="144" y="290" width="38" height="58" fill="#b4c2cf" stroke="#5b6f82" stroke-width="2"/>
+<rect x="93" y="296" width="51" height="45" rx="8" fill="#bd2741" stroke="#78192d" stroke-width="2"/>
+<path d="M71 303H94M71 333H94" stroke="#596e83" stroke-width="11"/>
+<rect x="183" y="397" width="1229" height="14" fill="#62758a"/>
+<!-- estrutura e nivel de piso -->
+<path d="M66 690H1518" stroke="#81919e" stroke-width="4"/><rect x="188" y="657" width="1225" height="15" fill="#728397"/>
+<rect x="180" y="403" width="20" height="273" rx="2" fill="url(#steel)" stroke="#677789" stroke-width="2"/><rect x="166" y="668" width="48" height="12" fill="#718296"/><circle cx="176" cy="674" r="3" fill="#f8fafc"/><circle cx="204" cy="674" r="3" fill="#f8fafc"/>
+<rect x="585" y="403" width="20" height="273" rx="2" fill="url(#steel)" stroke="#677789" stroke-width="2"/><rect x="571" y="668" width="48" height="12" fill="#718296"/><circle cx="581" cy="674" r="3" fill="#f8fafc"/><circle cx="609" cy="674" r="3" fill="#f8fafc"/>
+<rect x="990" y="403" width="20" height="273" rx="2" fill="url(#steel)" stroke="#677789" stroke-width="2"/><rect x="976" y="668" width="48" height="12" fill="#718296"/><circle cx="986" cy="674" r="3" fill="#f8fafc"/><circle cx="1014" cy="674" r="3" fill="#f8fafc"/>
+<rect x="1395" y="403" width="20" height="273" rx="2" fill="url(#steel)" stroke="#677789" stroke-width="2"/><rect x="1381" y="668" width="48" height="12" fill="#718296"/><circle cx="1391" cy="674" r="3" fill="#f8fafc"/><circle cx="1419" cy="674" r="3" fill="#f8fafc"/>
+<path d="M211 658L334 433M577 433L456 657M617 657L740 433M983 433L861 657M1024 657L1148 433M1388 433L1266 657" stroke="#a4b1bd" stroke-width="6" opacity=".75"/>
+<!-- saidas e alimentacao inferiores -->
+<g><path d="M347 411h96l-25 37h-46Z" fill="#b8c3cf" stroke="#627284" stroke-width="2"/><rect x="360" y="445" width="70" height="21" rx="3" fill="#ad243c" stroke="#732031" stroke-width="2"/><rect x="389" y="428" width="12" height="17" fill="#697786"/><rect x="369" y="468" width="52" height="45" rx="6" fill="#e8edf1" stroke="#627284" stroke-width="2"/><path d="M377 475l36 12-36 11 36 10" stroke="#8091a3" fill="none" stroke-width="3"/><path d="M395 511v17" stroke="#9f7852" stroke-width="5"/><text x="395" y="541" font-size="17" text-anchor="middle" font-weight="bold" fill="#24374b">FAST</text><rect x="301" y="554" width="188" height="90" rx="23" fill="#dae0e8" stroke="#8997a7" stroke-width="3" stroke-dasharray="7 5"/><text x="395" y="601" font-size="14" text-anchor="middle" fill="#55687a">PRENSA (REFERÊNCIA)</text></g>
+<g><path d="M747 411h96l-25 37h-46Z" fill="#b8c3cf" stroke="#627284" stroke-width="2"/><rect x="760" y="445" width="70" height="21" rx="3" fill="#ad243c" stroke="#732031" stroke-width="2"/><rect x="789" y="428" width="12" height="17" fill="#697786"/><rect x="769" y="468" width="52" height="45" rx="6" fill="#e8edf1" stroke="#627284" stroke-width="2"/><path d="M777 475l36 12-36 11 36 10" stroke="#8091a3" fill="none" stroke-width="3"/><path d="M795 511v17" stroke="#9f7852" stroke-width="5"/><text x="795" y="541" font-size="17" text-anchor="middle" font-weight="bold" fill="#24374b">P50</text><rect x="701" y="554" width="188" height="90" rx="23" fill="#dae0e8" stroke="#8997a7" stroke-width="3" stroke-dasharray="7 5"/><text x="795" y="601" font-size="14" text-anchor="middle" fill="#55687a">PRENSA (REFERÊNCIA)</text></g>
+<g><path d="M1147 411h96l-25 37h-46Z" fill="#b8c3cf" stroke="#627284" stroke-width="2"/><rect x="1160" y="445" width="70" height="21" rx="3" fill="#ad243c" stroke="#732031" stroke-width="2"/><rect x="1189" y="428" width="12" height="17" fill="#697786"/><rect x="1169" y="468" width="52" height="45" rx="6" fill="#e8edf1" stroke="#627284" stroke-width="2"/><path d="M1177 475l36 12-36 11 36 10" stroke="#8091a3" fill="none" stroke-width="3"/><path d="M1195 511v17" stroke="#9f7852" stroke-width="5"/><text x="1195" y="541" font-size="17" text-anchor="middle" font-weight="bold" fill="#24374b">P46</text><rect x="1101" y="554" width="188" height="90" rx="23" fill="#dae0e8" stroke="#8997a7" stroke-width="3" stroke-dasharray="7 5"/><text x="1195" y="601" font-size="14" text-anchor="middle" fill="#55687a">PRENSA (REFERÊNCIA)</text></g>
+<path d="M1410 230H1472M1410 408H1472M1457 230V408" stroke="#42617d" stroke-width="1.4" fill="none" marker-start="url(#dim)" marker-end="url(#dim)"/>
+<text x="1491" y="319" font-size="16" fill="#2b4e6b" transform="rotate(-90 1491 319)" text-anchor="middle">1325,7 mm (altura tolva · ref.)</text>
+<path d="M1412 411H1512M1412 657H1512M1500 411V657" stroke="#42617d" stroke-width="1.4" fill="none" marker-start="url(#dim)" marker-end="url(#dim)"/>
+<text x="1527" y="533" font-size="13" fill="#a22b3e" text-anchor="middle" transform="rotate(-90 1527 533)">COTA ESTRUTURA: PENDENTE</text>
+<text x="820" y="712" font-size="15" fill="#a22b3e" text-anchor="middle">Estrutura ilustrativa — perfis, altura, vãos, bases, contraventamento e cargas dependem de projeto estrutural.</text>
+<text x="43" y="764" font-size="23" fill="#263c51" font-weight="bold">B · PLANTA INTERNA (TAMPAS OCULTADAS)</text>
+<rect x="178" y="792" width="725" height="194" rx="4" fill="#e7edf3" stroke="#667689" stroke-width="4"/>
+<rect x="183" y="795" width="714" height="190" fill="none" stroke="#8d9dac" stroke-width="2"/>
+<g><rect x="180" y="818" width="706" height="44" rx="22" fill="#d7dfe7" stroke="#657587" stroke-width="2.5"/><line x1="177" x2="890" y1="840" y2="840" stroke="#556475" stroke-width="7"/><rect x="180" y="823" width="706" height="34" rx="16" fill="url(#flights)" opacity=".9"/><text x="943" y="846" font-size="16" fill="#30445a" font-weight="bold">ROSCA 1</text></g>
+<g><rect x="180" y="891" width="706" height="44" rx="22" fill="#d7dfe7" stroke="#657587" stroke-width="2.5"/><line x1="177" x2="890" y1="913" y2="913" stroke="#556475" stroke-width="7"/><rect x="180" y="896" width="706" height="34" rx="16" fill="url(#flights)" opacity=".9"/><text x="943" y="919" font-size="16" fill="#30445a" font-weight="bold">ROSCA 2</text></g>
+<rect x="118" y="830" width="58" height="44" rx="7" fill="#b3263f"/><rect x="118" y="908" width="58" height="44" rx="7" fill="#b3263f"/>
+<path d="M98 852h20M98 930h20" stroke="#60738a" stroke-width="11"/>
+<path d="M180 780V754M904 780V754M180 770H904" stroke="#42617d" stroke-width="1.5" marker-start="url(#dim)" marker-end="url(#dim)"/>
+<text x="542" y="759" font-size="17" font-weight="bold" text-anchor="middle" fill="#294966">6529 mm (trecho cotado no desenho interno)</text>
+<path d="M155 792h-20M155 986h-20M141 792v194" stroke="#42617d" stroke-width="1.4" marker-start="url(#dim)" marker-end="url(#dim)"/>
+<text x="128" y="889" font-size="16" transform="rotate(-90 128 889)" fill="#294966" text-anchor="middle">1615 mm (largura referência)</text>
+<text x="1054" y="763" font-size="23" fill="#263c51" font-weight="bold">C · VISTA DE EXTREMIDADE</text>
+<rect x="1160" y="805" width="334" height="171" rx="4" fill="url(#steel)" stroke="#647588" stroke-width="4"/>
+<path d="M1160 849H1494" stroke="#738498" stroke-width="3"/>
+<circle cx="1265" cy="906" r="48" fill="#dfe7ed" stroke="#657587" stroke-width="5"/><circle cx="1385" cy="906" r="48" fill="#dfe7ed" stroke="#657587" stroke-width="5"/>
+<circle cx="1265" cy="906" r="17" fill="#b62640" stroke="#657587" stroke-width="3"/><circle cx="1385" cy="906" r="17" fill="#b62640" stroke="#657587" stroke-width="3"/>
+<path d="M1164 971h328" stroke="#6c7c8e" stroke-width="12"/>
+<text x="1328" y="1013" font-size="14" text-anchor="middle" fill="#566e83">EIXOS PARALELOS · MOTORIZAÇÃO NA EXTREMIDADE</text>
+<rect x="31" y="1019" width="1539" height="32" fill="#f0f3f7"/>
+<text x="46" y="1041" font-size="15" fill="#344c62">DESENHO DE CONCEPÇÃO · NÃO FABRICAR OU MONTAR SEM LEVANTAMENTO E DIMENSIONAMENTO</text>
+<text x="1562" y="1041" font-size="14" text-anchor="end" fill="#344c62">REV 02 · 30/10/2026</text>
+</g>
+</svg>
