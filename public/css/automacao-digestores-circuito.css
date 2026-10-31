@@ -110,3 +110,6 @@
 #digestores-circuito-panel [data-thermal="VERMELHO_PISCANDO"] .circuito-tower-red{animation:circuito-thermal-blink 1s steps(1,end) infinite}
 @keyframes circuito-thermal-blink{50%{fill:#26303b}}
 @media(prefers-reduced-motion:reduce){#digestores-circuito-panel [data-thermal="VERMELHO_PISCANDO"] .circuito-tower-red{animation:none}}
+
+#digestores-circuito-panel .circuito-upper-gate-led{fill:#9aa3ad;stroke:#57616d;stroke-width:1.5}
+#digestores-circuito-panel [data-circuito-equipment^="gate"][data-gate-state="open"] .circuito-upper-gate-led{fill:#22c55e;stroke:#0f7b3e;filter:drop-shadow(0 0 5px #22c55e)}
