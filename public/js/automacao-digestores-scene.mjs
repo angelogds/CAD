@@ -51,10 +51,10 @@ export function createDigestorScene({ makeLabel } = {}) {
     parent.add(object);
     return register(key, object);
   }
-  // Sem placas flutuantes: seleção por clique e inspector permanecem.
-  const showFloatingEquipmentNames = false;
+  // Os rotulos continuam registrados para o inspetor e testes antigos,
+  // mas a camada visual de etiquetas é oculta no CSS desta cena.
   function label(text, position, width, key) {
-    if (!showFloatingEquipmentNames || !makeLabel) return;
+    if (!makeLabel) return;
     const object = makeLabel(text, width);
     if (!object) return;
     object.position.set(...position);
