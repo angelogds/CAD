@@ -211,7 +211,7 @@
       }
       if (after.stage === 'DESCARGA' && before.stage !== 'DESCARGA') {
         const item = values[Number(after.activeDigestor?.slice(1)) - 1];
-        if (item) record(item, 'Pronto acima de 120 °C: guilhotina frontal ABERTA só na maquete; percoladora em movimento.');
+        if (item) record(item, 'Pronto acima de 120 °C: guilhotina frontal ABERTA na simulação; LED da bancada depende da autorização local.');
       }
       if (after.stage === 'CONCLUIDO') {
         integrationActive = false;

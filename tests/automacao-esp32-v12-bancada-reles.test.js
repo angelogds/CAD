@@ -15,7 +15,7 @@ test('V12 preserva V11 sem modificar firmware de producao e liga LED bancada sep
  assert.match(firmware,/void apply\(bool allow,bool loadOpen,bool loadClosed,bool dischargeOpen,bool dischargeClosed\)/);
  assert.match(firmware,/\(loadOpen&&loadClosed\)/);
  assert.match(firmware,/\(dischargeOpen&&dischargeClosed\)/);
- assert.match(firmware,/purgeOutputs\.apply\(i,next\.bench\.outputs\[3\+i\],true\)/);
+ assert.match(firmware,/purgeOutputs\.applyBench\(benchActive,next\.bench\.outputs\[3\],next\.bench\.outputs\[4\]\)/);
 });
 test('espelhamento automático depende de seleção CAD, chave local e pacote completo atual, nunca salvo',()=>{
  assert.match(firmware,/benchLeds\.selectCad\(millis\(\)\)/);
@@ -33,6 +33,8 @@ test('transição de modo, perda de comunicação e falha desligam saídas',()=>
  assert.match(firmware,/if\(!configured\(\)\|\|!allow\|\|!keyOn\(\)/);
  assert.match(firmware,/const bool ok=false; \/\/ Proibe pulso local de cilindros/);
  assert.match(firmware,/if\(!next\.bench\.mirroring\)\{next\.signal\.color=cgd::Color::DESLIGADO;next\.signal\.ready=false;/);
+ assert.match(firmware,/todos os demais modos sao apenas pre-visualizacao, sem GPIO\.[\s\S]*?pins=\{false,false,false\};next\.signal\.color=cgd::Color::DESLIGADO;next\.signal\.ready=false/);
+ assert.match(firmware,/purgeOutputs\.stop\(i\); \/\/ V12: temporizador fora do CAD e somente virtual/);
  assert.match(firmware,/defined\(BOARD_HAS_PSRAM\)/);
  assert.match(firmware,/benchPinsCompatible=!psramFound\(\)/);
  assert.match(firmware,/configured\(\)const\{return CGD_ENABLE_MATERIAL_GATE_OUTPUTS==1&&benchPinsCompatible/);

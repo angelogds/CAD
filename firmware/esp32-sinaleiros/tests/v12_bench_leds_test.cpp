@@ -1,6 +1,48 @@
 #include <cassert>
 #include <stdint.h>
+#include <vector>
 #include "bench_leds.h"
+#include "bench_drivers.h"
+
+static int levels[40];
+static bool monitoring=false;
+static std::vector<int> writesOff;
+void digitalWrite(int pin,int level) {
+  levels[pin]=level;
+  if(level==HIGH)writesOff.push_back(pin);
+  if(monitoring) {
+    assert(!(levels[25]==LOW&&levels[26]==LOW));
+    assert(!(levels[32]==LOW&&levels[33]==LOW));
+    assert(!(levels[16]==LOW&&levels[17]==LOW));
+    assert(!(levels[32]==LOW&&levels[16]==LOW));
+  }
+}
+int digitalRead(int pin) { return levels[pin]; }
+void pinMode(int,int) {}
+uint32_t millis() { return 100; }
+static void checkDrivers() {
+  for(int &level:levels)level=HIGH;
+  benchPinsCompatible=true;levels[27]=LOW;
+  PurgeOutputs purges;CgdGatePulse gates;
+  purges.begin();gates.begin();monitoring=true;
+  purges.applyBench(true,false,true);assert(levels[25]==HIGH&&levels[26]==LOW);
+  purges.applyBench(true,true,false);assert(levels[25]==LOW&&levels[26]==HIGH);
+  writesOff.clear();purges.applyBench(true,true,false);
+  for(int pin:writesOff)assert(pin!=25); // Sustained relay never pulses off.
+  purges.applyBench(true,true,true);assert(levels[25]==HIGH&&levels[26]==HIGH);
+  purges.applyBench(true,true,false);purges.applyBench(false,true,false);
+  assert(levels[25]==HIGH&&levels[26]==HIGH);
+  gates.apply(true,false,true,false,true);assert(levels[33]==LOW&&levels[17]==LOW);
+  gates.apply(true,true,false,false,true);assert(levels[32]==LOW&&levels[33]==HIGH);
+  gates.apply(true,false,true,true,false);assert(levels[16]==LOW&&levels[17]==HIGH);
+  gates.apply(true,true,false,true,false); // Conflicting openings: all off.
+  assert(levels[32]==HIGH&&levels[33]==HIGH&&levels[16]==HIGH&&levels[17]==HIGH);
+  gates.apply(true,false,true,false,false); // Individual closed LED only.
+  assert(levels[33]==LOW&&levels[32]==HIGH&&levels[16]==HIGH&&levels[17]==HIGH);
+  levels[27]=HIGH;gates.apply(true,true,false,false,true);
+  assert(levels[32]==HIGH&&levels[33]==HIGH&&levels[16]==HIGH&&levels[17]==HIGH);
+  monitoring=false;
+}
 
 static cgd::BenchInput packet(uint32_t now=100U) {
   cgd::BenchInput i;
@@ -79,5 +121,6 @@ int main() {
   i=packet(start);rollover.selectCad(start);assert(rollover.tick(i,start).mirroring);
   assert(rollover.startTest(5,i,start+10U));isolated(rollover.tick(i,start+20U),5);
   isolated(rollover.tick(i,start+1100U),5);off(rollover.tick(i,start+2010U));
+  checkDrivers();
   return 0;
 }

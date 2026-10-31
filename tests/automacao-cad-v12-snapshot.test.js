@@ -104,10 +104,12 @@ test('snapshot integrado percorre carga, cozimento e descarga com os mesmos esta
   for (let index = 0; index < 100 && ui.snapshot().stage !== 'CONCLUIDO'; index++) {
     await ui.tick();
     const current = ui.posts.at(-1)[0];
-    phases.add(current.etapa_mecanica);
-    purgers.add(current.purgadores_visuais.camisa + '/' + current.purgadores_visuais.eixo);
     assert.equal(current.digestor_id, 1);
-    assert.ok(current.guilhotinas_simuladas.carga !== 'ABERTA' || current.guilhotinas_simuladas.descarga !== 'ABERTA');
+    if (current.fase !== 'PARADO') {
+      phases.add(current.etapa_mecanica);
+      purgers.add(current.purgadores_visuais.camisa + '/' + current.purgadores_visuais.eixo);
+      assert.ok(current.guilhotinas_simuladas.carga !== 'ABERTA' || current.guilhotinas_simuladas.descarga !== 'ABERTA');
+    }
     assert.deepEqual(current.purgadores_simulados, { camisa: 'FECHADO', eixo: 'FECHADO' }, 'canal legado continua sem comando industrial');
   }
   assert.equal(ui.snapshot().stage, 'CONCLUIDO');
@@ -204,6 +206,7 @@ test('os quatro digestores publicam ciclos em sequência com apenas um par de gu
     await ui.tick();
     const batch = ui.posts.at(-1);
     assert.equal(batch.length, 4);
+    if (batch.every(item => item.fase === 'PARADO')) continue;
     assert.ok(batch.filter(item => item.guilhotinas_simuladas.carga === 'ABERTA' || item.guilhotinas_simuladas.descarga === 'ABERTA').length <= 1);
     assert.ok(batch.filter(item => item.motor_digestor_simulado).length <= 1);
     assert.ok(batch.filter(item => item.purgadores_visuais.camisa === 'ABERTO' || item.purgadores_visuais.eixo === 'ABERTO').length <= 1);

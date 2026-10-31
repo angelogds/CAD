@@ -322,6 +322,16 @@ class PurgeOutputs {
     (void)open;
 #endif
   }
+  void applyBench(bool enabled,bool camisa,bool eixo) {
+    if(!enabled||(camisa&&eixo)){stopAll();return;}
+    const bool desired[2]={camisa,eixo};
+    // Break-before-make entre canais; nao pulsa OFF no rele que permanece ligado.
+    for(int i=0;i<2;i++)if(!desired[i])stop(i);
+    for(int i=0;i<2;i++)if(desired[i]){
+      if(!armed(i))arm(i);
+      apply(i,true,true);
+    }
+  }
   static int pin(int channel) { return channel == 0 ? 25 : 26; }
  private:
   bool configured_ = false;
@@ -648,7 +658,7 @@ const char LOCAL_UI[] PROGMEM = R"LOCALHTML(<!doctype html>
 <article class="card digestor-card unlinked" id="card4" aria-label="Digestor 4"><div class="digestor-top"><div class="digestor-title"><span class="number">04</span><h2>Digestor 4</h2></div><span class="badge" id="d4mode">NÃO VINCULADO</span></div><div class="digestor-body"><div class="digestor-visual" aria-hidden="true"><svg viewBox="0 0 220 125"><path d="M10 108H210M47 89V107M175 89V107" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><rect x="28" y="30" width="165" height="62" rx="29" fill="#e2e5ea" stroke="currentColor" stroke-width="2"/><ellipse cx="31" cy="61" rx="14" ry="30" fill="#f3f4f7" stroke="currentColor" stroke-width="2"/><path d="M109 30V13H153" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="169" cy="44" r="7" fill="#f5f6f8" stroke="currentColor" stroke-width="2"/><text x="118" y="70" fill="#747c89" text-anchor="middle" font-size="21" font-weight="750">D4</text></svg></div><div><div class="digestor-temp"><span id="d4temp">—</span><span class="digestor-unit"> °C</span></div><div class="digestor-desc" id="d4range">Outro ESP32 · sem leitura vinculada</div><div class="digestor-desc" id="d4sensor">Sem telemetria vinculada</div></div></div><div class="digestor-bottom"><div class="smalltower" role="img" id="d4tower" aria-label="Sem estado vinculado"><span class="lamp red" id="d4red"></span><span class="lamp yellow" id="d4yellow"></span><span class="lamp green" id="d4green"></span><span class="signaltext" id="d4signal">Sem sinal</span></div><div class="readystatus" id="d4ready">Pronto não informado</div></div><div class="channel-strip"><span>Purgador 1: <b id="d4p1">não vinculado</b></span><span>Purgador 2: <b id="d4p2">não vinculado</b></span></div><div class="statusline"><span id="d4contact">Aguardando vínculo</span><b id="d4stamp">—</b></div></article>
 </section>
 <section class="card panel" aria-labelledby="pcSourceTitle"><div class="cardhead"><h2 id="pcSourceTitle">Fonte da simulação</h2><span class="badge" id="pcSimStatus">AGUARDANDO ESTADO</span></div><p class="sub" id="pcHeating">Aquecimento virtual: não confirmado</p><p class="help"><span class="cg-led" id="cg-motor-led" data-on="false"></span> Motor virtual: <strong id="cg-motor-state">PARADO</strong></p><p class="help" id="pcSimHelp">Simulação CAD e bancada são independentes da produção. Selecione Simulação CAD e habilite a chave GPIO27 para espelhar os LEDs da bancada.</p></section>
-<section class="card panel" aria-labelledby="controlTitle"><div class="cardhead"><h2 id="controlTitle">Controles deste ESP32 · <span id="selectedDigestor">Digestor 1</span></h2><span class="badge" id="outputBadge">SAÍDAS NÃO CONFIRMADAS</span></div><div class="controlgrid"><div><h2>Modo de funcionamento</h2><div class="buttonrow"><button class="control" id="modeRemote" data-mode="simulacao">Simulação CAD</button><button class="control" id="modeAuto" data-mode="automatico">Automático · teste</button><button class="control" id="modeManual" data-mode="manual">Manual</button><button class="control" id="modeReal" data-mode="real" disabled>PT100 · operação real</button><button class="control stop" id="modeStop" data-mode="parado">Parar tudo</button></div><p class="help" id="modeHelp">Modo real disponível após habilitação e validação do PT100. O CAD apenas acompanha a decisão local.</p><h2 class="sectiontitle">Teste manual dos sinaleiros</h2><div class="buttonrow"><button class="control light-green" data-manual="verde" disabled>Verde</button><button class="control light-yellow" data-manual="amarelo" disabled>Amarelo</button><button class="control light-red" data-manual="vermelho" disabled>Vermelho</button><button class="control" data-manual="nenhum" disabled>Desligar</button></div></div><div><h2>Testes rápidos · 5 segundos</h2><div class="buttonrow"><button class="control light-green" data-test="inicio">Baixa · verde</button><button class="control light-yellow" data-test="meio">Intermediária · amarelo</button><button class="control light-red" data-test="alto">Alta · vermelho</button><button class="control light-red" data-test="fim">Pronto · vermelho piscando</button></div><p class="help">Os testes de bancada não representam uma medição PT100. O automático percorre as quatro faixas e encerra com os sinaleiros desligados.</p><p class="help" id="testRemaining">Nenhum teste em andamento.</p><p class="help" id="remoteInfo">Simulação CAD não selecionada.</p></div></div><p id="commandMessage" class="message" role="status"></p></section>
+<section class="card panel" aria-labelledby="controlTitle"><div class="cardhead"><h2 id="controlTitle">Controles deste ESP32 · <span id="selectedDigestor">Digestor 1</span></h2><span class="badge" id="outputBadge">SAÍDAS NÃO CONFIRMADAS</span></div><div class="controlgrid"><div><h2>Modo de funcionamento</h2><div class="buttonrow"><button class="control" id="modeRemote" data-mode="simulacao">Simulação CAD</button><button class="control" id="modeAuto" data-mode="automatico">Automático · virtual</button><button class="control" id="modeManual" data-mode="manual">Manual · virtual</button><button class="control" id="modeReal" data-mode="real" disabled>PT100 · monitoramento</button><button class="control stop" id="modeStop" data-mode="parado">Parar tudo</button></div><p class="help" id="modeHelp">V12: modos locais são apenas virtuais. Os relés de LEDs exigem Simulação CAD, comunicação atual e chave GPIO27.</p><h2 class="sectiontitle">Prévia virtual dos sinaleiros</h2><div class="buttonrow"><button class="control light-green" data-manual="verde" disabled>Verde</button><button class="control light-yellow" data-manual="amarelo" disabled>Amarelo</button><button class="control light-red" data-manual="vermelho" disabled>Vermelho</button><button class="control" data-manual="nenhum" disabled>Desligar</button></div></div><div><h2>Prévias virtuais · 5 segundos</h2><div class="buttonrow"><button class="control light-green" data-test="inicio">Baixa · verde</button><button class="control light-yellow" data-test="meio">Intermediária · amarelo</button><button class="control light-red" data-test="alto">Alta · vermelho</button><button class="control light-red" data-test="fim">Pronto · vermelho piscando</button></div><p class="help">Os testes de bancada não representam uma medição PT100. O automático percorre as quatro faixas e encerra com os sinaleiros desligados.</p><p class="help" id="testRemaining">Nenhum teste em andamento.</p><p class="help" id="remoteInfo">Simulação CAD não selecionada.</p></div></div><p id="commandMessage" class="message" role="status"></p></section>
 <details class="card settings" id="purgeSettings"><summary>Controle dos purgadores <span class="badge">DOIS CANAIS LOCAIS</span></summary><div class="settingbody"><div class="savedstatus" style="margin-bottom:14px"><strong>Relés para lâmpadas de bancada · SIMULAÇÃO CAD</strong>
  <p class="help">Teste elétrico isolado: somente LEDs/relés de baixa tensão. A chave física GPIO27→GND habilita a bancada; nenhum atuador da fábrica deve estar conectado.</p>
  <p class="help">Selecione Simulação CAD e feche a chave GPIO27: os LEDs acompanham automaticamente o ciclo. Perda de sinal desarma; para retomar, selecione novamente Simulação CAD.</p>
@@ -767,15 +777,18 @@ function render(data){
  const completeSimulation=simCurrent&&data.estado_simulacao_disponivel===true;
  const validSource=real?sensorValid&&readable:remote?simCurrent:true;
  const expired=remote&&data.sensor_status==='SIMULACAO_EXPIRADA';
- const color=validSource?data.cor_sinaleiro:'DESLIGADO';
+ const localPreview=!remote;
+ const color=validSource?(localPreview?data.cor_sinaleiro_virtual:data.cor_sinaleiro):'DESLIGADO';
+ const testColor=data.bancada_reles?.teste_individual?['Vermelho','Amarelo','Verde'][data.bancada_reles.teste_canal]:null;
+ const signalLabel=testColor?'Teste isolado · '+testColor:(colorNames[color]||'Não informado')+(localPreview?' · virtual':'');
  const ready=data.pronto_descarga===true&&color==='VERMELHO_PISCANDO'&&validSource&&readable;
  el('card'+id).className='card digestor-card linked';text('selectedDigestor','Digestor '+id);text(prefix+'mode',modes[data.modo]||'MODO NÃO INFORMADO');
  text(prefix+'temp',readable?data.temperatura_c.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}):'—');
  const sourceLabel=real?'PT100: '+(sensorNames[data.sensor_status]||'Não informado'):remote?(simCurrent?'SIMULADO · PC':expired?'Simulação CAD expirada':'Aguardando simulação do PC'):'Sensor: '+(sensorNames[data.sensor_status]||'Não informado');
  text(prefix+'range',real&&!validSource?'Sensor indisponível':remote&&!simCurrent?(expired?'Simulação expirada · sem temperatura atual':'Aguardando temperatura simulada do PC'):(rangeNames[data.faixa_temperatura]||'Faixa não informada'));text(prefix+'sensor',sourceLabel);
- text(prefix+'signal',colorNames[color]||'Não informado');text(prefix+'ready',ready?(real?'Pronto para descarga':'Pronto · simulado'):remote&&!simCurrent?'Pronto: não confirmado':'Pronto: não');el(prefix+'ready').className='readystatus'+(ready?' ready-on':'');
- ['red','yellow','green'].forEach((name,index)=>{const commanded=[data.vermelho,data.amarelo,data.verde][index]===true&&validSource;el(prefix+name).className='lamp '+name+(commanded?' active':'');});
- el(prefix+'tower').setAttribute('aria-label',colorNames[color]||'Estado não informado');
+ text(prefix+'signal',signalLabel);text(prefix+'ready',ready?(real?'Pronto para descarga':'Pronto · simulado'):remote&&!simCurrent?'Pronto: não confirmado':'Pronto: não');el(prefix+'ready').className='readystatus'+(ready?' ready-on':'');
+ ['red','yellow','green'].forEach((name,index)=>{const values=localPreview?[data.vermelho_virtual,data.amarelo_virtual,data.verde_virtual]:[data.vermelho,data.amarelo,data.verde];const commanded=values[index]===true&&validSource;el(prefix+name).className='lamp '+name+(commanded?' active':'');});
+ el(prefix+'tower').setAttribute('aria-label',signalLabel);
  text(prefix+'contact','Este ESP32 · contato agora');
  const measured=typeof data.timestamp_medicao==='string'?new Date(data.timestamp_medicao):null;
  text(prefix+'stamp',measured&&Number.isFinite(measured.getTime())&&validSource?(real?'Medição ':'Simulação ')+measured.toLocaleTimeString('pt-BR'):(real?'Horário pendente':simCurrent?'Temperatura simulada atual':'Sem medição real'));
@@ -783,10 +796,10 @@ function render(data){
  text('pcHeating',real?'Aquecimento virtual: não utilizado no modo real':completeSimulation&&typeof data.aquecimento_simulado==='boolean'?'Aquecimento virtual: '+(data.aquecimento_simulado?'ligado':'desligado')+' · simulado':'Aquecimento virtual: não confirmado');
  text('pcSimHelp',real?'As informações simuladas do PC não alteram o PT100 nem os ciclos locais neste modo.':completeSimulation?'O CAD controla a animação. Os LEDs acompanham o ciclo com a chave GPIO27 ativa e sem bloqueio de falha/desarme.':simCurrent?'Temperatura simulada atual. Estados de aquecimento e válvulas indisponíveis; o teste dos relés pelo CAD permanece bloqueado.':remote?'Aguardando uma simulação atual do PC. Sem renovação válida, o teste CAD fecha e desarma os canais.':'Selecione Simulação CAD para acompanhar temperatura, aquecimento e válvulas virtuais do PC.');
  el('connection').className='connection online';text('connectionText','ESP32 conectado · D'+id);
- text('outputBadge',data.saidas_habilitadas===true?'SINALEIROS DE BANCADA':'SINALEIROS DESATIVADOS');
+ text('outputBadge',localPreview?'PRÉVIA LOCAL · GPIO DESLIGADOS':data.bancada_reles?.armada||data.bancada_reles?.teste_individual?'LEDS DA BANCADA ATIVOS':'LEDS DESARMADOS');
  each('[data-mode]',button=>button.classList.toggle('selected',button.dataset.mode===data.modo));
  each('[data-manual]',button=>button.disabled=data.modo!=='manual');el('modeReal').disabled=data.pt100_habilitado!==true;
- text('modeHelp',real?'Operação real: o ESP32 lê o PT100 e decide a sinalização. O CAD somente supervisiona.':(data.pt100_habilitado===true?'PT100 habilitado. A seleção de operação real é local.':'PT100 ainda não habilitado. Modo real bloqueado; a simulação do PC funciona sem PT100.'));
+ text('modeHelp','V12: Manual, Automático e PT100 são apenas visualização. Para testar relés com LEDs, selecione Simulação CAD com comunicação e chave GPIO27 ativas.');
  text('testRemaining',['teste','automatico'].includes(data.modo)&&Number.isFinite(data.restante_ms)?'Etapa atual: '+(Math.max(0,data.restante_ms)/1000).toFixed(1)+' s restantes.':'Nenhum teste rápido em andamento.');
  text('remoteInfo',remote?(completeSimulation?'Simulação CAD ativa: luzes e relés de LEDs acompanham o CAD após autorização LOCAL da bancada.':simCurrent?'Temperatura simulada atual. Aguardando dados visuais de purgadores e guilhotinas do CAD.':expired?'Simulação CAD expirada. Sinaleiros apagados e teste CAD desarmado.':'Simulação CAD selecionada. Aguardando temperatura e estados virtuais atuais do PC.'):'Simulação CAD não selecionada.');
  text('wifiStatus',data.wifi_tentando?'Conectando...':(data.wifi_conectado?'Conectado':'Não conectado'));text('wifiSummary',data.wifi_tentando?'CONECTANDO':(data.wifi_conectado?'CONECTADO':'SEM REDE'));
@@ -832,6 +845,7 @@ let sending=false;
 window.cgdGatePanelUpdate=function(data){
  const cad=Boolean(data&&data.modo==='simulacao'&&data.simulacao_cad_atual&&data.estado_simulacao_disponivel);
  const bench=data?.bancada_reles||{};
+ const testLabel=['vermelho','amarelo','verde','camisa','eixo','carga aberta','carga fechada','descarga aberta','descarga fechada'][bench.teste_canal]||'LED';
  const active=Boolean(cad&&(bench.armada||bench.teste_individual)&&bench.chave_local_ativa);
  const motor=Boolean(cad&&data.motor_digestor_simulado&&data.etapa_mecanica==='COZIMENTO');
  led('cg-motor-led',motor);
@@ -851,7 +865,7 @@ window.cgdGatePanelUpdate=function(data){
    sending||!cad||!bench.chave_local_ativa||!bench.compatibilidade_pinos||bench.teste_individual);
  set('benchStatus',!data?'SEM CONTATO COM ESP32':!bench.compatibilidade_pinos?
    'PINAGEM BLOQUEADA · GPIO16/17 incompatíveis com PSRAM':bench.teste_individual?
-   'TESTE INDIVIDUAL · '+Math.ceil((bench.teste_restante_ms||0)/1000)+' s · demais LEDs apagados':bench.armada?
+   'TESTE INDIVIDUAL · '+testLabel+' · '+Math.ceil((bench.teste_restante_ms||0)/1000)+' s · demais LEDs apagados':bench.armada?
    'ESPELHAMENTO CAD ATIVO · somente LEDs de bancada':cad?
    (!bench.chave_local_ativa?'Feche a chave GPIO27-GND':bench.bloqueada?
     'DESARMADO · selecione novamente Simulação CAD para retomar':'Aguardando autorização da chave local'):
@@ -1178,6 +1192,8 @@ struct LocalSnapshot {
   int32_t version = -1;
   int8_t receivedPhase = -1;
   bool red = false, yellow = false, green = false;
+  cgd::Color previewColor=cgd::Color::DESLIGADO;
+  bool previewRed=false,previewYellow=false,previewGreen=false;
   bool cadCurrent = false, cadExpired = false, cadComplete = false, heating = false;
   bool purgeVirtualOpen[2] = {false, false};
   bool purgeDisplayOpen[2] = {false, false};
@@ -1241,6 +1257,7 @@ bool snapshot(LocalSnapshot &copy) {
   if (millis() - copy.updatedAt > 1250U) {
     copy.signal = cgd::unavailable(cgd::SensorStatus::SEM_SINAL);
     copy.red = copy.yellow = copy.green = false; copy.measuredAt = 0;
+    copy.previewColor=cgd::Color::DESLIGADO;copy.previewRed=copy.previewYellow=copy.previewGreen=false;
     copy.cadCurrent = false; copy.cadComplete = false; copy.heating = false;
     copy.purgeVirtualOpen[0] = copy.purgeVirtualOpen[1] = false;
     copy.gateDisplayOpen[0]=copy.gateDisplayOpen[1]=false;
@@ -1392,10 +1409,15 @@ void tarefaSinalizacao(void*) {
           (corManual == 1 ? cgd::Color::AMARELO : (corManual == 2 ? cgd::Color::VERDE : cgd::Color::DESLIGADO));
       }
       if (modo == PARADO) pins = {false, false, false};
+      next.previewColor=next.signal.color;
+      next.previewRed=pins.red;next.previewYellow=pins.yellow;next.previewGreen=pins.green;
       next.bench=benchLeds.tick(benchInput(now),now);
       if(modo==REMOTO_BANCADA){
         pins={next.bench.outputs[2],next.bench.outputs[1],next.bench.outputs[0]};
         if(!next.bench.mirroring){next.signal.color=cgd::Color::DESLIGADO;next.signal.ready=false;}
+      }else{
+        // V12: todos os demais modos sao apenas pre-visualizacao, sem GPIO.
+        pins={false,false,false};next.signal.color=cgd::Color::DESLIGADO;next.signal.ready=false;
       }
       escreverSaidas(pins.red, pins.yellow, pins.green);
       next.red = pins.red; next.yellow = pins.yellow; next.green = pins.green;
@@ -1405,13 +1427,10 @@ void tarefaSinalizacao(void*) {
         remoteCommand.validity, remoteCommand.purgeOpen[0], remoteCommand.purgeOpen[1]);
       const bool benchActive=next.bench.mirroring||next.bench.testing;
       // Relés LEDs da bancada: cada purgador alterna conforme os estados do CAD.
+      if(modo==REMOTO_BANCADA)purgeOutputs.applyBench(benchActive,next.bench.outputs[3],next.bench.outputs[4]);
       for(int i=0;i<2;i++){
         if(modo==REMOTO_BANCADA){
           purgadores[i].stop();cadPurgeTest.stop(i);
-          if(benchActive){
-            if(!purgeOutputs.armed(i))purgeOutputs.arm(i);
-            purgeOutputs.apply(i,next.bench.outputs[3+i],true);
-          }else purgeOutputs.stop(i);
           continue;
         }
         const bool healthy = modo == PARADO || (modo == OPERACAO_REAL && next.signal.hasTemperature);
@@ -1422,7 +1441,7 @@ void tarefaSinalizacao(void*) {
         if (purgeOutputs.armed(i) && (!healthy || (wasActive && !timer.active))) {
           purgadores[i].stop(); purgeOutputs.stop(i);
         }
-        purgeOutputs.apply(i, timer.active && timer.open, healthy);
+        purgeOutputs.stop(i); // V12: temporizador fora do CAD e somente virtual.
       }
       if(modo==REMOTO_BANCADA){
         cgdGate.apply(benchActive,next.bench.outputs[5],next.bench.outputs[6],
@@ -1580,6 +1599,8 @@ void enviarEstado() {
   doc["digestor"] = DIGESTOR_ID; doc["digestor_id"] = DIGESTOR_ID; doc["device_id"] = deviceId();
   doc["modo"] = nomeModo(s.mode); doc["fase"] = fase;
   doc["vermelho"] = s.red; doc["amarelo"] = s.yellow; doc["verde"] = s.green;
+  doc["cor_sinaleiro_virtual"]=cgd::name(s.previewColor);
+  doc["vermelho_virtual"]=s.previewRed;doc["amarelo_virtual"]=s.previewYellow;doc["verde_virtual"]=s.previewGreen;
   doc["restante_ms"] = (s.mode == AUTOMATICO || s.mode == SIMULACAO) ?
     (millis() - inicioFase < DURACAO_FASE_MS ? DURACAO_FASE_MS - (millis() - inicioFase) : 0) : 0;
   doc["remoto_restante_s"] = 0; doc["simulacao_persistente"] = s.mode == REMOTO_BANCADA;
@@ -1769,6 +1790,8 @@ void bancadaRelesHandler(){
   escreverSaidas(false,false,false);purgeOutputs.stopAll();cgdGate.stop();
   localSnapshot.bench=cgd::BenchState();localSnapshot.red=localSnapshot.yellow=localSnapshot.green=false;
   localSnapshot.mode=PARADO;localSnapshot.signal=cgd::unavailable();
+  localSnapshot.previewColor=cgd::Color::DESLIGADO;
+  localSnapshot.previewRed=localSnapshot.previewYellow=localSnapshot.previewGreen=false;
   localSnapshot.cadCurrent=false;localSnapshot.cadComplete=false;
   xSemaphoreGive(mutexEstado);
   servidor.send(200,"application/json","{\"ok\":true,\"armado\":false}");

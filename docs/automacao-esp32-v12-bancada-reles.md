@@ -8,6 +8,8 @@ A simulação CAD gera etapas CARGA, COZIMENTO, DESCARGA e TRANSFERÊNCIA. Na IH
 
 Selecionar **Simulação CAD** na IHM e fechar a chave GPIO27→GND autoriza o espelhamento automático dos LEDs. Não existe segundo botão de armamento. Os sinaleiros GPIO18/19/21 seguem a temperatura simulada; GPIO25/26 seguem os purgadores/empurradores virtuais; os dois pares das guilhotinas mostram aberto/fechado. Aquecimento e motor continuam exclusivamente virtuais, sem saída de vapor ou partida de motor.
 
+Nesta V12, **Manual, Automático, testes rápidos e PT100 são somente visualização**, com GPIOs desligados. Todos os nove relés exigem o modo Simulação CAD e os permissivos da bancada, incluindo os testes individuais de 2 segundos. Os firmwares legados V11 e `esp32-sinaleiros` não foram alterados.
+
 ## Pinagem para painel EXCLUSIVO de LEDs
 
 | Indicação na bancada | GPIO ESP32 | Comportamento |
