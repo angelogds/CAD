@@ -852,7 +852,9 @@ window.cgdGatePanelUpdate=function(data){
  if(cad){
   virtual.carga=mirrored.carga==='ABERTA'?'aberta':'fechada';
   virtual.descarga=mirrored.descarga==='ABERTA'?'aberta':'fechada';
- }else if(!data||data?.modo==='simulacao'){
+ }else if(!data||data.modo!=='parado'){
+  // Qualquer troca para REAL/MANUAL ou expiração da simulação limpa o estado
+  // virtual: jamais representar uma posição física com bit do CAD antigo.
   virtual.carga='fechada'; virtual.descarga='fechada';
  }
  showVirtual('carga');showVirtual('descarga');
