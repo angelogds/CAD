@@ -1,0 +1,75 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const Database = require('better-sqlite3');
+const db = new Database(':memory:');
+db.pragma('foreign_keys = ON');
+db.exec(`CREATE TABLE users(id INTEGER PRIMARY KEY,name TEXT);
+CREATE TABLE colaboradores(id INTEGER PRIMARY KEY,nome TEXT,ativo INTEGER DEFAULT 1,deleted_at TEXT);
+INSERT INTO users(id,name) VALUES(1,'Registrador');
+INSERT INTO colaboradores(id,nome,ativo) VALUES(11,'Operador de ensaio',1),(12,'Auxiliar de ensaio',1);`);
+db.exec(fs.readFileSync(path.join(__dirname,'../database/migrations/238_automacao_digestores_ciclos.sql'),'utf8'));
+require.cache[require.resolve('../database/db')] = {exports:db};
+const service = require('../modules/automacao/ciclos.service');
+
+test('registro REAL exige colaborador confirmado, valida digestor e bloqueia simultâneos',()=>{
+ assert.throws(()=>service.openReal({digestor_id:1,actor:1}),/Colaborador inválido/);
+ assert.throws(()=>service.openReal({digestor_id:5,colaborador_id:11,actor:1}),/Digestor inválido/);
+ const cycle=service.openReal({digestor_id:1,colaborador_id:11,actor:1});
+ assert.equal(cycle.status,'CARREGANDO');
+ assert.equal(cycle.origem,'REAL_MANUAL');
+ assert.equal(cycle.colaborador_id,11);
+ assert.throws(()=>service.openReal({digestor_id:1,colaborador_id:12,actor:1}),/Já existe um ciclo real/);
+});
+test('fases reais sequenciais preservam relógios e producao só ao concluir',()=>{
+ const cycle=service.list({origem:'REAL_MANUAL'}).rows[0];
+ assert.equal(service.list().total_concluidos,0);
+ assert.throws(()=>service.moveReal({id:cycle.id,action:'CONCLUIR',actor:1}),/Transição inválida/);
+ let a=service.moveReal({id:cycle.id,action:'INICIAR_COZIMENTO',actor:1});
+ assert.equal(a.status,'COZINHANDO');
+ assert.ok(a.carga_fim_ms>=a.inicio_ms);
+ a=service.moveReal({id:cycle.id,action:'INICIAR_DESCARGA',actor:1});
+ assert.equal(a.status,'DESCARREGANDO');
+ assert.ok(a.cozimento_fim_ms>=a.carga_fim_ms);
+ a=service.moveReal({id:cycle.id,action:'CONCLUIR',actor:1});
+ assert.equal(a.status,'CONCLUIDO');
+ assert.ok(a.descarga_fim_ms>=a.cozimento_fim_ms);
+ assert.equal(service.list().total_concluidos,1);
+ assert.equal(service.list().por_colaborador[0].colaborador_id,11);
+ assert.equal(service.list().por_colaborador[0].concluidos,1);
+ assert.equal(service.list().por_equipamento[0].concluidos,1);
+});
+test('cancelamento não conta como produção e libera abertura no mesmo equipamento',()=>{
+ const a=service.openReal({digestor_id:2,colaborador_id:12,actor:1});
+ service.moveReal({id:a.id,action:'CANCELAR',actor:1});
+ assert.equal(service.getById(a.id).status,'CANCELADO');
+ const b=service.openReal({digestor_id:2,colaborador_id:12,actor:1});
+ assert.equal(b.status,'CARREGANDO');
+ assert.equal(service.list().por_colaborador.some(x=>x.colaborador_id===12),false);
+});
+test('simulações não se misturam com real, usam relógio virtual e são idempotentes',()=>{
+ const payload={key:'sessao-de-teste:1',digestor_id:1,carga_s:6,cozimento_s:60,descarga_s:8,transferencia_s:12,actor:1};
+ const a=service.saveSimulation(payload), b=service.saveSimulation(payload);
+ assert.equal(a.id,b.id);
+ const report=service.list({origem:'SIMULACAO'});
+ assert.equal(report.rows.length,1);
+ assert.equal(report.rows[0].colaborador_id,null);
+ assert.equal(report.rows[0].tempos.unidade,'SEGUNDOS_VIRTUAIS');
+ assert.equal(report.rows[0].tempos.cozi_mento_s,undefined);
+ assert.equal(report.rows[0].tempos.cozimento_s,60);
+ assert.deepEqual(report.por_colaborador,[]);
+ assert.equal(service.list({origem:'REAL_MANUAL'}).total_concluidos,1);
+ assert.throws(()=>service.saveSimulation({...payload,key:'sessao-de-teste:2',carga_s:-1}),/Duração virtual inválida/);
+});
+test('rotas e tela aplicam permissão, CSRF e exibem separação de origens',()=>{
+ const route=fs.readFileSync(path.join(__dirname,'../modules/automacao/automacao.routes.js'),'utf8');
+ const page=fs.readFileSync(path.join(__dirname,'../views/automacao/digestores-ciclos.ejs'),'utf8');
+ const simulator=fs.readFileSync(path.join(__dirname,'../views/automacao/simulador-digestores.ejs'),'utf8');
+ assert.match(route,/apiCiclos/);
+ assert.match(route,/x-cgd-ciclos-csrf/);
+ assert.match(page,/Produção real • apontada/);
+ assert.match(page,/Simulações • virtuais/);
+ assert.match(simulator,/automacao-digestores-ciclos-simulacao.js/);
+ assert.match(simulator,/Histórico e relatórios dos ciclos/);
+});

@@ -8,6 +8,7 @@ const ctrl = require('./automacao.controller');
 const devices = require('./dispositivos.service');
 const bancada = require('./sinaleiro-bancada.service');
 const telemetria = require('./bancada-telemetria.service');
+const ciclos = require('./ciclos.service');
 
 const acessoCircuitos = [...new Set([...ACCESS.automacao_view, ...ACCESS.automacao_decanters_simulate])];
 router.get('/', requireLogin, requireRole(acessoCircuitos), ctrl.index);
@@ -26,6 +27,30 @@ router.get('/prensas', requireLogin, requireRole(ACCESS.automacao_view), ctrl.pr
 // Apenas ADMIN pode abrir o simulador local das prensas. Não há POST ou API industrial neste módulo.
 router.get('/prensas/simulador', requireLogin, requireRole([ROLE.ADMIN]), ctrl.simuladorPrensas);
 router.get('/digestores/simulador', requireLogin, requireRole(acessoCircuitos), ctrl.simuladorDigestores);
+
+router.get('/digestores/ciclos', requireLogin, requireRole(acessoCircuitos), ctrl.ciclosDigestores);
+// Relatórios só para leitura autorizada; operador nunca é atribuído pelo login da IHM.
+function apiCiclos(req,res,next) {
+  res.setHeader('Cache-Control','no-store');
+  const user=req.session?.user;
+  if(!user)return res.status(401).json({ok:false,code:'SESSAO_EXPIRADA'});
+  if(!ACCESS.automacao_decanters_simulate.includes(normalizeRole(user.role)))
+    return res.status(403).json({ok:false,code:'SEM_PERMISSAO'});
+  if(req.get('x-cgd-ciclos-csrf')!==req.session.automacaoCiclosCsrf || !req.session.automacaoCiclosCsrf)
+    return res.status(403).json({ok:false,code:'CSRF_INVALIDO'});
+  next();
+}
+function respondCiclo(res,fn) {
+  try{return res.json({ok:true,...fn()});}
+  catch(e){return res.status(e.status||500).json({ok:false,error:e.status?e.message:'Falha ao salvar o ciclo.'});}
+}
+router.post('/api/digestores/ciclos',apiCiclos,(req,res)=>
+  respondCiclo(res,()=>({ciclo:ciclos.openReal({...req.body,actor:req.session.user.id})})));
+router.post('/api/digestores/ciclos/:id/etapa',apiCiclos,(req,res)=>
+  respondCiclo(res,()=>({ciclo:ciclos.moveReal({id:req.params.id,action:req.body?.action,actor:req.session.user.id})})));
+router.post('/api/digestores/ciclos/simulacao',apiCiclos,(req,res)=>
+  respondCiclo(res,()=>({ciclo:ciclos.saveSimulation({...req.body,actor:req.session.user.id})})));
+
 
 // Gestão de credenciais EXCLUSIVA do ADMIN: inclusive endpoints JSON e URL legada.
 const admin = [requireLogin, requireRole([ROLE.ADMIN])];

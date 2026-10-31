@@ -1,0 +1,101 @@
+<% layout('layout') %>
+<% const dataFmt = n => n == null ? '—' : new Date(Number(n)).toLocaleString('pt-BR',{timeZone:'America/Bahia'}); %>
+<% const durFmt = s => s == null ? '—' : (Math.floor(s/3600)>0 ? Math.floor(s/3600)+' h ' : '') + Math.floor((s%3600)/60)+' min '+Math.floor(s%60)+' s'; %>
+<% const query = filtros || {}; %>
+<link rel="stylesheet" href="/css/automacao.css">
+<main class="auto-page auto-hmi auto-2a" id="digestores-ciclos" data-csrf="<%= ciclosCsrf %>">
+  <%- include('partials/brand') %>
+  <div class="auto-actions-top"><a class="auto-back-link" href="/automacao/digestores">← IHM Digestores</a> <a class="auto-simulator-link" href="/automacao/digestores/simulador">▶ Simulação integrada</a></div>
+  <header class="auto-hero"><div><span class="auto-eyebrow">CAMPO DO GADO • 2A AUTOMAÇÃO</span><h1>Histórico e tempos dos digestores</h1>
+  <p>Carregamento, cozimento e descarga por equipamento e colaborador. Registros reais apontados manualmente; simulações em relatório separado.</p></div></header>
+  <section class="auto-alert" role="note"><strong>Confiabilidade</strong><span>REAL MANUAL significa horários marcados por um responsável, não movimento confirmado pela ESP32, por PT100 ou por fim de curso. SIMULAÇÃO usa segundos virtuais e não conta na produção dos colaboradores.</span></section>
+  <style>
+  .cy-panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin:18px 0}
+  .cy-box{background:var(--auto-card,#fff);border:1px solid #d4ddda;border-radius:12px;padding:18px}
+  .cy-box h2{font-size:1.06rem;margin:0 0 13px}
+  .cy-form{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+  .cy-form label{display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:.9rem;min-width:120px;flex:1}
+  .cy-form input,.cy-form select{padding:9px;min-width:0;border-radius:7px;border:1px solid #bccac5;background:#fff}
+  .cy-form button,.cy-action,.cy-form a{padding:10px 14px;border-radius:8px;border:1px solid #2e7550;background:#2e7550;color:#fff;cursor:pointer;font-weight:600}
+  .cy-action.cancel{background:#fff;color:#9e3f36;border-color:#bc6a63}
+  .cy-form a{background:#fff;color:#245e44}
+  .cy-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin-top:16px}
+  .cy-stats article{padding:13px;border:1px solid #d4ddda;border-radius:10px;background:#fafcfb}
+  .cy-stats strong{display:block;font-size:1.45rem}
+  .cy-table-wrap{max-width:100%;overflow-x:auto}
+  .cy-table{width:100%;border-collapse:collapse;font-size:.88rem;white-space:nowrap}
+  .cy-table th,.cy-table td{padding:9px 11px;text-align:left;border-bottom:1px solid #e1e9e5}
+  .cy-table th{background:#eaf1ed}
+  .cy-muted{font-size:.86rem;color:#576760}
+  .cy-status{margin-top:12px;font-weight:600}
+  @media(max-width:650px){.cy-form{flex-direction:column;align-items:stretch}.cy-form label{width:100%}.cy-table{font-size:.8rem}}
+  </style>
+  <% if (podeRegistrar) { %>
+  <div class="cy-panels">
+    <section class="cy-box"><h2>Iniciar apontamento REAL</h2>
+      <form id="cy-start" class="cy-form">
+        <label>Digestor<select name="digestor_id" required><% for(let id=1;id<=4;id++){ %><option value="<%= id %>">Digestor <%= id %></option><% } %></select></label>
+        <label>Funcionário responsável<select name="colaborador_id" required><option value="">Selecione...</option>
+        <% funcionarios.forEach(c=>{ %><option value="<%= c.id %>"><%= c.nome %></option><% }); %></select></label>
+        <label>Observação (opcional)<input name="observacao" maxlength="500" placeholder="Turno / lote / observação"></label>
+        <button type="submit">▶ Iniciar carregamento</button>
+      </form>
+      <p class="cy-muted">Selecione o funcionário que realmente executou o ciclo; o login usado para registrar fica no histórico de auditoria. Não é possível abrir dois ciclos reais simultâneos no mesmo digestor.</p>
+    </section>
+    <section class="cy-box"><h2>Como marcar os tempos</h2><p class="cy-muted">1. Iniciar carregamento → 2. Iniciar cozimento → 3. Iniciar descarga → 4. Concluir. Os horários são registrados pelo servidor. Cancelamentos não entram na produtividade.</p>
+    <p id="cy-feedback" class="cy-status" role="status" aria-live="polite"></p></section>
+  </div>
+  <% } %>
+  <section class="cy-box"><h2>Filtros e relatório</h2>
+    <form method="get" action="/automacao/digestores/ciclos" class="cy-form">
+      <label>Origem<select name="origem"><option value="REAL_MANUAL" <%= query.origem==='REAL_MANUAL'?'selected':'' %>>Produção real • apontada</option><option value="SIMULACAO" <%= query.origem==='SIMULACAO'?'selected':'' %>>Simulações • virtuais</option></select></label>
+      <label>De<input name="de" type="date" value="<%= query.de||'' %>"></label>
+      <label>Até<input name="ate" type="date" value="<%= query.ate||'' %>"></label>
+      <label>Digestor<select name="digestor_id"><option value="">Todos</option><% for(let id=1;id<=4;id++){ %><option value="<%= id %>" <%= String(query.digestor_id)===String(id)?'selected':'' %>>Digestor <%= id %></option><% } %></select></label>
+      <label>Colaborador<select name="colaborador_id"><option value="">Todos</option><% funcionarios.forEach(c=>{ %><option value="<%= c.id %>" <%= String(query.colaborador_id)===String(c.id)?'selected':'' %>><%= c.nome %></option><% }); %></select></label>
+      <button type="submit">Aplicar filtros</button><a href="/automacao/digestores/ciclos">Limpar</a>
+    </form>
+    <div class="cy-stats">
+      <article>Concluídos no filtro<strong><%= relatorio.total_concluidos %></strong></article>
+      <article>Em andamento<strong><%= relatorio.total_abertos %></strong></article>
+      <article>Tipo de tempo<strong style="font-size:1rem"><%= relatorio.origem==='SIMULACAO'?'Virtual':'Real apontado' %></strong></article>
+    </div>
+    <% if (relatorio.limitado) { %><p class="cy-muted">Exibindo somente os 2.000 registros mais recentes. Reduza o período para obter um total completo.</p><% } %>
+  </section>
+  <div class="cy-panels">
+    <section class="cy-box"><h2>Resumo por digestor</h2>
+      <div class="cy-table-wrap"><table class="cy-table"><thead><tr><th>Equipamento</th><th>Ciclos concluídos</th><th>Carregamento</th><th>Cozimento</th></tr></thead><tbody>
+      <% relatorio.por_equipamento.forEach(r=>{ %><tr><td>D<%= r.digestor %></td><td><%= r.concluidos %></td><td><%= durFmt(r.carga_s) %></td><td><%= durFmt(r.cozimento_s) %></td></tr><% }); %>
+      </tbody></table></div>
+    </section>
+    <% if(relatorio.origem==='REAL_MANUAL'){ %>
+    <section class="cy-box"><h2>Produção por funcionário</h2>
+      <div class="cy-table-wrap"><table class="cy-table"><thead><tr><th>Responsável confirmado</th><th>Ciclos concluídos</th><th>Carregamento</th><th>Cozimento</th></tr></thead><tbody>
+      <% relatorio.por_colaborador.forEach(r=>{ %><tr><td><%= r.nome %></td><td><%= r.concluidos %></td><td><%= durFmt(r.carga_s) %></td><td><%= durFmt(r.cozimento_s) %></td></tr><% }); %>
+      <% if (!relatorio.por_colaborador.length) { %><tr><td colspan="4">Nenhum ciclo real concluído neste filtro.</td></tr><% } %></tbody></table></div>
+    </section>
+    <% } %>
+  </div>
+  <section class="cy-box"><h2>Histórico por ciclo</h2>
+    <div class="cy-table-wrap"><table class="cy-table">
+      <thead><tr><th>ID</th><th>Digestor</th><th>Funcionário</th><th>Início</th><th>Etapa</th><th>Carga</th><th>Cozimento</th><th>Descarga</th><th>Transferência</th><th>Operação</th></tr></thead>
+      <tbody>
+      <% relatorio.rows.forEach(t=>{ %><tr>
+        <td><%= t.id %></td><td>D<%= t.digestor_id %></td><td><%= t.colaborador_nome||'Somente simulação' %></td>
+        <td><%= dataFmt(t.inicio_ms) %></td><td><%= t.status %></td>
+        <td><%= durFmt(t.tempos.carga_s) %></td><td><%= durFmt(t.tempos.cozimento_s) %></td>
+        <td><%= durFmt(t.tempos.descarga_s) %></td><td><%= durFmt(t.tempos.transferencia_s) %></td>
+        <td><% if(podeRegistrar && t.origem==='REAL_MANUAL' && !['CONCLUIDO','CANCELADO'].includes(t.status)){ %>
+          <button class="cy-action" data-id="<%= t.id %>" data-action="<%= t.status==='CARREGANDO'?'INICIAR_COZIMENTO':t.status==='COZINHANDO'?'INICIAR_DESCARGA':'CONCLUIR' %>"><%= t.status==='CARREGANDO'?'Iniciar cozimento':t.status==='COZINHANDO'?'Iniciar descarga':'Concluir' %></button>
+          <button class="cy-action cancel" data-id="<%= t.id %>" data-action="CANCELAR">Cancelar</button>
+          <% } else { %>—<% } %></td>
+      </tr><% }); %>
+      <% if(!relatorio.rows.length){ %><tr><td colspan="10">Nenhum ciclo encontrado para o filtro escolhido.</td></tr><% } %>
+      </tbody>
+    </table></div>
+    <p class="cy-muted">Os tempos reais começam no momento do apontamento manual. Horários em Salvador/BA. A simulação mostra duração virtual, não duração real de trabalho.</p>
+  </section>
+</main>
+<% if (podeRegistrar) { %>
+<script src="/js/automacao-digestores-ciclos.js?v=20261030-ciclos1" defer></script>
+<% } %>

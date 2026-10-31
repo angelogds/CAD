@@ -15,9 +15,12 @@
   const presentation = document.getElementById('sim-presentation');
   const speed = document.getElementById('sim-speed');
   const integrationButton = document.getElementById('sim-link-circuits');
-  let integrationOn = false;
+  let integrationOn = Boolean(integrationButton);
   let integrationActive = false;
   const circuit = () => window.AutomacaoDigestoresCircuito;
+  const linkedStatus = document.getElementById('sim-integration-state');
+  const setLinkedStatus = message => { if (linkedStatus) linkedStatus.textContent = message; };
+
   const clock = document.getElementById('sim-clock');
   const eventsFilter = document.getElementById('sim-events-filter');
   const eventsList = document.getElementById('sim-events-list');
@@ -42,8 +45,8 @@
       } else visible.push(item.id);
     }
     selectionStatus.textContent = selection === 'all'
-      ? 'Quatro digestores selecionados · simulação independente'
-      : 'Digestor ' + selection + ' selecionado · os demais não iniciam';
+      ? 'Quatro digestores selecionados · ' + (integrationOn ? 'ciclo completo integrado' : 'simulação térmica independente')
+      : 'Digestor ' + selection + ' selecionado · ' + (integrationOn ? 'ciclo completo integrado' : 'simulação térmica independente');
     eventsFilter.value = selection;
     renderEvents();
     if (integrationOn) {
@@ -206,6 +209,7 @@
       if (after.stage === 'CONCLUIDO') {
         integrationActive = false;
         stop();
+        setLinkedStatus('Ciclo completo concluído: material transportado e tacho transferido virtualmente.');
       }
     }
     render();
@@ -218,6 +222,7 @@
     start.disabled = false;
     pause.disabled = true;
     if (integrationActive) circuit()?.pauseLinked();
+    if (integrationOn) setLinkedStatus('Ciclo pausado. Clique em Iniciar simulação para retomar.');
     if (integrationButton) integrationButton.disabled = false;
     render();
   }
@@ -242,7 +247,8 @@
     integrationOn = !integrationOn;
     if (!integrationOn) { circuit()?.exitLinked(); integrationActive = false; }
     integrationButton.setAttribute('aria-pressed', String(integrationOn));
-    integrationButton.textContent = integrationOn ? '✓ Simulações vinculadas · desativar' : 'Vincular simulações elétrica + mecânica';
+    integrationButton.textContent = integrationOn ? '✓ Integrado · elétrica + mecânica' : 'Vincular simulações elétrica + mecânica';
+    setLinkedStatus(integrationOn ? 'Integração ativada: clique em Iniciar simulação para percorrer o ciclo completo.' : 'Modo térmico independente: circuito mecânico desligado.');
     const mech = document.getElementById('digestores-circuito-selection');
     if (mech) mech.value = selection === 'all' ? 'TODOS' : 'D' + selection;
   });
@@ -250,16 +256,17 @@
     if (running) return;
     const existing = circuit()?.getSnapshot();
     if (integrationOn) {
-      if (!circuit()) { integrationOn = false; return; }
+      if (!circuit()) { setLinkedStatus('Circuito mecânico indisponível. Recarregue a página.'); return; }
       if (existing?.paused && existing?.linked) circuit().resumeLinked();
       else {
         const result = circuit().startLinked(selection === 'all' ? 'TODOS' : 'D' + selection);
-        if (!result.ok) return;
+        if (!result.ok) { setLinkedStatus(result.reason || 'Não foi possível iniciar o ciclo mecânico.'); return; }
         for (const item of values) {
           core.carregarDigestor(item, core.TEMPERATURA_INICIAL + (item.id - 1) * 2);
         }
       }
       integrationActive = true;
+      setLinkedStatus('Ciclo integrado em execução: carga, cozimento até >120 °C, descarga e transferência virtuais.');
     } else {
       // Modo independente preservado para demonstrar só o circuito elétrico.
       for (const item of values) {
@@ -303,5 +310,6 @@
     root.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   window.addEventListener('pagehide', stop, { once: true });
+  if (integrationButton) { integrationButton.setAttribute('aria-pressed', 'true'); integrationButton.textContent = '✓ Integrado · elétrica + mecânica'; }
   applySelection();
 })();

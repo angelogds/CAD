@@ -36,7 +36,7 @@ function publish(states, adminId) {
   const apply = db.transaction(() => {
     for (const entry of entries) {
       const validade = entry.fase==='PARADO' ? 0 : now+DURACAO_MS;
-      const virtualJson = entry.estado_simulacao_disponivel ? JSON.stringify({aquecimento_simulado:entry.aquecimento_simulado,purgadores_simulados:entry.purgadores_simulados,fonte_simulacao:'CAD'}) : null;
+      const virtualJson = entry.estado_simulacao_disponivel ? JSON.stringify({aquecimento_simulado:entry.aquecimento_simulado,purgadores_simulados:entry.purgadores_simulados,purgadores_visuais:entry.purgadores_visuais,guilhotinas_simuladas:entry.guilhotinas_simuladas,etapa_mecanica:entry.etapa_mecanica,fonte_simulacao:'CAD'}) : null;
       const atual = sel.get(entry.digestor_id);
       if (!atual) { ins.run(entry.digestor_id,entry.fase,validade,adminId||null,now,entry.temperatura_c,entry.faixa_temperatura,entry.cor_sinaleiro,entry.pronto_descarga?1:0,virtualJson); continue; }
       const mesmaFase = atual.fase===entry.fase && (atual.cor_sinaleiro || legacySignal(atual.fase).cor_sinaleiro)===entry.cor_sinaleiro && (atual.estado_simulacao_json || null)===virtualJson;

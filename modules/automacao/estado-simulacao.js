@@ -12,7 +12,25 @@ function normalizeSimulationState(value) {
   if (typeof b.aquecimento_simulado !== 'boolean' || !p || typeof p !== 'object' || Array.isArray(p) || !['ABERTO','FECHADO'].includes(p.camisa) || !['ABERTO','FECHADO'].includes(p.eixo)) {
     const e = new Error('Estado simulado exige aquecimento_simulado booleano e purgadores camisa/eixo ABERTO ou FECHADO.');e.status = 400;throw e;
   }
-  return { aquecimento_simulado: b.aquecimento_simulado, purgadores_simulados: { camisa: p.camisa, eixo: p.eixo } };
+  const valves = ['ABERTO','FECHADO'];
+  const visual = b.purgadores_visuais;
+  const gates = b.guilhotinas_simuladas;
+  const stages = ['PARADO','CARGA','COZIMENTO','DESCARGA','TRANSFERENCIA','CONCLUIDO'];
+  if (visual !== undefined && (!visual || typeof visual !== 'object' || Array.isArray(visual) ||
+      !valves.includes(visual.camisa) || !valves.includes(visual.eixo))) {
+    const e = new Error('Purgadores visuais inválidos.'); e.status = 400; throw e;
+  }
+  if (gates !== undefined && (!gates || typeof gates !== 'object' || Array.isArray(gates) ||
+      !['ABERTA','FECHADA'].includes(gates.carga) || !['ABERTA','FECHADA'].includes(gates.descarga))) {
+    const e = new Error('Guilhotinas simuladas inválidas.'); e.status = 400; throw e;
+  }
+  if (b.etapa_mecanica !== undefined && !stages.includes(b.etapa_mecanica)) {
+    const e = new Error('Etapa mecânica inválida.'); e.status = 400; throw e;
+  }
+  return { aquecimento_simulado: b.aquecimento_simulado, purgadores_simulados: { camisa: p.camisa, eixo: p.eixo },
+    ...(visual ? { purgadores_visuais: { camisa: visual.camisa, eixo: visual.eixo } } : {}),
+    ...(gates ? { guilhotinas_simuladas: { carga: gates.carga, descarga: gates.descarga } } : {}),
+    ...(b.etapa_mecanica !== undefined ? { etapa_mecanica: b.etapa_mecanica } : {}) };
 }
 function readStoredState(raw) {
   try { const state = JSON.parse(raw || 'null'); if (!state) return null; const virtual = normalizeSimulationState(state); return { ...(virtual || CLOSED), estado_simulacao_disponivel: !!virtual, fonte_simulacao: state.fonte_simulacao === 'CAD' ? 'CAD' : 'LOCAL' }; } catch (_) { return null; }
