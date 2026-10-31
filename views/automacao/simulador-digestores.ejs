@@ -1,8 +1,8 @@
 <% layout('layout') %>
 <% const bancadaPermitida = typeof simuladorBancadaPermitida !== 'undefined' ? simuladorBancadaPermitida : (typeof simuladorBancadaAdmin !== 'undefined' && simuladorBancadaAdmin); %>
-<link rel="stylesheet" href="/css/automacao.css?v=20261026-sync-esp-1">
-<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261026-sync-esp-1">
-<link rel="stylesheet" href="/css/automacao-digestores-circuito.css?v=20261030-integrado2">
+<link rel="stylesheet" href="/css/automacao.css?v=20261030-atuadores-v11">
+<link rel="stylesheet" href="/css/automacao-simulador.css?v=20261030-atuadores-v11">
+<link rel="stylesheet" href="/css/automacao-digestores-circuito.css?v=20261030-atuadores-v11">
 <main class="auto-page auto-hmi auto-2a" id="sim-digestores" data-ciclos-csrf="<%= typeof csrfCiclos!=='undefined'?csrfCiclos:'' %>">
   <%- include('partials/brand') %>
   <div class="auto-actions-top"><a href="/automacao/digestores/ciclos" class="auto-simulator-link">Histórico e relatórios dos ciclos</a> <a class="auto-back-link" href="<%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? '/automacao' : '/automacao/digestores' %>">← <%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? 'Voltar à automação' : 'Voltar aos Digestores' %></a></div>
@@ -20,7 +20,7 @@
     <button type="button" id="sim-reset">↺ Reiniciar</button>
     <button type="button" id="sim-presentation" aria-pressed="false">⛶ Modo apresentação</button>
     <label for="sim-speed">Velocidade</label><select id="sim-speed"><option value="1">1×</option><option value="3" selected>3×</option><option value="8">8×</option></select>
-    <span id="sim-clock" aria-live="polite">Tempo virtual: 00:00</span><small class="sim-speed-note">Purgadores: troca a cada 30 s virtuais; 3× = 10 s reais</small>
+    <span id="sim-clock" aria-live="polite">Tempo virtual: 00:00</span><small class="sim-speed-note">Purgadores: troca a cada 30 s virtuais; 3× = 10 s reais (somente maquete)</small>
   </div>
   <small id="sim-integration-state" role="status" aria-live="polite">Circuito completo ativado: carga → cozimento → descarga → transporte → tacho (simulado).</small>
   <%- include('partials/digestores-circuito', { controls: typeof simulacaoCircuitoPermitida !== 'undefined' && simulacaoCircuitoPermitida === true }) %>
@@ -91,7 +91,8 @@
           <span>Etapa térmica <b data-role="alarm">Carregado / frio</b></span>
         </div>
         <div class="sim-purge" aria-label="Purgadores simulados do digestor <%= id %>">
-          <div class="sim-purge-head"><strong>Alternância dos purgadores</strong><span data-role="purga-countdown">Aguardando simulação</span></div>
+          <div class="sim-purge-head"><strong>Empurradores / purgadores simulados</strong><span data-role="purga-countdown">Aguardando simulação</span></div>
+          <p class="sim-purge-note">Motor do digestor: <strong data-role="motor-virtual">AGUARDANDO CICLO</strong>. Na fase COZIMENTO, os empurradores alternam virtualmente; nenhum relé físico é energizado.</p>
           <div class="sim-purge-grid">
             <div class="sim-purger" data-role="camisa-box" data-state="closed">
               <span class="sim-valve-icon" data-role="camisa-icon" aria-hidden="true">◁▷</span>
@@ -138,13 +139,13 @@
   </section>
   <section class="auto-bottom-grid">
     <article class="auto-panel"><h2>Faixas demonstrativas</h2><p><strong>0 a 50 °C:</strong> verde fixo · <strong>acima de 50 e abaixo de 100 °C:</strong> amarelo fixo · <strong>100 a 120 °C:</strong> vermelho fixo · <strong>acima de 120 °C:</strong> vermelho piscando, pronto para descarga. O aviso de pronto é uma indicação térmica e não autoriza descarga automática.</p></article>
-    <article class="auto-panel"><h2>Limites do simulador</h2><p>O ciclo é gerado no navegador e pode ser sincronizado com a bancada. O aquecimento é apenas representado. Os purgadores alternam em 30 segundos virtuais por digestor habilitado; estados visuais e etapas mecânicas são espelhados no ESP32 sem ativar relés. Pausar ou reiniciar fecha ambos os estados. O teste físico de solenoides depende da liberação local de cada canal.</p></article>
+    <article class="auto-panel"><h2>Limites do simulador</h2><p>O ciclo é gerado no navegador e pode ser sincronizado com a bancada. O aquecimento é apenas representado. Empurradores/purgadores alternam a cada 30 segundos virtuais durante o cozimento; motor virtual, guilhotinas e etapas mecânicas são espelhados na IHM ESP32 sem acionar relés. Pausar ou reiniciar fecha ambos os estados. O teste físico de solenoides depende da liberação local de cada canal.</p></article>
   </section>
 </main>
-<script src="/js/automacao-simulador-core.js?v=20261026-sync-esp-1" defer></script>
-<script src="/js/automacao-simulador.js?v=20261030-integrado2" defer></script>
-<% if (bancadaPermitida) { %><script src="/js/automacao-simulador-http.js?v=20261026-sync-esp-1" defer></script><script src="/js/automacao-digestores.js?v=20261026-sync-esp-1" defer></script><script src="/js/automacao-simulador-remoto.js?v=20261026-sync-esp-1" defer></script><% } %>
-<script src="/js/automacao-digestores-circuito-core.js?v=20261030-integrado2" defer></script>
-<script src="/js/automacao-digestores-circuito.js?v=20261030-integrado2" defer></script>
-<script type="module" src="/js/automacao-digestores-3d.mjs?v=20261030-integrado2"></script>
+<script src="/js/automacao-simulador-core.js?v=20261030-atuadores-v11" defer></script>
+<script src="/js/automacao-simulador.js?v=20261030-atuadores-v11" defer></script>
+<% if (bancadaPermitida) { %><script src="/js/automacao-simulador-http.js?v=20261030-atuadores-v11" defer></script><script src="/js/automacao-digestores.js?v=20261030-atuadores-v11" defer></script><script src="/js/automacao-simulador-remoto.js?v=20261030-atuadores-v11" defer></script><% } %>
+<script src="/js/automacao-digestores-circuito-core.js?v=20261030-atuadores-v11" defer></script>
+<script src="/js/automacao-digestores-circuito.js?v=20261030-atuadores-v11" defer></script>
+<script type="module" src="/js/automacao-digestores-3d.mjs?v=20261030-atuadores-v11"></script>
 <% if (typeof csrfCiclos !== 'undefined' && csrfCiclos) { %><script src="/js/automacao-digestores-ciclos-simulacao.js?v=20261030-ciclos1" defer></script><% } %>

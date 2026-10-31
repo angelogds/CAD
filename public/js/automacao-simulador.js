@@ -100,6 +100,7 @@
 
   function render() {
     const thermalStates = Array(4).fill('DESLIGADO');
+    const mechState=integrationActive ? circuit()?.getSnapshot?.() : null;
     clock.textContent = 'Tempo virtual: ' + formatTime(virtualSeconds);
     for (const item of values) {
       const faixa = core.faixaTemperatura(item.temp);
@@ -127,6 +128,11 @@
         ({ red: 'vermelho', yellow: 'amarelo', green: 'verde' })[faixa.lamp] + (faixa.blink ? ' piscando • pronto para descarga (sim.)' : ' fixo'));
 
       get(item.card, 'contactor').textContent = heating ? 'LIGADO • SIM.' : 'DESLIGADO';
+      const motor=Boolean(mechState?.linked && mechState.running && mechState.activeDigestor==='D'+item.id
+        && mechState.stage==='COZIMENTO' && mechState.digestors?.[item.id-1]?.shaft);
+      const virtualMotor=item.card.querySelector('[data-role="motor-virtual"]');
+      if(virtualMotor) virtualMotor.textContent=motor?'LIGADO · SIMULADO':'PARADO · SIMULADO';
+      item.card.dataset.motorVirtual=String(motor);
       get(item.card, 'alarm').textContent = faixa.label;
       const labels = {
         CARREGADO: 'Material carregado',

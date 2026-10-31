@@ -15,10 +15,19 @@ function normalizeSimulationState(value) {
   const valves = ['ABERTO','FECHADO'];
   const visual = b.purgadores_visuais;
   const gates = b.guilhotinas_simuladas;
+  const pushers = b.empurradores_simulados;
+  const motor = b.motor_digestor_simulado;
   const stages = ['PARADO','CARGA','COZIMENTO','DESCARGA','TRANSFERENCIA','CONCLUIDO'];
   if (visual !== undefined && (!visual || typeof visual !== 'object' || Array.isArray(visual) ||
       !valves.includes(visual.camisa) || !valves.includes(visual.eixo))) {
     const e = new Error('Purgadores visuais inválidos.'); e.status = 400; throw e;
+  }
+  if (pushers !== undefined && (!pushers || typeof pushers !== 'object' || Array.isArray(pushers) ||
+      !valves.includes(pushers.camisa) || !valves.includes(pushers.eixo))) {
+    const e = new Error('Empurradores simulados inválidos.');e.status=400;throw e;
+  }
+  if (motor !== undefined && typeof motor !== 'boolean') {
+    const e = new Error('Motor simulado exige booleano.');e.status=400;throw e;
   }
   if (gates !== undefined && (!gates || typeof gates !== 'object' || Array.isArray(gates) ||
       !['ABERTA','FECHADA'].includes(gates.carga) || !['ABERTA','FECHADA'].includes(gates.descarga))) {
@@ -30,6 +39,8 @@ function normalizeSimulationState(value) {
   return { aquecimento_simulado: b.aquecimento_simulado, purgadores_simulados: { camisa: p.camisa, eixo: p.eixo },
     ...(visual ? { purgadores_visuais: { camisa: visual.camisa, eixo: visual.eixo } } : {}),
     ...(gates ? { guilhotinas_simuladas: { carga: gates.carga, descarga: gates.descarga } } : {}),
+    ...(pushers ? { empurradores_simulados: { camisa: pushers.camisa, eixo: pushers.eixo } } : {}),
+    ...(motor !== undefined ? { motor_digestor_simulado: motor } : {}),
     ...(b.etapa_mecanica !== undefined ? { etapa_mecanica: b.etapa_mecanica } : {}) };
 }
 function readStoredState(raw) {
