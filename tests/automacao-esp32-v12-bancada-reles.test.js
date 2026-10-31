@@ -46,7 +46,9 @@ test('IHM usa os dois blocos de purgadores e so um de guilhotinas',()=>{
  assert.doesNotMatch(firmware,/id="cg-pusher-eixo"/);
 });
 test('maquete 3D fica sem nomes flutuantes mas com indicador superior',()=>{
- assert.match(scene,/showFloatingEquipmentNames = false/);
+ assert.match(scene,/if \(!makeLabel\) return;/);
+ const css=read('public/css/automacao-digestores-circuito.css');
+ assert.match(css,/auto-scene-labels\{display:none !important/);
  assert.match(scene,/const led=mesh\(gate,new THREE\.SphereGeometry/);
  assert.match(scene,/gate\.led\.material\.emissiveIntensity=lit\?1\.8:0/);
  assert.match(view,/circuito-upper-gate-led/);
