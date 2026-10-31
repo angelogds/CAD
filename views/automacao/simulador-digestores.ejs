@@ -7,9 +7,9 @@
   <%- include('partials/brand') %>
   <section class="sim-controls-top sim-command-panel" id="sim-circuit-controls" aria-label="Controles do simulador">
     <div class="sim-command-heading">
-      <h1>Simulador dos digestores</h1>
+      <h1>Simulador dos Digestores</h1>
       <span class="auto-state waiting" id="sim-hardware-indicator" aria-live="polite"><%= bancadaPermitida ? 'Verificando ESP32…' : 'Simulação local' %></span>
-      <nav class="sim-command-links" aria-label="Navegação do simulador"><a href="<%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? '/automacao' : '/automacao/digestores' %>">Voltar</a></nav>
+      <nav class="sim-command-links" aria-label="Navegação do simulador"><a class="auto-back-link" href="<%= typeof visualizacaoAutomacaoCompleta !== 'undefined' && !visualizacaoAutomacaoCompleta ? '/automacao' : '/automacao/digestores' %>">Voltar</a></nav>
     </div>
     <div class="sim-command-main">
       <label class="sim-command-field" for="sim-select-digestor">Digestores<select id="sim-select-digestor"><option value="1">Digestor 1</option><option value="2">Digestor 2</option><option value="3">Digestor 3</option><option value="4">Digestor 4</option><option value="all" selected>Todos os quatro</option></select></label>
@@ -35,7 +35,7 @@
     <details class="sim-command-details">
       <summary>Ajustes e comunicação</summary>
       <div class="sim-command-detail-body">
-        <div class="sim-extra-actions"><button type="button" data-circuito-action="fit">Enquadrar circuito</button><button type="button" data-circuito-action="motion" aria-pressed="false">Pausar animação</button><button type="button" id="sim-presentation" aria-pressed="false">Apresentação</button><a href="/automacao/digestores/ciclos">Histórico de ciclos</a></div>
+        <div class="sim-extra-actions"><button type="button" data-circuito-action="fit">Enquadrar circuito</button><button type="button" data-circuito-action="motion" aria-pressed="false">Pausar animação</button><button type="button" id="sim-presentation" aria-pressed="false">Apresentação</button><a href="/automacao/digestores/ciclos">Histórico e relatórios dos ciclos</a></div>
         <p><span id="sim-selection-status" role="status">Quatro digestores selecionados</span> · <span id="sim-integration-state" role="status">Ciclo integrado</span></p>
         <p id="digestores-circuito-3d-status" role="status" aria-live="polite">Preparando visualização 3D…</p>
         <% if (bancadaPermitida) { %>
