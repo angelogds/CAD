@@ -1266,11 +1266,11 @@ void tarefaSinalizacao(void*) {
     if (xSemaphoreTake(mutexEstado, pdMS_TO_TICKS(5)) == pdTRUE) {
       if (synchronizationFault) {
         modo = PARADO; corManual = -1; remoteCommand.valid = false;
-        for (auto &p : purgadores) p.fault(); purgeOutputs.stopAll(); cadPurgeTest.stopAll(); synchronizationFault = false;
+        benchRelaysArmed=false; for(auto &p:purgadores)p.fault(); purgeOutputs.stopAll(); cadPurgeTest.stopAll(); cgdGate.stop(); synchronizationFault=false;
       }
       LocalSnapshot next; next.updatedAt = now;
       next.mode = modo;
-      if (previousMode != modo) { lastCommand = UINT32_MAX; previousMode = modo; localSimulation.stopSimulation(); }
+      if(previousMode!=modo){benchRelaysArmed=false;purgeOutputs.stopAll();cgdGate.stop();lastCommand=UINT32_MAX;previousMode=modo;localSimulation.stopSimulation();}
       if (modo == OPERACAO_REAL) {
         next.signal = pt100Configurado ? localReal.current(now) : cgd::unavailable(cgd::SensorStatus::SEM_SENSOR);
         next.measuredAt = next.signal.hasTemperature ? acquisitionEpoch : 0;
@@ -1322,14 +1322,18 @@ void tarefaSinalizacao(void*) {
       cadPurgeTest.update(false, WiFi.status() == WL_CONNECTED,
         remoteCommand.valid && remoteCommand.completeState, now, remoteCommand.receivedAt,
         remoteCommand.validity, remoteCommand.purgeOpen[0], remoteCommand.purgeOpen[1]);
-      // Driver físico separado: teste CAD exige armamento LOCAL e pacote completo fresco.
-      for (int i = 0; i < 2; ++i) {
-        if (modo == REMOTO_BANCADA) {
-          purgadores[i].stop();
-          // Modo SIMULACAO/CAD = SOMENTE espelhamento grafico. Nunca abrir
-          // relé de purgador nem guilhotina a partir de pacotes remotos.
-          cadPurgeTest.stop(i);
-          purgeOutputs.stop(i);
+      const bool benchHealthy=modo==REMOTO_BANCADA&&next.cadCurrent&&next.cadComplete&&
+        cgdGate.keyOn()&&uint32_t(now-benchArmedAt)<BENCH_MAX_ARM_MS;
+      if(benchRelaysArmed&&!benchHealthy){benchRelaysArmed=false;purgeOutputs.stopAll();cgdGate.stop();}
+      const bool benchActive=benchRelaysArmed&&benchHealthy;
+      // Relés LEDs da bancada: cada purgador alterna conforme os estados do CAD.
+      for(int i=0;i<2;i++){
+        if(modo==REMOTO_BANCADA){
+          purgadores[i].stop();cadPurgeTest.stop(i);
+          if(benchActive){
+            if(!purgeOutputs.armed(i))purgeOutputs.arm(i);
+            purgeOutputs.apply(i,next.pusherDisplayOpen[i],true);
+          }else purgeOutputs.stop(i);
           continue;
         }
         const bool healthy = modo == PARADO || (modo == OPERACAO_REAL && next.signal.hasTemperature);
@@ -1342,7 +1346,16 @@ void tarefaSinalizacao(void*) {
         }
         purgeOutputs.apply(i, timer.active && timer.open, healthy);
       }
-      cgdGate.tick(modo == PARADO, now);
+      if(modo==REMOTO_BANCADA){
+        cgdGate.benchSet(benchActive,next.gateDisplayOpen[0],next.gateDisplayOpen[1]);
+        for(int i=0;i<2;i++)if(gatePrevOpen[i]!=next.gateDisplayOpen[i]){
+          gatePrevOpen[i]=next.gateDisplayOpen[i];gateChangedAt[i]=now;
+        }
+      }else{
+        cgdGate.tick(false,now);
+        gateChangedAt[0]=gateChangedAt[1]=0;
+        gatePrevOpen[0]=gatePrevOpen[1]=false;
+      }
       xSemaphoreGive(mutexEstado);
     } else {
       // Falha de sincronização não retém lâmpada/válvula ligada. Latch exige novo armamento.
@@ -1496,7 +1509,21 @@ void enviarEstado() {
   materialGates["chave_local_ativa"] = cgdGate.keyOn();
   materialGates["pulso_ativo"] = cgdGate.active();
   materialGates["ultimo_comando_local"] = cgdGate.last();
-  materialGates["comandos_remotos_habilitados"] = false;
+  materialGates["comandos_remotos_habilitados"] = false; // producao: nao
+  JsonObject bench=doc["bancada_reles"].to<JsonObject>();
+  bench["armada"]=benchRelaysArmed&&s.mode==REMOTO_BANCADA;
+  bench["chave_local_ativa"]=cgdGate.keyOn();
+  bench["cad_atual"]=s.cadCurrent&&s.cadComplete;
+  bench["somente_lampadas"]=true;
+  bench["habilitacao_restante_s"]=benchRelaysArmed&&uint32_t(millis()-benchArmedAt)<BENCH_MAX_ARM_MS ?
+    (BENCH_MAX_ARM_MS-uint32_t(millis()-benchArmedAt))/1000U : 0;
+  bench["camisa"]=benchRelaysArmed&&s.cadCurrent&&s.pusherDisplayOpen[0];
+  bench["eixo"]=benchRelaysArmed&&s.cadCurrent&&s.pusherDisplayOpen[1];
+  bench["carga_aberta"]=benchRelaysArmed&&s.cadCurrent&&s.gateDisplayOpen[0];
+  bench["descarga_aberta"]=benchRelaysArmed&&s.cadCurrent&&s.gateDisplayOpen[1];
+  JsonObject held=doc["tempo_estado_guilhotinas_s"].to<JsonObject>();
+  held["carga"]=s.cadCurrent&&gateChangedAt[0]?(millis()-gateChangedAt[0])/1000U:0;
+  held["descarga"]=s.cadCurrent&&gateChangedAt[1]?(millis()-gateChangedAt[1])/1000U:0;
   doc["pt100_habilitado"] = pt100Configurado;
   doc["sensores_integrados"] = pt100Configurado; doc["saidas_habilitadas"] = true;
   doc["wifi_conectado"] = WiFi.status() == WL_CONNECTED; doc["wifi_tentando"] = wifiTentando;
@@ -1562,7 +1589,7 @@ void modoHandler() {
   else if (value == "parado") next = PARADO;
   else { servidor.send(400, "text/plain", "Modo invalido"); return; }
   if (xSemaphoreTake(mutexEstado, pdMS_TO_TICKS(20)) != pdTRUE) { servidor.send(503, "text/plain", "Tente novamente"); return; }
-  modo = next; corManual = -1; fase = 0; inicioFase = millis(); remoteCommand.valid = false; ++remoteCommand.generation;
+  benchRelaysArmed=false; modo=next; corManual=-1; fase=0; inicioFase=millis(); remoteCommand.valid=false; ++remoteCommand.generation;
   for (auto &p : purgadores) p.stop(); purgeOutputs.stopAll(); cadPurgeTest.stopAll(); cgdGate.stop();
   xSemaphoreGive(mutexEstado);
   preferenciasCAD.putString("modo", next == REMOTO_BANCADA ? "simulacao" : "parado");
@@ -1586,7 +1613,7 @@ void simularHandler() {
   else if (phase == "alto") value = 2; else if (phase == "fim") value = 3;
   else { servidor.send(400, "text/plain", "Etapa invalida"); return; }
   if (xSemaphoreTake(mutexEstado, pdMS_TO_TICKS(20)) != pdTRUE) { servidor.send(503, "text/plain", "Tente novamente"); return; }
-  modo = SIMULACAO; fase = value; inicioFase = millis(); remoteCommand.valid = false;
+  benchRelaysArmed=false; modo=SIMULACAO; fase=value; inicioFase=millis(); remoteCommand.valid=false;
   for (auto &p : purgadores) p.stop(); purgeOutputs.stopAll(); cadPurgeTest.stopAll(); cgdGate.stop();
   xSemaphoreGive(mutexEstado); preferenciasCAD.putString("modo", "parado");
   servidor.send(200, "application/json", "{\"ok\":true}");
@@ -1597,7 +1624,7 @@ void autorizarRemotoHandler() {
   if (!localPostAllowed()) return;
   if (WiFi.status() != WL_CONNECTED || copiarTokenCAD().isEmpty()) { servidor.send(409, "text/plain", "Conecte Wi-Fi e token CAD."); return; }
   if (xSemaphoreTake(mutexEstado, pdMS_TO_TICKS(20)) != pdTRUE) { servidor.send(503, "text/plain", "Tente novamente"); return; }
-  modo = REMOTO_BANCADA; remoteCommand.valid = false; ++remoteCommand.generation;
+  benchRelaysArmed=false; modo=REMOTO_BANCADA; remoteCommand.valid=false; ++remoteCommand.generation;
   for (auto &p : purgadores) p.stop(); purgeOutputs.stopAll(); cadPurgeTest.stopAll(); cgdGate.stop(); xSemaphoreGive(mutexEstado);
   preferenciasCAD.putString("modo", "simulacao"); servidor.send(200, "application/json", "{\"ok\":true}");
 }
@@ -1644,7 +1671,7 @@ void guilhotinasHandler() {
   if(xSemaphoreTake(mutexEstado,pdMS_TO_TICKS(20))!=pdTRUE){
     servidor.send(503,"text/plain","Controlador ocupado");return;
   }
-  const bool ok=modo==PARADO && cgdGate.request(g=="carga"?0:1,a=="abrir",millis());
+  const bool ok=false; // Proibe pulso local de cilindros em build de bancada.
   xSemaphoreGive(mutexEstado);
   if(!ok){
     servidor.send(409,"text/plain",
