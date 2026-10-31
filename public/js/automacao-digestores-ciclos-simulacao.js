@@ -24,11 +24,12 @@
    lastSeconds=second;
    const id=s.activeDigestor;
    if(id && /^D[1-4]$/.test(id)) {
+     const phaseStart=second-(Number(s.stageSeconds)||0);
      let clock=times.get(id);
-     if(!clock){clock={carga:second,cozimento:null,descarga:null,transferencia:null};times.set(id,clock);}
-     if(s.stage==='COZIMENTO' && clock.cozimento==null)clock.cozimento=second;
-     if(s.stage==='DESCARGA' && clock.descarga==null)clock.descarga=second;
-     if(s.stage==='TRANSFERENCIA' && clock.transferencia==null)clock.transferencia=second;
+     if(!clock){clock={carga:s.stage==='CARGA'?phaseStart:0,cozimento:null,descarga:null,transferencia:null};times.set(id,clock);}
+     if(s.stage==='COZIMENTO' && clock.cozimento==null)clock.cozimento=phaseStart;
+     if(s.stage==='DESCARGA' && clock.descarga==null)clock.descarga=phaseStart;
+     if(s.stage==='TRANSFERENCIA' && clock.transferencia==null)clock.transferencia=phaseStart;
    }
    for(const done of s.completed||[]){
      if(sent.has(done))continue;
@@ -39,7 +40,7 @@
        carga_s:clock.cozimento-clock.carga,
        cozimento_s:clock.descarga-clock.cozimento,
        descarga_s:clock.transferencia-clock.descarga,
-       transferencia_s:second-clock.transferencia
+       transferencia_s:(s.stage==='CARGA' ? second-(Number(s.stageSeconds)||0) : second)-clock.transferencia
      };
      if(Object.values(durations).some(v=>!Number.isFinite(v)||v<0||v>86400))continue;
      const digestor_id=Number(done.substring(1));
