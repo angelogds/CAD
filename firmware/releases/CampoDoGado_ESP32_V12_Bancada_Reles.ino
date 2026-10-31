@@ -1662,6 +1662,28 @@ void purgadoresHandler() {
 }
 
 
+
+void bancadaRelesHandler(){
+  if(!localPostAllowed())return;
+  const String acao=servidor.arg("valor");
+  if(acao!="armar"&&acao!="parar"){servidor.send(400,"text/plain","Acao invalida");return;}
+  if(xSemaphoreTake(mutexEstado,pdMS_TO_TICKS(30))!=pdTRUE){servidor.send(503,"text/plain","Ocupado");return;}
+  if(acao=="parar"){
+    benchRelaysArmed=false;purgeOutputs.stopAll();cgdGate.stop();
+    xSemaphoreGive(mutexEstado);
+    servidor.send(200,"application/json","{\"ok\":true,\"armado\":false}");return;
+  }
+  const bool fresh=remoteCommand.valid&&remoteCommand.completeState&&
+    cgd::fresh(millis(),remoteCommand.receivedAt,remoteCommand.validity);
+  const bool canArm=modo==REMOTO_BANCADA&&WiFi.status()==WL_CONNECTED&&
+    purgeOutputs.configured()&&cgdGate.configured()&&cgdGate.keyOn()&&fresh;
+  benchRelaysArmed=canArm;
+  if(canArm){benchArmedAt=millis();purgeOutputs.arm(0);purgeOutputs.arm(1);}
+  else{purgeOutputs.stopAll();cgdGate.stop();}
+  xSemaphoreGive(mutexEstado);
+  if(!canArm){servidor.send(409,"text/plain","Exige CAD atualizado, modo Simulacao, chave GPIO27-GND e LEDs de bancada.");return;}
+  servidor.send(200,"application/json","{\"ok\":true,\"armado\":true}");
+}
 void guilhotinasHandler() {
   if(!localPostAllowed())return;
   const String g=servidor.arg("guilhotina"),a=servidor.arg("acao");
@@ -1844,6 +1866,7 @@ void setup() {
   servidor.on("/api/remoto", HTTP_POST, autorizarRemotoHandler);
   servidor.on("/api/purgadores", HTTP_POST, purgadoresHandler);
   servidor.on("/api/guilhotinas", HTTP_POST, guilhotinasHandler);
+  servidor.on("/api/bancada/reles", HTTP_POST, bancadaRelesHandler);
   servidor.on("/api/wifi/scan", HTTP_GET, escanearWifiHandler);
   servidor.on("/api/wifi/conectar", HTTP_POST, conectarWifiHandler);
   servidor.on("/api/wifi/apagar", HTTP_POST, apagarWifiHandler);
