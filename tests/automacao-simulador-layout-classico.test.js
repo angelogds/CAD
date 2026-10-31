@@ -35,16 +35,26 @@ test('simulador preserva cartões e purgadores, sem gráfico de temperatura por 
   for (const source of [js, core]) assert.doesNotMatch(source, /\b(fetch|XMLHttpRequest|WebSocket|EventSource)\s*\(/);
 });
 
-test('conexão, seleção e modos ficam antes dos cartões sem duplicar controles', () => {
+test('um único painel de comandos vem antes do circuito e dos cartões, sem duplicar controles', () => {
   const view = read('views/automacao/simulador-digestores.ejs');
-  const connection = view.indexOf('class="sim-bancada-online"');
-  const selection = view.indexOf('class="sim-select-panel"');
-  const modes = view.indexOf('class="sim-toolbar"');
+  const panel = view.indexOf('id="sim-circuit-controls"');
+  const circuit = view.indexOf("include('partials/digestores-circuito',");
   const cards = view.indexOf('class="sim-grid"');
-  assert.ok(connection > 0 && connection < selection && selection < modes && modes < cards);
+  assert.ok(panel > 0 && panel < circuit && circuit < cards);
   for (const id of ['sim-connect-esp32', 'sim-select-digestor', 'sim-start', 'sim-purge-seconds']) {
     assert.equal(view.split('id="' + id + '"').length - 1, 1, id);
   }
   assert.match(view, /id="sim-purge-seconds" type="number" min="1" max="300" step="1" value="30"/);
   assert.doesNotMatch(view, /id="sim-solenoids-enable"|id="sim-solenoids-status"/);
+  assert.doesNotMatch(view, /class="auto-alert"|class="sim-bancada-online"|class="sim-select-panel"/);
+  const ejs = require('ejs');
+  const filename = path.join(__dirname, '../views/automacao/simulador-digestores.ejs');
+  const html = ejs.render(view, { layout() {}, simuladorBancadaPermitida: true, csrfAutomacao: 'test', simulacaoCircuitoPermitida: true }, { filename });
+  assert.equal((html.match(/id="sim-circuit-controls"/g) || []).length, 1);
+  assert.equal((html.match(/id="digestores-circuito-panel"/g) || []).length, 1);
+  for (const action of ['view-3d', 'view-scheme', 'fit', 'motion', 'start', 'pause', 'stop', 'live']) {
+    assert.equal((html.match(new RegExp('data-circuito-action="' + action + '"', 'g')) || []).length, 1, action);
+    assert.ok(html.indexOf('data-circuito-action="' + action + '"') < html.indexOf('id="digestores-circuito-panel"'), action);
+  }
+  assert.match(html, /<details class="sim-command-details">/);
 });
