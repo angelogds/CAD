@@ -271,3 +271,42 @@ test('migration 233 é aditiva e idempotente (preserva dados anteriores)',()=>{
   require('../database/migrations/233_automacao_bancada_correlacao.js')();
   assert.equal(db.prepare('SELECT fase FROM automacao_sinaleiros_bancada WHERE digestor_id=2').get().fase,'MEIO');
 });
+
+test('R4 recebe telemetria e devolve o comando na mesma consulta autenticada',async()=>{
+  const token=devices.issueToken('ESP32-DIGESTOR-01',1,1).token;
+  bancada.publish([{digestor_id:1,fase:'MEIO'}],1);
+  await withApp(async post=>{
+    const initial=await (await post('/sinaleiro-bancada',token,{digestor_id:1})).json();
+    assert.equal(d1().fase_aplicada,null);
+    const version=initial.sinaleiro_bancada.versao_fase;
+    const response=await post('/sinaleiro-bancada',token,{digestor_id:1,
+      estado:{digestor_id:1,fase:'MEIO',fase_recebida:'MEIO',fase_aplicada:'MEIO',versao_fase:version,firmware:'r4'}});
+    assert.equal(response.status,200,await response.clone().text());
+    const body=await response.json();assert.equal(body.estado_recebido,true);
+    assert.equal(body.sinaleiro_bancada.fase,'MEIO');assert.equal(body.comando_habilitado,false);
+    assert.deepEqual(body.comandos,[]);assert.equal(d1().fase_aplicada,'MEIO');
+    assert.equal(d1().saida_confirmada,null);
+    const legacy=await (await post('/sinaleiro-bancada',token,{digestor_id:1})).json();
+    assert.equal(legacy.estado_recebido,false);assert.equal(legacy.sinaleiro_bancada.fase,'MEIO');
+  });
+});
+test('R4 valida estado, identidade e digestor antes de qualquer escrita no poll combinado',async()=>{
+  const token=devices.issueToken('ESP32-R4-ESCOPO',1,'TODOS').token;
+  const device=devices.authenticate(token);
+  const count=()=>db.prepare('SELECT COUNT(*) n FROM automacao_bancada_telemetria WHERE device_pk=?').get(device.id).n;
+  await withApp(async post=>{
+    for(const estado of [null,[],true,'invalido']){
+      assert.equal((await post('/sinaleiro-bancada',token,{digestor_id:1,estado})).status,400);
+      assert.equal(count(),0);
+    }
+    for(const estado of [{digestor_id:2,fase:'MEIO'}, {digestor_id:1,fase:'VAPOR'},
+      {digestor_id:1,fase:'MEIO',device_id:'ESP32-OUTRO'}]){
+      const response=await post('/sinaleiro-bancada',token,{digestor_id:1,estado});
+      assert.ok([400,403].includes(response.status));assert.equal(count(),0);
+    }
+    assert.equal(db.prepare('SELECT last_seen_at FROM automacao_dispositivos WHERE id=?').get(device.id).last_seen_at,null);
+    const restricted=devices.issueToken('ESP32-R4-RESTRITO',1,1).token;
+    assert.equal((await post('/sinaleiro-bancada',restricted,{digestor_id:2,estado:{digestor_id:2,fase:'INICIO'}})).status,403);
+    assert.equal((await post('/sinaleiro-bancada','cgd_invalido_r4_token_123456789',{digestor_id:1,estado:{digestor_id:1,fase:'INICIO'}})).status,401);
+  });
+});

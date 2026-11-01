@@ -48,10 +48,14 @@ function publish(states, adminId) {
   apply();
   return {ok:true,modo:'SIMULACAO',comando_industrial_habilitado:false,estados:entries,duracao_ms:DURACAO_MS};
 }
-function poll(device, requested) {
+function digestorAutorizado(device, requested) {
   const id = device.digestor_id === null ? Number(requested) : device.digestor_id;
   if (!Number.isInteger(id) || id<1 || id>4) throw bad('digestor_id deve ser 1, 2, 3 ou 4.');
   if (requested != null && Number(requested)!==id) throw bad('Token sem autorização para este digestor.',403);
+  return id;
+}
+function poll(device, requested) {
+  const id = digestorAutorizado(device, requested);
   const row=db.prepare("SELECT * FROM automacao_sinaleiros_bancada WHERE digestor_id=?").get(id);
   const remaining=row ? Math.max(0, Number(row.valid_until_ms)-Date.now()) : 0;
   const fase=remaining>0?row.fase:'PARADO';
@@ -60,4 +64,4 @@ function poll(device, requested) {
   const virtual = fase !== 'PARADO' ? readStoredState(row.estado_simulacao_json) : null;
   return {digestor_id:id,fase,...sinal,...(virtual || CLOSED),estado_simulacao_disponivel:!!(virtual && virtual.estado_simulacao_disponivel),fonte_simulacao:'CAD',temperatura_c:fase === 'PARADO' ? null : row.temperatura_c,origem:'SIMULACAO',versao_fase:row?Number(row.versao)||0:0,validade_ms:Math.min(remaining,DURACAO_MS),bancada:true,processo_habilitado:false};
 }
-module.exports={publish,poll,DURACAO_MS};
+module.exports={publish,poll,digestorAutorizado,DURACAO_MS};
