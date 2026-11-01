@@ -710,7 +710,7 @@ const char LOCAL_UI[] PROGMEM = R"LOCALHTML(<!doctype html>
  </div>
 </div></details>
 <details class="card settings" id="wifiSettings"><summary>Configuração de Wi-Fi <span class="badge" id="wifiSummary">CONSULTANDO</span></summary><div class="settingbody configgrid"><div><label class="field" for="ssid">Rede Wi-Fi de 2,4 GHz (SSID)<input id="ssid" maxlength="32" autocomplete="off" placeholder="Selecione uma rede ou digite" list="networkOptions"><datalist id="networkOptions"></datalist></label><label class="field" for="wifiPassword">Senha da rede<input id="wifiPassword" type="password" maxlength="63" autocomplete="new-password" placeholder="Senha nunca é exibida novamente"></label><div class="buttonrow"><button class="control" id="scanWifi">Procurar redes</button><button class="control primary" id="connectWifi">Conectar e salvar</button></div><p class="help" id="networkInfo">A rede é salva no ESP32 somente após a conexão ser confirmada.</p><div class="networklist" id="networkList" aria-label="Redes Wi-Fi encontradas"></div></div><div><div class="savedstatus"><dl class="rows"><div><dt>Conexão</dt><dd id="wifiStatus">—</dd></div><div><dt>Rede</dt><dd id="wifiSsid">—</dd></div><div><dt>Endereço local</dt><dd id="wifiIp">—</dd></div><div><dt>Acesso direto</dt><dd>192.168.4.1</dd></div></dl></div><p class="help">O ponto de acesso próprio do ESP32 permanece disponível durante a configuração. Esta página usa HTTP local: configure senhas e token apenas na rede controlada de bancada.</p><div class="buttonrow" style="margin-top:15px"><button class="control stop" id="deleteWifi">Esquecer rede salva</button></div><p class="message" id="wifiMessage" role="status"></p></div></div></details>
-<details class="card settings" id="cadSettings"><summary>Integração com o CAD <span class="badge" id="cadSummary">CONSULTANDO</span></summary><div class="settingbody configgrid"><div><label class="field" for="cadToken">Token exclusivo deste ESP32<input id="cadToken" type="password" maxlength="200" autocomplete="off" placeholder="cgd_..."></label><div class="buttonrow"><button class="control primary" id="saveToken">Salvar token</button><button class="control stop" id="deleteToken">Apagar token</button><button class="control" id="authorizeRemote">Autorizar CAD</button></div><p class="help">Gere a credencial em Automação → Configuração no CAD. Pare os testes antes de trocar o token. A credencial salva não é devolvida para a página.</p><p class="message" id="cadMessage" role="status"></p></div><div><div class="savedstatus"><dl class="rows"><div><dt>Dispositivo</dt><dd id="cadDevice">—</dd></div><div><dt>Credencial</dt><dd id="cadConfigured">—</dd></div><div><dt>Comunicação</dt><dd id="cadStatus">—</dd></div><div><dt>HTTP</dt><dd id="cadHttp">—</dd></div><div><dt>Servidor</dt><dd>manutencao.campodogado.app.br</dd></div></dl></div><p class="help">Em operação real, o ESP32 decide a cor e envia a telemetria por HTTPS. A simulação CAD recebe apenas sinais de bancada; ordens industriais não fazem parte desta integração.</p></div></div></details>
+<details class="card settings" id="cadSettings"><summary>Integração com o CAD <span class="badge" id="cadSummary">CONSULTANDO</span></summary><div class="settingbody configgrid"><div><label class="field" for="cadToken">Token exclusivo deste ESP32<input id="cadToken" type="password" maxlength="200" autocomplete="off" placeholder="cgd_..."></label><div class="buttonrow"><button class="control primary" id="saveToken">Salvar token</button><button class="control stop" id="deleteToken">Apagar token</button><button class="control" id="authorizeRemote">Autorizar CAD</button></div><p class="help">Gere a credencial em Automação → Configuração no CAD. Pare os testes antes de trocar o token. A credencial salva não é devolvida para a página.</p><p class="message" id="cadMessage" role="status"></p></div><div><div class="savedstatus"><dl class="rows"><div><dt>Dispositivo</dt><dd id="cadDevice">—</dd></div><div><dt>Credencial</dt><dd id="cadConfigured">—</dd></div><div><dt>Comunicação</dt><dd id="cadStatus">—</dd></div><div><dt>HTTP</dt><dd id="cadHttp">—</dd></div><div><dt>Tempo HTTPS</dt><dd id="cadRtt">—</dd></div><div><dt>Intervalo das consultas</dt><dd id="cadPollGap">—</dd></div><div><dt>Servidor</dt><dd>manutencao.campodogado.app.br</dd></div></dl></div><p class="help">Em operação real, o ESP32 decide a cor e envia a telemetria por HTTPS. A simulação CAD recebe apenas sinais de bancada; ordens industriais não fazem parte desta integração.</p></div></div></details>
 <aside class="safety"><div class="safetyicon" aria-hidden="true">!</div><div><strong>Comandos locais · confira o estado de cada canal</strong><p>Esta versão aciona somente relés com LEDs de bancada. Mantenha solenóides, cilindros, vapor e máquinas desconectados. Desarmar apaga todos os LEDs e bloqueia a retomada automática. A tela informa comandos, sem retorno elétrico ou mecânico. “Pronto” indica somente a faixa de temperatura.</p></div></aside>
 
 
@@ -813,7 +813,7 @@ function render(data){
  text('firmware',data.firmware||'ESP32 · IHM local');renderPurge(data.purgadores,id,real,data.modo==='parado'||(data.modo==='real'&&sensorValid&&readable),{current:simCurrent,complete:completeSimulation,valves:data.purgadores_visuais||data.purgadores_simulados});lastContact=Date.now();
 }
 async function poll(){if(polling)return;polling=true;try{const response=await request('/api/estado',{},1800);if(!response.ok)throw Error('Sem contato');render(await response.json());}catch(_){clearLive();}finally{polling=false;}}
-async function pollCad(){if(cadPolling)return;cadPolling=true;try{const response=await request('/api/cad/status');if(!response.ok)throw Error('Sem contato');const data=await response.json();text('cadDevice',data.device_id);text('cadConfigured',data.credencial_configurada?'Salva no ESP32':'Não configurada');text('cadStatus',cadNames[data.status]||'Não informado');text('cadHttp',data.http===0?'—':data.http);text('cadSummary',data.status===4?'CONECTADO':data.credencial_configurada?'CONFIGURADO':'SEM TOKEN');}catch(_){text('cadStatus','Sem comunicação local');text('cadSummary','SEM CONTATO');}finally{cadPolling=false;}}
+async function pollCad(){if(cadPolling)return;cadPolling=true;try{const response=await request('/api/cad/status');if(!response.ok)throw Error('Sem contato');const data=await response.json();text('cadDevice',data.device_id);text('cadConfigured',data.credencial_configurada?'Salva no ESP32':'Não configurada');text('cadStatus',cadNames[data.status]||'Não informado');text('cadHttp',data.http===0?'—':data.http);text('cadRtt',data.rtt_ms?data.rtt_ms+' ms':'—');text('cadPollGap',data.intervalo_consulta_ms?data.intervalo_consulta_ms+' ms':'—');text('cadSummary',data.status===4?'CONECTADO':data.credencial_configurada?'CONFIGURADO':'SEM TOKEN');}catch(_){text('cadStatus','Sem comunicação local');text('cadSummary','SEM CONTATO');}finally{cadPolling=false;}}
 async function scanWifi(attempt=0){
  const button=el('scanWifi');button.disabled=true;text('networkInfo','Procurando redes de 2,4 GHz...');
  try{const response=await request('/api/wifi/scan');if(response.status===202){if(attempt>=12)throw Error('Busca em andamento; tente novamente em alguns instantes.');setTimeout(()=>scanWifi(attempt+1),1300);return;}if(!response.ok)throw Error('Não foi possível procurar redes.');const data=await response.json();const list=el('networkList'),options=el('networkOptions');list.replaceChildren();options.replaceChildren();const networks=new Map();(data.redes||[]).forEach(row=>{if(typeof row.ssid==='string'&&row.ssid&&!networks.has(row.ssid))networks.set(row.ssid,row);});[...networks.values()].sort((a,b)=>b.rssi-a.rssi).forEach(row=>{const option=document.createElement('option');option.value=row.ssid;options.appendChild(option);const select=document.createElement('button');select.type='button';select.className='control';const name=document.createElement('span');name.textContent=row.ssid;const info=document.createElement('small');info.textContent=(row.protegida?'Protegida · ':'Aberta · ')+row.rssi+' dBm';select.append(name,info);select.addEventListener('click',()=>{el('ssid').value=row.ssid;el('wifiPassword').focus();text('networkInfo','Rede selecionada. Informe a senha e conecte.');});list.appendChild(select);});text('networkInfo',networks.size+' rede(s) encontrada(s). Você também pode digitar o SSID.');button.disabled=false;}
@@ -836,7 +836,8 @@ async function purge(channel,action){const params={canal:String(channel),valor:a
  el('deleteWifi').addEventListener('click',async()=>{if(!confirm('Esquecer a rede salva? O acesso direto 192.168.4.1 permanece disponível.'))return;if(await post('/api/wifi/apagar',{},'wifiMessage'))text('wifiMessage','Rede salva removida. Use o acesso direto do ESP32.');el('wifiPassword').value='';});
  el('deleteToken').addEventListener('click',async()=>{if(!confirm('Apagar a credencial de integração salva neste ESP32?'))return;if(await post('/api/cad/apagar',{},'cadMessage')){text('cadMessage','Credencial removida.');el('cadToken').value='';await pollCad();}});
  el('authorizeRemote').addEventListener('click',()=>post('/api/remoto',{valor:'ligar'},'cadMessage'));
- setInterval(()=>{if(lastContact&&Date.now()-lastContact>2500)clearLive();poll();},1000);setInterval(pollCad,3000);
+ setInterval(()=>{if(lastContact&&Date.now()-lastContact>2500)clearLive();poll();},250);setInterval(pollCad,3000);
+ window.cgdRefreshLocal=poll;
  document.addEventListener('visibilitychange',()=>{if(!document.hidden){clearLive();poll();pollCad();}});poll();pollCad();
 })();
 </script>
@@ -899,6 +900,7 @@ async function bench(action){
      headers:{'X-CGD-Local':'true','Content-Type':'application/x-www-form-urlencoded'},
      body:new URLSearchParams({valor:action})});
    const body=await response.text();
+   await window.cgdRefreshLocal?.();
    set('benchMessage',response.ok?'Todos os LEDs desarmados. Selecione Simulação CAD para retomar.':
      'Falha na autorização: '+body.slice(0,210));
  }catch(e){set('benchMessage','Não foi possível comunicar com a bancada: '+e.message)}
@@ -914,6 +916,7 @@ document.querySelectorAll('[data-bench-test]').forEach(button=>button.addEventLi
      signal:AbortSignal.timeout(3000),headers:{'X-CGD-Local':'true','Content-Type':'application/x-www-form-urlencoded'},
      body:new URLSearchParams({canal:button.dataset.benchTest})});
    const body=await response.text();
+   await window.cgdRefreshLocal?.();
    set('benchMessage',response.ok?'Teste isolado por 2 segundos. Ao terminar, selecione Simulação CAD para retomar.':body.slice(0,210));
  }catch(error){set('benchMessage','Falha de comunicação local. O teste expira no ESP32.');}
  finally{sending=false;}
@@ -1072,8 +1075,9 @@ constexpr uint8_t PINO_R = 18, PINO_A = 19, PINO_V = 21;
 constexpr uint8_t RELE_LIGA = LOW, RELE_DESLIGA = HIGH;
 constexpr uint32_t DURACAO_FASE_MS = 5000;
 constexpr uint32_t VALIDADE_MAXIMA_REMOTA_MS = 6500;
+constexpr uint32_t CAD_POLL_MS=250, CAD_REPORT_MS=2000;
 const char *CAD_BASE = "https://manutencao.campodogado.app.br/api/automacao/device";
-const char *CAD_FIRMWARE = "temperatura-v12-bancada-reles-leds-r3";
+const char *CAD_FIRMWARE = "temperatura-v12-bancada-reles-leds-r4";
 const char *CERTIFICADOS_CAD = R"CGCERT(
 -----BEGIN CERTIFICATE-----
 MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
@@ -1140,7 +1144,7 @@ constexpr uint32_t LIMITE_WIFI_MS = 25000, NOVA_TENTATIVA_MS = 60000;
 SemaphoreHandle_t mutexCredencial = nullptr, mutexEstado = nullptr;
 String tokenCAD;
 volatile int statusCAD = 0, ultimoHttpCAD = 0;
-volatile uint32_t ultimoEnvioCAD = 0;
+volatile uint32_t ultimoEnvioCAD = 0, ultimoRttCAD=0, ultimoIntervaloCAD=0;
 
 enum Modo : uint8_t { PARADO, MANUAL, AUTOMATICO, SIMULACAO, REMOTO_BANCADA, OPERACAO_REAL };
 Modo modo = PARADO;
@@ -1445,16 +1449,31 @@ void tarefaSinalizacao(void*) {
   }
 }
 
+// ===== cad_transport.h =====
+// Uma unica tarefa usa estes clientes persistentes. TLS permanece autenticado por CA.
 int fazerPostCAD(const String &rota, const String &token, const String &json, String *resposta = nullptr) {
-  WiFiClientSecure tls; tls.setCACert(CERTIFICADOS_CAD); tls.setTimeout(3);
-  HTTPClient http; if (!http.begin(tls, String(CAD_BASE) + rota)) return -10;
-  http.setConnectTimeout(3000); http.setTimeout(3000);
-  http.addHeader("Authorization", String("Bearer ") + token);
-  http.addHeader("Content-Type", "application/json");
-  const int code = http.POST(json);
-  if (resposta && code == 200) *resposta = http.getString();
-  http.end(); return code;
+  static WiFiClientSecure tls;
+  static HTTPClient http;
+  tls.setCACert(CERTIFICADOS_CAD);tls.setTimeout(3000);tls.setHandshakeTimeout(3);
+  http.setReuse(true);
+  const uint32_t started=millis();
+  if(!http.begin(tls,String(CAD_BASE)+rota)){tls.stop();return -10;}
+  http.setConnectTimeout(3000);http.setTimeout(3000);
+  http.addHeader("Authorization",String("Bearer ")+token);
+  http.addHeader("Content-Type","application/json");
+  int code=http.POST(json);
+  const int declaredLength=code>0?http.getSize():-1;
+  // Consumir tambem /estado e erros antes de reutilizar o socket; nunca deixar bytes pendentes.
+  const String body=code>0?http.getString():String();
+  if(code>0&&declaredLength>=0&&body.length()!=size_t(declaredLength))code=-11; // corpo incompleto: descartar conexao
+  if(resposta&&code==200)*resposta=body;
+  if(code!=200)http.setReuse(false);
+  http.end();
+  if(code!=200)tls.stop();
+  ultimoRttCAD=uint32_t(millis()-started);
+  return code;
 }
+// ===== cad_transport_end =====
 String payloadTelemetria(const LocalSnapshot &s) {
   LocalSnapshot published=s;
   if(s.mode!=REMOTO_BANCADA||!s.bench.mirroring){
@@ -1477,12 +1496,14 @@ String payloadTelemetria(const LocalSnapshot &s) {
   // GPIO comandado não comprova retorno elétrico: nunca enviar saida_confirmada.
   String out; serializeJson(doc, out); return out;
 }
-bool receberSimulacaoCAD(const String &body) {
+bool receberSimulacaoCAD(const String &body,uint32_t requestElapsed=0,bool *reportAck=nullptr) {
   cgd::CadSimulationCommand command;
   if (!cgd::parseCadSimulationJson(body.c_str(), body.length(), DIGESTOR_ID, command)) return false;
   // Estados abaixo comandam apenas LEDs na V12. Nenhuma bobina industrial conectada.
   JsonDocument mirror;
   if (deserializeJson(mirror, body, DeserializationOption::NestingLimit(8))) return false;
+  if(reportAck)*reportAck=mirror["estado_recebido"].is<bool>()&&mirror["estado_recebido"].as<bool>();
+  if(command.active&&requestElapsed>=command.validity)return false;
   JsonObject mirrored = mirror["sinaleiro_bancada"].as<JsonObject>();
   const char* visualCamisa = mirrored["purgadores_visuais"]["camisa"].as<const char*>();
   const char* visualEixo = mirrored["purgadores_visuais"]["eixo"].as<const char*>();
@@ -1522,7 +1543,8 @@ bool receberSimulacaoCAD(const String &body) {
       }
     }
     remoteCommand.mechanicalStage[sizeof(remoteCommand.mechanicalStage)-1] = '\0';
-    remoteCommand.temperature = command.temperature; remoteCommand.validity = command.validity;
+    remoteCommand.temperature = command.temperature;
+    remoteCommand.validity = command.active?command.validity-requestElapsed:0;
     remoteCommand.receivedAt = millis(); ++remoteCommand.generation;
     remoteCommand.version = command.version; remoteCommand.receivedPhase = command.phase;
   }
@@ -1537,8 +1559,9 @@ void tarefaCAD(void*) {
   uint32_t lastPoll = 0, lastReport = 0, retryAt = 0;
   bool clockConfigured = false; String previousToken;
   Modo lastReportedMode = PARADO; cgd::Color lastReportedColor = cgd::Color::DESLIGADO;
+  int32_t lastReportedVersion=-1;
   while (true) {
-    vTaskDelay(pdMS_TO_TICKS(100));
+    vTaskDelay(pdMS_TO_TICKS(20));
     if (WiFi.status() != WL_CONNECTED) { statusCAD = 1; clockConfigured = false; invalidarRemoto(); continue; }
     if (!clockConfigured) { configTime(0, 0, "pool.ntp.org", "time.google.com"); clockConfigured = true; }
     time_t epoch; time(&epoch); if (epoch < 1700000000) { statusCAD = 2; continue; }
@@ -1549,26 +1572,40 @@ void tarefaCAD(void*) {
     }
     const uint32_t now = millis(); if (retryAt && int32_t(now - retryAt) < 0) continue;
     LocalSnapshot s; if (!snapshot(s)) continue;
-    if (s.mode == REMOTO_BANCADA && (!lastPoll || now - lastPoll >= 1000)) {
-      lastPoll = now; String response;
-      const int code = fazerPostCAD("/sinaleiro-bancada", token,
-        String("{\"digestor_id\":") + String(DIGESTOR_ID) + "}", &response);
-      ultimoHttpCAD = code;
-      if (code != 200 || !receberSimulacaoCAD(response)) {
-        invalidarRemoto(); statusCAD = (code == 401 || code == 403 || code == 429) ? 5 : 6;
-        retryAt = millis() + (statusCAD == 5 ? 60000U : 3000U); continue;
+    const bool reportDue=s.mode!=lastReportedMode||s.signal.color!=lastReportedColor||s.version!=lastReportedVersion||
+      !lastReport||uint32_t(now-lastReport)>=CAD_REPORT_MS;
+    if(s.mode==REMOTO_BANCADA){
+      if(lastPoll&&uint32_t(now-lastPoll)<CAD_POLL_MS)continue;
+      ultimoIntervaloCAD=lastPoll?uint32_t(now-lastPoll):0;
+      lastPoll=now;String response;
+      String request=String("{\"digestor_id\":")+String(DIGESTOR_ID);
+      if(reportDue)request+=String(",\"estado\":")+payloadTelemetria(s);
+      request+='}';
+      const uint32_t requestedAt=millis();bool reportAck=false;
+      const int code=fazerPostCAD("/sinaleiro-bancada",token,request,&response);
+      ultimoHttpCAD=code;
+      if(code!=200||!receberSimulacaoCAD(response,uint32_t(millis()-requestedAt),&reportAck)){
+        invalidarRemoto();statusCAD=(code==401||code==403||code==429)?5:6;
+        retryAt=millis()+(statusCAD==5?60000U:3000U);continue;
       }
-      statusCAD = 4;
-      vTaskDelay(pdMS_TO_TICKS(20)); // permitir que a tarefa local aplique a nova cópia.
+      statusCAD=4;
+      if(reportDue&&reportAck){
+        lastReport=millis();ultimoEnvioCAD=lastReport;
+        lastReportedMode=s.mode;lastReportedColor=s.signal.color;lastReportedVersion=s.version;
+      }
+      // Servidor R4 confirma a telemetria junto com o poll. Sem segunda viagem HTTPS.
+      // Sem ACK, preservar /estado como compatibilidade com servidores anteriores.
+      if(!reportDue||reportAck)continue;
+      vTaskDelay(pdMS_TO_TICKS(20));
     }
     if (!snapshot(s)) continue; // nunca relatar o estado anterior ao poll/mudança local.
     const bool changed = s.mode != lastReportedMode || s.signal.color != lastReportedColor;
-    if (changed || !lastReport || millis() - lastReport >= 2000) {
+    if (changed || !lastReport || millis() - lastReport >= CAD_REPORT_MS) {
       // Não inventar UTC: indicação local real continua enquanto o relógio sincroniza.
       if (s.mode == OPERACAO_REAL && s.signal.hasTemperature && s.measuredAt < 1700000000) continue;
       const int code = fazerPostCAD("/estado", token, payloadTelemetria(s));
       ultimoHttpCAD = code; lastReport = millis();
-      if (code == 200) { statusCAD = 4; ultimoEnvioCAD = millis(); lastReportedMode = s.mode; lastReportedColor = s.signal.color; }
+      if (code == 200) { statusCAD = 4; ultimoEnvioCAD = millis(); lastReportedMode = s.mode; lastReportedColor = s.signal.color;lastReportedVersion=s.version; }
       else { statusCAD = (code == 401 || code == 403 || code == 429) ? 5 : 6;
         retryAt = millis() + (statusCAD == 5 ? 60000U : 3000U);
         if (s.mode == REMOTO_BANCADA) invalidarRemoto(); }
@@ -1633,6 +1670,7 @@ void enviarEstado() {
   doc["wifi_mensagem"] = mensagemWifi; doc["wifi_rssi"] = WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0;
   doc["uptime_s"] = millis() / 1000; doc["firmware"] = CAD_FIRMWARE;
   time_t epoch; time(&epoch); doc["clock_sync"] = epoch >= 1700000000;
+  doc["cad_rtt_ms"]=ultimoRttCAD;doc["cad_intervalo_ms"]=ultimoIntervaloCAD;
   doc["cad_status"] = int(statusCAD); doc["ultimo_http_cad"] = int(ultimoHttpCAD);
   if (ultimoEnvioCAD) doc["ultimo_envio_s"] = (millis() - ultimoEnvioCAD) / 1000;
   else doc["ultimo_envio_s"] = nullptr;
@@ -1662,6 +1700,7 @@ void enviarEstado() {
 }
 void informacoesCAD() {
   JsonDocument doc; doc["device_id"] = deviceId(); doc["credencial_configurada"] = copiarTokenCAD().length() > 0;
+  doc["rtt_ms"]=ultimoRttCAD;doc["intervalo_consulta_ms"]=ultimoIntervaloCAD;
   doc["status"] = int(statusCAD); doc["http"] = int(ultimoHttpCAD); doc["api"] = CAD_BASE; jsonResponse(doc);
 }
 void configurarCAD() {
@@ -1985,6 +2024,7 @@ void setup() {
   modo=PARADO;benchLeds.stop();
   pt100.begin(); pt100Configurado = pt100.configured();
   iniciarRede();
+  WiFi.setSleep(false); // Bancada: evitar espera de power-save entre pacotes.
   const char *headers[] = {"Origin", "X-CGD-Local"}; servidor.collectHeaders(headers, 2);
   servidor.on("/", HTTP_GET, []() { servidor.sendHeader("Cache-Control", "no-store"); servidor.send_P(200, "text/html; charset=utf-8", LOCAL_UI); });
   servidor.on("/api/estado", HTTP_GET, enviarEstado);
@@ -2007,7 +2047,7 @@ void setup() {
   servidor.begin();
   xTaskCreatePinnedToCore(tarefaSinalizacao, "local_signals", 6144, nullptr, 2, nullptr, 1);
   xTaskCreatePinnedToCore(tarefaCAD, "cad_https", 12288, nullptr, 1, nullptr, 0);
-  Serial.println("IHM pronta: http://192.168.4.1 · R3: sete GPIOs de bancada, chave GPIO27 opcional");
+  Serial.println("IHM pronta: http://192.168.4.1 · R4: sete GPIOs de bancada, chave GPIO27 opcional");
 }
 void loop() {
   if (!mutexEstado || !mutexCredencial) { delay(10); return; }

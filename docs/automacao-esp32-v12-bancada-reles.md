@@ -1,12 +1,22 @@
-# ESP32 V12 revisão 3 — relés de bancada e guilhotinas em GPIO32/33
+# ESP32 V12 revisão 4 — comunicação mais frequente e guilhotinas em GPIO32/33
 
-Identificador na IHM: `temperatura-v12-bancada-reles-leds-r3`.
+Identificador na IHM: `temperatura-v12-bancada-reles-leds-r4`.
 Arquivo único: `firmware/releases/CampoDoGado_ESP32_V12_Bancada_Reles.ino`.
 A atualização do site não grava a placa: carregar este `.ino` na Arduino IDE continua sendo uma etapa local.
 
 Uso exclusivo em bancada com relés e LEDs, sem máquinas, solenóides ou cilindros conectados. A indicação ABERTA/FECHADA é simulada, sem retorno de fim de curso.
 
-## O que muda em relação à r2
+## Correção de atraso na r4
+
+Na amostra de produção analisada, o processamento do servidor teve mediana de 22 ms na consulta dos comandos e 21 ms na telemetria, enquanto as consultas da ESP32 chegaram com mediana de 1.895 ms e máximo de 2.846 ms. Isso não mede o tempo físico do relé: evidencia a espera entre consultas e os custos de rede. A r3 mantinha a rotina HTTPS anterior: TLS novo a cada chamada, consulta a cada 1 s e envio de status separado ocupando a mesma tarefa.
+
+A r4 mantém o cliente TLS/HTTP entre requisições e consome o corpo da resposta antes de reutilizar o socket. Erros fecham a conexão para permitir reconexão; a validação do certificado CA permanece. O handshake TLS recebe limite explícito de 3 s (o padrão do core era 120 s), e corpos HTTP incompletos descartam a conexão antes de reutilizá-la. O período mínimo de consulta passa a 250 ms, sujeito ao tempo de rede; Wi-Fi power-save é desativado na bancada. A IHM local consulta o estado a cada 250 ms, e o CAD consulta o status a cada 1 s sem repetir GETs a cada quadro da simulação.
+
+A rota existente de consulta aceita um campo opcional `estado`, usando a mesma autenticação e validação de `/estado`. Confirma `estado_recebido: true` somente após salvar o relatório do mesmo digestor. O ESP32 envia o relatório nessa viagem a cada 2 s ou em mudança de modo/cor/versão; não precisa fazer um segundo POST para isso. Clientes antigos continuam válidos. Na ausência de ACK de servidor anterior, a r4 usa `/estado` como fallback.
+
+O tempo gasto pela requisição é descontado da validade recebida, sem prolongar comandos atrasados. Nenhum teste encurta a expiração de 2 s nem retira desarme/intertravamento. Em **Integração com o CAD**, a IHM passa a mostrar **Tempo HTTPS** e **Intervalo das consultas**, medidos na própria placa, para comparar a rede após a gravação. Não se garante latência física de 250 ms nem operação em tempo real pela internet.
+
+## Pinagem e liberação mantidas da r3
 
 - Sete saídas disponíveis para testes físicos de LEDs. Nenhum GPIO é energizado automaticamente na partida.
 - GPIO27→GND passa a ser opcional. A compilação padrão usa `CGD_BENCH_REQUIRE_LOCAL_KEY 0`; usar `1` exige novamente a chave. A IHM distingue presença do jumper de autorização. GPIO27 permanece entrada, nunca saída.
@@ -35,7 +45,7 @@ Saídas **ativas em LOW**: LOW energiza o relé, HIGH desenergiza. COM/NA/NF sã
 ## Gravar e testar
 
 1. Na Arduino IDE, instalar **ESP32 core 3.3.12** e **ArduinoJson 7.4.3**. Selecionar ESP32 Dev Module para o módulo clássico utilizado na bancada.
-2. Abrir o `.ino` em pasta com o mesmo nome e gravar. Preservar a configuração elétrica LOW do módulo existente. Confirmar `...-r3` no rodapé da IHM após atualizar a página.
+2. Abrir o `.ino` em pasta com o mesmo nome e gravar. Preservar a configuração elétrica LOW do módulo existente. Confirmar `...-r4` no rodapé da IHM após atualizar a página.
 3. Entrar na IHM pelo IP local ou pelo AP `192.168.4.1`. Não é necessário jumper GPIO27 nesta compilação.
 4. Sem iniciar o CAD, usar **Testar LED · 2 s** em cada um dos sete canais. Cada teste desliga os demais, expira automaticamente e deixa a bancada parada. Aguardar 1 s entre testes. Nas guilhotinas, **Fechar e parar bancada** desenergiza todas as saídas.
 5. Para sinaleiros, selecionar **Manual · LEDs** e uma cor, ou usar os testes rápidos de 5 s / Automático. A IHM exibe o comando elétrico aplicado.
@@ -54,7 +64,7 @@ Temporizadores locais de purga continuam somente virtuais. Aquecimento, motor e 
 ## Verificação
 
 ```sh
-node --test tests/automacao-esp32-v12-bancada-reles.test.js tests/esp32-v12-bench-state.test.js tests/esp32-v12-ihm-reles.test.js
+node --test tests/automacao-esp32-v12-bancada-reles.test.js tests/esp32-v12-bench-state.test.js tests/esp32-v12-ihm-reles.test.js tests/esp32-v12-latencia.test.js
 arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all CampoDoGado_ESP32_V12_Bancada_Reles
 ```
 

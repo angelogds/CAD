@@ -17,6 +17,8 @@ Conexão, seleção e modos ficam acima dos cartões. O gráfico temperatura × 
 
 A IHM ESP32 conserva os dois blocos de purgadores e somente um bloco compacto de guilhotinas. Na revisão r3, selecionar **Simulação CAD** localmente autoriza o espelhamento; GPIO27 é opcional. As guilhotinas usam um relé por canal: GPIO32 para alimentação e GPIO33 para descarga, desenergizado com retorno ao NF. GPIO16/17 não são usados. Testes locais dos sete canais não dependem de pacote CAD e expiram em 2 s; os modos locais dos sinaleiros também acionam seus relés de LED, com prazo de 5 s por cor. Falha, perda de comunicação e desarme retiram as saídas; o firmware não restaura uma autorização após reiniciar. Testes individuais são temporários e isolam os demais LEDs. Consulte a pinagem e procedimento atualizado em [automacao-esp32-v12-bancada-reles.md](automacao-esp32-v12-bancada-reles.md).
 
+A revisão r4 reduz a espera de comunicação: cliente HTTPS persistente, consulta programada a cada 250 ms e relatório opcional junto ao poll autenticado. O CAD atualiza o status a cada 1 s e a IHM local a cada 250 ms. A validade desconta a viagem da requisição. São intervalos de software; o tempo real depende da rede e deve ser medido na bancada.
+
 ## Evidência de software
 
 - `tests/automacao-cad-v12-snapshot.test.js` executa os scripts reais do navegador em VM com relógio/rede controlados: ciclo completo, pausa/retomada, mudança de digestor com POST pendente, reinício rápido, falha do snapshot e bloqueio dos botões individuais.

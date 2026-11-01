@@ -80,7 +80,7 @@
     status.textContent=msg+'. Sincronização interrompida; comandos expiram automaticamente.';
   }
   void refreshStatus();
-  statusTimer=setInterval(refreshStatus,3000);
+  statusTimer=setInterval(refreshStatus,1000);
   const validadeTimer=setInterval(()=>{if(recebidoEm!==null)renderStatus();},1000);
   const selectedIds=()=>selector.value==='all'?[1,2,3,4]:[Number(selector.value)];
   function snapshots(stopped=false,ids=selectedIds()) {
@@ -141,7 +141,7 @@
           keepalive:request.stopped,
         });
         retired.forEach(id=>publishedIds.delete(id));
-        void refreshStatus();
+        // Status tem cadencia propria; nao repetir um GET a cada publicacao/evento.
         if(request.epoch===epoch&&(request.stopped||toggle.checked))
           status.textContent=request.stopped?'Teste remoto interrompido':'Sincronização de bancada: '+estados.map(e=>'D'+e.digestor_id+' '+e.fase).join(' · ');
       }
@@ -170,7 +170,7 @@
   function connectFromToggle() {
     // A opção do painel apenas sincroniza as lâmpadas por padrão.
     if(timer!==null)clearInterval(timer);
-    status.textContent='Sincronizando ciclo e LEDs da bancada; autorização pela chave local da ESP32.';
+    status.textContent='Sincronizando ciclo e LEDs da bancada; seleção local Simulação CAD na ESP32.';
     void publish();
     timer=setInterval(()=>{if(toggle.checked)void publish();},1000);
   }

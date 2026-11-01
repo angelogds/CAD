@@ -51,8 +51,19 @@ router.post('/estado', deviceAuth, (req, res) => {
 // Consulta iniciada pelo ESP32; pacote virtual de teste apenas para o digestor autorizado.
 router.post('/sinaleiro-bancada', deviceAuth, (req,res) => {
   try {
-    svc.recordPing(req.device);
-    return res.json({...base(req),modo:'SIMULACAO',sinaleiro_bancada:bancada.poll(req.device, req.body && req.body.digestor_id)});
+    const id = bancada.digestorAutorizado(req.device, req.body && req.body.digestor_id);
+    // R4: telemetria opcional na mesma viagem HTTPS do poll. Clientes antigos continuam válidos.
+    const hasReport = Object.prototype.hasOwnProperty.call(req.body || {}, 'estado');
+    if (hasReport) {
+      const estado = req.body.estado;
+      if (!estado || typeof estado !== 'object' || Array.isArray(estado))
+        return res.status(400).json({ok:false,error:'Estado deve ser um objeto.'});
+      if (Number(estado.digestor_id) !== id)
+        return res.status(403).json({ok:false,error:'Estado e consulta devem pertencer ao mesmo digestor.'});
+      svc.recordContact(req.device, estado);
+    } else svc.recordPing(req.device);
+    return res.json({...base(req),modo:'SIMULACAO',estado_recebido:hasReport,
+      sinaleiro_bancada:bancada.poll(req.device,id)});
   } catch (e) { return res.status(e.status||500).json({ok:false,error:e.status?e.message:'erro interno'}); }
 });
 module.exports = router;
