@@ -8,6 +8,9 @@
   const start=document.getElementById('sim-start');
   const autoSync=document.getElementById('sim-auto-sync');
   const connectButton=document.getElementById('sim-connect-esp32');
+  const realButton=document.getElementById('sim-real-components');
+  const realFeedback=document.getElementById('sim-real-feedback');
+  let canTestComponents=false;
   if(!root||!toggle||!status||!selector||!start)return;
   let timer=null,busy=false,statusTimer=null;
   let pending=null,queuedStop=null,epoch=0;
@@ -23,13 +26,26 @@
   const txt=(v)=>v==null?'—':String(v);
   const ago=(v)=>v==null?'nunca':(v<2?'agora':v+' s atrás');
   let ultimoStatus=[],recebidoEm=null,statusBusy=false;
+  function syncRealButton(message) {
+    if(!realButton)return;
+    realButton.disabled=!toggle.checked&&!canTestComponents;
+    realButton.setAttribute('aria-pressed',String(toggle.checked));
+    realButton.textContent=toggle.checked?'S · Encerrar teste real':'S · Simulação real';
+    if(realFeedback)realFeedback.textContent=message||(toggle.checked?
+      (start.disabled?'Relés vinculados ao ciclo':'Preparado · clique em Iniciar'):
+      canTestComponents?'Visual · relés não vinculados':'ESP32 indisponível para teste');
+  }
   function renderStatus() {
     if(!rows)return;
     const ui=window.AutomacaoTelemetriaUI;
     const digestores=ui&&recebidoEm!==null?ui.expirar(ultimoStatus,(Date.now()-recebidoEm)/1000):ultimoStatus;
       const sel=selector.value==='all'?null:Number(selector.value);
+      const matched=digestores.filter(d=>sel===null||d.digestor_id===sel);
+      canTestComponents=matched.some(d=>d.conexao==='ONLINE'&&d.origem!=='REAL')&&
+        !matched.some(d=>d.origem==='REAL');
+      if(realButton&&toggle.checked&&!canTestComponents)stop('Comunicação indisponível ou ESP32 em operação REAL. Teste interrompido.');
+      syncRealButton();
       if(indicator){
-        const matched=digestores.filter(d=>sel===null||d.digestor_id===sel);
         const online=matched.filter(d=>d.conexao==='ONLINE').length;
         const reais=matched.filter(d=>d.origem==='REAL').length;
         indicator.textContent=reais ? 'SIMULAÇÃO VISUAL • '+reais+' ESP32 EM OPERAÇÃO REAL (SUPERVISÃO)' : online
@@ -60,7 +76,9 @@
       ultimoStatus=data.digestores;recebidoEm=solicitadoEm;
       renderStatus();
     }catch(e){
-      ultimoStatus=[];recebidoEm=null;
+      ultimoStatus=[];recebidoEm=null;canTestComponents=false;
+      if(realButton&&toggle.checked)stop('Sem confirmação de comunicação. Teste interrompido.');
+      syncRealButton('Sem comunicação com ESP32');
       if(indicator){indicator.textContent='SIMULAÇÃO • STATUS ESP32 INDISPONÍVEL';indicator.dataset.conexao='erro';}
       const td=document.createElement('td');
       td.colSpan=12;td.setAttribute('role','alert');
@@ -78,6 +96,7 @@
     toggle.checked=false;
     if(timer!==null){clearInterval(timer);timer=null;}
     status.textContent=msg+'. Sincronização interrompida; comandos expiram automaticamente.';
+    syncRealButton('Teste interrompido · comandos expiram');
   }
   void refreshStatus();
   statusTimer=setInterval(refreshStatus,1000);
@@ -93,7 +112,7 @@
       const parado=stopped||!start.disabled||!valido;
       const fase=parado?'PARADO':temperatura>120?'FINAL':temperatura>50?'MEIO':'INICIO';
       // O canal legado de solenóides permanece fechado. A V12 usa somente os
-      // estados visuais para LEDs, com permissivo e intertravamentos locais.
+      // estados visuais para reles de teste, com permissivo e intertravamentos locais.
       const camisaVisual=!parado&&card.dataset.camisaSimulada==='ABERTO'?'ABERTO':'FECHADO';
       const eixoVisual=!parado&&card.dataset.eixoSimulado==='ABERTO'?'ABERTO':'FECHADO';
       // Saídas físicas e estados VISUAIS são canais distintos: firmware antigo
@@ -143,23 +162,28 @@
         retired.forEach(id=>publishedIds.delete(id));
         // Status tem cadencia propria; nao repetir um GET a cada publicacao/evento.
         if(request.epoch===epoch&&(request.stopped||toggle.checked))
-          status.textContent=request.stopped?'Teste remoto interrompido':'Sincronização de bancada: '+estados.map(e=>'D'+e.digestor_id+' '+e.fase).join(' · ');
+          status.textContent=request.stopped?'Teste remoto interrompido':'Componentes isolados · comandos de relés: '+estados.map(e=>'D'+e.digestor_id+' '+e.fase).join(' · ');
+        syncRealButton();
       }
     }catch(e){
       halt(e.kind==='SESSAO_EXPIRADA'||e.kind==='CSRF_INVALIDO'?e.message:'Falha na sincronização: '+e.message);
       if(e.kind==='SESSAO_EXPIRADA'||e.kind==='SEM_PERMISSAO'){if(statusTimer!==null){clearInterval(statusTimer);statusTimer=null;}void refreshStatus();}
     }finally{busy=false;}
   }
-  function stop() {
+  function stop(message) {
     epoch++;
     if(timer!==null){clearInterval(timer);timer=null;}
     if(toggle.checked||publishedIds.size)void publish(true);
     toggle.checked=false;
+    if(typeof message==='string')status.textContent=message;
+    syncRealButton();
   }
   function connect() {
     if(toggle.checked)return;
+    if(realButton&&!canTestComponents){status.textContent='Aguarde um ESP32 online em modo de teste.';syncRealButton();return;}
     toggle.checked=true;
-    status.textContent='Conectando CAD à bancada ESP32…';
+    syncRealButton();
+    status.textContent='Vinculando relés dos componentes isolados ao CAD…';
     void publish();
     timer=setInterval(()=>{if(toggle.checked)void publish();},1000);
   }
@@ -168,19 +192,20 @@
     else stop();
   });
   function connectFromToggle() {
-    // A opção do painel apenas sincroniza as lâmpadas por padrão.
+    // Compatibilidade com o controle interno: a ação visível é S · Simulação real.
     if(timer!==null)clearInterval(timer);
-    status.textContent='Sincronizando ciclo e LEDs da bancada; seleção local Simulação CAD na ESP32.';
+    if(realButton&&!canTestComponents){toggle.checked=false;syncRealButton();return;}
+    syncRealButton();
+    status.textContent='Teste dos relés de componentes isolados; selecione Simulação CAD na IHM ESP32.';
     void publish();
     timer=setInterval(()=>{if(toggle.checked)void publish();},1000);
   }
   connectButton?.addEventListener('click',()=>{
     void refreshStatus();
-    if(!start.disabled) {
-      status.textContent='Status consultado. Para enviar a simulação, clique em Iniciar simulação.';
-    } else connect();
+    status.textContent='Conexão consultada. Use S · Simulação real para vincular os relés.';
   });
-  start.addEventListener('click',()=>{if(autoSync?.checked!==false)connect();});
+  realButton?.addEventListener('click',()=>{if(toggle.checked)stop();else connect();});
+  start.addEventListener('click',()=>{if(autoSync?.checked===true)connect();syncRealButton();});
   root.addEventListener('simulador:estado',()=>{if(toggle.checked)void publish();});
   selector.addEventListener('change',stop);
   document.getElementById('sim-pause').addEventListener('click',stop);

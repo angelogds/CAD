@@ -9,8 +9,8 @@ const scene=read('public/js/automacao-digestores-scene.mjs');
 const view=read('views/automacao/partials/digestores-circuito.ejs');
 
 test('V12 preserva V11 sem modificar firmware de producao e liga LED bancada separado',()=>{
- assert.match(firmware,/temperatura-v12-bancada-reles-leds/);
- assert.match(firmware,/temperatura-v12-bancada-reles-leds-r4/);
+ assert.match(firmware,/bench\["perfil_teste"\]="COMPONENTES_ISOLADOS"/);
+ assert.match(firmware,/temperatura-v12-componentes-isolados-r5/);
  assert.match(firmware,/if\(s\.mode!=REMOTO_BANCADA\|\|!s\.bench\.mirroring\)\{/);
  assert.match(firmware,/published\.signal=cgd::unavailable\(cgd::SensorStatus::SEM_SINAL\)/);
  assert.match(firmware,/preencherSinal\(doc,published\)/);

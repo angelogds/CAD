@@ -7,19 +7,19 @@ const thermalCore = require('../public/js/automacao-simulador-core');
 const mechanicalCore = require('../public/js/automacao-digestores-circuito-core');
 
 // Usa os mesmos scripts e a ordem defer da página, com relógio/rede controlados.
-function simulator({ selection = '1', deferFirstPost = false } = {}) {
+function simulator({ selection = '1', deferFirstPost = false, relayButton = false, autoSync = true } = {}) {
   function node() {
     const handlers = new Map();
     const classes = new Set();
     return {
-      dataset: {}, style: {}, value: '', checked: false, disabled: false, textContent: '', children: [],
+      dataset: {}, style: {}, value: '', checked: false, disabled: false, textContent: '', children: [], attributes: {},
       classList: {
         toggle(name, force) { const on = force === undefined ? !classes.has(name) : force; on ? classes.add(name) : classes.delete(name); return on; },
       },
       addEventListener(type, fn) { if (!handlers.has(type)) handlers.set(type, []); handlers.get(type).push(fn); },
       dispatchEvent(event) { for (const fn of handlers.get(event.type) || []) fn(event); },
       fire(type) { this.dispatchEvent({ type, target: this, preventDefault() {} }); },
-      setAttribute() {}, removeAttribute() {}, scrollIntoView() {},
+      setAttribute(name, value) { this.attributes[name]=String(value); }, removeAttribute() {}, scrollIntoView() {},
       append(...items) { this.children.push(...items); }, appendChild(item) { this.children.push(item); },
       replaceChildren(...items) { this.children = items; },
       querySelector() { return null; }, querySelectorAll() { return []; },
@@ -31,10 +31,11 @@ function simulator({ selection = '1', deferFirstPost = false } = {}) {
     'sim-reset', 'sim-presentation', 'sim-speed', 'sim-link-circuits', 'sim-integration-state', 'sim-clock',
     'sim-events-filter', 'sim-events-list', 'sim-remote-enable', 'sim-remote-status', 'sim-auto-sync',
     'sim-connect-esp32', 'sim-remote-rows', 'sim-hardware-indicator', 'digestores-circuito-panel']) get(id);
+  if(relayButton){get('sim-real-components');get('sim-real-feedback');}
   get('sim-select-digestor').value = selection;
   get('sim-events-filter').value = 'all';
   get('sim-speed').value = '8';
-  get('sim-auto-sync').checked = true;
+  get('sim-auto-sync').checked = autoSync;
   get('sim-remote-enable').dataset.csrf = 'test-csrf';
   get('digestores-circuito-panel').dataset.controls = 'true';
   const cards = Array.from({ length: 4 }, (_, index) => {
@@ -65,11 +66,12 @@ function simulator({ selection = '1', deferFirstPost = false } = {}) {
   window.setInterval = setInterval;
   window.matchMedia = () => ({ matches: false });
   const posts = [];
+  let hardwareRows=relayButton?[{digestor_id:1,conexao:'ONLINE',origem:'SIMULACAO'}]:[],statusFailure=false;
   let releaseFirst;
   window.CGDSimHttp = {
     MSG: { RESPOSTA_INVALIDA: 'Resposta inválida' },
     async fetchJson(_url, options) {
-      if (!options || options.method !== 'POST') return { ok: true, digestores: [] };
+      if (!options || options.method !== 'POST') {if(statusFailure)throw Error('Falha de rede');return { ok: true, digestores: hardwareRows };}
       posts.push(JSON.parse(options.body).estados);
       if (deferFirstPost && posts.length === 1) await new Promise(resolve => { releaseFirst = resolve; });
       return { ok: true };
@@ -84,6 +86,8 @@ function simulator({ selection = '1', deferFirstPost = false } = {}) {
   const flush = async () => { for (let index = 0; index < 8; index++) await Promise.resolve(); };
   return {
     get, cards, posts, window, flush,
+    async status(rows) { hardwareRows=rows;statusFailure=false;const timer=[...timers.values()].find(item=>item.fn.name==='refreshStatus');if(timer)await timer.fn();await flush(); },
+    async failStatus() {statusFailure=true;const timer=[...timers.values()].find(item=>item.fn.name==='refreshStatus');if(timer)await timer.fn();await flush();},
     snapshot: () => window.AutomacaoDigestoresCircuito.getSnapshot(),
     async start() { get('sim-start').fire('click'); await flush(); },
     async tick() { const timer = [...timers.values()].find(item => item.fn.name === 'tick'); if (timer) timer.fn(); await flush(); },
@@ -232,4 +236,51 @@ test('pausa e retomada rápidas do mesmo digestor preservam PARADO antes da pró
   assert.equal(ui.posts[2][0].digestor_id, 1);
   assert.notEqual(ui.posts[2][0].fase, 'PARADO');
   assert.equal(ui.get('sim-remote-enable').checked, true);
+});
+
+
+test('S · Simulação real exige ação explícita e Conectar não aciona relés',async()=>{
+ const ui=simulator({relayButton:true,autoSync:false});await ui.flush();
+ assert.equal(ui.get('sim-real-components').disabled,false);
+ ui.get('sim-connect-esp32').fire('click');await ui.flush();assert.equal(ui.posts.length,0);
+ await ui.start();assert.equal(ui.posts.length,0);assert.equal(ui.get('sim-remote-enable').checked,false);
+ ui.get('sim-real-components').fire('click');await ui.flush();
+ assert.equal(ui.get('sim-remote-enable').checked,true);
+ assert.equal(ui.get('sim-real-components').attributes['aria-pressed'],'true');
+ assert.notEqual(ui.posts.at(-1)[0].fase,'PARADO');
+ await ui.pause();assert.equal(ui.posts.at(-1)[0].fase,'PARADO');
+ assert.equal(ui.get('sim-real-components').attributes['aria-pressed'],'false');
+});
+test('teste real pode ser preparado antes de iniciar; desativar envia PARADO',async()=>{
+ const ui=simulator({relayButton:true,autoSync:false});await ui.flush();
+ ui.get('sim-real-components').fire('click');await ui.flush();assert.equal(ui.posts.at(-1)[0].fase,'PARADO');
+ await ui.start();assert.notEqual(ui.posts.at(-1)[0].fase,'PARADO');
+ ui.get('sim-real-components').fire('click');await ui.flush();assert.equal(ui.posts.at(-1)[0].fase,'PARADO');
+ const count=ui.posts.length;await ui.tick();assert.equal(ui.posts.length,count);
+});
+test('sem comunicação ou ESP32 em operação REAL não aceita ativação de componentes',async()=>{
+ const ui=simulator({relayButton:true,autoSync:false});await ui.flush();
+ await ui.status([{digestor_id:1,conexao:'OFFLINE',origem:'SIMULACAO'}]);
+ assert.equal(ui.get('sim-real-components').disabled,true);
+ ui.get('sim-real-components').fire('click');await ui.flush();assert.equal(ui.posts.length,0);
+ await ui.status([{digestor_id:1,conexao:'ONLINE',origem:'SIMULACAO'}]);
+ ui.get('sim-real-components').fire('click');await ui.flush();await ui.start();
+ await ui.status([{digestor_id:1,conexao:'ONLINE',origem:'REAL'}]);
+ assert.equal(ui.get('sim-remote-enable').checked,false);assert.equal(ui.posts.at(-1)[0].fase,'PARADO');
+ assert.equal(ui.get('sim-real-components').disabled,true);
+});
+test('perda do status interrompe teste real e reconexão não rearma automaticamente',async()=>{
+ const ui=simulator({relayButton:true,autoSync:false});await ui.flush();await ui.start();
+ ui.get('sim-real-components').fire('click');await ui.flush();
+ await ui.failStatus();assert.equal(ui.get('sim-remote-enable').checked,false);
+ assert.equal(ui.posts.at(-1)[0].fase,'PARADO');
+ await ui.status([{digestor_id:1,conexao:'ONLINE',origem:'SIMULACAO'}]);
+ assert.equal(ui.get('sim-real-components').attributes['aria-pressed'],'false');
+ const count=ui.posts.length;await ui.tick();assert.equal(ui.posts.length,count);
+});
+test('botão real preserva parada pendente quando desativado durante POST',async()=>{
+ const ui=simulator({relayButton:true,autoSync:false,deferFirstPost:true});await ui.flush();await ui.start();
+ ui.get('sim-real-components').fire('click');await ui.flush();assert.equal(ui.posts.length,1);
+ ui.get('sim-real-components').fire('click');await ui.flush();ui.release();await ui.flush();
+ assert.equal(ui.posts.at(-1)[0].fase,'PARADO');assert.equal(ui.get('sim-remote-enable').checked,false);
 });

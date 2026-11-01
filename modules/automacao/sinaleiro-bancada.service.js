@@ -62,6 +62,6 @@ function poll(device, requested) {
   try{require('./bancada-telemetria.service').recordPoll(device,id,fase,row?Number(row.versao)||0:0);}catch(_){/* telemetria nunca bloqueia o sinal */}
   const sinal = fase === 'PARADO' ? legacySignal('PARADO') : { ...legacySignal(fase), ...(row.cor_sinaleiro ? {cor_sinaleiro:row.cor_sinaleiro,faixa_temperatura:row.faixa_temperatura,pronto_descarga:!!row.pronto_descarga} : {}) };
   const virtual = fase !== 'PARADO' ? readStoredState(row.estado_simulacao_json) : null;
-  return {digestor_id:id,fase,...sinal,...(virtual || CLOSED),estado_simulacao_disponivel:!!(virtual && virtual.estado_simulacao_disponivel),fonte_simulacao:'CAD',temperatura_c:fase === 'PARADO' ? null : row.temperatura_c,origem:'SIMULACAO',versao_fase:row?Number(row.versao)||0:0,validade_ms:Math.min(remaining,DURACAO_MS),bancada:true,processo_habilitado:false};
+  return {digestor_id:id,fase,...sinal,...(virtual || CLOSED),estado_simulacao_disponivel:!!(virtual && virtual.estado_simulacao_disponivel),fonte_simulacao:'CAD',temperatura_c:fase === 'PARADO' ? null : row.temperatura_c,origem:'SIMULACAO',versao_fase:row?Number(row.versao)||0:0,validade_ms:Math.min(remaining,DURACAO_MS),bancada:true,perfil_teste:'COMPONENTES_ISOLADOS',processo_habilitado:false};
 }
 module.exports={publish,poll,digestorAutorizado,DURACAO_MS};

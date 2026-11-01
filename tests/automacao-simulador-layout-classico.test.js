@@ -58,3 +58,17 @@ test('um único painel de comandos vem antes do circuito e dos cartões, sem dup
   }
   assert.match(html, /<details class="sim-command-details">/);
 });
+
+
+test('S · Simulação real fica junto da conexão, desativado inicialmente e restrito ao perfil autorizado',()=>{
+ const ejs=require('ejs'),view=read('views/automacao/simulador-digestores.ejs');
+ const filename=path.join(__dirname,'../views/automacao/simulador-digestores.ejs');
+ const render=allowed=>ejs.render(view,{layout(){},simuladorBancadaPermitida:allowed,csrfAutomacao:'test',simulacaoCircuitoPermitida:true},{filename});
+ const html=render(true);
+ assert.equal((html.match(/id="sim-real-components"/g)||[]).length,1);
+ assert.match(html,/<button[^>]+id="sim-real-components"[^>]+aria-pressed="false"[^>]+disabled/);
+ assert.ok(html.indexOf('id="sim-connect-esp32"')<html.indexOf('id="sim-real-components"'));
+ assert.match(html,/<input[^>]+id="sim-remote-enable"[^>]+hidden/);
+ assert.doesNotMatch(html,/<input[^>]+id="sim-auto-sync"[^>]*checked/);
+ assert.doesNotMatch(render(false),/id="sim-real-components"|id="sim-remote-enable"/);
+});

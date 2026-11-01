@@ -284,6 +284,8 @@ test('R4 recebe telemetria e devolve o comando na mesma consulta autenticada',as
     assert.equal(response.status,200,await response.clone().text());
     const body=await response.json();assert.equal(body.estado_recebido,true);
     assert.equal(body.sinaleiro_bancada.fase,'MEIO');assert.equal(body.comando_habilitado,false);
+    assert.equal(body.sinaleiro_bancada.perfil_teste,'COMPONENTES_ISOLADOS');
+    assert.equal(body.sinaleiro_bancada.processo_habilitado,false);
     assert.deepEqual(body.comandos,[]);assert.equal(d1().fase_aplicada,'MEIO');
     assert.equal(d1().saida_confirmada,null);
     const legacy=await (await post('/sinaleiro-bancada',token,{digestor_id:1})).json();
