@@ -237,9 +237,9 @@ function parseMoneyToCents(value, fallback = 0) {
 }
 
 function assertPurchasePayloadMatchesApprovedItems(solicitacaoId, payload = {}, selectedIds = []) {
-  if (!configuration.isApprovalRequired()) return true;
+  const approvalRequired = configuration.isApprovalRequired();
   const ids = (Array.isArray(selectedIds) ? selectedIds : [selectedIds]).filter(Boolean).map(Number);
-  assertItemsApprovedForPurchase(solicitacaoId, ids);
+  if (approvalRequired) assertItemsApprovedForPurchase(solicitacaoId, ids);
   if (!ids.length) return true;
 
   const rows = loadItems(solicitacaoId);
@@ -262,18 +262,21 @@ function assertPurchasePayloadMatchesApprovedItems(solicitacaoId, payload = {}, 
     const prospective = {
       ...current,
       fornecedor_id: Number(suppliers[index] || 0) || null,
-      valor_unitario_centavos: parseMoneyToCents(prices[index], Number(current.valor_unitario_centavos || 0)),
+      valor_unitario_centavos: parseMoneyToCents(prices[index], approvalRequired ? Number(current.valor_unitario_centavos || 0) : 0),
       status_cotacao: quotedIds.has(id) ? 'COTADO' : 'PENDENTE',
     };
     const approvedSignature = String(current.aprovacao_item_assinatura || '');
-    if (!isQuoteReady(prospective) || !approvedSignature || itemSignature(prospective) !== approvedSignature) {
+    if (normalize(current.status_compra) === 'CANCELADO' || !isQuoteReady(prospective)
+        || (approvalRequired && (!approvedSignature || itemSignature(prospective) !== approvedSignature))) {
       divergent.push(current);
     }
   });
 
   if (divergent.length) {
-    const error = new Error('Fornecedor, quantidade ou valor de item aprovado foi alterado. Salve a nova cotação e obtenha nova aprovação antes da compra.');
-    error.code = 'COMPRA_DIVERGE_DA_APROVACAO_ITEM';
+    const error = new Error(approvalRequired
+      ? 'Fornecedor, quantidade ou valor de item aprovado foi alterado. Salve a nova cotação e obtenha nova aprovação antes da compra.'
+      : 'Somente itens ativos com cotação válida, fornecedor e valor positivo podem ser comprados.');
+    error.code = approvalRequired ? 'COMPRA_DIVERGE_DA_APROVACAO_ITEM' : 'COMPRA_COTACAO_INVALIDA';
     error.itemIds = divergent.map((item) => item.id);
     throw error;
   }

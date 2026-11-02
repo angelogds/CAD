@@ -142,6 +142,15 @@ test('reativação exige aprovação válida e volta a bloquear mudança no pre�
   assert.equal(approvals.getHistory(7).length, 1);
 });
 
+test('dispensa mantém a cotação obrigatória para itens selecionados e não revive cancelados', () => {
+  for (const override of [{ valor_unitario: ['0,00'] }, { valor_unitario: ['-1,00'] }, { valor_unitario: [''] }, { fornecedor_id: [''] }, { cotado: [] }]) {
+    assert.throws(() => approvals.assertPurchasePayloadMatchesApprovedItems(7, { ...payload, ...override }, ['10']), { code: 'COMPRA_COTACAO_INVALIDA' });
+  }
+  assert.equal(approvals.assertPurchasePayloadMatchesApprovedItems(7, { ...payload, valor_unitario: ['12,00'] }, ['10']), true);
+  db.prepare("UPDATE solicitacao_itens SET status_compra='CANCELADO'").run();
+  assert.throws(() => approvals.assertPurchasePayloadMatchesApprovedItems(7, payload, ['10']), { code: 'COMPRA_COTACAO_INVALIDA' });
+});
+
 test('reativação não bloqueia novamente item comprado durante a dispensa', () => {
   db.prepare("UPDATE solicitacao_itens SET status_compra='COMPRADO'").run();
   setMode('1');
