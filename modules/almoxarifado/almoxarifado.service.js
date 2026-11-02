@@ -1,7 +1,7 @@
 const db = require("../../database/db");
 const { STATUS } = require("../solicitacoes/solicitacoes.service");
 const fluxoEstoqueService = require("../estoque/estoque.solicitacao-fluxo.service");
-const { normalizeSetorCorporativo } = require("../compras/compras-setores");
+const { normalizeSetorCorporativo, dbAliasesForSetor } = require("../compras/compras-setores");
 
 function hasColumn(table, name) {
   try { return db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === name); } catch { return false; }
@@ -401,14 +401,11 @@ function resolveEstoqueItem(item, solicitacaoId, localId, contexto = {}) {
     : null;
   const categoriaId = contexto.categoriaId ? Number(contexto.categoriaId) : null;
   const subcategoriaId = contexto.subcategoriaId ? Number(contexto.subcategoriaId) : null;
+  const setorDestino = normalizeSetorEstoque(contexto.setor);
 
   function updateClassification(estoqueItemId) {
     const updates = [];
     const vals = [];
-    if (HAS_ESTOQUE_SETOR && contexto.setor) {
-      updates.push("setor_utilizacao=CASE WHEN setor_utilizacao IS NULL OR TRIM(setor_utilizacao)='' THEN ? ELSE setor_utilizacao END");
-      vals.push(normalizeSetorEstoque(contexto.setor));
-    }
     if (HAS_ESTOQUE_CENTRO_CUSTO && contexto.centroCusto) {
       updates.push("subarea_centro_custo=COALESCE(NULLIF(TRIM(subarea_centro_custo),''),?)");
       vals.push(String(contexto.centroCusto).trim());
@@ -442,9 +439,21 @@ function resolveEstoqueItem(item, solicitacaoId, localId, contexto = {}) {
   if (item.estoque_item_id) {
     const linked = db.prepare(`SELECT id,
       ${HAS_ESTOQUE_EQUIPAMENTO_ID ? "equipamento_id" : "NULL AS equipamento_id"},
+      ${HAS_ESTOQUE_SETOR ? "setor_utilizacao" : "NULL AS setor_utilizacao"},
+      ${HAS_LOCAL_ID ? "local_id" : "NULL AS local_id"},
       ${HAS_SALDO_ATUAL ? "COALESCE(saldo_atual,0)" : "0"} AS saldo_atual
       FROM estoque_itens WHERE id=? AND ativo=1`).get(Number(item.estoque_item_id));
     if (linked) {
+      // COMUM é compartilhado quando escolhido explicitamente. Um vínculo com
+      // outro setor/local exige correção, sem transferir saldos ou reclassificar
+      // silenciosamente o catálogo que já existe.
+      const setorVinculado = normalizeSetorEstoque(linked.setor_utilizacao);
+      if (HAS_ESTOQUE_SETOR && setorVinculado !== 'COMUM' && setorVinculado !== setorDestino) {
+        throw new Error('O setor do material vinculado difere do setor da solicitação. Confira o vínculo do material antes de receber.');
+      }
+      if (HAS_LOCAL_ID && localId && linked.local_id && Number(linked.local_id) !== Number(localId)) {
+        throw new Error('O local informado difere do local do material vinculado. Confira o cadastro antes de receber.');
+      }
       const linkedEquipmentId = Number(linked.equipamento_id || 0) || null;
       const compatible = dedicatedEquipmentId
         ? linkedEquipmentId === dedicatedEquipmentId || (!linkedEquipmentId && Number(linked.saldo_atual || 0) <= 0)
@@ -463,12 +472,21 @@ function resolveEstoqueItem(item, solicitacaoId, localId, contexto = {}) {
     : "";
   const params = [nome, unidade];
   if (dedicatedEquipmentId && HAS_ESTOQUE_EQUIPAMENTO_ID) params.push(dedicatedEquipmentId);
+  const setorAliases = dbAliasesForSetor(setorDestino);
+  const setorWhere = HAS_ESTOQUE_SETOR
+    ? `AND COALESCE(NULLIF(TRIM(setor_utilizacao),''),'COMUM') COLLATE NOCASE IN (${setorAliases.map(() => '?').join(',')})`
+    : '';
+  if (HAS_ESTOQUE_SETOR) params.push(...setorAliases);
+  const localWhere = HAS_LOCAL_ID && localId ? 'AND local_id=?' : '';
+  if (localWhere) params.push(localId);
   const matches = db.prepare(`
     SELECT id FROM estoque_itens
     WHERE ativo=1
       AND LOWER(TRIM(nome))=LOWER(TRIM(?))
       AND UPPER(TRIM(COALESCE(unidade,'UN')))=?
       ${equipmentWhere}
+      ${setorWhere}
+      ${localWhere}
     ORDER BY id
     LIMIT 2
   `).all(...params);
