@@ -60,6 +60,7 @@ function scanner(req, res) {
     buscaPessoa,
     pessoasEncontradas,
     pessoa,
+    entregador: req.session.user,
     colaborador: pessoa,
     grupos,
     solicitacoes: reservaService.listSolicitacoes().filter(g => g.itens.some(i => Number(i.quantidade_disponivel) > 0)),

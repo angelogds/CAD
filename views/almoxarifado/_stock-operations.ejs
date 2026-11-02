@@ -1,0 +1,12 @@
+<% const stockPermitido=typeof canAccessModule!=='function'||typeof user==='undefined'||canAccessModule(user?.role,'estoque_view'); const almoxPermitido=typeof canAccessModule!=='function'||typeof user==='undefined'||canAccessModule(user?.role,'almoxarifado_read'); %>
+<section class="ac-stock-operations" aria-label="Organizar e consultar o estoque">
+  <% if(stockPermitido){ %>
+  <a class="ac-operation" href="/estoque/movimentos?tipo=SAIDA"><span class="ac-operation-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M7 7h10v10"/></svg></span><div><strong>Materiais retirados</strong><small>Histórico de entregas e responsáveis</small></div><span aria-hidden="true">→</span></a>
+  <a class="ac-operation" href="/estoque/reservas"><span class="ac-operation-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></span><div><strong>Materiais separados</strong><small>Destinados às solicitações e equipamentos</small></div><span aria-hidden="true">→</span></a>
+  <% } if(almoxPermitido){ %>
+  <a class="ac-operation" href="/almoxarifado/correias"><span class="ac-operation-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/></svg></span><div><strong>Correias</strong><small>Reservas e trocas por equipamento</small></div><span aria-hidden="true">→</span></a>
+  <% } %>
+</section>
+<% if(typeof user!=='undefined'&&['ADMIN','ALMOXARIFADO'].includes(user?.role)){ %>
+<details class="ac-catalog-links"><summary>Cadastros e organização</summary><div><a href="/estoque/itens">Catálogo de materiais</a><a href="/estoque/categorias">Categorias</a><a href="/estoque/locais">Locais e prateleiras</a><a href="/estoque/itens/novo">Cadastrar material</a></div></details>
+<% } %>

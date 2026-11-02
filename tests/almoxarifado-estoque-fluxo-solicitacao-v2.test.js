@@ -111,7 +111,8 @@ test('estoque usa painel padronizado com filtros e status de saldo', () => {
   assert.match(view, /Reservado/);
   assert.match(view, /Disponível livre/);
   assert.match(view, /Abaixo do mínimo/);
-  assert.match(view, /Estoque zerado/);
+  assert.doesNotMatch(view, /Estoque zerado/);
+  assert.match(view, /Materiais disponíveis/);
   assert.match(view, /Último movimento/);
   assert.match(controller, /situacao/);
   assert.match(controller, /categoria_id/);

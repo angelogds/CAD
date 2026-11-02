@@ -29,10 +29,10 @@ function index(req, res) {
     local_id: req.query.local_id || "",
     setor_utilizacao: req.query.setor_utilizacao || "",
     centro_custo: String(req.query.centro_custo || "").trim(),
-    situacao: ["", "ok", "baixo", "zerado"].includes(req.query.situacao || "") ? (req.query.situacao || "") : "",
+    situacao: ["", "ok", "baixo"].includes(req.query.situacao || "") ? (req.query.situacao || "") : "",
   };
   const baseFilters = { ...filtros, situacao: "", destino: 'GERAL' };
-  const baseItens = withReserva(service.listItens(baseFilters));
+  const baseItens = withReserva(service.listItens(baseFilters)).filter(i => i.saldo_disponivel > 0);
   const itens = filtrarSituacaoLivre(baseItens, filtros.situacao);
   const inteligencia = service.getInteligenciaReposicao(baseFilters);
   res.render("estoque/index", {
@@ -41,6 +41,7 @@ function index(req, res) {
     itens, categorias: service.listCategorias(), locais: service.listLocais(),
     centrosCusto: service.listCentrosCusto(), setoresEstoque: service.SETORES_ESTOQUE,
     inteligencia, filtros,
+    canWithdraw: require('../../config/rbac').ACCESS.estoque_retirada.includes(normalizeRole(req.session?.user?.role)),
   });
 }
 function itens(req, res) { res.render("estoque/itens", { title: "Itens", activeMenu: "estoque", itens: withReserva(service.listItens()) }); }
@@ -63,6 +64,13 @@ function criarCategoria(req, res) { service.createCategoria(req.body); req.flash
 function locais(req, res) { res.render("estoque/locais", { title: "Locais", activeMenu: "estoque", locais: service.listLocais() }); }
 function criarLocal(req, res) { service.createLocal(req.body); req.flash("success", "Local criado."); res.redirect("/estoque/locais"); }
 function movimentos(req, res) {
+  if (String(req.query.tipo || '').toUpperCase().startsWith('SAIDA')) {
+    return res.render('estoque/retirados', {
+      title: 'Materiais retirados', activeMenu: 'estoque',
+      consulta: reservaService.consultarRetiradas(req.query), filtros: req.query,
+      setores: service.SETORES_ESTOQUE,
+    });
+  }
   const filtros = { tipo: req.query.tipo || "", item_id: req.query.item_id || "" };
   const movimentos = service.listMovimentos().filter((mov) => (!filtros.tipo || mov.tipo === filtros.tipo) && (!filtros.item_id || String(mov.item_id) === String(filtros.item_id)));
   res.render("estoque/movimentos", { title: "Movimentos", activeMenu: "estoque", movimentos, filtros, itens: withReserva(service.listItens()) });

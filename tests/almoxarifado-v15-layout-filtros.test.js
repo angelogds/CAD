@@ -21,8 +21,8 @@ test("V15 conecta filtros do controller ao serviço sem modificar o fluxo de rec
   const view = conteudo("views/almoxarifado/gerencial.ejs");
   assert.match(ctrl,/consultaAtrasos=filtrarAtrasos\(pendencias,req.query/);
   assert.match(pdf,/filtrarAtrasos\(pendencias, req.query/);
-  assert.match(pdf,/for \(const item of consultaAtrasos\.atrasados\)/);
-  assert.match(pdf,/for \(const item of consultaAtrasos\.semPrevisao\)/);
+  assert.match(pdf,/consultaAtrasos\.atrasados\.map/);
+  assert.match(pdf,/consultaAtrasos\.semPrevisao\.map/);
   assert.match(view,/name="fornecedor"/);
   assert.match(view,/name="busca"/);
   assert.match(view,/name="tipo"/);

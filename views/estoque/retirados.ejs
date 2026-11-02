@@ -1,0 +1,36 @@
+<% layout('layout'); const c=consulta; const url=pagina=>'/estoque/movimentos?'+new URLSearchParams({tipo:'SAIDA',q:c.q,setor:c.setor,inicio:filtros.inicio||'',fim:filtros.fim||'',item_id:filtros.item_id||'',pagina:String(pagina)}); %>
+<div class="almox-central">
+  <header class="ac-header"><div><span class="ac-eyebrow">ESTOQUE · HISTÓRICO DE ENTREGAS</span><h1>Materiais retirados</h1><p>Cada entrega preserva a quantidade, o destino e os perfis responsáveis.</p></div><a class="ac-button" href="/estoque">Ver materiais disponíveis →</a></header>
+  <%- include('../almoxarifado/_tabs', {tab:'estoque'}) %>
+  <section class="ac-card">
+    <form method="get" action="/estoque/movimentos" class="ac-filters ac-queue-filters">
+      <input type="hidden" name="tipo" value="SAIDA">
+      <% if(filtros.item_id){ %><input type="hidden" name="item_id" value="<%=filtros.item_id%>"><% } %>
+      <label class="ac-search"><span>Material, solicitação ou responsável</span><input type="search" name="q" value="<%=c.q%>" placeholder="Buscar no histórico"></label>
+      <label><span>Setor</span><select name="setor"><option value="">Todos os setores</option><% setores.forEach(s=>{ %><option value="<%=s%>" <%=c.setor===s?'selected':''%>><%=s%></option><% }) %></select></label>
+      <label><span>De</span><input type="date" name="inicio" value="<%=filtros.inicio||''%>"></label>
+      <label><span>Até</span><input type="date" name="fim" value="<%=filtros.fim||''%>"></label>
+      <button class="ac-button ac-primary">Filtrar</button>
+    </form>
+  </section>
+  <p class="ac-muted"><%=c.total%> registro(s) de retirada. O saldo restante continua disponível no estoque.</p>
+  <section class="ac-ledger" aria-label="Retiradas registradas">
+    <% c.lista.forEach(m=>{ %>
+    <article class="ac-ledger-card">
+      <header><div><span class="ac-overline"><%=m.numero||'Retirada avulsa'%> · <%=m.setor%></span><h2><%=m.item_nome%></h2></div><b><%=Number(m.quantidade).toLocaleString('pt-BR')%> <%=m.unidade%></b></header>
+      <dl>
+        <div><dt>Quem retirou</dt><dd><%=m.retirante_nome%></dd></div>
+        <div><dt>Quem entregou</dt><dd><%=m.entregador_nome%></dd></div>
+        <div><dt>Destino</dt><dd><%=m.equipamento_nome||m.setor%></dd></div>
+        <div><dt>Data da retirada</dt><dd><%=fmtBR(m.data_mov)%></dd></div>
+      </dl>
+    </article>
+    <% }) %>
+  </section>
+  <% if(!c.lista.length){ %><p class="ac-empty">Nenhuma retirada encontrada nesta pesquisa.</p><% } %>
+  <nav class="ac-pagination" aria-label="Páginas do histórico">
+    <% if(c.pagina>1){ %><a class="ac-button" href="<%=url(c.pagina-1)%>">← Anterior</a><% } %>
+    <span>Página <%=c.pagina%> de <%=c.paginas%></span>
+    <% if(c.pagina<c.paginas){ %><a class="ac-button" href="<%=url(c.pagina+1)%>">Próxima →</a><% } %>
+  </nav>
+</div>

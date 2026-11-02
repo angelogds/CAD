@@ -27,10 +27,11 @@ function material(nome, setor = 'RECICLAGEM', localId = null) {
 }
 function pedido({ nome = 'Material de teste', setor = 'RECICLAGEM', estoqueItemId = null, quantidade = 10, comprada = 4, recebida = 0, status = 'COMPRADA', statusCompra = 'COMPRADO', equipamentoId = null } = {}) {
   const id = Number(db.prepare(`INSERT INTO solicitacoes(numero,titulo,solicitante_user_id,setor_origem,status,disponivel_compras,equipamento_id)
-    VALUES(?,?,?,?,?,1,?)`).run(`ESTAVEL-${++seq}`, 'Solicitação de teste', userId, setor, status, equipamentoId).lastInsertRowid);
+    VALUES(?,?,?,?,?,1,?)`).run(`ESTAVEL-${++seq}`, 'Solicitação de teste', userId, setor, 'EM_COTACAO', equipamentoId).lastInsertRowid);
   const itemId = Number(db.prepare(`INSERT INTO solicitacao_itens(solicitacao_id,item_nome,unidade,qtd_solicitada,estoque_item_id,
     status_cotacao,status_compra,qtd_comprada,qtd_recebida_total,fornecedor_id,valor_unitario_centavos)
     VALUES(?,?,'UN',?,?,'COTADO',?,?,?,?,1000)`).run(id, nome, quantidade, estoqueItemId, statusCompra, comprada, recebida, fornecedorId).lastInsertRowid);
+  db.prepare('UPDATE solicitacoes SET status=? WHERE id=?').run(status, id);
   return { id, itemId };
 }
 function salvar(sol, extra = {}) {
@@ -86,7 +87,7 @@ for (const encerrado of ['CANCELADO', 'ATENDIDO_ESTOQUE']) {
   });
 }
 
-for (const etapa of ['EM_COTACAO', 'ENTREGUE_SOLICITANTE']) {
+for (const etapa of ['EM_COTACAO']) {
   test(`salvar nova linha de pedido misto em ${etapa} mantém a compra recebida e permite cotar o restante`, () => {
     const sol = pedido({ recebida: 4, status: etapa });
     const nextId = Number(db.prepare(`INSERT INTO solicitacao_itens(solicitacao_id,item_nome,unidade,qtd_solicitada,status_compra)
@@ -267,7 +268,7 @@ test('identificação manual confirma nome uma única vez para todo o lote', () 
   assert.equal(reservas.retirarSelecionados({ ...data, nomeRetirante: 'Funcionário de teste' }).itens, 2);
 });
 
-test('fila inclui solicitações abertas ainda sem compra e encerra o recebimento separado da entrega', () => {
+test('fila exige compra efetiva e encerra o recebimento mesmo com restante ainda em cotação', () => {
   const central = require('../modules/almoxarifado/almoxarifado.solicitacoes.service');
   const aberta = pedido({ status: 'ABERTA', statusCompra: 'PENDENTE', comprada: null, nome: 'Ainda não comprado' });
   const misto = pedido({ status: 'EM_COTACAO', recebida: 4, nome: 'Parte já recebida' });
@@ -275,8 +276,9 @@ test('fila inclui solicitações abertas ainda sem compra e encerra o recebiment
   const finalizada = pedido({ status: 'SEPARADA_PARA_RETIRADA', recebida: 4, nome: 'Recebido para entregar' });
   const antesLiberacao = pedido({ status: 'ABERTA' }); db.prepare('UPDATE solicitacoes SET disponivel_compras=0 WHERE id=?').run(antesLiberacao.id);
   const ab = central.consultar({});
-  assert.ok(ab.idsVisiveis.has(aberta.id)); assert.ok(ab.idsVisiveis.has(misto.id)); assert.ok(!ab.idsVisiveis.has(antesLiberacao.id));
-  assert.equal(central.consultar({ q: 'Parte já recebida' }).lista[0].encerrada, false);
+  assert.ok(!ab.idsVisiveis.has(aberta.id)); assert.ok(ab.idsVisiveis.has(misto.id)); assert.ok(!ab.idsVisiveis.has(antesLiberacao.id));
+  assert.equal(central.consultar({ q: 'Parte já recebida' }).lista.length, 0);
+  assert.equal(central.consultar({ q: 'Parte já recebida', aba:'FECHADAS' }).lista[0].encerrada, true);
   assert.equal(central.consultar({ q: 'Recebido para entregar', aba: 'FECHADAS' }).lista[0].id, finalizada.id);
   assert.equal(central.consultar({ q: 'Ainda não comprado', situacao: 'PENDENTES' }).lista.length, 0);
   assert.ok(central.consultar({q:'Fornecedor de teste'}).idsVisiveis.has(misto.id));
@@ -363,4 +365,69 @@ test('migration é idempotente e preserva reservas e movimentações históricas
   assert.deepEqual(db.prepare('SELECT * FROM estoque_reservas ORDER BY id').all(),antes);
   assert.deepEqual(db.prepare('SELECT * FROM estoque_movimentos ORDER BY id').all(),movimentos);
   assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
+});
+
+test('entregue ou fechada permanece terminal mesmo com reserva histórica pendente', () => {
+  const fluxo=require('../modules/estoque/estoque.solicitacao-fluxo.service');
+  for(const terminal of ['ENTREGUE_SOLICITANTE','FECHADA']) {
+    const lote=prepararLote();
+    db.prepare('UPDATE solicitacoes SET status=? WHERE id=?').run(terminal,lote.sol.id);
+    const antes=snapshotLote(lote);
+    assert.equal(fluxo.syncSolicitacaoEntregaStatus(lote.sol.id).changed,false);
+    assert.ok(!reservas.listSolicitacoes().some(s=>s.solicitacao_id===lote.sol.id));
+    assert.equal(reservas.resumoPorItem().get(lote.rs[0].estoque_item_id)||0,0);
+    assert.throws(()=>db.prepare("UPDATE solicitacoes SET status='SEPARADA_PARA_RETIRADA' WHERE id=?").run(lote.sol.id),/não pode ser reaberta/);
+    assert.throws(()=>db.prepare("INSERT INTO solicitacao_itens(solicitacao_id,item_nome,unidade,qtd_solicitada) VALUES(?,'Tentativa','UN',1)").run(lote.sol.id),/não aceita novos itens/);
+    assert.throws(()=>db.prepare('UPDATE solicitacao_itens SET qtd_comprada=99 WHERE id=?').run(lote.sol.itemId),/não pode ser alterado/);
+    assert.throws(()=>db.prepare('UPDATE estoque_reservas SET quantidade_reservada=99 WHERE id=?').run(lote.rs[0].id),/não pode ser reaberta/);
+    assert.throws(()=>almox.reabrir(lote.sol.id),/não podem ser reabertas/);
+    assert.throws(()=>compras.resolverItemPorEstoque(lote.sol.id,lote.sol.itemId,userId),/encerrada/);
+    require('../database/migrations/241_almox_encerramento_definitivo')({db,tableExists:t=>!!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(t)});
+    assert.deepEqual(snapshotLote(lote),antes);
+  }
+});
+
+test('um comprado de dez aparece no almox; somente cotados ficam em Compras', () => {
+  const central=require('../modules/almoxarifado/almoxarifado.solicitacoes.service');
+  const sol=pedido({nome:'Único comprado entre dez',quantidade:1,comprada:1});
+  for(let n=0;n<9;n++)db.prepare("INSERT INTO solicitacao_itens(solicitacao_id,item_nome,unidade,qtd_solicitada,status_cotacao,status_compra) VALUES(?,?,'UN',2,'COTADO','PENDENTE')").run(sol.id,'Em cotação '+n);
+  const row=central.consultar({q:'Único comprado entre dez'}).lista[0];
+  assert.equal(row.itens_comprados,1);assert.equal(row.itens_total,10);assert.equal(row.itens_a_receber,1);
+  const cotada=pedido({nome:'Somente cotado sem compra',comprada:null,statusCompra:'PENDENTE',status:'COTADA'});
+  assert.ok(!central.consultar({q:'Somente cotado sem compra'}).idsVisiveis.has(cotada.id));
+});
+
+test('estoque operacional mostra saldo livre positivo e preserva retiradas parciais e totais no histórico', () => {
+  const nome='Saldo operacional único '+(++seq),stockId=material(nome);
+  const sol=pedido({nome,quantidade:4,comprada:4,estoqueItemId:stockId});
+  receber(sol,{qtdAgora:4});
+  const osId=Number(db.prepare("INSERT INTO os(equipamento_id,equipamento,descricao,status) VALUES(?,'Equipamento de teste','OS de retirada','ABERTA')").run(equipamentoId).lastInsertRowid);
+  const available=controller=>{let data;controller({query:{q:nome},session:{user:{id:userId,role:'ADMIN'}}},{render:(view,d)=>{data=d;}});return data.itens.find(i=>i.id===stockId);};
+  const ctrl=require('../modules/almoxarifado/almoxarifado.controller'),stockCtrl=require('../modules/estoque/estoque.controller');
+  estoque.registrarSaida({item_id:stockId,quantidade:1,os_id:osId,usuario_id:userId,observacao:'Retirada parcial'});
+  assert.equal(available(ctrl.estoqueOperacional).saldo_disponivel,3);
+  assert.equal(available(stockCtrl.index).saldo_disponivel,3);
+  estoque.registrarSaida({item_id:stockId,quantidade:3,os_id:osId,usuario_id:userId,observacao:'Retirada total'});
+  assert.equal(available(ctrl.estoqueOperacional),undefined);assert.equal(available(stockCtrl.index),undefined);
+  assert.ok(estoque.getItem(stockId));
+  const history=reservas.consultarRetiradas({q:nome,limite:1,pagina:2});
+  assert.equal(history.total,2);assert.equal(history.paginas,2);assert.equal(history.lista.length,1);assert.equal(history.lista[0].quantidade,1);
+});
+
+test('QR de colaborador vinculado registra os dois IDs e a entrega usa o perfil autenticado', () => {
+  const linkedId=Number(db.prepare("INSERT INTO users(name,email,password_hash,role,ativo) VALUES('Perfil mecânico QR','perfil-qr@example.invalid','fixture','MECANICO',1)").run().lastInsertRowid);
+  const colId=Number(db.prepare("INSERT INTO colaboradores(nome,funcao,setor,status,qr_token,qr_ativo,user_id) VALUES('Cadastro do mecânico','MECANICO','RECICLAGEM','ATIVO','token-perfil-vinculado',1,?)").run(linkedId).lastInsertRowid);
+  assert.equal(reservas.getPessoaByQr('CGCOL:token-perfil-vinculado').user_id,linkedId);
+  const lote=prepararLote();const body={operacao_token:lote.data.operacaoToken,qr_code:'CGCOL:token-perfil-vinculado',reserva_id:lote.rs.map(r=>String(r.id)),entregue_por_user_id:linkedId};
+  for(const r of lote.rs)body['quantidade_'+r.id]=r.quantidade_reservada;
+  const messages=[];
+  require('../modules/almoxarifado/retiradas-qr.controller').retirarLote({params:{id:lote.sol.id},body,session:{user:{id:userId}},flash:(t,m)=>messages.push({t,m})},{redirect(){}});
+  assert.equal(messages[0].t,'success');
+  const h=reservas.consultarRetiradas({solicitacaoId:lote.sol.id});
+  assert.equal(h.total,2);
+  assert.ok(h.lista.every(m=>m.retirado_por_user_id===linkedId&&m.retirado_por_colaborador_id===colId&&m.entregue_por_user_id===userId));
+  assert.equal(h.lista[0].retirante_nome,'Perfil mecânico QR');assert.equal(h.lista[0].entregador_nome,'Teste almox');
+  db.prepare('UPDATE users SET ativo=0 WHERE id=?').run(linkedId);
+  assert.equal(reservas.getPessoaByQr('CGCOL:token-perfil-vinculado'),null);
+  assert.equal(reservas.getPessoaByCadastro('COLABORADOR',colId),null);
 });

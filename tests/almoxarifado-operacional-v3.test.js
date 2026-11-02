@@ -19,8 +19,8 @@ test('V3 abre o Almoxarifado em uma central operacional e preserva as rotas ofic
   assert.match(controller, /function estoqueOperacional\(/);
   assert.doesNotMatch(tabs, /Compras a caminho/);
   assert.match(tabs, /Solicitações/);
-  assert.match(tabs, /Materiais separados/);
-  assert.match(tabs, /\/almoxarifado\/retiradas\/qr/);
+  assert.match(read('views','almoxarifado','_stock-operations.ejs'), /Materiais separados/);
+  assert.match(read('views','almoxarifado','estoque.ejs'), /\/almoxarifado\/retiradas\/qr/);
   assert.doesNotMatch(tabs, /\/estoque\/saidas\/nova\?contexto=almoxarifado/);
 });
 

@@ -16,6 +16,11 @@ function isEscalaRequest(requestUrl) {
     && (requestUrl.pathname === '/escala' || requestUrl.pathname.startsWith('/escala/'));
 }
 
+function isInventoryRequest(requestUrl) {
+  return requestUrl.origin === self.location.origin
+    && ['/almoxarifado', '/estoque'].some(prefix => requestUrl.pathname === prefix || requestUrl.pathname.startsWith(prefix + '/'));
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -30,7 +35,7 @@ self.addEventListener('activate', (event) => {
       .then((names) => Promise.all(names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))))
       .then(() => caches.open(CACHE_NAME))
       .then((cache) => cache.keys().then((requests) => Promise.all(
-        requests.filter((request) => isEscalaRequest(new URL(request.url))).map((request) => cache.delete(request))
+        requests.filter((request) => isEscalaRequest(new URL(request.url)) || isInventoryRequest(new URL(request.url))).map((request) => cache.delete(request))
       )))
       .then(() => self.clients.claim())
   );
@@ -42,7 +47,8 @@ self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
   const bypassPrefixes = ['/push/', '/mobile/', '/auth/'];
   // A Escala mostra pontos e formulários atuais; HTML salvo pode ocultar novos controles.
-  const shouldBypass = isEscalaRequest(requestUrl)
+  // Saldo e pendências devem refletir a última confirmação, inclusive após retirada.
+  const shouldBypass = isEscalaRequest(requestUrl) || isInventoryRequest(requestUrl)
     || bypassPrefixes.some((prefix) => requestUrl.pathname.startsWith(prefix));
   if (shouldBypass) return;
 

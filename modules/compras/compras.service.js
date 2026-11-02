@@ -551,6 +551,8 @@ function calcularNecessidadeCompra(quantidadeSolicitada, saldoDisponivel) {
 
 function resolverItemPorEstoque(solicitacaoId, itemId, userId) {
   return db.transaction(() => {
+    const sol = db.prepare('SELECT status FROM solicitacoes WHERE id=?').get(solicitacaoId);
+    if (!sol || ['FECHADA','ENTREGUE_SOLICITANTE'].includes(String(sol.status).toUpperCase())) throw new Error('Solicitação encerrada não pode ser alterada. Crie uma nova solicitação.');
     const item = db.prepare('SELECT * FROM solicitacao_itens WHERE id=? AND solicitacao_id=?').get(itemId, solicitacaoId);
     if (!item) throw new Error('Item não pertence à solicitação.');
     const cobertura = calcularNecessidadeCompra(item.qtd_solicitada, consultarSaldoItem(item.estoque_item_id));
@@ -558,14 +560,14 @@ function resolverItemPorEstoque(solicitacaoId, itemId, userId) {
     db.prepare(`UPDATE solicitacao_itens SET status_compra='ATENDIDO_ESTOQUE',qtd_comprada=0,fornecedor_id=NULL,
       valor_unitario_centavos=0,atualizado_por=?,updated_at=datetime('now') WHERE id=?`).run(userId || null, itemId);
     const itens = db.prepare('SELECT * FROM solicitacao_itens WHERE solicitacao_id=?').all(solicitacaoId);
-    const status = recalcularStatus(itens, STATUS.EM_COTACAO);
+    const status = recalcularStatus(itens, sol.status);
     db.prepare("UPDATE solicitacoes SET status=?,updated_at=datetime('now') WHERE id=?").run(status, solicitacaoId);
     return cobertura;
   })();
 }
 
 function recalcularStatus(itens, atual) {
-  if (atual === STATUS.FECHADA) return atual;
+  if ([STATUS.FECHADA, STATUS.ENTREGUE_SOLICITANTE].includes(atual)) return atual;
   const validos = itens.filter((i) => i.status_compra !== 'CANCELADO');
   if (!validos.length) return STATUS.ABERTA;
   const comprados = validos.filter((i) => i.status_compra === 'COMPRADO');
@@ -772,11 +774,7 @@ function pdfOptional(value) {
 }
 
 function getSolicitacaoPdfLogoPath() {
-  return [
-    'public/IMG/logopdf_campo_do_gado.png.png',
-    'public/img/logo_menu_256.png',
-    'public/img/logo.png',
-  ].map((p) => path.join(process.cwd(), p)).find((p) => fs.existsSync(p)) || null;
+  return require('../../utils/pdf-standard').logoPath('materiais');
 }
 
 function resolveAnexoPath(anexo) {

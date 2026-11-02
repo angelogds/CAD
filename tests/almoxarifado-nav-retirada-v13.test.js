@@ -8,10 +8,11 @@ const read = (f) => fs.readFileSync(path.join(__dirname, "..", f), "utf8");
 
 test("central reúne quatro áreas e mantém operações do estoque", () => {
   const tabs = read("views/almoxarifado/_tabs.ejs");
-  for (const name of ["Painel", "Solicitações", "Estoque", "Relatórios", "Retirada", "Materiais separados"]) {
+  for (const name of ["Painel", "Solicitações", "Estoque", "Relatórios"]) {
     assert.ok(tabs.includes(name), "Aba não encontrada: " + name);
   }
-  assert.doesNotMatch(tabs, /Compras a caminho/);
+  assert.doesNotMatch(tabs, /Compras a caminho|ac-subnav/);
+  assert.match(read("views/almoxarifado/_stock-operations.ejs"), /Materiais separados/);
   assert.match(read("views/estoque/reservas.ejs"), /almoxarifado\/_tabs/);
 });
 

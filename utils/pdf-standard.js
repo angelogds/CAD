@@ -24,11 +24,11 @@ const PAGE = Object.freeze({
   footerHeight: 28,
 });
 
-function logoPath() {
+function logoPath(documento) {
   // Marca oficial dos relatórios da Manutenção. Não usar o logo da Reciclagem
   // como identidade principal dos PDFs individuais/consolidados do RH/Manutenção.
   return [
-    'public/IMG/logo_menu.png.png',
+    documento === 'materiais' ? 'public/IMG/logopdf_campo_do_gado.png.png' : 'public/IMG/logo_menu.png.png',
     'public/img/logo_menu_256.png',
     'public/img/logo.png',
   ].map((p) => path.join(process.cwd(), p)).find((p) => fs.existsSync(p)) || null;

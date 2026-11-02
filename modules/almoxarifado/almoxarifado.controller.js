@@ -31,7 +31,7 @@ function index(req, res) {
   const consulta = central.consultar({});
   const separados = reservaService.listSolicitacoes().filter(g => g.itens.some(i => Number(i.quantidade_disponivel) > 0));
   const reposicao = require('../estoque/estoque.reposicao.service').resumo().filter(i => i.situacao !== 'OK');
-  const prateleira = estoqueService.listItens({ destino: 'GERAL' });
+  const prateleira = estoqueComDisponivel(estoqueService.listItens({ destino: 'GERAL' })).filter(i => i.saldo_disponivel > 0);
   res.render('almoxarifado/index', {
     title: 'Central do Almoxarifado', activeMenu: 'almoxarifado', tab: 'painel',
     resumo: consulta.resumo, lista: consulta.lista.slice(0, 6), separados: separados.slice(0, 4),
@@ -59,7 +59,7 @@ function estoqueOperacional(req, res) {
     ordem: ordensValidas.includes(ordemRaw) ? ordemRaw : "NOME",
   };
   if (filtros.equipamento_id) filtros.destino = 'EQUIPAMENTO';
-  const itensBase = estoqueComDisponivel(estoqueService.listItens(filtros));
+  const itensBase = estoqueComDisponivel(estoqueService.listItens(filtros)).filter(i => i.saldo_disponivel > 0);
   const semEndereco = (item) => !String(item.endereco_completo || "").trim();
   const abaixoMinimo = (item) => Number(item.saldo_minimo || 0) > 0
     && Number(item.saldo_disponivel || 0) < Number(item.saldo_minimo || 0);
@@ -89,7 +89,7 @@ function estoqueOperacional(req, res) {
     setor_utilizacao: filtros.setor_utilizacao,
     equipamento_id: filtros.equipamento_id,
     destino: filtros.destino,
-  }));
+  })).filter(i => i.saldo_disponivel > 0);
   const categoriasResumo = categorias.map((categoria) => {
     const itensCategoria = todosItens.filter((item) => Number(item.categoria_id) === Number(categoria.id));
     return {
@@ -98,7 +98,7 @@ function estoqueOperacional(req, res) {
       saldo_disponivel: itensCategoria.reduce((sum, item) => sum + Number(item.saldo_disponivel || 0), 0),
     };
   });
-  const prateleiraResumo = estoqueService.listItens({destino:'GERAL'});
+  const prateleiraResumo = estoqueComDisponivel(estoqueService.listItens({destino:'GERAL'})).filter(i => i.saldo_disponivel > 0);
 
   res.render("almoxarifado/estoque", {
     title: "Estoque do Almoxarifado",

@@ -36,7 +36,7 @@ const dataBR = iso => iso ? String(iso).slice(0,10).split('-').reverse().join('/
 const maior = Math.max(1,...dados.serie.map(s=>Math.max(s.entradas,s.saidas)));
 %>
 <div class="gerencial almox-v11 almox-v15 almox-central">
-  <header style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+  <header class="ac-header">
     <div><span style="color:#16844d;font-size:.78rem;font-weight:700">ALMOXARIFADO • GESTÃO E RESULTADOS</span>
       <h1>Painel gerencial de materiais</h1>
       <p class="muted">Custos, movimentações e consumo com base nos registros reais do sistema.</p>

@@ -31,8 +31,8 @@
   <header class="almox-store-head">
     <div>
       <span class="almox-hero__eyebrow">ALMOXARIFADO</span>
-      <h1 style="margin:0">Prateleiras do estoque</h1>
-      <p class="muted">Materiais de uso contínuo por setor. Compras para equipamentos ficam separadas nas solicitações.</p>
+      <h1 style="margin:0">Materiais disponíveis</h1>
+      <p class="muted">Somente materiais com saldo livre. Retiradas ficam no histórico; materiais para equipamentos ficam separados.</p>
     </div>
     <div class="almox-hero__actions">
       <% if(canManage){ %><a class="btn btn-sm btn-ghost" href="/almoxarifado/estoque/inventario">Cadastrar material existente</a><% } %>
@@ -42,7 +42,8 @@
   </header>
 
   <%- include('_tabs', { tab: 'estoque' }) %>
-  <% if(typeof setoresResumo!=='undefined'){ %><section class="ac-card"><header class="ac-section-head"><div><h2>Prateleira por setor</h2><p>Escolha o setor para localizar os materiais.</p></div></header><div class="ac-sectors"><% setoresResumo.forEach(s=>{ %><a href="/almoxarifado/estoque?setor_utilizacao=<%=encodeURIComponent(s.nome)%>"><span><%=s.nome==='COMUM'?'Comum · compartilhado':s.nome%></span><strong><%=s.itens%></strong><small>materiais cadastrados</small></a><% }) %></div></section><% } %>
+  <%- include('_stock-operations') %>
+  <% if(typeof setoresResumo!=='undefined'){ %><section class="ac-card"><header class="ac-section-head"><div><h2>Prateleira por setor</h2><p>Escolha o setor para localizar os materiais.</p></div></header><div class="ac-sectors"><% setoresResumo.forEach(s=>{ %><a href="/almoxarifado/estoque?setor_utilizacao=<%=encodeURIComponent(s.nome)%>"><span><%=s.nome==='COMUM'?'Comum · compartilhado':s.nome%></span><strong><%=s.itens%></strong><small>materiais disponíveis</small></a><% }) %></div></section><% } %>
 
 
   <section class="almox-store-category-strip" aria-label="Categorias do estoque">
@@ -90,7 +91,7 @@
           <option value="CATEGORIA" <%=filtros.ordem==='CATEGORIA'?'selected':''%>>Categoria</option>
           <option value="SALDO" <%=filtros.ordem==='SALDO'?'selected':''%>>Menor saldo disponível</option>
         </select></label>
-        <label><span>Tipo de estoque</span><select class="input" name="destino"><option value="">Todos</option><option value="GERAL" <%=filtros.destino==='GERAL'?'selected':''%>>Estoque geral</option><option value="EQUIPAMENTO" <%=filtros.destino==='EQUIPAMENTO'?'selected':''%>>Dedicado ao equipamento</option></select></label>
+        <label><span>Tipo de estoque</span><select class="input" name="destino"><option value="GERAL" <%=filtros.destino==='GERAL'?'selected':''%>>Estoque geral</option><option value="EQUIPAMENTO" <%=filtros.destino==='EQUIPAMENTO'?'selected':''%>>Dedicado ao equipamento</option></select></label>
         <label><span>Equipamento</span><select class="input" name="equipamento_id"><option value="">Todos</option><% equipamentos.forEach(e=>{ %><option value="<%=e.id%>" <%=String(filtros.equipamento_id)===String(e.id)?'selected':''%>><%=e.nome%></option><% }) %></select></label>
       </div>
     </details>

@@ -7,12 +7,12 @@ const root = path.join(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 
 test('almoxarifado usa o fluxo real de retirada do estoque sem duplicar rota avulsa', () => {
-  const tabs = read('views', 'almoxarifado', '_tabs.ejs');
+  const tabs = read('views', 'almoxarifado', 'estoque.ejs');
   const estoqueRoutes = read('modules', 'estoque', 'estoque.routes.js');
   const almoxRoutes = read('modules', 'almoxarifado', 'almoxarifado.routes.js');
 
   assert.match(tabs, /\/almoxarifado\/retiradas\/qr/);
-  assert.doesNotMatch(tabs, /\/estoque\/saidas\/nova\?contexto=almoxarifado/);
+  assert.doesNotMatch(read('views', 'almoxarifado', '_tabs.ejs'), /\/estoque\/saidas\/nova\?contexto=almoxarifado/);
   assert.match(estoqueRoutes, /router\.post\("\/saidas"[\s\S]*almoxCtrl\.registrarSaida/);
   assert.doesNotMatch(almoxRoutes, /post\("\/retiradas"/);
   assert.match(almoxRoutes, /itens\/:itemId\/retirar/);
@@ -45,10 +45,10 @@ test('entrada de compra reaproveita item vinculado ou correspondencia exata unic
   assert.match(service, /CMP-\$\{solicitacaoId\}-\$\{item\.id\}/);
 });
 
-test('reabertura preserva estoque e retorna o fluxo ao estado coerente', () => {
+test('solicitação encerrada recusa reabertura sem alterar estoque', () => {
   const service = read('modules', 'almoxarifado', 'almoxarifado.service.js');
 
-  assert.match(service, /s\.status === STATUS\.FECHADA \? STATUS\.RECEBIDA_TOTAL : STATUS\.EM_RECEBIMENTO/);
+  assert.match(service, /Solicitações encerradas não podem ser reabertas/);
   const reabrirBody = service.slice(service.indexOf('function reabrir'), service.indexOf('module.exports'));
   assert.doesNotMatch(reabrirBody, /estoque_movimentos/);
   assert.doesNotMatch(reabrirBody, /saldo_atual/);

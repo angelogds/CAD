@@ -5,7 +5,6 @@ const osChatService = require('../os-chat/os-chat.service');
 const TRACKED_STATUS = new Set([
   STATUS.RECEBIDA_TOTAL,
   STATUS.SEPARADA_PARA_RETIRADA,
-  STATUS.ENTREGUE_SOLICITANTE,
 ]);
 
 function tableExists(name) {

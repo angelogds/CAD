@@ -46,6 +46,7 @@ test('navegação reúne quatro acessos principais e preserva operações do est
   const principal=html.match(/<nav class="almox-tabs[\s\S]*?<\/nav>/)[0];
   assert.equal((principal.match(/<a /g)||[]).length,4);
   for(const url of ['/almoxarifado','/almoxarifado/recebimentos','/almoxarifado/estoque','/almoxarifado/gerencial'])assert.ok(principal.includes(url));
-  assert.match(html,/href="\/almoxarifado\/retiradas\/qr" aria-current="page"/);
-  assert.match(html,/href="\/almoxarifado\/correias"/);
+  assert.match(html,/href="\/almoxarifado\/estoque" aria-current="page"/);
+  assert.doesNotMatch(html,/ac-subnav/);
+  assert.match(render('_stock-operations.ejs',{}),/href="\/almoxarifado\/correias"/);
 });
