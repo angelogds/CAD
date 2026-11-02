@@ -573,6 +573,8 @@ function recalcularStatus(itens, atual) {
   const recebida = validos.reduce((s, i) => s + Number(i.qtd_recebida_total || 0), 0);
   const esperada = comprados.reduce((s, i) => s + Number(i.qtd_comprada ?? i.qtd_solicitada ?? 0), 0);
   if (comprados.length + estoque.length === validos.length) {
+    // Compras não desfaz uma separação/entrega que o Almoxarifado já registrou.
+    if (recebida >= esperada && [STATUS.SEPARADA_PARA_RETIRADA, STATUS.ENTREGUE_SOLICITANTE].includes(atual)) return atual;
     if (!comprados.length) return STATUS.SEPARADA_PARA_RETIRADA;
     if (esperada > 0 && recebida >= esperada) return STATUS.RECEBIDA_TOTAL;
     if (recebida > 0) return STATUS.RECEBIDA_PARCIAL;
@@ -602,6 +604,10 @@ function salvarPainelItens(solicitacaoId, payload = {}, userId) {
       const id = Number(rawId);
       const item = db.prepare('SELECT * FROM solicitacao_itens WHERE id=? AND solicitacao_id=?').get(id, solicitacaoId);
       if (!item) throw new Error('Item não pertence à solicitação.');
+      // O formulário envia também linhas antigas. O saldo de hoje serve apenas
+      // para sugerir novas compras, nunca para recalcular uma compra efetivada.
+      // Correções de compra usam o fluxo próprio, que bloqueia itens recebidos.
+      if (['COMPRADO', 'CANCELADO', 'ATENDIDO_ESTOQUE'].includes(String(item.status_compra || '').toUpperCase())) return;
       const fornecedorId = Number(values('fornecedor_id')[index] || 0) || null;
       if (fornecedorId && !fornecedorAtivo(fornecedorId)) throw new Error('Fornecedor inválido ou inativo.');
       const unitario = calculos.parseCentavos(values('valor_unitario')[index], 'Valor unitário');
