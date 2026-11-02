@@ -25,7 +25,7 @@ test('central mantém filtros legados e usa quantidades físicas para agrupar so
 
 test("V13 mantém QR prioritário e obriga confirmar nome no atendimento manual", () => {
   const ctrl = read("modules/almoxarifado/retiradas-qr.controller.js");
-  const view = read("views/almoxarifado/retirada_qr.ejs");
+  const view = (read("views/almoxarifado/retirada_qr.ejs")+read("views/almoxarifado/_retirada-identidade.ejs"));
   const service = read("modules/estoque/estoque.reservas.service.js");
   const routes = read("modules/almoxarifado/almoxarifado.routes.js");
   assert.match(view, /name="nome_retirante" required/);

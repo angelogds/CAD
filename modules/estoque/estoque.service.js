@@ -181,7 +181,7 @@ function listCentrosCusto() {
 function listEquipamentosEstoque() {
   if (!tableExists("equipamentos")) return [];
   const ativoFilter = hasColumn("equipamentos", "ativo") ? "WHERE COALESCE(ativo,1)=1" : "";
-  return db.prepare(`SELECT id,nome FROM equipamentos ${ativoFilter} ORDER BY nome`).all();
+  return db.prepare(`SELECT id,nome,${hasColumn('equipamentos','codigo')?"COALESCE(codigo,'')":"''"} codigo,${hasColumn('equipamentos','setor')?"COALESCE(setor,'')":"''"} setor FROM equipamentos ${ativoFilter} ORDER BY nome`).all();
 }
 function getInteligenciaReposicao(filters = {}) {
   const itens = listItens(filters);
@@ -462,28 +462,29 @@ function insertMovimento(data) {
     ["custo_unit", data.custo_unit], ["observacao", data.observacao], ["reserva_id", data.reserva_id],
     ["retirado_por_colaborador_id", data.retirado_por_colaborador_id], ["entregue_por_user_id", data.entregue_por_user_id],
     ["identificacao_origem", data.identificacao_origem], ["setor_utilizacao", data.setor_utilizacao],
-    ["subarea_centro_custo", data.subarea_centro_custo], ["empresa_consumidora", data.empresa_consumidora], ["mecanico_user_id", data.mecanico_user_id],
+    ["subarea_centro_custo", data.subarea_centro_custo], ["mecanico_user_id", data.mecanico_user_id],
+    ['retirado_por_user_id',data.retirado_por_user_id],['entrega_operacao_token',data.entrega_operacao_token],
   ];
   optional.forEach(([col, value]) => { if (hasColumn("estoque_movimentos", col)) { cols.push(col); vals.push(value ?? null); } });
   const info = db.prepare(`INSERT INTO estoque_movimentos (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`).run(...vals);
   return Number(info.lastInsertRowid);
 }
 
-function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id, origem = 'MANUAL', solicitacao_id, solicitacao_item_id, empresa_consumidora, setor_consumidor, mecanico_user_id }) {
+function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id, origem = 'MANUAL', solicitacao_id, solicitacao_item_id, setor_consumidor, mecanico_user_id }, identificacao = null) {
   const contexto = solicitacao_id ? getContextoSolicitacao(solicitacao_id, solicitacao_item_id) : null;
   const resolvedItemId = contexto ? Number(contexto.estoque_item_id) : Number(item_id);
   if (contexto && item_id && Number(item_id) !== resolvedItemId) throw new Error('O material selecionado não corresponde ao item da solicitação.');
 
   const item = getItem(resolvedItemId);
-  if (!item) throw new Error("Item não encontrado");
+  if (!item || Number(item.ativo ?? 1)!==1) throw new Error("Item não encontrado ou inativo");
   const qtd = Number(quantidade);
-  if (!(qtd > 0)) throw new Error("Quantidade inválida");
+  if (!Number.isFinite(qtd) || !(qtd > 0)) throw new Error("Quantidade inválida");
   if (qtd > Number(item.saldo_atual || 0)) throw new Error("Saldo insuficiente");
 
   let resolvedOsId = contexto?.os_id ? Number(contexto.os_id) : (os_id ? Number(os_id) : null);
   if (contexto?.os_id && os_id && Number(os_id) !== Number(contexto.os_id)) throw new Error('A OS informada não corresponde à solicitação.');
   const os = resolvedOsId ? validarOsAtiva(resolvedOsId) : null;
-  if (!contexto && !os) throw new Error('Uma OS ativa é obrigatória para registrar uma retirada manual.');
+  if (!contexto && !os && !identificacao) throw new Error('Uma OS ativa é obrigatória para registrar uma retirada manual.');
   if (contexto && qtd > Number(contexto.disponivel_retirada || 0)) {
     throw new Error(`Quantidade acima do disponível nesta solicitação. Máximo: ${contexto.disponivel_retirada}.`);
   }
@@ -493,9 +494,11 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
     if (qtd > Number(item.saldo_atual || 0) - reservado) throw new Error('Saldo livre insuficiente: material reservado.');
   }
   const setorConsumidor = normalizeSetorEstoque(contexto?.setor_origem || setor_consumidor);
-  if (!contexto && item.setor_utilizacao_exibicao === SETOR_COMUM && (!setorConsumidor || setorConsumidor === SETOR_COMUM || !String(empresa_consumidora || '').trim())) throw new Error('Informe empresa e setor consumidor para materiais comuns.');
+  if (!contexto && item.setor_utilizacao_exibicao === SETOR_COMUM && (!setorConsumidor || setorConsumidor === SETOR_COMUM)) throw new Error('Informe o setor consumidor para materiais comuns.');
   const reserva = contexto ? atualizarReservaDaRetirada(contexto, qtd) : null;
-  const equipamentoId = contexto?.equipamento_id || os?.equipamento_id || null;
+  const equipamentoId = contexto?.equipamento_id || os?.equipamento_id || identificacao?.equipamentoId || null;
+  if (identificacao?.equipamentoId && os?.equipamento_id && Number(identificacao.equipamentoId)!==Number(os.equipamento_id)) throw new Error('O equipamento não corresponde à OS.');
+  if (item.equipamento_id && Number(item.equipamento_id)!==Number(equipamentoId)) throw new Error('Material dedicado a outro equipamento.');
   const anterior = Number(item.saldo_atual || 0);
   const posterior = anterior - qtd;
   if (HAS_SALDO_ATUAL) {
@@ -516,9 +519,12 @@ function registrarSaidaCore({ item_id, quantidade, usuario_id, observacao, os_id
     custo_unit: HAS_MOV_CUSTO_UNIT ? (custoUnit || null) : null,
     observacao: observacao || (contexto ? `Retirada da solicitação ${contexto.numero || `#${contexto.solicitacao_id}`}` : null),
     reserva_id: reserva?.id || null,
-    entregue_por_user_id: contexto ? (usuario_id || null) : null,
-    identificacao_origem: contexto ? 'CONTEXTO_SEM_QR' : (String(origem).toUpperCase() === 'QR_CODE' ? 'QR_ITEM' : 'MANUAL'),
-    setor_utilizacao: setorMov, subarea_centro_custo: centroMov, empresa_consumidora: String(empresa_consumidora || contexto?.setor_origem || setorMov).trim(), mecanico_user_id: mecanico_user_id || null,
+    entregue_por_user_id: contexto || identificacao ? (usuario_id || null) : null,
+    retirado_por_colaborador_id:identificacao?.pessoa.colaborador_id||null,
+    retirado_por_user_id:identificacao?.pessoa.user_id||null,
+    entrega_operacao_token:identificacao?.token||null,
+    identificacao_origem:identificacao?.origem || (contexto ? 'CONTEXTO_SEM_QR' : (String(origem).toUpperCase() === 'QR_CODE' ? 'QR_ITEM' : 'MANUAL')),
+    setor_utilizacao: setorMov, subarea_centro_custo: centroMov, mecanico_user_id: mecanico_user_id || null,
   });
   return { movimentoId, itemId: resolvedItemId, saldoAnterior: anterior, saldoPosterior: posterior, osId: resolvedOsId, equipamentoId, reservaId: reserva?.id || null };
 }
@@ -531,6 +537,53 @@ function registrarSaida(data) {
       const fluxo = fluxoSolicitacaoService.syncSolicitacaoEntregaStatus(data.solicitacao_id, { userId: data.usuario_id });
       return { ...resultado, solicitacaoStatus: fluxo.status };
     }
+    return resultado;
+  })();
+}
+
+function retirarLivreSelecionados(data, user) {
+  const {ACCESS,normalizeRole}=require('../../config/rbac');
+  if(!ACCESS.estoque_retirada.includes(normalizeRole(user?.role)))throw new Error('Perfil sem permissão para retirada.');
+  const token=String(data.operacaoToken||'');
+  if(!/^[\w-]{16,128}$/.test(token))throw new Error('Operação inválida. Atualize a página.');
+  const reservas=require('./estoque.reservas.service');
+  const pessoa=reservas.identificarRetirante(data);
+  const setor=normalizeSetorEstoque(data.setorConsumidor);
+  if(!setor||setor===SETOR_COMUM)throw new Error('Selecione o setor consumidor.');
+  const equipamentoId=Number(data.equipamentoId)||null;
+  if(data.equipamentoId&&(!Number.isSafeInteger(equipamentoId)||equipamentoId<=0))throw new Error('Equipamento inválido.');
+  if(equipamentoId&&!listEquipamentosEstoque().some(e=>e.id===equipamentoId))throw new Error('Equipamento não encontrado ou inativo.');
+  const osId=Number(data.osId)||null;
+  const pedidoId=Number(data.pedidoCorreiaId)||null;
+  const itens=(Array.isArray(data.itens)?data.itens:[]).map(i=>({itemId:Number(i.itemId),quantidade:Number(String(i.quantidade).replace(',','.'))})).sort((a,b)=>a.itemId-b.itemId);
+  if(!pedidoId&&(!itens.length||itens.length>200||new Set(itens.map(i=>i.itemId)).size!==itens.length||itens.some(i=>!Number.isSafeInteger(i.itemId)||i.itemId<=0||!Number.isFinite(i.quantidade)||i.quantidade<=0)))throw new Error('Selecione de 1 a 200 materiais com quantidades válidas.');
+  const hash=require('node:crypto').createHash('sha256').update(JSON.stringify({itens,pedidoId,equipamentoId,osId,setor,pessoa:[pessoa.identity_type,pessoa.id],observacao:data.observacao||''})).digest('hex');
+  return db.transaction(()=>{
+    if(tableExists('estoque_retirada_operacoes')&&db.prepare('SELECT token FROM estoque_retirada_operacoes WHERE token=?').get(token))throw new Error('Operação já utilizada para outra retirada.');
+    const anterior=db.prepare('SELECT * FROM estoque_entrega_operacoes WHERE token=?').get(token);
+    if(anterior){if(anterior.usuario_id!==Number(user.id)||anterior.payload_hash!==hash)throw new Error('Operação já utilizada para outra retirada.');return {...JSON.parse(anterior.resultado_json),duplicado:true};}
+    db.prepare('INSERT INTO estoque_entrega_operacoes(token,usuario_id,payload_hash) VALUES(?,?,?)').run(token,user.id,hash);
+    const identificacao={pessoa,token,equipamentoId,origem:data.qrCode?(pessoa.identity_type==='USUARIO'?'QR_USUARIO':'QR_COLABORADOR'):(pessoa.identity_type==='USUARIO'?'CADASTRO_USUARIO':'CADASTRO_COLABORADOR')};
+    const belts=require('../correias/correias.fluxo.service');
+    const correias=new Set(require('../correias/correias.service').listCorreiasEstoque().map(i=>i.id));
+    const entregarCorreia=id=>{
+      const pedido=belts.get(id);
+      if(!['SOLICITADA','SEPARADA'].includes(pedido.status))throw new Error('Pedido de correias já entregue ou encerrado.');
+      if(!pessoa.user_id||Number(pessoa.user_id)!==Number(pedido.mecanico_user_id))throw new Error('O QR deve identificar o mecânico responsável por este pedido de correias.');
+      if(equipamentoId&&equipamentoId!==Number(pedido.equipamento_id))throw new Error('O equipamento deve corresponder ao pedido de correias.');
+      return belts.entregar(id,user,{...identificacao,setor});
+    };
+    if(pedidoId){const p=belts.get(pedidoId);if(itens.length!==1||itens[0].itemId!==Number(p.estoque_item_id)||itens[0].quantidade!==Number(p.quantidade))throw new Error('Selecione a quantidade reservada no pedido de correias.');}
+    const movimentos=pedidoId?[entregarCorreia(pedidoId)]:itens.map(i=>{
+      if(correias.has(i.itemId)){
+        if(!equipamentoId)throw new Error('Selecione o equipamento para retirar correias.');
+        const pedido=belts.solicitar({equipamento_id:equipamentoId,estoque_item_id:i.itemId,mecanico_user_id:pessoa.user_id,quantidade:i.quantidade,setor_consumidor:setor,observacao:data.observacao,operacao_token:token+'-'+i.itemId},user);
+        return entregarCorreia(pedido);
+      }
+      return registrarSaidaCore({item_id:i.itemId,quantidade:i.quantidade,usuario_id:user.id,os_id:osId,setor_consumidor:setor,observacao:data.observacao},identificacao).movimentoId;
+    });
+    const resultado={itens:movimentos.length,movimentos,pessoaNome:pessoa.nome};
+    db.prepare('UPDATE estoque_entrega_operacoes SET resultado_json=? WHERE token=?').run(JSON.stringify(resultado),token);
     return resultado;
   })();
 }
@@ -564,5 +617,5 @@ module.exports = {
   SETORES_ESTOQUE, SETOR_COMUM, dashboard, listItens, listCategorias, listSubcategorias, listLocais, listCentrosCusto, listEquipamentosEstoque, getInteligenciaReposicao,
   listMovimentos, createCategoria, createLocal, createItem, updateItemClassification, getItem,
   findItemForInventory, getLocalArmazemFardo, registrarInventarioFisico,
-  listOrdensAtivas, registrarSaida, registrarSaidasSolicitacao, getContextoSolicitacao,
+  listOrdensAtivas, registrarSaida, registrarSaidasSolicitacao, retirarLivreSelecionados, getContextoSolicitacao,
 };

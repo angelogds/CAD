@@ -38,7 +38,7 @@ test('recebimento cria ou atualiza reserva da mesma solicitação', () => {
 test('saldo reservado fica protegido contra retirada avulsa', () => {
   const migration = read('database/migrations/180_almox_estoque_reservas_qr_colaboradores.js');
   const stockView = read('views/estoque/index.ejs');
-  const outputView = read('views/estoque/saida_nova.ejs');
+  const outputView = read('views/almoxarifado/retirada_qr.ejs');
 
   assert.match(migration, /trg_estoque_proteger_saldo_reservado/);
   assert.match(migration, /Saldo reservado para solicitações não pode ser consumido por retirada avulsa/);
@@ -129,11 +129,12 @@ test('retirada contextual antiga sincroniza a reserva antes do saldo e continua 
   assert.ok(callPos > helperPos, 'deve sincronizar a reserva durante a retirada');
   assert.ok(stockPos > callPos, 'deve reduzir a reserva antes do saldo físico');
   assert.match(service, /reserva_id: reserva\?\.id/);
-  assert.match(service, /identificacao_origem: contexto \? 'CONTEXTO_SEM_QR'/);
+  assert.match(service, /identificacao_origem:identificacao\?\.origem/);
+  assert.match(service, /CONTEXTO_SEM_QR/);
 });
 
 test('scanner oferece câmera com fallback para leitor USB ou entrada manual', () => {
-  const view = read('views/almoxarifado/retirada_qr.ejs');
+  const view = (read('views/almoxarifado/retirada_qr.ejs')+read('views/almoxarifado/_retirada-identidade.ejs'));
   assert.match(read('public/js/almox-retirada.js'), /getUserMedia/);
   assert.match(read('public/js/almox-retirada.js'), /BarcodeDetector/);
   assert.match(view, /Código do cartão \/ leitor USB/);

@@ -18,7 +18,7 @@ function isEscalaRequest(requestUrl) {
 
 function isInventoryRequest(requestUrl) {
   return requestUrl.origin === self.location.origin
-    && ['/almoxarifado', '/estoque'].some(prefix => requestUrl.pathname === prefix || requestUrl.pathname.startsWith(prefix + '/'));
+    && ['/almoxarifado', '/estoque', '/pcm/correias', '/preventivas'].some(prefix => requestUrl.pathname === prefix || requestUrl.pathname.startsWith(prefix + '/'));
 }
 
 self.addEventListener('install', (event) => {

@@ -71,15 +71,12 @@ test('V6 compacta a prateleira operacional e preserva organização física', ()
   assert.doesNotMatch(view, /Retirada avulsa/);
 });
 
-test('V6 simplifica retirada direta sem perder a saída manual rastreável', () => {
-  const view = read('views','estoque','saida_nova.ejs');
-  const routes = read('modules','estoque','estoque.routes.js');
-  assert.match(view, /Retirada direta do estoque/);
-  assert.doesNotMatch(view, /<section class="almox-kpis">/);
-  assert.match(view, /name="item_id"/);
-  assert.match(view, /name="quantidade"/);
-  assert.match(view, /name="os_id" required/);
-  assert.match(routes, /router\.post\("\/saidas"[\s\S]*almoxCtrl\.registrarSaida/);
+test('retirada antiga redireciona e usa a tela única com QR e lote', () => {
+  const view=read('views','estoque','saida_nova.ejs');
+  const routes=read('modules','estoque','estoque.routes.js');
+  assert.match(view,/include\('\.\.\/almoxarifado\/retirada_qr'/);
+  assert.match(read('modules','estoque','estoque.controller.js'),/modo:'ESTOQUE'/);
+  assert.match(routes,/qrCtrl\.retirarLivre/);
 });
 
 test('V6 mantém telas principais compiláveis e responsivas', () => {

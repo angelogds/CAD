@@ -1,0 +1,83 @@
+<section class="ac-card">
+<h2>2. Identifique o funcionário</h2>
+<% if(pessoa){ %>
+<div class="ac-person">
+<img src="<%=pessoa.foto_url||'/IMG/logo_menu.png.png'%>" alt="">
+<div>
+<small>FUNCIONÁRIO IDENTIFICADO</small>
+<h3>
+<%=pessoa.nome%>
+</h3>
+<p>
+<%=pessoa.funcao||''%> · <%=pessoa.setor||''%>
+</p>
+</div>
+</div>
+<% }else if(codigo||(pessoaTipo&&pessoaId)){ %>
+<p class="ac-empty" role="alert">Identificação inválida ou inativa. Leia outro QR ou use um cadastro ativo.</p>
+<% } %>
+<% if(!pessoa){ %>
+<video id="qrVideo" playsinline muted hidden aria-label="Leitor do QR do funcionário">
+</video>
+<button class="ac-button ac-primary ac-camera-button" type="button" id="startQrCamera" data-solicitacao="<%=solicitacaoId||''%>" data-context="<%=new URLSearchParams(contexto)%>" aria-controls="qrVideo" aria-expanded="false">Escanear QR do funcionário</button>
+<p class="ac-camera-status" id="qrCameraStatus" role="status" aria-live="polite">A câmera abre somente ao tocar no botão.</p>
+<details class="ac-history">
+<summary>Sem câmera ou sem cartão QR</summary>
+<form class="ac-filters" method="get" action="/almoxarifado/retiradas/qr">
+<%- include('_retirada-contexto') %>
+<label class="ac-search">
+<span>Código do cartão / leitor USB</span>
+<input name="codigo" value="" autocomplete="off" placeholder="Leia ou informe o código">
+</label>
+<button class="ac-button">Identificar</button>
+</form>
+<form class="ac-filters" method="get" action="/almoxarifado/retiradas/qr">
+<%- include('_retirada-contexto') %>
+<label class="ac-search">
+<span>Busca manual pelo cadastro</span>
+<input type="search" name="q_pessoa" value="<%=buscaPessoa%>" minlength="2" placeholder="Nome, função ou setor">
+</label>
+<button class="ac-button">Buscar</button>
+</form>
+<% pessoasEncontradas.forEach(p=>{ const params=new URLSearchParams({...contexto,pessoa_tipo:p.identity_type,pessoa_id:String(p.identity_id||p.id)}); %>
+<a class="ac-request-row" href="/almoxarifado/retiradas/qr?<%=params%>">
+<div>
+<strong>
+<%=p.nome%>
+</strong>
+<small>
+<%=p.funcao||''%> · <%=p.setor||''%>
+</small>
+</div>
+<span>Selecionar →</span>
+</a>
+<% }) %>
+<% if(buscaPessoa&&!pessoasEncontradas.length){ %>
+<p>Nenhum cadastro ativo encontrado.</p>
+<% } %>
+<% if(podeCadastrarPessoa){ %>
+<details class="ac-history">
+<summary>Cadastrar pessoa ainda não registrada</summary>
+<form method="post" action="/almoxarifado/retiradas/colaboradores" data-lock-submit class="ac-form-stack">
+<%- include('_retirada-contexto') %>
+<label>Nome completo<input name="nome" required minlength="3" maxlength="120">
+</label>
+<label>Função<input name="funcao" maxlength="80">
+</label>
+<label>Setor<select name="setor">
+<% ['RECICLAGEM','FRIGORIFICO','LOGISTICA','ADMINISTRATIVO','NAO_INFORMADO'].forEach(s=>{ %>
+<option>
+<%=s%>
+</option>
+<% }) %>
+</select>
+</label>
+<button class="ac-button">Cadastrar e selecionar</button>
+</form>
+</details>
+<% } %>
+</details>
+<% }else{ %>
+<a class="ac-inline-link" href="/almoxarifado/retiradas/qr?<%=new URLSearchParams(contexto)%>">Trocar funcionário →</a>
+<% } %>
+</section>

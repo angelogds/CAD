@@ -13,7 +13,7 @@ test('almoxarifado usa o fluxo real de retirada do estoque sem duplicar rota avu
 
   assert.match(tabs, /\/almoxarifado\/retiradas\/qr/);
   assert.doesNotMatch(read('views', 'almoxarifado', '_tabs.ejs'), /\/estoque\/saidas\/nova\?contexto=almoxarifado/);
-  assert.match(estoqueRoutes, /router\.post\("\/saidas"[\s\S]*almoxCtrl\.registrarSaida/);
+  assert.match(estoqueRoutes, /router\.post\("\/saidas"[\s\S]*qrCtrl\.retirarLivre/);
   assert.doesNotMatch(almoxRoutes, /post\("\/retiradas"/);
   assert.match(almoxRoutes, /itens\/:itemId\/retirar/);
 });
@@ -54,13 +54,13 @@ test('solicitação encerrada recusa reabertura sem alterar estoque', () => {
   assert.doesNotMatch(reabrirBody, /saldo_atual/);
 });
 
-test('retirada avulsa mantém OS obrigatória e retirada por solicitação mantém a origem', () => {
-  const view = read('views', 'estoque', 'saida_nova.ejs');
+test('retirada identificada admite setor e equipamento; solicitação mantém origem', () => {
+  const view = read('views', 'almoxarifado', 'retirada_qr.ejs');
   const estoqueService = read('modules', 'estoque', 'estoque.service.js');
 
-  assert.match(view, /name="os_id" required/);
-  assert.match(view, /data-stock-item-select/);
-  assert.match(view, /name="contexto" value="almoxarifado"/);
+  assert.match(view, /name="equipamento_id"/);
+  assert.match(view, /name="setor_consumidor" required/);
+  assert.match(view, /data-withdraw-batch/);
   assert.match(estoqueService, /Uma OS ativa é obrigatória/);
   assert.match(estoqueService, /SAIDA_REQUISICAO_INTERNA/);
   assert.match(estoqueService, /const posterior = anterior - qtd/);

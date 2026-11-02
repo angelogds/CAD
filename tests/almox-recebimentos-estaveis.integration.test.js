@@ -268,7 +268,7 @@ test('identificação manual confirma nome uma única vez para todo o lote', () 
   assert.equal(reservas.retirarSelecionados({ ...data, nomeRetirante: 'Funcionário de teste' }).itens, 2);
 });
 
-test('fila exige compra efetiva e encerra o recebimento mesmo com restante ainda em cotação', () => {
+test('fila acompanha cotações e mantém o restante de pedido misto em acompanhamento', () => {
   const central = require('../modules/almoxarifado/almoxarifado.solicitacoes.service');
   const aberta = pedido({ status: 'ABERTA', statusCompra: 'PENDENTE', comprada: null, nome: 'Ainda não comprado' });
   const misto = pedido({ status: 'EM_COTACAO', recebida: 4, nome: 'Parte já recebida' });
@@ -276,9 +276,8 @@ test('fila exige compra efetiva e encerra o recebimento mesmo com restante ainda
   const finalizada = pedido({ status: 'SEPARADA_PARA_RETIRADA', recebida: 4, nome: 'Recebido para entregar' });
   const antesLiberacao = pedido({ status: 'ABERTA' }); db.prepare('UPDATE solicitacoes SET disponivel_compras=0 WHERE id=?').run(antesLiberacao.id);
   const ab = central.consultar({});
-  assert.ok(!ab.idsVisiveis.has(aberta.id)); assert.ok(ab.idsVisiveis.has(misto.id)); assert.ok(!ab.idsVisiveis.has(antesLiberacao.id));
-  assert.equal(central.consultar({ q: 'Parte já recebida' }).lista.length, 0);
-  assert.equal(central.consultar({ q: 'Parte já recebida', aba:'FECHADAS' }).lista[0].encerrada, true);
+  assert.ok(ab.idsVisiveis.has(aberta.id)); assert.ok(ab.idsVisiveis.has(misto.id)); assert.ok(!ab.idsVisiveis.has(antesLiberacao.id));
+  assert.equal(central.consultar({ q: 'Parte já recebida' }).lista[0].encerrada, false);
   assert.equal(central.consultar({ q: 'Recebido para entregar', aba: 'FECHADAS' }).lista[0].id, finalizada.id);
   assert.equal(central.consultar({ q: 'Ainda não comprado', situacao: 'PENDENTES' }).lista.length, 0);
   assert.ok(central.consultar({q:'Fornecedor de teste'}).idsVisiveis.has(misto.id));
@@ -387,14 +386,14 @@ test('entregue ou fechada permanece terminal mesmo com reserva histórica penden
   }
 });
 
-test('um comprado de dez aparece no almox; somente cotados ficam em Compras', () => {
+test('comprados e cotados aparecem no almox com etapas diferentes', () => {
   const central=require('../modules/almoxarifado/almoxarifado.solicitacoes.service');
   const sol=pedido({nome:'Único comprado entre dez',quantidade:1,comprada:1});
   for(let n=0;n<9;n++)db.prepare("INSERT INTO solicitacao_itens(solicitacao_id,item_nome,unidade,qtd_solicitada,status_cotacao,status_compra) VALUES(?,?,'UN',2,'COTADO','PENDENTE')").run(sol.id,'Em cotação '+n);
   const row=central.consultar({q:'Único comprado entre dez'}).lista[0];
   assert.equal(row.itens_comprados,1);assert.equal(row.itens_total,10);assert.equal(row.itens_a_receber,1);
   const cotada=pedido({nome:'Somente cotado sem compra',comprada:null,statusCompra:'PENDENTE',status:'COTADA'});
-  assert.ok(!central.consultar({q:'Somente cotado sem compra'}).idsVisiveis.has(cotada.id));
+  assert.equal(central.consultar({q:'Somente cotado sem compra'}).lista[0].etapa,'COTADA');
 });
 
 test('estoque operacional mostra saldo livre positivo e preserva retiradas parciais e totais no histórico', () => {
@@ -430,4 +429,94 @@ test('QR de colaborador vinculado registra os dois IDs e a entrega usa o perfil 
   db.prepare('UPDATE users SET ativo=0 WHERE id=?').run(linkedId);
   assert.equal(reservas.getPessoaByQr('CGCOL:token-perfil-vinculado'),null);
   assert.equal(reservas.getPessoaByCadastro('COLABORADOR',colId),null);
+});
+
+const operador={id:userId,role:'ADMIN',name:'Teste almox'};
+function livre(nome,saldo=5){const id=material(nome,'COMUM');db.prepare('UPDATE estoque_itens SET saldo_atual=? WHERE id=?').run(saldo,id);return id;}
+function entregaLivre(ids,extra={}){return {operacaoToken:require('node:crypto').randomUUID(),itens:ids.map(itemId=>({itemId,quantidade:1})),qrCode:'CGCOL:token-lote-teste',setorConsumidor:'RECICLAGEM',...extra};}
+
+test('retirada livre em lote identifica funcionário, setor e equipamento sem exigir OS ou empresa',()=>{
+  const ids=[livre('Óleo livre para lote'),livre('Alicate livre para lote')],data=entregaLivre(ids,{equipamentoId});
+  const r=estoque.retirarLivreSelecionados(data,operador);
+  assert.equal(r.itens,2);assert.deepEqual(ids.map(i=>estoque.getItem(i).saldo_atual),[4,4]);
+  const rows=db.prepare('SELECT * FROM estoque_movimentos WHERE entrega_operacao_token=?').all(data.operacaoToken);
+  assert.ok(rows.every(m=>m.retirado_por_colaborador_id===colaboradorId&&m.entregue_por_user_id===userId&&m.equipamento_id===equipamentoId&&m.setor_utilizacao==='RECICLAGEM'&&m.empresa_consumidora===null));
+  assert.equal(estoque.retirarLivreSelecionados(data,operador).duplicado,true);
+  assert.equal(reservas.consultarRetiradas({operacaoToken:data.operacaoToken}).total,2);
+  assert.throws(()=>estoque.retirarLivreSelecionados({...data,setorConsumidor:'LOGISTICA'},operador),/outra retirada/);
+  assert.deepEqual(ids.map(i=>estoque.getItem(i).saldo_atual),[4,4]);
+});
+
+test('falha em qualquer material livre reverte todos os saldos, movimentos e token',()=>{
+  const a=livre('Primeira linha livre transacional'),b=livre('Segunda linha livre transacional',1),data=entregaLivre([a,b]);
+  data.itens[1].quantidade=2;
+  const count=db.prepare('SELECT COUNT(*) n FROM estoque_movimentos').get().n;
+  assert.throws(()=>estoque.retirarLivreSelecionados(data,operador),/Saldo insuficiente/);
+  assert.deepEqual([estoque.getItem(a).saldo_atual,estoque.getItem(b).saldo_atual],[5,1]);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM estoque_movimentos').get().n,count);
+  assert.equal(db.prepare('SELECT token FROM estoque_entrega_operacoes WHERE token=?').get(data.operacaoToken),undefined);
+});
+
+test('retirada única recusa identidade, setor, equipamento e quantidades inválidos e protege reservas',()=>{
+  const id=livre('Livre validação de entrada');
+  for(const extra of [{qrCode:'CGCOL:invalido'},{setorConsumidor:''},{setorConsumidor:'COMUM'},{equipamentoId:999999},{itens:[{itemId:id,quantidade:Infinity}]},{itens:[{itemId:id,quantidade:1},{itemId:id,quantidade:1}]}])assert.throws(()=>estoque.retirarLivreSelecionados(entregaLivre([id],extra),operador));
+  const lote=prepararLote();
+  assert.throws(()=>estoque.retirarLivreSelecionados(entregaLivre([lote.rs[0].estoque_item_id],{equipamentoId}),operador),/Saldo livre insuficiente/);
+  assert.equal(estoque.getItem(lote.rs[0].estoque_item_id).saldo_atual,4);
+  assert.throws(()=>estoque.retirarLivreSelecionados(entregaLivre([id]),{id:userId,role:'DIRETORIA'}),/sem permissão/);
+});
+
+test('cotação em andamento aparece antes da primeira compra e não permite recebimento',()=>{
+  const s=pedido({nome:'Cotação em andamento sem compra',status:'EM_COTACAO',statusCompra:'PENDENTE',comprada:null});
+  db.prepare("UPDATE solicitacao_itens SET status_cotacao='PENDENTE' WHERE id=?").run(s.itemId);
+  const row=require('../modules/almoxarifado/almoxarifado.solicitacoes.service').consultar({q:'Cotação em andamento sem compra'}).lista[0];
+  assert.equal(row.etapa,'EM_COTACAO');assert.equal(row.itens_a_receber,0);assert.equal(row.encerrada,false);
+  assert.throws(()=>receber(s),/comprado/i);
+});
+
+test('PCM cadastra nova referência de correia por equipamento sem inventar saldo físico',()=>{
+  const service=require('../modules/correias/correias.service');
+  const id=service.createPlano({equipamento_id:equipamentoId,correia_codigo:'COR-PCM-NOVA-TESTE',correia_nome:'Perfil X de validação',quantidade_material:2,estoque_minimo_conjuntos:1,frequencia_tipo:'semanal',frequencia_valor:1},userId);
+  const p=db.prepare('SELECT * FROM preventiva_planos WHERE id=?').get(id),i=estoque.getItem(p.estoque_item_id);
+  assert.equal(p.equipamento_id,equipamentoId);assert.equal(p.quantidade_material,2);assert.equal(i.saldo_atual,0);assert.equal(i.categoria_nome,'CORREIAS');
+  assert.ok(db.prepare('SELECT id FROM preventiva_execucoes WHERE plano_id=?').get(id));
+  assert.throws(()=>service.createPlano({equipamento_id:equipamentoId,correia_codigo:'COR-PCM-INVALIDA',correia_nome:'Deve reverter',quantidade_material:0},userId));
+  assert.equal(db.prepare("SELECT id FROM estoque_itens WHERE codigo='COR-PCM-INVALIDA'").get(),undefined);
+});
+
+test('correias usam QR na entrega padrão e preservam o pedido para confirmação da troca',()=>{
+  const plans=require('../modules/correias/correias.service'),belts=require('../modules/correias/correias.fluxo.service');
+  const mecanico=Number(db.prepare("INSERT INTO users(name,email,password_hash,role,ativo) VALUES('Mecânico entrega padrão','mec-entrega-padrao@example.invalid','fixture','MECANICO',1)").run().lastInsertRowid);
+  db.prepare("INSERT INTO colaboradores(nome,funcao,setor,status,qr_token,qr_ativo,user_id) VALUES('Mecânico entrega padrão','MECANICO','RECICLAGEM','ATIVO','qr-entrega-correias',1,?)").run(mecanico);
+  const plano=plans.createPlano({equipamento_id:equipamentoId,correia_codigo:'COR-ENTREGA-PADRAO',correia_nome:'Correia para entrega padrão',quantidade_material:2,frequencia_tipo:'mensal',frequencia_valor:6},userId);
+  const itemId=db.prepare('SELECT estoque_item_id FROM preventiva_planos WHERE id=?').get(plano).estoque_item_id;
+  db.prepare('UPDATE estoque_itens SET saldo_atual=6 WHERE id=?').run(itemId);
+  const data=entregaLivre([itemId],{qrCode:'CGCOL:qr-entrega-correias',equipamentoId});data.itens[0].quantidade=2;
+  const r=estoque.retirarLivreSelecionados(data,operador);
+  const p=belts.list(equipamentoId).find(p=>p.movimento_id===r.movimentos[0]);
+  assert.equal(p.status,'RETIRADA');assert.equal(p.mecanico_user_id,mecanico);assert.equal(p.empresa_consumidora,'');assert.equal(estoque.getItem(itemId).saldo_atual,4);
+  const mov=db.prepare('SELECT * FROM estoque_movimentos WHERE id=?').get(p.movimento_id);
+  assert.equal(mov.retirado_por_user_id,mecanico);assert.equal(mov.entregue_por_user_id,userId);assert.equal(mov.entrega_operacao_token,data.operacaoToken);
+  belts.confirmarTroca(p.id,new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}),{id:mecanico,role:'MECANICO'});
+  assert.equal(estoque.getItem(itemId).saldo_atual,4);
+  const reservado=belts.solicitar({equipamento_id:equipamentoId,estoque_item_id:itemId,mecanico_user_id:mecanico,quantidade:2,setor_consumidor:'RECICLAGEM'},operador);
+  const pending=entregaLivre([itemId],{pedidoCorreiaId:reservado,qrCode:'CGCOL:qr-entrega-correias',equipamentoId});pending.itens[0].quantidade=2;
+  assert.throws(()=>estoque.retirarLivreSelecionados({...pending,qrCode:'CGCOL:token-lote-teste'},operador),/mecânico responsável/);
+  assert.equal(estoque.getItem(itemId).saldo_atual,4);
+  estoque.retirarLivreSelecionados(pending,operador);assert.equal(estoque.getItem(itemId).saldo_atual,2);
+});
+
+test('destino informado complementa solicitação sem equipamento; nonce não pode mudar de origem',()=>{
+  const stockId=livre('Reserva legada sem equipamento',4),sol=pedido({estoqueItemId:stockId,recebida:4,status:'RECEBIDA_TOTAL'});
+  const reserva=Number(db.prepare("INSERT INTO estoque_reservas(solicitacao_id,solicitacao_item_id,estoque_item_id,quantidade_reservada,quantidade_retirada,status) VALUES(?,?,?,4,0,'RESERVADA')").run(sol.id,sol.itemId,stockId).lastInsertRowid);
+  const data={solicitacaoId:sol.id,operacaoToken:require('node:crypto').randomUUID(),itens:[{reservaId:reserva,quantidade:1}],qrCode:'CGCOL:token-lote-teste',entreguePorUserId:userId,equipamentoId,setorConsumidor:'RECICLAGEM'};
+  const result=reservas.retirarSelecionados(data);
+  assert.equal(db.prepare('SELECT equipamento_id FROM estoque_movimentos WHERE id=?').get(result.movimentos[0]).equipamento_id,equipamentoId);
+  assert.equal(db.prepare('SELECT equipamento_id FROM solicitacoes WHERE id=?').get(sol.id).equipamento_id,null);
+  const itemId=livre('Não consumir ao reutilizar token');
+  assert.throws(()=>estoque.retirarLivreSelecionados(entregaLivre([itemId],{operacaoToken:data.operacaoToken}),operador),/outra retirada/);
+  assert.equal(estoque.getItem(itemId).saldo_atual,5);
+  const livreData=entregaLivre([itemId]);estoque.retirarLivreSelecionados(livreData,operador);
+  assert.throws(()=>reservas.retirarSelecionados({...data,operacaoToken:livreData.operacaoToken}),/outra retirada/);
+  assert.equal(estoque.getItem(stockId).saldo_atual,3);
 });

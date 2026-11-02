@@ -1,231 +1,67 @@
-<% layout('layout'); const grupo=solicitacaoId?grupos.find(g=>Number(g.solicitacao_id)===Number(solicitacaoId)):null; const disponiveis=grupo?grupo.itens.filter(i=>Number(i.quantidade_disponivel)>0):[]; %>
+<% layout('layout');
+const grupo=solicitacaoId?grupos.find(g=>Number(g.solicitacao_id)===Number(solicitacaoId)):null;
+const pronta=modo==='ESTOQUE'||(modo==='CORREIAS'?Boolean(pedido):Boolean(solicitacaoId))||historico.length>0;
+const disponiveis=modo==='ESTOQUE'?itens.map(i=>({...i,item_nome:i.nome,quantidade_disponivel:i.saldo_disponivel,saldo_fisico:i.saldo_atual})):
+ modo==='CORREIAS'?(pedido?[{id:pedido.estoque_item_id,item_nome:pedido.material_nome,unidade:'UN',quantidade_disponivel:pedido.quantidade,saldo_fisico:pedido.quantidade}]:[]):
+ (grupo?grupo.itens.filter(i=>Number(i.quantidade_disponivel)>0):[]);
+const contextoPost={...contexto};delete contextoPost.equipamento_id;delete contextoPost.setor_consumidor;
+%>
 <div class="almox-central">
-<header class="ac-header">
-<div>
-<span class="ac-eyebrow">ALMOXARIFADO · ENTREGA IDENTIFICADA</span>
-<h1>Retirada de materiais</h1>
-<p>Solicitação, funcionário e materiais. Confirme a entrega uma única vez.</p>
-<p class="ac-deliverer">Entrega registrada pelo perfil de <strong><%=entregador.name%></strong>.</p>
-</div>
-</header>
+<header class="ac-header"><div><span class="ac-eyebrow">ALMOXARIFADO · ENTREGA IDENTIFICADA</span><h1>Retirada de materiais</h1><p>Identifique o funcionário, selecione os materiais e confirme a entrega uma única vez.</p><p class="ac-deliverer">Entrega registrada pelo perfil de <strong><%=entregador.name%></strong>.</p></div></header>
 <%- include('_tabs',{tab:'retiradas'}) %>
-<ol class="ac-steps" aria-label="Etapas da retirada">
-<li <%-!solicitacaoId?'aria-current="step"':''%>>
-<span>1</span> Solicitação</li>
-<li <%-solicitacaoId&&!pessoa?'aria-current="step"':''%>>
-<span>2</span> QR do funcionário</li>
-<li <%-pessoa&&solicitacaoId?'aria-current="step"':''%>>
-<span>3</span> Materiais e OK</li>
-</ol>
+<ol class="ac-steps" aria-label="Etapas da retirada"><li <%-!pronta?'aria-current="step"':''%>><span>1</span> Origem</li><li <%-pronta&&!pessoa?'aria-current="step"':''%>><span>2</span> QR do funcionário</li><li <%-pronta&&pessoa?'aria-current="step"':''%>><span>3</span> Materiais e OK</li></ol>
 <section class="ac-card">
-<h2>1. Selecione a solicitação</h2>
+<h2>1. Escolha a origem dos materiais</h2>
 <form method="get" action="/almoxarifado/retiradas/qr" class="ac-filters ac-request-select">
-<label class="ac-search">
-<span>Solicitação com materiais separados</span>
-<select name="solicitacao_id" required>
-<option value="">Escolha a solicitação</option>
-<% if(solicitacaoId&&!solicitacoes.some(s=>s.solicitacao_id===solicitacaoId)){ %>
-<option value="<%=solicitacaoId%>" selected>
-<%=grupo?.numero||'#'+solicitacaoId%> · Consultar histórico</option>
-<% } %>
-<% solicitacoes.forEach(s=>{ %>
-<option value="<%=s.solicitacao_id%>" <%=s.solicitacao_id===solicitacaoId?'selected':''%>>
-<%=s.numero%> · <%=s.equipamento_nome||s.titulo%> · <%=s.setor_origem%>
-</option>
-<% }) %>
-</select>
-</label>
-<button class="ac-button" type="submit">Abrir</button>
+<label><span>Origem</span><select name="modo" data-withdraw-mode><% [['SOLICITACAO','Solicitação'],['ESTOQUE','Estoque disponível'],['CORREIAS','Pedido de correias']].forEach(([v,label])=>{ %><option value="<%=v%>" <%=modo===v?'selected':''%>><%=label%></option><% }) %></select></label>
+<% if(modo==='SOLICITACAO'){ %>
+<label class="ac-search"><span>Solicitação com materiais separados</span><select name="solicitacao_id" required><option value="">Escolha a solicitação</option>
+<% if(solicitacaoId&&!solicitacoes.some(s=>s.solicitacao_id===solicitacaoId)){ %><option value="<%=solicitacaoId%>" selected>#<%=solicitacaoId%> · Consultar histórico</option><% } %>
+<% solicitacoes.forEach(s=>{ %><option value="<%=s.solicitacao_id%>" <%=s.solicitacao_id===solicitacaoId?'selected':''%>><%=s.numero%> · <%=s.equipamento_nome||s.titulo%> · <%=s.setor_origem%></option><% }) %>
+</select></label>
+<% }else if(modo==='CORREIAS'){ %>
+<label class="ac-search"><span>Correias reservadas para o mecânico</span><select name="pedido_correia_id" required><option value="">Selecione o pedido</option><% pedidosCorreias.forEach(p=>{ %><option value="<%=p.id%>" <%=pedido?.id===p.id?'selected':''%>>#<%=p.id%> · <%=p.equipamento_nome%> · <%=p.material_nome%> · <%=p.mecanico_nome%></option><% }) %></select></label>
+<% }else{ %>
+<label class="ac-search"><span>Buscar material no estoque livre</span><input type="search" name="q" value="<%=contexto.q||''%>" placeholder="Código ou nome do material"></label>
+<% if(contexto.familia){ %><input type="hidden" name="familia" value="<%=contexto.familia%>"><% } %>
+<% if(itemSelecionado){ %><input type="hidden" name="item" value="<%=itemSelecionado%>"><% } %>
+<% } %><button class="ac-button" type="submit">Abrir</button>
 </form>
-<% if(!solicitacoes.length&&!solicitacaoId){ %>
-<p class="ac-empty">Nenhuma solicitação com material disponível para retirada.</p>
-<% } %>
+<% if(modo==='SOLICITACAO'&&!solicitacoes.length&&!solicitacaoId){ %><p class="ac-empty">Nenhuma solicitação com material disponível para retirada. Materiais de prateleira estão em Estoque disponível.</p><% } %>
 </section>
-<% if(solicitacaoId){ %>
+<% if(pronta){ %>
 <div class="ac-withdraw-layout">
-<section class="ac-card">
-<h2>2. Identifique o funcionário</h2>
-<% if(pessoa){ %>
-<div class="ac-person">
-<img src="<%=pessoa.foto_url||'/IMG/logo_menu.png.png'%>" alt="">
-<div>
-<small>FUNCIONÁRIO IDENTIFICADO</small>
-<h3>
-<%=pessoa.nome%>
-</h3>
-<p>
-<%=pessoa.funcao||''%> · <%=pessoa.setor||''%>
-</p>
-</div>
-</div>
-<% }else if(codigo||(pessoaTipo&&pessoaId)){ %>
-<p class="ac-empty" role="alert">Identificação inválida ou inativa. Leia outro QR ou use um cadastro ativo.</p>
-<% } %>
-<% if(!pessoa){ %>
-<video id="qrVideo" playsinline muted hidden aria-label="Leitor do QR do funcionário">
-</video>
-<button class="ac-button ac-primary ac-camera-button" type="button" id="startQrCamera" data-solicitacao="<%=solicitacaoId%>" aria-controls="qrVideo" aria-expanded="false">Escanear QR do funcionário</button>
-<p class="ac-camera-status" id="qrCameraStatus" role="status" aria-live="polite">A câmera abre somente ao tocar no botão.</p>
-<details class="ac-history">
-<summary>Sem câmera ou sem cartão QR</summary>
-<form class="ac-filters" method="get" action="/almoxarifado/retiradas/qr">
-<input type="hidden" name="solicitacao_id" value="<%=solicitacaoId%>">
-<label class="ac-search">
-<span>Código do cartão / leitor USB</span>
-<input name="codigo" value="" autocomplete="off" placeholder="Leia ou informe o código">
-</label>
-<button class="ac-button">Identificar</button>
-</form>
-<form class="ac-filters" method="get" action="/almoxarifado/retiradas/qr">
-<input type="hidden" name="solicitacao_id" value="<%=solicitacaoId%>">
-<label class="ac-search">
-<span>Busca manual pelo cadastro</span>
-<input type="search" name="q_pessoa" value="<%=buscaPessoa%>" minlength="2" placeholder="Nome, função ou setor">
-</label>
-<button class="ac-button">Buscar</button>
-</form>
-<% pessoasEncontradas.forEach(p=>{ const params=new URLSearchParams({solicitacao_id:String(solicitacaoId),pessoa_tipo:p.identity_type,pessoa_id:String(p.identity_id||p.id)}); %>
-<a class="ac-request-row" href="/almoxarifado/retiradas/qr?<%=params%>">
-<div>
-<strong>
-<%=p.nome%>
-</strong>
-<small>
-<%=p.funcao||''%> · <%=p.setor||''%>
-</small>
-</div>
-<span>Selecionar →</span>
-</a>
-<% }) %>
-<% if(buscaPessoa&&!pessoasEncontradas.length){ %>
-<p>Nenhum cadastro ativo encontrado.</p>
-<% } %>
-<% if(podeCadastrarPessoa){ %>
-<details class="ac-history">
-<summary>Cadastrar pessoa ainda não registrada</summary>
-<form method="post" action="/almoxarifado/retiradas/colaboradores" data-lock-submit class="ac-form-stack">
-<input type="hidden" name="solicitacao_id" value="<%=solicitacaoId%>">
-<label>Nome completo<input name="nome" required minlength="3" maxlength="120">
-</label>
-<label>Função<input name="funcao" maxlength="80">
-</label>
-<label>Setor<select name="setor">
-<% ['RECICLAGEM','FRIGORIFICO','LOGISTICA','ADMINISTRATIVO','NAO_INFORMADO'].forEach(s=>{ %>
-<option>
-<%=s%>
-</option>
-<% }) %>
-</select>
-</label>
-<button class="ac-button">Cadastrar e selecionar</button>
-</form>
-</details>
-<% } %>
-</details>
-<% }else{ %>
-<a class="ac-inline-link" href="/almoxarifado/retiradas/qr?solicitacao_id=<%=solicitacaoId%>">Trocar funcionário →</a>
-<% } %>
-</section>
+<%- include('_retirada-identidade') %>
 <section class="ac-card" id="materiais-retirada">
-<header class="ac-section-head">
-<div>
-<h2>3. Selecione os materiais</h2>
-<p>
-<%=grupo?grupo.numero+' · '+(grupo.equipamento_nome||grupo.titulo):'Confira o histórico abaixo'%>
-</p>
-</div>
-<% if(grupo){ %>
-<span class="ac-badge">
-<%=grupo.setor_origem%>
-</span>
-<% } %>
-</header>
-<% if(!pessoa){ %>
-<p class="ac-empty">Identifique o funcionário para selecionar a entrega.</p>
-<% }else if(!disponiveis.length){ %>
-<p class="ac-empty">Nenhum material pendente de retirada nesta solicitação.</p>
-<% }else if(!canWithdraw){ %>
-<p class="ac-empty">Seu perfil permite consultar a entrega.</p>
+<header class="ac-section-head"><div><h2>3. Selecione os materiais</h2><p><%=grupo?grupo.numero+' · '+(grupo.equipamento_nome||grupo.titulo):pedido?'Pedido de correias #'+pedido.id:'Materiais com saldo livre no estoque'%></p></div></header>
+<% if(!pessoa){ %><p class="ac-empty">Identifique o funcionário para selecionar a entrega.</p>
+<% }else if(!disponiveis.length){ %><p class="ac-empty">Nenhum material disponível nesta seleção.</p>
+<% }else if(!canWithdraw){ %><p class="ac-empty">Seu perfil permite consultar a entrega.</p>
 <% }else{ %>
-<form method="post" action="/almoxarifado/solicitacoes/<%=solicitacaoId%>/retirar-selecionados" data-withdraw-batch>
-<input type="hidden" name="operacao_token" value="<%=operacaoToken%>">
-<input type="hidden" name="qr_code" value="<%=codigo%>">
-<input type="hidden" name="pessoa_tipo" value="<%=pessoaTipo%>">
-<input type="hidden" name="pessoa_id" value="<%=pessoaId%>">
-<% if(!codigo){ %>
-<label class="ac-manual-name">Confirme o nome completo de quem retira<input name="nome_retirante" required minlength="3" maxlength="120" autocomplete="off" placeholder="Digite conforme o cadastro selecionado">
-</label>
-<% } %>
-<label class="ac-select-all">
-<input type="checkbox" data-select-all> Selecionar todos os disponíveis</label>
-<% disponiveis.forEach(i=>{ %>
-<article class="ac-pick-item">
-<label class="ac-pick-label">
-<input type="checkbox" name="reserva_id" value="<%=i.id%>" <%=Number(i.saldo_fisico)<=0?'disabled':''%>>
-<span>
-<strong>
-<%=i.item_nome%>
-</strong>
-<small>
-<%=i.quantidade_disponivel%> <%=i.unidade||'UN'%> disponível(is)</small>
-</span>
-</label>
-<label class="ac-pick-quantity">
-<span>Quantidade</span>
-<div class="ac-number-unit">
-<input type="number" inputmode="decimal" name="quantidade_<%=i.id%>" <%=Number(i.saldo_fisico)<=0?'disabled':''%> min="0.001" step="any" max="<%=Math.min(Number(i.quantidade_disponivel),Number(i.saldo_fisico))%>" value="<%=Math.min(Number(i.quantidade_disponivel),Number(i.saldo_fisico))%>" aria-label="Quantidade a retirar de <%=i.item_nome%>">
-<span>
-<%=i.unidade||'UN'%>
-</span>
+<form method="post" action="<%=modo==='SOLICITACAO'?'/almoxarifado/solicitacoes/'+solicitacaoId+'/retirar-selecionados':'/estoque/saidas'%>" data-withdraw-batch>
+<% Object.entries(contextoPost).forEach(([key,value])=>{ %><input type="hidden" name="<%=key%>" value="<%=value%>"><% }) %>
+<input type="hidden" name="operacao_token" value="<%=operacaoToken%>"><input type="hidden" name="qr_code" value="<%=codigo%>"><input type="hidden" name="pessoa_tipo" value="<%=pessoaTipo%>"><input type="hidden" name="pessoa_id" value="<%=pessoaId%>">
+<% if(!codigo){ %><label class="ac-manual-name">Confirme o nome completo de quem retira<input name="nome_retirante" required minlength="3" maxlength="120" autocomplete="off" placeholder="Digite conforme o cadastro selecionado"></label><% } %>
+<div class="ac-destination-grid">
+<label>Setor consumidor<select name="setor_consumidor" required><option value="">Selecione o setor</option><% setores.forEach(s=>{ %><option value="<%=s%>" <%=s===setorSelecionado?'selected':''%>><%=s%></option><% }) %></select></label>
+<label>Equipamento<% if(equipamentoFixo){ %><input type="hidden" name="equipamento_id" value="<%=equipamentoFixo%>"><select disabled aria-label="Equipamento do pedido"><% equipamentos.filter(e=>e.id===equipamentoFixo).forEach(e=>{ %><option><%=e.codigo?e.codigo+' · ':''%><%=e.nome%></option><% }) %></select><% }else{ %><select name="equipamento_id"><option value="">Sem equipamento · consumo do setor</option><% equipamentos.forEach(e=>{ %><option value="<%=e.id%>" <%=e.id===equipamentoSelecionado?'selected':''%>><%=e.codigo?e.codigo+' · ':''%><%=e.nome%><%=e.setor?' · '+e.setor:''%></option><% }) %></select><% } %></label>
 </div>
-</label>
-</article>
+<% if(modo==='ESTOQUE'){ %><p class="ac-muted">Para correias, selecione o equipamento vinculado ao plano no PCM.</p><% } %>
+<% if(modo==='ESTOQUE'){ %><label>Localizar material nesta lista<input type="search" data-material-search placeholder="Digite o nome ou código"></label><% } %>
+<label class="ac-select-all"><input type="checkbox" data-select-all> Selecionar materiais exibidos</label>
+<% disponiveis.forEach(i=>{ const max=Math.min(Number(i.quantidade_disponivel),Number(i.saldo_fisico)); %>
+<article class="ac-pick-item"><label class="ac-pick-label"><input data-material-check type="checkbox" name="<%=modo==='SOLICITACAO'?'reserva_id':'item_id'%>" value="<%=i.id%>" <%=max<=0?'disabled':''%> <%=modo==='ESTOQUE'&&i.id===itemSelecionado?'checked':''%>><span><strong><%=i.item_nome%></strong><small><%=i.quantidade_disponivel%> <%=i.unidade||'UN'%> disponível(is)</small><% if(i.equipamento_estoque_nome){ %><small>Destinado a <%=i.equipamento_estoque_nome%></small><% } %></span></label>
+<label class="ac-pick-quantity"><span>Quantidade</span><div class="ac-number-unit"><input type="number" inputmode="decimal" name="quantidade_<%=i.id%>" <%=max<=0?'disabled':''%> <%=modo==='CORREIAS'?'readonly':''%> min="0.001" step="any" max="<%=max%>" value="<%=modo==='ESTOQUE'?Math.min(1,max):max%>" aria-label="Quantidade a retirar de <%=i.item_nome%>"><span><%=i.unidade||'UN'%></span></div></label></article>
 <% }) %>
-<div class="ac-batch-footer">
-<div>
-<strong data-selection-count>Selecione os materiais</strong>
-<small>Entregar a <%=pessoa.nome%>
-</small>
-</div>
-<button class="ac-button ac-primary" type="submit" data-batch-submit>OK</button>
-</div>
+<details class="ac-history"><summary>Adicionar observação</summary><label>Observação<input name="observacao" maxlength="500"></label></details>
+<div class="ac-batch-footer"><strong data-selection-count>Materiais selecionados: 0</strong><button class="ac-button ac-primary" type="submit" data-batch-submit>OK</button></div>
 </form>
 <% } %>
-</section>
-</div>
-<section class="ac-card" id="historico-retirada">
-<header class="ac-section-head">
-<div>
-<h2>Histórico desta solicitação</h2>
-<p>Materiais, quem retirou, quem entregou e data da entrega.</p>
-</div>
-<a href="/almoxarifado/solicitacoes/<%=solicitacaoId%>/conferir">Ver solicitação →</a>
-</header>
-<% if(!historico.length){ %>
-<p class="ac-empty">Nenhuma retirada registrada.</p>
-<% } %>
-<div class="ac-history-list">
-<% historico.forEach(h=>{ %>
-<article>
-<div>
-<strong>
-<%=h.nome%>
-</strong>
-<span>
-<%=h.quantidade%> <%=h.unidade||'UN'%> · <%=h.retirante_nome%>
-</span>
-<small>Entregue por <%=h.entregador_nome%></small>
-</div>
-<small>
-<%=h.created_at%>
-</small>
-</article>
-<% }) %>
-</div>
-</section>
+</section></div>
+<section class="ac-card" id="historico-retirada"><header class="ac-section-head"><div><h2>Histórico <%=solicitacaoId?'desta solicitação':'da entrega'%></h2><p>Materiais, quem retirou, quem entregou e data da entrega.</p></div></header>
+<% if(!historico.length){ %><p class="ac-empty">Nenhuma retirada registrada nesta seleção.</p><% } %>
+<div class="ac-history-list"><% historico.forEach(h=>{ %><article><div><strong><%=h.nome%></strong><span><%=h.quantidade%> <%=h.unidade||'UN'%> · <%=h.retirante_nome%></span><small>Entregue por <%=h.entregador_nome%></small></div><small><%=h.created_at%></small></article><% }) %></div></section>
 <% } %>
 </div>
-<script src="/vendor/almox-qr/jsQR.js" defer>
-</script>
-<script src="/js/almox-retirada.js?v=20261102-v1" defer>
-</script>
+<script src="/vendor/almox-qr/jsQR.js" defer></script>
+<script src="/js/almox-retirada.js?v=20261102-v3" defer></script>

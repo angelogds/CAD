@@ -148,7 +148,7 @@ test('Meu Portal não tenta vincular perfis encarregados a colaboradores', () =>
 test('Almoxarifado mantém QR de mecânico e adiciona QR próprio do encarregado', () => {
   const estoque = read('modules/estoque/estoque.reservas.service.js');
   const userQr = read('modules/usuarios/usuarios.qr.service.js');
-  const scanner = read('views/almoxarifado/retirada_qr.ejs');
+  const scanner = read('views/almoxarifado/retirada_qr.ejs')+read('views/almoxarifado/_retirada-identidade.ejs');
 
   assert.match(userQr, /CGUSR:/);
   assert.match(userQr, /isDirectUserIdentityRole/);

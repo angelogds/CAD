@@ -1,7 +1,8 @@
 (() => {
+  document.querySelector('[data-withdraw-mode]')?.addEventListener('change',event=>event.target.form.submit());
   const batch = document.querySelector('[data-withdraw-batch]');
   if (batch) {
-    const checks = [...batch.querySelectorAll('[name="reserva_id"]')].filter(c => !c.disabled);
+    const checks = [...batch.querySelectorAll('[data-material-check]')].filter(c => !c.disabled);
     const all = batch.querySelector('[data-select-all]');
     const submit = batch.querySelector('[data-batch-submit]');
     const update = () => {
@@ -9,7 +10,8 @@
       batch.classList.toggle('has-selection', count > 0);
       batch.querySelector('[data-selection-count]').textContent = `Materiais selecionados: ${count}`;
       submit.disabled = count === 0;
-      if (all) { all.checked = count > 0 && count === checks.length; all.indeterminate = count > 0 && count < checks.length; }
+      const visible=checks.filter(c=>!c.closest('.ac-pick-item').hidden),selected=visible.filter(c=>c.checked).length;
+      if (all) { all.checked = selected > 0 && selected === visible.length; all.indeterminate = selected > 0 && selected < visible.length; }
       checks.forEach(c => {
         const row = c.closest('.ac-pick-item');
         row.classList.toggle('is-selected', c.checked);
@@ -17,9 +19,10 @@
         quantity.disabled = !c.checked; quantity.required = c.checked;
       });
     };
-    all?.addEventListener('change', () => { checks.forEach(c => { c.checked = all.checked; }); update(); });
+    all?.addEventListener('change', () => { checks.filter(c=>!c.closest('.ac-pick-item').hidden).forEach(c => { c.checked = all.checked; }); update(); });
     checks.forEach(c => c.addEventListener('change', update));
     batch.addEventListener('submit', () => { if (batch.checkValidity()) { submit.disabled = true; submit.textContent = 'Registrando…'; } });
+    batch.querySelector('[data-material-search]')?.addEventListener('input',event=>{const normalize=v=>String(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();const q=normalize(event.target.value);checks.forEach(c=>{c.closest('.ac-pick-item').hidden=!normalize(c.closest('.ac-pick-item').textContent).includes(q);});update();});
     update();
   }
   const start = document.getElementById('startQrCamera');
@@ -62,7 +65,7 @@
             const frame = context.getImageData(0, 0, canvas.width, canvas.height);
             value = window.jsQR(frame.data, frame.width, frame.height, { inversionAttempts: 'dontInvert' })?.data;
           }
-          if (value && stream && generation === scanGeneration) { stop(); const params = new URLSearchParams({ solicitacao_id: start.dataset.solicitacao, codigo: value }); window.location.assign('/almoxarifado/retiradas/qr?' + params + '#materiais-retirada'); }
+          if (value && stream && generation === scanGeneration) { stop(); const params = new URLSearchParams(start.dataset.context||''); params.set('codigo',value); window.location.assign('/almoxarifado/retiradas/qr?' + params + '#materiais-retirada'); }
         } catch (_) { if (detector && window.jsQR) detector = null; }
         finally { busy = false; }
       }, 280);
