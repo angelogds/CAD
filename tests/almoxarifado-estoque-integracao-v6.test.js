@@ -32,15 +32,15 @@ test('V6 mantém as ligações principais Almoxarifado, Estoque e Retirada em ro
   assert.match(tabs, /href="\/almoxarifado\/estoque"/);
   assert.doesNotMatch(tabs, /href="\/almoxarifado\/recebimentos\?fila=A_CAMINHO"/);
   assert.match(tabs, /href="\/almoxarifado\/recebimentos"/);
-  assert.match(tabs, /href="\/estoque\/reservas"/);
-  assert.match(tabs, /href="\/almoxarifado\/retiradas\/qr"/);
+  assert.match(read('views','almoxarifado','_stock-operations.ejs'), /href="\/estoque\/reservas"/);
+  assert.match(read('views','almoxarifado','estoque.ejs'), /href="\/almoxarifado\/retiradas\/qr"/);
 });
 
-test('V6 deixa somente uma entrada de retirada no menu principal do Almoxarifado', () => {
+test('menu principal mantém apenas quatro áreas e retirada fica na operação', () => {
   const tabs = ejs.render(read('views','almoxarifado','_tabs.ejs'),{tab:'estoque'});
   const links = tabs.match(/href="\/almoxarifado\/retiradas\/qr"/g) || [];
-  assert.equal(links.length, 1);
-  assert.match(tabs, />\s*Retirada\s*<\/a>/);
+  assert.equal(links.length, 0);
+  assert.match(read('views','almoxarifado','estoque.ejs'), />Retirada<\/a>/);
   assert.doesNotMatch(tabs, /Saída avulsa/);
   assert.doesNotMatch(tabs, /Entrega identificada/);
 });

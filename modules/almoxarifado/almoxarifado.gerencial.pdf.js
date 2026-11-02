@@ -1,96 +1,98 @@
-"use strict";
-const PDFDocument = require("pdfkit");
-const { gerarRelatorio } = require("./almoxarifado.gerencial.service");
-const { listarAtrasosPorFornecedor, filtrarAtrasos } = require("./almoxarifado.atrasos-fornecedor.service");
-const brl = v => (Number(v || 0) / 100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-const qtd = v => Number(v || 0).toLocaleString("pt-BR", {maximumFractionDigits: 2});
+'use strict';
+const { createInstitutionalReport } = require('../../utils/pdf/institutional-report');
+const { COLORS, logoPath, formatDate } = require('../../utils/pdf-standard');
+const { gerarRelatorio } = require('./almoxarifado.gerencial.service');
+const { listarAtrasosPorFornecedor, filtrarAtrasos } = require('./almoxarifado.atrasos-fornecedor.service');
+const brl = v => (Number(v || 0) / 100).toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+const qtd = v => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits:2 });
+const dataSerie = value => /^\d{4}-\d{2}$/.test(value) ? value.split('-').reverse().join('/') : formatDate(value);
+
+function gerarDocumento(info, pendencias, consultaAtrasos, { retiradas = { lista:[],total:0 }, emitidoEm = new Date() } = {}) {
+  const { periodo,resumo,maisSaidos,parados,inventario,serie } = info;
+  const report = createInstitutionalReport({
+    title:'Relatório gerencial do almoxarifado',
+    subtitle:`Movimentações de ${formatDate(periodo.inicio)} a ${formatDate(periodo.fim)} | Estoque atual na emissão`,
+    issuedAt:emitidoEm.toLocaleDateString('pt-BR', {timeZone:'America/Sao_Paulo'}),
+    logoPath:logoPath('materiais'),
+    colors:{...COLORS,text:'#374151',muted:'#6B7280',border:'#DDE5DE',row:'#F8FBF9'},
+    sector:'ALMOXARIFADO', headerContext:'Materiais | Manutenção Campo do Gado',
+    footerText:'Manutenção Campo do Gado - Almoxarifado - Documento gerencial para controle interno.',
+    subject:'Entradas, retiradas, estoque e acompanhamento de compras',
+  });
+  const render = () => {
+    report.start();
+    report.identification([
+      ['PERÍODO',`${formatDate(periodo.inicio)} a ${formatDate(periodo.fim)}`,'EMISSÃO',emitidoEm.toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})],
+      ['ESTOQUE','Saldo atual do cadastro','MOVIMENTAÇÕES','Entradas e saídas do período'],
+    ]);
+    report.summary([
+      {label:'Materiais com saldo atual',value:qtd(resumo.itensComSaldo)},
+      {label:'Entradas no período (registros)',value:qtd(resumo.registrosEntrada)},
+      {label:'Retiradas no período (registros)',value:qtd(resumo.registrosSaida)},
+    ]);
+    report.table({title:'Resumo de valores e qualidade dos registros',columns:[
+      {key:'indicador',label:'Indicador',width:350},{key:'valor',label:'Valor',width:165,align:'right'},
+    ],rows:[
+      {indicador:'Valor estimado em estoque (materiais precificados)',valor:brl(resumo.estoqueCentavos)},
+      {indicador:'Valor de entradas registrado / estimado',valor:brl(resumo.valorEntradaCentavos)},
+      {indicador:'Valor de saídas registrado / estimado',valor:brl(resumo.valorSaidaCentavos)},
+      {indicador:'Materiais com saldo sem custo cadastrado',valor:qtd(resumo.itensSemValor)},
+      {indicador:'Movimentações sem preço: entradas / saídas',valor:`${qtd(resumo.entradasSemPreco)} / ${qtd(resumo.saidasSemPreco)}`},
+    ]});
+    report.table({title:'Movimentação no período',columns:[
+      {key:'data',label:'Período',width:170},{key:'entradas',label:'Entradas (registros)',width:170,align:'right'},
+      {key:'saidas',label:'Saídas (registros)',width:175,align:'right'},
+    ],rows:serie.map(i=>({...i,data:dataSerie(i.data)})),emptyText:'Sem entradas ou saídas registradas no intervalo.'});
+    report.table({title:'Materiais mais retirados (por número de retiradas)',columns:[
+      {key:'nome',label:'Material',width:310},{key:'quantidade',label:'Quantidade',width:110,align:'right'},
+      {key:'saidas',label:'Retiradas',width:95,align:'right'},
+    ],rows:maisSaidos.map((i,n)=>({nome:`${n+1}. ${i.nome}`,quantidade:`${qtd(i.qtdSaida)} ${i.unidade}`,saidas:qtd(i.saidas)})),emptyText:'Nenhuma retirada no período.'});
+    report.note('Materiais sem saída há 90 dias ou mais: lista de atenção. Avaliar criticidade e reserva mínima antes de reduzir compras.',{keepWithNext:90});
+    report.table({title:'Materiais sem saídas há 90 dias ou mais',columns:[
+      {key:'nome',label:'Material',width:360},{key:'saldo',label:'Saldo atual',width:155,align:'right'},
+    ],rows:parados.map(i=>({nome:i.nome,saldo:`${qtd(i.saldo)} ${i.unidade}`})),emptyText:'Nenhum material antigo com saldo e sem saída identificado.'});
+    const pesquisa=[consultaAtrasos.filtros.tipo==='TODOS'?'Todas as pendências':consultaAtrasos.filtros.tipo==='ATRASADOS'?'Somente atrasados':'Sem previsão',consultaAtrasos.filtros.fornecedor||'Todos os fornecedores',consultaAtrasos.filtros.busca||''].filter(Boolean).join(' | ');
+    report.note(`Pesquisa de entregas: ${pesquisa}. Posição em ${formatDate(pendencias.hoje)}. Somente compras confirmadas com quantidade a receber.`,{keepWithNext:90});
+    report.summary([
+      {label:'Fornecedores com atraso (pesquisa)',value:qtd(consultaAtrasos.resumo.fornecedores)},
+      {label:'Materiais atrasados (pesquisa)',value:qtd(consultaAtrasos.resumo.atrasados)},
+      {label:'Pedidos com atraso (pesquisa)',value:qtd(consultaAtrasos.resumo.pedidos)},
+    ]);
+    report.table({title:'Materiais atrasados por fornecedor',columns:[
+      {key:'origem',label:'Fornecedor / solicitação',width:145,repeatOnSplit:true},
+      {key:'nome',label:'Material',width:185},{key:'pendente',label:'A receber',width:80,align:'right'},
+      {key:'prazo',label:'Previsão / atraso',width:105},
+    ],rows:consultaAtrasos.atrasados.map(i=>({origem:`${i.fornecedor}\n${i.numero}`,nome:i.nome,pendente:`${qtd(i.pendente)} ${i.unidade}`,prazo:`${formatDate(i.previsao)}\n${i.diasAtraso} dia(s)`})),emptyText:'Nenhum material com prazo vencido e recebimento pendente.'});
+    report.table({title:'Materiais pendentes sem previsão',columns:[
+      {key:'origem',label:'Fornecedor / solicitação',width:165,repeatOnSplit:true},{key:'nome',label:'Material',width:250},
+      {key:'pendente',label:'A receber',width:100,align:'right'},
+    ],rows:consultaAtrasos.semPrevisao.map(i=>({origem:`${i.fornecedor}\n${i.numero}`,nome:i.nome,pendente:`${qtd(i.pendente)} ${i.unidade}`})),emptyText:'Nenhuma compra pendente sem previsão.'});
+    report.note('Compras sem data válida não são classificadas como atrasadas. Completar a previsão em Compras. Quantidades de unidades distintas não são somadas.');
+    report.table({title:'Retiradas identificadas no período',columns:[
+      {key:'material',label:'Material / solicitação',width:200},{key:'quantidade',label:'Quantidade',width:75,align:'right'},
+      {key:'responsaveis',label:'Quem retirou / quem entregou',width:155},{key:'data',label:'Data',width:85},
+    ],rows:retiradas.lista.map(m=>({material:`${m.item_nome}\n${m.numero||'Retirada avulsa'}\n${m.setor}`,quantidade:`${qtd(m.quantidade)} ${m.unidade}`,responsaveis:`Retirou: ${m.retirante_nome}\nEntregou: ${m.entregador_nome}`,data:formatDate(m.data_mov)})),emptyText:'Nenhuma retirada registrada no intervalo.'});
+    if(retiradas.total>retiradas.lista.length)report.note(`Exibidos os ${retiradas.lista.length} registros mais recentes de ${retiradas.total}. O histórico completo está em Estoque > Materiais retirados, com busca e paginação.`);
+    report.table({title:'Inventário valorizado - saldo atual',columns:[
+      {key:'nome',label:'Material / setor',width:310},{key:'saldo',label:'Saldo atual',width:90,align:'right'},
+      {key:'valor',label:'Valor estimado',width:115,align:'right'},
+    ],rows:inventario.map(i=>({nome:`${i.nome}\n${i.setorPadrao}`,saldo:`${qtd(i.saldo)} ${i.unidade}`,valor:i.valorSaldoCentavos==null?'Custo não cadastrado':brl(i.valorSaldoCentavos)})),emptyText:'Nenhum material com saldo atual.'});
+    report.note('Notas: preços históricos da movimentação prevalecem; na ausência, usa-se o valor da compra vinculada ou, como estimativa, o custo atual do estoque. Ajustes de inventário não representam entradas ou saídas operacionais. Materiais sem custo não entram nos totais monetários. Quantidades de unidades diferentes não são somadas. Perfis ausentes em registros antigos permanecem não identificados. Este relatório não substitui a escrituração contábil.');
+    report.end();
+  };
+  return {doc:report.doc,render};
+}
 function exportar(req,res) {
   let info;
-  try { info = gerarRelatorio(req.query || {}); }
+  try { info=gerarRelatorio(req.query||{}); }
   catch(e) { return res.status(400).send(e.message); }
-  const {periodo,resumo,maisSaidos,parados,inventario,serie} = info;
-  const pendencias = listarAtrasosPorFornecedor(periodo.hoje);
-  const consultaAtrasos = filtrarAtrasos(pendencias, req.query || {});
-  const doc = new PDFDocument({size:"A4", margin:42, bufferPages:true, info:{Title:"Almoxarifado - relatório gerencial"}});
-  res.setHeader("Content-Type","application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="almoxarifado-gerencial-${periodo.inicio}-${periodo.fim}.pdf"`);
-  doc.pipe(res);
-  const black = "#24352f",green="#1c7848",gray="#62746d";
-  const heading=(s)=>{
-    if(doc.y>690) doc.addPage();
-    doc.moveDown(.8).font("Helvetica-Bold").fontSize(13).fillColor(green).text(s);
-    doc.moveDown(.3);
-  };
-  const line=(left,right)=>{
-    // Reserva a altura da maior célula para evitar sobreposição de descrições longas no PDF.
-    const esquerda=String(left), direita=String(right);
-    doc.font("Helvetica").fontSize(9);
-    const alturaEsquerda=doc.heightOfString(esquerda,{width:354});
-    doc.font("Helvetica-Bold").fontSize(9);
-    const alturaDireita=doc.heightOfString(direita,{width:155});
-    const altura=Math.max(alturaEsquerda,alturaDireita);
-    if (doc.y+altura>748) doc.addPage();
-    const y=doc.y;
-    doc.fillColor(black).font("Helvetica").fontSize(9).text(esquerda,42,y,{width:354});
-    doc.font("Helvetica-Bold").fontSize(9).text(direita,400,y,{width:155,align:"right"});
-    doc.y=y+altura+5;
-  };
-  doc.fillColor(green).font("Helvetica-Bold").fontSize(18).text("ALMOXARIFADO | RELATÓRIO GERENCIAL");
-  doc.fillColor(gray).fontSize(9).font("Helvetica").text(`Manutenção Campo do Gado  •  Período: ${periodo.inicio} a ${periodo.fim}`);
-  doc.text(`Emitido em ${new Date().toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"})}`);
-  heading("Resumo de entradas, saídas e estoque");
-  line("Materiais com saldo atual",resumo.itensComSaldo);
-  line("Valor estimado em estoque (itens precificados)",brl(resumo.estoqueCentavos));
-  line("Materiais com saldo sem custo cadastrado",resumo.itensSemValor);
-  line("Registros de entrada no período",resumo.registrosEntrada);
-  line("Custo de entradas registrado/estimado",brl(resumo.valorEntradaCentavos));
-  line("Registros de retirada no período",resumo.registrosSaida);
-  line("Custo de saídas registrado/estimado",brl(resumo.valorSaidaCentavos));
-  line("Movimentações sem preço de entrada/saída",`${resumo.entradasSemPreco} / ${resumo.saidasSemPreco}`);
-  heading("Movimentação no período");
-  if (!serie.length) doc.fontSize(9).text("Sem entradas ou saídas registradas no intervalo.");
-  serie.forEach(v=>line(v.data, `${v.entradas} entradas / ${v.saidas} saídas`));
-  heading("Materiais mais retirados (por número de retiradas)");
-  if (!maisSaidos.length) doc.fontSize(9).text("Nenhuma retirada no período.");
-  maisSaidos.forEach((i,n)=>line(`${n+1}. ${i.nome} (${i.unidade})`,`${qtd(i.qtdSaida)} / ${i.saidas} retiradas`));
-  heading("Materiais sem saídas há 90 dias ou mais");
-  doc.fillColor(gray).fontSize(8).text("Lista de atenção; avaliar criticidade e reserva mínima antes de reduzir compras.");
-  if (!parados.length) doc.fontSize(9).text("Nenhum item antigo com saldo e sem saída identificado.");
-  parados.forEach(i=>line(i.nome,`${qtd(i.saldo)} ${i.unidade} em estoque`));
-  heading("Materiais atrasados por fornecedor");
-  doc.fillColor(gray).font("Helvetica").fontSize(8).text("Pesquisa: "+[consultaAtrasos.filtros.tipo==="TODOS"?"Todas as pendências":consultaAtrasos.filtros.tipo==="ATRASADOS"?"Somente atrasados":"Sem previsão",consultaAtrasos.filtros.fornecedor||"Todos os fornecedores",consultaAtrasos.filtros.busca||""].filter(Boolean).join(" | "));
-  doc.fillColor(gray).font("Helvetica").fontSize(8).text("Prazo vencido em "+pendencias.hoje+" e quantidade comprada ainda pendente. Quantidades de unidades distintas não são somadas.");
-  line("Fornecedores com atraso (pesquisa)", consultaAtrasos.resumo.fornecedores);
-  line("Materiais atrasados (pesquisa)", consultaAtrasos.resumo.atrasados);
-  line("Pedidos com atraso (pesquisa)", consultaAtrasos.resumo.pedidos);
-  if (!consultaAtrasos.atrasados.length) doc.font("Helvetica").fontSize(9).text("Nenhum material com prazo vencido e recebimento pendente.");
-  let ultimoFornecedor = null;
-  for (const item of consultaAtrasos.atrasados) {
-    if (item.fornecedor !== ultimoFornecedor) {
-      heading(item.fornecedor);
-      ultimoFornecedor = item.fornecedor;
-    }
-    line(item.numero+" | "+item.nome,
-      qtd(item.pendente)+" "+item.unidade+" | "+item.diasAtraso+"d | "+item.previsao);
-  }
-  heading("Materiais pendentes sem previsão");
-  doc.fillColor(gray).font("Helvetica").fontSize(8).text("Sem data válida, não se classifica como atraso. Completar previsão em Compras.");
-  if (!consultaAtrasos.semPrevisao.length) doc.font("Helvetica").fontSize(9).text("Nenhuma compra pendente sem previsão.");
-  for (const item of consultaAtrasos.semPrevisao) {
-    line(item.fornecedor+" | "+item.numero+" | "+item.nome, qtd(item.pendente)+" "+item.unidade);
-  }
-  doc.addPage();
-  doc.fillColor(green).fontSize(14).font("Helvetica-Bold").text("Inventário valorizado - saldo atual");
-  doc.moveDown(.4);
-  inventario.forEach(i=>line(`${i.nome} — ${qtd(i.saldo)} ${i.unidade}`,i.valorSaldoCentavos==null?"Custo não cadastrado":brl(i.valorSaldoCentavos)));
-  doc.moveDown(.8).fillColor(gray).fontSize(8).text(
-    "Notas: preços históricos da movimentação prevalecem; na ausência, usa-se o valor da compra vinculada ou, como estimativa, o custo atual do estoque. Ajustes de inventário não são tratados como entradas/saídas operacionais. Materiais sem custo não entram nos totais monetários. Quantidades de unidades diferentes não são somadas. Este relatório é gerencial, não substitui escrituração contábil."
-  );
-  const pages=doc.bufferedPageRange();
-  for(let i=pages.start;i<pages.start+pages.count;i++){
-    doc.switchToPage(i);
-    doc.fillColor(gray).fontSize(8).text(`Campo do Gado · Almoxarifado | Página ${i+1}/${pages.count}`,42,790,{width:510,align:"right"});
-  }
-  doc.end();
+  const pendencias=listarAtrasosPorFornecedor(info.periodo.hoje);
+  const consultaAtrasos=filtrarAtrasos(pendencias, req.query||{});
+  const retiradas=require('../estoque/estoque.reservas.service').consultarRetiradas({...info.periodo,limite:100});
+  const pdf=gerarDocumento(info,pendencias,consultaAtrasos,{retiradas});
+  res.setHeader('Content-Type','application/pdf');
+  res.setHeader('Content-Disposition',`attachment; filename="almoxarifado-gerencial-${info.periodo.inicio}-${info.periodo.fim}.pdf"`);
+  pdf.doc.pipe(res);
+  pdf.render();
 }
-module.exports={exportar};
+module.exports={exportar,gerarDocumento};

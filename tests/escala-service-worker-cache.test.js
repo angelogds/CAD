@@ -110,3 +110,17 @@ test('instalação mantém assets offline existentes e permite ativação imedia
     assert.ok(fs.existsSync(path.join(__dirname, '../public', pathname)), `Asset de instalação ausente: ${pathname}`);
   }
 });
+
+test('almoxarifado e estoque não reutilizam páginas anteriores de pedidos ou saldo', () => {
+  const worker=loadWorker();
+  for(const pathname of ['/almoxarifado','/almoxarifado/recebimentos?aba=FECHADAS','/almoxarifado/retiradas/qr?solicitacao_id=1','/estoque','/estoque/reservas','/estoque/movimentos?tipo=SAIDA']) {
+    assert.equal(request(worker,pathname),undefined,pathname);
+  }
+  assert.deepEqual(worker.calls.matches,[]);
+});
+
+test('ativação remove cache operacional antigo e preserva assets e rotas parecidas',async()=>{
+  const worker=loadWorker(['/almoxarifado','/almoxarifado/recebimentos?solicitacao_id=1','/estoque','/estoque/reservas','/estoques/exemplo','/css/almox-central.css?v=20261102-v2']);
+  let activation;worker.handlers.activate({waitUntil(value){activation=value;}});await activation;
+  assert.deepEqual(worker.calls.deletedRequests,[`${origin}/almoxarifado`,`${origin}/almoxarifado/recebimentos?solicitacao_id=1`,`${origin}/estoque`,`${origin}/estoque/reservas`]);
+});

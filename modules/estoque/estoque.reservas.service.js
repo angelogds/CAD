@@ -60,18 +60,26 @@ function getPessoaByQr(codigo) {
       setor: user.setor || null,
       status: 'ATIVO',
       foto_url: user.photo_path || null,
+      perfil_role: user.role,
       qr_emitido_em: user.qr_emitido_em || null,
     };
   }
 
   const colaborador = getColaboradorByQr(raw);
   if (!colaborador) return null;
-  return {
-    ...colaborador,
-    identity_type: 'COLABORADOR',
-    user_id: Number(colaborador.user_id || 0) || null,
-    colaborador_id: Number(colaborador.id),
-  };
+  return identidadeColaborador(colaborador);
+}
+
+function identidadeColaborador(colaborador) {
+  let perfil = null;
+  if (colaborador.user_id) {
+    const ativo=hasColumn('users','ativo')?'COALESCE(ativo,1)':'1';
+    const deleted=hasColumn('users','deleted_at')?'deleted_at':'NULL';
+    perfil=db.prepare(`SELECT id,name,role,${ativo} ativo,${deleted} deleted_at FROM users WHERE id=?`).get(Number(colaborador.user_id));
+    if(!perfil || Number(perfil.ativo)!==1 || perfil.deleted_at)return null;
+  }
+  return {...colaborador,identity_type:'COLABORADOR',colaborador_id:Number(colaborador.id),
+    user_id:perfil?Number(perfil.id):null,nome:perfil?.name||colaborador.nome,perfil_role:perfil?.role||colaborador.funcao};
 }
 
 function getPessoaByCadastro(tipo, id) {
@@ -93,6 +101,7 @@ function getPessoaByCadastro(tipo, id) {
       setor: user.setor || null,
       status: 'ATIVO',
       foto_url: user.photo_path || null,
+      perfil_role: user.role,
       qr_emitido_em: user.qr_emitido_em || null,
     };
   }
@@ -107,12 +116,7 @@ function getPessoaByCadastro(tipo, id) {
     LIMIT 1
   `).get(identityId);
   if (!colaborador) return null;
-  return {
-    ...colaborador,
-    identity_type: 'COLABORADOR',
-    user_id: Number(colaborador.user_id || 0) || null,
-    colaborador_id: Number(colaborador.id),
-  };
+  return identidadeColaborador(colaborador);
 }
 
 function listPessoasAtivas(query) {
@@ -134,8 +138,10 @@ function listPessoasAtivas(query) {
       ORDER BY nome LIMIT 12
     `).all(like, like, like, like);
     for (const row of rows) {
+      const pessoa = identidadeColaborador(row);
+      if (!pessoa) continue;
       results.push({
-        ...row,
+        ...pessoa,
         identity_type: 'COLABORADOR',
         identity_id: Number(row.id),
         colaborador_id: Number(row.id),
@@ -183,7 +189,7 @@ function dashboard() {
       COUNT(DISTINCT CASE WHEN quantidade_reservada>quantidade_retirada THEN solicitacao_id END) prontas
     FROM estoque_reservas
     WHERE status<>'CANCELADA'
-      AND NOT EXISTS (SELECT 1 FROM solicitacoes s WHERE s.id=estoque_reservas.solicitacao_id AND UPPER(TRIM(s.status)) IN ('CANCELADA','CANCELADO'))
+      AND NOT EXISTS (SELECT 1 FROM solicitacoes s WHERE s.id=estoque_reservas.solicitacao_id AND UPPER(TRIM(s.status)) IN ('CANCELADA','CANCELADO','FECHADA','FECHADO','ENTREGUE_SOLICITANTE'))
   `).get();
   return {
     reservado: Number(row?.reservado || 0),
@@ -200,7 +206,7 @@ function resumoPorItem() {
       COALESCE(SUM(MAX(quantidade_reservada-quantidade_retirada,0)),0) reservado
     FROM estoque_reservas
     WHERE status<>'CANCELADA'
-      AND NOT EXISTS (SELECT 1 FROM solicitacoes s WHERE s.id=estoque_reservas.solicitacao_id AND UPPER(TRIM(s.status)) IN ('CANCELADA','CANCELADO'))
+      AND NOT EXISTS (SELECT 1 FROM solicitacoes s WHERE s.id=estoque_reservas.solicitacao_id AND UPPER(TRIM(s.status)) IN ('CANCELADA','CANCELADO','FECHADA','FECHADO','ENTREGUE_SOLICITANTE'))
     GROUP BY estoque_item_id
   `).all();
   const result = new Map(rows.map((r) => [Number(r.estoque_item_id), Number(r.reservado || 0)]));
@@ -214,7 +220,7 @@ function listReservas(options = {}) {
   if (!tableExists('estoque_reservas')) return [];
   const q = String(options.q || '').trim();
   const params = [];
-  let where = "WHERE r.status<>'CANCELADA' AND UPPER(TRIM(COALESCE(s.status,''))) NOT IN ('CANCELADA','CANCELADO','FECHADA','FECHADO') AND (o.id IS NULL OR UPPER(TRIM(COALESCE(o.status,''))) NOT IN ('CANCELADA','CANCELADO','CONCLUIDA','CONCLUÍDA','CONCLUIDO','FECHADA','FECHADO','FINALIZADA','FINALIZADO'))";
+  let where = "WHERE r.status<>'CANCELADA' AND UPPER(TRIM(COALESCE(s.status,''))) NOT IN ('CANCELADA','CANCELADO','FECHADA','FECHADO','ENTREGUE_SOLICITANTE') AND (o.id IS NULL OR UPPER(TRIM(COALESCE(o.status,''))) NOT IN ('CANCELADA','CANCELADO','CONCLUIDA','CONCLUÍDA','CONCLUIDO','FECHADA','FECHADO','FINALIZADA','FINALIZADO'))";
   if (options.solicitacao_id) { where += ' AND r.solicitacao_id=?'; params.push(Number(options.solicitacao_id)); }
   if (q) {
     where += ` AND (LOWER(COALESCE(s.numero,'')) LIKE ? OR LOWER(COALESCE(s.titulo,'')) LIKE ? OR LOWER(${itemNameExpr('si')}) LIKE ? OR LOWER(COALESCE(e.nome,'')) LIKE ?)`;
@@ -370,7 +376,7 @@ function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, n
       reserva_id: reserva.id,
       retirada_lote_token: retiradaLoteToken || null,
       retirado_por_colaborador_id: pessoa.identity_type === 'COLABORADOR' ? pessoa.colaborador_id : null,
-      retirado_por_user_id: pessoa.identity_type === 'USUARIO' ? pessoa.user_id : null,
+      retirado_por_user_id: pessoa.user_id || null,
       entregue_por_user_id: entreguePorUserId || null,
       identificacao_origem: qrCode
         ? (pessoa.identity_type === 'USUARIO' ? 'QR_USUARIO' : 'QR_COLABORADOR')
@@ -434,16 +440,50 @@ function retirarSelecionados(data) {
 function historicoRetiradas(solicitacaoId) {
   if (!solicitacaoId || !hasColumn('estoque_movimentos', 'retirada_lote_token')) return [];
   return db.prepare(`SELECT m.id,m.created_at,m.quantidade,m.retirada_lote_token,i.nome,i.unidade,
-      COALESCE(c.nome,u.name,'Cadastro histórico') retirante_nome
+      COALESCE(u.name,c.nome,'Não identificado no registro') retirante_nome,
+      COALESCE(eu.name,au.name,'Não identificado no registro') entregador_nome
     FROM estoque_movimentos m JOIN estoque_itens i ON i.id=m.item_id
     LEFT JOIN colaboradores c ON c.id=m.retirado_por_colaborador_id
     LEFT JOIN users u ON u.id=m.retirado_por_user_id
+    LEFT JOIN users eu ON eu.id=m.entregue_por_user_id
+    LEFT JOIN users au ON au.id=m.usuario_id
     WHERE m.solicitacao_id=? AND m.tipo LIKE 'SAIDA%' ORDER BY m.id DESC LIMIT 30`).all(Number(solicitacaoId));
+}
+
+function consultarRetiradas(filters={}) {
+  const data=hasColumn('estoque_movimentos','data_mov')?'COALESCE(m.data_mov,m.created_at)':'m.created_at';
+  const {dbAliasesForSetor}=require('../compras/compras-setores');
+  const where=["UPPER(m.tipo) LIKE 'SAIDA%'"]; const params=[];
+  const q=String(filters.q||'').trim().slice(0,120), setor=String(filters.setor||'').trim();
+  if(filters.solicitacaoId){where.push('m.solicitacao_id=?');params.push(Number(filters.solicitacaoId));}
+  if(q){where.push("(i.nome LIKE ? OR i.codigo LIKE ? OR s.numero LIKE ? OR COALESCE(ru.name,c.nome,'') LIKE ? OR COALESCE(eu.name,au.name,'') LIKE ?)");params.push(...Array(5).fill('%'+q+'%'));}
+  if(setor){const aliases=dbAliasesForSetor(setor);where.push(`COALESCE(m.setor_utilizacao,s.setor_origem,i.setor_utilizacao) COLLATE NOCASE IN (${aliases.map(()=>'?').join(',')})`);params.push(...aliases);}
+  if(filters.inicio){where.push(`date(${data})>=date(?)`);params.push(filters.inicio);}
+  if(filters.fim){where.push(`date(${data})<=date(?)`);params.push(filters.fim);}
+  if(filters.tipo&&filters.tipo!=='SAIDA'){where.push('m.tipo=?');params.push(filters.tipo);}
+  if(filters.item_id){where.push('m.item_id=?');params.push(Number(filters.item_id));}
+  const joins=`FROM estoque_movimentos m JOIN estoque_itens i ON i.id=m.item_id
+    LEFT JOIN solicitacoes s ON s.id=m.solicitacao_id LEFT JOIN equipamentos e ON e.id=m.equipamento_id
+    LEFT JOIN colaboradores c ON c.id=m.retirado_por_colaborador_id
+    LEFT JOIN users ru ON ru.id=m.retirado_por_user_id LEFT JOIN users eu ON eu.id=m.entregue_por_user_id
+    LEFT JOIN users au ON au.id=m.usuario_id WHERE ${where.join(' AND ')}`;
+  const total=Number(db.prepare(`SELECT COUNT(*) n ${joins}`).get(...params).n);
+  const limite=Math.min(100,Math.max(1,Number(filters.limite)||25));
+  const paginas=Math.max(1,Math.ceil(total/limite)), pagina=Math.min(paginas,Math.max(1,Math.trunc(Number(filters.pagina)||1)));
+  const lista=db.prepare(`SELECT m.id,m.item_id,m.quantidade,m.solicitacao_id,m.retirada_lote_token,
+    ${data} data_mov,i.nome item_nome,i.unidade,s.numero,s.status,e.nome equipamento_nome,
+    COALESCE(m.setor_utilizacao,s.setor_origem,i.setor_utilizacao,'Não informado') setor,
+    COALESCE(ru.name,c.nome,'Não identificado no registro') retirante_nome,
+    COALESCE(eu.name,au.name,'Não identificado no registro') entregador_nome,
+    m.retirado_por_user_id,m.retirado_por_colaborador_id,COALESCE(m.entregue_por_user_id,m.usuario_id) entregue_por_user_id
+    ${joins} ORDER BY ${data} DESC,m.id DESC LIMIT ? OFFSET ?`).all(...params,limite,(pagina-1)*limite);
+  return {lista,total,pagina,paginas,q,setor};
 }
 
 module.exports = {
   retirarSelecionados,
   historicoRetiradas,
+  consultarRetiradas,
   normalizeQr,
   getColaboradorByQr,
   getPessoaByQr,

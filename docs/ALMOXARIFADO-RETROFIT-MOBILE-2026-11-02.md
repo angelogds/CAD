@@ -6,7 +6,7 @@ Implementação autorizada pelo responsável em 02/11/2026: combinar as proposta
 
 - Quatro acessos principais: Painel, Solicitações, Estoque e Relatórios. Retirada, materiais separados e correias ficam nas operações do estoque.
 - Painel com solicitações abertas, compras a receber, entregas pendentes e materiais de prateleira por setor. Métricas usam contagem de solicitações/linhas, sem somar unidades incompatíveis.
-- Solicitações usam a mesma liberação de Compras, inclusive para Demandas. Itens ainda não comprados aparecem para acompanhamento. Pedidos mistos continuam abertos até resolver o restante.
+- Solicitações usam a mesma liberação de Compras, inclusive para Demandas. Na revisão posterior à PR #731, a fila passa a exigir ao menos um item COMPRADO com quantidade positiva: cotações sem compra ficam em Compras. Receber todos os itens comprados conclui a pendência de recebimento, mesmo com outros itens ainda em cotação. Uma nova compra em solicitação ainda ativa gera nova pendência; solicitações efetivamente FECHADAS ou ENTREGUES permanecem terminais.
 - Lista e conferência lado a lado no computador; cartões e conferência em uma coluna no celular. Busca por solicitação, material, equipamento e fornecedor, setor, etapa e paginação.
 - Recebimento por **quantidade recebida → OK**. Entrada e histórico são transacionais; token por item impede reenvio duplicado. Receber todo o comprado encerra a pendência física; retirada é uma etapa independente.
 - Com equipamento persistido na solicitação: destino dedicado e reserva para ele. Sem equipamento: entrada livre na prateleira, no setor correto. Categoria/endereço continuam disponíveis na organização do estoque e não bloqueiam o OK.
@@ -56,6 +56,22 @@ Testes de integração verificam destino, parcialidade legada, transação integ
 
 O ensaio local no navegador usa banco e pessoas fictícios, servidor real e resoluções 390/1440 px: recebimento, retirada de dois materiais, histórico, reenvio e RBAC. A leitura QR alternativa também é testada com um cartão sintético. A câmera física do celular precisa de validação em campo. A contagem final da suíte e o commit publicado ficam registrados na PR.
 
-Suíte local final: **1.721 testes aprovados**, sem falhas ou testes pulados. O navegador também verificou o acesso ao estoque dedicado por equipamento e a posição do OK acima da navegação inferior.
+Validação da PR #731: **1.721 testes aprovados**, sem falhas ou testes pulados. O navegador também verificou o acesso ao estoque dedicado por equipamento e a posição do OK acima da navegação inferior.
 
 Divergências históricas de estoque/compras não são corrigidas por inferência. É necessária conferência documental e física antes de ajustar registros antigos.
+
+## Revisão das telas, encerramento e PDF
+
+Solicitação adicional do responsável em 02/11/2026, após a publicação da PR #731:
+
+- Identidade verde, branca e cinza, com texto preto, em painel, solicitações/conferência, estoque, retiradas, separados, correias, inventário e cadastros. Apenas quatro acessos no topo; operações e cadastros em cards/detalhes. Links respeitam o perfil existente.
+- As duas listas operacionais de estoque exibem somente saldo livre positivo. A retirada parcial mantém o restante disponível. Ao esgotar, o material deixa a lista disponível e continua no catálogo e em **Materiais retirados**, com filtros e paginação. O histórico usa movimentos reais, inclusive de materiais hoje inativos.
+- QR de colaborador vinculado a um usuário grava os dois IDs reais. Quem entrega é o usuário da sessão, sem aceitar substituição enviada pelo formulário. Perfis inativos não identificam novas retiradas; registros antigos sem perfil continuam explicitamente não identificados.
+- Corrigido retorno automático de ENTREGUE_SOLICITANTE para SEPARADA_PARA_RETIRADA e removidos encerrados das filas e dos compromissos ativos de reserva. O cálculo de Compras também preserva o estado terminal.
+- Migration **241_almox_encerramento_definitivo.js** impede regressão de status terminal, novas linhas e recriação de reservas/quantidades em solicitação encerrada. A proteção de saldo usa os mesmos compromissos ativos da aplicação, incluindo correias. Não altera quantidades, movimentos nem reservas históricas; nenhuma conciliação por inferência.
+- O service worker deixa de armazenar e servir HTML de almoxarifado/estoque e remove suas cópias antigas na ativação. Evita exibir pendências/saldos anteriores depois da confirmação.
+- PDF gerencial utiliza `utils/pdf/institutional-report.js`, com a geometria do padrão de Solicitações de Material: marca, cabeçalho, faixas verdes, tabelas, continuação e rodapé numerado. Corrigida a deriva de `doc.x` para a coluna de valores que espremia os títulos no anexo. Inclui retirantes e entregadores identificados (até 100 registros recentes; o restante permanece no histórico paginado).
+
+Validação desta revisão: **1.728 testes locais aprovados**. Além da suíte, ensaio de navegação em 390/1440 px abrangeu cadastros, locais, categorias, detalhe, movimentos, inventário e retirada avulsa, além do fluxo principal de recebimento/retirada em lote. PDF real de três páginas inspecionado visualmente e teste com 90 materiais/descrições longas confirma margens, continuação e última linha.
+
+Acesso direto ao SQLite de produção não está disponível neste ambiente. O diagnóstico é sustentado pelo código, pela reprodução isolada e pelos logs da implantação; divergências antigas exigem conferência física/documental. Limites mínimos e novos cadastros de consumo seguem para a próxima etapa, conforme orientação do responsável.

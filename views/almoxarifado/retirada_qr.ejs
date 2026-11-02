@@ -5,6 +5,7 @@
 <span class="ac-eyebrow">ALMOXARIFADO · ENTREGA IDENTIFICADA</span>
 <h1>Retirada de materiais</h1>
 <p>Solicitação, funcionário e materiais. Confirme a entrega uma única vez.</p>
+<p class="ac-deliverer">Entrega registrada pelo perfil de <strong><%=entregador.name%></strong>.</p>
 </div>
 </header>
 <%- include('_tabs',{tab:'retiradas'}) %>
@@ -196,7 +197,7 @@
 <header class="ac-section-head">
 <div>
 <h2>Histórico desta solicitação</h2>
-<p>Materiais, responsável pela retirada e data da entrega.</p>
+<p>Materiais, quem retirou, quem entregou e data da entrega.</p>
 </div>
 <a href="/almoxarifado/solicitacoes/<%=solicitacaoId%>/conferir">Ver solicitação →</a>
 </header>
@@ -213,6 +214,7 @@
 <span>
 <%=h.quantidade%> <%=h.unidade||'UN'%> · <%=h.retirante_nome%>
 </span>
+<small>Entregue por <%=h.entregador_nome%></small>
 </div>
 <small>
 <%=h.created_at%>

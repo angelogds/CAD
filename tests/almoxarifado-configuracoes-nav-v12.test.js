@@ -5,14 +5,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const source = (filename) => fs.readFileSync(path.join(__dirname, "..", filename), "utf8");
 
-test("estoque apresenta operacoes e recolhe configuracoes", () => {
+test("estoque compartilha os quatro acessos e apresenta operações em cards", () => {
   const nav = source("views/estoque/_tabs.ejs");
-  for (const label of ["Estoque", "Para entregar", "Historico de movimentacoes", "Configuracoes do Almoxarifado", "Cadastrar material", "Categorias", "Locais e prateleiras"]) {
-    assert.ok(nav.normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(label), "Opcao ausente: " + label);
-  }
-  assert.match(nav, /stock-tabs-config/);
-  assert.match(nav, /estoque-nav-v12\.css/);
-  assert.doesNotMatch(nav, /href="\/estoque\/saidas\/nova"/);
+  const cards = source("views/almoxarifado/_stock-operations.ejs");
+  assert.match(nav, /almoxarifado\/_tabs/);
+  for (const label of ["Materiais retirados", "Materiais separados", "Correias", "Cadastros e organização", "Cadastrar material", "Categorias", "Locais e prateleiras"]) assert.ok(cards.includes(label));
+  assert.match(cards, /<details/);
+  assert.doesNotMatch(nav, /stock-tabs-config/);
 });
 
 test("retirada direta e historico continuam independentes", () => {
@@ -26,7 +25,7 @@ test("retirada direta e historico continuam independentes", () => {
 });
 
 test("cadastro usa menu de configuracoes e links existentes", () => {
-  const nav = source("views/estoque/_tabs.ejs");
+  const nav = source("views/almoxarifado/_stock-operations.ejs");
   const cadastro = source("views/estoque/novo_item.ejs");
   assert.match(cadastro, /tab: 'cadastro'/);
   assert.match(nav, /href="\/estoque\/itens\/novo"/);

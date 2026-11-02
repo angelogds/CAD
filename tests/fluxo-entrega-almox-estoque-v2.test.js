@@ -66,15 +66,15 @@ test('fechamento não pode ignorar material reservado ainda não entregue', () =
   assert.match(service, /Ainda existem materiais reservados aguardando entrega ao solicitante/);
 });
 
-test('reabertura preserva o estágio físico real do material', () => {
+test('reabertura de solicitação encerrada é recusada', () => {
   const service = read('modules/almoxarifado/almoxarifado.service.js');
 
   assert.match(service, /function reabrir\(id\)/);
-  assert.match(service, /resumoReserva\.pendente > 0 \? STATUS\.SEPARADA_PARA_RETIRADA : STATUS\.ENTREGUE_SOLICITANTE/);
+  assert.match(service, /Solicitações encerradas não podem ser reabertas/);
 });
 
 test('encerramento do recebimento preserva fila de entrega e fechamento histórico protegido', () => {
-  const menu=read('views/almoxarifado/_tabs.ejs');
+  const menu=read('views/almoxarifado/_stock-operations.ejs');
   assert.match(menu,/Materiais separados/);assert.match(read('views/estoque/reservas.ejs'),/A retirar/);
   const almox=read('modules/almoxarifado/almoxarifado.service.js');
   assert.match(almox,/Ainda existem materiais reservados aguardando entrega/);

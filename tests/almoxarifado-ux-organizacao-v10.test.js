@@ -8,7 +8,7 @@ const source=p=>fs.readFileSync(path.join(root,p),"utf8");
 
 test("abas do almoxarifado têm rótulos sem símbolos e navegação acessível",()=>{
   const partial=source("views/almoxarifado/_tabs.ejs");
-  for(const label of ["Painel","Solicitações","Materiais separados","Estoque","Retirada","Relatórios"]){
+  for(const label of ["Painel","Solicitações","Estoque","Relatórios"]){
     assert.ok(partial.includes(label),`Falta aba: ${label}`);
   }
   assert.doesNotMatch(partial,/Compras a caminho/);

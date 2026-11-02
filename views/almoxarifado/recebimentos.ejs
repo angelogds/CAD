@@ -43,7 +43,7 @@
 <span>Etapa</span>
 <select name="situacao">
 <option value="">Todas</option>
-<% [['PENDENTES','Com itens a receber'],['PARCIAL','Recebimento parcial'],['AGUARDANDO_COMPRAS','Aguardando Compras']].forEach(([v,l])=>{ %>
+<% [['PENDENTES','Com itens a receber'],['PARCIAL','Recebimento parcial']].forEach(([v,l])=>{ %>
 <option value="<%=v%>" <%=c.situacao===v?'selected':''%>>
 <%=l%>
 </option>

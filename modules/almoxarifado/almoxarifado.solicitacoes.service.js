@@ -23,10 +23,12 @@ function consultar(filters = {}) {
   const setor = normalizeSetorCorporativo(filters.setor);
   const registros = solicitacoes.map(s => {
     const itens = porSolicitacao.get(s.id) || [];
-    const comprados = itens.filter(i => i.status_compra === 'COMPRADO');
+    const comprados = itens.filter(i => String(i.status_compra).toUpperCase() === 'COMPRADO' && Number(i.qtd_comprada) > 0);
+    if (!comprados.length) return null;
     const aReceber = comprados.filter(i => Number(i.qtd_comprada || 0) > Number(i.qtd_recebida_total || 0));
     const aguardando = itens.filter(i => !['COMPRADO', 'ATENDIDO_ESTOQUE'].includes(i.status_compra));
-    const encerrada = s.status === 'FECHADA' || (itens.length > 0 && !aReceber.length && !aguardando.length);
+    const terminal = ['FECHADA','FECHADO','ENTREGUE_SOLICITANTE'].includes(String(s.status).trim().toUpperCase());
+    const encerrada = terminal || !aReceber.length;
     const parcial = aReceber.some(i => Number(i.qtd_recebida_total) > 0) || (aReceber.length && comprados.some(i => Number(i.qtd_recebida_total) > 0));
     const etapa = encerrada ? 'RECEBIDA' : aReceber.length ? (parcial ? 'PARCIAL' : 'A_RECEBER') : 'AGUARDANDO_COMPRAS';
     return { ...s, equipamento_nome: itens[0]?.equipamento_nome || null, equipamento_codigo: itens[0]?.equipamento_codigo || null,
@@ -37,7 +39,7 @@ function consultar(filters = {}) {
       divergencia_fechada: s.status === 'FECHADA' && aReceber.length > 0,
       busca: token([s.numero, s.titulo, s.solicitante_nome, s.fornecedor_nome, s.fornecedor, s.setor_origem,
         itens[0]?.equipamento_nome, itens[0]?.equipamento_codigo, ...itens.flatMap(i => [i.item_nome,i.fornecedor_item_nome])].join(' ')) };
-  }).filter(s => (!setor || s.setor_exibicao === setor) && (!q || s.busca.includes(token(q))));
+  }).filter(Boolean).filter(s => (!setor || s.setor_exibicao === setor) && (!q || s.busca.includes(token(q))));
   const resumo = { abertas: registros.filter(s => !s.encerrada).length, fechadas: registros.filter(s => s.encerrada).length,
     aReceber: registros.filter(s => !s.encerrada && s.itens_a_receber > 0).length,
     parciais: registros.filter(s => !s.encerrada && s.etapa === 'PARCIAL').length,

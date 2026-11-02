@@ -9,26 +9,27 @@
   const dateBR = (v) => { if(!v)return ''; const d=String(v).slice(0,10).split('-'); return d.length===3?`${d[2]}/${d[1]}/${d[0]}`:String(v); };
   const reposicaoLabel = (s) => ({REPOR_URGENTE:'Urgente',REPOR:'Repor',PROGRAMAR_REPOSICAO:'Programar',OK:'Normal',SEM_POLITICA:'Sem política'})[s] || 'Normal';
   const reposicaoClass = (s) => s==='REPOR_URGENTE'?'is-danger':s==='REPOR'?'is-warning':s==='PROGRAMAR_REPOSICAO'?'is-info':'is-ok';
-  const saldoDisponivelTotal = itens.reduce((s,i)=>s+Number(i.saldo_disponivel||0),0);
+
   const alertasReposicao = Number(inteligencia.criticos.length||0)+Number(inteligencia.programar.length||0);
   const hasAdvanced = Boolean(filtros.centro_custo || filtros.local_id);
 %>
 
-<div class="stock-v6-page almox-v11">
+<div class="stock-v6-page almox-v11 almox-central">
   <header class="stock-v6-head" aria-label="ESTOQUE • ALMOXARIFADO DA MANUTENÇÃO">
     <div>
       <span class="stock-v6-eyebrow">ESTOQUE</span>
-      <div class="stock-v6-titleline"><h1>Materiais em estoque</h1><span><%= itens.length %></span></div>
+      <div class="stock-v6-titleline"><h1>Materiais disponíveis</h1><span><%= itens.length %></span></div>
     </div>
 
   </header>
 
   <%- include('_tabs', { tab: 'itens' }) %>
+  <%- include('../almoxarifado/_stock-operations') %>
 
   <section class="stock-v6-summary" aria-label="Resumo do estoque: Saldo físico, Reservado e Disponível livre">
     <div><span>Itens</span><strong><%= cards.itens %></strong></div>
-    <div><span>Saldo livre</span><strong><%= saldoDisponivelTotal %></strong></div>
-    <div><span>Reservado</span><strong><%= Number(cards.reservado||0) %></strong></div>
+    <div><span>Com saldo livre</span><strong><%= itens.length %></strong></div>
+    <div><span>Setores atendidos</span><strong><%=new Set(itens.map(i=>i.setor_utilizacao_exibicao||'COMUM')).size%></strong></div>
     <div class="<%=alertasReposicao?'has-alert':''%>"><span>Reposição</span><strong><%= alertasReposicao %></strong></div>
   </section>
 
@@ -37,7 +38,7 @@
       <label class="stock-v6-search"><span>Buscar</span><input class="input" name="q" value="<%= filtros.q %>" placeholder="Código ou nome do material" /></label>
       <label><span>Setor</span><select class="input" name="setor_utilizacao"><option value="">Todos</option><% setoresEstoque.forEach(s=>{ %><option value="<%=s%>" <%=filtros.setor_utilizacao===s?'selected':''%>><%=s%></option><% }) %></select></label>
       <label><span>Categoria</span><select class="input" name="categoria_id"><option value="">Todas</option><% categorias.forEach(c=>{ %><option value="<%=c.id%>" <%=String(filtros.categoria_id)===String(c.id)?'selected':''%>><%=c.nome%></option><% }) %></select></label>
-      <label><span>Situação</span><select class="input" name="situacao"><option value="">Todas</option><option value="ok" <%=filtros.situacao==='ok'?'selected':''%>>Disponível</option><option value="baixo" <%=filtros.situacao==='baixo'?'selected':''%>>Abaixo do mínimo</option><option value="zerado" aria-label="Estoque zerado" <%=filtros.situacao==='zerado'?'selected':''%>>Zerado</option></select></label>
+      <label><span>Situação</span><select class="input" name="situacao"><option value="">Todas</option><option value="ok" <%=filtros.situacao==='ok'?'selected':''%>>Disponível</option><option value="baixo" <%=filtros.situacao==='baixo'?'selected':''%>>Abaixo do mínimo</option></select></label>
       <button class="btn btn-sm btn-green" type="submit">Filtrar</button>
       <a class="btn btn-sm btn-ghost" href="/estoque">Limpar</a>
 

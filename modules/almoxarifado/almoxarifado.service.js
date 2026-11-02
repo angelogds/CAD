@@ -733,20 +733,8 @@ function fechar(id) {
 }
 
 function reabrir(id) {
-  const s = getSolicitacao(id);
-  if (!s || ![STATUS.FECHADA, STATUS.RECEBIDA_PARCIAL].includes(s.status)) {
-    throw new Error("Somente recebimentos fechados ou parciais podem ser reabertos.");
-  }
-  const legacyStatus = s.status === STATUS.FECHADA ? STATUS.RECEBIDA_TOTAL : STATUS.EM_RECEBIMENTO;
-  let novoStatus = legacyStatus;
-  if (s.status === STATUS.FECHADA) {
-    const resumoReserva = fluxoEstoqueService.getResumoReservas(id);
-    novoStatus = resumoReserva.reservado > 0
-      ? (resumoReserva.pendente > 0 ? STATUS.SEPARADA_PARA_RETIRADA : STATUS.ENTREGUE_SOLICITANTE)
-      : legacyStatus;
-  }
-  db.prepare("UPDATE solicitacoes SET status=?, reaberta_em=datetime('now'), updated_at=datetime('now') WHERE id=?").run(novoStatus, id);
-  return novoStatus;
+  if (!getSolicitacao(id)) throw new Error('Solicitação não encontrada.');
+  throw new Error('Solicitações encerradas não podem ser reabertas. Crie uma nova solicitação para uma nova compra.');
 }
 
 module.exports = {
