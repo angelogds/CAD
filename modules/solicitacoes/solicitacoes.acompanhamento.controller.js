@@ -1,6 +1,7 @@
 const acompanhamentoService = require('../compras/acompanhamento.service');
 const itemApprovalService = require('../compras/compras.aprovacao-itens.service');
 const { normalizeRole } = require('../../config/rbac');
+const configuration = require('../compras/compras.configuracao.service');
 
 function scopedQuery(req) {
   const query = { ...(req.query || {}) };
@@ -32,7 +33,7 @@ function nextAction(row) {
   const semCotacaoReal = approvalItems.filter((item) => String(item.approvalState || '').toUpperCase() === 'SEM_COTACAO').length;
   if (Number(row.aprovacaoItens?.pendentesCount || 0) > 0) return 'AGUARDANDO_APROVACAO';
   if (semCotacaoReal > 0 || (!approvalItems.length && Number(row.semCotacao || 0) > 0)) return 'COTACAO_NECESSARIA';
-  if (Number(row.aprovacaoItens?.aprovadosCount || 0) > 0) return 'EFETIVAR_COMPRA';
+  if (Number(row.aprovacaoItens?.liberadosCount ?? row.aprovacaoItens?.aprovadosCount ?? 0) > 0) return 'EFETIVAR_COMPRA';
   if (Number(row.comprados || 0) > Number(row.recebidos || 0)) {
     return Number(row.recebidos || 0) > 0 ? 'RECEBIMENTO_PARCIAL' : 'AGUARDANDO_RECEBIMENTO';
   }
@@ -60,6 +61,7 @@ function matchesHighlight(row, highlight) {
 }
 
 function enrichDashboardWithApprovals(painel, query = {}) {
+  painel.approvalRequired = configuration.isApprovalRequired();
   const rows = Array.isArray(painel?.solicitacoes) ? painel.solicitacoes : [];
   let itensPendentes = 0;
   let valorPendente = 0;
@@ -161,7 +163,7 @@ function detalhe(req, res) {
       detalheCompra,
       approvalSummary,
       approvalHistory: itemApprovalService.getHistory(id),
-      canApproveItems: itemApprovalService.canApprove(req.session?.user),
+      canApproveItems: approvalSummary.approvalRequired !== false && itemApprovalService.canApprove(req.session?.user),
       acompanhamentoBasePath: context.basePath,
       acompanhamentoBackHref: context.backHref,
     });

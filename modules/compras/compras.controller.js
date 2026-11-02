@@ -7,6 +7,7 @@ const demandasComprasService = require('./compras-demandas.service');
 const { applyMigrations } = require('../../database/migrate');
 const storagePaths = require('../../config/storage');
 const { normalizeSetorCorporativo } = require('./compras-setores');
+const configuration = require('./compras.configuracao.service');
 
 const UPLOADS_DIR = storagePaths.UPLOAD_DIR;
 
@@ -70,8 +71,8 @@ function applyActiveItemCounters(rows) {
   const hasQtdComprada = hasColumn('solicitacao_itens', 'qtd_comprada');
   const hasApprovalStatus = hasColumn('solicitacao_itens', 'aprovacao_item_status');
   const expected = hasQtdComprada ? 'COALESCE(si.qtd_comprada,si.qtd_solicitada,0)' : 'COALESCE(si.qtd_solicitada,0)';
-  const aprovacaoPendente = hasApprovalStatus
-    ? "SUM(CASE WHEN UPPER(TRIM(COALESCE(si.aprovacao_item_status,''))) IN ('AGUARDANDO_APROVACAO','PENDENTE','EM_ANALISE','DEVOLVIDA_REVISAO','REPROVADA') AND UPPER(COALESCE(si.status_compra,''))<>'CANCELADO' THEN 1 ELSE 0 END)"
+  const aprovacaoPendente = hasApprovalStatus && configuration.isApprovalRequired()
+    ? "SUM(CASE WHEN UPPER(TRIM(COALESCE(si.aprovacao_item_status,''))) IN ('AGUARDANDO_APROVACAO','PENDENTE','EM_ANALISE','DEVOLVIDA_REVISAO','REPROVADA') AND UPPER(COALESCE(si.status_compra,'')) NOT IN ('CANCELADO','COMPRADO','ATENDIDO_ESTOQUE') THEN 1 ELSE 0 END)"
     : '0';
   const stats = db.prepare(`
     SELECT si.solicitacao_id,

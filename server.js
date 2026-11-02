@@ -419,6 +419,7 @@ mount("/meu-portal", "./modules/meu-portal/meu-portal.routes");
 mount("/avisos", "./modules/avisos/avisos.routes");
 mount("/usuarios", "./modules/usuarios/usuarios.routes");
 mount("/admin", "./modules/admin/storage.routes");
+mount("/admin", "./modules/admin/perfis.routes");
 mount("/demandas", "./modules/demandas/demandas.routes");
 mount("/motores", "./modules/motores/motores.routes");
 mount(OFFICIAL_ROUTES.inspecao, "./modules/inspecao/inspecao.routes");

@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const db = require('../../database/db');
 const { ROLE, normalizeRole } = require('../../config/rbac');
 const { assertCompraLiberada } = require('./compras-demandas.service');
+const configuration = require('./compras.configuracao.service');
 
 const ITEM_APPROVAL = Object.freeze({
   NONE: 'NAO_SOLICITADA',
@@ -125,11 +126,16 @@ function enrichItem(item) {
 }
 
 function getSummary(solicitacaoId) {
+  const approvalRequired = configuration.isApprovalRequired();
   const itens = loadItems(solicitacaoId).map(enrichItem);
-  const pendentes = itens.filter((item) => item.approvalState === ITEM_APPROVAL.PENDING);
+  const pendentes = approvalRequired ? itens.filter((item) => item.approvalState === ITEM_APPROVAL.PENDING) : [];
   const aprovados = itens.filter((item) => item.approvalState === ITEM_APPROVAL.APPROVED);
   const comprados = itens.filter((item) => item.approvalState === ITEM_APPROVAL.PURCHASED);
+  const liberados = itens.filter((item) => item.approvalState === ITEM_APPROVAL.APPROVED
+    || (!approvalRequired && item.approvalState === ITEM_APPROVAL.PENDING));
   return {
+    approvalRequired,
+    liberadosCount: liberados.length,
     itens,
     pendentes,
     aprovados,
@@ -158,6 +164,7 @@ function recordHistory({ solicitacaoId, item, userId, action }) {
 function approveQuotedItems(solicitacaoId, itemIds, sessionUser) {
   assertCanApprove(sessionUser);
   assertCompraLiberada(solicitacaoId);
+  if (!configuration.isApprovalRequired()) throw new Error('Acompanhamento da Diretoria desativado: os dados estão disponíveis para consulta, sem exigência de aprovação.');
   const summary = getSummary(solicitacaoId);
   const requestedIds = (Array.isArray(itemIds) ? itemIds : [itemIds]).filter(Boolean).map(Number);
   const targets = requestedIds.length
@@ -197,6 +204,7 @@ function getHistory(solicitacaoId) {
 }
 
 function assertItemsApprovedForPurchase(solicitacaoId, itemIds) {
+  if (!configuration.isApprovalRequired()) return true;
   const ids = (Array.isArray(itemIds) ? itemIds : [itemIds]).filter(Boolean).map(Number);
   if (!ids.length) return true;
   const summary = getSummary(solicitacaoId);
@@ -229,6 +237,7 @@ function parseMoneyToCents(value, fallback = 0) {
 }
 
 function assertPurchasePayloadMatchesApprovedItems(solicitacaoId, payload = {}, selectedIds = []) {
+  if (!configuration.isApprovalRequired()) return true;
   const ids = (Array.isArray(selectedIds) ? selectedIds : [selectedIds]).filter(Boolean).map(Number);
   assertItemsApprovedForPurchase(solicitacaoId, ids);
   if (!ids.length) return true;
@@ -274,9 +283,12 @@ function assertPurchasePayloadMatchesApprovedItems(solicitacaoId, payload = {}, 
 function assertAllQuotedApprovedForPurchase(solicitacaoId) {
   const summary = getSummary(solicitacaoId);
   const candidates = summary.itens.filter((item) => item.approvalState !== ITEM_APPROVAL.CANCELLED && item.approvalState !== ITEM_APPROVAL.PURCHASED);
-  const blocked = candidates.filter((item) => item.approvalState !== ITEM_APPROVAL.APPROVED);
+  const blocked = candidates.filter((item) => summary.approvalRequired
+    ? item.approvalState !== ITEM_APPROVAL.APPROVED : !isQuoteReady(item));
   if (blocked.length) {
-    const error = new Error('Existem itens sem cotação ou sem aprovação digital. Libere os itens cotados antes de concluir a compra.');
+    const error = new Error(summary.approvalRequired
+      ? 'Existem itens sem cotação ou sem aprovação digital. Libere os itens cotados antes de concluir a compra.'
+      : 'Existem itens sem cotação válida. Defina fornecedor e valor antes de concluir a compra.');
     error.code = 'SOLICITACAO_COM_ITENS_NAO_APROVADOS';
     throw error;
   }
