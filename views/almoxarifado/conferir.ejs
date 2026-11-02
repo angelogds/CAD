@@ -1,152 +1,69 @@
 <% layout('layout') %>
-<link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20260824-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-recebimento-item-v2" />
-<link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-operacional-v3.css?v=20261007-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-refino-v4.css?v=20261007-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-ux-v10.css?v=20261008-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-layout-v11.css?v=20261011-v1" />
-
-<%
-  const statusConfig = {
-    EM_COTACAO: { label: 'Em cotação', cls: 'almox-status--cotacao' },
-    COMPRADA: { label: 'Para receber', cls: 'almox-status--comprada' },
-    EM_RECEBIMENTO: { label: 'Em recebimento', cls: 'almox-status--recebimento' },
-    RECEBIDA_PARCIAL: { label: 'Recebida parcial', cls: 'almox-status--parcial' },
-    RECEBIDA_TOTAL: { label: 'Recebida total', cls: 'almox-status--total' },
-    SEPARADA_PARA_RETIRADA: { label: 'Separada para retirada', cls: 'almox-status--total' },
-    ENTREGUE_SOLICITANTE: { label: 'Entregue ao solicitante', cls: 'almox-status--fechada' },
-    FECHADA: { label: 'Fechada', cls: 'almox-status--fechada' }
-  };
-  const meta = statusConfig[sol.status] || { label: sol.status, cls: '' };
-  const receiptWorkflowActive = ['EM_RECEBIMENTO', 'RECEBIDA_PARCIAL'].includes(sol.status);
-  const canReceiveInCurrentStatus = ['EM_COTACAO', 'COMPRADA', 'EM_RECEBIMENTO', 'RECEBIDA_PARCIAL', 'REABERTA'].includes(String(sol.status || '').toUpperCase());
-  const hasToReceive = Number(sol.resumo.qtd_a_receber ?? sol.resumo.qtd_pendente ?? 0) > 0;
-  const hasReceived = Number(sol.resumo.qtd_recebida || 0) > 0;
-  const hasReservedForWithdrawal = canWithdraw && Number(sol.resumo.itens_disponiveis_retirada || 0) > 0;
-  const dateBR = (v) => { if(!v)return 'A definir'; const p=String(v).slice(0,10).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:String(v); };
-  const itemStage = (item) => {
-    const bought=String(item.status_compra||'').toUpperCase()==='COMPRADO';
-    const quoted=String(item.status_cotacao||'').toUpperCase()==='COTADO';
-    const received=Number(item.qtd_recebida_calc||0);
-    const purchased=Number(item.qtd_comprada_calc||0);
-    if (purchased>0 && received>=purchased) return ['Recebido','almox-status--total'];
-    if (received>0) return ['Recebido parcial','almox-status--parcial'];
-    if (bought) return ['Comprado • receber','almox-status--comprada'];
-    if (quoted) return ['Cotado','almox-status--cotacao'];
-    return ['Aguardando cotação','almox-status--fechada'];
-  };
-%>
-
-<div class="almox-page almox-flow-page almox-v11">
-  <header class="almox-hero">
-    <div><span class="almox-hero__eyebrow">ALMOXARIFADO • SOLICITAÇÃO COMPLETA</span><h1><%= sol.numero || ('Solicitação #' + sol.id) %></h1><p class="muted"><%= sol.titulo || 'Acompanhamento do material desde a cotação até a retirada.' %></p></div>
-    <div class="almox-hero__actions">
-      <a class="btn btn-ghost" href="/almoxarifado/recebimentos">← Voltar às solicitações</a>
-      <a class="btn btn-ghost" href="/estoque/reservas?q=<%= encodeURIComponent(sol.numero || String(sol.id)) %>">Ver materiais separados</a>
-      <% if (hasReservedForWithdrawal) { %><a class="btn btn-green" href="/almoxarifado/retiradas/qr?solicitacao_id=<%= sol.id %>">Entregar materiais por QR</a><% } %>
-    </div>
-  </header>
-
-  <%- include('_tabs', { tab: 'recebimentos' }) %>
-
-  <section class="almox-process-line" aria-label="Fluxo da solicitação">
-    <% [['EM_COTACAO','Cotação'],['COMPRADA','Compra'],['EM_RECEBIMENTO','Recebimento'],['SEPARADA_PARA_RETIRADA','Separado'],['ENTREGUE_SOLICITANTE','Entregue'],['FECHADA','Concluído']].forEach(([key,label],idx)=>{ const map={EM_COTACAO:0,COMPRADA:1,EM_RECEBIMENTO:2,RECEBIDA_PARCIAL:2,RECEBIDA_TOTAL:3,SEPARADA_PARA_RETIRADA:3,ENTREGUE_SOLICITANTE:4,FECHADA:5}; const active=(map[sol.status]??0)>=idx; %><div class="almox-process-step <%= active?'is-done':'' %>"><i><%= idx+1 %></i><span><%= label %></span></div><% }) %>
-  </section>
-
-  <section class="almox-flow-kpis almox-kpis">
-    <article class="almox-flow-kpi"><span>Itens solicitados</span><strong><%= sol.resumo.itens %></strong><small>Quantidade total: <%= Number(sol.resumo.qtd_solicitada||0) %></small></article>
-    <article class="almox-flow-kpi kpi-blue"><span>Itens cotados</span><strong><%= sol.resumo.itens_cotados %></strong><small>Visíveis antes da compra</small></article>
-    <article class="almox-flow-kpi kpi-green"><span>Itens comprados</span><strong><%= sol.resumo.itens_comprados %></strong><small>Quantidade comprada: <%= Number(sol.resumo.qtd_comprada||0) %></small></article>
-    <article class="almox-flow-kpi kpi-cyan"><span>Recebimento</span><strong><%= sol.resumo.progresso_pct %>%</strong><small><%= Number(sol.resumo.qtd_recebida||0) %> recebido(s) • <%= Number(sol.resumo.qtd_a_receber ?? sol.resumo.qtd_pendente ?? 0) %> a receber</small></article>
-  </section>
-
-  <section class="almox-request-context">
-    <div><span>Solicitante</span><strong><%= sol.solicitante_nome || '-' %></strong></div><div><span>Setor</span><strong><%= sol.setor_origem || '-' %></strong></div><div><span>OS vinculada</span><strong><%= sol.os_numero ? ('OS #'+sol.os_numero) : 'Sem OS vinculada' %></strong></div><div><span>Equipamento</span><strong><%= sol.equipamento_nome || 'Não informado' %></strong></div><div><span>Status geral</span><strong><span class="almox-status <%= meta.cls %>"><%= meta.label %></span></strong></div>
-  </section>
-
-  <section id="materiais" class="card almox-materials-card">
-    <div class="almox-request-head">
-      <div><h2>Materiais da solicitação</h2><p>O recebimento é liberado por item assim que Compras marcar o material como COMPRADO.</p></div>
-      <span class="almox-note-info">Após o recebimento, o material fica reservado para esta solicitação até a entrega identificada ao colaborador.</span>
-    </div>
-    <% if (!sol.itens.length) { %><div class="almox-empty">Esta solicitação não possui itens.</div><% } %>
-    <div class="almox-material-list">
-      <% sol.itens.forEach((item) => {
-        const solicitado=Number(item.qtd_solicitada_calc||0), comprado=Number(item.qtd_comprada_calc||0), recebido=Number(item.qtd_recebida_calc||0), aReceber=Math.max(Number(item.qtd_a_receber ?? item.pendente ?? 0),0), retirado=Number(item.qtd_retirada_solicitacao||0), disponivel=Math.max(Number(item.disponivel_retirada||0),0), saldoEstoque=Number(item.estoque_saldo_atual||0), maxRetirada=Math.min(disponivel,saldoEstoque), pct=comprado>0?Math.min(100,Math.round(recebido/comprado*100)):0, stage=itemStage(item), purchased=String(item.status_compra||'').toUpperCase()==='COMPRADO', partialReceipt=Boolean(item.divergencia_recebimento)||(purchased&&recebido>0&&aReceber>0), inputId=`qtdReceber${item.id}`, canReceiveItem=canManage&&canReceiveInCurrentStatus&&purchased&&aReceber>0;
-      %>
-        <article class="almox-material-row <%= partialReceipt ? 'has-receipt-shortage' : '' %>">
-          <div class="almox-material-main"><div class="almox-item__name"><%= item.item_nome_exibicao || item.item_nome || ('Item #'+item.id) %></div><div class="almox-item__desc"><%= item.item_descricao || item.descricao || 'Sem especificação complementar.' %></div><div class="almox-material-meta"><span>Fornecedor: <strong><%= item.fornecedor_exibicao || 'A definir' %></strong></span><span>Previsão: <strong><%= dateBR(item.previsao_exibicao) %></strong></span><% if(item.estoque_item_nome){ %><span>Estoque: <strong><%= item.estoque_item_nome %></strong><%= item.estoque_local_nome?(' • '+item.estoque_local_nome):'' %></span><% } %></div></div>
-          <div class="almox-material-stage"><span class="almox-status <%= stage[1] %>"><%= stage[0] %></span><div class="almox-progress"><div class="almox-progress__track"><div class="almox-progress__bar" style="width:<%= pct %>%"></div></div><small><%= comprado>0 ? (pct+'% recebido do comprado') : 'Recebimento ainda não liberado' %></small></div></div>
-          <div class="almox-material-quantities">
-            <span><small>Solicitado</small><b><%= solicitado %> <%= item.unidade||'UN' %></b></span>
-            <span><small>Cotado</small><b><%= String(item.status_cotacao||'').toUpperCase()==='COTADO' ? 'Sim' : 'Não' %></b></span>
-            <span><small>Comprado</small><b><%= comprado %> <%= item.unidade||'UN' %></b></span>
-            <span><small>Recebido</small><b><%= recebido %> <%= item.unidade||'UN' %></b></span>
-            <% if (purchased && aReceber > 0) { %><span class="<%= partialReceipt ? 'quantity-shortage' : 'quantity-awaiting' %>"><small><%= partialReceipt ? 'Faltante' : 'A receber' %></small><b><%= aReceber %> <%= item.unidade||'UN' %></b></span><% } else if (purchased) { %><span class="quantity-complete"><small>Recebimento</small><b>Completo</b></span><% } else { %><span><small>Recebimento</small><b>—</b></span><% } %>
-            <span><small>Retirado</small><b><%= retirado %> <%= item.unidade||'UN' %></b></span>
-          </div>
-
-          <% if (partialReceipt) { %>
-            <div class="almox-receipt-shortage"><strong>Recebimento parcial</strong><span>Foram compradas <%= comprado %> <%= item.unidade||'UN' %> e recebidas <%= recebido %>. Faltam <%= aReceber %> <%= item.unidade||'UN' %>. O setor de Compras ficará sinalizado até o Almoxarifado registrar o restante.</span></div>
-          <% } %>
-
-          <% if (canReceiveItem) { %>
-            <details class="almox-receive-disclosure" <%= partialReceipt ? 'open' : '' %>>
-              <summary class="btn btn-green"><%= partialReceipt ? 'Receber quantidade restante' : 'Receber material' %></summary>
-              <form method="POST" action="/almoxarifado/solicitacoes/<%= sol.id %>/itens/<%= item.id %>/receber" class="almox-inline-operation receive-operation almox-classify-grid almox-classify-grid-v4" data-lock-submit data-stock-classifier><input type="hidden" name="operacao_token" value="<%= typeof operacaoToken==='undefined'?'':operacaoToken+'-'+item.id %>">
-                <div><label for="<%= inputId %>"><span>Quantidade recebida agora</span></label><input id="<%= inputId %>" class="input" type="number" min="0.01" max="<%= aReceber %>" step="0.01" name="qtd_recebida_agora" required placeholder="Qtd" /><button type="button" class="btn btn-sm btn-ghost almox-quick-fill" data-fill-remaining="<%= inputId %>" data-remaining="<%= aReceber %>" style="margin-top:5px">Tudo: <%= aReceber %></button></div>
-                <label><span>Categoria</span><select class="input" name="categoria_id" data-category-select><option value="">Definir depois</option><% categorias.forEach(categoria=>{ %><option value="<%=categoria.id%>" <%=Number(item.estoque_categoria_id)===Number(categoria.id)?'selected':''%>><%=categoria.nome%></option><% }) %></select></label>
-                <label><span>Subcategoria</span><select class="input" name="subcategoria_id" data-subcategory-select><option value="">Definir depois</option><% subcategorias.forEach(sc=>{ %><option value="<%=sc.id%>" data-parent="<%=sc.parent_id||''%>" <%=Number(item.estoque_subcategoria_id)===Number(sc.id)?'selected':''%>><%=sc.nome%></option><% }) %></select></label>
-                <label><span>Local / área</span><select class="input" name="local_id"><option value="">Manter / definir depois</option><% locais.forEach(local=>{ %><option value="<%=local.id%>" <%=Number(item.estoque_local_id)===Number(local.id)?'selected':''%>><%=local.nome%></option><% }) %></select></label>
-                <label><span>Destino no estoque</span><select class="input" name="destino_estoque"><option value="GERAL" <%=!item.estoque_equipamento_id?'selected':''%>>Estoque geral</option><option value="EQUIPAMENTO" <%=item.estoque_equipamento_id?'selected':''%> <%=!sol.equipamento_id?'disabled':''%>>Dedicado ao equipamento</option></select><small class="almox-subline"><%=sol.equipamento_id ? ('Equipamento: '+(sol.equipamento_nome||('#'+sol.equipamento_id))) : 'Sem equipamento vinculado.'%></small></label>
-                <div class="almox-address-grid">
-                  <label><span>Zona</span><input class="input" name="endereco_zona" value="<%=item.estoque_endereco_zona||''%>" placeholder="A"></label>
-                  <label><span>Estante</span><input class="input" name="endereco_estante" value="<%=item.estoque_endereco_estante||''%>" placeholder="03"></label>
-                  <label><span>Prateleira</span><input class="input" name="endereco_prateleira" value="<%=item.estoque_endereco_prateleira||''%>" placeholder="02"></label>
-                  <label><span>Posição</span><input class="input" name="endereco_posicao" value="<%=item.estoque_endereco_posicao||''%>" placeholder="B"></label>
-                </div>
-                <label class="grow"><span>Observação</span><input class="input" name="observacao_item" placeholder="NF, lote, avaria, diferença ou observação" /></label>
-                <button class="btn btn-green" type="submit" data-pending-text="Registrando...">Confirmar recebimento</button>
-              </form>
-            </details>
-          <% } else if (purchased && aReceber > 0 && !canManage) { %>
-            <div class="almox-note-info almox-receipt-readonly">Material comprado e aguardando conferência. Seu perfil possui acesso somente de consulta.</div>
-          <% } %>
-
-          <% if (canWithdraw && maxRetirada > 0) { %>
-            <div class="almox-inline-operation withdraw-operation qr-withdraw-callout">
-              <div class="grow"><strong>Material separado para retirada</strong><div class="almox-subline">Identifique o colaborador pelo cartão QR antes de confirmar a entrega.</div></div>
-              <div class="almox-withdraw-balance"><small>Reservado nesta solicitação</small><strong><%= disponivel %> <%= item.unidade||'UN' %></strong><span>Saldo físico: <%= saldoEstoque %></span></div>
-              <a class="btn btn-green" href="/almoxarifado/retiradas/qr?solicitacao_id=<%= sol.id %>">Entregar por QR</a>
-            </div>
-          <% } else if (disponivel > 0 && saldoEstoque <= 0) { %><div class="almox-warning">Há quantidade recebida vinculada a esta solicitação, mas o saldo físico atual do item está zerado. Consulte os movimentos antes de tentar nova baixa.</div><% } %>
-        </article>
-      <% }) %>
-    </div>
-  </section>
-
-  <% if (historico && historico.length) { %><section class="card almox-history"><h3>Histórico de entradas desta solicitação</h3><div class="table-wrap"><table class="table"><thead><tr><th>Item</th><th>Quantidade</th><th>Usuário</th><th>Estoque</th><th>Data</th></tr></thead><tbody><% historico.forEach(mov=>{ %><tr><td><strong><%=mov.item_nome||('Item #'+mov.solicitacao_item_id)%></strong></td><td><%=Number(mov.quantidade||0)%> <%=mov.unidade||'UN'%></td><td><%=mov.usuario_nome||'-'%></td><td><%=mov.estoque_item_nome||('#'+mov.estoque_item_id)%></td><td><%=typeof fmtBR==='function'&&mov.created_at?fmtBR(mov.created_at):(mov.created_at||'-')%></td></tr><% }) %></tbody></table></div></section><% } %>
-
-  <% if (canManage) { %><div class="almox-footer-actions"><div><strong>Próxima ação</strong><div class="almox-subline"><% if(sol.status==='EM_COTACAO'){%>Receba normalmente os itens já marcados como COMPRADO. Os demais permanecem em cotação sem bloquear o Almoxarifado.<%}%><% if(sol.status==='COMPRADA'){%>Confirme cada material que chegou. O primeiro recebimento inicia automaticamente a etapa de recebimento e cria a reserva da solicitação.<%}%><% if(receiptWorkflowActive&&hasToReceive){%>Continue registrando apenas as quantidades fisicamente conferidas.<%}%><% if(receiptWorkflowActive&&!hasToReceive&&hasReceived){%>Todos os itens comprados foram recebidos; conclua a etapa e entregue os materiais por identificação QR.<%}%><% if(sol.status==='RECEBIDA_TOTAL'||sol.status==='SEPARADA_PARA_RETIRADA'){%>Material recebido e reservado. Use “Entregar materiais por QR” para registrar quem retirou cada item.<%}%><% if(sol.status==='ENTREGUE_SOLICITANTE'){%>Todos os materiais reservados foram entregues. O processo já pode ser fechado mantendo a rastreabilidade completa.<%}%></div></div><div class="almox-actions"><% if(receiptWorkflowActive&&hasReceived){%><form method="POST" action="/almoxarifado/solicitacoes/<%=sol.id%>/finalizar-recebimento" data-lock-submit><button class="btn btn-green" type="submit"><%=hasToReceive?'Finalizar como parcial':'Concluir recebimento'%></button></form><%}%><% if(sol.status==='ENTREGUE_SOLICITANTE'){%><form method="POST" action="/almoxarifado/solicitacoes/<%=sol.id%>/fechar" data-lock-submit><button class="btn btn-green" type="submit">Fechar processo</button></form><%}%></div></div><% } %>
+<div class="almox-central">
+<header class="ac-header">
+<div>
+<span class="ac-eyebrow">ALMOXARIFADO · <%=sol.numero||'#'+sol.id%>
+</span>
+<h1>
+<%=sol.titulo%>
+</h1>
+<p>
+<%=sol.setor_origem%> · <%=sol.equipamento_nome||'Materiais para prateleira'%>
+</p>
 </div>
-
-<script src="/js/almoxarifado-modern.js?v=20260824-v1" defer></script>
-<script>
-document.querySelectorAll('[data-stock-classifier]').forEach((form)=>{
-  const cat=form.querySelector('[data-category-select]');
-  const sub=form.querySelector('[data-subcategory-select]');
-  if(!cat||!sub)return;
-  const refresh=()=>{
-    const selected=String(cat.value||'');
-    [...sub.options].forEach((opt)=>{
-      if(!opt.value){opt.hidden=false;return;}
-      opt.hidden=selected && String(opt.dataset.parent||'')!==selected;
-    });
-    const current=sub.options[sub.selectedIndex];
-    if(current && current.hidden) sub.value='';
-  };
-  cat.addEventListener('change',refresh);
-  refresh();
-});
-</script>
+<a class="ac-button" href="/almoxarifado/recebimentos?solicitacao_id=<%=sol.id%>#conferencia">Voltar às solicitações</a>
+</header>
+<%- include('_tabs',{tab:'recebimentos'}) %>
+<div class="ac-conference-grid">
+<section class="ac-card" id="materiais">
+<h2>Conferência dos materiais</h2>
+<p>Informe apenas o que chegou. O restante continua pendente.</p>
+<%- include('_itens-recebimento',{sol,canManage,operacaoToken}) %>
+</section>
+<aside class="ac-card">
+<h2>Resumo da solicitação</h2>
+<dl class="ac-facts">
+<div>
+<dt>Solicitante</dt>
+<dd>
+<%=sol.solicitante_nome||'—'%>
+</dd>
+</div>
+<div>
+<dt>Fornecedor</dt>
+<dd>
+<%=sol.fornecedor||'Conforme os itens comprados'%>
+</dd>
+</div>
+<div>
+<dt>Situação</dt>
+<dd>
+<%=String(sol.status||'').replaceAll('_',' ')%>
+</dd>
+</div>
+</dl>
+<% if(canWithdraw){ %>
+<a class="ac-button ac-primary" href="/almoxarifado/retiradas/qr?solicitacao_id=<%=sol.id%>">Retirar materiais</a>
+<% } %>
+<details class="ac-history" open>
+<summary>Histórico de recebimento</summary>
+<% if(!historico.length){ %>
+<p>Nenhum recebimento registrado.</p>
+<% } %>
+<% historico.forEach(h=>{ %>
+<article>
+<strong>
+<%=h.item_nome||h.estoque_item_nome||'Material'%>
+</strong>
+<span>
+<%=h.quantidade%> · <%=h.usuario_nome||'Registro do sistema'%>
+</span>
+<small>
+<%=h.created_at||''%>
+</small>
+</article>
+<% }) %>
+</details>
+</aside>
+</div>
+</div>

@@ -73,20 +73,12 @@ test('reabertura preserva o estágio físico real do material', () => {
   assert.match(service, /resumoReserva\.pendente > 0 \? STATUS\.SEPARADA_PARA_RETIRADA : STATUS\.ENTREGUE_SOLICITANTE/);
 });
 
-test('almoxarifado preserva entrega separada e só fecha após entrega', () => {
-  const list = read('views/almoxarifado/recebimentos.ejs');
-  const detail = read('views/almoxarifado/conferir.ejs');
-
+test('encerramento do recebimento preserva fila de entrega e fechamento histórico protegido', () => {
   const menu=read('views/almoxarifado/_tabs.ejs');
-  assert.match(menu, /Para entregar/);
-  assert.match(read('views/estoque/reservas.ejs'), /A retirar/);
-  assert.match(list, /s\.status === 'ENTREGUE_SOLICITANTE'/);
-  assert.match(list, /s\.status === 'ENTREGUE_SOLICITANTE'.*\/fechar/s);
-
-  assert.match(detail, /\['SEPARADA_PARA_RETIRADA','Separado'\]/);
-  assert.match(detail, /\['ENTREGUE_SOLICITANTE','Entregue'\]/);
-  assert.match(detail, /sol\.status==='ENTREGUE_SOLICITANTE'/);
-  assert.match(detail, /Todos os materiais reservados foram entregues/);
+  assert.match(menu,/Materiais separados/);assert.match(read('views/estoque/reservas.ejs'),/A retirar/);
+  const almox=read('modules/almoxarifado/almoxarifado.service.js');
+  assert.match(almox,/Ainda existem materiais reservados aguardando entrega/);
+  assert.match(read('views/almoxarifado/conferir.ejs'),/retiradas\/qr\?solicitacao_id=/);
 });
 
 test('mudança de status registra histórico na OS quando houver vínculo', () => {

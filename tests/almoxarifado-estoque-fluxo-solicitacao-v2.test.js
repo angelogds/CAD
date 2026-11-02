@@ -11,48 +11,44 @@ test('almoxarifado acompanha a mesma solicitação desde a cotação', () => {
 
   assert.match(service, /STATUS\.EM_COTACAO/);
   assert.match(service, /ALMOX_STATUS/);
-  assert.match(view, /Solicitações no Almoxarifado/);
-  assert.match(view, /solicitados/);
-  assert.match(view, /cotados/);
-  assert.match(view, /comprados/);
-  assert.match(view, /recebidos/);
+  assert.match(view, /Solicitações/);
+  assert.match(view, /c.resumo.abertas/);
+  assert.match(view, /c.resumo.fechadas/);
 });
 
 test('item comprado pode ser recebido mesmo com solicitacao geral ainda em cotacao', () => {
   const service = read('modules/almoxarifado/almoxarifado.service.js');
-  const view = read('views/almoxarifado/conferir.ejs');
+  const view = read('views/almoxarifado/_itens-recebimento.ejs');
 
   assert.match(service, /STATUS_PERMITIDOS_RECEBIMENTO_ITEM[\s\S]*STATUS\.EM_COTACAO/);
   assert.match(service, /status_compra[\s\S]{0,120}COMPRADO/);
   assert.match(service, /\[STATUS\.COMPRADA, STATUS\.REABERTA\]\.includes\(statusSolicitacao\)/);
   assert.match(view, /canReceiveInCurrentStatus/);
   assert.match(view, /canReceiveItem=canManage&&canReceiveInCurrentStatus&&purchased&&aReceber>0/);
-  assert.match(view, /Receber material/);
-  assert.match(view, /Confirmar recebimento/);
+  assert.match(view, /Quantidade recebida agora/);
+  assert.match(view, />OK<\/button>/);
   assert.doesNotMatch(view, /editableReceipt/);
 });
 
 test('detalhe da solicitacao mostra todos os itens e só recebe item comprado', () => {
   const service = read('modules/almoxarifado/almoxarifado.service.js');
-  const view = read('views/almoxarifado/conferir.ejs');
+  const view = read('views/almoxarifado/_itens-recebimento.ejs');
 
   assert.match(service, /WHERE si\.solicitacao_id=\?/);
   assert.match(service, /Somente itens marcados como COMPRADO pelo setor de Compras podem ser recebidos/);
   assert.match(service, /Quantidade acima do que ainda falta receber/);
-  assert.match(view, /Acompanhamento do material desde a cotação até a retirada/);
-  assert.match(view, /Fornecedor:/);
-  assert.match(view, /Previsão:/);
+  assert.match(view, /Aguardando Compras/);
+  assert.match(view, /activeItems/);
   assert.match(view, /Quantidade recebida agora/);
 });
 
 test('semantica de recebimento usa a receber antes e faltante somente depois de recebimento parcial', () => {
   const service = read('modules/almoxarifado/almoxarifado.service.js');
-  const view = read('views/almoxarifado/conferir.ejs');
+  const view = read('views/almoxarifado/_itens-recebimento.ejs');
 
   assert.match(service, /divergencia_recebimento: comprado && recebida > 0 && aReceber > 0/);
-  assert.match(view, /partialReceipt=Boolean\(item\.divergencia_recebimento\)/);
-  assert.match(view, /partialReceipt \? 'Faltante' : 'A receber'/);
-  assert.match(view, /Recebimento parcial/);
+  assert.match(view, /Falta receber/);
+  assert.match(view, /Math.max\(expected-received,0\)/);
   assert.doesNotMatch(view, /<small>Pendente<\/small>/);
 });
 
@@ -94,8 +90,8 @@ test('retirada contextual permanece vinculada à solicitação, OS e equipamento
   assert.match(reservationStock, /entregue_por_user_id/);
   assert.match(routes, /retiradas\/qr/);
   assert.match(routes, /reservas\/:reservaId\/retirar/);
-  assert.match(detail, /Entregar materiais por QR/);
-  assert.match(detail, /Entregar por QR/);
+  assert.match(detail, /Retirar materiais/);
+  assert.match(detail, /retiradas\/qr\?solicitacao_id=/);
   assert.doesNotMatch(detail, />Dar baixa \/ retirar</);
 });
 

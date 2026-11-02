@@ -1,13 +1,20 @@
-<%
-  const currentTab = typeof tab !== 'undefined' && tab ? tab : (typeof almoxTab !== 'undefined' ? almoxTab : '');
-%>
-<link rel="stylesheet" href="/css/almoxarifado-nav-v13.css?v=20261013-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-layout-v15.css?v=20261013-v1" />
-<nav class="almox-tabs almox-tabs--operacional" aria-label="Navegação do Almoxarifado">
-  <a class="almox-tab <%= currentTab === 'painel' ? 'active' : '' %>" href="/almoxarifado" <%- currentTab === 'painel' ? 'aria-current="page"' : '' %>>Painel</a>
-  <a class="almox-tab <%= currentTab === 'recebimentos' ? 'active' : '' %>" href="/almoxarifado/recebimentos?status=COMPRADA" <%- currentTab === 'recebimentos' ? 'aria-current="page"' : '' %>>Compras a receber</a>
-  <a class="almox-tab <%= currentTab === 'separados' ? 'active' : '' %>" href="/estoque/reservas" <%- currentTab === 'separados' ? 'aria-current="page"' : '' %>>Para entregar</a>
-  <a class="almox-tab <%= currentTab === 'estoque' ? 'active' : '' %>" href="/almoxarifado/estoque" <%- currentTab === 'estoque' ? 'aria-current="page"' : '' %>>Estoque</a>
-  <a class="almox-tab <%= currentTab === 'retiradas' ? 'active' : '' %>" href="/almoxarifado/retiradas/qr" <%- currentTab === 'retiradas' ? 'aria-current="page"' : '' %>>Retirada</a>
-  <a class="almox-tab <%= currentTab === 'gerencial' ? 'active' : '' %>" href="/almoxarifado/gerencial" <%- currentTab === 'gerencial' ? 'aria-current="page"' : '' %>>Visão gerencial</a>
+<% const requestedTab=typeof tab!=='undefined'&&tab?tab:(typeof almoxTab!=='undefined'?almoxTab:''); const currentTab=requestedTab==='itens'?'estoque':requestedTab; const stockTabs=['estoque','separados','retiradas','correias']; %>
+<link rel="stylesheet" href="/css/almoxarifado-nav-v13.css?v=20261013-v1">
+<link rel="stylesheet" href="/css/almoxarifado-layout-v15.css?v=20261013-v1">
+<link rel="stylesheet" href="/css/almox-central.css?v=20261102-v1">
+<nav class="almox-tabs almox-tabs--central" aria-label="Navegação do Almoxarifado">
+<% [['painel','Painel','/almoxarifado'],['recebimentos','Solicitações','/almoxarifado/recebimentos'],['estoque','Estoque','/almoxarifado/estoque'],['gerencial','Relatórios','/almoxarifado/gerencial']].forEach(([id,label,url])=>{ const active=id===currentTab||(id==='estoque'&&stockTabs.includes(currentTab)); %>
+<a class="almox-tab <%=active?'active':''%>" href="<%=url%>" <%-active?'aria-current="page"':''%>>
+<%=label%>
+</a>
+<% }) %>
 </nav>
+<% if(stockTabs.includes(currentTab)){ %>
+<nav class="ac-subnav" aria-label="Operações do estoque">
+<% [['estoque','Prateleira','/almoxarifado/estoque'],['separados','Materiais separados','/estoque/reservas'],['retiradas','Retirada','/almoxarifado/retiradas/qr'],['correias','Correias','/almoxarifado/correias']].forEach(([id,label,url])=>{ %>
+<a href="<%=url%>" <%-id===currentTab?'aria-current="page"':''%>>
+<%=label%>
+</a>
+<% }) %>
+</nav>
+<% } %>

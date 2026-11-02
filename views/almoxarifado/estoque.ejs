@@ -18,7 +18,7 @@
     if(filtros.ordem && filtros.ordem !== 'NOME')p.set('ordem',filtros.ordem);
     return p.toString();
   };
-  const hasAdvanced=Boolean(filtros.destino||filtros.equipamento_id||filtros.situacao||(filtros.ordem&&filtros.ordem!=='NOME'));
+  const hasAdvanced=Boolean(filtros.destino==='EQUIPAMENTO'||filtros.equipamento_id||filtros.situacao||(filtros.ordem&&filtros.ordem!=='NOME'));
   const queryForSituation=(situacao)=>{
     const p=new URLSearchParams();
     ['q','categoria_id','subcategoria_id','setor_utilizacao','equipamento_id','destino','ordem'].forEach(k=>{if(filtros[k])p.set(k,filtros[k]);});
@@ -27,21 +27,23 @@
   };
 %>
 
-<div class="almox-page almox-op-page almox-stock-v6 almox-v11">
+<div class="almox-page almox-op-page almox-stock-v6 almox-v11 almox-central">
   <header class="almox-store-head">
     <div>
       <span class="almox-hero__eyebrow">ALMOXARIFADO</span>
       <h1 style="margin:0">Prateleiras do estoque</h1>
-      <p class="muted">Localize e organize os materiais.</p>
+      <p class="muted">Materiais de uso contínuo por setor. Compras para equipamentos ficam separadas nas solicitações.</p>
     </div>
     <div class="almox-hero__actions">
       <% if(canManage){ %><a class="btn btn-sm btn-ghost" href="/almoxarifado/estoque/inventario">Cadastrar material existente</a><% } %>
       <a class="btn btn-sm btn-green" href="/almoxarifado/retiradas/qr">Retirada</a>
-      <a class="btn btn-sm btn-ghost" href="/estoque">Análise do estoque</a>
+
     </div>
   </header>
 
   <%- include('_tabs', { tab: 'estoque' }) %>
+  <% if(typeof setoresResumo!=='undefined'){ %><section class="ac-card"><header class="ac-section-head"><div><h2>Prateleira por setor</h2><p>Escolha o setor para localizar os materiais.</p></div></header><div class="ac-sectors"><% setoresResumo.forEach(s=>{ %><a href="/almoxarifado/estoque?setor_utilizacao=<%=encodeURIComponent(s.nome)%>"><span><%=s.nome==='COMUM'?'Comum · compartilhado':s.nome%></span><strong><%=s.itens%></strong><small>materiais cadastrados</small></a><% }) %></div></section><% } %>
+
 
   <section class="almox-store-category-strip" aria-label="Categorias do estoque">
     <a class="almox-store-category <%= !filtros.categoria_id?'is-active':'' %>" href="/almoxarifado/estoque?<%=queryForCategory('')%>">

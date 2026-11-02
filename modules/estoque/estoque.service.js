@@ -1,6 +1,6 @@
 const db = require("../../database/db");
 const fluxoSolicitacaoService = require("./estoque.solicitacao-fluxo.service");
-const { SETORES, normalizeSetorCorporativo } = require("../compras/compras-setores");
+const { SETORES, normalizeSetorCorporativo, dbAliasesForSetor } = require("../compras/compras-setores");
 
 const SETOR_COMUM = 'COMUM';
 const SETORES_ESTOQUE = [SETORES.RECICLAGEM, SETORES.FRIGORIFICO, SETORES.LOGISTICA, SETORES.ADMINISTRATIVO, SETOR_COMUM];
@@ -112,7 +112,11 @@ function listItens(filters = {}) {
   if (filters.destino === "GERAL" && HAS_ESTOQUE_EQUIPAMENTO_ID) where.push("i.equipamento_id IS NULL");
   if (filters.destino === "EQUIPAMENTO" && HAS_ESTOQUE_EQUIPAMENTO_ID) where.push("i.equipamento_id IS NOT NULL");
   const setor = normalizeSetorEstoque(filters.setor_utilizacao);
-  if (setor && HAS_SETOR_UTILIZACAO) { where.push(`${setorItemExpr()}=?`); params.push(setor); }
+  if (setor && HAS_SETOR_UTILIZACAO) {
+    const aliases = dbAliasesForSetor(setor);
+    where.push(`${setorItemExpr()} COLLATE NOCASE IN (${aliases.map(() => '?').join(',')})`);
+    params.push(...aliases);
+  }
   if (filters.centro_custo && HAS_CENTRO_CUSTO) {
     where.push("LOWER(COALESCE(i.subarea_centro_custo,'')) LIKE ?");
     params.push(`%${String(filters.centro_custo).trim().toLowerCase()}%`);
@@ -140,7 +144,8 @@ function listItens(filters = {}) {
       const minimo = Number(row.saldo_minimo || 0);
       const coberturaDias = mediaDiaria > 0 ? saldo / mediaDiaria : null;
       const rotacao = consumo90d >= 20 ? 'ALTA' : consumo90d >= 5 ? 'MEDIA' : consumo90d > 0 ? 'BAIXA' : 'SEM_CONSUMO';
-      const sugestao = saldo <= 0
+      const politicaConfigurada = !row.equipamento_id && (minimo > 0 || Number(row.ponto_reposicao) > 0 || Number(row.saldo_alvo) > 0);
+      const sugestao = !politicaConfigurada ? 'SEM_POLITICA' : saldo <= 0
         ? 'REPOR_URGENTE'
         : saldo < minimo
           ? 'REPOR'
@@ -151,7 +156,8 @@ function listItens(filters = {}) {
         row.endereco_prateleira && `P${row.endereco_prateleira}`,
         row.endereco_posicao && `POS ${row.endereco_posicao}`,
       ].filter(Boolean);
-      return { ...row, endereco_completo: endereco_parts.join(' • '), consumo_medio_mensal_calc: mediaMensal, cobertura_dias_calc: coberturaDias, rotacao, reposicao_status: sugestao };
+      return { ...row, setor_utilizacao_exibicao: normalizeSetorEstoque(row.setor_utilizacao_exibicao) || row.setor_utilizacao_exibicao,
+        endereco_completo: endereco_parts.join(' • '), consumo_medio_mensal_calc: mediaMensal, cobertura_dias_calc: coberturaDias, rotacao, reposicao_status: sugestao };
     });
 }
 function listCategorias() { return tableExists("estoque_categorias") ? db.prepare("SELECT * FROM estoque_categorias WHERE ativo=1 AND COALESCE(parent_id,0)=0 ORDER BY nome").all() : []; }

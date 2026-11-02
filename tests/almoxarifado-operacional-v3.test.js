@@ -18,8 +18,8 @@ test('V3 abre o Almoxarifado em uma central operacional e preserva as rotas ofic
   assert.match(controller, /function index\(/);
   assert.match(controller, /function estoqueOperacional\(/);
   assert.doesNotMatch(tabs, /Compras a caminho/);
-  assert.match(tabs, /Compras a receber/);
-  assert.match(tabs, /Para entregar/);
+  assert.match(tabs, /Solicitações/);
+  assert.match(tabs, /Materiais separados/);
   assert.match(tabs, /\/almoxarifado\/retiradas\/qr/);
   assert.doesNotMatch(tabs, /\/estoque\/saidas\/nova\?contexto=almoxarifado/);
 });
@@ -48,18 +48,13 @@ test('migration V3 adiciona vínculo opcional ao equipamento e categorias sem sa
   db.close();
 });
 
-test('recebimento permite classificar categoria, local e estoque dedicado ao equipamento', () => {
-  const view = read('views', 'almoxarifado', 'conferir.ejs');
-  const service = read('modules', 'almoxarifado', 'almoxarifado.service.js');
-  const controller = read('modules', 'almoxarifado', 'almoxarifado.controller.js');
-
-  assert.match(view, /name="categoria_id"/);
-  assert.match(view, /name="destino_estoque"/);
-  assert.match(view, /Dedicado ao equipamento/);
-  assert.match(service, /resolveCategoria/);
-  assert.match(service, /solicitação precisa estar vinculada a um equipamento/i);
-  assert.match(service, /equipamento_id/);
-  assert.match(controller, /destinoEstoque: req\.body\.destino_estoque/);
+test('destino do recebimento segue o vínculo persistido e classificação fica na prateleira', () => {
+  const view=read('views','almoxarifado','_itens-recebimento.ejs');
+  assert.doesNotMatch(view,/name="destino_estoque"/);
+  assert.match(read('views','almoxarifado','estoque.ejs'),/name="categoria_id"/);
+  const service=read('modules','almoxarifado','almoxarifado.service.js');
+  assert.match(service,/resolvedDestinoEstoque = Number\(solicitacao.equipamento_id/);
+  assert.match(service,/resolveCategoria/);
 });
 
 test('retirada aceita QR ou cadastro e sempre revalida a identidade no servidor', () => {
@@ -73,7 +68,7 @@ test('retirada aceita QR ou cadastro e sempre revalida a identidade no servidor'
   assert.match(service, /CADASTRO_COLABORADOR/);
   assert.match(service, /CADASTRO_USUARIO/);
   assert.match(controller, /q_pessoa/);
-  assert.match(view, /Buscar funcionário pelo nome/);
+  assert.match(view, /Busca manual pelo cadastro/);
   assert.match(view, /name="pessoa_tipo"/);
   assert.match(view, /name="pessoa_id"/);
 });

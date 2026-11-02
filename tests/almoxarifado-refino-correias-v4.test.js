@@ -8,23 +8,11 @@ const ejs = require('ejs');
 const root = path.join(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 
-test('central do Almoxarifado prioriza recebimento e entrega sem perder consulta de compras', () => {
-  const view = read('views','almoxarifado','index.ejs');
-  const controller = read('modules','almoxarifado','almoxarifado.controller.js');
-  assert.match(view, /Receber material/);
-  assert.match(view, /Localizar e entregar/);
-  assert.match(view, /Consultar compras e cotações/);
-  assert.match(view, /Compras e cotação/);
-  assert.match(view, /name="q_compra"/);
-  assert.match(view, /name="q_recebimento"/);
-  assert.match(view, /Cotado/);
-  assert.match(view, /Não cotado/);
-  assert.match(view, /Já chegou/);
-  assert.match(view, /Não chegou/);
-  assert.match(controller, /compra_estado/);
-  assert.match(controller, /recebimento_estado/);
-  assert.doesNotMatch(view, /Últimas movimentações/);
-  assert.doesNotMatch(view, /Prateleiras por categoria/);
+test('painel reúne recebimentos, entregas e estoque setorial sem repetir formulários de busca', () => {
+  const view=read('views','almoxarifado','index.ejs');
+  for(const label of ['Solicitações em andamento','Próximas entregas','Estoque por setor'])assert.ok(view.includes(label));
+  assert.doesNotMatch(view,/name="q_compra"|name="q_recebimento"/);
+  assert.match(read('modules','almoxarifado','almoxarifado.controller.js'),/central.consultar/);
 });
 
 test('migration V4 adiciona subcategoria, endereço e integração preventiva sem saldo paralelo', () => {
@@ -60,8 +48,8 @@ test('migration V4 adiciona subcategoria, endereço e integração preventiva se
   db.close();
 });
 
-test('recebimento e prateleira usam subcategoria e endereço físico', () => {
-  const conferir = read('views','almoxarifado','conferir.ejs');
+test('classificação de subcategoria e endereço permanece na prateleira', () => {
+  const conferir = read('views','almoxarifado','estoque.ejs');
   const estoque = read('views','almoxarifado','estoque.ejs');
   const service = read('modules','almoxarifado','almoxarifado.service.js');
   assert.match(conferir, /name="subcategoria_id"/);

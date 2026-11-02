@@ -159,7 +159,7 @@ test('Almoxarifado mantém QR de mecânico e adiciona QR próprio do encarregado
   assert.match(estoque, /retirado_por_colaborador_id:/);
   assert.match(estoque, /QR_USUARIO/);
   assert.match(estoque, /QR_COLABORADOR/);
-  assert.match(scanner, /RESPONSÁVEL IDENTIFICADO/);
+  assert.match(scanner, /FUNCIONÁRIO IDENTIFICADO/);
 });
 
 test('cadastro de usuários deriva função e setor do perfil', () => {

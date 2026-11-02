@@ -1,0 +1,73 @@
+<% const canReceiveInCurrentStatus=['EM_COTACAO','COMPRADA','EM_RECEBIMENTO','RECEBIDA_PARCIAL','REABERTA'].includes(String(sol.status)); const activeItems=(sol.itens||[]).filter(i=>i.status_compra!=='CANCELADO'); %>
+<div class="ac-destination">
+<span aria-hidden="true">→</span>
+<div>
+<strong>
+<%=sol.equipamento_id?'Separado para '+(sol.equipamento_nome||'equipamento #'+sol.equipamento_id):'Estoque de prateleira'%>
+</strong>
+<small>Destino automático · <%=sol.setor_origem||'Setor não informado'%>
+</small>
+</div>
+</div>
+<% if(!activeItems.length){ %>
+<p class="ac-empty">Ainda não há materiais ativos nesta solicitação.</p>
+<% } %>
+<% activeItems.forEach(it=>{ const purchased=it.status_compra==='COMPRADO'; const expected=purchased?Number(it.qtd_comprada||0):0; const received=Number(it.qtd_recebida_total||0); const aReceber=Math.max(expected-received,0); const canReceiveItem=canManage&&canReceiveInCurrentStatus&&purchased&&aReceber>0; %>
+<article class="ac-material">
+<div class="ac-section-head">
+<div>
+<h3>
+<%=it.item_nome_exibicao||it.item_nome%>
+</h3>
+<% if(it.fornecedor_exibicao||it.previsao_exibicao){ %>
+<small><%=[it.fornecedor_exibicao&&'Fornecedor: '+it.fornecedor_exibicao,it.previsao_exibicao&&'Previsão: '+it.previsao_exibicao].filter(Boolean).join(' · ')%></small>
+<% } %>
+<% if(it.item_descricao){ %>
+<small>
+<%=it.item_descricao%>
+</small>
+<% } %>
+</div>
+<span class="ac-badge <%=canReceiveItem?'ac-ready':''%>">
+<%=it.status_compra==='ATENDIDO_ESTOQUE'?'Atendido pelo estoque':!purchased?'Aguardando Compras':aReceber>0?'A receber':'Recebido ✓'%>
+</span>
+</div>
+<% if(purchased){ %>
+<div class="ac-quantity-summary">
+<span>Comprado <strong>
+<%=expected%> <%=it.unidade||'UN'%>
+</strong>
+</span>
+<span>Recebido <strong>
+<%=received%> <%=it.unidade||'UN'%>
+</strong>
+</span>
+<span>Falta receber <strong>
+<%=aReceber%> <%=it.unidade||'UN'%>
+</strong>
+</span>
+</div>
+<% }else{ %>
+<p class="ac-muted">
+<%=it.qtd_solicitada_calc??it.qtd_solicitada%> <%=it.unidade||'UN'%> solicitado(s). A conferência fica disponível após a compra.</p>
+<% } %>
+<% if(canReceiveItem){ %>
+<form method="post" action="/almoxarifado/solicitacoes/<%=sol.id%>/itens/<%=it.id%>/receber" class="ac-receive-form" data-lock-submit>
+<% if(typeof embedded!=='undefined'&&embedded){ %>
+<input type="hidden" name="retorno_central" value="1">
+<% } %>
+<input type="hidden" name="operacao_token" value="<%=operacaoToken%>-<%=it.id%>">
+<label>
+<span>Quantidade recebida agora</span>
+<div class="ac-number-unit">
+<input type="number" inputmode="decimal" name="qtd_recebida_agora" min="0.001" step="any" max="<%=aReceber%>" value="<%=aReceber%>" required aria-label="Quantidade recebida de <%=it.item_nome_exibicao||it.item_nome%>">
+<span>
+<%=it.unidade||'UN'%>
+</span>
+</div>
+</label>
+<button class="ac-button ac-primary" type="submit" data-pending-text="Salvando…">OK</button>
+</form>
+<% } %>
+</article>
+<% }) %>

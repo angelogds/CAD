@@ -289,6 +289,7 @@ function insertMovimento(data) {
     ['retirado_por_user_id', data.retirado_por_user_id],
     ['entregue_por_user_id', data.entregue_por_user_id],
     ['identificacao_origem', data.identificacao_origem], ['empresa_consumidora', data.empresa_consumidora], ['setor_utilizacao', data.setor_utilizacao],
+    ['retirada_lote_token', data.retirada_lote_token],
   ];
   for (const [column, value] of optional) {
     if (hasColumn('estoque_movimentos', column)) { cols.push(column); vals.push(value ?? null); }
@@ -296,9 +297,9 @@ function insertMovimento(data) {
   return Number(db.prepare(`INSERT INTO estoque_movimentos (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).run(...vals).lastInsertRowid);
 }
 
-function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, nomeRetirante, entreguePorUserId, observacao, empresaConsumidora, setorConsumidor }) {
+function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, nomeRetirante, entreguePorUserId, observacao, empresaConsumidora, setorConsumidor, retiradaLoteToken }) {
   const qtd = Number(quantidade || 0);
-  if (!(qtd > 0)) throw new Error('Quantidade inválida para retirada.');
+  if (!Number.isFinite(qtd) || !(qtd > 0)) throw new Error('Quantidade inválida para retirada.');
   const pessoa = qrCode ? getPessoaByQr(qrCode) : getPessoaByCadastro(pessoaTipo, pessoaId);
   if (!pessoa) throw new Error('Funcionário não identificado, inativo ou inválido. Use o QR ou selecione um cadastro ativo.');
   // Retirada sem QR exige que o almoxarife digite e confirme o nome.
@@ -367,6 +368,7 @@ function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, n
       custo_unit: custoUnit || null,
       observacao: observacao || `Retirada ${reserva.numero || `#${reserva.solicitacao_id}`} por ${pessoa.nome}`,
       reserva_id: reserva.id,
+      retirada_lote_token: retiradaLoteToken || null,
       retirado_por_colaborador_id: pessoa.identity_type === 'COLABORADOR' ? pessoa.colaborador_id : null,
       retirado_por_user_id: pessoa.identity_type === 'USUARIO' ? pessoa.user_id : null,
       entregue_por_user_id: entreguePorUserId || null,
@@ -393,7 +395,55 @@ function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, n
   return resultado;
 }
 
+function retirarSelecionados(data) {
+  const solicitacaoId = Number(data.solicitacaoId);
+  const token = String(data.operacaoToken || '');
+  if (!Number.isSafeInteger(solicitacaoId) || solicitacaoId <= 0) throw new Error('Selecione uma solicitação.');
+  if (!/^[\w-]{16,128}$/.test(token)) throw new Error('Operação inválida. Atualize a página e tente novamente.');
+  if (!Array.isArray(data.itens) || !data.itens.length || data.itens.length > 200) throw new Error('Selecione de 1 a 200 materiais para retirar.');
+  const itens = data.itens.map(i => ({ reservaId: Number(i.reservaId), quantidade: Number(String(i.quantidade).replace(',', '.')) }))
+    .sort((a, b) => a.reservaId - b.reservaId);
+  if (new Set(itens.map(i => i.reservaId)).size !== itens.length || itens.some(i => !Number.isSafeInteger(i.reservaId) || i.reservaId <= 0 || !Number.isFinite(i.quantidade) || i.quantidade <= 0)) {
+    throw new Error('Seleção ou quantidade inválida.');
+  }
+  const pessoa = data.qrCode ? getPessoaByQr(data.qrCode) : getPessoaByCadastro(data.pessoaTipo, data.pessoaId);
+  if (!pessoa) throw new Error('Identifique um funcionário ativo antes de confirmar a retirada.');
+  const hash = require('node:crypto').createHash('sha256').update(JSON.stringify({ solicitacaoId, itens,
+    pessoa: [pessoa.identity_type, pessoa.id], nomeRetirante: data.nomeRetirante || '', observacao: data.observacao || '' })).digest('hex');
+  return db.transaction(() => {
+    const anterior = db.prepare('SELECT * FROM estoque_retirada_operacoes WHERE token=?').get(token);
+    if (anterior) {
+      if (anterior.solicitacao_id !== solicitacaoId || anterior.usuario_id !== Number(data.entreguePorUserId) || anterior.payload_hash !== hash) throw new Error('Operação já utilizada para outra retirada.');
+      return { ...JSON.parse(anterior.resultado_json), duplicado: true };
+    }
+    fluxoSolicitacaoService.assertRetiradaPermitida(solicitacaoId);
+    for (const i of itens) {
+      const reserva = getReserva(i.reservaId);
+      if (!reserva || Number(reserva.solicitacao_id) !== solicitacaoId) throw new Error('Todos os materiais devem pertencer à solicitação selecionada.');
+    }
+    db.prepare('INSERT INTO estoque_retirada_operacoes(token,solicitacao_id,usuario_id,payload_hash) VALUES(?,?,?,?)')
+      .run(token, solicitacaoId, data.entreguePorUserId, hash);
+    const resultados = itens.map(i => retirarReserva({ ...data, ...i, retiradaLoteToken: token }));
+    const resultado = { itens: resultados.length, movimentos: resultados.map(i => i.movimentoId), pessoaNome: pessoa.nome,
+      solicitacaoId, solicitacaoStatus: resultados.at(-1).solicitacaoStatus };
+    db.prepare('UPDATE estoque_retirada_operacoes SET resultado_json=? WHERE token=?').run(JSON.stringify(resultado), token);
+    return resultado;
+  })();
+}
+
+function historicoRetiradas(solicitacaoId) {
+  if (!solicitacaoId || !hasColumn('estoque_movimentos', 'retirada_lote_token')) return [];
+  return db.prepare(`SELECT m.id,m.created_at,m.quantidade,m.retirada_lote_token,i.nome,i.unidade,
+      COALESCE(c.nome,u.name,'Cadastro histórico') retirante_nome
+    FROM estoque_movimentos m JOIN estoque_itens i ON i.id=m.item_id
+    LEFT JOIN colaboradores c ON c.id=m.retirado_por_colaborador_id
+    LEFT JOIN users u ON u.id=m.retirado_por_user_id
+    WHERE m.solicitacao_id=? AND m.tipo LIKE 'SAIDA%' ORDER BY m.id DESC LIMIT 30`).all(Number(solicitacaoId));
+}
+
 module.exports = {
+  retirarSelecionados,
+  historicoRetiradas,
   normalizeQr,
   getColaboradorByQr,
   getPessoaByQr,

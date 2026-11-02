@@ -28,6 +28,7 @@ router.get("/solicitacoes/:id/conferir", requireLogin, requireRole(ACCESS.almoxa
 router.post("/solicitacoes/:id/itens/:itemId/receber", requireLogin, requireRole(ACCESS.almoxarifado_manage), ctrl.receberItem);
 router.post("/solicitacoes/:id/itens/:itemId/retirar", requireLogin, requireRole(ACCESS.estoque_retirada), ctrl.retirarItem);
 router.post("/solicitacoes/:id/retirar-todos", requireLogin, requireRole(ACCESS.estoque_retirada), ctrl.retirarTodos);
+router.post("/solicitacoes/:id/retirar-selecionados", requireLogin, requireRole(ACCESS.estoque_retirada), qrCtrl.retirarLote);
 router.post("/solicitacoes/:id/finalizar-recebimento", requireLogin, requireRole(ACCESS.almoxarifado_manage), ctrl.finalizar);
 router.post("/solicitacoes/:id/fechar", requireLogin, requireRole(ACCESS.almoxarifado_manage), ctrl.fechar);
 router.post("/solicitacoes/:id/reabrir", requireLogin, requireRole(ACCESS.almoxarifado_manage), ctrl.reabrir);

@@ -8,7 +8,7 @@ const source=p=>fs.readFileSync(path.join(root,p),"utf8");
 
 test("abas do almoxarifado têm rótulos sem símbolos e navegação acessível",()=>{
   const partial=source("views/almoxarifado/_tabs.ejs");
-  for(const label of ["Painel","Compras a receber","Para entregar","Estoque","Retirada","Visão gerencial"]){
+  for(const label of ["Painel","Solicitações","Materiais separados","Estoque","Retirada","Relatórios"]){
     assert.ok(partial.includes(label),`Falta aba: ${label}`);
   }
   assert.doesNotMatch(partial,/Compras a caminho/);
@@ -18,17 +18,17 @@ test("abas do almoxarifado têm rótulos sem símbolos e navegação acessível"
   assert.match(partial,/aria-label="Navegação do Almoxarifado"/);
 });
 
-test("todas as sete telas carregam a identidade visual compartilhada V10",()=>{
+test("telas operacionais compartilham navegação e tema responsivo",()=>{
   for(const page of ["index","recebimentos","conferir","estoque","inventario_armazem_fardo","retirada_qr","gerencial"]){
     const view=source(`views/almoxarifado/${page}.ejs`);
-    assert.match(view,/\/css\/almoxarifado-ux-v10\.css/,`CSS V10 ausente: ${page}`);
+    assert.match(source('views/almoxarifado/_tabs.ejs'),/almox-central\.css/);
     assert.match(view,/include\('_tabs'/,`Abas ausentes: ${page}`);
   }
-  const css=source("public/css/almoxarifado-ux-v10.css");
-  assert.match(css,/\.almox-tabs--operacional \.almox-tab/);
+  const css=source("public/css/almox-central.css");
+  assert.match(css,/\.almox-tabs--central \.almox-tab/);
   assert.match(css,/border-radius:8px/);
   assert.match(css,/:focus-visible/);
-  assert.match(css,/@media\(max-width:800px\)/);
+  assert.match(css,/@media\(max-width:760px\)/);
 });
 
 test("organização do estoque mantém ações originais e permite localizar sem endereço",()=>{

@@ -1,195 +1,229 @@
-<% layout('layout') %>
-<link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20261007-v3" />
-<link rel="stylesheet" href="/css/almoxarifado-operacional-v3.css?v=20261007-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-ux-v10.css?v=20261008-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-layout-v11.css?v=20261011-v1" />
-
-<div class="qr-withdraw-page almox-v11">
-  <header class="reserve-head">
-    <div>
-      <span class="eyebrow">ALMOXARIFADO</span>
-      <h1>Retirada</h1>
-      <p aria-label="Identifique o responsável ou colaborador">Priorize a leitura do cartão QR. Sem cartão, identifique a pessoa pelo cadastro e registre o nome na entrega.</p>
-    </div>
-  </header>
-
-  <%- include('_tabs', { tab: 'retiradas' }) %>
-
-  <section class="qr-scan-layout">
-    <article class="card qr-scanner-card">
-      <div class="qr-scanner-card__head"><div><h2>1. Identificar quem retira</h2><p>Preferencial: cartão QR. Alternativa: busca manual pelo cadastro.</p></div></div>
-      <div class="qr-reader-box"><video id="qrVideo" playsinline muted></video><div id="qrReaderPlaceholder">Câmera desligada</div></div>
-      <div class="qr-reader-actions">
-        <button class="btn btn-green" id="startQrCamera" type="button">Abrir câmera</button>
-        <button class="btn btn-ghost" id="stopQrCamera" type="button" disabled>Parar câmera</button>
-      </div>
-      <p class="muted" id="qrCameraStatus">A câmera só será solicitada quando você tocar em “Abrir câmera”.</p>
-      <form method="GET" action="/almoxarifado/retiradas/qr" class="qr-manual-form">
-        <% if (solicitacaoId) { %><input type="hidden" name="solicitacao_id" value="<%= solicitacaoId %>" /><% } %>
-        <label><span>Leitor USB / código manual</span><input class="input" id="qrManualCode" name="codigo" value="<%= codigo %>" placeholder="Leia o cartão ou informe o código" autocomplete="off" /></label>
-        <button class="btn btn-green" type="submit">Identificar</button>
-      </form>
-
-      <form method="GET" action="/almoxarifado/retiradas/qr" class="almox-identity-search">
-        <% if (solicitacaoId) { %><input type="hidden" name="solicitacao_id" value="<%= solicitacaoId %>" /><% } %>
-        <input class="input" name="q_pessoa" value="<%= buscaPessoa || '' %>" placeholder="Buscar funcionário pelo nome, função ou setor" autocomplete="off" />
-        <button class="btn btn-ghost" type="submit">Buscar cadastro para retirada manual</button>
-      </form>
-      <% if (buscaPessoa && pessoasEncontradas.length) { %>
-        <div class="almox-identity-results">
-          <% pessoasEncontradas.forEach(resultado=>{ const selectParams=new URLSearchParams(); selectParams.set('pessoa_tipo',resultado.identity_type); selectParams.set('pessoa_id',String(resultado.identity_id||resultado.id)); if(solicitacaoId)selectParams.set('solicitacao_id',String(solicitacaoId)); %>
-            <div class="almox-identity-option">
-              <div class="almox-identity-option__person">
-                <img src="<%= resultado.foto_url || '/IMG/logo_menu.png.png' %>" alt="" />
-                <div><strong><%=resultado.nome%></strong><span><%=resultado.funcao||'-'%> • <%=resultado.setor||'-'%></span></div>
-              </div>
-              <a class="btn btn-sm btn-green" href="/almoxarifado/retiradas/qr?<%=selectParams.toString()%>">Selecionar</a>
-            </div>
-          <% }) %>
-        </div>
-      <% } else if (buscaPessoa) { %>
-        <div class="almox-subline" style="margin-top:10px">Nenhum cadastro ativo encontrado para “<%=buscaPessoa%>”.</div>
-      <% } %>
-      <% if (podeCadastrarPessoa) { %>
-        <details class="almox-v13-cadastro">
-          <summary>Cadastrar pessoa sem cartão QR</summary>
-          <p class="muted">Use apenas quando a pessoa ainda não estiver cadastrada. O RH ou encarregado autorizado poderá emitir o cartão depois.</p>
-          <form method="POST" action="/almoxarifado/retiradas/colaboradores" class="almox-v13-cadastro-form" data-lock-submit>
-            <% if (solicitacaoId) { %><input type="hidden" name="solicitacao_id" value="<%=solicitacaoId%>" /><% } %>
-            <label><span>Nome completo de quem retirará</span><input class="input" name="nome" minlength="3" maxlength="120" placeholder="Nome completo" required autocomplete="off" /></label>
-            <label><span>Função</span><input class="input" name="funcao" maxlength="80" placeholder="Ex.: Auxiliar de manutenção" /></label>
-            <label><span>Setor</span><select class="input" name="setor">
-              <option value="MANUTENCAO">Manutenção</option>
-              <option value="RECICLAGEM">Reciclagem</option>
-              <option value="FRIGORIFICO">Frigorífico</option>
-              <option value="LOGISTICA">Logística</option>
-              <option value="ADMINISTRATIVO">Administrativo</option>
-              <option value="NAO_INFORMADO">Não informado</option>
-            </select></label>
-            <button class="btn btn-green" type="submit" data-pending-text="Cadastrando...">Cadastrar e selecionar</button>
-          </form>
-        </details>
-      <% } %>
-    </article>
-
-    <article class="card qr-identity-card">
-      <div><h2>2. Conferir</h2><p class="muted">Confirme a pessoa antes da entrega.</p></div>
-      <% if (!codigo && !(pessoaTipo && pessoaId)) { %>
-        <div class="qr-identity-empty">Aguardando QR ou seleção de um funcionário.</div>
-      <% } else if (!colaborador) { %>
-        <div class="qr-identity-error"><strong>Identificação inválida ou inativa.</strong><span>Leia outro QR ou selecione um cadastro ativo.</span></div>
-      <% } else { %>
-        <div class="qr-identity-person">
-          <img src="<%= colaborador.foto_url || '/IMG/logo_menu.png.png' %>" alt="Foto de <%= colaborador.nome %>" />
-          <div><small><%= colaborador.identity_type === 'USUARIO' ? 'RESPONSÁVEL IDENTIFICADO' : 'COLABORADOR IDENTIFICADO' %></small><h3><%= colaborador.nome %></h3><p><%= colaborador.funcao || '-' %> • <%= colaborador.setor || '-' %></p><span class="stock-state stock-state--ok">ATIVO</span></div>
-        </div>
-      <% } %>
-    </article>
-  </section>
-
-  <section class="card qr-delivery-section">
-    <div class="qr-delivery-head">
-      <div><h2>3. Entregar</h2><p>Baixa vinculada à solicitação e ao responsável.</p></div>
-      <% if (solicitacaoId) { const allParams=new URLSearchParams(); if(codigo)allParams.set('codigo',codigo); if(!codigo&&pessoaTipo&&pessoaId){allParams.set('pessoa_tipo',pessoaTipo);allParams.set('pessoa_id',String(pessoaId));} %><a class="btn btn-ghost" href="/almoxarifado/retiradas/qr?<%=allParams.toString()%>">Ver todas as solicitações</a><% } %>
-    </div>
-
-    <% if (!colaborador) { %>
-      <div class="reserve-empty"><strong>Identifique o responsável para liberar a confirmação de retirada.</strong></div>
-    <% } else if (!grupos.length) { %>
-      <div class="reserve-empty"><strong>Nenhum material reservado disponível.</strong><p>O recebimento precisa estar registrado e vinculado à solicitação.</p></div>
-    <% } else { %>
-      <div class="qr-delivery-groups">
-        <% grupos.forEach((grupo) => { %>
-          <article class="qr-delivery-group">
-            <header><div><span class="reserve-number"><%= grupo.numero %></span><h3><%= grupo.titulo %></h3><p><%= grupo.os_numero ? ('OS #'+grupo.os_numero+' • ') : '' %><%= grupo.equipamento_nome || 'Equipamento não informado' %></p></div><strong><%= grupo.total_disponivel %> disponível</strong></header>
-            <% grupo.itens.filter(i=>Number(i.quantidade_disponivel||0)>0).forEach((item) => { %>
-              <form class="qr-delivery-item" method="POST" action="/almoxarifado/reservas/<%= item.id %>/retirar" data-lock-submit>
-                <input type="hidden" name="qr_code" value="<%= codigo %>" />
-                <input type="hidden" name="pessoa_tipo" value="<%= pessoaTipo || '' %>" />
-                <input type="hidden" name="pessoa_id" value="<%= pessoaId || '' %>" />
-                <input type="hidden" name="solicitacao_id" value="<%= grupo.solicitacao_id %>" />
-                <% if (!codigo) { %><label class="almox-v13-confirmar-nome"><span>Nome completo de quem está retirando (obrigatório)</span><input class="input" name="nome_retirante" required minlength="3" maxlength="120" placeholder="Digite o nome conforme o cadastro" autocomplete="off" /></label><% } %>
-                <div><strong><%= item.item_nome %></strong><small>Saldo físico: <%= Number(item.saldo_fisico||0) %> <%= item.unidade||'UN' %> • Reservado disponível: <%= Number(item.quantidade_disponivel||0) %> <%= item.unidade||'UN' %></small></div>
-                <label><span>Quantidade</span><input class="input" type="number" name="quantidade" min="0.01" step="0.01" max="<%= Number(item.quantidade_disponivel||0) %>" value="<%= Number(item.quantidade_disponivel||0) %>" required /></label>
-                <label><span>Empresa consumidora</span><input class="input" name="empresa_consumidora" required placeholder="Quem utilizará o material" /></label>
-                <label><span>Setor consumidor</span><select class="input" name="setor_consumidor" required><% ['RECICLAGEM','FRIGORIFICO','LOGISTICA','ADMINISTRATIVO'].forEach(s=>{ %><option value="<%=s%>" <%=grupo.setor_origem===s?'selected':''%>><%=s%></option><% }) %></select></label>
-                <label><span>Observação</span><input class="input" name="observacao" placeholder="Opcional" /></label>
-                <button class="btn btn-green" type="submit" data-pending-text="Registrando...">Confirmar entrega</button>
-              </form>
-            <% }) %>
-          </article>
-        <% }) %>
-      </div>
-    <% } %>
-  </section>
+<% layout('layout'); const grupo=solicitacaoId?grupos.find(g=>Number(g.solicitacao_id)===Number(solicitacaoId)):null; const disponiveis=grupo?grupo.itens.filter(i=>Number(i.quantidade_disponivel)>0):[]; %>
+<div class="almox-central">
+<header class="ac-header">
+<div>
+<span class="ac-eyebrow">ALMOXARIFADO · ENTREGA IDENTIFICADA</span>
+<h1>Retirada de materiais</h1>
+<p>Solicitação, funcionário e materiais. Confirme a entrega uma única vez.</p>
 </div>
-
-<script>
-(() => {
-  const startBtn = document.getElementById('startQrCamera');
-  const stopBtn = document.getElementById('stopQrCamera');
-  const video = document.getElementById('qrVideo');
-  const placeholder = document.getElementById('qrReaderPlaceholder');
-  const status = document.getElementById('qrCameraStatus');
-  let stream = null;
-  let timer = null;
-  let detector = null;
-
-  const currentSolicitacao = <%- JSON.stringify(solicitacaoId || null) %>;
-  function redirectWithCode(code) {
-    const params = new URLSearchParams();
-    params.set('codigo', code);
-    if (currentSolicitacao) params.set('solicitacao_id', String(currentSolicitacao));
-    window.location.href = '/almoxarifado/retiradas/qr?' + params.toString();
-  }
-  async function stopCamera() {
-    if (timer) { clearInterval(timer); timer = null; }
-    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-    video.srcObject = null;
-    placeholder.style.display = 'grid';
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-  }
-  async function startCamera() {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      status.textContent = 'Este navegador não oferece acesso à câmera. Use o leitor USB ou informe o código manualmente.';
-      return;
-    }
-    if (!('BarcodeDetector' in window)) {
-      status.textContent = 'Leitura QR pela câmera não é suportada neste navegador. Use o leitor USB/código manual ou um navegador compatível.';
-      return;
-    }
-    try {
-      detector = new BarcodeDetector({ formats: ['qr_code'] });
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-      video.srcObject = stream;
-      await video.play();
-      placeholder.style.display = 'none';
-      startBtn.disabled = true;
-      stopBtn.disabled = false;
-      status.textContent = 'Aponte a câmera para o QR do cartão do responsável.';
-      timer = setInterval(async () => {
-        if (!detector || video.readyState < 2) return;
-        try {
-          const codes = await detector.detect(video);
-          if (codes?.length && codes[0].rawValue) {
-            const value = codes[0].rawValue;
-            await stopCamera();
-            redirectWithCode(value);
-          }
-        } catch (_error) {}
-      }, 350);
-    } catch (error) {
-      status.textContent = 'Não foi possível abrir a câmera. Verifique a permissão do navegador ou use o leitor USB.';
-      await stopCamera();
-    }
-  }
-  startBtn?.addEventListener('click', startCamera);
-  stopBtn?.addEventListener('click', stopCamera);
-  window.addEventListener('beforeunload', stopCamera);
-
-  const manual = document.getElementById('qrManualCode');
-  manual?.focus();
-})();
+</header>
+<%- include('_tabs',{tab:'retiradas'}) %>
+<ol class="ac-steps" aria-label="Etapas da retirada">
+<li <%-!solicitacaoId?'aria-current="step"':''%>>
+<span>1</span> Solicitação</li>
+<li <%-solicitacaoId&&!pessoa?'aria-current="step"':''%>>
+<span>2</span> QR do funcionário</li>
+<li <%-pessoa&&solicitacaoId?'aria-current="step"':''%>>
+<span>3</span> Materiais e OK</li>
+</ol>
+<section class="ac-card">
+<h2>1. Selecione a solicitação</h2>
+<form method="get" action="/almoxarifado/retiradas/qr" class="ac-filters ac-request-select">
+<label class="ac-search">
+<span>Solicitação com materiais separados</span>
+<select name="solicitacao_id" required>
+<option value="">Escolha a solicitação</option>
+<% if(solicitacaoId&&!solicitacoes.some(s=>s.solicitacao_id===solicitacaoId)){ %>
+<option value="<%=solicitacaoId%>" selected>
+<%=grupo?.numero||'#'+solicitacaoId%> · Consultar histórico</option>
+<% } %>
+<% solicitacoes.forEach(s=>{ %>
+<option value="<%=s.solicitacao_id%>" <%=s.solicitacao_id===solicitacaoId?'selected':''%>>
+<%=s.numero%> · <%=s.equipamento_nome||s.titulo%> · <%=s.setor_origem%>
+</option>
+<% }) %>
+</select>
+</label>
+<button class="ac-button" type="submit">Abrir</button>
+</form>
+<% if(!solicitacoes.length&&!solicitacaoId){ %>
+<p class="ac-empty">Nenhuma solicitação com material disponível para retirada.</p>
+<% } %>
+</section>
+<% if(solicitacaoId){ %>
+<div class="ac-withdraw-layout">
+<section class="ac-card">
+<h2>2. Identifique o funcionário</h2>
+<% if(pessoa){ %>
+<div class="ac-person">
+<img src="<%=pessoa.foto_url||'/IMG/logo_menu.png.png'%>" alt="">
+<div>
+<small>FUNCIONÁRIO IDENTIFICADO</small>
+<h3>
+<%=pessoa.nome%>
+</h3>
+<p>
+<%=pessoa.funcao||''%> · <%=pessoa.setor||''%>
+</p>
+</div>
+</div>
+<% }else if(codigo||(pessoaTipo&&pessoaId)){ %>
+<p class="ac-empty" role="alert">Identificação inválida ou inativa. Leia outro QR ou use um cadastro ativo.</p>
+<% } %>
+<% if(!pessoa){ %>
+<video id="qrVideo" playsinline muted hidden aria-label="Leitor do QR do funcionário">
+</video>
+<button class="ac-button ac-primary ac-camera-button" type="button" id="startQrCamera" data-solicitacao="<%=solicitacaoId%>" aria-controls="qrVideo" aria-expanded="false">Escanear QR do funcionário</button>
+<p class="ac-camera-status" id="qrCameraStatus" role="status" aria-live="polite">A câmera abre somente ao tocar no botão.</p>
+<details class="ac-history">
+<summary>Sem câmera ou sem cartão QR</summary>
+<form class="ac-filters" method="get" action="/almoxarifado/retiradas/qr">
+<input type="hidden" name="solicitacao_id" value="<%=solicitacaoId%>">
+<label class="ac-search">
+<span>Código do cartão / leitor USB</span>
+<input name="codigo" value="" autocomplete="off" placeholder="Leia ou informe o código">
+</label>
+<button class="ac-button">Identificar</button>
+</form>
+<form class="ac-filters" method="get" action="/almoxarifado/retiradas/qr">
+<input type="hidden" name="solicitacao_id" value="<%=solicitacaoId%>">
+<label class="ac-search">
+<span>Busca manual pelo cadastro</span>
+<input type="search" name="q_pessoa" value="<%=buscaPessoa%>" minlength="2" placeholder="Nome, função ou setor">
+</label>
+<button class="ac-button">Buscar</button>
+</form>
+<% pessoasEncontradas.forEach(p=>{ const params=new URLSearchParams({solicitacao_id:String(solicitacaoId),pessoa_tipo:p.identity_type,pessoa_id:String(p.identity_id||p.id)}); %>
+<a class="ac-request-row" href="/almoxarifado/retiradas/qr?<%=params%>">
+<div>
+<strong>
+<%=p.nome%>
+</strong>
+<small>
+<%=p.funcao||''%> · <%=p.setor||''%>
+</small>
+</div>
+<span>Selecionar →</span>
+</a>
+<% }) %>
+<% if(buscaPessoa&&!pessoasEncontradas.length){ %>
+<p>Nenhum cadastro ativo encontrado.</p>
+<% } %>
+<% if(podeCadastrarPessoa){ %>
+<details class="ac-history">
+<summary>Cadastrar pessoa ainda não registrada</summary>
+<form method="post" action="/almoxarifado/retiradas/colaboradores" data-lock-submit class="ac-form-stack">
+<input type="hidden" name="solicitacao_id" value="<%=solicitacaoId%>">
+<label>Nome completo<input name="nome" required minlength="3" maxlength="120">
+</label>
+<label>Função<input name="funcao" maxlength="80">
+</label>
+<label>Setor<select name="setor">
+<% ['RECICLAGEM','FRIGORIFICO','LOGISTICA','ADMINISTRATIVO','NAO_INFORMADO'].forEach(s=>{ %>
+<option>
+<%=s%>
+</option>
+<% }) %>
+</select>
+</label>
+<button class="ac-button">Cadastrar e selecionar</button>
+</form>
+</details>
+<% } %>
+</details>
+<% }else{ %>
+<a class="ac-inline-link" href="/almoxarifado/retiradas/qr?solicitacao_id=<%=solicitacaoId%>">Trocar funcionário →</a>
+<% } %>
+</section>
+<section class="ac-card" id="materiais-retirada">
+<header class="ac-section-head">
+<div>
+<h2>3. Selecione os materiais</h2>
+<p>
+<%=grupo?grupo.numero+' · '+(grupo.equipamento_nome||grupo.titulo):'Confira o histórico abaixo'%>
+</p>
+</div>
+<% if(grupo){ %>
+<span class="ac-badge">
+<%=grupo.setor_origem%>
+</span>
+<% } %>
+</header>
+<% if(!pessoa){ %>
+<p class="ac-empty">Identifique o funcionário para selecionar a entrega.</p>
+<% }else if(!disponiveis.length){ %>
+<p class="ac-empty">Nenhum material pendente de retirada nesta solicitação.</p>
+<% }else if(!canWithdraw){ %>
+<p class="ac-empty">Seu perfil permite consultar a entrega.</p>
+<% }else{ %>
+<form method="post" action="/almoxarifado/solicitacoes/<%=solicitacaoId%>/retirar-selecionados" data-withdraw-batch>
+<input type="hidden" name="operacao_token" value="<%=operacaoToken%>">
+<input type="hidden" name="qr_code" value="<%=codigo%>">
+<input type="hidden" name="pessoa_tipo" value="<%=pessoaTipo%>">
+<input type="hidden" name="pessoa_id" value="<%=pessoaId%>">
+<% if(!codigo){ %>
+<label class="ac-manual-name">Confirme o nome completo de quem retira<input name="nome_retirante" required minlength="3" maxlength="120" autocomplete="off" placeholder="Digite conforme o cadastro selecionado">
+</label>
+<% } %>
+<label class="ac-select-all">
+<input type="checkbox" data-select-all> Selecionar todos os disponíveis</label>
+<% disponiveis.forEach(i=>{ %>
+<article class="ac-pick-item">
+<label class="ac-pick-label">
+<input type="checkbox" name="reserva_id" value="<%=i.id%>" <%=Number(i.saldo_fisico)<=0?'disabled':''%>>
+<span>
+<strong>
+<%=i.item_nome%>
+</strong>
+<small>
+<%=i.quantidade_disponivel%> <%=i.unidade||'UN'%> disponível(is)</small>
+</span>
+</label>
+<label class="ac-pick-quantity">
+<span>Quantidade</span>
+<div class="ac-number-unit">
+<input type="number" inputmode="decimal" name="quantidade_<%=i.id%>" <%=Number(i.saldo_fisico)<=0?'disabled':''%> min="0.001" step="any" max="<%=Math.min(Number(i.quantidade_disponivel),Number(i.saldo_fisico))%>" value="<%=Math.min(Number(i.quantidade_disponivel),Number(i.saldo_fisico))%>" aria-label="Quantidade a retirar de <%=i.item_nome%>">
+<span>
+<%=i.unidade||'UN'%>
+</span>
+</div>
+</label>
+</article>
+<% }) %>
+<div class="ac-batch-footer">
+<div>
+<strong data-selection-count>Selecione os materiais</strong>
+<small>Entregar a <%=pessoa.nome%>
+</small>
+</div>
+<button class="ac-button ac-primary" type="submit" data-batch-submit>OK</button>
+</div>
+</form>
+<% } %>
+</section>
+</div>
+<section class="ac-card" id="historico-retirada">
+<header class="ac-section-head">
+<div>
+<h2>Histórico desta solicitação</h2>
+<p>Materiais, responsável pela retirada e data da entrega.</p>
+</div>
+<a href="/almoxarifado/solicitacoes/<%=solicitacaoId%>/conferir">Ver solicitação →</a>
+</header>
+<% if(!historico.length){ %>
+<p class="ac-empty">Nenhuma retirada registrada.</p>
+<% } %>
+<div class="ac-history-list">
+<% historico.forEach(h=>{ %>
+<article>
+<div>
+<strong>
+<%=h.nome%>
+</strong>
+<span>
+<%=h.quantidade%> <%=h.unidade||'UN'%> · <%=h.retirante_nome%>
+</span>
+</div>
+<small>
+<%=h.created_at%>
+</small>
+</article>
+<% }) %>
+</div>
+</section>
+<% } %>
+</div>
+<script src="/vendor/almox-qr/jsQR.js" defer>
+</script>
+<script src="/js/almox-retirada.js?v=20261102-v1" defer>
 </script>
