@@ -17,7 +17,7 @@ test('compras move recebidas, separadas e entregues para o histórico sem mudar 
   }
 });
 
-function aggregarComDados() {
+function aggregarComDados(approvalRequired = true) {
   const db = new Database(':memory:');
   db.exec("CREATE TABLE solicitacao_itens (solicitacao_id INTEGER, status_compra TEXT, status_cotacao TEXT, qtd_comprada REAL, qtd_solicitada REAL, qtd_recebida_total REAL, aprovacao_item_status TEXT)");
   const registrar=db.prepare("INSERT INTO solicitacao_itens(solicitacao_id,status_compra,status_cotacao,qtd_comprada,qtd_solicitada,qtd_recebida_total,aprovacao_item_status) VALUES (?,?, 'COTADO',?,?,?,?)");
@@ -38,6 +38,7 @@ function aggregarComDados() {
   const exec=group[0].replace(/\n\nfunction getOperationalQueue$/,'');
   const sandbox={
     db,
+    configuration: { isApprovalRequired: () => approvalRequired },
     hasColumn:(table,column)=>db.pragma('table_info(' + table + ')').some(c=>c.name===column),
     Set,Map,Number,Array
   };
@@ -52,12 +53,22 @@ test('conferência 100% retira da fila, mas mantém parciais e aprovações pend
     assert.equal(status.get(2),false,'100% comprado e recebido');
     assert.equal(status.get(3),true,'recebimento incompleto');
     assert.equal(status.get(4),true,'há outro item ainda aguardando compra');
-    assert.equal(status.get(5),true,'diretoria ainda não liberou a compra');
+    assert.equal(status.get(5),false,'item já comprado e recebido não volta a exigir aprovação');
     assert.equal(status.get(6),false,'item cancelado não impede encerramento');
     assert.equal(status.get(7),true,'pedido reaberto continua na fila');
     assert.equal(status.get(8),false,'parcial desatualizada mas 100% fisicamente recebida');
     assert.equal(status.get(10),true,'sem item comprado/recebido não pode ser arquivado por engano');
     assert.equal(status.get(11),true,'sem itens não pode ser arquivado');
+  } finally {db.close();}
+});
+
+test('aprovação dispensada não mantém compra já recebida na fila e preserva pendências físicas',()=>{
+  const {db,rows}=aggregarComDados(false);
+  try {
+    assert.ok(rows.every(row=>Number(row.itens_aprovacao_pendente||0)===0));
+    assert.equal(service.isOperationallyActive(rows.find(row=>row.id===5)),false);
+    assert.equal(service.isOperationallyActive(rows.find(row=>row.id===3)),true,'recebimento incompleto permanece ativo');
+    assert.equal(service.isOperationallyActive(rows.find(row=>row.id===4)),true,'item ainda não comprado permanece ativo');
   } finally {db.close();}
 });
 

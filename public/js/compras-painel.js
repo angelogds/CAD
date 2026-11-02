@@ -1,6 +1,7 @@
 (() => {
   const form = document.querySelector('#quote-form');
   if (!form) return;
+  let approvalRequired = form.dataset.approvalRequired !== '0';
 
   const rows = [...document.querySelectorAll('.quote-row')];
   const selectAll = document.querySelector('#select-all-items');
@@ -53,7 +54,7 @@
       // visualmente a tela, mas o middleware de compra continuará bloqueando a ação.
       const approvalState = String(row.dataset.purchaseApproval || '');
       const approvalKnown = Boolean(approvalState);
-      const approvalOk = !approvalKnown || approvalState === 'APROVADA' || approvalState === 'COMPRADO';
+      const approvalOk = !approvalRequired || !approvalKnown || approvalState === 'APROVADA' || approvalState === 'COMPRADO';
       const waitingApproval = quoted && !row.classList.contains('state-comprado') && approvalKnown && !approvalOk;
       buy.disabled = !quoted || row.classList.contains('state-comprado') || !approvalOk;
       if (buy.disabled) buy.checked = false;
@@ -83,6 +84,7 @@
       if (!response.ok) return;
       const payload = await response.json();
       if (!payload?.ok || !Array.isArray(payload.itens)) return;
+      approvalRequired = payload.aprovacao_obrigatoria !== false;
       const byId = new Map(payload.itens.map((item) => [String(item.id), String(item.approvalState || '')]));
       rows.forEach((row) => {
         const itemId = row.querySelector('input[name="item_id"]')?.value;
@@ -224,7 +226,7 @@
     }
     if (action === 'comprar' && !rows.some((row) => row.querySelector('.buy-check')?.checked)) {
       event.preventDefault();
-      alert('Selecione ao menos um item cotado e aprovado para marcar como comprado.');
+      alert(approvalRequired ? 'Selecione ao menos um item cotado e aprovado para marcar como comprado.' : 'Selecione ao menos um item cotado para marcar como comprado.');
     }
   });
   update();

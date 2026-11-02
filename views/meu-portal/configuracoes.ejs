@@ -27,6 +27,12 @@
   </header>
 
   <nav class="my-settings-menu" aria-label="Seções das configurações">
+    <% if (roleLabel === 'ADMIN') { %>
+    <a href="/admin/configuracoes/perfis" class="my-settings-menu__item">
+      <span class="my-settings-menu__icon" aria-hidden="true">⚙</span>
+      <span><strong>Configurações por perfil</strong><small>Acompanhamento da Diretoria</small></span>
+    </a>
+    <% } %>
     <a href="#preferencias" class="my-settings-menu__item">
       <span class="my-settings-menu__icon" aria-hidden="true">☰</span>
       <span><strong>Preferências</strong><small>Navegação e visual</small></span>

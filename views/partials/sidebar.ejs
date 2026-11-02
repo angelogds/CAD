@@ -115,6 +115,7 @@
       <div class="nav-divider"></div>
       <div class="nav-section">SISTEMA</div>
       <% if (canUsuarios) { %><%- navItem('/usuarios', 'Gerenciar Usuários', activeMenu === 'usuarios') %><% } %>
+      <% if (role === 'ADMIN') { %><%- navItem('/admin/configuracoes/perfis', 'Configurações por perfil', activeMenu === 'admin-perfis') %><% } %>
       <% if (canArmazenamento) { %><%- navItem('/admin/armazenamento', 'Saúde do Sistema', activeMenu === 'admin-armazenamento') %><%- navItem('/admin/limpeza-volume', 'Limpeza de volume', activeMenu === 'admin-limpeza-volume') %><% } %>
     <% } %>
   </nav>

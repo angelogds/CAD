@@ -1,4 +1,6 @@
 const itemApprovalService = require('./compras.aprovacao-itens.service');
+const configuration = require('./compras.configuracao.service');
+const { assertCompraLiberada } = require('./compras-demandas.service');
 
 function rejectToPurchaseDetail(error, req, res) {
   req.flash('error', error.message || 'Os itens selecionados precisam de aprovação digital antes da compra.');
@@ -30,6 +32,14 @@ function requireApprovedPurchaseIntent(req, res, next) {
 
 function blockExceptionalDirectPurchase(req, res, next) {
   if (String(req.body?.modo || '').toUpperCase() !== 'COMPRADO') return next();
+  if (!configuration.isApprovalRequired()) {
+    try {
+      assertCompraLiberada(Number(req.params.id));
+      return next();
+    } catch (error) {
+      return rejectToPurchaseDetail(error, req, res);
+    }
+  }
   req.flash('error', 'O item excepcional deve entrar primeiro em cotação. Assim que fornecedor e valor forem definidos, ele aparecerá automaticamente para aprovação de ADMIN/DIRETORIA.');
   return res.redirect(`/compras/solicitacoes/${Number(req.params.id)}#item-excepcional`);
 }

@@ -1,5 +1,6 @@
 (() => {
   const DASHBOARD_PATH = '/compras/solicitacoes';
+  let approvalRequired = true;
 
   function isDashboard() {
     return window.location.pathname.replace(/\/$/, '') === DASHBOARD_PATH
@@ -65,7 +66,8 @@
       if (!response.ok) return { approved: 0, pending: 0 };
       const payload = await response.json();
       if (!payload?.ok) return { approved: 0, pending: 0 };
-      return { approved: Number(payload.aprovados || 0), pending: Number(payload.pendentes || 0) };
+      approvalRequired = payload.aprovacao_obrigatoria !== false;
+      return { approved: Number(payload.liberados ?? payload.aprovados ?? 0), pending: Number(payload.pendentes || 0) };
     } catch (_error) {
       return { approved: 0, pending: 0 };
     }
@@ -102,7 +104,9 @@
     if (purchaseData && !purchaseData.querySelector('.director-release-note')) {
       const note = document.createElement('small');
       note.className = 'director-release-note';
-      note.textContent = `Diretoria liberou ${state.approved} ${plural(state.approved, 'item', 'itens')}. Ação do setor de Compras.`;
+      note.textContent = approvalRequired
+        ? `Diretoria liberou ${state.approved} ${plural(state.approved, 'item', 'itens')}. Ação do setor de Compras.`
+        : 'Aprovação da Diretoria dispensada. Cotação e compra pelo setor de Compras.';
       purchaseData.append(note);
     }
 
@@ -110,7 +114,7 @@
     if (open) {
       open.classList.add('director-release-buy');
       open.textContent = state.approved === 1 ? 'Comprar item liberado' : `Comprar ${state.approved} liberados`;
-      open.title = 'Abrir solicitação e efetuar a compra dos itens já aprovados pela Diretoria';
+      open.title = approvalRequired ? 'Abrir solicitação e efetuar a compra dos itens já aprovados pela Diretoria' : 'Abrir solicitação e efetuar a compra dos itens cotados';
     }
   }
 
@@ -166,12 +170,13 @@
     kicker.textContent = releasedItems > 0 ? 'AÇÃO NECESSÁRIA · COMPRAS' : 'ACOMPANHAMENTO DA DIRETORIA';
     const title = document.createElement('h2');
     title.textContent = releasedItems > 0
-      ? 'Itens aprovados pela Diretoria aguardando compra'
+      ? (approvalRequired ? 'Itens aprovados pela Diretoria aguardando compra' : 'Itens cotados disponíveis para compra')
       : 'Nenhum item liberado para compra';
     const text = document.createElement('p');
     text.textContent = releasedItems > 0
       ? `${releasedItems} ${plural(releasedItems, 'item aprovado', 'itens aprovados')} em ${releasedRequests} ${plural(releasedRequests, 'solicitação ativa', 'solicitações ativas')} já podem ser comprados.${pendingItems > 0 ? ` Outros ${pendingItems} item(ns) ainda aguardam decisão da Diretoria.` : ''}`
       : (pendingItems > 0 ? `${pendingItems} item(ns) ainda aguardam decisão da Diretoria.` : 'Não existem itens aprovados aguardando ação de compra neste momento.');
+    if (!approvalRequired) text.textContent = 'Acompanhamento da Diretoria desativado — somente consulta. Compras pode cotar e marcar como comprado sem aprovação digital.';
     copy.append(kicker, title, text);
     section.append(copy);
 
@@ -214,6 +219,7 @@
     let pendingItems = 0;
 
     if (global) {
+      approvalRequired = global.aprovacao_obrigatoria !== false;
       byRequest = new Map((Array.isArray(global.rows) ? global.rows : []).map((row) => [
         Number(row.solicitacao_id),
         { approved: Number(row.liberados || 0), pending: Number(row.aguardando || 0) },

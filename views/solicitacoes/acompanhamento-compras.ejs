@@ -5,6 +5,7 @@
 <link rel="stylesheet" href="/css/acompanhamento-compras-diretoria.css?v=20260919-1">
 <%
 const p=painel||{};
+const approvalRequired=p.approvalRequired!==false;
 const filters=p.filters||{};
 const solicitacoes=Array.isArray(p.solicitacoes)?p.solicitacoes:[];
 const custosEquipamentos=Array.isArray(p.custosMensaisEquipamentos)?p.custosMensaisEquipamentos:[];
@@ -37,6 +38,7 @@ const queryHref=(overrides={})=>{
     <a class="btn btn-sm btn-ghost system-compact-btn" href="<%=voltarHref%>">← Voltar</a>
   </header>
 
+  <% if(!approvalRequired){ %><div class="readonly-note" role="status">Acompanhamento da Diretoria desativado — somente consulta. Compras pode cotar e marcar como comprado sem aprovação digital. O ADMIN pode reativar nas configurações por perfil.</div><% } %>
   <nav class="executive-view-tabs" aria-label="Visão do acompanhamento">
     <a class="<%=filters.visao==='andamento'?'active':''%>" href="<%=queryHref({visao:'andamento',destaque:''})%>"><span>EM ANDAMENTO</span><strong><%=totals.andamento||0%></strong><small>somente pendências e fluxo ativo</small></a>
     <a class="<%=filters.visao==='historico'?'active':''%>" href="<%=queryHref({visao:'historico',periodo:filters.periodo==='todos'?'30':filters.periodo,destaque:''})%>"><span>HISTÓRICO</span><strong><%=totals.historico||0%></strong><small>concluídas / 100%</small></a>
@@ -78,7 +80,7 @@ const queryHref=(overrides={})=>{
   <section class="watch-section flow-section">
     <div class="section-title-row"><div><h2>ANDAMENTO DO FLUXO DE COMPRAS</h2><p>Percentuais calculados somente com os registros da visão e filtros atuais.</p></div></div>
     <div class="flow-grid"><% [['Cotação',p.fluxo?.cotacao],['Compra',p.fluxo?.compra],['Recebimento',p.fluxo?.recebimento],['Solicitações concluídas',p.fluxo?.concluidas]].forEach(x=>{ %><div><b><%=x[0]%></b><span><%=round(x[1])%>%</span><i><em style="width:<%=Math.min(100,Number(x[1])||0)%>%"></em></i></div><% }) %></div>
-    <div class="flow-steps">Solicitação <b>→</b> Cotação <b>→</b> Aprovação <b>→</b> Compra <b>→</b> Recebimento <b>→</b> Histórico</div>
+    <div class="flow-steps">Solicitação <b>→</b> Cotação <b>→</b> <%=approvalRequired?'Aprovação':'Aprovação dispensada'%> <b>→</b> Compra <b>→</b> Recebimento <b>→</b> Histórico</div>
   </section>
 
   <section class="watch-section requests-section requests-table-section">

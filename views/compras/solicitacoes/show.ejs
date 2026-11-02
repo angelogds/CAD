@@ -94,7 +94,10 @@ const quoteValue = Number(approvalCtx?.quote?.totalCentavos || sol.resumoItens?.
   <% if(approvalHistory.length){ %><details class="purchase-manual-details"><summary>Histórico da aprovação</summary><div class="purchase-approval-history"><% approvalHistory.slice(0,8).forEach(h=>{ %><div><strong><%=String(h.acao||'-').replaceAll('_',' ')%></strong><span><%=h.observacao||'-'%></span><small><%=h.created_at?fmtBR(h.created_at):'-'%></small></div><% }) %></div></details><% } %>
 </section>
 
-<form id="quote-form" method="POST" action="/compras/solicitacoes/<%= sol.id %>/painel-itens">
+<% if (typeof approvalRequired !== 'undefined' && !approvalRequired) { %>
+<div class="card" role="status"><strong>Acompanhamento da Diretoria desativado — somente consulta.</strong><p>Compras pode cotar e marcar como comprado sem aprovação digital da Diretoria.</p></div>
+<% } %>
+<form id="quote-form" data-approval-required="<%= typeof approvalRequired !== 'undefined' && !approvalRequired ? '0' : '1' %>" method="POST" action="/compras/solicitacoes/<%= sol.id %>/painel-itens">
 <div class="card quote-items-card" id="itens-cotacao"><div class="section-title">COTAÇÃO, COMPRA E ACOMPANHAMENTO DO RECEBIMENTO</div><p class="muted purchase-receipt-rule">Compras registra cotação e compra. A quantidade recebida é somente leitura aqui e é alimentada exclusivamente pela conferência do Almoxarifado.</p>
 <% if (!sol.valores_itens_revisados && sol.valor_total) { %><div class="legacy-warning">⚠️ Valor legado preservado: <strong><%= Number(sol.valor_total).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) %></strong>. Revise os preços por item.</div><% } %>
 <div class="table-wrap quote-table-wrap purchase-table-organized"><table class="table quote-table"><thead><tr><th class="col-select"><input type="checkbox" id="select-all-items" aria-label="Selecionar todos os itens cotados"></th><th class="col-status">Status</th><th class="col-item">Item / descrição</th><th class="col-qty">Qtd.</th><th class="col-un">UN</th><th class="col-supplier">Fornecedor</th><th class="col-price">Valor unitário</th><th class="col-subtotal">Subtotal</th><th class="col-receipt">Recebimento</th><th class="col-actions">Ações</th></tr></thead><tbody>
@@ -150,5 +153,5 @@ const quoteValue = Number(approvalCtx?.quote?.totalCentavos || sol.resumoItens?.
   </form>
 </dialog>
 
-<script src="/js/compras-painel.js" defer></script>
+<script src="/js/compras-painel.js?v=20261102-perfis" defer></script>
 <script src="/js/compras-itens-consenso.js" defer></script>

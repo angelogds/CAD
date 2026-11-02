@@ -1,6 +1,7 @@
 const db = require('../../database/db');
 const itemApprovalService = require('./compras.aprovacao-itens.service');
 const { resolvedDemandIdSql } = require('./compras-demandas.service');
+const configuration = require('./compras.configuracao.service');
 
 const CLOSED = new Set(['RECEBIDA_TOTAL', 'ENTREGUE_SOLICITANTE', 'FECHADA', 'CANCELADA']);
 
@@ -25,9 +26,10 @@ function isQuoteReady(item) {
 }
 
 function listDashboardStatus() {
+  const approvalRequired = configuration.isApprovalRequired();
   const requiredTables = ['solicitacoes', 'solicitacao_itens'];
   if (!requiredTables.every(tableExists)) {
-    return { rows: [], totalSolicitacoesLiberadas: 0, totalItensLiberados: 0, totalItensAguardando: 0 };
+    return { approvalRequired, rows: [], totalSolicitacoesLiberadas: 0, totalItensLiberados: 0, totalItensAguardando: 0 };
   }
 
   const itemCols = columns('solicitacao_itens');
@@ -40,7 +42,7 @@ function listDashboardStatus() {
     'status_compra',
   ];
   if (!approvalColumns.every((column) => itemCols.has(column))) {
-    return { rows: [], totalSolicitacoesLiberadas: 0, totalItensLiberados: 0, totalItensAguardando: 0 };
+    return { approvalRequired, rows: [], totalSolicitacoesLiberadas: 0, totalItensLiberados: 0, totalItensAguardando: 0 };
   }
 
   const qtdExpr = itemCols.has('qtd_solicitada') ? 'COALESCE(si.qtd_solicitada,0)'
@@ -91,8 +93,8 @@ function listDashboardStatus() {
     if (!quoteReady) continue;
 
     const currentSignature = itemApprovalService.itemSignature(item);
-    const approved = normalize(item.aprovacao_item_status) === 'APROVADA'
-      && String(item.aprovacao_item_assinatura || '') === currentSignature;
+    const approved = !approvalRequired || (normalize(item.aprovacao_item_status) === 'APROVADA'
+      && String(item.aprovacao_item_assinatura || '') === currentSignature);
 
     const key = Number(item.solicitacao_id);
     if (!grouped.has(key)) {
@@ -115,6 +117,7 @@ function listDashboardStatus() {
   });
 
   return {
+    approvalRequired,
     rows,
     totalSolicitacoesLiberadas: rows.filter((row) => row.liberados > 0).length,
     totalItensLiberados: rows.reduce((sum, row) => sum + Number(row.liberados || 0), 0),

@@ -7,6 +7,8 @@ function statusJson(req, res) {
     const summary = itemApprovalService.getSummary(solicitacaoId);
     return res.json({
       ok: true,
+      aprovacao_obrigatoria: summary.approvalRequired,
+      liberados: summary.liberadosCount,
       pendentes: summary.pendentesCount,
       aprovados: summary.aprovadosCount,
       valor_pendente_centavos: summary.pendentesValorCentavos,
@@ -32,6 +34,7 @@ function liberadosDashboardJson(_req, res) {
       total_solicitacoes_liberadas: summary.totalSolicitacoesLiberadas,
       total_itens_liberados: summary.totalItensLiberados,
       total_itens_aguardando: summary.totalItensAguardando,
+      aprovacao_obrigatoria: summary.approvalRequired,
     });
   } catch (error) {
     console.error('[compras.aprovacao-itens.liberadosDashboardJson]', error);

@@ -3,6 +3,7 @@ const flowService = require('./compras.itens-consenso.service');
 const approvalService = require('./compras.aprovacao.service');
 const consensusNotificationService = require('./compras.consenso-notificacoes.service');
 const bilateralService = require('../solicitacoes/solicitacoes.itens-bilateral.service');
+const configuration = require('./compras.configuracao.service');
 
 function getSolicitacaoBase(id) {
   const base = comprasService.getSolicitacaoDetalhe(Number(id));
@@ -27,6 +28,7 @@ function detalhe(req, res) {
       fornecedores: comprasService.listFornecedoresAtivos(),
       historicoExclusoes,
       aprovacao,
+      approvalRequired: configuration.isApprovalRequired(),
       diretores: approvalService.listDirectors(),
       selectedSupplierId: Number(req.query?.fornecedor_selecionado) || null,
       selectedItemId: Number(req.query?.item_id) || null,

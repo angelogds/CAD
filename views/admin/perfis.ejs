@@ -1,0 +1,36 @@
+<% layout('layout') %>
+<link rel="stylesheet" href="/css/admin-console.css?v=20260919-p5">
+<main class="admin-console">
+  <header class="admin-hero">
+    <div><span class="admin-eyebrow">ADMINISTRAÇÃO • CONFIGURAÇÕES</span><h1>Configurações por perfil</h1><p>Controle a participação de cada perfil no fluxo de trabalho.</p></div>
+    <a class="ui-btn ui-btn--outline" href="/meu-portal/configuracoes">Voltar às configurações</a>
+  </header>
+
+  <section class="admin-panel" aria-labelledby="diretoria-heading">
+    <form method="POST" action="/admin/configuracoes/perfis">
+      <label class="admin-field"><span>Perfil</span><select name="perfil"><option value="DIRETORIA" selected>Diretoria</option></select></label>
+      <div class="admin-section-head">
+        <div><h2 id="diretoria-heading">Acompanhamento de compras da Diretoria</h2><p>Vincular a efetivação da compra à aprovação digital da Diretoria.</p></div>
+        <span class="admin-badge <%= approvalRequired ? 'good' : 'info' %>" role="status"><%= approvalRequired ? 'Ativado — aprovação obrigatória' : 'Desativado — somente consulta' %></span>
+      </div>
+      <% if (approvalRequired) { %>
+        <p>Compras cota os itens e aguarda a aprovação digital de ADMIN ou DIRETORIA antes de marcar como comprado.</p>
+      <% } else { %>
+        <p>Compras pode cotar e marcar os itens como comprados sem aprovação digital da Diretoria. A Diretoria continua consultando valores, compras e recebimentos.</p>
+      <% } %>
+      <p>Ao reativar, os itens ainda não comprados voltam a exigir aprovação. Compras concluídas e históricos permanecem preservados.</p>
+      <div class="admin-actions">
+        <button class="ui-btn ui-btn--primary" name="obrigatoria" value="<%= approvalRequired ? '0' : '1' %>" type="submit"><%= approvalRequired ? 'Desativar acompanhamento da Diretoria' : 'Ativar acompanhamento da Diretoria' %></button>
+      </div>
+    </form>
+  </section>
+
+  <section class="admin-panel">
+    <div class="admin-section-head"><div><h2>Histórico da configuração</h2><p>Últimas alterações feitas pelo administrador.</p></div></div>
+    <% if (!history.length) { %><p>Nenhuma alteração pelo administrador registrada.</p><% } else { %>
+      <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Quando</th><th>Administrador</th><th>Exigência de aprovação</th></tr></thead><tbody>
+        <% history.forEach(row => { %><tr><td data-label="Quando"><%= fmtBR(row.alterado_em) %></td><td data-label="Administrador"><%= row.alterado_por_nome || 'Administrador' %></td><td data-label="Exigência de aprovação"><%= row.valor_novo === '1' ? 'Ativada' : 'Desativada — somente consulta' %></td></tr><% }) %>
+      </tbody></table></div>
+    <% } %>
+  </section>
+</main>
