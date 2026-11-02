@@ -3,7 +3,7 @@ const { requireLogin, requireRole } = require("../auth/auth.middleware");
 const { ACCESS } = require("../../config/rbac");
 const ctrl = require("./estoque.controller");
 const reservasCtrl = require("./estoque.reservas.controller");
-const almoxCtrl = require("../almoxarifado/almoxarifado.controller");
+const qrCtrl = require("../almoxarifado/retiradas-qr.controller");
 
 const reposicaoCtrl=require('./estoque.reposicao.controller');
 router.post('/reposicao/gerar',requireLogin,requireRole(ACCESS.estoque_manage),reposicaoCtrl.gerar);
@@ -23,6 +23,6 @@ router.post("/locais", requireLogin, requireRole(ACCESS.estoque_manage), ctrl.cr
 router.get("/movimentos", requireLogin, requireRole(ACCESS.estoque_view), ctrl.movimentos);
 router.get("/itens/:id/qr", requireLogin, requireRole(ACCESS.estoque_view), ctrl.qrItem);
 router.get("/saidas/nova", requireLogin, requireRole(ACCESS.estoque_retirada), ctrl.saidaNova);
-router.post("/saidas", requireLogin, requireRole(ACCESS.estoque_retirada), almoxCtrl.registrarSaida);
+router.post("/saidas", requireLogin, requireRole(ACCESS.estoque_retirada), qrCtrl.retirarLivre);
 
 module.exports = router;

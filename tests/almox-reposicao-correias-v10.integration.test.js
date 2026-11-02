@@ -118,7 +118,7 @@ test('telas operacionais renderizam compras unificadas com busca e filtros',()=>
   assert.match(filas,/<h1>Solicitações<\/h1>/);assert.match(filas,/name="situacao"/);assert.doesNotMatch(filas,/Compras a caminho/);
   const base={pedidos:belts.list(),equipamentos:legacy.listEquipamentos(),mecanicos:[mecanico],vinculos:belts.vinculos(eq),operacaoToken:'view-test'};
   const readOnly=render('almoxarifado/correias.ejs',{...base,user:{role:'DIRETORIA'}});assert.doesNotMatch(readOnly,/action="\/almoxarifado\/correias\/avulsa"/);
-  const editable=render('almoxarifado/correias.ejs',{...base,user:almoxUser});assert.match(editable,/name="empresa_consumidora"/);assert.match(editable,/name="operacao_token"/);
+  const editable=render('almoxarifado/correias.ejs',{...base,user:almoxUser});assert.doesNotMatch(editable,/empresa_consumidora/);assert.match(editable,/retiradas\/qr\?modo=ESTOQUE/);
   const inspection=render('preventivas/_correias-inspecao.ejs',{user:mecanico,plano:{id:plano},execucoes:[{id:exec,status:'PENDENTE',data_prevista:today}],execucoesAutorizadas:[exec],correiasVinculos:belts.vinculos(eq),correiasPedidos:belts.list(eq),correiasMecanicos:[mecanico]});
   assert.match(inspection,new RegExp(`/preventivas/${plano}/execucoes/${exec}/correias`));assert.match(inspection,/Verificar desgaste na próxima inspeção/);
   const policy=render('estoque/show.ejs',{user:almoxUser,item:estoque.getItem(correia),movimentos:[],canManageReposicao:true});assert.match(policy,/name="saldo_alvo"/);assert.match(policy,/MIG tubular 1,2 mm: 15 kg/);

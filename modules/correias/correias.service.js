@@ -27,7 +27,8 @@ function reservadoExpr(alias = 'i') {
   if (!tableExists('estoque_reservas')) return correias;
   return `${correias} + COALESCE((SELECT SUM(MAX(r.quantidade_reservada-r.quantidade_retirada,0))
     FROM estoque_reservas r
-    WHERE r.estoque_item_id=${alias}.id AND r.status<>'CANCELADA'),0)`;
+    WHERE r.estoque_item_id=${alias}.id AND r.status<>'CANCELADA'
+      AND NOT EXISTS(SELECT 1 FROM solicitacoes s WHERE s.id=r.solicitacao_id AND UPPER(TRIM(s.status)) IN ('CANCELADA','CANCELADO','FECHADA','FECHADO','ENTREGUE_SOLICITANTE'))),0)`;
 }
 
 function listEquipamentos() {
@@ -152,7 +153,25 @@ function computeNextDate(tipo, valor, baseDate) {
   return db.prepare("SELECT date(?, '+' || ? || ' day') d").get(base,n).d;
 }
 
-function createPlano(data, userId = null) {
+function createPlano(data,userId=null) {
+  return db.transaction(()=>{
+    if(!listEquipamentos().some(e=>e.id===Number(data.equipamento_id)))throw new Error('Selecione um equipamento ativo.');
+    let itemId=Number(data.estoque_item_id)||null;
+    if(!itemId){
+      const codigo=normalize(data.correia_codigo).toUpperCase(),referencia=normalize(data.correia_nome);
+      if(!codigo||!referencia)throw new Error('Informe código e referência da nova correia, ou selecione uma já cadastrada.');
+      if(codigo.length>80||referencia.length>200)throw new Error('Código ou referência muito longa.');
+      let categoria=db.prepare("SELECT id FROM estoque_categorias WHERE UPPER(nome)='CORREIAS' AND COALESCE(ativo,1)=1 ORDER BY id LIMIT 1").get();
+      if(!categoria)categoria={id:Number(db.prepare("INSERT INTO estoque_categorias(nome,ativo) VALUES('CORREIAS',1)").run().lastInsertRowid)};
+      itemId=require('../estoque/estoque.service').createItem({codigo,nome:'Correia '+referencia,unidade:'UN',categoria_id:categoria.id,setor_utilizacao:'COMUM'});
+    }
+    const qtd=parseQty(data.quantidade_material,0);
+    if(!Number.isInteger(qtd)||qtd<=0)throw new Error('Informe uma quantidade inteira de correias por troca.');
+    return createPlanoExistente({...data,estoque_item_id:itemId},userId);
+  })();
+}
+
+function createPlanoExistente(data, userId = null) {
   if (!tableExists('preventiva_planos') || !tableExists('preventiva_execucoes')) {
     throw new Error('Estrutura de preventivas indisponível.');
   }

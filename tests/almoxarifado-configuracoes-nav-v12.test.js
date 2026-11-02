@@ -19,7 +19,7 @@ test("retirada direta e historico continuam independentes", () => {
   const saida = source("views/estoque/saida_nova.ejs");
   const estoque = source("views/estoque/index.ejs");
   assert.match(movimentos, /href="\/estoque\/saidas\/nova"/);
-  assert.match(saida, /action="\/estoque\/saidas"/);
+  assert.match(saida, /include\('\.\.\/almoxarifado\/retirada_qr'/);
   assert.match(estoque, /href="\/estoque\/saidas\/nova\?item=/);
   assert.doesNotMatch(estoque, /stock-v6-head-actions/);
 });

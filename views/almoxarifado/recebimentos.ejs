@@ -4,7 +4,7 @@
 <div>
 <span class="ac-eyebrow">ALMOXARIFADO · SOLICITAÇÕES</span>
 <h1>Solicitações</h1>
-<p>Abra a solicitação e confirme somente o material que chegou.</p>
+<p>Acompanhe as cotações. Quando a compra for confirmada, abra a solicitação para receber.</p>
 </div>
 </header>
 <%- include('_tabs',{tab:'recebimentos'}) %>
@@ -43,7 +43,7 @@
 <span>Etapa</span>
 <select name="situacao">
 <option value="">Todas</option>
-<% [['PENDENTES','Com itens a receber'],['PARCIAL','Recebimento parcial']].forEach(([v,l])=>{ %>
+<% [['PENDENTES','Compra confirmada · a receber'],['PARCIAL','Recebimento parcial'],['AGUARDANDO_COMPRAS','Em cotação / aguardando compra']].forEach(([v,l])=>{ %>
 <option value="<%=v%>" <%=c.situacao===v?'selected':''%>>
 <%=l%>
 </option>
@@ -85,8 +85,7 @@
 <%=s.setor_exibicao%> · <%=s.itens_total%> material(is)</small>
 <div class="ac-request-count">
 <% if(s.itens_a_receber&&!s.encerrada){ %>
-<strong>
-<%=s.itens_a_receber%> a receber</strong>
+<strong class="ac-purchase-alert">Compra confirmada · <%=s.itens_a_receber%> item(ns) a receber</strong>
 <% } %>
 <% if(s.itens_aguardando){ %>
 <span>

@@ -110,7 +110,7 @@
           </div>
           <div data-label="Ação" class="stock-v6-actions">
             <a class="stock-v6-open" href="/estoque/itens/<%=item.id%>">Abrir →</a>
-            <% if(Number(item.saldo_disponivel||0)>0){ %><a class="btn btn-sm btn-ghost" href="/estoque/saidas/nova?item=<%=item.id%>">Retirar</a><% } %>
+            <% if(canWithdraw&&Number(item.saldo_disponivel||0)>0){ %><a class="btn btn-sm btn-ghost" href="/estoque/saidas/nova?item=<%=item.id%>">Retirar</a><% } %>
           </div>
         </article>
       <% }) %>

@@ -1,7 +1,6 @@
 const db = require('../../database/db');
 const { normalizeRole } = require('../../config/rbac');
 const exists = (table) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table);
-const setores = ['RECICLAGEM', 'LOGISTICA', 'FRIGORIFICO', 'ADMINISTRATIVO'];
 function quantidade(v) { const n = Number(String(v ?? '').replace(',', '.')); if (!Number.isFinite(n) || n <= 0) throw new Error('Informe uma quantidade maior que zero.'); return n; }
 function almox(user) { if (!['ADMIN', 'ALMOXARIFADO'].includes(normalizeRole(user?.role))) throw new Error('Esta ação é do Almoxarifado.'); }
 function vinculos(equipamentoId) {
@@ -31,34 +30,37 @@ function solicitar(data, user) {
     const qtd = quantidade(data.quantidade || vinculo.quantidade_material);
     if (!Number.isInteger(qtd)) throw new Error('A quantidade de correias deve ser inteira.');
     if (data.operacao_token) { const atual=db.prepare('SELECT id FROM correias_pedidos WHERE operacao_token=?').get(String(data.operacao_token)); if(atual) return atual.id; }
-    if (!setores.includes(data.setor_consumidor) || !String(data.empresa_consumidora || '').trim()) throw new Error('Informe a empresa e o setor consumidor.');
+    const setor=require('../compras/compras-setores').normalizeSetorCorporativo(data.setor_consumidor);
+    if (!['RECICLAGEM','LOGÍSTICA','FRIGORÍFICO','ADMINISTRATIVO'].includes(setor)) throw new Error('Selecione o setor consumidor.');
     // Reenvio da mesma inspeção mantém a reserva existente.
     if (execId) { const atual = db.prepare('SELECT id FROM correias_pedidos WHERE preventiva_execucao_id=? AND estoque_item_id=?').get(execId,vinculo.estoque_item_id); if (atual) return atual.id; }
     const saldo = Number(db.prepare('SELECT saldo_atual FROM estoque_itens WHERE id=?').get(vinculo.estoque_item_id).saldo_atual);
     const reservado = Number(require('../estoque/estoque.reservas.service').resumoPorItem().get(vinculo.estoque_item_id) || 0);
     if (saldo - reservado < qtd) throw new Error('Saldo livre insuficiente. Providencie a reposição antes de reservar.');
-    return Number(db.prepare(`INSERT INTO correias_pedidos(operacao_token,equipamento_id,estoque_item_id,preventiva_execucao_id,mecanico_user_id,quantidade,observacao,empresa_consumidora,setor_consumidor) VALUES(?,?,?,?,?,?,?,?,?)`).run(data.operacao_token||null,equipamentoId,vinculo.estoque_item_id,execId,mecanicoId,qtd,String(data.observacao || '').trim(),String(data.empresa_consumidora).trim(),data.setor_consumidor).lastInsertRowid);
+    return Number(db.prepare(`INSERT INTO correias_pedidos(operacao_token,equipamento_id,estoque_item_id,preventiva_execucao_id,mecanico_user_id,quantidade,observacao,empresa_consumidora,setor_consumidor) VALUES(?,?,?,?,?,?,?,?,?)`).run(data.operacao_token||null,equipamentoId,vinculo.estoque_item_id,execId,mecanicoId,qtd,String(data.observacao || '').trim(),'',setor).lastInsertRowid);
   })();
 }
-function movimento(p, user, tipo, qtd) {
+function movimento(p, user, tipo, qtd, identificacao = null) {
   const item = db.prepare('SELECT saldo_atual,custo_unit FROM estoque_itens WHERE id=?').get(p.estoque_item_id);
   const anterior = Number(item.saldo_atual), posterior = anterior + (tipo.startsWith('ENTRADA') ? qtd : -qtd);
   if (posterior < 0) throw new Error('Saldo insuficiente.');
   db.prepare("UPDATE estoque_itens SET saldo_atual=?,updated_at=datetime('now') WHERE id=?").run(posterior,p.estoque_item_id);
-  return Number(db.prepare(`INSERT INTO estoque_movimentos(tipo,item_id,quantidade,origem,equipamento_id,usuario_id,mecanico_user_id,empresa_consumidora,setor_utilizacao,saldo_anterior,saldo_posterior,custo_unit,observacao) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(tipo,p.estoque_item_id,qtd,p.preventiva_execucao_id?'PREVENTIVA':'MANUAL',p.equipamento_id,user.id,p.mecanico_user_id,p.empresa_consumidora,p.setor_consumidor,anterior,posterior,item.custo_unit || null,`Pedido de correias #${p.id}; execução ${p.preventiva_execucao_id || 'avulsa'}`).lastInsertRowid);
+  const id=Number(db.prepare(`INSERT INTO estoque_movimentos(tipo,item_id,quantidade,origem,equipamento_id,usuario_id,mecanico_user_id,setor_utilizacao,saldo_anterior,saldo_posterior,custo_unit,observacao) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(tipo,p.estoque_item_id,qtd,p.preventiva_execucao_id?'PREVENTIVA':'MANUAL',p.equipamento_id,user.id,p.mecanico_user_id,identificacao?.setor||p.setor_consumidor,anterior,posterior,item.custo_unit || null,`Pedido de correias #${p.id}; execução ${p.preventiva_execucao_id || 'avulsa'}`).lastInsertRowid);
+  if(identificacao)db.prepare('UPDATE estoque_movimentos SET retirado_por_user_id=?,retirado_por_colaborador_id=?,entregue_por_user_id=?,identificacao_origem=?,entrega_operacao_token=? WHERE id=?').run(identificacao.pessoa.user_id||null,identificacao.pessoa.colaborador_id||null,user.id,identificacao.origem,identificacao.token,id);
+  return id;
 }
-function baixarPedido(id, user) {
+function baixarPedido(id, user, identificacao = null) {
   return db.transaction(() => {
     const p = get(id); if (p.movimento_id) return p.movimento_id;
     if (!['SOLICITADA','SEPARADA'].includes(p.status)) throw new Error('Pedido não disponível para retirada.');
     // Libera apenas a própria reserva dentro da mesma transação da baixa.
     db.prepare("UPDATE correias_pedidos SET status='RETIRADA',updated_at=datetime('now') WHERE id=?").run(p.id);
-    const mov = movimento(p,user,'SAIDA_REQUISICAO_INTERNA',p.quantidade);
+    const mov = movimento(p,user,'SAIDA_REQUISICAO_INTERNA',p.quantidade,identificacao);
     db.prepare('UPDATE correias_pedidos SET movimento_id=? WHERE id=?').run(mov,p.id);
     return mov;
   })();
 }
-function entregar(id, user) { almox(user); return baixarPedido(id, user); }
+function entregar(id, user, identificacao) { almox(user); return baixarPedido(id, user, identificacao); }
 
 function registrarTrocaPreventiva(data, user) {
   return db.transaction(() => {
@@ -99,4 +101,4 @@ function confirmarTroca(id,date,user) {
 }
 function alertas(equipamentoId=null) { if(!exists('correias_alertas')) return []; return db.prepare(`SELECT a.*,e.nome equipamento_nome,i.nome material_nome,p.troca_em,u.name mecanico_nome FROM correias_alertas a JOIN correias_pedidos p ON p.id=a.pedido_id JOIN equipamentos e ON e.id=a.equipamento_id JOIN estoque_itens i ON i.id=p.estoque_item_id JOIN users u ON u.id=p.mecanico_user_id ${equipamentoId?'WHERE a.equipamento_id=?':''} ORDER BY a.id DESC LIMIT 100`).all(...(equipamentoId?[Number(equipamentoId)]:[])); }
 function salvarPrazo(equipamentoId,prazo) { const n=quantidade(prazo); if(!db.prepare('SELECT id FROM equipamentos WHERE id=?').get(Number(equipamentoId))) throw new Error('Equipamento não encontrado.'); db.prepare('INSERT INTO correias_config_equipamento(equipamento_id,prazo_falha_dias) VALUES(?,?) ON CONFLICT(equipamento_id) DO UPDATE SET prazo_falha_dias=excluded.prazo_falha_dias').run(Number(equipamentoId),n); }
-module.exports={vinculos,list,solicitar,entregar,separar,cancelar,devolver,confirmarTroca,registrarTrocaPreventiva,alertas,salvarPrazo};
+module.exports={get,vinculos,list,solicitar,entregar,separar,cancelar,devolver,confirmarTroca,registrarTrocaPreventiva,alertas,salvarPrazo};

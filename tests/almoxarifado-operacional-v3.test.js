@@ -60,7 +60,7 @@ test('destino do recebimento segue o vínculo persistido e classificação fica 
 test('retirada aceita QR ou cadastro e sempre revalida a identidade no servidor', () => {
   const service = read('modules', 'estoque', 'estoque.reservas.service.js');
   const controller = read('modules', 'almoxarifado', 'retiradas-qr.controller.js');
-  const view = read('views', 'almoxarifado', 'retirada_qr.ejs');
+  const view = (read('views', 'almoxarifado', 'retirada_qr.ejs')+read('views','almoxarifado','_retirada-identidade.ejs'));
 
   assert.match(service, /function getPessoaByCadastro/);
   assert.match(service, /function listPessoasAtivas/);

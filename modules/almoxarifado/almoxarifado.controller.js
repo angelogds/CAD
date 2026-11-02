@@ -286,35 +286,12 @@ function receberItem(req, res) {
   res.redirect(destino);
 }
 
-function retirarItem(req, res) {
-  try {
-    estoqueService.registrarSaida({
-      solicitacao_id: Number(req.params.id),
-      solicitacao_item_id: Number(req.params.itemId),
-      quantidade: Number(req.body.quantidade || 0),
-      usuario_id: req.session.user.id,
-      observacao: req.body.observacao || null,
-      origem: "SOLICITACAO",
-    });
-    req.flash("success", "Retirada registrada na solicitação e saldo do estoque atualizado.");
-  } catch (e) {
-    req.flash("error", e.message);
-  }
-  res.redirect(`/almoxarifado/solicitacoes/${req.params.id}/conferir#materiais`);
+function retirarItem(req,res) {
+  return res.redirect('/almoxarifado/retiradas/qr?solicitacao_id='+Number(req.params.id));
 }
 
-function retirarTodos(req, res) {
-  try {
-    const resultados = estoqueService.registrarSaidasSolicitacao({
-      solicitacao_id: Number(req.params.id),
-      usuario_id: req.session.user.id,
-      observacao: req.body.observacao || null,
-    });
-    req.flash("success", `${resultados.length} item(ns) disponível(is) retirado(s) da solicitação.`);
-  } catch (e) {
-    req.flash("error", e.message);
-  }
-  res.redirect(`/almoxarifado/solicitacoes/${req.params.id}/conferir#materiais`);
+function retirarTodos(req,res) {
+  return res.redirect('/almoxarifado/retiradas/qr?solicitacao_id='+Number(req.params.id));
 }
 
 function finalizar(req, res) {
@@ -360,15 +337,8 @@ function reabrir(req, res) {
   res.redirect(`/almoxarifado/solicitacoes/${req.params.id}/conferir`);
 }
 
-function registrarSaida(req, res) {
-  try {
-    estoqueService.registrarSaida({ ...req.body, usuario_id: req.session.user.id });
-    req.flash("success", "Saída registrada e saldo do estoque atualizado.");
-  } catch (e) {
-    req.flash("error", e.message);
-  }
-  const contexto = String(req.body.contexto || "").toLowerCase() === "almoxarifado" ? "?contexto=almoxarifado" : "";
-  res.redirect(`/estoque/saidas/nova${contexto}`);
+function registrarSaida(req,res) {
+  return require('./retiradas-qr.controller').retirarLivre(req,res);
 }
 
 module.exports = {

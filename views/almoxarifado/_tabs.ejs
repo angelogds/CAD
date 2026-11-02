@@ -1,9 +1,9 @@
 <% const requestedTab=typeof tab!=='undefined'&&tab?tab:(typeof almoxTab!=='undefined'?almoxTab:''); const currentTab=requestedTab==='itens'?'estoque':requestedTab; const almoxPermitido=typeof canAccessModule!=='function'||typeof user==='undefined'||canAccessModule(user?.role,'almoxarifado_read'); const stockTabs=['estoque','separados','retiradas','correias']; %>
 <link rel="stylesheet" href="/css/almoxarifado-nav-v13.css?v=20261013-v1">
 <link rel="stylesheet" href="/css/almoxarifado-layout-v15.css?v=20261013-v1">
-<link rel="stylesheet" href="/css/almox-central.css?v=20261102-v2">
+<link rel="stylesheet" href="/css/almox-central.css?v=20261102-v3">
 <nav class="almox-tabs almox-tabs--central" aria-label="Navegação do Almoxarifado">
-<% (almoxPermitido?[['painel','Painel','/almoxarifado'],['recebimentos','Solicitações','/almoxarifado/recebimentos'],['estoque','Estoque','/almoxarifado/estoque'],['gerencial','Relatórios','/almoxarifado/gerencial']]:[['estoque','Estoque','/estoque'],['movimentos','Materiais retirados','/estoque/movimentos?tipo=SAIDA']]).forEach(([id,label,url])=>{ const active=id===currentTab||(id==='estoque'&&stockTabs.includes(currentTab)); %>
+<% (almoxPermitido?[['painel','Painel','/almoxarifado'],['recebimentos','Solicitações','/almoxarifado/recebimentos'],['estoque','Estoque','/almoxarifado/estoque'],['gerencial','Relatórios','/almoxarifado/gerencial']]:(typeof canAccessModule!=='function'||typeof user==='undefined'||canAccessModule(user?.role,'estoque_view')?[['estoque','Estoque','/estoque'],['movimentos','Materiais retirados','/estoque/movimentos?tipo=SAIDA']]:[['retiradas','Retirada','/almoxarifado/retiradas/qr']])).forEach(([id,label,url])=>{ const active=id===currentTab||(id==='estoque'&&stockTabs.includes(currentTab)); %>
 <a class="almox-tab <%=active?'active':''%>" href="<%=url%>" <%-active?'aria-current="page"':''%>>
 <%=label%>
 </a>

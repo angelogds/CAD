@@ -303,9 +303,7 @@ function insertMovimento(data) {
   return Number(db.prepare(`INSERT INTO estoque_movimentos (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).run(...vals).lastInsertRowid);
 }
 
-function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, nomeRetirante, entreguePorUserId, observacao, empresaConsumidora, setorConsumidor, retiradaLoteToken }) {
-  const qtd = Number(quantidade || 0);
-  if (!Number.isFinite(qtd) || !(qtd > 0)) throw new Error('Quantidade inválida para retirada.');
+function identificarRetirante({qrCode,pessoaTipo,pessoaId,nomeRetirante}) {
   const pessoa = qrCode ? getPessoaByQr(qrCode) : getPessoaByCadastro(pessoaTipo, pessoaId);
   if (!pessoa) throw new Error('Funcionário não identificado, inativo ou inválido. Use o QR ou selecione um cadastro ativo.');
   // Retirada sem QR exige que o almoxarife digite e confirme o nome.
@@ -315,6 +313,13 @@ function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, n
       throw new Error('Na retirada manual, digite o nome completo conforme o cadastro da pessoa selecionada.');
     }
   }
+  return pessoa;
+}
+
+function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, nomeRetirante, entreguePorUserId, observacao, setorConsumidor, equipamentoId, retiradaLoteToken }) {
+  const qtd = Number(quantidade || 0);
+  if (!Number.isFinite(qtd) || !(qtd > 0)) throw new Error('Quantidade inválida para retirada.');
+  const pessoa = identificarRetirante({qrCode,pessoaTipo,pessoaId,nomeRetirante});
 
   const resultado = db.transaction(() => {
     const reserva = db.prepare(`
@@ -331,7 +336,13 @@ function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, n
     if (!reserva) throw new Error('Reserva não encontrada.');
     fluxoSolicitacaoService.assertRetiradaPermitida(reserva.solicitacao_id, reserva.os_id);
 
-    if (setorConsumidor && !['RECICLAGEM','LOGISTICA','FRIGORIFICO','ADMINISTRATIVO'].includes(setorConsumidor)) throw new Error('Setor consumidor inválido.');
+    const setores=require('../compras/compras-setores');
+    const setor=setores.normalizeSetorCorporativo(setorConsumidor||reserva.setor_origem);
+    if (!Object.values(setores.SETORES).includes(setor)) throw new Error('Selecione um setor consumidor válido.');
+    const equipamento = Number(reserva.equipamento_id) || Number(equipamentoId) || null;
+    if (equipamentoId && (!Number.isSafeInteger(Number(equipamentoId)) || Number(equipamentoId)<=0)) throw new Error('Equipamento inválido.');
+    if (reserva.equipamento_id && equipamentoId && Number(equipamentoId)!==Number(reserva.equipamento_id)) throw new Error('O equipamento deve corresponder à solicitação.');
+    if (equipamento && !require('./estoque.service').listEquipamentosEstoque().some(e=>e.id===equipamento)) throw new Error('Equipamento não encontrado ou inativo.');
     const disponivelReserva = Math.max(Number(reserva.quantidade_reservada || 0) - Number(reserva.quantidade_retirada || 0), 0);
     if (!(disponivelReserva > 0)) throw new Error('Esta reserva já foi retirada integralmente.');
     if (qtd > disponivelReserva) throw new Error(`Quantidade acima da reserva disponível. Máximo: ${disponivelReserva}.`);
@@ -359,13 +370,12 @@ function retirarReserva({ reservaId, quantidade, qrCode, pessoaTipo, pessoaId, n
       : Number(reserva.estoque_custo_unit || 0);
     const movimentoId = insertMovimento({
       tipo: 'SAIDA_REQUISICAO_INTERNA',
-      empresa_consumidora: String(empresaConsumidora || reserva.setor_origem || '').trim(),
-      setor_utilizacao: setorConsumidor || reserva.setor_origem || null,
+      setor_utilizacao: setor,
       item_id: reserva.estoque_item_id,
       quantidade: qtd,
       origem: 'SOLICITACAO',
       os_id: reserva.os_id || null,
-      equipamento_id: reserva.equipamento_id || null,
+      equipamento_id: equipamento,
       solicitacao_id: reserva.solicitacao_id,
       solicitacao_item_id: reserva.solicitacao_item_id,
       usuario_id: entreguePorUserId || null,
@@ -415,8 +425,10 @@ function retirarSelecionados(data) {
   const pessoa = data.qrCode ? getPessoaByQr(data.qrCode) : getPessoaByCadastro(data.pessoaTipo, data.pessoaId);
   if (!pessoa) throw new Error('Identifique um funcionário ativo antes de confirmar a retirada.');
   const hash = require('node:crypto').createHash('sha256').update(JSON.stringify({ solicitacaoId, itens,
-    pessoa: [pessoa.identity_type, pessoa.id], nomeRetirante: data.nomeRetirante || '', observacao: data.observacao || '' })).digest('hex');
+    pessoa: [pessoa.identity_type, pessoa.id], nomeRetirante: data.nomeRetirante || '', observacao: data.observacao || '',
+    ...(data.equipamentoId||data.setorConsumidor?{equipamentoId:Number(data.equipamentoId)||null,setorConsumidor:data.setorConsumidor||''}:{}) })).digest('hex');
   return db.transaction(() => {
+    if (tableExists('estoque_entrega_operacoes') && db.prepare('SELECT token FROM estoque_entrega_operacoes WHERE token=?').get(token)) throw new Error('Operação já utilizada para outra retirada.');
     const anterior = db.prepare('SELECT * FROM estoque_retirada_operacoes WHERE token=?').get(token);
     if (anterior) {
       if (anterior.solicitacao_id !== solicitacaoId || anterior.usuario_id !== Number(data.entreguePorUserId) || anterior.payload_hash !== hash) throw new Error('Operação já utilizada para outra retirada.');
@@ -462,6 +474,7 @@ function consultarRetiradas(filters={}) {
   if(filters.fim){where.push(`date(${data})<=date(?)`);params.push(filters.fim);}
   if(filters.tipo&&filters.tipo!=='SAIDA'){where.push('m.tipo=?');params.push(filters.tipo);}
   if(filters.item_id){where.push('m.item_id=?');params.push(Number(filters.item_id));}
+  if(filters.operacaoToken){where.push('m.entrega_operacao_token=?');params.push(String(filters.operacaoToken));}
   const joins=`FROM estoque_movimentos m JOIN estoque_itens i ON i.id=m.item_id
     LEFT JOIN solicitacoes s ON s.id=m.solicitacao_id LEFT JOIN equipamentos e ON e.id=m.equipamento_id
     LEFT JOIN colaboradores c ON c.id=m.retirado_por_colaborador_id
@@ -481,6 +494,7 @@ function consultarRetiradas(filters={}) {
 }
 
 module.exports = {
+  identificarRetirante,
   retirarSelecionados,
   historicoRetiradas,
   consultarRetiradas,

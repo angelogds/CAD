@@ -24,18 +24,21 @@ function consultar(filters = {}) {
   const registros = solicitacoes.map(s => {
     const itens = porSolicitacao.get(s.id) || [];
     const comprados = itens.filter(i => String(i.status_compra).toUpperCase() === 'COMPRADO' && Number(i.qtd_comprada) > 0);
-    if (!comprados.length) return null;
+    const status = String(s.status).trim().toUpperCase();
+    const cotados = itens.filter(i => String(i.status_cotacao).toUpperCase() === 'COTADO');
+    const emCotacao = ['EM_COTACAO','COTADA','AGUARDANDO_APROVACAO','APROVADA_DIRETORIA','DEVOLVIDA_REVISAO'].includes(status);
+    if (status === 'REPROVADA' || (!comprados.length && !cotados.length && !emCotacao)) return null;
     const aReceber = comprados.filter(i => Number(i.qtd_comprada || 0) > Number(i.qtd_recebida_total || 0));
     const aguardando = itens.filter(i => !['COMPRADO', 'ATENDIDO_ESTOQUE'].includes(i.status_compra));
     const terminal = ['FECHADA','FECHADO','ENTREGUE_SOLICITANTE'].includes(String(s.status).trim().toUpperCase());
-    const encerrada = terminal || !aReceber.length;
+    const encerrada = terminal || (comprados.length > 0 && !aReceber.length && !aguardando.length);
     const parcial = aReceber.some(i => Number(i.qtd_recebida_total) > 0) || (aReceber.length && comprados.some(i => Number(i.qtd_recebida_total) > 0));
-    const etapa = encerrada ? 'RECEBIDA' : aReceber.length ? (parcial ? 'PARCIAL' : 'A_RECEBER') : 'AGUARDANDO_COMPRAS';
+    const etapa = terminal ? 'ENCERRADA' : encerrada ? 'RECEBIDA' : aReceber.length ? (parcial ? 'PARCIAL' : 'A_RECEBER') : cotados.length ? 'COTADA' : 'EM_COTACAO';
     return { ...s, equipamento_nome: itens[0]?.equipamento_nome || null, equipamento_codigo: itens[0]?.equipamento_codigo || null,
       setor_exibicao: normalizeSetorCorporativo(s.setor_origem) || 'Não informado',
       itens_total: itens.length, itens_comprados: comprados.length, itens_a_receber: aReceber.length,
       itens_aguardando: aguardando.length, encerrada, etapa,
-      etapa_nome: { RECEBIDA: 'Recebimento concluído', PARCIAL: 'Recebimento parcial', A_RECEBER: 'Pronta para receber', AGUARDANDO_COMPRAS: 'Aguardando Compras' }[etapa],
+      etapa_nome: { ENCERRADA:'Encerrada', RECEBIDA:'Recebimento concluído', PARCIAL:'Recebimento parcial', A_RECEBER:'Compra confirmada · pronta para receber', COTADA:'Cotada · aguardando compra', EM_COTACAO:'Em cotação' }[etapa],
       divergencia_fechada: s.status === 'FECHADA' && aReceber.length > 0,
       busca: token([s.numero, s.titulo, s.solicitante_nome, s.fornecedor_nome, s.fornecedor, s.setor_origem,
         itens[0]?.equipamento_nome, itens[0]?.equipamento_codigo, ...itens.flatMap(i => [i.item_nome,i.fornecedor_item_nome])].join(' ')) };
@@ -49,7 +52,7 @@ function consultar(filters = {}) {
   const filas = registros.filter(s => (aba === 'FECHADAS' ? s.encerrada : !s.encerrada)
     && (!situacao || situacao === 'TODAS' ||
       (situacao === 'PENDENTES' ? s.itens_a_receber > 0 : situacao === 'NAO_CHEGOU' ? s.etapa === 'A_RECEBER' : situacao === 'PARCIAL' ? s.etapa === 'PARCIAL' :
-        situacao === 'AGUARDANDO_COMPRAS' ? s.etapa === 'AGUARDANDO_COMPRAS' : true)))
+        situacao === 'AGUARDANDO_COMPRAS' ? ['COTADA','EM_COTACAO'].includes(s.etapa) : true)))
     .sort((a,b) => Number(b.itens_a_receber > 0) - Number(a.itens_a_receber > 0) || b.id - a.id);
   const paginas = Math.max(1, Math.ceil(filas.length / 20));
   const pagina = Math.min(paginas, Math.max(1, Math.trunc(Number(filters.pagina) || 1)));

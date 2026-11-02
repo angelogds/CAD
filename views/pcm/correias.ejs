@@ -35,8 +35,9 @@
         <% if(canManagePcm){ %>
         <form method="POST" action="/pcm/correias/planos" class="belt-form-grid" data-lock-submit>
           <label class="pcm-field"><span>Equipamento</span><select class="pcm-input" name="equipamento_id" required><option value="">Selecione</option><% equipamentos.forEach(e=>{ %><option value="<%=e.id%>"><%=e.codigo?e.codigo+' • ':''%><%=e.nome%></option><% }) %></select></label>
-          <label class="pcm-field"><span>Correia do estoque</span><select class="pcm-input" name="estoque_item_id" required><option value="">Selecione</option><% correias.forEach(i=>{ %><option value="<%=i.id%>"><%=i.codigo?i.codigo+' • ':''%><%=i.nome%> — livre <%=Number(i.saldo_livre ?? i.saldo_atual ?? 0)%></option><% }) %></select></label>
-          <label class="pcm-field"><span>Quantidade por troca</span><input class="pcm-input" type="number" min="0.01" step="0.01" name="quantidade_material" value="2" required><small>Ex.: par de correias = 2 unidades.</small></label>
+          <label class="pcm-field"><span>Referência da correia</span><select class="pcm-input" name="estoque_item_id" data-belt-reference><option value="">Cadastrar nova referência</option><% correias.forEach(i=>{ %><option value="<%=i.id%>"><%=i.codigo?i.codigo+' • ':''%><%=i.nome%> — livre <%=Number(i.saldo_livre ?? i.saldo_atual ?? 0)%></option><% }) %></select></label>
+          <fieldset data-new-belt style="grid-column:1/-1;border:1px solid #d4e5da;border-radius:12px;padding:12px"><legend>Nova referência no catálogo</legend><div class="belt-form-grid"><label class="pcm-field"><span>Código / referência única</span><input class="pcm-input" name="correia_codigo" maxlength="80" placeholder="Referência completa do fabricante"></label><label class="pcm-field"><span>Descrição e medida</span><input class="pcm-input" name="correia_nome" maxlength="200" placeholder="Modelo, perfil e comprimento"></label></div><p>O cadastro começa sem saldo. A entrada física será registrada no almoxarifado.</p></fieldset>
+          <label class="pcm-field"><span>Quantidade por troca</span><input class="pcm-input" type="number" min="1" step="1" name="quantidade_material" required><small>Ex.: par de correias = 2 unidades.</small></label>
           <label class="pcm-field"><span>Conjuntos mínimos em reserva</span><input class="pcm-input" type="number" min="1" step="1" name="estoque_minimo_conjuntos" value="1" required><small>Padrão: pelo menos 1 conjunto por equipamento.</small></label>
           <label class="pcm-field"><span>Frequência</span><select class="pcm-input" name="frequencia_tipo"><option value="mensal">Mensal</option><option value="semanal">Semanal</option><option value="diario">Em dias</option><option value="anual">Anual</option></select></label>
           <label class="pcm-field"><span>Intervalo</span><input class="pcm-input" type="number" min="1" step="1" name="frequencia_valor" value="6" required></label>
@@ -75,3 +76,7 @@
     </section>
   </main></div>
 </div>
+
+<script>
+(()=>{const reference=document.querySelector('[data-belt-reference]'),fields=document.querySelector('[data-new-belt]');if(!reference||!fields)return;const refresh=()=>{fields.hidden=Boolean(reference.value);fields.querySelectorAll('input').forEach(i=>{i.required=!reference.value;i.disabled=Boolean(reference.value);});};reference.addEventListener('change',refresh);refresh();})();
+</script>
