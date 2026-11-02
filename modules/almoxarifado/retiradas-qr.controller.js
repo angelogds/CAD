@@ -62,8 +62,37 @@ function scanner(req, res) {
     pessoa,
     colaborador: pessoa,
     grupos,
+    solicitacoes: reservaService.listSolicitacoes().filter(g => g.itens.some(i => Number(i.quantidade_disponivel) > 0)),
+    historico: reservaService.historicoRetiradas(solicitacaoId),
+    operacaoToken: require('node:crypto').randomUUID(),
+    canWithdraw: require('../../config/rbac').ACCESS.estoque_retirada.includes(normalizeRole(req.session.user.role)),
     podeCadastrarPessoa: ['ADMIN','ALMOXARIFADO'].includes(normalizeRole(req.session.user.role)),
   });
+}
+
+function retirarLote(req, res) {
+  const solicitacaoId = Number(req.params.id);
+  const ids = Array.isArray(req.body.reserva_id) ? req.body.reserva_id : [req.body.reserva_id].filter(Boolean);
+  let concluida = false;
+  try {
+    const resultado = reservaService.retirarSelecionados({ solicitacaoId, operacaoToken: req.body.operacao_token,
+      itens: ids.map(id => ({ reservaId: id, quantidade: req.body[`quantidade_${id}`] })),
+      qrCode: String(req.body.qr_code || '').trim(), pessoaTipo: req.body.pessoa_tipo, pessoaId: req.body.pessoa_id,
+      nomeRetirante: req.body.nome_retirante, entreguePorUserId: req.session.user.id, observacao: req.body.observacao });
+    concluida = true;
+    req.flash('success', resultado.duplicado ? 'Esta retirada já foi registrada. O estoque foi mantido.'
+      : `${resultado.itens} material(is) entregue(s) a ${resultado.pessoaNome}. Retirada registrada no histórico.`);
+  } catch (error) { req.flash('error', error.message || 'Não foi possível confirmar a retirada. Nenhum item foi baixado.'); }
+  const params = new URLSearchParams({solicitacao_id:String(solicitacaoId)});
+  // Uma falha mantém a conferência atual. Uma entrega concluída limpa a pessoa
+  // e abre o histórico, para que a próxima entrega exija nova identificação.
+  if (!concluida) {
+    if (req.body.qr_code) params.set('codigo', String(req.body.qr_code));
+    else if (req.body.pessoa_tipo && req.body.pessoa_id) {
+      params.set('pessoa_tipo', String(req.body.pessoa_tipo)); params.set('pessoa_id', String(req.body.pessoa_id));
+    }
+  }
+  return res.redirect(`/almoxarifado/retiradas/qr?${params}#${concluida?'historico-retirada':'materiais-retirada'}`);
 }
 
 function retirar(req, res) {
@@ -99,4 +128,4 @@ function retirar(req, res) {
   return res.redirect(`/almoxarifado/retiradas/qr?${params.toString()}`);
 }
 
-module.exports = { scanner, retirar, cadastrarColaborador };
+module.exports = { scanner, retirar, retirarLote, cadastrarColaborador };

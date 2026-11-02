@@ -31,12 +31,13 @@ function index(req, res) {
     centro_custo: String(req.query.centro_custo || "").trim(),
     situacao: ["", "ok", "baixo", "zerado"].includes(req.query.situacao || "") ? (req.query.situacao || "") : "",
   };
-  const baseFilters = { ...filtros, situacao: "" };
-  const itens = filtrarSituacaoLivre(withReserva(service.listItens(baseFilters)), filtros.situacao);
+  const baseFilters = { ...filtros, situacao: "", destino: 'GERAL' };
+  const baseItens = withReserva(service.listItens(baseFilters));
+  const itens = filtrarSituacaoLivre(baseItens, filtros.situacao);
   const inteligencia = service.getInteligenciaReposicao(baseFilters);
   res.render("estoque/index", {
     title: "Estoque", activeMenu: "estoque",
-    cards: { ...service.dashboard(), ...reservaService.dashboard() },
+    cards: { ...service.dashboard(), ...reservaService.dashboard(), itens: baseItens.length },
     itens, categorias: service.listCategorias(), locais: service.listLocais(),
     centrosCusto: service.listCentrosCusto(), setoresEstoque: service.SETORES_ESTOQUE,
     inteligencia, filtros,

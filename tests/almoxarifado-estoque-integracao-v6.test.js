@@ -20,7 +20,7 @@ test('V6 corrige a consulta de subcategorias que causava erro 500 por coluna ati
 test('V6 mantém as ligações principais Almoxarifado, Estoque e Retirada em rotas reais', () => {
   const almoxRoutes = read('modules','almoxarifado','almoxarifado.routes.js');
   const estoqueRoutes = read('modules','estoque','estoque.routes.js');
-  const tabs = read('views','almoxarifado','_tabs.ejs');
+  const tabs = ejs.render(read('views','almoxarifado','_tabs.ejs'),{tab:'estoque'});
 
   assert.match(almoxRoutes, /router\.get\("\/estoque"[\s\S]*ctrl\.estoqueOperacional/);
   assert.match(almoxRoutes, /router\.get\("\/recebimentos"[\s\S]*ctrl\.recebimentos/);
@@ -31,13 +31,13 @@ test('V6 mantém as ligações principais Almoxarifado, Estoque e Retirada em ro
 
   assert.match(tabs, /href="\/almoxarifado\/estoque"/);
   assert.doesNotMatch(tabs, /href="\/almoxarifado\/recebimentos\?fila=A_CAMINHO"/);
-  assert.match(tabs, /href="\/almoxarifado\/recebimentos\?status=COMPRADA"/);
+  assert.match(tabs, /href="\/almoxarifado\/recebimentos"/);
   assert.match(tabs, /href="\/estoque\/reservas"/);
   assert.match(tabs, /href="\/almoxarifado\/retiradas\/qr"/);
 });
 
 test('V6 deixa somente uma entrada de retirada no menu principal do Almoxarifado', () => {
-  const tabs = read('views','almoxarifado','_tabs.ejs');
+  const tabs = ejs.render(read('views','almoxarifado','_tabs.ejs'),{tab:'estoque'});
   const links = tabs.match(/href="\/almoxarifado\/retiradas\/qr"/g) || [];
   assert.equal(links.length, 1);
   assert.match(tabs, />\s*Retirada\s*<\/a>/);

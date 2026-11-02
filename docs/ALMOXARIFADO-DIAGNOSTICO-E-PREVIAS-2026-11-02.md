@@ -1,5 +1,7 @@
 # Almoxarifado — diagnóstico e propostas visuais, 02/11/2026
 
+**Evolução posterior:** o responsável autorizou consolidar A/B/C e publicar o retrofit. Veja a [implementação do fluxo no celular](ALMOXARIFADO-RETROFIT-MOBILE-2026-11-02.md). Este documento preserva o diagnóstico e a situação das propostas antes dessa autorização.
+
 ## Regra solicitada pelo responsável
 
 - Reunir painel, solicitações, estoque e relatórios, reduzindo ações repetidas.

@@ -1,6 +1,6 @@
 const { randomUUID } = require("node:crypto");
 const service = require("./almoxarifado.service");
-const { montarFaixasRecebimento } = require("./almoxarifado.grafico");
+const central = require("./almoxarifado.solicitacoes.service");
 const estoqueService = require("../estoque/estoque.service");
 const reservaService = require("../estoque/estoque.reservas.service");
 const alertsHub = require("../alerts/alerts.hub");
@@ -28,53 +28,17 @@ function estoqueComDisponivel(itens) {
 }
 
 function index(req, res) {
-  const qCompra = String(req.query.q_compra || "").trim();
-  const compraEstado = ["TODOS","COTADO","NAO_COTADO"].includes(String(req.query.compra_estado || "").toUpperCase())
-    ? String(req.query.compra_estado || "").toUpperCase() : "TODOS";
-  const qRecebimento = String(req.query.q_recebimento || "").trim();
-  const recebimentoEstado = ["TODOS","CHEGOU","NAO_CHEGOU"].includes(String(req.query.recebimento_estado || "").toUpperCase())
-    ? String(req.query.recebimento_estado || "").toUpperCase() : "TODOS";
-
-  // Resumo gerencial somente leitura, derivado da fonte oficial de recebimentos.
-  // Não altera saldos nem gera novos registros de movimentação.
-  const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const registrosGerenciais = service.listRecebimentos({ status: "TODAS", query: "" });
-  const pedidosComprados = registrosGerenciais.filter((r) => Number(r.qtd_comprada_total || 0) > 0);
-  const painelGerencial = {
-    pedidosComprados: pedidosComprados.length,
-    aguardandoRecebimento: pedidosComprados.filter((r) => Number(r.qtd_pendente_total || 0) > 0).length,
-    recebidosParcialmente: pedidosComprados.filter((r) => Number(r.qtd_recebida_total_agregada || 0) > 0 && Number(r.qtd_pendente_total || 0) > 0).length,
-    atrasados: pedidosComprados.filter((r) => r.previsao_entrega && String(r.previsao_entrega).slice(0,10) < hoje && Number(r.qtd_pendente_total || 0) > 0).length,
-    semPrevisao: pedidosComprados.filter((r) => !r.previsao_entrega && Number(r.qtd_pendente_total || 0) > 0).length,
-  };
-
-  let compras = service.listRecebimentos({ status: "TODAS", query: qCompra })
-    // Compras a receber: encerrado o recebimento, deixa de ser pendência aqui.
-    // Permanecem consultáveis no histórico oficial do Almoxarifado.
-    .filter((row) => ["EM_COTACAO","COMPRADA","EM_RECEBIMENTO","RECEBIDA_PARCIAL"].includes(String(row.status || "").toUpperCase()));
-  if (compraEstado === "COTADO") compras = compras.filter((row) => Number(row.itens_total || 0) > 0 && Number(row.itens_cotados || 0) >= Number(row.itens_total || 0));
-  if (compraEstado === "NAO_COTADO") compras = compras.filter((row) => Number(row.itens_total || 0) === 0 || Number(row.itens_cotados || 0) < Number(row.itens_total || 0));
-
-  let recebimentos = service.listRecebimentos({ status: "TODAS", query: qRecebimento })
-    .filter((row) => Number(row.qtd_comprada_total || 0) > 0);
-  if (recebimentoEstado === "CHEGOU") recebimentos = recebimentos.filter((row) => Number(row.qtd_recebida_total_agregada || 0) > 0);
-  if (recebimentoEstado === "NAO_CHEGOU") recebimentos = recebimentos.filter((row) => Number(row.qtd_recebida_total_agregada || 0) <= 0);
-
-  res.render("almoxarifado/index", {
-    title: "Central do Almoxarifado",
-    activeMenu: "almoxarifado",
-    tab: "painel",
-    painelGerencial,
-    reposicao: require('../estoque/estoque.reposicao.service').resumo().filter(i=>i.situacao!=='OK').slice(0,20),
-    faixasRecebimento: montarFaixasRecebimento(painelGerencial),
-    compras: compras.slice(0, 20),
-    recebimentos: recebimentos.slice(0, 20),
-    qCompra,
-    compraEstado,
-    qRecebimento,
-    recebimentoEstado,
-    canManage: canManageAlmox(req.session.user),
-    canWithdraw: canWithdrawStock(req.session.user),
+  const consulta = central.consultar({});
+  const separados = reservaService.listSolicitacoes().filter(g => g.itens.some(i => Number(i.quantidade_disponivel) > 0));
+  const reposicao = require('../estoque/estoque.reposicao.service').resumo().filter(i => i.situacao !== 'OK');
+  const prateleira = estoqueService.listItens({ destino: 'GERAL' });
+  res.render('almoxarifado/index', {
+    title: 'Central do Almoxarifado', activeMenu: 'almoxarifado', tab: 'painel',
+    resumo: consulta.resumo, lista: consulta.lista.slice(0, 6), separados: separados.slice(0, 4),
+    totalSeparados: separados.length, reposicao: reposicao.slice(0, 6),
+    setores: estoqueService.SETORES_ESTOQUE.map(setor => ({ nome: setor,
+      itens: prateleira.filter(i => i.setor_utilizacao_exibicao === setor).length })),
+    canManage: canManageAlmox(req.session.user), canWithdraw: canWithdrawStock(req.session.user),
   });
 }
 
@@ -89,11 +53,12 @@ function estoqueOperacional(req, res) {
     subcategoria_id: req.query.subcategoria_id || "",
     setor_utilizacao: req.query.setor_utilizacao || "",
     equipamento_id: req.query.equipamento_id || "",
-    destino: ["", "GERAL", "EQUIPAMENTO"].includes(String(req.query.destino || "").toUpperCase())
-      ? String(req.query.destino || "").toUpperCase() : "",
+    destino: ["GERAL", "EQUIPAMENTO"].includes(String(req.query.destino || "GERAL").toUpperCase())
+      ? String(req.query.destino || "GERAL").toUpperCase() : "GERAL",
     situacao: situacoesValidas.includes(situacaoRaw) ? situacaoRaw : "",
     ordem: ordensValidas.includes(ordemRaw) ? ordemRaw : "NOME",
   };
+  if (filtros.equipamento_id) filtros.destino = 'EQUIPAMENTO';
   const itensBase = estoqueComDisponivel(estoqueService.listItens(filtros));
   const semEndereco = (item) => !String(item.endereco_completo || "").trim();
   const abaixoMinimo = (item) => Number(item.saldo_minimo || 0) > 0
@@ -133,6 +98,7 @@ function estoqueOperacional(req, res) {
       saldo_disponivel: itensCategoria.reduce((sum, item) => sum + Number(item.saldo_disponivel || 0), 0),
     };
   });
+  const prateleiraResumo = estoqueService.listItens({destino:'GERAL'});
 
   res.render("almoxarifado/estoque", {
     title: "Estoque do Almoxarifado",
@@ -144,6 +110,7 @@ function estoqueOperacional(req, res) {
     locais: estoqueService.listLocais(),
     categoriasResumo,
     setoresEstoque: estoqueService.SETORES_ESTOQUE,
+    setoresResumo: estoqueService.SETORES_ESTOQUE.map(setor => ({nome:setor,itens:prateleiraResumo.filter(i=>i.setor_utilizacao_exibicao===setor).length})),
     equipamentos: estoqueService.listEquipamentosEstoque(),
     filtros,
     canManage: canManageAlmox(req.session.user),
@@ -234,40 +201,16 @@ function publicarMaterialDisponivel({ solicitacaoId, itemId, quantidadeRecebida,
 }
 
 function recebimentos(req, res) {
-  // Uma única fila de compras com filtros por quantidades efetivamente recebidas.
-  // Preserva URLs antigas de status/fila para links já enviados aos usuários.
-  const antigoStatus = String(req.query.status || '').trim().toUpperCase();
-  const filtroSolicitado = String(req.query.situacao || (
-    ['RECEBIDA_TOTAL', 'SEPARADA_PARA_RETIRADA', 'ENTREGUE_SOLICITANTE', 'FECHADA'].includes(antigoStatus) ? 'TOTAL' :
-    ['RECEBIDA_PARCIAL', 'EM_RECEBIMENTO'].includes(antigoStatus) ? 'PARCIAL' :
-    antigoStatus === 'TODAS' || antigoStatus === 'EM_COTACAO' ? 'TODAS' : 'PENDENTES'
-  )).trim().toUpperCase();
-  const situacao = ['PENDENTES', 'NAO_CHEGOU', 'PARCIAL', 'TOTAL', 'TODAS'].includes(filtroSolicitado)
-    ? filtroSolicitado : 'PENDENTES';
-  const q = String(req.query.q || '').trim();
-  const classificacao = (row) => {
-    const pendente = Number(row.qtd_pendente_total || 0);
-    const recebida = Number(row.qtd_recebida_total_agregada || 0);
-    return pendente <= 0 ? 'TOTAL' : recebida > 0 ? 'PARCIAL' : 'NAO_CHEGOU';
-  };
-  const compras = service.listRecebimentos({ status: 'TODAS', query: q })
-    .filter(row => Number(row.qtd_comprada_total || 0) > 0)
-    .map(row => ({ ...row, situacao_recebimento: classificacao(row) }));
-  const contagens = {
-    PENDENTES: compras.filter(row => row.situacao_recebimento !== 'TOTAL').length,
-    NAO_CHEGOU: compras.filter(row => row.situacao_recebimento === 'NAO_CHEGOU').length,
-    PARCIAL: compras.filter(row => row.situacao_recebimento === 'PARCIAL').length,
-    TOTAL: compras.filter(row => row.situacao_recebimento === 'TOTAL').length,
-    TODAS: compras.length,
-  };
-  const lista = compras.filter(row => situacao === 'TODAS'
-    || (situacao === 'PENDENTES' ? row.situacao_recebimento !== 'TOTAL' : row.situacao_recebimento === situacao));
-  res.render("almoxarifado/recebimentos", {
-    title: "Compras a receber",
-    activeMenu: "almoxarifado",
-    lista, situacao, contagens,
-    status: "TODAS", q,
-    canManage: canManageAlmox(req.session.user),
+  const antigoStatus = String(req.query.status || '').toUpperCase();
+  const situacao = String(req.query.situacao || '').toUpperCase();
+  const consulta = central.consultar({ ...req.query, setor: req.query.setor,
+    aba: req.query.aba || (situacao === 'TOTAL' || ['RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SOLICITANTE','FECHADA'].includes(antigoStatus) ? 'FECHADAS' : 'ABERTAS') });
+  const selecionadaId = Number(req.query.solicitacao_id || 0);
+  const sol = consulta.idsVisiveis.has(selecionadaId) ? service.getSolicitacao(selecionadaId) : null;
+  res.render('almoxarifado/recebimentos', {
+    title: 'Solicitações do Almoxarifado', activeMenu: 'almoxarifado', tab: 'recebimentos',
+    consulta, sol, setores: estoqueService.SETORES_ESTOQUE.filter(s => s !== 'COMUM'),
+    operacaoToken: randomUUID(), canManage: canManageAlmox(req.session.user),
     canWithdraw: canWithdrawStock(req.session.user),
   });
 }
@@ -300,6 +243,9 @@ function conferir(req, res) {
 }
 
 function receberItem(req, res) {
+  const destino = req.body.retorno_central === '1'
+    ? `/almoxarifado/recebimentos?solicitacao_id=${Number(req.params.id)}#conferencia`
+    : `/almoxarifado/solicitacoes/${Number(req.params.id)}/conferir#materiais`;
   try {
     const quantidadeRecebida = Number(req.body.qtd_recebida_agora || 0);
     const solicitacaoId = Number(req.params.id);
@@ -317,13 +263,12 @@ function receberItem(req, res) {
       enderecoEstante: req.body.endereco_estante,
       enderecoPrateleira: req.body.endereco_prateleira,
       enderecoPosicao: req.body.endereco_posicao,
-      destinoEstoque: req.body.destino_estoque || "GERAL",
       userId: req.session.user.id,
     });
 
     if (resultado.duplicado) {
       req.flash('success', 'Este recebimento já foi registrado. O saldo foi mantido.');
-      return res.redirect(`/almoxarifado/solicitacoes/${req.params.id}/conferir#materiais`);
+      return res.redirect(destino);
     }
     // O evento só é emitido depois que receberItem conclui a transação e atualiza
     // o estoque. Se a solicitação não estiver vinculada a uma OS, nenhum alerta
@@ -338,7 +283,7 @@ function receberItem(req, res) {
   } catch (e) {
     req.flash("error", e.message);
   }
-  res.redirect(`/almoxarifado/solicitacoes/${req.params.id}/conferir#materiais`);
+  res.redirect(destino);
 }
 
 function retirarItem(req, res) {

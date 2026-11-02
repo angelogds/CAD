@@ -96,7 +96,7 @@ test('recebimento parcial não encerra saldo pendente e repetição do envio nã
   almox.receberItem({solicitacaoId:solId,itemId,qtdAgora:7,userId:almoxUser.id,operacaoToken:'partial-2'});
   assert.equal(estoque.getItem(id).saldo_atual,10);
   assert.ok(!compras.listSolicitacoesPorStatus().some(s=>s.id===solId));
-  assert.equal(require('../modules/estoque/estoque.reservas.service').resumoPorItem().get(id),10);
+  assert.equal(require('../modules/estoque/estoque.reservas.service').resumoPorItem().get(id)||0,0);
 });
 
 test('classificação automática herda endereço sem inventar especificação e migration é idempotente',()=>{
@@ -114,8 +114,8 @@ test('classificação automática herda endereço sem inventar especificação e
 test('telas operacionais renderizam compras unificadas com busca e filtros',()=>{
   const ejs=require('ejs');
   const render=(file,locals)=>ejs.render(fs.readFileSync(path.join(__dirname,'../views',file),'utf8'),{layout:()=>{},fmtBR:v=>String(v),...locals},{filename:path.join(__dirname,'../views',file)});
-  const filas=render('almoxarifado/recebimentos.ejs',{user:almoxUser,lista:[],status:'TODAS',situacao:'PENDENTES',contagens:{PENDENTES:0,NAO_CHEGOU:0,PARCIAL:0,TOTAL:0,TODAS:0},q:'correia',canManage:true,canWithdraw:false});
-  assert.match(filas,/<h1>Compras a receber<\/h1>/);assert.match(filas,/name="situacao" value="PENDENTES"/);assert.doesNotMatch(filas,/Compras a caminho/);
+  const filas=render('almoxarifado/recebimentos.ejs',{user:almoxUser,consulta:require('../modules/almoxarifado/almoxarifado.solicitacoes.service').consultar({q:'correia'}),sol:null,setores:[],operacaoToken:'view-test',canManage:true,canWithdraw:false});
+  assert.match(filas,/<h1>Solicitações<\/h1>/);assert.match(filas,/name="situacao"/);assert.doesNotMatch(filas,/Compras a caminho/);
   const base={pedidos:belts.list(),equipamentos:legacy.listEquipamentos(),mecanicos:[mecanico],vinculos:belts.vinculos(eq),operacaoToken:'view-test'};
   const readOnly=render('almoxarifado/correias.ejs',{...base,user:{role:'DIRETORIA'}});assert.doesNotMatch(readOnly,/action="\/almoxarifado\/correias\/avulsa"/);
   const editable=render('almoxarifado/correias.ejs',{...base,user:almoxUser});assert.match(editable,/name="empresa_consumidora"/);assert.match(editable,/name="operacao_token"/);

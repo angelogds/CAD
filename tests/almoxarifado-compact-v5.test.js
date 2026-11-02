@@ -1,58 +1,51 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const ejs = require('ejs');
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const ejs=require('ejs');
+const root=path.join(__dirname,'../views/almoxarifado');
+const render=(file,data)=>ejs.render(fs.readFileSync(path.join(root,file),'utf8'),{layout(){},...data},{filename:path.join(root,file)});
+const sol={id:1,numero:'SOL-TESTE',titulo:'Teste',status:'EM_COTACAO',setor_origem:'RECICLAGEM',itens:[
+  {id:11,item_nome:'Fio <teste>',unidade:'UN',status_compra:'COMPRADO',qtd_comprada:4,qtd_recebida_total:1},
+  {id:12,item_nome:'Alicate pendente',unidade:'UN',status_compra:'PENDENTE',qtd_solicitada:2},
+  {id:13,item_nome:'Cancelado oculto',status_compra:'CANCELADO',qtd_comprada:7}
+]};
 
-const root = path.join(__dirname, '..');
-const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
-
-test('V5 remove KPIs duplicados e concentra filtro e busca em uma única faixa', () => {
-  const view = read('views','almoxarifado','recebimentos.ejs');
-  assert.doesNotMatch(view, /almox-flow-kpis/);
-  assert.doesNotMatch(view, /Acompanhamento, sem entrada/);
-  assert.doesNotMatch(view, /Compras liberadas/);
-  assert.match(view, /almox-compact-toolbar/);
-  assert.match(view, /Buscar solicitação, material, equipamento ou fornecedor/);
-  assert.match(view, /Não chegou/);
-  assert.match(view, /Pendentes/);
+test('conferência de pedido misto recebe só a linha comprada, limita ao restante e escapa descrição',()=>{
+  const html=render('_itens-recebimento.ejs',{sol,canManage:true,operacaoToken:'teste'});
+  assert.equal((html.match(/<form /g)||[]).length,1);
+  assert.match(html,/itens\/11\/receber/);
+  assert.match(html,/max="3"/);
+  assert.match(html,/name="operacao_token" value="teste-11"/);
+  assert.match(html,/Fio &lt;teste&gt;/);
+  assert.match(html,/Alicate pendente/);
+  assert.doesNotMatch(html,/Cancelado oculto/);
+  assert.doesNotMatch(html,/name="destino_estoque"|name="categoria_id"/);
+  assert.equal((html.match(/>OK<\/button>/g)||[]).length,1);
 });
 
-test('V5 reduz a lista para cinco colunas operacionais', () => {
-  const view = read('views','almoxarifado','recebimentos.ejs');
-  assert.match(view, /Solicitação[\s\S]*Aplicação[\s\S]*Andamento[\s\S]*Fornecedor \/ previsão[\s\S]*Ação/);
-  assert.doesNotMatch(view, />OS \/ Equipamento<\/span><span>Solicitante/);
-  assert.doesNotMatch(view, /almox-flow-counts/);
-  assert.doesNotMatch(view, /almox-dual-progress/);
-  assert.match(view, /almox-compact-progress__track/);
-  assert.match(view, /s\.solicitante_nome[\s\S]*s\.setor_origem/);
-  assert.match(view, /s\.equipamento_nome \|\| 'Sem equipamento'/);
+test('perfil de consulta vê os itens sem controles de recebimento',()=>{
+  const html=render('_itens-recebimento.ejs',{sol,canManage:false,operacaoToken:'teste'});
+  assert.doesNotMatch(html,/<form|qtd_recebida_agora/);
+  assert.match(html,/Alicate pendente/);
 });
 
-test('V13 exibe estágio físico para cada compra na lista unificada', () => {
-  const view = read('views','almoxarifado','recebimentos.ejs');
-  assert.match(view, /const showStatus=true/);
-  assert.match(view, /situacao_recebimento/);
-  assert.match(view, /if\(showStatus\)/);
-  assert.match(view, /almox-status--mini/);
+test('solicitação fechada não oferece novo recebimento mesmo com divergência histórica',()=>{
+  const html=render('_itens-recebimento.ejs',{sol:{...sol,status:'FECHADA'},canManage:true,operacaoToken:'teste'});
+  assert.doesNotMatch(html,/<form/);
 });
 
-test('V5 mantém as ações críticas da operação', () => {
-  const view = read('views','almoxarifado','recebimentos.ejs');
-  assert.match(view, /tab: 'recebimentos'/);
-  assert.doesNotMatch(view, /Saída avulsa/);
-  assert.match(view, /iniciar-recebimento/);
-  assert.match(view, />Receber<\/button>/);
-  assert.match(view, /\/fechar/);
-  assert.match(view, /\/reabrir/);
+test('item recebido integralmente exibe situação sem novo botão OK',()=>{
+  const html=render('_itens-recebimento.ejs',{sol:{...sol,itens:[{...sol.itens[0],qtd_recebida_total:4}]},canManage:true,operacaoToken:'teste'});
+  assert.match(html,/Recebido ✓/);
+  assert.doesNotMatch(html,/<form/);
 });
 
-test('V5 compila e usa densidade compacta com tratamento mobile', () => {
-  const view = read('views','almoxarifado','recebimentos.ejs');
-  assert.doesNotThrow(() => ejs.compile(view,{filename:path.join(root,'views','almoxarifado','recebimentos.ejs')}));
-  const css = read('public','css','almoxarifado-compact-v5.css');
-  assert.match(css, /\.almox-compact-row\{padding:8px 12px/);
-  assert.match(css, /grid-template-columns:minmax\(250px,1\.75fr\)/);
-  assert.match(css, /@media\(max-width:760px\)/);
-  assert.match(css, /\.almox-compact-supplier\{display:none\}/);
+test('navegação reúne quatro acessos principais e preserva operações do estoque no contexto',()=>{
+  const html=render('_tabs.ejs',{tab:'retiradas'});
+  const principal=html.match(/<nav class="almox-tabs[\s\S]*?<\/nav>/)[0];
+  assert.equal((principal.match(/<a /g)||[]).length,4);
+  for(const url of ['/almoxarifado','/almoxarifado/recebimentos','/almoxarifado/estoque','/almoxarifado/gerencial'])assert.ok(principal.includes(url));
+  assert.match(html,/href="\/almoxarifado\/retiradas\/qr" aria-current="page"/);
+  assert.match(html,/href="\/almoxarifado\/correias"/);
 });

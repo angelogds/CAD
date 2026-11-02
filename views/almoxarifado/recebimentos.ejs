@@ -1,141 +1,143 @@
-<% layout('layout') %>
-<link rel="stylesheet" href="/css/almoxarifado-modern.css?v=20260824-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-flow-v2.css?v=20260902-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-reservas-qr.css?v=20260902-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-operacional-v3.css?v=20261007-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-compact-v5.css?v=20261007-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-ux-v10.css?v=20261008-v1" />
-<link rel="stylesheet" href="/css/almoxarifado-layout-v11.css?v=20261011-v1" />
-
-<%
-  const statusConfig = {
-    EM_COTACAO: { label: 'Em cotação', cls: 'almox-status--cotacao' },
-    COMPRADA: { label: 'Para receber', cls: 'almox-status--comprada' },
-    EM_RECEBIMENTO: { label: 'Em recebimento', cls: 'almox-status--recebimento' },
-    RECEBIDA_PARCIAL: { label: 'Parcial', cls: 'almox-status--parcial' },
-    RECEBIDA_TOTAL: { label: 'Recebida', cls: 'almox-status--total' },
-    SEPARADA_PARA_RETIRADA: { label: 'Separada', cls: 'almox-status--total' },
-    ENTREGUE_SOLICITANTE: { label: 'Entregue', cls: 'almox-status--fechada' },
-    FECHADA: { label: 'Fechada', cls: 'almox-status--fechada' }
-  };
-  const statusMeta = (value) => statusConfig[value] || { label: value || '-', cls: '' };
-  const querySuffix = q ? `&q=${encodeURIComponent(q)}` : '';
-  const dateBR = (v) => { if (!v) return ''; const p=String(v).slice(0,10).split('-'); return p.length===3 ? `${p[2]}/${p[1]}/${p[0]}` : String(v); };
-  const pageTitle = 'Compras a receber';
-  const currentCount = lista.length;
-%>
-
-<div class="almox-page almox-flow-page almox-compact-page almox-v11">
-  <header class="almox-compact-head">
-    <div class="almox-compact-title">
-      <span class="almox-hero__eyebrow">ALMOXARIFADO</span>
-      <div class="almox-compact-titleline">
-        <h1><%= pageTitle %></h1>
-        <span class="almox-compact-count"><%= currentCount %></span>
-      </div>
-    </div>
-    <div class="almox-compact-actions"><small class="muted">Conferência de materiais comprados e entregas pendentes</small></div>
-  </header>
-
-  <%- include('_tabs', { tab: 'recebimentos' }) %>
-
-  <section class="almox-flow-toolbar almox-compact-toolbar almox-kpis-compact">
-    <div class="almox-filter-chips almox-v13-filters" aria-label="Situação das compras a receber">
-      <% [['PENDENTES','Pendentes'],['NAO_CHEGOU','Não chegou'],['PARCIAL','Parcial'],['TOTAL','Recebido totalmente'],['TODAS','Todas']].forEach(([chave,rotulo])=>{ %>
-        <a class="almox-chip <%= situacao===chave?'active':'' %>" href="/almoxarifado/recebimentos?situacao=<%=chave%><%=querySuffix%>" <%- situacao===chave?'aria-current="page"':'' %>><%=rotulo%> <span class="almox-chip__count"><%=contagens[chave]%></span></a>
-      <% }) %>
-    </div>
-    <form class="almox-search almox-compact-search" method="GET" action="/almoxarifado/recebimentos">
-      <input type="hidden" name="situacao" value="<%=situacao%>" />
-      <input class="input" type="search" name="q" value="<%=q%>" placeholder="Buscar solicitação, material, equipamento ou fornecedor" aria-label="Buscar compras" />
-      <button class="btn btn-sm btn-ghost" type="submit">Buscar</button>
-      <% if(q){ %><a class="btn btn-sm btn-ghost" href="/almoxarifado/recebimentos?situacao=<%=situacao%>">Limpar</a><% } %>
-    </form>
-  </section>
-
-  <section class="card almox-request-card almox-compact-card" aria-label="Solicitações no Almoxarifado">
-    <% if (!lista.length) { %>
-      <div class="almox-empty"><strong>Nenhuma solicitação encontrada.</strong><div class="almox-subline">Ajuste o filtro ou a pesquisa.</div></div>
-    <% } else { %>
-      <div class="almox-request-table-wrap">
-        <div class="almox-compact-columns" aria-hidden="true">
-          <span>Solicitação</span>
-          <span>Aplicação</span>
-          <span>Andamento</span>
-          <span>Fornecedor / previsão</span>
-          <span>Ação</span>
-        </div>
-
-        <% lista.forEach((s) => {
-          const meta= s.situacao_recebimento === 'TOTAL' ? {label:'Recebido totalmente',cls:'almox-status--total'} : s.situacao_recebimento === 'PARCIAL' ? {label:'Recebido parcialmente',cls:'almox-status--parcial'} : {label:'Não chegou',cls:'almox-status--comprada'};
-          const total=Number(s.itens_total||0);
-          const cotados=Number(s.itens_cotados||0);
-          const comprados=Number(s.qtd_comprada_total||0);
-          const recebidos=Number(s.qtd_recebida_total_agregada||0);
-          const isCotacao=s.status === 'EM_COTACAO';
-          const receivedComplete=s.situacao_recebimento === 'TOTAL';
-          const pct=Number(s.progresso_pct||0);
-          const andamento=`${recebidos}/${comprados} recebido(s)`;
-          const showStatus=true;
-        %>
-          <article class="almox-compact-row" data-href="/almoxarifado/solicitacoes/<%= s.id %>/conferir" tabindex="0" role="link">
-            <div class="almox-compact-request" data-label="Solicitação">
-              <div class="almox-compact-request__top">
-                <span class="almox-request-number"><%= s.numero || ('#'+s.id) %></span>
-                <% if(showStatus){ %><span class="almox-status almox-status--mini <%= meta.cls %>"><%= meta.label %></span><% } %>
-              </div>
-              <strong><%= s.titulo || 'Solicitação de materiais' %></strong>
-              <small><%= s.solicitante_nome || '-' %><% if(s.setor_origem){ %> • <%= s.setor_origem %><% } %></small>
-            </div>
-
-            <div class="almox-compact-application" data-label="Aplicação">
-              <strong><%= s.equipamento_nome || 'Sem equipamento' %></strong>
-              <% if(s.os_id){ %><small>OS #<%= s.os_id %></small><% } %>
-            </div>
-
-            <div class="almox-compact-progress" data-label="Andamento">
-              <div class="almox-compact-progress__top">
-                <strong><%= andamento %></strong>
-                <span><%= pct %>%</span>
-              </div>
-              <div class="almox-compact-progress__track <%= receivedComplete ? 'is-complete' : '' %>" title="<%= total %> solicitados • <%= cotados %> cotados • <%= Number(s.itens_comprados||0) %> comprados • <%= recebidos %> recebidos"><i style="width:<%= pct %>%"></i></div>
-              <% if(Number(s.qtd_pendente_total||0)>0 && !isCotacao){ %><small><%= Number(s.qtd_pendente_total||0) %> pendente(s)</small><% } %>
-            </div>
-
-            <div class="almox-compact-supplier" data-label="Fornecedor / previsão">
-              <strong><%= s.fornecedor || '—' %></strong>
-              <% if(s.previsao_entrega){ %><small><%= dateBR(s.previsao_entrega) %></small><% } %>
-            </div>
-
-            <div data-label="Ação" class="almox-compact-row-actions" onclick="event.stopPropagation()">
-              <% if (canManage && s.status === 'COMPRADA') { %>
-                <form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/iniciar-recebimento" data-lock-submit>
-                  <button class="btn btn-sm btn-green" type="submit" data-pending-text="Abrindo...">Receber</button>
-                </form>
-              <% } else if (canManage && s.status === 'ENTREGUE_SOLICITANTE') { %>
-                <form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/fechar" data-lock-submit>
-                  <button class="btn btn-sm" type="submit">Fechar</button>
-                </form>
-              <% } else if (canManage && s.status === 'FECHADA') { %>
-                <form method="POST" action="/almoxarifado/solicitacoes/<%= s.id %>/reabrir" data-lock-submit>
-                  <button class="btn btn-sm btn-ghost" type="submit">Reabrir</button>
-                </form>
-              <% } else { %>
-                <a class="almox-compact-open" href="/almoxarifado/solicitacoes/<%= s.id %>/conferir">Conferir →</a>
-              <% } %>
-            </div>
-          </article>
-        <% }) %>
-      </div>
-    <% } %>
-  </section>
+<% layout('layout'); const c=consulta; const url=(extra={})=>'/almoxarifado/recebimentos?'+new URLSearchParams({q:c.q,setor:c.setor,aba:c.aba,situacao:c.situacao,pagina:String(c.pagina),...extra}).toString(); %>
+<div class="almox-central">
+<header class="ac-header">
+<div>
+<span class="ac-eyebrow">ALMOXARIFADO · SOLICITAÇÕES</span>
+<h1>Solicitações</h1>
+<p>Abra a solicitação e confirme somente o material que chegou.</p>
 </div>
-
-<script src="/js/almoxarifado-modern.js?v=20260824-v1" defer></script>
-<script>
-document.querySelectorAll('.almox-compact-row[data-href]').forEach(row=>{
-  const open=()=>location.href=row.dataset.href;
-  row.addEventListener('click',e=>{if(!e.target.closest('a,button,form,select,input'))open()});
-  row.addEventListener('keydown',e=>{if(e.key==='Enter')open()});
-});
-</script>
+</header>
+<%- include('_tabs',{tab:'recebimentos'}) %>
+<section class="ac-card">
+<div class="ac-section-head">
+<div class="ac-switch" aria-label="Situação das solicitações">
+<a href="<%=url({aba:'ABERTAS',pagina:'1',situacao:''})%>" <%-c.aba==='ABERTAS'?'aria-current="page"':''%>>Abertas <span>
+<%=c.resumo.abertas%>
+</span>
+</a>
+<a href="<%=url({aba:'FECHADAS',pagina:'1',situacao:''})%>" <%-c.aba==='FECHADAS'?'aria-current="page"':''%>>Fechadas <span>
+<%=c.resumo.fechadas%>
+</span>
+</a>
+</div>
+<span class="ac-muted">Fechadas: recebimento concluído. Entregas continuam em Estoque.</span>
+</div>
+<form class="ac-filters ac-queue-filters" method="get" action="/almoxarifado/recebimentos">
+<input type="hidden" name="aba" value="<%=c.aba%>">
+<label class="ac-search">
+<span>Buscar solicitação ou material</span>
+<input type="search" name="q" value="<%=c.q%>" placeholder="Número, equipamento, material ou fornecedor">
+</label>
+<label>
+<span>Setor</span>
+<select name="setor">
+<option value="">Todos os setores</option>
+<% setores.forEach(s=>{ %>
+<option value="<%=s%>" <%=s===c.setor?'selected':''%>>
+<%=s%>
+</option>
+<% }) %>
+</select>
+</label>
+<label>
+<span>Etapa</span>
+<select name="situacao">
+<option value="">Todas</option>
+<% [['PENDENTES','Com itens a receber'],['PARCIAL','Recebimento parcial'],['AGUARDANDO_COMPRAS','Aguardando Compras']].forEach(([v,l])=>{ %>
+<option value="<%=v%>" <%=c.situacao===v?'selected':''%>>
+<%=l%>
+</option>
+<% }) %>
+</select>
+</label>
+<button class="ac-button" type="submit">Filtrar</button>
+</form>
+</section>
+<div class="ac-workspace <%=sol?'ac-has-selection':''%>">
+<section class="ac-card ac-requests" id="solicitacoes">
+<header class="ac-section-head">
+<h2>
+<%=c.total%> solicitação(ões)</h2>
+</header>
+<% if(!c.lista.length){ %>
+<div class="ac-empty">
+<strong>Nenhuma solicitação nesta pesquisa.</strong>
+<p>Ajuste o setor, a busca ou consulte as fechadas.</p>
+</div>
+<% } %>
+<% c.lista.forEach(s=>{ %>
+<a class="ac-request-card <%=sol&&s.id===sol.id?'is-selected':''%>" href="<%=url({solicitacao_id:String(s.id)})%>#conferencia" <%-sol&&s.id===sol.id?'aria-current="true"':''%>>
+<div class="ac-section-head">
+<span class="ac-overline">
+<%=s.numero||'#'+s.id%>
+</span>
+<span class="ac-badge <%=s.itens_a_receber&&!s.encerrada?'ac-ready':''%>">
+<%=s.etapa_nome%>
+</span>
+</div>
+<h3>
+<%=s.titulo%>
+</h3>
+<p>
+<%=s.equipamento_nome||'Materiais para prateleira'%>
+</p>
+<small>
+<%=s.setor_exibicao%> · <%=s.itens_total%> material(is)</small>
+<div class="ac-request-count">
+<% if(s.itens_a_receber&&!s.encerrada){ %>
+<strong>
+<%=s.itens_a_receber%> a receber</strong>
+<% } %>
+<% if(s.itens_aguardando){ %>
+<span>
+<%=s.itens_aguardando%> aguardando Compras</span>
+<% } %>
+<% if(s.divergencia_fechada){ %>
+<span>Fechada com divergência histórica — conferir documentos</span>
+<% } %>
+</div>
+</a>
+<% }) %>
+<% if(c.paginas>1){ %>
+<nav class="ac-pagination" aria-label="Paginação">
+<% if(c.pagina>1){ %>
+<a href="<%=url({pagina:String(c.pagina-1)})%>">← Anterior</a>
+<% } %>
+<span>Página <%=c.pagina%> de <%=c.paginas%>
+</span>
+<% if(c.pagina<c.paginas){ %>
+<a href="<%=url({pagina:String(c.pagina+1)})%>">Próxima →</a>
+<% } %>
+</nav>
+<% } %>
+</section>
+<section class="ac-card ac-detail" id="conferencia" aria-label="Conferência da solicitação">
+<% if(sol){ %>
+<header class="ac-section-head">
+<div>
+<span class="ac-overline">
+<%=sol.numero||'#'+sol.id%>
+</span>
+<h2>
+<%=sol.titulo%>
+</h2>
+<p>
+<%=sol.setor_origem%> · <%=sol.equipamento_nome||'Prateleira'%>
+</p>
+</div>
+<a href="/almoxarifado/solicitacoes/<%=sol.id%>/conferir">Ver histórico →</a>
+</header>
+<%- include('_itens-recebimento',{sol,canManage,operacaoToken,embedded:true}) %>
+<% if(canWithdraw){ %>
+<a class="ac-inline-link" href="/almoxarifado/retiradas/qr?solicitacao_id=<%=sol.id%>">Consultar retirada desta solicitação →</a>
+<% } %>
+<% }else{ %>
+<div class="ac-empty ac-detail-placeholder">
+<span class="ac-box-icon" aria-hidden="true">▤</span>
+<h2>Selecione uma solicitação</h2>
+<p>Confira os itens comprados e informe a quantidade que chegou. Um OK registra a entrada.</p>
+</div>
+<% } %>
+</section>
+</div>
+</div>

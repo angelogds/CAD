@@ -18,26 +18,18 @@ test('almoxarifado usa o fluxo real de retirada do estoque sem duplicar rota avu
   assert.match(almoxRoutes, /itens\/:itemId\/retirar/);
 });
 
-test('recebimentos apresenta indicadores, busca, progresso e status de recebimento total', () => {
-  const view = read('views', 'almoxarifado', 'recebimentos.ejs');
-
-  assert.match(view, /almox-kpis/);
-  assert.match(view, /name="q"/);
-  assert.match(view, /qtd_recebida_total_agregada/);
-  assert.match(view, /qtd_comprada_total/);
-  assert.match(view, /RECEBIDA_TOTAL/);
-  assert.match(view, /s\.situacao_recebimento === 'TOTAL'/);
-  assert.match(view, /s\.status === 'FECHADA'/);
-  assert.doesNotMatch(view, /\['RECEBIDA_TOTAL', 'RECEBIDA_PARCIAL'\][\s\S]{0,100}fechar/);
+test('central oferece busca, abertas e fechadas sem ações manuais de encerramento', () => {
+  const view=read('views','almoxarifado','recebimentos.ejs');
+  assert.match(view,/name="q"/);assert.match(view,/Abertas/);assert.match(view,/Fechadas/);
+  assert.doesNotMatch(view,/\/fechar|\/reabrir|iniciar-recebimento/);
 });
 
-test('conferencia limita quantidade ao que falta receber e permite definir local de estoque', () => {
-  const view = read('views', 'almoxarifado', 'conferir.ejs');
+test('conferência limita ao restante; organização física fica na prateleira', () => {
+  const view = read('views', 'almoxarifado', '_itens-recebimento.ejs');
   const service = read('modules', 'almoxarifado', 'almoxarifado.service.js');
 
-  assert.match(view, /max="<%= aReceber %>"/);
-  assert.match(view, /name="local_id"/);
-  assert.match(view, /data-fill-remaining/);
+  assert.match(view, /max="<%=aReceber%>"/);
+  assert.match(read('views','almoxarifado','estoque.ejs'),/name="endereco_prateleira"/);
   assert.match(service, /quantidade > aReceber/);
   assert.match(service, /Local de estoque inválido ou inativo/);
   assert.match(service, /ENTRADA_COMPRA/);
@@ -79,10 +71,10 @@ test('retirada avulsa mantém OS obrigatória e retirada por solicitação mant�
 test('views do almoxarifado compartilham o novo pacote visual responsivo', () => {
   for (const file of ['index.ejs', 'recebimentos.ejs', 'conferir.ejs']) {
     const view = read('views', 'almoxarifado', file);
-    assert.match(view, /almoxarifado-modern\.css/);
-    assert.match(view, /almox-page/);
+    assert.match(view, /include\('_tabs'/);
+    assert.match(view, /almox-central/);
   }
-  const css = read('public', 'css', 'almoxarifado-modern.css');
+  const css = read('public', 'css', 'almox-central.css');
   assert.match(css, /@media\(max-width:760px\)/);
-  assert.match(css, /almox-mobile-list/);
+  assert.match(css, /ac-workspace/);
 });

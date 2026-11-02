@@ -134,9 +134,9 @@ test('retirada contextual antiga sincroniza a reserva antes do saldo e continua 
 
 test('scanner oferece câmera com fallback para leitor USB ou entrada manual', () => {
   const view = read('views/almoxarifado/retirada_qr.ejs');
-  assert.match(view, /getUserMedia/);
-  assert.match(view, /BarcodeDetector/);
-  assert.match(view, /Leitor USB \/ código manual/);
-  assert.match(view, /responsável ou colaborador/);
-  assert.match(view, /Identifique o responsável/);
+  assert.match(read('public/js/almox-retirada.js'), /getUserMedia/);
+  assert.match(read('public/js/almox-retirada.js'), /BarcodeDetector/);
+  assert.match(view, /Código do cartão \/ leitor USB/);
+  assert.match(view, /QR do funcionário/);
+  assert.match(view, /Identifique o funcionário/);
 });

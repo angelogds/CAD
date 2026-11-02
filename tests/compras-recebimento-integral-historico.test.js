@@ -80,7 +80,8 @@ test('fila, dashboard e almoxarifado compartilham conclusão após recebimento',
   assert.match(ctrl,/activeRows = allRows\.filter\(\(row\) => service\.isOperationallyActive\(row\)\)/);
   assert.match(ctrl,/historyRows = allRows\.filter\(\(row\) => !service\.isOperationallyActive\(row\)\)/);
   assert.match(dashboard,/CLOSED_RECEIPT_STATUSES[\s\S]*?'SEPARADA_PARA_RETIRADA'/);
-  assert.match(almox,/Compras a receber: encerrado o recebimento/);
+  assert.match(almox,/central.consultar/);
+  assert.match(read('modules/almoxarifado/almoxarifado.solicitacoes.service.js'),/encerrada/);
   assert.match(view,/Fechadas e histórico/);
   assert.match(view,/100% RECEBIDO NO ALMOXARIFADO/);
 });

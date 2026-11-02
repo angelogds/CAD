@@ -1,8 +1,10 @@
 <% layout('layout') %>
 <link rel="stylesheet" href="/css/almoxarifado-layout-v11.css?v=20261011-v1" />
+<div class="almox-central">
 <header class="stock-v11-head"><div><h1>Separação e retirada de correias</h1>
 <p>Pedidos vinculados ao equipamento e à preventiva. A baixa acontece na entrega; o mecânico confirma a substituição depois.</p>
 </div><a class="btn btn-ghost" href="/almoxarifado">Voltar ao painel</a></header>
+<%- include('_tabs',{tab:'correias'}) %>
 <% const manage=['ADMIN','ALMOXARIFADO'].includes(String(user?.role||'').toUpperCase()); %>
 <% if(manage){ %>
 <div class="card" style="margin:16px 0"><h2>Retirada avulsa durante a semana</h2>
@@ -27,3 +29,5 @@
 const busca=document.getElementById('equipamento-busca');
 if(busca) { const mat=document.getElementById('correias-material'); busca.addEventListener('input',()=>{const opt=Array.from(document.querySelectorAll('#correias-equipamentos option')).find(o=>o.value===busca.value); const id=opt?.dataset.id||'';document.getElementById('correias-equipamento-id').value=id;mat.value='';Array.from(mat.options).slice(1).forEach(o=>{o.disabled=o.dataset.equipamento!==id;o.hidden=o.disabled;});});mat.addEventListener('change',()=>{document.getElementById('correias-quantidade').value=mat.selectedOptions[0]?.dataset.quantidade||'';});}
 </script>
+
+</div>

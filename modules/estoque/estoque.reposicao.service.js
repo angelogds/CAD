@@ -20,7 +20,9 @@ function resumo() {
   const incoming=new Map(open.map(r=>[Number(r.id),Number(r.qtd)]));
   const pending=db.prepare(`SELECT v.estoque_item_id,s.id,s.numero,s.pre_status,s.status FROM estoque_reposicao_vinculos v JOIN solicitacoes s ON s.id=v.solicitacao_id WHERE s.status NOT IN ('CANCELADA','FECHADA','RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','ENTREGUE_SOLICITANTE') AND COALESCE(s.pre_status,'')<>'REPROVADA' ORDER BY s.id`).all();
   const pedidos=new Map(pending.map(r=>[Number(r.estoque_item_id),r]));
-  return estoque.listItens().map(i=>{
+  // Compra destinada a equipamento não é reposição de prateleira. Um material
+  // sem política de reposição cadastrada também não deve virar alerta de falta.
+  return estoque.listItens({destino:'GERAL'}).filter(i=>!i.equipamento_id && (Number(i.saldo_minimo)>0 || Number(i.ponto_reposicao)>0 || Number(i.saldo_alvo)>0)).map(i=>{
     const reservado=Number(reserves.get(Number(i.id))||0); const fisico=Number(i.saldo_atual||0); const livre=Math.max(fisico-reservado,0);
     const pedido=pedidos.get(Number(i.id));
     const pp=ponto(i);const alvo=Number(i.saldo_alvo||0); const chegada=Number(incoming.get(Number(i.id))||0);
@@ -43,7 +45,7 @@ function gerar(user) {
     const ids=[];
     for(const i of resumo()) {
       if(i.pedido||i.ponto_calculado<=0||i.disponivel>i.ponto_calculado||i.necessidade<=0) continue;
-      const setor=i.setor_utilizacao==='COMUM'?'RECICLAGEM':i.setor_utilizacao;
+      const setor=String(i.setor_utilizacao==='COMUM'?'RECICLAGEM':i.setor_utilizacao).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
       if(!['RECICLAGEM','FRIGORIFICO','LOGISTICA','ADMINISTRATIVO'].includes(setor)) continue;
       const sol=pre.create({setor_origem:setor,subarea_destino:setor==='LOGISTICA'?'MANUTENÇÃO / FROTA':setor==='ADMINISTRATIVO'?'ADMINISTRATIVO':'MANUTENÇÃO',semana_referencia:semana(),acao:'rascunho',itens_nome:[i.nome],itens_un:[i.unidade],itens_qtd:[i.necessidade],itens_item_id:[i.id],observacao:`Reposição automática • saldo livre ${i.disponivel} ${i.unidade}; ponto ${i.ponto_calculado}; alvo ${i.saldo_alvo}. Rateio previsto por setor: ${i.rateio_setores_json||'{}'}`},user);
       db.prepare('INSERT INTO estoque_reposicao_vinculos(estoque_item_id,solicitacao_id) VALUES(?,?)').run(i.id,sol.id);

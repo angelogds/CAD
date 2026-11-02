@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/css/almoxarifado-layout-v11.css?v=20261011-v1" />
 <%
   const dateBR = (v) => { if(!v)return ''; const d=String(v).slice(0,10).split('-'); return d.length===3?`${d[2]}/${d[1]}/${d[0]}`:String(v); };
-  const reposicaoLabel = (s) => ({REPOR_URGENTE:'Urgente',REPOR:'Repor',PROGRAMAR_REPOSICAO:'Programar',OK:'Normal'})[s] || 'Normal';
+  const reposicaoLabel = (s) => ({REPOR_URGENTE:'Urgente',REPOR:'Repor',PROGRAMAR_REPOSICAO:'Programar',OK:'Normal',SEM_POLITICA:'Sem política'})[s] || 'Normal';
   const reposicaoClass = (s) => s==='REPOR_URGENTE'?'is-danger':s==='REPOR'?'is-warning':s==='PROGRAMAR_REPOSICAO'?'is-info':'is-ok';
   const saldoDisponivelTotal = itens.reduce((s,i)=>s+Number(i.saldo_disponivel||0),0);
   const alertasReposicao = Number(inteligencia.criticos.length||0)+Number(inteligencia.programar.length||0);

@@ -8,11 +8,11 @@ const ejs = require("ejs");
 const raiz = path.join(__dirname, "..");
 const conteudo = file => fs.readFileSync(path.join(raiz,file), "utf8");
 
-test("V15 compila template EJS da Visão Gerencial e mantém seis abas", () => {
+test("relatório permanece compilável com os quatro acessos principais", () => {
   assert.doesNotThrow(() => ejs.compile(conteudo("views/almoxarifado/gerencial.ejs"), {filename:path.join(raiz,"views/almoxarifado/gerencial.ejs")}));
-  const nav = conteudo("views/almoxarifado/_tabs.ejs");
+  const nav = ejs.render(conteudo("views/almoxarifado/_tabs.ejs"),{tab:'gerencial'});
   assert.match(nav,/almoxarifado-layout-v15.css/);
-  assert.equal((nav.match(/class="almox-tab /g) || []).length,6);
+  assert.equal((nav.match(/class="almox-tab /g) || []).length,4);
 });
 
 test("V15 conecta filtros do controller ao serviço sem modificar o fluxo de recebimento", () => {

@@ -97,7 +97,9 @@ function qtdSolicitadaExpr(alias = "si") {
   return "0";
 }
 function qtdCompradaExpr(alias = "si") {
-  if (HAS_ITEM_QTD_COMPRADA) return `COALESCE(${alias}.qtd_comprada,0)`;
+  if (HAS_ITEM_QTD_COMPRADA) return HAS_ITEM_STATUS_COMPRA
+    ? `CASE WHEN UPPER(COALESCE(${alias}.status_compra,''))='COMPRADO' THEN COALESCE(${alias}.qtd_comprada,0) ELSE 0 END`
+    : `COALESCE(${alias}.qtd_comprada,0)`;
   if (HAS_ITEM_STATUS_COMPRA) return `CASE WHEN UPPER(COALESCE(${alias}.status_compra,''))='COMPRADO' THEN ${qtdSolicitadaExpr(alias)} ELSE 0 END`;
   return "0";
 }
@@ -455,8 +457,14 @@ function resolveEstoqueItem(item, solicitacaoId, localId, contexto = {}) {
         throw new Error('O local informado difere do local do material vinculado. Confira o cadastro antes de receber.');
       }
       const linkedEquipmentId = Number(linked.equipamento_id || 0) || null;
+      // Um recebimento parcial legado já pode ter saldo/retiradas neste SKU.
+      // Mantém o vínculo físico; nunca move a quantidade histórica a outro SKU.
+      if (Number(item.qtd_recebida_total || 0) > 0) {
+        if (linkedEquipmentId && linkedEquipmentId !== dedicatedEquipmentId) throw new Error('O material já recebido está vinculado a outro equipamento. Confira o histórico antes de receber.');
+        return Number(linked.id);
+      }
       const compatible = dedicatedEquipmentId
-        ? linkedEquipmentId === dedicatedEquipmentId || (!linkedEquipmentId && Number(linked.saldo_atual || 0) <= 0)
+        ? linkedEquipmentId === dedicatedEquipmentId
         : !linkedEquipmentId;
       if (compatible) {
         updateClassification(linked.id);
@@ -531,9 +539,9 @@ function insertEstoqueMovimento(data) {
   return Number(info.lastInsertRowid);
 }
 
-function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, categoriaId, subcategoriaId, enderecoZona, enderecoEstante, enderecoPrateleira, enderecoPosicao, destinoEstoque = 'GERAL', userId, operacaoToken }) {
+function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, categoriaId, subcategoriaId, enderecoZona, enderecoEstante, enderecoPrateleira, enderecoPosicao, userId, operacaoToken }) {
   const quantidade = Number(qtdAgora || 0);
-  if (!(quantidade > 0)) throw new Error("Quantidade deve ser maior que zero.");
+  if (!Number.isFinite(quantidade) || !(quantidade > 0)) throw new Error("Quantidade deve ser maior que zero.");
 
   return db.transaction(() => {
     if (operacaoToken && hasColumn('almox_recebimento_operacoes','token')) {
@@ -567,10 +575,8 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, cat
     const resolvedLocalId = resolveLocal(localId);
     const resolvedCategoriaId = resolveCategoria(categoriaId);
     const resolvedSubcategoriaId = resolveSubcategoria(subcategoriaId, resolvedCategoriaId);
-    const resolvedDestinoEstoque = String(destinoEstoque || 'GERAL').trim().toUpperCase() === 'EQUIPAMENTO' ? 'EQUIPAMENTO' : 'GERAL';
-    if (resolvedDestinoEstoque === 'EQUIPAMENTO' && !Number(solicitacao.equipamento_id || 0)) {
-      throw new Error("Para estoque dedicado, a solicitação precisa estar vinculada a um equipamento.");
-    }
+    // O destino vem do vínculo persistido, sem uma segunda escolha na conferência.
+    const resolvedDestinoEstoque = Number(solicitacao.equipamento_id || 0) > 0 ? 'EQUIPAMENTO' : 'GERAL';
     const setorDestino = hasColumn('solicitacoes','setor_origem') ? normalizeSetorEstoque(solicitacao.setor_origem) : 'COMUM';
     const centroCustoDestino = hasColumn('solicitacoes','subarea_destino') ? solicitacao.subarea_destino : null;
     const estoqueItemId = resolveEstoqueItem(item, solicitacaoId, resolvedLocalId, {
@@ -606,6 +612,10 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, cat
     const statusItem = recebida >= qtdComprada ? "OK" : "PARCIAL";
     const itemUpdates = ["qtd_recebida_total=?", "status_item=?", "estoque_item_id=?"];
     const itemValues = [recebida, statusItem, estoqueItemId];
+    if (hasColumn('solicitacao_itens', 'destino_recebimento')) {
+      itemUpdates.push('destino_recebimento=?');
+      itemValues.push(resolvedDestinoEstoque === 'EQUIPAMENTO' ? 'EQUIPAMENTO' : 'PRATELEIRA');
+    }
     if (hasColumn("solicitacao_itens", "observacao_item")) { itemUpdates.push("observacao_item=?"); itemValues.push(observacao || item.observacao_item || null); }
     if (hasColumn("solicitacao_itens", "updated_at")) itemUpdates.push("updated_at=datetime('now')");
     itemValues.push(itemId);
@@ -664,7 +674,7 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, cat
 
     // Sincroniza somente quando todos os itens estão efetivamente comprados.
     // Uma entrega parcial de pedido misto não encerra a cotação dos demais itens.
-    const naoComprados = db.prepare("SELECT COUNT(*) n FROM solicitacao_itens WHERE solicitacao_id=? AND COALESCE(status_compra,'')<>'COMPRADO'").get(solicitacaoId).n;
+    const naoComprados = db.prepare("SELECT COUNT(*) n FROM solicitacao_itens WHERE solicitacao_id=? AND UPPER(COALESCE(status_compra,'')) NOT IN ('COMPRADO','CANCELADO','ATENDIDO_ESTOQUE')").get(solicitacaoId).n;
     if (!naoComprados) finalizarRecebimentoCore(solicitacaoId);
     const faltanteApos = Math.max(qtdComprada - recebida, 0);
     return {
@@ -680,7 +690,7 @@ function receberItem({ solicitacaoId, itemId, qtdAgora, observacao, localId, cat
 
 function finalizarRecebimentoCore(id) {
   const sol = db.prepare('SELECT status FROM solicitacoes WHERE id=?').get(Number(id));
-  if (!sol || !['COMPRADA','EM_RECEBIMENTO','RECEBIDA_PARCIAL','RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','REABERTA'].includes(String(sol.status || '').trim().toUpperCase())) {
+  if (!sol || !['EM_COTACAO','COMPRADA','EM_RECEBIMENTO','RECEBIDA_PARCIAL','RECEBIDA_TOTAL','SEPARADA_PARA_RETIRADA','REABERTA'].includes(String(sol.status || '').trim().toUpperCase())) {
     throw new Error('Esta solicitação não está em uma etapa que permita finalizar o recebimento.');
   }
   if (HAS_ITEM_STATUS_COMPRA) {

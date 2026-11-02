@@ -47,8 +47,7 @@ function movimento(p, user, tipo, qtd) {
   db.prepare("UPDATE estoque_itens SET saldo_atual=?,updated_at=datetime('now') WHERE id=?").run(posterior,p.estoque_item_id);
   return Number(db.prepare(`INSERT INTO estoque_movimentos(tipo,item_id,quantidade,origem,equipamento_id,usuario_id,mecanico_user_id,empresa_consumidora,setor_utilizacao,saldo_anterior,saldo_posterior,custo_unit,observacao) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(tipo,p.estoque_item_id,qtd,p.preventiva_execucao_id?'PREVENTIVA':'MANUAL',p.equipamento_id,user.id,p.mecanico_user_id,p.empresa_consumidora,p.setor_consumidor,anterior,posterior,item.custo_unit || null,`Pedido de correias #${p.id}; execução ${p.preventiva_execucao_id || 'avulsa'}`).lastInsertRowid);
 }
-function entregar(id, user) {
-  almox(user);
+function baixarPedido(id, user) {
   return db.transaction(() => {
     const p = get(id); if (p.movimento_id) return p.movimento_id;
     if (!['SOLICITADA','SEPARADA'].includes(p.status)) throw new Error('Pedido não disponível para retirada.');
@@ -57,6 +56,25 @@ function entregar(id, user) {
     const mov = movimento(p,user,'SAIDA_REQUISICAO_INTERNA',p.quantidade);
     db.prepare('UPDATE correias_pedidos SET movimento_id=? WHERE id=?').run(mov,p.id);
     return mov;
+  })();
+}
+function entregar(id, user) { almox(user); return baixarPedido(id, user); }
+
+function registrarTrocaPreventiva(data, user) {
+  return db.transaction(() => {
+    const execId = Number(data.preventiva_execucao_id);
+    const prev = require('../preventivas/preventivas.service');
+    if (!prev.userCanExecutePreventiva(execId, user)) throw new Error('Preventiva atribuída a outro responsável.');
+    const exec = db.prepare('SELECT plano_id,estoque_movimento_id FROM preventiva_execucoes WHERE id=?').get(execId);
+    if (!exec || Number(exec.plano_id) !== Number(data.plano_id)) throw new Error('Execução não pertence ao plano informado.');
+    const existente = db.prepare('SELECT * FROM correias_pedidos WHERE preventiva_execucao_id=? AND estoque_item_id=?').get(execId, Number(data.estoque_item_id));
+    if (existente?.troca_em) return { pedidoId: existente.id, duplicado: true };
+    if (existente && quantidade(data.quantidade) !== Number(existente.quantidade)) throw new Error('A quantidade difere do pedido já reservado. Confira o pedido antes de registrar a troca.');
+    if (exec.estoque_movimento_id && !existente) throw new Error('Esta execução já possui uma baixa histórica. Confira o histórico antes de registrar outra troca.');
+    const id = existente?.id || solicitar(data, user);
+    baixarPedido(id, user);
+    confirmarTroca(id, data.troca_em, user);
+    return { pedidoId: id, duplicado: false };
   })();
 }
 function separar(id,user) { almox(user); const p=get(id); if(p.status==='SOLICITADA') db.prepare("UPDATE correias_pedidos SET status='SEPARADA',updated_at=datetime('now') WHERE id=?").run(p.id); }
@@ -81,4 +99,4 @@ function confirmarTroca(id,date,user) {
 }
 function alertas(equipamentoId=null) { if(!exists('correias_alertas')) return []; return db.prepare(`SELECT a.*,e.nome equipamento_nome,i.nome material_nome,p.troca_em,u.name mecanico_nome FROM correias_alertas a JOIN correias_pedidos p ON p.id=a.pedido_id JOIN equipamentos e ON e.id=a.equipamento_id JOIN estoque_itens i ON i.id=p.estoque_item_id JOIN users u ON u.id=p.mecanico_user_id ${equipamentoId?'WHERE a.equipamento_id=?':''} ORDER BY a.id DESC LIMIT 100`).all(...(equipamentoId?[Number(equipamentoId)]:[])); }
 function salvarPrazo(equipamentoId,prazo) { const n=quantidade(prazo); if(!db.prepare('SELECT id FROM equipamentos WHERE id=?').get(Number(equipamentoId))) throw new Error('Equipamento não encontrado.'); db.prepare('INSERT INTO correias_config_equipamento(equipamento_id,prazo_falha_dias) VALUES(?,?) ON CONFLICT(equipamento_id) DO UPDATE SET prazo_falha_dias=excluded.prazo_falha_dias').run(Number(equipamentoId),n); }
-module.exports={vinculos,list,solicitar,entregar,separar,cancelar,devolver,confirmarTroca,alertas,salvarPrazo};
+module.exports={vinculos,list,solicitar,entregar,separar,cancelar,devolver,confirmarTroca,registrarTrocaPreventiva,alertas,salvarPrazo};

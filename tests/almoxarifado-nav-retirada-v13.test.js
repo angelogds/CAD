@@ -6,24 +6,20 @@ const path = require("node:path");
 const ejs = require("ejs");
 const read = (f) => fs.readFileSync(path.join(__dirname, "..", f), "utf8");
 
-test("V13 tem somente seis abas operacionais e mantém fila de entrega", () => {
+test("central reúne quatro áreas e mantém operações do estoque", () => {
   const tabs = read("views/almoxarifado/_tabs.ejs");
-  for (const name of ["Painel", "Compras a receber", "Para entregar", "Estoque", "Retirada", "Visão gerencial"]) {
+  for (const name of ["Painel", "Solicitações", "Estoque", "Relatórios", "Retirada", "Materiais separados"]) {
     assert.ok(tabs.includes(name), "Aba não encontrada: " + name);
   }
   assert.doesNotMatch(tabs, /Compras a caminho/);
   assert.match(read("views/estoque/reservas.ejs"), /almoxarifado\/_tabs/);
 });
 
-test("V13 separa compras não recebidas, parciais e totalmente recebidas pelas quantidades", () => {
-  const ctrl = read("modules/almoxarifado/almoxarifado.controller.js");
-  const page = read("views/almoxarifado/recebimentos.ejs");
-  for (const status of ["PENDENTES","NAO_CHEGOU","PARCIAL","TOTAL","TODAS"]) {
-    assert.ok(ctrl.includes(status) && page.includes(status));
-  }
-  assert.match(ctrl, /qtd_pendente_total/);
-  assert.match(ctrl, /qtd_recebida_total_agregada/);
-  assert.doesNotMatch(page, /Compras a caminho/);
+test('central mantém filtros legados e usa quantidades físicas para agrupar solicitações', () => {
+  const central=read('modules/almoxarifado/almoxarifado.solicitacoes.service.js');
+  for(const status of ['PENDENTES','NAO_CHEGOU','PARCIAL','TODAS'])assert.ok(central.includes(status));
+  assert.match(central,/qtd_comprada/);assert.match(central,/qtd_recebida_total/);
+  assert.match(read('modules/almoxarifado/almoxarifado.controller.js'),/req.query.aba/);
 });
 
 test("V13 mantém QR prioritário e obriga confirmar nome no atendimento manual", () => {
@@ -32,8 +28,8 @@ test("V13 mantém QR prioritário e obriga confirmar nome no atendimento manual"
   const service = read("modules/estoque/estoque.reservas.service.js");
   const routes = read("modules/almoxarifado/almoxarifado.routes.js");
   assert.match(view, /name="nome_retirante" required/);
-  assert.match(view, /name="nome" minlength="3"/);
-  assert.match(view, /Cadastrar pessoa sem cartão QR/);
+  assert.match(view, /name="nome" required minlength="3"/);
+  assert.match(view, /Cadastrar pessoa ainda não registrada/);
   assert.match(ctrl, /cadastrarColaborador/);
   assert.match(ctrl, /normNome\(pessoa.nome\)/);
   assert.match(routes, /almoxarifado_manage\), qrCtrl\.cadastrarColaborador/);
