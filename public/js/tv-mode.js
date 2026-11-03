@@ -517,8 +517,8 @@
     const list = items(state.data?.operacao?.equipamentos);
     const max = Math.max(1, ...list.map((e) => e.falhas));
     return `<div class="screen two">
-      <article class="panel"><h2>Top 5 — incidência de falhas</h2>${list.map((e) => `<div class="bar-row"><span>${esc(e.nome)}</span><i><b style="width:${e.falhas / max * 100}%"></b></i><strong>${e.falhas}</strong></div>`).join('') || empty('Sem dados suficientes de falhas.')}</article>
-      <article class="panel"><h2>Criticidade dos equipamentos</h2>${list.map((e) => `<div class="list-row"><div><strong>${esc(e.nome)}</strong><small>${e.reincidencias} reincidência(s) · MTBF ${e.mtbf || 'Dados insuficientes'}</small></div><span class="badge">${esc(e.criticidade)}</span><strong>${esc(e.situacao)}</strong></div>`).join('') || empty('Nenhuma ocorrência registrada.')}</article>
+      <article class="panel"><h2>Top 5 — corretivas no período</h2>${list.map((e) => `<div class="bar-row"><span>${esc(e.nome)}</span><i><b style="width:${e.falhas / max * 100}%"></b></i><strong>${e.falhas}</strong></div>`).join('') || empty('Sem dados suficientes de falhas.')}</article>
+      <article class="panel"><h2>Criticidade dos equipamentos</h2>${list.map((e) => `<div class="list-row"><div><strong>${esc(e.nome)}</strong><small>${e.reincidencias} reincidência(s) · MTBF ${e.mtbf || 'Dados insuficientes'}</small></div><span class="badge">${esc(e.criticidade_atual||'—')}</span><strong>${esc(e.corretivas_abertas?e.situacao:'Sem corretiva aberta')}</strong></div>`).join('') || empty('Nenhuma ocorrência registrada.')}</article>
     </div>`;
   }
 

@@ -54,7 +54,7 @@ test('view mantém ordem, ações, filtros, estados vazios e modo TV', () => {
   const js=fs.readFileSync('public/js/operational-dashboard.js','utf8');
   assert.ok(view.indexOf('id="os"') < view.indexOf('id="criticidade"'));
   assert.ok(view.indexOf('id="criticidade"') < view.indexOf('id="preventivas"'));
-  for(const text of ['Todos os setores','Personalizado','DISTRIBUIÇÃO DAS OS','FALHAS — ÚLTIMOS 30 DIAS','Nenhuma demanda em andamento.']) assert.match(view,new RegExp(text));
+  for(const text of ['Todos os setores','Personalizado','DISTRIBUIÇÃO DAS OS','CORRETIVAS NO PERÍODO','Nenhuma demanda em andamento.']) assert.match(view,new RegExp(text));
   for(const removed of ['ATENÇÃO IMEDIATA','INDICADORES DE DESEMPENHO DA MANUTENÇÃO','Tempo aberto','Motivo não informado']) assert.doesNotMatch(view,new RegExp(removed));
   assert.match(view,/\.slice\(0,5\)/); assert.match(view,/\.slice\(0,6\)/);
   assert.match(view,/action="\/os\/<%= o\.id %>\/status"/);

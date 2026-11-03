@@ -79,5 +79,7 @@ test('dashboard principal preserva o ranking e o estado vazio da tendência', ()
 test('clique no equipamento direciona ao histórico correto', () => {
   const svc = createOperationalCriticalityService(makeDb());
   const ranking = svc.getRanking(svc.parseFilters({ inicio:'2026-07-01', fim:'2026-07-31' }));
-  assert.equal(ranking[0].historico_url, '/equipamentos/1?tab=historico');
+  assert.match(ranking[0].historico_url, /^\/dashboard\/criticidade\/equipamentos\/1\?/);
+  assert.match(ranking[0].historico_url, /inicio=2026-07-01/);
+  assert.match(ranking[0].historico_url, /fim=2026-07-31/);
 });

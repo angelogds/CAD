@@ -1,7 +1,5 @@
 const CACHE_NAME = 'campo-do-gado-v2-mobile';
 const STATIC_ASSETS = [
-  '/',
-  '/dashboard',
   '/css/app.css?v=20260919-1',
   '/css/ui-buttons.css?v=20260919-1',
   '/js/app-layout.js',
@@ -21,6 +19,12 @@ function isInventoryRequest(requestUrl) {
     && ['/almoxarifado', '/estoque', '/pcm/correias', '/preventivas'].some(prefix => requestUrl.pathname === prefix || requestUrl.pathname.startsWith(prefix + '/'));
 }
 
+function isOperationalDashboardRequest(requestUrl) {
+  return requestUrl.origin === self.location.origin
+    && (requestUrl.pathname === '/' || ['/dashboard','/tv'].some(prefix => requestUrl.pathname === prefix || requestUrl.pathname.startsWith(prefix + '/'))
+      || requestUrl.pathname.startsWith('/api/tv/'));
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -35,7 +39,7 @@ self.addEventListener('activate', (event) => {
       .then((names) => Promise.all(names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))))
       .then(() => caches.open(CACHE_NAME))
       .then((cache) => cache.keys().then((requests) => Promise.all(
-        requests.filter((request) => isEscalaRequest(new URL(request.url)) || isInventoryRequest(new URL(request.url))).map((request) => cache.delete(request))
+        requests.filter((request) => isEscalaRequest(new URL(request.url)) || isInventoryRequest(new URL(request.url)) || isOperationalDashboardRequest(new URL(request.url))).map((request) => cache.delete(request))
       )))
       .then(() => self.clients.claim())
   );
@@ -48,7 +52,7 @@ self.addEventListener('fetch', (event) => {
   const bypassPrefixes = ['/push/', '/mobile/', '/auth/'];
   // A Escala mostra pontos e formulários atuais; HTML salvo pode ocultar novos controles.
   // Saldo e pendências devem refletir a última confirmação, inclusive após retirada.
-  const shouldBypass = isEscalaRequest(requestUrl) || isInventoryRequest(requestUrl)
+  const shouldBypass = isEscalaRequest(requestUrl) || isInventoryRequest(requestUrl) || isOperationalDashboardRequest(requestUrl)
     || bypassPrefixes.some((prefix) => requestUrl.pathname.startsWith(prefix));
   if (shouldBypass) return;
 

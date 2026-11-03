@@ -49,8 +49,8 @@ test('desempenho e criticidade passam a usar tabelas proporcionais para TV', () 
   assert.match(js, /Desempenho mensal da equipe/);
   assert.match(js, /OS finalizadas/);
   assert.match(js, /Carga atual/);
-  assert.match(js, /Top 5 — incidência de falhas/);
-  assert.match(js, /MTBF/);
+  assert.match(js, /Top 5 — corretivas no período/);
+  assert.match(js, /Média entre falhas/);
   assert.match(styles, /\.performance-table/);
   assert.match(styles, /\.critical-table/);
   assert.match(styles, /\.tv-v3-table thead th/);

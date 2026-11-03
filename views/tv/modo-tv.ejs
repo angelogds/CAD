@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#087443">
   <title><%= title || 'Modo TV — Oficina' %></title>
   <link rel="stylesheet" href="/css/tv-mode.css">
-  <link rel="stylesheet" href="/css/tv-mode-2026.css?v=20260923-tv-config-v1">
-  <link rel="stylesheet" href="/css/tv-screens-2026.css?v=20260922-lubrificacao-tv-v6">
+  <link rel="stylesheet" href="/css/tv-mode-2026.css?v=20261103-criticidade-v1">
+  <link rel="stylesheet" href="/css/tv-screens-2026.css?v=20261103-criticidade-v1">
   <link rel="stylesheet" href="/css/tv-material-alerts.css">
 </head>
 <body>
@@ -100,7 +100,7 @@
 <script>
   window.CG_TV_MEDIA_CONFIG = <%- JSON.stringify(tvMediaConfig || {}) %>;
   window.CG_TV_CONFIG = {
-    snapshotUrl: '/api/tv/snapshot',
+    snapshotUrl: <%- JSON.stringify('/api/tv/snapshot' + (typeof criticalityQuery !== 'undefined' && criticalityQuery ? '?' + criticalityQuery : '')).replace(/</g,'\\u003c') %>,
     streamUrl: '/api/tv/stream',
     refreshMs: 60000,
     fastRefreshMs: 15000,
@@ -109,9 +109,9 @@
     criticalAlertMs: 25000
   };
 </script>
-<script src="/js/tv-mode.js?v=20260923-tv-config-v1"></script>
+<script src="/js/tv-mode.js?v=20261103-criticidade-v1"></script>
 <script src="/js/tv-voice-assistant.js"></script>
 <script src="/js/tv-material-alerts.js"></script>
-<script src="/js/tv-screens-2026.js?v=20260922-lubrificacao-tv-v6"></script>
+<script src="/js/tv-screens-2026.js?v=20261103-criticidade-v1"></script>
 </body>
 </html>
