@@ -266,7 +266,7 @@ function aprovarSolicitacao(id, user, observacao = '', { autorizar_excecao = fal
       motivo: solicitacao.motivo || 'Folga solicitada pelo colaborador via Banco de Horas',
       usuario: user,
     });
-    if (aprovacaoPosterior) escala.realizarFolgaCompensatoria(folgaId, user);
+    if (aprovacaoPosterior) escala.realizarFolgaCompensatoria(folgaId, { ...user, role: normalizeRole(user?.role) });
     const observacaoDecisao = [
       aprovacaoPosterior ? `Aprovação posterior: folga de ${dateBr.formatDateBR(solicitacao.data_folga)} confirmada como realizada.` : '',
       String(observacao || '').trim(),

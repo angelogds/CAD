@@ -120,7 +120,7 @@ test('aprovação posterior preserva RBAC e não libera novos pedidos retroativo
   const { service } = fixture(t);
   assert.throws(() => service.solicitarFolga({ user: employee, data_folga: '2026-10-27', permitirDataPassada: true }), /data passada/);
   assert.throws(() => service.validarProgramacaoManual({ colaborador_id: 1, tipo_lancamento: 'FOLGA_COMPENSATORIA', data_folga: '2026-10-27' }, admin), /data passada/);
-  for (const role of ['ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR']) {
+  for (const role of ['ENCARREGADO_MANUTENCAO', 'MANUTENCAO_SUPERVISOR', 'ADMINISTRADOR', 'ENCARREGADO', 'ENCARREGADO_DE_MANUTENCAO', 'SUPERVISOR_MANUTENCAO']) {
     const { service, request } = fixture(t), id = request();
     service.aprovarSolicitacao(id, { id: 1, role });
     assert.equal(service.getSolicitacao(id).status, 'APROVADA');
