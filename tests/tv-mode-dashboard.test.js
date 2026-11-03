@@ -111,8 +111,8 @@ test('sem clima ou fotos há fallback visual e nenhum dado demonstrativo', () =>
 test('acessos visíveis abrem exclusivamente /tv em nova aba', () => {
   const dashboard = fs.readFileSync('views/dashboard/index.ejs', 'utf8');
   const sidebar = fs.readFileSync('views/partials/sidebar.ejs', 'utf8');
-  const link = dashboard.match(/<a class="op-button ghost"[^>]+>▣ Modo TV<\/a>/)?.[0] || '';
-  assert.match(link, /href="\/tv"/);
+  const link = dashboard.match(/<a class="op-button ghost"[\s\S]*?>▣ Modo TV<\/a>/)?.[0] || '';
+  assert.match(link, /href="\/tv\?/);
   assert.match(link, /target="_blank"/);
   assert.match(link, /rel="noopener"/);
   assert.doesNotMatch(dashboard, /tv=1|Sair do modo TV/);

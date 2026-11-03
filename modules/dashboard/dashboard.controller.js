@@ -77,7 +77,8 @@ function buildDashboardPayload({ tvMode = false, query = {} } = {}) {
   const osPainel = service.getOSPainel(tvMode ? 30 : 50);
   const preventivas = service.getPreventivasDashboard();
   const demandasResumo = service.getDemandasResumoDashboard();
-  const criticidadeOperacional = criticalityService.getDashboard({ ...query, periodo: query.periodo === '7d' ? 7 : query.periodo === '30d' ? 30 : undefined });
+  const criticalityPeriod = operationalDashboardService.resolvePeriod(query);
+  const criticidadeOperacional = criticalityService.getDashboard({ ...query, inicio:criticalityPeriod.start, fim:criticalityPeriod.end });
   const operational = operationalDashboardService.buildOperationalDashboard({ query, osPainel, preventivas, demandas: demandasResumo, criticidade: criticidadeOperacional });
   operational.os.closedInPeriod = service.getOSFechadasPeriodo({ inicio: operational.period.start, fim: operational.period.end, setor: operational.sector });
   return {

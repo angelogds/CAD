@@ -134,7 +134,7 @@ function buildOperationalDashboard({ query = {}, osPainel = {}, preventivas = {}
     preventive.deadlines.semana && { type: 'prev-semana', count: preventive.deadlines.semana, text: 'preventiva(s) vence(m) nesta semana', target: 'preventivas' },
     Number(demandas.paradas) && { type: 'demandas-paradas', count: Number(demandas.paradas), text: 'demanda(s) parada(s)', target: 'demandas' },
   ].filter(Boolean);
-  return { period, sector, os, preventivas: preventive, critical, alerts,
+  return { period, sector, os, preventivas: preventive, critical, criticalSummary:criticidade.resumo||{},criticalSeries:criticidade.serie_falhas||[], alerts,
     indicators: maintenanceIndicators(osPainel.items || [], preventive),
     updatedAt: new Intl.DateTimeFormat('pt-BR', { timeZone: TIME_ZONE, dateStyle: 'short', timeStyle: 'short' }).format(now),
     timezone: TIME_ZONE };

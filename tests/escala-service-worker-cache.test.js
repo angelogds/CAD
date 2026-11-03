@@ -75,7 +75,7 @@ test('push, autenticação, mobile e envio de formulário mantêm bypass existen
   assert.deepEqual(worker.calls.fetches, []);
 });
 
-test('ativação remove HTML antigo da Escala preservando demais entradas do cache atual', async () => {
+test('ativação remove HTML operacional antigo preservando assets do cache atual', async () => {
   const worker = loadWorker([
     '/escala',
     '/escala/hora-extra/nova?colaborador_id=2',
@@ -90,6 +90,7 @@ test('ativação remove HTML antigo da Escala preservando demais entradas do cac
   assert.deepEqual(worker.calls.deletedRequests, [
     `${origin}/escala`,
     `${origin}/escala/hora-extra/nova?colaborador_id=2`,
+    `${origin}/dashboard`,
   ]);
   assert.deepEqual(worker.calls.deletedCaches, ['old-cache']);
   assert.equal(worker.calls.claimed, true);
@@ -103,7 +104,8 @@ test('instalação mantém assets offline existentes e permite ativação imedia
 
   assert.equal(worker.calls.skippedWaiting, true);
   assert.ok(worker.calls.preCached.includes('/css/app.css?v=20260919-1'));
-  assert.ok(worker.calls.preCached.includes('/dashboard'));
+  assert.ok(!worker.calls.preCached.includes('/dashboard'));
+  assert.ok(!worker.calls.preCached.includes('/'));
   for (const asset of worker.calls.preCached) {
     const pathname = new URL(asset, origin).pathname;
     if (pathname === '/' || pathname === '/dashboard') continue;

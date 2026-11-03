@@ -1,6 +1,7 @@
 const db = require('../../database/db');
 const manutencaoExecutivaService = require('../diretoria/diretoria.manutencao.service');
 const lubrificacaoSemanaService = require('../lubrificacao/lubrificacao-semana.service');
+const criticalityService = require('../dashboard/operational-criticality.service');
 
 const MANAGEMENT_CACHE_TTL_MS = 60000;
 let managementCache = { at: 0, data: null };
@@ -162,18 +163,14 @@ function calculateMTBF(occurrences) {
   const intervals = dates.slice(1).map((date, index) => date - dates[index]).filter((ms) => ms > 0); if (!intervals.length) return null;
   const hours = intervals.reduce((sum, ms) => sum + ms, 0) / intervals.length / 3600000; return hours >= 48 ? `${(hours / 24).toFixed(1)} dias` : `${hours.toFixed(1)} h`;
 }
-function getEquipamentos(allOS) {
-  const byEquipment = new Map();
-  allOS.filter((os) => os.tipo === 'CORRETIVA' || !os.tipo).forEach((os) => { const key = semAcentos(os.equipamento); if (!byEquipment.has(key)) byEquipment.set(key, []); byEquipment.get(key).push(os); });
-  const criticality = new Map(); safe('falha ao carregar criticidade dos equipamentos', () => tableExists('equipamentos') ? db.prepare('SELECT * FROM equipamentos').all() : [], []).forEach((eq) => criticality.set(semAcentos(eq.nome || eq.name), eq.criticidade));
-  return [...byEquipment.entries()].map(([key, occurrences]) => ({
-    nome: occurrences[0].equipamento,
-    falhas: occurrences.length,
-    reincidencias: Math.max(0, occurrences.length - 1),
-    mtbf: calculateMTBF(occurrences),
-    criticidade: semAcentos(criticality.get(key) || 'NAO INFORMADA'),
-    situacao: occurrences.some(isOSAtiva) ? occurrences.find(isOSAtiva).status : 'DISPONIVEL',
-  })).sort((a, b) => b.falhas - a.falhas).slice(0, 5);
+function getEquipamentos(criticality) {
+  return criticality.ranking.map(item => ({
+    equipamento_id:item.equipamento_id,nome:item.equipamento_nome,setor:item.setor,
+    falhas:item.total_falhas,reincidencias:item.reincidencias,mtbf:item.frequencia_media,
+    criticidade:item.criticidade,criticidade_atual:item.criticidade_atual,nivel:item.nivel,
+    corretivas_abertas:item.corretivas_abertas,situacao:item.situacao_atual,
+    ultima_falha:item.ultima_falha,historico_url:item.historico_url,
+  }));
 }
 
 function getMaterialRows() {
@@ -592,7 +589,8 @@ function getManagementSnapshot({ force = false } = {}) {
   }
 }
 
-async function getSnapshot(user) {
+async function getSnapshot(user, query = {}) {
+  const criticality = criticalityService.getDashboard(query);
   const result = getOS();
   const os = result.items;
   const active = os.filter(isOSAtiva);
@@ -618,7 +616,8 @@ async function getSnapshot(user) {
     },
     operacao: {
       ...operation,
-      equipamentos: getEquipamentos(os),
+      equipamentos: getEquipamentos(criticality),
+      criticidade: { filters:criticality.filters,resumo:criticality.resumo,serie_falhas:criticality.serie_falhas,atualizado_em:criticality.atualizado_em },
       materiaisDisponiveis: materiais.disponiveis,
       materiaisEmFluxo: materiais.emFluxo,
       materiaisResumo: materiais.resumo,

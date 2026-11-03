@@ -2,6 +2,7 @@ const tvService = require('./tv.service');
 const tvConfigService = require('./tv-config.service');
 const { normalizeRole } = require('../../config/rbac');
 const alertsHub = require('../alerts/alerts.hub');
+function criticalityQuery(query={}) { return Object.fromEntries(['periodo','inicio','fim','setor','equipamento_id','criticidade','tipo','status','ativo'].filter(k=>typeof query[k]==='string').map(k=>[k,query[k]])); }
 
 exports.page = async (req, res, next) => {
   try {
@@ -13,6 +14,7 @@ exports.page = async (req, res, next) => {
       user,
       canConfigureTv: ['ADMIN', 'ENCARREGADO_MANUTENCAO'].includes(role),
       tvMediaConfig: tvConfigService.getPublicConfig(),
+      criticalityQuery: new URLSearchParams(criticalityQuery(req.query)).toString(),
     });
   } catch (err) {
     next(err);
@@ -22,7 +24,7 @@ exports.page = async (req, res, next) => {
 exports.snapshot = async (req, res) => {
   try {
     const user = req.session?.user || req.user || null;
-    const data = await tvService.getSnapshot(user);
+    const data = await tvService.getSnapshot(user, criticalityQuery(req.query));
     res.set('Cache-Control', 'no-store');
     res.json({
       ok: true,

@@ -21,7 +21,7 @@ test('painel preserva filtros e rotas operacionais existentes',()=>{
   ['periodo','inicio','fim','setor','equipamento_id','criticidade','tipo','status','ativo'].forEach(name=>assert.match(view,new RegExp('name="'+name+'"')));
   assert.match(view,/action="\/dashboard\/criticidade"/);
   assert.match(view,/\/dashboard\/criticidade\/equipamentos\//);
-  assert.match(view,/\/os\?status=ABERTA/);
+  assert.match(view,/\/tv\?/);
 });
 
 test('painel mantém dados reais e não injeta valores fictícios',()=>{

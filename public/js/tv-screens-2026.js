@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '2026.09-v3.1';
+  const VERSION = '2026.11-criticidade-v1';
   const $screen = (name) => document.querySelector(`[data-tv-screen="${name}"]`);
   const items = (value) => Array.isArray(value) ? value : [];
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -229,40 +229,35 @@
   }
 
   function renderCriticidade(data) {
-    const equipment = items(data?.operacao?.equipamentos).slice(0, 8);
-    const totalFailures = equipment.reduce((sum, e) => sum + Number(e.falhas || 0), 0);
-    const totalRecurrences = equipment.reduce((sum, e) => sum + Number(e.reincidencias || 0), 0);
-    const critical = equipment.filter((e) => isHighCriticality(e.criticidade)).length;
-    const stopped = equipment.filter((e) => /PARAD|INDISPON/i.test(String(e.situacao || ''))).length;
-    const maxFailures = Math.max(1, ...equipment.map((e) => Number(e.falhas || 0)));
-    const top = [...equipment].sort((a, b) => Number(b.falhas || 0) - Number(a.falhas || 0)).slice(0, 5);
-    const rows = equipment.map((e) => `<tr>
-      <td><div class="tv-v3-equipment"><strong>${esc(e.nome || 'Equipamento não informado')}</strong><small>${esc(e.setor || e.local || 'Histórico de falhas')}</small></div></td>
-      <td><strong>${Number(e.falhas || 0)}</strong></td>
-      <td>${Number(e.reincidencias || 0)}</td>
-      <td>${esc(e.mtbf || 'Dados insuficientes')}</td>
-      <td><span class="badge ${priorityTone(e.criticidade)}">${esc(e.criticidade || 'NÃO INFORMADA')}</span></td>
-      <td><span class="tv-v3-state ${/PARAD|INDISPON/i.test(String(e.situacao || '')) ? 'danger' : 'available'}">${esc(e.situacao || 'Sem ocorrência ativa')}</span></td>
+    const equipment=items(data?.operacao?.equipamentos).slice(0,5);
+    const meta=data?.operacao?.criticidade||{}, summary=meta.resumo||{}, filters=meta.filters||{};
+    const maxFailures=Math.max(1,...equipment.map(e=>Number(e.falhas||0)));
+    const period=filters.start&&filters.end?`${dateBR(filters.start)} a ${dateBR(filters.end)}`:'Período não informado';
+    const status=e=>Number(e.corretivas_abertas)>0?String(e.situacao||'ABERTA').replaceAll('_',' '):'Sem corretiva aberta';
+    const rows=equipment.map(e=>`<tr>
+      <td><div class="tv-v3-equipment"><strong>${esc(e.nome||'Equipamento não informado')}</strong><small>${esc(e.setor||'')} · Última corretiva: ${esc(dateBR(e.ultima_falha))}</small></div></td>
+      <td><strong>${Number(e.falhas||0)}</strong></td><td>${Number(e.reincidencias||0)}</td>
+      <td>${esc(e.mtbf||'Dados insuficientes')}</td>
+      <td><span class="badge ${e.corretivas_abertas?priorityTone(e.criticidade_atual):'neutral'}">${esc(e.criticidade_atual||'—')}</span></td>
+      <td><span class="tv-v3-state ${e.corretivas_abertas?'warning':'available'}">${esc(status(e))}</span></td>
     </tr>`).join('');
-
-    return `<div class="screen tv-v3-root tv-v3-screen section-stack">
+    return `<div class="screen tv-v3-root tv-v3-screen section-stack tv-criticality-live">
+      <div class="tv-criticality-period"><strong>Somente corretivas</strong><span>${esc(period)} · ${esc(filters.setor||'Todos os setores')}</span><small>Atualização automática</small></div>
       ${metrics([
-        ['Equipamentos analisados', equipment.length, '', 'Com histórico'],
-        ['Falhas registradas', totalFailures, 'danger', 'Base exibida'],
-        ['Reincidências', totalRecurrences, 'warning', 'Falhas repetidas'],
-        ['Criticidade alta', critical, 'danger', 'Equipamentos críticos'],
-        ['Parados / indisponíveis', stopped, 'danger', 'Situação atual'],
-        ['Maior incidência', top[0]?.falhas || 0, 'info', top[0]?.nome || 'Sem dados'],
+        ['Equipamentos no período',summary.equipamentos??equipment.length,'','Com histórico corretivo'],
+        ['Corretivas registradas',summary.falhas??0,'','No período selecionado'],
+        ['Reincidências',summary.reincidencias??0,'warning','Intervalos de até 15 dias'],
+        ['Com corretiva aberta',summary.com_corretiva_aberta??0,'warning','Equipamentos'],
+        ['Críticos / altos atuais',summary.criticos_atuais??0,'danger','Serviços ainda abertos'],
+        ['Sem corretiva aberta',summary.encerrados??0,'','Histórico encerrado'],
       ])}
       <div class="tv-v3-layout tv-v3-critical-layout">
-        <article class="panel tv-v3-failure-panel">
-          <div class="panel-heading"><h2>Top 5 — incidência de falhas</h2><span>Equipamentos com maior recorrência</span></div>
-          <div class="tv-v3-failure-list">${top.map((e, index) => `<div class="tv-v3-failure-row"><span class="tv-v3-rank-position">#${index + 1}</span><div><strong>${esc(e.nome)}</strong><small>${Number(e.reincidencias || 0)} reincidência(s)</small></div><i><b style="width:${Number(e.falhas || 0) / maxFailures * 100}%"></b></i><strong>${Number(e.falhas || 0)}</strong></div>`).join('') || '<div class="empty">Sem dados suficientes de falhas.</div>'}</div>
+        <article class="panel tv-v3-failure-panel"><div class="panel-heading"><h2>Top 5 — corretivas no período</h2><span>Reincidência em até 15 dias</span></div>
+          <div class="tv-v3-failure-list">${equipment.map((e,index)=>`<div class="tv-v3-failure-row"><span class="tv-v3-rank-position">#${index+1}</span><div><strong>${esc(e.nome)}</strong><small>${Number(e.reincidencias||0)} reincidência(s)</small></div><i><b style="width:${Number(e.falhas||0)/maxFailures*100}%"></b></i><strong>${Number(e.falhas||0)}</strong></div>`).join('')||'<div class="empty">Nenhuma corretiva no período.</div>'}</div>
         </article>
-        <article class="panel tv-v3-table-panel">
-          <div class="panel-heading"><h2>Criticidade dos equipamentos</h2><span>Falhas, reincidência, MTBF e situação</span></div>
-          <div class="table-wrap"><table class="tv-v3-table critical-table"><thead><tr><th>Equipamento</th><th>Falhas</th><th>Reincid.</th><th>MTBF</th><th>Criticidade</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table></div>
-          ${rows ? '' : '<div class="empty">Nenhuma ocorrência registrada.</div>'}
+        <article class="panel tv-v3-table-panel"><div class="panel-heading"><h2>Criticidade dos equipamentos</h2><span>Histórico do período e situação atual</span></div>
+          <div class="table-wrap"><table class="tv-v3-table critical-table"><thead><tr><th>Equipamento</th><th>Corretivas</th><th>Reincid.</th><th>Média entre falhas</th><th>Prioridade atual</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table></div>
+          ${rows?'':'<div class="empty">Nenhuma falha corretiva registrada.</div>'}
         </article>
       </div>
     </div>`;
@@ -282,7 +277,7 @@
         ? data?.escalaVigente
         : name === 'desempenho'
           ? data?.rankingEquipe
-          : data?.operacao?.equipamentos;
+          : [data?.operacao?.equipamentos,data?.operacao?.criticidade];
     try { return JSON.stringify(subset); } catch (_error) { return String(Date.now()); }
   }
 
