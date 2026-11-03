@@ -588,7 +588,10 @@ test('EJS renderiza início fixo, formulário correto e histórico do lançament
   const ejs = require('ejs');
   const view = fs.readFileSync(path.join(root, 'views/escala/hora-extra-nova.ejs'), 'utf8');
   const render = data => ejs.render(view, { filename: path.join(root,'views/escala/hora-extra-nova.ejs'), layout: () => '', dateBr: require('../utils/data-hora-br'), ...data });
-  const html = render(res.data);
+  const html = render({ ...res.data, podeAbrir17Agora: true });
+  const antesDas17 = render({ ...res.data, podeAbrir17Agora: false });
+  assert.match(antesDas17, /data-before-17="1"/);
+  assert.match(antesDas17, /Disponível a partir das 17h/);
   assert.match(html, /action="\/escala\/hora-extra\/desde-17\/iniciar"/);
   assert.match(html, /Início contado a partir das 17h de hoje/);
   assert.doesNotMatch(html, /name="(?:inicio_extra|data_servico|criado_em|user_id)"/);
