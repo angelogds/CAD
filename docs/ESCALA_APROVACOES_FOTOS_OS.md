@@ -8,6 +8,12 @@ Os formulários são compartilhados com `/escala/folgas` pelo partial `_aprovaco
 
 Depois de uma ação iniciada na central, o usuário retorna a `/escala#aprovacoes-folgas`. O destino é permitido explicitamente; valores externos em `voltar_para` são ignorados. Os demais perfis não recebem a fila no modelo do painel. Funcionários excluídos da Escala ficam fora da contagem e da lista, usando o filtro de retenção existente.
 
+### Aprovação depois da data da folga
+
+Pedidos que continuam pendentes depois da data solicitada podem ser aprovados pela gestão. O cartão identifica **Aprovação posterior** e oferece **Aprovar e debitar**, confirmando a folga já realizada. A data original é preservada; a folga fica `REALIZADA`, enquanto a decisão, o responsável e o débito registram o momento efetivo da aprovação. Uma anotação automática em `observacao_decisao` identifica a regularização e preserva eventual observação da gestão.
+
+O saldo atual, conflitos, segunda-feira e eventual autorização excepcional continuam validados. A criação da folga, o débito, a realização e a decisão pertencem à mesma transação: falhas desfazem todas as alterações, e repetir a aprovação não gera outro débito. Pedidos para hoje ou datas futuras continuam `PROGRAMADA`. Novos pedidos retroativos pelo colaborador e a programação manual mantêm o bloqueio existente. Não é necessária migration.
+
 ## Ordem de serviço
 
 O campo mantém o `select[name=os_id]` e sua validação no serviço. O JavaScript aprimora a apresentação com um painel no fluxo do formulário, sempre abaixo do campo: pesquisa por número, equipamento ou descrição, rolagem interna e opções que respeitam a largura disponível. A seleção funciona com clique, teclado, Enter e Escape. “Sem OS” mantém a exigência de descrição. O identificador selecionado continua sendo enviado pelo campo original.

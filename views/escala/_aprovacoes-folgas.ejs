@@ -3,10 +3,13 @@
     <div class="escala-section-head"><div><h2 id="aprovacoesFolgasTitulo"><%= typeof tituloAprovacoes!=='undefined'?tituloAprovacoes:'Solicitações aguardando aprovação' %></h2><p>O saldo e a disponibilidade da data são revalidados no momento da aprovação.</p></div><span class="approval-counter"><%= typeof totalPendentesFolga!=='undefined'?totalPendentesFolga:pendentesFolga.length %> pendente(s)</span></div>
     <% if(!pendentesFolga.length){ %><div class="escala-empty">Nenhuma solicitação de folga aguardando decisão.</div><% } %>
     <div class="leave-request-grid">
-      <% pendentesFolga.forEach(s=>{ %>
+      <% pendentesFolga.forEach(s=>{ const aprovacaoPosterior = s.data_folga < dateBr.todayISO(); %>
         <article class="leave-request-card">
           <div class="approval-card-head"><div class="escala-avatar"><%= String(s.colaborador_nome||'C').charAt(0).toUpperCase() %></div><div class="approval-person"><strong><%= s.colaborador_nome %></strong><small>Solicitado em <%= dateBr.formatDateTimeBR(s.solicitado_em) %></small></div><span class="escala-status is-atestado">PENDENTE</span></div>
           <div class="leave-date"><span>Data solicitada</span><strong><%= dateBr.formatDateBR(s.data_folga) %></strong></div>
+          <% if(aprovacaoPosterior){ %>
+            <div class="escala-audit-note leave-late-note"><strong>Aprovação posterior</strong><span>Confirme a folga já realizada para debitar as horas do saldo atual.</span></div>
+          <% } %>
           <div class="approval-summary">
             <div><span>Saldo atual</span><strong><%= fmtMin(s.saldo_atual_minutos) %></strong></div>
             <div><span>Consumo</span><strong>-<%= fmtMin(s.minutos_solicitados) %></strong></div>
@@ -26,13 +29,13 @@
           <% } %>
           <% if(canManageEscala){ %>
             <div class="approval-primary-actions">
-              <form method="POST" action="/escala/folgas/solicitacoes/<%= s.id %>/aprovar" onsubmit="return confirm('Confirmar a aprovação desta folga?');">
+              <form method="POST" action="/escala/folgas/solicitacoes/<%= s.id %>/aprovar" data-confirm="<%= aprovacaoPosterior ? 'Confirmar que esta folga já foi realizada e debitar as horas do Banco de Horas?' : 'Confirmar a aprovação desta folga?' %>" onsubmit="return confirm(this.dataset.confirm);">
                 <% if(s.conflito_dia?.temFolgaAprovada){ %>
                   <label class="escala-field"><span class="label">Liberação excepcional</span><span><input type="checkbox" name="autorizar_excecao" value="1" required> Autorizo segunda folga nesta data</span></label>
                   <label class="escala-field"><span class="label">Justificativa obrigatória</span><textarea class="input" name="justificativa_excecao" minlength="10" required placeholder="Explique a necessidade e a cobertura da equipe"></textarea></label>
                 <% } %>
                 <% if(typeof voltarPara!=='undefined'&&voltarPara){ %><input type="hidden" name="voltar_para" value="<%= voltarPara %>"><% } %>
-                <button class="btn btn-green" type="submit">Aprovar folga</button>
+                <button class="btn btn-green" type="submit"><%= aprovacaoPosterior ? 'Aprovar e debitar' : 'Aprovar folga' %></button>
               </form>
               <details class="approval-details"><summary>Reprovar</summary><form method="POST" action="/escala/folgas/solicitacoes/<%= s.id %>/reprovar"><% if(typeof voltarPara!=='undefined'&&voltarPara){ %><input type="hidden" name="voltar_para" value="<%= voltarPara %>"><% } %><input class="input" name="motivo" placeholder="Motivo da reprovação" required><button class="btn btn-sm" type="submit">Confirmar reprovação</button></form></details>
             </div>
