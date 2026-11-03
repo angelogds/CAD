@@ -55,7 +55,7 @@ test('rotas separam autoatendimento da Manutenção de aprovação da gestão', 
 test('views simplificam aprovação e exibem datas formatadas', () => {
   const he = read('views/escala/hora-extra-pendentes.ejs');
   const self = read('views/escala/meu-painel.ejs');
-  const folgas = read('views/escala/folgas-programadas.ejs');
+  const folgas = read('views/escala/folgas-programadas.ejs') + read('views/escala/_aprovacoes-folgas.ejs');
   const nova = read('views/escala/hora-extra-nova.ejs');
   assert.match(he, /dateBr\.formatDateBR\(h\.data_servico\)/);
   assert.match(he, /dateBr\.formatTimeBR\(h\.inicio_extra\)/);

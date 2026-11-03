@@ -1402,7 +1402,7 @@ function listarOsDisponiveisParaHoraExtra() {
     SELECT o.id, o.equipamento_id, o.equipamento, o.descricao, o.status, e.nome AS equipamento_nome, e.setor
     FROM os o
     LEFT JOIN equipamentos e ON e.id = o.equipamento_id
-    WHERE upper(COALESCE(o.status,'')) NOT IN ('CONCLUIDA','CONCLUÍDA','CANCELADA','FECHADA')
+    WHERE upper(TRIM(COALESCE(o.status,''))) NOT IN ('CONCLUIDA','CONCLUÍDA','CONCLUIDO','CONCLUÍDO','FINALIZADA','FINALIZADO','FECHADA','FECHADO','CANCELADA','CANCELADO')
     ORDER BY o.id DESC LIMIT 200
   `).all();
 }

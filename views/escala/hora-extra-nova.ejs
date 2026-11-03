@@ -1,6 +1,6 @@
 <%- layout('layout') -%>
 <link rel="stylesheet" href="/css/escala-dashboard.css?v=20260913-rh">
-<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v1">
+<link rel="stylesheet" href="/css/escala-ui.css?v=20261103-v2">
 <%
 const listaColaboradores=Array.isArray(colaboradores)?colaboradores:(colaborador?[colaborador]:[]);
 const listaOs=Array.isArray(osDisponiveis)?osDisponiveis:[];
@@ -24,20 +24,29 @@ const fmtMin=v=>{const n=Math.max(0,Number(v)||0);return Math.floor(n/60)+'h'+St
 <form method="post" action="/escala/hora-extra/<%=emAndamento.id%>/finalizar" enctype="multipart/form-data" id="horaExtraFinalizarForm" data-geo-context="fim">
 <input type="hidden" name="latitude_fim"><input type="hidden" name="longitude_fim"><input type="hidden" name="precisao_fim">
 <div class="escala-geo"><div><strong>Localização</strong><small class="js-geo-status" data-context="fim" role="status" aria-live="polite">Permita a localização para finalizar.</small></div><button class="btn js-geo-retry" type="button" data-context="fim">Ativar localização</button></div>
-<details class="escala-compact-details"><summary>Adicionar foto da conclusão</summary><input class="input" type="file" name="foto_fim" accept="image/*" capture="environment"></details>
+<%- include('_foto-hora-extra',{contexto:'fim',tituloFoto:'Foto da conclusão'}) %>
 <div class="escala-actionbar"><button class="btn btn-green" type="submit" data-geo-submit disabled>Finalizar hora extra</button></div>
 </form>
 <% }else{ %>
 <form method="post" action="<%=inicioFixo17?'/escala/hora-extra/desde-17/iniciar':'/escala/hora-extra/iniciar'%>" enctype="multipart/form-data" id="horaExtraForm" data-geo-context="inicio" data-before-17="<%=inicioFixo17&&!liberado17?'1':'0'%>">
 <input type="hidden" name="colaborador_id" value="<%=colaborador.id%>"><input type="hidden" name="latitude_inicio"><input type="hidden" name="longitude_inicio"><input type="hidden" name="precisao_inicio">
 <div class="escala-form-grid" style="margin-top:16px">
-<label class="escala-field full">Ordem de serviço<select class="input" name="os_id" id="horaExtraOs"><option value="">Sem OS</option><% listaOs.forEach(os=>{ %><option value="<%=os.id%>" <%=Number(osSelecionadaId)===Number(os.id)?'selected':''%>>OS #<%=os.id%> · <%=os.equipamento_nome||os.equipamento||'Equipamento'%> · <%=os.descricao%></option><% }) %></select></label>
+<div class="escala-field full escala-os-picker" data-os-picker>
+<label for="horaExtraOs">Ordem de serviço</label>
+<select class="input" name="os_id" id="horaExtraOs"><option value="">Sem OS</option><% listaOs.forEach(os=>{ %><option value="<%=os.id%>" data-equipment="<%=os.equipamento_nome||os.equipamento||'Equipamento'%>" data-description="<%=os.descricao||''%>" <%=Number(osSelecionadaId)===Number(os.id)?'selected':''%>>OS #<%=os.id%> · <%=os.equipamento_nome||os.equipamento||'Equipamento'%> · <%=os.descricao%></option><% }) %></select>
+<div data-os-ui hidden>
+<button class="input escala-os-toggle" id="horaExtraOsToggle" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="horaExtraOsLista"><span data-os-selected>Sem OS</span><span aria-hidden="true">⌄</span></button>
+<div class="escala-os-panel" data-os-panel hidden>
+<label class="escala-os-search-label" for="horaExtraOsBusca">Buscar OS ou equipamento</label><input class="input" id="horaExtraOsBusca" data-os-search type="search" placeholder="Número, equipamento ou serviço" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="horaExtraOsLista">
+<div class="escala-os-list" id="horaExtraOsLista" role="listbox" aria-label="Ordens de serviço disponíveis" data-os-list></div>
+<p class="escala-os-empty" data-os-empty hidden>Nenhuma OS encontrada.</p>
+</div></div></div>
 <label class="escala-field full">Serviço realizado<textarea class="input" name="descricao_servico" id="horaExtraDescricao" rows="2" placeholder="Descreva o serviço"></textarea><small id="horaExtraDescricaoAjuda">Obrigatório quando não houver OS.</small></label>
 <% if(acessoInicioFixo17&&!inicioFixo17){ %><label class="escala-field full">Início<select class="input" name="modo_inicio" id="horaExtraModoInicio"><option value="AGORA">Agora</option><option value="FIXO_17H" <%=liberado17?'':'disabled'%>>Desde as 17h de hoje</option></select></label><% } %>
 </div>
 <% if(inicioFixo17){ %><p><%=liberado17?'Início contado a partir das 17h de hoje.':'Disponível a partir das 17h.'%></p><% } %>
 <div class="escala-geo"><div><strong>Localização</strong><small class="js-geo-status" data-context="inicio" role="status" aria-live="polite">Permita a localização para iniciar.</small></div><button class="btn js-geo-retry" type="button" data-context="inicio">Ativar localização</button></div>
-<details class="escala-compact-details"><summary>Adicionar foto inicial</summary><input class="input" type="file" name="foto_inicio" accept="image/*" capture="environment"></details>
+<%- include('_foto-hora-extra',{contexto:'inicio',tituloFoto:'Foto inicial'}) %>
 <div class="escala-actionbar"><button class="btn btn-green" id="horaExtraIniciarButton" type="submit" data-geo-submit disabled><%=inicioFixo17?'Iniciar desde as 17h':'Iniciar hora extra'%></button></div>
 </form>
 <% } %>
@@ -46,3 +55,4 @@ const fmtMin=v=>{const n=Math.max(0,Number(v)||0);return Math.floor(n/60)+'h'+St
 <% } %>
 </div></div>
 <script src="/js/escala-localizacao.js?v=20261103-v1" defer></script>
+<script src="/js/escala-hora-extra-ui.js?v=20261103-v2" defer></script>

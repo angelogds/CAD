@@ -1,5 +1,6 @@
 const service = require("./escala.service");
 const generator = require("./escala.pdf");
+const solicitacoesFolga = require("./escala.folga-solicitacao.service");
 let preventivasService = null;
 try {
   preventivasService = require("../preventivas/preventivas.service");
@@ -58,7 +59,7 @@ exports.index = (req, res, next) => {
   try {
     res.locals.activeMenu = "escala";
     const painel = service.listarPainelEscala({ user: currentUser(req), canViewAll: canViewAllEscala(req), colaboradorId: visibleColaboradorId(req) });
-    return res.render("escala/index", { title: "Escala", painel, equipeGerenciavel: canManageEscala(req) ? service.listarColaboradoresManutencao() : [], canManageEscala: canManageEscala(req), podeInicioFixo17:service.canIniciarHoraExtraDesde17(currentUser(req)), canViewAllEscala: canViewAllEscala(req), canReadEscalaDetails: canViewAllEscala(req) || Boolean(visibleColaboradorId(req)) });
+    return res.render("escala/index", { title: "Escala", painel, aprovacoesFolgas:canManageEscala(req)?solicitacoesFolga.listarPendentesParaAprovacao({limit:6}):[], totalAprovacoesFolgas:canManageEscala(req)?solicitacoesFolga.contarPendentes():0, equipeGerenciavel: canManageEscala(req) ? service.listarColaboradoresManutencao() : [], canManageEscala: canManageEscala(req), podeInicioFixo17:service.canIniciarHoraExtraDesde17(currentUser(req)), canViewAllEscala: canViewAllEscala(req), canReadEscalaDetails: canViewAllEscala(req) || Boolean(visibleColaboradorId(req)) });
   } catch (e) {
     next(e);
   }

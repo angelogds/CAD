@@ -7,6 +7,7 @@ const dateBr = require('../../utils/data-hora-br');
 function currentUser(req) { return req.user || req.session?.user || {}; }
 function canManage(req) { return canAccessModule(normalizeRole(currentUser(req).role), 'escala_manage'); }
 function flash(req, type, message) { req.flash?.(type, message); }
+function retornoAprovacao(req) { return req.body?.voltar_para==='/escala#aprovacoes-folgas'?'/escala#aprovacoes-folgas':'/escala/folgas'; }
 
 exports.index = (req, res, next) => {
   try {
@@ -120,7 +121,7 @@ exports.aprovarSolicitacao = (req, res) => {
     rhNotifications.notifyLeaveDecision(id, 'APROVADA');
     flash(req, 'success', 'Folga aprovada, lançada na Escala e debitada do Banco de Horas.');
   } catch (error) { flash(req, 'error', error.message); }
-  return res.redirect('/escala/folgas');
+  return res.redirect(retornoAprovacao(req));
 };
 
 exports.reprovarSolicitacao = (req, res) => {
@@ -130,5 +131,5 @@ exports.reprovarSolicitacao = (req, res) => {
     rhNotifications.notifyLeaveDecision(id, 'REPROVADA');
     flash(req, 'success', 'Solicitação reprovada e data liberada.');
   } catch (error) { flash(req, 'error', error.message); }
-  return res.redirect('/escala/folgas');
+  return res.redirect(retornoAprovacao(req));
 };
